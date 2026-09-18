@@ -1,5 +1,6 @@
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { swingResultOf } from '@/entities/batting/model/swingResult'
+import { BALANCE } from '@/shared/config/original/balance'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 
@@ -13,23 +14,23 @@ import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
  */
 const RANDOM_LIMIT = 10_000
 /** 코스 오차의 원본 범위 rand(−13, 21) */
-const SPREAD_RANGE = { minimum: -13, maximumExclusive: 21 } as const
+const SPREAD_RANGE = BALANCE.quickAtBat.spreadRange
 /** 호출자가 넘기는 기본 스윙 세기 (0x4b) */
-const BASE_POWER = 75
+const BASE_POWER = BALANCE.quickAtBat.basePower
 /** 스윙이 약해질지 보는 판정 — rand(0,10000) ≤ 2999 (0xc1584) */
-const WEAK_SWING_GATE = 2999
+const WEAK_SWING_GATE = BALANCE.quickAtBat.weakSwingGate
 /** 코스가 좁혀질지 보는 판정 — rand(0,10000) ≤ 1499 (0xc1590) */
-const TIGHT_COURSE_GATE = 1499
-const TIGHT_COURSE_GAIN = 3
+const TIGHT_COURSE_GATE = BALANCE.quickAtBat.tightCourseGate
+const TIGHT_COURSE_GAIN = BALANCE.quickAtBat.tightCourseGain
 /** d_level.dat 0x10·0x12 — 스윙 세기를 [0, 100] 으로 다시 펼친다 (지금 값으로는 그대로다) */
-const POWER_SCALE = { minimum: 0, maximumValue: 100 } as const
+const POWER_SCALE = BALANCE.quickAtBat.powerScale
 /** 연장에 들어가면 이닝마다 세기가 오르고 코스가 좁아져 경기가 끝나게 만든다 */
-const EXTRA_INNING_FROM = 9
-const EXTRA_INNING_POWER_STEP = 5
-const EXTRA_INNING_POWER_FLOOR = 50
+const EXTRA_INNING_FROM = BALANCE.quickAtBat.extraInningFrom
+const EXTRA_INNING_POWER_STEP = BALANCE.quickAtBat.extraInningPowerStep
+const EXTRA_INNING_POWER_FLOOR = BALANCE.quickAtBat.extraInningPowerFloor
 const EXTRA_INNING_DIVISOR_UNIT = 20
 /** 안타를 한 루 더 늘릴지 보는 주력 판정의 상한 (0xc1804) */
-const EXTRA_BASE_LIMIT = 666
+const EXTRA_BASE_LIMIT = BALANCE.quickAtBat.extraBaseLimit
 const STRIKES_FOR_STRIKEOUT = 3
 /** 타석이 끝나지 않는 일은 없지만, 파울이 끝없이 이어질 때를 대비한 안전망 (원본에는 없다) */
 const MAXIMUM_PITCHES = 200
@@ -38,13 +39,8 @@ const MAXIMUM_PITCHES = 200
  * 투수 구위 등급 표 (0xd896c, 0xb74bc 가 읽는다).
  * 줄 = 능력 ÷ 250 (0~3), 값은 누적 백분율이다.
  */
-const PITCH_GRADE_TABLE: readonly (readonly number[])[] = [
-  [5, 15, 70, 97, 100],
-  [4, 12, 60, 95, 100],
-  [3, 9, 50, 93, 100],
-  [2, 5, 45, 91, 100],
-]
-const PITCH_GRADE_BAND = 250
+const PITCH_GRADE_TABLE: readonly (readonly number[])[] = BALANCE.quickAtBat.pitchGradeTable
+const PITCH_GRADE_BAND = BALANCE.quickAtBat.pitchGradeBand
 
 export interface QuickAtBatBatter {
   readonly hit: number

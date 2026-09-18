@@ -1,7 +1,8 @@
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
-import { gainAbility, gainMorale, hasSkill, spendCycleAction } from '@/entities/career/model/playerCareer'
+import { BALANCE } from '@/shared/config/original/balance'
+import { countTraining, gainAbility, gainMorale, hasSkill, spendCycleAction } from '@/entities/career/model/playerCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { subItemMoraleRelief, subItemTrainingBonus } from '@/entities/career/model/subItems'
 import { abilityLimitOf } from '@/entities/career/model/abilityLimit'
@@ -52,25 +53,25 @@ interface IntegerRange {
   readonly maximumExclusive: number
 }
 
-const GAIN_RANGE: IntegerRange = { minimum: 4, maximumExclusive: 7 }
-const LEG_GAIN_RANGE: IntegerRange = { minimum: 5, maximumExclusive: 8 }
+const GAIN_RANGE: IntegerRange = BALANCE.training.gainRange
+const LEG_GAIN_RANGE: IntegerRange = BALANCE.training.legGainRange
 const LEG_ABILITIES: ReadonlySet<keyof BatterAbility> = new Set(['defense', 'run'])
-const MORALE_LOSS_RANGE: IntegerRange = { minimum: 5, maximumExclusive: 8 }
+const MORALE_LOSS_RANGE: IntegerRange = BALANCE.training.moraleLossRange
 /** 배팅 타입 첫 선택 → 보너스 능력치 (0 → 히트, 1 → 파워) */
 const TYPE_BONUS_ABILITY: readonly (keyof BatterAbility)[] = ['hit', 'power']
-const TYPE_BONUS = 1
+const TYPE_BONUS = BALANCE.training.typeBonus
 
-const SPECIAL_SWING_REQUIRED_SESSIONS = [4, 5, 6, 7]
-const SPECIAL_SWING_GAME_POINT_COST = [500, 700, 900, 1200]
+const SPECIAL_SWING_REQUIRED_SESSIONS = BALANCE.specialSwing.requiredSessions
+const SPECIAL_SWING_GAME_POINT_COST = BALANCE.specialSwing.gamePointCost
 
 /** 이번 레벨 필살타법 훈련 한 번의 G포인트 (최고 레벨이면 0) */
 export function specialSwingCostOf(career: PlayerCareer): number {
   return SPECIAL_SWING_GAME_POINT_COST[career.specialSwingLevel] ?? 0
 }
 export const SPECIAL_SWING_MAXIMUM_LEVEL = SPECIAL_SWING_REQUIRED_SESSIONS.length
-const SPECIAL_SWING_MORALE_RANGE: IntegerRange = { minimum: 9, maximumExclusive: 13 }
-const ROOKIE_SKILL = 0
-const WEAK_BODY_SKILL = 3
+const SPECIAL_SWING_MORALE_RANGE: IntegerRange = BALANCE.specialSwing.moraleLossRange
+const ROOKIE_SKILL = BALANCE.training.rookieSkillId
+const WEAK_BODY_SKILL = BALANCE.training.weakBodySkillId
 
 function roll(random: RandomPort, range: IntegerRange): number {
   return randomIntegerBelow(random, range.minimum, range.maximumExclusive)
@@ -95,7 +96,11 @@ export function blockReasonOf(career: PlayerCareer, menu: TrainingMenu): Trainin
 export function runTraining(career: PlayerCareer, menu: TrainingMenu, random: RandomPort): TrainingOutcome {
   const blockReason = blockReasonOf(career, menu)
   if (blockReason !== null) throw new Error(`훈련을 실행할 수 없습니다 (${blockReason}): ${menu.name}`)
-  return isSpecialSwingMenu(menu) ? runSpecialSwingTraining(career, menu, random) : runAbilityTraining(career, menu, random)
+  const outcome = isSpecialSwingMenu(menu)
+    ? runSpecialSwingTraining(career, menu, random)
+    : runAbilityTraining(career, menu, random)
+  // 훈련 횟수는 칭호 23·24 의 조건이라 능력 훈련·필살타법 양쪽 모두 센다
+  return { ...outcome, career: countTraining(outcome.career, menu.id) }
 }
 
 function runAbilityTraining(career: PlayerCareer, menu: TrainingMenu, random: RandomPort): TrainingOutcome {

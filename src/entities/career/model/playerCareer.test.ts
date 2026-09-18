@@ -75,3 +75,15 @@ describe('경기 끝 G포인트 — 0x4ea0c', () => {
     expect(gamePointRewardOf({ ...summary, recordIds: [] })).toBe(0)
   })
 })
+
+describe('신인 초기값 — 0x11244 디스어셈 대조', () => {
+  it('G포인트는 0 에서 시작한다 — 원본 신인 초기화는 G포인트를 아예 넣지 않는다', () => {
+    const 신인 = createCareer('선수')
+
+    // 원본이 쓰는 값은 연봉 50·소지금 60·인기도 0·평판 300·사기 100 뿐이다.
+    // 예전 웹판의 300 은 평판 값을 베낀 것이었다.
+    expect(신인.gamePoint, `gamePoint was: ${신인.gamePoint}`).toBe(0)
+    expect(신인.reputation).toBe(300)
+    expect(신인.morale).toBe(100)
+  })
+})

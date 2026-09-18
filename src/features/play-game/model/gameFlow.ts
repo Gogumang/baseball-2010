@@ -14,12 +14,14 @@ import { simulateQuickAtBat } from '@/entities/game/model/quickAtBat'
 import { simulateHalfInning } from '@/entities/game/model/simulateHalfInning'
 import { batterAt, startingPitcherOf } from '@/entities/team/model/teamRoster'
 import type { GameSummary } from '@/entities/game/model/gameSummary'
-import { EMPTY_SEASON_STATS, recordAtBat } from '@/entities/career/model/seasonStats'
+import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
 import type { SeasonStats } from '@/entities/career/model/seasonStats'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { advanceRunners } from '@/entities/game/model/baseState'
 import { atBatPenaltyCounts, atBatPopularityPoints } from '@/entities/career/model/gameEvaluation'
-import { atBatRecordIdsOf, gameEndRecordIdsOf } from '@/entities/game/model/gameRecords'
+import { gameEndRecordIdsOf } from '@/entities/game/model/gameRecords'
+import { EMPTY_BATTER_GAME_LOG, recordBatterAtBat } from '@/entities/game/model/batterGameLog'
+import type { BatterGameLog } from '@/entities/game/model/batterGameLog'
 import type { AcePlayer } from '@/shared/config/original/acePlayers'
 
 export interface GameLogEntry {
@@ -48,6 +50,11 @@ export interface GameProgress {
   readonly recordIds: readonly number[]
   /** 이어진 연타석 안타 수 */
   readonly consecutiveHits: number
+  /**
+   * 동료 타순(0~8)별 이 경기 기록. 원본은 기록을 팀 단위로 세므로 동료 타석도 G포인트가 된다
+   * (0xa77f0 게이트는 공격 팀만 보고, 0xa8024 의 "본인인가" 필터는 개인 통산 성적에만 걸린다).
+   */
+  readonly teammateLogs: Readonly<Record<number, BatterGameLog>>
   readonly log: readonly GameLogEntry[]
   readonly nextLogId: number
 }
@@ -88,6 +95,7 @@ export function startGame(
     recentAtBatCodes: [],
     recordIds: [],
     consecutiveHits: 0,
+    teammateLogs: {},
     log: [],
     nextLogId: 1,
   }
@@ -114,18 +122,15 @@ export function applyPlayerOutcome(
     hadSecondBaseRunner: progress.game.bases.second,
   })
 
-  const myStats = recordAtBat(progress.myStats, outcome, runsBattedIn)
-  const isHit = outcome.kind === '안타' || outcome.kind === '홈런'
-  // 연타석 = 최근 타석이 모두 안타 (0xa76f0) — 볼넷(기록 코드 8)도 연속을 끊는다
-  const consecutiveHits = isHit ? progress.consecutiveHits + 1 : 0
-  const recordIds = atBatRecordIdsOf({
+  // 기록 판정은 동료 타석과 같은 함수를 쓴다 — 원본은 기록을 팀 단위로 센다 (0xa77f0)
+  const recorded = recordBatterAtBat(
+    { stats: progress.myStats, consecutiveHits: progress.consecutiveHits },
     outcome,
-    runsScored: runsBattedIn,
-    consecutiveHits,
-    homeRunsInGame: myStats.homeRuns,
-    walksInGame: myStats.walks,
-    completesCycle: !isCycleOf(progress.myStats) && isCycleOf(myStats),
-  })
+    runsBattedIn,
+  )
+  const myStats = recorded.log.stats
+  const consecutiveHits = recorded.log.consecutiveHits
+  const recordIds = recorded.recordIds
 
   const afterMyAtBat: GameProgress = appendLog(
     {
@@ -195,9 +200,20 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort): GameProg
   )
   const game = applyAtBatOutcome(progress.game, outcome)
   const runsBattedIn = game.ourScore - progress.game.ourScore
+  const slot = progress.game.battingOrderIndex
+  const recorded = recordBatterAtBat(
+    progress.teammateLogs[slot] ?? EMPTY_BATTER_GAME_LOG,
+    outcome,
+    runsBattedIn,
+  )
 
   return appendLog(
-    { ...progress, game },
+    {
+      ...progress,
+      game,
+      teammateLogs: { ...progress.teammateLogs, [slot]: recorded.log },
+      recordIds: [...progress.recordIds, ...recorded.recordIds],
+    },
     `${progress.game.inning}회말 ${progress.game.battingOrderIndex + 1}번 — ${describeOutcome(outcome)}${
       runsBattedIn > 0 ? ` (${runsBattedIn}점)` : ''
     }`,
@@ -233,7 +249,3 @@ export function summaryOf(progress: GameProgress): GameSummary {
   }
 }
 
-function isCycleOf(stats: SeasonStats): boolean {
-  const singles = stats.hits - stats.doubles - stats.triples - stats.homeRuns
-  return singles > 0 && stats.doubles > 0 && stats.triples > 0 && stats.homeRuns > 0
-}

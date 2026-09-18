@@ -118,6 +118,30 @@ describe('경기 한 판을 끝까지 진행', () => {
   })
 })
 
+describe('동료 타석도 기록달성을 센다 — 원본은 기록을 팀 단위로 센다 (0xa77f0)', () => {
+  it('내가 계속 아웃만 쳐도 동료 타석에서 기록이 쌓인다', () => {
+    // 사용자는 전 타석 땅볼아웃이라 기록이 하나도 없다. 그래도 동료 여덟 타순이 친다
+    const 여러경기 = [1, 2, 3, 42, 777, 20100901].map((seed) => playFullGame(createSeededRandom(seed)))
+    const 기록있는경기 = 여러경기.filter((finished) => finished.recordIds.length > 0)
+
+    expect(
+      기록있는경기.length,
+      `기록이 나온 경기 수: ${기록있는경기.length}/${여러경기.length}`,
+    ).toBeGreaterThan(0)
+  })
+
+  it('동료 타순마다 따로 기록을 들고 있다 — 한 사람 것으로 뭉치지 않는다', () => {
+    const finished = playFullGame(createSeededRandom(20100901))
+    const 선 = Object.entries(finished.teammateLogs).filter(
+      ([, log]) => log.stats.plateAppearances > 0,
+    )
+
+    expect(선.length, `타석에 선 동료 수: ${선.length}`).toBeGreaterThan(1)
+    // 사용자 타순(PLAYER_BATTING_ORDER_INDEX)은 동료 기록에 섞이지 않는다
+    expect(finished.teammateLogs[PLAYER_BATTING_ORDER_INDEX]).toBeUndefined()
+  })
+})
+
 function playFullGame(random: ReturnType<typeof createSeededRandom>): GameProgress {
   let progress = startGame(random)
   let guard = 0

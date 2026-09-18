@@ -1,0 +1,107 @@
+{
+ "note": "원본 수치표. 값마다 binary.mod 주소를 source 에 적었다. 근거가 없는 것은 source 에 '추정' 이라고 적는다.",
+ "ability": {
+  "maximum": 999,
+  "rookieByBattingType": [
+   { "hit": 100, "power": 100, "defense": 100, "run": 100 },
+   { "hit": 80, "power": 150, "defense": 80, "run": 80 }
+  ],
+  "rookiePositionBonus": 30,
+  "source": "상한 0xc1b38 · 신인 표 0xcc3fa · 포지션 보너스 0x16e2c (포지션 뜻은 추정)"
+ },
+ "rookie": {
+  "popularity": 0,
+  "reputation": 300,
+  "morale": 100,
+  "salary": 50,
+  "money": 6000,
+  "gamePoint": 0,
+  "skillIds": [0, 8],
+  "source": "0x11244~0x112d2 직접 디스어셈. 연봉 50(0x32)·소지금 60(0x3c)·인기도 0·평판 300(0x96<<1)·사기 100(0x64). G포인트를 넣는 명령이 없어 0 이다"
+ },
+ "limits": {
+  "stamina": 100,
+  "morale": 100,
+  "popularity": 9999,
+  "reputation": 999,
+  "affection": 100,
+  "gamePoint": 99999,
+  "moneyUnits": 9999,
+  "nameBytes": 8,
+  "source": "인기도·평판 0xd4e50 점프표 · 소지금 0x1b768 · G포인트 0x4ea0c"
+ },
+ "money": {
+  "unit": 100,
+  "source": "원본 소지금·연봉 한 칸 = 100만원 (관리 화면 0x63118)"
+ },
+ "season": {
+  "gamesPerSeason": 45,
+  "gamesPerManagementCycle": 2,
+  "staminaRecoveryPerGame": 30,
+  "source": "45경기 0xb818c · 관리 주기 r_event_txt[176] · 체력 회복 30 은 추정"
+ },
+ "training": {
+  "gainRange": { "minimum": 4, "maximumExclusive": 7 },
+  "legGainRange": { "minimum": 5, "maximumExclusive": 8 },
+  "moraleLossRange": { "minimum": 5, "maximumExclusive": 8 },
+  "typeBonus": 1,
+  "rookieSkillId": 0,
+  "weakBodySkillId": 3,
+  "source": "0x17f5c · 히트/파워 bfa55(4,7) · 수비/주루 0x18704 · 타입 보너스 StrMODE[194] · 스킬 0x1891c·0x1898e"
+ },
+ "specialSwing": {
+  "requiredSessions": [4, 5, 6, 7],
+  "gamePointCost": [500, 700, 900, 1200],
+  "moraleLossRange": { "minimum": 9, "maximumExclusive": 13 },
+  "source": "0xa3bac 종류 4 — 필요 횟수 0xd7e92 · 비용 0xd80e1(−5,−7,−9,−12 ×100)"
+ },
+ "recordGamePoints": [
+  10, 8, 10, 12, 15, 10, 20, 40, 2, 5, 15, 30, 5, 20, 40, 100, 2, 3, 5, 20,
+  40, 10, 20, 40, 3, 5, 2, 100, 10, 20, 100, 120, 3, 5, 5, 8, 3, 10, 20, 40
+ ],
+ "recordGamePointsSource": "기록달성 금액표 0xcfbf8 (경기 중 누계표 0xd8158 과 값이 같다). 이름은 StrGAME[id+8]",
+ "swing": {
+  "note": "타격 판정 0xab214 가 쓰는 값. 함수 리터럴이 아니라 data/d_level.dat 에 있고, 폴백 0xb6f28 과 값이 같다",
+  "aceFormula": { "hitBase": 250, "hitCoefficient": 400, "extraBase": 70, "extraCoefficient": 430, "contactFactor": 1000 },
+  "normalFormula": { "hitBase": 280, "hitCoefficient": 200, "extraBase": 50, "extraCoefficient": 400, "contactFactor": 500 },
+  "hitWeight": 3,
+  "extraWeight": 1,
+  "powerPivot": 77,
+  "foulPercent": 30,
+  "outPercent": 35,
+  "aceBonus": { "batterBase": 400, "batterPerLevel": 35, "pitcherBase": 400, "pitcherPerLevel": 40 },
+  "missionAcePitcherBonus": 100,
+  "pitchGradeMultipliers": [80, 90, 95, 100, 115, 130],
+  "solidCap": 9000,
+  "homeRunCap": 4500,
+  "swingStrengthBonus": 500,
+  "exhaustedBonus": 2000,
+  "source": "d_level.dat 오프셋 0x46~0x5e · 0x1d8~0x1de · 0x1e0 (객체 오프셋 = 파일 오프셋 + 4)"
+ },
+ "quickAtBat": {
+  "note": "간이 타석 0xc11f0 — 사람이 조작하지 않는 타석",
+  "basePower": 75,
+  "spreadRange": { "minimum": -13, "maximumExclusive": 21 },
+  "weakSwingGate": 2999,
+  "tightCourseGate": 1499,
+  "tightCourseGain": 3,
+  "extraBaseLimit": 666,
+  "extraInningFrom": 9,
+  "extraInningPowerStep": 5,
+  "extraInningPowerFloor": 50,
+  "powerScale": { "minimum": 0, "maximumValue": 100 },
+  "pitchGradeTable": [
+   [5, 15, 70, 97, 100],
+   [4, 12, 60, 95, 100],
+   [3, 9, 50, 93, 100],
+   [2, 5, 45, 91, 100]
+  ],
+  "pitchGradeBand": 250,
+  "source": "리터럴 풀 0xc1580(10000)·0xc1584(2999)·0xc1590(1499)·0xc1804(666) · 등급표 0xd896c"
+ },
+ "coldGame": {
+  "fromInning": 7,
+  "margin": 10,
+  "source": "0xb68fc — 이닝 인덱스 > 5 부터. 말 공격 중에는 아웃 수와 무관하게 매 타석 본다 (0xb6976)"
+ }
+}

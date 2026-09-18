@@ -1,4 +1,5 @@
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
+import { BALANCE } from '@/shared/config/original/balance'
 
 /**
  * 기록달성 (binary.mod 0xa77f0 기록 추가 · 0x4ea0c 경기 끝 지급 — 누락 탐색 9차, QA 대조).
@@ -6,12 +7,14 @@ import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
  * 금액 표는 두 벌이고 값은 같다: 경기 끝 지급이 0xcfbf8, 경기 중 누계가 0xd8158.
  *
  * **원본은 기록을 팀 단위로 센다** (0xa77f0 게이트는 "공격·수비 팀이 사람 팀인가"만 본다).
- * 웹판은 40종 중 17종만 센다 — 아래가 빠져 있고, 원본보다 G 수입이 적다:
- *   - 동료 타석 기록 (원본은 동료 8명의 3루타·홈런·연타석·사이클·볼넷도 센다)
+ * 동료 여덟 타순의 기록도 여기로 들어온다 — `batterGameLog.ts` 가 타순별로 따로 세고,
+ * 사용자 타석과 같은 `recordBatterAtBat` 을 쓴다.
+ * 아직 빠진 것은 수비·투수 쪽이고, 그만큼 원본보다 G 수입이 적다:
  *   - 우리 팀 수비·투수 기록 16~27 (삼진 계열·도루 저지·병살·삼자범퇴)
  *   - 완투승 계열 28~31 (완투승·완봉승·노히트노런·퍼펙트게임)
  *   - 5 대타 홈런 · 6·7 백투백 · 8 도루 성공 · 32·33 연속 파울 · 36 필살송구 아웃
- * 상대 공격을 이닝 실점 난수로 대신하고 있어 투구·수비 사건 자체가 없다 — 원본 간이 시뮬레이터를 옮길 때 함께 채운다.
+ * 상대 공격은 이제 원본 간이 타석(0xc11f0)으로 돌지만 아직 타격 결과만 만든다 —
+ * 삼진 콤보·병살·삼자범퇴 같은 투구·수비 사건을 세려면 수비 쪽 상태(state+0x88~0x8a)를 더 옮겨야 한다.
  * 경기 중 누계를 화면에 실시간으로 보여 주는 것(0xa77f0)도 아직 없다.
  */
 export const RECORD_NAMES: readonly string[] = [
@@ -23,10 +26,7 @@ export const RECORD_NAMES: readonly string[] = [
   '필살송구 아웃', '10점차 이상 승', '20점차 이상 승', '30점차 이상 승',
 ]
 
-const RECORD_GAME_POINTS: readonly number[] = [
-  10, 8, 10, 12, 15, 10, 20, 40, 2, 5, 15, 30, 5, 20, 40, 100, 2, 3, 5, 20,
-  40, 10, 20, 40, 3, 5, 2, 100, 10, 20, 100, 120, 3, 5, 5, 8, 3, 10, 20, 40,
-]
+const RECORD_GAME_POINTS: readonly number[] = BALANCE.recordGamePoints
 
 const RECORD = {
   triple: 0,

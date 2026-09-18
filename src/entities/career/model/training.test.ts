@@ -172,3 +172,33 @@ describe('createCareer 신인은 병아리를 갖고 있다 — 기본 규칙과
     expect([의외성만.gains.hit, 의외성만.moraleLoss]).toEqual([스킬없음.gains.hit, 스킬없음.moraleLoss])
   })
 })
+
+describe('훈련 횟수 — 칭호 23·24 의 조건', () => {
+  // 훈련은 행동권을 쓰므로, 이어서 훈련하려면 다음 관리 주기가 열려야 한다
+  const 주기열기 = (career: PlayerCareer): PlayerCareer => ({ ...career, hasActedThisCycle: false, morale: 9999 })
+
+  it('훈련할 때마다 메뉴별로 한 번씩 센다', () => {
+    const 한번 = runTraining(선수(), 메뉴('히트'), 최소).career
+    expect(한번.trainingCounts).toEqual({ 히트: 1 })
+
+    const 두번 = runTraining(주기열기(한번), 메뉴('히트'), 최소).career
+    const 다른메뉴 = runTraining(주기열기(두번), 메뉴('파워'), 최소).career
+    expect(다른메뉴.trainingCounts).toEqual({ 히트: 2, 파워: 1 })
+  })
+
+  it('필살타법 훈련도 센다', () => {
+    expect(runTraining(선수({ gamePoint: 999 }), 메뉴('필살타법'), 최소).career.trainingCounts).toEqual({
+      필살타법: 1,
+    })
+  })
+
+  it('훈련을 100번 하면 칭호 조건인 합계 100 에 닿는다 — 읽기만 하고 쓰지 않던 버그를 막는다', () => {
+    let career = 선수({ morale: 9999 })
+    for (let count = 0; count < 100; count += 1) {
+      career = 주기열기(runTraining(career, 메뉴('히트'), 최소).career)
+    }
+    const total = Object.values(career.trainingCounts).reduce((sum, count) => sum + count, 0)
+
+    expect(total, `trainingCounts was: ${JSON.stringify(career.trainingCounts)}`).toBe(100)
+  })
+})

@@ -1,3 +1,4 @@
+import { BALANCE } from '@/shared/config/original/balance'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { applySwingSkills } from '@/entities/batting/model/swingSkills'
@@ -66,22 +67,25 @@ const ERROR_BANDS: readonly (readonly [number, number, number, number])[] = [
 ]
 const CENTER_FACTORS = [10_000, 500, 350] as const
 /** 제구 등급 → 투수 능력 배율 (d_level.dat 0x1e0) */
-const TIER_MULTIPLIERS = [80, 90, 95, 100, 115, 130]
+const TIER_MULTIPLIERS = BALANCE.swing.pitchGradeMultipliers
 const NEUTRAL_MULTIPLIER = 100
 /** 마선수 보너스 — 타자 0x1d8·0x1da, 투수 0x1dc·0x1de. 팀 레벨만큼 깎고 0 에서 멈춘다 */
-const ACE_BONUS = { batter: { base: 400, perLevel: 35 }, pitcher: { base: 400, perLevel: 40 } }
+const ACE_BONUS = {
+  batter: { base: BALANCE.swing.aceBonus.batterBase, perLevel: BALANCE.swing.aceBonus.batterPerLevel },
+  pitcher: { base: BALANCE.swing.aceBonus.pitcherBase, perLevel: BALANCE.swing.aceBonus.pitcherPerLevel },
+}
 /** 미션(원본 모드 5)에서 마선수 투수에게만 붙는 고정 보너스 */
-const MISSION_ACE_PITCHER_BONUS = 100
+const MISSION_ACE_PITCHER_BONUS = BALANCE.swing.missionAcePitcherBonus
 /**
  * 원본이 B·C 에 각각 더하는 param_15 × 500. 두 호출자 모두 param_15 로 1 만 넘긴다 —
  * 1 이 아닌 값이 오는 경로는 미해독이라 상수로 뒀다.
  * (예전 이식본은 이 500 을 "직전과 같은 구질" 보너스로 읽었는데, 0xab214 안에는 그런 조건이 없다.)
  */
-const SWING_STRENGTH_BONUS = 500
-const EXHAUSTED_BONUS = 2000
-const TIMING_PIVOT = 77 // d_level.dat 0x5c
-const SOLID_CAP = 9000
-const HOME_RUN_CAP = 4500
+const SWING_STRENGTH_BONUS = BALANCE.swing.swingStrengthBonus
+const EXHAUSTED_BONUS = BALANCE.swing.exhaustedBonus
+const TIMING_PIVOT = BALANCE.swing.powerPivot
+const SOLID_CAP = BALANCE.swing.solidCap
+const HOME_RUN_CAP = BALANCE.swing.homeRunCap
 const BUNT_LIMIT = { horizontal: 20, vertical: 18 }
 const BUNT_SUCCESS_PERCENT = [0, 75, 50, 50]
 const BUNT_SKILL = 11
@@ -124,16 +128,24 @@ export function swingFactorsOf(input: SwingResultInput): SwingFactors {
 
   const contact = input.buntKind > 0
     ? trunc((scaledContact * 12) / 10)
-    : trunc(((trunc((hitEdge * (isAceFormula ? 1000 : 500)) / 1000) + 1200) * trunc((scaledContact * input.timing) / 10_000)) / 10)
+    : trunc(
+        ((trunc((hitEdge * (isAceFormula ? BALANCE.swing.aceFormula : BALANCE.swing.normalFormula).contactFactor / 1000) + 1200) *
+          trunc((scaledContact * input.timing) / 10_000)) /
+          10),
+      )
 
-  const solidWeight = isAceFormula
-    ? trunc(trunc((hitEdge * 400 * 3 + powerEdge * 430) / 100) / 4) + 2500
-    : trunc(trunc((hitEdge * 200 * 3 + powerEdge * 400) / 100) / 4) + 2800
+  const formula = isAceFormula ? BALANCE.swing.aceFormula : BALANCE.swing.normalFormula
+  const { hitWeight, extraWeight } = BALANCE.swing
+  const solidWeight =
+    trunc(
+      trunc((hitEdge * formula.hitCoefficient * hitWeight + powerEdge * formula.extraCoefficient * extraWeight) / 100) /
+        (hitWeight + extraWeight),
+    ) + formula.hitBase * 10
   const timingScale = (input.timing - TIMING_PIVOT) * 2 + 100
   // 원본은 B 를 먼저 배율까지 끝내고 나서 탈진 보너스를 더하고, C 는 그 보너스를 먼저 받은 뒤 배율을 먹는다
   const exhausted = input.isPitcherExhausted ? EXHAUSTED_BONUS : 0
   const solid = trunc(((baseSolid + solidWeight + SWING_STRENGTH_BONUS) * timingScale) / 100) + exhausted
-  const homeRunWeight = isAceFormula ? 700 + trunc((powerEdge * 430) / 100) : 500 + trunc((powerEdge * 400) / 100)
+  const homeRunWeight = formula.extraBase * 10 + trunc((powerEdge * formula.extraCoefficient) / 100)
   const homeRun = trunc(((baseHomeRun + exhausted + homeRunWeight + SWING_STRENGTH_BONUS) * timingScale) / 100)
 
   const skilled = applySwingSkills({ solid, homeRun }, input.batterSkillIds, input.pitcherSkillIds, input.situation)
@@ -164,7 +176,9 @@ export function swingResultOf(input: SwingResultInput, random: RandomPort): Swin
     const code = randomIntegerBelow(random, 0, 10_000) >= lineDriveLimit ? 15 : 18
     return { kind: '타구', code, isSolid: true }
   }
-  const roll = randomIntegerBelow(random, 0, 10_000) - 3000
+  const roll = randomIntegerBelow(random, 0, 10_000) - BALANCE.swing.foulPercent * 100
   if (roll < 0) return { kind: '타구', code: 9, isSolid: true }
-  return roll - 3500 < 0 ? { kind: '타구', code: 0, isSolid: false } : { kind: '타구', code: 3, isSolid: false }
+  return roll - BALANCE.swing.outPercent * 100 < 0
+    ? { kind: '타구', code: 0, isSolid: false }
+    : { kind: '타구', code: 3, isSolid: false }
 }

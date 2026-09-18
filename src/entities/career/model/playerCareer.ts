@@ -1,6 +1,7 @@
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { GameSummary } from '@/entities/game/model/gameSummary'
 import type { League } from '@/entities/league/model/league'
+import { BALANCE } from '@/shared/config/original/balance'
 import { EMPTY_LEAGUE, recordLeagueResult } from '@/entities/league/model/league'
 import { playLeagueDay } from '@/entities/league/model/leagueDay'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -13,22 +14,22 @@ import {
 import type { SeasonStats } from '@/entities/career/model/seasonStats'
 
 /** 원본 능력치 상한 (0xb6414 가 999 로 자른다) */
-export const MAXIMUM_ABILITY = 999
-const MAXIMUM_AFFECTION = 100
-export const MAXIMUM_STAMINA = 100
+export const MAXIMUM_ABILITY = BALANCE.ability.maximum
+const MAXIMUM_AFFECTION = BALANCE.limits.affection
+export const MAXIMUM_STAMINA = BALANCE.limits.stamina
 
 /**
  * 관리 메뉴가 열리는 주기.
  * 원작 설명서 원문: "2경기마다 관리 메뉴가 발생하며 다음 커맨드로 선수를 육성합니다."
  * (StrHOWTO[11], r_event_txt[172])
  */
-export const GAMES_PER_MANAGEMENT_CYCLE = 2
+export const GAMES_PER_MANAGEMENT_CYCLE = BALANCE.season.gamesPerManagementCycle
 
 /** 한 시즌 경기 수. 원작 설명서 StrHOWTO[10]: "1년에 총 45경기의 정규리그를 진행하며" */
-export const GAMES_PER_SEASON = 45
+export const GAMES_PER_SEASON = BALANCE.season.gamesPerSeason
 
 /** 경기를 치르면 회복하는 체력 */
-const STAMINA_RECOVERY_PER_GAME = 30
+const STAMINA_RECOVERY_PER_GAME = BALANCE.season.staminaRecoveryPerGame
 
 export interface PlayerCareer {
   readonly name: string
@@ -128,38 +129,35 @@ export interface PlayerCareer {
 }
 
 /** 신인의 시작 상태 — 나만의리그 공통 초기화 0x11244~0x11296 */
-export const STARTING_POPULARITY = 0
-export const STARTING_REPUTATION = 300
-export const STARTING_MORALE = 100
+export const STARTING_POPULARITY = BALANCE.rookie.popularity
+export const STARTING_REPUTATION = BALANCE.rookie.reputation
+export const STARTING_MORALE = BALANCE.rookie.morale
 /** 원본 연봉 50 (0xa4fd8). 원본 단위(100만원) 그대로 둔다 — 화면은 ×100 만원 (관리 화면 0x63118) */
-export const STARTING_SALARY = 50
+export const STARTING_SALARY = BALANCE.rookie.salary
 /** 소지금 단위는 만원이다. 원본은 100만원 단위 60 = 6000만 */
-export const STARTING_MONEY = 6000
+export const STARTING_MONEY = BALANCE.rookie.money
 /** 원본 소지금·연봉 한 칸 = 100만원 */
-export const ORIGINAL_MONEY_UNIT = 100
+export const ORIGINAL_MONEY_UNIT = BALANCE.money.unit
 /** 원본 소지금 상한 9999 칸 (0x1b768) */
-const MAXIMUM_MONEY = 9999 * ORIGINAL_MONEY_UNIT
+const MAXIMUM_MONEY = BALANCE.limits.moneyUnits * ORIGINAL_MONEY_UNIT
 /** 신인 스킬 — 0 병아리 · 8 의외성 (0x11230 에서 a4bd9 두 번) */
-const STARTING_SKILL_IDS: readonly number[] = [0, 8]
+const STARTING_SKILL_IDS: readonly number[] = BALANCE.rookie.skillIds
 
 /**
  * 인기도·평판 상한. 원본 칭호 조건에 "평판 999 달성", "인기도 4000이상 달성" 이 있다 (StrNICKNAME[91][71]).
  * 이벤트 보상 점프 표(binary.mod 0xd4e50)도 인기도를 9999, 평판을 999 로 자른다 (점검 에이전트 정적 확인).
  */
-export const MAXIMUM_POPULARITY = 9999
-export const MAXIMUM_REPUTATION = 999
-export const MAXIMUM_MORALE = 100
+export const MAXIMUM_POPULARITY = BALANCE.limits.popularity
+export const MAXIMUM_REPUTATION = BALANCE.limits.reputation
+export const MAXIMUM_MORALE = BALANCE.limits.morale
 
 /** 기본 소속 팀 — 서울 드래곤즈 */
 export const DEFAULT_TEAM_ID = 0
 
 /** 타자 시작 능력치 표 0xcc3fa (배팅 타입 → 히트·파워·수비·주루) */
-const ROOKIE_ABILITY_BY_TYPE: readonly BatterAbility[] = [
-  { hit: 100, power: 100, defense: 100, run: 100 },
-  { hit: 80, power: 150, defense: 80, run: 80 },
-]
+const ROOKIE_ABILITY_BY_TYPE: readonly BatterAbility[] = BALANCE.ability.rookieByBattingType
 /** 생성 화면 둘째 목록이 0 이면 수비, 아니면 주루에 더한다 (0x16e2c) — 목록 뜻은 내야/외야 (추정) */
-const ROOKIE_POSITION_BONUS = 30
+const ROOKIE_POSITION_BONUS = BALANCE.ability.rookiePositionBonus
 
 export function rookieAbilityOf(battingTypeIndex: number, positionIndex: number): BatterAbility {
   const base = ROOKIE_ABILITY_BY_TYPE[battingTypeIndex] ?? ROOKIE_ABILITY_BY_TYPE[0]
@@ -185,12 +183,12 @@ export interface RookieProfile {
 export const DEFAULT_ROOKIE_PROFILE: RookieProfile = { battingTypeIndex: 0, positionIndex: 0, battingSide: 0, skinIndex: 0 }
 
 /** 이름 길이 — 원본은 CP949 바이트로 센다. 한글 2바이트, 영문·숫자 1바이트 (StrMODE[3] "한글 4글자, 영문 8글자") */
-export const MAXIMUM_NAME_BYTES = 8
+export const MAXIMUM_NAME_BYTES = BALANCE.limits.nameBytes
 
 export function nameByteLengthOf(name: string): number {
   return [...name].reduce((total, character) => total + (character.charCodeAt(0) > 0x7f ? 2 : 1), 0)
 }
-const STARTING_GAME_POINT = 300
+const STARTING_GAME_POINT = BALANCE.rookie.gamePoint
 
 export function createCareer(name: string, profile: RookieProfile = DEFAULT_ROOKIE_PROFILE): PlayerCareer {
   return {
@@ -252,6 +250,17 @@ export function createCareer(name: string, profile: RookieProfile = DEFAULT_ROOK
 
 export function trainingCountOf(career: PlayerCareer, menuId: string): number {
   return career.trainingCounts[menuId] ?? 0
+}
+
+/**
+ * 훈련 한 번을 메뉴별로 센다. 칭호 23(200회)·24(100회)가 이 합을 본다 (titles.ts).
+ * 메뉴별로 나눠 두는 것은 원본 저장 구조를 아직 못 찾아서다 — 합계만 쓰므로 안전하다 (추정).
+ */
+export function countTraining(career: PlayerCareer, menuId: string): PlayerCareer {
+  return {
+    ...career,
+    trainingCounts: { ...career.trainingCounts, [menuId]: trainingCountOf(career, menuId) + 1 },
+  }
 }
 
 export function gainPopularity(career: PlayerCareer, amount: number): PlayerCareer {
@@ -355,7 +364,7 @@ export function applyLeagueDay(career: PlayerCareer, myTeamId: number, random: R
 }
 
 /** 원본 전역 G포인트 상한 */
-const MAXIMUM_GAME_POINT = 99_999
+const MAXIMUM_GAME_POINT = BALANCE.limits.gamePoint
 
 /** 경기 끝 G포인트 = 달성 기록 금액 합 (0x4ea0c, 누락 탐색 9차). 출전·승리 보너스는 원본에 없다 */
 export function gamePointRewardOf(summary: GameSummary): number {

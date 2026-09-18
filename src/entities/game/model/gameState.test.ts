@@ -168,3 +168,36 @@ describe('경기 종료 규칙 — 0xb68fc (누락 탐색 9차)', () => {
     expect(game.isFinished).toBe(true)
   })
 })
+
+describe('콜드게임 — 말 공격 중에는 아웃과 무관하게 매 타석 본다 (0xb6976)', () => {
+  const 상황 = (overrides: Partial<GameState> = {}): GameState => ({
+    ...createGame(),
+    inning: 7,
+    half: '말',
+    outs: 0,
+    ourScore: 9,
+    opponentScore: 0,
+    ...overrides,
+  })
+
+  it('7회말 무사에 10점 차가 되는 순간 경기가 끝난다 — 3아웃을 기다리지 않는다', () => {
+    const after = applyAtBatOutcome(상황(), { kind: '홈런' })
+
+    expect(after.ourScore).toBe(10)
+    expect(after.isFinished, `점수 ${after.ourScore}:${after.opponentScore}`).toBe(true)
+  })
+
+  it('9점 차까지는 이어진다', () => {
+    const after = applyAtBatOutcome(상황({ ourScore: 8 }), { kind: '홈런' })
+
+    expect(after.ourScore).toBe(9)
+    expect(after.isFinished).toBe(false)
+  })
+
+  it('6회까지는 10점 차여도 끝나지 않는다 — 7회부터다', () => {
+    const after = applyAtBatOutcome(상황({ inning: 6 }), { kind: '홈런' })
+
+    expect(after.ourScore).toBe(10)
+    expect(after.isFinished).toBe(false)
+  })
+})
