@@ -1,0 +1,106 @@
+[
+ [
+  {
+   "frame": 0,
+   "delay": 1
+  },
+  {
+   "frame": 1,
+   "delay": 1
+  },
+  {
+   "frame": 2,
+   "delay": 1
+  },
+  {
+   "frame": 3,
+   "delay": 1
+  },
+  {
+   "frame": 4,
+   "delay": 1
+  },
+  {
+   "frame": 5,
+   "delay": 1
+  },
+  {
+   "frame": 21,
+   "delay": 0
+  }
+ ],
+ [
+  {
+   "frame": 12,
+   "delay": 2
+  },
+  {
+   "frame": 13,
+   "delay": 1
+  },
+  {
+   "frame": 14,
+   "delay": 1
+  },
+  {
+   "frame": 15,
+   "delay": 1
+  },
+  {
+   "frame": 16,
+   "delay": 1
+  },
+  {
+   "frame": 17,
+   "delay": 1
+  },
+  {
+   "frame": 21,
+   "delay": 0
+  }
+ ],
+ [
+  {
+   "frame": 8,
+   "delay": 2
+  },
+  {
+   "frame": 9,
+   "delay": 2
+  },
+  {
+   "frame": 10,
+   "delay": 2
+  },
+  {
+   "frame": 11,
+   "delay": 2
+  },
+  {
+   "frame": 21,
+   "delay": 0
+  }
+ ],
+ [
+  {
+   "frame": 8,
+   "delay": 2
+  },
+  {
+   "frame": 9,
+   "delay": 2
+  },
+  {
+   "frame": 6,
+   "delay": 2
+  },
+  {
+   "frame": 7,
+   "delay": 2
+  },
+  {
+   "frame": 21,
+   "delay": 0
+  }
+ ]
+]

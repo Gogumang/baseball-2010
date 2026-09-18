@@ -1,0 +1,79 @@
+import { ORIGINAL_TITLES } from '@/shared/config/original/titles'
+import type { PlayerCareer } from '@/entities/career/model/playerCareer'
+import { isSeasonFinished } from '@/entities/career/model/playerCareer'
+import { battingAverageOf } from '@/entities/career/model/seasonStats'
+import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
+
+/**
+ * 칭호(닉네임) — 원본 StrNICKNAME 128개는 **이름 64개(0~63) + 획득 조건 원문 64개(64~127)** 의 짝이다.
+ * 예: 35 "안타제조기" ↔ 99 "통산 500안타 달성".
+ *
+ * 아래 표는 조건 원문을 그대로 코드로 옮긴 것이다. 지금 웹판이 기록하지 않는 것
+ * (MVP·우승·국가대표·마선수 공략·또또복권·도루·번트 시도·투수 기록·능력치 999)은 아직 판정하지 않는다.
+ */
+const NAME_COUNT = ORIGINAL_TITLES.length / 2
+
+export const TITLE_NAMES: readonly string[] = ORIGINAL_TITLES.slice(0, NAME_COUNT)
+
+export function conditionTextOf(title: string): string | null {
+  const index = TITLE_NAMES.indexOf(title)
+  return index < 0 ? null : stripGameMarkup(ORIGINAL_TITLES[index + NAME_COUNT]).trim()
+}
+
+/** StrNICKNAME[64+i] 의 연차·기준값 */
+const NINTH_YEAR = 9
+const FINAL_YEAR = 13
+const SIXTH_YEAR = 6
+/** 소지금은 만원 단위라 60억 = 600,000만 */
+const MONEY_SIX_BILLION = 600_000
+const FOUR_TENTHS = 0.4
+
+type TitleRule = (career: PlayerCareer) => boolean
+
+const trainingTotalOf = (career: PlayerCareer) =>
+  Object.values(career.trainingCounts).reduce((total, count) => total + count, 0)
+
+const RULES: Readonly<Record<number, TitleRule>> = {
+  0: () => true, // 지금부터 시작이다!
+  3: (career) => career.season >= NINTH_YEAR && career.popularity >= 2000, // 9년차 인기도 2000이상
+  4: (career) => career.season >= NINTH_YEAR && career.reputation >= 750, // 9년차 평판 750이상
+  6: (career) => career.popularity >= 2000, // 인기도 2000이상
+  7: (career) => career.popularity >= 4000, // 인기도 4000이상
+  10: (career) => career.season >= FINAL_YEAR, // 13년차 선수 생활의 마무리
+  21: (career) => career.lotteryFirstPrizes >= 5, // 또또복권 1등 5번 당첨
+  22: (career) => career.lotteryPurchases >= 100, // 또또복권 100번 구매
+  23: (career) => trainingTotalOf(career) >= 200, // 훈련 횟수 200회
+  24: (career) => trainingTotalOf(career) >= 100, // 훈련 횟수 100회
+  25: (career) => isSeasonFinished(career) && career.outingsThisSeason <= 2, // 1년간 외출 2회 이하
+  26: (career) => isSeasonFinished(career) && career.outingsThisSeason >= 20, // 1년간 외출 20회 이상
+  27: (career) => career.reputation >= 999, // 평판 999
+  28: (career) => career.reputation >= 700, // 평판 700
+  29: (career) => career.reputation <= 0, // 평판 0
+  31: (career) => career.money >= MONEY_SIX_BILLION, // 소지금 60억
+  35: (career) => career.careerStats.hits >= 500, // 통산 500안타
+  36: (career) => career.careerStats.runsBattedIn >= 300, // 통산 300타점
+  37: ({ careerStats }) => careerStats.hits >= 700 && careerStats.runsBattedIn >= 400 && careerStats.homeRuns >= 250,
+  39: (career) => career.bestHomeRunsInGame >= 4, // 한 경기 홈런 4회
+  40: (career) => career.careerStats.homeRuns >= 100,
+  41: (career) => career.careerStats.homeRuns >= 200,
+  42: (career) => career.careerStats.homeRuns >= 300,
+  43: (career) => career.season >= SIXTH_YEAR && (battingAverageOf(career.careerStats) ?? 0) >= FOUR_TENTHS,
+  47: (career) => career.cycleHitGames >= 2, // 사이클링 히트 2회
+}
+
+export function currentTitleOf(career: PlayerCareer): string {
+  return career.titleIds[career.titleIds.length - 1] ?? TITLE_NAMES[0]
+}
+
+/** 조건을 만족했지만 아직 얻지 않은 칭호 (원본 번호 순) */
+export function evaluateNewTitles(career: PlayerCareer): readonly string[] {
+  return Object.entries(RULES)
+    .filter(([, rule]) => rule(career))
+    .map(([index]) => TITLE_NAMES[Number(index)])
+    .filter((title) => !career.titleIds.includes(title))
+}
+
+export function awardTitles(career: PlayerCareer, titles: readonly string[]): PlayerCareer {
+  if (titles.length === 0) return career
+  return { ...career, titleIds: [...career.titleIds, ...titles] }
+}

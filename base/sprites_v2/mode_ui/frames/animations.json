@@ -1,0 +1,58 @@
+[
+ [
+  {
+   "frame": 22,
+   "delay": 2
+  },
+  {
+   "frame": 23,
+   "delay": 3
+  }
+ ],
+ [
+  {
+   "frame": 61,
+   "delay": 2
+  },
+  {
+   "frame": 61,
+   "delay": 3
+  }
+ ],
+ [
+  {
+   "frame": 62,
+   "delay": 2
+  },
+  {
+   "frame": 62,
+   "delay": 3
+  }
+ ],
+ [
+  {
+   "frame": 77,
+   "delay": 4
+  },
+  {
+   "frame": 78,
+   "delay": 4
+  },
+  {
+   "frame": 79,
+   "delay": 4
+  },
+  {
+   "frame": 80,
+   "delay": 4
+  },
+  {
+   "frame": 81,
+   "delay": 4
+  },
+  {
+   "frame": 82,
+   "delay": 4
+  }
+ ]
+]

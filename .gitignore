@@ -1,0 +1,23 @@
+node_modules
+
+# Yarn Berry Zero-Install — 캐시와 .pnp.cjs 는 저장소에 두고, 설치 상태만 뺀다
+.yarn/*
+!.yarn/cache
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+.yarn/install-state.gz
+dist
+.DS_Store
+*.local
+*.tsbuildinfo
+__pycache__/
+*.pyc
+
+# 원본 패키지에서 생성한 것 (tools/ 스크립트로 재생성 가능)
+base/work/
+base/sprites/
+base/extracted/
+public/sprites/

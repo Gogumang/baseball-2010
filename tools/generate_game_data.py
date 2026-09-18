@@ -1,0 +1,1011 @@
+#!/usr/bin/env python3
+"""
+추출한 원본 테이블을 게임이 바로 쓰는 TypeScript 데이터로 변환한다.
+
+    python3 tools/generate_game_data.py
+
+입력: base/extracted/*.json   (tools/extract_wipi_game.py 결과)
+출력: src/shared/config/original/*.ts  (손으로 고치지 말 것 — 이 스크립트를 고칠 것)
+"""
+
+from __future__ import annotations
+
+import json
+import struct
+from pathlib import Path
+
+EXTRACTED = Path('base/extracted')
+OUTPUT = Path('src/shared/config/original')
+
+# 원본 능력치는 0~999 눈금이다. 웹판도 같은 눈금을 쓴다 (예전에는 10으로 나눴다).
+ABILITY_SCALE = 1
+
+# 선수/마선수 레코드 레이아웃 (48바이트)
+#   0        u8   아이디
+#   1..9     CP949 이름 (널 패딩)
+#   12..19   u16 × 4  능력치
+ABILITY_OFFSET = 12
+ABILITY_COUNT = 4
+
+# StrCOMMON 안의 구간. 인덱스를 직접 확인해 정리한 것이다.
+COMMON_TEAM_RANGE = (0, 15)
+COMMON_ACE_PITCHER_RANGE = (15, 20)
+COMMON_ACE_BATTER_RANGE = (20, 25)
+COMMON_BATTER_BURST_RANGE = (25, 30)
+COMMON_PITCHER_BURST_RANGE = (31, 37)
+COMMON_SKILL_START = 55
+
+# StrMODE 안의 구간.
+MODE_STAT_RANGE = (22, 35)          # 인기도 · 평판 · 사기 · 소지금 …
+MODE_TRAINING_RANGE = (35, 48)      # 히트 · 파워 · 수비 · 주루 · 모든능력치 · 제구 …
+MODE_SCHEDULE_RANGE = (48, 59)      # 들어가기 · 팬미팅 · 외식 · 입원 · 야구교실 …
+
+# ace_icon.pzx 는 StrCOMMON 순서를 따른다 — 투수 5명이 먼저다.
+ACE_ICON_PITCHER_START = 0
+ACE_ICON_BATTER_START = 5
+
+BANNER = ('// 이 파일은 tools/generate_game_data.py 가 원본 패키지에서 생성했다.\n'
+          '// 직접 고치지 말고 생성기를 고칠 것.\n\n')
+
+
+def load(name: str):
+    return json.loads((EXTRACTED / f'{name}.json').read_text(encoding='utf-8'))
+
+
+def abilities_of(row_hex: str) -> list[int]:
+    row = bytes.fromhex(row_hex)
+    return [
+        int.from_bytes(row[ABILITY_OFFSET + i * 2:ABILITY_OFFSET + 2 + i * 2], 'little')
+        // ABILITY_SCALE
+        for i in range(ABILITY_COUNT)
+    ]
+
+
+def quote(text: str) -> str:
+    return "'" + text.replace('\\', '\\\\').replace("'", "\\'") + "'"
+
+
+def clean_strings(entries: list[str]) -> list[str]:
+    return [entry.rstrip('\x00').strip() for entry in entries]
+
+
+def write(filename: str, body: str) -> None:
+    (OUTPUT / filename).write_text(BANNER + body, encoding='utf-8')
+    print(f'  {filename}')
+
+
+DATA_OUTPUT = OUTPUT / 'data'
+
+
+def write_json(filename: str, value) -> None:
+    """대사·에피소드처럼 양이 많은 원본 데이터는 JSON 으로 두고, TS 는 타입만 입혀 읽는다."""
+    DATA_OUTPUT.mkdir(parents=True, exist_ok=True)
+    (DATA_OUTPUT / filename).write_text(json.dumps(value, ensure_ascii=False, indent=1) + '\n', encoding='utf-8')
+    print(f'  data/{filename}')
+
+
+def write_json_module(filename: str, json_name: str, value, declaration: str, imports: str = '') -> None:
+    """JSON 한 벌 + 그것을 읽는 얇은 TS 모듈을 함께 만든다."""
+    write_json(json_name, value)
+    body = [imports] if imports else []
+    body += [f"import data from '@/shared/config/original/data/{json_name}'", '', declaration]
+    write(filename, '\n'.join(body) + '\n')
+
+
+def generate_ace_players() -> None:
+    """마선수 — 원작의 특별 상대. 타자 5명 + 투수 5명."""
+    lines = [
+        "import type { BatterAbility } from '@/entities/batting/model/batter'",
+        '',
+        'export interface AcePlayer {',
+        '  readonly id: string',
+        '  readonly name: string',
+        "  readonly role: '타자' | '투수'",
+        '  readonly ability: BatterAbility',
+        '  /** 원본 ace/ace_icon.pzx 의 33×33 아이콘 */',
+        '  readonly iconUrl: string',
+        '  /** 원본에서 합성한 애니메이션 프레임 폴더 */',
+        '  readonly framesUrl: string',
+        '  readonly frameCount: number',
+        '  /** 프레임 합성이 안 된 경우 쓰는 정지 그림 */',
+        '  readonly stillUrl: string',
+        '  /** 필살기 이름 (StrCOMMON) */',
+        '  readonly burst: string',
+        '}',
+        '',
+        '/** 원본 XlsACE_BAT_DATA / XlsACE_PIT_DATA. 능력치는 원본 0~999 눈금 그대로. */',
+        'export const ACE_PLAYERS: readonly AcePlayer[] = [',
+    ]
+    common = clean_strings(load('StrCOMMON'))
+    batter_bursts = common[slice(*COMMON_BATTER_BURST_RANGE)]
+    pitcher_bursts = common[slice(*COMMON_PITCHER_BURST_RANGE)]
+
+    # ace/ 스프라이트 파일명 순서와 표 순서가 같다.
+    sprite_ids = {
+        '타자': ['medica', 'kao', 'roze', 'death', 'tiger'],
+        '투수': ['psyker', 'leony', 'bbmachine', 'ballantine', 'dragona'],
+    }
+    icon_start = {'타자': ACE_ICON_BATTER_START, '투수': ACE_ICON_PITCHER_START}
+    bursts = {'타자': batter_bursts, '투수': pitcher_bursts}
+    frame_counts = count_frames()
+
+    for role, table in (('타자', 'XlsACE_BAT_DATA'), ('투수', 'XlsACE_PIT_DATA')):
+        data = load(table)
+        for index, (name, row) in enumerate(zip(data['names'], data['rows'])):
+            # 원본 순서는 히트·파워·수비·주루 (생성 표 0xcc3fa·훈련 0x17f5c, 누락 탐색 5차)
+            hit, power, defense, run = abilities_of(row)
+            identifier = sprite_ids[role][index]
+            folder = ('batter_' if role == '타자' else 'pitcher_') + identifier
+            icon = f'/sprites/ace_icon/{icon_start[role] + index:03d}.png'
+            burst = bursts[role][index] if index < len(bursts[role]) else ''
+            lines.append(
+                f"  {{ id: {quote(identifier)}, name: {quote(name)}, "
+                f"role: '{role}', ability: {{ hit: {hit}, power: {power}, "
+                f"run: {run}, defense: {defense} }}, iconUrl: {quote(icon)}, "
+                f"framesUrl: {quote('/sprites/' + folder + '/frames')}, "
+                f"frameCount: {frame_counts.get(folder, 0)}, "
+                f"stillUrl: {quote(largest_image(folder))}, burst: {quote(burst)} }},"
+            )
+    lines.append(']')
+    write('acePlayers.ts', '\n'.join(lines) + '\n')
+
+
+def largest_image(folder: str) -> str:
+    """프레임 합성이 실패한 캐릭터를 위해 가장 큰 파트 그림을 고른다."""
+    directory = Path('public/sprites') / folder
+    if not directory.exists():
+        return ''
+    candidates = [path for path in directory.glob('*.png')]
+    if not candidates:
+        return ''
+    biggest = max(candidates, key=lambda path: path.stat().st_size)
+    return f'/sprites/{folder}/{biggest.name}'
+
+
+def count_frames() -> dict:
+    """합성된 프레임이 몇 장인지 센다. 없으면 0."""
+    root = Path('public/sprites')
+    counts = {}
+    if not root.exists():
+        return counts
+    for frames in root.glob('*/frames'):
+        counts[frames.parent.name] = len(list(frames.glob('*.png')))
+    return counts
+
+
+def generate_roster() -> None:
+    """일반 선수 명단 — 타자 180명, 투수 120명."""
+    rosters = {}
+    for label, table in (('batters', 'XlsBATTER_DATA'), ('pitchers', 'XlsPITCHER_DATA')):
+        data = load(table)
+        rosters[label] = [
+            {'id': index, 'name': name, 'ability': abilities_of(row)}
+            for index, (name, row) in enumerate(zip(data['names'], data['rows']))
+            if name.strip()
+        ]
+    write_json_module(
+        'roster.ts',
+        'roster.json',
+        rosters,
+        'export interface RosterPlayer {\n'
+        '  readonly id: number\n'
+        '  readonly name: string\n'
+        '  /** 히트 · 파워 · 수비 · 주루 (투수는 제구 · 구속 · 변화 · 체력) — 0xb6414 인덱스 순서 */\n'
+        '  readonly ability: readonly [number, number, number, number]\n'
+        '}\n'
+        '\n'
+        '// JSON 은 네 칸 튜플을 나타내지 못해 한 번 더 단언한다\n'
+        'export const BATTERS = data.batters as unknown as readonly RosterPlayer[]\n'
+        'export const PITCHERS = data.pitchers as unknown as readonly RosterPlayer[]',
+    )
+
+
+def generate_teams() -> None:
+    data = load('XlsTEAM_DATA')
+    names = clean_strings(load('StrCOMMON'))[slice(*COMMON_TEAM_RANGE)]
+
+    lines = [
+        'export interface TeamRecord {',
+        '  readonly id: number',
+        '  readonly name: string',
+        '  readonly logoUrl: string',
+        '  /** 원본 XlsTEAM_DATA의 u16 6개. 팀 전력 지표로 보인다. */',
+        '  readonly values: readonly number[]',
+        '}',
+        '',
+        '/** 원본 팀 15개. 이름은 StrCOMMON, 로고는 ui/team_logo.pzx 이며 순서가 같다. */',
+        'export const TEAMS: readonly TeamRecord[] = [',
+    ]
+    for index, row_hex in enumerate(data['rows']):
+        row = bytes.fromhex(row_hex)
+        values = [int.from_bytes(row[i:i + 2], 'little') for i in range(0, len(row), 2)]
+        name = names[index] if index < len(names) else f'팀 {index}'
+        lines.append(
+            f"  {{ id: {index}, name: {quote(name)}, "
+            f"logoUrl: {quote(f'/sprites/team_logo/{index:03d}.png')}, "
+            f"values: [{', '.join(map(str, values))}] }},"
+        )
+    lines.append(']')
+    write('teams.ts', '\n'.join(lines) + '\n')
+
+
+def generate_string_list(source: str, const_name: str, filename: str, comment: str) -> None:
+    entries = clean_strings(load(source))
+    json_name = filename.replace('.ts', '.json')
+    write_json_module(
+        filename,
+        json_name,
+        entries,
+        f'/** {comment} (원본 {source}, {len(entries)}개) */\n'
+        f'export const {const_name}: readonly string[] = data',
+    )
+
+
+# ── 스토리 ────────────────────────────────────────────────
+
+# 선택지로 볼 최대 길이. 이보다 길면 대사로 본다.
+CHOICE_MAX_LENGTH = 34
+# 선택지 묶음으로 인정할 최소/최대 개수
+CHOICE_RUN_MINIMUM = 2
+CHOICE_RUN_MAXIMUM = 4
+# 선택지가 안 나와도 이 줄 수를 넘으면 장면을 끊는다.
+SCENE_MAX_LINES = 12
+
+
+def looks_like_choice(text: str) -> bool:
+    """
+    선택지는 '연봉 협상한다', '그냥 받아들인다'처럼 짧은 서술형 행동 문장이다.
+    줄바꿈 마크업이 들어간 긴 대사는 선택지가 아니다.
+    """
+    stripped = text.strip()
+    if not stripped or '!N' in stripped or len(stripped) > CHOICE_MAX_LENGTH:
+        return False
+    body = stripped.split('(')[0].strip().rstrip('.')
+    return body.endswith('다')
+
+
+# 스킬 40종: 이름 StrCOMMON[55~94], 소개 StrSKILL[0~39], 효과 StrSKILL[40~79]
+SKILL_COUNT = 40
+COMMON_SKILL_NAME_START = 55
+# 효과 문구로 나눈 대상 — 0~7 공통(훈련·부상·능력치), 8~23 타자(안타율·장타율), 24~39 투수(피안타율·실투율)
+SKILL_ROLE_RANGES = (('공통', 0, 8), ('타자', 8, 24), ('투수', 24, 40))
+
+
+def generate_skills() -> None:
+    """스킬 — 이름·소개·효과를 한 레코드로 묶는다. 획득 조건과 색(플러스/마이너스/스페셜)은 미해독."""
+    common = clean_strings(load('StrCOMMON'))
+    texts = clean_strings(load('StrSKILL'))
+    skills = [
+        {
+            'id': index,
+            'name': common[COMMON_SKILL_NAME_START + index],
+            'description': texts[index],
+            'effect': texts[SKILL_COUNT + index],
+            'role': role,
+        }
+        for role, start, end in SKILL_ROLE_RANGES
+        for index in range(start, end)
+    ]
+    write_json_module(
+        'skills.ts',
+        'skills.json',
+        skills,
+        'export interface OriginalSkill {\n'
+        '  readonly id: number\n'
+        '  readonly name: string\n'
+        '  /** 소개 (StrSKILL[id]) */\n'
+        '  readonly description: string\n'
+        '  /** 효과 (StrSKILL[40+id]) — 마크업 원문 */\n'
+        '  readonly effect: string\n'
+        "  /** 효과 문구로 나눈 대상 */\n"
+        "  readonly role: '공통' | '타자' | '투수'\n"
+        '}\n'
+        '\n'
+        '/** 스킬 40종 (StrCOMMON[55~94] + StrSKILL) */\n'
+        'export const ORIGINAL_SKILLS: readonly OriginalSkill[] = data as readonly OriginalSkill[]',
+    )
+
+
+# 올해의 목표 표 (binary.mod, VA = 파일오프셋 + 0xfcc) — 누락 탐색 에이전트가 찾은 주소
+BINARY_VA_OFFSET = 0xFCC
+BATTER_YEAR_GOAL_TABLE_VA = 0xD7F9E
+YEAR_COUNT = 13
+GOAL_COUNT = 5
+# 선수 +0xb 상위 비트로 고르는 표 중 실제 값이 있는 것은 두 개다 (세 번째는 다른 데이터)
+BATTER_GOAL_TABLE_COUNT = 2
+
+
+def generate_year_goals() -> None:
+    """올해의 목표 — 연차 13 × 5칸 (타율×1000 · 안타 · 홈런 · 타점 · 인기도 상승), StrUSER_EVT[0]."""
+    binary = (EXTRACTED.parent / 'work' / 'jar' / 'binary.mod').read_bytes()
+    offset = BATTER_YEAR_GOAL_TABLE_VA - BINARY_VA_OFFSET
+    count = BATTER_GOAL_TABLE_COUNT * YEAR_COUNT * GOAL_COUNT
+    values = struct.unpack_from(f'<{count}H', binary, offset)
+    tables = []
+    for table in range(BATTER_GOAL_TABLE_COUNT):
+        rows = []
+        for year in range(YEAR_COUNT):
+            start = (table * YEAR_COUNT + year) * GOAL_COUNT
+            rows.append('[' + ', '.join(str(v) for v in values[start:start + GOAL_COUNT]) + ']')
+        tables.append('  [\n    ' + ',\n    '.join(rows) + ',\n  ]')
+    lines = [
+        '/**',
+        ' * 타자 올해의 목표 (binary.mod 0xd7f9e). [표][연차−1] = [타율×1000, 안타, 홈런, 타점, 인기도 상승].',
+        ' * 표는 선수 타입 비트(선수 +0xb)로 고른다.',
+        ' */',
+        'export const BATTER_YEAR_GOALS: readonly (readonly (readonly number[])[])[] = [',
+        ',\n'.join(tables) + ',',
+        ']',
+    ]
+    write('yearGoals.ts', '\n'.join(lines) + '\n')
+
+
+def generate_bursts() -> None:
+    """필살기 — 타자 스윙 5종, 투수 볼 6종 (StrCOMMON)."""
+    common = clean_strings(load('StrCOMMON'))
+    lines = [
+        '/** 타자 필살기 (원본 StrCOMMON) */',
+        'export const BATTER_BURSTS: readonly string[] = ['
+        + ', '.join(quote(t) for t in common[slice(*COMMON_BATTER_BURST_RANGE)]) + ']',
+        '',
+        '/** 투수 필살기 (원본 StrCOMMON) */',
+        'export const PITCHER_BURSTS: readonly string[] = ['
+        + ', '.join(quote(t) for t in common[slice(*COMMON_PITCHER_BURST_RANGE)]) + ']',
+    ]
+    write('bursts.ts', '\n'.join(lines) + '\n')
+
+
+def generate_mode_menus() -> None:
+    """원작의 훈련 항목과 스케줄 활동 (StrMODE)."""
+    mode = clean_strings(load('StrMODE'))
+    training = [t for t in mode[slice(*MODE_TRAINING_RANGE)] if t]
+    schedule = [t for t in mode[slice(*MODE_SCHEDULE_RANGE)] if t and t != '들어가기']
+    stats = [t for t in mode[slice(*MODE_STAT_RANGE)] if t]
+
+    lines = [
+        '/** 원작 훈련 항목 — 능력치 이름을 골라 횟수를 쌓는다 (StrMODE) */',
+        'export const TRAINING_TARGETS: readonly string[] = ['
+        + ', '.join(quote(t) for t in training) + ']',
+        '',
+        '/** 원작 스케줄 활동 (StrMODE) */',
+        'export const SCHEDULE_ACTIVITIES: readonly string[] = ['
+        + ', '.join(quote(t) for t in schedule) + ']',
+        '',
+        '/** 원작 선수 상태 항목 (StrMODE) */',
+        'export const STATUS_LABELS: readonly string[] = ['
+        + ', '.join(quote(t) for t in stats) + ']',
+    ]
+    write('modeMenus.ts', '\n'.join(lines) + '\n')
+
+
+# 미션 레코드 배치 (레코드 바이트를 직접 세어 확인했다):
+#   u8 × 9 | u16 제한 | u16 제한시간 | u8 조건코드 | 목표 32 | 이름 32 | 설명문 64 | ...
+# 제한시간을 u8 로 읽으면 300초(2c 01)가 44초가 된다 — 실제로 그렇게 잘못 읽고 있었다.
+MISSION_ID_OFFSET = 0
+MISSION_STAGE_OFFSET = 1
+# 윗 4비트 = 상대 마선수 순번 (타자편은 마투수, 투수편은 마타자 순서. 0 이면 일반 선수)
+MISSION_OPPONENT_OFFSET = 8
+# 상위 바이트 = 타석 제한, 하위 바이트 윗 4비트 = 스윙 제한, 아래 4비트 = 투구 수 제한.
+# 설명문과 전부 맞는다: 투수 4번 0x0106 "6개의 공으로", 타자 10번 0x0030 "3번의 스윙으로"
+MISSION_LIMITS_OFFSET = 9
+MISSION_TIME_LIMIT_OFFSET = 11
+# 투수편 몇 미션에만 1~3 이 있다 (5번 무실점·10번 무안타·마타자 미션). 뜻은 미해독이다.
+# 예전에는 이 바이트가 목표 문자열 앞에 붙어 '\x01아웃' 이 되는 바람에 목표가 판정되지 않았다.
+MISSION_CONDITION_OFFSET = 13
+MISSION_TEXT_FIELDS = ((14, 32), (46, 32), (78, 64))
+
+# 목표 개수 칸 (레코드 뒤쪽). 4비트 단위로 여러 목표가 한 바이트를 나눠 쓴다.
+# (오프셋, 비트 이동, 마스크) — 모든 미션의 설명문 숫자와 맞는다.
+#   타자 1 "2안타와 1타점" → 166=02, 165=01 / 타자 13 "3번의 타석을 모두 홈런" → 163=03
+#   투수 2 "MAX투구게이지 6구와 2아웃" → 161 위=6, 164=02 / 투수 1 "경기를 마무리" → 164=03 (설명문에 숫자 없음)
+BATTER_GOAL_COUNT_FIELDS = {
+    '단타': (160, 0, 0xF), '2루타': (160, 4, 0xF), '3루타': (161, 0, 0xF),
+    '그라운드홈런': (162, 0, 0xF), '만루홈런': (162, 4, 0xF), '홈런': (163, 0, 0xFF),
+    '도루': (164, 0, 0xF), '번트': (164, 4, 0xF), '타점': (165, 0, 0xFF), '안타': (166, 0, 0xFF),
+}
+PITCHER_GOAL_COUNT_FIELDS = {
+    '삼진콤보': (160, 0, 0xF), '탈삼진': (160, 4, 0xF), 'MAX게이지': (161, 4, 0xF), '아웃': (164, 0, 0xFF),
+}
+
+
+# 시작 상황 (점검 에이전트, 0xaae7c) — 3번 바이트 아래 4비트 = 시작 이닝(0부터),
+# 4번 바이트 비트0-1 아웃 · 2-3 볼 · 4-5 스트라이크 (볼/스트라이크 순서는 추정 — 투수 14번 "3볼" 과 맞음),
+# 5번 바이트 주자 비트 4=1루 · 2=2루 · 1=3루 (0xa9a9c)
+MISSION_INNING_OFFSET = 3
+MISSION_COUNT_OFFSET = 4
+MISSION_RUNNER_OFFSET = 5
+# 투수 실패 한도 (0xaac76~0xaacd6) — 그 값에 닿는 순간 실패. 0 이면 한도 없음
+PITCHER_RUN_LIMIT = (161, 0, 0xF)
+PITCHER_WALK_LIMIT = (162, 4, 0xF)
+PITCHER_HIT_LIMIT = (162, 0, 0xF)
+
+
+def nibble(row: bytes, field: tuple) -> int:
+    offset, shift, mask = field
+    return (row[offset] >> shift) & mask
+
+
+def goal_counts_of(row: bytes, fields: dict) -> dict:
+    counts = {name: (row[offset] >> shift) & mask for name, (offset, shift, mask) in fields.items()}
+    return {name: count for name, count in counts.items() if count > 0}
+
+
+def fixed_cp949(row: bytes, offset: int, size: int) -> str:
+    return row[offset:offset + size].split(b'\x00', 1)[0].decode('cp949').strip()
+
+
+# 142~159 = 9이닝 × 2팀 점수판 (0xaa610). 위 줄 = 원정 상대, 아래 줄 = 홈(우리) — 타자 12번 4:7 9회말 만루,
+# 투수 1번 3:1 로 앞선 9회(실점 한도 2 = 동점) 와 맞아서 이렇게 읽는다 (추정)
+MISSION_SCOREBOARD_OFFSET = 142
+INNINGS = 9
+
+
+def start_of(row: bytes) -> str:
+    count = row[MISSION_COUNT_OFFSET]
+    opponent = sum(row[MISSION_SCOREBOARD_OFFSET:MISSION_SCOREBOARD_OFFSET + INNINGS])
+    ours = sum(row[MISSION_SCOREBOARD_OFFSET + INNINGS:MISSION_SCOREBOARD_OFFSET + 2 * INNINGS])
+    runners = row[MISSION_RUNNER_OFFSET]
+    flag = lambda bit: 'true' if runners & bit else 'false'
+    return (
+        f"{{ inning: {(row[MISSION_INNING_OFFSET] & 0xF) + 1}, outs: {count & 3}, "
+        f"balls: {(count >> 2) & 3}, strikes: {(count >> 4) & 3}, "
+        f"runners: {{ first: {flag(4)}, second: {flag(2)}, third: {flag(1)} }}, "
+        f"ourScore: {ours}, opponentScore: {opponent} }}"
+    )
+
+
+def fail_limits_of(row: bytes, side: str) -> str:
+    if side != '투수':
+        return '{ runs: 0, walks: 0, hits: 0 }'
+    return (
+        f"{{ runs: {nibble(row, PITCHER_RUN_LIMIT)}, walks: {nibble(row, PITCHER_WALK_LIMIT)}, "
+        f"hits: {nibble(row, PITCHER_HIT_LIMIT)} }}"
+    )
+
+
+def generate_missions() -> None:
+    """
+    미션 모드 — 원작 설명서: "타자편, 투수편으로 나누어지며 총 28개의 미션이
+    준비되어 있습니다. 육성 선수 혹은 팀을 조작하여 제한 조건 내에서 게임 내 목표를..."
+
+    이름·목표·설명문은 XlsBATTER_MISSION / XlsPITCHER_MISSION 레코드의 고정 길이 CP949 칸이다.
+    """
+    lines = [
+        'export interface OriginalMission {',
+        '  readonly id: number',
+        "  readonly side: '타자' | '투수'",
+        '  /** 난이도 단계. 원본 레코드의 두 번째 열이며 세 미션마다 오른다. */',
+        '  readonly stage: number',
+        '  readonly name: string',
+        '  /** 목표 종류. 원본은 여러 개를 | 로 묶는다. */',
+        '  readonly goals: readonly string[]',
+        '  /** 원작 설명문. !N 은 줄바꿈 마크업이다. */',
+        '  readonly briefing: string',
+        '  /** 초 단위. 0이면 시간 제한이 없다. */',
+        '  readonly timeLimitSeconds: number',
+        '  /** 타석 제한. 0이면 없다. */',
+        '  readonly plateAppearanceLimit: number',
+        '  /** 스윙 제한. 0이면 없다. */',
+        '  readonly swingLimit: number',
+        '  /** 투구 수 제한. 0이면 없다. */',
+        '  readonly pitchLimit: number',
+        '  /** 상대 마선수 순번 (1부터, 상대 편 ACE_PLAYERS 순서). 0이면 일반 선수. */',
+        '  readonly opponentAce: number',
+        '  /** 원본 조건 코드. 뜻은 미해독이다. */',
+        '  readonly conditionCode: number',
+        '  /** 목표별 필요 개수 (레코드 뒤쪽 칸). 사이클링히트는 단타·2루타·3루타·홈런 각각이다. */',
+        '  readonly goalCounts: Readonly<Record<string, number>>',
+        '  /** 시작 상황 — 이닝(1부터)·아웃·볼·스트라이크·주자 */',
+        '  readonly start: {',
+        '    readonly inning: number',
+        '    readonly outs: number',
+        '    readonly balls: number',
+        '    readonly strikes: number',
+        '    readonly runners: { readonly first: boolean; readonly second: boolean; readonly third: boolean }',
+        '    readonly ourScore: number',
+        '    readonly opponentScore: number',
+        '  }',
+        '  /** 투수편 실패 한도 — 실점·볼넷·피안타가 이 값에 닿으면 실패. 0 이면 없음 */',
+        '  readonly failLimits: { readonly runs: number; readonly walks: number; readonly hits: number }',
+        '}',
+        '',
+        '/** 원본 XlsBATTER_MISSION / XlsPITCHER_MISSION */',
+        'export const MISSIONS: readonly OriginalMission[] = [',
+    ]
+
+    for side, table, count_fields in (
+        ('타자', 'XlsBATTER_MISSION', BATTER_GOAL_COUNT_FIELDS),
+        ('투수', 'XlsPITCHER_MISSION', PITCHER_GOAL_COUNT_FIELDS),
+    ):
+        data = load(table)
+        for row_hex in data['rows']:
+            row = bytes.fromhex(row_hex)
+            goals, name, briefing = (fixed_cp949(row, offset, size) for offset, size in MISSION_TEXT_FIELDS)
+            if not name:
+                continue
+            limits, time_limit = struct.unpack_from('<HH', row, MISSION_LIMITS_OFFSET)
+            lines.append(
+                f"  {{ id: {row[MISSION_ID_OFFSET]}, side: '{side}', "
+                f"stage: {row[MISSION_STAGE_OFFSET]}, name: {quote(name)}, "
+                f"goals: [{', '.join(quote(g) for g in goals.split('|'))}], "
+                f"briefing: {quote(briefing)}, "
+                f"timeLimitSeconds: {time_limit}, "
+                f"plateAppearanceLimit: {limits >> 8}, "
+                f"swingLimit: {(limits >> 4) & 0xF}, "
+                f"pitchLimit: {limits & 0xF}, "
+                f"opponentAce: {row[MISSION_OPPONENT_OFFSET] >> 4}, "
+                f"conditionCode: {row[MISSION_CONDITION_OFFSET]}, "
+                f"goalCounts: {{ {', '.join(f'{quote(k)}: {v}' for k, v in goal_counts_of(row, count_fields).items())} }}, "
+                f"start: {start_of(row)}, "
+                f"failLimits: {fail_limits_of(row, side)} }},"
+            )
+    lines.append(']')
+    write('missions.ts', '\n'.join(lines) + '\n')
+
+
+# data/pitch.zt1 의 좌표 단위를 존 단위로 바꾸는 나눗수.
+# 가장 큰 변화(CHANGEUP 1614)가 존 0.9가 되도록 잡았다 — 원본의 존 크기는 미해독이라
+# 이 한 값만 우리가 정했고, 구질 사이의 상대 비율은 전부 원본 그대로다.
+PITCH_BREAK_DIVISOR = 1793
+
+PITCH_TYPE_NAMES = [
+    'FASTBALL', 'TWO-SEAM', 'H.FAST', 'SINKER', 'SHOOT', 'SLIDER', 'CURVE', 'FORK',
+    'CHANGEUP', 'CUT FAST', 'R.FAST', 'H.SINKER', 'H.SHOOT', 'H.SLIDER', 'S.CURVE',
+    'S.CHANGEUP', 'GYRO', 'P.SINKER', 'P.SLIDER', 'KNUCKLE', 'SPECIAL',
+]
+
+# 레코드 수가 가장 많은 직구(32)를 기준 구속 1.0으로 둔다.
+FASTEST_RECORD_COUNT = 32
+
+
+def read_pitch_curves() -> list[dict]:
+    """
+    data/pitch.zt1 의 구질별 궤적 제어점에서 변화량을 계산한다.
+
+        u8 항목수 | u32 오프셋 × N | 항목
+        항목 = u8 구질번호 | u8 레코드수 | 레코드…
+        레코드 = u16 크기 | u8 단계 | u16 점정보 | (i32 x, i32 y, i32 z) × 점개수
+
+    ※ 점정보는 하위 바이트만 점 개수다. 상위 바이트는 변형 번호라 마스킹해야 한다
+      (514 = 0x0202 → 점 2개, 변형 2). 이걸 안 가리면 점이 수백 개로 잡힌다.
+
+    ※ 레코드는 **4개씩 한 묶음이 구속 단계**다. 묶음 안에서 `단계`가 1~2씩 줄어든다
+      (FASTBALL 18/16/14/12, CHANGEUP 24/23/22/21). `단계`가 곧 공이 날아가는
+      프레임 수라서 이것이 원본의 실제 비행 시간이다.
+
+    첫 점은 릴리스, 마지막 점은 플레이트이며 모든 구질이 같다.
+    가운데 점이 직선에서 얼마나 벗어나는지가 곧 변화량이다.
+    직구는 점이 둘뿐이라 변화가 0이 된다 — 원본이 실제로 그렇다.
+    """
+    import zlib as _zlib
+    raw = _zlib.decompress(Path('base/work/jar/data/pitch.zt1').read_bytes()[8:])
+    count = raw[0]
+    offsets = [int.from_bytes(raw[1 + i * 4:5 + i * 4], 'little') for i in range(count)]
+
+    curves = []
+    for index in range(min(count, len(PITCH_TYPE_NAMES))):
+        end = offsets[index + 1] if index + 1 < count else len(raw)
+        block = raw[offsets[index]:end]
+        record_count = block[1]
+        record_size = int.from_bytes(block[2:4], 'little')
+        record = block[2:2 + record_size]
+        point_count = int.from_bytes(record[3:5], 'little') & 0xFF
+
+        # 앞 4개 레코드가 구속 1~4단계다. 그 `단계` 값이 비행 프레임 수다.
+        flight_steps = []
+        cursor = 2
+        for _ in range(min(4, record_count)):
+            size = int.from_bytes(block[cursor:cursor + 2], 'little')
+            if size <= 0 or cursor + size > len(block):
+                break
+            flight_steps.append(block[cursor + 2])
+            cursor += size
+
+        points = []
+        for p in range(point_count):
+            base = 5 + p * 12
+            points.append(tuple(
+                int.from_bytes(record[base + k * 4:base + 4 + k * 4], 'little', signed=True)
+                for k in range(3)
+            ))
+
+        horizontal = vertical = 0
+        if len(points) >= 2:
+            (x0, y0, z0), (x1, y1, z1) = points[0], points[-1]
+            for (x, y, z) in points[1:-1]:
+                ratio = (z - z0) / (z1 - z0) if z1 != z0 else 0
+                dx = x - (x0 + (x1 - x0) * ratio)
+                dy = y - (y0 + (y1 - y0) * ratio)
+                if abs(dx) > abs(horizontal):
+                    horizontal = dx
+                if abs(dy) > abs(vertical):
+                    vertical = dy
+
+        curves.append({
+            'name': PITCH_TYPE_NAMES[index],
+            'horizontal': horizontal / PITCH_BREAK_DIVISOR,
+            # 원본은 y가 아래로 갈수록 크다. 우리 좌표는 위가 양수라 부호를 뒤집는다.
+            'vertical': -vertical / PITCH_BREAK_DIVISOR,
+            'speed': record_count / FASTEST_RECORD_COUNT,
+            'flight_steps': flight_steps,
+        })
+    return curves
+
+
+def generate_pitch_types() -> None:
+    lines = [
+        'export interface PitchTypeInfo {',
+        '  readonly name: string',
+        '  /** 변화량 (존 단위). 원본 궤적 제어점에서 계산했다. */',
+        '  readonly horizontalBreak: number',
+        '  readonly verticalBreak: number',
+        '  /** 구속 계수. 원본 궤적의 레코드 수 비율이다. */',
+        '  readonly speed: number',
+        '  /**',
+        '   * 구속 1~4단계별 비행 프레임 수. pitch.zt1 레코드의 `단계` 값 그대로다.',
+        '   * 앞이 느리고 뒤로 갈수록 빠르다 (FASTBALL 18/16/14/12).',
+        '   */',
+        '  readonly flightSteps: readonly number[]',
+        '}',
+        '',
+        '/** 원작 구질 21종. 이름은 binary.mod, 변화량·구속·비행 프레임은 data/pitch.zt1 에서 왔다. */',
+        'export const PITCH_TYPES: readonly PitchTypeInfo[] = [',
+    ]
+    for curve in read_pitch_curves():
+        lines.append(
+            f"  {{ name: {quote(curve['name'])}, "
+            f"horizontalBreak: {curve['horizontal']:.3f}, "
+            f"verticalBreak: {curve['vertical']:.3f}, "
+            f"speed: {curve['speed']:.3f}, "
+            f"flightSteps: [{', '.join(str(s) for s in curve['flight_steps'])}] }},"
+        )
+    lines.append(']')
+    write('pitchTypes.ts', '\n'.join(lines) + '\n')
+
+
+
+EVENT_PORTRAIT_FILES = ('event_char_0', 'event_char_1', 'event_char_2')
+
+
+def _event_portraits(portraits: list[dict]) -> list[dict]:
+    # 캐릭터 번호의 기본 애니메이션이 -1 인 항목은 원작도 자리를 차지하지 않는다 (0x7f54c).
+    return [
+        {'file': p['file'], 'animation': p['anim'], 'side': p['side']}
+        for p in portraits
+        if not p.get('hidden') and p.get('file') in EVENT_PORTRAIT_FILES
+    ]
+
+
+def _event_command(command: dict, texts: list[str]) -> dict:
+    op = command['op']
+    if op == 'system' and command['sub'] == 0:
+        # 알림 팝업 — arg 가 대사 번호다 (0x8cf64 system 0)
+        text = texts[command['arg']] if command['arg'] < len(texts) else ''
+        return {'op': 'system', 'sub': 0, 'arg': command['arg'], 'text': text}
+    if op == 'say':
+        return {'op': 'say', 'text': command['textStr'] or '', 'speaker': command['speaker'],
+                'format': command['fmt'], 'portraits': _event_portraits(command['portraits'])}
+    if op == 'choice':
+        return {'op': 'choice', 'portraits': _event_portraits(command['portraits']),
+                'choices': [{'text': c['textStr'] or '', 'gotoEvent': c['gotoEvent']} for c in command['choices']]}
+    if op == 'yesno':
+        return {'op': 'yesno', 'text': command['textStr'] or '', 'yesEvent': command['yesEvent'], 'noEvent': command['noEvent']}
+    if op == 'match':
+        return {'op': 'match', 'team': command['team'], 'resultEvents': [command['arg1'], command['arg2']]}
+    return {key: value for key, value in command.items() if key not in ('textStr', 'speakerName')}
+
+
+def generate_events() -> None:
+    """
+    tools/decode_events.py 가 해독한 r_event 스크립트를 웹에서 쓰는 형태로 옮긴다.
+    대사·화자·초상화(파일·애니메이션·좌우)·선택지 분기가 전부 원본 그대로다.
+    """
+    events = json.loads(Path('base/extracted/r_event.json').read_text(encoding='utf-8'))
+    texts = json.loads(Path('base/extracted/r_event_txt.json').read_text(encoding='utf-8'))
+    names = load('StrMODE')
+    # 화자 번호 0 = 이름 없음, 1 = 플레이어, 2~24 = StrMODE[번호+91] (binary.mod 0x8b0xx)
+    speakers = ['', '<player>'] + [names[code + 91] for code in range(2, 25)]
+
+    out = [
+        {
+            'id': e['id'],
+            # 대상 편 — 0 코드가 직접 부름(분기·평가·엔딩) · 1 공통 · 2 타자 · 3 투수 (점검 에이전트, 타자/투수 쌍 대사로 확인)
+            'audience': e['enabled'],
+            'repeatable': bool(e['repeatable']),
+            'trigger': e['trigger'],
+            'requiresEvent': e['requiresEvent'],
+            'dateFrom': e['dateFrom'],
+            'dateTo': e['dateTo'],
+            'conditions': e['conditions'],
+            'commands': [_event_command(c, texts) for c in e['commands']],
+        }
+        for e in events
+    ]
+    write_json_module(
+        'events.ts',
+        'events.json',
+        out,
+        '/** 원본 data/r_event.zt1 이벤트 스크립트 (binary.mod 0xadd10 해석기 기준으로 해독). */\n'
+        'export const ORIGINAL_EVENTS: readonly OriginalEvent[] = data as readonly OriginalEvent[]',
+        imports="import type { OriginalEvent } from '@/shared/config/original/eventTypes'",
+    )
+    meta = [
+        f'/** r_event 이벤트 수. 본문(events.ts)을 불러오지 않고 진행 상태를 알 때 쓴다. */',
+        f'export const TOTAL_EVENT_COUNT = {len(out)}',
+        '',
+
+        '/** 화자 번호 → 이름표. 0 은 이름 없음, 1 은 플레이어 이름으로 바꾼다 (StrMODE[번호+91]). */',
+        f'export const SPEAKER_NAMES: readonly string[] = {json.dumps(speakers, ensure_ascii=False)}',
+    ]
+    write('eventMeta.ts', '\n'.join(meta) + '\n')
+
+PATTERN_FILE = Path('base/work/jar/data/pattern.dat')
+PATTERN_FLAG_FILE = Path('base/work/jar/data/pattern_plag.dat')
+# pattern.dat 은 앞 9바이트 뒤(파일 +9)부터, pattern_plag.dat 은 파일 처음부터 같은 구조다:
+#   u8 묶음 수 · u32×묶음 수 (기준점부터의 거리) · 묶음마다 u8 코드 · u16 개수 · 항목들
+PATTERN_BASE = 9
+PATTERN_FLAG_BASE = 0
+
+
+def _pattern_groups(data: bytes, base: int, item_size: int) -> dict:
+    count = data[base]
+    groups = {}
+    for index in range(count):
+        offset = base + int.from_bytes(data[base + 1 + index * 4:base + 5 + index * 4], 'little')
+        code = data[offset]
+        size = int.from_bytes(data[offset + 1:offset + 3], 'little')
+        items = [
+            int.from_bytes(data[offset + 3 + i * item_size:offset + 3 + (i + 1) * item_size], 'little')
+            for i in range(size)
+        ]
+        groups[code] = items
+    return groups
+
+
+def generate_batted_ball_patterns() -> None:
+    patterns = _pattern_groups(PATTERN_FILE.read_bytes(), PATTERN_BASE, 4)
+    flags = _pattern_groups(PATTERN_FLAG_FILE.read_bytes(), PATTERN_FLAG_BASE, 1)
+    lines = []
+    for code in sorted(patterns):
+        words = patterns[code]
+        code_flags = flags.get(code, [0] * len(words))
+        if len(code_flags) != len(words):
+            raise ValueError(f'pattern_plag 개수가 다릅니다: 코드 {code} {len(code_flags)} != {len(words)}')
+        items = ', '.join(
+            f'[{w >> 23}, {(w >> 11) & 0xFFF}, {w & 0x7FF}, {flag}]' for w, flag in zip(words, code_flags)
+        )
+        lines.append(f'  {code}: [{items}],')
+    body = [
+        '/**',
+        ' * 원본 data/pattern.dat · pattern_plag.dat — 타구 결과 코드(0~26, 21~23 없음)별 타구 패턴.',
+        ' * 항목 = [a, b, c, 플래그]. u32 w 에서 a = w>>23, b = (w>>11)&0xfff, c = w&0x7ff (0xb0614 · 위치 분석 3차).',
+        ' * 뜻(추정): a 수평각(90 = 가운데, 45~135 밖이면 파울) · b 타구 속도 · c 높이. 플래그 비트0 = c 부호 반전.',
+        ' */',
+        'export type BattedBallPattern = readonly [angle: number, speed: number, height: number, flags: number]',
+        '',
+        'export const BATTED_BALL_PATTERNS: Readonly<Record<number, readonly BattedBallPattern[]>> = {',
+        *lines,
+        '}',
+    ]
+    write('battedBallPatterns.ts', '\n'.join(body) + '\n')
+
+
+BINARY_MOD = Path('base/work/jar/binary.mod')
+# binary.mod 파일 오프셋 = VA − 0xfcc
+BINARY_VA_BASE = 0xFCC
+
+
+def read_binary_table(va: int, fmt: str) -> list[int]:
+    import struct as _struct
+    raw = BINARY_MOD.read_bytes()
+    return list(_struct.unpack_from(fmt, raw, va - BINARY_VA_BASE))
+
+
+def generate_pitch_curves() -> None:
+    """
+    data/pitch.zt1 투구 레코드 전부 (위치 분석 2·5차).
+        항목 = u8 구질 | u8 레코드수 | 레코드…
+        레코드 = u8 크기 | u8 곡선종류(0 베지어 · 1 B-스플라인) | u8 비행 틱 N | u8 점수 | u8 폼(level) | (i32 x, y, z) × 점수
+    항목 번호 + 1 이 원본 구질 번호 t 다 (1 FASTBALL … 21 SPECIAL, 22 마구).
+    """
+    import struct as _struct
+    import zlib as _zlib
+    raw = _zlib.decompress(Path('base/work/jar/data/pitch.zt1').read_bytes()[8:])
+    count = raw[0]
+    offsets = [_struct.unpack_from('<I', raw, 1 + i * 4)[0] for i in range(count)]
+    entries = []
+    for index in range(count):
+        end = offsets[index + 1] if index + 1 < count else len(raw)
+        block = raw[offsets[index]:end]
+        cursor = 2
+        records = []
+        for _ in range(block[1]):
+            size, curve, frames, point_count, form = block[cursor:cursor + 5]
+            if size != 5 + 12 * point_count:
+                raise ValueError(f'pitch.zt1 레코드 크기가 맞지 않습니다: 항목 {index} 크기 {size} 점 {point_count}')
+            points = [
+                list(_struct.unpack_from('<iii', block, cursor + 5 + 12 * p)) for p in range(point_count)
+            ]
+            records.append(f'{{ curve: {curve}, frames: {frames}, form: {form}, points: {points} }}')
+            cursor += size
+        entries.append('  [' + ', '.join(records) + '],')
+    body = [
+        '/**',
+        ' * 원본 data/pitch.zt1 투구 레코드 (파서 0x9e944 · 위치 분석 2·5차).',
+        ' * PITCH_RECORDS[t − 1] = 구질 t 의 레코드들. 같은 폼 안에서 k 번째(구속 단계 0~3)를 고른다.',
+        ' * 좌표는 발사점 S(20000, 0, 24500) 기준 상대값이다.',
+        ' */',
+        'export interface PitchRecord {',
+        '  /** 0 베지어 · 1 B-스플라인(미해독) */',
+        '  readonly curve: number',
+        '  /** 공이 나는 틱 수 N */',
+        '  readonly frames: number',
+        '  /** 투수 폼(level) */',
+        '  readonly form: number',
+        '  readonly points: readonly (readonly [number, number, number])[]',
+        '}',
+        '',
+        'export const PITCH_RECORDS: readonly (readonly PitchRecord[])[] = [',
+        *entries,
+        ']',
+    ]
+    write('pitchRecords.ts', '\n'.join(body) + '\n')
+
+
+def generate_trigonometry_tables() -> None:
+    """원본 정수 삼각함수 표 (위치 분석 2·5차, 0x6c6a8 · 0x6c768 · 0x6c7c0)."""
+    sine_hundred = read_binary_table(0xD310C, '<91B')
+    tangent = read_binary_table(0xD2FA4, '<90I')
+    sine_sixteen = read_binary_table(0xD2EEC, '<91H')
+    body = [
+        '/** sin × 100, 0~90° (표 0xd310c) */',
+        f'export const SINE_HUNDRED_TABLE: readonly number[] = {sine_hundred}',
+        '',
+        '/** tan × 10000, 0~89° (표 0xd2fa4) — 역탄젠트 이진 탐색용 */',
+        f'export const TANGENT_TABLE: readonly number[] = {tangent}',
+        '',
+        '/** sin × 65535, 0~90° (표 0xd2eec) — 제구 오차 각도용 */',
+        f'export const SINE_SIXTEEN_TABLE: readonly number[] = {sine_sixteen}',
+    ]
+    write('trigonometryTables.ts', '\n'.join(body) + '\n')
+
+
+PITCH_PATTERN_DIFFICULTIES = ('easy', 'normal', 'hard')
+PITCH_PATTERN_HEADER = 10
+PITCH_PATTERN_COLUMNS = 9
+
+
+def generate_pitch_patterns() -> None:
+    """
+    data/pitchpattern_{easy,normal,hard}.arr (0x9ede0 · 0x9eeac, 위치 분석 5차).
+    머리 10바이트(열 수 9 + 열 종류) 뒤 9바이트 행 72개 = (스트라이크, 볼, 아웃, 목표 종류 0~4 가중치 %, 주자 상황 열).
+    """
+    lines = []
+    for difficulty in PITCH_PATTERN_DIFFICULTIES:
+        raw = Path(f'base/work/jar/data/pitchpattern_{difficulty}.arr').read_bytes()
+        body = raw[PITCH_PATTERN_HEADER:]
+        if raw[0] != PITCH_PATTERN_COLUMNS or len(body) % PITCH_PATTERN_COLUMNS:
+            raise ValueError(f'pitchpattern_{difficulty}.arr 형식이 예상과 다릅니다')
+        rows = [list(body[i:i + PITCH_PATTERN_COLUMNS]) for i in range(0, len(body), PITCH_PATTERN_COLUMNS)]
+        lines.append(f'  {difficulty}: {rows},')
+    body = [
+        '/**',
+        ' * 원본 data/pitchpattern_*.arr — 행 = [스트라이크, 볼, 아웃, w0, w1, w2, w3, w4, 주자열].',
+        ' * 주자열: 1 주자 있고 2사 아님 · 2 주자 있고 2사 · 3 주자 없음. w 는 목표 종류 0~4 의 % 가중치.',
+        ' */',
+        "export type PitchPatternDifficulty = 'easy' | 'normal' | 'hard'",
+        '',
+        'export const PITCH_PATTERNS: Readonly<Record<PitchPatternDifficulty, readonly (readonly number[])[]>> = {',
+        *lines,
+        '}',
+    ]
+    write('pitchPatterns.ts', '\n'.join(body) + '\n')
+
+
+PITCHER_FORM_OFFSET = 0x0B
+PITCHER_MAGIC_OFFSET = 0x18
+PITCHER_PITCH_MASK_OFFSET = 0x1C
+
+
+def pitcher_repertoire_of(row_hex: str) -> tuple[int, int, int]:
+    """선수 레코드 → (폼 니블 +0xb>>4, 마구 번호 +0x18, 보유 구질 비트마스크 u32 +0x1c)"""
+    import struct as _struct
+    row = bytes.fromhex(row_hex)
+    return (
+        row[PITCHER_FORM_OFFSET] >> 4,
+        row[PITCHER_MAGIC_OFFSET],
+        _struct.unpack_from('<I', row, PITCHER_PITCH_MASK_OFFSET)[0],
+    )
+
+
+def generate_pitcher_repertoires() -> None:
+    """투수 레코드의 폼·마구·보유 구질 (0xb6e24 · 0xb6d2c, 위치 분석 5차). 마선수 투수 5명 + 일반 투수 120명."""
+    lines = []
+    for label, table in (('ACE_PITCHER_REPERTOIRES', 'XlsACE_PIT_DATA'), ('ROSTER_PITCHER_REPERTOIRES', 'XlsPITCHER_DATA')):
+        data = load(table)
+        items = []
+        for name, row in zip(data['names'], data['rows']):
+            if not name.strip():
+                continue
+            form, magic, mask = pitcher_repertoire_of(row)
+            items.append(f'  {{ name: {quote(name)}, form: {form}, magicId: {magic}, pitchMask: {mask} }},')
+        lines += [f'export const {label}: readonly PitcherRepertoire[] = [', *items, ']', '']
+    body = [
+        '/** 투수 레코드 — 폼 니블(+0xb>>4), 마구 번호(+0x18, 0 = 없음), 보유 구질 비트마스크(+0x1c, 비트 t−1 = 구질 t) */',
+        'export interface PitcherRepertoire {',
+        '  readonly name: string',
+        '  readonly form: number',
+        '  readonly magicId: number',
+        '  readonly pitchMask: number',
+        '}',
+        '',
+        *lines,
+    ]
+    write('pitcherRepertoires.ts', '\n'.join(body))
+
+
+SKY_ROW_COUNT = 6
+SKY_COLUMN_COUNT = 13
+SKY_COLOR_COUNT = 10
+
+
+def generate_stadium_scene() -> None:
+    """
+    타석 화면 배경 표 (위치 분석 6차).
+        하늘 0x77fe8 — 색 번호 표 0xd37a4[행 × 13 + 열], 색 쌍 표 0xd37f2[번호] = (위 RGB, 아래 RGB)
+        펜스 0x77974 — stadium/fence.pzf 프레임의 박스 0·1 = 팀 아이콘, 박스 2 = 전광판
+    """
+    import sys as _sys
+    _sys.path.insert(0, str(Path(__file__).parent))
+    from decode_pzx import read_section
+    import struct as _struct
+    rows = read_binary_table(0xD37A4, f'<{SKY_ROW_COUNT * SKY_COLUMN_COUNT}B')
+    colors = read_binary_table(0xD37F2, f'<{SKY_COLOR_COUNT * 6}B')
+    fence_raw = Path('base/work/jar/stadium/fence.pzf').read_bytes()
+    boxes = []
+    for block in read_section(fence_raw, 4, len(fence_raw)):
+        frame_boxes = [list(_struct.unpack_from('<hhhh', block, 2 + 8 * k)) for k in range(block[1])]
+        boxes.append(frame_boxes)
+    sky_rows = [rows[r * SKY_COLUMN_COUNT:(r + 1) * SKY_COLUMN_COUNT] for r in range(SKY_ROW_COUNT)]
+    sky_colors = [colors[i * 6:i * 6 + 6] for i in range(SKY_COLOR_COUNT)]
+    body = [
+        '/** 하늘 색 번호 — SKY_COLOR_ROWS[행][min(이닝, 12)] (표 0xd37a4, 행 6개) */',
+        f'export const SKY_COLOR_ROWS: readonly (readonly number[])[] = {sky_rows}',
+        '',
+        '/** 하늘 색 쌍 [위 R, G, B, 아래 R, G, B] (표 0xd37f2) */',
+        f'export const SKY_COLOR_PAIRS: readonly (readonly number[])[] = {sky_colors}',
+        '',
+        '/** 구장 펜스 프레임별 박스 [x, y, 폭, 높이] — 0·1 팀 아이콘, 2 전광판 (fence.pzf) */',
+        f'export const FENCE_BOXES: readonly (readonly (readonly number[])[])[] = {boxes}',
+    ]
+    write('stadiumScene.ts', '\n'.join(body) + '\n')
+
+
+def main() -> None:
+    OUTPUT.mkdir(parents=True, exist_ok=True)
+    print('생성:')
+    generate_ace_players()
+    generate_roster()
+    generate_teams()
+    generate_string_list('StrNICKNAME', 'ORIGINAL_TITLES', 'titles.ts', '칭호')
+    generate_skills()
+    generate_year_goals()
+    generate_string_list('StrITEM', 'ORIGINAL_ITEMS', 'items.ts', '아이템 이름')
+    generate_string_list('StrENDING', 'ORIGINAL_ENDINGS', 'endings.ts', '엔딩 전문')
+    generate_string_list('StrTIP', 'ORIGINAL_TIPS', 'tips.ts', '로딩 팁')
+    generate_string_list('StrHOWTO', 'ORIGINAL_HOWTO', 'howto.ts', '게임 내 도움말')
+    generate_string_list('StrUSER_EVT', 'ORIGINAL_USER_EVENTS', 'userEvents.ts', '경기 후 평가·목표·연속 기록 문구')
+    generate_bursts()
+    generate_mode_menus()
+    generate_missions()
+    generate_pitch_types()
+    generate_events()
+    generate_batted_ball_patterns()
+    generate_pitch_curves()
+    generate_trigonometry_tables()
+    generate_pitch_patterns()
+    generate_pitcher_repertoires()
+    generate_stadium_scene()
+
+
+main()

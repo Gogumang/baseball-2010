@@ -1,0 +1,854 @@
+{
+ "ace_icon": [
+  0,
+  0,
+  0,
+  0
+ ],
+ "ballantine_effect": [
+  12,
+  12,
+  1,
+  0
+ ],
+ "batter_death": [
+  12,
+  12,
+  0,
+  0
+ ],
+ "batter_kao": [
+  15,
+  15,
+  0,
+  0
+ ],
+ "batter_medica": [
+  12,
+  12,
+  0,
+  0
+ ],
+ "batter_roze": [
+  13,
+  13,
+  0,
+  0
+ ],
+ "batter_tiger": [
+  13,
+  13,
+  2,
+  0
+ ],
+ "bbmachine_effect": [
+  10,
+  10,
+  1,
+  0
+ ],
+ "defender_ballantine": [
+  38,
+  38,
+  0,
+  0
+ ],
+ "defender_bbmachine": [
+  38,
+  38,
+  0,
+  0
+ ],
+ "defender_death": [
+  125,
+  125,
+  3,
+  0
+ ],
+ "defender_dragona": [
+  38,
+  38,
+  0,
+  0
+ ],
+ "defender_kao": [
+  125,
+  125,
+  3,
+  0
+ ],
+ "defender_leony": [
+  38,
+  38,
+  0,
+  0
+ ],
+ "defender_medica": [
+  125,
+  125,
+  3,
+  0
+ ],
+ "defender_psyker": [
+  38,
+  38,
+  0,
+  0
+ ],
+ "defender_roze": [
+  125,
+  125,
+  3,
+  0
+ ],
+ "defender_tiger": [
+  125,
+  125,
+  3,
+  0
+ ],
+ "dragona_effect": [
+  0,
+  0,
+  0,
+  0
+ ],
+ "leony_effect": [
+  13,
+  13,
+  0,
+  0
+ ],
+ "medica_effect": [
+  3,
+  3,
+  1,
+  0
+ ],
+ "pitcher_ballantine": [
+  19,
+  19,
+  2,
+  0
+ ],
+ "pitcher_bbmachine": [
+  14,
+  14,
+  2,
+  0
+ ],
+ "pitcher_dragona": [
+  14,
+  14,
+  2,
+  0
+ ],
+ "pitcher_leony": [
+  16,
+  16,
+  2,
+  0
+ ],
+ "pitcher_psyker": [
+  20,
+  20,
+  1,
+  0
+ ],
+ "psyker_effect": [
+  0,
+  0,
+  0,
+  0
+ ],
+ "ball": [
+  34,
+  34,
+  0,
+  0
+ ],
+ "batter_balancer": [
+  28,
+  26,
+  0,
+  0
+ ],
+ "batter_batter": [
+  27,
+  27,
+  0,
+  0
+ ],
+ "batter_ghost": [
+  8,
+  8,
+  2,
+  0
+ ],
+ "batter_helmet": [
+  27,
+  27,
+  0,
+  0
+ ],
+ "batter_shadow": [
+  27,
+  27,
+  0,
+  0
+ ],
+ "batter_sluger": [
+  26,
+  25,
+  0,
+  0
+ ],
+ "certi": [
+  9,
+  9,
+  0,
+  0
+ ],
+ "deadly_effect": [
+  4,
+  4,
+  1,
+  0
+ ],
+ "defender": [
+  125,
+  125,
+  3,
+  0
+ ],
+ "effect_fire": [
+  4,
+  4,
+  1,
+  0
+ ],
+ "effect_frame": [
+  4,
+  4,
+  1,
+  0
+ ],
+ "effect_meteor": [
+  6,
+  6,
+  1,
+  0
+ ],
+ "effect_pitcher": [
+  8,
+  8,
+  1,
+  0
+ ],
+ "effect_power": [
+  5,
+  5,
+  1,
+  0
+ ],
+ "effect_shinning": [
+  4,
+  4,
+  1,
+  0
+ ],
+ "effect_tornado": [
+  5,
+  5,
+  1,
+  0
+ ],
+ "game_effect": [
+  22,
+  21,
+  4,
+  0
+ ],
+ "player_effect": [
+  58,
+  55,
+  17,
+  0
+ ],
+ "sky_effect_light": [
+  11,
+  11,
+  1,
+  0
+ ],
+ "sky_effect_light1": [
+  11,
+  11,
+  1,
+  0
+ ],
+ "ending": [
+  1,
+  1,
+  4,
+  0
+ ],
+ "event_ani": [
+  12,
+  11,
+  6,
+  0
+ ],
+ "event_char_0": [
+  181,
+  180,
+  105,
+  0
+ ],
+ "event_char_1": [
+  99,
+  98,
+  35,
+  0
+ ],
+ "event_char_2": [
+  25,
+  24,
+  48,
+  0
+ ],
+ "item_bat_hand": [
+  27,
+  27,
+  0,
+  0
+ ],
+ "item_bat_hand_014_0": [
+  27,
+  27,
+  0,
+  0
+ ],
+ "item_bat_hand_10": [
+  27,
+  27,
+  0,
+  0
+ ],
+ "item_bat_hand_1_1": [
+  27,
+  25,
+  0,
+  0
+ ],
+ "item_bat_hand_2_0": [
+  27,
+  27,
+  0,
+  0
+ ],
+ "item_bat_hand_35_0": [
+  27,
+  27,
+  0,
+  0
+ ],
+ "item_bat_hand_4_1": [
+  27,
+  25,
+  0,
+  0
+ ],
+ "item_bat_hand_5_1": [
+  27,
+  25,
+  0,
+  0
+ ],
+ "item_bat_hand_6_0": [
+  27,
+  27,
+  0,
+  0
+ ],
+ "item_bat_hand_7": [
+  27,
+  27,
+  0,
+  0
+ ],
+ "item_bat_hand_8": [
+  27,
+  27,
+  0,
+  0
+ ],
+ "item_bat_hand_9": [
+  27,
+  27,
+  0,
+  0
+ ],
+ "item_bat_head_0": [
+  27,
+  27,
+  2,
+  0
+ ],
+ "item_bat_head_1": [
+  27,
+  27,
+  2,
+  0
+ ],
+ "item_bat_head_10": [
+  27,
+  27,
+  0,
+  0
+ ],
+ "item_bat_head_2": [
+  27,
+  27,
+  2,
+  0
+ ],
+ "item_bat_head_3": [
+  27,
+  27,
+  2,
+  0
+ ],
+ "item_bat_head_4": [
+  27,
+  27,
+  2,
+  0
+ ],
+ "item_bat_head_5": [
+  27,
+  27,
+  2,
+  0
+ ],
+ "item_bat_head_6": [
+  27,
+  27,
+  2,
+  0
+ ],
+ "item_bat_head_7": [
+  27,
+  27,
+  0,
+  0
+ ],
+ "item_bat_head_8": [
+  27,
+  27,
+  0,
+  0
+ ],
+ "item_bat_head_9": [
+  27,
+  27,
+  0,
+  0
+ ],
+ "item_bat_leg_0": [
+  27,
+  27,
+  0,
+  0
+ ],
+ "item_bat_leg_7": [
+  27,
+  27,
+  0,
+  0
+ ],
+ "item_pit_body_10": [
+  22,
+  22,
+  4,
+  0
+ ],
+ "item_pit_body_7": [
+  22,
+  22,
+  4,
+  0
+ ],
+ "item_pit_body_8": [
+  22,
+  22,
+  4,
+  0
+ ],
+ "item_pit_body_9": [
+  22,
+  22,
+  4,
+  0
+ ],
+ "item_pit_hand_0": [
+  22,
+  19,
+  4,
+  0
+ ],
+ "item_pit_hand_7": [
+  22,
+  19,
+  4,
+  0
+ ],
+ "item_pit_head_0": [
+  22,
+  22,
+  4,
+  0
+ ],
+ "item_pit_head_1": [
+  22,
+  22,
+  4,
+  0
+ ],
+ "item_pit_head_10": [
+  22,
+  22,
+  4,
+  0
+ ],
+ "item_pit_head_2": [
+  22,
+  22,
+  4,
+  0
+ ],
+ "item_pit_head_3": [
+  22,
+  22,
+  4,
+  0
+ ],
+ "item_pit_head_4": [
+  22,
+  22,
+  4,
+  0
+ ],
+ "item_pit_head_5": [
+  22,
+  22,
+  4,
+  0
+ ],
+ "item_pit_head_6": [
+  22,
+  22,
+  4,
+  0
+ ],
+ "item_pit_head_7": [
+  22,
+  22,
+  4,
+  0
+ ],
+ "item_pit_head_8": [
+  22,
+  22,
+  4,
+  0
+ ],
+ "item_pit_head_9": [
+  22,
+  22,
+  4,
+  0
+ ],
+ "item_pit_leg_0": [
+  22,
+  22,
+  4,
+  0
+ ],
+ "item_pit_leg_7": [
+  22,
+  22,
+  4,
+  0
+ ],
+ "loadingbar": [
+  6,
+  6,
+  1,
+  0
+ ],
+ "logo": [
+  3,
+  3,
+  1,
+  0
+ ],
+ "main_ball": [
+  7,
+  7,
+  1,
+  0
+ ],
+ "main_title": [
+  21,
+  21,
+  3,
+  0
+ ],
+ "main_ui": [
+  29,
+  29,
+  0,
+  0
+ ],
+ "pitcher": [
+  44,
+  35,
+  4,
+  0
+ ],
+ "ptcimg": [
+  17,
+  17,
+  9,
+  0
+ ],
+ "raise_traning_ani": [
+  123,
+  123,
+  15,
+  0
+ ],
+ "attack": [
+  1,
+  1,
+  0,
+  0
+ ],
+ "attack_sky_cloud": [
+  3,
+  3,
+  0,
+  0
+ ],
+ "board_ani": [
+  1,
+  1,
+  0,
+  0
+ ],
+ "defense": [
+  0,
+  0,
+  0,
+  0
+ ],
+ "event_zone": [
+  1,
+  1,
+  0,
+  0
+ ],
+ "fence_board": [
+  4,
+  4,
+  0,
+  0
+ ],
+ "hidden_board_0": [
+  1,
+  1,
+  0,
+  0
+ ],
+ "hidden_board_1": [
+  1,
+  1,
+  0,
+  0
+ ],
+ "hidden_board_2": [
+  1,
+  1,
+  0,
+  0
+ ],
+ "hidden_fence_0": [
+  5,
+  5,
+  0,
+  0
+ ],
+ "hidden_fence_1": [
+  5,
+  5,
+  0,
+  0
+ ],
+ "hidden_fence_2": [
+  5,
+  5,
+  0,
+  0
+ ],
+ "ppl": [
+  17,
+  17,
+  0,
+  0
+ ],
+ "stadium_symbol": [
+  0,
+  0,
+  0,
+  0
+ ],
+ "team_s_icon": [
+  0,
+  0,
+  0,
+  0
+ ],
+ "team_traning_ani": [
+  142,
+  141,
+  6,
+  0
+ ],
+ "touch": [
+  28,
+  28,
+  0,
+  0
+ ],
+ "touch_oem": [
+  0,
+  0,
+  0,
+  0
+ ],
+ "combo": [
+  6,
+  6,
+  4,
+  0
+ ],
+ "event_map": [
+  13,
+  13,
+  3,
+  0
+ ],
+ "game_frame": [
+  10,
+  10,
+  0,
+  0
+ ],
+ "game_judge": [
+  41,
+  40,
+  10,
+  0
+ ],
+ "game_ui": [
+  95,
+  93,
+  11,
+  0
+ ],
+ "gpoint": [
+  6,
+  6,
+  1,
+  0
+ ],
+ "img_text": [
+  409,
+  409,
+  0,
+  0
+ ],
+ "item_icon": [
+  11,
+  0,
+  1,
+  0
+ ],
+ "mode_back": [
+  3,
+  3,
+  0,
+  0
+ ],
+ "mode_icon": [
+  0,
+  0,
+  0,
+  0
+ ],
+ "mode_ui": [
+  92,
+  72,
+  4,
+  0
+ ],
+ "num": [
+  0,
+  0,
+  0,
+  0
+ ],
+ "popup": [
+  23,
+  23,
+  1,
+  0
+ ],
+ "result": [
+  2,
+  2,
+  3,
+  0
+ ],
+ "slt_frame": [
+  62,
+  62,
+  0,
+  0
+ ],
+ "slt_pitch": [
+  81,
+  80,
+  6,
+  0
+ ],
+ "team_logo": [
+  0,
+  0,
+  0,
+  0
+ ],
+ "team_logo_ini": [
+  0,
+  0,
+  0,
+  0
+ ],
+ "trainning": [
+  25,
+  24,
+  4,
+  0
+ ]
+}
