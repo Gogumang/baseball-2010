@@ -58,7 +58,7 @@ export function MissionSelectScreen({
     >
       <img
         className={popupLabel}
-        src={`/sprites/popup/${side === '타자' ? '046' : '047'}.png`}
+        src={`./sprites/popup/${side === '타자' ? '046' : '047'}.png`}
         alt={`${side}편`}
       />
       <MenuList

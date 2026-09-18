@@ -10,8 +10,8 @@ import {
 import type { DetailResult } from '@/pages/management/lib/detailPopup'
 import * as styles from '@/pages/management/ui/DetailPopup.css'
 
-const IMG_TEXT = '/sprites/img_text/frames'
-const MODE_UI = '/sprites/mode_ui/frames'
+const IMG_TEXT = './sprites/img_text/frames'
+const MODE_UI = './sprites/mode_ui/frames'
 const imageOf = (folder: string, frame: number) => `${folder}/${String(frame).padStart(3, '0')}.png`
 const ROW_HEIGHT = 15
 /** 화살표는 3갱신마다 1px 흔들린다 */
@@ -37,7 +37,7 @@ export function DetailPopup({ result, onClose }: DetailPopupProps) {
   return (
     <div className={styles.overlay} role="dialog" aria-label="상세정보" onClick={onClose}>
       <div className={styles.window} style={{ left: DETAIL_WINDOW.x, top: DETAIL_WINDOW.y, width: DETAIL_WINDOW.width, height: DETAIL_WINDOW.height }} />
-      <img className={styles.layer} alt="" src={`/sprites/management/label_navy_${DETAIL_TITLE_FRAME}.png`}
+      <img className={styles.layer} alt="" src={`./sprites/management/label_navy_${DETAIL_TITLE_FRAME}.png`}
         style={{ left: DETAIL_WINDOW.x + Math.trunc((85 - widthOf(DETAIL_TITLE_FRAME)) / 2), top: DETAIL_WINDOW.y + 5 }} />
       <FrameSprite folder={MODE_UI} frame={DETAIL_TABLE_FRAME} origins={origins} x={0} y={DETAIL_Y_OFFSET} />
       <img className={styles.layer} alt="" src={imageOf(IMG_TEXT, DETAIL_HEADER.frame)}

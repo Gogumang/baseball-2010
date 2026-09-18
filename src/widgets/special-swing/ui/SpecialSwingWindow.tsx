@@ -14,8 +14,8 @@ import { SpecialSwingSlot } from '@/widgets/special-swing/ui/SpecialSwingSlot'
 import * as styles from '@/shared/ui/GameWindow/GameWindow.css'
 import * as local from '@/widgets/special-swing/ui/SpecialSwingWindow.css'
 
-const IMG_TEXT = '/sprites/img_text/frames'
-const MODE_UI = '/sprites/mode_ui/frames'
+const IMG_TEXT = './sprites/img_text/frames'
+const MODE_UI = './sprites/mode_ui/frames'
 /** img_text 글자 그림 높이 */
 const LABEL_HEIGHT = 10
 
@@ -50,7 +50,7 @@ export function SpecialSwingWindow({ level, sessions, onClose }: SpecialSwingWin
     <div className={styles.overlay} role="dialog" aria-label="필살타법" onClick={onClose}>
       <div className={styles.window}
         style={{ left: SPECIAL_SWING_WINDOW.x, top: SPECIAL_SWING_WINDOW.y, width: SPECIAL_SWING_WINDOW.width, height: SPECIAL_SWING_WINDOW.height }} />
-      <img className={styles.layer} alt="" src={`/sprites/management/label_navy_${TITLE_FRAME}.png`}
+      <img className={styles.layer} alt="" src={`./sprites/management/label_navy_${TITLE_FRAME}.png`}
         style={{ left: TITLE_BOX.x + Math.trunc((TITLE_BOX.width - widthOf(TITLE_FRAME)) / 2), top: TITLE_BOX.y + Math.trunc((TITLE_BOX.height - LABEL_HEIGHT + 1) / 2) }} />
       <img className={styles.layer} alt="" src={`${MODE_UI}/${String(FRAME_IMAGE.frame).padStart(3, '0')}.png`}
         style={{ left: FRAME_IMAGE.x, top: FRAME_IMAGE.y }} />

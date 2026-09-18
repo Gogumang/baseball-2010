@@ -127,7 +127,7 @@ function drawBatter(context: CanvasRenderingContext2D, swingFrame: number, shift
 }
 
 /** 존 표시는 선이 아니라 slt_pitch 프레임 73(빨간 모서리)을 존 가운데에 찍는다 (0x35ae8) */
-const ZONE_FRAME_FOLDER = '/sprites/slt_pitch/frames'
+const ZONE_FRAME_FOLDER = './sprites/slt_pitch/frames'
 const ZONE_FRAME_INDEX = 73
 
 function drawStrikeZone(context: CanvasRenderingContext2D): void {
@@ -152,7 +152,7 @@ function drawEagleEyeMarker(context: CanvasRenderingContext2D, center: { x: numb
 }
 
 /** ball.pzx 합성 프레임 — 원점이 공 가운데라 투영 좌표에 원점대로 놓는다 */
-const BALL_FRAMES = '/sprites/ball/frames'
+const BALL_FRAMES = './sprites/ball/frames'
 
 function drawBall(context: CanvasRenderingContext2D, pitch: Pitch, frame: number): void {
   const position = ballPixelAt(pitch, frame)

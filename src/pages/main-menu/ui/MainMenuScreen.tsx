@@ -64,7 +64,7 @@ export function MainMenuScreen({
 
   return (
     <RawScreen>
-      <img className={styles.banner} src="/sprites/mode_back/000.png" alt="" />
+      <img className={styles.banner} src="./sprites/mode_back/000.png" alt="" />
       <button type="button" className={styles.backButton} onClick={() => dispatch({ type: '뒤로' })}>
         ‹ 타이틀
       </button>

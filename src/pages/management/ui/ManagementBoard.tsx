@@ -9,9 +9,9 @@ import { StatusValues } from '@/pages/management/ui/StatusValues'
 import * as styles from '@/pages/management/ui/ManagementScreen.css'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 
-const MODE_UI = '/sprites/mode_ui/frames'
-const MODE_BACK = '/sprites/mode_back/frames'
-const IMG_TEXT = '/sprites/img_text/frames'
+const MODE_UI = './sprites/mode_ui/frames'
+const MODE_BACK = './sprites/mode_back/frames'
+const IMG_TEXT = './sprites/img_text/frames'
 const STATUS_FRAME = 11
 const SCREEN_WIDTH = 240
 

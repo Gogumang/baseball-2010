@@ -13,9 +13,9 @@ import * as styles from '@/widgets/training-scene/ui/TrainingScene.css'
  *
  * **아직 반영 안 한 것**: 장착 아이템 레이어(item_bat_*) · 타입별 sluger · 피부 팔레트(.mpl).
  */
-const BODY = '/sprites/batter_balancer/frames'
-const HELMET = '/sprites/batter_helmet/frames'
-const BAT = '/sprites/batter_batter/frames'
+const BODY = './sprites/batter_balancer/frames'
+const HELMET = './sprites/batter_helmet/frames'
+const BAT = './sprites/batter_batter/frames'
 /** balancer 의 몸통 앞부분 프레임 차이 (sluger 는 13) */
 const BODY_FRONT_OFFSET = 14
 

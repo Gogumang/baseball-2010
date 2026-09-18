@@ -33,7 +33,7 @@ interface PortraitSpriteProps {
 }
 
 function PortraitSprite({ placed, baseline }: PortraitSpriteProps) {
-  const folder = `/sprites/${placed.portrait.file}/frames`
+  const folder = `./sprites/${placed.portrait.file}/frames`
   const origins = useFrameOrigins(folder)
   const animations = useAnimations(folder)
   const update = useUpdateClock()

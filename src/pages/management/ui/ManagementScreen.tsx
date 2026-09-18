@@ -53,7 +53,7 @@ export interface ManagementScreenProps {
 export function ManagementScreen(props: ManagementScreenProps) {
   const { career, noticeText } = props
   const menu = useManagementMenu(props)
-  const labelOrigins = useFrameOrigins('/sprites/img_text/frames')
+  const labelOrigins = useFrameOrigins('./sprites/img_text/frames')
   const slots = menu.kind === 'main' ? COMMAND_SLOTS : COMMAND_MENUS[menu.kind]
   const labelWidths = Object.fromEntries(
     slots.map((slot) => [slot.labelFrame, labelOrigins?.[String(slot.labelFrame).padStart(3, '0')]?.width ?? 0]),

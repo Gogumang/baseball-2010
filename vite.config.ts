@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react'
 import { vanillaExtractPlugin } from '@vanilla-extract/vite-plugin'
 
 export default defineConfig({
+  base: './',
   plugins: [react(), vanillaExtractPlugin()],
   resolve: {
     alias: {

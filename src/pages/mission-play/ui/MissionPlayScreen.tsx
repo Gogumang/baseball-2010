@@ -87,8 +87,8 @@ export function MissionPlayScreen({
             strikes: atBat.strikes,
             outs: run.outs,
             bases: run.bases,
-            ourLogoUrl: '/sprites/team_logo_ini/000.png',
-            opponentLogoUrl: '/sprites/team_logo_ini/001.png',
+            ourLogoUrl: './sprites/team_logo_ini/000.png',
+            opponentLogoUrl: './sprites/team_logo_ini/001.png',
           }}
           acePitcher={
             opponent === null

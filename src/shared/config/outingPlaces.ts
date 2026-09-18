@@ -84,7 +84,7 @@ export interface OutingPlace {
 
 const box = (x: number, y: number, width: number, height: number): MapBox => ({ x, y, width, height })
 
-const MAP = '/sprites/event_map'
+const MAP = './sprites/event_map'
 
 export const OUTING_PLACES: readonly OutingPlace[] = [
   {
@@ -202,4 +202,4 @@ export const ROAD_FRAME = 6
 export const CURSOR_ANIMATION = 0
 /** 설명서 StrHOWTO[16] 이 [!] 아이콘이라 부르므로 2 를 쓴다. [?] 를 언제 쓰는지는 미확인 */
 export const EVENT_MARKER_ANIMATION = 2
-export const PLACE_LABEL_FRAMES = '/sprites/img_text/frames'
+export const PLACE_LABEL_FRAMES = './sprites/img_text/frames'

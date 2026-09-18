@@ -19,9 +19,9 @@ export function sprite(url: string): HTMLImageElement | null {
 }
 
 /** 판정 글자 애니메이션 폴더 (game_judge.pzx, 0x393b4) */
-export const JUDGE_FRAMES = '/sprites/game_judge/frames'
+export const JUDGE_FRAMES = './sprites/game_judge/frames'
 
-export const FIELD_BACKGROUND = '/sprites/attack/000.png'
+export const FIELD_BACKGROUND = './sprites/attack/000.png'
 
 /**
  * 합성 프레임의 원점.
@@ -91,11 +91,11 @@ export function placedFrame(folder: string, index: number): PlacedFrame | null {
 }
 
 /** 마선수가 아닐 때 마운드에 서는 평범한 투수 */
-export const PITCHER_FRAMES = '/sprites/pitcher/frames'
+export const PITCHER_FRAMES = './sprites/pitcher/frames'
 
 /** 타석 배경 폴더 (위치 분석 6차) */
-export const CLOUD_FRAMES = '/sprites/attack_sky_cloud/frames'
-export const FENCE_FRAMES = '/sprites/fence/frames'
-export const CROWD_FRAMES = '/sprites/ppl/frames'
-export const SCOREBOARD_FRAMES = '/sprites/board_ani/frames'
-export const TEAM_ICON = (index: number) => `/sprites/team_s_icon/${String(index).padStart(3, '0')}.png`
+export const CLOUD_FRAMES = './sprites/attack_sky_cloud/frames'
+export const FENCE_FRAMES = './sprites/fence/frames'
+export const CROWD_FRAMES = './sprites/ppl/frames'
+export const SCOREBOARD_FRAMES = './sprites/board_ani/frames'
+export const TEAM_ICON = (index: number) => `./sprites/team_s_icon/${String(index).padStart(3, '0')}.png`

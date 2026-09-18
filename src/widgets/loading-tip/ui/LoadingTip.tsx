@@ -12,7 +12,7 @@ import * as styles from '@/widgets/loading-tip/ui/LoadingTip.css'
  * 상자를 화면 가운데 두는 것, 선수가 상자 아래 띠를 왼쪽→오른쪽으로 달리는 것,
  * 로딩 길이(LOADING_UPDATES)는 **추정**이다 — 원본 좌표·시간은 binary.mod 안에 있다.
  */
-const FOLDER = '/sprites/loadingbar/frames'
+const FOLDER = './sprites/loadingbar/frames'
 const RUNNER_ANIMATION = 0
 export const LOADING_UPDATES = 30
 const RUNNER_START_X = 20

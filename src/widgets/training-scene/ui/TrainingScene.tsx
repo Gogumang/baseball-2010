@@ -10,7 +10,7 @@ import * as styles from '@/widgets/training-scene/ui/TrainingScene.css'
 
 /** 연출 기준점 = 창 사각형 ((x + w) / 2, y + h) = (120, 137) (0x84954) */
 const ANCHOR = { x: 120, y: 137 }
-const WINDOW_FOLDER = '/sprites/mode_back/frames'
+const WINDOW_FOLDER = './sprites/mode_back/frames'
 /** 창 배경은 mode_back 을 (1, 52) 에 그린다 — 잘라내기 틀이 (1, 66) 이라 틀 안에서는 y −14 */
 const WINDOW_OFFSET_Y = 52 - 66
 

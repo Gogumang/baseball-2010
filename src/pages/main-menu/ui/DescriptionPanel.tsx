@@ -14,7 +14,7 @@ export function DescriptionPanel({ raw, children }: DescriptionPanelProps) {
 
   return (
     <>
-      <img className={styles.panel} src="/sprites/main_ui/003.png" alt="" />
+      <img className={styles.panel} src="./sprites/main_ui/003.png" alt="" />
       <div className={styles.panelText}>
         {lines.map((line, index) => (
           <p key={index}>{line.segments.map((segment) => segment.text).join('')}</p>

@@ -28,9 +28,9 @@ export interface HudState {
   readonly opponentTeamId?: number
 }
 
-const HUD_FRAMES = '/sprites/game_ui/frames'
+const HUD_FRAMES = './sprites/game_ui/frames'
 const HUD_ORIGIN = { x: 6, y: 6 }
-const PART = (index: number) => `/sprites/game_ui/${String(index).padStart(3, '0')}.png`
+const PART = (index: number) => `./sprites/game_ui/${String(index).padStart(3, '0')}.png`
 
 const ROW_TOP = { x: 8, y: 21, width: 36, height: 14 }
 const ROW_BOTTOM = { x: 8, y: 38, width: 36, height: 14 }
@@ -115,7 +115,7 @@ function drawNumber(
   spacing = 0,
 ): void {
   const digits = String(Math.max(0, Math.trunc(value)))
-  const images = [...digits].map((digit) => sprite(`/sprites/num/${String(start + Number(digit)).padStart(3, '0')}.png`))
+  const images = [...digits].map((digit) => sprite(`./sprites/num/${String(start + Number(digit)).padStart(3, '0')}.png`))
   if (images.some((image) => image === null)) return
   const width = images.reduce((total, image) => total + (image?.width ?? 0) + spacing, -spacing)
   let x = rightX - width

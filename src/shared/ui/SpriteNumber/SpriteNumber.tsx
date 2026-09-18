@@ -21,7 +21,7 @@ interface SpriteNumberProps {
 
 /** num.pzx 숫자 그림을 오른쪽 정렬로 늘어놓는다 — 한 글자 전진 = 폭 + 1, 세로 가운데(ceil) */
 export function SpriteNumber({
-  glyphs, right, boxTop, boxHeight, folder = '/sprites/num', glyphHeight = GLYPH_HEIGHT,
+  glyphs, right, boxTop, boxHeight, folder = './sprites/num', glyphHeight = GLYPH_HEIGHT,
 }: SpriteNumberProps) {
   const top = boxTop + Math.trunc((boxHeight - glyphHeight + 1) / 2)
   let x = right - glyphsWidthOf(glyphs)

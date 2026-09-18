@@ -12,8 +12,8 @@ import * as styles from '@/pages/game-result/ui/GameResultScreen.css'
  * 화면 안 위치는 코드 안이라 모른다 — 결과 칸 맨 위에 둔다 (추정).
  */
 const RESULT_SPRITE: Readonly<Partial<Record<GameSummary['result'], string>>> = {
-  승: '/sprites/result/frames/000.png',
-  패: '/sprites/result/frames/001.png',
+  승: './sprites/result/frames/000.png',
+  패: './sprites/result/frames/001.png',
 }
 
 interface GameResultScreenProps {

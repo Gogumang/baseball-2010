@@ -22,7 +22,7 @@ describe('원본 팀 데이터', () => {
     const urls = TEAMS.map((team) => team.logoUrl)
 
     expect(new Set(urls).size).toBe(TEAMS.length)
-    expect(urls.every((url) => url.startsWith('/sprites/team_logo/'))).toBe(true)
+    expect(urls.every((url) => url.startsWith('./sprites/team_logo/'))).toBe(true)
   })
 })
 
@@ -44,8 +44,8 @@ describe('원본 마선수 데이터', () => {
     const pitcher = ACE_PLAYERS.find((ace) => ace.name === '싸이커')
     const batter = ACE_PLAYERS.find((ace) => ace.name === '메디카')
 
-    expect(pitcher?.iconUrl).toBe('/sprites/ace_icon/000.png')
-    expect(batter?.iconUrl).toBe('/sprites/ace_icon/005.png')
+    expect(pitcher?.iconUrl).toBe('./sprites/ace_icon/000.png')
+    expect(batter?.iconUrl).toBe('./sprites/ace_icon/005.png')
   })
 
   it('필살기가 원작 목록에서 온다', () => {

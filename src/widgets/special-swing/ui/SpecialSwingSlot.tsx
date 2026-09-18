@@ -6,10 +6,10 @@ import {
 import * as styles from '@/shared/ui/GameWindow/GameWindow.css'
 import * as local from '@/widgets/special-swing/ui/SpecialSwingWindow.css'
 
-const IMG_TEXT = '/sprites/img_text/frames'
-const MODE_ICON = '/sprites/mode_icon'
+const IMG_TEXT = './sprites/img_text/frames'
+const MODE_ICON = './sprites/mode_icon'
 /** mode_icon.mpl 팔레트 0(주황)으로 다시 칠한 아이콘 — tools/generate_management_sprites.py 가 만든다 */
-const ICON_ORANGE = `/sprites/management/icon_selected_${SLOT_ICON_FRAME}.png`
+const ICON_ORANGE = `./sprites/management/icon_selected_${SLOT_ICON_FRAME}.png`
 const ICON_NORMAL = `${MODE_ICON}/${String(SLOT_ICON_FRAME).padStart(3, '0')}.png`
 /** img_text 294 "LV" 크기 */
 const LEVEL_LABEL_SIZE = { width: 11, height: 5 }

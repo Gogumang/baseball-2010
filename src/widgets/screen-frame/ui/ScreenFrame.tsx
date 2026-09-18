@@ -7,8 +7,8 @@ import {
 import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import * as styles from '@/widgets/screen-frame/ui/ScreenFrame.css'
 
-const frameImage = (index: number) => `/sprites/game_frame/${String(index).padStart(3, '0')}.png`
-const pointImage = (index: number) => `/sprites/gpoint/${String(index).padStart(3, '0')}.png`
+const frameImage = (index: number) => `./sprites/game_frame/${String(index).padStart(3, '0')}.png`
+const pointImage = (index: number) => `./sprites/gpoint/${String(index).padStart(3, '0')}.png`
 const GAME_POINT_COIN = 11
 
 interface ScreenFrameProps {

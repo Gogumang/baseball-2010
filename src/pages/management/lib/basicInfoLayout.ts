@@ -45,8 +45,8 @@ export function radarLabelBoxOf(axis: number): { x: number; y: number } {
 
 /** 축 이름 img_text (표 0xd1b14, 타자) */
 export const RADAR_LABEL_FRAMES = [41, 42, 43, 44]
-export const RADAR_LABEL_BOX_IMAGE = '/sprites/slt_frame/017.png'
-export const RADAR_BACKGROUND_IMAGE = '/sprites/slt_frame/003.png'
+export const RADAR_LABEL_BOX_IMAGE = './sprites/slt_frame/017.png'
+export const RADAR_BACKGROUND_IMAGE = './sprites/slt_frame/003.png'
 export const RADAR_COLORS = { axis: ORIGINAL_COLORS.radarAxis, fill: ORIGINAL_COLORS.highlightYellow, fillOpacity: 0xb4 / 255, edge: ORIGINAL_COLORS.text }
 
 /** 숫자 색 — 기본값보다 표시값이 크면 초록, 작으면 빨강 (0x7c008) */

@@ -50,5 +50,5 @@ export const TRAINING_PRESENTATION_OF: Readonly<Record<string, TrainingPresentat
 export const TRAINING_POPUP_UPDATES = 60
 
 export function animationFolderOf(file: TrainingAnimationFile): string {
-  return `/sprites/${file}/frames`
+  return `./sprites/${file}/frames`
 }

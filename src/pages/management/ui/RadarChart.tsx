@@ -9,16 +9,16 @@ import {
 import * as styles from '@/pages/management/ui/ManagementScreen.css'
 
 const KEYS: readonly (keyof BatterAbility)[] = ['hit', 'power', 'defense', 'run']
-const IMG_TEXT = '/sprites/img_text/frames'
+const IMG_TEXT = './sprites/img_text/frames'
 const BACKGROUND_HALF = { width: 31, height: 62 }
 
 /** ABILITY 레이더 (0x5a990) — 999 기준, 축 이름 상자, 숫자 색 비교 */
 export function RadarChart({ base, shown }: { readonly base: BatterAbility; readonly shown: BatterAbility }) {
-  const origins = useFrameOrigins('/sprites/mode_ui/frames')
+  const origins = useFrameOrigins('./sprites/mode_ui/frames')
   const points = KEYS.map((key, axis) => radarPointOf(axis, shown[key]))
   return (
     <>
-      <FrameSprite folder="/sprites/mode_ui/frames" frame={8} origins={origins} x={ABILITY_TITLE.plate.x} y={ABILITY_TITLE.plate.y} />
+      <FrameSprite folder="./sprites/mode_ui/frames" frame={8} origins={origins} x={ABILITY_TITLE.plate.x} y={ABILITY_TITLE.plate.y} />
       <img className={styles.layer} alt="" src={`${IMG_TEXT}/${ABILITY_TITLE.frame}.png`}
         style={{ left: ABILITY_TITLE.centerX - 19, top: ABILITY_TITLE.y }} />
       {/* 배경 원 = slt_frame 그림3(반원)을 좌우로 붙인다 */}

@@ -13,10 +13,10 @@ import {
 import type { StandingsBox } from '@/widgets/standings/lib/standingsLayout'
 import * as styles from '@/shared/ui/GameWindow/GameWindow.css'
 
-const IMG_TEXT = '/sprites/img_text/frames'
-const MODE_UI = '/sprites/mode_ui/frames'
-const NUM = '/sprites/num'
-const navyLabel = (frame: number) => `/sprites/management/label_navy_${frame}.png`
+const IMG_TEXT = './sprites/img_text/frames'
+const MODE_UI = './sprites/mode_ui/frames'
+const NUM = './sprites/num'
+const navyLabel = (frame: number) => `./sprites/management/label_navy_${frame}.png`
 const frameImage = (folder: string, frame: number) => `${folder}/${String(frame).padStart(3, '0')}.png`
 
 interface StandingsWindowProps {

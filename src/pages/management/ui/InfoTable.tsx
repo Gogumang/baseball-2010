@@ -3,7 +3,7 @@ import { INFO_COLUMNS, INFO_ROW_HEIGHT, INFO_ROW_STEP, INFO_TOP } from '@/pages/
 import * as styles from '@/pages/management/ui/ManagementScreen.css'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 
-const IMG_TEXT = '/sprites/img_text/frames'
+const IMG_TEXT = './sprites/img_text/frames'
 
 /** 정보 칸 (0x7c450) — 이름표는 img_text 오른쪽 정렬, 값은 시스템 글꼴 가운데. 타순만 노란 숫자 */
 export function InfoTable({ values, battingOrder }: { readonly values: readonly string[]; readonly battingOrder: number }) {

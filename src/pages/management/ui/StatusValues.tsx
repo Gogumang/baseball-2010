@@ -9,7 +9,7 @@ import {
 import type { Box } from '@/pages/management/lib/managementLayout'
 import * as styles from '@/pages/management/ui/ManagementScreen.css'
 
-const IMG_TEXT = '/sprites/img_text/frames'
+const IMG_TEXT = './sprites/img_text/frames'
 const LABEL_HEIGHT = 10
 /** 값 숫자는 박스 오른쪽 끝에서 2px 안쪽 */
 const VALUE_INSET = 2
@@ -68,15 +68,15 @@ export function StatusValues({ career }: { readonly career: PlayerCareer }) {
           </g>
         ))}
       </svg>
-      <img className={styles.layer} src="/sprites/management/label_yellow_335.png" alt="" style={{ left: gameLabelLeft, top: messageTop + 3 }} />
+      <img className={styles.layer} src="./sprites/management/label_yellow_335.png" alt="" style={{ left: gameLabelLeft, top: messageTop + 3 }} />
       <SpriteNumber glyphs={totalGlyphs} right={totalRight} boxTop={messageTop} boxHeight={message.height} />
       <SpriteNumber glyphs={[{ frame: SLASH_FRAME, width: SLASH_WIDTH - 1 }]} right={slashLeft + SLASH_WIDTH} boxTop={messageTop} boxHeight={message.height} />
       <SpriteNumber glyphs={gameGlyphs} right={gameRight} boxTop={messageTop} boxHeight={message.height} />
-      <img className={styles.layer} src="/sprites/management/label_yellow_334.png" alt="" style={{ left: yearLabelLeft, top: messageTop + 3 }} />
+      <img className={styles.layer} src="./sprites/management/label_yellow_334.png" alt="" style={{ left: yearLabelLeft, top: messageTop + 3 }} />
       <SpriteNumber glyphs={numberGlyphsOf(career.season)} right={yearRight} boxTop={messageTop} boxHeight={message.height} />
 
       {icons.map((frame, index) => (
-        <img key={frame} className={styles.layer} src={`/sprites/mode_ui/frames/${String(frame).padStart(3, '0')}.png`} alt=""
+        <img key={frame} className={styles.layer} src={`./sprites/mode_ui/frames/${String(frame).padStart(3, '0')}.png`} alt=""
           style={{ left: statusIcons.x + index * STATUS_ICON_STEP, top: statusIcons.y }} />
       ))}
     </>

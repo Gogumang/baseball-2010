@@ -11,7 +11,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import * as styles from '@/pages/game/ui/GameScreen.css'
 import { detail } from '@/shared/ui/MenuList/MenuList.css'
 
-const smallLogoUrlOf = (teamId: number) => `/sprites/team_logo_ini/${String(teamId).padStart(3, '0')}.png`
+const smallLogoUrlOf = (teamId: number) => `./sprites/team_logo_ini/${String(teamId).padStart(3, '0')}.png`
 
 interface GameScreenProps {
   readonly career: PlayerCareer

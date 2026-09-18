@@ -12,8 +12,8 @@ import type { ItemBox } from '@/widgets/item-window/lib/itemWindowLayout'
 import * as styles from '@/shared/ui/GameWindow/GameWindow.css'
 import * as local from '@/widgets/item-window/ui/ItemWindow.css'
 
-const IMG_TEXT = '/sprites/img_text/frames'
-const ITEM_ICON = '/sprites/item_icon'
+const IMG_TEXT = './sprites/img_text/frames'
+const ITEM_ICON = './sprites/item_icon'
 const LABEL_HEIGHT = 10
 
 export interface ItemWindowEntry {

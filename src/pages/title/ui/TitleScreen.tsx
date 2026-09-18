@@ -2,7 +2,7 @@ import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 import { useTitleIntro } from '@/pages/title/model/useTitleIntro'
 import * as styles from '@/pages/title/ui/TitleScreen.css'
 
-const SPRITE = '/sprites/main_title'
+const SPRITE = './sprites/main_title'
 
 /** 원본 좌표. titleIntro.ts 주석에 프레임 번호별 근거가 있다. */
 const PLAYER_X = 126
