@@ -15,7 +15,7 @@ export const aceCard = style({
   alignItems: 'center',
   gap: '0 7px',
   border: `1px solid ${theme.color.line}`,
-  background: '#0c1222',
+  background: theme.color.surfaceDeep,
   padding: '5px 6px',
   fontSize: '12px',
 })

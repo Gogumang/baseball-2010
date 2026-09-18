@@ -12,6 +12,7 @@ import { batterLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
 const BATTER_BODY_TYPE = 0
 import type { HudState } from '@/widgets/batting-stage/lib/renderHud'
 import { STAGE_LAYOUT, toPixel } from '@/widgets/batting-stage/lib/stageLayout'
+import { UI_COLORS } from '@/shared/config/design'
 
 export { STAGE_HEIGHT, STAGE_WIDTH, toPixel, toZoneCoordinate } from '@/widgets/batting-stage/lib/stageLayout'
 
@@ -138,7 +139,7 @@ function drawStrikeZone(context: CanvasRenderingContext2D): void {
 }
 
 function drawEagleEyeMarker(context: CanvasRenderingContext2D, center: { x: number; y: number }): void {
-  context.strokeStyle = 'rgba(120, 255, 190, 0.9)'
+  context.strokeStyle = UI_COLORS.eagleEye
   context.lineWidth = 1.5
   context.beginPath()
   context.arc(center.x, center.y, 8, 0, Math.PI * 2)
@@ -160,7 +161,7 @@ function drawBall(context: CanvasRenderingContext2D, pitch: Pitch, frame: number
   const placed = placedFrame(BALL_FRAMES, ballFrame)
 
   if (placed === null) {
-    context.fillStyle = '#fdfdf5'
+    context.fillStyle = UI_COLORS.ball
     context.beginPath()
     context.arc(position.x, position.y, 1 + ballFrame / 2, 0, Math.PI * 2)
     context.fill()
@@ -185,8 +186,8 @@ function drawResultText(context: CanvasRenderingContext2D, text: string, resultT
   context.textAlign = 'center'
   context.textBaseline = 'middle'
   context.lineWidth = 4
-  context.strokeStyle = 'rgba(0, 0, 0, 0.7)'
+  context.strokeStyle = UI_COLORS.resultOutline
   context.strokeText(text, centerX, centerY)
-  context.fillStyle = '#ffd666'
+  context.fillStyle = UI_COLORS.resultText
   context.fillText(text, centerX, centerY)
 }

@@ -1,4 +1,5 @@
 import { style } from '@vanilla-extract/css'
+import { ORIGINAL_COLORS } from '@/shared/config/design'
 
 export const layer = style({
   position: 'absolute',
@@ -16,5 +17,5 @@ export const backButton = style({
   background: 'none',
   cursor: 'pointer',
   imageRendering: 'pixelated',
-  selectors: { '&:focus-visible': { outline: '1px dashed #FFFFFF' } },
+  selectors: { '&:focus-visible': { outline: `1px dashed ${ORIGINAL_COLORS.text}` } },
 })

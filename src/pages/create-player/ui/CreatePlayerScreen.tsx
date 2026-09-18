@@ -1,11 +1,10 @@
 import { useState } from 'react'
-import { AbilityBars, Hint, Notice, Panel, PixelScreen } from '@/shared/ui'
+import { AbilityBars, Hint, Notice, Panel, PixelScreen, TextField } from '@/shared/ui'
 import {
   DEFAULT_ROOKIE_PROFILE, MAXIMUM_NAME_BYTES, nameByteLengthOf, rookieAbilityOf,
 } from '@/entities/career/model/playerCareer'
 import type { RookieProfile } from '@/entities/career/model/playerCareer'
 import { ChoiceRow } from '@/pages/create-player/ui/ChoiceRow'
-import * as styles from '@/pages/create-player/ui/CreatePlayerScreen.css'
 
 interface CreatePlayerScreenProps {
   readonly onCreate: (name: string, profile: RookieProfile) => void
@@ -50,7 +49,7 @@ export function CreatePlayerScreen({ onCreate, onCancel }: CreatePlayerScreenPro
           event.preventDefault()
           if (trimmedName.length > 0) setIsConfirming(true)
         }}>
-          <input className={styles.nameInput} value={name} placeholder="한글 4글자, 영문 8글자" autoFocus
+          <TextField value={name} placeholder="한글 4글자, 영문 8글자" autoFocus
             onChange={(event) => {
               if (nameByteLengthOf(event.target.value) <= MAXIMUM_NAME_BYTES) setName(event.target.value)
             }} />

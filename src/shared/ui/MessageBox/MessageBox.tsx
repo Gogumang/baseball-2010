@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { MarkupText } from '@/shared/ui'
+import { ORIGINAL_COLORS } from '@/shared/config/design'
 import * as styles from '@/shared/ui/MessageBox/MessageBox.css'
 
 interface MessageBoxProps {
@@ -63,7 +64,7 @@ export function MessageBox({ text, buttons, onAnswer }: MessageBoxProps) {
         <div className={styles.buttons}>
           {buttons.map((label, index) => (
             <button key={label} type="button" className={styles.button}
-              style={{ color: index === selected ? '#FFFF00' : '#FFFFFF' }}
+              style={{ color: index === selected ? ORIGINAL_COLORS.highlightYellow : ORIGINAL_COLORS.text }}
               onMouseEnter={() => setSelected(index)} onFocus={() => setSelected(index)}
               onClick={() => onAnswer(index)}>
               {label}

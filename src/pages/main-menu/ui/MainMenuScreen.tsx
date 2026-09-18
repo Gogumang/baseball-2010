@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { SelectBox } from '@/shared/ui'
+import { Button, SelectBox } from '@/shared/ui'
 import type { SelectOption } from '@/shared/ui'
 import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 import { parseGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
@@ -65,19 +65,19 @@ export function MainMenuScreen({
   return (
     <RawScreen>
       <img className={styles.banner} src="./sprites/mode_back/000.png" alt="" />
-      <button type="button" className={styles.backButton} onClick={() => dispatch({ type: '뒤로' })}>
+      <Button variant="corner" className={styles.backButton} onClick={() => dispatch({ type: '뒤로' })}>
         ‹ 타이틀
-      </button>
+      </Button>
       <div className={styles.topRightButtons}>
-        <button type="button" className={styles.cornerButton} onClick={onSpecial}>
+        <Button variant="corner" className={styles.cornerButton} onClick={onSpecial}>
           스페셜
-        </button>
-        <button type="button" className={styles.cornerButton} onClick={onHelp}>
+        </Button>
+        <Button variant="corner" className={styles.cornerButton} onClick={onHelp}>
           도움말
-        </button>
-        <button type="button" className={styles.cornerButton} onClick={onSettings}>
+        </Button>
+        <Button variant="corner" className={styles.cornerButton} onClick={onSettings}>
           환경설정
-        </button>
+        </Button>
       </div>
 
       <div className={styles.content}>
@@ -88,25 +88,23 @@ export function MainMenuScreen({
           onChange={(id) => dispatch({ type: '모드선택', id })}
           onOpenChange={setIsSheetOpen}
         />
-        <button
-          type="button"
-          className={styles.startButton}
+        <Button
           disabled={state.isConfirmingNewGame}
           onClick={() => dispatch({ type: '시작' })}
         >
           시작하기
-        </button>
+        </Button>
       </div>
 
       {state.isConfirmingNewGame ? (
         <DescriptionPanel raw={NEW_GAME_CONFIRM}>
           <div className={styles.confirmKeys}>
-            <button type="button" className={styles.confirmKey} onClick={() => dispatch({ type: '확인', isAccepted: true })}>
+            <Button variant="text" onClick={() => dispatch({ type: '확인', isAccepted: true })}>
               예
-            </button>
-            <button type="button" className={styles.confirmKey} onClick={() => dispatch({ type: '확인', isAccepted: false })}>
+            </Button>
+            <Button variant="text" onClick={() => dispatch({ type: '확인', isAccepted: false })}>
               아니오
-            </button>
+            </Button>
           </div>
         </DescriptionPanel>
       ) : (

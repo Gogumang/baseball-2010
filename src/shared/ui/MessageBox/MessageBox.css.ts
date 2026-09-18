@@ -1,5 +1,6 @@
 import { globalStyle, style } from '@vanilla-extract/css'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
+import { theme } from '@/app/styles/theme.css'
 
 /**
  * 상자 높이 = 줄수×14 + 50 + (버튼 높이 + 10) (0x74ef4) — 한 줄이면 86.
@@ -18,7 +19,7 @@ export const dim = style({
   position: 'absolute',
   inset: 0,
   zIndex: 5,
-  background: 'rgba(0, 0, 0, 0.5)',
+  background: theme.color.scrim,
 })
 
 /** 판 #335FCD, 위 5줄 #1E1AA6·#1E1AA6·#FFFFFF·#7B9EFF·#7B9EFF, 아래는 거꾸로 (0x744c4) */
@@ -31,8 +32,8 @@ export const box = style({
   boxSizing: 'border-box',
   padding: `${TEXT_TOP}px 0 ${BUTTONS_TO_BOTTOM}px`,
   background: [
-    'linear-gradient(to bottom, #1E1AA6 0 2px, #FFFFFF 2px 3px, #7B9EFF 3px 5px, transparent 5px)',
-    'linear-gradient(to top, #1E1AA6 0 2px, #FFFFFF 2px 3px, #7B9EFF 3px 5px, transparent 5px)',
+    `linear-gradient(to bottom, ${ORIGINAL_COLORS.boxEdgeOuter} 0 2px, ${ORIGINAL_COLORS.boxEdgeWhite} 2px 3px, ${ORIGINAL_COLORS.boxEdgeInner} 3px 5px, transparent 5px)`,
+    `linear-gradient(to top, ${ORIGINAL_COLORS.boxEdgeOuter} 0 2px, ${ORIGINAL_COLORS.boxEdgeWhite} 2px 3px, ${ORIGINAL_COLORS.boxEdgeInner} 3px 5px, transparent 5px)`,
     ORIGINAL_COLORS.boardFill,
   ].join(', '),
 })

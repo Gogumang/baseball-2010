@@ -16,7 +16,7 @@ export const track = style({
   position: 'relative',
   display: 'block',
   height: '14px',
-  background: '#0c1222',
+  background: theme.color.surfaceDeep,
   border: `1px solid ${theme.color.line}`,
 })
 
@@ -26,7 +26,7 @@ export const perfectZone = style({
   left: '47%',
   width: '6%',
   height: '100%',
-  background: 'rgba(255, 210, 63, 0.35)',
+  background: theme.color.accentWash,
 })
 
 export const fill = style({

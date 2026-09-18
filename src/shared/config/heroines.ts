@@ -1,5 +1,6 @@
 import { ACE_PLAYERS } from '@/shared/config/original/acePlayers'
 import type { AcePlayer } from '@/shared/config/original/acePlayers'
+import { CHARACTER_COLORS } from '@/shared/config/design'
 
 /**
  * 마선수 — 원작의 특별 상대. 원본 XlsACE_BAT_DATA / XlsACE_PIT_DATA에서 가져온다.
@@ -10,19 +11,19 @@ export interface Heroine extends AcePlayer {
 }
 
 const ACCENT_COLORS: Readonly<Record<string, string>> = {
-  medica: '#6fdc8c',
-  kao: '#ffa657',
-  roze: '#ff7eb6',
-  death: '#a78bfa',
-  tiger: '#ffd23f',
-  psyker: '#7dd3fc',
-  leony: '#f472b6',
-  bbmachine: '#94a3b8',
-  ballantine: '#fb923c',
-  dragona: '#4ade80',
+  medica: CHARACTER_COLORS.medica,
+  kao: CHARACTER_COLORS.kao,
+  roze: CHARACTER_COLORS.roze,
+  death: CHARACTER_COLORS.death,
+  tiger: CHARACTER_COLORS.tiger,
+  psyker: CHARACTER_COLORS.psyker,
+  leony: CHARACTER_COLORS.leony,
+  bbmachine: CHARACTER_COLORS.bbmachine,
+  ballantine: CHARACTER_COLORS.ballantine,
+  dragona: CHARACTER_COLORS.dragona,
 }
 
-const FALLBACK_ACCENT = '#8f9cb5'
+const FALLBACK_ACCENT = CHARACTER_COLORS.fallback
 
 export const HEROINES: readonly Heroine[] = ACE_PLAYERS.map((ace) => ({
   ...ace,

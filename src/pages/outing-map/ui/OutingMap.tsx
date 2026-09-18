@@ -12,7 +12,7 @@ import type { MapBox, OutingPlace } from '@/shared/config/outingPlaces'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
-import { FrameSprite } from '@/shared/ui'
+import { Button, FrameSprite } from '@/shared/ui'
 import * as styles from '@/pages/outing-map/ui/OutingMapScreen.css'
 
 /** 박스 가운데 아래를 애니메이션 원점으로 쓴다 — [!] 프레임 원점이 (−10, −15) 라 박스에 꼭 맞는다 (추정) */
@@ -73,9 +73,9 @@ export function OutingMap({ selectedPlaceId, eventPlaceIds, noticeText, onOpen, 
         )
       })}
 
-      <button type="button" className={styles.cornerButton} onClick={onBack}>
+      <Button variant="corner" className={styles.cornerButton} onClick={onBack}>
         ‹ 관리
-      </button>
+      </Button>
       <div className={styles.noticeLine}>
         {noticeText !== '' ? noticeText : eventPlaceIds.size > 0 ? '[!] 장소에서 들어가기 · 건물을 누르세요' : '건물을 누르세요'}
       </div>

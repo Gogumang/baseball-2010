@@ -8,5 +8,8 @@ import colors from '@/shared/config/design/colors.json'
  */
 export const ORIGINAL_COLORS = colors.original
 export const UI_COLORS = colors.ui
+export const CHARACTER_COLORS = colors.characters
 
 export type OriginalColorName = keyof typeof ORIGINAL_COLORS
+export type UiColorName = keyof typeof UI_COLORS
+export type CharacterColorName = keyof typeof CHARACTER_COLORS

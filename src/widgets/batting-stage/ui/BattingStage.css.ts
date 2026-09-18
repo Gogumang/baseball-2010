@@ -11,7 +11,7 @@ export const stage = style({
   width: theme.size.screenWidth,
   height: theme.size.screenHeight,
   margin: '0 -10px',
-  background: '#0b1730',
+  background: theme.color.stageBackground,
   touchAction: 'none',
   cursor: 'crosshair',
   imageRendering: 'pixelated',

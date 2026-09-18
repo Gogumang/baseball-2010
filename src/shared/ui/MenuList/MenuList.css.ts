@@ -18,7 +18,7 @@ export const item = style({
   minHeight: '44px',
   background: 'none',
   border: 'none',
-  borderBottom: '1px solid #202b46',
+  borderBottom: `1px solid ${theme.color.lineMuted}`,
   color: theme.color.ink,
   font: 'inherit',
   textAlign: 'left',
@@ -39,7 +39,7 @@ export const detail = style({
   color: theme.color.inkDim,
   lineHeight: 1.45,
   selectors: {
-    [`${item}[aria-selected="true"] &`]: { color: '#d9c98f' },
+    [`${item}[aria-selected="true"] &`]: { color: theme.color.accentMuted },
   },
 })
 

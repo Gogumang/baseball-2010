@@ -1,4 +1,5 @@
 import { style } from '@vanilla-extract/css'
+import { theme } from '@/app/styles/theme.css'
 
 /**
  * 훈련 팝업 (binary.mod 0x848d0, 서브 에이전트 B 확인).
@@ -49,8 +50,8 @@ export const caption = style({
   top: '4px',
   padding: '1px 6px',
   borderRadius: '4px',
-  background: 'rgba(0, 0, 0, 0.5)',
-  color: '#ffd23f',
+  background: theme.color.scrim,
+  color: theme.color.accent,
   fontSize: '11px',
   fontWeight: 700,
 })

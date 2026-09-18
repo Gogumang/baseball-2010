@@ -16,7 +16,7 @@ export const overlay = style({
   position: 'absolute',
   inset: 0,
   zIndex: 10,
-  background: 'rgba(0, 0, 0, 0.55)',
+  background: theme.color.scrimStrong,
   animation: `${fadeIn} 160ms ease-out`,
 })
 

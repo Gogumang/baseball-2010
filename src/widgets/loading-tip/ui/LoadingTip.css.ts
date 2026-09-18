@@ -1,4 +1,5 @@
 import { globalStyle, style } from '@vanilla-extract/css'
+import { ORIGINAL_COLORS } from '@/shared/config/design'
 
 const BOX_WIDTH = 170
 const BOX_HEIGHT = 147
@@ -10,7 +11,7 @@ export const overlay = style({
   position: 'absolute',
   inset: 0,
   zIndex: 20,
-  background: '#000',
+  background: ORIGINAL_COLORS.black,
 })
 
 export const box = style({
@@ -36,7 +37,7 @@ export const tipArea = style({
   width: '150px',
   height: '66px',
   overflow: 'hidden',
-  color: '#fff',
+  color: ORIGINAL_COLORS.text,
 })
 
 globalStyle(`${tipArea} p`, {

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Hint, MenuList, MessageBox, Notice, Panel, PixelScreen, StatusBar } from '@/shared/ui'
+import { Button, Hint, MenuList, MessageBox, Notice, Panel, PixelScreen, StatusBar } from '@/shared/ui'
 import type { MenuItem } from '@/shared/ui'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { SUB_ITEMS, hasSubItem } from '@/entities/career/model/subItems'
@@ -67,10 +67,10 @@ function EquipmentShopScreen({ initialTab, career, noticeText, onPurchase, onBac
       <StatusBar career={career} />
       {!isWearing && <div className={styles.tabs} role="tablist">
         {TABS.map((candidate) => (
-          <button key={candidate} type="button" role="tab" aria-selected={candidate === tab}
-            className={styles.tab} onClick={() => setTab(candidate)}>
+          <Button key={candidate} variant="segment" role="tab" aria-selected={candidate === tab}
+            className={styles.compactTab} onClick={() => setTab(candidate)}>
             {TAB_LABEL[candidate]}
-          </button>
+          </Button>
         ))}
       </div>}
       {noticeText !== '' && (
@@ -82,10 +82,10 @@ function EquipmentShopScreen({ initialTab, career, noticeText, onPurchase, onBac
         <>
           <div className={styles.tabs} role="tablist">
             {EQUIPMENT_PARTS.map((candidate) => (
-              <button key={candidate.index} type="button" role="tab" aria-selected={candidate.index === part}
-                className={styles.tab} onClick={() => setPart(candidate.index)}>
+              <Button key={candidate.index} variant="segment" role="tab" aria-selected={candidate.index === part}
+                className={styles.compactTab} onClick={() => setPart(candidate.index)}>
                 {candidate.name}
-              </button>
+              </Button>
             ))}
           </div>
           <MenuList items={equipmentMenuOf(career, part, isWearing)} onSelect={select} />

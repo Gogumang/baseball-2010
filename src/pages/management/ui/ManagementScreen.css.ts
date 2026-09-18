@@ -32,7 +32,7 @@ export const commandButton = style({
   background: 'none',
   cursor: 'pointer',
   selectors: {
-    '&:focus-visible': { outline: '1px dashed #FFFFFF' },
+    '&:focus-visible': { outline: `1px dashed ${ORIGINAL_COLORS.text}` },
     // 비활성 칸은 흑백으로 바꾼다 (0xc37a8 은 RGB565 채널 평균 — CSS grayscale 은 근사)
     '&:disabled': { filter: 'grayscale(1)', cursor: 'not-allowed' },
   },
@@ -53,7 +53,7 @@ export const trainingPopup = style({
 export const cardPanel = style({
   position: 'absolute',
   boxSizing: 'border-box',
-  border: '1px solid #244CAE',
+  border: `1px solid ${ORIGINAL_COLORS.boardEdge}`,
   background: ORIGINAL_COLORS.panelDeep,
   pointerEvents: 'none',
 })
@@ -62,5 +62,4 @@ export const infoValue = style([
   layer,
   { fontSize: '11px', lineHeight: '15px', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden' },
 ])
-
 

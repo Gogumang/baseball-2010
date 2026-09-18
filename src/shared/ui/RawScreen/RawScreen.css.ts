@@ -1,5 +1,6 @@
 import { style } from '@vanilla-extract/css'
 import { theme } from '@/app/styles/theme.css'
+import { ORIGINAL_COLORS } from '@/shared/config/design'
 
 /**
  * 타이틀바·소프트키 없이 원작 240×320 한 장만 쓰는 화면.
@@ -12,7 +13,7 @@ export const screen = style({
   width: theme.size.screenWidth,
   height: 'calc(100dvh / var(--zoom))',
   zoom: 'var(--zoom)',
-  background: '#000',
+  background: ORIGINAL_COLORS.black,
   overflow: 'hidden',
 })
 

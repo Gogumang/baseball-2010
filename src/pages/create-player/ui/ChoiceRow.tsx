@@ -1,4 +1,4 @@
-import { Hint, Panel } from '@/shared/ui'
+import { Button, Hint, Panel } from '@/shared/ui'
 import * as styles from '@/pages/create-player/ui/CreatePlayerScreen.css'
 
 interface ChoiceRowProps {
@@ -15,10 +15,10 @@ export function ChoiceRow({ heading, hint, options, selected, onSelect }: Choice
     <Panel heading={heading}>
       <div className={styles.choices} role="radiogroup" aria-label={heading}>
         {options.map((option, index) => (
-          <button key={option} type="button" role="radio" aria-checked={index === selected}
-            className={styles.choice} onClick={() => onSelect(index)}>
+          <Button key={option} variant="segment" role="radio" aria-checked={index === selected}
+            onClick={() => onSelect(index)}>
             {option}
-          </button>
+          </Button>
         ))}
       </div>
       <Hint>{hint}</Hint>

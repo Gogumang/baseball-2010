@@ -9,7 +9,7 @@ export const grid = style({
   width: '120px',
   margin: '0 auto',
   border: `2px solid ${theme.color.accent}`,
-  background: '#0c1222',
+  background: theme.color.surfaceDeep,
 })
 
 export const cell = style({

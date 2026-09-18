@@ -18,10 +18,10 @@ export const layer = style({
 export const window = style({
   position: 'absolute',
   boxSizing: 'border-box',
-  border: '1px solid #080408',
+  border: `1px solid ${ORIGINAL_COLORS.windowBorder}`,
   borderRadius: '6px',
   background: ORIGINAL_COLORS.boardFill,
-  boxShadow: 'inset 0 0 0 1px #FFFFFF',
+  boxShadow: `inset 0 0 0 1px ${ORIGINAL_COLORS.text}`,
 })
 
 /** 메시지 줄 — 흰 글자, 16px 간격, 상자 밖은 잘린다 (0x8a18a) */

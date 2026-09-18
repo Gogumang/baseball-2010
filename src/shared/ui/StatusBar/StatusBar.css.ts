@@ -43,7 +43,7 @@ export const abilityRow = style({
 export const abilityTrack = style({
   display: 'block',
   height: '9px',
-  background: '#0c1222',
+  background: theme.color.surfaceDeep,
   border: `1px solid ${theme.color.line}`,
 })
 

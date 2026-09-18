@@ -30,13 +30,6 @@ export const cornerButton = style({
   top: '4px',
   zIndex: 2,
   padding: '2px 7px',
-  border: 'none',
-  borderRadius: '6px',
-  background: 'rgba(0, 0, 0, 0.55)',
-  color: theme.color.ink,
-  font: 'inherit',
-  fontSize: '10px',
-  cursor: 'pointer',
 })
 
 /** 지도 아래 남는 줄에 안내·결과 문구를 쓴다 (원본 메시지줄 위치는 미확인) */
@@ -47,7 +40,7 @@ export const noticeLine = style({
   bottom: 0,
   zIndex: 2,
   padding: '1px 4px',
-  background: 'rgba(0, 0, 0, 0.6)',
+  background: theme.color.scrimOpaque,
   color: theme.color.ink,
   fontSize: '9px',
   lineHeight: 1.4,

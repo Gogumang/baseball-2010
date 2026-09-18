@@ -6,6 +6,7 @@ import {
 } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import * as styles from '@/widgets/screen-frame/ui/ScreenFrame.css'
+import { ORIGINAL_COLORS } from '@/shared/config/design'
 
 const frameImage = (index: number) => `./sprites/game_frame/${String(index).padStart(3, '0')}.png`
 const pointImage = (index: number) => `./sprites/gpoint/${String(index).padStart(3, '0')}.png`
@@ -33,7 +34,7 @@ export function ScreenFrame({ title, gamePoint, onBack }: ScreenFrameProps) {
         <rect x={0} y={bottom - 5} width={240} height={5} fill={FRAME_COLORS.footerBand} />
         <rect x={0} y={bottom - 5} width={240} height={1} fill={FRAME_COLORS.footerLine} />
         {/* G포인트 알약 (0x54a60) — (x0+9, y0+1, 60, 13) */}
-        <rect x={GAME_POINT_LEFT + 9} y={top + 19} width={60} height={13} rx={6} fill={FRAME_COLORS.pill} stroke="#000000" />
+        <rect x={GAME_POINT_LEFT + 9} y={top + 19} width={60} height={13} rx={6} fill={FRAME_COLORS.pill} stroke={ORIGINAL_COLORS.black} />
       </svg>
       {HEADER_TILE_XS.map((x) => <img key={x} className={styles.layer} style={{ left: x, top: top + 11 }} src={frameImage(0)} alt="" />)}
       <img className={styles.layer} style={{ left: HEADER_CORNER_X, top: top + 11 }} src={frameImage(1)} alt="" />

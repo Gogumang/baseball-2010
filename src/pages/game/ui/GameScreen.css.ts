@@ -19,7 +19,7 @@ export const aceAlert = style({
   alignItems: 'center',
   gap: '9px',
   border: `2px solid ${theme.color.accentDeep}`,
-  background: '#2a1d10',
+  background: theme.color.alertBackground,
   padding: '6px 9px',
   fontSize: '13px',
 })

@@ -35,7 +35,7 @@ globalStyle('html, body', {
 })
 
 globalStyle('body', {
-  background: '#05070d',
+  background: theme.color.canvas,
   color: theme.color.ink,
   fontFamily: theme.font.body,
   fontSize: '14px',

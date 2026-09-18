@@ -34,7 +34,7 @@ export const titleBar = style({
 
 export const badge = style({
   fontSize: '11px',
-  color: '#cfe0ff',
+  color: theme.color.badgeInk,
   fontWeight: 400,
 })
 

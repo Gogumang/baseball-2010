@@ -4,6 +4,7 @@ import {
 } from '@/widgets/batting-stage/lib/spriteLoader'
 import { CLOUD_WRAP_WIDTH, cloudScrollAt, isCloudVisible, skyColorsOf, teamIconOf } from '@/widgets/batting-stage/lib/stageScenery'
 import { STAGE_HEIGHT, STAGE_LAYOUT, STAGE_WIDTH } from '@/widgets/batting-stage/lib/stageLayout'
+import { ORIGINAL_COLORS } from '@/shared/config/design'
 
 /**
  * 타석 배경 (0x78578): 하늘 0x77fe8 → 펜스 0x77974(팀 아이콘·관중·전광판) → 바닥 0x7725c.
@@ -30,7 +31,7 @@ const MISSION_TEAM_ICON = 11
 const SCOREBOARD_BOX = 2
 
 export function drawScenery(context: CanvasRenderingContext2D, state: SceneryState): void {
-  context.fillStyle = '#000000'
+  context.fillStyle = ORIGINAL_COLORS.black
   context.fillRect(0, 0, STAGE_WIDTH, STAGE_HEIGHT)
   const colorIndex = drawSky(context, state)
   if (isCloudVisible(colorIndex)) drawClouds(context, state.tick)

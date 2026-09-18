@@ -1,4 +1,5 @@
 import { placedFrame, sprite } from '@/widgets/batting-stage/lib/spriteLoader'
+import { ORIGINAL_COLORS, UI_COLORS } from '@/shared/config/design'
 
 /**
  * 경기 HUD — binary.mod 0x373d0 (position-re 2차, 바이트 확인).
@@ -34,8 +35,8 @@ const PART = (index: number) => `./sprites/game_ui/${String(index).padStart(3, '
 
 const ROW_TOP = { x: 8, y: 21, width: 36, height: 14 }
 const ROW_BOTTOM = { x: 8, y: 38, width: 36, height: 14 }
-const ROW_COLOR = '#222854'
-const OFFENSE_BAR_COLOR = '#ffe500'
+const ROW_COLOR = UI_COLORS.hudRow
+const OFFENSE_BAR_COLOR = UI_COLORS.hudOffense
 const OFFENSE_BAR_WIDTH = 3
 const LOGO_OFFSET = { x: 5, y: 2 }
 
@@ -56,9 +57,9 @@ const BOTTOM_ROW_SCORE_OFFSET_Y = 3
 const INNING_DIGITS_START = 0
 
 export function drawHud(context: CanvasRenderingContext2D, hud: HudState): void {
-  context.fillStyle = '#000'
+  context.fillStyle = ORIGINAL_COLORS.black
   context.fillRect(5, 5, 82, 50)
-  context.fillStyle = '#335fcd'
+  context.fillStyle = ORIGINAL_COLORS.boardFill
   context.fillRect(6, 6, 80, 48)
 
   // 위 줄 = 원정(초 공격), 아래 줄 = 홈(말 공격) — 플레이어 팀은 홈이다

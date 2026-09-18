@@ -20,35 +20,11 @@ export const content = style({
   gap: '12px',
 })
 
-export const startButton = style({
-  height: '38px',
-  border: 'none',
-  borderRadius: '8px',
-  background: theme.color.accent,
-  color: '#0a0f1c',
-  font: 'inherit',
-  fontSize: '14px',
-  fontWeight: 700,
-  cursor: 'pointer',
-  selectors: {
-    '&:disabled': { opacity: 0.45, cursor: 'default' },
-    '&:focus-visible': { outline: `2px solid ${theme.color.ink}`, outlineOffset: '2px' },
-  },
-})
-
 export const backButton = style({
   position: 'absolute',
   left: '6px',
   top: '6px',
   zIndex: 1,
-  padding: '3px 8px',
-  border: 'none',
-  borderRadius: '6px',
-  background: 'rgba(0, 0, 0, 0.45)',
-  color: theme.color.ink,
-  font: 'inherit',
-  fontSize: '10px',
-  cursor: 'pointer',
 })
 
 export const topRightButtons = style({
@@ -60,7 +36,7 @@ export const topRightButtons = style({
   gap: '4px',
 })
 
-export const cornerButton = style([backButton, { position: 'static' }])
+export const cornerButton = style({ position: 'static' })
 
 export const panel = style([pixel, { left: '45px', top: '251px' }])
 
@@ -75,7 +51,7 @@ export const panelText = style({
   alignItems: 'center',
   justifyContent: 'center',
   gap: '2px',
-  color: '#1e2942',
+  color: theme.color.panelRaised,
   // 원본 글꼴 synGak9_11.ft2 가 9×11 이다. 11px 웹 글꼴로는 149px 패널에서 넘친다.
   fontFamily: "'Galmuri9', 'Galmuri11', monospace",
   fontSize: '9px',
@@ -84,15 +60,5 @@ export const panelText = style({
 })
 
 export const confirmKeys = style({ display: 'flex', gap: '14px', marginTop: '2px' })
-
-export const confirmKey = style({
-  padding: '0 4px',
-  border: 'none',
-  background: 'none',
-  color: '#17306e',
-  font: 'inherit',
-  fontWeight: 700,
-  cursor: 'pointer',
-})
 
 globalStyle(`${panelText} p`, { margin: 0 })
