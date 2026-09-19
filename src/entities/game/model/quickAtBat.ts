@@ -5,12 +5,13 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 
 /**
- * 원본 간이 타석 (binary.mod 0xc11f0 — 디컴파일 대조).
- * 사람이 조작하지 않는 타석은 원본도 이 함수로 돌린다: 동료 여덟 타순, 상대 팀 공격,
- * 그리고 하루치 다른 팀 경기(0xc2a48)까지 전부 같은 길을 쓴다.
- * 스윙 판정 자체는 사람 타석과 똑같이 0xab214(`swingResultOf`)로 간다 — 별도의 확률표가 없다.
+ * 원본 간이 타석 (binary.mod 0xc262c 루프 · 0xc11f0 스윙 · 0xc1818 투구 판정 — 전부 디스어셈 대조).
+ * 사람이 조작하지 않는 타석은 원본도 이 길로 돌린다: 동료 여덟 타순, 상대 팀 공격,
+ * 그리고 하루치 다른 팀 경기(0xc2a48)까지 전부 같다.
  *
- * 원본에는 **볼 카운트가 없다**. 스트라이크만 세고 셋이면 삼진이다.
+ * **투구마다 두 갈래로 나뉜다** (0xc262c): `rand(0,100) <= 59` 면 스윙(0xc11f0), 아니면 투구 판정(0xc1818).
+ * 스윙 판정은 사람 타석과 똑같이 0xab214(`swingResultOf`)로 가고, 투구 판정은 볼·스트라이크를 세어
+ * 볼넷과 루킹 삼진을 만든다. 14회에는 스윙을 강제해 경기가 끝나게 한다.
  */
 const RANDOM_LIMIT = 10_000
 /** 코스 오차의 원본 범위 rand(−13, 21) */
@@ -32,6 +33,22 @@ const EXTRA_INNING_DIVISOR_UNIT = 20
 /** 안타를 한 루 더 늘릴지 보는 주력 판정의 상한 (0xc1804) */
 const EXTRA_BASE_LIMIT = BALANCE.quickAtBat.extraBaseLimit
 const STRIKES_FOR_STRIKEOUT = 3
+/**
+ * 한 타석 루프 (0xc262c) — 투구마다 두 갈래로 나뉜다.
+ * `rand(0,100) <= 59` 면 스윙(0xc11f0), 아니면 투구 판정(0xc1818). 단 14회에는 스윙을 강제한다.
+ */
+const SWING_PATH_LIMIT = 59
+const FORCED_SWING_INNING = 14
+/**
+ * 스트라이크존에 넣을 확률 (0xc1818).
+ *   기준 = 65 − (마선수면 10) − trunc((제구 + 구속) ÷ 50)
+ *   `rand(0,100) > 기준` 이면 존 안이다. 투수가 좋을수록 기준이 낮아져 스트라이크가 늘어난다.
+ */
+const STRIKE_ZONE_BASE = 65
+const ACE_STRIKE_BONUS = 10
+const PITCHER_STAT_DIVISOR = 50
+/** 볼 카운트가 이 값을 넘으면 포볼이다 — 0x9d57c 가 `볼 <= 2` 일 때만 볼을 센다 */
+const BALLS_BEFORE_WALK = 3
 /** 타석이 끝나지 않는 일은 없지만, 파울이 끝없이 이어질 때를 대비한 안전망 (원본에는 없다) */
 const MAXIMUM_PITCHES = 200
 
@@ -56,6 +73,8 @@ export interface QuickAtBatPitcher {
   /** 0 이면 탈진이라 0xab214 가 B·C 에 2000 을 얹는다 */
   readonly stamina: number
   readonly skillIds: readonly number[]
+  /** 마선수면 스트라이크존 기준이 10 낮아진다 (0xc1818) */
+  readonly isAce?: boolean
 }
 
 export interface QuickAtBatSituation {
@@ -129,6 +148,28 @@ export function quickPitchOf(
   if (randomIntegerBelow(random, 0, 2) === 0) spreadY = -spreadY
 
   return { spreadX, spreadY, power }
+}
+
+/** 투구 판정 결과 (0x9d57c 가 돌려주는 코드 1·2·3·4·5) */
+export type PitchJudgement = '스트라이크' | '볼' | '포볼' | '삼진'
+
+/**
+ * 스윙하지 않는 투구의 판정 (0xc1818 → 0x9d57c).
+ * 원본은 데드볼(코드 4)도 내지만 그 조건인 상태 플래그 +0x12 를 아직 해독하지 못해 넣지 않았다.
+ * 마찬가지로 +0x10(존 밖인데도 스트라이크로 치는 플래그)도 0 으로 본다 (추정).
+ */
+export function judgePitchOf(
+  pitcher: QuickAtBatPitcher,
+  strikes: number,
+  balls: number,
+  random: RandomPort,
+): PitchJudgement {
+  const aceBonus = pitcher.isAce === true ? ACE_STRIKE_BONUS : 0
+  const bonus = aceBonus + trunc((pitcher.control + pitcher.velocity) / PITCHER_STAT_DIVISOR)
+  const threshold = STRIKE_ZONE_BASE - bonus
+  const isInsideZone = randomIntegerBelow(random, 0, 100) > threshold
+  if (!isInsideZone) return balls <= BALLS_BEFORE_WALK - 1 ? '볼' : '포볼'
+  return strikes <= STRIKES_FOR_STRIKEOUT - 2 ? '스트라이크' : '삼진'
 }
 
 /** 0xc11f0 의 결과 코드 분기를 그대로 옮긴 판정 하나 */
@@ -206,7 +247,11 @@ function verdictOf(
   return { kind: '끝', outcome: { kind: '아웃', detail: '땅볼아웃' } }
 }
 
-/** 타석 하나를 끝까지 돌린다 (0xc11f0 을 스트라이크 셋이 찰 때까지 반복) */
+/**
+ * 타석 하나를 끝까지 돌린다 (0xc262c).
+ * 투구마다 스윙 경로(0xc11f0, 60%)와 투구 판정 경로(0xc1818, 40%)로 갈린다 — 14회는 스윙만 한다.
+ * 볼넷은 판정 경로에서만 나온다.
+ */
 export function simulateQuickAtBat(
   batter: QuickAtBatBatter,
   pitcher: QuickAtBatPitcher,
@@ -214,7 +259,19 @@ export function simulateQuickAtBat(
   random: RandomPort,
 ): AtBatOutcome {
   let strikes = 0
+  let balls = 0
   for (let pitch = 0; pitch < MAXIMUM_PITCHES; pitch += 1) {
+    const isSwing =
+      randomIntegerBelow(random, 0, 100) <= SWING_PATH_LIMIT || situation.inning === FORCED_SWING_INNING
+    if (!isSwing) {
+      const judged = judgePitchOf(pitcher, strikes, balls, random)
+      if (judged === '삼진') return { kind: '삼진' }
+      if (judged === '포볼') return { kind: '볼넷' }
+      if (judged === '볼') balls += 1
+      else strikes += 1
+      continue
+    }
+
     const verdict = verdictOf(batter, pitcher, situation, random)
     if (verdict.kind === '끝') return verdict.outcome
     // 파울은 투 스트라이크까지만 센다

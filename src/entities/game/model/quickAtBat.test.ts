@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { pitchGradeOf, quickPitchOf, simulateQuickAtBat } from '@/entities/game/model/quickAtBat'
+import { judgePitchOf, pitchGradeOf, quickPitchOf, simulateQuickAtBat } from '@/entities/game/model/quickAtBat'
 import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
@@ -88,7 +88,7 @@ describe('quickPitchOf — 0xc11f0 투구 한 번', () => {
 })
 
 describe('simulateQuickAtBat — 타석 하나', () => {
-  it('헛스윙만 나오면 세 번째에 삼진으로 끝난다 — 간이 타석에는 볼넷이 없다', () => {
+  it('헛스윙만 나오면 세 번째에 삼진으로 끝난다', () => {
     // 오차를 크게 뽑아(0.99) contact 를 0 으로 만든다
     expect(simulateQuickAtBat(타자, 투수, { inning: 1 }, 고정(0.99))).toEqual({ kind: '삼진' })
   })
@@ -123,5 +123,70 @@ describe('simulateQuickAtBat — 타석 하나', () => {
     const 강한타자 = 쳐낸비율({ hit: 900, power: 900, run: 900, skillIds: [] })
 
     expect(강한타자).toBeGreaterThan(약한타자)
+  })
+})
+
+describe('judgePitchOf — 스윙하지 않는 투구 (0xc1818 → 0x9d57c)', () => {
+  const 투수 = (control: number, velocity: number) => ({ control, velocity, stamina: 90, skillIds: [] })
+
+  it('스트라이크존 기준은 65 − (제구+구속)÷50 이고, 그보다 큰 값이 나오면 존 안이다', () => {
+    // 제구 600 + 구속 580 = 1180 → 보정 23 → 기준 42
+    const 좋은투수 = 투수(600, 580)
+
+    // rand(0,100) 이 42 이하면 존 밖(볼), 넘으면 존 안(스트라이크)
+    expect(judgePitchOf(좋은투수, 0, 0, 고정(0.42))).toBe('볼')
+    expect(judgePitchOf(좋은투수, 0, 0, 고정(0.43))).toBe('스트라이크')
+  })
+
+  it('투수가 좋을수록 스트라이크가 늘어난다', () => {
+    const 굴림 = 고정(0.5)
+    expect(judgePitchOf(투수(100, 100), 0, 0, 굴림)).toBe('볼')
+    expect(judgePitchOf(투수(600, 580), 0, 0, 고정(0.5))).toBe('스트라이크')
+  })
+
+  it('마선수는 기준이 10 더 낮다 (스트라이크가 늘어난다)', () => {
+    // 제구 200 + 구속 200 = 400 → 보정 8 → 기준 57. 마선수면 47
+    expect(judgePitchOf({ ...투수(200, 200) }, 0, 0, 고정(0.5))).toBe('볼')
+    expect(judgePitchOf({ ...투수(200, 200), isAce: true }, 0, 0, 고정(0.5))).toBe('스트라이크')
+  })
+
+  it('볼 셋에서 또 존 밖이면 포볼, 스트라이크 둘에서 존 안이면 삼진', () => {
+    const 좋은투수 = 투수(600, 580)
+
+    expect(judgePitchOf(좋은투수, 0, 2, 고정(0.42))).toBe('볼')
+    expect(judgePitchOf(좋은투수, 0, 3, 고정(0.42))).toBe('포볼')
+    expect(judgePitchOf(좋은투수, 1, 0, 고정(0.43))).toBe('스트라이크')
+    expect(judgePitchOf(좋은투수, 2, 0, 고정(0.43))).toBe('삼진')
+  })
+})
+
+describe('타석 루프 — 스윙 60% · 판정 40% (0xc262c)', () => {
+  it('약한 투수를 만나면 볼넷이 나온다 — 판정 경로가 살아 있다는 증거', () => {
+    let seed = 20100901
+    const random: RandomPort = {
+      next: () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648 },
+      nextInRange: (minimum, maximum) => minimum + (maximum - minimum) / 2,
+      pick: (candidates) => candidates[0],
+    }
+    const 약한투수 = { control: 100, velocity: 100, stamina: 90, skillIds: [] }
+    let walks = 0
+    for (let index = 0; index < 2000; index += 1) {
+      if (simulateQuickAtBat(타자, 약한투수, { inning: 1 }, random).kind === '볼넷') walks += 1
+    }
+
+    expect(walks, `볼넷 ${walks}/2000`).toBeGreaterThan(0)
+  })
+
+  it('14회에는 스윙만 한다 — 볼넷으로 끝나지 않는다 (0xc262c)', () => {
+    let seed = 7
+    const random: RandomPort = {
+      next: () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648 },
+      nextInRange: (minimum, maximum) => minimum + (maximum - minimum) / 2,
+      pick: (candidates) => candidates[0],
+    }
+    const 약한투수 = { control: 100, velocity: 100, stamina: 90, skillIds: [] }
+    const 결과들 = Array.from({ length: 500 }, () => simulateQuickAtBat(타자, 약한투수, { inning: 14 }, random))
+
+    expect(결과들.some((outcome) => outcome.kind === '볼넷')).toBe(false)
   })
 })

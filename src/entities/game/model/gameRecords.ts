@@ -106,8 +106,8 @@ export interface CompleteGameInput {
  *   그 밖 → 완투승(28)
  * 이 넷은 마스크 0xe0f 에 들어 있어 **팀 조건조차 없이 항상 집계된다**.
  *
- * **주의**: 웹판 간이 타석(0xc11f0)에는 볼 카운트가 없어 볼넷이 나오지 않는다.
- * 그래서 `walksAllowed` 는 늘 0 이고 퍼펙트게임이 원본보다 자주 나온다 — 투구 판정을 옮기면 풀린다.
+ * 볼넷은 투구 판정 경로(0xc1818)를 옮기면서 들어왔다. 다만 데드볼(코드 4)의 조건인 상태 플래그 +0x12 는
+ * 아직 해독하지 못해 데드볼로 인한 출루는 세지 않는다.
  */
 export function completeGameRecordIdsOf(input: CompleteGameInput): number[] {
   if (input.outsRecorded < input.regulationInnings * OUTS_PER_INNING) return []
