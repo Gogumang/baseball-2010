@@ -5,7 +5,7 @@ import { BALANCE } from '@/shared/config/original/balance'
 import type { PostseasonSeries } from '@/entities/league/model/league'
 import { finishRegularSeason } from '@/entities/league/model/seasonEnd'
 import { runCpuPostseason } from '@/entities/league/model/postseasonPlay'
-import { EMPTY_LEAGUE, advancePostseason, recordLeagueResult } from '@/entities/league/model/league'
+import { EMPTY_LEAGUE, advancePostseason, opponentOf, recordLeagueResult } from '@/entities/league/model/league'
 import { playLeagueDay } from '@/entities/league/model/leagueDay'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
@@ -405,6 +405,20 @@ export function applyPostseasonProgress(career: PlayerCareer, random: RandomPort
   if (career.postseason === null) return career
   const advanced = runCpuPostseason(career.postseason, career.teamId, random)
   return advanced === career.postseason ? career : { ...career, postseason: advanced }
+}
+
+/**
+ * 다음 경기 상대 (0xb765c).
+ * 정규시즌은 일정표 0xd89cb 에서 그날 상대를 읽고, 포스트시즌은 지금 시리즈의 맞은편이다.
+ * 포스트시즌인데 내 팀이 그 시리즈에 없으면(진출 실패) 상대가 없다 — 그때는 일정표로 돌아간다 (추정).
+ */
+export function nextOpponentOf(career: PlayerCareer): number {
+  const series = career.postseason
+  if (series !== null && series.round !== '종료') {
+    if (series.teams[0] === career.teamId) return series.teams[1]
+    if (series.teams[1] === career.teamId) return series.teams[0]
+  }
+  return opponentOf(career.gamesPlayed, career.teamId)
 }
 
 /** 원본 전역 G포인트 상한 */

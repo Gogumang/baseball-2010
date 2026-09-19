@@ -13,6 +13,7 @@ import type { GameState } from '@/entities/game/model/gameState'
 import { simulateQuickAtBat } from '@/entities/game/model/quickAtBat'
 import { simulateHalfInning } from '@/entities/game/model/simulateHalfInning'
 import { batterAt, startingPitcherOf } from '@/entities/team/model/teamRoster'
+import { opponentOf } from '@/entities/league/model/league'
 import type { GameSummary } from '@/entities/game/model/gameSummary'
 import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
 import type { SeasonStats } from '@/entities/career/model/seasonStats'
@@ -72,20 +73,21 @@ const RECENT_AT_BAT_COUNT = 2
  * 리그 팀 수. StrHOWTO[7] "기본 10개 팀과 히든 5팀" — 히든 5팀(국가대표 4팀·외인구단, 원본 10~14)은
  * 리그 상대가 아니다. 상대는 자기 팀을 뺀 기본 팀에서 고른다.
  */
-const LEAGUE_TEAM_COUNT = 10
 
+/**
+ * 상대는 원본 일정표(0xd89cb)가 정한다 — 무작위로 고르지 않는다.
+ * 부르는 쪽이 `nextOpponentOf` 로 구해서 넘긴다. 안 넘기면 일정표 첫날 상대를 쓴다.
+ */
 export function startGame(
   random: RandomPort,
   ourTeamId = 0,
   battingOrder = PLAYER_BATTING_ORDER_INDEX + 1,
+  opponentTeamId = opponentOf(0, ourTeamId),
 ): GameProgress {
-  const candidates = Array.from({ length: LEAGUE_TEAM_COUNT }, (_unused, index) => index).filter(
-    (index) => index !== ourTeamId,
-  )
   const initial: GameProgress = {
     game: createGame(battingOrder - 1),
     ourTeamId,
-    opponentTeamId: random.pick(candidates),
+    opponentTeamId,
     // 정규 경기에 마선수가 무작위로 나오는 코드는 원본에 없다 — 마선수 대결은 이벤트 match 명령으로만 (누락 탐색 8차)
     aceOpponent: null,
     myStats: EMPTY_SEASON_STATS,

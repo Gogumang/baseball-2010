@@ -10,6 +10,7 @@ import {
   applyGameResult,
   applyLeagueDay,
   applyPostseasonProgress,
+  nextOpponentOf,
   applySeasonEnd,
   createCareer,
   gainMorale,
@@ -99,10 +100,13 @@ export function useCareerSession({
   }, [career, saveGame])
 
   const beginGame = useCallback(() => {
+    const current = careerRef.current
     const started = startGame(
       random,
-      careerRef.current?.teamId ?? 0,
-      careerRef.current?.battingOrder,
+      current?.teamId ?? 0,
+      current?.battingOrder,
+      // 상대는 일정표(정규시즌)나 지금 시리즈(포스트시즌)가 정한다 — 무작위가 아니다
+      current === null || current === undefined ? undefined : nextOpponentOf(current),
     )
     progressRef.current = started
     setProgress(started)

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { applyGameResult, applySeasonEnd, createCareer, GAMES_PER_SEASON, gamePointRewardOf, nameByteLengthOf, rookieAbilityOf, startNextSeason } from '@/entities/career/model/playerCareer'
-import { EMPTY_LEAGUE, recordLeagueResult } from '@/entities/league/model/league'
+import { applyGameResult, applySeasonEnd, createCareer, nextOpponentOf, GAMES_PER_SEASON, gamePointRewardOf, nameByteLengthOf, rookieAbilityOf, startNextSeason } from '@/entities/career/model/playerCareer'
+import { EMPTY_LEAGUE, opponentOf, recordLeagueResult } from '@/entities/league/model/league'
 import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
 import type { GameSummary } from '@/entities/game/model/gameSummary'
 
@@ -153,5 +153,28 @@ describe('포스트시즌 경기는 시리즈 승수로 들어간다 (0xb76dc �
     }
 
     expect(career.postseason?.round).toBe('플레이오프')
+  })
+})
+
+describe('다음 경기 상대 — 일정표와 시리즈 (0xb765c)', () => {
+  it('정규시즌에는 일정표가 그날 상대를 정한다', () => {
+    const 선수 = { ...createCareer('선수'), teamId: 3, gamesPlayed: 0 }
+
+    expect(nextOpponentOf(선수)).toBe(opponentOf(0, 3))
+    expect(nextOpponentOf({ ...선수, gamesPlayed: 5 })).toBe(opponentOf(5, 3))
+  })
+
+  it('포스트시즌에는 지금 시리즈의 맞은편이 상대다', () => {
+    const 정산 = applySeasonEnd({ ...createCareer('선수'), gamesPlayed: GAMES_PER_SEASON, teamId: 2 })
+    const 시리즈 = 정산.postseason!
+
+    // 준PO 는 3위 vs 4위 — 빈 리그라 팀 2·3 이 붙는다
+    expect(nextOpponentOf(정산)).toBe(시리즈.teams[0] === 2 ? 시리즈.teams[1] : 시리즈.teams[0])
+  })
+
+  it('포스트시즌에 진출하지 못했으면 일정표로 돌아간다', () => {
+    const 정산 = applySeasonEnd({ ...createCareer('선수'), gamesPlayed: GAMES_PER_SEASON, teamId: 9 })
+
+    expect(nextOpponentOf(정산)).toBe(opponentOf(GAMES_PER_SEASON, 9))
   })
 })

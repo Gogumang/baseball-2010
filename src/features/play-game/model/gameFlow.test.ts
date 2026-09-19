@@ -3,6 +3,7 @@ import { applyPlayerOutcome, startGame, summaryOf } from '@/features/play-game/m
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import { isPlayerTurn, PLAYER_BATTING_ORDER_INDEX } from '@/entities/game/model/gameState'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
+import { opponentOf } from '@/entities/league/model/league'
 
 describe('startGame', () => {
   it('커리어 타순(9번)이면 플레이어는 아홉 번째 타자다', () => {
@@ -12,12 +13,19 @@ describe('startGame', () => {
     expect(progress.game.battingOrderIndex === 8 || progress.game.isFinished).toBe(true)
   })
 
-  it('상대는 리그 기본 10팀 중 자기 팀이 아닌 팀이다 — 히든 5팀은 리그에 없다 (StrHOWTO[7])', () => {
-    const opponents = new Set(
-      Array.from({ length: 200 }, (_unused, seed) => startGame(createSeededRandom(seed), 3).opponentTeamId),
-    )
+  it('상대는 무작위가 아니라 원본 일정표(0xd89cb)가 정한다', () => {
+    // 씨앗이 달라도 같은 날이면 같은 상대다
+    const 상대들 = Array.from({ length: 20 }, (_unused, seed) => startGame(createSeededRandom(seed), 3).opponentTeamId)
 
-    expect([...opponents].sort((a, b) => a - b)).toEqual([0, 1, 2, 4, 5, 6, 7, 8, 9])
+    expect(new Set(상대들).size, `상대가 씨앗마다 달라집니다: ${[...new Set(상대들)]}`).toBe(1)
+    expect(상대들[0]).toBe(opponentOf(0, 3))
+  })
+
+  it('한 바퀴(9일) 돌면 나머지 아홉 팀을 한 번씩 만난다 — 10팀 라운드로빈', () => {
+    const 상대들 = Array.from({ length: 9 }, (_unused, day) => opponentOf(day, 3))
+
+    expect(new Set(상대들).size).toBe(9)
+    expect([...상대들].sort((a, b) => a - b)).toEqual([0, 1, 2, 4, 5, 6, 7, 8, 9])
   })
 
   it('플레이어의 첫 타석까지 자동으로 진행한다', () => {
