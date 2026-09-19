@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AbilityBars, Hint, Notice, Panel, PixelScreen, TextField } from '@/shared/ui'
+import { AbilityBars, Hint, MessageBox, Panel, PixelScreen, TextField } from '@/shared/ui'
 import {
   DEFAULT_ROOKIE_PROFILE, MAXIMUM_NAME_BYTES, nameByteLengthOf, rookieAbilityOf,
 } from '@/entities/career/model/playerCareer'
@@ -25,25 +25,23 @@ export function CreatePlayerScreen({ onCreate, onCancel }: CreatePlayerScreenPro
   const trimmedName = name.trim()
   const update = (patch: Partial<RookieProfile>) => setProfile((previous) => ({ ...previous, ...patch }))
 
-  if (isConfirming) {
-    return (
-      <PixelScreen
-        title="선수 등록"
-        leftKey={{ label: '예', onPress: () => onCreate(trimmedName, profile) }}
-        rightKey={{ label: '아니오', onPress: () => setIsConfirming(false) }}
-      >
-        {/* StrMODE[2] */}
-        <Notice>이대로 결정 하시겠습니까?</Notice>
-      </PixelScreen>
-    )
-  }
-
   return (
     <PixelScreen
       title="선수 등록"
       leftKey={{ label: '등록', onPress: () => setIsConfirming(true), isDisabled: trimmedName.length === 0 }}
       rightKey={{ label: '취소', onPress: onCancel }}
     >
+      {/*
+        원본은 예/아니오 질문을 화면을 비우고 묻지 않는다 — 지금 화면 위에 메시지 상자(0xbbef8)를 얹는다.
+        예전에는 빈 화면으로 갈아 끼워 화면 대부분이 검게 남았다. 문구는 StrMODE[2].
+      */}
+      {isConfirming && (
+        <MessageBox
+          text="!C이대로 결정 하시겠습니까?"
+          buttons={['예', '아니오']}
+          onAnswer={(index) => (index === 0 ? onCreate(trimmedName, profile) : setIsConfirming(false))}
+        />
+      )}
       <Panel heading="이름">
         <form onSubmit={(event) => {
           event.preventDefault()
