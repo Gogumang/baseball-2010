@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import * as styles from '@/shared/ui/PixelScreen/PixelScreen.css'
 
@@ -15,8 +16,33 @@ interface PixelScreenProps {
   readonly rightKey?: SoftKey
 }
 
-/** 피처폰 화면 한 장. 타이틀바 · 본문 · 소프트키의 3단 구성을 강제한다. */
+/**
+ * 피처폰 화면 한 장. 타이틀바 · 본문 · 소프트키의 3단 구성을 강제한다.
+ *
+ * 본문은 넘치면 스크롤되지만 240px 폭을 지키려고 스크롤바를 숨긴다. 그러면 글이 그냥 잘린 것처럼
+ * 보여서, 아래에 더 있을 때만 화살표를 띄운다 (원본에 없는 웹판 표시 — 이 화면들 자체가 웹판 껍데기다).
+ */
 export function PixelScreen({ title, badge, children, leftKey, rightKey }: PixelScreenProps) {
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const [hasMoreBelow, setHasMoreBelow] = useState(false)
+
+  const checkOverflow = useCallback(() => {
+    const body = bodyRef.current
+    if (body === null) return
+    // 1px 은 소수점 높이 때문에 생기는 오차를 넘긴다
+    setHasMoreBelow(body.scrollTop + body.clientHeight < body.scrollHeight - 1)
+  }, [])
+
+  useEffect(() => {
+    checkOverflow()
+    const body = bodyRef.current
+    if (body === null || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(checkOverflow)
+    observer.observe(body)
+    for (const child of Array.from(body.children)) observer.observe(child)
+    return () => observer.disconnect()
+  }, [checkOverflow, children])
+
   return (
     <div className={styles.screen}>
       <header className={styles.titleBar}>
@@ -24,7 +50,16 @@ export function PixelScreen({ title, badge, children, leftKey, rightKey }: Pixel
         {badge !== undefined && <span className={styles.badge}>{badge}</span>}
       </header>
 
-      <div className={styles.body}>{children}</div>
+      <div className={styles.bodyWrapper}>
+        <div ref={bodyRef} className={styles.body} onScroll={checkOverflow}>
+          {children}
+        </div>
+        {hasMoreBelow && (
+          <span className={styles.moreBelow} aria-label="아래에 더 있습니다">
+            ▼
+          </span>
+        )}
+      </div>
 
       {(leftKey !== undefined || rightKey !== undefined) && (
         <footer className={styles.softKeys}>

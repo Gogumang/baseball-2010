@@ -77,3 +77,24 @@ export const softKey = style({
     '& + &': { borderLeft: `2px solid ${theme.color.line}`, color: theme.color.inkDim },
   },
 })
+
+/** 본문을 감싸 화살표를 본문 위에 띄운다 */
+export const bodyWrapper = style({
+  position: 'relative',
+  flex: 1,
+  minHeight: 0,
+  display: 'flex',
+  flexDirection: 'column',
+})
+
+/** 아래에 내용이 더 있을 때만 뜨는 화살표 — 스크롤바를 숨겨서 잘린 것처럼 보이는 것을 막는다 */
+export const moreBelow = style({
+  position: 'absolute',
+  right: '6px',
+  bottom: '2px',
+  pointerEvents: 'none',
+  color: theme.color.accent,
+  fontSize: '10px',
+  lineHeight: 1,
+  textShadow: `0 0 3px ${theme.color.canvas}, 0 0 3px ${theme.color.canvas}`,
+})
