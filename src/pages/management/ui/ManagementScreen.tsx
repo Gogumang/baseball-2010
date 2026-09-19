@@ -61,9 +61,9 @@ export function ManagementScreen(props: ManagementScreenProps) {
 
   return (
     <RawScreen>
-      {menu.isShowingBasicInfo
-        ? <BasicInfoCard career={career} />
-        : <ManagementBoard career={career} titleName={currentTitleOf(career)} hour={new Date().getHours()} />}
+      {!menu.isShowingBasicInfo && (
+        <ManagementBoard career={career} titleName={currentTitleOf(career)} hour={new Date().getHours()} />
+      )}
       {menu.playingMenuId !== null && (
         <div className={styles.trainingPopup}>
           <TrainingScene presentation={TRAINING_PRESENTATION_OF[menu.playingMenuId] ?? null}
@@ -73,6 +73,12 @@ export function ManagementScreen(props: ManagementScreenProps) {
       <CommandBar slots={slots} cursor={menu.cursor} bounce={menu.bounce} slideUpdates={menu.slideUpdates}
         disabledIds={menu.disabledIds} labelWidths={labelWidths} parent={menu.parent}
         onHover={menu.moveCursor} onSelect={menu.select} />
+      {/*
+        기본정보 카드는 커맨드 줄 **뒤에** 그린다. 원본 그리기 순서(0x167cc)도 상태판 → 커맨드 줄 →
+        덮개(훈련 팝업 0x7f814) 순이라 덮개가 커맨드 줄을 가린다.
+        커맨드 줄보다 먼저 그리면 정보 칸 넷째 줄("필살"·"타순")이 아이콘에 덮여 사라진다.
+      */}
+      {menu.isShowingBasicInfo && <BasicInfoCard career={career} />}
       <ScreenFrame title="나만의리그타자편" gamePoint={career.gamePoint} onBack={menu.back} />
       {menu.overlay === '기록실' && <StandingsWindow league={career.league} onClose={menu.closeOverlay} />}
       {menu.overlay === '필살타법' && (

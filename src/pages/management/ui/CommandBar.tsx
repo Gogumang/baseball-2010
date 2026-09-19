@@ -32,7 +32,7 @@ export function CommandBar(props: CommandBarProps) {
   const selectedY = commandSlotYAt(selected.y, slideUpdates)
   const labelWidth = labelWidths[selected.labelFrame] ?? 0
   return (
-    <>
+    <div data-testid="command-bar">
       {parent !== null && (
         <>
           <img className={styles.layer} alt="" src={iconOf(parent.icon, true)} style={{
@@ -70,6 +70,6 @@ export function CommandBar(props: CommandBarProps) {
           top: selectedY + COMMAND_LABEL_OFFSET_Y + Math.trunc((COMMAND_LABEL_HEIGHT - LABEL_GLYPH_HEIGHT + 1) / 2) - 1,
         }}
       />
-    </>
+    </div>
   )
 }

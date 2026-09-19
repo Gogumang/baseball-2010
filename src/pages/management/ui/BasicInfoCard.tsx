@@ -26,7 +26,7 @@ export function BasicInfoCard({ career }: { readonly career: PlayerCareer }) {
     SKIN_NAMES[career.skinIndex] ?? '',
   ]
   return (
-    <>
+    <div data-testid="basic-info-card">
       <div className={styles.cardPanel} style={{ left: FIGURE_BOX.x, top: FIGURE_BOX.y, width: FIGURE_BOX.width, height: FIGURE_BOX.height }} />
       <div className={styles.cardPanel} style={{ left: RIGHT_PANEL.x, top: RIGHT_PANEL.y, width: RIGHT_PANEL.width, height: RIGHT_PANEL.height }} />
       {batterLayersOf(0, career.battingTypeIndex).map((layer, index) => (
@@ -35,7 +35,7 @@ export function BasicInfoCard({ career }: { readonly career: PlayerCareer }) {
       <RadarChart base={career.ability} shown={shown} />
       <div className={styles.cardPanel} style={{ left: INFO_BOARD.x, top: INFO_BOARD.y, width: INFO_BOARD.width, height: INFO_BOARD.height, background: INFO_BOARD.color }} />
       <InfoTable values={values} battingOrder={career.battingOrder} />
-    </>
+    </div>
   )
 }
 

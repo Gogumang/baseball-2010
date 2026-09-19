@@ -112,3 +112,22 @@ describe('관리 화면 알림 상자', () => {
     expect(onSelect, '알림 뒤의 [선수정보] 까지 눌렸다').not.toHaveBeenCalled()
   })
 })
+
+describe('기본정보 카드는 커맨드 줄에 가리지 않는다 (QA 1회차 H3)', () => {
+  it('카드가 커맨드 줄보다 나중에 그려진다 — 정보 칸 넷째 줄이 아이콘에 덮이지 않는다', () => {
+    // 정보 칸 넷째 줄은 y 235~250, 커맨드 아이콘은 y 236·245 라 자리가 겹친다.
+    // 겹칠 때 누가 이기는지는 DOM 순서로 정해진다 — 카드가 뒤에 와야 원본 그리기 순서(0x167cc)와 같다.
+    const { container } = render(<ManagementScreen {...propsWith({})} />)
+
+    fireEvent.click(screen.getByRole('button', { name: '선수정보' }))
+    fireEvent.click(screen.getByRole('button', { name: '기본정보' }))
+
+    const 카드 = container.querySelector('[data-testid="basic-info-card"]')
+    const 커맨드 = container.querySelector('[data-testid="command-bar"]')
+    expect(카드, '기본정보 카드를 찾지 못했습니다').not.toBeNull()
+    expect(커맨드, '커맨드 줄을 찾지 못했습니다').not.toBeNull()
+
+    const 순서 = 커맨드!.compareDocumentPosition(카드!)
+    expect(순서 & Node.DOCUMENT_POSITION_FOLLOWING, '카드가 커맨드 줄보다 먼저 그려집니다').toBeTruthy()
+  })
+})
