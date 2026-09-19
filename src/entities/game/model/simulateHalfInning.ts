@@ -1,7 +1,14 @@
-import { advanceRunners, EMPTY_BASES } from '@/entities/game/model/baseState'
+import {
+  GROUND_OUT_ADVANCE_LIMIT,
+  advanceOnGroundOut,
+  advanceRunners,
+  canAdvanceOnGroundOut,
+  EMPTY_BASES,
+} from '@/entities/game/model/baseState'
 import { playQuickAtBat } from '@/entities/game/model/quickAtBat'
 import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { strikeoutRecordIdsOf, threePitchInningRecordIdsOf } from '@/entities/game/model/gameRecords'
 
 /**
@@ -82,8 +89,13 @@ export function simulateHalfInning(
       // 삼진이 아닌 타석이 하나라도 끼면 콤보가 끊긴다
       combo = 0
     }
+    const canAdvance = outcome.kind === '아웃' && outcome.detail === '땅볼아웃' && canAdvanceOnGroundOut(bases, outs)
     const advanced = advanceRunners(bases, outcome, outs)
     bases = advanced.bases
+    // 땅볼 아웃에 60% 로 주자가 한 루 나간다 (0xc11f0)
+    if (canAdvance && randomIntegerBelow(random, 0, 10_000) <= GROUND_OUT_ADVANCE_LIMIT) {
+      bases = advanceOnGroundOut(bases)
+    }
     outs += advanced.outsAdded
     // 3아웃이 되는 순간 들어오던 주자는 득점으로 치지 않는다
     runs += outs >= OUTS_PER_INNING && advanced.outsAdded > 0 ? 0 : advanced.runsScored

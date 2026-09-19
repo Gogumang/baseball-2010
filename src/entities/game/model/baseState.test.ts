@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { advanceRunners, EMPTY_BASES, runnerCountOf } from '@/entities/game/model/baseState'
+import { advanceRunners, EMPTY_BASES, runnerCountOf , advanceOnGroundOut, canAdvanceOnGroundOut} from '@/entities/game/model/baseState'
 import type { BaseState } from '@/entities/game/model/baseState'
 
 const 만루: BaseState = { first: true, second: true, third: true }
@@ -112,5 +112,28 @@ describe('runnerCountOf', () => {
     expect(runnerCountOf(EMPTY_BASES)).toBe(0)
     expect(runnerCountOf(주자1루)).toBe(1)
     expect(runnerCountOf(만루)).toBe(3)
+  })
+})
+
+describe('땅볼 진루타 — 0xc11f0 (상한 0xc17ec = 5999)', () => {
+  it('2아웃이면 진루하지 않는다', () => {
+    expect(canAdvanceOnGroundOut({ first: true, second: false, third: false }, 2)).toBe(false)
+  })
+
+  it('주자가 없으면 진루할 것도 없다', () => {
+    expect(canAdvanceOnGroundOut(EMPTY_BASES, 0)).toBe(false)
+  })
+
+  it('3루에 주자가 있으면 진루타로 보지 않는다 — 원본이 앞 주자 베이스를 3 미만으로 본다', () => {
+    expect(canAdvanceOnGroundOut({ first: true, second: false, third: true }, 0)).toBe(false)
+    expect(canAdvanceOnGroundOut({ first: true, second: false, third: false }, 0)).toBe(true)
+  })
+
+  it('주자를 한 루씩 민다 — 3루 주자가 없으니 득점은 없다', () => {
+    expect(advanceOnGroundOut({ first: true, second: true, third: false })).toEqual({
+      first: false,
+      second: true,
+      third: true,
+    })
   })
 })
