@@ -15,3 +15,19 @@ export const nameTag = style({
   fontSize: '11px',
   fontWeight: 700,
 })
+
+/**
+ * 이벤트는 관리 화면 위에 겹쳐 뜬다 (trigger 0). 240×320 칸 전체를 덮되 뒤 화면이 비치도록
+ * 배경은 칠하지 않고, 대사·선택지만 아래쪽에 모은다.
+ */
+export const overlay = style({
+  position: 'absolute',
+  inset: 0,
+  display: 'flex',
+  flexDirection: 'column',
+  justifyContent: 'flex-end',
+  alignItems: 'stretch',
+  gap: '4px',
+  padding: '0 8px 24px',
+  zIndex: 30,
+})

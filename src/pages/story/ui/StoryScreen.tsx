@@ -1,7 +1,7 @@
-import { Hint, MarkupText, MenuList, PixelScreen } from '@/shared/ui'
+import { Hint, MarkupText, MenuList } from '@/shared/ui'
 import type { MenuItem } from '@/shared/ui'
 import { dialogueButton } from '@/shared/ui/DialogueBox/DialogueBox.css'
-import { SPEAKER_NAMES, TOTAL_EVENT_COUNT } from '@/shared/config/original/eventMeta'
+import { SPEAKER_NAMES } from '@/shared/config/original/eventMeta'
 import type { OriginalEvent } from '@/shared/config/original/eventTypes'
 import type { EventReward } from '@/entities/story/model/eventReward'
 import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
@@ -32,7 +32,6 @@ interface StoryScreenProps {
 export function StoryScreen({ events, event, playerName, teamName, onComplete, onMatch, carried }: StoryScreenProps) {
   const { step, portraits, next, jump } = useEventPlayback(events, event, onComplete, onMatch, carried)
   const command = step.command
-  const order = events.findIndex((candidate) => candidate.id === step.cursor.eventId) + 1
 
   const speakerName =
     command?.op !== 'say' || command.speaker === 0
@@ -55,11 +54,7 @@ export function StoryScreen({ events, event, playerName, teamName, onComplete, o
   const isDialogue = command?.op === 'say' || command?.op === 'system'
 
   return (
-    <PixelScreen
-      title="이벤트"
-      badge={`${Math.max(order, 1)} / ${TOTAL_EVENT_COUNT}`}
-      leftKey={isDialogue ? { label: '다음', onPress: next } : undefined}
-    >
+    <div className={styles.overlay}>
       <EventPortraits portraits={portraits} height={styles.PORTRAIT_HEIGHT} />
       {speakerName !== null && <span className={styles.nameTag}>{speakerName}</span>}
 
@@ -74,6 +69,6 @@ export function StoryScreen({ events, event, playerName, teamName, onComplete, o
       ) : (
         <Hint>대사창을 누르거나 Enter</Hint>
       )}
-    </PixelScreen>
+    </div>
   )
 }

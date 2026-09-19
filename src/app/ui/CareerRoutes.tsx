@@ -111,17 +111,22 @@ export function CareerRoutes({
     case '이벤트': {
       const event = session.storyEvents?.find((candidate) => candidate.id === screen.eventId)
       if (session.storyEvents === null || event === undefined) return management
+      // 원본은 이벤트를 따로 된 화면으로 띄우지 않는다. trigger 0 이벤트는 **관리 화면 위에** 뜬다
+      // (events.json 의 trigger: 0 관리 화면 · 1 외출 지도 · 2~6 장소). 그래서 뒤에 관리 화면을 깔아 둔다.
       return (
-        <StoryScreen
-          key={event.id}
-          events={session.storyEvents}
-          event={event}
-          playerName={career.name}
-          teamName={(TEAMS[career.teamId] ?? TEAMS[0]).name}
-          onComplete={actions.completeScene}
-          carried={screen.carried}
-          onMatch={(command, carried) => onAceMatch(command, carried, screen.context)}
-        />
+        <>
+          {management}
+          <StoryScreen
+            key={event.id}
+            events={session.storyEvents}
+            event={event}
+            playerName={career.name}
+            teamName={(TEAMS[career.teamId] ?? TEAMS[0]).name}
+            onComplete={actions.completeScene}
+            carried={screen.carried}
+            onMatch={(command, carried) => onAceMatch(command, carried, screen.context)}
+          />
+        </>
       )
     }
 
