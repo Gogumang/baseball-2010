@@ -111,11 +111,12 @@ export function CareerRoutes({
     case '이벤트': {
       const event = session.storyEvents?.find((candidate) => candidate.id === screen.eventId)
       if (session.storyEvents === null || event === undefined) return management
-      // 원본은 이벤트를 따로 된 화면으로 띄우지 않는다. trigger 0 이벤트는 **관리 화면 위에** 뜬다
-      // (events.json 의 trigger: 0 관리 화면 · 1 외출 지도 · 2~6 장소). 그래서 뒤에 관리 화면을 깔아 둔다.
+      // 원본은 이벤트를 따로 된 화면으로 띄우지 않는다. `trigger` 가 **어느 화면 위에 뜨는지**를 가리킨다
+      // (0 관리 화면 · 1 외출 지도 · 2~6 장소). 관리 화면(trigger 0)만 확인돼서 그것부터 깔아 둔다 —
+      // 외출·장소 이벤트의 뒷 화면은 아직 확인하지 못해 예전처럼 덮개만 띄운다.
       return (
         <>
-          {management}
+          {screen.context === '관리' && management}
           <StoryScreen
             key={event.id}
             events={session.storyEvents}
