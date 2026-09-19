@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { applyGameResult, createCareer, gamePointRewardOf, nameByteLengthOf, rookieAbilityOf, startNextSeason } from '@/entities/career/model/playerCareer'
-import { EMPTY_LEAGUE } from '@/entities/league/model/league'
+import { applyGameResult, applySeasonEnd, createCareer, GAMES_PER_SEASON, gamePointRewardOf, nameByteLengthOf, rookieAbilityOf, startNextSeason } from '@/entities/career/model/playerCareer'
+import { EMPTY_LEAGUE, recordLeagueResult } from '@/entities/league/model/league'
 import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
 import type { GameSummary } from '@/entities/game/model/gameSummary'
 
@@ -85,5 +85,43 @@ describe('신인 초기값 — 0x11244 디스어셈 대조', () => {
     expect(신인.gamePoint, `gamePoint was: ${신인.gamePoint}`).toBe(0)
     expect(신인.reputation).toBe(300)
     expect(신인.morale).toBe(100)
+  })
+})
+
+describe('정규시즌 종료 — 45경기째 (0xb818c)', () => {
+  it('45경기 전에는 포스트시즌이 열리지 않는다', () => {
+    const 선수 = { ...createCareer('선수'), gamesPlayed: GAMES_PER_SEASON - 1 }
+
+    expect(applySeasonEnd(선수).postseason).toBeNull()
+    expect(applySeasonEnd(선수).regularSeasonFirstCount).toBe(0)
+  })
+
+  it('45경기째에 준플레이오프 대진이 열린다', () => {
+    const 선수 = { ...createCareer('선수'), gamesPlayed: GAMES_PER_SEASON }
+
+    const 정산 = applySeasonEnd(선수)
+    expect(정산.postseason?.round).toBe('준플레이오프')
+    expect(정산.postseason?.winsNeeded).toBe(3)
+  })
+
+  it('내 팀이 1위면 정규시즌 1위 횟수가 는다 — 원본 레코드 +0x7a', () => {
+    // 내 팀(0번)만 이겨 놓으면 1위가 된다
+    let league = EMPTY_LEAGUE
+    for (let win = 0; win < 5; win += 1) league = recordLeagueResult(league, 0, 1)
+    const 선수 = { ...createCareer('선수'), gamesPlayed: GAMES_PER_SEASON, teamId: 0, league }
+
+    expect(applySeasonEnd(선수).regularSeasonFirstCount).toBe(1)
+  })
+
+  it('이미 포스트시즌이 열려 있으면 두 번 세지 않는다', () => {
+    let league = EMPTY_LEAGUE
+    for (let win = 0; win < 5; win += 1) league = recordLeagueResult(league, 0, 1)
+    const 선수 = { ...createCareer('선수'), gamesPlayed: GAMES_PER_SEASON, teamId: 0, league }
+
+    const 한번 = applySeasonEnd(선수)
+    const 두번 = applySeasonEnd(한번)
+
+    expect(두번.regularSeasonFirstCount).toBe(1)
+    expect(두번.postseason).toBe(한번.postseason)
   })
 })

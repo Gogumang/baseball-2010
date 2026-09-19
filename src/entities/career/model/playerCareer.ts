@@ -2,6 +2,8 @@ import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { GameSummary } from '@/entities/game/model/gameSummary'
 import type { League } from '@/entities/league/model/league'
 import { BALANCE } from '@/shared/config/original/balance'
+import type { PostseasonSeries } from '@/entities/league/model/league'
+import { finishRegularSeason } from '@/entities/league/model/seasonEnd'
 import { EMPTY_LEAGUE, recordLeagueResult } from '@/entities/league/model/league'
 import { playLeagueDay } from '@/entities/league/model/leagueDay'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -108,6 +110,10 @@ export interface PlayerCareer {
   readonly openedHiddenIds: readonly number[]
   /** 리그 전적 (0xb76dc·0xb77e0). 지금은 내 팀 경기만 쌓인다 — 다른 팀 경기는 원본 간이 시뮬레이터를 옮길 때 채운다 */
   readonly league: League
+  /** 정규시즌 1위 횟수 — 원본 세이브 레코드 +0x7a (0xb818c 가 45경기째에 늘린다) */
+  readonly regularSeasonFirstCount: number
+  /** 진행 중인 포스트시즌. 정규시즌 중에는 null 이다 (0xb80a8 이 45경기째에 연다) */
+  readonly postseason: PostseasonSeries | null
   /** 또또상품권 구매 수(상한 200, +0x186) · 1등 횟수 — 칭호 21·22 */
   readonly lotteryPurchases: number
   readonly lotteryFirstPrizes: number
@@ -233,6 +239,8 @@ export function createCareer(name: string, profile: RookieProfile = DEFAULT_ROOK
     ownedEquipment: [],
     openedHiddenIds: [],
     league: EMPTY_LEAGUE,
+    regularSeasonFirstCount: 0,
+    postseason: null,
     lotteryPurchases: 0,
     lotteryFirstPrizes: 0,
     specialSwingLevel: 0,
@@ -361,6 +369,21 @@ export function applyGameResult(career: PlayerCareer, summary: GameSummary): Pla
  */
 export function applyLeagueDay(career: PlayerCareer, myTeamId: number, random: RandomPort): PlayerCareer {
   return { ...career, league: playLeagueDay(career.league, Math.max(0, career.gamesPlayed - 1), myTeamId, random) }
+}
+
+/**
+ * 45경기가 끝나면 정규시즌을 닫는다 (0xb818c).
+ * 1위면 레코드 +0x7a 를 늘리고, 포스트시즌 대진(0xb80a8)을 연다.
+ * 이미 포스트시즌이 열려 있으면 아무것도 하지 않는다.
+ */
+export function applySeasonEnd(career: PlayerCareer): PlayerCareer {
+  if (career.postseason !== null || career.gamesPlayed < GAMES_PER_SEASON) return career
+  const result = finishRegularSeason(career.league, career.teamId)
+  return {
+    ...career,
+    regularSeasonFirstCount: career.regularSeasonFirstCount + (result.isRegularSeasonFirst ? 1 : 0),
+    postseason: result.postseason,
+  }
 }
 
 /** 원본 전역 G포인트 상한 */
