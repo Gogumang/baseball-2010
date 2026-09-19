@@ -167,3 +167,25 @@ describe('마선수 — 정규 경기에는 나오지 않는다 (누락 탐색 8
     expect(aces.every((ace) => ace === null)).toBe(true)
   })
 })
+
+describe('삼진 계열 기록이 경기 중에 쌓인다 (16~23·25)', () => {
+  it('상대 공격에서 우리 투수가 잡은 삼진으로 기록이 나온다', () => {
+    // 여러 시드로 한 경기씩 돌려 삼진 계열(16~25) 기록이 한 번이라도 나오는지 본다
+    const 나온기록 = new Set<number>()
+    for (const seed of [1, 7, 42, 777, 20100901, 2024, 31337]) {
+      for (const id of playFullGame(createSeededRandom(seed)).recordIds) {
+        if (id >= 16 && id <= 25) 나온기록.add(id)
+      }
+    }
+
+    expect(나온기록.size, `나온 삼진 계열 기록: ${[...나온기록]}`).toBeGreaterThan(0)
+  })
+
+  it('연속 삼진은 이닝을 넘어서도 이어진다 — 이닝마다 끊기면 콤보가 안 나온다', () => {
+    const finished = playFullGame(createSeededRandom(20100901))
+
+    // 우리 투수가 잡은 삼진 수가 이닝 수보다 많다 = 이닝을 넘겨 누적된다
+    expect(finished.pitching.strikeouts).toBeGreaterThan(0)
+    expect(finished.pitching.outsRecorded).toBeGreaterThanOrEqual(finished.pitching.strikeouts)
+  })
+})

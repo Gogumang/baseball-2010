@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { atBatRecordIdsOf, gameEndRecordIdsOf, recordGamePointsOf, RECORD_NAMES, completeGameRecordIdsOf } from '@/entities/game/model/gameRecords'
-import type { CompleteGameInput } from '@/entities/game/model/gameRecords'
+import { atBatRecordIdsOf, gameEndRecordIdsOf, recordGamePointsOf, RECORD_NAMES, completeGameRecordIdsOf, strikeoutRecordIdsOf, threePitchInningRecordIdsOf } from '@/entities/game/model/gameRecords'
+import type { CompleteGameInput, StrikeoutRecordInput } from '@/entities/game/model/gameRecords'
 
 const 타석 = (overrides = {}) => ({
   outcome: { kind: '아웃', detail: '땅볼아웃' } as const,
@@ -76,5 +76,52 @@ describe('완투 계열 기록 — 0xa7de8 (마스크 0xe0f, 팀 조건 없이 �
   it('금액은 노히트노런 100 · 퍼펙트게임 120 이다', () => {
     expect(recordGamePointsOf([30])).toBe(100)
     expect(recordGamePointsOf([31])).toBe(120)
+  })
+})
+
+describe('삼진 계열 기록 — 16~23·25 (0xa7c4c·0xa7d0c)', () => {
+  const 삼진 = (overrides: Partial<StrikeoutRecordInput> = {}): StrikeoutRecordInput => ({
+    pitches: 5,
+    balls: 1,
+    comboCount: 1,
+    pitcherStrikeouts: 1,
+    ...overrides,
+  })
+
+  it('공 셋으로 끝내면 삼구 삼진(16)', () => {
+    expect(strikeoutRecordIdsOf(삼진({ pitches: 3 }))).toContain(16)
+    expect(strikeoutRecordIdsOf(삼진({ pitches: 4 }))).not.toContain(16)
+  })
+
+  it('볼 셋까지 가서 잡으면 풀카운트 삼진(17)', () => {
+    expect(strikeoutRecordIdsOf(삼진({ balls: 3 }))).toContain(17)
+    expect(strikeoutRecordIdsOf(삼진({ balls: 2 }))).not.toContain(17)
+  })
+
+  it('연속 삼진 3·6·9 에서 콤보 기록(18·19·20)', () => {
+    expect(strikeoutRecordIdsOf(삼진({ comboCount: 3 }))).toContain(18)
+    expect(strikeoutRecordIdsOf(삼진({ comboCount: 6 }))).toContain(19)
+    expect(strikeoutRecordIdsOf(삼진({ comboCount: 9 }))).toContain(20)
+    // 사이 숫자에는 주지 않는다 — 딱 그 순간 한 번씩이다
+    expect(strikeoutRecordIdsOf(삼진({ comboCount: 4 })).filter((id) => id >= 18 && id <= 20)).toEqual([])
+  })
+
+  it('한 투수 10·15·20삼진에서 기록(21·22·23)', () => {
+    expect(strikeoutRecordIdsOf(삼진({ pitcherStrikeouts: 10 }))).toContain(21)
+    expect(strikeoutRecordIdsOf(삼진({ pitcherStrikeouts: 15 }))).toContain(22)
+    expect(strikeoutRecordIdsOf(삼진({ pitcherStrikeouts: 20 }))).toContain(23)
+  })
+
+  it('한 타석에서 여러 기록이 겹칠 수 있다', () => {
+    const ids = strikeoutRecordIdsOf({ pitches: 3, balls: 3, comboCount: 3, pitcherStrikeouts: 10 })
+
+    expect(ids).toEqual([16, 17, 18, 21])
+  })
+
+  it('한 이닝을 공 셋으로 끝내면 삼구 삼자범퇴(25)', () => {
+    expect(threePitchInningRecordIdsOf(3, 3)).toEqual([25])
+    expect(threePitchInningRecordIdsOf(4, 3)).toEqual([])
+    // 3아웃으로 끝나지 않았으면 주지 않는다
+    expect(threePitchInningRecordIdsOf(3, 2)).toEqual([])
   })
 })

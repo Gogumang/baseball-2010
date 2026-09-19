@@ -58,7 +58,14 @@ export interface GameProgress {
    */
   readonly teammateLogs: Readonly<Record<number, BatterGameLog>>
   /** 우리 투수가 내준 것 — 완투 계열 기록(0xa7de8)이 보는 state+0x88·0x89·0x8a */
-  readonly pitching: { readonly hitsAllowed: number; readonly walksAllowed: number; readonly outsRecorded: number }
+  readonly pitching: {
+    readonly hitsAllowed: number
+    readonly walksAllowed: number
+    readonly outsRecorded: number
+    /** 우리 투수가 잡은 삼진 수와 이어지는 연속 삼진 — 삼진 계열 기록(16~23) 판정에 쓴다 */
+    readonly strikeouts: number
+    readonly strikeoutCombo: number
+  }
   readonly log: readonly GameLogEntry[]
   readonly nextLogId: number
 }
@@ -101,7 +108,7 @@ export function startGame(
     recordIds: [],
     consecutiveHits: 0,
     teammateLogs: {},
-    pitching: { hitsAllowed: 0, walksAllowed: 0, outsRecorded: 0 },
+    pitching: { hitsAllowed: 0, walksAllowed: 0, outsRecorded: 0, strikeouts: 0, strikeoutCombo: 0 },
     log: [],
     nextLogId: 1,
   }
@@ -186,6 +193,7 @@ function playOpponentInning(progress: GameProgress, random: RandomPort): GamePro
     startingPitcherOf(progress.ourTeamId),
     progress.game.inning,
     random,
+    { strikeoutCombo: progress.pitching.strikeoutCombo, strikeouts: progress.pitching.strikeouts },
   )
   const runs = half.runs
   const game = applyOpponentInning(progress.game, runs)
@@ -198,7 +206,11 @@ function playOpponentInning(progress: GameProgress, random: RandomPort): GamePro
         hitsAllowed: progress.pitching.hitsAllowed + half.hits,
         walksAllowed: progress.pitching.walksAllowed + half.walks,
         outsRecorded: progress.pitching.outsRecorded + half.outs,
+        strikeouts: progress.pitching.strikeouts + half.strikeouts,
+        strikeoutCombo: half.strikeoutCombo,
       },
+      // 삼진 계열 기록도 우리 팀 것이다 (0xa77f0 은 수비 팀이 사람 팀인지 본다)
+      recordIds: [...progress.recordIds, ...half.recordIds],
     },
     `${progress.game.inning}회초 상대 공격 — ${runs}점`,
     false,

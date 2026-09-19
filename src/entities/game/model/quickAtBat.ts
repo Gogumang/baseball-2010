@@ -247,40 +247,61 @@ function verdictOf(
   return { kind: '끝', outcome: { kind: '아웃', detail: '땅볼아웃' } }
 }
 
+/** 타석 하나의 결과와, 기록달성 판정에 쓰는 투구 내역 */
+export interface QuickAtBatPlay {
+  readonly outcome: AtBatOutcome
+  /** 이 타석에서 던진 공 수 — 삼구 삼진(16) 판정에 쓴다 */
+  readonly pitches: number
+  /** 끝났을 때의 볼 카운트 — 풀카운트 삼진(17) 판정에 쓴다 */
+  readonly balls: number
+  readonly strikes: number
+}
+
 /**
  * 타석 하나를 끝까지 돌린다 (0xc262c).
  * 투구마다 스윙 경로(0xc11f0, 60%)와 투구 판정 경로(0xc1818, 40%)로 갈린다 — 14회는 스윙만 한다.
  * 볼넷은 판정 경로에서만 나온다.
  */
-export function simulateQuickAtBat(
+export function playQuickAtBat(
   batter: QuickAtBatBatter,
   pitcher: QuickAtBatPitcher,
   situation: QuickAtBatSituation,
   random: RandomPort,
-): AtBatOutcome {
+): QuickAtBatPlay {
   let strikes = 0
   let balls = 0
-  for (let pitch = 0; pitch < MAXIMUM_PITCHES; pitch += 1) {
+  for (let pitch = 1; pitch <= MAXIMUM_PITCHES; pitch += 1) {
+    const done = (outcome: AtBatOutcome): QuickAtBatPlay => ({ outcome, pitches: pitch, balls, strikes })
     const isSwing =
       randomIntegerBelow(random, 0, 100) <= SWING_PATH_LIMIT || situation.inning === FORCED_SWING_INNING
     if (!isSwing) {
       const judged = judgePitchOf(pitcher, strikes, balls, random)
-      if (judged === '삼진') return { kind: '삼진' }
-      if (judged === '포볼') return { kind: '볼넷' }
+      if (judged === '삼진') return done({ kind: '삼진' })
+      if (judged === '포볼') return done({ kind: '볼넷' })
       if (judged === '볼') balls += 1
       else strikes += 1
       continue
     }
 
     const verdict = verdictOf(batter, pitcher, situation, random)
-    if (verdict.kind === '끝') return verdict.outcome
+    if (verdict.kind === '끝') return done(verdict.outcome)
     // 파울은 투 스트라이크까지만 센다
     if (verdict.kind === '파울') {
       if (strikes < STRIKES_FOR_STRIKEOUT - 1) strikes += 1
       continue
     }
     strikes += 1
-    if (strikes >= STRIKES_FOR_STRIKEOUT) return { kind: '삼진' }
+    if (strikes >= STRIKES_FOR_STRIKEOUT) return done({ kind: '삼진' })
   }
-  return { kind: '삼진' }
+  return { outcome: { kind: '삼진' }, pitches: MAXIMUM_PITCHES, balls, strikes }
+}
+
+/** 결과만 필요할 때 쓰는 얇은 껍데기 */
+export function simulateQuickAtBat(
+  batter: QuickAtBatBatter,
+  pitcher: QuickAtBatPitcher,
+  situation: QuickAtBatSituation,
+  random: RandomPort,
+): AtBatOutcome {
+  return playQuickAtBat(batter, pitcher, situation, random).outcome
 }

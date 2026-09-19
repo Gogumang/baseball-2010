@@ -11,8 +11,10 @@ import { BALANCE } from '@/shared/config/original/balance'
  * 사용자 타석과 같은 `recordBatterAtBat` 을 쓴다.
  * 완투 계열 28~31 도 들어왔다 (`completeGameRecordIdsOf`) — 상대 공격이 실제 타석으로 돌아가
  * 피안타·실점을 셀 수 있게 되면서 가능해졌다.
- * 아직 빠진 것은 투구 사건 쪽이고, 그만큼 원본보다 G 수입이 적다:
- *   - 우리 팀 수비·투수 기록 16~27 (삼진 계열·도루 저지·병살·삼자범퇴)
+ * 삼진 계열 16~23 과 삼구 삼자범퇴 25 도 들어왔다 — 투구 판정 경로(0xc1818)를 옮기면서 공 수·볼 카운트를
+ * 셀 수 있게 된 덕이다.
+ * 아직 빠진 것은 수비 플레이 쪽이고, 그만큼 원본보다 G 수입이 적다:
+ *   - 24 도루 저지 · 26 더블플레이 · 27 트리플플레이 (수비 플레이 자체를 아직 안 만든다)
  *   - 5 대타 홈런 · 6·7 백투백 · 8 도루 성공 · 32·33 연속 파울 · 36 필살송구 아웃
  * 상대 공격은 이제 원본 간이 타석(0xc11f0)으로 돌지만 아직 타격 결과만 만든다 —
  * 삼진 콤보·병살·삼자범퇴 같은 투구·수비 사건을 세려면 수비 쪽 상태(state+0x88~0x8a)를 더 옮겨야 한다.
@@ -122,6 +124,58 @@ export function completeGameRecordIdsOf(input: CompleteGameInput): number[] {
   if (input.hitsAllowed === 0 && input.runsAllowed === 0) return [COMPLETE_GAME.noHitter]
   if (input.runsAllowed === 0) return [COMPLETE_GAME.shutout]
   return [COMPLETE_GAME.completeGame]
+}
+
+const STRIKEOUT = {
+  threePitch: 16,
+  fullCount: 17,
+  combo: 18,
+  pitcherTotal: 21,
+  threePitchInning: 25,
+} as const
+/** 삼진 콤보는 3·6·9 연속에서 준다 (18·19·20) */
+const COMBO_STEPS = [3, 6, 9]
+/** 한 투수 삼진은 10·15·20 에서 준다 (21·22·23) */
+const PITCHER_TOTAL_STEPS = [10, 15, 20]
+/** 삼구 삼진 — 세 개로 끝낸 삼진 */
+const THREE_PITCH_COUNT = 3
+/** 풀카운트 = 볼 셋 */
+const FULL_COUNT_BALLS = 3
+/** 삼구 삼자범퇴 — 한 이닝을 공 셋으로 끝낸다 */
+const THREE_PITCH_INNING_PITCHES = 3
+
+export interface StrikeoutRecordInput {
+  /** 이 타석에서 던진 공 수 */
+  readonly pitches: number
+  /** 끝났을 때의 볼 카운트 */
+  readonly balls: number
+  /** 이 삼진까지 이어진 연속 삼진 수 */
+  readonly comboCount: number
+  /** 이 삼진까지 우리 투수가 잡은 삼진 수 */
+  readonly pitcherStrikeouts: number
+}
+
+/**
+ * 삼진 계열 기록 (0xa7c4c·0xa7d0c 가 삼진 연출과 함께 부른다).
+ *   16 삼구 삼진 · 17 풀카운트 삼진 · 18~20 삼진 콤보 x3/x6/x9 · 21~23 한 투수 10/15/20삼진
+ * 우리 투수가 잡은 삼진에만 준다 (0xa77f0 게이트가 수비 팀이 사람 팀인지 본다).
+ */
+export function strikeoutRecordIdsOf(input: StrikeoutRecordInput): number[] {
+  const ids: number[] = []
+  if (input.pitches === THREE_PITCH_COUNT) ids.push(STRIKEOUT.threePitch)
+  if (input.balls === FULL_COUNT_BALLS) ids.push(STRIKEOUT.fullCount)
+  const comboStep = COMBO_STEPS.indexOf(input.comboCount)
+  if (comboStep >= 0) ids.push(STRIKEOUT.combo + comboStep)
+  const totalStep = PITCHER_TOTAL_STEPS.indexOf(input.pitcherStrikeouts)
+  if (totalStep >= 0) ids.push(STRIKEOUT.pitcherTotal + totalStep)
+  return ids
+}
+
+/** 삼구 삼자범퇴 (25) — 한 이닝을 공 셋으로 끝냈는가 */
+export function threePitchInningRecordIdsOf(pitchesInInning: number, outs: number): number[] {
+  return pitchesInInning === THREE_PITCH_INNING_PITCHES && outs >= OUTS_PER_INNING
+    ? [STRIKEOUT.threePitchInning]
+    : []
 }
 
 export function recordGamePointsOf(recordIds: readonly number[]): number {
