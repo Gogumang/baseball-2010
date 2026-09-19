@@ -19,7 +19,6 @@ import type { SeasonStats } from '@/entities/career/model/seasonStats'
 /** 원본 능력치 상한 (0xb6414 가 999 로 자른다) */
 export const MAXIMUM_ABILITY = BALANCE.ability.maximum
 const MAXIMUM_AFFECTION = BALANCE.limits.affection
-export const MAXIMUM_STAMINA = BALANCE.limits.stamina
 
 /**
  * 관리 메뉴가 열리는 주기.
@@ -32,13 +31,11 @@ export const GAMES_PER_MANAGEMENT_CYCLE = BALANCE.season.gamesPerManagementCycle
 export const GAMES_PER_SEASON = BALANCE.season.gamesPerSeason
 
 /** 경기를 치르면 회복하는 체력 */
-const STAMINA_RECOVERY_PER_GAME = BALANCE.season.staminaRecoveryPerGame
 
 export interface PlayerCareer {
   readonly name: string
   readonly ability: BatterAbility
   readonly gamePoint: number
-  readonly stamina: number
   readonly season: number
   readonly gamesPlayed: number
   readonly stats: SeasonStats
@@ -202,7 +199,6 @@ export function createCareer(name: string, profile: RookieProfile = DEFAULT_ROOK
     name,
     ability: rookieAbilityOf(profile.battingTypeIndex, profile.positionIndex),
     gamePoint: STARTING_GAME_POINT,
-    stamina: MAXIMUM_STAMINA,
     season: 1,
     gamesPlayed: 0,
     stats: EMPTY_SEASON_STATS,
@@ -337,7 +333,6 @@ export function applyGameResult(career: PlayerCareer, summary: GameSummary): Pla
   return {
     ...career,
     gamePoint: Math.min(MAXIMUM_GAME_POINT, career.gamePoint + gamePointRewardOf(summary)),
-    stamina: clamp(career.stamina + STAMINA_RECOVERY_PER_GAME, 0, MAXIMUM_STAMINA),
     gamesPlayed: career.gamesPlayed + 1,
     illnessCooldown: Math.max(0, career.illnessCooldown - 1),
     // 행동권은 다음 관리 주기가 열릴 때만 돌아온다 — 경기마다 돌려주면 이어하기로 두 번 할 수 있다
@@ -449,7 +444,6 @@ export function startNextSeason(career: PlayerCareer): PlayerCareer {
     morale: MAXIMUM_MORALE,
     money: Math.min(MAXIMUM_MONEY, career.money + career.salary * ORIGINAL_MONEY_UNIT),
     stats: EMPTY_SEASON_STATS,
-    stamina: MAXIMUM_STAMINA,
     wins: 0,
     draws: 0,
     losses: 0,

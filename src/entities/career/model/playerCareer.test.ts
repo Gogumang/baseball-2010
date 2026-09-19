@@ -178,3 +178,15 @@ describe('다음 경기 상대 — 일정표와 시리즈 (0xb765c)', () => {
     expect(nextOpponentOf(정산)).toBe(opponentOf(GAMES_PER_SEASON, 9))
   })
 })
+
+describe('타자에게 체력은 없다 (StrHOWTO 능력치 설명)', () => {
+  it('타자 커리어에 stamina 필드가 없다 — 체력은 투수 능력치다', () => {
+    // StrHOWTO: "1. 투수 능력치 … 체력 : 투구 수에 영향 / 2. 타자 능력치 : 히트·파워·수비·주루"
+    // 관리 메뉴 수치도 사기·인기도·평판·소지금·관중뿐이다.
+    expect(Object.keys(createCareer('선수'))).not.toContain('stamina')
+  })
+
+  it('타자 능력치는 히트·파워·수비·주루 넷뿐이다', () => {
+    expect(Object.keys(createCareer('선수').ability).sort()).toEqual(['defense', 'hit', 'power', 'run'])
+  })
+})

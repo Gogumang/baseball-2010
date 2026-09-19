@@ -43,7 +43,6 @@ interface Balance {
     readonly skillIds: readonly number[]
   }
   readonly limits: {
-    readonly stamina: number
     readonly morale: number
     readonly popularity: number
     readonly reputation: number
@@ -56,7 +55,6 @@ interface Balance {
   readonly season: {
     readonly gamesPerSeason: number
     readonly gamesPerManagementCycle: number
-    readonly staminaRecoveryPerGame: number
   }
   readonly training: {
     readonly gainRange: IntegerRange

@@ -19,7 +19,6 @@ const ANCIENT_SAVE = {
   name: '옛선수',
   ability: { hit: 42, power: 38, defense: 31, run: 25 },
   gamePoint: 1200,
-  stamina: 70,
   season: 3,
   gamesPlayed: 18,
 }

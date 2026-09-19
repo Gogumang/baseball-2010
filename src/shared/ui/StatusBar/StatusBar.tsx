@@ -10,9 +10,14 @@ export function StatusBar({ career }: { readonly career: PlayerCareer }) {
         <span>G포인트</span>
         <span>{career.gamePoint.toLocaleString('ko-KR')}</span>
       </div>
+      {/*
+        체력은 **투수 능력치**다 (StrHOWTO: "투수 능력치 … 체력 : 투구 수에 영향").
+        타자 능력치는 히트·파워·수비·주루뿐이고, 관리 수치도 사기·인기도·평판·소지금·관중이다.
+        웹판이 타자에게 만들어 붙였던 체력을 걷어내고 원본에 있는 사기를 보여 준다.
+      */}
       <div className={styles.cell}>
-        <span>체력</span>
-        <span>{career.stamina}</span>
+        <span>사기</span>
+        <span>{career.morale}</span>
       </div>
       <div className={styles.cell}>
         <span>경기</span>
