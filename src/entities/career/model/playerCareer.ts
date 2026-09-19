@@ -4,6 +4,7 @@ import type { League } from '@/entities/league/model/league'
 import { BALANCE } from '@/shared/config/original/balance'
 import type { PostseasonSeries } from '@/entities/league/model/league'
 import { finishRegularSeason } from '@/entities/league/model/seasonEnd'
+import { runCpuPostseason } from '@/entities/league/model/postseasonPlay'
 import { EMPTY_LEAGUE, recordLeagueResult } from '@/entities/league/model/league'
 import { playLeagueDay } from '@/entities/league/model/leagueDay'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -384,6 +385,16 @@ export function applySeasonEnd(career: PlayerCareer): PlayerCareer {
     regularSeasonFirstCount: career.regularSeasonFirstCount + (result.isRegularSeasonFirst ? 1 : 0),
     postseason: result.postseason,
   }
+}
+
+/**
+ * 포스트시즌을 내 차례까지 진행한다 (0x13da0).
+ * 내 팀이 지금 시리즈에 있으면 그대로 두고, 아니면 CPU 끼리 돌려 다음 차례를 만든다.
+ */
+export function applyPostseasonProgress(career: PlayerCareer, random: RandomPort): PlayerCareer {
+  if (career.postseason === null) return career
+  const advanced = runCpuPostseason(career.postseason, career.teamId, random)
+  return advanced === career.postseason ? career : { ...career, postseason: advanced }
 }
 
 /** 원본 전역 G포인트 상한 */

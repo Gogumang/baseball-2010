@@ -9,6 +9,7 @@ import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePit
 import {
   applyGameResult,
   applyLeagueDay,
+  applyPostseasonProgress,
   applySeasonEnd,
   createCareer,
   gainMorale,
@@ -123,8 +124,11 @@ export function useCareerSession({
         gainReputation(
           gainPopularity(
             // 같은 날 나머지 네 경기도 원본대로 치러 순위표에 넣는다 (0xc2a48)
-            // 45경기째면 정규시즌을 닫고 포스트시즌 대진을 연다 (0xb818c)
-            applySeasonEnd(applyLeagueDay(applyGameResult(currentCareer, summary), summary.ourTeamId, random)),
+            // 45경기째면 정규시즌을 닫고, 포스트시즌은 내 차례가 올 때까지 CPU 끼리 돌린다 (0x13da0)
+            applyPostseasonProgress(
+              applySeasonEnd(applyLeagueDay(applyGameResult(currentCareer, summary), summary.ourTeamId, random)),
+              random,
+            ),
             evaluation.popularityChange,
           ),
           evaluation.reputationChange,
