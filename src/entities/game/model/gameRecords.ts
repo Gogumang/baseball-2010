@@ -9,9 +9,10 @@ import { BALANCE } from '@/shared/config/original/balance'
  * **원본은 기록을 팀 단위로 센다** (0xa77f0 게이트는 "공격·수비 팀이 사람 팀인가"만 본다).
  * 동료 여덟 타순의 기록도 여기로 들어온다 — `batterGameLog.ts` 가 타순별로 따로 세고,
  * 사용자 타석과 같은 `recordBatterAtBat` 을 쓴다.
- * 아직 빠진 것은 수비·투수 쪽이고, 그만큼 원본보다 G 수입이 적다:
+ * 완투 계열 28~31 도 들어왔다 (`completeGameRecordIdsOf`) — 상대 공격이 실제 타석으로 돌아가
+ * 피안타·실점을 셀 수 있게 되면서 가능해졌다.
+ * 아직 빠진 것은 투구 사건 쪽이고, 그만큼 원본보다 G 수입이 적다:
  *   - 우리 팀 수비·투수 기록 16~27 (삼진 계열·도루 저지·병살·삼자범퇴)
- *   - 완투승 계열 28~31 (완투승·완봉승·노히트노런·퍼펙트게임)
  *   - 5 대타 홈런 · 6·7 백투백 · 8 도루 성공 · 32·33 연속 파울 · 36 필살송구 아웃
  * 상대 공격은 이제 원본 간이 타석(0xc11f0)으로 돌지만 아직 타격 결과만 만든다 —
  * 삼진 콤보·병살·삼자범퇴 같은 투구·수비 사건을 세려면 수비 쪽 상태(state+0x88~0x8a)를 더 옮겨야 한다.
@@ -80,6 +81,47 @@ const MARGIN_TIERS = 3
 export function gameEndRecordIdsOf(winningMargin: number): number[] {
   const tier = Math.min(MARGIN_TIERS, Math.floor(winningMargin / MARGIN_STEP))
   return tier >= 1 ? [RECORD.marginWin + tier - 1] : []
+}
+
+const COMPLETE_GAME = { completeGame: 28, shutout: 29, noHitter: 30, perfect: 31 } as const
+/** 퍼펙트게임은 아웃이 28 미만일 때만 인정된다 — 연장에 가면 안 된다 (0xa7de8) */
+const PERFECT_GAME_OUT_LIMIT = 28
+const OUTS_PER_INNING = 3
+
+export interface CompleteGameInput {
+  /** 우리 투수가 잡은 아웃 수 */
+  readonly outsRecorded: number
+  /** 정규 이닝 수 (보통 9) */
+  readonly regulationInnings: number
+  readonly hitsAllowed: number
+  readonly walksAllowed: number
+  readonly runsAllowed: number
+}
+
+/**
+ * 완투 계열 기록 (0xa7de8). 아웃카운트가 정규 이닝을 다 채웠을 때만 본다:
+ *   출루·피안타·실점이 모두 0 이고 아웃 < 28 → 퍼펙트게임(31)
+ *   피안타·실점이 0 → 노히트노런(30)
+ *   실점이 0 → 완봉승(29)
+ *   그 밖 → 완투승(28)
+ * 이 넷은 마스크 0xe0f 에 들어 있어 **팀 조건조차 없이 항상 집계된다**.
+ *
+ * **주의**: 웹판 간이 타석(0xc11f0)에는 볼 카운트가 없어 볼넷이 나오지 않는다.
+ * 그래서 `walksAllowed` 는 늘 0 이고 퍼펙트게임이 원본보다 자주 나온다 — 투구 판정을 옮기면 풀린다.
+ */
+export function completeGameRecordIdsOf(input: CompleteGameInput): number[] {
+  if (input.outsRecorded < input.regulationInnings * OUTS_PER_INNING) return []
+  if (
+    input.hitsAllowed === 0 &&
+    input.walksAllowed === 0 &&
+    input.runsAllowed === 0 &&
+    input.outsRecorded < PERFECT_GAME_OUT_LIMIT
+  ) {
+    return [COMPLETE_GAME.perfect]
+  }
+  if (input.hitsAllowed === 0 && input.runsAllowed === 0) return [COMPLETE_GAME.noHitter]
+  if (input.runsAllowed === 0) return [COMPLETE_GAME.shutout]
+  return [COMPLETE_GAME.completeGame]
 }
 
 export function recordGamePointsOf(recordIds: readonly number[]): number {

@@ -16,6 +16,12 @@ export interface HalfInningResult {
   readonly runs: number
   /** 다음 이닝이 이어받을 타순 */
   readonly nextBattingOrderIndex: number
+  /** 이 이닝에 맞은 안타 수 — 완투 계열 기록(0xa7de8)이 state+0x89 로 센다 */
+  readonly hits: number
+  /** 이 이닝에 내준 볼넷 수 — state+0x88. 간이 타석에는 볼 카운트가 없어 늘 0 이다 */
+  readonly walks: number
+  /** 이 이닝에 잡은 아웃 수 — 3아웃으로 끝나지 않는 경우가 없어 보통 3 이다 */
+  readonly outs: number
 }
 
 export function simulateHalfInning(
@@ -28,10 +34,14 @@ export function simulateHalfInning(
   let bases = EMPTY_BASES
   let outs = 0
   let runs = 0
+  let hits = 0
+  let walks = 0
   let order = battingOrderIndex
 
   for (let faced = 0; faced < MAXIMUM_BATTERS && outs < OUTS_PER_INNING; faced += 1) {
     const outcome = simulateQuickAtBat(batterAt(order), pitcher, { inning }, random)
+    if (outcome.kind === '안타' || outcome.kind === '홈런') hits += 1
+    if (outcome.kind === '볼넷') walks += 1
     const advanced = advanceRunners(bases, outcome, outs)
     bases = advanced.bases
     outs += advanced.outsAdded
@@ -40,5 +50,5 @@ export function simulateHalfInning(
     order += 1
   }
 
-  return { runs, nextBattingOrderIndex: order }
+  return { runs, nextBattingOrderIndex: order, hits, walks, outs }
 }

@@ -5,6 +5,7 @@ import {
   applyAtBatOutcome,
   applyOpponentInning,
   createGame,
+  INNINGS_PER_GAME,
   PLAYER_BATTING_ORDER_INDEX,
   isPlayerTurn,
   resultOf,
@@ -20,7 +21,7 @@ import type { SeasonStats } from '@/entities/career/model/seasonStats'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { advanceRunners } from '@/entities/game/model/baseState'
 import { atBatPenaltyCounts, atBatPopularityPoints } from '@/entities/career/model/gameEvaluation'
-import { gameEndRecordIdsOf } from '@/entities/game/model/gameRecords'
+import { completeGameRecordIdsOf, gameEndRecordIdsOf } from '@/entities/game/model/gameRecords'
 import { EMPTY_BATTER_GAME_LOG, recordBatterAtBat } from '@/entities/game/model/batterGameLog'
 import type { BatterGameLog } from '@/entities/game/model/batterGameLog'
 import type { AcePlayer } from '@/shared/config/original/acePlayers'
@@ -56,6 +57,8 @@ export interface GameProgress {
    * (0xa77f0 게이트는 공격 팀만 보고, 0xa8024 의 "본인인가" 필터는 개인 통산 성적에만 걸린다).
    */
   readonly teammateLogs: Readonly<Record<number, BatterGameLog>>
+  /** 우리 투수가 내준 것 — 완투 계열 기록(0xa7de8)이 보는 state+0x88·0x89·0x8a */
+  readonly pitching: { readonly hitsAllowed: number; readonly walksAllowed: number; readonly outsRecorded: number }
   readonly log: readonly GameLogEntry[]
   readonly nextLogId: number
 }
@@ -98,6 +101,7 @@ export function startGame(
     recordIds: [],
     consecutiveHits: 0,
     teammateLogs: {},
+    pitching: { hitsAllowed: 0, walksAllowed: 0, outsRecorded: 0 },
     log: [],
     nextLogId: 1,
   }
@@ -176,17 +180,26 @@ function advanceUntilPlayerTurn(
  * 상대 타순은 웹판이 아직 따로 들고 있지 않아 이닝마다 1번부터 시작한다 (추정).
  */
 function playOpponentInning(progress: GameProgress, random: RandomPort): GameProgress {
-  const { runs } = simulateHalfInning(
+  const half = simulateHalfInning(
     0,
     (order) => batterAt(progress.opponentTeamId, order),
     startingPitcherOf(progress.ourTeamId),
     progress.game.inning,
     random,
   )
+  const runs = half.runs
   const game = applyOpponentInning(progress.game, runs)
 
   return appendLog(
-    { ...progress, game },
+    {
+      ...progress,
+      game,
+      pitching: {
+        hitsAllowed: progress.pitching.hitsAllowed + half.hits,
+        walksAllowed: progress.pitching.walksAllowed + half.walks,
+        outsRecorded: progress.pitching.outsRecorded + half.outs,
+      },
+    },
     `${progress.game.inning}회초 상대 공격 — ${runs}점`,
     false,
   )
@@ -243,6 +256,13 @@ export function summaryOf(progress: GameProgress): GameSummary {
     recordIds: [
       ...progress.recordIds,
       ...gameEndRecordIdsOf(progress.game.ourScore - progress.game.opponentScore),
+      ...completeGameRecordIdsOf({
+        outsRecorded: progress.pitching.outsRecorded,
+        regulationInnings: INNINGS_PER_GAME,
+        hitsAllowed: progress.pitching.hitsAllowed,
+        walksAllowed: progress.pitching.walksAllowed,
+        runsAllowed: progress.game.opponentScore,
+      }),
     ],
     doublePlays: progress.doublePlays,
     scoringPositionOuts: progress.scoringPositionOuts,
