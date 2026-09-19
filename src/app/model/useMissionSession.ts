@@ -188,7 +188,7 @@ export function useMissionSession({
     /** 원작 미션 '기동력은 나의 힘' — 번트와 도루를 1개씩 */
     steal: (ability: BatterAbility) => {
       if (missionRun === null || !canSteal(missionRun)) return
-      const result = attemptSteal(ability, missionPitcherAbility(missionRun.mission), random)
+      const result = attemptSteal(ability, random)
       runner.setBannerText(result === '성공' ? '도루 성공!' : '도루 실패')
       setMissionRun(result === '성공' ? applySteal(missionRun) : failSteal(missionRun))
     },
