@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { initialMainMenu, reduceMainMenu } from '@/pages/main-menu/model/mainMenu'
+import { MODE_ENTRIES, initialMainMenu, isEntryEnabled, reduceMainMenu } from '@/pages/main-menu/model/mainMenu'
 
-describe('reduceMainMenu — 셀렉트박스로 모드를 고르는 메인 메뉴', () => {
+describe('reduceMainMenu — 원본 글자 목록에서 모드를 고르는 메인 메뉴', () => {
   it('저장이 없으면 나만의리그, 있으면 최근게임이 먼저 골라져 있다', () => {
     expect(initialMainMenu(false).selectedModeId).toBe('나만의리그')
     expect(initialMainMenu(true).selectedModeId).toBe('최근게임')
@@ -43,5 +43,42 @@ describe('reduceMainMenu — 셀렉트박스로 모드를 고르는 메인 메�
 
   it('뒤로는 타이틀로 간다', () => {
     expect(reduceMainMenu(initialMainMenu(false), { type: '뒤로' }, false).effect).toBe('타이틀로')
+  })
+})
+
+describe('원본 목록 — ↑↓ 로 고른다', () => {
+  it('아래로 가면 다음 모드, 위로 가면 앞 모드가 된다', () => {
+    const 시작 = initialMainMenu(false)
+    const 아래 = reduceMainMenu(시작, { type: '커서', step: 1 }, false).state
+    const 다시위 = reduceMainMenu(아래, { type: '커서', step: -1 }, false).state
+
+    expect(아래.selectedModeId).not.toBe(시작.selectedModeId)
+    expect(다시위.selectedModeId).toBe(시작.selectedModeId)
+  })
+
+  it('끝에서 한 바퀴 돈다', () => {
+    let state = initialMainMenu(false)
+    const 본것 = new Set<string>()
+    for (let step = 0; step < MODE_ENTRIES.length; step += 1) {
+      본것.add(state.selectedModeId)
+      state = reduceMainMenu(state, { type: '커서', step: 1 }, false).state
+    }
+
+    // 한 바퀴 돌면 모든 칸을 지나고 처음으로 돌아온다
+    expect(본것.size).toBe(MODE_ENTRIES.length)
+    expect(state.selectedModeId).toBe(initialMainMenu(false).selectedModeId)
+  })
+
+  it('고를 수 없는 칸에도 커서는 간다 — 설명을 읽을 수 있어야 한다', () => {
+    let state = initialMainMenu(false)
+    const 고를수없는칸 = MODE_ENTRIES.filter((entry) => !isEntryEnabled(entry, false)).map((entry) => entry.id)
+    const 지난칸 = new Set<string>()
+    for (let step = 0; step < MODE_ENTRIES.length; step += 1) {
+      지난칸.add(state.selectedModeId)
+      state = reduceMainMenu(state, { type: '커서', step: 1 }, false).state
+    }
+
+    expect(고를수없는칸.length).toBeGreaterThan(0)
+    for (const id of 고를수없는칸) expect(지난칸).toContain(id)
   })
 })

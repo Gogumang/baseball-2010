@@ -11,6 +11,8 @@ export interface MainMenuState {
 
 export type MainMenuAction =
   | { readonly type: '모드선택'; readonly id: string }
+  /** 원본 목록은 ↑↓ 로 고른다. 고를 수 없는 칸은 건너뛰지 않고 그대로 머문다 (원본 확인 전이라 추정) */
+  | { readonly type: '커서'; readonly step: 1 | -1 }
   | { readonly type: '시작' }
   | { readonly type: '뒤로' }
   | { readonly type: '확인'; readonly isAccepted: boolean }
@@ -53,6 +55,11 @@ export function reduceMainMenu(
       // 셀렉트박스가 비활성 옵션을 막지만, 상태 규칙도 스스로 지킨다.
       if (entry === undefined || !isEntryEnabled(entry, hasSavedGame)) return stay(state)
       return stay({ ...state, selectedModeId: entry.id })
+    }
+    case '커서': {
+      const index = MODE_ENTRIES.findIndex((candidate) => candidate.id === state.selectedModeId)
+      const next = MODE_ENTRIES[(index + action.step + MODE_ENTRIES.length) % MODE_ENTRIES.length]
+      return stay({ ...state, selectedModeId: next.id })
     }
     case '시작':
       return start(state, hasSavedGame)

@@ -3,8 +3,8 @@ import { initialMainMenu, reduceMainMenu } from '@/pages/main-menu/model/mainMen
 import type { MainMenuAction, MainMenuEffect, MainMenuState } from '@/pages/main-menu/model/mainMenu'
 
 /**
- * 메뉴 상태와 화면 단위 키 입력 (Enter 시작, Esc 뒤로).
- * 셀렉트박스 시트가 열려 있으면 키는 시트가 가져가므로 여기서는 무시한다.
+ * 메뉴 상태와 화면 단위 키 입력 — 원본대로 ↑↓ 로 고르고 Enter 로 시작, Esc 로 뒤로 간다.
+ * `isSheetOpen` 은 예전 셀렉트박스 시절에 키를 시트에 넘겨주던 자리다 (지금은 늘 false 로 들어온다).
  */
 export function useMainMenu(
   hasSavedGame: boolean,
@@ -43,6 +43,11 @@ export function useMainMenu(
       } else if (event.key === 'Escape' || event.key === 'Backspace') {
         event.preventDefault()
         dispatch({ type: '뒤로' })
+      } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+        // 원본 목록은 ↑↓ 로 고른다 (셀렉트박스였을 때는 시트가 가져가던 키다)
+        if (stateRef.current.isConfirmingNewGame) return
+        event.preventDefault()
+        dispatch({ type: '커서', step: event.key === 'ArrowDown' ? 1 : -1 })
       }
     }
     window.addEventListener('keydown', onKeyDown)
