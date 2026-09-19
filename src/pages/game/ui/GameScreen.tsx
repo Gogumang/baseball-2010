@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { BigResult, DialogueBox, Hint, MarkupText, PixelScreen } from '@/shared/ui'
+import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
 import { effectiveAbilityOf } from '@/entities/career/model/condition'
 import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
@@ -44,11 +45,20 @@ export function GameScreen({
   const [isConfirmingQuit, setIsConfirmingQuit] = useState(false)
   const isEagleEyeEnabled = career.eagleEyeGamesRemaining > 0
   const ace = progress.aceOpponent
+  /**
+   * 경기 중 모은 G포인트 누계. 원본도 기록을 달성할 때마다 더해 화면에 보여 준다 (0xa77f0 이 evt+0x180 에 누적).
+   * 원본이 이 숫자를 어디에 그리는지는 아직 못 찾아, 웹 껍데기의 제목 옆 칸에 둔다 (추정).
+   */
+  const earnedGamePoint = recordGamePointsOf(progress.recordIds)
 
   return (
     <PixelScreen
       title={`${career.name} · ${career.battingOrder}번타자`}
-      badge={isEagleEyeEnabled ? `이글아이 ${career.eagleEyeGamesRemaining}` : undefined}
+      badge={
+        isEagleEyeEnabled
+          ? `G ${earnedGamePoint} · 이글아이 ${career.eagleEyeGamesRemaining}`
+          : `G ${earnedGamePoint}`
+      }
       leftKey={isConfirmingQuit ? { label: '예', onPress: onQuit } : undefined}
       rightKey={
         isConfirmingQuit
