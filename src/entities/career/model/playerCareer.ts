@@ -5,7 +5,7 @@ import { BALANCE } from '@/shared/config/original/balance'
 import type { PostseasonSeries } from '@/entities/league/model/league'
 import { finishRegularSeason } from '@/entities/league/model/seasonEnd'
 import { runCpuPostseason } from '@/entities/league/model/postseasonPlay'
-import { EMPTY_LEAGUE, recordLeagueResult } from '@/entities/league/model/league'
+import { EMPTY_LEAGUE, advancePostseason, recordLeagueResult } from '@/entities/league/model/league'
 import { playLeagueDay } from '@/entities/league/model/leagueDay'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
@@ -348,14 +348,24 @@ export function applyGameResult(career: PlayerCareer, summary: GameSummary): Pla
     eagleEyeGamesRemaining: Math.max(0, career.eagleEyeGamesRemaining - 1),
     stats: mergeStats(career.stats, playedStats),
     careerStats: mergeStats(career.careerStats, playedStats),
-    // 무승부는 원본도 승·패 어디에도 넣지 않는다
+    // 무승부는 원본도 승·패 어디에도 넣지 않는다.
+    // **포스트시즌 중에는 정규시즌 전적을 건드리지 않는다** — 0xb76dc 가 포스트시즌 플래그로 갈라져
+    // 시리즈 승수만 깎는다. 그래서 45경기 뒤에 치른 경기가 순위표에 더 쌓이지 않는다.
     league:
-      summary.result === '무'
+      summary.result === '무' || career.postseason !== null
         ? career.league
         : recordLeagueResult(
             career.league,
             summary.result === '승' ? summary.ourTeamId : summary.opponentTeamId,
             summary.result === '승' ? summary.opponentTeamId : summary.ourTeamId,
+          ),
+    // 포스트시즌 경기는 시리즈 승수로 들어간다 (0xb76dc 포스트시즌 분기)
+    postseason:
+      career.postseason === null || summary.result === '무'
+        ? career.postseason
+        : advancePostseason(
+            career.postseason,
+            summary.result === '승' ? summary.ourTeamId : summary.opponentTeamId,
           ),
     wins: career.wins + (summary.result === '승' ? 1 : 0),
     draws: career.draws + (summary.result === '무' ? 1 : 0),

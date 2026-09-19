@@ -125,3 +125,33 @@ describe('정규시즌 종료 — 45경기째 (0xb818c)', () => {
     expect(두번.postseason).toBe(한번.postseason)
   })
 })
+
+describe('포스트시즌 경기는 시리즈 승수로 들어간다 (0xb76dc 포스트시즌 분기)', () => {
+  const 포스트시즌경기 = (overrides = {}) =>
+    ({ result: '승', stats: EMPTY_SEASON_STATS, recordIds: [], ourTeamId: 2, opponentTeamId: 3, ...overrides }) as unknown as GameSummary
+
+  const 포스트시즌선수 = () => {
+    const 정산 = applySeasonEnd({ ...createCareer('선수'), gamesPlayed: GAMES_PER_SEASON, teamId: 2 })
+    // 준PO 는 3위 vs 4위 — 빈 리그라 순위가 팀 번호 순이므로 팀 2·3 이 붙는다
+    expect(정산.postseason?.teams).toContain(2)
+    return 정산
+  }
+
+  it('이기면 정규시즌 전적이 아니라 시리즈 승수가 는다', () => {
+    const before = 포스트시즌선수()
+    const after = applyGameResult(before, 포스트시즌경기())
+
+    expect(after.postseason?.wins.reduce((sum, win) => sum + win, 0)).toBe(1)
+    // 정규시즌 순위표는 그대로다 — 45경기 뒤 경기가 순위표에 더 쌓이면 안 된다
+    expect(after.league).toEqual(before.league)
+  })
+
+  it('3승을 채우면 다음 라운드로 올라간다', () => {
+    let career = 포스트시즌선수()
+    for (let win = 0; win < 3; win += 1) {
+      career = applyGameResult(career, 포스트시즌경기())
+    }
+
+    expect(career.postseason?.round).toBe('플레이오프')
+  })
+})
