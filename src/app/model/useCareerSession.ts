@@ -22,7 +22,7 @@ import {
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { awardTitles, evaluateNewTitles } from '@/entities/career/model/titles'
 import { blockReasonOf, runTraining } from '@/entities/career/model/training'
-import { trainingBlockTextOf, trainingOutcomeTextOf } from '@/entities/career/model/trainingText'
+import { trainingBlockTextOf, trainingOutcomeLinesOf } from '@/entities/career/model/trainingText'
 import { recoverAfterRest, restBlockReasonOf, runOuting, runRest } from '@/entities/career/model/outing'
 import { EVENT_TRIGGER, finishEvent, placeTriggerOf } from '@/entities/story/model/storyScene'
 import { selectShopItem } from '@/features/shop/model/shopSelection'
@@ -325,7 +325,7 @@ export function useCareerSession({
       setManagementDetail({
         before: career,
         after: trained,
-        messages: [trainingOutcomeTextOf(outcome)],
+        messages: trainingOutcomeLinesOf(outcome),
         afterClose: { kind: '훈련', isSpecialSwing: outcome.specialSwing !== null },
       })
     },
