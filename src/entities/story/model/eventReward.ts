@@ -7,6 +7,7 @@ import { battingOrderPathOf } from '@/entities/career/model/battingOrder'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { abilityLimitOf } from '@/entities/career/model/abilityLimit'
 import { openHidden } from '@/entities/career/model/equipment'
+import { applyGpItem } from '@/entities/career/model/gpItems'
 
 /**
  * 원작 이벤트 보상 (r_event 명령 7).
@@ -42,6 +43,12 @@ export const EVENT_REWARD_KIND = {
   목표타순: 18,
   타순: 19,
   질병: 11,
+  /** 모든 능력치 +v — 13~16 처리를 네 칸에 (0x8c8e8). 이벤트 231 이 v=10 으로 쓴다 */
+  모든능력치: 17,
+  /** GP 아이템 v−1 의 효과 (0xa4488). 이벤트 36 이 v=10 → 아이템 9 */
+  GP아이템: 9,
+  /** 명령의 **첫 종류**가 21 이면 엔딩 진입 (0x8d4c4). 보상 처리 0x8c460 자체는 무시한다 */
+  엔딩진입: 21,
 } as const
 
 export function rewardsIn(commands: readonly EventCommand[]): EventReward[] {
@@ -68,14 +75,23 @@ const ABILITY_REWARD_KINDS: Readonly<Record<number, 'hit' | 'power' | 'defense' 
   16: 'run',
 }
 
+/** 능력치 한 칸을 올리고 타입 한계로 자른다 (13~16, 0x8c8e8 과 같은 처리) */
+function raiseAbility(
+  career: PlayerCareer,
+  ability: 'hit' | 'power' | 'defense' | 'run',
+  value: number,
+): PlayerCareer {
+  const raised = gainAbility(career, { [ability]: value })
+  const limit = abilityLimitOf(career.battingTypeIndex)[ability]
+  return { ...raised, ability: { ...raised.ability, [ability]: Math.min(raised.ability[ability], limit) } }
+}
+
+const ALL_ABILITIES = ['hit', 'power', 'defense', 'run'] as const
+
 function applyReward(career: PlayerCareer, reward: EventReward, random: RandomPort | undefined): PlayerCareer {
   if (reward.kind === HIDDEN_OPEN_KIND) return openHidden(career, Math.abs(reward.value))
   const ability = ABILITY_REWARD_KINDS[reward.kind]
-  if (ability !== undefined) {
-    const raised = gainAbility(career, { [ability]: reward.value })
-    const limit = abilityLimitOf(career.battingTypeIndex)[ability]
-    return { ...raised, ability: { ...raised.ability, [ability]: Math.min(raised.ability[ability], limit) } }
-  }
+  if (ability !== undefined) return raiseAbility(career, ability, reward.value)
   switch (reward.kind) {
     case EVENT_REWARD_KIND.인기도:
       return gainPopularity(career, reward.value)
@@ -95,6 +111,12 @@ function applyReward(career: PlayerCareer, reward: EventReward, random: RandomPo
       return applySalaryChange(career, reward.value)
     case EVENT_REWARD_KIND.G포인트:
       return { ...career, gamePoint: clamp(career.gamePoint + reward.value, 0, MAXIMUM_GAME_POINT) }
+    case EVENT_REWARD_KIND.모든능력치:
+      // 네 칸 각각 13~16 과 같은 처리 (0x8c8e8). 이벤트 231 v=10
+      return ALL_ABILITIES.reduce((current, key) => raiseAbility(current, key, reward.value), career)
+    case EVENT_REWARD_KIND.GP아이템:
+      // GP 아이템 v−1 의 효과만 준다 (0xa4488) — 값을 치르지 않는다. 이벤트 36 v=10 → 아이템 9
+      return random === undefined ? career : applyGpItem(career, reward.value - 1, random).career
     case EVENT_REWARD_KIND.질병:
       if (reward.value < 0) return { ...career, isSick: false, illnessName: null, illnessCooldown: ILLNESS_COOLDOWN }
       return {

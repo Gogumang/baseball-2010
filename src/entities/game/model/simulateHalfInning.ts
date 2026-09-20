@@ -89,12 +89,15 @@ export function simulateHalfInning(
       // 삼진이 아닌 타석이 하나라도 끼면 콤보가 끊긴다
       combo = 0
     }
-    const canAdvance = outcome.kind === '아웃' && outcome.detail === '땅볼아웃' && canAdvanceOnGroundOut(bases, outs)
+    const isGroundOut = outcome.kind === '아웃' && outcome.detail === '땅볼아웃'
     const advanced = advanceRunners(bases, outcome, outs, { quickEngine: true })
     bases = advanced.bases
-    // 땅볼 아웃에 60% 로 주자가 한 루 나간다 (0xc11f0)
-    if (canAdvance && randomIntegerBelow(random, 0, 10_000) <= GROUND_OUT_ADVANCE_LIMIT) {
-      bases = advanceOnGroundOut(bases)
+    // 땅볼 아웃에 60% 로 주자가 한 루 나간다 (0xc15b8).
+    // **원본은 아웃 ≤1 이면 주자가 없어도 난수를 먼저 뽑고**, 그 뒤에 주자·3루 조건을 본다 (E 3g).
+    // 앞서 웹은 진루 가능할 때만 뽑아서 같은 시드로도 뒤가 어긋났다.
+    if (isGroundOut && outs < OUTS_PER_INNING - 1) {
+      const rolled = randomIntegerBelow(random, 0, 10_000) <= GROUND_OUT_ADVANCE_LIMIT
+      if (rolled && canAdvanceOnGroundOut(bases, outs)) bases = advanceOnGroundOut(bases)
     }
     outs += advanced.outsAdded
     // 3아웃이 되는 순간 들어오던 주자는 득점으로 치지 않는다

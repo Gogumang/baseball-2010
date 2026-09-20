@@ -89,6 +89,32 @@ describe('applyEventRewards — 원작 이벤트 보상', () => {
     expect(applyEventRewards(before, [{ kind: 8, value: 3 }])).toEqual(before)
   })
 
+  it('종류 17 은 모든 능력치를 올린다 (0x8c8e8, 이벤트 231 v=10)', () => {
+    const before = 선수()
+    const after = applyEventRewards(before, [{ kind: 17, value: 10 }])
+
+    expect(after.ability).toEqual({
+      hit: before.ability.hit + 10,
+      power: before.ability.power + 10,
+      defense: before.ability.defense + 10,
+      run: before.ability.run + 10,
+    })
+  })
+
+  it('연차 보정 — 이벤트 393 은 인기도 +3y · 평판 −2y (0x8d508)', () => {
+    const 삼년차 = { ...선수(), season: 3 }  // y = 2
+    const 보정없음 = applyEventRewards(삼년차, [{ kind: 0, value: 10 }, { kind: 1, value: 10 }])
+    const 보정 = applyEventRewards(삼년차, [{ kind: 0, value: 10 }, { kind: 1, value: 10 }], undefined, 393)
+
+    expect(보정.popularity - 보정없음.popularity).toBe(3 * 2)
+    expect(보정.reputation - 보정없음.reputation).toBe(-2 * 2)
+  })
+
+  it('1년차(y=0)에는 연차 보정이 붙지 않는다', () => {
+    const 일년차 = 선수()
+    expect(applyEventRewards(일년차, [{ kind: 0, value: 10 }], undefined, 393).popularity).toBe(20)
+  })
+
   it('입력 커리어를 바꾸지 않는다', () => {
     const before = 선수()
     applyEventRewards(before, [{ kind: 0, value: 10 }])
