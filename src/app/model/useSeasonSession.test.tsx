@@ -13,11 +13,8 @@ function 메모리저장(): JsonStorePort {
   let held: unknown = null
   return {
     load: () => held,
-    save: (value: unknown) => {
+    save: (value: object) => {
       held = value
-    },
-    clear: () => {
-      held = null
     },
   }
 }
