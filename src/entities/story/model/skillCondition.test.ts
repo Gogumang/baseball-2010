@@ -37,9 +37,22 @@ describe('조건 20 — 스킬 획득 (0xad1ba)', () => {
 
   it('아직 카운터를 못 옮긴 스킬은 통과시키지 않는다 (2 먹튀·7 전설 등)', () => {
     const career = 선수({ skillIds: [] })
-    expect([2, 3, 4, 7, 10].map((id) => meetsSkillAcquireCondition(career, 값(id), undefined))).toEqual([
-      false, false, false, false, false,
+    expect([2, 7, 10].map((id) => meetsSkillAcquireCondition(career, 값(id), undefined))).toEqual([
+      false, false, false,
     ])
+  })
+
+  it('20 에러왕 — 연차 ≥ 3 · 수비 실효 ≤ 400 · 30경기째 · 이번 시즌 수비 훈련 0', () => {
+    const 기본 = { skillIds: [], season: 4, gamesPlayed: 30, ability: { hit: 400, power: 400, defense: 400, run: 400 } }
+    expect(meetsSkillAcquireCondition(선수(기본), 값(20), undefined)).toBe(true)
+    // 29경기째에는 보지 않는다 — 원본은 경기 수를 같음(==)으로 본다
+    expect(meetsSkillAcquireCondition(선수({ ...기본, gamesPlayed: 29 }), 값(20), undefined)).toBe(false)
+    // 이번 시즌에 수비를 한 번이라도 훈련했으면 안 걸린다
+    const 훈련함 = 선수({ ...기본, trainingCounts: { 수비: 1 }, seasonStartTrainingCounts: {} })
+    expect(meetsSkillAcquireCondition(훈련함, 값(20), undefined)).toBe(false)
+    // 지난 시즌 훈련은 세지 않는다 (통산 − 새 시즌 사본)
+    const 작년훈련 = 선수({ ...기본, trainingCounts: { 수비: 5 }, seasonStartTrainingCounts: { 수비: 5 } })
+    expect(meetsSkillAcquireCondition(작년훈련, 값(20), undefined)).toBe(true)
   })
 })
 
@@ -53,8 +66,20 @@ describe('조건 21 — 스킬 해제', () => {
     expect(meetsSkillReleaseCondition(선수({ skillIds: [16] }), 값(16))).toBe(true)
   })
 
-  it('카운터가 필요한 해제 조건은 아직 통과시키지 않는다 (3 몹쓸몸·18 헛스윙)', () => {
-    expect(meetsSkillReleaseCondition(선수({ skillIds: [3] }), 값(3))).toBe(false)
-    expect(meetsSkillReleaseCondition(선수({ skillIds: [18] }), 값(18))).toBe(false)
+  it('3 몹쓸몸은 그 스킬을 가진 채로 훈련 6회를 해야 풀린다 (+0x75 > 5)', () => {
+    expect(meetsSkillReleaseCondition(선수({ skillIds: [3], badBodyTrainings: 5 }), 값(3))).toBe(false)
+    expect(meetsSkillReleaseCondition(선수({ skillIds: [3], badBodyTrainings: 6 }), 값(3))).toBe(true)
+  })
+
+  it('18 헛스윙은 히트를 연속 8회 훈련해야 풀린다 (+0x70 > 7)', () => {
+    const 일곱 = 선수({ skillIds: [18], consecutiveTrainingCounts: { 히트: 7 } })
+    const 여덟 = 선수({ skillIds: [18], consecutiveTrainingCounts: { 히트: 8 } })
+
+    expect(meetsSkillReleaseCondition(일곱, 값(18))).toBe(false)
+    expect(meetsSkillReleaseCondition(여덟, 값(18))).toBe(true)
+  })
+
+  it('아직 카운터를 못 옮긴 해제 조건은 통과시키지 않는다 (5 무력감)', () => {
+    expect(meetsSkillReleaseCondition(선수({ skillIds: [5] }), 값(5))).toBe(false)
   })
 })

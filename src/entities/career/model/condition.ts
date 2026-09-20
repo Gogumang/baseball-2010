@@ -56,15 +56,27 @@ const reduceByPercent = (value: number, percent: number) =>
  *
  * 앞서 웹은 ① 부상·질병 중 하나만 ② 장비 보정 **전에** 곱하고 ③ 사기 감소가 없었다 — 셋 다 고쳤다.
  */
-export function effectiveAbilityOf(career: PlayerCareer): BatterAbility {
-  const moraleCut = MORALE_ABILITY_CUTS.find(([limit]) => career.morale <= limit)?.[1] ?? 0
+/**
+ * **0xb6414 까지만** 본 능력치 — 장착 레벨 보너스와 스킬 보정을 넣고, 부상·질병·사기는 빼고.
+ * 이벤트 조건 20(스킬 획득)이 보는 "실효" 가 이 값이다 (A-4 의 `0xb6414(기록, i, 1)`).
+ */
+export function equippedAbilityOf(career: PlayerCareer): BatterAbility {
   const adjust = (key: keyof BatterAbility) => {
-    // 1. 0xb6414 — 장비 보너스와 스킬 보정
     let value = clampAbility(career.ability[key] + equipmentBonusOf(career.equipmentLevels[key]))
     if (hasSkill(career, POWERLESS_SKILL)) value = clampAbility(value - SKILL_PENALTY)
     if (hasSkill(career, LEGEND_SKILL)) value = clampAbility(value + LEGEND_BONUS)
     if (key === 'defense' && hasSkill(career, DEFENSE_PENALTY_SKILL)) value = clampAbility(value - SKILL_PENALTY)
+    return value
+  }
+  return { hit: adjust('hit'), power: adjust('power'), run: adjust('run'), defense: adjust('defense') }
+}
+
+export function effectiveAbilityOf(career: PlayerCareer): BatterAbility {
+  const moraleCut = MORALE_ABILITY_CUTS.find(([limit]) => career.morale <= limit)?.[1] ?? 0
+  const equipped = equippedAbilityOf(career)
+  const adjust = (key: keyof BatterAbility) => {
     // 2. 질병 → 부상 차례로
+    let value = equipped[key]
     if (career.isSick) value = clampAbility(reduceByPercent(value, ILLNESS_ABILITY_CUT))
     if (career.isInjured) value = clampAbility(reduceByPercent(value, INJURY_ABILITY_CUT))
     // 3. 사기 감소

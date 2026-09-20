@@ -52,6 +52,20 @@ export interface PlayerCareer {
   readonly teamId: number
   /** 훈련 항목별 누적 횟수. 원작의 "%d/%d회 훈련" 표시를 위한 것. */
   readonly trainingCounts: Readonly<Record<string, number>>
+  /**
+   * 새 시즌이 시작할 때 떠 둔 통산 훈련 수 사본 (+0x6b+i).
+   * 통산에서 이걸 빼면 **이번 시즌 훈련 수**가 된다 — 스킬 획득 조건이 그 값을 본다 (A-4).
+   */
+  readonly seasonStartTrainingCounts: Readonly<Record<string, number>>
+  /**
+   * 칸별 **연속** 훈련 수 (+0x70~+0x74). 같은 칸을 훈련하면 오르고,
+   * **다른 칸을 훈련하면 전부 0 이 된다** (0x18a80). 스킬 18·19·20 해제 조건이 본다.
+   */
+  readonly consecutiveTrainingCounts: Readonly<Record<string, number>>
+  /** 몹쓸몸(스킬 3)을 가진 채로 한 훈련 수 (+0x75) — 6회가 되면 해제 조건을 넘는다 */
+  readonly badBodyTrainings: number
+  /** 유리몸(스킬 4)을 가진 채로 한 훈련 수 (+0x76) — 8회가 되면 해제 조건을 넘는다 */
+  readonly fragileTrainings: number
   /** 원작 인기도 — 경기 후 감독 평가와 외출로 변동 */
   readonly popularity: number
   /** 원작 평판 */
@@ -217,6 +231,10 @@ export function createCareer(name: string, profile: RookieProfile = DEFAULT_ROOK
     storySceneIndex: 0,
     teamId: DEFAULT_TEAM_ID,
     trainingCounts: {},
+    seasonStartTrainingCounts: {},
+    consecutiveTrainingCounts: {},
+    badBodyTrainings: 0,
+    fragileTrainings: 0,
     popularity: STARTING_POPULARITY,
     reputation: STARTING_REPUTATION,
     morale: STARTING_MORALE,
@@ -270,11 +288,36 @@ export function trainingCountOf(career: PlayerCareer, menuId: string): number {
  * 훈련 한 번을 메뉴별로 센다. 칭호 23(200회)·24(100회)가 이 합을 본다 (titles.ts).
  * 메뉴별로 나눠 두는 것은 원본 저장 구조를 아직 못 찾아서다 — 합계만 쓰므로 안전하다 (추정).
  */
+/** 몹쓸몸·유리몸 스킬 번호 — 그 스킬을 가진 채로 훈련한 횟수를 따로 센다 (A-4) */
+const BAD_BODY_SKILL = 3
+const FRAGILE_SKILL = 4
+
+/**
+ * 훈련 한 번을 센다 (0x18a80).
+ * 통산 수와 함께 **칸별 연속 훈련 수**도 갱신한다 — 훈련한 칸은 +1, **나머지 칸은 모두 0** 이다.
+ * 몹쓸몸·유리몸을 가진 채로 한 훈련도 따로 센다.
+ */
 export function countTraining(career: PlayerCareer, menuId: string): PlayerCareer {
   return {
     ...career,
     trainingCounts: { ...career.trainingCounts, [menuId]: trainingCountOf(career, menuId) + 1 },
+    consecutiveTrainingCounts: { [menuId]: (career.consecutiveTrainingCounts[menuId] ?? 0) + 1 },
+    badBodyTrainings: career.badBodyTrainings + (hasSkill(career, BAD_BODY_SKILL) ? 1 : 0),
+    fragileTrainings: career.fragileTrainings + (hasSkill(career, FRAGILE_SKILL) ? 1 : 0),
   }
+}
+
+/** 이번 시즌 칸별 훈련 수 = 통산 − 새 시즌 사본 (A-4) */
+export function seasonTrainingCountOf(career: PlayerCareer, menuId: string): number {
+  return trainingCountOf(career, menuId) - (career.seasonStartTrainingCounts[menuId] ?? 0)
+}
+
+/** 이번 시즌 훈련 수 합계 */
+export function seasonTrainingTotalOf(career: PlayerCareer): number {
+  return Object.keys(career.trainingCounts).reduce(
+    (total, menuId) => total + seasonTrainingCountOf(career, menuId),
+    0,
+  )
 }
 
 export function gainPopularity(career: PlayerCareer, amount: number): PlayerCareer {
@@ -472,6 +515,8 @@ export function startNextSeason(career: PlayerCareer): PlayerCareer {
     gamesPlayed: 0,
     outingsThisSeason: 0,
     popularityAtSeasonStart: career.popularity,
+    // 새 시즌 시작 때 통산 훈련 수를 떠 둔다 (+0x6b+i) — 이번 시즌 훈련 수를 빼서 구한다
+    seasonStartTrainingCounts: { ...career.trainingCounts },
     // 새 시즌 전환 0x1b768: 사기 100, 소지금 += 연봉
     morale: MAXIMUM_MORALE,
     money: Math.min(MAXIMUM_MONEY, career.money + career.salary * ORIGINAL_MONEY_UNIT),
