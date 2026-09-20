@@ -7,9 +7,18 @@ describe('reduceMainMenu — 원본 글자 목록에서 모드를 고르는 메�
     expect(initialMainMenu(true).selectedModeId).toBe('최근게임')
   })
 
-  it('아직 만들지 않은 모드는 골라지지 않는다', () => {
-    const result = reduceMainMenu(initialMainMenu(true), { type: '모드선택', id: '시즌모드' }, true)
+  it('아직 만들지 않은 모드는 골라지지 않는다 — 일반모드·대전모드', () => {
+    const result = reduceMainMenu(initialMainMenu(true), { type: '모드선택', id: '대전모드' }, true)
     expect(result.state.selectedModeId).toBe('최근게임')
+  })
+
+  it('시즌모드로 시작하면 시즌모드로 간다 — 저장을 지워도 되는지 묻지 않는다', () => {
+    const 고름 = reduceMainMenu(initialMainMenu(true), { type: '모드선택', id: '시즌모드' }, true)
+    expect(고름.state.selectedModeId).toBe('시즌모드')
+
+    const 시작 = reduceMainMenu(고름.state, { type: '시작' }, true)
+    expect(시작.effect).toBe('시즌모드')
+    expect(시작.state.isConfirmingNewGame).toBe(false)
   })
 
   it('저장이 없으면 최근게임은 골라지지 않는다', () => {

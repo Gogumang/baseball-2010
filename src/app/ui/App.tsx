@@ -16,10 +16,14 @@ import { aceMatchMissionOf, matchResultEventOf } from '@/entities/story/model/ac
 import { effectiveAbilityOf } from '@/entities/career/model/condition'
 import type { AceMatchStarter } from '@/app/ui/CareerRoutes'
 import { useGameSettings } from '@/app/model/useGameSettings'
+import { useSeasonSession } from '@/app/model/useSeasonSession'
+import { SeasonRoute } from '@/app/ui/SeasonRoute'
 import { ROOKIE_BATTER_ABILITY } from '@/entities/batting/model/batter'
 
 const SETTINGS_KEY = 'compus-baseball/settings'
 const COLLECTION_KEY = 'compus-baseball/collection'
+/** 시즌모드 저장 — 원본은 나만의리그와 **다른 칸**에 담는다 (0x22755) */
+const SEASON_KEY = 'compus-baseball/season'
 
 const ENTRY_SCREENS: readonly Screen['kind'][] = ['타이틀', '메인메뉴', '도움말', '환경설정', '스페셜', '팀선택', '선수등록', '홈런더비']
 
@@ -37,11 +41,13 @@ export function App() {
   const missionRecord = useMemo(() => createLocalStorageMissionRecord(), [])
   const settingsStore = useMemo(() => createLocalStorageJsonStore(SETTINGS_KEY), [])
   const collectionStore = useMemo(() => createLocalStorageJsonStore(COLLECTION_KEY), [])
+  const seasonStore = useMemo(() => createLocalStorageJsonStore(SEASON_KEY), [])
   const gameSettings = useGameSettings(settingsStore)
   const random = useMemo(() => createSeededRandom(Date.now() & 0x7fffffff), [])
   const [screen, setScreen] = useState<Screen>({ kind: '타이틀' })
 
   const runner = useAtBatRunner()
+  const seasonSession = useSeasonSession(seasonStore, random)
   const careerSession = useCareerSession({ runner, random, saveGame, screen, setScreen })
   // 미션 보상 G — 원본은 전역 저장에 쌓지만 웹은 커리어에 둔다. 육성 선수가 없으면 받아 갈 곳이 없다
   const mission = useMissionSession({
@@ -81,6 +87,11 @@ export function App() {
         pitchControl={gameSettings.settings.pitchControl}
       />
     )
+  }
+
+  // 시즌모드는 나만의리그 커리어와 아예 다른 저장·흐름이다 (원본 장면 0x105)
+  if (screen.kind === '시즌모드') {
+    return <SeasonRoute session={seasonSession} onExit={() => setScreen({ kind: '메인메뉴' })} />
   }
 
   if (ENTRY_SCREENS.includes(screen.kind) || careerSession.career === null) {

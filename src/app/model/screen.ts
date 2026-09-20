@@ -13,6 +13,8 @@ export type Screen =
   | { readonly kind: '스페셜' }
   /** 팀 고르기 (원본 나만의리그 상태 0x65) — 고른 팀을 들고 등록으로 넘어간다 */
   | { readonly kind: '팀선택' }
+  /** 시즌모드 (원본 게임 모드 2, 장면 0x105) — 안쪽 화면은 시즌 상태 기계가 정한다 */
+  | { readonly kind: '시즌모드' }
   | { readonly kind: '선수등록'; readonly teamId?: number }
   | { readonly kind: '경기' }
   | {

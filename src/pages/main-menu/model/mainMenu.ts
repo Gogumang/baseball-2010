@@ -18,7 +18,7 @@ export type MainMenuAction =
   | { readonly type: '확인'; readonly isAccepted: boolean }
 
 /** 메뉴 밖으로 나가야 하는 결과. null 이면 메뉴 안에서 끝난다. */
-export type MainMenuEffect = '이어하기' | '새로하기' | '미션' | '홈런더비' | '타이틀로' | null
+export type MainMenuEffect = '이어하기' | '새로하기' | '미션' | '홈런더비' | '시즌모드' | '타이틀로' | null
 
 export interface MainMenuResult {
   readonly state: MainMenuState
@@ -77,6 +77,8 @@ function start(state: MainMenuState, hasSavedGame: boolean): MainMenuResult {
   if (entry.id === '최근게임') return { state, effect: '이어하기' }
   if (entry.id === '미션모드') return { state, effect: '미션' }
   if (entry.id === '홈런더비') return { state, effect: '홈런더비' }
+  // 시즌모드는 저장이 따로라 나만의리그처럼 지워도 되는지 묻지 않는다 (0x22755 는 다른 칸)
+  if (entry.id === '시즌모드') return { state, effect: '시즌모드' }
   if (entry.id === '나만의리그') {
     // StrMAINMENU[15] — 저장이 있으면 지워도 되는지 먼저 묻는다.
     return hasSavedGame

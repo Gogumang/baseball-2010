@@ -27,7 +27,7 @@ export const GAME_START_MENU: readonly MainMenuEntry[] = [
   { id: '최근게임', labelFrame: 6, isAvailable: true, description: '마지막으로 진행한 게임!N모드를 재시작합니다' }, // [6]
   { id: '일반모드', labelFrame: 7, isAvailable: false, description: '원하는 팀을 선택해 자유롭게!N플레이하는 모드입니다' }, // [7]
   { id: '나만의리그', labelFrame: 8, isAvailable: true, description: '나만의 선수를 자유롭게 육성!N할 수 있는 모드입니다' }, // [8]
-  { id: '시즌모드', labelFrame: 9, isAvailable: false, description: '우승을 목표로 1개 팀을 직접!N관리할 수 있는 모드입니다' }, // [9]
+  { id: '시즌모드', labelFrame: 9, isAvailable: true, description: '우승을 목표로 1개 팀을 직접!N관리할 수 있는 모드입니다' }, // [9]
   { id: '대전모드', labelFrame: 10, isAvailable: false, description: '다른 유저의 시즌모드 팀과!N경쟁할 수 있는 모드입니다' }, // [10]
   { id: '홈런더비', labelFrame: 13, isAvailable: true, description: '홈런더비를 통해 타격감을!N향상 시킬 수 있는 모드입니다' }, // [11]
   { id: '미션모드', labelFrame: 12, isAvailable: true, description: '상황에 따라 주어진 목표를!N달성하는 모드입니다' }, // [12]
