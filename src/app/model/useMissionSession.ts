@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useMemo } from 'react'
 import type { Screen } from '@/app/model/screen'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import { isAtBatFinished } from '@/entities/at-bat/model/atBatState'
@@ -39,7 +39,8 @@ import type { OriginalMission } from '@/shared/config/original/missions'
 import type { AcePlayer } from '@/shared/config/original/acePlayers'
 import type { PitchTypeInfo } from '@/shared/config/original/pitchTypes'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import type { MissionRecordPort } from '@/shared/api/save/missionRecordPort'
+import type { MissionClearCounts, MissionRecordPort } from '@/shared/api/save/missionRecordPort'
+import { missionRewardOf } from '@/entities/mission/model/missionReward'
 
 interface MissionSessionInput {
   readonly runner: AtBatRunner
@@ -47,6 +48,11 @@ interface MissionSessionInput {
   readonly missionRecord: MissionRecordPort
   readonly screen: Screen
   readonly setScreen: (screen: Screen) => void
+  /**
+   * 미션 클리어 보상 G 를 받아 갈 곳 (0xa52b0). 원본은 전역 저장에 쌓지만 웹은 커리어에 둔다 —
+   * 육성 선수가 없으면 받아 갈 곳이 없으므로 넘기지 않아도 된다.
+   */
+  readonly onGamePointReward?: (amount: number) => void
 }
 
 /** 미션 상대. 원본 레코드의 마선수 순번이 있으면 그 마선수다 (타자 미션이면 마투수). */
@@ -59,6 +65,9 @@ export function missionPitcherAbility(mission: OriginalMission): PitcherAbility 
   return opponent === null ? DEFAULT_PITCHER_ABILITY : pitcherAbilityOf(opponent)
 }
 
+/** 클리어 횟수 상한 — 원본은 s8 칸에 99 까지 센다 (0xa51d0) */
+const MAXIMUM_CLEARS = 99
+
 /** 미션 모드 한 판 — 타자편(MissionRun)과 투수편(PitcherRun)을 함께 다룬다. */
 export function useMissionSession({
   runner,
@@ -66,6 +75,7 @@ export function useMissionSession({
   missionRecord,
   screen,
   setScreen,
+  onGamePointReward,
 }: MissionSessionInput) {
   const [missionRun, setMissionRun] = useState<MissionRun | null>(null)
   const missionRunRef = useRef(missionRun)
@@ -73,7 +83,12 @@ export function useMissionSession({
   const [pitcherRun, setPitcherRun] = useState<PitcherRun | null>(null)
   /** 결과를 확인하고 돌아갈 때 마지막으로 한 편의 목록을 연다 */
   const [lastSide, setLastSide] = useState<OriginalMission['side']>('타자')
-  const [clearedKeys, setClearedKeys] = useState<readonly string[]>(() => missionRecord.load())
+  const [clearCounts, setClearCounts] = useState<MissionClearCounts>(() => missionRecord.load())
+  /** 한 번이라도 깬 미션 키 — 잠금 판정과 컬렉션이 쓴다 */
+  const clearedKeys = useMemo(
+    () => Object.entries(clearCounts).filter(([, count]) => count > 0).map(([key]) => key),
+    [clearCounts],
+  )
 
   // 미션 제한 시간. 타자편·투수편 모두 진행 중일 때만 1초씩 흘린다.
   const isBatterRunning = (screen.kind === '미션진행' || screen.kind === '마선수대결') && missionRun?.status === '진행중'
@@ -145,11 +160,19 @@ export function useMissionSession({
     setPitcherRun(nextRun)
   }
 
+  /**
+   * 미션을 깼을 때 — **클리어 횟수를 올리고 보상 G 를 준다** (0xa52b0, Q2 1a·1b).
+   * 보상은 이번 클리어를 더하기 **전** 횟수로 계산하므로 다시 깰수록 줄어든다.
+   * 원본은 99 회에서 센 것을 멈춘다.
+   */
   const rememberCleared = (mission: OriginalMission, status: string) => {
+    if (status !== '성공') return
     const key = missionKeyOf(mission)
-    if (status !== '성공' || clearedKeys.includes(key)) return
-    const next = [...clearedKeys, key]
-    setClearedKeys(next)
+    const previous = clearCounts[key] ?? 0
+    const reward = missionRewardOf(mission.stage, previous)
+    if (reward > 0) onGamePointReward?.(reward)
+    const next = { ...clearCounts, [key]: Math.min(MAXIMUM_CLEARS, previous + 1) }
+    setClearCounts(next)
     missionRecord.save(next)
   }
 
@@ -216,5 +239,5 @@ export function useMissionSession({
     },
   }
 
-  return { missionRun, pitcherRun, clearedKeys, lastSide, handleMissionPitch, handleThrow, actions }
+  return { missionRun, pitcherRun, clearedKeys, clearCounts, lastSide, handleMissionPitch, handleThrow, actions }
 }

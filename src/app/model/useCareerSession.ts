@@ -21,6 +21,7 @@ import {
   isManagementCycleOpen,
   isSeasonFinished,
   startNextSeason,
+  gainGamePoint,
 } from '@/entities/career/model/playerCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { awardTitles, evaluateNewTitles } from '@/entities/career/model/titles'
@@ -234,6 +235,13 @@ export function useCareerSession({
 
   const actions = {
     syncOpenedHidden,
+    /**
+     * 미션 클리어 보상 G (0xa52b0). 원본은 전역 저장 +0x64 에 쌓지만 웹은 커리어에 둔다 —
+     * 육성 선수가 없으면 받아 갈 곳이 없어 그냥 버린다.
+     */
+    gainGamePoint: (amount: number) => {
+      setCareer((current) => (current === null ? current : gainGamePoint(current, amount)))
+    },
     startNewCareer: (name: string, profile: RookieProfile) => {
       saveGame.clear()
       setCareer(createCareer(name, profile))

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { BATTER_MISSIONS, PITCHER_MISSIONS, missionKeyOf } from '@/entities/mission/model/missionGoal'
 import type { OriginalMission } from '@/shared/config/original/missions'
 import { popupLabel } from '@/shared/ui/PixelNumber/PixelNumber.css'
+import { missionRewardOf } from '@/entities/mission/model/missionReward'
 
 /**
  * 미션 선택. 원작 설명서: "타자편, 투수편으로 나누어지며 총 28개의 미션이
@@ -13,6 +14,8 @@ const LISTED_MISSIONS = [...BATTER_MISSIONS, ...PITCHER_MISSIONS]
 
 interface MissionSelectScreenProps {
   readonly clearedKeys: readonly string[]
+  /** 미션별 클리어 횟수 (0xa51d0) — 보상 G 가 다시 깰수록 줄어서 횟수를 보여 준다 */
+  readonly clearCounts?: Readonly<Record<string, number>>
   readonly initialSide: OriginalMission['side']
   readonly onSelect: (mission: OriginalMission) => void
   readonly onBack: () => void
@@ -20,6 +23,7 @@ interface MissionSelectScreenProps {
 
 export function MissionSelectScreen({
   clearedKeys,
+  clearCounts = {},
   initialSide,
   onSelect,
   onBack,
@@ -35,13 +39,18 @@ export function MissionSelectScreen({
     const previous = missions[index - 1]
     const isLocked = previous !== undefined && !clearedKeys.includes(missionKeyOf(previous))
 
+    const clears = clearCounts[missionKeyOf(mission)] ?? 0
+    // 다음에 깼을 때 받을 G — 같은 미션을 다시 깰수록 줄어든다 (0xa52b0)
+    const reward = missionRewardOf(mission.stage, clears)
+
     return {
       id: String(mission.id),
-      label: `${clearedKeys.includes(missionKeyOf(mission)) ? '★ ' : ''}${mission.name}`,
+      label: `${clears > 0 ? `★${clears > 1 ? clears : ''} ` : ''}${mission.name}`,
       detail: isLocked
         ? '이전 단계를 클리어해주세요'
         : mission.goals.join(' · ') +
-          (mission.timeLimitSeconds > 0 ? ` · ${mission.timeLimitSeconds}초` : ''),
+          (mission.timeLimitSeconds > 0 ? ` · ${mission.timeLimitSeconds}초` : '') +
+          (reward > 0 ? ` · ${reward} G` : ''),
       isDisabled: isLocked,
     }
   })

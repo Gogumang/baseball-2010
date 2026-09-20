@@ -43,7 +43,11 @@ export function App() {
 
   const runner = useAtBatRunner()
   const careerSession = useCareerSession({ runner, random, saveGame, screen, setScreen })
-  const mission = useMissionSession({ runner, random, missionRecord, screen, setScreen })
+  // 미션 보상 G — 원본은 전역 저장에 쌓지만 웹은 커리어에 둔다. 육성 선수가 없으면 받아 갈 곳이 없다
+  const mission = useMissionSession({
+    runner, random, missionRecord, screen, setScreen,
+    onGamePointReward: careerSession.actions.gainGamePoint,
+  })
   const collection = useCollection(collectionStore, careerSession.career, isEveryMissionCleared(mission.clearedKeys))
   // 히든 오픈은 원본에서 전역 저장이라 선수에게도 알려 준다 (상점이 선수 기록으로 판정한다)
   const { syncOpenedHidden } = careerSession.actions

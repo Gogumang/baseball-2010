@@ -279,6 +279,11 @@ export function gainReputation(career: PlayerCareer, amount: number): PlayerCare
   return { ...career, reputation: clamp(career.reputation + amount, 0, MAXIMUM_REPUTATION) }
 }
 
+/** G포인트를 더한다 (상한 99999). 원본은 전역 저장 +0x64 에 쌓는다 */
+export function gainGamePoint(career: PlayerCareer, amount: number): PlayerCareer {
+  return { ...career, gamePoint: clamp(career.gamePoint + amount, 0, MAXIMUM_GAME_POINT) }
+}
+
 export function gainMorale(career: PlayerCareer, amount: number): PlayerCareer {
   return { ...career, morale: clamp(career.morale + amount, 0, MAXIMUM_MORALE) }
 }

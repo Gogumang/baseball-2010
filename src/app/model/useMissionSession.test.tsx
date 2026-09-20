@@ -18,7 +18,7 @@ const WIN_EVENT_ID = 114
 const LOSE_EVENT_ID = 115
 
 function setUpSession() {
-  const missionRecord: MissionRecordPort = { load: () => [], save: vi.fn() }
+  const missionRecord: MissionRecordPort = { load: () => ({}), save: vi.fn() }
   const random = createSeededRandom(1)
   let screen: Screen = { kind: '관리' }
   const setScreen = vi.fn((next: Screen) => {

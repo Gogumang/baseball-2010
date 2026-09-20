@@ -38,6 +38,7 @@ export function MissionRoutes({
   const selectScreen = (
     <MissionSelectScreen
       clearedKeys={session.clearedKeys}
+      clearCounts={session.clearCounts}
       initialSide={session.lastSide}
       onSelect={(mission) => setScreen({ kind: '미션설명', mission })}
       onBack={() => setScreen({ kind: '메인메뉴' })}
