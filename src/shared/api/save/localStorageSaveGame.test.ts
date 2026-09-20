@@ -69,6 +69,23 @@ describe('세이브 불러오기', () => {
     expect(save.load()).toEqual(career)
   })
 
+  /**
+   * 리그 선수 기록표(0xa8024)는 나중에 생긴 칸이다. 예전 저장에는 없으니 빈 표로 시작해야 하고,
+   * 쌓인 표는 JSON 을 오가도 그대로여야 한다 (키가 숫자라 문자열로 오가는 것만 조심하면 된다).
+   */
+  it('리그 선수 기록표는 예전 저장에서 빈 표가 되고, 저장한 표는 그대로 돌아온다', () => {
+    writeSave(2, ANCIENT_SAVE)
+    expect(createLocalStorageSaveGame().load()?.leaguePlayerStats).toEqual({ batters: {} })
+
+    const save = createLocalStorageSaveGame()
+    const 표 = { batters: { 51: { atBats: 120, hits: 40, homeRuns: 9, runsBattedIn: 33 } } }
+    save.save({ ...createCareer('저장'), leaguePlayerStats: 표 })
+
+    const loaded = save.load()
+    expect(loaded?.leaguePlayerStats).toEqual(표)
+    expect(loaded?.leaguePlayerStats.batters[51].homeRuns).toBe(9)
+  })
+
   it('알 수 없는 형식·깨진 JSON 은 새 게임으로 본다 (null)', () => {
     writeSave(99, ANCIENT_SAVE)
     expect(createLocalStorageSaveGame().load()).toBeNull()

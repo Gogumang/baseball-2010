@@ -3,6 +3,8 @@ import { applyGameResult, applySeasonEnd, createCareer, nextOpponentOf, GAMES_PE
 import { EMPTY_LEAGUE, opponentOf, recordLeagueResult } from '@/entities/league/model/league'
 import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
 import type { GameSummary } from '@/entities/game/model/gameSummary'
+import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
+import { EMPTY_LEAGUE_PLAYER_STATS, leagueBatterIdOf } from '@/entities/league/model/leaguePlayerStats'
 
 describe('신인 초기값 — 0x11244', () => {
   it('인기도 0 · 평판 300 · 사기 100 · 소지금 6000만 · 연봉 50 으로 시작한다', () => {
@@ -93,6 +95,56 @@ describe('새 시즌 전환 — 0x1b768', () => {
 
     expect(next.league).toEqual(EMPTY_LEAGUE)
     expect(next.postseason).toBeNull()
+  })
+
+  it('리그 선수 시즌 성적도 0 으로 되돌린다 (0x204e0 — 순위표 재료가 해를 넘기지 않는다)', () => {
+    const 지난시즌 = {
+      ...createCareer('선수'),
+      leaguePlayerStats: { batters: { 7: { atBats: 300, hits: 120, homeRuns: 40, runsBattedIn: 99 } } },
+    }
+
+    expect(startNextSeason(지난시즌).leaguePlayerStats).toEqual(EMPTY_LEAGUE_PLAYER_STATS)
+  })
+})
+
+/**
+ * 사람 경기도 원본은 같은 타석 기록 함수 0xa8024 를 부른다 (B-2) —
+ * 동료 여덟 타순과 상대 팀 타석이 CPU 끼리 경기와 **한 표**에 쌓여야 한다.
+ */
+describe('사람 경기의 타석도 리그 선수 기록표에 쌓인다 — 0xa8024', () => {
+  const 타석 = (teamId: number, battingOrderIndex: number, outcome: AtBatOutcome, runsBattedIn = 0) =>
+    ({ teamId, battingOrderIndex, outcome, runsBattedIn })
+
+  it('동료·상대 타석이 각자의 레코드에 들어간다', () => {
+    const summary = {
+      result: '승',
+      stats: EMPTY_SEASON_STATS,
+      recordIds: [],
+      ourTeamId: 0,
+      opponentTeamId: 3,
+      leaguePlateAppearances: [
+        타석(0, 1, { kind: '홈런' }, 2),
+        타석(0, 1, { kind: '볼넷' }),
+        타석(3, 4, { kind: '안타', bases: 2 }, 1),
+        타석(3, 4, { kind: '삼진' }),
+      ],
+    } as unknown as GameSummary
+
+    const career = applyGameResult(createCareer('선수'), summary)
+
+    // 볼넷은 타수에서 빠진다 (countsAsAtBat)
+    expect(career.leaguePlayerStats.batters[leagueBatterIdOf(0, 1)]).toEqual({
+      atBats: 1, hits: 1, homeRuns: 1, runsBattedIn: 2,
+    })
+    expect(career.leaguePlayerStats.batters[leagueBatterIdOf(3, 4)]).toEqual({
+      atBats: 2, hits: 1, homeRuns: 0, runsBattedIn: 1,
+    })
+  })
+
+  it('리그 밖 경기(칸이 없는 요약)는 표를 건드리지 않는다', () => {
+    const summary = { result: '승', stats: EMPTY_SEASON_STATS, recordIds: [], ourTeamId: 0, opponentTeamId: 3 } as unknown as GameSummary
+
+    expect(applyGameResult(createCareer('선수'), summary).leaguePlayerStats).toEqual(EMPTY_LEAGUE_PLAYER_STATS)
   })
 })
 

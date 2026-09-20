@@ -7,7 +7,17 @@ import {
   applySeasonEnd,
   createCareer,
   nextOpponentOf,
+  startNextSeason,
 } from '@/entities/career/model/playerCareer'
+import { EMPTY_LEAGUE_PLAYER_STATS } from '@/entities/league/model/leaguePlayerStats'
+import { LEADER_KIND, QUALIFIED_AT_BATS, leaderOf } from '@/entities/awards/model/leaderboard'
+import {
+  MAXIMUM_SALARY_RANK,
+  careerLeagueRecordsOf,
+  judgeSeasonAwards,
+  salaryNegotiationRankOf,
+} from '@/entities/awards/model/seasonAwards'
+import { SALARY_FIRM_EVENT_ID, salaryResultEventId } from '@/entities/career/model/seasonFlow'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { LEAGUE_TEAM_COUNT, rankingOf } from '@/entities/league/model/league'
 import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
@@ -95,6 +105,65 @@ describe('한 시즌 통째로 — 경기 정산 흐름이 이어지는가', () 
       const 뒤 = league.wins[ranking[rank]]
       expect(앞, `${rank}위(${뒤}승)가 ${rank - 1}위(${앞}승)보다 많이 이겼습니다`).toBeGreaterThanOrEqual(뒤)
     }
+  })
+
+  /**
+   * 개인 타이틀·MVP·연봉협상 등급의 재료 (0xa8024 → 0x9d789 → 0xa4d78, B-2·B-3·B-5).
+   * 45경기를 치르면 리그 선수 전원에게 시즌 성적이 있어야 한다.
+   */
+  it('45경기를 치르면 리그 선수 기록표가 차고, 규정 타수(104)를 넘는 선수가 나온다', () => {
+    const career = 한시즌(2010)
+    const lines = Object.values(career.leaguePlayerStats.batters)
+
+    expect(lines.length).toBeGreaterThan(0)
+    expect(lines.reduce((sum, line) => sum + line.homeRuns, 0)).toBeGreaterThan(0)
+    expect(lines.filter((line) => line.atBats >= QUALIFIED_AT_BATS).length).toBeGreaterThan(0)
+  })
+
+  it('그 표로 만든 순위표에 홈런·타점 1위가 실제로 나온다 — 예전에는 재료가 없어 수상이 없었다', () => {
+    const career = 한시즌(2010)
+    const records = careerLeagueRecordsOf(career)
+
+    expect(leaderOf(records, LEADER_KIND.홈런)).not.toBeNull()
+    expect(leaderOf(records, LEADER_KIND.타점)).not.toBeNull()
+    expect(leaderOf(records, LEADER_KIND.타율)).not.toBeNull()
+  })
+
+  it('새 시즌이 되면 기록표가 0 으로 돌아간다 (0x204e0)', () => {
+    const 지난시즌 = 한시즌(2010)
+
+    expect(Object.keys(지난시즌.leaguePlayerStats.batters).length).toBeGreaterThan(0)
+    expect(startNextSeason(지난시즌).leaguePlayerStats).toEqual(EMPTY_LEAGUE_PLAYER_STATS)
+  })
+
+  /**
+   * B-5 등급표의 꼭대기 — 3관왕 + MVP = k 5 → 강경 384(+30%) · 정중 388(+20%).
+   * 리그 선수 기록표가 실제로 판정을 움직이는지 한 시즌 돌린 표 위에서 확인한다.
+   */
+  it('3관왕 + MVP 면 k = 5 가 나온다', () => {
+    const 지난시즌 = 한시즌(2010)
+    const 리그최고 = (pick: (line: { atBats: number; hits: number; homeRuns: number; runsBattedIn: number }) => number) =>
+      Object.values(지난시즌.leaguePlayerStats.batters).reduce((best, line) => Math.max(best, pick(line)), 0)
+
+    // 리그 누구보다 잘 친 성적 + 올해의 목표를 전부 채운 인기도 → 세 부문 1위와 MVP 조건을 모두 넘긴다
+    const 최강 = {
+      ...지난시즌,
+      popularity: 4000,
+      popularityAtSeasonStart: 0,
+      stats: {
+        ...EMPTY_SEASON_STATS,
+        atBats: QUALIFIED_AT_BATS + 100,
+        hits: QUALIFIED_AT_BATS + 100,
+        homeRuns: 리그최고((line) => line.homeRuns) + 1,
+        runsBattedIn: 리그최고((line) => line.runsBattedIn) + 1,
+      },
+    }
+    const awards = judgeSeasonAwards(최강, careerLeagueRecordsOf(최강))
+
+    expect(awards.wonCount).toBe(3)
+    expect(awards.isMostValuablePlayer).toBe(true)
+    expect(salaryNegotiationRankOf(최강)).toBe(MAXIMUM_SALARY_RANK)
+    expect(salaryResultEventId(SALARY_FIRM_EVENT_ID, salaryNegotiationRankOf(최강))).toBe(384)
   })
 
   it('상대는 일정표대로 돌아 한 시즌에 아홉 팀을 고루 만난다', () => {

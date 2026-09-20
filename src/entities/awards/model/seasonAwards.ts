@@ -7,15 +7,18 @@ import {
   leaderOf,
 } from '@/entities/awards/model/leaderboard'
 import type { LeaderKind, LeagueRecord } from '@/entities/awards/model/leaderboard'
+import { LEAGUE_TEAM_COUNT } from '@/entities/league/model/league'
+import { leagueBatterIdOf, leagueBatterLineOf } from '@/entities/league/model/leaguePlayerStats'
+import type { LeaguePlayerStats } from '@/entities/league/model/leaguePlayerStats'
+import { teamBatters } from '@/entities/team/model/teamRoster'
 
 /**
  * 개인 타이틀(370~374)·시즌 MVP(375~377)·연봉협상 등급 k
  * (binary.mod 0x8dad4 · 0x8dd60 · 0xa4d78 — B-season-awards.md B-2·B-3·B-5, 모두 **확정**).
  *
- * ⚠️ **웹에 없어 아직 못 채우는 것**: 순위표를 만들려면 CPU 선수의 개인 시즌 성적이 있어야 한다
- * (`leaderboard.ts` 머리말 참고). 기록표를 넘기지 않으면 1위가 없어 수상도 MVP 도 없고,
- * 등급 k 는 0 이 된다 — 지금까지 `app/model/seasonEvents.ts` 가 상수로 박아 두던 값과 같다.
- * 다만 이제는 **상수가 아니라 계산 결과**라, 기록표만 생기면 그대로 살아난다.
+ * 순위표 재료인 **CPU 선수 개인 시즌 성적**은 이제 `career.leaguePlayerStats` 에 쌓인다
+ * (`entities/league/model/leaguePlayerStats.ts` — 사람 경기와 CPU 끼리 경기가 원본처럼 같은 표를 쓴다).
+ * 시즌 초에는 표가 비어 1위가 없으니 수상도 MVP 도 없고, 45경기를 치르고 나면 살아난다.
  */
 
 /** 시상 문구 StrUSER_EVT 번호 (표 0xd4e30) */
@@ -276,21 +279,21 @@ export function salaryRankOf(awards: SeasonAwards): number {
 }
 
 /**
- * 웹에 아직 리그 선수 기록표가 없다는 사실을 한 곳에 모아 둔 값.
- * `leagueDay.ts` 가 선수별 성적을 쌓기 시작하면 이 자리에 그 표를 넘기면 된다.
+ * 기록표를 안 넘겼을 때의 빈 순위표. 자격자가 없어 1위도 수상도 없다 (등급 k = 0).
+ * 리그 밖에서 부르는 곳(테스트·미션)이 쓰라고 남겨 둔다.
  */
 export const NO_LEAGUE_RECORDS: readonly LeagueRecord[] = []
 
 /**
  * `app/model/seasonEvents.ts` 가 쓰는 입구 — 커리어 하나로 등급 k 를 낸다.
  *
- * ⚠️ 기록표를 안 넘기면 순위표가 비어 **k = 0** 이다(강경 387 −20% / 정중 391 −10%).
- * 지어낸 CPU 성적으로 채우지 않는다 — `leaderboard.ts` 머리말에 적은 대로 원본은 CPU 경기에서
- * 실제로 쌓은 기록만 본다. 내 선수 하나만 넣어도 안 된다(혼자면 늘 3관왕이 된다).
+ * 둘째 인자를 안 주면 **커리어가 들고 있는 리그 선수 기록표**(`career.leaguePlayerStats`)로
+ * 순위표를 만든다. 지어낸 성적이 아니라 CPU 경기(0xc2a48)와 사람 경기(0xae24c)가 실제로
+ * 0xa8024 로 쌓아 온 표다 — 원본과 같은 재료다.
  */
 export function salaryNegotiationRankOf(
   career: PlayerCareer,
-  records: readonly LeagueRecord[] = NO_LEAGUE_RECORDS,
+  records: readonly LeagueRecord[] = careerLeagueRecordsOf(career),
   role: AwardRole = '타자',
 ): number {
   return salaryRankOf(judgeSeasonAwards(career, records, role))
@@ -315,4 +318,42 @@ export function myLeagueRecordOf(career: PlayerCareer): LeagueRecord {
     homeRuns: career.stats.homeRuns,
     runsBattedIn: career.stats.runsBattedIn,
   }
+}
+
+/**
+ * 리그 선수 기록표 → 순위표가 훑을 레코드 줄들 (0x9d789 의 순회 순서 그대로).
+ *
+ * 원본은 **팀 0부터, 팀 안에서는 명단 순서대로** 훑는다. 동점이면 먼저 들어간 쪽이 1위이므로
+ * 이 순서가 곧 동점 우선순위다. 웹은 `BATTERS` 가 팀마다 12명씩 이어 붙어 있어 그대로 맞는다.
+ *
+ * `myRecord` 를 주면 **내 팀 명단 끝**에 끼운다. 원본은 내 선수 레코드가 팀 명단 안에 있지만
+ * 몇 번째인지는 모른다 — 선수 생성(0x1762e)이 명단에 더하는 모양이라 끝으로 두었다 (**추정**).
+ * 동점일 때만 차이가 나고, 그때는 같은 팀 로스터 타자가 앞선다.
+ */
+export function leagueRecordsOf(
+  stats: LeaguePlayerStats,
+  myRecord: LeagueRecord | null = null,
+): readonly LeagueRecord[] {
+  const records: LeagueRecord[] = []
+  for (let teamId = 0; teamId < LEAGUE_TEAM_COUNT; teamId += 1) {
+    teamBatters(teamId).forEach((player, slot) => {
+      const line = leagueBatterLineOf(stats, leagueBatterIdOf(teamId, slot))
+      records.push({
+        ...EMPTY_LEAGUE_RECORD,
+        teamId,
+        name: player.name,
+        atBatsOrOuts: line.atBats,
+        hits: line.hits,
+        homeRuns: line.homeRuns,
+        runsBattedIn: line.runsBattedIn,
+      })
+    })
+    if (myRecord !== null && myRecord.teamId === teamId) records.push(myRecord)
+  }
+  return records
+}
+
+/** 커리어 하나로 순위표 재료를 만든다 — 리그 선수 표 + 내 선수 한 줄 */
+export function careerLeagueRecordsOf(career: PlayerCareer): readonly LeagueRecord[] {
+  return leagueRecordsOf(career.leaguePlayerStats, myLeagueRecordOf(career))
 }

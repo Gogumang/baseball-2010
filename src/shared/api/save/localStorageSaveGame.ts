@@ -92,6 +92,12 @@ function normalizeCareer(saved: PlayerCareer): PlayerCareer {
     careerStats: { ...base.careerStats, ...saved.careerStats },
     affection: { ...saved.affection },
     league: saved.league ?? base.league,
+    // 리그 선수 기록표(0xa8024)는 나중에 생긴 칸이다 — 예전 저장에는 없으니 빈 표로 시작한다.
+    // 저장 형식 번호를 올리지 않는 이유: 빠진 칸이 기본값으로 채워지면 그만이고,
+    // 번호를 올리면 `load` 가 예전 저장을 통째로 버려(`version !== ...` → null) 선수가 사라진다.
+    leaguePlayerStats: {
+      batters: { ...base.leaguePlayerStats.batters, ...saved.leaguePlayerStats?.batters },
+    },
     titleIds: saved.titleIds ?? [],
     seenEventIds: saved.seenEventIds ?? [],
   }

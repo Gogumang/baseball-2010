@@ -1,7 +1,16 @@
 import { LEAGUE_TEAM_COUNT, opponentOf, recordLeagueResult } from '@/entities/league/model/league'
 import type { League } from '@/entities/league/model/league'
 import { simulateHalfInning } from '@/entities/game/model/simulateHalfInning'
+import type { HalfInningResult } from '@/entities/game/model/simulateHalfInning'
 import { batterAt, startingPitcherOf } from '@/entities/team/model/teamRoster'
+import {
+  EMPTY_LEAGUE_PLAYER_STATS,
+  recordLeaguePlateAppearances,
+} from '@/entities/league/model/leaguePlayerStats'
+import type {
+  LeaguePlateAppearance,
+  LeaguePlayerStats,
+} from '@/entities/league/model/leaguePlayerStats'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
 /**
@@ -47,6 +56,12 @@ export function matchupsOf(day: number): readonly LeagueMatchup[] {
 export interface LeagueGameScore {
   readonly awayRuns: number
   readonly homeRuns: number
+  /**
+   * 이 경기에서 나온 **선수별 타석 결과**. 원본은 CPU 끼리 경기도 사람 경기와 같은 기록 함수
+   * 0xa8024 를 불러 선수 레코드에 타수·안타·홈런·타점을 쌓는다 (B-2 확정) — 웹도 여기서
+   * 결과를 버리지 않고 내보내, `playLeagueDay` 가 리그 선수 기록표에 쌓는다.
+   */
+  readonly plateAppearances: readonly LeaguePlateAppearance[]
 }
 
 /** 한 경기를 9이닝(동점이면 연장)까지 돌린다 */
@@ -58,11 +73,19 @@ export function simulateLeagueGame(matchup: LeagueMatchup, random: RandomPort): 
   let homeRuns = 0
   let awayOrder = 0
   let homeOrder = 0
+  const plateAppearances: LeaguePlateAppearance[] = []
+  /** 반 이닝이 내놓은 타석 결과를 공격 팀 것으로 적어 둔다 — 판정에는 손대지 않는다 */
+  const collect = (teamId: number, half: HalfInningResult) => {
+    for (const appearance of half.plateAppearances) {
+      plateAppearances.push({ teamId, ...appearance })
+    }
+  }
 
   for (let inning = 1; inning <= MAXIMUM_INNINGS; inning += 1) {
     const top = simulateHalfInning(awayOrder, (order) => batterAt(matchup.away, order), homePitcher, inning, random)
     awayRuns += top.runs
     awayOrder = top.nextBattingOrderIndex
+    collect(matchup.away, top)
 
     // 홈이 이미 앞서 있으면 9회말은 치르지 않는다
     if (inning >= REGULAR_INNINGS && homeRuns > awayRuns) break
@@ -70,26 +93,40 @@ export function simulateLeagueGame(matchup: LeagueMatchup, random: RandomPort): 
     const bottom = simulateHalfInning(homeOrder, (order) => batterAt(matchup.home, order), awayPitcher, inning, random)
     homeRuns += bottom.runs
     homeOrder = bottom.nextBattingOrderIndex
+    collect(matchup.home, bottom)
 
     if (inning >= REGULAR_INNINGS && awayRuns !== homeRuns) break
   }
 
-  return { awayRuns, homeRuns }
+  return { awayRuns, homeRuns, plateAppearances }
+}
+
+/** 하루치 경기가 남긴 것 — 순위표와 **선수 기록표** 두 벌이다 */
+export interface LeagueDayResult {
+  readonly league: League
+  readonly playerStats: LeaguePlayerStats
 }
 
 /**
  * 하루치 경기를 리그 전적에 넣는다. `myTeamId` 가 낀 경기는 사람이 직접 치르므로 건너뛴다.
  * 원본에 무승부가 없어 어느 한쪽이 반드시 승이 되고, **원본은 진 팀에 승을 준다** (아래 주석).
+ *
+ * 원본은 이 경기들도 사람 경기와 같은 기록 함수 0xa8024 를 부르므로 **선수별 성적이 함께 쌓인다**
+ * (B-2 확정). 그래서 `playerStats` 를 받아 쌓은 것을 돌려준다 — 이 표가 개인 타이틀·MVP·
+ * 연봉협상 등급의 유일한 재료다. 안 넘기면 빈 표에서 시작한다.
  */
 export function playLeagueDay(
   league: League,
   day: number,
   myTeamId: number,
   random: RandomPort,
-): League {
-  return matchupsOf(day).reduce((current, matchup) => {
+  playerStats: LeaguePlayerStats = EMPTY_LEAGUE_PLAYER_STATS,
+): LeagueDayResult {
+  const plateAppearances: LeaguePlateAppearance[] = []
+  const played = matchupsOf(day).reduce((current, matchup) => {
     if (matchup.away === myTeamId || matchup.home === myTeamId) return current
     const score = simulateLeagueGame(matchup, random)
+    plateAppearances.push(...score.plateAppearances)
     // ⚠️ 원본 버그를 그대로 옮긴 것 (0xc2a48, R1 확정 · DECISIONS 2026-09-20 ①):
     //    `원정 득점 > 홈 득점` 이면 **홈** 에 승을, 아니면 **원정** 에 승을 준다 — 늘 진 팀이 이긴다.
     //    상대전적도 같이 뒤집히고, 동점이면 원정 승이다.
@@ -98,4 +135,6 @@ export function playLeagueDay(
       ? recordLeagueResult(current, matchup.home, matchup.away)
       : recordLeagueResult(current, matchup.away, matchup.home)
   }, league)
+
+  return { league: played, playerStats: recordLeaguePlateAppearances(playerStats, plateAppearances) }
 }

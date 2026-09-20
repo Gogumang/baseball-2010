@@ -26,6 +26,7 @@ import type { ReputationCounts } from '@/entities/career/model/gameEvaluation'
 import { completeGameRecordIdsOf, gameEndRecordIdsOf } from '@/entities/game/model/gameRecords'
 import { EMPTY_BATTER_GAME_LOG, recordBatterAtBat } from '@/entities/game/model/batterGameLog'
 import type { BatterGameLog } from '@/entities/game/model/batterGameLog'
+import type { LeaguePlateAppearance } from '@/entities/league/model/leaguePlayerStats'
 import type { AcePlayer } from '@/shared/config/original/acePlayers'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
@@ -73,6 +74,12 @@ export interface GameProgress {
    * (0xa77f0 게이트는 공격 팀만 보고, 0xa8024 의 "본인인가" 필터는 개인 통산 성적에만 걸린다).
    */
   readonly teammateLogs: Readonly<Record<number, BatterGameLog>>
+  /**
+   * 리그 선수 기록표에 넘길 타석 결과 — **동료 여덟 타순과 상대 팀 타자** 것이다.
+   * 원본은 사람 경기(0xae24c·0xae3e8)도 CPU 끼리 경기와 **같은 0xa8024** 를 불러 양 팀 선수
+   * 레코드에 성적을 쌓는다 (B-2 확정). 내 타석은 `myStats` 가 이미 세므로 여기 넣지 않는다.
+   */
+  readonly leaguePlateAppearances: readonly LeaguePlateAppearance[]
   /** 우리 투수가 내준 것 — 완투 계열 기록(0xa7de8)이 보는 state+0x88·0x89·0x8a */
   readonly pitching: {
     readonly hitsAllowed: number
@@ -143,6 +150,7 @@ export function startGame(
     recordIds: [],
     consecutiveHits: 0,
     teammateLogs: {},
+    leaguePlateAppearances: [],
     pitching: { hitsAllowed: 0, walksAllowed: 0, outsRecorded: 0, strikeouts: 0, strikeoutCombo: 0 },
     log: [],
     nextLogId: 1,
@@ -322,6 +330,14 @@ function playOpponentInning(progress: GameProgress, random: RandomPort): GamePro
       },
       // 삼진 계열 기록도 우리 팀 것이다 (0xa77f0 은 수비 팀이 사람 팀인지 본다)
       recordIds: [...progress.recordIds, ...half.recordIds],
+      // 상대 팀 타석도 원본은 같은 0xa8024 로 상대 선수 레코드에 쌓는다 (B-2)
+      leaguePlateAppearances: [
+        ...progress.leaguePlateAppearances,
+        ...half.plateAppearances.map((appearance) => ({
+          teamId: progress.opponentTeamId,
+          ...appearance,
+        })),
+      ],
     },
     `${progress.game.inning}회${progress.game.half} 상대 공격 — ${runs}점`,
     false,
@@ -351,6 +367,11 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort): GameProg
       game,
       teammateLogs: { ...progress.teammateLogs, [slot]: recorded.log },
       recordIds: [...progress.recordIds, ...recorded.recordIds],
+      // 동료 타석도 우리 팀 선수 레코드에 쌓인다 — 타순 칸이 곧 로스터 칸이다 (`batterAt` 과 같은 자리)
+      leaguePlateAppearances: [
+        ...progress.leaguePlateAppearances,
+        { teamId: progress.ourTeamId, battingOrderIndex: slot, outcome, runsBattedIn },
+      ],
     },
     `${progress.game.inning}회${progress.game.half} ${progress.game.battingOrderIndex + 1}번 — ${describeOutcome(outcome)}${
       runsBattedIn > 0 ? ` (${runsBattedIn}점)` : ''
@@ -397,6 +418,7 @@ export function summaryOf(progress: GameProgress): GameSummary {
     reputationCounts: progress.reputationCounts,
     ourTeamId: progress.ourTeamId,
     opponentTeamId: progress.opponentTeamId,
+    leaguePlateAppearances: progress.leaguePlateAppearances,
   }
 }
 

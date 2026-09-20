@@ -5,18 +5,17 @@
  * 팀 명단은 0xb53d1(타자 +0x10 개수) · 0xb51fd(투수 +0xc 개수)로 읽고,
  * 선수 레코드의 칸을 종류별로 꺼내 큰 쪽부터(방어율만 작은 쪽부터) 끼워 넣는다.
  *
- * ⚠️ **선행 조건 — 웹에는 CPU 선수의 개인 성적이 없다.**
+ * **재료 — CPU 선수의 개인 성적** (B-2 마지막 문단, 확정):
  * 원본은 CPU 끼리 경기(0xc2a48)도 사람 경기(0xae24c·0xae3e8)와 **같은 타석 기록 함수 0xa8024**
  * 를 불러 선수 레코드마다 홈런(+0x28)·타점(+0x2a)·타수(+0x20)를 쌓는다. 그래서 45경기가 끝나면
- * 리그 300명 전원에게 시즌 성적이 있다 (B-2 마지막 문단, 확정).
- * 웹의 `entities/league/model/leagueDay.ts` 는 같은 간이 타석 엔진을 돌리면서도 **점수만 읽고 버린다**.
- * `shared/config/original/roster.ts` 도 이름·능력치 네 칸뿐이라 성적을 담을 곳이 아예 없다
- * (`playerCareer.ts` 의 `startNextSeason` 주석도 같은 사실을 적어 두었다).
+ * 리그 전원에게 시즌 성적이 있다.
+ * 웹도 이제 같은 표를 쌓는다 — `entities/league/model/leaguePlayerStats.ts` 가 그 표이고,
+ * 쌓는 곳은 `leagueDay.playLeagueDay`(CPU 경기)와 `playerCareer.applyGameResult`(사람 경기),
+ * 새 시즌에 비우는 곳은 `playerCareer.startNextSeason`(0x204e0) 이다.
+ * 표를 레코드 줄로 바꾸는 것은 `seasonAwards.leagueRecordsOf` 다.
  *
- * → 그래서 이 파일은 **기록표를 인자로 받는 순수 함수**로만 만들었다. 성적을 지어내지 않는다.
- *   기록표가 비면 1위가 없어 수상도 없다 (지금 웹의 상태). CPU 성적을 쌓는 곳은 `leagueDay.ts`
- *   (`simulateLeagueGame` 이 타석 결과를 버리는 자리)이고, 시즌 전환 때 비우는 곳은
- *   `playerCareer.ts` 의 `startNextSeason` 이다 — 그 두 곳이 채워지면 여기 인자로 넘기면 된다.
+ * → 이 파일은 그래도 **기록표를 인자로 받는 순수 함수**로 둔다. 성적을 지어내지 않는다 —
+ *   기록표가 비면 1위가 없어 수상도 없다.
  */
 
 /** 순위표 종류 (점프표 0xd7398). 원본 번호를 그대로 쓴다 */

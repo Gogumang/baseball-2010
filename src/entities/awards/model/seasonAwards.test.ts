@@ -9,8 +9,14 @@ import {
 } from '@/entities/career/model/seasonFlow'
 import { EMPTY_LEAGUE_RECORD } from '@/entities/awards/model/leaderboard'
 import type { LeagueRecord } from '@/entities/awards/model/leaderboard'
+import { LEAGUE_TEAM_COUNT } from '@/entities/league/model/league'
+import { leagueBatterIdOf } from '@/entities/league/model/leaguePlayerStats'
+import type { LeaguePlayerStats } from '@/entities/league/model/leaguePlayerStats'
+import { BATTERS_PER_TEAM } from '@/entities/team/model/teamRoster'
 import {
   MAXIMUM_SALARY_RANK,
+  careerLeagueRecordsOf,
+  leagueRecordsOf,
   MVP_EVENT_ID,
   MVP_MISSED_EVENT_ID,
   NO_TEAM,
@@ -269,11 +275,48 @@ describe('연봉협상 등급 k — 0xa4d78 (B-5)', () => {
     expect(salaryResultEventId(SALARY_POLITE_EVENT_ID, rank)).toBe(polite)
   })
 
-  it('⚠️ 리그 기록표를 안 넘기면 k = 0 이다 — CPU 선수 성적이 웹에 없어서다', () => {
+  /**
+   * 기록표를 생략하면 **커리어가 들고 있는 리그 선수 기록표**를 쓴다.
+   * (예전에는 넘길 표 자체가 없어 늘 0 이었다 — 그 가정을 여기서 걷어낸다.)
+   */
+  it('기록표를 생략하면 커리어의 리그 선수 표로 계산한다 — 아무도 안 뛰었으면 혼자 3관왕이다', () => {
     const career = 선수({ popularity: 4000, popularityAtSeasonStart: 0 }, { atBats: 300, hits: 150, homeRuns: 60, runsBattedIn: 150 })
 
-    expect(salaryNegotiationRankOf(career)).toBe(0)
-    expect(salaryResultEventId(SALARY_FIRM_EVENT_ID, salaryNegotiationRankOf(career))).toBe(387)
+    // CPU 표가 비어 있으면 타수가 있는 선수가 나 하나라 세 부문 모두 1위 → 3관왕 + MVP = 5
+    expect(salaryNegotiationRankOf(career)).toBe(MAXIMUM_SALARY_RANK)
+    expect(salaryResultEventId(SALARY_FIRM_EVENT_ID, salaryNegotiationRankOf(career))).toBe(384)
+  })
+
+  it('CPU 선수가 나보다 잘하면 등급이 내려간다 — 표가 실제로 판정에 쓰인다', () => {
+    const 나 = { atBats: 300, hits: 150, homeRuns: 60, runsBattedIn: 150 }
+    const career = 선수({ popularity: 4000, popularityAtSeasonStart: 0 }, 나)
+    // 다른 팀(3번) 로스터 0번 타자에게 홈런·타점만 더 얹는다 → 홈런왕·타점왕을 뺏기고 타율왕만 남는다
+    const 강타자 = leagueBatterIdOf(3, 0)
+    const 표: LeaguePlayerStats = {
+      batters: { [강타자]: { atBats: 300, hits: 100, homeRuns: 70, runsBattedIn: 200 } },
+    }
+
+    // 타이틀 1개(타율왕) + 올해의 목표를 채워 MVP +2 = 3 — 3관왕이던 k = 5 에서 내려온다
+    expect(salaryNegotiationRankOf({ ...career, leaguePlayerStats: 표 })).toBe(3)
+  })
+})
+
+describe('leagueRecordsOf — 기록표를 순위표 순회 순서로 편다 (0x9d789)', () => {
+  it('열 팀 × 12명이 팀 번호 순서로 나오고, 내 선수는 자기 팀 명단 끝에 끼어든다', () => {
+    const career = 선수({ teamId: 2 }, { atBats: 100 })
+    const records = careerLeagueRecordsOf(career)
+
+    expect(records).toHaveLength(LEAGUE_TEAM_COUNT * BATTERS_PER_TEAM + 1)
+    expect(records[2 * BATTERS_PER_TEAM + BATTERS_PER_TEAM].isMine).toBe(true)
+    expect(records.map((record) => record.teamId)).toEqual([...records].sort((a, b) => a.teamId - b.teamId).map((record) => record.teamId))
+  })
+
+  it('표에 있는 선수만 성적이 붙고 나머지는 타수 0 이라 순위표에서 빠진다', () => {
+    const id = leagueBatterIdOf(5, 7)
+    const records = leagueRecordsOf({ batters: { [id]: { atBats: 120, hits: 48, homeRuns: 12, runsBattedIn: 40 } } })
+
+    expect(records[id]).toMatchObject({ teamId: 5, atBatsOrOuts: 120, hits: 48, homeRuns: 12, runsBattedIn: 40 })
+    expect(records.filter((record) => record.atBatsOrOuts > 0)).toHaveLength(1)
   })
 })
 

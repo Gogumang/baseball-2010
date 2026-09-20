@@ -29,9 +29,9 @@ const RELEASE_ENDING = 1
 const RETIREMENT_ENDING = 2
 /**
  * 연봉협상 등급 k (0xa4d78, B-5 확정) = 타이틀 1위 수(홈런·타점·타율) + (그 해 MVP 면 +2).
- * 이제 `entities/awards` 가 계산한다 (`salaryNegotiationRankOf`). 다만 **CPU 선수의 개인
- * 시즌 성적이 웹에 아직 없어** 순위표가 비고, 그래서 값은 여전히 0 이다 — 상수가 아니라
- * 계산 결과라는 점만 다르다. `leagueDay.ts` 가 선수별 기록을 쌓으면 그 표를 둘째 인자로 넘기면 된다.
+ * `entities/awards` 의 `salaryNegotiationRankOf` 가 계산한다 — 둘째 인자를 생략하면
+ * **커리어가 들고 있는 리그 선수 기록표**(`career.leaguePlayerStats`)로 순위표를 만든다.
+ * 그 표는 CPU 끼리 경기(0xc2a48)와 사람 경기(0xae24c)가 원본처럼 같은 0xa8024 로 쌓은 것이다.
  */
 
 /**

@@ -7,6 +7,11 @@ import { finishRegularSeason } from '@/entities/league/model/seasonEnd'
 import { runCpuPostseason } from '@/entities/league/model/postseasonPlay'
 import { EMPTY_LEAGUE, advancePostseason, opponentOf, recordLeagueResult } from '@/entities/league/model/league'
 import { playLeagueDay } from '@/entities/league/model/leagueDay'
+import {
+  EMPTY_LEAGUE_PLAYER_STATS,
+  recordLeaguePlateAppearances,
+} from '@/entities/league/model/leaguePlayerStats'
+import type { LeaguePlayerStats } from '@/entities/league/model/leaguePlayerStats'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
 import {
@@ -149,6 +154,12 @@ export interface PlayerCareer {
   readonly openedHiddenIds: readonly number[]
   /** 리그 전적 (0xb76dc·0xb77e0). 지금은 내 팀 경기만 쌓인다 — 다른 팀 경기는 원본 간이 시뮬레이터를 옮길 때 채운다 */
   readonly league: League
+  /**
+   * 리그 선수 개인 시즌 성적 (타석 기록 0xa8024). 사람 경기와 CPU 끼리 경기가 **같은 표**에 쌓는다.
+   * 개인 타이틀 순위표 0x9d789 · MVP · 연봉협상 등급 k 가 전부 이 표를 본다 (B-2·B-3·B-5).
+   * 새 시즌에 0 으로 돌아간다 (0x204e0 — `startNextSeason`).
+   */
+  readonly leaguePlayerStats: LeaguePlayerStats
   /** 정규시즌 1위 횟수 — 원본 세이브 레코드 +0x7a (0xb818c 가 45경기째에 늘린다) */
   readonly regularSeasonFirstCount: number
   /** 진행 중인 포스트시즌. 정규시즌 중에는 null 이다 (0xb80a8 이 45경기째에 연다) */
@@ -289,6 +300,7 @@ export function createCareer(name: string, profile: RookieProfile = DEFAULT_ROOK
     ownedEquipment: [],
     openedHiddenIds: [],
     league: EMPTY_LEAGUE,
+    leaguePlayerStats: EMPTY_LEAGUE_PLAYER_STATS,
     regularSeasonFirstCount: 0,
     postseason: null,
     lotteryPurchases: 0,
@@ -471,6 +483,14 @@ export function applyGameResult(career: PlayerCareer, summary: GameSummary): Pla
     eagleEyeGamesRemaining: Math.max(0, career.eagleEyeGamesRemaining - 1),
     stats: mergeStats(career.stats, playedStats),
     careerStats: mergeStats(career.careerStats, playedStats),
+    // 사람 경기도 원본은 **같은 기록 함수 0xa8024** 를 부른다 — 동료 여덟 타순과 상대 팀 타석이
+    // CPU 끼리 경기와 한 표에 쌓인다 (B-2). 내 선수만 빠져 있는데, 내 성적은 `stats` 가 이미
+    // 세고 있어 두 번 세지 않으려는 것이다 (순위표를 만들 때 `myLeagueRecordOf` 로 끼워 넣는다).
+    // 미션·홈런더비처럼 리그 밖 경기는 이 칸을 주지 않으므로 그때는 표가 그대로다.
+    leaguePlayerStats: recordLeaguePlateAppearances(
+      career.leaguePlayerStats,
+      summary.leaguePlateAppearances ?? [],
+    ),
     // 무승부는 원본도 승·패 어디에도 넣지 않는다.
     // **포스트시즌 중에는 정규시즌 전적을 건드리지 않는다** — 0xb76dc 가 포스트시즌 플래그로 갈라져
     // 시리즈 승수만 깎는다. 그래서 45경기 뒤에 치른 경기가 순위표에 더 쌓이지 않는다.
@@ -502,7 +522,10 @@ export function applyGameResult(career: PlayerCareer, summary: GameSummary): Pla
  * `applyGameResult` 뒤에 부르는 것을 전제로 `gamesPlayed − 1` 을 일차로 쓴다.
  */
 export function applyLeagueDay(career: PlayerCareer, myTeamId: number, random: RandomPort): PlayerCareer {
-  return { ...career, league: playLeagueDay(career.league, Math.max(0, career.gamesPlayed - 1), myTeamId, random) }
+  const day = Math.max(0, career.gamesPlayed - 1)
+  // 원본 0xc2a48 은 승패만이 아니라 **선수별 타석 기록(0xa8024)도** 남긴다 — 둘 다 받아 넣는다
+  const played = playLeagueDay(career.league, day, myTeamId, random, career.leaguePlayerStats)
+  return { ...career, league: played.league, leaguePlayerStats: played.playerStats }
 }
 
 /**
@@ -591,9 +614,10 @@ export function startNextSeason(career: PlayerCareer): PlayerCareer {
     stats: EMPTY_SEASON_STATS,
     // 리그를 새로 깐다 — `0xa39ae` 가 리그 객체(S+0x80)를 초기화하고, 뒤이어 `0x204e0(저장, 편, 0)`
     // 이 **리그 전 선수의 시즌 성적**을 0 으로 되돌린다(팀 레코드·능력치·사기는 그대로 둔다).
-    // 웹판은 리그 선수 명단이 `shared/config` 의 붙박이 표라 개인 시즌 성적을 들고 있지 않다 —
-    // 옮길 수 있는 것은 순위표와 포스트시즌 대진뿐이라 그 둘만 비운다.
+    // 웹판은 로스터가 붙박이 표라 성적만 따로 `leaguePlayerStats` 에 담는다 — 그 표가 0x204e0 이
+    // 지우는 칸에 해당하므로 여기서 함께 비운다.
     league: EMPTY_LEAGUE,
+    leaguePlayerStats: EMPTY_LEAGUE_PLAYER_STATS,
     postseason: null,
     wins: 0,
     draws: 0,

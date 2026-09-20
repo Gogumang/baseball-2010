@@ -68,4 +68,21 @@ describe('simulateHalfInning — 3아웃까지 원본 타석 엔진을 돌린다
     expect(받은타순[0]).toBe(7)
     expect(받은타순[1]).toBe(8)
   })
+
+  /**
+   * 원본은 간이 엔진이 끝낸 타석도 사람 경기와 같은 기록 함수 0xa8024 로 흘려보낸다 (B-2).
+   * **판정은 그대로 두고 결과만 내보내는 것**이라, 같은 씨앗의 점수는 전과 같아야 한다.
+   */
+  it('타석 결과를 타순과 함께 내준다 — 점수 합과 타점 합이 맞는다', () => {
+    const result = simulateHalfInning(3, () => 타자(700), 투수(300), 1, 씨앗난수(123))
+    const 타순들 = result.plateAppearances.map((appearance) => appearance.battingOrderIndex)
+
+    // 첫 타자는 이어받은 자리, 그 뒤로 하나씩 올라간다
+    expect(타순들[0]).toBe(3)
+    expect(타순들).toEqual(타순들.map((_unused, index) => 3 + index))
+    // 마지막 타석 다음이 다음 이닝의 시작 타순이다
+    expect(result.nextBattingOrderIndex).toBe(3 + result.plateAppearances.length)
+    // 타점 합 = 이닝 득점 (3아웃으로 지워진 득점은 양쪽 모두에서 빠진다)
+    expect(result.plateAppearances.reduce((sum, at) => sum + at.runsBattedIn, 0)).toBe(result.runs)
+  })
 })

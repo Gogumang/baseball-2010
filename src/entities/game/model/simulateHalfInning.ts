@@ -10,6 +10,7 @@ import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { strikeoutRecordIdsOf, threePitchInningRecordIdsOf } from '@/entities/game/model/gameRecords'
+import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 
 /**
  * 연출 없는 반 이닝 (원본 0xc2a48 이 하루치 다른 팀 경기를 돌릴 때 쓰는 길).
@@ -20,10 +21,27 @@ const OUTS_PER_INNING = 3
 /** 한 이닝이 끝나지 않는 일은 없지만, 판정이 한쪽으로 쏠릴 때를 대비한 안전망 (원본에는 없다) */
 const MAXIMUM_BATTERS = 100
 
+/**
+ * 타석 하나의 결과 — 어느 타순이 무엇을 쳤고 그 플레이로 몇 점이 들어왔는가.
+ *
+ * 원본은 간이 엔진이 끝낸 타석도 사람 경기와 **같은 기록 함수 0xa8024** 로 흘려보내
+ * 선수 레코드에 타수·안타·홈런·타점을 쌓는다 (B-season-awards.md B-2). 웹은 그 결과를
+ * 여기까지만 내보내고, 누구의 레코드에 넣을지는 부르는 쪽(`leagueDay`·`gameFlow`)이 정한다.
+ */
+export interface HalfInningPlateAppearance {
+  /** `batterAt` 에 넘긴 타순 커서 그대로 — 로스터 칸은 부르는 쪽이 나머지로 구한다 */
+  readonly battingOrderIndex: number
+  readonly outcome: AtBatOutcome
+  /** 이 플레이로 실제로 들어온 점수 (+0x2a 타점). 3아웃으로 지워진 득점은 빠진다 */
+  readonly runsBattedIn: number
+}
+
 export interface HalfInningResult {
   readonly runs: number
   /** 다음 이닝이 이어받을 타순 */
   readonly nextBattingOrderIndex: number
+  /** 이 이닝에 나온 타석 결과 (0xa8024 가 선수 레코드에 쌓는 재료) */
+  readonly plateAppearances: readonly HalfInningPlateAppearance[]
   /** 이 이닝에 맞은 안타 수 — 완투 계열 기록(0xa7de8)이 state+0x89 로 센다 */
   readonly hits: number
   /** 이 이닝에 내준 볼넷 수 — state+0x88 (투구 판정 0xc1818 에서 나온다) */
@@ -67,6 +85,7 @@ export function simulateHalfInning(
   let combo = before.strikeoutCombo
   let order = battingOrderIndex
   const recordIds: number[] = []
+  const plateAppearances: HalfInningPlateAppearance[] = []
 
   for (let faced = 0; faced < MAXIMUM_BATTERS && outs < OUTS_PER_INNING; faced += 1) {
     const play = playQuickAtBat(batterAt(order), pitcher, { inning }, random)
@@ -101,7 +120,10 @@ export function simulateHalfInning(
     }
     outs += advanced.outsAdded
     // 3아웃이 되는 순간 들어오던 주자는 득점으로 치지 않는다
-    runs += outs >= OUTS_PER_INNING && advanced.outsAdded > 0 ? 0 : advanced.runsScored
+    const scored = outs >= OUTS_PER_INNING && advanced.outsAdded > 0 ? 0 : advanced.runsScored
+    runs += scored
+    // 판정은 그대로 두고 **결과만 내보낸다** — 원본이 0xa8024 로 흘려보내는 자리다
+    plateAppearances.push({ battingOrderIndex: order, outcome, runsBattedIn: scored })
     order += 1
   }
 
@@ -110,6 +132,7 @@ export function simulateHalfInning(
   return {
     runs,
     nextBattingOrderIndex: order,
+    plateAppearances,
     hits,
     walks,
     outs,
