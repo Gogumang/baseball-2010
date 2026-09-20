@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { Screen } from '@/app/model/screen'
-import { MessageBox } from '@/shared/ui'
+import { MessageBox, RawScreen } from '@/shared/ui'
 import { HomeRunDerbyScreen } from '@/pages/home-run-derby/ui/HomeRunDerbyScreen'
 import { effectiveAbilityOf } from '@/entities/career/model/condition'
 import { createLocalStorageJsonStore } from '@/shared/api/save/localStorageJsonStore'
@@ -63,6 +63,22 @@ export function EntryRoutes({ screen, setScreen, session, gameSettings, collecti
     )
   }
 
+  /**
+   * 나만의리그 편 고르기 — ⚠️ **웹판 임시** (screen.ts 의 '나리편선택' 주석 참고).
+   * 원본은 모드 3 투수편 / 4 타자편을 따로 저장하는데 편을 고르는 자리를 아직 못 찾았다.
+   */
+  if (screen.kind === '나리편선택') {
+    return (
+      <RawScreen>
+        <MessageBox
+          text="!C나만의 리그!N어느 편으로 시작할까요?"
+          buttons={['타자편', '투수편']}
+          onAnswer={(index) => setScreen(index === 0 ? { kind: '팀선택' } : { kind: '투수편' })}
+        />
+      </RawScreen>
+    )
+  }
+
   // 원본 흐름은 0x65 팀 고르기 → 0x66 등록 → 0x67 확인이다 (C-6)
   if (screen.kind === '팀선택') {
     return (
@@ -121,7 +137,7 @@ export function EntryRoutes({ screen, setScreen, session, gameSettings, collecti
     <MainMenuScreen
       hasSavedGame={session.savedCareer !== null}
       onContinue={session.actions.continueSaved}
-      onNewGame={() => setScreen({ kind: '팀선택' })}
+      onNewGame={() => setScreen({ kind: '나리편선택' })}
       onSelectMode={(mode) => {
         // 시즌모드는 팀을 맡는 모드라 육성 선수가 없어도 들어간다 (원본 장면 0x105)
         if (mode === '시즌모드') return setScreen({ kind: '시즌모드' })
