@@ -14,16 +14,12 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 
 /**
- * 능력치 → 등급 0~7 (0xbbe98).
- * 원본은 수비·주루·투구 어디서나 이 한 함수를 쓴다.
- * (아직 `entities/fielding` 이 없어 여기 둔다 — 그쪽이 생기면 합치는 게 맞다.)
+ * 능력치 → 등급 0~7 (0xbbe98) — 원본은 수비·주루·투구 어디서나 이 한 함수를 쓴다.
+ * 수비 모델 쪽 것을 그대로 다시 내보낸다(한 벌만 두려고).
  */
-const GRADE_THRESHOLDS: readonly number[] = [125, 250, 375, 525, 675, 825, 925]
+import { abilityGradeOf } from '@/entities/fielding/model/fieldGeometry'
 
-export function abilityGradeOf(ability: number): number {
-  const found = GRADE_THRESHOLDS.findIndex((threshold) => ability <= threshold)
-  return found === -1 ? 7 : found
-}
+export { abilityGradeOf }
 
 /** 표 0xd25b0 — 필살수비 확률(등급별, ×10 하면 1000 분율) */
 export const SPECIAL_DEFENSE_TABLE: readonly number[] = [1, 2, 3, 3, 4, 4, 5, 6]

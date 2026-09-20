@@ -76,9 +76,19 @@ export function isForcedRunner(play: PlayView, runners: readonly RunnerState[], 
   return runner.targetBase === previous.startBase
 }
 
+/**
+ * 원본 난이도는 **옵션 `+0x2c` 에 2(hard) 로 박혀 있고 뒤로 바꾸는 곳이 없다**
+ * (P7 K2 · L 요약 확정 · DECISIONS 2026-09-20 ②). 그래서 환경설정 화면에도 난이도 줄이 없다.
+ * 값을 넣지 않으면 이 기본값을 쓴다.
+ */
+export const ORIGINAL_DIFFICULTY = 2
+
 export interface ThrowTargetInput extends DefenseContext {
-  /** 제어기 +0x10 전역 설정 +6 바이트. 0~1 이면 점수식, 3 이상이면 늘 "여유 최대" 규칙 */
-  readonly difficulty: number
+  /**
+   * 제어기 +0x10 전역 설정 +6 바이트. 0~1 이면 점수식, 3 이상이면 늘 "여유 최대" 규칙.
+   * 원본은 늘 `ORIGINAL_DIFFICULTY`(2) 다 — 안 넣으면 그 값을 쓴다.
+   */
+  readonly difficulty?: number
   /** 0xa990c(주자관리) = 살아 있는 주자 수. 0 이고 내야수가 잡았으면 안 던진다 */
   readonly activeRunnerCount: number
 }
@@ -280,7 +290,7 @@ export function describeThrowTarget(input: ThrowTargetInput): ThrowTargetDebug {
       scoreA[base][other] = termA + termC
       scoreB[base][other] = 2 * termB + termD + SCORE_FLOOR
     }
-    if (input.difficulty + effective > 2) sure = true
+    if ((input.difficulty ?? ORIGINAL_DIFFICULTY) + effective > 2) sure = true
   }
 
   // ── 고르기 (3-4) ──
