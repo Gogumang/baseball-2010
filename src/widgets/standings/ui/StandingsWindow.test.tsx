@@ -8,6 +8,7 @@ import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
 import type { GameSummary } from '@/entities/game/model/gameSummary'
 import type { GameResult } from '@/entities/game/model/gameState'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
+import { EMPTY_REPUTATION_COUNTS } from '@/entities/career/model/gameEvaluation'
 
 /**
  * 기록실 순위표가 `career.league` 를 그대로 그리는지 본다.
@@ -94,6 +95,7 @@ function summaryOf(result: GameResult, opponentTeamId: number): GameSummary {
     popularityPoints: 0,
     doublePlays: 0,
     scoringPositionOuts: 0,
+    reputationCounts: EMPTY_REPUTATION_COUNTS,
     ourTeamId: OUR_TEAM,
     opponentTeamId,
     recordIds: [],

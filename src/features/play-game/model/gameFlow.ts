@@ -19,7 +19,8 @@ import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
 import type { SeasonStats } from '@/entities/career/model/seasonStats'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { advanceRunners } from '@/entities/game/model/baseState'
-import { atBatPenaltyCounts, atBatPopularityPoints } from '@/entities/career/model/gameEvaluation'
+import { atBatPenaltyCounts, atBatPopularityPoints, EMPTY_REPUTATION_COUNTS } from '@/entities/career/model/gameEvaluation'
+import type { ReputationCounts } from '@/entities/career/model/gameEvaluation'
 import { completeGameRecordIdsOf, gameEndRecordIdsOf } from '@/entities/game/model/gameRecords'
 import { EMPTY_BATTER_GAME_LOG, recordBatterAtBat } from '@/entities/game/model/batterGameLog'
 import type { BatterGameLog } from '@/entities/game/model/batterGameLog'
@@ -45,6 +46,8 @@ export interface GameProgress {
   /** 사용자가 친 병살 수 · 득점권 주자를 두고 아웃된 타석 수 — 경기 후 평판 입력 */
   readonly doublePlays: number
   readonly scoringPositionOuts: number
+  /** 평판 가산 칸 누계 (0xa57f8) */
+  readonly reputationCounts: ReputationCounts
   /** 사용자 최근 두 타석의 기록 코드 — 스킬 16·17 조건 (0x53100) */
   readonly recentAtBatCodes: readonly number[]
   /** 이 경기에서 달성한 기록 id (한 번 달성할 때마다 하나씩, 0xa77f0) */
@@ -109,6 +112,7 @@ export function startGame(
     popularityPoints: 0,
     doublePlays: 0,
     scoringPositionOuts: 0,
+    reputationCounts: EMPTY_REPUTATION_COUNTS,
     recentAtBatCodes: [],
     recordIds: [],
     consecutiveHits: 0,
@@ -162,6 +166,13 @@ export function applyPlayerOutcome(
       recentAtBatCodes: [...progress.recentAtBatCodes, atBatRecordCodeOf(outcome)].slice(-RECENT_AT_BAT_COUNT),
       doublePlays: progress.doublePlays + penalties.doublePlays,
       scoringPositionOuts: progress.scoringPositionOuts + penalties.scoringPositionOuts,
+      reputationCounts: addReputationCounts(progress.reputationCounts, {
+        outcome,
+        runsBattedIn,
+        isWalkOff,
+        ourScoreBefore: progress.game.ourScore,
+        opponentScore: progress.game.opponentScore,
+      }),
     },
     `${progress.game.inning}회말 나 — ${describeOutcome(outcome)}${
       runsBattedIn > 0 ? ` (${runsBattedIn}타점)` : ''
@@ -171,6 +182,46 @@ export function applyPlayerOutcome(
 
   return advanceUntilPlayerTurn(afterMyAtBat, random)
 }
+
+/**
+ * 평판 가산 칸 누계 (0xa57f8 의 사건 코드, P7 B1·B2 확정).
+ *
+ * 역전·동점 득점은 원본이 **득점 처리 0xa5c34 에서 1점마다** 판정한다. 그 함수는 점수를 올리기 직전에
+ * `L[측] = 올리기 전 내 점수` 를 적어 두고(0xb6a9c), 올린 뒤 아래를 본다:
+ *   - 동점 득점 (G+0x110): `상대 점수 == 내 점수`
+ *   - 역전 득점 (G+0x114): `L(상대) >= L(나) && 상대 점수 < 내 점수` → 정수라 `상대 점수 == 올리기 전 내 점수`
+ * 타석 하나로 r 점이 들어오면 내 점수가 `before+1 … before+r` 로 차례로 오르므로, 그 구간에
+ * 상대 점수가 걸리는지만 보면 같은 결과가 된다.
+ *
+ * 번트 안타(G+0xf4)는 웹에 번트가 없어 늘 0 이다.
+ */
+function addReputationCounts(
+  counts: ReputationCounts,
+  play: {
+    outcome: AtBatOutcome
+    runsBattedIn: number
+    isWalkOff: boolean
+    ourScoreBefore: number
+    opponentScore: number
+  },
+): ReputationCounts {
+  const { outcome, runsBattedIn, isWalkOff, ourScoreBefore, opponentScore } = play
+  const isHit = outcome.kind === '안타' || outcome.kind === '홈런'
+  const after = ourScoreBefore + runsBattedIn
+  return {
+    grandSlams: counts.grandSlams + (outcome.kind === '홈런' && runsBattedIn === GRAND_SLAM_RUNS ? 1 : 0),
+    walkOffs: counts.walkOffs + (isWalkOff && isHit ? 1 : 0),
+    buntHits: counts.buntHits,
+    walks: counts.walks + (outcome.kind === '볼넷' ? 1 : 0),
+    goAheadRuns:
+      counts.goAheadRuns + (opponentScore >= ourScoreBefore && opponentScore <= after - 1 ? 1 : 0),
+    tyingRuns:
+      counts.tyingRuns + (opponentScore > ourScoreBefore && opponentScore <= after ? 1 : 0),
+  }
+}
+
+/** 만루 홈런 — 그 플레이 득점이 4 점 (0xa8696) */
+const GRAND_SLAM_RUNS = 4
 
 /** 상대 공격과 동료 타석을 플레이어 차례가 돌아올 때까지 자동으로 소화한다. */
 function advanceUntilPlayerTurn(
@@ -289,6 +340,7 @@ export function summaryOf(progress: GameProgress): GameSummary {
     ],
     doublePlays: progress.doublePlays,
     scoringPositionOuts: progress.scoringPositionOuts,
+    reputationCounts: progress.reputationCounts,
     ourTeamId: progress.ourTeamId,
     opponentTeamId: progress.opponentTeamId,
   }

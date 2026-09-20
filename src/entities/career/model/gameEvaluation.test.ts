@@ -129,15 +129,39 @@ describe('evaluateGame — 경기 뒤 인기도·평판·사기 (0xa719c)', () =
     expect(evaluateGame(선수(), 경기({ result: '패', popularityPoints: 8 })).moraleChange).toBe(-7 + 2)
   })
 
-  it('무안타면 평판 −5, 병살 2개 이상 −2, 득점권 아웃이 있으면 −1', () => {
-    expect(evaluateGame(선수(), 경기({ stats: 기록(), doublePlays: 2, scoringPositionOuts: 1 })).reputationChange).toBe(-5 - 2 - 1)
+  it('무안타 −5 · 병살 2개 초과 −2 · 득점권 아웃 −1 에 구간 보정이 붙는다', () => {
+    // 신인 평판 300 → 구간 i=2 → 감산 −50% 라 −8 이 −4 로 줄어든다
+    expect(evaluateGame(선수(), 경기({ stats: 기록(), doublePlays: 2, scoringPositionOuts: 1 })).reputationChange).toBe(-4)
   })
 
-  it('평판은 인기도 변화·안타·홈런 합계로 오른다', () => {
+  it('가산에도 구간 보정이 붙는다 — 평판이 낮을수록 크게 오른다', () => {
     const evaluation = evaluateGame(선수(), 경기({ stats: 기록({ hits: 2, homeRuns: 1 }), popularityPoints: 8 }))
 
     expect(evaluation.popularityChange).toBe(5)
-    expect(evaluation.reputationChange).toBe(3 + 2 + 2)
+    // 인기도 +3 · 안타 +2 · 홈런 +2 = 7 → 구간 i=2 가산 +50% → 10
+    expect(evaluation.reputationChange).toBe(10)
+  })
+
+  it('평판이 높을수록 덜 오르고 더 깎인다 (0xd82a0 / 0xd82c8)', () => {
+    const 고평판 = 선수({ reputation: 900 })  // i = 8 → 가산 −15% · 감산 +20%
+    const 올림 = evaluateGame(고평판, 경기({ stats: 기록({ hits: 2, homeRuns: 1 }), popularityPoints: 8 }))
+    expect(올림.reputationChange).toBe(7 - 1)
+
+    const 내림 = evaluateGame(고평판, 경기({ stats: 기록(), doublePlays: 2, scoringPositionOuts: 1 }))
+    expect(내림.reputationChange).toBe(-8 - 1)
+  })
+
+  it('만루홈런 +2 · 끝내기 +3 · 볼넷 2개 +1 · 동점/역전 득점 +2 칸이 붙는다 (P7 B1)', () => {
+    const 기본 = evaluateGame(선수(), 경기({ stats: 기록({ hits: 1 }) })).reputationChange
+    const 더함 = evaluateGame(
+      선수(),
+      경기({
+        stats: 기록({ hits: 1 }),
+        reputationCounts: { grandSlams: 1, walkOffs: 1, buntHits: 0, walks: 2, goAheadRuns: 1, tyingRuns: 0 },
+      }),
+    ).reputationChange
+
+    expect(더함).toBeGreaterThan(기본)
   })
 })
 

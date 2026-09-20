@@ -112,19 +112,88 @@ export function popularityChangeOf(points: number, stats: SeasonStats): number {
 const HITLESS_REPUTATION = -5
 const DOUBLE_PLAY_REPUTATION = -2
 const SCORING_POSITION_OUT_REPUTATION = -1
+const STRIKEOUT_REPUTATION = -2
 
 /**
- * 평판 변화 (0xa6218) — 인기도 변화 3~6, 안타 합계, 홈런 합계, 사이클, 무안타 −5,
- * 병살 2개 이상 −2, 득점권 아웃 −1. 뜻을 모르는 나머지 항목은 빠져 있다.
+ * 평판 가산 칸 (0xa57f8 의 사건 코드 → G+오프셋, P7 B1·B2 확정).
+ * 웹이 아직 만들지 않은 사건(번트 안타)은 늘 0 이다.
  */
-function reputationChangeOf(popularityChange: number, game: GameEvaluationInput): number {
+export interface ReputationCounts {
+  /** G+0xc8 — 만루 홈런 (+2) */
+  readonly grandSlams: number
+  /** G+0xc4 — 끝내기 안타·홈런 (+3) */
+  readonly walkOffs: number
+  /** G+0xf4 — 번트 안타 (+1). 웹에는 번트가 없어 늘 0 이다 */
+  readonly buntHits: number
+  /** G+0xfc — 볼넷 (2개 이상이면 +1) */
+  readonly walks: number
+  /** G+0x114 — 앞서가는(역전) 득점 (+2) */
+  readonly goAheadRuns: number
+  /** G+0x110 — 동점 득점 (+2) */
+  readonly tyingRuns: number
+}
+
+export const EMPTY_REPUTATION_COUNTS: ReputationCounts = {
+  grandSlams: 0, walkOffs: 0, buntHits: 0, walks: 0, goAheadRuns: 0, tyingRuns: 0,
+}
+
+/** 평판 구간 보정 — 가산 쪽 0xd82a0 (%) */
+const REPUTATION_GAIN_TIERS = [90, 70, 50, 20, 10, 0, -5, -10, -15, -20]
+/** 평판 구간 보정 — 감산 쪽 0xd82c8 (%) */
+const REPUTATION_LOSS_TIERS = [-90, -70, -50, -30, -10, 0, 5, 10, 20, 30]
+
+/**
+ * 평판 변화 (0xa6218, B-10 확정).
+ *
+ * ```
+ * 가산 r7 = 인기도변화 3→1,4→2,5→3,6→4
+ *         + 안타수 1→1,2→2,3→3,>3→4
+ *         + 홈런수 1→2,2~3→3,>3→4
+ *         + (만루홈런 ? 2) + (사이클 ? 3) + (볼넷>1 ? 1) + (동점득점 ? 2)
+ *         + (역전득점 ? 2) + (끝내기 ? 3) + (번트안타 ? 1)
+ * 감산 m  = (무안타 ? −5) + (병살>1 ? −2) + (삼진>1 ? −2) + (득점권아웃 ? −1)
+ * i  = (평판 − 1) / 100                                  ; 0 쪽 버림
+ * 변화 = (r7 + trunc(r7·T1[i]/100)) + (m − trunc(|m|·T2[i]/100))
+ * ```
+ *
+ * 앞서 웹은 **구간 보정 T1/T2 가 통째로 빠져 있었고** 칸 7개(만루홈런·끝내기·번트안타·
+ * 볼넷·역전·동점·삼진)도 없었다. 평판이 낮을수록 가산이 크게 부풀고(최대 +90%),
+ * 높을수록 깎이는(−20%) 구조라 없으면 성장 곡선이 통째로 달라진다.
+ */
+function reputationChangeOf(
+  popularityChange: number,
+  game: GameEvaluationInput,
+  reputation: number,
+): number {
   const { stats } = game
+  const counts = game.reputationCounts ?? EMPTY_REPUTATION_COUNTS
+
   const fromPopularity = popularityChange >= 3 ? popularityChange - 2 : 0
-  const fromHits = stats.hits === 0 ? HITLESS_REPUTATION : Math.min(stats.hits, 4)
+  const fromHits = stats.hits === 0 ? 0 : Math.min(stats.hits, 4)
   const fromHomeRuns = stats.homeRuns === 0 ? 0 : stats.homeRuns === 1 ? 2 : stats.homeRuns <= 3 ? 3 : 4
-  const fromDoublePlays = game.doublePlays >= DOUBLE_PLAY_OUTS ? DOUBLE_PLAY_REPUTATION : 0
-  const fromScoringPosition = game.scoringPositionOuts > 0 ? SCORING_POSITION_OUT_REPUTATION : 0
-  return fromPopularity + fromHits + fromHomeRuns + (isCycle(stats) ? 3 : 0) + fromDoublePlays + fromScoringPosition
+  const gain =
+    fromPopularity + fromHits + fromHomeRuns +
+    (counts.grandSlams > 0 ? 2 : 0) +
+    (isCycle(stats) ? 3 : 0) +
+    (counts.walks > 1 ? 1 : 0) +
+    (counts.tyingRuns > 0 ? 2 : 0) +
+    (counts.goAheadRuns > 0 ? 2 : 0) +
+    (counts.walkOffs > 0 ? 3 : 0) +
+    (counts.buntHits > 0 ? 1 : 0)
+
+  const loss =
+    (stats.hits === 0 ? HITLESS_REPUTATION : 0) +
+    (game.doublePlays > 1 ? DOUBLE_PLAY_REPUTATION : 0) +
+    (stats.strikeouts > 1 ? STRIKEOUT_REPUTATION : 0) +
+    (game.scoringPositionOuts > 0 ? SCORING_POSITION_OUT_REPUTATION : 0)
+
+  const tier = Math.min(
+    REPUTATION_GAIN_TIERS.length - 1,
+    Math.max(0, Math.trunc((reputation - 1) / 100)),
+  )
+  const adjustedGain = gain + Math.trunc((gain * REPUTATION_GAIN_TIERS[tier]) / 100)
+  const adjustedLoss = loss - Math.trunc((Math.abs(loss) * REPUTATION_LOSS_TIERS[tier]) / 100)
+  return adjustedGain + adjustedLoss
 }
 
 const WIN_MORALE = 5
@@ -177,6 +246,8 @@ export interface GameEvaluationInput {
   readonly scoringPositionOuts: number
   readonly ourTeamId: number
   readonly opponentTeamId: number
+  /** 평판 가산 칸 (0xa57f8). 없으면 전부 0 으로 본다 */
+  readonly reputationCounts?: ReputationCounts
 }
 
 export interface GameEvaluation {
@@ -190,7 +261,8 @@ export function evaluateGame(career: PlayerCareer, game: GameEvaluationInput): G
   const popularityChange = popularityChangeOf(game.popularityPoints, game.stats)
   return {
     popularityChange,
-    reputationChange: reputationChangeOf(popularityChange, game),
+    // 평판 구간 보정은 **경기 전 평판**으로 칸을 고른다 (0xa6218 이 먼저 읽는다)
+    reputationChange: reputationChangeOf(popularityChange, game, career.reputation),
     moraleChange: moraleChangeOf(career, game, popularityChange),
     commentIndex: managerCommentIndexOf(career, popularityChange),
   }
