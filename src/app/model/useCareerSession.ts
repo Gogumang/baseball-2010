@@ -24,6 +24,7 @@ import {
   gainGamePoint,
   countGameForSkills,
 } from '@/entities/career/model/playerCareer'
+import { applyBurstRewards } from '@/entities/career/model/burstReward'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { awardTitles, evaluateNewTitles } from '@/entities/career/model/titles'
 import { blockReasonOf, runTraining } from '@/entities/career/model/training'
@@ -242,6 +243,20 @@ export function useCareerSession({
 
   const actions = {
     syncOpenedHidden,
+
+    /**
+     * 돌발미션 결과 창을 닫았다 — 보상·페널티를 내 선수에게 얹고 판정을 치운다 (0x8e34c).
+     * 나만의리그는 붙을 곳이 내 선수 레코드(0x1fa2d)라 커리어에 바로 얹는다.
+     */
+    closeBurstResult: () => {
+      const current = progressRef.current
+      const resolution = current?.lastBurstResolution ?? null
+      if (current === null || resolution === null) return
+      const cleared = { ...current, lastBurstResolution: null }
+      progressRef.current = cleared
+      setProgress(cleared)
+      setCareer((player) => (player === null ? player : applyBurstRewards(player, resolution.deltas)))
+    },
     /**
      * 미션 클리어 보상 G (0xa52b0). 원본은 전역 저장 +0x64 에 쌓지만 웹은 커리어에 둔다 —
      * 육성 선수가 없으면 받아 갈 곳이 없어 그냥 버린다.

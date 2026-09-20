@@ -33,6 +33,9 @@ import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
+import type { BurstResolution, BurstSession } from '@/entities/burst-mission/model/burstMissionSession'
+import { createBurstSession, resolveBurst, tryTriggerBurst } from '@/entities/burst-mission/model/burstMissionSession'
+import { burstResultBitsOf } from '@/entities/burst-mission/model/burstResultBits'
 
 export interface GameLogEntry {
   readonly id: number
@@ -96,6 +99,16 @@ export interface GameProgress {
    * 수비 화면은 이것만 받아 그리면 된다 (라우팅은 앱 쪽 몫이라 여기서 연결하지 않는다).
    */
   readonly lastDefensePlay: DefensePlayResult | null
+  /**
+   * 이번 경기의 돌발미션 상태 (경기 장면이 모드 2·3·4 에서만 만드는 객체, 0x48658).
+   * `burst.current` 가 차 있으면 진행 중인 돌발이 있다 — 화면은 이것만 보고 창을 띄우면 된다.
+   */
+  readonly burst: BurstSession | null
+  /**
+   * 마지막 타석이 끝나며 난 돌발 판정. 보상 변화량이 들어 있고, 화면이 결과 창을 닫은 뒤
+   * 커리어에 얹는다 (`applyBurstRewards`). 판정이 안 났으면 null 이다.
+   */
+  readonly lastBurstResolution: BurstResolution | null
 }
 
 /**
@@ -155,6 +168,8 @@ export function startGame(
     log: [],
     nextLogId: 1,
     lastDefensePlay: null,
+    burst: createBurstSession(MY_LEAGUE_BATTER_MODE),
+    lastBurstResolution: null,
   }
   return advanceUntilPlayerTurn(initial, random)
 }
@@ -215,11 +230,31 @@ export function applyPlayerOutcome(
   const consecutiveHits = recorded.log.consecutiveHits
   const recordIds = recorded.recordIds
 
+  // 돌발 판정은 타석이 끝나는 자리에서 한다 (0x4e6d4 → 0x8f414). 결과비트가 0 이거나
+  // 목표 5번이면 판정이 나지 않고 돌발이 그대로 살아 다음 타석으로 넘어간다.
+  const resolution =
+    progress.burst === null
+      ? null
+      : resolveBurst(
+          progress.burst,
+          burstResultBitsOf({
+            outcome,
+            runsBattedIn,
+            outsBefore: progress.game.outs,
+            outsAdded: outsInPlay,
+            inningEnded: progress.game.outs + outsInPlay >= OUTS_PER_INNING,
+            humanTeamWalkOff: isWalkOff,
+            // 웹 타석에는 번트가 없어 B6·B7 은 늘 꺼져 있다
+          }),
+        )
+
   const afterMyAtBat: GameProgress = appendLog(
     {
       ...progress,
       game: nextGame,
       lastDefensePlay: defensePlay,
+      burst: resolution === null ? progress.burst : resolution.session,
+      lastBurstResolution: resolution !== null && resolution.judgement !== null ? resolution : null,
       myStats,
       consecutiveHits,
       recordIds: [...progress.recordIds, ...recordIds],
@@ -284,6 +319,47 @@ function addReputationCounts(
 /** 만루 홈런 — 그 플레이 득점이 4 점 (0xa8696) */
 const GRAND_SLAM_RUNS = 4
 
+/** 한 이닝 아웃 수 — 돌발 결과비트 B5 가 "이닝이 안 끝났는가" 를 볼 때 쓴다 */
+const OUTS_PER_INNING = 3
+
+/**
+ * 타석 준비에서 돌발미션 발동을 굴린다 (장면 상태 0xf → 0x8f158).
+ *
+ * **근사**: 원본은 경기 장면이 도는 **모든 타석** 준비에서 굴리지만, 웹은 동료·상대 타석을
+ * 간이 엔진으로 한 번에 넘겨 상태 0xf 를 지나지 않는다. 그래서 **사용자 타석에서만** 굴린다.
+ * 나만의리그 타자편 표(BATTER)의 목표가 모두 내 타석 결과라 뜻은 달라지지 않지만,
+ * 굴리는 횟수가 줄어 발동이 원본보다 드물다.
+ *
+ * 상대 타순 슬롯(team+0x32)·상대 마선수는 웹판이 아직 들고 있지 않다 —
+ * 클린업(b0=1)·마선수(b0=10~22) 조건 행은 그래서 지금은 걸리지 않는다.
+ */
+function triggerBurstForMyAtBat(progress: GameProgress, random: RandomPort): GameProgress {
+  const session = progress.burst
+  if (session === null) return progress
+
+  const ace = progress.aceOpponent
+  const next = tryTriggerBurst(
+    session,
+    {
+      isHumanTeamBatting: true,
+      bases: progress.game.bases,
+      outs: progress.game.outs,
+      // 원본 이닝은 0-기준이다 (game+0x6b) — 웹 `inning` 은 1-기준이라 하나 뺀다
+      inning: progress.game.inning - 1,
+      ourScore: progress.game.ourScore,
+      opponentScore: progress.game.opponentScore,
+      opponentBattingSlot: 0,
+      opponentAceBatterId: ace !== null && ace.role === '타자' ? ace.id : null,
+      opponentAcePitcherId: ace !== null && ace.role === '투수' ? ace.id : null,
+      hitsInGame: progress.myStats.hits,
+      homeRunsInGame: progress.myStats.homeRuns,
+      strikeoutsInGame: progress.pitching.strikeouts,
+    },
+    random,
+  )
+  return next === session ? progress : { ...progress, burst: next }
+}
+
 /** 상대 공격과 동료 타석을 플레이어 차례가 돌아올 때까지 자동으로 소화한다. */
 function advanceUntilPlayerTurn(
   progress: GameProgress,
@@ -292,7 +368,9 @@ function advanceUntilPlayerTurn(
   let current = progress
 
   for (let step = 0; step < MAXIMUM_AUTO_STEPS; step += 1) {
-    if (current.game.isFinished || isPlayerTurn(current.game)) return current
+    if (current.game.isFinished) return current
+    // 내 타석이 오면 그 자리가 곧 타석 준비(0xf)다 — 돌발을 굴리고 넘긴다
+    if (isPlayerTurn(current.game)) return triggerBurstForMyAtBat(current, random)
     // 우리가 공격하는 반 이닝은 측이 정한다 — '초' 고정이 아니다 (측 0 선공 · 측 1 후공)
     current = current.game.half === ourHalfOf(current.game)
       ? playTeammateAtBat(current, random)
