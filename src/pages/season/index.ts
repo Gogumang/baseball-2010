@@ -25,6 +25,40 @@ export type { SeasonGoalsScreenProps } from '@/pages/season/ui/SeasonGoalsScreen
 export { GameIncomeScreen } from '@/pages/season/ui/GameIncomeScreen'
 export type { GameIncomeScreenProps } from '@/pages/season/ui/GameIncomeScreen'
 
+export { SeasonTrainingScreen } from '@/pages/season/ui/SeasonTrainingScreen'
+export type { SeasonTrainingScreenProps } from '@/pages/season/ui/SeasonTrainingScreen'
+
+export { SeasonOutingScreen } from '@/pages/season/ui/SeasonOutingScreen'
+export type { SeasonOutingScreenProps } from '@/pages/season/ui/SeasonOutingScreen'
+
+export { SeasonItemMenuScreen } from '@/pages/season/ui/SeasonItemMenuScreen'
+export type { SeasonItemMenuScreenProps } from '@/pages/season/ui/SeasonItemMenuScreen'
+
+/** 트레이닝 칸·가드·굴림 표 (J 4-6) — 굴림·적용은 부르는 쪽이 한다 */
+export {
+  TEAM_ABILITY_LABELS, TRAINING_SLOTS, HELL_TRAINING_INDEX, HELL_TRAINING_GAME_POINT,
+  TRAINING_GUARD_CEILING, TRAINING_GAIN_RANGE, TRAINING_MORALE_LOSS_RANGE,
+  HELL_TRAINING_GAIN_RANGE, HELL_TRAINING_MORALE_LOSS_RANGE,
+  TRAINING_SUB_ITEM_GAIN, MASSAGER_MORALE_RELIEF, checkSeasonTraining,
+} from '@/widgets/season/lib/seasonTraining'
+export type {
+  TrainingSlot, TrainingRefusal, TrainingCheckInput, TrainingCheckResult,
+} from '@/widgets/season/lib/seasonTraining'
+
+/** 시즌 외출 5종의 표·가드 (P4 3절) — ⚠️ 나리 외출표와 섞어 쓰면 안 된다 */
+export {
+  SEASON_OUTING_PLACES, SEASON_OUTING_ACTIVITIES, SEASON_OUTING_COSTS,
+  SEASON_OUTING_REQUIRED_POPULARITY, SEASON_OUTING_EFFECTS, SEASON_OUTING_SUB_ITEMS,
+  checkSeasonOuting,
+} from '@/widgets/season/lib/seasonOuting'
+export type {
+  SeasonOutingPlace, SeasonOutingRefusal, SeasonOutingEffect, SeasonOutingCheckResult,
+} from '@/widgets/season/lib/seasonOuting'
+
+/** 아이템 메뉴 칸과 아이템 창 종류 `[win+0x1a4]` */
+export { SEASON_ITEM_MENU, ITEM_WINDOW_KIND } from '@/widgets/season/lib/seasonItemMenu'
+export type { SeasonItemMenuEntry, ItemWindowKind } from '@/widgets/season/lib/seasonItemMenu'
+
 /** 영입 목록을 만들 때 쓰는 입력 타입 (`widgets/season` 이 가진다) */
 export type {
   RecruitCandidate, RecruitListInput,
