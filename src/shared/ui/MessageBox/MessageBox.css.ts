@@ -3,14 +3,21 @@ import { ORIGINAL_COLORS } from '@/shared/config/design'
 import { theme } from '@/app/styles/theme.css'
 
 /**
- * 상자 높이 = 줄수×14 + 50 + (버튼 높이 + 10) (0x74ef4) — 한 줄이면 86.
- * 글은 y+20 에서 시작하고 버튼 윗변은 y+56 이다. 버튼이 바닥에서 18 떨어지는 셈인데
- * 그 18 이 어느 필드에서 오는지는 미해독이라 명세 합성 그림에 맞춘 값이다 (추정).
+ * 상자 크기 (0x74ef4, F-1 확정):
+ * ```
+ * h = 줄수×14 + 50 + 행수×버튼높이(15) + (행수−1)×10
+ * 상자 y = (320 − h) / 2
+ * 버튼 y = 상자y + h − 15 − (행수×15 + (행수−1)×10)
+ * ```
+ * 한 줄 예/아니오면 **h = 79**, 상자 y = 120, 글 y = 140, 버튼 윗변 y = 169 다.
+ * (20 + 14 + 15 + 15 + 15 = 79 — 아래 네 값이 그 구성이다.)
+ * 앞서 웹은 버튼 높이를 12 로 보고 h 가 86 이었다.
  */
 const TEXT_TOP = 20
-const TEXT_TO_BUTTONS = 22
-const BUTTONS_TO_BOTTOM = 18
-const BUTTON_HEIGHT = 12
+const TEXT_TO_BUTTONS = 15
+const BUTTONS_TO_BOTTOM = 15
+/** 버튼 그림 `ui/popup.pzx` 는 41×15 다 */
+const BUTTON_HEIGHT = 15
 /** 글 줄 간격 14 (0x74664) */
 const LINE_HEIGHT = 14
 const FONT_SIZE = 11
