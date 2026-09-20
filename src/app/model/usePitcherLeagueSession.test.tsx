@@ -19,7 +19,7 @@ function 메모리저장(): JsonStorePort {
 }
 
 const 신인 = {
-  role: PITCHER_ROLE.선발,
+  role: PITCHER_ROLE.starter,
   typeIndex: 0,
   handIndex: 0,
   skinIndex: 0,
@@ -67,7 +67,7 @@ describe('투수편 세션', () => {
 
     expect(result.current.scene).toBe('경기')
     expect(result.current.gameOptions?.ourTeamId).toBe(3)
-    expect(result.current.gameOptions?.role).toBe(PITCHER_ROLE.선발)
+    expect(result.current.gameOptions?.role).toBe(PITCHER_ROLE.starter)
     // 환경설정 "투구 게이지" — 원본 기본값은 꺼짐이다 (K 5-2)
     expect(result.current.gameOptions?.gaugeSettingOn).toBe(false)
   })
