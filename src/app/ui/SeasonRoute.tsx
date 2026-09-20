@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
 import {
-  GameIncomeScreen, PlayerRecruitScreen, SeasonGoalsScreen, SeasonManagementScreen,
-  SeasonTeamMenuScreen, StadiumShopScreen,
+  GameIncomeScreen, PlayerRecruitScreen, SeasonGoalsScreen, SeasonItemMenuScreen,
+  SeasonManagementScreen, SeasonOutingScreen, SeasonTeamMenuScreen, SeasonTrainingScreen,
+  StadiumShopScreen,
 } from '@/pages/season'
 import { TeamSelectScreen } from '@/pages/create-player/ui/TeamSelectScreen'
 import { MessageBox, RawScreen } from '@/shared/ui'
@@ -95,6 +96,39 @@ export function SeasonRoute({ session, random, onExit }: SeasonRouteProps) {
           backToTeamMenu()
         }}
         onBack={backToTeamMenu}
+      />
+    )
+  }
+
+  if (scene === SEASON_SCENE_STATE.트레이닝) {
+    return (
+      <SeasonTrainingScreen
+        state={state}
+        // G 포인트는 전역 저장(+0x64) 칸이라 시즌 레코드에 없다 — 웹은 아직 시즌 쪽 G 를 안 들고 있어 0 이다
+        gamePoints={0}
+        onTrain={(_slot, index) => actions.runTraining(index)}
+        onBack={backToManagement}
+      />
+    )
+  }
+
+  if (scene === SEASON_SCENE_STATE.외출지도) {
+    return (
+      <SeasonOutingScreen
+        state={state}
+        outingSubItems={state.record.outingSubItems}
+        onRun={(_place, index) => actions.runOuting(index)}
+        onBack={backToManagement}
+      />
+    )
+  }
+
+  if (scene === SEASON_SCENE_STATE.아이템) {
+    return (
+      <SeasonItemMenuScreen
+        state={state}
+        onSelect={(_item, target) => actions.goto(target)}
+        onBack={backToManagement}
       />
     )
   }

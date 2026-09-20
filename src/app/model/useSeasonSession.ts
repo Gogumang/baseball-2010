@@ -26,6 +26,14 @@ import { advanceNationalCupDay, playCpuNationalCupGame } from '@/entities/nation
 import { isSeasonNationalCupYear } from '@/entities/national-cup/model/nationalCupFlow'
 import type { NationalCupFinish } from '@/entities/national-cup/model/nationalCupFlow'
 import { applySeasonReward } from '@/entities/season-mode/model/seasonRewards'
+import {
+  HELL_TRAINING_GAIN_RANGE, HELL_TRAINING_INDEX, HELL_TRAINING_MORALE_LOSS_RANGE,
+  MASSAGER_MORALE_RELIEF, TRAINING_APPLY_LIMIT, TRAINING_GAIN_RANGE,
+  TRAINING_MORALE_LOSS_RANGE, TRAINING_SUB_ITEM_GAIN,
+} from '@/widgets/season/lib/seasonTraining'
+import { SEASON_OUTING_EFFECTS } from '@/widgets/season/lib/seasonOuting'
+import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
+import { MORALE_LIMIT, POPULARITY_LIMIT, REPUTATION_LIMIT, MONEY_LIMIT, clampTo } from '@/entities/season-mode/model/seasonRecord'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
@@ -62,6 +70,10 @@ export interface SeasonActions {
   /** 국가대항전 한 경기 — ⚠️ 웹판 임시 자동 진행 (팀 경기 화면이 없다) */
   readonly playCupGame: (myTeam: number, opponent: number, cup: NationalCup) => void
   readonly finishCup: (finish: NationalCupFinish) => void
+  /** 팀 트레이닝 한 번 — 굴리고 적용한다 (연출 0xde → 굴림 0xc074 → 적용 0xa2f24) */
+  readonly runTraining: (slot: number) => void
+  /** 시즌 외출 한 번 — 굴리고 적용한다 (연출 0xe3 → 결과 0xc81c) */
+  readonly runOuting: (place: number) => void
   readonly clearNotice: () => void
   readonly quit: () => void
 }
@@ -266,6 +278,92 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
     [commit, save],
   )
 
+  /**
+   * 팀 트레이닝 (굴림 `0xc074` → 적용 `0xa2f24`, J 4-6).
+   * 칸 0~3 은 그 칸만, 지옥훈련(4)은 **네 칸을 따로 굴린다**. 서브 아이템은 해당 칸 +2,
+   * 자동안마기는 사기 감소 −1 이다. 상승은 999 로 자른다.
+   */
+  const runTraining = useCallback(
+    (slot: number) => {
+      if (save === null) return
+      const { record, teamAbilities, teamMorale } = save.state
+      const myTeam = record.teamId
+      const isHell = slot === HELL_TRAINING_INDEX
+      const gainRange = isHell ? HELL_TRAINING_GAIN_RANGE : TRAINING_GAIN_RANGE
+      const lossRange = isHell ? HELL_TRAINING_MORALE_LOSS_RANGE : TRAINING_MORALE_LOSS_RANGE
+
+      const mine = [...(teamAbilities[myTeam] ?? [])]
+      const raise = (index: number) => {
+        const bonus = record.trainingSubItems[index] === true ? TRAINING_SUB_ITEM_GAIN : 0
+        const gain = randomIntegerBelow(random, gainRange[0], gainRange[1]) + bonus
+        mine[index] = Math.min(TRAINING_APPLY_LIMIT, (mine[index] ?? 0) + gain)
+      }
+      if (isHell) mine.forEach((_value, index) => raise(index))
+      else raise(slot)
+
+      const relief = record.massager ? MASSAGER_MORALE_RELIEF : 0
+      const loss = Math.max(0, randomIntegerBelow(random, lossRange[0], lossRange[1]) - relief)
+
+      commit({
+        ...save,
+        state: {
+          ...save.state,
+          teamAbilities: teamAbilities.map((row, team) => (team === myTeam ? mine : row)),
+          teamMorale: clampTo(teamMorale - loss, MORALE_LIMIT),
+          // ⚠️ 트레이닝이 SR+4 를 세우는 자리는 문서에 없다. 외출(0xc81c)과 같은 규칙으로 둔다 (추정)
+          record: { ...record, acted: true },
+        },
+      })
+      setScene(SEASON_SCENE_STATE.관리메뉴)
+    },
+    [commit, random, save],
+  )
+
+  /**
+   * 시즌 외출 (결과 `0xc81c`, P4 3절 표).
+   * 사기 난수는 [a, b) 이고 **친선경기(0)·야구교실(3)은 부호를 뒤집는다**(0xc8b0).
+   * 소지금은 정액이지만 친선경기만 `rand(8,11)` 을 굴린다.
+   */
+  const runOuting = useCallback(
+    (place: number) => {
+      if (save === null) return
+      const effect = SEASON_OUTING_EFFECTS[place]
+      if (effect === undefined) return
+      const { record, teamMorale } = save.state
+
+      const rolled = randomIntegerBelow(random, effect.moraleRange[0], effect.moraleRange[1])
+      const moraleChange = effect.negatesMorale ? -rolled : rolled
+      const money = effect.moneyRange === undefined
+        ? effect.money
+        : randomIntegerBelow(random, effect.moneyRange[0], effect.moneyRange[1])
+      const popularity = effect.popularityRange === undefined
+        ? 0
+        : randomIntegerBelow(random, effect.popularityRange[0], effect.popularityRange[1])
+      const reputation = effect.reputationRange === undefined
+        ? 0
+        : randomIntegerBelow(random, effect.reputationRange[0], effect.reputationRange[1])
+
+      commit({
+        ...save,
+        state: {
+          ...save.state,
+          teamMorale: clampTo(teamMorale + moraleChange, MORALE_LIMIT),
+          record: {
+            ...record,
+            // 비용은 가드가 본 것과 같은 표를 쓴다 — 효과의 money 가 이미 음수라 따로 빼지 않는다
+            money: clampTo(record.money + money, MONEY_LIMIT),
+            popularity: clampTo(record.popularity + popularity, POPULARITY_LIMIT),
+            reputation: clampTo(record.reputation + reputation, REPUTATION_LIMIT),
+            // 입원이면 질병이 낫는다 (0xcc6a 굴림은 seasonEventFlow 몫이라 여기서는 그대로 둔다)
+            acted: true,
+          },
+        },
+      })
+      setScene(SEASON_SCENE_STATE.관리메뉴)
+    },
+    [commit, random, save],
+  )
+
   const goto = useCallback((next: SeasonSceneState) => setScene(next), [])
   const clearNotice = useCallback(() => setNotice(''), [])
   const quit = useCallback(() => setScene(SEASON_SCENE_STATE.팀고르기), [])
@@ -279,7 +377,7 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
     notice,
     actions: {
       chooseTeam, goto, updateRecord, updateRoster, playNextGame, confirmIncome,
-      playCupGame, finishCup, clearNotice, quit,
+      playCupGame, finishCup, runTraining, runOuting, clearNotice, quit,
     },
   }
 }

@@ -88,3 +88,60 @@ describe('시즌 세션', () => {
     expect(result.current.cup?.teams).toEqual([10, 11, 12, 13])
   })
 })
+
+describe('시즌 관리 커맨드', () => {
+  it('트레이닝은 고른 칸만 올리고 사기를 깎는다 (J 4-6)', () => {
+    const { result } = 띄우기()
+    act(() => result.current.actions.chooseTeam(0))
+    const 전 = result.current.state!
+
+    act(() => result.current.actions.runTraining(1))
+
+    const 후 = result.current.state!
+    const 내팀 = 후.record.teamId
+    expect(후.teamAbilities[내팀][1]).toBeGreaterThan(전.teamAbilities[내팀][1])
+    // 고르지 않은 칸은 그대로다
+    expect(후.teamAbilities[내팀][0]).toBe(전.teamAbilities[내팀][0])
+    expect(후.teamMorale).toBeLessThan(전.teamMorale)
+    expect(후.record.acted).toBe(true)
+  })
+
+  it('지옥훈련은 네 칸을 모두 올린다', () => {
+    const { result } = 띄우기()
+    act(() => result.current.actions.chooseTeam(0))
+    const 전 = result.current.state!.teamAbilities[0]
+
+    act(() => result.current.actions.runTraining(4))
+
+    const 후 = result.current.state!.teamAbilities[0]
+    expect(후.every((value, index) => value > 전[index])).toBe(true)
+  })
+
+  it('친선경기는 사기를 깎고 소지금을 준다 — 사기 난수의 부호를 뒤집는다 (0xc8b0)', () => {
+    const { result } = 띄우기()
+    act(() => result.current.actions.chooseTeam(0))
+    const 전 = result.current.state!
+    // 새 시즌 사기는 100(최대)이라 올리는 쪽은 여기서 안 보인다 — 원본 0x5758 이 100 으로 시작한다
+    expect(전.teamMorale).toBe(100)
+
+    act(() => result.current.actions.runOuting(0))
+
+    const 후 = result.current.state!
+    expect(후.teamMorale).toBeLessThan(전.teamMorale)
+    expect(후.record.money).toBeGreaterThan(전.record.money)
+    expect(후.record.acted).toBe(true)
+  })
+
+  it('회식은 사기를 올리고 소지금 4 를 깎는다 — 사기가 깎여 있을 때 보인다', () => {
+    const { result } = 띄우기()
+    act(() => result.current.actions.chooseTeam(0))
+    act(() => result.current.actions.runOuting(0)) // 친선경기로 사기를 먼저 깎는다
+    const 전 = result.current.state!
+
+    act(() => result.current.actions.runOuting(1))
+
+    const 후 = result.current.state!
+    expect(후.teamMorale).toBeGreaterThan(전.teamMorale)
+    expect(후.record.money).toBe(전.record.money - 4)
+  })
+})
