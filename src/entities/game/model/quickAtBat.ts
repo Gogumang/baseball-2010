@@ -35,10 +35,13 @@ const EXTRA_BASE_LIMIT = BALANCE.quickAtBat.extraBaseLimit
 const STRIKES_FOR_STRIKEOUT = 3
 /**
  * 한 타석 루프 (0xc262c) — 투구마다 두 갈래로 나뉜다.
- * `rand(0,100) <= 59` 면 스윙(0xc11f0), 아니면 투구 판정(0xc1818). 단 14회에는 스윙을 강제한다.
+ * `rand(0,100) <= 59` 면 스윙(0xc11f0), 아니면 투구 판정(0xc1818). 단 15회에는 스윙을 강제한다.
+ *
+ * 원본 이닝은 **0부터** 세서 `이닝 == 0xe` 가 딱 그 한 이닝만 걸린다 (0xc26e0) → 1-기준으로 15회다.
+ * 연장 보정도 같은 이유로 `이닝 > 9`(0-기준) = **11회부터**이고, 그래서 `extraInningFrom` 이 10 이다 (0xc13e0).
  */
 const SWING_PATH_LIMIT = 59
-const FORCED_SWING_INNING = 14
+const FORCED_SWING_INNING = 15
 /**
  * 스트라이크존에 넣을 확률 (0xc1818).
  *   기준 = 65 − (마선수면 10) − trunc((제구 + 구속) ÷ 50)
@@ -78,7 +81,7 @@ export interface QuickAtBatPitcher {
 }
 
 export interface QuickAtBatSituation {
-  /** 1부터. 10회부터 연장 보정이 붙는다 */
+  /** 1부터. 11회부터 연장 보정이 붙는다 (원본 이닝은 0-기준이라 `이닝 > 9`) */
   readonly inning: number
 }
 

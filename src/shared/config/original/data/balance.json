@@ -184,7 +184,7 @@
   "tightCourseGate": 1499,
   "tightCourseGain": 3,
   "extraBaseLimit": 666,
-  "extraInningFrom": 9,
+  "extraInningFrom": 10,
   "extraInningPowerStep": 5,
   "extraInningPowerFloor": 50,
   "powerScale": {

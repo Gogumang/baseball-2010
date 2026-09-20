@@ -90,7 +90,7 @@ export function simulateHalfInning(
       combo = 0
     }
     const canAdvance = outcome.kind === '아웃' && outcome.detail === '땅볼아웃' && canAdvanceOnGroundOut(bases, outs)
-    const advanced = advanceRunners(bases, outcome, outs)
+    const advanced = advanceRunners(bases, outcome, outs, { quickEngine: true })
     bases = advanced.bases
     // 땅볼 아웃에 60% 로 주자가 한 루 나간다 (0xc11f0)
     if (canAdvance && randomIntegerBelow(random, 0, 10_000) <= GROUND_OUT_ADVANCE_LIMIT) {

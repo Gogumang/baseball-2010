@@ -91,28 +91,45 @@ const PERFECT_GAME_OUT_LIMIT = 28
 const OUTS_PER_INNING = 3
 
 export interface CompleteGameInput {
+  /** 게임 모드 (0x1552d10). 원본은 **모드 4(나만의리그 타자편)면 완투 계열을 주지 않는다** */
+  readonly mode: number
+  /** 사람 팀이 이겼는가 (0xb69c8 — 동점이면 팀 0 승) */
+  readonly won: boolean
+  /** 이 경기에서 사람이 투구 코스를 한 번이라도 확정했는가 (state+0x8c) */
+  readonly pitchCourseConfirmed: boolean
+  /** 실제로 치른 이닝 수 — 연장이면 그만큼 늘어난다 (state[0x6b]+1) */
+  readonly inningsPlayed: number
   /** 우리 투수가 잡은 아웃 수 */
   readonly outsRecorded: number
-  /** 정규 이닝 수 (보통 9) */
-  readonly regulationInnings: number
   readonly hitsAllowed: number
   readonly walksAllowed: number
   readonly runsAllowed: number
 }
 
+/** 완투 계열을 주지 않는 모드 — 나만의리그 타자편 (0xa7de8 의 `모드 == 4 → 끝`) */
+const NO_COMPLETE_GAME_MODE = 4
+
 /**
- * 완투 계열 기록 (0xa7de8). 아웃카운트가 정규 이닝을 다 채웠을 때만 본다:
- *   출루·피안타·실점이 모두 0 이고 아웃 < 28 → 퍼펙트게임(31)
- *   피안타·실점이 0 → 노히트노런(30)
- *   실점이 0 → 완봉승(29)
- *   그 밖 → 완투승(28)
- * 이 넷은 마스크 0xe0f 에 들어 있어 **팀 조건조차 없이 항상 집계된다**.
+ * 완투 계열 기록 (0xa7de8). 마스크 0xe0f 라 0xa77f0 의 팀 게이트는 건너뛰지만,
+ * **부르는 쪽인 0xa7de8 이 스스로 네 가지를 먼저 본다** (R8 6절, 확정):
+ *   ① 사람 팀이 이긴 경기 ② 모드 ≠ 4(나만의리그 타자편)
+ *   ③ 이 경기에서 사람이 투구 코스를 한 번이라도 확정했음 (state+0x8c)
+ *   ④ 현재 투수가 잡은 아웃 == 3 × 치른 이닝 — **정규 9이닝이 아니라 경기에서 치른 이닝 전부**
+ * 그 다음에 등급을 가린다:
+ *   출루·피안타·실점이 모두 0 이고 아웃 ≤ 27 → 퍼펙트게임(31)
+ *   피안타·실점이 0 → 노히트노런(30) · 실점이 0 → 완봉승(29) · 그 밖 → 완투승(28)
+ *
+ * 지금 웹의 나만의리그 타자편은 모드 4 라 **원본대로면 이 넷이 한 번도 나오지 않는다.**
+ * 투수편·일반모드를 옮기면 그때 살아난다.
  *
  * 볼넷은 투구 판정 경로(0xc1818)를 옮기면서 들어왔다. 다만 데드볼(코드 4)의 조건인 상태 플래그 +0x12 는
  * 아직 해독하지 못해 데드볼로 인한 출루는 세지 않는다.
  */
 export function completeGameRecordIdsOf(input: CompleteGameInput): number[] {
-  if (input.outsRecorded < input.regulationInnings * OUTS_PER_INNING) return []
+  if (!input.won) return []
+  if (input.mode === NO_COMPLETE_GAME_MODE) return []
+  if (!input.pitchCourseConfirmed) return []
+  if (input.outsRecorded !== input.inningsPlayed * OUTS_PER_INNING) return []
   if (
     input.hitsAllowed === 0 &&
     input.walksAllowed === 0 &&

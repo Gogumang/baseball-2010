@@ -78,11 +78,13 @@ describe('quickPitchOf — 0xc11f0 투구 한 번', () => {
     expect(Math.abs(좁힘.spreadX)).toBeLessThan(21)
   })
 
-  it('10회 이후에는 스윙 세기가 이닝마다 5 씩 오르고 100 에서 멈춘다', () => {
+  it('11회부터 스윙 세기가 이닝마다 5 씩 오르고 100 에서 멈춘다 (원본 이닝은 0-기준)', () => {
     const random = () => 순서난수([0.9, 0.9, 0.9, 0.9])
 
-    expect(quickPitchOf(타자, 투수, { inning: 10 }, random()).power).toBe(80)
-    expect(quickPitchOf(타자, 투수, { inning: 14 }, random()).power).toBe(100)
+    // 10회까지는 보정이 없다 — 원본 조건이 `이닝 > 9`(0-기준) 라 1-기준으로 11회부터다
+    expect(quickPitchOf(타자, 투수, { inning: 10 }, random()).power).toBe(75)
+    expect(quickPitchOf(타자, 투수, { inning: 11 }, random()).power).toBe(80)
+    expect(quickPitchOf(타자, 투수, { inning: 15 }, random()).power).toBe(100)
     expect(quickPitchOf(타자, 투수, { inning: 20 }, random()).power).toBe(100)
   })
 })
@@ -177,7 +179,7 @@ describe('타석 루프 — 스윙 60% · 판정 40% (0xc262c)', () => {
     expect(walks, `볼넷 ${walks}/2000`).toBeGreaterThan(0)
   })
 
-  it('14회에는 스윙만 한다 — 볼넷으로 끝나지 않는다 (0xc262c)', () => {
+  it('15회에는 스윙만 한다 — 볼넷으로 끝나지 않는다 (0xc262c, 0-기준 0xe)', () => {
     let seed = 7
     const random: RandomPort = {
       next: () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648 },
@@ -185,8 +187,12 @@ describe('타석 루프 — 스윙 60% · 판정 40% (0xc262c)', () => {
       pick: (candidates) => candidates[0],
     }
     const 약한투수 = { control: 100, velocity: 100, stamina: 90, skillIds: [] }
-    const 결과들 = Array.from({ length: 500 }, () => simulateQuickAtBat(타자, 약한투수, { inning: 14 }, random))
+    const 결과들 = Array.from({ length: 500 }, () => simulateQuickAtBat(타자, 약한투수, { inning: 15 }, random))
 
     expect(결과들.some((outcome) => outcome.kind === '볼넷')).toBe(false)
+
+    // 14회는 아직 강제가 아니다 — 원본은 0-기준 0xe 한 이닝만 본다
+    const 십사회 = Array.from({ length: 500 }, () => simulateQuickAtBat(타자, 약한투수, { inning: 14 }, random))
+    expect(십사회.some((outcome) => outcome.kind === '볼넷')).toBe(true)
   })
 })

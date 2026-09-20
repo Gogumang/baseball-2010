@@ -46,7 +46,11 @@ export function selectPitch(
   pitcher: PitcherAbility,
   situation: PitchSituation,
   random: RandomPort,
-  difficulty: PitchPatternDifficulty = 'normal',
+  /**
+   * 원본은 늘 `pitchpattern_hard` 를 쓴다 — 옵션 `+0x2c` 가 난이도이고 **기본값 2 = hard** 이며
+   * 뒤로 바꾸는 코드가 없다 (L 4-A · P7 K2 확정 · DECISIONS 2026-09-20 ②).
+   */
+  difficulty: PitchPatternDifficulty = 'hard',
 ): Pitch {
   const repertoire = pitcher.repertoire ?? DEFAULT_REPERTOIRE
   const list = pitchListOf(repertoire.pitchMask, false)

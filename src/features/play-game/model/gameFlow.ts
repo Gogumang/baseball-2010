@@ -5,7 +5,6 @@ import {
   applyAtBatOutcome,
   applyOpponentInning,
   createGame,
-  INNINGS_PER_GAME,
   PLAYER_BATTING_ORDER_INDEX,
   isPlayerTurn,
   resultOf,
@@ -69,6 +68,12 @@ export interface GameProgress {
   readonly log: readonly GameLogEntry[]
   readonly nextLogId: number
 }
+
+/**
+ * 이 화면이 돌리는 경기는 나만의리그 **타자편** = 원본 게임 모드 4 다 (0x327b8 모드표, H-1).
+ * 기록달성 판정이 모드를 보므로 상수로 둔다.
+ */
+const MY_LEAGUE_BATTER_MODE = 4
 
 /**
  * 자동 진행이 끝나지 않는 상황을 막는 안전장치.
@@ -269,8 +274,13 @@ export function summaryOf(progress: GameProgress): GameSummary {
       ...progress.recordIds,
       ...gameEndRecordIdsOf(progress.game.ourScore - progress.game.opponentScore),
       ...completeGameRecordIdsOf({
+        // 나만의리그 타자편 = 원본 모드 4 → 0xa7de8 이 완투 계열을 아예 주지 않는다 (R8 6절)
+        mode: MY_LEAGUE_BATTER_MODE,
+        won: progress.game.ourScore > progress.game.opponentScore,
+        // 타자편에는 사용자가 투구 코스를 찍는 순간이 없다 → state+0x8c 는 늘 0
+        pitchCourseConfirmed: false,
+        inningsPlayed: progress.game.inning,
         outsRecorded: progress.pitching.outsRecorded,
-        regulationInnings: INNINGS_PER_GAME,
         hitsAllowed: progress.pitching.hitsAllowed,
         walksAllowed: progress.pitching.walksAllowed,
         runsAllowed: progress.game.opponentScore,

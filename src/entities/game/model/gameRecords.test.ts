@@ -37,18 +37,39 @@ describe('기록달성 — 0xa77f0 · 금액표 0xd8158', () => {
   })
 })
 
-describe('완투 계열 기록 — 0xa7de8 (마스크 0xe0f, 팀 조건 없이 항상 집계)', () => {
+describe('완투 계열 기록 — 0xa7de8 (승리·모드·코스확정·아웃수 네 조건을 먼저 본다)', () => {
+  // 모드 0(일반)에 사람이 코스를 찍고 이긴 경기 = 완투 계열이 나올 수 있는 최소 조건
   const 완투 = (overrides: Partial<CompleteGameInput> = {}): CompleteGameInput => ({
+    mode: 0,
+    won: true,
+    pitchCourseConfirmed: true,
+    inningsPlayed: 9,
     outsRecorded: 27,
-    regulationInnings: 9,
     hitsAllowed: 5,
     walksAllowed: 2,
     runsAllowed: 3,
     ...overrides,
   })
 
-  it('정규 이닝을 다 채우지 못하면 아무것도 주지 않는다 — 중간에 내려가면 완투가 아니다', () => {
+  it('진 경기에는 주지 않는다 — 0xa7de8 이 사람 팀 승리를 먼저 본다', () => {
+    expect(completeGameRecordIdsOf(완투({ won: false }))).toEqual([])
+  })
+
+  it('나만의리그 타자편(모드 4)에서는 한 번도 나오지 않는다', () => {
+    expect(completeGameRecordIdsOf(완투({ mode: 4 }))).toEqual([])
+  })
+
+  it('사람이 투구 코스를 한 번도 확정하지 않았으면 주지 않는다 — state+0x8c', () => {
+    expect(completeGameRecordIdsOf(완투({ pitchCourseConfirmed: false }))).toEqual([])
+  })
+
+  it('치른 이닝을 다 채우지 못하면 아무것도 주지 않는다 — 중간에 내려가면 완투가 아니다', () => {
     expect(completeGameRecordIdsOf(완투({ outsRecorded: 26 }))).toEqual([])
+  })
+
+  it('연장이면 그만큼 아웃을 더 잡아야 한다 — 정규 9이닝이 아니라 치른 이닝 전부', () => {
+    expect(completeGameRecordIdsOf(완투({ inningsPlayed: 11, outsRecorded: 27 }))).toEqual([])
+    expect(completeGameRecordIdsOf(완투({ inningsPlayed: 11, outsRecorded: 33 }))).toEqual([28])
   })
 
   it('실점이 있으면 완투승(28)', () => {
@@ -68,7 +89,7 @@ describe('완투 계열 기록 — 0xa7de8 (마스크 0xe0f, 팀 조건 없이 �
   })
 
   it('연장에 가면 퍼펙트게임이 아니다 — 아웃 28 부터는 노히트노런으로 내려간다', () => {
-    const 연장 = 완투({ outsRecorded: 28, hitsAllowed: 0, walksAllowed: 0, runsAllowed: 0 })
+    const 연장 = 완투({ inningsPlayed: 10, outsRecorded: 30, hitsAllowed: 0, walksAllowed: 0, runsAllowed: 0 })
 
     expect(completeGameRecordIdsOf(연장)).toEqual([30])
   })

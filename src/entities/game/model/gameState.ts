@@ -4,8 +4,12 @@ import { advanceRunners, EMPTY_BASES } from '@/entities/game/model/baseState'
 import type { BaseState } from '@/entities/game/model/baseState'
 
 export const INNINGS_PER_GAME = 9
-/** 연장 상한 — 원본에는 상한 코드가 없다(14회에 시뮬레이터 분기만 있음). 끝없는 경기를 막으려 12회로 둔다 (추정) */
-export const MAXIMUM_INNINGS = 12
+/**
+ * **원본에는 연장 상한이 없다** (E 3d 확정) — 동점이면 점수가 갈릴 때까지 돈다.
+ * 14회 분기는 상한이 아니라 "15회에 스윙 강제"(0xc26e0, 0-기준 0xe)였다.
+ * 여기 값은 끝없는 경기를 막는 **우리 쪽 안전망**이라 원본 동작이 아니다.
+ */
+export const MAXIMUM_INNINGS = 30
 /** 콜드게임 — 7회(이닝 인덱스 > 5) 이후 10점 차 (0xb68fc) */
 const COLD_GAME_FROM_INNING = BALANCE.coldGame.fromInning
 const COLD_GAME_MARGIN = BALANCE.coldGame.margin

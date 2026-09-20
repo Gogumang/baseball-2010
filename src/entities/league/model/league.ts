@@ -62,14 +62,39 @@ export function recordLeagueResult(league: League, winner: number, loser: number
   }
 }
 
-/** 순위(1위부터 팀 번호). 상대 전적까지 같으면 팀 번호 순으로 둔다 (추정) */
+/**
+ * 순위(1위부터 팀 번호) — 원본 0xb79d8 의 **선택 정렬을 그대로 옮긴 것**이다.
+ * 순서 배열 초기값은 표 0xd8a25 = `[0,1,…,9]`, 승·패 사본을 함께 swap 하며 훑는다.
+ *
+ * ⚠️ **원본 버그를 그대로 둔다** (E 2절·3e 확정 · DECISIONS 2026-09-20):
+ * 상대전적 표 `headToHead` 는 **팀 번호**로 된 표인데, 비교에 쓰는 `best`·`j` 는 정렬 중인
+ * **배열 위치**다. 표를 함께 섞지도 않는다 → swap 이 한 번이라도 일어나면 엉뚱한 팀끼리의
+ * 전적을 비교한다. 상대전적까지 같으면 `best` 를 바꾸지 않으므로 마지막 기준은
+ * "현재 배열 위치가 앞선 팀" 이고, 초기값 덕에 대체로 팀 번호 순으로 보이지만 엄밀히는 아니다.
+ */
 export function rankingOf(league: League): number[] {
-  return Array.from({ length: LEAGUE_TEAM_COUNT }, (_unused, team) => team).sort((first, second) => {
-    if (league.wins[first] !== league.wins[second]) return league.wins[second] - league.wins[first]
-    if (league.losses[first] !== league.losses[second]) return league.losses[first] - league.losses[second]
-    const headToHead = league.headToHead[second][first] - league.headToHead[first][second]
-    return headToHead !== 0 ? headToHead : first - second
-  })
+  const order = Array.from({ length: LEAGUE_TEAM_COUNT }, (_unused, team) => team)
+  const wins = [...league.wins]
+  const losses = [...league.losses]
+
+  for (let i = 0; i < LEAGUE_TEAM_COUNT - 1; i += 1) {
+    let best = i
+    for (let j = i + 1; j < LEAGUE_TEAM_COUNT; j += 1) {
+      if (wins[best] < wins[j]) best = j
+      else if (wins[best] === wins[j] && losses[best] > losses[j]) best = j
+      // 색인 버그: j·best 는 배열 위치인데 headToHead 는 팀 번호 표다 (원본 그대로)
+      else if (
+        wins[best] === wins[j] &&
+        losses[best] === losses[j] &&
+        league.headToHead[j][best] > league.headToHead[best][j]
+      ) best = j
+    }
+    ;[wins[i], wins[best]] = [wins[best], wins[i]]
+    ;[losses[i], losses[best]] = [losses[best], losses[i]]
+    ;[order[i], order[best]] = [order[best], order[i]]
+  }
+
+  return order
 }
 
 export const POSTSEASON_TEAM_COUNT = 4

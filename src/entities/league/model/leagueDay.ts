@@ -12,8 +12,13 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
  * **무승부가 없다.** 리그 구조체에 무승부 칸 자체가 없어서, 점수가 같으면 한쪽이 승으로 들어간다.
  */
 export const REGULAR_INNINGS = 9
-/** 0xc262c 가 이닝 14 를 특별히 다루는 것으로 보아 연장 상한으로 본다 (추정) */
-export const MAXIMUM_INNINGS = 14
+/**
+ * **원본에는 연장 상한이 없다** (E 3d 확정): 이닝 증가 0xb6b6c 에 막는 값이 없고, 경기 끝 판정
+ * 0xb68fc 는 동점이면 절대 끝내지 않으며, 점수판 0xb6988 은 `이닝 mod 9` 로 칸을 돌려 쓴다.
+ * 여기 값은 무한 루프를 막는 **우리 쪽 안전망**일 뿐이라 원본 동작이 아니다 — 실제로 걸리는 일은 거의 없다.
+ * (0xc262c 의 이닝 14 는 상한이 아니라 "15회에 스윙 강제" 였다. `quickAtBat.ts` 참고)
+ */
+export const MAXIMUM_INNINGS = 30
 
 export interface LeagueMatchup {
   /** 먼저 공격하는 쪽 */
@@ -73,7 +78,7 @@ export function simulateLeagueGame(matchup: LeagueMatchup, random: RandomPort): 
 
 /**
  * 하루치 경기를 리그 전적에 넣는다. `myTeamId` 가 낀 경기는 사람이 직접 치르므로 건너뛴다.
- * 점수가 같으면 홈 팀 승으로 넣는다 — 원본에 무승부가 없어서 어느 한쪽이 반드시 승이 된다 (추정).
+ * 원본에 무승부가 없어 어느 한쪽이 반드시 승이 되고, **원본은 진 팀에 승을 준다** (아래 주석).
  */
 export function playLeagueDay(
   league: League,
@@ -84,8 +89,12 @@ export function playLeagueDay(
   return matchupsOf(day).reduce((current, matchup) => {
     if (matchup.away === myTeamId || matchup.home === myTeamId) return current
     const score = simulateLeagueGame(matchup, random)
+    // ⚠️ 원본 버그를 그대로 옮긴 것 (0xc2a48, R1 확정 · DECISIONS 2026-09-20 ①):
+    //    `원정 득점 > 홈 득점` 이면 **홈** 에 승을, 아니면 **원정** 에 승을 준다 — 늘 진 팀이 이긴다.
+    //    상대전적도 같이 뒤집히고, 동점이면 원정 승이다.
+    //    포스트시즌 0xc2760 은 같은 함수를 쓰면서도 정상이라, 목록 포인터를 엇갈려 넘긴 실수 하나로 설명된다.
     return score.awayRuns > score.homeRuns
-      ? recordLeagueResult(current, matchup.away, matchup.home)
-      : recordLeagueResult(current, matchup.home, matchup.away)
+      ? recordLeagueResult(current, matchup.home, matchup.away)
+      : recordLeagueResult(current, matchup.away, matchup.home)
   }, league)
 }
