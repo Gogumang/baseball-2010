@@ -7,11 +7,14 @@ import { TeamSelectScreen } from '@/pages/create-player/ui/TeamSelectScreen'
 import { MessageBox, RawScreen } from '@/shared/ui'
 import { SEASON_SCENE_STATE, seasonOpponentOf } from '@/entities/season-mode/model/seasonStateMachine'
 import { TEAMS } from '@/shared/config/original/teams'
+import { NationalCupScreen } from '@/pages/national-cup/ui/NationalCupScreen'
+import type { RandomPort } from '@/shared/api/random/randomPort'
 import { seasonRanksOf } from '@/app/model/useSeasonSession'
 import type { SeasonSession } from '@/app/model/useSeasonSession'
 
 interface SeasonRouteProps {
   readonly session: SeasonSession
+  readonly random: RandomPort
   /** 시즌모드에서 나간다 — 메인 메뉴로 (원본은 `0xbc290(앱, 0x103)`) */
   readonly onExit: () => void
 }
@@ -26,8 +29,8 @@ interface SeasonRouteProps {
  * 선수단/코치채용 0xd7 · 포스트시즌·시상·결산·엔딩)은 알림을 띄우고 관리 메뉴로 되돌린다 —
  * 조용히 아무것도 안 하는 것보다 낫다.
  */
-export function SeasonRoute({ session, onExit }: SeasonRouteProps) {
-  const { state, scene, league, roster, notice, actions } = session
+export function SeasonRoute({ session, random, onExit }: SeasonRouteProps) {
+  const { state, scene, league, roster, cup, notice, actions } = session
 
   const ranks = useMemo(
     () => (state === null ? { myRank: 0, opponentRank: 0 } : seasonRanksOf(league, state.record)),
@@ -112,6 +115,20 @@ export function SeasonRoute({ session, onExit }: SeasonRouteProps) {
           popularityGain: state.record.popularity - state.record.popularityAtSeasonStart,
         }}
         onBack={backToManagement}
+      />
+    )
+  }
+
+  if (scene === SEASON_SCENE_STATE.국가대항전 && cup !== null) {
+    return (
+      <NationalCupScreen
+        mode="시즌모드"
+        cup={cup}
+        yearIndex={state.record.yearIndex}
+        random={random}
+        // ⚠️ 웹판 임시 — 원본은 여기서 사람이 대표팀을 조작해 경기를 친다 (시즌 221)
+        onStartGame={(matchup, current) => actions.playCupGame(matchup.myTeam, matchup.opponent, current)}
+        onFinish={(finish) => actions.finishCup(finish)}
       />
     )
   }

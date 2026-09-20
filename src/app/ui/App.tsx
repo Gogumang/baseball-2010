@@ -91,7 +91,7 @@ export function App() {
 
   // 시즌모드는 나만의리그 커리어와 아예 다른 저장·흐름이다 (원본 장면 0x105)
   if (screen.kind === '시즌모드') {
-    return <SeasonRoute session={seasonSession} onExit={() => setScreen({ kind: '메인메뉴' })} />
+    return <SeasonRoute session={seasonSession} random={random} onExit={() => setScreen({ kind: '메인메뉴' })} />
   }
 
   if (ENTRY_SCREENS.includes(screen.kind) || careerSession.career === null) {
