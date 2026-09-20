@@ -81,11 +81,19 @@ describe('evaluateNewTitles — 원문 조건', () => {
     expect(titles).toContain('사이클링 히터')
   })
 
-  it('6년차 통산 타율 4할', () => {
+  it('6년차 18경기째에만 통산 타율 4할을 본다 (P3 9절)', () => {
     const 타율4할 = { atBats: 100, hits: 40 }
 
-    expect(evaluateNewTitles(선수({ season: 5 }, 타율4할))).not.toContain('공포의 4할 타자')
-    expect(evaluateNewTitles(선수({ season: 6 }, 타율4할))).toContain('공포의 4할 타자')
+    expect(evaluateNewTitles(선수({ season: 5, gamesPlayed: 18 }, 타율4할))).not.toContain('공포의 4할 타자')
+    expect(evaluateNewTitles(선수({ season: 6, gamesPlayed: 18 }, 타율4할))).toContain('공포의 4할 타자')
+    // 그 앞뒤 경기에서는 보지 않는다 — 원본은 딱 한 순간만 판정한다
+    expect(evaluateNewTitles(선수({ season: 6, gamesPlayed: 17 }, 타율4할))).not.toContain('공포의 4할 타자')
+    expect(evaluateNewTitles(선수({ season: 6, gamesPlayed: 19 }, 타율4할))).not.toContain('공포의 4할 타자')
+  })
+
+  it('9년차 칭호는 9년차에만 준다 — 10년차 이후에는 주지 않는다 (P3 9절)', () => {
+    expect(evaluateNewTitles(선수({ season: 9, popularity: 2000 }))).toContain('카리스마 캡틴')
+    expect(evaluateNewTitles(선수({ season: 10, popularity: 2000 }))).not.toContain('카리스마 캡틴')
   })
 
   it('이미 가진 칭호는 다시 주지 않는다', () => {

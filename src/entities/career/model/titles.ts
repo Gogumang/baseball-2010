@@ -30,13 +30,17 @@ const FOUR_TENTHS = 0.4
 
 type TitleRule = (career: PlayerCareer) => boolean
 
+/** 칭호 43 "통산 4할" 을 보는 경기 번호 — 6년차 18경기째 한 순간 (0x1b214) */
+const FOUR_TENTHS_CHECK_GAME = 18
+
 const trainingTotalOf = (career: PlayerCareer) =>
   Object.values(career.trainingCounts).reduce((total, count) => total + count, 0)
 
 const RULES: Readonly<Record<number, TitleRule>> = {
   0: () => true, // 지금부터 시작이다!
-  3: (career) => career.season >= NINTH_YEAR && career.popularity >= 2000, // 9년차 인기도 2000이상
-  4: (career) => career.season >= NINTH_YEAR && career.reputation >= 750, // 9년차 평판 750이상
+  // 원본은 연차 인덱스 == 8, 즉 **9년차에만** 본다 (P3 9절). `>=` 면 10년차 이후에도 줘 버린다
+  3: (career) => career.season === NINTH_YEAR && career.popularity >= 2000, // 9년차 인기도 2000이상
+  4: (career) => career.season === NINTH_YEAR && career.reputation >= 750, // 9년차 평판 750이상
   6: (career) => career.popularity >= 2000, // 인기도 2000이상
   7: (career) => career.popularity >= 4000, // 인기도 4000이상
   10: (career) => career.season >= FINAL_YEAR, // 13년차 선수 생활의 마무리
@@ -44,6 +48,8 @@ const RULES: Readonly<Record<number, TitleRule>> = {
   22: (career) => career.lotteryPurchases >= 100, // 또또복권 100번 구매
   23: (career) => trainingTotalOf(career) >= 200, // 훈련 횟수 200회
   24: (career) => trainingTotalOf(career) >= 100, // 훈련 횟수 100회
+  // 값은 원본과 같다. 시점만 다르다 — 원본은 **다음 시즌 첫 경기 전**에 지난해 값으로 본다.
+  // 그래서 원본은 13년차(마지막 해) 외출을 볼 기회가 없는데, 여기서는 13년차 끝에도 준다 (P3 9절)
   25: (career) => isSeasonFinished(career) && career.outingsThisSeason <= 2, // 1년간 외출 2회 이하
   26: (career) => isSeasonFinished(career) && career.outingsThisSeason >= 20, // 1년간 외출 20회 이상
   27: (career) => career.reputation >= 999, // 평판 999
@@ -57,7 +63,11 @@ const RULES: Readonly<Record<number, TitleRule>> = {
   40: (career) => career.careerStats.homeRuns >= 100,
   41: (career) => career.careerStats.homeRuns >= 200,
   42: (career) => career.careerStats.homeRuns >= 300,
-  43: (career) => career.season >= SIXTH_YEAR && (battingAverageOf(career.careerStats) ?? 0) >= FOUR_TENTHS,
+  // 원본은 **6년차 18경기째 딱 한 순간**만 본다 (P3 9절) — `>=` 면 그 뒤로 계속 판정한다
+  43: (career) =>
+    career.season === SIXTH_YEAR &&
+    career.gamesPlayed === FOUR_TENTHS_CHECK_GAME &&
+    (battingAverageOf(career.careerStats) ?? 0) >= FOUR_TENTHS,
   47: (career) => career.cycleHitGames >= 2, // 사이클링 히트 2회
 }
 
