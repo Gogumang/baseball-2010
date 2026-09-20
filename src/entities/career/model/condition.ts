@@ -19,8 +19,9 @@ export const ILLNESS_NAMES: readonly string[] = ['감기', '몸살', '식중독'
 
 /** 부상 남은 기간 (0x1b4c4 가 +0x1b5 = 3) */
 const INJURY_DURATION = 3
-const INJURY_ABILITY_RATIO = 0.4
-const ILLNESS_ABILITY_RATIO = 0.7
+/** 부상·질병 감소율 (0xb570c) — 둘 다면 질병 먼저, 부상 다음으로 **차례로** 곱한다 */
+const ILLNESS_ABILITY_CUT = 30
+const INJURY_ABILITY_CUT = 60
 
 /** 실효 능력치 스킬 보정 (0xb6414, 누락 탐색 5차) — 스킬 20 은 수비(인덱스 2)만 */
 const POWERLESS_SKILL = 5
@@ -32,20 +33,42 @@ const LEGEND_BONUS = 50
 const clampAbility = (value: number) => Math.min(MAXIMUM_ABILITY, Math.max(0, value))
 
 /**
- * 경기에 쓰는 능력치 (0xb6414 순서, 단계마다 0~999 로 자른다 — 점검 10차):
- *   1. 비율(버림) — 원본 표 0xd88aa 는 마선수 레벨 배율이라 육성 선수는 100% 다 (누락 탐색 6차).
- *      부상 60%·질병 30% 감소는 문구(StrMODE[212]·r_event_txt[537])대로 이 자리에서 곱한다 (자리는 추정)
- *   2. 장착 레벨 보너스 +30~250
- *   3. 무력감 −100 · 전설 +50 · 스킬 20 수비 −100
+ * 사기가 낮을 때의 능력치 감소 (0xb570c 뒷부분) — 나눗셈은 0 쪽 버림이다.
+ * 안내문은 StrMODE[213] "사기가 낮아 선수 능력치가 %d 감소하였습니다".
+ */
+const MORALE_ABILITY_CUTS: readonly (readonly [number, number])[] = [
+  // [사기 상한, 감소율 %] — 사기 > 50 이면 그대로
+  [10, 50],
+  [30, 20],
+  [50, 10],
+]
+
+/** `v += (−p·v)/100` 을 0 쪽 버림으로 (원본 나눗셈 0xca738) */
+const reduceByPercent = (value: number, percent: number) =>
+  value - Math.trunc((value * percent) / 100)
+
+/**
+ * 경기에 쓰는 능력치 (0xb570c 순서, 단계마다 0~999 로 자른다):
+ *   1. 0xb6414 — 마선수 배율(육성 선수는 100%) → 장착 레벨 보너스 +30~250 → 스킬 보정
+ *      (무력감 −100 · 전설 +50 · 스킬 20 수비 −100)
+ *   2. **그 뒤에** 질병 −30% → 부상 −60% 를 **둘 다 차례로** (G-1 확정)
+ *   3. 마지막으로 사기 감소: 31~50 −10% · 11~30 −20% · ≤10 −50%
+ *
+ * 앞서 웹은 ① 부상·질병 중 하나만 ② 장비 보정 **전에** 곱하고 ③ 사기 감소가 없었다 — 셋 다 고쳤다.
  */
 export function effectiveAbilityOf(career: PlayerCareer): BatterAbility {
-  const ratio = career.isInjured ? INJURY_ABILITY_RATIO : career.isSick ? ILLNESS_ABILITY_RATIO : 1
+  const moraleCut = MORALE_ABILITY_CUTS.find(([limit]) => career.morale <= limit)?.[1] ?? 0
   const adjust = (key: keyof BatterAbility) => {
-    let value = Math.floor(career.ability[key] * ratio)
-    value = clampAbility(value + equipmentBonusOf(career.equipmentLevels[key]))
+    // 1. 0xb6414 — 장비 보너스와 스킬 보정
+    let value = clampAbility(career.ability[key] + equipmentBonusOf(career.equipmentLevels[key]))
     if (hasSkill(career, POWERLESS_SKILL)) value = clampAbility(value - SKILL_PENALTY)
     if (hasSkill(career, LEGEND_SKILL)) value = clampAbility(value + LEGEND_BONUS)
     if (key === 'defense' && hasSkill(career, DEFENSE_PENALTY_SKILL)) value = clampAbility(value - SKILL_PENALTY)
+    // 2. 질병 → 부상 차례로
+    if (career.isSick) value = clampAbility(reduceByPercent(value, ILLNESS_ABILITY_CUT))
+    if (career.isInjured) value = clampAbility(reduceByPercent(value, INJURY_ABILITY_CUT))
+    // 3. 사기 감소
+    if (moraleCut > 0) value = clampAbility(reduceByPercent(value, moraleCut))
     return value
   }
   return { hit: adjust('hit'), power: adjust('power'), run: adjust('run'), defense: adjust('defense') }

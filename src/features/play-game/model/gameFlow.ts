@@ -134,6 +134,7 @@ export function applyPlayerOutcome(
   const isWalkOff = nextGame.isFinished && runsBattedIn > 0 && nextGame.ourScore > nextGame.opponentScore
   const points = atBatPopularityPoints({ outcome, runsBattedIn, outsInPlay, isWalkOff })
   const penalties = atBatPenaltyCounts({
+    outcome,
     outsInPlay,
     runsBattedIn,
     isWalkOff,

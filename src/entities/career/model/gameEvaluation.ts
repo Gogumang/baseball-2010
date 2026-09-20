@@ -17,26 +17,46 @@ export interface AtBatContext {
   readonly isWalkOff: boolean
 }
 
-const HIT_POINTS_WITH_RBI = [3, 4, 5, 6]
-const WALK_OFF_WITH_RBI = 5
-const WALK_OFF_WITHOUT_RBI = 4
+/** 홈런의 인기도 점수 — 칸은 루타가 아니라 **득점 수**다: 솔로 3 · 투런 4 · 스리런 5 · 만루 6 */
+const HOME_RUN_POINTS_BY_RUNS = [3, 4, 5, 6]
+/** 끝내기 홈런 */
+const WALK_OFF_HOME_RUN = 5
+/** 홈런이 아닌 끝내기 — 원본은 "끝내기 **그리고** 득점 > 0" 일 때만 이 가지로 간다 */
+const WALK_OFF_HIT = 4
 export const DOUBLE_PLAY_OUTS = 2
 
 /**
- * 사용자 타석 하나의 인기도 점수 (0xa59c0, 점검 7차 재확인).
- * 타점이 있으면 표 값만 주고 타점 수는 더하지 않는다.
- * 원본은 타점 없는 안타에 진루 보너스(r6 가 1~3 이면 +1~3)를 더하지만 r6 의 뜻을 몰라 넣지 않았다 — 미해독.
+ * 사용자 타석 하나의 인기도 점수 (0xa59c0, R7 1a 확정).
+ *
+ * ```
+ * 홈런 > 0:
+ *    끝내기 → +5
+ *    아니면 득점 1 → +3 · 2 → +4 · 3 → +5 · 4 → +6      ; 표 칸은 루타가 아니라 득점 수다
+ * 홈런 아님:
+ *    끝내기 && 득점 > 0 → +4, 끝
+ *    득점 1 → +1 · 득점 2~3 → +2                        ; 안타가 아니어도 (밀어내기·희생플라이·땅볼 타점)
+ *    안타면 루타 1 → +1 · 2 → +2 · 3 → +3               ; 위 득점 점수에 **더한다**
+ *    안타 아니면 아웃 > 1 → −1
+ * ```
+ * 앞서 웹은 ① 홈런·안타를 한 표로 묶고 ② 칸을 루타로 보고 ③ 득점 가산을 통째로 빼먹었다.
+ * 주석에 "뜻을 모르겠다" 고 적혀 있던 `r6` 은 실은 **루타 점수**였다.
  */
 export function atBatPopularityPoints({ outcome, runsBattedIn, outsInPlay, isWalkOff }: AtBatContext): number {
-  if (outcome.kind === '안타' || outcome.kind === '홈런') {
-    const bases = outcome.kind === '홈런' ? 4 : outcome.bases
-    if (runsBattedIn > 0) return isWalkOff ? WALK_OFF_WITH_RBI : HIT_POINTS_WITH_RBI[bases - 1]
-    return isWalkOff ? WALK_OFF_WITHOUT_RBI : bases === 1 ? 1 : 2
+  if (outcome.kind === '홈런') {
+    if (isWalkOff) return WALK_OFF_HOME_RUN
+    return HOME_RUN_POINTS_BY_RUNS[Math.min(runsBattedIn, HOME_RUN_POINTS_BY_RUNS.length) - 1] ?? 0
   }
-  return outsInPlay >= DOUBLE_PLAY_OUTS ? -1 : 0
+  if (isWalkOff && runsBattedIn > 0) return WALK_OFF_HIT
+
+  // 득점 점수 — 안타가 아니어도 붙는다
+  let points = runsBattedIn === 1 ? 1 : runsBattedIn === 2 || runsBattedIn === 3 ? 2 : 0
+  if (outcome.kind === '안타') points += outcome.bases
+  else if (outsInPlay >= DOUBLE_PLAY_OUTS) points -= 1
+  return points
 }
 
 export interface AtBatPenaltyInput {
+  readonly outcome: AtBatOutcome
   readonly outsInPlay: number
   readonly runsBattedIn: number
   readonly isWalkOff: boolean
@@ -44,11 +64,19 @@ export interface AtBatPenaltyInput {
   readonly hadSecondBaseRunner: boolean
 }
 
-/** 평판 감점용 카운터 증가분. 원본은 타점도 끝내기도 없는 경로에서만 센다 (점검 9차) */
+/**
+ * 평판 감점용 카운터 증가분 (0xa5ab2~0xa5aea, R7 1a 확정).
+ * 홈런이거나 "끝내기 + 득점" 이면 그 앞에서 함수가 끝나므로 둘 다 세지 않는다. 그 밖에는:
+ *   - 병살 G+0x118: **안타가 아닐 때** 아웃 > 1 이면 센다 (득점이 있어도 센다)
+ *   - 득점권 아웃 G+0x11c: **안타여도** 아웃 > 0 이고 2루에 주자가 있었으면 센다
+ * 앞서 웹은 "타점도 끝내기도 없을 때만" 으로 조건을 좁게 잡고 있었다.
+ */
 export function atBatPenaltyCounts(input: AtBatPenaltyInput): { doublePlays: number; scoringPositionOuts: number } {
-  if (input.runsBattedIn > 0 || input.isWalkOff) return { doublePlays: 0, scoringPositionOuts: 0 }
+  if (input.outcome.kind === '홈런') return { doublePlays: 0, scoringPositionOuts: 0 }
+  if (input.isWalkOff && input.runsBattedIn > 0) return { doublePlays: 0, scoringPositionOuts: 0 }
+  const isHit = input.outcome.kind === '안타'
   return {
-    doublePlays: input.outsInPlay >= DOUBLE_PLAY_OUTS ? 1 : 0,
+    doublePlays: !isHit && input.outsInPlay >= DOUBLE_PLAY_OUTS ? 1 : 0,
     scoringPositionOuts: input.outsInPlay > 0 && input.hadSecondBaseRunner ? 1 : 0,
   }
 }
@@ -60,9 +88,16 @@ function isCycle(stats: SeasonStats): boolean {
   return singles > 0 && stats.doubles > 0 && stats.triples > 0 && stats.homeRuns > 0
 }
 
-/** 경기 점수 → 인기도 변화 −2~6 (0xa690c) */
+/** 그 경기 삼진이 이만큼을 넘으면 −1 (0xa6934: `G+0x108 > 1`) */
+const STRIKEOUT_PENALTY_LIMIT = 1
+
+/**
+ * 경기 점수 → 인기도 변화 −2~6 (0xa690c).
+ * 사이클 +7 **앞에** 삼진 2개 이상이면 −1 이 먼저 붙는다 (0xa6934) — 웹에 빠져 있던 줄이다.
+ */
 export function popularityChangeOf(points: number, stats: SeasonStats): number {
-  const total = points + (isCycle(stats) ? CYCLE_BONUS : 0)
+  const strikeoutPenalty = stats.strikeouts > STRIKEOUT_PENALTY_LIMIT ? -1 : 0
+  const total = points + strikeoutPenalty + (isCycle(stats) ? CYCLE_BONUS : 0)
   if (total > 10) return 6
   if (total >= 8) return 5
   if (total >= 6) return 4

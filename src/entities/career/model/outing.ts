@@ -10,7 +10,7 @@ import type { OutingEffect, OutingFunction, OutingRange, RolledOutingEffect } fr
 import { HOSPITAL_RECOVERY, REST_RECOVERY, rollRecovery } from '@/entities/career/model/recovery'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
-import { applyOutingSubItems, hasSubItem } from '@/entities/career/model/subItems'
+import { applyOutingSubItems } from '@/entities/career/model/subItems'
 
 /**
  * 외출 커맨드 — 2010판에서 신규 추가된 기능이다.
@@ -20,6 +20,16 @@ import { applyOutingSubItems, hasSubItem } from '@/entities/career/model/subItem
 
 export type OutingBlockReason = '소지금부족' | '이미행동함' | '건강함' | '인기도부족' | '사기최고'
 
+/**
+ * 외출 막힘 판정 — **원본 0x16cf0 의 순서 그대로**다 (G-3 확정):
+ *   1. 필요 인기도 `0xcc402[장소]` > 인기도 → StrMODE[62]
+ *   2. 비용 > 소지금 → StrMODE[77]
+ *   3. 입원인데 질병·부상 없음 → StrMODE[196]
+ *   4. 외식인데 사기 100 → StrMODE[91]
+ *
+ * ⚠️ **원본 버그를 그대로 옮긴다** (DECISIONS 2026-09-20): 2번 소지금 검사는 **보험증서를 보지 않는다**
+ * (0x16d42) → 보험증서가 있어 실제로는 공짜인 입원도 소지금이 모자라면 막힌다.
+ */
 export function outingBlockReasonOf(
   career: PlayerCareer,
   outingFunction: OutingFunction,
@@ -27,16 +37,14 @@ export function outingBlockReasonOf(
   if (career.hasActedThisCycle) return '이미행동함'
   // StrMODE[62] "인기도가 부족합니다. 필요한 인기도 : %d"
   if (career.popularity < outingFunction.requiredPopularity) return '인기도부족'
-  // 외식은 사기가 최고면 막힌다 (StrMODE[91], 0x16cf0)
-  if (outingFunction.id === '외식' && career.morale >= MAXIMUM_MORALE) return '사기최고'
+  // StrMODE[77] — 보험증서(서브아이템 7)를 보지 않는다 (원본 그대로)
+  if (outingFunction.effect.moneyCost > 0 && career.money < outingFunction.effect.moneyCost) return '소지금부족'
   // StrMODE[196] "건강한 상태입니다 입원할 필요가 없습니다"
   if (outingFunction.effect.healsInjury && !career.isInjured && !career.isSick) return '건강함'
-  const cost = outingFunction.effect.moneyCost - (hasFreeHospital(career, outingFunction.id) ? outingFunction.effect.moneyCost : 0)
-  return cost > 0 && career.money < cost ? '소지금부족' : null
+  // 외식은 사기가 최고면 막힌다 (StrMODE[91])
+  if (outingFunction.id === '외식' && career.morale >= MAXIMUM_MORALE) return '사기최고'
+  return null
 }
-
-/** 보험증서가 있으면 입원비가 들지 않는다 — 막힘 판정에만 쓴다 (실제 보정은 applyOutingSubItems) */
-const hasFreeHospital = (career: PlayerCareer, functionId: string) => functionId === '입원' && hasSubItem(career, 7)
 
 function rollRange(random: RandomPort, [first, second]: OutingRange): number {
   const sign = first < 0 ? -1 : 1

@@ -15,15 +15,29 @@ const 선수 = (overrides: Partial<PlayerCareer> = {}): PlayerCareer => ({ ...cr
 const 기록 = (stats: Partial<typeof EMPTY_SEASON_STATS> = {}) => ({ ...EMPTY_SEASON_STATS, ...stats })
 
 describe('타석 인기도 점수 — 0xa59c0', () => {
-  it('타점이 있으면 단타 3 · 2루타 4 · 3루타 5 · 홈런 6 — 더 더하지 않는다 (점검 7차)', () => {
-    expect(atBatPopularityPoints({ outcome: { kind: '안타', bases: 1 }, runsBattedIn: 1, outsInPlay: 0, isWalkOff: false })).toBe(3)
+  it('홈런은 루타가 아니라 득점 수로 센다 — 솔로 3 · 투런 4 · 스리런 5 · 만루 6', () => {
+    expect(atBatPopularityPoints({ outcome: { kind: '홈런' }, runsBattedIn: 1, outsInPlay: 0, isWalkOff: false })).toBe(3)
+    expect(atBatPopularityPoints({ outcome: { kind: '홈런' }, runsBattedIn: 2, outsInPlay: 0, isWalkOff: false })).toBe(4)
     expect(atBatPopularityPoints({ outcome: { kind: '홈런' }, runsBattedIn: 4, outsInPlay: 0, isWalkOff: false })).toBe(6)
   })
 
-  it('타점이 없으면 단타 1 · 장타 2, 끝내기는 4·5', () => {
+  it('끝내기 홈런은 5, 홈런이 아닌 끝내기(득점 있음)는 4', () => {
+    expect(atBatPopularityPoints({ outcome: { kind: '홈런' }, runsBattedIn: 4, outsInPlay: 0, isWalkOff: true })).toBe(5)
+    expect(atBatPopularityPoints({ outcome: { kind: '안타', bases: 1 }, runsBattedIn: 1, outsInPlay: 0, isWalkOff: true })).toBe(4)
+  })
+
+  it('안타는 득점 점수 + 루타 점수를 더한다 — 2타점 2루타 = 2 + 2 = 4', () => {
+    expect(atBatPopularityPoints({ outcome: { kind: '안타', bases: 2 }, runsBattedIn: 2, outsInPlay: 0, isWalkOff: false })).toBe(4)
+    expect(atBatPopularityPoints({ outcome: { kind: '안타', bases: 1 }, runsBattedIn: 1, outsInPlay: 0, isWalkOff: false })).toBe(2)
+    // 타점이 없으면 루타 점수만 — 3루타는 3 이다 (앞서 2 로 한 칸 모자랐다)
+    expect(atBatPopularityPoints({ outcome: { kind: '안타', bases: 3 }, runsBattedIn: 0, outsInPlay: 0, isWalkOff: false })).toBe(3)
     expect(atBatPopularityPoints({ outcome: { kind: '안타', bases: 2 }, runsBattedIn: 0, outsInPlay: 0, isWalkOff: false })).toBe(2)
-    expect(atBatPopularityPoints({ outcome: { kind: '안타', bases: 1 }, runsBattedIn: 1, outsInPlay: 0, isWalkOff: true })).toBe(5)
-    expect(atBatPopularityPoints({ outcome: { kind: '안타', bases: 1 }, runsBattedIn: 0, outsInPlay: 0, isWalkOff: true })).toBe(4)
+  })
+
+  it('안타가 아닌 타점도 점수가 된다 — 밀어내기·희생플라이·땅볼 타점 (1점 +1 · 2~3점 +2)', () => {
+    expect(atBatPopularityPoints({ outcome: { kind: '아웃', detail: '뜬공아웃' }, runsBattedIn: 1, outsInPlay: 1, isWalkOff: false })).toBe(1)
+    expect(atBatPopularityPoints({ outcome: { kind: '볼넷' }, runsBattedIn: 1, outsInPlay: 0, isWalkOff: false })).toBe(1)
+    expect(atBatPopularityPoints({ outcome: { kind: '아웃', detail: '땅볼아웃' }, runsBattedIn: 2, outsInPlay: 1, isWalkOff: false })).toBe(2)
   })
 
   it('한 플레이 2아웃 이상(병살)이면 −1, 보통 아웃은 0', () => {
@@ -33,16 +47,29 @@ describe('타석 인기도 점수 — 0xa59c0', () => {
 })
 
 describe('타석 감점 카운터 — 0xa59c0 (+0x118 병살 · +0x11c 득점권 아웃)', () => {
-  const 타석 = (overrides = {}) => ({ outsInPlay: 1, runsBattedIn: 0, isWalkOff: false, hadSecondBaseRunner: true, ...overrides })
+  const 타석 = (overrides = {}) => ({
+    outcome: { kind: '아웃', detail: '땅볼아웃' } as const,
+    outsInPlay: 1,
+    runsBattedIn: 0,
+    isWalkOff: false,
+    hadSecondBaseRunner: true,
+    ...overrides,
+  })
 
   it('2루 주자를 두고 아웃되면 득점권 아웃, 2아웃 이상이면 병살도 센다', () => {
     expect(atBatPenaltyCounts(타석())).toEqual({ doublePlays: 0, scoringPositionOuts: 1 })
     expect(atBatPenaltyCounts(타석({ outsInPlay: 2 }))).toEqual({ doublePlays: 1, scoringPositionOuts: 1 })
   })
 
-  it('타점이 났거나 끝내기면 세지 않는다 (희생플라이 등)', () => {
-    expect(atBatPenaltyCounts(타석({ runsBattedIn: 1 }))).toEqual({ doublePlays: 0, scoringPositionOuts: 0 })
-    expect(atBatPenaltyCounts(타석({ isWalkOff: true, outsInPlay: 2 }))).toEqual({ doublePlays: 0, scoringPositionOuts: 0 })
+  it('타점이 나도 센다 — 홈런이나 "끝내기 + 득점" 일 때만 빠진다', () => {
+    expect(atBatPenaltyCounts(타석({ runsBattedIn: 1 }))).toEqual({ doublePlays: 0, scoringPositionOuts: 1 })
+    expect(atBatPenaltyCounts(타석({ outcome: { kind: '홈런' } }))).toEqual({ doublePlays: 0, scoringPositionOuts: 0 })
+    expect(atBatPenaltyCounts(타석({ isWalkOff: true, runsBattedIn: 1, outsInPlay: 2 }))).toEqual({ doublePlays: 0, scoringPositionOuts: 0 })
+  })
+
+  it('안타여도 득점권 아웃은 센다 — 다만 병살은 안타가 아닐 때만', () => {
+    const 안타 = { outcome: { kind: '안타', bases: 1 } as const, outsInPlay: 2 }
+    expect(atBatPenaltyCounts(타석(안타))).toEqual({ doublePlays: 0, scoringPositionOuts: 1 })
   })
 
   it('3루 주자만 있으면 득점권 아웃이 아니다 — 원본은 2루(a97a1 인덱스 2)만 본다', () => {

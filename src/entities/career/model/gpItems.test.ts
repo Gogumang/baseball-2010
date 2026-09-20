@@ -51,9 +51,15 @@ describe('GP 아이템 (타자, 0xa4488)', () => {
     expect(applyGpItem(장타, 4, 보통).career.ability).toEqual({ hit: 800, power: 850, defense: 750, run: 750 })
   })
 
-  it('장착 보너스로 실효값이 한계를 넘으면 기본값이 한계까지 올라간다 (원본 동작)', () => {
+  it('한계 비교는 장비·스킬을 뺀 기본값으로 한다 — 장비가 있어도 기본값을 깎지 않는다 (0xa4488)', () => {
     const 장비 = 선수({ skillIds: [], ability: { hit: 700, power: 100, defense: 100, run: 100 }, equipmentLevels: { hit: 5, power: 0, defense: 0, run: 0 } })
-    expect(applyGpItem(장비, 0, 보통).career.ability.hit).toBe(800)
+    // 기본값 700 + 10 = 710 은 한계 800 아래라 그대로 오른다 (앞서는 장비 보너스 탓에 800 으로 깎였다)
+    expect(applyGpItem(장비, 0, 보통).career.ability.hit).toBe(710)
+  })
+
+  it('기본값이 한계를 넘으면 한계로 내린다', () => {
+    const 한계초과 = 선수({ skillIds: [], ability: { hit: 795, power: 100, defense: 100, run: 100 }, equipmentLevels: { hit: 0, power: 0, defense: 0, run: 0 } })
+    expect(applyGpItem(한계초과, 0, 보통).career.ability.hit).toBe(800)
   })
 
   it('영지버섯 사기 +40 (상한 100) · 종합건강진단은 부상·질병 치료 · 이글아이는 20경기(상한 99)', () => {

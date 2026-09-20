@@ -4,7 +4,6 @@ import { gainMorale } from '@/entities/career/model/playerCareer'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { abilityLimitOf } from '@/entities/career/model/abilityLimit'
-import { effectiveAbilityOf } from '@/entities/career/model/condition'
 
 /**
  * GP 아이템 (타자편, binary.mod 0xa4488 — 누락 탐색 5차).
@@ -46,16 +45,17 @@ export { abilityLimitOf }
 const MAXIMUM_ABILITY = 999
 
 /**
- * 기본값 +10 (999 로 자름) 뒤, 실효 능력치(장착 보너스 포함 0xb6414)가 한계보다 크면 기본값을 한계로 둔다 (0xa4528).
- * 그래서 장착 보너스가 있으면 기본값이 한계까지 오르고, 이미 한계를 넘었던 기본값은 한계로 내려간다 (원본 동작).
+ * 기본값 +10 (999 로 자름) 뒤, **기본값이** 한계보다 크면 한계로 내린다 (0xa4488, G-5 확정).
+ * 비교에 쓰는 값은 **장비·스킬을 뺀 기본 능력치**다 — 앞서 웹은 `effectiveAbilityOf`(장착 보너스 포함)로
+ * 비교해서, 장비가 있으면 기본값을 한계 **아래로** 깎아 버렸다.
  */
 function raiseWithinLimit(career: PlayerCareer, abilities: readonly (keyof BatterAbility)[]): PlayerCareer {
   const limits = abilityLimitOf(career.battingTypeIndex)
   let next = career
   for (const key of abilities) {
-    const raised = { ...next, ability: { ...next.ability, [key]: Math.min(MAXIMUM_ABILITY, next.ability[key] + ABILITY_ITEM_GAIN) } }
-    const exceeds = effectiveAbilityOf(raised)[key] > limits[key]
-    next = exceeds ? { ...raised, ability: { ...raised.ability, [key]: Math.min(limits[key], MAXIMUM_ABILITY) } } : raised
+    const raised = Math.min(MAXIMUM_ABILITY, next.ability[key] + ABILITY_ITEM_GAIN)
+    const capped = raised > limits[key] ? Math.min(limits[key], MAXIMUM_ABILITY) : raised
+    next = { ...next, ability: { ...next.ability, [key]: capped } }
   }
   return next
 }
