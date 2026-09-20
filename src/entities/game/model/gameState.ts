@@ -1,7 +1,7 @@
 import { BALANCE } from '@/shared/config/original/balance'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { advanceRunners, EMPTY_BASES } from '@/entities/game/model/baseState'
-import type { BaseState } from '@/entities/game/model/baseState'
+import type { AdvanceResult, BaseState } from '@/entities/game/model/baseState'
 
 export const INNINGS_PER_GAME = 9
 /**
@@ -77,11 +77,21 @@ export function applyOpponentInning(game: GameState, runs: number): GameState {
   }
 }
 
-/** 우리 공격(말)에서 타석 하나의 결과를 반영한다. 3아웃이면 이닝을 넘긴다. */
-export function applyAtBatOutcome(game: GameState, outcome: AtBatOutcome): GameState {
+/**
+ * 우리 공격(말)에서 타석 하나의 결과를 반영한다. 3아웃이면 이닝을 넘긴다.
+ *
+ * `precomputed` 를 주면 주자 처리를 그 결과로 대신한다 — 사람 경기에서 수비 시뮬레이션
+ * (`features/defense-play`)이 정한 아웃·득점·루 상황을 그대로 넣는 자리다.
+ * 안 주면 지금까지처럼 `baseState.advanceRunners` 의 근사를 쓴다 (미션·투수편이 그 길을 쓴다).
+ */
+export function applyAtBatOutcome(
+  game: GameState,
+  outcome: AtBatOutcome,
+  precomputed?: AdvanceResult,
+): GameState {
   if (game.isFinished || game.half !== '말') return game
 
-  const advance = advanceRunners(game.bases, outcome, game.outs)
+  const advance = precomputed ?? advanceRunners(game.bases, outcome, game.outs)
   const outs = game.outs + advance.outsAdded
   const afterAtBat: GameState = {
     ...game,

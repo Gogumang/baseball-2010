@@ -4,6 +4,9 @@ import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import { isPlayerTurn, PLAYER_BATTING_ORDER_INDEX } from '@/entities/game/model/gameState'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { opponentOf } from '@/entities/league/model/league'
+import { advanceRunners, EMPTY_BASES } from '@/entities/game/model/baseState'
+import type { BaseState } from '@/entities/game/model/baseState'
+import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 
 describe('startGame', () => {
   it('커리어 타순(9번)이면 플레이어는 아홉 번째 타자다', () => {
@@ -187,5 +190,72 @@ describe('삼진 계열 기록이 경기 중에 쌓인다 (16~23·25)', () => {
     // 우리 투수가 잡은 삼진 수가 이닝 수보다 많다 = 이닝을 넘겨 누적된다
     expect(finished.pitching.strikeouts).toBeGreaterThan(0)
     expect(finished.pitching.outsRecorded).toBeGreaterThanOrEqual(finished.pitching.strikeouts)
+  })
+})
+
+describe('사람 타석은 수비 시뮬레이션을 돌린다 — CPU 간이 엔진(0xc11f0)은 그대로 둔다', () => {
+  /** 원하는 루 상황·아웃으로 사용자 타석 하나를 만든다 */
+  function 내타석(bases: BaseState, outs: number): GameProgress {
+    const progress = startGame(createSeededRandom(20100901))
+    return { ...progress, game: { ...progress.game, bases, outs, half: '말' } }
+  }
+
+  it('인플레이 타구면 매 틱 화면 스냅샷이 남는다', () => {
+    const after = applyPlayerOutcome(
+      내타석(EMPTY_BASES, 0),
+      { kind: '아웃', detail: '땅볼아웃' },
+      createSeededRandom(3),
+    )
+
+    expect(after.lastDefensePlay).not.toBeNull()
+    expect(after.lastDefensePlay!.ticks.length).toBeGreaterThan(1)
+    expect(after.lastDefensePlay!.ticks[0].fielders).toHaveLength(9)
+  })
+
+  it('삼진·볼넷은 수비가 돌 일이 없다', () => {
+    const after = applyPlayerOutcome(내타석(EMPTY_BASES, 0), { kind: '삼진' }, createSeededRandom(3))
+
+    expect(after.lastDefensePlay).toBeNull()
+  })
+
+  it('깊은 뜬공은 3루 주자를 불러들이고, 얕은 뜬공은 못 불러들인다 (희생플라이 보장 제거)', () => {
+    const 깊은뜬공: BattedBallPattern = [90, 900, 1500, 0]
+    const 얕은뜬공: BattedBallPattern = [90, 250, 700, 0]
+    const 시작 = 내타석({ first: false, second: false, third: true }, 0)
+    const 뜬공아웃 = { kind: '아웃', detail: '뜬공아웃' } as const
+
+    // 타석 뒤에는 동료 타석이 이어져 점수가 더 붙으므로, 이 타구가 만든 결과만 본다
+    const 깊게 = applyPlayerOutcome(시작, 뜬공아웃, createSeededRandom(3), { pattern: 깊은뜬공 })
+    const 얕게 = applyPlayerOutcome(시작, 뜬공아웃, createSeededRandom(3), { pattern: 얕은뜬공 })
+
+    expect(깊게.lastDefensePlay!.advance).toMatchObject({ runsScored: 1, outsAdded: 1 })
+    expect(얕게.lastDefensePlay!.advance).toMatchObject({
+      runsScored: 0,
+      outsAdded: 1,
+      bases: { first: false, second: false, third: true },
+    })
+  })
+
+  it('2아웃 땅볼로 타자주자가 죽으면 3루 주자 득점이 무효가 된다 (S2 2-5)', () => {
+    const 땅볼아웃 = { kind: '아웃', detail: '땅볼아웃' } as const
+    const 무사 = 내타석({ first: false, second: false, third: true }, 0)
+    const 이사 = 내타석({ first: false, second: false, third: true }, 2)
+
+    expect(
+      applyPlayerOutcome(무사, 땅볼아웃, createSeededRandom(3)).lastDefensePlay!.advance.runsScored,
+    ).toBe(1)
+    // 2아웃이면 같은 타구인데도 점수가 0 이다
+    expect(
+      applyPlayerOutcome(이사, 땅볼아웃, createSeededRandom(3)).lastDefensePlay!.advance.runsScored,
+    ).toBe(0)
+  })
+
+  it('CPU 간이 엔진은 손대지 않았다 — advanceRunners 의 근사는 그대로다', () => {
+    const 주자3루: BaseState = { first: false, second: false, third: true }
+    // quickEngine 은 뜬공에 주자를 안 움직이고, 기본 갈래는 희생플라이 근사를 그대로 둔다
+    expect(
+      advanceRunners(주자3루, { kind: '아웃', detail: '뜬공아웃' }, 0, { quickEngine: true }),
+    ).toEqual({ bases: 주자3루, runsScored: 0, outsAdded: 1 })
+    expect(advanceRunners(주자3루, { kind: '아웃', detail: '뜬공아웃' }, 0).runsScored).toBe(1)
   })
 })

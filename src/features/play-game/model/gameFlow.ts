@@ -25,6 +25,11 @@ import { completeGameRecordIdsOf, gameEndRecordIdsOf } from '@/entities/game/mod
 import { EMPTY_BATTER_GAME_LOG, recordBatterAtBat } from '@/entities/game/model/batterGameLog'
 import type { BatterGameLog } from '@/entities/game/model/batterGameLog'
 import type { AcePlayer } from '@/shared/config/original/acePlayers'
+import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
+import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
+import { isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
+import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
+import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
 
 export interface GameLogEntry {
   readonly id: number
@@ -70,6 +75,11 @@ export interface GameProgress {
   }
   readonly log: readonly GameLogEntry[]
   readonly nextLogId: number
+  /**
+   * 사용자 타석에서 마지막으로 돌린 수비 시뮬레이션. 매 틱의 `DefenseViewState` 가 여기 들어 있다 —
+   * 수비 화면은 이것만 받아 그리면 된다 (라우팅은 앱 쪽 몫이라 여기서 연결하지 않는다).
+   */
+  readonly lastDefensePlay: DefensePlayResult | null
 }
 
 /**
@@ -121,21 +131,44 @@ export function startGame(
     pitching: { hitsAllowed: 0, walksAllowed: 0, outsRecorded: 0, strikeouts: 0, strikeoutCombo: 0 },
     log: [],
     nextLogId: 1,
+    lastDefensePlay: null,
   }
   return advanceUntilPlayerTurn(initial, random)
 }
 
-/** 플레이어 타석의 결과를 반영하고, 다시 플레이어 차례가 올 때까지 자동 진행한다. */
+/**
+ * 플레이어 타석의 결과를 반영하고, 다시 플레이어 차례가 올 때까지 자동 진행한다.
+ *
+ * **원본은 CPU 끼리의 경기에만 간이 엔진(0xc11f0)을 쓰고 사람 경기는 수비 시뮬레이션을 돌린다.**
+ * 그래서 여기서는 타구가 인플레이면 `features/defense-play` 진행기를 돌려 아웃·득점·루 상황을
+ * 그 결과로 갈아 끼운다 — `baseState` 의 희생플라이 보장·고정 진루표 근사는 이 길에서 안 쓰인다.
+ * 삼진·볼넷·홈런은 수비가 개입할 것이 없어 지금까지의 길(0xc11f0 과 같은 규칙)을 그대로 쓴다.
+ *
+ * `pattern` 을 주면 그 원본 패턴으로 궤적을 만든다. 안 주면 같은 결과를 내는 대표 패턴을
+ * 원본 표에서 골라 쓴다 (`representativePatternOf`).
+ */
 export function applyPlayerOutcome(
   progress: GameProgress,
   outcome: AtBatOutcome,
   random: RandomPort,
+  options: { readonly pattern?: BattedBallPattern } = {},
 ): GameProgress {
   if (progress.game.isFinished) return progress
 
-  const nextGame = applyAtBatOutcome(progress.game, outcome)
+  const defensePlay = isBattedBallInPlay(outcome)
+    ? runDefensePlay({
+        outcome,
+        trajectory: battedBallTrajectory(options.pattern ?? representativePatternOf(outcome)),
+        bases: progress.game.bases,
+        outs: progress.game.outs,
+      })
+    : null
+
+  const nextGame = applyAtBatOutcome(progress.game, outcome, defensePlay?.advance)
   const runsBattedIn = nextGame.ourScore - progress.game.ourScore
-  const outsInPlay = advanceRunners(progress.game.bases, outcome, progress.game.outs).outsAdded
+  const outsInPlay =
+    defensePlay?.advance.outsAdded ??
+    advanceRunners(progress.game.bases, outcome, progress.game.outs).outsAdded
   const isWalkOff = nextGame.isFinished && runsBattedIn > 0 && nextGame.ourScore > nextGame.opponentScore
   const points = atBatPopularityPoints({ outcome, runsBattedIn, outsInPlay, isWalkOff })
   const penalties = atBatPenaltyCounts({
@@ -160,6 +193,7 @@ export function applyPlayerOutcome(
     {
       ...progress,
       game: nextGame,
+      lastDefensePlay: defensePlay,
       myStats,
       consecutiveHits,
       recordIds: [...progress.recordIds, ...recordIds],
