@@ -44,7 +44,7 @@ import {
   midSeasonTitlesOf,
 } from '@/entities/career/model/seasonFlow'
 import { forgetRepeatableEvents } from '@/entities/story/model/storyScene'
-import { battingOrderEventId, emptyPlaceEventId } from '@/entities/career/model/battingOrder'
+import { battingOrderEventId, emptyPlaceEventId, isEmptyPlaceEventId } from '@/entities/career/model/battingOrder'
 import type { OutingPlace } from '@/shared/config/outingPlaces'
 import { applyEventRewards } from '@/entities/story/model/eventReward'
 import { rollTrainingInjury } from '@/entities/career/model/condition'
@@ -411,6 +411,12 @@ export function useCareerSession({
       if (openTexts.length > 0) setManagementNotice(openTexts.join(' · '))
 
       if (screen.context === '장소') {
+        // 빈 장소(440~444)는 **행동·외출 횟수를 쓰지 않고** 장소 화면으로 돌아간다 (0x1c014, G-4).
+        // 앞서 웹은 빈 장소에서도 행동을 썼다 — 원본과 반대였다.
+        if (isEmptyPlaceEventId(screen.eventId)) {
+          setCareer(viewed)
+          return setScreen({ kind: '외출' })
+        }
         // 장소 이벤트도 외출이다 — 행동을 쓰고 외출 횟수(칭호 "1년간 외출")에 센다
         const visited = spendCycleAction({ ...viewed, outingsThisSeason: viewed.outingsThisSeason + 1 })
         setCareer(awardTitles(visited, evaluateNewTitles(visited)))

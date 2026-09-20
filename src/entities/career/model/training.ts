@@ -83,7 +83,8 @@ export function blockReasonOf(career: PlayerCareer, menu: TrainingMenu): Trainin
   if (career.hasActedThisCycle) return '이미행동함'
   if (career.morale <= 0) return '사기부족'
   // 원본은 G포인트가 모자라도 막지 않는다 (0xa3c84 가 0 에서 바닥을 친다).
-  // 최고 레벨 가드는 원본에서 못 찾았고, 표를 넘어 읽는 것을 막으려고 우리가 둔 것이다 (추정).
+  // 최고 레벨 가드는 **원본에도 있다** (R7 4절 확정): 필살타법 창 0x17828 이 "칸 i == 배운 수" 일 때만
+  // 훈련시키므로, 최고 레벨이면 모든 칸이 StrMODE[63] 으로 막힌다. 우리가 넣은 안전장치가 아니다.
   if (isSpecialSwingMenu(menu)) {
     return career.specialSwingLevel >= SPECIAL_SWING_MAXIMUM_LEVEL ? '훈련완료' : null
   }

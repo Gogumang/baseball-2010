@@ -31,9 +31,13 @@ export const HEADER_DIVIDER_COUNT = 4
 export const ROW_FRAME = 19
 export const ROW_FRAME_ORIGIN = { x: 20, y: 78 } as const
 export const ROW_STEP = 18
-/** 정규 시즌 10줄, 포스트시즌 플래그([+0xac])면 4줄 */
+/**
+ * 정규 시즌 10줄. `[+0xac]` 가 서면 4줄인데, 이 플래그는 포스트시즌이 아니라
+ * **국가대항전 진행 중** 표시다 (P5 확정, P1 의 "포스트시즌 플래그" 는 오독이었다).
+ * 4줄은 대회에 나온 **4개국** 순위다 — 국가대항전을 만들 때 쓰면 된다.
+ */
 export const ROW_COUNT = 10
-export const POSTSEASON_ROW_COUNT = 4
+export const NATIONAL_MATCH_ROW_COUNT = 4
 
 /** 줄 안의 칸 — f19 박스0~4 (첫 줄 기준 y, 아랫 줄은 +18i) */
 export const ROW_CELLS = {
