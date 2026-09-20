@@ -65,13 +65,25 @@ export const buttons = style({
   marginTop: `${TEXT_TO_BUTTONS}px`,
 })
 
+/** 버튼 그림 41×15 — 고른 칸은 49×23 이 같은 기준점에서 사방 4px 넘쳐 나온다 */
+const BUTTON_WIDTH = 41
+
 export const button = style({
+  position: 'relative',
   padding: 0,
   border: 'none',
   background: 'none',
   font: 'inherit',
   fontSize: `${FONT_SIZE}px`,
+  width: `${BUTTON_WIDTH}px`,
   height: `${BUTTON_HEIGHT}px`,
   lineHeight: `${BUTTON_HEIGHT}px`,
   cursor: 'pointer',
+})
+
+export const buttonImage = style({
+  position: 'absolute',
+  left: 0,
+  top: 0,
+  imageRendering: 'pixelated',
 })

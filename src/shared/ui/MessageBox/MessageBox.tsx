@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { MarkupText } from '@/shared/ui'
-import { ORIGINAL_COLORS } from '@/shared/config/design'
 import * as styles from '@/shared/ui/MessageBox/MessageBox.css'
 
 interface MessageBoxProps {
   /** 원문 마크업 (StrMODE) */
   readonly text: string
-  /** 버튼 글자 — 종류 1 은 하나, 종류 2 는 둘. 원본 문자열표를 못 찾아 "확인"·"예/아니오" 로 둔다 (추정) */
+  /**
+   * 버튼 이름. 화면에는 **글자가 아니라 `ui/popup.pzx` 그림**이 나가고(F-1), 이 값은 읽기 보조용이다.
+   * 하나면 알림(프레임 0 "OK"), 둘이면 예/아니오다.
+   */
   readonly buttons: readonly string[]
   /** 누른 버튼 번호 */
   readonly onAnswer: (index: number) => void
@@ -15,8 +17,28 @@ interface MessageBoxProps {
 /**
  * 메시지 상자 (0xbbef8 → 0x74ef4 배치 · 0x746cc 그리기 — layout-re 4차, 판·위치 바이트 확인).
  * 화면을 검정 반투명으로 덮고, 폭 240 띠를 세로 가운데에 둔다. 글은 (45, y+20) 부터 폭 150, 줄 간격 14.
- * 버튼은 시스템 글꼴 글자이고 첫 버튼이 기본 선택이다. 선택 색(노랑)·열림 애니메이션은 미확인 (추정).
+ * 버튼은 `ui/popup.pzx` 프레임 그림이고 첫 버튼이 기본 선택이다 (F-1 확정) — "확인" 이 아니라 **"OK"**,
+ * 고른 칸은 노란 글자가 아니라 **주황 그림 6·7**(49×23)이다.
+ * 아직 없는 것: 열림(세로 ×2 펼침)·닫힘(가로 ÷2) 애니메이션.
  */
+const POPUP = './sprites/popup/frames'
+/**
+ * 버튼은 글자가 아니라 `ui/popup.pzx` 프레임 그림이다 (F-1 확정).
+ *   알림(버튼 하나) = 프레임 0 "OK" · 예/아니오 = 1 "예" · 2 "아니오" (41×15)
+ *   고른 칸은 주황 그림 6·7 (49×23) 로 바뀐다 — 노란 글자색이 아니었다.
+ */
+const NOTICE_FRAME = 0
+const YES_NO_FRAMES = [1, 2]
+const YES_NO_SELECTED_FRAMES = [6, 7]
+/** 선택 그림 원점 (−4,−4) */
+const SELECTED_OVERFLOW = 4
+
+/** 버튼 칸 → 그림 프레임. 버튼이 하나면 알림이라 "OK" 한 장뿐이고 고른 그림이 따로 없다 */
+function buttonFrameOf(count: number, index: number, isSelected: boolean): number | undefined {
+  if (count <= 1) return NOTICE_FRAME
+  return (isSelected ? YES_NO_SELECTED_FRAMES : YES_NO_FRAMES)[index]
+}
+
 export function MessageBox({ text, buttons, onAnswer }: MessageBoxProps) {
   const [selected, setSelected] = useState(0)
 
@@ -62,14 +84,25 @@ export function MessageBox({ text, buttons, onAnswer }: MessageBoxProps) {
           <MarkupText raw={text} />
         </div>
         <div className={styles.buttons}>
-          {buttons.map((label, index) => (
-            <button key={label} type="button" className={styles.button}
-              style={{ color: index === selected ? ORIGINAL_COLORS.highlightYellow : ORIGINAL_COLORS.text }}
-              onMouseEnter={() => setSelected(index)} onFocus={() => setSelected(index)}
-              onClick={() => onAnswer(index)}>
-              {label}
-            </button>
-          ))}
+          {buttons.map((label, index) => {
+            const isSelected = index === selected
+            const frame = buttonFrameOf(buttons.length, index, isSelected)
+            return (
+              <button key={label} type="button" className={styles.button} aria-label={label}
+                onMouseEnter={() => setSelected(index)} onFocus={() => setSelected(index)}
+                onClick={() => onAnswer(index)}>
+                {frame === undefined ? label : (
+                  <img
+                    className={styles.buttonImage}
+                    src={`${POPUP}/${String(frame).padStart(3, '0')}.png`}
+                    alt=""
+                    // 선택 그림(49×23)은 원점이 (−4,−4) 라 같은 자리에서 사방 4px 넘쳐 그려진다
+                    style={isSelected && buttons.length > 1 ? { left: -SELECTED_OVERFLOW, top: -SELECTED_OVERFLOW } : undefined}
+                  />
+                )}
+              </button>
+            )
+          })}
         </div>
       </div>
     </div>
