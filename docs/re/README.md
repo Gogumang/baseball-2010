@@ -6,6 +6,7 @@
 ## 먼저 읽을 것
 | 파일 | 내용 |
 |---|---|
+| **[FOR-IMPLEMENTER.md](FOR-IMPLEMENTER.md)** | **웹을 고칠 사람은 이것부터.** 틀린 곳 61건(파일:줄 → 원본 동작) · 없는 기능 20묶음 · 뽑아야 할 데이터 21건 · 추천 순서 |
 | **[CORRECTIONS.md](CORRECTIONS.md)** | **나중 해독이 앞 판단을 뒤집은 것 40여 건.** 다른 문서를 읽기 전에 꼭 볼 것 |
 | [DECISIONS.md](DECISIONS.md) | 사용자 결정 (원본 버그를 그대로 옮긴다 등)과 원본 버그 목록 |
 | [UNRESOLVED.md](UNRESOLVED.md) | 아직 해석되지 않은 것 목록 |
