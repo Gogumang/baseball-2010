@@ -81,7 +81,11 @@ const COLLECTOR_LEVEL = 8
  * 원본 오픈 비트는 전역 저장(game_o.sav)에 있고 이벤트 304~307(보상 7)·미션 올 클리어 등으로도 열리지만
  * 웹판은 아직 컬렉터 조건만 본다 (누락 탐색 7차 표 참고).
  */
-/** 타자 장비 오픈 id (헬멧 35~38 · 배트 39~42 · 밴드 43~46 · 슈즈 47~50, 0x61f5c) */
+/**
+ * 타자 장비 오픈 id (헬멧 35~38 · 배트 39~42 · 밴드 43~46 · 슈즈 47~50, 0x61f5c).
+ * 부위를 다 모았을 때 열리는 **컬렉터 id 는 타자 36·40·44·48** 이다 (R12 5절 확정).
+ * 투수 쪽은 20·24·28·32 인데 웹에 투수편이 없어 아직 쓰지 않는다.
+ */
 const BATTER_HIDDEN_ID_START = 35
 const HIDDEN_LEVELS_PER_PART = 4
 
@@ -100,8 +104,23 @@ export function isHiddenOpen(career: PlayerCareer, part: number, level: number):
 
 const BATTER_HIDDEN_ID_END = BATTER_HIDDEN_ID_START + EQUIPMENT_PARTS.length * HIDDEN_LEVELS_PER_PART
 
-/** 히든 오픈 알림 — StrCOMMON[139] "히든 아이템 오픈!! [%s]" + [143] "나만의리그 타자편에서 사용가능합니다". 타자 장비 id 가 아니면 null */
+/**
+ * 히든 오픈 알림 — StrCOMMON[139] "히든 아이템 오픈!! [%s]" 뒤에 **쓰는 곳을 알리는 뒷줄**이 붙는다.
+ * 뒷줄은 id 로 갈린다 (R12 5절 확정): **13~18 시즌모드**(StrCOMMON[141]) ·
+ * **19~34 나만의리그 투수편**(142) · **35~50 나만의리그 타자편**(143).
+ * 앞서 웹은 타자 id 만 다루고 뒷줄도 타자 문구로 고정돼 있었다.
+ */
+const SEASON_HIDDEN_ID_RANGE = { first: 13, last: 18 }
+const PITCHER_HIDDEN_ID_RANGE = { first: 19, last: 34 }
+
 export function hiddenOpenTextOf(id: number): string | null {
+  if (id >= SEASON_HIDDEN_ID_RANGE.first && id <= SEASON_HIDDEN_ID_RANGE.last) {
+    // 구장 아이템(관중석·전광판) — 이름은 시즌 구단관리 쪽이라 아직 없다
+    return '히든 아이템 오픈!! 시즌모드에서 사용가능합니다'
+  }
+  if (id >= PITCHER_HIDDEN_ID_RANGE.first && id <= PITCHER_HIDDEN_ID_RANGE.last) {
+    return '히든 아이템 오픈!! 나만의리그 투수편에서 사용가능합니다'
+  }
   if (id < BATTER_HIDDEN_ID_START || id >= BATTER_HIDDEN_ID_END) return null
   const offset = id - BATTER_HIDDEN_ID_START
   const item = equipmentItemOf(Math.floor(offset / HIDDEN_LEVELS_PER_PART), FIRST_HIDDEN_LEVEL + (offset % HIDDEN_LEVELS_PER_PART))

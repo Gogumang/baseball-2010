@@ -14,6 +14,16 @@ import { SpecialSwingSlot } from '@/widgets/special-swing/ui/SpecialSwingSlot'
 import * as styles from '@/shared/ui/GameWindow/GameWindow.css'
 import * as local from '@/widgets/special-swing/ui/SpecialSwingWindow.css'
 
+/**
+ * 칸 → 필살타법 이름. 기술 번호는 [1,2,3,4] 이고 **넷째 칸만 4 + 타입** 이다 (0x17828).
+ * `BATTER_BURSTS` 는 0-기준이라 번호에서 1 을 뺀다.
+ */
+function burstNameOf(slot: number, battingTypeIndex: number): string {
+  const LAST_SLOT = 3
+  const number = slot === LAST_SLOT ? 4 + battingTypeIndex : slot + 1
+  return BATTER_BURSTS[number - 1] ?? ''
+}
+
 const IMG_TEXT = './sprites/img_text/frames'
 const MODE_UI = './sprites/mode_ui/frames'
 /** img_text 글자 그림 높이 */
@@ -24,11 +34,19 @@ interface SpecialSwingWindowProps {
   readonly level: number
   /** 이번 레벨에서 지금까지 한 훈련 횟수 */
   readonly sessions: number
+  /** 선수 타입 (0 타격형 · 1 장타형) — **넷째 칸 이름이 이걸로 갈린다** */
+  readonly battingTypeIndex: number
   readonly onClose: () => void
 }
 
-/** 필살타법 창 (0x803d4) — 칸 4개 · 이름 · 설명 · 훈련 횟수. 나만의리그 장면 위에 뜬다 */
-export function SpecialSwingWindow({ level, sessions, onClose }: SpecialSwingWindowProps) {
+/**
+ * 필살타법 창 (0x803d4) — 칸 4개 · 이름 · 설명 · 훈련 횟수. 나만의리그 장면 위에 뜬다.
+ *
+ * 이름은 `StrCOMMON[24 + 기술번호]` 이고 기술 번호는 [1,2,3,4] 인데,
+ * **넷째 칸만 `4 + 타입`**(레코드 +0xb 위 3비트)이다 (H-4 확정):
+ * 타격형이면 미라지 스윙, 장타형이면 **메테오 스윙**. 앞서 웹은 늘 미라지 스윙이었다.
+ */
+export function SpecialSwingWindow({ level, sessions, battingTypeIndex, onClose }: SpecialSwingWindowProps) {
   const [cursor, setCursor] = useState(Math.min(Math.max(level - 1, 0), SLOT_COUNT - 1))
   const textOrigins = useFrameOrigins(IMG_TEXT)
   const update = useUpdateCounter()
@@ -74,7 +92,7 @@ export function SpecialSwingWindow({ level, sessions, onClose }: SpecialSwingWin
       )}
 
       <div className={local.text} style={{ left: NAME_BOX.x, top: NAME_BOX.y + 1, width: NAME_BOX.width }}>
-        {BATTER_BURSTS[cursor] ?? ''}
+        {burstNameOf(cursor, battingTypeIndex)}
       </div>
       {/* 설명 문자열은 원본 문자열표 번호 계산(293/295)이 미해독이라 비워 둔다 */}
       <div className={local.text} style={{ left: DESCRIPTION_BOX.x, top: DESCRIPTION_BOX.y, width: DESCRIPTION_BOX.width }} />

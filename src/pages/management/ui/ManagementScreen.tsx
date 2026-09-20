@@ -82,7 +82,7 @@ export function ManagementScreen(props: ManagementScreenProps) {
       <ScreenFrame title="나만의리그타자편" gamePoint={career.gamePoint} onBack={menu.back} />
       {menu.overlay === '기록실' && <StandingsWindow league={career.league} onClose={menu.closeOverlay} />}
       {menu.overlay === '필살타법' && (
-        <SpecialSwingWindow level={career.specialSwingLevel} sessions={career.specialSwingSessions} onClose={menu.closeOverlay} />
+        <SpecialSwingWindow level={career.specialSwingLevel} sessions={career.specialSwingSessions} battingTypeIndex={career.battingTypeIndex} onClose={menu.closeOverlay} />
       )}
       {props.detail !== null && <DetailPopup result={props.detail} onClose={props.onCloseDetail} />}
       {menu.question !== null && (
