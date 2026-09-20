@@ -60,6 +60,11 @@ export interface PlayerCareer {
   readonly morale: number
   /** 원작 소지금 (만원 단위). G포인트와는 별개다. */
   readonly money: number
+  /**
+   * 한 번 해제한 마이너스 스킬 (+0x1d0+k, 표 0xd7e10 = [2,3,4,5,17,18,19,20]).
+   * **다시 얻을 수 없다** — 이벤트 조건 20 이 이 플래그를 본다 (A-4).
+   */
+  readonly removedMinusSkillIds: readonly number[]
   readonly isInjured: boolean
   /** 부상 상태로 치른 경기 수 (+0x1b6) — 20 이 되면 부상 엔딩 0 (0xa3a84) */
   readonly injuredGamesPlayed: number
@@ -216,6 +221,7 @@ export function createCareer(name: string, profile: RookieProfile = DEFAULT_ROOK
     reputation: STARTING_REPUTATION,
     morale: STARTING_MORALE,
     money: STARTING_MONEY,
+    removedMinusSkillIds: [],
     isInjured: false,
     injuredGamesPlayed: 0,
     isSick: false,
@@ -297,13 +303,29 @@ export function hasSkill(career: PlayerCareer, skillId: number): boolean {
   return career.skillIds.includes(skillId)
 }
 
-/** 보상 종류 4 — 양수 n 은 스킬 n−1 획득, 음수 −n 은 스킬 n−1 해제 (0x8c5bc) */
+/** 마이너스 스킬 (표 0xd7e10) — 한 번 해제하면 다시 얻을 수 없다 */
+export const MINUS_SKILL_IDS: readonly number[] = [2, 3, 4, 5, 17, 18, 19, 20]
+
+/**
+ * 보상 종류 4 — 양수 n 은 스킬 n−1 획득, 음수 −n 은 스킬 n−1 해제 (0x8c5bc).
+ *
+ * **마이너스 스킬을 해제하면 `+0x1d0+k` 플래그가 서서 다시 얻지 못한다** (0xa4430, A-6).
+ * 획득 쪽도 그 플래그를 보고 막는다 — 웹에 통째로 빠져 있던 규칙이다.
+ */
 export function applySkillReward(career: PlayerCareer, value: number): PlayerCareer {
   const skillId = Math.abs(value) - 1
   if (value > 0) {
-    return hasSkill(career, skillId) ? career : { ...career, skillIds: [...career.skillIds, skillId] }
+    if (hasSkill(career, skillId)) return career
+    if (career.removedMinusSkillIds.includes(skillId)) return career
+    return { ...career, skillIds: [...career.skillIds, skillId] }
   }
-  return { ...career, skillIds: career.skillIds.filter((id) => id !== skillId) }
+  if (!hasSkill(career, skillId)) return career
+  const removed = MINUS_SKILL_IDS.includes(skillId) && !career.removedMinusSkillIds.includes(skillId)
+  return {
+    ...career,
+    skillIds: career.skillIds.filter((id) => id !== skillId),
+    removedMinusSkillIds: removed ? [...career.removedMinusSkillIds, skillId] : career.removedMinusSkillIds,
+  }
 }
 
 export function affectionOf(career: PlayerCareer, heroineId: string): number {

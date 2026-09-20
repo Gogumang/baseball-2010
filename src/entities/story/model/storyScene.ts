@@ -2,6 +2,7 @@ import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { GAMES_PER_SEASON } from '@/entities/career/model/playerCareer'
 import type { OriginalEvent } from '@/shared/config/original/eventTypes'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { meetsSkillAcquireCondition, meetsSkillReleaseCondition } from '@/entities/story/model/skillCondition'
 
 /**
  * 원작 이벤트 일정 (r_event 레코드 머리).
@@ -29,7 +30,7 @@ export const OPENING_EVENT_ID = 451
 
 const BATTER_AUDIENCES: ReadonlySet<number> = new Set([1, 2])
 
-const CONDITION = { 인기도: 18, 평판: 19, 질병: 22, 봤음: 24, 안봤음: 25 } as const
+const CONDITION = { 인기도: 18, 평판: 19, 스킬획득: 20, 스킬해제: 21, 질병: 22, 봤음: 24, 안봤음: 25 } as const
 const ABILITY_CONDITIONS = ['hit', 'power', 'defense', 'run'] as const
 
 /** 유리몸 — 질병 확률 +10 (0xadb32) */
@@ -110,6 +111,10 @@ function meetsConditions(event: OriginalEvent, career: PlayerCareer, random: Ran
         return hasSeen(career, condition.value)
       case CONDITION.안봤음:
         return !hasSeen(career, condition.value)
+      case CONDITION.스킬획득:
+        return meetsSkillAcquireCondition(career, condition.value, random)
+      case CONDITION.스킬해제:
+        return meetsSkillReleaseCondition(career, condition.value)
       case CONDITION.질병:
         if (random === undefined || career.isSick || career.illnessCooldown > 0) return false
         return random.nextInRange(0, PERCENT) < illnessChanceOf(career.morale, career.skillIds)
