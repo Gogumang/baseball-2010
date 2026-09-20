@@ -1,0 +1,111 @@
+import { describe, expect, it } from 'vitest'
+import { TEAMS } from '@/shared/config/original/teams'
+import {
+  GAME_RECORD_SIZE,
+  MORALE_LIMIT,
+  SEASON_GAME_COUNT,
+  STADIUM_OWNED_SIZE,
+  TEAM_ABILITY_LIMIT,
+  clampTo,
+  initialTeamAbilities,
+  isFinalYear,
+  seasonDayOf,
+  startNewSeason,
+  startNextYear,
+} from '@/entities/season-mode/model/seasonRecord'
+
+describe('새 시즌 0x5758', () => {
+  it('소지금 50(=5000만) · 인기도 0 · 팀 사기 100 으로 시작한다', () => {
+    const { record, teamMorale } = startNewSeason(3, '테스트구단')
+    expect(record.teamId).toBe(3)
+    expect(record.money).toBe(50)
+    expect(record.popularity).toBe(0)
+    expect(teamMorale).toBe(MORALE_LIMIT)
+  })
+
+  it('평판·연차는 0 으로 남는다 (0x5758 이 쓰지 않는다)', () => {
+    const { record } = startNewSeason(0, 'T')
+    expect(record.reputation).toBe(0)
+    expect(record.yearIndex).toBe(0)
+  })
+
+  it('평판 기록은 16칸, 구장 보유 플래그는 21칸이다', () => {
+    const { record } = startNewSeason(0, 'T')
+    expect(record.gameRecord).toHaveLength(GAME_RECORD_SIZE)
+    expect(record.stadiumOwned).toHaveLength(STADIUM_OWNED_SIZE)
+    expect(record.stadiumEquipped).toEqual([0, 0, 0])
+  })
+
+  it('팀 능력치는 XlsTEAM_DATA 값 그대로다', () => {
+    const abilities = initialTeamAbilities()
+    expect(abilities).toHaveLength(10)
+    expect(abilities[0]).toEqual(TEAMS[0].values.slice(2))
+  })
+})
+
+describe('새 해 0x6e0c', () => {
+  it('연차가 오르고 사기가 100 으로 돌아가며 경기 수가 0 이 된다', () => {
+    const 앞 = startNewSeason(0, 'T')
+    const 뒤 = startNextYear({ ...앞, teamMorale: 12, record: { ...앞.record, games: 45, yearIndex: 2 } })
+    expect(뒤.record.yearIndex).toBe(3)
+    expect(뒤.record.games).toBe(0)
+    expect(뒤.teamMorale).toBe(MORALE_LIMIT)
+  })
+
+  it('CPU 9팀만 능력치가 +30 오른다 — 내 팀은 그대로다', () => {
+    const 앞 = startNewSeason(4, 'T')
+    const 뒤 = startNextYear(앞)
+    expect(뒤.teamAbilities[4]).toEqual(앞.teamAbilities[4])
+    expect(뒤.teamAbilities[0]).toEqual(앞.teamAbilities[0].map((value) => value + 30))
+  })
+
+  it('팀 능력치는 999 에서 막힌다', () => {
+    const 앞 = startNewSeason(0, 'T')
+    const 가득 = { ...앞, teamAbilities: 앞.teamAbilities.map(() => [990, 999, 700, 500]) }
+    const 뒤 = startNextYear(가득)
+    expect(뒤.teamAbilities[1]).toEqual([TEAM_ABILITY_LIMIT, TEAM_ABILITY_LIMIT, 730, 530])
+  })
+
+  it('인기도·평판·소지금은 해를 넘겨 그대로 간다', () => {
+    const 앞 = startNewSeason(0, 'T')
+    const 뒤 = startNextYear({
+      ...앞,
+      record: { ...앞.record, popularity: 700, reputation: 300, money: 1_234 },
+    })
+    expect(뒤.record.popularity).toBe(700)
+    expect(뒤.record.reputation).toBe(300)
+    expect(뒤.record.money).toBe(1_234)
+    // 목표 ⑤ 가 보는 "시즌 시작 인기도" 는 새로 떠 둔다
+    expect(뒤.record.popularityAtSeasonStart).toBe(700)
+  })
+
+  it('⚠️ 국가대항전 플래그를 내리지 않는다 (원본 그대로 — 사용자 판단 대기)', () => {
+    const 앞 = startNewSeason(0, 'T')
+    const 뒤 = startNextYear({ ...앞, record: { ...앞.record, nationalCup: true } })
+    expect(뒤.record.nationalCup).toBe(true)
+  })
+})
+
+describe('이벤트 날짜와 연차', () => {
+  it('지금 = 연차idx × 45 + 경기수 + 1', () => {
+    const { record } = startNewSeason(0, 'T')
+    expect(seasonDayOf(record)).toBe(1)
+    expect(seasonDayOf({ ...record, games: 2 })).toBe(3)
+    expect(seasonDayOf({ ...record, games: 20 })).toBe(21)
+    expect(seasonDayOf({ ...record, yearIndex: 1, games: 0 })).toBe(SEASON_GAME_COUNT + 1)
+  })
+
+  it('10년차(연차 idx 9)가 엔딩이 걸리는 해다', () => {
+    const { record } = startNewSeason(0, 'T')
+    expect(isFinalYear(record)).toBe(false)
+    expect(isFinalYear({ ...record, yearIndex: 9 })).toBe(true)
+  })
+})
+
+describe('clampTo — 원본의 0..상한 자르기', () => {
+  it('위아래를 모두 자른다', () => {
+    expect(clampTo(-5, 100)).toBe(0)
+    expect(clampTo(150, 100)).toBe(100)
+    expect(clampTo(50, 100)).toBe(50)
+  })
+})
