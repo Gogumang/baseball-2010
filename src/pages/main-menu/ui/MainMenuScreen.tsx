@@ -10,7 +10,7 @@ import {
 import { DescriptionPanel } from '@/pages/main-menu/ui/DescriptionPanel'
 import * as styles from '@/pages/main-menu/ui/MainMenuScreen.css'
 
-export type GameMode = '미션'
+export type GameMode = '미션' | '홈런더비'
 
 interface MainMenuScreenProps {
   readonly hasSavedGame: boolean
@@ -51,6 +51,7 @@ export function MainMenuScreen({
     if (effect === '이어하기') onContinue()
     else if (effect === '새로하기') onNewGame()
     else if (effect === '미션') onSelectMode('미션')
+    else if (effect === '홈런더비') onSelectMode('홈런더비')
     else onBack()
   })
   const origins = useFrameOrigins(`${MAIN_UI}/frames`)

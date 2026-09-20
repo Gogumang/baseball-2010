@@ -44,6 +44,7 @@ export type Screen =
   | { readonly kind: '시즌종료' }
   | { readonly kind: '엔딩'; readonly endingIndex: number }
   | { readonly kind: '미션선택' }
+  | { readonly kind: '홈런더비' }
   | { readonly kind: '미션설명'; readonly mission: OriginalMission }
   | { readonly kind: '미션진행'; readonly mission: OriginalMission }
   | { readonly kind: '투수미션'; readonly mission: OriginalMission }
