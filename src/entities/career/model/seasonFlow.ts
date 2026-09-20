@@ -82,11 +82,16 @@ export function goalResultEventId(achieved: number): number {
 }
 
 /** StrENDING 번호. 7년차 전에는 null */
+/** 부상 중 이만큼 경기를 치르면 부상 엔딩 (0xa3a84 의 `+0x1b6 > 19`) */
+const INJURED_GAMES_FOR_ENDING = 20
+
 export function judgeEnding(career: PlayerCareer): number | null {
   const year = career.season
   const popularity = career.popularity
   const reputation = career.reputation
   const money = Math.trunc(career.money / MONEY_UNIT)
+  // 원본 0xa3a84 의 **첫 줄** — 연차보다 먼저 본다 (G-2·B-6). 웹에 빠져 있던 판정이다
+  if (career.injuredGamesPlayed >= INJURED_GAMES_FOR_ENDING) return 0
   if (year < FIRST_ENDING_YEAR) return null
   if (year === FIRST_ENDING_YEAR && popularity <= 499) return 1
   if (year >= FINAL_YEAR) {
@@ -135,7 +140,7 @@ const INJURY_ENDING = 0
  */
 export function continueAfterEnding(career: PlayerCareer): PlayerCareer {
   const paid: PlayerCareer = { ...career, gamePoint: career.gamePoint - CONTINUE_COST_GAME_POINT, endingIndex: null }
-  if (career.endingIndex === INJURY_ENDING) return { ...paid, isInjured: false }
+  if (career.endingIndex === INJURY_ENDING) return { ...paid, isInjured: false, injuredGamesPlayed: 0 }
   return startNextSeason(paid)
 }
 

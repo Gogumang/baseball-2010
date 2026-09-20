@@ -42,7 +42,8 @@ export function rollRecovery(career: PlayerCareer, chance: RecoveryChance, rando
     const roll = randomIntegerBelow(random, 0, PERCENT)
     if (roll < chance.injury || remaining === 0) {
       recoveries.push('부상에서 회복 되었습니다.')
-      next = { ...next, isInjured: false, injuryRemaining: 0 }
+      // 부상에서 회복되면 누적 경기 수도 0 으로 (G-2)
+      next = { ...next, isInjured: false, injuryRemaining: 0, injuredGamesPlayed: 0 }
     } else {
       next = { ...next, injuryRemaining: remaining }
     }

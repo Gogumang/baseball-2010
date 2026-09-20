@@ -61,6 +61,8 @@ export interface PlayerCareer {
   /** 원작 소지금 (만원 단위). G포인트와는 별개다. */
   readonly money: number
   readonly isInjured: boolean
+  /** 부상 상태로 치른 경기 수 (+0x1b6) — 20 이 되면 부상 엔딩 0 (0xa3a84) */
+  readonly injuredGamesPlayed: number
   readonly isSick: boolean
   /** 걸린 질병 이름 (StrMODE[186]~[189]). 모르면 null */
   readonly illnessName: string | null
@@ -215,6 +217,7 @@ export function createCareer(name: string, profile: RookieProfile = DEFAULT_ROOK
     morale: STARTING_MORALE,
     money: STARTING_MONEY,
     isInjured: false,
+    injuredGamesPlayed: 0,
     isSick: false,
     illnessName: null,
     hasActedThisCycle: false,
@@ -334,6 +337,8 @@ export function applyGameResult(career: PlayerCareer, summary: GameSummary): Pla
     ...career,
     gamePoint: Math.min(MAXIMUM_GAME_POINT, career.gamePoint + gamePointRewardOf(summary)),
     gamesPlayed: career.gamesPlayed + 1,
+    // 부상 중 치른 경기 수 (+0x1b6). 부상 기간은 경기로 줄지 않고 휴식·입원으로만 줄어든다 (G-2)
+    injuredGamesPlayed: career.injuredGamesPlayed + (career.isInjured ? 1 : 0),
     illnessCooldown: Math.max(0, career.illnessCooldown - 1),
     // 행동권은 다음 관리 주기가 열릴 때만 돌아온다 — 경기마다 돌려주면 이어하기로 두 번 할 수 있다
     hasActedThisCycle:

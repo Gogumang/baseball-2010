@@ -110,10 +110,42 @@ function applyReward(career: PlayerCareer, reward: EventReward, random: RandomPo
   }
 }
 
+/**
+ * 목표 달성 결과 이벤트의 **연차 보정** (0x8d508, A-6 확정).
+ * `y` = 0-기준 연차. 나만의리그 타자·투수편 값이다 (시즌모드는 다른 값이라 여기 없다):
+ *   - 393·394·395 — 인기도(0) +3y · 평판(1) −2y · 소지금(3) +y
+ *   - 396 — 인기도(0) −4y · 평판(1) −3y
+ * 웹에 통째로 빠져 있던 줄이다.
+ */
+const YEAR_ADJUSTED_EVENTS: Readonly<Record<number, Readonly<Record<number, number>>>> = {
+  393: { 0: 3, 1: -2, 3: 1 },
+  394: { 0: 3, 1: -2, 3: 1 },
+  395: { 0: 3, 1: -2, 3: 1 },
+  396: { 0: -4, 1: -3 },
+}
+
+function applyYearAdjust(
+  rewards: readonly EventReward[],
+  eventId: number | undefined,
+  season: number,
+): readonly EventReward[] {
+  const table = eventId === undefined ? undefined : YEAR_ADJUSTED_EVENTS[eventId]
+  if (table === undefined) return rewards
+  const years = Math.max(0, season - 1)
+  if (years === 0) return rewards
+  return rewards.map((reward) => {
+    const perYear = table[reward.kind]
+    return perYear === undefined ? reward : { ...reward, value: reward.value + perYear * years }
+  })
+}
+
 export function applyEventRewards(
   career: PlayerCareer,
   rewards: readonly EventReward[],
   random?: RandomPort,
+  /** 연차 보정이 붙는 이벤트인지 가리는 번호 (393~396) */
+  eventId?: number,
 ): PlayerCareer {
-  return rewards.reduce((current, reward) => applyReward(current, reward, random), career)
+  const adjusted = applyYearAdjust(rewards, eventId, career.season)
+  return adjusted.reduce((current, reward) => applyReward(current, reward, random), career)
 }

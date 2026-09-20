@@ -70,6 +70,7 @@ const MINUS_SKILL_IDS: ReadonlySet<number> = new Set([2, 3, 4, 5, 17, 18, 19, 20
 const cure = (career: PlayerCareer): PlayerCareer => ({
   ...career,
   isInjured: false,
+  injuredGamesPlayed: 0,
   isSick: false,
   illnessName: null,
   illnessCooldown: CURE_COOLDOWN,

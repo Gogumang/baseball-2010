@@ -402,7 +402,7 @@ export function useCareerSession({
 
     completeScene: (rewards: readonly EventReward[], viewedEventIds: readonly number[]) => {
       if (career === null || screen.kind !== '이벤트') return
-      const viewed = applyEventRewards(finishEvent(career, viewedEventIds), rewards, random)
+      const viewed = applyEventRewards(finishEvent(career, viewedEventIds), rewards, random, screen.eventId)
       // 보상 7 로 열린 히든 장비 알림 (StrCOMMON[139]+[143])
       const openTexts = viewed.openedHiddenIds
         .filter((id) => !career.openedHiddenIds.includes(id))

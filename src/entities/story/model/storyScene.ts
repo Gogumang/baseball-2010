@@ -32,13 +32,23 @@ const BATTER_AUDIENCES: ReadonlySet<number> = new Set([1, 2])
 const CONDITION = { 인기도: 18, 평판: 19, 질병: 22, 봤음: 24, 안봤음: 25 } as const
 const ABILITY_CONDITIONS = ['hit', 'power', 'defense', 'run'] as const
 
-/** 조건 22 — 사기 구간별 질병 확률(%) */
-export function illnessChanceOf(morale: number): number {
-  if (morale > 70) return 0
-  if (morale > 50) return 2
-  if (morale > 30) return 4
-  if (morale > 10) return 7
-  return 14
+/** 유리몸 — 질병 확률 +10 (0xadb32) */
+const FRAGILE_SKILL = 4
+/** 행운 — 질병 확률 −20 */
+const LUCK_SKILL = 6
+
+/**
+ * 조건 22 질병 확률(%) — 사기 구간표에 **스킬 보정**이 붙는다 (0xadb32, G-8 확정):
+ * 유리몸(스킬 4) +10 · 행운(스킬 6) −20, 0 미만은 0 으로 자른다.
+ * 앞서 웹은 사기 구간만 보고 보정을 빼먹고 있었다.
+ */
+export function illnessChanceOf(morale: number, skillIds: readonly number[] = []): number {
+  const base = morale > 70 ? 0 : morale > 50 ? 2 : morale > 30 ? 4 : morale > 10 ? 7 : 14
+  const adjusted =
+    base +
+    (skillIds.includes(FRAGILE_SKILL) ? 10 : 0) -
+    (skillIds.includes(LUCK_SKILL) ? 20 : 0)
+  return Math.max(0, adjusted)
 }
 
 const PERCENT = 100
@@ -65,13 +75,26 @@ export function branchOnlyEventIds(events: readonly OriginalEvent[]): ReadonlySe
 
 const hasSeen = (career: PlayerCareer, eventId: number) => career.seenEventIds.includes(String(eventId))
 
+/**
+ * 날짜 창 검사 (0xacfbc 7번, A-2 확정).
+ *
+ * ```
+ * 네 바이트 a,b,c,d 중 **하나라도 0 이면 검사 자체를 건너뛴다**
+ * from = (a−1)·45 + b · to = (c−1)·45 + d
+ * now  = 연차(0부터)·45 + 치른 경기 수 + 1        ; 45 로 자르지 않는다
+ * from <= now <= to
+ * ```
+ * 앞서 웹은 ① 연차 둘 다 0 일 때만 생략하고 ② 경기 번호를 45 로 잘랐으며
+ * ③ 한 시즌을 100 으로 셌다 — 셋 다 원본과 달랐다.
+ */
 function isInDateWindow(event: OriginalEvent, career: PlayerCareer): boolean {
   const [fromSeason, fromGame] = event.dateFrom
   const [toSeason, toGame] = event.dateTo
-  if (fromSeason === 0 && toSeason === 0) return true
-  const game = Math.min(career.gamesPlayed + 1, GAMES_PER_SEASON)
-  const now = career.season * PERCENT + game
-  return now >= fromSeason * PERCENT + fromGame && now <= toSeason * PERCENT + toGame
+  if (fromSeason === 0 || fromGame === 0 || toSeason === 0 || toGame === 0) return true
+  const now = (career.season - 1) * GAMES_PER_SEASON + career.gamesPlayed + 1
+  const from = (fromSeason - 1) * GAMES_PER_SEASON + fromGame
+  const to = (toSeason - 1) * GAMES_PER_SEASON + toGame
+  return now >= from && now <= to
 }
 
 function meetsConditions(event: OriginalEvent, career: PlayerCareer, random: RandomPort | undefined): boolean {
@@ -89,7 +112,7 @@ function meetsConditions(event: OriginalEvent, career: PlayerCareer, random: Ran
         return !hasSeen(career, condition.value)
       case CONDITION.질병:
         if (random === undefined || career.isSick || career.illnessCooldown > 0) return false
-        return random.nextInRange(0, PERCENT) < illnessChanceOf(career.morale)
+        return random.nextInRange(0, PERCENT) < illnessChanceOf(career.morale, career.skillIds)
       default:
         return false
     }
@@ -107,8 +130,16 @@ function isEligible(event: OriginalEvent, career: PlayerCareer, trigger: number,
 }
 
 /**
- * 이 trigger 에서 지금 볼 이벤트. 무작위 조건(질병)은 random 이 있을 때만 판정한다 —
+ * 이 trigger 에서 지금 볼 이벤트 (0xadc70). 무작위 조건(질병)은 random 이 있을 때만 판정한다 —
  * 지도 [!] 표시처럼 미리 보기만 할 때는 random 없이 부른다.
+ *
+ * **"분기 전용 이벤트 제외" 규칙은 원본에 없다** (A-1 확정). 원본은 분기로만 닿는 이벤트를
+ * **대상(audience) 0** 으로 막는데, 그 검사는 아래 `isEligible` 의 `BATTER_AUDIENCES` 가 이미 하고 있다.
+ * 그래서 따로 빼던 목록을 없앴다 — 대상이 1·2 인 이벤트는 분기로도 닿고 평소에도 나오는 게 원본이다.
+ *
+ * ⚠️ 아직 다른 점: 원본은 **커서를 이어 쓴다** — 다음 호출이 지난 당첨 위치부터 훑고, 끝까지 없으면
+ * 0 으로 되감으며 그 호출은 "없음" 이 된다 (0xae170 이 "현재 레코드 다음" 을 커서로 저장).
+ * 커서는 저장에 들어가는 값이라 아직 넣지 않았다 — 지금은 늘 배열 처음부터 훑는다.
  */
 export function nextEventFor(
   career: PlayerCareer,
@@ -119,10 +150,7 @@ export function nextEventFor(
   if (trigger === EVENT_TRIGGER.관리 && !hasSeen(career, OPENING_EVENT_ID)) {
     return events.find((event) => event.id === OPENING_EVENT_ID) ?? null
   }
-  const branchOnly = branchOnlyEventIds(events)
-  const candidates = events.filter(
-    (event) => !branchOnly.has(event.id) && isEligible(event, career, trigger, random),
-  )
+  const candidates = events.filter((event) => isEligible(event, career, trigger, random))
   return candidates.find((event) => !hasSeen(career, event.id)) ?? null
 }
 

@@ -163,7 +163,13 @@ describe('조건 판정 (switch 0xd83a0)', () => {
 
 describe('질병 조건 22 — 사기 구간 확률 (0xadb32)', () => {
   it('사기 70 초과 0%, 51~70 2%, 31~50 4%, 11~30 7%, 10 이하 14%', () => {
-    expect([80, 70, 51, 50, 31, 30, 11, 10, 0].map(illnessChanceOf)).toEqual([0, 2, 2, 4, 4, 7, 7, 14, 14])
+    expect([80, 70, 51, 50, 31, 30, 11, 10, 0].map((morale) => illnessChanceOf(morale))).toEqual([0, 2, 2, 4, 4, 7, 7, 14, 14])
+  })
+
+  it('유리몸(4)은 +10, 행운(6)은 −20 — 0 미만은 0 으로 자른다 (G-8)', () => {
+    expect(illnessChanceOf(30, [4])).toBe(7 + 10)
+    expect(illnessChanceOf(30, [6])).toBe(0)
+    expect(illnessChanceOf(0, [4, 6])).toBe(14 + 10 - 20)
   })
 
   it('확률에 걸리지 않으면 질병 이벤트(490)가 나오지 않는다', () => {
