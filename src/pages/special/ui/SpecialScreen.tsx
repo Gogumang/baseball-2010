@@ -1,19 +1,14 @@
 import { useState } from 'react'
-import { Hint, MenuList, Notice, Panel, PixelScreen, TitleTag } from '@/shared/ui'
+import { Hint, MenuList, Notice, Panel, PixelScreen } from '@/shared/ui'
 import type { Collection } from '@/entities/collection/model/collection'
 import { HALL_OF_FAME_BATTER_SLOTS } from '@/entities/collection/model/collection'
 import { TITLE_NAMES } from '@/entities/career/model/titles'
 import { ORIGINAL_SKILLS } from '@/shared/config/original/skills'
 import { ORIGINAL_ENDINGS } from '@/shared/config/original/endings'
 import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
+import { RecordAnnals } from '@/pages/record/ui/RecordAnnals'
 
-type SpecialView = '목록' | '닉네임' | '스킬' | '엔딩' | '명예의 전당'
-
-/** 나만의리그 엔딩 — StrENDING[0~14] (15~19 는 시즌모드, 20·21 은 최종·제작진) */
-const CAREER_ENDING_COUNT = 15
-/** 목록은 이름 없이 요약한다 — "%s은(는) " 같은 이름·조사 묶음을 뺀다 */
-const NAME_WITH_PARTICLE = /%s\S*\s*/g
-const UNKNOWN = '???'
+type SpecialView = '목록' | '기록연감' | '명예의 전당'
 
 interface SpecialScreenProps {
   readonly collection: Collection
@@ -22,6 +17,7 @@ interface SpecialScreenProps {
 
 /**
  * 원작 메인 메뉴 [스페셜] (StrMAINMENU[1], StrHOWTO[28]) 중 오프라인으로 되는 것 — 기록연감과 명예의 전당.
+ * 원본 목록은 여덟 칸(main_ui 15~21·28)인데 나머지는 통신 기능이라 없다 (P6 2d).
  * G포인트 충전·선물·친구추천·선물받기는 통신 기능이라 없고, 마선수 선택·에디트는 아직 없다.
  */
 export function SpecialScreen({ collection, onBack }: SpecialScreenProps) {
@@ -33,9 +29,12 @@ export function SpecialScreen({ collection, onBack }: SpecialScreenProps) {
       <PixelScreen title="스페셜" rightKey={back}>
         <MenuList
           items={[
-            { id: '닉네임', label: '기록연감 · 닉네임', detail: `${collection.titles.length}/${TITLE_NAMES.length}` },
-            { id: '스킬', label: '기록연감 · 스킬', detail: `${collection.skills.length}/${ORIGINAL_SKILLS.length}` },
-            { id: '엔딩', label: '기록연감 · 엔딩', detail: `${collection.endings.length}/${CAREER_ENDING_COUNT}` },
+            // 원본 스페셜은 기록연감이 **한 칸**(main_ui 프레임 21)이고, 그 안에서 탭으로 갈린다 (P6 2c·2d)
+            {
+              id: '기록연감',
+              label: '기록연감',
+              detail: `닉네임 ${collection.titles.length}/${TITLE_NAMES.length} · 스킬 ${collection.skills.length}/${ORIGINAL_SKILLS.length}`,
+            },
             { id: '명예의 전당', label: '명예의 전당', detail: `${collection.hallOfFame.length}/${HALL_OF_FAME_BATTER_SLOTS}` },
           ]}
           onSelect={(id) => setView(id as SpecialView)}
@@ -45,38 +44,8 @@ export function SpecialScreen({ collection, onBack }: SpecialScreenProps) {
     )
   }
 
-  if (view === '닉네임') {
-    return (
-      <PixelScreen title="닉네임" rightKey={back}>
-        {TITLE_NAMES.map((name) => (
-          <TitleTag key={name}>{collection.titles.includes(name) ? name : UNKNOWN}</TitleTag>
-        ))}
-      </PixelScreen>
-    )
-  }
-
-  if (view === '스킬') {
-    return (
-      <PixelScreen title="스킬" rightKey={back}>
-        {ORIGINAL_SKILLS.map((skill) => (
-          <Notice key={skill.id}>
-            {collection.skills.includes(skill.id) ? `${skill.name} — ${stripGameMarkup(skill.effect).replace(/\s+/g, ' ')}` : UNKNOWN}
-          </Notice>
-        ))}
-      </PixelScreen>
-    )
-  }
-
-  if (view === '엔딩') {
-    return (
-      <PixelScreen title="엔딩" rightKey={back}>
-        {ORIGINAL_ENDINGS.slice(0, CAREER_ENDING_COUNT).map((text, index) => (
-          <Notice key={index}>
-            {index + 1}. {collection.endings.includes(index) ? stripGameMarkup(text.replace(NAME_WITH_PARTICLE, '')).split('\n')[0] : UNKNOWN}
-          </Notice>
-        ))}
-      </PixelScreen>
-    )
+  if (view === '기록연감') {
+    return <RecordAnnals collection={collection} onBack={() => setView('목록')} />
   }
 
   return (
