@@ -67,6 +67,11 @@ export interface PlayerCareer {
    * **다른 칸을 훈련하면 전부 0 이 된다** (0x18a80). 스킬 18·19·20 해제 조건이 본다.
    */
   readonly consecutiveTrainingCounts: Readonly<Record<string, number>>
+  /**
+   * 연도별 MVP 비트 (+0x1ca) — 연차 1 이 bit0 이고 13년까지 쓴다 (0xa4d50).
+   * 시즌이 바뀌어도 **지우지 않는다** — 통산 MVP 횟수를 보는 칭호가 이것을 읽는다.
+   */
+  readonly mvpSeasonBits: number
   /** 이번 시즌 인기도 변화 합 (+0x1c2) — 새 시즌에 0 이 된다. 먹튀 획득 조건이 본다 */
   readonly seasonPopularityGain: number
   /** 먹튀(스킬 2)를 가진 뒤의 인기도 변화 합과 경기 수 (+0x1c0 / +0x1cd) — 먹튀 해제 조건이 본다 */
@@ -264,6 +269,7 @@ export function createCareer(name: string, profile: RookieProfile = DEFAULT_ROOK
     trainingCounts: {},
     seasonStartTrainingCounts: {},
     consecutiveTrainingCounts: {},
+    mvpSeasonBits: 0,
     seasonPopularityGain: 0,
     moneyGrubberPopularityGain: 0,
     moneyGrubberGames: 0,

@@ -1,7 +1,8 @@
 import { ORIGINAL_TITLES } from '@/shared/config/original/titles'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
-import { isSeasonFinished } from '@/entities/career/model/playerCareer'
+import { hasSkill, isSeasonFinished } from '@/entities/career/model/playerCareer'
 import { battingAverageOf } from '@/entities/career/model/seasonStats'
+import { careerMvpCount, hasBackToBackMvp, hasMvpInSeason } from '@/entities/awards/model/seasonAwards'
 import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 
 /**
@@ -36,8 +37,29 @@ const FOUR_TENTHS_CHECK_GAME = 18
 const trainingTotalOf = (career: PlayerCareer) =>
   Object.values(career.trainingCounts).reduce((total, count) => total + count, 0)
 
+/**
+ * MVP 계열 칭호 (P3 9절·10절) — 전부 **시즌 시작 때**(경기 수 0) 본다.
+ * 연도별 MVP 비트 `career+0x1ca` 를 읽는다.
+ */
+const SEASON_START_GAMES = 0
+/** 전설 스킬 — 그 조건이 "우승 8회 + MVP 7회" 라 칭호 13 이 이 스킬 하나만 본다 (0x1a36e) */
+const LEGEND_SKILL = 7
+const isSeasonStart = (career: PlayerCareer) => career.gamesPlayed === SEASON_START_GAMES
+
 const RULES: Readonly<Record<number, TitleRule>> = {
   0: () => true, // 지금부터 시작이다!
+  // 2 최고의 루키 — 연차idx 1(2년차 시작) 이고 **1년차 MVP** (0x1a204)
+  2: (career) => career.season === 2 && isSeasonStart(career) && hasMvpInSeason(career.mvpSeasonBits, 1),
+  // 11 야구의 정점 — 통산 MVP 6회 (0x1a32e, `> 5`)
+  11: (career) => careerMvpCount(career.mvpSeasonBits) > 5,
+  // 12 베이스볼 마스터 — 통산 MVP 10회 (0x1a34e, `> 9`)
+  12: (career) => careerMvpCount(career.mvpSeasonBits) > 9,
+  // 13 살아있는 전설 — 전설 스킬 보유 (0x1a36e). 그 스킬 조건이 우승 8회 + MVP 7회다 (A 문서)
+  13: (career) => hasSkill(career, LEGEND_SKILL),
+  // 32 괴물 타자 — 연차idx > 1 이고 시즌 시작이며 **2년 연속 MVP** (0x1a6b6)
+  32: (career) => career.season > 2 && isSeasonStart(career) && hasBackToBackMvp(career.mvpSeasonBits),
+  // 33 국민 타자 — 연차idx > 3 이고 시즌 시작이며 통산 MVP 4회 (0x1a704, `> 3`)
+  33: (career) => career.season > 4 && isSeasonStart(career) && careerMvpCount(career.mvpSeasonBits) > 3,
   // 원본은 연차 인덱스 == 8, 즉 **9년차에만** 본다 (P3 9절). `>=` 면 10년차 이후에도 줘 버린다
   3: (career) => career.season === NINTH_YEAR && career.popularity >= 2000, // 9년차 인기도 2000이상
   4: (career) => career.season === NINTH_YEAR && career.reputation >= 750, // 9년차 평판 750이상

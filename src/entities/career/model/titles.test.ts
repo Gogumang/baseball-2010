@@ -117,6 +117,34 @@ describe('awardTitles', () => {
     expect(awardTitles(career, [])).toBe(career)
   })
 
+  it('MVP 칭호는 연도별 MVP 비트를 본다 — 1년차 MVP 면 2년차 시작에 "최고의 루키" (0x1a204)', () => {
+    // 비트 자리는 연차 1 이 bit0 이다
+    const 루키MVP = { mvpSeasonBits: 0b1, season: 2, gamesPlayed: 0 }
+
+    expect(evaluateNewTitles(선수(루키MVP))).toContain('최고의 루키')
+    // 시즌 도중에는 안 본다 — 원본은 경기 수 0 일 때만 본다
+    expect(evaluateNewTitles(선수({ ...루키MVP, gamesPlayed: 1 }))).not.toContain('최고의 루키')
+    // 1년차에 MVP 가 아니면 안 준다
+    expect(evaluateNewTitles(선수({ ...루키MVP, mvpSeasonBits: 0b10 }))).not.toContain('최고의 루키')
+  })
+
+  it('통산 MVP 6회면 "야구의 정점", 10회면 "베이스볼 마스터" (0x1a32e·0x1a34e)', () => {
+    const 여섯번 = 0b111111
+    const 열번 = 0b1111111111
+
+    expect(evaluateNewTitles(선수({ mvpSeasonBits: 여섯번 }))).toContain('야구의 정점')
+    expect(evaluateNewTitles(선수({ mvpSeasonBits: 0b11111 }))).not.toContain('야구의 정점')
+    expect(evaluateNewTitles(선수({ mvpSeasonBits: 열번 }))).toContain('베이스볼 마스터')
+  })
+
+  it('2년 연속 MVP 면 "괴물 타자", 통산 4회면 "국민 타자" (0x1a6b6·0x1a704)', () => {
+    // 1·2년차 연속
+    expect(evaluateNewTitles(선수({ mvpSeasonBits: 0b11, season: 3, gamesPlayed: 0 }))).toContain('괴물 타자')
+    // 1·3년차는 연속이 아니다
+    expect(evaluateNewTitles(선수({ mvpSeasonBits: 0b101, season: 4, gamesPlayed: 0 }))).not.toContain('괴물 타자')
+    expect(evaluateNewTitles(선수({ mvpSeasonBits: 0b1111, season: 5, gamesPlayed: 0 }))).toContain('국민 타자')
+  })
+
   it('또또복권 1등 5번은 "행운의 사나이", 100번 구매는 "도박묵시록" (StrNICKNAME[85]·[86])', () => {
     expect(evaluateNewTitles(선수({ titleIds: ['이름 없는 신인'], lotteryFirstPrizes: 5 }))).toContain('행운의 사나이')
     expect(evaluateNewTitles(선수({ titleIds: ['이름 없는 신인'], lotteryPurchases: 100 }))).toContain('도박묵시록')

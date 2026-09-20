@@ -52,6 +52,7 @@ import { applyEventRewards } from '@/entities/story/model/eventReward'
 import { rollTrainingInjury } from '@/entities/career/model/condition'
 import type { ManagementDetail } from '@/app/model/managementDetail'
 import { evaluateGame, updateStreaks } from '@/entities/career/model/gameEvaluation'
+import { recordSeasonMvp } from '@/entities/awards/model/seasonAwards'
 import type { EventReward } from '@/entities/story/model/eventReward'
 import type { ManagementCommand } from '@/pages/management/ui/ManagementScreen'
 import { OUTING_PLACES } from '@/shared/config/outingPlaces'
@@ -221,7 +222,10 @@ export function useCareerSession({
       setCareer(applyEndingBonus({ ...viewed, endingIndex: step.endingIndex }, step.endingIndex))
       return setScreen({ kind: '엔딩', endingIndex: step.endingIndex })
     }
-    const next = step.kind === '새시즌' ? startNextSeason(viewed) : viewed
+    // 시즌이 끝나면 시상을 하고 **MVP 비트를 남긴다** (0x8dd60 → career+0x1ca).
+    // 새 시즌으로 넘어가도 지우지 않는다 — 통산 MVP 를 보는 칭호가 이것을 읽는다.
+    const awarded = step.kind === '새시즌' ? recordSeasonMvp(viewed) : viewed
+    const next = step.kind === '새시즌' ? startNextSeason(awarded) : awarded
     setCareer(awardTitles(next, evaluateNewTitles(next)))
     setScreen({ kind: '관리' })
     setManagementCheck(step.kind === '새시즌' ? '고정' : '무작위포함')
