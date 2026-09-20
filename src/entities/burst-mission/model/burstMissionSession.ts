@@ -58,8 +58,7 @@ export function canTriggerBurst(session: BurstSession): boolean {
  * 타석이 시작될 때 부른다 (장면 상태 0xf → 0x8f158). 발동하면 `current` 가 차고
  * 발동 횟수가 하나 오른다 — 원본도 **뽑은 순간** obj+0x228 을 올린다(0x8f000).
  *
- * `rows` 를 넘기지 않으면 모드·공수에 맞는 원본 표를 쓴다. 표가 아직 비어 있으므로
- * (`burstMissionRow.ts` 의 `BURST_TABLES` 주석) 지금은 늘 발동하지 않는다.
+ * `rows` 를 넘기지 않으면 모드·공수에 맞는 원본 표를 쓴다 (`burstMissionRow.ts` 의 `BURST_TABLES`).
  */
 export function tryTriggerBurst(
   session: BurstSession,

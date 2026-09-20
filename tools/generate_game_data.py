@@ -355,6 +355,116 @@ def generate_bursts() -> None:
     write('bursts.ts', '\n'.join(lines) + '\n')
 
 
+# ── 돌발미션 ──────────────────────────────────────────────
+
+# .zt1 은 u32 전체 크기 · u32 해제 크기 · zlib 이다 (tools/extract_wipi_game.py).
+ZT1_HEADER_SIZE = 8
+# GXL 레코드 표 머리: 'GXL'+버전 4바이트 · u16 행크기 · u16 열수 · u16 행수 = 10바이트,
+# 그 뒤에 u8 열 타입이 열 수만큼 붙는다. 그래서 **본문 시작 = 10 + 열 수** 다.
+# 돌발미션 표는 16열이라 26바이트(0x1a)를 건너뛰며, 그래야 40/44/56행 × 16바이트가 파일 끝에
+# 딱 맞게 떨어진다 (XlsACE_PIT_DATA 가 23열이라 0x21 을 건너뛰는 것과 같은 계산이다).
+GXL_FIXED_HEADER = 10
+
+# 돌발미션 대사 한 줄 = u8 화자 · u8 표정 · CP949 128바이트. 한 행에 4줄 = 520바이트다
+# (줄 0 제안 · 1 성공 · 2 실패 · 3 무효 — entities/burst-mission/model/burstMissionJudge.ts).
+BURST_TEXT_LINE_COUNT = 4
+BURST_TEXT_STRING_SIZE = 128
+BURST_TEXT_LINE_SIZE = 2 + BURST_TEXT_STRING_SIZE
+
+# 표 이름 → (본문 표, 대사 표, 행 수). 행 수는 로더 0x8e1b0 이 읽는 값이며 검산용이다.
+BURST_MISSION_TABLES = (
+    ('BATTER', 'XlsBATTER_BURST', 'XlsBATTER_BURST_TEXT', 40),
+    ('PITCHER', 'XlsPITCHER_BURST', 'XlsPITCHER_BURST_TEXT', 44),
+    ('SEASON', 'XlsSEASON_BURST', 'XlsSEASON_BURST_TEXT', 56),
+)
+
+BURST_ROW_SIZE = 16
+
+
+def read_gxl_rows(name: str) -> tuple[list[bytes], list[int]]:
+    """
+    data/<name>.zt1 (GXL 레코드 표)을 원시 바이트에서 직접 풀어 행 목록으로 돌려준다.
+
+    `base/extracted/*.json` 을 거치지 않는 이유: 그 JSON 의 `names` 는 모든 표가
+    [u8 아이디][CP949 이름 9바이트] 로 시작한다고 보고 읽은 값이라, 이름 칸이 없는
+    돌발미션 표에서는 숫자를 글자로 잘못 읽은 쓰레기다.
+    """
+    import zlib as _zlib
+    raw = _zlib.decompress(Path(f'base/work/jar/data/{name}.zt1').read_bytes()[ZT1_HEADER_SIZE:])
+    if raw[0:3] != b'GXL':
+        raise ValueError(f'{name}: GXL 표가 아니다 (앞 4바이트 {raw[:4]!r})')
+    row_size = int.from_bytes(raw[4:6], 'little')
+    column_count = int.from_bytes(raw[6:8], 'little')
+    row_count = int.from_bytes(raw[8:10], 'little')
+    data_start = GXL_FIXED_HEADER + column_count
+    if data_start + row_count * row_size != len(raw):
+        raise ValueError(f'{name}: 행 레이아웃 검산 실패 '
+                         f'({data_start}+{row_count}*{row_size} != {len(raw)})')
+    rows = [raw[data_start + i * row_size:data_start + (i + 1) * row_size] for i in range(row_count)]
+    return rows, list(raw[GXL_FIXED_HEADER:data_start])
+
+
+def burst_lines_of(row: bytes) -> list[dict]:
+    lines = []
+    for index in range(BURST_TEXT_LINE_COUNT):
+        offset = index * BURST_TEXT_LINE_SIZE
+        lines.append({
+            'speaker': row[offset],
+            'expression': row[offset + 1],
+            'text': fixed_cp949(row, offset + 2, BURST_TEXT_STRING_SIZE),
+        })
+    return lines
+
+
+def generate_burst_missions() -> None:
+    """
+    돌발미션 — 타석 전에 감독·동료가 걸어 오는 짧은 과제.
+
+    본문 표(`XlsBATTER_BURST` 40행 · `XlsPITCHER_BURST` 44행 · `XlsSEASON_BURST` 56행)는
+    16열이 전부 u8 인 16바이트 행이다. **뜻풀이는 여기서 하지 않고 원시 16바이트 그대로 낸다** —
+    열의 뜻은 `entities/burst-mission/model/burstMissionRow.ts` 의 `decodeBurstRow` 가 안다.
+    """
+    tables = {}
+    for label, body_table, text_table, expected_rows in BURST_MISSION_TABLES:
+        rows, column_types = read_gxl_rows(body_table)
+        text_rows, _ = read_gxl_rows(text_table)
+        if len(rows) != expected_rows or len(text_rows) != expected_rows:
+            raise ValueError(f'{body_table}: 행 수가 {expected_rows} 가 아니다 '
+                             f'(본문 {len(rows)} · 대사 {len(text_rows)})')
+        if any(len(row) != BURST_ROW_SIZE for row in rows) or any(t != 0 for t in column_types):
+            raise ValueError(f'{body_table}: 16바이트 u8 × 16 열이 아니다 (열 타입 {column_types})')
+        tables[label] = {
+            'rowBytes': [list(row) for row in rows],
+            'lines': [burst_lines_of(row) for row in text_rows],
+        }
+
+    write_json_module(
+        'burstMissions.ts',
+        'burstMissions.json',
+        tables,
+        '/** 돌발미션 대사 한 줄. 화자·표정 번호는 원본 값 그대로다 (뜻은 미해독) */\n'
+        'export interface OriginalBurstLine {\n'
+        '  readonly speaker: number\n'
+        '  readonly expression: number\n'
+        '  /** 마크업 원문 — !cRRGGBB 색상 · !N 줄바꿈 */\n'
+        '  readonly text: string\n'
+        '}\n'
+        '\n'
+        'export interface OriginalBurstTable {\n'
+        '  /** 행마다 원시 16바이트. 뜻은 entities/burst-mission 의 decodeBurstRow 가 입힌다 */\n'
+        '  readonly rowBytes: readonly (readonly number[])[]\n'
+        '  /** 행마다 대사 4줄 — 0 제안 · 1 성공 · 2 실패 · 3 무효 */\n'
+        '  readonly lines: readonly (readonly OriginalBurstLine[])[]\n'
+        '}\n'
+        '\n'
+        "export type OriginalBurstTableName = 'BATTER' | 'PITCHER' | 'SEASON'\n"
+        '\n'
+        '/** 돌발미션 표 (원본 Xls{BATTER,PITCHER,SEASON}_BURST + _TEXT — 40 · 44 · 56행) */\n'
+        'export const ORIGINAL_BURST_TABLES: Readonly<Record<OriginalBurstTableName, OriginalBurstTable>> =\n'
+        '  data as unknown as Readonly<Record<OriginalBurstTableName, OriginalBurstTable>>',
+    )
+
+
 def generate_mode_menus() -> None:
     """원작의 훈련 항목과 스케줄 활동 (StrMODE)."""
     mode = clean_strings(load('StrMODE'))
@@ -996,6 +1106,7 @@ def main() -> None:
     generate_string_list('StrHOWTO', 'ORIGINAL_HOWTO', 'howto.ts', '게임 내 도움말')
     generate_string_list('StrUSER_EVT', 'ORIGINAL_USER_EVENTS', 'userEvents.ts', '경기 후 평가·목표·연속 기록 문구')
     generate_bursts()
+    generate_burst_missions()
     generate_mode_menus()
     generate_missions()
     generate_pitch_types()

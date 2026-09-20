@@ -1,3 +1,5 @@
+import { ORIGINAL_BURST_TABLES } from '@/shared/config/original/burstMissions'
+
 /**
  * 돌발미션 표 한 행 (binary.mod `data/XlsBATTER_BURST.zt1` 0xd50b4 · `XlsPITCHER_BURST` 0xd50d0 ·
  * `XlsSEASON_BURST` 0xd50ec, 로더 0x8e1b0 — K-bursts-special.md 4절 1-0·1-1, 확정).
@@ -113,30 +115,25 @@ export function decodeBurstRow(bytes: readonly number[], index: number): BurstMi
   }
 }
 
+function decodeBurstTable(name: BurstTableName): readonly BurstMissionRow[] {
+  return ORIGINAL_BURST_TABLES[name].rowBytes.map((bytes, index) => decodeBurstRow(bytes, index))
+}
+
 /**
- * ⚠️ **원본 표가 아직 저장소에 없다.**
+ * 원본 표 140행 (`data/XlsBATTER_BURST.zt1` 40 · `XlsPITCHER_BURST.zt1` 44 ·
+ * `XlsSEASON_BURST.zt1` 56 — 로더 0x8e1b0).
  *
- * `src/shared/config/original/data/` 를 뒤졌지만 돌발미션 표는 없다 (`bursts.ts` 는 마선수
- * *필살기 이름*이라 무관하다). 여기에 손으로 140행을 지어 넣지 않는다 — 원본 값과 어긋나면
- * 그때부터 근사가 되기 때문이다.
+ * 값은 `tools/generate_game_data.py` 가 원시 .zt1 에서 뽑아 둔
+ * `shared/config/original/data/burstMissions.json` 의 **행 16바이트 그대로**이고, 뜻은 여기서
+ * `decodeBurstRow` 가 입힌다. 표 순서는 원본 파일 순서다 — 발동 때 행마다 주사위를 굴리므로
+ * (`burstMissionTrigger.ts` 의 `rollBurstRow`) **순서를 바꾸면 난수 소비가 달라진다.**
  *
- * **표는 이렇게 들어와야 한다** (K 4절 1-0):
- *   1. `tools/generate_game_data.py` 에 `data/XlsBATTER_BURST.zt1`(40행) ·
- *      `XlsPITCHER_BURST.zt1`(44행) · `XlsSEASON_BURST.zt1`(56행) 을 **행 16바이트 u8 원시값**으로
- *      뽑는 갈래를 더해 `data/bursts.json` 을 만든다.
- *      `base/extracted/*.json` 의 `names` 는 행 바이트를 잘못 읽은 값이라 쓰면 안 된다.
- *   2. 대사는 같은 생성기가 `XlsBATTER_BURST_TEXT`(0xd5178) · `PITCHER`(0xd5198) ·
- *      `SEASON`(0xd51b8) 에서 행 520바이트 = (u8 화자, u8 표정, 문자열 128) × 4줄로 뽑는다 —
- *      줄 0 제안 · 1 성공 · 2 실패 · 3 무효.
- *   3. 그 JSON 을 `decodeBurstRow` 로 풀어 아래 표를 채운다. 행 수는 `BURST_ROW_COUNTS` 와 같아야 한다.
- *
- * 그때까지 이 표는 비어 있고, 모델 함수는 모두 **행 목록을 인자로 받도록** 만들어 두었다.
- * 풀어 적은 140행 전체는 `docs/re/K-bursts-special.md` 4절 1-7 에 있다 (대조용).
+ * 대사 4줄(0 제안 · 1 성공 · 2 실패 · 3 무효)은 같은 JSON 의 `lines` 에 행 번호로 짝지어 있다.
  */
 export const BURST_TABLES: Readonly<Record<BurstTableName, readonly BurstMissionRow[]>> = {
-  BATTER: [],
-  PITCHER: [],
-  SEASON: [],
+  BATTER: decodeBurstTable('BATTER'),
+  PITCHER: decodeBurstTable('PITCHER'),
+  SEASON: decodeBurstTable('SEASON'),
 }
 
 /**

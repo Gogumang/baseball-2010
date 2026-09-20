@@ -66,10 +66,10 @@ describe('표 고르기', () => {
     expect(BURST_ROW_COUNTS).toEqual({ BATTER: 40, PITCHER: 44, SEASON: 56 })
   })
 
-  it('원본 표가 아직 저장소에 없어 비어 있다 — 생성기가 채울 자리다', () => {
-    expect(BURST_TABLES.BATTER).toHaveLength(0)
-    expect(BURST_TABLES.PITCHER).toHaveLength(0)
-    expect(BURST_TABLES.SEASON).toHaveLength(0)
+  it('원본 표가 그 행 수만큼 들어와 있다', () => {
+    expect(BURST_TABLES.BATTER).toHaveLength(BURST_ROW_COUNTS.BATTER)
+    expect(BURST_TABLES.PITCHER).toHaveLength(BURST_ROW_COUNTS.PITCHER)
+    expect(BURST_TABLES.SEASON).toHaveLength(BURST_ROW_COUNTS.SEASON)
   })
 
   it('시즌 표만 반으로 갈린다 — 공격이면 0~30, 수비면 31~55 (0x8f000)', () => {

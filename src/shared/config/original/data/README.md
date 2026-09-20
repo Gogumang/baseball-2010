@@ -14,6 +14,7 @@
 | `items.json` | `StrITEM` | 아이템 이름·효과·히든 힌트 |
 | `skills.json` | `StrCOMMON` + `StrSKILL` | 스킬 40종 (이름·소개·효과·대상) |
 | `roster.json` | `XlsBATTER_DATA` · `XlsPITCHER_DATA` | 일반 선수 명단과 능력치 |
+| `burstMissions.json` | `Xls{BATTER,PITCHER,SEASON}_BURST` + `_TEXT` | 돌발미션 140행 (조건·목표·보상 원시 16바이트, 대사 4줄) |
 
 ## events.json 한 편의 모양
 
