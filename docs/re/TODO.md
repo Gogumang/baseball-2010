@@ -75,3 +75,17 @@
 
 ## 해독 불가 (원본 서버 필요)
 - [-] 대전모드 상대 · 보상 · 등급, 랭킹, G 충전 · 선물, 데이터 백업/복구, 미션 다운로드
+
+## 5차 대기열 — UNRESOLVED.md 의 남은 63건 (2026-09-20~, 동시에 3개)
+> UNRESOLVED.md ④ "다음에 해독한다면 이 순서" 를 그대로 따른다. 🌐·죽은 코드·궤적은 하지 않는다.
+- [x] S1 U-03 승·패·세이브 투수 판정 (state+0x44/0x50/0x5c 를 쓰는 곳 전수) → `S1-win-loss-save.md`
+- [x] S2 U-01·U-02 페어/파울 문턱(0x9d660)과 2아웃 득점 보류(메시지 0x13) → `S2-fair-foul.md`
+- [x] S3 U-04 구장 아이템 구매 처리와 가격 표 0xd44c4 → `S3-stadium-items.md`
+- [x] S4 U-06 평판 평가 16칸(SR+0x1a0)의 칸 이름 → `S4-season-reputation.md`
+- [x] S5 U-13~U-17 투수편 잔여 5건 (평가 칸 5개·state+0x6a·게이지 글자·CPU 선발 교체·S+0x68/0x69) → `S5-pitcher-leftovers.md`
+- [x] S6 U-18~U-21 시즌·국가대항전 뒷정리 4건 (S+0x12c 리셋·대표팀 복구·선수 +0xa 비트·0xb6720) → `S6-season-cleanup.md`
+- [x] S7 U-07~U-09 수비·주루 AI 잔여 앞쪽 (송구 목표 점수식 0xafb24·도착 틱 0xaf284·충돌 종류 vt6c) → `S7-fielding-ai-2.md`
+- [x] S8 U-10~U-12 수비 AI 상태 8·9·0xe·메시지 0xbc3·state[0x19]·견제 리드 폭 → `S8-fielding-ai-3.md`
+- [x] S9 U-24 마선수 레벨업 창 + U-50 목록 격자 위젯(0x79ed5/0x7a571 — U-51·55·60 동반) → `S9-widgets.md`
+- [x] S10 U-46·U-53·U-58 에셋 렌더해 눈으로 읽기 묶음 → `S10-asset-reading.md`
+- [x] S11 Q3 최종 감사: 정말 다 해석됐는지 독립 확인 → `Q3-final-audit.md`

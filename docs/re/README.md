@@ -1,17 +1,18 @@
 # 원본 해독 문서 (게임빌 2010 프로야구 → 웹 이식)
 
 원본 `base/게임빌2010프로야구/0002C663.jar` 의 `binary.mod`(ARM Thumb, 심볼 없음)와 데이터·에셋을 해독한 결과다.
-2026-09-19 ~ 09-20 에 38개 주제로 나눠 작업했다.
+2026-09-19 ~ 09-20 에 **49개 주제**(A~L · P · Q · R · S)로 나눠 작업했고, 마지막에 최종 감사(Q3)로 빈 곳을 확인했다.
 
 ## 먼저 읽을 것
 | 파일 | 내용 |
 |---|---|
-| **[FOR-IMPLEMENTER.md](FOR-IMPLEMENTER.md)** | **웹을 고칠 사람은 이것부터.** 틀린 곳 61건(파일:줄 → 원본 동작) · 없는 기능 20묶음 · 뽑아야 할 데이터 21건 · 추천 순서 |
+| **[FOR-IMPLEMENTER.md](FOR-IMPLEMENTER.md)** | **웹을 고칠 사람은 이것부터.** 틀린 곳 61건(파일:줄 → 원본 동작) · 없는 기능 20묶음 · 뽑아야 할 데이터 21건 · 추천 순서 · **F 절 = 5차 해독으로 새로 닫힌 것** |
 | **[CORRECTIONS.md](CORRECTIONS.md)** | **나중 해독이 앞 판단을 뒤집은 것 40여 건.** 다른 문서를 읽기 전에 꼭 볼 것 |
 | [DECISIONS.md](DECISIONS.md) | 사용자 결정 (원본 버그를 그대로 옮긴다 등)과 원본 버그 목록 |
-| [UNRESOLVED.md](UNRESOLVED.md) | 아직 해석되지 않은 것 목록 |
+| [UNRESOLVED.md](UNRESOLVED.md) | 아직 해석되지 않은 것 목록 (63건 중 **25건이 5차 해독으로 닫혔다**) |
 | [INVENTORY.md](INVENTORY.md) | 원본 기능 전체 ↔ 웹판 대조표 (무엇이 없는지) |
-| [TODO.md](TODO.md) | 작업 진행 기록 (38개 항목, 전부 완료) |
+| **[Q3-final-audit.md](Q3-final-audit.md)** | **최종 감사 — "정말 다 해석됐나"** 에 대한 답 (게임 범위 코드 81.4% 덮임) |
+| [TODO.md](TODO.md) | 작업 진행 기록 (49개 항목, 전부 완료) |
 
 ## 표기
 - **확정** = 디스어셈으로 식·표까지 확인 · **유력** = 한 고리 미확인 · **미해결**
@@ -29,10 +30,14 @@
 | [R1-league-day-winner.md](R1-league-day-winner.md) | **CPU 끼리 경기의 승패가 뒤집혀 있다**(원본 버그, 확정) |
 | [P2-fielding-ai.md](P2-fielding-ai.md) | 타구 뒤 수비 AI — 포구 예측·추적·송구·자동 주루·태그/포스 |
 | [Q1-cpu-offense-ai.md](Q1-cpu-offense-ai.md) | CPU 타자의 스윙·번트 판단, CPU 도루·대타 |
+| [S8-fielding-ai-3.md](S8-fielding-ai-3.md) | 협살, 송구 타이밍 게이트, 견제 송구, 0.1% 폭투 사건, 리드 없음 |
+| [S7-fielding-ai-2.md](S7-fielding-ai-2.md) | CPU 송구 목표 루 점수식, 송구 도착 틱·중계, 루 좌표·vtable 정리 |
 | [I-controls.md](I-controls.md) | 사람 조작 전체 — 주루·송구·견제·교체·필살수비·레이저 송구 |
 | [R3-field-view.md](R3-field-view.md) | 수비 화면 카메라, 동작 번호, 슬라이딩, 속도 단위 |
 | [R8-record-triggers.md](R8-record-triggers.md) | 기록달성 40종의 판정 지점 전수 |
 | [R10-game-states.md](R10-game-states.md) | 경기 장면 상태 표 (인트로·공수 교대·벤치 클리어링·자동진행) |
+| [S1-win-loss-save.md](S1-win-loss-save.md) | 승·패·세이브 투수 판정, 승계 주자 실점 귀속 |
+| [S2-fair-foul.md](S2-fair-foul.md) | 페어/파울 각도 문턱 3종, 2아웃 득점 보류, 2스트라이크 번트 파울 |
 | [R15-ac758.md](R15-ac758.md) | 스윙 타이밍 등급(진동), 그 밖 작은 의문 7건 |
 
 ### 투수편 · 필살기
@@ -40,6 +45,7 @@
 |---|---|
 | [P1-pitcher-rules.md](P1-pitcher-rules.md) | 등판 로테이션·감독 강판·스태미나·투구 게이지·투수 평가 |
 | [H2-special-skills.md](H2-special-skills.md) | 필살타법 5종·마구 6종 발동과 효과, 마선수 레벨별 횟수 |
+| [S5-pitcher-leftovers.md](S5-pitcher-leftovers.md) | 투수 평가 칸 5개, 콜드게임 구원 기회, 투구 게이지 그림, CPU 로테이션 |
 | [D-pitch-trajectory.md](D-pitch-trajectory.md) | 공 궤적 — **원본 데이터(pitch.zt1)를 그대로 쓰기로 결정** |
 
 ### 육성 (나만의리그)
@@ -61,6 +67,9 @@
 | [H-modes.md](H-modes.md) | 모드 번호·장면 구조, 홈런더비, 대전모드, 스킬 장착 |
 | [J-modes-rules.md](J-modes-rules.md) | 일반모드 준비·경기진행 설정, 시즌 구단관리, 투수편 등록 |
 | [P4-season-flow.md](P4-season-flow.md) | 시즌모드 진행 흐름·관중 수입·s_event |
+| [S6-season-cleanup.md](S6-season-cleanup.md) | 국가대항전 뒷정리, 선수 `+0xa` 종류 비트, 선수영입 끼워넣기 |
+| [S4-season-reputation.md](S4-season-reputation.md) | 시즌 평판 평가 16칸의 뜻과 가중치 (점프표 4↔5 뒤집힘) |
+| [S3-stadium-items.md](S3-stadium-items.md) | 구장 아이템(관중석·전광판·잔디) 구매·교체·가격·히든 해금 |
 | [R13-season-leftovers.md](R13-season-leftovers.md) | 시즌 잔여 상태, 포스트시즌 대진, 선수영입, 히든 장비 |
 | [Q2-mission-rewards.md](Q2-mission-rewards.md) | 미션 보상·클리어 횟수, 명예의 전당 선수 활용 |
 
@@ -71,11 +80,13 @@
 | [P6-screens.md](P6-screens.md) | 미션 선택·기록연감·스페셜·상점·대진표·엔딩·환경설정 배치 |
 | [R4-lineup-screens.md](R4-lineup-screens.md) | 교체 화면, 엔트리 편집, 일반모드 준비 단계 |
 | [R14-game-side-screens.md](R14-game-side-screens.md) | 홈런더비 결과, 감독 강판 대사 창 |
+| [S9-widgets.md](S9-widgets.md) | 목록 격자 위젯(모든 목록 화면 공용), 마선수 레벨업·오픈 창, 능력치 마름모 |
 | [R11-special-leftovers.md](R11-special-leftovers.md) | 에디트(이름 변경), 글 입력, 명전 삭제, 모드 잠금 |
 | [R12-shop-guards.md](R12-shop-guards.md) | 상점 가드 문구, 장비 컬렉터 해금, 구내매점 만료 |
 | [R2-game-effects.md](R2-game-effects.md) | 경기 연출(HOMERUN·불꽃·컷인·전광판)과 효과음 장면 |
 | [L-sound-effects.md](L-sound-effects.md) | 사운드 52개 변환·재생 시점, 연출 에셋, 장비 외형 |
 | [R5-font-particles.md](R5-font-particles.md) | 원본 비트맵 한글 글꼴, 파티클 설정 (`_raw/work/R5/` 에 변환 스크립트) |
+| [S10-asset-reading.md](S10-asset-reading.md) | 에셋을 렌더해 눈으로 읽은 글자·그림 (img_text 팔레트 5장 포함) |
 | [R6-sprite-leftovers.md](R6-sprite-leftovers.md) | 좌우 반전, 시즌 관중 그림, 그리기 효과 식 |
 
 ### 그 밖
@@ -83,6 +94,7 @@
 |---|---|
 | [P7-leftovers.md](P7-leftovers.md) | 1차 문서에 남았던 작은 조각 14건 |
 | [Q0-coverage-audit.md](Q0-coverage-audit.md) | 빈 곳 감사 — 무엇이 아직 안 풀렸는지 훑은 기록 |
+| **[Q3-final-audit.md](Q3-final-audit.md)** | **최종 감사** — 게임 범위 코드 81.4% 덮임, 남은 곳은 규칙이 아니라 그래픽·통신·위젯 |
 
 ## 웹 이식 우선순위 (제안)
 1. **틀린 것 고치기** — 완투 기록 조건(R8), 연장 한 이닝 어긋남(E), 희생플라이(E·P2), 평판 구간 보정과 칸 7개(B·P7), 인기도 식(R7), 연봉 등급 고정(B)
