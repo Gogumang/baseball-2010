@@ -239,6 +239,11 @@ export interface RookieProfile {
   readonly battingSide: number
   /** 0 황인 · 1 백인 · 2 흑인 (선수 +0xb 비트2~3) */
   readonly skinIndex: number
+  /**
+   * 팀 고르기(상태 0x65)에서 고른 팀 — 목록 값 0~14 그대로다 (C-1: 몸통 팔레트 = 피부×15 + 팀).
+   * 안 넘기면 기본 팀(서울 드래곤즈)이다.
+   */
+  readonly teamId?: number
 }
 
 export const DEFAULT_ROOKIE_PROFILE: RookieProfile = { battingTypeIndex: 0, positionIndex: 0, battingSide: 0, skinIndex: 0 }
@@ -265,7 +270,7 @@ export function createCareer(name: string, profile: RookieProfile = DEFAULT_ROOK
     eagleEyeGamesRemaining: 0,
     seenEventIds: [],
     storySceneIndex: 0,
-    teamId: DEFAULT_TEAM_ID,
+    teamId: profile.teamId ?? DEFAULT_TEAM_ID,
     trainingCounts: {},
     seasonStartTrainingCounts: {},
     consecutiveTrainingCounts: {},

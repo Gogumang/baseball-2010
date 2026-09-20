@@ -21,7 +21,7 @@ import { ROOKIE_BATTER_ABILITY } from '@/entities/batting/model/batter'
 const SETTINGS_KEY = 'compus-baseball/settings'
 const COLLECTION_KEY = 'compus-baseball/collection'
 
-const ENTRY_SCREENS: readonly Screen['kind'][] = ['타이틀', '메인메뉴', '도움말', '환경설정', '스페셜', '선수등록', '홈런더비']
+const ENTRY_SCREENS: readonly Screen['kind'][] = ['타이틀', '메인메뉴', '도움말', '환경설정', '스페셜', '팀선택', '선수등록', '홈런더비']
 
 const MISSION_SCREENS: readonly Screen['kind'][] = [
   '마선수대결',

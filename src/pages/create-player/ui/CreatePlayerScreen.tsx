@@ -25,6 +25,8 @@ const IMG_TEXT = './sprites/img_text/frames'
 const frameSrc = (folder: string, frame: number) => `${folder}/${String(frame).padStart(3, '0')}.png`
 
 interface CreatePlayerScreenProps {
+  /** 앞 화면에서 고른 팀 (0~14). 안 넘기면 기본 팀이다 */
+  readonly teamId?: number
   readonly onCreate: (name: string, profile: RookieProfile) => void
   readonly onCancel: () => void
 }
@@ -36,13 +38,14 @@ interface CreatePlayerScreenProps {
  * 얹는다. 고르는 줄은 다섯 — **이름 · 타입 · 포지션 · 손 · 피부** 순서다(줄 목록 [this+0x74], 0x17360).
  * 등록 화면에 **타순 선택은 없다**(C-4 확정) — 타순 칸은 보여 주기만 하고 신인 9번은 0xa4c2c 가 넣는다.
  *
- * ⚠️ 팀 고르기(0x65)는 웹에 아직 없어 기본 팀(서울 드래곤즈)으로 둔다 — 팀명 칸은 그래서 붙박이다.
+ * 팀은 앞 화면(팀 고르기 0x65, `TeamSelectScreen`)이 고른 것을 받아 **보여 주기만** 한다 —
+ * 등록 화면에서 고르는 줄은 다섯뿐이라 팀명 칸은 여기서 바뀌지 않는다.
  * ⚠️ 피부를 바꿔도 그림 색이 바뀌지 않는다. 원본은 몸통 팔레트를 **피부×15 + 팀** 번호의 .mpl 로
  *    갈아 끼우는데(C-1), 웹 스프라이트는 "팀 2 · 황인" 한 벌로 구워져 있고 .mpl 적용은 tools/ 몫이다.
  */
-export function CreatePlayerScreen({ onCreate, onCancel }: CreatePlayerScreenProps) {
+export function CreatePlayerScreen({ teamId = DEFAULT_TEAM_ID, onCreate, onCancel }: CreatePlayerScreenProps) {
   const [name, setName] = useState('')
-  const [profile, setProfile] = useState<RookieProfile>(DEFAULT_ROOKIE_PROFILE)
+  const [profile, setProfile] = useState<RookieProfile>({ ...DEFAULT_ROOKIE_PROFILE, teamId })
   const [selectedRow, setSelectedRow] = useState(0)
   const [isConfirming, setIsConfirming] = useState(false)
   const [tick, setTick] = useState(1)
@@ -54,7 +57,7 @@ export function CreatePlayerScreen({ onCreate, onCancel }: CreatePlayerScreenPro
   const selectedId = ROW_ORDER[selectedRow]
 
   const valueOf = (id: InfoCellId): string => {
-    if (id === '팀명') return (TEAMS[DEFAULT_TEAM_ID] ?? TEAMS[0]).name
+    if (id === '팀명') return (TEAMS[teamId] ?? TEAMS[0]).name
     if (id === '이름') return name
     // 필살 = 선수 +0x18 필살 번호의 이름. 신인은 필살타법이 없어 빈 칸이다
     if (id === '필살') return ''

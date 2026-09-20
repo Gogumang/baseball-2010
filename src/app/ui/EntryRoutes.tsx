@@ -15,6 +15,7 @@ import { SpecialScreen } from '@/pages/special/ui/SpecialScreen'
 import { TitleScreen } from '@/pages/title/ui/TitleScreen'
 import { MainMenuScreen } from '@/pages/main-menu/ui/MainMenuScreen'
 import { CreatePlayerScreen } from '@/pages/create-player/ui/CreatePlayerScreen'
+import { TeamSelectScreen } from '@/pages/create-player/ui/TeamSelectScreen'
 import { HelpScreen } from '@/pages/help/ui/HelpScreen'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 
@@ -62,11 +63,24 @@ export function EntryRoutes({ screen, setScreen, session, gameSettings, collecti
     )
   }
 
+  // 원본 흐름은 0x65 팀 고르기 → 0x66 등록 → 0x67 확인이다 (C-6)
+  if (screen.kind === '팀선택') {
+    return (
+      <TeamSelectScreen
+        openedHiddenIds={session.savedCareer?.openedHiddenIds}
+        onSelect={(teamId) => setScreen({ kind: '선수등록', teamId })}
+        onCancel={() => setScreen({ kind: '메인메뉴' })}
+      />
+    )
+  }
+
   if (screen.kind === '선수등록') {
     return (
       <CreatePlayerScreen
+        teamId={screen.teamId}
         onCreate={session.actions.startNewCareer}
-        onCancel={() => setScreen({ kind: '메인메뉴' })}
+        // 등록에서 물러나면 팀 고르기로 돌아간다 (원본도 한 단계씩 뒤로 간다)
+        onCancel={() => setScreen({ kind: '팀선택' })}
       />
     )
   }
@@ -107,7 +121,7 @@ export function EntryRoutes({ screen, setScreen, session, gameSettings, collecti
     <MainMenuScreen
       hasSavedGame={session.savedCareer !== null}
       onContinue={session.actions.continueSaved}
-      onNewGame={() => setScreen({ kind: '선수등록' })}
+      onNewGame={() => setScreen({ kind: '팀선택' })}
       onSelectMode={(mode) => {
         // 홈런더비도 미션과 같은 선수 고르기 창을 쓴다 — 결과 2 = 육성 타자 · 4 = 명예 타자 (H-2 · Q2)
         if (session.career === null && session.savedCareer === null) {
