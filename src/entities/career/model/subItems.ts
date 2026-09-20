@@ -7,7 +7,8 @@ import type { RolledOutingEffect } from '@/shared/config/outingPlaces'
  *   이름   StrITEM[88~97] · 효과 문구 StrITEM[148~154]
  *   가격   표 0xcc430 × 10 (100만원 단위) — 웹판 소지금은 만원이라 × 1000
  *   보유   선수 +0x58+k 플래그, 영구 (0x14d12)
- *   효과   k 0~4 는 코드에서 확인. k 5~9 는 효과 문구대로 넣었고 코드 적용 지점은 미확인 (추정)
+ *   효과   k 0~4 는 코드에서 확인. k 5~9 는 효과 문구대로 넣었고 **값은 원본과 같음이 확정**됐다 (G 0절) —
+ *          다만 코드에서 어디에 적용되는지는 아직 못 짚었다
  */
 export interface SubItem {
   readonly id: number
@@ -78,7 +79,7 @@ export function subItemMoraleRelief(career: PlayerCareer): number {
 const OUTING_ITEM = { 팬미팅: 5, 외식: 6, 입원: 7, 야구교실: 8, CF촬영: 9 } as const
 const CF_BONUS_MONEY = 400
 
-/** 외출 기능 효과에 서브 아이템 보정을 더한다 (추정: 코드 적용 지점 미확인, 문구 기준) */
+/** 외출 기능 효과에 서브 아이템 보정을 더한다 — 값은 확정, 원본의 적용 지점만 미확인 (G 0절) */
 export function applyOutingSubItems(career: PlayerCareer, functionId: string, effect: RolledOutingEffect): RolledOutingEffect {
   const owns = (name: keyof typeof OUTING_ITEM) => functionId === name && hasSubItem(career, OUTING_ITEM[name])
   if (owns('팬미팅')) return { ...effect, popularityGain: effect.popularityGain + 2 }

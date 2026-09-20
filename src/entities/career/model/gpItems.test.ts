@@ -32,7 +32,9 @@ describe('GP 아이템 (타자, 0xa4488)', () => {
   })
 
   it('알림은 원문 조각으로 만든다 — StrMODE[35+k]+[83], [122], 복권은 [116]/[117]', () => {
-    expect(gpItemNoticeOf(1, null)).toBe('파워 +10 상승하였습니다')
+    // ⚠️ 원본 버그 그대로 — 실제로는 +10 오르는데 글에는 6(엄마의도시락은 8)이 찍힌다
+    expect(gpItemNoticeOf(1, null)).toBe('파워 6 상승하였습니다')
+    expect(gpItemNoticeOf(4, null)).toBe('모든능력치 8 상승하였습니다')
     expect(gpItemNoticeOf(6, null)).toBe('사기 +40 회복되었습니다')
     expect(gpItemNoticeOf(5, 1)).toBe('1등 당첨!! [1억] 획득!')
     expect(gpItemNoticeOf(5, '우정상')).toBe('우정상 당첨!! [영지버섯] 획득!')

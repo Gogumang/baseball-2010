@@ -447,7 +447,8 @@ export function applyGameResult(career: PlayerCareer, summary: GameSummary): Pla
     // 부상 중 치른 경기 수 (+0x1b6). 부상 기간은 경기로 줄지 않고 휴식·입원으로만 줄어든다 (G-2)
     injuredGamesPlayed: career.injuredGamesPlayed + (career.isInjured ? 1 : 0),
     illnessCooldown: Math.max(0, career.illnessCooldown - 1),
-    // 행동권은 다음 관리 주기가 열릴 때만 돌아온다 — 경기마다 돌려주면 이어하기로 두 번 할 수 있다
+    // 원본은 **경기마다** 행동 플래그를 지운다 (0x4f158, G-6 확정). 관리 화면이 2경기마다만 열리므로
+    // 결과는 같지만 기준이 다르다 — 여기서는 "이어하기로 두 번 행동" 을 막으려고 주기 기준을 쓴다.
     hasActedThisCycle:
       (career.gamesPlayed + 1) % GAMES_PER_MANAGEMENT_CYCLE === 0 ? false : career.hasActedThisCycle,
     bestHomeRunsInGame: Math.max(career.bestHomeRunsInGame, summary.stats.homeRuns),

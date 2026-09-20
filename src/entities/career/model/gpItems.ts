@@ -10,7 +10,7 @@ import { abilityLimitOf } from '@/entities/career/model/abilityLimit'
  *   0~3  능력치 +10 · 4 모든 능력치 +10 — 타입 한계치(표 0xd80c6 × 10)를 넘지 않는다
  *   5    또또상품권 — 누적 확률 표 0xd80b1(%) · 상금 표 0xd80a7(100만원)
  *   6    영지버섯 사기 +40 · 7 종합건강진단 치료 · 8 최면요법 마이너스 스킬 삭제 · 9 이글아이 +20경기(상한 99)
- * GP 가격 표는 아직 못 찾았다 — 상점 연결은 가격을 찾은 뒤에 한다.
+ * GP 가격은 상점 0x14e54 가 `0xcc41b`[k (다른 모드 +10)] × 100 G 로 읽는다 — 표 값 [3,3,3,3,10,3,3,5,20,5] 확정.
  */
 export interface GpItem {
   readonly id: number
@@ -209,6 +209,12 @@ export function purchaseGpItem(career: PlayerCareer, id: number, random: RandomP
 }
 
 const ABILITY_NAMES = ['히트', '파워', '수비', '주루', '모든능력치']
+/**
+ * ⚠️ **원본 버그를 그대로 옮긴다** (G 2절 확정 · DECISIONS 2026-09-20):
+ * 능력치는 실제로 **+10** 오르는데, 알림 글에는 **칸별 아이템 6 · 엄마의도시락 8** 이라고 찍힌다.
+ * 글 = StrMODE[35+k] + " " + 숫자 + " " + StrMODE[83] 이고, 그 숫자 인자가 6·8 로 박혀 있다.
+ */
+const ABILITY_NOTICE_NUMBERS = [6, 6, 6, 6, 8]
 const STATIC_NOTICES: Readonly<Record<number, string>> = {
   6: '사기 +40 회복되었습니다', // StrMODE[122]
   7: '부상 및 질병이 모두 치료 되었습니다', // StrMODE[123]
@@ -224,8 +230,8 @@ function prizeLabelOf(prize: LotteryPrize, prizeItemId: number | undefined): str
 
 /** 사용 알림 — 원문 조각을 이어 붙인다 (StrMODE[35+k]+[83] · [116]/[117] · [122~126]). 상의 아이템 이름은 StrITEM[98+k] */
 export function gpItemNoticeOf(id: number, prize: LotteryPrize | null, prizeItemId?: number): string {
-  // 원본: StrMODE[35+k] + " " + 숫자 + " " + [83] — 숫자 인자(6·8)의 뜻은 미확인이라 실제 증가량 +10 을 쓴다 (추정)
-  if (id < ABILITY_NAMES.length) return `${ABILITY_NAMES[id]} +10 상승하였습니다`
+  // 실제 상승은 +10 이지만 글에는 6·8 이 찍힌다 (원본 그대로)
+  if (id < ABILITY_NAMES.length) return `${ABILITY_NAMES[id]} ${ABILITY_NOTICE_NUMBERS[id]} 상승하였습니다`
   if (id === LOTTERY_ITEM && prize !== null) {
     const title = typeof prize === 'number' ? `${prize}등` : prize
     return `${title} 당첨!! [${prizeLabelOf(prize, prizeItemId)}] 획득!`
