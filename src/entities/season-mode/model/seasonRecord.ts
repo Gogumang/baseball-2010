@@ -45,8 +45,18 @@ export interface SeasonRecord {
   readonly storeGames: number
   /** SR+0x56 — 이번 주기에 트레이드를 썼는가 (GP 아이템 칸 5 가 0 으로 되돌린다) */
   readonly tradeUsed: number
-  /** SR+0x58+칸 — 외출 서브 아이템 보유 (0xcbe6c 점프표가 장소별로 하나씩 본다) */
-  readonly subItems: readonly boolean[]
+  /**
+   * SR+0x58+칸 — **팀 트레이닝** 서브 아이템 4칸 (투구·타격·집중·근성, J 4-6 "해당 칸 상승 +2").
+   *
+   * 서브아이템 상점은 이 칸들을 `rec[0x58 + 줄×5 + 칸]` 2×5 격자로 다룬다 (R12 (나) 확정) —
+   * 줄 0 이 0x58~0x5c(트레이닝 4칸 + 자동안마기), 줄 1 이 0x5d~0x61(외출 5칸)이다.
+   */
+  readonly trainingSubItems: readonly boolean[]
+  /**
+   * SR+0x5d+p — **외출** 서브 아이템 5칸 (장소 p 별로 하나, 점프표 0xcbe6c).
+   * ⚠️ 예전에는 이 칸을 0x58 로 적어 트레이닝 칸·자동안마기와 겹쳐 있었다 (P4 3절·R12 로 정정).
+   */
+  readonly outingSubItems: readonly boolean[]
   /** SR+0x5c — 자동안마기 (팀 트레이닝 사기 감소 −1) */
   readonly massager: boolean
   /** SR+0x62 (s16) — 평판 0~999 */
@@ -116,8 +126,10 @@ export const TEAM_ABILITY_LIMIT = 999
 export const STADIUM_OWNED_SIZE = 21
 /** 평판 기록은 16바이트를 memset 한다 (0xa3424) */
 export const GAME_RECORD_SIZE = 16
-/** 외출 서브 아이템 칸 수 (장소 5곳) */
-const SUB_ITEM_SIZE = 5
+/** 트레이닝 서브 아이템 칸 수 — 능력치 4칸 (0x58~0x5b) */
+const TRAINING_SUB_ITEM_SIZE = 4
+/** 외출 서브 아이템 칸 수 — 장소 5곳 (0x5d~0x61) */
+const OUTING_SUB_ITEM_SIZE = 5
 
 /** 원본과 같은 자르기 — 값을 [0, limit] 안으로 */
 export function clampTo(value: number, limit: number): number {
@@ -180,7 +192,8 @@ export function startNewSeason(teamId: number, name: string): SeasonState {
       aimVisionGames: 0,
       storeGames: 0,
       tradeUsed: 0,
-      subItems: falses(SUB_ITEM_SIZE),
+      trainingSubItems: falses(TRAINING_SUB_ITEM_SIZE),
+      outingSubItems: falses(OUTING_SUB_ITEM_SIZE),
       massager: false,
       reputation: 0,
       lastReputationGrade: 0,

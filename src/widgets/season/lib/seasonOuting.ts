@@ -86,9 +86,8 @@ export const SEASON_OUTING_EFFECTS: readonly SeasonOutingEffect[] = [
  * 서브 아이템 보너스 (`SR+0x5d+p`, 점프표 `0xcbe6c`) — StrITEM[220]~[224] 와 같다.
  * **부호 뒤집기 뒤에** 더한다 (P4 3절 · G 171행).
  *
- * ⚠️ 이 보유 플래그는 아직 모델에 없다: `seasonRecord.ts` 의 `subItems` 는 `SR+0x58+칸`
- * (= 트레이닝 4칸 + 자동안마기 `+0x5c`) 자리다. 서브 아이템은 `rec[0x58 + 줄×5 + 칸]` 2×5
- * 격자(R12)라 **외출 쪽은 두 번째 줄 `+0x5d`~`+0x61`** 이다 → 화면은 밖에서 받아 쓴다.
+ * 보유 플래그는 모델의 `SeasonRecord.outingSubItems` 다. 서브아이템 상점은 이 칸들을
+ * `rec[0x58 + 줄×5 + 칸]` 2×5 격자로 다루고(R12), **외출 쪽이 두 번째 줄 `+0x5d`~`+0x61`** 이다.
  */
 export interface SeasonOutingSubItemBonus {
   readonly money?: number

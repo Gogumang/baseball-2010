@@ -109,3 +109,14 @@ describe('clampTo — 원본의 0..상한 자르기', () => {
     expect(clampTo(50, 100)).toBe(50)
   })
 })
+
+describe('서브 아이템 칸 (R12 (나) · P4 3절 정정)', () => {
+  it('트레이닝 4칸(0x58~0x5b)과 외출 5칸(0x5d~0x61)은 서로 다른 줄이다', () => {
+    const { record } = startNewSeason(0, '팀')
+
+    expect(record.trainingSubItems).toHaveLength(4)
+    expect(record.outingSubItems).toHaveLength(5)
+    // 자동안마기(0x5c)는 둘 사이의 별도 칸이라 어느 배열에도 안 들어간다
+    expect(record.massager).toBe(false)
+  })
+})

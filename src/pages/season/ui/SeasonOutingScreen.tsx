@@ -33,10 +33,8 @@ export interface SeasonOutingScreenProps {
   /**
    * 외출 서브 아이템 보유 `SR+0x5d+p` 5칸 (StrITEM[220]~[224]).
    *
-   * ⚠️ **모델에 아직 이 칸이 없다**: `seasonRecord.ts` 의 `subItems` 는 `SR+0x58+칸`
-   * (= 트레이닝 4칸 + 자동안마기 `+0x5c`) 자리다. 서브 아이템은 `rec[0x58 + 줄×5 + 칸]`
-   * 2×5 격자(R12)라 외출 쪽은 **둘째 줄**이다. 모델에 칸이 생기면 그것을 넘겨라 —
-   * 없으면 전부 없는 것으로 본다. 값은 **가드에 쓰이지 않고**(아래 원본 버그) 설명 줄에만 나온다.
+   * 모델의 `SeasonRecord.outingSubItems` 를 그대로 넘기면 된다. 안 넘기면 전부 없는 것으로 본다.
+   * 값은 **가드에 쓰이지 않고**(아래 원본 버그) 설명 줄에만 나온다.
    */
   readonly outingSubItems?: readonly boolean[]
   /**
