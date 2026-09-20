@@ -10,6 +10,7 @@ import {
 import type { MapBox, OutingPlace } from '@/shared/config/outingPlaces'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
+import type { ReactNode } from 'react'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { Button, FrameSprite } from '@/shared/ui'
 import * as styles from '@/pages/outing-map/ui/OutingMapScreen.css'
@@ -35,10 +36,12 @@ interface OutingMapProps {
   readonly noticeText: string
   readonly onOpen: (place: OutingPlace) => void
   readonly onBack: () => void
+  /** 지도 위에 얹을 것 — 장소 기능 말풍선 (F-2 2-7) */
+  readonly children?: ReactNode
 }
 
 /** 원작 외출 지도 — event_map 프레임 그대로 (건물·이름·[!]·선택 화살표) */
-export function OutingMap({ selectedPlaceId, eventPlaceIds, noticeText, onOpen, onBack }: OutingMapProps) {
+export function OutingMap({ selectedPlaceId, eventPlaceIds, noticeText, onOpen, onBack, children }: OutingMapProps) {
   const origins = useFrameOrigins(MAP_FRAMES)
   const labelOrigins = useFrameOrigins(PLACE_LABEL_FRAMES)
   const animations = useAnimations(MAP_FRAMES)
@@ -94,6 +97,7 @@ export function OutingMap({ selectedPlaceId, eventPlaceIds, noticeText, onOpen, 
       <div className={styles.noticeLine}>
         {noticeText !== '' ? noticeText : eventPlaceIds.size > 0 ? '[!] 장소에서 들어가기 · 건물을 누르세요' : '건물을 누르세요'}
       </div>
+      {children}
     </RawScreen>
   )
 }
