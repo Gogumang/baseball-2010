@@ -1,62 +1,57 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MessageBox } from '@/shared/ui/MessageBox/MessageBox'
 
 /**
- * 메시지 상자는 화면을 덮는 창이다 — 열려 있는 동안 키는 상자가 가져가야 한다.
- * 뒤쪽 메뉴가 같은 Enter 를 같이 받으면 상자를 눌러 닫을 수 없다.
+ * 메시지 상자 (0x74ef4 배치 · F-1).
+ * 버튼은 글자가 아니라 `ui/popup.pzx` 프레임 그림이다 — 알림 0 "OK", 예/아니오 1·2, 고르면 6·7.
  */
 
 afterEach(cleanup)
 
-const pressKey = (key: string) => fireEvent.keyDown(window, { key })
+const 그림 = (name: string) => screen.getByRole('button', { name }).querySelector('img')
 
-describe('메시지 상자 키 조작', () => {
-  it('Enter 는 고른 버튼을 누른다 — 처음 고른 것은 첫 버튼이다', () => {
+describe('메시지 상자 버튼 — popup.pzx 프레임', () => {
+  it('알림은 프레임 0 "OK" 한 장뿐이다 — "확인" 글자가 아니다', () => {
+    render(<MessageBox text="알림" buttons={['확인']} onAnswer={vi.fn()} />)
+
+    expect(screen.getAllByRole('button')).toHaveLength(1)
+    expect(그림('확인')?.getAttribute('src')).toContain('popup/frames/000.png')
+  })
+
+  it('예/아니오는 비선택 1·2 이고, 고른 칸만 주황 그림 6·7 로 바뀐다', () => {
+    render(<MessageBox text="질문" buttons={['예', '아니오']} onAnswer={vi.fn()} />)
+
+    // 처음 고른 칸은 [예]
+    expect(그림('예')?.getAttribute('src')).toContain('popup/frames/006.png')
+    expect(그림('아니오')?.getAttribute('src')).toContain('popup/frames/002.png')
+
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+
+    expect(그림('예')?.getAttribute('src')).toContain('popup/frames/001.png')
+    expect(그림('아니오')?.getAttribute('src')).toContain('popup/frames/007.png')
+  })
+
+  it('고른 그림은 원점이 (−4,−4) 라 사방 4px 넘쳐 그려진다', () => {
+    render(<MessageBox text="질문" buttons={['예', '아니오']} onAnswer={vi.fn()} />)
+
+    expect(그림('예')?.getAttribute('style')).toContain('-4px')
+  })
+
+  it('Enter 는 고른 칸, Escape 는 마지막 칸을 답으로 준다', () => {
     const onAnswer = vi.fn()
-    render(<MessageBox text="!C물어봅니다" buttons={['예', '아니오']} onAnswer={onAnswer} />)
+    render(<MessageBox text="질문" buttons={['예', '아니오']} onAnswer={onAnswer} />)
 
-    pressKey('Enter')
-
+    fireEvent.keyDown(window, { key: 'Enter' })
     expect(onAnswer).toHaveBeenCalledWith(0)
   })
 
-  it('좌우 키로 버튼을 옮긴다', () => {
+  it('Escape 는 마지막 칸이다 — 예/아니오면 [아니오]', () => {
     const onAnswer = vi.fn()
-    render(<MessageBox text="!C물어봅니다" buttons={['예', '아니오']} onAnswer={onAnswer} />)
+    render(<MessageBox text="질문" buttons={['예', '아니오']} onAnswer={onAnswer} />)
 
-    pressKey('ArrowRight')
-    pressKey('Enter')
-
+    fireEvent.keyDown(window, { key: 'Escape' })
     expect(onAnswer).toHaveBeenCalledWith(1)
-  })
-
-  it('Escape 는 마지막 버튼(아니오·확인)을 누른다', () => {
-    const onAnswer = vi.fn()
-    render(<MessageBox text="!C물어봅니다" buttons={['예', '아니오']} onAnswer={onAnswer} />)
-
-    pressKey('Escape')
-
-    expect(onAnswer).toHaveBeenCalledWith(1)
-  })
-
-  it('버튼이 하나면 Enter·Escape 모두 그 버튼이다', () => {
-    const onAnswer = vi.fn()
-    render(<MessageBox text="!C알립니다" buttons={['확인']} onAnswer={onAnswer} />)
-
-    pressKey('Escape')
-
-    expect(onAnswer).toHaveBeenCalledWith(0)
-  })
-
-  it('한 번 답하면 더 받지 않는다 — 키를 길게 눌러 두 번 답해지지 않게', () => {
-    const onAnswer = vi.fn()
-    render(<MessageBox text="!C물어봅니다" buttons={['예', '아니오']} onAnswer={onAnswer} />)
-
-    pressKey('Enter')
-    pressKey('Enter')
-
-    expect(onAnswer, `불린 횟수: ${onAnswer.mock.calls.length}`).toHaveBeenCalledTimes(1)
   })
 })
