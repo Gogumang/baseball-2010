@@ -3,7 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { EndingScreen } from '@/pages/ending/ui/EndingScreen'
 import {
-  BAND_WINDOW, ENDING_IMAGE, IRIS, endingImageXOf, irisDrawValueOf, irisRadiusOf,
+  BAND_WINDOW, ENDING_IMAGE, IRIS, IRIS_STAGES, WALK_IN,
+  endingImageXOf, irisDrawValueOf, irisRadiusOf,
 } from '@/pages/ending/lib/endingLayout'
 
 /**
@@ -74,19 +75,27 @@ describe('원형 전환(아이리스) 반지름 — S9 8-2', () => {
     expect(irisRadiusOf(2)).toBe(D - Math.trunc((D * 110) / 100) + Math.trunc((D * 32) / 100))
   })
 
-  it('t = 0 은 0.10·D, t = 1 은 0.06·D 로 오히려 줄어든다 (원본 그대로)', () => {
-    expect(irisRadiusOf(0)).toBe(20)
-    expect(irisRadiusOf(1)).toBe(12)
-    expect(irisRadiusOf(2)).toBe(44)
+  it('D 는 240 − [this+0x2fc] 다 — 첫 단계 140(중심 −58·−55) · 뒤 단계 240 (S12 6절)', () => {
+    expect(IRIS_STAGES.open).toEqual({ diameter: 140, dx: -58, dy: -55 })
+    expect(IRIS_STAGES.reveal).toEqual({ diameter: 240, dx: 0, dy: 0 })
+    expect(IRIS.diameter).toBe(140)
   })
 
-  it('t ≥ 7 이면 p 가 110 에 걸려 r = D 가 되어 화면을 다 덮는다', () => {
+  it('t = 0 은 0.10·D, t = 1 은 0.06·D 로 오히려 줄어든다 (원본 그대로)', () => {
+    expect(irisRadiusOf(0)).toBe(14)
+    expect(irisRadiusOf(1)).toBe(8)
+    expect(irisRadiusOf(2)).toBe(30)
+  })
+
+  it('t ≥ 7 이면 p 가 110 에 걸려 r = D 가 된다', () => {
     expect(irisRadiusOf(IRIS.fullTick)).toBe(IRIS.diameter)
     expect(irisRadiusOf(100)).toBe(IRIS.diameter)
+    // 뒤 단계 D = 240 이면 가운데에서 대각선 절반(200)을 넘어 화면을 다 덮는다
+    expect(irisRadiusOf(IRIS.fullTick, IRIS_STAGES.reveal.diameter)).toBe(240)
   })
 
   it('원 그리기에 쓰는 값은 화면폭 − r 이다 ([this+0x2f8])', () => {
-    expect(irisDrawValueOf(0)).toBe(240 - 20)
+    expect(irisDrawValueOf(0)).toBe(240 - 14)
   })
 
   it('검정 판에 원을 뚫어 덮는다 (evenodd)', () => {
@@ -95,6 +104,27 @@ describe('원형 전환(아이리스) 반지름 — S9 8-2', () => {
 
     expect(판?.getAttribute('fill')).toBe(IRIS.cover)
     expect(판?.getAttribute('d')).toContain(`M0,0H240V320H0Z`)
+  })
+})
+
+describe('걸어 들어오는 그림 — S12 7절', () => {
+  it('3틱에 1px 왼쪽으로 오고 8틱에 한 번 1px 튄다', () => {
+    // 애니 x = 240 − n/3 − 20 · 아이콘 x = 240 − n/3 − 62
+    expect(WALK_IN.xOf(0, WALK_IN.characterDx)).toBe(220)
+    expect(WALK_IN.xOf(3, WALK_IN.characterDx)).toBe(219)
+    expect(WALK_IN.xOf(0, WALK_IN.iconDx)).toBe(178)
+    // y = (n & 7) ? 137 : 136 · 아이콘은 (n & 7) ? 61 : 60
+    expect(WALK_IN.characterYOf(8)).toBe(136)
+    expect(WALK_IN.characterYOf(9)).toBe(137)
+    expect(WALK_IN.iconYOf(8)).toBe(60)
+    expect(WALK_IN.iconYOf(9)).toBe(61)
+  })
+
+  it('그림은 event_char_0 애니와 mode_ui 프레임 87 이다', () => {
+    expect(WALK_IN.characterFolder).toBe('./sprites/event_char_0/frames')
+    expect(WALK_IN.characterAnimation).toBe(2)
+    expect(WALK_IN.iconFolder).toBe('./sprites/mode_ui/frames')
+    expect(WALK_IN.iconFrame).toBe(87)
   })
 })
 

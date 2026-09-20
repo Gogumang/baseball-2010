@@ -8,24 +8,17 @@ export const sprite = style({
   pointerEvents: 'none',
 })
 
-/** 줄 하나 — 그림은 따로 그리고 눌림만 받는 투명 칸이다 */
-export const row = style({
+/** 장 넘기기 칸 — 원본은 좌우 키(0x637d0)뿐이라 이 단추는 웹판 편의다 */
+export const sectionButton = style({
   position: 'absolute',
   padding: 0,
   border: 'none',
   background: 'none',
-  font: 'inherit',
+  color: ORIGINAL_COLORS.text,
+  fontSize: '10px',
+  lineHeight: '12px',
   cursor: 'pointer',
   selectors: { '&:focus-visible': { outline: `1px dashed ${ORIGINAL_COLORS.text}` } },
-})
-
-/** 설명 판 안 글 — RGB(128,128,128) 회색, 11px 줄 (0x55545) */
-export const description = style({
-  position: 'absolute',
-  fontSize: '11px',
-  lineHeight: '12px',
-  whiteSpace: 'nowrap',
-  pointerEvents: 'none',
 })
 
 /** 바닥띠 되돌아가기 표시 (바닥 비트 0x4) */

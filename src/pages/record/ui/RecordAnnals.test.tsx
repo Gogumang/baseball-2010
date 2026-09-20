@@ -5,7 +5,10 @@ import { RecordAnnals } from '@/pages/record/ui/RecordAnnals'
 import { EMPTY_COLLECTION } from '@/entities/collection/model/collection'
 import { ORIGINAL_SKILLS } from '@/shared/config/original/skills'
 import { TITLE_NAMES } from '@/entities/career/model/titles'
-import { CELL_GRID, PANEL, cellPositionOf } from '@/pages/record/lib/recordAnnalsLayout'
+import {
+  CELL_GRID, PANEL, TAB_CURSOR, TAB_NAME_Y, TAB_SELECTED_WIDTH, TAB_SLOT_WIDTH,
+  cellPositionOf, tabIconXOf, tabNameXOf, tabSlotXOf,
+} from '@/pages/record/lib/recordAnnalsLayout'
 
 /**
  * 기록연감 (0x2e29c — P6 2c). 탭 다섯이 192 판 위에 놓이고
@@ -32,6 +35,24 @@ describe('기록연감 뼈대', () => {
     for (const name of ['기록', '진행', '스킬', '닉네임', '통계']) {
       expect(screen.getByRole('button', { name })).toBeTruthy()
     }
+  })
+
+  it('탭 칸은 slt_frame 프레임 4~8 의 박스다 — 26/55/84/113/142, 폭 72, 간격 29 (S12 1절)', () => {
+    expect([0, 1, 2, 3, 4].map(tabSlotXOf)).toEqual([26, 55, 84, 113, 142])
+    expect(TAB_SLOT_WIDTH).toBe(72)
+    // 커서 y = 54 · 이름 y = 58 · 이름은 박스 안 가운데 (72 − 이름폭)/2
+    expect(TAB_CURSOR.y).toBe(54)
+    expect(TAB_NAME_Y).toBe(58)
+    expect(tabNameXOf(2, 40)).toBe(84 + 16)
+  })
+
+  it('안 고른 탭은 29px 아이콘 칸이고 고른 탭만 75px 로 넓다', () => {
+    띄우기() // 고른 탭 = 0
+
+    expect(screen.getByRole('button', { name: '기록' }).style.width).toBe(`${TAB_SELECTED_WIDTH}px`)
+    expect(screen.getByRole('button', { name: '진행' }).style.left).toBe(`${tabIconXOf(1, 0)}px`)
+    // 고른 탭보다 뒤 칸은 넓어진 칸만큼(46) 밀린다 — 24 + 29 + 46 = 99
+    expect(tabIconXOf(1, 0)).toBe(99)
   })
 
   it('쪽이 있는 탭만 쪽 번호를 보여 준다 — 기록 6쪽 · 진행 없음', () => {

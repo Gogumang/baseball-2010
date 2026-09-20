@@ -61,8 +61,8 @@ describe('월드 좌표 → 화면 좌표', () => {
 
     const first = screen.getByTestId('defense-fielder-2')
     expect(Number.parseInt(first.style.left, 10)).toBeGreaterThan(120)
-    // 달리기 → 동작 4 · 칸 1 = 프레임 10 (R3 2-1)
-    expect(first.dataset.frame).toBe('10')
+    // 달리기 → 동작 4 · 칸 1 = vt40 날값 10 에 +17 한 프레임 27 (R3 2-1 · S12 8-1)
+    expect(first.dataset.frame).toBe('27')
   })
 
   it('공은 높이만큼 위로 올라가고 그림자는 바닥에 남는다', () => {
@@ -104,20 +104,22 @@ describe('주자와 번쩍임', () => {
   })
 })
 
-describe('좌우 반전', () => {
-  it('반전 칸만 뒤집기 클래스를 붙인다', () => {
+describe('좌·우 그림 (S12 8절 — 좌우 반전이 아니다)', () => {
+  it('야수는 뒤집지 않고 동작 3·4 의 다른 프레임 묶음으로 좌·우를 가른다', () => {
     띄우기({
       ...기본_상태,
       fielders: [
-        { slot: 0, x: 20000, z: 24500, action: FIELDER_ACTION.stand, actionTick: 0 },
-        { slot: 1, x: 20000, z: 29705, action: FIELDER_ACTION.stand, actionTick: 0, isFlipped: true },
+        { slot: 0, x: 20000, z: 24500, action: FIELDER_ACTION.runLeft, actionTick: 0 },
+        { slot: 1, x: 20000, z: 29705, action: FIELDER_ACTION.runRight, actionTick: 0 },
       ],
     })
 
-    const plain = screen.getByTestId('defense-fielder-0').className.split(' ')
-    const flipped = screen.getByTestId('defense-fielder-1').className.split(' ')
-    expect(plain).toHaveLength(1)
-    expect(flipped).toHaveLength(2)
-    expect(flipped[0]).toBe(plain[0])
+    const 왼 = screen.getByTestId('defense-fielder-0')
+    const 오 = screen.getByTestId('defense-fielder-1')
+    // 프레임은 vt40 날값 6·9 에 +17 을 더한 23·26 이고, 뒤집기 클래스는 붙지 않는다
+    expect(왼.dataset.frame).toBe('23')
+    expect(오.dataset.frame).toBe('26')
+    expect(왼.className.split(' ')).toHaveLength(1)
+    expect(오.className.split(' ')).toEqual(왼.className.split(' '))
   })
 })

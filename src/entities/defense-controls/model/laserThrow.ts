@@ -6,7 +6,7 @@
  *      이 플래그는 포구 판정의 **높이 창을 넓히는 것뿐**이다(점프 1701~4000 · 슬라이딩 501~1500·거리 2000~3000).
  *   2. 공을 잡고 나면 레이저 송구를 굴리고, 통과하면 사람 수비는 야수 몸이 **반짝인다**(경기+0x19ad).
  *      CPU 수비는 반짝임 없이 곧바로 레이저(경기+0x19ae).
- *   3. 반짝이는 19틱 안에 **새로 누른**(누르고 있기 불가) 키가 들어오면 레이저 확정.
+ *   3. 반짝임 창(포구 −10 ~ +8틱, S12 3절) 안에 **새로 누른**(누르고 있기 불가) 키가 들어오면 레이저 확정.
  *      같은 틱에 그 키는 송구 목표(0x588)로도 가므로 **키 한 번 = 목표 선택 + 레이저 확정**이다.
  */
 
@@ -105,17 +105,35 @@ export function rollLaserThrow(input: LaserThrowInput, random: RandomPort): bool
 }
 
 /**
- * "반짝이는 순간" 창 — 0xb2648.
- * 카운터는 `플레이+0x174 − 공[0x68] == 10` 인 순간 0 에서 시작하고(공을 잡은 뒤 10틱째로 보임 — **유력**),
- * 틱마다 +1 하며 `(값 − 1) ≤ 18` 인 동안 열려 있다 → **19틱**.
- * 시작 기준점이 유력이라, 여기서는 "공 잡은 틱"을 0 으로 두고 10~28틱을 창으로 잡았다.
+ * "반짝이는 순간" 창 — 0xb2648 (S12 3절 **확정**).
+ *
+ * ```
+ * d = (s16)[플레이+0x174](포구 틱) − 공[0x68](현재 틱)
+ * if (d == 10) [플레이+0x1e4] = 0          ; ★ 기준점 — 공 잡기 10틱 **전**
+ * if ([플레이+0x1e4] != -1) [플레이+0x1e4] += 1
+ * return (unsigned)([플레이+0x1e4] - 1) <= 0x12    ; 카운터 1~19 → 열림
+ * ```
+ * 부호가 반대라 앞서 적어 둔 "공 잡은 뒤 10틱째" 는 틀렸다 —
+ * 창은 **포구 −10 ~ +8** 틱이다(공이 글러브에 닿기 전부터 반짝이고 잡는 순간이 창 한가운데쯤이다).
+ *
+ * ⚠️ **원본 버그 — 그대로 옮긴다**: 카운터는 틱이 아니라 **0xb2648 이 불릴 때마다** 오른다.
+ * 한 틱 갱신 `0x524c0` 이 `0x523bc`(그 안에서 0x5242c, 반짝이는 동안은 0x5241a 까지 한 번 더)와
+ * `0x4e858`(0x4e864)을 잇달아 불러 **틱당 2~3번** 오른다 → 19번이 다 차는 데 실제로는 **7~9틱**뿐이다.
+ * (메모리 규칙: 버그로 보여도 원본대로 옮기고 수정은 나중에.)
  */
-export const LASER_WINDOW_START_TICK = 10
+/** 포구 틱을 0 으로 센 창 시작 — 공 잡기 10틱 전 */
+export const LASER_WINDOW_FIRST_TICK = -10
+/** 카운터가 세는 횟수 (1~19) */
 export const LASER_WINDOW_TICKS = 19
-export const LASER_WINDOW_LAST_TICK = LASER_WINDOW_START_TICK + LASER_WINDOW_TICKS - 1
+/** 창 끝 — 포구 8틱 뒤 */
+export const LASER_WINDOW_LAST_TICK = 8
+/** 원본 버그로 카운터가 한 틱에 오르는 횟수 (보통 2, 반짝이는 동안 3) */
+export const LASER_WINDOW_COUNTS_PER_TICK = { normal: 2, whileShining: 3 } as const
+/** 그래서 실제로 열려 있는 틱 수 — 19 / (2~3) ≈ 7~9틱 (원본 버그, 나중에 수정 후보) */
+export const LASER_WINDOW_REAL_TICKS = { min: 7, max: 9 } as const
 
 export interface LaserWindowInput {
-  /** 공을 잡은 틱을 0 으로 센 경과 틱 */
+  /** 포구 틱을 0 으로 센 경과 틱 — 창이 포구 **전**에 열리므로 음수가 들어온다 */
   readonly ticksSinceCatch: number
   /** 플레이+0x160 ≠ −1 — 사람이 이미 송구 목표를 골랐다 */
   readonly hasChosenThrowTarget: boolean
@@ -132,7 +150,7 @@ export interface LaserWindowInput {
 export function isLaserWindowOpen(input: LaserWindowInput): boolean {
   if (input.hasChosenThrowTarget && input.isBallHeld && input.isThrowerReady) return false
   return (
-    input.ticksSinceCatch >= LASER_WINDOW_START_TICK && input.ticksSinceCatch <= LASER_WINDOW_LAST_TICK
+    input.ticksSinceCatch >= LASER_WINDOW_FIRST_TICK && input.ticksSinceCatch <= LASER_WINDOW_LAST_TICK
   )
 }
 

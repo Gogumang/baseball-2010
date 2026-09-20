@@ -25,8 +25,7 @@ import {
   ballFrameOf,
   ballShadowFrameOf,
   cameraTargetOf,
-  fielderFrameOf,
-  fielderFramesOf,
+  fielderSpriteOf,
   flashOffsetOf,
   runnerFrameOf,
 } from '@/pages/defense/lib/defenseView'
@@ -173,15 +172,16 @@ function Fielder({
   readonly fielder: DefenseFielder
   readonly point: { readonly x: number; readonly y: number }
 }) {
-  const frame = fielderFrameOf(fielder.action, fielder.actionTick)
+  // 그림판마다 프레임 기준이 다르다 — 보통·타자 마선수는 +17, 투수 마선수는 날값 (S12 8절)
+  const { folder, frame } = fielderSpriteOf(fielder)
   return (
     <div
-      className={`${styles.actor}${fielder.isFlipped === true ? ` ${styles.flipped}` : ''}`}
+      className={styles.actor}
       style={{ left: point.x, top: point.y }}
       data-testid={`defense-fielder-${fielder.slot}`}
       data-frame={frame}
     >
-      <ActorSprite folder={fielderFramesOf(fielder, frame)} frame={frame} />
+      <ActorSprite folder={folder} frame={frame} />
     </div>
   )
 }
@@ -201,7 +201,7 @@ function Runner({
       data-testid={`defense-runner-${runner.index}`}
       data-frame={frame}
     >
-      {/* 주자 전용 그림판이 저장소에 없다 — 원본도 같은 그림 객체를 쓰므로 defender 를 쓴다 (R10 4절) */}
+      {/* 주자도 defender.pzx 를 쓴다 — 앞 17장(000~016)이 주자 칸이다 (S12 4-1 확정) */}
       <ActorSprite folder={DEFENDER_FRAMES} frame={frame} />
     </div>
   )

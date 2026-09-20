@@ -4,86 +4,78 @@ import {
 } from '@/pages/special/lib/specialLayout'
 
 /**
- * 도움말 배치 (메인 메뉴 상태 9 목록 + 상태 37 본문 — P6 2d·1-2).
+ * 도움말 배치 — **큰 정정** (S12 2절).
  *
- * 목록 그리기는 **스페셜(상태 6)과 글자 하나 다르지 않다**:
- * 메뉴 판 `0x24b1c`(반원 바퀴, F-5) + **하위 목록 `0x2524c`** + 머리띠 `0x54d95(skin, 0, 5)`
- * (제목 "2010프로야구", 바닥 되돌아가기). 표만 다르다 — 상태 9 는 **표 `0xceb37`(다섯 칸)**.
- * 그래서 바퀴·머리띠·줄 자리·설명 판 상수는 `specialLayout.ts` 를 그대로 가져다 쓴다
- * (같은 원본 함수를 두 번 옮겨 적으면 한쪽만 고쳐질 수 있다).
+ * 앞서 "도움말 = 메인 메뉴 상태 9 목록 + 상태 37 본문" 이라고 옮긴 것은 **틀렸다**.
+ *   - 상태 9 하위 목록의 설명 글은 `0x2584c adds r1, #0x18` → `StrMAINMENU[24 + 커서]`
+ *     ("…의 순위를 확인합니다") 이므로 그 화면은 **랭킹 하위 메뉴**다. 상태 37 은 **랭킹 표**이고,
+ *     표 `0xcedf4 = [9,12,15,18,20]` 은 그 화면의 img_text **제목 프레임**이다(StrHOWTO 와 무관).
+ *   - **진짜 도움말은 상태 7** 이다 — 그리기 `0x2fc8c` = 판 `0x58371(skin, 메뉴, 0)` +
+ *     StrHOWTO 뷰어 `0x639a5`(→ `0x58d10`) + 머리띠 `0x54d95(메뉴, 0, 5)`.
+ *     뷰어는 `0x2668c` 가 `0x63689(뷰어, 0)` 로 **장 0** 부터 열고, 상태 10 [게임문의]만
+ *     `0x63689(뷰어, 6)` + `[뷰어+0x45c] = 1`(장 이동 잠금)로 연다.
+ *     경기 중 메뉴 [조작방법](`0x3c25a`)도 같은 뷰어를 **장 0**(기본 조작)으로 연다.
  *
- * 고르면 상태 37 = **가운데 192 폭 창**(공용 판 `0x55e61`, 정렬 0x22) + 표 `0xcedf4` 로
- * StrHOWTO 본문을 보여 준다 (F-8 493줄 · P6 1-2 표).
+ * 장 묶음은 `shared/config/helpSections.ts` 가 원본 표 `0xd0b18 = [5,5,7,6,3,6,4]` 그대로 담는다 —
+ * **일곱 장**이라 기본 조작·미션모드·환경설정도 모두 이 화면에서 볼 수 있다
+ * (앞서 "다섯 칸뿐이라 이 화면에 없다" 고 적어 둔 주석은 틀렸다).
  */
 
 export { DESCRIPTION_PANEL, FOOTER, HEADBAND, ROW, SCREEN, WHEEL, descriptionPanelTopOf, rowTopOf }
 
-export interface HelpItem {
+/**
+ * ⚠️ 아래 다섯 칸은 **도움말이 아니라 랭킹 하위 메뉴(상태 9)** 의 것이다 (표 `0xceb37` =
+ * main_ui 프레임 7 일반모드 · 8 나만의리그 · 9 시즌모드 · 10 대전모드 · 13 홈런더비).
+ * 설명 글은 `StrMAINMENU[24 + 커서]` 다. 랭킹 화면을 옮길 때 이 값을 그대로 가져가면 된다 —
+ * 도움말 화면(상태 7)은 이 목록을 쓰지 않는다.
+ */
+export interface RankingMenuItem {
   readonly id: string
   /** main_ui 프레임 번호 (표 0xceb37) */
   readonly labelFrame: number
   /** 프레임 그림 크기 — PNG 머리에서 읽은 실제 값 (origins.json 은 다 (0,0) 원점이다) */
   readonly labelWidth: number
   readonly labelHeight: number
-  /**
-   * 설명 글 원문. P6 2d 가 "StrMAINMENU[기준 + 커서]" 라고만 적어 기준을 못 읽었는데,
-   * 게임모드 목록(상태 5)이 프레임 6~13 에 StrMAINMENU[6]~[12] 를 붙이는 것과 맞추면
-   * 도움말의 기준은 **7** 이다 — 프레임 7·8·9·10·13 ↔ [7]~[11] 이 그대로 모드 설명과 들어맞는다 (유력).
-   */
+  /** 설명 글 원문 — StrMAINMENU[24 + 커서] (S12 2-1 확정) */
   readonly description: string
-  /** 본문 묶음 — `shared/config/helpSections.ts` 의 묶음 이름 */
-  readonly sectionTitle: string
 }
 
-/**
- * 다섯 칸 — **7 일반모드 · 8 나만의리그 · 9 시즌모드 · 10 대전모드 · 13 홈런더비** (표 0xceb37 확정).
- *
- * ⚠️ StrHOWTO 36쪽 가운데 이 다섯 모드 밖의 묶음(기본 조작 [0]~[4] · 미션모드 [27] ·
- * 스페셜 [28]~[29] · 환경설정 [30]~[31] · 게임문의 [32]~[35])은 **이 화면에 없다.**
- * 기본 조작은 원본이 경기 중 메뉴 [조작방법](I 3절, 0x63688 하위 4)으로 따로 보여 주고,
- * 나머지가 어느 칸에 붙는지는 본문 표 `0xcedf4` 를 아직 못 읽어 알 수 없다.
- * 표 0xceb37 이 "다섯 칸" 으로 확정이라 **칸을 늘리지 않고** 원본대로 다섯만 둔다.
- */
-export const HELP_ITEMS: readonly HelpItem[] = [
+export const RANKING_MENU_ITEMS: readonly RankingMenuItem[] = [
   {
     id: '일반모드', labelFrame: 7, labelWidth: 97, labelHeight: 27,
-    description: '원하는 팀을 선택해 자유롭게!N플레이하는 모드입니다', // StrMAINMENU[7]
-    sectionTitle: '일반모드',
+    description: '일반모드의!N순위를 확인합니다', // StrMAINMENU[24]
   },
   {
     id: '나만의리그', labelFrame: 8, labelWidth: 115, labelHeight: 27,
-    description: '나만의 선수를 자유롭게 육성!N할 수 있는 모드입니다', // [8]
-    sectionTitle: '나만의리그',
+    description: '나만의 리그의!N순위를 확인합니다', // [25]
   },
   {
     id: '시즌모드', labelFrame: 9, labelWidth: 98, labelHeight: 27,
-    description: '우승을 목표로 1개 팀을 직접!N관리할 수 있는 모드입니다', // [9]
-    sectionTitle: '시즌모드',
+    description: '시즌모드의!N순위를 확인합니다', // [26]
   },
   {
     id: '대전모드', labelFrame: 10, labelWidth: 96, labelHeight: 27,
-    description: '다른 유저의 시즌모드 팀과!N경쟁할 수 있는 모드입니다', // [10]
-    sectionTitle: '대전모드',
+    description: '대전모드의!N순위를 확인합니다', // [27]
   },
   {
     id: '홈런더비', labelFrame: 13, labelWidth: 95, labelHeight: 27,
-    description: '홈런더비를 통해 타격감을!N향상 시킬 수 있는 모드입니다', // [11]
-    sectionTitle: '홈런더비',
+    // 원본 글은 "훈련모드의…" 다 (칸은 홈런더비인데 글이 어긋난 것 — 원본 그대로 옮긴다)
+    description: '훈련모드의!N순위를 확인합니다', // [28]
   },
 ]
 
-export const ITEM_COUNT = HELP_ITEMS.length
+/** 랭킹 표 화면(상태 37)의 제목 그림 — 표 `0xcedf4` = img_text 프레임 (S12 2-1) */
+export const RANKING_TITLE_FRAMES = [9, 12, 15, 18, 20] as const
 
 /** 항목 그림 왼쪽 끝 — 가운데 x = W − 39 − w/2 이므로 오른쪽 끝이 201 에 붙는다 (0x253d4) */
-export const rowLeftOf = (item: HelpItem) => ROW.rightEdge - item.labelWidth
+export const rowLeftOf = (item: RankingMenuItem) => ROW.rightEdge - item.labelWidth
 
 /**
- * 본문 창 (상태 37, 그리기 `0x2fccc`) — 공용 판 `0x55e61(skin, 120, 160, 192 × h, 정렬 0x22)`.
- * 환경설정·기록연감과 같은 가운데 192 판이라 값도 같다: x0 = W/2 − 96 = 24, y0 = H/2 − 106 = 54.
+ * 도움말 본문 창 (상태 7, 그리기 `0x2fc8c` → 뷰어 `0x639a5` → `0x58d10`).
  *
- * ⚠️ 창 **안쪽** 배치(쪽 제목 줄·글 시작 y·스크롤 표시)는 표 `0xcedf4` 를 못 읽어 모른다.
- * 기록연감 쪽 제목 줄과 같은 자리(노란 네모 (34, 78) + 제목 (42, 76))를 쓰고
- * 본문은 그 아래 16px 에서 시작한다 — **배치 근사**.
+ * ⚠️ 판 `0x58371` 의 치수와 뷰어 `0x58d10` 의 쪽 나누기·글 배치는 **아직 미해독**이다.
+ * 환경설정·기록연감과 같은 가운데 192 판(x0 = W/2 − 96 = 24, y0 = H/2 − 106 = 54)으로 두고
+ * 쪽 제목 줄은 기록연감 자리를 쓴다 — **배치 근사**.
  */
 export const BODY_PANEL = {
   x: SCREEN.width / 2 - 96,

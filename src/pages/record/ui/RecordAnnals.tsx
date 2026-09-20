@@ -10,7 +10,8 @@ import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import {
   CELL_FRAMES, CELL_GRID, LIST_GRID, LOCKED_MARK, NAME_ROW, PAGER, PAGE_TITLE, PANEL,
   PROGRESS_ROW, SCROLL_MARKS, SKILL_DESCRIPTION, TAB_BAR, TAB_COUNT, TAB_CURSOR, TAB_NAMES,
-  TAB_NAME_FRAMES, TAB_PAGE_COUNTS, TAB_SLOT_WIDTH, TOTAL_ROW, cellPositionOf, tabSlotXOf,
+  TAB_NAME_FRAMES, TAB_NAME_Y, TAB_PAGE_COUNTS, TOTAL_ROW, cellPositionOf, tabIconWidthOf,
+  tabIconXOf, tabNameXOf, tabSlotXOf,
 } from '@/pages/record/lib/recordAnnalsLayout'
 import * as styles from '@/pages/record/ui/RecordAnnals.css'
 
@@ -19,6 +20,10 @@ const SLT_FRAMES = `${SLT_FRAME}/frames`
 const IMG_TEXT = './sprites/img_text/frames'
 
 const imageSrc = (folder: string, id: number) => `${folder}/${String(id).padStart(3, '0')}.png`
+
+/** 탭 이름 그림 폭 — 원본은 `0xba815(…, img_text, 276+탭, 1)` 로 크기를 재 가운데를 맞춘다 (0x2e546) */
+const nameWidthOf = (origins: ReturnType<typeof useFrameOrigins>, frame: number) =>
+  origins?.[String(frame).padStart(3, '0')]?.width ?? 0
 
 interface RecordAnnalsProps {
   readonly collection: Collection
@@ -31,8 +36,9 @@ interface RecordAnnalsProps {
  * 탭 다섯(기록·진행·스킬·닉네임·통계)이 192×212 판 위에 놓인다.
  *   진행(엔딩)·스킬은 **41×25 칸 격자 4열**, 닉네임은 **164×18 줄 8개**다.
  *
- * ⚠️ 탭 이름·커서의 x 는 원래 탭 막대 프레임의 **박스**가 정하는데(0x94a65) 박스 값을 아직
- * 못 뽑아 막대를 다섯 칸으로 고르게 나눠 썼다 — 그 부분만 배치 근사다.
+ * 탭 이름·커서의 x 는 탭 막대 프레임의 **박스**가 정한다(0x94a65) — slt_frame 프레임 4~8 의
+ * 박스 0 `(2/31/60/89/118, 2, 72, 17)` 을 읽어 확정했다(S12 1절). 간격은 29 다.
+ * 원본은 **고른 탭의 이름 하나만** img_text 로 그리고, 안 고른 탭은 막대 그림 안의 아이콘이다.
  *
  * ⚠️ 탭 0 기록·탭 4 통계는 원본이 **달성 횟수**를 보여 주는데 웹은 그 누계를 아직 저장하지 않는다.
  * 이름만 원본 줄 배치로 보여 주고 값은 비워 둔다.
@@ -79,16 +85,19 @@ export function RecordAnnals({ collection, onBack }: RecordAnnalsProps) {
       {/* 탭 막대 — 고른 탭만 넓은 칸이라 탭마다 프레임이 다르다 */}
       <FrameSprite folder={SLT_FRAMES} frame={TAB_BAR.firstFrame + tab} origins={frames}
         x={TAB_BAR.x} y={TAB_BAR.y} />
+      {/* 커서 프레임 9 — 고른 탭 박스 (24 + 박스x, 54) */}
       <FrameSprite folder={SLT_FRAMES} frame={TAB_CURSOR.frame} origins={frames}
-        x={tabSlotXOf(tab) + TAB_SLOT_WIDTH / 2 - TAB_CURSOR.width / 2} y={TAB_CURSOR.y} />
+        x={tabSlotXOf(tab)} y={TAB_CURSOR.y} />
+      {/* 이름은 고른 탭 하나만 — 박스 안 가운데 맞춤 (0x2e568) */}
+      <FrameSprite folder={IMG_TEXT} frame={TAB_NAME_FRAMES[tab]} origins={textFrames}
+        x={tabNameXOf(tab, nameWidthOf(textFrames, TAB_NAME_FRAMES[tab]))} y={TAB_NAME_Y} />
       {TAB_NAMES.map((name, index) => (
-        <div key={name}>
-          <FrameSprite folder={IMG_TEXT} frame={TAB_NAME_FRAMES[index]} origins={textFrames}
-            x={tabSlotXOf(index) + TAB_SLOT_WIDTH / 2 - 10} y={TAB_BAR.y + 5} />
-          <button type="button" className={styles.tab} aria-label={name}
-            style={{ left: tabSlotXOf(index), top: TAB_BAR.y, width: TAB_SLOT_WIDTH, height: TAB_BAR.height }}
-            onClick={() => changeTab(index)} />
-        </div>
+        <button key={name} type="button" className={styles.tab} aria-label={name}
+          style={{
+            left: tabIconXOf(index, tab), top: TAB_BAR.y,
+            width: tabIconWidthOf(index, tab), height: TAB_BAR.height,
+          }}
+          onClick={() => changeTab(index)} />
       ))}
 
       {pageCount > 0 && (

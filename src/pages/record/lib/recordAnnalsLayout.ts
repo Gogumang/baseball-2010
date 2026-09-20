@@ -20,14 +20,46 @@ export const TAB_NAMES = ['기록', '진행', '스킬', '닉네임', '통계'] a
 export const TAB_COUNT = TAB_NAME_FRAMES.length
 
 /**
- * 탭 이름·커서의 x 는 탭 막대 프레임의 **박스**가 정한다 (0x94a65).
- * 박스 값은 아직 못 뽑아 막대를 다섯 칸으로 고르게 나눠 쓴다 (배치 근사).
+ * 탭 이름·커서의 x 는 탭 막대 프레임의 **박스**가 정한다 (0x94a65 → 0x94fe1,
+ * 박스 한 칸 = 8바이트 i16 x,y,w,h). slt_frame 프레임 4~8 의 **박스 0** 을 직접 읽은 값이다 (S12 1절 확정):
+ *
+ * ```
+ * 탭 0 (2, 2, 72, 17) · 1 (31, …) · 2 (60, …) · 3 (89, …) · 4 (118, 2, 72, 17)
+ * ```
+ * x 간격은 **29** 다 — 막대 폭 192 를 5 로 나눈 38.4 가 아니다.
+ * 박스는 프레임 왼쪽 위가 원점이라 화면 좌표는 막대 x0 = **24** 를 더한다.
  */
-export const TAB_SLOT_WIDTH = TAB_BAR.width / TAB_COUNT
-export const tabSlotXOf = (tab: number) => TAB_BAR.x + TAB_SLOT_WIDTH * tab
+export const TAB_SLOT_BOX_XS = [2, 31, 60, 89, 118] as const
+export const TAB_SLOT_WIDTH = 72
+export const TAB_SLOT_HEIGHT = 17
+/** 고른 탭 박스의 화면 x — 26 · 55 · 84 · 113 · 142 (0x2e51c 가 읽는 박스 0) */
+export const tabSlotXOf = (tab: number) => TAB_BAR.x + TAB_SLOT_BOX_XS[tab]
 
-/** 탭 커서 프레임 9 (72×17) — 고른 탭 박스 x, y = y0 + 박스y − 2 */
-export const TAB_CURSOR = { frame: 9, width: 72, height: 17, y: TAB_BAR.y + 1 } as const
+/**
+ * 박스는 **고른 탭의 글씨 칸**이다. 안 고른 탭은 아이콘만 든 29px 칸이고 그림은 막대 프레임에 붙어 있다
+ * (프레임 파트 배치 — 안 고른 탭 i 의 x = `29i`(i < 고른탭) · `29i + 46`(i > 고른탭), 고른 탭은 폭 75).
+ */
+export const TAB_ICON_STEP = 29
+export const TAB_ICON_WIDTH = 29
+export const TAB_SELECTED_WIDTH = 75
+export const TAB_SELECTED_GAP = 46
+export function tabIconXOf(tab: number, selected: number): number {
+  const base = TAB_BAR.x + TAB_ICON_STEP * tab
+  return tab > selected ? base + TAB_SELECTED_GAP : base
+}
+export const tabIconWidthOf = (tab: number, selected: number) =>
+  (tab === selected ? TAB_SELECTED_WIDTH : TAB_ICON_WIDTH)
+
+/** 탭 커서 프레임 9 (72×17) — `x = 24 + 박스x`, `y = 54 + 박스y − 2 = 54` (0x2e5ca~0x2e618) */
+export const TAB_CURSOR = { frame: 9, width: TAB_SLOT_WIDTH, height: TAB_SLOT_HEIGHT, y: 54 } as const
+
+/**
+ * 탭 이름 (img_text 276+탭) — `x = 24 + 박스x + (박스w − 이름폭)/2`, `y = 54 + 박스y + 2 = 58`
+ * (0x2e568~0x2e5ba). 원본은 **고른 탭의 이름 하나만** 그린다 — 안 고른 탭은 막대 그림의 아이콘이다.
+ */
+export const TAB_NAME_Y = 58
+export const tabNameXOf = (tab: number, nameWidth: number) =>
+  tabSlotXOf(tab) + Math.trunc((TAB_SLOT_WIDTH - nameWidth) / 2)
 
 /** 쪽 수가 있는 탭 (표 0xce8dc s8) — 기록 6쪽 · 닉네임 3쪽 · 통계 2쪽 */
 export const TAB_PAGE_COUNTS = [6, 0, 0, 3, 2] as const

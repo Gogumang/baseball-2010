@@ -11,7 +11,9 @@ import {
   rollSpecialDefense,
   specialDefenseChanceOf,
   SPECIAL_DEFENSE_TABLE,
-  LASER_WINDOW_START_TICK,
+  LASER_WINDOW_FIRST_TICK,
+  LASER_WINDOW_LAST_TICK,
+  LASER_WINDOW_REAL_TICKS,
   LASER_WINDOW_TICKS,
 } from '@/entities/defense-controls/model/laserThrow'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -113,30 +115,34 @@ describe('레이저 송구 확률 — 표 0xd2590 [3,4,5,6,7,8,9,10]', () => {
   })
 })
 
-describe('"반짝이는 순간" 창 — 0xb2648 (19틱)', () => {
+describe('"반짝이는 순간" 창 — 0xb2648 (포구 −10 ~ +8틱)', () => {
   const 기본 = { hasChosenThrowTarget: false, isBallHeld: true, isThrowerReady: true }
 
-  it('창 길이는 19틱이고 공 잡은 뒤 10틱째에 열린다 (시작 기준점은 유력)', () => {
+  it('창은 공 잡기 10틱 **전**에 열려 19번 센다 (S12 3절 — 부호 정정)', () => {
     expect(LASER_WINDOW_TICKS).toBe(19)
-    expect(LASER_WINDOW_START_TICK).toBe(10)
+    expect(LASER_WINDOW_FIRST_TICK).toBe(-10)
+    expect(LASER_WINDOW_LAST_TICK).toBe(8)
     const 표: ReadonlyArray<readonly [number, boolean]> = [
-      [0, false],
+      [-11, false],
+      [-10, true],
+      [0, true],
+      [8, true],
       [9, false],
-      [10, true],
-      [20, true],
-      [28, true],
-      [29, false],
     ]
     표.forEach(([ticksSinceCatch, expected]) => {
       expect(isLaserWindowOpen({ ...기본, ticksSinceCatch }), `${ticksSinceCatch}틱`).toBe(expected)
     })
   })
 
+  it('원본 버그 — 카운터가 틱당 2~3번 올라 실제 창은 7~9틱이다 (그대로 옮긴다)', () => {
+    expect(LASER_WINDOW_REAL_TICKS).toEqual({ min: 7, max: 9 })
+  })
+
   it('이미 목표를 고르고 공을 쥔 채 던질 준비가 끝났으면 창이 닫힌다', () => {
-    expect(isLaserWindowOpen({ ...기본, ticksSinceCatch: 15, hasChosenThrowTarget: true })).toBe(false)
+    expect(isLaserWindowOpen({ ...기본, ticksSinceCatch: 5, hasChosenThrowTarget: true })).toBe(false)
     // 셋 중 하나라도 빠지면 창은 그대로 열려 있다
     expect(
-      isLaserWindowOpen({ ...기본, ticksSinceCatch: 15, hasChosenThrowTarget: true, isThrowerReady: false }),
+      isLaserWindowOpen({ ...기본, ticksSinceCatch: 5, hasChosenThrowTarget: true, isThrowerReady: false }),
     ).toBe(true)
   })
 })

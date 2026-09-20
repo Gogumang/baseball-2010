@@ -29,8 +29,7 @@ export const actor = style({
   height: 0,
 })
 
-/** 좌우 반전 — 기준점(0,0)을 축으로 뒤집는다 */
-export const flipped = style({
-  transform: 'scaleX(-1)',
-  transformOrigin: '0 0',
-})
+/*
+ * 좌우 반전 칸은 지웠다 — 원본 야수 그리기(0x79b48)에 뒤집기가 없다(S12 8절).
+ * `+0x11` 은 프레임 +17 이고, 좌/우는 동작 3·4 가 다른 프레임 묶음으로 처리한다.
+ */

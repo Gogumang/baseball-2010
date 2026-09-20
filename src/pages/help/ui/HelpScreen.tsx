@@ -1,15 +1,11 @@
 import { useEffect, useState } from 'react'
 import { MarkupText, RawScreen } from '@/shared/ui'
-import { GAME_VERSION, HELP_SECTIONS } from '@/shared/config/helpSections'
 import {
-  BODY_PANEL, DESCRIPTION_PANEL, FOOTER, HEADBAND, HELP_ITEMS, ITEM_COUNT, ROW, SCREEN, WHEEL,
-  descriptionPanelTopOf, rowLeftOf, rowTopOf,
-} from '@/pages/help/lib/helpLayout'
+  GAME_VERSION, HELP_LAST_BROWSABLE_CHAPTER, HELP_SECTIONS,
+} from '@/shared/config/helpSections'
+import { BODY_PANEL, FOOTER, HEADBAND, SCREEN } from '@/pages/help/lib/helpLayout'
 import * as styles from '@/pages/help/ui/HelpScreen.css'
 
-const MAIN_UI = './sprites/main_ui'
-const MAIN_UI_FRAMES = `${MAIN_UI}/frames`
-const MAIN_BALL_FRAMES = './sprites/main_ball/frames'
 const GAME_FRAME = './sprites/game_frame'
 const SLT_FRAME = './sprites/slt_frame'
 
@@ -17,134 +13,145 @@ const imageSrc = (folder: string, id: number) => `${folder}/${String(id).padStar
 
 interface HelpScreenProps {
   readonly onBack: () => void
+  /** 여는 장 — 메인 메뉴 [도움말](상태 7)은 **0**, [게임문의](상태 10)는 **6** (0x2668c) */
+  readonly chapter?: number
+  /** 상태 10 은 `[뷰어+0x45c] = 1` 로 장 이동을 잠근다 (0x2668c) */
+  readonly isChapterLocked?: boolean
 }
 
 /**
- * 원작 메인 메뉴 [도움말] = 하위 상태 9 (StrMAINMENU[2] "게임에 대한 각종 도움말을 살펴볼 수 있습니다").
+ * 도움말 = 메인 메뉴 **상태 7** 의 StrHOWTO 뷰어 (그리기 0x2fc8c → 0x639a5 → 0x58d10 — S12 2절).
  *
- * 그리기는 스페셜(상태 6)과 같은 **하위 목록 0x2524c** 다 — 반원 바퀴(0x24b1c) 위에 세로 목록이 서고
- * 머리띠 0x54d95(제목 0 "2010프로야구", 바닥 5 = 되돌아가기)가 위아래를 덮는다.
- * 칸은 표 **0xceb37** 이 정한 다섯 = main_ui 프레임 **7 일반모드 · 8 나만의리그 · 9 시즌모드 ·
- * 10 대전모드 · 13 홈런더비** (P6 2d 확정).
+ * ⚠️ **정정**: 앞서 옮긴 "상태 9 목록 + 상태 37 본문" 은 도움말이 아니라 **랭킹**이었다
+ * (설명 글이 `StrMAINMENU[24 + 커서]` = "…의 순위를 확인합니다"). 랭킹 쪽 값은
+ * `helpLayout.ts` 의 `RANKING_MENU_ITEMS`·`RANKING_TITLE_FRAMES` 에 남겨 두었다.
  *
- * 고르면 상태 37(그리기 0x2fccc) = 가운데 192 폭 창에 **StrHOWTO 본문**을 쪽 단위로 보여 준다.
+ * 장은 원본 표 `0xd0b18 = [5,5,7,6,3,6,4]` 그대로 **일곱**이라(`helpSections.ts`)
+ * 기본 조작·미션모드·환경설정까지 모두 이 화면에서 볼 수 있다. 메인 메뉴에서 돌아다닐 수 있는 장은
+ * **0~5** 고(0x638be·0x63914), 장 6 게임문의는 상태 10 에서 잠긴 채 열린다.
  *
- * ⚠️ 근사한 곳: 줄 y(스페셜과 같은 이유로 간격을 벌렸다 — `specialLayout.ts` ROW 주석),
- * 바퀴는 호와 공만, 본문 창 안쪽 배치(표 0xcedf4 미해독)는 기록연감 쪽 제목 줄에 맞췄다.
+ * ⚠️ 근사한 곳: 판(0x58371)과 뷰어(0x58d10)의 안쪽 배치·쪽 나누기는 아직 미해독이라
+ * 가운데 192 판에 기록연감 쪽 제목 줄을 썼고, 키도 웹판 나름이다
+ * (원본은 좌우 키로 장을 넘긴다 — 0x637d0. 여기서는 좌우 = 쪽, 위아래 = 장).
  */
-export function HelpScreen({ onBack }: HelpScreenProps) {
-  const [cursor, setCursor] = useState(0)
-  const [openIndex, setOpenIndex] = useState<number | null>(null)
+export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false }: HelpScreenProps) {
+  const [section, setSection] = useState(chapter)
+  const [page, setPage] = useState(0)
+
+  const pages = HELP_SECTIONS[section]?.pages ?? []
+  const pageCount = Math.max(pages.length, 1)
+  const movePage = (step: number) => setPage((previous) => (previous + step + pageCount) % pageCount)
+  /** 장 넘기기 — 0~5 를 돌고 끝에서 되감는다 (0x638be `movs r4, #5` · 0x63914 `cmp r0, #4; bgt`) */
+  const moveSection = (step: number) => {
+    if (isChapterLocked) return
+    const count = HELP_LAST_BROWSABLE_CHAPTER + 1
+    setSection((previous) => (previous + step + count) % count)
+    setPage(0)
+  }
 
   useEffect(() => {
-    if (openIndex !== null) return undefined
     const onKeyDown = (event: KeyboardEvent) => {
-      const step = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0
-      if (step !== 0) {
-        event.preventDefault()
-        return setCursor((previous) => (previous + step + ITEM_COUNT) % ITEM_COUNT)
-      }
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault()
-        return setOpenIndex(cursor)
-      }
       if (event.key === 'Escape' || event.key === 'Backspace') {
         event.preventDefault()
-        onBack()
+        return onBack()
+      }
+      const pageStep = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
+      if (pageStep !== 0) {
+        event.preventDefault()
+        return movePage(pageStep)
+      }
+      const sectionStep = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0
+      if (sectionStep !== 0) {
+        event.preventDefault()
+        moveSection(sectionStep)
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   })
 
-  if (openIndex !== null) {
-    return <HelpBody index={openIndex} onBack={() => setOpenIndex(null)} />
-  }
-
-  const selected = HELP_ITEMS[cursor]
-
   return (
     <RawScreen>
-      {/* 반원 바퀴 0x24b1c — 테두리 원 3겹 (120, 320) 반지름 93·95·97 */}
-      <svg
-        className={styles.sprite}
-        style={{ left: 0, top: 0 }}
-        viewBox={`0 0 ${SCREEN.width} ${SCREEN.height}`}
-        width={SCREEN.width}
-        height={SCREEN.height}
-        shapeRendering="crispEdges"
-      >
-        {WHEEL.radii.map((radius, index) => (
-          <circle key={radius} cx={WHEEL.centerX} cy={WHEEL.centerY} r={radius} fill="none" stroke={WHEEL.colors[index]} />
-        ))}
-      </svg>
-      <img
-        className={styles.sprite}
-        alt=""
-        src={imageSrc(MAIN_BALL_FRAMES, WHEEL.ball.frame)}
-        style={{ left: WHEEL.centerX + WHEEL.ball.dx, top: WHEEL.centerY + WHEEL.ball.dy }}
-      />
-
-      {/* 다섯 칸 — 고른 줄은 설명 판이 그리므로 목록에서는 빼고 그린다 (원본도 판이 그 자리를 덮는다) */}
-      {HELP_ITEMS.map((item, index) => (
-        index === cursor ? null : (
-          <img
-            key={item.id}
-            className={styles.sprite}
-            alt=""
-            src={imageSrc(MAIN_UI_FRAMES, item.labelFrame)}
-            style={{ left: rowLeftOf(item), top: rowTopOf(index) }}
-          />
-        )
-      ))}
-
-      {/* 고른 줄 설명 판 = main_ui 이미지 3 (149×63) 을 (96, 줄 y − 31), 안에 항목 그림 + 설명 글 */}
-      <img
-        className={styles.sprite}
-        alt=""
-        src={imageSrc(MAIN_UI, DESCRIPTION_PANEL.image)}
-        style={{ left: DESCRIPTION_PANEL.x, top: descriptionPanelTopOf(cursor) }}
-      />
-      <img
-        className={styles.sprite}
-        alt=""
-        src={imageSrc(MAIN_UI_FRAMES, selected.labelFrame)}
-        style={{
-          left: DESCRIPTION_PANEL.x + DESCRIPTION_PANEL.padding,
-          top: descriptionPanelTopOf(cursor) + DESCRIPTION_PANEL.padding,
-        }}
-      />
       <div
-        className={styles.description}
-        style={{
-          left: DESCRIPTION_PANEL.x + DESCRIPTION_PANEL.padding,
-          top: descriptionPanelTopOf(cursor) + DESCRIPTION_PANEL.textDy,
-          color: DESCRIPTION_PANEL.textColor,
-        }}
-      >
-        {selected.description.split('!N').map((line) => <div key={line}>{line}</div>)}
+        className={styles.panel}
+        style={{ left: BODY_PANEL.x, top: BODY_PANEL.y, width: BODY_PANEL.width, height: BODY_PANEL.height }}
+      />
+
+      <img
+        className={styles.sprite}
+        alt=""
+        src={imageSrc(SLT_FRAME, BODY_PANEL.bullet.image)}
+        style={{ left: BODY_PANEL.bullet.x, top: BODY_PANEL.bullet.y }}
+      />
+      <div className={styles.bodyTitle} style={{ left: BODY_PANEL.titleX, top: BODY_PANEL.titleY }}>
+        {HELP_SECTIONS[section]?.title ?? ''}
+      </div>
+      <div className={styles.pagerText} style={{ left: BODY_PANEL.pager.numberX, top: BODY_PANEL.pager.y }}>
+        {page + 1}/{pageCount}
       </div>
 
-      {/* 눌림을 받는 투명 칸 — 그림 위에 얹어 설명 판에 가린 줄도 누를 수 있게 한다 */}
-      {HELP_ITEMS.map((item, index) => (
-        <button
-          key={item.id}
-          type="button"
-          className={styles.row}
-          aria-label={item.id}
-          aria-current={index === cursor}
-          style={{ left: rowLeftOf(item), top: rowTopOf(index), width: item.labelWidth, height: ROW.step }}
-          onMouseEnter={() => setCursor(index)}
-          onClick={() => setOpenIndex(index)}
-        />
-      ))}
+      <div
+        className={styles.bodyText}
+        style={{
+          left: BODY_PANEL.textX,
+          top: BODY_PANEL.textY,
+          width: BODY_PANEL.textWidth,
+          height: BODY_PANEL.y + BODY_PANEL.height - BODY_PANEL.textY - 10,
+        }}
+      >
+        <MarkupText raw={pages[page] ?? ''} replacements={[GAME_VERSION]} />
+      </div>
+
+      {/* 쪽 넘기기 화살 slt_frame 이미지 20 — 원본은 키지만 웹판은 누를 수 있게 둔다 */}
+      <button
+        type="button"
+        className={styles.backButton}
+        aria-label="이전 쪽"
+        style={{ left: BODY_PANEL.pager.leftX, top: BODY_PANEL.pager.arrowY }}
+        onClick={() => movePage(-1)}
+      >
+        <img src={imageSrc(SLT_FRAME, BODY_PANEL.pager.arrowImage)} alt="" />
+      </button>
+      <button
+        type="button"
+        className={styles.backButton}
+        aria-label="다음 쪽"
+        style={{ left: BODY_PANEL.pager.rightX, top: BODY_PANEL.pager.arrowY, transform: 'scaleX(-1)' }}
+        onClick={() => movePage(1)}
+      >
+        <img src={imageSrc(SLT_FRAME, BODY_PANEL.pager.arrowImage)} alt="" />
+      </button>
+
+      {/* 장 넘기기 — 원본은 좌우 키(0x637d0), 웹판은 누를 수도 있게 둔다. 상태 10 은 잠긴다 */}
+      {!isChapterLocked && (
+        <>
+          <button
+            type="button"
+            className={styles.sectionButton}
+            aria-label="이전 장"
+            style={{ left: BODY_PANEL.x + 6, top: BODY_PANEL.y + BODY_PANEL.height - 22 }}
+            onClick={() => moveSection(-1)}
+          >
+            ‹ 앞 장
+          </button>
+          <button
+            type="button"
+            className={styles.sectionButton}
+            aria-label="다음 장"
+            style={{ left: BODY_PANEL.x + BODY_PANEL.width - 54, top: BODY_PANEL.y + BODY_PANEL.height - 22 }}
+            onClick={() => moveSection(1)}
+          >
+            뒷 장 ›
+          </button>
+        </>
+      )}
 
       <HelpBands onBack={onBack} />
     </RawScreen>
   )
 }
 
-/** 머리띠·바닥띠 0x54d95(skin, 0, 5) — 제목 "2010프로야구" + 바닥 되돌아가기 (P6 1-1) */
+/** 머리띠·바닥띠 0x54d95(메뉴, 0, 5) — 제목 "2010프로야구" + 바닥 되돌아가기 (P6 1-1) */
 function HelpBands({ onBack }: { readonly onBack: () => void }) {
   return (
     <>
@@ -180,88 +187,5 @@ function HelpBands({ onBack }: { readonly onBack: () => void }) {
         <img src={imageSrc(GAME_FRAME, FOOTER.backIcon.image)} alt="" />
       </button>
     </>
-  )
-}
-
-/**
- * 도움말 본문 (상태 37, 그리기 0x2fccc) — 가운데 192 폭 창 + 표 0xcedf4.
- * 본문은 원본 StrHOWTO 원문(`shared/config/original/data/howto.json`)을 쪽 단위로 보여 준다.
- */
-function HelpBody({ index, onBack }: { readonly index: number; readonly onBack: () => void }) {
-  const item = HELP_ITEMS[index]
-  const section = HELP_SECTIONS.find((candidate) => candidate.title === item.sectionTitle)
-  const pages = section?.pages ?? []
-  const [page, setPage] = useState(0)
-  const pageCount = Math.max(pages.length, 1)
-  const movePage = (step: number) => setPage((previous) => (previous + step + pageCount) % pageCount)
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' || event.key === 'Backspace') {
-        event.preventDefault()
-        return onBack()
-      }
-      const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
-      if (step !== 0) {
-        event.preventDefault()
-        movePage(step)
-      }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  })
-
-  return (
-    <RawScreen>
-      <div
-        className={styles.panel}
-        style={{ left: BODY_PANEL.x, top: BODY_PANEL.y, width: BODY_PANEL.width, height: BODY_PANEL.height }}
-      />
-
-      <img
-        className={styles.sprite}
-        alt=""
-        src={imageSrc(SLT_FRAME, BODY_PANEL.bullet.image)}
-        style={{ left: BODY_PANEL.bullet.x, top: BODY_PANEL.bullet.y }}
-      />
-      <div className={styles.bodyTitle} style={{ left: BODY_PANEL.titleX, top: BODY_PANEL.titleY }}>{item.id}</div>
-      <div className={styles.pagerText} style={{ left: BODY_PANEL.pager.numberX, top: BODY_PANEL.pager.y }}>
-        {page + 1}/{pageCount}
-      </div>
-
-      <div
-        className={styles.bodyText}
-        style={{
-          left: BODY_PANEL.textX,
-          top: BODY_PANEL.textY,
-          width: BODY_PANEL.textWidth,
-          height: BODY_PANEL.y + BODY_PANEL.height - BODY_PANEL.textY - 10,
-        }}
-      >
-        <MarkupText raw={pages[page] ?? ''} replacements={[GAME_VERSION]} />
-      </div>
-
-      {/* 쪽 넘기기 화살 slt_frame 이미지 20 — 원본은 좌우 키지만 웹판은 누를 수 있게 둔다 */}
-      <button
-        type="button"
-        className={styles.backButton}
-        aria-label="이전 쪽"
-        style={{ left: BODY_PANEL.pager.leftX, top: BODY_PANEL.pager.arrowY }}
-        onClick={() => movePage(-1)}
-      >
-        <img src={imageSrc(SLT_FRAME, BODY_PANEL.pager.arrowImage)} alt="" />
-      </button>
-      <button
-        type="button"
-        className={styles.backButton}
-        aria-label="다음 쪽"
-        style={{ left: BODY_PANEL.pager.rightX, top: BODY_PANEL.pager.arrowY, transform: 'scaleX(-1)' }}
-        onClick={() => movePage(1)}
-      >
-        <img src={imageSrc(SLT_FRAME, BODY_PANEL.pager.arrowImage)} alt="" />
-      </button>
-
-      <HelpBands onBack={onBack} />
-    </RawScreen>
   )
 }

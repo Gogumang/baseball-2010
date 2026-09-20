@@ -67,8 +67,8 @@ describe('화면 스냅샷 만들기', () => {
     const view = viewStateOf({ ...기본(), throwingSlot: 5 })
 
     expect(view.fielders[5].action).toBe(FIELDER_ACTION.throw)
-    // 화면 쪽 프레임 표와도 이어진다 (R3 2-1 = I 1c)
-    expect(fielderFrameOf(FIELDER_ACTION.throw, 0)).toBe(12)
+    // 화면 쪽 프레임 표와도 이어진다 (R3 2-1 = I 1c, 그리는 프레임은 날값 12 + 17)
+    expect(fielderFrameOf(FIELDER_ACTION.throw, 0)).toBe(29)
   })
 
   it('루에 서 있는 주자는 제자리, 뛰는 주자는 달리기다', () => {

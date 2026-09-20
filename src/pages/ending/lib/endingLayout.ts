@@ -45,17 +45,39 @@ export const BAND_WINDOW_BOTTOM = BAND_WINDOW.y + BAND_WINDOW.height
 export const BAND_BACKGROUND = { frame: 0, left: 1, top: 66, height: 70 } as const
 
 /**
- * 캐릭터 애니 `[this+0x344]` 를 (W − n/3 − 20, 띠 아래) · 선수 그림 `[this+0x15c]` 를 (W − n/3 − 62, …)
- * (n = 틱 카운터 → 오른쪽에서 왼쪽으로 걸어 들어온다, P6 4b-2 **유력**).
+ * 걸어 들어오는 그림 두 개 — **확정** (S12 7절, P6 4b-2 정정).
  *
- * ⚠️ 두 칸이 **어느 스프라이트 파일**을 가리키는지 아직 못 밝혀(`ppl` 은 관중, `event_char_*` 는 이벤트 얼굴)
- * 웹판은 그림을 그리지 않고 자리 식만 남겨 둔다. 파일이 밝혀지면 이 값으로 바로 그리면 된다.
+ * - `[this+0x344]` = **`event_char_0.pzx` 애니**(육성 선수 캐릭터). 적재 `0x87cd6` 가
+ *   `0x63a05([0x1552cfc], 1, 2)` 로 만들고 반복 재생을 켠다. 애니 번호는 `(0 또는 8) + 2` 로,
+ *   육성 선수 레코드가 `p[0xb] >> 4 > 1` 이면 8 을 쓴다(0x63a5c~0x63a92).
+ *   팔레트도 `(p[0xb] >> 2) & 3` 으로 고르는데, 웹판은 외모 비트를 아직 안 옮겨 **기본 애니 2** 를 쓴다.
+ * - `[this+0x15c]` 는 필드가 아니라 **프레임 배열 바이트 오프셋(0xae × 2)** 이었다 —
+ *   `this+0x138`(= `ui/mode_ui.pzx`)의 **프레임 87**(부상 아이콘)이다. 단계 `[this+0x2e4] == 0` 일 때만 그린다.
+ *
+ * 자리 (0x885b0~0x885e6 · 0x8865e~0x88698, `n` = 그리기 2번째 인자 = 틱 카운터):
+ * ```
+ * 애니        x = 240 − n/3 − 20   y = (n & 7) ? 137 : 136
+ * 프레임 87   x = 240 − n/3 − 62   y = (n & 7) ? 61  : 60
+ * ```
+ * `n/3` 은 `__divsi3` 정수 나눗셈이라 **3틱에 1px** 왼쪽으로 오고,
+ * `n & 7 == 0` 인 틱(8틱에 한 번)만 1px 위로 튄다 — 걸음 흔들림이다.
  */
 export const WALK_IN = {
+  /** event_char_0.pzx 애니 — 기본 번호 0 + 2 (외모 비트가 붙으면 8 + 2) */
+  characterFolder: './sprites/event_char_0/frames',
+  characterAnimation: 2,
+  characterAnimationWithLook: 10,
   characterDx: -20,
-  playerDx: -62,
-  /** x = W − n/3 + dx */
+  /** 부상 아이콘 = ui/mode_ui 프레임 87 (20×19) */
+  iconFolder: './sprites/mode_ui/frames',
+  iconFrame: 87,
+  iconDx: -62,
+  /** x = W − n/3 + dx — 3틱에 1px */
   xOf: (tick: number, dx: number) => SCREEN.width - Math.trunc(tick / 3) + dx,
+  /** y — 8틱에 한 번 1px 위로 튄다 */
+  characterYOf: (tick: number) => ((tick & 7) !== 0 ? 137 : 136),
+  iconYOf: (tick: number) => ((tick & 7) !== 0 ? 61 : 60),
+  /** 띠 아래 = 137 (mode_ui 프레임 10 박스 0 의 아래 끝) */
   y: BAND_WINDOW_BOTTOM,
 } as const
 
@@ -99,17 +121,37 @@ export const ENDING_IMAGE_TICKS = -ENDING_IMAGE.startOffset * 2
  * 원형 전환(아이리스) — 오프스크린 `[0x1552ae4]` 를 검정으로 칠하고 투명색 **RGB(255,0,255)** 원을
  * `0x1400708(가운데 (W/2 + dx, H/2 + dy), 지름 …, 0°~360°)` 로 뚫은 뒤 화면에 덮는다 (P6 4b-5).
  */
+/**
+ * 아이리스 단계값 — **확정** (S12 6절).
+ *
+ * ```
+ * 0x887ce  r0 = 화면 폭 (0x14008b8 = 240)
+ * 0x887ea  D = 240 − [this+0x2fc]
+ * ```
+ * `[this+0x2fc]` 를 넣는 곳은 딱 둘이고, 원 중심 보정 `[+0x300]`/`[+0x304]` 도 같이 들어간다:
+ *
+ * | 주소 | `[+0x2fc]` | **D** | 중심 보정 (dx, dy) |
+ * |---|---|---|---|
+ * | `0x879b6` 단계 설정 | 100 | **140** | (**−58**, **−55**) |
+ * | `0x87e2c` 뒤 단계 재설정 | 0 | **240** | (0, 0) |
+ */
+export const IRIS_STAGES = {
+  /** 엔딩이 열릴 때 — 원이 가운데 140px 까지만 열린다 */
+  open: { diameter: 140, dx: -58, dy: -55 },
+  /** 뒤 단계 — D = 240 이라 화면을 다 덮는다 */
+  reveal: { diameter: 240, dx: 0, dy: 0 },
+} as const
+
 export const IRIS = {
   centerX: SCREEN.width / 2,
   centerY: SCREEN.height / 2,
   /** 덮는 판 색 */
   cover: '#000000',
-  /**
-   * 반지름 식의 `D` 는 원본이 "앞 단계 값 − [this+0x2fc]" 로 얻는 값이라 정확한 수를 못 읽었다.
-   * **화면을 남김없이 덮는 가장 작은 반지름**(대각선 절반 = √(240² + 320²)/2 = 200)을 쓴다 — **근사**.
-   * t ≥ 7 에서 r = D 가 되어 "원이 화면을 다 덮는다"(S9 8-2)는 설명과 맞는다.
-   */
-  diameter: 200,
+  /** 첫 단계 D (0x879b6) — 반지름 식의 기본값 */
+  diameter: IRIS_STAGES.open.diameter,
+  /** 원 중심 보정 — 가운데 (W/2 + dx, H/2 + dy) (P6 4b 5항) */
+  dx: IRIS_STAGES.open.dx,
+  dy: IRIS_STAGES.open.dy,
   /** p 가 110 에 걸리는 틱 — 이 뒤로는 r 이 D 에서 멈춘다 */
   fullTick: 7,
 } as const

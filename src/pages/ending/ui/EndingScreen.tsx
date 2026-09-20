@@ -1,11 +1,13 @@
 import { useState, type ReactNode } from 'react'
-import { MarkupText, MessageBox, RawScreen } from '@/shared/ui'
+import { FrameSprite, MarkupText, MessageBox, RawScreen } from '@/shared/ui'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
+import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
+import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
 import { ORIGINAL_ENDINGS } from '@/shared/config/original/endings'
 import type { HallOfFameResult } from '@/entities/collection/model/collection'
 import {
   BAND_BACKGROUND, BAND_WINDOW, CREDITS, ENDING_IMAGE, ENDING_IMAGE_TICKS, ENDING_TEXT,
-  IRIS, SCREEN, creditsTopOf, endingImageXOf, irisRadiusOf,
+  IRIS, IRIS_STAGES, SCREEN, WALK_IN, creditsTopOf, endingImageXOf, irisRadiusOf,
 } from '@/pages/ending/lib/endingLayout'
 import * as styles from '@/pages/ending/ui/EndingScreen.css'
 
@@ -62,7 +64,8 @@ interface Question {
  *
  * ⚠️ 근사한 곳: 제작진은 **게임이 실제로 끝나는 엔딩에서만** 흐르게 했다(부상·방출은 이어하기를
  * 묻는 자리라 건너뛴다) — 원본이 어느 엔딩에서 제작진을 돌리는지는 못 읽었다.
- * 그림 시작 오프셋·아이리스 D·걸어 들어오는 캐릭터는 `endingLayout.ts` 주석 참고.
+ * 그림 시작 오프셋은 `endingLayout.ts` 주석 참고. 아이리스 D(140 → 240)와 걸어 들어오는 그림
+ * (event_char_0 애니 + mode_ui 프레임 87)은 S12 6·7 절에서 확정됐다.
  */
 export function EndingScreen(props: EndingScreenProps) {
   const { playerName, endingIndex, bonusGamePoint, isContinuable, onRegister, onContinue, onFinish } = props
@@ -139,7 +142,16 @@ function EndingStage({ playerName, endingIndex, isCredits, onPress, children }: 
    * 원형 전환은 그림 이동량과 **다른 칸**(전환 틱 [this+0x308])이 몬다 — 화면이 열리는 것이 먼저고
    * 그림은 그 뒤로도 계속 미끄러진다. 웹판도 같은 틱을 그대로 넣어 t ≥ 7 에 원이 화면을 다 덮는다.
    */
-  const radius = irisRadiusOf(tick)
+  /**
+   * 단계에 따라 D 가 다르다 (S12 6절) — 첫 단계 `0x879b6` 은 D = 140 에 중심 보정 (−58, −55),
+   * 뒤 단계 `0x87e2c` 는 D = 240 에 보정 없음이라 화면을 다 덮는다.
+   * ⚠️ 단계가 **언제** 바뀌는지는 아직 못 읽어, 첫 단계가 다 열리는 틱에 뒤 단계로 넘긴다 (근사).
+   */
+  const isFirstStage = tick < IRIS.fullTick
+  const stage = isFirstStage ? IRIS_STAGES.open : IRIS_STAGES.reveal
+  const radius = isFirstStage ? irisRadiusOf(tick, stage.diameter) : stage.diameter
+  const irisX = IRIS.centerX + stage.dx
+  const irisY = IRIS.centerY + stage.dy
   const bandEdgeY = BAND_WINDOW.y + BAND_WINDOW.height - BAND_WINDOW.edgeHeight
 
   return (
@@ -187,6 +199,9 @@ function EndingStage({ playerName, endingIndex, isCredits, onPress, children }: 
         />
       ))}
 
+      {/* 걸어 들어오는 그림 둘 — 3틱에 1px 왼쪽으로 온다 (S12 7절) */}
+      <WalkIn tick={tick} />
+
       {/* 원형 전환 — 검정 판에 원을 뚫어 덮는다 (S9 8-2). evenodd 라 원 안쪽이 구멍이 된다 */}
       <svg
         className={styles.overlay}
@@ -199,7 +214,7 @@ function EndingStage({ playerName, endingIndex, isCredits, onPress, children }: 
           fillRule="evenodd"
           fill={IRIS.cover}
           d={`M0,0H${SCREEN.width}V${SCREEN.height}H0Z`
-            + `M${IRIS.centerX - radius},${IRIS.centerY}`
+            + `M${irisX - radius},${irisY}`
             + `a${radius},${radius} 0 1,0 ${radius * 2},0`
             + `a${radius},${radius} 0 1,0 ${-radius * 2},0`}
         />
@@ -221,6 +236,43 @@ function EndingStage({ playerName, endingIndex, isCredits, onPress, children }: 
       )}
       {children}
     </RawScreen>
+  )
+}
+
+/**
+ * 걸어 들어오는 그림 (S12 7절 확정) — `event_char_0.pzx` 애니(육성 선수 캐릭터)와
+ * `ui/mode_ui.pzx` 프레임 87(부상 아이콘)이 오른쪽에서 **3틱에 1px** 씩 온다.
+ * `n & 7 == 0` 인 틱만 1px 위로 튄다(걸음 흔들림).
+ *
+ * ⚠️ 애니 번호는 원본이 육성 선수 레코드의 외모 비트로 0+2 / 8+2 를 고르는데(0x63a5c),
+ * 웹판은 그 비트를 아직 안 옮겨 **기본 2** 를 쓴다. 팔레트 고르기도 아직 없다.
+ */
+function WalkIn({ tick }: { readonly tick: number }) {
+  const origins = useFrameOrigins(WALK_IN.characterFolder)
+  const animations = useAnimations(WALK_IN.characterFolder)
+  const iconOrigins = useFrameOrigins(WALK_IN.iconFolder)
+  const entries = animations?.[WALK_IN.characterAnimation]
+  const step = entries === undefined ? null : animationStepAt(entries, tick)
+
+  return (
+    <>
+      {step !== null && (
+        <FrameSprite
+          folder={WALK_IN.characterFolder}
+          frame={step.frame}
+          origins={origins}
+          x={WALK_IN.xOf(tick, WALK_IN.characterDx) + step.dx}
+          y={WALK_IN.characterYOf(tick) + step.dy}
+        />
+      )}
+      <FrameSprite
+        folder={WALK_IN.iconFolder}
+        frame={WALK_IN.iconFrame}
+        origins={iconOrigins}
+        x={WALK_IN.xOf(tick, WALK_IN.iconDx)}
+        y={WALK_IN.iconYOf(tick)}
+      />
+    </>
   )
 }
 
