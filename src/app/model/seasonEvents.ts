@@ -12,6 +12,7 @@ import {
   salaryResultEventId,
   yearEndEventId,
 } from '@/entities/career/model/seasonFlow'
+import { salaryNegotiationRankOf } from '@/entities/awards/model/seasonAwards'
 
 /** 시즌 이벤트 하나를 마친 뒤 할 일 */
 export type SeasonStep =
@@ -28,10 +29,10 @@ const RELEASE_ENDING = 1
 const RETIREMENT_ENDING = 2
 /**
  * 연봉협상 등급 k (0xa4d78, B-5 확정) = 타이틀 1위 수(홈런·타점·타율) + (그 해 MVP 면 +2).
- * ⚠️ **웹에 개인 타이틀·MVP 판정 자체가 없어 아직 0 으로 둔다** — 그래서 강경은 늘 387(−20%),
- * 정중은 늘 391(−10%) 이 된다. 개인 타이틀(370~374)·MVP(375~377)를 만들면 여기부터 이어야 한다.
+ * 이제 `entities/awards` 가 계산한다 (`salaryNegotiationRankOf`). 다만 **CPU 선수의 개인
+ * 시즌 성적이 웹에 아직 없어** 순위표가 비고, 그래서 값은 여전히 0 이다 — 상수가 아니라
+ * 계산 결과라는 점만 다르다. `leagueDay.ts` 가 선수별 기록을 쌓으면 그 표를 둘째 인자로 넘기면 된다.
  */
-const TITLE_RANK = 0
 
 /**
  * 연말 이벤트 연결 (누락 탐색 에이전트: 0x10bb0 · 0x8d0dc · 0x10c54 · 0x8d05a).
@@ -53,7 +54,7 @@ export function nextSeasonStep(career: PlayerCareer, viewed: readonly number[]):
   }
   if (saw(SALARY_FIRM_EVENT_ID) || saw(SALARY_POLITE_EVENT_ID)) {
     const choice = saw(SALARY_FIRM_EVENT_ID) ? SALARY_FIRM_EVENT_ID : SALARY_POLITE_EVENT_ID
-    return { kind: '이벤트', eventId: salaryResultEventId(choice, TITLE_RANK) }
+    return { kind: '이벤트', eventId: salaryResultEventId(choice, salaryNegotiationRankOf(career)) }
   }
   if (viewed.some((id) => GOAL_RESULT_EVENT_IDS.includes(id))) {
     return { kind: '이벤트', eventId: yearEndEventId(career) }
