@@ -13,8 +13,6 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
  * 표는 19칸(스킬 2~20)이고, 표에 없는 스킬은 그냥 통과다.
  *
  * ⚠️ **아직 다 옮기지 못했다.** 원본 조건 가운데 아래 것들은 웹에 없는 값을 본다:
- *   - 2 먹튀: 이번 시즌 인기도 변화 합(+0x1c2) · 먹튀 보유 중 합/경기 수(+0x1c0/+0x1cd)
- *   - 5 무력감 해제: 경기 뒤 사기 ≥ 90 연속 경기 수(+0x1c7)
  *   - 7 전설: 우승 횟수(+0x7a) · 그 해 MVP 비트(+0x1ca)
  *   - 10~16: 연도·통산 세부 기록 칸(+0x20~+0x2c, +0x1f0[])
  * 그 조건들은 **아직 통과시키지 않는다**(= 이벤트가 뜨지 않는다).
@@ -47,6 +45,13 @@ const ACQUIRE_RULES: Readonly<Record<number, (career: PlayerCareer, random: Rand
     const g = career.gamesPlayed
     const t = seasonTrainingTotalOf(career)
     return (g === 18 && t <= 2) || (g === 38 && t <= 4)
+  },
+  // 2 먹튀 — 연차 ≥ 2 이고 (g==14 && 이번 시즌 인기도 합 ≤ 15 | g==32 && ≤ 35) (0xad2a2)
+  2: (career) => {
+    if (yearIndexOf(career) < 2) return false
+    const g = career.gamesPlayed
+    const gain = career.seasonPopularityGain
+    return (g === 14 && gain <= 15) || (g === 32 && gain <= 35)
   },
   // 5 무력감 — 사기 ≤ 20, 연차 ≥ 3, rand[0,100) ≥ 70 (30%) (0xad43a)
   5: (career, random) =>
@@ -82,6 +87,12 @@ const CONSECUTIVE_TRAINING_LIMIT = 7
 
 /** 해제 조건을 옮긴 스킬 */
 const RELEASE_RULES: Readonly<Record<number, (career: PlayerCareer) => boolean>> = {
+  // 2 먹튀 — 먹튀를 가진 뒤 5경기 이상이고, 경기당 인기도 변화 평균 > 3 (0xad9ce)
+  2: (career) =>
+    career.moneyGrubberGames >= 5 &&
+    Math.trunc(career.moneyGrubberPopularityGain / career.moneyGrubberGames) > 3,
+  // 5 무력감 — 경기 뒤 사기 ≥ 90 인 경기가 연속 6회 (+0x1c7 > 5)
+  5: (career) => career.highMoraleStreak > 5,
   // 3 몹쓸몸 — 몹쓸몸을 가진 채로 훈련 6회 (+0x75 > 5)
   3: (career) => career.badBodyTrainings > 5,
   // 4 유리몸 — 유리몸을 가진 채로 훈련 8회 (+0x76 > 7)

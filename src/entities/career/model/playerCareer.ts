@@ -62,6 +62,13 @@ export interface PlayerCareer {
    * **다른 칸을 훈련하면 전부 0 이 된다** (0x18a80). 스킬 18·19·20 해제 조건이 본다.
    */
   readonly consecutiveTrainingCounts: Readonly<Record<string, number>>
+  /** 이번 시즌 인기도 변화 합 (+0x1c2) — 새 시즌에 0 이 된다. 먹튀 획득 조건이 본다 */
+  readonly seasonPopularityGain: number
+  /** 먹튀(스킬 2)를 가진 뒤의 인기도 변화 합과 경기 수 (+0x1c0 / +0x1cd) — 먹튀 해제 조건이 본다 */
+  readonly moneyGrubberPopularityGain: number
+  readonly moneyGrubberGames: number
+  /** 무력감(스킬 5) 보유 중 "경기 뒤 사기 ≥ 90" 이 **연속**으로 이어진 경기 수 (+0x1c7) */
+  readonly highMoraleStreak: number
   /** 몹쓸몸(스킬 3)을 가진 채로 한 훈련 수 (+0x75) — 6회가 되면 해제 조건을 넘는다 */
   readonly badBodyTrainings: number
   /** 유리몸(스킬 4)을 가진 채로 한 훈련 수 (+0x76) — 8회가 되면 해제 조건을 넘는다 */
@@ -233,6 +240,10 @@ export function createCareer(name: string, profile: RookieProfile = DEFAULT_ROOK
     trainingCounts: {},
     seasonStartTrainingCounts: {},
     consecutiveTrainingCounts: {},
+    seasonPopularityGain: 0,
+    moneyGrubberPopularityGain: 0,
+    moneyGrubberGames: 0,
+    highMoraleStreak: 0,
     badBodyTrainings: 0,
     fragileTrainings: 0,
     popularity: STARTING_POPULARITY,
@@ -304,6 +315,32 @@ export function countTraining(career: PlayerCareer, menuId: string): PlayerCaree
     consecutiveTrainingCounts: { [menuId]: (career.consecutiveTrainingCounts[menuId] ?? 0) + 1 },
     badBodyTrainings: career.badBodyTrainings + (hasSkill(career, BAD_BODY_SKILL) ? 1 : 0),
     fragileTrainings: career.fragileTrainings + (hasSkill(career, FRAGILE_SKILL) ? 1 : 0),
+  }
+}
+
+const MONEY_GRUBBER_SKILL = 2
+const HELPLESS_SKILL = 5
+/** 무력감 해제 카운터가 이어지는 기준 사기 (A-4) */
+const HIGH_MORALE = 90
+
+/**
+ * 경기 뒤 카운터 (A-4) — 인기도 변화가 정해진 다음에 부른다.
+ *   +0x1c2 이번 시즌 인기도 변화 합 · +0x1c0/+0x1cd 먹튀 보유 중 합/경기 수
+ *   +0x1c7 무력감 보유 중 "경기 뒤 사기 ≥ 90" 연속 경기 수
+ * 먹튀·무력감 카운터는 그 스킬이 **없으면 0** 으로 되돌린다.
+ */
+export function countGameForSkills(
+  career: PlayerCareer,
+  popularityChange: number,
+): PlayerCareer {
+  const hasMoneyGrubber = hasSkill(career, MONEY_GRUBBER_SKILL)
+  const hasHelpless = hasSkill(career, HELPLESS_SKILL)
+  return {
+    ...career,
+    seasonPopularityGain: career.seasonPopularityGain + popularityChange,
+    moneyGrubberPopularityGain: hasMoneyGrubber ? career.moneyGrubberPopularityGain + popularityChange : 0,
+    moneyGrubberGames: hasMoneyGrubber ? career.moneyGrubberGames + 1 : 0,
+    highMoraleStreak: hasHelpless && career.morale >= HIGH_MORALE ? career.highMoraleStreak + 1 : 0,
   }
 }
 
@@ -517,6 +554,8 @@ export function startNextSeason(career: PlayerCareer): PlayerCareer {
     popularityAtSeasonStart: career.popularity,
     // 새 시즌 시작 때 통산 훈련 수를 떠 둔다 (+0x6b+i) — 이번 시즌 훈련 수를 빼서 구한다
     seasonStartTrainingCounts: { ...career.trainingCounts },
+    // 이번 시즌 인기도 변화 합은 새 시즌에 0 이다 (+0x1c2)
+    seasonPopularityGain: 0,
     // 새 시즌 전환 0x1b768: 사기 100, 소지금 += 연봉
     morale: MAXIMUM_MORALE,
     money: Math.min(MAXIMUM_MONEY, career.money + career.salary * ORIGINAL_MONEY_UNIT),

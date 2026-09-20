@@ -35,11 +35,16 @@ describe('조건 20 — 스킬 획득 (0xad1ba)', () => {
     expect(meetsSkillAcquireCondition(선수({ skillIds: [], morale: 20, season: 3 }), 값(5), 항상)).toBe(false)
   })
 
-  it('아직 카운터를 못 옮긴 스킬은 통과시키지 않는다 (2 먹튀·7 전설 등)', () => {
+  it('아직 기록 칸을 못 옮긴 스킬은 통과시키지 않는다 (7 전설·10 해결사)', () => {
     const career = 선수({ skillIds: [] })
-    expect([2, 7, 10].map((id) => meetsSkillAcquireCondition(career, 값(id), undefined))).toEqual([
-      false, false, false,
-    ])
+    expect([7, 10].map((id) => meetsSkillAcquireCondition(career, 값(id), undefined))).toEqual([false, false])
+  })
+
+  it('2 먹튀 — 연차 ≥ 2 이고 14경기째 이번 시즌 인기도 합 ≤ 15 (0xad2a2)', () => {
+    const 기본 = { skillIds: [], season: 3, gamesPlayed: 14 }
+    expect(meetsSkillAcquireCondition(선수({ ...기본, seasonPopularityGain: 15 }), 값(2), undefined)).toBe(true)
+    expect(meetsSkillAcquireCondition(선수({ ...기본, seasonPopularityGain: 16 }), 값(2), undefined)).toBe(false)
+    expect(meetsSkillAcquireCondition(선수({ ...기본, season: 2, seasonPopularityGain: 0 }), 값(2), undefined)).toBe(false)
   })
 
   it('20 에러왕 — 연차 ≥ 3 · 수비 실효 ≤ 400 · 30경기째 · 이번 시즌 수비 훈련 0', () => {
@@ -79,7 +84,14 @@ describe('조건 21 — 스킬 해제', () => {
     expect(meetsSkillReleaseCondition(여덟, 값(18))).toBe(true)
   })
 
-  it('아직 카운터를 못 옮긴 해제 조건은 통과시키지 않는다 (5 무력감)', () => {
-    expect(meetsSkillReleaseCondition(선수({ skillIds: [5] }), 값(5))).toBe(false)
+  it('5 무력감은 경기 뒤 사기 ≥ 90 인 경기가 연속 6회여야 풀린다 (+0x1c7 > 5)', () => {
+    expect(meetsSkillReleaseCondition(선수({ skillIds: [5], highMoraleStreak: 5 }), 값(5))).toBe(false)
+    expect(meetsSkillReleaseCondition(선수({ skillIds: [5], highMoraleStreak: 6 }), 값(5))).toBe(true)
+  })
+
+  it('2 먹튀는 5경기 이상이고 경기당 인기도 변화가 3 을 넘어야 풀린다 (0xad9ce)', () => {
+    expect(meetsSkillReleaseCondition(선수({ skillIds: [2], moneyGrubberGames: 5, moneyGrubberPopularityGain: 20 }), 값(2))).toBe(true)
+    expect(meetsSkillReleaseCondition(선수({ skillIds: [2], moneyGrubberGames: 5, moneyGrubberPopularityGain: 15 }), 값(2))).toBe(false)
+    expect(meetsSkillReleaseCondition(선수({ skillIds: [2], moneyGrubberGames: 4, moneyGrubberPopularityGain: 40 }), 값(2))).toBe(false)
   })
 })

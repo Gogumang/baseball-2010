@@ -22,6 +22,7 @@ import {
   isSeasonFinished,
   startNextSeason,
   gainGamePoint,
+  countGameForSkills,
 } from '@/entities/career/model/playerCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { awardTitles, evaluateNewTitles } from '@/entities/career/model/titles'
@@ -140,7 +141,9 @@ export function useCareerSession({
         ),
         evaluation.moraleChange,
       )
-      const streak = updateStreaks(evaluated, summary.stats)
+      // 스킬 조건용 경기 뒤 카운터 — 사기까지 반영된 뒤에 센다 (A-4)
+      const counted = countGameForSkills(evaluated, evaluation.popularityChange)
+      const streak = updateStreaks(counted, summary.stats)
       const streakReputation = streak.notices.reduce((total, notice) => total + notice.reputationChange, 0)
       // 부상은 경기 뒤가 아니라 훈련 결과 창을 닫을 때 굴린다 (0x1b4c4)
       const rolled = gainReputation(streak.career, streakReputation)
