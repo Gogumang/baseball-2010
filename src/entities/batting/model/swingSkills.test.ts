@@ -31,19 +31,29 @@ describe('스윙 스킬 보정 — 0xab214 (점검 10차)', () => {
     expect([1, 2, 3, 4, 5].map(적용)).toEqual([1000, 900, 900, 900, 1000])
   })
 
-  it('16 상승세는 최근 두 타석이 모두 안타(0<x<5), 17 하락세는 모두 아웃(4<x<8)일 때만', () => {
+  it('16 상승세는 링버퍼의 가장 오래된 두 칸이 모두 안타이고 개수가 3 보다 많을 때만 (0xaba7e)', () => {
     const 기록 = (recentAtBatCodes: number[]) => 상황({ recentAtBatCodes })
-    expect(applySwingSkills({ solid: 1000, homeRun: 1000 }, [16], [], 기록([1, 4])).solid).toBe(1050)
-    expect(applySwingSkills({ solid: 1000, homeRun: 1000 }, [16], [], 기록([1, 5])).solid).toBe(1000)
-    expect(applySwingSkills({ solid: 1000, homeRun: 1000 }, [17], [], 기록([5, 7])).solid).toBe(900)
+    // 맨 앞 두 칸이 안타 + 개수 4 → 걸린다
+    expect(applySwingSkills({ solid: 1000, homeRun: 1000 }, [16], [], 기록([1, 4, 5, 6])).solid).toBe(1050)
+    // 같은 앞 두 칸이어도 개수가 3 이면 안 걸린다
+    expect(applySwingSkills({ solid: 1000, homeRun: 1000 }, [16], [], 기록([1, 4, 5])).solid).toBe(1000)
+    // 최근 둘이 안타여도 맨 앞이 아웃이면 안 걸린다 — 앞서 웹은 이걸 걸리게 했다
+    expect(applySwingSkills({ solid: 1000, homeRun: 1000 }, [16], [], 기록([5, 6, 1, 4])).solid).toBe(1000)
+  })
+
+  it('17 하락세는 맨 앞 두 칸이 모두 아웃이고 개수가 2 보다 많을 때만', () => {
+    const 기록 = (recentAtBatCodes: number[]) => 상황({ recentAtBatCodes })
+    expect(applySwingSkills({ solid: 1000, homeRun: 1000 }, [17], [], 기록([5, 7, 1])).solid).toBe(900)
+    expect(applySwingSkills({ solid: 1000, homeRun: 1000 }, [17], [], 기록([5, 7])).solid).toBe(1000)
     expect(applySwingSkills({ solid: 1000, homeRun: 1000 }, [17], [], 기록([7])).solid).toBe(1000)
   })
 
-  it('타석 기록 코드 — 안타 1~4, 아웃 5~7, 볼넷 8 (추정)', () => {
+  it('타석 기록 코드 — 안타 1~4, 5 그 밖의 아웃 · 6 뜬공 · 7 삼진, 볼넷 8 (P7 A1)', () => {
     expect(atBatRecordCodeOf({ kind: '안타', bases: 2 })).toBe(2)
     expect(atBatRecordCodeOf({ kind: '홈런' })).toBe(4)
-    expect(atBatRecordCodeOf({ kind: '삼진' })).toBe(5)
-    expect(atBatRecordCodeOf({ kind: '아웃', detail: '뜬공아웃' })).toBe(7)
+    expect(atBatRecordCodeOf({ kind: '삼진' })).toBe(7)
+    expect(atBatRecordCodeOf({ kind: '아웃', detail: '뜬공아웃' })).toBe(6)
+    expect(atBatRecordCodeOf({ kind: '아웃', detail: '땅볼아웃' })).toBe(5)
     expect(atBatRecordCodeOf({ kind: '볼넷' })).toBe(8)
   })
 })

@@ -23,7 +23,11 @@ export interface SwingSituation {
   readonly recentAtBatCodes: readonly number[]
 }
 
-/** 기록 목록 0x53100 의 코드. 안타 1~4 · 아웃 5~7 은 16·17 조건 구간에서 거꾸로 짐작한 것이다 (추정) */
+/**
+ * 타석 기록 링버퍼의 코드 (0xa8024 가 넣는 값, P7 A1 확정):
+ *   1~4 안타(루타) · **5 그 밖의 아웃(땅볼·포스·태그) · 6 뜬공 아웃 · 7 삼진** · 8 볼넷 · 9 사구
+ * 앞서 웹은 5 삼진 · 6 땅볼 · 7 그 밖 아웃으로 5·6·7 을 다르게 짚고 있었다.
+ */
 export function atBatRecordCodeOf(outcome: AtBatOutcome): number {
   switch (outcome.kind) {
     case '안타':
@@ -31,17 +35,33 @@ export function atBatRecordCodeOf(outcome: AtBatOutcome): number {
     case '홈런':
       return 4
     case '삼진':
-      return 5
+      return 7
     case '아웃':
-      return outcome.detail === '땅볼아웃' ? 6 : 7
+      return outcome.detail === '뜬공아웃' ? 6 : 5
     default:
       return 8
   }
 }
 
-const lastTwo = (codes: readonly number[]) => (codes.length < 2 ? null : codes.slice(-2))
-const isHotStreak = (s: SwingSituation) => lastTwo(s.recentAtBatCodes)?.every((code) => code > 0 && code < 5) ?? false
-const isColdStreak = (s: SwingSituation) => lastTwo(s.recentAtBatCodes)?.every((code) => code > 4 && code < 8) ?? false
+/**
+ * 스킬 16 상승세 · 17 하락세 (0xaba7e~, A-5 확정).
+ *
+ * 타자마다 **용량 10 의 링버퍼**가 있고, 읽기 `i=0` 이 **가장 오래된** 기록이다.
+ * 그래서 보는 것은 "최근 두 타석" 이 아니라 **버퍼의 맨 앞 두 칸**이고, 개수 조건이 따로 붙는다:
+ *   - 상승세: 개수 > 3 이고 code(0)·code(1) 이 모두 1~4(안타)
+ *   - 하락세: 개수 > 2 이고 code(0)·code(1) 이 모두 5~7(아웃)
+ * 앞서 웹은 `slice(-2)`(가장 최근 둘)를 보고 개수 조건이 없었다 — 조건이 훨씬 자주 걸렸다.
+ */
+const HOT_STREAK_MINIMUM = 3
+const COLD_STREAK_MINIMUM = 2
+
+const oldestTwo = (codes: readonly number[], minimumCount: number) =>
+  codes.length > minimumCount ? codes.slice(0, 2) : null
+
+const isHotStreak = (s: SwingSituation) =>
+  oldestTwo(s.recentAtBatCodes, HOT_STREAK_MINIMUM)?.every((code) => code > 0 && code < 5) ?? false
+const isColdStreak = (s: SwingSituation) =>
+  oldestTwo(s.recentAtBatCodes, COLD_STREAK_MINIMUM)?.every((code) => code > 4 && code < 8) ?? false
 
 export interface SwingWeights {
   /** B(잘 맞음) */

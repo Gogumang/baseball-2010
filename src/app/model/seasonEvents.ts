@@ -26,7 +26,11 @@ const INJURY_ENDING_EVENT_ID = 500
 const INJURY_ENDING = 0
 const RELEASE_ENDING = 1
 const RETIREMENT_ENDING = 2
-/** 개인 타이틀·MVP 가 아직 없어 연봉 등급은 0 이다 */
+/**
+ * 연봉협상 등급 k (0xa4d78, B-5 확정) = 타이틀 1위 수(홈런·타점·타율) + (그 해 MVP 면 +2).
+ * ⚠️ **웹에 개인 타이틀·MVP 판정 자체가 없어 아직 0 으로 둔다** — 그래서 강경은 늘 387(−20%),
+ * 정중은 늘 391(−10%) 이 된다. 개인 타이틀(370~374)·MVP(375~377)를 만들면 여기부터 이어야 한다.
+ */
 const TITLE_RANK = 0
 
 /**

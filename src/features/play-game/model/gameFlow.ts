@@ -85,7 +85,8 @@ const MY_LEAGUE_BATTER_MODE = 4
 const MAXIMUM_AUTO_STEPS = 500
 
 const MAXIMUM_LOG_LENGTH = 40
-const RECENT_AT_BAT_COUNT = 2
+/** 타석 기록 링버퍼 용량 (0xa908c) — 스킬 16·17 은 이 버퍼의 **가장 오래된** 두 칸을 본다 */
+const RECENT_AT_BAT_COUNT = 10
 
 /**
  * 리그 팀 수. StrHOWTO[7] "기본 10개 팀과 히든 5팀" — 히든 5팀(국가대표 4팀·외인구단, 원본 10~14)은

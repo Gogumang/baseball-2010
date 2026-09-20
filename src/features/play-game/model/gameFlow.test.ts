@@ -86,14 +86,14 @@ describe('applyPlayerOutcome', () => {
 })
 
 describe('최근 타석 기록 — 스킬 16·17 조건', () => {
-  it('사용자 타석마다 기록 코드를 쌓고 최근 두 개만 남긴다', () => {
+  it('사용자 타석마다 기록 코드를 쌓는다 — 링버퍼 용량 10 (0xa908c)', () => {
     let progress = startGame(createSeededRandom(1))
     for (const outcome of [{ kind: '홈런' }, { kind: '삼진' }, { kind: '안타', bases: 2 }] as const) {
       if (progress.game.isFinished) break
       progress = applyPlayerOutcome(progress, outcome, createSeededRandom(3))
     }
 
-    expect(progress.recentAtBatCodes).toEqual([5, 2])
+    expect(progress.recentAtBatCodes).toEqual([4, 7, 2])
   })
 })
 

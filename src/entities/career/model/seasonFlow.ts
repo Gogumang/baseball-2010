@@ -20,16 +20,19 @@ export const SALARY_ACCEPT_EVENT_ID = 383
 const FINAL_YEAR = 13
 const LEGEND_SKILL = 7
 const FIRST_ENDING_YEAR = 7
-/** 선수 타입 비트로 표를 고른다 — 웹판 선수는 타입 선택이 없어 첫 표를 쓴다 (추정) */
-const GOAL_TABLE = 0
 const AVERAGE_SCALE = 1000
 /** 소지금 판정 단위(100만원) — 웹판 소지금은 만원 단위다 */
 const MONEY_UNIT = 100
 
 export type GoalStage = '중간' | '연말'
 
+/**
+ * 올해의 목표 (0xd7f9e, B-9 확정) — 표는 **선수 타입 비트**(선수 +0xb 위 3비트)로 고른다.
+ * 웹의 `battingTypeIndex` 가 그 타입(0 타격형 · 1 장타형)이라 그대로 쓴다.
+ * 앞서 웹은 늘 첫 표를 써서 장타형 선수도 타격형 목표를 받고 있었다.
+ */
 export function yearGoalsOf(career: PlayerCareer): readonly number[] {
-  const table = BATTER_YEAR_GOALS[GOAL_TABLE]
+  const table = BATTER_YEAR_GOALS[Math.min(career.battingTypeIndex, BATTER_YEAR_GOALS.length - 1)]
   return table[Math.min(career.season, table.length) - 1]
 }
 
