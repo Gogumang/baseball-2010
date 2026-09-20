@@ -77,6 +77,18 @@ export interface DefensePlayInput {
   readonly defenseAbilities?: readonly number[]
   /** 주자들의 주루 능력치. 기본 500 */
   readonly runAbility?: number
+  /**
+   * **이 타구는 잡히지 않는다** — 필살타법이 성공한 타구 (0x51800, S13 6절 확정).
+   *
+   * 원본은 확률 굴림에 성공하면 공 객체(`[경기+0x204]`)의 속성 목록 `+0x5c` 에
+   * `0xaf180(목록, 4, 0, −1)` 로 **비트 4 = 송구공 표시**를 단다. 야수는 포구 틱에 그 비트를 보고
+   * 메시지 `0xbc3`(받음)만 보낸 뒤 **쥐기(0xb2710)로 가지 않고**, 그 `0xbc3` 은 전용 처리기가
+   * 아예 없다(P2 2b 181행 · S8 4절). 결국 그 타구는 아무도 잡지 못한다.
+   *
+   * ⚠️ 비트를 읽는 쪽(`0xb425c`)은 궤적 물리 루프(`0xb401c` 계열) 안이라 해독 금지 구역이다 —
+   * 이미 공개된 두 노트의 읽기만 근거로 삼았고 물리식은 건드리지 않았다.
+   */
+  readonly isUncatchable?: boolean
   readonly maximumTicks?: number
 }
 
@@ -85,10 +97,12 @@ export interface DefensePlayResult {
   readonly advance: AdvanceResult
   /** 매 틱의 화면 스냅샷 (`pages/defense` 가 그대로 그린다) */
   readonly ticks: readonly DefensePlayView[]
-  /** 잡은 야수 칸 */
+  /** 공을 쫓은 야수 칸. 잡히지 않는 타구면 "닿기만 한" 야수다 */
   readonly catchFielderSlot: number
-  /** 포구 틱 */
+  /** 포구 틱. 잡히지 않는 타구면 야수가 공에 닿은 틱이다 */
   readonly catchTick: number
+  /** 필살타법 성공으로 아무도 잡지 못한 타구인가 (0x51800) */
+  readonly isUncatchable: boolean
   /** 뜬공을 뜬 채로 잡았는가 (태그업이 걸리는 조건) */
   readonly caughtOnTheFly: boolean
   /** CPU 가 고른 송구 목표 루. −1 이면 안 던졌다 */
@@ -183,7 +197,9 @@ export function runDefensePlay(input: DefensePlayInput): DefensePlayResult {
 
   let fielders = createFielders(abilities)
   const runners = createPlayRunners(input.bases, input.outcome, speed)
-  const onTheFly = catchesOnTheFly(input.outcome)
+  const uncatchable = input.isUncatchable === true
+  // 잡히지 않는 타구는 뜬 채로 잡힐 일도 없다 — 떨어진 뒤 굴러가는 공처럼 본다
+  const onTheFly = !uncatchable && catchesOnTheFly(input.outcome)
 
   // ── 포구 예보 ──
   // 뜬 채로 잡히는 타구는 낙구 전까지만, 굴러간 타구는 낙구 **다음** 틱부터 본다.
@@ -249,7 +265,8 @@ export function runDefensePlay(input: DefensePlayInput): DefensePlayResult {
     const ballOnGround = play.everHeld || tick >= trajectory.landingTick
 
     // ── 1. 포구 ──
-    if (tick === catchTick) {
+    // 필살타법 성공 타구(비트 4)는 야수가 쥐지 않고 지나친다 — 포구 자체를 건너뛴다 (0xaf180·0xbc3)
+    if (tick === catchTick && !uncatchable) {
       fielders = fielders.map((fielder) =>
         fielder.slot === chaserSlot
           ? {
@@ -364,8 +381,12 @@ export function runDefensePlay(input: DefensePlayInput): DefensePlayResult {
           throwBase,
           throwArrivalTick,
           throwFromSlot,
+          uncatchable,
         }),
-        ballIsFlying: tick < catchTick || (throwArrivalTick >= 0 && tick < throwArrivalTick),
+        ballIsFlying:
+          uncatchable
+            ? tick < trajectory.landingTick
+            : tick < catchTick || (throwArrivalTick >= 0 && tick < throwArrivalTick),
         fielders,
         runners: runners.map((runner) => runner.state),
         catchKind: tick >= play.actionStartTick && tick <= catchTick ? play.catchKind : null,
@@ -420,7 +441,9 @@ export function runDefensePlay(input: DefensePlayInput): DefensePlayResult {
     // ── 8. 끝났나 ──
     const throwSettled = throwArrivalTick < 0 || tick >= throwArrivalTick
     const batterSettled = batterOutTick < 0 || tick >= batterOutTick
-    if (play.everHeld && throwSettled && batterSettled && !stillActive) {
+    // 아무도 잡지 않는 타구는 "잡은 적 있음" 이 서지 않으므로 낙구를 끝 조건으로 쓴다
+    const ballSettled = uncatchable ? tick >= trajectory.landingTick : play.everHeld
+    if (ballSettled && throwSettled && batterSettled && !stillActive) {
       play = { ...play, finished: true }
       break
     }
@@ -447,6 +470,7 @@ export function runDefensePlay(input: DefensePlayInput): DefensePlayResult {
     ticks,
     catchFielderSlot: chaserSlot,
     catchTick,
+    isUncatchable: uncatchable,
     caughtOnTheFly: onTheFly,
     throwBase,
     throwArrivalTick,
@@ -537,10 +561,13 @@ interface BallPointInput {
   readonly throwBase: number
   readonly throwArrivalTick: number
   readonly throwFromSlot: number
+  /** 아무도 잡지 않는 타구인가 — 그러면 공은 끝까지 궤적 위에 있다 */
+  readonly uncatchable: boolean
 }
 
 /** 이번 틱에 공이 어디 있나 — 포구 전에는 궤적, 포구 뒤에는 송구선 위 */
 function ballPointAt(input: BallPointInput): WorldPoint {
+  if (input.uncatchable) return input.trajectory.pointAt(input.tick)
   if (input.tick < input.catchTick) return input.trajectory.pointAt(input.tick)
   const holder = input.fielders[input.chaserSlot] ?? input.fielders[0]
   if (input.throwArrivalTick < 0 || input.throwBase === NONE) return holder.position

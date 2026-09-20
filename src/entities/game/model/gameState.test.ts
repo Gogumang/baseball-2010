@@ -6,7 +6,11 @@ import {
   INNINGS_PER_GAME,
   MAXIMUM_INNINGS,
   isPlayerTurn,
+  opponentHalfOf,
+  ourHalfOf,
   PLAYER_BATTING_ORDER_INDEX,
+  PLAYER_SIDE_FIRST_BAT,
+  PLAYER_SIDE_LAST_BAT,
   resultOf,
 } from '@/entities/game/model/gameState'
 import type { GameState } from '@/entities/game/model/gameState'
@@ -199,5 +203,61 @@ describe('콜드게임 — 말 공격 중에는 아웃과 무관하게 매 타�
 
     expect(after.ourScore).toBe(10)
     expect(after.isFinished).toBe(false)
+  })
+})
+
+describe('사람이 맡는 측 — 설정 레코드 +8 (0x30f44, S13 1-2)', () => {
+  /** 측 0 = 선공 — 사람이 1회초에 공격한다 */
+  const 선공경기 = (overrides: Partial<GameState> = {}): GameState => ({
+    ...createGame(PLAYER_BATTING_ORDER_INDEX, PLAYER_SIDE_FIRST_BAT),
+    ...overrides,
+  })
+
+  it('기본값은 후공(측 1)이다 — 나만의리그는 지금까지처럼 말에 공격한다', () => {
+    expect(createGame().playerSide).toBe(PLAYER_SIDE_LAST_BAT)
+    expect(ourHalfOf(createGame())).toBe('말')
+    expect(opponentHalfOf(createGame())).toBe('초')
+  })
+
+  it('측 0 이면 1회초부터 내 차례다', () => {
+    expect(ourHalfOf(선공경기())).toBe('초')
+    expect(isPlayerTurn(선공경기({ battingOrderIndex: PLAYER_BATTING_ORDER_INDEX }))).toBe(true)
+    // 상대 공격은 말이므로 그때는 내 차례가 아니다
+    expect(isPlayerTurn(선공경기({ half: '말', battingOrderIndex: PLAYER_BATTING_ORDER_INDEX }))).toBe(false)
+  })
+
+  it('측 0 이면 초에 타석이 돌고 3아웃에 같은 이닝 말로 넘어간다', () => {
+    const game = applyAtBatOutcome(선공경기({ outs: 2 }), 땅볼아웃)
+
+    expect([game.inning, game.half, game.outs]).toEqual([1, '말', 0])
+  })
+
+  it('측 0 이면 상대 공격은 말이고, 그 이닝이 끝나면 다음 회 초로 간다', () => {
+    const 상대공격 = 선공경기({ half: '말' })
+
+    // 우리 공격(초)인 상태에서 부르면 아무것도 바꾸지 않는다
+    const 우리공격 = 선공경기()
+    expect(applyOpponentInning(우리공격, 3)).toBe(우리공격)
+
+    const game = applyOpponentInning(상대공격, 2)
+    expect([game.opponentScore, game.inning, game.half]).toEqual([2, 2, '초'])
+  })
+
+  it('측 0 이면 홈팀은 상대다 — 9회말에 상대가 앞서면 끝난다', () => {
+    const game = applyOpponentInning(선공경기({ inning: 9, half: '말', ourScore: 2 }), 3)
+
+    expect([game.isFinished, resultOf(game)]).toEqual([true, '패'])
+  })
+
+  it('측 0 의 끝내기는 우리 쪽에 없다 — 9회초에 앞서도 상대의 말 공격이 남는다', () => {
+    const game = applyAtBatOutcome(선공경기({ inning: 9, outs: 2, ourScore: 3, opponentScore: 1 }), 땅볼아웃)
+
+    expect([game.isFinished, game.half]).toEqual([false, '말'])
+  })
+
+  it('측 0 이어도 콜드게임은 공격 중인 우리가 10점 앞서는 순간이다 (0xb6976)', () => {
+    const game = applyAtBatOutcome(선공경기({ inning: 7, ourScore: 9 }), { kind: '홈런' })
+
+    expect([game.ourScore, game.isFinished]).toEqual([10, true])
   })
 })

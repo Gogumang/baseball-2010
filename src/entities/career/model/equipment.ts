@@ -93,6 +93,21 @@ export function hiddenOpenIdOf(part: number, level: number): number {
   return BATTER_HIDDEN_ID_START + part * HIDDEN_LEVELS_PER_PART + level - FIRST_HIDDEN_LEVEL
 }
 
+/*
+ * 오픈 id 41 = **오토봇 배트**(배트 39~42 중 레벨 9) 의 조건 — 확정 (S13 4-3, `0x6900` 머리).
+ * 시즌 결산에서 **시즌모드·나리 투수편·나리 타자편 세 곳 모두 정규시즌 1위를 한 번 이상**이면 열린다
+ * (`0x695e`·`0x6988`·`0x69a8` 이 세 레코드의 `+0x7a` 를 본다).
+ *
+ * ⚠️ **원본 버그 그대로** — `0x69c0` 의 `0x62368(ui, 0x29, 0)` 은 **새로 열었을 때만** 0 이 아닌 값을
+ * 돌려주는데(`0x6237c` 가 `0x61f5c`(이미 열렸나)로 먼저 걸러 0 을 돌려준다), 그 값이 0 이 아니면
+ * `0x6900` 이 **곧장 끝나 버린다**. 즉 **오토봇 배트가 열리는 그 해의 시즌 우승 G 보상
+ * (3000/10000/20000)이 통째로 건너뛰어진다.** 이미 열려 있던 해에는 보상이 정상이다.
+ * (Q2 192행은 이 조건을 뒤집어 적어 두었다 — "이미 열렸으면 건너뛴다" 가 아니라 "새로 열리면" 이다.)
+ *
+ * 웹판에는 시즌모드도, 나리 투수편도, 시즌 우승 G 보상 단계 자체도 없어 **옮길 코드가 없다** —
+ * 조건과 버그만 적어 둔다. 그 셋이 생기면 이 순서(해금 검사 → 열렸으면 보상 건너뜀)를 그대로 옮길 것.
+ */
+
 const isCollector = (career: PlayerCareer, part: number) =>
   Array.from({ length: FIRST_HIDDEN_LEVEL }, (_unused, index) => index).every((owned) => ownsEquipment(career, part, owned))
 

@@ -51,8 +51,9 @@ export interface LeagueGameScore {
 
 /** 한 경기를 9이닝(동점이면 연장)까지 돌린다 */
 export function simulateLeagueGame(matchup: LeagueMatchup, random: RandomPort): LeagueGameScore {
-  const awayPitcher = startingPitcherOf(matchup.away)
-  const homePitcher = startingPitcherOf(matchup.home)
+  // 선발은 경기를 세울 때 로스터 앞 4명 중 하나로 정해진다 (0x3107a·0x31090, S13 1-4b)
+  const awayPitcher = startingPitcherOf(matchup.away, random)
+  const homePitcher = startingPitcherOf(matchup.home, random)
   let awayRuns = 0
   let homeRuns = 0
   let awayOrder = 0

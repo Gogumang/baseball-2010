@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   ACE_PITCHERS,
+  derbyAcePitcherOf,
   missionOpponentOf,
   pitcherAbilityOf,
 } from '@/entities/game/model/aceOpponent'
@@ -45,5 +46,23 @@ describe('missionOpponentOf — 미션 레코드의 마선수 순번', () => {
 
   it('0 은 일반 선수라 마선수가 없다', () => {
     expect(missionOpponentOf('투수', 0)).toBeNull()
+  })
+})
+
+describe('홈런더비 마투수 난입 — 표 0xcfce8 = [1,2,3,4] (S13 5절 확정)', () => {
+  it('마투수 표의 차례는 원본 파일 줄 차례다 — 0 싸이커부터', () => {
+    expect(ACE_PITCHERS.map((ace) => ace.name)).toEqual([
+      '싸이커', '레오니', '붕붕머신', '발렌타인', '드래고나',
+    ])
+  })
+
+  it('단계 1~4 는 레오니·붕붕머신·발렌타인·드래고나이고 싸이커는 안 나온다', () => {
+    expect([1, 2, 3, 4].map((stage) => derbyAcePitcherOf(stage)?.name)).toEqual([
+      '레오니', '붕붕머신', '발렌타인', '드래고나',
+    ])
+    // 단계 0 은 마투수가 없다 (0x48d9a 가 s <= 0 이면 건너뛴다)
+    expect(derbyAcePitcherOf(0)).toBeNull()
+    expect(derbyAcePitcherOf(5)).toBeNull()
+    expect([1, 2, 3, 4].every((stage) => derbyAcePitcherOf(stage)?.name !== '싸이커')).toBe(true)
   })
 })

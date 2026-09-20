@@ -3,11 +3,14 @@ import {
   BATTERS_PER_TEAM,
   PITCHERS_PER_TEAM,
   batterAt,
+  rollStartingPitcherIndex,
+  STARTING_PITCHER_CANDIDATES,
   startingPitcherOf,
   teamBatters,
   teamPitchers,
 } from '@/entities/team/model/teamRoster'
 import { BATTERS, PITCHERS } from '@/shared/config/original/roster'
+import type { RandomPort } from '@/shared/api/random/randomPort'
 
 describe('teamRoster — 원본 Team 구조체의 12타자·8투수', () => {
   it('원본 명단이 15팀으로 정확히 나뉜다', () => {
@@ -48,5 +51,35 @@ describe('teamRoster — 원본 Team 구조체의 12타자·8투수', () => {
       stamina: pitcher.ability[3],
       skillIds: [],
     })
+  })
+})
+
+describe('선발 투수 무작위 — 0xb8c94(팀, 0, bfa54(0,4)) (S13 1-4b)', () => {
+  /** 늘 같은 값을 내는 가짜 난수 — 0~1 을 그대로 돌려준다 */
+  const 고정난수 = (value: number): RandomPort => ({
+    next: () => value,
+    nextInRange: (minimum, maximum) => minimum + value * (maximum - minimum),
+    pick: (candidates) => candidates[0],
+  })
+
+  it('로스터 앞 4명 중 하나를 고른다 — 0~3 균등', () => {
+    expect(rollStartingPitcherIndex(고정난수(0))).toBe(0)
+    expect(rollStartingPitcherIndex(고정난수(0.99))).toBe(STARTING_PITCHER_CANDIDATES - 1)
+    expect(STARTING_PITCHER_CANDIDATES).toBe(4)
+  })
+
+  it('뽑힌 칸의 투수가 선발이 된다 — 0번 고정이 아니다', () => {
+    const 셋째 = teamPitchers(0)[2]
+
+    expect(startingPitcherOf(0, 고정난수(0.6))).toEqual({
+      control: 셋째.ability[0],
+      velocity: 셋째.ability[1],
+      stamina: 셋째.ability[3],
+      skillIds: [],
+    })
+  })
+
+  it('난수를 안 주면 지금까지처럼 0번을 쓴다 (교환이 안 일어난 경우와 같다)', () => {
+    expect(startingPitcherOf(0)).toEqual(startingPitcherOf(0, 0))
   })
 })

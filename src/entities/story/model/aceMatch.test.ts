@@ -9,11 +9,15 @@ describe('마선수 대결 — r_event match 명령', () => {
     expect(aceMatchPitcherOf(3)).toBeNull()
   })
 
-  it('대결은 그 마투수를 상대하는 타자편 "공략" 레코드로 치른다 (추정)', () => {
+  it('대결 레코드는 미션 번호 = team − 1 이다 (0x8d764, S13 4-1 확정)', () => {
     const mission = aceMatchMissionOf(18)
 
     expect(mission).toMatchObject({ side: '타자', stage: 0, name: '붕붕머신', opponentAce: 3 })
     expect(aceMatchMissionOf(99)).toBeNull()
+    // 번호는 "공략" 레코드에만 쓰이는 것이 아니다 — 표의 아무 레코드나 그대로 가리킨다
+    expect(aceMatchMissionOf(1)).toMatchObject({ side: '타자', id: 1, name: '명품 타자의 첫 걸음' })
+    // 편은 이벤트 쪽(evt+0x20)이 정한다 — 투수편이면 투수 미션 표를 본다
+    expect(aceMatchMissionOf(16, '투수')).toMatchObject({ side: '투수', id: 16, name: '메디카' })
   })
 
   it('이기면 첫 결과 이벤트, 지면 둘째 결과 이벤트로 간다', () => {

@@ -217,3 +217,47 @@ describe('대표 패턴 고르기 — 원본 표 안에서만 고른다', () => 
     expect(representativePatternOf(이루타)).toEqual(representativePatternOf(이루타))
   })
 })
+
+describe('필살타법 성공 타구는 야수가 잡지 못한다 — 공 비트 4 (0x51800 · 0xaf180 · 0xbc3, S13 6절)', () => {
+  const 필살타구 = (outcome: AtBatOutcome, bases: BaseState, outs: number, pattern?: BattedBallPattern) =>
+    runDefensePlay({
+      outcome,
+      trajectory: battedBallTrajectory(pattern ?? representativePatternOf(outcome)),
+      bases,
+      outs,
+      isUncatchable: true,
+    })
+
+  it('뜬공아웃이어도 잡히지 않아 아웃이 하나도 안 난다', () => {
+    const 보통 = play(뜬공아웃, EMPTY_BASES, 0, 깊은뜬공)
+    const 필살 = 필살타구(뜬공아웃, EMPTY_BASES, 0, 깊은뜬공)
+
+    expect(보통.advance.outsAdded).toBe(1)
+    expect(필살.advance.outsAdded).toBe(0)
+    expect(필살.isUncatchable).toBe(true)
+    expect(필살.caughtOnTheFly).toBe(false)
+  })
+
+  it('포구를 건너뛰므로 송구도 없다 — 진행 기록에 "잡았다" 가 없다', () => {
+    const 필살 = 필살타구(땅볼아웃, EMPTY_BASES, 0)
+
+    expect(필살.log.some((line) => line.includes('잡았다'))).toBe(false)
+    expect(필살.throwBase).toBe(-1)
+    expect(필살.throwArrivalTick).toBe(-1)
+  })
+
+  it('3루 주자는 잡히지 않은 타구에 그대로 홈을 밟는다', () => {
+    const 필살 = 필살타구(뜬공아웃, 주자3루, 2, 깊은뜬공)
+
+    expect(필살.advance.runsScored).toBe(1)
+    expect(필살.advance.outsAdded).toBe(0)
+  })
+
+  it('공은 끝까지 궤적 위에 있다 — 야수 손으로 옮겨 가지 않는다', () => {
+    const 필살 = 필살타구(땅볼아웃, EMPTY_BASES, 0)
+    const 궤적 = battedBallTrajectory(representativePatternOf(땅볼아웃))
+    const 마지막 = 필살.ticks[필살.ticks.length - 1]
+
+    expect(마지막.ball.x).toBe(궤적.pointAt(필살.ticks.length - 1).x)
+  })
+})

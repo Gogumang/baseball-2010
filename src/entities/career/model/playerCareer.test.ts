@@ -65,6 +65,35 @@ describe('새 시즌 전환 — 0x1b768', () => {
   it('소지금은 9999×100만 을 넘지 않는다', () => {
     expect(startNextSeason({ ...createCareer('선수'), money: 999_000, salary: 100 }).money).toBe(999_900)
   })
+
+  it('올해의 목표 플래그 둘을 되돌린다 — +0x1b7(0xa39d0) · +0x1bc(0x1b882)', () => {
+    const next = startNextSeason({
+      ...createCareer('선수'),
+      hasSeenYearGoalWindow: true,
+      yearGoalEventDone: true,
+    })
+
+    expect([next.hasSeenYearGoalWindow, next.yearGoalEventDone]).toEqual([false, false])
+  })
+
+  it('인기도 스냅샷을 지금 인기도로 다시 뜬다 (+0x78 ← 0xb6e78, 0xa39e0)', () => {
+    const next = startNextSeason({ ...createCareer('선수'), popularity: 820, popularityAtSeasonStart: 100 })
+
+    expect(next.popularityAtSeasonStart).toBe(820)
+  })
+
+  it('리그 순위표와 포스트시즌 대진을 새로 깐다 (리그 객체 S+0x80 초기화, 0xa39ae)', () => {
+    const 지난시즌 = {
+      ...createCareer('선수'),
+      league: recordLeagueResult(EMPTY_LEAGUE, 0, 1),
+      postseason: { round: '한국시리즈', teams: [0, 1], wins: [2, 1], winsNeeded: 4 },
+    } as unknown as Parameters<typeof startNextSeason>[0]
+
+    const next = startNextSeason(지난시즌)
+
+    expect(next.league).toEqual(EMPTY_LEAGUE)
+    expect(next.postseason).toBeNull()
+  })
 })
 
 describe('경기 끝 G포인트 — 0x4ea0c', () => {

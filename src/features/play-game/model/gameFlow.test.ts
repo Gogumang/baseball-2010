@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { applyPlayerOutcome, startGame, summaryOf } from '@/features/play-game/model/gameFlow'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
-import { isPlayerTurn, PLAYER_BATTING_ORDER_INDEX } from '@/entities/game/model/gameState'
+import { isPlayerTurn, PLAYER_BATTING_ORDER_INDEX, PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { opponentOf } from '@/entities/league/model/league'
 import { advanceRunners, EMPTY_BASES } from '@/entities/game/model/baseState'
@@ -257,5 +257,30 @@ describe('사람 타석은 수비 시뮬레이션을 돌린다 — CPU 간이 �
       advanceRunners(주자3루, { kind: '아웃', detail: '뜬공아웃' }, 0, { quickEngine: true }),
     ).toEqual({ bases: 주자3루, runsScored: 0, outsAdded: 1 })
     expect(advanceRunners(주자3루, { kind: '아웃', detail: '뜬공아웃' }, 0).runsScored).toBe(1)
+  })
+})
+
+describe('사람이 선공일 때 (측 0) — 설정 레코드 +8 (0x30f44)', () => {
+  it('측 0 이면 1회초부터 내 타석이고, 상대 공격이 아직 로그에 없다', () => {
+    const progress = startGame(createSeededRandom(20100901), 0, undefined, undefined, PLAYER_SIDE_FIRST_BAT)
+
+    expect(progress.game.playerSide).toBe(PLAYER_SIDE_FIRST_BAT)
+    expect(progress.game.half).toBe('초')
+    expect(isPlayerTurn(progress.game)).toBe(true)
+    expect(progress.log.some((entry) => entry.text.includes('상대 공격'))).toBe(false)
+  })
+
+  it('측 0 으로도 경기가 끝까지 돌아간다', () => {
+    const random = createSeededRandom(20100901)
+    let progress = startGame(random, 0, undefined, undefined, PLAYER_SIDE_FIRST_BAT)
+    let guard = 0
+
+    while (!progress.game.isFinished && guard < 200) {
+      progress = applyPlayerOutcome(progress, { kind: '아웃', detail: '땅볼아웃' }, random)
+      guard += 1
+    }
+
+    expect(progress.game.isFinished).toBe(true)
+    expect(progress.myStats.plateAppearances).toBeGreaterThan(0)
   })
 })

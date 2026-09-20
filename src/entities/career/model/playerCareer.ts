@@ -103,8 +103,21 @@ export interface PlayerCareer {
   readonly bestHomeRunsInGame: number
   /** 사이클링 히트를 친 경기 수 — 칭호 "사이클링 히트 2회 달성" */
   readonly cycleHitGames: number
-  /** 시즌 시작 때 인기도 — 올해의 목표 "인기도 상승" 과 연봉 계산의 기준 */
+  /**
+   * 시즌 시작 때 인기도 (선수 +0x78) — 올해의 목표 "인기도 상승" 과 연봉 계산의 기준.
+   * 새 시즌 전환이 `S[0x78] = 0xb6e78(S)`(지금 인기도)로 다시 뜬다 (0xa39e0).
+   */
   readonly popularityAtSeasonStart: number
+  /**
+   * 올해의 목표 창을 이미 봤는가 (선수 +0x1b7, 0xa39d0 이 새 시즌마다 0 으로 되돌린다).
+   */
+  readonly hasSeenYearGoalWindow: boolean
+  /**
+   * 연초 "올해의 목표" 이벤트(0xd4)를 이미 치렀는가 (선수 +0x1bc 4바이트).
+   * 이벤트 조건이 `S+0x1bc == 0 && S+0x187 == 0` 이라, 새 시즌 전환(0x1b882)이 이 칸을 비워
+   * **목표 창을 다시 띄우는 스위치**가 된다.
+   */
+  readonly yearGoalEventDone: boolean
   /** 연봉 (만원 단위, 추정) — 새 시즌 시작 때 소지금에 들어온다 */
   readonly salary: number
   /** 선수 생활이 끝났으면 StrENDING 번호 */
@@ -260,6 +273,8 @@ export function createCareer(name: string, profile: RookieProfile = DEFAULT_ROOK
     bestHomeRunsInGame: 0,
     cycleHitGames: 0,
     popularityAtSeasonStart: STARTING_POPULARITY,
+    hasSeenYearGoalWindow: false,
+    yearGoalEventDone: false,
     salary: STARTING_SALARY,
     endingIndex: null,
     illnessCooldown: 0,
@@ -545,14 +560,27 @@ export function isSeasonFinished(career: PlayerCareer): boolean {
   return career.gamesPlayed >= GAMES_PER_SEASON
 }
 
-/** 시즌을 넘긴다. 시즌 성적은 초기화되고 통산 성적은 남는다. */
+/**
+ * 시즌을 넘긴다 (0x1b768 · 안쪽 `0xa39a8`, S13 2절 전수 확정).
+ * 시즌 성적은 초기화되고 통산 성적은 남는다.
+ *
+ * ⚠️ **원본 버그 그대로** — `0xa39bc`·`0xa39c6` 이 **둘 다 `S+0x1e0`** 을 16바이트 지운다.
+ * 경기 뒤 누적 카운터는 `+0x1e0`·`+0x1f0` **두 벌**이고 `0xa690c` 가 같은 값을 양쪽에 더하는데,
+ * 둘째 줄이 `r6`(= `S + 0x1e0`)을 그대로 다시 써서 **`+0x1f0` 벌은 영영 안 지워진다**
+ * → 나리 누적 카운터 한 벌이 해를 넘겨 계속 쌓인다.
+ * 웹판에는 그 두 벌짜리 누적 카운터 자체가 없어 **옮길 코드가 없다** — 사실만 적어 둔다.
+ */
 export function startNextSeason(career: PlayerCareer): PlayerCareer {
   return {
     ...career,
     season: career.season + 1,
     gamesPlayed: 0,
     outingsThisSeason: 0,
+    // 인기도 스냅샷 (+0x78 ← 지금 인기도, 0xa39e0) — 올해의 목표 "인기도 상승" 의 기준점
     popularityAtSeasonStart: career.popularity,
+    // 올해의 목표 플래그 두 개를 되돌린다 — +0x1b7(0xa39d0) 창을 봤다 · +0x1bc(0x1b882) 연초 이벤트
+    hasSeenYearGoalWindow: false,
+    yearGoalEventDone: false,
     // 새 시즌 시작 때 통산 훈련 수를 떠 둔다 (+0x6b+i) — 이번 시즌 훈련 수를 빼서 구한다
     seasonStartTrainingCounts: { ...career.trainingCounts },
     // 이번 시즌 인기도 변화 합은 새 시즌에 0 이다 (+0x1c2)
@@ -561,6 +589,12 @@ export function startNextSeason(career: PlayerCareer): PlayerCareer {
     morale: MAXIMUM_MORALE,
     money: Math.min(MAXIMUM_MONEY, career.money + career.salary * ORIGINAL_MONEY_UNIT),
     stats: EMPTY_SEASON_STATS,
+    // 리그를 새로 깐다 — `0xa39ae` 가 리그 객체(S+0x80)를 초기화하고, 뒤이어 `0x204e0(저장, 편, 0)`
+    // 이 **리그 전 선수의 시즌 성적**을 0 으로 되돌린다(팀 레코드·능력치·사기는 그대로 둔다).
+    // 웹판은 리그 선수 명단이 `shared/config` 의 붙박이 표라 개인 시즌 성적을 들고 있지 않다 —
+    // 옮길 수 있는 것은 순위표와 포스트시즌 대진뿐이라 그 둘만 비운다.
+    league: EMPTY_LEAGUE,
+    postseason: null,
     wins: 0,
     draws: 0,
     losses: 0,

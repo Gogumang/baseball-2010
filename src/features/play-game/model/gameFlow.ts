@@ -6,13 +6,15 @@ import {
   applyOpponentInning,
   createGame,
   PLAYER_BATTING_ORDER_INDEX,
+  PLAYER_SIDE_LAST_BAT,
   isPlayerTurn,
+  ourHalfOf,
   resultOf,
 } from '@/entities/game/model/gameState'
-import type { GameState } from '@/entities/game/model/gameState'
+import type { GameState, PlayerSide } from '@/entities/game/model/gameState'
 import { simulateQuickAtBat } from '@/entities/game/model/quickAtBat'
 import { simulateHalfInning } from '@/entities/game/model/simulateHalfInning'
-import { batterAt, startingPitcherOf } from '@/entities/team/model/teamRoster'
+import { batterAt, rollStartingPitcherIndex, startingPitcherOf } from '@/entities/team/model/teamRoster'
 import { opponentOf } from '@/entities/league/model/league'
 import type { GameSummary } from '@/entities/game/model/gameSummary'
 import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
@@ -45,6 +47,13 @@ export interface GameProgress {
   readonly opponentTeamId: number
   /** 이번 경기에 등판한 마선수. 없으면 평범한 투수다. */
   readonly aceOpponent: AcePlayer | null
+  /**
+   * 양 팀 선발 투수의 로스터 칸 — 경기를 세울 때 한 번만 뽑는다 (0x3107a·0x31090, S13 1-4b).
+   * 원본은 투수 0번과 이 칸을 **레코드째 맞바꿔** 0번이 선발이 되지만, 웹판 로스터는 붙박이
+   * 표라 바꿀 수 없어 칸 번호를 경기 내내 들고 다닌다.
+   */
+  readonly ourStartingPitcherIndex: number
+  readonly opponentStartingPitcherIndex: number
   readonly myStats: SeasonStats
   /** 사용자 타석 인기도 점수 합 */
   readonly popularityPoints: number
@@ -112,13 +121,19 @@ export function startGame(
   ourTeamId = 0,
   battingOrder = PLAYER_BATTING_ORDER_INDEX + 1,
   opponentTeamId = opponentOf(0, ourTeamId),
+  // 사람이 맡는 측 — 원본 설정 레코드 +8 (0x30f44). 일반모드는 반반이지만 나만의리그 화면은
+  // 늘 후공으로 돌려 왔으므로 기본값만 측 1 로 두고 박아 두지는 않는다.
+  playerSide: PlayerSide = PLAYER_SIDE_LAST_BAT,
 ): GameProgress {
   const initial: GameProgress = {
-    game: createGame(battingOrder - 1),
+    game: createGame(battingOrder - 1, playerSide),
     ourTeamId,
     opponentTeamId,
     // 정규 경기에 마선수가 무작위로 나오는 코드는 원본에 없다 — 마선수 대결은 이벤트 match 명령으로만 (누락 탐색 8차)
     aceOpponent: null,
+    // 원본은 AI 팀 → 사람 팀 차례로 뽑는다 (0x31088 → 0x3109e)
+    opponentStartingPitcherIndex: rollStartingPitcherIndex(random),
+    ourStartingPitcherIndex: rollStartingPitcherIndex(random),
     myStats: EMPTY_SEASON_STATS,
     popularityPoints: 0,
     doublePlays: 0,
@@ -146,12 +161,13 @@ export function startGame(
  *
  * `pattern` 을 주면 그 원본 패턴으로 궤적을 만든다. 안 주면 같은 결과를 내는 대표 패턴을
  * 원본 표에서 골라 쓴다 (`representativePatternOf`).
+ * `isUncatchable` 은 필살타법 성공 타구 — 야수가 포구를 건너뛴다 (0x51800, S13 6절).
  */
 export function applyPlayerOutcome(
   progress: GameProgress,
   outcome: AtBatOutcome,
   random: RandomPort,
-  options: { readonly pattern?: BattedBallPattern } = {},
+  options: { readonly pattern?: BattedBallPattern; readonly isUncatchable?: boolean } = {},
 ): GameProgress {
   if (progress.game.isFinished) return progress
 
@@ -161,6 +177,8 @@ export function applyPlayerOutcome(
         trajectory: battedBallTrajectory(options.pattern ?? representativePatternOf(outcome)),
         bases: progress.game.bases,
         outs: progress.game.outs,
+        // 필살타법이 성공한 타구면 야수가 쥐지 않는다 (0x51800) — 타석 쪽이 확률 굴림을 하면 넘겨 준다
+        isUncatchable: options.isUncatchable,
       })
     : null
 
@@ -209,7 +227,7 @@ export function applyPlayerOutcome(
         opponentScore: progress.game.opponentScore,
       }),
     },
-    `${progress.game.inning}회말 나 — ${describeOutcome(outcome)}${
+    `${progress.game.inning}회${progress.game.half} 나 — ${describeOutcome(outcome)}${
       runsBattedIn > 0 ? ` (${runsBattedIn}타점)` : ''
     }`,
     true,
@@ -267,9 +285,10 @@ function advanceUntilPlayerTurn(
 
   for (let step = 0; step < MAXIMUM_AUTO_STEPS; step += 1) {
     if (current.game.isFinished || isPlayerTurn(current.game)) return current
-    current = current.game.half === '초'
-      ? playOpponentInning(current, random)
-      : playTeammateAtBat(current, random)
+    // 우리가 공격하는 반 이닝은 측이 정한다 — '초' 고정이 아니다 (측 0 선공 · 측 1 후공)
+    current = current.game.half === ourHalfOf(current.game)
+      ? playTeammateAtBat(current, random)
+      : playOpponentInning(current, random)
   }
   throw new Error('경기 자동 진행이 끝나지 않았습니다 — 진행 규칙을 확인하세요')
 }
@@ -282,7 +301,7 @@ function playOpponentInning(progress: GameProgress, random: RandomPort): GamePro
   const half = simulateHalfInning(
     0,
     (order) => batterAt(progress.opponentTeamId, order),
-    startingPitcherOf(progress.ourTeamId),
+    startingPitcherOf(progress.ourTeamId, progress.ourStartingPitcherIndex),
     progress.game.inning,
     random,
     { strikeoutCombo: progress.pitching.strikeoutCombo, strikeouts: progress.pitching.strikeouts },
@@ -304,7 +323,7 @@ function playOpponentInning(progress: GameProgress, random: RandomPort): GamePro
       // 삼진 계열 기록도 우리 팀 것이다 (0xa77f0 은 수비 팀이 사람 팀인지 본다)
       recordIds: [...progress.recordIds, ...half.recordIds],
     },
-    `${progress.game.inning}회초 상대 공격 — ${runs}점`,
+    `${progress.game.inning}회${progress.game.half} 상대 공격 — ${runs}점`,
     false,
   )
 }
@@ -313,7 +332,7 @@ function playOpponentInning(progress: GameProgress, random: RandomPort): GamePro
 function playTeammateAtBat(progress: GameProgress, random: RandomPort): GameProgress {
   const outcome = simulateQuickAtBat(
     batterAt(progress.ourTeamId, progress.game.battingOrderIndex),
-    startingPitcherOf(progress.opponentTeamId),
+    startingPitcherOf(progress.opponentTeamId, progress.opponentStartingPitcherIndex),
     { inning: progress.game.inning },
     random,
   )
@@ -333,7 +352,7 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort): GameProg
       teammateLogs: { ...progress.teammateLogs, [slot]: recorded.log },
       recordIds: [...progress.recordIds, ...recorded.recordIds],
     },
-    `${progress.game.inning}회말 ${progress.game.battingOrderIndex + 1}번 — ${describeOutcome(outcome)}${
+    `${progress.game.inning}회${progress.game.half} ${progress.game.battingOrderIndex + 1}번 — ${describeOutcome(outcome)}${
       runsBattedIn > 0 ? ` (${runsBattedIn}점)` : ''
     }`,
     false,
