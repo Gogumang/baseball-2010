@@ -43,7 +43,8 @@ const findMission = (side: '타자' | '투수', id: number): OriginalMission => 
 /** 미션마다 가장 이상적인 타석 결과 순서 */
 function idealBatterOutcomes(mission: OriginalMission): AtBatOutcome[] {
   if (mission.goals.includes('사이클링히트')) return [SINGLE, DOUBLE, TRIPLE, HOME_RUN]
-  if (mission.goals.includes('그라운드홈런')) return [TRIPLE]
+  // 그라운드홈런은 이제 홈런으로 센다 (E-8)
+  if (mission.goals.includes('그라운드홈런')) return [HOME_RUN]
   if (mission.goals.includes('2루타')) return [DOUBLE, HOME_RUN]
   return Array.from({ length: MAXIMUM_PLATE_APPEARANCES }, () => HOME_RUN)
 }

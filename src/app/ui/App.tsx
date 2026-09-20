@@ -75,6 +75,8 @@ export function App() {
         runner={runner}
         random={random}
         // 마선수 대결은 육성 선수의 경기용 능력치(장비·스킬·부상 반영)로 친다
+        // 미션 진입을 육성 선수가 있을 때만 열어 두므로(EntryRoutes, Q2 3-1) 여기 신인 능력치는
+        // 저장을 불러오는 중 같은 짧은 순간에만 쓰인다 — 원본에는 신인 대체가 없다
         ability={careerSession.career === null ? ROOKIE_BATTER_ABILITY : effectiveAbilityOf(careerSession.career)}
         pitchControl={gameSettings.settings.pitchControl}
       />

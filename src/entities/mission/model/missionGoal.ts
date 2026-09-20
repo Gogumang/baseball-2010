@@ -133,11 +133,15 @@ export function goalNamesFor(
     names.push('안타')
     if (outcome.bases === 1) names.push('단타')
     if (outcome.bases === 2) names.push('2루타')
-    // 타구 판정에 장내 홈런이 없어서, 그라운드를 도는 데 가장 가까운 3루타를 그라운드홈런으로 친다 (추정)
-    if (outcome.bases === 3) names.push('3루타', '그라운드홈런')
+    if (outcome.bases === 3) names.push('3루타')
   }
   if (outcome.kind === '홈런') {
     names.push('안타', '홈런')
+    // 원본은 타자주자가 **플레이 중 홈에 닿으면** 홈런으로 세고 그라운드홈런 수도 함께 올린다
+    // (0xaa0a8 → state+0x25, E-8 확정). 웹 타구 근사에는 장내 홈런을 만들 길이 없어
+    // 수비 시뮬레이션이 들어올 때까지는 **담장 넘긴 홈런도 그라운드홈런으로 친다** —
+    // 앞서 3루타를 그라운드홈런으로 세던 것보다 원본에 가깝다(원본은 3루타를 절대 안 센다).
+    names.push('그라운드홈런')
     if (runnersBefore === FULL_BASES) names.push('만루홈런')
   }
   if (runsBattedIn > 0) names.push('타점')

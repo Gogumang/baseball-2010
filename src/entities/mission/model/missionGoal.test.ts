@@ -72,8 +72,9 @@ describe('goalNamesFor', () => {
   })
 
   it('홈런은 안타에도 홈런에도 해당한다', () => {
-    expect(goalNamesFor({ kind: '홈런' }, 1)).toEqual(['안타', '홈런', '타점'])
-    expect(goalNamesFor({ kind: '홈런' }, 4, false, 3)).toEqual(['안타', '홈런', '만루홈런', '타점'])
+    // 그라운드홈런은 원본이 홈런 쪽에서 센다 (0xaa0a8, E-8) — 수비 시뮬이 없어 모든 홈런을 함께 센다
+    expect(goalNamesFor({ kind: '홈런' }, 1)).toEqual(['안타', '홈런', '그라운드홈런', '타점'])
+    expect(goalNamesFor({ kind: '홈런' }, 4, false, 3)).toEqual(['안타', '홈런', '그라운드홈런', '만루홈런', '타점'])
   })
 
   it('타점이 있으면 타점 목표가 잡힌다', () => {
