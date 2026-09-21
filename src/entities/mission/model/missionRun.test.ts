@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyOutcome, giveUp, startMission, tick } from '@/entities/mission/model/missionRun'
+import { applyOutcome, giveUp, missionAdvance, startMission, tick } from '@/entities/mission/model/missionRun'
 import { MISSIONS } from '@/shared/config/original/missions'
 
 const 첫걸음 = MISSIONS.find((m) => m.name === '명품 타자의 첫 걸음')!
@@ -79,6 +79,69 @@ describe('applyOutcome', () => {
     applyOutcome(before, { kind: '홈런' })
 
     expect(before.progress.plateAppearances).toBe(0)
+  })
+})
+
+/**
+ * 미션도 사람이 치는 타석이라 원본은 간이 엔진이 아니라 **수비 시뮬레이션**을 돌린다
+ * (0xae24c·0xae3e8). 태그업 0xa9620 → 자동 진루 0xaf918("송구보다 2틱 이상 빠를 때만")
+ * → 2아웃 득점 보류 순서다 (P2 7절 표 · U-02).
+ *
+ * 아래 값은 `runDefensePlay` 가 실제로 돌려준 것을 그대로 못 박은 것이다 — 난수를 넘기지
+ * 않으므로 결정론이다.
+ */
+describe('missionAdvance — 미션 주루도 수비 시뮬레이션이 정한다 (P2 7절 · U-02)', () => {
+  const 주자 = (first: boolean, second: boolean, third: boolean) => ({ first, second, third })
+
+  it('1루타에 2루 주자가 홈까지 온다 — "1루타면 3루 주자만 득점" 고정표가 아니다', () => {
+    expect(missionAdvance(주자(false, true, false), 0, { kind: '안타', bases: 1 })).toEqual({
+      bases: 주자(true, false, false),
+      runsScored: 1,
+      outsAdded: 0,
+    })
+  })
+
+  it('1루타에 1루 주자가 3루까지 간다 (0xaf918 자동 추가 진루)', () => {
+    expect(missionAdvance(주자(true, false, false), 0, { kind: '안타', bases: 1 })).toEqual({
+      bases: 주자(true, false, true),
+      runsScored: 0,
+      outsAdded: 0,
+    })
+  })
+
+  it('2아웃이면 득점이 보류된다 — 3루 주자 뜬공에 점수가 없다', () => {
+    const 뜬공 = { kind: '아웃', detail: '뜬공아웃' } as const
+    expect(missionAdvance(주자(false, false, true), 1, 뜬공).runsScored).toBe(1)
+    expect(missionAdvance(주자(false, false, true), 2, 뜬공).runsScored).toBe(0)
+  })
+
+  it('3루 주자 땅볼은 병살이 되고 점수가 없다 — 희생플라이 보장 근사가 사라졌다', () => {
+    expect(missionAdvance(주자(false, false, true), 0, { kind: '아웃', detail: '땅볼아웃' })).toEqual({
+      bases: 주자(false, false, false),
+      runsScored: 0,
+      outsAdded: 2,
+    })
+  })
+
+  it('삼진·볼넷·홈런은 수비가 개입할 것이 없어 예전 길 그대로다', () => {
+    expect(missionAdvance(주자(false, true, false), 0, { kind: '삼진' })).toEqual({
+      bases: 주자(false, true, false),
+      runsScored: 0,
+      outsAdded: 1,
+    })
+    expect(missionAdvance(주자(false, true, false), 0, { kind: '홈런' })).toEqual({
+      bases: 주자(false, false, false),
+      runsScored: 2,
+      outsAdded: 0,
+    })
+  })
+
+  it('미션 진행에도 이어져 있다 — 1루 주자가 단타에 3루까지 간다', () => {
+    // 고정 진루표였다면 1루 주자는 2루까지만 갔다
+    const 방망이 = MISSIONS.find((m) => m.name === '폭발하는 방망이')!
+    const run = applyOutcome(startMission(방망이), { kind: '안타', bases: 1 })
+
+    expect(run.bases).toEqual({ first: true, second: false, third: true })
   })
 })
 

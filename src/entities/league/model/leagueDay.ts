@@ -1,4 +1,10 @@
-import { LEAGUE_TEAM_COUNT, opponentOf, recordLeagueResult } from '@/entities/league/model/league'
+import {
+  LEAGUE_SIDE_HOME,
+  LEAGUE_TEAM_COUNT,
+  leagueSideOf,
+  opponentOf,
+  recordLeagueResult,
+} from '@/entities/league/model/league'
 import type { League } from '@/entities/league/model/league'
 import { simulateHalfInning, startingMoundOf } from '@/entities/game/model/simulateHalfInning'
 import type {
@@ -51,8 +57,18 @@ export interface LeagueMatchup {
 
 /**
  * 오늘 치르는 다섯 경기. 일정표 0xd89cb 를 팀 번호가 작은 쪽부터 훑어 짝을 짓는다.
- * 원본은 홈/원정을 0xb7844 (일차 패리티 + 22일차 반전)로 정하는데, 승패 기록에는
- * 영향이 없어 여기서는 번호가 작은 쪽을 먼저 공격하게 둔다 (추정).
+ *
+ * 홈/원정은 **원본 `0xb7844` 그대로**다 (R1 항목 2·5 확정, `leagueSideOf`):
+ * ```
+ * r7 = (일차 / 9) & 1 ; 일차 > 22 면 r7 을 한 번 더 뒤집는다
+ * 짝 중 번호가 큰 쪽 = r7, 작은 쪽 = !r7      ; 두 팀은 늘 반대 값
+ * side 1 = 홈(말 공격) · 0 = 원정(초 공격)     ; A목록(+8)이 side 1
+ * ```
+ * 그래서 9일 주기가 한 바퀴 돌 때마다, 그리고 23일째부터 한 번 더 홈/원정이 뒤집힌다.
+ * (예전에는 "번호 작은 팀이 원정" 으로 고정해 두었다 — U-40, 이제 닫혔다.)
+ *
+ * 대진을 채우는 순서(번호 작은 팀부터)는 원본 0xc2a48 첫머리와 같다 — 원본도 팀 0 부터
+ * 훑어 빈 칸을 채우므로 **경기 순서**는 그대로고 바뀌는 것은 어느 쪽이 먼저 공격하느냐다.
  */
 export function matchupsOf(day: number): readonly LeagueMatchup[] {
   const matchups: LeagueMatchup[] = []
@@ -62,7 +78,11 @@ export function matchupsOf(day: number): readonly LeagueMatchup[] {
     const opponent = opponentOf(day, team)
     scheduled.add(team)
     scheduled.add(opponent)
-    matchups.push({ away: team, home: opponent })
+    matchups.push(
+      leagueSideOf(day, team) === LEAGUE_SIDE_HOME
+        ? { away: opponent, home: team }
+        : { away: team, home: opponent },
+    )
   }
   return matchups
 }

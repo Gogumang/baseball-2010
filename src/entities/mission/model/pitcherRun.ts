@@ -7,9 +7,9 @@ import {
   OUTS_PER_INNING,
   recordPitcherOutcome,
 } from '@/entities/mission/model/missionGoal'
-import { advanceRunners, EMPTY_BASES } from '@/entities/game/model/baseState'
+import { EMPTY_BASES } from '@/entities/game/model/baseState'
 import { isHit } from '@/entities/at-bat/model/atBatOutcome'
-import { limitOrNull } from '@/entities/mission/model/missionRun'
+import { limitOrNull, missionAdvance } from '@/entities/mission/model/missionRun'
 import type { MissionRun, MissionStatus } from '@/entities/mission/model/missionRun'
 
 /**
@@ -73,9 +73,15 @@ function brokenConditionsOf(mission: OriginalMission, allowed: PitcherRun['allow
   ].filter((name): name is string => name !== null)
 }
 
-/** 수비 쪽에서 주자·아웃을 옮긴다. 3아웃이면 다음 이닝(주자 없음, 0아웃) */
+/**
+ * 수비 쪽에서 주자·아웃을 옮긴다. 3아웃이면 다음 이닝(주자 없음, 0아웃).
+ *
+ * 인플레이 타구는 타자편 미션과 **같은** `missionAdvance` 로 간다 — 원본 수비 시뮬레이션
+ * (태그업 0xa9620 + 자동 진루 0xaf918 "송구보다 2틱 이상 빠를 때만" + 2아웃 득점 보류)이다.
+ * 실점(`allowed.runs`)·이닝 목표(`totalOuts`)가 이 결과를 그대로 받는다 (P2 7절 · U-02).
+ */
 function advanceDefense(run: PitcherRun, outcome: AtBatOutcome) {
-  const advance = advanceRunners(run.bases, outcome, run.outs)
+  const advance = missionAdvance(run.bases, run.outs, outcome)
   const outs = run.outs + advance.outsAdded
   const isInningOver = outs >= OUTS_PER_INNING
   return {

@@ -206,3 +206,31 @@ describe('이닝 단위 미션 — 노히트노런 · 퍼펙트게임', () => {
     expect(run.outs).toBe(2)
   })
 })
+
+/**
+ * 투수편 미션도 타자편과 **같은** `missionAdvance` 를 탄다 — 원본 수비 시뮬레이션
+ * (태그업 0xa9620 + 자동 진루 0xaf918 + 2아웃 득점 보류, P2 7절 · U-02).
+ * 실점(`allowed.runs`)과 아웃(`totalOuts`)이 그 결과를 그대로 받는다.
+ */
+describe('수비 진행 — 미션도 수비 시뮬레이션이 돌린다 (P2 7절 · U-02)', () => {
+  const 사우팅 = PITCHER_MISSIONS.find((m) => m.name.includes('영혼의 사우팅'))!
+
+  it('2루 주자가 있으면 단타에 1실점이다 — 고정 진루표 근사(0실점)가 아니다', () => {
+    expect(사우팅.start.runners).toEqual({ first: false, second: true, third: false })
+
+    const run = applyPitcherOutcome(startPitcherMission(사우팅), { kind: '안타', bases: 1 })
+
+    expect(run.allowed.runs).toBe(1)
+    expect(run.bases).toEqual({ first: true, second: false, third: false })
+  })
+
+  it('1·3루 땅볼은 병살이 되어 아웃 두 개가 쌓이고 3루 주자는 못 들어온다', () => {
+    const 챔피언 = PITCHER_MISSIONS.find((m) => m.name === '최강의 챔피언')!
+    expect(챔피언.start.runners).toEqual({ first: true, second: false, third: true })
+
+    const run = applyPitcherOutcome(startPitcherMission(챔피언), { kind: '아웃', detail: '땅볼아웃' })
+
+    expect(run.totalOuts).toBe(2)
+    expect(run.allowed.runs).toBe(0)
+  })
+})

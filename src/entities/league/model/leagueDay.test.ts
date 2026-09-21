@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { matchupsOf, playLeagueDay, simulateLeagueGame } from '@/entities/league/model/leagueDay'
-import { EMPTY_LEAGUE, LEAGUE_TEAM_COUNT, opponentOf } from '@/entities/league/model/league'
+import {
+  EMPTY_LEAGUE,
+  LEAGUE_SIDE_HOME,
+  LEAGUE_TEAM_COUNT,
+  leagueSideOf,
+  opponentOf,
+} from '@/entities/league/model/league'
 import { BATTERS_PER_TEAM, PITCHERS_PER_TEAM, startingPitcherOf } from '@/entities/team/model/teamRoster'
 import { rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
 import { EMPTY_LEAGUE_PLAYER_STATS } from '@/entities/league/model/leaguePlayerStats'
@@ -36,9 +42,66 @@ describe('matchupsOf — 일정표 0xd89cb 로 짠 하루 다섯 경기', () => 
     }
   })
 
-  it('9일마다 일정이 되풀이된다 (라운드로빈 9라운드 × 5순환)', () => {
-    expect(matchupsOf(9)).toEqual(matchupsOf(0))
-    expect(matchupsOf(44)).toEqual(matchupsOf(8))
+  it('9일마다 **짝**이 되풀이된다 (라운드로빈 9라운드 × 5순환) — 홈/원정은 따로 돈다', () => {
+    const 짝 = (day: number) =>
+      matchupsOf(day)
+        .map(({ away, home }) => [away, home].sort((a, b) => a - b).join('-'))
+        .sort()
+
+    expect(짝(9)).toEqual(짝(0))
+    expect(짝(44)).toEqual(짝(8))
+  })
+
+  /**
+   * `0xb7844` — r7 = (일차/9)&1, 일차 > 22 면 한 번 더 뒤집기, 짝 중 작은 번호가 `!r7`(1=홈).
+   * 아래 숫자는 실제로 돌려 받은 값 그대로다 (R1 항목 2·5).
+   */
+  describe('홈/원정 — 0xb7844 의 9일 주기 패리티 + 22일차 반전', () => {
+    it('같은 짝 0–1 의 홈이 날짜마다 뒤집힌다', () => {
+      // 일차   0  9 18 27 36
+      // r7     0  1  0  1  0   ← (일차/9)&1
+      // >22     -  -  -  ✔  ✔   ← 한 번 더 반전
+      // 홈      0  1  0  0  1
+      const 홈 = (day: number) => matchupsOf(day)[0].home
+      expect([홈(0), 홈(9), 홈(18), 홈(27), 홈(36)]).toEqual([0, 1, 0, 0, 1])
+    })
+
+    it('첫날 다섯 경기는 번호 작은 쪽이 홈이다', () => {
+      expect(matchupsOf(0)).toEqual([
+        { away: 1, home: 0 },
+        { away: 3, home: 2 },
+        { away: 5, home: 4 },
+        { away: 7, home: 6 },
+        { away: 9, home: 8 },
+      ])
+    })
+
+    it('9일차는 같은 짝이 그대로 뒤집힌다', () => {
+      expect(matchupsOf(9)).toEqual([
+        { away: 0, home: 1 },
+        { away: 2, home: 3 },
+        { away: 4, home: 5 },
+        { away: 6, home: 7 },
+        { away: 8, home: 9 },
+      ])
+    })
+
+    it('22일차와 23일차 사이에서 한 번 더 뒤집힌다 (`d > 0x16`)', () => {
+      // 22 와 31 은 r7 이 서로 다른데 22일차 반전이 31 에만 걸려 결과가 같아진다
+      expect(matchupsOf(22)[0]).toEqual({ away: 5, home: 0 })
+      expect(matchupsOf(31)[0]).toEqual({ away: 5, home: 0 })
+      // 23 일차(같은 라운드 아님)는 작은 번호가 원정이다
+      expect(matchupsOf(23)[0]).toEqual({ away: 0, home: 6 })
+    })
+
+    it('짝의 두 팀은 늘 반대 편이다 — 한쪽이 홈이면 다른 쪽은 원정', () => {
+      for (let day = 0; day < 45; day += 1) {
+        for (const { away, home } of matchupsOf(day)) {
+          expect(leagueSideOf(day, home)).toBe(LEAGUE_SIDE_HOME)
+          expect(leagueSideOf(day, away)).not.toBe(LEAGUE_SIDE_HOME)
+        }
+      }
+    })
   })
 })
 

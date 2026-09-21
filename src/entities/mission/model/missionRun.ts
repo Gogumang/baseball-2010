@@ -3,7 +3,10 @@ import type { OriginalMission } from '@/shared/config/original/missions'
 import { createProgress, isCleared, recordOutcome, recordSteal } from '@/entities/mission/model/missionGoal'
 import type { MissionProgress } from '@/entities/mission/model/missionGoal'
 import { advanceRunners, runnerCountOf } from '@/entities/game/model/baseState'
-import type { BaseState } from '@/entities/game/model/baseState'
+import type { AdvanceResult, BaseState } from '@/entities/game/model/baseState'
+import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
+import { isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
+import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
 
 /**
  * 미션 한 판의 진행 상태.
@@ -53,6 +56,35 @@ export function startMission(mission: OriginalMission): MissionRun {
 }
 
 /**
+ * 미션 타석 하나의 주자·아웃·득점을 정한다.
+ *
+ * 미션도 **사람이 치는 타석**이라 원본은 간이 엔진(0xc11f0)이 아니라 수비 시뮬레이션을 돌린다
+ * (0xae24c·0xae3e8). 그래서 인플레이 타구는 타자편·팀경기·투수편과 **같은 진행기**
+ * `features/defense-play/runDefensePlay` 로 넘긴다 — 태그업 0xa9620 으로 모든 주자의 요구 루가
+ * 원래 루가 되고, 자동 진루 0xaf918 이 **수비 송구보다 2틱 이상 빠를 때만** 다음 루로 보내며,
+ * 2아웃 득점 보류(메시지 0x13)까지 그 안에서 돈다 (P2 7절 · U-02).
+ *
+ * 그래서 `baseState` 의 두 근사 — "3루 주자 + 2아웃 전 뜬공이면 무조건 1점"(희생플라이 보장)과
+ * "안타 진루 고정" — 은 미션에서도 더 이상 쓰이지 않는다. 삼진·볼넷·홈런은 수비가 개입할 것이
+ * 없어 예전 길 그대로다.
+ *
+ * ⚠️ 어느 원본 패턴이었는지는 미션 타석 쪽이 아직 안 넘겨 주므로 `representativePatternOf` 로
+ * 같은 결과를 내는 원본 패턴 하나를 골라 궤적을 만든다 — **고르는 규칙은 근사다**
+ * (타자편 `applyPlayerOutcome` 도 패턴을 못 받으면 같은 길을 쓴다).
+ * 난수는 넘기지 않는다 — 펌블·악송구·필살수비 굴림을 돌리지 않아 결정론이고, 미션의
+ * 기존 씨앗 순서도 건드리지 않는다.
+ */
+export function missionAdvance(bases: BaseState, outs: number, outcome: AtBatOutcome): AdvanceResult {
+  if (!isBattedBallInPlay(outcome)) return advanceRunners(bases, outcome, outs)
+  return runDefensePlay({
+    outcome,
+    trajectory: battedBallTrajectory(representativePatternOf(outcome)),
+    bases,
+    outs,
+  }).advance
+}
+
+/**
  * 공격 결과로 주자·아웃을 옮긴다. 3아웃이 되면 미션 시작 상황으로 되돌린다 —
  * 미션은 한 이닝을 넘기지 않는 것으로 본다 (추정).
  */
@@ -60,7 +92,7 @@ export function advanceSituation(
   run: Pick<MissionRun, 'mission' | 'bases' | 'outs'>,
   outcome: AtBatOutcome,
 ): { bases: BaseState; outs: number; runsScored: number } {
-  const advance = advanceRunners(run.bases, outcome, run.outs)
+  const advance = missionAdvance(run.bases, run.outs, outcome)
   const outs = run.outs + advance.outsAdded
   if (outs >= OUTS_PER_INNING) {
     return { bases: run.mission.start.runners, outs: run.mission.start.outs, runsScored: 0 }

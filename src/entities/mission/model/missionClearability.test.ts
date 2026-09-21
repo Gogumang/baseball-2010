@@ -214,9 +214,16 @@ describe('판정 규칙', () => {
     expect(run.status).toBe('실패')
   })
 
-  it('투수 5번은 2루 주자가 있어 단타는 버티지만 2루타(실점)는 실점 한도 1 에 닿아 실패다', () => {
+  /**
+   * ⚠️ 예전에는 "단타는 버틴다" 였다 — `baseState` 의 **고정 진루표 근사**(1루타면 3루 주자만
+   * 득점)로 2루 주자가 3루까지만 갔기 때문이다. 이제 미션도 수비 시뮬레이션을 돌리므로
+   * 자동 진루 0xaf918 이 2루 주자를 홈까지 불러들인다 (P2 7절 "1루타에 2루 주자 득점").
+   * 실점 한도 1 짜리 미션이라 그 자리에서 실패다. 씨앗이 아니라 **상태로 못 박았다**.
+   */
+  it('투수 5번은 2루 주자가 있어 단타에도 1점을 내준다 — 실점 한도 1 에 닿아 실패다', () => {
     const afterSingle = applyPitcherOutcome(startPitcherMission(findMission('투수', 5)), SINGLE)
-    expect(afterSingle.status).toBe('진행중')
+    expect(afterSingle.allowed.runs).toBe(1)
+    expect(afterSingle.status).toBe('실패')
 
     expect(applyPitcherOutcome(startPitcherMission(findMission('투수', 5)), DOUBLE).status).toBe('실패')
   })
