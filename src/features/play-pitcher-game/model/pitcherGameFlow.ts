@@ -35,10 +35,10 @@ import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
 import {
   PITCHER_EDITION_MODE,
   RELIEF_ENTRY_INNING_INDEX,
-  ROTATION_SIZE,
   START_ASSIGNMENT,
   isMyStartDay,
   reliefNeverEnteredOf,
+  rotationSlotOf,
   startAssignmentOf,
 } from '@/entities/pitcher-career/model/pitcherRotation'
 import { EMPTY_MANAGER_HOOK_FLAGS, judgeManagerHook } from '@/entities/pitcher-career/model/managerHook'
@@ -285,12 +285,12 @@ function ourOtherPitcherIndex(options: PitcherGameOptions): number {
     isPostseason: options.isPostseason,
   })
   if (assignment >= 1) return assignment
-  return ((options.dayCounter % ROTATION_SIZE) + ROTATION_SIZE) % ROTATION_SIZE
+  return rotationSlotOf(options.dayCounter)
 }
 
 /** 상대 팀 선발 — 하루 한 칸씩 도는 4인 로테이션의 0번 (0xb8c80 → 0xb5ca8, S5 U-16) */
 function opponentPitcherIndex(options: PitcherGameOptions): number {
-  return ((options.dayCounter % ROTATION_SIZE) + ROTATION_SIZE) % ROTATION_SIZE
+  return rotationSlotOf(options.dayCounter)
 }
 
 function quickPitcherAt(teamId: number, index: number) {

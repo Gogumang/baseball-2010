@@ -53,8 +53,20 @@ describe('경기 진행기와 돌발미션', () => {
   })
 
   it('돌발이 없던 타석은 판정도 없다', () => {
+    // 이 테스트가 보려는 것은 **뜬 돌발이 없으면 판정도 없다** 이다.
+    // 씨앗 운을 타지 않게 상태로 못 박는다 — 예전에는 씨앗 하나에 기대고 있어 60개 중 42개에서
+    // 깨졌다(선발을 로테이션으로 바꾸며 난수 스트림이 밀리자 드러났다). 이 타석에서 새 돌발이
+    // 뜨면 그 자리에서 판정이 날 수 있으므로, 경기당 한 번(obj+0x229)을 이미 써 버린 상태로
+    // 두어 새로 뜨지 못하게 하고, `startGame` 이 동료 타석에서 남긴 판정도 지운다.
     const progress = startGame(씨앗(20100901))
-    const 돌발없음 = { ...progress, burst: progress.burst === null ? null : { ...progress.burst, current: null } }
+    const 돌발없음 = {
+      ...progress,
+      burst:
+        progress.burst === null
+          ? null
+          : { ...progress.burst, current: null, triggeredCount: MAXIMUM_BURSTS_PER_GAME },
+      lastBurstResolution: null,
+    }
 
     const after = applyPlayerOutcome(돌발없음, { kind: '삼진' }, 씨앗(3))
 

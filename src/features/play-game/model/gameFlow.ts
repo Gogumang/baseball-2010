@@ -14,7 +14,8 @@ import {
 import type { GameState, PlayerSide } from '@/entities/game/model/gameState'
 import { simulateQuickAtBat } from '@/entities/game/model/quickAtBat'
 import { simulateHalfInning } from '@/entities/game/model/simulateHalfInning'
-import { batterAt, rollStartingPitcherIndex, startingPitcherOf } from '@/entities/team/model/teamRoster'
+import { batterAt, startingPitcherOf } from '@/entities/team/model/teamRoster'
+import { rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
 import { opponentOf } from '@/entities/league/model/league'
 import type { GameSummary } from '@/entities/game/model/gameSummary'
 import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
@@ -55,9 +56,11 @@ export interface GameProgress {
   /** 이번 경기에 등판한 마선수. 없으면 평범한 투수다. */
   readonly aceOpponent: AcePlayer | null
   /**
-   * 양 팀 선발 투수의 로스터 칸 — 경기를 세울 때 한 번만 뽑는다 (0x3107a·0x31090, S13 1-4b).
-   * 원본은 투수 0번과 이 칸을 **레코드째 맞바꿔** 0번이 선발이 되지만, 웹판 로스터는 붙박이
-   * 표라 바꿀 수 없어 칸 번호를 경기 내내 들고 다닌다.
+   * 양 팀 선발 투수의 로스터 칸 — 경기를 세울 때 한 번만 정한다.
+   * 이 화면은 나만의리그 **타자편(모드 4)** 이라 원본 경기 준비 `0x1c46c` 가 두 팀 모두
+   * `0xb8c80`(→ `0xb5ca8`) 로 4인 로테이션을 한 칸 돌린다 (P1 1-1) — 무작위가 아니다.
+   * 원본은 투수 0번과 이 칸을 **레코드째 섞어** 0번이 선발이 되지만, 웹판 로스터는 붙박이
+   * 표라 바꿀 수 없어 칸 번호를 경기 내내 들고 다닌다 (`rotationSlotOf` 주석 — **근사다**).
    */
   readonly ourStartingPitcherIndex: number
   readonly opponentStartingPitcherIndex: number
@@ -147,6 +150,11 @@ export function startGame(
   // 사람이 맡는 측 — 원본 설정 레코드 +8 (0x30f44). 일반모드는 반반이지만 나만의리그 화면은
   // 늘 후공으로 돌려 왔으므로 기본값만 측 1 로 두고 박아 두지는 않는다.
   playerSide: PlayerSide = PLAYER_SIDE_LAST_BAT,
+  /**
+   * 리그 날짜 카운터 g (`리그+0x32` = `시즌+0xb2`, 커리어의 `gamesPlayed`) — 4인 로테이션이 본다.
+   * 안 넘기면 0 = 시즌 첫 경기라 두 팀 모두 로스터 0번이 선발이다 (원본 `g == 0` 이면 안 돌린다).
+   */
+  dayCounter = 0,
 ): GameProgress {
   const initial: GameProgress = {
     game: createGame(battingOrder - 1, playerSide),
@@ -154,9 +162,10 @@ export function startGame(
     opponentTeamId,
     // 정규 경기에 마선수가 무작위로 나오는 코드는 원본에 없다 — 마선수 대결은 이벤트 match 명령으로만 (누락 탐색 8차)
     aceOpponent: null,
-    // 원본은 AI 팀 → 사람 팀 차례로 뽑는다 (0x31088 → 0x3109e)
-    opponentStartingPitcherIndex: rollStartingPitcherIndex(random),
-    ourStartingPitcherIndex: rollStartingPitcherIndex(random),
+    // 모드 4 는 경기 준비 0x1c46c 에서 **두 팀 모두** 0xb8c80 로 4인 로테이션을 한 칸 돌린다
+    // (P1 1-1 의 `else (모드 4): if g != 0: 0xb8c80(내 팀)` + 그 앞줄의 상대 팀). 무작위가 아니다.
+    opponentStartingPitcherIndex: rotationSlotOf(dayCounter),
+    ourStartingPitcherIndex: rotationSlotOf(dayCounter),
     myStats: EMPTY_SEASON_STATS,
     popularityPoints: 0,
     doublePlays: 0,

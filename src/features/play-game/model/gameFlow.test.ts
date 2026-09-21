@@ -315,3 +315,32 @@ describe('사람이 선공일 때 (측 0) — 설정 레코드 +8 (0x30f44)', ()
     expect(progress.myStats.plateAppearances).toBeGreaterThan(0)
   })
 })
+
+describe('나만의리그 타자편(모드 4) 선발은 4인 로테이션이다 (0x1c46c → 0xb8c80)', () => {
+  const 선발 = (dayCounter: number, seed: number) =>
+    startGame(createSeededRandom(seed), 0, 9, opponentOf(dayCounter, 0), PLAYER_SIDE_FIRST_BAT, dayCounter)
+
+  it('네 경기를 연달아 치르면 선발이 0 → 1 → 2 → 3 으로 돌고 다섯째 날 다시 0 이다', () => {
+    const 칸들 = [0, 1, 2, 3, 4].map((day) => 선발(day, 20100901).ourStartingPitcherIndex)
+
+    expect(칸들).toEqual([0, 1, 2, 3, 0])
+  })
+
+  it('양 팀이 같이 돌고, 씨앗이 달라도 같은 칸이다 — 무작위가 아니다', () => {
+    for (const day of [0, 1, 2, 3, 6]) {
+      const 갑 = 선발(day, 1)
+      const 을 = 선발(day, 999)
+
+      expect(갑.opponentStartingPitcherIndex, `${day}일차`).toBe(갑.ourStartingPitcherIndex)
+      expect(을.ourStartingPitcherIndex).toBe(갑.ourStartingPitcherIndex)
+      expect(을.opponentStartingPitcherIndex).toBe(갑.opponentStartingPitcherIndex)
+    }
+  })
+
+  it('날짜를 안 넘기면 시즌 첫 경기(g == 0)와 같아 두 팀 다 로스터 0번이다', () => {
+    const progress = startGame(createSeededRandom(20100901))
+
+    expect(progress.ourStartingPitcherIndex).toBe(0)
+    expect(progress.opponentStartingPitcherIndex).toBe(0)
+  })
+})

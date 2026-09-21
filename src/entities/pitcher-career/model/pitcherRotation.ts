@@ -36,6 +36,25 @@ export function advanceRotation<T>(pitchers: readonly T[]): T[] {
   return next
 }
 
+/**
+ * 날짜 카운터 g 로 셈하는 **오늘의 선발 칸**.
+ *
+ * 원본은 `0xb5ca8` 로 로스터 레코드를 하루 한 칸씩 **실제로 섞고**(영구) 늘 0번을 선발로 세운다
+ * (경기용 팀 객체 `0xb891c` 가 `team[i] = i`). 웹판 로스터는 `shared/config/original/roster.ts`
+ * 의 **붙박이 표**라 레코드를 되쓸 수 없다. 그래서 섞는 대신 **칸 번호를 셈해서 들고 다닌다**
+ * — **근사다**.
+ *
+ * 리그는 10팀이 날마다 다섯 경기를 모두 치르므로(일정표 0xd89cb, `league.ts`) 어느 팀이든
+ * 하루에 딱 한 칸씩 돈다. 그래서 g 번 돌린 로스터의 0번은 원래 로스터의 `g % 4` 번과 같다.
+ * 원본도 포스트시즌 CPU 경기에서 같은 식 `k = (리그+0x32) % 4` 를 쓴다 (P1 1-0).
+ *
+ * 근사가 원본과 갈리는 자리는 하나뿐이다: 원본은 섞인 로스터가 저장에 남아 **투수편 맞바꿈
+ * (0xa4f60)·새 시즌 0↔k(0x1b684) 같은 다른 뒤섞임과 겹쳐 쌓이지만**, 웹은 늘 g 하나로만 셈한다.
+ */
+export function rotationSlotOf(dayCounter: number): number {
+  return ((Math.trunc(dayCounter) % ROTATION_SIZE) + ROTATION_SIZE) % ROTATION_SIZE
+}
+
 /** `0xb8c94(team, 0, k)` → `0xb5e98` — 0번과 k번 레코드를 통째로 맞바꾼다 */
 export function swapWithStarter<T>(pitchers: readonly T[], slot: number): T[] {
   if (slot <= 0 || slot >= pitchers.length) return [...pitchers]

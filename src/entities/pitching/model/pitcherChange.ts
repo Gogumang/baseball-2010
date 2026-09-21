@@ -57,7 +57,13 @@ export interface PitcherChangeInput extends MoundPitcherCounters {
 export interface PitcherChangeDecision {
   readonly replace: boolean
   /**
-   * "마무리 상황" 표시. 새 투수를 **벤치 마지막**(0xac360 이 참일 때)에서 고를지를 가른다.
+   * "마무리 상황" 표시. 새 투수를 어떻게 고를지를 가른다 (0xac5d8~0xac61c):
+   *   - 마무리 상황이 **아니면** 0xac360 을 굴려, 참이면 벤치 **마지막**에서 고른다
+   *   - 마무리 상황이면 굴리지 않고 곧장 0xabfcc(`chooseReplacementPitcher`) 로 간다
+   *     (이때 0xabfcc 의 다섯째 인자 = 마무리 플래그 → `lateInningFlag`)
+   * ⚠️ E-6 4절 3c 가 이 방향을 **거꾸로** 적었던 것을 CORRECTIONS 가 정정했다 ("E: 새 투수는
+   * … 방향이 반대", V3-E "새 투수 고르기 방향이 반대").
+   *
    * ⚠️ 원본 문서(E-6, 유력)가 "A>1 이면 교체 / 9회 이후엔 여기에 더해 마무리 상황을 표시" 로만
    * 적혀 있어, 마무리 상황 자체가 교체를 부르는지는 알 수 없다 — 여기서는 **표시만** 한다.
    */
@@ -127,6 +133,8 @@ export function judgePitcherChange(input: PitcherChangeInput): PitcherChangeDeci
 /**
  * 마무리 투입 굴림 `0xac360` — 참이면 새 투수를 **벤치 마지막**에서 고른다.
  * 확률은 `d_level.dat[0x36..0x3b]` = 45·35·50·60·60·30 % (P7 E2 확정).
+ *
+ * ⚠️ 이 굴림은 **마무리 상황이 아닐 때만** 돈다 (V3-E 정정) — `PitcherChangeDecision.saveSituation` 참고.
  */
 export const CLOSER_ROLL_PERCENTS: readonly number[] = [45, 35, 50, 60, 60, 30]
 

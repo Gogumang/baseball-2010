@@ -19,6 +19,7 @@ import {
   isPitchTurn,
   ourPitcherStats,
   pitchSlotsFor,
+  replacementPitcherIndexOf,
   runAutoProgress,
   startTeamGame,
   stealableBases,
@@ -350,5 +351,110 @@ describe('`#` 교체 화면 진입 조건 (0x498d4 의 # 가지)', () => {
     const { progress } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
 
     expect(canOpenPitcherChange(progress)).toBe(false)
+  })
+})
+
+describe('시즌모드 선발은 4인 로테이션이다 (0x6548 → 0xb8c80 → 0xb5ca8)', () => {
+  const 선발 = (dayCounter: number) => {
+    // 씨앗을 바꿔도 같은 칸이어야 한다 — 시즌모드는 무작위로 뽑지 않는다
+    const 갑 = 시작({ mode: 2, dayCounter }, 1).progress
+    const 을 = 시작({ mode: 2, dayCounter }, 12345).progress
+    expect(을.ourPitcherIndex, '씨앗이 달라도 같은 선발').toBe(갑.ourPitcherIndex)
+    expect(을.opponentPitcherIndex).toBe(갑.opponentPitcherIndex)
+    return { ours: 갑.ourPitcherIndex, opponent: 갑.opponentPitcherIndex }
+  }
+
+  it('네 경기를 연달아 치르면 선발이 0 → 1 → 2 → 3 으로 돌고 다섯째 날 다시 0 이다', () => {
+    expect([0, 1, 2, 3, 4].map((day) => 선발(day).ours)).toEqual([0, 1, 2, 3, 0])
+  })
+
+  it('양 팀이 같이 돈다 — 원본은 경기 준비에서 두 팀 모두 한 칸 돌린다', () => {
+    for (const day of [0, 1, 2, 3, 5, 9]) {
+      const { ours, opponent } = 선발(day)
+      expect(opponent, `${day}일차`).toBe(ours)
+    }
+  })
+
+  it('날짜를 안 넘기면 시즌 첫 경기(g == 0)와 같아 두 팀 다 로스터 0번이다', () => {
+    const { progress } = 시작({ mode: 2 })
+
+    expect(progress.ourPitcherIndex).toBe(0)
+    expect(progress.opponentPitcherIndex).toBe(0)
+  })
+
+  it('일반모드(1)·대전(8)은 원본대로 앞 4명 중 **무작위** 다 (0x3107a·0x31090)', () => {
+    const 칸들 = new Set<number>()
+    for (let seed = 1; seed <= 60; seed += 1) {
+      const { progress } = 시작({ mode: 1, dayCounter: 0 }, seed)
+      칸들.add(progress.ourPitcherIndex)
+      칸들.add(progress.opponentPitcherIndex)
+    }
+
+    expect(칸들.size, '무작위라면 0~3 이 두루 나온다').toBeGreaterThan(1)
+    expect([...칸들].every((index) => index >= 0 && index < 4)).toBe(true)
+
+    const 대전 = 시작({ mode: 8, dayCounter: 3 }, 20100901).progress
+    const 대전2 = 시작({ mode: 8, dayCounter: 3 }, 777).progress
+    // 날짜를 넘겨도 로테이션을 안 탄다 — 씨앗이 다르면 갈린다
+    expect(
+      대전.ourPitcherIndex !== 대전2.ourPitcherIndex ||
+        대전.opponentPitcherIndex !== 대전2.opponentPitcherIndex,
+    ).toBe(true)
+  })
+})
+
+describe('새 투수 고르기 방향 (0xac5d8, V3-E 정정)', () => {
+  const 벤치 = [1, 2, 3, 5, 7]
+  const 상황 = {
+    inningIndex: 8,
+    lead: 1,
+    runnerCount: 0,
+    currentStamina: 5_000,
+  } as const
+
+  it('마무리 상황이면 굴리지 않고 0xabfcc 로 간다 — 벤치 마지막이 아니다', () => {
+    // 굴림 칸 1(9회)은 45% 라 씨앗을 여럿 훑어도 **한 번도** 벤치 마지막이 나오면 안 된다
+    for (let seed = 1; seed <= 40; seed += 1) {
+      const picked = replacementPitcherIndexOf(
+        벤치,
+        { ...상황, saveSituation: true },
+        createSeededRandom(seed),
+      )
+      expect(picked, `씨앗 ${seed}`).not.toBe(벤치[벤치.length - 1])
+    }
+  })
+
+  it('마무리 상황이 **아닐 때** 굴려서 참이면 벤치 마지막을 올린다', () => {
+    const 고른칸 = new Set<number>()
+    for (let seed = 1; seed <= 40; seed += 1) {
+      고른칸.add(
+        replacementPitcherIndexOf(벤치, { ...상황, saveSituation: false }, createSeededRandom(seed)),
+      )
+    }
+
+    expect(고른칸.has(벤치[벤치.length - 1]), '굴림이 참인 씨앗에서는 벤치 마지막').toBe(true)
+    expect(고른칸.size, '거짓인 씨앗에서는 0xabfcc 가 고른 다른 칸').toBeGreaterThan(1)
+  })
+
+  it('마무리 상황이면 난수를 아예 쓰지 않는다 (0xac360 을 건너뛴다)', () => {
+    let 굴린횟수 = 0
+    const 세는난수: RandomPort = {
+      next: () => {
+        굴린횟수 += 1
+        return 0.5
+      },
+      nextInRange: (from: number, to: number) => {
+        굴린횟수 += 1
+        return from + (to - from) / 2
+      },
+      pick: <T,>(candidates: readonly T[]) => {
+        굴린횟수 += 1
+        return candidates[0]
+      },
+    }
+
+    replacementPitcherIndexOf(벤치, { ...상황, saveSituation: true }, 세는난수)
+
+    expect(굴린횟수).toBe(0)
   })
 })

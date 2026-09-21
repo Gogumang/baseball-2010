@@ -14,6 +14,7 @@ import { advanceRunners } from '@/entities/game/model/baseState'
 import { attemptSteal, canStealFrom } from '@/entities/game/model/steal'
 import { playQuickAtBat } from '@/entities/game/model/quickAtBat'
 import { rollStartingPitcherIndex } from '@/entities/team/model/teamRoster'
+import { rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
 import { applyOpponentAtBat } from '@/features/play-pitcher-game/model/pitcherGameState'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
@@ -136,6 +137,12 @@ export interface TeamGameOptions {
   readonly settings?: MatchProgressSettings
   /** 시즌 팀 질병·사기·코치 (모드 2에서만 쓰인다) */
   readonly season?: SeasonTeamCondition
+  /**
+   * 리그 날짜 카운터 g (`리그+0x32` = `시즌+0xb2` = 시즌 레코드의 `games`) — **모드 2 에서만** 본다.
+   * 시즌모드 경기 직전 화면 `0x6548` 이 `0xb8c80` 으로 양 팀 4인 로테이션을 한 칸 돌리는 자리다
+   * (R13 4절). 안 넘기면 0 = 시즌 첫 경기라 두 팀 모두 로스터 0번이 선발이다.
+   */
+  readonly dayCounter?: number
   /** 팀별 능력치 네 칸. 안 넘기면 XlsTEAM_DATA 값 */
   readonly teamAbilities?: readonly (readonly number[])[]
   /** 내 팀 타순 칸별 수비 자리·보직 — 보직 불일치 −20% 입력 (시즌모드 전용) */
@@ -186,7 +193,8 @@ export interface TeamGameProgress {
   /** 상대 타순 커서 0~8 */
   readonly opponentOrderIndex: number
   /**
-   * **지금 마운드에 선** 투수의 로스터 칸. 경기를 세울 때 선발을 뽑고(0x3107a·0x31090),
+   * **지금 마운드에 선** 투수의 로스터 칸. 경기를 세울 때 선발을 정하고(`startingPitcherSlotsOf`
+   * — 모드 1·8·9 는 무작위 0x3107a·0x31090, 모드 2 는 4인 로테이션 0xb8c80),
    * 그 뒤로는 CPU 교체 AI(0xac428)나 `#` 메뉴(R4 1b)가 이 칸을 바꾼다 (교체 실행 0xaf09c).
    */
   readonly ourPitcherIndex: number
@@ -225,16 +233,39 @@ export interface TeamGameProgress {
 
 /* ── 시작 ────────────────────────────────────────────────────────────────────── */
 
+/**
+ * 이 경기의 양 팀 선발 칸 — **모드마다 원본이 다르다**.
+ *
+ *   - 모드 1 일반 · 8·9 대전 (`0x30f20`·`0x30be0`): 경기를 세울 때 `0xb8c94(팀, 0, bfa54(0,4))`
+ *     로 **로스터 앞 4명 중 무작위** (S13 1-4b 확정). AI 팀 → 사람 팀 차례로 뽑는다.
+ *   - 모드 2 시즌: 경기 직전 화면 `0x6548` 이 `0xb8c80` → `0xb5ca8` 로 **양 팀 4인 로테이션**을
+ *     한 칸 돌린다 (R13 4절 · P1 1-1 과 같은 규칙). 무작위가 아니다.
+ *
+ * 로테이션 쪽은 붙박이 로스터를 섞을 수 없어 칸 번호로 셈한다 — `rotationSlotOf` 주석(**근사다**).
+ */
+function startingPitcherSlotsOf(
+  options: TeamGameOptions,
+  random: RandomPort,
+): { readonly opponent: number; readonly ours: number } {
+  if (options.mode === TEAM_GAME_MODE.시즌) {
+    const slot = rotationSlotOf(options.dayCounter ?? 0)
+    return { opponent: slot, ours: slot }
+  }
+  // 원본은 AI 팀 → 사람 팀 차례로 뽑는다 (0x31088 → 0x3109e)
+  const opponent = rollStartingPitcherIndex(random)
+  return { opponent, ours: rollStartingPitcherIndex(random) }
+}
+
 export function startTeamGame(options: TeamGameOptions, random: RandomPort): TeamGameProgress {
+  const startingSlots = startingPitcherSlotsOf(options, random)
   const initial: TeamGameProgress = {
     options,
     // 타순 칸은 "사람이 서는 자리" 가 아니다 — 팀 경기는 아홉 칸을 모두 사람이 친다
     game: createGame(-1, options.playerSide),
     atBat: createAtBat(),
     opponentOrderIndex: 0,
-    // 원본은 AI 팀 → 사람 팀 차례로 뽑는다 (0x31088 → 0x3109e)
-    opponentPitcherIndex: rollStartingPitcherIndex(random),
-    ourPitcherIndex: rollStartingPitcherIndex(random),
+    opponentPitcherIndex: startingSlots.opponent,
+    ourPitcherIndex: startingSlots.ours,
     ourUsedPitchers: [],
     opponentUsedPitchers: [],
     opponentStamina: FULL_STAMINA,
@@ -740,31 +771,82 @@ function judgeAutoPitcherChange(
   })
   if (!decision.replace) return progress
 
-  // 마무리 상황이면 0xac360 을 굴려 참이면 벤치 **마지막**, 아니면 0xabfcc 로 고른다
-  const closerFirst =
-    decision.saveSituation &&
-    rollsCloser(
-      {
-        inningIndex: game.inning - 1,
-        lead: defenseScore - offenseScore,
-        runnerCount: runnerCountOf(game.bases),
-        // 팀 경기는 한 팀을 사람이 잡으므로 "두 팀 다 CPU" 가 아니다 (0xb6c20)
-        bothTeamsAreCpu: false,
-      },
-      random,
-    )
-  const next = closerFirst
-    ? bench[bench.length - 1]
-    : chooseReplacementPitcher(
-        bench.map((index) => ({ index })),
-        { inningIndex: game.inning - 1, lateInningFlag: decision.saveSituation, currentStamina: stamina },
-      )
+  const next = replacementPitcherIndexOf(
+    bench,
+    {
+      saveSituation: decision.saveSituation,
+      // 원본 이닝은 0-기준이다 (state+0x6b)
+      inningIndex: game.inning - 1,
+      lead: defenseScore - offenseScore,
+      runnerCount: runnerCountOf(game.bases),
+      currentStamina: stamina,
+    },
+    random,
+  )
   if (next < 0) return progress
 
   return appendLog(
     applyPitcherChange(progress, defendingIsOurs, next),
     `${game.inning}회${game.half} ${defendingIsOurs ? '우리' : '상대'} 투수 교체 — ${current + 1}번 → ${next + 1}번`,
     false,
+  )
+}
+
+export interface ReplacementPickInput {
+  /** `judgePitcherChange` 가 세운 "마무리 상황" 표시 */
+  readonly saveSituation: boolean
+  /** **0-기준** 이닝 (state+0x6b) */
+  readonly inningIndex: number
+  /** 수비 팀 점수 − 공격 팀 점수 */
+  readonly lead: number
+  readonly runnerCount: number
+  /** 지금 마운드에 선 투수의 스태미나 */
+  readonly currentStamina: number
+}
+
+/**
+ * 새 투수 고르기 `0xac5d8~0xac61c`.
+ *
+ * ```
+ * 0xb8a8d(team, 0) 이 참이고 **마무리 상황이 아니면**  →  0xac360 굴림
+ *     참   → 벤치 **마지막**(벤치 수 − 1)
+ *     거짓 → 벤치 ≤ 1 이면 0번, 아니면 0xabfcc
+ * 마무리 상황이거나 0xb8a8d 가 거짓이면  →  0xabfcc(…, [sp] = 마무리 플래그)
+ * ```
+ *
+ * ⚠️ E-defense-rules 4절 3c 가 이 방향을 **거꾸로**("마무리 상황이면 벤치 마지막") 적었던 것을
+ * CORRECTIONS 가 정정했다 — V3-E "❌ 새 투수 고르기 방향이 반대". 여기서는 정정 쪽이다.
+ *
+ * ⚠️ `0xb8a8d(team, 0)` 이 무엇을 보는지는 해독 문서에 없어 **늘 참으로 본다** — **근사다**.
+ * "벤치 ≤ 1 이면 0번" 갈래도 따로 두지 않았다 — 후보가 하나뿐이면 `chooseReplacementPitcher`
+ * 가 그 하나를 돌려주므로 결과가 같다(벤치가 비면 `judgePitcherChange` 가 이미 안 바꾼다).
+ */
+export function replacementPitcherIndexOf(
+  bench: readonly number[],
+  input: ReplacementPickInput,
+  random: RandomPort,
+): number {
+  const picksBenchLast =
+    !input.saveSituation &&
+    rollsCloser(
+      {
+        inningIndex: input.inningIndex,
+        lead: input.lead,
+        runnerCount: input.runnerCount,
+        // 팀 경기는 한 팀을 사람이 잡으므로 "두 팀 다 CPU" 가 아니다 (0xb6c20)
+        bothTeamsAreCpu: false,
+      },
+      random,
+    )
+  if (picksBenchLast) return bench.length === 0 ? -1 : bench[bench.length - 1]
+  return chooseReplacementPitcher(
+    bench.map((index) => ({ index })),
+    {
+      inningIndex: input.inningIndex,
+      // 0xabfcc 의 다섯째 인자가 마무리 플래그다 (V3-E)
+      lateInningFlag: input.saveSituation,
+      currentStamina: input.currentStamina,
+    },
   )
 }
 

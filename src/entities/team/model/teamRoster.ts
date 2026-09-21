@@ -52,6 +52,11 @@ export const STARTING_PITCHER_CANDIDATES = 4
  * 경기를 세울 때 고르는 선발 칸 (0x3107a~0x3109e, S13 1-4b 확정).
  * 원본은 `0xb8c94(팀, 0, bfa54(0,4))` = `0xb5e98(명부, 0, k, 1)` 로 **투수 0번과 k번을
  * 레코드째 맞바꾼다**. 교환이라 뽑힌 투수가 0번(= 선발) 자리로 오고, `k = 0` 이면 그대로다.
+ *
+ * ⚠️ **이 무작위는 일반모드(0x30f20)·대전모드(0x30be0) 것이다** — S13 1-0 이 두 함수가 모드
+ * 1 과 8·9 전용임을 확정했다. 리그가 도는 모드(2 시즌 · 3 투수편 · 4 타자편)와 CPU 끼리의
+ * 리그 경기는 무작위가 아니라 **하루 한 칸씩 도는 4인 로테이션**이다
+ * (0xb8c80 → 0xb5ca8 — `entities/pitcher-career/model/pitcherRotation.rotationSlotOf`).
  */
 export function rollStartingPitcherIndex(random: RandomPort): number {
   return Math.trunc(random.nextInRange(0, STARTING_PITCHER_CANDIDATES))

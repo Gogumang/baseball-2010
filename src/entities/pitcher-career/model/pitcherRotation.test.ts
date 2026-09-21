@@ -12,6 +12,7 @@ import {
   isMyStartDay,
   preGameRotationPlanOf,
   reliefNeverEnteredOf,
+  rotationSlotOf,
   shouldEnterAsRelief,
   startAssignmentOf,
   swapWithStarter,
@@ -157,5 +158,23 @@ describe('7회 콜드게임 = 등판 기회 없음 (S5 U-14)', () => {
     expect(reliefNeverEnteredOf(COLD_GAME_INNING_INDEX)).toBe(true)
     expect(reliefNeverEnteredOf(7)).toBe(false)
     expect(reliefNeverEnteredOf(8)).toBe(false)
+  })
+})
+
+describe('붙박이 로스터용 선발 칸 셈 `rotationSlotOf` (근사)', () => {
+  it('네 경기를 연달아 치르면 선발이 0 → 1 → 2 → 3 으로 돌고 다시 0 으로 온다', () => {
+    expect([0, 1, 2, 3, 4, 5, 6, 7, 8].map(rotationSlotOf)).toEqual([0, 1, 2, 3, 0, 1, 2, 3, 0])
+  })
+
+  it('로스터를 g 번 실제로 돌린 뒤의 0번과 같은 칸을 가리킨다 (0xb5ca8 과 맞춰 본다)', () => {
+    let roster = [0, 1, 2, 3, 4, 5, 6, 7]
+    for (let g = 0; g < 12; g += 1) {
+      expect(roster[0], `${g}일차`).toBe(rotationSlotOf(g))
+      roster = advanceRotation(roster)
+    }
+  })
+
+  it('음수 날짜가 들어와도 0~3 안에 머문다 (원본에는 없는 경우라 안전망이다)', () => {
+    expect([-1, -4, -5].map(rotationSlotOf)).toEqual([3, 0, 3])
   })
 })
