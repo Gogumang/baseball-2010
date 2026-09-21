@@ -31,19 +31,36 @@ const resultSpriteOf = (result: GameSummary['result']) =>
   result === '승' ? RESULT_SPRITES.승 : RESULT_SPRITES.패
 
 /**
- * 승·패·세 투수 세 줄의 **이름**은 웹에 아직 없다.
+ * 승·패·세 투수 세 줄의 **이름**.
  *
  * 원본은 경기 상태 state+0x44/0x48(승) · +0x50/0x54(패) · +0x5c/0x60(세) 에
- * "그 순간 마운드에 선 투수" 를 한 점 날 때마다(0xa5c34)·투수 교체 때(0xa60c0) 적어 둔다
- * (S1-win-loss-save.md 2~4절 확정). 웹판 `gameFlow.ts` 는 투수를 팀 하나로 뭉뚱그려 돌리고
- * 마운드에 누가 섰는지를 기록하지 않아 이 칸을 채울 값이 없다 — **투수편(마운드 교체)이
- * 들어와야 채워진다**. 그때까지는 원본 배치대로 줄만 그리고 이름 칸을 비워 둔다.
- * (원본도 측 == 2 = "없음" 이면 그 줄 이름을 비운다 — R10 5절.)
+ * "그 순간 마운드에 선 투수" 를 한 점 날 때마다(0xa5c34)·투수 교체 때(0xa60c0) 적어 두고,
+ * 경기 끝(0xa7de8)에 셋을 확정한다 (S1-win-loss-save.md 2~4절 확정 — 웹판 판정은
+ * `features/play-pitcher-game/model/winLossSave.ts` 가 그대로 갖고 있다).
+ *
+ * ⚠️ **값이 없어 못 채우는 칸**: 이 화면을 쓰는 타자편(`app/ui/CareerRoutes.tsx`)의
+ * `gameFlow.ts` 는 투수를 팀 하나로 뭉뚱그려 돌려 **마운드에 누가 섰는지를 기록하지 않는다**.
+ * `GameSummary` 에도 그 칸이 없다. 그래서 여기서는 **받을 자리(`pitcherNames`)만 열어 두고**
+ * 안 넘기면 원본의 "측 == 2 = 없음" 과 같이 이름 칸을 비운다 (R10 5절).
+ * 투수편(마운드 교체)이 타자편에 들어오면 `gameEndDecisionOf(...)` 의 셋을 이름으로 바꿔
+ * 이 prop 으로 넘기면 된다.
  */
-const PITCHER_NAMES: readonly (string | null)[] = [null, null, null]
+const EMPTY_PITCHER_NAMES: readonly (string | null)[] = [null, null, null]
+
+/** 승·패·세 세 줄에 들어갈 투수 이름. 없으면(측 2 = 없음) 그 줄을 비운다 — R10 5절 */
+export interface PitcherOfRecordNames {
+  readonly win: string | null
+  readonly loss: string | null
+  readonly save: string | null
+}
 
 interface GameResultScreenProps {
   readonly summary: GameSummary
+  /**
+   * 승리투수·패전투수·세이브 이름. 타자편은 마운드 투수를 기록하지 않아 아직 넘길 값이 없다 —
+   * 안 넘기면 세 줄 모두 빈 칸이다 (원본도 "없음" 이면 비운다).
+   */
+  readonly pitcherNames?: PitcherOfRecordNames
   readonly gamePointReward: number
   readonly newTitles: readonly string[]
   readonly evaluation: GameEvaluation
@@ -74,6 +91,7 @@ const fillNumbers = (raw: string, values: readonly number[]) => {
  */
 export function GameResultScreen({
   summary,
+  pitcherNames,
   gamePointReward,
   newTitles,
   evaluation,
@@ -83,6 +101,10 @@ export function GameResultScreen({
 }: GameResultScreenProps) {
   const [isDetailOpen, setIsDetailOpen] = useState(false)
   const { stats } = summary
+  const rowNames =
+    pitcherNames === undefined
+      ? EMPTY_PITCHER_NAMES
+      : [pitcherNames.win, pitcherNames.loss, pitcherNames.save]
 
   if (isDetailOpen) {
     return (
@@ -207,7 +229,7 @@ export function GameResultScreen({
       {PITCHER_LABELS.map((label, row) => {
         const labelPosition = pitcherLabelPositionOf(row)
         const nameBox = pitcherNameBoxOf(row)
-        const name = PITCHER_NAMES[row]
+        const name = rowNames[row]
         return (
           <div key={label.frame}>
             <img

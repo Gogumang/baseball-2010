@@ -37,7 +37,7 @@ export const emptyCell = style({
   pointerEvents: 'none',
 })
 
-/** 순위 딱지 글 — 원본은 글꼴 33 numBox + img_text 307 "위" */
+/** 순위 딱지 글 — ⚠️ 원본은 numBox 숫자 + img_text 307 "위" 다 (컴포넌트 쪽 주석 참고) */
 export const rankTag = style({
   position: 'absolute',
   display: 'flex',

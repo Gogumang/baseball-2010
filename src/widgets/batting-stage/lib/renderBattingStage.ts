@@ -6,6 +6,7 @@ import type { SceneryState } from '@/widgets/batting-stage/lib/renderScenery'
 import { judgeAnimationOf, judgeFrameAt, pitcherFrameAt, pitcherIdleFrameAt } from '@/widgets/batting-stage/lib/stageScenery'
 
 import { drawHud } from '@/widgets/batting-stage/lib/renderHud'
+import { drawFieldMap } from '@/widgets/batting-stage/lib/renderFieldMap'
 import { batterLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
 
 /** 타자 몸통 종류 — 타자 폼을 넘기지 않아 balancer(0) (추정) */
@@ -67,6 +68,8 @@ export function renderBattingStage(
   }
   if (scene.hud !== null) {
     drawHud(context, scene.hud)
+    // 전광판과 별개로 원본이 타석 중에 그리는 작은 지도 (0x395f4) — 루상 주자가 여기 보인다
+    drawFieldMap(context, scene.hud.bases)
   }
   if (scene.resultText !== '') {
     drawResultText(context, scene.resultText, scene.resultTick)

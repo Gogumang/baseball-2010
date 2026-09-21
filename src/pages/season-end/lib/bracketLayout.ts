@@ -36,8 +36,7 @@ export const LOGO_INSET = 3
 
 /**
  * 프레임 53 박스 4~7 — 순위 딱지.
- * 원본은 `numBox(순위, 1, 4, 글꼴 33, 8)` + `img_text 307 "위"` 오른쪽 정렬(0x24) 이지만,
- * 웹에는 글꼴 33 비트맵 숫자를 아직 안 옮겨서 "N위" 글자 한 줄로 둔다 (근사).
+ * 원본은 `numBox(순위, 1, 4, 33, 8)` + `img_text 307 "위"` **오른쪽 정렬(0x24)** 이다 (P6 4a-1).
  */
 export const RANK_TAGS: readonly BracketBox[] = [
   { x: 26, y: 243, width: 39, height: 15 }, // 4위
@@ -108,4 +107,31 @@ export const WON_LINE_COLOR = '#FF0000'
 /** 순위 1~4 → 계단 칸 색인. 칸은 4위부터이므로 뒤집는다 */
 export function cellIndexOfRank(rank: number): number {
   return 4 - rank
+}
+
+/**
+ * 순위 딱지의 "위" 글자 = img_text 프레임 **307** (9×10) — 딱지 칸 오른쪽 끝에 세로 가운데 (정렬 0x24).
+ */
+export const RANK_UNIT = { folder: './sprites/img_text/frames', frame: 307, width: 9, height: 10 } as const
+
+/**
+ * ⚠️ **미해독 — 근사**: `numBox` 의 인자 `33` 이 **어느 숫자 글자꼴인지** 못 읽었다.
+ * `num.pzx` 의 숫자 묶음은 10칸 단위(0·10·20·30·40·50·90…)라 33 은 묶음 머리가 아니고,
+ * P6 이 같은 자리를 "글꼴 34 가운데"·"글꼴 36" 이라고도 적는데 34 = 0x22 · 36 = 0x24 는
+ * 다른 화면에서 쓰는 **정렬 상수**와 겹친다 — 글자꼴 번호가 아닐 수 있다.
+ * 그래서 순위표(0x7f070)와 같은 **하늘색 숫자(num 90번대, 8×8)** 로 둔다.
+ */
+export { SKY_BLUE_GLYPH_HEIGHT as RANK_GLYPH_HEIGHT, skyBlueNumberGlyphsOf as rankGlyphsOf } from '@/shared/lib/pixelNumber/pixelNumber'
+
+/** "위" 그림 왼쪽 위 — 딱지 칸 오른쪽 끝, 세로 가운데 */
+export function rankUnitPositionOf(tag: BracketBox): { x: number; y: number } {
+  return {
+    x: tag.x + tag.width - RANK_UNIT.width,
+    y: tag.y + Math.floor((tag.height - RANK_UNIT.height) / 2),
+  }
+}
+
+/** 숫자는 "위" 바로 왼쪽에 오른쪽 정렬로 붙는다 */
+export function rankDigitRightOf(tag: BracketBox): number {
+  return tag.x + tag.width - RANK_UNIT.width
 }

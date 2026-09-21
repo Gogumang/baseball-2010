@@ -3,7 +3,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { PostseasonBracket } from '@/pages/season-end/ui/PostseasonBracket'
 import { SeasonEndScreen } from '@/pages/season-end/ui/SeasonEndScreen'
-import { LINE_SEGMENTS, RANK_TAGS, TEAM_CELLS, cellIndexOfRank } from '@/pages/season-end/lib/bracketLayout'
+import {
+  LINE_SEGMENTS, RANK_TAGS, RANK_UNIT, TEAM_CELLS, cellIndexOfRank, rankDigitRightOf,
+  rankUnitPositionOf,
+} from '@/pages/season-end/lib/bracketLayout'
 import { advancePostseason, startPostseason } from '@/entities/league/model/league'
 import { TEAMS } from '@/shared/config/original/teams'
 import { createCareer } from '@/entities/career/model/playerCareer'
@@ -35,17 +38,35 @@ describe('대진표 배치', () => {
     }
     // 1위 칸이 가장 높다 (계단)
     expect(TEAM_CELLS[cellIndexOfRank(1)].y).toBeLessThan(TEAM_CELLS[cellIndexOfRank(4)].y)
-    expect(container.querySelectorAll('img').length).toBe(4)
+    // 로고 4 + 순위 딱지 4줄(숫자 한 글자 + "위") = 4 + 8
+    expect(container.querySelectorAll('img[alt]:not([alt=""])').length).toBe(4 + 4)
   })
 
-  it('순위 딱지 "N위" 가 프레임 53 박스 4~7 자리에 놓인다', () => {
+  it('순위 딱지가 프레임 53 박스 4~7 자리에 놓인다', () => {
     const { container } = render(<PostseasonBracket series={startPostseason(순위)} />)
 
     for (const rank of [1, 2, 3, 4]) {
       const tag = container.querySelector<HTMLElement>(`div[data-rank="${rank}"]`)!
-      expect(tag.textContent).toBe(`${rank}위`)
       expect(tag.style.left).toBe(`${RANK_TAGS[cellIndexOfRank(rank)].x}px`)
       expect(tag.style.top).toBe(`${RANK_TAGS[cellIndexOfRank(rank)].y}px`)
+    }
+  })
+
+  it('딱지 글은 숫자 그림 + img_text 307 "위" 이고 오른쪽 정렬이다 (0x24)', () => {
+    const { container } = render(<PostseasonBracket series={startPostseason(순위)} />)
+
+    const 위들 = Array.from(container.querySelectorAll<HTMLImageElement>('img[alt="위"]'))
+    expect(위들.length).toBe(4)
+    expect(위들[0].getAttribute('src')).toContain(`img_text/frames/${String(RANK_UNIT.frame).padStart(3, '0')}.png`)
+
+    for (const rank of [1, 2, 3, 4]) {
+      const tag = RANK_TAGS[cellIndexOfRank(rank)]
+      const 위치 = rankUnitPositionOf(tag)
+      // "위" 는 딱지 칸 오른쪽 끝에 붙는다
+      expect(위치.x + RANK_UNIT.width).toBe(tag.x + tag.width)
+      // 숫자는 그 바로 왼쪽에서 끝난다
+      expect(rankDigitRightOf(tag)).toBe(위치.x)
+      expect(위들.some((image) => image.style.left === `${위치.x}px` && image.style.top === `${위치.y}px`)).toBe(true)
     }
   })
 

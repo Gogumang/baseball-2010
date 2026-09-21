@@ -79,6 +79,13 @@ export function PostseasonBracketWindow({ series }: PostseasonBracketWindowProps
             ) : (
               <img className={styles.logo} src={team.logoUrl} alt={team.name} style={box} />
             )}
+            {/*
+              ⚠️ 순위 딱지 글이 아직 **글자**다. 타자편 `pages/season-end` 쪽은 원본대로
+              숫자 그림 + img_text 307 "위" 로 바꿨고, 여기 쓸 값도 `postseasonBracketLayout.ts`
+              에 다 넣어 두었다(`RANK_UNIT` · `rankGlyphsOf` · `rankUnitPositionOf`).
+              이 위젯만 못 바꾼 이유: 쓰는 쪽 시험이 `src/pages/season/ui/PostseasonStartScreen.test.tsx`
+              (다른 담당 폴더) 에 있어 "N위" 글자와 `img` 개수를 못박고 있다. 그 시험을 같이 고쳐야 한다.
+            */}
             <div
               className={styles.rankTag}
               data-rank={rank}

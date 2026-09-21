@@ -3,7 +3,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { SpecialScreen } from '@/pages/special/ui/SpecialScreen'
 import { EMPTY_COLLECTION } from '@/entities/collection/model/collection'
-import { ROW, SPECIAL_ITEMS, rowLeftOf, rowTopOf } from '@/pages/special/lib/specialLayout'
+import {
+  HALL_OF_FAME_BUBBLE, HALL_OF_FAME_GRID, HALL_OF_FAME_PITCHER_SLOTS, HALL_OF_FAME_SLOTS,
+  ROW, SPECIAL_ITEMS, hallOfFameBubblePositionOf, hallOfFameCellOf, rowLeftOf, rowTopOf,
+} from '@/pages/special/lib/specialLayout'
 
 /**
  * 스페셜 목록 (메인 메뉴 상태 6, 하위 목록 0x2524c — P6 2d).
@@ -93,7 +96,7 @@ describe('스페셜 칸 고르기', () => {
 
     fireEvent.click(칸('명예의전당'))
 
-    expect(screen.getByText('등록된 선수가 없습니다')).toBeTruthy()
+    expect(screen.getByAltText('PLAYER')).toBeTruthy()
   })
 
   it('↑↓ 로 커서를 옮기고 Enter 로 연다', () => {
@@ -112,5 +115,81 @@ describe('스페셜 칸 고르기', () => {
     fireEvent.click(screen.getByRole('button', { name: '되돌아가기' }))
 
     expect(onBack).toHaveBeenCalled()
+  })
+})
+
+/**
+ * 명예의 전당 (공용 목록 페이지 k = 8 — P6 2a-3 · S9 3~4절).
+ * 격자 식은 확정값이고, 칸 너비·틈과 슬롯 상태 표만 근사다.
+ */
+describe('명예의 전당 격자 5×3', () => {
+  const 열기 = () => {
+    띄우기()
+    fireEvent.click(칸('명예의전당'))
+  }
+
+  it('슬롯 15칸이고 왼쪽 x 20 에서 40 씩, 줄은 179 에서 40 씩이다', () => {
+    열기()
+
+    expect(screen.getAllByRole('button', { name: /번 슬롯$/ }).length).toBe(HALL_OF_FAME_SLOTS)
+    expect(hallOfFameCellOf(0).x).toBe(20)
+    expect(hallOfFameCellOf(4).x).toBe(180)
+    expect(HALL_OF_FAME_GRID.firstRowY).toBe(179)
+  })
+
+  it('종류 6 의 열별 y 보정 [3,3,3,13,13] 이 그대로 붙는다 — 4·5열만 10px 위다', () => {
+    expect(hallOfFameCellOf(0).y).toBe(179 - 3)
+    expect(hallOfFameCellOf(3).y).toBe(179 - 13)
+    expect(hallOfFameCellOf(4).y).toBe(179 - 13)
+    expect(hallOfFameCellOf(10).y).toBe(179 + 80 - 3)
+  })
+
+  it('칸 바탕은 (x−3, y−3, 칸+3) 둥근 네모다 (0x7a844)', () => {
+    열기()
+    const cell = hallOfFameCellOf(0)
+    const 칸0 = screen.getByRole('button', { name: '1번 슬롯' })
+
+    expect(칸0.style.left).toBe(`${cell.x - 3}px`)
+    expect(칸0.style.top).toBe(`${cell.y - 3}px`)
+    expect(칸0.style.width).toBe(`${cell.width + 3}px`)
+  })
+
+  it('슬롯 0~4 는 투수 칸, 5~14 는 타자 칸이다 — 등록된 선수는 타자 칸부터 찬다', () => {
+    const famer = {
+      name: '전설', ability: { hit: 1, power: 2, defense: 3, run: 4 },
+      endingIndex: 6, season: 13, titleIds: [],
+    }
+    render(<SpecialScreen collection={{ ...EMPTY_COLLECTION, hallOfFame: [famer] }} onBack={vi.fn()} />)
+    fireEvent.click(칸('명예의전당'))
+
+    const 슬롯 = (index: number) => screen.getByRole('button', { name: `${index + 1}번 슬롯` })
+    expect(슬롯(HALL_OF_FAME_PITCHER_SLOTS).dataset.kind).toBe('찬칸')
+    expect(슬롯(0).dataset.kind).toBe('빈칸')
+    // 첫 커서가 타자 첫 칸이라 이름 막대에 그 선수가 뜬다
+    expect(screen.getByText('전설')).toBeTruthy()
+  })
+
+  it('칸을 누르면 말풍선이 칸 오른쪽 26px 에 뜨고, 오른쪽 두 열에서는 왼쪽으로 뒤집는다', () => {
+    열기()
+
+    fireEvent.click(screen.getByRole('button', { name: '1번 슬롯' }))
+    const 말풍선 = screen.getByRole('menu', { name: '명예의 전당 슬롯' })
+    expect(말풍선.style.left).toBe(`${hallOfFameCellOf(0).x + 26}px`)
+    expect(말풍선.style.width).toBe(`${HALL_OF_FAME_BUBBLE.width}px`)
+    expect(screen.getByRole('menuitem', { name: '친구에게 선물' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: '슬롯에서 삭제' })).toBeTruthy()
+
+    // 4번째 열(열 3)은 칸 왼쪽으로 뒤집힌다
+    const 오른쪽 = hallOfFameCellOf(3)
+    expect(hallOfFameBubblePositionOf(오른쪽).x).toBe(오른쪽.x + 13 - HALL_OF_FAME_BUBBLE.width)
+  })
+
+  it('말풍선 두 칸은 아직 웹에서 못 하는 일이라 안내를 띄운다', () => {
+    열기()
+
+    fireEvent.click(screen.getByRole('button', { name: '1번 슬롯' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '친구에게 선물' }))
+
+    expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain('통신')
   })
 })

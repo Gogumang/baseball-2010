@@ -109,7 +109,7 @@ describe('승·패·세이브 투수 3줄', () => {
     })
   })
 
-  it('투수 이름은 아직 비어 있다 — 웹에 마운드 투수 기록이 없다', () => {
+  it('이름을 안 넘기면 세 칸이 비어 있다 — 타자편에 마운드 투수 기록이 없다', () => {
     띄우기()
 
     // 이름 칸은 딱지 칸 바로 오른쪽이다
@@ -119,6 +119,31 @@ describe('승·패·세이브 투수 3줄', () => {
       const nameBox = plate.querySelector(`div[style*="left: ${nameBoxLeft}px"]`) as HTMLElement
       expect(nameBox.textContent).toBe('')
     }
+  })
+
+  it('이름을 넘기면 승·패·세 차례로 채운다 (state+0x44 · +0x50 · +0x5c)', () => {
+    const nameBoxLeft = PITCHER_ROW_X + PITCHER_ROWS.labelPlate.width
+    render(
+      <GameResultScreen
+        summary={요약()}
+        pitcherNames={{ win: '김승리', loss: '박패전', save: null }}
+        gamePointReward={0}
+        newTitles={[]}
+        evaluation={{ popularityChange: 0, reputationChange: 0, moraleChange: 0, commentIndex: 0 }}
+        streakNotices={[]}
+        career={createCareer('선수')}
+        onContinue={vi.fn()}
+      />,
+    )
+
+    const 이름 = (labelName: string) => {
+      const plate = screen.getByAltText(labelName).parentElement as HTMLElement
+      return (plate.querySelector(`div[style*="left: ${nameBoxLeft}px"]`) as HTMLElement).textContent
+    }
+    expect(이름('승리투수')).toBe('김승리')
+    expect(이름('패전투수')).toBe('박패전')
+    // 세이브는 "없음"(측 2) 이라 빈 칸이다
+    expect(이름('세이브')).toBe('')
   })
 })
 

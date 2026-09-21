@@ -48,3 +48,51 @@ export const backButton = style({
   imageRendering: 'pixelated',
   selectors: { '&:focus-visible': { outline: `1px dashed ${ORIGINAL_COLORS.text}` } },
 })
+
+/** 명예의 전당 A 자리의 원 두 개 (0x6b7b9 — A−38 지름 77 · A−31 지름 63) */
+export const hofCircle = style({
+  position: 'absolute',
+  borderRadius: '50%',
+  pointerEvents: 'none',
+})
+
+/** 이름 막대 안 흰 글씨 가운데 (0xd24b4 `"!C!cFFFFFF%s"`) */
+export const hofName = style({
+  position: 'absolute',
+  textAlign: 'center',
+  color: '#FFFFFF',
+  fontSize: '11px',
+  lineHeight: '11px',
+  pointerEvents: 'none',
+})
+
+/** 격자 칸 바탕 = 둥근 네모 RGB(48,69,205) (0x7a844). 눌림도 이 칸이 받는다 */
+export const hofCell = style({
+  position: 'absolute',
+  padding: 0,
+  border: 'none',
+  font: 'inherit',
+  cursor: 'pointer',
+  selectors: {
+    '&[aria-current="true"]': { outline: '1px solid #FFFF00' },
+    '&:focus-visible': { outline: `1px dashed ${ORIGINAL_COLORS.text}` },
+  },
+})
+
+/** 말풍선 판 76×36 (0x65866) */
+export const hofBubble = style({
+  position: 'absolute',
+  boxSizing: 'border-box',
+})
+
+/** 말풍선 칸 70×14 — 흰 글 가운데, 고른 칸은 노랑 테두리 */
+export const hofBubbleCell = style({
+  position: 'absolute',
+  padding: 0,
+  border: 'none',
+  color: '#FFFFFF',
+  fontSize: '10px',
+  lineHeight: '14px',
+  textAlign: 'center',
+  cursor: 'pointer',
+})

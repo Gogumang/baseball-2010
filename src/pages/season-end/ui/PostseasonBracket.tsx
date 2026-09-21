@@ -1,8 +1,9 @@
-import { Button, FrameSprite, RawScreen } from '@/shared/ui'
+import { Button, FrameSprite, RawScreen, SpriteNumber } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import {
-  BACKDROP, LEG_ORDER, LINE_COLOR, LINE_SEGMENTS, LOGO_INSET, RANK_TAGS, TEAM_CELLS,
-  WON_LINE_COLOR, cellIndexOfRank,
+  BACKDROP, LEG_ORDER, LINE_COLOR, LINE_SEGMENTS, LOGO_INSET, RANK_GLYPH_HEIGHT, RANK_TAGS,
+  RANK_UNIT, TEAM_CELLS, WON_LINE_COLOR, cellIndexOfRank, rankDigitRightOf, rankGlyphsOf,
+  rankUnitPositionOf,
 } from '@/pages/season-end/lib/bracketLayout'
 import { bracketViewOf } from '@/pages/season-end/lib/postseasonBracket'
 import { TEAMS } from '@/shared/config/original/teams'
@@ -21,7 +22,7 @@ interface PostseasonBracketProps {
  * 포스트시즌 대진표 (0x853ac — P6 4a-1 확정).
  *
  * mode_ui 프레임 53(195×210) 계단 그림을 앵커 (0,0) 에 통째로 깔고,
- * 그 프레임 박스 0~3 에 팀 로고를(+3), 박스 4~7 에 "N위" 딱지를 얹는다.
+ * 그 프레임 박스 0~3 에 팀 로고를(+3), 박스 4~7 에 순위 딱지(숫자 + img_text 307 "위")를 얹는다.
  * 대진 선은 그림 없는 프레임 54~57 의 2px 박스를 먼저 #08044A 로 모두 채운 뒤,
  * **이긴 길만 빨강 RGB(255,0,0)** 으로 다시 채운다 (0x855b4~0x857ec).
  *
@@ -75,10 +76,14 @@ export function PostseasonBracket({ series, onShowStats, onNext, nextLabel = '�
                   width: cell.width - LOGO_INSET * 2, height: cell.height - LOGO_INSET * 2,
                 }} />
             )}
+            {/* 순위 딱지 = 숫자 + img_text 307 "위" 오른쪽 정렬 (0x24) */}
             <div className={styles.rankTag} data-rank={rank}
-              style={{ left: tag.x, top: tag.y, width: tag.width, height: tag.height }}>
-              {rank}위
-            </div>
+              style={{ left: tag.x, top: tag.y, width: tag.width, height: tag.height }} />
+            <SpriteNumber glyphs={rankGlyphsOf(rank)} right={rankDigitRightOf(tag)}
+              boxTop={tag.y} boxHeight={tag.height} glyphHeight={RANK_GLYPH_HEIGHT} />
+            <img className={styles.rankUnit} alt="위"
+              src={`${RANK_UNIT.folder}/${String(RANK_UNIT.frame).padStart(3, '0')}.png`}
+              style={{ left: rankUnitPositionOf(tag).x, top: rankUnitPositionOf(tag).y }} />
           </div>
         )
       })}
