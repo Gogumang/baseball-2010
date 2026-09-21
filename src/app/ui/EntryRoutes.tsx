@@ -8,6 +8,14 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 
 /** 홈런더비 최고 비거리 저장 칸 */
 const DERBY_BEST_KEY = 'compus-baseball/derby-best'
+
+/** StrMAINMENU[14] 원문 그대로 (`base/extracted/StrMAINMENU.json`) */
+const MY_LEAGUE_EDITION_PROMPT = '!C어떤 선수로!N플레이 하시겠습니까?'
+/** 선수 목록 결과 코드 1 육성 투수 · 2 육성 타자 → 원본 모드 3 · 4 (H-modes 1절) */
+const MY_LEAGUE_EDITIONS = [
+  { label: '육성 투수', code: 1 },
+  { label: '육성 타자', code: 2 },
+] as const
 import type { useCareerSession } from '@/app/model/useCareerSession'
 import type { useGameSettings } from '@/app/model/useGameSettings'
 import type { Collection } from '@/entities/collection/model/collection'
@@ -64,16 +72,27 @@ export function EntryRoutes({ screen, setScreen, session, gameSettings, collecti
   }
 
   /**
-   * 나만의리그 편 고르기 — ⚠️ **웹판 임시** (screen.ts 의 '나리편선택' 주석 참고).
-   * 원본은 모드 3 투수편 / 4 타자편을 따로 저장하는데 편을 고르는 자리를 아직 못 찾았다.
+   * 나만의리그 편 고르기 — 원본 메인 메뉴 **하위 13(0x2464c)** 이다 (H-modes 1절).
+   *
+   * 예/아니오 팝업이 아니라 **선수 목록 창**(`0x62568` / 항목 채우기 `0x5eae0`)이고,
+   * 질문 머리는 **StrMAINMENU[14] `!C어떤 선수로!N플레이 하시겠습니까?`** 다.
+   * 결과 코드는 **1 육성 투수 · 2 육성 타자 · 3 명예 투수 · 4 명예 타자** 이고
+   * (Q2-mission-rewards 1절 확정), 나만의리그는 그중 **육성 쪽만** 받아 모드 3·4 로 간다.
+   *
+   * ⚠️ **근사다**: 명예 선수 칸(3·4)은 미션·홈런더비가 쓰는 자리라 여기서는 안 보인다.
+   *    원본이 나리에서도 그 두 칸을 그리는지는 `0x5eae0` 속을 안 읽어 확인하지 못했다.
+   *
+   * 예전에는 `MessageBox` 를 썼는데, 그 상자의 버튼은 글자가 아니라 `popup.pzx` **그림**
+   * (프레임 1 "예" · 2 "아니오")이라 `buttons` 로 넘긴 이름이 화면에 안 나오고 늘 예/아니오가 떴다.
    */
   if (screen.kind === '나리편선택') {
     return (
       <RawScreen>
         <MessageBox
-          text="!C나만의 리그!N어느 편으로 시작할까요?"
-          buttons={['타자편', '투수편']}
-          onAnswer={(index) => setScreen(index === 0 ? { kind: '팀선택' } : { kind: '투수편' })}
+          text={MY_LEAGUE_EDITION_PROMPT}
+          buttons={MY_LEAGUE_EDITIONS.map((edition) => edition.label)}
+          listItems={MY_LEAGUE_EDITIONS.map((edition) => edition.label)}
+          onAnswer={(index) => setScreen(index === 0 ? { kind: '투수편' } : { kind: '팀선택' })}
         />
       </RawScreen>
     )

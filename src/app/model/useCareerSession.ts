@@ -91,7 +91,19 @@ export function useCareerSession({
   setScreen,
 }: CareerSessionInput) {
   const [savedCareer, setSavedCareer] = useState<PlayerCareer | null>(() => saveGame.load())
-  const [career, setCareer] = useState<PlayerCareer | null>(null)
+  const [rawCareer, setCareer] = useState<PlayerCareer | null>(null)
+  /**
+   * ⚠️ **테스트용** — `?무한G` 가 켜져 있으면 G 를 최대로 올린다 (`devOptions.ts`).
+   *
+   * ⚠️ 예전에는 **보여 주는 값만** 올리고 저장은 그대로 뒀는데, 그러면 화면과 판정이 어긋난다:
+   *    상점이 99999 를 보여 주면서 1000 G 짜리 엄마의도시락을 "G포인트 부족" 으로 막았다
+   *    (구매 가드 `shopSelection.ts` 는 진짜 값을 본다). 거짓말하는 스위치가 더 나빠서,
+   *    지금은 **상태 자체를** 올린다 — 그래서 켠 채로 무언가를 하면 저장에도 99999 가 남는다.
+   */
+  const career = isInfiniteGamePointOn() && rawCareer !== null
+    ? { ...rawCareer, gamePoint: MAXIMUM_GAME_POINT }
+    : rawCareer
+
   const [progress, setProgress] = useState<GameProgress | null>(null)
 
   const [shopNotice, setShopNotice] = useState('')
@@ -639,17 +651,10 @@ export function useCareerSession({
     },
   }
 
-  /**
-   * ⚠️ **테스트용** — `?무한G` 가 켜져 있으면 보여 주는 G 만 최대로 올린다 (`devOptions.ts`).
-   * 저장(`career` 상태)은 그대로라 스위치를 끄면 원래 값으로 돌아온다.
-   */
-  const shownCareer = career !== null && isInfiniteGamePointOn()
-    ? { ...career, gamePoint: MAXIMUM_GAME_POINT }
-    : career
 
   return {
     savedCareer,
-    career: shownCareer,
+    career,
     progress,
     shopNotice,
     outingNotice,

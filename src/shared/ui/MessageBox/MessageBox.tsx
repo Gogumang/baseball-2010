@@ -11,6 +11,14 @@ interface MessageBoxProps {
    * 하나면 알림(프레임 0 "OK"), 둘이면 예/아니오다.
    */
   readonly buttons: readonly string[]
+  /**
+   * **선수 목록 창**(0x62568)처럼 칸을 **글자로** 골라야 하는 자리에 쓴다.
+   *
+   * 보통 상자의 버튼은 글자가 아니라 `ui/popup.pzx` 그림(1 "예" · 2 "아니오")이라,
+   * 예/아니오가 아닌 것을 고르게 하려면 그림을 쓸 수 없다. 이 값을 주면 그림 대신
+   * 이 글자들을 세로로 그린다 — 칸 수와 순서는 `buttons` 와 같아야 한다.
+   */
+  readonly listItems?: readonly string[]
   /** 누른 버튼 번호 */
   readonly onAnswer: (index: number) => void
 }
@@ -68,7 +76,7 @@ function buttonFrameOf(count: number, index: number, isSelected: boolean): numbe
   return (isSelected ? YES_NO_SELECTED_FRAMES : YES_NO_FRAMES)[index]
 }
 
-export function MessageBox({ text, buttons, onAnswer }: MessageBoxProps) {
+export function MessageBox({ text, buttons, listItems, onAnswer }: MessageBoxProps) {
   const [selected, setSelected] = useState(0)
 
   // 상자가 열려 있는 동안 키는 상자 것이다. 뒤쪽 메뉴가 같은 Enter 를 같이 받으면
@@ -177,12 +185,14 @@ export function MessageBox({ text, buttons, onAnswer }: MessageBoxProps) {
         <div className={styles.buttons} style={contentStyle}>
           {buttons.map((label, index) => {
             const isSelected = index === selected
-            const frame = buttonFrameOf(buttons.length, index, isSelected)
+            // 글자 목록이면 그림을 쓰지 않는다 — 예/아니오 그림으로는 다른 것을 고를 수 없다
+            const frame = listItems === undefined ? buttonFrameOf(buttons.length, index, isSelected) : undefined
+            const shown = listItems?.[index] ?? label
             return (
               <button key={label} type="button" className={styles.button} aria-label={label}
                 onMouseEnter={() => setSelected(index)} onFocus={() => setSelected(index)}
                 onClick={() => answer(index)}>
-                {frame === undefined ? label : (
+                {frame === undefined ? (isSelected ? `▶ ${shown}` : shown) : (
                   <img
                     className={styles.buttonImage}
                     src={`${POPUP}/${String(frame).padStart(3, '0')}.png`}
