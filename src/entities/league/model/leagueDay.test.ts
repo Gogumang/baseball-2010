@@ -142,41 +142,52 @@ describe('CPU 끼리 경기도 날짜가 선발을 정한다 (0xb5ca8 · S5 U-16
 })
 
 describe('CPU 끼리 경기가 선발 투수 기록도 쌓는다 (0xa8024 · 경기 끝 0xa7de8, P1 6절)', () => {
-  it('양 팀 선발 두 줄이 나오고, 승과 패가 하나씩이다', () => {
+  it('양 팀 선발 줄이 나오고, 승과 패는 그 두 줄에만 붙는다', () => {
     const 경기 = simulateLeagueGame({ away: 2, home: 3 }, 씨앗난수(77), 1)
+    // 선발 칸(1)은 양 팀 한 줄씩. 구원은 벤치에서 오므로 이 칸이 될 수 없다
+    const 선발줄 = 경기.pitcherAppearances.filter((줄) => 줄.pitcherSlot === 1)
 
-    expect(경기.pitcherAppearances).toHaveLength(2)
-    expect(경기.pitcherAppearances.map((줄) => 줄.pitcherSlot)).toEqual([1, 1])
+    expect(선발줄).toHaveLength(2)
     expect(경기.pitcherAppearances.filter((줄) => 줄.decision === '승')).toHaveLength(1)
     expect(경기.pitcherAppearances.filter((줄) => 줄.decision === '패')).toHaveLength(1)
+    // 교체로 올라온 투수는 승패가 없다 (세이브도 원본이 안 준다 — CORRECTIONS 2-1)
+    expect(경기.pitcherAppearances.every((줄) => 줄.decision === null || 줄.pitcherSlot === 1)).toBe(true)
   })
 
   it('승은 **점수가 많은 쪽** 선발에게 간다 — 순위표의 원본 버그(0xc2a48)와 따로 논다', () => {
     const 경기 = simulateLeagueGame({ away: 2, home: 3 }, 씨앗난수(77), 1)
-    const 원정 = 경기.pitcherAppearances[0]
-    const 홈 = 경기.pitcherAppearances[1]
+    const 선발 = (teamId: number) =>
+      경기.pitcherAppearances.find((줄) => 줄.teamId === teamId && 줄.pitcherSlot === 1)
 
-    const 이긴쪽 = 경기.awayRuns >= 경기.homeRuns ? 원정 : 홈
-    const 진쪽 = 이긴쪽 === 원정 ? 홈 : 원정
-    expect(이긴쪽.decision).toBe('승')
-    expect(진쪽.decision).toBe('패')
+    const 이긴쪽 = 경기.awayRuns >= 경기.homeRuns ? 선발(2) : 선발(3)
+    const 진쪽 = 경기.awayRuns >= 경기.homeRuns ? 선발(3) : 선발(2)
+    expect(이긴쪽?.decision).toBe('승')
+    expect(진쪽?.decision).toBe('패')
   })
 
-  it('실점은 상대 팀 득점과 같고, 아웃은 9이닝치(27)부터다', () => {
+  /**
+   * 타석마다 도는 CPU 교체(0xc1ba4)로 한 경기에 여러 투수가 나온다 — 그래서 "선발 한 줄"이 아니라
+   * **팀 줄 전체를 합쳐** 상대 득점·이닝과 맞춘다.
+   */
+  it('팀 투수 줄을 합치면 실점이 상대 득점과 같고, 아웃은 9이닝치(27)부터다', () => {
     const 경기 = simulateLeagueGame({ away: 2, home: 3 }, 씨앗난수(2009), 0)
-    const [원정, 홈] = 경기.pitcherAppearances
+    const 팀합 = (teamId: number, 고르기: (줄: (typeof 경기.pitcherAppearances)[number]) => number) =>
+      경기.pitcherAppearances.filter((줄) => 줄.teamId === teamId).reduce((sum, 줄) => sum + 고르기(줄), 0)
 
-    // 선발 하나가 끝까지 던지므로 팀 실점이 그대로 그 투수의 실점이다
-    expect(원정.runsAllowed).toBe(경기.homeRuns)
-    expect(홈.runsAllowed).toBe(경기.awayRuns)
-    // 홈이 9회말을 치르지 않는 경우가 있어 원정 투수는 24아웃일 수 있다
-    expect(홈.outs).toBeGreaterThanOrEqual(27)
-    expect(원정.outs).toBeGreaterThanOrEqual(24)
-    expect(원정.pitches).toBeGreaterThan(0)
-    expect(원정.strikeouts).toBeGreaterThanOrEqual(0)
+    expect(팀합(2, (줄) => 줄.runsAllowed)).toBe(경기.homeRuns)
+    expect(팀합(3, (줄) => 줄.runsAllowed)).toBe(경기.awayRuns)
+    // 홈이 9회말을 치르지 않는 경우가 있어 원정 투수진은 24아웃일 수 있다
+    expect(팀합(3, (줄) => 줄.outs)).toBeGreaterThanOrEqual(27)
+    expect(팀합(2, (줄) => 줄.outs)).toBeGreaterThanOrEqual(24)
+    expect(팀합(2, (줄) => 줄.pitches)).toBeGreaterThan(0)
+    expect(팀합(2, (줄) => 줄.strikeouts)).toBeGreaterThanOrEqual(0)
   })
 
-  it('세이브는 늘 0 이다 — 웹에는 구원 교체가 없다', () => {
+  /**
+   * ⚠️ 구원 교체가 생긴 뒤에도 세이브는 0 이다 — **그게 원본이다.** 세이브 종류 코드 state+0x64 를
+   * 0 으로 되돌리는 코드가 없어 경기 끝 검사(0xa7eaa)에 늘 걸린다 (CORRECTIONS 2-1 · S1).
+   */
+  it('세이브는 늘 0 이다 — 원본도 세이브를 한 번도 기록하지 않는다', () => {
     const { playerStats } = playLeagueDay(EMPTY_LEAGUE, 0, 4, 씨앗난수(5))
     const 줄들 = Object.values(playerStats.pitchers ?? {})
 
@@ -192,15 +203,20 @@ describe('CPU 끼리 경기가 선발 투수 기록도 쌓는다 (0xa8024 · 경
 
     expect(합((줄) => 줄.wins)).toBe(4)
     expect(합((줄) => 줄.losses)).toBe(4)
-    expect(줄들).toHaveLength(8)
+    // 네 경기 여덟 선발에 구원이 더 붙는다 (교체가 생기기 전에는 딱 여덟 줄이었다)
+    expect(줄들.length).toBeGreaterThanOrEqual(8)
   })
 
-  it('그날 쓰는 선발 칸은 로테이션이 정한다 — 하루에 한 팀에 한 줄뿐이다', () => {
+  it('그날 쓰는 선발 칸은 로테이션이 정한다 — 승패가 붙는 줄이 그 칸이다', () => {
     const { playerStats } = playLeagueDay(EMPTY_LEAGUE, 3, 4, 씨앗난수(9))
-    const 칸 = Object.keys(playerStats.pitchers ?? {}).map((id) => Number(id) % PITCHERS_PER_TEAM)
+    const 줄들 = Object.entries(playerStats.pitchers ?? {})
+    const 선발칸 = 줄들
+      .filter(([, 줄]) => 줄.wins + 줄.losses > 0)
+      .map(([id]) => Number(id) % PITCHERS_PER_TEAM)
 
-    expect(new Set(칸).size).toBe(1)
-    expect(칸[0]).toBe(rotationSlotOf(3))
+    // 네 경기 × 양 팀 = 여덟 선발, 전부 그날의 로테이션 칸이다
+    expect(선발칸).toHaveLength(8)
+    expect(new Set(선발칸)).toEqual(new Set([rotationSlotOf(3)]))
   })
 
   it('이어서 돌리면 투수 줄도 앞서 쌓은 표 위에 더해진다', () => {
@@ -234,12 +250,51 @@ describe('CPU 끼리 경기가 선발 투수 기록도 쌓는다 (0xa8024 · 경
     // 동점이면 연장을 가므로 딱 떨어지지는 않는다
     expect(합((줄) => 줄.outs)).toBeGreaterThanOrEqual(225 * 51)
     expect(합((줄) => 줄.outs)).toBeLessThan(225 * 60)
-    // 로테이션 네 칸만 던지므로 10팀 × 4 = 40명이 규정 이닝(45)을 채운다
+    // 로테이션 네 칸이 선발을 다 맡으므로 10팀 × 4 = 40명이 규정 이닝(45)을 채운다.
+    // (구원으로 올라오는 투수도 대개 그 네 칸이다 — 웹 로스터에 보직이 없어 벤치 번호가 작은
+    //  쪽부터 고르기 때문이다. `chooseReplacementPitcher` 주석 참고)
     expect(줄들.filter((줄) => Math.trunc(줄.outs / 3) >= 45)).toHaveLength(40)
-    for (const 줄 of 줄들) {
+    // ⚠️ 방어율은 **규정 이닝을 채운 선발만** 본다 — 몇 타자 만에 내려간 구원은 0.00 이나
+    //    무한대가 나오고, 원본 순위표도 이닝이 적은 투수를 뺀다
+    for (const 줄 of 줄들.filter((줄) => Math.trunc(줄.outs / 3) >= 45)) {
       const 방어율 = (줄.runsAllowed * 2700) / 줄.outs / 100
       expect(방어율).toBeGreaterThan(1)
       expect(방어율).toBeLessThan(9)
     }
+  })
+})
+
+/**
+ * CPU 끼리의 경기도 사람 경기와 같은 함수로 투수를 바꾸고(0xc1ba4 → 0xac428) 도루를 건다
+ * (0xc1818). 45일을 돌려 **정말로 도는지** 숫자로 못 박는다.
+ */
+describe('CPU 끼리 경기의 투수 교체·도루가 실제로 돈다', () => {
+  it('45일 225경기에서 교체와 도루가 꾸준히 나온다', () => {
+    const random = 씨앗난수(12_345)
+    let 경기수 = 0
+    let 등판 = 0
+    let 도루 = 0
+    let 교체경기 = 0
+
+    for (let day = 0; day < 45; day += 1) {
+      for (const matchup of matchupsOf(day)) {
+        const 경기 = simulateLeagueGame(matchup, random, rotationSlotOf(day))
+        const 팀별등판 = [matchup.away, matchup.home].map(
+          (teamId) => 경기.pitcherAppearances.filter((줄) => 줄.teamId === teamId).length,
+        )
+        경기수 += 1
+        등판 += 팀별등판[0] + 팀별등판[1]
+        도루 += 경기.steals
+        if (팀별등판.some((수) => 수 > 1)) 교체경기 += 1
+      }
+    }
+
+    expect(경기수).toBe(225)
+    // 팀당 한 명을 넘는다 = 선발 고정이 아니다
+    expect(등판 / 경기수 / 2).toBeGreaterThan(1)
+    // 절반 넘는 경기에서 투수가 바뀐다
+    expect(교체경기 / 경기수).toBeGreaterThan(0.5)
+    // 도루는 실패가 없어 경기마다 여러 개가 쌓인다 (표 0xd9064 가 꽤 후하다 — 원본 그대로)
+    expect(도루 / 경기수).toBeGreaterThan(1)
   })
 })

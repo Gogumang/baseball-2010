@@ -1,8 +1,19 @@
 import { LEAGUE_TEAM_COUNT, opponentOf, recordLeagueResult } from '@/entities/league/model/league'
 import type { League } from '@/entities/league/model/league'
-import { simulateHalfInning } from '@/entities/game/model/simulateHalfInning'
-import type { HalfInningResult } from '@/entities/game/model/simulateHalfInning'
-import { batterAt, rollStartingPitcherIndex, startingPitcherOf } from '@/entities/team/model/teamRoster'
+import { simulateHalfInning, startingMoundOf } from '@/entities/game/model/simulateHalfInning'
+import type {
+  HalfInningDefense,
+  HalfInningMound,
+  HalfInningResult,
+} from '@/entities/game/model/simulateHalfInning'
+import {
+  PITCHERS_PER_TEAM,
+  batterAt,
+  quickPitcherOf,
+  rollStartingPitcherIndex,
+  startingPitcherOf,
+  teamPitchers,
+} from '@/entities/team/model/teamRoster'
 import { rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
 import {
   EMPTY_LEAGUE_PLAYER_STATS,
@@ -66,11 +77,40 @@ export interface LeagueGameScore {
    */
   readonly plateAppearances: readonly LeaguePlateAppearance[]
   /**
-   * 이 경기에서 나온 **투수 기록** 두 줄 (양 팀 선발). 원본도 같은 레코드에 아웃 +0x20 ·
+   * 이 경기에서 나온 **투수 기록** — 던진 투수마다 한 줄이다. 타석마다 도는 CPU 교체
+   * (0xc1ba4 → 0xac428)로 한 팀에서 여럿이 나올 수 있다. 원본도 같은 레코드에 아웃 +0x20 ·
    * 실점 +0x22 · 탈삼진 +0x26 · 투구 수 +0x28 을 쌓고, 경기 끝 0xa7de8 이 승 +0x2e · 패 +0x2f 를
-   * 매긴다 (P1-pitcher-rules.md 6절). 세이브 +0x24 는 웹에 구원 교체가 없어 늘 0 이다.
+   * 매긴다 (P1-pitcher-rules.md 6절). 세이브 +0x24 는 **원본이 한 번도 안 준다** (CORRECTIONS 2-1).
    */
   readonly pitcherAppearances: readonly LeaguePitcherAppearance[]
+  /**
+   * 이 경기에서 나온 도루 수 (0xc1818, E-5). 원본은 주자 레코드에 도루를 +1 하지만
+   * 웹 리그 선수 기록표(`LeagueBatterLine`)에는 도루 칸이 없어 **경기 합계만** 내놓는다.
+   */
+  readonly steals: number
+}
+
+/** 팀 투수 여덟 칸 (`team+0x0c`) — 벤치는 여기서 마운드와 이미 쓴 투수를 뺀 나머지다 */
+const ALL_PITCHER_SLOTS: readonly number[] = Array.from({ length: PITCHERS_PER_TEAM }, (_, slot) => slot)
+
+/**
+ * 한 팀의 수비 쪽 재료 (`HalfInningDefense`) — 반 이닝마다 리드와 마운드만 갈아 끼운다.
+ *
+ * `bothTeamsAreCpu` 는 **참**이다: 하루치 리그 경기는 양 팀 다 CPU 조작이라 마무리 투입 굴림
+ * 0xac360 이 첫 줄에서 0 을 돌려준다 (`state[0x31+0]==1 && state[0x31+1]==1`, 0xb6c20).
+ * 그래서 리그 경기의 새 투수는 **늘 0xabfcc** 로 고른다.
+ */
+function defenseOf(teamId: number, mound: HalfInningMound, lead: number): HalfInningDefense {
+  const roster = teamPitchers(teamId)
+  return {
+    mound,
+    pitcherSlots: ALL_PITCHER_SLOTS,
+    pitcherAt: (slot) => quickPitcherOf(roster[slot % roster.length]),
+    // 투수 능력치 순서는 제구·구속·변화·**체력** (칸 3)
+    staminaAbilityAt: (slot) => roster[slot % roster.length].ability[3],
+    lead,
+    bothTeamsAreCpu: true,
+  }
 }
 
 /**
@@ -90,6 +130,8 @@ export function simulateLeagueGame(
   // 난수를 부르는 횟수·순서는 예전과 같다(팀마다 한 번씩).
   const awaySlot = startingPitcherSlot ?? rollStartingPitcherIndex(random)
   const homeSlot = startingPitcherSlot ?? rollStartingPitcherIndex(random)
+  // 선발 능력은 아래 `defenseOf` 가 마운드 칸으로 다시 집으므로, 이 둘은 수비 쪽을 넘기지 않는
+  // 길(포스트시즌 한 경기 등)에서 쓰는 기본값이다
   const awayPitcher = startingPitcherOf(matchup.away, awaySlot)
   const homePitcher = startingPitcherOf(matchup.home, homeSlot)
   let awayRuns = 0
@@ -104,35 +146,64 @@ export function simulateLeagueGame(
     }
   }
   /**
-   * 투수 쪽 합계. 웹 간이 엔진은 **선발 하나가 경기를 끝까지 던지므로** 반 이닝 결과를 모두
-   * 상대 팀 선발에게 그대로 얹으면 된다 (교체가 없어 책임 투수를 가릴 일이 없다).
+   * 투수 쪽 합계 — **투수 칸마다** 한 줄이다. 타석마다 도는 CPU 교체(0xc1ba4 → 0xac428)로
+   * 한 경기에 여러 투수가 나올 수 있어, 반 이닝이 내놓는 `pitcherLines` 를 그대로 모은다.
    */
-  const pitched = {
-    [matchup.away]: { outs: 0, runsAllowed: 0, strikeouts: 0, pitches: 0 },
-    [matchup.home]: { outs: 0, runsAllowed: 0, strikeouts: 0, pitches: 0 },
-  }
+  const pitched = new Map<number, Map<number, { outs: number; runsAllowed: number; strikeouts: number; pitches: number }>>()
   /** 이 반 이닝을 던진 쪽(= 수비 팀)에게 쌓는다 */
   const charge = (defenseTeamId: number, half: HalfInningResult) => {
-    const line = pitched[defenseTeamId]
-    line.outs += half.outs
-    line.runsAllowed += half.runs
-    line.strikeouts += half.strikeouts
-    line.pitches += half.pitches
+    const team = pitched.get(defenseTeamId) ?? new Map()
+    for (const line of half.pitcherLines) {
+      const before = team.get(line.pitcherSlot) ?? { outs: 0, runsAllowed: 0, strikeouts: 0, pitches: 0 }
+      team.set(line.pitcherSlot, {
+        outs: before.outs + line.outs,
+        runsAllowed: before.runsAllowed + line.runsAllowed,
+        strikeouts: before.strikeouts + line.strikeouts,
+        pitches: before.pitches + line.pitches,
+      })
+    }
+    pitched.set(defenseTeamId, team)
   }
 
+  let awayMound = startingMoundOf(awaySlot)
+  let homeMound = startingMoundOf(homeSlot)
+  let steals = 0
+
   for (let inning = 1; inning <= MAXIMUM_INNINGS; inning += 1) {
-    const top = simulateHalfInning(awayOrder, (order) => batterAt(matchup.away, order), homePitcher, inning, random)
+    const top = simulateHalfInning(
+      awayOrder,
+      (order) => batterAt(matchup.away, order),
+      homePitcher,
+      inning,
+      random,
+      undefined,
+      undefined,
+      defenseOf(matchup.home, homeMound, homeRuns - awayRuns),
+    )
     awayRuns += top.runs
     awayOrder = top.nextBattingOrderIndex
+    homeMound = top.mound ?? homeMound
+    steals += top.steals
     collect(matchup.away, top)
     charge(matchup.home, top)
 
     // 홈이 이미 앞서 있으면 9회말은 치르지 않는다
     if (inning >= REGULAR_INNINGS && homeRuns > awayRuns) break
 
-    const bottom = simulateHalfInning(homeOrder, (order) => batterAt(matchup.home, order), awayPitcher, inning, random)
+    const bottom = simulateHalfInning(
+      homeOrder,
+      (order) => batterAt(matchup.home, order),
+      awayPitcher,
+      inning,
+      random,
+      undefined,
+      undefined,
+      defenseOf(matchup.away, awayMound, awayRuns - homeRuns),
+    )
     homeRuns += bottom.runs
     homeOrder = bottom.nextBattingOrderIndex
+    awayMound = bottom.mound ?? awayMound
+    steals += bottom.steals
     collect(matchup.home, bottom)
     charge(matchup.away, bottom)
 
@@ -141,8 +212,12 @@ export function simulateLeagueGame(
 
   /**
    * 승패 투수 — **근사다**. 원본 규칙(0xa7de8 이 읽는 `state+0x44/0x48`·`+0x50/0x54` 를 누가
-   * 채우는가)은 해독 문서가 "미해결" 로 남겨 두었다 (P1 6절 마지막 줄). 웹 간이 엔진은 선발
-   * 하나가 끝까지 던지므로 **이긴 팀 선발에게 승, 진 팀 선발에게 패**로 둔다.
+   * 채우는가)은 해독 문서가 "미해결" 로 남겨 두었다 (P1 6절 마지막 줄). 여기서는 **이긴 팀
+   * 선발에게 승, 진 팀 선발에게 패**로 두고, 구원으로 올라온 투수는 `null` 이다.
+   *
+   * ⚠️ **세이브(+0x24)는 여전히 늘 0 이다 — 그게 원본이다.** 세이브 종류 코드 `state+0x64` 를
+   * 0 으로 되돌리는 코드가 없어 경기 끝 검사(0xa7eaa)에 늘 걸린다: **원본에서도 세이브가 한 번도
+   * 기록되지 않는다** (CORRECTIONS 2-1, S1 유력). 구원 교체가 생겼다고 세이브를 지어내지 않는다.
    *
    * 판정은 **실제 점수**로 한다. 아래 `playLeagueDay` 가 옮겨 온 원본 버그(0xc2a48 이 순위표에
    * 진 팀을 승으로 적는 것)는 **순위표 기록 쪽 실수**이고, 원본에서도 승패 투수는 경기 안에서
@@ -150,12 +225,19 @@ export function simulateLeagueGame(
    * 동점(웹 안전망인 30이닝까지 안 갈린 경우)은 순위표와 같이 원정 쪽을 승으로 본다.
    */
   const awayWon = awayRuns >= homeRuns
+  const linesOf = (teamId: number, starterSlot: number, decision: '승' | '패') =>
+    [...(pitched.get(teamId) ?? new Map()).entries()].map(([pitcherSlot, line]) => ({
+      teamId,
+      pitcherSlot,
+      ...line,
+      decision: pitcherSlot === starterSlot ? decision : null,
+    }))
   const pitcherAppearances: readonly LeaguePitcherAppearance[] = [
-    { teamId: matchup.away, pitcherSlot: awaySlot, ...pitched[matchup.away], decision: awayWon ? '승' : '패' },
-    { teamId: matchup.home, pitcherSlot: homeSlot, ...pitched[matchup.home], decision: awayWon ? '패' : '승' },
+    ...linesOf(matchup.away, awaySlot, awayWon ? '승' : '패'),
+    ...linesOf(matchup.home, homeSlot, awayWon ? '패' : '승'),
   ]
 
-  return { awayRuns, homeRuns, plateAppearances, pitcherAppearances }
+  return { awayRuns, homeRuns, plateAppearances, pitcherAppearances, steals }
 }
 
 /** 하루치 경기가 남긴 것 — 순위표와 **선수 기록표** 두 벌이다 */

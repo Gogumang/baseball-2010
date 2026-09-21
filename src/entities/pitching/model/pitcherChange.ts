@@ -255,3 +255,66 @@ export function chooseReplacementPitcher(
   }
   return -1
 }
+
+export interface ReplacementPickInput {
+  /** `judgePitcherChange` 가 세운 "마무리 상황" 표시 */
+  readonly saveSituation: boolean
+  /** **0-기준** 이닝 (state+0x6b) */
+  readonly inningIndex: number
+  /** 수비 팀 점수 − 공격 팀 점수 */
+  readonly lead: number
+  readonly runnerCount: number
+  /** 지금 마운드에 선 투수의 스태미나 */
+  readonly currentStamina: number
+  /** 두 팀 다 CPU 조작이면 마무리 굴림 0xac360 을 아예 돌리지 않는다 (0xb6c20) */
+  readonly bothTeamsAreCpu?: boolean
+  /** 모드 3 이면 마선수를 건너뛴다 */
+  readonly excludeSpecialPitchers?: boolean
+}
+
+/**
+ * 새 투수 고르기 `0xac5d8~0xac61c` — 판정(`judgePitcherChange`)이 "바꾼다" 고 한 뒤의 자리.
+ *
+ * ```
+ * 0xb8a8d(team, 0) 이 참이고 **마무리 상황이 아니면**  →  0xac360 굴림
+ *     참   → 벤치 **마지막**(벤치 수 − 1)
+ *     거짓 → 벤치 ≤ 1 이면 0번, 아니면 0xabfcc
+ * 마무리 상황이거나 0xb8a8d 가 거짓이면  →  0xabfcc(…, [sp] = 마무리 플래그)
+ * ```
+ *
+ * ⚠️ E-defense-rules 4절 3c 가 이 방향을 **거꾸로**("마무리 상황이면 벤치 마지막") 적었던 것을
+ * CORRECTIONS 2절이 정정했다 — "E: 새 투수는 … **방향이 반대**". 여기서는 정정 쪽이다.
+ *
+ * ⚠️ `0xb8a8d(team, 0)` 이 무엇을 보는지는 해독 문서에 없어 **늘 참으로 본다** — **근사다**.
+ * "벤치 ≤ 1 이면 0번" 갈래도 따로 두지 않았다 — 후보가 하나뿐이면 `chooseReplacementPitcher`
+ * 가 그 하나를 돌려주므로 결과가 같다(벤치가 비면 `judgePitcherChange` 가 이미 안 바꾼다).
+ *
+ * ⚠️ `features/play-team-game/model/teamGameFlow.replacementPitcherIndexOf` 가 같은 규칙을
+ * 먼저 갖고 있다(팀 경기 전용). 둘은 같은 자리를 옮긴 것이라 **나중에 이쪽 하나로 합쳐야 한다** —
+ * 이번 작업에서는 `features` 를 건드리지 않기로 해 그대로 둔다.
+ */
+export function replacementPitcherSlotOf(
+  bench: readonly ReplacementCandidate[],
+  input: ReplacementPickInput,
+  random: RandomPort,
+): number {
+  const picksBenchLast =
+    !input.saveSituation &&
+    rollsCloser(
+      {
+        inningIndex: input.inningIndex,
+        lead: input.lead,
+        runnerCount: input.runnerCount,
+        bothTeamsAreCpu: input.bothTeamsAreCpu,
+      },
+      random,
+    )
+  if (picksBenchLast) return bench.length === 0 ? -1 : bench[bench.length - 1].index
+  return chooseReplacementPitcher(bench, {
+    inningIndex: input.inningIndex,
+    // 0xabfcc 의 다섯째 인자가 마무리 플래그다 (V3-E)
+    lateInningFlag: input.saveSituation,
+    currentStamina: input.currentStamina,
+    excludeSpecialPitchers: input.excludeSpecialPitchers,
+  })
+}

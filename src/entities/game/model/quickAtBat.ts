@@ -260,6 +260,16 @@ export interface QuickAtBatPlay {
   readonly strikes: number
 }
 
+/** 투구 하나가 지나는 자리에 부르는 갈고리 */
+export interface QuickAtBatHooks {
+  /**
+   * 투구 판정 경로(0xc1818)가 볼·스트라이크를 가른 **바로 뒤**.
+   * 원본은 이 자리에서만 **도루**를 굴린다 (E-defense-rules E-5) — 스윙 경로(0xc11f0)에는 없다.
+   * 안 넘기면 아무 일도 하지 않으므로 난수 순서도 그대로다.
+   */
+  readonly onPitchJudged?: (judgement: PitchJudgement) => void
+}
+
 /**
  * 타석 하나를 끝까지 돌린다 (0xc262c).
  * 투구마다 스윙 경로(0xc11f0, 60%)와 투구 판정 경로(0xc1818, 40%)로 갈린다 — 14회는 스윙만 한다.
@@ -270,6 +280,7 @@ export function playQuickAtBat(
   pitcher: QuickAtBatPitcher,
   situation: QuickAtBatSituation,
   random: RandomPort,
+  hooks: QuickAtBatHooks = {},
 ): QuickAtBatPlay {
   let strikes = 0
   let balls = 0
@@ -279,6 +290,8 @@ export function playQuickAtBat(
       randomIntegerBelow(random, 0, 100) <= SWING_PATH_LIMIT || situation.inning === FORCED_SWING_INNING
     if (!isSwing) {
       const judged = judgePitchOf(pitcher, strikes, balls, random)
+      // 볼·스트라이크를 가른 뒤 도루를 굴린다 (0xc1818 안, E-5). 타석을 끝내는 투구에서도 돈다
+      hooks.onPitchJudged?.(judged)
       if (judged === '삼진') return done({ kind: '삼진' })
       if (judged === '포볼') return done({ kind: '볼넷' })
       if (judged === '볼') balls += 1

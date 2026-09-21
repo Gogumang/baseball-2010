@@ -5,11 +5,19 @@ import {
   CLOSER_ROLL_PERCENTS,
   EMPTY_MOUND_COUNTERS,
   judgePitcherChange,
+  replacementPitcherSlotOf,
   rollsCloser,
 } from '@/entities/pitching/model/pitcherChange'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
+import type { RandomPort } from '@/shared/api/random/randomPort'
+
+const 고정난수 = (value: number): RandomPort => ({
+  next: () => value,
+  nextInRange: (minimum, maximum) => minimum + value * (maximum - minimum),
+  pick: (candidates) => candidates[0],
+})
 
 const 기본 = {
   ...EMPTY_MOUND_COUNTERS,
@@ -154,5 +162,41 @@ describe('새 투수 고르기 0xabfcc', () => {
 
   it('후보가 없으면 −1 이다', () => {
     expect(chooseReplacementPitcher([], { inningIndex: 3, currentStamina: 0 })).toBe(-1)
+  })
+})
+
+/**
+ * 판정 뒤의 자리 0xac5d8~0xac61c — **마무리 상황이 아닐 때만** 0xac360 을 굴린다
+ * (CORRECTIONS 2절 "새 투수 고르기 방향이 반대").
+ */
+describe('새 투수 고르기 앞의 갈림길 0xac5d8', () => {
+  const 후보 = [{ index: 2 }, { index: 3 }, { index: 5 }]
+  const 기본상황 = { inningIndex: 8, lead: 1, runnerCount: 0, currentStamina: 5000 }
+
+  it('마무리 상황이면 굴리지 않고 곧장 0xabfcc 로 간다', () => {
+    // 굴렸다면 9회·1점 차라 벤치 마지막(5)이 나왔을 자리다
+    expect(
+      replacementPitcherSlotOf(후보, { ...기본상황, saveSituation: true }, 고정난수(0)),
+    ).toBe(2)
+  })
+
+  it('마무리 상황이 아니고 굴림에 이기면 벤치 **마지막**을 올린다', () => {
+    expect(
+      replacementPitcherSlotOf(후보, { ...기본상황, saveSituation: false }, 고정난수(0)),
+    ).toBe(5)
+  })
+
+  it('두 팀 다 CPU 면 굴림 자체가 없어 늘 0xabfcc 다 (0xb6c20 — 리그 CPU 경기)', () => {
+    expect(
+      replacementPitcherSlotOf(
+        후보,
+        { ...기본상황, saveSituation: false, bothTeamsAreCpu: true },
+        고정난수(0),
+      ),
+    ).toBe(2)
+  })
+
+  it('벤치가 비면 −1 이다', () => {
+    expect(replacementPitcherSlotOf([], { ...기본상황, saveSituation: true }, 고정난수(0))).toBe(-1)
   })
 })

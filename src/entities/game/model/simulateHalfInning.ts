@@ -8,6 +8,20 @@ import {
 import type { BaseState } from '@/entities/game/model/baseState'
 import { playQuickAtBat } from '@/entities/game/model/quickAtBat'
 import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
+import { runnerCountOf } from '@/entities/game/model/baseState'
+import { quickEngineSteal, quickStealBaseOf } from '@/entities/game/model/steal'
+import {
+  judgePitcherChange,
+  replacementPitcherSlotOf,
+} from '@/entities/pitching/model/pitcherChange'
+import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
+import {
+  FULL_STAMINA,
+  consumeStamina,
+  pitchStaminaCostOf,
+  staminaCapacityOf,
+  staminaPercentOf,
+} from '@/entities/pitcher-career/model/pitcherStamina'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { strikeoutRecordIdsOf, threePitchInningRecordIdsOf } from '@/entities/game/model/gameRecords'
@@ -57,7 +71,91 @@ export interface HalfInningResult {
   readonly recordIds: readonly number[]
   /** 이닝이 끝났을 때 이어지고 있는 연속 삼진 수 — 다음 이닝이 이어받는다 */
   readonly strikeoutCombo: number
+  /** 이 이닝에 허용한 도루 수 (0xc1818, E-5) — 원본은 주자마다 도루 기록 +1 을 준다 */
+  readonly steals: number
+  /**
+   * 이 이닝에 던진 투수마다 한 줄 (`defense` 를 넘겼을 때만 채운다).
+   * 교체가 없으면 한 줄이고, 교체가 있으면 던진 순서대로 여러 줄이다.
+   */
+  readonly pitcherLines: readonly HalfInningPitcherLine[]
+  /** 이닝이 끝났을 때의 마운드 — 다음 이닝에 그대로 넘긴다 (`defense` 를 넘겼을 때만) */
+  readonly mound?: HalfInningMound
 }
+
+/* ── 수비 쪽: 마운드와 투수 교체 (0xc1ba4 → 0xac428 · 0xabfcc · 0xaf09c) ─────── */
+
+/**
+ * 지금 마운드에 선 투수와 그에 딸린 카운터 — 원본 팀 객체 `+0x27c` 묶음과 `team+0x33`(벤치 수).
+ * 반 이닝 하나가 끝나면 부르는 쪽이 이것을 그대로 들고 다음 이닝에 다시 넘긴다.
+ */
+export interface HalfInningMound {
+  /** 로스터 투수 칸 (`team[0]`) */
+  readonly pitcherSlot: number
+  /** 이 투수의 스태미나 `+0x2c` (0~10000) */
+  readonly stamina: number
+  /** **B(`+0x280`)** 이 투수의 실점 — 투수 교체(0xaec64)에서만 0 이 된다 */
+  readonly runsAllowed: number
+  /** `+0x27c` 이 투수의 투구 수 */
+  readonly pitches: number
+  /** 이미 등판했던 투수 칸 — 벤치(`team+0x33`)에서 뺀다 */
+  readonly usedSlots: readonly number[]
+  /** `state[0xd]` — 교체 직후 한 투구 동안은 다시 안 바꾼다 (0xa5e72 가 투구마다 0 으로) */
+  readonly justChanged: boolean
+}
+
+/** 선발이 막 올라온 마운드 — 스태미나는 가득이다 (시즌 시작 0xb6cc4 가 10000) */
+export function startingMoundOf(pitcherSlot: number, stamina: number = FULL_STAMINA): HalfInningMound {
+  return {
+    pitcherSlot,
+    stamina,
+    runsAllowed: 0,
+    pitches: 0,
+    usedSlots: [],
+    justChanged: false,
+  }
+}
+
+/** 투수 한 명이 이 이닝에 남긴 줄 */
+export interface HalfInningPitcherLine {
+  readonly pitcherSlot: number
+  readonly outs: number
+  readonly runsAllowed: number
+  readonly strikeouts: number
+  readonly pitches: number
+}
+
+/**
+ * 반 이닝을 도는 동안 수비 팀이 쓰는 것 — 이것을 넘기면 **타석마다 CPU 투수 교체**(0xc1ba4)가 돌고
+ * 투구마다 체력이 깎인다 (0xa5e14). 안 넘기면 예전처럼 투수 하나가 끝까지 던진다.
+ */
+export interface HalfInningDefense {
+  /** 이 이닝을 시작할 때의 마운드 */
+  readonly mound: HalfInningMound
+  /** 이 팀의 투수 칸 전부 (`team+0x0c` 8명) — 마운드와 이미 쓴 투수를 뺀 나머지가 벤치다 */
+  readonly pitcherSlots: readonly number[]
+  /** 그 칸 투수의 간이 타석용 능력 */
+  readonly pitcherAt: (pitcherSlot: number) => QuickAtBatPitcher
+  /** 그 칸 투수의 **체력 실효 능력치(칸 3)** — 스태미나 용량 X 의 바탕 (0x66e44) */
+  readonly staminaAbilityAt: (pitcherSlot: number) => number
+  /** 이 반 이닝이 시작될 때의 리드 (수비 점수 − 공격 점수) */
+  readonly lead: number
+  /** 팀 사기 (0x66e44 의 `V[+2]`). 모르면 100 */
+  readonly morale?: number
+  /**
+   * 두 팀 다 CPU 조작인가 (`state[0x31+측]`). 참이면 마무리 투입 굴림 0xac360 이 곧장 0 을
+   * 돌려준다 (0xb6c20) — **CPU 끼리의 리그 경기가 바로 이 경우다**.
+   */
+  readonly bothTeamsAreCpu?: boolean
+}
+
+/** 원본 실점 카운터 A·B 는 99 에서 자른다 (P7 E1) */
+const MAXIMUM_COUNTER = 99
+
+/**
+ * 간이 엔진은 구질을 고르지 않는다 — 0xc26c8 이 0xa5e14 에 **늘 1(FASTBALL)** 을 넘긴다
+ * (P1 3-1 확정). 그래서 투구 하나의 기본 소모는 늘 9 다.
+ */
+const QUICK_PITCH_TYPE = 1
 
 export interface HalfInningPitching {
   /** 이 이닝 전까지 이어지던 연속 삼진 수 */
@@ -103,6 +201,7 @@ export function simulateHalfInning(
   random: RandomPort,
   before: HalfInningPitching = EMPTY_HALF_INNING_PITCHING,
   hooks: HalfInningHooks = {},
+  defense?: HalfInningDefense,
 ): HalfInningResult {
   let bases = EMPTY_BASES
   let outs = 0
@@ -111,12 +210,45 @@ export function simulateHalfInning(
   let walks = 0
   let strikeouts = 0
   let pitches = 0
+  let steals = 0
   let combo = before.strikeoutCombo
   let order = battingOrderIndex
   const recordIds: number[] = []
   const plateAppearances: HalfInningPlateAppearance[] = []
+  let mound = defense?.mound
+  /**
+   * **A(`+0x284`)** 이 투수의 이번 이닝 실점. 이닝 교대 0xa5b00 이 0 으로 되돌리므로
+   * 반 이닝마다 0 에서 시작한다 (P7 E1).
+   */
+  let inningRunsAllowed = 0
+  const lines = new Map<number, HalfInningPitcherLine>()
+  const addLine = (slot: number, add: Omit<HalfInningPitcherLine, 'pitcherSlot'>) => {
+    const line = lines.get(slot) ?? { pitcherSlot: slot, outs: 0, runsAllowed: 0, strikeouts: 0, pitches: 0 }
+    lines.set(slot, {
+      pitcherSlot: slot,
+      outs: line.outs + add.outs,
+      runsAllowed: line.runsAllowed + add.runsAllowed,
+      strikeouts: line.strikeouts + add.strikeouts,
+      pitches: line.pitches + add.pitches,
+    })
+  }
 
   for (let faced = 0; faced < MAXIMUM_BATTERS && outs < OUTS_PER_INNING; faced += 1) {
+    // 간이 타석 루프 0xc262c 는 **타석마다 먼저** 0xc1ba4 를 불러 수비 팀 투수 교체를 판정한다
+    if (defense !== undefined && mound !== undefined) {
+      const changed = changePitcherIfNeeded(defense, mound, {
+        inningIndex: inning - 1,
+        lead: defense.lead - runs,
+        runnerCount: runnerCountOf(bases),
+        inningRunsAllowed,
+        random,
+      })
+      if (changed !== mound) {
+        mound = changed
+        // 교체 0xaec64 가 +0x27c·+0x280·+0x284 를 한꺼번에 0 으로 민다
+        inningRunsAllowed = 0
+      }
+    }
     // 상태 0xf — 타석 준비. 원본은 여기서 돌발미션 발동을 굴린다 (0x8f158)
     hooks.onAtBatStart?.({
       bases,
@@ -125,7 +257,37 @@ export function simulateHalfInning(
       strikeoutsSoFar: before.strikeouts + strikeouts,
     })
     const outsBefore = outs
-    const play = playQuickAtBat(batterAt(order), pitcher, { inning }, random)
+    /**
+     * 간이 엔진이 보는 투수 체력은 **체력%**(0xaebb0)다 — 0xc1430·0xc183c 가 그 값을 읽는다
+     * (P1 3-3). 그래서 마운드가 있으면 능력치 칸 3 대신 살아 있는 체력%를 넘긴다.
+     */
+    const facing =
+      defense !== undefined && mound !== undefined
+        ? { ...defense.pitcherAt(mound.pitcherSlot), stamina: staminaPercentOf(mound.stamina) }
+        : pitcher
+    const play = playQuickAtBat(batterAt(order), facing, { inning }, random, {
+      /**
+       * 투구 판정 경로 뒤에만 도루를 굴린다 (0xc1818, E-5). **실패가 없어** 주자를 잃지 않는다.
+       *
+       * ⚠️ **주자가 누구인지가 근사다** — 반 이닝 엔진은 루에 선 주자의 신원을 들고 있지 않다.
+       * 1루 주자는 직전 타자, 2루 주자는 그 앞 타자로 보고 타순에서 거꾸로 센다
+       * (`features/play-team-game/model/teamGameFlow.stealBase` 도 같은 근사를 쓴다).
+       * 도루로 2루에 간 주자는 실제로는 직전 타자라 이 셈이 한 칸 어긋나고, 이닝 첫 타석처럼
+       * 거꾸로 셀 타자가 모자라면 0번으로 막는다.
+       */
+      onPitchJudged: () => {
+        const base = quickStealBaseOf(bases)
+        if (base === null) return
+        const runner = batterAt(Math.max(0, order - base))
+        const stolen = quickEngineSteal(
+          bases,
+          { hit: 0, power: 0, defense: 0, run: runner.run },
+          random,
+        )
+        bases = stolen.bases
+        steals += stolen.stolen
+      },
+    })
     const outcome = play.outcome
     pitches += play.pitches
     if (outcome.kind === '안타' || outcome.kind === '홈런') hits += 1
@@ -169,6 +331,24 @@ export function simulateHalfInning(
       outsAdded: advanced.outsAdded,
       inningEnded: outs >= OUTS_PER_INNING,
     })
+
+    if (defense !== undefined && mound !== undefined) {
+      addLine(mound.pitcherSlot, {
+        outs: advanced.outsAdded,
+        runsAllowed: scored,
+        strikeouts: outcome.kind === '삼진' ? 1 : 0,
+        pitches: play.pitches,
+      })
+      inningRunsAllowed = Math.min(MAXIMUM_COUNTER, inningRunsAllowed + scored)
+      mound = {
+        ...mound,
+        stamina: drainQuickPitcher(defense, mound, play.pitches),
+        runsAllowed: Math.min(MAXIMUM_COUNTER, mound.runsAllowed + scored),
+        pitches: mound.pitches + play.pitches,
+        // 투구마다 state[0xd] 가 내려간다 (0xa5e72) — 타석을 하나 치렀으면 반드시 내려가 있다
+        justChanged: false,
+      }
+    }
     order += 1
   }
 
@@ -185,5 +365,108 @@ export function simulateHalfInning(
     pitches,
     recordIds,
     strikeoutCombo: combo,
+    steals,
+    pitcherLines: [...lines.values()],
+    mound,
   }
+}
+
+/**
+ * 타석 하나를 돌리기 **전에** 수비 팀 투수를 바꿀지 본다 (0xc1ba4 → 0xac428 → 0xabfcc → 0xaf09c).
+ * 안 바꾸면 받은 마운드를 그대로 돌려준다.
+ *
+ * ⚠️ 원본 `0xc1ba4` 의 첫 갈래(모드 3 에서 **8회**에 벤치 마선수로 교체 — CORRECTIONS 2절이
+ * "7회" 를 8회로 정정했다)는 **나만의리그 투수편 전용**이라 CPU 끼리의 리그 경기에는 없다.
+ * 그 갈래는 `entities/pitcher-career/model/pitcherRotation` 이 이미 갖고 있다.
+ *
+ * ⚠️ **웹 로스터에 보직(`+0xb` 하위 2비트)이 없다** — 선발(0)로 본다. 역할 0·1 은 같은 갈래라
+ * 결과가 같고, 마무리(2) 갈래만 못 탄다. **근사다.**
+ */
+function changePitcherIfNeeded(
+  defense: HalfInningDefense,
+  mound: HalfInningMound,
+  situation: {
+    readonly inningIndex: number
+    readonly lead: number
+    readonly runnerCount: number
+    readonly inningRunsAllowed: number
+    readonly random: RandomPort
+  },
+): HalfInningMound {
+  const bench = defense.pitcherSlots.filter(
+    (slot) => slot !== mound.pitcherSlot && !mound.usedSlots.includes(slot),
+  )
+  const decision = judgePitcherChange({
+    inningRunsAllowed: situation.inningRunsAllowed,
+    runsAllowed: mound.runsAllowed,
+    pitches: mound.pitches,
+    role: PITCHER_ROLE.starter,
+    stamina: mound.stamina,
+    benchCount: bench.length,
+    justChanged: mound.justChanged,
+    lead: situation.lead,
+    inningIndex: situation.inningIndex,
+    runnerCount: situation.runnerCount,
+  })
+  if (!decision.replace) return mound
+
+  const next = replacementPitcherSlotOf(
+    // ⚠️ 벤치 투수의 스태미나를 따로 들고 다니지 않아 **다 가득**으로 본다 — 스태미나가 같으면
+    //    0xabfcc 가 벤치 번호가 작은 쪽을 고른다. **근사다.**
+    bench.map((slot) => ({ index: slot })),
+    {
+      saveSituation: decision.saveSituation,
+      inningIndex: situation.inningIndex,
+      lead: situation.lead,
+      runnerCount: situation.runnerCount,
+      currentStamina: mound.stamina,
+      bothTeamsAreCpu: defense.bothTeamsAreCpu,
+    },
+    situation.random,
+  )
+  if (next < 0) return mound
+
+  // 교체 0xaec64 는 카운터(+0x27c·+0x280·+0x284)를 한꺼번에 0 으로 민다.
+  // ⚠️ 올라온 투수의 스태미나는 원본이 **시즌 내내 이어지는 레코드 값**(+0x2c)을 그대로 쓰는데,
+  //    웹 리그는 투수별 스태미나를 저장하지 않아 **가득**에서 시작한다 — **근사다.**
+  //    (경기 사이 회복 0xb60e0 은 `pitcherStamina.recoverStaminaAfterGameDay` 에 이미 있다.)
+  return {
+    pitcherSlot: next,
+    stamina: FULL_STAMINA,
+    runsAllowed: 0,
+    pitches: 0,
+    usedSlots: [...mound.usedSlots, mound.pitcherSlot],
+    justChanged: true,
+  }
+}
+
+/**
+ * 투구 하나마다 깎이는 스태미나 (0xa5e14 → 0xaeb08). 간이 엔진은 구질을 안 골라 늘 직구(소모 9)다.
+ *
+ * 용량 X = 사기보정(체력 실효 능력치) + (첫 투수 ? 200 : 0) + 250 (0x66e44) — 구원으로 올라온
+ * 투수는 +200 이 없어 같은 체력이면 더 빨리 지친다.
+ *
+ * ⚠️ **근사**: 원본은 투구마다 깎지만 여기서는 타석이 끝난 뒤 그 타석의 투구 수만큼 한꺼번에
+ * 깎는다 (`features/play-team-game` 의 `drainQuickPitcher` 와 같은 근사). 깎이는 총량은 같고,
+ * 한 타석 **안에서** 보는 체력%만 한 타석 늦는다.
+ */
+function drainQuickPitcher(
+  defense: HalfInningDefense,
+  mound: HalfInningMound,
+  pitchCount: number,
+): number {
+  const capacity = staminaCapacityOf(
+    defense.staminaAbilityAt(mound.pitcherSlot),
+    defense.morale ?? 100,
+    mound.usedSlots.length === 0,
+  )
+  const cost = pitchStaminaCostOf({
+    pitchTypeNumber: QUICK_PITCH_TYPE,
+    batterIntimidates: false,
+    pitcherIsCoward: false,
+    pitcherEndures: false,
+  })
+  let stamina = mound.stamina
+  for (let pitch = 0; pitch < pitchCount; pitch += 1) stamina = consumeStamina(stamina, cost, capacity)
+  return stamina
 }
