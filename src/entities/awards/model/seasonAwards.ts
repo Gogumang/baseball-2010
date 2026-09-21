@@ -8,9 +8,14 @@ import {
 } from '@/entities/awards/model/leaderboard'
 import type { LeaderKind, LeagueRecord } from '@/entities/awards/model/leaderboard'
 import { LEAGUE_TEAM_COUNT } from '@/entities/league/model/league'
-import { leagueBatterIdOf, leagueBatterLineOf } from '@/entities/league/model/leaguePlayerStats'
+import {
+  leagueBatterIdOf,
+  leagueBatterLineOf,
+  leaguePitcherIdOf,
+  leaguePitcherLineOf,
+} from '@/entities/league/model/leaguePlayerStats'
 import type { LeaguePlayerStats } from '@/entities/league/model/leaguePlayerStats'
-import { teamBatters } from '@/entities/team/model/teamRoster'
+import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 
 /**
  * 개인 타이틀(370~374)·시즌 MVP(375~377)·연봉협상 등급 k
@@ -161,29 +166,39 @@ export interface SeasonAwards {
 }
 
 /**
- * 시상 한 번 (0x8dad4 → 0x8dd60).
+ * 시상을 받는 **내 육성 선수** — 타자편·투수편이 함께 쓰는 꼴이다.
+ * (원본은 한 벌의 육성 코드가 모드 3·4 를 같이 돌리므로 0x8dd60 도 하나뿐이다.)
+ */
+export interface AwardSubject {
+  readonly teamId: number
+  readonly name: string
+  /** 올해의 목표 달성 수 — **단계 2**(MVP 판정용, 0xa3de8 인자 2) */
+  readonly achievedGoalCount: number
+}
+
+/**
+ * 시상 한 번 (0x8dad4 → 0x8dd60) — 모드를 가리지 않는 알맹이다.
  *
  * MVP = **(타이틀 ≥ 1) AND (타이틀 3개 모두 OR 올해의 목표(단계 2) 달성 4개 이상)** — B-3 확정.
  * 0x8de58 이 세 칸을 한 번에 보고 모두 0 이면 바로 탈락시키므로, 목표를 다 채워도
  * **타이틀이 하나도 없으면 MVP 가 아니다**.
  */
-export function judgeSeasonAwards(
-  career: PlayerCareer,
+export function judgeAwards(
+  subject: AwardSubject,
   records: readonly LeagueRecord[],
   role: AwardRole = '타자',
 ): SeasonAwards {
   const titles = judgeTitles(records, role)
   const wonCount = titles.filter((title) => title.isMine).length
   const isMostValuablePlayer =
-    wonCount >= 1 &&
-    (wonCount === titles.length || achievedGoalCountForMvp(career) >= MVP_GOAL_COUNT)
+    wonCount >= 1 && (wonCount === titles.length || subject.achievedGoalCount >= MVP_GOAL_COUNT)
 
   if (isMostValuablePlayer) {
     return {
       titles,
       wonCount,
       isMostValuablePlayer,
-      mostValuablePlayer: { teamId: career.teamId, name: career.name },
+      mostValuablePlayer: { teamId: subject.teamId, name: subject.name },
     }
   }
   // MVP 가 아니면 내가 못 딴 **첫** 타이틀의 수상자를 MVP 로 보여 준다 (0x8df18)
@@ -194,6 +209,19 @@ export function judgeSeasonAwards(
     isMostValuablePlayer,
     mostValuablePlayer: shown ? { teamId: shown.teamId, name: shown.winnerName } : null,
   }
+}
+
+/** 타자편(모드 4) 입구 — 커리어에서 목표 달성 수를 세어 `judgeAwards` 에 넘긴다 */
+export function judgeSeasonAwards(
+  career: PlayerCareer,
+  records: readonly LeagueRecord[],
+  role: AwardRole = '타자',
+): SeasonAwards {
+  return judgeAwards(
+    { teamId: career.teamId, name: career.name, achievedGoalCount: achievedGoalCountForMvp(career) },
+    records,
+    role,
+  )
 }
 
 // ─── 이벤트 번호와 보상 ────────────────────────────────────────────────────────
@@ -380,4 +408,41 @@ export function leagueRecordsOf(
 /** 커리어 하나로 순위표 재료를 만든다 — 리그 선수 표 + 내 선수 한 줄 */
 export function careerLeagueRecordsOf(career: PlayerCareer): readonly LeagueRecord[] {
   return leagueRecordsOf(career.leaguePlayerStats, myLeagueRecordOf(career))
+}
+
+/**
+ * 리그 **투수** 기록표 → 순위표가 훑을 레코드 줄들.
+ *
+ * 원본은 한 순위표 함수(0x9d789)가 종류에 따라 팀의 타자 명단(0xb53d1)이나 **투수 명단**(0xb51fd,
+ * 레코드 +0xc 개수)을 훑는다 — 투수 타이틀(승·탈삼진·방어율)은 투수 명단 쪽이다.
+ * 웹은 명단이 `shared/config` 의 붙박이 표라 표만 갈아 끼운다: 팀 0부터, 팀 안에서는 로스터 순서.
+ *
+ * 칸 대응은 P1 6절 그대로다 — `atBatsOrOuts` = +0x20 아웃, `hits`·`earnedRuns` = +0x22 실점
+ * (자책 구분이 없어 같은 칸이다), `saves` = +0x24, `strikeouts` = +0x26, `wins` = +0x2e,
+ * `losses` = +0x2f.
+ */
+export function leaguePitcherRecordsOf(
+  stats: LeaguePlayerStats,
+  myRecord: LeagueRecord | null = null,
+): readonly LeagueRecord[] {
+  const records: LeagueRecord[] = []
+  for (let teamId = 0; teamId < LEAGUE_TEAM_COUNT; teamId += 1) {
+    teamPitchers(teamId).forEach((player, slot) => {
+      const line = leaguePitcherLineOf(stats, leaguePitcherIdOf(teamId, slot))
+      records.push({
+        ...EMPTY_LEAGUE_RECORD,
+        teamId,
+        name: player.name,
+        atBatsOrOuts: line.outs,
+        hits: line.runsAllowed,
+        saves: line.saves,
+        strikeouts: line.strikeouts,
+        earnedRuns: line.runsAllowed,
+        wins: line.wins,
+        losses: line.losses,
+      })
+    })
+    if (myRecord !== null && myRecord.teamId === teamId) records.push(myRecord)
+  }
+  return records
 }

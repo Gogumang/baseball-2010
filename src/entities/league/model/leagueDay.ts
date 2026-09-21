@@ -2,13 +2,15 @@ import { LEAGUE_TEAM_COUNT, opponentOf, recordLeagueResult } from '@/entities/le
 import type { League } from '@/entities/league/model/league'
 import { simulateHalfInning } from '@/entities/game/model/simulateHalfInning'
 import type { HalfInningResult } from '@/entities/game/model/simulateHalfInning'
-import { batterAt, startingPitcherOf } from '@/entities/team/model/teamRoster'
+import { batterAt, rollStartingPitcherIndex, startingPitcherOf } from '@/entities/team/model/teamRoster'
 import { rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
 import {
   EMPTY_LEAGUE_PLAYER_STATS,
+  recordLeaguePitcherAppearances,
   recordLeaguePlateAppearances,
 } from '@/entities/league/model/leaguePlayerStats'
 import type {
+  LeaguePitcherAppearance,
   LeaguePlateAppearance,
   LeaguePlayerStats,
 } from '@/entities/league/model/leaguePlayerStats'
@@ -63,6 +65,12 @@ export interface LeagueGameScore {
    * 결과를 버리지 않고 내보내, `playLeagueDay` 가 리그 선수 기록표에 쌓는다.
    */
   readonly plateAppearances: readonly LeaguePlateAppearance[]
+  /**
+   * 이 경기에서 나온 **투수 기록** 두 줄 (양 팀 선발). 원본도 같은 레코드에 아웃 +0x20 ·
+   * 실점 +0x22 · 탈삼진 +0x26 · 투구 수 +0x28 을 쌓고, 경기 끝 0xa7de8 이 승 +0x2e · 패 +0x2f 를
+   * 매긴다 (P1-pitcher-rules.md 6절). 세이브 +0x24 는 웹에 구원 교체가 없어 늘 0 이다.
+   */
+  readonly pitcherAppearances: readonly LeaguePitcherAppearance[]
 }
 
 /**
@@ -78,8 +86,12 @@ export function simulateLeagueGame(
   startingPitcherSlot?: number,
 ): LeagueGameScore {
   // 선발은 경기를 세울 때 로스터 앞 4명 중 하나로 정해진다 (0x3107a·0x31090, S13 1-4b)
-  const awayPitcher = startingPitcherOf(matchup.away, startingPitcherSlot ?? random)
-  const homePitcher = startingPitcherOf(matchup.home, startingPitcherSlot ?? random)
+  // 칸 번호를 먼저 정해 두는 것은 **투수 기록을 그 칸에 쌓아야** 하기 때문이다.
+  // 난수를 부르는 횟수·순서는 예전과 같다(팀마다 한 번씩).
+  const awaySlot = startingPitcherSlot ?? rollStartingPitcherIndex(random)
+  const homeSlot = startingPitcherSlot ?? rollStartingPitcherIndex(random)
+  const awayPitcher = startingPitcherOf(matchup.away, awaySlot)
+  const homePitcher = startingPitcherOf(matchup.home, homeSlot)
   let awayRuns = 0
   let homeRuns = 0
   let awayOrder = 0
@@ -91,12 +103,29 @@ export function simulateLeagueGame(
       plateAppearances.push({ teamId, ...appearance })
     }
   }
+  /**
+   * 투수 쪽 합계. 웹 간이 엔진은 **선발 하나가 경기를 끝까지 던지므로** 반 이닝 결과를 모두
+   * 상대 팀 선발에게 그대로 얹으면 된다 (교체가 없어 책임 투수를 가릴 일이 없다).
+   */
+  const pitched = {
+    [matchup.away]: { outs: 0, runsAllowed: 0, strikeouts: 0, pitches: 0 },
+    [matchup.home]: { outs: 0, runsAllowed: 0, strikeouts: 0, pitches: 0 },
+  }
+  /** 이 반 이닝을 던진 쪽(= 수비 팀)에게 쌓는다 */
+  const charge = (defenseTeamId: number, half: HalfInningResult) => {
+    const line = pitched[defenseTeamId]
+    line.outs += half.outs
+    line.runsAllowed += half.runs
+    line.strikeouts += half.strikeouts
+    line.pitches += half.pitches
+  }
 
   for (let inning = 1; inning <= MAXIMUM_INNINGS; inning += 1) {
     const top = simulateHalfInning(awayOrder, (order) => batterAt(matchup.away, order), homePitcher, inning, random)
     awayRuns += top.runs
     awayOrder = top.nextBattingOrderIndex
     collect(matchup.away, top)
+    charge(matchup.home, top)
 
     // 홈이 이미 앞서 있으면 9회말은 치르지 않는다
     if (inning >= REGULAR_INNINGS && homeRuns > awayRuns) break
@@ -105,11 +134,28 @@ export function simulateLeagueGame(
     homeRuns += bottom.runs
     homeOrder = bottom.nextBattingOrderIndex
     collect(matchup.home, bottom)
+    charge(matchup.away, bottom)
 
     if (inning >= REGULAR_INNINGS && awayRuns !== homeRuns) break
   }
 
-  return { awayRuns, homeRuns, plateAppearances }
+  /**
+   * 승패 투수 — **근사다**. 원본 규칙(0xa7de8 이 읽는 `state+0x44/0x48`·`+0x50/0x54` 를 누가
+   * 채우는가)은 해독 문서가 "미해결" 로 남겨 두었다 (P1 6절 마지막 줄). 웹 간이 엔진은 선발
+   * 하나가 끝까지 던지므로 **이긴 팀 선발에게 승, 진 팀 선발에게 패**로 둔다.
+   *
+   * 판정은 **실제 점수**로 한다. 아래 `playLeagueDay` 가 옮겨 온 원본 버그(0xc2a48 이 순위표에
+   * 진 팀을 승으로 적는 것)는 **순위표 기록 쪽 실수**이고, 원본에서도 승패 투수는 경기 안에서
+   * 정해진 진짜 결과를 본다 — 그래서 여기서는 뒤집지 않는다.
+   * 동점(웹 안전망인 30이닝까지 안 갈린 경우)은 순위표와 같이 원정 쪽을 승으로 본다.
+   */
+  const awayWon = awayRuns >= homeRuns
+  const pitcherAppearances: readonly LeaguePitcherAppearance[] = [
+    { teamId: matchup.away, pitcherSlot: awaySlot, ...pitched[matchup.away], decision: awayWon ? '승' : '패' },
+    { teamId: matchup.home, pitcherSlot: homeSlot, ...pitched[matchup.home], decision: awayWon ? '패' : '승' },
+  ]
+
+  return { awayRuns, homeRuns, plateAppearances, pitcherAppearances }
 }
 
 /** 하루치 경기가 남긴 것 — 순위표와 **선수 기록표** 두 벌이다 */
@@ -134,11 +180,13 @@ export function playLeagueDay(
   playerStats: LeaguePlayerStats = EMPTY_LEAGUE_PLAYER_STATS,
 ): LeagueDayResult {
   const plateAppearances: LeaguePlateAppearance[] = []
+  const pitcherAppearances: LeaguePitcherAppearance[] = []
   const played = matchupsOf(day).reduce((current, matchup) => {
     if (matchup.away === myTeamId || matchup.home === myTeamId) return current
     // 하루가 끝날 때마다 팀마다 로테이션이 한 칸 돈다 (0xb5ca8, S5 U-16) — 날짜가 선발을 정한다
     const score = simulateLeagueGame(matchup, random, rotationSlotOf(day))
     plateAppearances.push(...score.plateAppearances)
+    pitcherAppearances.push(...score.pitcherAppearances)
     // ⚠️ 원본 버그를 그대로 옮긴 것 (0xc2a48, R1 확정 · DECISIONS 2026-09-20 ①):
     //    `원정 득점 > 홈 득점` 이면 **홈** 에 승을, 아니면 **원정** 에 승을 준다 — 늘 진 팀이 이긴다.
     //    상대전적도 같이 뒤집히고, 동점이면 원정 승이다.
@@ -148,5 +196,11 @@ export function playLeagueDay(
       : recordLeagueResult(current, matchup.away, matchup.home)
   }, league)
 
-  return { league: played, playerStats: recordLeaguePlateAppearances(playerStats, plateAppearances) }
+  return {
+    league: played,
+    playerStats: recordLeaguePitcherAppearances(
+      recordLeaguePlateAppearances(playerStats, plateAppearances),
+      pitcherAppearances,
+    ),
+  }
 }

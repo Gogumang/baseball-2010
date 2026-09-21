@@ -12,7 +12,18 @@ import {
   pitcherInjuryEndingOf,
   pitcherRetirementEndingOf,
   pitcherYearEndStepOf,
+  judgePitcherSeasonAwards,
+  myPitcherLeagueRecordOf,
+  pitcherAwardRoleOf,
+  pitcherSalaryNegotiationRankOf,
+  recordPitcherSeasonMvp,
 } from '@/entities/pitcher-career/model/pitcherSeasonFlow'
+import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
+import { NO_TEAM } from '@/entities/awards/model/seasonAwards'
+import {
+  EMPTY_LEAGUE_PITCHER_LINE,
+  leaguePitcherIdOf,
+} from '@/entities/league/model/leaguePlayerStats'
 
 const 투수 = (overrides: Partial<PitcherCareer> = {}): PitcherCareer => ({
   ...createPitcherCareer('테스트'),
@@ -120,5 +131,102 @@ describe('엔딩 보너스와 이어하기 (141 틀 0x1bbc4)', () => {
     expect(이어함.gamesPlayed).toBe(0)
     expect(이어함.stamina).toBe(10_000)
     expect(이어함.gamePoint).toBe(0)
+  })
+})
+
+describe('투수편 개인 타이틀·MVP·연봉 등급 (0x8dad4 · 0x8dd60 · 0xa4d78)', () => {
+  /** 규정 이닝 45 = 135 아웃 (0x9d7d0 의 0x2d) */
+  const 좋은성적 = {
+    games: 12,
+    outs: 405,
+    runsAllowed: 10,
+    saves: 0,
+    strikeouts: 200,
+    pitches: 1500,
+    wins: 20,
+    losses: 1,
+  }
+
+  it('선발 보직은 다승왕·삼진왕·방어왕 세 칸이다 (종류 표 0xd4f24)', () => {
+    const 시상 = judgePitcherSeasonAwards(투수({ stats: 좋은성적 }))
+
+    expect(시상.titles.map((칸) => 칸.name)).toEqual(['다승왕', '삼진왕', '방어왕'])
+  })
+
+  it('구원 보직이면 첫째가 세이브왕으로 바뀐다 (0xb6ded == 2)', () => {
+    const 마무리 = 투수({ role: PITCHER_ROLE.relief, stats: { ...좋은성적, saves: 30 } })
+
+    expect(pitcherAwardRoleOf(마무리)).toBe('마무리')
+    expect(judgePitcherSeasonAwards(마무리).titles.map((칸) => 칸.name)).toEqual([
+      '세이브왕',
+      '삼진왕',
+      '방어왕',
+    ])
+  })
+
+  it('리그 투수 표가 비어 있으면 내 성적만으로 세 타이틀을 쓸어 담고 MVP 가 된다', () => {
+    const 시상 = judgePitcherSeasonAwards(투수({ stats: 좋은성적 }))
+
+    expect(시상.wonCount).toBe(3)
+    expect(시상.isMostValuablePlayer).toBe(true)
+    // 등급 k = 타이틀 3 + MVP 2 = 5 (강경 384 / 정중 388 자리)
+    expect(pitcherSalaryNegotiationRankOf(투수({ stats: 좋은성적 }))).toBe(5)
+  })
+
+  it('한 번도 안 던졌으면(아웃 0) 순위표에서 빠져 수상이 없다', () => {
+    const 시상 = judgePitcherSeasonAwards(투수())
+
+    expect(시상.wonCount).toBe(0)
+    expect(시상.isMostValuablePlayer).toBe(false)
+    expect(시상.titles.every((칸) => 칸.teamId === NO_TEAM)).toBe(true)
+  })
+
+  it('규정 이닝(45)을 못 채우면 방어왕만 빠진다', () => {
+    const 시상 = judgePitcherSeasonAwards(투수({ stats: { ...좋은성적, outs: 100 } }))
+    const 방어왕 = 시상.titles.find((칸) => 칸.name === '방어왕')
+
+    expect(시상.wonCount).toBe(2)
+    expect(방어왕?.isMine).toBe(false)
+    expect(방어왕?.teamId).toBe(NO_TEAM)
+  })
+
+  it('CPU 투수가 더 많이 이기면 다승왕을 뺏긴다 — 리그 표가 재료다', () => {
+    const 나은CPU = {
+      ...EMPTY_LEAGUE_PITCHER_LINE,
+      outs: 405,
+      runsAllowed: 200,
+      strikeouts: 10,
+      wins: 30,
+    }
+    const 시상 = judgePitcherSeasonAwards(
+      투수({
+        stats: 좋은성적,
+        leaguePlayerStats: { batters: {}, pitchers: { [leaguePitcherIdOf(1, 0)]: 나은CPU } },
+      }),
+    )
+    const 다승왕 = 시상.titles.find((칸) => 칸.name === '다승왕')
+
+    expect(다승왕?.isMine).toBe(false)
+    expect(다승왕?.teamId).toBe(1)
+    expect(시상.wonCount).toBe(2)
+    // 세 칸을 다 못 먹었고 목표 달성 수를 못 세니 MVP 도 없다 (투수 목표 표 0xd7e9a 미이식)
+    expect(시상.isMostValuablePlayer).toBe(false)
+  })
+
+  it('MVP 면 그 해 비트가 career+0x1ca 에 남는다 (0xa4d2c)', () => {
+    const 남김 = recordPitcherSeasonMvp(투수({ season: 3, stats: 좋은성적 }))
+
+    expect(남김.mvpSeasonBits).toBe(1 << 2)
+    // 수상이 없으면 커리어를 그대로 돌려준다
+    expect(recordPitcherSeasonMvp(투수({ season: 3 })).mvpSeasonBits).toBe(0)
+  })
+
+  it('내 선수 줄은 실점을 자책점 자리에도 그대로 쓴다 (웹엔 실책이 없다 — 근사)', () => {
+    const 줄 = myPitcherLeagueRecordOf(투수({ stats: 좋은성적 }))
+
+    expect(줄.atBatsOrOuts).toBe(405)
+    expect(줄.hits).toBe(10)
+    expect(줄.earnedRuns).toBe(10)
+    expect(줄.isMine).toBe(true)
   })
 })

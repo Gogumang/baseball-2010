@@ -46,7 +46,10 @@ export interface LeagueRecord {
   readonly isOutOfRanking: boolean
   /** +0x20 — 타자는 타수, 투수는 잡은 아웃 수. **0 이하면 순위표에서 뺀다** */
   readonly atBatsOrOuts: number
-  /** +0x22 — 타자는 안타, 투수는 피안타(종류 5·8) */
+  /**
+   * +0x22 — 타자는 안타, **투수는 실점**(자책/비자책을 가르지 않는다, P1-pitcher-rules.md 6절 확정).
+   * 순위표 종류 5(투수 +0x22)와 방어율(종류 4)이 이 칸을 본다.
+   */
   readonly hits: number
   /** +0x24 세이브 */
   readonly saves: number
@@ -58,7 +61,13 @@ export interface LeagueRecord {
   readonly runsBattedIn: number
   /** +0x2c — 타자 쪽 종류 10 이 보는 칸 (뜻 미확인) */
   readonly batterExtra: number
-  /** 방어율(0xb6ce9) 계산에 쓰는 자책점 */
+  /**
+   * 방어율(0xb6ce8) 분자 = 레코드 +0x22 실점.
+   *
+   * ⚠️ **웹은 실책 개념이 없어 실점이 곧 자책점이다** — **근사다**. 원본도 +0x22 하나로 자책·
+   * 비자책을 가르지 않으니(P1 6절 "실점(자책 구분 없음)") 결과는 같다. `hits` 와 같은 칸이지만
+   * 뜻이 갈리는 자리라 이름을 따로 두었다.
+   */
   readonly earnedRuns: number
   /** +0x2e 승 */
   readonly wins: number
@@ -106,18 +115,23 @@ export function battingAverageOf(record: LeagueRecord): number | null {
 }
 
 /**
- * 방어율 (0xb6ce9) — **자책점 × 27 / 아웃** 을 100 배 정수로 둔다.
- * ⚠️ B 문서가 "0xb6ce9, 오름차순" 까지만 확정하고 **식 자체는 적지 않았다** → 야구의 표준식
- * (자책점 × 9이닝 / 이닝, 이닝 = 아웃/3)을 정수로 옮긴 **추정**이다. 순위만 쓰므로 배율은 결과에
- * 영향이 없고, 원본 식이 밝혀지면 이 함수 하나만 고치면 된다.
+ * 방어율 (0xb6ce8) = `min(9999, trunc(실점 × 2700 / 아웃))` — **100 배 정수**다.
+ * P1-pitcher-rules.md 6절이 식까지 확정했다(9이닝 = 27아웃 × 100). 앞서 추정으로 적어 둔
+ * `자책점 × 3 × 9 × 100 / 아웃` 과 **숫자가 같아** 값은 바뀌지 않고, 9999 상한만 새로 붙었다.
+ * `pitcherCareer.seasonEarnedRunAverageOf` 와 같은 식이다.
  */
 export const EARNED_RUN_AVERAGE_SCALE = 100
 const OUTS_PER_INNING = 3
+/** 원본 상한 — 0xb6ce8 이 9999(= 99.99) 에서 자른다 */
+export const MAXIMUM_EARNED_RUN_AVERAGE = 9999
 
 export function earnedRunAverageOf(record: LeagueRecord): number | null {
   if (record.atBatsOrOuts <= 0) return null
-  return Math.trunc(
-    (record.earnedRuns * OUTS_PER_INNING * 9 * EARNED_RUN_AVERAGE_SCALE) / record.atBatsOrOuts,
+  return Math.min(
+    MAXIMUM_EARNED_RUN_AVERAGE,
+    Math.trunc(
+      (record.earnedRuns * OUTS_PER_INNING * 9 * EARNED_RUN_AVERAGE_SCALE) / record.atBatsOrOuts,
+    ),
   )
 }
 

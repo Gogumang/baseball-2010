@@ -19,6 +19,7 @@ import {
   pitcherInjuryEndingOf,
   pitcherRetirementEndingOf,
   pitcherYearEndStepOf,
+  recordPitcherSeasonMvp,
 } from '@/entities/pitcher-career/model/pitcherSeasonFlow'
 import type { PitcherRookieProfile } from '@/entities/pitcher-career/model/pitcherRegistration'
 import {
@@ -77,12 +78,23 @@ export interface PitcherLeagueSession {
  * 커리어에 칸을 더할 때마다 옛 저장에는 그 칸이 없어 `undefined` 가 된다 — 그대로 캐스팅하면
  * 화면이 조용히 어긋난다(예: 마구 고른 번호가 없어 "사용 중" 표시가 안 된다).
  * 새 커리어 한 벌을 바탕에 깔고 저장을 덮어쓰는 것으로 한 번에 막는다.
+ *
+ * ⚠️ 겉만 덮어쓰면 **한 겹 안쪽 칸**은 못 메운다. 리그 선수 기록표에 투수 줄(`pitchers`)이
+ * 새로 생겼는데 옛 저장에는 `{ batters }` 뿐이라, 그대로 두면 `pitchers` 가 `undefined` 인 채
+ * 돌아다닌다. 저장 형식 번호는 올리지 않는다 — 올리면 옛 저장이 통째로 버려져 선수가 사라진다.
  */
 function normalizePitcherCareer(raw: unknown): PitcherCareer | null {
   if (raw === null || typeof raw !== 'object') return null
   const saved = raw as Partial<PitcherCareer>
   if (typeof saved.name !== 'string') return null
-  return { ...createPitcherCareer(saved.name), ...saved }
+  const base = createPitcherCareer(saved.name)
+  return {
+    ...base,
+    ...saved,
+    stats: { ...base.stats, ...saved.stats },
+    careerStats: { ...base.careerStats, ...saved.careerStats },
+    leaguePlayerStats: { ...base.leaguePlayerStats, ...saved.leaguePlayerStats },
+  }
 }
 
 export function usePitcherLeagueSession(
@@ -170,17 +182,30 @@ export function usePitcherLeagueSession(
     [commit],
   )
 
-  /** 시즌 끝 화면 [다음] → 연말 상태 132 의 분기 */
+  /**
+   * 시즌 끝 화면 [다음] → 연말 상태 132 의 분기.
+   *
+   * 그 앞에 **상태 130(타이틀 0x8dad4) · 131(MVP 0x8dd60)** 이 있다 — 웹은 발표 화면(370·375)이
+   * 아직 없어 **판정만** 하고 지나간다. `recordPitcherSeasonMvp` 가 리그 투수 순위표에서 다승
+   * (마무리면 세이브)·탈삼진·방어율 1위를 가려 MVP 면 `career+0x1ca` 비트를 남긴다.
+   * 발표 화면과 보상(372~374 소지금 +3/+6/+10 · 377 인기도+20 평판+30 소지금+10)은
+   * 화면이 생기면 이 자리에 끼우면 된다.
+   */
   const beginYearEnd = useCallback(() => {
     if (career === null) return
-    const step = pitcherYearEndStepOf(career)
+    // 130 → 131 (MVP 비트) → 132 순서다. 연말 분기는 인기도·평판만 보므로 시상이 앞서도 값은 같다
+    const awarded = recordPitcherSeasonMvp(career)
+    const step = pitcherYearEndStepOf(awarded)
     if (step.kind === '엔딩') {
       // 엔딩 보너스는 엔딩을 띄울 때 준다 (0x1220c). 부상·방출은 0 이다
-      commit(applyPitcherEndingBonus({ ...career, endingIndex: step.endingIndex }, step.endingIndex))
+      commit(applyPitcherEndingBonus({ ...awarded, endingIndex: step.endingIndex }, step.endingIndex))
       return setScene('엔딩')
     }
-    if (step.kind === '은퇴선택') return setScene('연말')
-    startNewSeason(career)
+    if (step.kind === '은퇴선택') {
+      commit(awarded)
+      return setScene('연말')
+    }
+    startNewSeason(awarded)
   }, [career, commit, startNewSeason])
 
   /** 502 "연봉 협상한다" — 연봉협상 이벤트가 아직 없어 곧바로 새 시즌이다 (pitcherSeasonFlow 머리글) */

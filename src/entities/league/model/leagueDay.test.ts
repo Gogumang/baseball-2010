@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { matchupsOf, playLeagueDay, simulateLeagueGame } from '@/entities/league/model/leagueDay'
 import { EMPTY_LEAGUE, LEAGUE_TEAM_COUNT, opponentOf } from '@/entities/league/model/league'
-import { BATTERS_PER_TEAM, startingPitcherOf } from '@/entities/team/model/teamRoster'
+import { BATTERS_PER_TEAM, PITCHERS_PER_TEAM, startingPitcherOf } from '@/entities/team/model/teamRoster'
+import { rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
+import { EMPTY_LEAGUE_PLAYER_STATS } from '@/entities/league/model/leaguePlayerStats'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
 function 씨앗난수(seed: number): RandomPort {
@@ -136,5 +138,108 @@ describe('CPU 끼리 경기도 날짜가 선발을 정한다 (0xb5ca8 · S5 U-16
   it('네 칸이 서로 다른 투수를 집는다', () => {
     const 능력 = [0, 1, 2, 3].map((slot) => startingPitcherOf(2, slot).control)
     expect(new Set(능력).size).toBeGreaterThan(1)
+  })
+})
+
+describe('CPU 끼리 경기가 선발 투수 기록도 쌓는다 (0xa8024 · 경기 끝 0xa7de8, P1 6절)', () => {
+  it('양 팀 선발 두 줄이 나오고, 승과 패가 하나씩이다', () => {
+    const 경기 = simulateLeagueGame({ away: 2, home: 3 }, 씨앗난수(77), 1)
+
+    expect(경기.pitcherAppearances).toHaveLength(2)
+    expect(경기.pitcherAppearances.map((줄) => 줄.pitcherSlot)).toEqual([1, 1])
+    expect(경기.pitcherAppearances.filter((줄) => 줄.decision === '승')).toHaveLength(1)
+    expect(경기.pitcherAppearances.filter((줄) => 줄.decision === '패')).toHaveLength(1)
+  })
+
+  it('승은 **점수가 많은 쪽** 선발에게 간다 — 순위표의 원본 버그(0xc2a48)와 따로 논다', () => {
+    const 경기 = simulateLeagueGame({ away: 2, home: 3 }, 씨앗난수(77), 1)
+    const 원정 = 경기.pitcherAppearances[0]
+    const 홈 = 경기.pitcherAppearances[1]
+
+    const 이긴쪽 = 경기.awayRuns >= 경기.homeRuns ? 원정 : 홈
+    const 진쪽 = 이긴쪽 === 원정 ? 홈 : 원정
+    expect(이긴쪽.decision).toBe('승')
+    expect(진쪽.decision).toBe('패')
+  })
+
+  it('실점은 상대 팀 득점과 같고, 아웃은 9이닝치(27)부터다', () => {
+    const 경기 = simulateLeagueGame({ away: 2, home: 3 }, 씨앗난수(2009), 0)
+    const [원정, 홈] = 경기.pitcherAppearances
+
+    // 선발 하나가 끝까지 던지므로 팀 실점이 그대로 그 투수의 실점이다
+    expect(원정.runsAllowed).toBe(경기.homeRuns)
+    expect(홈.runsAllowed).toBe(경기.awayRuns)
+    // 홈이 9회말을 치르지 않는 경우가 있어 원정 투수는 24아웃일 수 있다
+    expect(홈.outs).toBeGreaterThanOrEqual(27)
+    expect(원정.outs).toBeGreaterThanOrEqual(24)
+    expect(원정.pitches).toBeGreaterThan(0)
+    expect(원정.strikeouts).toBeGreaterThanOrEqual(0)
+  })
+
+  it('세이브는 늘 0 이다 — 웹에는 구원 교체가 없다', () => {
+    const { playerStats } = playLeagueDay(EMPTY_LEAGUE, 0, 4, 씨앗난수(5))
+    const 줄들 = Object.values(playerStats.pitchers ?? {})
+
+    expect(줄들.length).toBeGreaterThan(0)
+    expect(줄들.every((줄) => 줄.saves === 0)).toBe(true)
+  })
+
+  it('하루치 네 경기가 승 4 · 패 4 로 쌓인다 (내 팀 경기는 빠진다)', () => {
+    const { playerStats } = playLeagueDay(EMPTY_LEAGUE, 0, 4, 씨앗난수(5))
+    const 줄들 = Object.values(playerStats.pitchers ?? {})
+    const 합 = (고르기: (줄: (typeof 줄들)[number]) => number) =>
+      줄들.reduce((sum, 줄) => sum + 고르기(줄), 0)
+
+    expect(합((줄) => 줄.wins)).toBe(4)
+    expect(합((줄) => 줄.losses)).toBe(4)
+    expect(줄들).toHaveLength(8)
+  })
+
+  it('그날 쓰는 선발 칸은 로테이션이 정한다 — 하루에 한 팀에 한 줄뿐이다', () => {
+    const { playerStats } = playLeagueDay(EMPTY_LEAGUE, 3, 4, 씨앗난수(9))
+    const 칸 = Object.keys(playerStats.pitchers ?? {}).map((id) => Number(id) % PITCHERS_PER_TEAM)
+
+    expect(new Set(칸).size).toBe(1)
+    expect(칸[0]).toBe(rotationSlotOf(3))
+  })
+
+  it('이어서 돌리면 투수 줄도 앞서 쌓은 표 위에 더해진다', () => {
+    const 하루 = playLeagueDay(EMPTY_LEAGUE, 0, 4, 씨앗난수(5))
+    const 이틀 = playLeagueDay(하루.league, 1, 4, 씨앗난수(6), 하루.playerStats)
+    const 이닝합 = (stats: typeof 하루.playerStats) =>
+      Object.values(stats.pitchers ?? {}).reduce((sum, 줄) => sum + 줄.outs, 0)
+
+    // 타자 표도 같이 살아 있어야 한다 (두 기록이 서로를 지우면 안 된다)
+    expect(Object.keys(이틀.playerStats.batters).length).toBeGreaterThan(0)
+    expect(이닝합(이틀.playerStats)).toBeGreaterThan(이닝합(하루.playerStats))
+  })
+
+  it('45일을 돌리면 승·패 합이 경기 수(225)와 맞고 방어율이 말이 되는 범위다', () => {
+    const random = 씨앗난수(12_345)
+    let league = EMPTY_LEAGUE
+    let stats = EMPTY_LEAGUE_PLAYER_STATS
+    // `myTeamId` 를 -1 로 두면 다섯 경기가 모두 CPU 경기다 (45일 × 5 = 225경기)
+    for (let day = 0; day < 45; day += 1) {
+      const 하루 = playLeagueDay(league, day, -1, random, stats)
+      league = 하루.league
+      stats = 하루.playerStats
+    }
+    const 줄들 = Object.values(stats.pitchers ?? {})
+    const 합 = (고르기: (줄: (typeof 줄들)[number]) => number) =>
+      줄들.reduce((sum, 줄) => sum + 고르기(줄), 0)
+
+    expect(합((줄) => 줄.wins)).toBe(225)
+    expect(합((줄) => 줄.losses)).toBe(225)
+    // 한 경기에 양 팀 합쳐 18이닝(54아웃)이 기준이다. 홈이 앞서면 9회말을 안 치르고(−3),
+    // 동점이면 연장을 가므로 딱 떨어지지는 않는다
+    expect(합((줄) => 줄.outs)).toBeGreaterThanOrEqual(225 * 51)
+    expect(합((줄) => 줄.outs)).toBeLessThan(225 * 60)
+    // 로테이션 네 칸만 던지므로 10팀 × 4 = 40명이 규정 이닝(45)을 채운다
+    expect(줄들.filter((줄) => Math.trunc(줄.outs / 3) >= 45)).toHaveLength(40)
+    for (const 줄 of 줄들) {
+      const 방어율 = (줄.runsAllowed * 2700) / 줄.outs / 100
+      expect(방어율).toBeGreaterThan(1)
+      expect(방어율).toBeLessThan(9)
+    }
   })
 })

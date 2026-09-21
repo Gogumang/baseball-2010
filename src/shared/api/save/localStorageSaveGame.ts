@@ -97,6 +97,12 @@ function normalizeCareer(saved: PlayerCareer): PlayerCareer {
     // 번호를 올리면 `load` 가 예전 저장을 통째로 버려(`version !== ...` → null) 선수가 사라진다.
     leaguePlayerStats: {
       batters: { ...base.leaguePlayerStats.batters, ...saved.leaguePlayerStats?.batters },
+      // 투수 줄은 타자 줄보다 더 나중에 생겼다 — 저장에 없으면 칸 자체를 두지 않는다.
+      // ⚠️ 빈 표를 `{}` 로 박아 두면 안 된다: `EMPTY_LEAGUE_PLAYER_STATS` 가 `{ batters: {} }`
+      //    모양 그대로라 왕복 비교가 어긋난다 (저장 형식 번호는 그대로 둔다).
+      ...(saved.leaguePlayerStats?.pitchers === undefined
+        ? {}
+        : { pitchers: { ...saved.leaguePlayerStats.pitchers } }),
     },
     titleIds: saved.titleIds ?? [],
     seenEventIds: saved.seenEventIds ?? [],
