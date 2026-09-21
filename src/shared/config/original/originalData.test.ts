@@ -49,10 +49,23 @@ describe('원본 마선수 데이터', () => {
     expect(batter?.iconUrl).toBe('./sprites/ace_icon/005.png')
   })
 
-  it('필살기가 원작 목록에서 온다', () => {
+  /**
+   * ⚠️ 예전에는 **육성 선수용 기술 이름**(`BATTER_BURSTS`·`PITCHER_BURSTS`, StrCOMMON 25~35)에서
+   * 온다고 못박고 있어 메디카가 "파워 스윙" 인 것을 지켜 주고 있었다.
+   * 마선수 기술은 다른 구간이다 — 마타자 `StrCOMMON[0x5f+n]` = 100~104 ·
+   * 마투수 `[0x5a+n]` = 95~99 (H2 6절·4-1 확정).
+   */
+  it('마선수 필살기는 **마선수 전용 이름**이다 — 육성 기술 이름이 아니다', () => {
+    const 마타자 = ['핑크 봄', '플레임 스트라이커', '메이든 임팩트', '하트 브레이커', '크로스 액스']
+    const 마투수 = ['싸이킥 스타', '트리플 크로우', '홀로그램 레이저', '다크 일루전', '브레스 웨폰']
+
+    expect(ACE_PLAYERS.filter((ace) => ace.role === '타자').map((ace) => ace.burst)).toEqual(마타자)
+    expect(ACE_PLAYERS.filter((ace) => ace.role === '투수').map((ace) => ace.burst)).toEqual(마투수)
+
+    // 육성 기술 이름은 여전히 그쪽 목록이다 (필살타법 창이 쓴다)
     for (const ace of ACE_PLAYERS) {
-      const pool = ace.role === '타자' ? BATTER_BURSTS : PITCHER_BURSTS
-      expect(pool, `${ace.name}의 필살기 ${ace.burst}`).toContain(ace.burst)
+      const 육성목록 = ace.role === '타자' ? BATTER_BURSTS : PITCHER_BURSTS
+      expect(육성목록, `${ace.name} 의 ${ace.burst} 가 육성 목록에 있으면 안 된다`).not.toContain(ace.burst)
     }
   })
 

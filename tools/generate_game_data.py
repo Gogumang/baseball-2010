@@ -31,8 +31,15 @@ ABILITY_COUNT = 4
 COMMON_TEAM_RANGE = (0, 15)
 COMMON_ACE_PITCHER_RANGE = (15, 20)
 COMMON_ACE_BATTER_RANGE = (20, 25)
+# 육성 선수의 필살타법·마구 이름 (창에 뜨는 것)
 COMMON_BATTER_BURST_RANGE = (25, 30)
 COMMON_PITCHER_BURST_RANGE = (31, 37)
+# ⚠️ 마선수 기술 이름은 **다른 구간**이다 (H2 6절·4-1 확정):
+#   마타자 StrCOMMON[0x5f + n] = 100~104 (핑크 봄 · 플레임 스트라이커 · 메이든 임팩트 · 하트 브레이커 · 크로스 액스)
+#   마투수 StrCOMMON[0x5a + n] = 95~99  (싸이킥 스타 · 트리플 크로우 · 홀로그램 레이저 · 다크 일루전 · 브레스 웨폰)
+# 예전에는 위 육성용 구간을 순번으로 붙여 메디카가 "파워 스윙" 이 되어 있었다.
+COMMON_ACE_BATTER_BURST_RANGE = (100, 105)
+COMMON_ACE_PITCHER_BURST_RANGE = (95, 100)
 COMMON_SKILL_START = 55
 
 # StrMODE 안의 구간.
@@ -117,8 +124,8 @@ def generate_ace_players() -> None:
         'export const ACE_PLAYERS: readonly AcePlayer[] = [',
     ]
     common = clean_strings(load('StrCOMMON'))
-    batter_bursts = common[slice(*COMMON_BATTER_BURST_RANGE)]
-    pitcher_bursts = common[slice(*COMMON_PITCHER_BURST_RANGE)]
+    batter_bursts = common[slice(*COMMON_ACE_BATTER_BURST_RANGE)]
+    pitcher_bursts = common[slice(*COMMON_ACE_PITCHER_BURST_RANGE)]
 
     # ace/ 스프라이트 파일명 순서와 표 순서가 같다.
     sprite_ids = {
