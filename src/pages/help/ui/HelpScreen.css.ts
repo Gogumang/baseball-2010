@@ -1,4 +1,4 @@
-import { style } from '@vanilla-extract/css'
+import { globalStyle, style } from '@vanilla-extract/css'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 
 /** 원작 좌표에 그대로 놓는 그림 한 장 */
@@ -15,8 +15,8 @@ export const sectionButton = style({
   border: 'none',
   background: 'none',
   color: ORIGINAL_COLORS.text,
-  fontSize: '10px',
-  lineHeight: '12px',
+  fontSize: '11px',
+  lineHeight: '13px',
   cursor: 'pointer',
   selectors: { '&:focus-visible': { outline: `1px dashed ${ORIGINAL_COLORS.text}` } },
 })
@@ -56,16 +56,22 @@ export const bodyTitle = style({
 export const bodyText = style({
   position: 'absolute',
   color: ORIGINAL_COLORS.text,
-  fontSize: '10px',
+  fontSize: '11px',
+  // 줄 높이는 12px — 원본 줄간(11+3=14)보다 2px 좁다. 본문 칸 아래 244px 에 장 넘기기 단추가
+  // 있어 12줄짜리 첫 장이 14px(168) · 13px(156) 로는 그 단추를 덮는다. 12px 면 144 라 안 겹친다.
+  // **근사다** — 줄 높이는 도트 또렷함과 무관하니 글자 크기는 11px 그대로 둔다.
   lineHeight: '12px',
   overflowY: 'auto',
 })
+
+// 본문은 `MarkupText` 가 <p> 로 그린다 — 그쪽 줄 높이(원본 14px)가 이겨서 여기서 다시 눌러 준다
+globalStyle(`${bodyText} p`, { lineHeight: '12px' })
 
 /** 쪽 번호 */
 export const pagerText = style({
   position: 'absolute',
   color: ORIGINAL_COLORS.text,
-  fontSize: '10px',
-  lineHeight: '12px',
+  fontSize: '11px',
+  lineHeight: '13px',
   pointerEvents: 'none',
 })

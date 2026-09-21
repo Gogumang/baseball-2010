@@ -42,6 +42,6 @@ export const noticeLine = style({
   padding: '1px 4px',
   background: theme.color.scrimOpaque,
   color: theme.color.ink,
-  fontSize: '9px',
-  lineHeight: 1.4,
+  fontSize: '11px',
+  lineHeight: 14 / 11,
 })

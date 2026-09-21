@@ -9,7 +9,7 @@ export const panel = style({
 
 export const heading = style({
   margin: '0 0 7px',
-  fontSize: '12px',
+  fontSize: '11px',
   color: theme.color.accent,
   fontWeight: 700,
 })

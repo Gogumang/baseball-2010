@@ -506,9 +506,26 @@ MISSION_OPPONENT_OFFSET = 8
 # 설명문과 전부 맞는다: 투수 4번 0x0106 "6개의 공으로", 타자 10번 0x0030 "3번의 스윙으로"
 MISSION_LIMITS_OFFSET = 9
 MISSION_TIME_LIMIT_OFFSET = 11
-# 투수편 몇 미션에만 1~3 이 있다 (5번 무실점·10번 무안타·마타자 미션). 뜻은 미해독이다.
+# 바이트 13 = **투수 미션의 조준점 흔들림 세기** 0~3 (E-defense-rules.md E-7 · 4a, 확정).
+#   읽어 두기 0xaa57c(`ldrb [rec,#0xd]` → 미션 컨텍스트 +0x20), 쓰기 0x39c5c(투수 조준 틱 갱신,
+#   화면 모드 5 = 투수 미션일 때만). 조준점은 존 중심 기준 x ±600 · y ±400 으로 잘린 뒤:
+#     1: rand(0,100) ≤ 50 이면 x += rand(−40, 40)
+#     2: rand(0,100) ≤ 50 이면 x += rand(−80, 80), y += rand(−80, 80)
+#     3: rand(0,100) ≤ 50 이면 x = rand(중심x−600, 중심x+600), y = rand(중심y−400, 중심y+400)
+#   붙은 미션: 투수 4 로제 · 5 "흔들리지 않는 마음" = 1 / 투수 8 크라이져 · 12 킹타이거 = 2 /
+#   투수 10 "난공불락의 철벽마무리" = 3. 타자편은 모두 0(효과 없음).
 # 예전에는 이 바이트가 목표 문자열 앞에 붙어 '\x01아웃' 이 되는 바람에 목표가 판정되지 않았다.
 MISSION_CONDITION_OFFSET = 13
+
+# 흔들림 세기별 매개변수 (0x39d24~0x39dde). 확률은 `rand(0,100) <= 50` 이라 **51%** 다 — 원본 그대로.
+MISSION_AIM_SHAKE_CHANCE = 50
+MISSION_AIM_CLAMP_X = 600
+MISSION_AIM_CLAMP_Y = 400
+MISSION_AIM_SHAKE_LEVELS = (
+    (1, 40, 0, 'false'),
+    (2, 80, 80, 'false'),
+    (3, MISSION_AIM_CLAMP_X, MISSION_AIM_CLAMP_Y, 'true'),
+)
 MISSION_TEXT_FIELDS = ((14, 32), (46, 32), (78, 64))
 
 # 목표 개수 칸 (레코드 뒤쪽). 4비트 단위로 여러 목표가 한 바이트를 나눠 쓴다.
@@ -608,7 +625,10 @@ def generate_missions() -> None:
         '  readonly pitchLimit: number',
         '  /** 상대 마선수 순번 (1부터, 상대 편 ACE_PLAYERS 순서). 0이면 일반 선수. */',
         '  readonly opponentAce: number',
-        '  /** 원본 조건 코드. 뜻은 미해독이다. */',
+        '  /**',
+        '   * 원본 레코드 바이트 13 = **투수 미션의 조준점 흔들림 세기** 0~3 (0xaa57c → 0x39c5c).',
+        '   * 0 이면 흔들리지 않는다. 1~3 의 뜻은 `MISSION_AIM_SHAKES` 를 볼 것. 타자편은 모두 0 이다.',
+        '   */',
         '  readonly conditionCode: number',
         '  /** 목표별 필요 개수 (레코드 뒤쪽 칸). 사이클링히트는 단타·2루타·3루타·홈런 각각이다. */',
         '  readonly goalCounts: Readonly<Record<string, number>>',
@@ -657,6 +677,33 @@ def generate_missions() -> None:
                 f"failLimits: {fail_limits_of(row, side)} }},"
             )
     lines.append(']')
+    lines += [
+        '',
+        '/** 투수 미션 조준점 흔들림 (0x39c5c) — `conditionCode` 가 색인이다 */',
+        'export interface MissionAimShake {',
+        '  /** 틱마다 흔들릴 확률 % — 원본은 rand(0,100) <= 50 이라 51% 다 (⚠️ 원본 그대로) */',
+        '  readonly chancePercent: number',
+        '  /** 가로 흔들림 폭 (rand(−x, x)) */',
+        '  readonly shakeX: number',
+        '  /** 세로 흔들림 폭 (0 이면 세로는 안 흔든다) */',
+        '  readonly shakeY: number',
+        '  /** true 면 흔드는 대신 존 안 아무 데로 조준점을 옮긴다 */',
+        '  readonly teleport: boolean',
+        '}',
+        '',
+        '/** 조준점이 존 중심에서 벗어날 수 있는 한계 (0x39c5c) */',
+        f'export const MISSION_AIM_CLAMP = {{ x: {MISSION_AIM_CLAMP_X}, y: {MISSION_AIM_CLAMP_Y} }}',
+        '',
+        '/** MISSION_AIM_SHAKES[conditionCode] — 0 은 흔들림 없음 */',
+        'export const MISSION_AIM_SHAKES: readonly (MissionAimShake | null)[] = [',
+        '  null,',
+        *[
+            f'  {{ chancePercent: {MISSION_AIM_SHAKE_CHANCE}, shakeX: {x}, shakeY: {y}, teleport: {teleport} }},'
+            f' // 조건코드 {code}'
+            for code, x, y, teleport in MISSION_AIM_SHAKE_LEVELS
+        ],
+        ']',
+    ]
     write('missions.ts', '\n'.join(lines) + '\n')
 
 
@@ -918,6 +965,15 @@ def read_binary_table(va: int, fmt: str) -> list[int]:
     return list(_struct.unpack_from(fmt, raw, va - BINARY_VA_BASE))
 
 
+# 마구 레코드 고르기 (0x9e944, H2-special-skills.md 3-5).
+MAGIC_PITCH_TYPE = 22
+# 마투수 마구 번호 5~9 는 레코드 12~16 이다 (m + 7)
+MAGIC_ACE_MIN_ID = 5
+MAGIC_ACE_INDEX_OFFSET = 7
+# 폼 f ≤ 5 이고 홀수면 f − 1 (0x9e950)
+MAGIC_FORM_PAIR_LIMIT = 5
+
+
 def generate_pitch_curves() -> None:
     """
     data/pitch.zt1 투구 레코드 전부 (위치 분석 2·5차).
@@ -965,6 +1021,27 @@ def generate_pitch_curves() -> None:
         'export const PITCH_RECORDS: readonly (readonly PitchRecord[])[] = [',
         *entries,
         ']',
+        '',
+        '/** 마구는 구질 22 하나다 — PITCH_RECORDS 색인은 t − 1 이다 */',
+        f'export const MAGIC_PITCH_TYPE = {MAGIC_PITCH_TYPE}',
+        '',
+        '/**',
+        ' * 마구 → 구질 22 블록의 몇 번째 레코드인가 (0x9e944, H2-special-skills.md 3-5).',
+        ' *   육성·일반 마구 (magicId 1~4): 3(m − 1) + 폼/2',
+        ' *   마투수      (magicId 5~9): m + 7',
+        ' * 폼은 0x9e950 에서 먼저 홀수를 하나 내린다 (0/1 → 0, 2/3 → 2, 4/5 → 4; 6 이상은 그대로).',
+        ' * 마구 4 는 폼에 따라 샤이닝 볼 · 캐넌 볼 · 미라지 볼로 갈리는데 레코드와 이름만 다르다.',
+        ' */',
+        'export function magicPitchRecordIndex(magicId: number, form: number): number {',
+        f'  if (magicId >= {MAGIC_ACE_MIN_ID}) return magicId + {MAGIC_ACE_INDEX_OFFSET}',
+        f'  const evenForm = form <= {MAGIC_FORM_PAIR_LIMIT} && form % 2 === 1 ? form - 1 : form',
+        '  return 3 * (magicId - 1) + Math.trunc(evenForm / 2)',
+        '}',
+        '',
+        '/** 마구 레코드 — 없으면 undefined (구질 22 블록은 레코드 17개다) */',
+        'export function magicPitchRecord(magicId: number, form: number): PitchRecord | undefined {',
+        f'  return PITCH_RECORDS[MAGIC_PITCH_TYPE - 1]?.[magicPitchRecordIndex(magicId, form)]',
+        '}',
     ]
     write('pitchRecords.ts', '\n'.join(body) + '\n')
 
@@ -1017,6 +1094,362 @@ def generate_pitch_patterns() -> None:
         '}',
     ]
     write('pitchPatterns.ts', '\n'.join(body) + '\n')
+
+
+# ── CPU 타자 행동 확률표 (data/battingPattern.arr) ─────────────
+# 512바이트 = 머리 8(열 수 7 + 열 종류 7) + 7바이트 행 72개.
+# 행 = [스트라이크, 볼, 아웃, c0 치기, c1 번트, c2 지켜보기, 주자열]. 모든 행 c0+c1+c2 = 100.
+#   적재 0x9f074(생성자 0x9f0d0 ← 경기 장면 0x3e340) · 행 찾기 0x9f11c(S·B·O·주자열이 모두 같은 첫 행)
+#   상황 넣기 0x9f190(주자열 = 주자 없음 3 / 2사 2 / 그 밖 1) · 뽑기 0x9f224(r = rand(0,100))
+#   쓰는 곳 0x34334 = CPU 타자 행동 결정 (근거: L-sound-effects.md 4-C · Q1-cpu-offense-ai.md 1b·6절)
+BATTING_PATTERN_FILE = Path('base/work/jar/data/battingPattern.arr')
+BATTING_PATTERN_HEADER = 8
+BATTING_PATTERN_COLUMNS = 7
+BATTING_PATTERN_ROW_COUNT = 72
+
+
+def generate_batting_patterns() -> None:
+    """CPU 타자가 치기·번트·지켜보기를 고르는 원본 확률표."""
+    raw = BATTING_PATTERN_FILE.read_bytes()
+    body_bytes = raw[BATTING_PATTERN_HEADER:]
+    if raw[0] != BATTING_PATTERN_COLUMNS or len(body_bytes) != BATTING_PATTERN_COLUMNS * BATTING_PATTERN_ROW_COUNT:
+        raise ValueError('battingPattern.arr 형식이 예상과 다릅니다')
+    rows = [
+        list(body_bytes[i * BATTING_PATTERN_COLUMNS:(i + 1) * BATTING_PATTERN_COLUMNS])
+        for i in range(BATTING_PATTERN_ROW_COUNT)
+    ]
+    for row in rows:
+        if row[3] + row[4] + row[5] != 100:
+            raise ValueError(f'battingPattern.arr 행 합이 100이 아닙니다: {row}')
+    body = [
+        '/**',
+        ' * 원본 data/battingPattern.arr — CPU 타자의 행동 확률표 (적재 0x9f074, 쓰는 곳 0x34334).',
+        ' * 행 = [스트라이크, 볼, 아웃, 치기 %, 번트 %, 지켜보기 %, 주자열]. 세 확률의 합은 늘 100 이다.',
+        ' * 주자열: 1 주자 있고 2사 아님 · 2 주자 있고 2사 · 3 주자 없음 (0x9f190).',
+        ' */',
+        f'export const BATTING_PATTERNS: readonly (readonly number[])[] = {rows}',
+        '',
+        "export type BattingPatternChoice = '치기' | '번트' | '지켜보기'",
+        '',
+        '/** 행에서 꺼낸 확률 — 0x9f224 가 rand(0,100) 한 번으로 고른다 */',
+        'export interface BattingPatternOdds {',
+        '  /** 치기 % (c0) */',
+        '  readonly swing: number',
+        '  /** 번트 % (c1) */',
+        '  readonly bunt: number',
+        '  /** 지켜보기 % (c2) */',
+        '  readonly take: number',
+        '}',
+        '',
+        '/** 주자열 고르기 (0x9f190) — 주자 없음 3 · 2사 2 · 그 밖 1 */',
+        'export function battingPatternRunnerColumn(outs: number, hasRunner: boolean): number {',
+        '  if (!hasRunner) return 3',
+        '  return outs === 2 ? 2 : 1',
+        '}',
+        '',
+        '/**',
+        ' * 상황 → 확률 (행 찾기 0x9f11c). 원본은 72행을 앞에서부터 훑어 처음 맞는 행을 쓴다.',
+        ' * 볼카운트가 표에 없는 값이면 원본도 찾지 못하므로 첫 행으로 근사한다 — **근사다**.',
+        ' */',
+        'export function battingPatternOdds(',
+        '  strikes: number,',
+        '  balls: number,',
+        '  outs: number,',
+        '  hasRunner: boolean,',
+        '): BattingPatternOdds {',
+        '  const column = battingPatternRunnerColumn(outs, hasRunner)',
+        '  const row =',
+        '    BATTING_PATTERNS.find(',
+        '      (candidate) =>',
+        '        candidate[0] === strikes &&',
+        '        candidate[1] === balls &&',
+        '        candidate[2] === outs &&',
+        '        candidate[6] === column,',
+        '    ) ?? BATTING_PATTERNS[0]',
+        '  return { swing: row[3], bunt: row[4], take: row[5] }',
+        '}',
+        '',
+        '/** 뽑기 0x9f224 — roll = rand(0, 100) */',
+        'export function battingPatternChoiceOf(odds: BattingPatternOdds, roll: number): BattingPatternChoice {',
+        "  if (roll < odds.swing) return '치기'",
+        "  if (roll < odds.swing + odds.bunt) return '번트'",
+        "  return '지켜보기'",
+        '}',
+    ]
+    write('battingPatterns.ts', '\n'.join(body) + '\n')
+
+
+# ── 경기 밸런스 표 (data/d_level.dat) ─────────────────────────
+# 488바이트. 적재 0xb7370 / 0xb7414 / 0x7262c, 읽기 실패 시 폴백 0xb6f28 과 값이 같다.
+# **난이도 옵션이 아니다** — 파일 하나를 모든 모드가 쓴다 (L-sound-effects.md 4-D).
+# 문서는 적재본 기준으로 주소를 적는다: **객체 오프셋 = 파일 오프셋 + 4**.
+# 아래 상수는 전부 **파일 오프셋**이고, 주석에 괄호로 객체 오프셋을 적어 둔다.
+D_LEVEL_FILE = Path('base/work/jar/data/d_level.dat')
+D_LEVEL_SIZE = 488
+
+# 필살타법·마구 보정표 (0x34d6c). 육성·명전 선수는 기술 번호 n = 번호−1 (4칸),
+# 마선수는 k = 레벨×5 + 순번 (25칸, 다섯 명 값이 같다). 근거 H2-special-skills.md 2절.
+D_LEVEL_BURST_STEPS = 4
+D_LEVEL_ACE_STEPS = 25
+
+
+def read_d_level() -> bytes:
+    raw = D_LEVEL_FILE.read_bytes()
+    if len(raw) != D_LEVEL_SIZE:
+        raise ValueError(f'd_level.dat 크기가 {D_LEVEL_SIZE} 가 아닙니다: {len(raw)}')
+    return raw
+
+
+def d_u16(raw: bytes, offset: int) -> int:
+    return int.from_bytes(raw[offset:offset + 2], 'little')
+
+
+def d_u16_list(raw: bytes, offset: int, count: int) -> list[int]:
+    return [d_u16(raw, offset + 2 * i) for i in range(count)]
+
+
+def d_s8_list(raw: bytes, offset: int, count: int) -> list[int]:
+    return [int.from_bytes(raw[offset + i:offset + i + 1], 'little', signed=True) for i in range(count)]
+
+
+def generate_d_level() -> None:
+    """data/d_level.dat 를 통째로 읽어 이름을 붙인다 — 손으로 옮겨 적지 않는다."""
+    raw = read_d_level()
+    burst = lambda offset: d_u16_list(raw, offset, D_LEVEL_BURST_STEPS)
+    ace = lambda offset: d_u16_list(raw, offset, D_LEVEL_ACE_STEPS)
+    burst_pct = lambda offset: d_s8_list(raw, offset, D_LEVEL_BURST_STEPS)
+    ace_pct = lambda offset: d_s8_list(raw, offset, D_LEVEL_ACE_STEPS)
+    body = [
+        '/**',
+        ' * 원본 data/d_level.dat (488바이트) — **경기 밸런스 설정표**. 난이도 옵션이 아니라',
+        ' * 파일 하나를 모든 모드가 쓴다 (적재 0xb7370 · 폴백 0xb6f28 과 값이 같다).',
+        ' * 문서의 주소는 적재본 기준이라 **객체 오프셋 = 파일 오프셋 + 4** 다.',
+        ' * 아래 주석의 0x.. 는 파일 오프셋이다.',
+        ' */',
+        'export const D_LEVEL = {',
+        '  /** 스윙 타이밍 0x34be0 — max(바닥, 배율 × (폭 − 벌점) / 폭) */',
+        f'  swingTiming: {{ floor: {d_u16(raw, 0x0C)}, scale: {d_u16(raw, 0x0E)} }}, // 0x0c · 0x0e',
+        '  /** 주자 스타트 판정 기준 (0xa092c: 주루×7/100 + 이 값, ÷250) */',
+        f'  runnerLeadBase: {d_u16(raw, 0x10)}, // 0x10',
+        '  fielding: {',
+        '    /** 모든 야수 같은 달리기 속도 (0xa2164) */',
+        f'    runSpeed: {d_u16(raw, 0x14)}, // 0x14',
+        '    /** 송구 속도 = 기본 + 등급배수 × (수비등급 + 1) */',
+        f'    throwSpeedBase: {d_u16(raw, 0x16)}, // 0x16',
+        f'    throwSpeedPerGrade: {d_u16(raw, 0x26)}, // 0x26',
+        '    /** 이동 능력 = 배수 × (수비등급 + 1) */',
+        f'    movePerGrade: {d_u16(raw, 0x24)}, // 0x24',
+        '    /** 에러 값 = 기준 − 수비등급 + 8 (= 10 − 등급) */',
+        f'    errorBase: {d_u16(raw, 0x28)}, // 0x28',
+        '    /** 송구 공 중력 배율 % — 내야(칸 ≤ 5) · 외야 */',
+        f'    infieldThrowGravityPercent: {d_u16(raw, 0x18)}, // 0x18',
+        f'    outfieldThrowGravityPercent: {d_u16(raw, 0x1A)}, // 0x1a',
+        '    /** 포구 → 송구 지연 틱 (내야는 중계 뒤 재송구 지연도 같다) */',
+        f'    infieldReleaseTicks: {d_u16(raw, 0x1C)}, // 0x1c',
+        f'    outfieldReleaseTicks: {d_u16(raw, 0x1E)}, // 0x1e',
+        '    /** 중계 문턱 거리 (0xaf3d4 가 미정렬 u32 로 읽지만 0x40 이 0 이라 이 값) */',
+        f'    relayDistance: {d_u16(raw, 0x3E)}, // 0x3e',
+        '  },',
+        '  /** 투구마다 rand(0,10000) 로 보는 폭투·포일 (0.1%) — 홈런더비 제외 */',
+        f'  wildPitchChance: {d_u16(raw, 0x2A)}, // 0x2a (분모 10000)',
+        '  /** 투수 교체 확률 % (0xac360) — 평소 · 9회 · 8회 · 지고 있음 · 주자 2명 이상 · 1점 차 리드 */',
+        f'  reliefChances: {d_s8_list(raw, 0x36, 6)}, // 0x36~0x3b',
+        '  /** 타격 판정 0xab214 — 마선수(ace) · 일반(normal) 식 */',
+        '  swing: {',
+        f'    aceFormula: {{ hitBase: {d_u16(raw, 0x42)}, hitCoefficient: {d_u16(raw, 0x44)},'
+        f' extraBase: {d_u16(raw, 0x46)}, extraCoefficient: {d_u16(raw, 0x48)},'
+        f' contactFactor: {d_u16(raw, 0x4A)} }}, // 0x42~0x4a',
+        f'    normalFormula: {{ hitBase: {d_u16(raw, 0x4C)}, hitCoefficient: {d_u16(raw, 0x4E)},'
+        f' extraBase: {d_u16(raw, 0x50)}, extraCoefficient: {d_u16(raw, 0x52)},'
+        f' contactFactor: {d_u16(raw, 0x54)} }}, // 0x4c~0x54',
+        f'    hitWeight: {raw[0x56]}, // 0x56',
+        f'    extraWeight: {raw[0x57]}, // 0x57',
+        f'    powerPivot: {raw[0x58]}, // 0x58',
+        f'    foulPercent: {raw[0x59]}, // 0x59',
+        f'    outPercent: {raw[0x5A]}, // 0x5a',
+        '    /** 마선수 보너스 — 타자 기본·레벨당 · 투수 기본·레벨당 */',
+        f'    aceBonus: {{ batterBase: {d_u16(raw, 0x1D4)}, batterPerLevel: {d_u16(raw, 0x1D6)},'
+        f' pitcherBase: {d_u16(raw, 0x1D8)}, pitcherPerLevel: {d_u16(raw, 0x1DA)} }}, // 0x1d4~0x1da',
+        '    /** 제구 등급 → 투수 능력 배율 % */',
+        f'    pitchGradeMultipliers: {d_u16_list(raw, 0x1DC, 6)}, // 0x1dc~0x1e6',
+        '  },',
+        '  /**',
+        '   * 필살타법·마구 보정 (0x34d6c → 0xab214 에 넘기는 12바이트).',
+        '   * `burst*` 는 육성·명전 선수의 기술 번호 1~4 (색인 = 번호 − 1),',
+        '   * `ace*` 는 마선수의 레벨×5 + 순번 (25칸, 다섯 명 값이 같다).',
+        '   * ⚠️ 원본 그대로: 마구의 solid·homeRun % 는 투수가 아니라 **타자** 쪽에 더해진다.',
+        '   */',
+        '  boost: {',
+        f'    burstBatterHit: {burst(0x78)}, // 0x78',
+        f'    burstBatterPower: {burst(0x80)}, // 0x80',
+        f'    burstBatterSolidPercent: {burst_pct(0x19A)}, // 0x19a',
+        f'    burstBatterHomeRunPercent: {burst_pct(0x19E)}, // 0x19e',
+        f'    magicPitchControl: {burst(0x88)}, // 0x88',
+        f'    magicPitchSpeed: {burst(0x90)}, // 0x90',
+        f'    magicPitchSolidPercent: {burst_pct(0x160)}, // 0x160',
+        f'    magicPitchHomeRunPercent: {burst_pct(0x164)}, // 0x164',
+        f'    aceBatterHit: {ace(0xFC)}, // 0xfc',
+        f'    aceBatterPower: {ace(0x12E)}, // 0x12e',
+        f'    aceBatterSolidPercent: {ace_pct(0x1A2)}, // 0x1a2',
+        f'    aceBatterHomeRunPercent: {ace_pct(0x1BB)}, // 0x1bb',
+        f'    acePitcherControl: {ace(0x98)}, // 0x98',
+        f'    acePitcherSpeed: {ace(0xCA)}, // 0xca',
+        f'    acePitcherSolidPercent: {ace_pct(0x168)}, // 0x168',
+        f'    acePitcherHomeRunPercent: {ace_pct(0x181)}, // 0x181',
+        '  },',
+        '} as const',
+        '',
+        '/** 아직 이름을 못 붙인 칸까지 남김없이 — d_level.dat 488바이트 그대로 */',
+        f'export const D_LEVEL_RAW: readonly number[] = {list(raw)}',
+    ]
+    write('dLevel.ts', '\n'.join(body) + '\n')
+
+
+# ── 원본 수치표 balance.json ───────────────────────────────────
+# d_level.dat 에서 오는 값은 **파일을 직접 읽는다**. 그 밖은 binary.mod 디스어셈으로 확인한
+# 리터럴이라 여기에 적어 두고 source 에 주소를 남긴다 (근거 없는 값은 source 에 "추정").
+BALANCE_LITERALS = {
+    'ability': {
+        'maximum': 999,
+        'rookieByBattingType': [
+            {'hit': 100, 'power': 100, 'defense': 100, 'run': 100},
+            {'hit': 80, 'power': 150, 'defense': 80, 'run': 80},
+        ],
+        'rookiePositionBonus': 30,
+        'source': '상한 0xc1b38 · 신인 표 0xcc3fa · 포지션 보너스 0x16e2c (포지션 뜻은 추정)',
+    },
+    'rookie': {
+        'popularity': 0, 'reputation': 300, 'morale': 100, 'salary': 50,
+        'money': 6000, 'gamePoint': 0, 'skillIds': [0, 8],
+        'source': ('0x11244~0x112d2 직접 디스어셈. 연봉 50(0x32)·소지금 60(0x3c)·인기도 0·평판 300(0x96<<1)'
+                   '·사기 100(0x64). G포인트를 넣는 명령이 없어 0 이다'),
+    },
+    'limits': {
+        'morale': 100, 'popularity': 9999, 'reputation': 999, 'affection': 100,
+        'gamePoint': 99999, 'moneyUnits': 9999, 'nameBytes': 8,
+        'source': '인기도·평판 0xd4e50 점프표 · 소지금 0x1b768 · G포인트 0x4ea0c',
+    },
+    'money': {'unit': 100, 'source': '원본 소지금·연봉 한 칸 = 100만원 (관리 화면 0x63118)'},
+    'season': {
+        'gamesPerSeason': 45, 'gamesPerManagementCycle': 2,
+        'source': '45경기 0xb818c · 관리 주기 r_event_txt[176]',
+    },
+    'training': {
+        'gainRange': {'minimum': 4, 'maximumExclusive': 7},
+        'legGainRange': {'minimum': 5, 'maximumExclusive': 8},
+        'moraleLossRange': {'minimum': 5, 'maximumExclusive': 8},
+        'typeBonus': 1, 'rookieSkillId': 0, 'weakBodySkillId': 3,
+        'source': '0x17f5c · 히트/파워 bfa55(4,7) · 수비/주루 0x18704 · 타입 보너스 StrMODE[194] · 스킬 0x1891c·0x1898e',
+    },
+    'specialSwing': {
+        'requiredSessions': [4, 5, 6, 7],
+        'gamePointCost': [500, 700, 900, 1200],
+        'moraleLossRange': {'minimum': 9, 'maximumExclusive': 13},
+        'source': '0xa3bac 종류 4 — 필요 횟수 0xd7e92 · 비용 0xd80e1(−5,−7,−9,−12 ×100)',
+    },
+    'coldGame': {
+        'fromInning': 7, 'margin': 10,
+        'source': '0xb68fc — 이닝 인덱스 > 5 부터. 말 공격 중에는 아웃 수와 무관하게 매 타석 본다 (0xb6976)',
+    },
+}
+
+# 기록달성 금액표 0xcfbf8 (경기 중 누계표 0xd8158 과 값이 같다)
+BALANCE_RECORD_GAME_POINTS = [
+    10, 8, 10, 12, 15, 10, 20, 40, 2, 5, 15, 30, 5, 20, 40, 100, 2, 3, 5, 20,
+    40, 10, 20, 40, 3, 5, 2, 100, 10, 20, 100, 120, 3, 5, 5, 8, 3, 10, 20, 40,
+]
+
+# 간이 타석 0xc11f0 의 리터럴 — d_level.dat 이 아니라 함수 리터럴 풀에 있다
+BALANCE_QUICK_AT_BAT_LITERALS = {
+    'basePower': 75,
+    'spreadRange': {'minimum': -13, 'maximumExclusive': 21},
+    'weakSwingGate': 2999,
+    'tightCourseGate': 1499,
+    'tightCourseGain': 3,
+    'extraBaseLimit': 666,
+    'extraInningFrom': 10,
+    'extraInningPowerStep': 5,
+    'extraInningPowerFloor': 50,
+}
+BALANCE_QUICK_AT_BAT_GRADE_TABLE = [
+    [5, 15, 70, 97, 100],
+    [4, 12, 60, 95, 100],
+    [3, 9, 50, 93, 100],
+    [2, 5, 45, 91, 100],
+]
+
+# 0xab214 안의 함수 리터럴 — d_level.dat 에는 없다 (파일 전체를 훑어 확인했다)
+BALANCE_SWING_CODE_LITERALS = {
+    'missionAcePitcherBonus': 100,
+    'solidCap': 9000,
+    'homeRunCap': 4500,
+    'swingStrengthBonus': 500,
+    'exhaustedBonus': 2000,
+}
+
+
+def generate_balance() -> None:
+    """
+    원본 수치표. **d_level.dat 에서 오는 값은 파일을 직접 읽는다** (예전에는 손으로 옮겨 적었다).
+    파일 오프셋 ↔ 문서의 객체 오프셋은 +4 만큼 어긋난다 — source 에는 파일 오프셋을 적는다.
+    """
+    raw = read_d_level()
+    formula = lambda offset: {
+        'hitBase': d_u16(raw, offset),
+        'hitCoefficient': d_u16(raw, offset + 2),
+        'extraBase': d_u16(raw, offset + 4),
+        'extraCoefficient': d_u16(raw, offset + 6),
+        'contactFactor': d_u16(raw, offset + 8),
+    }
+    value = {
+        'note': "원본 수치표. 값마다 binary.mod 주소를 source 에 적었다. 근거가 없는 것은 source 에 '추정' 이라고 적는다.",
+        'ability': BALANCE_LITERALS['ability'],
+        'rookie': BALANCE_LITERALS['rookie'],
+        'limits': BALANCE_LITERALS['limits'],
+        'money': BALANCE_LITERALS['money'],
+        'season': BALANCE_LITERALS['season'],
+        'training': BALANCE_LITERALS['training'],
+        'specialSwing': BALANCE_LITERALS['specialSwing'],
+        'recordGamePoints': BALANCE_RECORD_GAME_POINTS,
+        'recordGamePointsSource': '기록달성 금액표 0xcfbf8 (경기 중 누계표 0xd8158 과 값이 같다). 이름은 StrGAME[id+8]',
+        'swing': {
+            'note': '타격 판정 0xab214 가 쓰는 값. 함수 리터럴이 아니라 data/d_level.dat 에 있고, 폴백 0xb6f28 과 값이 같다',
+            'aceFormula': formula(0x42),
+            'normalFormula': formula(0x4C),
+            'hitWeight': raw[0x56],
+            'extraWeight': raw[0x57],
+            'powerPivot': raw[0x58],
+            'foulPercent': raw[0x59],
+            'outPercent': raw[0x5A],
+            'aceBonus': {
+                'batterBase': d_u16(raw, 0x1D4),
+                'batterPerLevel': d_u16(raw, 0x1D6),
+                'pitcherBase': d_u16(raw, 0x1D8),
+                'pitcherPerLevel': d_u16(raw, 0x1DA),
+            },
+            'missionAcePitcherBonus': BALANCE_SWING_CODE_LITERALS['missionAcePitcherBonus'],
+            'pitchGradeMultipliers': d_u16_list(raw, 0x1DC, 6),
+            'solidCap': BALANCE_SWING_CODE_LITERALS['solidCap'],
+            'homeRunCap': BALANCE_SWING_CODE_LITERALS['homeRunCap'],
+            'swingStrengthBonus': BALANCE_SWING_CODE_LITERALS['swingStrengthBonus'],
+            'exhaustedBonus': BALANCE_SWING_CODE_LITERALS['exhaustedBonus'],
+            'source': ('data/d_level.dat 파일 오프셋 0x42~0x5a · 0x1d4~0x1e6 을 생성기가 직접 읽는다 '
+                       '(문서의 객체 오프셋 0x46~0x5e · 0x1d8~0x1e0 = 파일 + 4). '
+                       'missionAcePitcherBonus·solidCap·homeRunCap·swingStrengthBonus·exhaustedBonus 는 '
+                       '0xab214 안의 함수 리터럴이라 파일에 없다'),
+        },
+        'quickAtBat': {
+            'note': '간이 타석 0xc11f0 — 사람이 조작하지 않는 타석',
+            **BALANCE_QUICK_AT_BAT_LITERALS,
+            'powerScale': {'minimum': d_u16(raw, 0x0C), 'maximumValue': d_u16(raw, 0x0E)},
+            'pitchGradeTable': BALANCE_QUICK_AT_BAT_GRADE_TABLE,
+            'pitchGradeBand': 250,
+            'source': ('리터럴 풀 0xc1580(10000)·0xc1584(2999)·0xc1590(1499)·0xc1804(666) · 등급표 0xd896c · '
+                       'powerScale 은 data/d_level.dat 파일 0x0c·0x0e 를 직접 읽는다'),
+        },
+        'coldGame': BALANCE_LITERALS['coldGame'],
+    }
+    write_json('balance.json', value)
 
 
 PITCHER_FORM_OFFSET = 0x0B
@@ -1123,8 +1556,11 @@ def main() -> None:
     generate_pitch_curves()
     generate_trigonometry_tables()
     generate_pitch_patterns()
+    generate_batting_patterns()
     generate_pitcher_repertoires()
     generate_stadium_scene()
+    generate_d_level()
+    generate_balance()
 
 
 main()

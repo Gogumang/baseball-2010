@@ -86,7 +86,7 @@ export const partTab = style({
   border: 'none',
   background: 'transparent',
   color: SHOP_COLORS.text,
-  fontSize: '10px',
+  fontSize: '11px',
   cursor: 'pointer',
 })
 

@@ -54,4 +54,4 @@ export const dialogue = style({
 })
 
 // MarkupText 는 이벤트 대사 기준(13px·1.7)이라 경기 창 규격으로 되돌린다
-globalStyle(`${headline} p, ${dialogue} p`, { fontSize: '10px', lineHeight: '12px' })
+globalStyle(`${headline} p, ${dialogue} p`, { fontSize: '11px', lineHeight: '13px' })

@@ -25,6 +25,14 @@
         최상위 비트 1 → (값 & 0x7FFF)개의 u8 팔레트 인덱스가 뒤따른다
         그 외         → 그 수만큼 투명 픽셀을 건너뛴다
       팔레트 0번은 항상 마젠타(#FF00FF)이며 투명색이다.
+
+  .mpl (대체 팔레트) — 같은 이름으로 옆에 있으면 함께 읽는다
+      C-create-palette.md C-2 와 같다. 여기서 쓰는 것은 0x40(이미지별 변형) 형뿐이다:
+      PZX 파트 효과 `0x05+n` 이 "이 파트 이미지의 n 번째 변형 팔레트" 를 고른다 (binary.mod 0xc8bb4).
+
+  프레임 박스
+      프레임 머리의 `u8 파트수 | u8 박스수 | (i16 x,y,w,h) × 박스수`. 원본 0x94a64(out, 프레임, 0, k)
+      가 k 번 박스를 돌려주고 화면 배치(정보 판·값 칸 …)가 이 좌표를 쓴다 — `frames/boxes.json` 으로 낸다.
 """
 
 from __future__ import annotations
@@ -55,6 +63,78 @@ def rgb565(value: int) -> tuple[int, int, int]:
 
 
 MAGENTA_RGB = rgb565(MAGENTA_RGB565)
+
+# ── .mpl 대체 팔레트 ──────────────────────────────────────
+#
+# 두 형식뿐이다 (docs/re/C-create-palette.md C-2, 22개 파일 전부 이대로 파싱된다):
+#
+#   첫 바이트 h — 윗 니블이 종류, 아래 니블 ≠ 0 이면 팔레트 뒤에 u32 하나가 더 붙는다
+#                 (실제 파일은 전부 0 이다)
+#
+#   h>>4 = 2·3 — 통팔레트 (파일 대부분이 0x30)
+#       u8 팔레트수 N | u32 절대오프셋 × N | 팔레트 × N
+#       팔레트 = u8 색수(0 이면 256) | 색 × 색수     (3 이면 RGB565 u16, 2 면 RGB 3바이트)
+#
+#   h>>4 = 4 — 이미지별 변형 (ui/game_ui.mpl · ui/mode_ui.mpl 둘뿐)
+#       u8 0x40 | u16 개수 N | u16 이미지번호 × N | u32 절대오프셋 × N | 묶음 × N
+#       묶음 = u8 변형수 K | (u8 색수 | u16 RGB565 × 색수) × K
+BULK_MPL_KINDS = (2, 3)
+PER_IMAGE_MPL_KIND = 4
+
+
+def read_mpl(path: Path) -> dict:
+    """.mpl 을 파싱한다. 통팔레트는 {'palettes': [...]}, 0x40 형은 {'per_image': {이미지: [변형…]}}."""
+    raw = path.read_bytes()
+    head = raw[0]
+    kind, has_tail = head >> 4, head & 0x0F
+
+    if kind == PER_IMAGE_MPL_KIND:
+        count = struct.unpack_from('<H', raw, 1)[0]
+        images = list(struct.unpack_from(f'<{count}H', raw, 3))
+        offsets = struct.unpack_from(f'<{count}I', raw, 3 + count * 2)
+        variants: dict[int, list[list[tuple[int, int, int]]]] = {}
+        for image, offset in zip(images, offsets):
+            cursor = offset
+            variant_count = raw[cursor]
+            cursor += 1
+            palettes = []
+            for _ in range(variant_count):
+                color_count = raw[cursor] or 256
+                cursor += 1
+                palettes.append([rgb565(struct.unpack_from('<H', raw, cursor + 2 * i)[0])
+                                 for i in range(color_count)])
+                cursor += color_count * 2
+            variants[image] = palettes
+        return {'kind': kind, 'per_image': variants}
+
+    if kind not in BULK_MPL_KINDS:
+        raise ValueError(f'{path.name}: 모르는 mpl 종류 {head:#04x}')
+
+    count = raw[1]
+    offsets = struct.unpack_from(f'<{count}I', raw, 2)
+    palettes = []
+    for offset in offsets:
+        color_count = raw[offset] or 256
+        if kind == 3:
+            palettes.append([rgb565(struct.unpack_from('<H', raw, offset + 1 + 2 * i)[0])
+                             for i in range(color_count)])
+        else:  # kind 2 — RGB 3바이트
+            palettes.append([tuple(raw[offset + 1 + 3 * i:offset + 4 + 3 * i])
+                             for i in range(color_count)])
+    return {'kind': kind, 'has_tail': bool(has_tail), 'palettes': palettes}
+
+
+def read_variant_mpl(pzx_path: Path) -> dict[int, list[list[tuple[int, int, int]]]]:
+    """PZX 옆에 같은 이름의 0x40 형 .mpl 이 있으면 이미지별 변형표를 준다. 없으면 빈 표다.
+
+    0x30 형 .mpl (batter_*·pitcher 같은 팀·피부 팔레트)은 파트 효과가 쓰지 않는다 —
+    원본도 0x91f0c 가 0 을 돌려준다. img_text.pzx 가 효과 5~7 을 쓰고도 색이 그대로인 이유다.
+    """
+    mpl = pzx_path.with_suffix('.mpl')
+    if not mpl.exists():
+        return {}
+    parsed = read_mpl(mpl)
+    return parsed.get('per_image', {})
 
 
 def read_image_section(raw: bytes, image_at: int) -> tuple[list[tuple[int, int, int]], bytes]:
@@ -207,8 +287,14 @@ def read_section(raw: bytes, at: int, end: int) -> list[bytes]:
     return [raw[offsets[i]:offsets[i + 1]] for i in range(count)]
 
 
-def parse_frame(block: bytes) -> list[dict]:
+def parse_frame(block: bytes) -> dict:
+    """프레임 한 덩이 → {'boxes': [(x,y,w,h)…], 'parts': [...]}.
+
+    박스는 원본 0x94a64 가 돌려주는 사각형이다. 프레임 좌표 그대로(합성 PNG 의 잘린 좌표가 아니다)
+    두어야 화면 배치에 쓸 수 있다 — origins.json 의 x·y 를 빼면 PNG 안 좌표가 된다.
+    """
     part_count, box_count = block[0], block[1]
+    boxes = [tuple(struct.unpack_from('<4h', block, 2 + 8 * i)) for i in range(box_count)]
     cursor = 2 + 8 * box_count
     parts = []
     for _ in range(part_count):
@@ -227,7 +313,7 @@ def parse_frame(block: bytes) -> list[dict]:
         parts.append({'image': image, 'x': x, 'y': y, 'effects': effects})
     if cursor != len(block):
         raise ValueError(f'프레임 길이가 맞지 않습니다: {cursor} != {len(block)}')
-    return parts
+    return {'boxes': boxes, 'parts': parts}
 
 
 def parse_animation(block: bytes) -> list[dict]:
@@ -263,13 +349,17 @@ FLIP_VERTICAL_EFFECT = 0x04
 ALPHA_SIXTEENTHS_EFFECT = 0x66
 ALPHA_BYTE_EFFECT = 0x67
 FILL_EFFECTS = (0x6E, 0x6F)
+# 효과 0x05 ~ 0x64 = 붙은 0x40 mpl 의 (효과−5) 번째 변형 팔레트 (binary.mod 0xc8bb4 `subs r2,#5`)
+VARIANT_EFFECT_FIRST = 0x05
+VARIANT_EFFECT_LAST = 0x64
 
 
-def _part_style(effects) -> tuple[bool, bool, float, tuple[int, int, int] | None]:
-    """효과 → (좌우, 상하, 불투명도, 채울 색). 0x7E 등 뜻을 모르는 효과는 무시한다."""
+def _part_style(effects) -> tuple[bool, bool, float, tuple[int, int, int] | None, int | None]:
+    """효과 → (좌우, 상하, 불투명도, 채울 색, 팔레트 변형 번호). 0x7E 등 뜻을 모르는 효과는 무시한다."""
     mirror = flip = False
     alpha = 1.0
     fill = None
+    variant = None
     for kind, value in effects:
         if kind == MIRROR_EFFECT:
             mirror = True
@@ -281,19 +371,40 @@ def _part_style(effects) -> tuple[bool, bool, float, tuple[int, int, int] | None
             alpha = min(1.0, value / 255)
         elif kind in FILL_EFFECTS and value is not None:
             fill = rgb565(value & 0xFFFF)
-    return mirror, flip, alpha, fill
+        elif VARIANT_EFFECT_FIRST <= kind <= VARIANT_EFFECT_LAST:
+            variant = kind - VARIANT_EFFECT_FIRST
+    return mirror, flip, alpha, fill, variant
 
 
-def compose_frame(parts: list[dict], images):
+def variant_palette(variants, image: int, index: int | None, palette):
+    """
+    파트 효과가 고른 변형 팔레트. 원본 0xc8bb4 는 색 목록이 없으면 **색수가 같을 때만** 통째로 덮는다
+    — 실제 파일(mode_ui 0·1·31 · game_ui 8·9)은 모두 이미지 팔레트와 색수가 같다.
+    """
+    if index is None:
+        return palette
+    candidates = variants.get(image)
+    if not candidates or index >= len(candidates):
+        return palette
+    replacement = candidates[index]
+    return replacement if len(replacement) == len(palette) else palette
+
+
+def compose_frame(parts: list[dict], images, variants=None):
     """파트를 파일 순서대로 겹친다. 이미지마다 제 팔레트를 쓰고 반투명 파트는 섞는다.
 
     효과 (서브 에이전트 E 가 렌더 결과로 확인, 뜻은 추정):
       0x03 좌우 뒤집기 · 0x04 상하 뒤집기(certi 화살표) · 0x66 n 반투명 n/16(잔상·볼터치)
       0x67 n 반투명 n/255 · 0x6E/0x6F 값 = 파트 모양대로 그 색으로 채우기(번쩍임·실루엣)
+      0x05~0x64 붙은 0x40 mpl 의 (효과−5)번 변형 팔레트 (UI 선택/비활성 색, 0xc8bb4)
+
+    팔레트 번호 캔버스도 함께 돌려준다 — 팀·피부 팔레트를 웹에서 런타임에 갈아 끼울 때 쓴다.
+    반투명·채우기로 섞인 자리와 변형 팔레트를 쓴 자리는 번호가 뜻을 잃으므로 None 으로 둔다.
     """
+    variants = variants or {}
     usable = [p for p in parts if p['image'] < len(images) and images[p['image']][0] > 0]
     if not usable:
-        return 0, 0, 0, 0, []
+        return 0, 0, 0, 0, [], []
 
     left = min(p['x'] for p in usable)
     top = min(p['y'] for p in usable)
@@ -301,12 +412,15 @@ def compose_frame(parts: list[dict], images):
     bottom = max(p['y'] + images[p['image']][1] for p in usable)
     width, height = right - left, bottom - top
     if width > MAXIMUM_FRAME_SIDE or height > MAXIMUM_FRAME_SIDE:
-        return 0, 0, 0, 0, []
+        return 0, 0, 0, 0, [], []
 
     canvas = [[None] * width for _ in range(height)]
+    index_canvas = [[None] * width for _ in range(height)]
     for part in usable:
-        part_width, part_height, pixels, palette = images[part['image']]
-        mirror, flip, alpha, fill = _part_style(part['effects'])
+        part_width, part_height, pixels, base_palette = images[part['image']]
+        mirror, flip, alpha, fill, variant = _part_style(part['effects'])
+        palette = variant_palette(variants, part['image'], variant, base_palette)
+        plain = fill is None and variant is None
         for row in range(part_height):
             source_row = part_height - 1 - row if flip else row
             for column in range(part_width):
@@ -317,6 +431,7 @@ def compose_frame(parts: list[dict], images):
                 red, green, blue = fill if fill is not None else palette[value]
                 x, y = part['x'] - left + column, part['y'] - top + row
                 below = canvas[y][x]
+                index_canvas[y][x] = value if plain and alpha >= 1.0 else None
                 if alpha >= 1.0 or below is None:
                     canvas[y][x] = (red, green, blue, round(255 * alpha))
                     continue
@@ -326,7 +441,7 @@ def compose_frame(parts: list[dict], images):
                     (top_value * alpha + under_value * under_alpha * (1 - alpha)) / out_alpha
                 )
                 canvas[y][x] = (mix(red, below[0]), mix(green, below[1]), mix(blue, below[2]), round(255 * out_alpha))
-    return left, top, width, height, canvas
+    return left, top, width, height, canvas, index_canvas
 
 
 def decode_file(path: Path, output_dir: Path) -> int:
@@ -359,21 +474,54 @@ def decode_file(path: Path, output_dir: Path) -> int:
     if not frames:
         return written
 
+    variants = read_variant_mpl(path)
     frame_dir = target / 'frames'
     frame_dir.mkdir(parents=True, exist_ok=True)
     # 프레임마다 바운딩 박스로 잘라내므로 원점을 따로 남긴다 — 여러 레이어를 겹칠 때 필요하다.
     origins: dict[str, dict[str, int]] = {}
-    for index, parts in enumerate(frames):
-        left, top, width, height, canvas = compose_frame(parts, images)
+    boxes: dict[str, list[list[int]]] = {}
+    for index, frame in enumerate(frames):
+        if frame['boxes']:
+            boxes[f'{index:03d}'] = [list(box) for box in frame['boxes']]
+        left, top, width, height, canvas, _ = compose_frame(frame['parts'], images, variants)
         if width <= 0 or height <= 0:
             continue
         write_rgba_png(frame_dir / f'{index:03d}.png', width, height, canvas)
         origins[f'{index:03d}'] = {'x': left, 'y': top, 'width': width, 'height': height}
         written += 1
     (frame_dir / 'origins.json').write_text(json.dumps(origins, indent=1, sort_keys=True), encoding='utf-8')
+    write_boxes(frame_dir, boxes)
     if animations:
         (frame_dir / 'animations.json').write_text(json.dumps(animations, indent=1), encoding='utf-8')
     return written
+
+
+def frame_boxes(path: Path) -> dict[str, list[list[int]]]:
+    """PZX(또는 PZF)의 프레임 박스만 뽑는다 — 그림은 풀지 않는다."""
+    raw = path.read_bytes()
+    if raw[0:3] == b'PZX':
+        image_at, frame_at, _ = struct.unpack_from('<III', raw, 4)
+        blocks = read_section(raw, frame_at, image_at)
+    else:  # PZF — 프레임 구간만 들어 있다 (stadium/fence)
+        blocks = read_section(raw, PZD_PZF_SECTION_AT, len(raw))
+    boxes: dict[str, list[list[int]]] = {}
+    for index, block in enumerate(blocks):
+        found = parse_frame(block)['boxes']
+        if found:
+            boxes[f'{index:03d}'] = [list(box) for box in found]
+    return boxes
+
+
+def write_boxes(frame_dir: Path, boxes: dict[str, list[list[int]]]) -> None:
+    """
+    프레임 박스를 `boxes.json` 으로 낸다 — origins.json 은 화면들이 이미 읽고 있으므로 건드리지 않는다.
+
+    값은 **프레임 좌표 그대로**다 (원본 0x94a64 가 돌려주는 x,y,w,h). 박스가 없는 프레임은 넣지 않는다.
+    """
+    if not boxes:
+        (frame_dir / 'boxes.json').unlink(missing_ok=True)
+        return
+    (frame_dir / 'boxes.json').write_text(json.dumps(boxes, indent=1, sort_keys=True), encoding='utf-8')
 
 
 PZD_PZF_SECTION_AT = 4
@@ -398,13 +546,17 @@ def decode_split_pair(image_path: Path, frame_path: Path, output_dir: Path) -> i
     frame_dir = output_dir / frame_path.stem / 'frames'
     frame_dir.mkdir(parents=True, exist_ok=True)
     origins: dict[str, dict[str, int]] = {}
-    for index, parts in enumerate(frames):
-        left, top, width, height, canvas = compose_frame(parts, images)
+    boxes: dict[str, list[list[int]]] = {}
+    for index, frame in enumerate(frames):
+        if frame['boxes']:
+            boxes[f'{index:03d}'] = [list(box) for box in frame['boxes']]
+        left, top, width, height, canvas, _ = compose_frame(frame['parts'], images)
         if width <= 0 or height <= 0:
             continue
         write_rgba_png(frame_dir / f'{index:03d}.png', width, height, canvas)
         origins[f'{index:03d}'] = {'x': left, 'y': top, 'width': width, 'height': height}
     (frame_dir / 'origins.json').write_text(json.dumps(origins, indent=1, sort_keys=True), encoding='utf-8')
+    write_boxes(frame_dir, boxes)
     return len(origins)
 
 
@@ -425,6 +577,15 @@ def main() -> int:
             continue
         total += count
         print(f'  {path.relative_to(arguments.root)!s:<36} PNG {count}장')
+
+    # PZD(그림) + PZF(프레임) 로 쪼개진 짝 — stadium/fence
+    for frame_path in sorted(arguments.root.rglob('*.pzf')):
+        image_path = frame_path.with_suffix('.pzd')
+        if not image_path.exists():
+            continue
+        count = decode_split_pair(image_path, frame_path, arguments.output)
+        total += count
+        print(f'  {frame_path.relative_to(arguments.root)!s:<36} PNG {count}장')
 
     print(f'\n총 {total}장 생성, 실패 {failures}개 → {arguments.output}/')
     return 0

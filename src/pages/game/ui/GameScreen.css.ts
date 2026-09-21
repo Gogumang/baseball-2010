@@ -21,7 +21,7 @@ export const aceAlert = style({
   border: `2px solid ${theme.color.accentDeep}`,
   background: theme.color.alertBackground,
   padding: '6px 9px',
-  fontSize: '13px',
+  fontSize: '11px',
 })
 
 globalStyle(`${aceAlert} img`, {

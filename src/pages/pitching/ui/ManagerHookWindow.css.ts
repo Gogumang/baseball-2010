@@ -33,7 +33,7 @@ export const text = style({
   padding: '5px',
   paddingRight: '20px',
   lineHeight: '14px',
-  fontSize: '12px',
+  fontSize: '11px',
   color: theme.color.ink,
   whiteSpace: 'pre-wrap',
 })

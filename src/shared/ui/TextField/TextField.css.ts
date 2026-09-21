@@ -8,7 +8,7 @@ export const field = style({
   border: `2px solid ${theme.color.line}`,
   color: theme.color.ink,
   font: 'inherit',
-  fontSize: '15px',
+  fontSize: '11px',
   selectors: {
     '&:focus': { outline: 'none', borderColor: theme.color.accent },
   },

@@ -101,8 +101,8 @@ export const cell = style({
   border: `1px solid ${ORIGINAL_COLORS.boxEdgeOuter}`,
   background: ORIGINAL_COLORS.panelDeep,
   color: ORIGINAL_COLORS.text,
-  fontSize: '8px',
-  lineHeight: '8px',
+  fontSize: '11px',
+  lineHeight: '11px',
   cursor: 'pointer',
 })
 

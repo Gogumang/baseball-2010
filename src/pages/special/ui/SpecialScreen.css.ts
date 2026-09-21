@@ -91,7 +91,7 @@ export const hofBubbleCell = style({
   padding: 0,
   border: 'none',
   color: '#FFFFFF',
-  fontSize: '10px',
+  fontSize: '11px',
   lineHeight: '14px',
   textAlign: 'center',
   cursor: 'pointer',

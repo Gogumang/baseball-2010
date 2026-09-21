@@ -21,7 +21,10 @@ export interface OriginalMission {
   readonly pitchLimit: number
   /** 상대 마선수 순번 (1부터, 상대 편 ACE_PLAYERS 순서). 0이면 일반 선수. */
   readonly opponentAce: number
-  /** 원본 조건 코드. 뜻은 미해독이다. */
+  /**
+   * 원본 레코드 바이트 13 = **투수 미션의 조준점 흔들림 세기** 0~3 (0xaa57c → 0x39c5c).
+   * 0 이면 흔들리지 않는다. 1~3 의 뜻은 `MISSION_AIM_SHAKES` 를 볼 것. 타자편은 모두 0 이다.
+   */
   readonly conditionCode: number
   /** 목표별 필요 개수 (레코드 뒤쪽 칸). 사이클링히트는 단타·2루타·3루타·홈런 각각이다. */
   readonly goalCounts: Readonly<Record<string, number>>
@@ -79,4 +82,27 @@ export const MISSIONS: readonly OriginalMission[] = [
   { id: 18, side: '투수', stage: 0, name: '로제', goals: ['아웃'], briefing: '로제 공략', timeLimitSeconds: 0, plateAppearanceLimit: 1, swingLimit: 0, pitchLimit: 5, opponentAce: 3, conditionCode: 0, goalCounts: { '아웃': 1 }, start: { inning: 1, outs: 0, balls: 0, strikes: 0, runners: { first: false, second: false, third: false }, ourScore: 0, opponentScore: 1 }, failLimits: { runs: 1, walks: 1, hits: 1 } },
   { id: 19, side: '투수', stage: 0, name: '크라이져', goals: ['아웃'], briefing: '크라이져 공략', timeLimitSeconds: 0, plateAppearanceLimit: 1, swingLimit: 0, pitchLimit: 5, opponentAce: 4, conditionCode: 0, goalCounts: { '아웃': 1 }, start: { inning: 1, outs: 0, balls: 0, strikes: 0, runners: { first: false, second: false, third: false }, ourScore: 0, opponentScore: 1 }, failLimits: { runs: 1, walks: 1, hits: 1 } },
   { id: 20, side: '투수', stage: 0, name: '어거지죠', goals: ['아웃'], briefing: '어거지죠 공략', timeLimitSeconds: 0, plateAppearanceLimit: 1, swingLimit: 0, pitchLimit: 5, opponentAce: 2, conditionCode: 0, goalCounts: { '아웃': 1 }, start: { inning: 1, outs: 0, balls: 0, strikes: 0, runners: { first: false, second: false, third: false }, ourScore: 0, opponentScore: 1 }, failLimits: { runs: 1, walks: 1, hits: 1 } },
+]
+
+/** 투수 미션 조준점 흔들림 (0x39c5c) — `conditionCode` 가 색인이다 */
+export interface MissionAimShake {
+  /** 틱마다 흔들릴 확률 % — 원본은 rand(0,100) <= 50 이라 51% 다 (⚠️ 원본 그대로) */
+  readonly chancePercent: number
+  /** 가로 흔들림 폭 (rand(−x, x)) */
+  readonly shakeX: number
+  /** 세로 흔들림 폭 (0 이면 세로는 안 흔든다) */
+  readonly shakeY: number
+  /** true 면 흔드는 대신 존 안 아무 데로 조준점을 옮긴다 */
+  readonly teleport: boolean
+}
+
+/** 조준점이 존 중심에서 벗어날 수 있는 한계 (0x39c5c) */
+export const MISSION_AIM_CLAMP = { x: 600, y: 400 }
+
+/** MISSION_AIM_SHAKES[conditionCode] — 0 은 흔들림 없음 */
+export const MISSION_AIM_SHAKES: readonly (MissionAimShake | null)[] = [
+  null,
+  { chancePercent: 50, shakeX: 40, shakeY: 0, teleport: false }, // 조건코드 1
+  { chancePercent: 50, shakeX: 80, shakeY: 80, teleport: false }, // 조건코드 2
+  { chancePercent: 50, shakeX: 600, shakeY: 400, teleport: true }, // 조건코드 3
 ]

@@ -17,7 +17,7 @@ export const variant = styleVariants({
     borderRadius: '8px',
     background: theme.color.accent,
     color: theme.color.inkOnAccent,
-    fontSize: '14px',
+    fontSize: '11px',
     fontWeight: 700,
   },
   corner: {
@@ -25,7 +25,7 @@ export const variant = styleVariants({
     borderRadius: '6px',
     background: theme.color.scrimStrong,
     color: theme.color.ink,
-    fontSize: '10px',
+    fontSize: '11px',
   },
   segment: {
     flex: 1,
@@ -34,7 +34,7 @@ export const variant = styleVariants({
     borderRadius: '6px',
     background: 'transparent',
     color: theme.color.inkDim,
-    fontSize: '12px',
+    fontSize: '11px',
     selectors: {
       '&[aria-checked="true"], &[aria-selected="true"]': {
         background: theme.color.accent,

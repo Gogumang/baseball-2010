@@ -28,7 +28,7 @@ export const titleBar = style({
   padding: '7px 10px',
   background: `linear-gradient(${theme.color.titleBarTop}, ${theme.color.titleBarBottom})`,
   borderBottom: `2px solid ${theme.color.line}`,
-  fontSize: '13px',
+  fontSize: '11px',
   fontWeight: 700,
 })
 
@@ -67,7 +67,7 @@ export const softKey = style({
   border: 'none',
   color: theme.color.accent,
   font: 'inherit',
-  fontSize: '13px',
+  fontSize: '11px',
   cursor: 'pointer',
   minHeight: '44px',
 
@@ -94,7 +94,7 @@ export const moreBelow = style({
   bottom: '2px',
   pointerEvents: 'none',
   color: theme.color.accent,
-  fontSize: '10px',
+  fontSize: '11px',
   lineHeight: 1,
   textShadow: `0 0 3px ${theme.color.canvas}, 0 0 3px ${theme.color.canvas}`,
 })

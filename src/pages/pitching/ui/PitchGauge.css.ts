@@ -39,6 +39,6 @@ export const fill = style({
 export const label = style({
   display: 'block',
   marginTop: '5px',
-  fontSize: '12px',
+  fontSize: '11px',
   color: theme.color.accent,
 })

@@ -37,8 +37,8 @@ export const cell = style({
   border: 'none',
   background: 'none',
   font: 'inherit',
-  fontSize: '9px',
-  lineHeight: '10px',
+  fontSize: '11px',
+  lineHeight: '11px',
   cursor: 'pointer',
 })
 
@@ -47,8 +47,8 @@ export const cellShadow = style({
   position: 'absolute',
   color: '#000000',
   textAlign: 'center',
-  fontSize: '9px',
-  lineHeight: '10px',
+  fontSize: '11px',
+  lineHeight: '11px',
   pointerEvents: 'none',
 })
 
@@ -56,16 +56,16 @@ export const cellName = style({
   position: 'absolute',
   color: ORIGINAL_COLORS.text,
   textAlign: 'center',
-  fontSize: '9px',
-  lineHeight: '10px',
+  fontSize: '11px',
+  lineHeight: '11px',
   pointerEvents: 'none',
 })
 
 export const rowText = style({
   position: 'absolute',
   color: ORIGINAL_COLORS.text,
-  fontSize: '10px',
-  lineHeight: '10px',
+  fontSize: '11px',
+  lineHeight: '11px',
   whiteSpace: 'nowrap',
   overflow: 'hidden',
   pointerEvents: 'none',
@@ -76,8 +76,8 @@ export const totalValue = style({
   position: 'absolute',
   color: ORIGINAL_COLORS.highlightYellow,
   textAlign: 'center',
-  fontSize: '10px',
-  lineHeight: '10px',
+  fontSize: '11px',
+  lineHeight: '11px',
   pointerEvents: 'none',
 })
 
@@ -86,8 +86,8 @@ export const progressValue = style({
   position: 'absolute',
   color: ORIGINAL_COLORS.text,
   textAlign: 'center',
-  fontSize: '10px',
-  lineHeight: '10px',
+  fontSize: '11px',
+  lineHeight: '11px',
   pointerEvents: 'none',
 })
 
@@ -103,8 +103,10 @@ export const descriptionBox = style({
 export const descriptionText = style({
   position: 'absolute',
   color: ORIGINAL_COLORS.text,
-  fontSize: '10px',
-  lineHeight: '12px',
+  fontSize: '11px',
+  // 줄 높이 13px — 원본 줄간(11+3=14)보다 1px 좁다. 설명 상자가 60px 이라 14px 로는
+  // 네 줄짜리 설명이 상자 밖으로 흐른다. **근사다** (줄 높이는 도트 또렷함과 무관하다).
+  lineHeight: '13px',
   whiteSpace: 'pre-line',
   pointerEvents: 'none',
 })
@@ -112,8 +114,8 @@ export const descriptionText = style({
 export const pagerText = style({
   position: 'absolute',
   color: ORIGINAL_COLORS.text,
-  fontSize: '10px',
-  lineHeight: '10px',
+  fontSize: '11px',
+  lineHeight: '11px',
   pointerEvents: 'none',
 })
 

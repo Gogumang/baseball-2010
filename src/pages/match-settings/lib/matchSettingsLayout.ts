@@ -80,4 +80,4 @@ export const BACK_BUTTON: SettingsBox = {
 }
 
 /** 창 안 글자 규격 — 다른 창들과 같은 11px 글·13px 줄 (**근사**) */
-export const TEXT = { size: 11, lineHeight: 13, smallSize: 9, smallLineHeight: 11 } as const
+export const TEXT = { size: 11, lineHeight: 13, smallSize: 11, smallLineHeight: 13 } as const

@@ -9,7 +9,19 @@ python3 tools/extract_wipi_game.py base/게임빌2010프로야구/0002C663.jar -
 python3 tools/decode_pzx.py base/work/jar -o base/sprites   # PNG 7,570장 (파트 3,426 + 합성 프레임 4,144)
 python3 tools/generate_game_data.py                          # src/shared/config/original/*.ts
 python3 tools/sprite_sheet.py <폴더> <출력.png>              # 확인용 시트
+python3 tools/apply_mpl.py                                   # .mpl 팔레트를 스프라이트에 굽는다 (멱등)
+python3 tools/extract_sounds.py --wildmidi <wildmidi>        # 소리 52개 → public/sounds/*.mp3
+python3 tools/extract_font.py                                # .ft2 → public/font 아틀라스 + 좌표 JSON
+
+# 웹폰트는 fonttools 가 필요하다. 홈브루 파이썬은 외부 관리(PEP 668)라 venv 에 따로 깐다
+python3 -m venv tools/.venv && tools/.venv/bin/pip install fonttools brotli
+tools/.venv/bin/python tools/build_webfont.py                # 아틀라스 → public/font/synGak9.woff2
 ```
+
+`apply_mpl.py` · `extract_font.py` · `build_webfont.py` 는 **멱등**이다 — 다시 돌려 결과 파일의
+해시가 같은 것을 확인했다.
+`extract_sounds.py` 의 WildMIDI 빌드법은 그 스크립트 머리 주석에 있다
+(`.mmf` 26개가 FM 악보형이라 ffmpeg 으로는 안 되고 WildMIDI `-DWANT_MAFM=ON` 이 필요하다).
 
 ## ★ 가장 중요한 자료: 게임 내 설명서 (StrHOWTO)
 

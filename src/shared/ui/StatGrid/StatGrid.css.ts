@@ -19,6 +19,6 @@ export const label = style({
 })
 
 export const value = style({
-  fontSize: '13px',
+  fontSize: '11px',
   fontWeight: 700,
 })

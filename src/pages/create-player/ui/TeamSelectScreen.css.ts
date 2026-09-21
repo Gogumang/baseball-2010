@@ -35,8 +35,8 @@ export const centeredText = style({
   position: 'absolute',
   textAlign: 'center',
   color: ORIGINAL_COLORS.text,
-  fontSize: '9px',
-  lineHeight: '12px',
+  fontSize: '11px',
+  lineHeight: '13px',
   pointerEvents: 'none',
   whiteSpace: 'nowrap',
 })

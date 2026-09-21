@@ -63,8 +63,8 @@ export const descriptionBox = style({
 export const descriptionText = style({
   position: 'absolute',
   color: ORIGINAL_COLORS.text,
-  fontSize: '10px',
-  lineHeight: '12px',
+  fontSize: '11px',
+  lineHeight: '14px',
   pointerEvents: 'none',
 })
 
@@ -73,8 +73,8 @@ export const value = style({
   position: 'absolute',
   color: ORIGINAL_COLORS.text,
   textAlign: 'center',
-  fontSize: '10px',
-  lineHeight: '10px',
+  fontSize: '11px',
+  lineHeight: '11px',
   pointerEvents: 'none',
 })
 

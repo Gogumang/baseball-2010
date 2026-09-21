@@ -20,8 +20,8 @@ export const centeredText = style({
   position: 'absolute',
   textAlign: 'center',
   color: ORIGINAL_COLORS.text,
-  fontSize: '9px',
-  lineHeight: '12px',
+  fontSize: '11px',
+  lineHeight: '13px',
   pointerEvents: 'none',
   whiteSpace: 'nowrap',
 })
@@ -41,7 +41,7 @@ export const cell = style({
   background: 'transparent',
   color: ORIGINAL_COLORS.text,
   font: 'inherit',
-  fontSize: '9px',
+  fontSize: '11px',
   cursor: 'pointer',
   imageRendering: 'pixelated',
 })
@@ -58,7 +58,7 @@ export const sideButton = style({
   border: '1px solid transparent',
   background: 'transparent',
   color: ORIGINAL_COLORS.text,
-  fontSize: '9px',
+  fontSize: '11px',
   cursor: 'pointer',
 })
 
@@ -107,14 +107,14 @@ export const settingsWindow = style({
   background: ORIGINAL_COLORS.panelDeep,
   border: `1px solid ${ORIGINAL_COLORS.boxEdgeInner}`,
   color: ORIGINAL_COLORS.text,
-  fontSize: '9px',
-  lineHeight: '12px',
+  fontSize: '11px',
+  lineHeight: '14px',
   overflowY: 'auto',
 })
 
 export const settingsHeading = style({
   margin: '0 0 4px',
-  fontSize: '10px',
+  fontSize: '11px',
   color: ORIGINAL_COLORS.highlightYellow,
 })
 
@@ -123,6 +123,8 @@ export const settingsRow = style({
   gap: '2px',
   alignItems: 'center',
   margin: '2px 0',
+  // 상세 설정 줄은 칸이 아홉 개다 — 11px 글꼴에서는 한 줄에 다 못 서므로 접어 내린다
+  flexWrap: 'wrap',
 })
 
 export const settingsRowLabel = style({
@@ -136,7 +138,10 @@ export const settingsOption = style({
   border: `1px solid ${ORIGINAL_COLORS.boardEdge}`,
   background: 'transparent',
   color: ORIGINAL_COLORS.text,
-  fontSize: '9px',
+  fontSize: '11px',
+  // 이름이 줄어 "찬스/플레/이" 처럼 세 줄로 접히지 않게 못박는다 (9px 때는 48px 에 들어갔다)
+  flexShrink: 0,
+  whiteSpace: 'nowrap',
   cursor: 'pointer',
 })
 

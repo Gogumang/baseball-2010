@@ -6,8 +6,10 @@
  */
 export * from '@/shared/config/original/acePlayers'
 export * from '@/shared/config/original/battedBallPatterns'
+export * from '@/shared/config/original/battingPatterns'
 export * from '@/shared/config/original/burstMissions'
 export * from '@/shared/config/original/bursts'
+export * from '@/shared/config/original/dLevel'
 export * from '@/shared/config/original/endings'
 export * from '@/shared/config/original/eventMeta'
 export * from '@/shared/config/original/eventTypes'

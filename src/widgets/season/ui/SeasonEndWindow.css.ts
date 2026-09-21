@@ -44,8 +44,8 @@ export const rankTag = style({
   alignItems: 'center',
   justifyContent: 'center',
   color: ORIGINAL_COLORS.text,
-  fontSize: '10px',
-  lineHeight: '10px',
+  fontSize: '11px',
+  lineHeight: '11px',
   pointerEvents: 'none',
 })
 

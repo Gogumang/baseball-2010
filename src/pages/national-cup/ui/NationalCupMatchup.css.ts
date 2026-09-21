@@ -23,8 +23,8 @@ export const title = style({
 export const round = style({
   position: 'absolute',
   textAlign: 'center',
-  fontSize: '10px',
-  lineHeight: '12px',
+  fontSize: '11px',
+  lineHeight: '13px',
   color: ORIGINAL_COLORS.highlightYellow,
   pointerEvents: 'none',
 })
@@ -38,8 +38,8 @@ export const logo = style({
 export const teamName = style({
   position: 'absolute',
   textAlign: 'center',
-  fontSize: '10px',
-  lineHeight: '12px',
+  fontSize: '11px',
+  lineHeight: '13px',
   color: ORIGINAL_COLORS.text,
   pointerEvents: 'none',
 })
@@ -48,8 +48,8 @@ export const vs = style({
   position: 'absolute',
   width: '100%',
   textAlign: 'center',
-  fontSize: '14px',
-  lineHeight: '16px',
+  fontSize: '22px',
+  lineHeight: '22px',
   color: ORIGINAL_COLORS.highlightYellow,
   pointerEvents: 'none',
 })
@@ -57,7 +57,7 @@ export const vs = style({
 export const hint = style({
   position: 'absolute',
   textAlign: 'center',
-  fontSize: '10px',
+  fontSize: '11px',
   lineHeight: '13px',
   color: ORIGINAL_COLORS.text,
   pointerEvents: 'none',

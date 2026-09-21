@@ -42,16 +42,15 @@ export const overBest = style({
 export const label = style({
   position: 'absolute',
   color: ORIGINAL_COLORS.text,
-  fontSize: '8px',
-  lineHeight: '10px',
-  letterSpacing: '0.5px',
+  fontSize: '11px',
+  lineHeight: '11px',
   textShadow: `1px 1px 0 ${ORIGINAL_COLORS.black}`,
 })
 
 export const aceName = style({
   position: 'absolute',
   color: ORIGINAL_COLORS.highlightYellow,
-  fontSize: '9px',
+  fontSize: '11px',
   lineHeight: '11px',
   whiteSpace: 'nowrap',
   textShadow: `1px 1px 0 ${ORIGINAL_COLORS.black}`,

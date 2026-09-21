@@ -163,7 +163,8 @@ def parse_file(buf, txt, names):
 def main():
     out_dir = BASE + '/extracted'
     names = json.load(open(BASE + '/extracted/StrMODE.json'))
-    anim_counts = {n: len(json.load(open(BASE + '/sprites/%s/frames/animations.json' % n)))
+    # 스프라이트 추출 결과는 base/sprites_v2/ 로 옮겨졌다 (예전 base/sprites/ 는 없다)
+    anim_counts = {n: len(json.load(open(BASE + '/sprites_v2/%s/frames/animations.json' % n)))
                    for n in ('event_char_0', 'event_char_1', 'event_char_2')}
     report = {}
     for name in ('r_event', 's_event'):

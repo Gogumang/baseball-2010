@@ -108,16 +108,30 @@ export const STADIUM_BOXES = {
  * 스크롤 막대 박스 5(207, …) 왼쪽에 세로로 놓는다.
  */
 export const STADIUM_KIND_ROW = { x: 27, y: 196, width: 32, height: 18, step: 34 } as const
+/**
+ * 칸 막대 — 글꼴이 11px 이 되면서 8px 짜리 줄에 글자가 안 들어간다.
+ * 줄을 13px 로 키우면 스크롤 막대 자리(185~258) 안에 **넉 줄**만 선다.
+ * 원본 프레임 32 에 **스크롤 막대와 ▲▼ 가 들어 있으므로** 목록이 굴러가는 것이 원본에 가깝다 —
+ * 일곱 줄을 한 번에 다 보여 주던 웹판 쪽이 오히려 임의였다. 몇 줄이 보이는지는 **근사다**.
+ */
 export const STADIUM_SLOT_ROW = {
   x: STADIUM_BOXES.slotHead.x,
   y: 196,
   width: STADIUM_BOXES.slotHead.width,
-  height: 8,
-  step: 9,
+  height: 13,
+  step: 14,
+  /** 한 번에 보이는 줄 수 — 196 + 14×4 = 252 로 스크롤 막대 아래끝(258) 안이다 */
+  visible: 4,
 } as const
 
+/** 커서가 늘 보이도록 굴린 목록의 첫 줄 번호 (커서가 아래로 가면 그만큼 밀어 올린다) */
+export function stadiumSlotWindowStartOf(slot: number, count: number): number {
+  const lastStart = Math.max(0, count - STADIUM_SLOT_ROW.visible)
+  return Math.min(Math.max(0, slot - STADIUM_SLOT_ROW.visible + 1), lastStart)
+}
+
 /** 창 안 글자 규격 — 이 저장소의 다른 창(ShopWindow)과 같은 11px 글·13px 줄 */
-export const TEXT = { size: 11, lineHeight: 13, smallSize: 9, smallLineHeight: 10 } as const
+export const TEXT = { size: 11, lineHeight: 13, smallSize: 11, smallLineHeight: 13 } as const
 
 /**
  * 시즌 금액 글 — 시즌 소지금·가격은 **100만 원 단위**다 (SR+2, S3 3절).

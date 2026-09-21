@@ -77,10 +77,10 @@ export const rowSelected = style({
   color: ORIGINAL_COLORS.highlightYellow,
 })
 
-/** 줄 왼쪽 커서 표시 */
+/** 줄 왼쪽 커서 표시 — ▶ 는 대체 글꼴이 그려 11px 에서 10px 을 먹는다 (8px 이면 1px 삐져나왔다) */
 export const cursor = style({
-  width: '8px',
-  flex: '0 0 8px',
+  width: '10px',
+  flex: '0 0 10px',
   color: ORIGINAL_COLORS.cursorCyan,
 })
 
@@ -115,15 +115,45 @@ export const stadiumPanel = style({
   boxShadow: 'inset 0 0 0 1px #4A7DDE',
 })
 
+/**
+ * 칸 막대가 굴러가는 창 — 줄이 13px 이라 넉 줄만 보인다. 나머지 줄은 **지우지 않고** 넘침을 잘라
+ * 감춘다 (지우면 읽어 주는 도구도 시험도 그 줄을 못 본다).
+ */
+export const stadiumSlotList = style({
+  position: 'absolute',
+  overflow: 'hidden',
+})
+
+/** 창 안에서 통째로 밀려 올라가는 줄 묶음 */
+export const stadiumSlotTrack = style({
+  position: 'absolute',
+  left: 0,
+  top: 0,
+  width: '100%',
+})
+
 /** 구장 아이템 창의 칸 막대 (파란 막대 7개) */
 export const stadiumBar = style({
   position: 'absolute',
   boxSizing: 'border-box',
-  padding: 0,
+  padding: '0 1px',
   border: '1px solid #29318C',
   background: '#4A7BDE',
   color: ORIGINAL_COLORS.text,
   fontSize: `${TEXT.smallSize}px`,
   lineHeight: `${TEXT.smallLineHeight}px`,
+  // 이름 + 값이 70px 을 넘으면 접히면서 윗줄을 덮었다 — 한 줄로 못박고 이름만 줄인다
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
   cursor: 'pointer',
 })
+
+/** 칸 이름 — 자리가 모자라면 말줄임 */
+export const stadiumBarName = style({
+  minWidth: 0,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+})
+
+/** 칸 값 (가격·보유 여부) — 절대 줄이지 않는다 */
+export const stadiumBarValue = style({ flex: 'none' })

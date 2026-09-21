@@ -25,8 +25,8 @@ export const emptyCell = style({
   alignItems: 'center',
   justifyContent: 'center',
   color: ORIGINAL_COLORS.text,
-  fontSize: '9px',
-  lineHeight: '10px',
+  fontSize: '11px',
+  lineHeight: '11px',
   textAlign: 'center',
   pointerEvents: 'none',
 })

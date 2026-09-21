@@ -11,7 +11,7 @@ export const hint = style({
 
 export const notice = style({
   margin: 0,
-  fontSize: '12px',
+  fontSize: '11px',
   color: theme.color.inkDim,
 })
 

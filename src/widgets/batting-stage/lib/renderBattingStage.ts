@@ -13,6 +13,7 @@ import { batterLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
 import type { HudState } from '@/widgets/batting-stage/lib/renderHud'
 import { STAGE_LAYOUT, toPixel } from '@/widgets/batting-stage/lib/stageLayout'
 import { UI_COLORS } from '@/shared/config/design'
+import { PIXEL_FONT_FAMILY } from '@/app/styles/theme.css'
 
 export { STAGE_HEIGHT, STAGE_WIDTH, toPixel, toZoneCoordinate } from '@/widgets/batting-stage/lib/stageLayout'
 
@@ -197,7 +198,10 @@ function drawResultText(context: CanvasRenderingContext2D, text: string, resultT
     return
   }
 
-  context.font = 'bold 20px Galmuri11, "Apple SD Gothic Neo", sans-serif'
+  // 원본 글꼴 웹폰트를 정수 2배(22px)로 쓴다 — 11 의 정수배여야 도트가 안 뭉갠다.
+  // 캔버스 `ctx.font` 는 CSS 변수를 못 읽어 `PIXEL_FONT_FAMILY` 상수를 직접 끼운다.
+  // 굵게(bold)는 빼 둔다 — 비트맵 글꼴에 굵은 자형이 없어 브라우저가 억지로 번지게 그린다.
+  context.font = `22px '${PIXEL_FONT_FAMILY}', 'Galmuri11', sans-serif`
   context.textAlign = 'center'
   context.textBaseline = 'middle'
   context.lineWidth = 4

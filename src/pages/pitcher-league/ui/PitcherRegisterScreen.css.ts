@@ -16,13 +16,13 @@ export const rowSelected = style({
 export const label = style({
   width: '52px',
   color: ORIGINAL_COLORS.tableDivider,
-  fontSize: '9px',
+  fontSize: '11px',
 })
 
 export const value = style({
   flex: 1,
   color: ORIGINAL_COLORS.text,
-  fontSize: '10px',
+  fontSize: '11px',
 })
 
 export const arrow = style({
@@ -30,7 +30,7 @@ export const arrow = style({
   background: 'transparent',
   color: ORIGINAL_COLORS.text,
   cursor: 'pointer',
-  fontSize: '10px',
+  fontSize: '11px',
   padding: '0 2px',
 })
 
@@ -49,7 +49,7 @@ export const pitchCell = style({
   border: `1px solid ${ORIGINAL_COLORS.windowBorder}`,
   background: 'transparent',
   color: ORIGINAL_COLORS.text,
-  fontSize: '9px',
+  fontSize: '11px',
   padding: '2px',
   cursor: 'pointer',
 })

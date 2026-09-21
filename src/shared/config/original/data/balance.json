@@ -171,7 +171,7 @@
   "homeRunCap": 4500,
   "swingStrengthBonus": 500,
   "exhaustedBonus": 2000,
-  "source": "d_level.dat 오프셋 0x46~0x5e · 0x1d8~0x1de · 0x1e0 (객체 오프셋 = 파일 오프셋 + 4)"
+  "source": "data/d_level.dat 파일 오프셋 0x42~0x5a · 0x1d4~0x1e6 을 생성기가 직접 읽는다 (문서의 객체 오프셋 0x46~0x5e · 0x1d8~0x1e0 = 파일 + 4). missionAcePitcherBonus·solidCap·homeRunCap·swingStrengthBonus·exhaustedBonus 는 0xab214 안의 함수 리터럴이라 파일에 없다"
  },
  "quickAtBat": {
   "note": "간이 타석 0xc11f0 — 사람이 조작하지 않는 타석",
@@ -222,7 +222,7 @@
    ]
   ],
   "pitchGradeBand": 250,
-  "source": "리터럴 풀 0xc1580(10000)·0xc1584(2999)·0xc1590(1499)·0xc1804(666) · 등급표 0xd896c"
+  "source": "리터럴 풀 0xc1580(10000)·0xc1584(2999)·0xc1590(1499)·0xc1804(666) · 등급표 0xd896c · powerScale 은 data/d_level.dat 파일 0x0c·0x0e 를 직접 읽는다"
  },
  "coldGame": {
   "fromInning": 7,

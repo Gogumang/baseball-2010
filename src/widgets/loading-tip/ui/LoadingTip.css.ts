@@ -41,6 +41,6 @@ export const tipArea = style({
 })
 
 globalStyle(`${tipArea} p`, {
-  fontSize: '9px',
-  lineHeight: 1.45,
+  fontSize: '11px',
+  lineHeight: 14 / 11,
 })

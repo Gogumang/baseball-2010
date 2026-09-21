@@ -24,7 +24,7 @@ globalStyle(`${cell} span:first-child`, {
 
 globalStyle(`${cell} span:last-child`, {
   color: theme.color.ink,
-  fontSize: '13px',
+  fontSize: '11px',
   fontWeight: 700,
 })
 

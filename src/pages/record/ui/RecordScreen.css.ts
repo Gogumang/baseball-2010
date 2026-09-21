@@ -17,7 +17,7 @@ export const aceCard = style({
   border: `1px solid ${theme.color.line}`,
   background: theme.color.surfaceDeep,
   padding: '5px 6px',
-  fontSize: '12px',
+  fontSize: '11px',
 })
 
 /** 마선수 그림은 세로로 두 줄을 차지하고 아래쪽에 붙는다. */
@@ -31,5 +31,5 @@ globalStyle(`${aceCard} img`, {
 })
 
 globalStyle(`${aceCard} .${detail}`, {
-  fontSize: '10px',
+  fontSize: '11px',
 })

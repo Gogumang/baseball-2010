@@ -15,7 +15,7 @@ export const cell = style({
   padding: 0,
   border: 'none',
   font: 'inherit',
-  fontSize: '10px',
-  lineHeight: '10px',
+  fontSize: '11px',
+  lineHeight: '11px',
   cursor: 'pointer',
 })

@@ -31,8 +31,8 @@ export const sprite = style({
 export const question = style({
   position: 'absolute',
   color: ORIGINAL_COLORS.text,
-  fontSize: '10px',
-  lineHeight: '12px',
+  fontSize: '11px',
+  lineHeight: '13px',
   textAlign: 'center',
   pointerEvents: 'none',
 })
@@ -60,8 +60,8 @@ export const newRecord = style({
   width: '240px',
   textAlign: 'center',
   color: ORIGINAL_COLORS.highlightYellow,
-  fontSize: '10px',
-  lineHeight: '12px',
+  fontSize: '11px',
+  lineHeight: '13px',
   textShadow: `1px 1px 0 ${ORIGINAL_COLORS.black}`,
   pointerEvents: 'none',
 })

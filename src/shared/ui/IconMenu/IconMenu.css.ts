@@ -56,12 +56,12 @@ export const caption = style({
   border: `2px solid ${theme.color.line}`,
   background: theme.color.panel,
   padding: '7px 8px',
-  fontSize: '12px',
+  fontSize: '11px',
 })
 
 globalStyle(`${caption} strong`, {
   color: theme.color.accent,
-  fontSize: '13px',
+  fontSize: '11px',
 })
 
 globalStyle(`${caption} span`, {

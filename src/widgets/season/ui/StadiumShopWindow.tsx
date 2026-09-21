@@ -8,7 +8,7 @@ import {
 import type { StadiumKind } from '@/entities/season-mode/model/stadiumItems'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import {
-  STADIUM_BOXES, STADIUM_KIND_ROW, STADIUM_SLOT_ROW, TEXT,
+  STADIUM_BOXES, STADIUM_KIND_ROW, STADIUM_SLOT_ROW, TEXT, stadiumSlotWindowStartOf,
 } from '@/widgets/season/lib/seasonWindowLayout'
 import { seasonMoneyTextOf } from '@/widgets/season/lib/seasonText'
 import * as styles from '@/widgets/season/ui/SeasonWindow.css'
@@ -141,8 +141,21 @@ export function StadiumShopWindow({
         </button>
       ))}
 
-      {/* 칸 막대 — 관중석·전광판 7개, 잔디 4개 */}
-      {Array.from({ length: slotCount }, (_, index) => {
+      {/* 칸 막대 — 관중석·전광판 7개, 잔디 4개. 11px 글자를 담으려면 줄이 13px 이라 넉 줄씩 굴린다 */}
+      <div
+        className={styles.stadiumSlotList}
+        style={{
+          left: STADIUM_SLOT_ROW.x,
+          top: STADIUM_SLOT_ROW.y,
+          width: STADIUM_SLOT_ROW.width,
+          height: STADIUM_SLOT_ROW.step * STADIUM_SLOT_ROW.visible,
+        }}
+      >
+      <div
+        className={styles.stadiumSlotTrack}
+        style={{ transform: `translateY(${-STADIUM_SLOT_ROW.step * stadiumSlotWindowStartOf(slot, slotCount)}px)` }}
+      >
+      {Array.from({ length: slotCount }, (_unused, index) => {
         const owned = ownsStadiumItem(record, kind, index)
         const locked = lockedText(index)
         const rowPrice = stadiumPriceOf(kind, index) ?? 0
@@ -157,9 +170,9 @@ export function StadiumShopWindow({
             aria-label={`${kind} ${locked ?? stadiumItemNameOf(kind, index)}`}
             aria-current={index === slot}
             style={{
-              left: STADIUM_SLOT_ROW.x,
-              top: STADIUM_SLOT_ROW.y + STADIUM_SLOT_ROW.step * index,
-              width: STADIUM_SLOT_ROW.width,
+              left: 0,
+              top: STADIUM_SLOT_ROW.step * index,
+              width: '100%',
               height: STADIUM_SLOT_ROW.height,
               display: 'flex',
               justifyContent: 'space-between',
@@ -175,11 +188,14 @@ export function StadiumShopWindow({
               onSelect(kind, index)
             }}
           >
-            <span>{locked ?? stadiumItemNameOf(kind, index)}</span>
-            <span>{value}</span>
+            {/* 이름은 칸(70px)보다 길면 말줄임 — 고른 줄의 온전한 이름은 머리칸 박스 2 가 보여 준다 */}
+            <span className={styles.stadiumBarName}>{locked ?? stadiumItemNameOf(kind, index)}</span>
+            <span className={styles.stadiumBarValue}>{value}</span>
           </button>
         )
       })}
+      </div>
+      </div>
 
       {/* 박스 4 설명 */}
       <div

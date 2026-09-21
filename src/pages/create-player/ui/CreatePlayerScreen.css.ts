@@ -107,8 +107,8 @@ export const hint = style([
   layer,
   {
     color: ORIGINAL_COLORS.text,
-    fontSize: '10px',
-    lineHeight: '12px',
+    fontSize: '11px',
+    lineHeight: '13px',
     textAlign: 'center',
   },
 ])
