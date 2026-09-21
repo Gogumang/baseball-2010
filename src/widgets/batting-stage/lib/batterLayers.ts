@@ -6,7 +6,7 @@
  * 없는 것으로 그린다 (추정). 손 아이템이 없으면 bat/batter_batter 를 쓴다. 다리는 item_bat_leg_0 (추정).
  * 그림자는 +0x48 플래그일 때만 그리는데 플래그 뜻이 미확인이라 늘 그린다 (추정).
  */
-const SPRITES = '/sprites'
+const SPRITES = './sprites'
 const BODY_FOLDERS = [`${SPRITES}/batter_balancer/frames`, `${SPRITES}/batter_sluger/frames`]
 const SHADOW = `${SPRITES}/batter_shadow/frames`
 const HELMET = `${SPRITES}/batter_helmet/frames`
