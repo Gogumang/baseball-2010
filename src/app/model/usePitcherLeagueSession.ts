@@ -44,13 +44,27 @@ export interface PitcherLeagueSession {
   }
 }
 
+/**
+ * 저장을 불러올 때 **빠진 칸을 기본값으로 메운다**.
+ *
+ * 커리어에 칸을 더할 때마다 옛 저장에는 그 칸이 없어 `undefined` 가 된다 — 그대로 캐스팅하면
+ * 화면이 조용히 어긋난다(예: 마구 고른 번호가 없어 "사용 중" 표시가 안 된다).
+ * 새 커리어 한 벌을 바탕에 깔고 저장을 덮어쓰는 것으로 한 번에 막는다.
+ */
+function normalizePitcherCareer(raw: unknown): PitcherCareer | null {
+  if (raw === null || typeof raw !== 'object') return null
+  const saved = raw as Partial<PitcherCareer>
+  if (typeof saved.name !== 'string') return null
+  return { ...createPitcherCareer(saved.name), ...saved }
+}
+
 export function usePitcherLeagueSession(
   store: JsonStorePort,
   random: RandomPort,
   gaugeSettingOn: boolean,
 ): PitcherLeagueSession {
   const loaded = useRef<PitcherCareer | null>(null)
-  if (loaded.current === null) loaded.current = (store.load() as PitcherCareer | null) ?? null
+  if (loaded.current === null) loaded.current = normalizePitcherCareer(store.load())
 
   const [career, setCareer] = useState<PitcherCareer | null>(loaded.current)
   const [scene, setScene] = useState<PitcherScene>(career === null ? '등록' : '관리')

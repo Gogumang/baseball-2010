@@ -72,3 +72,26 @@ describe('투수편 세션', () => {
     expect(result.current.gameOptions?.gaugeSettingOn).toBe(false)
   })
 })
+
+describe('옛 저장 불러오기', () => {
+  it('커리어에 칸이 늘어도 **빠진 칸을 기본값으로 메운다**', () => {
+    const store = 메모리저장()
+    // 칸이 늘기 전에 저장된 모양 — selectedMagicNumber 같은 새 칸이 없다
+    store.save({ name: '옛투수', teamId: 5 } as object)
+
+    const { result } = 띄우기(store)
+
+    expect(result.current.career?.name).toBe('옛투수')
+    expect(result.current.career?.teamId).toBe(5)
+    // 새 칸이 undefined 로 남지 않는다
+    expect(result.current.career?.selectedMagicNumber).toBe(0)
+    expect(result.current.career?.season).toBeGreaterThan(0)
+  })
+
+  it('이름이 없는 값은 커리어로 보지 않는다', () => {
+    const store = 메모리저장()
+    store.save({ teamId: 1 } as object)
+
+    expect(띄우기(store).result.current.career).toBeNull()
+  })
+})
