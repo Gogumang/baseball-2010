@@ -103,3 +103,19 @@ describe('모든 타석 준비에서 굴린다 (K 4절 1-6)', () => {
     expect(판정난_경기).toBeGreaterThan(10)
   })
 })
+
+describe('판정이 새지 않는가', () => {
+  it('내 타석에서 판정이 안 나도 **앞서 난 판정을 지우지 않는다**', () => {
+    const progress = startGame(씨앗(20100901))
+    // 동료·상대 타석에서 난 판정이 아직 화면에 안 뜬 상태를 흉내 낸다
+    const 대기중 = {
+      ...progress,
+      burst: progress.burst === null ? null : { ...progress.burst, current: null },
+      lastBurstResolution: { session: progress.burst!, row: null, judgement: '성공', deltas: [] } as never,
+    }
+
+    const after = applyPlayerOutcome(대기중, { kind: '삼진' }, 씨앗(3))
+
+    expect(after.lastBurstResolution).not.toBeNull()
+  })
+})

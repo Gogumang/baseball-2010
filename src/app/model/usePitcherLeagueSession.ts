@@ -16,6 +16,7 @@ import {
   pitcherGameOutcomeOf,
 } from '@/pages/pitcher-league/model/pitcherGameOptions'
 import type { PitcherGameOptions, PitcherGameSummary } from '@/features/play-pitcher-game/model/pitcherGameFlow'
+import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
@@ -99,7 +100,11 @@ export function usePitcherLeagueSession(
   const finishGame = useCallback(
     (summary: PitcherGameSummary) => {
       if (career === null || gameOptions === null) return
-      const outcome = pitcherGameOutcomeOf(summary, gameOptions)
+      // 기록 달성 G 는 요약이 들고 온다 (0xa77f0 → 0x4ea0c). 강판당한 경기는 원본이 전면 차단해 0 이다
+      const outcome = pitcherGameOutcomeOf(summary, gameOptions, {
+        entered: summary.hasEntered,
+        gamePointReward: recordGamePointsOf(summary.recordIds),
+      })
       const recorded = applyPitcherGameResult(career, outcome)
       const day = applyPitcherLeagueDay(recorded, random)
       const seasoned = applyPitcherPostseasonProgress(applyPitcherSeasonEnd(day), random)

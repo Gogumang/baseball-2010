@@ -255,7 +255,10 @@ export function applyPlayerOutcome(
       game: nextGame,
       lastDefensePlay: defensePlay,
       burst: resolution === null ? progress.burst : resolution.session,
-      lastBurstResolution: resolution !== null && resolution.judgement !== null ? resolution : null,
+      // ⚠️ 아직 안 보여 준 판정을 지우지 않는다 — 돌발은 이제 동료·상대 타석에서도 나므로
+      //    여기서 null 로 덮으면 그 보상이 화면에 안 뜬 채 사라진다. 지우는 것은 창을 닫을 때뿐이다
+      lastBurstResolution:
+        resolution !== null && resolution.judgement !== null ? resolution : progress.lastBurstResolution,
       myStats,
       consecutiveHits,
       recordIds: [...progress.recordIds, ...recordIds],
