@@ -79,10 +79,22 @@ import { effectiveThrowSpeedOf, readyTicksOf, throwTicksToFielder } from '@/enti
 import { chooseThrowTargetBase } from '@/entities/fielding/model/throwTargetBase'
 import { EMPTY_BASES, type AdvanceResult, type BaseState } from '@/entities/game/model/baseState'
 import { forecastCatch } from '@/features/defense-play/model/catchForecast'
-import { viewStateOf, type DefensePlayView } from '@/features/defense-play/model/defensePlayView'
+import {
+  viewStateOf,
+  type ActionMemory,
+  type DefensePlayView,
+} from '@/features/defense-play/model/defensePlayView'
 
 /**
- * 타구 하나를 **틱 단위로 끝까지 돌리는 순수 함수**.
+ * 타구 하나를 **틱 단위로 돌리는 진행기**.
+ *
+ * ## 틱 스테퍼 — 사람이 실시간으로 끼어들 수 있게
+ * 예전에는 타구 하나를 통째로 미리 계산해 `ticks` 배열을 뱉는 한 덩이 함수였다. 그러면
+ * **사람이 아직 안 누른 키를 알 수 없어** 실시간 조작이 원리적으로 불가능하다. 그래서 넷으로 쪼갰다:
+ *   `startDefensePlay` → `stepDefensePlay`(한 갱신 = 한 틱, 0xc2198) → `isDefensePlayFinished` →
+ *   `defensePlayResultOf`
+ * `runDefensePlay` 는 그 넷을 끝까지 돌리는 **얇은 껍데기**로 남아 있다 — 미리 다 계산해도 되는
+ * 자리(CPU 경기·미션)는 그대로 부르면 되고, 결과는 쪼개기 전과 **한 톨도 다르지 않다**.
  *
  * `entities/fielding` 에 따로따로 들어와 있는 조각들을 여기서 한 줄로 잇는다:
  *   포구 예보(0xb12d0 · 0xb3b38) → 송구 목표 루(0xafb24) → 송구 도착 틱(0xaf284) →
@@ -275,7 +287,8 @@ function batterMinimumBaseOf(outcome: AtBatOutcome): number {
   return 1
 }
 
-interface MutableRunner {
+/** 진행기 안에서 **제자리에서 바뀌는** 주자 한 명 */
+export interface MutableRunner {
   state: RunnerState
   /** 최소 진루 루 — 타자주자만 결과 코드로 정해진다 */
   minimumBase: number
@@ -331,7 +344,90 @@ function assignCovers(chaserSlot: number, ballToFirstSide: boolean): number[] {
   })
 }
 
-export function runDefensePlay(input: DefensePlayInput): DefensePlayResult {
+/**
+ * **한 플레이가 도는 동안 바뀌는 것 전부** — 지금까지 `runDefensePlay` 루프 안의 `let` 변수였던 것들이다.
+ *
+ * 앞쪽(`input`~`specialDefense`)은 시작할 때 한 번 정해지고 끝까지 안 바뀌는 것,
+ * 뒤쪽은 틱마다 바뀌는 것이다.
+ *
+ * ⚠️ **제자리에서 고친다**: `stepDefensePlay` 는 이 객체를 **그대로 고쳐 같은 객체를 돌려준다**.
+ * 주자(`runners`)·기록(`ticks`·`log`)·동작 기억(`previousActions`)은 원래부터 제자리에서 바뀌던 것이라
+ * 겉만 불변으로 꾸며 봐야 거짓말이 된다. **지난 상태를 들고 있지 말고 늘 돌려받은 것을 써라.**
+ */
+export interface DefensePlayState {
+  // ── 시작할 때 정해지는 것 ──
+  readonly input: DefensePlayInput
+  readonly trajectory: BattedBallTrajectory
+  readonly abilities: readonly number[]
+  readonly maximumTicks: number
+  /** 아무도 잡지 못하는 타구인가 (필살타법 0x51800) */
+  readonly uncatchable: boolean
+  /** 뜬 채로 잡히는 타구인가 */
+  readonly onTheFly: boolean
+  /** 공을 쫓는 야수 칸 */
+  readonly chaserSlot: number
+  /** 포구 지점 — 펌블로 포구 틱이 밀려도 **자리는 그대로다** (⚠️ 원본 그대로) */
+  readonly catchPoint: WorldPoint
+  /** 루 커버 배정 (0xd85a8 + 0xb1e24) */
+  readonly covers: readonly number[]
+  readonly defenseIsCpu: boolean
+  /** 필살수비 창 — 시작할 때 한 번만 굴린다 (0x66b30 / 0x66be4) */
+  readonly specialDefense: { readonly jumpUnlocked: boolean; readonly slideUnlocked: boolean }
+  /** 주자들 — **제자리에서 바뀐다** */
+  readonly runners: readonly MutableRunner[]
+  /** 매 틱 화면 스냅샷 — **제자리에서 쌓인다** */
+  readonly ticks: DefensePlayView[]
+  /** 진행 기록 — **제자리에서 쌓인다** */
+  readonly log: string[]
+  /** `actionTick` 을 세는 동작 기억 — **제자리에서 바뀐다** */
+  readonly previousActions: ActionMemory
+
+  // ── 틱마다 바뀌는 것 ──
+  /** 다음에 돌릴 틱 번호 */
+  tick: number
+  fielders: readonly FielderState[]
+  play: PlayView
+  /** 2아웃 보류 득점 state[0] */
+  held: HeldRunState
+  outs: number
+  outsAdded: number
+  throwBase: number
+  throwArrivalTick: number
+  throwFromSlot: number
+  batterOutTick: number
+  /** 포구 틱 — 펌블이 나면 15틱 뒤로 밀린다 */
+  catchTick: number
+  fumbled: boolean
+  errantThrow: boolean
+  /** 경기+0x24 — 자동 주루. 사람이 주루 키를 누르면 0 이 된다 (0x5209e) */
+  autoBaserunning: boolean
+  /** 주자관리+0x31c — 이번 플레이에서 이미 슬라이딩 효과음을 냈다 */
+  slidingSoundPlayed: boolean
+  /** 경기+0x19ad(반짝임) */
+  laserShining: boolean
+  /** 경기+0x19ae(레이저 확정) */
+  laserConfirmed: boolean
+  /** 경기+0x19af — 한 플레이에 한 번만 굴린다 */
+  laserRolled: boolean
+  /** 플레이+0x1f4(레이저 송구가 나갔다) */
+  laserThrow: boolean
+  /** 협살 기록칸 P+0x1ec~+0x1f3 (0xb3a04). 대상이 −1 이면 협살 중이 아니다 */
+  rundown: RundownPlan
+  /** 협살 중 짝에게 던진 공이 닿는 틱. 없으면 −1 */
+  rundownThrowArrival: number
+  /** 그 공을 받을 야수 칸 */
+  rundownThrowTo: number
+  rundowns: number
+  rundownOuts: number
+}
+
+/**
+ * 타구 하나를 **시작 상태**로 세운다 — 포구 예보 · 필살수비 굴림 · 커버 배정까지.
+ *
+ * ⚠️ 난수는 여기서 **필살수비 굴림(최대 2번)만** 돈다. 펌블·악송구·레이저는 틱 안에서 돈다 —
+ * 그 순서와 횟수가 씨앗 결과를 정하므로 자리를 옮기면 안 된다.
+ */
+export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
   const trajectory = input.trajectory
   const abilities =
     input.defenseAbilities ?? Array.from({ length: 9 }, () => DEFAULT_ABILITY)
@@ -403,49 +499,129 @@ export function runDefensePlay(input: DefensePlayInput): DefensePlayResult {
     earliestCatchTick: onTheFly ? forecast.earliestCatchTick : 0xffff,
   }
 
-  let held: HeldRunState = EMPTY_HELD_RUNS
-  let outs = input.outs
-  let outsAdded = 0
-  let throwBase = NONE
-  let throwArrivalTick = -1
-  let throwFromSlot = NONE
-  let batterOutTick = -1
-  let fumbled = false
-  let errantThrow = false
-  /** 경기+0x24 — 자동 주루. 사람이 주루 키를 누르면 0 이 된다 (0x5209e) */
-  let autoBaserunning = true
-  /** 주자관리+0x31c — 이번 플레이에서 이미 슬라이딩 효과음을 냈다 */
-  let slidingSoundPlayed = false
-  /** 경기+0x19ad(반짝임) · +0x19ae(레이저 확정) · 플레이+0x1f4(레이저 송구) */
-  let laserShining = false
-  let laserConfirmed = false
-  let laserRolled = false
-  let laserThrow = false
-  /** 협살 기록칸 P+0x1ec~+0x1f3 (0xb3a04). 대상이 −1 이면 협살 중이 아니다 */
-  let rundown: RundownPlan = NO_RUNDOWN
-  /** 협살 중 짝에게 던진 공이 닿는 틱과 받을 야수 — 없으면 −1 */
-  let rundownThrowArrival = -1
-  let rundownThrowTo = NONE
-  let rundowns = 0
-  let rundownOuts = 0
-  const defenseIsCpu = input.defenseIsCpu === true
-  const ticks: DefensePlayView[] = []
-  const log: string[] = []
-  const previousActions = new Map<string, { action: number; since: number }>()
+  return {
+    input,
+    trajectory,
+    abilities,
+    maximumTicks,
+    uncatchable,
+    onTheFly,
+    chaserSlot,
+    catchPoint,
+    covers,
+    defenseIsCpu: input.defenseIsCpu === true,
+    specialDefense,
+    runners,
+    ticks: [],
+    log: [],
+    previousActions: new Map<string, { action: number; since: number }>(),
 
-  const contextAt = (tick: number): DefenseContext => ({
+    tick: 0,
+    fielders,
+    play,
+    held: EMPTY_HELD_RUNS,
+    outs: input.outs,
+    outsAdded: 0,
+    throwBase: NONE,
+    throwArrivalTick: -1,
+    throwFromSlot: NONE,
+    batterOutTick: -1,
+    catchTick,
+    fumbled: false,
+    errantThrow: false,
+    autoBaserunning: true,
+    slidingSoundPlayed: false,
+    laserShining: false,
+    laserConfirmed: false,
+    laserRolled: false,
+    laserThrow: false,
+    rundown: NO_RUNDOWN,
+    rundownThrowArrival: -1,
+    rundownThrowTo: NONE,
+    rundowns: 0,
+    rundownOuts: 0,
+  }
+}
+
+/**
+ * 더 돌릴 것이 남았는가 — 원본 루프의 `for (tick = 0; tick <= 최대틱; …)` 와 그 안의 `break` 다.
+ * 끝 조건(공·송구·타자주자가 다 정리됐고 뛰는 주자가 없다)이 서면 `play.finished` 가 선다.
+ */
+export function isDefensePlayFinished(state: DefensePlayState): boolean {
+  return state.play.finished || state.tick > state.maximumTicks
+}
+
+/**
+ * **한 틱만 돌린다** — 원본 경기 루프의 한 갱신(0xc2198)에 해당한다.
+ *
+ * `key` 는 **이번 틱에 눌린 키**다. `runDefensePlay` 처럼 미리 다 계산하는 쪽은
+ * `input.controls.keyAt(tick)` 에서 꺼내 넘기고, 화면(`DefensePlayback`)은 실제 `keydown` 을 넘긴다.
+ * 어느 쪽이든 진행기가 보는 것은 똑같다.
+ *
+ * ⚠️ 상태는 **제자리에서 바뀐다** — 돌려받은 것을 쓰고 지난 것은 버려라.
+ */
+export function stepDefensePlay(
+  state: DefensePlayState,
+  key: DefenseKeyPress | null = null,
+): DefensePlayState {
+  if (isDefensePlayFinished(state)) return state
+
+  const input = state.input
+  const trajectory = state.trajectory
+  const abilities = state.abilities
+  const maximumTicks = state.maximumTicks
+  const uncatchable = state.uncatchable
+  const onTheFly = state.onTheFly
+  const chaserSlot = state.chaserSlot
+  const catchPoint = state.catchPoint
+  const covers = state.covers
+  const defenseIsCpu = state.defenseIsCpu
+  const runners = state.runners
+  const ticks = state.ticks
+  const log = state.log
+  const previousActions = state.previousActions
+  const tick = state.tick
+
+  let fielders = state.fielders
+  let play = state.play
+  let held = state.held
+  let outs = state.outs
+  let outsAdded = state.outsAdded
+  let throwBase = state.throwBase
+  let throwArrivalTick = state.throwArrivalTick
+  let throwFromSlot = state.throwFromSlot
+  let batterOutTick = state.batterOutTick
+  let catchTick = state.catchTick
+  let fumbled = state.fumbled
+  let errantThrow = state.errantThrow
+  let autoBaserunning = state.autoBaserunning
+  let slidingSoundPlayed = state.slidingSoundPlayed
+  let laserShining = state.laserShining
+  let laserConfirmed = state.laserConfirmed
+  let laserRolled = state.laserRolled
+  let laserThrow = state.laserThrow
+  let rundown = state.rundown
+  let rundownThrowArrival = state.rundownThrowArrival
+  let rundownThrowTo = state.rundownThrowTo
+  let rundowns = state.rundowns
+  let rundownOuts = state.rundownOuts
+
+  const contextAt = (at: number): DefenseContext => ({
     play,
     fielders,
     runners: runners.map((runner) => runner.state),
-    currentTick: tick,
+    currentTick: at,
     landingTick: trajectory.landingTick,
   })
 
-  for (let tick = 0; tick <= maximumTicks; tick += 1) {
+  // 아래 묶음은 예전 `for (let tick = 0; …)` 루프의 **몸통 그대로**다.
+  // 한 줄도 안 옮기려고 묶음(블록)만 씌워 두었다 — 결과가 한 톨도 달라지면 안 되는 자리다.
+  {
     const ballOnGround = play.everHeld || tick >= trajectory.landingTick
 
     // ── 0. 사람 조작 (상태 0x17 갈래 0x53420 — I-controls 0·2b·3b절) ──
-    const press = input.controls?.keyAt(tick) ?? null
+    // 예전에는 `input.controls?.keyAt(tick)` 로 미리 물어봤다. 이제는 **이번 틱에 눌린 키**를 받는다
+    const press = key
     if (input.controls !== undefined && press !== null) {
       const command = inPlayCommandOf(press.key, input.controls.side, {
         canReturn: input.controls.canReturn,
@@ -870,19 +1046,51 @@ export function runDefensePlay(input: DefensePlayInput): DefensePlayResult {
     const ballSettled = uncatchable ? tick >= trajectory.landingTick : play.everHeld
     if (ballSettled && throwSettled && batterSettled && !stillActive) {
       play = { ...play, finished: true }
-      break
     }
   }
 
-  /**
-   * 타석 단위로 마무리할 때의 같은 결과 규칙 (S2 2-5, `runsAfterTwoOutRule`):
-   * **땅볼로 타자주자가 아웃이 되어 그 플레이에서 3아웃이 되면 주자 득점은 0** 이다.
-   * 틱 단위로는 주자가 타자주자보다 먼저 홈을 밟아 `state[0]` 보류를 안 타는 경우가 있어
-   * (0xaa164 는 "타자주자가 살아서 뛰는 중" 이면 바로 올린다) 마지막에 한 번 더 건다.
-   */
+  // ── 한 틱치를 상태에 되돌려 넣는다 ──
+  state.fielders = fielders
+  state.play = play
+  state.held = held
+  state.outs = outs
+  state.outsAdded = outsAdded
+  state.throwBase = throwBase
+  state.throwArrivalTick = throwArrivalTick
+  state.throwFromSlot = throwFromSlot
+  state.batterOutTick = batterOutTick
+  state.catchTick = catchTick
+  state.fumbled = fumbled
+  state.errantThrow = errantThrow
+  state.autoBaserunning = autoBaserunning
+  state.slidingSoundPlayed = slidingSoundPlayed
+  state.laserShining = laserShining
+  state.laserConfirmed = laserConfirmed
+  state.laserRolled = laserRolled
+  state.laserThrow = laserThrow
+  state.rundown = rundown
+  state.rundownThrowArrival = rundownThrowArrival
+  state.rundownThrowTo = rundownThrowTo
+  state.rundowns = rundowns
+  state.rundownOuts = rundownOuts
+  state.tick = tick + 1
+  return state
+}
+
+/**
+ * 다 돈 상태에서 결과를 뽑는다 — 원본 루프가 끝난 뒤의 마무리다.
+ *
+ * 타석 단위로 마무리할 때의 같은 결과 규칙 (S2 2-5, `runsAfterTwoOutRule`):
+ * **땅볼로 타자주자가 아웃이 되어 그 플레이에서 3아웃이 되면 주자 득점은 0** 이다.
+ * 틱 단위로는 주자가 타자주자보다 먼저 홈을 밟아 `state[0]` 보류를 안 타는 경우가 있어
+ * (0xaa164 는 "타자주자가 살아서 뛰는 중" 이면 바로 올린다) 마지막에 한 번 더 건다.
+ */
+export function defensePlayResultOf(state: DefensePlayState): DefensePlayResult {
+  const held = state.held
+  const runners = state.runners
   const runsScored = runsAfterTwoOutRule(held.scoreboardRuns, {
-    outsAfter: outs,
-    ballOnGround: !onTheFly,
+    outsAfter: state.outs,
+    ballOnGround: !state.onTheFly,
     batterRunnerOut: runners[0].state.isOut,
   })
 
@@ -890,24 +1098,38 @@ export function runDefensePlay(input: DefensePlayInput): DefensePlayResult {
     advance: {
       bases: basesOf(runners),
       runsScored,
-      outsAdded,
+      outsAdded: state.outsAdded,
     },
-    ticks,
-    catchFielderSlot: chaserSlot,
-    catchTick,
-    isUncatchable: uncatchable,
-    caughtOnTheFly: onTheFly,
-    throwBase,
-    throwArrivalTick,
+    ticks: state.ticks,
+    catchFielderSlot: state.chaserSlot,
+    catchTick: state.catchTick,
+    isUncatchable: state.uncatchable,
+    caughtOnTheFly: state.onTheFly,
+    throwBase: state.throwBase,
+    throwArrivalTick: state.throwArrivalTick,
     voidedRuns: held.heldRuns + (held.scoreboardRuns - runsScored),
-    fumbled,
-    errantThrow,
-    specialDefense,
-    laserThrow,
-    rundowns,
-    rundownOuts,
-    log,
+    fumbled: state.fumbled,
+    errantThrow: state.errantThrow,
+    specialDefense: state.specialDefense,
+    laserThrow: state.laserThrow,
+    rundowns: state.rundowns,
+    rundownOuts: state.rundownOuts,
+    log: state.log,
   }
+}
+
+/**
+ * 타구 하나를 **끝까지 미리 돌려** 결과를 내준다 — 스테퍼를 다 돌리는 **얇은 껍데기**다.
+ *
+ * 사람이 실시간으로 치는 화면은 이것을 쓰지 않고 `startDefensePlay`·`stepDefensePlay` 를 직접 돌린다.
+ * 여기서는 조작이 있으면 `keyAt(tick)` 으로 "그 틱에 눌렸을 키" 를 미리 물어 넘긴다.
+ */
+export function runDefensePlay(input: DefensePlayInput): DefensePlayResult {
+  let state = startDefensePlay(input)
+  while (!isDefensePlayFinished(state)) {
+    state = stepDefensePlay(state, input.controls?.keyAt(state.tick) ?? null)
+  }
+  return defensePlayResultOf(state)
 }
 
 /** 펌블 뒤 동작 잠금 틱 — 야수+0xb4 = 15 (놓침 동작 0xd, R3 2-1) */
