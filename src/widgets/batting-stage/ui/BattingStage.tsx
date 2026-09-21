@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import { resolvePitch } from '@/features/play-at-bat/model/resolvePitch'
 import type { BattingSwing } from '@/features/play-at-bat/model/resolvePitch'
 import { nextBatterShift } from '@/features/play-at-bat/model/batterShift'
@@ -15,6 +15,7 @@ import { ballFrameAt, useStageRefs } from '@/widgets/batting-stage/model/stageRe
 import type { AcePitcherFrames, StageHud } from '@/widgets/batting-stage/model/stageRefs'
 import { useStageAnimation } from '@/widgets/batting-stage/model/useStageAnimation'
 import { useStageControls } from '@/widgets/batting-stage/model/useStageControls'
+import { rollSpecialSwing } from '@/entities/batting/model/specialSwing'
 import * as styles from '@/widgets/batting-stage/ui/BattingStage.css'
 
 interface BattingStageProps {
@@ -34,12 +35,27 @@ interface BattingStageProps {
   /** 참이면 새 공을 던지지 않는다. 타석 결과 연출 중에 쓴다. */
   readonly isPaused: boolean
   readonly random: RandomPort
-  readonly onPitchResolved: (detail: PitchOutcomeDetail, pitch: Pitch) => void
+  /**
+   * **필살타법 레벨** (선수 기록 +0x201). 0 이면 못 배운 것이라 '0' 키를 눌러도 늘 실패한다.
+   * 마타자는 번호와 무관하게 30% 라 `isAceBatter` 로 따로 알린다 (H2 2-2).
+   */
+  readonly specialSwingLevel?: number
+  readonly isAceBatter?: boolean
+  /**
+   * 세 번째 인자는 **필살타법이 성공한 타구인가** — 성공하면 야수가 쥐지 않고 지나친다
+   * (0x51800 → `features/defense-play` 의 `isUncatchable`).
+   */
+  readonly onPitchResolved: (detail: PitchOutcomeDetail, pitch: Pitch, isUncatchable?: boolean) => void
 }
 
 /** 원작 타석 화면. 그리기는 lib, 루프와 조작은 model이 맡는다. */
-export function BattingStage({ canBunt = false, swingMode = '일반', batterSkillIds = [], recentAtBatCodes = [], ...props }: BattingStageProps) {
+export function BattingStage({ canBunt = false, swingMode = '일반', batterSkillIds = [], recentAtBatCodes = [], specialSwingLevel = 0, isAceBatter = false, ...props }: BattingStageProps) {
   const refs = useStageRefs({ ...props, canBunt, swingMode, batterSkillIds, recentAtBatCodes })
+  /**
+   * 이번 공에 필살타법을 걸어 두었는가 (`S+0x10`).
+   * 새 투구 준비 `0x34334` 가 0 으로 되돌리므로 **공마다 다시 눌러야 한다** (H2 2-2).
+   */
+  const specialArmedRef = useRef(false)
   const { pitchRef, phaseRef, phaseStartedAtRef, resultTextRef, swingStartedAtRef, shiftRef, buntRef, deckRef, latestRef } = refs
 
   const finishPitch = useCallback((swing: BattingSwing | null, now: number) => {
@@ -57,13 +73,17 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterSkil
       isPitcherAce: latest.acePitcher !== null,
     }
     const result = resolvePitch(pitch, swing, context, deck, latest.random)
+    // 필살 스윙이면 여기서 굴린다 (0x34c74). 걸어 두지 않았으면 굴리지 않는다
+    const isUncatchable = specialArmedRef.current
+      && rollSpecialSwing(specialSwingLevel, latest.random, isAceBatter)
+    specialArmedRef.current = false
     deckRef.current = result.deck
     buntRef.current = null
     resultTextRef.current = describeResolution(result.detail)
     phaseRef.current = '결과'
     phaseStartedAtRef.current = now
-    latest.onPitchResolved(result.detail, pitch)
-  }, [])
+    latest.onPitchResolved(result.detail, pitch, isUncatchable)
+  }, [isAceBatter, specialSwingLevel])
 
   const actions = useMemo(() => {
     const frameNow = (now: number) => ballFrameAt(now, phaseStartedAtRef.current, millisecondsPerFrame())
@@ -81,6 +101,11 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterSkil
       },
       moveBatter: (direction: -1 | 1) => {
         shiftRef.current = nextBatterShift(shiftRef.current, direction)
+      },
+      /** '0' 은 **이번 공에** 필살타법을 건다 — 스윙은 따로 해야 한다 (0x535a4 → 0x6a6) */
+      specialSwing: (now: number) => {
+        if (!isFlying(now)) return
+        specialArmedRef.current = true
       },
     }
   }, [finishPitch])

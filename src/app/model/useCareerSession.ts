@@ -164,7 +164,7 @@ export function useCareerSession({
   )
 
   const handlePitchResolved = useCallback(
-    (detail: PitchOutcomeDetail) => {
+    (detail: PitchOutcomeDetail, _pitch?: unknown, isUncatchable?: boolean) => {
       const nextAtBat = runner.applyPitch(detail.resolution)
       if (!isAtBatFinished(nextAtBat) || nextAtBat.outcome === null) return
 
@@ -173,7 +173,8 @@ export function useCareerSession({
 
       const { bases } = currentProgress.game
       const runnersOnBase = [bases.first, bases.second, bases.third].filter(Boolean).length
-      const advanced = applyPlayerOutcome(currentProgress, nextAtBat.outcome, random)
+      // 필살타법이 성공한 타구면 야수가 쥐지 않는다 (0x51800)
+      const advanced = applyPlayerOutcome(currentProgress, nextAtBat.outcome, random, { isUncatchable })
       progressRef.current = advanced
       setProgress(advanced)
 

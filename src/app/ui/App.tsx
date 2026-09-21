@@ -92,6 +92,7 @@ export function App() {
         // 저장을 불러오는 중 같은 짧은 순간에만 쓰인다 — 원본에는 신인 대체가 없다
         ability={careerSession.career === null ? ROOKIE_BATTER_ABILITY : effectiveAbilityOf(careerSession.career)}
         pitchControl={gameSettings.settings.pitchControl}
+        gameSettings={gameSettings}
       />
     )
   }

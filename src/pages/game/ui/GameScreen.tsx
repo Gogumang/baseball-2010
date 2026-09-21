@@ -27,7 +27,8 @@ interface GameScreenProps {
   readonly isPaused: boolean
   readonly bannerText: string
   readonly random: RandomPort
-  readonly onPitchResolved: (detail: PitchOutcomeDetail, pitch: Pitch) => void
+  /** 세 번째 인자는 **필살타법이 성공한 타구인가** (0x51800) */
+  readonly onPitchResolved: (detail: PitchOutcomeDetail, pitch: Pitch, isUncatchable?: boolean) => void
   /** 경기를 그만두고 메인 메뉴로 (이 경기 기록은 사라진다) */
   readonly onQuit: () => void
   /**
@@ -174,6 +175,8 @@ export function GameScreen({
           }
           isPaused={isPaused || isMenuOpen}
           random={random}
+          // 필살타법 '0' (0x535a4 → 0x34c74). 레벨 0 이면 눌러도 늘 실패다 — 마타자는 30% 고정
+          specialSwingLevel={career.specialSwingLevel}
           onPitchResolved={onPitchResolved}
         />
       </div>

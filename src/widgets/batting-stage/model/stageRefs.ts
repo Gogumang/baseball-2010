@@ -39,7 +39,8 @@ export interface StageLatest {
   readonly batterSkillIds: readonly number[]
   /** 최근 타석 기록 코드 — 스킬 16·17 조건 */
   readonly recentAtBatCodes: readonly number[]
-  readonly onPitchResolved: (detail: PitchOutcomeDetail, pitch: Pitch) => void
+  /** 세 번째 인자는 **필살타법이 성공한 타구인가** (0x51800) */
+  readonly onPitchResolved: (detail: PitchOutcomeDetail, pitch: Pitch, isUncatchable?: boolean) => void
 }
 
 export interface StageRefs {

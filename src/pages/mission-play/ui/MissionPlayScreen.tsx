@@ -1,4 +1,9 @@
+import { useState } from 'react'
 import { BigResult, Hint, PixelScreen } from '@/shared/ui'
+import type { GameSettings } from '@/entities/settings/model/gameSettings'
+import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
+import { HelpScreen } from '@/pages/help/ui/HelpScreen'
+import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import * as styles from '@/pages/mission-play/ui/MissionPlayScreen.css'
 import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
@@ -27,7 +32,19 @@ interface MissionPlayScreenProps {
   readonly onFinish: () => void
   /** 도루 목표가 있는 미션에서만 쓴다 */
   readonly onSteal: () => void
+  /**
+   * 경기 중 메뉴 **"다시하기"** (표 0xcfcfc 행 1 · StrGAME[7], `0x3c706`).
+   * 미션·홈런더비 행만 자동진행 자리에 이 칸이 온다. 안 넘기면 칸이 잠긴다.
+   */
+  readonly onRestart?: () => void
+  /** 경기 중 메뉴 "설정" 칸이 열 환경설정. 안 넘기면 칸이 잠긴다 */
+  readonly settings?: GameSettings
+  readonly onSettingsChange?: (settings: GameSettings) => void
 }
+
+/** 미션 타자편 = 원본 전역 모드 5 — 경기 중 메뉴 표 0xcfcfc 의 **행 1**(다시하기가 있는 줄) */
+const MISSION_BATTER_MODE = 5
+type MenuOverlay = '조작방법' | '설정'
 
 export function MissionPlayScreen({
   run,
@@ -42,7 +59,12 @@ export function MissionPlayScreen({
   onGiveUp,
   onFinish,
   onSteal,
+  onRestart,
+  settings,
+  onSettingsChange,
 }: MissionPlayScreenProps) {
+  const [isMenuOpen, setMenuOpen] = useState(false)
+  const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
   const goals = goalsOf(run.mission, run.progress)
   const isOver = run.status !== '진행중'
   const canBunt = run.mission.goals.includes('번트')
@@ -56,6 +78,20 @@ export function MissionPlayScreen({
   }
   if (run.remainingSwings !== null) badgeParts.push(`${Math.max(0, run.remainingSwings)}스윙`)
 
+  // 경기 중 메뉴의 "조작방법"(0x3c212)·"설정"(0x3c326)
+  if (overlay === '조작방법') return <HelpScreen onBack={() => setOverlay(null)} />
+  if (overlay === '설정' && settings !== undefined && onSettingsChange !== undefined) {
+    return (
+      <SettingsScreen
+        settings={settings}
+        hasSavedCareer={false}
+        onChange={onSettingsChange}
+        onResetCareer={() => {}}
+        onBack={() => setOverlay(null)}
+      />
+    )
+  }
+
   return (
     <PixelScreen
       title={run.mission.name}
@@ -67,9 +103,35 @@ export function MissionPlayScreen({
             ? { label: '도루', onPress: onSteal }
             : undefined
       }
-      rightKey={isOver ? undefined : { label: '포기', onPress: onGiveUp }}
+      rightKey={
+        isOver
+          ? undefined
+          : { label: isMenuOpen ? '닫기' : '메뉴', onPress: () => setMenuOpen((open) => !open) }
+      }
     >
       <GoalBar goals={goals} />
+
+      {isMenuOpen && (
+        <InGameMenu
+          // 미션 행은 자동진행 자리에 **다시하기**가 온다 (표 0xcfcfc 행 1)
+          mode={MISSION_BATTER_MODE}
+          onContinue={() => setMenuOpen(false)}
+          onQuit={onGiveUp}
+          onRestart={onRestart}
+          onOpenHelp={() => {
+            setMenuOpen(false)
+            setOverlay('조작방법')
+          }}
+          onOpenSettings={
+            settings === undefined || onSettingsChange === undefined
+              ? undefined
+              : () => {
+                  setMenuOpen(false)
+                  setOverlay('설정')
+                }
+          }
+        />
+      )}
 
       <div className={styles.stageArea}>
         <BattingStage

@@ -9,6 +9,7 @@ import type { BatterAbility } from '@/entities/batting/model/batter'
 import { PITCH_TYPES } from '@/shared/config/original/pitchTypes'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { PitchControl } from '@/entities/settings/model/gameSettings'
+import type { useGameSettings } from '@/app/model/useGameSettings'
 
 /** 원작 구질 선택은 다섯 자리다 (StrHOWTO <투구 조작>) */
 const PITCHER_REPERTOIRE_SIZE = 5
@@ -20,6 +21,8 @@ interface MissionRoutesProps {
   readonly runner: AtBatRunner
   readonly random: RandomPort
   readonly ability: BatterAbility
+  /** 경기 중 메뉴 "설정" 칸 */
+  readonly gameSettings: ReturnType<typeof useGameSettings>
   readonly pitchControl: PitchControl
 }
 
@@ -32,6 +35,7 @@ export function MissionRoutes({
   random,
   ability,
   pitchControl,
+  gameSettings,
 }: MissionRoutesProps) {
   const { missionRun, pitcherRun, actions } = session
 
@@ -72,6 +76,10 @@ export function MissionRoutes({
         onSteal={() => actions.steal(ability)}
         onGiveUp={actions.giveUpBatter}
         onFinish={screen.kind === '마선수대결' ? actions.finishAceMatch : actions.finishBatter}
+        // 경기 중 메뉴 "다시하기" (StrGAME[7]) — 같은 미션을 처음부터 다시 세운다
+        onRestart={() => actions.begin(missionRun.mission)}
+        settings={gameSettings.settings}
+        onSettingsChange={gameSettings.setSettings}
       />
     )
   }
