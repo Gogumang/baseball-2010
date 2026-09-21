@@ -168,7 +168,7 @@ export function SeasonRoute({ session, random, onExit }: SeasonRouteProps) {
         yearIndex={state.record.yearIndex}
         random={random}
         // ⚠️ 웹판 임시 — 원본은 여기서 사람이 대표팀을 조작해 경기를 친다 (시즌 221)
-        onStartGame={(matchup, current) => actions.playCupGame(matchup.myTeam, matchup.opponent, current)}
+        onStartGame={(matchup) => actions.playCupGame(matchup.myTeam, matchup.opponent)}
         onFinish={(finish) => actions.finishCup(finish)}
       />
     )
@@ -227,6 +227,7 @@ export function SeasonRoute({ session, random, onExit }: SeasonRouteProps) {
         leagueFirstAwardedBits={0}
         onApplyKoreanSeriesReward={(reward) => actions.updateRecord(applySeasonReward(state.record, reward))}
         onLeagueFirstAward={() => undefined}
+        onContinuePostseason={actions.continuePostseason}
         onFinish={actions.finishSeason}
       />
     )

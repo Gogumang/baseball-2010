@@ -253,12 +253,29 @@ describe('포스트시즌', () => {
     return rendered
   }
 
-  it('정규시즌이 끝나면 대진이 짜이고 **우승팀이 정해질 때까지** 돈다 (웹판 임시 자동 진행)', () => {
+  it('정규시즌이 끝나면 **대진만 짜고** 경기는 아직 안 친다 — 결산 화면(0xef)이 진행시킨다', () => {
     const { result } = 시즌끝()
 
-    expect(result.current.series?.round).toBe('종료')
-    expect(result.current.series?.champion).not.toBeNull()
-    expect(result.current.state?.record.postseasonChampion).toBe(result.current.series?.champion)
+    expect(result.current.series?.round).toBe('준플레이오프')
+    expect(result.current.series?.champion).toBeNull()
+    expect(result.current.state?.record.inPostseason).toBe(true)
+  })
+
+  it('결산에서 진행시키면 — 내 차례면 경기 화면, 아니면 CPU 끼리 돈다 (0x13da0)', () => {
+    const { result } = 시즌끝()
+    const 내팀 = result.current.state!.record.teamId
+    const 첫시리즈 = result.current.series!
+
+    act(() => result.current.actions.continuePostseason())
+
+    if (첫시리즈.teams.includes(내팀)) {
+      expect(result.current.scene).toBe(SEASON_SCENE_STATE.경기직전)
+      expect(result.current.gameKind).toBe('포스트시즌')
+    } else {
+      // 내 차례가 오거나 우승이 정해질 때까지 돌린다
+      const series = result.current.series!
+      expect(series.round === '종료' || series.teams.includes(내팀)).toBe(true)
+    }
   })
 
   it('포스트시즌은 정규시즌 1~4위만 올라간다', () => {

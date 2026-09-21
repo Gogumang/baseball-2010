@@ -19,7 +19,9 @@ import type { League } from '@/entities/league/model/league'
 import { recordLeagueResult } from '@/entities/league/model/league'
 import { playLeagueDay } from '@/entities/league/model/leagueDay'
 import { finishRegularSeason } from '@/entities/league/model/seasonEnd'
-import { playCpuSeriesGame } from '@/entities/league/model/postseasonPlay'
+import { runCpuPostseason } from '@/entities/league/model/postseasonPlay'
+import { advancePostseason } from '@/entities/league/model/league'
+import { isMyTurn } from '@/entities/league/model/seasonEnd'
 import type { PostseasonSeries } from '@/entities/league/model/league'
 import { EMPTY_LEAGUE_PLAYER_STATS, recordLeaguePlateAppearances } from '@/entities/league/model/leaguePlayerStats'
 import type { LeaguePlayerStats } from '@/entities/league/model/leaguePlayerStats'
@@ -32,7 +34,7 @@ import { FULL_PLAY_SETTINGS } from '@/features/play-team-game/model/matchSetting
 import { PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
 import { createNationalCup } from '@/entities/national-cup/model/nationalCup'
-import { advanceNationalCupDay, playCpuNationalCupGame } from '@/entities/national-cup/model/nationalCupPlay'
+import { advanceNationalCupDay } from '@/entities/national-cup/model/nationalCupPlay'
 import { isSeasonNationalCupYear } from '@/entities/national-cup/model/nationalCupFlow'
 import type { NationalCupFinish } from '@/entities/national-cup/model/nationalCupFlow'
 import { applySeasonReward } from '@/entities/season-mode/model/seasonRewards'
@@ -72,6 +74,8 @@ export interface SeasonSession {
   readonly ranking: readonly number[]
   /** 지금 치를 팀 경기의 옵션. 경기 화면이 아니면 null */
   readonly gameOptions: TeamGameOptions | null
+  /** 그 경기가 정규·포스트시즌·국가대항전 중 무엇인가 */
+  readonly gameKind: SeasonGameKind
   /** 진행 중인 국가대항전. 없으면 null (원본 L+0xa8~ 칸) */
   readonly cup: NationalCup | null
   readonly notice: string
@@ -85,15 +89,17 @@ export interface SeasonActions {
   readonly updateRoster: (roster: SeasonTeamRoster) => void
   readonly playNextGame: () => void
   readonly confirmIncome: (record: SeasonRecord) => void
-  /** 국가대항전 한 경기 — ⚠️ 웹판 임시 자동 진행 (팀 경기 화면이 없다) */
-  readonly playCupGame: (myTeam: number, opponent: number, cup: NationalCup) => void
+  /** 국가대항전 한 경기 — 사람이 대표팀을 조작한다 */
+  readonly playCupGame: (myTeam: number, opponent: number) => void
   readonly finishCup: (finish: NationalCupFinish) => void
   /** 팀 트레이닝 한 번 — 굴리고 적용한다 (연출 0xde → 굴림 0xc074 → 적용 0xa2f24) */
   readonly runTraining: (slot: number) => void
   /** 시즌 외출 한 번 — 굴리고 적용한다 (연출 0xe3 → 결과 0xc81c) */
   readonly runOuting: (place: number) => void
-  /** 팀 경기가 끝났다 — 요약으로 하루를 정산하고 관중수입(0xe9)으로 간다 */
+  /** 팀 경기가 끝났다 — 종류에 맞게 정산한다 (정규는 관중수입 0xe9 으로) */
   readonly finishGame: (summary: TeamGameSummary) => void
+  /** 결산 화면에서 포스트시즌을 한 걸음 진행시킨다 (0xef — 내 차례면 경기, 아니면 CPU 구간) */
+  readonly continuePostseason: () => void
   /** 시즌 끝 사슬의 다음 칸으로 (포스트시즌시작 → 시상 셋 → 정규시즌순위 → 결산) */
   readonly nextSeasonEndStep: () => void
   /** 결산을 닫았다 — 국가대항전 연차면 대회, 아니면 새 해 (afterKoreanSeries) */
@@ -138,14 +144,15 @@ function rosterOf(teamId: number): SeasonTeamRoster {
 
 const EMPTY_ROSTER: SeasonTeamRoster = { pitchers: [], batters: [] }
 
-/** 포스트시즌 세 시리즈를 다 돌려도 넉넉한 안전망 (원본에는 없다) */
-const POSTSEASON_GAME_LIMIT = 40
 /** SR+0xb7 = 0xf 는 "우승팀 미정" 이다 (P4 1a) */
 const NO_CHAMPION = 0xf
 /** 시즌모드 = 원본 게임 모드 2 (능력치 보정 마스크 0x306 에 든다) */
 const SEASON_GAME_MODE = 2
 /** 코치 칸 SR+0x185 가 시즌 레코드에 아직 없다 — 없음(−1)으로 둔다 */
 const NO_COACH = -1
+
+/** 같은 경기 화면을 쓰는 세 갈래 — 끝났을 때 정산하는 곳이 다르다 */
+export type SeasonGameKind = '정규' | '포스트시즌' | '국가대항전'
 
 export function useSeasonSession(store: JsonStorePort, random: RandomPort): SeasonSession {
   const loaded = useRef<SeasonSave | null>(null)
@@ -159,6 +166,8 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
   )
   const [notice, setNotice] = useState('')
   const [gameOptions, setGameOptions] = useState<TeamGameOptions | null>(null)
+  /** 지금 치르는 경기가 무엇인가 — 끝났을 때 어디로 정산할지 갈린다 */
+  const [gameKind, setGameKind] = useState<SeasonGameKind>('정규')
 
   const commit = useCallback(
     (next: SeasonSave) => {
@@ -209,10 +218,31 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
    * 같은 날 나머지 네 경기를 돌리고(0xc2a48 — 승패 뒤집힘 버그 포함), 평가(0xa719c)를
    * 얹고 phase 를 "경기끝" 으로 두어 관중수입(0xe9)으로 넘어간다.
    */
+  /** 커리어·팀 상태에서 팀 경기 옵션을 만든다 (세 종류가 같은 화면을 쓴다) */
+  const optionsFor = useCallback(
+    (opponent: number): TeamGameOptions | null => {
+      if (save === null) return null
+      const { record } = save.state
+      return {
+        mode: SEASON_GAME_MODE,
+        ourTeamId: record.teamId,
+        opponentTeamId: opponent,
+        // ⚠️ 홈/원정은 원본이 0xb7844(날짜/9 홀짝 + 22일 이후 반전, R1)로 정하는데 그 함수가
+        //    웹 entities/league 에 없다. 지금은 늘 후공으로 둔다
+        playerSide: PLAYER_SIDE_LAST_BAT,
+        settings: FULL_PLAY_SETTINGS,
+        season: { illness: record.illness, morale: save.state.teamMorale, coach: NO_COACH },
+        teamAbilities: save.state.teamAbilities,
+      }
+    },
+    [save],
+  )
+
   const playNextGame = useCallback(() => {
     if (save === null) return
     const { record } = save.state
     const opponent = seasonOpponentOf(record)
+    setGameKind('정규')
     setGameOptions({
       // 시즌모드 = 원본 게임 모드 2
       mode: SEASON_GAME_MODE,
@@ -239,6 +269,33 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
       if (save === null) return
       const { record } = save.state
       const opponent = summary.opponentTeamId
+
+      // 포스트시즌·국가대항전은 리그 전적·수입 정산을 타지 않는다
+      if (gameKind === '포스트시즌') {
+        const series = save.series ?? null
+        if (series === null) return
+        const winner = summary.won ? record.teamId : opponent
+        const advanced = runCpuPostseason(advancePostseason(series, winner), record.teamId, random)
+        commit({
+          ...save,
+          series: advanced,
+          state: {
+            ...save.state,
+            record: { ...record, postseasonChampion: advanced.champion ?? NO_CHAMPION },
+          },
+        })
+        setGameOptions(null)
+        return setScene(SEASON_SCENE_STATE.시즌결산)
+      }
+      if (gameKind === '국가대항전') {
+        const cup = save.cup ?? null
+        if (cup === null) return
+        const winner = summary.won ? record.teamId : opponent
+        const loser = summary.won ? opponent : record.teamId
+        commit({ ...save, cup: advanceNationalCupDay(cup, winner, loser, random) })
+        setGameOptions(null)
+        return setScene(SEASON_SCENE_STATE.국가대항전)
+      }
 
       const afterMyGame = summary.won
         ? recordLeagueResult(save.league, record.teamId, opponent)
@@ -298,17 +355,13 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
          * 정규시즌 종료 (0xb818c → 0xb80a8): 1위면 `+0x7a` 를 늘리고 대진을 짠다.
          * 국가대항전은 여기가 아니라 **결산을 닫은 뒤**(`finishSeason` → `afterKoreanSeries`)다.
          *
-         * ⚠️ **웹판 임시** — 원본은 내 팀 차례의 시리즈를 사람이 치른다(0x13da0 은 CPU 구간만 돌린다).
-         *    팀 경기 화면이 없어 우승이 정해질 때까지 **전부 간이 엔진으로** 돌린다.
+         * 포스트시즌 경기는 여기서 치르지 않는다 — 원본도 **결산 화면(0xef)** 이
+         * 라운드를 하나씩 진행시킨다 (내 팀 차례면 사람이 치고, 아니면 0xc2760 으로 돌린다).
          */
         const end = finishRegularSeason(save.league, settled.teamId)
-        let series = end.postseason
-        for (let game = 0; game < POSTSEASON_GAME_LIMIT && series.round !== '종료'; game += 1) {
-          series = playCpuSeriesGame(series, random)
-        }
         commit({
           ...save,
-          series,
+          series: end.postseason,
           ranking: end.ranking,
           state: {
             ...save.state,
@@ -316,7 +369,7 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
               ...settled,
               regularSeasonFirsts: settled.regularSeasonFirsts + (end.isRegularSeasonFirst ? 1 : 0),
               inPostseason: true,
-              postseasonChampion: series.champion ?? NO_CHAMPION,
+              postseasonChampion: NO_CHAMPION,
             },
           },
         })
@@ -325,20 +378,49 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
       }
       setScene(afterGameNext(settled))
     },
-    [commit, random, save],
+    [commit, gameKind, random, save],
   )
 
   /**
-   * 국가대항전 한 경기 — ⚠️ **웹판 임시 자동 진행**. 원본은 사람이 대표팀을 조작한다
-   * (나리 142 / 시즌 221). 여기서는 CPU 경기와 같은 간이 엔진(0xc2dac)으로 승패만 낸다.
+   * 결산 화면(0xef)이 포스트시즌을 한 걸음 진행시킨다.
+   * 내 팀이 지금 시리즈에 있으면 **사람이 친다**(원본 0xd7 선수단 → 경기),
+   * 없으면 내 차례가 오거나 우승이 정해질 때까지 CPU 끼리 돌린다 (0x13da0 → 0xc2760).
+   */
+  const continuePostseason = useCallback(() => {
+    const series = save?.series ?? null
+    if (save === null || series === null) return
+    const myTeam = save.state.record.teamId
+    if (isMyTurn(series, myTeam)) {
+      const options = optionsFor(series.teams[0] === myTeam ? series.teams[1] : series.teams[0])
+      if (options === null) return
+      setGameKind('포스트시즌')
+      setGameOptions(options)
+      return setScene(SEASON_SCENE_STATE.경기직전)
+    }
+    const advanced = runCpuPostseason(series, myTeam, random)
+    commit({
+      ...save,
+      series: advanced,
+      state: {
+        ...save.state,
+        record: { ...save.state.record, postseasonChampion: advanced.champion ?? NO_CHAMPION },
+      },
+    })
+  }, [commit, optionsFor, random, save])
+
+  /**
+   * 국가대항전 한 경기 — 원본대로 **사람이 대표팀을 조작한다** (시즌 221).
+   * 대진은 대회 화면이 골라 주고, 끝나면 `finishGame` 이 `advanceNationalCupDay` 로 하루를 넘긴다.
    */
   const playCupGame = useCallback(
-    (myTeam: number, opponent: number, cup: NationalCup) => {
-      if (save === null) return
-      const { winner, loser } = playCpuNationalCupGame(myTeam, opponent, random)
-      commit({ ...save, cup: advanceNationalCupDay(cup, winner, loser, random) })
+    (_myTeam: number, opponent: number) => {
+      const options = optionsFor(opponent)
+      if (options === null) return
+      setGameKind('국가대항전')
+      setGameOptions(options)
+      setScene(SEASON_SCENE_STATE.경기직전)
     },
-    [commit, random, save],
+    [optionsFor],
   )
 
   /** 대회 끝 — 보상을 넣고 히든 팀을 연 뒤 관리 메뉴로 돌아간다 */
@@ -497,11 +579,13 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
     series: save?.series ?? null,
     ranking: save?.ranking ?? [],
     gameOptions,
+    gameKind,
     cup: save?.cup ?? null,
     notice,
     actions: {
       chooseTeam, goto, updateRecord, updateRoster, playNextGame, confirmIncome,
-      playCupGame, finishCup, finishGame, runTraining, runOuting, nextSeasonEndStep, finishSeason,
+      playCupGame, finishCup, finishGame, continuePostseason,
+      runTraining, runOuting, nextSeasonEndStep, finishSeason,
       clearNotice, quit,
     },
   }
