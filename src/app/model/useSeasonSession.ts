@@ -37,13 +37,16 @@ import { createNationalCup } from '@/entities/national-cup/model/nationalCup'
 import { advanceNationalCupDay } from '@/entities/national-cup/model/nationalCupPlay'
 import { isSeasonNationalCupYear } from '@/entities/national-cup/model/nationalCupFlow'
 import type { NationalCupFinish } from '@/entities/national-cup/model/nationalCupFlow'
-import { applySeasonReward } from '@/entities/season-mode/model/seasonRewards'
+import { applySeasonReward, GAME_POINT_LIMIT } from '@/entities/season-mode/model/seasonRewards'
+import type { LeagueFirstAward } from '@/entities/season-mode/model/seasonRewards'
+import type { SeasonAwardReward } from '@/widgets/season/lib/seasonAwardEvents'
 import {
   HELL_TRAINING_GAIN_RANGE, HELL_TRAINING_INDEX, HELL_TRAINING_MORALE_LOSS_RANGE,
   MASSAGER_MORALE_RELIEF, TRAINING_APPLY_LIMIT, TRAINING_GAIN_RANGE,
   TRAINING_MORALE_LOSS_RANGE, TRAINING_SUB_ITEM_GAIN,
 } from '@/widgets/season/lib/seasonTraining'
-import { SEASON_OUTING_EFFECTS } from '@/widgets/season/lib/seasonOuting'
+import { SEASON_OUTING_EFFECTS, SEASON_OUTING_PLACES } from '@/widgets/season/lib/seasonOuting'
+import { cureIllnessAtHospital } from '@/entities/season-mode/model/seasonEventFlow'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { MORALE_LIMIT, POPULARITY_LIMIT, REPUTATION_LIMIT, MONEY_LIMIT, clampTo } from '@/entities/season-mode/model/seasonRecord'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
@@ -76,6 +79,10 @@ export interface SeasonSession {
   readonly gameOptions: TeamGameOptions | null
   /** 그 경기가 정규·포스트시즌·국가대항전 중 무엇인가 */
   readonly gameKind: SeasonGameKind
+  /** 전역 저장 +0x145 — 리그 1위 G 를 이미 받은 문턱 비트 */
+  readonly leagueFirstAwardedBits: number
+  /** 전역 저장 +0x64 — 시즌 쪽 G포인트 */
+  readonly gamePoints: number
   /** 진행 중인 국가대항전. 없으면 null (원본 L+0xa8~ 칸) */
   readonly cup: NationalCup | null
   readonly notice: string
@@ -100,8 +107,13 @@ export interface SeasonActions {
   readonly finishGame: (summary: TeamGameSummary) => void
   /** 결산 화면에서 포스트시즌을 한 걸음 진행시킨다 (0xef — 내 차례면 경기, 아니면 CPU 구간) */
   readonly continuePostseason: () => void
-  /** 시즌 끝 사슬의 다음 칸으로 (포스트시즌시작 → 시상 셋 → 정규시즌순위 → 결산) */
-  readonly nextSeasonEndStep: () => void
+  /**
+   * 시즌 끝 사슬의 다음 칸으로 (포스트시즌시작 → 시상 셋 → 정규시즌순위 → 결산).
+   * 그 칸의 **보상**(P4 2a)을 레코드에 얹고 넘어간다 — 화면은 문구만 보여 준다.
+   */
+  readonly nextSeasonEndStep: (reward?: SeasonAwardReward) => void
+  /** 리그 1위 G 를 지급하고 받은 비트를 남긴다 (0x6900 · 0x87e8) */
+  readonly awardLeagueFirst: (award: LeagueFirstAward) => void
   /** 결산을 닫았다 — 국가대항전 연차면 대회, 아니면 새 해 (afterKoreanSeries) */
   readonly finishSeason: () => void
   readonly clearNotice: () => void
@@ -154,6 +166,9 @@ const NO_COACH = -1
 /** 같은 경기 화면을 쓰는 세 갈래 — 끝났을 때 정산하는 곳이 다르다 */
 export type SeasonGameKind = '정규' | '포스트시즌' | '국가대항전'
 
+/** 시즌 외출 장소 표에서 **병원** 칸 (StrMODE[54+p] = 친선경기·회식·입원·야구교실·구단CF) */
+const HOSPITAL_PLACE = SEASON_OUTING_PLACES.indexOf('병원')
+
 export function useSeasonSession(store: JsonStorePort, random: RandomPort): SeasonSession {
   const loaded = useRef<SeasonSave | null>(null)
   if (loaded.current === null) loaded.current = (store.load() as SeasonSave | null) ?? null
@@ -168,6 +183,10 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
   const [gameOptions, setGameOptions] = useState<TeamGameOptions | null>(null)
   /** 지금 치르는 경기가 무엇인가 — 끝났을 때 어디로 정산할지 갈린다 */
   const [gameKind, setGameKind] = useState<SeasonGameKind>('정규')
+  /** 전역 저장 +0x145 — 리그 1위 G 를 이미 받은 문턱 비트 (시즌을 새로 해도 남는다) */
+  const [leagueFirstAwardedBits, setLeagueFirstAwardedBits] = useState(0)
+  /** 전역 저장 +0x64 — 시즌 쪽 G포인트 */
+  const [gamePoints, setGamePoints] = useState(0)
 
   const commit = useCallback(
     (next: SeasonSave) => {
@@ -500,18 +519,20 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
         ? 0
         : randomIntegerBelow(random, effect.reputationRange[0], effect.reputationRange[1])
 
+      // 입원(장소 2)이면 치료를 굴린다 — `rand(0,101) ≤ 89` 이거나 여유 칸이 0 이면 낫는다 (0xcc6a)
+      const cured = place === HOSPITAL_PLACE ? cureIllnessAtHospital(record, random).record : record
+
       commit({
         ...save,
         state: {
           ...save.state,
           teamMorale: clampTo(teamMorale + moraleChange, MORALE_LIMIT),
           record: {
-            ...record,
+            ...cured,
             // 비용은 가드가 본 것과 같은 표를 쓴다 — 효과의 money 가 이미 음수라 따로 빼지 않는다
             money: clampTo(record.money + money, MONEY_LIMIT),
             popularity: clampTo(record.popularity + popularity, POPULARITY_LIMIT),
             reputation: clampTo(record.reputation + reputation, REPUTATION_LIMIT),
-            // 입원이면 질병이 낫는다 (0xcc6a 굴림은 seasonEventFlow 몫이라 여기서는 그대로 둔다)
             acted: true,
           },
         },
@@ -521,13 +542,48 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
     [commit, random, save],
   )
 
-  /** 시즌 끝 사슬 한 칸 (SEASON_END_CHAIN). 사슬 밖이면 결산으로 보낸다 */
-  const nextSeasonEndStep = useCallback(() => {
-    setScene((current) => {
-      const step = SEASON_END_CHAIN.find((candidate) => candidate.state === current)
-      return step?.next ?? SEASON_SCENE_STATE.시즌결산
-    })
-  }, [])
+  /**
+   * 시즌 끝 사슬 한 칸 (SEASON_END_CHAIN). 사슬 밖이면 결산으로 보낸다.
+   *
+   * 시상·목표·순위 이벤트의 **보상을 실제로 얹는다** (P4 2a) — 예전에는 화면이 문구만
+   * 띄우고 인기도·평판·소지금이 하나도 안 움직였다.
+   */
+  const nextSeasonEndStep = useCallback(
+    (reward?: SeasonAwardReward) => {
+      if (save !== null && reward !== undefined) {
+        const { record } = save.state
+        commit({
+          ...save,
+          state: {
+            ...save.state,
+            record: {
+              ...record,
+              popularity: clampTo(record.popularity + reward.popularity, POPULARITY_LIMIT),
+              reputation: clampTo(record.reputation + reward.reputation, REPUTATION_LIMIT),
+              money: clampTo(record.money + reward.money, MONEY_LIMIT),
+            },
+          },
+        })
+      }
+      setScene((current) => {
+        const step = SEASON_END_CHAIN.find((candidate) => candidate.state === current)
+        return step?.next ?? SEASON_SCENE_STATE.시즌결산
+      })
+    },
+    [commit, save],
+  )
+
+  /**
+   * 리그 1위 G 지급 (`0x6900` → `0x87e8`). 받은 칸은 **전역 저장 +0x145 비트**라
+   * 시즌을 새로 시작해도 남는다 — 그래서 시즌 저장이 아니라 따로 둔다.
+   */
+  const awardLeagueFirst = useCallback(
+    (award: LeagueFirstAward) => {
+      setLeagueFirstAwardedBits((bits) => bits | (1 << award.bit))
+      setGamePoints((points) => Math.min(GAME_POINT_LIMIT, points + award.gamePoint))
+    },
+    [],
+  )
 
   /**
    * 결산을 닫았다 (`0x87b4`) — 연차 idx 가 **짝수**면 국가대항전, 홀수면 곧장 새 해다.
@@ -570,12 +626,14 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
     ranking: save?.ranking ?? [],
     gameOptions,
     gameKind,
+    leagueFirstAwardedBits,
+    gamePoints,
     cup: save?.cup ?? null,
     notice,
     actions: {
       chooseTeam, goto, updateRecord, updateRoster, playNextGame, confirmIncome,
       playCupGame, finishCup, finishGame, continuePostseason,
-      runTraining, runOuting, nextSeasonEndStep, finishSeason,
+      runTraining, runOuting, nextSeasonEndStep, awardLeagueFirst, finishSeason,
       clearNotice, quit,
     },
   }

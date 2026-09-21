@@ -70,22 +70,33 @@ describe('보상 적용 — 상한에서 막힌다', () => {
 })
 
 describe('리그 1위 G StrMODE[223]', () => {
-  it('문턱 3·10·20 에 1000·5000·10000 G 다', () => {
-    expect(LEAGUE_FIRST_THRESHOLDS).toEqual([3, 10, 20])
-    expect(LEAGUE_FIRST_GAME_POINTS).toEqual([1, 5, 10])
+  /**
+   * ⚠️ 예전에는 문턱·금액을 바꿔 적어 "문턱 3·10·20 에 1000·5000·10000 G" 를 못박고 있었다.
+   * 두 표를 바꿔 읽은 P4 본문을 그대로 옮긴 것이고 Q2 5-1 이 정정했다 (CORRECTIONS 2절).
+   */
+  it('문턱 **1·5·10** 회에 **3000·10000·20000** G 다 (Q2 5-1)', () => {
+    expect(LEAGUE_FIRST_THRESHOLDS).toEqual([1, 5, 10])
+    expect(LEAGUE_FIRST_GAME_POINTS).toEqual([3, 10, 20])
   })
 
   it('한 번에 하나만 준다', () => {
     const record = 기본({ regularSeasonFirsts: 12 })
     const 첫번째 = nextLeagueFirstAward(record, 0)
-    expect(첫번째).toEqual({ threshold: 3, gamePoint: 1_000, bit: 0 })
+    expect(첫번째).toEqual({ threshold: 1, gamePoint: 3_000, bit: 0 })
     const 두번째 = nextLeagueFirstAward(record, 0b001)
-    expect(두번째).toEqual({ threshold: 10, gamePoint: 5_000, bit: 1 })
-    expect(nextLeagueFirstAward(record, 0b011)).toBeNull()
+    expect(두번째).toEqual({ threshold: 5, gamePoint: 10_000, bit: 1 })
+    const 세번째 = nextLeagueFirstAward(record, 0b011)
+    expect(세번째).toEqual({ threshold: 10, gamePoint: 20_000, bit: 2 })
+    expect(nextLeagueFirstAward(record, 0b111)).toBeNull()
   })
 
-  it('문턱에 못 미치면 안 준다', () => {
-    expect(nextLeagueFirstAward(기본({ regularSeasonFirsts: 2 }), 0)).toBeNull()
+  it('문턱에 못 미치면 안 준다 — 1위가 한 번도 없어야 한다', () => {
+    expect(nextLeagueFirstAward(기본({ regularSeasonFirsts: 0 }), 0)).toBeNull()
+  })
+
+  /** 시즌은 10년이라 셋째 칸(10회)이 마지막이다 — 뒤바뀐 값(20회)으로는 영영 못 받았다 */
+  it('10회면 셋째 칸까지 받을 수 있다', () => {
+    expect(nextLeagueFirstAward(기본({ regularSeasonFirsts: 10 }), 0b011)?.gamePoint).toBe(20_000)
   })
 
   it('이미 받은 비트는 다시 주지 않는다 — 시즌을 새로 해도 전역 저장이라 그대로다', () => {

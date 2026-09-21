@@ -4,6 +4,7 @@ import {
   SeasonGoalsScreen, SeasonItemMenuScreen, SeasonManagementScreen, SeasonMvpScreen,
   SeasonOutingScreen, SeasonSummaryScreen, SeasonTeamMenuScreen, SeasonTitleAwardScreen,
   SeasonTrainingScreen, StadiumShopScreen, SEASON_MVP_LEADER_KINDS,
+  seasonAwardRewardOf, seasonMvpResultEventId, seasonTitleResultEventId,
 } from '@/pages/season'
 import { judgeTitles, leagueRecordsOf } from '@/entities/awards/model/seasonAwards'
 import { leaderOf } from '@/entities/awards/model/leaderboard'
@@ -186,12 +187,16 @@ export function SeasonRoute({ session, random, onExit }: SeasonRouteProps) {
       ...record,
       isMine: record.teamId === state.record.teamId,
     }))
+    const titles = judgeTitles(records, isBatter ? '타자' : '시즌투수')
     return (
       <SeasonTitleAwardScreen
         role={isBatter ? '타자' : '투수'}
         // 시즌모드 투수는 네 칸이라 역할 이름이 다르다 (다승·삼진·방어·세이브)
-        titles={judgeTitles(records, isBatter ? '타자' : '시즌투수')}
-        onNext={actions.nextSeasonEndStep}
+        titles={titles}
+        // 시상 보상 (P4 2a) — 수상자가 내 팀이면 373·375 가 평판 +10 · 소지금 +5 를 준다
+        onNext={() => actions.nextSeasonEndStep(seasonAwardRewardOf(
+          seasonTitleResultEventId(isBatter ? '타자' : '투수', titles.some((slot) => slot.isMine)),
+        ))}
       />
     )
   }
@@ -201,11 +206,13 @@ export function SeasonRoute({ session, random, onExit }: SeasonRouteProps) {
     // 시즌 MVP 는 표 0xd4f34 에서 rand(0..6) 으로 종류 하나를 골라 그 1위를 발표한다 (B-3)
     const kind = SEASON_MVP_LEADER_KINDS[randomIntegerBelow(random, 0, SEASON_MVP_LEADER_KINDS.length)]
     const leader = kind === undefined ? null : leaderOf(records, kind)
+    const isMine = leader?.record.teamId === state.record.teamId
     return (
       <SeasonMvpScreen
         winner={leader === null ? null : { name: leader.record.name, teamId: leader.record.teamId }}
-        isMine={leader?.record.teamId === state.record.teamId}
-        onNext={actions.nextSeasonEndStep}
+        isMine={isMine}
+        // MVP 보상 — 379(내 팀)면 인기도 +10 · 평판 +20 · 소지금 +10
+        onNext={() => actions.nextSeasonEndStep(seasonAwardRewardOf(seasonMvpResultEventId(isMine)))}
       />
     )
   }
@@ -224,9 +231,9 @@ export function SeasonRoute({ session, random, onExit }: SeasonRouteProps) {
         // 0xb7aa0(리그, 팀, 0) — 0 우승 · 1 준우승(한국시리즈에서 진 팀) · 그 밖은 보상 없음.
         // 웹 entities/league 에 이 함수가 없어 시리즈 결과에서 바로 읽는다
         postseasonRank={postseasonRankOf(series, state.record.teamId)}
-        leagueFirstAwardedBits={0}
+        leagueFirstAwardedBits={session.leagueFirstAwardedBits}
         onApplyKoreanSeriesReward={(reward) => actions.updateRecord(applySeasonReward(state.record, reward))}
-        onLeagueFirstAward={() => undefined}
+        onLeagueFirstAward={actions.awardLeagueFirst}
         onContinuePostseason={actions.continuePostseason}
         onFinish={actions.finishSeason}
       />

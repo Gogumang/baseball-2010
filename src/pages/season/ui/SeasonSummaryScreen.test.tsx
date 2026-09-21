@@ -113,12 +113,12 @@ describe('한국시리즈 우승 보상', () => {
 })
 
 describe('리그 1위 누적 G (StrMODE[223])', () => {
-  it('1위 3회면 1000 G 를 한 번 준다', () => {
+  it('1위 1회면 3000 G 를 한 번 준다 (Q2 5-1 — 문턱·금액이 뒤바뀌어 있었다)', () => {
     const onAward = vi.fn()
     const onFinish = vi.fn()
     render(
       <SeasonSummaryScreen
-        record={기록({ regularSeasonFirsts: 3 })}
+        record={기록({ regularSeasonFirsts: 1 })}
         series={우승시리즈()}
         postseasonRank={2}
         leagueFirstAwardedBits={0}
@@ -132,15 +132,15 @@ describe('리그 1위 누적 G (StrMODE[223])', () => {
     확인() // [137] 우승 팝업 → 순위 2 라 보상 없이 리그 1위 검사로
 
     const 글 = screen.getByRole('dialog', { name: '알림' }).textContent ?? ''
-    expect(글).toContain('1위 3회')
-    expect(글).toContain('1000 G포인트')
+    expect(글).toContain('1위 1회')
+    expect(글).toContain('3000 G포인트')
 
     확인()
-    expect(onAward).toHaveBeenCalledWith({ threshold: 3, gamePoint: 1000, bit: 0 })
+    expect(onAward).toHaveBeenCalledWith({ threshold: 1, gamePoint: 3000, bit: 0 })
     expect(onFinish).toHaveBeenCalled()
   })
 
-  it('1위 10회인데 아직 아무 비트도 안 켜졌으면 3회분 → 10회분 을 하나씩 잇달아 준다', () => {
+  it('1위 10회인데 아무 비트도 안 켜졌으면 1회분 → 5회분 → 10회분 을 하나씩 잇달아 준다', () => {
     const onAward = vi.fn()
     const onFinish = vi.fn()
     render(
@@ -157,12 +157,15 @@ describe('리그 1위 누적 G (StrMODE[223])', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '결과' }))
     확인()
-    확인() // 3회분
-    expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain('5000 G포인트')
+    확인() // 1회분
+    expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain('10000 G포인트')
+    확인() // 5회분
+    expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain('20000 G포인트')
     확인() // 10회분
 
-    expect(onAward).toHaveBeenNthCalledWith(1, { threshold: 3, gamePoint: 1000, bit: 0 })
-    expect(onAward).toHaveBeenNthCalledWith(2, { threshold: 10, gamePoint: 5000, bit: 1 })
+    expect(onAward).toHaveBeenNthCalledWith(1, { threshold: 1, gamePoint: 3000, bit: 0 })
+    expect(onAward).toHaveBeenNthCalledWith(2, { threshold: 5, gamePoint: 10000, bit: 1 })
+    expect(onAward).toHaveBeenNthCalledWith(3, { threshold: 10, gamePoint: 20000, bit: 2 })
     expect(onFinish).toHaveBeenCalled()
   })
 
@@ -171,7 +174,7 @@ describe('리그 1위 누적 G (StrMODE[223])', () => {
     const onFinish = vi.fn()
     render(
       <SeasonSummaryScreen
-        record={기록({ regularSeasonFirsts: 3 })}
+        record={기록({ regularSeasonFirsts: 1 })}
         series={우승시리즈()}
         postseasonRank={2}
         leagueFirstAwardedBits={0b1}

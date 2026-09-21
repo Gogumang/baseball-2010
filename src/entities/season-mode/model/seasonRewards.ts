@@ -70,10 +70,17 @@ export function applySeasonReward(record: SeasonRecord, reward: SeasonReward): S
   }
 }
 
-/** 리그 1위 누적 문턱 `0xcbdec` (s8) */
-export const LEAGUE_FIRST_THRESHOLDS: readonly number[] = [3, 10, 20]
-/** 그때 주는 G `0xcbdef` (s8) — 실제 지급은 ×1000 이다 */
-export const LEAGUE_FIRST_GAME_POINTS: readonly number[] = [1, 5, 10]
+/**
+ * 리그 1위 누적 **문턱** `0xcbdef` (s8) = [1, 5, 10] — 1회·5회·10회 (0x69f6).
+ *
+ * ⚠️ 예전에는 문턱과 금액을 **통째로 바꿔** 적어 두었다(주소까지 서로 바뀌어 있었다).
+ * P4 본문의 "3/10/20회 → 1000/5000/10000 G" 가 두 표를 바꿔 읽은 것이고,
+ * Q2 5-1 이 정정했다 — **1회 3000 · 5회 10000 · 10회 20000 G** (CORRECTIONS 2절).
+ * 뒤바뀐 값으로는 첫 보상에 1위 3회가 필요하고 셋째 칸(20회)은 시즌이 10년이라 영영 못 받는다.
+ */
+export const LEAGUE_FIRST_THRESHOLDS: readonly number[] = [1, 5, 10]
+/** 그때 주는 **금액** `0xcbdec` (s8) = [3, 10, 20] — 실제 지급은 ×1000 이다 (0x69e8) */
+export const LEAGUE_FIRST_GAME_POINTS: readonly number[] = [3, 10, 20]
 /** G포인트 상한 (저장+0x64) */
 export const GAME_POINT_LIMIT = 99_999
 
