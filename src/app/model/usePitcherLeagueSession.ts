@@ -9,7 +9,17 @@ import {
   gainPitcherMorale,
   gainPitcherPopularity,
   gainPitcherReputation,
+  isPitcherSeasonFinished,
+  startNextPitcherSeason,
 } from '@/entities/pitcher-career/model/pitcherCareer'
+import {
+  applyPitcherEndingBonus,
+  canContinueAfterPitcherEnding,
+  continueAfterPitcherEnding,
+  pitcherInjuryEndingOf,
+  pitcherRetirementEndingOf,
+  pitcherYearEndStepOf,
+} from '@/entities/pitcher-career/model/pitcherSeasonFlow'
 import type { PitcherRookieProfile } from '@/entities/pitcher-career/model/pitcherRegistration'
 import {
   pitcherGameOptionsOf,
@@ -29,7 +39,11 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
  * 환경설정 "모드 초기화" 가 각각 지운다 (StrMAINMENU[210]·[211]).
  */
 
-export type PitcherScene = '등록' | '관리' | '경기'
+/**
+ * 화면 유니온 — 원본 장면 0x106 의 상태 번호를 괄호에 적는다.
+ *   등록(101~104) · 관리(105) · 경기(144) · 시즌종료(136 자리) · 연말(132) · 엔딩(141)
+ */
+export type PitcherScene = '등록' | '관리' | '경기' | '시즌종료' | '연말' | '엔딩'
 
 export interface PitcherLeagueSession {
   readonly career: PitcherCareer | null
@@ -43,6 +57,16 @@ export interface PitcherLeagueSession {
     readonly goto: (scene: PitcherScene) => void
     readonly beginGame: () => void
     readonly finishGame: (summary: PitcherGameSummary) => void
+    /** 시즌 끝 화면 [다음] → 연말 분기 132 (엔딩 · 은퇴 선택 · 새 시즌) */
+    readonly beginYearEnd: () => void
+    /** 연말 502 "연봉 협상한다" → 새 시즌 처리 0x1b768 → 137 → 105 */
+    readonly continueCareer: () => void
+    /** 연말 502 "은퇴한다" → 496 → 503 → 엔딩 화면 141 */
+    readonly retire: () => void
+    /** 엔딩 141 의 팝업 0x32 — 5000 G포인트로 이어하기. 모자라면 false */
+    readonly continueAfterEnding: () => boolean
+    /** 엔딩을 다 본 뒤 — 선수를 지운다 (145 틀이 메인 메뉴로 나가는 자리) */
+    readonly finishEnding: () => void
     readonly reset: () => void
   }
 }
@@ -117,12 +141,81 @@ export function usePitcherLeagueSession(
         ),
         summary.evaluation.moraleChange,
       )
-      commit(evaluated)
       setGameOptions(null)
+
+      // 경기 뒤 평가 116 의 끝 — 정규시즌이 닫혔으면 시즌 끝 사슬(136→…→132)로 간다.
+      // 45경기를 다 치렀는지는 `isPitcherSeasonFinished`(0xb818c) 가 본다.
+      if (isPitcherSeasonFinished(evaluated)) {
+        commit(evaluated)
+        return setScene('시즌종료')
+      }
+      // 관리 화면 진입 105(0x11910 → 0x11b32)의 첫 줄 — 부상 누적 20경기면 이벤트 500 → 엔딩 141 (B-7)
+      const injury = pitcherInjuryEndingOf(evaluated)
+      if (injury !== null) {
+        commit({ ...evaluated, endingIndex: injury })
+        return setScene('엔딩')
+      }
+      commit(evaluated)
       setScene('관리')
     },
     [career, commit, gameOptions, random],
   )
+
+  /** 새 시즌 처리 0x1b768 → 137 "N년차" 표지 → 105 관리 화면 (웹은 표지를 건너뛴다) */
+  const startNewSeason = useCallback(
+    (finished: PitcherCareer) => {
+      commit(startNextPitcherSeason(finished))
+      setScene('관리')
+    },
+    [commit],
+  )
+
+  /** 시즌 끝 화면 [다음] → 연말 상태 132 의 분기 */
+  const beginYearEnd = useCallback(() => {
+    if (career === null) return
+    const step = pitcherYearEndStepOf(career)
+    if (step.kind === '엔딩') {
+      // 엔딩 보너스는 엔딩을 띄울 때 준다 (0x1220c). 부상·방출은 0 이다
+      commit(applyPitcherEndingBonus({ ...career, endingIndex: step.endingIndex }, step.endingIndex))
+      return setScene('엔딩')
+    }
+    if (step.kind === '은퇴선택') return setScene('연말')
+    startNewSeason(career)
+  }, [career, commit, startNewSeason])
+
+  /** 502 "연봉 협상한다" — 연봉협상 이벤트가 아직 없어 곧바로 새 시즌이다 (pitcherSeasonFlow 머리글) */
+  const continueCareer = useCallback(() => {
+    if (career === null) return
+    startNewSeason(career)
+  }, [career, startNewSeason])
+
+  /** 502 "은퇴한다" → 496 → 503 → 엔딩 141 */
+  const retire = useCallback(() => {
+    if (career === null) return
+    const endingIndex = pitcherRetirementEndingOf(career)
+    commit(applyPitcherEndingBonus({ ...career, endingIndex }, endingIndex))
+    setScene('엔딩')
+  }, [career, commit])
+
+  /** 엔딩 141 의 팝업 0x32 — 5000 G포인트로 이어하기 */
+  const continueAfterEnding = useCallback(() => {
+    if (career === null || career.endingIndex === null) return false
+    if (!canContinueAfterPitcherEnding(career, career.endingIndex)) return false
+    commit(continueAfterPitcherEnding(career))
+    setScene('관리')
+    return true
+  }, [career, commit])
+
+  /**
+   * 엔딩을 다 본 뒤 — 선수를 지운다 (145 틀이 `+0x278` 을 켜고 메인 메뉴 장면 0x103 으로 나가는 자리).
+   * 저장소에 `clear` 가 없어 **이름 없는 빈 덩어리**를 덮어쓴다 — `normalizePitcherCareer` 가 null 로 읽는다.
+   */
+  const finishEnding = useCallback(() => {
+    store.save({})
+    setCareer(null)
+    setGameOptions(null)
+    setScene('등록')
+  }, [store])
 
   const goto = useCallback((next: PitcherScene) => setScene(next), [])
 
@@ -144,6 +237,18 @@ export function usePitcherLeagueSession(
     career: shown,
     scene,
     gameOptions,
-    actions: { create, save: commit, goto, beginGame, finishGame, reset },
+    actions: {
+      create,
+      save: commit,
+      goto,
+      beginGame,
+      finishGame,
+      beginYearEnd,
+      continueCareer,
+      retire,
+      continueAfterEnding,
+      finishEnding,
+      reset,
+    },
   }
 }
