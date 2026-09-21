@@ -7,6 +7,7 @@ import { judgeAnimationOf, judgeFrameAt, pitcherFrameAt, pitcherIdleFrameAt } fr
 
 import { drawHud } from '@/widgets/batting-stage/lib/renderHud'
 import { drawFieldMap } from '@/widgets/batting-stage/lib/renderFieldMap'
+import { drawHomeRunBanner } from '@/widgets/batting-stage/lib/renderHomeRunBanner'
 import { batterLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
 
 /** 타자 몸통 종류 — 타자 폼을 넘기지 않아 balancer(0) (추정) */
@@ -33,6 +34,13 @@ export interface StageScene {
   /** 이글아이 아이템 사용 시 공의 도착 지점을 미리 보여준다. */
   readonly isEagleEyeEnabled: boolean
   readonly resultText: string
+  /**
+   * 홈런 연출(HOMERUN 글자, 원본 +0x1960)이 켜졌는가. 켜지면 판정 문구 대신 이 연출이 나간다.
+   * 글자 문구로 판정하지 않도록 타석 결과가 따로 채운다.
+   */
+  readonly isHomeRun: boolean
+  /** 홈런 연출이 켜진 뒤 흐른 틱 */
+  readonly homeRunTick: number
   /** 타자 자세 f (0xb905c) — 레이어마다 가산값을 더해 그린다 */
   readonly swingFrame: number
   /** 마운드에 그릴 마선수. 없으면 평범한 투수라 그리지 않는다. */
@@ -72,7 +80,10 @@ export function renderBattingStage(
     // 전광판과 별개로 원본이 타석 중에 그리는 작은 지도 (0x395f4) — 루상 주자가 여기 보인다
     drawFieldMap(context, scene.hud.bases)
   }
-  if (scene.resultText !== '') {
+  // 홈런은 판정 글자(game_judge)가 없고 HOMERUN 글자 연출이 대신 나간다 (R2 3-2, 7절 표의 v = 8·12)
+  if (scene.isHomeRun) {
+    drawHomeRunBanner(context, scene.homeRunTick)
+  } else if (scene.resultText !== '') {
     drawResultText(context, scene.resultText, scene.resultTick)
   }
 }

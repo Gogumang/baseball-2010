@@ -42,6 +42,15 @@ export function describeResolution(detail: PitchOutcomeDetail): string {
 }
 
 /**
+ * 홈런인가 — 판정 스위치 v = 8·12 (R2 3-2 의 켜는 곳).
+ * 화면에 띄우는 문구는 사람이 읽는 글자라 바뀔 수 있으니 문구 대신 결과로 가린다.
+ */
+export function isHomeRunResolution(detail: PitchOutcomeDetail): boolean {
+  const { resolution } = detail
+  return resolution.kind === '타구' && resolution.outcome.kind === '홈런'
+}
+
+/**
  * 스킬 조건에 쓰는 타석 상황. HUD 가 없으면 기본 상황이다.
  * 타자 side 는 화면 배치(STAGE_SIDE)와 같게 둔다. 투수 좌우는 원본 선수 레코드에서 아직 읽지 않아 0 — 추정.
  */

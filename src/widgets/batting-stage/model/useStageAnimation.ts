@@ -26,6 +26,7 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch) {
     phaseRef,
     phaseStartedAtRef,
     resultTextRef,
+    homeRunStartedAtRef,
     swingStartedAtRef,
     shiftRef,
     buntRef,
@@ -55,6 +56,8 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch) {
         if (elapsed >= WIND_UP_MILLISECONDS) {
           const { pitcherAbility, random } = latestRef.current
           pitchRef.current = selectPitch(pitcherAbility, pitchSituationOf(latestRef.current.hud), random)
+          // 새 투구가 시작하면 홈런 글자 연출을 끈다 (원본 +0x1960 을 다음 플레이가 지우는 자리)
+          homeRunStartedAtRef.current = -1
           phaseRef.current = '투구중'
           phaseStartedAtRef.current = now
         }
@@ -90,6 +93,9 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch) {
       const tickLength = millisecondsPerFrame()
       const isPitching = phaseRef.current === '투구중' && pitch !== null
       const ballFrame = isPitching ? ballFrameAt(now, phaseStartedAtRef.current, tickLength) : -1
+      // 홈런 연출은 결과 문구 시간(1150ms)보다 길다 — 날아 들어오기만 22틱이라 따로 센다
+      const homeRunStartedAt = homeRunStartedAtRef.current
+      const isHomeRun = homeRunStartedAt >= 0
 
       renderBattingStage(context, {
         pitch,
@@ -97,6 +103,8 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch) {
         shift: shiftRef.current,
         isEagleEyeEnabled: latestRef.current.isEagleEyeEnabled && phaseRef.current === '투구중',
         resultText: phaseRef.current === '결과' ? resultTextRef.current : '',
+        isHomeRun,
+        homeRunTick: isHomeRun ? pitchTickAt(now, homeRunStartedAt, tickLength) : 0,
         swingFrame: batterFrameNow(now, swingStartedAtRef.current, buntRef.current !== null),
         hud: latestRef.current.hud,
         acePitcher: latestRef.current.acePitcher,
@@ -127,6 +135,7 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch) {
       pitchRef.current = null
       buntRef.current = null
       resultTextRef.current = ''
+      homeRunStartedAtRef.current = -1
     }
 
     document.addEventListener('visibilitychange', onVisibilityChange)

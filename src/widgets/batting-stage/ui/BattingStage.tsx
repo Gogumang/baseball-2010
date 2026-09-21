@@ -10,7 +10,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import { STAGE_HEIGHT, STAGE_WIDTH } from '@/widgets/batting-stage/lib/renderBattingStage'
-import { describeResolution, situationOf } from '@/widgets/batting-stage/lib/stageText'
+import { describeResolution, isHomeRunResolution, situationOf } from '@/widgets/batting-stage/lib/stageText'
 import { ballFrameAt, useStageRefs } from '@/widgets/batting-stage/model/stageRefs'
 import type { AcePitcherFrames, StageHud } from '@/widgets/batting-stage/model/stageRefs'
 import { useStageAnimation } from '@/widgets/batting-stage/model/useStageAnimation'
@@ -56,7 +56,7 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterSkil
    * 새 투구 준비 `0x34334` 가 0 으로 되돌리므로 **공마다 다시 눌러야 한다** (H2 2-2).
    */
   const specialArmedRef = useRef(false)
-  const { pitchRef, phaseRef, phaseStartedAtRef, resultTextRef, swingStartedAtRef, shiftRef, buntRef, deckRef, latestRef } = refs
+  const { pitchRef, phaseRef, phaseStartedAtRef, resultTextRef, homeRunStartedAtRef, swingStartedAtRef, shiftRef, buntRef, deckRef, latestRef } = refs
 
   const finishPitch = useCallback((swing: BattingSwing | null, now: number) => {
     const pitch = pitchRef.current
@@ -80,6 +80,8 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterSkil
     deckRef.current = result.deck
     buntRef.current = null
     resultTextRef.current = describeResolution(result.detail)
+    // 홈런이면 판정 글자 대신 HOMERUN 글자 연출을 켠다 (원본 0x51cd8 의 +0x1960, 사운드 11 은 웹에 없음)
+    homeRunStartedAtRef.current = isHomeRunResolution(result.detail) ? now : -1
     phaseRef.current = '결과'
     phaseStartedAtRef.current = now
     latest.onPitchResolved(result.detail, pitch, isUncatchable)

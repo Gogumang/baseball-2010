@@ -21,6 +21,11 @@ export function sprite(url: string): HTMLImageElement | null {
 /** 판정 글자 애니메이션 폴더 (game_judge.pzx, 0x393b4) */
 export const JUDGE_FRAMES = './sprites/game_judge/frames'
 
+/** 경기 연출 그림 (game_effect.pzx, 게임+0x102c) — 홈런 글자는 이미지 54~60 (R2 3-2) */
+export const GAME_EFFECT_IMAGE = (index: number) =>
+  `./sprites/game_effect/${String(index).padStart(3, '0')}.png`
+export const GAME_EFFECT_FRAMES = './sprites/game_effect/frames'
+
 export const FIELD_BACKGROUND = './sprites/attack/000.png'
 
 /**

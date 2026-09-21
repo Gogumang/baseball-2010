@@ -49,6 +49,12 @@ export interface StageRefs {
   readonly phaseRef: MutableRefObject<StagePhase>
   readonly phaseStartedAtRef: MutableRefObject<number>
   readonly resultTextRef: MutableRefObject<string>
+  /**
+   * 홈런 글자 연출(원본 켜짐 칸 +0x1960)이 켜진 시각. −1 이면 꺼짐.
+   * 원본은 홈런 판정 가지에서 켜고 다음 플레이가 지울 때까지 돌리므로,
+   * 웹도 결과 문구 시간과 따로 두고 **다음 투구가 시작할 때** 끈다.
+   */
+  readonly homeRunStartedAtRef: MutableRefObject<number>
   readonly swingStartedAtRef: MutableRefObject<number>
   readonly shiftRef: MutableRefObject<number>
   readonly buntRef: MutableRefObject<BuntStance | null>
@@ -72,6 +78,7 @@ export function useStageRefs(latest: StageLatest): StageRefs {
     phaseRef: useRef<StagePhase>('대기'),
     phaseStartedAtRef: useRef(0),
     resultTextRef: useRef(''),
+    homeRunStartedAtRef: useRef(-1),
     swingStartedAtRef: useRef(-1),
     shiftRef: useRef(0),
     buntRef: useRef<BuntStance | null>(null),
