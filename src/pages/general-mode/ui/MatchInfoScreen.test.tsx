@@ -97,3 +97,32 @@ describe('빠른실행 재선택', () => {
     expect(onRespin).toHaveBeenCalled()
   })
 })
+
+describe('머리띠·바닥띠 (ScreenFrame)', () => {
+  it('머리띠에 제목 12 "경기정보" 그림이 뜬다 (P6 1-1)', () => {
+    const { container } = 띄우기()
+
+    expect(container.querySelector('img[src$="game_frame/012.png"]')).toBeTruthy()
+  })
+
+  it('바닥띠 되돌아가기가 여전히 눌린다 — 원본 소프트키 자리다', () => {
+    const onCancel = vi.fn()
+    띄우기({ onCancel })
+
+    fireEvent.click(screen.getByRole('button', { name: '되돌아가기' }))
+
+    expect(onCancel).toHaveBeenCalled()
+  })
+
+  it("'경기 시작' 과 '0 경기설정' 단추는 그대로 남는다", () => {
+    const onStart = vi.fn()
+    const onOpenSettings = vi.fn()
+    띄우기({ onStart, onOpenSettings })
+
+    fireEvent.click(screen.getByRole('button', { name: '경기 시작' }))
+    fireEvent.click(screen.getByRole('button', { name: '0 경기설정' }))
+
+    expect(onStart).toHaveBeenCalled()
+    expect(onOpenSettings).toHaveBeenCalled()
+  })
+})

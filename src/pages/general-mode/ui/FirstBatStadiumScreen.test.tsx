@@ -112,3 +112,29 @@ describe('CLR', () => {
     expect(onCancel).toHaveBeenCalled()
   })
 })
+
+describe('머리띠·바닥띠 (ScreenFrame)', () => {
+  it('머리띠에 제목 4 "선공/구장" 그림이 뜬다 (P6 1-1)', () => {
+    const { container } = 띄우기()
+
+    expect(container.querySelector('img[src$="game_frame/004.png"]')).toBeTruthy()
+  })
+
+  it('바닥띠 되돌아가기가 여전히 눌린다 — 원본 소프트키 자리다', () => {
+    const onCancel = vi.fn()
+    띄우기({ onCancel })
+
+    fireEvent.click(screen.getByRole('button', { name: '되돌아가기' }))
+
+    expect(onCancel).toHaveBeenCalled()
+  })
+
+  it("구장 단계의 '이 구장으로' 는 그대로 남는다", () => {
+    const onChooseStadium = vi.fn()
+    띄우기({ phase: FIRST_BAT_PHASE.구장, stadiumId: 2, onChooseStadium })
+
+    fireEvent.click(screen.getByRole('button', { name: '이 구장으로' }))
+
+    expect(onChooseStadium).toHaveBeenCalledWith(2)
+  })
+})

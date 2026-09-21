@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { RawScreen } from '@/shared/ui'
+import { RawScreen, WHITE_BAR_INK } from '@/shared/ui'
 import { TEAMS } from '@/shared/config/original/teams'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
@@ -108,12 +108,8 @@ export function TeamSelectScreen({
           <img className={styles.layer} alt="" src={frameSrc(IMG_TEXT, frame)}
             style={{
               left: anchor.x + TAG.dx, top: anchor.y + textDy, width: TAG.barWidth, objectFit: 'none',
-              // ⚠️ **근사다 — .mpl 팔레트가 아직 이식되지 않아서 넣은 임시 처리.**
-              // 막대 116 은 흰색(231,227,231)이고 img_text 157 "PLAYER" 도 흰색(239,239,239)이라
-              // 그대로 겹치면 흰 글씨가 흰 막대에 묻혀 안 보인다. 원본은 img_text.mpl 팔레트를 갈아
-              // 끼워 글자 색을 바꾸므로, 팔레트를 이식하면 이 줄은 지워야 한다.
-              // 파란 막대(117)에 얹는 B 딱지는 원본 그대로 흰 글씨다.
-              ...(onWhiteBar ? { filter: 'invert(1)' } : {}),
+              // 흰 막대(116) 위 글자만 보정한다 — 파란 막대(117)의 B 딱지는 원본 그대로 흰 글씨다
+              ...(onWhiteBar ? WHITE_BAR_INK : {}),
             }} />
         </span>
       ))}

@@ -147,3 +147,20 @@ describe('이름 막대', () => {
     expect(screen.getByTestId('마선수-이름').textContent).toBe('LOCK')
   })
 })
+
+describe('머리띠·바닥띠 (ScreenFrame)', () => {
+  it('머리띠에 제목 8 "마선수선택" 그림이 뜬다 (P6 1-1)', () => {
+    const { container } = 띄우기()
+
+    expect(container.querySelector('img[src$="game_frame/008.png"]')).toBeTruthy()
+  })
+
+  it('바닥띠 되돌아가기가 여전히 눌린다 — 원본 소프트키 자리다', () => {
+    const onCancel = vi.fn()
+    띄우기({ onCancel })
+
+    fireEvent.click(screen.getByRole('button', { name: '되돌아가기' }))
+
+    expect(onCancel).toHaveBeenCalled()
+  })
+})

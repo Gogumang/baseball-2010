@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Button, FrameSprite, Hint, RawScreen } from '@/shared/ui'
+import { FrameSprite, Hint, RawScreen, WHITE_BAR_INK } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
+import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { ACE_PLAYERS } from '@/shared/config/original/acePlayers'
 import { ACE_LAYOUT, LOCKED_CIRCLES, NAME_BAR, TAG, aceCellPositionOf } from '@/pages/general-mode/lib/prepareLayout'
 import { ACE_PER_ROLE, ACE_PHASE, aceIndexOfCell, aceRoleOfCell } from '@/pages/general-mode/lib/generalModeSetup'
@@ -37,6 +38,8 @@ export interface AceSelectScreenProps {
    *    웹판에는 아직 그 저장이 없다. 없으면 이름만 그린다.
    */
   readonly levels?: Readonly<Record<number, number>>
+  /** 머리띠 G포인트 — 들고 있는 곳에서만 넘긴다 (팀 고르기 화면과 같은 규칙) */
+  readonly gamePoint?: number
   readonly onSelect: (cell: number) => void
   readonly onCancel: () => void
 }
@@ -55,7 +58,7 @@ export interface AceSelectScreenProps {
  *   - 열린 마선수 자리의 애니메이션 `[skin+0x138]` — 여기서는 정지 그림을 쓴다.
  */
 export function AceSelectScreen({
-  phase, openedAcePitcherIds = [], openedAceBatterIds = [], levels, onSelect, onCancel,
+  phase, openedAcePitcherIds = [], openedAceBatterIds = [], levels, gamePoint = 0, onSelect, onCancel,
 }: AceSelectScreenProps) {
   const imgTextOrigins = useFrameOrigins(IMG_TEXT_FRAME)
   const cellCount = ACE_LAYOUT.grid.columns * ACE_LAYOUT.grid.rows
@@ -111,15 +114,16 @@ export function AceSelectScreen({
       {/* A 딱지 — 지금 단계에 따라 img_text 51 "마투수" / 50 "마타자" */}
       <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, TAG.whiteBar)}
         style={{ left: anchorA.x + TAG.dx, top: anchorA.y + TAG.aDy }} />
-      <FrameSprite folder={IMG_TEXT_FRAME} origins={imgTextOrigins}
+      {/* 흰 막대(116) 위 글자라 공용 보정을 쓴다 — 팔레트를 이식하면 이 style 을 뗀다 */}
+      <FrameSprite folder={IMG_TEXT_FRAME} origins={imgTextOrigins} style={WHITE_BAR_INK} centerX
         frame={phase === ACE_PHASE.마투수 ? ACE_LAYOUT.tagFrames.마투수 : ACE_LAYOUT.tagFrames.마타자}
-        x={anchorA.x + TAG.dx} y={anchorA.y + TAG.aDy + TAG.textDdy} />
+        x={anchorA.x} y={anchorA.y + TAG.aDy + TAG.textDdy} />
 
       {/* B 딱지 — 파란 막대(117) 에 ABILITY, k 2 는 기본값 43 위다 */}
       <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, TAG.blueBar)}
         style={{ left: anchorB.x + TAG.dx, top: anchorB.y + TAG.bDyDefault }} />
-      <FrameSprite folder={IMG_TEXT_FRAME} frame={ACE_LAYOUT.tagFrames.ability} origins={imgTextOrigins}
-        x={anchorB.x + TAG.dx} y={anchorB.y + TAG.bDyDefault + TAG.textDdy} />
+      <FrameSprite folder={IMG_TEXT_FRAME} frame={ACE_LAYOUT.tagFrames.ability} origins={imgTextOrigins} centerX
+        x={anchorB.x} y={anchorB.y + TAG.bDyDefault + TAG.textDdy} />
 
       {/* A — 커서가 짚은 마선수. 잠겼으면 원 두 개 + LOCK */}
       {isCursorOpen && cursorPlayer !== undefined ? (
@@ -186,10 +190,16 @@ export function AceSelectScreen({
         )
       })}
 
-      <Hint>
-        {phase === ACE_PHASE.마투수 ? '마투수를 고르세요' : '마타자를 고르세요'} — 방향키 이동 · Enter 결정
-      </Hint>
-      <Button variant="corner" onClick={onCancel}>되돌아가기</Button>
+      {/* 원본에 없는 웹 전용 안내 — 흐름 배치라 (0,0) 에 떨어져 머리띠를 가리던 것을 제자리로 옮겼다 */}
+      <div className={styles.hintLine}>
+        <Hint>
+          {phase === ACE_PHASE.마투수 ? '마투수를 고르세요' : '마타자를 고르세요'} — 방향키 이동 · Enter 결정
+        </Hint>
+      </div>
+
+      {/* 머리띠(제목 8 "마선수선택")·바닥띠 — 원본 공용 목록 k 2 도 이 둘을 얹는다 (P6 1-1 · 2a-5) */}
+      {/* 바닥띠의 "되돌아가기" 가 원본 소프트키다 — 따로 두었던 버튼은 없앴다 (스테이지 (0,0) 에 떨어져 있었다) */}
+      <ScreenFrame title="마선수선택" gamePoint={gamePoint} onBack={onCancel} />
     </RawScreen>
   )
 }

@@ -67,6 +67,32 @@ export const sideButtonSelected = style({
 })
 
 /**
+ * 원본에 없는 **웹 전용 단추** 자리 — 바닥띠(y 300~320) 왼쪽 빈 칸에 세운다.
+ * 오른쪽 182~240 은 바닥띠 그림과 되돌아가기 소프트키(`ScreenFrame`)가 쓰므로 비워 둔다.
+ * `left` 는 쓰는 쪽에서 준다.
+ */
+export const softKey = style({
+  position: 'absolute',
+  top: '302px',
+  zIndex: 2,
+  padding: '2px 5px',
+  whiteSpace: 'nowrap',
+})
+
+/**
+ * 원본에 없는 **웹 전용 조작 안내** 줄 — 바닥띠 바로 위 빈 줄에 눕힌다.
+ * 원본 좌표를 쓰는 조각 중 가장 아래가 경기정보 다섯째 줄(259+15 = 274)이라 그 밑이다.
+ */
+export const hintLine = style({
+  position: 'absolute',
+  left: 0,
+  top: '276px',
+  width: '240px',
+  zIndex: 2,
+  pointerEvents: 'none',
+})
+
+/**
  * 경기진행 설정 창 (0x6042c).
  * ⚠️ 원본 배치 미해독 — 근사: 창 좌표가 R4 "남은 것" 에 있어 공용 판 크기(192 폭)만 빌려 썼다.
  */

@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
-import { Button, FrameSprite, Hint, RawScreen } from '@/shared/ui'
+import { Button, FrameSprite, Hint, RawScreen, WHITE_BAR_INK } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
+import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { TEAMS } from '@/shared/config/original/teams'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import type { PlayerSide } from '@/entities/game/model/gameState'
@@ -38,6 +39,8 @@ export interface FirstBatStadiumScreenProps {
   readonly stadiumId: number
   /** 도시·좌석 표 (위 주석 참고). 안 넘기면 두 줄이 비어 있다 */
   readonly stadiums?: readonly StadiumEntry[]
+  /** 머리띠 G포인트 — 들고 있는 곳에서만 넘긴다 (팀 고르기 화면과 같은 규칙) */
+  readonly gamePoint?: number
   /** 선공 커서 `skin+0x74` 만 뒤집을 때 */
   readonly onMoveFirstBat: (side: PlayerSide) => void
   readonly onChooseFirstBat: (side: PlayerSide) => void
@@ -60,7 +63,7 @@ export interface FirstBatStadiumScreenProps {
  *    그림만 빈칸이 된다.
  */
 export function FirstBatStadiumScreen({
-  userTeamId, aiTeamId, phase, playerSide, stadiumId, stadiums,
+  userTeamId, aiTeamId, phase, playerSide, stadiumId, stadiums, gamePoint = 0,
   onMoveFirstBat, onChooseFirstBat, onChooseStadium, onMoveStadium, onCancel,
 }: FirstBatStadiumScreenProps) {
   const gameUiOrigins = useFrameOrigins(GAME_UI_FRAME)
@@ -123,8 +126,9 @@ export function FirstBatStadiumScreen({
         <span key={frame}>
           <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, TAG.whiteBar)}
             style={{ left: anchor.x + TAG.dx, top: anchor.y + dy }} />
-          <FrameSprite folder={IMG_TEXT_FRAME} frame={frame} origins={imgTextOrigins}
-            x={anchor.x + TAG.dx} y={anchor.y + dy + TAG.textDdy} />
+          {/* 둘 다 흰 막대(116) 위 글자라 공용 보정을 쓴다 — 팔레트를 이식하면 이 style 을 뗀다 */}
+          <FrameSprite folder={IMG_TEXT_FRAME} frame={frame} origins={imgTextOrigins} style={WHITE_BAR_INK} centerX
+            x={anchor.x} y={anchor.y + dy + TAG.textDdy} />
         </span>
       ))}
 
@@ -166,7 +170,10 @@ export function FirstBatStadiumScreen({
               {label}
             </button>
           ))}
-          <Hint>선공을 고르세요 — ←→ 바꾸기 · Enter 결정</Hint>
+          {/* 원본에 없는 웹 전용 안내 — 흐름 배치라 (0,0) 에 떨어져 있던 것을 제자리로 옮겼다 */}
+          <div className={styles.hintLine}>
+            <Hint>선공을 고르세요 — ←→ 바꾸기 · Enter 결정</Hint>
+          </div>
         </>
       )}
 
@@ -226,11 +233,20 @@ export function FirstBatStadiumScreen({
 
       {isStadiumPhase && (
         <>
-          <Button onClick={() => onChooseStadium(stadiumId)}>이 구장으로</Button>
-          <Hint>구장을 고르세요 — ←→ 바꾸기 · Enter 결정</Hint>
+          {/* 원본에는 없는 웹 전용 OK 단추 — 원본은 소프트키가 한다. 바닥띠 왼쪽 빈 칸에 세운다 */}
+          <Button variant="corner" className={styles.softKey} style={{ left: 4 }}
+            onClick={() => onChooseStadium(stadiumId)}>
+            이 구장으로
+          </Button>
+          <div className={styles.hintLine}>
+            <Hint>구장을 고르세요 — ←→ 바꾸기 · Enter 결정</Hint>
+          </div>
         </>
       )}
-      <Button variant="corner" onClick={onCancel}>되돌아가기</Button>
+
+      {/* 머리띠(제목 4 "선공/구장")·바닥띠 — 원본 공용 목록 k 3 도 이 둘을 얹는다 (P6 1-1 · 2a-4) */}
+      {/* 바닥띠의 "되돌아가기" 가 원본 소프트키다 — 따로 두었던 버튼은 없앴다 (스테이지 (0,0) 에 떨어져 있었다) */}
+      <ScreenFrame title="선공/구장" gamePoint={gamePoint} onBack={onCancel} />
     </RawScreen>
   )
 }

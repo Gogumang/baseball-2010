@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { MessageBox, RawScreen } from '@/shared/ui'
+import { MessageBox, RawScreen, WHITE_BAR_INK } from '@/shared/ui'
 import type { Collection } from '@/entities/collection/model/collection'
 import { HALL_OF_FAME_BATTER_SLOTS } from '@/entities/collection/model/collection'
 import { RecordAnnals } from '@/pages/record/ui/RecordAnnals'
@@ -349,7 +349,13 @@ function HallOfFameView({ collection, onBack }: { readonly collection: Collectio
               className={styles.sprite}
               alt={side === 'a' ? 'PLAYER' : 'ABILITY'}
               src={imageSrc(IMG_TEXT_FRAMES, tag.label)}
-              style={{ left: point.x - Math.floor(tag.labelWidth / 2), top: point.y + tag.labelDy }}
+              style={{
+                left: point.x - Math.floor(tag.labelWidth / 2),
+                top: point.y + tag.labelDy,
+                // A 는 흰 막대(116) 위 글자라 공용 보정을 쓴다 — 팔레트를 이식하면 이 줄을 뗀다.
+                // B 는 파란 막대(117) 라 원본 그대로 흰 글씨다
+                ...(side === 'a' ? WHITE_BAR_INK : {}),
+              }}
             />
           </div>
         )
