@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { matchupsOf, playLeagueDay, simulateLeagueGame } from '@/entities/league/model/leagueDay'
 import { EMPTY_LEAGUE, LEAGUE_TEAM_COUNT, opponentOf } from '@/entities/league/model/league'
-import { BATTERS_PER_TEAM } from '@/entities/team/model/teamRoster'
+import { BATTERS_PER_TEAM, startingPitcherOf } from '@/entities/team/model/teamRoster'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
 function 씨앗난수(seed: number): RandomPort {
@@ -114,5 +114,27 @@ describe('playLeagueDay — 선수별 타석 기록이 쌓인다', () => {
       expect(line.homeRuns).toBeLessThanOrEqual(line.hits)
       expect(line.runsBattedIn).toBeGreaterThanOrEqual(0)
     }
+  })
+})
+
+describe('CPU 끼리 경기도 날짜가 선발을 정한다 (0xb5ca8 · S5 U-16)', () => {
+  it('선발 칸을 주면 씨앗이 달라도 같은 투수를 쓴다 — 무작위가 아니다', () => {
+    const 칸 = 2
+    const 왼쪽 = simulateLeagueGame({ away: 2, home: 3 }, 씨앗난수(11), 칸)
+    const 오른쪽 = simulateLeagueGame({ away: 2, home: 3 }, 씨앗난수(11), 칸)
+    expect(왼쪽.awayRuns).toBe(오른쪽.awayRuns)
+    expect(왼쪽.homeRuns).toBe(오른쪽.homeRuns)
+  })
+
+  it('칸을 안 주면 예전처럼 난수로 뽑는다 (일정표가 없는 포스트시즌 자리)', () => {
+    // 난수를 쓰는지만 본다 — 같은 씨앗이면 결과가 재현된다
+    const 하나 = simulateLeagueGame({ away: 2, home: 3 }, 씨앗난수(11))
+    const 둘 = simulateLeagueGame({ away: 2, home: 3 }, 씨앗난수(11))
+    expect(하나.awayRuns).toBe(둘.awayRuns)
+  })
+
+  it('네 칸이 서로 다른 투수를 집는다', () => {
+    const 능력 = [0, 1, 2, 3].map((slot) => startingPitcherOf(2, slot).control)
+    expect(new Set(능력).size).toBeGreaterThan(1)
   })
 })

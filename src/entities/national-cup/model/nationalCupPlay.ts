@@ -17,10 +17,8 @@ import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
  * 국가대항전 선발 투수 칸 — 양 팀 모두 `L+0x32 % 4` 번째 투수다 (`0xb6c2d`).
  * 정규 경기(`0x3107a`)가 `rand(0,4)` 로 뽑는 것과 달리 **날짜로 정해진다** — 로테이션인 셈이다.
  *
- * ⚠️ 지금은 **이 값을 경기에 꽂을 자리가 없다.** 웹판 공용 시뮬 `simulateLeagueGame`
- * (`entities/league`)은 선발을 스스로 `rand(0,4)` 로 뽑고 선발 칸을 인자로 받지 않는데,
- * 그 파일은 이 작업의 담당 폴더 밖이라 손대지 않았다. `simulateLeagueGame` 이 선발 칸을 받게 되면
- * `playCpuNationalCupGame` 에서 이 값을 넘기면 된다 — 규칙 자체는 여기 그대로 남겨 둔다.
+ * `simulateLeagueGame` 이 선발 칸을 받게 되어 이제 실제로 꽂힌다 —
+ * `playCpuNationalCupGame` 이 이 값을 그대로 넘긴다.
  */
 export function nationalCupStartingPitcherIndex(cup: NationalCup): number {
   return cup.day % STARTING_PITCHER_CANDIDATES
@@ -49,8 +47,14 @@ export interface NationalCupGameResult {
  * 웹판은 포스트시즌(`playCpuSeriesGame`)과 같이 칸 1 을 선공(away)으로 두고
  * 정규 경기와 같은 타석 엔진(`simulateLeagueGame`)을 쓴다 — 원본도 같은 간이 타석 루프다.
  */
-export function playCpuNationalCupGame(a: number, b: number, random: RandomPort): NationalCupGameResult {
-  const score = simulateLeagueGame({ away: a, home: b }, random)
+export function playCpuNationalCupGame(
+  a: number,
+  b: number,
+  random: RandomPort,
+  /** 양 팀 공통 선발 칸 — `nationalCupStartingPitcherIndex(cup)` 가 주는 `L+0x32 % 4` (0xb6c2d) */
+  startingPitcherSlot?: number,
+): NationalCupGameResult {
+  const score = simulateLeagueGame({ away: a, home: b }, random, startingPitcherSlot)
   // 칸 1(a) 이 더 많이 냈을 때만 a 승 — 동점이면 b 승이다 (원본 그대로)
   const winner = score.awayRuns > score.homeRuns ? a : b
   const loser = winner === a ? b : a
@@ -80,7 +84,8 @@ export function advanceNationalCupDay(
     other === null
       ? afterHuman
       : (() => {
-          const result = playCpuNationalCupGame(other[0], other[1], random)
+          // 대회는 날짜가 선발을 정한다 (0xb6c2d) — 정규 경기의 rand(0,4) 와 다르다
+          const result = playCpuNationalCupGame(other[0], other[1], random, nationalCupStartingPitcherIndex(afterHuman))
           return recordNationalCupResult(afterHuman, result.winner, result.loser)
         })()
 

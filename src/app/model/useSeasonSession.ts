@@ -317,6 +317,9 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
         settings: FULL_PLAY_SETTINGS,
         // 코치는 SR+0x185 다 — 채용 화면(0xd7)이 채운 칸을 그대로 넘긴다 (−1 = 없음)
         season: { illness: record.illness, morale: save.state.teamMorale, coach: record.coach },
+        // 리그 날짜 카운터 g = SR+0xb2(치른 경기 수) — 양 팀 선발이 네 경기마다 한 바퀴 돈다.
+        // 안 넘기면 0 고정이라 늘 로스터 0번이 선발이었다 (0xb5ca8 로테이션이 안 돈다)
+        dayCounter: record.games,
         teamAbilities: save.state.teamAbilities,
       }
     },

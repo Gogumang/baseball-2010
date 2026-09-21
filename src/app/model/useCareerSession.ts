@@ -123,8 +123,14 @@ export function useCareerSession({
 
   /** 경기 한 판을 세운다 — 로딩 화면(StrTIP)이 끝나야 첫 투구가 나간다 */
   const startMatch = useCallback(
-    (ourTeamId: number, battingOrder: number | undefined, opponentTeamId: number | undefined) => {
-      const started = startGame(random, ourTeamId, battingOrder, opponentTeamId)
+    (
+      ourTeamId: number,
+      battingOrder: number | undefined,
+      opponentTeamId: number | undefined,
+      /** 리그 날짜 카운터 g — 4인 로테이션이 본다 (`시즌+0xb2` 자리, 커리어는 `gamesPlayed`) */
+      dayCounter = 0,
+    ) => {
+      const started = startGame(random, ourTeamId, battingOrder, opponentTeamId, undefined, dayCounter)
       progressRef.current = started
       setProgress(started)
       runner.resetAtBat()
@@ -144,6 +150,8 @@ export function useCareerSession({
       current?.battingOrder,
       // 상대는 일정표(정규시즌)나 지금 시리즈(포스트시즌)가 정한다 — 무작위가 아니다
       current === null || current === undefined ? undefined : nextOpponentOf(current),
+      // 오늘까지 치른 경기 수가 곧 날짜 카운터 g 다 — 양 팀 선발이 네 경기마다 한 바퀴 돈다
+      current?.gamesPlayed ?? 0,
     )
   }, [startMatch])
 

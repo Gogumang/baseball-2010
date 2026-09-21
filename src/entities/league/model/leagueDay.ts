@@ -3,6 +3,7 @@ import type { League } from '@/entities/league/model/league'
 import { simulateHalfInning } from '@/entities/game/model/simulateHalfInning'
 import type { HalfInningResult } from '@/entities/game/model/simulateHalfInning'
 import { batterAt, startingPitcherOf } from '@/entities/team/model/teamRoster'
+import { rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
 import {
   EMPTY_LEAGUE_PLAYER_STATS,
   recordLeaguePlateAppearances,
@@ -64,11 +65,21 @@ export interface LeagueGameScore {
   readonly plateAppearances: readonly LeaguePlateAppearance[]
 }
 
-/** 한 경기를 9이닝(동점이면 연장)까지 돌린다 */
-export function simulateLeagueGame(matchup: LeagueMatchup, random: RandomPort): LeagueGameScore {
+/**
+ * 한 경기를 9이닝(동점이면 연장)까지 돌린다.
+ *
+ * `startingPitcherSlot` 을 주면 **양 팀 모두 그 칸**이 선발이다 — 정규 리그는 날짜로 도는
+ * 4인 로테이션(`0xb5ca8`), 국가대항전은 `L+0x32 % 4`(`0xb6c2d`) 라 둘 다 날짜가 정한다.
+ * 안 주면 예전처럼 `rand(0,4)` 로 뽑는다 — 일정표가 없는 포스트시즌(0xc2760) 자리다.
+ */
+export function simulateLeagueGame(
+  matchup: LeagueMatchup,
+  random: RandomPort,
+  startingPitcherSlot?: number,
+): LeagueGameScore {
   // 선발은 경기를 세울 때 로스터 앞 4명 중 하나로 정해진다 (0x3107a·0x31090, S13 1-4b)
-  const awayPitcher = startingPitcherOf(matchup.away, random)
-  const homePitcher = startingPitcherOf(matchup.home, random)
+  const awayPitcher = startingPitcherOf(matchup.away, startingPitcherSlot ?? random)
+  const homePitcher = startingPitcherOf(matchup.home, startingPitcherSlot ?? random)
   let awayRuns = 0
   let homeRuns = 0
   let awayOrder = 0
@@ -125,7 +136,8 @@ export function playLeagueDay(
   const plateAppearances: LeaguePlateAppearance[] = []
   const played = matchupsOf(day).reduce((current, matchup) => {
     if (matchup.away === myTeamId || matchup.home === myTeamId) return current
-    const score = simulateLeagueGame(matchup, random)
+    // 하루가 끝날 때마다 팀마다 로테이션이 한 칸 돈다 (0xb5ca8, S5 U-16) — 날짜가 선발을 정한다
+    const score = simulateLeagueGame(matchup, random, rotationSlotOf(day))
     plateAppearances.push(...score.plateAppearances)
     // ⚠️ 원본 버그를 그대로 옮긴 것 (0xc2a48, R1 확정 · DECISIONS 2026-09-20 ①):
     //    `원정 득점 > 홈 득점` 이면 **홈** 에 승을, 아니면 **원정** 에 승을 준다 — 늘 진 팀이 이긴다.
