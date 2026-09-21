@@ -334,8 +334,15 @@ function HallOfFameView({ collection, onBack }: { readonly collection: Collectio
         />
       )}
 
-      {/* 딱지 — A = slt_frame 116 + img_text 157 "PLAYER", B = 117 + 159 "ABILITY" (0x65744) */}
-      {([['a', a] as const, ['b', b] as const]).map(([side, point]) => {
+      {/*
+        딱지 — B(117 파란 막대 + img_text 159 "ABILITY") 만 그린다 (0x65744).
+        ⚠️ **A 딱지는 원본도 명예의 전당(k 8)에서 안 그린다.** 공용 목록 0x63b15 가 A 딱지
+        플래그 `[sp+0xb4]` 를 기본 1 로 두는데(0x63cea `movs r2,#1`), k 6·7·8·9 갈래가
+        0x63da0~0x63da6 에서 0 으로 끈다 — 표 0xd1eac 가 라벨 157/159 를 적어 두어도
+        그리는 쪽 0x65764~0x65768 이 `cmp r2,#0; beq` 로 A 를 통째로 건너뛴다.
+        (0 으로 쓰는 곳 셋을 전수 확인했다 — A 가 그려지는 k 는 0·1·3·4·5 뿐이다.)
+      */}
+      {([['b', b] as const]).map(([side, point]) => {
         const tag = HALL_OF_FAME_TAGS[side]
         return (
           <div key={side}>
@@ -347,7 +354,7 @@ function HallOfFameView({ collection, onBack }: { readonly collection: Collectio
             />
             <img
               className={styles.sprite}
-              alt={side === 'a' ? 'PLAYER' : 'ABILITY'}
+              alt="ABILITY"
               src={imageSrc(IMG_TEXT_FRAMES, tag.label)}
               style={{
                 left: point.x - Math.floor(tag.labelWidth / 2),

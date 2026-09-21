@@ -111,14 +111,15 @@ export function AceSelectScreen({
 
   return (
     <RawScreen>
-      {/* A 딱지 — 지금 단계에 따라 img_text 51 "마투수" / 50 "마타자" */}
-      <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, TAG.whiteBar)}
-        style={{ left: anchorA.x + TAG.dx, top: anchorA.y + TAG.aDy }} />
-      {/* 흰 막대(116) 위 글자라 공용 보정을 쓴다 — 팔레트를 이식하면 이 style 을 뗀다 */}
-      <FrameSprite folder={IMG_TEXT_FRAME} origins={imgTextOrigins} centerX
-        frame={phase === ACE_PHASE.마투수 ? ACE_LAYOUT.tagFrames.마투수 : ACE_LAYOUT.tagFrames.마타자}
-        x={anchorA.x} y={anchorA.y + TAG.aDy + TAG.textDdy} />
-
+      {/*
+        ⚠️ **A 딱지는 그리지 않는다 — 원본도 마선수 고르기(k 2·11)에서는 안 그린다.**
+        공용 목록 0x63b15 는 A 딱지 플래그 `[sp+0xb4]` 를 기본 1 로 두는데(0x63cea `movs r2,#1`
+        → 0x63cfa), 마선수 갈래가 0x63d62~0x63d68 에서 0 으로 끈다. 그리는 쪽 0x65764~0x65768 이
+        `ldr r2,[sp,#0xb4]; cmp r2,#0; beq 0x657e0` 로 통째로 건너뛴다.
+        (플래그를 0 으로 쓰는 곳은 셋 — 0x63d68 마선수 · 0x63da6 k 6~9 · 0x63dbc k 10.
+         즉 A 딱지가 그려지는 k 는 **0·1·3·4·5 뿐**이다. 직접 디스어셈해 전수 확인했다.)
+        어느 단계인지는 아래 안내 줄이 알려 준다. B 딱지(ABILITY)는 원본도 그린다.
+      */}
       {/* B 딱지 — 파란 막대(117) 에 ABILITY, k 2 는 기본값 43 위다 */}
       <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, TAG.blueBar)}
         style={{ left: anchorB.x + TAG.dx, top: anchorB.y + TAG.bDyDefault }} />

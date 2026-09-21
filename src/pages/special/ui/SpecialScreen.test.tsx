@@ -96,7 +96,9 @@ describe('스페셜 칸 고르기', () => {
 
     fireEvent.click(칸('명예의전당'))
 
-    expect(screen.getByAltText('PLAYER')).toBeTruthy()
+    // 화면 표식으로 B 딱지(ABILITY)를 본다 — A 딱지(PLAYER)는 원본이 k 8 에서 안 그려
+    // 이제 웹판도 안 그린다 (0x63da0~0x63da6 이 `[sp+0xb4]` 를 0 으로 끈다)
+    expect(screen.getByAltText('ABILITY')).toBeTruthy()
   })
 
   it('↑↓ 로 커서를 옮기고 Enter 로 연다', () => {
