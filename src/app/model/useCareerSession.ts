@@ -63,6 +63,16 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { isInfiniteGamePointOn } from '@/shared/lib/dev/devOptions'
 import { pickLoadingTip } from '@/shared/config/loadingTips'
 import type { SaveGamePort } from '@/shared/api/save/saveGamePort'
+import { createNationalCup } from '@/entities/national-cup/model/nationalCup'
+import type { NationalCup, NationalCupMatchup } from '@/entities/national-cup/model/nationalCup'
+import { advanceNationalCupDay } from '@/entities/national-cup/model/nationalCupPlay'
+import {
+  careerNationalCupRewardItems,
+  careerNationalTeamEventId,
+  isCareerNationalCupYear,
+  NATIONAL_CUP_EVENT,
+} from '@/entities/national-cup/model/nationalCupFlow'
+import type { NationalCupFinish } from '@/entities/national-cup/model/nationalCupFlow'
 
 interface CareerSessionInput {
   readonly runner: AtBatRunner
@@ -105,24 +115,37 @@ export function useCareerSession({
     setSavedCareer(career)
   }, [career, saveGame])
 
+  /**
+   * 사람이 치르고 있는 국가대항전 경기 (상태 142 `0x1c46c`) — 경기가 끝나면 이 대회로 하루를 넘긴다.
+   * 정규 경기일 때는 늘 null 이다.
+   */
+  const cupGameRef = useRef<NationalCup | null>(null)
+
+  /** 경기 한 판을 세운다 — 로딩 화면(StrTIP)이 끝나야 첫 투구가 나간다 */
+  const startMatch = useCallback(
+    (ourTeamId: number, battingOrder: number | undefined, opponentTeamId: number | undefined) => {
+      const started = startGame(random, ourTeamId, battingOrder, opponentTeamId)
+      progressRef.current = started
+      setProgress(started)
+      runner.resetAtBat()
+      runner.setBannerText('')
+      runner.setIsPaused(true)
+      setLoadingTip(pickLoadingTip(random))
+      setScreen({ kind: '경기' })
+    },
+    [random, runner, setScreen],
+  )
+
   const beginGame = useCallback(() => {
     const current = careerRef.current
-    const started = startGame(
-      random,
+    cupGameRef.current = null
+    startMatch(
       current?.teamId ?? 0,
       current?.battingOrder,
       // 상대는 일정표(정규시즌)나 지금 시리즈(포스트시즌)가 정한다 — 무작위가 아니다
       current === null || current === undefined ? undefined : nextOpponentOf(current),
     )
-    progressRef.current = started
-    setProgress(started)
-    runner.resetAtBat()
-    runner.setBannerText('')
-    // 로딩 화면(StrTIP)이 끝나야 첫 투구가 시작된다.
-    runner.setIsPaused(true)
-    setLoadingTip(pickLoadingTip(random))
-    setScreen({ kind: '경기' })
-  }, [random, runner, setScreen])
+  }, [startMatch])
 
   /** 경기가 끝났을 때 보상·칭호를 정산하고 결과 화면으로 넘어간다. */
   const finishGame = useCallback(
@@ -165,6 +188,30 @@ export function useCareerSession({
     [random, setScreen],
   )
 
+  /**
+   * 국가대항전 사람 경기가 끝났다 — 결과 장면 `0x4ea0c` 차례(내 경기 승패 기록 → 같은 라운드
+   * CPU 경기 `0xc2dac` → 하루 끝 `0xb818c`)를 `advanceNationalCupDay` 가 그대로 한다.
+   * 그 뒤 상태 101 재진입(`0x1c154`)이 `S+0x12c` 를 보고 순위 화면 134 로 돌려보낸다 (P5 1a·5절).
+   *
+   * ⚠️ **웹판 임시**: 원본은 대회 경기 뒤에도 경기 결과 화면을 한 번 보여 주는데, 웹 `경기결과`
+   * 화면의 [확인]은 정규시즌 정산(`confirmGameResult`)에 묶여 있어 대회 경기에는 쓸 수 없다 —
+   * 곧장 순위 화면으로 돌아간다.
+   * 대회 경기는 커리어 기록(리그 승패·연속 기록·칭호·G포인트)을 건드리지 않는다. 원본도 국가대항전
+   * 승패는 4국 칸(`L+0xb0`/`L+0xb4`)에만 넣고 "정규 기록은 건드리지 않는다"(P5 1a).
+   */
+  const finishCupGame = useCallback(
+    (finished: GameProgress, cup: NationalCup) => {
+      const summary = summaryOf(finished)
+      // 무승부는 대한민국의 패로 친다 — 원본 CPU 경기(`0xc2f12`)도 동점이면 뒷 칸이 이긴다. **근사다**
+      const won = summary.result === '승'
+      const winner = won ? summary.ourTeamId : summary.opponentTeamId
+      const loser = won ? summary.opponentTeamId : summary.ourTeamId
+      cupGameRef.current = null
+      setScreen({ kind: '국가대항전', cup: advanceNationalCupDay(cup, winner, loser, random) })
+    },
+    [random, setScreen],
+  )
+
   const handlePitchResolved = useCallback(
     (detail: PitchOutcomeDetail, _pitch?: unknown, isUncatchable?: boolean) => {
       const nextAtBat = runner.applyPitch(detail.resolution)
@@ -185,11 +232,14 @@ export function useCareerSession({
           runner.setIsPaused(false)
           return
         }
+        // 국가대항전 경기는 커리어 정산을 타지 않고 대회 하루를 넘긴다 (상태 142 → 101 → 134)
+        const cup = cupGameRef.current
+        if (cup !== null) return finishCupGame(advanced, cup)
         const currentCareer = careerRef.current
         if (currentCareer !== null) finishGame(advanced, currentCareer)
       })
     },
-    [finishGame, random, runner],
+    [finishCupGame, finishGame, random, runner],
   )
 
   const story = useStorySchedule(career)
@@ -215,7 +265,33 @@ export function useCareerSession({
     if (event !== null) setScreen({ kind: '이벤트', eventId: event.id, context: '관리' })
   }, [managementCheck, screen.kind, career, story, random, setScreen])
 
+  /**
+   * 새 시즌 처리 `0x1b768` → 137 "N년차" → 105 관리 화면.
+   * 시즌이 끝나면 시상을 하고 **MVP 비트를 남긴다** (0x8dd60 → career+0x1ca).
+   * 새 시즌으로 넘어가도 지우지 않는다 — 통산 MVP 를 보는 칭호가 이것을 읽는다.
+   */
+  const startNewSeason = (finished: PlayerCareer) => {
+    const next = startNextSeason(recordSeasonMvp(finished))
+    setCareer(awardTitles(next, evaluateNewTitles(next)))
+    setScreen({ kind: '관리' })
+    setManagementCheck('고정')
+  }
+
   const continueSeason = (viewed: PlayerCareer, viewedEventIds: readonly number[]) => {
+    // ── 국가대표 이벤트(461~464)는 연말 사슬 밖이다. 상태 133 이 따로 예약한 것이라 먼저 가른다 ──
+    if (viewedEventIds.includes(NATIONAL_CUP_EVENT.출전)) {
+      // 463 출전 — 상태 133 이 `0xb7bf1(L)` 로 대회를 세우고 순위 화면 134 를 줄에 넣는다
+      setCareer(awardTitles(viewed, evaluateNewTitles(viewed)))
+      return setScreen({ kind: '국가대항전', cup: createNationalCup() })
+    }
+    if (viewedEventIds.includes(NATIONAL_CUP_EVENT.거절) || viewedEventIds.includes(NATIONAL_CUP_EVENT.탈락)) {
+      // 464 거절은 `S+0x12c = 0` 으로 바로 새 시즌이다 (P5 요약, 확정).
+      // 462 탈락은 원본이 상태 105(관리 화면)로만 적혀 있고 새 시즌 처리(`0x1b768`)가 안 보이는데,
+      // 그러면 연말 사슬이 안 닫혀 웹에서는 그 해에 갇힌다. 대회 끝(`0x1b92c`)이 우승·탈락 두 갈래
+      // **모두** `0x1b768` 로 가는 것과 짝을 맞춰 여기서도 새 시즌으로 넘긴다 — **근사다**.
+      return startNewSeason(viewed)
+    }
+
     const step = nextSeasonStep(viewed, viewedEventIds)
     if (step.kind === '이벤트') {
       setCareer(viewed)
@@ -226,13 +302,22 @@ export function useCareerSession({
       setCareer(applyEndingBonus({ ...viewed, endingIndex: step.endingIndex }, step.endingIndex))
       return setScreen({ kind: '엔딩', endingIndex: step.endingIndex })
     }
-    // 시즌이 끝나면 시상을 하고 **MVP 비트를 남긴다** (0x8dd60 → career+0x1ca).
-    // 새 시즌으로 넘어가도 지우지 않는다 — 통산 MVP 를 보는 칭호가 이것을 읽는다.
-    const awarded = step.kind === '새시즌' ? recordSeasonMvp(viewed) : viewed
-    const next = step.kind === '새시즌' ? startNextSeason(awarded) : awarded
-    setCareer(awardTitles(next, evaluateNewTitles(next)))
+    if (step.kind === '새시즌') {
+      // 연말 상태 132 → 133 국가대표 선발 판정 (`0x1a090`). 연차 idx 는 **끝난 해**의 것이라
+      // 새 시즌을 올리기 전에 본다. 방출·13년차 은퇴는 위 '엔딩' 가지에서 이미 빠졌다.
+      if (isCareerNationalCupYear(viewed.season - 1)) {
+        setCareer(viewed)
+        return setScreen({
+          kind: '이벤트',
+          eventId: careerNationalTeamEventId(achievedGoalCount(viewed, '연말')),
+          context: '시즌',
+        })
+      }
+      return startNewSeason(viewed)
+    }
+    setCareer(awardTitles(viewed, evaluateNewTitles(viewed)))
     setScreen({ kind: '관리' })
-    setManagementCheck(step.kind === '새시즌' ? '고정' : '무작위포함')
+    setManagementCheck('무작위포함')
   }
 
   /** 전역 기록의 히든 오픈 id 를 선수에게 옮긴다 — 더할 것이 없으면 그대로 둔다 */
@@ -493,6 +578,37 @@ export function useCareerSession({
     beginYearEnd: () => {
       if (career === null) return
       setScreen({ kind: '이벤트', eventId: GOAL_INTRO_EVENT_ID, context: '시즌' })
+    },
+
+    /**
+     * 매치업 화면(135) [확인] → 경기 준비 142 → 사람 경기.
+     * `0x1c46c` 가 내 팀을 `0xb7614(L,n,0)`(= 대한민국)로 바꿔 끼우므로 팀 10 으로 친다.
+     *
+     * ⚠️ **웹판 임시**: 원본은 여기서 **내 선수가 낀 대표팀 명단**(P5 2절, `0xb53f1`/`0xb521d`)으로
+     * 치르는데, 웹은 팀 로스터가 붙박이 표(`entities/team`)라 내 선수를 끼워 넣을 자리가 없다 —
+     * 대한민국 기본 명단으로 친다.
+     */
+    startCupGame: (matchup: NationalCupMatchup, cup: NationalCup) => {
+      if (career === null) return
+      cupGameRef.current = cup
+      startMatch(matchup.myTeam, career.battingOrder, matchup.opponent)
+    },
+
+    /**
+     * 대회 끝 — 결과 팝업(`0x25`)과 보상 팝업(`0x26`)을 모두 닫았을 때 (`0x1b92c`).
+     * 보상은 커리어에 얹고, 열린 히든 팀은 `openedHiddenIds` 에 넣는다 (웹은 이 칸 하나가
+     * 전역 기록 `+0x70` 히든 팀 목록으로 흘러간다 — `App.tsx` 가 그렇게 넘긴다).
+     * 그 뒤 원본대로 새 시즌 처리(`0x1b768`)다.
+     *
+     * 국가대항전 플래그(`S+0x12c`)는 커리어 저장에 자리가 없고 대회 레코드를 화면이 들고 있어,
+     * 화면을 떠나면 그대로 없어진다 — 시즌모드의 "플래그가 안 내려가 다음 시즌이 막힌다" 는
+     * 원본 버그와는 **무관하다** (그쪽 동작은 건드리지 않았다).
+     */
+    finishCup: (finish: NationalCupFinish) => {
+      if (career === null) return
+      const rewarded = applyEventRewards(career, careerNationalCupRewardItems(finish.reward), random)
+      const missing = finish.openedTeams.filter((id) => !rewarded.openedHiddenIds.includes(id))
+      startNewSeason({ ...rewarded, openedHiddenIds: [...rewarded.openedHiddenIds, ...missing] })
     },
 
     /** 부상·방출 엔딩 뒤 5000 G포인트로 이어한다 (StrMODE[221]). 모자라면 false */

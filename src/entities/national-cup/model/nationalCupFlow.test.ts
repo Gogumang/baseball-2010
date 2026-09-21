@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   NATIONAL_CUP_STATE,
+  careerNationalCupRewardItems,
   careerNationalCupRewardOf,
+  careerNationalTeamEventId,
+  isCareerNationalCupYear,
   confirmNationalCupStandings,
   finishNationalCup,
   hiddenTeamsToOpen,
@@ -36,6 +39,15 @@ describe('출전 판정', () => {
 
   it('제 n 회 = (연차idx >> 1) + 1', () => {
     expect([0, 2, 4, 6, 8].map(nationalCupEditionOf)).toEqual([1, 2, 3, 4, 5])
+  })
+
+  it('나만의리그도 연차 idx 가 짝수인 해(1·3·5·7·9·11년차)에만 선발 판정을 한다 (0x10cec)', () => {
+    expect([0, 1, 2, 3, 10, 11].map(isCareerNationalCupYear)).toEqual([true, false, true, false, true, false])
+  })
+
+  it('상태 133 은 목표 4개 이상이면 선발 461, 아니면 탈락 462 를 예약한다 (0x1a090)', () => {
+    expect([0, 3].map(careerNationalTeamEventId)).toEqual([462, 462])
+    expect([4, 5].map(careerNationalTeamEventId)).toEqual([461, 461])
   })
 
   it('상태 번호는 원본 값 그대로다', () => {
@@ -104,6 +116,19 @@ describe('보상', () => {
       gamePoint: 0,
       messageId: 0,
     })
+  })
+
+  it('나만의리그 보상은 이벤트 보상 칸(0 인기도·1 평판·3 소지금·10 G포인트)으로 바뀐다', () => {
+    expect(careerNationalCupRewardItems(careerNationalCupRewardOf(10))).toEqual([
+      { kind: 0, value: 20 },
+      { kind: 1, value: 30 },
+      { kind: 3, value: 20 },
+      { kind: 10, value: 1000 },
+    ])
+  })
+
+  it('보상이 없으면 이벤트 보상 칸도 비어 있다', () => {
+    expect(careerNationalCupRewardItems(careerNationalCupRewardOf(13))).toEqual([])
   })
 
   it('시즌모드는 seasonRewards 의 nationalCupRewardOf 를 그대로 쓴다', () => {

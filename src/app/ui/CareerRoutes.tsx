@@ -11,6 +11,7 @@ import { ScreenOverlay } from '@/shared/ui'
 import { StoryScreen } from '@/pages/story/ui/StoryScreen'
 import { RecordScreen } from '@/pages/record/ui/RecordScreen'
 import { SeasonEndScreen } from '@/pages/season-end/ui/SeasonEndScreen'
+import { NationalCupScreen } from '@/pages/national-cup/ui/NationalCupScreen'
 import { EndingScreen } from '@/pages/ending/ui/EndingScreen'
 import type { HallOfFameResult } from '@/entities/collection/model/collection'
 import { endingBonusOf, isContinuableEnding } from '@/entities/career/model/seasonFlow'
@@ -153,6 +154,21 @@ export function CareerRoutes({
 
     case '시즌종료':
       return <SeasonEndScreen career={career} onStartNextSeason={actions.beginYearEnd} />
+
+    case '국가대항전':
+      return (
+        <NationalCupScreen
+          mode="나만의리그"
+          cup={screen.cup}
+          // 제 n 회 = (연차 idx >> 1) + 1 (`0x85e6c`). 대회는 **끝난 해**의 연말에 치르고
+          // 새 시즌은 대회가 끝난 뒤에야 오르므로(`0x1b768`), 연차 idx 는 지금 시즌 − 1 이다
+          yearIndex={career.season - 1}
+          random={random}
+          onStartGame={actions.startCupGame}
+          onFinish={actions.finishCup}
+        />
+      )
+
     case '엔딩':
       return (
         <EndingScreen playerName={career.name} endingIndex={screen.endingIndex}

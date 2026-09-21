@@ -1,6 +1,7 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { NATIONAL_CUP_RUNNER_UP_TEXT_MONEY, nationalCupRewardOf } from '@/entities/season-mode/model/seasonRewards'
 import type { SeasonReward } from '@/entities/season-mode/model/seasonRewards'
+import type { EventReward } from '@/entities/story/model/eventReward'
 import {
   KOREA_TEAM_ID,
   UNDECIDED_TEAM,
@@ -52,6 +53,26 @@ export const NATIONAL_CUP_EVENT = { 선발: 461, 탈락: 462, 출전: 463, 거�
  */
 export function isCareerNationalCupCallUp(achievedGoalCount: number): boolean {
   return achievedGoalCount > 3
+}
+
+/**
+ * 나만의리그가 국가대표 선발 판정(상태 133)을 하는 해.
+ *
+ * 연말 상태 132(`0x10c54`)가 연차 idx(`career+0xb3`)의 **bit0 이 0** 이면(1·3·5·7·9·11년차)
+ * 상태 133 을 줄에 넣는다 (`0x10cec` 의 `lsls r0,r3,#31; bmi` → 건너뜀).
+ * 13년차 은퇴식(504)·방출(501) 경로는 이 검사 **앞에서** 빠지므로 국가대표가 없다.
+ *
+ * 근거: `docs/re/B-season-awards.md` 3절 "국가대표 (461~464)" (확정) ·
+ *       `docs/re/R9-myleague-states.md` 2b 절 (연차idx 짝수 → 133, 홀수 → 새 시즌).
+ * 식은 시즌모드 `isSeasonNationalCupYear` 와 같다 — 둘 다 "2년에 한번"(이벤트 461 대사)이다.
+ */
+export function isCareerNationalCupYear(yearIndex: number): boolean {
+  return (yearIndex & 1) === 0
+}
+
+/** 상태 133(`0x1a090`)이 예약하는 이벤트 — 올해 목표 4개 이상이면 선발 461, 아니면 탈락 462 */
+export function careerNationalTeamEventId(achievedGoalCount: number): number {
+  return isCareerNationalCupCallUp(achievedGoalCount) ? NATIONAL_CUP_EVENT.선발 : NATIONAL_CUP_EVENT.탈락
 }
 
 /**
@@ -158,6 +179,25 @@ export function nationalCupRewardText(reward: SeasonReward): string {
   ]
   if (reward.gamePoint > 0) lines.push(`${reward.gamePoint} G포인트 지급`)
   return lines.join('!N')
+}
+
+/**
+ * 나만의리그 보상을 **이벤트 보상 칸**(`r_event` 명령 7, 점프 표 `0xd4e50`)으로 바꾼다.
+ *
+ * 나리 쪽 정산 자리는 시즌 레코드가 아니라 커리어(`PlayerCareer`)라, 팝업 `0x26` 이 직접 하는
+ * 네 줄(인기도 `S+0x48` · 평판 `S+0x62` · 소지금 `S+0x2` · 전역 G포인트 `+0x64`)을
+ * 같은 상한을 쓰는 `applyEventRewards` 에 넘겨 처리한다 — 종류 번호는 원본 표 그대로
+ * **0 인기도 · 1 평판 · 3 소지금(100만원 단위) · 10 G포인트** 다.
+ * 보상이 없으면(탈락·나리 준우승) 빈 목록이다.
+ */
+export function careerNationalCupRewardItems(reward: SeasonReward): readonly EventReward[] {
+  if (reward.messageId === 0) return []
+  return [
+    { kind: 0, value: reward.popularity },
+    { kind: 1, value: reward.reputation },
+    { kind: 3, value: reward.money },
+    { kind: 10, value: reward.gamePoint },
+  ]
 }
 
 /** 모드에 맞는 대회 보상. 시즌모드는 `seasonRewards.nationalCupRewardOf` 를 그대로 쓴다 */

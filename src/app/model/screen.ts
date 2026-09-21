@@ -1,5 +1,6 @@
 import type { OriginalMission } from '@/shared/config/original/missions'
 import type { GameSummary } from '@/entities/game/model/gameSummary'
+import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
 import type { StoryContext } from '@/app/model/useStorySchedule'
 import type { StoryCarry } from '@/entities/story/model/aceMatch'
 import type { GameEvaluation, StreakNotice } from '@/entities/career/model/gameEvaluation'
@@ -62,6 +63,14 @@ export type Screen =
     }
   | { readonly kind: '성적' }
   | { readonly kind: '시즌종료' }
+  /**
+   * 나만의리그 국가대항전 (원본 상태 134 순위 · 135 매치업 — 화면 한 벌이 둘을 같이 돈다).
+   *
+   * ⚠️ **웹판 임시**: 원본은 대회 레코드를 리그 구조체 `L+0xa8`~`L+0xc4` 에 두어 세이브에 남기는데,
+   * 웹 저장 모양(`PlayerCareer`)엔 자리가 없어 **화면이 들고 다닌다** — 대회 도중에 끄면 대회가 없어진다.
+   * (`entities/career` 는 이 작업의 담당 폴더 밖이라 칸을 더하지 않았다.)
+   */
+  | { readonly kind: '국가대항전'; readonly cup: NationalCup }
   | { readonly kind: '엔딩'; readonly endingIndex: number }
   | { readonly kind: '미션선택' }
   | { readonly kind: '홈런더비' }
