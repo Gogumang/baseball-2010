@@ -21,6 +21,7 @@ import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
 import type { SeasonStats } from '@/entities/career/model/seasonStats'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { advanceRunners } from '@/entities/game/model/baseState'
+import { attemptSteal, canStealFrom } from '@/entities/game/model/steal'
 import type { BaseState } from '@/entities/game/model/baseState'
 import { atBatPenaltyCounts, atBatPopularityPoints, EMPTY_REPUTATION_COUNTS } from '@/entities/career/model/gameEvaluation'
 import type { ReputationCounts } from '@/entities/career/model/gameEvaluation'
@@ -572,6 +573,45 @@ function appendLog(progress: GameProgress, text: string, isMine: boolean): GameP
     log: [entry, ...progress.log].slice(0, MAXIMUM_LOG_LENGTH),
     nextLogId: progress.nextLogId + 1,
   }
+}
+
+/**
+ * 도루 한 번 (원본 키 처리 `0x53610` → 메시지 `0x583`, 판정 표 `0xd9064`).
+ *
+ * `base` 는 **대상 주자가 선 루**다 — 키 '3' 이 1루 주자, '2' 가 2루 주자이고
+ * 3루 주자(키 '1')는 원본이 홈 도루를 걸지 않는다 (`canStealFrom`).
+ *
+ * ⚠️ **근사**: 웹 `GameState` 는 루에 선 주자가 누구인지 모른다. 원본은 주자 객체가 제 능력치를
+ * 들고 있지만, 여기서는 **1루 주자 = 직전 타자 · 2루 주자 = 그 앞 타자**로 타순을 거꾸로 세어
+ * 주력을 꺼낸다. 성공하면 한 루 나가고, 실패하면 아웃 하나가 는다.
+ */
+export function stealBase(progress: GameProgress, base: 1 | 2, random: RandomPort): GameProgress {
+  const { game } = progress
+  if (game.isFinished || game.half !== ourHalfOf(game)) return progress
+  if (!canStealFrom(base)) return progress
+  const occupied = base === 1 ? game.bases.first : game.bases.second
+  const nextBaseTaken = base === 1 ? game.bases.second : game.bases.third
+  if (!occupied || nextBaseTaken) return progress
+
+  const slotsBack = base === 1 ? 1 : 2
+  const slot = (game.battingOrderIndex - slotsBack + BATTING_ORDER_SIZE) % BATTING_ORDER_SIZE
+  const runner = batterAt(progress.ourTeamId, slot)
+  // 도루 판정은 주력(`run`)만 본다 (표 0xd9064) — 나머지 칸은 안 쓴다
+  const result = attemptSteal({ hit: runner.hit, power: runner.power, defense: 0, run: runner.run }, random)
+
+  if (result === '실패') {
+    const outs = game.outs + 1
+    const bases = base === 1 ? { ...game.bases, first: false } : { ...game.bases, second: false }
+    return appendLog(
+      { ...progress, game: { ...game, outs, bases } },
+      `${game.inning}회${game.half} 도루 실패 — 아웃`,
+      true,
+    )
+  }
+  const bases = base === 1
+    ? { ...game.bases, first: false, second: true }
+    : { ...game.bases, second: false, third: true }
+  return appendLog({ ...progress, game: { ...game, bases } }, `${game.inning}회${game.half} 도루 성공`, true)
 }
 
 export function summaryOf(progress: GameProgress): GameSummary {

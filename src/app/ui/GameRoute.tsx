@@ -9,6 +9,7 @@ import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
 import { pitcherAbilityOf } from '@/entities/game/model/aceOpponent'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import type { useGameSettings } from '@/app/model/useGameSettings'
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import type { BurstMissionRow } from '@/entities/burst-mission/model/burstMissionRow'
@@ -21,6 +22,7 @@ interface GameRouteProps {
   readonly runner: AtBatRunner
   readonly random: RandomPort
   readonly career: PlayerCareer
+  readonly gameSettings: ReturnType<typeof useGameSettings>
 }
 
 /**
@@ -33,7 +35,7 @@ interface GameRouteProps {
  * 돌발미션이 발동하면 **타석 화면 위에** 창을 얹는다 (원본 상태 0x1b, K 4절 1-6).
  * 창이 떠 있는 동안 타석을 멈춰 둔다 — 원본도 장면 상태가 0xf 를 떠나 있어 투구가 나가지 않는다.
  */
-export function GameRoute({ session, progress, runner, random, career }: GameRouteProps) {
+export function GameRoute({ session, progress, runner, random, career, gameSettings }: GameRouteProps) {
   /** 이미 다 보여 준 플레이 — 같은 플레이를 두 번 재생하지 않으려고 기억해 둔다 */
   const [shownPlay, setShownPlay] = useState<DefensePlayResult | null>(null)
   const play = progress.lastDefensePlay
@@ -77,6 +79,9 @@ export function GameRoute({ session, progress, runner, random, career }: GameRou
         random={random}
         onPitchResolved={session.handlePitchResolved}
         onQuit={session.actions.quitGame}
+        onSteal={session.actions.stealBase}
+        settings={gameSettings.settings}
+        onSettingsChange={gameSettings.setSettings}
       />
       {burstLines !== null && (
         <BurstMissionWindow

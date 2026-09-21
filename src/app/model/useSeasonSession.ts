@@ -114,6 +114,8 @@ export interface SeasonActions {
   readonly nextSeasonEndStep: (reward?: SeasonAwardReward) => void
   /** 리그 1위 G 를 지급하고 받은 비트를 남긴다 (0x6900 · 0x87e8) */
   readonly awardLeagueFirst: (award: LeagueFirstAward) => void
+  /** 경기 중 자동진행 값 등 G 를 쓴다 (모자라면 화면이 먼저 막는다) */
+  readonly spendGamePoint: (cost: number) => void
   /** 결산을 닫았다 — 국가대항전 연차면 대회, 아니면 새 해 (afterKoreanSeries) */
   readonly finishSeason: () => void
   readonly clearNotice: () => void
@@ -612,6 +614,10 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
     setScene(SEASON_SCENE_STATE.관리메뉴)
   }, [commit, save])
 
+  const spendGamePoint = useCallback((cost: number) => {
+    setGamePoints((points) => Math.max(0, points - cost))
+  }, [])
+
   const goto = useCallback((next: SeasonSceneState) => setScene(next), [])
   const clearNotice = useCallback(() => setNotice(''), [])
   const quit = useCallback(() => setScene(SEASON_SCENE_STATE.팀고르기), [])
@@ -633,7 +639,7 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
     actions: {
       chooseTeam, goto, updateRecord, updateRoster, playNextGame, confirmIncome,
       playCupGame, finishCup, finishGame, continuePostseason,
-      runTraining, runOuting, nextSeasonEndStep, awardLeagueFirst, finishSeason,
+      runTraining, runOuting, nextSeasonEndStep, awardLeagueFirst, spendGamePoint, finishSeason,
       clearNotice, quit,
     },
   }

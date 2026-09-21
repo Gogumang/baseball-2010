@@ -3,7 +3,7 @@ import type { Screen } from '@/app/model/screen'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import { isAtBatFinished } from '@/entities/at-bat/model/atBatState'
 import { describeOutcomeBanner } from '@/entities/at-bat/model/resolutionText'
-import { applyPlayerOutcome, startGame, summaryOf } from '@/features/play-game/model/gameFlow'
+import { applyPlayerOutcome, startGame, stealBase, summaryOf } from '@/features/play-game/model/gameFlow'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import {
@@ -243,6 +243,19 @@ export function useCareerSession({
 
   const actions = {
     syncOpenedHidden,
+
+    /**
+     * 도루 (원본 키 '3' 1루 주자 · '2' 2루 주자 → `0x53610`).
+     * 성공하면 한 루 나가고 실패하면 아웃 하나가 는다 — 판정은 진행기가 한다.
+     */
+    stealBase: (base: 1 | 2) => {
+      const current = progressRef.current
+      if (current === null) return
+      const next = stealBase(current, base, random)
+      if (next === current) return
+      progressRef.current = next
+      setProgress(next)
+    },
 
     /**
      * 돌발미션 결과 창을 닫았다 — 보상·페널티를 내 선수에게 얹고 판정을 치운다 (0x8e34c).

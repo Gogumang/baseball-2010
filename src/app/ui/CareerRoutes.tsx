@@ -2,6 +2,7 @@ import type { Screen } from '@/app/model/screen'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import type { useCareerSession } from '@/app/model/useCareerSession'
 import { GameRoute } from '@/app/ui/GameRoute'
+import type { useGameSettings } from '@/app/model/useGameSettings'
 import { GameResultScreen } from '@/pages/game-result/ui/GameResultScreen'
 import { ManagementScreen } from '@/pages/management/ui/ManagementScreen'
 import { ShopScreen } from '@/pages/shop/ui/ShopScreen'
@@ -29,6 +30,8 @@ interface CareerRoutesProps {
   readonly career: PlayerCareer
   readonly onRegisterHallOfFame: (career: PlayerCareer) => HallOfFameResult['kind']
   readonly onAceMatch: AceMatchStarter
+  /** 경기 중 메뉴 "설정" 칸이 열 환경설정 — 안 넘기면 그 칸이 잠긴다 */
+  readonly gameSettings: ReturnType<typeof useGameSettings>
 }
 
 export type AceMatchStarter = (command: MatchCommand, carried: StoryCarry, context: StoryContext) => void
@@ -43,6 +46,7 @@ export function CareerRoutes({
   career,
   onRegisterHallOfFame,
   onAceMatch,
+  gameSettings,
 }: CareerRoutesProps) {
   const { actions } = session
   const backToManagement = () => setScreen({ kind: '관리' })
@@ -68,7 +72,16 @@ export function CareerRoutes({
   switch (screen.kind) {
     case '경기':
       if (session.progress === null) return management
-      return <GameRoute session={session} progress={session.progress} runner={runner} random={random} career={career} />
+      return (
+        <GameRoute
+          session={session}
+          progress={session.progress}
+          runner={runner}
+          random={random}
+          career={career}
+          gameSettings={gameSettings}
+        />
+      )
 
     case '경기결과':
       return (

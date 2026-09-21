@@ -3,11 +3,14 @@ import { PitcherManagementScreen } from '@/pages/pitcher-league/ui/PitcherManage
 import { PitcherGameScreen } from '@/pages/pitching/ui/PitcherGameScreen'
 import type { PitcherLeagueSession } from '@/app/model/usePitcherLeagueSession'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import type { useGameSettings } from '@/app/model/useGameSettings'
 
 interface PitcherLeagueRouteProps {
   readonly session: PitcherLeagueSession
   readonly random: RandomPort
   readonly openedHiddenIds?: readonly number[]
+  /** 경기 중 메뉴 "설정" 칸 */
+  readonly gameSettings: ReturnType<typeof useGameSettings>
   readonly onExit: () => void
 }
 
@@ -20,7 +23,9 @@ interface PitcherLeagueRouteProps {
  * `onOuting`/`onOpenShop` 은 투수편 외출(112)·상점(110/111) 화면이 생기면 그때 넘긴다 —
  * 지금은 그 칸을 누르면 화면이 "아직 옮기지 않은 화면입니다" 를 띄운다.
  */
-export function PitcherLeagueRoute({ session, random, openedHiddenIds = [], onExit }: PitcherLeagueRouteProps) {
+export function PitcherLeagueRoute({
+  session, random, openedHiddenIds = [], gameSettings, onExit,
+}: PitcherLeagueRouteProps) {
   const { career, scene, gameOptions, actions } = session
 
   if (career === null || scene === '등록') {
@@ -34,6 +39,8 @@ export function PitcherLeagueRoute({ session, random, openedHiddenIds = [], onEx
         random={random}
         onFinish={actions.finishGame}
         onQuit={() => actions.goto('관리')}
+        settings={gameSettings.settings}
+        onSettingsChange={gameSettings.setSettings}
       />
     )
   }

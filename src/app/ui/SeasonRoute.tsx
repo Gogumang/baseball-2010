@@ -18,12 +18,15 @@ import { TEAMS } from '@/shared/config/original/teams'
 import { NationalCupScreen } from '@/pages/national-cup/ui/NationalCupScreen'
 import { TeamGameScreen } from '@/pages/team-game/ui/TeamGameScreen'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import type { useGameSettings } from '@/app/model/useGameSettings'
 import { seasonRanksOf } from '@/app/model/useSeasonSession'
 import type { SeasonSession } from '@/app/model/useSeasonSession'
 
 interface SeasonRouteProps {
   readonly session: SeasonSession
   readonly random: RandomPort
+  /** 경기 중 메뉴 "설정" 칸과 자동진행 G 검사에 쓴다 */
+  readonly gameSettings: ReturnType<typeof useGameSettings>
   /** 시즌모드에서 나간다 — 메인 메뉴로 (원본은 `0xbc290(앱, 0x103)`) */
   readonly onExit: () => void
 }
@@ -38,7 +41,7 @@ interface SeasonRouteProps {
  * 선수단/코치채용 0xd7 · 포스트시즌·시상·결산·엔딩)은 알림을 띄우고 관리 메뉴로 되돌린다 —
  * 조용히 아무것도 안 하는 것보다 낫다.
  */
-export function SeasonRoute({ session, random, onExit }: SeasonRouteProps) {
+export function SeasonRoute({ session, random, gameSettings, onExit }: SeasonRouteProps) {
   const { state, scene, league, roster, playerStats, series, cup, gameOptions, notice, actions } = session
 
   const ranks = useMemo(
@@ -259,6 +262,11 @@ export function SeasonRoute({ session, random, onExit }: SeasonRouteProps) {
         random={random}
         onFinish={actions.finishGame}
         onQuit={backToManagement}
+        // 자동진행 비용은 전역 저장 +0x64 에서 나간다 (시즌 사용내역 종류 3, 0x22c29)
+        gamePoint={session.gamePoints}
+        onSpendGamePoint={actions.spendGamePoint}
+        settings={gameSettings.settings}
+        onSettingsChange={gameSettings.setSettings}
       />
     )
   }

@@ -98,7 +98,14 @@ export function App() {
 
   // 시즌모드는 나만의리그 커리어와 아예 다른 저장·흐름이다 (원본 장면 0x105)
   if (screen.kind === '시즌모드') {
-    return <SeasonRoute session={seasonSession} random={random} onExit={() => setScreen({ kind: '메인메뉴' })} />
+    return (
+      <SeasonRoute
+        session={seasonSession}
+        random={random}
+        gameSettings={gameSettings}
+        onExit={() => setScreen({ kind: '메인메뉴' })}
+      />
+    )
   }
 
   // 일반모드는 저장이 없다 — 준비 다섯 화면부터 경기까지 한 화면이 돌고 메인 메뉴로 돌아간다
@@ -122,6 +129,7 @@ export function App() {
         session={pitcherSession}
         random={random}
         openedHiddenIds={collection.collection.openedHiddenIds}
+        gameSettings={gameSettings}
         onExit={() => setScreen({ kind: '메인메뉴' })}
       />
     )
@@ -141,6 +149,7 @@ export function App() {
       career={careerSession.career}
       onRegisterHallOfFame={collection.register}
       onAceMatch={startAceMatch}
+      gameSettings={gameSettings}
     />
   )
 }

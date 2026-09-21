@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyPlayerOutcome, startGame } from '@/features/play-game/model/gameFlow'
+import { applyPlayerOutcome, startGame, stealBase } from '@/features/play-game/model/gameFlow'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { BURST_TABLES } from '@/entities/burst-mission/model/burstMissionRow'
@@ -117,5 +117,39 @@ describe('판정이 새지 않는가', () => {
     const after = applyPlayerOutcome(대기중, { kind: '삼진' }, 씨앗(3))
 
     expect(after.lastBurstResolution).not.toBeNull()
+  })
+})
+
+describe('도루 (0x53610 · 표 0xd9064)', () => {
+  const 주자있는경기 = () => {
+    const progress = startGame(씨앗(20100901))
+    return {
+      ...progress,
+      game: { ...progress.game, bases: { first: true, second: false, third: false }, outs: 0 },
+    }
+  }
+
+  it('성공하면 한 루 나가고, 실패하면 아웃이 하나 는다', () => {
+    const before = 주자있는경기()
+    // 씨앗을 바꿔 가며 두 갈래를 다 본다
+    const 결과들 = Array.from({ length: 40 }, (_unused, seed) => stealBase(before, 1, 씨앗(seed + 1)))
+    const 성공 = 결과들.find((next) => next.game.bases.second)
+    const 실패 = 결과들.find((next) => next.game.outs === 1)
+
+    expect(성공?.game.bases.first, '성공하면 1루가 빈다').toBe(false)
+    expect(실패?.game.bases.first, '실패하면 주자가 지워진다').toBe(false)
+  })
+
+  it('앞 루가 차 있으면 걸지 않는다', () => {
+    const 막힘 = { ...주자있는경기() }
+    const before = { ...막힘, game: { ...막힘.game, bases: { first: true, second: true, third: false } } }
+
+    expect(stealBase(before, 1, 씨앗(3))).toBe(before)
+  })
+
+  it('주자가 없으면 아무 일도 없다', () => {
+    const before = startGame(씨앗(20100901))
+
+    expect(stealBase(before, 2, 씨앗(3))).toBe(before)
   })
 })
