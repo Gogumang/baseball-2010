@@ -51,10 +51,47 @@ export const MENU_ROW = {
 /** 줄별 아이콘 (이미지 87 바탕 가운데) */
 export const ROW_ICON_IMAGES = { sound: 89, speed: 53, vibration: 91 } as const
 
-/** 사운드 값 — 소리 크기만큼 이미지 98 + k 를 x0 + 118 부터, 아래 맞춤 */
-export const SOUND_BARS = { firstImage: 98, x: PANEL.x + 118, dy: 35, gap: 1 } as const
-/** 속도 값 — 속도 + 1 개만큼 이미지 102 + k 를 x0 + 107 부터, 아래 맞춤 */
-export const SPEED_MARKS = { firstImage: 102, x: PANEL.x + 107, dy: 37 } as const
+/**
+ * 사운드 값 — 소리 크기만큼 이미지 98 + k 를 `x = x0 + 118 + k·(w + 1)`,
+ * `y = Y + 35 + (h최대 − h)` 에 찍는다 (P6 5절 확정). 곧 **아래 맞춤**이다.
+ * 이미지 98~101 은 12×2 · 12×5 · 12×8 · 12×11 이라 밑변이 모두 Y + 46 에 모인다.
+ */
+export const SOUND_BARS = {
+  firstImage: 98,
+  x: PANEL.x + 118,
+  dy: 35,
+  gap: 1,
+  /** 이미지 98~101 의 폭·높이 (public/sprites/slt_frame/098~101.png) */
+  sizes: [
+    { width: 12, height: 2 }, { width: 12, height: 5 },
+    { width: 12, height: 8 }, { width: 12, height: 11 },
+  ],
+} as const
+
+/**
+ * 속도 값 — 속도 + 1 개만큼 이미지 102 + k 를 x0 + 107 부터 가로로, `y = Y + 37` **아래 맞춤**.
+ * 이미지 102~105 는 11×7 · 11×7 · 12×9 · 12×9 라 밑변이 모두 Y + 46 에 모인다.
+ * 가로 간격은 원본 식을 못 읽어 예전 값(12px)을 그대로 둔다.
+ */
+export const SPEED_MARKS = {
+  firstImage: 102,
+  x: PANEL.x + 107,
+  dy: 37,
+  step: 12,
+  /** 이미지 102~105 의 폭·높이 (public/sprites/slt_frame/102~105.png) */
+  sizes: [
+    { width: 11, height: 7 }, { width: 11, height: 7 },
+    { width: 12, height: 9 }, { width: 12, height: 9 },
+  ],
+} as const
+
+/** 아래 맞춤 세로 보정 — `(h최대 − h)`. 표에 없는 칸은 마지막 칸으로 본다. */
+export function bottomAlignOffset(sizes: readonly { readonly height: number }[], index: number): number {
+  if (sizes.length === 0) return 0
+  const tallest = Math.max(...sizes.map((size) => size.height))
+  const size = sizes[Math.min(Math.max(0, index), sizes.length - 1)]
+  return tallest - size.height
+}
 /** 진동 값 — OFF/ON 두 칸, 고른 쪽에 노랑 사각 35×15 */
 export const VIBRATION = {
   off: { x: PANEL.x + 97, dy: 41, width: 38 },

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import { DEFAULT_SETTINGS } from '@/entities/settings/model/gameSettings'
-import { MENU_ROW, PANEL, VALUE_ROW, rowTopOf } from '@/pages/settings/lib/settingsLayout'
+import { MENU_ROW, PANEL, SOUND_BARS, SPEED_MARKS, VALUE_ROW, bottomAlignOffset, rowTopOf } from '@/pages/settings/lib/settingsLayout'
 
 /**
  * 환경설정 창 (공용 페이지 0x593c8 종류 8 — P6 5절).
@@ -58,6 +58,34 @@ describe('환경설정 창 배치', () => {
     expect(panel.style.top).toBe(`${PANEL.y}px`)
     expect(panel.style.width).toBe(`${PANEL.width}px`)
     expect(panel.style.height).toBe(`${PANEL.height}px`)
+  })
+})
+
+/**
+ * 예전에는 `alignSelf:'end'` 로 아래 맞춤을 흉내 냈는데, 그 그림들은 `position:absolute` 라
+ * 아무 효과가 없어 막대가 **천장에 붙은 내림 계단**으로 나왔다 (최대 9px 어긋남).
+ * P6 5절 확정 식 `y = Y + 35 + (h최대 − h)` · `y = Y + 37 아래 맞춤` 을 직접 더하도록 바꿨다.
+ */
+describe('소리 막대·속도 꺾쇠는 아래 맞춤이다 (P6 5절 확정)', () => {
+  it('소리 막대 넷(12×2·5·8·11)의 밑변이 모두 Y + 46 에 모인다', () => {
+    const 밑변 = SOUND_BARS.sizes.map(
+      (size, k) => SOUND_BARS.dy + bottomAlignOffset(SOUND_BARS.sizes, k) + size.height,
+    )
+
+    expect(밑변).toEqual([46, 46, 46, 46])
+  })
+
+  it('속도 꺾쇠 넷(11×7·11×7·12×9·12×9)의 밑변도 모두 Y + 46 에 모인다', () => {
+    const 밑변 = SPEED_MARKS.sizes.map(
+      (size, k) => SPEED_MARKS.dy + bottomAlignOffset(SPEED_MARKS.sizes, k) + size.height,
+    )
+
+    expect(밑변).toEqual([46, 46, 46, 46])
+  })
+
+  it('가장 낮은 막대는 9px 내려 앉는다 — 예전 값(0)과 다른 곳이다', () => {
+    expect(bottomAlignOffset(SOUND_BARS.sizes, 0)).toBe(9)
+    expect(bottomAlignOffset(SOUND_BARS.sizes, 3)).toBe(0)
   })
 })
 

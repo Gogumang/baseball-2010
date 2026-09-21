@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
-import { animationFolderOf, TRAINING_POPUP_UPDATES } from '@/shared/config/original/trainingAnimation'
+import { animationFolderOf, figurePosesOf, TRAINING_POPUP_UPDATES } from '@/shared/config/original/trainingAnimation'
 import type { TrainingPresentation } from '@/shared/config/original/trainingAnimation'
 import { animationStepAt, figurePoseAt } from '@/widgets/training-scene/lib/animationPlayback'
 import { TrainingFigure } from '@/widgets/training-scene/ui/TrainingFigure'
@@ -25,12 +25,17 @@ interface TrainingSceneProps {
   /** null 이면 연출 없이 창만 보인다 */
   readonly presentation: TrainingPresentation | null
   readonly caption?: string
+  /**
+   * 타자 타입 (0 타격형 · 그 밖 장타형) — 동작표를 가른다 (F-6 · 5-3 확정).
+   * 안 넘기면 타격형으로 본다.
+   */
+  readonly battingTypeIndex?: number
   /** 게이지가 가득 차면(60번 갱신) 불린다 */
   readonly onFinished?: () => void
 }
 
 /** 원작 훈련 팝업. presentation 이 바뀔 때마다 처음부터 튼다. */
-export function TrainingScene({ presentation, caption, onFinished }: TrainingSceneProps) {
+export function TrainingScene({ presentation, caption, battingTypeIndex = 0, onFinished }: TrainingSceneProps) {
   const folder = animationFolderOf(presentation?.file ?? 'raise_traning_ani')
   const origins = useFrameOrigins(folder)
   const animations = useAnimations(folder)
@@ -91,7 +96,7 @@ export function TrainingScene({ presentation, caption, onFinished }: TrainingSce
         )}
         {figure !== null && step !== null && (
           <TrainingFigure
-            pose={figurePoseAt(figure.poses, step.entryIndex)}
+            pose={figurePoseAt(figurePosesOf(figure, battingTypeIndex), step.entryIndex)}
             x={ANCHOR.x + figure.offsetX}
             y={ANCHOR.y - figure.liftY}
           />

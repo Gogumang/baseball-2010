@@ -11,7 +11,10 @@ import { ORIGINAL_COLORS, UI_COLORS } from '@/shared/config/design'
  *   램프: S 파트 13 (58,24)(67,24) · B 파트 14 (58,34)(67,34)(76,34) · O 파트 15 (58,44)(67,44)
  *   이닝: 박스 0 (15,8,10,9) — "회" 글자 앞
  *   점수: 숫자 프레임 20~, 자간 −3, 아래 줄은 y+3 (점검 에이전트) · 공격 막대 높이 h−2 · 위 줄 = 먼저 공격(원정)
- * **추정**: 숫자 글꼴이 num.pzx 라는 것, 점수 오른쪽 정렬, 새 램프 확대 연출(0x37828)은 없음
+ *
+ * **확정** (F-3 · 3-1): 숫자 글꼴 = `ui/num.pzx` (0x3740c → 0x330f0), 점수 **오른쪽 정렬**
+ * (0x3756c 정렬 0x24 = 오른쪽+세로 가운데, 아래 줄은 오른쪽만),
+ * 그리고 **새 램프 확대 연출이 있다** (0x37828) — 예전 주석의 "없음" 은 틀렸다.
  */
 export interface HudState {
   readonly inning: number
@@ -50,13 +53,50 @@ const LAMPS = [
   { part: 15, x: 58, y: 44, key: 'outs' },
 ] as const
 
+/**
+ * 새 램프 확대 연출 (0x37828, F-3 · 3-1 확정).
+ * 카운트가 바뀌면 그 종류의 타이머를 5 로 두고(0x37744), 타이머 z > 0 인 동안
+ * **가장 새 램프(칸 = 개수−1)만** 효과 0x10(정수 배 확대)·배율 z 로 그린 뒤 z 를 하나 줄인다.
+ * 자리는 `(x − (z−1)·w/2, y − (z−1)·h/2)` — 제자리에 가운데를 고정한 채 5배에서 1배로 줄어든다.
+ * 정수 배 확대라는 것은 R6 3b 확정 (프레임 그리기 0x944b5 의 e == 0x10, b > 0 → 좌표·크기 ×b).
+ */
+const LAMP_ZOOM_TICKS = 5
+
+type LampKey = (typeof LAMPS)[number]['key']
+
+/** 램프 종류별 "지난 카운트"와 "타이머를 5 로 둔 틱". 원본은 게임 객체에 들고 있다 */
+const lampZoom: Record<LampKey, { count: number; startedTick: number }> = {
+  strikes: { count: 0, startedTick: -LAMP_ZOOM_TICKS },
+  balls: { count: 0, startedTick: -LAMP_ZOOM_TICKS },
+  outs: { count: 0, startedTick: -LAMP_ZOOM_TICKS },
+}
+/** 틱이 거꾸로 가면 타석이 새로 열린 것이라 기억을 버린다 */
+let lastHudTick = -1
+
+/** 지금 배율 z (1 이면 보통 그리기와 같다). 틱으로 세니 한 틱에 두 번 그려도 같은 값이다 */
+function lampScaleAt(key: LampKey, count: number, tick: number): number {
+  const remembered = lampZoom[key]
+  if (remembered.count !== count) {
+    lampZoom[key] = { count, startedTick: tick }
+    return LAMP_ZOOM_TICKS
+  }
+  const scale = LAMP_ZOOM_TICKS - (tick - remembered.startedTick)
+  return Math.max(1, Math.min(LAMP_ZOOM_TICKS, scale))
+}
+
 const INNING_BOX = { x: 15, y: 8, width: 10 }
 const SCORE_DIGITS_START = 20
 const SCORE_LETTER_SPACING = -3
 const BOTTOM_ROW_SCORE_OFFSET_Y = 3
 const INNING_DIGITS_START = 0
 
-export function drawHud(context: CanvasRenderingContext2D, hud: HudState): void {
+/** `tick` = 타석이 열린 뒤 흐른 틱. 새 램프 확대 연출이 이걸로 z 를 센다 */
+export function drawHud(context: CanvasRenderingContext2D, hud: HudState, tick: number): void {
+  if (tick < lastHudTick) {
+    for (const lamp of LAMPS) lampZoom[lamp.key] = { count: 0, startedTick: tick - LAMP_ZOOM_TICKS }
+  }
+  lastHudTick = tick
+
   context.fillStyle = ORIGINAL_COLORS.black
   context.fillRect(5, 5, 82, 50)
   context.fillStyle = ORIGINAL_COLORS.boardFill
@@ -78,13 +118,41 @@ export function drawHud(context: CanvasRenderingContext2D, hud: HudState): void 
 
   for (const lamp of LAMPS) {
     const image = sprite(PART(lamp.part))
+    const count = hud[lamp.key]
+    const scale = lampScaleAt(lamp.key, count, tick)
     if (image === null) continue
-    for (let index = 0; index < hud[lamp.key]; index += 1) {
-      context.drawImage(image, lamp.x + index * LAMP_STEP, lamp.y)
+    for (let index = 0; index < count; index += 1) {
+      const x = lamp.x + index * LAMP_STEP
+      // 가장 새 램프만 배율 z 로 그린다. z == 1 이면 보통 그리기와 같은 자리·크기다
+      if (index !== count - 1 || scale <= 1) {
+        context.drawImage(image, x, lamp.y)
+        continue
+      }
+      drawZoomedLamp(context, image, x, lamp.y, scale)
     }
   }
 
   drawNumber(context, hud.inning, INNING_BOX.x + INNING_BOX.width, INNING_BOX.y, INNING_DIGITS_START)
+}
+
+/** 정수 배 확대 — 자리 `(x − (z−1)·w/2, y − (z−1)·h/2)`, 크기 `w·z × h·z` (0x944b5) */
+function drawZoomedLamp(
+  context: CanvasRenderingContext2D,
+  image: HTMLImageElement,
+  x: number,
+  y: number,
+  scale: number,
+): void {
+  const wasSmoothing = context.imageSmoothingEnabled
+  context.imageSmoothingEnabled = false
+  context.drawImage(
+    image,
+    x - ((scale - 1) * image.width) / 2,
+    y - ((scale - 1) * image.height) / 2,
+    image.width * scale,
+    image.height * scale,
+  )
+  context.imageSmoothingEnabled = wasSmoothing
 }
 
 function drawTeamRow(

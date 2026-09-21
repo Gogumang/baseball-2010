@@ -26,11 +26,26 @@ describe('titlePoseAt — 원본 main_title 프레임 순서', () => {
     expect(pose.isSettled).toBe(true)
   })
 
-  it('끝난 뒤 TOUCH SCREEN 은 켜졌다 꺼졌다 한다', () => {
-    const 켜짐 = titlePoseAt(프레임(16)).isPromptVisible
-    const 꺼짐 = titlePoseAt(프레임(24)).isPromptVisible
-    expect(켜짐).toBe(true)
-    expect(꺼짐).toBe(false)
+  /**
+   * 예전 테스트는 8프레임마다 켜고 끄는 TOUCH SCREEN 을 못박고 있었다.
+   * 이 빌드는 TOUCH SCREEN(애니 2)을 쓰지 않고 **애니 1 의 PRESS ANY KEY** 를 돌린다
+   * (F-4·4-1 확정): 프레임 13(2틱 안 보임) → 16(1틱 흐림) → 17(4틱 밝음) → 16(1틱 흐림).
+   */
+  it('끝난 뒤 PRESS ANY KEY 가 8틱 주기로 안보임2·흐림1·밝음4·흐림1 을 돈다', () => {
+    const 주기 = [0, 1, 2, 3, 4, 5, 6, 7].map((tick) => titlePoseAt(프레임(16 + tick)).promptPhase)
+
+    expect(주기).toEqual(['hidden', 'hidden', 'dim', 'bright', 'bright', 'bright', 'bright', 'dim'])
+    expect(titlePoseAt(프레임(16 + 8)).promptPhase).toBe('hidden')
+  })
+
+  /**
+   * 예전에는 전체이용가를 인트로 **중에만** (0,5) 에 그렸다.
+   * 원본 0x2cbac 은 저작권·판 번호·전체이용가를 인트로가 끝난 뒤에만 지나간다.
+   */
+  it('인트로 중에는 저작권·판 번호·전체이용가를 그리지 않는다', () => {
+    expect(titlePoseAt(프레임(2)).isSettled).toBe(false)
+    expect(titlePoseAt(프레임(15)).isSettled).toBe(false)
+    expect(titlePoseAt(프레임(16)).isSettled).toBe(true)
   })
 
   it('음수 시간은 첫 프레임으로 본다', () => {

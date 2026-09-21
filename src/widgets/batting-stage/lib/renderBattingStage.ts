@@ -67,7 +67,8 @@ export function renderBattingStage(
     drawBall(context, scene.pitch, scene.frame)
   }
   if (scene.hud !== null) {
-    drawHud(context, scene.hud)
+    // 틱을 넘기는 까닭 = 새 램프 확대 연출(0x37828)이 5틱 동안 배율을 줄인다
+    drawHud(context, scene.hud, scene.tick)
     // 전광판과 별개로 원본이 타석 중에 그리는 작은 지도 (0x395f4) — 루상 주자가 여기 보인다
     drawFieldMap(context, scene.hud.bases)
   }

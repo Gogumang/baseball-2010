@@ -6,7 +6,7 @@ import type { GameSettings } from '@/entities/settings/model/gameSettings'
 import { SETTINGS_TEXT } from '@/shared/config/settingsMenu'
 import {
   FIRST_MENU_ROW, MENU_ROW, OK_BUTTON, PANEL, ROW_COUNT, ROW_ICON_IMAGES,
-  SOUND_BARS, SPEED_MARKS, TITLE, VALUE_ROW, VIBRATION, rowTopOf,
+  SOUND_BARS, SPEED_MARKS, TITLE, VALUE_ROW, VIBRATION, bottomAlignOffset, rowTopOf,
 } from '@/pages/settings/lib/settingsLayout'
 import * as styles from '@/pages/settings/ui/SettingsScreen.css'
 
@@ -132,15 +132,26 @@ export function SettingsScreen({ settings, hasSavedCareer, onChange, onResetCare
                 <img className={styles.sprite} alt=""
                   src={imageSrc(SLT_FRAME, VALUE_ROW.arrowImage)}
                   style={{ left: VALUE_ROW.rightArrow.x, top: top + VALUE_ROW.rightArrow.dy, transform: 'scaleX(-1)' }} />
+                {/*
+                  소리 막대·속도 꺾쇠는 **아래 맞춤**이다 (P6 5절 확정).
+                  그림이 position:absolute 라 `alignSelf:'end'` 는 아무 일도 하지 않았다 —
+                  원본 식대로 `y + (h최대 − h)` 를 직접 더한다.
+                */}
                 {index === 0 && Array.from({ length: settings.soundLevel }, (_unused, k) => (
                   <img key={k} className={styles.sprite} alt=""
                     src={imageSrc(SLT_FRAME, SOUND_BARS.firstImage + k)}
-                    style={{ left: SOUND_BARS.x + k * (12 + SOUND_BARS.gap), top: top + SOUND_BARS.dy, alignSelf: 'end' }} />
+                    style={{
+                      left: SOUND_BARS.x + k * (SOUND_BARS.sizes[Math.min(k, SOUND_BARS.sizes.length - 1)].width + SOUND_BARS.gap),
+                      top: top + SOUND_BARS.dy + bottomAlignOffset(SOUND_BARS.sizes, k),
+                    }} />
                 ))}
                 {index === 1 && Array.from({ length: settings.speedLevel + 1 }, (_unused, k) => (
                   <img key={k} className={styles.sprite} alt=""
                     src={imageSrc(SLT_FRAME, SPEED_MARKS.firstImage + k)}
-                    style={{ left: SPEED_MARKS.x + k * 12, top: top + SPEED_MARKS.dy }} />
+                    style={{
+                      left: SPEED_MARKS.x + k * SPEED_MARKS.step,
+                      top: top + SPEED_MARKS.dy + bottomAlignOffset(SPEED_MARKS.sizes, k),
+                    }} />
                 ))}
                 {index === 2 && (
                   <>

@@ -67,7 +67,10 @@ export function ManagementScreen(props: ManagementScreenProps) {
       {menu.playingMenuId !== null && (
         <div className={styles.trainingPopup}>
           <TrainingScene presentation={TRAINING_PRESENTATION_OF[menu.playingMenuId] ?? null}
-            caption={`${menu.playingMenuId}훈련`} onFinished={menu.finishTraining} />
+            caption={`${menu.playingMenuId}훈련`}
+            // 장타형은 동작표가 따로다 (0xd4a18·0xd4a6c — F-6). 0 만 타격형이고 그 밖은 장타형이다
+            battingTypeIndex={career.battingTypeIndex}
+            onFinished={menu.finishTraining} />
         </div>
       )}
       <CommandBar slots={slots} cursor={menu.cursor} bounce={menu.bounce} slideUpdates={menu.slideUpdates}
