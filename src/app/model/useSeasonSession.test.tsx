@@ -5,6 +5,7 @@ import { useSeasonSession } from '@/app/model/useSeasonSession'
 import { SEASON_GAME_COUNT } from '@/entities/season-mode/model/seasonRecord'
 import { SEASON_SCENE_STATE } from '@/entities/season-mode/model/seasonStateMachine'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
+import type { TeamGameSummary } from '@/features/play-team-game/model/teamGameFlow'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 
 /** 시즌 모드 한 판을 잇는 훅 (원본 장면 0x105) — 저장·장면 전환만 본다 */
@@ -21,6 +22,22 @@ function 메모리저장(): JsonStorePort {
 
 const 띄우기 = (store: JsonStorePort = 메모리저장()) =>
   renderHook(() => useSeasonSession(store, createSeededRandom(20100901)))
+
+/** 팀 경기가 끝나고 오는 요약 — 정산에 쓰는 칸만 채운다 */
+const 요약 = (overrides: Partial<TeamGameSummary> = {}): TeamGameSummary => ({
+  result: '승',
+  won: true,
+  ourScore: 5,
+  opponentScore: 3,
+  ourTeamId: 0,
+  opponentTeamId: 1,
+  inningsPlayed: 9,
+  pitching: { hitsAllowed: 6, walksAllowed: 2, outsRecorded: 27, runsAllowed: 3, allowedBaserunner: true },
+  leaguePlateAppearances: [],
+  popularityCompleteGame: null,
+  reputationCompleteGame: null,
+  ...overrides,
+})
 
 describe('시즌 세션', () => {
   it('저장이 없으면 팀 고르기부터다 (0xca)', () => {
@@ -53,11 +70,26 @@ describe('시즌 세션', () => {
     expect(둘째판.result.current.scene).toBe(SEASON_SCENE_STATE.관리메뉴)
   })
 
-  it('경기를 치르면 경기 수가 오르고 관중수입 창으로 간다 (0xe9)', () => {
+  it('다음경기를 고르면 **팀 경기 화면**으로 간다 — 옵션이 커리어에서 채워진다', () => {
     const { result } = 띄우기()
     act(() => result.current.actions.chooseTeam(0))
 
     act(() => result.current.actions.playNextGame())
+
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.경기직전)
+    // 시즌모드 = 원본 게임 모드 2 (능력치 보정 마스크 0x306 에 든다)
+    expect(result.current.gameOptions?.mode).toBe(2)
+    expect(result.current.gameOptions?.ourTeamId).toBe(0)
+    // 경기 수는 아직 오르지 않는다 — 경기가 끝나야 센다
+    expect(result.current.state?.record.games).toBe(0)
+  })
+
+  it('경기가 끝나면 경기 수가 오르고 관중수입 창으로 간다 (0xe9)', () => {
+    const { result } = 띄우기()
+    act(() => result.current.actions.chooseTeam(0))
+    act(() => result.current.actions.playNextGame())
+
+    act(() => result.current.actions.finishGame(요약()))
 
     expect(result.current.state?.record.games).toBe(1)
     expect(result.current.scene).toBe(SEASON_SCENE_STATE.관중수입)
@@ -69,6 +101,7 @@ describe('시즌 세션', () => {
     const { result } = 띄우기()
     act(() => result.current.actions.chooseTeam(0))
     act(() => result.current.actions.playNextGame())
+    act(() => result.current.actions.finishGame(요약()))
 
     // 1경기째 뒤 → 홀수라 관리 메뉴가 안 열리고 다음경기로
     act(() => result.current.actions.confirmIncome(result.current.state!.record))

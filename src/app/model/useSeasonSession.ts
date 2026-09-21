@@ -17,16 +17,19 @@ import type { SeasonTeamRoster } from '@/entities/season-mode/model/playerRecrui
 import { EMPTY_LEAGUE, rankingOf } from '@/entities/league/model/league'
 import type { League } from '@/entities/league/model/league'
 import { recordLeagueResult } from '@/entities/league/model/league'
-import { playLeagueDay, simulateLeagueGame } from '@/entities/league/model/leagueDay'
+import { playLeagueDay } from '@/entities/league/model/leagueDay'
 import { finishRegularSeason } from '@/entities/league/model/seasonEnd'
 import { playCpuSeriesGame } from '@/entities/league/model/postseasonPlay'
 import type { PostseasonSeries } from '@/entities/league/model/league'
-import { EMPTY_LEAGUE_PLAYER_STATS } from '@/entities/league/model/leaguePlayerStats'
+import { EMPTY_LEAGUE_PLAYER_STATS, recordLeaguePlateAppearances } from '@/entities/league/model/leaguePlayerStats'
 import type { LeaguePlayerStats } from '@/entities/league/model/leaguePlayerStats'
 import { startNextYear } from '@/entities/season-mode/model/seasonRecord'
 import { SEASON_END_CHAIN } from '@/entities/season-mode/model/seasonStateMachine'
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { TEAMS } from '@/shared/config/original/teams'
+import type { TeamGameOptions, TeamGameSummary } from '@/features/play-team-game/model/teamGameFlow'
+import { FULL_PLAY_SETTINGS } from '@/features/play-team-game/model/matchSettings'
+import { PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
 import { createNationalCup } from '@/entities/national-cup/model/nationalCup'
 import { advanceNationalCupDay, playCpuNationalCupGame } from '@/entities/national-cup/model/nationalCupPlay'
@@ -67,6 +70,8 @@ export interface SeasonSession {
   readonly series: PostseasonSeries | null
   /** 정규시즌 순위 (1위부터 팀 번호). 시즌이 끝나야 채워진다 */
   readonly ranking: readonly number[]
+  /** 지금 치를 팀 경기의 옵션. 경기 화면이 아니면 null */
+  readonly gameOptions: TeamGameOptions | null
   /** 진행 중인 국가대항전. 없으면 null (원본 L+0xa8~ 칸) */
   readonly cup: NationalCup | null
   readonly notice: string
@@ -87,6 +92,8 @@ export interface SeasonActions {
   readonly runTraining: (slot: number) => void
   /** 시즌 외출 한 번 — 굴리고 적용한다 (연출 0xe3 → 결과 0xc81c) */
   readonly runOuting: (place: number) => void
+  /** 팀 경기가 끝났다 — 요약으로 하루를 정산하고 관중수입(0xe9)으로 간다 */
+  readonly finishGame: (summary: TeamGameSummary) => void
   /** 시즌 끝 사슬의 다음 칸으로 (포스트시즌시작 → 시상 셋 → 정규시즌순위 → 결산) */
   readonly nextSeasonEndStep: () => void
   /** 결산을 닫았다 — 국가대항전 연차면 대회, 아니면 새 해 (afterKoreanSeries) */
@@ -135,6 +142,10 @@ const EMPTY_ROSTER: SeasonTeamRoster = { pitchers: [], batters: [] }
 const POSTSEASON_GAME_LIMIT = 40
 /** SR+0xb7 = 0xf 는 "우승팀 미정" 이다 (P4 1a) */
 const NO_CHAMPION = 0xf
+/** 시즌모드 = 원본 게임 모드 2 (능력치 보정 마스크 0x306 에 든다) */
+const SEASON_GAME_MODE = 2
+/** 코치 칸 SR+0x185 가 시즌 레코드에 아직 없다 — 없음(−1)으로 둔다 */
+const NO_COACH = -1
 
 export function useSeasonSession(store: JsonStorePort, random: RandomPort): SeasonSession {
   const loaded = useRef<SeasonSave | null>(null)
@@ -147,6 +158,7 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
       : enterSeasonScene(save.state.record, { hasSeasonSave: true }),
   )
   const [notice, setNotice] = useState('')
+  const [gameOptions, setGameOptions] = useState<TeamGameOptions | null>(null)
 
   const commit = useCallback(
     (next: SeasonSave) => {
@@ -201,57 +213,79 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
     if (save === null) return
     const { record } = save.state
     const opponent = seasonOpponentOf(record)
-    // 홈/원정은 원본이 0xb7844 로 정하는데 어느 쪽이 홈인지 문서에 없다 — 번호가 작은 쪽을 먼저 공격시킨다 (추정)
-    const matchup = record.teamId < opponent
-      ? { away: record.teamId, home: opponent }
-      : { away: opponent, home: record.teamId }
-    const score = simulateLeagueGame(matchup, random)
-    const myRuns = matchup.away === record.teamId ? score.awayRuns : score.homeRuns
-    const opponentRuns = matchup.away === record.teamId ? score.homeRuns : score.awayRuns
-    // ⚠️ 0xb69c8 — 동점이면 먼저 공격한 쪽이 이긴 것으로 본다 (원본 그대로)
-    const won = myRuns > opponentRuns || (myRuns === opponentRuns && matchup.away === record.teamId)
-
-    const afterMyGame = won
-      ? recordLeagueResult(save.league, record.teamId, opponent)
-      : recordLeagueResult(save.league, opponent, record.teamId)
-    // 같은 날 나머지 네 경기 (내 경기는 건너뛴다)
-    const day = playLeagueDay(
-      afterMyGame,
-      record.games,
-      record.teamId,
-      random,
-      save.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS,
-    )
-
-    const evaluation = evaluateSeasonGame(save.state.record, {
-      myRuns,
-      opponentRuns,
-      won,
-      // 웹판 자동 경기에는 내 투수가 없어 완투 등급을 매길 수 없다 — 늘 null(없음)이다
-      popularityCompleteGame: null,
-      reputationCompleteGame: null,
+    setGameOptions({
+      // 시즌모드 = 원본 게임 모드 2
+      mode: SEASON_GAME_MODE,
+      ourTeamId: record.teamId,
       opponentTeamId: opponent,
+      // ⚠️ 홈/원정은 원본이 0xb7844(날짜/9 홀짝 + 22일 이후 반전, R1)로 정하는데 그 함수가
+      //    웹 entities/league 에 없다. 지금은 늘 후공으로 둔다 — 그 함수가 생기면 여기서 고른다
+      playerSide: PLAYER_SIDE_LAST_BAT,
+      // 경기진행 설정 화면(0x5ffcc)이 아직 없어 "모든 이닝 직접 플레이" 로 둔다
+      settings: FULL_PLAY_SETTINGS,
+      season: { illness: record.illness, morale: save.state.teamMorale, coach: NO_COACH },
+      teamAbilities: save.state.teamAbilities,
     })
-    const evaluated = applySeasonGameEvaluation(save.state, evaluation)
+    setScene(SEASON_SCENE_STATE.경기직전)
+  }, [save])
 
-    commit({
-      ...save,
-      league: day.league,
-      playerStats: day.playerStats,
-      state: {
-        ...evaluated,
-        record: {
-          ...evaluated.record,
-          games: evaluated.record.games + 1,
-          // 경기를 치르면 이번 주기의 트레이닝·외출 표시를 지운다 (0x4f158)
-          acted: false,
-          aimVisionGames: Math.max(0, evaluated.record.aimVisionGames - 1),
-          phase: SEASON_PHASE.경기끝,
+  /**
+   * 경기가 끝났다 — 원본 차례 그대로 정산한다:
+   * 내 경기를 전적에 넣고, 같은 날 나머지 네 경기를 돌리고(0xc2a48 — 승패 뒤집힘 버그 포함),
+   * 선수 기록표에 **양 팀 타석**을 쌓고(0xa8024), 평가(0xa719c)를 얹은 뒤 관중수입(0xe9)으로 간다.
+   */
+  const finishGame = useCallback(
+    (summary: TeamGameSummary) => {
+      if (save === null) return
+      const { record } = save.state
+      const opponent = summary.opponentTeamId
+
+      const afterMyGame = summary.won
+        ? recordLeagueResult(save.league, record.teamId, opponent)
+        : recordLeagueResult(save.league, opponent, record.teamId)
+      const day = playLeagueDay(
+        afterMyGame,
+        record.games,
+        record.teamId,
+        random,
+        recordLeaguePlateAppearances(
+          save.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS,
+          summary.leaguePlateAppearances,
+        ),
+      )
+
+      const evaluation = evaluateSeasonGame(record, {
+        myRuns: summary.ourScore,
+        opponentRuns: summary.opponentScore,
+        won: summary.won,
+        // 완투 두 칸이 이제 실제로 채워진다 — 인기도와 평판이 서로 다른 이닝 칸을 본다
+        popularityCompleteGame: summary.popularityCompleteGame,
+        reputationCompleteGame: summary.reputationCompleteGame,
+        opponentTeamId: opponent,
+      })
+      const evaluated = applySeasonGameEvaluation(save.state, evaluation)
+
+      commit({
+        ...save,
+        league: day.league,
+        playerStats: day.playerStats,
+        state: {
+          ...evaluated,
+          record: {
+            ...evaluated.record,
+            games: evaluated.record.games + 1,
+            // 경기를 치르면 이번 주기의 트레이닝·외출 표시를 지운다 (0x4f158)
+            acted: false,
+            aimVisionGames: Math.max(0, evaluated.record.aimVisionGames - 1),
+            phase: SEASON_PHASE.경기끝,
+          },
         },
-      },
-    })
-    setScene(SEASON_SCENE_STATE.관중수입)
-  }, [commit, random, save])
+      })
+      setGameOptions(null)
+      setScene(SEASON_SCENE_STATE.관중수입)
+    },
+    [commit, random, save],
+  )
 
   /** 관중수입 창에서 확인 — 정산된 레코드를 받아 경기 뒤 마무리로 간다 (0xf1) */
   const confirmIncome = useCallback(
@@ -462,11 +496,12 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
     playerStats: save?.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS,
     series: save?.series ?? null,
     ranking: save?.ranking ?? [],
+    gameOptions,
     cup: save?.cup ?? null,
     notice,
     actions: {
       chooseTeam, goto, updateRecord, updateRoster, playNextGame, confirmIncome,
-      playCupGame, finishCup, runTraining, runOuting, nextSeasonEndStep, finishSeason,
+      playCupGame, finishCup, finishGame, runTraining, runOuting, nextSeasonEndStep, finishSeason,
       clearNotice, quit,
     },
   }

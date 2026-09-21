@@ -15,6 +15,7 @@ import { applySeasonReward } from '@/entities/season-mode/model/seasonRewards'
 import type { PostseasonSeries } from '@/entities/league/model/league'
 import { TEAMS } from '@/shared/config/original/teams'
 import { NationalCupScreen } from '@/pages/national-cup/ui/NationalCupScreen'
+import { TeamGameScreen } from '@/pages/team-game/ui/TeamGameScreen'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { seasonRanksOf } from '@/app/model/useSeasonSession'
 import type { SeasonSession } from '@/app/model/useSeasonSession'
@@ -37,7 +38,7 @@ interface SeasonRouteProps {
  * 조용히 아무것도 안 하는 것보다 낫다.
  */
 export function SeasonRoute({ session, random, onExit }: SeasonRouteProps) {
-  const { state, scene, league, roster, playerStats, series, cup, notice, actions } = session
+  const { state, scene, league, roster, playerStats, series, cup, gameOptions, notice, actions } = session
 
   const ranks = useMemo(
     () => (state === null ? { myRank: 0, opponentRank: 0 } : seasonRanksOf(league, state.record)),
@@ -238,6 +239,18 @@ export function SeasonRoute({ session, random, onExit }: SeasonRouteProps) {
         teamMorale={state.teamMorale}
         input={ranks}
         onConfirm={(settlement) => actions.confirmIncome(settlement.record)}
+      />
+    )
+  }
+
+  // 경기 — 사람이 팀을 조작한다 (모드 2)
+  if (scene === SEASON_SCENE_STATE.경기직전 && gameOptions !== null) {
+    return (
+      <TeamGameScreen
+        options={gameOptions}
+        random={random}
+        onFinish={actions.finishGame}
+        onQuit={backToManagement}
       />
     )
   }
