@@ -44,7 +44,15 @@ globalStyle('body', {
   overflow: 'hidden',
 })
 
+/**
+ * 화면 한 장을 가운데에 세운다.
+ *
+ * ⚠️ `position: relative` 가 중요하다 — 화면 **위에 얹히는 덮개**(이벤트 대사창·돌발미션 창 등)는
+ * 화면과 형제로 그려지면서 `position: absolute; inset: 0` 을 쓴다. 기준점이 없으면 그 덮개가
+ * **창 전체로 퍼져** 초상화·대사가 게임 화면 밖 구석에 나온다. 실제로 그런 상태였다.
+ */
 globalStyle('#root', {
+  position: 'relative',
   height: '100%',
   display: 'flex',
   justifyContent: 'center',

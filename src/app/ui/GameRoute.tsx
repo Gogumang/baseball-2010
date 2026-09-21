@@ -5,6 +5,7 @@ import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import { GameScreen } from '@/pages/game/ui/GameScreen'
 import { LoadingTip } from '@/widgets/loading-tip/ui/LoadingTip'
 import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
+import { ScreenOverlay } from '@/shared/ui'
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
 import { pitcherAbilityOf } from '@/entities/game/model/aceOpponent'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
@@ -83,12 +84,15 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
         settings={gameSettings.settings}
         onSettingsChange={gameSettings.setSettings}
       />
+      {/* 돌발 창도 화면 위 덮개라 기둥 안에 가둔다 — 안 그러면 창 전체로 퍼진다 */}
       {burstLines !== null && (
+        <ScreenOverlay>
         <BurstMissionWindow
           lines={burstLines}
           judgement={resolution?.judgement ?? null}
           onClose={resolution !== null ? closeBurstResult : closeProposal}
         />
+        </ScreenOverlay>
       )}
     </>
   )

@@ -7,6 +7,7 @@ import { GameResultScreen } from '@/pages/game-result/ui/GameResultScreen'
 import { ManagementScreen } from '@/pages/management/ui/ManagementScreen'
 import { ShopScreen } from '@/pages/shop/ui/ShopScreen'
 import { OutingMapScreen } from '@/pages/outing-map/ui/OutingMapScreen'
+import { ScreenOverlay } from '@/shared/ui'
 import { StoryScreen } from '@/pages/story/ui/StoryScreen'
 import { RecordScreen } from '@/pages/record/ui/RecordScreen'
 import { SeasonEndScreen } from '@/pages/season-end/ui/SeasonEndScreen'
@@ -130,6 +131,8 @@ export function CareerRoutes({
       return (
         <>
           {screen.context === '관리' && management}
+          {/* 대사창은 화면 **위에 얹히는 덮개**다 — 안 감싸면 창 전체로 퍼져 구석에 그려진다 */}
+          <ScreenOverlay>
           <StoryScreen
             key={event.id}
             events={session.storyEvents}
@@ -140,6 +143,7 @@ export function CareerRoutes({
             carried={screen.carried}
             onMatch={(command, carried) => onAceMatch(command, carried, screen.context)}
           />
+          </ScreenOverlay>
         </>
       )
     }
