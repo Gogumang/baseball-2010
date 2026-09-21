@@ -91,3 +91,14 @@ describe('원본 목록 — ↑↓ 로 고른다', () => {
     for (const id of 고를수없는칸) expect(지난칸).toContain(id)
   })
 })
+
+describe('일반모드 (모드 1)', () => {
+  it('메뉴에서 고를 수 있다 — 저장이 없어 지워도 되는지 묻지 않는다', () => {
+    const 고름 = reduceMainMenu(initialMainMenu(true), { type: '모드선택', id: '일반모드' }, true)
+    expect(고름.state.selectedModeId).toBe('일반모드')
+
+    const 시작 = reduceMainMenu(고름.state, { type: '시작' }, true)
+    expect(시작.effect).toBe('일반모드')
+    expect(시작.state.isConfirmingNewGame).toBe(false)
+  })
+})

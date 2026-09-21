@@ -139,8 +139,9 @@ export function EntryRoutes({ screen, setScreen, session, gameSettings, collecti
       onContinue={session.actions.continueSaved}
       onNewGame={() => setScreen({ kind: '나리편선택' })}
       onSelectMode={(mode) => {
-        // 시즌모드는 팀을 맡는 모드라 육성 선수가 없어도 들어간다 (원본 장면 0x105)
+        // 시즌모드·일반모드는 팀을 맡는 모드라 육성 선수가 없어도 들어간다
         if (mode === '시즌모드') return setScreen({ kind: '시즌모드' })
+        if (mode === '일반모드') return setScreen({ kind: '일반모드' })
         // 홈런더비도 미션과 같은 선수 고르기 창을 쓴다 — 결과 2 = 육성 타자 · 4 = 명예 타자 (H-2 · Q2)
         if (session.career === null && session.savedCareer === null) {
           return setMissionBlocked(true)

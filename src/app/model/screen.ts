@@ -26,6 +26,11 @@ export type Screen =
   | { readonly kind: '투수편' }
   /** 시즌모드 (원본 게임 모드 2, 장면 0x105) — 안쪽 화면은 시즌 상태 기계가 정한다 */
   | { readonly kind: '시즌모드' }
+  /**
+   * 일반모드 (원본 게임 모드 1) — 준비 다섯 화면(상태 18~22)부터 경기까지 한 화면이 돈다.
+   * 저장이 없다: 한 판 치고 메인 메뉴로 돌아간다.
+   */
+  | { readonly kind: '일반모드' }
   | { readonly kind: '선수등록'; readonly teamId?: number }
   | { readonly kind: '경기' }
   | {

@@ -20,6 +20,7 @@ import { useSeasonSession } from '@/app/model/useSeasonSession'
 import { SeasonRoute } from '@/app/ui/SeasonRoute'
 import { usePitcherLeagueSession } from '@/app/model/usePitcherLeagueSession'
 import { PitcherLeagueRoute } from '@/app/ui/PitcherLeagueRoute'
+import { GeneralModeScreen } from '@/pages/general-mode'
 import { ROOKIE_BATTER_ABILITY } from '@/entities/batting/model/batter'
 
 const SETTINGS_KEY = 'compus-baseball/settings'
@@ -29,7 +30,7 @@ const SEASON_KEY = 'compus-baseball/season'
 /** 투수편 저장 — 원본도 타자편과 **다른 칸**이다 (StrMAINMENU[210]·[211] 모드 초기화가 따로 지운다) */
 const PITCHER_KEY = 'compus-baseball/pitcher-league'
 
-const ENTRY_SCREENS: readonly Screen['kind'][] = ['타이틀', '메인메뉴', '도움말', '환경설정', '스페셜', '나리편선택', '팀선택', '선수등록', '홈런더비']
+const ENTRY_SCREENS: readonly Screen['kind'][] = ['타이틀', '메인메뉴', '도움말', '환경설정', '스페셜', '나리편선택', '팀선택', '선수등록', '홈런더비', '일반모드']
 
 const MISSION_SCREENS: readonly Screen['kind'][] = [
   '마선수대결',
@@ -98,6 +99,20 @@ export function App() {
   // 시즌모드는 나만의리그 커리어와 아예 다른 저장·흐름이다 (원본 장면 0x105)
   if (screen.kind === '시즌모드') {
     return <SeasonRoute session={seasonSession} random={random} onExit={() => setScreen({ kind: '메인메뉴' })} />
+  }
+
+  // 일반모드는 저장이 없다 — 준비 다섯 화면부터 경기까지 한 화면이 돌고 메인 메뉴로 돌아간다
+  if (screen.kind === '일반모드') {
+    return (
+      <GeneralModeScreen
+        random={random}
+        openedHiddenTeamIds={collection.collection.openedHiddenIds}
+        gaugeSettingOn={gameSettings.settings.pitchControl === '게이지'}
+        // 한 판 치고 끝이라 정산할 곳이 없다 — 원본도 모드 1 은 저장에 아무것도 안 남긴다
+        onFinish={() => setScreen({ kind: '메인메뉴' })}
+        onExit={() => setScreen({ kind: '메인메뉴' })}
+      />
+    )
   }
 
   // 나만의리그 투수편은 타자편 커리어와 다른 저장·흐름이다 (원본 모드 3, 장면 0x106)
