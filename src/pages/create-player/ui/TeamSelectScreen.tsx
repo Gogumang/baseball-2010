@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Button, RawScreen } from '@/shared/ui'
+import { RawScreen } from '@/shared/ui'
 import { TEAMS } from '@/shared/config/original/teams'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
+import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
+import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import {
   ABILITY_CHART, ANCHOR_A, ANCHOR_B, GRID, LOCKED_CIRCLES, LOCKED_NAME, NAME_BAR, TAG,
   TEAM_COUNT, cellPositionOf, isTeamOpen,
@@ -13,18 +15,36 @@ import * as styles from '@/pages/create-player/ui/TeamSelectScreen.css'
 const SLT_IMAGE = './sprites/slt_frame'
 const imageSrc = (folder: string, image: number) => `${folder}/${String(image).padStart(3, '0')}.png`
 const IMG_TEXT = './sprites/img_text/frames'
-/** 격자 칸의 작은 로고 — 큰 team_logo(77×76)는 40px 칸을 넘친다. HUD 와 같은 ui/team_logo_ini(12×12) 를 쓴다 */
-const smallLogoUrlOf = (teamId: number) => `./sprites/team_logo_ini/${String(teamId).padStart(3, '0')}.png`
 /** 큰 로고는 A 자리에만 쓴다 (77×76 을 가운데 맞춤) */
 const BIG_LOGO_HALF = { width: 38, height: 38 } as const
-/** 작은 로고를 40px 칸 가운데에 놓는다 (12×12 → (40−12)/2 = 14) */
-const SMALL_LOGO_INSET = (GRID.cell - 12) / 2
+
+/**
+ * 격자 칸 바탕 — slt_frame **이미지 0** (39×38, 위아래 두 단으로 나뉜 파란 사각).
+ * 해독 노트 `P6-screens.md:127` 이 격자 객체 **+0x94 = slt_frame** 이라 적고 있다.
+ */
+const CELL_FRAME_IMAGE = 0
+/**
+ * 고른 칸 테두리 — slt_frame **이미지 1** (42×42, 속 빈 노란 사각 테두리).
+ * ⚠️ 원본 그림이 칸(40px)보다 2px 커서 사방으로 1px 씩 비어져 나온다 — 원본 그림 크기 그대로 둔다.
+ */
+const CELL_CURSOR_IMAGE = 1
+const CELL_CURSOR_SIZE = 42
+/**
+ * 칸 안 로고 — 격자 객체 **+0x9c = team_logo** (77×76) 이다 (`P6-screens.md:127`).
+ * **칸 안 로고 크기는 근사다** (0x7a571 미해독, team_logo 77×76 을 칸 39×38 에 맞춰 줄였다).
+ * 원본 그리기 합성식 0xbb91d 에 "크기 a/10" 배율이 있어 5/10 ≈ 38×38 로 보는 것이 자연스럽다.
+ */
+const CELL_LOGO_SIZE = 38
 
 const frameSrc = (folder: string, frame: number) => `${folder}/${String(frame).padStart(3, '0')}.png`
 
 interface TeamSelectScreenProps {
   /** 히든 팀(10~14) 해금 기록 — 전역 기록 +0x70+idx 자리다 */
   readonly openedHiddenIds?: readonly number[]
+  /** 머리띠 제목 — 같은 화면을 여러 모드가 빌려 쓴다 (나만의리그·시즌모드·일반모드) */
+  readonly title?: ScreenFrameTitle
+  /** 머리띠 G포인트 — 들고 있는 곳에서만 넘긴다 */
+  readonly gamePoint?: number
   readonly onSelect: (teamId: number) => void
   readonly onCancel: () => void
 }
@@ -41,7 +61,9 @@ interface TeamSelectScreenProps {
  *   - **능력치 도형** — 0x5aefd 는 인자만 읽었다(B 아래 반지름 30). 여기서는 팀 레코드의
  *     u16 네 칸을 네 축 방사형으로 그린다. 원본이 몇 축인지·눈금이 무엇인지는 아직 모른다.
  */
-export function TeamSelectScreen({ openedHiddenIds = [], onSelect, onCancel }: TeamSelectScreenProps) {
+export function TeamSelectScreen({
+  openedHiddenIds = [], title = '팀선택', gamePoint = 0, onSelect, onCancel,
+}: TeamSelectScreenProps) {
   const [cursor, setCursor] = useState(0)
 
   const team = TEAMS[cursor] ?? TEAMS[0]
@@ -77,14 +99,22 @@ export function TeamSelectScreen({ openedHiddenIds = [], onSelect, onCancel }: T
     <RawScreen>
       {/* A·B 딱지 — A 는 흰 막대(이미지 116), B 는 파란 막대(이미지 117)로 서로 다르다 */}
       {[
-        { anchor: ANCHOR_A, bar: TAG.aBarImage, barDy: TAG.aDy, textDy: TAG.aTextDy, frame: TAG.aTextFrame },
-        { anchor: ANCHOR_B, bar: TAG.bBarImage, barDy: TAG.bDy, textDy: TAG.bTextDy, frame: TAG.bTextFrame },
-      ].map(({ anchor, bar, barDy, textDy, frame }) => (
+        { anchor: ANCHOR_A, bar: TAG.aBarImage, barDy: TAG.aDy, textDy: TAG.aTextDy, frame: TAG.aTextFrame, onWhiteBar: true },
+        { anchor: ANCHOR_B, bar: TAG.bBarImage, barDy: TAG.bDy, textDy: TAG.bTextDy, frame: TAG.bTextFrame, onWhiteBar: false },
+      ].map(({ anchor, bar, barDy, textDy, frame, onWhiteBar }) => (
         <span key={frame}>
           <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, bar)}
             style={{ left: anchor.x + TAG.dx, top: anchor.y + barDy }} />
           <img className={styles.layer} alt="" src={frameSrc(IMG_TEXT, frame)}
-            style={{ left: anchor.x + TAG.dx, top: anchor.y + textDy, width: TAG.barWidth, objectFit: 'none' }} />
+            style={{
+              left: anchor.x + TAG.dx, top: anchor.y + textDy, width: TAG.barWidth, objectFit: 'none',
+              // ⚠️ **근사다 — .mpl 팔레트가 아직 이식되지 않아서 넣은 임시 처리.**
+              // 막대 116 은 흰색(231,227,231)이고 img_text 157 "PLAYER" 도 흰색(239,239,239)이라
+              // 그대로 겹치면 흰 글씨가 흰 막대에 묻혀 안 보인다. 원본은 img_text.mpl 팔레트를 갈아
+              // 끼워 글자 색을 바꾸므로, 팔레트를 이식하면 이 줄은 지워야 한다.
+              // 파란 막대(117)에 얹는 B 딱지는 원본 그대로 흰 글씨다.
+              ...(onWhiteBar ? { filter: 'invert(1)' } : {}),
+            }} />
         </span>
       ))}
 
@@ -126,20 +156,35 @@ export function TeamSelectScreen({ openedHiddenIds = [], onSelect, onCancel }: T
             type="button"
             aria-label={open ? entry.name : LOCKED_NAME}
             aria-pressed={index === cursor}
-            className={`${styles.cell} ${index === cursor ? styles.cellSelected : ''}`}
+            className={styles.cell}
             style={{ left: x, top: y, width: GRID.cell, height: GRID.cell }}
             onClick={() => (open ? onSelect(index) : setCursor(index))}
             onMouseEnter={() => setCursor(index)}
           >
+            {/* 칸 바탕(slt_frame 0) 먼저 깔고 그 위에 로고·물음표를 얹는다 */}
+            <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, CELL_FRAME_IMAGE)}
+              style={{ left: 0, top: 0 }} />
             {open
-              ? <img className={styles.layer} alt="" src={smallLogoUrlOf(entry.id)}
-                  style={{ left: SMALL_LOGO_INSET, top: SMALL_LOGO_INSET }} />
+              ? <img className={styles.layer} alt="" src={entry.logoUrl}
+                  style={{
+                    left: (GRID.cell - CELL_LOGO_SIZE) / 2,
+                    top: (GRID.cell - CELL_LOGO_SIZE) / 2,
+                    width: CELL_LOGO_SIZE,
+                    height: CELL_LOGO_SIZE,
+                  }} />
               : <span className={styles.centeredText} style={{ left: 0, top: 14, width: GRID.cell }}>?</span>}
+            {index === cursor && (
+              <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, CELL_CURSOR_IMAGE)}
+                style={{ left: (GRID.cell - CELL_CURSOR_SIZE) / 2, top: (GRID.cell - CELL_CURSOR_SIZE) / 2 }} />
+            )}
           </button>
         )
       })}
 
-      <Button onClick={onCancel}>되돌아가기</Button>
+      {/* 머리띠(제목)·바닥띠 — 원본 상태 101 그리기 0x15de4 도 이 둘을 얹는다 (P6 1-1 · R9 206 · F 489) */}
+      {/* 바닥띠의 "되돌아가기" 가 원본의 되돌아가기 소프트키다 (P6 1-1) — 따로 둔 버튼은 없앴다:
+          흐름 배치라 스테이지 왼쪽 위 (0,0) 에 그려져 머리띠 제목을 가리고 있었다 */}
+      <ScreenFrame title={title} gamePoint={gamePoint} onBack={onCancel} />
     </RawScreen>
   )
 }

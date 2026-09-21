@@ -49,7 +49,7 @@ export function ScreenFrame({ title, gamePoint, onBack }: ScreenFrameProps) {
       })}
       {FOOTER_TILE_XS.map((x) => <img key={x} className={styles.layer} style={{ left: x, top: bottom - 20 }} src={frameImage(20)} alt="" />)}
       <img className={styles.layer} style={{ left: FOOTER_CORNER_X, top: bottom - 20 }} src={frameImage(19)} alt="" />
-      <button type="button" aria-label="뒤로" className={styles.backButton} style={{ left: BACK_ICON_X, top: bottom - 16 }} onClick={onBack}>
+      <button type="button" aria-label="되돌아가기" className={styles.backButton} style={{ left: BACK_ICON_X, top: bottom - 16 }} onClick={onBack}>
         <img src={frameImage(21)} alt="" />
       </button>
     </>

@@ -76,6 +76,48 @@ describe('팀 고르기', () => {
     expect(onSelect).toHaveBeenCalledWith(0)
   })
 
+  it('칸마다 파란 바탕 그림(slt_frame 0)을 깐다', () => {
+    const { container } = 띄우기()
+
+    // jsdom 에는 canvas 도 vanilla-extract 도 없어 CSS 로는 못 본다 — src 로 센다
+    expect(container.querySelectorAll('img[src$="slt_frame/000.png"]')).toHaveLength(TEAM_COUNT)
+  })
+
+  it('칸 안 로고는 큰 team_logo 를 칸에 맞게 줄여 그린다 (근사)', () => {
+    const { container } = 띄우기()
+
+    const 로고 = container.querySelector<HTMLImageElement>(`img[src$="team_logo/003.png"]`)
+
+    expect(로고).toBeTruthy()
+    expect(로고?.style.width).toBe('38px')
+  })
+
+  it('고른 칸에만 노란 테두리 그림(slt_frame 1)이 붙는다', () => {
+    const { container } = 띄우기()
+
+    expect(container.querySelectorAll('img[src$="slt_frame/001.png"]')).toHaveLength(1)
+
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+
+    const 테두리들 = container.querySelectorAll('img[src$="slt_frame/001.png"]')
+    expect(테두리들).toHaveLength(1)
+    // 커서가 1번 칸으로 옮겨 갔다 — 42px 그림이라 40px 칸에서 1px 씩 비어져 나온다
+    expect((테두리들[0].parentElement as HTMLElement).style.left).toBe(`${cellPositionOf(1).x}px`)
+  })
+
+  it('머리띠 제목은 prop 으로 갈아 끼운다', () => {
+    // 나만의리그타자편 = game_frame 9(제목) + 10(타자편)
+    const { container } = 띄우기({ title: '나만의리그타자편' })
+
+    expect(container.querySelector('img[src$="game_frame/009.png"]')).toBeTruthy()
+    expect(container.querySelector('img[src$="game_frame/010.png"]')).toBeTruthy()
+
+    cleanup()
+    // 기본값은 팀선택 = game_frame 5
+    const 기본 = 띄우기()
+    expect(기본.container.querySelector('img[src$="game_frame/005.png"]')).toBeTruthy()
+  })
+
   it('아래 키는 한 줄(5칸)씩 내려간다', () => {
     const onSelect = vi.fn()
     띄우기({ onSelect })

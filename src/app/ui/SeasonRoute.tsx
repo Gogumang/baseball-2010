@@ -59,7 +59,7 @@ export function SeasonRoute({ session, random, gameSettings, onExit }: SeasonRou
 
   // 저장이 없으면 팀 고르기부터다 (0xca). 팀 고르기 화면은 선수 등록 쪽 것을 그대로 쓴다
   if (state === null || scene === SEASON_SCENE_STATE.팀고르기) {
-    return <TeamSelectScreen onSelect={actions.chooseTeam} onCancel={onExit} />
+    return <TeamSelectScreen title="시즌모드" onSelect={actions.chooseTeam} onCancel={onExit} />
   }
 
   const backToManagement = () => actions.goto(SEASON_SCENE_STATE.관리메뉴)

@@ -15,19 +15,19 @@ export const lockedCircle = style({
   pointerEvents: 'none',
 })
 
-/** 격자 칸 — 칸 40px 은 확정, 테두리·바탕은 칸 그리기(0x7a571)가 미해독이라 근사다 */
+/**
+ * 격자 칸 — 칸 40px 은 확정. 바탕·커서 테두리는 이제 원본 그림(slt_frame 0·1)을 쓰므로
+ * 여기서는 칠하지 않는다. 그림이 칸(40px)보다 커도 잘리지 않게 넘침을 살려 둔다.
+ */
 export const cell = style({
   position: 'absolute',
   boxSizing: 'border-box',
   padding: 0,
-  border: '1px solid transparent',
+  border: 'none',
   background: 'transparent',
+  overflow: 'visible',
   cursor: 'pointer',
   imageRendering: 'pixelated',
-})
-
-export const cellSelected = style({
-  borderColor: ORIGINAL_COLORS.highlightYellow,
 })
 
 /** 팀 이름·딱지 글자 — 막대 안 가운데 */

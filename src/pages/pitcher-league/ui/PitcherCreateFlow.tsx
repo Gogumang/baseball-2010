@@ -24,7 +24,7 @@ export function PitcherCreateFlow({ openedHiddenIds = [], onCreate, onCancel }: 
 
   if (teamId === null) {
     return (
-      <TeamSelectScreen openedHiddenIds={openedHiddenIds} onSelect={setTeamId} onCancel={onCancel} />
+      <TeamSelectScreen title="나만의리그투수편" openedHiddenIds={openedHiddenIds} onSelect={setTeamId} onCancel={onCancel} />
     )
   }
   return (

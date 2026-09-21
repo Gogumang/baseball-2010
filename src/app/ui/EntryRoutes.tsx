@@ -83,6 +83,7 @@ export function EntryRoutes({ screen, setScreen, session, gameSettings, collecti
   if (screen.kind === '팀선택') {
     return (
       <TeamSelectScreen
+        title="나만의리그타자편"
         openedHiddenIds={session.savedCareer?.openedHiddenIds}
         onSelect={(teamId) => setScreen({ kind: '선수등록', teamId })}
         onCancel={() => setScreen({ kind: '메인메뉴' })}

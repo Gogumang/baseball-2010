@@ -89,6 +89,7 @@ export function GeneralModeScreen(props: GeneralModeScreenProps) {
     case GENERAL_MODE_STEP.유저팀:
       return (
         <TeamSelectScreen
+          title="팀선택"
           openedHiddenIds={openedHiddenTeamIds ?? []}
           onSelect={actions.selectUserTeam}
           onCancel={onExit}
@@ -97,6 +98,7 @@ export function GeneralModeScreen(props: GeneralModeScreenProps) {
     case GENERAL_MODE_STEP.AI팀:
       return (
         <TeamSelectScreen
+          title="팀선택"
           openedHiddenIds={openedHiddenTeamIds ?? []}
           // ⚠️ 유저 팀과 같은 팀인지 보지 않는다 — 원본 그대로다 (R4 3a 상태 19)
           onSelect={actions.selectAiTeam}
