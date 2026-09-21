@@ -102,6 +102,12 @@ export interface SeasonRecord {
   readonly stadiumOwned: readonly boolean[]
   /** SR+0x1b8 / +0x1b9 / +0x1ba — 지금 장착한 관중석 · 전광판 · 잔디 칸 */
   readonly stadiumEquipped: readonly number[]
+  /**
+   * SR+0x1bc — **엔딩까지 본 다 끝난 시즌** 표시 (R13 2절 — 문서 등급 **유력**).
+   * 10년차 엔딩 그리기 `0x8bd8` 이 켜고 저장한다. 서 있으면 진입 분기(0xcb)가
+   * phase 를 보기 전에 무조건 관리 메뉴로 보내고, 연초 목표 상태(0xd4)도 막는다.
+   */
+  readonly endingSeen: boolean
 }
 
 /** 한 해 정규시즌 경기 수 (StrHOWTO[10] "1년에 총 45경기") */
@@ -216,6 +222,8 @@ export function startNewSeason(teamId: number, name: string): SeasonState {
       lastAttendance: 0,
       stadiumOwned: falses(STADIUM_OWNED_SIZE),
       stadiumEquipped: zeros(STADIUM_EQUIPPED_SIZE),
+      // SR+0x1bc — 새 시즌은 `0x204e0` 초기화 값(0)으로 남는다
+      endingSeen: false,
     },
     teamMorale: MORALE_LIMIT,
     teamAbilities: initialTeamAbilities(),

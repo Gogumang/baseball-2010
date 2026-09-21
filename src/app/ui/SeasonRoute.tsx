@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import {
   GameIncomeScreen, PlayerRecruitScreen, PostseasonStartScreen, RegularSeasonRankScreen,
-  SeasonGoalsScreen, SeasonItemMenuScreen, SeasonManagementScreen, SeasonMvpScreen,
+  SeasonEndingScreen, SeasonGoalsScreen, SeasonItemMenuScreen, SeasonManagementScreen, SeasonMvpScreen,
   SeasonOutingScreen, SeasonSummaryScreen, SeasonTeamMenuScreen, SeasonTitleAwardScreen,
   SeasonTrainingScreen, StadiumShopScreen, SEASON_MVP_LEADER_KINDS,
   seasonAwardRewardOf, seasonMvpResultEventId, seasonTitleResultEventId,
@@ -12,7 +12,7 @@ import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { TeamSelectScreen } from '@/pages/create-player/ui/TeamSelectScreen'
 import { MessageBox, RawScreen } from '@/shared/ui'
 import { SEASON_SCENE_STATE, seasonOpponentOf } from '@/entities/season-mode/model/seasonStateMachine'
-import { applySeasonReward } from '@/entities/season-mode/model/seasonRewards'
+import { applySeasonReward, judgeSeasonEnding } from '@/entities/season-mode/model/seasonRewards'
 import type { PostseasonSeries } from '@/entities/league/model/league'
 import { TEAMS } from '@/shared/config/original/teams'
 import { NationalCupScreen } from '@/pages/national-cup/ui/NationalCupScreen'
@@ -37,9 +37,8 @@ interface SeasonRouteProps {
  * 어느 화면 다음에 무엇이 오는지는 `entities/season-mode` 의 상태 기계가 정하고,
  * 여기서는 그 장면 번호에 맞는 화면을 고르기만 한다.
  *
- * **아직 화면이 없는 장면**(트레이닝 0xcf · 외출 0xd1 · 아이템 0xd0 · 트레이드 0xe4 ·
- * 선수단/코치채용 0xd7 · 포스트시즌·시상·결산·엔딩)은 알림을 띄우고 관리 메뉴로 되돌린다 —
- * 조용히 아무것도 안 하는 것보다 낫다.
+ * **아직 화면이 없는 장면**(트레이드 0xe4 · 선수단/코치채용 0xd7 · 연초 목표 0xd4 등)은
+ * 알림을 띄우고 관리 메뉴로 되돌린다 — 조용히 아무것도 안 하는 것보다 낫다.
  */
 export function SeasonRoute({ session, random, gameSettings, onExit }: SeasonRouteProps) {
   const { state, scene, league, roster, playerStats, series, cup, gameOptions, notice, actions } = session
@@ -88,6 +87,10 @@ export function SeasonRoute({ session, random, gameSettings, onExit }: SeasonRou
         record={state.record}
         teamMorale={state.teamMorale}
         mode={scene === SEASON_SCENE_STATE.구장관리 ? '구장관리' : '상점'}
+        // 히든 칸 해금 플래그 `app[0xe0 + 종류×4 + (칸−4)]` (S3 7절) — 전역 저장 칸이라
+        // 시즌 레코드가 아니라 세션이 들고 있다. 안 넘기면 히든이 영영 안 열린다
+        isHiddenOpen={(unlockId) => session.openedStadiumIds.includes(unlockId)}
+        onUnlock={actions.openStadiumItems}
         onChange={actions.updateRecord}
         onBack={scene === SEASON_SCENE_STATE.구장관리 ? backToTeamMenu : backToManagement}
       />
@@ -239,6 +242,22 @@ export function SeasonRoute({ session, random, gameSettings, onExit }: SeasonRou
         onLeagueFirstAward={actions.awardLeagueFirst}
         onContinuePostseason={actions.continuePostseason}
         onFinish={actions.finishSeason}
+      />
+    )
+  }
+
+  if (scene === SEASON_SCENE_STATE.엔딩) {
+    return (
+      <SeasonEndingScreen
+        // 엔딩 번호는 레코드에서 다시 판정한다 (0xa3084). 여기 올 때 레코드가 그대로라 값이 같다.
+        // ⚠️ 원본은 판정값 e 를 `저장+0xa0+e` 에 남기지만 그 전역 저장 칸이 웹에 없다 — **근사다**.
+        // 손댄 세이브 등으로 10년차가 아닌 채 phase 6 이면 0(비 인기 구단)으로 둔다
+        endingIndex={judgeSeasonEnding(state.record) ?? 0}
+        onEndingSeen={actions.markEndingSeen}
+        // 엔딩·보너스까지 보고 나면 **메인 메뉴로 나간다**. 0xf5 의 키 처리 `0x6b3c` 가
+        // 보너스를 준 뒤 어디로 가는지는 문서(P4 1a·J 4-8 · P6 4b)에 없어 확인하지 못했다 —
+        // 시즌은 여기서 끝이고 SR+0x1bc 가 섰으니 다시 들어와도 관리 메뉴다. **근사다**
+        onFinish={onExit}
       />
     )
   }

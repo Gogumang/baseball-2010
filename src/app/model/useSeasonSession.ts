@@ -1,6 +1,8 @@
 import { useCallback, useRef, useState } from 'react'
 import type { SeasonRecord, SeasonState } from '@/entities/season-mode/model/seasonRecord'
-import { SEASON_GAME_COUNT, normalizeSeasonState, startNewSeason } from '@/entities/season-mode/model/seasonRecord'
+import {
+  SEASON_GAME_COUNT, isFinalYear, normalizeSeasonState, startNewSeason,
+} from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonSceneState } from '@/entities/season-mode/model/seasonStateMachine'
 import {
   SEASON_PHASE,
@@ -37,7 +39,7 @@ import { createNationalCup } from '@/entities/national-cup/model/nationalCup'
 import { advanceNationalCupDay } from '@/entities/national-cup/model/nationalCupPlay'
 import { isSeasonNationalCupYear } from '@/entities/national-cup/model/nationalCupFlow'
 import type { NationalCupFinish } from '@/entities/national-cup/model/nationalCupFlow'
-import { applySeasonReward, GAME_POINT_LIMIT } from '@/entities/season-mode/model/seasonRewards'
+import { applySeasonReward, GAME_POINT_LIMIT, judgeSeasonEnding } from '@/entities/season-mode/model/seasonRewards'
 import type { LeagueFirstAward } from '@/entities/season-mode/model/seasonRewards'
 import type { SeasonAwardReward } from '@/widgets/season/lib/seasonAwardEvents'
 import {
@@ -84,6 +86,14 @@ export interface SeasonSession {
   readonly leagueFirstAwardedBits: number
   /** 전역 저장 +0x64 — 시즌 쪽 G포인트 */
   readonly gamePoints: number
+  /**
+   * 열린 구장 히든 아이템 id (관중석 13·14·15 · 전광판 16·17·18).
+   * 원본 자리는 **전역 저장** `app[0xe0 + 종류×4 + (칸−4)]` 다 (S3 7절) — 시즌 레코드가 아니라
+   * 앱 저장에 있어 시즌을 새로 시작해도 남는다. 웹에는 그 전역 저장 객체가 없어
+   * `leagueFirstAwardedBits`(+0x145) · `gamePoints`(+0x64) 와 **같은 자리**(세션 상태)에 둔다.
+   * ⚠️ 그래서 웹에서는 새로 고치면 사라진다 — 위 두 칸과 같은 한계다.
+   */
+  readonly openedStadiumIds: readonly number[]
   /** 진행 중인 국가대항전. 없으면 null (원본 L+0xa8~ 칸) */
   readonly cup: NationalCup | null
   readonly notice: string
@@ -117,6 +127,10 @@ export interface SeasonActions {
   readonly awardLeagueFirst: (award: LeagueFirstAward) => void
   /** 경기 중 자동진행 값 등 G 를 쓴다 (모자라면 화면이 먼저 막는다) */
   readonly spendGamePoint: (cost: number) => void
+  /** 구장 히든 아이템을 연다 (0x81d0 컬렉터 해금 — `app[0xe0 + …] = 1`) */
+  readonly openStadiumItems: (unlockIds: readonly number[]) => void
+  /** 엔딩을 봤다 — SR+0x1bc = 1 로 켜고 저장한다 (0x8bd8, R13 2절) */
+  readonly markEndingSeen: () => void
   /** 결산을 닫았다 — 국가대항전 연차면 대회, 아니면 새 해 (afterKoreanSeries) */
   readonly finishSeason: () => void
   readonly clearNotice: () => void
@@ -200,7 +214,11 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
   const [scene, setScene] = useState<SeasonSceneState>(() =>
     save === null
       ? SEASON_SCENE_STATE.팀고르기
-      : enterSeasonScene(save.state.record, { hasSeasonSave: true }),
+      // SR+0x1bc 가 서 있으면(엔딩까지 본 시즌) 진입 분기가 phase 를 보기 전에 관리 메뉴로 보낸다
+      : enterSeasonScene(save.state.record, {
+        hasSeasonSave: true,
+        forceManagementMenu: save.state.record.endingSeen,
+      }),
   )
   const [notice, setNotice] = useState('')
   const [gameOptions, setGameOptions] = useState<TeamGameOptions | null>(null)
@@ -210,6 +228,8 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
   const [leagueFirstAwardedBits, setLeagueFirstAwardedBits] = useState(0)
   /** 전역 저장 +0x64 — 시즌 쪽 G포인트 */
   const [gamePoints, setGamePoints] = useState(0)
+  /** 전역 저장 app+0xe0 — 열린 구장 히든 아이템 id (S3 7절). 위 두 칸과 같은 자리에 둔다 */
+  const [openedStadiumIds, setOpenedStadiumIds] = useState<readonly number[]>([])
 
   const commit = useCallback(
     (next: SeasonSave) => {
@@ -610,7 +630,17 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
 
   /**
    * 결산을 닫았다 (`0x87b4`) — 연차 idx 가 **짝수**면 국가대항전, 홀수면 곧장 새 해다.
-   * 새 해는 `startNextYear`(0x6e0c)가 연차를 올리고 CPU 9팀 능력치를 +30 한다.
+   * 새 해 `0x6e0c` 는 머리에서 먼저 **10년차 엔딩 판정 `0xa3084`** 를 본다 (P4 1c):
+   * ```
+   * e = 0xa3084(SR)                 ; 연차 idx 가 9(isFinalYear)가 아니면 −1
+   * e ≥ 0: 저장+0xa0+e = 1, phase = 6, 저장, 이벤트 500 → 0xd3 → 0xf5(엔딩)
+   * e < 0: 연차 +1 · 리그 초기화 · CPU 9팀 +30 → 0xc9
+   * ```
+   * 예전에는 이 머리 분기가 통째로 빠져 있어 **10년차 엔딩에 영영 닿지 못했다**.
+   *
+   * ⚠️ 안 옮긴 것 — `저장+0xa0+e = 1`(본 엔딩 종류 표시)는 **전역 저장** 칸이라 웹에 자리가 없다.
+   * 이벤트 500("시즌모드 10년은 모두 종료") 재생(0xd3)도 시즌 이벤트 흐름이 아직 없어 건너뛰고
+   * 곧장 0xf5 로 간다 — **근사다**.
    */
   const finishSeason = useCallback(() => {
     if (save === null) return
@@ -622,6 +652,12 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
         cup: createNationalCup(),
       })
       return setScene(SEASON_SCENE_STATE.국가대항전)
+    }
+    // 0x6e0c 머리 — 마지막 해(연차 idx 9)면 새 해 대신 **엔딩**이다.
+    // `judgeSeasonEnding` 이 0~4 를 돌려주는 해가 곧 `isFinalYear` 인 해라 둘은 같은 조건이다.
+    if (isFinalYear(record) && judgeSeasonEnding(record) !== null) {
+      commit({ ...save, state: { ...save.state, record: { ...record, phase: SEASON_PHASE.엔딩 } } })
+      return setScene(SEASON_SCENE_STATE.엔딩)
     }
     // 새 해로 넘어가며 리그 전적·선수 성적을 비운다 (정규시즌 표는 해마다 새로 센다)
     commit({
@@ -638,6 +674,24 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
   const spendGamePoint = useCallback((cost: number) => {
     setGamePoints((points) => Math.max(0, points - cost))
   }, [])
+
+  /**
+   * 구장 히든 아이템 해금 (`0x81d0` → `0x9f6cc(app, 종류, k, 1)`).
+   * 원본 자리가 전역 저장이라 시즌 세이브가 아니라 세션 칸에 쌓는다 (위 `openedStadiumIds` 주석).
+   * ⚠️ 안 옮긴 것 — 해금 알림 `0x62368` (StrCOMMON[139] + [141] "시즌모드에서 사용가능합니다").
+   */
+  const openStadiumItems = useCallback((unlockIds: readonly number[]) => {
+    setOpenedStadiumIds((opened) => {
+      const added = unlockIds.filter((id) => !opened.includes(id))
+      return added.length === 0 ? opened : [...opened, ...added]
+    })
+  }, [])
+
+  /** 엔딩을 그리기 시작하면 SR+0x1bc 를 켜고 저장한다 (0x8bd8 안 0x8cf0~0x8d00) */
+  const markEndingSeen = useCallback(() => {
+    if (save === null || save.state.record.endingSeen) return
+    commit({ ...save, state: { ...save.state, record: { ...save.state.record, endingSeen: true } } })
+  }, [commit, save])
 
   const goto = useCallback((next: SeasonSceneState) => setScene(next), [])
   const clearNotice = useCallback(() => setNotice(''), [])
@@ -656,13 +710,14 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
     leagueFirstAwardedBits,
     // ⚠️ **테스트용** — `?무한G` 면 보여 주는 값만 최대로 올린다 (저장은 그대로다)
     gamePoints: isInfiniteGamePointOn() ? GAME_POINT_LIMIT : gamePoints,
+    openedStadiumIds,
     cup: save?.cup ?? null,
     notice,
     actions: {
       chooseTeam, goto, updateRecord, updateRoster, playNextGame, confirmIncome,
       playCupGame, finishCup, finishGame, continuePostseason,
       runTraining, runOuting, nextSeasonEndStep, awardLeagueFirst, spendGamePoint, finishSeason,
-      clearNotice, quit,
+      openStadiumItems, markEndingSeen, clearNotice, quit,
     },
   }
 }

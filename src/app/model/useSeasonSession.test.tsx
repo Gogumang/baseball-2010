@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { useSeasonSession } from '@/app/model/useSeasonSession'
 import { SEASON_GAME_COUNT } from '@/entities/season-mode/model/seasonRecord'
-import { SEASON_SCENE_STATE } from '@/entities/season-mode/model/seasonStateMachine'
+import { SEASON_PHASE, SEASON_SCENE_STATE } from '@/entities/season-mode/model/seasonStateMachine'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { TeamGameSummary } from '@/features/play-team-game/model/teamGameFlow'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
@@ -178,6 +178,18 @@ describe('시즌 관리 커맨드', () => {
   })
 })
 
+describe('구장 히든 해금 (app+0xe0)', () => {
+  it('컬렉터 해금 id 를 쌓아 둔다 — 같은 id 를 두 번 열어도 한 번만 남는다', () => {
+    const { result } = 띄우기()
+    act(() => result.current.actions.chooseTeam(0))
+
+    act(() => result.current.actions.openStadiumItems([13]))
+    act(() => result.current.actions.openStadiumItems([13, 16]))
+
+    expect(result.current.openedStadiumIds).toEqual([13, 16])
+  })
+})
+
 describe('시즌 끝 사슬', () => {
   it('국가대항전이 아닌 연차는 정규시즌이 끝나면 **포스트시즌 시작(0xee)** 으로 간다', () => {
     const { result } = 띄우기()
@@ -225,6 +237,38 @@ describe('시즌 끝 사슬', () => {
     expect(result.current.state?.record.yearIndex).toBe(2)
     expect(result.current.scene).toBe(SEASON_SCENE_STATE.관리메뉴)
     expect(result.current.league.wins.every((wins) => wins === 0)).toBe(true)
+  })
+
+  it('**마지막 해(연차 idx 9)** 는 결산을 닫으면 새 해가 아니라 엔딩(0xf5)으로 간다 (0x6e0c 머리)', () => {
+    const { result } = 띄우기()
+    act(() => result.current.actions.chooseTeam(0))
+    act(() => result.current.actions.confirmIncome({
+      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 9,
+    }))
+
+    act(() => result.current.actions.finishSeason())
+
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.엔딩)
+    // phase 6 으로 저장해 두어야 다시 들어와도 엔딩으로 온다 (진입 분기 0xcb)
+    expect(result.current.state?.record.phase).toBe(SEASON_PHASE.엔딩)
+    expect(result.current.state?.record.yearIndex).toBe(9) // 연차를 올리지 않는다
+  })
+
+  it('엔딩을 보면 SR+0x1bc 가 서고, 다시 띄우면 관리 메뉴로 온다 (0x8bd8 → 0xcb)', () => {
+    const store = 메모리저장()
+    const 첫판 = 띄우기(store)
+    act(() => 첫판.result.current.actions.chooseTeam(0))
+    act(() => 첫판.result.current.actions.confirmIncome({
+      ...첫판.result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 9,
+    }))
+    act(() => 첫판.result.current.actions.finishSeason())
+
+    act(() => 첫판.result.current.actions.markEndingSeen())
+
+    expect(첫판.result.current.state?.record.endingSeen).toBe(true)
+    const 둘째판 = 띄우기(store)
+    expect(둘째판.result.current.state?.record.phase).toBe(SEASON_PHASE.엔딩)
+    expect(둘째판.result.current.scene).toBe(SEASON_SCENE_STATE.관리메뉴)
   })
 
   it('짝수 연차는 결산 뒤 국가대항전이 열린다', () => {
