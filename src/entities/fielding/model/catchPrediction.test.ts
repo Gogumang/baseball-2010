@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   actionStartTickOf,
+  approachedDistanceOf,
   backupPointOf,
   catchKindsAt,
   catchRadiusOf,
@@ -39,6 +40,35 @@ describe('포구 반경 — 내야 500 · 외야 300 (0xb1644)', () => {
     expect(catchKindsAt(창({ slot: 8, ball: { x: 20_301, y: 800, z: 20_000 } }))).not.toContain(
       CATCH_KIND.LOW,
     )
+  })
+})
+
+describe('직선 근사 거리 — `정지면 d −= 속도 × n` (0xb12d0)', () => {
+  it('달린 틱만큼 거리가 줄어 반경 밖 공도 닿는다', () => {
+    const 멀리 = { x: 22_000, y: 800, z: 20_000 } // 2000 떨어진 공
+
+    expect(catchKindsAt(창({ ball: 멀리 }))).not.toContain(CATCH_KIND.LOW)
+    // 220 × 7 = 1540 을 빼면 460 → 내야 반경 500 안이다
+    expect(catchKindsAt(창({ ball: 멀리, runTicks: 7, speed: 220 }))).toContain(CATCH_KIND.LOW)
+  })
+
+  it('빼기만 하고 0 으로 자르지 않는다 — 음수 거리도 원본 그대로다', () => {
+    expect(approachedDistanceOf(창({ runTicks: 5, speed: 220 }))).toBe(-1100)
+  })
+
+  it('그래서 슬라이딩 창(1999 < d ≤ 3000)이 실제로 열린다', () => {
+    const 슬라이딩창 = 창({
+      slot: 8,
+      fielder: { x: 20_000, y: 0, z: 18_000 },
+      ball: { x: 20_000, y: 1_200, z: 20_500 }, // 거리 2500, 공이 야수보다 홈 쪽
+      tick: 20,
+      landingTick: 21,
+      slideUnlocked: true,
+    })
+
+    expect(catchKindsAt(슬라이딩창)).toContain(CATCH_KIND.SLIDE)
+    // 야수가 뛴 만큼 빼서 2000 이하가 되면 창이 닫힌다 (너무 가까우면 날아서 잡을 일이 없다)
+    expect(catchKindsAt({ ...슬라이딩창, runTicks: 3, speed: 220 })).not.toContain(CATCH_KIND.SLIDE)
   })
 })
 

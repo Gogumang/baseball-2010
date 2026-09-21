@@ -240,17 +240,27 @@ describe('사람 타석은 수비 시뮬레이션을 돌린다 — CPU 간이 �
     })
   })
 
-  it('2아웃 땅볼로 타자주자가 죽으면 3루 주자 득점이 무효가 된다 (S2 2-5)', () => {
-    const 땅볼아웃 = { kind: '아웃', detail: '땅볼아웃' } as const
+  /**
+   * S2 2-5: **타자주자가 아웃이 되어 그 플레이로 3아웃이 되면 주자 득점이 0 이다.**
+   *
+   * ⚠️ 예전에는 대조군으로 **땅볼**을 썼다. 포구 반경(0xb12d0)이 되살아나면서 평범한 주자(주력 500)는
+   * 무사 땅볼에서도 홈 송구에 잡히게 되어, 0아웃 쪽이 0 점이 된 것이 **규칙 때문이 아니라 송구 때문**이라
+   * 대조가 성립하지 않았다. 득점이 실제로 나는 **깊은 뜬공**(희생플라이)으로 바꿨다.
+   */
+  it('2아웃에 타자주자가 죽으면 3루 주자 득점이 무효가 된다 (S2 2-5)', () => {
+    const 깊은뜬공: BattedBallPattern = [90, 900, 1500, 0]
+    const 뜬공아웃 = { kind: '아웃', detail: '뜬공아웃' } as const
     const 무사 = 내타석({ first: false, second: false, third: true }, 0)
     const 이사 = 내타석({ first: false, second: false, third: true }, 2)
 
     expect(
-      applyPlayerOutcome(무사, 땅볼아웃, createSeededRandom(3)).lastDefensePlay!.advance.runsScored,
+      applyPlayerOutcome(무사, 뜬공아웃, createSeededRandom(3), { pattern: 깊은뜬공 })
+        .lastDefensePlay!.advance.runsScored,
     ).toBe(1)
     // 2아웃이면 같은 타구인데도 점수가 0 이다
     expect(
-      applyPlayerOutcome(이사, 땅볼아웃, createSeededRandom(3)).lastDefensePlay!.advance.runsScored,
+      applyPlayerOutcome(이사, 뜬공아웃, createSeededRandom(3), { pattern: 깊은뜬공 })
+        .lastDefensePlay!.advance.runsScored,
     ).toBe(0)
   })
 

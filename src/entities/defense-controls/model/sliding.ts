@@ -64,8 +64,12 @@ export function canSlide(runner: SlidingRunner): boolean {
 export interface SlideKeyInput {
   /** 플레이 종류 (플레이+0x118). 2 = 볼넷 밀어내기 · 3 = (원본이 함께 막는 번호) */
   readonly playKind: number
-  /** 0xb68dc — 경기가 끝났다 */
-  readonly isGameOver: boolean
+  /**
+   * 0xb68dc — **이 타구가 파울인가** (CORRECTIONS.md 2절 확정: 결과 7 = 파울,
+   * 2스트라이크 번트면 11 = 아웃). 앞서 "경기 끝남" 으로 읽었던 것이 틀렸다.
+   * → **원본은 파울 타구에서 슬라이딩 키가 안 먹는다.**
+   */
+  readonly isFoulBattedBall: boolean
   readonly runners: readonly SlidingRunner[]
   /** 0x6e575 — 효과음이 아직 울리는 중 */
   readonly isSoundPlaying: boolean
@@ -84,7 +88,7 @@ export interface SlideKeyResult {
  * 사람 키(OK → 메시지 0x585) 슬라이딩 — 0x518da.
  *
  * 원본 순서를 그대로 지킨다:
- *   플레이 종류 2·3 → 끝 / 경기 끝 → 끝 / 걸어 나가는 주자가 하나라도 있으면 → 끝
+ *   플레이 종류 2·3 → 끝 / **파울 타구(0xb68dc)** → 끝 / 걸어 나가는 주자가 하나라도 있으면 → 끝
  *   → 0xa96ec 로 **여기서 실제 슬라이딩이 걸리고**
  *   → 그 뒤에야 소리 재생 중·+0x31c 잠금을 본다.
  * 즉 **두 번째 누름에서도 슬라이딩은 또 걸리고 효과음만 한 번**이다 — 버그로 보여도 원본 그대로 옮긴다.
@@ -93,7 +97,7 @@ export function slideOnKey(input: SlideKeyInput): SlideKeyResult {
   const 없음: SlideKeyResult = { slidRunnerIndexes: [], playsSound: false }
 
   if (input.playKind === 2 || input.playKind === 3) return 없음
-  if (input.isGameOver) return 없음
+  if (input.isFoulBattedBall) return 없음
   if (input.runners.some((runner) => runner.isLeavingField)) return 없음
 
   const slidRunnerIndexes = input.runners

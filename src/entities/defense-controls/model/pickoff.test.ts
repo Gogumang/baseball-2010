@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   pickoffCoverFielderOf,
+  pickoffPlayForKey,
   pickoffPlayOf,
   PICKOFF_PLAY_KIND,
   RUNNER_LEAD_DISTANCE,
@@ -35,5 +36,31 @@ describe('견제 — 원본 0x50f28 · 0xb28be', () => {
 
   it('주자 리드 폭이라는 값이 원본에 없다 — 주자는 루 좌표에 정확히 선다', () => {
     expect(RUNNER_LEAD_DISTANCE).toBe(0)
+  })
+})
+
+describe('견제 키 한 번 → 견제 플레이 (0x53548 → 0x50f28)', () => {
+  const 만루 = () => true
+  const 빈루 = () => false
+
+  it("'3'/'1'/'7' 이 1·2·3루 견제다 — 방향키 갈래는 원본에 없다", () => {
+    expect(pickoffPlayForKey('3', 만루)?.targetBase).toBe(1)
+    expect(pickoffPlayForKey('1', 만루)?.targetBase).toBe(2)
+    expect(pickoffPlayForKey('7', 만루)?.targetBase).toBe(3)
+    expect(pickoffPlayForKey('ArrowUp', 만루)).toBeNull()
+    expect(pickoffPlayForKey('2', 만루)).toBeNull()
+  })
+
+  it('그 루에 주자가 없으면 키를 먹고 아무 일도 없다', () => {
+    expect(pickoffPlayForKey('3', 빈루)).toBeNull()
+  })
+
+  it('나온 플레이는 종류 4 · 상태 0x17 이고 커버는 루 번호 + 1 이다', () => {
+    expect(pickoffPlayForKey('1', 만루)).toEqual({
+      playKind: PICKOFF_PLAY_KIND,
+      targetBase: 2,
+      coverFielderSlot: 3,
+      nextGameState: 0x17,
+    })
   })
 })

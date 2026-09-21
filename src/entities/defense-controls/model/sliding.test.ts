@@ -55,7 +55,7 @@ describe('슬라이딩 구간 — 원본 0xa9690 (71 ≤ 진행률 ≤ 94)', () 
 describe('OK 키 슬라이딩 — 원본 0x518da', () => {
   const 기본 = {
     playKind: 1,
-    isGameOver: false,
+    isFoulBattedBall: false,
     isSoundPlaying: false,
     hasPlayedSoundThisPlay: false,
   }
@@ -69,11 +69,14 @@ describe('OK 키 슬라이딩 — 원본 0x518da', () => {
     expect(result.playsSound).toBe(true)
   })
 
-  it('플레이 종류 2·3(볼넷 밀어내기 계열)과 경기 끝에서는 아무 일도 없다', () => {
+  // 앞서 0xb68dc 를 "경기 끝남" 으로 읽고 그 이름을 못박고 있었다.
+  // CORRECTIONS.md 2절이 **"이 타구가 파울인가"**(결과 7 = 파울, 2스트라이크 번트면 11 = 아웃)로
+  // 뒤집었으므로 이름과 뜻을 바로잡는다 — 막히는 상황이 "경기 끝" 이 아니라 **파울 타구**다.
+  it('플레이 종류 2·3(볼넷 밀어내기 계열)과 파울 타구에서는 아무 일도 없다', () => {
     const runners = [주자()]
     expect(slideOnKey({ ...기본, playKind: 2, runners }).slidRunnerIndexes).toEqual([])
     expect(slideOnKey({ ...기본, playKind: 3, runners }).slidRunnerIndexes).toEqual([])
-    expect(slideOnKey({ ...기본, isGameOver: true, runners }).slidRunnerIndexes).toEqual([])
+    expect(slideOnKey({ ...기본, isFoulBattedBall: true, runners }).slidRunnerIndexes).toEqual([])
   })
 
   it('아웃돼 걸어 나가는 주자가 하나라도 있으면 통째로 막힌다', () => {

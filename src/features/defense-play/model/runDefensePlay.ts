@@ -1,18 +1,48 @@
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
+import type { RandomPort } from '@/shared/api/random/randomPort'
+import {
+  inPlayCommandOf,
+  type ControlSide,
+  type RunnerTarget,
+} from '@/entities/defense-controls/model/defenseKeys'
+import {
+  canFireLaser,
+  isLaserWindowOpen,
+  judgeLaserInput,
+  rollLaserThrow,
+  SIXTH_SENSE_SKILL_ID,
+  HOME_RUN_DERBY_MODE,
+  BATTER_CAREER_MODE,
+  LASER_WINDOW_FIRST_TICK,
+} from '@/entities/defense-controls/model/laserThrow'
+import {
+  slideOnKey,
+  SLIDING_SPEED_BONUS,
+  type SlidingRunner,
+} from '@/entities/defense-controls/model/sliding'
 import {
   autoAdvanceDecisions,
   requiredBasesOnBounce,
   requiredBasesOnFlyCatch,
 } from '@/entities/fielding/model/autoAdvance'
+import {
+  MINIMUM_THROW_SPEED,
+  NO_THROW_ERROR,
+  rollFumble,
+  rollSpecialDefense,
+  rollThrowError,
+} from '@/entities/fielding/model/fieldingErrors'
 import type { BattedBallTrajectory } from '@/entities/fielding/model/catchPrediction'
 import {
   BASE_DEFAULT_FIELDER,
   basePosition,
   isSamePoint,
+  progressPercent,
   runnerSpeedOf,
   stepToward,
+  ticksToReach,
   type WorldPoint,
 } from '@/entities/fielding/model/fieldGeometry'
 import {
@@ -34,7 +64,7 @@ import {
   type HeldRunState,
 } from '@/entities/fielding/model/heldRuns'
 import { defenseArrivalTicks, secondBaseCoverSlot } from '@/entities/fielding/model/throwArrival'
-import { readyTicksOf } from '@/entities/fielding/model/throwPlan'
+import { effectiveThrowSpeedOf, readyTicksOf } from '@/entities/fielding/model/throwPlan'
 import { chooseThrowTargetBase } from '@/entities/fielding/model/throwTargetBase'
 import { EMPTY_BASES, type AdvanceResult, type BaseState } from '@/entities/game/model/baseState'
 import { forecastCatch } from '@/features/defense-play/model/catchForecast'
@@ -90,6 +120,41 @@ export interface DefensePlayInput {
    */
   readonly isUncatchable?: boolean
   readonly maximumTicks?: number
+  /**
+   * 난수. **주면 원본 확률 굴림이 돈다** — 필살수비(0x66b30/0x66be4) · 펌블(0xb41d0) ·
+   * 악송구(0xa1828) · 레이저 송구(0x66a8c). 안 주면 하나도 굴리지 않아 지금까지와 똑같이 결정론이다.
+   */
+  readonly random?: RandomPort
+  /** 수비 9명의 스킬 번호 (칸 순서). 21(초감각)이면 필살수비·레이저 확률 +3%p */
+  readonly fielderSkillIds?: readonly (readonly number[])[]
+  /** 전역 모드 0x1552d10 — 7(홈런더비)이면 필살수비를 안 굴리고, 4(나리 타자편)면 기준이 절반이다 */
+  readonly gameMode?: number
+  /** 사람 조작 (I-controls 0절 상태 0x17 표). 안 주면 전부 자동이다 */
+  readonly controls?: DefensePlayControls
+}
+
+/** 이번 틱에 눌린 키 한 개 — 경기 장면 `this+0x38` 에 해당한다 */
+export interface DefenseKeyPress {
+  /** `KeyboardEvent.key` 그대로 (`defenseKeys.ts` 가 원본 키로 옮긴다) */
+  readonly key: string
+  /**
+   * 누르고 있는 중인가. 레이저 확정은 **새로 누른 키만** 받는다
+   * (0x4e858 `this+0x6c & 0xf == 0` = 키 반복 계수 0).
+   */
+  readonly isRepeat?: boolean
+}
+
+/**
+ * 사람 조작 — 화면이 틱마다 "이번 틱에 눌린 키" 를 넘겨 준다.
+ * 원본은 경기 장면이 매 틱 키를 담고 조작 객체 0x536bc 가 상태 0x17 갈래(0x53420)로 가른다.
+ */
+export interface DefensePlayControls {
+  /** 조작 객체 `[+0xc]` — 0 공격(주루) / 1 수비(송구·레이저) */
+  readonly side: ControlSide
+  /** 이 틱에 눌린 키. 없으면 null */
+  keyAt(tick: number): DefenseKeyPress | null
+  /** 귀루 셋('3'/'1'/'7')의 게이트 `[+0x1c] & 0xf0 == 0` (뜻 미해결). 기본 true */
+  readonly canReturn?: boolean
 }
 
 export interface DefensePlayResult {
@@ -111,6 +176,14 @@ export interface DefensePlayResult {
   readonly throwArrivalTick: number
   /** 보류됐다가 3아웃으로 날아간 득점 수 (state[0]) */
   readonly voidedRuns: number
+  /** 펌블(에러)이 났는가 — 0xb41d0 굴림 (`random` 을 줘야 돈다) */
+  readonly fumbled: boolean
+  /** 악송구가 났는가 — 0xa1828 굴림 */
+  readonly errantThrow: boolean
+  /** 필살수비 창이 열렸는가 — 0x66b30(점프) / 0x66be4(슬라이딩). 열려도 보통 포구가 되면 안 쓰인다 */
+  readonly specialDefense: { readonly jumpUnlocked: boolean; readonly slideUnlocked: boolean }
+  /** 사람이 반짝임 창 안에 키를 넣어 레이저 송구가 나갔는가 (플레이+0x1f4) */
+  readonly laserThrow: boolean
   /** 사람이 읽을 진행 기록 — 테스트가 "왜 그렇게 됐나" 를 확인할 때 쓴다 */
   readonly log: readonly string[]
 }
@@ -204,15 +277,33 @@ export function runDefensePlay(input: DefensePlayInput): DefensePlayResult {
   // ── 포구 예보 ──
   // 뜬 채로 잡히는 타구는 낙구 전까지만, 굴러간 타구는 낙구 **다음** 틱부터 본다.
   // (낙구 틱에 걸리면 `chooseChaser` 우선순위 1~5 = "낙구 전 포구" 가 되어 잡힌 공이 된다)
-  const forecast = forecastCatch(
-    trajectory,
-    fielders,
-    onTheFly
-      ? { from: 0, to: trajectory.landingTick }
-      : { from: trajectory.landingTick + 1, to: Number.POSITIVE_INFINITY },
-  )
+  const window = onTheFly
+    ? { from: 0, to: trajectory.landingTick }
+    : { from: trajectory.landingTick + 1, to: Number.POSITIVE_INFINITY }
+  let forecast = forecastCatch(trajectory, fielders, window)
+
+  // ── 필살수비 굴림 (메시지 0x11 = 타구가 떠난 순간, I-controls 2c) ──
+  // A(점프, +0x1f5) 를 먼저 굴리고 실패했을 때만 B(슬라이딩, +0x1f6). 창을 여는 것뿐이라
+  // 보통 포구가 낙구 전에 되면 쓰이지 않는다 (고르기 우선순위 4·5 — P2 3절).
+  // 원본은 "이미 고른 추적야수" 의 칸으로 조건을 보므로 여기서도 예보를 한 번 돌린 뒤에 굴리고,
+  // 창이 열리면 예보(0xb12d0 = vt24)를 다시 만든다 — 원본도 vt24 를 여러 번 부른다.
+  const specialDefense = rollSpecialDefenseFor({
+    random: input.random,
+    ability: abilities[forecast.choice.slot] ?? DEFAULT_ABILITY,
+    skillIds: input.fielderSkillIds?.[forecast.choice.slot],
+    gameMode: input.gameMode,
+    chaserSlot: forecast.choice.slot,
+    uncatchable,
+  })
+  if (specialDefense.jumpUnlocked || specialDefense.slideUnlocked) {
+    forecast = forecastCatch(trajectory, fielders, window, {
+      jumpUnlocked: specialDefense.jumpUnlocked,
+      slideUnlocked: specialDefense.slideUnlocked,
+    })
+  }
+
   const chaserSlot = forecast.choice.slot
-  const catchTick = Math.max(0, Math.min(forecast.choice.catchTick, maximumTicks))
+  let catchTick = Math.max(0, Math.min(forecast.choice.catchTick, maximumTicks))
   const catchPoint = trajectory.pointAt(catchTick)
   const covers = assignCovers(chaserSlot, catchPoint.x > basePosition(0).x)
 
@@ -249,6 +340,17 @@ export function runDefensePlay(input: DefensePlayInput): DefensePlayResult {
   let throwArrivalTick = -1
   let throwFromSlot = NONE
   let batterOutTick = -1
+  let fumbled = false
+  let errantThrow = false
+  /** 경기+0x24 — 자동 주루. 사람이 주루 키를 누르면 0 이 된다 (0x5209e) */
+  let autoBaserunning = true
+  /** 주자관리+0x31c — 이번 플레이에서 이미 슬라이딩 효과음을 냈다 */
+  let slidingSoundPlayed = false
+  /** 경기+0x19ad(반짝임) · +0x19ae(레이저 확정) · 플레이+0x1f4(레이저 송구) */
+  let laserShining = false
+  let laserConfirmed = false
+  let laserRolled = false
+  let laserThrow = false
   const ticks: DefensePlayView[] = []
   const log: string[] = []
   const previousActions = new Map<string, { action: number; since: number }>()
@@ -264,8 +366,104 @@ export function runDefensePlay(input: DefensePlayInput): DefensePlayResult {
   for (let tick = 0; tick <= maximumTicks; tick += 1) {
     const ballOnGround = play.everHeld || tick >= trajectory.landingTick
 
+    // ── 0. 사람 조작 (상태 0x17 갈래 0x53420 — I-controls 0·2b·3b절) ──
+    const press = input.controls?.keyAt(tick) ?? null
+    if (input.controls !== undefined && press !== null) {
+      const command = inPlayCommandOf(press.key, input.controls.side, {
+        canReturn: input.controls.canReturn,
+      })
+      if (command !== null && !play.finished) {
+        if (command.kind === '송구') {
+          // 메시지 0x588 → 플레이 vt0x60 → 플레이+0x160. 자동 규칙(0xb1c90)보다 늘 앞선다
+          play = { ...play, manualThrowBase: command.target }
+          log.push(`${tick}틱 사람이 ${command.target}루로 송구 지시`)
+        } else if (command.kind === '슬라이딩') {
+          // 메시지 0x585 → 0x518da
+          const decision = slideOnKey({
+            playKind: play.kind,
+            // 인플레이 진행기는 페어 타구만 돌린다 — 파울이면 여기까지 오지 않는다
+            isFoulBattedBall: false,
+            runners: runners.map(slidingRunnerOf),
+            isSoundPlaying: false,
+            hasPlayedSoundThisPlay: slidingSoundPlayed,
+          })
+          if (decision.playsSound) slidingSoundPlayed = true
+          for (const index of decision.slidRunnerIndexes) {
+            const runner = runners[index]
+            if (runner.state.sliding) continue
+            // 슬라이딩의 이득은 딱 하나, 속도 +40 (0xa0164 · R3 3절)
+            runner.state = {
+              ...runner.state,
+              sliding: true,
+              speed: runner.state.speed + SLIDING_SPEED_BONUS,
+            }
+          }
+          if (decision.slidRunnerIndexes.length > 0) {
+            log.push(`${tick}틱 슬라이딩 — 주자 ${decision.slidRunnerIndexes.join('·')}`)
+          }
+        } else {
+          // 메시지 0x582(진루) · 0x584(귀루) → 0x5209e / 0x5222a → 0xa9b04
+          // 0x5209e 는 먼저 경기+0x24 = 0(자동 끄기), 0xa9b04 는 성공한 주자마다 다시 1 로 되돌린다.
+          // 앞뒤가 서로 밀어내는 것이 **원본 그대로**라 그 순서를 지킨다.
+          autoBaserunning = false
+          const moved = runBaserunningCommand(runners, command.kind, command.runner)
+          if (moved.length > 0) {
+            autoBaserunning = true
+            log.push(`${tick}틱 ${command.kind} — 주자 ${moved.join('·')}`)
+          }
+        }
+      }
+    }
+
+    // ── 0b. 레이저 송구 반짝임 창 (0x523bc · 0xb2648 · 0x4e858 — I-controls 2d) ──
+    if (input.controls?.side === '수비' && input.random !== undefined && !uncatchable) {
+      const ticksSinceCatch = tick - catchTick
+      const windowOpen = isLaserWindowOpen({
+        ticksSinceCatch,
+        hasChosenThrowTarget: play.manualThrowBase !== NONE,
+        isBallHeld: play.held,
+        isThrowerReady: fielders[chaserSlot].actionRemainingTicks <= 0,
+      })
+      // 굴림은 한 플레이에 한 번(this+0x19af). 창이 열리는 첫 틱(포구 10틱 전)에 굴린다
+      if (!laserRolled && windowOpen && ticksSinceCatch >= LASER_WINDOW_FIRST_TICK) {
+        laserRolled = true
+        laserShining = rollLaserThrow(
+          {
+            defenseAbility: abilities[chaserSlot] ?? DEFAULT_ABILITY,
+            skillIds: input.fielderSkillIds?.[chaserSlot] ?? [],
+          },
+          input.random,
+        )
+      }
+      const judged = judgeLaserInput({
+        isShining: laserShining,
+        isWindowOpen: windowOpen,
+        key: press?.key ?? null,
+        isRepeat: press?.isRepeat === true,
+      })
+      laserShining = judged.isShining
+      if (judged.isLaserConfirmed) laserConfirmed = true
+    }
+
     // ── 1. 포구 ──
     // 필살타법 성공 타구(비트 4)는 야수가 쥐지 않고 지나친다 — 포구 자체를 건너뛴다 (0xaf180·0xbc3)
+    if (tick === catchTick && !uncatchable && input.random !== undefined && !fumbled) {
+      // 펌블 굴림 (0xb41d0) — **움직이는 공을 잡을 때마다** 걸린다(뜬공 직접 포구 포함).
+      // 굴러와 멈춘 공을 줍는 것만 빠진다 (공 vt18 = "공이 멈췄는가", P2 3절 정정).
+      const ballIsMoving = tick < trajectory.length - 1
+      if (rollFumble(abilities[chaserSlot] ?? DEFAULT_ABILITY, ballIsMoving, input.random)) {
+        fumbled = true
+        // 야수+0xb8 = 6(놓침 동작), 야수+0xb4 = 15(동작 잠금), 공은 야수 vt78 로 **무작위 튕김**.
+        // **근사 1**: 튕김 궤적은 만들지 않는다(궤적 물리 루프는 해독 금지 구역). 같은 자리에서
+        // 동작 잠금 15틱 뒤에 다시 줍는 것으로 본다 (R3 5절 동작 0xd = `+0xb4 = 15`).
+        // **근사 2**: 원본은 뜬공을 펌블하면 공이 땅에 닿아 타자주자 표시(+0x98)가 풀려 **뜬공 아웃이
+        // 사라진다**. 여기서는 타석 결과 코드가 이미 '아웃' 이라 그것을 뒤집으면 기록과 어긋난다 —
+        // 그래서 아웃은 그대로 두고 **시간만 잃는** 것으로 옮겼다 (주자들은 그사이 더 간다).
+        catchTick = Math.min(tick + FUMBLE_LOCK_TICKS, maximumTicks)
+        play = { ...play, catchTick, actionStartTick: catchTick }
+        log.push(`${tick}틱 ${chaserSlot}번 야수 펌블 — ${catchTick}틱에 다시 줍는다`)
+      }
+    }
     if (tick === catchTick && !uncatchable) {
       fielders = fielders.map((fielder) =>
         fielder.slot === chaserSlot
@@ -313,13 +511,43 @@ export function runDefensePlay(input: DefensePlayInput): DefensePlayResult {
         })
       }
 
-      // ── 송구 목표 루 (0xafb24) ──
+      // ── 송구 목표 루 ──
+      // 사람이 방향키로 고른 목표(플레이+0x160)가 있으면 그 루가 먼저다 (0xb1c90 의 사람 가지).
+      // 안 골랐으면 CPU 점수식(0xafb24)이 고른다.
       const active = runners.filter((runner) => !runner.state.isOut && !runner.state.scored).length
-      throwBase = chooseThrowTargetBase({ ...contextAt(tick), activeRunnerCount: active })
+      throwBase =
+        play.manualThrowBase !== NONE
+          ? play.manualThrowBase
+          : chooseThrowTargetBase({ ...contextAt(tick), activeRunnerCount: active })
       if (throwBase !== NONE) {
-        throwArrivalTick = tick + defenseArrivalTicks(contextAt(tick), throwBase)
+        // 레이저 송구 — 반짝임 창 안에 새로 누른 키가 들어왔고 공을 쥐었으면 특수 송구가 나간다 (0x400bc)
+        laserThrow = canFireLaser({
+          isLaserConfirmed: laserConfirmed,
+          hasChosenThrowTarget: play.manualThrowBase !== NONE,
+          isBallHeld: true,
+          isThrowerReady: true,
+        })
+        // 악송구 굴림 (0xa1828). 레이저(특수)면 기준이 +100 = +1%p 더 위험하다
+        const error =
+          input.random === undefined
+            ? NO_THROW_ERROR
+            : rollThrowError(abilities[chaserSlot] ?? DEFAULT_ABILITY, laserThrow, input.random)
+        errantThrow = error.errant
+        let arrivalTicks = defenseArrivalTicks(contextAt(tick), throwBase)
+        if (error.errant) {
+          // 속도 보정은 공 속도에 그대로 더해진다(하한 100) → 도착 틱이 그 비율만큼 늘거나 준다.
+          // **근사**: 방향 보정(±49)은 공이 루를 벗어난다는 뜻이라 궤적을 다시 만들어야 하는데
+          // 그 물리 루프는 해독 금지 구역이다. 여기서는 "그 송구로는 아웃이 안 난다" 로만 본다.
+          const base = effectiveThrowSpeedOf(fielders[chaserSlot])
+          const errant = Math.max(MINIMUM_THROW_SPEED, base + error.speedDelta)
+          arrivalTicks = Math.max(1, Math.trunc((arrivalTicks * base) / errant))
+        }
+        throwArrivalTick = tick + arrivalTicks
         throwFromSlot = chaserSlot
-        log.push(`${tick}틱 ${throwBase}루로 송구 — ${throwArrivalTick}틱 도착`)
+        log.push(
+          `${tick}틱 ${throwBase}루로 ${laserThrow ? '레이저 ' : ''}송구 — ${throwArrivalTick}틱 도착` +
+            (error.errant ? ' (악송구)' : ''),
+        )
       }
       // 땅볼·직선타로 타자주자가 죽는 시각은 1루에 공이 닿는 때다
       if (input.outcome.kind === '아웃' && !onTheFly) {
@@ -328,17 +556,20 @@ export function runDefensePlay(input: DefensePlayInput): DefensePlayResult {
     }
 
     // ── 2. 송구 도착 — 그 루로 가던 주자가 아직 못 닿았으면 아웃 ──
+    // 악송구면 공이 루를 벗어나므로 아무도 잡히지 않는다 (위 근사)
     if (throwArrivalTick >= 0 && tick === throwArrivalTick) {
-      for (let index = runners.length - 1; index >= 1; index -= 1) {
-        const runner = runners[index]
-        if (runner.state.isOut || runner.state.scored) continue
-        if (wrapBase(runner.state.targetBase) !== wrapBase(throwBase)) continue
-        if (isAtTarget(runner.state)) continue
-        markOut(runner)
-        outs += 1
-        outsAdded += 1
-        log.push(`${tick}틱 ${index}번 주자 ${throwBase}루에서 아웃`)
-        break
+      if (!errantThrow) {
+        for (let index = runners.length - 1; index >= 1; index -= 1) {
+          const runner = runners[index]
+          if (runner.state.isOut || runner.state.scored) continue
+          if (wrapBase(runner.state.targetBase) !== wrapBase(throwBase)) continue
+          if (isAtTarget(runner.state)) continue
+          markOut(runner)
+          outs += 1
+          outsAdded += 1
+          log.push(`${tick}틱 ${index}번 주자 ${throwBase}루에서 아웃`)
+          break
+        }
       }
       play = { ...play, wantsThrow: false }
     }
@@ -353,7 +584,8 @@ export function runDefensePlay(input: DefensePlayInput): DefensePlayResult {
 
     // ── 4. 자동 추가 진루 (0xaf918) ──
     // 멈춘 주자(루에 붙은 주자·태그업 대기)까지 보려면 force 가 필요하다 — 원본 인자 그대로다.
-    if (!play.finished) {
+    // 사람이 주루 키를 눌러 경기+0x24 가 0 이 된 플레이에서는 돌지 않는다 (I-controls 3b).
+    if (!play.finished && autoBaserunning) {
       const decisions = autoAdvanceDecisions({ ...contextAt(tick), force: true })
       for (const decision of decisions) {
         const runner = runners[decision.runnerIndex]
@@ -475,8 +707,109 @@ export function runDefensePlay(input: DefensePlayInput): DefensePlayResult {
     throwBase,
     throwArrivalTick,
     voidedRuns: held.heldRuns + (held.scoreboardRuns - runsScored),
+    fumbled,
+    errantThrow,
+    specialDefense,
+    laserThrow,
     log,
   }
+}
+
+/** 펌블 뒤 동작 잠금 틱 — 야수+0xb4 = 15 (놓침 동작 0xd, R3 2-1) */
+const FUMBLE_LOCK_TICKS = 15
+
+interface SpecialDefenseRollInput {
+  readonly random?: RandomPort
+  readonly ability: number
+  readonly skillIds?: readonly number[]
+  readonly gameMode?: number
+  readonly chaserSlot: number
+  readonly uncatchable: boolean
+}
+
+/**
+ * 필살수비 굴림의 관문 (0x50faa 가지, I-controls 2c).
+ * 모드 7(홈런더비) 제외 · 공 쫓는 야수가 투수(0)·포수(1)가 아닐 것 — 나머지 조건(경기+0x13·0x19·0x1e,
+ * 담장 판정 0x36140)은 이 진행기가 도는 시점에 이미 참이다(페어 인플레이 타구만 돌린다).
+ */
+function rollSpecialDefenseFor(input: SpecialDefenseRollInput): {
+  readonly jumpUnlocked: boolean
+  readonly slideUnlocked: boolean
+} {
+  const 닫힘 = { jumpUnlocked: false, slideUnlocked: false }
+  if (input.random === undefined) return 닫힘
+  if (input.uncatchable) return 닫힘
+  if (input.gameMode === HOME_RUN_DERBY_MODE) return 닫힘
+  if (input.chaserSlot === 0 || input.chaserSlot === 1) return 닫힘
+  return rollSpecialDefense(input.ability, input.random, {
+    hasSixthSense: input.skillIds?.includes(SIXTH_SENSE_SKILL_ID) === true,
+    isBatterCareerMode: input.gameMode === BATTER_CAREER_MODE,
+  })
+}
+
+/** 주자 한 명을 슬라이딩 판정(0xa9690)이 보는 모양으로 옮긴다 */
+function slidingRunnerOf(runner: MutableRunner): SlidingRunner {
+  const target = basePosition(runner.state.targetBase)
+  return {
+    progressPercent: progressPercent(runner.state.legStart, runner.state.position, target),
+    isOut: runner.state.isOut,
+    // 아웃돼 걸어 나가는 연출(+0xba)은 이 진행기에 없다 — 죽은 주자는 그 자리에서 사라진다
+    isLeavingField: false,
+    isSliding: runner.state.sliding,
+    targetBase: runner.state.targetBase,
+    ticksToArrive: ticksToReach(runner.state.position, target, runner.state.speed),
+  }
+}
+
+/**
+ * 주루 키 한 번 — 0xa9b04(주자관리, 루, 방향).
+ * 인자는 **주자 번호**다 — 1·2·3 = 투구 때 1·2·3루에 있던 주자, −1 = 전원 (I-controls 0절).
+ * 전원이면 **진루는 1→2→3루 주자 순, 귀루는 3→2→1루 주자 순**으로 하나씩 부른다.
+ *
+ * 앞길 검사(0xa99a8)는 "가려는 루를 다른 주자가 목표로 삼고 있지 않을 것" 만 옮겼고,
+ * 뒷길 검사(0xa9924)는 **달리는 중인 주자를 출발 루로 되돌리는 것**으로 좁혔다.
+ * 원본의 나머지 조건은 문서가 **유력**으로만 적어 두어 지어내지 않는다 (I-controls 3b).
+ */
+function runBaserunningCommand(
+  runners: readonly MutableRunner[],
+  kind: '진루' | '귀루',
+  target: RunnerTarget,
+): readonly number[] {
+  const order: RunnerTarget[] =
+    target === '전원' ? (kind === '진루' ? [1, 2, 3] : [3, 2, 1]) : [target]
+  const moved: number[] = []
+  for (const pitchBase of order) {
+    // 0xa97a0(루의 주자) — 인자가 가리키는 것은 "투구 때 그 루에 있던 주자" 다
+    const runner = runners.find(
+      (candidate) =>
+        !candidate.state.isOut &&
+        !candidate.state.scored &&
+        candidate.state.pitchBase === pitchBase,
+    )
+    if (runner === undefined) continue
+
+    if (kind === '귀루') {
+      // 달리는 중인 주자만 되돌린다 (이미 루에 붙어 있으면 되돌릴 곳이 없다)
+      if (isAtTarget(runner.state)) continue
+      startLeg(runner, runner.state.startBase)
+      moved.push(runner.state.index)
+      continue
+    }
+
+    const toBase = runner.state.targetBase + 1
+    if (toBase > HOME_BASE) continue
+    const blocked = runners.some(
+      (other) =>
+        other !== runner &&
+        !other.state.isOut &&
+        !other.state.scored &&
+        wrapBase(other.state.targetBase) === wrapBase(toBase),
+    )
+    if (blocked) continue
+    startLeg(runner, toBase)
+    moved.push(runner.state.index)
+  }
+  return moved
 }
 
 /** 패턴에서 궤적까지 한 번에 만들어 돌린다 — 부르는 쪽이 편하게 */

@@ -79,12 +79,22 @@ export function catchRadiusOf(slot: number): number {
 
 export interface CatchWindowInput {
   readonly slot: number
+  /** 야수(복제)의 위치 +0x20. **공 지점이 아니라 야수가 서 있는 곳**이다 */
   readonly fielder: WorldPoint
   /** 이 틱의 공 예측점. y 가 높이 h */
   readonly ball: WorldPoint
   readonly tick: number
   /** 낙구 틱 (공 +0xaa0) */
   readonly landingTick: number
+  /**
+   * 직선 근사로 "이미 달린 틱 수" n — 0xb12d0 의 `정지면 d −= 복제.속도(+0x3c) × n[j]` (P2 2a).
+   * 원본은 복제를 실제로 움직이지 않는 틱마다 n 을 올리고, 거리에서 그만큼을 빼 "그 사이 뛰었다" 로 친다.
+   * 빼기만 하고 0 으로 자르지 않아 **거리가 음수가 될 수 있는 것도 원본 그대로**다
+   * (음수면 포구 반경은 통과하고 슬라이딩 창 `1999 < d` 는 닫힌다).
+   */
+  readonly runTicks?: number
+  /** 복제의 달리기 속도 +0x3c (원본은 9명 모두 220). `runTicks` 와 함께 쓴다 */
+  readonly speed?: number
   /** 필살 점프 창이 열렸는가 (플레이 +0x1f5) */
   readonly jumpUnlocked?: boolean
   /** 필살 슬라이딩 창이 열렸는가 (플레이 +0x1f6) */
@@ -94,6 +104,16 @@ export interface CatchWindowInput {
    * 값이 있고 내 칸이 아니면 낮은 공·가슴 높이 창이 닫힌다 (유력: 사람이 조작하는 야수).
    */
   readonly onlySlot?: number
+}
+
+/**
+ * 판정에 쓰는 거리 d — 0xb12d0 의 `d = isqrt(dx²+dz²)(복제 위치, P(t))`, 정지 근사면 `d −= 속도 × n`.
+ * 자르지 않는다(원본 그대로).
+ */
+export function approachedDistanceOf(input: CatchWindowInput): number {
+  const distance = horizontalDistance(input.fielder, input.ball)
+  const ran = (input.runTicks ?? 0) * (input.speed ?? 0)
+  return distance - ran
 }
 
 /**
@@ -113,7 +133,7 @@ export function catchKindsAt(input: CatchWindowInput): readonly CatchKind[] {
     height <= HEIGHT_WINDOW.jump.maximum
   const slide = input.slideUnlocked === true && !grounderHeight && height <= HEIGHT_WINDOW.slide
 
-  const distance = horizontalDistance(input.fielder, input.ball)
+  const distance = approachedDistanceOf(input)
   const radius = catchRadiusOf(input.slot)
   const beforeLanding = input.landingTick > input.tick
   const kinds: CatchKind[] = []
@@ -150,7 +170,7 @@ export function catchKindsAt(input: CatchWindowInput): readonly CatchKind[] {
  * 잡는 판정은 없고 몸을 날리는 연출·길막기다 (유력).
  */
 export function isDiveCandidate(input: CatchWindowInput & { readonly startedAtPlate: boolean }): boolean {
-  const distance = horizontalDistance(input.fielder, input.ball)
+  const distance = approachedDistanceOf(input)
   return (
     input.startedAtPlate &&
     input.ball.y <= HEIGHT_WINDOW.grounder &&

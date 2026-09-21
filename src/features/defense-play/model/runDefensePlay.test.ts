@@ -6,7 +6,12 @@ import { BASE_POSITIONS, FIELDER_COUNT } from '@/entities/fielding/model/fieldGe
 import { EMPTY_BASES, type BaseState } from '@/entities/game/model/baseState'
 import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
 import { isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
-import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
+import type {
+  DefensePlayControls,
+  DefensePlayInput,
+  DefensePlayResult,
+} from '@/features/defense-play/model/runDefensePlay'
+import type { RandomPort } from '@/shared/api/random/randomPort'
 import { BATTED_BALL_PATTERNS, type BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 
 const 땅볼아웃: AtBatOutcome = { kind: '아웃', detail: '땅볼아웃' }
@@ -145,9 +150,12 @@ describe('2아웃 득점 보류 — state[0] (0xaa164 · 0xaa34c · 0xaa388)', (
     expect(결과.voidedRuns).toBeGreaterThanOrEqual(1)
   })
 
+  // 주루 700 으로 올린 까닭: 포구 반경(내야 500 · 외야 300)이 되살아나면서 야수가 한두 틱 먼저 잡게 됐고,
+  // 그래서 **평범한 주자(500)는 땅볼에서 홈 송구에 잡힌다**. 보류 규칙이 무엇을 막는지 보이려면
+  // 0아웃이었을 때 실제로 점수가 나는 주자가 있어야 해서 발이 빠른 주자로 바꿨다.
   it('2아웃 땅볼로 타자주자가 죽으면 그 플레이 득점은 0 이다 (S2 2-5)', () => {
-    const 없을때 = play(땅볼아웃, 주자3루, 0)
-    const 두아웃 = play(땅볼아웃, 주자3루, 2)
+    const 없을때 = play(땅볼아웃, 주자3루, 0, representativePatternOf(땅볼아웃), 700)
+    const 두아웃 = play(땅볼아웃, 주자3루, 2, representativePatternOf(땅볼아웃), 700)
 
     expect(두아웃.advance.outsAdded).toBeGreaterThanOrEqual(1)
     expect(두아웃.advance.runsScored).toBe(0)
@@ -215,6 +223,161 @@ describe('대표 패턴 고르기 — 원본 표 안에서만 고른다', () => 
 
   it('같은 결과에는 늘 같은 패턴이 나온다', () => {
     expect(representativePatternOf(이루타)).toEqual(representativePatternOf(이루타))
+  })
+})
+
+/** next() 가 늘 같은 값인 난수 포트 — 0 이면 모든 확률 굴림이 성공하고, 1 에 가까우면 전부 실패한다 */
+const 고정난수 = (value: number): RandomPort => ({
+  next: () => value,
+  nextInRange: (minimum, maximum) => minimum + value * (maximum - minimum),
+  pick: (candidates) => candidates[0],
+})
+
+/** next() 를 차례대로 돌려주는 난수 포트 — 굴림 하나만 떼어 볼 때 쓴다 */
+const 차례난수 = (values: readonly number[]): RandomPort => {
+  let index = 0
+  return {
+    next: () => values[Math.min(index++, values.length - 1)],
+    nextInRange: (minimum, maximum) => (minimum + maximum) / 2,
+    pick: (candidates) => candidates[0],
+  }
+}
+
+/** 틱마다 같은 키를 눌러 주는 조작 — 화면이 넘겨야 하는 모양 그대로다 */
+const 계속누름 = (side: '공격' | '수비', key: string): DefensePlayControls => ({
+  side,
+  keyAt: () => ({ key, isRepeat: false }),
+})
+
+describe('확률 굴림은 난수를 줘야 돈다 — 펌블 · 악송구 · 필살수비 (I-controls 2a·2b·2c)', () => {
+  const 굴림포함 = (random: RandomPort, extra: Partial<DefensePlayInput> = {}) =>
+    runDefensePlay({
+      outcome: 땅볼아웃,
+      trajectory: battedBallTrajectory(representativePatternOf(땅볼아웃)),
+      bases: EMPTY_BASES,
+      outs: 0,
+      random,
+      ...extra,
+    })
+
+  it('난수를 안 주면 아무것도 굴리지 않는다 — 지금까지의 결정론 그대로다', () => {
+    const 결과 = play(땅볼아웃, EMPTY_BASES, 0)
+
+    expect(결과.fumbled).toBe(false)
+    expect(결과.errantThrow).toBe(false)
+    expect(결과.specialDefense).toEqual({ jumpUnlocked: false, slideUnlocked: false })
+    expect(결과.laserThrow).toBe(false)
+  })
+
+  it('난수가 늘 0 이면 펌블이 난다 — 동작 잠금 15틱만큼 포구가 늦어진다 (야수+0xb4 = 15)', () => {
+    const 결과 = 굴림포함(고정난수(0))
+
+    expect(결과.fumbled).toBe(true)
+    expect(결과.log.some((line) => line.includes('펌블'))).toBe(true)
+    expect(결과.catchTick).toBe(play(땅볼아웃, EMPTY_BASES, 0).catchTick + 15)
+  })
+
+  it('악송구가 나면 그 송구로는 아무도 못 잡는다 (0xa1828 — 방향이 틀어진다)', () => {
+    // 굴림 순서대로 값을 먹인다: 필살수비 A → B → 펌블 → 악송구.
+    // 앞 셋은 실패(0.9), 마지막만 성공(0) 시켜 **악송구만** 떼어 본다.
+    const 결과 = runDefensePlay({
+      outcome: 땅볼아웃,
+      trajectory: battedBallTrajectory(representativePatternOf(땅볼아웃)),
+      bases: 주자1루,
+      outs: 0,
+      random: 차례난수([0.9, 0.9, 0.9, 0, 0.9]),
+    })
+
+    expect(결과.fumbled).toBe(false)
+    expect(결과.errantThrow).toBe(true)
+    expect(결과.log.some((line) => line.includes('악송구'))).toBe(true)
+    // 1루 주자는 홈 송구가 빗나가 살아 있다 — 잡힌 아웃은 타자주자 하나뿐이다
+    expect(결과.advance.outsAdded).toBe(1)
+  })
+
+  it('난수가 늘 1 에 가까우면 하나도 안 걸린다', () => {
+    const 결과 = 굴림포함(고정난수(0.999))
+
+    expect(결과.fumbled).toBe(false)
+    expect(결과.errantThrow).toBe(false)
+    expect(결과.specialDefense.jumpUnlocked).toBe(false)
+  })
+
+  it('필살수비는 A(점프) 먼저, 실패했을 때만 B(슬라이딩) — 그리고 모드 7 은 아예 안 굴린다', () => {
+    const 걸림 = 굴림포함(고정난수(0), { trajectory: battedBallTrajectory(깊은뜬공), outcome: 뜬공아웃 })
+    expect(걸림.specialDefense).toEqual({ jumpUnlocked: true, slideUnlocked: false })
+
+    const 홈런더비 = 굴림포함(고정난수(0), {
+      trajectory: battedBallTrajectory(깊은뜬공),
+      outcome: 뜬공아웃,
+      gameMode: 7,
+    })
+    expect(홈런더비.specialDefense).toEqual({ jumpUnlocked: false, slideUnlocked: false })
+  })
+})
+
+describe('사람 조작 — 상태 0x17 키 표 (I-controls 0·2b·2d·3b)', () => {
+  it("수비일 때 '2' 는 2루 송구다 — 사람이 고른 목표가 CPU 점수식보다 앞선다", () => {
+    const 자동 = play(단타, 주자1루, 0)
+    const 수동 = runDefensePlay({
+      outcome: 단타,
+      trajectory: battedBallTrajectory(representativePatternOf(단타)),
+      bases: 주자1루,
+      outs: 0,
+      controls: 계속누름('수비', '2'),
+    })
+
+    expect(수동.throwBase).toBe(2)
+    expect(수동.log.some((line) => line.includes('사람이 2루로 송구 지시'))).toBe(true)
+    // 자동은 같은 루를 고를 수도 있으니 "지시가 기록됐다" 로 가른다
+    expect(자동.log.some((line) => line.includes('사람이'))).toBe(false)
+  })
+
+  it("공격일 때 '8' 은 3루 주자 진루다 — 얕은 뜬공에서 못 들어오던 주자를 뛰게 한다", () => {
+    const 가만히 = play(뜬공아웃, 주자3루, 0, 얕은뜬공)
+    const 태그업 = runDefensePlay({
+      outcome: 뜬공아웃,
+      trajectory: battedBallTrajectory(얕은뜬공),
+      bases: 주자3루,
+      outs: 0,
+      controls: 계속누름('공격', '8'),
+    })
+
+    expect(가만히.advance.runsScored).toBe(0)
+    expect(태그업.log.some((line) => line.includes('진루'))).toBe(true)
+  })
+
+  it('OK 는 슬라이딩이다 — 진행률 71~94% 구간에 든 주자만 걸린다 (0xa9690)', () => {
+    const 결과 = runDefensePlay({
+      outcome: 단타,
+      trajectory: battedBallTrajectory(representativePatternOf(단타)),
+      bases: 주자1루,
+      outs: 0,
+      controls: 계속누름('공격', ' '),
+    })
+
+    expect(결과.log.some((line) => line.includes('슬라이딩'))).toBe(true)
+  })
+
+  it('레이저 송구는 반짝임 창 안에 새로 누른 키가 있어야 나간다 (0x66a8c · 0xb2648 · 0x4e858)', () => {
+    const 공통 = {
+      outcome: 단타,
+      trajectory: battedBallTrajectory(representativePatternOf(단타)),
+      bases: 주자1루,
+      outs: 0,
+      random: 고정난수(0),
+    }
+    const 눌렀다 = runDefensePlay({ ...공통, controls: 계속누름('수비', '2') })
+    const 누르고있다 = runDefensePlay({
+      ...공통,
+      controls: { side: '수비', keyAt: () => ({ key: '2', isRepeat: true }) },
+    })
+    const 안눌렀다 = runDefensePlay({ ...공통, controls: { side: '수비', keyAt: () => null } })
+
+    expect(눌렀다.laserThrow).toBe(true)
+    // 누르고 있기로는 안 된다 — 원본이 키 반복 계수 0 만 받는다
+    expect(누르고있다.laserThrow).toBe(false)
+    expect(안눌렀다.laserThrow).toBe(false)
   })
 })
 

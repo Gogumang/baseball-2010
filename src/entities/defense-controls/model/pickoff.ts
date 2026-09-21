@@ -9,6 +9,8 @@
  * 견제 시작 0xb28be 도 야수 넷만 루로 보내고 주자에게는 아무 호출도 하지 않는다.
  */
 
+import { pickoffCommandOf } from '@/entities/defense-controls/model/defenseKeys'
+
 /** 견제 대상은 1·2·3루뿐이다 (0x50f28 `루 > 0`) */
 export type PickoffBase = 1 | 2 | 3
 
@@ -58,4 +60,20 @@ export function pickoffPlayOf(input: PickoffInput): PickoffPlay | null {
     coverFielderSlot: pickoffCoverFielderOf(input.base),
     nextGameState: PICKOFF_GAME_STATE,
   }
+}
+
+/**
+ * **키 한 번 → 견제 플레이** — 입력(0x53548)부터 메시지 0x10 처리(0x50f28)까지를 한 줄로 잇는다.
+ * 화면은 **경기 상태 0xf(구질 고르기)에서 사람이 수비일 때만** 이 함수에 키를 넘기면 된다.
+ *
+ * 돌려주는 것이 `null` 이 아니면 그대로 수비 화면(상태 0x17)을 플레이 종류 4 로 열면 된다 —
+ * 원본에는 별도 "견제 아웃 확률" 이 없고, 주자 귀루 대 송구의 시뮬레이션이 판정 전부다 (I-controls 4a).
+ */
+export function pickoffPlayForKey(
+  webKey: string,
+  hasRunnerOnBase: (base: PickoffBase) => boolean,
+): PickoffPlay | null {
+  const command = pickoffCommandOf(webKey)
+  if (command === null) return null
+  return pickoffPlayOf({ base: command.base, hasRunner: hasRunnerOnBase(command.base) })
 }
