@@ -19,15 +19,18 @@ interface SpecialSwingSlotProps {
   readonly index: number
   readonly x: number
   readonly y: number
-  /** 지금 필살 레벨의 칸이면 주황 아이콘 */
-  readonly isCurrentLevel: boolean
+  /**
+   * 지금 **쓰는** 기술의 칸이면 주황 아이콘 (레코드 +0x18 == 그 칸의 기술 번호, R7 4절 정정).
+   * 예전에는 "레벨" 칸을 칠했는데 원본은 칸마다 다른 기술이고 표시는 고른 번호다.
+   */
+  readonly isInUse: boolean
   /** 해금되지 않은 칸은 안쪽 1px 을 흑백으로 (0xc37a8) */
   readonly isLocked: boolean
 }
 
 /** 필살 칸 하나 — 아이콘 · "LV" · 레벨 숫자 (0x805a8~0x807be) */
-export function SpecialSwingSlot({ index, x, y, isCurrentLevel, isLocked }: SpecialSwingSlotProps) {
-  const icon = isCurrentLevel ? ICON_ORANGE : ICON_NORMAL
+export function SpecialSwingSlot({ index, x, y, isInUse, isLocked }: SpecialSwingSlotProps) {
+  const icon = isInUse ? ICON_ORANGE : ICON_NORMAL
 
   return (
     <>

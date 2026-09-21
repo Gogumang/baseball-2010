@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
-  ABILITY_AXIS_ANGLES, ABILITY_AXIS_MAXIMUM, ABILITY_CHART, ANCHOR_A, ANCHOR_B, GRID, NAME_BAR,
-  OPEN_TEAM_COUNT, TAG, TEAM_COUNT, abilityAxisLengthOf, abilityAxisMaximumLengthOf,
-  abilityChartOutlineOf, abilityChartVerticesOf, cellPositionOf, gridRowCountOf, isTeamOpen,
-  teamNameFrameOf,
+  ABILITY_AXIS_ANGLES, ABILITY_AXIS_MAXIMUM, ABILITY_CHART, ABILITY_FRAME_RADIUS, ANCHOR_A,
+  ANCHOR_B, GRID, NAME_BAR, OPEN_TEAM_COUNT, TAG, TEAM_COUNT, abilityAxisLengthOf,
+  abilityAxisMaximumLengthOf, abilityChartFrameOf, abilityChartVerticesOf, cellPositionOf,
+  gridRowCountOf, isTeamOpen, teamNameFrameOf,
 } from '@/pages/create-player/lib/teamSelectLayout'
 
 /** 팀 고르기 배치 (상태 0x65 → 목록 0x63b15 의 k=0, 본문 0x63dee — P6 2a 확정) */
@@ -97,9 +97,10 @@ describe('능력치 마름모', () => {
     ])
   })
 
-  it('바깥 마름모는 네 축 모두 최대길이로 뻗는다 — 값 마름모가 그 안에 들어간다', () => {
-    expect(abilityChartOutlineOf(중심)).toEqual([
-      { x: 156, y: 82 }, { x: 199, y: 82 }, { x: 199, y: 125 }, { x: 156, y: 125 },
+  it('바탕 테두리는 넘겨받은 30 이 아니라 **고정 29** 다 (0x7639c movs r3,#0x1d)', () => {
+    expect(ABILITY_FRAME_RADIUS).toBe(29)
+    expect(abilityChartFrameOf(중심)).toEqual([
+      { x: 157, y: 83 }, { x: 198, y: 83 }, { x: 198, y: 124 }, { x: 157, y: 124 },
     ])
   })
 

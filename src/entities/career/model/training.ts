@@ -68,6 +68,10 @@ const SPECIAL_SWING_GAME_POINT_COST = BALANCE.specialSwing.gamePointCost
 export function specialSwingCostOf(career: PlayerCareer): number {
   return SPECIAL_SWING_GAME_POINT_COST[career.specialSwingLevel] ?? 0
 }
+/** 칸 i 를 배우는 데 드는 G포인트 — 표 `0xcc3e6` = [−5,−7,−9,−12] × 100 (R7 4절) */
+export function specialSwingSlotCostOf(slot: number): number {
+  return SPECIAL_SWING_GAME_POINT_COST[slot] ?? 0
+}
 export const SPECIAL_SWING_MAXIMUM_LEVEL = SPECIAL_SWING_REQUIRED_SESSIONS.length
 const SPECIAL_SWING_MORALE_RANGE: IntegerRange = BALANCE.specialSwing.moraleLossRange
 const ROOKIE_SKILL = BALANCE.training.rookieSkillId
@@ -79,10 +83,47 @@ function roll(random: RandomPort, range: IntegerRange): number {
 
 const isSpecialSwingMenu = (menu: TrainingMenu) => menu.abilities.length === 0
 
+/**
+ * 필살타법 창(상태 0x6c) 칸 i 의 **필요 인기도** — 표 `0xcc3ea` = [1,5,10,15] × 100 (R7 4절 확정).
+ * 비용 표 `0xcc3e6` = [−5,−7,−9,−12] × 100 은 `BALANCE.specialSwing.gamePointCost` 와 같은 값이다.
+ */
+export const SPECIAL_SWING_REQUIRED_POPULARITY: readonly number[] = [100, 500, 1000, 1500]
+
+/** 칸 하나가 막히는 까닭 — 차례와 문구 번호가 원본 그대로다 */
+export type SpecialSwingSlotBlock = '훈련완료' | '인기도부족' | '선행필요' | 'G포인트부족'
+
+/**
+ * 필살타법 창 칸 i 의 훈련 가드 — 키 처리 `0x17828` (0x17858~0x17a42, R7 4절 **확정**).
+ *
+ * ```
+ * L = 배운 수(저장 +0x201)
+ * if L > i:                          StrMODE[63] "이미 훈련 완료된 스킬입니다"      ; 0x1787a
+ * elif 인기도 < 0xcc3ea[i] × 100:    StrMODE[62] "인기도가 부족합니다 …"            ; 0x1789a
+ * elif L < i:                        StrMODE[64] "선행 스킬 훈련 완료 후 …"          ; 0x178de
+ * elif 비용 > G:                     StrMODE[65] "G포인트가 부족합니다 …"            ; 예/아니오
+ * else:                              StrMODE[66] "%d G포인트가 소모됩니다 …"         ; 예 → 0xa3bac
+ * ```
+ * 훈련할 수 있는 칸은 **i == L 한 칸뿐**이라, L = 4 면 네 칸이 모두 [63] 으로 막힌다.
+ */
+export function specialSwingSlotBlockOf(
+  career: Pick<PlayerCareer, 'specialSwingLevel' | 'popularity' | 'gamePoint'>,
+  slot: number,
+): SpecialSwingSlotBlock | null {
+  const learned = career.specialSwingLevel
+  if (learned > slot) return '훈련완료'
+  if (career.popularity < (SPECIAL_SWING_REQUIRED_POPULARITY[slot] ?? 0)) return '인기도부족'
+  if (learned < slot) return '선행필요'
+  if ((SPECIAL_SWING_GAME_POINT_COST[slot] ?? 0) > career.gamePoint) return 'G포인트부족'
+  return null
+}
+
 export function blockReasonOf(career: PlayerCareer, menu: TrainingMenu): TrainingBlockReason | null {
   if (career.hasActedThisCycle) return '이미행동함'
   if (career.morale <= 0) return '사기부족'
-  // 원본은 G포인트가 모자라도 막지 않는다 (0xa3c84 가 0 에서 바닥을 친다).
+  // 훈련 **함수**(0xa3c78)는 G포인트가 모자라도 막지 않는다 — 0xa3c84 가 0 에서 바닥을 친다.
+  // 막는 것은 그 앞의 **창**(0x17828)이고, 거기에 인기도 100/500/1000/1500 과 G 부족([65]) 가드가 있다
+  // (R7 4절 확정 → `specialSwingSlotBlockOf`). 여기 `blockReasonOf` 는 창을 거치지 않는 흐름이라
+  // 원본 훈련 함수 쪽 규칙만 본다.
   // 최고 레벨 가드는 **원본에도 있다** (R7 4절 확정): 필살타법 창 0x17828 이 "칸 i == 배운 수" 일 때만
   // 훈련시키므로, 최고 레벨이면 모든 칸이 StrMODE[63] 으로 막힌다. 우리가 넣은 안전장치가 아니다.
   if (isSpecialSwingMenu(menu)) {
