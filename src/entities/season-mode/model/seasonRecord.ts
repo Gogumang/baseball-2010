@@ -46,6 +46,14 @@ export interface SeasonRecord {
   /** SR+0x56 — 이번 주기에 트레이드를 썼는가 (GP 아이템 칸 5 가 0 으로 되돌린다) */
   readonly tradeUsed: number
   /**
+   * SR+0x185 (s8) — 채용한 코치 칸. **−1 = 없음**, 0~4 마투수 · 5~9 마타자 (J 4-2·4-3).
+   * 경기 능력치에 정액 보너스가 붙는다 (`gameAbilities.coachBonusOf`).
+   *
+   * ⚠️ 원본이 이 칸을 **−1 로 두는 자리**는 문서에 없다(새 시즌 초기화 0x5758 은 안 건드리고
+   * 0x204e0 의 초기화 값만 유력). J 4-2 가 "−1 = 없음" 이라 기본값을 −1 로 둔다 — **근사다**.
+   */
+  readonly coach: number
+  /**
    * SR+0x58+칸 — **팀 트레이닝** 서브 아이템 4칸 (투구·타격·집중·근성, J 4-6 "해당 칸 상승 +2").
    *
    * 서브아이템 상점은 이 칸들을 `rec[0x58 + 줄×5 + 칸]` 2×5 격자로 다룬다 (R12 (나) 확정) —
@@ -134,6 +142,8 @@ export const STADIUM_OWNED_SIZE = 21
 export const GAME_RECORD_SIZE = 16
 /** 지금 장착한 구장 아이템 3칸 — 관중석·전광판·잔디 (SR+0x1b8·0x1b9·0x1ba) */
 export const STADIUM_EQUIPPED_SIZE = 3
+/** SR+0x185 의 "코치 없음" 값 (s8 −1, J 4-2) — `gameAbilities.NO_COACH` 와 같은 값이다 */
+export const NO_COACH = -1
 /** 트레이닝 서브 아이템 칸 수 — 능력치 4칸 (0x58~0x5b) */
 const TRAINING_SUB_ITEM_SIZE = 4
 /** 외출 서브 아이템 칸 수 — 장소 5곳 (0x5d~0x61) */
@@ -200,6 +210,8 @@ export function startNewSeason(teamId: number, name: string): SeasonState {
       aimVisionGames: 0,
       storeGames: 0,
       tradeUsed: 0,
+      // SR+0x185 — 코치 없음. 위 필드 주석 참고(원본이 −1 을 쓰는 자리는 문서에 없다)
+      coach: NO_COACH,
       trainingSubItems: falses(TRAINING_SUB_ITEM_SIZE),
       outingSubItems: falses(OUTING_SUB_ITEM_SIZE),
       massager: false,

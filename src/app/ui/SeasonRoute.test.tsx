@@ -10,6 +10,7 @@ import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import { SEASON_PHASE, SEASON_SCENE_STATE } from '@/entities/season-mode/model/seasonStateMachine'
 import type { SeasonSceneState } from '@/entities/season-mode/model/seasonStateMachine'
 import { stadiumOwnedIndexOf } from '@/entities/season-mode/model/stadiumItems'
+import { TEAMS } from '@/shared/config/original/teams'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 
@@ -147,5 +148,43 @@ describe('구장 상점 히든 해금 배선 (app+0xe0)', () => {
 
     // 미오픈(StrMODE[76]) 이 아니라 구매 확인(StrMODE[79]) 이 뜬다
     expect(알림글()).toContain('구매하겠습니까')
+  })
+})
+
+describe('구단관리 트레이드·코치채용 배선 (0xe4 · 0xd7)', () => {
+  it('트레이드를 고르면 "아직 없습니다" 가 아니라 **팀 고르기**가 뜬다', () => {
+    const store = 메모리저장(세이브(레코드()))
+    render(<시즌화면 store={store} 장면={SEASON_SCENE_STATE.구단관리} onExit={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole('button', { name: /트레이드/ }))
+
+    expect(document.body.textContent).not.toContain('아직 없습니다')
+    expect(screen.getAllByRole('button', { name: TEAMS[1].name }).length).toBeGreaterThan(0)
+  })
+
+  it('트레이드를 한 번 쓰면(SR+0x56) 가드가 걸린다', () => {
+    const store = 메모리저장(세이브(레코드({ tradeUsed: 1 })))
+    render(<시즌화면 store={store} 장면={SEASON_SCENE_STATE.구단관리} onExit={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole('button', { name: /트레이드/ }))
+
+    expect(알림글()).toContain('이미 사용했습니다')
+    expect(screen.queryAllByRole('button', { name: TEAMS[1].name })).toHaveLength(0)
+  })
+
+  it('코치채용을 고르면 코치 목록이 뜨고, 뽑은 코치가 **저장에 남는다** (SR+0x185)', () => {
+    const store = 메모리저장(세이브(레코드({ money: 9999, popularity: 9999 })))
+    render(<시즌화면 store={store} 장면={SEASON_SCENE_STATE.구단관리} onExit={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole('button', { name: /코치채용/ }))
+    expect(screen.getByRole('button', { name: /싸이커/ })).toBeDefined()
+
+    fireEvent.click(screen.getByRole('button', { name: /싸이커/ }))
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+
+    const saved = store.load() as { state: { record: SeasonRecord } }
+    expect(saved.state.record.coach).toBe(0)
+    // 계약금 1억(= 100) 이 빠졌다
+    expect(saved.state.record.money).toBe(9899)
   })
 })

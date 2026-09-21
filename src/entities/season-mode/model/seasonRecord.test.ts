@@ -160,6 +160,13 @@ describe('옛 세이브 메우기 — normalizeSeasonRecord', () => {
   it('null 이면 새 시즌 기본값이다', () => {
     expect(normalizeSeasonRecord(null).gameRecord).toHaveLength(GAME_RECORD_SIZE)
   })
+
+  it('코치 칸(SR+0x185)이 없던 세이브는 **없음(−1)** 으로 채운다', () => {
+    const 메운것 = normalizeSeasonRecord({ teamId: 3, money: 120 })
+    expect(메운것.coach).toBe(-1)
+    // 저장된 코치는 그대로 둔다
+    expect(normalizeSeasonRecord({ coach: 7 }).coach).toBe(7)
+  })
 })
 
 describe('옛 세이브 메우기 — normalizeSeasonState', () => {

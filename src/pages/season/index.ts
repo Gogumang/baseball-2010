@@ -19,6 +19,14 @@ export type { StadiumShopScreenProps } from '@/pages/season/ui/StadiumShopScreen
 export { PlayerRecruitScreen } from '@/pages/season/ui/PlayerRecruitScreen'
 export type { PlayerRecruitScreenProps } from '@/pages/season/ui/PlayerRecruitScreen'
 
+/** 트레이드 네 칸 0xe4 → 0xe5 → 0xe6 → 0xe7 (J 4-4) */
+export { TradeScreen } from '@/pages/season/ui/TradeScreen'
+export type { TradeScreenProps } from '@/pages/season/ui/TradeScreen'
+
+/** 코치채용 — 선수단 화면 0xd7 을 `this+0x11c = 2` 로 띄운 것 (J 4-3) */
+export { CoachHireScreen } from '@/pages/season/ui/CoachHireScreen'
+export type { CoachHireScreenProps } from '@/pages/season/ui/CoachHireScreen'
+
 export { SeasonGoalsScreen } from '@/pages/season/ui/SeasonGoalsScreen'
 export type { SeasonGoalsScreenProps } from '@/pages/season/ui/SeasonGoalsScreen'
 

@@ -47,17 +47,31 @@ export const ROW_WIDTH = SEASON_WINDOW.width - WINDOW_INSET * 2
 /** 판 안에 들어가는 줄 수 — (212 − 26 − 6) / 18 = 10 (**근사**) */
 export const VISIBLE_ROWS = 10
 
+/**
+ * 아래 설명 줄이 차지하는 높이 — 두 줄치 (**근사**).
+ *
+ * ⚠️ 예전에는 `FOOTER_BOX` 를 판 **안쪽** 목록 열 줄 바로 아래에 두었는데, 그러면 높이가
+ * `266 − 260 − 4 = 2px` 밖에 안 남아 설명 글이 판 밖으로 넘쳐 **상태바와 겹쳤다**.
+ * 설명 줄을 쓰는 화면이 열 곳이라 모두 같은 증상이었다 (코치채용이 제일 심했다).
+ * 목록 열 줄을 그대로 두려고 설명 줄을 **판 아래 빈 띠**로 내리고 상태바를 화면 맨 아래로
+ * 옮겼다. 원본 배치(0xaa24·0x5cfec·0xd4e8)는 미해독이라 어느 쪽이든 근사다.
+ */
+export const FOOTER_HEIGHT = 26
+
 export function rowBoxOf(index: number): SeasonBox {
   return { x: LIST_ORIGIN.x, y: LIST_ORIGIN.y + ROW_STEP * index, width: ROW_WIDTH, height: ROW_HEIGHT }
 }
 
-/** 판 아래쪽 알림·설명 줄 (**근사**) — 목록 아래 남는 자리 */
+/** 판 아래 빈 띠의 설명 줄 (**근사**) — 판(바닥 266)과 상태바(296) 사이 */
 export const FOOTER_BOX: SeasonBox = {
   x: SEASON_WINDOW.x + WINDOW_INSET,
-  y: LIST_ORIGIN.y + ROW_STEP * VISIBLE_ROWS,
+  y: SEASON_WINDOW.y + SEASON_WINDOW.height + 2,
   width: ROW_WIDTH,
-  height: SEASON_WINDOW.y + SEASON_WINDOW.height - (LIST_ORIGIN.y + ROW_STEP * VISIBLE_ROWS) - 4,
+  height: FOOTER_HEIGHT,
 }
+
+/** 상태바 줄 — 화면 맨 아래 (**근사**). 설명 줄 아래로 내려 겹치지 않게 한다 */
+export const STATUS_BAR_Y = SCREEN.height - 24
 
 /**
  * 구장 아이템 창 `0x83378` — mode_ui **프레임 32 의 박스 0~6** (P6 3절 확정).

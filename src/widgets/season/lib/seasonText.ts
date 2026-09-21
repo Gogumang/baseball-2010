@@ -35,3 +35,13 @@ export function earnedRunAverageTextOf(perHundred: number): string {
   const value = Math.max(0, Math.trunc(perHundred))
   return `${Math.trunc(value / 100)}.${String(value % 100).padStart(2, '0')}`
 }
+
+/**
+ * StrMODE 문구의 `%s`·`%d` 를 순서대로 채운다.
+ *
+ * 메시지 상자(`MessageBox`)는 서식 인자를 받지 않아(마크업만 그린다) 여기서 미리 채운다.
+ * 원본 `sprintf(obj+0xba, Str…, …)` 와 같은 자리다 (R12 3b).
+ */
+export function fillModeText(raw: string, ...values: readonly (string | number)[]): string {
+  return values.reduce<string>((text, value) => text.replace(/%[sd]/, String(value)), raw)
+}

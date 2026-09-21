@@ -16,6 +16,7 @@ import {
   evaluateSeasonGame,
 } from '@/entities/season-mode/model/seasonEvaluation'
 import type { SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
+import type { TradeSettlement } from '@/entities/season-mode/model/playerTrade'
 import { EMPTY_LEAGUE, LEAGUE_SIDE_HOME, leagueSideOf, rankingOf } from '@/entities/league/model/league'
 import type { League } from '@/entities/league/model/league'
 import { recordLeagueResult } from '@/entities/league/model/league'
@@ -105,6 +106,8 @@ export interface SeasonActions {
   readonly goto: (scene: SeasonSceneState) => void
   readonly updateRecord: (record: SeasonRecord) => void
   readonly updateRoster: (roster: SeasonTeamRoster) => void
+  /** 트레이드 한 번이 끝났다 (0xe7) — 커맨드 표시·명단·G 를 **한 번에** 적어 넣는다 */
+  readonly finishTrade: (settlement: TradeSettlement) => void
   readonly playNextGame: () => void
   readonly confirmIncome: (record: SeasonRecord) => void
   /** 국가대항전 한 경기 — 사람이 대표팀을 조작한다 */
@@ -177,8 +180,6 @@ const EMPTY_ROSTER: SeasonTeamRoster = { pitchers: [], batters: [] }
 const NO_CHAMPION = 0xf
 /** 시즌모드 = 원본 게임 모드 2 (능력치 보정 마스크 0x306 에 든다) */
 const SEASON_GAME_MODE = 2
-/** 코치 칸 SR+0x185 가 시즌 레코드에 아직 없다 — 없음(−1)으로 둔다 */
-const NO_COACH = -1
 
 /** 같은 경기 화면을 쓰는 세 갈래 — 끝났을 때 정산하는 곳이 다르다 */
 export type SeasonGameKind = '정규' | '포스트시즌' | '국가대항전'
@@ -274,6 +275,25 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
   )
 
   /**
+   * 트레이드 진행 결과 (0xe7 — `docs/re/J-modes-rules.md` 4-4).
+   *
+   * 레코드(SR+0x56)·명단·G(저장+0x64)가 한꺼번에 바뀌므로 **한 번에 커밋한다** —
+   * `updateRecord` 와 `updateRoster` 를 잇달아 부르면 같은 `save` 를 보고 한쪽이 덮인다.
+   */
+  const finishTrade = useCallback(
+    (settlement: TradeSettlement) => {
+      if (save === null) return
+      commit({
+        ...save,
+        state: { ...save.state, record: settlement.record },
+        roster: settlement.roster,
+      })
+      setGamePoints((points) => Math.max(0, points - settlement.gamePointCost))
+    },
+    [commit, save],
+  )
+
+  /**
    * 다음 경기 — ⚠️ **웹판 임시 자동 진행**. 파일 머리 주석 참고.
    *
    * 원본 순서를 지킨다: 내 경기를 치르고(0xc2dac 과 같은 간이 엔진) 전적에 넣은 뒤,
@@ -295,7 +315,8 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
           ? PLAYER_SIDE_LAST_BAT
           : PLAYER_SIDE_FIRST_BAT,
         settings: FULL_PLAY_SETTINGS,
-        season: { illness: record.illness, morale: save.state.teamMorale, coach: NO_COACH },
+        // 코치는 SR+0x185 다 — 채용 화면(0xd7)이 채운 칸을 그대로 넘긴다 (−1 = 없음)
+        season: { illness: record.illness, morale: save.state.teamMorale, coach: record.coach },
         teamAbilities: save.state.teamAbilities,
       }
     },
@@ -714,7 +735,7 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
     cup: save?.cup ?? null,
     notice,
     actions: {
-      chooseTeam, goto, updateRecord, updateRoster, playNextGame, confirmIncome,
+      chooseTeam, goto, updateRecord, updateRoster, finishTrade, playNextGame, confirmIncome,
       playCupGame, finishCup, finishGame, continuePostseason,
       runTraining, runOuting, nextSeasonEndStep, awardLeagueFirst, spendGamePoint, finishSeason,
       openStadiumItems, markEndingSeen, clearNotice, quit,

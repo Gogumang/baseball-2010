@@ -1,5 +1,5 @@
 import { STATUS_LABELS } from '@/shared/config/original/modeMenus'
-import { SEASON_WINDOW, TEXT } from '@/widgets/season/lib/seasonWindowLayout'
+import { SEASON_WINDOW, STATUS_BAR_Y, TEXT } from '@/widgets/season/lib/seasonWindowLayout'
 import { seasonMoneyTextOf } from '@/widgets/season/lib/seasonText'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import * as styles from '@/widgets/season/ui/SeasonWindow.css'
@@ -22,7 +22,7 @@ export interface SeasonStatusBarProps {
 const [POPULARITY, REPUTATION, MORALE, MONEY] = STATUS_LABELS
 
 /** 판 아래 한 줄 (**근사**) */
-const BAR = { x: SEASON_WINDOW.x, y: SEASON_WINDOW.y + SEASON_WINDOW.height + 4, width: SEASON_WINDOW.width } as const
+const BAR = { x: SEASON_WINDOW.x, y: STATUS_BAR_Y, width: SEASON_WINDOW.width } as const
 
 export function SeasonStatusBar({ record, teamMorale }: SeasonStatusBarProps) {
   const entries: readonly (readonly [string, string])[] = [

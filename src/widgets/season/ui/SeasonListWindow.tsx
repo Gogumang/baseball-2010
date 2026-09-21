@@ -38,10 +38,11 @@ export function SeasonListWindow({
   title, rows, cursor, onMoveCursor, onSelect, footer, onBack, backLabel = '되돌아가기',
 }: SeasonListWindowProps) {
   // 판에 들어가는 줄 수를 넘으면 커서를 따라 굴린다 (원본 목록 객체도 ▲▼ 로 굴린다 — 근사)
-  const first = rows.length <= VISIBLE_ROWS
+  const rowCount = VISIBLE_ROWS
+  const first = rows.length <= rowCount
     ? 0
-    : Math.min(Math.max(0, cursor - VISIBLE_ROWS + 1), rows.length - VISIBLE_ROWS)
-  const visible = rows.slice(first, first + VISIBLE_ROWS)
+    : Math.min(Math.max(0, cursor - rowCount + 1), rows.length - rowCount)
+  const visible = rows.slice(first, first + rowCount)
 
   return (
     <div role="group" aria-label={title}>

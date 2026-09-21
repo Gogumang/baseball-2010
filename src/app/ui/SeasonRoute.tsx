@@ -3,7 +3,7 @@ import {
   GameIncomeScreen, PlayerRecruitScreen, PostseasonStartScreen, RegularSeasonRankScreen,
   SeasonEndingScreen, SeasonGoalsScreen, SeasonItemMenuScreen, SeasonManagementScreen, SeasonMvpScreen,
   SeasonOutingScreen, SeasonSummaryScreen, SeasonTeamMenuScreen, SeasonTitleAwardScreen,
-  SeasonTrainingScreen, StadiumShopScreen, SEASON_MVP_LEADER_KINDS,
+  SeasonTrainingScreen, StadiumShopScreen, TradeScreen, CoachHireScreen, SEASON_MVP_LEADER_KINDS,
   seasonAwardRewardOf, seasonMvpResultEventId, seasonTitleResultEventId,
 } from '@/pages/season'
 import { judgeTitles, leagueRecordsOf } from '@/entities/awards/model/seasonAwards'
@@ -37,7 +37,7 @@ interface SeasonRouteProps {
  * 어느 화면 다음에 무엇이 오는지는 `entities/season-mode` 의 상태 기계가 정하고,
  * 여기서는 그 장면 번호에 맞는 화면을 고르기만 한다.
  *
- * **아직 화면이 없는 장면**(트레이드 0xe4 · 선수단/코치채용 0xd7 · 연초 목표 0xd4 등)은
+ * **아직 화면이 없는 장면**(연초 목표 0xd4 등)은
  * 알림을 띄우고 관리 메뉴로 되돌린다 — 조용히 아무것도 안 하는 것보다 낫다.
  */
 export function SeasonRoute({ session, random, gameSettings, onExit }: SeasonRouteProps) {
@@ -93,6 +93,35 @@ export function SeasonRoute({ session, random, gameSettings, onExit }: SeasonRou
         onUnlock={actions.openStadiumItems}
         onChange={actions.updateRecord}
         onBack={scene === SEASON_SCENE_STATE.구장관리 ? backToTeamMenu : backToManagement}
+      />
+    )
+  }
+
+  // 트레이드 한 바퀴 (0xe4 팀 고르기 → 0xe5 영입 선수 → 0xe6 보상 선수 → 0xe7 확인·진행).
+  // 원본도 한 장면 객체가 네 칸을 이어 들고 있어(this+0x154·0x158·0x15c) 화면 하나가 단계를 든다
+  if (scene === SEASON_SCENE_STATE.트레이드) {
+    return (
+      <TradeScreen
+        state={state}
+        roster={roster}
+        gamePoints={session.gamePoints}
+        random={random}
+        onTrade={actions.finishTrade}
+        onBack={backToTeamMenu}
+      />
+    )
+  }
+
+  // 코치채용 — 원본은 **선수단 화면 0xd7** 을 `this+0x11c = 2` 로 띄운다 (P4 1b).
+  // ⚠️ 웹에는 그 `this+0x11c` 칸이 없고 경기 전 엔트리 화면(=1)도 아직 없다. 0xd7 로 오는 길이
+  //    지금은 구단관리-코치채용 하나뿐이라 여기서 바로 코치채용을 띄운다 — **근사다**
+  if (scene === SEASON_SCENE_STATE.선수단) {
+    return (
+      <CoachHireScreen
+        state={state}
+        gamePoints={session.gamePoints}
+        onHire={actions.updateRecord}
+        onBack={backToTeamMenu}
       />
     )
   }
