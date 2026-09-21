@@ -3,10 +3,10 @@ import { glyphsWidthOf } from '@/shared/lib/pixelNumber/pixelNumber'
 import { rankGlyphsOf, valueGlyphsOf, winningPercentOf } from '@/widgets/standings/lib/standingsLayout'
 
 describe('winningPercentOf', () => {
-  it('승률은 소수점 없는 정수 퍼센트다', () => {
-    expect(winningPercentOf(30, 14)).toBe(68)
-    expect(winningPercentOf(22, 22)).toBe(50)
-    expect(winningPercentOf(15, 29)).toBe(34)
+  it('승률은 **승×1000/(승+패)** 세 자리 숫자다 — 5할이면 500 (P6 4a-2)', () => {
+    expect(winningPercentOf(30, 14)).toBe(681)
+    expect(winningPercentOf(22, 22)).toBe(500)
+    expect(winningPercentOf(15, 29)).toBe(340)
   })
 
   it('한 경기도 치르지 않았으면 0 이다 (0 으로 나누지 않는다)', () => {

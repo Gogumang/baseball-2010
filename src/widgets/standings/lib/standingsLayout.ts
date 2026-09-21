@@ -59,8 +59,14 @@ export { SKY_BLUE_GLYPH_HEIGHT as RANK_GLYPH_HEIGHT, skyBlueNumberGlyphsOf as ra
 
 export const valueGlyphsOf = numberGlyphsOf
 
-/** 승률 = 승×100÷(승+패) 정수 퍼센트. 소수점이 없고 한 경기도 치르지 않았으면 0 이다 */
+/**
+ * 승률 = **승×1000÷(승+패)** (박스 4, 0xb815d·0xb812d 옆 — P6 4a-2 확정).
+ *
+ * 원본은 소수점 없는 세 자리 숫자(5할이면 `500`)를 numBox 로 오른쪽 맞춤해 그린다.
+ * ⚠️ 예전에는 ×100 이라 화면에 `50` 이 나갔다 — 원본과 자릿수가 달랐다.
+ * 한 경기도 치르지 않았으면 0 이다(원본도 나눗셈 전에 막는다).
+ */
 export function winningPercentOf(wins: number, losses: number): number {
   const played = wins + losses
-  return played === 0 ? 0 : Math.trunc((wins * 100) / played)
+  return played === 0 ? 0 : Math.trunc((wins * 1000) / played)
 }

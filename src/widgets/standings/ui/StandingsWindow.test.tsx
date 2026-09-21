@@ -134,19 +134,19 @@ describe('기록실 순위표', () => {
     expect(rowOf(rows, RIVAL_TEAM)).toMatchObject({ wins: 1, losses: 3 })
   })
 
-  it('승률은 승×100÷(승+패) 를 버린 정수 % 다', () => {
-    // 3승 1패 = 75%, 상대는 1승 3패 = 25%
+  it('승률은 승×1000÷(승+패) 를 버린 세 자리 숫자다 (P6 4a-2)', () => {
+    // 3승 1패 = 750, 상대는 1승 3패 = 250
     render(<StandingsWindow league={afterGames(['승', '승', '승', '패']).league} onClose={vi.fn()} />)
     const rows = readStandings()
 
-    expect(rowOf(rows, OUR_TEAM)?.winningPercent, `우리 승률: ${rowOf(rows, OUR_TEAM)?.winningPercent}`).toBe(75)
-    expect(rowOf(rows, RIVAL_TEAM)?.winningPercent).toBe(25)
+    expect(rowOf(rows, OUR_TEAM)?.winningPercent, `우리 승률: ${rowOf(rows, OUR_TEAM)?.winningPercent}`).toBe(750)
+    expect(rowOf(rows, RIVAL_TEAM)?.winningPercent).toBe(250)
   })
 
-  it('버림이라 2승 1패는 67% 가 아니라 66% 다', () => {
+  it('버림이라 2승 1패는 667 이 아니라 666 이다', () => {
     render(<StandingsWindow league={afterGames(['승', '승', '패']).league} onClose={vi.fn()} />)
 
-    expect(rowOf(readStandings(), OUR_TEAM)?.winningPercent).toBe(66)
+    expect(rowOf(readStandings(), OUR_TEAM)?.winningPercent).toBe(666)
   })
 
   it('무승부는 승도 패도 늘리지 않는다 (0xb76dc·0xb77e0 에 무승부 분기가 없다)', () => {
@@ -156,7 +156,7 @@ describe('기록실 순위표', () => {
     render(<StandingsWindow league={drawn.league} onClose={vi.fn()} />)
     const rows = readStandings()
 
-    expect(rowOf(rows, OUR_TEAM)).toMatchObject({ wins: 1, losses: 1, winningPercent: 50 })
+    expect(rowOf(rows, OUR_TEAM)).toMatchObject({ wins: 1, losses: 1, winningPercent: 500 })
     expect(drawn.league).toEqual(withoutDraws.league)
     // 선수 개인 기록에는 무승부가 남는다 — 순위표만 안 세는 것이다
     expect(drawn.draws, `개인 무승부: ${drawn.draws}`).toBe(2)
