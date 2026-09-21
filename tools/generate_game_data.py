@@ -27,6 +27,16 @@ ABILITY_SCALE = 1
 ABILITY_OFFSET = 12
 ABILITY_COUNT = 4
 
+# 수비 위치 코드 — XlsBATTER_DATA 행 바이트 28 (레코드 +0x1c, 표의 14번째 칸 u32).
+# 원본 0xb1048 은 `(레코드 +0x1c & 0xf) − 1` 로 수비 칸을 고른다 (칸 0 = 투수는 건너뜀).
+#   1 지명 · 2 포수 · 3 1루 · 4 2루 · 5 3루 · 6 유격
+#   7 = 1루 쪽 외야(우익 자리) · 8 = 3루 쪽 외야(좌익 자리) · 9 중견
+#   0 = 자리 없는 후보 (15팀 × 3명 = 45명)
+# ⚠️ 원본 그대로: 기록 번호(7 좌익 · 8 중견 · 9 우익)와 7·8·9 가 다르다. 좌표 표 0xd86ec 를 따른다.
+# 근거: R3-field-view.md 2-2·6절
+POSITION_OFFSET = 28
+POSITION_MASK = 0xF
+
 # StrCOMMON 안의 구간. 인덱스를 직접 확인해 정리한 것이다.
 COMMON_TEAM_RANGE = (0, 15)
 COMMON_ACE_PITCHER_RANGE = (15, 20)
@@ -66,6 +76,12 @@ def abilities_of(row_hex: str) -> list[int]:
         // ABILITY_SCALE
         for i in range(ABILITY_COUNT)
     ]
+
+
+def position_of(row_hex: str) -> int:
+    """타자 레코드의 수비 위치 코드 (0xb1048 과 같은 식)."""
+    row = bytes.fromhex(row_hex)
+    return int.from_bytes(row[POSITION_OFFSET:POSITION_OFFSET + 4], 'little') & POSITION_MASK
 
 
 def quote(text: str) -> str:
@@ -185,11 +201,16 @@ def generate_roster() -> None:
     rosters = {}
     for label, table in (('batters', 'XlsBATTER_DATA'), ('pitchers', 'XlsPITCHER_DATA')):
         data = load(table)
-        rosters[label] = [
-            {'id': index, 'name': name, 'ability': abilities_of(row)}
-            for index, (name, row) in enumerate(zip(data['names'], data['rows']))
-            if name.strip()
-        ]
+        rows = []
+        for index, (name, row) in enumerate(zip(data['names'], data['rows'])):
+            if not name.strip():
+                continue
+            player = {'id': index, 'name': name, 'ability': abilities_of(row)}
+            # 수비 위치는 타자 표에만 있다. 투수 표의 같은 칸(+0x1c)은 다른 뜻이라 넣지 않는다.
+            if label == 'batters':
+                player['position'] = position_of(row)
+            rows.append(player)
+        rosters[label] = rows
     write_json_module(
         'roster.ts',
         'roster.json',
@@ -199,6 +220,15 @@ def generate_roster() -> None:
         '  readonly name: string\n'
         '  /** 히트 · 파워 · 수비 · 주루 (투수는 제구 · 구속 · 변화 · 체력) — 0xb6414 인덱스 순서 */\n'
         '  readonly ability: readonly [number, number, number, number]\n'
+        '  /**\n'
+        '   * 수비 위치 코드 — 원본 레코드 +0x1c (XlsBATTER_DATA 행 바이트 28).\n'
+        '   * 1 지명 · 2 포수 · 3 1루 · 4 2루 · 5 3루 · 6 유격 ·\n'
+        '   * 7 = 1루 쪽 외야(우익 자리) · 8 = 3루 쪽 외야(좌익 자리) · 9 중견 · 0 = 자리 없는 후보.\n'
+        '   * 수비 칸 번호는 `code - 1` 이고 칸 0(투수)은 이 검색에서 빠진다 (0xb1048).\n'
+        '   * ⚠️ 원본 그대로: 기록 번호(7 좌익 · 8 중견 · 9 우익)와 7·8·9 가 어긋난다.\n'
+        '   * 투수 명단에는 없다.\n'
+        '   */\n'
+        '  readonly position?: number\n'
         '}\n'
         '\n'
         '// JSON 은 네 칸 튜플을 나타내지 못해 한 번 더 단언한다\n'
