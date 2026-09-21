@@ -7,8 +7,9 @@ import {
 import type { RookieProfile } from '@/entities/career/model/playerCareer'
 import { TEAMS } from '@/shared/config/original/teams'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
-import { batterLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
+import { batterLayerPaletteIndex, batterLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
 import type { BatterLayer } from '@/widgets/batting-stage/lib/batterLayers'
+import { useRecoloredSprite } from '@/shared/lib/sprite/paletteSwap'
 // 원본은 등록 화면을 관리 화면 기본정보 카드(0x15e20)로 그린다 — 카드 좌표·레이더를 그대로 가져다 쓴다
 import { FIGURE_BOX, FIGURE_FOOT, INFO_BOARD, RIGHT_PANEL } from '@/pages/management/lib/basicInfoLayout'
 import { RadarChart } from '@/pages/management/ui/RadarChart'
@@ -40,8 +41,11 @@ interface CreatePlayerScreenProps {
  *
  * 팀은 앞 화면(팀 고르기 0x65, `TeamSelectScreen`)이 고른 것을 받아 **보여 주기만** 한다 —
  * 등록 화면에서 고르는 줄은 다섯뿐이라 팀명 칸은 여기서 바뀌지 않는다.
- * ⚠️ 피부를 바꿔도 그림 색이 바뀌지 않는다. 원본은 몸통 팔레트를 **피부×15 + 팀** 번호의 .mpl 로
- *    갈아 끼우는데(C-1), 웹 스프라이트는 "팀 2 · 황인" 한 벌로 구워져 있고 .mpl 적용은 tools/ 몫이다.
+ *
+ * 피부·팀을 바꾸면 그림 색도 따라 바뀐다 (C-1 확정, 원본 0x171a0 이 피부 줄을 바꾼 뒤 0x10810 을
+ * 다시 불러 팔레트만 갈아 끼우는 것과 같다). 웹 스프라이트는 "팀 2 · 황인" 한 벌로 구워져 있으므로
+ * `useRecoloredSprite` 가 팔레트 번호 지도(`<폴더>/frames/index/NNN.png`)와 `palette.json` 으로
+ * **몸통 = 피부×15 + 팀 · 헬멧 = 팀** 벌을 그때그때 칠한다 (`batterLayerPaletteIndex`).
  */
 export function CreatePlayerScreen({ teamId = DEFAULT_TEAM_ID, onCreate, onCancel }: CreatePlayerScreenProps) {
   const [name, setName] = useState('')
@@ -129,8 +133,11 @@ export function CreatePlayerScreen({ teamId = DEFAULT_TEAM_ID, onCreate, onCance
           transformOrigin: `${FIGURE_FOOT.x}px 0`,
           transform: profile.battingSide === 1 ? 'scaleX(-1)' : undefined,
         }}>
-        {batterLayersOf(FIGURE_POSE_FRAME, profile.battingTypeIndex).map((layer, index) => (
-          <LayerSprite key={index} layer={layer} />
+        {/* 열쇠가 폴더·프레임인 이유: 타입을 바꾸면 몸통 파일이 갈리는데, 그대로 두면 `useRecoloredSprite`
+            가 앞 그림 주소를 한 번 더 내보내 엉뚱한 겹이 비친다 (상태가 한 박자 늦는다) */}
+        {batterLayersOf(FIGURE_POSE_FRAME, profile.battingTypeIndex).map((layer) => (
+          <LayerSprite key={`${layer.folder}#${layer.frame}`} layer={layer}
+            skinIndex={profile.skinIndex} teamIndex={teamId} />
         ))}
       </div>
 
@@ -223,10 +230,29 @@ export function CreatePlayerScreen({ teamId = DEFAULT_TEAM_ID, onCreate, onCance
   )
 }
 
-/** 선수 그림 한 겹 — 레이어마다 폴더가 달라 원점 파일도 따로 읽는다 */
-function LayerSprite({ layer }: { readonly layer: BatterLayer }) {
+/**
+ * 선수 그림 한 겹 — 레이어마다 폴더가 달라 원점 파일도 따로 읽는다.
+ *
+ * `FrameSprite` 를 못 쓰고 `<img>` 를 직접 놓는 이유: 칠한 그림은 데이터 URL 이라 `src` 를 갈아야 하는데
+ * `FrameSprite` 는 폴더·프레임으로 `src` 를 스스로 만든다. 자리 계산은 `FrameSprite` 와 같다.
+ * ⚠️ 캔버스가 없으면(테스트의 jsdom) `useRecoloredSprite` 가 조용히 구운 그림을 그대로 내보낸다.
+ */
+function LayerSprite({
+  layer, skinIndex, teamIndex,
+}: {
+  readonly layer: BatterLayer
+  readonly skinIndex: number
+  readonly teamIndex: number
+}) {
   const origins = useFrameOrigins(layer.folder)
-  return <FrameSprite folder={layer.folder} frame={layer.frame} origins={origins} x={FIGURE_FOOT.x} y={FIGURE_FOOT.y} />
+  const key = String(layer.frame).padStart(3, '0')
+  const src = useRecoloredSprite(`${layer.folder}/${key}.png`, batterLayerPaletteIndex(layer.folder, skinIndex, teamIndex))
+  const origin = origins?.[key]
+  if (origin === undefined) return null
+  return (
+    <img className={styles.layer} alt="" src={src}
+      style={{ left: FIGURE_FOOT.x + origin.x, top: FIGURE_FOOT.y + origin.y }} />
+  )
 }
 
 /** 값 칸 양옆 화살표 — 그림은 근사(ARROW 주석) */

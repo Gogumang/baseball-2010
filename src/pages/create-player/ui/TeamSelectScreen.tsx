@@ -6,7 +6,7 @@ import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import {
   ABILITY_CHART, ANCHOR_A, ANCHOR_B, GRID, LOCKED_CIRCLES, LOCKED_NAME, NAME_BAR, TAG,
-  TEAM_COUNT, cellPositionOf, isTeamOpen,
+  TEAM_COUNT, abilityChartOutlineOf, abilityChartVerticesOf, cellPositionOf, isTeamOpen,
 } from '@/pages/create-player/lib/teamSelectLayout'
 import * as styles from '@/pages/create-player/ui/TeamSelectScreen.css'
 
@@ -58,8 +58,8 @@ interface TeamSelectScreenProps {
  *
  * **근사한 곳** (원본 함수 속이 안 풀렸다):
  *   - 격자 **칸 배치** — 칸 40px·5열·중심 (120,182) 만 확정이고 칸 그리기 0x7a571 은 미해독이다.
- *   - **능력치 도형** — 0x5aefd 는 인자만 읽었다(B 아래 반지름 30). 여기서는 팀 레코드의
- *     u16 네 칸을 네 축 방사형으로 그린다. 원본이 몇 축인지·눈금이 무엇인지는 아직 모른다.
+ *   - **능력치 마름모의 그리는 방법** — 축 각도(225·315·45·135)·반지름 30·값 → 길이 식은
+ *     디스어셈으로 확정했지만(아래 `TeamAbilityChart`), 선·채움을 어떤 순서로 얹는지는 미해독이다.
  */
 export function TeamSelectScreen({
   openedHiddenIds = [], title = '팀선택', gamePoint = 0, onSelect, onCancel,
@@ -184,31 +184,43 @@ export function TeamSelectScreen({
 }
 
 /**
- * 팀 능력치 도형 — **근사**. 원본 0x5aefd 는 B 아래 반지름 30 에 그린다는 것만 확정이고
- * 속은 미해독이라, 팀 레코드 u16 네 칸을 네 축(위·오른쪽·아래·왼쪽)으로 펼쳐 그린다.
+ * 바깥 마름모 채움 알파 — `anim+0x80 = 0xb4ffff00`(0x5b386) 의 위 바이트 0xb4.
+ * 아래 세 바이트 ffff00 이 `radarFill`(#FFFF00) 과 같고, `anim+0x7c = makeColor(255,255,255)`(0x5b380)
+ * 가 `radarEdge`(#FFFFFF) 다. ⚠️ 어느 색이 채움이고 어느 색이 선인지는 **유력** — 그리는 함수는 못 읽었다.
+ */
+const CHART_FILL_ALPHA = 0xb4 / 0xff
+
+/**
+ * 팀 능력치 마름모 — `0x5aefd` 종류 0, 반지름 30 (S9 5절 + 이번 디스어셈).
+ *
+ * 길이 식 `0x75ebc` 를 떴다: **현재길이 = 반지름 × 값 / 999**, 축은 표 `0xd1b0c` 의
+ * **225·315·45·135°** 네 대각선이다. 원본은 축마다 **최대길이(= 반지름)** 꼭짓점도 함께 계산해
+ * 정점 구조(+0xc/+0x10 최대점, +0x14/+0x18 현재점)에 들고 있으므로, 값 마름모 뒤에 반지름 30 의
+ * **바깥 마름모**를 함께 그린다 — ⚠️ 바깥 마름모를 어떤 선으로 그리는지는 **근사다** (그리는 함수 미해독).
+ *
+ * ⚠️ 꼭짓점 그림(프레임 8·9·10·11)과 축 딱지(반지름 +18, 0x5b412 루프)는 웹에 그림 근거가 없어 뺐다.
+ * 원본은 숫자를 쓰지 않고 도형만 그린다 — 여기도 숫자를 넣지 않는다.
  */
 function TeamAbilityChart({ values }: { readonly values: readonly number[] }) {
   const center = { x: ANCHOR_B.x + ABILITY_CHART.dx, y: ANCHOR_B.y + ABILITY_CHART.dy }
-  const size = ABILITY_CHART.radius * 2
-  if (values.length === 0) {
-    return (
-      <span className={styles.lockedCircle}
-        style={{ left: center.x - ABILITY_CHART.radius, top: center.y - ABILITY_CHART.radius,
-          width: size, height: size, background: ORIGINAL_COLORS.panelDeep }} />
-    )
-  }
-  // 팀 능력치는 원본 0~999 눈금이다 (teams.ts 주석)
-  const points = values.slice(0, 4).map((value, axis) => {
-    const ratio = Math.min(1, value / 999)
-    const length = ABILITY_CHART.radius * ratio
-    const angle = (Math.PI / 2) * axis - Math.PI / 2
-    return `${(center.x + Math.cos(angle) * length).toFixed(1)},${(center.y + Math.sin(angle) * length).toFixed(1)}`
-  })
+  const radius = ABILITY_CHART.radius
+  const size = radius * 2
+  const pointsOf = (points: readonly { readonly x: number; readonly y: number }[]) =>
+    points.map((point) => `${point.x},${point.y}`).join(' ')
+  // 잠긴 팀은 원본도 idx −1 로 네 값을 0 으로 채운다 (0x5b008) — 바깥 마름모만 남는다
+  const hasValues = values.length > 0
+
   return (
-    <svg className={styles.layer} width={size} height={size}
-      viewBox={`${center.x - ABILITY_CHART.radius} ${center.y - ABILITY_CHART.radius} ${size} ${size}`}
-      style={{ left: center.x - ABILITY_CHART.radius, top: center.y - ABILITY_CHART.radius }}>
-      <polygon points={points.join(' ')} fill={ORIGINAL_COLORS.radarFill} stroke={ORIGINAL_COLORS.radarEdge} />
+    <svg className={styles.layer} width={size} height={size} shapeRendering="crispEdges"
+      viewBox={`${center.x - radius} ${center.y - radius} ${size} ${size}`}
+      style={{ left: center.x - radius, top: center.y - radius }}>
+      <polygon points={pointsOf(abilityChartOutlineOf(center, radius))}
+        fill="none" stroke={ORIGINAL_COLORS.radarEdge} strokeWidth={1} />
+      {hasValues && (
+        <polygon points={pointsOf(abilityChartVerticesOf(center, values, radius))}
+          fill={ORIGINAL_COLORS.radarFill} fillOpacity={CHART_FILL_ALPHA}
+          stroke={ORIGINAL_COLORS.radarEdge} strokeWidth={1} />
+      )}
     </svg>
   )
 }

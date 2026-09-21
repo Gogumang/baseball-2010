@@ -11,6 +11,8 @@
  * k = 0 보정 (표 0xd1eac) → A = (58, 110) · B = (178, 96)
  * ```
  */
+import { cosineSixteen, sineSixteen } from '@/shared/lib/math/originalTrigonometry'
+
 const SCREEN_WIDTH = 240
 const SCREEN_HEIGHT = 320
 
@@ -123,5 +125,97 @@ export const NAME_BAR = { image: 9, width: 82, height: 15, dx: -41, dy: 40 } as 
 export const NAME_TEXT = { firstFrame: 65, dy: 42 } as const
 export const teamNameFrameOf = (teamId: number) => NAME_TEXT.firstFrame + teamId
 
-/** 능력치 도형 — `0x5aefd(…, B.x, B.y + 8, …, 잠김이면 −1, 반지름 30)` */
+/**
+ * 능력치 마름모 — `0x5aefd(skin, [skin+0xd4], B.x, B.y + 8, 종류 0, …, 팀 idx(잠김이면 −1), 반지름 30, …)`.
+ *
+ * 호출 두 군데를 떠서 인자를 확인했다 (0x63dee 안):
+ *   - 열린 팀 `0x63e5c~0x63e74` → 스택 [8] = 팀 idx, **[0xc] = `movs r3,#0x1e` = 30**
+ *   - 잠긴 팀 `0x63f14~0x63f38` → 스택 [8] = −1,     **[0xc] = 0x1e = 30**
+ * 그 30 이 `anim+0x1d8` 로 들어가 꼭짓점 길이의 기준이 된다 (0x5b396).
+ */
 export const ABILITY_CHART = { dx: 0, dy: 8, radius: 30 } as const
+
+/**
+ * 4축 각도 — 표 `0xd1b0c` (= 서술자 표 `0xd1b2c` 각 항목의 +4). **화면 좌표(y 가 아래)의 네 대각선**이라
+ * 왼위 · 오른위 · 오른아래 · 왼아래 순이다. 꼭짓점 그림은 방향마다 8·9·10·11 로 다르다 (S9 5-1 확정).
+ * 값은 팀 레코드 `+4 · +6 · +8 · +0xa` 를 이 차례로 짝지어 넣는다 (0x5b062~0x5b084).
+ */
+export const ABILITY_AXIS_ANGLES: readonly number[] = [225, 315, 45, 135]
+
+/**
+ * 축 하나의 최대치 — 서술자 표 `0xd1b2c` 항목의 첫 u16. 네 축 모두 **999** 다.
+ * 나눗셈 상수(`0x760d0`)도 같은 999 다.
+ */
+export const ABILITY_AXIS_MAXIMUM = 999
+const ABILITY_CHART_SCALE = 999
+
+/**
+ * **값 → 꼭짓점 길이** (`0x75ebc`, 이번에 디스어셈으로 풀었다 — S9 5절 "미해결" 이던 곳):
+ *
+ * ```
+ * 75f1c: 반지름(anim+0x1d8) 이 0 이면 32 를 넣는다
+ * 75f30: 최대길이(+0xa) = 반지름 × 서술자+0(축 최대치)  / 999      ; 0xca7b5 정수 나눗셈
+ * 75f96: 현재길이(+0xb) = 최대길이 × 서술자+2(능력치 값) / 999
+ * ```
+ * 축 최대치가 999 라 **최대길이 = 반지름**, **현재길이 = 반지름 × 값 / 999** 로 줄어든다.
+ * 정수 나눗셈이라 버림이다.
+ */
+export function abilityAxisMaximumLengthOf(radius: number = ABILITY_CHART.radius): number {
+  return Math.trunc((radius * ABILITY_AXIS_MAXIMUM) / ABILITY_CHART_SCALE)
+}
+export function abilityAxisLengthOf(value: number, radius: number = ABILITY_CHART.radius): number {
+  return Math.trunc((abilityAxisMaximumLengthOf(radius) * value) / ABILITY_CHART_SCALE)
+}
+
+export interface ChartPoint {
+  readonly x: number
+  readonly y: number
+}
+
+/**
+ * 축 하나의 꼭짓점 (`0x75f4e~0x75f88` 최대점 · `0x76034~0x7606a` 현재점):
+ *
+ * ```
+ * x = 중심x + (길이 × cos(각도)) >> 16
+ * y = 중심y + (길이 × sin(각도)) >> 16
+ * ```
+ * sin·cos 는 `0x6c7c0`·`0x6c7f4` 의 ×65535 표(`0xd2eec` = `SINE_SIXTEEN_TABLE`)다.
+ * `>>` 는 산술 시프트라 내림이다.
+ */
+export function abilityVertexOf(center: ChartPoint, length: number, angle: number): ChartPoint {
+  return {
+    x: center.x + ((length * cosineSixteen(angle)) >> 16),
+    y: center.y + ((length * sineSixteen(angle)) >> 16),
+  }
+}
+
+/** 값 네 개의 꼭짓점. 값이 없으면(잠긴 팀, idx = −1) 원본도 네 값을 0 으로 채운다 (0x5b008~0x5b026) */
+export function abilityChartVerticesOf(
+  center: ChartPoint,
+  values: readonly number[],
+  radius: number = ABILITY_CHART.radius,
+): readonly ChartPoint[] {
+  return ABILITY_AXIS_ANGLES.map((angle, axis) =>
+    abilityVertexOf(center, abilityAxisLengthOf(values[axis] ?? 0, radius), angle))
+}
+
+/**
+ * 바탕 테두리 — 그리기 `0x7633c` (확정).
+ * 넘겨받은 반지름이 아니라 **고정 29**(`0x7639c movs r3,#0x1d`)로, 자기 각도표 `0xd36fc`
+ * (= 역시 [225,315,45,135])를 따라 네 꼭짓점을 잡고 **선 네 줄**(0x763d6~0x7641e)을 긋는다.
+ * 색은 `makeColor(0x6b, 0x92, 0xf4)` = **#6B92F4** (`radarAxis`) 다.
+ */
+export const ABILITY_FRAME_RADIUS = 29
+
+export function abilityChartFrameOf(center: ChartPoint): readonly ChartPoint[] {
+  return ABILITY_AXIS_ANGLES.map((angle) => abilityVertexOf(center, ABILITY_FRAME_RADIUS, angle))
+}
+
+/**
+ * 축별 **최대 꼭짓점**(길이 = 최대길이)으로 그리는 빨간 테두리 — `0x76440~0x764a2`,
+ * 색은 `anim+0x1dc = makeColor(255,0,0)`(0x5b36c). 다만 `anim+0x1e0` 이 0 이 아닐 때만 그리는데
+ * (0x76424) 그 칸을 세우는 곳을 못 찾았다 — **그래서 웹에서는 그리지 않는다**.
+ */
+export function abilityChartMaximumOf(center: ChartPoint, radius: number = ABILITY_CHART.radius): readonly ChartPoint[] {
+  return ABILITY_AXIS_ANGLES.map((angle) => abilityVertexOf(center, abilityAxisMaximumLengthOf(radius), angle))
+}

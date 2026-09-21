@@ -140,6 +140,8 @@ export function CareerRoutes({
             event={event}
             playerName={career.name}
             teamName={(TEAMS[career.teamId] ?? TEAMS[0]).name}
+            skinIndex={career.skinIndex}
+            battingTypeIndex={career.battingTypeIndex}
             onComplete={actions.completeScene}
             carried={screen.carried}
             onMatch={(command, carried) => onAceMatch(command, carried, screen.context)}

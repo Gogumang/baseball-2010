@@ -21,6 +21,10 @@ interface StoryScreenProps {
   readonly event: OriginalEvent
   readonly playerName: string
   readonly teamName: string
+  /** 주인공 초상화 팔레트 — 피부 0 황인 · 1 백인 · 2 흑인 (event_char_0.mpl, C-1) */
+  readonly skinIndex?: number
+  /** 0 타격형 · 1 장타형. 장타형이면 초상화 애니가 **+8** 이다 (V2 정정) */
+  readonly battingTypeIndex?: number
   readonly onComplete: (rewards: readonly EventReward[], viewedEventIds: readonly number[]) => void
   /** 경기 명령 — 마선수 대결로 나간다 */
   readonly onMatch: (command: MatchCommand, carry: StoryCarry) => void
@@ -29,7 +33,9 @@ interface StoryScreenProps {
 }
 
 /** 원작 이벤트. 대사마다 원본이 정한 인물·표정·자리로 초상화를 띄운다. */
-export function StoryScreen({ events, event, playerName, teamName, onComplete, onMatch, carried }: StoryScreenProps) {
+export function StoryScreen({
+  events, event, playerName, teamName, skinIndex, battingTypeIndex, onComplete, onMatch, carried,
+}: StoryScreenProps) {
   const { step, portraits, next, jump } = useEventPlayback(events, event, onComplete, onMatch, carried)
   const command = step.command
 
@@ -55,7 +61,8 @@ export function StoryScreen({ events, event, playerName, teamName, onComplete, o
 
   return (
     <div className={styles.overlay}>
-      <EventPortraits portraits={portraits} height={styles.PORTRAIT_HEIGHT} />
+      <EventPortraits portraits={portraits} height={styles.PORTRAIT_HEIGHT}
+        skinIndex={skinIndex} battingTypeIndex={battingTypeIndex} />
       {speakerName !== null && <span className={styles.nameTag}>{speakerName}</span>}
 
       {dialogue !== '' && (

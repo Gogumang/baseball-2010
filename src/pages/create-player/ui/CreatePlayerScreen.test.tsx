@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen, fireEvent } from '@testing-library/react'
 import { CreatePlayerScreen } from '@/pages/create-player/ui/CreatePlayerScreen'
 import { cursorRectOf } from '@/pages/create-player/lib/createPlayerLayout'
+import { batterLayerPaletteIndex } from '@/widgets/batting-stage/lib/batterLayers'
 import type { RookieProfile } from '@/entities/career/model/playerCareer'
 
 /**
@@ -120,5 +121,33 @@ describe('선수 등록 — 확인 질문은 화면을 비우지 않는다', () 
     화면()
 
     expect(screen.getByRole('button', { name: '등록' }).hasAttribute('disabled')).toBe(true)
+  })
+})
+
+describe('선수 등록 — 피부·팀이 그림 팔레트를 고른다 (C-1)', () => {
+  const 몸통 = './sprites/batter_balancer/frames'
+  const 장타몸통 = './sprites/batter_sluger/frames'
+  const 헬멧 = './sprites/batter_helmet/frames'
+
+  it('몸통은 피부 × 15 + 팀 이다 (0x78be8)', () => {
+    expect(batterLayerPaletteIndex(몸통, 0, 2)).toBe(2)
+    expect(batterLayerPaletteIndex(몸통, 1, 0)).toBe(15)
+    expect(batterLayerPaletteIndex(장타몸통, 2, 14)).toBe(44)
+  })
+
+  it('헬멧은 팀만 본다 — 헬멧엔 피부가 없다 (0x78c14)', () => {
+    expect(batterLayerPaletteIndex(헬멧, 0, 7)).toBe(7)
+    expect(batterLayerPaletteIndex(헬멧, 2, 7)).toBe(7)
+  })
+
+  it('그림자·배트·다리는 .mpl 이 없어 구운 색 그대로다', () => {
+    expect(batterLayerPaletteIndex('./sprites/batter_shadow/frames', 2, 7)).toBeNull()
+    expect(batterLayerPaletteIndex('./sprites/batter_batter/frames', 2, 7)).toBeNull()
+    expect(batterLayerPaletteIndex('./sprites/item_bat_leg_0/frames', 2, 7)).toBeNull()
+  })
+
+  it('피부를 바꾸면 몸통 팔레트 번호가 15 씩 옮겨 간다 — 같은 팀에서 세 벌', () => {
+    const 팀 = 5
+    expect([0, 1, 2].map((skin) => batterLayerPaletteIndex(몸통, skin, 팀))).toEqual([5, 20, 35])
   })
 })

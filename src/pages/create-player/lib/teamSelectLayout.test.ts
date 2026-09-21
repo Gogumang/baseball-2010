@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
-  ANCHOR_A, ANCHOR_B, GRID, NAME_BAR, OPEN_TEAM_COUNT, TAG, TEAM_COUNT,
-  cellPositionOf, gridRowCountOf, isTeamOpen, teamNameFrameOf,
+  ABILITY_AXIS_ANGLES, ABILITY_AXIS_MAXIMUM, ABILITY_CHART, ANCHOR_A, ANCHOR_B, GRID, NAME_BAR,
+  OPEN_TEAM_COUNT, TAG, TEAM_COUNT, abilityAxisLengthOf, abilityAxisMaximumLengthOf,
+  abilityChartOutlineOf, abilityChartVerticesOf, cellPositionOf, gridRowCountOf, isTeamOpen,
+  teamNameFrameOf,
 } from '@/pages/create-player/lib/teamSelectLayout'
 
 /** 팀 고르기 배치 (상태 0x65 → 목록 0x63b15 의 k=0, 본문 0x63dee — P6 2a 확정) */
@@ -59,6 +61,50 @@ describe('팀 격자', () => {
     expect(cellPositionOf(3).y).toBe(cellPositionOf(0).y - 10)
     expect(cellPositionOf(4).y).toBe(cellPositionOf(0).y - 10)
     expect(cellPositionOf(2).y).toBe(cellPositionOf(0).y)
+  })
+})
+
+/**
+ * 능력치 마름모 — 0x5aefd 종류 0 · 꼭짓점 길이 0x75ebc (이번에 디스어셈으로 풀었다).
+ * 호출이 넘기는 반지름은 두 갈래(열린 팀 0x63e64 · 잠긴 팀 0x63f22) 모두 `movs r3,#0x1e` = 30 이다.
+ */
+describe('능력치 마름모', () => {
+  const 중심 = { x: ANCHOR_B.x + ABILITY_CHART.dx, y: ANCHOR_B.y + ABILITY_CHART.dy }
+  /** 서울 드래곤즈 TEAM_DATA 의 네 능력치 (레코드 +4·+6·+8·+0xa) */
+  const 드래곤즈 = [365, 440, 430, 365]
+
+  it('4축은 표 0xd1b0c 의 225·315·45·135° 네 대각선이다 — 위·오른쪽·아래·왼쪽이 아니다', () => {
+    expect(ABILITY_AXIS_ANGLES).toEqual([225, 315, 45, 135])
+    expect([ABILITY_CHART.radius, ABILITY_AXIS_MAXIMUM]).toEqual([30, 999])
+  })
+
+  it('최대길이 = 반지름 × 축 최대치 / 999 라 999 축에서는 반지름 그대로다 (0x75f30)', () => {
+    expect(abilityAxisMaximumLengthOf(30)).toBe(30)
+  })
+
+  it('현재길이 = 최대길이 × 값 / 999 이고 정수 나눗셈이라 버린다 (0x75f96)', () => {
+    expect(드래곤즈.map((value) => abilityAxisLengthOf(value, 30))).toEqual([10, 13, 12, 10])
+    expect(abilityAxisLengthOf(999, 30)).toBe(30)
+    expect(abilityAxisLengthOf(0, 30)).toBe(0)
+  })
+
+  it('꼭짓점 = 중심 + (길이 × cos·sin) >> 16 — ×65535 표(0xd2eec)와 산술 시프트다', () => {
+    expect(abilityChartVerticesOf(중심, 드래곤즈)).toEqual([
+      { x: 170, y: 96 },  // 225° 왼위
+      { x: 187, y: 94 },  // 315° 오른위
+      { x: 186, y: 112 }, // 45°  오른아래
+      { x: 170, y: 111 }, // 135° 왼아래
+    ])
+  })
+
+  it('바깥 마름모는 네 축 모두 최대길이로 뻗는다 — 값 마름모가 그 안에 들어간다', () => {
+    expect(abilityChartOutlineOf(중심)).toEqual([
+      { x: 156, y: 82 }, { x: 199, y: 82 }, { x: 199, y: 125 }, { x: 156, y: 125 },
+    ])
+  })
+
+  it('잠긴 팀(idx −1)은 원본도 네 값을 0 으로 채워 꼭짓점이 중심에 모인다 (0x5b008)', () => {
+    expect(abilityChartVerticesOf(중심, [])).toEqual([중심, 중심, 중심, 중심])
   })
 })
 

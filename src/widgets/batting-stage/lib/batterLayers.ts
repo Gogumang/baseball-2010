@@ -6,6 +6,8 @@
  * 없는 것으로 그린다 (추정). 손 아이템이 없으면 bat/batter_batter 를 쓴다. 다리는 item_bat_leg_0 (추정).
  * 그림자는 +0x48 플래그일 때만 그리는데 플래그 뜻이 미확인이라 늘 그린다 (추정).
  */
+import { outfitPaletteIndex } from '@/shared/lib/sprite/paletteSwap'
+
 const SPRITES = './sprites'
 const BODY_FOLDERS = [`${SPRITES}/batter_balancer/frames`, `${SPRITES}/batter_sluger/frames`]
 const SHADOW = `${SPRITES}/batter_shadow/frames`
@@ -27,6 +29,23 @@ export interface BatterLayer {
  */
 export function bodyTypeOf(form: number): number {
   return Math.max(0, Math.trunc(form)) >> 1 === 0 ? 0 : 1
+}
+
+/**
+ * 레이어 한 겹이 쓸 대체 팔레트(.mpl) 번호 — 없으면 null (C-1 확정).
+ *   몸통 `bat/batter_balancer`·`batter_sluger` → **피부 × 15 + 팀** (0x78be8)
+ *   헬멧 `bat/batter_helmet`                  → **팀** (0x78c14 — 헬멧엔 피부가 없다)
+ * 그림자·배트·다리·잔상은 .mpl 이 아예 없어 원본도 구운 색 그대로 그린다.
+ *
+ * 순수 함수라 캔버스가 없는 곳(테스트)에서도 쓸 수 있다. 실제로 칠하는 것은
+ * `shared/lib/sprite/paletteSwap.ts` 의 `useRecoloredSprite`(<img>) 몫이다 —
+ * ⚠️ 타석 화면은 캔버스(`renderBattingStage.drawBatter`)라 이 번호를 아직 못 받는다:
+ * `drawBatter` 는 피부·팀을 넘겨받지 않고 `spriteLoader.placedFrame` 도 URL 한 개만 받는다.
+ */
+export function batterLayerPaletteIndex(folder: string, skinIndex: number, teamIndex: number): number | null {
+  if (folder === BODY_FOLDERS[0] || folder === BODY_FOLDERS[1]) return outfitPaletteIndex(skinIndex, teamIndex)
+  if (folder === HELMET) return teamIndex
+  return null
 }
 
 interface PoseTable {
