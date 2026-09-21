@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { BigResult, Hint, MenuList, Panel, PixelScreen, StatGrid } from '@/shared/ui'
 import type { MenuItem, StatEntry } from '@/shared/ui'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -32,6 +32,8 @@ import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 // (같은 상태 0x10·0x11 의 조작이라 화면을 따로 만들 이유가 없다).
 import { CourseGrid } from '@/pages/pitching/ui/CourseGrid'
 import { PitchGradeGauge } from '@/pages/pitching/ui/PitchGradeGauge'
+import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
+import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import * as styles from '@/pages/team-game/ui/TeamGameScreen.css'
 
 /**
@@ -93,6 +95,10 @@ export function TeamGameScreen({
   const [courseCell, setCourseCell] = useState(4)
   const [isMenuOpen, setMenuOpen] = useState(false)
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
+  /** 이미 다 보여 준 수비 플레이 — 같은 플레이를 두 번 재생하지 않는다 */
+  const [shownPlay, setShownPlay] = useState<DefensePlayResult | null>(null)
+  const play = progress.lastDefensePlay
+  const finishPlayback = useCallback(() => setShownPlay(play), [play])
   /** `#` 투수 교체 화면(경기 상태 0xb)이 떠 있는가 */
   const [isChangingPitcher, setChangingPitcher] = useState(false)
   /** 제안 대사를 이미 보여 준 돌발 행 번호 */
@@ -177,6 +183,14 @@ export function TeamGameScreen({
         </Hint>
       </PixelScreen>
     )
+  }
+
+  /**
+   * 인플레이 타구는 **수비 화면을 먼저 보여 준다** (원본 상태 0x17).
+   * 이게 없으면 배트에 맞은 공이 어디로 갔는지 화면에 아예 안 나온다.
+   */
+  if (play !== null && play !== shownPlay && play.ticks.length > 0) {
+    return <DefensePlayback ticks={play.ticks} onDone={finishPlayback} />
   }
 
   // 경기 중 메뉴의 "조작방법"(0x3c212)·"설정"(0x3c326) — 원본도 경기 장면 위에 같은 화면을 얹는다
