@@ -4,11 +4,14 @@ import {
   GAME_RECORD_SIZE,
   MORALE_LIMIT,
   SEASON_GAME_COUNT,
+  STADIUM_EQUIPPED_SIZE,
   STADIUM_OWNED_SIZE,
   TEAM_ABILITY_LIMIT,
   clampTo,
   initialTeamAbilities,
   isFinalYear,
+  normalizeSeasonRecord,
+  normalizeSeasonState,
   seasonDayOf,
   startNewSeason,
   startNextYear,
@@ -118,5 +121,58 @@ describe('서브 아이템 칸 (R12 (나) · P4 3절 정정)', () => {
     expect(record.outingSubItems).toHaveLength(5)
     // 자동안마기(0x5c)는 둘 사이의 별도 칸이라 어느 배열에도 안 들어간다
     expect(record.massager).toBe(false)
+  })
+})
+
+describe('옛 세이브 메우기 — normalizeSeasonRecord', () => {
+  it('배열 칸이 통째로 없는 세이브도 기본값으로 채운다 (예전에는 경기 한 판에 터졌다)', () => {
+    // 필드가 늘기 전에 저장한 세이브 — 배열 칸이 아예 없다
+    const 옛세이브 = { teamId: 3, name: '드래곤즈', money: 120, games: 12, yearIndex: 1 }
+    const 메운것 = normalizeSeasonRecord(옛세이브)
+
+    expect(메운것.gameRecord).toHaveLength(GAME_RECORD_SIZE)
+    expect(메운것.gameRecord.every((칸) => 칸 === 0)).toBe(true)
+    expect(메운것.stadiumEquipped).toHaveLength(STADIUM_EQUIPPED_SIZE)
+    expect(메운것.stadiumOwned).toHaveLength(STADIUM_OWNED_SIZE)
+    expect(메운것.trainingSubItems).toHaveLength(4)
+    expect(메운것.outingSubItems).toHaveLength(5)
+  })
+
+  it('저장된 값은 손대지 않는다', () => {
+    const 옛세이브 = { teamId: 3, name: '드래곤즈', money: 120, games: 12, yearIndex: 1 }
+    const 메운것 = normalizeSeasonRecord(옛세이브)
+    expect(메운것.teamId).toBe(3)
+    expect(메운것.name).toBe('드래곤즈')
+    expect(메운것.money).toBe(120)
+    expect(메운것.games).toBe(12)
+    expect(메운것.yearIndex).toBe(1)
+  })
+
+  it('길이가 모자란 배열은 뒤를 채워 늘린다 (칸이 늘어난 경우)', () => {
+    const 메운것 = normalizeSeasonRecord({ gameRecord: [5, 7], stadiumEquipped: [2] })
+    expect(메운것.gameRecord).toHaveLength(GAME_RECORD_SIZE)
+    expect(메운것.gameRecord[0]).toBe(5)
+    expect(메운것.gameRecord[1]).toBe(7)
+    expect(메운것.gameRecord[2]).toBe(0)
+    expect(메운것.stadiumEquipped).toEqual([2, 0, 0])
+  })
+
+  it('null 이면 새 시즌 기본값이다', () => {
+    expect(normalizeSeasonRecord(null).gameRecord).toHaveLength(GAME_RECORD_SIZE)
+  })
+})
+
+describe('옛 세이브 메우기 — normalizeSeasonState', () => {
+  it('사기·팀 능력치가 없으면 새 시즌 값으로 채운다', () => {
+    const 메운것 = normalizeSeasonState({ record: { teamId: 2 } })
+    expect(메운것.teamMorale).toBe(MORALE_LIMIT)
+    expect(메운것.teamAbilities).toHaveLength(10)
+    expect(메운것.record.teamId).toBe(2)
+  })
+
+  it('있는 사기·능력치는 그대로 둔다', () => {
+    const 메운것 = normalizeSeasonState({ teamMorale: 42, teamAbilities: [[1, 2, 3, 4]] })
+    expect(메운것.teamMorale).toBe(42)
+    expect(메운것.teamAbilities[0]).toEqual([1, 2, 3, 4])
   })
 })

@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 import type { SeasonRecord, SeasonState } from '@/entities/season-mode/model/seasonRecord'
-import { SEASON_GAME_COUNT, startNewSeason } from '@/entities/season-mode/model/seasonRecord'
+import { SEASON_GAME_COUNT, normalizeSeasonState, startNewSeason } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonSceneState } from '@/entities/season-mode/model/seasonStateMachine'
 import {
   SEASON_PHASE,
@@ -172,9 +172,29 @@ export type SeasonGameKind = '정규' | '포스트시즌' | '국가대항전'
 /** 시즌 외출 장소 표에서 **병원** 칸 (StrMODE[54+p] = 친선경기·회식·입원·야구교실·구단CF) */
 const HOSPITAL_PLACE = SEASON_OUTING_PLACES.indexOf('병원')
 
+/**
+ * 저장에서 읽은 것을 쓸 수 있는 모양으로 만든다.
+ *
+ * 저장은 그냥 JSON 이라 **필드가 늘기 전에 저장한 세이브**에는 나중에 생긴 칸이 아예 없다.
+ * 예전에는 `as SeasonSave` 로 캐스팅만 해서 그 `undefined` 가 그대로 흘렀고, 경기 한 판만
+ * 끝내도 `seasonReputation` 의 `score -= s[1]` 에서 터졌다. 나만의리그 쪽 `normalizeCareer`
+ * 와 같은 자세로 **빠진 칸만 기본값으로 채운다** — 있는 값은 손대지 않는다.
+ */
+function normalizeSeasonSave(saved: Partial<SeasonSave> | null): SeasonSave | null {
+  if (saved === null || saved === undefined || typeof saved !== 'object') return null
+  const state = normalizeSeasonState(saved.state)
+  return {
+    ...saved,
+    state,
+    league: saved.league ?? EMPTY_LEAGUE,
+    roster: saved.roster ?? rosterOf(state.record.teamId),
+    playerStats: saved.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS,
+  }
+}
+
 export function useSeasonSession(store: JsonStorePort, random: RandomPort): SeasonSession {
   const loaded = useRef<SeasonSave | null>(null)
-  if (loaded.current === null) loaded.current = (store.load() as SeasonSave | null) ?? null
+  if (loaded.current === null) loaded.current = normalizeSeasonSave(store.load() as Partial<SeasonSave> | null)
 
   const [save, setSave] = useState<SeasonSave | null>(loaded.current)
   const [scene, setScene] = useState<SeasonSceneState>(() =>
