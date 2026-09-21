@@ -11,7 +11,7 @@ import { drawHomeRunBanner } from '@/widgets/batting-stage/lib/renderHomeRunBann
 import { batterLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
 
 import type { HudState } from '@/widgets/batting-stage/lib/renderHud'
-import { STAGE_LAYOUT, toPixel } from '@/widgets/batting-stage/lib/stageLayout'
+import { BATTER_SIDE, STAGE_SIDE, stageLayoutOf, toPixel } from '@/widgets/batting-stage/lib/stageLayout'
 import { UI_COLORS } from '@/shared/config/design'
 import { PIXEL_FONT_FAMILY } from '@/app/styles/theme.css'
 
@@ -44,6 +44,11 @@ export interface StageScene {
   readonly swingFrame: number
   /** 타자 몸통 종류 t = 폼 >> 1 (0 balancer · 1 sluger, 0x78ab0) */
   readonly bodyType: number
+  /**
+   * 타자 손 = 폼 & 1 (0 우타 · 1 좌타, 0xb63c0). 안 넘기면 좌타 배치다.
+   * 우타면 타자 그림과 구장이 좌우로 뒤집히고 앵커·존도 표의 우타 칸을 쓴다 (R6 4절).
+   */
+  readonly side?: number
   /** 마운드에 그릴 마선수. 없으면 평범한 투수라 그리지 않는다. */
   /** 화면에 겹쳐 그릴 경기 상황 */
   readonly hud: HudState | null
@@ -58,17 +63,19 @@ export function renderBattingStage(
   context: CanvasRenderingContext2D,
   scene: StageScene,
 ): void {
+  const side = scene.side ?? STAGE_SIDE
   drawScenery(context, {
     ...scene.scenery,
     tick: scene.tick,
+    side,
     inning: scene.hud?.inning ?? 1,
     ourTeamId: scene.hud?.ourTeamId ?? null,
     opponentTeamId: scene.hud?.opponentTeamId ?? null,
   })
   const progress = scene.pitch === null || scene.frame < 0 ? -1 : scene.frame / scene.pitch.frameCount
-  drawPitcher(context, scene.acePitcher, progress, scene.pitcherTick, scene.tick)
-  drawBatter(context, scene.swingFrame, scene.shift, scene.bodyType)
-  drawStrikeZone(context)
+  drawPitcher(context, scene.acePitcher, progress, scene.pitcherTick, scene.tick, side)
+  drawBatter(context, scene.swingFrame, scene.shift, scene.bodyType, side)
+  drawStrikeZone(context, side)
   if (scene.pitch !== null && scene.isEagleEyeEnabled) {
     drawEagleEyeMarker(context, platePixelOf(scene.pitch))
   }
@@ -89,12 +96,6 @@ export function renderBattingStage(
   }
 }
 
-/** 타자·투수 앵커 (프레임 원점 = 발밑) — 원본 표 0xcfb2c · 0xcfb18 */
-const BATTER_ANCHOR_X = STAGE_LAYOUT.batterAnchor.x
-const BATTER_ANCHOR_Y = STAGE_LAYOUT.batterAnchor.y
-const MOUND_CENTER_X = STAGE_LAYOUT.pitcherAnchor.x
-const MOUND_BOTTOM_Y = STAGE_LAYOUT.pitcherAnchor.y
-
 /** 일반 투수 폼 — 원본 투수 명단 첫 선수의 폼(0)으로 둔다 (추정). 홀수 폼이면 좌우 반전이다 */
 const PITCHER_FORM = 0
 
@@ -104,7 +105,10 @@ function drawPitcher(
   progress: number,
   pitcherTick: number | null,
   tick: number,
+  side: number,
 ): void {
+  // 투수 앵커 (프레임 원점 = 발밑) — 원본 표 0xcfb18 의 side 칸
+  const { x: MOUND_CENTER_X, y: MOUND_BOTTOM_Y } = stageLayoutOf(side).pitcherAnchor
   const ratio = progress < 0 ? 0 : Math.min(1, progress)
 
   if (ace === null) {
@@ -130,27 +134,43 @@ function drawPitcher(
   context.drawImage(image, MOUND_CENTER_X - image.width / 2, MOUND_BOTTOM_Y - image.height)
 }
 
-/** 원작 타자는 그림자·몸통·헬멧·배트·몸통 앞·다리를 자세마다 다른 순서로 겹친다 (0x78cfc) */
-function drawBatter(context: CanvasRenderingContext2D, swingFrame: number, shift: number, bodyType: number): void {
+/**
+ * 원작 타자는 그림자·몸통·헬멧·배트·몸통 앞·다리를 자세마다 다른 순서로 겹친다 (0x78cfc).
+ * 그림은 **좌타 자세로 그려져 있어** 우타(+0x3c == 0)면 효과 0x11 로 좌우를 뒤집는다 (R6 4절).
+ * 앵커는 표 0xcfb2c 의 side 칸이고, 뒤집을 때는 그 앵커를 축으로 거울을 놓는다.
+ */
+function drawBatter(
+  context: CanvasRenderingContext2D,
+  swingFrame: number,
+  shift: number,
+  bodyType: number,
+  side: number,
+): void {
+  const anchor = stageLayoutOf(side).batterAnchor
+  // 좌우 이동(fe4)은 원본도 객체 x(+4)에 그대로 더하므로 거울 축을 그 자리로 옮겨 방향을 지킨다.
+  // 원본 엔진이 파트 상자 안에서 뒤집는지 그림 안에서 뒤집는지는 못 봤다 — 축 잡기는 **근사**다.
+  const axisX = anchor.x + shift
+  context.save()
+  if (side === BATTER_SIDE.우타) {
+    context.translate(axisX * 2, 0)
+    context.scale(-1, 1)
+  }
   for (const layer of batterLayersOf(swingFrame, bodyType)) {
     const frame = placedFrame(layer.folder, layer.frame)
     if (frame === null) continue
-    context.drawImage(
-      frame.image,
-      BATTER_ANCHOR_X + shift + frame.offsetX,
-      BATTER_ANCHOR_Y + frame.offsetY,
-    )
+    context.drawImage(frame.image, axisX + frame.offsetX, anchor.y + frame.offsetY)
   }
+  context.restore()
 }
 
 /** 존 표시는 선이 아니라 slt_pitch 프레임 73(빨간 모서리)을 존 가운데에 찍는다 (0x35ae8) */
 const ZONE_FRAME_FOLDER = './sprites/slt_pitch/frames'
 const ZONE_FRAME_INDEX = 73
 
-function drawStrikeZone(context: CanvasRenderingContext2D): void {
+function drawStrikeZone(context: CanvasRenderingContext2D, side: number): void {
   const frame = placedFrame(ZONE_FRAME_FOLDER, ZONE_FRAME_INDEX)
   if (frame === null) return
-  const center = toPixel({ x: 0, y: 0 })
+  const center = toPixel({ x: 0, y: 0 }, side)
   context.drawImage(frame.image, Math.round(center.x) + frame.offsetX, Math.round(center.y) + frame.offsetY)
 }
 
@@ -188,7 +208,7 @@ function drawBall(context: CanvasRenderingContext2D, pitch: Pitch, frame: number
 
 /** 판정 글자 — game_judge 애니를 (117,224) 원점에 재생한다 (0x39504 → 0x393b4). 해당 애니가 없는 문구는 글자로 쓴다 */
 function drawResultText(context: CanvasRenderingContext2D, text: string, resultTick: number): void {
-  const { x: centerX, y: centerY } = STAGE_LAYOUT.judgeCenter
+  const { x: centerX, y: centerY } = stageLayoutOf().judgeCenter
   const animation = judgeAnimationOf(text)
   if (animation !== null) {
     const entries = frameAnimations(JUDGE_FRAMES)?.[animation]

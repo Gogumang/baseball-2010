@@ -21,8 +21,11 @@ export function ballPixelAt(pitch: Pitch, frame: number): { x: number; y: number
   if (path !== null && path.length > 0) {
     return projectToScreen(path[clampFrame(frame, path.length)], pitch.stageSide)
   }
-  const plate = toPixel(pitch.plate)
-  const bend = toPixel({ x: pitch.plate.x - pitch.breakOffset.x, y: pitch.plate.y - pitch.breakOffset.y })
+  const plate = toPixel(pitch.plate, pitch.stageSide)
+  const bend = toPixel(
+    { x: pitch.plate.x - pitch.breakOffset.x, y: pitch.plate.y - pitch.breakOffset.y },
+    pitch.stageSide,
+  )
   const controlPoints = [RELEASE_PIXEL, bend, plate].map((point) => ({
     x: Math.round(point.x * FIXED_POINT),
     y: Math.round(point.y * FIXED_POINT),
@@ -36,7 +39,7 @@ export function ballPixelAt(pitch: Pitch, frame: number): { x: number; y: number
 export function platePixelOf(pitch: Pitch): { x: number; y: number } {
   const path = pitch.worldPath
   if (path !== null && path.length > 0) return projectToScreen(path[path.length - 1], pitch.stageSide)
-  return toPixel(pitch.plate)
+  return toPixel(pitch.plate, pitch.stageSide)
 }
 
 /** 공 종류(game+0x1080)의 뜻은 미해독이라 첫 묶음(0)을 쓴다 (추정) */

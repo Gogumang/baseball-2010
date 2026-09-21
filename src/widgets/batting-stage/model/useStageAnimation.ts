@@ -5,6 +5,7 @@ import type { BattingSwing } from '@/features/play-at-bat/model/resolvePitch'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { bodyTypeOf } from '@/widgets/batting-stage/lib/batterLayers'
 import { renderBattingStage } from '@/widgets/batting-stage/lib/renderBattingStage'
+import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
 import { batterFrameNow, pitchSituationOf } from '@/widgets/batting-stage/lib/stageText'
 import { ballFrameAt, pitchTickAt } from '@/widgets/batting-stage/model/stageRefs'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
@@ -59,7 +60,7 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
         }
         if (elapsed >= WIND_UP_MILLISECONDS) {
           const { pitcherAbility, random } = latestRef.current
-          pitchRef.current = selectPitch(pitcherAbility, pitchSituationOf(latestRef.current.hud), random)
+          pitchRef.current = selectPitch(pitcherAbility, pitchSituationOf(latestRef.current.hud, latestRef.current.batterForm), random)
           // 새 투구가 시작하면 홈런 글자 연출을 끈다 (원본 +0x1960 을 다음 플레이가 지우는 자리)
           homeRunStartedAtRef.current = -1
           phaseRef.current = '투구중'
@@ -105,6 +106,8 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
       const tickLength = millisecondsPerFrame()
       // 몸통 종류 t = 폼 >> 1 (0 balancer · 1 sluger, 0x78ab0) — 자세표도 이걸로 갈린다
       const bodyType = bodyTypeOf(latestRef.current.batterForm)
+      // 손 = 폼 & 1 (0 우타 · 1 좌타) — 그림 반전과 앵커·존 칸을 고른다 (R6 4절)
+      const side = batterSideOfForm(latestRef.current.batterForm)
       const isPitching = phaseRef.current === '투구중' && pitch !== null
       const ballFrame = isPitching ? ballFrameAt(now, phaseStartedAtRef.current, tickLength) : -1
       // 홈런 연출은 결과 문구 시간(1150ms)보다 길다 — 날아 들어오기만 22틱이라 따로 센다
@@ -121,6 +124,7 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
         homeRunTick: isHomeRun ? pitchTickAt(now, homeRunStartedAt, tickLength) : 0,
         swingFrame: batterFrameNow(now, swingStartedAtRef.current, buntRef.current !== null, bodyType),
         bodyType,
+        side,
         hud: latestRef.current.hud,
         acePitcher: latestRef.current.acePitcher,
         pitcherTick: isPitching ? pitchTickAt(now, phaseStartedAtRef.current, tickLength) : null,

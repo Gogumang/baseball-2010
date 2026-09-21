@@ -3,7 +3,7 @@ import type { SwingSituation } from '@/entities/batting/model/swingSkills'
 import type { HudState } from '@/widgets/batting-stage/lib/renderHud'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import type { PitchSituation } from '@/entities/pitching/model/selectPitch'
-import { STAGE_SIDE } from '@/widgets/batting-stage/lib/stageLayout'
+import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
 import { batterFrameAt } from '@/widgets/batting-stage/lib/batterLayers'
 
 /** 지금 그릴 타자 자세 f — 틱은 게임 속도(한 틱 ms)로 센다. 자세표도 몸통 종류로 갈린다 */
@@ -52,9 +52,14 @@ export function isHomeRunResolution(detail: PitchOutcomeDetail): boolean {
 
 /**
  * 스킬 조건에 쓰는 타석 상황. HUD 가 없으면 기본 상황이다.
- * 타자 side 는 화면 배치(STAGE_SIDE)와 같게 둔다. 투수 좌우는 원본 선수 레코드에서 아직 읽지 않아 0 — 추정.
+ * 타자 side 는 **폼의 낮은 비트 = 손**(0xb63c0, 0 우타 · 1 좌타)이다 — 화면 배치와 같은 값을 쓴다.
+ * 투수 좌우는 원본 선수 레코드에서 아직 읽지 않아 0 — 추정.
  */
-export function situationOf(hud: HudState | null, recentAtBatCodes: readonly number[] = []): SwingSituation {
+export function situationOf(
+  hud: HudState | null,
+  recentAtBatCodes: readonly number[] = [],
+  batterForm = 0,
+): SwingSituation {
   const bases = hud?.bases ?? { first: false, second: false, third: false }
   return {
     inning: hud?.inning ?? 1,
@@ -62,7 +67,7 @@ export function situationOf(hud: HudState | null, recentAtBatCodes: readonly num
     runnerCount: Number(bases.first) + Number(bases.second) + Number(bases.third),
     hasSecondBaseRunner: bases.second,
     pitcherSide: 0,
-    batterSide: STAGE_SIDE,
+    batterSide: batterSideOfForm(batterForm),
     balls: hud?.balls ?? 0,
     strikes: hud?.strikes ?? 0,
     batterOrderIndex: 0,
@@ -70,15 +75,15 @@ export function situationOf(hud: HudState | null, recentAtBatCodes: readonly num
   }
 }
 
-/** CPU 투구 AI 에 넘길 볼카운트·주자 상황 */
-export function pitchSituationOf(hud: HudState | null): PitchSituation {
+/** CPU 투구 AI 에 넘길 볼카운트·주자 상황. side 는 타자 손이라 투구 원점·판정 기준점이 따라 갈린다 */
+export function pitchSituationOf(hud: HudState | null, batterForm = 0): PitchSituation {
   const bases = hud?.bases ?? { first: false, second: false, third: false }
   return {
     strikes: hud?.strikes ?? 0,
     balls: hud?.balls ?? 0,
     outs: hud?.outs ?? 0,
     runnerCount: Number(bases.first) + Number(bases.second) + Number(bases.third),
-    batterSide: STAGE_SIDE,
-    side: STAGE_SIDE,
+    batterSide: batterSideOfForm(batterForm),
+    side: batterSideOfForm(batterForm),
   }
 }

@@ -75,7 +75,7 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
       pitcher: latest.pitcherAbility,
       mode: latest.swingMode,
       batterSkillIds: latest.batterSkillIds,
-      situation: situationOf(latest.hud, latest.recentAtBatCodes),
+      situation: situationOf(latest.hud, latest.recentAtBatCodes, latest.batterForm),
       // 마선수가 등판했으면 원본 isAce 가 켜진 것과 같다 (0xab214 의 마선수 계수·보너스)
       isPitcherAce: latest.acePitcher !== null,
     }

@@ -3,12 +3,15 @@ import {
   CLOUD_FRAMES, CROWD_FRAMES, FENCE_FRAMES, FIELD_BACKGROUND, SCOREBOARD_FRAMES, TEAM_ICON, placedFrame, sprite,
 } from '@/widgets/batting-stage/lib/spriteLoader'
 import { CLOUD_WRAP_WIDTH, cloudScrollAt, isCloudVisible, skyColorsOf, teamIconOf } from '@/widgets/batting-stage/lib/stageScenery'
-import { STAGE_HEIGHT, STAGE_LAYOUT, STAGE_WIDTH } from '@/widgets/batting-stage/lib/stageLayout'
+import { BATTER_SIDE, STAGE_HEIGHT, STAGE_LAYOUT, STAGE_SIDE, STAGE_WIDTH } from '@/widgets/batting-stage/lib/stageLayout'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 
 /**
  * 타석 배경 (0x78578): 하늘 0x77fe8 → 펜스 0x77974(팀 아이콘·관중·전광판) → 바닥 0x7725c.
- * 좌표는 카메라 오프셋 (−120, −70) 을 뺀 화면 좌표다. 웹 화면은 좌타(side 1) 배치다.
+ * 좌표는 카메라 오프셋 (−120, −70) 을 뺀 화면 좌표다. 적혀 있는 수치는 좌타(side 1) 기준이다.
+ *
+ * 구장 객체 +0x60 은 **현재 타자의 손**을 받아, 우타(0)면 구장 그리기 0x77494 가 효과 0x11 로
+ * **펜스·관중·전광판을 통째로 뒤집는다** (R6 4절). 하늘·구름과 바닥(0x7725c)은 뒤집지 않는다.
  */
 export interface SceneryState {
   /** 하늘 표 행 (0~5) */
@@ -20,6 +23,8 @@ export interface SceneryState {
   readonly stadium: number
   readonly ourTeamId: number | null
   readonly opponentTeamId: number | null
+  /** 타자 손 (0 우타 · 1 좌타). 우타면 펜스 묶음이 좌우로 뒤집힌다. 없으면 좌타 배치다 */
+  readonly side?: number
   /**
    * 환경설정 전광판(+0x3a) — OFF 면 전광판을 그리지 않는다 (0x77726, R2-game-effects.md 6절).
    * 생략하면(웹판이 아직 안 이어 준 자리) 켠 것으로 본다 — 이 필드는 아직 부르는 쪽이 배선하지 않았다.
@@ -87,6 +92,19 @@ function drawClouds(context: CanvasRenderingContext2D, tick: number): void {
 }
 
 function drawFence(context: CanvasRenderingContext2D, state: SceneryState): void {
+  // 우타면 펜스 묶음 전체를 화면 가운데 축으로 뒤집는다.
+  // 원본은 뒤집은 그림을 월드 x+490/x+480 에 놓는데(0x77494) 그 1px 어긋남까지는 못 옮겼다 — **근사**.
+  const isMirrored = (state.side ?? STAGE_SIDE) === BATTER_SIDE.우타
+  context.save()
+  if (isMirrored) {
+    context.translate(STAGE_WIDTH, 0)
+    context.scale(-1, 1)
+  }
+  drawFenceParts(context, state)
+  context.restore()
+}
+
+function drawFenceParts(context: CanvasRenderingContext2D, state: SceneryState): void {
   const fence = placedFrame(FENCE_FRAMES, state.stadium)
   if (fence !== null) context.drawImage(fence.image, FENCE_ANCHOR.x + fence.offsetX, FENCE_ANCHOR.y + fence.offsetY)
 
