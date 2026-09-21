@@ -9,7 +9,8 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { StageScene } from '@/widgets/batting-stage/lib/renderBattingStage'
 import { PITCHER_RELEASE_TICKS } from '@/widgets/batting-stage/lib/stageScenery'
 
-export type StagePhase = '대기' | '투구중' | '결과'
+/** 원본 경기 상태 — 대기·투구중 0xf/0x11 · **타격 0x13** · 결과 0x12/0x17 */
+export type StagePhase = '대기' | '투구중' | '타격' | '결과'
 
 export type StageHud = StageScene['hud']
 
@@ -25,6 +26,20 @@ export interface BuntStance {
   readonly frame: number
 }
 
+/**
+ * 상태 0x13 동안 손에 들고 있는 타격 결과 — 이 단계가 끝나야 인플레이(0x17)로 넘긴다.
+ * 결과 문구·HOMERUN 글자도 여기서 꺼내므로 붙잡아 두는 동안에는 화면에 뜨지 않는다.
+ */
+export interface PendingHit {
+  /** 붙잡아 둘 틱 수 (0x406a4 문턱 또는 틱 8) */
+  readonly ticks: number
+  readonly detail: PitchOutcomeDetail
+  readonly pitch: Pitch
+  readonly isUncatchable: boolean
+  readonly isHomeRun: boolean
+  readonly resultText: string
+}
+
 /** 매 프레임 최신 값을 읽어야 하는 props 묶음. */
 export interface StageLatest {
   readonly batterAbility: BatterAbility
@@ -33,6 +48,8 @@ export interface StageLatest {
   readonly hud: StageHud | null
   readonly acePitcher: AcePitcherFrames | null
   readonly canBunt: boolean
+  /** 타자 폼 (원본 rec[0xb] 윗니블 = 2 × 타입 + 손). 몸통·자세표를 `폼 >> 1` 로 고른다 */
+  readonly batterForm: number
   readonly isPaused: boolean
   readonly random: RandomPort
   readonly swingMode: SwingMode
@@ -59,6 +76,8 @@ export interface StageRefs {
   readonly shiftRef: MutableRefObject<number>
   readonly buntRef: MutableRefObject<BuntStance | null>
   readonly deckRef: MutableRefObject<PatternDeck | null>
+  /** 상태 0x13 이 붙잡고 있는 타격 결과. 없으면 이 단계가 아니다 */
+  readonly pendingHitRef: MutableRefObject<PendingHit | null>
   readonly pointerDownAtRef: MutableRefObject<number>
   readonly latestRef: MutableRefObject<StageLatest>
 }
@@ -83,6 +102,7 @@ export function useStageRefs(latest: StageLatest): StageRefs {
     shiftRef: useRef(0),
     buntRef: useRef<BuntStance | null>(null),
     deckRef: useRef<PatternDeck | null>(null),
+    pendingHitRef: useRef<PendingHit | null>(null),
     pointerDownAtRef: useRef(0),
     latestRef,
   }

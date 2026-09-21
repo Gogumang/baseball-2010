@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { batterFrameAt, batterLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
+import { batterFrameAt, batterLayersOf, bodyTypeOf } from '@/widgets/batting-stage/lib/batterLayers'
 
 const 파일 = (layers: ReturnType<typeof batterLayersOf>) => layers.map((layer) => `${layer.folder.split('/')[2]}:${layer.frame}`)
 
@@ -50,5 +50,21 @@ describe('타자 레이어 — 0x78cfc (겹침 표 0xd3a54)', () => {
     expect(파일(batterLayersOf(0, 1))).toEqual([
       'batter_shadow:14', 'batter_sluger:0', 'batter_helmet:14', 'batter_batter:14', 'batter_sluger:13', 'item_bat_leg_0:14',
     ])
+  })
+})
+
+describe('타자 폼 → 몸통 종류 t = 폼 >> 1 (0x78ab0)', () => {
+  it('니블 0·1(타격형 우타·좌타)은 balancer, 2·3(장타형)은 sluger 다', () => {
+    expect([0, 1, 2, 3].map(bodyTypeOf)).toEqual([0, 0, 1, 1])
+  })
+
+  it('장타형 폼을 주면 몸통 폴더가 sluger 로 바뀐다', () => {
+    expect(파일(batterLayersOf(0, bodyTypeOf(2)))[1]).toBe('batter_sluger:0')
+    expect(파일(batterLayersOf(0, bodyTypeOf(0)))[1]).toBe('batter_balancer:0')
+  })
+
+  it('장타형은 자세표도 갈린다 — 대기 다섯 칸 · 번트 12', () => {
+    expect(batterFrameAt({ tick: 16, swingTick: null, isBunting: false, bodyType: bodyTypeOf(3) })).toBe(4)
+    expect(batterFrameAt({ tick: 0, swingTick: null, isBunting: true, bodyType: bodyTypeOf(3) })).toBe(12)
   })
 })

@@ -1,7 +1,7 @@
 /**
  * 타자 그림 (binary.mod 0xb905c 자세 · 0x78cfc 레이어 — 위치 분석 5차, 바이트 확인).
  * 모든 레이어를 같은 앵커에 프레임 원점대로 겹친다. 레이어 폴더 프레임 = 자세 f + 레이어 가산값.
- *   bodyType t = 타자 폼 >> 1 (0 balancer · 1 sluger) — 웹은 폼을 넘기지 않아 0 으로 그린다 (추정)
+ *   bodyType t = 타자 폼 >> 1 (0 balancer · 1 sluger) — `bodyTypeOf` 참고.
  * 아이템 레이어: 머리 아이템(+0x1c)·손 아이템(+0x20/+0x44)은 장비 레벨과 아이템 번호의 대응이 미확인이라
  * 없는 것으로 그린다 (추정). 손 아이템이 없으면 bat/batter_batter 를 쓴다. 다리는 item_bat_leg_0 (추정).
  * 그림자는 +0x48 플래그일 때만 그리는데 플래그 뜻이 미확인이라 늘 그린다 (추정).
@@ -17,6 +17,16 @@ const GHOST = `${SPRITES}/batter_ghost/frames`
 export interface BatterLayer {
   readonly folder: string
   readonly frame: number
+}
+
+/**
+ * 원본 "폼" = 선수 레코드 `rec[0xb]` 의 **윗니블 = 2 × 타입 + 손** (C 5절 0x16f9a).
+ * 몸통 파일 적재 0x78ab0 이 그 니블로 고른다 — `≤ 1 → bat/batter_balancer · 2·3 → bat/batter_sluger`
+ * (C-create-palette 127행). 곧 **t = 폼 >> 1 = 타입**(0 타격형 · 1 장타형)이다.
+ * 웹은 `career.battingTypeIndex`(타입) 와 `career.battingSide`(손) 를 들고 있어 폼을 그대로 만들 수 있다.
+ */
+export function bodyTypeOf(form: number): number {
+  return Math.max(0, Math.trunc(form)) >> 1 === 0 ? 0 : 1
 }
 
 interface PoseTable {

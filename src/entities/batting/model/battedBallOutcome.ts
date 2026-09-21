@@ -97,6 +97,21 @@ export function randomPattern(code: number, random: RandomPort): BattedBallPatte
   return patterns[randomIntegerBelow(random, 0, patterns.length)]
 }
 
+/**
+ * 방금 뽑은 패턴 — `drawPattern` 이 돌려준 덱에서 되읽는다.
+ *
+ * 타석 화면이 큰 타구 판정(0x392ac)에 쓸 (각·세기·높이) 를 알아야 하는데 `resolvePitch` 는
+ * 패턴을 밖으로 내보내지 않는다. 덱의 커서가 **방금 쓴 칸의 바로 뒤**를 가리키므로
+ * 난수를 더 쓰지 않고 그대로 되읽을 수 있다.
+ */
+export function lastDrawnPattern(deck: PatternDeck, code: number): BattedBallPattern | null {
+  const patterns = BATTED_BALL_PATTERNS[code]
+  const order = deck.orders[code]
+  const cursor = deck.cursors[code] ?? 0
+  if (patterns === undefined || order === undefined || cursor <= 0) return null
+  return patterns[order[cursor - 1]] ?? null
+}
+
 /** 다음 패턴. 다 쓰면 그 코드만 다시 섞는다 (다시 섞는 시점은 추정) */
 export function drawPattern(
   deck: PatternDeck,

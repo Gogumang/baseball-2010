@@ -10,8 +10,6 @@ import { drawFieldMap } from '@/widgets/batting-stage/lib/renderFieldMap'
 import { drawHomeRunBanner } from '@/widgets/batting-stage/lib/renderHomeRunBanner'
 import { batterLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
 
-/** 타자 몸통 종류 — 타자 폼을 넘기지 않아 balancer(0) (추정) */
-const BATTER_BODY_TYPE = 0
 import type { HudState } from '@/widgets/batting-stage/lib/renderHud'
 import { STAGE_LAYOUT, toPixel } from '@/widgets/batting-stage/lib/stageLayout'
 import { UI_COLORS } from '@/shared/config/design'
@@ -43,6 +41,8 @@ export interface StageScene {
   readonly homeRunTick: number
   /** 타자 자세 f (0xb905c) — 레이어마다 가산값을 더해 그린다 */
   readonly swingFrame: number
+  /** 타자 몸통 종류 t = 폼 >> 1 (0 balancer · 1 sluger, 0x78ab0) */
+  readonly bodyType: number
   /** 마운드에 그릴 마선수. 없으면 평범한 투수라 그리지 않는다. */
   /** 화면에 겹쳐 그릴 경기 상황 */
   readonly hud: HudState | null
@@ -66,7 +66,7 @@ export function renderBattingStage(
   })
   const progress = scene.pitch === null || scene.frame < 0 ? -1 : scene.frame / scene.pitch.frameCount
   drawPitcher(context, scene.acePitcher, progress, scene.pitcherTick, scene.tick)
-  drawBatter(context, scene.swingFrame, scene.shift)
+  drawBatter(context, scene.swingFrame, scene.shift, scene.bodyType)
   drawStrikeZone(context)
   if (scene.pitch !== null && scene.isEagleEyeEnabled) {
     drawEagleEyeMarker(context, platePixelOf(scene.pitch))
@@ -130,8 +130,8 @@ function drawPitcher(
 }
 
 /** 원작 타자는 그림자·몸통·헬멧·배트·몸통 앞·다리를 자세마다 다른 순서로 겹친다 (0x78cfc) */
-function drawBatter(context: CanvasRenderingContext2D, swingFrame: number, shift: number): void {
-  for (const layer of batterLayersOf(swingFrame, BATTER_BODY_TYPE)) {
+function drawBatter(context: CanvasRenderingContext2D, swingFrame: number, shift: number, bodyType: number): void {
+  for (const layer of batterLayersOf(swingFrame, bodyType)) {
     const frame = placedFrame(layer.folder, layer.frame)
     if (frame === null) continue
     context.drawImage(

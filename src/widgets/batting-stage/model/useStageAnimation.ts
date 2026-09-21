@@ -3,6 +3,7 @@ import { selectPitch } from '@/entities/pitching/model/selectPitch'
 import { lastSwingFrameOf } from '@/entities/batting/model/swingTiming'
 import type { BattingSwing } from '@/features/play-at-bat/model/resolvePitch'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { bodyTypeOf } from '@/widgets/batting-stage/lib/batterLayers'
 import { renderBattingStage } from '@/widgets/batting-stage/lib/renderBattingStage'
 import { batterFrameNow, pitchSituationOf } from '@/widgets/batting-stage/lib/stageText'
 import { ballFrameAt, pitchTickAt } from '@/widgets/batting-stage/model/stageRefs'
@@ -17,9 +18,11 @@ const SPECIAL_PITCH = 'SPECIAL'
 const SKY_ROW_COUNT = 6
 
 type FinishPitch = (swing: BattingSwing | null, now: number) => void
+/** 상태 0x13 을 끝내고 인플레이로 넘기는 고리 */
+type CommitHit = (now: number) => void
 
 /** 캔버스 애니메이션 루프와 투구 단계 진행. */
-export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch) {
+export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, commitHit: CommitHit) {
   const {
     canvasRef,
     pitchRef,
@@ -30,6 +33,7 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch) {
     swingStartedAtRef,
     shiftRef,
     buntRef,
+    pendingHitRef,
     latestRef,
   } = refs
 
@@ -79,6 +83,14 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch) {
         }
       }
 
+      // 상태 0x13 — 큰 타구면 낙구할 때까지, 아니면 틱 8 만에 인플레이로 넘어간다 (R10 4절)
+      if (phaseRef.current === '타격') {
+        const pending = pendingHitRef.current
+        const held = pitchTickAt(now, phaseStartedAtRef.current, millisecondsPerFrame())
+        if (pending === null || held >= pending.ticks) commitHit(now)
+        return
+      }
+
       if (phaseRef.current === '결과' && elapsed >= RESULT_DISPLAY_MILLISECONDS) {
         phaseRef.current = '대기'
         phaseStartedAtRef.current = now
@@ -91,6 +103,8 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch) {
 
       const pitch = pitchRef.current
       const tickLength = millisecondsPerFrame()
+      // 몸통 종류 t = 폼 >> 1 (0 balancer · 1 sluger, 0x78ab0) — 자세표도 이걸로 갈린다
+      const bodyType = bodyTypeOf(latestRef.current.batterForm)
       const isPitching = phaseRef.current === '투구중' && pitch !== null
       const ballFrame = isPitching ? ballFrameAt(now, phaseStartedAtRef.current, tickLength) : -1
       // 홈런 연출은 결과 문구 시간(1150ms)보다 길다 — 날아 들어오기만 22틱이라 따로 센다
@@ -105,7 +119,8 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch) {
         resultText: phaseRef.current === '결과' ? resultTextRef.current : '',
         isHomeRun,
         homeRunTick: isHomeRun ? pitchTickAt(now, homeRunStartedAt, tickLength) : 0,
-        swingFrame: batterFrameNow(now, swingStartedAtRef.current, buntRef.current !== null),
+        swingFrame: batterFrameNow(now, swingStartedAtRef.current, buntRef.current !== null, bodyType),
+        bodyType,
         hud: latestRef.current.hud,
         acePitcher: latestRef.current.acePitcher,
         pitcherTick: isPitching ? pitchTickAt(now, phaseStartedAtRef.current, tickLength) : null,
@@ -121,8 +136,8 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch) {
     phaseStartedAtRef.current = performance.now()
     animationHandle = requestAnimationFrame(frame)
     return () => cancelAnimationFrame(animationHandle)
-    // ref 묶음은 값이 바뀌지 않는다. finishPitch만 바뀔 수 있다.
-  }, [finishPitch])
+    // ref 묶음은 값이 바뀌지 않는다. finishPitch·commitHit만 바뀔 수 있다.
+  }, [commitHit, finishPitch])
 
   useEffect(() => {
     const onVisibilityChange = () => {
@@ -134,6 +149,7 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch) {
       phaseStartedAtRef.current = performance.now()
       pitchRef.current = null
       buntRef.current = null
+      pendingHitRef.current = null
       resultTextRef.current = ''
       homeRunStartedAtRef.current = -1
     }

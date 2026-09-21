@@ -3,6 +3,7 @@ import { resolvePitch } from '@/features/play-at-bat/model/resolvePitch'
 import type { BattingSwing } from '@/features/play-at-bat/model/resolvePitch'
 import { nextBatterShift } from '@/features/play-at-bat/model/batterShift'
 import { createPatternDeck } from '@/entities/batting/model/battedBallOutcome'
+import { hitPauseTicksOf, pauseInputOf } from '@/widgets/batting-stage/lib/hitPause'
 import type { SwingMode } from '@/entities/batting/model/swingResult'
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { Pitch, PitcherAbility } from '@/entities/pitching/model/pitch'
@@ -30,6 +31,12 @@ interface BattingStageProps {
   readonly canBunt?: boolean
   /** 판정 모드 — 나만의리그는 "내 선수" 보너스가 붙는다 (0xab214) */
   readonly swingMode?: SwingMode
+  /**
+   * **타자 폼** = 원본 선수 레코드 `rec[0xb]` 의 윗니블 `2 × 타입 + 손` (C 5절 0x16f9a).
+   * 몸통 파일(balancer/sluger)과 자세표를 `폼 >> 1` 로 고른다 (0x78ab0).
+   * 안 넘기면 0 = 타격형·우타라 예전과 같은 밸런스형 몸통이다.
+   */
+  readonly batterForm?: number
   readonly batterSkillIds?: readonly number[]
   readonly recentAtBatCodes?: readonly number[]
   /** 참이면 새 공을 던지지 않는다. 타석 결과 연출 중에 쓴다. */
@@ -49,14 +56,14 @@ interface BattingStageProps {
 }
 
 /** 원작 타석 화면. 그리기는 lib, 루프와 조작은 model이 맡는다. */
-export function BattingStage({ canBunt = false, swingMode = '일반', batterSkillIds = [], recentAtBatCodes = [], specialSwingLevel = 0, isAceBatter = false, ...props }: BattingStageProps) {
-  const refs = useStageRefs({ ...props, canBunt, swingMode, batterSkillIds, recentAtBatCodes })
+export function BattingStage({ canBunt = false, swingMode = '일반', batterForm = 0, batterSkillIds = [], recentAtBatCodes = [], specialSwingLevel = 0, isAceBatter = false, ...props }: BattingStageProps) {
+  const refs = useStageRefs({ ...props, canBunt, swingMode, batterForm, batterSkillIds, recentAtBatCodes })
   /**
    * 이번 공에 필살타법을 걸어 두었는가 (`S+0x10`).
    * 새 투구 준비 `0x34334` 가 0 으로 되돌리므로 **공마다 다시 눌러야 한다** (H2 2-2).
    */
   const specialArmedRef = useRef(false)
-  const { pitchRef, phaseRef, phaseStartedAtRef, resultTextRef, homeRunStartedAtRef, swingStartedAtRef, shiftRef, buntRef, deckRef, latestRef } = refs
+  const { pitchRef, phaseRef, phaseStartedAtRef, resultTextRef, homeRunStartedAtRef, swingStartedAtRef, shiftRef, buntRef, deckRef, pendingHitRef, latestRef } = refs
 
   const finishPitch = useCallback((swing: BattingSwing | null, now: number) => {
     const pitch = pitchRef.current
@@ -79,13 +86,43 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterSkil
     specialArmedRef.current = false
     deckRef.current = result.deck
     buntRef.current = null
-    resultTextRef.current = describeResolution(result.detail)
+    const resultText = describeResolution(result.detail)
     // 홈런이면 판정 글자 대신 HOMERUN 글자 연출을 켠다 (원본 0x51cd8 의 +0x1960, 사운드 11 은 웹에 없음)
-    homeRunStartedAtRef.current = isHomeRunResolution(result.detail) ? now : -1
+    const isHomeRun = isHomeRunResolution(result.detail)
+
+    // 맞은 공이면 인플레이(0x17) 앞에 **상태 0x13** 을 한 번 거친다. 헛스윙·볼은 0x12 라 그냥 결과다.
+    if (result.detail.resultCode !== null) {
+      pendingHitRef.current = {
+        ticks: hitPauseTicksOf(pauseInputOf(result.detail.resultCode, result.deck)),
+        detail: result.detail,
+        pitch,
+        isUncatchable,
+        isHomeRun,
+        resultText,
+      }
+      phaseRef.current = '타격'
+      phaseStartedAtRef.current = now
+      return
+    }
+
+    resultTextRef.current = resultText
+    homeRunStartedAtRef.current = isHomeRun ? now : -1
     phaseRef.current = '결과'
     phaseStartedAtRef.current = now
     latest.onPitchResolved(result.detail, pitch, isUncatchable)
   }, [isAceBatter, specialSwingLevel])
+
+  /** 상태 0x13 을 끝내고 인플레이(0x17)로 넘긴다 — 시간이 다 됐거나 OK/'5' 로 건너뛸 때 */
+  const commitHit = useCallback((now: number) => {
+    const pending = pendingHitRef.current
+    if (pending === null) return
+    pendingHitRef.current = null
+    resultTextRef.current = pending.resultText
+    homeRunStartedAtRef.current = pending.isHomeRun ? now : -1
+    phaseRef.current = '결과'
+    phaseStartedAtRef.current = now
+    latestRef.current.onPitchResolved(pending.detail, pending.pitch, pending.isUncatchable)
+  }, [])
 
   const actions = useMemo(() => {
     const frameNow = (now: number) => ballFrameAt(now, phaseStartedAtRef.current, millisecondsPerFrame())
@@ -93,6 +130,8 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterSkil
     const isFlying = (now: number) => phaseRef.current === '투구중' && pitchRef.current !== null && frameNow(now) >= 0
     return {
       swing: (now: number) => {
+        // 상태 0x13 은 OK(−5)·'5' 로 건너뛴다 (0x406e8). 그때 스윙 키는 건너뛰기로만 쓰인다
+        if (phaseRef.current === '타격') return commitHit(now)
         if (!isFlying(now)) return
         swingStartedAtRef.current = now
         finishPitch({ frame: frameNow(now), shift: shiftRef.current, buntKind: 0 }, now)
@@ -110,9 +149,9 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterSkil
         specialArmedRef.current = true
       },
     }
-  }, [finishPitch])
+  }, [commitHit, finishPitch])
 
-  useStageAnimation(refs, finishPitch)
+  useStageAnimation(refs, finishPitch, commitHit)
   const pointerHandlers = useStageControls(refs, actions)
 
   return (
