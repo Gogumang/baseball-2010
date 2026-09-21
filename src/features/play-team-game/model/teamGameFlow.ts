@@ -11,6 +11,7 @@ import {
 } from '@/entities/game/model/gameState'
 import type { GameState, PlayerSide } from '@/entities/game/model/gameState'
 import { advanceRunners } from '@/entities/game/model/baseState'
+import { attemptSteal, canStealFrom } from '@/entities/game/model/steal'
 import { playQuickAtBat } from '@/entities/game/model/quickAtBat'
 import { rollStartingPitcherIndex } from '@/entities/team/model/teamRoster'
 import { applyOpponentAtBat } from '@/features/play-pitcher-game/model/pitcherGameState'
@@ -90,7 +91,8 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
  *   - 경기 중 **대타** `#`(R4 1a) — 타순은 끝까지 그대로다
  *   - 엔트리 편집(0x55864) — 타순은 로스터 순서 그대로다
  *   (경기 중 **투수 교체**는 들어왔다: 자동으로 넘긴 타석에서 CPU 교체 AI(0xac428)가 양 팀 투수를
- *    바꾸고, 사람이 잡은 타석은 원본대로 `#` 메뉴가 바꾼다 — `changePitcher` 를 화면이 부르면 된다)
+ *    바꾸고, 사람이 잡은 타석은 원본대로 `#` 메뉴가 바꾼다 — `changePitcher`·`canOpenPitcherChange`)
+ *   - 자동진행 **중계 화면**(경기 상태 0x21, R10 7절) — 비용·가드·자동 소화만 있다(`runAutoProgress`)
  *   - 감독 강판은 **투수편(모드 3) 전용**이라(P1 2절) 팀 경기에는 원본에도 없다
  *
  * ## 부르는 쪽에게 (시즌 세션 · 포스트시즌 · 국가대항전)
@@ -820,6 +822,157 @@ export function changePitcher(progress: TeamGameProgress, benchIndex: number): T
 /** 지금 바꿔 넣을 수 있는 우리 팀 투수 칸 — 화면의 투수 교체 목록이 쓴다 */
 export function availablePitchers(progress: TeamGameProgress): readonly number[] {
   return benchIndexesOf(progress.ourPitcherIndex, progress.ourUsedPitchers)
+}
+
+/**
+ * `#` 로 교체 화면(경기 상태 0xb)을 열 수 있는가 — 진입 조건 `0x498d4` 의 '#' 가지 (I-controls 4b · R4 1a).
+ *
+ * 원본 조건 셋: ① `0x38984` 참(모드 4·7 은 막는다 — 팀 경기 모드 1·2·8·9 는 통과),
+ * ② 경기 상태가 **0xe 또는 0xf**(투구 전·구질 고르기) — 웹에서는 *사람이 던질 차례이고 아직 안 던진 상태*,
+ * ③ 사람 팀 벤치 투수 수 `팀+0x33` > 0.
+ *
+ * ⚠️ 팀 경기에서 사람이 **공격** 중일 때 원본은 같은 키로 **대타**(`0xaf06c`)를 연다.
+ * 대타는 아직 안 옮겼으므로(로스터 교환·재출장 금지가 통째로 없다) 여기서는 수비 중에만 참이다.
+ */
+export function canOpenPitcherChange(progress: TeamGameProgress): boolean {
+  if (progress.game.isFinished) return false
+  if (!isPitchTurn(progress)) return false
+  return availablePitchers(progress).length > 0
+}
+
+/* ── 자동진행 (경기 중 메뉴 동작 4 = 0x3c60c → 하위 2 = 0x3c7d8) ─────────────── */
+
+/** 대전모드(8·9) 자동진행 비용 (`3c67e: movs r2,#0x64`) */
+export const AUTO_PROGRESS_COST_VERSUS = 100
+/** 그 밖 모드의 자동진행 비용 (`3c694: movs r2,#0x1e`) */
+export const AUTO_PROGRESS_COST = 30
+/** 대전모드는 0-기준 이닝이 5 를 넘으면 거절한다 (`경기+0x6b > 5` → StrGAME[2]) */
+const AUTO_PROGRESS_LAST_INNING_INDEX = 5
+
+/** 이 모드의 자동진행 G포인트 비용 */
+export function autoProgressCostOf(mode: number): number {
+  return mode === TEAM_GAME_MODE.대전 || mode === TEAM_GAME_MODE.대전이벤트
+    ? AUTO_PROGRESS_COST_VERSUS
+    : AUTO_PROGRESS_COST
+}
+
+/** 대전모드인가 — 6회 제한과 100G 가 붙는 두 모드 */
+function isVersusMode(mode: number): boolean {
+  return mode === TEAM_GAME_MODE.대전 || mode === TEAM_GAME_MODE.대전이벤트
+}
+
+/**
+ * 지금 자동진행을 물어볼 수 있는가 — **대전모드는 6회까지만**이다 (`0x3c60c`).
+ * 거짓이면 원본은 StrGAME[2]("6회까지만") 알림만 띄우고 끝낸다.
+ */
+export function canAutoProgress(progress: TeamGameProgress): boolean {
+  if (progress.game.isFinished) return false
+  if (!isVersusMode(progress.options.mode)) return true
+  // 원본 이닝은 0-기준이다 (state+0x6b)
+  return progress.game.inning - 1 <= AUTO_PROGRESS_LAST_INNING_INDEX
+}
+
+/**
+ * 자동진행을 한 번 굴린다 — 사람 차례를 건너뛰고 간이 엔진이 타석을 이어 돌린다
+ * (`0x3c8da` 가 간이 시뮬레이터 `this+0x1780` 으로 넘기고, 갱신 `0x48480` 이 `0xc262c` 를 반복한다).
+ *
+ * ⚠️ **중계 화면(경기 상태 0x21)은 옮기지 않았다** — 속도 칸 3단계·주자 그림·"공격팀(PLAYER/COM)" 띠·
+ * CLR 중단 질문(StrGAME[6])은 R10 7절에 있지만 연출이라 건너뛰었다. 여기서는 결과만 계산한다.
+ *
+ * ⚠️ **끝나는 지점은 근사**다. 원본은 `0xc2198(sim,1)` 이 거짓이 될 때까지 도는데 그 조건을 못 읽었다
+ * (I-controls 4d 는 "7회 직접 플레이 전환 지점으로 보임 — 유력" 이라고만 적는다).
+ * 여기서는 **경기 끝까지** 돌리되, 대전모드는 "6회까지만" 이라는 StrGAME[2] 에 맞춰 **6회를 마치면 멈춘다**.
+ */
+export function runAutoProgress(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
+  let current = progress
+  for (let step = 0; step < MAXIMUM_AUTO_STEPS; step += 1) {
+    if (current.game.isFinished) return current
+    if (isVersusMode(current.options.mode) && current.game.inning - 1 > AUTO_PROGRESS_LAST_INNING_INDEX) {
+      break
+    }
+    current = isOurOffense(current)
+      ? playAutoOffenseAtBat(current, random)
+      : playAutoDefenseAtBat(current, random)
+  }
+  // 자동진행이 멈춘 자리부터는 평소대로 — 다음 사람 차례에서 선다
+  return advance(current, random)
+}
+
+/* ── 도루 (상태 0x11 공격, 0x53610 → 메시지 0x583) ───────────────────────────── */
+
+/**
+ * 도루를 걸 수 있는 루 — 원본 키는 '3' → 1루 주자 · '2' → 2루 주자 · '1' → 3루 주자다
+ * (`0x53610`, 인자 = 대상 주자 1·2·3). 공격 중(상태 0x11)일 때만 받는다.
+ *
+ * 3루 주자는 빠진다 — `entities/game/model/steal` 의 `canStealFrom` 이 적은 대로
+ * 원본 도루 판정(0xc1818)이 홈 도루를 걸지 않기 때문이다.
+ */
+export function stealableBases(progress: TeamGameProgress): readonly StealBase[] {
+  if (!isBatterTurn(progress)) return []
+  const bases = progress.game.bases
+  const out: StealBase[] = []
+  if (bases.first && !bases.second) out.push(1)
+  if (bases.second && !bases.third) out.push(2)
+  return out.filter((base) => canStealFrom(base))
+}
+
+/** 도루 대상 주자가 선 루 */
+export type StealBase = 1 | 2 | 3
+
+/**
+ * 도루 한 번 (메시지 0x583). 성공하면 주자가 한 루 가고, 실패하면 그 주자가 죽는다.
+ *
+ * 판정은 `entities/game/model/steal` 의 원본 표(0xd9064, 주력만 본다)를 그대로 쓴다.
+ *
+ * ⚠️ **주자가 누구인지가 근사**다 — 웹 `GameState` 는 루에 선 주자의 신원을 들고 있지 않다.
+ * 1루 주자는 직전 타자, 2루 주자는 그 앞 타자로 보고 타순에서 거꾸로 세어 능력치를 꺼낸다.
+ */
+export function stealBase(
+  progress: TeamGameProgress,
+  base: StealBase,
+  random: RandomPort,
+): TeamGameProgress {
+  if (!stealableBases(progress).includes(base)) return progress
+  const before = progress.game
+  const runnerSlot =
+    (before.battingOrderIndex - base + BATTING_ORDER_SIZE * 2) % BATTING_ORDER_SIZE
+  const runner = stageBatterAbility(
+    abilityContextOf(progress.options),
+    progress.options.ourTeamId,
+    runnerSlot,
+  )
+  const succeeded = attemptSteal(runner, random) === '성공'
+
+  if (succeeded) {
+    const bases =
+      base === 1
+        ? { ...before.bases, first: false, second: true }
+        : { ...before.bases, second: false, third: true }
+    return appendLog(
+      { ...progress, game: { ...before, bases } },
+      `${before.inning}회${before.half} ${base}루 주자 도루 성공`,
+      true,
+    )
+  }
+
+  // 도루 실패 = 주자 한 명 아웃. 타석은 그대로 이어지므로 타순 커서는 되돌린다.
+  const bases = base === 1 ? { ...before.bases, first: false } : { ...before.bases, second: false }
+  const caught = applyAtBatOutcome(before, { kind: '아웃', detail: '땅볼아웃' }, {
+    bases,
+    runsScored: 0,
+    outsAdded: 1,
+  })
+  const next: TeamGameProgress = {
+    ...progress,
+    game: { ...caught, battingOrderIndex: before.battingOrderIndex },
+    // 반 이닝이 넘어갔으면 볼카운트도 새로 시작한다
+    atBat: caught.half === before.half ? progress.atBat : createAtBat(),
+    atBatPrepared: caught.half === before.half ? progress.atBatPrepared : false,
+  }
+  return advance(
+    appendLog(next, `${before.inning}회${before.half} ${base}루 주자 도루 실패 (주루사)`, true),
+    random,
+  )
 }
 
 /**

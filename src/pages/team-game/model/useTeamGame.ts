@@ -5,14 +5,21 @@ import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import {
   applyBatterOutcome,
   applyBatterPitch,
+  availablePitchers,
+  canOpenPitcherChange,
+  changePitcher,
   closeBurstWindow,
   isBatterTurn,
   isPitchTurn,
+  runAutoProgress,
   startTeamGame,
+  stealableBases,
+  stealBase,
   summaryOf,
   throwPitch,
 } from '@/features/play-team-game/model/teamGameFlow'
 import type {
+  StealBase,
   TeamGameOptions,
   TeamGameProgress,
   TeamGameSummary,
@@ -34,6 +41,12 @@ export interface TeamGameSession {
   readonly canPitch: boolean
   /** 경기가 끝났으면 요약, 아니면 null */
   readonly summary: TeamGameSummary | null
+  /** `#` 로 투수 교체 화면(상태 0xb)을 열 수 있는가 — 벤치 투수가 있고 투구 전일 때만 */
+  readonly canChangePitcher: boolean
+  /** 지금 벤치에서 올릴 수 있는 우리 투수 칸 */
+  readonly benchPitchers: readonly number[]
+  /** 지금 도루를 걸 수 있는 루 ('3' 1루 · '2' 2루) */
+  readonly stealableBases: readonly StealBase[]
   readonly actions: {
     /** 타석 화면이 판정한 공 하나 */
     readonly resolvePitch: (detail: PitchOutcomeDetail) => void
@@ -43,6 +56,12 @@ export interface TeamGameSession {
     readonly throwPitch: (input: TeamPitchInput) => void
     /** 돌발 창 닫기 */
     readonly closeBurst: () => void
+    /** `#` 교체 화면에서 벤치 투수 칸을 고른다 (R4 1a·1c) */
+    readonly changePitcher: (benchIndex: number) => void
+    /** 도루 (메시지 0x583) — 대상 주자가 선 루 */
+    readonly steal: (base: StealBase) => void
+    /** 경기 중 메뉴 '*' 의 자동진행 — **비용 검사는 화면이 먼저 한다** */
+    readonly autoProgress: () => void
   }
 }
 
@@ -58,6 +77,10 @@ export function useTeamGame(options: TeamGameOptions, random: RandomPort): TeamG
       throwPitch: (input: TeamPitchInput) =>
         setProgress((current) => throwPitch(current, input, random)),
       closeBurst: () => setProgress((current) => closeBurstWindow(current)),
+      changePitcher: (benchIndex: number) =>
+        setProgress((current) => changePitcher(current, benchIndex)),
+      steal: (base: StealBase) => setProgress((current) => stealBase(current, base, random)),
+      autoProgress: () => setProgress((current) => runAutoProgress(current, random)),
     }),
     [random],
   )
@@ -72,8 +95,11 @@ export function useTeamGame(options: TeamGameOptions, random: RandomPort): TeamG
     canBat: isBatterTurn(progress),
     canPitch: isPitchTurn(progress),
     summary,
+    canChangePitcher: canOpenPitcherChange(progress),
+    benchPitchers: availablePitchers(progress),
+    stealableBases: stealableBases(progress),
     actions,
   }
 }
 
-export type { TeamGameOptions, TeamGameProgress, TeamGameSummary, TeamPitchInput }
+export type { StealBase, TeamGameOptions, TeamGameProgress, TeamGameSummary, TeamPitchInput }

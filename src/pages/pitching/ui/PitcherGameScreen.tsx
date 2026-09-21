@@ -14,6 +14,10 @@ import type {
   PitcherGameOptions,
   PitcherGameSummary,
 } from '@/features/play-pitcher-game/model/pitcherGameFlow'
+import type { GameSettings } from '@/entities/settings/model/gameSettings'
+import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
+import { HelpScreen } from '@/pages/help/ui/HelpScreen'
+import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import { usePitcherGame } from '@/pages/pitching/model/usePitcherGame'
 import { CourseGrid } from '@/pages/pitching/ui/CourseGrid'
 import { PitchGradeGauge } from '@/pages/pitching/ui/PitchGradeGauge'
@@ -33,6 +37,11 @@ import * as styles from '@/pages/pitching/ui/PitcherGameScreen.css'
  * (`features/play-pitcher-game/model/pitcherPitch.courseTargetOf` 주석 참조).
  */
 type PitchPhase = '구질' | '코스' | '게이지'
+/** 경기 화면을 덮는 하위 화면 — 경기 중 메뉴가 연다 */
+type MenuOverlay = '조작방법' | '설정'
+
+/** 나만의리그 투수편 = 원본 전역 모드 3 — 경기 중 메뉴 표 0xcfcfc 의 **행 2**(네 칸)다 */
+const PITCHER_CAREER_MODE = 3
 
 interface PitcherGameScreenProps {
   readonly options: PitcherGameOptions
@@ -41,13 +50,25 @@ interface PitcherGameScreenProps {
   readonly onFinish: (summary: PitcherGameSummary) => void
   /** 경기 화면을 그냥 나갈 때 (원본 경기 중 메뉴 '*' 의 "나가기") */
   readonly onQuit?: () => void
+  /** 경기 중 메뉴 "설정" 칸이 열 환경설정 값. 안 넘기면 칸이 잠긴다 */
+  readonly settings?: GameSettings
+  readonly onSettingsChange?: (settings: GameSettings) => void
 }
 
-export function PitcherGameScreen({ options, random, onFinish, onQuit }: PitcherGameScreenProps) {
+export function PitcherGameScreen({
+  options,
+  random,
+  onFinish,
+  onQuit,
+  settings,
+  onSettingsChange,
+}: PitcherGameScreenProps) {
   const session = usePitcherGame(options, random)
   const { progress, canPitch, summary, actions } = session
 
   const [phase, setPhase] = useState<PitchPhase>('구질')
+  const [isMenuOpen, setMenuOpen] = useState(false)
+  const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
   const [slot, setSlot] = useState<PitchSlot | null>(null)
   const [courseCell, setCourseCell] = useState(4)
   /** 제안 대사를 이미 보여 준 돌발 행 */
@@ -60,6 +81,20 @@ export function PitcherGameScreen({ options, random, onFinish, onQuit }: Pitcher
     if (!canPitch) return
     if (progress.atBat.balls === 0 && progress.atBat.strikes === 0) setPhase('구질')
   }, [canPitch, progress.atBat.balls, progress.atBat.strikes])
+
+  /**
+   * 원본 공용 키 처리 `0x498d4` 의 '\*' — 경기 중 메뉴.
+   * ('#' 는 이 모드에서 교체 화면이 아니라 "그만 던지시겠습니까"(StrGAME[104])로 간다 — I-controls 4b.)
+   */
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat || event.key !== '*') return
+      event.preventDefault()
+      setMenuOpen((open) => !open)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
 
   const burst = progress.burst
   const resolution = progress.lastBurstResolution
@@ -76,6 +111,20 @@ export function PitcherGameScreen({ options, random, onFinish, onQuit }: Pitcher
     actions.throwPitch({ typeNumber: slot.typeNumber, courseCell, gaugeCell })
     setPhase('구질')
     setSlot(null)
+  }
+
+  // 경기 중 메뉴의 "조작방법"(0x3c212)·"설정"(0x3c326)
+  if (overlay === '조작방법') return <HelpScreen onBack={() => setOverlay(null)} />
+  if (overlay === '설정' && settings !== undefined && onSettingsChange !== undefined) {
+    return (
+      <SettingsScreen
+        settings={settings}
+        hasSavedCareer={false}
+        onChange={onSettingsChange}
+        onResetCareer={() => {}}
+        onBack={() => setOverlay(null)}
+      />
+    )
   }
 
   if (summary !== null) {
@@ -105,9 +154,14 @@ export function PitcherGameScreen({ options, random, onFinish, onQuit }: Pitcher
         title={`${progress.game.inning}회${progress.game.half}`}
         badge={`${staminaPercentOf(progress.stamina)}%`}
         leftKey={
-          canPitch ? { label: '# 강판', onPress: () => setAsksGiveUp(true) } : undefined
+          canPitch && !isMenuOpen
+            ? { label: '# 강판', onPress: () => setAsksGiveUp(true) }
+            : undefined
         }
-        rightKey={onQuit === undefined ? undefined : { label: '나가기', onPress: onQuit }}
+        rightKey={{
+          label: isMenuOpen ? '닫기' : '메뉴',
+          onPress: () => setMenuOpen((open) => !open),
+        }}
       >
         <div className={styles.hud}>
           <span>
@@ -151,7 +205,28 @@ export function PitcherGameScreen({ options, random, onFinish, onQuit }: Pitcher
           />
         </div>
 
-        {asksGiveUp && (
+        {isMenuOpen && (
+          <InGameMenu
+            // 나만의리그 투수편은 표 0xcfcfc 의 행 2 — 자동진행·다시하기가 없는 네 칸이다
+            mode={PITCHER_CAREER_MODE}
+            onContinue={() => setMenuOpen(false)}
+            onQuit={onQuit}
+            onOpenHelp={() => {
+              setMenuOpen(false)
+              setOverlay('조작방법')
+            }}
+            onOpenSettings={
+              settings === undefined || onSettingsChange === undefined
+                ? undefined
+                : () => {
+                    setMenuOpen(false)
+                    setOverlay('설정')
+                  }
+            }
+          />
+        )}
+
+        {!isMenuOpen && asksGiveUp && (
           <>
             {/* StrGAME[104] "그만 던지시겠습니까?" — 모드 3 은 교체 화면 대신 이 물음만 뜬다 */}
             <Panel heading="그만 던지시겠습니까?" />
@@ -168,7 +243,7 @@ export function PitcherGameScreen({ options, random, onFinish, onQuit }: Pitcher
           </>
         )}
 
-        {!asksGiveUp && canPitch && phase === '구질' && (
+        {!asksGiveUp && !isMenuOpen && canPitch && phase === '구질' && (
           <>
             <Panel heading="1. 구질 선택" />
             <MenuList
@@ -183,7 +258,7 @@ export function PitcherGameScreen({ options, random, onFinish, onQuit }: Pitcher
           </>
         )}
 
-        {!asksGiveUp && canPitch && phase === '코스' && (
+        {!asksGiveUp && !isMenuOpen && canPitch && phase === '코스' && (
           <>
             <Panel heading={<>2. 코스 선택 — {slot?.name}</>} />
             <CourseGrid
@@ -205,7 +280,7 @@ export function PitcherGameScreen({ options, random, onFinish, onQuit }: Pitcher
           </>
         )}
 
-        {!asksGiveUp && canPitch && phase === '게이지' && (
+        {!asksGiveUp && !isMenuOpen && canPitch && phase === '게이지' && (
           <>
             <Panel heading="3. 투구 결정" />
             <PitchGradeGauge onPress={throwWith} />

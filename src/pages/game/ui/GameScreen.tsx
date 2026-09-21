@@ -1,6 +1,11 @@
-import { useState } from 'react'
-import { BigResult, DialogueBox, Hint, MarkupText, PixelScreen } from '@/shared/ui'
+import { useEffect, useState } from 'react'
+import { BigResult, Hint, PixelScreen } from '@/shared/ui'
 import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
+import { canStealFrom } from '@/entities/game/model/steal'
+import type { GameSettings } from '@/entities/settings/model/gameSettings'
+import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
+import { HelpScreen } from '@/pages/help/ui/HelpScreen'
+import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import { effectiveAbilityOf } from '@/entities/career/model/condition'
 import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
@@ -25,11 +30,21 @@ interface GameScreenProps {
   readonly onPitchResolved: (detail: PitchOutcomeDetail, pitch: Pitch) => void
   /** 경기를 그만두고 메인 메뉴로 (이 경기 기록은 사라진다) */
   readonly onQuit: () => void
+  /**
+   * **도루** (원본 0x53610 → 메시지 0x583). 인자는 대상 주자가 선 루다 —
+   * 원본 키는 '3' 1루 주자 · '2' 2루 주자이고, 3루 주자(키 '1')는 원본이 홈 도루를 걸지 않는다.
+   * 안 넘기면 도루 입구가 뜨지 않는다.
+   */
+  readonly onSteal?: (base: 1 | 2) => void
+  /** 경기 중 메뉴 "설정" 칸이 열 환경설정 값. 안 넘기면 칸이 잠긴다 */
+  readonly settings?: GameSettings
+  readonly onSettingsChange?: (settings: GameSettings) => void
 }
 
-/** StrGAME[0] 경기 중 메뉴 호출(*) 확인 문구 */
-const QUIT_CONFIRM =
-  '!C!cFFFFFF현재 이닝의 기록과 획득한!N!cFF0000G포인트가 사라집니다!cFFFFFF!N메인메뉴로 나가시겠습니까?'
+/** 나만의리그 타자편 = 원본 전역 모드 4 — 경기 중 메뉴 표 0xcfcfc 의 **행 2**(네 칸)다 */
+const BATTER_CAREER_MODE = 4
+/** 경기 화면을 덮는 하위 화면 */
+type MenuOverlay = '조작방법' | '설정'
 
 export function GameScreen({
   career,
@@ -41,8 +56,12 @@ export function GameScreen({
   random,
   onPitchResolved,
   onQuit,
+  onSteal,
+  settings,
+  onSettingsChange,
 }: GameScreenProps) {
-  const [isConfirmingQuit, setIsConfirmingQuit] = useState(false)
+  const [isMenuOpen, setMenuOpen] = useState(false)
+  const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
   const isEagleEyeEnabled = career.eagleEyeGamesRemaining > 0
   const ace = progress.aceOpponent
   /**
@@ -50,6 +69,49 @@ export function GameScreen({
    * 원본이 이 숫자를 어디에 그리는지는 아직 못 찾아, 웹 껍데기의 제목 옆 칸에 둔다 (추정).
    */
   const earnedGamePoint = recordGamePointsOf(progress.recordIds)
+
+  /** 지금 도루를 걸 수 있는 루 — 앞 루가 비어 있어야 한다. 3루 주자는 빠진다 (`canStealFrom`) */
+  const bases = progress.game.bases
+  const stealableBases = (onSteal === undefined
+    ? []
+    : ([
+        bases.first && !bases.second ? 1 : null,
+        bases.second && !bases.third ? 2 : null,
+      ].filter((base) => base !== null) as (1 | 2)[])
+  ).filter((base) => canStealFrom(base))
+
+  /** 원본 공용 키 처리 0x498d4 — '*' 메뉴 · 도루 '3'/'2' */
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat) return
+      if (event.key === '*') {
+        event.preventDefault()
+        return setMenuOpen((open) => !open)
+      }
+      if (isMenuOpen || overlay !== null) return
+      const base = event.key === '3' ? 1 : event.key === '2' ? 2 : null
+      if (base !== null && stealableBases.includes(base)) {
+        event.preventDefault()
+        onSteal?.(base)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [isMenuOpen, onSteal, overlay, stealableBases])
+
+  // 경기 중 메뉴의 "조작방법"(0x3c212)·"설정"(0x3c326)
+  if (overlay === '조작방법') return <HelpScreen onBack={() => setOverlay(null)} />
+  if (overlay === '설정' && settings !== undefined && onSettingsChange !== undefined) {
+    return (
+      <SettingsScreen
+        settings={settings}
+        hasSavedCareer={false}
+        onChange={onSettingsChange}
+        onResetCareer={() => {}}
+        onBack={() => setOverlay(null)}
+      />
+    )
+  }
 
   return (
     <PixelScreen
@@ -59,12 +121,18 @@ export function GameScreen({
           ? `G ${earnedGamePoint} · 이글아이 ${career.eagleEyeGamesRemaining}`
           : `G ${earnedGamePoint}`
       }
-      leftKey={isConfirmingQuit ? { label: '예', onPress: onQuit } : undefined}
-      rightKey={
-        isConfirmingQuit
-          ? { label: '아니오', onPress: () => setIsConfirmingQuit(false) }
-          : { label: '메뉴', onPress: () => setIsConfirmingQuit(true) }
+      leftKey={
+        stealableBases.length > 0 && !isMenuOpen
+          ? {
+              label: `도루 ${stealableBases[0]}루`,
+              onPress: () => onSteal?.(stealableBases[0]),
+            }
+          : undefined
       }
+      rightKey={{
+        label: isMenuOpen ? '닫기' : '메뉴',
+        onPress: () => setMenuOpen((open) => !open),
+      }}
     >
       <div className={styles.stageArea}>
         {ace !== null && (
@@ -104,19 +172,36 @@ export function GameScreen({
               ? null
               : { framesUrl: ace.framesUrl, frameCount: ace.frameCount, stillUrl: ace.stillUrl }
           }
-          isPaused={isPaused || isConfirmingQuit}
+          isPaused={isPaused || isMenuOpen}
           random={random}
           onPitchResolved={onPitchResolved}
         />
       </div>
 
-      {isConfirmingQuit ? (
-        <DialogueBox>
-          <MarkupText raw={QUIT_CONFIRM} />
-        </DialogueBox>
+      {isMenuOpen ? (
+        <InGameMenu
+          // 나만의리그 타자편은 표 0xcfcfc 의 행 2 — 자동진행·다시하기가 없는 네 칸이다
+          mode={BATTER_CAREER_MODE}
+          onContinue={() => setMenuOpen(false)}
+          onQuit={onQuit}
+          onOpenHelp={() => {
+            setMenuOpen(false)
+            setOverlay('조작방법')
+          }}
+          onOpenSettings={
+            settings === undefined || onSettingsChange === undefined
+              ? undefined
+              : () => {
+                  setMenuOpen(false)
+                  setOverlay('설정')
+                }
+          }
+        />
       ) : bannerText === '' ? (
         <Hint>
           탭·Space·5 스윙 · 좌우 끝 탭·←→(4·6) 타자 이동
+          {stealableBases.includes(1) && ' · 3 도루(1루)'}
+          {stealableBases.includes(2) && ' · 2 도루(2루)'}
         </Hint>
       ) : (
         <BigResult>{bannerText}</BigResult>

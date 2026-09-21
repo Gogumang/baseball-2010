@@ -109,3 +109,23 @@ describe('투수편 경기 화면', () => {
     expect(ORIGINAL_USER_EVENTS.length).toBeGreaterThan(38)
   })
 })
+
+describe('경기 중 메뉴 (표 0xcfcfc 행 2 — 나만의리그)', () => {
+  it('네 칸뿐이다 — 자동진행·다시하기가 없다', () => {
+    띄우기()
+    fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
+
+    for (const 칸 of ['계속', '조작방법', '설정', '나가기']) {
+      expect(screen.getByText(칸)).toBeTruthy()
+    }
+    expect(screen.queryByText('자동진행')).toBeNull()
+    expect(screen.queryByText('다시하기')).toBeNull()
+  })
+
+  it('메뉴가 떠 있는 동안에는 투구 단계가 가려진다', () => {
+    띄우기()
+    fireEvent.keyDown(window, { key: '*' })
+
+    expect(screen.queryByText('1. 구질 선택')).toBeNull()
+  })
+})

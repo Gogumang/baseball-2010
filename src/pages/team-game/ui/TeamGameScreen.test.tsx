@@ -70,12 +70,114 @@ describe('팀 경기 화면 — 공격(타석) 차례', () => {
   })
 })
 
-describe('경기 중 메뉴', () => {
-  it("'*' 메뉴의 나가기 확인 문구가 뜬다 (StrGAME[0])", () => {
+describe('경기 중 메뉴 (표 0xcfcfc 행 0)', () => {
+  it('다섯 칸이 원본 차례대로 뜬다 — 계속·자동진행·조작방법·설정·나가기', () => {
     띄우기()
     fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
 
+    expect(screen.getByText('경기 중 메뉴')).toBeTruthy()
+    for (const 칸 of ['계속', '자동진행', '조작방법', '설정', '나가기']) {
+      expect(screen.getByText(칸)).toBeTruthy()
+    }
+  })
+
+  it("'*' 키로도 메뉴가 열린다 (0x498d4 는 소프트키1 을 '*' 로 읽는다)", () => {
+    띄우기()
+    fireEvent.keyDown(window, { key: '*' })
+
+    expect(screen.getByText('경기 중 메뉴')).toBeTruthy()
+  })
+
+  it('나가기를 고르면 StrGAME[0] 확인 문구가 뜬다', () => {
+    띄우기()
+    fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
+    fireEvent.click(screen.getByText('나가기'))
+
     expect(screen.getByText(/메인메뉴로 나가시겠습니까/)).toBeTruthy()
-    expect(screen.getByRole('button', { name: '예' })).toBeTruthy()
+    expect(screen.getByText('예')).toBeTruthy()
+  })
+
+  it('G포인트를 안 넘기면 자동진행 칸이 잠긴다 (비용을 검사할 수 없다)', () => {
+    띄우기()
+    fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
+    const 자동진행 = screen.getByText('자동진행').closest('button')
+
+    expect(자동진행?.disabled).toBe(true)
+  })
+
+  it('자동진행은 30 G 를 묻고, 모자라면 StrGAME[5] 알림만 뜬다 (0x3c7d8)', () => {
+    const onSpendGamePoint = vi.fn()
+    render(
+      <TeamGameScreen
+        options={기본옵션}
+        random={createSeededRandom(20100901)}
+        onFinish={vi.fn()}
+        onQuit={vi.fn()}
+        gamePoint={10}
+        onSpendGamePoint={onSpendGamePoint}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
+    fireEvent.click(screen.getByText('자동진행'))
+
+    expect(screen.getByText(/30 G포인트/)).toBeTruthy()
+    fireEvent.click(screen.getByText('예'))
+
+    expect(screen.getByText(/G포인트가 부족합니다/)).toBeTruthy()
+    expect(onSpendGamePoint).not.toHaveBeenCalled()
+  })
+
+  it('G포인트가 넉넉하면 비용을 알리고 경기를 자동으로 소화한다', () => {
+    const onSpendGamePoint = vi.fn()
+    render(
+      <TeamGameScreen
+        options={기본옵션}
+        random={createSeededRandom(20100901)}
+        onFinish={vi.fn()}
+        onQuit={vi.fn()}
+        gamePoint={500}
+        onSpendGamePoint={onSpendGamePoint}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
+    fireEvent.click(screen.getByText('자동진행'))
+    fireEvent.click(screen.getByText('예'))
+
+    expect(onSpendGamePoint).toHaveBeenCalledWith(30)
+    // 시즌 경기는 끝까지 소화된다 — 결과 화면이 뜬다
+    expect(screen.getByText('경기 결과')).toBeTruthy()
+  })
+
+  it('대전모드(8)는 100 G 다', () => {
+    render(
+      <TeamGameScreen
+        options={{ ...기본옵션, mode: 8 }}
+        random={createSeededRandom(20100901)}
+        onFinish={vi.fn()}
+        onQuit={vi.fn()}
+        gamePoint={500}
+        onSpendGamePoint={vi.fn()}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
+    fireEvent.click(screen.getByText('자동진행'))
+
+    expect(screen.getByText(/100 G포인트/)).toBeTruthy()
+  })
+})
+
+describe('투수 교체 (#)', () => {
+  it('우리 수비 차례면 # 교체 소프트키가 뜨고, 벤치 목록이 열린다 (상태 0xb)', () => {
+    띄우기()
+    fireEvent.click(screen.getByRole('button', { name: '# 교체' }))
+
+    expect(screen.getByText('투수 교체')).toBeTruthy()
+    expect(screen.getByText(/지금 투수 —/)).toBeTruthy()
+  })
+
+  it('우리 공격 차례에는 교체 입구가 없다 — 원본은 그 자리에서 대타를 연다', () => {
+    띄우기({ playerSide: PLAYER_SIDE_FIRST_BAT })
+
+    expect(screen.queryByRole('button', { name: '# 교체' })).toBeNull()
   })
 })

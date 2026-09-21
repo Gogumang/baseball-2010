@@ -8,7 +8,10 @@ import {
 } from '@/features/play-team-game/model/matchSettings'
 import {
   applyBatterOutcome,
+  autoProgressCostOf,
   availablePitchers,
+  canAutoProgress,
+  canOpenPitcherChange,
   changePitcher,
   currentBatterAbility,
   currentPitcherAbility,
@@ -16,7 +19,10 @@ import {
   isPitchTurn,
   ourPitcherStats,
   pitchSlotsFor,
+  runAutoProgress,
   startTeamGame,
+  stealableBases,
+  stealBase,
   summaryOf,
   throwPitch,
 } from '@/features/play-team-game/model/teamGameFlow'
@@ -217,5 +223,118 @@ describe('경기 중 투수 교체 (0xc1ba4 → 0xac428)', () => {
 
     expect(changePitcher(progress, progress.ourPitcherIndex)).toBe(progress)
     expect(changePitcher(progress, 99)).toBe(progress)
+  })
+})
+
+describe('자동진행 (경기 중 메뉴 동작 4 = 0x3c60c)', () => {
+  it('비용은 대전모드(8·9) 100 · 그 밖 30 이다', () => {
+    expect(autoProgressCostOf(1)).toBe(30)
+    expect(autoProgressCostOf(2)).toBe(30)
+    expect(autoProgressCostOf(8)).toBe(100)
+    expect(autoProgressCostOf(9)).toBe(100)
+  })
+
+  it('시즌 경기는 이닝과 무관하게 물어볼 수 있다', () => {
+    const { progress } = 시작()
+
+    expect(canAutoProgress(progress)).toBe(true)
+  })
+
+  it('대전모드는 0-기준 이닝이 5 를 넘으면 거절한다 (StrGAME[2] "6회까지만")', () => {
+    const { progress } = 시작({ mode: 8 })
+    const 육회 = { ...progress, game: { ...progress.game, inning: 6 } }
+    const 칠회 = { ...progress, game: { ...progress.game, inning: 7 } }
+
+    expect(canAutoProgress(육회)).toBe(true)
+    expect(canAutoProgress(칠회)).toBe(false)
+  })
+
+  it('자동진행은 사람 차례를 건너뛰고 경기를 끝까지 소화한다', () => {
+    const { progress, random } = 시작()
+
+    expect(progress.game.isFinished).toBe(false)
+    expect(runAutoProgress(progress, random).game.isFinished).toBe(true)
+  })
+
+  it('⚠️ 근사 — 대전모드는 6회를 마치면 멈춘다 (원본이 멈추는 지점은 미해독)', () => {
+    const { progress, random } = 시작({ mode: 8 })
+    const 소화 = runAutoProgress(progress, random)
+
+    expect(소화.game.isFinished).toBe(false)
+    expect(소화.game.inning).toBe(7)
+  })
+})
+
+describe('도루 (0x53610 → 메시지 0x583)', () => {
+  /** 1루에 주자를 세운 우리 공격 상황 */
+  const 일루주자 = () => {
+    const { progress, random } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
+    return {
+      progress: {
+        ...progress,
+        game: { ...progress.game, bases: { first: true, second: false, third: false } },
+      },
+      random,
+    }
+  }
+
+  it('1루 주자만 있으면 1루 도루를 걸 수 있다 — 3루 주자는 빠진다', () => {
+    const { progress } = 일루주자()
+
+    expect(stealableBases(progress)).toEqual([1])
+
+    const 만루 = { ...progress, game: { ...progress.game, bases: { first: true, second: true, third: true } } }
+    expect(stealableBases(만루)).toEqual([])
+  })
+
+  it('우리 수비 차례에는 도루가 없다 (원본도 공격일 때만 0x53610 을 탄다)', () => {
+    const { progress } = 시작()
+
+    expect(stealableBases({
+      ...progress,
+      game: { ...progress.game, bases: { first: true, second: false, third: false } },
+    })).toEqual([])
+  })
+
+  it('성공하면 주자가 2루로 가고, 실패하면 아웃이 하나 는다', () => {
+    const { progress } = 일루주자()
+    // 성공·실패 둘 다 나오도록 씨앗을 여러 개 돌린다
+    const 결과 = [1, 2, 3, 4, 5, 6, 7, 8].map((seed) =>
+      stealBase(progress, 1, createSeededRandom(seed)),
+    )
+    const 성공 = 결과.filter((next) => next.game.bases.second)
+    const 실패 = 결과.filter((next) => !next.game.bases.second)
+
+    expect(성공.length + 실패.length).toBe(8)
+    for (const next of 성공) {
+      expect(next.game.bases.first).toBe(false)
+      expect(next.game.outs).toBe(progress.game.outs)
+    }
+    for (const next of 실패) {
+      expect(next.game.outs).toBe(progress.game.outs + 1)
+      // 타석은 이어진다 — 타순 커서가 넘어가지 않는다
+      expect(next.game.battingOrderIndex).toBe(progress.game.battingOrderIndex)
+    }
+  })
+
+  it('걸 수 없는 루면 그대로 돌려준다', () => {
+    const { progress, random } = 일루주자()
+
+    expect(stealBase(progress, 2, random)).toBe(progress)
+    expect(stealBase(progress, 3, random)).toBe(progress)
+  })
+})
+
+describe('`#` 교체 화면 진입 조건 (0x498d4 의 # 가지)', () => {
+  it('우리 수비 차례이고 벤치 투수가 있으면 연다', () => {
+    const { progress } = 시작()
+
+    expect(canOpenPitcherChange(progress)).toBe(true)
+  })
+
+  it('우리 공격 차례에는 열지 않는다 — 원본은 그 자리에서 대타를 연다 (아직 안 옮겼다)', () => {
+    const { progress } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
+
+    expect(canOpenPitcherChange(progress)).toBe(false)
   })
 })
