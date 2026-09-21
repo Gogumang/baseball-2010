@@ -17,6 +17,8 @@ import {
 } from '@/pages/pitcher-league/model/pitcherGameOptions'
 import type { PitcherGameOptions, PitcherGameSummary } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
+import { MAXIMUM_GAME_POINT } from '@/entities/career/model/playerCareer'
+import { isInfiniteGamePointOn } from '@/shared/lib/dev/devOptions'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
@@ -130,5 +132,18 @@ export function usePitcherLeagueSession(
     setScene('등록')
   }, [])
 
-  return { career, scene, gameOptions, actions: { create, save: commit, goto, beginGame, finishGame, reset } }
+  /**
+   * ⚠️ **테스트용** — `?무한G` 면 보여 주는 G 만 최대로 올린다 (`devOptions.ts`).
+   * 저장은 그대로라 스위치를 끄면 원래 값으로 돌아온다.
+   */
+  const shown = career !== null && isInfiniteGamePointOn()
+    ? { ...career, gamePoint: MAXIMUM_GAME_POINT }
+    : career
+
+  return {
+    career: shown,
+    scene,
+    gameOptions,
+    actions: { create, save: commit, goto, beginGame, finishGame, reset },
+  }
 }

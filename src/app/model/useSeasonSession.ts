@@ -49,6 +49,7 @@ import { SEASON_OUTING_EFFECTS, SEASON_OUTING_PLACES } from '@/widgets/season/li
 import { cureIllnessAtHospital } from '@/entities/season-mode/model/seasonEventFlow'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { MORALE_LIMIT, POPULARITY_LIMIT, REPUTATION_LIMIT, MONEY_LIMIT, clampTo } from '@/entities/season-mode/model/seasonRecord'
+import { isInfiniteGamePointOn } from '@/shared/lib/dev/devOptions'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
@@ -633,7 +634,8 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
     gameOptions,
     gameKind,
     leagueFirstAwardedBits,
-    gamePoints,
+    // ⚠️ **테스트용** — `?무한G` 면 보여 주는 값만 최대로 올린다 (저장은 그대로다)
+    gamePoints: isInfiniteGamePointOn() ? GAME_POINT_LIMIT : gamePoints,
     cup: save?.cup ?? null,
     notice,
     actions: {

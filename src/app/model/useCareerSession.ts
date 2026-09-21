@@ -23,6 +23,7 @@ import {
   startNextSeason,
   gainGamePoint,
   countGameForSkills,
+  MAXIMUM_GAME_POINT,
 } from '@/entities/career/model/playerCareer'
 import { applyBurstRewards } from '@/entities/career/model/burstReward'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
@@ -59,6 +60,7 @@ import type { ManagementCommand } from '@/pages/management/ui/ManagementScreen'
 import { OUTING_PLACES } from '@/shared/config/outingPlaces'
 import { TRAINING_MENUS } from '@/shared/config/trainingMenus'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { isInfiniteGamePointOn } from '@/shared/lib/dev/devOptions'
 import { pickLoadingTip } from '@/shared/config/loadingTips'
 import type { SaveGamePort } from '@/shared/api/save/saveGamePort'
 
@@ -513,9 +515,17 @@ export function useCareerSession({
     },
   }
 
+  /**
+   * ⚠️ **테스트용** — `?무한G` 가 켜져 있으면 보여 주는 G 만 최대로 올린다 (`devOptions.ts`).
+   * 저장(`career` 상태)은 그대로라 스위치를 끄면 원래 값으로 돌아온다.
+   */
+  const shownCareer = career !== null && isInfiniteGamePointOn()
+    ? { ...career, gamePoint: MAXIMUM_GAME_POINT }
+    : career
+
   return {
     savedCareer,
-    career,
+    career: shownCareer,
     progress,
     shopNotice,
     outingNotice,

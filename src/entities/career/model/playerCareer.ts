@@ -578,7 +578,8 @@ export function nextOpponentOf(career: PlayerCareer): number {
 }
 
 /** 원본 전역 G포인트 상한 */
-const MAXIMUM_GAME_POINT = BALANCE.limits.gamePoint
+/** G포인트 상한 (저장+0x64) */
+export const MAXIMUM_GAME_POINT = BALANCE.limits.gamePoint
 
 /** 경기 끝 G포인트 = 달성 기록 금액 합 (0x4ea0c, 누락 탐색 9차). 출전·승리 보너스는 원본에 없다 */
 export function gamePointRewardOf(summary: GameSummary): number {
