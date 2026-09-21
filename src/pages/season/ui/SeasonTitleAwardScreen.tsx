@@ -19,8 +19,8 @@ export interface SeasonTitleAwardScreenProps {
    *
    * ⚠️ 시즌모드는 `isMine` 을 **"1위 팀 == 내 팀"** 으로 본다 (나리는 선수 레코드 +0xa 부호 비트).
    * 그러니 부르는 쪽이 `LeagueRecord.isMine` 을 그렇게 채워 넘겨야 한다 (B 4절 2번).
-   * ⚠️ 시즌모드 **투수 타이틀은 네 칸**(다승·삼진·방어·**세이브**)이다 — 자세한 것은
-   * `widgets/season/lib/seasonAwardEvents.ts` 의 `SEASON_PITCHER_TITLE_KINDS` 주석 참고.
+   * ⚠️ 시즌모드 **투수 타이틀은 네 칸**(다승·삼진·방어·**세이브**)이다 —
+   * `judgeTitles(records, '시즌투수')` 를 쓴다. 나리 `'투수'`(세 칸)와 섞지 말 것.
    */
   readonly titles: readonly TitleSlot[]
   /** 확인 — 타자시상 다음은 투수시상(0xec), 투수시상 다음은 최우수선수(0xed) 다 */

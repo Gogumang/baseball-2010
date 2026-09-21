@@ -337,3 +337,17 @@ describe('내 선수의 순위표 한 줄', () => {
     })
   })
 })
+
+describe('시즌모드 투수 타이틀 (B 4절 2번)', () => {
+  it('나리는 세 칸인데 시즌모드는 **네 칸**이다 — 넷째가 세이브왕', () => {
+    const 나리 = judgeTitles([], '투수').map((slot) => slot.name)
+    const 시즌 = judgeTitles([], '시즌투수').map((slot) => slot.name)
+
+    expect(나리).toEqual(['다승왕', '삼진왕', '방어왕'])
+    expect(시즌).toEqual(['다승왕', '삼진왕', '방어왕', '세이브왕'])
+  })
+
+  it('나리 마무리는 칸 수는 그대로 셋이고 첫째만 세이브왕이 된다', () => {
+    expect(judgeTitles([], '마무리').map((slot) => slot.name)).toEqual(['세이브왕', '삼진왕', '방어왕'])
+  })
+})

@@ -92,9 +92,8 @@ export const SEASON_MVP_LEADER_KINDS: readonly LeaderKind[] = [
  * 시즌모드 **투수 타이틀은 네 칸**이다 — 표 0xd4f24 = `[1, 6, 4, 13]` 의 넷째가
  * 시즌모드에서는 **3(세이브)** 으로 바뀐다 (B 4절 2번: "시즌모드는 넷째가 3(세이브, 문자열 82)").
  *
- * ⚠️ `entities/awards/model/seasonAwards.ts` 의 `TITLE_SPECS.투수` 는 **세 칸뿐**이라
- * 시즌모드 투수 시상에 그대로 쓰면 세이브왕이 빠진다. 그 파일은 이번 작업 범위 밖이라 고치지 않았다 —
- * 부르는 쪽이 네 번째 칸(세이브왕)을 직접 얹어 넘겨야 한다. 여기에 종류만 적어 둔다.
+ * `entities/awards/model/seasonAwards.ts` 의 `judgeTitles(records, '시즌투수')` 가 이 네 칸을 돌려준다
+ * (나리 `'투수'` 는 세 칸이라 섞지 말 것). 여기에는 종류만 남겨 둔다.
  */
 export const SEASON_PITCHER_TITLE_KINDS: readonly LeaderKind[] = [
   LEADER_KIND.승,

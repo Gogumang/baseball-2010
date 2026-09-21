@@ -34,8 +34,12 @@ export const TITLE_USER_EVENT_INDEX = {
 
 export type TitleName = keyof typeof TITLE_USER_EVENT_INDEX
 
-/** 내 선수가 타자인지 투수인지 — 원본 모드 3(나만의리그 투수)·4(나만의리그 타자) */
-export type AwardRole = '타자' | '투수' | '마무리'
+/**
+ * 내 선수가 타자인지 투수인지 — 원본 모드 3(나만의리그 투수)·4(나만의리그 타자).
+ *
+ * `시즌투수` 는 **시즌모드(모드 2)** 전용이다. 나만의리그와 칸 수가 다르다 — 아래 표 주석 참고.
+ */
+export type AwardRole = '타자' | '투수' | '마무리' | '시즌투수'
 
 interface TitleSpec {
   readonly name: TitleName
@@ -46,6 +50,9 @@ interface TitleSpec {
  * 타자 종류 표 0xd4f18 = `[9, 11, 12]` → 홈런왕·타점왕·타율왕.
  * 투수 종류 표 0xd4f24 = `[1, 6, 4, 13]` → 다승왕·삼진왕·방어왕 (13 은 `cmp #0xd` 로 건너뛴다).
  * 나만의리그 투수가 **마무리**(0xb6ded == 2)면 첫째가 3(세이브)로 바뀌어 세이브왕이 된다.
+ *
+ * ⚠️ **시즌모드는 넷째가 3(세이브, 문자열 82)** 이라 투수 타이틀이 **네 칸**이다 (B 4절 2번).
+ * 나만의리그(세 칸)와 섞지 말 것 — MVP 판정이 읽는 칸도 나리는 셋(+0x36c~0x36e)이다.
  */
 const TITLE_SPECS: Readonly<Record<AwardRole, readonly TitleSpec[]>> = {
   타자: [
@@ -62,6 +69,12 @@ const TITLE_SPECS: Readonly<Record<AwardRole, readonly TitleSpec[]>> = {
     { name: '세이브왕', kind: LEADER_KIND.세이브 },
     { name: '삼진왕', kind: LEADER_KIND.탈삼진 },
     { name: '방어왕', kind: LEADER_KIND.방어율 },
+  ],
+  시즌투수: [
+    { name: '다승왕', kind: LEADER_KIND.승 },
+    { name: '삼진왕', kind: LEADER_KIND.탈삼진 },
+    { name: '방어왕', kind: LEADER_KIND.방어율 },
+    { name: '세이브왕', kind: LEADER_KIND.세이브 },
   ],
 }
 
@@ -82,7 +95,7 @@ export interface TitleSlot {
 /** 수상자가 없을 때 채우는 팀 번호 — 원본 0x8dad4 가 칸을 10 으로 초기화한다 */
 export const NO_TEAM = 10
 
-/** 개인 타이틀 세 칸 (0x8dad4). 순위표 1위를 그대로 옮겨 적는다 */
+/** 개인 타이틀 (0x8dad4) — 나리는 세 칸, 시즌모드 투수는 네 칸이다. 순위표 1위를 그대로 옮겨 적는다 */
 export function judgeTitles(
   records: readonly LeagueRecord[],
   role: AwardRole = '타자',
