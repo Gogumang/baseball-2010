@@ -19,6 +19,7 @@ import {
   rundownAction,
   rundownBasePoint,
   RUNDOWN_REMAINING_PERCENT,
+  tagsRunner,
 } from '@/entities/fielding/model/rundown'
 
 const 주력500 = runnerSpeedOf(500)
@@ -160,5 +161,35 @@ describe('협살 종료 0xb26b8', () => {
       slot === 2 || slot === 3 ? { ...fielder, aiState: AI_STATE.RUNDOWN } : fielder,
     )
     expect(endRundown(협살중).map((fielder) => fielder.aiState)).toEqual(Array(9).fill(AI_STATE.IDLE))
+  })
+})
+
+describe('태그 아웃 0xb36d0 결과 3 — 거리 ≤ 499', () => {
+  const 주자 = 사이주자(1, 50)
+
+  /** 주자에게서 dx 만큼 떨어진 곳에 선, 공을 쥔 야수 */
+  const 공쥔야수 = (dx: number) => ({
+    ...야수들[2],
+    holdingBall: true,
+    position: { ...주자.position, x: 주자.position.x + dx },
+  })
+
+  it('공 쥔 야수가 499 안이면 잡고, 500 이면 못 잡는다 (0xb36d0 의 즉시값 그대로)', () => {
+    expect(tagsRunner(공쥔야수(499), 주자)).toBe(true)
+    expect(tagsRunner(공쥔야수(500), 주자)).toBe(false)
+  })
+
+  it('공을 안 쥔 야수는 붙어 있어도 못 잡는다 (플레이+0x12c)', () => {
+    expect(tagsRunner({ ...공쥔야수(100), holdingBall: false }, 주자)).toBe(false)
+  })
+
+  it('루 위에 붙은 주자는 세이프다 (주자 vt18)', () => {
+    const 루위주자 = createRunner(1, 1, 주력500, { targetBase: 2, position: basePosition(2) })
+    expect(tagsRunner({ ...야수들[3], holdingBall: true, position: basePosition(2) }, 루위주자)).toBe(false)
+  })
+
+  it('이미 죽었거나 득점한 주자는 다시 잡지 않는다', () => {
+    expect(tagsRunner(공쥔야수(100), { ...주자, isOut: true })).toBe(false)
+    expect(tagsRunner(공쥔야수(100), { ...주자, scored: true })).toBe(false)
   })
 })

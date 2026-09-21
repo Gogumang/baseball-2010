@@ -1,5 +1,12 @@
-import { basePosition, ticksToReach, type WorldPoint } from '@/entities/fielding/model/fieldGeometry'
+import { TAG_DISTANCE } from '@/entities/fielding/model/autoAdvance'
 import {
+  basePosition,
+  horizontalDistance,
+  ticksToReach,
+  type WorldPoint,
+} from '@/entities/fielding/model/fieldGeometry'
+import {
+  isRunnerStopped,
   legTotalTicksOf,
   NONE,
   remainingTicksOf,
@@ -14,6 +21,18 @@ import { throwTicksTo, throwTicksToFielder } from '@/entities/fielding/model/thr
  * 협살(런다운) — AI 상태 8 (0xb48b6) · 대상 고르기 0xb398c · 계획 0xb3a04 · 시작 0xb3a94 (S8 1절, 확정).
  *
  * **사람이 수비하면 협살이 절대 안 일어난다**: 시작 조건이 `state[0x31 + 수비측] == 1`(= CPU) 이다 (S8 1-4).
+ *
+ * ## 협살에 걸린 주자는 누가 움직이나 — **원본에 주자 쪽 협살 AI 는 없다** (찾아본 결과)
+ * 협살은 수비가 CPU 일 때만 걸리므로 **그때 공격은 늘 사람**이고, 되돌아 뛰는 것은
+ * **사람이 누르는 귀루 키**('3'/'1'/'7' → 메시지 0x584 → 0xa9b04, I-controls 3b)다. 자동 주루
+ * (0xaf918)는 **앞으로 가는 판정만** 한다(P2 5a, 옮겨 둔 `autoAdvance.ts`) — 되돌리는 가지가 없다.
+ * 근거로 삼은 것: ① 협살 기록칸 `P+0x1ec`~`+0x1f3` 을 읽고 쓰는 곳은 수비 쪽(0xb26b8 · 0xb3a04 ·
+ * 0xb3a94 · 0xb3f66 · 0xb4316 · 0xb4942)뿐이고, ② 주자의 목표 루를 바꾸는 유일한 길인
+ * 주자 vt0x48(= 0xa07b0, vtable 0xd771c)의 호출부(0x466a4·0x4679e 견제 귀루 · 0xa93fc·0xa9b90·
+ * 0xa9bba·0xa9c4e·0xa9f0e 주자관리 · 0xafa1c 자동 진루) 중 **협살 기록칸이나 공 위치를 보는 곳이
+ * 하나도 없다**. 견제(종류 4)만 "전원 즉시 귀루"(0x4677a, Q1 3b)라는 반응이 따로 있다.
+ * → **주자가 안 되돌면 협살은 태그로 안 끝난다.** 야수는 전원 220/틱이고 주자는 300+주루×7/100
+ * (≈335)이라, 뒤를 쫓는 야수는 원본에서도 절대 못 따라잡는다.
  */
 
 /** 다음 루까지 **남은** 비율이 이 값을 넘는 주자를 노린다 (0xb39d8 `cmp #0x23`, 즉시값으로 박혀 있다) */
@@ -121,6 +140,10 @@ export interface RundownTickInput extends DefenseContext {
 
 /**
  * 협살 한 틱. 공을 쥔 쪽과 아닌 쪽의 여유 틱이 **5 와 4 로 다르다** — 원본 그대로 옮긴다.
+ *
+ * ⚠️ **원본 그대로**: 공을 쥔 야수가 **주자 뒤쪽 루를 보는 쪽이면 `coversBack` 이 늘 참**이라
+ * 짝에게 던지지 않고 끝까지 쫓기만 한다(0xb4a96). 야수 220 < 주자 ≈335 이라 뒤에서는 절대
+ * 못 따라잡으므로, 그 배치에서 시작된 협살은 주자가 되돌아 뛰지 않는 한 태그로 안 끝난다.
  */
 export function rundownAction(input: RundownTickInput): RundownAction {
   const { plan, slot, play, fielders, runners } = input
@@ -152,6 +175,25 @@ export function rundownAction(input: RundownTickInput): RundownAction {
   if (runnerTicks > throwTicks + FREE_MARGIN_TICKS) return { kind: '주자추적', runnerIndex: plan.runnerIndex }
   if (runnerTicks > throwTicks) return { kind: '대기' }
   return { kind: '루로', base: slot === plan.backFielder ? plan.backBase : plan.frontBase }
+}
+
+/**
+ * **태그 아웃 (0xb36d0 결과 3, I 3c 확정)** — 협살에서 아웃이 나는 유일한 길이다.
+ *
+ * 조건 그대로: 공을 쥔 야수가 있고(`플레이+0x12c`), 주자가 아직 안 죽었고,
+ * **거리(0xbece8) ≤ 499** 이고, **주자가 루 위가 아니다**(`주자.vt18` 거짓 — 루에 붙은 주자는 세이프).
+ * 원본은 이 판정을 AI 상태와 무관하게 아웃 판정 함수가 돌리고, 아웃이 나면 그 안에서
+ * 협살 종료 0xb26b8 을 부른다 (0xb3946).
+ *
+ * ⚠️ 예전 이 자리의 **근사**("공 쥔 야수가 한 걸음(220) 안까지 붙으면 아웃")는 지웠다.
+ * 원본 숫자 499 가 문서에 확정으로 박혀 있어 그대로 쓴다.
+ */
+export function tagsRunner(fielder: FielderState, runner: RunnerState): boolean {
+  if (!fielder.holdingBall) return false
+  if (runner.isOut || runner.scored) return false
+  // 루 위에 붙어 있는 주자는 태그가 안 된다 (vt18 = 위치 == 목표점)
+  if (isRunnerStopped(runner)) return false
+  return horizontalDistance(fielder.position, runner.position) <= TAG_DISTANCE
 }
 
 /**

@@ -39,7 +39,6 @@ import {
   BASE_DEFAULT_FIELDER,
   basePosition,
   FIELDER_COUNT,
-  horizontalDistance,
   isSamePoint,
   progressPercent,
   runnerSpeedOf,
@@ -53,6 +52,7 @@ import {
   chooseRundownRunner,
   endRundown,
   rundownAction,
+  tagsRunner,
   NO_RUNDOWN,
   type RundownPlan,
 } from '@/entities/fielding/model/rundown'
@@ -887,9 +887,14 @@ export function stepDefensePlay(
         let released = true
         if (chased !== undefined && !chased.state.isOut) {
           released = false
+          // 공이 짝에게 날아가는 중이면 "공 쪽" 은 짝이 선 자리다 (원본은 공 객체의 목표점 공+0x2c 을 본다)
+          const ballTarget =
+            rundownThrowArrival >= 0 && rundownThrowTo !== NONE
+              ? fielders[rundownThrowTo]?.position ?? catchPoint
+              : catchPoint
           for (const slot of [rundown.backFielder, rundown.frontFielder]) {
             if (released) break
-            const action = rundownAction({ ...contextAt(tick), plan: rundown, slot, ballTarget: catchPoint })
+            const action = rundownAction({ ...contextAt(tick), plan: rundown, slot, ballTarget })
             if (action.kind === '협살해제') {
               released = true
               break
@@ -899,26 +904,25 @@ export function stepDefensePlay(
             if (action.kind === '주자추적') {
               // vt0x4c — 상대의 현재 위치를 그대로 목표로 삼는다
               const to = chased.state.position
-              const moved = stepToward(self.position, to, self.speed)
               fielders = fielders.map((fielder) =>
-                fielder.slot === slot ? { ...fielder, target: to, position: moved } : fielder,
+                fielder.slot === slot
+                  ? { ...fielder, target: to, position: stepToward(fielder.position, to, fielder.speed) }
+                  : fielder,
               )
-              // **근사**: 태그 판정(0xb3946)은 따로 있는 함수라 여기서는 "공을 쥔 야수가 한 걸음 안까지
-              // 붙으면 잡았다" 로 본다. 원본의 태그 판정 줄까지는 안 읽었다.
-              if (self.holdingBall && horizontalDistance(moved, to) <= self.speed) {
-                markOut(chased)
-                outs += 1
-                outsAdded += 1
-                rundownOuts += 1
-                released = true
-                log.push(`${tick}틱 협살 태그 — ${rundown.runnerIndex}번 주자 아웃`)
-              }
             } else if (action.kind === '짝에게송구') {
               if (rundownThrowArrival < 0) {
                 const partner = fielders[action.toSlot]
                 if (partner !== undefined) {
                   rundownThrowTo = action.toSlot
                   rundownThrowArrival = tick + Math.max(1, throwTicksToFielder(self, partner))
+                  // **공이 손을 떠난다** — 던진 야수는 `야수+0xe0 = 0`, 플레이는 `+0x12c = 0` 이 된다.
+                  // 그래서 원본에서 던진 야수는 다음 틱부터 상태 8 의 첫 갈래("아직 포구 전")로 떨어져
+                  // **제 송구를 따라 짝 쪽으로 달린다**. 이 줄이 없으면 던진 야수가 제 루에 붙박여
+                  // 두 야수가 주자 쪽으로 좁혀 들어오지 않는다.
+                  fielders = fielders.map((fielder) =>
+                    fielder.slot === slot ? { ...fielder, holdingBall: false } : fielder,
+                  )
+                  play = { ...play, held: false }
                   log.push(`${tick}틱 협살 송구 ${slot}→${action.toSlot} — ${rundownThrowArrival}틱 도착`)
                 }
               }
@@ -931,6 +935,19 @@ export function stepDefensePlay(
               )
             }
             // '대기' 는 vt0x10(동작 정지) — 이번 틱에 아무것도 안 한다
+
+            // ── 태그 아웃 판정 (0xb36d0 결과 3 → 0xb3946 이 협살을 끝낸다) ──
+            // 원본은 AI 상태와 무관하게 아웃 판정이 돌아, **공 쥔 야수와 주자의 거리가 499 이하**이고
+            // 주자가 루 위가 아니면 아웃이다. 여기서는 협살에 낀 두 야수에 대해서만 본다.
+            const afterMove = fielders[slot]
+            if (afterMove !== undefined && tagsRunner(afterMove, chased.state)) {
+              markOut(chased)
+              outs += 1
+              outsAdded += 1
+              rundownOuts += 1
+              released = true
+              log.push(`${tick}틱 협살 태그 — ${rundown.runnerIndex}번 주자 아웃`)
+            }
           }
         }
         if (released) {

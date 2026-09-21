@@ -491,6 +491,34 @@ describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
     expect(시작).toContain('1번 주자')
   })
 
+  it('**주자가 안 되돌면 태그가 안 난다** — 원본에도 주자 쪽 협살 AI 가 없다', () => {
+    // 자동 주루(0xaf918)는 앞으로 가는 판정만 한다. 뒤를 쫓는 야수는 220/틱, 주자는 ≈335/틱 이라
+    // 절대 못 따라잡고, 주자가 루에 35% 미만으로 붙으면 고르기(0xb398c)가 −1 이 되어 협살이 풀린다.
+    const 결과 = 협살상황(true)
+
+    expect(결과.rundowns).toBe(1)
+    expect(결과.rundownOuts).toBe(0)
+    expect(결과.log.some((line) => line.includes('협살 태그'))).toBe(false)
+  })
+
+  it('사람이 귀루 키를 누르면 되돌아 뛰고, 앞 루를 지키던 공 쥔 야수가 태그한다 (0xb36d0 결과 3)', () => {
+    // 협살은 수비가 CPU 일 때만 걸리므로 공격은 늘 사람이다. 되돌아 뛰는 것은 귀루 키('3' = 1루 주자,
+    // 메시지 0x584)이고, 아웃은 거리 ≤ 499 태그다 — 원본에서 협살이 아웃으로 끝나는 유일한 길이다.
+    const 결과 = runDefensePlay({
+      outcome: 이루타,
+      trajectory: battedBallTrajectory(representativePatternOf(이루타)),
+      bases: { first: true, second: true, third: false },
+      outs: 0,
+      defenseIsCpu: true,
+      controls: { side: '공격', keyAt: (tick) => (tick === 33 ? { key: '3' } : null) },
+    })
+
+    expect(결과.log.some((line) => line.includes('귀루'))).toBe(true)
+    expect(결과.rundowns).toBe(1)
+    expect(결과.rundownOuts).toBe(1)
+    expect(결과.log.some((line) => line.includes('협살 태그'))).toBe(true)
+  })
+
   it('타자주자는 협살 대상이 아니다 — 타자주자의 운명은 결과 코드가 정한다 (근사)', () => {
     // 3루타는 타자주자가 반드시 3루까지 간다. 협살이 그를 잡으면 기록과 어긋난다
     const 결과 = runDefensePlay({
