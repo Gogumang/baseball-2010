@@ -8,8 +8,8 @@
  *   random={random}
  *   isQuickStart={빠른실행으로_들어왔는가}
  *   openedHiddenTeamIds={전역기록_0x70}   // 히든 팀 10~14 중 열린 것
- *   openedAcePitcherIds={저장_0x30}       // 마투수 0~4
- *   openedAceBatterIds={저장_0x35}        // 마타자 0~4
+ *   openedAcePitcherIds={저장_0x30}       // 마투수 0~4 — 저장에 아직 없으면 DEFAULT_OPENED_ACE_PITCHER_IDS
+ *   openedAceBatterIds={저장_0x35}        // 마타자 0~4 — 저장에 아직 없으면 DEFAULT_OPENED_ACE_BATTER_IDS
  *   onFinish={(summary) => …}             // 경기 끝
  *   onExit={() => 메인메뉴로()}            // 준비 첫 화면에서 CLR · 경기 중 나가기
  * />
@@ -41,7 +41,8 @@ export type { GeneralModeSession, UseGeneralModeOptions } from '@/pages/general-
 
 /** 준비 기록(skin+0xbc)과 단계 번호 — 저장에 적거나 화면을 따로 몰 때 쓴다 */
 export {
-  ACE_PER_ROLE, ACE_PHASE, FIRST_BAT_PHASE, GENERAL_MODE_STEP, INITIAL_SETUP, NO_ACE, STADIUM_COUNT,
+  ACE_PER_ROLE, ACE_PHASE, DEFAULT_OPENED_ACE_BATTER_IDS, DEFAULT_OPENED_ACE_PITCHER_IDS,
+  FIRST_BAT_PHASE, GENERAL_MODE_STEP, INITIAL_SETUP, NO_ACE, STADIUM_COUNT,
   aceIndexOfCell, aceRoleOfCell, teamGameOptionsOf,
 } from '@/pages/general-mode/lib/generalModeSetup'
 export type {

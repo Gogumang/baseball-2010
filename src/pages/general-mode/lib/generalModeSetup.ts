@@ -50,6 +50,22 @@ export const STADIUM_COUNT = 10
 /** 마투수 5 · 마타자 5 (저장 +0x30..0x34 · +0x35..0x39) */
 export const ACE_PER_ROLE = 5
 
+/**
+ * 새 저장에서 이미 열려 있는 마선수 — **웹판 저장에는 아직 마선수 오픈 플래그 칸이 없다**
+ * (`mgr[0x30+idx]`, 전역 기록. `docs/re/S9-widgets.md` 1-4절 · `K-bursts-special.md` K-3:
+ * "해금 id: 0~7 마선수 (…) **싸이커·메디카는 기본 개방**"). 나머지 8명은 기록 누계나 G 로 여는
+ * 대상이라 그 저장 칸이 생기기 전에는 열 수 없다. 그동안은 원본과 같이 이 둘만 기본으로 튼다.
+ *
+ * 마투수 로컬 0 = 싸이커(전역 idx 0). `AceSelectScreen`/`GeneralModeScreen` 이 이 배열을
+ * `openedAcePitcherIds` 기본값으로 받는다.
+ */
+export const DEFAULT_OPENED_ACE_PITCHER_IDS: readonly number[] = [0]
+
+/**
+ * 마타자 로컬 0 = 메디카(전역 idx 5). `DEFAULT_OPENED_ACE_PITCHER_IDS` 와 같은 근거다.
+ */
+export const DEFAULT_OPENED_ACE_BATTER_IDS: readonly number[] = [0]
+
 /** 처음 열었을 때의 기록 — 저장이 0 으로 초기화되므로 전부 0 이다 */
 export const INITIAL_SETUP: GeneralModeSetup = {
   userTeamId: 0,

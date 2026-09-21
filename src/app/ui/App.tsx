@@ -20,7 +20,7 @@ import { useSeasonSession } from '@/app/model/useSeasonSession'
 import { SeasonRoute } from '@/app/ui/SeasonRoute'
 import { usePitcherLeagueSession } from '@/app/model/usePitcherLeagueSession'
 import { PitcherLeagueRoute } from '@/app/ui/PitcherLeagueRoute'
-import { GeneralModeScreen } from '@/pages/general-mode'
+import { GeneralModeScreen, DEFAULT_OPENED_ACE_BATTER_IDS, DEFAULT_OPENED_ACE_PITCHER_IDS } from '@/pages/general-mode'
 import { ROOKIE_BATTER_ABILITY } from '@/entities/batting/model/batter'
 
 const SETTINGS_KEY = 'compus-baseball/settings'
@@ -115,6 +115,10 @@ export function App() {
       <GeneralModeScreen
         random={random}
         openedHiddenTeamIds={collection.collection.openedHiddenIds}
+        // 마선수 오픈 플래그(mgr[0x30+idx], 전역 기록)는 웹판 저장에 아직 칸이 없다 — 저장이
+        // 생기기 전까지는 원본처럼 기본 개방분(싸이커·메디카)만 열어 둔다 (K-bursts-special.md K-3)
+        openedAcePitcherIds={DEFAULT_OPENED_ACE_PITCHER_IDS}
+        openedAceBatterIds={DEFAULT_OPENED_ACE_BATTER_IDS}
         gaugeSettingOn={gameSettings.settings.pitchControl === '게이지'}
         // 한 판 치고 끝이라 정산할 곳이 없다 — 원본도 모드 1 은 저장에 아무것도 안 남긴다
         onFinish={() => setScreen({ kind: '메인메뉴' })}

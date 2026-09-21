@@ -2,7 +2,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { ACE_PLAYERS } from '@/shared/config/original/acePlayers'
-import { ACE_PHASE } from '@/pages/general-mode/lib/generalModeSetup'
+import {
+  ACE_PHASE, DEFAULT_OPENED_ACE_BATTER_IDS, DEFAULT_OPENED_ACE_PITCHER_IDS,
+} from '@/pages/general-mode/lib/generalModeSetup'
 import { AceSelectScreen, acePlayerOfCell } from '@/pages/general-mode/ui/AceSelectScreen'
 
 /** 마선수 고르기 (하위 상태 21, 목록 k = 2) — 윗줄 마투수 5 · 아랫줄 마타자 5 */
@@ -82,6 +84,47 @@ describe('마타자 단계', () => {
 
     expect(cells[0].disabled).toBe(true)
     expect(cells[7].disabled).toBe(false)
+  })
+})
+
+describe('prop 을 안 넘기면(App.tsx 연결 누락 재현) 10칸이 전부 LOCK 이다', () => {
+  it('openedAcePitcherIds·openedAceBatterIds 를 아예 안 주면 무엇도 못 고른다', () => {
+    render(<AceSelectScreen phase={ACE_PHASE.마투수} onSelect={vi.fn()} onCancel={vi.fn()} />)
+    const cells = 칸들()
+
+    expect(cells.every((cell) => cell.disabled)).toBe(true)
+    expect(screen.getAllByRole('button', { name: 'LOCK' })).toHaveLength(10)
+  })
+})
+
+describe('App.tsx 기본 개방(DEFAULT_OPENED_ACE_*)을 넘기면', () => {
+  it('마투수 로컬 0(싸이커)만 고를 수 있다', () => {
+    띄우기({
+      openedAcePitcherIds: DEFAULT_OPENED_ACE_PITCHER_IDS,
+      openedAceBatterIds: DEFAULT_OPENED_ACE_BATTER_IDS,
+    })
+    const cells = 칸들()
+
+    expect(cells[0].disabled).toBe(false)
+    expect(cells[1].disabled).toBe(true)
+    expect(cells[2].disabled).toBe(true)
+    expect(cells[3].disabled).toBe(true)
+    expect(cells[4].disabled).toBe(true)
+  })
+
+  it('마타자 로컬 0(메디카)만 고를 수 있다', () => {
+    띄우기({
+      phase: ACE_PHASE.마타자,
+      openedAcePitcherIds: DEFAULT_OPENED_ACE_PITCHER_IDS,
+      openedAceBatterIds: DEFAULT_OPENED_ACE_BATTER_IDS,
+    })
+    const cells = 칸들()
+
+    expect(cells[5].disabled).toBe(false)
+    expect(cells[6].disabled).toBe(true)
+    expect(cells[7].disabled).toBe(true)
+    expect(cells[8].disabled).toBe(true)
+    expect(cells[9].disabled).toBe(true)
   })
 })
 
