@@ -34,6 +34,51 @@ export type { SeasonOutingScreenProps } from '@/pages/season/ui/SeasonOutingScre
 export { SeasonItemMenuScreen } from '@/pages/season/ui/SeasonItemMenuScreen'
 export type { SeasonItemMenuScreenProps } from '@/pages/season/ui/SeasonItemMenuScreen'
 
+/**
+ * ── 시즌 끝 화면들 (정규시즌 45경기 뒤 0xe9 → 0xee → 0xeb → 0xec → 0xed → 0xf0 → 0xef → … → 0xf5)
+ *
+ * | 원본 상태 | 화면 |
+ * |---|---|
+ * | 0xee 포스트시즌 시작 | `PostseasonStartScreen` |
+ * | 0xeb 타자시상 | `SeasonTitleAwardScreen` (`role="타자"`) |
+ * | 0xec 투수시상 | `SeasonTitleAwardScreen` (`role="투수"`) |
+ * | 0xed 최우수선수 | `SeasonMvpScreen` |
+ * | 0xf0 정규시즌 순위 | `RegularSeasonRankScreen` |
+ * | 0xef 시즌 결산 | `SeasonSummaryScreen` |
+ * | 0xf5 엔딩 | `SeasonEndingScreen` |
+ *
+ * 단계 차례와 각 단계가 트는 이벤트는 `entities/season-mode` 의 `SEASON_END_CHAIN` 이 가진다.
+ */
+export { PostseasonStartScreen } from '@/pages/season/ui/PostseasonStartScreen'
+export type { PostseasonStartScreenProps } from '@/pages/season/ui/PostseasonStartScreen'
+
+export { SeasonTitleAwardScreen } from '@/pages/season/ui/SeasonTitleAwardScreen'
+export type { SeasonTitleAwardScreenProps } from '@/pages/season/ui/SeasonTitleAwardScreen'
+
+export { SeasonMvpScreen } from '@/pages/season/ui/SeasonMvpScreen'
+export type { SeasonMvpScreenProps } from '@/pages/season/ui/SeasonMvpScreen'
+
+export { RegularSeasonRankScreen } from '@/pages/season/ui/RegularSeasonRankScreen'
+export type { RegularSeasonRankScreenProps } from '@/pages/season/ui/RegularSeasonRankScreen'
+
+export { SeasonSummaryScreen } from '@/pages/season/ui/SeasonSummaryScreen'
+export type { SeasonSummaryScreenProps } from '@/pages/season/ui/SeasonSummaryScreen'
+
+export { SeasonEndingScreen } from '@/pages/season/ui/SeasonEndingScreen'
+export type { SeasonEndingScreenProps } from '@/pages/season/ui/SeasonEndingScreen'
+
+/** 포스트시즌 대진표 0x853ac (P6 4a-1 확정) — 시즌 끝 화면 둘이 함께 쓴다 */
+export { PostseasonBracketWindow } from '@/widgets/season/ui/PostseasonBracketWindow'
+export type { PostseasonBracketWindowProps } from '@/widgets/season/ui/PostseasonBracketWindow'
+
+/** 시즌모드 전용 시상 이벤트 번호·보상 (P4 2a 확정) — ⚠️ 나리(371+개수·376/377)와 다르다 */
+export {
+  SEASON_AWARD_INTRO_EVENT_ID, SEASON_AWARD_REWARDS, SEASON_MVP_LEADER_KINDS,
+  SEASON_MVP_RESULT_EVENT_ID, SEASON_PITCHER_TITLE_KINDS, SEASON_TITLE_RESULT_EVENT_ID,
+  seasonAwardRewardOf, seasonMvpResultEventId, seasonTitleResultEventId,
+} from '@/widgets/season/lib/seasonAwardEvents'
+export type { SeasonAwardReward, SeasonAwardRole } from '@/widgets/season/lib/seasonAwardEvents'
+
 /** 트레이닝 칸·가드·굴림 표 (J 4-6) — 굴림·적용은 부르는 쪽이 한다 */
 export {
   TEAM_ABILITY_LABELS, TRAINING_SLOTS, HELL_TRAINING_INDEX, HELL_TRAINING_GAME_POINT,
