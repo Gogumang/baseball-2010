@@ -18,16 +18,34 @@ const SCREEN_HEIGHT = 320
 export const ANCHOR_A = { x: 58, y: 110 } as const
 export const ANCHOR_B = { x: 178, y: 96 } as const
 
-/** A·B 딱지 — slt_frame 116(57×15 흰 막대) 위에 img_text 프레임. k=0 은 157 PLAYER · 159 ABILITY */
+/**
+ * A·B 딱지 (0x65744, 모든 k 공통 — P6 2a-4).
+ *
+ * ```
+ * A 딱지 = slt_frame **이미지 116**(57×15 흰 막대)  을 (A.x − 28, A.y − 53), 글자는 A.y − 48
+ * B 딱지 = slt_frame **이미지 117**(57×15 파란 막대) 을 (B.x − 28, B.y − 43), 글자는 그 +5
+ * ```
+ * k 3~5 만 B 도 116·53 을 쓴다 — 팀 고르기(k=0)는 **117·43** 이다.
+ *
+ * ⚠️ 막대는 `slt_frame/NNN.png`(**이미지** 128장)에 있다. `slt_frame/frames/`(프레임 62장)에는
+ *    116·117 이 아예 없어서, 프레임 쪽으로 찾으면 아무것도 안 그려진다.
+ */
 export const TAG = {
-  barFrame: 116,
+  /** A 딱지 흰 막대 — slt_frame **이미지** 116 */
+  aBarImage: 116,
+  /** B 딱지 파란 막대 — slt_frame **이미지** 117 (k=0 기본값) */
+  bBarImage: 117,
   barWidth: 57,
   barHeight: 15,
-  /** 막대 원점 = (기준점.x − 28, 기준점.y − 53) (0x65744) */
   dx: -28,
-  dy: -53,
-  /** 글자 y = 기준점.y − 48 */
-  textDy: -48,
+  /** A 막대 원점 y 보정 */
+  aDy: -53,
+  /** B 막대 원점 y 보정 — A 와 다르다 */
+  bDy: -43,
+  /** A 글자 y = A.y − 48 (막대 +5) */
+  aTextDy: -48,
+  /** B 글자 y = B 막대 +5 */
+  bTextDy: -38,
   aTextFrame: 157,
   bTextFrame: 159,
 } as const
@@ -79,8 +97,11 @@ export const LOCKED_CIRCLES = [
 /** 잠긴 팀의 이름 자리 글 — `"!C!cFFFFFF???"` (0xd2478), (A.x − 41, A.y + 42) 폭 82 가운데 */
 export const LOCKED_NAME = '???'
 
-/** 이름 막대 — slt_frame 이미지 9 (82×15) 을 (A.x − 41, A.y + 40) */
-export const NAME_BAR = { frame: 9, width: 82, height: 15, dx: -41, dy: 40 } as const
+/**
+ * 이름 막대 — slt_frame **이미지** 9 (82×15) 을 (A.x − 41, A.y + 40).
+ * ⚠️ 같은 번호가 `slt_frame/frames/009.png` 에도 있지만 그건 72×17(탭 커서)이다 — 다른 그림이다.
+ */
+export const NAME_BAR = { image: 9, width: 82, height: 15, dx: -41, dy: 40 } as const
 /** 팀 이름 글 — img_text 프레임 **65 + 팀**, y = A.y + 42, 막대 안 가운데 */
 export const NAME_TEXT = { firstFrame: 65, dy: 42 } as const
 export const teamNameFrameOf = (teamId: number) => NAME_TEXT.firstFrame + teamId

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Button, FrameSprite, RawScreen } from '@/shared/ui'
-import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
+import { Button, RawScreen } from '@/shared/ui'
 import { TEAMS } from '@/shared/config/original/teams'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 import {
@@ -9,7 +8,10 @@ import {
 } from '@/pages/create-player/lib/teamSelectLayout'
 import * as styles from '@/pages/create-player/ui/TeamSelectScreen.css'
 
-const SLT_FRAME = './sprites/slt_frame/frames'
+/** 이미지 폴더 (128장) — 노트가 "slt_frame 이미지 N" 이라 부르는 막대들이 여기 있다.
+ *  프레임 폴더(`slt_frame/frames`, 62장)와 **번호 체계가 다르다** — 116·117 은 프레임 쪽에 없다 */
+const SLT_IMAGE = './sprites/slt_frame'
+const imageSrc = (folder: string, image: number) => `${folder}/${String(image).padStart(3, '0')}.png`
 const IMG_TEXT = './sprites/img_text/frames'
 /** 격자 칸의 작은 로고 — 큰 team_logo(77×76)는 40px 칸을 넘친다. HUD 와 같은 ui/team_logo_ini(12×12) 를 쓴다 */
 const smallLogoUrlOf = (teamId: number) => `./sprites/team_logo_ini/${String(teamId).padStart(3, '0')}.png`
@@ -41,7 +43,6 @@ interface TeamSelectScreenProps {
  */
 export function TeamSelectScreen({ openedHiddenIds = [], onSelect, onCancel }: TeamSelectScreenProps) {
   const [cursor, setCursor] = useState(0)
-  const sltOrigins = useFrameOrigins(SLT_FRAME)
 
   const team = TEAMS[cursor] ?? TEAMS[0]
   const isOpen = isTeamOpen(cursor, openedHiddenIds)
@@ -74,16 +75,16 @@ export function TeamSelectScreen({ openedHiddenIds = [], onSelect, onCancel }: T
 
   return (
     <RawScreen>
-      {/* A·B 딱지 — 흰 막대(slt_frame 116) 위에 PLAYER · ABILITY */}
+      {/* A·B 딱지 — A 는 흰 막대(이미지 116), B 는 파란 막대(이미지 117)로 서로 다르다 */}
       {[
-        { anchor: ANCHOR_A, frame: TAG.aTextFrame },
-        { anchor: ANCHOR_B, frame: TAG.bTextFrame },
-      ].map(({ anchor, frame }) => (
+        { anchor: ANCHOR_A, bar: TAG.aBarImage, barDy: TAG.aDy, textDy: TAG.aTextDy, frame: TAG.aTextFrame },
+        { anchor: ANCHOR_B, bar: TAG.bBarImage, barDy: TAG.bDy, textDy: TAG.bTextDy, frame: TAG.bTextFrame },
+      ].map(({ anchor, bar, barDy, textDy, frame }) => (
         <span key={frame}>
-          <FrameSprite folder={SLT_FRAME} frame={TAG.barFrame} origins={sltOrigins}
-            x={anchor.x + TAG.dx} y={anchor.y + TAG.dy} />
+          <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, bar)}
+            style={{ left: anchor.x + TAG.dx, top: anchor.y + barDy }} />
           <img className={styles.layer} alt="" src={frameSrc(IMG_TEXT, frame)}
-            style={{ left: anchor.x + TAG.dx, top: anchor.y + TAG.textDy, width: TAG.barWidth, objectFit: 'none' }} />
+            style={{ left: anchor.x + TAG.dx, top: anchor.y + textDy, width: TAG.barWidth, objectFit: 'none' }} />
         </span>
       ))}
 
@@ -104,9 +105,9 @@ export function TeamSelectScreen({ openedHiddenIds = [], onSelect, onCancel }: T
         ))
       )}
 
-      {/* 이름 막대 (slt_frame 9, 82×15) + 이름. 잠긴 팀은 ??? 다 */}
-      <FrameSprite folder={SLT_FRAME} frame={NAME_BAR.frame} origins={sltOrigins}
-        x={ANCHOR_A.x + NAME_BAR.dx} y={ANCHOR_A.y + NAME_BAR.dy} />
+      {/* 이름 막대 (slt_frame **이미지** 9, 82×15) + 이름. 잠긴 팀은 ??? 다 */}
+      <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, NAME_BAR.image)}
+        style={{ left: ANCHOR_A.x + NAME_BAR.dx, top: ANCHOR_A.y + NAME_BAR.dy }} />
       <span className={styles.centeredText}
         style={{ left: ANCHOR_A.x + NAME_BAR.dx, top: ANCHOR_A.y + 42, width: NAME_BAR.width }}>
         {isOpen ? team.name : LOCKED_NAME}

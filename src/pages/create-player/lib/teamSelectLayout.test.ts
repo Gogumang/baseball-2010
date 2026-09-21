@@ -12,13 +12,20 @@ describe('기준점', () => {
     expect([ANCHOR_B.x, ANCHOR_B.y]).toEqual([178, 96])
   })
 
-  it('딱지 막대는 기준점에서 (−28, −53), 글자는 −48 이다 (0x65744)', () => {
-    expect([TAG.dx, TAG.dy, TAG.textDy]).toEqual([-28, -53, -48])
+  it('A 딱지는 흰 막대(이미지 116) 를 (−28, −53), 글자는 −48 이다 (0x65744)', () => {
+    expect([TAG.aBarImage, TAG.dx, TAG.aDy, TAG.aTextDy]).toEqual([116, -28, -53, -48])
     expect([TAG.aTextFrame, TAG.bTextFrame]).toEqual([157, 159])
   })
 
-  it('이름 막대는 slt_frame 9 (82×15) 을 (A.x−41, A.y+40) 에 둔다', () => {
-    expect([NAME_BAR.frame, NAME_BAR.width, NAME_BAR.height]).toEqual([9, 82, 15])
+  it('B 딱지는 **파란 막대(이미지 117)** 이고 y 보정도 −43 으로 다르다 — k 3~5 만 116·53 이다', () => {
+    expect(TAG.bBarImage).toBe(117)
+    expect(TAG.bDy).toBe(-43)
+    expect(TAG.bTextDy).toBe(TAG.bDy + 5)
+  })
+
+  it('이름 막대는 slt_frame **이미지** 9 (82×15) 을 (A.x−41, A.y+40) 에 둔다', () => {
+    // ⚠️ 같은 번호가 frames 폴더에도 있지만 그건 72×17(탭 커서)이라 다른 그림이다
+    expect([NAME_BAR.image, NAME_BAR.width, NAME_BAR.height]).toEqual([9, 82, 15])
     expect([ANCHOR_A.x + NAME_BAR.dx, ANCHOR_A.y + NAME_BAR.dy]).toEqual([17, 150])
   })
 
