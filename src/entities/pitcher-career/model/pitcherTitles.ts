@@ -64,7 +64,7 @@ export function titleSubjectOfPitcher(career: PitcherCareer): TitleSubject {
     mvpSeasonBits: career.mvpSeasonBits,
     championships: career.regularSeasonFirstCount,
     trainingTotal: trainingTotalOf(career),
-    outingsThisSeason: career.outingsThisSeason,
+    outingsLastSeason: career.outingsLastSeason,
     lotteryFirstPrizes: 0,
     lotteryPurchases: 0,
     seenEventIds: career.seenEventIds,

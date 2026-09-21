@@ -134,17 +134,57 @@ function isEligible(event: OriginalEvent, career: PlayerCareer, trigger: number,
   )
 }
 
+/** 이벤트 한 번 훑기의 결과 — 뽑힌 이벤트와 **다음 호출이 이어서 볼 자리**(0xadc70 의 reader+0x28) */
+export interface EventScan {
+  readonly event: OriginalEvent | null
+  readonly cursor: number
+}
+
 /**
- * 이 trigger 에서 지금 볼 이벤트 (0xadc70). 무작위 조건(질병)은 random 이 있을 때만 판정한다 —
- * 지도 [!] 표시처럼 미리 보기만 할 때는 random 없이 부른다.
+ * 커서에서 이어 훑는다 (0xadc70, A-1 확정).
+ *
+ * ```
+ * while cursor < 개수:
+ *     if acfbc(레코드): return 찾음            ; 커서는 그 레코드에 **멈춘다**
+ *     cursor += 1
+ * cursor = 0; return 없음                      ; 끝까지 없으면 되감고 이번 호출은 "없음"
+ * ```
+ * 당첨 레코드에 커서가 멈추는 것이 핵심이다 — 그 이벤트는 본 것이 되므로 다음 호출은
+ * 판정 4번(본 이벤트면 불발)에 걸려 곧바로 그 다음 칸으로 넘어간다.
+ * 번호로 부를 때(0xae170)는 "현재 레코드 **다음** 위치" 를 커서로 남긴다 — 오프닝이 그 갈래다.
+ *
+ * 무작위 조건(질병)은 random 이 있을 때만 판정한다 — 지도 [!] 표시처럼 미리 보기만 할 때는
+ * random 없이 부른다.
+ */
+export function scanEventFrom(
+  career: PlayerCareer,
+  events: readonly OriginalEvent[],
+  trigger: number,
+  cursor: number,
+  random?: RandomPort,
+): EventScan {
+  if (trigger === EVENT_TRIGGER.관리 && !hasSeen(career, OPENING_EVENT_ID)) {
+    const index = events.findIndex((event) => event.id === OPENING_EVENT_ID)
+    // 오프닝은 번호로 부르는 갈래(0x8bde0 → 0x8bdc8)라 커서에 "그 다음 칸" 이 남는다 (0xae170)
+    if (index >= 0) return { event: events[index], cursor: index + 1 }
+    return { event: null, cursor }
+  }
+
+  for (let at = Math.max(0, cursor); at < events.length; at += 1) {
+    const event = events[at]
+    if (isEligible(event, career, trigger, random) && !hasSeen(career, event.id)) {
+      return { event, cursor: at }
+    }
+  }
+  return { event: null, cursor: 0 }
+}
+
+/**
+ * 배열 처음부터 훑어 지금 볼 이벤트 (커서를 안 쓰는 갈래).
+ * 외출 장소 [!] 배정 0x8cdc0 이 이렇게 **늘 처음부터** 훑으므로 미리 보기는 이 창구를 쓴다.
  *
  * **"분기 전용 이벤트 제외" 규칙은 원본에 없다** (A-1 확정). 원본은 분기로만 닿는 이벤트를
- * **대상(audience) 0** 으로 막는데, 그 검사는 아래 `isEligible` 의 `BATTER_AUDIENCES` 가 이미 하고 있다.
- * 그래서 따로 빼던 목록을 없앴다 — 대상이 1·2 인 이벤트는 분기로도 닿고 평소에도 나오는 게 원본이다.
- *
- * ⚠️ 아직 다른 점: 원본은 **커서를 이어 쓴다** — 다음 호출이 지난 당첨 위치부터 훑고, 끝까지 없으면
- * 0 으로 되감으며 그 호출은 "없음" 이 된다 (0xae170 이 "현재 레코드 다음" 을 커서로 저장).
- * 커서는 저장에 들어가는 값이라 아직 넣지 않았다 — 지금은 늘 배열 처음부터 훑는다.
+ * **대상(audience) 0** 으로 막는데, 그 검사는 `isEligible` 의 `BATTER_AUDIENCES` 가 이미 하고 있다.
  */
 export function nextEventFor(
   career: PlayerCareer,
@@ -152,11 +192,7 @@ export function nextEventFor(
   trigger: number,
   random?: RandomPort,
 ): OriginalEvent | null {
-  if (trigger === EVENT_TRIGGER.관리 && !hasSeen(career, OPENING_EVENT_ID)) {
-    return events.find((event) => event.id === OPENING_EVENT_ID) ?? null
-  }
-  const candidates = events.filter((event) => isEligible(event, career, trigger, random))
-  return candidates.find((event) => !hasSeen(career, event.id)) ?? null
+  return scanEventFrom(career, events, trigger, 0, random).event
 }
 
 /** 저장을 불러올 때 — 반복 이벤트는 다시 볼 수 있게 기록에서 지운다 (0xacf60) */

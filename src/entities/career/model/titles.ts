@@ -114,8 +114,8 @@ export interface TitleSubject {
   readonly championships: number
   /** 훈련 칸별 누적의 합 (Σ +0x4b..+0x4f) */
   readonly trainingTotal: number
-  /** 지난 1년 외출 수 (+0x6a) */
-  readonly outingsThisSeason: number
+  /** 지난 1년 외출 수 (+0x6a) — 칭호 25·26 이 **새 시즌 첫 경기 전**에 이 값을 본다 */
+  readonly outingsLastSeason: number
   /** 또또복권 1등 횟수 (+0x185) · 구매 수 (+0x186) */
   readonly lotteryFirstPrizes: number
   readonly lotteryPurchases: number
@@ -171,10 +171,11 @@ const COMMON_RULES: Readonly<Record<number, SubjectRule>> = {
   22: (s) => s.lotteryPurchases >= 100, // 또또복권 100번 구매
   23: (s) => s.trainingTotal >= 200, // 훈련 횟수 200회
   24: (s) => s.trainingTotal >= 100, // 훈련 횟수 100회
-  // 값은 원본과 같다. 시점만 다르다 — 원본은 **다음 시즌 첫 경기 전**에 지난해 값으로 본다.
-  // 그래서 원본은 13년차(마지막 해) 외출을 볼 기회가 없는데, 여기서는 13년차 끝에도 준다 (P3 9절)
-  25: (s) => s.seasonFinished && s.outingsThisSeason <= 2, // 1년간 외출 2회 이하
-  26: (s) => s.seasonFinished && s.outingsThisSeason >= 20, // 1년간 외출 20회 이상
+  // 25·26 은 **다음 시즌 첫 경기 전**에 지난해 +0x6a 로 본다 (0x1a590·0x1a5d0, P3 9절):
+  // `연차idx > 0 && 경기 수 == 0`. 시즌 끝에 보던 웹은 13년차(마지막 해) 외출까지 쳐 줬는데,
+  // 원본은 그 해 뒤에 새 시즌이 없어 **13년차 외출은 볼 기회가 없다** — 그 차이까지 그대로 옮긴다.
+  25: (s) => s.season > 1 && isSeasonStart(s) && s.outingsLastSeason <= 2, // 1년간 외출 2회 이하
+  26: (s) => s.season > 1 && isSeasonStart(s) && s.outingsLastSeason > 19, // 1년간 외출 20회 이상
   27: (s) => s.reputation >= 999, // 평판 999
   28: (s) => s.reputation >= 700, // 평판 700
   29: (s) => s.reputation <= 0, // 평판 0
@@ -214,7 +215,7 @@ export function titleSubjectOfBatter(career: PlayerCareer): TitleSubject {
     mvpSeasonBits: career.mvpSeasonBits,
     championships: career.regularSeasonFirstCount,
     trainingTotal: trainingTotalOf(career),
-    outingsThisSeason: career.outingsThisSeason,
+    outingsLastSeason: career.outingsLastSeason,
     lotteryFirstPrizes: career.lotteryFirstPrizes,
     lotteryPurchases: career.lotteryPurchases,
     seenEventIds: career.seenEventIds,

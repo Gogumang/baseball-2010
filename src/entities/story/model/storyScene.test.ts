@@ -8,6 +8,7 @@ import {
   nextEventFor,
   OPENING_EVENT_ID,
   placeTriggerOf,
+  scanEventFrom,
 } from '@/entities/story/model/storyScene'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
@@ -110,6 +111,68 @@ describe('nextEventFor — 원본 이벤트 일정', () => {
     const after = finishEvent(오프닝을본선수(), [first.id])
 
     expect(nextEventFor(after, ORIGINAL_EVENTS, EVENT_TRIGGER.관리)?.id).not.toBe(first.id)
+  })
+})
+
+describe('scanEventFrom — 커서 이어 쓰기 (0xadc70)', () => {
+  it('찾은 레코드 자리에 커서가 멈춘다', () => {
+    const scan = scanEventFrom(오프닝을본선수(), ORIGINAL_EVENTS, EVENT_TRIGGER.관리, 0)
+
+    expect(scan.event?.id).toBe(1)
+    expect(ORIGINAL_EVENTS[scan.cursor].id).toBe(1)
+  })
+
+  it('그 자리에서 다시 불러도 — 본 이벤트가 되었으니 — 같은 것을 또 주지 않는다', () => {
+    const 처음 = scanEventFrom(오프닝을본선수(), ORIGINAL_EVENTS, EVENT_TRIGGER.관리, 0)
+    const 본뒤 = finishEvent(오프닝을본선수(), [처음.event!.id])
+    const 다음 = scanEventFrom(본뒤, ORIGINAL_EVENTS, EVENT_TRIGGER.관리, 처음.cursor)
+
+    expect(다음.event?.id).not.toBe(처음.event?.id)
+  })
+
+  it('커서를 이어 쓰며 훑으면 한 이벤트를 두 번 주지 않는다', () => {
+    let career = 오프닝을본선수()
+    let cursor = 0
+    const 본것: number[] = []
+    for (let round = 0; round < 8; round += 1) {
+      const scan = scanEventFrom(career, ORIGINAL_EVENTS, EVENT_TRIGGER.관리, cursor)
+      cursor = scan.cursor
+      if (scan.event === null) continue
+      본것.push(scan.event.id)
+      career = finishEvent(career, [scan.event.id])
+    }
+
+    expect(본것.length).toBeGreaterThan(0)
+    expect(new Set(본것).size).toBe(본것.length)
+  })
+
+  it('커서 앞쪽은 다시 훑지 않는다 — 처음부터 훑던 웹과 달라지는 지점', () => {
+    const career = 오프닝을본선수()
+    const 처음 = scanEventFrom(career, ORIGINAL_EVENTS, EVENT_TRIGGER.관리, 0)
+
+    expect(scanEventFrom(career, ORIGINAL_EVENTS, EVENT_TRIGGER.관리, 처음.cursor + 1).event?.id)
+      .not.toBe(처음.event?.id)
+  })
+
+  it('끝까지 없으면 커서를 0 으로 되감고 그 호출은 "없음" 이다', () => {
+    const scan = scanEventFrom(오프닝을본선수(), ORIGINAL_EVENTS, EVENT_TRIGGER.관리, ORIGINAL_EVENTS.length)
+
+    expect(scan.event).toBeNull()
+    expect(scan.cursor).toBe(0)
+  })
+
+  it('오프닝은 번호 호출이라 커서에 "그 다음 칸" 이 남는다 (0xae170)', () => {
+    const scan = scanEventFrom(선수(), ORIGINAL_EVENTS, EVENT_TRIGGER.관리, 0)
+
+    expect(scan.event?.id).toBe(OPENING_EVENT_ID)
+    expect(scan.cursor).toBe(ORIGINAL_EVENTS.findIndex((event) => event.id === OPENING_EVENT_ID) + 1)
+  })
+
+  it('nextEventFor 는 늘 처음부터 훑는다 — 장소 [!] 배정 0x8cdc0 갈래', () => {
+    const career = 오프닝을본선수()
+
+    expect(nextEventFor(career, ORIGINAL_EVENTS, EVENT_TRIGGER.관리)?.id)
+      .toBe(scanEventFrom(career, ORIGINAL_EVENTS, EVENT_TRIGGER.관리, 0).event?.id)
   })
 })
 

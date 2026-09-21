@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
-import { nextEventFor, placeTriggerOf } from '@/entities/story/model/storyScene'
+import { nextEventFor, placeTriggerOf, scanEventFrom } from '@/entities/story/model/storyScene'
 import type { OriginalEvent } from '@/shared/config/original/eventTypes'
 import { OUTING_PLACES } from '@/shared/config/outingPlaces'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -36,8 +36,19 @@ export function useStorySchedule(career: PlayerCareer | null) {
     )
   }, [career, events])
 
-  const eventFor = (current: PlayerCareer, trigger: number, random?: RandomPort) =>
-    events === null ? null : nextEventFor(current, events, trigger, random)
+  /**
+   * 이벤트 레코드 커서 (0xadc70 의 reader+0x28). 원본은 **다음 호출이 지난 자리부터** 훑고,
+   * 끝까지 없으면 0 으로 되감는다 (A-1 확정). 지우는 시점이 원본 저장 어디인지는 문서에 없어
+   * 세션 동안만 들고 있다 — 불러오기 뒤 처음부터 훑는 것이 다를 수 있다 (**근사**).
+   */
+  const cursorRef = useRef(0)
+
+  const eventFor = (current: PlayerCareer, trigger: number, random?: RandomPort) => {
+    if (events === null) return null
+    const scan = scanEventFrom(current, events, trigger, cursorRef.current, random)
+    cursorRef.current = scan.cursor
+    return scan.event
+  }
 
   return { events, eventPlaceIds, eventFor }
 }

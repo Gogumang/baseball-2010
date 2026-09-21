@@ -191,6 +191,8 @@ export interface PitcherCareer {
   readonly consecutiveTrainingCounts: Readonly<Record<string, number>>
   readonly hasActedThisCycle: boolean
   readonly outingsThisSeason: number
+  /** 지난 시즌 외출 수 — 칭호 25·26 이 새 시즌 첫 경기 전에 본다 (타자편 `outingsLastSeason` 과 같은 칸) */
+  readonly outingsLastSeason: number
   readonly isInjured: boolean
   readonly injuredGamesPlayed: number
   readonly injuryRemaining: number
@@ -264,6 +266,7 @@ export function createPitcherCareer(
     consecutiveTrainingCounts: {},
     hasActedThisCycle: false,
     outingsThisSeason: 0,
+    outingsLastSeason: 0,
     isInjured: false,
     injuredGamesPlayed: 0,
     injuryRemaining: 0,
@@ -535,7 +538,9 @@ export function startNextPitcherSeason(career: PitcherCareer): PitcherCareer {
     ...career,
     season: career.season + 1,
     gamesPlayed: 0,
+    // 칭호 25·26 은 새 시즌 첫 경기 전에 **지난해** 외출 수로 본다 (P3 9절)
     outingsThisSeason: 0,
+    outingsLastSeason: career.outingsThisSeason,
     popularityAtSeasonStart: career.popularity,
     hasSeenYearGoalWindow: false,
     yearGoalEventDone: false,

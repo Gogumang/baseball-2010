@@ -72,7 +72,8 @@ export function StoryScreen({
       )}
 
       {menu !== null ? (
-        <MenuList items={menu} onSelect={(id) => jump(Number(id))} />
+        // 원본 선택지는 대사 창 안 글줄이라 화살표·판이 없고 고른 줄만 노랑이다 (0x7fd22, R14 3-4)
+        <MenuList items={menu} cursorStyle="선택지" onSelect={(id) => jump(Number(id))} />
       ) : (
         <Hint>대사창을 누르거나 Enter</Hint>
       )}

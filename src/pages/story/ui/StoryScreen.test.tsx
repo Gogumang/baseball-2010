@@ -35,6 +35,31 @@ describe('StoryScreen — 관리 화면 위에 겹치는 덮개다', () => {
     expect(root.className).toContain('overlay')
   })
 
+  it('선택지는 원본 대사 창 갈래로 그린다 — 화살표 없이 고른 줄만 색이 바뀐다 (0x7fd22)', () => {
+    const 선택지이벤트 = {
+      ...이벤트,
+      commands: [{ op: 'choice', portraits: [], choices: [{ text: '예', gotoEvent: 2 }, { text: '아니오', gotoEvent: 3 }] }],
+    } as unknown as OriginalEvent
+
+    render(
+      <StoryScreen
+        events={[선택지이벤트]}
+        event={선택지이벤트}
+        playerName="테스트"
+        teamName="드래곤즈"
+        onComplete={() => {}}
+        onMatch={() => {}}
+      />,
+    )
+
+    const 줄 = screen.getAllByRole('option')
+    expect(줄).toHaveLength(2)
+    // 원본은 고른 줄 글자색만 바꾼다 — ▶ 커서를 그리지 않는다
+    expect(줄.map((item) => item.textContent).join('')).not.toContain('▶')
+    expect(줄[0].getAttribute('aria-selected')).toBe('true')
+    expect(줄[0].className).toContain('choiceItem')
+  })
+
   it('대사는 그대로 보여 준다', () => {
     render(
       <StoryScreen

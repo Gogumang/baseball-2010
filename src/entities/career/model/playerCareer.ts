@@ -107,8 +107,17 @@ export interface PlayerCareer {
    * r_event_txt[176] "한번에 트레이닝, 휴식, 외출 중 딱 한 가지 일만 할 수 있으니"
    */
   readonly hasActedThisCycle: boolean
-  /** 이번 시즌 외출 횟수 — 칭호 "1년간 외출 2회 이하/20회 이상" (StrNICKNAME[89][90]) */
+  /** 이번 시즌 외출 횟수 (선수 +0x6a) */
   readonly outingsThisSeason: number
+  /**
+   * 지난 시즌 외출 횟수 — 칭호 25·26 "1년간 외출 2회 이하/20회 이상" (StrNICKNAME[89][90]) 전용.
+   *
+   * 원본은 칸을 하나(+0x6a)만 두고 **새 시즌 첫 경기 전**에 그 값을 본다(0x1a590·0x1a5d0, P3 9절).
+   * 시즌 전환 0x1b768·0xa39a8 어디에도 +0x6a 를 지우는 줄이 없어 **어디서 지우는지는 미확인**이라,
+   * 웹은 전환 때 이 칸에 지난해 값을 떠 두고 세는 칸은 0 으로 되돌린다 — 문서가 확정한
+   * "지난해 값으로 판정" 은 그대로이고, 지우는 시점만 **근사**다.
+   */
+  readonly outingsLastSeason: number
   /** 한 경기 최다 홈런 — 칭호 "한 경기 홈런 4회 달성" */
   readonly bestHomeRunsInGame: number
   /** 사이클링 히트를 친 경기 수 — 칭호 "사이클링 히트 2회 달성" */
@@ -292,6 +301,7 @@ export function createCareer(name: string, profile: RookieProfile = DEFAULT_ROOK
     illnessName: null,
     hasActedThisCycle: false,
     outingsThisSeason: 0,
+    outingsLastSeason: 0,
     bestHomeRunsInGame: 0,
     cycleHitGames: 0,
     popularityAtSeasonStart: STARTING_POPULARITY,
@@ -609,7 +619,9 @@ export function startNextSeason(career: PlayerCareer): PlayerCareer {
     ...career,
     season: career.season + 1,
     gamesPlayed: 0,
+    // 칭호 25·26 은 새 시즌 첫 경기 전에 **지난해** 외출 수로 본다 (P3 9절) — 세는 칸을 비우기 전에 떠 둔다
     outingsThisSeason: 0,
+    outingsLastSeason: career.outingsThisSeason,
     // 인기도 스냅샷 (+0x78 ← 지금 인기도, 0xa39e0) — 올해의 목표 "인기도 상승" 의 기준점
     popularityAtSeasonStart: career.popularity,
     // 올해의 목표 플래그 두 개를 되돌린다 — +0x1b7(0xa39d0) 창을 봤다 · +0x1bc(0x1b882) 연초 이벤트

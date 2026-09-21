@@ -17,6 +17,13 @@ export interface MenuItem {
 interface MenuListProps {
   readonly items: readonly MenuItem[]
   readonly onSelect: (id: string) => void
+  /**
+   * 커서를 그리는 방식.
+   *   `'목록'`   — 웹판 기본. 왼쪽에 ▶ 를 찍고 고른 줄 배경을 바꾼다.
+   *   `'선택지'` — **원본 대사 창의 선택지 갈래**(0x7fd22): 화살표도 배경도 없고
+   *                고른 줄 글자만 노랑 RGB(255,255,0) 으로 칠한다 (R14 3-4 표 dlg+0xe4).
+   */
+  readonly cursorStyle?: '목록' | '선택지'
 }
 
 /**
@@ -24,7 +31,7 @@ interface MenuListProps {
  * 키보드(↑↓ + Enter)와 터치(탭)를 같은 동작으로 다룬다 — 데스크탑과 모바일에서
  * 조작 방식만 다를 뿐 화면은 동일하다.
  */
-export function MenuList({ items, onSelect }: MenuListProps) {
+export function MenuList({ items, onSelect, cursorStyle = '목록' }: MenuListProps) {
   const [selectedIndex, setSelectedIndex] = useState(0)
   const itemsRef = useRef(items)
   itemsRef.current = items
@@ -68,12 +75,12 @@ export function MenuList({ items, onSelect }: MenuListProps) {
   }, [])
 
   return (
-    <ul className={styles.list} role="listbox">
+    <ul className={cursorStyle === '선택지' ? styles.choiceList : styles.list} role="listbox">
       {items.map((item, index) => (
         <li key={item.id}>
           <button
             type="button"
-            className={styles.item}
+            className={cursorStyle === '선택지' ? styles.choiceItem : styles.item}
             role="option"
             aria-selected={index === selectedIndex}
             disabled={item.isDisabled === true}
@@ -83,7 +90,10 @@ export function MenuList({ items, onSelect }: MenuListProps) {
               onSelect(item.id)
             }}
           >
-            <span className={styles.cursor}>{index === selectedIndex ? '▶' : ''}</span>
+            {/* 원본 선택지 갈래는 화살표를 안 그린다 — 고른 줄 색만 바뀐다 (0x7fd22) */}
+            {cursorStyle === '목록' && (
+              <span className={styles.cursor}>{index === selectedIndex ? '▶' : ''}</span>
+            )}
             {item.iconUrl !== undefined && (
               <img className={styles.icon} src={item.iconUrl} alt="" aria-hidden />
             )}

@@ -28,9 +28,8 @@ interface EventPortraitsProps {
  * 원작 이벤트 초상화. 좌우 자리마다 PZX 애니메이션을 반복 재생하고, 새 인물은 미끄러져 들어온다.
  * 주인공은 피부 팔레트와 장타형 몸(+8)을 따라간다 (C-1 확정 — `portraitSlots.ts` 참고).
  *
- * ⚠️ 아직 `pages/story/ui/StoryScreen.tsx` 가 이 둘을 안 넘겨 기본값(황인·타격형)으로 돈다.
- *    `app/ui/CareerRoutes.tsx` → `StoryScreen` 이 `career.skinIndex`·`career.battingTypeIndex` 를
- *    내려보내 주면 그대로 살아난다.
+ * 값은 `app/ui/CareerRoutes.tsx` → `StoryScreen` → 여기로 `career.skinIndex`·`career.battingTypeIndex`
+ * 가 내려온다. 안 넘기는 자리(미션·이야기 밖 화면)만 기본값 황인·타격형으로 돈다.
  */
 export function EventPortraits({ portraits, height, skinIndex = 0, battingTypeIndex = 0 }: EventPortraitsProps) {
   const placed = placePortraits(portraits, SCREEN_WIDTH)

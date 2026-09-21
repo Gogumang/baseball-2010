@@ -13,7 +13,7 @@ import {
   titleListOf,
   titleNumberOf,
 } from '@/entities/career/model/titles'
-import { createCareer, GAMES_PER_SEASON } from '@/entities/career/model/playerCareer'
+import { createCareer, GAMES_PER_SEASON, startNextSeason } from '@/entities/career/model/playerCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
 import { ORIGINAL_TITLES } from '@/shared/config/original/titles'
@@ -60,13 +60,31 @@ describe('evaluateNewTitles — 원문 조건', () => {
     expect(titles).not.toContain('꽃보다 야구')
   })
 
-  it('1년간 외출 조건은 시즌이 끝났을 때만 본다', () => {
-    const 시즌중 = 선수({ outingsThisSeason: 0, gamesPlayed: 10 })
-    const 시즌끝 = 선수({ outingsThisSeason: 0, gamesPlayed: GAMES_PER_SEASON })
+  it('1년간 외출 조건은 다음 시즌 첫 경기 전에 지난해 값으로 본다 (0x1a590·0x1a5d0)', () => {
+    const 시즌끝 = 선수({ outingsLastSeason: 0, outingsThisSeason: 0, season: 1, gamesPlayed: GAMES_PER_SEASON })
+    const 새시즌 = 선수({ outingsLastSeason: 0, season: 2, gamesPlayed: 0 })
+    const 새시즌_경기뒤 = 선수({ outingsLastSeason: 0, season: 2, gamesPlayed: 1 })
 
-    expect(evaluateNewTitles(시즌중)).not.toContain('은둔형 외톨이')
-    expect(evaluateNewTitles(시즌끝)).toContain('은둔형 외톨이')
-    expect(evaluateNewTitles(선수({ outingsThisSeason: 20, gamesPlayed: GAMES_PER_SEASON }))).toContain('자유로운 영혼')
+    // 시즌이 끝난 그 해에는 아직 안 준다 — 원본은 해를 넘겨야 본다
+    expect(evaluateNewTitles(시즌끝)).not.toContain('은둔형 외톨이')
+    expect(evaluateNewTitles(새시즌)).toContain('은둔형 외톨이')
+    expect(evaluateNewTitles(새시즌_경기뒤)).not.toContain('은둔형 외톨이')
+  })
+
+  it('1년차 시작(연차idx 0)에는 외출 칭호를 주지 않는다', () => {
+    expect(evaluateNewTitles(선수({ outingsLastSeason: 0, season: 1, gamesPlayed: 0 }))).not.toContain('은둔형 외톨이')
+  })
+
+  it('자유로운 영혼은 지난해 외출이 20회 이상일 때만 (> 19)', () => {
+    expect(evaluateNewTitles(선수({ outingsLastSeason: 19, season: 2, gamesPlayed: 0 }))).not.toContain('자유로운 영혼')
+    expect(evaluateNewTitles(선수({ outingsLastSeason: 20, season: 2, gamesPlayed: 0 }))).toContain('자유로운 영혼')
+  })
+
+  it('시즌을 넘기면 이번 시즌 외출 수가 지난해 칸으로 옮겨간다', () => {
+    const 넘긴 = startNextSeason(선수({ outingsThisSeason: 7, season: 3 }))
+
+    expect(넘긴.outingsLastSeason).toBe(7)
+    expect(넘긴.outingsThisSeason).toBe(0)
   })
 
   it('평판 700·999, 인기도 2000·4000', () => {

@@ -1,5 +1,6 @@
 import { style } from '@vanilla-extract/css'
 import { theme } from '@/app/styles/theme.css'
+import { ORIGINAL_COLORS } from '@/shared/config/design'
 
 export const list = style({
   listStyle: 'none',
@@ -29,6 +30,37 @@ export const item = style({
       background: theme.color.panelRaised,
       color: theme.color.accent,
     },
+    '&:disabled': { color: theme.color.inkFaint, cursor: 'default' },
+  },
+})
+
+/**
+ * 원본 대사 창의 선택지 목록 (0x7fd22) — 창 본체가 이미 반투명 검정 띠라 테두리·판을 따로 두지 않는다.
+ * 줄 사이 간격은 글 그리기의 줄높이 0xe(14) 를 따른다 (R14 3-4).
+ */
+export const choiceList = style({
+  listStyle: 'none',
+  margin: 0,
+  padding: 0,
+})
+
+/** 고른 줄만 노랑 RGB(255,255,0), 나머지는 흰색 — 배경도 화살표도 없다 */
+export const choiceItem = style({
+  display: 'flex',
+  alignItems: 'flex-start',
+  gap: '6px',
+  width: '100%',
+  padding: '0 5px',
+  minHeight: '14px',
+  lineHeight: '14px',
+  background: 'none',
+  border: 'none',
+  color: ORIGINAL_COLORS.text,
+  font: 'inherit',
+  textAlign: 'left',
+  cursor: 'pointer',
+  selectors: {
+    '&[aria-selected="true"]': { color: ORIGINAL_COLORS.highlightYellow },
     '&:disabled': { color: theme.color.inkFaint, cursor: 'default' },
   },
 })
