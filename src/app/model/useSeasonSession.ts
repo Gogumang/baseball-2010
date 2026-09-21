@@ -18,6 +18,10 @@ import { EMPTY_LEAGUE, rankingOf } from '@/entities/league/model/league'
 import type { League } from '@/entities/league/model/league'
 import { recordLeagueResult } from '@/entities/league/model/league'
 import { playLeagueDay, simulateLeagueGame } from '@/entities/league/model/leagueDay'
+import { EMPTY_LEAGUE_PLAYER_STATS } from '@/entities/league/model/leaguePlayerStats'
+import type { LeaguePlayerStats } from '@/entities/league/model/leaguePlayerStats'
+import { startNextYear } from '@/entities/season-mode/model/seasonRecord'
+import { SEASON_END_CHAIN } from '@/entities/season-mode/model/seasonStateMachine'
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { TEAMS } from '@/shared/config/original/teams'
 import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
@@ -54,6 +58,8 @@ export interface SeasonSession {
   readonly scene: SeasonSceneState
   readonly league: League
   readonly roster: SeasonTeamRoster
+  /** 리그 선수별 성적 — 타이틀·MVP 판정의 유일한 재료다 (B-2) */
+  readonly playerStats: LeaguePlayerStats
   /** 진행 중인 국가대항전. 없으면 null (원본 L+0xa8~ 칸) */
   readonly cup: NationalCup | null
   readonly notice: string
@@ -74,6 +80,10 @@ export interface SeasonActions {
   readonly runTraining: (slot: number) => void
   /** 시즌 외출 한 번 — 굴리고 적용한다 (연출 0xe3 → 결과 0xc81c) */
   readonly runOuting: (place: number) => void
+  /** 시즌 끝 사슬의 다음 칸으로 (포스트시즌시작 → 시상 셋 → 정규시즌순위 → 결산) */
+  readonly nextSeasonEndStep: () => void
+  /** 결산을 닫았다 — 국가대항전 연차면 대회, 아니면 새 해 (afterKoreanSeries) */
+  readonly finishSeason: () => void
   readonly clearNotice: () => void
   readonly quit: () => void
 }
@@ -83,6 +93,7 @@ interface SeasonSave {
   readonly state: SeasonState
   readonly league: League
   readonly roster: SeasonTeamRoster
+  readonly playerStats?: LeaguePlayerStats
   /** 진행 중인 국가대항전 (L+0xa8~0xc3). 대회 밖이면 null */
   readonly cup?: NationalCup | null
 }
@@ -138,6 +149,7 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
         state: startNewSeason(teamId, TEAMS[teamId]?.name ?? ''),
         league: EMPTY_LEAGUE,
         roster: rosterOf(teamId),
+        playerStats: EMPTY_LEAGUE_PLAYER_STATS,
         cup: null,
       }
       commit(next)
@@ -187,7 +199,13 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
       ? recordLeagueResult(save.league, record.teamId, opponent)
       : recordLeagueResult(save.league, opponent, record.teamId)
     // 같은 날 나머지 네 경기 (내 경기는 건너뛴다)
-    const day = playLeagueDay(afterMyGame, record.games, record.teamId, random)
+    const day = playLeagueDay(
+      afterMyGame,
+      record.games,
+      record.teamId,
+      random,
+      save.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS,
+    )
 
     const evaluation = evaluateSeasonGame(save.state.record, {
       myRuns,
@@ -203,6 +221,7 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
     commit({
       ...save,
       league: day.league,
+      playerStats: day.playerStats,
       state: {
         ...evaluated,
         record: {
@@ -235,8 +254,8 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
           })
           return setScene(SEASON_SCENE_STATE.국가대항전)
         }
-        setNotice('정규시즌이 끝났습니다. 포스트시즌 화면은 아직 없습니다.')
-        return setScene(SEASON_SCENE_STATE.관리메뉴)
+        // 원본 시즌 끝 사슬의 첫 칸 (0xee → 시상 셋 → 정규시즌순위 → 결산)
+        return setScene(SEASON_END_CHAIN[0].state)
       }
       setScene(afterGameNext(settled))
     },
@@ -364,6 +383,39 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
     [commit, random, save],
   )
 
+  /** 시즌 끝 사슬 한 칸 (SEASON_END_CHAIN). 사슬 밖이면 결산으로 보낸다 */
+  const nextSeasonEndStep = useCallback(() => {
+    setScene((current) => {
+      const step = SEASON_END_CHAIN.find((candidate) => candidate.state === current)
+      return step?.next ?? SEASON_SCENE_STATE.시즌결산
+    })
+  }, [])
+
+  /**
+   * 결산을 닫았다 (`0x87b4`) — 연차 idx 가 **짝수**면 국가대항전, 홀수면 곧장 새 해다.
+   * 새 해는 `startNextYear`(0x6e0c)가 연차를 올리고 CPU 9팀 능력치를 +30 한다.
+   */
+  const finishSeason = useCallback(() => {
+    if (save === null) return
+    const { record } = save.state
+    if (isSeasonNationalCupYear(record.yearIndex)) {
+      commit({
+        ...save,
+        state: { ...save.state, record: { ...record, nationalCup: true } },
+        cup: createNationalCup(),
+      })
+      return setScene(SEASON_SCENE_STATE.국가대항전)
+    }
+    // 새 해로 넘어가며 리그 전적·선수 성적을 비운다 (정규시즌 표는 해마다 새로 센다)
+    commit({
+      ...save,
+      state: startNextYear(save.state),
+      league: EMPTY_LEAGUE,
+      playerStats: EMPTY_LEAGUE_PLAYER_STATS,
+    })
+    setScene(SEASON_SCENE_STATE.관리메뉴)
+  }, [commit, save])
+
   const goto = useCallback((next: SeasonSceneState) => setScene(next), [])
   const clearNotice = useCallback(() => setNotice(''), [])
   const quit = useCallback(() => setScene(SEASON_SCENE_STATE.팀고르기), [])
@@ -373,11 +425,13 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
     scene,
     league: save?.league ?? EMPTY_LEAGUE,
     roster: save?.roster ?? EMPTY_ROSTER,
+    playerStats: save?.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS,
     cup: save?.cup ?? null,
     notice,
     actions: {
       chooseTeam, goto, updateRecord, updateRoster, playNextGame, confirmIncome,
-      playCupGame, finishCup, runTraining, runOuting, clearNotice, quit,
+      playCupGame, finishCup, runTraining, runOuting, nextSeasonEndStep, finishSeason,
+      clearNotice, quit,
     },
   }
 }

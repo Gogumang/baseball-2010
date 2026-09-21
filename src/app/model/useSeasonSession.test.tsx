@@ -145,3 +145,68 @@ describe('시즌 관리 커맨드', () => {
     expect(후.record.money).toBe(전.record.money - 4)
   })
 })
+
+describe('시즌 끝 사슬', () => {
+  it('국가대항전이 아닌 연차는 정규시즌이 끝나면 **포스트시즌 시작(0xee)** 으로 간다', () => {
+    const { result } = 띄우기()
+    act(() => result.current.actions.chooseTeam(0))
+    // 2년차(연차idx 1)는 국가대항전 연차가 아니다
+    const 홀수연차 = { ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1 }
+
+    act(() => result.current.actions.confirmIncome(홀수연차))
+
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.포스트시즌시작)
+  })
+
+  it('사슬은 0xee → 0xeb → 0xec → 0xed → 0xf0 → 0xef 차례다', () => {
+    const { result } = 띄우기()
+    act(() => result.current.actions.chooseTeam(0))
+    act(() => result.current.actions.confirmIncome({
+      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
+    }))
+
+    const 차례 = [result.current.scene]
+    for (let step = 0; step < 5; step += 1) {
+      act(() => result.current.actions.nextSeasonEndStep())
+      차례.push(result.current.scene)
+    }
+
+    expect(차례).toEqual([
+      SEASON_SCENE_STATE.포스트시즌시작,
+      SEASON_SCENE_STATE.타자시상,
+      SEASON_SCENE_STATE.투수시상,
+      SEASON_SCENE_STATE.최우수선수,
+      SEASON_SCENE_STATE.정규시즌순위,
+      SEASON_SCENE_STATE.시즌결산,
+    ])
+  })
+
+  it('결산을 닫으면 홀수 연차는 새 해로 간다 — 연차가 오르고 리그 전적이 비워진다 (0x6e0c)', () => {
+    const { result } = 띄우기()
+    act(() => result.current.actions.chooseTeam(0))
+    act(() => result.current.actions.confirmIncome({
+      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
+    }))
+
+    act(() => result.current.actions.finishSeason())
+
+    expect(result.current.state?.record.yearIndex).toBe(2)
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.관리메뉴)
+    expect(result.current.league.wins.every((wins) => wins === 0)).toBe(true)
+  })
+
+  it('짝수 연차는 결산 뒤 국가대항전이 열린다', () => {
+    const { result } = 띄우기()
+    act(() => result.current.actions.chooseTeam(0))
+    act(() => result.current.actions.confirmIncome({
+      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
+    }))
+    // 결산 직전에 연차를 짝수로 바꾼다 (원본 afterKoreanSeries 가 보는 칸)
+    act(() => result.current.actions.updateRecord({ ...result.current.state!.record, yearIndex: 2 }))
+
+    act(() => result.current.actions.finishSeason())
+
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.국가대항전)
+    expect(result.current.cup).not.toBeNull()
+  })
+})

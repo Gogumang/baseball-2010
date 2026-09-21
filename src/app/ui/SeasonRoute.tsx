@@ -1,12 +1,17 @@
 import { useMemo } from 'react'
 import {
-  GameIncomeScreen, PlayerRecruitScreen, SeasonGoalsScreen, SeasonItemMenuScreen,
-  SeasonManagementScreen, SeasonOutingScreen, SeasonTeamMenuScreen, SeasonTrainingScreen,
-  StadiumShopScreen,
+  GameIncomeScreen, PlayerRecruitScreen, PostseasonStartScreen, RegularSeasonRankScreen,
+  SeasonGoalsScreen, SeasonItemMenuScreen, SeasonManagementScreen, SeasonMvpScreen,
+  SeasonOutingScreen, SeasonSummaryScreen, SeasonTeamMenuScreen, SeasonTitleAwardScreen,
+  SeasonTrainingScreen, StadiumShopScreen, SEASON_MVP_LEADER_KINDS,
 } from '@/pages/season'
+import { judgeTitles, leagueRecordsOf } from '@/entities/awards/model/seasonAwards'
+import { leaderOf } from '@/entities/awards/model/leaderboard'
+import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { TeamSelectScreen } from '@/pages/create-player/ui/TeamSelectScreen'
 import { MessageBox, RawScreen } from '@/shared/ui'
 import { SEASON_SCENE_STATE, seasonOpponentOf } from '@/entities/season-mode/model/seasonStateMachine'
+import { applySeasonReward } from '@/entities/season-mode/model/seasonRewards'
 import { TEAMS } from '@/shared/config/original/teams'
 import { NationalCupScreen } from '@/pages/national-cup/ui/NationalCupScreen'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -31,7 +36,7 @@ interface SeasonRouteProps {
  * 조용히 아무것도 안 하는 것보다 낫다.
  */
 export function SeasonRoute({ session, random, onExit }: SeasonRouteProps) {
-  const { state, scene, league, roster, cup, notice, actions } = session
+  const { state, scene, league, roster, playerStats, cup, notice, actions } = session
 
   const ranks = useMemo(
     () => (state === null ? { myRank: 0, opponentRank: 0 } : seasonRanksOf(league, state.record)),
@@ -163,6 +168,66 @@ export function SeasonRoute({ session, random, onExit }: SeasonRouteProps) {
         // ⚠️ 웹판 임시 — 원본은 여기서 사람이 대표팀을 조작해 경기를 친다 (시즌 221)
         onStartGame={(matchup, current) => actions.playCupGame(matchup.myTeam, matchup.opponent, current)}
         onFinish={(finish) => actions.finishCup(finish)}
+      />
+    )
+  }
+
+  // ── 시즌 끝 사슬 (0xee → 0xeb → 0xec → 0xed → 0xf0 → 0xef) ──────────────────
+  if (scene === SEASON_SCENE_STATE.포스트시즌시작) {
+    // 포스트시즌 대진은 웹 entities/league 가 짜지만 시즌 세션이 아직 안 들고 있다 —
+    // 대진표는 시리즈가 없으면 빈 계단으로 그린다
+    return <PostseasonStartScreen series={null} onNext={actions.nextSeasonEndStep} />
+  }
+
+  if (scene === SEASON_SCENE_STATE.타자시상 || scene === SEASON_SCENE_STATE.투수시상) {
+    const isBatter = scene === SEASON_SCENE_STATE.타자시상
+    // ⚠️ 시즌모드는 `isMine` 을 "1위 팀 == 내 팀" 으로 본다 (B 4절 2번) — 여기서 그렇게 채운다
+    const records = leagueRecordsOf(playerStats).map((record) => ({
+      ...record,
+      isMine: record.teamId === state.record.teamId,
+    }))
+    return (
+      <SeasonTitleAwardScreen
+        role={isBatter ? '타자' : '투수'}
+        // 시즌모드 투수는 네 칸이라 역할 이름이 다르다 (다승·삼진·방어·세이브)
+        titles={judgeTitles(records, isBatter ? '타자' : '시즌투수')}
+        onNext={actions.nextSeasonEndStep}
+      />
+    )
+  }
+
+  if (scene === SEASON_SCENE_STATE.최우수선수) {
+    const records = leagueRecordsOf(playerStats)
+    // 시즌 MVP 는 표 0xd4f34 에서 rand(0..6) 으로 종류 하나를 골라 그 1위를 발표한다 (B-3)
+    const kind = SEASON_MVP_LEADER_KINDS[randomIntegerBelow(random, 0, SEASON_MVP_LEADER_KINDS.length)]
+    const leader = kind === undefined ? null : leaderOf(records, kind)
+    return (
+      <SeasonMvpScreen
+        winner={leader === null ? null : { name: leader.record.name, teamId: leader.record.teamId }}
+        isMine={leader?.record.teamId === state.record.teamId}
+        onNext={actions.nextSeasonEndStep}
+      />
+    )
+  }
+
+  if (scene === SEASON_SCENE_STATE.정규시즌순위) {
+    return (
+      <RegularSeasonRankScreen league={league} teamId={state.record.teamId} onNext={actions.nextSeasonEndStep} />
+    )
+  }
+
+  if (scene === SEASON_SCENE_STATE.시즌결산) {
+    return (
+      <SeasonSummaryScreen
+        record={state.record}
+        series={null}
+        // 포스트시즌 순위 0xb7aa0(리그, 팀, 0) 에 해당하는 함수가 웹에 없다 —
+        // 웹은 아직 포스트시즌을 치르지 않으므로 "보상 없음" 자리를 넘긴다
+        postseasonRank={2}
+        leagueFirstAwardedBits={0}
+        onApplyKoreanSeriesReward={(reward) => actions.updateRecord(applySeasonReward(state.record, reward))}
+        onLeagueFirstAward={() => undefined}
+        onFinish={actions.finishSeason}
       />
     )
   }
