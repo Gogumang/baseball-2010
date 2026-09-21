@@ -36,8 +36,18 @@ export interface SwingResultInput {
   /** 타자가 마선수인가 (원본 isAce = 선수 레코드 [10] 의 부호 비트, 0xb6388) */
   readonly isBatterAce?: boolean
   readonly isPitcherAce?: boolean
-  /** 마선수 보너스를 깎는 팀 레벨 — 원본은 팀 데이터 +0xb3 */
-  readonly teamLevel?: number
+  /**
+   * 마선수 보너스 aB·aP 를 깎는 레벨 값 (0xab214 의 `base − perLevel × 레벨`).
+   *
+   * ⚠️ **이 값이 어디서 오는지는 해독 문서에 없다.** 예전 주석은 "팀 데이터 +0xb3" 이라고 적었지만
+   * 그런 칸은 문서 어디에도 없다 — `+0xb3` 은 시즌·선수 레코드의 **연차 idx** 다 (P4·P3·S6).
+   * 가장 그럴듯한 후보는 **마선수 레벨 0~4** (`u8 mgr[0x13a + idx]`, S9 확정 · H2 2절)다.
+   * 마선수의 다른 효과(히트·파워 +150~220, B +15~20%, C +6~9%)를 모두 그 레벨이 고르기 때문이다.
+   * 다만 0xab214 가 이 값을 읽어 오는 자리는 아직 해독되지 않아 **지어내서 잇지 않는다.**
+   *
+   * 안 넘기면 0 이고, 그러면 보너스가 표의 최댓값(타자 400 · 투수 400) 그대로다.
+   */
+  readonly aceBonusLevel?: number
   readonly isPitcherExhausted: boolean
   readonly batterSkillIds: readonly number[]
   readonly pitcherSkillIds: readonly number[]
@@ -69,7 +79,10 @@ const CENTER_FACTORS = [10_000, 500, 350] as const
 /** 제구 등급 → 투수 능력 배율 (d_level.dat 0x1e0) */
 const TIER_MULTIPLIERS = BALANCE.swing.pitchGradeMultipliers
 const NEUTRAL_MULTIPLIER = 100
-/** 마선수 보너스 — 타자 0x1d8·0x1da, 투수 0x1dc·0x1de. 팀 레벨만큼 깎고 0 에서 멈춘다 */
+/**
+ * 마선수 보너스 — d_level.dat 0x1d8·0x1da(타자), 0x1dc·0x1de(투수).
+ * `base − perLevel × aceBonusLevel` 이고 0 에서 멈춘다 (레벨의 출처는 `aceBonusLevel` 주석 참고).
+ */
 const ACE_BONUS = {
   batter: { base: BALANCE.swing.aceBonus.batterBase, perLevel: BALANCE.swing.aceBonus.batterPerLevel },
   pitcher: { base: BALANCE.swing.aceBonus.pitcherBase, perLevel: BALANCE.swing.aceBonus.pitcherPerLevel },
@@ -110,8 +123,9 @@ export function swingFactorsOf(input: SwingResultInput): SwingFactors {
 
   // 마선수 보너스와 마선수 계수는 육성(원본 모드 3·4 = 나만의리그)에서만 켜진다.
   const isCareerMode = input.mode === '나만의리그'
-  const teamLevel = input.teamLevel ?? 0
-  const aceBonusOf = ({ base, perLevel }: { base: number; perLevel: number }) => Math.max(0, base - perLevel * teamLevel)
+  const aceBonusLevel = input.aceBonusLevel ?? 0
+  const aceBonusOf = ({ base, perLevel }: { base: number; perLevel: number }) =>
+    Math.max(0, base - perLevel * aceBonusLevel)
   const batterBonus = isCareerMode && input.isBatterAce === true ? aceBonusOf(ACE_BONUS.batter) : 0
   const pitcherBonus = isCareerMode && input.isPitcherAce === true
     ? aceBonusOf(ACE_BONUS.pitcher)

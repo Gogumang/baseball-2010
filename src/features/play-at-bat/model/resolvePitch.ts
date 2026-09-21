@@ -29,8 +29,19 @@ export interface BattingContext {
   readonly mode: SwingMode
   readonly batterSkillIds: readonly number[]
   readonly situation: SwingSituation
-  /** 마선수가 던지고 있는가 — 원본 isAce (0xb6388). 팀 레벨은 아직 없어 0(보너스 최대)으로 둔다 (추정) */
+  /**
+   * 마선수가 던지고 있는가 — 원본 isAce = 선수 레코드 `+0xa` 부호비트 (0xb6388).
+   * 마선수 등판을 아는 화면(`widgets/batting-stage`)이 넘긴다.
+   */
   readonly isPitcherAce?: boolean
+  /**
+   * 마선수 보너스를 깎는 레벨 (0xab214 의 aB·aP). 안 넘기면 0 = **보너스 최대**다.
+   *
+   * ⚠️ 예전 주석이 적은 "팀 레벨(팀 데이터 +0xb3)" 은 **해독 문서에 근거가 없다** — 그 오프셋은
+   * 연차 idx 다. 값의 출처는 `entities/batting/model/swingResult.ts` 의 `aceBonusLevel` 주석에
+   * 모아 두었다(유력 후보 = 마선수 레벨 `mgr[0x13a+idx]` 0~4). 앱이 그 값을 알게 되면 여기로 넘기면 된다.
+   */
+  readonly aceBonusLevel?: number
 }
 
 export interface PitchOutcomeDetail {
@@ -105,6 +116,7 @@ export function resolvePitch(
       },
       mode: context.mode,
       isPitcherAce: context.isPitcherAce,
+      aceBonusLevel: context.aceBonusLevel,
       isPitcherExhausted: false,
       batterSkillIds: context.batterSkillIds,
       pitcherSkillIds: [],

@@ -105,7 +105,14 @@ function advanceForWalk(bases: BaseState): AdvanceResult {
  * 사람 경기의 원본은 여기서 점수를 주는 게 아니라 수비 시뮬레이션이 정한다 (P2 7절):
  * 뜬공을 잡으면 모든 주자의 요구 루가 원래 루가 되고(0xa9620 태그업), 자동 진루 0xaf918 이
  * **수비 송구보다 2틱 이상 빠를 때만** 다음 루로 보낸다 — 즉 희생플라이가 보장되지 않고,
- * 1·2루 주자의 태그업 진루도 있다. 수비 시뮬레이션을 옮기기 전까지는 지금의 "3루 주자면 1점" 근사를 둔다.
+ * 1·2루 주자의 태그업 진루도 있다.
+ *
+ * 그 수비 시뮬레이션은 `features/defense-play/runDefensePlay` 로 옮겨졌고, **사람이 잡은 타석은
+ * 셋 다 그 길로 간다**: 타자편(`play-game`)·팀 경기(`play-team-game`)·투수편(`play-pitcher-game`).
+ * 자동으로 넘기는 타석은 원본도 간이 엔진이므로 `quickEngine` 갈래를 쓴다.
+ *
+ * ⚠️ 그래서 아래 "3루 주자면 1점" 근사에 남은 길은 **미션 모드**(`entities/mission`) 뿐이다.
+ * 미션도 사람이 치는 타석이라 원본대로면 수비 시뮬레이션이 돌아야 한다 — 아직 안 이었다.
  */
 function advanceForOut(
   bases: BaseState,

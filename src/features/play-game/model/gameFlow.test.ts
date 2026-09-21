@@ -101,11 +101,15 @@ describe('최근 타석 기록 — 스킬 16·17 조건', () => {
 })
 
 describe('경기 한 판을 끝까지 진행', () => {
-  it('9이닝이 모두 소화되고 결과가 나온다', () => {
+  it('9이닝이 모두 소화되고 결과가 나온다 (동점이면 연장)', () => {
     const finished = playFullGame(createSeededRandom(20100901))
 
     expect(finished.game.isFinished).toBe(true)
-    expect(finished.game.inning).toBe(9)
+    // 이 시드가 딱 9회에 끝나는 것을 못박고 있었는데, 두 가지가 바뀌며 같은 시드가 연장으로 갔다:
+    //   ① 돌발미션을 **모든 타석 준비**에서 굴리게 되어 난수 차례가 밀렸다 (K 4절 1-6)
+    //   ② 간이 엔진 타석에서 희생플라이를 뺐다 — 원본 간이 엔진에는 없다 (E-2 확정)
+    // 규칙으로 말할 수 있는 것은 "정규 9이닝을 다 치른다" 뿐이다 (연장 상한은 원본에 없다).
+    expect(finished.game.inning).toBeGreaterThanOrEqual(9)
 
     const summary = summaryOf(finished)
     expect(['승', '무', '패']).toContain(summary.result)

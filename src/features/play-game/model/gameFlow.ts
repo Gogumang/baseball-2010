@@ -21,6 +21,7 @@ import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
 import type { SeasonStats } from '@/entities/career/model/seasonStats'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { advanceRunners } from '@/entities/game/model/baseState'
+import type { BaseState } from '@/entities/game/model/baseState'
 import { atBatPenaltyCounts, atBatPopularityPoints, EMPTY_REPUTATION_COUNTS } from '@/entities/career/model/gameEvaluation'
 import type { ReputationCounts } from '@/entities/career/model/gameEvaluation'
 import { completeGameRecordIdsOf, gameEndRecordIdsOf } from '@/entities/game/model/gameRecords'
@@ -322,39 +323,64 @@ const GRAND_SLAM_RUNS = 4
 /** 한 이닝 아웃 수 — 돌발 결과비트 B5 가 "이닝이 안 끝났는가" 를 볼 때 쓴다 */
 const OUTS_PER_INNING = 3
 
+/** 타순 칸 수 — 상대 타순 슬롯(team+0x32)은 0~8 로 돈다 */
+const BATTING_ORDER_SIZE = 9
+
 /**
  * 타석 준비에서 돌발미션 발동을 굴린다 (장면 상태 0xf → 0x8f158).
  *
- * **근사**: 원본은 경기 장면이 도는 **모든 타석** 준비에서 굴리지만, 웹은 동료·상대 타석을
- * 간이 엔진으로 한 번에 넘겨 상태 0xf 를 지나지 않는다. 그래서 **사용자 타석에서만** 굴린다.
- * 나만의리그 타자편 표(BATTER)의 목표가 모두 내 타석 결과라 뜻은 달라지지 않지만,
- * 굴리는 횟수가 줄어 발동이 원본보다 드물다.
+ * 원본은 경기 장면이 지나는 **모든 타석** 준비에서 굴린다 (K 4절 1-6, 확정) — 내 타석뿐 아니라
+ * 동료 타석·상대 타석도 같은 상태 0xf 를 지난다. 웹도 이제 세 자리에서 모두 굴린다:
+ *   내 타석(`advanceUntilPlayerTurn`) · 동료 타석(`playTeammateAtBat`) ·
+ *   상대 타석(`simulateHalfInning` 의 `onAtBatStart` 갈고리).
+ * 예전에는 내 타석에서만 굴려 **발동이 원본보다 드물었다.**
  *
- * 상대 타순 슬롯(team+0x32)·상대 마선수는 웹판이 아직 들고 있지 않다 —
- * 클린업(b0=1)·마선수(b0=10~22) 조건 행은 그래서 지금은 걸리지 않는다.
+ * 판정도 같은 자리를 따라간다 — 동료·상대 타석에서 뜬 돌발은 **그 타석 결과로** 판정된다
+ * (0x8f414 는 타석이 끝나는 자리마다 돈다).
+ *
+ * 상대 마선수(b0=10~22)는 웹판 로스터가 아직 들고 있지 않아 그 조건 행은 걸리지 않는다.
  */
+function burstContextOf(
+  progress: GameProgress,
+  situation: {
+    readonly isHumanTeamBatting: boolean
+    readonly bases: BaseState
+    readonly outs: number
+    readonly opponentBattingSlot: number
+    readonly hitsInGame: number
+    readonly homeRunsInGame: number
+    readonly strikeoutsInGame: number
+  },
+) {
+  const ace = progress.aceOpponent
+  return {
+    ...situation,
+    // 원본 이닝은 0-기준이다 (game+0x6b) — 웹 `inning` 은 1-기준이라 하나 뺀다
+    inning: progress.game.inning - 1,
+    ourScore: progress.game.ourScore,
+    opponentScore: progress.game.opponentScore,
+    opponentAceBatterId: ace !== null && ace.role === '타자' ? ace.id : null,
+    opponentAcePitcherId: ace !== null && ace.role === '투수' ? ace.id : null,
+  }
+}
+
 function triggerBurstForMyAtBat(progress: GameProgress, random: RandomPort): GameProgress {
   const session = progress.burst
   if (session === null) return progress
 
-  const ace = progress.aceOpponent
   const next = tryTriggerBurst(
     session,
-    {
+    burstContextOf(progress, {
       isHumanTeamBatting: true,
       bases: progress.game.bases,
       outs: progress.game.outs,
-      // 원본 이닝은 0-기준이다 (game+0x6b) — 웹 `inning` 은 1-기준이라 하나 뺀다
-      inning: progress.game.inning - 1,
-      ourScore: progress.game.ourScore,
-      opponentScore: progress.game.opponentScore,
+      // 상대 타순 슬롯(team+0x32)은 우리 공격 중에도 상대 팀 칸을 가리킨다 —
+      // 웹판은 이닝마다 1번부터 시작하는 근사라(playOpponentInning) 여기서는 0 이다
       opponentBattingSlot: 0,
-      opponentAceBatterId: ace !== null && ace.role === '타자' ? ace.id : null,
-      opponentAcePitcherId: ace !== null && ace.role === '투수' ? ace.id : null,
       hitsInGame: progress.myStats.hits,
       homeRunsInGame: progress.myStats.homeRuns,
       strikeoutsInGame: progress.pitching.strikeouts,
-    },
+    }),
     random,
   )
   return next === session ? progress : { ...progress, burst: next }
@@ -384,6 +410,9 @@ function advanceUntilPlayerTurn(
  * 상대 타순은 웹판이 아직 따로 들고 있지 않아 이닝마다 1번부터 시작한다 (추정).
  */
 function playOpponentInning(progress: GameProgress, random: RandomPort): GameProgress {
+  // 상대 타석도 장면 상태 0xf 를 지나므로 타석마다 돌발을 굴리고, 그 타석 결과로 판정한다
+  let burst = progress.burst
+  let resolution: BurstResolution | null = null
   const half = simulateHalfInning(
     0,
     (order) => batterAt(progress.opponentTeamId, order),
@@ -391,6 +420,31 @@ function playOpponentInning(progress: GameProgress, random: RandomPort): GamePro
     progress.game.inning,
     random,
     { strikeoutCombo: progress.pitching.strikeoutCombo, strikeouts: progress.pitching.strikeouts },
+    {
+      onAtBatStart: (state) => {
+        if (burst === null) return
+        burst = tryTriggerBurst(
+          burst,
+          burstContextOf(progress, {
+            isHumanTeamBatting: false,
+            bases: state.bases,
+            outs: state.outs,
+            opponentBattingSlot: state.battingOrderIndex % BATTING_ORDER_SIZE,
+            // 상대 타자의 이번 경기 안타·홈런 칸을 웹판이 아직 안 들고 있다 (기록 +0x12·+0x13)
+            hitsInGame: 0,
+            homeRunsInGame: 0,
+            strikeoutsInGame: state.strikeoutsSoFar,
+          }),
+          random,
+        )
+      },
+      onAtBatEnd: (state) => {
+        if (burst === null) return
+        const judged = resolveBurst(burst, burstResultBitsOf(state))
+        burst = judged.session
+        if (judged.judgement !== null) resolution = judged
+      },
+    },
   )
   const runs = half.runs
   const game = applyOpponentInning(progress.game, runs)
@@ -399,6 +453,8 @@ function playOpponentInning(progress: GameProgress, random: RandomPort): GamePro
     {
       ...progress,
       game,
+      burst,
+      lastBurstResolution: resolution ?? progress.lastBurstResolution,
       pitching: {
         hitsAllowed: progress.pitching.hitsAllowed + half.hits,
         walksAllowed: progress.pitching.walksAllowed + half.walks,
@@ -424,13 +480,38 @@ function playOpponentInning(progress: GameProgress, random: RandomPort): GamePro
 
 /** 동료 타석도 원본은 같은 간이 타석 엔진을 쓴다 — 우리 팀 명단의 실제 능력치가 들어간다 */
 function playTeammateAtBat(progress: GameProgress, random: RandomPort): GameProgress {
+  // 상태 0xf — 동료 타석 준비에서도 돌발을 굴린다 (K 4절 1-6)
+  const slotBefore = progress.game.battingOrderIndex
+  const logBefore = progress.teammateLogs[slotBefore] ?? EMPTY_BATTER_GAME_LOG
+  const triggered =
+    progress.burst === null
+      ? null
+      : tryTriggerBurst(
+          progress.burst,
+          burstContextOf(progress, {
+            isHumanTeamBatting: true,
+            bases: progress.game.bases,
+            outs: progress.game.outs,
+            opponentBattingSlot: 0,
+            hitsInGame: logBefore.stats.hits,
+            homeRunsInGame: logBefore.stats.homeRuns,
+            strikeoutsInGame: progress.pitching.strikeouts,
+          }),
+          random,
+        )
   const outcome = simulateQuickAtBat(
     batterAt(progress.ourTeamId, progress.game.battingOrderIndex),
     startingPitcherOf(progress.opponentTeamId, progress.opponentStartingPitcherIndex),
     { inning: progress.game.inning },
     random,
   )
-  const game = applyAtBatOutcome(progress.game, outcome)
+  // 동료 타석은 원본도 간이 엔진(0xc262c)이 돌린다 — **간이 엔진에는 희생플라이가 없다** (E-2 확정).
+  // 사람 타석과 달리 수비 시뮬레이션이 돌지 않으므로 `quickEngine` 갈래를 쓴다.
+  const game = applyAtBatOutcome(
+    progress.game,
+    outcome,
+    advanceRunners(progress.game.bases, outcome, progress.game.outs, { quickEngine: true }),
+  )
   const runsBattedIn = game.ourScore - progress.game.ourScore
   const slot = progress.game.battingOrderIndex
   const recorded = recordBatterAtBat(
@@ -438,11 +519,33 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort): GameProg
     outcome,
     runsBattedIn,
   )
+  // 타석이 끝나는 자리 — 동료 타석에서 뜬 돌발도 **그 타석 결과로** 판정된다 (0x8f414)
+  const outsAdded = advanceRunners(progress.game.bases, outcome, progress.game.outs, {
+    quickEngine: true,
+  }).outsAdded
+  const resolved =
+    triggered === null
+      ? null
+      : resolveBurst(
+          triggered,
+          burstResultBitsOf({
+            outcome,
+            runsBattedIn,
+            outsBefore: progress.game.outs,
+            outsAdded,
+            inningEnded: progress.game.outs + outsAdded >= OUTS_PER_INNING,
+            humanTeamWalkOff:
+              game.isFinished && runsBattedIn > 0 && game.ourScore > game.opponentScore,
+          }),
+        )
 
   return appendLog(
     {
       ...progress,
       game,
+      burst: resolved === null ? triggered ?? progress.burst : resolved.session,
+      lastBurstResolution:
+        resolved !== null && resolved.judgement !== null ? resolved : progress.lastBurstResolution,
       teammateLogs: { ...progress.teammateLogs, [slot]: recorded.log },
       recordIds: [...progress.recordIds, ...recorded.recordIds],
       // 동료 타석도 우리 팀 선수 레코드에 쌓인다 — 타순 칸이 곧 로스터 칸이다 (`batterAt` 과 같은 자리)

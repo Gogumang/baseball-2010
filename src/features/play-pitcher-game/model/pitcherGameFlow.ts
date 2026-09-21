@@ -11,9 +11,21 @@ import { applyPitchResolution, createAtBat } from '@/entities/at-bat/model/atBat
 import type { AtBatState, PitchResolution } from '@/entities/at-bat/model/atBatState'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { describeOutcome, isHit } from '@/entities/at-bat/model/atBatOutcome'
-import { simulateQuickAtBat } from '@/entities/game/model/quickAtBat'
+import { playQuickAtBat } from '@/entities/game/model/quickAtBat'
 import { batterAt, teamBatters, teamPitchers, quickPitcherOf } from '@/entities/team/model/teamRoster'
 import { advanceRunners } from '@/entities/game/model/baseState'
+import {
+  completeGameRecordIdsOf,
+  gameEndRecordIdsOf,
+  strikeoutRecordIdsOf,
+  threePitchInningRecordIdsOf,
+} from '@/entities/game/model/gameRecords'
+import { EMPTY_BATTER_GAME_LOG, recordBatterAtBat } from '@/entities/game/model/batterGameLog'
+import type { BatterGameLog } from '@/entities/game/model/batterGameLog'
+import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
+import { isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
+import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
+import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
 import { pitchAgainstBatter } from '@/entities/pitching/model/simulateBatter'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -112,6 +124,20 @@ export const MY_PITCHER_NUMBER = 0
 const TEAMMATE_PITCHER_NUMBER = -1
 const OPPONENT_PITCHER_NUMBER = -2
 
+/**
+ * 기록달성 지급 0xa77f0 의 **첫 관문** — `ctx+0x24` 첫 바이트가 0 이어야 한 건이라도 들어온다.
+ *
+ * 그 바이트의 뜻은 R15 10절이 확정했다: **"사람 투수가 강판되어 남은 경기를 간이 엔진이
+ * 끝까지 돌리는 중"** (0xc1b48 에서 1 — R8 1절의 "30G 자동진행" 해석은 틀렸고, 30G 자동진행은
+ * `engine+0xa0` 을 쓴다). 웹판에서 그 표시가 곧 `simpleEngineRunning` 이다.
+ *
+ * → 감독 강판이든 스스로 강판이든 **강판된 뒤에는 경기 끝 기록(28~31·37~39)까지 포함해
+ *   아무 기록도 들어오지 않는다.** 강판 전에 받아 둔 기록은 그대로 남는다.
+ */
+function recordsAllowed(progress: PitcherGameProgress): boolean {
+  return !progress.simpleEngineRunning
+}
+
 export interface PitcherGameOptions {
   readonly ourTeamId: number
   readonly opponentTeamId: number
@@ -198,6 +224,30 @@ export interface PitcherGameProgress {
   readonly perfectInningFlag: boolean
   /** 상대 타순 칸별 이번 경기 안타·홈런 — 돌발 b6/b7 조건이 읽는 기록 +0x12·+0x13 */
   readonly opponentBatterLogs: Readonly<Record<number, { hits: number; homeRuns: number }>>
+  /**
+   * 이 경기에서 달성한 기록 id (0xa77f0 이 한 번 받을 때마다 하나).
+   * 투수편은 모드 3 이라 **공격·수비 게이트가 둘 다 열린다** (0x3a20a — 모드 3·4 는 내 팀 전체가 사람 팀).
+   * 그래서 동료 타석의 타격 기록(0~15·34·35)과 우리 투수의 삼진 계열(16~23·25)이 모두 들어온다.
+   */
+  readonly recordIds: readonly number[]
+  /** 우리 팀 타순(0~8)별 이 경기 기록 — 투수편 주인공은 타석에 안 서므로 아홉 칸 모두 동료다 */
+  readonly teammateLogs: Readonly<Record<number, BatterGameLog>>
+  /** ctx+0x161 — 이번 타석 투구 수. 삼구 삼진(16) 판정이 읽는다 */
+  readonly atBatPitches: number
+  /** ctx+0x16c — 이번 반 이닝 투구 수. 삼구 삼자범퇴(25) 판정이 읽는다 */
+  readonly halfInningPitches: number
+  /**
+   * 0xb8cec 가 돌려주는 **지금 마운드에 선 우리 투수**의 경기 기록 R[0]·R[1].
+   * 기록 18~23 은 "현재 투수" 기준이라 투수가 바뀌면 0 부터 다시 센다 (R8 4-2).
+   * `record.strikeouts` 와 달리 동료 투수가 잡은 삼진도 여기 들어간다.
+   */
+  readonly moundStrikeouts: number
+  readonly moundStrikeoutCombo: number
+  /**
+   * 내가 던진 타석에서 마지막으로 돌린 수비 시뮬레이션 (`features/defense-play`).
+   * 매 틱의 화면 스냅샷이 들어 있어 수비 화면은 이것만 받아 그리면 된다 (타자편 `gameFlow` 와 같다).
+   */
+  readonly lastDefensePlay: DefensePlayResult | null
   readonly burst: BurstSession | null
   readonly lastBurstResolution: BurstResolution | null
   readonly log: readonly PitcherGameLogEntry[]
@@ -294,6 +344,13 @@ export function startPitcherGame(
     teamRunsAllowed: 0,
     perfectInningFlag: true,
     opponentBatterLogs: {},
+    recordIds: [],
+    teammateLogs: {},
+    atBatPitches: 0,
+    halfInningPitches: 0,
+    moundStrikeouts: 0,
+    moundStrikeoutCombo: 0,
+    lastDefensePlay: null,
     // 경기 장면은 모드 2·3·4 일 때만 돌발 객체를 만든다 (0x48658)
     burst: createBurstSession(PITCHER_EDITION_MODE),
     lastBurstResolution: null,
@@ -395,6 +452,9 @@ export function throwPitch(
     // ⚠️ 마구 횟수는 **코스 확정(OK)** 때 줄어든다 — 구질을 고른 순간이 아니다 (0x50e9c)
     magicRemaining: isMagic ? progress.magicRemaining - 1 : progress.magicRemaining,
     pitchCount: progress.pitchCount + 1,
+    // ctx+0x161 · ctx+0x16c — 투구 처리 0xa5e14 가 공 하나마다 둘 다 올린다
+    atBatPitches: progress.atBatPitches + 1,
+    halfInningPitches: progress.halfInningPitches + 1,
     // R+0x158 — t == 5 로 던진 공. 마구는 늘 5 라 함께 센다
     pitcherRecord: recordPitchGrade(progress.pitcherRecord, grade),
     lastPitch: pitch,
@@ -404,7 +464,7 @@ export function throwPitch(
 
   const outcome = afterPitch.atBat.outcome
   if (outcome === null) return afterPitch
-  return advance(applyDefensivePlay(afterPitch, outcome, true), random)
+  return advance(applyDefensivePlay(afterPitch, outcome, true, afterPitch.atBat.balls), random)
 }
 
 /* ── 수비 타석 하나 ───────────────────────────────────────────────────────────── */
@@ -412,14 +472,39 @@ export function throwPitch(
 /**
  * 상대 타석 하나를 경기에 반영한다.
  * `mine` 이 참이면 내가 던진 타석이라 투수 기록·돌발 판정까지 함께 한다.
+ *
+ * `balls` 는 타석이 끝났을 때의 볼 카운트 (풀카운트 삼진 17 판정).
+ * `progress.atBatPitches`·`progress.halfInningPitches` 는 부르는 쪽이 이미 올려 두었다.
  */
 function applyDefensivePlay(
   progress: PitcherGameProgress,
   outcome: AtBatOutcome,
   mine: boolean,
+  balls: number,
 ): PitcherGameProgress {
   const before = progress.game
-  const advanceResult = advanceRunners(before.bases, outcome, before.outs)
+  /**
+   * 내가 던진 타석의 인플레이 타구는 **수비 시뮬레이션**이 주자·아웃·득점을 정한다.
+   * 투수편도 원본에서는 사람 경기(0xae24c·0xae3e8)라 간이 엔진이 아니라 수비 AI 가 돈다 —
+   * 그래서 `baseState` 의 두 근사("희생플라이 보장"·"고정 진루표")가 여기서는 쓰이지 않고,
+   * 태그업(0xa9620) → 자동 추가 진루(0xaf918, 송구보다 2틱 넘게 빠를 때만) → 2아웃 득점 보류
+   * 순서가 그대로 돈다 (P2 7절 · E-defense-rules).
+   *
+   * 내가 마운드에 없는 타석(구원 대기·강판 뒤)은 원본도 간이 엔진(0xc262c)이라 그대로 둔다.
+   */
+  const defensePlay =
+    mine && isBattedBallInPlay(outcome)
+      ? runDefensePlay({
+          outcome,
+          trajectory: battedBallTrajectory(representativePatternOf(outcome)),
+          bases: before.bases,
+          outs: before.outs,
+        })
+      : null
+  const advanceResult =
+    defensePlay?.advance ??
+    // 간이 엔진이 돌린 타석 — **원본 간이 엔진에는 희생플라이가 없다** (E-2 확정)
+    advanceRunners(before.bases, outcome, before.outs, { quickEngine: true })
   const applied = applyOpponentAtBat(before, progress.opponentOrderIndex, outcome, advanceResult)
   const slot = progress.opponentOrderIndex
   const previousLog = progress.opponentBatterLogs[slot] ?? { hits: 0, homeRuns: 0 }
@@ -449,11 +534,43 @@ function applyDefensivePlay(
       }
     : progress.record
 
+  // 0xb8cec — 지금 마운드에 선 우리 투수의 경기 기록 R[0](삼진)·R[1](연속 삼진).
+  // 삼진 아닌 결과로 끝난 타석마다 콤보가 끊긴다 (R8 5-5).
+  const strikeout = outcome.kind === '삼진'
+  const moundStrikeouts = progress.moundStrikeouts + (strikeout ? 1 : 0)
+  const moundStrikeoutCombo = strikeout ? progress.moundStrikeoutCombo + 1 : 0
+
+  // 삼진 계열 16·17(0xa7c4c) 과 18~23(0xa7998). 게이트는 "수비 팀이 사람 팀인가" 만 보므로
+  // 동료 투수가 잡은 삼진도 우리 팀 기록으로 들어온다 (R8 1절).
+  const newRecordIds: number[] = strikeout
+    ? [
+        ...strikeoutRecordIdsOf({
+          pitches: progress.atBatPitches,
+          balls,
+          comboCount: moundStrikeoutCombo,
+          pitcherStrikeouts: moundStrikeouts,
+        }),
+      ]
+    : []
+  // 25 삼구 삼자범퇴 (0xa7d0c) — 반 이닝을 공 셋으로 3아웃
+  if (inningEnded) {
+    newRecordIds.push(
+      ...threePitchInningRecordIdsOf(progress.halfInningPitches, before.outs + applied.outsAdded),
+    )
+  }
+
   const next: PitcherGameProgress = {
     ...progress,
     game: applied.game,
     opponentOrderIndex: applied.opponentOrderIndex,
     decision,
+    moundStrikeouts,
+    moundStrikeoutCombo,
+    lastDefensePlay: defensePlay ?? progress.lastDefensePlay,
+    atBatPitches: 0,
+    recordIds: recordsAllowed(progress)
+      ? [...progress.recordIds, ...newRecordIds]
+      : progress.recordIds,
     inningRuns: addInningRuns(progress.inningRuns, before.inning, applied.runsScored),
     record,
     pitcherRecord: mine ? recordBatterFaced(progress.pitcherRecord, 0) : progress.pitcherRecord,
@@ -474,9 +591,15 @@ function applyDefensivePlay(
     endedInningIndex: applied.game.inning - 1,
   }
 
-  const resolved = mine
-    ? resolveBurstFor(next, outcome, applied.runsScored, before.outs, applied.outsAdded, inningEnded)
-    : next
+  // 0x8f414 는 **타석이 끝나는 자리마다** 돈다 — 동료·상대 타석에서 뜬 돌발도 그 결과로 판정된다
+  const resolved = resolveBurstFor(
+    next,
+    outcome,
+    applied.runsScored,
+    before.outs,
+    applied.outsAdded,
+    inningEnded,
+  )
   const halfChanged = applied.game.half !== before.half || applied.game.inning !== before.inning
   const closed: PitcherGameProgress = halfChanged
     ? {
@@ -484,6 +607,8 @@ function applyDefensivePlay(
         // 이닝 칸을 비우고 삼자범퇴 표시를 다시 세운다
         inningRuns: clearInningRuns(resolved.inningRuns, applied.game.inning),
         perfectInningFlag: true,
+        // ctx+0x16c 는 반 이닝이 시작할 때 0 이 된다 (0xa5b00)
+        halfInningPitches: 0,
       }
     : resolved
 
@@ -603,15 +728,33 @@ function prepareAtBat(progress: PitcherGameProgress, random: RandomPort): Pitche
     }
   }
 
+  return { ...triggerBurstAtPrep(progress, false, random), hookFlags: hook.flags, atBatPrepared: true }
+}
+
+/**
+ * 상태 0xf(타석 준비)의 **돌발 발동 판정** (0x8f158).
+ *
+ * 원본은 경기 장면이 지나는 **모든 타석** 준비에서 굴린다 (K 4절 1-6, 확정) — 내가 던지는 타석뿐
+ * 아니라 동료 타석·내가 마운드에 없는 수비 타석도 같은 자리를 지난다. 예전에는 내가 던지는
+ * 타석에서만 굴려 발동이 원본보다 드물었다.
+ *
+ * 다만 **강판 뒤(상태 0x21 = 간이 엔진 중계)에는 0xf 를 지나지 않는다** — 그래서 굴리지 않는다.
+ */
+function triggerBurstAtPrep(
+  progress: PitcherGameProgress,
+  isHumanTeamBatting: boolean,
+  random: RandomPort,
+): PitcherGameProgress {
   const session = progress.burst
-  if (session === null) return { ...progress, hookFlags: hook.flags, atBatPrepared: true }
+  if (session === null || progress.simpleEngineRunning) return progress
   const log = progress.opponentBatterLogs[progress.opponentOrderIndex] ?? { hits: 0, homeRuns: 0 }
   const next = tryTriggerBurst(
     session,
     {
-      // 투수편에서 사람 팀은 늘 수비다 — 그래서 XlsPITCHER_BURST 44행의 목표가 전부 아웃 계열이다
-      isHumanTeamBatting: false,
-      bases,
+      // 투수편 XlsPITCHER_BURST 44행의 목표는 전부 아웃 계열이라 사람 팀 공격 갈래가 따로 없다
+      // (표를 가르는 것은 시즌 모드뿐 — 0x8f000)
+      isHumanTeamBatting,
+      bases: progress.game.bases,
       outs: progress.game.outs,
       // 원본 이닝은 0-기준이다 (game+0x6b)
       inning: progress.game.inning - 1,
@@ -627,7 +770,7 @@ function prepareAtBat(progress: PitcherGameProgress, random: RandomPort): Pitche
     },
     random,
   )
-  return { ...progress, hookFlags: hook.flags, burst: next, atBatPrepared: true }
+  return next === session ? progress : { ...progress, burst: next }
 }
 
 /* ── 강판 ────────────────────────────────────────────────────────────────────── */
@@ -644,6 +787,9 @@ export function giveUpPitching(
         ...progress,
         onMound: false,
         simpleEngineRunning: true,
+        // 새 투수의 기록이 되므로 0 부터. (어차피 강판 뒤에는 기록 게이트가 닫힌다)
+        moundStrikeouts: 0,
+        moundStrikeoutCombo: 0,
         atBatPrepared: false,
         atBat: createAtBat(),
       },
@@ -670,6 +816,8 @@ export function closeManagerHookWindow(
         managerHookText: null,
         onMound: false,
         simpleEngineRunning: true,
+        moundStrikeouts: 0,
+        moundStrikeoutCombo: 0,
         atBatPrepared: false,
         atBat: createAtBat(),
       },
@@ -754,6 +902,9 @@ function enterAsRelief(progress: PitcherGameProgress): PitcherGameProgress {
       decision,
       pitcherRecord: recordEntryLead(progress.pitcherRecord, situation),
       record: { ...progress.record, leadingAtEntry: situation.leading },
+      // 기록 18~23 은 **현재 투수**의 R[0]·R[1] 을 보므로 투수가 바뀌면 0 부터 다시 센다 (R8 4-2)
+      moundStrikeouts: 0,
+      moundStrikeoutCombo: 0,
       atBatPrepared: false,
       atBat: createAtBat(),
     },
@@ -771,13 +922,24 @@ function playDefensiveAtBat(
   random: RandomPort,
 ): PitcherGameProgress {
   const { options } = progress
-  const outcome = simulateQuickAtBat(
-    batterAt(options.opponentTeamId, progress.opponentOrderIndex),
+  // 상태 0xf — 내가 마운드에 없어도 장면은 타석 준비를 지난다 (강판 뒤 0x21 은 제외)
+  const prepared = triggerBurstAtPrep(progress, false, random)
+  const play = playQuickAtBat(
+    batterAt(options.opponentTeamId, prepared.opponentOrderIndex),
     quickPitcherAt(options.ourTeamId, ourOtherPitcherIndex(options)),
-    { inning: progress.game.inning },
+    { inning: prepared.game.inning },
     random,
   )
-  return applyDefensivePlay(progress, outcome, false)
+  return applyDefensivePlay(
+    {
+      ...prepared,
+      atBatPitches: play.pitches,
+      halfInningPitches: prepared.halfInningPitches + play.pitches,
+    },
+    play.outcome,
+    false,
+    play.balls,
+  )
 }
 
 /** 동료 타석 — 투수편 주인공은 타석에 서지 않으므로 아홉 칸 모두 간이 엔진이 돈다 */
@@ -786,14 +948,21 @@ function playTeammateAtBat(
   random: RandomPort,
 ): PitcherGameProgress {
   const { options } = progress
+  // 상태 0xf — 동료 타석 준비에서도 굴린다 (K 4절 1-6)
+  progress = triggerBurstAtPrep(progress, true, random)
   const before = progress.game
-  const outcome = simulateQuickAtBat(
+  const outcome = playQuickAtBat(
     batterAt(options.ourTeamId, before.battingOrderIndex),
     quickPitcherAt(options.opponentTeamId, opponentPitcherIndex(options)),
     { inning: before.inning },
     random,
+  ).outcome
+  // 동료 타석은 원본도 간이 엔진(0xc262c)이다 — 희생플라이가 없다 (E-2 확정)
+  const game = applyAtBatOutcome(
+    before,
+    outcome,
+    advanceRunners(before.bases, outcome, before.outs, { quickEngine: true }),
   )
-  const game = applyAtBatOutcome(before, outcome)
   const runs = game.ourScore - before.ourScore
   let decision = progress.decision
   for (let run = 1; run <= runs; run += 1) {
@@ -801,14 +970,40 @@ function playTeammateAtBat(
   }
   const slot = before.battingOrderIndex
   const halfChanged = game.half !== before.half || game.inning !== before.inning
+  const outsAdded = advanceRunners(before.bases, outcome, before.outs, { quickEngine: true }).outsAdded
+  // 타석이 끝나는 자리 — 동료 타석에서 뜬 돌발도 그 타석 결과로 판정된다 (0x8f414)
+  const judged = resolveBurstFor(
+    // 끝내기 비트(0xa89f0)는 **타석이 끝난 뒤의** 점수로 본다
+    { ...progress, game },
+    outcome,
+    runs,
+    before.outs,
+    outsAdded,
+    before.outs + outsAdded >= OUTS_PER_INNING,
+  )
+  // 모드 3 은 내 팀 전체가 사람 팀이라 **공격 게이트도 열린다** (0x3a20a) —
+  // 간이 엔진이 돌린 동료 타석도 같은 0xa8024 를 지나 타격 기록(0~15·34·35)이 된다 (R8 1절·8절).
+  const recorded = recordBatterAtBat(
+    progress.teammateLogs[slot] ?? EMPTY_BATTER_GAME_LOG,
+    outcome,
+    runs,
+  )
   return appendLog(
     {
       ...progress,
+      burst: judged.burst,
+      lastBurstResolution: judged.lastBurstResolution,
       game,
       decision,
       endedInningIndex: game.inning - 1,
+      teammateLogs: { ...progress.teammateLogs, [slot]: recorded.log },
+      recordIds: recordsAllowed(progress)
+        ? [...progress.recordIds, ...recorded.recordIds]
+        : progress.recordIds,
       perfectInningFlag: halfChanged ? true : progress.perfectInningFlag,
       inningRuns: halfChanged ? clearInningRuns(progress.inningRuns, game.inning) : progress.inningRuns,
+      // 우리 공격이 끝나면 다음 수비 반 이닝의 투구 수를 0 부터 센다
+      halfInningPitches: halfChanged ? 0 : progress.halfInningPitches,
     },
     `${before.inning}회${before.half} ${(slot % BATTING_ORDER_SIZE) + 1}번 — ${describeOutcome(outcome)}${
       runs > 0 ? ` (${runs}점)` : ''
@@ -858,6 +1053,16 @@ export interface PitcherGameSummary {
   }
   /** 경기 뒤 남은 스태미나 (레코드 +0x2c). 경기 사이 회복은 `recoverStaminaAfterGameDay` 가 한다 */
   readonly stamina: number
+  /**
+   * 이 경기에서 달성한 기록 id — 경기 끝 G포인트 지급(0x4ea0c)의 입력.
+   * 앱은 `recordGamePointsOf(summary.recordIds)` 로 G 를 구해 커리어에 얹으면 된다.
+   */
+  readonly recordIds: readonly number[]
+  /**
+   * 이 경기에 한 번이라도 마운드에 섰는가 (`progress.hasEntered`) — 등판 경기 수를 세는 입력.
+   * 선발이면 경기 시작부터 참이고, 구원은 8회에 올라오는 순간 참이 된다.
+   */
+  readonly hasEntered: boolean
 }
 
 /** 방어율 `0xb6ce8` = 아웃>0 ? min(9999, trunc(실점 × 2700 / 아웃)) : (실점>0 ? 9999 : 0) */
@@ -916,7 +1121,41 @@ export function summaryOf(progress: PitcherGameProgress): PitcherGameSummary {
       saves: decisionCode === 3 ? 1 : 0,
     },
     stamina: progress.stamina,
+    recordIds: gameEndRecordIdsFor(progress),
+    hasEntered: progress.hasEntered,
   }
+}
+
+/**
+ * 경기 끝 0xa7de8 이 더 얹는 기록 — 37~39 점수차 승과 28~31 완투 계열.
+ *
+ * 투수편은 **모드 3** 이라 0xa7de8 의 `모드 == 4 → 끝` 가지에 걸리지 않는다 →
+ * 타자편과 달리 완투 계열이 실제로 나올 수 있다. 나머지 세 조건은 원본 그대로 본다:
+ *   ① 사람 팀 승리 ② 사람이 이 경기에서 투구 코스를 한 번이라도 확정함(state+0x8c = 내가 공을 던짐)
+ *   ③ 사람 팀 **현재** 투수가 잡은 아웃 == 3 × 치른 이닝 (연장 포함)
+ * 피안타·볼넷·실점은 우리 팀 투수 **전체**가 내준 state+0x88·0x89·0x8a 를 쓴다 —
+ * 원본도 팀 단위 칸이라 구원으로 올라온 경우엔 ③ 에서 먼저 걸러진다.
+ *
+ * 강판 뒤에는 `recordsAllowed` 가 닫히므로 이 둘도 들어오지 않는다 (0xa77f0 첫 게이트).
+ */
+function gameEndRecordIdsFor(progress: PitcherGameProgress): readonly number[] {
+  if (!recordsAllowed(progress)) return progress.recordIds
+  return [
+    ...progress.recordIds,
+    ...gameEndRecordIdsOf(progress.game.ourScore - progress.game.opponentScore),
+    ...completeGameRecordIdsOf({
+      mode: PITCHER_EDITION_MODE,
+      won: progress.game.ourScore > progress.game.opponentScore,
+      // state+0x8c 는 코스 확정(0x50e9c)에서만 1 이 된다 — 웹에서는 공을 한 번이라도 던졌는가
+      pitchCourseConfirmed: progress.pitchCount > 0,
+      // state[0x6b]+1 = 치른 이닝 전부 (연장이면 그만큼 늘어난다)
+      inningsPlayed: progress.endedInningIndex + 1,
+      outsRecorded: progress.record.outsRecorded,
+      hitsAllowed: progress.teamHitsAllowed,
+      walksAllowed: progress.teamWalksAllowed,
+      runsAllowed: progress.teamRunsAllowed,
+    }),
+  ]
 }
 
 /** 기본 측 — 나만의리그 화면은 지금까지 늘 후공으로 돌려 왔다 (타자편과 같은 기본값) */

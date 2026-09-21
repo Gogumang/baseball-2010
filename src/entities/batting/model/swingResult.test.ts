@@ -57,8 +57,8 @@ describe('swingFactorsOf — 0xab214 중간값 (디컴파일 대조)', () => {
     expect(swingFactorsOf(기본입력({ mode: '나만의리그' }))).toEqual(swingFactorsOf(기본입력()))
   })
 
-  it('나만의리그에서 타자가 마선수면 400−35×팀레벨 보너스가 붙고 계수가 250·400·430·K 1000 으로 바뀐다', () => {
-    const factors = swingFactorsOf(기본입력({ mode: '나만의리그', isBatterAce: true, teamLevel: 0 }))
+  it('나만의리그에서 타자가 마선수면 400−35×레벨 보너스가 붙고 계수가 250·400·430·K 1000 으로 바뀐다', () => {
+    const factors = swingFactorsOf(기본입력({ mode: '나만의리그', isBatterAce: true, aceBonusLevel: 0 }))
 
     // H = P = 300+400 − 300 = 400, contact = trunc((trunc(400×1000/1000)+1200) × 100 / 10)
     expect(factors.contact).toBe(16000)
@@ -68,20 +68,20 @@ describe('swingFactorsOf — 0xab214 중간값 (디컴파일 대조)', () => {
     expect(factors.homeRun).toBe(4774)
   })
 
-  it('팀레벨이 오르면 마선수 보너스가 줄고 0 에서 멈춘다 (타자 35/레벨 · 투수 40/레벨)', () => {
-    const 레벨0 = swingFactorsOf(기본입력({ mode: '나만의리그', isBatterAce: true, teamLevel: 0 }))
-    const 레벨10 = swingFactorsOf(기본입력({ mode: '나만의리그', isBatterAce: true, teamLevel: 10 }))
-    const 레벨20 = swingFactorsOf(기본입력({ mode: '나만의리그', isBatterAce: true, teamLevel: 20 }))
+  it('레벨이 오르면 마선수 보너스가 줄고 0 에서 멈춘다 (타자 35/레벨 · 투수 40/레벨 — 레벨 출처는 미해결)', () => {
+    const 레벨0 = swingFactorsOf(기본입력({ mode: '나만의리그', isBatterAce: true, aceBonusLevel: 0 }))
+    const 레벨10 = swingFactorsOf(기본입력({ mode: '나만의리그', isBatterAce: true, aceBonusLevel: 10 }))
+    const 레벨20 = swingFactorsOf(기본입력({ mode: '나만의리그', isBatterAce: true, aceBonusLevel: 20 }))
 
     // 레벨 10 이면 400−350 = 50, 레벨 20 이면 음수라 0 으로 막는다
     expect(레벨10.contact).toBeLessThan(레벨0.contact)
     expect(레벨20.contact).toBeLessThan(레벨10.contact)
-    expect(레벨20.contact).toBe(swingFactorsOf(기본입력({ mode: '나만의리그', isBatterAce: true, teamLevel: 99 })).contact)
+    expect(레벨20.contact).toBe(swingFactorsOf(기본입력({ mode: '나만의리그', isBatterAce: true, aceBonusLevel: 99 })).contact)
   })
 
-  it('나만의리그에서 투수가 마선수면 투수 능력에 400−40×팀레벨이 더해져 타자가 불리해진다', () => {
+  it('나만의리그에서 투수가 마선수면 투수 능력에 400−40×레벨이 더해져 타자가 불리해진다', () => {
     const 보통 = swingFactorsOf(기본입력({ mode: '나만의리그' }))
-    const 마투수 = swingFactorsOf(기본입력({ mode: '나만의리그', isPitcherAce: true, teamLevel: 0 }))
+    const 마투수 = swingFactorsOf(기본입력({ mode: '나만의리그', isPitcherAce: true, aceBonusLevel: 0 }))
 
     // H = 300 − (300+400) = −400 이라 contact 가 떨어진다
     expect(마투수.contact).toBeLessThan(보통.contact)
@@ -90,7 +90,7 @@ describe('swingFactorsOf — 0xab214 중간값 (디컴파일 대조)', () => {
 
   it('미션에서 마선수 투수는 보너스가 100 이고 계수는 일반 그대로다', () => {
     const 미션 = swingFactorsOf(기본입력({ mode: '미션', isPitcherAce: true }))
-    const 리그 = swingFactorsOf(기본입력({ mode: '나만의리그', isPitcherAce: true, teamLevel: 0 }))
+    const 리그 = swingFactorsOf(기본입력({ mode: '나만의리그', isPitcherAce: true, aceBonusLevel: 0 }))
 
     expect(미션.contact).toBeLessThan(swingFactorsOf(기본입력()).contact)
     expect(미션.contact).toBeGreaterThan(리그.contact)

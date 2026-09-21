@@ -5,6 +5,7 @@ import {
   canAdvanceOnGroundOut,
   EMPTY_BASES,
 } from '@/entities/game/model/baseState'
+import type { BaseState } from '@/entities/game/model/baseState'
 import { playQuickAtBat } from '@/entities/game/model/quickAtBat'
 import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -67,6 +68,33 @@ export interface HalfInningPitching {
 
 export const EMPTY_HALF_INNING_PITCHING: HalfInningPitching = { strikeoutCombo: 0, strikeouts: 0 }
 
+/**
+ * 타석 하나가 시작·끝날 때 부르는 갈고리 — **돌발미션 발동(0x8f158)과 판정(0x8f414)** 자리다.
+ *
+ * 원본 경기 장면은 반 이닝을 뭉뚱그리지 않고 타석마다 상태 0xd → 0xe → **0xf(준비)** → … → 0x18 을
+ * 지나고, 0xf 에서 돌발을 굴리고 타석이 끝나는 자리에서 결과비트로 판정한다 (K 4절 1-6).
+ * 반 이닝을 한 번에 도는 이 함수에 그 두 자리를 열어 두어, 부르는 쪽이 같은 시점에 끼어들 수 있게 한다.
+ * 안 넘기면 아무 일도 하지 않으므로 하루치 다른 팀 경기(0xc2a48)처럼 장면이 없는 길은 그대로다.
+ */
+export interface HalfInningHooks {
+  /** 상태 0xf — 이 타석이 시작될 때의 루·아웃 */
+  readonly onAtBatStart?: (state: {
+    readonly bases: BaseState
+    readonly outs: number
+    readonly battingOrderIndex: number
+    /** 이 타석 전까지 이 투수가 잡은 삼진 (돌발 조건 b6 = 3) */
+    readonly strikeoutsSoFar: number
+  }) => void
+  /** 타석이 끝나는 자리 — 결과비트를 만들 재료 */
+  readonly onAtBatEnd?: (state: {
+    readonly outcome: AtBatOutcome
+    readonly runsBattedIn: number
+    readonly outsBefore: number
+    readonly outsAdded: number
+    readonly inningEnded: boolean
+  }) => void
+}
+
 export function simulateHalfInning(
   battingOrderIndex: number,
   batterAt: (battingOrderIndex: number) => QuickAtBatBatter,
@@ -74,6 +102,7 @@ export function simulateHalfInning(
   inning: number,
   random: RandomPort,
   before: HalfInningPitching = EMPTY_HALF_INNING_PITCHING,
+  hooks: HalfInningHooks = {},
 ): HalfInningResult {
   let bases = EMPTY_BASES
   let outs = 0
@@ -88,6 +117,14 @@ export function simulateHalfInning(
   const plateAppearances: HalfInningPlateAppearance[] = []
 
   for (let faced = 0; faced < MAXIMUM_BATTERS && outs < OUTS_PER_INNING; faced += 1) {
+    // 상태 0xf — 타석 준비. 원본은 여기서 돌발미션 발동을 굴린다 (0x8f158)
+    hooks.onAtBatStart?.({
+      bases,
+      outs,
+      battingOrderIndex: order,
+      strikeoutsSoFar: before.strikeouts + strikeouts,
+    })
+    const outsBefore = outs
     const play = playQuickAtBat(batterAt(order), pitcher, { inning }, random)
     const outcome = play.outcome
     pitches += play.pitches
@@ -124,6 +161,14 @@ export function simulateHalfInning(
     runs += scored
     // 판정은 그대로 두고 **결과만 내보낸다** — 원본이 0xa8024 로 흘려보내는 자리다
     plateAppearances.push({ battingOrderIndex: order, outcome, runsBattedIn: scored })
+    // 타석이 끝나는 자리 — 원본은 여기서 돌발 결과비트로 판정한다 (0x8f414)
+    hooks.onAtBatEnd?.({
+      outcome,
+      runsBattedIn: scored,
+      outsBefore,
+      outsAdded: advanced.outsAdded,
+      inningEnded: outs >= OUTS_PER_INNING,
+    })
     order += 1
   }
 

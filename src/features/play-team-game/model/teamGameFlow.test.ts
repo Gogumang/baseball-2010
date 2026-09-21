@@ -8,6 +8,8 @@ import {
 } from '@/features/play-team-game/model/matchSettings'
 import {
   applyBatterOutcome,
+  availablePitchers,
+  changePitcher,
   currentBatterAbility,
   currentPitcherAbility,
   isBatterTurn,
@@ -168,5 +170,52 @@ describe('경기 한 판을 끝까지', () => {
     // 점수를 줬으면 완봉·노히트·퍼펙트가 아니다. 등급 자체는 아웃 수 조건이 맞아야 붙는다
     expect(summary.popularityCompleteGame === null || typeof summary.popularityCompleteGame === 'string').toBe(true)
     expect(summary.pitching.outsRecorded).toBeGreaterThan(0)
+  })
+})
+
+describe('경기 중 투수 교체 (0xc1ba4 → 0xac428)', () => {
+  /** 사람이 한 타석도 안 잡는 설정 — 모든 타석이 간이 엔진을 지나 0xc1ba4 를 부른다 */
+  const 전부자동 = {
+    ...FULL_PLAY_SETTINGS,
+    kind: MATCH_SETTING_KIND.상세,
+    value: 0,
+  } as const
+
+  it('자동으로 넘긴 타석에서는 선발이 9이닝을 다 던지지 않는다', () => {
+    let 바뀐경기 = 0
+    for (let seed = 1; seed <= 12; seed += 1) {
+      const { progress } = 시작({ settings: 전부자동 }, seed)
+      if (!progress.game.isFinished) continue
+      if (progress.ourUsedPitchers.length > 0 || progress.opponentUsedPitchers.length > 0) {
+        바뀐경기 += 1
+      }
+    }
+
+    // 예전에는 양 팀 모두 선발 한 명으로 경기를 끝냈다
+    expect(바뀐경기).toBeGreaterThan(0)
+  })
+
+  it('사람이 `#` 로 우리 투수를 바꾼다 — 원본도 우리 투수는 사람 손으로만 바꾼다 (R4 1b)', () => {
+    const { progress } = 시작()
+    const 후보 = availablePitchers(progress)
+
+    expect(후보.length).toBeGreaterThan(0)
+    expect(후보).not.toContain(progress.ourPitcherIndex)
+
+    const 바꾼뒤 = changePitcher(progress, 후보[0])
+    expect(바꾼뒤.ourPitcherIndex).toBe(후보[0])
+    expect(바꾼뒤.ourUsedPitchers).toContain(progress.ourPitcherIndex)
+    // 새 투수는 스태미나가 가득이고 카운터가 0 이다 (0xaec64 memset)
+    expect(바꾼뒤.stamina).toBe(10_000)
+    expect(바꾼뒤.ourPitcherCounters).toEqual({ inningRunsAllowed: 0, runsAllowed: 0, pitches: 0 })
+    // state[0xd] — 다음 한 투구 동안은 다시 안 바뀐다
+    expect(바꾼뒤.pitcherJustChanged).toBe(true)
+  })
+
+  it('벤치에 없는 칸으로는 바뀌지 않는다', () => {
+    const { progress } = 시작()
+
+    expect(changePitcher(progress, progress.ourPitcherIndex)).toBe(progress)
+    expect(changePitcher(progress, 99)).toBe(progress)
   })
 })

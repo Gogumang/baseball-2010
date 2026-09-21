@@ -61,3 +61,45 @@ describe('경기 진행기와 돌발미션', () => {
     expect(after.lastBurstResolution).toBeNull()
   })
 })
+
+describe('모든 타석 준비에서 굴린다 (K 4절 1-6)', () => {
+  /**
+   * 예전에는 **내 타석에서만** 굴려 원본보다 발동이 드물었다. 원본은 경기 장면이 지나는
+   * 모든 타석(동료·상대 포함)의 상태 0xf 에서 굴린다 — 굴리는 횟수가 늘어난 만큼 발동률이 오른다.
+   */
+  const 발동한_경기수 = (씨앗수: number) => {
+    let count = 0
+    for (let seed = 1; seed <= 씨앗수; seed += 1) {
+      let progress = startGame(씨앗(seed))
+      const random = 씨앗(seed + 1)
+      for (let step = 0; step < 200 && !progress.game.isFinished; step += 1) {
+        if ((progress.burst?.triggeredCount ?? 0) > 0) break
+        progress = applyPlayerOutcome(progress, { kind: '삼진' }, random)
+      }
+      if ((progress.burst?.triggeredCount ?? 0) > 0) count += 1
+    }
+    return count
+  }
+
+  it('한 경기를 끝까지 돌리면 거의 모든 시드에서 돌발이 한 번 뜬다', () => {
+    // 내 타석에서만 굴리던 때는 시드 40개 중 절반도 안 떴다
+    expect(발동한_경기수(40)).toBeGreaterThan(30)
+  })
+
+  it('동료·상대 타석에서 뜬 돌발도 그 타석 결과로 판정된다 — 경기당 한 번에서 멈춘다', () => {
+    let 판정난_경기 = 0
+    for (let seed = 1; seed <= 20; seed += 1) {
+      let progress = startGame(씨앗(seed))
+      const random = 씨앗(seed + 7)
+      for (let step = 0; step < 200 && !progress.game.isFinished; step += 1) {
+        progress = applyPlayerOutcome(progress, { kind: '삼진' }, random)
+      }
+
+      expect(progress.burst?.triggeredCount).toBeLessThanOrEqual(MAXIMUM_BURSTS_PER_GAME)
+      if (progress.burst?.judgement != null) 판정난_경기 += 1
+    }
+
+    // 판정 자리가 내 타석에만 있었다면 동료·상대 타석에서 뜬 돌발이 끝까지 걸린 채로 남는다
+    expect(판정난_경기).toBeGreaterThan(10)
+  })
+})
