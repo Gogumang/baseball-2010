@@ -42,10 +42,11 @@ describe('상점 선택 — 0x14a74', () => {
     expect(selectShopItem(보유, shopItemId('장착', 0, 0), 난수)).toMatchObject({ notice: '이미 가지고 있는 아이템입니다', career: 보유 })
   })
 
-  it('장비착용 화면에서는 가진 장비를 끼고, 끼고 있으면 알린다 (0x17b66, StrMODE[142]·[80])', () => {
+  it('장비착용 화면에서는 가진 장비를 끼고, 성공 알림은 없다 — 확인 팝업(81) 뒤 알림 없음 (0x17b66, StrMODE[80])', () => {
     const 보유 = 선수({ ownedEquipment: ['0-0', '0-1'], equipmentLevels: { hit: 2, power: 0, defense: 0, run: 0 } })
 
-    expect(selectShopItem(보유, shopItemId('착용', 0, 0), 난수)).toMatchObject({ notice: '해당 장비를 장착 했습니다' })
+    // StrMODE 에 "장착 했습니다" 같은 문구가 없다 — 원본은 확인 팝업 뒤 따로 알리지 않는다 (R12-shop-guards.md 5절)
+    expect(selectShopItem(보유, shopItemId('착용', 0, 0), 난수)).toMatchObject({ notice: '' })
     expect(selectShopItem(보유, shopItemId('착용', 0, 0), 난수).career.equipmentLevels.hit).toBe(1)
     expect(selectShopItem(보유, shopItemId('착용', 0, 1), 난수).notice).toBe('현재 장착 중인 장비입니다')
     expect(selectShopItem(보유, shopItemId('착용', 0, 3), 난수).notice).toBe('')

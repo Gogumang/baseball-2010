@@ -14,12 +14,17 @@ export interface SceneryState {
   /** 하늘 표 행 (0~5) */
   readonly skyRow: number
   readonly inning: number
-  /** 타석 화면이 열린 뒤 흐른 틱 — 구름 이동 */
+  /** 타석 화면이 열린 뒤 흐른 틱 — 구름·전광판 이동 */
   readonly tick: number
   /** 구장 번호 — 고르는 규칙(st+0x70)이 미확인이라 0 (추정) */
   readonly stadium: number
   readonly ourTeamId: number | null
   readonly opponentTeamId: number | null
+  /**
+   * 환경설정 전광판(+0x3a) — OFF 면 전광판을 그리지 않는다 (0x77726, R2-game-effects.md 6절).
+   * 생략하면(웹판이 아직 안 이어 준 자리) 켠 것으로 본다 — 이 필드는 아직 부르는 쪽이 배선하지 않았다.
+   */
+  readonly isScoreboardOn?: boolean
 }
 
 const CAMERA = { x: -120, y: -70 }
@@ -28,7 +33,24 @@ const CLOUD_COUNT = 3
 /** 좌타 펜스 기준점 (−121 − 10, −70 + 3) */
 const FENCE_ANCHOR = { x: CAMERA.x - 1 - 10, y: CAMERA.y + 3 }
 const MISSION_TEAM_ICON = 11
+/**
+ * FENCE_BOXES 의 세 번째 칸(전광판용으로 뽑아 둔 칸, generate_stadium_scene.py 주석 "2 전광판")을 쓴다.
+ * 원본 0x77494 는 상자 0(종류 +0x8a == 3 이면 2)을 쓰지만, 그 "박스"는 fence.pzf 가 아니라
+ * fence_board.pzx 자체 프레임의 박스로 보인다(팀 아이콘이 이미 FENCE_BOXES 박스 0·1 을 쓰고 있어
+ * 겹칠 수 없다) — fence_board.pzx 박스 데이터를 아직 추출하지 못해 종류 분기는 못 옮긴다 (R2-game-effects.md 6절, **근사**).
+ */
 const SCOREBOARD_BOX = 2
+/** 전광판 글자 시작 x — 상자 폭 + 2 (되감기 값과 같다, 0x77edc) */
+const SCOREBOARD_SCROLL_START_MARGIN = 2
+/** 프레임 폭(143) + 10 만큼 완전히 빠지면 되감는다 (0x77fb4) */
+const SCOREBOARD_REWIND_THRESHOLD = -153
+
+/** 전광판 x 이동(구장+0x8c) — 틱당 1px 씩 왼쪽으로 흘러 −153 밑으로 빠지면 시작값으로 되감는다 (0x77fb4) */
+export function scoreboardScrollX(boxWidth: number, tick: number): number {
+  const start = boxWidth + SCOREBOARD_SCROLL_START_MARGIN
+  const cycleLength = start - SCOREBOARD_REWIND_THRESHOLD + 1
+  return start - (Math.max(0, tick) % cycleLength)
+}
 
 export function drawScenery(context: CanvasRenderingContext2D, state: SceneryState): void {
   context.fillStyle = ORIGINAL_COLORS.black
@@ -83,7 +105,8 @@ function drawFence(context: CanvasRenderingContext2D, state: SceneryState): void
   const crowd = placedFrame(CROWD_FRAMES, state.stadium)
   if (crowd !== null) context.drawImage(crowd.image, FENCE_ANCHOR.x + crowd.offsetX, FENCE_ANCHOR.y + crowd.offsetY)
 
-  // 전광판 (board_ani) — 박스 2 로 잘라 그린다. 흐르는 애니메이션은 미해독이라 첫 프레임을 세운다 (추정)
+  // 전광판 (board_ani) — 환경설정 +0x3a OFF 면 그리지 않는다 (R2-game-effects.md 6절)
+  if (state.isScoreboardOn === false) return
   const box = boxes[SCOREBOARD_BOX]
   const board = placedFrame(SCOREBOARD_FRAMES, 0)
   if (box === undefined || board === null) return
@@ -91,9 +114,11 @@ function drawFence(context: CanvasRenderingContext2D, state: SceneryState): void
   const top = FENCE_ANCHOR.y + box[1]
   context.save()
   context.beginPath()
-  context.rect(left, top, box[2], box[3])
+  // 원본은 상자를 x+1, w−1 로 살짝 좁혀서 자른다 (0xbaf6d)
+  context.rect(left + 1, top, box[2] - 1, box[3])
   context.clip()
-  context.drawImage(board.image, left + board.offsetX, top + board.offsetY)
+  // 글자는 상자 왼쪽 끝 + 이동값(구장+0x8c) 에 그린다 — 틱마다 1px 씩 흘러간다 (0x77fb4)
+  context.drawImage(board.image, left + scoreboardScrollX(box[2], state.tick), top + board.offsetY)
   context.restore()
 }
 

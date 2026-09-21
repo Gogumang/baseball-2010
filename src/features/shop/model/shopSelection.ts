@@ -31,7 +31,8 @@ function wearEquipment(career: PlayerCareer, part: number, level: number): ShopS
   if (!ownsEquipment(career, part, level)) return { career, notice: '' }
   const isEquipped = career.equipmentLevels[EQUIPMENT_PARTS[part].ability] === level + 1
   if (isEquipped) return { career, notice: '현재 장착 중인 장비입니다' } // StrMODE[80]
-  return { career: equipOwned(career, part, level), notice: '해당 장비를 장착 했습니다' } // StrMODE[142]
+  // 장착 성공 알림은 없다 — StrMODE 에 그런 문구가 없고, 원본은 확인 팝업(81) 뒤 알림이 따로 없다 (R12-shop-guards.md 5절)
+  return { career: equipOwned(career, part, level), notice: '' }
 }
 
 /** 상점 장착 탭 (0x13506) — 미오픈 → 보유 → 인기도 → 소지금 순으로 막는다 */

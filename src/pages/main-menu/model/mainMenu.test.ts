@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { MODE_ENTRIES, initialMainMenu, isEntryEnabled, reduceMainMenu } from '@/pages/main-menu/model/mainMenu'
 
 describe('reduceMainMenu — 원본 글자 목록에서 모드를 고르는 메인 메뉴', () => {
-  it('저장이 없으면 나만의리그, 있으면 최근게임이 먼저 골라져 있다', () => {
-    expect(initialMainMenu(false).selectedModeId).toBe('나만의리그')
+  it('원본은 저장 유무와 무관하게 늘 커서 0(최근게임)에서 시작한다', () => {
+    expect(initialMainMenu(false).selectedModeId).toBe('최근게임')
     expect(initialMainMenu(true).selectedModeId).toBe('최근게임')
   })
 
@@ -21,13 +21,20 @@ describe('reduceMainMenu — 원본 글자 목록에서 모드를 고르는 메�
     expect(시작.state.isConfirmingNewGame).toBe(false)
   })
 
-  it('저장이 없으면 최근게임은 골라지지 않는다', () => {
-    const result = reduceMainMenu(initialMainMenu(false), { type: '모드선택', id: '최근게임' }, false)
-    expect(result.state.selectedModeId).toBe('나만의리그')
+  it('저장이 없어도 최근게임은 잠기지 않는다 — 원본은 커서로 막지 않는다', () => {
+    const 나만의리그로이동 = reduceMainMenu(initialMainMenu(false), { type: '모드선택', id: '나만의리그' }, false)
+    expect(나만의리그로이동.state.selectedModeId).toBe('나만의리그')
+
+    const result = reduceMainMenu(나만의리그로이동.state, { type: '모드선택', id: '최근게임' }, false)
+    expect(result.state.selectedModeId).toBe('최근게임')
   })
 
   it('최근게임으로 시작하면 이어하기다', () => {
     expect(reduceMainMenu(initialMainMenu(true), { type: '시작' }, true).effect).toBe('이어하기')
+  })
+
+  it('저장이 없어도 최근게임에서 시작을 누르면 이어하기다 — 원본은 커서를 막지 않는다', () => {
+    expect(reduceMainMenu(initialMainMenu(false), { type: '시작' }, false).effect).toBe('이어하기')
   })
 
   it('미션모드로 시작하면 미션 선택으로 간다', () => {
@@ -36,7 +43,8 @@ describe('reduceMainMenu — 원본 글자 목록에서 모드를 고르는 메�
   })
 
   it('저장이 없으면 나만의리그는 바로 새로하기다', () => {
-    expect(reduceMainMenu(initialMainMenu(false), { type: '시작' }, false).effect).toBe('새로하기')
+    const 고름 = reduceMainMenu(initialMainMenu(false), { type: '모드선택', id: '나만의리그' }, false)
+    expect(reduceMainMenu(고름.state, { type: '시작' }, false).effect).toBe('새로하기')
   })
 
   it('저장이 있는데 나만의리그로 시작하면 지울지 먼저 묻는다', () => {

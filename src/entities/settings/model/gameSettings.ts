@@ -55,10 +55,10 @@ export interface GameSettings {
 /** 소리 크기 칸 수 — 막대 그림 98~101 이 네 장이다 */
 export const SOUND_LEVEL_COUNT = 5
 
-/** 투구 기본값은 원본에서 못 찾았다 — 이전 웹판 동작(게이지)을 유지한다 (추정). */
+/** 투구 기본값은 원본 상세 설정 기본(칸 0, 게이지 OFF) 이다 — 문서 등급 유력 (K-bursts-special.md K-5 5-2). */
 export const DEFAULT_SETTINGS: GameSettings = {
   speedLevel: DEFAULT_SPEED_LEVEL,
-  pitchControl: '게이지',
+  pitchControl: '기본',
   // 원본 생성자 값 — 소리 크기 +0x2e = 2, 진동 +0x3b = 1 (F-9)
   soundLevel: 2,
   isVibrationOn: true,

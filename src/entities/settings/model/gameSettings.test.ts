@@ -18,6 +18,10 @@ describe('환경설정 값', () => {
     expect(normalizeSettings(null)).toEqual(DEFAULT_SETTINGS)
   })
 
+  it('투구 기본값은 게이지 OFF(기본) 이다 — 원본 상세 설정 기본값 (K-bursts-special.md K-5 5-2, 유력)', () => {
+    expect(DEFAULT_SETTINGS.pitchControl).toBe('기본')
+  })
+
   it('올바른 저장값은 그대로 쓴다', () => {
     expect(
       normalizeSettings({

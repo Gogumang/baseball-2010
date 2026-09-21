@@ -1,7 +1,12 @@
 import { style } from '@vanilla-extract/css'
 import { theme } from '@/app/styles/theme.css'
 
-/** 초상화 판 높이. 가장 큰 인물(event_char_1, 101px)이 들어가는 값 — 원작 세로 위치는 **추정**이다. */
+/**
+ * 초상화 판 높이. 가장 큰 인물(event_char_1, 101px)이 들어가는 값.
+ * 원작 초상화 바닥 y 는 확정이다(240×320 화면 좌표, R6-sprite-leftovers.md 5절) —
+ * 관리 화면은 **y = 135**, 외출 지도·장소는 **y = 252**. 이 이야기 화면 판이 그 좌표 그대로
+ * 놓이는지(화면 전체 배치 대조)는 확인하지 않았다.
+ */
 export const PORTRAIT_HEIGHT = 104
 
 export const nameTag = style({

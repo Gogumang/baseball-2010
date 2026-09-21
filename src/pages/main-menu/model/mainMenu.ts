@@ -26,15 +26,17 @@ export interface MainMenuResult {
   readonly effect: MainMenuEffect
 }
 
-/** 저장이 있으면 이어하기가 가장 흔한 선택이라 최근게임을 먼저 골라 둔다. */
-export function initialMainMenu(hasSavedGame: boolean): MainMenuState {
-  return { selectedModeId: hasSavedGame ? '최근게임' : '나만의리그', isConfirmingNewGame: false }
+/** 원본은 저장 유무와 무관하게 늘 커서 0(최근게임)에서 시작한다 (R11-special-leftovers.md 4-2, 0x25b88). */
+export function initialMainMenu(_hasSavedGame: boolean): MainMenuState {
+  return { selectedModeId: MODE_ENTRIES[0].id, isConfirmingNewGame: false }
 }
 
-/** 최근게임은 저장이 있어야 고를 수 있다 (StrMAINMENU[6] "마지막으로 진행한 게임 모드를 재시작"). */
-export function isEntryEnabled(entry: MainMenuEntry, hasSavedGame: boolean): boolean {
-  if (!entry.isAvailable) return false
-  return entry.id !== '최근게임' || hasSavedGame
+/**
+ * 원본은 최근게임을 저장 유무로 잠그지 않는다 — 7개가 늘 나오고 커서도 그대로 지나간다
+ * (R11-special-leftovers.md 4-2, 0x25b88). 이 빌드에서 아직 못 만든 항목(isAvailable)만 막는다.
+ */
+export function isEntryEnabled(entry: MainMenuEntry, _hasSavedGame: boolean): boolean {
+  return entry.isAvailable
 }
 
 export function reduceMainMenu(

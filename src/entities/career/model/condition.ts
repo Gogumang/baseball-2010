@@ -13,7 +13,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
  *   질병 이름: StrMODE[186]~[189]
  * 질병은 원본에서 이벤트 490(조건 22 — 사기 구간 확률)로만 걸린다 → storyScene.
  * 부상은 훈련 결과 창을 닫을 때 굴린다 (rollTrainingInjury, 0x1b4c4).
- * 둘 다일 때 더 큰 감소만 적용하는 것은 추정이다.
+ * 둘 다면 질병 −30% → 부상 −60% 를 차례로 곱한다 — 더 큰 감소 하나만 적용하는 게 아니다 (0xb570c, G-1 확정).
  */
 export const ILLNESS_NAMES: readonly string[] = ['감기', '몸살', '식중독', '배탈']
 
