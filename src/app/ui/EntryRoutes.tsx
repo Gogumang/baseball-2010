@@ -118,6 +118,8 @@ export function EntryRoutes({ screen, setScreen, session, gameSettings, collecti
           }
           session.actions.gainGamePoint(result.gainedGamePoint)
         }}
+        settings={gameSettings.settings}
+        onSettingsChange={gameSettings.setSettings}
         onExit={() => setScreen({ kind: '메인메뉴' })}
       />
     )

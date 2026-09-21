@@ -1,4 +1,9 @@
+import { useState } from 'react'
 import { BigResult, Hint, PixelScreen } from '@/shared/ui'
+import type { GameSettings } from '@/entities/settings/model/gameSettings'
+import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
+import { HelpScreen } from '@/pages/help/ui/HelpScreen'
+import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
 import type { BatterAbility } from '@/entities/batting/model/batter'
@@ -26,7 +31,14 @@ interface HomeRunDerbyScreenProps {
   readonly onFinish?: (result: DerbyResult) => void
   /** 결과 화면에서 "아니오" — 메인 메뉴로 (전역 0x140006c = 4) */
   readonly onExit: () => void
+  /** 경기 중 메뉴 "설정" 칸이 열 환경설정. 안 넘기면 칸이 잠긴다 */
+  readonly settings?: GameSettings
+  readonly onSettingsChange?: (settings: GameSettings) => void
 }
+
+/** 홈런더비 = 원본 전역 모드 7 — 경기 중 메뉴 표 0xcfcfc 의 **행 1**(자동진행 자리에 다시하기) */
+const DERBY_MODE = 7
+type MenuOverlay = '조작방법' | '설정'
 
 /**
  * 홈런더비 (게임 모드 7) — `docs/re/H-modes.md` H-2 절의 규칙 전체를 옮긴 화면이다.
@@ -45,9 +57,27 @@ export function HomeRunDerbyScreen({
   gamePoint,
   onFinish,
   onExit,
+  settings,
+  onSettingsChange,
 }: HomeRunDerbyScreenProps) {
   const session = useHomeRunDerby({ random, bestDistance, onFinish })
   const tick = useUpdateCounter()
+  const [isMenuOpen, setMenuOpen] = useState(false)
+  const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
+
+  // 경기 중 메뉴의 "조작방법"(0x3c212)·"설정"(0x3c326)
+  if (overlay === '조작방법') return <HelpScreen onBack={() => setOverlay(null)} />
+  if (overlay === '설정' && settings !== undefined && onSettingsChange !== undefined) {
+    return (
+      <SettingsScreen
+        settings={settings}
+        hasSavedCareer={false}
+        onChange={onSettingsChange}
+        onResetCareer={() => {}}
+        onBack={() => setOverlay(null)}
+      />
+    )
+  }
 
   if (session.result !== null) {
     return (
@@ -67,8 +97,35 @@ export function HomeRunDerbyScreen({
     <PixelScreen
       title="홈런더비"
       badge={`${derbyBallNumberOf(run)} / ${derbyBallCountOf(run)}구${run.isBonusGame ? ' · 보너스' : ''}`}
-      rightKey={{ label: '나가기', onPress: onExit }}
+      rightKey={{
+        label: isMenuOpen ? '닫기' : '메뉴',
+        onPress: () => setMenuOpen((open) => !open),
+      }}
     >
+      {isMenuOpen && (
+        <InGameMenu
+          // 홈런더비 행은 자동진행 자리에 **다시하기**가 온다 (표 0xcfcfc 행 1)
+          mode={DERBY_MODE}
+          onContinue={() => setMenuOpen(false)}
+          onQuit={onExit}
+          onRestart={() => {
+            setMenuOpen(false)
+            session.restart()
+          }}
+          onOpenHelp={() => {
+            setMenuOpen(false)
+            setOverlay('조작방법')
+          }}
+          onOpenSettings={
+            settings === undefined || onSettingsChange === undefined
+              ? undefined
+              : () => {
+                  setMenuOpen(false)
+                  setOverlay('설정')
+                }
+          }
+        />
+      )}
       <div className={styles.stageArea}>
         <BattingStage
           batterAbility={ability}
