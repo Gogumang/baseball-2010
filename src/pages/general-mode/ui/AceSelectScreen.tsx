@@ -1,0 +1,195 @@
+import { useEffect, useState } from 'react'
+import { Button, FrameSprite, Hint, RawScreen } from '@/shared/ui'
+import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
+import { ACE_PLAYERS } from '@/shared/config/original/acePlayers'
+import { ACE_LAYOUT, LOCKED_CIRCLES, NAME_BAR, TAG, aceCellPositionOf } from '@/pages/general-mode/lib/prepareLayout'
+import { ACE_PER_ROLE, ACE_PHASE, aceIndexOfCell, aceRoleOfCell } from '@/pages/general-mode/lib/generalModeSetup'
+import type { AcePhase } from '@/pages/general-mode/lib/generalModeSetup'
+import * as styles from '@/pages/general-mode/ui/prepareScreen.css'
+
+const SLT_IMAGE = './sprites/slt_frame'
+const IMG_TEXT_FRAME = './sprites/img_text/frames'
+
+const imageSrc = (folder: string, index: number) => `${folder}/${String(index).padStart(3, '0')}.png`
+
+/** 잠긴 칸 글 — slt_frame 이미지 114 "LOCK" 을 대신하는 읽기용 이름 */
+const LOCK_LABEL = 'LOCK'
+
+/**
+ * 웹판 `ACE_PLAYERS` 는 **마타자 0~4 · 마투수 5~9** 순서다. 화면 격자는 **윗줄 마투수 · 아랫줄 마타자**라
+ * 칸 번호를 이렇게 갈아 준다.
+ */
+export function acePlayerOfCell(cell: number) {
+  const index = aceIndexOfCell(cell)
+  return aceRoleOfCell(cell) === ACE_PHASE.마투수 ? ACE_PLAYERS[ACE_PER_ROLE + index] : ACE_PLAYERS[index]
+}
+
+export interface AceSelectScreenProps {
+  /** 하위 단계 `[skin+0xd0]` — 마투수를 먼저 고른다 */
+  readonly phase: AcePhase
+  /** 저장 +0x30..0x34 — 열린 마투수 번호 0~4 */
+  readonly openedAcePitcherIds?: readonly number[]
+  /** 저장 +0x35..0x39 — 열린 마타자 번호 0~4 */
+  readonly openedAceBatterIds?: readonly number[]
+  /**
+   * 마선수 레벨 — 이름 막대 글은 `"!C!cFFFFFF%s !cFFFF00LV.%d"` (0xd2498) 다.
+   * ⚠️ **값이 없어 못 채운 자리**: 레벨은 스페셜 마선수 화면(상태 28)이 올리는 저장 값이고
+   *    웹판에는 아직 그 저장이 없다. 없으면 이름만 그린다.
+   */
+  readonly levels?: Readonly<Record<number, number>>
+  readonly onSelect: (cell: number) => void
+  readonly onCancel: () => void
+}
+
+/**
+ * **마선수 고르기** — 메인 메뉴 하위 상태 **21**, 공용 목록 `0x63b15` 의 **k = 2**
+ * (진입 0x263f4 · 갱신 0x29df8 · 본문 0x647b4. P6 2a-5 좌표 확정).
+ *
+ * 격자는 10칸(윗줄 마투수 0~4 · 아랫줄 마타자 5~9)이고 **마투수를 먼저** 고른 뒤 커서가
+ * 아랫줄로 내려간다. 마투수 OK 는 `rec+0xe`, 마타자 OK 는 `rec+0xd` 에 적힌다.
+ *
+ * ⚠️ 여기 없는 것 (문서에 값이 없다):
+ *   - 잠긴 칸을 눌렀을 때의 힌트 팝업 — 문자열표 `[0x1552cf8]` 의 [0x28]·[0x2a]·[0x2b] 인데
+ *     그 표가 웹판 데이터에 없다.
+ *   - `0` 키의 레벨업·구매 하위 창 (하위 단계 1·2·10, K 3-3 쪽).
+ *   - 열린 마선수 자리의 애니메이션 `[skin+0x138]` — 여기서는 정지 그림을 쓴다.
+ */
+export function AceSelectScreen({
+  phase, openedAcePitcherIds = [], openedAceBatterIds = [], levels, onSelect, onCancel,
+}: AceSelectScreenProps) {
+  const imgTextOrigins = useFrameOrigins(IMG_TEXT_FRAME)
+  const cellCount = ACE_LAYOUT.grid.columns * ACE_LAYOUT.grid.rows
+  // 마투수 단계는 윗줄에서, 마타자 단계는 아랫줄에서 커서가 시작한다 (원본이 OK 뒤 커서를 내린다)
+  const [cursor, setCursor] = useState(phase === ACE_PHASE.마투수 ? 0 : ACE_PER_ROLE)
+
+  useEffect(() => {
+    setCursor(phase === ACE_PHASE.마투수 ? 0 : ACE_PER_ROLE)
+  }, [phase])
+
+  const isCellOpen = (cell: number) =>
+    aceRoleOfCell(cell) === ACE_PHASE.마투수
+      ? openedAcePitcherIds.includes(aceIndexOfCell(cell))
+      : openedAceBatterIds.includes(aceIndexOfCell(cell))
+
+  /** 지금 단계의 줄만 고를 수 있다 — 원본도 단계에 맞는 줄에서만 OK 를 받는다 */
+  const isCellSelectable = (cell: number) => aceRoleOfCell(cell) === phase && isCellOpen(cell)
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const step =
+        event.key === 'ArrowRight' ? 1
+        : event.key === 'ArrowLeft' ? -1
+        : event.key === 'ArrowDown' ? ACE_LAYOUT.grid.columns
+        : event.key === 'ArrowUp' ? -ACE_LAYOUT.grid.columns
+        : 0
+      if (step !== 0) {
+        event.preventDefault()
+        return setCursor((previous) => Math.min(cellCount - 1, Math.max(0, previous + step)))
+      }
+      if (event.key === 'Enter') {
+        event.preventDefault()
+        if (isCellSelectable(cursor)) onSelect(cursor)
+        return
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onCancel()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+    // 커서·열린 목록·단계를 모두 보는 닫힘이라 **매 그림마다** 새로 건다 (의존 목록 없음)
+  })
+
+  const { anchorA, anchorB } = ACE_LAYOUT
+  const cursorPlayer = acePlayerOfCell(cursor)
+  const isCursorOpen = isCellOpen(cursor)
+  const cursorLevel = levels?.[cursor]
+
+  return (
+    <RawScreen>
+      {/* A 딱지 — 지금 단계에 따라 img_text 51 "마투수" / 50 "마타자" */}
+      <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, TAG.whiteBar)}
+        style={{ left: anchorA.x + TAG.dx, top: anchorA.y + TAG.aDy }} />
+      <FrameSprite folder={IMG_TEXT_FRAME} origins={imgTextOrigins}
+        frame={phase === ACE_PHASE.마투수 ? ACE_LAYOUT.tagFrames.마투수 : ACE_LAYOUT.tagFrames.마타자}
+        x={anchorA.x + TAG.dx} y={anchorA.y + TAG.aDy + TAG.textDdy} />
+
+      {/* B 딱지 — 파란 막대(117) 에 ABILITY, k 2 는 기본값 43 위다 */}
+      <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, TAG.blueBar)}
+        style={{ left: anchorB.x + TAG.dx, top: anchorB.y + TAG.bDyDefault }} />
+      <FrameSprite folder={IMG_TEXT_FRAME} frame={ACE_LAYOUT.tagFrames.ability} origins={imgTextOrigins}
+        x={anchorB.x + TAG.dx} y={anchorB.y + TAG.bDyDefault + TAG.textDdy} />
+
+      {/* A — 커서가 짚은 마선수. 잠겼으면 원 두 개 + LOCK */}
+      {isCursorOpen && cursorPlayer !== undefined ? (
+        <img className={styles.layer} alt={cursorPlayer.name} src={cursorPlayer.stillUrl}
+          style={{ left: anchorA.x - 20, top: anchorA.y - 20 }} />
+      ) : (
+        LOCKED_CIRCLES.map((circle) => (
+          <span key={circle.diameter} className={styles.lockedCircle}
+            style={{
+              left: anchorA.x - circle.diameter / 2,
+              top: anchorA.y - circle.diameter / 2,
+              width: circle.diameter,
+              height: circle.diameter,
+              background: circle.color,
+            }} />
+        ))
+      )}
+
+      {/* 이름 막대 (slt_frame 이미지 9) + 이름 + 노란 LV */}
+      <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, NAME_BAR.image)}
+        style={{ left: anchorA.x + NAME_BAR.dx, top: anchorA.y + NAME_BAR.dy }} />
+      <span className={styles.centeredText} data-testid="마선수-이름"
+        style={{ left: anchorA.x + NAME_BAR.dx, top: anchorA.y + NAME_BAR.textDy, width: NAME_BAR.width }}>
+        {isCursorOpen && cursorPlayer !== undefined
+          ? `${cursorPlayer.name}${cursorLevel === undefined ? '' : ` LV.${cursorLevel}`}`
+          : LOCK_LABEL}
+      </span>
+
+      {/* 줄 딱지 — PITCHER / BATTER */}
+      {ACE_LAYOUT.rowTags.map((tag) => (
+        <span key={tag.label}>
+          <span className={styles.fillPanel}
+            style={{
+              left: tag.panel.x, top: tag.panel.y, width: tag.panel.width, height: tag.panel.height,
+              background: ACE_LAYOUT.panelColor, borderRadius: 2,
+            }} />
+          <img className={styles.layer} alt={tag.label} src={imageSrc(SLT_IMAGE, tag.image)}
+            style={{ left: tag.imageAt.x, top: tag.imageAt.y }} />
+        </span>
+      ))}
+
+      {/* 10칸 격자 */}
+      {Array.from({ length: cellCount }, (_unused, cell) => {
+        const { x, y } = aceCellPositionOf(cell)
+        const player = acePlayerOfCell(cell)
+        const open = isCellOpen(cell)
+        return (
+          <button
+            key={cell}
+            type="button"
+            aria-label={open && player !== undefined ? player.name : LOCK_LABEL}
+            aria-pressed={cell === cursor}
+            disabled={!isCellSelectable(cell)}
+            className={`${styles.cell} ${cell === cursor ? styles.cellSelected : ''}`}
+            style={{ left: x, top: y, width: ACE_LAYOUT.grid.cell, height: ACE_LAYOUT.grid.cell }}
+            onClick={() => onSelect(cell)}
+            onMouseEnter={() => setCursor(cell)}
+          >
+            {open && player !== undefined
+              ? <img className={styles.layer} alt="" src={player.iconUrl} style={{ left: 3, top: 3 }} />
+              : <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, ACE_LAYOUT.lock.iconImage)}
+                  style={{ left: 12, top: 12 }} />}
+          </button>
+        )
+      })}
+
+      <Hint>
+        {phase === ACE_PHASE.마투수 ? '마투수를 고르세요' : '마타자를 고르세요'} — 방향키 이동 · Enter 결정
+      </Hint>
+      <Button variant="corner" onClick={onCancel}>되돌아가기</Button>
+    </RawScreen>
+  )
+}
