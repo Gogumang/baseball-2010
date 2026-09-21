@@ -5,7 +5,11 @@ import { AUTO_ADVANCE_TICK_MARGIN, beatsThrow } from '@/entities/fielding/model/
 import { BASE_POSITIONS, FIELDER_COUNT } from '@/entities/fielding/model/fieldGeometry'
 import { EMPTY_BASES, type BaseState } from '@/entities/game/model/baseState'
 import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
-import { isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
+import {
+  defenseAbilitiesOf,
+  isBattedBallInPlay,
+  runDefensePlay,
+} from '@/features/defense-play/model/runDefensePlay'
 import type {
   DefensePlayControls,
   DefensePlayInput,
@@ -422,5 +426,83 @@ describe('필살타법 성공 타구는 야수가 잡지 못한다 — 공 비�
     const 마지막 = 필살.ticks[필살.ticks.length - 1]
 
     expect(마지막.ball.x).toBe(궤적.pointAt(필살.ticks.length - 1).x)
+  })
+})
+
+describe('수비 아홉 칸 능력치 — 자리 코드 −1 이 칸 번호다 (0xb103e~0xb105e)', () => {
+  it('자리 코드 2~9 가 칸 1~8 로 가고, 칸 0(투수)은 따로 받는다', () => {
+    const 능력치 = defenseAbilitiesOf(
+      [
+        { position: 2, defense: 610 }, // 포수 → 칸 1
+        { position: 3, defense: 620 }, // 1루수 → 칸 2
+        { position: 9, defense: 690 }, // 중견 → 칸 8
+        { position: 1, defense: 999 }, // 지명 — 수비 자리가 없다
+        { position: 0, defense: 999 }, // 후보 — 자리 없음
+      ],
+      333,
+    )
+
+    expect(능력치).toHaveLength(FIELDER_COUNT)
+    expect(능력치[0]).toBe(333)
+    expect(능력치[1]).toBe(610)
+    expect(능력치[2]).toBe(620)
+    expect(능력치[8]).toBe(690)
+    // 못 채운 칸은 원본 평균대(등급 3)로 둔다
+    expect(능력치[3]).toBe(500)
+  })
+
+  it('같은 자리가 두 번 나오면 앞 선수가 이긴다 — 뒤는 후보다', () => {
+    expect(defenseAbilitiesOf([{ position: 4, defense: 700 }, { position: 4, defense: 100 }])[3]).toBe(700)
+  })
+
+  it('안 주면 아홉 칸 모두 500 이다 — 지금까지의 기본값 그대로', () => {
+    expect(defenseAbilitiesOf([])).toEqual(Array.from({ length: FIELDER_COUNT }, () => 500))
+  })
+})
+
+describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
+  const 협살상황 = (defenseIsCpu: boolean) =>
+    runDefensePlay({
+      outcome: 단타,
+      trajectory: battedBallTrajectory(representativePatternOf(단타)),
+      bases: 주자1루,
+      outs: 0,
+      defenseIsCpu,
+    })
+
+  it('수비가 CPU 일 때만 걸린다 — 사람이 수비하면 원본에서도 안 일어난다 (state[0x31+수비측])', () => {
+    expect(협살상황(true).log.some((line) => line.includes('협살 시작'))).toBe(true)
+    expect(협살상황(false).log.some((line) => line.includes('협살 시작'))).toBe(false)
+  })
+
+  it('안 주면 안 돈다 — 부르는 쪽이 말해 주지 않으면 시작하지 않는다', () => {
+    const 기본 = play(단타, 주자1루, 0)
+
+    expect(기본.rundowns).toBe(0)
+    expect(기본.log.some((line) => line.includes('협살'))).toBe(false)
+  })
+
+  it('송구가 닿으면 공은 받은 야수의 손으로 옮겨 간다 — 그래야 협살 조건이 선다 (0xb2734)', () => {
+    const 결과 = 협살상황(true)
+    const 시작 = 결과.log.find((line) => line.includes('협살 시작'))
+
+    expect(결과.rundowns).toBe(1)
+    // 2루로 간 송구를 받은 유격수(5)와 3루수(4)가 1번 주자를 사이에 둔다
+    expect(시작).toContain('1번 주자')
+  })
+
+  it('타자주자는 협살 대상이 아니다 — 타자주자의 운명은 결과 코드가 정한다 (근사)', () => {
+    // 3루타는 타자주자가 반드시 3루까지 간다. 협살이 그를 잡으면 기록과 어긋난다
+    const 결과 = runDefensePlay({
+      outcome: 삼루타,
+      trajectory: battedBallTrajectory(representativePatternOf(삼루타)),
+      bases: EMPTY_BASES,
+      outs: 0,
+      defenseIsCpu: true,
+    })
+
+    expect(결과.advance.outsAdded).toBe(0)
+    expect(결과.advance.bases).toEqual({ first: false, second: false, third: true })
+    expect(결과.rundowns).toBe(0)
   })
 })

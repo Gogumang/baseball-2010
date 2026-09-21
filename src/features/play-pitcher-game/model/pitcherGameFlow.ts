@@ -23,7 +23,7 @@ import {
 import { EMPTY_BATTER_GAME_LOG, recordBatterAtBat } from '@/entities/game/model/batterGameLog'
 import type { BatterGameLog } from '@/entities/game/model/batterGameLog'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
-import { isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
+import { defenseAbilitiesOf, isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { homeRunPlaybackOf } from '@/features/defense-play/model/homeRunPlayback'
 import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
@@ -465,7 +465,7 @@ export function throwPitch(
 
   const outcome = afterPitch.atBat.outcome
   if (outcome === null) return afterPitch
-  return advance(applyDefensivePlay(afterPitch, outcome, true, afterPitch.atBat.balls), random)
+  return advance(applyDefensivePlay(afterPitch, outcome, true, afterPitch.atBat.balls, random), random)
 }
 
 /* ── 수비 타석 하나 ───────────────────────────────────────────────────────────── */
@@ -482,6 +482,7 @@ function applyDefensivePlay(
   outcome: AtBatOutcome,
   mine: boolean,
   balls: number,
+  random: RandomPort,
 ): PitcherGameProgress {
   const before = progress.game
   /**
@@ -500,6 +501,23 @@ function applyDefensivePlay(
           trajectory: battedBallTrajectory(representativePatternOf(outcome)),
           bases: before.bases,
           outs: before.outs,
+          // 내가 던진 타석이니 수비 아홉 칸은 **우리 팀**이고, 칸 0(투수)은 나다.
+          // ⚠️ 원본 그대로: 칸 0 도 능력치 칸 2 를 읽어 투수 레코드에서는 **변화**가 들어간다
+          // (0xb570c(팀, 2, 선수, 90, 1) — `defenseAbilitiesOf` 주석).
+          defenseAbilities: defenseAbilitiesOf(
+            teamBatters(progress.options.ourTeamId).map((player) => ({
+              position: player.position,
+              defense: player.ability[2],
+            })),
+            progress.options.stats.breaking,
+          ),
+          // 주자는 상대 타자다 — 지금 타순 칸의 주루
+          runAbility: opponentBatterAbility(progress.options.opponentTeamId, progress.opponentOrderIndex).run,
+          random,
+          // 나만의리그 투수편 = 전역 모드 3
+          gameMode: PITCHER_EDITION_MODE,
+          // 수비는 사람(나)이다 → 협살은 원본에서도 안 일어난다 (S8 1-4)
+          defenseIsCpu: false,
         })
       : null
   // 내가 던진 타석이면 홈런도 날아가는 그림을 보여 준다 — 득점·주자는 아래 길이 그대로 정한다
@@ -942,6 +960,7 @@ function playDefensiveAtBat(
     play.outcome,
     false,
     play.balls,
+    random,
   )
 }
 

@@ -38,6 +38,8 @@ import type { BattedBallTrajectory } from '@/entities/fielding/model/catchPredic
 import {
   BASE_DEFAULT_FIELDER,
   basePosition,
+  FIELDER_COUNT,
+  horizontalDistance,
   isSamePoint,
   progressPercent,
   runnerSpeedOf,
@@ -45,6 +47,15 @@ import {
   ticksToReach,
   type WorldPoint,
 } from '@/entities/fielding/model/fieldGeometry'
+import {
+  buildRundownPlan,
+  canStartRundown,
+  chooseRundownRunner,
+  endRundown,
+  rundownAction,
+  NO_RUNDOWN,
+  type RundownPlan,
+} from '@/entities/fielding/model/rundown'
 import {
   AI_STATE,
   createFielders,
@@ -64,7 +75,7 @@ import {
   type HeldRunState,
 } from '@/entities/fielding/model/heldRuns'
 import { defenseArrivalTicks, secondBaseCoverSlot } from '@/entities/fielding/model/throwArrival'
-import { effectiveThrowSpeedOf, readyTicksOf } from '@/entities/fielding/model/throwPlan'
+import { effectiveThrowSpeedOf, readyTicksOf, throwTicksToFielder } from '@/entities/fielding/model/throwPlan'
 import { chooseThrowTargetBase } from '@/entities/fielding/model/throwTargetBase'
 import { EMPTY_BASES, type AdvanceResult, type BaseState } from '@/entities/game/model/baseState'
 import { forecastCatch } from '@/features/defense-play/model/catchForecast'
@@ -129,8 +140,55 @@ export interface DefensePlayInput {
   readonly fielderSkillIds?: readonly (readonly number[])[]
   /** 전역 모드 0x1552d10 — 7(홈런더비)이면 필살수비를 안 굴리고, 4(나리 타자편)면 기준이 절반이다 */
   readonly gameMode?: number
+  /**
+   * **수비를 CPU 가 맡았는가** — 협살(AI 상태 8)은 `state[0x31 + 수비측] == 1` 일 때만 시작한다
+   * (S8 1-4, 확정). 사람이 수비하면 원본에서도 협살이 절대 안 일어난다.
+   *
+   * 안 주면 **안 도는 쪽**으로 둔다. 원본은 경기 상태가 늘 답을 알지만 이 진행기는 부르는 쪽이
+   * 말해 줘야 알 수 있어서, 모르면 시작하지 않는 쪽이 안전하다.
+   */
+  readonly defenseIsCpu?: boolean
   /** 사람 조작 (I-controls 0절 상태 0x17 표). 안 주면 전부 자동이다 */
   readonly controls?: DefensePlayControls
+}
+
+/** `defenseAbilitiesOf` 가 받는 수비 한 명 */
+export interface DefenseLineupPlayer {
+  /**
+   * 수비 자리 코드 = 선수 레코드 `+0x1c & 0xf` (1 지명 · 2 포수 · 3 1루 · 4 2루 · 5 3루 ·
+   * 6 유격 · 7 1루 쪽 외야 · 8 3루 쪽 외야 · 9 중견). **수비 칸 = 코드 − 1** 이고
+   * 칸 0(투수)은 이 표에서 빠진다 (0xb103e~0xb105e · 0xb1048).
+   */
+  readonly position?: number
+  /** 경기용 능력치 칸 2 — 타자 레코드면 수비 (0xb570c(팀, 2, 선수, 90, 1), I-controls 1a) */
+  readonly defense: number
+}
+
+/**
+ * 타순에 선 선수들을 **수비 칸 9개**(0 투수 … 8 중견)의 능력치 배열로 옮긴다.
+ *
+ * ⚠️ **원본 그대로**: 칸 0(투수)의 "수비 능력치" 도 같은 `0xb570c(팀, **2**, 선수, 90, 1)` 로 읽는데,
+ * 투수 레코드의 칸 2 는 **변화**다 (J-4 의 칸 표). 원본이 레코드 종류를 가리지 않고 칸 2 를 읽으므로
+ * 여기서도 투수의 변화 값을 그대로 넘긴다 — 고치지 않는다.
+ *
+ * 자리 코드가 없거나 겹치는 칸은 원본 평균대(등급 3 = 500)로 둔다.
+ */
+export function defenseAbilitiesOf(
+  lineup: readonly DefenseLineupPlayer[],
+  pitcherDefense: number = DEFAULT_ABILITY,
+): number[] {
+  const abilities = Array.from({ length: FIELDER_COUNT }, () => DEFAULT_ABILITY)
+  abilities[0] = pitcherDefense
+  const filled = Array.from({ length: FIELDER_COUNT }, (_unused, slot) => slot === 0)
+  for (const player of lineup) {
+    const code = (player.position ?? 0) & 0xf
+    const slot = code - 1
+    if (slot < 1 || slot >= FIELDER_COUNT) continue
+    if (filled[slot]) continue
+    abilities[slot] = player.defense
+    filled[slot] = true
+  }
+  return abilities
 }
 
 /** 이번 틱에 눌린 키 한 개 — 경기 장면 `this+0x38` 에 해당한다 */
@@ -184,6 +242,13 @@ export interface DefensePlayResult {
   readonly specialDefense: { readonly jumpUnlocked: boolean; readonly slideUnlocked: boolean }
   /** 사람이 반짝임 창 안에 키를 넣어 레이저 송구가 나갔는가 (플레이+0x1f4) */
   readonly laserThrow: boolean
+  /**
+   * 협살(AI 상태 8)이 몇 번 걸렸는가 — 0xb3a94. `defenseIsCpu` 를 줘야 돈다.
+   * 홈런 재생(`homeRunPlayback`)처럼 진행기를 안 돌린 결과에는 없다.
+   */
+  readonly rundowns?: number
+  /** 협살로 잡은 아웃 수 */
+  readonly rundownOuts?: number
   /** 사람이 읽을 진행 기록 — 테스트가 "왜 그렇게 됐나" 를 확인할 때 쓴다 */
   readonly log: readonly string[]
 }
@@ -356,6 +421,14 @@ export function runDefensePlay(input: DefensePlayInput): DefensePlayResult {
   let laserConfirmed = false
   let laserRolled = false
   let laserThrow = false
+  /** 협살 기록칸 P+0x1ec~+0x1f3 (0xb3a04). 대상이 −1 이면 협살 중이 아니다 */
+  let rundown: RundownPlan = NO_RUNDOWN
+  /** 협살 중 짝에게 던진 공이 닿는 틱과 받을 야수 — 없으면 −1 */
+  let rundownThrowArrival = -1
+  let rundownThrowTo = NONE
+  let rundowns = 0
+  let rundownOuts = 0
+  const defenseIsCpu = input.defenseIsCpu === true
   const ticks: DefensePlayView[] = []
   const log: string[] = []
   const previousActions = new Map<string, { action: number; since: number }>()
@@ -577,6 +650,121 @@ export function runDefensePlay(input: DefensePlayInput): DefensePlayResult {
         }
       }
       play = { ...play, wantsThrow: false }
+      // 공은 **받은 야수의 손으로 옮겨 간다** — 0xb2734 가 `P+0x130 = 받은 야수 번호` · `야수+0xe0 = 1`.
+      // 이 줄이 없으면 공 쥔 야수가 끝까지 "쫓아간 야수" 로 남는데, 그 야수는 커버 배정에서 빠져 있어
+      // 협살 조건("공 쥔 야수가 두 커버 야수 중 하나", 0xb3fa8)이 영영 서지 않는다.
+      const receiverSlot = errantThrow ? NONE : covers[wrapBase(throwBase)] ?? NONE
+      if (receiverSlot !== NONE) {
+        fielders = fielders.map((fielder) =>
+          fielder.slot === receiverSlot
+            ? { ...fielder, holdingBall: true }
+            : fielder.holdingBall
+              ? { ...fielder, holdingBall: false }
+              : fielder,
+        )
+        play = { ...play, ballHolderSlot: receiverSlot, held: true }
+      }
+    }
+
+    // ── 2b. 협살 (AI 상태 8) ──
+    // 원본은 플레이 틱 0xb401c 안 0xb433c~0xb4378 에서, 송구 판정 바로 뒤에 이 갈래를 본다:
+    //   `P+0x1f0 == −1 이면 0xb3fa8(가능 검사) → state[0x31+수비측] == 1(CPU) 이면 0xb3a94(시작)`.
+    // **사람이 수비하면 협살은 절대 안 일어난다** (S8 1-4).
+    if (defenseIsCpu && !play.finished && play.everHeld) {
+      if (rundown.runnerIndex === NONE) {
+        const context = contextAt(tick)
+        const target = chooseRundownRunner(context.runners)
+        // ⚠️ **근사**: 대상이 타자주자(0번)면 협살을 걸지 않는다. 이 진행기의 규약이
+        // "타자주자의 운명은 결과 코드가 정한다" 여서, 송구 도착 아웃 판정도 같은 이유로
+        // `index >= 1` 부터 본다. 협살이 타자주자를 잡으면 3루타가 아웃으로 뒤집혀 기록과 어긋난다.
+        // 원본은 위치 분석이 결과를 정하지 않으므로 타자주자도 협살 대상이 된다.
+        // 고르기(0xb398c)가 **뒤 주자부터** 보므로 0번은 다른 주자가 없을 때만 뽑힌다.
+        if (target !== NONE && target !== 0 && canStartRundown(context, true)) {
+          rundown = buildRundownPlan(context, target)
+          rundowns += 1
+          fielders = fielders.map((fielder) =>
+            fielder.slot === rundown.backFielder || fielder.slot === rundown.frontFielder
+              ? { ...fielder, aiState: AI_STATE.RUNDOWN }
+              : fielder,
+          )
+          log.push(
+            `${tick}틱 협살 시작 — ${rundown.runnerIndex}번 주자 ${rundown.backBase}↔${rundown.frontBase}루 ` +
+              `(야수 ${rundown.backFielder}·${rundown.frontFielder})`,
+          )
+        }
+      } else {
+        // 협살 중 짝에게 던진 공이 닿았다 — 공 쥔 쪽이 바뀐다
+        if (rundownThrowArrival >= 0 && tick >= rundownThrowArrival) {
+          const to = rundownThrowTo
+          fielders = fielders.map((fielder) =>
+            fielder.slot === to
+              ? { ...fielder, holdingBall: true }
+              : fielder.holdingBall
+                ? { ...fielder, holdingBall: false }
+                : fielder,
+          )
+          play = { ...play, ballHolderSlot: to, held: true }
+          rundownThrowArrival = -1
+          rundownThrowTo = NONE
+        }
+        const chased = runners[rundown.runnerIndex]
+        let released = true
+        if (chased !== undefined && !chased.state.isOut) {
+          released = false
+          for (const slot of [rundown.backFielder, rundown.frontFielder]) {
+            if (released) break
+            const action = rundownAction({ ...contextAt(tick), plan: rundown, slot, ballTarget: catchPoint })
+            if (action.kind === '협살해제') {
+              released = true
+              break
+            }
+            const self = fielders[slot]
+            if (self === undefined) continue
+            if (action.kind === '주자추적') {
+              // vt0x4c — 상대의 현재 위치를 그대로 목표로 삼는다
+              const to = chased.state.position
+              const moved = stepToward(self.position, to, self.speed)
+              fielders = fielders.map((fielder) =>
+                fielder.slot === slot ? { ...fielder, target: to, position: moved } : fielder,
+              )
+              // **근사**: 태그 판정(0xb3946)은 따로 있는 함수라 여기서는 "공을 쥔 야수가 한 걸음 안까지
+              // 붙으면 잡았다" 로 본다. 원본의 태그 판정 줄까지는 안 읽었다.
+              if (self.holdingBall && horizontalDistance(moved, to) <= self.speed) {
+                markOut(chased)
+                outs += 1
+                outsAdded += 1
+                rundownOuts += 1
+                released = true
+                log.push(`${tick}틱 협살 태그 — ${rundown.runnerIndex}번 주자 아웃`)
+              }
+            } else if (action.kind === '짝에게송구') {
+              if (rundownThrowArrival < 0) {
+                const partner = fielders[action.toSlot]
+                if (partner !== undefined) {
+                  rundownThrowTo = action.toSlot
+                  rundownThrowArrival = tick + Math.max(1, throwTicksToFielder(self, partner))
+                  log.push(`${tick}틱 협살 송구 ${slot}→${action.toSlot} — ${rundownThrowArrival}틱 도착`)
+                }
+              }
+            } else if (action.kind === '루로' || action.kind === '공쫓기') {
+              const to = action.kind === '루로' ? basePosition(action.base) : action.target
+              fielders = fielders.map((fielder) =>
+                fielder.slot === slot
+                  ? { ...fielder, target: to, position: stepToward(fielder.position, to, fielder.speed) }
+                  : fielder,
+              )
+            }
+            // '대기' 는 vt0x10(동작 정지) — 이번 틱에 아무것도 안 한다
+          }
+        }
+        if (released) {
+          // 협살 종료 0xb26b8 — 기록칸을 지우고 상태 8 인 야수를 전부 상태 0 으로 되돌린다
+          fielders = endRundown(fielders)
+          rundown = NO_RUNDOWN
+          rundownThrowArrival = -1
+          rundownThrowTo = NONE
+        }
+      }
     }
 
     // ── 3. 타자주자의 선언된 운명 ──
@@ -716,6 +904,8 @@ export function runDefensePlay(input: DefensePlayInput): DefensePlayResult {
     errantThrow,
     specialDefense,
     laserThrow,
+    rundowns,
+    rundownOuts,
     log,
   }
 }
@@ -869,6 +1059,8 @@ interface FielderMoveInput {
 
 /** 야수 한 틱 — 쫓는 야수는 포구 지점으로, 커버는 제 루로, 나머지는 제자리 */
 function moveFielder(fielder: FielderState, input: FielderMoveInput): FielderState {
+  // 협살(상태 8) 중인 야수는 분기표가 0xb48b6 으로 가므로 커버 이동을 하지 않는다 — 2b 절이 이미 옮겼다
+  if (fielder.aiState === AI_STATE.RUNDOWN) return fielder
   if (fielder.slot === input.chaserSlot) {
     if (input.tick >= input.catchTick) return fielder
     return {

@@ -17,7 +17,7 @@ import { rollStartingPitcherIndex } from '@/entities/team/model/teamRoster'
 import { rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
 import { applyOpponentAtBat } from '@/features/play-pitcher-game/model/pitcherGameState'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
-import { isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
+import { defenseAbilitiesOf, isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { homeRunPlaybackOf } from '@/features/defense-play/model/homeRunPlayback'
 import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
@@ -51,7 +51,7 @@ import {
 } from '@/entities/pitching/model/pitcherChange'
 import type { MoundPitcherCounters } from '@/entities/pitching/model/pitcherChange'
 import { runnerCountOf } from '@/entities/game/model/baseState'
-import { PITCHERS_PER_TEAM } from '@/entities/team/model/teamRoster'
+import { PITCHERS_PER_TEAM, teamBatters } from '@/entities/team/model/teamRoster'
 import {
   buildHumanPitch,
   drainStamina,
@@ -65,6 +65,7 @@ import type { FieldingAssignment, SeasonTeamCondition } from '@/features/play-te
 import { FULL_PLAY_SETTINGS, isHumanControlled } from '@/features/play-team-game/model/matchSettings'
 import type { MatchProgressSettings } from '@/features/play-team-game/model/matchSettings'
 import {
+  batterGameAbilities,
   quickBatterFor,
   quickPitcherFor,
   pitcherGameAbilities,
@@ -373,6 +374,31 @@ export function ourPitcherStats(progress: TeamGameProgress): PitcherStats {
   return { control: ability[0], velocity: ability[1], breaking: ability[2], stamina: ability[3] }
 }
 
+/**
+ * 한 팀의 수비 아홉 칸 능력치 — 타순에 선 선수의 **경기용** 수비(질병·보직·사기·팀 능력치·코치까지
+ * 먹인 값, J-4)를 로스터의 수비 자리 코드로 칸에 꽂는다.
+ * 칸 0(투수)은 지금 마운드에 선 투수의 능력치 칸 2 다 (⚠️ 원본 그대로 — `defenseAbilitiesOf` 주석).
+ */
+function defenseAbilitiesFor(
+  progress: TeamGameProgress,
+  teamId: number,
+  pitcherIndex: number,
+): readonly number[] {
+  const context = abilityContextOf(progress.options)
+  return defenseAbilitiesOf(
+    teamBatters(teamId).map((player, slot) => ({
+      position: player.position,
+      defense: batterGameAbilities(context, teamId, slot)[2],
+    })),
+    pitcherGameAbilities(context, teamId, pitcherIndex)[2],
+  )
+}
+
+/** 타순 한 칸의 경기용 주루 능력치 (칸 3) — 진행기의 주자 속도가 된다 */
+function runAbilityFor(progress: TeamGameProgress, teamId: number, battingOrderIndex: number): number {
+  return batterGameAbilities(abilityContextOf(progress.options), teamId, battingOrderIndex)[3]
+}
+
 /** 고를 수 있는 구질 칸 여섯 (0xb6d2c) */
 export function pitchSlotsFor(progress: TeamGameProgress): readonly PitchSlot[] {
   const repertoire = rosterRepertoireOf(progress.options.ourTeamId, progress.ourPitcherIndex)
@@ -421,6 +447,14 @@ export function applyBatterOutcome(
         trajectory: battedBallTrajectory(options.pattern ?? representativePatternOf(outcome)),
         bases: before.bases,
         outs: before.outs,
+        // 우리 공격이니 수비는 상대 팀이다
+        defenseAbilities: defenseAbilitiesFor(progress, progress.options.opponentTeamId, progress.opponentPitcherIndex),
+        runAbility: runAbilityFor(progress, progress.options.ourTeamId, before.battingOrderIndex),
+        // 난수를 넘겨야 펌블·악송구·필살수비·레이저 굴림이 돈다
+        random,
+        gameMode: progress.options.mode,
+        // 상대 수비는 CPU 다 → 협살(AI 상태 8)이 돈다
+        defenseIsCpu: true,
         // 필살타법이 성공한 타구면 야수가 쥐지 않는다 (0x51800)
         isUncatchable: options.isUncatchable,
       })
@@ -577,7 +611,7 @@ export function throwPitch(
 
   const outcome = afterPitch.atBat.outcome
   if (outcome === null) return afterPitch
-  return advance(applyDefensiveAtBat(afterPitch, outcome, true), random)
+  return advance(applyDefensiveAtBat(afterPitch, outcome, true, random), random)
 }
 
 /**
@@ -588,6 +622,7 @@ function applyDefensiveAtBat(
   progress: TeamGameProgress,
   outcome: AtBatOutcome,
   mine: boolean,
+  random: RandomPort,
 ): TeamGameProgress {
   const before = progress.game
   const defensePlay =
@@ -597,6 +632,13 @@ function applyDefensiveAtBat(
           trajectory: battedBallTrajectory(representativePatternOf(outcome)),
           bases: before.bases,
           outs: before.outs,
+          // 우리가 수비 중이다 — 아홉 칸은 우리 팀, 주자는 상대 타자
+          defenseAbilities: defenseAbilitiesFor(progress, progress.options.ourTeamId, progress.ourPitcherIndex),
+          runAbility: runAbilityFor(progress, progress.options.opponentTeamId, progress.opponentOrderIndex),
+          random,
+          gameMode: progress.options.mode,
+          // 이 타석의 수비는 **사람**이다 → 협살은 원본에서도 안 일어난다 (S8 1-4)
+          defenseIsCpu: false,
         })
       : null
   // 내가 던진 타석이면 홈런도 날아가는 그림을 보여 준다 (자동으로 넘긴 타석은 재생 자체가 없다)
@@ -1186,6 +1228,7 @@ function playAutoDefenseAtBat(progress: TeamGameProgress, random: RandomPort): T
     },
     play.outcome,
     false,
+    random,
   )
 }
 

@@ -14,7 +14,7 @@ import {
 import type { GameState, PlayerSide } from '@/entities/game/model/gameState'
 import { simulateQuickAtBat } from '@/entities/game/model/quickAtBat'
 import { simulateHalfInning } from '@/entities/game/model/simulateHalfInning'
-import { batterAt, startingPitcherOf } from '@/entities/team/model/teamRoster'
+import { batterAt, startingPitcherOf, teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
 import { opponentOf } from '@/entities/league/model/league'
 import type { GameSummary } from '@/entities/game/model/gameSummary'
@@ -33,7 +33,7 @@ import type { LeaguePlateAppearance } from '@/entities/league/model/leaguePlayer
 import type { AcePlayer } from '@/shared/config/original/acePlayers'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
-import { isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
+import { defenseAbilitiesOf, isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { homeRunPlaybackOf } from '@/features/defense-play/model/homeRunPlayback'
 import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
@@ -212,6 +212,15 @@ export function applyPlayerOutcome(
         trajectory: battedBallTrajectory(options.pattern ?? representativePatternOf(outcome)),
         bases: progress.game.bases,
         outs: progress.game.outs,
+        // 수비는 상대 팀이다 — 로스터의 수비 자리 코드로 아홉 칸을 채운다
+        defenseAbilities: opponentDefenseAbilitiesOf(progress),
+        runAbility: runnerRunAbilityOf(progress),
+        // 난수를 넘겨야 펌블(0xb41d0)·악송구(0xa1828)·필살수비(0x66b30/0x66be4) 굴림이 돈다
+        random,
+        // 나만의리그 타자편 = 전역 모드 4 (0x1552d10) — 필살수비 기준이 절반이다
+        gameMode: MY_LEAGUE_BATTER_MODE,
+        // 내 타석이므로 수비는 언제나 CPU 다 → 협살(AI 상태 8)이 돈다
+        defenseIsCpu: true,
         // 필살타법이 성공한 타구면 야수가 쥐지 않는다 (0x51800) — 타석 쪽이 확률 굴림을 하면 넘겨 준다
         isUncatchable: options.isUncatchable,
       })
@@ -298,6 +307,35 @@ export function applyPlayerOutcome(
   )
 
   return advanceUntilPlayerTurn(afterMyAtBat, random)
+}
+
+/**
+ * 수비 아홉 칸의 능력치 — **상대 팀** 로스터에서 만든다.
+ *
+ * 나만의리그 타자편은 전역 모드 4 라 팀 능력치 보정(비트마스크 0x306 = 모드 1·2·8·9)이
+ * 붙지 않는다 → 로스터에 적힌 밑값을 그대로 쓴다.
+ * 칸 0(투수)은 오늘 상대 선발의 능력치 칸 2 다 (`defenseAbilitiesOf` 주석 — ⚠️ 원본 그대로).
+ */
+function opponentDefenseAbilitiesOf(progress: GameProgress): readonly number[] {
+  const pitcher = teamPitchers(progress.opponentTeamId)[progress.opponentStartingPitcherIndex]
+  return defenseAbilitiesOf(
+    teamBatters(progress.opponentTeamId).map((player) => ({
+      position: player.position,
+      defense: player.ability[2],
+    })),
+    pitcher?.ability[2],
+  )
+}
+
+/**
+ * 주자들의 주루 능력치.
+ *
+ * ⚠️ **근사**: 원본은 주자마다 제 레코드로 `0xb570c(팀, 3, 선수, 90)` 을 불러 속도를 따로 잡지만
+ * (I-controls 3a), 이 진행기는 주자 전원에 한 값만 받는다. 지금 타석에 선 칸의 주루를 넘긴다 —
+ * 누상 주자가 누구인지 `GameState` 가 들고 있지 않은 것도 `stealBase` 와 같은 한계다.
+ */
+function runnerRunAbilityOf(progress: GameProgress): number {
+  return batterAt(progress.ourTeamId, progress.game.battingOrderIndex).run
 }
 
 /**

@@ -7,6 +7,7 @@ import type { AdvanceResult, BaseState } from '@/entities/game/model/baseState'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
+import type { RandomPort } from '@/shared/api/random/randomPort'
 
 /**
  * 미션 한 판의 진행 상태.
@@ -71,18 +72,36 @@ export function startMission(mission: OriginalMission): MissionRun {
  * ⚠️ 어느 원본 패턴이었는지는 미션 타석 쪽이 아직 안 넘겨 주므로 `representativePatternOf` 로
  * 같은 결과를 내는 원본 패턴 하나를 골라 궤적을 만든다 — **고르는 규칙은 근사다**
  * (타자편 `applyPlayerOutcome` 도 패턴을 못 받으면 같은 길을 쓴다).
- * 난수는 넘기지 않는다 — 펌블·악송구·필살수비 굴림을 돌리지 않아 결정론이고, 미션의
- * 기존 씨앗 순서도 건드리지 않는다.
+ *
+ * `random` 을 주면 원본 확률 굴림(펌블 0xb41d0 · 악송구 0xa1828 · 필살수비 0x66b30/0x66be4)이
+ * **돌고**, 안 주면 지금까지처럼 결정론이다. 미션 화면(`app/model/useMissionSession`)이 아직
+ * 난수를 넘겨 주지 않아 기본값은 "안 굴림" 이다.
+ *
+ * ⚠️ **수비 능력치·주루는 못 넘긴다**: 미션 레코드(`OriginalMission`)에는 팀도 타순도 없어
+ * 아홉 칸을 채울 근거가 없다. 그래서 진행기 기본값(등급 3 = 500)이 그대로 쓰인다 — **근사다**.
+ * 협살도 마찬가지로 수비가 CPU 인지 알 길이 없어(원본은 `state[0x31+수비측]`) 돌리지 않는다.
  */
-export function missionAdvance(bases: BaseState, outs: number, outcome: AtBatOutcome): AdvanceResult {
+export function missionAdvance(
+  bases: BaseState,
+  outs: number,
+  outcome: AtBatOutcome,
+  options: { readonly random?: RandomPort; readonly gameMode?: number } = {},
+): AdvanceResult {
   if (!isBattedBallInPlay(outcome)) return advanceRunners(bases, outcome, outs)
   return runDefensePlay({
     outcome,
     trajectory: battedBallTrajectory(representativePatternOf(outcome)),
     bases,
     outs,
+    random: options.random,
+    // 미션 타자편 = 전역 모드 5 · 투수편 = 6 (경기 중 메뉴 표 0xcfcfc 의 갈래).
+    // 둘 다 필살수비 기준을 손대지 않는 모드라 값만 흘려 보낸다.
+    gameMode: options.gameMode ?? MISSION_BATTER_MODE,
   }).advance
 }
+
+/** 미션 타자편 = 원본 전역 모드 5 (투수편은 6) */
+export const MISSION_BATTER_MODE = 5
 
 /**
  * 공격 결과로 주자·아웃을 옮긴다. 3아웃이 되면 미션 시작 상황으로 되돌린다 —
@@ -91,8 +110,9 @@ export function missionAdvance(bases: BaseState, outs: number, outcome: AtBatOut
 export function advanceSituation(
   run: Pick<MissionRun, 'mission' | 'bases' | 'outs'>,
   outcome: AtBatOutcome,
+  random?: RandomPort,
 ): { bases: BaseState; outs: number; runsScored: number } {
-  const advance = missionAdvance(run.bases, run.outs, outcome)
+  const advance = missionAdvance(run.bases, run.outs, outcome, { random })
   const outs = run.outs + advance.outsAdded
   if (outs >= OUTS_PER_INNING) {
     return { bases: run.mission.start.runners, outs: run.mission.start.outs, runsScored: 0 }
@@ -112,11 +132,20 @@ export function checkSwingsExhausted<T extends MissionRun>(run: T): T {
   return run.remainingSwings <= 0 ? { ...run, status: '실패' } : run
 }
 
-/** 타석 하나가 끝났을 때. 목표를 채우면 즉시 성공, 제한을 넘기면 실패다. */
-export function applyOutcome(run: MissionRun, outcome: AtBatOutcome, isBunt = false): MissionRun {
+/**
+ * 타석 하나가 끝났을 때. 목표를 채우면 즉시 성공, 제한을 넘기면 실패다.
+ *
+ * `random` 을 주면 수비 진행기의 원본 확률 굴림이 돈다 — 안 주면 지금까지와 같은 결정론이다.
+ */
+export function applyOutcome(
+  run: MissionRun,
+  outcome: AtBatOutcome,
+  isBunt = false,
+  random?: RandomPort,
+): MissionRun {
   if (run.status !== '진행중') return run
 
-  const situation = advanceSituation(run, outcome)
+  const situation = advanceSituation(run, outcome, random)
   const progress = recordOutcome(
     run.progress,
     outcome,
