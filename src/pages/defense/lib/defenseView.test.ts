@@ -12,7 +12,6 @@ import {
   type DefenseFielder,
   type DefenseViewState,
   ballFrameOf,
-  ballShadowFrameOf,
   cameraTargetOf,
   fielderActionFrameOf,
   fielderFrameOf,
@@ -188,6 +187,8 @@ describe('공 그림', () => {
     expect(ballFrameOf(0)).toBe(0)
     expect(ballFrameOf(1200)).toBe(2)
     expect(ballFrameOf(99999)).toBe(10)
-    expect(ballShadowFrameOf(1200)).toBe(25)
+    // 11칸을 넘지 않는다 — 011~022 는 불꽃 공, 023~033 은 날개 공(둘 다 마구 그림)이라
+    // 보통 공에 섞여 나오면 안 된다
+    expect(ballFrameOf(99999)).toBeLessThan(11)
   })
 })

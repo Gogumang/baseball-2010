@@ -11,6 +11,7 @@ import {
   FIELDER_ACTION,
   RUNNER_ACTION,
   type DefenseFielder,
+  type DefenseFlash,
   type DefenseRunner,
   type DefenseViewState,
 } from '@/pages/defense/lib/defenseView'
@@ -47,6 +48,25 @@ export interface ViewStateInput {
   /** 송구가 가고 있는 루. 없으면 −1 */
   readonly throwBase: number
   readonly previousActions: ActionMemory
+
+  // ── 아래 넷은 **아직 부르는 쪽이 안 넘긴다**. 안 주면 지금까지와 똑같이 논다. ──
+
+  /**
+   * 경기+0x19ad — 레이저 송구 반짝임이 켜져 있는가 (진행기 `laserShining`).
+   * 켜져 있는 동안 공 자리에 번쩍임 B(0x441c4, 공 +0x1f7)를 그린다.
+   */
+  readonly laserShining?: boolean
+  /**
+   * 필살수비 창 — 0x66b30(점프) / 0x66be4(슬라이딩). 열린 창으로 실제 필살 포구가 나가는
+   * 틱에 번쩍임 C(0x44398, 공 +0x1f8)를 그린다.
+   */
+  readonly specialDefense?: { readonly jumpUnlocked: boolean; readonly slideUnlocked: boolean } | null
+  /** 수비 칸별 마선수 번호 0~4 (없으면 null·undefined). 이름 표 0xd3f10, 20바이트 간격 — C-16 */
+  readonly aceIndexes?: readonly (number | null | undefined)[]
+  /** 수비 팀 번호 0~14 — 야수 그림 팔레트 (C-1) */
+  readonly defenseTeamIndex?: number | null
+  /** 공격 팀 번호 0~14 — 주자 그림 팔레트 */
+  readonly offenseTeamIndex?: number | null
 }
 
 export function viewStateOf(input: ViewStateInput): DefensePlayView {
@@ -58,6 +78,8 @@ export function viewStateOf(input: ViewStateInput): DefensePlayView {
       z: fielder.position.z,
       action,
       actionTick: tickSince(input.previousActions, `f${fielder.slot}`, action, input.tick),
+      aceIndex: aceIndexOf(input.aceIndexes, fielder.slot),
+      teamIndex: input.defenseTeamIndex ?? null,
     }
   })
 
@@ -73,6 +95,7 @@ export function viewStateOf(input: ViewStateInput): DefensePlayView {
       isAdvancing: runner.targetBase > runner.startBase,
       // 아웃된 주자도 걸어 나가는 동안은 그린다 (R3 3-4)
       isVisible: true,
+      teamIndex: input.offenseTeamIndex ?? null,
     }
   })
 
@@ -81,9 +104,72 @@ export function viewStateOf(input: ViewStateInput): DefensePlayView {
     ball: { x: input.ball.x, z: input.ball.z, height: input.ball.y, isFlying: input.ballIsFlying },
     fielders,
     runners,
-    flash: null,
+    flash: flashOf(input, fielders),
     cameraTarget: null,
   }
+}
+
+/** 수비 칸 → 마선수 번호. 표에 없거나 0~4 밖이면 보통 수비수 그림이다 */
+function aceIndexOf(
+  aces: readonly (number | null | undefined)[] | undefined,
+  slot: number,
+): number | null {
+  const ace = aces?.[slot]
+  if (ace == null || !Number.isInteger(ace) || ace < 0 || ace > 4) return null
+  return ace
+}
+
+/** 번쩍임 켜짐 칸 세 가지를 기억에 적는 번호 — 0 은 "꺼짐" 이다 */
+const FLASH_NONE = 0
+const FLASH_LASER = 1
+const FLASH_SPECIAL = 2
+
+/**
+ * 공 자리 번쩍임 (`deadly_effect`, R2 2절).
+ *
+ * 원본은 켜짐 칸이 **공 +0x1f7(B) · +0x1f8(C)** 인데 그 둘을 세우는 곳은 공 처리 코드
+ * (0xb3b38·0xb401c) 안이라 읽지 않았다(R2 2절 "미해결"). 그래서 진행기가 이미 들고 있는
+ * 두 상태로 **근사다**:
+ *   B(`kind 'b'`, 공 위 −50) ← 레이저 반짝임 경기+0x19ad 가 켜져 있는 틱
+ *   C(`kind 'c'`, 방향별 ±10) ← 열린 필살수비 창으로 실제 점프·슬라이딩 포구가 나가는 틱
+ * C 의 방향 값(공 +0xa8 = 0xf 아래 · 0x10 위 · 0x11 왼 · 0x12 오른)이 슬라이딩 캐치 동작
+ * 번호 0xf~0x12 와 **그대로 맞아떨어지는 것**이 이 짝짓기의 근거다.
+ *
+ * 원본대로 B 가 먼저다 — C 는 공 +0x1f7 == 0 일 때만 돈다(0x525c8).
+ * 칸(`step`)은 deadly_effect 애니 0 [0,1,2,3] 지연 0 을 틱마다 한 칸씩 넘기고 마지막에서 멈춘다.
+ */
+function flashOf(input: ViewStateInput, fielders: readonly DefenseFielder[]): DefenseFlash | null {
+  const chaser = fielders.find((fielder) => fielder.slot === input.chaserSlot)
+  const kind = input.laserShining === true ? FLASH_LASER : specialFlashOf(input, chaser)
+  // 꺼져 있어도 기억은 갱신해 둬야 다음 번쩍임이 0 칸부터 다시 돈다
+  const since = tickSince(input.previousActions, 'flash', kind, input.tick)
+  if (kind === FLASH_NONE) return null
+
+  const step = Math.min(since, DEADLY_EFFECT_STEPS - 1)
+  if (kind === FLASH_LASER) return { kind: 'b', step }
+  const action = chaser?.action ?? 0
+  const hasDirection =
+    action >= FIELDER_ACTION.slideCatchDown && action <= FIELDER_ACTION.slideCatchRight
+  // 점프 캐치(0xe)는 방향 칸이 없다 — 공 자리 그대로 그린다
+  return hasDirection ? { kind: 'c', step, direction: action } : { kind: 'c', step }
+}
+
+/** deadly_effect 애니 0 의 칸 수 — 프레임 [0,1,2,3] (R2 2절) */
+const DEADLY_EFFECT_STEPS = 4
+
+/** 열린 필살수비 창으로 실제 필살 포구가 나가고 있으면 C, 아니면 꺼짐 */
+function specialFlashOf(input: ViewStateInput, chaser: DefenseFielder | undefined): number {
+  const window = input.specialDefense
+  if (window == null || chaser === undefined) return FLASH_NONE
+  if (window.jumpUnlocked && chaser.action === FIELDER_ACTION.jumpCatch) return FLASH_SPECIAL
+  if (
+    window.slideUnlocked &&
+    chaser.action >= FIELDER_ACTION.slideCatchDown &&
+    chaser.action <= FIELDER_ACTION.slideCatchRight
+  ) {
+    return FLASH_SPECIAL
+  }
+  return FLASH_NONE
 }
 
 /** 야수 동작 — 포구 > 송구 > 달리기 > 제자리 */

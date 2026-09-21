@@ -22,6 +22,16 @@ export const background = style({
 
 export const backgroundMirrored = style([background, { transform: 'scaleX(-1)' }])
 
+/**
+ * 팀 팔레트로 다시 칠한 그림 한 장 — `FrameSprite` 와 같은 모양이지만 주소(src)를
+ * 교체 엔진에서 받아 오므로 여기서 따로 낸다 (`shared/ui/FrameSprite` 는 읽기 전용).
+ */
+export const paintedSprite = style({
+  position: 'absolute',
+  imageRendering: 'pixelated',
+  pointerEvents: 'none',
+})
+
 /** 야수·주자·공 한 칸 — 크기 0 인 기준점이고 그림은 원점만큼 비껴 놓인다 */
 export const actor = style({
   position: 'absolute',

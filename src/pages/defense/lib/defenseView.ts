@@ -6,6 +6,7 @@
  */
 
 import type { WorldPoint } from '@/pages/defense/lib/defenseCamera'
+import { TEAM_COUNT } from '@/shared/lib/sprite/paletteSwap'
 
 /** 수비 배경 stadium/defense.pzx — 310×500 한 장 (FOR-IMPLEMENTER B-1) */
 export const DEFENSE_BACKGROUND_URL = './sprites/defense/000.png'
@@ -235,6 +236,8 @@ export interface DefenseFielder {
    */
   /** 마선수 번호 0~4, 마선수가 아니면 null (R3 7-1) */
   readonly aceIndex?: number | null
+  /** 수비 팀 번호 0~14 — 그림 색을 갈아 끼우는 데 쓴다. 안 주면 구운 색 그대로다 (C-1) */
+  readonly teamIndex?: number | null
 }
 
 /** 주자 한 명 */
@@ -252,6 +255,20 @@ export interface DefenseRunner {
   readonly isAdvancing: boolean
   /** 아웃돼 퇴장 중이어도 걸어 나가는 동안은 그린다(R3 3-4). 아예 안 그릴 때만 false */
   readonly isVisible?: boolean
+  /** 공격 팀 번호 0~14 — 주자도 `defender.pzx` 를 쓰므로 같은 팔레트 표를 탄다. 안 주면 구운 색이다 */
+  readonly teamIndex?: number | null
+}
+
+/**
+ * 수비수 그림이 쓸 팔레트 번호 — `defender.mpl` 은 **피부가 없어 팀 번호가 곧 벌 번호**다
+ * (`palette.json` 의 `select: "팀"`, 15벌 · 적재 0x48658). 몸통처럼 `피부 × 15 + 팀` 을
+ * 쓰는 것은 batter/pitcher 뿐이라 여기서는 `outfitPaletteIndex` 를 쓰지 않는다.
+ * 팀 번호가 없거나 범위를 벗어나면 null — 구운 벌(2번)을 그대로 쓴다.
+ */
+export function defenderPaletteIndexOf(teamIndex: number | null | undefined): number | null {
+  if (teamIndex == null || !Number.isInteger(teamIndex)) return null
+  if (teamIndex < 0 || teamIndex >= TEAM_COUNT) return null
+  return teamIndex
 }
 
 /**
@@ -337,16 +354,20 @@ export function fielderSpriteOf(fielder: DefenseFielder): FielderSprite {
 
 /**
  * 공 그림 프레임.
- * ball.pzx 는 000~010 이 2~12px 짜리 동그라미(높이별 크기로 보인다),
- * 011~022 가 세로로 늘어난 것, 023~033 이 납작한 그림자다.
+ *
+ * ball.pzx 는 **공 종류 3 × 크기 11칸**이다 (`ballFrameOf(path, i, 종류)` = 크기 + 11×종류, 0x358fc):
+ *   - 000~010 보통 야구공 (2×2 → 12×12)
+ *   - 011~022 **불꽃 공** — 마구 1 "파이어 볼" 쪽 그림
+ *   - 023~033 **날개 달린 공** — 또 다른 마구 그림 (가로로 길다, 최대 33×11)
+ *
+ * ⚠️ 예전 주석은 011~022 를 "세로로 늘어난 것", 023~033 을 "납작한 그림자"라고 적어 뒀는데
+ *    **둘 다 틀렸다**. 그림을 직접 펼쳐 보면 불꽃과 날개다. 그 오해 때문에 수비 화면이
+ *    날개 공을 공 그림자로 깔아, 공 양옆에 검은 날개가 붙어 보였다.
+ *
  * 고르는 식은 공 궤적 코드(0xb3b38·0xb401c) 안이라 읽지 않았다 —
  * 여기서는 500 월드 단위마다 한 칸 굵어지는 것으로 근사한다.
  */
 export const BALL_HEIGHT_PER_FRAME = 500
 export function ballFrameOf(height: number): number {
   return Math.max(0, Math.min(10, Math.trunc(height / BALL_HEIGHT_PER_FRAME)))
-}
-/** 그림자 프레임 — 동그라미와 같은 칸의 납작한 그림 (023~033) */
-export function ballShadowFrameOf(height: number): number {
-  return 23 + ballFrameOf(height)
 }

@@ -8,9 +8,13 @@ import {
 import { createFielders, createRunner, NONE } from '@/entities/fielding/model/fieldingState'
 import { viewStateOf, type ActionMemory } from '@/features/defense-play/model/defensePlayView'
 import {
+  ACE_PITCHER_DEFENDER_FRAMES,
   cameraTargetOf,
+  DEFENDER_FRAMES,
   fielderFrameOf,
+  fielderSpriteOf,
   FIELDER_ACTION,
+  flashOffsetOf,
   RUNNER_ACTION,
 } from '@/pages/defense/lib/defenseView'
 
@@ -112,5 +116,125 @@ describe('화면 스냅샷 만들기', () => {
     const view = viewStateOf(기본())
 
     expect(cameraTargetOf(view)).toEqual({ x: 20_000, z: 30_000 - 1_000 })
+  })
+})
+
+describe('마선수 그림 (R3 7-1 · C-16)', () => {
+  it('마선수 번호를 주면 야수 칸마다 실어 준다', () => {
+    const view = viewStateOf({ ...기본(), aceIndexes: [3, null, undefined, 0] })
+
+    expect(view.fielders[0].aceIndex).toBe(3)
+    expect(view.fielders[3].aceIndex).toBe(0)
+    expect(view.fielders[1].aceIndex).toBeNull()
+    expect(view.fielders[2].aceIndex).toBeNull()
+    // 표에 아예 없는 칸도 보통 수비수다
+    expect(view.fielders[8].aceIndex).toBeNull()
+  })
+
+  it('마선수는 제 그림판을 쓰고, 안 주면 보통 defender 다', () => {
+    const 마선수 = viewStateOf({ ...기본(), aceIndexes: [1] })
+    const 보통 = viewStateOf(기본())
+
+    // 투수 칸(0) 마선수는 투수 그림판 · 날값 그대로, 보통 수비수는 defender · 날값 +17 (S12 8-2)
+    expect(fielderSpriteOf(마선수.fielders[0])).toEqual({
+      folder: ACE_PITCHER_DEFENDER_FRAMES[1],
+      frame: 0,
+    })
+    expect(fielderSpriteOf(보통.fielders[0]).folder).toBe(DEFENDER_FRAMES)
+  })
+
+  it('0~4 를 벗어난 번호는 무시한다', () => {
+    const view = viewStateOf({ ...기본(), aceIndexes: [-1, 5, 1.5] })
+
+    expect(view.fielders.slice(0, 3).map((fielder) => fielder.aceIndex)).toEqual([null, null, null])
+  })
+})
+
+describe('팀 번호 (C-1 — 그림 색 갈아 끼우기)', () => {
+  it('수비·공격 팀 번호를 야수와 주자에 따로 실어 준다', () => {
+    const view = viewStateOf({ ...기본(), defenseTeamIndex: 4, offenseTeamIndex: 11 })
+
+    expect(view.fielders[0].teamIndex).toBe(4)
+    expect(view.runners[0].teamIndex).toBe(11)
+  })
+
+  it('안 주면 null 이라 구운 색 그대로다', () => {
+    const view = viewStateOf(기본())
+
+    expect(view.fielders[0].teamIndex).toBeNull()
+    expect(view.runners[0].teamIndex).toBeNull()
+  })
+})
+
+describe('공 자리 번쩍임 (R2 2절 — deadly_effect)', () => {
+  /** 추적 야수(칸 0)가 아래쪽으로 슬라이딩 캐치를 하는 틱 */
+  const 슬라이딩_포구 = (memory: ActionMemory) => ({
+    ...기본(memory),
+    chaserSlot: 0,
+    catchKind: CATCH_KIND.SLIDE,
+  })
+
+  it('아무것도 안 켜져 있으면 번쩍임이 없다 (지금까지와 같다)', () => {
+    expect(viewStateOf(기본()).flash).toBeNull()
+  })
+
+  it('레이저 반짝임이 켜지면 번쩍임 B 다 (공 위 −50)', () => {
+    const view = viewStateOf({ ...기본(), laserShining: true })
+
+    expect(view.flash).toEqual({ kind: 'b', step: 0 })
+    expect(flashOffsetOf(view.flash!)).toEqual({ x: 0, y: -50 })
+  })
+
+  it('번쩍임 칸은 틱마다 한 칸씩 넘어가고 마지막(3)에서 멈춘다', () => {
+    const memory: ActionMemory = new Map()
+    const 칸들 = [0, 1, 2, 3, 4, 5].map(
+      (tick) => viewStateOf({ ...기본(memory), tick, laserShining: true }).flash?.step,
+    )
+
+    expect(칸들).toEqual([0, 1, 2, 3, 3, 3])
+  })
+
+  it('열린 필살수비 창으로 슬라이딩 포구가 나가면 번쩍임 C 다 — 방향은 포구 동작 번호다', () => {
+    const memory: ActionMemory = new Map()
+    const view = viewStateOf({
+      ...슬라이딩_포구(memory),
+      specialDefense: { jumpUnlocked: false, slideUnlocked: true },
+    })
+
+    // 공이 홈 쪽(z 큰 쪽)에 있으니 아래 방향 슬라이딩 캐치 0xf — 공 +0xa8 의 0xf 와 같은 값이다
+    expect(view.fielders[0].action).toBe(FIELDER_ACTION.slideCatchDown)
+    expect(view.flash).toEqual({ kind: 'c', step: 0, direction: 0xf })
+    expect(flashOffsetOf(view.flash!)).toEqual({ x: 0, y: 10 })
+  })
+
+  it('창이 안 열렸으면 같은 포구라도 번쩍이지 않는다', () => {
+    const memory: ActionMemory = new Map()
+    const view = viewStateOf({
+      ...슬라이딩_포구(memory),
+      specialDefense: { jumpUnlocked: true, slideUnlocked: false },
+    })
+
+    expect(view.flash).toBeNull()
+  })
+
+  it('원본대로 B 가 C 보다 먼저다 (0x525c8 은 공 +0x1f7 이 0 일 때만 돈다)', () => {
+    const memory: ActionMemory = new Map()
+    const view = viewStateOf({
+      ...슬라이딩_포구(memory),
+      specialDefense: { jumpUnlocked: false, slideUnlocked: true },
+      laserShining: true,
+    })
+
+    expect(view.flash?.kind).toBe('b')
+  })
+
+  it('번쩍임이 꺼졌다 다시 켜지면 칸이 0 부터 다시 돈다', () => {
+    const memory: ActionMemory = new Map()
+    viewStateOf({ ...기본(memory), tick: 0, laserShining: true })
+    viewStateOf({ ...기본(memory), tick: 1, laserShining: true })
+    viewStateOf({ ...기본(memory), tick: 2, laserShining: false })
+    const 다시 = viewStateOf({ ...기본(memory), tick: 3, laserShining: true })
+
+    expect(다시.flash).toEqual({ kind: 'b', step: 0 })
   })
 })

@@ -1,6 +1,7 @@
 import { useRef, type ReactNode } from 'react'
 import { FrameSprite, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
+import { useRecoloredSprite } from '@/shared/lib/sprite/paletteSwap'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import {
   CAMERA_FOLLOW_PERCENT,
@@ -23,8 +24,8 @@ import {
   type DefenseRunner,
   type DefenseViewState,
   ballFrameOf,
-  ballShadowFrameOf,
   cameraTargetOf,
+  defenderPaletteIndexOf,
   fielderSpriteOf,
   flashOffsetOf,
   runnerFrameOf,
@@ -48,10 +49,64 @@ interface DefenseScreenProps {
   readonly children?: ReactNode
 }
 
-/** 그림 한 장 — 폴더마다 원점을 따로 읽는다(폴더가 칸마다 다르므로 컴포넌트로 뺀다) */
-function ActorSprite({ folder, frame }: { readonly folder: string; readonly frame: number }) {
+/**
+ * 그림 한 장 — 폴더마다 원점을 따로 읽는다(폴더가 칸마다 다르므로 컴포넌트로 뺀다).
+ *
+ * 팀 팔레트 번호를 주면 `defender.mpl` 벌로 다시 칠하고(C-1), 안 주면 구운 그림 그대로다.
+ * 원점 읽기(`useFrameOrigins`)는 **여기에 남겨 둔다** — 칠하는 쪽만 프레임마다 새로 마운트해야
+ * 하는데(아래 `PaintedSprite` 주석), 원점까지 같이 새로 마운트하면 틱마다 그림이 한 번씩 사라진다.
+ */
+function ActorSprite({
+  folder,
+  frame,
+  paletteIndex = null,
+}: {
+  readonly folder: string
+  readonly frame: number
+  readonly paletteIndex?: number | null
+}) {
   const origins = useFrameOrigins(folder)
-  return <FrameSprite folder={folder} frame={frame} origins={origins} x={0} y={0} />
+  if (paletteIndex === null) {
+    return <FrameSprite folder={folder} frame={frame} origins={origins} x={0} y={0} />
+  }
+  const key = String(frame).padStart(3, '0')
+  const origin = origins?.[key]
+  if (origin === undefined) return null
+  return (
+    // ⚠️ `key` = 프레임 번호 — 아래 주석 참고. 수비 화면은 매 틱 동작이 바뀌어 반드시 걸린다.
+    <PaintedSprite
+      key={key}
+      url={`${folder}/${key}.png`}
+      paletteIndex={paletteIndex}
+      left={origin.x}
+      top={origin.y}
+    />
+  )
+}
+
+/**
+ * 팀 색으로 칠한 그림 한 장.
+ *
+ * 프레임마다 **따로 마운트**해야 한다(`key` = 프레임 번호): `useRecoloredSprite` 는 칠한 주소를
+ * 상태로 들고 있어서, 프레임이 바뀐 그 그리기 한 번은 **앞 프레임 주소**를 내보낸다
+ * (초상화 `EventPortraits.tsx` 의 `PaintedFrame` 에서 실제로 걸렸던 함정이다).
+ * 새로 마운트하면 처음 상태가 이번 프레임의 구운 주소라 엉뚱한 칸이 비칠 일이 없다.
+ * ⚠️ 캔버스가 없거나(테스트의 jsdom) 아직 다 안 칠했으면 구운 그림을 그대로 쓴다 — 색만 한 박자 늦는다.
+ */
+function PaintedSprite({
+  url,
+  paletteIndex,
+  left,
+  top,
+}: {
+  readonly url: string
+  readonly paletteIndex: number | null
+  readonly left: number
+  readonly top: number
+}) {
+  return (
+    <img className={styles.paintedSprite} style={{ left, top }} src={useRecoloredSprite(url, paletteIndex)} alt="" />
+  )
 }
 
 /**
@@ -136,11 +191,15 @@ export function DefenseScreen({
           data-testid="defense-background-right"
         />
 
-        {/* 공 그림자는 바닥(z)에, 공은 높이만큼 위에 (높이 단위도 월드 단위다 — R3 1-3) */}
-        <div className={styles.actor} style={{ left: ballGround.x, top: ballGround.y }} data-testid="defense-ball-shadow">
-          <ActorSprite folder={BALL_FRAMES} frame={ballShadowFrameOf(state.ball.height)} />
-        </div>
+        {/*
+          공은 바닥(z)에서 높이만큼 위에 그린다 (높이 단위도 월드 단위다 — R3 1-3).
 
+          ⚠️ **공 그림자는 그리지 않는다.** 예전에는 ball.pzx 023~033 을 "납작한 그림자"로 알고
+             바닥에 깔았는데, 그 칸들은 그림자가 아니라 **날개 달린 마구 공**이라 공 양옆에
+             검은 날개가 붙어 보였다. 원본이 공 그림자를 그린다는 근거는 문서 어디에도 없고
+             (R3 1-3 은 대상을 "공 (x, z−높이)" 하나로만 적는다), 고르는 식이 든 궤적 코드
+             0xb3b38·0xb401c 는 아직 안 읽었다. **모르는 것을 그리느니 안 그린다.**
+        */}
         {actors.map((actor) => actor.node)}
 
         <div className={styles.actor} style={{ left: ballPoint.x, top: ballPoint.y }} data-testid="defense-ball">
@@ -174,6 +233,8 @@ function Fielder({
 }) {
   // 그림판마다 프레임 기준이 다르다 — 보통·타자 마선수는 +17, 투수 마선수는 날값 (S12 8절)
   const { folder, frame } = fielderSpriteOf(fielder)
+  // 마선수 그림은 팀 색을 안 탄다 — 제 색을 가진 인물이고 `.mpl` 대체 팔레트도 굽지 않았다
+  const paletteIndex = fielder.aceIndex == null ? defenderPaletteIndexOf(fielder.teamIndex) : null
   return (
     <div
       className={styles.actor}
@@ -181,7 +242,7 @@ function Fielder({
       data-testid={`defense-fielder-${fielder.slot}`}
       data-frame={frame}
     >
-      <ActorSprite folder={folder} frame={frame} />
+      <ActorSprite folder={folder} frame={frame} paletteIndex={paletteIndex} />
     </div>
   )
 }
@@ -202,7 +263,11 @@ function Runner({
       data-frame={frame}
     >
       {/* 주자도 defender.pzx 를 쓴다 — 앞 17장(000~016)이 주자 칸이다 (S12 4-1 확정) */}
-      <ActorSprite folder={DEFENDER_FRAMES} frame={frame} />
+      <ActorSprite
+        folder={DEFENDER_FRAMES}
+        frame={frame}
+        paletteIndex={defenderPaletteIndexOf(runner.teamIndex)}
+      />
     </div>
   )
 }
