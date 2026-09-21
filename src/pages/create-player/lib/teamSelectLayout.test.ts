@@ -38,15 +38,27 @@ describe('기준점', () => {
 describe('팀 격자', () => {
   it('15팀 · 5열 · 칸 40px · 중심 (120, 182) 다', () => {
     expect(TEAM_COUNT).toBe(15)
-    expect([GRID.columns, GRID.cell, GRID.centerX, GRID.centerY]).toEqual([5, 40, 120, 182])
+    expect([GRID.columns, GRID.cell, GRID.centerX, GRID.top]).toEqual([5, 40, 120, 182])
     expect(gridRowCountOf(TEAM_COUNT)).toBe(3)
   })
 
-  it('칸은 중심을 기준으로 펼쳐진다 — 첫 칸 (20, 122)', () => {
-    expect(cellPositionOf(0)).toEqual({ x: 20, y: 122 })
+  /**
+   * ⚠️ 예전에는 세로도 중심으로 읽어 첫 칸이 (20, 122) 였다 — 격자가 60px 올라가
+   * 팀 로고(72~148)와 이름 막대(150~165)를 덮고 있었다. 원본은 **cy 가 첫 줄 위쪽**이다
+   * (S9 10절 정정 1). 182 로 내려오면 이름 막대 아래끝 165 밑이라 겹치지 않는다.
+   */
+  it('가로만 가운데를 맞추고 **세로는 cy 를 그대로** 쓴다 — 첫 칸 (20, 179)', () => {
+    // 첫 열의 y 보정은 3 이라 182 − 3 = 179
+    expect(cellPositionOf(0)).toEqual({ x: 20, y: 179 })
     // 한 줄 아래 첫 칸은 40px 내려간다
-    expect(cellPositionOf(5)).toEqual({ x: 20, y: 162 })
+    expect(cellPositionOf(5)).toEqual({ x: 20, y: 219 })
     expect(cellPositionOf(4).x).toBe(20 + 40 * 4)
+  })
+
+  it('5열 화면의 **열별 y 보정** [3,3,3,13,13] 을 받는다 — 4·5열이 10px 더 올라간다 (S9 4-3)', () => {
+    expect(cellPositionOf(3).y).toBe(cellPositionOf(0).y - 10)
+    expect(cellPositionOf(4).y).toBe(cellPositionOf(0).y - 10)
+    expect(cellPositionOf(2).y).toBe(cellPositionOf(0).y)
   })
 })
 

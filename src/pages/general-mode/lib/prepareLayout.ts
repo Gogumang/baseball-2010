@@ -104,7 +104,11 @@ export const ACE_LAYOUT = {
   anchorA: { x: 58, y: 107 },
   anchorB: { x: 178, y: 96 },
   /** `0x79ed5(격자, 7, 120, H/2 + 30, 표, 40, 5열, 2행)` → 10칸 */
-  grid: { columns: 5, rows: 2, cell: 40, centerX: 120, centerY: 190 },
+  /**
+   * `0x79ed5(격자, k==2 ? 7 : 8, 120, H/2 + 30 = 190, 표, 40, 5열, 2행)`.
+   * ⚠️ 네 번째 인자는 **첫 줄 위쪽 y** 다 (중심 아님 — S9 10절 정정 1).
+   */
+  grid: { columns: 5, rows: 2, cell: 40, centerX: 120, top: 190 },
   /** 줄 딱지 — 둥근 판 #3045CD (17,175,51×10) + slt_frame 이미지 8 "PITCHER"(46×7) 을 (20,176) */
   rowTags: [
     { panel: { x: 17, y: 175, width: 51, height: 10 }, image: 8, imageAt: { x: 20, y: 176 }, label: 'PITCHER' },
@@ -120,16 +124,26 @@ export const ACE_LAYOUT = {
 } as const
 
 /**
- * 마선수 격자 칸 i 의 왼쪽 위.
- * ⚠️ 칸 그리기 내부 `0x7a571` 이 미해독이라 **칸 배치는 근사**다 — 칸 40px·5열·2행·중심만 확정이다.
+ * 마선수 격자 칸 i 의 왼쪽 위 (그리기 `0x7a571`, S9 3-2·4-3 확정).
+ *
+ * 가로만 가운데를 맞추고 **세로는 `top` 을 그대로** 쓴다. 5열 화면이라 열별 보정
+ * `0xd40b8 = [3,3,3,13,13]` 도 받는다 (종류 7·8 이 대상이다).
+ *
+ * ⚠️ 예전에는 세로도 중심으로 읽어 두 줄이 150·190 에 놓였다 — 줄 딱지 PITCHER(175)가
+ * 첫 줄 칸 한복판을 뚫고, BATTER(233)는 둘째 줄이 끝난 뒤 허공에 떴다.
+ * ⚠️ 칸 너비 배열과 가로·세로 틈은 문서에 값이 없어 40·0 으로 둔다 (**근사**).
  */
 export function aceCellPositionOf(index: number) {
-  const { columns, rows, cell, centerX, centerY } = ACE_LAYOUT.grid
+  const { columns, cell, centerX, top } = ACE_LAYOUT.grid
+  const column = index % columns
   return {
-    x: centerX - (columns * cell) / 2 + cell * (index % columns),
-    y: centerY - (rows * cell) / 2 + cell * Math.floor(index / columns),
+    x: centerX - (columns * cell) / 2 + cell * column,
+    y: top + cell * Math.floor(index / columns) - ACE_COLUMN_Y_OFFSETS[column],
   }
 }
+
+/** 5열 화면 전용 열별 y 보정 `0xd40b8` (S9 4-3 확정) */
+const ACE_COLUMN_Y_OFFSETS = [3, 3, 3, 13, 13] as const
 
 /* ── k = 4 경기정보 (0x64d30~0x65108) ────────────────────────────────────────── */
 

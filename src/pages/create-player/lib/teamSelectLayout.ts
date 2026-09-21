@@ -51,15 +51,27 @@ export const TAG = {
 } as const
 
 /**
- * 팀 격자 — `0x79ed5([skin+0xe0], 9, 120, H/2 + 22 = 182, 표, 칸 40, 5열, 행 = 개수/5)`.
- * **15팀 · 5열 · 칸 40px · 중심 (120, 182)** 다 (에디트 화면 k=9 만 10팀이다).
+ * 팀 격자 — `0x79ed5([skin+0xe0], **종류 9**, 120, H/2 + 22 = 182, 표, 칸 40, 5열, 행 = 개수/5)`.
+ * 15팀 · 5열 · 칸 40px (에디트 화면 k=9 만 10팀이다).
+ *
+ * ⚠️ **네 번째 인자는 중심이 아니라 "첫 줄 위쪽 y" 다** (S9 10절 정정 1 확정, 0x79f36·0x79f3c):
+ * `+0x10 = cx − 폭/2` 로 **가로만** 가운데를 맞추고 `+0x14 = cy` 는 그대로 쓴다.
+ * P6 의 "중심 (120,182)" 는 가로만 중심이라는 뜻이다.
+ * 예전에는 세로도 중심으로 읽어 격자가 60px 올라가 **로고·이름 막대를 덮고 있었다**.
  */
 export const GRID = {
   columns: 5,
   cell: 40,
   centerX: SCREEN_WIDTH / 2,
-  centerY: SCREEN_HEIGHT / 2 + 22,
+  /** 첫 줄 **위쪽** y (중심 아님) */
+  top: SCREEN_HEIGHT / 2 + 22,
 } as const
+
+/**
+ * 5열 화면 전용 **열별 y 보정** 표 `0xd40b8` = [3,3,3,13,13] (S9 4-3 확정).
+ * 종류 3·4·6·7·8·9 에 걸리므로 팀 격자(종류 9)도 받는다 — 4·5번째 열이 10px 더 올라간다.
+ */
+export const COLUMN_Y_OFFSETS = [3, 3, 3, 13, 13] as const
 
 export const TEAM_COUNT = 15
 /** 히든이 아닌 기본 팀 — 0~9 는 늘 열려 있다 (0x63e30: `idx ≤ 9` 또는 전역 기록 +0x70+idx ≠ 0) */
@@ -68,16 +80,21 @@ export const OPEN_TEAM_COUNT = 10
 export const gridRowCountOf = (count: number) => Math.ceil(count / GRID.columns)
 
 /**
- * 격자 칸 i 의 왼쪽 위. 격자는 중심 기준이라 전체 폭·높이의 반을 뺀다
- * (칸 그리기 내부 0x7a571 은 미해독이라 **칸 배치는 근사**다 — 칸 40px·5열·중심만 확정이다).
+ * 격자 칸 i 의 왼쪽 위 (그리기 `0x7a571`, S9 3-2·4-3 확정).
+ *
+ * ```
+ * 왼쪽 = cx − (칸너비 합 + (열−1)·가로틈) / 2      ; 가로만 가운데
+ * 위쪽 = cy                                        ; 그대로 쓴다
+ * y[i] -= 0xd40b8[i mod 열]                        ; 5열 화면의 열별 보정
+ * ```
+ * ⚠️ 칸 **너비 배열**과 가로·세로 틈은 문서에 값이 없어 40·0 으로 둔다 (**근사**).
  */
-export function cellPositionOf(index: number, count = TEAM_COUNT) {
-  const rows = gridRowCountOf(count)
+export function cellPositionOf(index: number, _count = TEAM_COUNT) {
   const left = GRID.centerX - (GRID.columns * GRID.cell) / 2
-  const top = GRID.centerY - (rows * GRID.cell) / 2
+  const column = index % GRID.columns
   return {
-    x: left + GRID.cell * (index % GRID.columns),
-    y: top + GRID.cell * Math.floor(index / GRID.columns),
+    x: left + GRID.cell * column,
+    y: GRID.top + GRID.cell * Math.floor(index / GRID.columns) - COLUMN_Y_OFFSETS[column],
   }
 }
 
