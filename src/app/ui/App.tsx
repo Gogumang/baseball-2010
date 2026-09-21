@@ -16,6 +16,8 @@ import { aceMatchMissionOf, matchResultEventOf } from '@/entities/story/model/ac
 import { effectiveAbilityOf } from '@/entities/career/model/condition'
 import type { AceMatchStarter } from '@/app/ui/CareerRoutes'
 import { useGameSettings } from '@/app/model/useGameSettings'
+import { useSceneBgm, useSound } from '@/app/model/useSound'
+import { screenBgmOf } from '@/app/model/screenBgm'
 import { useSeasonSession } from '@/app/model/useSeasonSession'
 import { SeasonRoute } from '@/app/ui/SeasonRoute'
 import { usePitcherLeagueSession } from '@/app/model/usePitcherLeagueSession'
@@ -49,8 +51,12 @@ export function App() {
   const seasonStore = useMemo(() => createLocalStorageJsonStore(SEASON_KEY), [])
   const pitcherStore = useMemo(() => createLocalStorageJsonStore(PITCHER_KEY), [])
   const gameSettings = useGameSettings(settingsStore)
+  // 소리 통로 하나 — 환경설정 칸(0~4) × 25 가 원본 소리 크기다 (옵션 +0x2e)
+  const sound = useSound(gameSettings.settings.soundLevel)
   const random = useMemo(() => createSeededRandom(Date.now() & 0x7fffffff), [])
   const [screen, setScreen] = useState<Screen>({ kind: '타이틀' })
+  // 화면이 바뀌면 그 화면의 배경음으로 갈아탄다 (`screenBgm.ts` 의 표)
+  useSceneBgm(sound, screenBgmOf(screen))
 
   const runner = useAtBatRunner()
   const seasonSession = useSeasonSession(seasonStore, random)
