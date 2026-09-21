@@ -11,6 +11,12 @@ import * as styles from '@/pages/create-player/ui/TeamSelectScreen.css'
 
 const SLT_FRAME = './sprites/slt_frame/frames'
 const IMG_TEXT = './sprites/img_text/frames'
+/** 격자 칸의 작은 로고 — 큰 team_logo(77×76)는 40px 칸을 넘친다. HUD 와 같은 ui/team_logo_ini(12×12) 를 쓴다 */
+const smallLogoUrlOf = (teamId: number) => `./sprites/team_logo_ini/${String(teamId).padStart(3, '0')}.png`
+/** 큰 로고는 A 자리에만 쓴다 (77×76 을 가운데 맞춤) */
+const BIG_LOGO_HALF = { width: 38, height: 38 } as const
+/** 작은 로고를 40px 칸 가운데에 놓는다 (12×12 → (40−12)/2 = 14) */
+const SMALL_LOGO_INSET = (GRID.cell - 12) / 2
 
 const frameSrc = (folder: string, frame: number) => `${folder}/${String(frame).padStart(3, '0')}.png`
 
@@ -84,7 +90,7 @@ export function TeamSelectScreen({ openedHiddenIds = [], onSelect, onCancel }: T
       {/* A — 열린 팀은 로고, 잠긴 히든 팀은 파란 원 두 개 */}
       {isOpen ? (
         <img className={styles.layer} alt={team.name} src={team.logoUrl}
-          style={{ left: ANCHOR_A.x - 20, top: ANCHOR_A.y - 20 }} />
+          style={{ left: ANCHOR_A.x - BIG_LOGO_HALF.width, top: ANCHOR_A.y - BIG_LOGO_HALF.height }} />
       ) : (
         LOCKED_CIRCLES.map((circle) => (
           <span key={circle.diameter} className={styles.lockedCircle}
@@ -125,7 +131,8 @@ export function TeamSelectScreen({ openedHiddenIds = [], onSelect, onCancel }: T
             onMouseEnter={() => setCursor(index)}
           >
             {open
-              ? <img className={styles.layer} alt="" src={entry.logoUrl} style={{ left: 4, top: 4 }} />
+              ? <img className={styles.layer} alt="" src={smallLogoUrlOf(entry.id)}
+                  style={{ left: SMALL_LOGO_INSET, top: SMALL_LOGO_INSET }} />
               : <span className={styles.centeredText} style={{ left: 0, top: 14, width: GRID.cell }}>?</span>}
           </button>
         )
