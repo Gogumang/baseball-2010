@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { RawScreen, WHITE_BAR_INK } from '@/shared/ui'
+import { RawScreen } from '@/shared/ui'
 import { TEAMS } from '@/shared/config/original/teams'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
@@ -99,17 +99,15 @@ export function TeamSelectScreen({
     <RawScreen>
       {/* A·B 딱지 — A 는 흰 막대(이미지 116), B 는 파란 막대(이미지 117)로 서로 다르다 */}
       {[
-        { anchor: ANCHOR_A, bar: TAG.aBarImage, barDy: TAG.aDy, textDy: TAG.aTextDy, frame: TAG.aTextFrame, onWhiteBar: true },
-        { anchor: ANCHOR_B, bar: TAG.bBarImage, barDy: TAG.bDy, textDy: TAG.bTextDy, frame: TAG.bTextFrame, onWhiteBar: false },
-      ].map(({ anchor, bar, barDy, textDy, frame, onWhiteBar }) => (
+        { anchor: ANCHOR_A, bar: TAG.aBarImage, barDy: TAG.aDy, textDy: TAG.aTextDy, frame: TAG.aTextFrame },
+        { anchor: ANCHOR_B, bar: TAG.bBarImage, barDy: TAG.bDy, textDy: TAG.bTextDy, frame: TAG.bTextFrame },
+      ].map(({ anchor, bar, barDy, textDy, frame }) => (
         <span key={frame}>
           <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, bar)}
             style={{ left: anchor.x + TAG.dx, top: anchor.y + barDy }} />
           <img className={styles.layer} alt="" src={frameSrc(IMG_TEXT, frame)}
             style={{
               left: anchor.x + TAG.dx, top: anchor.y + textDy, width: TAG.barWidth, objectFit: 'none',
-              // 흰 막대(116) 위 글자만 보정한다 — 파란 막대(117)의 B 딱지는 원본 그대로 흰 글씨다
-              ...(onWhiteBar ? WHITE_BAR_INK : {}),
             }} />
         </span>
       ))}

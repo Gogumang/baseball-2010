@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Button, FrameSprite, Hint, RawScreen, WHITE_BAR_INK } from '@/shared/ui'
+import { Button, FrameSprite, Hint, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { TEAMS } from '@/shared/config/original/teams'
@@ -127,7 +127,7 @@ export function FirstBatStadiumScreen({
           <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, TAG.whiteBar)}
             style={{ left: anchor.x + TAG.dx, top: anchor.y + dy }} />
           {/* 둘 다 흰 막대(116) 위 글자라 공용 보정을 쓴다 — 팔레트를 이식하면 이 style 을 뗀다 */}
-          <FrameSprite folder={IMG_TEXT_FRAME} frame={frame} origins={imgTextOrigins} style={WHITE_BAR_INK} centerX
+          <FrameSprite folder={IMG_TEXT_FRAME} frame={frame} origins={imgTextOrigins} centerX
             x={anchor.x} y={anchor.y + dy + TAG.textDdy} />
         </span>
       ))}

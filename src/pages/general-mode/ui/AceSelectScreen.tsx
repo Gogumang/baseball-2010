@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FrameSprite, Hint, RawScreen, WHITE_BAR_INK } from '@/shared/ui'
+import { FrameSprite, Hint, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { ACE_PLAYERS } from '@/shared/config/original/acePlayers'
@@ -115,7 +115,7 @@ export function AceSelectScreen({
       <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, TAG.whiteBar)}
         style={{ left: anchorA.x + TAG.dx, top: anchorA.y + TAG.aDy }} />
       {/* 흰 막대(116) 위 글자라 공용 보정을 쓴다 — 팔레트를 이식하면 이 style 을 뗀다 */}
-      <FrameSprite folder={IMG_TEXT_FRAME} origins={imgTextOrigins} style={WHITE_BAR_INK} centerX
+      <FrameSprite folder={IMG_TEXT_FRAME} origins={imgTextOrigins} centerX
         frame={phase === ACE_PHASE.마투수 ? ACE_LAYOUT.tagFrames.마투수 : ACE_LAYOUT.tagFrames.마타자}
         x={anchorA.x} y={anchorA.y + TAG.aDy + TAG.textDdy} />
 

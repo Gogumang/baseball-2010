@@ -9,7 +9,7 @@ interface FrameSpriteProps {
   /** 프레임 원점이 놓일 화면 좌표 */
   readonly x: number
   readonly y: number
-  /** 자리(left·top) 위에 덧바를 것 — 흰 막대 위 글자 보정(`WHITE_BAR_INK`) 같은 데 쓴다 */
+  /** 자리(left·top) 위에 덧바를 것 */
   readonly style?: CSSProperties
   /**
    * `x` 를 **가운데**로 삼는다 — 왼쪽 끝이 아니라 `x − 폭/2` 에 놓는다.

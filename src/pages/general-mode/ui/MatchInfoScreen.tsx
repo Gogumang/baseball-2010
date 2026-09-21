@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Button, FrameSprite, Hint, RawScreen, WHITE_BAR_INK } from '@/shared/ui'
+import { Button, FrameSprite, Hint, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { TEAMS } from '@/shared/config/original/teams'
@@ -92,7 +92,7 @@ export function MatchInfoScreen({
           <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, TAG.whiteBar)}
             style={{ left: anchor.x + TAG.dx, top: anchor.y + TAG.bDyMatchScreens }} />
           {/* 둘 다 흰 막대(116) 위 글자라 공용 보정을 쓴다 — 팔레트를 이식하면 이 style 을 뗀다 */}
-          <FrameSprite folder={IMG_TEXT_FRAME} frame={frame} origins={imgTextOrigins} style={WHITE_BAR_INK} centerX
+          <FrameSprite folder={IMG_TEXT_FRAME} frame={frame} origins={imgTextOrigins} centerX
             x={anchor.x} y={anchor.y + TAG.bDyMatchScreens + TAG.textDdy} />
         </span>
       ))}
@@ -128,9 +128,8 @@ export function MatchInfoScreen({
           <span key={line.label}>
             <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.labelBar.image)}
               style={{ left: MATCH_INFO_LAYOUT.labelBar.x, top: y }} />
-            {/* 가운데 딱지 막대(이미지 18)도 116 과 같은 흰 막대(231,227,231)라 같은 보정을 쓴다 */}
+            {/* 가운데 딱지 막대(이미지 18)도 116 과 같은 흰 막대다 — 글자는 팔레트 3(짙은 파랑)으로 구웠다 */}
             <FrameSprite folder={IMG_TEXT_FRAME} frame={line.labelFrame} origins={imgTextOrigins}
-              style={WHITE_BAR_INK}
               x={MATCH_INFO_LAYOUT.labelBar.x} y={y + MATCH_INFO_LAYOUT.labelBar.textDy} />
             <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.valueCell.image)}
               style={{ left: MATCH_INFO_LAYOUT.valueCell.userX, top: y }} />
