@@ -136,13 +136,13 @@ def generate_ace_players() -> None:
             hit, power, defense, run = abilities_of(row)
             identifier = sprite_ids[role][index]
             folder = ('batter_' if role == '타자' else 'pitcher_') + identifier
-            icon = f'/sprites/ace_icon/{icon_start[role] + index:03d}.png'
+            icon = f'./sprites/ace_icon/{icon_start[role] + index:03d}.png'
             burst = bursts[role][index] if index < len(bursts[role]) else ''
             lines.append(
                 f"  {{ id: {quote(identifier)}, name: {quote(name)}, "
                 f"role: '{role}', ability: {{ hit: {hit}, power: {power}, "
                 f"run: {run}, defense: {defense} }}, iconUrl: {quote(icon)}, "
-                f"framesUrl: {quote('/sprites/' + folder + '/frames')}, "
+                f"framesUrl: {quote('./sprites/' + folder + '/frames')}, "
                 f"frameCount: {frame_counts.get(folder, 0)}, "
                 f"stillUrl: {quote(largest_image(folder))}, burst: {quote(burst)} }},"
             )
@@ -159,7 +159,7 @@ def largest_image(folder: str) -> str:
     if not candidates:
         return ''
     biggest = max(candidates, key=lambda path: path.stat().st_size)
-    return f'/sprites/{folder}/{biggest.name}'
+    return f'./sprites/{folder}/{biggest.name}'
 
 
 def count_frames() -> dict:
@@ -222,7 +222,7 @@ def generate_teams() -> None:
         name = names[index] if index < len(names) else f'팀 {index}'
         lines.append(
             f"  {{ id: {index}, name: {quote(name)}, "
-            f"logoUrl: {quote(f'/sprites/team_logo/{index:03d}.png')}, "
+            f"logoUrl: {quote(f'./sprites/team_logo/{index:03d}.png')}, "
             f"values: [{', '.join(map(str, values))}] }},"
         )
     lines.append(']')
@@ -1105,6 +1105,7 @@ def main() -> None:
     generate_string_list('StrTIP', 'ORIGINAL_TIPS', 'tips.ts', '로딩 팁')
     generate_string_list('StrHOWTO', 'ORIGINAL_HOWTO', 'howto.ts', '게임 내 도움말')
     generate_string_list('StrUSER_EVT', 'ORIGINAL_USER_EVENTS', 'userEvents.ts', '경기 후 평가·목표·연속 기록 문구')
+    generate_string_list('StrMODE', 'ORIGINAL_MODE_TEXT', 'modeText.ts', '모드 화면 문구 (관리·상점·시즌·투수편 팝업)')
     generate_bursts()
     generate_burst_missions()
     generate_mode_menus()

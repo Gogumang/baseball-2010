@@ -6,6 +6,7 @@ import { BATTER_BURSTS, PITCHER_BURSTS } from '@/shared/config/original/bursts'
 import { ORIGINAL_TITLES } from '@/shared/config/original/titles'
 import { ORIGINAL_ITEMS } from '@/shared/config/original/items'
 import { ORIGINAL_EVENTS } from '@/shared/config/original/events'
+import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 
 describe('원본 팀 데이터', () => {
   it('팀이 15개다', () => {
@@ -103,5 +104,26 @@ describe('스킬 40종 — StrCOMMON[55~94] 이름 + StrSKILL 소개·효과', (
     expect(ORIGINAL_SKILLS.filter((skill) => skill.role === '타자')).toHaveLength(16)
     expect(ORIGINAL_SKILLS[11]).toMatchObject({ name: '번트왕', effect: '번트 성공 확률 +10%' })
     expect(ORIGINAL_SKILLS[39].name).toBe('혼신')
+  })
+})
+
+describe('StrMODE 문구표', () => {
+  it('모드 화면 문구 231개를 원본에서 그대로 읽는다', () => {
+    expect(ORIGINAL_MODE_TEXT).toHaveLength(231)
+  })
+
+  it('화면들이 코드에 옮겨 적던 문구가 여기 있다', () => {
+    // 투수편 팝업 0x78 · 휴식 거절 · 트레이닝 거절 · 지옥훈련 500G
+    expect(ORIGINAL_MODE_TEXT[59]).toContain('원하는 항목을 선택해주세요')
+    expect(ORIGINAL_MODE_TEXT[91]).toContain('사기 최고 상태입니다')
+    expect(ORIGINAL_MODE_TEXT[193]).toContain('훈련을 할 수 없습니다')
+    expect(ORIGINAL_MODE_TEXT[141]).toContain('500 G포인트')
+  })
+
+  it('한국시리즈·국가대항전 보상 문구는 금액이 %d 다 — 값은 코드가 넣는다', () => {
+    expect(ORIGINAL_MODE_TEXT[197]).toContain('한국시리즈 우승')
+    expect(ORIGINAL_MODE_TEXT[198]).toContain('한국시리즈 준우승')
+    expect(ORIGINAL_MODE_TEXT[200]).toContain('국가대항전 준우승')
+    expect(ORIGINAL_MODE_TEXT[200]).toContain('소지금 +%d만')
   })
 })
