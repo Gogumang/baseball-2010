@@ -18,6 +18,9 @@ import { EMPTY_LEAGUE, rankingOf } from '@/entities/league/model/league'
 import type { League } from '@/entities/league/model/league'
 import { recordLeagueResult } from '@/entities/league/model/league'
 import { playLeagueDay, simulateLeagueGame } from '@/entities/league/model/leagueDay'
+import { finishRegularSeason } from '@/entities/league/model/seasonEnd'
+import { playCpuSeriesGame } from '@/entities/league/model/postseasonPlay'
+import type { PostseasonSeries } from '@/entities/league/model/league'
 import { EMPTY_LEAGUE_PLAYER_STATS } from '@/entities/league/model/leaguePlayerStats'
 import type { LeaguePlayerStats } from '@/entities/league/model/leaguePlayerStats'
 import { startNextYear } from '@/entities/season-mode/model/seasonRecord'
@@ -60,6 +63,10 @@ export interface SeasonSession {
   readonly roster: SeasonTeamRoster
   /** 리그 선수별 성적 — 타이틀·MVP 판정의 유일한 재료다 (B-2) */
   readonly playerStats: LeaguePlayerStats
+  /** 포스트시즌 시리즈 (준PO → PO → 한국시리즈). 정규시즌 중에는 null */
+  readonly series: PostseasonSeries | null
+  /** 정규시즌 순위 (1위부터 팀 번호). 시즌이 끝나야 채워진다 */
+  readonly ranking: readonly number[]
   /** 진행 중인 국가대항전. 없으면 null (원본 L+0xa8~ 칸) */
   readonly cup: NationalCup | null
   readonly notice: string
@@ -94,6 +101,8 @@ interface SeasonSave {
   readonly league: League
   readonly roster: SeasonTeamRoster
   readonly playerStats?: LeaguePlayerStats
+  readonly series?: PostseasonSeries | null
+  readonly ranking?: readonly number[]
   /** 진행 중인 국가대항전 (L+0xa8~0xc3). 대회 밖이면 null */
   readonly cup?: NationalCup | null
 }
@@ -121,6 +130,11 @@ function rosterOf(teamId: number): SeasonTeamRoster {
 }
 
 const EMPTY_ROSTER: SeasonTeamRoster = { pitchers: [], batters: [] }
+
+/** 포스트시즌 세 시리즈를 다 돌려도 넉넉한 안전망 (원본에는 없다) */
+const POSTSEASON_GAME_LIMIT = 40
+/** SR+0xb7 = 0xf 는 "우승팀 미정" 이다 (P4 1a) */
+const NO_CHAMPION = 0xf
 
 export function useSeasonSession(store: JsonStorePort, random: RandomPort): SeasonSession {
   const loaded = useRef<SeasonSave | null>(null)
@@ -150,6 +164,8 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
         league: EMPTY_LEAGUE,
         roster: rosterOf(teamId),
         playerStats: EMPTY_LEAGUE_PLAYER_STATS,
+        series: null,
+        ranking: [],
         cup: null,
       }
       commit(next)
@@ -244,22 +260,38 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
       const settled: SeasonRecord = { ...record, phase: SEASON_PHASE.기본 }
       commit({ ...save, state: { ...save.state, record: settled } })
       if (settled.games >= SEASON_GAME_COUNT) {
-        // ⚠️ 원본은 정규시즌 뒤 **포스트시즌 → 한국시리즈**를 치르고 나서야 국가대항전으로 간다
-        //    (`afterKoreanSeries`). 웹에 포스트시즌 화면이 없어 여기서 바로 연다 — 원본과 다른 길이다.
-        if (isSeasonNationalCupYear(settled.yearIndex)) {
-          commit({
-            ...save,
-            state: { ...save.state, record: { ...settled, nationalCup: true } },
-            cup: createNationalCup(),
-          })
-          return setScene(SEASON_SCENE_STATE.국가대항전)
+        /*
+         * 정규시즌 종료 (0xb818c → 0xb80a8): 1위면 `+0x7a` 를 늘리고 대진을 짠다.
+         * 국가대항전은 여기가 아니라 **결산을 닫은 뒤**(`finishSeason` → `afterKoreanSeries`)다.
+         *
+         * ⚠️ **웹판 임시** — 원본은 내 팀 차례의 시리즈를 사람이 치른다(0x13da0 은 CPU 구간만 돌린다).
+         *    팀 경기 화면이 없어 우승이 정해질 때까지 **전부 간이 엔진으로** 돌린다.
+         */
+        const end = finishRegularSeason(save.league, settled.teamId)
+        let series = end.postseason
+        for (let game = 0; game < POSTSEASON_GAME_LIMIT && series.round !== '종료'; game += 1) {
+          series = playCpuSeriesGame(series, random)
         }
+        commit({
+          ...save,
+          series,
+          ranking: end.ranking,
+          state: {
+            ...save.state,
+            record: {
+              ...settled,
+              regularSeasonFirsts: settled.regularSeasonFirsts + (end.isRegularSeasonFirst ? 1 : 0),
+              inPostseason: true,
+              postseasonChampion: series.champion ?? NO_CHAMPION,
+            },
+          },
+        })
         // 원본 시즌 끝 사슬의 첫 칸 (0xee → 시상 셋 → 정규시즌순위 → 결산)
         return setScene(SEASON_END_CHAIN[0].state)
       }
       setScene(afterGameNext(settled))
     },
-    [commit, save],
+    [commit, random, save],
   )
 
   /**
@@ -412,6 +444,8 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
       state: startNextYear(save.state),
       league: EMPTY_LEAGUE,
       playerStats: EMPTY_LEAGUE_PLAYER_STATS,
+      series: null,
+      ranking: [],
     })
     setScene(SEASON_SCENE_STATE.관리메뉴)
   }, [commit, save])
@@ -426,6 +460,8 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
     league: save?.league ?? EMPTY_LEAGUE,
     roster: save?.roster ?? EMPTY_ROSTER,
     playerStats: save?.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS,
+    series: save?.series ?? null,
+    ranking: save?.ranking ?? [],
     cup: save?.cup ?? null,
     notice,
     actions: {

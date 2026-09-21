@@ -12,6 +12,7 @@ import { TeamSelectScreen } from '@/pages/create-player/ui/TeamSelectScreen'
 import { MessageBox, RawScreen } from '@/shared/ui'
 import { SEASON_SCENE_STATE, seasonOpponentOf } from '@/entities/season-mode/model/seasonStateMachine'
 import { applySeasonReward } from '@/entities/season-mode/model/seasonRewards'
+import type { PostseasonSeries } from '@/entities/league/model/league'
 import { TEAMS } from '@/shared/config/original/teams'
 import { NationalCupScreen } from '@/pages/national-cup/ui/NationalCupScreen'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -36,7 +37,7 @@ interface SeasonRouteProps {
  * 조용히 아무것도 안 하는 것보다 낫다.
  */
 export function SeasonRoute({ session, random, onExit }: SeasonRouteProps) {
-  const { state, scene, league, roster, playerStats, cup, notice, actions } = session
+  const { state, scene, league, roster, playerStats, series, cup, notice, actions } = session
 
   const ranks = useMemo(
     () => (state === null ? { myRank: 0, opponentRank: 0 } : seasonRanksOf(league, state.record)),
@@ -174,9 +175,7 @@ export function SeasonRoute({ session, random, onExit }: SeasonRouteProps) {
 
   // ── 시즌 끝 사슬 (0xee → 0xeb → 0xec → 0xed → 0xf0 → 0xef) ──────────────────
   if (scene === SEASON_SCENE_STATE.포스트시즌시작) {
-    // 포스트시즌 대진은 웹 entities/league 가 짜지만 시즌 세션이 아직 안 들고 있다 —
-    // 대진표는 시리즈가 없으면 빈 계단으로 그린다
-    return <PostseasonStartScreen series={null} onNext={actions.nextSeasonEndStep} />
+    return <PostseasonStartScreen series={series} onNext={actions.nextSeasonEndStep} />
   }
 
   if (scene === SEASON_SCENE_STATE.타자시상 || scene === SEASON_SCENE_STATE.투수시상) {
@@ -220,10 +219,10 @@ export function SeasonRoute({ session, random, onExit }: SeasonRouteProps) {
     return (
       <SeasonSummaryScreen
         record={state.record}
-        series={null}
-        // 포스트시즌 순위 0xb7aa0(리그, 팀, 0) 에 해당하는 함수가 웹에 없다 —
-        // 웹은 아직 포스트시즌을 치르지 않으므로 "보상 없음" 자리를 넘긴다
-        postseasonRank={2}
+        series={series}
+        // 0xb7aa0(리그, 팀, 0) — 0 우승 · 1 준우승(한국시리즈에서 진 팀) · 그 밖은 보상 없음.
+        // 웹 entities/league 에 이 함수가 없어 시리즈 결과에서 바로 읽는다
+        postseasonRank={postseasonRankOf(series, state.record.teamId)}
         leagueFirstAwardedBits={0}
         onApplyKoreanSeriesReward={(reward) => actions.updateRecord(applySeasonReward(state.record, reward))}
         onLeagueFirstAward={() => undefined}
@@ -267,3 +266,17 @@ export function SeasonRoute({ session, random, onExit }: SeasonRouteProps) {
     </RawScreen>
   )
 }
+
+/**
+ * 내 팀의 포스트시즌 순위 — 원본 `0xb7aa0(리그, 팀, 0)` 자리다.
+ * **0 우승 · 1 준우승(한국시리즈에서 진 팀)** 이고, 그 밖에는 보상이 붙지 않는다.
+ * `entities/league` 에 같은 함수가 없어 시리즈 결과에서 읽는다.
+ */
+function postseasonRankOf(series: PostseasonSeries | null, teamId: number): number {
+  if (series === null || series.round !== '종료') return NO_POSTSEASON_REWARD
+  if (series.champion === teamId) return 0
+  return series.teams.includes(teamId) ? 1 : NO_POSTSEASON_REWARD
+}
+
+/** 우승도 준우승도 아닐 때 넘기는 값 — 결산 화면이 보상을 붙이지 않는다 */
+const NO_POSTSEASON_REWARD = 2

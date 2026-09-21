@@ -75,17 +75,16 @@ describe('시즌 세션', () => {
     expect(result.current.scene).toBe(SEASON_SCENE_STATE.다음경기)
   })
 
-  it('정규시즌이 끝나고 국가대항전 연차면 대회가 열린다 (연차idx 짝수)', () => {
+  it('정규시즌이 끝나면 **국가대항전 연차라도** 시즌 끝 사슬이 먼저다 (afterKoreanSeries)', () => {
     const { result } = 띄우기()
     act(() => result.current.actions.chooseTeam(0))
-    // 1년차(연차idx 0)는 국가대항전 연차다
+    // 1년차(연차idx 0)는 국가대항전 연차지만, 대회는 결산을 닫은 뒤에 열린다
     const 마지막경기 = { ...result.current.state!.record, games: SEASON_GAME_COUNT }
 
     act(() => result.current.actions.confirmIncome(마지막경기))
 
-    expect(result.current.scene).toBe(SEASON_SCENE_STATE.국가대항전)
-    expect(result.current.state?.record.nationalCup).toBe(true)
-    expect(result.current.cup?.teams).toEqual([10, 11, 12, 13])
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.포스트시즌시작)
+    expect(result.current.state?.record.nationalCup).toBe(false)
   })
 })
 
@@ -208,5 +207,46 @@ describe('시즌 끝 사슬', () => {
 
     expect(result.current.scene).toBe(SEASON_SCENE_STATE.국가대항전)
     expect(result.current.cup).not.toBeNull()
+  })
+})
+
+describe('포스트시즌', () => {
+  const 시즌끝 = () => {
+    const rendered = 띄우기()
+    act(() => rendered.result.current.actions.chooseTeam(0))
+    act(() => rendered.result.current.actions.confirmIncome({
+      ...rendered.result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
+    }))
+    return rendered
+  }
+
+  it('정규시즌이 끝나면 대진이 짜이고 **우승팀이 정해질 때까지** 돈다 (웹판 임시 자동 진행)', () => {
+    const { result } = 시즌끝()
+
+    expect(result.current.series?.round).toBe('종료')
+    expect(result.current.series?.champion).not.toBeNull()
+    expect(result.current.state?.record.postseasonChampion).toBe(result.current.series?.champion)
+  })
+
+  it('포스트시즌은 정규시즌 1~4위만 올라간다', () => {
+    const { result } = 시즌끝()
+
+    expect(result.current.series?.qualifiers).toEqual(result.current.ranking.slice(0, 4))
+  })
+
+  it('정규시즌 1위면 `+0x7a`(1위 횟수)가 오른다', () => {
+    const { result } = 시즌끝()
+    const 일위 = result.current.ranking[0]
+
+    expect(result.current.state?.record.regularSeasonFirsts).toBe(일위 === 0 ? 1 : 0)
+  })
+
+  it('새 해로 넘어가면 시리즈·순위가 비워진다', () => {
+    const { result } = 시즌끝()
+
+    act(() => result.current.actions.finishSeason())
+
+    expect(result.current.series).toBeNull()
+    expect(result.current.ranking).toEqual([])
   })
 })
