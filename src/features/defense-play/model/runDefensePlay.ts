@@ -188,7 +188,12 @@ export interface DefensePlayResult {
   readonly log: readonly string[]
 }
 
-/** 이 타석이 수비 시뮬레이션을 돌릴 타구인가 — 삼진·볼넷·홈런은 돌릴 것이 없다 */
+/**
+ * 이 타석이 수비 시뮬레이션을 돌릴 타구인가 — 삼진·볼넷·홈런은 돌릴 것이 없다.
+ *
+ * 홈런은 아무도 잡지 못하고 진루·득점도 타석 쪽이 이미 정해 놓으므로 여기서 빼 두고,
+ * **날아가는 그림만** `homeRunPlayback.ts` 가 따로 만든다.
+ */
 export function isBattedBallInPlay(outcome: AtBatOutcome): boolean {
   return outcome.kind === '안타' || outcome.kind === '아웃'
 }

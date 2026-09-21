@@ -18,6 +18,7 @@ import { applyOpponentAtBat } from '@/features/play-pitcher-game/model/pitcherGa
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
+import { homeRunPlaybackOf } from '@/features/defense-play/model/homeRunPlayback'
 import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 import type { LeaguePlateAppearance } from '@/entities/league/model/leaguePlayerStats'
@@ -393,6 +394,8 @@ export function applyBatterOutcome(
         isUncatchable: options.isUncatchable,
       })
     : null
+  // 홈런도 공이 날아가는 그림은 나와야 한다 — 진루·득점은 그대로 두고 **보여 줄 틱만** 만든다
+  const playback = defensePlay ?? homeRunPlaybackOf({ outcome, bases: before.bases, pattern: options.pattern })
 
   const game = applyAtBatOutcome(before, outcome, defensePlay?.advance)
   const runsBattedIn = game.ourScore - before.ourScore
@@ -406,7 +409,7 @@ export function applyBatterOutcome(
   const next: TeamGameProgress = {
     ...progress,
     game,
-    lastDefensePlay: defensePlay,
+    lastDefensePlay: playback,
     atBat: createAtBat(),
     atBatPrepared: false,
     // 우리 타석의 득점은 **상대 투수**의 A·B 로 들어간다 (0xa5c34 는 수비 팀 칸을 올린다)
@@ -565,6 +568,8 @@ function applyDefensiveAtBat(
           outs: before.outs,
         })
       : null
+  // 내가 던진 타석이면 홈런도 날아가는 그림을 보여 준다 (자동으로 넘긴 타석은 재생 자체가 없다)
+  const playback = defensePlay ?? (mine ? homeRunPlaybackOf({ outcome, bases: before.bases }) : null)
   const applied = applyOpponentAtBat(
     before,
     progress.opponentOrderIndex,
@@ -581,7 +586,7 @@ function applyDefensiveAtBat(
     ...progress,
     game: applied.game,
     opponentOrderIndex: applied.opponentOrderIndex,
-    lastDefensePlay: defensePlay ?? progress.lastDefensePlay,
+    lastDefensePlay: playback ?? progress.lastDefensePlay,
     atBat: createAtBat(),
     atBatPrepared: false,
     // 득점 처리 0xa5c34 가 1점마다 수비 팀 A·B 를 올린다 (P7 E1)

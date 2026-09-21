@@ -34,6 +34,7 @@ import type { BattedBallPattern } from '@/shared/config/original/battedBallPatte
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
+import { homeRunPlaybackOf } from '@/features/defense-play/model/homeRunPlayback'
 import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
 import type { BurstResolution, BurstSession } from '@/entities/burst-mission/model/burstMissionSession'
 import { createBurstSession, resolveBurst, tryTriggerBurst } from '@/entities/burst-mission/model/burstMissionSession'
@@ -206,6 +207,12 @@ export function applyPlayerOutcome(
         isUncatchable: options.isUncatchable,
       })
     : null
+  /**
+   * 홈런도 **공이 날아가는 그림**은 나와야 한다 — 원본은 타구가 뜨면 홈런이라도 경기 장면이
+   * 상태 0x17(수비 인플레이)로 넘어가 같은 루프를 돈다. 다만 홈런의 진루·득점은 타석 쪽이
+   * 이미 맞게 하고 있으므로 **보여 줄 틱만** 따로 만들어 `lastDefensePlay` 에 넣는다.
+   */
+  const playback = defensePlay ?? homeRunPlaybackOf({ outcome, bases: progress.game.bases, pattern: options.pattern })
 
   const nextGame = applyAtBatOutcome(progress.game, outcome, defensePlay?.advance)
   const runsBattedIn = nextGame.ourScore - progress.game.ourScore
@@ -254,7 +261,7 @@ export function applyPlayerOutcome(
     {
       ...progress,
       game: nextGame,
-      lastDefensePlay: defensePlay,
+      lastDefensePlay: playback,
       burst: resolution === null ? progress.burst : resolution.session,
       // ⚠️ 아직 안 보여 준 판정을 지우지 않는다 — 돌발은 이제 동료·상대 타석에서도 나므로
       //    여기서 null 로 덮으면 그 보상이 화면에 안 뜬 채 사라진다. 지우는 것은 창을 닫을 때뿐이다

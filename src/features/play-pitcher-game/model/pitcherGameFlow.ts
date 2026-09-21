@@ -25,6 +25,7 @@ import type { BatterGameLog } from '@/entities/game/model/batterGameLog'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
+import { homeRunPlaybackOf } from '@/features/defense-play/model/homeRunPlayback'
 import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
 import { pitchAgainstBatter } from '@/entities/pitching/model/simulateBatter'
 import type { Pitch } from '@/entities/pitching/model/pitch'
@@ -501,6 +502,8 @@ function applyDefensivePlay(
           outs: before.outs,
         })
       : null
+  // 내가 던진 타석이면 홈런도 날아가는 그림을 보여 준다 — 득점·주자는 아래 길이 그대로 정한다
+  const playback = defensePlay ?? (mine ? homeRunPlaybackOf({ outcome, bases: before.bases }) : null)
   const advanceResult =
     defensePlay?.advance ??
     // 간이 엔진이 돌린 타석 — **원본 간이 엔진에는 희생플라이가 없다** (E-2 확정)
@@ -566,7 +569,7 @@ function applyDefensivePlay(
     decision,
     moundStrikeouts,
     moundStrikeoutCombo,
-    lastDefensePlay: defensePlay ?? progress.lastDefensePlay,
+    lastDefensePlay: playback ?? progress.lastDefensePlay,
     atBatPitches: 0,
     recordIds: recordsAllowed(progress)
       ? [...progress.recordIds, ...newRecordIds]

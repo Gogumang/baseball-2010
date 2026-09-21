@@ -222,6 +222,23 @@ describe('사람 타석은 수비 시뮬레이션을 돌린다 — CPU 간이 �
     expect(after.lastDefensePlay).toBeNull()
   })
 
+  it('홈런도 공이 날아가는 그림이 나온다 — 점수는 지금까지와 똑같다', () => {
+    const 만루 = { first: true, second: true, third: true }
+    const after = applyPlayerOutcome(내타석(만루, 0), { kind: '홈런' }, createSeededRandom(3))
+
+    const play = after.lastDefensePlay
+    expect(play).not.toBeNull()
+    // 다른 타구(땅볼 31 · 뜬공 37~45 · 3루타 72틱)와 비슷한 길이여야 스쳐 지나가지도 지루하지도 않다
+    expect(play!.ticks.length).toBeGreaterThanOrEqual(40)
+    expect(play!.ticks.length).toBeLessThanOrEqual(80)
+    // 만루 홈런은 4타점 — 재생을 붙였다고 점수 계산이 달라지면 안 된다
+    expect(after.myStats.runsBattedIn).toBe(4)
+    // 마지막 틱에는 타자주자까지 넷 모두 홈에 서 있다
+    const 마지막 = play!.ticks[play!.ticks.length - 1]
+    expect(마지막.runners).toHaveLength(4)
+    expect(마지막.runners.every((runner) => runner.base === 0)).toBe(true)
+  })
+
   it('깊은 뜬공은 3루 주자를 불러들이고, 얕은 뜬공은 못 불러들인다 (희생플라이 보장 제거)', () => {
     const 깊은뜬공: BattedBallPattern = [90, 900, 1500, 0]
     const 얕은뜬공: BattedBallPattern = [90, 250, 700, 0]

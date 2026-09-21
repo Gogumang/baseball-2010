@@ -138,6 +138,20 @@ describe('사람이 치는 타석', () => {
     const after = applyBatterOutcome(progress, { kind: '삼진' }, random)
     expect(after.game.battingOrderIndex).toBe(1)
   })
+
+  it('홈런도 공이 날아가는 그림이 나온다 — 점수는 그대로다', () => {
+    const { progress, random } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
+    const after = applyBatterOutcome(progress, { kind: '홈런' }, random)
+
+    const play = after.lastDefensePlay
+    expect(play).not.toBeNull()
+    expect(play!.ticks.length).toBeGreaterThanOrEqual(40)
+    expect(play!.ticks.length).toBeLessThanOrEqual(80)
+    // 주자 없는 홈런은 1점 — 재생을 붙였다고 점수가 달라지면 안 된다
+    expect(after.game.ourScore).toBe(progress.game.ourScore + 1)
+    const 마지막 = play!.ticks[play!.ticks.length - 1]
+    expect(마지막.runners.every((runner) => runner.base === 0)).toBe(true)
+  })
 })
 
 describe('경기용 능력치가 화면까지 이어진다', () => {
