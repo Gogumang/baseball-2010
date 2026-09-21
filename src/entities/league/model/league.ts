@@ -24,6 +24,29 @@ export function opponentOf(day: number, team: number): number {
   return SCHEDULE[day % SCHEDULE_DAYS][team]
 }
 
+/**
+ * 그날 그 팀이 홈인가 원정인가 (`0xb7844`, R1 1절 확정).
+ *
+ * ```
+ * d  = 날짜 (리그+0x32, 치른 경기 수)
+ * r7 = (d / 9) & 1          ; 9일 주기가 한 바퀴 돌 때마다 뒤집힌다
+ * d > 22 면 r7 을 한 번 더 뒤집는다
+ * 짝 중 **번호가 큰 쪽**이 r7, 작은 쪽이 !r7  → 두 팀은 늘 반대 값
+ * ```
+ *
+ * 돌려주는 값이 원본 side 다 — **1 = 홈(말 공격) · 0 = 원정(초 공격)** (A목록 +8 이 side 1).
+ */
+export function leagueSideOf(day: number, team: number): number {
+  const rounds = Math.trunc(day / SCHEDULE_DAYS) & 1
+  const flipped = day > SIDE_FLIP_DAY ? 1 - rounds : rounds
+  return team > opponentOf(day, team) ? flipped : 1 - flipped
+}
+
+/** 홈/원정이 한 번 더 뒤집히는 날 — `d > 0x16` (0xb78f4) */
+const SIDE_FLIP_DAY = 22
+/** 원본 side 1 = 홈(말 공격) */
+export const LEAGUE_SIDE_HOME = 1
+
 export interface League {
   readonly wins: readonly number[]
   readonly losses: readonly number[]

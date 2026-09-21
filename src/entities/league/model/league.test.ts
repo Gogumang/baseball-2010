@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   EMPTY_LEAGUE,
   advancePostseason,
+  leagueSideOf,
   opponentOf,
   rankingOf,
   recordLeagueResult,
@@ -63,5 +64,32 @@ describe('포스트시즌 — 0xb80a8 계단식', () => {
 
   it('4위 이내면 진출이다', () => {
     expect(startPostseason(순위).qualifiers).toEqual([4, 1, 6, 0])
+  })
+})
+
+describe('leagueSideOf — 홈/원정 배정 (0xb7844, R1 1절)', () => {
+  it('짝을 이룬 두 팀은 늘 반대 값이다', () => {
+    for (let day = 0; day < 45; day += 1) {
+      for (let team = 0; team < 10; team += 1) {
+        expect(leagueSideOf(day, team)).toBe(1 - leagueSideOf(day, opponentOf(day, team)))
+      }
+    }
+  })
+
+  it('9일 주기가 한 바퀴 돌 때마다 뒤집힌다', () => {
+    expect(leagueSideOf(0, 0)).toBe(1 - leagueSideOf(9, 0))
+    expect(leagueSideOf(0, 0)).toBe(leagueSideOf(18, 0))
+  })
+
+  it('23일째부터 한 번 더 뒤집는다 (`d > 0x16`)', () => {
+    // 22 와 31 은 같은 요일(주기 위치)인데 22 는 뒤집기 전, 31 은 뒤집은 뒤다
+    expect(leagueSideOf(22, 0)).toBe(1 - leagueSideOf(22 + 18, 0))
+  })
+
+  it('짝 중 번호가 큰 쪽이 r7 을 받는다 — 첫날은 번호 큰 쪽이 원정이다', () => {
+    const 상대 = opponentOf(0, 0)
+    const 큰쪽 = Math.max(0, 상대)
+
+    expect(leagueSideOf(0, 큰쪽)).toBe(0)
   })
 })

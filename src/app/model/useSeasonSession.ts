@@ -14,7 +14,7 @@ import {
   evaluateSeasonGame,
 } from '@/entities/season-mode/model/seasonEvaluation'
 import type { SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
-import { EMPTY_LEAGUE, rankingOf } from '@/entities/league/model/league'
+import { EMPTY_LEAGUE, LEAGUE_SIDE_HOME, leagueSideOf, rankingOf } from '@/entities/league/model/league'
 import type { League } from '@/entities/league/model/league'
 import { recordLeagueResult } from '@/entities/league/model/league'
 import { playLeagueDay } from '@/entities/league/model/leagueDay'
@@ -31,7 +31,7 @@ import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { TEAMS } from '@/shared/config/original/teams'
 import type { TeamGameOptions, TeamGameSummary } from '@/features/play-team-game/model/teamGameFlow'
 import { FULL_PLAY_SETTINGS } from '@/features/play-team-game/model/matchSettings'
-import { PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
+import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
 import { createNationalCup } from '@/entities/national-cup/model/nationalCup'
 import { advanceNationalCupDay } from '@/entities/national-cup/model/nationalCupPlay'
@@ -227,9 +227,11 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
         mode: SEASON_GAME_MODE,
         ourTeamId: record.teamId,
         opponentTeamId: opponent,
-        // ⚠️ 홈/원정은 원본이 0xb7844(날짜/9 홀짝 + 22일 이후 반전, R1)로 정하는데 그 함수가
-        //    웹 entities/league 에 없다. 지금은 늘 후공으로 둔다
-        playerSide: PLAYER_SIDE_LAST_BAT,
+        // 홈/원정은 원본 0xb7844 가 정한다 — 홈(side 1)이면 말 공격(후공)이다.
+        // ⚠️ 포스트시즌·국가대항전은 일정표가 없어 이 식이 안 맞는다. 그쪽은 늘 후공이다
+        playerSide: leagueSideOf(record.games, record.teamId) === LEAGUE_SIDE_HOME
+          ? PLAYER_SIDE_LAST_BAT
+          : PLAYER_SIDE_FIRST_BAT,
         settings: FULL_PLAY_SETTINGS,
         season: { illness: record.illness, morale: save.state.teamMorale, coach: NO_COACH },
         teamAbilities: save.state.teamAbilities,
@@ -240,24 +242,12 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
 
   const playNextGame = useCallback(() => {
     if (save === null) return
-    const { record } = save.state
-    const opponent = seasonOpponentOf(record)
+    const options = optionsFor(seasonOpponentOf(save.state.record))
+    if (options === null) return
     setGameKind('정규')
-    setGameOptions({
-      // 시즌모드 = 원본 게임 모드 2
-      mode: SEASON_GAME_MODE,
-      ourTeamId: record.teamId,
-      opponentTeamId: opponent,
-      // ⚠️ 홈/원정은 원본이 0xb7844(날짜/9 홀짝 + 22일 이후 반전, R1)로 정하는데 그 함수가
-      //    웹 entities/league 에 없다. 지금은 늘 후공으로 둔다 — 그 함수가 생기면 여기서 고른다
-      playerSide: PLAYER_SIDE_LAST_BAT,
-      // 경기진행 설정 화면(0x5ffcc)이 아직 없어 "모든 이닝 직접 플레이" 로 둔다
-      settings: FULL_PLAY_SETTINGS,
-      season: { illness: record.illness, morale: save.state.teamMorale, coach: NO_COACH },
-      teamAbilities: save.state.teamAbilities,
-    })
+    setGameOptions(options)
     setScene(SEASON_SCENE_STATE.경기직전)
-  }, [save])
+  }, [optionsFor, save])
 
   /**
    * 경기가 끝났다 — 원본 차례 그대로 정산한다:
