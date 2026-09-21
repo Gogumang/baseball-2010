@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import {
+  ALL_TITLES_REWARD_GAME_POINT,
   awardTitles,
   conditionTextOf,
   currentTitleOf,
   evaluateNewTitles,
+  isAllTitlesCollected,
+  nextTitleOf,
+  PITCHER_TITLE_OFFSET,
+  TITLE_COUNT,
   TITLE_NAMES,
+  titleListOf,
+  titleNumberOf,
 } from '@/entities/career/model/titles'
 import { createCareer, GAMES_PER_SEASON } from '@/entities/career/model/playerCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
@@ -149,5 +156,92 @@ describe('awardTitles', () => {
     expect(evaluateNewTitles(선수({ titleIds: ['이름 없는 신인'], lotteryFirstPrizes: 5 }))).toContain('행운의 사나이')
     expect(evaluateNewTitles(선수({ titleIds: ['이름 없는 신인'], lotteryPurchases: 100 }))).toContain('도박묵시록')
     expect(evaluateNewTitles(선수({ titleIds: ['이름 없는 신인'], lotteryPurchases: 99 }))).not.toContain('도박묵시록')
+  })
+})
+
+describe('새로 옮긴 판정 (P3 5·6·7절)', () => {
+  it('우승 5회면 "우승청부업자" (0x1a29a — s8 +0x7a > 4)', () => {
+    expect(evaluateNewTitles(선수({ regularSeasonFirstCount: 4 }))).not.toContain('우승청부업자')
+    expect(evaluateNewTitles(선수({ regularSeasonFirstCount: 5 }))).toContain('우승청부업자')
+  })
+
+  it('전설 스킬을 가지면 "살아있는 전설" (0x1a36e)', () => {
+    expect(evaluateNewTitles(선수({ skillIds: [7] }))).toContain('살아있는 전설')
+    expect(evaluateNewTitles(선수({ skillIds: [] }))).not.toContain('살아있는 전설')
+  })
+
+  it('번트왕 스킬(비트 11)이면 "번트의 귀재" (0x1a752)', () => {
+    expect(evaluateNewTitles(선수({ skillIds: [11] }))).toContain('번트의 귀재')
+  })
+
+  it('연애 이벤트 300~303 을 본 수가 칭호 14~20 을 가른다 (0x1a392~0x1a49e)', () => {
+    const 본선수 = (...ids: number[]) => 선수({ seenEventIds: ids.map(String) })
+
+    expect(evaluateNewTitles(본선수(300))).toContain('간호사 페티쉬')
+    expect(evaluateNewTitles(본선수(301))).toContain('와일드 씽씽이')
+    expect(evaluateNewTitles(본선수(302))).toContain('로리콘은 범죄')
+    expect(evaluateNewTitles(본선수(303))).toContain('피할 수 없는 유혹')
+    // 이름 칭호가 먼저, 사람 수 칭호가 뒤다 (번호 순서)
+    expect(evaluateNewTitles(본선수(300, 301))).toContain('사랑에 빠진 남자')
+    expect(evaluateNewTitles(본선수(300))).not.toContain('사랑에 빠진 남자')
+    expect(evaluateNewTitles(본선수(300, 301, 302))).toContain('바람둥이')
+    expect(evaluateNewTitles(본선수(300, 301, 302, 303))).toContain('희대의 풍운아')
+  })
+
+  it('실효 능력이 모두 999 면 "5툴 플레이어" (0x1ad7e)', () => {
+    const 만렙 = { hit: 999, power: 999, defense: 999, run: 999 }
+
+    expect(evaluateNewTitles(선수({ ability: 만렙 }))).toContain('5툴 플레이어')
+    expect(evaluateNewTitles(선수({ ability: { ...만렙, run: 998 } }))).not.toContain('5툴 플레이어')
+    // 사기가 낮으면 실효값이 깎여서 못 받는다 — 원본도 0xb6414 실효값을 본다
+    expect(evaluateNewTitles(선수({ ability: 만렙, morale: 10 }))).not.toContain('5툴 플레이어')
+  })
+
+  it('필살타법 4단계면 "약속된 승리의 타자" (0x1ae04, +0x201 > 3 — 근사다)', () => {
+    expect(evaluateNewTitles(선수({ specialSwingLevel: 3 }))).not.toContain('약속된 승리의 타자')
+    expect(evaluateNewTitles(선수({ specialSwingLevel: 4 }))).toContain('약속된 승리의 타자')
+  })
+
+  it('칭호는 번호 오름차순으로 나온다 (0x1a1c0 은 작은 번호부터 본다)', () => {
+    const titles = evaluateNewTitles(선수({ popularity: 4000, reputation: 999 }))
+
+    expect(titles.map(titleNumberOf)).toEqual([...titles.map(titleNumberOf)].sort((a, b) => a - b))
+  })
+
+  it('nextTitleOf 는 원본처럼 하나만 준다', () => {
+    const career = 선수({ popularity: 4000 })
+
+    expect(nextTitleOf(career)).toBe('이름 없는 신인')
+    // 이름 없는 신인을 받은 뒤에야 다음 번호가 나온다 — 원본은 확인할 때마다 하나씩 이어 준다
+    expect(nextTitleOf(선수({ popularity: 4000, titleIds: ['이름 없는 신인'] }))).toBe('슈퍼 스타')
+  })
+})
+
+describe('칭호 표·목록·완성 보상 (P3 10절)', () => {
+  it('이름 64개는 모두 다르다 — 웹은 이름으로 칭호를 들고 있다', () => {
+    expect(new Set(TITLE_NAMES).size).toBe(TITLE_COUNT)
+    expect(TITLE_COUNT).toBe(64)
+  })
+
+  it('투수편 이름은 타자편 번호 + 16 이다 (0x7d5ee)', () => {
+    expect(TITLE_NAMES[32]).toBe('괴물 타자')
+    expect(TITLE_NAMES[32 + PITCHER_TITLE_OFFSET]).toBe('괴물 투수')
+    expect(conditionTextOf('퍼펙트 플레이어')).toBe('퍼펙트 게임 2회 달성')
+  })
+
+  it('목록은 얻은 순서가 아니라 번호 오름차순이다 (0x104cc)', () => {
+    expect(titleListOf(['사이클링 히터', '이름 없는 신인', '슈퍼 스타'])).toEqual([
+      '이름 없는 신인',
+      '슈퍼 스타',
+      '사이클링 히터',
+    ])
+    // 모르는 이름은 버린다
+    expect(titleListOf(['없는칭호'])).toEqual([])
+  })
+
+  it('64개를 다 모으면 완성이고 보상은 60,000 G 다 (0x28e98)', () => {
+    expect(isAllTitlesCollected(TITLE_NAMES.slice(0, 63))).toBe(false)
+    expect(isAllTitlesCollected(TITLE_NAMES)).toBe(true)
+    expect(ALL_TITLES_REWARD_GAME_POINT).toBe(60_000)
   })
 })
