@@ -50,7 +50,7 @@ export const BAND_BACKGROUND = { frame: 0, left: 1, top: 66, height: 70 } as con
  * - `[this+0x344]` = **`event_char_0.pzx` 애니**(육성 선수 캐릭터). 적재 `0x87cd6` 가
  *   `0x63a05([0x1552cfc], 1, 2)` 로 만들고 반복 재생을 켠다. 애니 번호는 `(0 또는 8) + 2` 로,
  *   육성 선수 레코드가 `p[0xb] >> 4 > 1` 이면 8 을 쓴다(0x63a5c~0x63a92).
- *   팔레트도 `(p[0xb] >> 2) & 3` 으로 고르는데, 웹판은 외모 비트를 아직 안 옮겨 **기본 애니 2** 를 쓴다.
+ *   팔레트도 `(p[0xb] >> 2) & 3` 으로 고른다 — 아래 `endingWalkInAnimationOf`·`endingWalkInPaletteOf`.
  * - `[this+0x15c]` 는 필드가 아니라 **프레임 배열 바이트 오프셋(0xae × 2)** 이었다 —
  *   `this+0x138`(= `ui/mode_ui.pzx`)의 **프레임 87**(부상 아이콘)이다. 단계 `[this+0x2e4] == 0` 일 때만 그린다.
  *
@@ -63,7 +63,7 @@ export const BAND_BACKGROUND = { frame: 0, left: 1, top: 66, height: 70 } as con
  * `n & 7 == 0` 인 틱(8틱에 한 번)만 1px 위로 튄다 — 걸음 흔들림이다.
  */
 export const WALK_IN = {
-  /** event_char_0.pzx 애니 — 기본 번호 0 + 2 (외모 비트가 붙으면 8 + 2) */
+  /** event_char_0.pzx 애니 — 기본 번호 0 + 2 (장타형이면 8 + 2) */
   characterFolder: './sprites/event_char_0/frames',
   characterAnimation: 2,
   characterAnimationWithLook: 10,
@@ -80,6 +80,47 @@ export const WALK_IN = {
   /** 띠 아래 = 137 (mode_ui 프레임 10 박스 0 의 아래 끝) */
   y: BAND_WINDOW_BOTTOM,
 } as const
+
+/**
+ * 걸어 들어오는 선수의 생김새 — 레코드 `+0xb` 한 바이트에서 뽑는다 (C-4 등록 화면과 같은 칸).
+ * 엔딩(`0x63a04` 의 idx == 1)만 표 `0xd0ae6` 대신 이 바이트를 본다 (S12 7-1 확정).
+ */
+export interface EndingWalkInLook {
+  /** 전역 모드 `[0x1552d10]` — **4 나리 타자편** · 3 투수편 */
+  readonly mode: number
+  /** `+0xb` bit5~7 = 등록 타입 (타자 0 타격형 · 1 장타형) */
+  readonly typeIndex: number
+  /** `+0xb` bit4 = 손 (0 우 · 1 좌) */
+  readonly handIndex: number
+  /** `+0xb` bit2~3 = 피부 (0 황인 · 1 백인 · 2 흑인) */
+  readonly skinIndex: number
+}
+
+/** 타자편 모드 번호 — 엔딩 애니 8 가지는 이 모드에서만 탄다 */
+export const BATTER_EDITION_MODE = 4
+
+/**
+ * 엔딩 애니 번호 = `(모드 4 이고 p[0xb] >> 4 > 1 ? 8 : 0) + 2` (0x63a5c~0x63a92).
+ * `p[0xb] >> 4` 는 `타입<<1 | 손` 이라 **타입 ≥ 1**(= 타자 장타형)이면 8 이다.
+ * 투수편(모드 3)은 조건에서 빠지므로 늘 2 다.
+ */
+export function endingWalkInAnimationOf(look: EndingWalkInLook): number {
+  const typeAndHand = (look.typeIndex << 1) | (look.handIndex & 1)
+  const base = look.mode === BATTER_EDITION_MODE && typeAndHand > 1 ? 8 : 0
+  return base + WALK_IN.characterAnimation
+}
+
+/**
+ * `event_char_0.mpl` 팔레트 번호 = `(p[0xb] >> 2) & 3` 이 **1 → 0 · 2 → 1 · 그 밖 → 2** (0x63a92).
+ *
+ * ⚠️ **원본 그대로**: 피부 0(황인)이 팔레트 **2**(C-1 이 "인물 8·9 용" 이라 적은 칸)로 간다.
+ * 이벤트 초상화 쪽(0x63a50)은 피부 0 이면 mpl 을 아예 안 쓰는데 엔딩만 다르다 — 고치지 않는다.
+ */
+export function endingWalkInPaletteOf(look: EndingWalkInLook): number {
+  const skin = look.skinIndex & 3
+  if (skin === 1) return 0
+  return skin === 2 ? 1 : 2
+}
 
 /**
  * 엔딩 그림 — `ending.pzx` 이미지 0 (146×96, 원점 (−84,−57) = `public/sprites/ending/frames/origins.json`).

@@ -6,9 +6,11 @@ import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
 import { ORIGINAL_ENDINGS } from '@/shared/config/original/endings'
 import type { HallOfFameResult } from '@/entities/collection/model/collection'
 import {
-  BAND_BACKGROUND, BAND_WINDOW, CREDITS, ENDING_IMAGE, ENDING_IMAGE_TICKS, ENDING_TEXT,
-  IRIS, IRIS_STAGES, SCREEN, WALK_IN, creditsTopOf, endingImageXOf, irisRadiusOf,
+  BAND_BACKGROUND, BAND_WINDOW, BATTER_EDITION_MODE, CREDITS, ENDING_IMAGE, ENDING_IMAGE_TICKS,
+  ENDING_TEXT, IRIS, IRIS_STAGES, SCREEN, WALK_IN, creditsTopOf, endingImageXOf,
+  endingWalkInAnimationOf, endingWalkInPaletteOf, irisRadiusOf,
 } from '@/pages/ending/lib/endingLayout'
+import type { EndingWalkInLook } from '@/pages/ending/lib/endingLayout'
 import * as styles from '@/pages/ending/ui/EndingScreen.css'
 
 const ENDING_FRAMES = './sprites/ending/frames'
@@ -26,6 +28,19 @@ interface EndingScreenProps {
   /** 5000 G포인트로 이어하기. 모자라면 false */
   readonly onContinue: () => boolean
   readonly onFinish: () => void
+  /**
+   * 걸어 들어오는 선수의 생김새 (레코드 +0xb, 0x63a5c). 안 주면 **타격형 황인 타자**로 본다 —
+   * 애니 2 · 팔레트 2 로, 원본이 그 비트에서 뽑는 값과 같다.
+   */
+  readonly walkInLook?: EndingWalkInLook
+}
+
+/** 안 주었을 때의 생김새 — 모두 0 (타자편 · 타격형 · 우타 · 황인) */
+const DEFAULT_WALK_IN_LOOK: EndingWalkInLook = {
+  mode: BATTER_EDITION_MODE,
+  typeIndex: 0,
+  handIndex: 0,
+  skinIndex: 0,
 }
 
 /** 엔딩 뒤 원문 문구 */
@@ -69,6 +84,7 @@ interface Question {
  */
 export function EndingScreen(props: EndingScreenProps) {
   const { playerName, endingIndex, bonusGamePoint, isContinuable, onRegister, onContinue, onFinish } = props
+  const walkInLook = props.walkInLook ?? DEFAULT_WALK_IN_LOOK
   const [phase, setPhase] = useState<Phase>('엔딩')
   const [message, setMessage] = useState('')
   const inform = (text: string) => {
@@ -103,7 +119,13 @@ export function EndingScreen(props: EndingScreenProps) {
       : undefined
 
   return (
-    <EndingStage playerName={playerName} endingIndex={endingIndex} isCredits={phase === '제작진'} onPress={onPress}>
+    <EndingStage
+      playerName={playerName}
+      endingIndex={endingIndex}
+      isCredits={phase === '제작진'}
+      walkInLook={walkInLook}
+      onPress={onPress}
+    >
       {phase === '보너스' && (
         <MessageBox
           text={TEXT.bonus.replace('%d', String(bonusGamePoint))}
@@ -127,13 +149,14 @@ interface EndingStageProps {
   readonly playerName: string
   readonly endingIndex: number
   readonly isCredits: boolean
+  readonly walkInLook: EndingWalkInLook
   /** 화면을 눌러 다음으로 갈 수 있을 때만 준다 — 없으면 연출이 제자리에 멈춘다 */
   readonly onPress?: () => void
   readonly children?: ReactNode
 }
 
 /** 엔딩 연출 한 장 — 띠 창 + 엔딩 그림 + 원형 전환 + 글/제작진 (0x882b4) */
-function EndingStage({ playerName, endingIndex, isCredits, onPress, children }: EndingStageProps) {
+function EndingStage({ playerName, endingIndex, isCredits, walkInLook, onPress, children }: EndingStageProps) {
   /** 그림이 다 들어오면 연출이 끝난다 — 그 뒤로는 움직이는 것이 없다 */
   const settledTick = Math.max(ENDING_IMAGE_TICKS, IRIS.fullTick)
   const tick = Math.min(useUpdateCounter(), settledTick)
@@ -200,7 +223,7 @@ function EndingStage({ playerName, endingIndex, isCredits, onPress, children }: 
       ))}
 
       {/* 걸어 들어오는 그림 둘 — 3틱에 1px 왼쪽으로 온다 (S12 7절) */}
-      <WalkIn tick={tick} />
+      <WalkIn tick={tick} look={walkInLook} />
 
       {/* 원형 전환 — 검정 판에 원을 뚫어 덮는다 (S9 8-2). evenodd 라 원 안쪽이 구멍이 된다 */}
       <svg
@@ -244,18 +267,22 @@ function EndingStage({ playerName, endingIndex, isCredits, onPress, children }: 
  * `ui/mode_ui.pzx` 프레임 87(부상 아이콘)이 오른쪽에서 **3틱에 1px** 씩 온다.
  * `n & 7 == 0` 인 틱만 1px 위로 튄다(걸음 흔들림).
  *
- * ⚠️ 애니 번호는 원본이 육성 선수 레코드의 외모 비트로 0+2 / 8+2 를 고르는데(0x63a5c),
- * 웹판은 그 비트를 아직 안 옮겨 **기본 2** 를 쓴다. 팔레트 고르기도 아직 없다.
+ * 애니 번호는 육성 선수 레코드의 외모 비트가 고른다 — 타자 장타형이면 **8+2**, 그 밖 **0+2**
+ * (0x63a5c, `endingWalkInAnimationOf`).
+ *
+ * ⚠️ **팔레트는 번호만 고르고 아직 칠하지 못한다**: `event_char_0.mpl` 팔레트 교체가 웹에 없다
+ * (C-1 "그림 팔레트는 아직 바꾸지 않는다"). 번호는 `data-palette` 로 남겨 둔다 —
+ * `shared` 에 mpl 팔레트 교체가 생기면 그 번호를 그대로 넘기면 된다.
  */
-function WalkIn({ tick }: { readonly tick: number }) {
+function WalkIn({ tick, look }: { readonly tick: number; readonly look: EndingWalkInLook }) {
   const origins = useFrameOrigins(WALK_IN.characterFolder)
   const animations = useAnimations(WALK_IN.characterFolder)
   const iconOrigins = useFrameOrigins(WALK_IN.iconFolder)
-  const entries = animations?.[WALK_IN.characterAnimation]
+  const entries = animations?.[endingWalkInAnimationOf(look)]
   const step = entries === undefined ? null : animationStepAt(entries, tick)
 
   return (
-    <>
+    <div data-palette={endingWalkInPaletteOf(look)} data-animation={endingWalkInAnimationOf(look)}>
       {step !== null && (
         <FrameSprite
           folder={WALK_IN.characterFolder}
@@ -272,7 +299,7 @@ function WalkIn({ tick }: { readonly tick: number }) {
         x={WALK_IN.xOf(tick, WALK_IN.iconDx)}
         y={WALK_IN.iconYOf(tick)}
       />
-    </>
+    </div>
   )
 }
 

@@ -237,6 +237,80 @@ describe('선수정보 하위 메뉴 (상태 106 · 점프표 0xcc69c)', () => {
     expect(screen.queryByText('구질 훈련')).toBeNull()
   })
 
+  it('123 창 탭 1 — 마구 칸을 고르면 StrMODE[70] 을 묻고 레코드 +0x18 에 번호를 넣는다 (0x17cec)', () => {
+    const onSave = vi.fn()
+    화면({ career: 투수({ magicLevel: 2 }), onSave })
+
+    누르기('선수정보')
+    누르기('구질')
+    누르기('마구')
+
+    // 칸 넷은 표 0xcc368 = [1,2,3,4] 이름 그대로다 (번호 4 는 폼 0 → 샤이닝 볼)
+    누르기('웨이브 볼')
+    expect(screen.getByText('[웨이브 볼] 을 사용하시겠습니까?')).toBeTruthy()
+    fireEvent.click(칸('예'))
+
+    expect((onSave.mock.calls[0][0] as PitcherCareer).selectedMagicNumber).toBe(2)
+  })
+
+  it('아직 배우지 않은 칸은 StrMODE[71], 이미 쓰는 칸은 StrMODE[69] 로 막는다', () => {
+    const onSave = vi.fn()
+    const { unmount } = 화면({ career: 투수({ magicLevel: 1, selectedMagicNumber: 1 }), onSave })
+
+    누르기('선수정보')
+    누르기('구질')
+    누르기('마구')
+
+    누르기('웨이브 볼')
+    expect(screen.getByText('트레이닝 완료 후 사용할 수 있습니다')).toBeTruthy()
+
+    누르기('파이어 볼')
+    expect(screen.getByText('현재 사용 중인 스킬입니다')).toBeTruthy()
+    expect(onSave).not.toHaveBeenCalled()
+    unmount()
+  })
+
+  it('123 창 탭 2 — 구질을 고르면 StrMODE[73] 을 묻고, 이미 쓰는 구질은 [72] 로 막는다', () => {
+    const onSave = vi.fn()
+    화면({ onSave })
+
+    누르기('선수정보')
+    누르기('구질')
+    누르기('구질')
+
+    // 등록이 무조건 주는 FASTBALL (0xb6d5e)
+    누르기('FASTBALL')
+    expect(screen.getByText('해당 구질을 사용하시겠습니까?')).toBeTruthy()
+    fireEvent.click(칸('예'))
+    expect((onSave.mock.calls[0][0] as PitcherCareer).selectedPitchType).toBe(1)
+  })
+
+  it('[기록실] 은 StrMODE[74] 두 갈래 팝업(0x80)을 거쳐 124 로 간다', () => {
+    화면()
+
+    누르기('선수정보')
+    누르기('기록실')
+    expect(screen.getByText('보고 싶은 기록을 선택해주세요')).toBeTruthy()
+
+    // 장면+0x164 = 0 → 기본 엔트리 목록 창(0x5cfec) 자리 — 주인공이 투수 0번(선발)이다
+    누르기('팀 엔트리')
+    expect(screen.getByText('투수 엔트리')).toBeTruthy()
+    expect(screen.getByText('0 테스트')).toBeTruthy()
+    expect(screen.queryByText('1년차 성적')).toBeNull()
+  })
+
+  it('두 번째 갈래는 나리 판 목록(0x5796c) 자리 — 내 투수 성적이다', () => {
+    화면()
+
+    누르기('선수정보')
+    누르기('기록실')
+    누르기('선수 성적')
+
+    expect(screen.getByText('1년차 성적')).toBeTruthy()
+    expect(screen.getByText('통산 성적')).toBeTruthy()
+    expect(screen.queryByText('투수 엔트리')).toBeNull()
+  })
+
   it('[기본정보] 는 능력치와 보직 한계를 보여 준다 (상태 119)', () => {
     화면({ career: 투수({ role: PITCHER_ROLE.relief }) })
 
@@ -259,6 +333,21 @@ describe('휴식 (상태 105 칸 2 → 팝업 0x2a → 127)', () => {
 
     expect((onSave.mock.calls[0][0] as PitcherCareer).morale).toBe(60)
     expect(screen.getByText('사기 10 상승하였습니다')).toBeTruthy()
+  })
+
+  it('결과 창을 닫을 때 회복 판정 0x1b308 을 굴린다 (질병 60% · 부상 30%)', () => {
+    const onSave = vi.fn()
+    화면({ career: 투수({ isInjured: true, injuryRemaining: 3, isSick: true, illnessName: '감기' }), onSave })
+
+    누르기('휴식')
+    fireEvent.click(칸('예'))
+    // 사기 결과 창을 닫아야 회복 판정이 돈다
+    fireEvent.click(칸('확인'))
+
+    // 고정 난수 0 → 질병·부상 둘 다 낫는다
+    const recovered = onSave.mock.calls[1][0] as PitcherCareer
+    expect([recovered.isSick, recovered.isInjured]).toEqual([false, false])
+    expect(screen.getByText(/부상에서 회복 되었습니다/)).toBeTruthy()
   })
 
   it('⚠️ 원본 그대로: 사기가 최고면 아프거나 다쳤어도 StrMODE[91] 로 거절한다 (0x12682)', () => {

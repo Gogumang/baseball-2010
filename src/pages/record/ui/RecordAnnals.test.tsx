@@ -9,6 +9,7 @@ import {
   CELL_GRID, PANEL, TAB_CURSOR, TAB_NAME_Y, TAB_SELECTED_WIDTH, TAB_SLOT_WIDTH,
   cellPositionOf, tabIconXOf, tabNameXOf, tabSlotXOf,
 } from '@/pages/record/lib/recordAnnalsLayout'
+import { STAT_NAMES } from '@/pages/record/lib/statNames'
 
 /**
  * 기록연감 (0x2e29c — P6 2c). 탭 다섯이 192 판 위에 놓이고
@@ -98,6 +99,17 @@ describe('기록연감 칸 격자', () => {
     fireEvent.click(screen.getByRole('button', { name: '스킬' }))
 
     expect(screen.getByText(/효과 :/)).toBeTruthy()
+  })
+
+  it('통계 탭 줄 이름은 StrMAINMENU[129~182] 그대로다 (P6 2c)', () => {
+    띄우기()
+    fireEvent.click(screen.getByRole('button', { name: '통계' }))
+
+    expect(STAT_NAMES).toHaveLength(182 - 129 + 1)
+    expect(STAT_NAMES[0]).toBe('일반 모드')
+    expect(STAT_NAMES[STAT_NAMES.length - 1]).toBe('선물 받은 GP')
+    // 한 쪽은 8줄이다 (0x79ed5 … 18, 1열, 8줄)
+    for (const name of STAT_NAMES.slice(0, 8)) expect(screen.getByText(name)).toBeTruthy()
   })
 
   it('스킬·닉네임 탭은 아래에 전체합계를 보여 준다', () => {

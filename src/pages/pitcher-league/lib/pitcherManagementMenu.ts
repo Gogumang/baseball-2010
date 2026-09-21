@@ -65,10 +65,25 @@ export const PITCH_WINDOW_CHOICES: readonly [string, string] = ['마구', '구�
  */
 export const PITCH_WINDOW_TABS = { 마구: 1, 구질: 2 } as const
 
+/**
+ * 106 칸 4 [기록실] 의 팝업 **0x80** (StrMODE[74] "보고 싶은 기록을 선택해주세요", 키 0x196ec).
+ * 좌우로 `+0x166` 을 토글하고 확인하면 `장면+0x164 = +0x166` 으로 **124** 로 간다 (R9 3절).
+ *
+ * 124 는 그 값으로 갈린다 (R4 2c):
+ *   `+0x164 == 0` → 0x5761c 가 저장에서 팀을 만들고 **기본 엔트리 목록 창**(0x5cfec)
+ *   `+0x164 != 0` → **나리 판 목록**(0x5796c, 이름·타율·방어율)
+ *
+ * ⚠️ **두 갈래의 이름표는 문서에 없다** — 하는 일로 적었다 (**근사**).
+ */
+export const RECORD_WINDOW_TABS = { 엔트리: 0, 성적: 1 } as const
+export const RECORD_WINDOW_CHOICES: readonly [string, string] = ['팀 엔트리', '선수 성적']
+
 /** 팝업 글 (StrMODE 번호만 확정이고 원문은 표가 웹에 없어 뜻만 옮겼다) */
 export const PITCHER_MANAGEMENT_TEXT = {
   /** StrMODE[59] — 팝업 0x78 */
   chooseItem: '원하는 항목을 선택해주세요',
+  /** StrMODE[74] — 팝업 0x80 (기록실 두 갈래) */
+  chooseRecord: '보고 싶은 기록을 선택해주세요',
   /** StrMODE[90] — 휴식 확인 (팝업 0x2a) */
   restQuestion: '휴식을 취하시겠습니까?',
   /** StrMODE[91] — 사기가 이미 최고 */
@@ -79,9 +94,22 @@ export const PITCHER_MANAGEMENT_TEXT = {
   moraleEmpty: '사기가 부족하여 훈련할 수 없습니다',
   /** r_event_txt[176] — 한 주기에 트레이닝·휴식·외출 중 한 가지 */
   alreadyActed: '트레이닝·휴식·외출은 한 번에 한 가지만 할 수 있습니다',
+  /** StrMODE[69] — 123 창에서 이미 쓰는 마구를 또 고름 */
+  magicAlreadyInUse: '현재 사용 중인 스킬입니다',
+  /** StrMODE[71] — 아직 배우지 않은 마구 칸 */
+  magicNeedsTraining: '트레이닝 완료 후 사용할 수 있습니다',
+  /** StrMODE[72] — 이미 쓰는 구질 */
+  pitchAlreadyInUse: '현재 사용 중인 구질입니다',
+  /** StrMODE[73] — 구질 고르기 확인 */
+  pitchUseQuestion: '해당 구질을 사용하시겠습니까?',
   /** ⚠️ 웹판 문구 — 원본에는 없다. 아직 옮기지 않은 화면을 고른 자리 */
   notPorted: '아직 옮기지 않은 화면입니다',
 } as const
+
+/** StrMODE[70] "[%s] 을 사용하시겠습니까?" — 123 창의 마구 고르기 확인 (0x17cec) */
+export function useQuestionOf(name: string): string {
+  return `[${name}] 을 사용하시겠습니까?`
+}
 
 /** StrMODE[85] "[%s훈련]을 하시겠습니까?" (0x12e40) */
 export function trainingQuestionOf(menuName: string): string {

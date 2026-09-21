@@ -1,6 +1,7 @@
 import { BALANCE } from '@/shared/config/original/balance'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { REST_RECOVERY, rollRecovery } from '@/entities/career/model/recovery'
 import { gainPitcherMorale, spendPitcherCycleAction } from '@/entities/pitcher-career/model/pitcherCareer'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 
@@ -12,9 +13,9 @@ import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCaree
  * 때문이다 (R9 2절: 관리 장면 0x106 은 두 편 공용). 커리어 타입만 달라 같은 함수를 부르지 못해
  * 여기에 다시 적는다 — 투수편 `entities` 에 휴식이 생기면 그리로 옮기면 된다.
  *
- * ⚠️ **못 옮긴 것**: 원본은 결과 창을 닫을 때 회복 판정 0x1b308(질병 60% · 부상 30%)을 한 번 더
- * 굴린다. 그 굴림(`rollRecovery`)은 타자 커리어(`PlayerCareer`) 전용이라 투수편에는 아직 없다 —
- * 투수용이 생기면 `runPitcherRest` 결과에 이어 붙일 자리다.
+ * 결과 창을 닫을 때의 **회복 판정 0x1b308**(질병 60% · 부상 30%)은 `recoverAfterPitcherRest` 다.
+ * 병·부상 칸이 타자편과 같은 자리라 굴림 자체는 `entities/career/model/recovery.ts` 를 그대로 쓴다
+ * (G 2-2 확정 — 원본도 두 편이 같은 0x1b308 을 지난다).
  */
 
 /** 사기 회복 `bfa55(10, 16)` = 10~15 (0x18e3c) */
@@ -42,10 +43,21 @@ export interface PitcherRestOutcome {
   readonly moraleGain: number
 }
 
-/** 휴식 한 번 (0x18e3c) — 사기만 오른다. 주기 행동 한 칸을 쓴다 */
+/**
+ * 휴식 한 번 (0x18e3c) — 사기만 오른다. 주기 행동 한 칸을 쓴다.
+ * 회복 판정은 결과 창을 닫을 때 `recoverAfterPitcherRest` 로 한다 (0x1b308, 타자편과 같은 차례).
+ */
 export function runPitcherRest(career: PitcherCareer, random: RandomPort): PitcherRestOutcome {
   const blockReason = pitcherRestBlockReasonOf(career)
   if (blockReason !== null) throw new Error(`휴식할 수 없습니다 (${blockReason})`)
   const moraleGain = randomIntegerBelow(random, REST_MORALE_RANGE.minimum, REST_MORALE_RANGE.maximumExclusive)
   return { career: gainPitcherMorale(spendPitcherCycleAction(career), moraleGain), moraleGain }
+}
+
+/**
+ * 휴식 결과 창을 닫을 때의 회복 판정 (0x1b308 — 질병 60% · 부상 30%).
+ * 타자편 `recoverAfterRest` 와 **같은 함수·같은 확률**이다 (G 2-2).
+ */
+export function recoverAfterPitcherRest(career: PitcherCareer, random: RandomPort) {
+  return rollRecovery(career, REST_RECOVERY, random)
 }

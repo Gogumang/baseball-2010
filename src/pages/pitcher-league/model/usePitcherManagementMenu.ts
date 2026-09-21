@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 import { BALANCE } from '@/shared/config/original/balance'
 import type { MenuItem } from '@/shared/ui'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { pitcherAbilityLimitsOf } from '@/entities/pitcher-career/model/pitcherCareer'
+import { pitcherAbilityLimitsOf, pitcherFormOfCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { PITCHER_ABILITY_NAMES, PITCHER_ABILITY_ORDER } from '@/entities/pitcher-career/model/pitcherAbility'
 import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbility'
@@ -17,16 +17,32 @@ import type {
   PitcherTrainingMenu,
 } from '@/entities/pitcher-career/model/pitcherManagement'
 import {
+  magicNumberOfCell,
+  magicSelectBlockReasonOf,
+  pitchTypeSelectBlockReasonOf,
+  selectMagicPitch,
+  selectPitchType,
+} from '@/entities/pitcher-career/model/pitchSelection'
+import { magicPitchNameOf } from '@/entities/pitcher-career/model/magicPitch'
+import { pitchTypeNameOf } from '@/entities/pitcher-career/model/pitchTraining'
+import {
   PITCHER_COMMAND_SLOTS,
   PITCHER_MANAGEMENT_TEXT,
   PITCHER_PLAYER_INFO_SLOTS,
   PITCH_WINDOW_CHOICES,
   PITCH_WINDOW_TABS,
+  RECORD_WINDOW_CHOICES,
+  RECORD_WINDOW_TABS,
   trainingQuestionOf,
   trainingResultOf,
+  useQuestionOf,
 } from '@/pages/pitcher-league/lib/pitcherManagementMenu'
 import type { PitcherManagementCommand } from '@/pages/pitcher-league/lib/pitcherManagementMenu'
-import { pitcherRestBlockReasonOf, runPitcherRest } from '@/pages/pitcher-league/model/pitcherRest'
+import {
+  pitcherRestBlockReasonOf,
+  recoverAfterPitcherRest,
+  runPitcherRest,
+} from '@/pages/pitcher-league/model/pitcherRest'
 
 /**
  * 투수편 관리 화면의 상태 기계 — 원본 장면 0x106 의 상태 **105(허브) · 106(선수정보) · 107(트레이닝)**
@@ -76,6 +92,12 @@ export interface PitcherManagementMenu {
   readonly pitchWindowTab: number
   /** 창 안에서 탭을 바꾼다 (원본은 좌우 키로 `+0x166` 을 토글한다) */
   readonly changePitchTab: (tab: number) => void
+  /** 기록실 창의 갈래 (장면 +0x164) — 0 엔트리 목록 · 1 나리 판 성적 */
+  readonly recordWindowTab: number
+  /** 123 창 탭 1 — 마구 칸 i(0~3) 고르기 */
+  readonly selectMagicCell: (cellIndex: number) => void
+  /** 123 창 탭 2 — 구질 고르기 */
+  readonly selectPitchCell: (typeNumber: number) => void
   readonly items: readonly MenuItem[]
   readonly notice: string
   readonly question: PitcherMenuQuestion | null
@@ -99,9 +121,13 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
   const [kind, setKind] = useState<PitcherMenuKind>('관리')
   const [subWindow, setSubWindow] = useState<PitcherMenuWindow>(null)
   const [pitchWindowTab, setPitchWindowTab] = useState<number>(PITCH_WINDOW_TABS.마구)
+  /** 기록실 창의 갈래 (장면 +0x164 — 팝업 0x80 이 정한다) */
+  const [recordWindowTab, setRecordWindowTab] = useState<number>(RECORD_WINDOW_TABS.엔트리)
   const [notice, setNotice] = useState('')
   const [question, setQuestion] = useState<PitcherMenuQuestion | null>(null)
   const [choice, setChoice] = useState<PitcherMenuChoice | null>(null)
+  /** 알림 창을 **닫을 때** 할 일 — 휴식 회복 판정 0x1b308 처럼 결과 창 뒤에 붙는 것들 */
+  const [afterNotice, setAfterNotice] = useState<(() => void) | null>(null)
 
   /** 아직 옮기지 않은 화면으로 가는 칸 — 원본에는 없는 웹판 알림이다 */
   const openOrNotice = useCallback((open: (() => void) | undefined) => {
@@ -197,6 +223,15 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
           onSave(rest.career)
           // StrMODE[24] "사기" + 수치 + [83] (0x18e3c)
           setNotice(`사기 ${rest.moraleGain} 상승하였습니다`)
+          /*
+           * 결과 창을 **닫을 때** 회복 판정 0x1b308 (질병 60% · 부상 30%, G 2-2).
+           * 타자편 `useCareerSession` 이 `recoverAfterRest` 를 부르는 자리와 같다.
+           */
+          setAfterNotice(() => () => {
+            const recovered = recoverAfterPitcherRest(rest.career, random)
+            onSave(recovered.career)
+            if (recovered.recoveries.length > 0) setNotice(recovered.recoveries.join(' '))
+          })
         },
       })
     },
@@ -209,11 +244,19 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
       if (id === '장비착용' || id === '아이템/스킬') return openOrNotice(onOpenShop)
       if (id === '구질') return openPitchWindow(false)
       /*
-       * [기록실] — 원본은 StrMODE[74] "보고 싶은 기록을 선택해주세요" 두 갈래 팝업(0x80)으로
-       * `장면+0x164` 를 정하고 **124 선수 기록 목록**(엔트리 편집기 판 0x5761c/0x5796c)을 연다.
-       * ⚠️ 두 갈래의 이름이 문서에 없어 팝업을 두지 않고 시즌 성적 창 하나만 연다 (**웹판 근사**).
+       * [기록실] — StrMODE[74] 두 갈래 팝업(0x80)이 `장면+0x164` 를 정하고 **124** 로 간다.
+       * 0 이면 기본 엔트리 목록(0x5cfec), 그 밖이면 나리 판 목록(0x5796c) 이다 (R4 2c).
+       * ⚠️ 두 갈래의 **이름표**는 문서에 없어 하는 일로 적었다 (`RECORD_WINDOW_CHOICES`).
        */
-      return setSubWindow('기록실')
+      return setChoice({
+        text: PITCHER_MANAGEMENT_TEXT.chooseRecord,
+        labels: RECORD_WINDOW_CHOICES,
+        onChoose: (index) => {
+          setRecordWindowTab(index === 0 ? RECORD_WINDOW_TABS.엔트리 : RECORD_WINDOW_TABS.성적)
+          setChoice(null)
+          setSubWindow('기록실')
+        },
+      })
     },
     [onOpenShop, openPitchWindow],
   )
@@ -280,6 +323,50 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     [choice],
   )
 
+  /**
+   * 123 창 탭 1 — 마구 칸 i 를 고른다 (키 0x17cec).
+   * 막히는 차례도 원본 그대로: 사용 중(StrMODE[69]) → 배운 수 부족([71]) → 확인([70]).
+   */
+  const selectMagicCell = useCallback(
+    (cellIndex: number) => {
+      setNotice('')
+      const reason = magicSelectBlockReasonOf(career, cellIndex)
+      if (reason === '사용중') return setNotice(PITCHER_MANAGEMENT_TEXT.magicAlreadyInUse)
+      if (reason !== null) return setNotice(PITCHER_MANAGEMENT_TEXT.magicNeedsTraining)
+      const name = magicPitchNameOf(magicNumberOfCell(cellIndex), pitcherFormOfCareer(career)) ?? ''
+      return setQuestion({
+        text: useQuestionOf(name),
+        onYes: () => onSave(selectMagicPitch(career, cellIndex)),
+      })
+    },
+    [career, onSave],
+  )
+
+  /** 123 창 탭 2 — 구질 하나를 고른다 (StrMODE[72]·[73]) */
+  const selectPitchCell = useCallback(
+    (typeNumber: number) => {
+      setNotice('')
+      const reason = pitchTypeSelectBlockReasonOf(career, typeNumber)
+      if (reason === '사용중') return setNotice(PITCHER_MANAGEMENT_TEXT.pitchAlreadyInUse)
+      // 창에는 가진 구질만 놓이므로 '미보유' 는 원본에도 없는 길이다
+      if (reason !== null) return setNotice(`${pitchTypeNameOf(typeNumber)} 을(를) 아직 배우지 않았습니다`)
+      return setQuestion({
+        text: PITCHER_MANAGEMENT_TEXT.pitchUseQuestion,
+        onYes: () => onSave(selectPitchType(career, typeNumber)),
+      })
+    },
+    [career, onSave],
+  )
+
+  /** 알림을 닫는다 — 닫을 때 할 일이 걸려 있으면 그것까지 (휴식 회복 판정 0x1b308) */
+  const dismissNotice = useCallback(() => {
+    setNotice('')
+    const next = afterNotice
+    if (next === null) return
+    setAfterNotice(null)
+    next()
+  }, [afterNotice])
+
   const saveTrainedPitch = useCallback(
     (trained: PitcherCareer) => {
       onSave(trained)
@@ -294,13 +381,16 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     subWindow,
     pitchWindowTab,
     changePitchTab: setPitchWindowTab,
+    recordWindowTab,
+    selectMagicCell,
+    selectPitchCell,
     items,
     notice,
     question,
     choice,
     select,
     back,
-    dismissNotice: () => setNotice(''),
+    dismissNotice,
     answerQuestion,
     chooseOption,
     closeWindow,

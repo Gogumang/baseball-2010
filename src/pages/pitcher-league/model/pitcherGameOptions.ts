@@ -92,12 +92,16 @@ export function pitcherGameOptionsOf(
     repertoire: {
       pitchMask: career.pitchMask,
       form: pitcherFormOfCareer(career),
-      // 육성 투수의 마구 번호는 마구 레벨 그대로다 (투수 표 0xcc368 = [1,2,3,4], H-4)
-      magicNumber: career.magicLevel,
+      /*
+       * 경기에 실리는 것은 **123 창에서 고른 번호**(레코드 +0x18)다 — 배운 수(magicLevel)는
+       * 고를 수 있는 번호의 상한일 뿐이다 (H2 1-2 "레벨은 여기서 직접 쓰이지 않는다").
+       * 그래서 훈련만 하고 고르지 않으면 원본에서도 마구가 나가지 않는다.
+       */
+      magicNumber: career.selectedMagicNumber,
       isAce: false,
     },
     magicCount: magicPitchCountOf({
-      number: career.magicLevel,
+      number: career.selectedMagicNumber,
       isAce: false,
       aceLevel: 0,
       hasSpiritSkill: hasPitcherSkill(career, SPIRIT_SKILL),

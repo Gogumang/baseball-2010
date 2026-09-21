@@ -37,11 +37,32 @@ export const pitchList = style({
 })
 
 export const pitchChip = style({
+  background: 'transparent',
   border: `1px solid ${ORIGINAL_COLORS.windowBorder}`,
   color: ORIGINAL_COLORS.highlightYellow,
   fontSize: '8px',
   lineHeight: '11px',
   padding: '1px 2px',
+  cursor: 'pointer',
+})
+
+/** 기록실 엔트리 줄 (124 의 목록 칸 자리 — ⚠️ 원본 칸 배치 0x5796c 미해독) */
+export const entryRow = style({
+  color: ORIGINAL_COLORS.text,
+  fontSize: '8px',
+  lineHeight: '11px',
+  minWidth: '52px',
+})
+
+/** 지금 쓰는 칸 (레코드 +0x18) — 원본은 창 안에서 "사용 중" 으로 가른다 */
+export const pitchChipSelected = style({
+  borderColor: ORIGINAL_COLORS.highlightYellow,
+  color: ORIGINAL_COLORS.text,
+})
+
+/** 아직 훈련이 덜 된 칸 — StrMODE[71] 로 막히는 자리 */
+export const pitchChipLocked = style({
+  color: ORIGINAL_COLORS.tableDivider,
 })
 
 /** 탭 줄 (마구 1 · 구질 2) */

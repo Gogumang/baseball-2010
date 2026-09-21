@@ -46,12 +46,21 @@ describe('경기 옵션 조립 — 커리어 → PitcherGameOptions', () => {
     expect(options.staminaAbility).toBe(500)
   })
 
-  it('마구는 레벨이 곧 레코드 +0x18 번호이고 횟수는 표 0xd84ff 다 (1→4 · 2→5 · 3→6 · 4→7)', () => {
+  /*
+   * 예전에는 배운 수(magicLevel)를 그대로 레코드 +0x18 로 넘겼다. 원본은 123 창에서 **고른 번호**
+   * (+0x18)만 경기에 싣고 배운 수는 고를 수 있는 번호의 상한일 뿐이라(H2 1-2) 고른 번호로 바꿨다.
+   */
+  it('마구는 123 창에서 고른 번호(+0x18)가 나가고 횟수는 표 0xd84ff 다 (1→4 · 2→5 · 3→6 · 4→7)', () => {
     expect(pitcherGameOptionsOf(투수()).magicCount).toBe(0)
-    expect(pitcherGameOptionsOf(투수({ magicLevel: 2 })).magicCount).toBe(5)
-    expect(pitcherGameOptionsOf(투수({ magicLevel: 2 })).repertoire.magicNumber).toBe(2)
+    // 훈련만 하고 고르지 않았으면 마구가 나가지 않는다
+    expect(pitcherGameOptionsOf(투수({ magicLevel: 2 })).repertoire.magicNumber).toBe(0)
+    expect(pitcherGameOptionsOf(투수({ magicLevel: 2 })).magicCount).toBe(0)
+
+    const 고름 = 투수({ magicLevel: 2, selectedMagicNumber: 2 })
+    expect(pitcherGameOptionsOf(고름).repertoire.magicNumber).toBe(2)
+    expect(pitcherGameOptionsOf(고름).magicCount).toBe(5)
     // 투수 스킬 23 혼신 +2
-    expect(pitcherGameOptionsOf(투수({ magicLevel: 2, skillIds: [23] })).magicCount).toBe(7)
+    expect(pitcherGameOptionsOf(투수({ magicLevel: 2, selectedMagicNumber: 2, skillIds: [23] })).magicCount).toBe(7)
   })
 
   it('투구 게이지는 넘기지 않으면 **꺼짐**이다 — 원본 기본값 (K 5-2)', () => {

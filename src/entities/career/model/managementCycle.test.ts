@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { applyGameResult, createCareer, startNextSeason } from '@/entities/career/model/playerCareer'
+import {
+  applyGameResult,
+  createCareer,
+  isManagementCycleOpen,
+  startNextSeason,
+} from '@/entities/career/model/playerCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { blockReasonOf, runTraining } from '@/entities/career/model/training'
 import { outingBlockReasonOf, restBlockReasonOf, runOuting, runRest } from '@/entities/career/model/outing'
@@ -39,13 +44,25 @@ describe('관리 주기마다 한 가지만', () => {
     expect(blockReasonOf(runOuting(부자선수(), 외식, createSeededRandom(1)), 히트)).toBe('이미행동함')
   })
 
-  it('다음 관리 주기(2경기 뒤)가 열려야 다시 할 수 있다', () => {
+  /*
+   * 예전 이 테스트는 "2경기(관리 주기)를 치러야 행동이 다시 생긴다" 를 못박았다.
+   * 원본은 **경기마다** 행동 플래그를 지운다 (0x4f158, G-6 확정) — 관리 화면이 2경기마다만
+   * 열리므로 사람이 보는 결과는 같지만 기준이 다르다. 투수편은 이미 원본대로라 타자편도 맞췄다.
+   */
+  it('경기를 한 번 치르면 행동 플래그가 풀린다 (0x4f158)', () => {
     const rested = runRest(부자선수({ gamesPlayed: 2 }), createSeededRandom(1)).career
-    const afterOneGame = applyGameResult(rested, 경기결과)
-    expect(restBlockReasonOf(afterOneGame)).toBe('이미행동함')
+    expect(restBlockReasonOf(rested)).toBe('이미행동함')
 
-    const afterTwoGames = applyGameResult(afterOneGame, 경기결과)
-    expect(restBlockReasonOf(afterTwoGames)).toBeNull()
+    const afterOneGame = applyGameResult(rested, 경기결과)
+    expect(afterOneGame.hasActedThisCycle).toBe(false)
+    expect(restBlockReasonOf(afterOneGame)).toBeNull()
+  })
+
+  it('관리 화면이 열리는 때는 그대로 2경기마다다 (StrHOWTO[10][11])', () => {
+    const 선수 = 부자선수()
+
+    expect(isManagementCycleOpen({ ...선수, gamesPlayed: 1 })).toBe(false)
+    expect(isManagementCycleOpen({ ...선수, gamesPlayed: 2 })).toBe(true)
   })
 })
 

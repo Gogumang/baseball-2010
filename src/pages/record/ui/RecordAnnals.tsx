@@ -13,6 +13,7 @@ import {
   TAB_NAME_FRAMES, TAB_NAME_Y, TAB_PAGE_COUNTS, TOTAL_ROW, cellPositionOf, tabIconWidthOf,
   tabIconXOf, tabNameXOf, tabSlotXOf,
 } from '@/pages/record/lib/recordAnnalsLayout'
+import { STAT_NAMES } from '@/pages/record/lib/statNames'
 import * as styles from '@/pages/record/ui/RecordAnnals.css'
 
 const SLT_FRAME = './sprites/slt_frame'
@@ -42,6 +43,7 @@ interface RecordAnnalsProps {
  *
  * ⚠️ 탭 0 기록·탭 4 통계는 원본이 **달성 횟수**를 보여 주는데 웹은 그 누계를 아직 저장하지 않는다.
  * 이름만 원본 줄 배치로 보여 주고 값은 비워 둔다.
+ * 탭 4 의 줄 이름은 StrMAINMENU[129~182] 를 그대로 옮긴 `lib/statNames.ts` 다.
  */
 export function RecordAnnals({ collection, onBack }: RecordAnnalsProps) {
   const [tab, setTab] = useState(0)
@@ -202,12 +204,6 @@ export function RecordAnnals({ collection, onBack }: RecordAnnalsProps) {
     </RawScreen>
   )
 }
-
-/** 통계 탭 줄 이름 — 원본 StrMAINMENU[129~182] 은 아직 안 옮겼다 */
-const STAT_NAMES: readonly string[] = [
-  '일반모드 판 수', '나만의리그 판 수', '시즌모드 판 수', '대전모드 판 수',
-  '홈런더비 판 수', '미션모드 판 수', '모은 G포인트', '쓴 G포인트',
-]
 
 interface CellItem {
   readonly name: string

@@ -3,8 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { EndingScreen } from '@/pages/ending/ui/EndingScreen'
 import {
-  BAND_WINDOW, ENDING_IMAGE, IRIS, IRIS_STAGES, WALK_IN,
-  endingImageXOf, irisDrawValueOf, irisRadiusOf,
+  BAND_WINDOW, BATTER_EDITION_MODE, ENDING_IMAGE, IRIS, IRIS_STAGES, WALK_IN,
+  endingImageXOf, endingWalkInAnimationOf, endingWalkInPaletteOf, irisDrawValueOf, irisRadiusOf,
 } from '@/pages/ending/lib/endingLayout'
 
 /**
@@ -118,6 +118,38 @@ describe('걸어 들어오는 그림 — S12 7절', () => {
     expect(WALK_IN.characterYOf(9)).toBe(137)
     expect(WALK_IN.iconYOf(8)).toBe(60)
     expect(WALK_IN.iconYOf(9)).toBe(61)
+  })
+
+  it('애니 번호는 레코드 +0xb 가 고른다 — 타자 장타형만 8+2, 그 밖은 0+2 (0x63a5c)', () => {
+    const 기본 = { mode: BATTER_EDITION_MODE, typeIndex: 0, handIndex: 0, skinIndex: 0 }
+
+    expect(endingWalkInAnimationOf(기본)).toBe(2)
+    // p[0xb]>>4 = 타입<<1 | 손 이라 우타든 좌타든 타입 1 이면 8 이다
+    expect(endingWalkInAnimationOf({ ...기본, typeIndex: 1 })).toBe(10)
+    expect(endingWalkInAnimationOf({ ...기본, typeIndex: 1, handIndex: 1 })).toBe(10)
+    // 손만 좌면 >>4 값이 1 이라 조건(>1)에 못 미친다
+    expect(endingWalkInAnimationOf({ ...기본, handIndex: 1 })).toBe(2)
+    // 투수편(모드 3)은 조건에서 빠져 늘 2 다
+    expect(endingWalkInAnimationOf({ ...기본, mode: 3, typeIndex: 2 })).toBe(2)
+  })
+
+  it('⚠️ 원본 그대로 — 엔딩 팔레트는 피부 1→0 · 2→1 · 그 밖(0 황인)→2 다 (0x63a92)', () => {
+    const 기본 = { mode: BATTER_EDITION_MODE, typeIndex: 0, handIndex: 0, skinIndex: 0 }
+
+    expect(endingWalkInPaletteOf({ ...기본, skinIndex: 1 })).toBe(0)
+    expect(endingWalkInPaletteOf({ ...기본, skinIndex: 2 })).toBe(1)
+    // 이벤트 초상화(0x63a50)는 피부 0 이면 mpl 을 안 쓰는데 엔딩만 팔레트 2 로 간다
+    expect(endingWalkInPaletteOf(기본)).toBe(2)
+  })
+
+  it('고른 애니·팔레트 번호를 걸어 들어오는 그림에 얹는다', () => {
+    const { container } = 띄우기({
+      walkInLook: { mode: BATTER_EDITION_MODE, typeIndex: 1, handIndex: 0, skinIndex: 1 },
+    })
+    const walkIn = container.querySelector('div[data-animation]') as HTMLElement
+
+    expect(walkIn.dataset.animation).toBe('10')
+    expect(walkIn.dataset.palette).toBe('0')
   })
 
   it('그림은 event_char_0 애니와 mode_ui 프레임 87 이다', () => {

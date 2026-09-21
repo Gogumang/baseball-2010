@@ -134,10 +134,27 @@ export interface PitcherCareer {
   /** 보유 구질 비트마스크 `+0x1c` (비트 t−1 = 구질 t) */
   readonly pitchMask: number
   /**
-   * 마구 레벨 0~4 — 필살타법 창(탭 0·1)의 훈련 단계. 레코드 `+0x18` 마구 번호가 곧 이 값이다
-   * (투수 표 0xcc368 = [1,2,3,4], H-4 · H2 1-2). 0 이면 마구가 없다.
+   * 마구 **배운 수** 0~4 — 필살타법 창(탭 0·1)의 훈련 단계, 저장 `+0x201` 자리다
+   * (타자 필살타법과 같은 칸, H-4 · H2 1-2). 0 이면 마구가 없다.
+   *
+   * ⚠️ 배운 수는 **고를 수 있는 번호의 상한**일 뿐이고, 경기에 실리는 것은 아래
+   * `selectedMagicNumber`(레코드 +0x18) 다 (H2 1-2 "레벨은 여기서 직접 쓰이지 않는다").
    */
   readonly magicLevel: number
+  /**
+   * 고른 마구 번호 — 레코드 `+0x18` (0 없음 · 1~4). 123 창(키 0x17cec)이 표 0xcc368 = [1,2,3,4]
+   * 에서 골라 넣는다. 번호 4 는 폼에 따라 샤이닝·캐넌·미라지로 이름만 갈린다 (H2 2절).
+   */
+  readonly selectedMagicNumber: number
+  /**
+   * 고른 구질 — 123 창 탭 2 (StrMODE[72] "현재 사용 중인 구질입니다" · [73] "해당 구질을
+   * 사용하시겠습니까?"). 0 이면 고른 적이 없다.
+   *
+   * ⚠️ **원본 저장 칸을 못 찾았다**: 경기의 구질 칸 6개는 0xb6d2c 가 **마스크 +0x1c 만** 보고 만들고
+   * (H2 3-1), 0x17cec 의 탭 2 가지가 무엇을 쓰는지는 해독 문서에 없다. 그래서 이 칸은 아직
+   * **경기로 넘어가지 않는다** — 원본 칸이 밝혀지면 여기를 그 칸으로 바꾸면 된다.
+   */
+  readonly selectedPitchType: number
   /** 이번 레벨에 쌓은 마구 훈련 횟수 (타자 필살타법 +0x200 자리) */
   readonly magicSessions: number
   /** 구질 훈련 단계 8칸 — 0 없음 · 1 기본 습득 · 2 상위 습득 (커리어 +0x208, J 3-2) */
@@ -214,6 +231,9 @@ export function createPitcherCareer(
     skinIndex: profile.skinIndex,
     pitchMask: rookiePitchMaskOf(profile.breakingPitchSlots),
     magicLevel: 0,
+    // 신인은 마구도 고른 구질도 없다 (레코드 +0x18 = 0)
+    selectedMagicNumber: 0,
+    selectedPitchType: 0,
     magicSessions: 0,
     pitchTrainingStages: rookiePitchTrainingStagesOf(profile.breakingPitchSlots),
     hiddenPitchRows: new Array<boolean>(HIDDEN_PITCH_ROW_COUNT).fill(false),

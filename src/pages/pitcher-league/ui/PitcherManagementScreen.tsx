@@ -66,9 +66,15 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
       {menu.subWindow === null && <PitcherStatusBoard career={career} />}
       {menu.subWindow === '기본정보' && <PitcherBasicInfoPanel career={career} />}
       {menu.subWindow === '구질목록' && (
-        <PitcherRepertoirePanel career={career} tab={menu.pitchWindowTab} onChangeTab={menu.changePitchTab} />
+        <PitcherRepertoirePanel
+          career={career}
+          tab={menu.pitchWindowTab}
+          onChangeTab={menu.changePitchTab}
+          onSelectMagic={menu.selectMagicCell}
+          onSelectPitch={menu.selectPitchCell}
+        />
       )}
-      {menu.subWindow === '기록실' && <PitcherRecordPanel career={career} />}
+      {menu.subWindow === '기록실' && <PitcherRecordPanel career={career} tab={menu.recordWindowTab} />}
 
       {menu.subWindow === null && menu.choice === null && (
         <Panel heading={menu.kind === '관리' ? '커맨드' : menu.kind}>
