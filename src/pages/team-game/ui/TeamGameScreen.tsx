@@ -42,6 +42,8 @@ import * as styles from '@/pages/team-game/ui/TeamGameScreen.css'
  * 한 화면에서 공수를 번갈아 돈다:
  *   - 우리 공격 → 타석 화면(`widgets/batting-stage`, 상태 0xf~0x13)
  *   - 우리 수비 → 투구 세 단계(구질 0xf → 코스 0x10 → 게이지 0x11)
+ *   - 어느 쪽이든 **인플레이 타구가 뜨면 수비 화면**(상태 0x17)으로 넘어가 공이 멈출 때까지
+ *     매 갱신 키를 읽는다 — 공격이면 주루(0x5331c), 수비면 송구(0x533c8)다
  *   - 그 밖(경기진행 설정이 "자동" 이라고 한 타석) → 진행기가 간이 엔진으로 넘긴 뒤 다음 사람 차례에서 멈춘다
  *
  * 경기 중 조작은 원본 `0x498d4` 를 따른다:
@@ -115,9 +117,13 @@ export function TeamGameScreen({
    * (CLR 은 웹에서 Escape·Backspace 로 받는다 — 원본 키 코드 −16.)
    */
   const isStealable = session.stealableBases
+  const isDefenseInPlay = session.pendingDefensePlay !== null
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat) return
+      // 수비 진행 중(상태 0x17)에는 이 키들이 원본에서도 안 먹는다 — '*' 는 경기 상태 0xd~0x15,
+      // '#' 는 0xe·0xf 일 때만 열리고(0x498d4), 그 사이 키는 주루·송구가 가져간다
+      if (isDefenseInPlay) return
       if (event.key === '*') {
         event.preventDefault()
         setChangingPitcher(false)
@@ -151,7 +157,15 @@ export function TeamGameScreen({
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [actions, isChangingPitcher, isMenuOpen, isStealable, overlay, session.canChangePitcher])
+  }, [
+    actions,
+    isChangingPitcher,
+    isDefenseInPlay,
+    isMenuOpen,
+    isStealable,
+    overlay,
+    session.canChangePitcher,
+  ])
 
   const burst = progress.burst
   const resolution = progress.lastBurstResolution
@@ -186,7 +200,24 @@ export function TeamGameScreen({
   }
 
   /**
-   * 인플레이 타구는 **수비 화면을 먼저 보여 준다** (원본 상태 0x17).
+   * 사람이 조작하는 갈래가 먼저다 — 진행 중인 타구가 있으면 **실시간으로 한 틱씩** 돌린다.
+   * 원본은 타구가 뜬 순간 상태 0x17 로 넘어가 공이 멈출 때까지 같은 루프를 돌며 매 갱신 키를 읽고,
+   * 사람이 **공격이면 주루**(0x5331c), **수비면 송구**(0x533c8)를 잡는다 (I 0절 상태 0x17 표).
+   * 팀 경기는 공수를 모두 사람이 맡으니 그 쪽이 이닝마다 갈린다 — 진행기가 붙들 때 적어 둔 값을 그대로 쓴다.
+   * 다 돌면 `onDone` 이 그 결과를 경기 상태에 먹인다 — **주자 처리는 그때 처음 정해진다.**
+   */
+  const pending = session.pendingDefensePlay
+  if (pending !== null) {
+    return (
+      <DefensePlayback
+        input={pending.input}
+        side={pending.side}
+        onDone={actions.finishDefensePlay}
+      />
+    )
+  }
+  /**
+   * 홈런 비행처럼 조작할 것이 없는 장면은 **미리 만들어 둔 틱을 재생만** 한다 (원본도 같은 0x17 이다).
    * 이게 없으면 배트에 맞은 공이 어디로 갔는지 화면에 아예 안 나온다.
    */
   if (play !== null && play !== shownPlay && play.ticks.length > 0) {

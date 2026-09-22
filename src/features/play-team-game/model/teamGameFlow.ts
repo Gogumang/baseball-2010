@@ -18,7 +18,8 @@ import { rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
 import { applyOpponentAtBat } from '@/features/play-pitcher-game/model/pitcherGameState'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { defenseAbilitiesOf, isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
-import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
+import type { DefensePlayInput, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
+import type { ControlSide } from '@/entities/defense-controls/model/defenseKeys'
 import { homeRunPlaybackOf } from '@/features/defense-play/model/homeRunPlayback'
 import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
@@ -178,6 +179,23 @@ export interface TeamPitchingLine {
   readonly allowedBaserunner: boolean
 }
 
+/**
+ * 화면이 실시간으로 돌리는 한 타구 — 진행기에 넘길 것과, 그것이 끝난 뒤 어느 길로 먹일지.
+ *
+ * `side` 는 **사람이 어느 쪽을 잡는가** 다 — 조작 객체 `[+0xc]` (0 공격 · 1 수비).
+ * 원본은 상태 0x17 갈래 `0x53420` 에서 **공격이면 주루 `0x5331c`**(진루 0x582 · 귀루 0x584 ·
+ * OK → 슬라이딩 0x585), **수비면 송구 `0x533c8`**(0x588, 목표 루)로 가른다 (I 0절 표).
+ * 팀 경기는 공수를 모두 사람이 맡으니 이 칸도 타석마다 갈린다 — 나만의리그 타자편처럼 고정이 아니다.
+ */
+export interface PendingDefensePlay {
+  /** 사람이 잡은 쪽 — 우리 공격 타석이면 '공격'(주루), 사람이 던진 타석이면 '수비'(송구) */
+  readonly side: ControlSide
+  /** 진행기에 그대로 넘기는 한 타구 (`startDefensePlay`/`stepDefensePlay` 가 받는다) */
+  readonly input: DefensePlayInput
+  /** 이 타구를 낸 타석 결과 — 다 돌린 뒤 경기 상태에 먹일 때 쓴다 */
+  readonly outcome: AtBatOutcome
+}
+
 const EMPTY_PITCHING_LINE: TeamPitchingLine = {
   outsRecorded: 0,
   hitsAllowed: 0,
@@ -218,8 +236,26 @@ export interface TeamGameProgress {
   readonly pitchCount: number
   readonly lastPitch: Pitch | null
   readonly lastResolution: PitchResolution | null
-  /** 사람이 친 마지막 인플레이 타구의 수비 시뮬레이션 (수비 화면이 이것만 받아 그리면 된다) */
+  /**
+   * **재생만 하면 되는** 장면 — 매 틱 스냅샷이 들어 있어 화면은 이것만 받아 그리면 된다.
+   * 홈런 비행처럼 사람이 조작할 것이 없는 장면이 여기 들어온다. 사람이 주루·송구를 잡는
+   * 인플레이 타구는 `pendingDefensePlay` 쪽으로 가고, 다 본 뒤에는 **여기 남기지 않는다**
+   * — 남기면 같은 장면을 한 번 더 튼다.
+   */
   readonly lastDefensePlay: DefensePlayResult | null
+  /**
+   * **지금 화면이 실시간으로 돌리고 있는 타구.** 차 있으면 이 경기는 "수비 진행 중" 이고,
+   * 타석 결과(안타/아웃 코드)만 정해졌을 뿐 **진루·아웃·득점은 아직 하나도 안 먹였다**.
+   *
+   * 원본은 타구가 뜨면 경기 장면이 상태 0x17 로 넘어가 공이 멈출 때까지 같은 루프를 돌며
+   * 매 갱신 눌린 키를 읽는다 (R10 · I 0절). 그 동안 다음 투구는 나가지 않는다 —
+   * 웹도 이 칸이 차 있는 동안 `isHumanTurn` 이 거짓이 되어 다음 타석을 시작하지 않는다.
+   *
+   * 화면이 다 돌고 나면 `resolveDefensePlay` 가 그 결과를 먹이고 이 칸을 비운다.
+   * 미리 다 계산해도 되는 자리(자동 소화·테스트)는 `applyBatterOutcome`·`throwPitch` 를 부르면
+   * 이 칸을 거쳐 가되 한 번에 비워져 나온다 — 밖에서 보면 예전과 똑같다.
+   */
+  readonly pendingDefensePlay: PendingDefensePlay | null
   readonly pitching: TeamPitchingLine
   /** 우리 팀 타선이 친 안타 수 (간단 박스스코어) */
   readonly ourHits: number
@@ -280,6 +316,7 @@ export function startTeamGame(options: TeamGameOptions, random: RandomPort): Tea
     lastPitch: null,
     lastResolution: null,
     lastDefensePlay: null,
+    pendingDefensePlay: null,
     pitching: EMPTY_PITCHING_LINE,
     ourHits: 0,
     leaguePlateAppearances: [],
@@ -311,6 +348,9 @@ export function isOurOffense(progress: TeamGameProgress): boolean {
  */
 export function isHumanTurn(progress: TeamGameProgress): boolean {
   if (progress.game.isFinished) return false
+  // 수비 진행 중(원본 상태 0x17)에는 타석·투구 차례가 아니다 — 원본도 공이 멈출 때까지
+  // 0xe·0xf 로 돌아가지 않아 다음 투구가 나가지 않는다
+  if (progress.pendingDefensePlay !== null) return false
   const ours = isOurOffense(progress)
   return isHumanControlled(settingsOf(progress), {
     mode: progress.options.mode,
@@ -414,53 +454,153 @@ export function pitchSlotsFor(progress: TeamGameProgress): readonly PitchSlot[] 
 /**
  * 사람 타석의 **공 하나**를 반영한다. 타석이 끝나면 그 자리에서 주자·점수까지 처리한다.
  * 화면은 `BattingStage` 가 준 `PitchOutcomeDetail` 을 그대로 넘기면 된다.
+ *
+ * ⚠️ 수비 화면을 띄우는 화면은 `startBatterPitch` 를 쓴다 — 이쪽은 타구까지 미리 다 돌려 버린다.
  */
 export function applyBatterPitch(
   progress: TeamGameProgress,
   detail: PitchOutcomeDetail,
   random: RandomPort,
-  options: { readonly pattern?: BattedBallPattern; readonly isUncatchable?: boolean } = {},
+  options: BatterOutcomeOptions = {},
+): TeamGameProgress {
+  return batterPitch(progress, detail, random, options, applyBatterOutcome)
+}
+
+/**
+ * 같은 공 하나지만, 타석이 인플레이 타구로 끝나면 **주자 처리를 수비 화면 뒤로 미룬다**
+ * (`pendingDefensePlay` 에 얹고 멈춘다). 화면이 다 돌면 `resolveDefensePlay` 를 부르면 된다.
+ */
+export function startBatterPitch(
+  progress: TeamGameProgress,
+  detail: PitchOutcomeDetail,
+  random: RandomPort,
+  options: BatterOutcomeOptions = {},
+): TeamGameProgress {
+  return batterPitch(progress, detail, random, options, startBatterOutcome)
+}
+
+function batterPitch(
+  progress: TeamGameProgress,
+  detail: PitchOutcomeDetail,
+  random: RandomPort,
+  options: BatterOutcomeOptions,
+  applyOutcome: (
+    progress: TeamGameProgress,
+    outcome: AtBatOutcome,
+    random: RandomPort,
+    options: BatterOutcomeOptions,
+  ) => TeamGameProgress,
 ): TeamGameProgress {
   if (!isBatterTurn(progress)) return progress
   const atBat = applyPitchResolution(progress.atBat, detail.resolution)
   const outcome = atBat.outcome
   if (outcome === null) return { ...progress, atBat }
-  return applyBatterOutcome({ ...progress, atBat }, outcome, random, options)
+  return applyOutcome({ ...progress, atBat }, outcome, random, options)
+}
+
+export interface BatterOutcomeOptions {
+  readonly pattern?: BattedBallPattern
+  readonly isUncatchable?: boolean
 }
 
 /**
  * 사람 타석 하나의 **결과**를 반영하고 다음 사람 차례까지 민다.
  * 인플레이 타구는 수비 시뮬레이션을 돌려 아웃·득점·루 상황을 그 결과로 갈아 끼운다.
+ *
+ * ⚠️ 사람이 주루를 조작하는 화면은 이것을 쓰지 않는다 — `startBatterOutcome` 으로 타석 결과만
+ * 먼저 정하고, 화면이 틱을 다 돌린 뒤 `resolveDefensePlay` 로 주자 처리를 먹인다.
+ * 여기는 그 둘을 한 줄로 이어 붙인 **얇은 껍데기**다 (자동 소화·테스트처럼 끼어들 사람이 없는 자리용).
  */
 export function applyBatterOutcome(
   progress: TeamGameProgress,
   outcome: AtBatOutcome,
   random: RandomPort,
-  options: { readonly pattern?: BattedBallPattern; readonly isUncatchable?: boolean } = {},
+  options: BatterOutcomeOptions = {},
+): TeamGameProgress {
+  const started = startBatterOutcome(progress, outcome, random, options)
+  const pending = started.pendingDefensePlay
+  if (pending === null) return started
+  // 미리 다 돌려 버린다 — `runDefensePlay` 는 스테퍼를 끝까지 도는 얇은 껍데기라 난수 차례가 같다.
+  // 이 갈래는 아직 아무것도 안 보여 줬으므로 돌린 결과를 그대로 재생거리로 넘긴다 (예전 그대로).
+  const result = runDefensePlay(pending.input)
+  return finishBatterOutcome({ ...started, pendingDefensePlay: null }, outcome, random, result, result)
+}
+
+/**
+ * 사람 타석의 결과 코드만 먼저 정한다 — **인플레이 타구면 주자 처리를 뒤로 미룬다.**
+ *
+ * 인플레이 타구는 진행기에 넘길 `DefensePlayInput` 만 만들어 `pendingDefensePlay` 에 얹고
+ * 경기 상태는 **한 톨도 건드리지 않은 채** 돌려준다. 그 동안 `isHumanTurn` 이 거짓이라
+ * 다음 투구가 나가지 않는 것이 이 칸의 뜻이다 (원본 상태 0x17 이 도는 동안 0xf 로 안 돌아간다).
+ *
+ * 우리 공격 타석이므로 사람이 잡는 쪽은 **공격(주루 0x5331c)** 이다 (I 0절 상태 0x17 표).
+ * 삼진·볼넷·홈런은 수비가 개입할 것이 없어 여기서 곧장 끝낸다.
+ */
+export function startBatterOutcome(
+  progress: TeamGameProgress,
+  outcome: AtBatOutcome,
+  random: RandomPort,
+  options: BatterOutcomeOptions = {},
 ): TeamGameProgress {
   if (progress.game.isFinished) return progress
-  const before = progress.game
+  if (!isBattedBallInPlay(outcome)) {
+    // 홈런도 공이 날아가는 그림은 나와야 한다 — 진루·득점은 그대로 두고 **보여 줄 틱만** 만든다
+    const playback = homeRunPlaybackOf({ outcome, bases: progress.game.bases, pattern: options.pattern })
+    return finishBatterOutcome(progress, outcome, random, null, playback)
+  }
+  return {
+    ...progress,
+    pendingDefensePlay: {
+      side: '공격',
+      input: batterDefenseInputOf(progress, outcome, random, options),
+      outcome,
+    },
+  }
+}
 
-  const defensePlay = isBattedBallInPlay(outcome)
-    ? runDefensePlay({
-        outcome,
-        trajectory: battedBallTrajectory(options.pattern ?? representativePatternOf(outcome)),
-        bases: before.bases,
-        outs: before.outs,
-        // 우리 공격이니 수비는 상대 팀이다
-        defenseAbilities: defenseAbilitiesFor(progress, progress.options.opponentTeamId, progress.opponentPitcherIndex),
-        runAbility: runAbilityFor(progress, progress.options.ourTeamId, before.battingOrderIndex),
-        // 난수를 넘겨야 펌블·악송구·필살수비·레이저 굴림이 돈다
-        random,
-        gameMode: progress.options.mode,
-        // 상대 수비는 CPU 다 → 협살(AI 상태 8)이 돈다
-        defenseIsCpu: true,
-        // 필살타법이 성공한 타구면 야수가 쥐지 않는다 (0x51800)
-        isUncatchable: options.isUncatchable,
-      })
-    : null
-  // 홈런도 공이 날아가는 그림은 나와야 한다 — 진루·득점은 그대로 두고 **보여 줄 틱만** 만든다
-  const playback = defensePlay ?? homeRunPlaybackOf({ outcome, bases: before.bases, pattern: options.pattern })
+/**
+ * 우리 공격 타석의 타구 하나 — 능력치·난수·모드·수비 주체까지 다 여기서 채운다.
+ * 이 객체를 만드는 데는 난수를 **한 번도 쓰지 않는다** (굴림은 전부 진행기 안에서 돈다).
+ */
+function batterDefenseInputOf(
+  progress: TeamGameProgress,
+  outcome: AtBatOutcome,
+  random: RandomPort,
+  options: BatterOutcomeOptions,
+): DefensePlayInput {
+  const before = progress.game
+  return {
+    outcome,
+    trajectory: battedBallTrajectory(options.pattern ?? representativePatternOf(outcome)),
+    bases: before.bases,
+    outs: before.outs,
+    // 우리 공격이니 수비는 상대 팀이다
+    defenseAbilities: defenseAbilitiesFor(progress, progress.options.opponentTeamId, progress.opponentPitcherIndex),
+    runAbility: runAbilityFor(progress, progress.options.ourTeamId, before.battingOrderIndex),
+    // 난수를 넘겨야 펌블·악송구·필살수비·레이저 굴림이 돈다
+    random,
+    gameMode: progress.options.mode,
+    // 상대 수비는 CPU 다 → 협살(AI 상태 8)이 돈다
+    defenseIsCpu: true,
+    // 필살타법이 성공한 타구면 야수가 쥐지 않는다 (0x51800)
+    isUncatchable: options.isUncatchable,
+  }
+}
+
+/**
+ * 사람 타석 하나를 경기 상태에 먹이고 다음 사람 차례까지 민다 — 예전 `applyBatterOutcome` 의 몸통이다.
+ *
+ * `defensePlay` 가 있으면 그 결과로 진루·아웃·득점을 갈아 끼운다. `playback` 은 화면에 재생시킬 것 —
+ * **실시간으로 이미 다 보여 준 플레이는 null** 이고, 홈런은 부르는 쪽이 비행 틱을 만들어 넘긴다.
+ */
+function finishBatterOutcome(
+  progress: TeamGameProgress,
+  outcome: AtBatOutcome,
+  random: RandomPort,
+  defensePlay: DefensePlayResult | null,
+  playback: DefensePlayResult | null,
+): TeamGameProgress {
+  const before = progress.game
 
   const game = applyAtBatOutcome(before, outcome, defensePlay?.advance)
   const runsBattedIn = game.ourScore - before.ourScore
@@ -526,11 +666,35 @@ export interface TeamPitchInput {
 /**
  * 공 하나를 던진다 (상태 0x10 확정 → 0x11 → 0x12/0x13).
  * 투수편 `pitcherGameFlow.throwPitch` 와 같은 순서다 — 상대 타자는 CPU 가 반응한다.
+ *
+ * ⚠️ 수비 화면을 띄우는 화면은 `startThrowPitch` 를 쓴다 — 이쪽은 타구까지 미리 다 돌려 버린다.
  */
 export function throwPitch(
   progress: TeamGameProgress,
   input: TeamPitchInput,
   random: RandomPort,
+): TeamGameProgress {
+  return pitchOnce(progress, input, random, false)
+}
+
+/**
+ * 같은 공 하나지만, 인플레이 타구가 나오면 **송구를 사람이 잡도록 거기서 멈춘다**
+ * (`pendingDefensePlay` 에 얹는다). 화면이 다 돌면 `resolveDefensePlay` 를 부르면 된다.
+ */
+export function startThrowPitch(
+  progress: TeamGameProgress,
+  input: TeamPitchInput,
+  random: RandomPort,
+): TeamGameProgress {
+  return pitchOnce(progress, input, random, true)
+}
+
+/** `defer` 가 참이면 인플레이 타구에서 멈춘다 — 그 밖은 예전처럼 타구까지 한 번에 돌린다 */
+function pitchOnce(
+  progress: TeamGameProgress,
+  input: TeamPitchInput,
+  random: RandomPort,
+  defer: boolean,
 ): TeamGameProgress {
   if (!isPitchTurn(progress)) return progress
   const { options } = progress
@@ -611,38 +775,84 @@ export function throwPitch(
 
   const outcome = afterPitch.atBat.outcome
   if (outcome === null) return afterPitch
-  return advance(applyDefensiveAtBat(afterPitch, outcome, true, random), random)
+
+  const started = startDefensiveAtBat(afterPitch, outcome, true, random)
+  const pending = started.pendingDefensePlay
+  // 수비 진행 중 — 화면이 틱을 돌리는 동안 경기를 붙들어 둔다 (원본 상태 0x17)
+  if (pending === null) return advance(started, random)
+  if (defer) return started
+  // 미리 다 돌려 버리는 갈래 — 난수를 쓰는 자리가 예전 `runDefensePlay` 호출과 똑같다
+  const result = runDefensePlay(pending.input)
+  return advance(
+    finishDefensiveAtBat({ ...started, pendingDefensePlay: null }, outcome, true, result, result),
+    random,
+  )
 }
 
 /**
- * 상대 타석 하나를 반영한다. `mine` 이 참이면 사람이 던진 타석이라
- * 인플레이 타구에 수비 시뮬레이션을 돌리고 돌발 판정까지 한다.
+ * 상대 타석 하나의 결과 코드만 먼저 정한다. `mine` 이 참이면 사람이 던진 타석이라
+ * 인플레이 타구를 `pendingDefensePlay` 에 얹고 **경기 상태는 한 톨도 안 건드린 채** 멈춘다.
+ *
+ * 사람이 잡는 쪽은 **수비(송구 0x533c8)** 다 — 원본 상태 0x17 갈래가 공/수로 가르는 그 자리다
+ * (I 0절 표: 공격이면 0x5331c 주루, 수비면 0x533c8 송구).
+ *
+ * 자동으로 넘긴 타석(`mine` 거짓)은 수비 시뮬레이션 자체가 없어 곧장 끝난다.
  */
-function applyDefensiveAtBat(
+function startDefensiveAtBat(
   progress: TeamGameProgress,
   outcome: AtBatOutcome,
   mine: boolean,
   random: RandomPort,
 ): TeamGameProgress {
+  if (!(mine && isBattedBallInPlay(outcome))) {
+    // 내가 던진 타석이면 홈런도 날아가는 그림을 보여 준다 (자동으로 넘긴 타석은 재생 자체가 없다)
+    const playback = mine ? homeRunPlaybackOf({ outcome, bases: progress.game.bases }) : null
+    return finishDefensiveAtBat(progress, outcome, mine, null, playback)
+  }
+  return {
+    ...progress,
+    pendingDefensePlay: { side: '수비', input: defensiveDefenseInputOf(progress, outcome, random), outcome },
+  }
+}
+
+/**
+ * 사람이 던진 타석의 타구 하나. 이 객체를 만드는 데는 난수를 **한 번도 쓰지 않는다**
+ * (굴림은 전부 진행기 안에서 돈다).
+ */
+function defensiveDefenseInputOf(
+  progress: TeamGameProgress,
+  outcome: AtBatOutcome,
+  random: RandomPort,
+): DefensePlayInput {
   const before = progress.game
-  const defensePlay =
-    mine && isBattedBallInPlay(outcome)
-      ? runDefensePlay({
-          outcome,
-          trajectory: battedBallTrajectory(representativePatternOf(outcome)),
-          bases: before.bases,
-          outs: before.outs,
-          // 우리가 수비 중이다 — 아홉 칸은 우리 팀, 주자는 상대 타자
-          defenseAbilities: defenseAbilitiesFor(progress, progress.options.ourTeamId, progress.ourPitcherIndex),
-          runAbility: runAbilityFor(progress, progress.options.opponentTeamId, progress.opponentOrderIndex),
-          random,
-          gameMode: progress.options.mode,
-          // 이 타석의 수비는 **사람**이다 → 협살은 원본에서도 안 일어난다 (S8 1-4)
-          defenseIsCpu: false,
-        })
-      : null
-  // 내가 던진 타석이면 홈런도 날아가는 그림을 보여 준다 (자동으로 넘긴 타석은 재생 자체가 없다)
-  const playback = defensePlay ?? (mine ? homeRunPlaybackOf({ outcome, bases: before.bases }) : null)
+  return {
+    outcome,
+    trajectory: battedBallTrajectory(representativePatternOf(outcome)),
+    bases: before.bases,
+    outs: before.outs,
+    // 우리가 수비 중이다 — 아홉 칸은 우리 팀, 주자는 상대 타자
+    defenseAbilities: defenseAbilitiesFor(progress, progress.options.ourTeamId, progress.ourPitcherIndex),
+    runAbility: runAbilityFor(progress, progress.options.opponentTeamId, progress.opponentOrderIndex),
+    random,
+    gameMode: progress.options.mode,
+    // 이 타석의 수비는 **사람**이다 → 협살은 원본에서도 안 일어난다 (S8 1-4)
+    defenseIsCpu: false,
+  }
+}
+
+/**
+ * 상대 타석 하나를 경기 상태에 먹인다 — 예전 `applyDefensiveAtBat` 의 몸통이다.
+ * `playback` 이 null 이면 재생할 것이 없다는 뜻이라 `lastDefensePlay` 는 그대로 둔다
+ * (실시간으로 이미 다 보여 준 플레이가 여기로 온다 — 넣으면 같은 장면을 한 번 더 튼다).
+ */
+function finishDefensiveAtBat(
+  progress: TeamGameProgress,
+  outcome: AtBatOutcome,
+  mine: boolean,
+  defensePlay: DefensePlayResult | null,
+  playback: DefensePlayResult | null,
+): TeamGameProgress {
+  const before = progress.game
   const applied = applyOpponentAtBat(
     before,
     progress.opponentOrderIndex,
@@ -707,6 +917,32 @@ function applyDefensiveAtBat(
     }`,
     mine,
   )
+}
+
+/* ── 수비 화면이 끝났을 때 (원본 상태 0x17 → 0x18/0xe) ───────────────────────── */
+
+/**
+ * 화면이 다 돌린 수비 플레이를 **그때** 경기 상태에 먹인다.
+ *
+ * `result.advance`(진루·아웃·득점)와 `result.voidedRuns`(3아웃으로 날아간 보류 득점)가 여기서
+ * 비로소 경기 상태가 된다. 붙들어 둔 칸을 비우므로 다음 타석이 그제서야 시작된다.
+ *
+ * 공격이었으면 우리 타석 길로, 수비였으면 상대 타석 길로 간다 — 붙들 때 적어 둔 `side` 가 가른다.
+ * 이미 눈으로 다 본 플레이라 재생거리(`lastDefensePlay`)로는 남기지 않는다.
+ */
+export function resolveDefensePlay(
+  progress: TeamGameProgress,
+  result: DefensePlayResult,
+  random: RandomPort,
+): TeamGameProgress {
+  const pending = progress.pendingDefensePlay
+  if (pending === null) return progress
+  const cleared = { ...progress, pendingDefensePlay: null }
+  if (pending.side === '공격') {
+    // 우리 타석 쪽은 몸통 끝에서 이미 다음 사람 차례까지 민다
+    return finishBatterOutcome(cleared, pending.outcome, random, result, null)
+  }
+  return advance(finishDefensiveAtBat(cleared, pending.outcome, true, result, null), random)
 }
 
 /* ── 타석 준비 · 돌발 ─────────────────────────────────────────────────────────── */
@@ -1013,6 +1249,8 @@ export function canAutoProgress(progress: TeamGameProgress): boolean {
  * 여기서는 **경기 끝까지** 돌리되, 대전모드는 "6회까지만" 이라는 StrGAME[2] 에 맞춰 **6회를 마치면 멈춘다**.
  */
 export function runAutoProgress(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
+  // 수비 진행 중에는 손대지 않는다 — 붙들어 둔 타구를 버리고 다음 타석으로 넘어가면 안 된다
+  if (progress.pendingDefensePlay !== null) return progress
   let current = progress
   for (let step = 0; step < MAXIMUM_AUTO_STEPS; step += 1) {
     if (current.game.isFinished) return current
@@ -1214,7 +1452,7 @@ function playAutoDefenseAtBat(progress: TeamGameProgress, random: RandomPort): T
     { inning: progress.game.inning },
     random,
   )
-  return applyDefensiveAtBat(
+  return startDefensiveAtBat(
     {
       ...progress,
       pitcherJustChanged: false,

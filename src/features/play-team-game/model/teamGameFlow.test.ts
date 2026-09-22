@@ -20,13 +20,17 @@ import {
   ourPitcherStats,
   pitchSlotsFor,
   replacementPitcherIndexOf,
+  resolveDefensePlay,
   runAutoProgress,
+  startBatterOutcome,
   startTeamGame,
+  startThrowPitch,
   stealableBases,
   stealBase,
   summaryOf,
   throwPitch,
 } from '@/features/play-team-game/model/teamGameFlow'
+import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { TeamGameOptions, TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
@@ -456,5 +460,171 @@ describe('새 투수 고르기 방향 (0xac5d8, V3-E 정정)', () => {
     replacementPitcherIndexOf(벤치, { ...상황, saveSituation: true }, 세는난수)
 
     expect(굴린횟수).toBe(0)
+  })
+})
+
+describe('주자 처리는 수비 화면이 끝나야 정해진다 (상태 0x17 이 도는 동안은 붙들어 둔다)', () => {
+  const 땅볼 = { kind: '아웃', detail: '땅볼아웃' } as const
+
+  const 같은코스 = (progress: TeamGameProgress) => ({
+    typeNumber: 첫구질(progress),
+    courseCell: 4,
+    gaugeCell: 0,
+  })
+
+  /** 인플레이 타구가 나 붙들리는 투구가 **몇 번째**인지 센다 (0-기준). 없으면 null */
+  function 붙들리는투구번호(seed: number): number | null {
+    const random = createSeededRandom(seed)
+    let current = startTeamGame(기본옵션, random)
+    for (let pitch = 0; pitch < 300; pitch += 1) {
+      if (!isPitchTurn(current)) return null
+      const next = startThrowPitch(current, 같은코스(current), random)
+      if (next.pendingDefensePlay !== null) return pitch
+      current = next
+    }
+    return null
+  }
+
+  /**
+   * 같은 씨앗을 처음부터 다시 돌려 그 투구 **직전**으로 간다 — 난수 포트까지 같은 자리에 둔다.
+   * 두 길(한 번에 · 쪼개서)을 정확히 같은 난수 상태에서 견주려면 이렇게 두 번 재현해야 한다.
+   */
+  function 송구직전(seed: number, pitchIndex: number) {
+    const random = createSeededRandom(seed)
+    let current = startTeamGame(기본옵션, random)
+    for (let pitch = 0; pitch < pitchIndex; pitch += 1) {
+      current = startThrowPitch(current, 같은코스(current), random)
+    }
+    return { progress: current, input: 같은코스(current), random }
+  }
+
+  it('우리 공격의 인플레이 타구는 타구만 들고 멈춘다 — 진루·아웃·득점이 하나도 안 먹는다', () => {
+    const { progress, random } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
+
+    const 진행중 = startBatterOutcome(progress, 땅볼, random)
+
+    expect(진행중.pendingDefensePlay).not.toBeNull()
+    expect(진행중.pendingDefensePlay!.outcome).toEqual(땅볼)
+    // 투구 때의 루 상황·아웃을 그대로 들고 간다
+    expect(진행중.pendingDefensePlay!.input.bases).toEqual(progress.game.bases)
+    expect(진행중.pendingDefensePlay!.input.outs).toBe(progress.game.outs)
+    // 경기 상태는 한 톨도 안 바뀐다 — 타순도 안 돌고 기록도 안 쌓인다
+    expect(진행중.game).toEqual(progress.game)
+    expect(진행중.leaguePlateAppearances).toEqual(progress.leaguePlateAppearances)
+    expect(진행중.log).toEqual(progress.log)
+  })
+
+  it('붙들려 있는 동안은 칠 차례도 던질 차례도 아니다 — 다음 투구가 못 나간다 (0x17 → 0xf 안 감)', () => {
+    const { progress, random } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
+    const 진행중 = startBatterOutcome(progress, 땅볼, random)
+
+    expect(isBatterTurn(진행중)).toBe(false)
+    expect(isPitchTurn(진행중)).toBe(false)
+    // 도루·자동진행도 그 사이에는 안 먹는다
+    expect(stealableBases(진행중)).toEqual([])
+    expect(runAutoProgress(진행중, random)).toBe(진행중)
+  })
+
+  it('화면이 돌린 결과를 먹이면 그때 진루·아웃이 정해지고 칸이 비워진다', () => {
+    const { progress, random } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
+    const 진행중 = startBatterOutcome(progress, { kind: '안타', bases: 2 }, random)
+    const 결과 = runDefensePlay(진행중.pendingDefensePlay!.input)
+
+    const 끝 = resolveDefensePlay(진행중, 결과, random)
+
+    expect(끝.pendingDefensePlay).toBeNull()
+    expect(끝.ourHits).toBe(1)
+    expect(끝.game.battingOrderIndex).toBe(1)
+    // 이미 눈으로 다 본 플레이라 재생거리로 남기지 않는다 — 남기면 같은 장면을 한 번 더 튼다
+    expect(끝.lastDefensePlay).toBeNull()
+  })
+
+  it('삼진·볼넷·홈런은 붙들 것이 없어 곧장 끝난다', () => {
+    for (const outcome of [{ kind: '삼진' }, { kind: '볼넷' }, { kind: '홈런' }] as const) {
+      const { progress, random } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
+      const 끝 = startBatterOutcome(progress, outcome, random)
+      expect(끝.pendingDefensePlay, `${outcome.kind}`).toBeNull()
+    }
+  })
+
+  it('우리 공격 타석은 사람이 **공격**(주루 0x5331c)을 잡는다 — I 0절 상태 0x17 표', () => {
+    const { progress, random } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
+    const 진행중 = startBatterOutcome(progress, 땅볼, random)
+
+    expect(진행중.pendingDefensePlay!.side).toBe('공격')
+    // 우리 공격이므로 수비는 상대 CPU 다 → 협살(AI 상태 8)이 돈다
+    expect(진행중.pendingDefensePlay!.input.defenseIsCpu).toBe(true)
+  })
+
+  it('사람이 던진 타석은 사람이 **수비**(송구 0x533c8)를 잡는다 — 같은 표의 반대 갈래', () => {
+    const 번호 = 붙들리는투구번호(20100901)
+    expect(번호).not.toBeNull()
+    const { progress, input, random } = 송구직전(20100901, 번호!)
+
+    const 진행중 = startThrowPitch(progress, input, random)
+
+    expect(진행중.pendingDefensePlay!.side).toBe('수비')
+    // 이 타석의 수비는 사람이다 → 협살은 원본에서도 안 일어난다 (S8 1-4)
+    expect(진행중.pendingDefensePlay!.input.defenseIsCpu).toBe(false)
+    // 붙들려 있는 동안은 던질 차례가 아니다
+    expect(isPitchTurn(진행중)).toBe(false)
+    // 경기 상태는 한 톨도 안 바뀐다 (투구 수·스태미나만 이미 깎여 있다)
+    expect(진행중.game).toEqual(progress.game)
+    expect(진행중.pitching).toEqual(progress.pitching)
+  })
+
+  it('자동으로 넘긴 타석은 붙들지 않는다 — 원본도 그 구간은 0x17 을 지나지 않는다', () => {
+    // "7회부터 직접" 설정이면 시작하자마자 여섯 이닝이 간이 엔진으로 지나간다
+    const { progress } = 시작({
+      settings: {
+        ...FULL_PLAY_SETTINGS,
+        kind: MATCH_SETTING_KIND.이닝,
+        value: INNING_VALUE.일곱째이닝부터,
+      },
+    })
+    expect(progress.pendingDefensePlay).toBeNull()
+  })
+
+  it('타자편 — 둘로 쪼갠 길과 한 번에 돌리는 길의 결과가 같다 (난수 차례도 같다)', () => {
+    const 기준 = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT }).progress
+    const 뜬공 = { kind: '아웃', detail: '뜬공아웃' } as const
+
+    const 한번에 = applyBatterOutcome(기준, 뜬공, createSeededRandom(3))
+    const 쪼개서 = (() => {
+      const random = createSeededRandom(3)
+      const 진행중 = startBatterOutcome(기준, 뜬공, random)
+      return resolveDefensePlay(진행중, runDefensePlay(진행중.pendingDefensePlay!.input), random)
+    })()
+
+    expect(쪼개서.game).toEqual(한번에.game)
+    expect(쪼개서.ourHits).toBe(한번에.ourHits)
+    expect(쪼개서.leaguePlateAppearances).toEqual(한번에.leaguePlateAppearances)
+    expect(쪼개서.opponentPitcherCounters).toEqual(한번에.opponentPitcherCounters)
+    expect(쪼개서.burst).toEqual(한번에.burst)
+    expect(쪼개서.log.map((entry) => entry.text)).toEqual(한번에.log.map((entry) => entry.text))
+  })
+
+  it('투수편 — 둘로 쪼갠 길과 한 번에 돌리는 길의 결과가 같다 (난수 차례도 같다)', () => {
+    const 번호 = 붙들리는투구번호(20100901)
+    expect(번호).not.toBeNull()
+
+    const 한번에 = (() => {
+      const { progress, input, random } = 송구직전(20100901, 번호!)
+      return throwPitch(progress, input, random)
+    })()
+    const 쪼개서 = (() => {
+      const { progress, input, random } = 송구직전(20100901, 번호!)
+      const 진행중 = startThrowPitch(progress, input, random)
+      expect(진행중.pendingDefensePlay).not.toBeNull()
+      return resolveDefensePlay(진행중, runDefensePlay(진행중.pendingDefensePlay!.input), random)
+    })()
+
+    expect(쪼개서.pendingDefensePlay).toBeNull()
+    expect(쪼개서.game).toEqual(한번에.game)
+    expect(쪼개서.pitching).toEqual(한번에.pitching)
+    expect(쪼개서.leaguePlateAppearances).toEqual(한번에.leaguePlateAppearances)
+    expect(쪼개서.ourPitcherCounters).toEqual(한번에.ourPitcherCounters)
+    expect(쪼개서.burst).toEqual(한번에.burst)
+    expect(쪼개서.log.map((entry) => entry.text)).toEqual(한번에.log.map((entry) => entry.text))
   })
 })

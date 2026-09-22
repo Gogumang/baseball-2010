@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import { TeamGameScreen } from '@/pages/team-game/ui/TeamGameScreen'
+import { DEFENSE_BACKGROUND_URL } from '@/pages/defense/lib/defenseView'
 import type { TeamGameOptions } from '@/features/play-team-game/model/teamGameFlow'
 
 afterEach(cleanup)
@@ -56,6 +57,32 @@ describe('팀 경기 화면 — 수비(투구) 차례', () => {
     fireEvent.click(screen.getAllByRole('button', { name: /[◎·]/ })[0])
 
     expect(screen.getByText('3. 투구 결정')).toBeTruthy()
+  })
+})
+
+describe('팀 경기 화면 — 인플레이 타구는 수비 화면으로 (상태 0x17)', () => {
+  /**
+   * 사람이 던진 공이 인플레이 타구가 되면 **투구 단계 대신 수비 화면**이 뜬다.
+   * 원본도 그 순간 경기 장면이 0x17 로 넘어가 공이 멈출 때까지 같은 루프를 돌며 키를 읽는다.
+   *
+   * ⚠️ jsdom 에는 캔버스도 프레임 원점 JSON 도 없어 야수·공 그림은 확인할 수 없다 —
+   * 구장 배경이 섰는지로 화면이 바뀐 것만 본다 (`DefensePlayback.test.tsx` 와 같은 한계).
+   * 붙든 상태를 다시 푸는 쪽은 `useTeamGame.test.tsx` 가 본다.
+   */
+  it('던진 공이 타구가 되면 구질 고르기가 사라지고 수비 화면이 뜬다', () => {
+    const { container } = 띄우기()
+
+    // 타구가 날 때까지 같은 구질·코스로 던진다 (씨앗 20100901 은 여덟 번째 투구에서 난다)
+    for (let pitch = 0; pitch < 200; pitch += 1) {
+      if (screen.queryByText('1. 구질 선택') === null) break
+      fireEvent.click(screen.getByText('FASTBALL'))
+      fireEvent.click(screen.getAllByRole('button', { name: /[◎·]/ })[0])
+    }
+
+    expect(screen.queryByText('1. 구질 선택')).toBeNull()
+    // 타석으로 넘어간 것이 아니다 — 수비 화면이다
+    expect(screen.queryByText('타석')).toBeNull()
+    expect(container.querySelector(`img[src="${DEFENSE_BACKGROUND_URL}"]`)).not.toBeNull()
   })
 })
 
