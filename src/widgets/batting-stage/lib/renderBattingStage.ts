@@ -3,7 +3,7 @@ import { ballFrameIndexAt, ballPixelAt, platePixelOf } from '@/widgets/batting-s
 import { frameAnimations, JUDGE_FRAMES, PITCHER_FRAMES, placedFrame, sprite } from '@/widgets/batting-stage/lib/spriteLoader'
 import { drawScenery } from '@/widgets/batting-stage/lib/renderScenery'
 import type { SceneryState } from '@/widgets/batting-stage/lib/renderScenery'
-import { judgeAnimationOf, judgeFrameAt, pitcherFrameAt, pitcherIdleFrameAt } from '@/widgets/batting-stage/lib/stageScenery'
+import { judgeAnimationOf, judgeFrameAt, PITCHER_OVERLAY_FRAME_OFFSET, pitcherFrameAt, pitcherIdleFrameAt } from '@/widgets/batting-stage/lib/stageScenery'
 
 import { drawHud } from '@/widgets/batting-stage/lib/renderHud'
 import { drawFieldMap } from '@/widgets/batting-stage/lib/renderFieldMap'
@@ -114,9 +114,13 @@ function drawPitcher(
   if (ace === null) {
     // 투구 단계 표 (0x9e0b8) · 대기 동작 (state 2)
     const index = pitcherTick === null ? pitcherIdleFrameAt(tick) : pitcherFrameAt(PITCHER_FORM, pitcherTick)
-    const frame = placedFrame(PITCHER_FRAMES, index)
-    if (frame === null) return
-    context.drawImage(frame.image, MOUND_CENTER_X + frame.offsetX, MOUND_BOTTOM_Y + frame.offsetY)
+    // 원본 0x79524 는 바탕 프레임 f 위에 같은 그림의 f+22 를 한 번 더 겹친다 —
+    // 몸통·던지는 팔·글러브 안 공이 거기 들어 있다 (PITCHER_OVERLAY_FRAME_OFFSET 주석).
+    for (const layer of [index, index + PITCHER_OVERLAY_FRAME_OFFSET]) {
+      const frame = placedFrame(PITCHER_FRAMES, layer)
+      if (frame === null) continue
+      context.drawImage(frame.image, MOUND_CENTER_X + frame.offsetX, MOUND_BOTTOM_Y + frame.offsetY)
+    }
     return
   }
 

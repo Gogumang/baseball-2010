@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   CLOUD_WRAP_WIDTH,
+  PITCHER_OVERLAY_FRAME_OFFSET,
   PITCHER_RELEASE_TICKS,
   cloudScrollAt,
   isCloudVisible,
@@ -57,6 +58,13 @@ describe('투수 투구 — 0x9e0b8 (단계 표 · 유지 dur+1)', () => {
 
   it('대기 [0,19,0,19,0] 유지 [1,1,3,4,4]+1 을 되풀이한다 (추정: 반복)', () => {
     expect([0, 1, 2, 3, 4].map(pitcherIdleFrameAt)).toEqual([0, 0, 19, 19, 0])
+  })
+
+  it('덧그림은 프레임 f+22 다 — 0x79662 `adds r3,r6,#0x16`', () => {
+    expect(PITCHER_OVERLAY_FRAME_OFFSET).toBe(22)
+    // 와인드업 3~6 의 몸통은 25~28, 대기 0~2 의 글러브 안 공은 22~24 에 들어 있다
+    expect([3, 4, 5, 6].map((frame) => frame + PITCHER_OVERLAY_FRAME_OFFSET)).toEqual([25, 26, 27, 28])
+    expect(pitcherIdleFrameAt(0) + PITCHER_OVERLAY_FRAME_OFFSET).toBe(22)
   })
 })
 
