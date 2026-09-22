@@ -58,16 +58,24 @@ export function bendControlPoints(points: readonly WorldPoint[], target: WorldPo
 }
 
 export interface PitchPathRequest {
-  /** 원본 구질 번호 1~21 */
+  /** 원본 구질 번호 1~21 (22 = 마구) */
   readonly typeNumber: number
   readonly form: number
   readonly speedStage: number
   readonly target: WorldPoint
+  /**
+   * 레코드를 폼·구속 단계로 찾지 않고 블록 안 번호로 곧장 고른다 — 마구(구질 22)용.
+   * 마구는 구속 단계 레코드가 없고 번호가 `3(m−1) + 폼/2` 또는 `m + 7` 이다 (0x9e944, H2 3-5).
+   */
+  readonly recordIndex?: number
 }
 
 /** 월드 좌표 N 점. B-스플라인 레코드(곡선 종류 1)는 미해독이라 베지어로 돈다 (추정) */
-export function pitchPathOf({ typeNumber, form, speedStage, target }: PitchPathRequest): WorldPoint[] {
-  const record = pitchRecordOf(typeNumber, form, speedStage)
+export function pitchPathOf({ typeNumber, form, speedStage, target, recordIndex }: PitchPathRequest): WorldPoint[] {
+  const record =
+    recordIndex === undefined
+      ? pitchRecordOf(typeNumber, form, speedStage)
+      : PITCH_RECORDS[typeNumber - 1]?.[recordIndex] ?? pitchRecordOf(typeNumber, form, speedStage)
   const mirror = isMirroredForm(form) ? -1 : 1
   const controlPoints = record.points.map(([x, y, z]) => ({
     x: x * mirror + RELEASE_ORIGIN.x,

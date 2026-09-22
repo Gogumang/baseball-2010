@@ -64,6 +64,23 @@ describe('궤적이 없는 공의 그림 칸', () => {
   })
 })
 
+describe('마구 공 그림 종류 (경기+0x1080, ball.pzx 종류 3 × 크기 11칸)', () => {
+  it('종류 1 은 불꽃 공 011~022, 종류 2 는 날개 공 023~033 칸으로 옮겨진다', () => {
+    const 불꽃 = { ...원본직구, ballKind: 1 }
+    const 날개 = { ...원본직구, ballKind: 2 }
+    expect([0, 1, 2].map((frame) => ballFrameIndexAt(불꽃, frame))).toEqual([13, 15, 20])
+    expect([0, 1, 2].map((frame) => ballFrameIndexAt(날개, frame))).toEqual([24, 26, 31])
+  })
+
+  it('종류를 안 주면 보통 공(0)이다', () => {
+    expect(ballFrameIndexAt(원본직구, 2)).toBe(9)
+  })
+
+  it('궤적이 없는 공도 같은 묶음으로 옮겨진다', () => {
+    expect(ballFrameIndexAt({ ...커브, ballKind: 2 }, 19)).toBe(9 + 22)
+  })
+})
+
 describe('타석 화면 규격', () => {
   it('원작 피처폰 해상도 240×320을 쓴다', async () => {
     const { STAGE_WIDTH, STAGE_HEIGHT } = await import('@/widgets/batting-stage/lib/renderBattingStage')

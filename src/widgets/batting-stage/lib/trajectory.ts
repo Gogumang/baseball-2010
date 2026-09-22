@@ -1,5 +1,5 @@
 import type { Pitch } from '@/entities/pitching/model/pitch'
-import { ballFrameOf, projectToScreen } from '@/entities/pitching/model/pitchCurve'
+import { BALL_FRAMES_PER_KIND, ballFrameOf, projectToScreen } from '@/entities/pitching/model/pitchCurve'
 import { bezierPointAt } from '@/shared/lib/bezier/bezier'
 import { toPixel } from '@/widgets/batting-stage/lib/stageLayout'
 
@@ -42,15 +42,22 @@ export function platePixelOf(pitch: Pitch): { x: number; y: number } {
   return toPixel(pitch.plate, pitch.stageSide)
 }
 
-/** 공 종류(game+0x1080)의 뜻은 미해독이라 첫 묶음(0)을 쓴다 (추정) */
-const BALL_KIND = 0
+/**
+ * 공 그림 종류 = 경기+0x1080 (0x46fa8) — ball.pzx 는 종류 3 × 크기 11칸이다
+ * (000~010 보통 · 011~022 불꽃 · 023~033 날개). 마투수 마구만 0 이 아닌 값을 쓴다:
+ * **발렌타인(마구 8) → 2(날개) · 드래고나(마구 9) → 1(불꽃)**, 그 밖엔 전부 0 이다
+ * (근거는 `entities/pitcher-career/model/magicPitch.ts` 의 `MAGIC_BALL_KIND_BY_NUMBER` 주석).
+ * 종류를 정하는 것은 `selectPitch` 이고 여기서는 그대로 받아 쓴다.
+ */
+const DEFAULT_BALL_KIND = 0
 const SMALLEST_BALL = 2
 const LARGEST_BALL = 9
 
 /** ball.pzx 프레임 번호 */
 export function ballFrameIndexAt(pitch: Pitch, frame: number): number {
   const path = pitch.worldPath
-  if (path !== null && path.length > 0) return ballFrameOf(path, clampFrame(frame, path.length), BALL_KIND)
+  const ballKind = pitch.ballKind ?? DEFAULT_BALL_KIND
+  if (path !== null && path.length > 0) return ballFrameOf(path, clampFrame(frame, path.length), ballKind)
   const ratio = Math.max(0, Math.min(1, frame / Math.max(1, pitch.frameCount - 1)))
-  return SMALLEST_BALL + Math.round(ratio * (LARGEST_BALL - SMALLEST_BALL))
+  return SMALLEST_BALL + Math.round(ratio * (LARGEST_BALL - SMALLEST_BALL)) + BALL_FRAMES_PER_KIND * ballKind
 }

@@ -12,6 +12,14 @@ import { targetKindOf } from '@/entities/pitching/model/pitchIntelligence'
 import { applyControlError, pitchTargetOf } from '@/entities/pitching/model/pitchTarget'
 import { pitchPathOf, ZONE_CENTERS } from '@/entities/pitching/model/pitchCurve'
 import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
+import {
+  MAGIC_PITCH_TYPE_NUMBER,
+  magicBallKindOf,
+  magicPitchNameOf,
+  magicPitchRecordIndexOf,
+} from '@/entities/pitcher-career/model/magicPitch'
+import { advanceMagicPitchGameState } from '@/entities/pitching/model/magicPitchGame'
+import type { MagicPitchGameState } from '@/entities/pitching/model/magicPitchGame'
 
 /** 투구 엔진 능력치(0~100)를 원본 눈금(0~999)으로 — 투수편 이식 전 임시 경계 */
 const ORIGINAL_SCALE = 10
@@ -28,6 +36,9 @@ export interface PitchSituation extends CountSituation {
  */
 export const DEFAULT_REPERTOIRE: PitcherRepertoireInfo = { form: 0, pitchMask: ROSTER_PITCHER_REPERTOIRES[0].pitchMask, magicId: 0 }
 
+/** 마구 이름을 못 고를 때 쓰는 글자 — `features/play-pitcher-game` 의 사람 투구와 같은 대체값 */
+const MAGIC_PITCH_NAME = '마구'
+
 /** 존 표시 반폭 (월드) — 목표 종류 1·2 의 최대 거리 331·329. 스트라이크 판정 경계로 쓴다 (추정: 원본 판정 위치 미확인) */
 const ZONE_HALF_WORLD = { x: 331, y: 329 }
 
@@ -40,7 +51,10 @@ function plateOf(target: WorldPoint, side: number) {
  * CPU 투구 — 원본 순서 그대로 난수를 뽑는다:
  *   구질(0x344dc) → 목표 종류(0x9eeac) → 목표점(0x345fc) → 제구 등급(0xb74bc) → 제구 오차(0x4dc78) → 곡선
  * 등급을 목표점 뒤에 뽑는 순서와, 구속 단계(등급이 필요)를 곡선 직전에 정하는 것은 호출 흐름에서 추정했다.
- * 마구(구질 22)는 B-스플라인 레코드와 남은 횟수가 미해독이라 목록에 넣지 않는다 (추정).
+ *
+ * 마구(구질 22)는 투수 레코드 **+0x18(= `repertoire.magicId`)** 이 0 이 아니면 구질 칸 5 에 들어간다
+ * (0xb6d6a). 남은 횟수는 `magicPitchGame` 이 들고 있다 — 일반 선수 레코드는 +0x18 이 모두 0 이라
+ * (H2 4-2) 마구를 던지는 것은 마투수와 육성·명전 투수뿐이다.
  */
 export function selectPitch(
   pitcher: PitcherAbility,
@@ -51,10 +65,22 @@ export function selectPitch(
    * 뒤로 바꾸는 코드가 없다 (L 4-A · P7 K2 확정 · DECISIONS 2026-09-20 ②).
    */
   difficulty: PitchPatternDifficulty = 'hard',
+  /**
+   * 경기 내내 이어지는 마구 상태 (남은 횟수 · 공+0x10). 원본이 팀+0x28 과 공 객체를 고치듯
+   * **제자리에서 고친다** — 경기마다 `createMagicPitchGameState(레퍼토리)` 로 하나 만들어
+   * 투구마다 같은 객체를 넘겨야 한다.
+   *
+   * ⚠️ **안 넘기면 마구가 나오지 않는다** (남은 횟수 0). 마구 조건(0x344dc)이 볼카운트 48칸 중
+   * 36칸(75%)에서 참이라, 남은 횟수를 줄이는 이 객체가 없으면 마구가 경기 내내 계속 나가
+   * 원본(한 경기 4~9회)과 크게 어긋난다 — 그래서 기본값은 "꺼짐" 이다.
+   * 타석 화면 호출처는 `widgets/batting-stage/model/useStageAnimation.ts` 다.
+   */
+  magic?: MagicPitchGameState,
 ): Pitch {
   const repertoire = pitcher.repertoire ?? DEFAULT_REPERTOIRE
-  const list = pitchListOf(repertoire.pitchMask, false)
-  const typeNumber = computerPitchTypeOf({ list, magicCount: 0, ...situation }, random)
+  const magicState = magic ?? { remaining: 0, ballMagicNumber: 0 }
+  const list = pitchListOf(repertoire.pitchMask, repertoire.magicId !== 0)
+  const typeNumber = computerPitchTypeOf({ list, magicCount: magicState.remaining, ...situation }, random)
   const kind = targetKindOf(difficulty, situation, random)
   const target = pitchTargetOf(kind, situation, random)
   const control = pitcher.control * ORIGINAL_SCALE
@@ -65,12 +91,23 @@ export function selectPitch(
     velocity: pitcher.velocity * ORIGINAL_SCALE,
     breaking: (pitcher.breaking ?? pitcher.velocity) * ORIGINAL_SCALE,
   }
+  const isMagic = typeNumber === MAGIC_PITCH_TYPE_NUMBER
+  // 마구는 게이지를 쓰지 않고 등급이 늘 5 다 — 구속 단계 레코드가 없어 번호로 곧장 고른다 (H2 3-5·3-6)
   const speedStage = pitchSpeedStageOf(typeNumber - 1, stats, controlTier)
-  const worldPath = pitchPathOf({ typeNumber, form: repertoire.form, speedStage, target: finalTarget })
+  const recordIndex = isMagic ? magicPitchRecordIndexOf(repertoire.magicId, repertoire.form) : null
+  const worldPath = pitchPathOf({
+    typeNumber,
+    form: repertoire.form,
+    speedStage,
+    target: finalTarget,
+    ...(recordIndex === null ? {} : { recordIndex }),
+  })
   const type = PITCH_TYPES[typeNumber - 1] ?? PITCH_TYPES[0]
 
+  advanceMagicPitchGameState(magicState, typeNumber, repertoire.magicId)
+
   return {
-    type: type.name,
+    type: isMagic ? magicPitchNameOf(repertoire.magicId, repertoire.form) ?? MAGIC_PITCH_NAME : type.name,
     plate: plateOf(finalTarget, situation.side),
     breakOffset: { x: type.horizontalBreak, y: type.verticalBreak },
     flightDurationMilliseconds: worldPath.length * millisecondsPerFrame(),
@@ -78,6 +115,9 @@ export function selectPitch(
     controlTier,
     worldPath,
     stageSide: situation.side,
+    magicNumber: magicState.ballMagicNumber,
+    // 0x46fa8 은 구질 22 일 때만 경기+0x1080 을 쓰고, 새 투구 준비 0x3d954 가 0 으로 지운다
+    ballKind: isMagic ? magicBallKindOf(repertoire.magicId) : 0,
   }
 }
 

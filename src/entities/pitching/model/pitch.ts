@@ -29,6 +29,14 @@ export interface Pitch {
   readonly worldPath: readonly WorldPoint[] | null
   /** 화면 배치 side — 투영 원점(0xcfb18)과 기준점(0xcfb54)을 고른다 */
   readonly stageSide: number
+  /**
+   * 이번 공에 실린 마구 번호 = 공 객체 +0x10 (0x3de10). 0 이면 마구 보정이 없다.
+   * ⚠️ 원본이 이 칸을 되돌리지 않아서, 마구 뒤의 직구·변화구에도 값이 남는다 (H2 3-4).
+   * 아직 안 옮긴 곳(사용자 투구)은 없는 값이라 `?? 0` 으로 읽는다.
+   */
+  readonly magicNumber?: number
+  /** ball.pzx 공 그림 종류 = 경기+0x1080 (0x46fa8) — 0 보통 · 1 불꽃 · 2 날개 */
+  readonly ballKind?: number
 }
 
 /** 투수 레코드에서 온 폼·구질 (pitcherRepertoires) */

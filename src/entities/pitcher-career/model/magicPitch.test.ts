@@ -10,7 +10,9 @@ import {
   MAGIC_SPEED_RANGES,
   NO_MAGIC_PITCH_CORRECTION,
   SPIRIT_SKILL_BONUS,
+  MAGIC_BALL_KIND_BY_NUMBER,
   ballMagicNumberAfterPitch,
+  magicBallKindOf,
   canSelectMagicPitch,
   derbyPitchTypeOf,
   magicPitchCorrectionOf,
@@ -188,5 +190,18 @@ describe('⚠️ 공 객체의 마구 번호는 되돌아가지 않는다 (원�
 
   it('남은 횟수가 0 이면(마지막 한 번) 새로 쓰지 않는다', () => {
     expect(ballMagicNumberAfterPitch(0, MAGIC_PITCH_TYPE_NUMBER, 3, 0)).toBe(0)
+  })
+})
+
+describe('공 그림 종류 (경기+0x1080, 0x46fa8)', () => {
+  it('발렌타인(8)만 2(날개) · 드래고나(9)만 1(불꽃) 이고 나머지는 보통 공이다', () => {
+    expect([0, 1, 2, 3, 4, 5, 6, 7].map(magicBallKindOf)).toEqual([0, 0, 0, 0, 0, 0, 0, 0])
+    expect(magicBallKindOf(8)).toBe(2)
+    expect(magicBallKindOf(9)).toBe(1)
+  })
+
+  it('표 밖 번호는 보통 공이다', () => {
+    expect(magicBallKindOf(10)).toBe(0)
+    expect(MAGIC_BALL_KIND_BY_NUMBER).toHaveLength(10)
   })
 })

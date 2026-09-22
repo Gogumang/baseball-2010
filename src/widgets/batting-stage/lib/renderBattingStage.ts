@@ -1,4 +1,5 @@
 import type { Pitch } from '@/entities/pitching/model/pitch'
+import { BALL_FRAMES_PER_KIND } from '@/entities/pitching/model/pitchCurve'
 import { ballFrameIndexAt, ballPixelAt, platePixelOf } from '@/widgets/batting-stage/lib/trajectory'
 import { frameAnimations, JUDGE_FRAMES, PITCHER_FRAMES, placedFrame, sprite } from '@/widgets/batting-stage/lib/spriteLoader'
 import { drawScenery } from '@/widgets/batting-stage/lib/renderScenery'
@@ -203,7 +204,8 @@ function drawBall(context: CanvasRenderingContext2D, pitch: Pitch, frame: number
   if (placed === null) {
     context.fillStyle = UI_COLORS.ball
     context.beginPath()
-    context.arc(position.x, position.y, 1 + ballFrame / 2, 0, Math.PI * 2)
+    // 그림이 없을 때의 대체 동그라미 — 프레임 번호에서 종류(11칸 묶음)를 덜고 크기만 쓴다
+    context.arc(position.x, position.y, 1 + (ballFrame % BALL_FRAMES_PER_KIND) / 2, 0, Math.PI * 2)
     context.fill()
     return
   }
