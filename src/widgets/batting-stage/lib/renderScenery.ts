@@ -92,9 +92,17 @@ function drawClouds(context: CanvasRenderingContext2D, tick: number): void {
 }
 
 function drawFence(context: CanvasRenderingContext2D, state: SceneryState): void {
-  // 우타면 펜스 묶음 전체를 화면 가운데 축으로 뒤집는다.
-  // 원본은 뒤집은 그림을 월드 x+490/x+480 에 놓는데(0x77494) 그 1px 어긋남까지는 못 옮겼다 — **근사**.
-  const isMirrored = (state.side ?? STAGE_SIDE) === BATTER_SIDE.우타
+  /**
+   * ⚠️ **꺼 뒀다.** 우타일 때 펜스 묶음을 통째로 뒤집었더니 관중석 그림(`ppl`)에 박혀 있는
+   *    **"GAMEVIL®" 광고 글자가 거울상**으로 나왔다. 원본 그림 파일에서는 그 글자가
+   *    똑바로 읽히므로(직접 펼쳐서 확인), 퍼블리셔 로고를 뒤집어 내보냈을 리가 없다.
+   *
+   *    앵커 표(0xcfb18·0xcfb2c·0xcfb7c)의 두 칸이 폭 480 기준 거울이라
+   *    (480−276=204≈203 · 480−184=296≈295 · 480−226−33=221) 원본이 무대를 통째로
+   *    뒤집는 것처럼 보이지만, **어느 쪽이 native 인지**가 아직 안 밝혀졌다.
+   *    밝혀질 때까지는 배경을 뒤집지 않는다 — 타자 그림 반전과 앵커 표는 그대로 산다.
+   */
+  const isMirrored = false && (state.side ?? STAGE_SIDE) === BATTER_SIDE.우타
   context.save()
   if (isMirrored) {
     context.translate(STAGE_WIDTH, 0)
