@@ -34,7 +34,7 @@ import type { AcePlayer } from '@/shared/config/original/acePlayers'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { defenseAbilitiesOf, isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
-import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
+import type { DefensePlayInput, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { homeRunPlaybackOf } from '@/features/defense-play/model/homeRunPlayback'
 import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
 import type { BurstResolution, BurstSession } from '@/entities/burst-mission/model/burstMissionSession'
@@ -101,10 +101,26 @@ export interface GameProgress {
   readonly log: readonly GameLogEntry[]
   readonly nextLogId: number
   /**
-   * 사용자 타석에서 마지막으로 돌린 수비 시뮬레이션. 매 틱의 `DefenseViewState` 가 여기 들어 있다 —
-   * 수비 화면은 이것만 받아 그리면 된다 (라우팅은 앱 쪽 몫이라 여기서 연결하지 않는다).
+   * **재생만 하면 되는** 장면. 매 틱의 `DefenseViewState` 가 들어 있어 화면은 이것만 받아 그리면 된다
+   * (라우팅은 앱 쪽 몫이라 여기서 연결하지 않는다).
+   *
+   * 홈런 비행처럼 사람이 조작할 것이 없는 장면이 여기 들어온다. 사람이 주루를 잡는 인플레이 타구는
+   * `pendingDefensePlay` 쪽으로 가고, 다 본 뒤에는 **여기 남기지 않는다** — 남기면 한 번 더 튼다.
    */
   readonly lastDefensePlay: DefensePlayResult | null
+  /**
+   * **지금 화면이 실시간으로 돌리고 있는 타구.** 차 있으면 이 경기는 "수비 진행 중" 이고,
+   * 타석 결과(안타/아웃 코드)만 정해졌을 뿐 **진루·아웃·득점은 아직 하나도 안 먹였다**.
+   *
+   * 원본은 타구가 뜨면 경기 장면이 상태 0x17 로 넘어가 공이 멈출 때까지 같은 루프를 돌며
+   * 매 갱신 눌린 키를 읽는다 (R10 · I 문서). 그 동안 다음 투구는 나가지 않는다 —
+   * 웹도 이 칸이 차 있는 동안 다음 타석을 시작하지 않는 것으로 그 자리를 붙든다.
+   *
+   * 화면이 다 돌고 나면 `resolveDefensePlay` 가 그 결과를 먹이고 이 칸을 비운다.
+   * 미리 다 계산해도 되는 자리(미션·테스트)는 `applyPlayerOutcome` 을 부르면 이 칸을 거쳐
+   * 가되 한 번에 비워져 나온다 — 밖에서 보면 예전과 똑같다.
+   */
+  readonly pendingDefensePlay: DefensePlayInput | null
   /**
    * 이번 경기의 돌발미션 상태 (경기 장면이 모드 2·3·4 에서만 만드는 객체, 0x48658).
    * `burst.current` 가 차 있으면 진행 중인 돌발이 있다 — 화면은 이것만 보고 창을 띄우면 된다.
@@ -180,6 +196,7 @@ export function startGame(
     log: [],
     nextLogId: 1,
     lastDefensePlay: null,
+    pendingDefensePlay: null,
     burst: createBurstSession(MY_LEAGUE_BATTER_MODE),
     lastBurstResolution: null,
   }
@@ -197,41 +214,119 @@ export function startGame(
  * `pattern` 을 주면 그 원본 패턴으로 궤적을 만든다. 안 주면 같은 결과를 내는 대표 패턴을
  * 원본 표에서 골라 쓴다 (`representativePatternOf`).
  * `isUncatchable` 은 필살타법 성공 타구 — 야수가 포구를 건너뛴다 (0x51800, S13 6절).
+ *
+ * ⚠️ 사람이 주루를 조작하는 화면은 이것을 쓰지 않는다 — `startPlayerOutcome` 으로 타석 결과만
+ * 먼저 정하고, 화면이 틱을 다 돌린 뒤 `resolveDefensePlay` 로 주자 처리를 먹인다.
+ * 여기는 그 둘을 한 줄로 이어 붙인 **얇은 껍데기**다 (미션·테스트처럼 끼어들 사람이 없는 자리용).
  */
 export function applyPlayerOutcome(
   progress: GameProgress,
   outcome: AtBatOutcome,
   random: RandomPort,
-  options: { readonly pattern?: BattedBallPattern; readonly isUncatchable?: boolean } = {},
+  options: PlayerOutcomeOptions = {},
+): GameProgress {
+  const started = startPlayerOutcome(progress, outcome, random, options)
+  const pending = started.pendingDefensePlay
+  if (pending === null) return started
+  // 미리 다 돌려 버린다 — `runDefensePlay` 는 스테퍼를 끝까지 도는 얇은 껍데기다.
+  // 이 갈래는 아직 아무것도 안 보여 줬으므로 돌린 결과를 그대로 재생거리로 넘긴다 (예전 그대로).
+  const result = runDefensePlay(pending)
+  return finishPlayerOutcome({ ...started, pendingDefensePlay: null }, outcome, random, result, result)
+}
+
+export interface PlayerOutcomeOptions {
+  readonly pattern?: BattedBallPattern
+  readonly isUncatchable?: boolean
+}
+
+/**
+ * 타석 결과만 먼저 정한다 — **인플레이 타구면 주자 처리를 뒤로 미룬다.**
+ *
+ * 인플레이 타구는 진행기에 넘길 `DefensePlayInput` 만 만들어 `pendingDefensePlay` 에 얹고
+ * 경기 상태는 **한 톨도 건드리지 않은 채** 돌려준다. 그 동안 다음 타석이 시작되지 않는 것이
+ * 이 칸의 뜻이다 (원본 상태 0x17 이 도는 동안 투구가 안 나가는 것과 같은 자리).
+ * 주자 처리·기록·돌발 판정은 화면이 다 돌고 `resolveDefensePlay` 를 부를 때 한 번에 한다.
+ *
+ * 삼진·볼넷·홈런은 수비가 개입할 것이 없어 여기서 곧장 끝낸다 (0xc11f0 과 같은 규칙).
+ */
+export function startPlayerOutcome(
+  progress: GameProgress,
+  outcome: AtBatOutcome,
+  random: RandomPort,
+  options: PlayerOutcomeOptions = {},
 ): GameProgress {
   if (progress.game.isFinished) return progress
+  if (!isBattedBallInPlay(outcome)) {
+    // 홈런은 날아가는 그림만 따로 만들어 재생시킨다 — 점수는 타석 쪽이 이미 맞게 한다
+    const playback = homeRunPlaybackOf({ outcome, bases: progress.game.bases, pattern: options.pattern })
+    return finishPlayerOutcome(progress, outcome, random, null, playback)
+  }
+  return { ...progress, pendingDefensePlay: defensePlayInputOf(progress, outcome, random, options) }
+}
 
-  const defensePlay = isBattedBallInPlay(outcome)
-    ? runDefensePlay({
-        outcome,
-        trajectory: battedBallTrajectory(options.pattern ?? representativePatternOf(outcome)),
-        bases: progress.game.bases,
-        outs: progress.game.outs,
-        // 수비는 상대 팀이다 — 로스터의 수비 자리 코드로 아홉 칸을 채운다
-        defenseAbilities: opponentDefenseAbilitiesOf(progress),
-        runAbility: runnerRunAbilityOf(progress),
-        // 난수를 넘겨야 펌블(0xb41d0)·악송구(0xa1828)·필살수비(0x66b30/0x66be4) 굴림이 돈다
-        random,
-        // 나만의리그 타자편 = 전역 모드 4 (0x1552d10) — 필살수비 기준이 절반이다
-        gameMode: MY_LEAGUE_BATTER_MODE,
-        // 내 타석이므로 수비는 언제나 CPU 다 → 협살(AI 상태 8)이 돈다
-        defenseIsCpu: true,
-        // 필살타법이 성공한 타구면 야수가 쥐지 않는다 (0x51800) — 타석 쪽이 확률 굴림을 하면 넘겨 준다
-        isUncatchable: options.isUncatchable,
-      })
-    : null
+/**
+ * 화면이 다 돌린 수비 플레이를 **그때** 경기 상태에 먹인다.
+ *
+ * `result.advance`(진루·아웃·득점)와 `result.voidedRuns`(3아웃으로 날아간 보류 득점)가 여기서
+ * 비로소 경기 상태가 된다. 이미 눈으로 다 본 플레이라 `lastDefensePlay` 에는 넣지 않는다 —
+ * 넣으면 화면이 같은 장면을 한 번 더 재생한다.
+ */
+export function resolveDefensePlay(
+  progress: GameProgress,
+  result: DefensePlayResult,
+  random: RandomPort,
+): GameProgress {
+  const pending = progress.pendingDefensePlay
+  if (pending === null) return progress
+  return finishPlayerOutcome({ ...progress, pendingDefensePlay: null }, pending.outcome, random, result, null)
+}
+
+/**
+ * 진행기에 넘길 한 타구 — 능력치·난수·모드·수비 주체까지 다 여기서 채운다.
+ * 이 객체를 만드는 데는 난수를 **한 번도 쓰지 않는다** (굴림은 전부 진행기 안에서 돈다).
+ */
+function defensePlayInputOf(
+  progress: GameProgress,
+  outcome: AtBatOutcome,
+  random: RandomPort,
+  options: PlayerOutcomeOptions,
+): DefensePlayInput {
+  return {
+    outcome,
+    trajectory: battedBallTrajectory(options.pattern ?? representativePatternOf(outcome)),
+    bases: progress.game.bases,
+    outs: progress.game.outs,
+    // 수비는 상대 팀이다 — 로스터의 수비 자리 코드로 아홉 칸을 채운다
+    defenseAbilities: opponentDefenseAbilitiesOf(progress),
+    runAbility: runnerRunAbilityOf(progress),
+    // 난수를 넘겨야 펌블(0xb41d0)·악송구(0xa1828)·필살수비(0x66b30/0x66be4) 굴림이 돈다
+    random,
+    // 나만의리그 타자편 = 전역 모드 4 (0x1552d10) — 필살수비 기준이 절반이다
+    gameMode: MY_LEAGUE_BATTER_MODE,
+    // 내 타석이므로 수비는 언제나 CPU 다 → 협살(AI 상태 8)이 돈다
+    defenseIsCpu: true,
+    // 필살타법이 성공한 타구면 야수가 쥐지 않는다 (0x51800) — 타석 쪽이 확률 굴림을 하면 넘겨 준다
+    isUncatchable: options.isUncatchable,
+  }
+}
+
+/**
+ * 타석 하나를 경기 상태에 먹이고 다음 내 차례까지 자동 진행한다 — 예전 `applyPlayerOutcome` 의 몸통이다.
+ *
+ * `defensePlay` 가 있으면 그 결과로 진루·아웃·득점을 갈아 끼운다. `playback` 은 화면에 재생시킬 것 —
+ * 실시간으로 이미 다 보여 준 플레이는 null 이고, 홈런은 여기서 비행 틱을 따로 만든다.
+ */
+function finishPlayerOutcome(
+  progress: GameProgress,
+  outcome: AtBatOutcome,
+  random: RandomPort,
+  defensePlay: DefensePlayResult | null,
   /**
-   * 홈런도 **공이 날아가는 그림**은 나와야 한다 — 원본은 타구가 뜨면 홈런이라도 경기 장면이
-   * 상태 0x17(수비 인플레이)로 넘어가 같은 루프를 돈다. 다만 홈런의 진루·득점은 타석 쪽이
-   * 이미 맞게 하고 있으므로 **보여 줄 틱만** 따로 만들어 `lastDefensePlay` 에 넣는다.
+   * 화면에 재생시킬 틱 묶음. 홈런 비행이거나, 미리 다 돌려 버린 갈래의 그 결과다.
+   * **실시간으로 이미 다 보여 준 플레이는 null** — 넣으면 같은 장면을 한 번 더 튼다.
    */
-  const playback = defensePlay ?? homeRunPlaybackOf({ outcome, bases: progress.game.bases, pattern: options.pattern })
-
+  playback: DefensePlayResult | null,
+): GameProgress {
   const nextGame = applyAtBatOutcome(progress.game, outcome, defensePlay?.advance)
   const runsBattedIn = nextGame.ourScore - progress.game.ourScore
   const outsInPlay =
@@ -302,6 +397,9 @@ export function applyPlayerOutcome(
     },
     `${progress.game.inning}회${progress.game.half} 나 — ${describeOutcome(outcome)}${
       runsBattedIn > 0 ? ` (${runsBattedIn}타점)` : ''
+    }${
+      // 3아웃으로 날아간 보류 득점(state[0])은 점수판에 안 올라가므로 기록으로만 남긴다
+      defensePlay !== null && defensePlay.voidedRuns > 0 ? ` (${defensePlay.voidedRuns}점 무효)` : ''
     }`,
     true,
   )

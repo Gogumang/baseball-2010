@@ -30,8 +30,11 @@ interface GameRouteProps {
  * 나만의리그 경기 — 원작 로딩 화면(StrTIP)이 끝나면 타석으로.
  *
  * 인플레이 타구가 나오면 **수비 화면을 먼저 보여 준다**. 원본은 타구가 뜬 순간 경기 장면이
- * 상태 0x17(수비 인플레이)로 넘어가 공이 멈출 때까지 같은 루프를 돈다 (R10 · I 문서).
- * 웹은 진행기가 그 플레이를 통째로 계산해 두므로 여기서는 재생만 하고, 다 보면 타석으로 돌아간다.
+ * 상태 0x17(수비 인플레이)로 넘어가 공이 멈출 때까지 같은 루프를 돌며 **매 갱신 눌린 키를 읽는다**
+ * (R10 · I 문서). 웹도 이제 같은 모양이다 — 진행기를 여기서 **실시간으로 한 틱씩** 돌리고
+ * (`input` 갈래), 사람은 모드 4 에서 늘 공격이라 `side="공격"`(진루·귀루·슬라이딩)을 잡는다.
+ * 다 돌면 `onDone` 이 그 결과를 경기 상태에 먹인다 — **주자 처리는 그때 처음 정해진다.**
+ * 홈런 비행처럼 조작할 것이 없는 장면만 예전대로 `ticks` 재생 갈래로 간다.
  *
  * 돌발미션이 발동하면 **타석 화면 위에** 창을 얹는다 (원본 상태 0x1b, K 4절 1-6).
  * 창이 떠 있는 동안 타석을 멈춰 둔다 — 원본도 장면 상태가 0xf 를 떠나 있어 투구가 나가지 않는다.
@@ -57,6 +60,16 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
       <RawScreen>
         <LoadingTip tip={session.loadingTip} onDone={session.actions.finishLoading} />
       </RawScreen>
+    )
+  }
+  // 사람이 주루를 잡는 갈래가 먼저다 — 진행 중인 타구가 있으면 그것을 실시간으로 돌린다
+  if (progress.pendingDefensePlay !== null) {
+    return (
+      <DefensePlayback
+        input={progress.pendingDefensePlay}
+        side="공격"
+        onDone={session.actions.finishDefensePlay}
+      />
     )
   }
   if (play !== null && play !== shownPlay && play.ticks.length > 0) {

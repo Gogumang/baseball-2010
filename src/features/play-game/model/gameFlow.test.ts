@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { applyPlayerOutcome, startGame, summaryOf } from '@/features/play-game/model/gameFlow'
+import {
+  applyPlayerOutcome,
+  resolveDefensePlay,
+  startGame,
+  startPlayerOutcome,
+  summaryOf,
+} from '@/features/play-game/model/gameFlow'
+import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import { isPlayerTurn, PLAYER_BATTING_ORDER_INDEX, PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
@@ -288,6 +295,73 @@ describe('사람 타석은 수비 시뮬레이션을 돌린다 — CPU 간이 �
       advanceRunners(주자3루, { kind: '아웃', detail: '뜬공아웃' }, 0, { quickEngine: true }),
     ).toEqual({ bases: 주자3루, runsScored: 0, outsAdded: 1 })
     expect(advanceRunners(주자3루, { kind: '아웃', detail: '뜬공아웃' }, 0).runsScored).toBe(1)
+  })
+})
+
+describe('주자 처리는 수비 화면이 끝나야 정해진다 (상태 0x17 이 도는 동안은 붙들어 둔다)', () => {
+  function 내타석(bases: BaseState, outs: number): GameProgress {
+    const progress = startGame(createSeededRandom(20100901))
+    return { ...progress, game: { ...progress.game, bases, outs, half: '말' } }
+  }
+
+  it('인플레이 타구는 타구만 들고 멈춘다 — 진루·아웃·득점이 하나도 안 먹는다', () => {
+    const 시작 = 내타석({ first: true, second: false, third: true }, 0)
+
+    const 진행중 = startPlayerOutcome(시작, { kind: '아웃', detail: '땅볼아웃' }, createSeededRandom(3))
+
+    expect(진행중.pendingDefensePlay).not.toBeNull()
+    expect(진행중.pendingDefensePlay!.outcome).toEqual({ kind: '아웃', detail: '땅볼아웃' })
+    // 투구 때의 루 상황·아웃을 그대로 들고 간다
+    expect(진행중.pendingDefensePlay!.bases).toEqual({ first: true, second: false, third: true })
+    expect(진행중.pendingDefensePlay!.outs).toBe(0)
+    // 경기 상태는 한 톨도 안 바뀐다 — 다음 타석도 시작되지 않았다
+    expect(진행중.game).toEqual(시작.game)
+    expect(진행중.myStats).toEqual(시작.myStats)
+    expect(진행중.log).toEqual(시작.log)
+  })
+
+  it('화면이 돌린 결과를 먹이면 그때 진루·아웃이 정해지고 칸이 비워진다', () => {
+    const 시작 = 내타석(EMPTY_BASES, 0)
+    const 진행중 = startPlayerOutcome(시작, { kind: '안타', bases: 2 }, createSeededRandom(3))
+    const 결과 = runDefensePlay(진행중.pendingDefensePlay!)
+
+    const 끝 = resolveDefensePlay(진행중, 결과, createSeededRandom(3))
+
+    expect(끝.pendingDefensePlay).toBeNull()
+    expect(끝.myStats.hits).toBe(1)
+    // 이미 눈으로 다 본 플레이라 재생거리로 남기지 않는다 — 남기면 같은 장면을 한 번 더 튼다
+    expect(끝.lastDefensePlay).toBeNull()
+  })
+
+  it('붙들려 있는 동안 타석 결과 코드는 이미 정해져 있다 — 뒤로 미룬 것은 주자 처리뿐이다', () => {
+    const 시작 = 내타석(EMPTY_BASES, 0)
+    const 진행중 = startPlayerOutcome(시작, { kind: '안타', bases: 1 }, createSeededRandom(3))
+
+    expect(진행중.pendingDefensePlay!.outcome).toEqual({ kind: '안타', bases: 1 })
+    expect(진행중.myStats.hits).toBe(0)
+  })
+
+  it('삼진·볼넷·홈런은 붙들 것이 없어 곧장 끝난다', () => {
+    for (const outcome of [{ kind: '삼진' }, { kind: '볼넷' }, { kind: '홈런' }] as const) {
+      const 끝 = startPlayerOutcome(내타석(EMPTY_BASES, 0), outcome, createSeededRandom(3))
+      expect(끝.pendingDefensePlay, `${outcome.kind}`).toBeNull()
+    }
+  })
+
+  it('둘로 쪼갠 길과 한 번에 돌리는 길의 결과가 같다 — 난수 차례도 같다', () => {
+    const 시작 = 내타석({ first: false, second: false, third: true }, 0)
+    const 뜬공아웃 = { kind: '아웃', detail: '뜬공아웃' } as const
+
+    const 한번에 = applyPlayerOutcome(시작, 뜬공아웃, createSeededRandom(3))
+    const 쪼개서 = (() => {
+      const random = createSeededRandom(3)
+      const 진행중 = startPlayerOutcome(시작, 뜬공아웃, random)
+      return resolveDefensePlay(진행중, runDefensePlay(진행중.pendingDefensePlay!), random)
+    })()
+
+    expect(쪼개서.game).toEqual(한번에.game)
+    expect(쪼개서.myStats).toEqual(한번에.myStats)
+    expect(쪼개서.log.map((entry) => entry.text)).toEqual(한번에.log.map((entry) => entry.text))
   })
 })
 

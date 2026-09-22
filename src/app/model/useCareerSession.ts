@@ -3,8 +3,11 @@ import type { Screen } from '@/app/model/screen'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import { isAtBatFinished } from '@/entities/at-bat/model/atBatState'
 import { describeOutcomeBanner } from '@/entities/at-bat/model/resolutionText'
-import { applyPlayerOutcome, startGame, stealBase, summaryOf } from '@/features/play-game/model/gameFlow'
+import { resolveDefensePlay, startGame, startPlayerOutcome, stealBase, summaryOf } from '@/features/play-game/model/gameFlow'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
+import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
+import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
+import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import {
   applyGameResult,
@@ -232,22 +235,13 @@ export function useCareerSession({
     [random, setScreen],
   )
 
-  const handlePitchResolved = useCallback(
-    (detail: PitchOutcomeDetail, _pitch?: unknown, isUncatchable?: boolean) => {
-      const nextAtBat = runner.applyPitch(detail.resolution)
-      if (!isAtBatFinished(nextAtBat) || nextAtBat.outcome === null) return
-
-      const currentProgress = progressRef.current
-      if (currentProgress === null) return
-
-      const { bases } = currentProgress.game
-      const runnersOnBase = [bases.first, bases.second, bases.third].filter(Boolean).length
-      // 필살타법이 성공한 타구면 야수가 쥐지 않는다 (0x51800)
-      const advanced = applyPlayerOutcome(currentProgress, nextAtBat.outcome, random, { isUncatchable })
-      progressRef.current = advanced
-      setProgress(advanced)
-
-      runner.pauseWithBanner(describeOutcomeBanner(nextAtBat.outcome, runnersOnBase), () => {
+  /**
+   * 타석 하나가 경기 상태에 다 먹은 뒤 — 결과 배너를 띄우고, 경기가 끝났으면 정산으로 넘긴다.
+   * 인플레이 타구는 **수비 화면이 끝난 뒤에야** 여기까지 온다.
+   */
+  const finishAtBat = useCallback(
+    (advanced: GameProgress, outcome: AtBatOutcome, runnersOnBase: number) => {
+      runner.pauseWithBanner(describeOutcomeBanner(outcome, runnersOnBase), () => {
         if (!advanced.game.isFinished) {
           runner.setIsPaused(false)
           return
@@ -259,7 +253,34 @@ export function useCareerSession({
         if (currentCareer !== null) finishGame(advanced, currentCareer)
       })
     },
-    [finishCupGame, finishGame, random, runner],
+    [finishCupGame, finishGame, runner],
+  )
+
+  const handlePitchResolved = useCallback(
+    (detail: PitchOutcomeDetail, _pitch?: unknown, isUncatchable?: boolean) => {
+      const nextAtBat = runner.applyPitch(detail.resolution)
+      if (!isAtBatFinished(nextAtBat) || nextAtBat.outcome === null) return
+
+      const currentProgress = progressRef.current
+      if (currentProgress === null) return
+
+      const { bases } = currentProgress.game
+      const runnersOnBase = [bases.first, bases.second, bases.third].filter(Boolean).length
+      // 타석 결과(안타/아웃 코드)만 먼저 정한다 — 인플레이 타구면 주자 처리는 화면 뒤로 미뤄진다.
+      // 필살타법이 성공한 타구면 야수가 쥐지 않는다 (0x51800)
+      const advanced = startPlayerOutcome(currentProgress, nextAtBat.outcome, random, { isUncatchable })
+      progressRef.current = advanced
+      setProgress(advanced)
+
+      // 수비 진행 중 — 화면이 틱을 돌리는 동안 타석을 멈춰 둔다. 원본도 상태 0x17 이 도는 동안
+      // 0xf(타석 준비)로 돌아가지 않아 다음 투구가 나가지 않는다
+      if (advanced.pendingDefensePlay !== null) {
+        runner.setIsPaused(true)
+        return
+      }
+      finishAtBat(advanced, nextAtBat.outcome, runnersOnBase)
+    },
+    [finishAtBat, random, runner],
   )
 
   const story = useStorySchedule(career)
@@ -349,8 +370,34 @@ export function useCareerSession({
     })
   }, [])
 
+  /**
+   * 수비 화면이 한 타구를 다 돌렸다 (`DefensePlayback` 의 `onDone`).
+   * **여기서야** 진루·아웃·득점이 경기 상태가 된다 — 그 전까지는 타석 결과 코드만 정해져 있었다.
+   *
+   * 화면이 결과를 안 넘겨 주는 경우(재생 갈래로 잘못 들어간 때)는 여기서 끝까지 돌려서라도
+   * 붙들어 둔 상태를 푼다 — 안 그러면 다음 타석이 영영 시작되지 않는다.
+   */
+  const finishDefensePlay = useCallback(
+    (result?: DefensePlayResult) => {
+      const current = progressRef.current
+      const pending = current?.pendingDefensePlay ?? null
+      if (current === null || pending === null) return
+
+      const { bases } = current.game
+      const runnersOnBase = [bases.first, bases.second, bases.third].filter(Boolean).length
+      const resolved = resolveDefensePlay(current, result ?? runDefensePlay(pending), random)
+      progressRef.current = resolved
+      setProgress(resolved)
+      finishAtBat(resolved, pending.outcome, runnersOnBase)
+    },
+    [finishAtBat, random],
+  )
+
   const actions = {
     syncOpenedHidden,
+
+    /** 수비 화면이 끝났다 — 주자 처리를 이제 먹인다 */
+    finishDefensePlay,
 
     /**
      * 도루 (원본 키 '3' 1루 주자 · '2' 2루 주자 → `0x53610`).
