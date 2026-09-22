@@ -1,5 +1,8 @@
 import { useEffect } from 'react'
-import { selectPitch } from '@/entities/pitching/model/selectPitch'
+import { DEFAULT_REPERTOIRE, selectPitch } from '@/entities/pitching/model/selectPitch'
+import { createMagicPitchGameState } from '@/entities/pitching/model/magicPitchGame'
+import type { MagicPitchGameState } from '@/entities/pitching/model/magicPitchGame'
+import type { PitcherRepertoireInfo } from '@/entities/pitching/model/pitch'
 import { lastSwingFrameOf } from '@/entities/batting/model/swingTiming'
 import type { BattingSwing } from '@/features/play-at-bat/model/resolvePitch'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
@@ -45,6 +48,25 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
 
     let animationHandle = 0
     const openedAt = performance.now()
+
+    /**
+     * 마구 상태 — 원본이 **팀 +0x28**(남은 횟수)과 **공 +0x10**(이번 공에 실린 번호)을
+     * 제자리에서 고치듯, 경기 하나 동안 같은 객체를 계속 넘긴다.
+     * 안 넘기면 남은 횟수가 늘 0 이라 마구가 아예 안 나가고, 매 투구 새로 만들면
+     * 마구 조건(0x344dc)이 볼카운트 48칸 중 36칸에서 참이라 **투구마다 마구**가 된다.
+     *
+     * ⚠️ **근사**: 마운드에 선 투수가 바뀌면 새로 만든다. 원본 칸은 팀 것이라
+     *    구원 투수가 남은 횟수를 물려받는지 새로 받는지가 **확인되지 않았다** —
+     *    그 칸을 세우는 자리를 아직 못 읽었다.
+     */
+    let magic: { readonly magicId: number; readonly state: MagicPitchGameState } | null = null
+    const magicStateOf = (repertoire: PitcherRepertoireInfo | undefined) => {
+      const info = repertoire ?? DEFAULT_REPERTOIRE
+      if (magic === null || magic.magicId !== info.magicId) {
+        magic = { magicId: info.magicId, state: createMagicPitchGameState(info) }
+      }
+      return magic.state
+    }
     // 하늘 표 행 = 구장 팀 데이터 +0xb2 — 웹은 팀 데이터에 그 칸이 없어 원본의 대체 규칙 rand(0,6) 을 쓴다 (추정)
     const skyRow = randomIntegerBelow(latestRef.current.random, 0, SKY_ROW_COUNT)
 
@@ -60,7 +82,13 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
         }
         if (elapsed >= WIND_UP_MILLISECONDS) {
           const { pitcherAbility, random } = latestRef.current
-          pitchRef.current = selectPitch(pitcherAbility, pitchSituationOf(latestRef.current.hud, latestRef.current.batterForm), random)
+          pitchRef.current = selectPitch(
+            pitcherAbility,
+            pitchSituationOf(latestRef.current.hud, latestRef.current.batterForm),
+            random,
+            'hard',
+            magicStateOf(pitcherAbility.repertoire),
+          )
           // 새 투구가 시작하면 홈런 글자 연출을 끈다 (원본 +0x1960 을 다음 플레이가 지우는 자리)
           homeRunStartedAtRef.current = -1
           phaseRef.current = '투구중'
