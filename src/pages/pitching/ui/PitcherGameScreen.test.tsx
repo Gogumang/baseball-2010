@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
@@ -10,6 +11,24 @@ import { PitcherGameScreen } from '@/pages/pitching/ui/PitcherGameScreen'
 import type { PitcherGameOptions } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 
 afterEach(cleanup)
+
+/**
+ * 수비 화면에 무엇이 넘어가는지 적어 두려고 **원본을 그대로 감싼다** (그림은 원본이 그린다).
+ * ⭐ 투수편은 사람이 **수비**라 `side="수비"` 여야 한다 — 표 0절이 "공격이면 0x5331c 주루 /
+ * 수비면 0x533c8 송구" 라고 가른다.
+ */
+const { 수비화면props } = vi.hoisted(() => ({ 수비화면props: vi.fn() }))
+
+vi.mock('@/pages/defense/ui/DefensePlayback', async (importOriginal) => {
+  const 원본 = await importOriginal<typeof import('@/pages/defense/ui/DefensePlayback')>()
+  return {
+    ...원본,
+    DefensePlayback: (props: Parameters<typeof 원본.DefensePlayback>[0]) => {
+      수비화면props(props)
+      return <원본.DefensePlayback {...props} />
+    },
+  }
+})
 
 const 기본옵션: PitcherGameOptions = {
   ourTeamId: 0,
@@ -127,5 +146,65 @@ describe('경기 중 메뉴 (표 0xcfcfc 행 2 — 나만의리그)', () => {
     fireEvent.keyDown(window, { key: '*' })
 
     expect(screen.queryByText('1. 구질 선택')).toBeNull()
+  })
+})
+
+/**
+ * 원본은 타구가 뜬 순간 경기 장면이 상태 0x17(수비 인플레이)로 넘어가 공이 멈출 때까지 같은
+ * 루프를 돌며 **매 갱신 눌린 키를 읽는다** (R10 · I 문서). 웹 투수편도 이제 같은 모양이다 —
+ * 진행기를 화면에서 한 틱씩 돌리고, 다 돌면 그 결과가 그때 경기 상태가 된다.
+ */
+describe('내가 던진 인플레이 타구 — 수비 화면이 실시간으로 돈다 (상태 0x17)', () => {
+  /** 한 개 던진다 — 구질 FASTBALL → 코스 가운데 (게이지가 꺼져 있어 코스 확정이 곧 투구다) */
+  function 한개던지기() {
+    fireEvent.click(screen.getByText('FASTBALL'))
+    fireEvent.click(screen.getAllByRole('button', { name: /[◎·]/ })[0])
+  }
+
+  /** 인플레이 타구가 떠서 수비 화면이 설 때까지 던진다 */
+  function 수비화면까지던지기(최대 = 80) {
+    for (let pitch = 0; pitch < 최대; pitch += 1) {
+      if (screen.queryByText('1. 구질 선택') === null) return
+      한개던지기()
+    }
+  }
+
+  it('인플레이 타구가 뜨면 타석 대신 수비 화면이 서고, 그 동안 다음 공이 못 나간다', () => {
+    띄우기({}, 3)
+    수비화면까지던지기()
+
+    // 원본이 0x17 을 도는 동안 0xf(구질 고르기)로 안 돌아가는 그 자리다
+    expect(screen.queryByText('1. 구질 선택')).toBeNull()
+    expect(screen.getAllByTestId('defense-background-left').length).toBeGreaterThan(0)
+  })
+
+  it('⭐ 사람이 잡는 쪽은 "수비" 다 — 타자편과 정반대로 송구 키를 읽는다 (0x533c8)', () => {
+    수비화면props.mockClear()
+    띄우기({}, 3)
+    수비화면까지던지기()
+
+    const props = 수비화면props.mock.calls.at(-1)?.[0]
+    expect(props).toBeDefined()
+    expect(props.side).toBe('수비')
+    // 미리 계산해 둔 틱 재생이 아니라 **실시간으로 돌리는** 갈래다
+    expect(props.input).toBeDefined()
+    expect(props.ticks).toBeUndefined()
+  })
+
+  it('수비 화면이 다 돌면 붙든 상태가 풀려 타석으로 돌아온다', () => {
+    vi.useFakeTimers()
+    try {
+      띄우기({}, 3)
+      수비화면까지던지기()
+      expect(screen.queryByText('1. 구질 선택')).toBeNull()
+
+      for (let 갱신 = 0; 갱신 < 400 && screen.queryByText('1. 구질 선택') === null; 갱신 += 1) {
+        act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
+      }
+
+      expect(screen.getByText('1. 구질 선택')).toBeTruthy()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

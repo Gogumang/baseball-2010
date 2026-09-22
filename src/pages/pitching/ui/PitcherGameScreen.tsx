@@ -121,8 +121,26 @@ export function PitcherGameScreen({
 
   /**
    * 내가 던진 공이 인플레이로 갔으면 **수비 화면을 먼저 보여 준다** (원본 상태 0x17).
-   * 이게 없으면 맞은 공이 어디로 갔는지 화면에 아예 안 나온다.
+   * 진행 중인 타구가 있으면 여기서 **실시간으로 한 틱씩** 돌린다 — 원본도 공이 멈출 때까지
+   * 같은 루프를 돌며 매 갱신 눌린 키를 읽는다 (R10 · I 문서).
+   *
+   * ⭐ 투수편은 **사람이 수비**다 — 조작 표 0절이 "공격이면 0x5331c 주루 / 수비면 0x533c8 송구"
+   * 라고 가른다. 이 칸이 차는 자리는 `startPitch` 뿐이고 그 앞에 `isPitchTurn`(내 투수가 마운드에
+   * 있는 수비 반 이닝)이 있으므로, 여기 오는 타구는 **언제나** 내가 수비하는 타구다.
+   * 우리 팀 공격 이닝은 아홉 칸 모두 간이 엔진이 돌려 수비 화면 자체가 뜨지 않는다.
+   *
+   * 다 돌면 `onDone` 이 그 결과를 경기 상태에 먹인다 — **주자 처리는 그때 처음 정해진다.**
    */
+  if (progress.pendingDefensePlay !== null) {
+    return (
+      <DefensePlayback
+        input={progress.pendingDefensePlay}
+        side="수비"
+        onDone={actions.finishDefensePlay}
+      />
+    )
+  }
+  // 홈런 비행처럼 조작할 것이 없는 장면만 예전대로 재생 갈래로 간다
   if (play !== null && play !== shownPlay && play.ticks.length > 0) {
     return <DefensePlayback ticks={play.ticks} onDone={finishPlayback} />
   }

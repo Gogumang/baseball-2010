@@ -14,11 +14,14 @@ import {
   giveUpPitching,
   isPitchTurn,
   pitchSlotsFor,
+  resolveDefensePlay,
+  startPitch,
   startPitcherGame,
   startsToday,
   summaryOf,
   throwPitch,
 } from '@/features/play-pitcher-game/model/pitcherGameFlow'
+import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type {
   PitcherGameOptions,
   PitcherGameProgress,
@@ -348,5 +351,132 @@ describe('수비 진루 (0xaf918 자동 주루)', () => {
     expect(
       advanceRunners({ first: false, second: false, third: true }, 뜬공아웃, 0, { quickEngine: true }),
     ).toEqual({ bases: { first: false, second: false, third: true }, runsScored: 0, outsAdded: 1 })
+  })
+})
+
+describe('주자 처리는 수비 화면이 끝나야 정해진다 (상태 0x17 이 도는 동안은 붙들어 둔다)', () => {
+  /**
+   * 인플레이 타구가 처음 뜨는 자리까지 던져 **그 직전 상태**와 **붙들린 상태**를 함께 돌려준다.
+   *
+   * 투수편은 타석 결과를 난수가 정하므로 타자편 테스트처럼 결과 코드를 박아 넣을 수 없다 —
+   * 나올 때까지 한가운데 직구를 던진다.
+   */
+  function 붙들린자리(seed: number) {
+    const random = 씨앗(seed)
+    let current = startPitcherGame(기본옵션, random)
+    for (let pitch = 0; pitch < 300; pitch += 1) {
+      if (!isPitchTurn(current)) break
+      const next = startPitch(current, 한가운데직구, random)
+      if (next.pendingDefensePlay !== null) return { 직전: current, 진행중: next, random }
+      current = next
+    }
+    throw new Error(`씨앗 ${seed} 에서 인플레이 타구가 나오지 않았습니다`)
+  }
+
+  /** 인플레이 타구가 처음 뜰 때까지 공 몇 개가 드는가 — 두 길을 같은 자리에서 견주려고 센다 */
+  function 인플레이까지투구수(seed: number): number {
+    const random = 씨앗(seed)
+    let current = startPitcherGame(기본옵션, random)
+    for (let pitch = 1; pitch <= 300; pitch += 1) {
+      if (!isPitchTurn(current)) break
+      current = startPitch(current, 한가운데직구, random)
+      if (current.pendingDefensePlay !== null) return pitch
+    }
+    throw new Error(`씨앗 ${seed} 에서 인플레이 타구가 나오지 않았습니다`)
+  }
+
+  it('인플레이 타구는 타구만 들고 멈춘다 — 진루·아웃·실점이 하나도 안 먹는다', () => {
+    const { 직전, 진행중 } = 붙들린자리(3)
+
+    expect(진행중.pendingDefensePlay).not.toBeNull()
+    // 투구 때의 루 상황·아웃을 그대로 들고 간다
+    expect(진행중.pendingDefensePlay!.bases).toEqual(직전.game.bases)
+    expect(진행중.pendingDefensePlay!.outs).toBe(직전.game.outs)
+    // 수비는 사람(나)이다 → 협살이 안 돈다 (S8 1-4)
+    expect(진행중.pendingDefensePlay!.defenseIsCpu).toBe(false)
+    // 경기 상태·기록은 한 톨도 안 바뀐다 — 다음 타석도 시작되지 않았다
+    expect(진행중.game).toEqual(직전.game)
+    expect(진행중.record).toEqual(직전.record)
+    expect(진행중.log).toEqual(직전.log)
+    expect(진행중.teamRunsAllowed).toBe(직전.teamRunsAllowed)
+  })
+
+  it('붙들려 있는 동안은 다음 공이 나가지 않는다 (원본은 0x17 을 도는 동안 0xf 로 안 간다)', () => {
+    const { 진행중, random } = 붙들린자리(3)
+
+    expect(isPitchTurn(진행중)).toBe(false)
+    // 그래도 던져 보면 아무 일도 없다
+    expect(startPitch(진행중, 한가운데직구, random)).toBe(진행중)
+  })
+
+  it('화면이 돌린 결과를 먹이면 그때 진루·아웃이 정해지고 칸이 비워진다', () => {
+    const { 직전, 진행중, random } = 붙들린자리(3)
+
+    const 끝 = resolveDefensePlay(진행중, runDefensePlay(진행중.pendingDefensePlay!), random)
+
+    expect(끝.pendingDefensePlay).toBeNull()
+    // 타석이 하나 넘어갔다 — 타순이 돌거나 아웃·점수가 움직인다
+    expect(끝.log.length).toBeGreaterThan(직전.log.length)
+    // 이미 눈으로 다 본 플레이라 재생거리로 남기지 않는다 — 남기면 같은 장면을 한 번 더 튼다
+    expect(끝.lastDefensePlay).toBe(직전.lastDefensePlay)
+  })
+
+  it('붙드는 것은 인플레이 타구뿐이다 — 삼진·볼넷은 곧장 끝난다', () => {
+    const random = 씨앗(3)
+    let current = startPitcherGame(기본옵션, random)
+    const 붙든결과: string[] = []
+    let 안붙든타석 = 0
+    for (let pitch = 0; pitch < 300 && isPitchTurn(current); pitch += 1) {
+      const 직전 = current
+      current = startPitch(current, 한가운데직구, random)
+      if (current.pendingDefensePlay !== null) {
+        붙든결과.push(current.pendingDefensePlay.outcome.kind)
+        current = resolveDefensePlay(current, runDefensePlay(current.pendingDefensePlay), random)
+        continue
+      }
+      // 붙들지 않았는데 로그가 늘었다 = 수비가 개입할 것이 없는 타석 결과로 끝났다
+      if (current.log.length > 직전.log.length) 안붙든타석 += 1
+    }
+
+    expect(붙든결과.length).toBeGreaterThan(0)
+    expect(붙든결과.every((kind) => kind === '안타' || kind === '아웃')).toBe(true)
+    expect(안붙든타석).toBeGreaterThan(0)
+  })
+
+  it('둘로 쪼갠 길과 한 번에 돌리는 길의 결과가 같다 — 난수 차례도 같다', () => {
+    const 씨 = 3
+    const 공수 = 인플레이까지투구수(씨)
+
+    const 한번에 = (() => {
+      const random = 씨앗(씨)
+      let current = startPitcherGame(기본옵션, random)
+      for (let pitch = 1; pitch <= 공수; pitch += 1) {
+        current = throwPitch(current, 한가운데직구, random)
+      }
+      return current
+    })()
+    const 쪼개서 = (() => {
+      const random = 씨앗(씨)
+      let current = startPitcherGame(기본옵션, random)
+      for (let pitch = 1; pitch <= 공수; pitch += 1) {
+        current = startPitch(current, 한가운데직구, random)
+        if (current.pendingDefensePlay === null) continue
+        current = resolveDefensePlay(current, runDefensePlay(current.pendingDefensePlay), random)
+      }
+      return current
+    })()
+
+    expect(쪼개서.game).toEqual(한번에.game)
+    expect(쪼개서.record).toEqual(한번에.record)
+    expect(쪼개서.pitcherRecord).toEqual(한번에.pitcherRecord)
+    expect(쪼개서.decision).toEqual(한번에.decision)
+    expect(쪼개서.recordIds).toEqual(한번에.recordIds)
+    expect(쪼개서.stamina).toBe(한번에.stamina)
+    expect(쪼개서.teamRunsAllowed).toBe(한번에.teamRunsAllowed)
+    expect(쪼개서.log.map((entry) => entry.text)).toEqual(한번에.log.map((entry) => entry.text))
+    // ⚠️ 한 군데만 다르다 — 껍데기 길은 아직 아무것도 안 보여 줬으므로 돌린 결과를 재생거리로 넘기고,
+    // 쪼갠 길은 화면이 이미 다 보여 줘서 안 남긴다
+    expect(한번에.lastDefensePlay).not.toBeNull()
+    expect(쪼개서.lastDefensePlay).toBeNull()
   })
 })
