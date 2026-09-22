@@ -534,3 +534,88 @@ describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
     expect(결과.rundowns).toBe(0)
   })
 })
+
+describe('화면 스냅샷 배선 — 번쩍임 · 마선수 그림 · 팀 팔레트 (R2 2절 · C-16 · C-1)', () => {
+  /** 필살 슬라이딩 캐치가 골라지는 원본 패턴 (코드 0, 뜬공아웃) — 창이 열려야 골라진다 */
+  const 슬라이딩캐치패턴: BattedBallPattern = [92, 955, 1159, 0]
+  /** 필살 점프 캐치가 골라지는 원본 패턴 (코드 1, 뜬공아웃) */
+  const 점프캐치패턴: BattedBallPattern = [126, 1021, 963, 0]
+
+  it('안 넘기면 지금까지와 똑같다 — 번쩍임 없음 · 보통 수비수 그림 · 팔레트 없음', () => {
+    const 결과 = play(땅볼아웃, EMPTY_BASES, 0)
+
+    expect(결과.ticks.every((틱) => 틱.flash === null)).toBe(true)
+    expect(결과.ticks[0].fielders.every((야수) => 야수.aceIndex === null)).toBe(true)
+    expect(결과.ticks[0].fielders.every((야수) => 야수.teamIndex === null)).toBe(true)
+    expect(결과.ticks[0].runners.every((주자) => 주자.teamIndex === null)).toBe(true)
+  })
+
+  it('마선수 번호와 팀 번호가 화면 스냅샷까지 내려간다', () => {
+    const 결과 = runDefensePlay({
+      outcome: 단타,
+      trajectory: battedBallTrajectory(representativePatternOf(단타)),
+      bases: 주자1루,
+      outs: 0,
+      // 칸 6(유격) 이 마선수 2번(로제) — 나머지는 보통 수비수 그림
+      aceIndexes: [null, null, null, null, null, null, 2, null, null],
+      defenseTeamIndex: 4,
+      offenseTeamIndex: 11,
+    })
+
+    const 첫틱 = 결과.ticks[0]
+    expect(첫틱.fielders[6].aceIndex).toBe(2)
+    expect(첫틱.fielders[5].aceIndex).toBeNull()
+    expect(첫틱.fielders.every((야수) => 야수.teamIndex === 4)).toBe(true)
+    expect(첫틱.runners.every((주자) => 주자.teamIndex === 11)).toBe(true)
+  })
+
+  it('번쩍임은 필살 포구에서만 뜬다 — 보통 포구 타구에는 한 틱도 없다', () => {
+    // 레이저 반짝임(경기+0x19ad)은 deadly_effect 가 아니다 — 켜도 번쩍임이 뜨지 않는다
+    const 결과 = runDefensePlay({
+      outcome: 땅볼아웃,
+      trajectory: battedBallTrajectory(representativePatternOf(땅볼아웃)),
+      bases: EMPTY_BASES,
+      outs: 0,
+      random: 고정난수(0),
+      controls: { side: '수비', keyAt: () => null },
+    })
+
+    expect(결과.ticks.every((틱) => 틱.flash === null)).toBe(true)
+  })
+
+  it('필살 점프 캐치가 나가는 틱에 번쩍임 B 가 뜬다 (플레이+0x1f7, 0xd87f4 종류 3)', () => {
+    // 굴림 차례: 필살수비 A(점프) 성공 → 나머지 실패. 원본 굴림 순서 그대로다
+    const 결과 = runDefensePlay({
+      outcome: 뜬공아웃,
+      trajectory: battedBallTrajectory(점프캐치패턴),
+      bases: EMPTY_BASES,
+      outs: 0,
+      random: 차례난수([0, 0.9]),
+    })
+
+    expect(결과.specialDefense).toEqual({ jumpUnlocked: true, slideUnlocked: false })
+    const 번쩍임 = 결과.ticks.filter((틱) => 틱.flash?.kind === 'b')
+    expect(번쩍임.length).toBeGreaterThan(0)
+    // deadly_effect 애니 0 은 네 칸이고 마지막 칸에서 멈춘다. 점프는 방향 칸을 안 쓴다
+    expect(번쩍임[0].flash?.step).toBe(0)
+    expect(번쩍임.every((틱) => (틱.flash?.step ?? 0) <= 3)).toBe(true)
+    expect(번쩍임.every((틱) => 틱.flash?.direction === undefined)).toBe(true)
+  })
+
+  it('필살 슬라이딩 캐치가 나가는 틱에 방향이 달린 번쩍임 C 가 뜬다 (플레이+0x1f8, 종류 4)', () => {
+    // 굴림 차례: A(점프) 실패 → B(슬라이딩) 성공 → 나머지 실패
+    const 결과 = runDefensePlay({
+      outcome: 뜬공아웃,
+      trajectory: battedBallTrajectory(슬라이딩캐치패턴),
+      bases: EMPTY_BASES,
+      outs: 0,
+      random: 차례난수([0.9, 0, 0.9]),
+    })
+
+    expect(결과.specialDefense).toEqual({ jumpUnlocked: false, slideUnlocked: true })
+    const 번쩍임 = 결과.ticks.filter((틱) => 틱.flash?.kind === 'c')
+    expect(번쩍임.length).toBeGreaterThan(0)
+    // 방향 값은 슬라이딩 캐치 동작 번호 0xf~0x12 와 같은 칸을 쓴다
+    expect(번쩍임.every((틱) => (틱.flash?.direction ?? 0) >= 0xf && (틱.flash?.direction ?? 0) <= 0x12)).toBe(true)
+  })
+})

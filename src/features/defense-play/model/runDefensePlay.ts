@@ -162,6 +162,29 @@ export interface DefensePlayInput {
   readonly defenseIsCpu?: boolean
   /** 사람 조작 (I-controls 0절 상태 0x17 표). 안 주면 전부 자동이다 */
   readonly controls?: DefensePlayControls
+
+  // ── 아래 셋은 **그림에만 쓰인다** — 진행(아웃·진루·난수)에는 한 톨도 안 닿는다 ──
+
+  /**
+   * 수비 칸별 **마선수 번호 0~4** (마선수가 아닌 칸은 null·undefined). 안 주면 아홉 칸 모두
+   * 보통 수비수 그림(`defender.pzx`)이다.
+   *
+   * 번호는 `0xb63a0(선수)` = 마선수(레코드 `+0xa` 비트6)면 `+0xa & 0x1f`, 아니면 −1 이다.
+   * 타자 마선수 다섯의 그림 이름은 표 `0xd3f10`(20바이트 간격, C-16 · R3 7-1)에서 고른다:
+   * 0 메디카 · 1 어거지죠 · 2 로제 · 3 크라이져 · 4 킹타이거.
+   *
+   * ⚠️ **원본 그대로**: 원본은 타자 마선수 그림을 **팀당 첫 한 명만** 적재해 놓고 그리는 쪽
+   * (`0x79b48` 의 b 갈래)은 "그 칸 선수가 마선수인가" 만 보므로, 한 팀에 타자 마선수가 둘 이상이면
+   * 둘째부터도 첫째의 그림으로 나온다(R3 7-3). 그 버그를 되살리려면 **부르는 쪽이** 마선수인 칸에
+   * 전부 같은(첫째의) 번호를 넣어 주면 된다 — 여기서 고쳐 주지 않는다.
+   *
+   * ⚠️ 칸 0(투수)의 투수 마선수 그림(`0xd4008`, 38장)은 아직 안 옮겼다 — 이 표는 타자 마선수용이다.
+   */
+  readonly aceIndexes?: readonly (number | null | undefined)[]
+  /** 수비 팀 번호 0~14 — 야수 그림 팔레트 `defender.mpl` (C-1, 15색) */
+  readonly defenseTeamIndex?: number
+  /** 공격 팀 번호 0~14 — 주자 그림 팔레트 */
+  readonly offenseTeamIndex?: number
 }
 
 /** `defenseAbilitiesOf` 가 받는 수비 한 명 */
@@ -1012,6 +1035,13 @@ export function stepDefensePlay(
         throwingSlot: throwArrivalTick >= 0 && tick >= catchTick && tick < catchTick + 3 ? chaserSlot : NONE,
         throwBase,
         previousActions,
+        // ── 그림에만 쓰이는 것들 ──
+        // 번쩍임(deadly_effect B·C)은 넘길 것이 없다 — 켜짐 칸 플레이+0x1f7·+0x1f8 을 세우는 것이
+        // 포구 동작 분기표 0xd87f4 의 종류 3(점프)·4(슬라이딩)라 `catchKind` 로 이미 정해진다
+        // (P2 2b, 확정). `defensePlayView.flashOf` 주석 참고.
+        aceIndexes: input.aceIndexes,
+        defenseTeamIndex: input.defenseTeamIndex,
+        offenseTeamIndex: input.offenseTeamIndex,
       }),
     )
 
