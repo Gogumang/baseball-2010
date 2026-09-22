@@ -34,6 +34,10 @@ import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
 import { ROOKIE_BATTER_ABILITY } from '@/entities/batting/model/batter'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
+import { inPlayCallSoundIdOf, pitchCallSoundIdOf, PITCH_RELEASE_SOUND } from '@/features/play-at-bat/model/atBatSounds'
+import { playSoundIds } from '@/app/model/useSound'
+import { createSilentSound } from '@/shared/api/audio/soundPort'
+import type { SoundPort } from '@/shared/api/audio/soundPort'
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { OriginalMission } from '@/shared/config/original/missions'
 import type { AcePlayer } from '@/shared/config/original/acePlayers'
@@ -53,6 +57,8 @@ interface MissionSessionInput {
    * 육성 선수가 없으면 받아 갈 곳이 없으므로 넘기지 않아도 된다.
    */
   readonly onGamePointReward?: (amount: number) => void
+  /** 소리 통로 (원본 사운드 객체 `[0x1400058]`). 안 넘기면 아무 소리도 안 난다 */
+  readonly sound?: SoundPort
 }
 
 /** 미션 상대. 원본 레코드의 마선수 순번이 있으면 그 마선수다 (타자 미션이면 마투수). */
@@ -76,7 +82,10 @@ export function useMissionSession({
   screen,
   setScreen,
   onGamePointReward,
+  sound,
 }: MissionSessionInput) {
+  const silent = useMemo(() => createSilentSound(), [])
+  const audio = sound ?? silent
   const [missionRun, setMissionRun] = useState<MissionRun | null>(null)
   const missionRunRef = useRef(missionRun)
   missionRunRef.current = missionRun
@@ -109,6 +118,13 @@ export function useMissionSession({
     (detail: PitchOutcomeDetail) => {
       const nextAtBat = runner.applyPitch(detail.resolution)
       const hasSwung = detail.hasSwung
+      // 타구음 → 심판 콜 순서 (경기 장면과 같은 0x51408 이다).
+      // 미션은 수비 시뮬레이션을 따로 돌리지 않으므로 아웃 콜도 여기서 같이 난다
+      playSoundIds(audio, [
+        detail.contactSoundId,
+        pitchCallSoundIdOf(detail.resolution, nextAtBat),
+        nextAtBat.outcome === null ? null : inPlayCallSoundIdOf(nextAtBat.outcome),
+      ])
 
       if (!isAtBatFinished(nextAtBat) || nextAtBat.outcome === null) {
         if (hasSwung) {
@@ -130,7 +146,7 @@ export function useMissionSession({
         describeOutcomeBanner(outcome, current === null ? 0 : runnerCountOf(current.bases)),
       )
     },
-    [runner],
+    [audio, runner],
   )
 
   /** 원작 투구 조작: 구질 → 코스 → 게이지. 타자는 자동으로 반응한다. */
@@ -150,6 +166,16 @@ export function useMissionSession({
     let nextRun = recordPitch(pitcherRun, gauge === 'PERFECT')
     const nextAtBat = runner.applyPitch(resolution)
     runner.setBannerText(describePitchResolution(resolution))
+    // 투구 순간 소리 12 (0x3f378 — 투수 단계가 공을 놓는 칸에 닿을 때). 이어서 심판 콜.
+    // ⚠️ 마구 갈래 28 은 잇지 않았다 — 이 자리가 던진 공이 마구인지 알 수 없다
+    //    (`PitchTypeInfo` 에 마구 칸이 없고 미션 투수는 평범한 투수다).
+    // ⚠️ **근사**: 웹은 던지는 순간에 결과가 다 나오므로 투구음과 심판 콜이 붙어 버린다.
+    //    통로가 하나라 뒤 소리가 앞 소리를 끊는다 (원본은 공이 날아가는 동안이 사이에 있다).
+    playSoundIds(audio, [
+      PITCH_RELEASE_SOUND,
+      pitchCallSoundIdOf(resolution, nextAtBat),
+      nextAtBat.outcome === null ? null : inPlayCallSoundIdOf(nextAtBat.outcome),
+    ])
 
     if (isAtBatFinished(nextAtBat) && nextAtBat.outcome !== null) {
       nextRun = applyPitcherOutcome(nextRun, nextAtBat.outcome)

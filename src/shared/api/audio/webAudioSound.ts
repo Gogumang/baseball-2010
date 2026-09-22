@@ -9,6 +9,9 @@ import { soundFileUrl } from '@/shared/config/original/sounds'
  *
  * `AudioContext` 가 없는 환경(jsdom·서버 렌더)에서는 **아무 소리도 내지 않고 조용히 넘어간다**.
  * 소리가 안 나는 것 때문에 게임이 멈추면 안 되므로 모든 접근을 try/catch 로 감쌌다.
+ *
+ * 원본 규칙 하나를 웹 쪽으로 옮겨 적었다: 효과음은 배경음을 끊지만 **끝나면 배경음으로 돌아온다**
+ * (`start` 의 `onended` 주석 — 원본은 팝업이 끝나는 자리마다 `resumeBgm` 을 손으로 부른다).
  */
 
 /** 재생 통로를 여는 함수. 못 열면 null. */
@@ -118,6 +121,15 @@ export function createWebAudioSound(options: WebAudioSoundOptions = {}): SoundPo
     activeSource = null
   }
 
+  /**
+   * 원본 `0x6eaf0 resumeBgm` 의 몸통. 아래 `play` 도 효과음이 끝나면 이것을 밟는다.
+   */
+  const resumeRemembered = () => {
+    if (rememberedBgmId === null || volume === 0) return
+    playingBgmId = rememberedBgmId
+    start(rememberedBgmId, true)
+  }
+
   const start = (id: number, loop: boolean) => {
     const ctx = openContext()
     if (!ctx || !master) return
@@ -132,6 +144,18 @@ export function createWebAudioSound(options: WebAudioSoundOptions = {}): SoundPo
         source.buffer = buffer
         source.loop = loop
         source.connect(master)
+        if (!loop) {
+          // ── 효과음이 끝나면 기억해 둔 배경음으로 돌아간다 ──
+          // 원본은 통로가 하나뿐이라 효과음이 배경음을 끊고, **팝업이 끝나는 자리마다 손으로**
+          // `0x6eaf0 resumeBgm` 을 부른다 (20여 곳). 웹은 효과음이 끝나는 시각을 브라우저가
+          // 알려 주므로 그 자리를 여기서 자동으로 밟는다 — **이 되돌리기 시점은 근사다**.
+          // 그래야 효과음 하나가 배경음을 영구히 죽이지 않는다.
+          source.onended = () => {
+            if (token !== playToken) return
+            activeSource = null
+            resumeRemembered()
+          }
+        }
         source.start()
         activeSource = source
       } catch {
@@ -165,11 +189,7 @@ export function createWebAudioSound(options: WebAudioSoundOptions = {}): SoundPo
       rememberedBgmId = null
     },
 
-    resumeBgm: () => {
-      if (rememberedBgmId === null || volume === 0) return
-      playingBgmId = rememberedBgmId
-      start(rememberedBgmId, true)
-    },
+    resumeBgm: resumeRemembered,
 
     currentBgm: () => rememberedBgmId,
 

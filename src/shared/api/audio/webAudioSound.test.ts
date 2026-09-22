@@ -13,10 +13,21 @@ interface StartedSound {
 }
 
 /** 무엇이 언제 울렸는지 적어 두는 가짜 통로 */
+interface FakeSource {
+  buffer: { url: string } | null
+  loop: boolean
+  onended: (() => void) | null
+  connect: () => void
+  start: () => void
+  stop: () => void
+}
+
 function createFakeAudio() {
   const started: StartedSound[] = []
   const stopped: string[] = []
   const fetched: string[] = []
+  /** 튼 순서대로의 재생 통로 — 브라우저가 "다 울렸다" 고 알리는 것을 흉내내는 데 쓴다 */
+  const sources: FakeSource[] = []
   const gain = { value: 1 }
 
   const context = {
@@ -25,11 +36,15 @@ function createFakeAudio() {
     createGain: () => ({ gain, connect: () => {} }),
     createBufferSource: () => {
       // 어느 파일인지는 붙여 준 buffer 에 적혀 있다 (실제 WebAudio 도 buffer 를 나중에 넣는다).
-      const source = {
-        buffer: null as { url: string } | null,
+      const source: FakeSource = {
+        buffer: null,
         loop: false,
+        onended: null,
         connect: () => {},
-        start: () => started.push({ url: source.buffer?.url ?? '?', loop: source.loop }),
+        start: () => {
+          started.push({ url: source.buffer?.url ?? '?', loop: source.loop })
+          sources.push(source)
+        },
         stop: () => stopped.push(source.buffer?.url ?? '?'),
       }
       return source
@@ -49,6 +64,8 @@ function createFakeAudio() {
     started,
     stopped,
     fetched,
+    /** n 번째로 튼 소리가 끝났다고 알린다 (기본: 가장 마지막) */
+    fireEnded: (index = sources.length - 1) => sources[index]?.onended?.(),
     gain,
     options: {
       createContext: () => context as unknown as AudioContext,
@@ -184,6 +201,71 @@ describe('소리 포트 — 재생', () => {
 
     await vi.waitFor(() => expect(fake.fetched).toEqual(['sounds/001.mp3']))
     expect(fake.started).toHaveLength(1)
+  })
+
+  it('효과음이 끝나면 배경음이 **원래 번호로** 돌아온다 (원본 resumeBgm 0x6eaf0 자리)', async () => {
+    const fake = createFakeAudio()
+    const sound = createWebAudioSound(fake.options)
+
+    sound.playBgm(33)
+    await vi.waitFor(() => expect(fake.started).toHaveLength(1))
+    // 삼진 콜이 배경음을 끊는다 — 원본도 통로가 하나뿐이다
+    sound.play(21)
+    await vi.waitFor(() => expect(fake.started).toHaveLength(2))
+    expect(fake.stopped).toEqual(['sounds/033.mp3'])
+
+    fake.fireEnded()
+
+    await vi.waitFor(() => expect(fake.started).toHaveLength(3))
+    expect(fake.started[2]).toEqual({ url: 'sounds/033.mp3', loop: true })
+    expect(sound.currentBgm()).toBe(33)
+  })
+
+  it('효과음을 잇달아 내도 마지막 하나가 끝난 뒤 한 번만 돌아온다', async () => {
+    const fake = createFakeAudio()
+    const sound = createWebAudioSound(fake.options)
+
+    sound.playBgm(33)
+    await vi.waitFor(() => expect(fake.started).toHaveLength(1))
+    sound.play(6)
+    await vi.waitFor(() => expect(fake.started).toHaveLength(2))
+    sound.play(20)
+    await vi.waitFor(() => expect(fake.started).toHaveLength(3))
+
+    // 먼저 튼 타격음이 뒤늦게 끝났다고 알려도 통로를 가져간 쪽이 아니므로 되돌리지 않는다
+    fake.fireEnded(1)
+    expect(fake.started).toHaveLength(3)
+
+    fake.fireEnded(2)
+    await vi.waitFor(() => expect(fake.started).toHaveLength(4))
+    expect(fake.started[3]).toEqual({ url: 'sounds/033.mp3', loop: true })
+  })
+
+  it('배경음이 없었으면 효과음이 끝나도 아무것도 틀지 않는다', async () => {
+    const fake = createFakeAudio()
+    const sound = createWebAudioSound(fake.options)
+
+    sound.play(18)
+    await vi.waitFor(() => expect(fake.started).toHaveLength(1))
+    fake.fireEnded()
+
+    expect(fake.started).toHaveLength(1)
+    expect(sound.currentBgm()).toBeNull()
+  })
+
+  it('배경음을 멈춘 뒤 효과음이 끝나도 되살리지 않는다 (0x6e438 이 기억을 지운다)', async () => {
+    const fake = createFakeAudio()
+    const sound = createWebAudioSound(fake.options)
+
+    sound.playBgm(33)
+    await vi.waitFor(() => expect(fake.started).toHaveLength(1))
+    sound.stopBgm()
+    sound.play(22)
+    await vi.waitFor(() => expect(fake.started).toHaveLength(2))
+    fake.fireEnded()
+
+    expect(fake.started).toHaveLength(2)
+    expect(sound.currentBgm()).toBeNull()
   })
 
   it('파일을 못 받으면 그 소리만 빠지고 다음 소리는 울린다', async () => {

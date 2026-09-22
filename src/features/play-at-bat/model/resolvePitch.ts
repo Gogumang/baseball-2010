@@ -4,6 +4,7 @@ import type { SwingSituation } from '@/entities/batting/model/swingSkills'
 import { timingOf } from '@/entities/batting/model/swingTiming'
 import { hitDirectionOf } from '@/entities/batting/model/hitDirection'
 import { drawPattern, outcomeOfPattern } from '@/entities/batting/model/battedBallOutcome'
+import { contactSoundIdOf } from '@/features/play-at-bat/model/atBatSounds'
 import type { PatternDeck } from '@/entities/batting/model/battedBallOutcome'
 import { isInsideStrikeZone } from '@/shared/lib/geometry/coordinate'
 import type { BatterAbility } from '@/entities/batting/model/batter'
@@ -52,6 +53,14 @@ export interface PitchOutcomeDetail {
   readonly isBunt: boolean
   /** 방향까지 붙인 원본 결과 코드. 스윙하지 않았으면 null */
   readonly resultCode: number | null
+  /**
+   * **타구 순간에 울릴 소리 번호** (`atBatSounds.contactSoundIdOf`). 울릴 것이 없으면 null.
+   *
+   * 여기서 정해 실어 보내는 이유: 번호를 고르는 데 **방금 뽑은 타구 패턴**(각·세기·높이)이
+   * 필요한데 그 패턴을 밖으로 내보내지 않기 때문이다. 심판 콜은 볼카운트를 알아야 해서
+   * 받는 쪽(`app/model`)이 `pitchCallSoundIdOf` 로 따로 고른다.
+   */
+  readonly contactSoundId?: number | null
 }
 
 /** 존 좌표 1.0 이 원본 픽셀 몇 개인가 — 33px 존의 절반 (stageLayout 과 같은 값) */
@@ -98,7 +107,10 @@ export function resolvePitch(
     const resolution: PitchResolution = isInsideStrikeZone(pitch.plate)
       ? { kind: '스트라이크', isSwinging: false }
       : { kind: '볼' }
-    return { detail: { resolution, hasSwung: false, isBunt: false, resultCode: null }, deck }
+    return {
+      detail: { resolution, hasSwung: false, isBunt: false, resultCode: null, contactSoundId: null },
+      deck,
+    }
   }
 
   const error = plateErrorOf(pitch, swing.shift)
@@ -126,7 +138,15 @@ export function resolvePitch(
   )
   if (result.kind === '헛스윙') {
     const resolution: PitchResolution = { kind: '스트라이크', isSwinging: true }
-    return { detail: { resolution, hasSwung: true, isBunt: false, resultCode: null }, deck }
+    // 헛스윙 바람 소리 8 (0x51350) — 필살 스윙·마선수 타자의 27 은 그 값이 여기까지 오지 않는다
+    const contactSoundId = contactSoundIdOf({
+      hasSwung: true,
+      hasHit: false,
+      buntKind: swing.buntKind,
+      resultCode: null,
+      pattern: null,
+    })
+    return { detail: { resolution, hasSwung: true, isBunt: false, resultCode: null, contactSoundId }, deck }
   }
 
   const direction = hitDirectionOf(
@@ -136,9 +156,17 @@ export function resolvePitch(
   const code = result.code + direction
   const drawn = drawPattern(deck, code, random)
   const batted = outcomeOfPattern(code, drawn.pattern, random)
+  // 타격음 7·9·5·59·6 — 방금 뽑은 패턴의 각·세기·높이로 고른다 (0x515de~0x5164a)
+  const contactSoundId = contactSoundIdOf({
+    hasSwung: true,
+    hasHit: true,
+    buntKind: swing.buntKind,
+    resultCode: code,
+    pattern: drawn.pattern,
+  })
   const detail: PitchOutcomeDetail =
     batted.kind === '파울'
-      ? { resolution: { kind: '파울' }, hasSwung: true, isBunt: false, resultCode: code }
-      : { resolution: { kind: '타구', outcome: batted.outcome }, hasSwung: true, isBunt: batted.isBunt, resultCode: code }
+      ? { resolution: { kind: '파울' }, hasSwung: true, isBunt: false, resultCode: code, contactSoundId }
+      : { resolution: { kind: '타구', outcome: batted.outcome }, hasSwung: true, isBunt: batted.isBunt, resultCode: code, contactSoundId }
   return { detail, deck: drawn.deck }
 }

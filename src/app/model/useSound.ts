@@ -27,11 +27,47 @@ export function useSound(soundLevel: number): SoundPort {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  /** 처음 칸 값은 미리듣기를 내지 않는다 — 원본도 **바꿀 때**만 낸다 */
+  const lastLevelRef = useRef<number | null>(null)
   useEffect(() => {
     sound.setVolume(soundLevel * VOLUME_PER_LEVEL)
+    const previous = lastLevelRef.current
+    lastLevelRef.current = soundLevel
+    // 환경설정 칸 0 을 좌우로 움직여 값을 적용한 뒤(0x9f524) 효과음 5 로 미리듣기를 낸다
+    // (0x2963e — 경기 중 메뉴의 같은 칸 0x3cbde 도 같다)
+    if (previous !== null && previous !== soundLevel) sound.play(SOUND_LEVEL_PREVIEW)
   }, [sound, soundLevel])
 
   return sound
+}
+
+/** 소리 크기를 바꿀 때 나는 미리듣기 (= 강한 타구 타격음과 같은 번호) */
+export const SOUND_LEVEL_PREVIEW = 5
+
+/**
+ * 번호 목록을 원본 통로에 차례로 넣는다. `null`·`undefined` 는 "울릴 것이 없다" 는 뜻이라 건너뛴다.
+ *
+ * 통로가 하나뿐이라(원본 0x6e9d4) **뒤에 넣은 소리가 앞 소리를 끊는다** — 목록의 순서는
+ * 원본이 부르는 순서 그대로여야 한다.
+ */
+export function playSoundIds(sound: SoundPort, ids: readonly (number | null | undefined)[]): void {
+  for (const id of ids) {
+    if (id === null || id === undefined) continue
+    sound.play(id)
+  }
+}
+
+/**
+ * 화면에 **들어설 때 한 번** 나는 효과음·음성 (`screenBgm` 의 `SCREEN_ENTER_SOUND`).
+ * 같은 화면에 머무는 동안 다시 그려도 한 번만 낸다.
+ */
+export function useSceneEnterSound(sound: SoundPort, screenKind: string, soundId: number | null): void {
+  const lastRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (lastRef.current === screenKind) return
+    lastRef.current = screenKind
+    if (soundId !== null) sound.play(soundId)
+  }, [sound, screenKind, soundId])
 }
 
 /**

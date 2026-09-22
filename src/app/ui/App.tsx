@@ -16,8 +16,8 @@ import { aceMatchMissionOf, matchResultEventOf } from '@/entities/story/model/ac
 import { effectiveAbilityOf } from '@/entities/career/model/condition'
 import type { AceMatchStarter } from '@/app/ui/CareerRoutes'
 import { useGameSettings } from '@/app/model/useGameSettings'
-import { useSceneBgm, useSound } from '@/app/model/useSound'
-import { screenBgmOf } from '@/app/model/screenBgm'
+import { useSceneBgm, useSceneEnterSound, useSound } from '@/app/model/useSound'
+import { screenBgmOf, screenEnterSoundOf } from '@/app/model/screenBgm'
 import { useSeasonSession } from '@/app/model/useSeasonSession'
 import { SeasonRoute } from '@/app/ui/SeasonRoute'
 import { usePitcherLeagueSession } from '@/app/model/usePitcherLeagueSession'
@@ -57,14 +57,16 @@ export function App() {
   const [screen, setScreen] = useState<Screen>({ kind: '타이틀' })
   // 화면이 바뀌면 그 화면의 배경음으로 갈아탄다 (`screenBgm.ts` 의 표)
   useSceneBgm(sound, screenBgmOf(screen))
+  // 화면에 들어설 때 한 번 나는 소리 — 타이틀의 로고 음성 0 (0x69400)
+  useSceneEnterSound(sound, screen.kind, screenEnterSoundOf(screen))
 
   const runner = useAtBatRunner()
   const seasonSession = useSeasonSession(seasonStore, random)
   const pitcherSession = usePitcherLeagueSession(pitcherStore, random, gameSettings.settings.pitchControl === '게이지')
-  const careerSession = useCareerSession({ runner, random, saveGame, screen, setScreen })
+  const careerSession = useCareerSession({ runner, random, saveGame, screen, setScreen, sound })
   // 미션 보상 G — 원본은 전역 저장에 쌓지만 웹은 커리어에 둔다. 육성 선수가 없으면 받아 갈 곳이 없다
   const mission = useMissionSession({
-    runner, random, missionRecord, screen, setScreen,
+    runner, random, missionRecord, screen, setScreen, sound,
     onGamePointReward: careerSession.actions.gainGamePoint,
   })
   const collection = useCollection(collectionStore, careerSession.career, isEveryMissionCleared(mission.clearedKeys))

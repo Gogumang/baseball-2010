@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Screen } from '@/app/model/screen'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import { isAtBatFinished } from '@/entities/at-bat/model/atBatState'
@@ -9,6 +9,15 @@ import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
+import { inPlayCallSoundIdOf, pitchCallSoundIdOf } from '@/features/play-at-bat/model/atBatSounds'
+import {
+  GAME_INTRO_SOUND,
+  gameResultSoundIdOf,
+  gameStepSoundIdsOf,
+} from '@/features/play-game/model/gameSounds'
+import { playSoundIds } from '@/app/model/useSound'
+import { createSilentSound } from '@/shared/api/audio/soundPort'
+import type { SoundPort } from '@/shared/api/audio/soundPort'
 import {
   applyGameResult,
   applyLeagueDay,
@@ -83,6 +92,11 @@ interface CareerSessionInput {
   readonly saveGame: SaveGamePort
   readonly screen: Screen
   readonly setScreen: (screen: Screen) => void
+  /**
+   * 소리 통로 (원본 사운드 객체 `[0x1400058]`). 안 넘기면 아무 소리도 안 난다 —
+   * 테스트는 그대로 두면 된다.
+   */
+  readonly sound?: SoundPort
 }
 
 /** 육성 모드 한 판 — 커리어·경기 진행·관리 커맨드를 한데 묶는다. */
@@ -92,7 +106,11 @@ export function useCareerSession({
   saveGame,
   screen,
   setScreen,
+  sound,
 }: CareerSessionInput) {
+  // 통로를 안 받으면 조용한 포트로 — 아래 자리들이 `sound` 가 있는지 매번 보지 않게 한다
+  const silent = useMemo(() => createSilentSound(), [])
+  const audio = sound ?? silent
   const [savedCareer, setSavedCareer] = useState<PlayerCareer | null>(() => saveGame.load())
   const [rawCareer, setCareer] = useState<PlayerCareer | null>(null)
   /**
@@ -174,6 +192,8 @@ export function useCareerSession({
   const finishGame = useCallback(
     (finished: GameProgress, currentCareer: PlayerCareer) => {
       const summary = summaryOf(finished)
+      // 승리 31 · 패배 32 징글. 무승부는 원본이 어느 쪽을 내는지 문서에 없어 비워 둔다
+      playSoundIds(audio, [gameResultSoundIdOf(summary.result)])
       // 경기 후 평가 — 인기도 → 평판 → 사기 (0xa719c), 이어서 연속 기록 (0x8a6fc)
       const evaluation = evaluateGame(currentCareer, summary)
       const evaluated = gainMorale(
@@ -208,7 +228,7 @@ export function useCareerSession({
         streakNotices: streak.notices,
       })
     },
-    [random, setScreen],
+    [audio, random, setScreen],
   )
 
   /**
@@ -259,6 +279,8 @@ export function useCareerSession({
   const handlePitchResolved = useCallback(
     (detail: PitchOutcomeDetail, _pitch?: unknown, isUncatchable?: boolean) => {
       const nextAtBat = runner.applyPitch(detail.resolution)
+      // 타구음(0x515de~) → 심판 콜(0x51a94) 순서. 통로가 하나라 뒤 소리가 앞 소리를 끊는다
+      playSoundIds(audio, [detail.contactSoundId, pitchCallSoundIdOf(detail.resolution, nextAtBat)])
       if (!isAtBatFinished(nextAtBat) || nextAtBat.outcome === null) return
 
       const currentProgress = progressRef.current
@@ -278,9 +300,14 @@ export function useCareerSession({
         runner.setIsPaused(true)
         return
       }
+      // 홈런·삼진·볼넷은 수비를 기다리지 않는다 — 홈런 함성(11)과 진행 소리를 여기서 낸다
+      playSoundIds(audio, [
+        inPlayCallSoundIdOf(nextAtBat.outcome),
+        ...gameStepSoundIdsOf(currentProgress, advanced),
+      ])
       finishAtBat(advanced, nextAtBat.outcome, runnersOnBase)
     },
-    [finishAtBat, random, runner],
+    [audio, finishAtBat, random, runner],
   )
 
   const story = useStorySchedule(career)
@@ -388,9 +415,14 @@ export function useCareerSession({
       const resolved = resolveDefensePlay(current, result ?? runDefensePlay(pending), random)
       progressRef.current = resolved
       setProgress(resolved)
+      // 플레이가 끝난 자리 — 아웃 콜(0x51b36)과 진행 소리는 여기서야 난다
+      playSoundIds(audio, [
+        inPlayCallSoundIdOf(pending.outcome),
+        ...gameStepSoundIdsOf(current, resolved),
+      ])
       finishAtBat(resolved, pending.outcome, runnersOnBase)
     },
-    [finishAtBat, random],
+    [audio, finishAtBat, random],
   )
 
   const actions = {
@@ -410,6 +442,9 @@ export function useCareerSession({
       if (next === current) return
       progressRef.current = next
       setProgress(next)
+      // 도루 실패로 이닝이 끝나면 공수 교대 징글이 난다. 세이프 콜(17)은 잇지 않았다 —
+      // 원본 판정 v9 가 어떤 플레이에서 나는지 미해결이다
+      playSoundIds(audio, gameStepSoundIdsOf(current, next))
     },
 
     /**
@@ -648,6 +683,8 @@ export function useCareerSession({
     finishLoading: () => {
       setLoadingTip(null)
       runner.setIsPaused(false)
+      // 경기 시작 인트로 예약음 61 (상태 0xc). 웹에는 인트로 화면이 없어 로딩이 끝나는 자리다 — 근사
+      playSoundIds(audio, [GAME_INTRO_SOUND])
     },
 
     /** 시즌 성적 화면 뒤 — 올해의 목표 결과(392)부터 연말 이벤트를 잇는다 */

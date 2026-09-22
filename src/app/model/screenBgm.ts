@@ -52,3 +52,23 @@ export function screenBgmOf(screen: Screen): number | null {
   const table: Partial<Record<string, number>> = SCREEN_BGM
   return table[screen.kind] ?? null
 }
+
+/**
+ * 화면에 **들어설 때 한 번** 나는 효과음·음성 (배경음이 아니다).
+ *
+ * ```
+ * 0  로고 "GAMEVIL"  장면 0x103 상태 2 = 시작 인증·로고 화면 (0x69400)
+ * ```
+ *
+ * ⚠️ **브라우저는 사용자가 한 번 누르기 전에는 소리를 못 낸다** (`useSound` 머리 주석).
+ * 앱을 켜고 처음 보는 타이틀에서는 이 음성이 실제로 울리지 않는다 — 다시 타이틀로 돌아오면 난다.
+ */
+export const SCREEN_ENTER_SOUND = {
+  타이틀: 0,
+} as const satisfies Partial<Record<Screen['kind'], number>>
+
+/** 이 화면에 들어설 때 낼 효과음. 없으면 null */
+export function screenEnterSoundOf(screen: Screen): number | null {
+  const table: Partial<Record<string, number>> = SCREEN_ENTER_SOUND
+  return table[screen.kind] ?? null
+}
