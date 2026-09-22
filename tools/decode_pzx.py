@@ -527,6 +527,24 @@ def write_boxes(frame_dir: Path, boxes: dict[str, list[list[int]]]) -> None:
 PZD_PZF_SECTION_AT = 4
 
 
+def split_pair_image(frame_path: Path) -> Path | None:
+    """
+    PZF 의 짝 PZD 를 찾는다.
+
+    같은 이름이 먼저다 (`fence.pzf` ↔ `fence.pzd`). 없으면 밑줄 뒤를 한 마디씩 떼고 다시 찾는다 —
+    원본 적재 0x76ba4 가 **fence.pzd 한 장을 fence.pzf(일반 11구장)·fence_season.pzf(시즌 20프레임)
+    두 PZF 가 함께 쓰기** 때문이다 (L-sound-effects.md 5-D · R6-sprite-leftovers.md 1절).
+    """
+    stem = frame_path.stem
+    while True:
+        candidate = frame_path.with_name(f'{stem}.pzd')
+        if candidate.exists():
+            return candidate
+        if '_' not in stem:
+            return None
+        stem = stem.rsplit('_', 1)[0]
+
+
 def decode_split_pair(image_path: Path, frame_path: Path, output_dir: Path) -> int:
     """
     PZD(이미지 구간만, 오프셋 4) + PZF(프레임 구간만, 오프셋 4) 짝을 PZX 처럼 푼다 — stadium/fence (위치 분석 6차).
@@ -580,8 +598,8 @@ def main() -> int:
 
     # PZD(그림) + PZF(프레임) 로 쪼개진 짝 — stadium/fence
     for frame_path in sorted(arguments.root.rglob('*.pzf')):
-        image_path = frame_path.with_suffix('.pzd')
-        if not image_path.exists():
+        image_path = split_pair_image(frame_path)
+        if image_path is None:
             continue
         count = decode_split_pair(image_path, frame_path, arguments.output)
         total += count

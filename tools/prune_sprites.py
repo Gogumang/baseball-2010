@@ -81,6 +81,13 @@ def main() -> int:
     parser.add_argument('--dry-run', action='store_true')
     arguments = parser.parse_args()
 
+    # 아래에서 TARGET_ROOT 를 통째로 지우고 다시 채운다. 원본 트리가 없으면 "지우고 아무것도
+    # 안 넣기" 가 되어 배포본이 날아가므로 먼저 막는다 (지금 저장소에는 base/sprites 가 없다 —
+    # public/sprites 는 decode_pzx.py 를 -o public/sprites 로 직접 돌려 채운 것이다).
+    if not SOURCE_ROOT.exists():
+        raise ValueError(f'원본 스프라이트 트리가 없습니다: {SOURCE_ROOT} '
+                         f'(먼저 python3 tools/decode_pzx.py base/work/jar -o {SOURCE_ROOT} 를 돌리세요)')
+
     wanted = collect()
     total = sum((SOURCE_ROOT / path).stat().st_size for path in wanted)
     available = sum(1 for _ in SOURCE_ROOT.rglob('*.png'))
