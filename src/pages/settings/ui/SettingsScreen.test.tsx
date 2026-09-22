@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
-import { DEFAULT_SETTINGS } from '@/entities/settings/model/gameSettings'
+import { DEFAULT_SETTINGS, SPEED_LEVEL_COUNT } from '@/entities/settings/model/gameSettings'
 import { MENU_ROW, PANEL, SOUND_BARS, SPEED_MARKS, VALUE_ROW, bottomAlignOffset, rowTopOf } from '@/pages/settings/lib/settingsLayout'
 
 /**
@@ -75,12 +75,20 @@ describe('소리 막대·속도 꺾쇠는 아래 맞춤이다 (P6 5절 확정)',
     expect(밑변).toEqual([46, 46, 46, 46])
   })
 
-  it('속도 꺾쇠 넷(11×7·11×7·12×9·12×9)의 밑변도 모두 Y + 46 에 모인다', () => {
+  /**
+   * 꺾쇠는 **넷이 아니라 다섯**이다 — 속도 [옵션+0x2f] 는 0~4 고(K-5 5-1, 프레임 표 0xd7624 =
+   * [250,100,62,45,35] 다섯 칸) 그리는 쪽은 `속도 + 1 개만큼 이미지 102 + k` 라(P6 5절)
+   * 최대 속도에서 **102~106 다섯 장**이 나온다. 106 은 13×11 이라(public/sprites/slt_frame/106.png)
+   * h최대가 9 에서 11 로 올라가고 밑변은 Y + 48 이 된다.
+   * 예전 표는 102~105 넷만 적어 다섯째 장을 넷째 크기(12×9)로 보고 혼자 2px 내려앉혔다.
+   */
+  it('속도 꺾쇠 다섯(11×7·11×7·12×9·12×9·13×11)의 밑변이 모두 Y + 48 에 모인다', () => {
     const 밑변 = SPEED_MARKS.sizes.map(
       (size, k) => SPEED_MARKS.dy + bottomAlignOffset(SPEED_MARKS.sizes, k) + size.height,
     )
 
-    expect(밑변).toEqual([46, 46, 46, 46])
+    expect(SPEED_MARKS.sizes.length).toBe(SPEED_LEVEL_COUNT)
+    expect(밑변).toEqual([48, 48, 48, 48, 48])
   })
 
   it('가장 낮은 막대는 9px 내려 앉는다 — 예전 값(0)과 다른 곳이다', () => {
@@ -125,5 +133,51 @@ describe('환경설정 값 바꾸기', () => {
     fireEvent.click(줄('모드 초기화'))
 
     expect(screen.queryByRole('dialog')).toBeNull()
+  })
+})
+
+/**
+ * 상세 설정 — 원본은 팝업이 아니라 **딴 페이지**(장면 상태 0x20 · 페이지 32)고
+ * 그리기 루프가 `cmp r6,#4` 로 **네 줄**이다 (P7-leftovers K2 확정).
+ * 줄 아이콘 표 0xd1afc = [93,94,90,97] · 값 라벨 첫 번호 표 0xd1b04 = [74,76,76,78] →
+ * 값 0 이 앞 문구(기본 · 수동 · 수동 · OFF) 이고 지금 값만 흰색이다.
+ * 다섯째 줄 "터치"(StrMAINMENU[73])는 원본이 값만 읽고 그리지 않아 웹에도 없다.
+ */
+describe('환경설정 → 상세 설정 (원본 페이지 32, 네 줄)', () => {
+  const 상세열기 = (overrides: Partial<Parameters<typeof SettingsScreen>[0]> = {}) => {
+    띄우기(overrides)
+    fireEvent.click(줄('상세 설정'))
+  }
+
+  it('투구·주루·송구·전광판 네 줄이 나오고 터치 줄은 없다', () => {
+    상세열기()
+
+    for (const name of ['투구', '주루', '송구', '전광판']) expect(줄(name)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '터치' })).toBeNull()
+  })
+
+  it('지금 값만 흰색이고 아닌 칸은 #7B93D4 다 — 기본값 투구는 [74] 기본이다', () => {
+    상세열기()
+
+    expect(screen.getByText('기본').style.color).toBe('rgb(255, 255, 255)')
+    expect(screen.getByText('게이지').style.color).toBe('rgb(123, 147, 212)')
+  })
+
+  it('줄을 누르면 값이 뒤집힌다 (갱신 0x288ac 의 `eor #1`)', () => {
+    const onChange = vi.fn()
+    상세열기({ onChange })
+
+    fireEvent.click(줄('주루'))
+
+    expect(onChange).toHaveBeenCalledWith({ ...DEFAULT_SETTINGS, runningMode: '수동' })
+  })
+
+  it('웹 배선이 없는 전광판도 원본에 줄이 있으니 그대로 바꿀 수 있다', () => {
+    const onChange = vi.fn()
+    상세열기({ onChange })
+
+    fireEvent.click(줄('전광판'))
+
+    expect(onChange).toHaveBeenCalledWith({ ...DEFAULT_SETTINGS, isScoreboardOn: false })
   })
 })
