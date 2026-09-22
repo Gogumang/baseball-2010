@@ -48,6 +48,12 @@ export interface PlayerCareer {
   /** 마선수 아이디 → 호감도 (0~100) */
   readonly affection: Readonly<Record<string, number>>
   readonly titleIds: readonly string[]
+  /**
+   * 장착 중인 칭호 **번호** (+0x1c4, s8). 새 선수는 −1 = 없음 (0x11292).
+   * 칭호를 얻으면 곧바로 이 칸에 들어가고(0x1b214), 뒤에 칭호 목록 화면(하위 상태 129)에서 바꾼다
+   * (키 처리 0x11f78 — P3 10-1).
+   */
+  readonly equippedTitle: number
   /** 이글아이 아이템이 남아 있는 경기 수. 0이면 투구 도착 지점이 보이지 않는다. */
   readonly eagleEyeGamesRemaining: number
   readonly seenEventIds: readonly string[]
@@ -276,6 +282,8 @@ export function createCareer(name: string, profile: RookieProfile = DEFAULT_ROOK
     careerStats: EMPTY_SEASON_STATS,
     affection: {},
     titleIds: [],
+    // 새 선수의 +0x1c4 는 −1 이다 (0x11292). 0번 "이름 없는 신인" 을 첫 관리 화면에서 얻으며 곧바로 장착된다
+    equippedTitle: -1,
     eagleEyeGamesRemaining: 0,
     seenEventIds: [],
     storySceneIndex: 0,

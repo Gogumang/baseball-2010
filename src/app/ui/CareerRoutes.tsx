@@ -67,6 +67,7 @@ export function CareerRoutes({
       onDismissNotice={actions.dismissManagementNotice}
       onOpenShop={actions.openShop}
       onOpenPlayerInfo={actions.openPlayerInfo}
+      onEquipTitle={actions.equipTitle}
       onExit={() => setScreen({ kind: '메인메뉴' })}
     />
   )

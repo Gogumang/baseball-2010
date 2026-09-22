@@ -131,3 +131,91 @@ describe('기본정보 카드는 커맨드 줄에 가리지 않는다 (QA 1회�
     expect(순서 & Node.DOCUMENT_POSITION_FOLLOWING, '카드가 커맨드 줄보다 먼저 그려집니다').toBeTruthy()
   })
 })
+
+describe('칭호(닉네임) 목록 — 기본정보 카드에서 여는 하위 상태 129', () => {
+  /**
+   * ⚠️ 여는 키는 **'*'** 다. 원작 설명서 StrHOWTO[15] 는 "(#) 키" 라고 적었지만, 상태 119 의
+   * 키 처리 `0x1056c` 가 보는 값은 `'*'(0x2a) → 129` 다 (R9 「119·129·120 … 확정」).
+   */
+  const 기본정보열기 = () => {
+    fireEvent.click(screen.getByRole('button', { name: '선수정보' }))
+    fireEvent.click(screen.getByRole('button', { name: '기본정보' }))
+  }
+  const 칭호창 = () => screen.queryByRole('dialog', { name: '칭호' })
+
+  it("기본정보 카드에서 '*' 를 누르면 칭호 목록이 열린다", () => {
+    render(<ManagementScreen {...propsWith({
+      career: { ...createCareer('테스터'), titleIds: ['이름 없는 신인', '안타제조기'] },
+      onEquipTitle: vi.fn(),
+    })} />)
+    기본정보열기()
+
+    fireEvent.keyDown(window, { key: '*' })
+
+    expect(칭호창(), "'*' 로 칭호 목록이 열리지 않았다").not.toBeNull()
+  })
+
+  it("기본정보 카드가 아니면 '*' 는 아무 일도 하지 않는다", () => {
+    render(<ManagementScreen {...propsWith({ onEquipTitle: vi.fn() })} />)
+
+    fireEvent.keyDown(window, { key: '*' })
+
+    expect(칭호창()).toBeNull()
+  })
+
+  it('목록은 얻은 순서가 아니라 번호 오름차순이고, 고르면 장착을 알린다 (0x104cc·0x11f78)', () => {
+    const onEquipTitle = vi.fn()
+    render(<ManagementScreen {...propsWith({
+      // 나중에 얻은 "이름 없는 신인"(0번)이 앞에 와야 한다
+      career: { ...createCareer('테스터'), titleIds: ['안타제조기', '이름 없는 신인'], equippedTitle: 35 },
+      onEquipTitle,
+    })} />)
+    기본정보열기()
+    fireEvent.keyDown(window, { key: '*' })
+
+    const 줄 = screen.getAllByRole('button').filter((button) => 칭호창()?.contains(button) === true)
+    expect(줄.map((button) => button.textContent)).toEqual(['이름 없는 신인', '안타제조기'])
+
+    fireEvent.click(줄[0])
+
+    expect(onEquipTitle).toHaveBeenCalledWith('이름 없는 신인')
+    expect(screen.queryByRole('dialog', { name: '알림' })?.textContent).toContain('닉네임이 적용되었습니다')
+  })
+
+  it('이미 장착한 줄을 고르면 아무 일도 없다 (0x11fd6 의 `!=` 검사)', () => {
+    const onEquipTitle = vi.fn()
+    render(<ManagementScreen {...propsWith({
+      career: { ...createCareer('테스터'), titleIds: ['이름 없는 신인'], equippedTitle: 0 },
+      onEquipTitle,
+    })} />)
+    기본정보열기()
+    fireEvent.keyDown(window, { key: '*' })
+
+    fireEvent.click(screen.getByRole('button', { name: '이름 없는 신인' }))
+
+    expect(onEquipTitle).not.toHaveBeenCalled()
+  })
+
+  it("칭호 목록에서 '*' 를 다시 누르면 기본정보 카드로 돌아간다 (129 → 119)", () => {
+    const { container } = render(<ManagementScreen {...propsWith({
+      career: { ...createCareer('테스터'), titleIds: ['이름 없는 신인'] },
+      onEquipTitle: vi.fn(),
+    })} />)
+    기본정보열기()
+    fireEvent.keyDown(window, { key: '*' })
+
+    fireEvent.keyDown(window, { key: '*' })
+
+    expect(칭호창(), '창이 닫히지 않았다').toBeNull()
+    expect(container.querySelector('[data-testid="basic-info-card"]'), '기본정보 카드로 돌아오지 않았다').not.toBeNull()
+  })
+
+  it('onEquipTitle 을 안 넘기면 창이 열리지 않는다', () => {
+    render(<ManagementScreen {...propsWith({ career: { ...createCareer('테스터'), titleIds: ['이름 없는 신인'] } })} />)
+    기본정보열기()
+
+    fireEvent.keyDown(window, { key: '*' })
+
+    expect(칭호창()).toBeNull()
+  })
+})

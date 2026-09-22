@@ -30,7 +30,7 @@ import {
 } from '@/entities/career/model/playerCareer'
 import { applyBurstRewards } from '@/entities/career/model/burstReward'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
-import { awardTitles, evaluateNewTitles } from '@/entities/career/model/titles'
+import { awardTitles, equipTitle, evaluateNewTitles } from '@/entities/career/model/titles'
 import { blockReasonOf, runTraining } from '@/entities/career/model/training'
 import { trainingBlockTextOf, trainingOutcomeLinesOf } from '@/entities/career/model/trainingText'
 import { recoverAfterRest, restBlockReasonOf, runOuting, runRest } from '@/entities/career/model/outing'
@@ -503,6 +503,15 @@ export function useCareerSession({
         return setScreen({ kind: '아이템', tab: '착용' })
       }
       setScreen({ kind: '성적' })
+    },
+
+    /**
+     * 칭호 목록(하위 상태 129)에서 하나를 골랐다 — 키 처리 0x11f78 의 확인 갈래.
+     * 원본은 선수 +0x1c4 를 바꾸고 팝업(이름 + StrMODE[138])을 띄운 뒤 곧바로 저장한다(0x1fdec).
+     * 웹은 커리어가 바뀌면 `useEffect` 가 저장하므로 여기서는 값만 쓴다.
+     */
+    equipTitle: (title: string) => {
+      setCareer((current) => (current === null ? current : equipTitle(current, title)))
     },
 
     confirmGameResult: () => {

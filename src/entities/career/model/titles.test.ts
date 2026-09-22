@@ -4,11 +4,15 @@ import {
   awardTitles,
   conditionTextOf,
   currentTitleOf,
+  equipTitle,
+  equipTitleNoticeOf,
   evaluateNewTitles,
   isAllTitlesCollected,
   nextTitleOf,
+  NO_EQUIPPED_TITLE,
   PITCHER_TITLE_OFFSET,
   TITLE_COUNT,
+  TITLE_ROWS_PER_PAGE,
   TITLE_NAMES,
   titleListOf,
   titleNumberOf,
@@ -132,6 +136,58 @@ describe('currentTitleOf', () => {
   it('칭호가 없으면 첫 칭호, 있으면 가장 최근에 얻은 칭호다', () => {
     expect(currentTitleOf(선수())).toBe('이름 없는 신인')
     expect(currentTitleOf(선수({ titleIds: ['이름 없는 신인', '안타제조기'] }))).toBe('안타제조기')
+  })
+
+  it('장착값(+0x1c4)이 있으면 그것을 쓴다 — 얻은 순서보다 우선한다 (0x7d5cc)', () => {
+    const career = 선수({ titleIds: ['이름 없는 신인', '안타제조기'], equippedTitle: 0 })
+
+    expect(currentTitleOf(career)).toBe('이름 없는 신인')
+  })
+
+  it('옛 저장처럼 장착값이 −1 이면 예전처럼 마지막에 얻은 것을 쓴다', () => {
+    expect(선수().equippedTitle).toBe(NO_EQUIPPED_TITLE)
+    expect(currentTitleOf(선수({ titleIds: ['안타제조기'], equippedTitle: NO_EQUIPPED_TITLE }))).toBe('안타제조기')
+  })
+})
+
+describe('equipTitle — 칭호 목록(상태 129) 확인 키 0x11f78', () => {
+  it('고른 칭호 번호를 +0x1c4 에 쓴다', () => {
+    const career = equipTitle(선수({ titleIds: ['이름 없는 신인', '안타제조기'] }), '안타제조기')
+
+    expect(career.equippedTitle).toBe(titleNumberOf('안타제조기'))
+    expect(currentTitleOf(career)).toBe('안타제조기')
+  })
+
+  it('이미 장착한 것을 다시 고르면 아무 일도 없다 (0x11fd6 의 `!=` 검사)', () => {
+    const career = 선수({ equippedTitle: 0 })
+
+    expect(equipTitle(career, '이름 없는 신인')).toBe(career)
+  })
+
+  it('모르는 이름은 무시한다', () => {
+    const career = 선수({ equippedTitle: 0 })
+
+    expect(equipTitle(career, '없는칭호')).toBe(career)
+  })
+
+  it('팝업 글은 이름 + StrMODE[138] 이다 (0x11fe2)', () => {
+    expect(equipTitleNoticeOf('안타제조기')).toBe('안타제조기!N닉네임이 적용되었습니다')
+  })
+})
+
+describe('얻는 즉시 장착 (0x1b214)', () => {
+  it('awardTitles 는 준 칭호 중 번호가 가장 큰 것을 장착한다', () => {
+    const career = awardTitles(선수(), ['이름 없는 신인', '안타제조기'])
+
+    expect(career.equippedTitle).toBe(titleNumberOf('안타제조기'))
+  })
+
+  it('목록은 얻은 순서가 아니라 번호 오름차순이다 (0x104cc)', () => {
+    expect(titleListOf(['안타제조기', '이름 없는 신인'])).toEqual(['이름 없는 신인', '안타제조기'])
+  })
+
+  it('한 화면 줄 수는 9 다 — 목록 객체에 min(개수, 9) 로 넣는다', () => {
+    expect(TITLE_ROWS_PER_PAGE).toBe(9)
   })
 })
 

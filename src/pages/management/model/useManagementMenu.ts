@@ -16,7 +16,7 @@ const SPECIAL_SWING_MENU_ID = '필살타법'
 type MenuKind = 'main' | SubMenuKind
 
 /** 관리 화면을 덮는 창 */
-export type ManagementOverlay = '기록실' | '필살타법'
+export type ManagementOverlay = '기록실' | '필살타법' | '칭호'
 
 /** 관리 화면 커서·하위 메뉴·훈련 연출 상태 */
 export function useManagementMenu(props: ManagementScreenProps) {
@@ -102,6 +102,19 @@ export function useManagementMenu(props: ManagementScreenProps) {
         return
       }
       if (event.key === 'Escape' || event.key === 'Backspace') return back()
+      /*
+       * 기본정보 카드(상태 119) 에서 칭호 목록(상태 129) 을 여는 키.
+       *
+       * ⚠️ 원작 설명서 StrHOWTO[15] 는 "[선수정보] -> [기본정보]에서 **(#) 키**로 확인 및 변경" 이라 적었지만,
+       * 119 의 키 처리 `0x1056c` 가 실제로 보는 값은 **'*'(0x2a)** 다 (R9 「119·129·120 … 확정」:
+       * `취소(−16) → 106, '*'(0x2a) → 129, '0'(0x30) → 120`). 설명서와 코드가 어긋나는 자리라
+       * **코드 쪽을 그대로 옮긴다**. 129 에서 '*' 는 다시 119 로 돌아가는 키다 (0x11f9a, P3 10-1).
+       */
+      if (event.key === '*') {
+        if (overlay === '칭호') return setOverlay(null)
+        if (isShowingBasicInfo && overlay === null) return setOverlay('칭호')
+        return
+      }
       // 창이 열려 있으면 뒤쪽 커맨드 줄은 방향키·확인에 반응하지 않는다
       if (overlay !== null) return
       const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0

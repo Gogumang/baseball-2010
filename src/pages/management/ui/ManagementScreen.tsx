@@ -15,6 +15,7 @@ import { DetailPopup } from '@/pages/management/ui/DetailPopup'
 import { StandingsWindow } from '@/widgets/standings/ui/StandingsWindow'
 // 리그 전적을 경기 결과에 잇는 일은 팀 리드 담당이라, 그때까지는 빈 리그(전부 0승 0패)를 보여 준다
 import { SpecialSwingWindow } from '@/widgets/special-swing/ui/SpecialSwingWindow'
+import { TitleListWindow } from '@/widgets/management/ui/TitleListWindow'
 import type { DetailResult } from '@/pages/management/lib/detailPopup'
 import * as styles from '@/pages/management/ui/ManagementScreen.css'
 
@@ -42,6 +43,11 @@ export interface ManagementScreenProps {
   readonly onDismissNotice: () => void
   readonly onOpenShop: (tab: string) => void
   readonly onOpenPlayerInfo: (itemId: string) => void
+  /**
+   * 칭호 목록(하위 상태 129)에서 하나를 골랐다 — 선수 +0x1c4 에 쓰고 저장한다 (0x11f78).
+   * 안 넘기면 그 창이 열리지 않는다.
+   */
+  readonly onEquipTitle?: (title: string) => void
   /** 메인 메뉴로 나간다. 진행 상황은 이미 저장되어 있다. */
   readonly onExit: () => void
 }
@@ -84,6 +90,10 @@ export function ManagementScreen(props: ManagementScreenProps) {
       {menu.isShowingBasicInfo && <BasicInfoCard career={career} />}
       <ScreenFrame title="나만의리그타자편" gamePoint={career.gamePoint} onBack={menu.back} />
       {menu.overlay === '기록실' && <StandingsWindow league={career.league} onClose={menu.closeOverlay} />}
+      {/* 칭호 목록(상태 129) — 기본정보 카드 위에 뜨고, 취소하면 그 카드(119)로 돌아간다 */}
+      {menu.overlay === '칭호' && props.onEquipTitle !== undefined && (
+        <TitleListWindow career={career} onEquip={props.onEquipTitle} onClose={menu.closeOverlay} />
+      )}
       {menu.overlay === '필살타법' && (
         <SpecialSwingWindow level={career.specialSwingLevel} sessions={career.specialSwingSessions} battingTypeIndex={career.battingTypeIndex} onClose={menu.closeOverlay} />
       )}

@@ -5,6 +5,7 @@ import { effectiveAbilityOf } from '@/entities/career/model/condition'
 import { battingAverageOf } from '@/entities/career/model/seasonStats'
 import { careerMvpCount, hasBackToBackMvp, hasMvpInSeason } from '@/entities/awards/model/seasonAwards'
 import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
+import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 
 /**
  * 칭호(닉네임) — 원본 StrNICKNAME 128개는 **이름 64개(0~63) + 획득 조건 원문 64개(64~127)** 의 짝이다.
@@ -28,6 +29,10 @@ export const TITLE_COUNT = NAME_COUNT
 export const COMMON_TITLE_COUNT = 32
 /** 투수편 이름은 타자편 번호 + 16 (P3 2절 0x7d5ee) */
 export const PITCHER_TITLE_OFFSET = 16
+/** StrMODE[138] "닉네임이 적용되었습니다" — 장착 팝업이 쓴다 (0x11fe2) */
+const EQUIPPED_TITLE_TEXT = 138
+/** 칭호 목록 한 화면에 들어가는 줄 수 — 목록 객체에 `min(개수, 9)` 로 넣는다 (0x104cc) */
+export const TITLE_ROWS_PER_PAGE = 9
 
 export function conditionTextOf(title: string): string | null {
   const index = TITLE_NAMES.indexOf(title)
@@ -273,8 +278,36 @@ export function unownedTitleNamesOf(numbers: readonly number[], owned: readonly 
     .filter((title) => !owned.includes(title))
 }
 
+/** 장착 없음 — 원본 선수 +0x1c4 의 −1 (0x11292) */
+export const NO_EQUIPPED_TITLE = -1
+
+/**
+ * 지금 장착한 칭호 이름 (선수 +0x1c4 → StrNICKNAME[번호]).
+ *
+ * 원본은 +0x1c4 < 0 이면 기본정보 창에 칭호 줄 자체를 안 그린다 (0x7d5cc, P3 10-1).
+ * 웹은 상태판에 늘 한 줄을 쓰고 있어, 장착값이 없거나 이름표 밖이면 **예전처럼 마지막에 얻은 것**을
+ * 쓴다 — 옛 저장에는 +0x1c4 칸이 없어서다.
+ */
 export function currentTitleOf(career: PlayerCareer): string {
-  return career.titleIds[career.titleIds.length - 1] ?? TITLE_NAMES[0]
+  return TITLE_NAMES[career.equippedTitle] ?? career.titleIds[career.titleIds.length - 1] ?? TITLE_NAMES[0]
+}
+
+/**
+ * 칭호 목록(상태 129)에서 하나를 고른다 — 키 처리 0x11f78 의 확인 갈래:
+ * `if 선수+0x1c4 != sel: 선수+0x1c4 = sel` 뒤 팝업 → 저장. 이미 장착한 것이면 **아무 일도 없다**.
+ */
+export function equipTitle(career: PlayerCareer, title: string): PlayerCareer {
+  const index = titleNumberOf(title)
+  if (index < 0 || index === career.equippedTitle) return career
+  return { ...career, equippedTitle: index }
+}
+
+/**
+ * 장착 확인 팝업 글 (0x11fe2~0x12040) — **이름 + StrMODE[138]** 을 그냥 이어 붙인다.
+ * [138] 이 `!N` 으로 시작해서 이름 다음 줄에 "닉네임이 적용되었습니다" 가 온다.
+ */
+export function equipTitleNoticeOf(title: string): string {
+  return `${title}${ORIGINAL_MODE_TEXT[EQUIPPED_TITLE_TEXT] ?? ''}`
 }
 
 /** 조건을 만족했지만 아직 얻지 않은 칭호 (원본 번호 순) */
@@ -297,7 +330,14 @@ export function nextTitleOf(career: PlayerCareer): string | null {
   return evaluateNewTitles(career)[0] ?? null
 }
 
+/**
+ * 칭호를 준다. 원본은 팝업 확인 때 비트를 켜고 **곧바로 장착**한다 (0x1b214 `선수+0x1c4 = i`).
+ * 웹은 여러 개를 한꺼번에 붙이는데, 원본도 번호 오름차순으로 하나씩 이어 주므로
+ * 마지막에 남는 장착값은 **번호가 가장 큰 것**으로 같다.
+ */
 export function awardTitles(career: PlayerCareer, titles: readonly string[]): PlayerCareer {
   if (titles.length === 0) return career
-  return { ...career, titleIds: [...career.titleIds, ...titles] }
+  const given = [...titles].map(titleNumberOf).filter((index) => index >= 0)
+  const equipped = given.length === 0 ? career.equippedTitle : Math.max(...given)
+  return { ...career, titleIds: [...career.titleIds, ...titles], equippedTitle: equipped }
 }
