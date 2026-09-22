@@ -61,6 +61,39 @@ MODE_SCHEDULE_RANGE = (48, 59)      # 들어가기 · 팬미팅 · 외식 · 입
 ACE_ICON_PITCHER_START = 0
 ACE_ICON_BATTER_START = 5
 
+# ── 마선수 G 오픈 가격·오픈 힌트 (XlsACE_LEVEL_UP) ────────────────────────────
+# 이름과 달리 **레벨업 표가 아니다** — 기본 능력치·G 오픈 가격·오픈 힌트 표다
+# (K-bursts-special.md K-3 · 3-3, 확정). 레벨업 비용(3000/6000/9000/12000)은 u32 표 0xd1724 쪽이라
+# **다른 표**이니 섞지 말 것.
+#
+# 행 76바이트 = u16 ×6 + 고정 74바이트 문자열, 10행. **행 차례 = 마선수 고르기 격자 칸 차례**다
+# (칸 0~4 마투수 = 표 번호 1~5 · 칸 5~9 마타자 = 표 번호 6~10).
+#   u16[0]   마선수 번호 1~10
+#   u16[1~4] 기본 능력치 히트·파워·수비·주루 (XlsACE_PIT_DATA / XlsACE_BAT_DATA 와 같은 값 — 아래서 검산한다)
+#   u16[5]   G포인트 오픈 가격 (0xa6c6 `ldrb [r5,#0xb]<<8 | [r5,#0xa]` → StrCOMMON[43] 의 %d)
+#   +0xc     오픈 힌트 (0xa6d0 `adds r2,#0xc` → StrCOMMON[42]/[43] 의 %s)
+ACE_OPEN_TABLE_NAME = 'XlsACE_LEVEL_UP'
+ACE_OPEN_ROW_SIZE = 76
+ACE_OPEN_ABILITY_OFFSET = 2
+ACE_OPEN_PRICE_OFFSET = 10
+ACE_OPEN_HINT_OFFSET = 12
+ACE_OPEN_HINT_SIZE = 74
+# ⚠️ **가격 0 = 무료가 아니다.** 원본 0xa68e 는 가격을 보지 않고 **칸 번호 4·9 를 그대로 박아 놓고**
+#    그 두 칸만 StrCOMMON[42] "G포인트로 오픈할 수 없습니다" 로 보낸다:
+#      a68e: cmp r7,#4 / a690: beq a696 / a692: cmp r7,#9 / a694: bne a6ba
+#    (직접 디스어셈해 확인. 칸 4 = 드래고나, 칸 9 = 킹타이거 — 둘 다 가격 칸이 0 이다.)
+ACE_GAMEPOINT_LOCKED_CELLS = (4, 9)
+# 기본 개방 칸 — 0 싸이커 · 5 메디카. 해금 id 가 없고 힌트도 "기본 개방" 이다 (K-3 3-0).
+ACE_DEFAULT_OPEN_CELLS = (0, 5)
+# 잠긴 칸을 눌렀을 때의 팝업 글
+COMMON_ACE_OPEN_BLOCKED = 42
+COMMON_ACE_OPEN_CONFIRM = 43
+# 칸 차례대로의 acePlayers.ts id — 스프라이트 이름과 같다 (generate_ace_players 의 sprite_ids)
+ACE_OPEN_CELL_IDS = (
+    'psyker', 'leony', 'bbmachine', 'ballantine', 'dragona',
+    'medica', 'kao', 'roze', 'death', 'tiger',
+)
+
 BANNER = ('// 이 파일은 tools/generate_game_data.py 가 원본 패키지에서 생성했다.\n'
           '// 직접 고치지 말고 생성기를 고칠 것.\n\n')
 
@@ -194,6 +227,127 @@ def count_frames() -> dict:
     for frames in root.glob('*/frames'):
         counts[frames.parent.name] = len(list(frames.glob('*.png')))
     return counts
+
+
+def generate_ace_open() -> None:
+    """마선수 G 오픈 가격·오픈 힌트 (XlsACE_LEVEL_UP). 능력치는 ACE 본표와 교차 검산만 하고 버린다."""
+    data = load(ACE_OPEN_TABLE_NAME)
+    rows = [bytes.fromhex(row) for row in data['rows']]
+    if len(rows) != len(ACE_OPEN_CELL_IDS) or any(len(row) != ACE_OPEN_ROW_SIZE for row in rows):
+        raise ValueError(f'{ACE_OPEN_TABLE_NAME} 형식이 예상과 다릅니다')
+
+    # 이름은 이 표에 없다 — 능력치가 같은 ACE 본표에서 가져오고, 그 **같음**을 여기서 검산한다.
+    # (표 차례: 마투수 5명 → 마타자 5명 = 격자 칸 0~9)
+    names, abilities = [], []
+    for table in ('XlsACE_PIT_DATA', 'XlsACE_BAT_DATA'):
+        source = load(table)
+        names += clean_strings(source['names'])
+        abilities += [abilities_of(row) for row in source['rows']]
+
+    lines = [
+        "import type { BatterAbility } from '@/entities/batting/model/batter'",
+        '',
+        '/**',
+        ' * 원본 `XlsACE_LEVEL_UP` 한 줄 — **이름과 달리 레벨업 표가 아니다.** 기본 능력치·G 오픈 가격·',
+        ' * 오픈 힌트 표다 (K-bursts-special.md K-3 · 3-3, 확정).',
+        ' *',
+        ' * ⚠️ 레벨업 비용(3000·6000·9000·12000 G, u32 표 0xd1724 × 1000)은 **다른 표**다 — 섞지 말 것.',
+        ' */',
+        'export interface AceOpenEntry {',
+        '  /** 표의 마선수 번호 1~10 (1~5 마투수 · 6~10 마타자) */',
+        '  readonly number: number',
+        '  /** 마선수 고르기 격자 칸 0~9 — 표의 줄 차례와 같다 (윗줄 0~4 마투수 · 아랫줄 5~9 마타자) */',
+        '  readonly cell: number',
+        "  /** `acePlayers.ts` 의 `id` */",
+        '  readonly aceId: string',
+        '  readonly name: string',
+        '  /** 이 표에 실린 기본 능력치. `ACE_PLAYERS` 의 값과 같다 (생성기가 다르면 멈춘다) */',
+        '  readonly ability: BatterAbility',
+        '  /**',
+        '   * u16[5] — G포인트 오픈 가격 (0xa6c6 → StrCOMMON[43] 의 %d).',
+        '   *',
+        '   * ⚠️ **0 이 "무료" 라는 뜻이 아니다.** `aceOpensWithGamePoint` 를 볼 것.',
+        '   */',
+        '  readonly openPriceGamePoint: number',
+        '  /** 문자열 (+0xc) — 잠긴 칸을 눌렀을 때 StrCOMMON[42]/[43] 의 %s 로 들어가는 오픈 힌트 */',
+        '  readonly openHint: string',
+        '}',
+        '',
+        '/**',
+        ' * 마선수 오픈 가격·힌트 표 — **칸 번호(0~9)로 색인한다.**',
+        ' *',
+        ' * 0G 인 네 칸의 뜻이 서로 다르다 (K-3 3-0 · 3-1 · 3-3):',
+        ' *   - 칸 0 싸이커 · 칸 5 메디카 = **기본 개방** (해금 id 가 없다. 힌트도 "기본 개방")',
+        ' *   - 칸 4 드래고나 · 칸 9 킹타이거 = **G포인트로 열 수 없다** (StrCOMMON[42]).',
+        ' *     킹타이거는 만루홈런 누계 54 로 열리고(해금 id 7), 드래고나는 기록 누계 표에 아예 없어',
+        ' *     힌트 "2010.gamevil.com" 대로 웹/이벤트 쪽 해금으로 보인다 — **미해결**.',
+        ' * 나머지 여섯 칸은 가격만 내면 기록 달성 없이도 열 수 있다 (StrCOMMON[43] "오픈 조건을 달성하지 않고…").',
+        ' */',
+        'export const ACE_OPEN_TABLE: readonly AceOpenEntry[] = [',
+    ]
+    for cell, row in enumerate(rows):
+        number = int.from_bytes(row[0:2], 'little')
+        ability = [
+            int.from_bytes(row[ACE_OPEN_ABILITY_OFFSET + i * 2:ACE_OPEN_ABILITY_OFFSET + 2 + i * 2], 'little')
+            for i in range(ABILITY_COUNT)
+        ]
+        if number != cell + 1:
+            raise ValueError(f'{ACE_OPEN_TABLE_NAME} 줄 차례가 번호와 어긋납니다: 칸 {cell} 번호 {number}')
+        if ability != abilities[cell]:
+            raise ValueError(
+                f'{ACE_OPEN_TABLE_NAME} 능력치가 ACE 본표와 다릅니다: 칸 {cell} {ability} != {abilities[cell]}'
+            )
+        hit, power, defense, run = ability
+        price = int.from_bytes(row[ACE_OPEN_PRICE_OFFSET:ACE_OPEN_PRICE_OFFSET + 2], 'little')
+        hint = fixed_cp949(row, ACE_OPEN_HINT_OFFSET, ACE_OPEN_HINT_SIZE)
+        lines.append(
+            f'  {{ number: {number}, cell: {cell}, aceId: {quote(ACE_OPEN_CELL_IDS[cell])}, '
+            f'name: {quote(names[cell])}, '
+            f'ability: {{ hit: {hit}, power: {power}, run: {run}, defense: {defense} }}, '
+            f'openPriceGamePoint: {price}, openHint: {quote(hint)} }},'
+        )
+    lines.append(']')
+
+    common = clean_strings(load('StrCOMMON'))
+    blocked_cells = ', '.join(str(cell) for cell in ACE_GAMEPOINT_LOCKED_CELLS)
+    default_cells = ', '.join(str(cell) for cell in ACE_DEFAULT_OPEN_CELLS)
+    lines += [
+        '',
+        '/**',
+        ' * **G포인트로 열 수 없는 칸** — 원본 0xa68e 는 가격 칸을 보지 않고 칸 번호를 그대로 박아 놨다:',
+        ' * `cmp r7,#4; beq …; cmp r7,#9; bne …` (직접 디스어셈해 확인).',
+        ' */',
+        f'export const ACE_GAMEPOINT_LOCKED_CELLS: readonly number[] = [{blocked_cells}]',
+        '',
+        '/** 처음부터 열려 있는 칸 — 0 싸이커 · 5 메디카 (해금 id 가 없다. K-3 3-0) */',
+        f'export const ACE_DEFAULT_OPEN_CELLS: readonly number[] = [{default_cells}]',
+        '',
+        '/** 이 칸을 G포인트로 열 수 있나 (0xa68e) */',
+        'export function aceOpensWithGamePoint(cell: number): boolean {',
+        '  return !ACE_GAMEPOINT_LOCKED_CELLS.includes(cell)',
+        '}',
+        '',
+        '/** 잠긴 칸을 눌렀을 때의 팝업 글 (0xa696 · 0xa6ba). %s = 오픈 힌트 · %d = 오픈 가격 */',
+        'export const ACE_OPEN_POPUP = {',
+        f'  /** StrCOMMON[{COMMON_ACE_OPEN_BLOCKED}] — G포인트로 못 여는 칸 (알림 하나) */',
+        f'  blocked: {quote(common[COMMON_ACE_OPEN_BLOCKED])},',
+        f'  /** StrCOMMON[{COMMON_ACE_OPEN_CONFIRM}] — 가격을 물어보는 칸 (예/아니오) */',
+        f'  confirm: {quote(common[COMMON_ACE_OPEN_CONFIRM])},',
+        '} as const',
+        '',
+        '/**',
+        ' * 잠긴 칸 팝업 글 만들기 — 원본이 %s·%d 에 넣는 것을 그대로 채운다.',
+        ' * 칸이 표 밖이면 빈 글을 준다 (원본에는 없는 경우다).',
+        ' */',
+        'export function aceOpenPopupTextOf(cell: number): string {',
+        '  const entry = ACE_OPEN_TABLE[cell]',
+        "  if (entry === undefined) return ''",
+        '  return aceOpensWithGamePoint(cell)',
+        "    ? ACE_OPEN_POPUP.confirm.replace('%s', entry.openHint).replace('%d', String(entry.openPriceGamePoint))",
+        "    : ACE_OPEN_POPUP.blocked.replace('%s', entry.openHint)",
+        '}',
+    ]
+    write('aceOpen.ts', '\n'.join(lines) + '\n')
 
 
 def generate_roster() -> None:
@@ -1154,6 +1308,10 @@ def generate_batting_patterns() -> None:
     body = [
         '/**',
         ' * 원본 data/battingPattern.arr — CPU 타자의 행동 확률표 (적재 0x9f074, 쓰는 곳 0x34334).',
+        ' *',
+        ' * ⚠️ **원본도 사람이 투구할 때만 이 표를 쓴다** — 유일한 호출이 경기 장면(0x104) 메시지 0x6a9',
+        ' *    → 0x51f26 → `bl 0x34334` 다 (Q1-cpu-offense-ai.md 1a, 확정). 간이 엔진(자동 경기·시즌',
+        ' *    결과)에는 원본에도 이 표가 들어가지 않으니 그쪽에 배선하지 말 것.',
         ' * 행 = [스트라이크, 볼, 아웃, 치기 %, 번트 %, 지켜보기 %, 주자열]. 세 확률의 합은 늘 100 이다.',
         ' * 주자열: 1 주자 있고 2사 아님 · 2 주자 있고 2사 · 3 주자 없음 (0x9f190).',
         ' */',
@@ -1565,6 +1723,7 @@ def main() -> None:
     OUTPUT.mkdir(parents=True, exist_ok=True)
     print('생성:')
     generate_ace_players()
+    generate_ace_open()
     generate_roster()
     generate_teams()
     generate_string_list('StrNICKNAME', 'ORIGINAL_TITLES', 'titles.ts', '칭호')

@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { ACE_PLAYERS } from '@/shared/config/original/acePlayers'
+import {
+  ACE_DEFAULT_OPEN_CELLS,
+  ACE_GAMEPOINT_LOCKED_CELLS,
+  ACE_OPEN_TABLE,
+  aceOpenPopupTextOf,
+  aceOpensWithGamePoint,
+} from '@/shared/config/original/aceOpen'
 import { TEAMS } from '@/shared/config/original/teams'
 import { BATTERS, PITCHERS } from '@/shared/config/original/roster'
 import { BATTER_BURSTS, PITCHER_BURSTS } from '@/shared/config/original/bursts'
@@ -91,6 +98,89 @@ describe('원본 마선수 데이터', () => {
     const ids = ACE_PLAYERS.map((ace) => ace.id)
 
     expect(new Set(ids).size).toBe(ids.length)
+  })
+})
+
+describe('마선수 G 오픈 가격·오픈 힌트 (XlsACE_LEVEL_UP, K-3 3-3)', () => {
+  it('10줄이고 번호 1~10 이 칸 0~9 차례와 같다', () => {
+    expect(ACE_OPEN_TABLE).toHaveLength(10)
+    expect(ACE_OPEN_TABLE.map((entry) => entry.number)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    expect(ACE_OPEN_TABLE.map((entry) => entry.cell)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+  })
+
+  /**
+   * **교차 검산** — 이 표의 u16[1~4] 는 `XlsACE_PIT_DATA` / `XlsACE_BAT_DATA` 와 같은 값이다.
+   * 칸 차례가 **마투수 5명 → 마타자 5명** 인 반면 `ACE_PLAYERS` 는 **마타자가 먼저**라 갈아 준다.
+   */
+  it('능력치가 ACE_PLAYERS 와 한 칸도 어긋나지 않는다', () => {
+    const 마투수 = ACE_PLAYERS.filter((ace) => ace.role === '투수')
+    const 마타자 = ACE_PLAYERS.filter((ace) => ace.role === '타자')
+    const 칸차례 = [...마투수, ...마타자]
+
+    expect(ACE_OPEN_TABLE.map((entry) => entry.aceId)).toEqual(칸차례.map((ace) => ace.id))
+    expect(ACE_OPEN_TABLE.map((entry) => entry.name)).toEqual(칸차례.map((ace) => ace.name))
+    expect(ACE_OPEN_TABLE.map((entry) => entry.ability)).toEqual(칸차례.map((ace) => ace.ability))
+  })
+
+  it('싸이커는 670/550/820/300 이다 (히트·파워·수비·주루 차례 확인)', () => {
+    expect(ACE_OPEN_TABLE[0]).toMatchObject({
+      name: '싸이커',
+      ability: { hit: 670, power: 550, defense: 820, run: 300 },
+    })
+  })
+
+  it('G 오픈 가격이 0/6000/9000/12000 이다 — 레벨업 비용(3000~)과 다른 표다', () => {
+    expect(ACE_OPEN_TABLE.map((entry) => entry.openPriceGamePoint)).toEqual([
+      0, 6000, 9000, 12000, 0, 0, 6000, 9000, 12000, 0,
+    ])
+    // 레벨업 비용 표 0xd1724 는 3000 으로 시작한다 — 이 표에는 3000 이 없다
+    expect(ACE_OPEN_TABLE.some((entry) => entry.openPriceGamePoint === 3000)).toBe(false)
+  })
+
+  it('오픈 힌트 열 개가 원본 문자열 그대로다', () => {
+    expect(ACE_OPEN_TABLE.map((entry) => entry.openHint)).toEqual([
+      '기본 개방',
+      '삼진 삼진 삼진!!',
+      '풀카운트 승부!',
+      '퍼펙트 트리플',
+      '2010.gamevil.com',
+      '기본 개방',
+      '오오!! 스피드왕!',
+      '외로운 홈런타자',
+      '사이클링 트리플',
+      '오오!! 만루홈런!',
+    ])
+  })
+
+  /**
+   * ⚠️ **"0G = 무료" 가 아니다.** 0xa68e 는 가격 칸을 보지 않고 칸 번호 4·9 를 그대로 박아 놓고
+   * 그 둘만 StrCOMMON[42] "G포인트로 오픈할 수 없습니다" 로 보낸다. 칸 0·5 도 가격이 0 이지만
+   * 기본 개방이라 이 갈래에 아예 오지 않는다.
+   */
+  it('0G 인 네 칸의 뜻이 서로 다르다 — 기본 개방 둘 · G 로 못 여는 둘', () => {
+    const 공짜칸 = ACE_OPEN_TABLE.filter((entry) => entry.openPriceGamePoint === 0).map((entry) => entry.cell)
+
+    expect(공짜칸).toEqual([0, 4, 5, 9])
+    expect(ACE_DEFAULT_OPEN_CELLS).toEqual([0, 5])
+    expect(ACE_GAMEPOINT_LOCKED_CELLS).toEqual([4, 9])
+    expect(aceOpensWithGamePoint(4)).toBe(false)
+    expect(aceOpensWithGamePoint(9)).toBe(false)
+    // 가격이 붙은 여섯 칸은 기록 달성 없이 G 로 열 수 있다
+    for (const entry of ACE_OPEN_TABLE) {
+      if (entry.openPriceGamePoint > 0) expect(aceOpensWithGamePoint(entry.cell)).toBe(true)
+    }
+  })
+
+  it('잠긴 칸 팝업 글에 힌트와 가격이 박힌다 (StrCOMMON[42]/[43])', () => {
+    const 레오니 = aceOpenPopupTextOf(1)
+    expect(레오니).toContain('삼진 삼진 삼진!!')
+    expect(레오니).toContain('6000 G포인트')
+    expect(레오니).toContain('오픈하시겠습니까?')
+
+    const 드래고나 = aceOpenPopupTextOf(4)
+    expect(드래고나).toContain('2010.gamevil.com')
+    expect(드래고나).toContain('오픈할 수 없습니다')
+    expect(드래고나).not.toContain('%d')
   })
 })
 

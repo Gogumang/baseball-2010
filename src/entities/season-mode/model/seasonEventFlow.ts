@@ -8,9 +8,12 @@ import type { SeasonSceneState } from '@/entities/season-mode/model/seasonStateM
 /**
  * s_event(시즌 이벤트) 연결 지점 — `docs/re/P4-season-flow.md` 2a·2b·6 절 (확정).
  *
- * **아직 이 저장소에 s_event 해독본이 없다**: `base/extracted/` 에는 `s_event_txt.json`(대사)만
- * 있고 `src/shared/config/original/data/events.json` 은 r_event 313건뿐이다. 그래서 여기에는
- * **발동 조건과 연결 지점만** 두고, 이벤트 본문(대사·명령)은 담지 않는다 — 없는 값을 지어내지 않는다.
+ * 여기에는 **발동 조건과 연결 지점만** 둔다. 이벤트 본문(대사·명령)은 담지 않는다.
+ *
+ * ⚠️ 옛 주석은 "아직 이 저장소에 s_event 해독본이 없다" 고 적고 있었다 — **틀렸다.**
+ *    `base/extracted/s_event.json` (30건) 과 `s_event_txt.json` (대사) 이 이미 있다. 다만
+ *    `src/shared/config/original/data/events.json` 은 r_event 313건뿐이고, 본문을 쓸 **시즌모드
+ *    화면 자체가 웹판에 없어** 생성기에 배선하지 않았다. 화면이 생길 때 같이 뽑으면 된다.
  */
 
 /** 이벤트 폴링이 쓰는 화면 코드 */

@@ -3,6 +3,7 @@ import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { cosineSixteen, sineSixteen } from '@/shared/lib/math/originalTrigonometry'
 import { PLATE_DEPTH, ZONE_CENTERS } from '@/entities/pitching/model/pitchCurve'
 import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
+import { MISSION_AIM_CLAMP, MISSION_AIM_SHAKES } from '@/shared/config/original/missions'
 
 /**
  * CPU 목표점 (0x345fc) 과 제구 오차 (0x4dc78) — 위치 분석 2·5차, 난수 순서까지 원본 그대로.
@@ -76,15 +77,66 @@ const AIM_HALF_WIDTHS = [21, 20, 18, 16, 14, 12, 10, 8, 6]
 const COMPUTER_AIM_OFFSET = 3
 const SIXTEEN_BITS = 16
 
+/**
+ * **투수 미션 조준점 흔들림** (0x39c5c — E-defense-rules.md E-7 · 4a, 확정).
+ *
+ * 원본은 투수 미션(화면 모드 5)에서 **조준하는 매 틱**에 조준점을 존 중심 기준
+ * x ±600 · y ±400 으로 자른 뒤, 미션 레코드 바이트 13(`missions.ts` 의 `conditionCode`) 에 따라
+ * 흔든다. 세기별 값은 `MISSION_AIM_SHAKES` 에 있다.
+ *
+ * ⚠️ **근사 한 군데**: 웹판에는 조준 틱이 없다 — 사람 투구는 3×3 코스 칸을 골라 한 번에 던진다
+ *    (`features/play-pitcher-game` 의 `courseTargetOf`). 그래서 매 틱이 아니라 **던질 때 한 번**만
+ *    흔든다. 자르기 → 흔들기 순서와 난수 차례는 원본 틱 하나와 같다.
+ *
+ * 흔들고 난 값은 원본도 다시 자르지 않는다 (다음 틱에서야 잘린다) — **원본 그대로 두었다**.
+ */
+export function applyMissionAimShake(
+  aim: WorldPoint,
+  conditionCode: number,
+  side: number,
+  random: RandomPort,
+): WorldPoint {
+  const center = ZONE_CENTERS[side] ?? ZONE_CENTERS[0]
+  const clamp = (value: number, middle: number, half: number) =>
+    Math.max(middle - half, Math.min(middle + half, value))
+  let x = clamp(aim.x, center.x, MISSION_AIM_CLAMP.x)
+  let y = clamp(aim.y, center.y, MISSION_AIM_CLAMP.y)
+
+  const shake = MISSION_AIM_SHAKES[conditionCode] ?? null
+  if (shake === null) return { x, y, z: aim.z }
+  // 원본은 `rand(0,100) <= 50` 이라 51% 다 (⚠️ 원본 그대로)
+  if (randomIntegerBelow(random, 0, 100) > shake.chancePercent) return { x, y, z: aim.z }
+
+  if (shake.teleport) {
+    x = randomIntegerBelow(random, center.x - shake.shakeX, center.x + shake.shakeX)
+    y = randomIntegerBelow(random, center.y - shake.shakeY, center.y + shake.shakeY)
+    return { x, y, z: aim.z }
+  }
+  x += randomIntegerBelow(random, -shake.shakeX, shake.shakeX)
+  // 세기 1 은 가로만 흔든다 (shakeY = 0 이라 난수도 뽑지 않는다 — 원본도 세로 갈래를 건너뛴다)
+  if (shake.shakeY !== 0) y += randomIntegerBelow(random, -shake.shakeY, shake.shakeY)
+  return { x, y, z: aim.z }
+}
+
 export interface ControlErrorInput {
   /** 제구 등급 0~5 (0xb74bc) */
   readonly tier: number
   readonly isComputer: boolean
   /** 사용자 투구의 조준 칸 (게이지). CPU 는 등급 + 3 */
   readonly aimIndex?: number
+  /**
+   * **투수 미션 조준 흔들림** — `missions.ts` 의 `conditionCode` 0~3 과 존 중심을 고르는 배치 side.
+   * 안 넘기거나 `conditionCode` 가 0 이면 흔들지 않는다 = 지금까지와 똑같이 논다 (0x39c5c).
+   */
+  readonly missionAim?: { readonly conditionCode: number; readonly side: number }
 }
 
 export function applyControlError(target: WorldPoint, input: ControlErrorInput, random: RandomPort): WorldPoint {
+  // 원본 차례대로 조준 흔들림(0x39c5c, 조준 중)이 먼저고 제구 흩어짐(0x4dc78, 던질 때)이 나중이다
+  const aim =
+    input.missionAim === undefined || input.missionAim.conditionCode === 0
+      ? target
+      : applyMissionAimShake(target, input.missionAim.conditionCode, input.missionAim.side, random)
   const row = ERROR_ROWS[Math.max(0, Math.min(input.tier, ERROR_ROWS.length - 1))]
   const aimIndex = input.isComputer ? input.tier + COMPUTER_AIM_OFFSET : (input.aimIndex ?? 0)
   const roll = randomIntegerBelow(random, 0, 100)
@@ -94,7 +146,7 @@ export function applyControlError(target: WorldPoint, input: ControlErrorInput, 
   const angle = randomIntegerBelow(random, 0, 360) + 1
   const dx = Math.abs(coefficient * ((half + randomIntegerBelow(random, -2, 3)) * sineSixteen(angle))) >> SIXTEEN_BITS
   const dy = Math.abs(coefficient * ((half + randomIntegerBelow(random, -2, 3)) * cosineSixteen(angle))) >> SIXTEEN_BITS
-  const x = randomIntegerBelow(random, 0, 2) !== 0 ? target.x - dx : target.x + dx
-  const y = randomIntegerBelow(random, 0, 2) !== 0 ? target.y - dy : target.y + dy
-  return { x, y, z: target.z }
+  const x = randomIntegerBelow(random, 0, 2) !== 0 ? aim.x - dx : aim.x + dx
+  const y = randomIntegerBelow(random, 0, 2) !== 0 ? aim.y - dy : aim.y + dy
+  return { x, y, z: aim.z }
 }

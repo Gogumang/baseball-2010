@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { FrameSprite, Hint, RawScreen } from '@/shared/ui'
+import { FrameSprite, Hint, MessageBox, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { ACE_PLAYERS } from '@/shared/config/original/acePlayers'
+import { aceOpenPopupTextOf, aceOpensWithGamePoint } from '@/shared/config/original/aceOpen'
 import { ACE_LAYOUT, LOCKED_CIRCLES, NAME_BAR, TAG, aceCellPositionOf } from '@/pages/general-mode/lib/prepareLayout'
 import { ACE_PER_ROLE, ACE_PHASE, aceIndexOfCell, aceRoleOfCell } from '@/pages/general-mode/lib/generalModeSetup'
 import type { AcePhase } from '@/pages/general-mode/lib/generalModeSetup'
@@ -51,10 +52,17 @@ export interface AceSelectScreenProps {
  * 격자는 10칸(윗줄 마투수 0~4 · 아랫줄 마타자 5~9)이고 **마투수를 먼저** 고른 뒤 커서가
  * 아랫줄로 내려간다. 마투수 OK 는 `rec+0xe`, 마타자 OK 는 `rec+0xd` 에 적힌다.
  *
- * ⚠️ 여기 없는 것 (문서에 값이 없다):
- *   - 잠긴 칸을 눌렀을 때의 힌트 팝업 — 문자열표 `[0x1552cf8]` 의 [0x28]·[0x2a]·[0x2b] 인데
- *     그 표가 웹판 데이터에 없다.
- *   - `0` 키의 레벨업·구매 하위 창 (하위 단계 1·2·10, K 3-3 쪽).
+ * **잠긴 칸을 누르면 오픈 힌트 팝업**이 뜬다 (0xa248 안 0xa68e~0xa6dc). 문자열표 `[0x1552cf8]` 은
+ * StrCOMMON 이고 [0x2a]·[0x2b] = StrCOMMON[42]·[43] 이며, 힌트 글 자체는 `XlsACE_LEVEL_UP` 의
+ * +0xc 칸이다 — `shared/config/original/aceOpen.ts` 에 다 있다.
+ * (예전 주석은 "그 표가 웹판 데이터에 없다" 고 적고 있었다 — **틀렸다.** 표는 `base/extracted/` 에
+ *  있었고 생성기가 안 뽑고 있던 것뿐이다.)
+ *
+ * ⚠️ 여기 없는 것:
+ *   - **실제 오픈**. 원본은 [43] 에서 "예" 를 고르면 G포인트를 빼고 오픈 플래그(`mgr[0x30+idx]`)를
+ *     세우는데, 웹판 저장에는 그 칸이 없다 (`App.tsx` 의 `DEFAULT_OPENED_ACE_*` 로 고정). 그래서
+ *     팝업은 **힌트만 보여 주고 닫힌다** — 근사다.
+ *   - `0` 키의 레벨업 하위 창 (하위 단계 1·2·10, K 3-3 쪽). 레벨업 비용 표는 이 표가 아니다.
  *   - 열린 마선수 자리의 애니메이션 `[skin+0x138]` — 여기서는 정지 그림을 쓴다.
  */
 export function AceSelectScreen({
@@ -64,6 +72,8 @@ export function AceSelectScreen({
   const cellCount = ACE_LAYOUT.grid.columns * ACE_LAYOUT.grid.rows
   // 마투수 단계는 윗줄에서, 마타자 단계는 아랫줄에서 커서가 시작한다 (원본이 OK 뒤 커서를 내린다)
   const [cursor, setCursor] = useState(phase === ACE_PHASE.마투수 ? 0 : ACE_PER_ROLE)
+  /** 오픈 힌트 팝업이 뜬 칸 (0xa68e~0xa6dc). null 이면 안 뜬 것 */
+  const [hintCell, setHintCell] = useState<number | null>(null)
 
   useEffect(() => {
     setCursor(phase === ACE_PHASE.마투수 ? 0 : ACE_PER_ROLE)
@@ -77,8 +87,19 @@ export function AceSelectScreen({
   /** 지금 단계의 줄만 고를 수 있다 — 원본도 단계에 맞는 줄에서만 OK 를 받는다 */
   const isCellSelectable = (cell: number) => aceRoleOfCell(cell) === phase && isCellOpen(cell)
 
+  /**
+   * OK 한 번 — 열린 칸이면 고르고, **잠긴 칸이면 오픈 힌트 팝업**을 띄운다 (0xa248 → 0xa68e).
+   * 팝업은 단계에 맞는 줄에서만 띄운다 (OK 를 받는 줄이 거기뿐이다).
+   */
+  const pressCell = (cell: number) => {
+    if (isCellSelectable(cell)) return onSelect(cell)
+    if (aceRoleOfCell(cell) === phase) setHintCell(cell)
+  }
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      // 팝업이 떠 있는 동안에는 격자 키를 받지 않는다 — MessageBox 가 답을 가져간다
+      if (hintCell !== null) return
       const step =
         event.key === 'ArrowRight' ? 1
         : event.key === 'ArrowLeft' ? -1
@@ -91,7 +112,7 @@ export function AceSelectScreen({
       }
       if (event.key === 'Enter') {
         event.preventDefault()
-        if (isCellSelectable(cursor)) onSelect(cursor)
+        pressCell(cursor)
         return
       }
       if (event.key === 'Escape') {
@@ -201,6 +222,19 @@ export function AceSelectScreen({
       {/* 머리띠(제목 8 "마선수선택")·바닥띠 — 원본 공용 목록 k 2 도 이 둘을 얹는다 (P6 1-1 · 2a-5) */}
       {/* 바닥띠의 "되돌아가기" 가 원본 소프트키다 — 따로 두었던 버튼은 없앴다 (스테이지 (0,0) 에 떨어져 있었다) */}
       <ScreenFrame title="마선수선택" gamePoint={gamePoint} onBack={onCancel} />
+
+      {/*
+        **오픈 힌트 팝업** (0xa68e~0xa6dc) — 칸 4·9(드래고나·킹타이거)는 StrCOMMON[42] 알림 하나,
+        나머지는 StrCOMMON[43] 예/아니오다. 버튼 짝은 원본대로 두었지만 **"예" 가 아무 일도 하지 않는다** —
+        G포인트를 빼고 오픈 플래그를 세울 저장 칸이 웹판에 없다 (근사).
+      */}
+      {hintCell !== null && (
+        <MessageBox
+          text={aceOpenPopupTextOf(hintCell)}
+          buttons={aceOpensWithGamePoint(hintCell) ? ['예', '아니오'] : ['OK']}
+          onAnswer={() => setHintCell(null)}
+        />
+      )}
     </RawScreen>
   )
 }

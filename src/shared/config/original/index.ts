@@ -4,6 +4,7 @@
  * 데이터 본문은 `data/*.json` 에 있고, 여기 TS 모듈은 타입만 입힌다.
  * 모두 tools/generate_game_data.py 가 원본 패키지에서 만든다 — 직접 고치지 말 것.
  */
+export * from '@/shared/config/original/aceOpen'
 export * from '@/shared/config/original/acePlayers'
 export * from '@/shared/config/original/battedBallPatterns'
 export * from '@/shared/config/original/battingPatterns'

@@ -128,6 +128,53 @@ describe('App.tsx 기본 개방(DEFAULT_OPENED_ACE_*)을 넘기면', () => {
   })
 })
 
+/**
+ * 잠긴 칸에서 OK 를 누르면 오픈 힌트 팝업이 뜬다 (0xa248 → 0xa68e~0xa6dc).
+ * 힌트 글은 `XlsACE_LEVEL_UP` +0xc, 겉틀은 StrCOMMON[42]/[43] 이다.
+ */
+describe('오픈 힌트 팝업', () => {
+  const 누르기 = (keys: string[]) => {
+    for (const key of keys) fireEvent.keyDown(window, { key })
+  }
+
+  it('잠긴 칸에서 Enter 를 누르면 그 마선수의 힌트와 G 가격이 뜬다', () => {
+    const { container } = 띄우기({ openedAcePitcherIds: [0] })
+
+    // 칸 0(싸이커, 열림) → 칸 1(레오니, 잠김)
+    누르기(['ArrowRight', 'Enter'])
+
+    expect(container.textContent).toContain('삼진 삼진 삼진!!')
+    expect(container.textContent).toContain('6000 G포인트')
+  })
+
+  it('드래고나(칸 4)는 G 로 못 여는 칸이라 "오픈할 수 없습니다" 다 — 0G 가 무료라는 뜻이 아니다', () => {
+    const { container } = 띄우기({ openedAcePitcherIds: [0] })
+
+    누르기(['ArrowRight', 'ArrowRight', 'ArrowRight', 'ArrowRight', 'Enter'])
+
+    expect(container.textContent).toContain('2010.gamevil.com')
+    expect(container.textContent).toContain('오픈할 수 없습니다')
+  })
+
+  it('열린 칸에서는 팝업 대신 그 칸을 고른다', () => {
+    const onSelect = vi.fn()
+    const { container } = 띄우기({ openedAcePitcherIds: [0], onSelect })
+
+    누르기(['Enter'])
+
+    expect(onSelect).toHaveBeenCalledWith(0)
+    expect(container.textContent).not.toContain('마선수 오픈 힌트')
+  })
+
+  it('다른 줄(지금 단계가 아닌 줄)의 잠긴 칸에서는 아무것도 안 뜬다', () => {
+    const { container } = 띄우기({ openedAcePitcherIds: [0], openedAceBatterIds: [] })
+
+    누르기(['ArrowDown', 'Enter'])
+
+    expect(container.textContent).not.toContain('마선수 오픈 힌트')
+  })
+})
+
 describe('이름 막대', () => {
   it('커서가 짚은 마선수 이름을 적는다', () => {
     띄우기()
