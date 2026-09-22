@@ -22,6 +22,13 @@ interface HomeRunDerbyScreenProps {
    * 웹에는 아직 명예의 전당 선수를 경기에 넣는 길이 없어 부르는 쪽이 육성 선수를 넘긴다.
    */
   readonly ability: BatterAbility
+  /**
+   * 치는 선수의 겉모습 — 원본이 나리 타자편 저장을 올리므로 **그 선수의 피부·폼·장비**가 그대로 나온다.
+   * 안 넘기면 구운 벌(피부 0)과 맨몸으로 그려진다.
+   */
+  readonly batterForm?: number
+  readonly batterSkinIndex?: number
+  readonly batterEquipmentLevels?: BatterAbility
   readonly random: RandomPort
   /** 저장된 최고 비거리 (저장 +0x5c, u16) */
   readonly bestDistance: number
@@ -52,6 +59,9 @@ type MenuOverlay = '조작방법' | '설정'
  */
 export function HomeRunDerbyScreen({
   ability,
+  batterForm,
+  batterSkinIndex,
+  batterEquipmentLevels,
   random,
   bestDistance,
   gamePoint,
@@ -129,6 +139,9 @@ export function HomeRunDerbyScreen({
       <div className={styles.stageArea}>
         <BattingStage
           batterAbility={ability}
+          batterForm={batterForm}
+          batterSkinIndex={batterSkinIndex}
+          batterEquipmentLevels={batterEquipmentLevels}
           pitcherAbility={pitcher.ability}
           swingMode="일반"
           isEagleEyeEnabled={false}

@@ -128,6 +128,10 @@ export function EntryRoutes({ screen, setScreen, session, gameSettings, collecti
       <HomeRunDerbyScreen
         // 원본은 모드 7 로 들어갈 때 0x213c0(앱,4,0) 으로 나만의리그 타자편 저장을 올린다
         ability={effectiveAbilityOf(career)}
+        // 같은 저장을 올리니 겉모습도 그 선수 것이다 — 폼(몸통·손)·피부·장비
+        batterForm={career.battingTypeIndex * 2 + career.battingSide}
+        batterSkinIndex={career.skinIndex}
+        batterEquipmentLevels={career.equipmentLevels}
         random={random}
         bestDistance={derbyBest}
         gamePoint={career.gamePoint}

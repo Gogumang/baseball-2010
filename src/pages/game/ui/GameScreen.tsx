@@ -151,6 +151,10 @@ export function GameScreen({
           swingMode="나만의리그"
           // 타자 폼 = 원본 rec[0xb] 윗니블 `2 × 타입 + 손` (C 5절 0x16f9a) — 장타형이면 sluger 몸통이 나온다
           batterForm={career.battingTypeIndex * 2 + career.battingSide}
+          // 고른 피부(0 황인 · 1 백인 · 2 흑인)와 장비를 타석 그림에 입힌다 —
+          // 안 넘기면 구운 벌(피부 0)과 맨몸으로 나간다
+          batterSkinIndex={career.skinIndex}
+          batterEquipmentLevels={career.equipmentLevels}
           batterSkillIds={career.skillIds}
           recentAtBatCodes={progress.recentAtBatCodes}
           pitcherAbility={pitcherAbility}
