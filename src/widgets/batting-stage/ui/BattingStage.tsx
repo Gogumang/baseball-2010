@@ -3,6 +3,7 @@ import { resolvePitch } from '@/features/play-at-bat/model/resolvePitch'
 import type { BattingSwing } from '@/features/play-at-bat/model/resolvePitch'
 import { nextBatterShift } from '@/features/play-at-bat/model/batterShift'
 import { createPatternDeck } from '@/entities/batting/model/battedBallOutcome'
+import { batterEquipmentOf, NO_EQUIPMENT } from '@/widgets/batting-stage/lib/batterLayers'
 import { hitPauseTicksOf, pauseInputOf } from '@/widgets/batting-stage/lib/hitPause'
 import type { SwingMode } from '@/entities/batting/model/swingResult'
 import type { BatterAbility } from '@/entities/batting/model/batter'
@@ -37,6 +38,24 @@ interface BattingStageProps {
    * 안 넘기면 0 = 타격형·우타라 예전과 같은 밸런스형 몸통이다.
    */
   readonly batterForm?: number
+  /**
+   * **피부** (선수 레코드 `rec[0xb]` bit2-3 — 0 황인 · 1 백인 · 2 흑인) 와 **소속 팀 번호**.
+   * 원본은 타자 그림 객체를 세울 때 이 둘을 같이 넘겨 몸통 팔레트 `피부 × 15 + 팀`,
+   * 헬멧 팔레트 `팀` 을 고른다 (0x10810 → 0x78be8·0x78c14, C-1).
+   *
+   * 안 넘기면 피부는 0(황인 — 구운 PNG 가 쓰는 벌도 피부 0 이다), 팀은 `hud.ourTeamId` 다.
+   * ⚠️ 팀을 hud 에서 꺼내는 것은 **근사**다 — "타석에 선 쪽이 내 팀" 이라고 본 것이라
+   * 상대 팀 공격을 그리는 화면이 생기면 `batterTeamIndex` 를 따로 넘겨야 한다.
+   */
+  readonly batterSkinIndex?: number
+  readonly batterTeamIndex?: number
+  /**
+   * **장착 장비 니블** = `career.equipmentLevels` (0 미장착 · 1~11 = 레벨+1, 부위 순서는
+   * 히트·파워·수비·주루 = 헬멧·배트·밴드·슈즈). 원본도 이 니블에서 `등급 − 1` 을 꺼내
+   * 머리·손·다리 그림 슬롯을 채운다 (0x10866 → 0x78fd8).
+   * 안 넘기면 아무것도 장착하지 않은 선수로 그린다.
+   */
+  readonly batterEquipmentLevels?: BatterAbility
   readonly batterSkillIds?: readonly number[]
   readonly recentAtBatCodes?: readonly number[]
   /** 참이면 새 공을 던지지 않는다. 타석 결과 연출 중에 쓴다. */
@@ -56,8 +75,19 @@ interface BattingStageProps {
 }
 
 /** 원작 타석 화면. 그리기는 lib, 루프와 조작은 model이 맡는다. */
-export function BattingStage({ canBunt = false, swingMode = '일반', batterForm = 0, batterSkillIds = [], recentAtBatCodes = [], specialSwingLevel = 0, isAceBatter = false, ...props }: BattingStageProps) {
-  const refs = useStageRefs({ ...props, canBunt, swingMode, batterForm, batterSkillIds, recentAtBatCodes })
+export function BattingStage({ canBunt = false, swingMode = '일반', batterForm = 0, batterSkinIndex = 0, batterTeamIndex, batterEquipmentLevels, batterSkillIds = [], recentAtBatCodes = [], specialSwingLevel = 0, isAceBatter = false, ...props }: BattingStageProps) {
+  const refs = useStageRefs({
+    ...props,
+    canBunt,
+    swingMode,
+    batterForm,
+    batterSkinIndex,
+    batterEquipment: batterEquipmentLevels === undefined ? NO_EQUIPMENT : batterEquipmentOf(batterEquipmentLevels),
+    // 팀을 안 넘기면 HUD 의 내 팀 번호를 쓴다 (근사 — props 주석 참고)
+    batterTeamIndex: batterTeamIndex ?? props.hud?.ourTeamId ?? 0,
+    batterSkillIds,
+    recentAtBatCodes,
+  })
   /**
    * 이번 공에 필살타법을 걸어 두었는가 (`S+0x10`).
    * 새 투구 준비 `0x34334` 가 0 으로 되돌리므로 **공마다 다시 눌러야 한다** (H2 2-2).

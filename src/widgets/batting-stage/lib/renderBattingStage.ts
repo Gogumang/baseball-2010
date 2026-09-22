@@ -9,7 +9,8 @@ import { judgeAnimationOf, judgeFrameAt, PITCHER_OVERLAY_FRAME_OFFSET, pitcherFr
 import { drawHud } from '@/widgets/batting-stage/lib/renderHud'
 import { drawFieldMap } from '@/widgets/batting-stage/lib/renderFieldMap'
 import { drawHomeRunBanner } from '@/widgets/batting-stage/lib/renderHomeRunBanner'
-import { batterLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
+import { batterLayerPaletteIndex, batterLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
+import type { BatterEquipment } from '@/widgets/batting-stage/lib/batterLayers'
 
 import type { HudState } from '@/widgets/batting-stage/lib/renderHud'
 import { BATTER_SIDE, STAGE_SIDE, stageLayoutOf, toPixel } from '@/widgets/batting-stage/lib/stageLayout'
@@ -46,6 +47,14 @@ export interface StageScene {
   /** 타자 몸통 종류 t = 폼 >> 1 (0 balancer · 1 sluger, 0x78ab0) */
   readonly bodyType: number
   /**
+   * 타자 그림의 대체 팔레트 재료 — 몸통 = **피부 × 15 + 팀** · 헬멧 = **팀** (0x78be8·0x78c14, C-1).
+   * 원본은 그림 객체를 세울 때 선수 레코드 `rec[0xb]` 의 피부(bit2-3)와 팀 번호를 같이 넘긴다 (0x10810).
+   */
+  readonly batterSkinIndex: number
+  readonly batterTeamIndex: number
+  /** 장착 장비 등급 순번 (부위별 −1 = 미장착) — 머리·손·다리 레이어 (0x78fd8) */
+  readonly batterEquipment: BatterEquipment
+  /**
    * 타자 손 = 폼 & 1 (0 우타 · 1 좌타, 0xb63c0). 안 넘기면 좌타 배치다.
    * 우타면 타자 그림과 구장이 좌우로 뒤집히고 앵커·존도 표의 우타 칸을 쓴다 (R6 4절).
    */
@@ -75,7 +84,7 @@ export function renderBattingStage(
   })
   const progress = scene.pitch === null || scene.frame < 0 ? -1 : scene.frame / scene.pitch.frameCount
   drawPitcher(context, scene.acePitcher, progress, scene.pitcherTick, scene.tick, side)
-  drawBatter(context, scene.swingFrame, scene.shift, scene.bodyType, side)
+  drawBatter(context, scene.swingFrame, scene.shift, scene.bodyType, side, scene.batterSkinIndex, scene.batterTeamIndex, scene.batterEquipment)
   drawStrikeZone(context, side)
   if (scene.pitch !== null && scene.isEagleEyeEnabled) {
     drawEagleEyeMarker(context, platePixelOf(scene.pitch))
@@ -143,6 +152,9 @@ function drawPitcher(
  * 원작 타자는 그림자·몸통·헬멧·배트·몸통 앞·다리를 자세마다 다른 순서로 겹친다 (0x78cfc).
  * 그림은 **좌타 자세로 그려져 있어** 우타(+0x3c == 0)면 효과 0x11 로 좌우를 뒤집는다 (R6 4절).
  * 앵커는 표 0xcfb2c 의 side 칸이고, 뒤집을 때는 그 앵커를 축으로 거울을 놓는다.
+ *
+ * 레이어마다 대체 팔레트 벌(`batterLayerPaletteIndex`)을 붙여 그린다 — 원본도 몸통·헬멧만
+ * .mpl 을 갈아 끼우고 그림자·배트·다리는 구운 색 그대로다 (0x78be8·0x78c14).
  */
 function drawBatter(
   context: CanvasRenderingContext2D,
@@ -150,6 +162,9 @@ function drawBatter(
   shift: number,
   bodyType: number,
   side: number,
+  skinIndex: number,
+  teamIndex: number,
+  equipment: BatterEquipment,
 ): void {
   const anchor = stageLayoutOf(side).batterAnchor
   // 좌우 이동(fe4)은 원본도 객체 x(+4)에 그대로 더하므로 거울 축을 그 자리로 옮겨 방향을 지킨다.
@@ -160,8 +175,10 @@ function drawBatter(
     context.translate(axisX * 2, 0)
     context.scale(-1, 1)
   }
-  for (const layer of batterLayersOf(swingFrame, bodyType)) {
-    const frame = placedFrame(layer.folder, layer.frame)
+  // 장비 레이어의 등급 색(`gradePaletteRow`)은 아직 못 칠한다 — item_* 폴더에 팔레트 번호
+  // 지도(frames/index)가 없어서다 (BatterLayer 주석). 지금은 그림 기본색으로 나간다.
+  for (const layer of batterLayersOf(swingFrame, bodyType, equipment)) {
+    const frame = placedFrame(layer.folder, layer.frame, batterLayerPaletteIndex(layer.folder, skinIndex, teamIndex))
     if (frame === null) continue
     context.drawImage(frame.image, axisX + frame.offsetX, anchor.y + frame.offsetY)
   }

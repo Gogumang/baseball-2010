@@ -2,9 +2,9 @@
  * 타자 그림 (binary.mod 0xb905c 자세 · 0x78cfc 레이어 — 위치 분석 5차, 바이트 확인).
  * 모든 레이어를 같은 앵커에 프레임 원점대로 겹친다. 레이어 폴더 프레임 = 자세 f + 레이어 가산값.
  *   bodyType t = 타자 폼 >> 1 (0 balancer · 1 sluger) — `bodyTypeOf` 참고.
- * 아이템 레이어: 머리 아이템(+0x1c)·손 아이템(+0x20/+0x44)은 장비 레벨과 아이템 번호의 대응이 미확인이라
- * 없는 것으로 그린다 (추정). 손 아이템이 없으면 bat/batter_batter 를 쓴다. 다리는 item_bat_leg_0 (추정).
- * 그림자는 +0x48 플래그일 때만 그리는데 플래그 뜻이 미확인이라 늘 그린다 (추정).
+ * 아이템 레이어(머리 +0x1c · 손 +0x14/+0x20/+0x44 · 다리 +0x28)는 장비 등급 순번 n 으로 고른다 —
+ * `equipmentGradeOf`·`batterEquipmentOf` 주석 참고 (0x78fd8 적재 · 0x78cfc 겹치기, 디스어셈 확인).
+ * 그림자는 +0x48 플래그일 때만 그리는데 플래그를 세우는 자리를 못 찾아 늘 그린다 (추정).
  */
 import { outfitPaletteIndex } from '@/shared/lib/sprite/paletteSwap'
 
@@ -13,12 +13,103 @@ const BODY_FOLDERS = [`${SPRITES}/batter_balancer/frames`, `${SPRITES}/batter_sl
 const SHADOW = `${SPRITES}/batter_shadow/frames`
 const HELMET = `${SPRITES}/batter_helmet/frames`
 const BAT = `${SPRITES}/batter_batter/frames`
-const LEG = `${SPRITES}/item_bat_leg_0/frames`
 const GHOST = `${SPRITES}/batter_ghost/frames`
 
 export interface BatterLayer {
   readonly folder: string
   readonly frame: number
+  /**
+   * 등급 색 `.mpl` 줄 (손·다리 장비만). ⚠️ **아직 칠하지 못한다** — `public/sprites/item_*` 에는
+   * `palette.json` 은 있어도 픽셀별 팔레트 번호 지도(`frames/index/NNN.png`)가 없어서
+   * `placedFrame` 이 갈아 끼울 수가 없다 (지도를 내는 것은 `tools/apply_mpl.py` 몫).
+   * 규칙만 여기 적어 둔다 — 지도가 생기면 `drawBatter` 에서 이 값을 넘기면 된다.
+   */
+  readonly gradePaletteRow?: number
+}
+
+/**
+ * 장비 한 부위의 **등급 순번 n** (0~10, −1 = 미장착).
+ *
+ * 원본 호출지 0x10866 은 부위 0~3 을 돌며 선수 레코드의 장비 니블(+0x19·+0x1a, 부위마다 4비트)에서
+ * `n = 니블 − 1` 을 꺼내 그림 객체 vtable 슬롯 5(0x78fd8)에 `(부위, n)` 으로 넘긴다.
+ * **니블이 0(미장착)이면 아예 부르지 않는다** (`subs r2,r1,#1; bmi`) — 그래서 웹도 −1 로 둔다.
+ * 웹 `career.equipmentLevels` 가 그 니블(0 미장착 · 1~11 = 레벨+1)을 그대로 들고 있다.
+ */
+export function equipmentGradeOf(nibble: number): number {
+  const level = Math.trunc(nibble) - 1
+  return level < 0 ? -1 : Math.min(EQUIPMENT_GRADE_MAX, level)
+}
+
+const EQUIPMENT_GRADE_MAX = 10
+
+/** 타자 그림에 보이는 세 부위 (부위 2 밴드는 원본도 그림이 없다 — 0x7907c `cmp r6,#2` 에서 끝낸다) */
+export interface BatterEquipment {
+  /** 부위 0 헬멧 아이템 */
+  readonly head: number
+  /** 부위 1 배트 */
+  readonly hand: number
+  /** 부위 3 슈즈 */
+  readonly leg: number
+}
+
+export const NO_EQUIPMENT: BatterEquipment = { head: -1, hand: -1, leg: -1 }
+
+/** 니블 묶음(career.equipmentLevels 순서 = 히트·파워·수비·주루 = 헬멧·배트·밴드·슈즈) → 등급 순번 */
+export function batterEquipmentOf(nibbles: { hit: number; power: number; run: number }): BatterEquipment {
+  return {
+    head: equipmentGradeOf(nibbles.hit),
+    hand: equipmentGradeOf(nibbles.power),
+    leg: equipmentGradeOf(nibbles.run),
+  }
+}
+
+/** 등급 7 부터가 히든이고 파일·팔레트가 갈린다 (0x790f6 `cmp r7,#6 / bgt` · 0x7922e) */
+const FIRST_HIDDEN_GRADE = 7
+
+/**
+ * 부위별 장비 그림 (문자열 표 0xd3bfc~0xd3cc0 · 적재 0x78fd8, 디스어셈 확인):
+ *   머리        `item_bat_head_{n}`                                → +0x1c
+ *   손 n ≤ 6    `item_bat_hand` + `item_bat_hand.mpl` 줄 (n ≤ 1 → 기본색, 아니면 n−2)  → +0x14
+ *      덧그림   `item_bat_hand_{2_0 · 3·5 → 35_0 · 6_0 · 그 밖 014_0}`               → +0x20
+ *   손 n ≥ 7    `item_bat_hand_{n}`                                → +0x14 (덧그림 없음)
+ *   손 셋째     n ∈ {1,4,5} 면 `item_bat_hand_{n}_1`               → +0x44
+ *   다리 n ≤ 6  `item_bat_leg_0` + `.mpl` 줄 n−1                   → +0x28
+ *   다리 n ≥ 7  `item_bat_leg_7` + `.mpl` 줄 n−8                   → +0x28
+ * 벌 수도 딱 맞는다 — item_bat_hand 5벌(n 2~6) · leg_0 6벌(n 1~6) · leg_7 3벌(n 8~10).
+ */
+const HAND_OVERLAY_NAMES: Readonly<Record<number, string>> = { 2: '2_0', 3: '35_0', 5: '35_0', 6: '6_0' }
+const HAND_THIRD_GRADES = [1, 4, 5]
+
+function headItemLayer(grade: number, frame: number): BatterLayer | null {
+  return grade < 0 ? null : { folder: `${SPRITES}/item_bat_head_${grade}/frames`, frame }
+}
+
+function handLayer(grade: number, frame: number): BatterLayer {
+  // 손 장비가 없으면 원본도 기본 배트를 쥔다 (0x78c88 — 몸통 적재가 +0x14 에 batter_batter 를 넣는다)
+  if (grade < 0) return { folder: BAT, frame }
+  if (grade >= FIRST_HIDDEN_GRADE) return { folder: `${SPRITES}/item_bat_hand_${grade}/frames`, frame }
+  // n ≤ 1 은 원본도 줄 −1 = 기본색이라 벌을 안 붙인다
+  const folder = `${SPRITES}/item_bat_hand/frames`
+  return grade <= 1 ? { folder, frame } : { folder, frame, gradePaletteRow: grade - 2 }
+}
+
+function handOverlayLayer(grade: number, frame: number): BatterLayer | null {
+  if (grade < 0 || grade >= FIRST_HIDDEN_GRADE) return null
+  return { folder: `${SPRITES}/item_bat_hand_${HAND_OVERLAY_NAMES[grade] ?? '014_0'}/frames`, frame }
+}
+
+function handThirdLayer(grade: number, frame: number): BatterLayer | null {
+  if (!HAND_THIRD_GRADES.includes(grade)) return null
+  return { folder: `${SPRITES}/item_bat_hand_${grade}_1/frames`, frame }
+}
+
+/** 슈즈를 신지 않으면 다리 레이어가 **아예 없다** (0x78e24 `s8[+0x41] < 0` 이면 슬롯을 비워 둔다) */
+function legItemLayer(grade: number, frame: number): BatterLayer | null {
+  if (grade < 0) return null
+  // 줄 −1 (n = 0 · 7) 은 기본색이라 벌을 안 붙인다
+  const folder = grade >= FIRST_HIDDEN_GRADE ? `${SPRITES}/item_bat_leg_7/frames` : `${SPRITES}/item_bat_leg_0/frames`
+  const row = grade >= FIRST_HIDDEN_GRADE ? grade - 8 : grade - 1
+  return row < 0 ? { folder, frame } : { folder, frame, gradePaletteRow: row }
 }
 
 /**
@@ -37,10 +128,9 @@ export function bodyTypeOf(form: number): number {
  *   헬멧 `bat/batter_helmet`                  → **팀** (0x78c14 — 헬멧엔 피부가 없다)
  * 그림자·배트·다리·잔상은 .mpl 이 아예 없어 원본도 구운 색 그대로 그린다.
  *
- * 순수 함수라 캔버스가 없는 곳(테스트)에서도 쓸 수 있다. 실제로 칠하는 것은
- * `shared/lib/sprite/paletteSwap.ts` 의 `useRecoloredSprite`(<img>) 몫이다 —
- * ⚠️ 타석 화면은 캔버스(`renderBattingStage.drawBatter`)라 이 번호를 아직 못 받는다:
- * `drawBatter` 는 피부·팀을 넘겨받지 않고 `spriteLoader.placedFrame` 도 URL 한 개만 받는다.
+ * 순수 함수라 캔버스가 없는 곳(테스트)에서도 쓸 수 있다. 실제로 칠하는 것은 두 갈래다 —
+ * <img> 는 `shared/lib/sprite/paletteSwap.ts` 의 `useRecoloredSprite`(등록·수비·초상화),
+ * 캔버스(타석)는 `spriteLoader.placedFrame(folder, frame, paletteIndex)` 가 맡는다.
  */
 export function batterLayerPaletteIndex(folder: string, skinIndex: number, teamIndex: number): number | null {
   if (folder === BODY_FOLDERS[0] || folder === BODY_FOLDERS[1]) return outfitPaletteIndex(skinIndex, teamIndex)
@@ -96,26 +186,36 @@ const GHOST_SLUGER_OFFSET = 8
 const GHOST_SLOT = 4
 const GHOST_SLOT_LATE = 1
 
-export function batterLayersOf(frame: number, bodyType: number): BatterLayer[] {
+/**
+ * 자세 f 의 레이어 목록 — `equipment` 를 안 주면 아무것도 장착하지 않은 선수다.
+ *
+ * 슬롯 0~8 = 그림자 · 몸통 · 헬멧 · 머리아이템 · 배트(손) · 몸통앞 · 손덧그림 · 손셋째 · 다리.
+ * 규칙 1·2·3 의 자리바꿈(0x78e54·0x78e66·0x78e88)을 슬롯 순서 표로 적어 둔 것이라
+ * 아이템 슬롯도 그 표의 빈 자리에 그대로 들어간다 (바이트 단위로 다시 확인했다).
+ */
+export function batterLayersOf(frame: number, bodyType: number, equipment: BatterEquipment = NO_EQUIPMENT): BatterLayer[] {
   const type = bodyType === 1 ? 1 : 0
   const adjust = type === 1 ? SLUGER_ADJUST : 0
   const body: BatterLayer = { folder: BODY_FOLDERS[type], frame }
   const front: BatterLayer = { folder: BODY_FOLDERS[type], frame: frame + FRONT_OFFSETS[type] }
   const shadow: BatterLayer = { folder: SHADOW, frame: frame + adjust }
-  const helmet: BatterLayer = { folder: HELMET, frame: frame + adjust }
-  const bat: BatterLayer = { folder: BAT, frame: frame + adjust }
-  const leg: BatterLayer = { folder: LEG, frame: frame + adjust }
+  // 머리 장비가 등급 2 이상이면 원본은 **헬멧을 지운다** (0x78df4 — 헬멧 슬롯에 0 을 넣는다)
+  const helmet: BatterLayer | null = equipment.head > 1 ? null : { folder: HELMET, frame: frame + adjust }
+  const head = headItemLayer(equipment.head, frame + adjust)
+  const bat = handLayer(equipment.hand, frame + adjust)
+  const handOverlay = handOverlayLayer(equipment.hand, frame + adjust)
+  const handThird = handThirdLayer(equipment.hand, frame + adjust)
+  const leg = legItemLayer(equipment.leg, frame + adjust)
 
   const rule = ORDER_RULES[type][frame] ?? 0
-  // 슬롯 0~8 = 그림자·몸통·헬멧·머리아이템·배트·몸통앞·손아이템·손추가·다리 (아이템 슬롯은 비어 있다)
   const slots: (BatterLayer | null)[] =
     rule === 1
-      ? [shadow, body, helmet, null, front, bat, null, null, leg]
+      ? [shadow, body, helmet, head, front, bat, handOverlay, handThird, leg]
       : rule === 2
-        ? [shadow, bat, body, helmet, null, front, null, null, leg]
+        ? [shadow, bat, body, helmet, head, front, handOverlay, handThird, leg]
         : rule === 3
-          ? [shadow, bat, null, null, front, body, helmet, null, leg]
-          : [shadow, body, helmet, null, bat, front, null, null, leg]
+          ? [shadow, bat, handOverlay, handThird, front, body, helmet, head, leg]
+          : [shadow, body, helmet, head, bat, front, handOverlay, handThird, leg]
 
   if (GHOST_FRAMES.includes(frame)) {
     const ghost: BatterLayer = { folder: GHOST, frame: frame - (type === 0 ? GHOST_BALANCER_OFFSET : GHOST_SLUGER_OFFSET) }

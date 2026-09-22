@@ -6,6 +6,7 @@ import type { PatternDeck } from '@/entities/batting/model/battedBallOutcome'
 import type { Pitch, PitcherAbility } from '@/entities/pitching/model/pitch'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import type { BatterEquipment } from '@/widgets/batting-stage/lib/batterLayers'
 import type { StageScene } from '@/widgets/batting-stage/lib/renderBattingStage'
 import { PITCHER_RELEASE_TICKS } from '@/widgets/batting-stage/lib/stageScenery'
 
@@ -50,6 +51,11 @@ export interface StageLatest {
   readonly canBunt: boolean
   /** 타자 폼 (원본 rec[0xb] 윗니블 = 2 × 타입 + 손). 몸통·자세표를 `폼 >> 1` 로 고른다 */
   readonly batterForm: number
+  /** 타자 그림 팔레트 재료 — 몸통 피부×15+팀 · 헬멧 팀 (0x78be8·0x78c14) */
+  readonly batterSkinIndex: number
+  readonly batterTeamIndex: number
+  /** 장착 장비의 등급 순번 (부위별 −1 = 미장착) — 머리·손·다리 그림 슬롯을 채운다 */
+  readonly batterEquipment: BatterEquipment
   readonly isPaused: boolean
   readonly random: RandomPort
   readonly swingMode: SwingMode

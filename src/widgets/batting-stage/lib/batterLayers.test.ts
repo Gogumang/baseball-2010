@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { batterFrameAt, batterLayersOf, bodyTypeOf } from '@/widgets/batting-stage/lib/batterLayers'
+import { batterEquipmentOf, batterFrameAt, batterLayersOf, bodyTypeOf, equipmentGradeOf } from '@/widgets/batting-stage/lib/batterLayers'
 
 const 파일 = (layers: ReturnType<typeof batterLayersOf>) => layers.map((layer) => `${layer.folder.split('/')[2]}:${layer.frame}`)
 
@@ -25,9 +25,9 @@ describe('타자 자세 프레임 f — 0xb905c', () => {
 })
 
 describe('타자 레이어 — 0x78cfc (겹침 표 0xd3a54)', () => {
-  it('규칙 0 (f=4): 그림자·몸통·헬멧·배트·몸통 앞(f+14)·다리 순서', () => {
+  it('규칙 0 (f=4): 그림자·몸통·헬멧·배트·몸통 앞(f+14) 순서 — 맨몸이면 다리 레이어가 없다', () => {
     expect(파일(batterLayersOf(4, 0))).toEqual([
-      'batter_shadow:4', 'batter_balancer:4', 'batter_helmet:4', 'batter_batter:4', 'batter_balancer:18', 'item_bat_leg_0:4',
+      'batter_shadow:4', 'batter_balancer:4', 'batter_helmet:4', 'batter_batter:4', 'batter_balancer:18',
     ])
   })
 
@@ -48,8 +48,53 @@ describe('타자 레이어 — 0x78cfc (겹침 표 0xd3a54)', () => {
 
   it('sluger 는 몸통 외 레이어가 +14, 몸통 앞이 +13 이다', () => {
     expect(파일(batterLayersOf(0, 1))).toEqual([
-      'batter_shadow:14', 'batter_sluger:0', 'batter_helmet:14', 'batter_batter:14', 'batter_sluger:13', 'item_bat_leg_0:14',
+      'batter_shadow:14', 'batter_sluger:0', 'batter_helmet:14', 'batter_batter:14', 'batter_sluger:13',
     ])
+  })
+})
+
+describe('장비 외형 레이어 — 0x78fd8 적재 · 0x78cfc 슬롯', () => {
+  it('장비 니블(0 미장착 · 레벨+1) → 등급 순번 n = 니블 − 1 (0x10866)', () => {
+    expect([0, 1, 2, 8, 11].map(equipmentGradeOf)).toEqual([-1, 0, 1, 7, 10])
+    expect(batterEquipmentOf({ hit: 3, power: 1, run: 0 })).toEqual({ head: 2, hand: 0, leg: -1 })
+  })
+
+  it('머리·손·다리 장비가 슬롯 3·4·8 에 들어간다 (규칙 0, f=4)', () => {
+    expect(파일(batterLayersOf(4, 0, { head: 1, hand: 0, leg: 3 }))).toEqual([
+      'batter_shadow:4', 'batter_balancer:4', 'batter_helmet:4', 'item_bat_head_1:4', 'item_bat_hand:4',
+      'batter_balancer:18', 'item_bat_hand_014_0:4', 'item_bat_leg_0:4',
+    ])
+  })
+
+  it('머리 장비 등급 2 이상이면 헬멧을 안 그린다 (0x78df4)', () => {
+    expect(파일(batterLayersOf(4, 0, { head: 2, hand: -1, leg: -1 }))).toEqual([
+      'batter_shadow:4', 'batter_balancer:4', 'item_bat_head_2:4', 'batter_batter:4', 'batter_balancer:18',
+    ])
+  })
+
+  it('손 등급 1·4·5 는 셋째 겹(_1)이 붙고, 덧그림 이름은 2_0·35_0·6_0·014_0 이다', () => {
+    expect(파일(batterLayersOf(4, 0, { head: -1, hand: 5, leg: -1 })).slice(5)).toEqual([
+      'item_bat_hand_35_0:4', 'item_bat_hand_5_1:4',
+    ])
+    expect(파일(batterLayersOf(4, 0, { head: -1, hand: 2, leg: -1 })).slice(5)).toEqual(['item_bat_hand_2_0:4'])
+    expect(파일(batterLayersOf(4, 0, { head: -1, hand: 6, leg: -1 })).slice(5)).toEqual(['item_bat_hand_6_0:4'])
+  })
+
+  it('히든 등급(7~10)은 손이 item_bat_hand_{n} 한 장이고 덧그림이 없다', () => {
+    expect(파일(batterLayersOf(4, 0, { head: -1, hand: 9, leg: 10 }))).toEqual([
+      'batter_shadow:4', 'batter_balancer:4', 'batter_helmet:4', 'item_bat_hand_9:4', 'batter_balancer:18', 'item_bat_leg_7:4',
+    ])
+  })
+
+  it('등급 색 .mpl 줄 — 손 n≤1·다리 0·7 은 기본색, 나머지는 n−2 · n−1 · n−8', () => {
+    const 줄 = (layers: ReturnType<typeof batterLayersOf>, folder: string) =>
+      layers.find((layer) => layer.folder.includes(folder))?.gradePaletteRow
+    expect(줄(batterLayersOf(4, 0, { head: -1, hand: 1, leg: -1 }), 'item_bat_hand/')).toBeUndefined()
+    expect(줄(batterLayersOf(4, 0, { head: -1, hand: 4, leg: -1 }), 'item_bat_hand/')).toBe(2)
+    expect(줄(batterLayersOf(4, 0, { head: -1, hand: -1, leg: 0 }), 'item_bat_leg_0')).toBeUndefined()
+    expect(줄(batterLayersOf(4, 0, { head: -1, hand: -1, leg: 6 }), 'item_bat_leg_0')).toBe(5)
+    expect(줄(batterLayersOf(4, 0, { head: -1, hand: -1, leg: 7 }), 'item_bat_leg_7')).toBeUndefined()
+    expect(줄(batterLayersOf(4, 0, { head: -1, hand: -1, leg: 10 }), 'item_bat_leg_7')).toBe(2)
   })
 })
 
