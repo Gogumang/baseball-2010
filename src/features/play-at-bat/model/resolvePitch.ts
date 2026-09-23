@@ -155,7 +155,12 @@ export function resolvePitch(
   )
   const code = result.code + direction
   const drawn = drawPattern(deck, code, random)
-  const batted = outcomeOfPattern(code, drawn.pattern, random)
+  // 2스트라이크 번트 파울은 아웃이다 (0x9d5e2~0x9d600). `situation.strikes` 는 이 공을 먹이기
+  // 전의 카운트라 원본 `(s8)state[4] > 1` 과 같은 자리다
+  const batted = outcomeOfPattern(code, drawn.pattern, random, {
+    strikes: context.situation.strikes,
+    buntKind: swing.buntKind,
+  })
   // 타격음 7·9·5·59·6 — 방금 뽑은 패턴의 각·세기·높이로 고른다 (0x515de~0x5164a)
   const contactSoundId = contactSoundIdOf({
     hasSwung: true,

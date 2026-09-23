@@ -46,7 +46,58 @@ const groundOut = fair({ kind: '아웃', detail: '땅볼아웃' })
 const flyOut = fair({ kind: '아웃', detail: '뜬공아웃' })
 const lineOut = fair({ kind: '아웃', detail: '직선타아웃' })
 
-export function outcomeOfPattern(code: number, pattern: BattedBallPattern, random: RandomPort): BattedBallResult {
+/**
+ * 원본 `0x9d5bc` 가 **파울을 아웃으로 뒤집을 때** 보는 두 칸 (0x9d5e2~0x9d600, 디스어셈 재확인).
+ *
+ * ```
+ * 0009d5d4: bl 0xb68dc            ; 파울인가 (state[0x1c])
+ * 0009d5e2: ldrsb r3,[r2,#4]      ; (s8)state[4]  = 스트라이크 수
+ * 0009d5e6: cmp r3,#1 ; ble 0x9d5fe   ; 1 이하면 그냥 파울(판정 7)
+ * 0009d5ea: ldrsb r3,[r2,#0x13]   ; (s8)state[0x13] = 번트 종류
+ * 0009d5f2: beq 0x9d5fe           ; 0 이면 그냥 파울
+ * 0009d5fa: movs r2,#0xb          ; 판정 11 = 아웃
+ * ```
+ *
+ * 즉 **2스트라이크에서 낸 번트가 파울이 되면 아웃**이다. 스트라이크 수는 이 공을 먹이기
+ * **전**의 값이다 (원본도 타구 판정이 카운트를 올리기 전에 돈다).
+ */
+export interface BuntFoulSituation {
+  /** 이 공을 먹이기 전의 스트라이크 수 — 원본 `(s8)state[4] > 1` */
+  readonly strikes: number
+  /** 0 스윙 · 1~3 번트 종류 — 원본 `(s8)state[0x13] != 0` */
+  readonly buntKind: number
+}
+
+/**
+ * 2스트라이크 번트 파울 아웃 (원본 판정 11).
+ *
+ * ⚠️ **detail 은 근사다.** 원본은 파울 = 죽은 공이라 주자가 그대로 서지만, 웹 `AtBatOutcome` 에는
+ * 그런 아웃 갈래가 없다. 있는 셋 가운데 `직선타아웃` 을 골랐다 — 이유는 둘이다:
+ *   1. 잡힌 타구로 쳐 주자를 움직이지 않는다 (`baseState.advanceForOut` 은 뜬공만 희생플라이로 본다).
+ *   2. 아웃 콜이 원본과 같은 **62** 가 된다 (`atBatSounds.inPlayCallSoundIdOf` — 판정 11 도 62 다).
+ * 갈래를 새로 만들려면 `entities/at-bat` · `features/defense-play` 를 같이 고쳐야 해서 두지 않았다.
+ */
+const buntFoulOut = fair({ kind: '아웃', detail: '직선타아웃' })
+
+/**
+ * 결과 코드·패턴 → 타석 결과. `situation` 을 주면 위 **2스트라이크 번트 파울 아웃** 규칙까지 본다.
+ *
+ * 원본 순서 그대로다 — 먼저 타구를 페어/파울로 가른 뒤(0x9d660 계열), 파울이면 0x9d5e2 가
+ * 카운트와 번트 종류를 보고 아웃으로 뒤집는다. 아래 `battedBallResultOf` 의 식·문턱은 그대로다.
+ */
+export function outcomeOfPattern(
+  code: number,
+  pattern: BattedBallPattern,
+  random: RandomPort,
+  situation?: BuntFoulSituation,
+): BattedBallResult {
+  const result = battedBallResultOf(code, pattern, random)
+  if (result.kind !== '파울' || situation === undefined) return result
+  if (situation.strikes <= 1 || situation.buntKind === 0) return result
+  return buntFoulOut
+}
+
+function battedBallResultOf(code: number, pattern: BattedBallPattern, random: RandomPort): BattedBallResult {
   const [angle, speed] = pattern
   if (angle < FAIR_ANGLE.minimum || angle > FAIR_ANGLE.maximum) return { kind: '파울' }
   switch (code - (code % GROUP_SIZE)) {

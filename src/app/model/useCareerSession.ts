@@ -9,7 +9,8 @@ import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
-import { inPlayCallSoundIdOf, pitchCallSoundIdOf } from '@/features/play-at-bat/model/atBatSounds'
+import { deepHitCheerSoundIdOf, inPlayCallSoundIdOf, pitchCallSoundIdOf } from '@/features/play-at-bat/model/atBatSounds'
+import { carryDistanceOf } from '@/entities/batting/model/battedBallFlight'
 import {
   GAME_INTRO_SOUND,
   gameResultSoundIdOf,
@@ -86,6 +87,33 @@ import {
 } from '@/entities/national-cup/model/nationalCupFlow'
 import type { NationalCupFinish } from '@/entities/national-cup/model/nationalCupFlow'
 import type { GamePointWalletSession } from '@/entities/wallet/model/useGamePointWallet'
+
+/**
+ * **경기 뒤 평가 창의 좋음·보통·나쁨 징글** (36 · 37 · 38).
+ *
+ * 나만의리그 상태 116(경기 뒤 평가) 안 `0x12c96~0x12cc6` — 디스어셈 재확인:
+ * ```
+ * 00012c96: ldr r3,[r4] ; adds r3,#0x4a ; ldrsb r0,[r3,r0]  ; p = (s8)레코드[+0x4a]
+ * 00012c9e: cmp r0,#0 ; bge 0x12cb2
+ * 00012ca4: movs r1,#0x26        ; p < 0      → 38
+ * 00012cb6: cmp r0,#1 ; bgt 0x12cc0
+ * 00012cbc: movs r1,#0x25        ; 0 ≤ p ≤ 1 → 37
+ * 00012cc2: movs r1,#0x24        ; p > 1     → 36
+ * ```
+ * 시즌모드 쪽(0xdea0 = 0x105 상태 0xe9, 경기 뒤 관중·수입 창)은 같은 모양인데 문턱만 **3** 이다
+ * (0xdece `cmp r3,#3`). 이 세션은 **나만의리그 타자편**(모드 4 · 장면 0x106)이라 문턱 1 을 쓴다.
+ *
+ * 레코드 `+0x4a` = **직전 경기 인기도 변화 p** 로 확정돼 있다 (A 0절 "+0x4a s8: 지난 경기
+ * 인기도 변화 (0xa68ca 가 쓴다) 확정" · P1 5-2 정정). 웹 값은 `evaluation.popularityChange` 다.
+ *
+ * ⚠️ **근사인 곳은 우는 자리뿐이다.** 원본은 결과 화면과 평가 창이 따로인데 웹은 한 화면이라
+ * 승패 징글(31·32) 바로 뒤에 이어 낸다 — 통로가 하나라 앞 소리가 끊긴다.
+ */
+const MY_LEAGUE_EVALUATION_THRESHOLD = 1
+function evaluationJingleIdOf(popularityChange: number): number {
+  if (popularityChange < 0) return 38
+  return popularityChange > MY_LEAGUE_EVALUATION_THRESHOLD ? 36 : 37
+}
 
 interface CareerSessionInput {
   readonly runner: AtBatRunner
@@ -240,10 +268,14 @@ export function useCareerSession({
   const finishGame = useCallback(
     (finished: GameProgress, currentCareer: PlayerCareer) => {
       const summary = summaryOf(finished)
-      // 승리 31 · 패배 32 징글. 무승부는 원본이 어느 쪽을 내는지 문서에 없어 비워 둔다
-      playSoundIds(audio, [gameResultSoundIdOf(summary.result)])
       // 경기 후 평가 — 인기도 → 평판 → 사기 (0xa719c), 이어서 연속 기록 (0x8a6fc)
       const evaluation = evaluateGame(currentCareer, summary)
+      // 승리 31 · 패배 32 징글 (무승부는 원본이 어느 쪽을 내는지 문서에 없어 비워 둔다) →
+      // 평가 창 징글 36·37·38. 원본은 두 화면이 따로지만 웹은 한 화면이라 이어서 낸다
+      playSoundIds(audio, [
+        gameResultSoundIdOf(summary.result),
+        evaluationJingleIdOf(evaluation.popularityChange),
+      ])
       const evaluated = gainMorale(
         gainReputation(
           gainPopularity(
@@ -460,12 +492,19 @@ export function useCareerSession({
 
       const { bases } = current.game
       const runnersOnBase = [bases.first, bases.second, bases.third].filter(Boolean).length
-      const resolved = resolveDefensePlay(current, result ?? runDefensePlay(pending), random)
+      const played = result ?? runDefensePlay(pending)
+      const resolved = resolveDefensePlay(current, played, random)
       progressRef.current = resolved
       setProgress(resolved)
-      // 플레이가 끝난 자리 — 아웃 콜(0x51b36)과 진행 소리는 여기서야 난다
+      // 플레이가 끝난 자리 — 아웃 콜(0x51b36)·세이프 콜(0x51c14)과 진행 소리는 여기서야 난다.
+      // 함성 60 은 원본이 **낙구 틱**에 내는 것이라 이 자리는 근사다 (atBatSounds 주석)
       playSoundIds(audio, [
-        inPlayCallSoundIdOf(pending.outcome),
+        deepHitCheerSoundIdOf({
+          outcome: pending.outcome,
+          carryDistance: carryDistanceOf(pending.trajectory),
+          caughtOnTheFly: played.caughtOnTheFly,
+        }),
+        inPlayCallSoundIdOf(pending.outcome, played),
         ...gameStepSoundIdsOf(current, resolved),
       ])
       finishAtBat(resolved, pending.outcome, runnersOnBase)

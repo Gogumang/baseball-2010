@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   contactSoundIdOf,
+  deepHitCheerSoundIdOf,
   inPlayCallSoundIdOf,
   pitchCallSoundIdOf,
   PITCH_RELEASE_SOUND,
@@ -95,15 +96,47 @@ describe('심판 콜 (판정 스위치 0x51a94)', () => {
 })
 
 describe('플레이가 끝난 뒤의 콜', () => {
-  it('홈런은 함성 11, 아웃은 아웃 콜 20, 안타는 소리가 없다', () => {
+  /**
+   * ⚠️ 예전 씨앗 테스트는 "아웃은 늘 20" 이었다. 0x51b36~0x51b48 을 다시 떠 보니
+   * `state[0x1f]`(바운드 없이 잡은 아웃) 나 `state[0x87]`(태그성 아웃) 이 서면 **62** 다 —
+   * 잡아서 낸 뜬공 아웃은 20 이 아니라 62 였다. 그래서 기대값을 고쳤다.
+   */
+  it('홈런은 함성 11, 잡은 아웃은 62, 루에서 잡은 포스 아웃은 20, 안타는 소리가 없다', () => {
     expect(inPlayCallSoundIdOf({ kind: '홈런' })).toBe(11)
-    expect(inPlayCallSoundIdOf({ kind: '아웃', detail: '뜬공아웃' })).toBe(20)
+    expect(inPlayCallSoundIdOf({ kind: '아웃', detail: '뜬공아웃' })).toBe(62)
+    expect(inPlayCallSoundIdOf({ kind: '아웃', detail: '직선타아웃' })).toBe(62)
+    expect(inPlayCallSoundIdOf({ kind: '아웃', detail: '땅볼아웃' })).toBe(20)
     expect(inPlayCallSoundIdOf({ kind: '안타', bases: 2 })).toBeNull()
+  })
+
+  it('수비 결과를 주면 원본 칸(state[0x1f])을 그대로 본다 — 땅볼도 뜬 채로 잡혔으면 62', () => {
+    expect(inPlayCallSoundIdOf({ kind: '아웃', detail: '땅볼아웃' }, { caughtOnTheFly: true })).toBe(62)
+    expect(inPlayCallSoundIdOf({ kind: '아웃', detail: '뜬공아웃' }, { caughtOnTheFly: false })).toBe(20)
+  })
+
+  it('안타인데 루로 송구가 도착했으면 세이프 콜 17 (0xb442a 근사)', () => {
+    expect(inPlayCallSoundIdOf({ kind: '안타', bases: 1 }, { throwBase: 1, throwArrivalTick: 20 })).toBe(17)
+    // 송구가 없었으면 "아웃 될 뻔" 이 아니다 — 원본도 외야 안타에는 이 콜을 안 낸다
+    expect(inPlayCallSoundIdOf({ kind: '안타', bases: 2 }, { throwBase: -1, throwArrivalTick: -1 })).toBeNull()
   })
 
   it('삼진·볼넷은 심판 콜 쪽이 이미 냈으므로 여기서 또 내지 않는다', () => {
     expect(inPlayCallSoundIdOf({ kind: '삼진' })).toBeNull()
     expect(inPlayCallSoundIdOf({ kind: '볼넷' })).toBeNull()
+  })
+})
+
+describe('깊은 타구 함성 60 (0x52b62~0x52ba4)', () => {
+  it('아무도 못 잡고 떨어진 깊은 타구에만 난다 — 문턱은 원본 10274 그대로다', () => {
+    expect(deepHitCheerSoundIdOf({ outcome: { kind: '안타', bases: 2 }, carryDistance: 10_275 })).toBe(60)
+    expect(deepHitCheerSoundIdOf({ outcome: { kind: '안타', bases: 2 }, carryDistance: 10_274 })).toBeNull()
+  })
+
+  it('잡힌 타구와 홈런은 안 낸다 (플레이+0x113 · 결과 코드 24~26 갈래)', () => {
+    const 깊이 = 20_000
+    expect(deepHitCheerSoundIdOf({ outcome: { kind: '아웃', detail: '뜬공아웃' }, carryDistance: 깊이 })).toBeNull()
+    expect(deepHitCheerSoundIdOf({ outcome: { kind: '안타', bases: 3 }, carryDistance: 깊이, caughtOnTheFly: true })).toBeNull()
+    expect(deepHitCheerSoundIdOf({ outcome: { kind: '홈런' }, carryDistance: 깊이 })).toBeNull()
   })
 })
 

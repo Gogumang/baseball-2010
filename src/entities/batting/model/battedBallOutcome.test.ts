@@ -62,6 +62,48 @@ describe('outcomeOfPattern — 수비 대체 근사 (전부 추정)', () => {
   })
 })
 
+describe('2스트라이크 번트 파울 아웃 (0x9d5e2~0x9d600)', () => {
+  /** 번트 코드에서 실제로 파울이 되는 패턴 — 표에서 그대로 골랐다 (각이 45~135 밖) */
+  const 번트파울패턴 = BATTED_BALL_PATTERNS[6].find((pattern) => pattern[0] < 45 || pattern[0] > 135)!
+
+  it('2스트라이크에서 낸 번트가 파울이면 아웃이다', () => {
+    expect(outcomeOfPattern(6, 번트파울패턴, 고정(0), { strikes: 2, buntKind: 1 })).toEqual({
+      kind: '타구',
+      outcome: { kind: '아웃', detail: '직선타아웃' },
+      isBunt: false,
+    })
+  })
+
+  it('스트라이크가 1 이하이거나 번트가 아니면 그냥 파울이다 — 원본 두 조건 그대로', () => {
+    expect(outcomeOfPattern(6, 번트파울패턴, 고정(0), { strikes: 1, buntKind: 1 })).toEqual({ kind: '파울' })
+    expect(outcomeOfPattern(6, 번트파울패턴, 고정(0), { strikes: 2, buntKind: 0 })).toEqual({ kind: '파울' })
+    // 상황을 안 주면 예전처럼 파울 그대로다 (덱 없이 부르는 자리들)
+    expect(outcomeOfPattern(6, 번트파울패턴, 고정(0))).toEqual({ kind: '파울' })
+  })
+
+  it('페어로 간 번트는 2스트라이크여도 그대로 희생번트다', () => {
+    expect(outcomeOfPattern(6, [90, 300, 0, 0], 고정(0), { strikes: 2, buntKind: 1 })).toEqual({
+      kind: '타구',
+      outcome: { kind: '아웃', detail: '땅볼아웃' },
+      isBunt: true,
+    })
+  })
+
+  /**
+   * 원본 패턴 표 전수 — 번트 코드에서 파울이 나오는 비율. 웹 덱은 코드마다 표를 섞어 한 바퀴씩
+   * 돌리므로 길게 보면 표의 비율 그대로다.
+   */
+  it('번트 코드 패턴 표 실측 — 성공 코드는 7.4%, 실패 코드는 62.5% 가 파울이다', () => {
+    const 파울수 = (code: number) =>
+      BATTED_BALL_PATTERNS[code].filter((pattern) => outcomeOfPattern(code, pattern, 고정(0)).kind === '파울').length
+
+    expect([6, 7, 8].map(파울수)).toEqual([3, 2, 3])
+    expect([6, 7, 8].map((code) => BATTED_BALL_PATTERNS[code].length)).toEqual([40, 35, 33])
+    expect([12, 13, 14].map(파울수)).toEqual([10, 20, 20])
+    expect([12, 13, 14].map((code) => BATTED_BALL_PATTERNS[code].length)).toEqual([20, 30, 30])
+  })
+})
+
 describe('패턴 덱 — 0xb0614 섞은 뒤 차례로 꺼냄', () => {
   it('코드마다 원본 패턴을 하나씩 돌려주고 다 쓰면 다시 섞는다', () => {
     const random = 고정(0)
