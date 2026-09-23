@@ -74,6 +74,11 @@ import {
   runsAfterTwoOutRule,
   type HeldRunState,
 } from '@/entities/fielding/model/heldRuns'
+import {
+  judgeOut,
+  OUT_KIND,
+  releaseForcesAfterOut,
+} from '@/entities/fielding/model/outJudgement'
 import { defenseArrivalTicks, secondBaseCoverSlot } from '@/entities/fielding/model/throwArrival'
 import { effectiveThrowSpeedOf, readyTicksOf, throwTicksToFielder } from '@/entities/fielding/model/throwPlan'
 import { chooseThrowTargetBase } from '@/entities/fielding/model/throwTargetBase'
@@ -639,6 +644,48 @@ export function stepDefensePlay(
     landingTick: trajectory.landingTick,
   })
 
+  /**
+   * **아웃 판정 0xb36d0 (플레이 vt90) 한 번 돌리기.**
+   *
+   * 원본이 이 판정을 부르는 자리는 하나가 아니다 — **공을 쥘 때마다**(`0xb2710` 안 `0xb2758`) 한 번,
+   * 그리고 플레이 틱 `0xb401c` 안 `0xb43da`("이 플레이의 야수가 공을 쥐고 있으면")에서 **틱마다** 한 번.
+   * 그래서 여기서도 세 자리에서 부른다: 야수가 공을 잡았을 때 · 송구가 루에 닿았을 때 · 틱 갱신 뒤.
+   * 잡는 순간에도 한 번 도는 것이 중요하다 — 그러지 않으면 "송구가 닿는 그 틱에 루를 밟은 주자" 가
+   * 늘 세이프가 되어, 예전의 송구 도착 판정과 아슬아슬한 경우의 답이 달라진다.
+   *
+   * ⚠️ **0번(타자주자)은 뺀다.** 이 진행기의 규약이 "타자주자의 운명은 결과 코드가 정한다" 여서,
+   * 판정이 3루타 주자를 태그로 잡으면 기록과 어긋난다. 원본에는 이 제외가 없다 — **근사**다.
+   */
+  const runOutJudgement = (): void => {
+    if (play.finished) return
+    const judged = judgeOut({ ...contextAt(tick), skipRunnerIndexes: [0] })
+    if (judged.kind === OUT_KIND.NONE) return
+    const victim = runners[judged.runnerIndex]
+    if (victim === undefined || victim.state.isOut) return
+    markOut(victim)
+    outs += 1
+    outsAdded += 1
+    // 결과 3(태그)이면 원본은 그 자리에서 협살을 끝낸다 (0xb3946 → 0xb26b8)
+    if (judged.kind === OUT_KIND.TAG && rundown.runnerIndex === judged.runnerIndex) {
+      rundownOuts += 1
+      log.push(`${tick}틱 협살 태그 — ${judged.runnerIndex}번 주자 아웃`)
+    } else {
+      const name = judged.kind === OUT_KIND.FLY ? '뜬공' : judged.kind === OUT_KIND.BASE ? '루' : '태그'
+      log.push(`${tick}틱 ${judged.runnerIndex}번 주자 ${name} 아웃 (0xb36d0 결과 ${judged.kind})`)
+    }
+    if (judged.kind === OUT_KIND.TAG) {
+      fielders = endRundown(fielders)
+      rundown = NO_RUNDOWN
+      rundownThrowArrival = -1
+      rundownThrowTo = NONE
+    }
+    // 0xa9648 — 아웃 뒤 포스 풀기
+    const relaxed = releaseForcesAfterOut(runners.map((runner) => runner.state))
+    runners.forEach((runner, index) => {
+      runner.state = relaxed[index] ?? runner.state
+    })
+  }
+
   // 아래 묶음은 예전 `for (let tick = 0; …)` 루프의 **몸통 그대로**다.
   // 한 줄도 안 옮기려고 묶음(블록)만 씌워 두었다 — 결과가 한 톨도 달라지면 안 되는 자리다.
   {
@@ -783,6 +830,8 @@ export function stepDefensePlay(
       )
       play = { ...play, held: true, everHeld: true, wantsThrow: true }
       log.push(`${tick}틱 ${chaserSlot}번 야수가 잡았다 (종류 ${play.catchKind})`)
+      // 공 쥐기 0xb2710 은 쥐자마자 vt90(아웃 판정)을 부른다 (0xb2758)
+      runOutJudgement()
 
       if (onTheFly) {
         // 뜬공 아웃 — 타자주자는 여기서 죽고, 나머지는 리터치(0xa9620) 뒤 태그업 판정을 받는다
@@ -858,22 +907,14 @@ export function stepDefensePlay(
       }
     }
 
-    // ── 2. 송구 도착 — 그 루로 가던 주자가 아직 못 닿았으면 아웃 ──
-    // 악송구면 공이 루를 벗어나므로 아무도 잡히지 않는다 (위 근사)
+    // ── 2. 송구 도착 — 공이 받은 야수의 손으로 옮겨 간다 ──
+    //
+    // ⚠️ 예전에는 여기서 **"그 루로 가던 주자가 아직 못 닿았으면 아웃"** 을 바로 찍었다.
+    // 그것은 원본에 없는 갈래다. 원본은 아웃 판정 `0xb36d0`(vt90) 하나가 **틱마다** 돌면서
+    // 포스(2)와 태그(3)를 **갈라서** 잡는다 — 포스가 안 걸린 주자는 루에 공이 먼저 닿아도
+    // 안 죽고 태그(≤499)를 받아야 죽는다. 그래서 그 갈래를 통째로 6b 절로 옮겼다.
+    // (`outJudgement.judgeOut` · 근거는 그 파일 머리에 다 적어 두었다.)
     if (throwArrivalTick >= 0 && tick === throwArrivalTick) {
-      if (!errantThrow) {
-        for (let index = runners.length - 1; index >= 1; index -= 1) {
-          const runner = runners[index]
-          if (runner.state.isOut || runner.state.scored) continue
-          if (wrapBase(runner.state.targetBase) !== wrapBase(throwBase)) continue
-          if (isAtTarget(runner.state)) continue
-          markOut(runner)
-          outs += 1
-          outsAdded += 1
-          log.push(`${tick}틱 ${index}번 주자 ${throwBase}루에서 아웃`)
-          break
-        }
-      }
       play = { ...play, wantsThrow: false }
       // 공은 **받은 야수의 손으로 옮겨 간다** — 0xb2734 가 `P+0x130 = 받은 야수 번호` · `야수+0xe0 = 1`.
       // 이 줄이 없으면 공 쥔 야수가 끝까지 "쫓아간 야수" 로 남는데, 그 야수는 커버 배정에서 빠져 있어
@@ -888,6 +929,8 @@ export function stepDefensePlay(
               : fielder,
         )
         play = { ...play, ballHolderSlot: receiverSlot, held: true }
+        // 받은 야수도 0xb2734 → 0xb2710 을 거치므로 그 자리에서 아웃 판정이 한 번 돈다
+        runOutJudgement()
       }
     }
 
@@ -1104,6 +1147,9 @@ export function stepDefensePlay(
         log.push(`${tick}틱 ${runner.state.index}번 주자 홈 — 보류 ${held.heldRuns} / 득점 ${held.scoreboardRuns}`)
       }
     }
+
+    // ── 6b. 아웃 판정 0xb36d0 — 틱 갱신 뒤 갈래 (0xb43da) ──
+    runOutJudgement()
 
     // ── 7. 보류 득점 풀기 (0xaa34c) ──
     const stillActive = runners.some(

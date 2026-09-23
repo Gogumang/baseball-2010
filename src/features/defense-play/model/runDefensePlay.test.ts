@@ -505,9 +505,15 @@ describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
     expect(결과.log.some((line) => line.includes('협살 태그'))).toBe(false)
   })
 
-  it('사람이 귀루 키를 누르면 되돌아 뛰고, 앞 루를 지키던 공 쥔 야수가 태그한다 (0xb36d0 결과 3)', () => {
+  it('사람이 귀루 키를 누르면 되돌아 뛰다가 태그로 죽는다 — 협살이 서기 전에 아웃 판정이 먼저 잡는다', () => {
     // 협살은 수비가 CPU 일 때만 걸리므로 공격은 늘 사람이다. 되돌아 뛰는 것은 귀루 키('3' = 1루 주자,
-    // 메시지 0x584)이고, 아웃은 거리 ≤ 499 태그다 — 원본에서 협살이 아웃으로 끝나는 유일한 길이다.
+    // 메시지 0x584)이고, 아웃은 거리 ≤ 499 태그(0xb36d0 결과 3)다.
+    //
+    // ⚠️ **예전에는 이 아웃이 `rundownOuts` 로 셌다.** 그때는 진행기가 아웃 판정을 협살 갈래 안에서만
+    // 돌렸기 때문이다. 이제는 원본대로 아웃 판정 `0xb36d0` 이 **공을 쥘 때마다·틱마다** 돌고,
+    // 원본 플레이 틱 `0xb401c` 의 차례가 **vt90(0xb42f2) → 협살 시작(0xb433c~0xb4378) → vt90(0xb43de)**
+    // 이라 **송구를 받는 그 틱의 아웃 판정이 협살 기록칸보다 먼저** 이 주자를 잡는다.
+    // 그래서 협살은 아예 서지 않고, 아웃은 협살 아웃이 아니라 평범한 태그 아웃으로 난다.
     const 결과 = runDefensePlay({
       outcome: 이루타,
       trajectory: battedBallTrajectory(representativePatternOf(이루타)),
@@ -518,9 +524,9 @@ describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
     })
 
     expect(결과.log.some((line) => line.includes('귀루'))).toBe(true)
-    expect(결과.rundowns).toBe(1)
-    expect(결과.rundownOuts).toBe(1)
-    expect(결과.log.some((line) => line.includes('협살 태그'))).toBe(true)
+    expect(결과.rundowns).toBe(0)
+    expect(결과.rundownOuts).toBe(0)
+    expect(결과.log.some((line) => line.includes('태그 아웃 (0xb36d0 결과 3)'))).toBe(true)
   })
 
   it('타자주자는 협살 대상이 아니다 — 타자주자의 운명은 결과 코드가 정한다 (근사)', () => {
