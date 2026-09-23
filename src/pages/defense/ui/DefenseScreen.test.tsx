@@ -242,3 +242,36 @@ describe('팀 팔레트로 다시 칠하기', () => {
     expect(defenderPaletteIndexOf(undefined)).toBeNull()
   })
 })
+
+/** 레이저 송구 반짝임 — 0x43278 의 0x43406~0x4342c (I-controls 1c 끝 · R2 2절) */
+describe('레이저 송구 반짝임', () => {
+  const 야수둘: DefenseViewState = {
+    ...기본_상태,
+    fielders: [
+      ...기본_상태.fielders,
+      { slot: 6, x: 30700, z: 12300, action: FIELDER_ACTION.stand, actionTick: 0 },
+    ],
+  }
+
+  it('칸을 안 주면 아무도 안 반짝인다', () => {
+    띄우기(야수둘)
+
+    expect(screen.getByTestId('defense-fielder-0').dataset.laserShining).toBeUndefined()
+    expect(screen.getByTestId('defense-fielder-6').dataset.laserShining).toBeUndefined()
+  })
+
+  it('공 쥔 야수 **한 명만** 빨갛게 그린다', () => {
+    띄우기({ ...야수둘, laserShiningSlot: 6 })
+
+    expect(screen.getByTestId('defense-fielder-6').dataset.laserShining).toBe('true')
+    expect(screen.getByTestId('defense-fielder-0').dataset.laserShining).toBeUndefined()
+    // 색만 바뀐다 — 그림(프레임)은 그대로다
+    expect(screen.getByTestId('defense-fielder-6').dataset.frame).toBe('17')
+  })
+
+  it('deadly_effect 번쩍임과 다른 표시다 — 반짝여도 공 자리에는 아무것도 안 뜬다', () => {
+    띄우기({ ...야수둘, laserShiningSlot: 6 })
+
+    expect(screen.queryByTestId('defense-flash')).toBeNull()
+  })
+})

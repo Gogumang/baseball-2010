@@ -16,7 +16,12 @@ import {
   type RunnerState,
 } from '@/entities/fielding/model/fieldingState'
 import { EMPTY_BASES, runnerCountOf, type BaseState } from '@/entities/game/model/baseState'
-import { viewStateOf, type ActionMemory, type DefensePlayView } from '@/features/defense-play/model/defensePlayView'
+import {
+  aceIndexesWithOriginalBug,
+  viewStateOf,
+  type ActionMemory,
+  type DefensePlayView,
+} from '@/features/defense-play/model/defensePlayView'
 import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
@@ -62,6 +67,22 @@ export interface HomeRunPlaybackInput {
   readonly pattern?: BattedBallPattern
   /** 수비 9명의 수비 능력치 (칸 순서). 기본 500 — 여기서는 시작 자리를 만드는 데만 쓰인다 */
   readonly defenseAbilities?: readonly number[]
+
+  // ── 아래 셋은 **그림에만 쓰인다**. 안 주면 지금까지와 똑같다 (`runDefensePlay` 와 같은 칸들) ──
+
+  /**
+   * 수비 칸별 **마선수 번호 0~4** (마선수가 아닌 칸은 null·undefined) — R3 7-1 · C-16.
+   * 칸 0(투수)은 투수 마선수 표 0xd4008, 나머지는 타자 마선수 표 0xd3f10 이다.
+   *
+   * ⚠️ 타자 마선수 그림은 원본이 **팀당 첫 한 명만** 적재하므로 둘째부터도 첫째 그림으로 나온다.
+   * 그 버그를 되살리는 것은 **부르는 쪽 몫**이라(`viewStateOf` 는 표를 그대로 넘긴다)
+   * 여기서 `aceIndexesWithOriginalBug` 를 한 번 통과시켜 넘긴다 (R3 7-3).
+   */
+  readonly aceIndexes?: readonly (number | null | undefined)[]
+  /** 수비 팀 번호 0~14 — 야수 그림 팔레트 `defender.mpl` (C-1, 15색) */
+  readonly defenseTeamIndex?: number
+  /** 공격 팀 번호 0~14 — 주자 그림 팔레트 */
+  readonly offenseTeamIndex?: number
 }
 
 interface TrotRunner {
@@ -89,6 +110,9 @@ export function homeRunPlaybackOf(input: HomeRunPlaybackInput): DefensePlayResul
   const ticks: DefensePlayView[] = []
   const previousActions: ActionMemory = new Map()
 
+  // 마선수 표는 매 틱 같으므로 한 번만 뭉개 둔다 (원본 버그 — R3 7-3)
+  const aceIndexes = aceIndexesWithOriginalBug(input.aceIndexes)
+
   const snapshotAt = (tick: number): DefensePlayView =>
     viewStateOf({
       tick,
@@ -102,6 +126,11 @@ export function homeRunPlaybackOf(input: HomeRunPlaybackInput): DefensePlayResul
       throwingSlot: NONE,
       throwBase: NONE,
       previousActions,
+      // ── 그림에만 쓰이는 것들 ──
+      // 홈런 재생에는 레이저 반짝임이 없다 — 공을 쥔 야수가 없으니 0x43406 의 첫 조건이 안 선다
+      aceIndexes,
+      defenseTeamIndex: input.defenseTeamIndex,
+      offenseTeamIndex: input.offenseTeamIndex,
     })
 
   for (let tick = 0; tick <= MAXIMUM_TICKS; tick += 1) {

@@ -6,7 +6,11 @@ import {
   SLIDING_PROGRESS_RANGE,
 } from '@/entities/fielding/model/fieldGeometry'
 import { createFielders, createRunner, NONE } from '@/entities/fielding/model/fieldingState'
-import { viewStateOf, type ActionMemory } from '@/features/defense-play/model/defensePlayView'
+import {
+  aceIndexesWithOriginalBug,
+  viewStateOf,
+  type ActionMemory,
+} from '@/features/defense-play/model/defensePlayView'
 import {
   ACE_PITCHER_DEFENDER_FRAMES,
   cameraTargetOf,
@@ -147,6 +151,48 @@ describe('마선수 그림 (R3 7-1 · C-16)', () => {
     const view = viewStateOf({ ...기본(), aceIndexes: [-1, 5, 1.5] })
 
     expect(view.fielders.slice(0, 3).map((fielder) => fielder.aceIndex)).toEqual([null, null, null])
+  })
+
+  it('진행기는 표를 그대로 넘긴다 — 팀당 하나로 뭉개 주지 않는다 (R3 7-3)', () => {
+    const view = viewStateOf({ ...기본(), aceIndexes: [null, null, 1, null, null, null, 3] })
+
+    expect(view.fielders[2].aceIndex).toBe(1)
+    expect(view.fielders[6].aceIndex).toBe(3)
+  })
+
+  it('뭉개기는 부르는 쪽이 한다 — 타자 마선수 칸이 모두 첫째 번호가 된다 (원본 버그)', () => {
+    // 칸 0 은 투수 마선수(표 0xd4008)라 따로 적재된다 — 뭉개기에서 빠진다
+    const 뭉갠표 = aceIndexesWithOriginalBug([2, null, 1, null, null, null, 3, undefined, 4])
+
+    expect(뭉갠표).toEqual([2, null, 1, null, null, null, 1, undefined, 1])
+
+    const view = viewStateOf({ ...기본(), aceIndexes: 뭉갠표 })
+    expect(view.fielders.map((fielder) => fielder.aceIndex)).toEqual([2, null, 1, null, null, null, 1, null, 1])
+  })
+
+  it('타자 마선수가 없거나 표를 안 주면 뭉갤 것도 없다', () => {
+    expect(aceIndexesWithOriginalBug(undefined)).toBeUndefined()
+    expect(aceIndexesWithOriginalBug([3, null, null])).toEqual([3, null, null])
+    // 0~4 밖은 마선수가 아니므로 첫째로 세지 않는다
+    expect(aceIndexesWithOriginalBug([null, 9, null, 2, null, 0])).toEqual([null, 9, null, 2, null, 2])
+  })
+})
+
+describe('레이저 송구 반짝임 칸 (경기+0x19ad — 0x43406~0x4342c)', () => {
+  it('진행기가 준 칸이 화면 스냅샷까지 내려간다', () => {
+    expect(viewStateOf({ ...기본(), laserShiningSlot: 6 }).laserShiningSlot).toBe(6)
+  })
+
+  it('안 주거나 −1 이면 아무도 안 반짝인다', () => {
+    expect(viewStateOf(기본()).laserShiningSlot).toBeNull()
+    expect(viewStateOf({ ...기본(), laserShiningSlot: NONE }).laserShiningSlot).toBeNull()
+    expect(viewStateOf({ ...기본(), laserShiningSlot: 9 }).laserShiningSlot).toBeNull()
+  })
+
+  it('deadly_effect 번쩍임과는 다른 칸이다 — 반짝여도 flash 는 안 뜬다', () => {
+    const view = viewStateOf({ ...기본(), laserShiningSlot: 8 })
+
+    expect(view.flash).toBeNull()
   })
 })
 

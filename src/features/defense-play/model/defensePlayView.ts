@@ -54,6 +54,11 @@ export interface ViewStateInput {
 
   /** 수비 칸별 마선수 번호 0~4 (없으면 null·undefined). 이름 표 0xd3f10, 20바이트 간격 — C-16 */
   readonly aceIndexes?: readonly (number | null | undefined)[]
+  /**
+   * 레이저 송구 반짝임(경기+0x19ad)을 띄울 야수 칸. 안 주면 아무도 안 반짝인다.
+   * 세 조건(공 쥔 야수 · +0x19ad · deadly_effect A 안 돎)은 **진행기가** 본다 — `defenseView.ts` 주석.
+   */
+  readonly laserShiningSlot?: number | null
   /** 수비 팀 번호 0~14 — 야수 그림 팔레트 (C-1) */
   readonly defenseTeamIndex?: number | null
   /** 공격 팀 번호 0~14 — 주자 그림 팔레트 */
@@ -96,8 +101,45 @@ export function viewStateOf(input: ViewStateInput): DefensePlayView {
     fielders,
     runners,
     flash: flashOf(input, fielders),
+    // 레이저 반짝임은 그릴 칸 하나로 끝이다 — 고르는 조건은 진행기 몫이다(0x43406~0x4342c)
+    laserShiningSlot: laserShiningSlotOf(input.laserShiningSlot),
     cameraTarget: null,
   }
+}
+
+/** 반짝일 야수 칸 고르기 — 0~8 밖이면 아무도 안 반짝이는 것으로 본다(−1 이 "없음" 이다) */
+function laserShiningSlotOf(slot: number | null | undefined): number | null {
+  if (slot == null || !Number.isInteger(slot) || slot < 0 || slot > 8) return null
+  return slot
+}
+
+/**
+ * 타자 마선수 그림을 **팀당 첫 한 명으로 뭉갠다** — 원본 버그 그대로다 (R3 7-3).
+ *
+ * 원본 적재(0x3a680~0x3a716)는 팀 선수 목록에서 `+0xa & 0x40` 인 **첫 선수** 하나로만
+ * `0x79a5c(obj, 번호)` 를 부르고, 그리는 쪽 `0x79b48` 의 b 갈래는 "그 칸 선수가 마선수인가" 만
+ * 본다. 그래서 한 팀에 타자 마선수가 둘 이상이면 **둘째부터도 첫째의 그림**으로 나온다.
+ *
+ * 칸 0(투수)은 따로 적재되는 그림(`0x79ab0`, 표 0xd4008)이라 **건드리지 않는다** —
+ * a 갈래가 b 갈래보다 먼저다.
+ *
+ * `viewStateOf` 는 이것을 **자동으로 해 주지 않는다**(진행기는 받은 표를 그대로 넘긴다).
+ * 버그를 되살리려면 표를 만드는 쪽이 이 함수를 통과시켜야 한다.
+ */
+export function aceIndexesWithOriginalBug(
+  aces: readonly (number | null | undefined)[] | undefined,
+): readonly (number | null | undefined)[] | undefined {
+  if (aces === undefined) return undefined
+  // 칸 1 부터 훑어 첫 타자 마선수를 찾는다 (칸 0 은 투수 마선수라 셈에서 뺀다)
+  let first: number | null = null
+  for (let slot = 1; slot < aces.length; slot += 1) {
+    const ace = aceIndexOf(aces, slot)
+    if (ace === null) continue
+    first = ace
+    break
+  }
+  if (first === null) return aces
+  return aces.map((ace, slot) => (slot === 0 || aceIndexOf(aces, slot) === null ? ace : first))
 }
 
 /** 수비 칸 → 마선수 번호. 표에 없거나 0~4 밖이면 보통 수비수 그림이다 */
@@ -144,9 +186,9 @@ const FLASH_SLIDE = 2
  * 그 단계 칸이 없어 **포구 동작이 걸려 있는 틱 동안**(동작 시작 틱 ~ 포구 틱) 그린다.
  * 칸(`step`)은 deadly_effect 애니 0 [0,1,2,3] 지연 0 을 틱마다 한 칸씩 넘기고 마지막에서 멈춘다.
  *
- * ⚠️ 레이저 송구 반짝임 경기+0x19ad 는 deadly_effect 가 **아니다** — 0x43278 이 야수 위에
- * 빨강(255,0,0)·크기 12 로 찍는 **다른 표시**다(R2 2절). 화면 모양(`DefenseViewState`)에 그 칸이
- * 없어 아직 못 붙였다 — `pages/defense` 쪽 일이다.
+ * ⚠️ 레이저 송구 반짝임 경기+0x19ad 는 deadly_effect 가 **아니다** — 0x43278 이 공 쥔 야수를
+ * 효과 12 + 빨강(255,0,0)으로 그리는 **다른 표시**다(R2 2절 · I-controls 1c 끝).
+ * 그쪽은 `DefenseViewState.laserShiningSlot` 으로 따로 내려간다 — 여기서 섞지 않는다.
  */
 function flashOf(input: ViewStateInput, fielders: readonly DefenseFielder[]): DefenseFlash | null {
   const chaser = fielders.find((fielder) => fielder.slot === input.chaserSlot)

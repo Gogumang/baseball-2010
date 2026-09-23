@@ -77,3 +77,51 @@ describe('홈런 비행 재생', () => {
     expect({ x: 마지막.x, z: 마지막.z }).not.toEqual({ x: 마지막틱.ball.x, z: 마지막틱.ball.z })
   })
 })
+
+/** 홈런 재생도 같은 화면 스냅샷을 쓴다 — 팀 색·마선수 그림이 빠져 있었다 (C-1 · C-16 · R3 7-3) */
+describe('홈런 재생 화면 — 팀 팔레트와 마선수 그림', () => {
+  it('안 넘기면 지금까지와 똑같다 — 구운 색·보통 수비수 그림', () => {
+    const 첫틱 = 재생().ticks[0]
+
+    expect(첫틱.fielders.every((야수) => 야수.teamIndex === null)).toBe(true)
+    expect(첫틱.runners.every((주자) => 주자.teamIndex === null)).toBe(true)
+    expect(첫틱.fielders.every((야수) => 야수.aceIndex === null)).toBe(true)
+  })
+
+  it('팀 번호를 넘기면 야수·주자가 제 팀 색을 탄다', () => {
+    const result = homeRunPlaybackOf({
+      outcome: { kind: '홈런' },
+      bases: 만루,
+      defenseTeamIndex: 4,
+      offenseTeamIndex: 11,
+    })
+    if (result === null) throw new Error('홈런 재생이 없다')
+
+    expect(result.ticks[0].fielders.every((야수) => 야수.teamIndex === 4)).toBe(true)
+    expect(result.ticks[0].runners.every((주자) => 주자.teamIndex === 11)).toBe(true)
+    // 마지막 틱까지 계속 칠한다
+    const 마지막 = result.ticks[result.ticks.length - 1]
+    expect(마지막.fielders.every((야수) => 야수.teamIndex === 4)).toBe(true)
+  })
+
+  it('타자 마선수가 둘이면 둘째도 첫째 그림으로 나온다 — 원본 버그 그대로 (R3 7-3)', () => {
+    const result = homeRunPlaybackOf({
+      outcome: { kind: '홈런' },
+      bases: EMPTY_BASES,
+      // 칸 0 투수 마선수 3 · 칸 2 타자 마선수 1 · 칸 6 타자 마선수 4
+      aceIndexes: [3, null, 1, null, null, null, 4, null, null],
+    })
+    if (result === null) throw new Error('홈런 재생이 없다')
+
+    const 첫틱 = result.ticks[0]
+    // 투수 칸은 제 표(0xd4008)라 그대로, 타자 마선수 칸은 첫째(1)로 뭉개진다
+    expect(첫틱.fielders[0].aceIndex).toBe(3)
+    expect(첫틱.fielders[2].aceIndex).toBe(1)
+    expect(첫틱.fielders[6].aceIndex).toBe(1)
+    expect(첫틱.fielders[5].aceIndex).toBeNull()
+  })
+
+  it('홈런 재생에는 레이저 반짝임이 없다 — 공을 쥔 야수가 없다', () => {
+    expect(재생().ticks.every((틱) => 틱.laserShiningSlot === null)).toBe(true)
+  })
+})

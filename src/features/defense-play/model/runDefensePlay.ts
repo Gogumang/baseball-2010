@@ -177,8 +177,10 @@ export interface DefensePlayInput {
    * (`0x79b48` 의 b 갈래)은 "그 칸 선수가 마선수인가" 만 보므로, 한 팀에 타자 마선수가 둘 이상이면
    * 둘째부터도 첫째의 그림으로 나온다(R3 7-3). 그 버그를 되살리려면 **부르는 쪽이** 마선수인 칸에
    * 전부 같은(첫째의) 번호를 넣어 주면 된다 — 여기서 고쳐 주지 않는다.
+   * (`defensePlayView.aceIndexesWithOriginalBug` 가 그 일을 한 번에 해 준다.)
    *
-   * ⚠️ 칸 0(투수)의 투수 마선수 그림(`0xd4008`, 38장)은 아직 안 옮겼다 — 이 표는 타자 마선수용이다.
+   * 칸 0(투수)은 표가 다르다 — 투수 마선수 그림 `0xd4008`(38장)은 `+17` 을 안 쓴다.
+   * 그 갈림은 `pages/defense/lib/defenseView.fielderSpriteOf` 가 칸 0 인지로 이미 처리한다(S12 8-2).
    */
   readonly aceIndexes?: readonly (number | null | undefined)[]
   /** 수비 팀 번호 0~14 — 야수 그림 팔레트 `defender.mpl` (C-1, 15색) */
@@ -1039,6 +1041,10 @@ export function stepDefensePlay(
         // 번쩍임(deadly_effect B·C)은 넘길 것이 없다 — 켜짐 칸 플레이+0x1f7·+0x1f8 을 세우는 것이
         // 포구 동작 분기표 0xd87f4 의 종류 3(점프)·4(슬라이딩)라 `catchKind` 로 이미 정해진다
         // (P2 2b, 확정). `defensePlayView.flashOf` 주석 참고.
+        // 레이저 송구 반짝임(경기+0x19ad) — 0x43406~0x4342c 의 세 조건을 여기서 본다:
+        // 공 쥔 야수(플레이+0x130) · 반짝임 켜짐 · deadly_effect A(+0x1990)가 안 돎.
+        // A 는 **그리지 않는 줌 펀치**라 웹판에 상태 자체가 없다(R2 2절) — 셋째 조건은 늘 참으로 둔다(근사).
+        laserShiningSlot: laserShining && play.held ? play.ballHolderSlot : NONE,
         aceIndexes: input.aceIndexes,
         defenseTeamIndex: input.defenseTeamIndex,
         offenseTeamIndex: input.offenseTeamIndex,

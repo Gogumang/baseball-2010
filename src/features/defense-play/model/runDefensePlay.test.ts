@@ -619,3 +619,47 @@ describe('화면 스냅샷 배선 — 번쩍임 · 마선수 그림 · 팀 팔�
     expect(번쩍임.every((틱) => (틱.flash?.direction ?? 0) >= 0xf && (틱.flash?.direction ?? 0) <= 0x12)).toBe(true)
   })
 })
+
+describe('레이저 송구 반짝임이 화면까지 내려간다 (경기+0x19ad — 0x43406~0x4342c)', () => {
+  const 공통 = {
+    outcome: 단타,
+    trajectory: battedBallTrajectory(representativePatternOf(단타)),
+    bases: 주자1루,
+    outs: 0,
+  }
+
+  it('사람 수비가 아니면 한 틱도 안 반짝인다 — 굴림 자체가 안 돈다', () => {
+    const 조작없음 = runDefensePlay({ ...공통, random: 고정난수(0.02) })
+    const 공격조작 = runDefensePlay({ ...공통, random: 고정난수(0.02), controls: 계속누름('공격', ' ') })
+
+    expect(조작없음.ticks.every((틱) => 틱.laserShiningSlot === null)).toBe(true)
+    expect(공격조작.ticks.every((틱) => 틱.laserShiningSlot === null)).toBe(true)
+  })
+
+  it('굴림이 통과하면 **공 쥔 야수 칸**이 실린다 (플레이+0x130)', () => {
+    // 0.02 는 레이저 기준(등급 3 = 60/1000)은 넘고 펌블·필살수비 기준에는 안 걸리는 값이다
+    const 결과 = runDefensePlay({
+      ...공통,
+      random: 고정난수(0.02),
+      controls: { side: '수비', keyAt: () => null },
+    })
+
+    const 반짝틱 = 결과.ticks.filter((틱) => 틱.laserShiningSlot !== null)
+    // 창은 포구 −10 ~ +8틱인데 그중 **공을 쥔 뒤**만 그려진다 — 9틱
+    expect(반짝틱.length).toBe(9)
+    // 공을 쥔 뒤에만 그린다 — 포구 틱 앞은 창이 열려 있어도 안 그린다 (0x43406 의 첫 조건)
+    expect(반짝틱.every((틱) => 틱.tick >= 결과.catchTick)).toBe(true)
+    expect(반짝틱.every((틱) => 틱.laserShiningSlot === 결과.catchFielderSlot)).toBe(true)
+  })
+
+  it('굴림이 떨어지면 안 반짝인다 — deadly_effect 번쩍임과도 겹치지 않는다', () => {
+    const 결과 = runDefensePlay({
+      ...공통,
+      random: 고정난수(0.999),
+      controls: { side: '수비', keyAt: () => null },
+    })
+
+    expect(결과.ticks.every((틱) => 틱.laserShiningSlot === null)).toBe(true)
+    expect(결과.ticks.every((틱) => 틱.flash === null)).toBe(true)
+  })
+})

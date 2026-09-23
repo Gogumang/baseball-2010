@@ -164,7 +164,15 @@ export function DefenseScreen({
       })),
     ...state.fielders.map((fielder) => ({
       z: fielder.z,
-      node: <Fielder key={`fielder-${fielder.slot}`} fielder={fielder} point={screenOf(fielder)} />,
+      node: (
+        <Fielder
+          key={`fielder-${fielder.slot}`}
+          fielder={fielder}
+          point={screenOf(fielder)}
+          // 레이저 송구 반짝임은 **공 쥔 야수 한 명**만 빨갛게 한다 (0x43406~0x4342c)
+          isLaserShining={state.laserShiningSlot === fielder.slot}
+        />
+      ),
     })),
   ].sort((a, b) => a.z - b.z)
 
@@ -227,9 +235,12 @@ export function DefenseScreen({
 function Fielder({
   fielder,
   point,
+  isLaserShining = false,
 }: {
   readonly fielder: DefenseFielder
   readonly point: { readonly x: number; readonly y: number }
+  /** 레이저 송구 반짝임(경기+0x19ad) — 이 야수 몸을 빨강(255,0,0)으로 그린다 */
+  readonly isLaserShining?: boolean
 }) {
   // 그림판마다 프레임 기준이 다르다 — 보통·타자 마선수는 +17, 투수 마선수는 날값 (S12 8절)
   const { folder, frame } = fielderSpriteOf(fielder)
@@ -237,10 +248,12 @@ function Fielder({
   const paletteIndex = fielder.aceIndex == null ? defenderPaletteIndexOf(fielder.teamIndex) : null
   return (
     <div
-      className={styles.actor}
+      className={isLaserShining ? `${styles.actor} ${styles.laserShining}` : styles.actor}
       style={{ left: point.x, top: point.y }}
       data-testid={`defense-fielder-${fielder.slot}`}
       data-frame={frame}
+      // 반짝이는 순간은 그림이 아니라 색만 바뀌므로 테스트가 볼 표시를 따로 남긴다
+      data-laser-shining={isLaserShining ? 'true' : undefined}
     >
       <ActorSprite folder={folder} frame={frame} paletteIndex={paletteIndex} />
     </div>

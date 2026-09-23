@@ -301,6 +301,19 @@ export function flashOffsetOf(flash: DefenseFlash): { readonly x: number; readon
   }
 }
 
+/**
+ * 레이저 송구 **반짝임**(경기+0x19ad)을 칠하는 색 — `0x1400748` = RGB(255,0,0) (I-controls 1c 끝).
+ * `deadly_effect` 번쩍임(B·C)과는 **다른 표시**다. 그쪽은 공 자리에 그림을 겹치고,
+ * 이쪽은 **공을 쥔 야수의 몸**을 빨갛게 그린다.
+ */
+export const LASER_SHINE_COLOR = { r: 255, g: 0, b: 0 } as const
+/**
+ * 그 야수를 그릴 때 쓰는 그리기 효과 번호 — `0x79b48` 에 넘기는 **12** (I-controls 1c 끝 0x43406~0x4342c).
+ * 효과 번호가 픽셀을 어떻게 섞는지(`0xbb91d` 의 종류·세기 식)는 **R2 3-2 에서 미해결**이라,
+ * 웹판은 "몸 전체를 빨간 실루엣으로 덮는다" 로 **근사**한다.
+ */
+export const LASER_SHINE_EFFECT_KIND = 12
+
 /** 화면 한 틱치 스냅샷 */
 export interface DefenseViewState {
   readonly ball: DefenseBall
@@ -308,6 +321,20 @@ export interface DefenseViewState {
   readonly runners: readonly DefenseRunner[]
   /** 번쩍임이 돌고 있으면 그 상태, 아니면 null */
   readonly flash?: DefenseFlash | null
+  /**
+   * 레이저 송구 반짝임(경기+0x19ad)을 띄울 **야수 칸**. 아무도 안 반짝이면 null 이다.
+   *
+   * 원본 0x43278 은 야수 9명을 도는 그 자리(0x43406~0x4342c)에서 세 조건을 모두 볼 때만
+   * 이 야수를 효과 12 + 빨강으로 그린다 (I-controls 1c 끝 · R2 2절):
+   *   1. 이 야수가 **공을 쥔 야수**(플레이+0x130) 이고,
+   *   2. 경기+0x19ad(반짝임)가 켜져 있고,
+   *   3. deadly_effect A(+0x1990)가 **안 돌고 있다**.
+   * 셋을 보는 쪽은 진행기다 — 화면은 "몇 번 칸" 한 칸만 받아서 그린다.
+   *
+   * ⚠️ **번쩍임(`flash`)과 헷갈리지 마라.** 저쪽은 `deadly_effect.pzx` 를 공 자리에 겹치는
+   * 필살 포구 연출이고, 이쪽은 야수 몸 색이다. 원본에서도 함수가 다르다(0x441c4/0x44398 대 0x43278).
+   */
+  readonly laserShiningSlot?: number | null
   /**
    * 카메라가 따로 볼 곳. 원본은 상태 0x18(경기 끝 직전)에 투수판 (20000, 24500) 의
    * (x, z − 2000) 을 1%/틱 으로 본다 (R3 1-3). 없으면 아래 규칙대로 공/타자주자를 본다.
