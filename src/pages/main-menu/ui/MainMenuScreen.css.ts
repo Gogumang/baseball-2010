@@ -2,14 +2,19 @@ import { globalStyle, style } from '@vanilla-extract/css'
 import { theme } from '@/app/styles/theme.css'
 
 /*
- * 메인 메뉴는 원본 그림으로만 그린다 — 배너(mode_back/000), 글자 목록(main_ui/frames),
- * 선택 바(main_ui/002), 설명 판(main_ui/003). 좌표는 `lib/mainMenuLayout.ts` 가 들고 있다.
- * 두 단(처음 메뉴 · 게임시작 목록) 모두 같은 틀을 쓴다.
+ * 메인 메뉴는 원본 그림으로만 그린다 — 배너(mode_back/000), 글자(main_ui/frames),
+ * 선택 바(main_ui/002), 설명 판(main_ui/003), 바퀴 가운데 공(main_ball). 좌표·색은
+ * `lib/mainMenuLayout.ts` 가 들고 있다.
+ * 윗단(처음 메뉴)은 원본 반원 바퀴, 아랫단(게임시작 목록)은 아직 세로 목록이다(근사).
  * 구석의 취소 버튼만 원본에 없다 — 원본은 CLR 키라 웹 임시로 둔다.
  */
 export const layer = style({ position: 'absolute', imageRendering: 'pixelated', pointerEvents: 'none' })
 
-/** 글자 그림 한 줄 — 그림 그대로 두고 눌리는 칸만 만든다 */
+/**
+ * 글자 그림 한 칸 — 그림 그대로 두고 눌리는 칸만 만든다.
+ * `lineHeight: 0` 은 꾸밈이 아니라 치수 문제다: 인라인 <img> 밑에 붙는 글줄 여백 때문에
+ * 버튼이 그림(27px)보다 3px 커져, 27px 간격으로 깔면 줄끼리 겹친 것처럼 잡혔다.
+ */
 export const menuRow = style({
   position: 'absolute',
   padding: 0,
@@ -17,6 +22,8 @@ export const menuRow = style({
   background: 'none',
   cursor: 'pointer',
   imageRendering: 'pixelated',
+  lineHeight: 0,
+  fontSize: 0,
 })
 
 /**
