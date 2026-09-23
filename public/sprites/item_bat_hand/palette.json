@@ -1,6 +1,6 @@
 {
  "mpl": "item/item_bat_hand.mpl",
- "select": "미해결 — 원본이 몇 번을 고르는지 아직 못 찾았다",
+ "select": "등급 n: 0·1 → 기본색(mpl 안 씀) · 2~6 → 줄 n−2 (0x790f6)",
  "baked": null,
  "colors": [
   "#ff00ff",

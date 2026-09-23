@@ -1,6 +1,6 @@
 {
  "mpl": "item/item_pit_hand_0.mpl",
- "select": "미해결 — 원본이 몇 번을 고르는지 아직 못 찾았다",
+ "select": "등급 n: 0 → 기본색 · 1~6 → 줄 n−1 (0x79832)",
  "baked": null,
  "colors": [
   "#ff00ff",

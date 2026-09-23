@@ -1692,18 +1692,39 @@ def generate_stadium_scene() -> None:
     타석 화면 배경 표 (위치 분석 6차).
         하늘 0x77fe8 — 색 번호 표 0xd37a4[행 × 13 + 열], 색 쌍 표 0xd37f2[번호] = (위 RGB, 아래 RGB)
         펜스 0x77974 — stadium/fence.pzf 프레임의 박스 0·1 = 팀 아이콘, 박스 2 = 전광판
+        전광판 0x77494 — 시즌·대전 구장의 자리 상자는 **전광판 그림** 에서 나온다 (아래)
     """
     import sys as _sys
     _sys.path.insert(0, str(Path(__file__).parent))
-    from decode_pzx import read_section
+    from decode_pzx import read_section, frame_boxes
     import struct as _struct
     rows = read_binary_table(0xD37A4, f'<{SKY_ROW_COUNT * SKY_COLUMN_COUNT}B')
     colors = read_binary_table(0xD37F2, f'<{SKY_COLOR_COUNT * 6}B')
     fence_raw = Path('base/work/jar/stadium/fence.pzf').read_bytes()
     boxes = []
     for block in read_section(fence_raw, 4, len(fence_raw)):
-        frame_boxes = [list(_struct.unpack_from('<hhhh', block, 2 + 8 * k)) for k in range(block[1])]
-        boxes.append(frame_boxes)
+        boxes.append([list(_struct.unpack_from('<hhhh', block, 2 + 8 * k)) for k in range(block[1])])
+    # ── 시즌·대전 구장(0x77494)의 자리 상자 ────────────────────────────────────────
+    #
+    # **상자는 관중석 그림이 아니라 전광판 그림에서 나온다.** 0x77494 를 읽어 확인했다:
+    #   775a2  [sp+0x14] = 구장객체+0x8a (전광판 번호 w)
+    #   775d0~775f8  w ≤ 3 → [obj+0x40](fence_board) 프레임[w] · w > 3 → hidden_board_{w−4} 프레임[0]
+    #                 → 이 그림이 r7 이 되고, 아래 세 군데가 모두 r7 의 상자를 읽는다
+    #   77654  `cmp w,#3 ; bne` → **w == 3 일 때만** 상자 0·1 을 팀 아이콘 자리로 쓴다 (77670·776c8)
+    #   7773e·77744  w == 0 또는 w == 5 면 전광판 화면을 아예 안 그린다
+    #   7775a  상자 0 = 전광판 화면 자리 · 7776a  w == 3 이면 상자 2 로 덮어쓴다
+    # 상자 개수가 이 분기와 딱 맞는다: w 0 (fence_board 프레임 0) 과 w 5 (hidden_board_1) 만 0개다.
+    #
+    # `hidden_fence_0~2` 에도 상자가 있으나(1×1 짜리 4·4·2개) 0x77494 는 관중석 그림의 상자를
+    # 읽지 않는다 — 어디서 쓰는지 못 찾았다. `fence_season.pzf` 는 상자가 하나도 없다.
+    # 그래서 둘 다 내보내지 않는다 (해독 노트 J-modes-rules.md 1-3 · R6-sprite-leftovers.md 1절).
+    STADIUM_BOARD_COUNT = 7      # StrITEM 133~139 전광판 7종 (소형~초대형 4 + 히든 3)
+    HIDDEN_BOARD_FROM = 4        # 이 번호부터 hidden_board_(w−4)
+    board_frames = frame_boxes(Path('base/work/jar/stadium/fence_board.pzx'))
+    board_boxes = [board_frames.get(f'{w:03d}', []) for w in range(HIDDEN_BOARD_FROM)]
+    for n in range(STADIUM_BOARD_COUNT - HIDDEN_BOARD_FROM):
+        board_boxes.append(frame_boxes(Path(f'base/work/jar/stadium/hidden_board_{n}.pzx')).get('000', []))
+
     sky_rows = [rows[r * SKY_COLUMN_COUNT:(r + 1) * SKY_COLUMN_COUNT] for r in range(SKY_ROW_COUNT)]
     sky_colors = [colors[i * 6:i * 6 + 6] for i in range(SKY_COLOR_COUNT)]
     body = [
@@ -1715,6 +1736,16 @@ def generate_stadium_scene() -> None:
         '',
         '/** 구장 펜스 프레임별 박스 [x, y, 폭, 높이] — 0·1 팀 아이콘, 2 전광판 (fence.pzf) */',
         f'export const FENCE_BOXES: readonly (readonly (readonly number[])[])[] = {boxes}',
+        '',
+        '/**',
+        ' * 전광판 번호(구장객체 +0x8a, 0~6)별 자리 박스 [x, y, 폭, 높이] — 시즌·대전 구장(0x77494).',
+        ' *',
+        ' * 0~3 = `fence_board.pzx` 프레임 0~3(소형·중형·대형·초대형), 4~6 = `hidden_board_0~2` 프레임 0.',
+        ' * 번호 3 일 때만 박스가 세 개다: **0·1 = 팀 아이콘, 2 = 전광판 화면**. 그 밖에는 박스 0 이',
+        ' * 전광판 화면이고 팀 아이콘은 그리지 않는다 (0x77654 `cmp #3`). 번호 0·5 는 박스가 없고',
+        ' * 원본도 전광판 화면을 건너뛴다 (0x7773e·0x77744).',
+        ' */',
+        f'export const BOARD_BOXES: readonly (readonly (readonly number[])[])[] = {board_boxes}',
     ]
     write('stadiumScene.ts', '\n'.join(body) + '\n')
 
