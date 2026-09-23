@@ -368,3 +368,61 @@ describe('휴식 (상태 105 칸 2 → 팝업 0x2a → 127)', () => {
     expect(screen.getByText('트레이닝·휴식·외출은 한 번에 한 가지만 할 수 있습니다')).toBeTruthy()
   })
 })
+
+describe('칭호 목록 창 (기본정보 119 → 129)', () => {
+  const 칭호투수 = () => 투수({ titleIds: ['이름 없는 신인', '닥터 K'], equippedTitle: 50 })
+
+  /**
+   * ⚠️ 원작 **설명서** StrHOWTO[15] 는 "(#) 키" 라 적었지만 119 의 키 처리 0x1056c 가 보는 값은
+   * **'*'(0x2a)** 다 (R9 301~303). 설명서와 코드가 어긋나는 자리라 코드 쪽을 그대로 옮긴다.
+   */
+  it("기본정보에서 '*' 를 누르면 얻은 칭호가 번호 오름차순으로 뜬다", () => {
+    화면({ career: 칭호투수() })
+    누르기('선수정보')
+    누르기('기본정보')
+
+    expect(screen.queryByRole('dialog', { name: '칭호' })).toBeNull()
+    fireEvent.keyDown(window, { key: '*' })
+
+    const 창 = screen.getByRole('dialog', { name: '칭호' })
+    expect([...창.querySelectorAll('button')].map((칸) => 칸.textContent)).toEqual([
+      '이름 없는 신인',
+      '닥터 K',
+    ])
+  })
+
+  it("'*' 를 다시 누르면 119 로 돌아간다 (0x11f9a)", () => {
+    화면({ career: 칭호투수() })
+    누르기('선수정보')
+    누르기('기본정보')
+
+    fireEvent.keyDown(window, { key: '*' })
+    fireEvent.keyDown(window, { key: '*' })
+
+    expect(screen.queryByRole('dialog', { name: '칭호' })).toBeNull()
+    // 기본정보 카드는 그대로 남는다
+    expect(screen.getByText('기본정보')).toBeTruthy()
+  })
+
+  it('고르면 선수 +0x1c4 가 바뀌어 저장된다 — 팝업은 이름 + StrMODE[138] 이다', () => {
+    const onSave = vi.fn()
+    화면({ career: 칭호투수(), onSave })
+    누르기('선수정보')
+    누르기('기본정보')
+    fireEvent.keyDown(window, { key: '*' })
+
+    fireEvent.click(screen.getByRole('button', { name: '이름 없는 신인' }))
+
+    expect(onSave).toHaveBeenCalledOnce()
+    expect(onSave.mock.calls[0][0].equippedTitle).toBe(0)
+    expect(screen.getByText(/닉네임이 적용되었습니다/)).toBeTruthy()
+  })
+
+  it('장착 없음(−1)이면 기본정보 카드에 칭호 줄이 없다 (0x7d5cc)', () => {
+    화면({ career: 투수({ titleIds: ['이름 없는 신인'] }) })
+    누르기('선수정보')
+    누르기('기본정보')
+
+    expect(screen.queryByText('칭호')).toBeNull()
+  })
+})

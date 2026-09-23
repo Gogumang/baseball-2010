@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { BALANCE } from '@/shared/config/original/balance'
 import type { MenuItem } from '@/shared/ui'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -24,6 +24,7 @@ import {
   selectPitchType,
 } from '@/entities/pitcher-career/model/pitchSelection'
 import { magicPitchNameOf } from '@/entities/pitcher-career/model/magicPitch'
+import { equipPitcherTitle } from '@/entities/pitcher-career/model/pitcherTitles'
 import { pitchTypeNameOf } from '@/entities/pitcher-career/model/pitchTraining'
 import {
   PITCHER_COMMAND_SLOTS,
@@ -98,6 +99,11 @@ export interface PitcherManagementMenu {
   readonly selectMagicCell: (cellIndex: number) => void
   /** 123 창 탭 2 — 구질 고르기 */
   readonly selectPitchCell: (typeNumber: number) => void
+  /** 기본정보(119) 위에 띄운 칭호 목록 창 — 원본 하위 상태 **129** (P3 10-1) */
+  readonly isTitleWindowOpen: boolean
+  readonly closeTitleWindow: () => void
+  /** 129 확인 — 선수 +0x1c4 에 고른 번호를 넣고 저장한다 (0x11f78) */
+  readonly equipTitle: (title: string) => void
   readonly items: readonly MenuItem[]
   readonly notice: string
   readonly question: PitcherMenuQuestion | null
@@ -120,6 +126,8 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
   const { career, random, onSave, onNextGame, onOuting, onOpenShop, onExit } = input
   const [kind, setKind] = useState<PitcherMenuKind>('관리')
   const [subWindow, setSubWindow] = useState<PitcherMenuWindow>(null)
+  /** 119 위에 뜨는 칭호 목록 창(129). 창을 여닫는 키는 `'*'` 다 — 아래 키 처리 주석 참고 */
+  const [isTitleWindowOpen, setIsTitleWindowOpen] = useState(false)
   const [pitchWindowTab, setPitchWindowTab] = useState<number>(PITCH_WINDOW_TABS.마구)
   /** 기록실 창의 갈래 (장면 +0x164 — 팝업 0x80 이 정한다) */
   const [recordWindowTab, setRecordWindowTab] = useState<number>(RECORD_WINDOW_TABS.엔트리)
@@ -294,14 +302,43 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     // 108(구질 훈련) 취소는 107 로, 나머지 창은 106 으로 돌아간다
     setKind(subWindow === '구질훈련' ? '트레이닝' : '선수정보')
     setSubWindow(null)
+    setIsTitleWindowOpen(false)
   }, [subWindow])
 
   const back = useCallback(() => {
     setNotice('')
+    // 129 취소도 **119** 로 돌아간다 (0x11f9a) — 기본정보 카드는 그대로 남는다
+    if (isTitleWindowOpen) return setIsTitleWindowOpen(false)
     if (subWindow !== null) return closeWindow()
     if (kind !== '관리') return setKind('관리')
     return onExit()
-  }, [closeWindow, kind, onExit, subWindow])
+  }, [closeWindow, isTitleWindowOpen, kind, onExit, subWindow])
+
+  /*
+   * 기본정보(119) 에서 칭호 목록(129) 을 여는 키.
+   *
+   * ⚠️ 원작 **설명서** StrHOWTO[15] 는 "(#) 키" 라고 적었지만, 119 의 키 처리 `0x1056c` 가 실제로
+   * 보는 값은 **'*'(0x2a)** 다 (R9-myleague-states 301~303: `취소(−16) → 106, '*'(0x2a) → 129,
+   * '0'(0x30) → 120`). 설명서와 코드가 어긋나는 자리라 **코드 쪽을 그대로 옮긴다** — 타자편
+   * `useManagementMenu` 와 같은 처리다. 129 에서 '*' 는 다시 119 로 돌아가는 키다 (0x11f9a).
+   */
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== '*') return
+      // 팝업이 떠 있으면 그쪽이 먼저 키를 가져간다 (원본도 창 위 팝업이 키를 잡는다)
+      if (question !== null || choice !== null || notice !== '') return
+      if (isTitleWindowOpen) return setIsTitleWindowOpen(false)
+      if (subWindow === '기본정보') setIsTitleWindowOpen(true)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [choice, isTitleWindowOpen, notice, question, subWindow])
+
+  /** 129 확인 — `선수+0x1c4 = sel` 뒤 곧바로 저장한다 (0x11f78 의 확인 갈래) */
+  const equipTitle = useCallback(
+    (title: string) => onSave(equipPitcherTitle(career, title)),
+    [career, onSave],
+  )
 
   const answerQuestion = useCallback(
     (isYes: boolean) => {
@@ -384,6 +421,9 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     recordWindowTab,
     selectMagicCell,
     selectPitchCell,
+    isTitleWindowOpen,
+    closeTitleWindow: () => setIsTitleWindowOpen(false),
+    equipTitle,
     items,
     notice,
     question,

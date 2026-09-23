@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import {
   applyPitcherGameResult,
@@ -21,6 +21,10 @@ import {
   pitcherYearEndStepOf,
   recordPitcherSeasonMvp,
 } from '@/entities/pitcher-career/model/pitcherSeasonFlow'
+import {
+  awardPitcherTitles,
+  evaluateNewPitcherTitles,
+} from '@/entities/pitcher-career/model/pitcherTitles'
 import type { PitcherRookieProfile } from '@/entities/pitcher-career/model/pitcherRegistration'
 import {
   pitcherGameOptionsOf,
@@ -116,6 +120,21 @@ export function usePitcherLeagueSession(
     },
     [store],
   )
+
+  /**
+   * 칭호 판정 — 원본은 **관리 화면(105)에 들어올 때마다** 0x1a1c0 이 번호 순서로 검사한다 (P3 4절).
+   * 맞는 것을 주면서 곧바로 장착까지 한다 (0x1b214 `선수+0x1c4 = i`).
+   *
+   * ⚠️ 원본은 **처음 맞는 하나만** 팝업으로 주고 확인하면 다음 프레임에 다시 판정하는데,
+   * 웹은 타자편(`useCareerSession`)과 마찬가지로 팝업 없이 **한꺼번에** 붙인다 (P3 9절 "부여 방식 차이").
+   * 번호 오름차순으로 이어 주므로 마지막에 남는 장착값은 원본과 같다.
+   */
+  useEffect(() => {
+    if (career === null || scene !== '관리') return
+    const earned = evaluateNewPitcherTitles(career)
+    if (earned.length === 0) return
+    commit(awardPitcherTitles(career, earned))
+  }, [career, commit, scene])
 
   const create = useCallback(
     (name: string, profile: PitcherRookieProfile) => {

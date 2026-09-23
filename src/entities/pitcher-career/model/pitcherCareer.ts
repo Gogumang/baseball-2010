@@ -8,6 +8,7 @@ import { EMPTY_LEAGUE_PLAYER_STATS } from '@/entities/league/model/leaguePlayerS
 import type { LeaguePlayerStats } from '@/entities/league/model/leaguePlayerStats'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { equipmentBonusOf } from '@/entities/career/model/equipment'
+import { NO_EQUIPPED_TITLE } from '@/entities/career/model/titles'
 import {
   MAXIMUM_PITCHER_ABILITY,
   PITCHER_ABILITY_ORDER,
@@ -178,6 +179,12 @@ export interface PitcherCareer {
   readonly skillIds: readonly number[]
   readonly removedMinusSkillIds: readonly number[]
   readonly titleIds: readonly string[]
+  /**
+   * 지금 장착한 칭호 번호 — 원본 선수 레코드 **+0x1c4** (타자편 `PlayerCareer.equippedTitle` 과 같은 칸).
+   * 새 선수는 **−1**(없음)이고, 칭호를 얻으면 그 자리에서 곧바로 여기에 번호가 들어간다 (0x1b214).
+   * 투수편 번호는 48~63 이라 이름표 `TITLE_NAMES[번호]` 가 그대로 투수 이름이다 (P3 8절).
+   */
+  readonly equippedTitle: number
   readonly subItemIds: readonly number[]
   /** 장착 레벨 니블 (0 = 미장착, 1~11 = 레벨+1) — 능력치 이름으로 부위를 가리킨다 */
   readonly equipmentLevels: PitcherAbility
@@ -254,6 +261,8 @@ export function createPitcherCareer(
     skillIds: STARTING_SKILL_IDS,
     removedMinusSkillIds: [],
     titleIds: [],
+    // 선수 +0x1c4 는 만들 때 −1 이다 — 기본정보 카드가 그 값이면 칭호 줄을 안 그린다 (0x11292)
+    equippedTitle: NO_EQUIPPED_TITLE,
     subItemIds: [],
     equipmentLevels: { control: 0, velocity: 0, breaking: 0, stamina: 0 },
     ownedEquipment: [],

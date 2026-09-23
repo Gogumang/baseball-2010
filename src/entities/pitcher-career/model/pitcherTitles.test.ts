@@ -4,11 +4,12 @@ import type { PitcherCareer, PitcherSeasonStats } from '@/entities/pitcher-caree
 import {
   awardPitcherTitles,
   evaluateNewPitcherTitles,
+  equipPitcherTitle,
   nextPitcherTitleOf,
   savePointsOf,
 } from '@/entities/pitcher-career/model/pitcherTitles'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
-import { TITLE_NAMES } from '@/entities/career/model/titles'
+import { NO_EQUIPPED_TITLE, TITLE_NAMES } from '@/entities/career/model/titles'
 
 function 투수(
   overrides: Partial<PitcherCareer> = {},
@@ -126,5 +127,32 @@ describe('투수편 칭호 — 이름은 48~63, 비트는 타자편 32~47 과 �
     expect(evaluateNewPitcherTitles(받은뒤)).toEqual([])
     expect(nextPitcherTitleOf(받은뒤)).toBeNull()
     expect(awardPitcherTitles(받은뒤, [])).toBe(받은뒤)
+  })
+})
+
+describe('장착 칭호 — 선수 +0x1c4 (P3 10-1)', () => {
+  it('새 투수는 장착한 것이 없다 (−1)', () => {
+    expect(투수().equippedTitle).toBe(NO_EQUIPPED_TITLE)
+  })
+
+  it('얻으면 곧바로 장착한다 (0x1b214) — 여럿이면 **번호가 가장 큰 것**이 남는다', () => {
+    const 신인 = 투수()
+
+    const 받은뒤 = awardPitcherTitles(신인, ['이름 없는 신인'])
+    expect(받은뒤.equippedTitle).toBe(0)
+
+    // 타자편 `awardTitles` 와 같은 규칙 — 번호 오름차순으로 이어 주면 마지막이 가장 큰 번호다
+    const 에이스 = awardPitcherTitles(받은뒤, ['떠오르는 에이스', '초강력 탈삼진머신'])
+    expect(TITLE_NAMES[에이스.equippedTitle]).toBe('떠오르는 에이스')
+  })
+
+  it('129 확인 — 고른 번호를 +0x1c4 에 넣고, 이미 장착한 것이면 아무 일도 없다', () => {
+    const 신인 = awardPitcherTitles(투수(), ['이름 없는 신인', '닥터 K'])
+
+    const 바꾼뒤 = equipPitcherTitle(신인, '이름 없는 신인')
+    expect(TITLE_NAMES[바꾼뒤.equippedTitle]).toBe('이름 없는 신인')
+    expect(equipPitcherTitle(바꾼뒤, '이름 없는 신인')).toBe(바꾼뒤)
+    // 표에 없는 이름은 무시한다
+    expect(equipPitcherTitle(바꾼뒤, '없는칭호')).toBe(바꾼뒤)
   })
 })

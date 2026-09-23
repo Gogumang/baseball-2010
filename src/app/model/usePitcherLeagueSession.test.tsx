@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { usePitcherLeagueSession } from '@/app/model/usePitcherLeagueSession'
+import { NO_EQUIPPED_TITLE } from '@/entities/career/model/titles'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
@@ -241,6 +242,17 @@ describe('옛 저장 불러오기', () => {
     // 새 칸이 undefined 로 남지 않는다
     expect(result.current.career?.selectedMagicNumber).toBe(0)
     expect(result.current.career?.season).toBeGreaterThan(0)
+  })
+
+  it('칭호 칸(+0x1c4)이 없는 옛 저장도 −1 로 메워 장착 없음으로 시작한다', () => {
+    const store = 메모리저장()
+    // 칭호를 이미 몇 개 얻은 옛 저장 — 그때는 `equippedTitle` 칸 자체가 없었다
+    store.save({ name: '옛투수', titleIds: ['이름 없는 신인', '닥터 K'] } as object)
+
+    const { result } = 띄우기(store)
+
+    expect(result.current.career?.titleIds).toEqual(['이름 없는 신인', '닥터 K'])
+    expect(result.current.career?.equippedTitle).toBe(NO_EQUIPPED_TITLE)
   })
 
   it('이름이 없는 값은 커리어로 보지 않는다', () => {

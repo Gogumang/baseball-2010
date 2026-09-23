@@ -1,5 +1,8 @@
 import { MenuList, MessageBox, Panel, PixelScreen } from '@/shared/ui'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
+import type { PlayerCareer } from '@/entities/career/model/playerCareer'
+import { createCareer } from '@/entities/career/model/playerCareer'
+import { TitleListWindow } from '@/widgets/management/ui/TitleListWindow'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { usePitcherManagementMenu } from '@/pages/pitcher-league/model/usePitcherManagementMenu'
 import { PitcherStatusBoard } from '@/pages/pitcher-league/ui/PitcherStatusBoard'
@@ -39,6 +42,17 @@ export interface PitcherManagementScreenProps {
   readonly onExit: () => void
 }
 
+/**
+ * 칭호 목록 창은 **타자편 위젯을 그대로 쓴다** — 원본도 창 하나를 두 편이 같이 쓰고,
+ * 투수 이름(48~63)은 이미 `TITLE_NAMES` 안에 들어 있어 번호 기반 구조가 그대로 맞는다.
+ *
+ * ⚠️ 다만 그 위젯의 프로프 타입이 **타자 커리어**라, 창이 실제로 보는 두 칸(`titleIds`·`equippedTitle`)
+ * 만 빈 타자 커리어 위에 얹어 넘긴다. 위젯(`src/widgets/**`)은 손대지 않는다.
+ */
+function titleViewOf(career: PitcherCareer): PlayerCareer {
+  return { ...createCareer(career.name), titleIds: career.titleIds, equippedTitle: career.equippedTitle }
+}
+
 export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
   const { career } = props
   const menu = usePitcherManagementMenu(props)
@@ -65,6 +79,17 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
       {/* 하위 메뉴(106·107)가 열려도 화면은 그대로고 아래 줄만 바뀐다 (0x7e84c) */}
       {menu.subWindow === null && <PitcherStatusBoard career={career} />}
       {menu.subWindow === '기본정보' && <PitcherBasicInfoPanel career={career} />}
+      {/*
+        칭호 목록 창 — 원본 하위 상태 **129** (P3 10-1). 기본정보(119) 위에 겹쳐 뜨고
+        '*' 키로 여닫는다 (`usePitcherManagementMenu` 의 키 처리 주석 참고).
+      */}
+      {menu.subWindow === '기본정보' && menu.isTitleWindowOpen && (
+        <TitleListWindow
+          career={titleViewOf(career)}
+          onEquip={menu.equipTitle}
+          onClose={menu.closeTitleWindow}
+        />
+      )}
       {menu.subWindow === '구질목록' && (
         <PitcherRepertoirePanel
           career={career}

@@ -14,6 +14,7 @@ import {
   matchesMonsterTitle,
   matchesNationalTitle,
   PITCHER_TITLE_OFFSET,
+  titleNumberOf,
   unownedTitleNamesOf,
 } from '@/entities/career/model/titles'
 
@@ -124,9 +125,27 @@ export function nextPitcherTitleOf(career: PitcherCareer): string | null {
   return evaluateNewPitcherTitles(career)[0] ?? null
 }
 
+/**
+ * 칭호를 준다. 원본은 팝업 확인 때 비트를 켜고 **곧바로 장착**한다 (0x1b214 `선수+0x1c4 = i`).
+ * 타자편 `awardTitles` 와 **같은 규칙**이다 — 웹은 여러 개를 한꺼번에 붙이는데, 원본도 번호
+ * 오름차순으로 하나씩 이어 주므로 마지막에 남는 장착값은 **번호가 가장 큰 것**으로 같다.
+ */
 export function awardPitcherTitles(career: PitcherCareer, titles: readonly string[]): PitcherCareer {
   if (titles.length === 0) return career
-  return { ...career, titleIds: [...career.titleIds, ...titles] }
+  const given = [...titles].map(titleNumberOf).filter((index) => index >= 0)
+  const equipped = given.length === 0 ? career.equippedTitle : Math.max(...given)
+  return { ...career, titleIds: [...career.titleIds, ...titles], equippedTitle: equipped }
+}
+
+/**
+ * 칭호 목록(상태 129)에서 하나를 고른다 — 키 0x11f78 의 확인 갈래:
+ * `if 선수+0x1c4 != sel: 선수+0x1c4 = sel` 뒤 팝업 → 저장. 이미 장착한 것이면 **아무 일도 없다**.
+ * 타자편 `equipTitle` 과 같은 식이고, 투수 이름(48~63)도 번호가 그대로 매겨져 그 식을 같이 쓴다.
+ */
+export function equipPitcherTitle(career: PitcherCareer, title: string): PitcherCareer {
+  const index = titleNumberOf(title)
+  if (index < 0 || index === career.equippedTitle) return career
+  return { ...career, equippedTitle: index }
 }
 
 /** 투수편 전용 번호인가 (48~63). 기록연감이 편별로 따로 세는 칸이다 (P3 10-2) */
