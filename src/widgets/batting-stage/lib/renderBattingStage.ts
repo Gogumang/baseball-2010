@@ -11,7 +11,7 @@ import type { ParticleScene } from '@/entities/particle/model/particleScene'
 import { drawHud } from '@/widgets/batting-stage/lib/renderHud'
 import { drawFieldMap } from '@/widgets/batting-stage/lib/renderFieldMap'
 import { drawHomeRunBanner } from '@/widgets/batting-stage/lib/renderHomeRunBanner'
-import { batterLayerPaletteIndex, batterLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
+import { batterLayersOf, layerPaletteIndexOf } from '@/widgets/batting-stage/lib/batterLayers'
 import type { BatterEquipment } from '@/widgets/batting-stage/lib/batterLayers'
 
 import type { HudState } from '@/widgets/batting-stage/lib/renderHud'
@@ -164,8 +164,9 @@ function drawPitcher(
  * 그림은 **좌타 자세로 그려져 있어** 우타(+0x3c == 0)면 효과 0x11 로 좌우를 뒤집는다 (R6 4절).
  * 앵커는 표 0xcfb2c 의 side 칸이고, 뒤집을 때는 그 앵커를 축으로 거울을 놓는다.
  *
- * 레이어마다 대체 팔레트 벌(`batterLayerPaletteIndex`)을 붙여 그린다 — 원본도 몸통·헬멧만
- * .mpl 을 갈아 끼우고 그림자·배트·다리는 구운 색 그대로다 (0x78be8·0x78c14).
+ * 레이어마다 대체 팔레트 벌(`layerPaletteIndexOf`)을 붙여 그린다 — 몸통·헬멧은 피부×15+팀
+ * (0x78be8·0x78c14), 장비 손·다리는 **등급 줄**(0x790f6·0x79252·0x7927e)이다.
+ * 그림자·기본 배트는 .mpl 이 없어 원본도 구운 색 그대로다.
  */
 function drawBatter(
   context: CanvasRenderingContext2D,
@@ -186,10 +187,8 @@ function drawBatter(
     context.translate(axisX * 2, 0)
     context.scale(-1, 1)
   }
-  // 장비 레이어의 등급 색(`gradePaletteRow`)은 아직 못 칠한다 — item_* 폴더에 팔레트 번호
-  // 지도(frames/index)가 없어서다 (BatterLayer 주석). 지금은 그림 기본색으로 나간다.
   for (const layer of batterLayersOf(swingFrame, bodyType, equipment)) {
-    const frame = placedFrame(layer.folder, layer.frame, batterLayerPaletteIndex(layer.folder, skinIndex, teamIndex))
+    const frame = placedFrame(layer.folder, layer.frame, layerPaletteIndexOf(layer, skinIndex, teamIndex))
     if (frame === null) continue
     context.drawImage(frame.image, axisX + frame.offsetX, anchor.y + frame.offsetY)
   }

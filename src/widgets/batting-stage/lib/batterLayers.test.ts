@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { batterEquipmentOf, batterFrameAt, batterLayersOf, bodyTypeOf, equipmentGradeOf } from '@/widgets/batting-stage/lib/batterLayers'
+import { batterEquipmentOf, batterFrameAt, batterLayersOf, bodyTypeOf, equipmentGradeOf, layerPaletteIndexOf } from '@/widgets/batting-stage/lib/batterLayers'
 
 const 파일 = (layers: ReturnType<typeof batterLayersOf>) => layers.map((layer) => `${layer.folder.split('/')[2]}:${layer.frame}`)
 
@@ -95,6 +95,47 @@ describe('장비 외형 레이어 — 0x78fd8 적재 · 0x78cfc 슬롯', () => {
     expect(줄(batterLayersOf(4, 0, { head: -1, hand: -1, leg: 6 }), 'item_bat_leg_0')).toBe(5)
     expect(줄(batterLayersOf(4, 0, { head: -1, hand: -1, leg: 7 }), 'item_bat_leg_7')).toBeUndefined()
     expect(줄(batterLayersOf(4, 0, { head: -1, hand: -1, leg: 10 }), 'item_bat_leg_7')).toBe(2)
+  })
+})
+
+describe('레이어 한 겹이 칠할 팔레트 번호 — layerPaletteIndexOf', () => {
+  const 겹 = (layers: ReturnType<typeof batterLayersOf>, folder: string) =>
+    layers.find((layer) => layer.folder.includes(folder))!
+
+  it('장비 손·다리는 등급 줄을 그대로 쓴다 (팀·피부와 무관)', () => {
+    const 손4 = 겹(batterLayersOf(4, 0, { head: -1, hand: 4, leg: -1 }), 'item_bat_hand/')
+    expect(layerPaletteIndexOf(손4, 2, 7)).toBe(2)
+    const 다리6 = 겹(batterLayersOf(4, 0, { head: -1, hand: -1, leg: 6 }), 'item_bat_leg_0')
+    expect(layerPaletteIndexOf(다리6, 0, 0)).toBe(5)
+    const 다리10 = 겹(batterLayersOf(4, 0, { head: -1, hand: -1, leg: 10 }), 'item_bat_leg_7')
+    expect(layerPaletteIndexOf(다리10, 1, 14)).toBe(2)
+  })
+
+  it('⚠️ 등급 줄 0 은 진짜 0번 벌이다 — null 로 새면 안 된다 (baked 가 null 이라 줄 0 도 갈아 끼운다)', () => {
+    const 손2 = 겹(batterLayersOf(4, 0, { head: -1, hand: 2, leg: -1 }), 'item_bat_hand/')
+    expect(손2.gradePaletteRow).toBe(0)
+    expect(layerPaletteIndexOf(손2, 2, 7)).toBe(0)
+    const 다리1 = 겹(batterLayersOf(4, 0, { head: -1, hand: -1, leg: 1 }), 'item_bat_leg_0')
+    expect(layerPaletteIndexOf(다리1, 2, 7)).toBe(0)
+    const 다리8 = 겹(batterLayersOf(4, 0, { head: -1, hand: -1, leg: 8 }), 'item_bat_leg_7')
+    expect(layerPaletteIndexOf(다리8, 2, 7)).toBe(0)
+  })
+
+  it('줄이 없는 등급(손 0·1 · 다리 0·7)과 그림자·기본 배트는 구운 색 그대로다', () => {
+    const 손1 = 겹(batterLayersOf(4, 0, { head: -1, hand: 1, leg: -1 }), 'item_bat_hand/')
+    expect(layerPaletteIndexOf(손1, 2, 7)).toBeNull()
+    const 다리0 = 겹(batterLayersOf(4, 0, { head: -1, hand: -1, leg: 0 }), 'item_bat_leg_0')
+    expect(layerPaletteIndexOf(다리0, 2, 7)).toBeNull()
+    const 다리7 = 겹(batterLayersOf(4, 0, { head: -1, hand: -1, leg: 7 }), 'item_bat_leg_7')
+    expect(layerPaletteIndexOf(다리7, 2, 7)).toBeNull()
+    expect(layerPaletteIndexOf(겹(batterLayersOf(4, 0), 'batter_shadow'), 2, 7)).toBeNull()
+    expect(layerPaletteIndexOf(겹(batterLayersOf(4, 0), 'batter_batter'), 2, 7)).toBeNull()
+  })
+
+  it('몸통은 피부×15+팀, 헬멧은 팀 — 장비 줄이 이 길을 가로채지 않는다', () => {
+    const layers = batterLayersOf(4, 0, { head: -1, hand: 4, leg: 6 })
+    expect(layerPaletteIndexOf(겹(layers, 'batter_balancer'), 2, 7)).toBe(37)
+    expect(layerPaletteIndexOf(겹(layers, 'batter_helmet'), 2, 7)).toBe(7)
   })
 })
 

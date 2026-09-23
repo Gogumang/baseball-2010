@@ -19,10 +19,12 @@ export interface BatterLayer {
   readonly folder: string
   readonly frame: number
   /**
-   * 등급 색 `.mpl` 줄 (손·다리 장비만). ⚠️ **아직 칠하지 못한다** — `public/sprites/item_*` 에는
-   * `palette.json` 은 있어도 픽셀별 팔레트 번호 지도(`frames/index/NNN.png`)가 없어서
-   * `placedFrame` 이 갈아 끼울 수가 없다 (지도를 내는 것은 `tools/apply_mpl.py` 몫).
-   * 규칙만 여기 적어 둔다 — 지도가 생기면 `drawBatter` 에서 이 값을 넘기면 된다.
+   * 등급 색 `.mpl` 줄 (손·다리 장비만). `drawBatter` 가 이 값을 그대로 `placedFrame` 의
+   * 팔레트 번호로 넘겨 칠한다 — 번호 지도는 `public/sprites/item_…` 폴더의 `frames/index/NNN.png`.
+   *
+   * ⚠️ 장비 폴더는 `palette.json` 의 `baked` 가 **null** 이다 (벌 0 이 아니다). 줄 −1 = "그림
+   * 기본색" 이라 구운 PNG 가 `.mpl` 벌 목록 밖에 있어서다 — 그래서 줄 0 도 갈아 끼워야 한다.
+   * 줄이 없는 등급(기본색)은 이 값을 **아예 안 붙인다**.
    */
   readonly gradePaletteRow?: number
 }
@@ -126,7 +128,8 @@ export function bodyTypeOf(form: number): number {
  * 레이어 한 겹이 쓸 대체 팔레트(.mpl) 번호 — 없으면 null (C-1 확정).
  *   몸통 `bat/batter_balancer`·`batter_sluger` → **피부 × 15 + 팀** (0x78be8)
  *   헬멧 `bat/batter_helmet`                  → **팀** (0x78c14 — 헬멧엔 피부가 없다)
- * 그림자·배트·다리·잔상은 .mpl 이 아예 없어 원본도 구운 색 그대로 그린다.
+ * 그림자·기본 배트·잔상은 .mpl 이 아예 없어 원본도 구운 색 그대로 그린다
+ * (장비 손·다리는 .mpl 이 있지만 팀이 아니라 **등급**으로 갈려서 `gradePaletteRow` 쪽이다).
  *
  * 순수 함수라 캔버스가 없는 곳(테스트)에서도 쓸 수 있다. 실제로 칠하는 것은 두 갈래다 —
  * <img> 는 `shared/lib/sprite/paletteSwap.ts` 의 `useRecoloredSprite`(등록·수비·초상화),
@@ -136,6 +139,17 @@ export function batterLayerPaletteIndex(folder: string, skinIndex: number, teamI
   if (folder === BODY_FOLDERS[0] || folder === BODY_FOLDERS[1]) return outfitPaletteIndex(skinIndex, teamIndex)
   if (folder === HELMET) return teamIndex
   return null
+}
+
+/**
+ * 레이어 한 겹을 칠할 팔레트 번호 — 장비(손·다리)는 **등급 줄**, 몸통·헬멧은 피부×15+팀.
+ * 한 레이어가 둘을 같이 쓰는 일은 없다 (장비 폴더는 `batterLayerPaletteIndex` 가 null 을 준다).
+ *
+ * ⚠️ `??` 여야 한다 — 등급 줄 **0 은 진짜 0번 벌**이라 `||` 로 쓰면 기본색으로 새어 나간다.
+ * 장비 폴더는 `palette.json` 의 `baked` 가 null(= 구운 그림이 벌 목록 밖)이라 줄 0 도 갈아 끼운다.
+ */
+export function layerPaletteIndexOf(layer: BatterLayer, skinIndex: number, teamIndex: number): number | null {
+  return layer.gradePaletteRow ?? batterLayerPaletteIndex(layer.folder, skinIndex, teamIndex)
 }
 
 interface PoseTable {
