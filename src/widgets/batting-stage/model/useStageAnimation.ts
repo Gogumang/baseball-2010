@@ -11,6 +11,8 @@ import { renderBattingStage } from '@/widgets/batting-stage/lib/renderBattingSta
 import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
 import { batterFrameNow, pitchSituationOf } from '@/widgets/batting-stage/lib/stageText'
 import { ballFrameAt, pitchTickAt } from '@/widgets/batting-stage/model/stageRefs'
+import { clearParticles, tickParticles } from '@/entities/particle/model/particleScene'
+import { preloadPtcParts } from '@/widgets/particles/lib/renderParticles'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import type { StageRefs } from '@/widgets/batting-stage/model/stageRefs'
 
@@ -38,6 +40,7 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
     shiftRef,
     buntRef,
     pendingHitRef,
+    particlesRef,
     latestRef,
   } = refs
 
@@ -48,6 +51,8 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
 
     let animationHandle = 0
     const openedAt = performance.now()
+    // 파티클 파트 그림은 연출이 뜨기 전에 받아 둬야 첫 연출이 보인다
+    preloadPtcParts()
 
     /**
      * 마구 상태 — 원본이 **팀 +0x28**(남은 횟수)과 **공 +0x10**(이번 공에 실린 번호)을
@@ -127,6 +132,13 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
       }
     }
 
+    /**
+     * 파티클은 **원본 틱**에 맞춰 굴린다 — rAF 가 60fps 라도 갱신은 틱마다 한 번이다.
+     * 탭이 쉬다 돌아오면 밀린 틱이 한꺼번에 쌓이므로 따라잡기는 몇 틱으로 끊는다.
+     */
+    let particleTick = 0
+    const PARTICLE_CATCH_UP_LIMIT = 4
+
     const frame = (now: number) => {
       advancePhase(now)
 
@@ -141,6 +153,14 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
       // 홈런 연출은 결과 문구 시간(1150ms)보다 길다 — 날아 들어오기만 22틱이라 따로 센다
       const homeRunStartedAt = homeRunStartedAtRef.current
       const isHomeRun = homeRunStartedAt >= 0
+
+      const nowTick = pitchTickAt(now, openedAt, tickLength)
+      if (particleTick === 0) particleTick = nowTick
+      const steps = Math.min(PARTICLE_CATCH_UP_LIMIT, nowTick - particleTick)
+      for (let step = 0; step < steps; step += 1) {
+        tickParticles(particlesRef.current, latestRef.current.random)
+      }
+      particleTick = nowTick
 
       renderBattingStage(context, {
         pitch,
@@ -159,7 +179,8 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
         hud: latestRef.current.hud,
         acePitcher: latestRef.current.acePitcher,
         pitcherTick: isPitching ? pitchTickAt(now, phaseStartedAtRef.current, tickLength) : null,
-        tick: pitchTickAt(now, openedAt, tickLength),
+        tick: nowTick,
+        particles: particlesRef.current,
         resultTick: phaseRef.current === '결과' ? pitchTickAt(now, phaseStartedAtRef.current, tickLength) : 0,
         // 구장 번호를 고르는 규칙(st+0x70)이 미확인이라 0 번 구장으로 둔다 (추정)
         scenery: { skyRow, stadium: 0 },
@@ -187,6 +208,8 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
       pendingHitRef.current = null
       resultTextRef.current = ''
       homeRunStartedAtRef.current = -1
+      // 쉬는 동안 밀린 연출은 버린다 (원본도 상태가 바뀔 때 목록을 비운다, 0x6dee4)
+      clearParticles(particlesRef.current)
     }
 
     document.addEventListener('visibilitychange', onVisibilityChange)

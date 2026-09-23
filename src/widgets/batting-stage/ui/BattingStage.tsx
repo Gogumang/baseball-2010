@@ -2,9 +2,20 @@ import { useCallback, useMemo, useRef } from 'react'
 import { resolvePitch } from '@/features/play-at-bat/model/resolvePitch'
 import type { BattingSwing } from '@/features/play-at-bat/model/resolvePitch'
 import { nextBatterShift } from '@/features/play-at-bat/model/batterShift'
-import { createPatternDeck } from '@/entities/batting/model/battedBallOutcome'
+import { createPatternDeck, lastDrawnPattern } from '@/entities/batting/model/battedBallOutcome'
+import { emitParticles } from '@/entities/particle/model/particleScene'
+import { particleConfigOf } from '@/widgets/particles/lib/particleCatalog'
 import { batterEquipmentOf, NO_EQUIPMENT } from '@/widgets/batting-stage/lib/batterLayers'
-import { hitPauseTicksOf, pauseInputOf } from '@/widgets/batting-stage/lib/hitPause'
+import { hitPauseTicksOf, isBigHit, pauseInputOf } from '@/widgets/batting-stage/lib/hitPause'
+import {
+  BIG_HIT_PARTICLE,
+  HIT_PARTICLE_IMAGE,
+  hitParticleIdOf,
+  hitParticleInputOf,
+  specialSwingParticleOf,
+} from '@/widgets/batting-stage/lib/hitParticles'
+import { ballPixelAt } from '@/widgets/batting-stage/lib/trajectory'
+import { batterSideOfForm, stageLayoutOf } from '@/widgets/batting-stage/lib/stageLayout'
 import type { SwingMode } from '@/entities/batting/model/swingResult'
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { Pitch, PitcherAbility } from '@/entities/pitching/model/pitch'
@@ -93,7 +104,7 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
    * 새 투구 준비 `0x34334` 가 0 으로 되돌리므로 **공마다 다시 눌러야 한다** (H2 2-2).
    */
   const specialArmedRef = useRef(false)
-  const { pitchRef, phaseRef, phaseStartedAtRef, resultTextRef, homeRunStartedAtRef, swingStartedAtRef, shiftRef, buntRef, deckRef, pendingHitRef, latestRef } = refs
+  const { pitchRef, phaseRef, phaseStartedAtRef, resultTextRef, homeRunStartedAtRef, swingStartedAtRef, shiftRef, buntRef, deckRef, pendingHitRef, particlesRef, latestRef } = refs
 
   const finishPitch = useCallback((swing: BattingSwing | null, now: number) => {
     const pitch = pitchRef.current
@@ -113,6 +124,22 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
     // 필살 스윙이면 여기서 굴린다 (0x34c74). 걸어 두지 않았으면 굴리지 않는다
     const isUncatchable = specialArmedRef.current
       && rollSpecialSwing(specialSwingLevel, latest.random, isAceBatter)
+    // 필살 연출 파티클은 **성공 여부와 무관**하게 `S+0x10` 이 켜져 있으면 나간다 (0x49aec).
+    // ⚠️ 원본은 상태 0x13 그리기에서 한 번(경기+0x196b) 쏘는데, 웹은 그 자리를 따로 두지 않아
+    //    스윙이 판정되는 이 시점에 쏜다 — **때는 근사**고 고르는 번호만 원본 그대로다.
+    if (specialArmedRef.current && swing !== null) {
+      const special = specialSwingParticleOf(specialSwingLevel, isAceBatter)
+      if (special !== null) {
+        const anchor = stageLayoutOf(batterSideOfForm(latest.batterForm)).batterAnchor
+        emitParticles(
+          particlesRef.current,
+          particleConfigOf(special.id),
+          anchor.x + shiftRef.current,
+          anchor.y + special.offsetY,
+          special.img,
+        )
+      }
+    }
     specialArmedRef.current = false
     deckRef.current = result.deck
     buntRef.current = null
@@ -122,12 +149,25 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
 
     // 맞은 공이면 인플레이(0x17) 앞에 **상태 0x13** 을 한 번 거친다. 헛스윙·볼은 0x12 라 그냥 결과다.
     if (result.detail.resultCode !== null) {
+      const pauseInput = pauseInputOf(result.detail.resultCode, result.deck)
+      const watchesBigHit = isBigHit(pauseInput)
+      // 타격 순간 불꽃 (0x49e64 → 0x4a0ca) — 타격점은 맞은 틱의 공 자리로 본다 (근사)
+      const pattern = lastDrawnPattern(result.deck, result.detail.resultCode)
+      const contact = swing === null ? null : ballPixelAt(pitch, swing.frame)
+      if (pattern !== null && contact !== null) {
+        const particleId = hitParticleIdOf(hitParticleInputOf(pattern, result.detail.resultCode, watchesBigHit))
+        if (particleId !== null) {
+          emitParticles(particlesRef.current, particleConfigOf(particleId), contact.x, contact.y, HIT_PARTICLE_IMAGE)
+        }
+      }
       pendingHitRef.current = {
-        ticks: hitPauseTicksOf(pauseInputOf(result.detail.resultCode, result.deck)),
+        ticks: hitPauseTicksOf(pauseInput),
         detail: result.detail,
         pitch,
         isUncatchable,
         isHomeRun,
+        // 큰 타구 감상이 끝나는 자리에 016 을 쏜다 (0x4cb1c → 0x4cd14)
+        bigHitAt: watchesBigHit ? contact : null,
         resultText,
       }
       phaseRef.current = '타격'
@@ -147,6 +187,16 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
     const pending = pendingHitRef.current
     if (pending === null) return
     pendingHitRef.current = null
+    // 상태 19 카운터가 다 되면 타격점에 016 (id 15, 프레임 10) 을 쏜다 (R2 3-4)
+    if (pending.bigHitAt !== null) {
+      emitParticles(
+        particlesRef.current,
+        particleConfigOf(BIG_HIT_PARTICLE.id),
+        pending.bigHitAt.x,
+        pending.bigHitAt.y,
+        BIG_HIT_PARTICLE.img,
+      )
+    }
     resultTextRef.current = pending.resultText
     homeRunStartedAtRef.current = pending.isHomeRun ? now : -1
     phaseRef.current = '결과'

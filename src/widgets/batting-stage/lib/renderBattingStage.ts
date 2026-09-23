@@ -6,6 +6,8 @@ import { drawScenery } from '@/widgets/batting-stage/lib/renderScenery'
 import type { SceneryState } from '@/widgets/batting-stage/lib/renderScenery'
 import { judgeAnimationOf, judgeFrameAt, PITCHER_OVERLAY_FRAME_OFFSET, pitcherFrameAt, pitcherIdleFrameAt } from '@/widgets/batting-stage/lib/stageScenery'
 
+import { drawParticles } from '@/widgets/particles/lib/renderParticles'
+import type { ParticleScene } from '@/entities/particle/model/particleScene'
 import { drawHud } from '@/widgets/batting-stage/lib/renderHud'
 import { drawFieldMap } from '@/widgets/batting-stage/lib/renderFieldMap'
 import { drawHomeRunBanner } from '@/widgets/batting-stage/lib/renderHomeRunBanner'
@@ -42,6 +44,12 @@ export interface StageScene {
   readonly isHomeRun: boolean
   /** 홈런 연출이 켜진 뒤 흐른 틱 */
   readonly homeRunTick: number
+  /**
+   * 살아 있는 파티클. 없으면 안 그린다.
+   * ⚠️ 그리는 **순서**는 근사다 — 원본 파티클 관리자의 그리기가 타석 화면 묶음(0x50828)의
+   * 어느 자리에서 도는지 못 봤다. 여기서는 선수·공 위, 전광판·판정 글자 아래에 둔다.
+   */
+  readonly particles?: ParticleScene | null
   /** 타자 자세 f (0xb905c) — 레이어마다 가산값을 더해 그린다 */
   readonly swingFrame: number
   /** 타자 몸통 종류 t = 폼 >> 1 (0 balancer · 1 sluger, 0x78ab0) */
@@ -91,6 +99,9 @@ export function renderBattingStage(
   }
   if (scene.pitch !== null && scene.frame >= 0 && scene.frame < scene.pitch.frameCount) {
     drawBall(context, scene.pitch, scene.frame)
+  }
+  if (scene.particles !== null && scene.particles !== undefined) {
+    drawParticles(context, scene.particles)
   }
   if (scene.hud !== null) {
     // 틱을 넘기는 까닭 = 새 램프 확대 연출(0x37828)이 5틱 동안 배율을 줄인다

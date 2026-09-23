@@ -6,6 +6,8 @@ import type { PatternDeck } from '@/entities/batting/model/battedBallOutcome'
 import type { Pitch, PitcherAbility } from '@/entities/pitching/model/pitch'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createParticleScene } from '@/entities/particle/model/particleScene'
+import type { ParticleScene } from '@/entities/particle/model/particleScene'
 import type { BatterEquipment } from '@/widgets/batting-stage/lib/batterLayers'
 import type { StageScene } from '@/widgets/batting-stage/lib/renderBattingStage'
 import { PITCHER_RELEASE_TICKS } from '@/widgets/batting-stage/lib/stageScenery'
@@ -38,6 +40,11 @@ export interface PendingHit {
   readonly pitch: Pitch
   readonly isUncatchable: boolean
   readonly isHomeRun: boolean
+  /**
+   * 큰 타구 감상이 끝나는 자리에 쏠 파티클의 화면 좌표 (0x4cb1c → 0x4cd14 의 `016.ptc`).
+   * 감상 플래그 `+0x199a` 가 꺼진 타구면 null 이라 아무것도 안 쏜다.
+   */
+  readonly bigHitAt: { readonly x: number; readonly y: number } | null
   readonly resultText: string
 }
 
@@ -84,6 +91,8 @@ export interface StageRefs {
   readonly deckRef: MutableRefObject<PatternDeck | null>
   /** 상태 0x13 이 붙잡고 있는 타격 결과. 없으면 이 단계가 아니다 */
   readonly pendingHitRef: MutableRefObject<PendingHit | null>
+  /** 살아 있는 파티클 이미터 목록 (원본 파티클 관리자 [0x1400068]) */
+  readonly particlesRef: MutableRefObject<ParticleScene>
   readonly pointerDownAtRef: MutableRefObject<number>
   readonly latestRef: MutableRefObject<StageLatest>
 }
@@ -109,6 +118,7 @@ export function useStageRefs(latest: StageLatest): StageRefs {
     buntRef: useRef<BuntStance | null>(null),
     deckRef: useRef<PatternDeck | null>(null),
     pendingHitRef: useRef<PendingHit | null>(null),
+    particlesRef: useRef<ParticleScene>(createParticleScene()),
     pointerDownAtRef: useRef(0),
     latestRef,
   }
