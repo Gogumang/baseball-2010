@@ -44,7 +44,8 @@ import { applySeasonReward, GAME_POINT_LIMIT, judgeSeasonEnding } from '@/entiti
 import type { LeagueFirstAward } from '@/entities/season-mode/model/seasonRewards'
 import type { SeasonAwardReward } from '@/widgets/season/lib/seasonAwardEvents'
 import {
-  HELL_TRAINING_GAIN_RANGE, HELL_TRAINING_INDEX, HELL_TRAINING_MORALE_LOSS_RANGE,
+  HELL_TRAINING_GAIN_RANGE, HELL_TRAINING_GAME_POINT, HELL_TRAINING_INDEX,
+  HELL_TRAINING_MORALE_LOSS_RANGE,
   MASSAGER_MORALE_RELIEF, TRAINING_APPLY_LIMIT, TRAINING_GAIN_RANGE,
   TRAINING_MORALE_LOSS_RANGE, TRAINING_SUB_ITEM_GAIN,
 } from '@/widgets/season/lib/seasonTraining'
@@ -53,6 +54,7 @@ import { cureIllnessAtHospital } from '@/entities/season-mode/model/seasonEventF
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { MORALE_LIMIT, POPULARITY_LIMIT, REPUTATION_LIMIT, MONEY_LIMIT, clampTo } from '@/entities/season-mode/model/seasonRecord'
 import { isInfiniteGamePointOn } from '@/shared/lib/dev/devOptions'
+import type { GamePointWalletSession } from '@/entities/wallet/model/useGamePointWallet'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
@@ -85,14 +87,17 @@ export interface SeasonSession {
   readonly gameKind: SeasonGameKind
   /** 전역 저장 +0x145 — 리그 1위 G 를 이미 받은 문턱 비트 */
   readonly leagueFirstAwardedBits: number
-  /** 전역 저장 +0x64 — 시즌 쪽 G포인트 */
+  /**
+   * 전역 기록 +0x64 — G포인트. **모드마다 다른 칸은 없다**(시즌 GP아이템 0x7c8c·0x801a 도
+   * 같은 칸이다) — 그래서 지갑(`entities/wallet`)을 넘겨받으면 그 값이 그대로 여기로 나온다.
+   */
   readonly gamePoints: number
   /**
    * 열린 구장 히든 아이템 id (관중석 13·14·15 · 전광판 16·17·18).
    * 원본 자리는 **전역 저장** `app[0xe0 + 종류×4 + (칸−4)]` 다 (S3 7절) — 시즌 레코드가 아니라
    * 앱 저장에 있어 시즌을 새로 시작해도 남는다. 웹에는 그 전역 저장 객체가 없어
-   * `leagueFirstAwardedBits`(+0x145) · `gamePoints`(+0x64) 와 **같은 자리**(세션 상태)에 둔다.
-   * ⚠️ 그래서 웹에서는 새로 고치면 사라진다 — 위 두 칸과 같은 한계다.
+   * `leagueFirstAwardedBits`(+0x145) 와 **같은 자리**(세션 상태)에 둔다.
+   * ⚠️ 그래서 웹에서는 새로 고치면 사라진다 — G(+0x64)는 지갑으로 옮겨 이 한계를 벗어났다.
    */
   readonly openedStadiumIds: readonly number[]
   /** 진행 중인 국가대항전. 없으면 null (원본 L+0xa8~ 칸) */
@@ -207,7 +212,16 @@ function normalizeSeasonSave(saved: Partial<SeasonSave> | null): SeasonSave | nu
   }
 }
 
-export function useSeasonSession(store: JsonStorePort, random: RandomPort): SeasonSession {
+/**
+ * @param wallet 전역 G 지갑(`useGamePointWallet`). 넘기면 **지갑이 G 의 주인**이고
+ *   시즌은 자기 주머니를 안 쓴다. 안 넘기면 예전처럼 세션 주머니로 논다(테스트용) —
+ *   그 자리는 새로 고치면 사라진다.
+ */
+export function useSeasonSession(
+  store: JsonStorePort,
+  random: RandomPort,
+  wallet: GamePointWalletSession | null = null,
+): SeasonSession {
   const loaded = useRef<SeasonSave | null>(null)
   if (loaded.current === null) loaded.current = normalizeSeasonSave(store.load() as Partial<SeasonSave> | null)
 
@@ -227,10 +241,46 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
   const [gameKind, setGameKind] = useState<SeasonGameKind>('정규')
   /** 전역 저장 +0x145 — 리그 1위 G 를 이미 받은 문턱 비트 (시즌을 새로 해도 남는다) */
   const [leagueFirstAwardedBits, setLeagueFirstAwardedBits] = useState(0)
-  /** 전역 저장 +0x64 — 시즌 쪽 G포인트 */
-  const [gamePoints, setGamePoints] = useState(0)
-  /** 전역 저장 app+0xe0 — 열린 구장 히든 아이템 id (S3 7절). 위 두 칸과 같은 자리에 둔다 */
+  /**
+   * 지갑을 안 넘겼을 때만 쓰는 **세션 주머니** — 옛 동작 그대로다 (테스트용).
+   * 지갑을 넘기면 이 칸은 놀고 `wallet.balance` 가 유일한 값이다.
+   */
+  const [ownGamePoints, setOwnGamePoints] = useState(0)
+  /** 전역 저장 app+0xe0 — 열린 구장 히든 아이템 id (S3 7절). 위 칸과 같은 자리에 둔다 */
   const [openedStadiumIds, setOpenedStadiumIds] = useState<readonly number[]>([])
+
+  /**
+   * 지금 들고 있는 G — **화면도 판정도 이 값 하나만 본다.**
+   *
+   * 지갑을 넘기면 `?무한G` 는 지갑 안에서 처리된다(`balance` 가 늘 99999 이고 쓰기는 안 먹는다).
+   * 안 넘겼을 때만 예전처럼 여기서 보여 주는 값을 올린다 — 판정도 같은 값을 보므로
+   * "99999 인데 G포인트 부족" 같은 어긋남은 어느 쪽에서도 나지 않는다.
+   */
+  const gamePoints = wallet === null
+    ? (isInfiniteGamePointOn() ? GAME_POINT_LIMIT : ownGamePoints)
+    : wallet.balance
+
+  /** G 보상을 쌓는다 (상한 99999 — 0xa3e4) */
+  const gainGamePoint = useCallback(
+    (amount: number) => {
+      if (wallet !== null) return wallet.gain(amount)
+      setOwnGamePoints((points) => Math.min(GAME_POINT_LIMIT, points + amount))
+    },
+    [wallet],
+  )
+
+  /**
+   * G 를 치른다 (`spendGamePoint` 액션이자 안에서도 쓴다).
+   * ⚠️ 지갑을 쓰면 **모자랄 때 한 푼도 안 깎인다**(0xa46e) — 세션 주머니 때의 0 으로 자르기와
+   *    다르지만, 화면이 값을 먼저 막으니 닿지 않는 갈래다.
+   */
+  const spendGamePoint = useCallback(
+    (cost: number) => {
+      if (wallet !== null) return wallet.spend(cost)
+      setOwnGamePoints((points) => Math.max(0, points - cost))
+    },
+    [wallet],
+  )
 
   const commit = useCallback(
     (next: SeasonSave) => {
@@ -288,9 +338,9 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
         state: { ...save.state, record: settlement.record },
         roster: settlement.roster,
       })
-      setGamePoints((points) => Math.max(0, points - settlement.gamePointCost))
+      spendGamePoint(settlement.gamePointCost)
     },
-    [commit, save],
+    [commit, save, spendGamePoint],
   )
 
   /**
@@ -557,9 +607,12 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
           record: { ...record, acted: true },
         },
       })
+      // 지옥훈련이면 G −= 500 (0xa2fca 리터럴, 0..99999 로 자른다 — J 4-6).
+      // 예전에는 시즌 G 칸이 늘 0 이라 이 차감이 통째로 빠져 있었다
+      if (isHell) spendGamePoint(HELL_TRAINING_GAME_POINT)
       setScene(SEASON_SCENE_STATE.관리메뉴)
     },
-    [commit, random, save],
+    [commit, random, save, spendGamePoint],
   )
 
   /**
@@ -647,9 +700,9 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
   const awardLeagueFirst = useCallback(
     (award: LeagueFirstAward) => {
       setLeagueFirstAwardedBits((bits) => bits | (1 << award.bit))
-      setGamePoints((points) => Math.min(GAME_POINT_LIMIT, points + award.gamePoint))
+      gainGamePoint(award.gamePoint)
     },
-    [],
+    [gainGamePoint],
   )
 
   /**
@@ -695,10 +748,6 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
     setScene(SEASON_SCENE_STATE.관리메뉴)
   }, [commit, save])
 
-  const spendGamePoint = useCallback((cost: number) => {
-    setGamePoints((points) => Math.max(0, points - cost))
-  }, [])
-
   /**
    * 구장 히든 아이템 해금 (`0x81d0` → `0x9f6cc(app, 종류, k, 1)`).
    * 원본 자리가 전역 저장이라 시즌 세이브가 아니라 세션 칸에 쌓는다 (위 `openedStadiumIds` 주석).
@@ -732,8 +781,8 @@ export function useSeasonSession(store: JsonStorePort, random: RandomPort): Seas
     gameOptions,
     gameKind,
     leagueFirstAwardedBits,
-    // ⚠️ **테스트용** — `?무한G` 면 보여 주는 값만 최대로 올린다 (저장은 그대로다)
-    gamePoints: isInfiniteGamePointOn() ? GAME_POINT_LIMIT : gamePoints,
+    // 지갑이 주인이다 (`?무한G` 도 지갑 안에서 갈린다) — 위 `gamePoints` 주석 참고
+    gamePoints,
     openedStadiumIds,
     cup: save?.cup ?? null,
     notice,

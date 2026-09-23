@@ -81,7 +81,7 @@ export function App() {
   const aceOpen = useAceOpen(aceOpenStore)
   // 전역 G 지갑 — 원본 `mgr[+0x64]`. 마선수 구매·미션·홈런더비가 다 이 한 칸을 본다
   const wallet = useGamePointWallet(walletStore, legacyGamePoint)
-  const seasonSession = useSeasonSession(seasonStore, random)
+  const seasonSession = useSeasonSession(seasonStore, random, wallet)
   const pitcherSession = usePitcherLeagueSession(pitcherStore, random, gameSettings.settings.pitchControl === '게이지')
   const careerSession = useCareerSession({ runner, random, saveGame, screen, setScreen, sound, wallet })
   // 미션 보상 G (0x4ef72) — 지갑으로 들어간다. 육성 선수가 없어도 사라지지 않는다

@@ -147,8 +147,8 @@ export function SeasonRoute({ session, random, gameSettings, onExit }: SeasonRou
     return (
       <SeasonTrainingScreen
         state={state}
-        // G 포인트는 전역 저장(+0x64) 칸이라 시즌 레코드에 없다 — 웹은 아직 시즌 쪽 G 를 안 들고 있어 0 이다
-        gamePoints={0}
+        // G 포인트는 전역 저장(+0x64) 칸이라 시즌 레코드에 없다 — 그 칸이 곧 지갑이다
+        gamePoints={session.gamePoints}
         onTrain={(_slot, index) => actions.runTraining(index)}
         onBack={backToManagement}
       />

@@ -4,6 +4,8 @@ import { act, renderHook } from '@testing-library/react'
 import { useSeasonSession } from '@/app/model/useSeasonSession'
 import { SEASON_GAME_COUNT } from '@/entities/season-mode/model/seasonRecord'
 import { SEASON_PHASE, SEASON_SCENE_STATE } from '@/entities/season-mode/model/seasonStateMachine'
+import { GAME_POINT_LIMIT } from '@/entities/season-mode/model/seasonRewards'
+import { useGamePointWallet } from '@/entities/wallet/model/useGamePointWallet'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { TeamGameSummary } from '@/features/play-team-game/model/teamGameFlow'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
@@ -342,5 +344,84 @@ describe('포스트시즌', () => {
 
     expect(result.current.series).toBeNull()
     expect(result.current.ranking).toEqual([])
+  })
+})
+
+describe('전역 G 지갑 (mgr[+0x64])', () => {
+  /** 시즌 세션과 지갑을 같이 띄운다 — 실제 App 배선과 같은 모양이다 */
+  const 지갑띄우기 = (시작G: number, seasonStore: JsonStorePort = 메모리저장()) => {
+    let 적힌지갑: unknown = { gamePoint: 시작G }
+    const walletStore: JsonStorePort = {
+      load: () => 적힌지갑,
+      save: (value) => {
+        적힌지갑 = value
+      },
+    }
+    return renderHook(() => {
+      const wallet = useGamePointWallet(walletStore)
+      return { wallet, session: useSeasonSession(seasonStore, createSeededRandom(20100901), wallet) }
+    })
+  }
+
+  it('지갑을 넘기면 시즌 G 가 지갑 값이다 — 모드마다 다른 칸은 없다', () => {
+    const { result } = 지갑띄우기(7000)
+
+    expect(result.current.session.gamePoints).toBe(7000)
+  })
+
+  it('G 를 쓰면 세션이 아니라 **지갑**이 깎인다 (경기 중 자동진행 0x22c29)', () => {
+    const { result } = 지갑띄우기(7000)
+
+    act(() => result.current.session.actions.spendGamePoint(1500))
+
+    expect(result.current.wallet.balance).toBe(5500)
+    expect(result.current.session.gamePoints).toBe(5500)
+  })
+
+  it('리그 1위 보상 G 는 지갑에 쌓인다 (0x6900 → 0x87e8)', () => {
+    const { result } = 지갑띄우기(1000)
+
+    act(() => result.current.session.actions.awardLeagueFirst({ threshold: 1, bit: 0, gamePoint: 3000 }))
+
+    expect(result.current.wallet.balance).toBe(4000)
+    expect(result.current.session.leagueFirstAwardedBits).toBe(1)
+  })
+
+  it('지옥훈련은 지갑에서 500G 를 뺀다 (0xa2fca)', () => {
+    const { result } = 지갑띄우기(2000)
+    act(() => result.current.session.actions.chooseTeam(0))
+
+    act(() => result.current.session.actions.runTraining(4))
+
+    expect(result.current.wallet.balance).toBe(1500)
+  })
+
+  it('칸 0~3 팀 트레이닝은 G 를 안 쓴다 (J 4-6)', () => {
+    const { result } = 지갑띄우기(2000)
+    act(() => result.current.session.actions.chooseTeam(0))
+
+    act(() => result.current.session.actions.runTraining(1))
+
+    expect(result.current.wallet.balance).toBe(2000)
+  })
+
+  it('`?무한G` 면 **보여 주는 값과 판정이 같은 값**이고 지갑은 안 깎인다', () => {
+    window.history.replaceState({}, '', '/?무한G')
+    const { result } = 지갑띄우기(10)
+
+    expect(result.current.session.gamePoints).toBe(GAME_POINT_LIMIT)
+    act(() => result.current.session.actions.spendGamePoint(2000))
+    expect(result.current.session.gamePoints).toBe(GAME_POINT_LIMIT)
+
+    window.history.replaceState({}, '', '/')
+  })
+
+  it('지갑을 안 넘기면 예전처럼 세션 주머니로 논다 (기존 테스트가 사는 길)', () => {
+    const { result } = 띄우기()
+
+    act(() => result.current.actions.awardLeagueFirst({ threshold: 5, bit: 2, gamePoint: 2000 }))
+    act(() => result.current.actions.spendGamePoint(500))
+
+    expect(result.current.gamePoints).toBe(1500)
   })
 })
