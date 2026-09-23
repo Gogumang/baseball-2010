@@ -23,6 +23,7 @@ import { SeasonRoute } from '@/app/ui/SeasonRoute'
 import { usePitcherLeagueSession } from '@/app/model/usePitcherLeagueSession'
 import { PitcherLeagueRoute } from '@/app/ui/PitcherLeagueRoute'
 import { GeneralModeScreen, aceOpenPriceOf, useAceOpen } from '@/pages/general-mode'
+import { useGamePointWallet } from '@/entities/wallet/model/useGamePointWallet'
 import { ROOKIE_BATTER_ABILITY } from '@/entities/batting/model/batter'
 
 const SETTINGS_KEY = 'compus-baseball/settings'
@@ -36,6 +37,12 @@ const PITCHER_KEY = 'compus-baseball/pitcher-league'
  * 옛 세이브에는 이 칸이 아예 없다 — 없으면 정규화가 기본 개방 둘(싸이커·메디카)만 켠다.
  */
 const ACE_OPEN_KEY = 'compus-baseball/ace-open'
+/**
+ * **G포인트 지갑** — 원본 전역 기록 `mgr[+0x64]` 한 칸이다 (`entities/wallet` 머리글에 디스어셈).
+ * 모드와 상관없이 하나라 커리어·시즌 저장과 **따로** 둔다.
+ * 옛 세이브에는 이 칸이 없다 — 없으면 `career.gamePoint` 를 그대로 옮겨 온다(이사).
+ */
+const WALLET_KEY = 'compus-baseball/wallet'
 
 const ENTRY_SCREENS: readonly Screen['kind'][] = ['타이틀', '메인메뉴', '도움말', '환경설정', '스페셜', '나리편선택', '팀선택', '선수등록', '홈런더비', '일반모드']
 
@@ -56,6 +63,9 @@ export function App() {
   const seasonStore = useMemo(() => createLocalStorageJsonStore(SEASON_KEY), [])
   const pitcherStore = useMemo(() => createLocalStorageJsonStore(PITCHER_KEY), [])
   const aceOpenStore = useMemo(() => createLocalStorageJsonStore(ACE_OPEN_KEY), [])
+  const walletStore = useMemo(() => createLocalStorageJsonStore(WALLET_KEY), [])
+  /** 옛 세이브 이사거리 — 지갑 칸이 없던 시절 G는 나만의리그 선수 안에 들어 있었다 */
+  const legacyGamePoint = useMemo(() => saveGame.load()?.gamePoint ?? null, [saveGame])
   const gameSettings = useGameSettings(settingsStore)
   // 소리 통로 하나 — 환경설정 칸(0~4) × 25 가 원본 소리 크기다 (옵션 +0x2e)
   const sound = useSound(gameSettings.settings.soundLevel)
@@ -69,10 +79,12 @@ export function App() {
   const runner = useAtBatRunner()
   // 마선수 오픈 플래그 — 원본 전역 기록 `mgr[0x30..0x39]`
   const aceOpen = useAceOpen(aceOpenStore)
+  // 전역 G 지갑 — 원본 `mgr[+0x64]`. 마선수 구매·미션·홈런더비가 다 이 한 칸을 본다
+  const wallet = useGamePointWallet(walletStore, legacyGamePoint)
   const seasonSession = useSeasonSession(seasonStore, random)
   const pitcherSession = usePitcherLeagueSession(pitcherStore, random, gameSettings.settings.pitchControl === '게이지')
-  const careerSession = useCareerSession({ runner, random, saveGame, screen, setScreen, sound })
-  // 미션 보상 G — 원본은 전역 저장에 쌓지만 웹은 커리어에 둔다. 육성 선수가 없으면 받아 갈 곳이 없다
+  const careerSession = useCareerSession({ runner, random, saveGame, screen, setScreen, sound, wallet })
+  // 미션 보상 G (0x4ef72) — 지갑으로 들어간다. 육성 선수가 없어도 사라지지 않는다
   const mission = useMissionSession({
     runner, random, missionRecord, screen, setScreen, sound,
     onGamePointReward: careerSession.actions.gainGamePoint,
@@ -135,17 +147,13 @@ export function App() {
         // (싸이커·메디카) 둘만 켜져 있다 (K-bursts-special.md K-3 3-3)
         openedAcePitcherIds={aceOpen.openedAcePitcherIds}
         openedAceBatterIds={aceOpen.openedAceBatterIds}
-        // ⚠️ **근사**: 원본 G포인트는 전역 기록(`mgr+0x64`)이라 모드와 상관없이 하나다. 웹판은
-        //    육성 선수 칸에 있어서 **저장된 선수**의 것을 쓴다 — 홈런더비(EntryRoutes)가 이미
-        //    `career ?? savedCareer` 로 같은 자리를 메우고 있다. 선수가 아예 없으면 0 이다.
-        gamePoint={(careerSession.career ?? careerSession.savedCareer)?.gamePoint ?? 0}
+        // 원본 G포인트는 전역 기록(`mgr+0x64`)이라 모드와 상관없이 하나다 — 지갑을 그대로 본다.
+        // 육성 선수가 없어도 값이 있고, 육성 선수가 있으면 그쪽 화면과 같은 값이다.
+        gamePoint={wallet.balance}
         // "예" → G를 빼고 플래그를 세운다 (0xa3e2 · 0xa3f6). 모자람 판정은 화면이 이미 했다.
-        // `gainGamePoint` 의 자르기 [0, 99999] 가 원본 0xa3e4~0xa3f0 과 같다.
-        // ⚠️ **못 메운 자리**: 나만의리그를 안 들고 있는 동안에는 `gainGamePoint` 가 손댈 선수가
-        //    없어 **G가 실제로 안 깎인다** (홈런더비 보상이 사라지는 것과 같은 자리다).
-        //    전역 G 지갑이 생기기 전까지는 여기서 더 할 수 있는 것이 없다.
+        // `spend` 의 자르기 [0, 99999] 와 "모자라면 한 푼도 안 깎는다" 가 원본 0xa3dc~0xa3f4 와 같다.
         onOpenAce={(cell) => {
-          careerSession.actions.gainGamePoint(-aceOpenPriceOf(cell))
+          wallet.spend(aceOpenPriceOf(cell))
           aceOpen.open(cell)
         }}
         gaugeSettingOn={gameSettings.settings.pitchControl === '게이지'}
@@ -170,7 +178,7 @@ export function App() {
   }
 
   if (ENTRY_SCREENS.includes(screen.kind) || careerSession.career === null) {
-    return <EntryRoutes screen={screen} setScreen={setScreen} session={careerSession} gameSettings={gameSettings} collection={collection.collection} random={random} />
+    return <EntryRoutes screen={screen} setScreen={setScreen} session={careerSession} gameSettings={gameSettings} collection={collection.collection} random={random} wallet={wallet} />
   }
 
   return (

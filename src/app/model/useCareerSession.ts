@@ -85,6 +85,7 @@ import {
   NATIONAL_CUP_EVENT,
 } from '@/entities/national-cup/model/nationalCupFlow'
 import type { NationalCupFinish } from '@/entities/national-cup/model/nationalCupFlow'
+import type { GamePointWalletSession } from '@/entities/wallet/model/useGamePointWallet'
 
 interface CareerSessionInput {
   readonly runner: AtBatRunner
@@ -97,6 +98,11 @@ interface CareerSessionInput {
    * 테스트는 그대로 두면 된다.
    */
   readonly sound?: SoundPort
+  /**
+   * 전역 G 지갑 (원본 `mgr[+0x64]`). 넘기면 **G의 주인이 지갑**이 되고 커리어 칸은 따라간다.
+   * 안 넘기면 예전처럼 커리어 칸 하나로만 돈다 — 테스트는 그대로 두면 된다.
+   */
+  readonly wallet?: GamePointWalletSession
 }
 
 /** 육성 모드 한 판 — 커리어·경기 진행·관리 커맨드를 한데 묶는다. */
@@ -107,6 +113,7 @@ export function useCareerSession({
   screen,
   setScreen,
   sound,
+  wallet,
 }: CareerSessionInput) {
   // 통로를 안 받으면 조용한 포트로 — 아래 자리들이 `sound` 가 있는지 매번 보지 않게 한다
   const silent = useMemo(() => createSilentSound(), [])
@@ -114,16 +121,23 @@ export function useCareerSession({
   const [savedCareer, setSavedCareer] = useState<PlayerCareer | null>(() => saveGame.load())
   const [rawCareer, setCareer] = useState<PlayerCareer | null>(null)
   /**
-   * ⚠️ **테스트용** — `?무한G` 가 켜져 있으면 G 를 최대로 올린다 (`devOptions.ts`).
+   * 커리어가 내보이는 G 는 **지갑 값**이다 (원본 `mgr[+0x64]` 한 칸). 상점·관리 화면·상태 막대가
+   * 다 이 `career.gamePoint` 를 읽으므로, 여기서 한 번 갈아 끼우면 화면과 판정이 같은 값을 본다.
    *
-   * ⚠️ 예전에는 **보여 주는 값만** 올리고 저장은 그대로 뒀는데, 그러면 화면과 판정이 어긋난다:
-   *    상점이 99999 를 보여 주면서 1000 G 짜리 엄마의도시락을 "G포인트 부족" 으로 막았다
-   *    (구매 가드 `shopSelection.ts` 는 진짜 값을 본다). 거짓말하는 스위치가 더 나빠서,
-   *    지금은 **상태 자체를** 올린다 — 그래서 켠 채로 무언가를 하면 저장에도 99999 가 남는다.
+   * ⚠️ **테스트용** — `?무한G` 는 지갑 쪽에서 처리한다 (`useGamePointWallet`): `balance` 가 늘
+   *    99999 이고 쓰기는 먹히지 않는다. 지갑을 안 받은 자리(테스트)는 예전처럼 여기서 올린다.
+   *
+   * ⚠️ **값이 같으면 `rawCareer` 를 그대로 돌려줘야 한다.** 새 객체를 매번 만들면 아래 저장 고리가
+   *    `setSavedCareer` 로 다시 그리고, 그 그리기가 또 새 객체를 만들어 **무한히 돈다**.
    */
-  const career = isInfiniteGamePointOn() && rawCareer !== null
-    ? { ...rawCareer, gamePoint: MAXIMUM_GAME_POINT }
-    : rawCareer
+  const overriddenGamePoint = wallet?.balance ?? (isInfiniteGamePointOn() ? MAXIMUM_GAME_POINT : null)
+  const career = useMemo(
+    () =>
+      rawCareer === null || overriddenGamePoint === null || rawCareer.gamePoint === overriddenGamePoint
+        ? rawCareer
+        : { ...rawCareer, gamePoint: overriddenGamePoint },
+    [rawCareer, overriddenGamePoint],
+  )
 
   const [progress, setProgress] = useState<GameProgress | null>(null)
 
@@ -147,6 +161,40 @@ export function useCareerSession({
     saveGame.save(career)
     setSavedCareer(career)
   }, [career, saveGame])
+
+  /**
+   * **커리어 칸 ↔ 지갑 다리.**
+   *
+   * 원본은 G가 전역 한 칸이라 다리가 필요 없지만, 웹판은 상점·경기 보상·이벤트가 전부
+   * `PlayerCareer` 를 통째로 갈아 끼우는 식이라 커리어 칸을 아직 못 없앴다. 그래서 **나중에
+   * 바뀐 쪽이 이기게** 이어 둔다 — 지갑이 주인이고, 커리어 칸은 저장 호환용 그림자다.
+   *
+   * - 커리어 쪽 G가 움직였으면(상점 구매·경기 보상·이벤트) 그 값을 지갑으로 옮긴다.
+   * - 그 밖에 둘이 어긋나면 **지갑이 이긴다.** 선수를 불러오거나 새로 등록한 참에 옛 저장에
+   *   남은 값이 지갑을 되돌리는 것을 막는다 (원본도 선수 등록·모드 초기화로 G가 줄지 않는다).
+   */
+  const walletBalance = wallet?.balance ?? 0
+  const setWalletBalance = wallet?.setBalance
+  const walletBridgeRef = useRef<{ career: number | null; wallet: number }>({
+    career: rawCareer?.gamePoint ?? null,
+    wallet: walletBalance,
+  })
+  useEffect(() => {
+    if (setWalletBalance === undefined) return
+    const previous = walletBridgeRef.current
+    const careerPoint = rawCareer?.gamePoint ?? null
+    if (careerPoint !== null && previous.career !== null && careerPoint !== previous.career) {
+      walletBridgeRef.current = { career: careerPoint, wallet: careerPoint }
+      setWalletBalance(careerPoint)
+      return
+    }
+    if (careerPoint !== null && careerPoint !== walletBalance) {
+      walletBridgeRef.current = { career: walletBalance, wallet: walletBalance }
+      setCareer((current) => (current === null ? current : { ...current, gamePoint: walletBalance }))
+      return
+    }
+    walletBridgeRef.current = { career: careerPoint, wallet: walletBalance }
+  }, [rawCareer, walletBalance, setWalletBalance])
 
   /**
    * 사람이 치르고 있는 국가대항전 경기 (상태 142 `0x1c46c`) — 경기가 끝나면 이 대회로 하루를 넘긴다.
@@ -461,10 +509,12 @@ export function useCareerSession({
       setCareer((player) => (player === null ? player : applyBurstRewards(player, resolution.deltas)))
     },
     /**
-     * 미션 클리어 보상 G (0xa52b0). 원본은 전역 저장 +0x64 에 쌓지만 웹은 커리어에 둔다 —
-     * 육성 선수가 없으면 받아 갈 곳이 없어 그냥 버린다.
+     * 보상 G — 미션 클리어(0x4ef72)·홈런더비 결과(0x4f6cc) 둘 다 원본은 **전역 +0x64** 에 쌓는다.
+     * 지갑이 있으면 거기로 넣는다: 육성 선수가 안 올라온 화면에서도 G가 사라지지 않는다.
+     * (지갑이 없는 자리는 예전처럼 커리어에 쌓고, 선수가 없으면 버린다.)
      */
     gainGamePoint: (amount: number) => {
+      if (wallet !== undefined) return wallet.gain(amount)
       setCareer((current) => (current === null ? current : gainGamePoint(current, amount)))
     },
     startNewCareer: (name: string, profile: RookieProfile) => {

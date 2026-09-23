@@ -19,6 +19,7 @@ const MY_LEAGUE_EDITIONS = [
 import type { useCareerSession } from '@/app/model/useCareerSession'
 import type { useGameSettings } from '@/app/model/useGameSettings'
 import type { Collection } from '@/entities/collection/model/collection'
+import type { GamePointWalletSession } from '@/entities/wallet/model/useGamePointWallet'
 import { SpecialScreen } from '@/pages/special/ui/SpecialScreen'
 import { TitleScreen } from '@/pages/title/ui/TitleScreen'
 import { MainMenuScreen } from '@/pages/main-menu/ui/MainMenuScreen'
@@ -34,10 +35,12 @@ interface EntryRoutesProps {
   readonly gameSettings: ReturnType<typeof useGameSettings>
   readonly collection: Collection
   readonly random: RandomPort
+  /** 전역 G 지갑 (원본 `mgr[+0x64]`) — 홈런더비 결과창의 "보유 G" 가 이 값이다 (0x461f2) */
+  readonly wallet: GamePointWalletSession
 }
 
 /** 커리어가 아직 없을 때의 화면 — 타이틀 → 메인 메뉴(도움말) → 선수 등록. */
-export function EntryRoutes({ screen, setScreen, session, gameSettings, collection, random }: EntryRoutesProps) {
+export function EntryRoutes({ screen, setScreen, session, gameSettings, collection, random, wallet }: EntryRoutesProps) {
   const [isMissionBlocked, setMissionBlocked] = useState(false)
   /** 홈런더비 최고 비거리 (저장 +0x5c) — 원본은 게임 전체 저장에 두므로 커리어와 따로 둔다 */
   const derbyStore = useMemo(() => createLocalStorageJsonStore(DERBY_BEST_KEY), [])
@@ -134,12 +137,14 @@ export function EntryRoutes({ screen, setScreen, session, gameSettings, collecti
         batterEquipmentLevels={career.equipmentLevels}
         random={random}
         bestDistance={derbyBest}
-        gamePoint={career.gamePoint}
+        // 보유 G 는 전역 기록 `mgr[+0x64]` 다 (0x461f2) — 선수 칸이 아니라 지갑을 본다
+        gamePoint={wallet.balance}
         onFinish={(result) => {
           if (result.bestDistance > derbyBest) {
             setDerbyBest(result.bestDistance)
             derbyStore.save({ bestDistance: result.bestDistance })
           }
+          // 결과 보상도 전역 +0x64 에 쌓는다 (0x4f6cc, 상한 99999) — 지갑으로 들어간다
           session.actions.gainGamePoint(result.gainedGamePoint)
         }}
         settings={gameSettings.settings}

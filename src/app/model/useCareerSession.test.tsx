@@ -12,6 +12,8 @@ import { careerNationalCupRewardOf } from '@/entities/national-cup/model/nationa
 import { createNationalCup } from '@/entities/national-cup/model/nationalCup'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { SaveGamePort } from '@/shared/api/save/saveGamePort'
+import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
+import { useGamePointWallet } from '@/entities/wallet/model/useGamePointWallet'
 
 /**
  * 나만의리그 연말 국가대표 사슬 — 연봉 사슬이 끝나면 상태 133(선발 판정)이 끼고,
@@ -185,5 +187,84 @@ describe('대회 경기 한 바퀴 (135 → 142 → 사람 경기 → 101 → 13
     expect(rendered.result.current.screen).toEqual({ kind: '경기' })
     expect(rendered.result.current.session.progress?.ourTeamId).toBe(10)
     expect(rendered.result.current.session.progress?.opponentTeamId).toBe(11)
+  })
+})
+
+/**
+ * **G 지갑 다리** — 원본 G는 전역 기록 `mgr[+0x64]` 한 칸이라 모드·선수와 상관없이 하나다
+ * (`entities/wallet/model/gamePointWallet.ts` 머리글에 디스어셈).
+ * 웹판은 커리어 칸(`gamePoint`)을 저장 호환용 그림자로 남겨 두고 지갑을 주인으로 삼는다.
+ */
+const 지갑띄우기 = (saved: PlayerCareer, 지갑저장: unknown) => {
+  const saveGame = 메모리저장(saved)
+  const random = createSeededRandom(20100901)
+  let 적힌지갑 = 지갑저장
+  const store: JsonStorePort = {
+    load: () => 적힌지갑,
+    save: (value) => {
+      적힌지갑 = value
+    },
+  }
+  return renderHook(() => {
+    const [screen, setScreen] = useState<Screen>({ kind: '메인메뉴' })
+    const runner = useAtBatRunner()
+    const wallet = useGamePointWallet(store, saved.gamePoint)
+    return {
+      screen,
+      setScreen,
+      wallet,
+      session: useCareerSession({ runner, random, saveGame, screen, setScreen, wallet }),
+    }
+  })
+}
+
+describe('G 지갑 다리 (전역 mgr[+0x64])', () => {
+  it('⚠️ 지갑 칸이 없던 옛 세이브는 `career.gamePoint` 가 지갑으로 이사한다', () => {
+    const rendered = 지갑띄우기(목표달성선수({ gamePoint: 4500 }), null)
+    expect(rendered.result.current.wallet.balance).toBe(4500)
+  })
+
+  it('선수를 불러와도 지갑이 이긴다 — 옛 세이브에 남은 값이 지갑을 되돌리지 않는다', () => {
+    // 지갑은 이미 1200 (일반모드에서 마선수를 사고 남은 값), 옛 선수 칸은 4500 인 채다
+    const rendered = 지갑띄우기(목표달성선수({ gamePoint: 4500 }), { gamePoint: 1200 })
+    act(() => rendered.result.current.session.actions.continueSaved())
+
+    expect(rendered.result.current.wallet.balance).toBe(1200)
+    // 선수가 내보이는 값도 지갑 값이다 — 상점·상태 막대가 이 칸을 본다
+    expect(rendered.result.current.session.career?.gamePoint).toBe(1200)
+  })
+
+  it('선수가 없는 동안 받은 보상도 지갑에 쌓이고, 선수를 불러오면 그 값이 보인다', () => {
+    const rendered = 지갑띄우기(목표달성선수({ gamePoint: 0 }), { gamePoint: 0 })
+
+    // 홈런더비·미션 보상 자리 (0x4f6cc · 0x4ef72) — 육성 선수가 안 올라온 채로 들어온다
+    act(() => rendered.result.current.session.actions.gainGamePoint(3000))
+    expect(rendered.result.current.wallet.balance).toBe(3000)
+
+    act(() => rendered.result.current.session.actions.continueSaved())
+    expect(rendered.result.current.session.career?.gamePoint).toBe(3000)
+  })
+
+  it('선수 쪽에서 G가 움직이면(대회 보상) 지갑으로 옮겨 간다', () => {
+    const rendered = 지갑띄우기(목표달성선수({ popularity: 100, reputation: 0, money: 0, gamePoint: 0 }), {
+      gamePoint: 500,
+    })
+    act(() => rendered.result.current.session.actions.continueSaved())
+    연봉사슬끝내기(rendered)
+    이벤트보기(rendered, [461, 463])
+
+    act(() =>
+      rendered.result.current.session.actions.finishCup({
+        champion: 10,
+        isKoreaChampion: true,
+        koreaInFinal: true,
+        reward: careerNationalCupRewardOf(10),
+        openedTeams: [10, 11],
+      }),
+    )
+
+    // 지갑 500 + 우승 보상 1000
+    expect(rendered.result.current.wallet.balance).toBe(1500)
+    expect(rendered.result.current.session.career?.gamePoint).toBe(1500)
   })
 })
