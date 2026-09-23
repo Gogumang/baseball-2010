@@ -55,3 +55,39 @@ export function createSilentSound(): SoundPort {
     getVolume: () => volume,
   }
 }
+
+/**
+ * **지금 앱이 쓰는 소리 통로 하나** — 원본 전역 포인터 `[0x1400058]` 자리다.
+ *
+ * 원본은 사운드 객체를 전역에 하나 두고 경기 코드가 어디서든 `play(전역, n, -1, loop)` 로 부른다.
+ * 웹판도 통로는 하나뿐이라(`useSound`) 화면마다 소품으로 물려 내리는 대신 같은 모양으로 둔다 —
+ * 경기 화면들(`pages/team-game` · `pages/pitching` · `pages/home-run-derby`)이 자기를 띄운 길
+ * (`app/ui` 의 라우트들)을 거치지 않고 바로 소리를 낼 수 있어야 하기 때문이다.
+ *
+ * 통로가 아직 안 꽂힌 동안(테스트에서 화면만 따로 그릴 때 등)은 **조용한 포트**로 떨어진다.
+ */
+let activePort: SoundPort | null = null
+const fallbackPort = createSilentSound()
+
+/** 소리 통로를 전역 자리에 꽂는다 — `app/model/useSound` 가 앱 하나에 한 번 부른다. */
+export function setActiveSound(port: SoundPort | null): void {
+  activePort = port
+}
+
+/** 지금 꽂혀 있는 통로. 없으면 조용한 포트 (원본에는 없는 웹판 안전장치다). */
+export function activeSound(): SoundPort {
+  return activePort ?? fallbackPort
+}
+
+/**
+ * 번호 목록을 통로에 차례로 넣는다. `null`·`undefined` 는 "울릴 것이 없다" 는 뜻이라 건너뛴다.
+ *
+ * 통로가 하나뿐이라(원본 0x6e9d4) **뒤에 넣은 소리가 앞 소리를 끊는다** — 목록의 순서는
+ * 원본이 부르는 순서 그대로여야 한다.
+ */
+export function playSoundIds(sound: SoundPort, ids: readonly (number | null | undefined)[]): void {
+  for (const id of ids) {
+    if (id === null || id === undefined) continue
+    sound.play(id)
+  }
+}

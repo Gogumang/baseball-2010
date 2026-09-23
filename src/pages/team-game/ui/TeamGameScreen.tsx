@@ -24,6 +24,8 @@ import type {
 } from '@/features/play-team-game/model/teamGameFlow'
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
 import { useTeamGame } from '@/pages/team-game/model/useTeamGame'
+import { PITCHER_CHANGE_SOUND } from '@/pages/team-game/model/teamGameSounds'
+import { activeSound } from '@/shared/api/audio/soundPort'
 // 조작방법·환경설정 화면은 메인 메뉴 쪽에 이미 있다 — 경기 중 메뉴도 **같은 화면**을 연다
 // (원본 0x3c212 는 StrHOWTO 뷰어, 0x3c326 은 StrMAINMENU 쪽 설정 페이지를 그대로 부른다).
 import { HelpScreen } from '@/pages/help/ui/HelpScreen'
@@ -103,6 +105,12 @@ export function TeamGameScreen({
   const finishPlayback = useCallback(() => setShownPlay(play), [play])
   /** `#` 투수 교체 화면(경기 상태 0xb)이 떠 있는가 */
   const [isChangingPitcher, setChangingPitcher] = useState(false)
+  // 교체 화면에 **들어설 때** "Time!" 22 (상태 0xb 진입 0x3ae08 → 0x3af06)
+  const audio = activeSound()
+  useEffect(() => {
+    if (!isChangingPitcher) return
+    audio.play(PITCHER_CHANGE_SOUND)
+  }, [audio, isChangingPitcher])
   /** 제안 대사를 이미 보여 준 돌발 행 번호 */
   const [shownProposal, setShownProposal] = useState<number | null>(null)
 

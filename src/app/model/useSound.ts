@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
-import { createSilentSound } from '@/shared/api/audio/soundPort'
+import { createSilentSound, setActiveSound } from '@/shared/api/audio/soundPort'
 import type { SoundPort } from '@/shared/api/audio/soundPort'
 import { createWebAudioSound } from '@/shared/api/audio/webAudioSound'
 
@@ -27,6 +27,12 @@ export function useSound(soundLevel: number): SoundPort {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // 원본 전역 사운드 포인터 `[0x1400058]` 자리에 꽂는다 — 경기 화면들이 소품을 안 받고도
+  // 같은 통로로 소리를 낸다 (`shared/api/audio/soundPort` 의 `activeSound`).
+  // effect 가 아니라 **그리는 자리**에서 꽂는 까닭: React 는 자식 effect 를 부모보다 먼저 돌려서
+  // effect 로 꽂으면 화면이 들어서며 내는 소리(예: 경기 인트로 61)가 통로보다 빨라진다.
+  setActiveSound(sound)
+
   /** 처음 칸 값은 미리듣기를 내지 않는다 — 원본도 **바꿀 때**만 낸다 */
   const lastLevelRef = useRef<number | null>(null)
   useEffect(() => {
@@ -45,17 +51,10 @@ export function useSound(soundLevel: number): SoundPort {
 export const SOUND_LEVEL_PREVIEW = 5
 
 /**
- * 번호 목록을 원본 통로에 차례로 넣는다. `null`·`undefined` 는 "울릴 것이 없다" 는 뜻이라 건너뛴다.
- *
- * 통로가 하나뿐이라(원본 0x6e9d4) **뒤에 넣은 소리가 앞 소리를 끊는다** — 목록의 순서는
- * 원본이 부르는 순서 그대로여야 한다.
+ * 번호 목록을 원본 통로에 차례로 넣는다 — 알맹이는 `shared/api/audio/soundPort` 에 있다.
+ * (경기 화면들도 같은 것을 쓰는데 `pages` 가 `app` 을 들여다볼 자리는 아니라 아래로 내렸다.)
  */
-export function playSoundIds(sound: SoundPort, ids: readonly (number | null | undefined)[]): void {
-  for (const id of ids) {
-    if (id === null || id === undefined) continue
-    sound.play(id)
-  }
-}
+export { playSoundIds } from '@/shared/api/audio/soundPort'
 
 /**
  * 화면에 **들어설 때 한 번** 나는 효과음·음성 (`screenBgm` 의 `SCREEN_ENTER_SOUND`).

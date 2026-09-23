@@ -7,7 +7,9 @@ import { applyDerbyPitch, createDerbyRun, derbyResultOf } from '@/entities/home-
 import type { DerbyResult, DerbyRun } from '@/entities/home-run-derby/model/derbyRun'
 import { isEventZoneHit } from '@/entities/home-run-derby/model/eventZone'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
+import { LOSE_SOUND, WIN_SOUND } from '@/features/play-game/model/gameSounds'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { activeSound, playSoundIds } from '@/shared/api/audio/soundPort'
 
 /** 공 하나의 결과를 보여 주는 시간 — 타석 화면들이 쓰는 값과 같다 (원본에 없는 웹판 연출) */
 const BANNER_MILLISECONDS = 1_500
@@ -69,9 +71,19 @@ export function useHomeRunDerby({ random, bestDistance, onFinish }: HomeRunDerby
   }
   useEffect(() => () => clearTimer(), [])
 
+  const audio = activeSound()
+  const audioRef = useRef(audio)
+  audioRef.current = audio
+
   const onPitchResolved = useCallback((detail: PitchOutcomeDetail) => {
     const current = runRef.current
     if (current.isFinished) return
+
+    // **타구 순간 소리** (0x515de~0x5164a) — 강 5 · 보통 6 · 약 59 · 큰 타구 7 · 헛스윙 8.
+    // 고르는 것은 `features/play-at-bat/model/atBatSounds` 가 이미 했고 여기는 울리기만 한다.
+    // ⚠️ 심판 콜은 안 낸다 — 홈런더비는 볼·스트라이크를 세지 않아(H-2) 판정 스위치가 보는
+    //    볼카운트 자체가 없고, 어느 갈래로 들어가는지도 문서에 없다.
+    playSoundIds(audioRef.current, [detail.contactSoundId])
 
     const isHomeRun = detail.resolution.kind === '타구' && detail.resolution.outcome.kind === '홈런'
     const batted = detail.resultCode === null ? null : derbyBattedBallOf(detail.resultCode, isHomeRun, randomRef.current)
@@ -102,6 +114,9 @@ export function useHomeRunDerby({ random, bestDistance, onFinish }: HomeRunDerby
       if (runRef.current.isFinished) {
         const finished = derbyResultOf(runRef.current, bestRef.current)
         setResult(finished)
+        // 결과 창(상태 0x1a) 진입 0x4f574 — 누적 > 저장 +0x5c 면 신기록 0x1f(31), 아니면 0x20(32)
+        // 을 예약한다 (R14 1-2 · L 1-F). 승패 징글과 **같은 번호를 나눠 쓰는 자리**다
+        playSoundIds(audioRef.current, [finished.isNewRecord ? WIN_SOUND : LOSE_SOUND])
         onFinishRef.current?.(finished)
         return
       }

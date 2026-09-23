@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
@@ -29,6 +29,15 @@ import type {
 } from '@/features/play-team-game/model/teamGameFlow'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
+import { applyPitchResolution } from '@/entities/at-bat/model/atBatState'
+import {
+  inPlayCallSoundIdOf,
+  pitchCallSoundIdOf,
+  PITCH_RELEASE_SOUND,
+} from '@/features/play-at-bat/model/atBatSounds'
+import { GAME_INTRO_SOUND, gameResultSoundIdOf } from '@/features/play-game/model/gameSounds'
+import { stepSoundIdsOf } from '@/pages/team-game/model/teamGameSounds'
+import { activeSound, playSoundIds } from '@/shared/api/audio/soundPort'
 
 /**
  * 팀 경기 한 판을 들고 있는 상태 고리 (일반·시즌·대전 공용).
@@ -86,29 +95,108 @@ export interface TeamGameSession {
 export function useTeamGame(options: TeamGameOptions, random: RandomPort): TeamGameSession {
   const [progress, setProgress] = useState<TeamGameProgress>(() => startTeamGame(options, random))
 
+  /**
+   * 최신 진행 상태. 소리는 **업데이터 밖에서** 골라야 한다 — 업데이터 안에서 소리를 내면
+   * StrictMode 가 업데이터를 두 번 돌리며 같은 소리를 두 번 낸다 (`useAtBatRunner` 주석과 같은 까닭).
+   */
+  const progressRef = useRef(progress)
+  const audio = activeSound()
+
+  /** 진행 한 걸음을 먹이고, 그 사이에 원본이 내는 소리를 울린다 */
+  const step = useMemo(() => {
+    return (
+      next: (current: TeamGameProgress) => TeamGameProgress,
+      soundsOf?: (before: TeamGameProgress, after: TeamGameProgress) => readonly (number | null)[],
+    ) => {
+      const current = progressRef.current
+      const after = next(current)
+      if (after === current) return current
+      progressRef.current = after
+      setProgress(after)
+      playSoundIds(audio, [
+        ...(soundsOf === undefined ? [] : soundsOf(current, after)),
+        ...stepSoundIdsOf(current, after),
+        // 경기 결과 징글 31/32 — 상태 0x19(결과 적재 0x4ea0c)에서 난다.
+        // 무승부는 원본이 어느 쪽을 내는지 문서에 없어 `gameResultSoundIdOf` 가 비워 둔다
+        ...(after.game.isFinished && !current.game.isFinished
+          ? [gameResultSoundIdOf(summaryOf(after).result)]
+          : []),
+      ])
+      return after
+    }
+  }, [audio])
+
+  // 경기 시작 인트로 예약음 61 (상태 0xc 진입 0x3b148).
+  // ⚠️ 웹에는 인트로 화면(270→0 을 5씩 54틱)이 없어 **경기가 서는 자리**에 둔다 — 근사다
+  useEffect(() => {
+    playSoundIds(audio, [GAME_INTRO_SOUND])
+    // 경기 한 판에 한 번 — 고리가 살아 있는 동안 다시 내지 않는다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const actions = useMemo(
     () => ({
       // 인플레이 타구가 나오면 **여기서 멈춘다** — 주자 처리는 수비 화면이 끝난 뒤다 (상태 0x17)
       resolvePitch: (detail: PitchOutcomeDetail) =>
-        setProgress((current) => startBatterPitch(current, detail, random)),
+        step(
+          (current) => startBatterPitch(current, detail, random),
+          // 타구음(0x515de~) → 심판 콜(0x51a94) 순서. 통로가 하나라 뒤 소리가 앞 소리를 끊는다.
+          // 인플레이 타구면 아웃 콜은 여기서 안 난다 — 수비 화면이 끝난 뒤(`finishDefensePlay`)다
+          (before, after) => {
+            // 진행기가 타석이 끝나면 볼카운트를 바로 새 타석으로 되돌리므로(`finishBatterOutcome`),
+            // 심판 콜이 보는 "이 공을 먹인 뒤" 의 카운트는 여기서 따로 만든다
+            const nextAtBat = applyPitchResolution(before.atBat, detail.resolution)
+            return [
+              detail.contactSoundId ?? null,
+              pitchCallSoundIdOf(detail.resolution, nextAtBat),
+              after.pendingDefensePlay !== null || nextAtBat.outcome === null
+                ? null
+                : inPlayCallSoundIdOf(nextAtBat.outcome),
+            ]
+          },
+        ),
       applyOutcome: (outcome: AtBatOutcome) =>
-        setProgress((current) => startBatterOutcome(current, outcome, random)),
+        step(
+          (current) => startBatterOutcome(current, outcome, random),
+          (_before, after) => (after.pendingDefensePlay !== null ? [] : [inPlayCallSoundIdOf(outcome)]),
+        ),
       throwPitch: (input: TeamPitchInput) =>
-        setProgress((current) => startThrowPitch(current, input, random)),
-      closeBurst: () => setProgress((current) => closeBurstWindow(current)),
-      changePitcher: (benchIndex: number) =>
-        setProgress((current) => changePitcher(current, benchIndex)),
-      steal: (base: StealBase) => setProgress((current) => stealBase(current, base, random)),
-      autoProgress: () => setProgress((current) => runAutoProgress(current, random)),
-      finishDefensePlay: (result?: DefensePlayResult) =>
-        setProgress((current) => {
-          const pending = current.pendingDefensePlay
-          if (pending === null) return current
+        step(
+          (current) => startThrowPitch(current, input, random),
+          // 투구 순간 소리 12 (0x3f378). ⚠️ 마구 갈래 28 은 안 이었다 — 이 자리가 마구인지 못 가른다.
+          // ⚠️ **근사**: 웹은 던지는 순간에 판정까지 다 나와 투구음과 심판 콜이 붙는다 (통로가 하나라
+          //    뒤 소리가 앞 소리를 끊는다). 원본은 공이 날아가는 동안이 사이에 있다
+          (before, after) => {
+            const resolution = after.lastResolution
+            if (resolution === null) return [PITCH_RELEASE_SOUND]
+            const nextAtBat = applyPitchResolution(before.atBat, resolution)
+            return [
+              PITCH_RELEASE_SOUND,
+              pitchCallSoundIdOf(resolution, nextAtBat),
+              after.pendingDefensePlay !== null || nextAtBat.outcome === null
+                ? null
+                : inPlayCallSoundIdOf(nextAtBat.outcome),
+            ]
+          },
+        ),
+      closeBurst: () => step((current) => closeBurstWindow(current)),
+      changePitcher: (benchIndex: number) => step((current) => changePitcher(current, benchIndex)),
+      // 도루 실패로 이닝이 끝나면 공수 교대 징글이 난다. 세이프 콜(17)은 잇지 않았다 —
+      // 원본 판정 v9 가 어떤 플레이에서 나는지 미해결이다
+      steal: (base: StealBase) => step((current) => stealBase(current, base, random)),
+      autoProgress: () => step((current) => runAutoProgress(current, random)),
+      finishDefensePlay: (result?: DefensePlayResult) => {
+        const pending = progressRef.current.pendingDefensePlay
+        if (pending === null) return
+        step(
           // 결과를 못 받았으면 남은 틱을 여기서 끝까지 돌린다 — 붙든 상태는 반드시 푼다
-          return resolveDefensePlay(current, result ?? runDefensePlay(pending.input), random)
-        }),
+          (current) => resolveDefensePlay(current, result ?? runDefensePlay(pending.input), random),
+          // 플레이가 끝난 자리 — 아웃 콜(0x51b36)·홈런 함성(11)은 여기서야 난다
+          () => [inPlayCallSoundIdOf(pending.outcome)],
+        )
+      },
     }),
-    [random],
+    [random, step],
   )
 
   const summary = useMemo(
