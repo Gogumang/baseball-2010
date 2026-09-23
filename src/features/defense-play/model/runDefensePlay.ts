@@ -695,7 +695,23 @@ export function stepDefensePlay(
     }
 
     // ── 0b. 레이저 송구 반짝임 창 (0x523bc · 0xb2648 · 0x4e858 — I-controls 2d) ──
-    if (input.controls?.side === '수비' && input.random !== undefined && !uncatchable) {
+    //
+    // ⚠️ 굴림(0x66a8c)은 **사람·CPU 를 가리지 않고** 돈다. 0x523bc 를 그대로 읽으면
+    //   0x523d6  [this+0x19af] ≠ 0 → 반환        ; 한 플레이 한 번
+    //   0x523e0  [this+0x1094] > 0  → 반환
+    //   0x523e6  공 가진 야수가 있으면 준비됐는지(0xb8da8) 확인, 없으면 건너뜀
+    //   0x52408  [경기+0x19] ≠ 0 → 반환
+    //   0x5242a  창 0xb2648(플레이) 거짓 → 반환
+    //   0x5243e  주자 수 0xa9598 == 0 → 반환
+    //   0x52456  0x66a8c(…) 굴림 → 떨어져도 0x5248c 에서 `+0x19af = 1`
+    //   0x52468  통과하면 `경기[0x31 + 경기[0xa]]` 가 0(사람)이면 `+0x19ad`(반짝임),
+    //            아니면(CPU) `+0x19ae`(곧바로 레이저)
+    // 즉 **굴림은 갈림 앞**에 있다. 예전 웹판은 `controls.side === '수비'` 로 굴림째 막아
+    // CPU 수비 타구에서 난수를 한 번 덜 뽑아 원본과 차례가 어긋났다 — 그 자리를 바로잡는다.
+    //
+    // 주자 수(0xa9598) 관문은 따로 옮기지 않았다 — 이 진행기의 `runners` 에는 타자주자가 늘
+    // 들어 있어 타구 플레이에서는 언제나 참이다.
+    if (input.random !== undefined && !uncatchable) {
       const ticksSinceCatch = tick - catchTick
       const windowOpen = isLaserWindowOpen({
         ticksSinceCatch,
@@ -706,14 +722,22 @@ export function stepDefensePlay(
       // 굴림은 한 플레이에 한 번(this+0x19af). 창이 열리는 첫 틱(포구 10틱 전)에 굴린다
       if (!laserRolled && windowOpen && ticksSinceCatch >= LASER_WINDOW_FIRST_TICK) {
         laserRolled = true
-        laserShining = rollLaserThrow(
+        const passed = rollLaserThrow(
           {
             defenseAbility: abilities[chaserSlot] ?? DEFAULT_ABILITY,
             skillIds: input.fielderSkillIds?.[chaserSlot] ?? [],
           },
           input.random,
         )
+        if (passed) {
+          // CPU 수비는 반짝임 없이 곧바로 `경기+0x19ae`, 사람 수비는 `경기+0x19ad`(반짝임)
+          if (defenseIsCpu) laserConfirmed = true
+          else laserShining = true
+        }
       }
+      // 0x4e858 은 조건 없이 매 틱 돈다 — 창이 닫히면 `+0x19ad` 를 지우고,
+      // 반짝이는 중에 **새로 누른** 키가 오면 `+0x19ae` 를 켠다. CPU 수비는 반짝임이 없으니
+      // 이 갈래가 아무것도 바꾸지 않는다(키도 안 들어온다).
       const judged = judgeLaserInput({
         isShining: laserShining,
         isWindowOpen: windowOpen,

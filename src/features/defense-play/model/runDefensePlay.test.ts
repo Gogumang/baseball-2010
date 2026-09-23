@@ -282,14 +282,18 @@ describe('확률 굴림은 난수를 줘야 돈다 — 펌블 · 악송구 · �
   })
 
   it('악송구가 나면 그 송구로는 아무도 못 잡는다 (0xa1828 — 방향이 틀어진다)', () => {
-    // 굴림 순서대로 값을 먹인다: 필살수비 A → B → 펌블 → 악송구.
-    // 앞 셋은 실패(0.9), 마지막만 성공(0) 시켜 **악송구만** 떼어 본다.
+    // 굴림 순서대로 값을 먹인다: 필살수비 A → B → **레이저** → 펌블 → 악송구.
+    // 앞 넷은 실패(0.9), 마지막만 성공(0) 시켜 **악송구만** 떼어 본다.
+    //
+    // ⚠️ 레이저 굴림(0x66a8c)이 셋째 자리에 있는 것은 **원본 그대로**다 — 0x523bc 는 사람·CPU 를
+    // 가리지 않고 돌고(수비 주체 갈림은 0x52468 의 굴림 **뒤**), 창이 열리는 첫 틱(포구 10틱 전)이
+    // 펌블 굴림(포구 틱, 0xb41d0)보다 앞선다. 예전에는 사람 수비일 때만 굴려 이 자리가 비어 있었다.
     const 결과 = runDefensePlay({
       outcome: 땅볼아웃,
       trajectory: battedBallTrajectory(representativePatternOf(땅볼아웃)),
       bases: 주자1루,
       outs: 0,
-      random: 차례난수([0.9, 0.9, 0.9, 0, 0.9]),
+      random: 차례난수([0.9, 0.9, 0.9, 0.9, 0, 0.9]),
     })
 
     expect(결과.fumbled).toBe(false)
@@ -628,12 +632,39 @@ describe('레이저 송구 반짝임이 화면까지 내려간다 (경기+0x19ad
     outs: 0,
   }
 
-  it('사람 수비가 아니면 한 틱도 안 반짝인다 — 굴림 자체가 안 돈다', () => {
-    const 조작없음 = runDefensePlay({ ...공통, random: 고정난수(0.02) })
-    const 공격조작 = runDefensePlay({ ...공통, random: 고정난수(0.02), controls: 계속누름('공격', ' ') })
+  it('CPU 수비면 굴림은 돌되 반짝이지 않는다 — 곧바로 경기+0x19ae (0x52468~0x52484)', () => {
+    // 0x523bc 는 수비 주체를 보지 않고 굴린 뒤(0x52456), 통과했을 때만
+    // `경기[0x31 + 경기[0xa]]` 로 갈린다 — 0 이면 사람 → `+0x19ad`(반짝임),
+    // 아니면 CPU → `+0x19ae`(반짝임 없이 곧바로 레이저).
+    const cpu수비 = runDefensePlay({ ...공통, random: 고정난수(0.02), defenseIsCpu: true })
+    const 공격조작 = runDefensePlay({
+      ...공통,
+      random: 고정난수(0.02),
+      defenseIsCpu: true,
+      controls: 계속누름('공격', ' '),
+    })
 
-    expect(조작없음.ticks.every((틱) => 틱.laserShiningSlot === null)).toBe(true)
+    expect(cpu수비.ticks.every((틱) => 틱.laserShiningSlot === null)).toBe(true)
     expect(공격조작.ticks.every((틱) => 틱.laserShiningSlot === null)).toBe(true)
+  })
+
+  it('CPU 수비 타구도 난수를 한 번 더 뽑는다 — 굴림이 갈림 앞에 있다 (0x52456)', () => {
+    // 이 한 번이 빠져 있어서 같은 씨앗인데도 CPU 수비 쪽 난수 차례가 원본과 어긋났다.
+    const 뽑은수 = (extra: Partial<DefensePlayInput>) => {
+      let count = 0
+      const random: RandomPort = {
+        next: () => {
+          count += 1
+          return 0.9
+        },
+        nextInRange: (minimum, maximum) => (minimum + maximum) / 2,
+        pick: (candidates) => candidates[0],
+      }
+      runDefensePlay({ ...공통, random, ...extra })
+      return count
+    }
+
+    expect(뽑은수({ defenseIsCpu: true })).toBe(뽑은수({ defenseIsCpu: false }))
   })
 
   it('굴림이 통과하면 **공 쥔 야수 칸**이 실린다 (플레이+0x130)', () => {
