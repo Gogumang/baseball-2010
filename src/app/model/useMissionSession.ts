@@ -149,6 +149,24 @@ export function useMissionSession({
     [audio, runner],
   )
 
+  /**
+   * **진행 중인 미션의 조준점 흔들림 세기** — 레코드 바이트 13 (`conditionCode`, 0xaa57c → 0x39c5c).
+   * 미션이 안 도는 중이면 0 이다 = 안 흔들린다.
+   *
+   * 경기 진행기(`features/play-pitcher-game` 의 `PitchInput.missionConditionCode`)가 이 값을 받아
+   * 조준점을 흔든다. 값의 뜻은 `shared/config/original/missions.ts` 의 `MISSION_AIM_SHAKES` 에 있다.
+   *
+   * ⚠️ 타자 미션은 표가 **전부 0** 이라 타자편에서는 늘 0 이다 (원본 그대로).
+   * ⚠️ **아직 못 꿴 곳**: 미션 모드의 투수 화면(`PitchingScreen` → `handleThrow`)은 경기 진행기가
+   *    아니라 `entities/pitching` 의 간단한 `buildPitch`(존 좌표 −1~1 모델)로 공을 만든다. 흔들림
+   *    값은 월드 좌표(±600·±400)라 그 모델에 그대로 못 넣는다 — 그 화면이 진행기로 옮겨 가면
+   *    이 값을 `throwPitch` 에 실어 주면 된다.
+   */
+  const missionConditionCode =
+    pitcherRun !== null && pitcherRun.status === '진행중' ? pitcherRun.mission.conditionCode
+    : missionRun !== null && missionRun.status === '진행중' ? missionRun.mission.conditionCode
+    : 0
+
   /** 원작 투구 조작: 구질 → 코스 → 게이지. 타자는 자동으로 반응한다. */
   const handleThrow = (type: PitchTypeInfo, courseCell: number, gauge: GaugeResult) => {
     if (pitcherRun === null || pitcherRun.status !== '진행중') return
@@ -265,5 +283,8 @@ export function useMissionSession({
     },
   }
 
-  return { missionRun, pitcherRun, clearedKeys, clearCounts, lastSide, handleMissionPitch, handleThrow, actions }
+  return {
+    missionRun, pitcherRun, clearedKeys, clearCounts, lastSide,
+    missionConditionCode, handleMissionPitch, handleThrow, actions,
+  }
 }

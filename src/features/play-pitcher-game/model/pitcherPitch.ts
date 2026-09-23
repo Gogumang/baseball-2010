@@ -194,6 +194,12 @@ export interface HumanPitchInput {
   readonly repertoire: PitcherRepertoire
   /** 화면 배치 side (투영 원점 0xcfb18 의 칸) */
   readonly side: number
+  /**
+   * **투수 미션 조준점 흔들림 세기** — 미션 레코드 바이트 13 (`missions.ts` 의 `conditionCode`,
+   * 0xaa57c → 0x39c5c). 안 넘기거나 0 이면 안 흔들린다 = 지금까지와 똑같이 논다.
+   * 미션이 아닌 경기(나만의리그·시즌)에서는 늘 없다.
+   */
+  readonly missionConditionCode?: number
 }
 
 /**
@@ -221,9 +227,18 @@ export function buildHumanPitch(input: HumanPitchInput, random: RandomPort): Pit
   const { typeNumber, stats, repertoire, side } = input
   const isMagic = typeNumber === MAGIC_PITCH_TYPE_NUMBER
   const target = courseTargetOf(input.courseCell, side)
+  // 미션 조준 흔들림(0x39c5c)이 제구 흩어짐(0x4dc78)보다 **먼저**다 — 순서·난수 차례는
+  // `applyControlError` 안에 있다. 세기가 0 이면 난수를 한 톨도 안 뽑는다
   const finalTarget = applyControlError(
     target,
-    { tier: input.grade, isComputer: false, aimIndex: input.gaugeCell },
+    {
+      tier: input.grade,
+      isComputer: false,
+      aimIndex: input.gaugeCell,
+      ...(input.missionConditionCode === undefined
+        ? {}
+        : { missionAim: { conditionCode: input.missionConditionCode, side } }),
+    },
     random,
   )
   const speedStage = isMagic

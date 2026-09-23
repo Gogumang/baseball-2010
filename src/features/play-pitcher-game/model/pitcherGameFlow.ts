@@ -414,6 +414,14 @@ export interface PitchInput {
   readonly courseCell: number
   /** 게이지에서 누른 칸 0~9. 안 눌렀으면 0 */
   readonly gaugeCell: number
+  /**
+   * **투수 미션 조준점 흔들림 세기 0~3** — 미션 레코드 바이트 13 (`missions.ts` 의
+   * `conditionCode`, 0xaa57c → 0x39c5c). 미션이 아니면 안 넘긴다.
+   *
+   * 안 넘기거나 0 이면 조준점을 안 흔든다 — 지금까지와 똑같이 논다.
+   * ⚠️ 타자 미션은 이 값이 **전부 0** 이라 타자편에서는 아무 일도 없다 (표 확인).
+   */
+  readonly missionConditionCode?: number
 }
 
 /**
@@ -479,6 +487,10 @@ export function startPitch(
       stats: fatigued,
       repertoire: options.repertoire,
       side: options.stageSide ?? 1,
+      // 투수 미션일 때만 조준 흔들림 세기가 실린다 (0x39c5c)
+      ...(input.missionConditionCode === undefined
+        ? {}
+        : { missionConditionCode: input.missionConditionCode }),
     },
     random,
   )

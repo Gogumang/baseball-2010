@@ -175,6 +175,70 @@ describe('오픈 힌트 팝업', () => {
   })
 })
 
+/**
+ * "예" 를 고르면 진짜로 산다 (0xa390~0xa46e).
+ * G 가 모자라면 안 사고 부족 팝업(0xcc214)이 대신 뜬다 — G 는 한 푼도 안 깎인다.
+ */
+describe('G포인트로 오픈하기', () => {
+  const 누르기 = (keys: string[]) => {
+    for (const key of keys) fireEvent.keyDown(window, { key })
+  }
+  /** 칸 0(열림) → 칸 1(레오니, 6000G) 로 커서를 옮기고 OK */
+  const 레오니팝업 = (overrides: Partial<Props>) => {
+    const rendered = 띄우기({ openedAcePitcherIds: [0], ...overrides })
+    누르기(['ArrowRight', 'Enter'])
+    return rendered
+  }
+
+  it('G 가 넉넉하면 "예" 가 그 칸 번호를 넘긴다', () => {
+    const onOpenAce = vi.fn()
+    레오니팝업({ gamePoint: 6000, onOpenAce })
+
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+
+    expect(onOpenAce).toHaveBeenCalledWith(1)
+  })
+
+  it('"아니오" 는 아무 일도 안 한다', () => {
+    const onOpenAce = vi.fn()
+    const { container } = 레오니팝업({ gamePoint: 99999, onOpenAce })
+
+    fireEvent.click(screen.getByRole('button', { name: '아니오' }))
+
+    expect(onOpenAce).not.toHaveBeenCalled()
+    expect(container.textContent).not.toContain('부족합니다')
+  })
+
+  it('G 가 1 모자라면 안 사고 부족 팝업이 뜬다 (0xa3dc `blt` → 0xaa00)', () => {
+    const onOpenAce = vi.fn()
+    const { container } = 레오니팝업({ gamePoint: 5999, onOpenAce })
+
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+
+    expect(onOpenAce).not.toHaveBeenCalled()
+    expect(container.textContent).toContain('G포인트가 부족합니다')
+  })
+
+  it('못 여는 칸(4 드래고나)은 버튼이 OK 하나뿐이라 살 수 없다', () => {
+    const onOpenAce = vi.fn()
+    띄우기({ openedAcePitcherIds: [0], gamePoint: 99999, onOpenAce })
+
+    누르기(['ArrowRight', 'ArrowRight', 'ArrowRight', 'ArrowRight', 'Enter'])
+    fireEvent.click(screen.getByRole('button', { name: 'OK' }))
+
+    expect(onOpenAce).not.toHaveBeenCalled()
+  })
+
+  it('onOpenAce 를 안 넘기면 예전처럼 힌트만 보여 주고 닫힌다', () => {
+    const { container } = 레오니팝업({ gamePoint: 99999 })
+
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+
+    expect(container.textContent).not.toContain('마선수 오픈 힌트')
+    expect(container.textContent).not.toContain('부족합니다')
+  })
+})
+
 describe('이름 막대', () => {
   it('커서가 짚은 마선수 이름을 적는다', () => {
     띄우기()

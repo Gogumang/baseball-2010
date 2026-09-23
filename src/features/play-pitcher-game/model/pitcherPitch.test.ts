@@ -216,3 +216,43 @@ describe('사람 투구 만들기', () => {
     expect(벗어남(5)).toBeLessThan(벗어남(0))
   })
 })
+
+/**
+ * 투수 미션 조준 흔들림 (0x39c5c) — 세기는 미션 레코드 바이트 13(`conditionCode`)다.
+ * 여기서는 **값이 진짜 전달되는지**만 본다. 흔드는 식 자체는 `entities/pitching` 쪽 시험이 맡는다.
+ */
+describe('미션 조준 흔들림 전달', () => {
+  const 던지기 = (missionConditionCode?: number) =>
+    buildHumanPitch(
+      {
+        typeNumber: 1,
+        courseCell: 4,
+        grade: 3,
+        gaugeCell: 6,
+        stats: 능력,
+        repertoire: 레퍼토리,
+        side: 1,
+        ...(missionConditionCode === undefined ? {} : { missionConditionCode }),
+      },
+      씨앗(7),
+    )
+
+  it('안 넘기면 지금까지와 똑같이 논다', () => {
+    expect(던지기().plate).toEqual(던지기(undefined).plate)
+  })
+
+  it('세기 0 은 난수를 한 톨도 안 쓴다 — 안 넘긴 것과 같은 공이다', () => {
+    expect(던지기(0).plate).toEqual(던지기().plate)
+  })
+
+  it('세기 3(존 안 아무 데로 옮기기)은 다른 공이 된다', () => {
+    expect(던지기(3).plate).not.toEqual(던지기().plate)
+  })
+
+  it('세기 1(가로만 ±40)은 세로가 그대로일 수도 있을 만큼 작게 흔든다', () => {
+    const 흔든공 = 던지기(1)
+    const 안흔든공 = 던지기()
+
+    expect(Math.abs(흔든공.plate.x - 안흔든공.plate.x)).toBeGreaterThan(0)
+  })
+})

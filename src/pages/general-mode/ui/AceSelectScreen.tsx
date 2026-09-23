@@ -4,6 +4,7 @@ import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { ACE_PLAYERS } from '@/shared/config/original/acePlayers'
 import { aceOpenPopupTextOf, aceOpensWithGamePoint } from '@/shared/config/original/aceOpen'
+import { ACE_OPEN_SHORTAGE_POPUP, aceOpenPriceOf } from '@/pages/general-mode/lib/aceOpenState'
 import { ACE_LAYOUT, LOCKED_CIRCLES, NAME_BAR, TAG, aceCellPositionOf } from '@/pages/general-mode/lib/prepareLayout'
 import { ACE_PER_ROLE, ACE_PHASE, aceIndexOfCell, aceRoleOfCell } from '@/pages/general-mode/lib/generalModeSetup'
 import type { AcePhase } from '@/pages/general-mode/lib/generalModeSetup'
@@ -41,6 +42,12 @@ export interface AceSelectScreenProps {
   readonly levels?: Readonly<Record<number, number>>
   /** 머리띠 G포인트 — 들고 있는 곳에서만 넘긴다 (팀 고르기 화면과 같은 규칙) */
   readonly gamePoint?: number
+  /**
+   * **G포인트로 이 칸을 연다** — 확인 팝업에서 "예" 를 고르고 G가 모자라지 않을 때만 부른다
+   * (0xa3a2 → 0xa3dc → 0xa3f6). 받는 쪽이 G를 빼고 오픈 플래그를 세운다.
+   * 안 넘기면 팝업이 힌트만 보여 주고 닫힌다 (예전 그대로).
+   */
+  readonly onOpenAce?: (cell: number) => void
   readonly onSelect: (cell: number) => void
   readonly onCancel: () => void
 }
@@ -58,15 +65,17 @@ export interface AceSelectScreenProps {
  * (예전 주석은 "그 표가 웹판 데이터에 없다" 고 적고 있었다 — **틀렸다.** 표는 `base/extracted/` 에
  *  있었고 생성기가 안 뽑고 있던 것뿐이다.)
  *
+ * **실제 오픈**도 이제 여기서 한다 (0xa390~0xa46e): [43] 에서 "예" 를 고르면 `onOpenAce(칸)` 로
+ * 나가고, 들고 있는 G가 가격보다 **적으면** 대신 부족 팝업(0xcc214)이 뜬다 — 자세한 것은
+ * `lib/aceOpenState.ts` 의 머리글을 볼 것.
+ *
  * ⚠️ 여기 없는 것:
- *   - **실제 오픈**. 원본은 [43] 에서 "예" 를 고르면 G포인트를 빼고 오픈 플래그(`mgr[0x30+idx]`)를
- *     세우는데, 웹판 저장에는 그 칸이 없다 (`App.tsx` 의 `DEFAULT_OPENED_ACE_*` 로 고정). 그래서
- *     팝업은 **힌트만 보여 주고 닫힌다** — 근사다.
  *   - `0` 키의 레벨업 하위 창 (하위 단계 1·2·10, K 3-3 쪽). 레벨업 비용 표는 이 표가 아니다.
  *   - 열린 마선수 자리의 애니메이션 `[skin+0x138]` — 여기서는 정지 그림을 쓴다.
  */
 export function AceSelectScreen({
-  phase, openedAcePitcherIds = [], openedAceBatterIds = [], levels, gamePoint = 0, onSelect, onCancel,
+  phase, openedAcePitcherIds = [], openedAceBatterIds = [], levels, gamePoint = 0,
+  onOpenAce, onSelect, onCancel,
 }: AceSelectScreenProps) {
   const imgTextOrigins = useFrameOrigins(IMG_TEXT_FRAME)
   const cellCount = ACE_LAYOUT.grid.columns * ACE_LAYOUT.grid.rows
@@ -74,6 +83,8 @@ export function AceSelectScreen({
   const [cursor, setCursor] = useState(phase === ACE_PHASE.마투수 ? 0 : ACE_PER_ROLE)
   /** 오픈 힌트 팝업이 뜬 칸 (0xa68e~0xa6dc). null 이면 안 뜬 것 */
   const [hintCell, setHintCell] = useState<number | null>(null)
+  /** G가 모자라 뜬 부족 팝업 (0xa46e → 0xaa00, 팝업 id 0x20) */
+  const [isShortageOpen, setIsShortageOpen] = useState(false)
 
   useEffect(() => {
     setCursor(phase === ACE_PHASE.마투수 ? 0 : ACE_PER_ROLE)
@@ -96,10 +107,23 @@ export function AceSelectScreen({
     if (aceRoleOfCell(cell) === phase) setHintCell(cell)
   }
 
+  /**
+   * 오픈 힌트 팝업의 답 (0xa390~0xa46e). 첫 버튼(0)이 "예" 다.
+   *
+   * G가 모자라면(`G < 가격`, 0xa3dc `blt`) **사지 않고** 부족 팝업으로 넘어간다 — G도 안 깎인다.
+   * 가격과 딱 같으면 산다. 못 여는 칸(4·9)은 버튼이 OK 하나라 여기로 와도 아무 일이 없다.
+   */
+  const answerOpenPopup = (cell: number, answer: number) => {
+    setHintCell(null)
+    if (answer !== 0 || !aceOpensWithGamePoint(cell) || onOpenAce === undefined) return
+    if (gamePoint < aceOpenPriceOf(cell)) return setIsShortageOpen(true)
+    onOpenAce(cell)
+  }
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       // 팝업이 떠 있는 동안에는 격자 키를 받지 않는다 — MessageBox 가 답을 가져간다
-      if (hintCell !== null) return
+      if (hintCell !== null || isShortageOpen) return
       const step =
         event.key === 'ArrowRight' ? 1
         : event.key === 'ArrowLeft' ? -1
@@ -232,7 +256,19 @@ export function AceSelectScreen({
         <MessageBox
           text={aceOpenPopupTextOf(hintCell)}
           buttons={aceOpensWithGamePoint(hintCell) ? ['예', '아니오'] : ['OK']}
-          onAnswer={() => setHintCell(null)}
+          onAnswer={(answer) => answerOpenPopup(hintCell, answer)}
+        />
+      )}
+
+      {/*
+        **G포인트 부족 팝업** (0xa46e → 0xaa00, id 0x20) — 글은 문자열표가 아니라 코드에 박힌
+        0xcc214 다. ⚠️ 원본은 "예" 가 유료 구매 페이지로 나가지만 웹판에는 그 길이 없어 둘 다 닫는다.
+      */}
+      {isShortageOpen && (
+        <MessageBox
+          text={ACE_OPEN_SHORTAGE_POPUP}
+          buttons={['예', '아니오']}
+          onAnswer={() => setIsShortageOpen(false)}
         />
       )}
     </RawScreen>

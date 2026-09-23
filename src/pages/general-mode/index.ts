@@ -39,6 +39,19 @@ export type { MatchSettingsWindowProps } from '@/pages/general-mode/ui/MatchSett
 export { useGeneralMode } from '@/pages/general-mode/model/useGeneralMode'
 export type { GeneralModeSession, UseGeneralModeOptions } from '@/pages/general-mode/model/useGeneralMode'
 
+/**
+ * 마선수 오픈 플래그 저장 칸 (`mgr[0x30..0x39]`) — 앱이 저장소만 꽂아 주면 된다.
+ * 오픈 값은 `aceOpenPriceOf` 로 꺼내 G 에서 뺀다.
+ */
+export { useAceOpen } from '@/pages/general-mode/model/useAceOpen'
+export type { AceOpenSession } from '@/pages/general-mode/model/useAceOpen'
+export {
+  ACE_OPEN_CELL_COUNT, ACE_OPEN_SHORTAGE_POPUP, INITIAL_ACE_OPEN_SAVE,
+  aceBatterIdsOf, aceOpenAnswerOf, aceOpenPriceOf, acePitcherIdsOf,
+  isAceCellOpen, normalizeAceOpenSave, openAceCell,
+} from '@/pages/general-mode/lib/aceOpenState'
+export type { AceOpenAnswer, AceOpenSave } from '@/pages/general-mode/lib/aceOpenState'
+
 /** 준비 기록(skin+0xbc)과 단계 번호 — 저장에 적거나 화면을 따로 몰 때 쓴다 */
 export {
   ACE_PER_ROLE, ACE_PHASE, DEFAULT_OPENED_ACE_BATTER_IDS, DEFAULT_OPENED_ACE_PITCHER_IDS,

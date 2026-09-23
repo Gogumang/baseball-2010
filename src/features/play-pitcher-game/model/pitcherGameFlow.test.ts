@@ -480,3 +480,24 @@ describe('주자 처리는 수비 화면이 끝나야 정해진다 (상태 0x17 
     expect(쪼개서.lastDefensePlay).toBeNull()
   })
 })
+
+/**
+ * 투수 미션 조준 흔들림 (0x39c5c) — 진행기 입력에 실린 `conditionCode` 가 투구 만들기까지 간다.
+ * ⚠️ 흔들림 값은 **투수 미션 레코드**에서 온다. 타자 미션은 전부 0 이라 아무 일도 없다.
+ */
+describe('미션 조준 흔들림을 진행기가 실어 나른다', () => {
+  const 던진공 = (missionConditionCode?: number) =>
+    startPitch(
+      startPitcherGame(기본옵션, 씨앗(3)),
+      { ...한가운데직구, ...(missionConditionCode === undefined ? {} : { missionConditionCode }) },
+      씨앗(5),
+    ).lastPitch
+
+  it('안 실으면 지금까지와 똑같은 공이다', () => {
+    expect(던진공(0)?.plate).toEqual(던진공()?.plate)
+  })
+
+  it('세기 3 을 실으면 공이 달라진다', () => {
+    expect(던진공(3)?.plate).not.toEqual(던진공()?.plate)
+  })
+})

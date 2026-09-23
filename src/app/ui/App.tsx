@@ -22,7 +22,7 @@ import { useSeasonSession } from '@/app/model/useSeasonSession'
 import { SeasonRoute } from '@/app/ui/SeasonRoute'
 import { usePitcherLeagueSession } from '@/app/model/usePitcherLeagueSession'
 import { PitcherLeagueRoute } from '@/app/ui/PitcherLeagueRoute'
-import { GeneralModeScreen, DEFAULT_OPENED_ACE_BATTER_IDS, DEFAULT_OPENED_ACE_PITCHER_IDS } from '@/pages/general-mode'
+import { GeneralModeScreen, aceOpenPriceOf, useAceOpen } from '@/pages/general-mode'
 import { ROOKIE_BATTER_ABILITY } from '@/entities/batting/model/batter'
 
 const SETTINGS_KEY = 'compus-baseball/settings'
@@ -31,6 +31,11 @@ const COLLECTION_KEY = 'compus-baseball/collection'
 const SEASON_KEY = 'compus-baseball/season'
 /** 투수편 저장 — 원본도 타자편과 **다른 칸**이다 (StrMAINMENU[210]·[211] 모드 초기화가 따로 지운다) */
 const PITCHER_KEY = 'compus-baseball/pitcher-league'
+/**
+ * 마선수 오픈 플래그 10칸 — 원본은 전역 기록 `mgr[0x30..0x39]` 다 (0xa3f6).
+ * 옛 세이브에는 이 칸이 아예 없다 — 없으면 정규화가 기본 개방 둘(싸이커·메디카)만 켠다.
+ */
+const ACE_OPEN_KEY = 'compus-baseball/ace-open'
 
 const ENTRY_SCREENS: readonly Screen['kind'][] = ['타이틀', '메인메뉴', '도움말', '환경설정', '스페셜', '나리편선택', '팀선택', '선수등록', '홈런더비', '일반모드']
 
@@ -50,6 +55,7 @@ export function App() {
   const collectionStore = useMemo(() => createLocalStorageJsonStore(COLLECTION_KEY), [])
   const seasonStore = useMemo(() => createLocalStorageJsonStore(SEASON_KEY), [])
   const pitcherStore = useMemo(() => createLocalStorageJsonStore(PITCHER_KEY), [])
+  const aceOpenStore = useMemo(() => createLocalStorageJsonStore(ACE_OPEN_KEY), [])
   const gameSettings = useGameSettings(settingsStore)
   // 소리 통로 하나 — 환경설정 칸(0~4) × 25 가 원본 소리 크기다 (옵션 +0x2e)
   const sound = useSound(gameSettings.settings.soundLevel)
@@ -61,6 +67,8 @@ export function App() {
   useSceneEnterSound(sound, screen.kind, screenEnterSoundOf(screen))
 
   const runner = useAtBatRunner()
+  // 마선수 오픈 플래그 — 원본 전역 기록 `mgr[0x30..0x39]`
+  const aceOpen = useAceOpen(aceOpenStore)
   const seasonSession = useSeasonSession(seasonStore, random)
   const pitcherSession = usePitcherLeagueSession(pitcherStore, random, gameSettings.settings.pitchControl === '게이지')
   const careerSession = useCareerSession({ runner, random, saveGame, screen, setScreen, sound })
@@ -123,10 +131,23 @@ export function App() {
       <GeneralModeScreen
         random={random}
         openedHiddenTeamIds={collection.collection.openedHiddenIds}
-        // 마선수 오픈 플래그(mgr[0x30+idx], 전역 기록)는 웹판 저장에 아직 칸이 없다 — 저장이
-        // 생기기 전까지는 원본처럼 기본 개방분(싸이커·메디카)만 열어 둔다 (K-bursts-special.md K-3)
-        openedAcePitcherIds={DEFAULT_OPENED_ACE_PITCHER_IDS}
-        openedAceBatterIds={DEFAULT_OPENED_ACE_BATTER_IDS}
+        // 마선수 오픈 플래그(mgr[0x30+idx]) — 이제 저장에서 읽는다. 새 저장이면 기본 개방분
+        // (싸이커·메디카) 둘만 켜져 있다 (K-bursts-special.md K-3 3-3)
+        openedAcePitcherIds={aceOpen.openedAcePitcherIds}
+        openedAceBatterIds={aceOpen.openedAceBatterIds}
+        // ⚠️ **근사**: 원본 G포인트는 전역 기록(`mgr+0x64`)이라 모드와 상관없이 하나다. 웹판은
+        //    육성 선수 칸에 있어서 **저장된 선수**의 것을 쓴다 — 홈런더비(EntryRoutes)가 이미
+        //    `career ?? savedCareer` 로 같은 자리를 메우고 있다. 선수가 아예 없으면 0 이다.
+        gamePoint={(careerSession.career ?? careerSession.savedCareer)?.gamePoint ?? 0}
+        // "예" → G를 빼고 플래그를 세운다 (0xa3e2 · 0xa3f6). 모자람 판정은 화면이 이미 했다.
+        // `gainGamePoint` 의 자르기 [0, 99999] 가 원본 0xa3e4~0xa3f0 과 같다.
+        // ⚠️ **못 메운 자리**: 나만의리그를 안 들고 있는 동안에는 `gainGamePoint` 가 손댈 선수가
+        //    없어 **G가 실제로 안 깎인다** (홈런더비 보상이 사라지는 것과 같은 자리다).
+        //    전역 G 지갑이 생기기 전까지는 여기서 더 할 수 있는 것이 없다.
+        onOpenAce={(cell) => {
+          careerSession.actions.gainGamePoint(-aceOpenPriceOf(cell))
+          aceOpen.open(cell)
+        }}
         gaugeSettingOn={gameSettings.settings.pitchControl === '게이지'}
         // 한 판 치고 끝이라 정산할 곳이 없다 — 원본도 모드 1 은 저장에 아무것도 안 남긴다
         onFinish={() => setScreen({ kind: '메인메뉴' })}

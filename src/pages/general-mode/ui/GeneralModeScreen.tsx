@@ -23,6 +23,13 @@ export interface GeneralModeScreenProps {
   readonly openedAceBatterIds?: readonly number[]
   /** 마선수 레벨 (격자 칸 번호 → 레벨). 없으면 이름만 나온다 */
   readonly aceLevels?: Readonly<Record<number, number>>
+  /**
+   * 들고 있는 G포인트 (원본은 전역 기록 `mgr+0x64`, 웹판은 육성 선수 칸).
+   * 마선수 오픈 값과 머리띠 숫자가 이것을 본다.
+   */
+  readonly gamePoint?: number
+  /** 마선수 한 칸을 G로 열었다 (0xa3f6) — 받는 쪽이 G를 빼고 오픈 플래그를 세운다 */
+  readonly onOpenAce?: (cell: number) => void
   /** 구장 표 — 도시명 0xd1df8 · 수용 인원 0xd1e34 (웹판 데이터에 아직 없다) */
   readonly stadiums?: readonly StadiumEntry[]
   /** 저장에서 읽은 경기진행 설정 (모드 칸 0) */
@@ -57,7 +64,7 @@ export interface GeneralModeScreenProps {
 export function GeneralModeScreen(props: GeneralModeScreenProps) {
   const {
     random, isQuickStart = false, openedHiddenTeamIds, openedAcePitcherIds, openedAceBatterIds,
-    aceLevels, stadiums, initialSettings, gaugeSettingOn, onFinish, onExit,
+    aceLevels, gamePoint, onOpenAce, stadiums, initialSettings, gaugeSettingOn, onFinish, onExit,
   } = props
 
   const session = useGeneralMode({
@@ -128,6 +135,8 @@ export function GeneralModeScreen(props: GeneralModeScreenProps) {
           {...(openedAcePitcherIds === undefined ? {} : { openedAcePitcherIds })}
           {...(openedAceBatterIds === undefined ? {} : { openedAceBatterIds })}
           {...(aceLevels === undefined ? {} : { levels: aceLevels })}
+          {...(gamePoint === undefined ? {} : { gamePoint })}
+          {...(onOpenAce === undefined ? {} : { onOpenAce })}
           onSelect={actions.selectAce}
           onCancel={back}
         />
