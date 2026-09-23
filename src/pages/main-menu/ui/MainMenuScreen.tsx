@@ -30,7 +30,18 @@ interface MainMenuScreenProps {
 }
 
 const MAIN_UI = './sprites/main_ui'
+/**
+ * 윗단(바퀴) 칸 글자는 **`ui/img_text` 프레임**이다 — 높이 **10px** 로, 아랫단이 쓰는
+ * `main_ui` 글자(높이 27)보다 훨씬 작다. 원본 번호표 `[0x1552d4c + 4i]` 는 아직 안 읽혔지만,
+ * `img_text` 409장을 펼쳐 보면 앞칸이 **그대로 메뉴 차례**다:
+ *   0 게임시작 · 1 스페셜 · 2 도움말 · 3 환경설정 · 4 랭킹 … 그리고 **26 게임문의**
+ * ⚠️ **게임문의만 5 가 아니다** — 프레임 5 는 "선물&추천" 이다. 0~5 연속으로 짐작하면 틀린다.
+ * 눈으로 맞춘 것이라 **유력**이지만, 다섯 칸이 순서대로 맞는 것과 26 이 정확히 "게임문의" 인 것이 근거다.
+ */
+const IMG_TEXT = './sprites/img_text'
+const TOP_TEXT_FRAMES: readonly number[] = [0, 1, 2, 3, 4, 26]
 const labelImage = (frame: number) => `${MAIN_UI}/frames/${String(frame).padStart(3, '0')}.png`
+const textImage = (frame: number) => `${IMG_TEXT}/frames/${String(frame).padStart(3, '0')}.png`
 const partImage = (frame: number) => `${MAIN_UI}/${String(frame).padStart(3, '0')}.png`
 
 /**
@@ -72,7 +83,7 @@ export function MainMenuScreen({
     else onBack()
   })
   const origins = useFrameOrigins(`${MAIN_UI}/frames`)
-  const widthOf = (frame: number) => origins?.[String(frame).padStart(3, '0')]?.width ?? 0
+  const textOrigins = useFrameOrigins(`${IMG_TEXT}/frames`)
   const entries = entriesOf(state.tier)
   const selectedId = selectedIdOf(state)
   const selectedIndex = entries.findIndex((entry) => entry.id === selectedId)
@@ -123,7 +134,12 @@ export function MainMenuScreen({
 
       {/* 잠긴 칸도 목록에 그대로 나오고 커서도 지나간다 (R11 4-1) — 안내조차 없는 칸만 흐리게 (근사) */}
       {entries.map((entry, index) => {
-        const topLeft = labelTopLeftOf(index, widthOf(entry.labelFrame))
+        // 바퀴는 img_text(10px), 세로 목록은 main_ui(27px) — 그림판이 다르니 폭도 따로 잰다
+        const textFrame = TOP_TEXT_FRAMES[index]
+        const useText = isWheel && textFrame !== undefined
+        const key = String(useText ? textFrame : entry.labelFrame).padStart(3, '0')
+        const width = (useText ? textOrigins : origins)?.[key]?.width ?? 0
+        const topLeft = labelTopLeftOf(index, width)
         return (
           <button
             key={entry.id}
@@ -138,7 +154,7 @@ export function MainMenuScreen({
               dispatch({ type: '시작' })
             }}
           >
-            <img src={labelImage(entry.labelFrame)} alt="" />
+            <img src={useText ? textImage(textFrame) : labelImage(entry.labelFrame)} alt="" />
           </button>
         )
       })}
