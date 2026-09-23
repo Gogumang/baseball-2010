@@ -7,10 +7,12 @@
  *
  * isAvailable 은 원작 여부가 아니라 **이 웹판에서 아직 만들었는지**다.
  *
- * ⚠️ `TOP_MENU` 는 지금 **아무 데서도 안 쓴다.** 웹판 메인 메뉴(`MainMenuScreen`)는 원작의 두 단
- * (처음 메뉴 → 게임시작 목록) 중 아랫단인 `GAME_START_MENU` 만 그리고, 스페셜·도움말·환경설정은
- * 화면 구석의 임시 버튼으로 연다. 그래서 여기 플래그를 켜도 아직 화면에 보이는 것은 없다 —
- * 원작대로 처음 메뉴 한 단을 되살리는 일은 따로 남아 있다.
+ * 두 단 = 원본 장면 0x103 의 하위 상태 **4(처음 메뉴 `TOP_MENU`)** 와 **5(게임시작 목록
+ * `GAME_START_MENU`)** 다. 4 에서 [게임시작] 을 고르면 5 로 내려가고(진입 0x25b88), 5 에서 CLR 을
+ * 누르면 4 로 돌아온다(갱신 0x28cb0 의 `0xbcb49(this+0x18, 4)`).
+ * 글자 그림 번호는 상태 5 의 표 0xceb28 (6·7·8·9·10·13·12) 이 `main_ui` 프레임과 그대로 맞고
+ * (P6-screens 2d 확정), 처음 메뉴 쪽 0~5 는 프레임 그림을 눈으로 확인해 붙였다
+ * (000 게임시작 · 001 스페셜 · 002 도움말 · 003 환경설정 · 004 랭킹 · 005 게임문의).
  */
 export interface MainMenuEntry {
   readonly id: string
@@ -40,3 +42,9 @@ export const GAME_START_MENU: readonly MainMenuEntry[] = [
 
 /** [15] 나만의리그를 새로 시작할 때 기존 저장이 있으면 묻는다. */
 export const NEW_GAME_CONFIRM = '!C새로하시겠습니까?!N기존 데이터는 사라집니다.'
+
+/**
+ * [115] 대전모드를 고를 때 시즌 커리어(전역기록 +0x42)가 없으면 뜨는 확인 팝업 문구.
+ * 원본 갱신 0x28cb0 → 0x28dcc 가 StrMAINMENU[0x73 = 115] 로 띄운다 (R11-special-leftovers 4-1 확정).
+ */
+export const SEASON_FIRST_NOTICE = '!C!cFFFFFF시즌모드를!N먼저 시작해주세요'

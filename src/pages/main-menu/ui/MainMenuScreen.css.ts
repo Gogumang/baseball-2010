@@ -4,7 +4,8 @@ import { theme } from '@/app/styles/theme.css'
 /*
  * 메인 메뉴는 원본 그림으로만 그린다 — 배너(mode_back/000), 글자 목록(main_ui/frames),
  * 선택 바(main_ui/002), 설명 판(main_ui/003). 좌표는 `lib/mainMenuLayout.ts` 가 들고 있다.
- * 구석의 스페셜·도움말·환경설정·타이틀 버튼만 원본 화면이 아직 없어 웹 임시로 둔다.
+ * 두 단(처음 메뉴 · 게임시작 목록) 모두 같은 틀을 쓴다.
+ * 구석의 취소 버튼만 원본에 없다 — 원본은 CLR 키라 웹 임시로 둔다.
  */
 export const layer = style({ position: 'absolute', imageRendering: 'pixelated', pointerEvents: 'none' })
 
@@ -16,10 +17,13 @@ export const menuRow = style({
   background: 'none',
   cursor: 'pointer',
   imageRendering: 'pixelated',
-  selectors: {
-    '&:disabled': { cursor: 'default', opacity: 0.45 },
-  },
 })
+
+/**
+ * 못 들어가고 안내 문구도 없는 칸(랭킹·게임문의) — 흐리게 둔다.
+ * ⚠️ **근사**: 원작이 이런 칸을 어떻게 보이는지는 해독 문서에 없다 (`model/mainMenu.ts` 참고).
+ */
+export const menuRowDimmed = style([menuRow, { opacity: 0.45 }])
 
 /** 설명 판 위에 얹는 글 */
 export const description = style({
@@ -57,23 +61,6 @@ export const backButton = style({
   left: '6px',
   top: '6px',
   zIndex: 1,
-  border: 'none',
-  background: 'none',
-  color: theme.color.inkDim,
-  fontSize: '11px',
-  cursor: 'pointer',
-})
-
-export const topRightButtons = style({
-  position: 'absolute',
-  right: '6px',
-  top: '6px',
-  zIndex: 1,
-  display: 'flex',
-  gap: '4px',
-})
-
-export const cornerButton = style({
   border: 'none',
   background: 'none',
   color: theme.color.inkDim,
