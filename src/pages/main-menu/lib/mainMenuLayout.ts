@@ -1,32 +1,44 @@
 /**
  * 메인 메뉴 배치 — 원본 그림·좌표를 그대로 쓴다.
  *
- * 원작 메뉴 판(0x24b1c)은 **화면 아래 반원 바퀴**다 (F-ui-layout F-5 · 4-2).
+ * 원작 메뉴는 **두 겹**이다. 어느 하위 상태든 먼저 반원 바퀴 판 0x24b1c 를 깔고,
+ * 하위 목록이 있는 상태(5·6·9 …)는 그 위에 **세로 릴 0x2524c** 를 더 그린다
+ * (부르는 곳 0x2857c·0x285ac·0x285dc·0x2860c·0x2863c 가 모두 `0x24b1c` → `0x2524c` 짝이다).
  *
- * ## 확정 (디스어셈에서 읽은 값 — F-ui-layout 4-2)
- * - 바퀴 중심 `(scrW>>1, scrH)` = **(120, 320)** — 초기화 0x237c4~0x237dc
+ * ## 두 단이 **같은 모델**이다 — 각도가 아니라 **배열이 돈다**
+ * 커서가 칸 사이를 옮겨 다니는 것이 아니라, 화면 자리는 고정이고 **항목 배열이 한 칸씩 회전**한다.
+ * 회전 함수는 윗단·아랫단이 **같은 0x24780** 이다 (윗단 0x24c58, 아랫단 0x253a6).
+ *   `0x24780(obj, arr, n, dir)` — arr 에서 −1 이 아닌 구간만 찾아
+ *   dir −1 이면 오른쪽 1칸, dir −2 면 왼쪽 1칸 돌린다. **고른 칸은 언제나 그 구간의 첫 칸**이다.
+ * 키도 같다 (상태 4 는 0x294e6, 상태 5 는 0x28e26): ↑·← = −1, ↓·→ = −2.
+ *
+ * ## 윗단 (하위 상태 4, 반원 바퀴) — 확정
+ * - 중심 `(scrW>>1, scrH)` = **(120, 320)** — 0x237c4(폭 0x14008b8) · 0x237d6(높이 0x14008c8)
  * - 테두리 원 3겹: 반지름 **93 · 95 · 97**, 색 RGB(37,55,120) · RGB(138,185,235) · RGB(36,55,120) — 0x24cf6~0x24d70
  * - 가운데에 main_ball 애니 0 을 (120,320) 기준점으로 그린다 — 0x24cda
- * - 칸 6개 각도 표 0xcead4 = **[0,45,90,180,270,315]**, 순서 표 0xceae0 = [0..5]
+ * - 각도 표 0xcead4 = **[0,45,90,180,270,315]** (s16), 순서 표 0xceae0 = [0..5]
+ * - 칸 그림 표 **0xcea6c = [0,1,2,3,4,26]** (u32, `ui/img_text` 프레임) — 상태 4 진입 0x258fc 가
+ *   전역 `[0x1552d4c]` 로 통째로 복사하고, 그 배열이 0x24c58 에서 돈다. **확정**
+ *   (예전 주석이 "눈으로 맞춘 유력" 이라 했는데 값은 그대로 맞았다.)
  * - 칸 위치: `x = 120 + (cos a·93 >> 16) + (a 가 [90,270] 밖이면 20)`, `y = 320 + (sin a·93 >> 16)` — 0x24e8a~0x24eba
- * - 도는 동안 각 = 표값 ± 카운터×9, **90° 벌어진 칸(90↔180 · 180↔270)은 ×18** — 0x24de6~0x24e2c
- * - 카운터 0→4, 즉 **한 칸 이동이 5틱** — 0x24c42~0x24c4c
- * - 칸 그림은 기준점 가운데 맞춤 `(x − w/2, y − h/2)` — 0x24ecc~0x24ee8
+ * - 도는 동안 각 = 표값 ± 카운터×9, **90° 벌어지는 칸만 ×18** — 0x24de6~0x24e2c
+ * - 카운터 0→4, 5틱째에 배열을 돌린다 — 0x24c42~0x24c4c
+ * - 칸 그림은 기준점 가운데 맞춤 `(x − w/2, y − h/2)`, 폭·높이는 그 img_text 프레임 것이다 — 0x24fc4~0x24fe2
+ * - **각이 19 미만이거나 341 초과면 아예 안 그린다** — 0x24ef0. 고른 칸은 배열 0번 = 각도 0° 라
+ *   **늘 이 구간에 들어간다 → 고른 칸은 바퀴에 안 그려지고 설명 판이 대신한다.**
+ * - 커서 [obj+0xe8] 은 0~5 로 감싼다 — 0x24bfa~0x24c14. OK 를 누르면 표 0xcebdc = [5,6,7,8,9,10]
+ *   으로 하위 상태를 고른다 (0x294a2) → 게임시작 5 · 스페셜 6 · 도움말 7 · 환경설정 8 · 랭킹 9 · 게임문의 10.
  *
- * ## 유력·근사 (문서가 확정이라고 안 적은 것 — 지어내지 않고 여기 적어 둔다)
- * - **선택된 칸이 맨 위 270° 에 온다**: 4-2 가 "유력" 이라고만 적는다.
- * - **도는 방향**: 원본 방향 값은 [+0x100] = −1/−2 인데 ↑↓ 중 어느 쪽인지는 문서에 없다.
- *   웹은 "다음 칸이 315°→270° 로 올라온다"(= 표 순서 거꾸로)로 뒀다. **근사**.
- * - **칸 그림**: 원본은 ui/img_text 프레임([0x1552d4c+4i], 번호표 미해독)을 그린다.
- *   웹은 지금 쓰던 main_ui 글자 그림(높이 27)을 그대로 바퀴에 얹는다. 원본 아이콘은 10px 높이라
- *   양끝 칸(180°·0°)이 화면 밖으로 덜 삐져나갔을 것이다. **근사**.
- * - **각도 구간별 main_ui 이미지 1·2·3·4 분기**(a>332→2, 323<a≤332→1, a≤27→3, 27<a≤36→4)는
- *   뜻이 미확인(4-2 "미확인")이라 옮기지 않았다.
+ * ## 아랫단 (세로 릴 0x2524c) — 확정
+ * 아래 `MENU_REEL_*` 주석 참고. 표 넷을 전부 binary.mod 에서 다시 떠 대조했다.
+ *
+ * ## 아직 모르는 것
+ * - 각도 구간별 main_ui 이미지 0·1·2 접힘 연출(R6 2절)은 안 옮겼다. **미구현**(지어낸 것 아님).
  * - main_ball 을 그리는 조건 `[+0xe6] ≥ 0` 의 뜻을 몰라 늘 그린다. **근사**.
  *
  * 그림 치수는 직접 읽어 확정이다:
- *   배너 `mode_back/000` 240×84 · 글자 `main_ui/frames/NNN` 높이 **27**
- *   선택 바 `main_ui/002` 125×15 · 설명 판 `main_ui/003` 149×63
+ *   배너 `mode_back/000` 240×84 · `main_ui/frames/NNN` 높이 **27** · `img_text/frames/NNN` 높이 **10**
+ *   설명 판 `main_ui/003` 149×63
  */
 
 /** 원작 화면 */
@@ -37,18 +49,18 @@ export const SCREEN_CENTER_X = 120
 
 export const MENU_BANNER = { x: 0, y: 0, width: 240, height: 84 } as const
 
-/** 글자 그림의 공통 높이 (main_ui/frames 원점표에서 읽었다) */
+/** `main_ui/frames` 글자 그림의 공통 높이 (원점표에서 읽었다) — 설명 판 안 큰 글자가 이 크기다 */
 export const MENU_LABEL_HEIGHT = 27
 
-// ──────────────────────────────── 반원 바퀴 (윗단 = 처음 메뉴 6칸) ────────────────────────────────
+// ──────────────────────────── 반원 바퀴 (윗단 = 처음 메뉴 6칸) ────────────────────────────
 
 /** 바퀴 중심 (120,320) — 초기화 0x237c4 (확정) */
-export const MENU_WHEEL_CENTER = { x: 120, y: 320 } as const
+export const MENU_WHEEL_CENTER = { x: SCREEN_CENTER_X, y: SCREEN_HEIGHT } as const
 
-/** 칸이 놓이는 반지름 — 위치식의 93 (확정) */
+/** 칸이 놓이는 반지름 — 0x24e92 의 0x5d (확정) */
 export const MENU_WHEEL_RADIUS = 93
 
-/** 테두리 원 3겹 — 0x24cf6~0x24d70 (확정). 안쪽부터 93 · 95 · 97 */
+/** 테두리 원 3겹 — 0x24cf6~0x24d70 (확정) */
 export const MENU_WHEEL_RINGS = [
   { radius: 93, color: 'rgb(37, 55, 120)' },
   { radius: 95, color: 'rgb(138, 185, 235)' },
@@ -60,10 +72,21 @@ export const MENU_WHEEL_ANGLES = [0, 45, 90, 180, 270, 315] as const
 /** 순서 표 0xceae0 — 확정. 표 자리와 칸 번호가 1:1 이다. */
 export const MENU_WHEEL_ORDER = [0, 1, 2, 3, 4, 5] as const
 
-/** 선택된 칸이 오는 표 자리 = 270°(맨 위) — 4-2 "유력" */
-export const MENU_WHEEL_SELECTED_SLOT = 4
+/**
+ * 칸 글자 표 0xcea6c (u32 6개, `ui/img_text` 프레임 번호) — 확정.
+ * 상태 4 진입 0x258fc 가 `memcpy([0x1552d4c], 0xcea6c, 0x18)` 로 복사한다.
+ * 0 게임시작 · 1 스페셜 · 2 도움말 · 3 환경설정 · 4 랭킹 · **26 게임문의** (5 는 "선물&추천" 이라 아니다).
+ */
+export const MENU_WHEEL_ITEM_FRAMES = [0, 1, 2, 3, 4, 26] as const
 
-/** 한 칸 이동에 걸리는 틱 — 카운터 0→4 (확정) */
+/**
+ * 고른 칸이 오는 배열 자리 = **0번(각도 0°)** — 0x24780 이 구간 첫 칸을 기준으로 돌리고,
+ * 설명 판도 이 자리(`[sp+0x38] == 0`)에서만 그린다 (0x24ff0). **확정**.
+ * 각도 0° 는 아래 `isMenuWheelAngleDrawn` 에서 걸러지므로 **고른 칸은 바퀴에 안 그려진다.**
+ */
+export const MENU_WHEEL_SELECTED_SLOT = 0
+
+/** 한 칸 이동에 걸리는 틱 — 카운터 0→4, 5틱째 회전 (확정) */
 export const MENU_WHEEL_TURN_TICKS = 5
 
 /** 기준점 가운데 맞춤이라 화면 밖으로 넘치는 칸도 그대로 그린다 (stage 가 잘라 준다) */
@@ -71,6 +94,9 @@ export interface MenuWheelPoint {
   readonly x: number
   readonly y: number
 }
+
+/** 원본 키 방향 값 `[obj+0x100]` — ↑·← 가 −1, ↓·→ 가 −2 다 (0x294e6 · 0x28e26) */
+export type MenuTurnDirection = -1 | -2
 
 /** 각도를 0 이상 360 미만으로 접는다 */
 function wrapDegrees(angle: number): number {
@@ -102,45 +128,53 @@ export function menuWheelPointOf(angle: number): MenuWheelPoint {
 }
 
 /**
- * 화면에 보이는 칸인지 — 기준점이 화면 아래(y > 320)로 내려가면 안 보인다.
- * 표의 여섯 각 중 45°·90° 가 여기 걸려, 실제로는 **네 칸(180 · 270 · 315 · 0)만** 보인다.
+ * 그 각에 칸을 그리는지 — 0x24ef0 `r2 = a − 0x13 ; cmp r2, #0x142 ; bhi 건너뜀` (부호 없음)
+ * 곧 **19 ≤ a ≤ 341** 만 그린다. 표의 0° 자리(= 고른 칸)는 여기서 걸린다.
  */
-export function isMenuWheelAngleVisible(angle: number): boolean {
-  return menuWheelPointOf(angle).y <= SCREEN_HEIGHT
+export function isMenuWheelAngleDrawn(angle: number): boolean {
+  const a = wrapDegrees(angle)
+  return a >= 19 && a <= 341
 }
 
 /**
- * 칸 번호 → 각도 표 자리. 고른 칸이 270°(표 4번)에 오도록 돌린 것이다.
- * 표가 여섯 자리뿐이라 **6칸짜리 윗단에만** 쓴다.
+ * 도는 동안 한 틱에 움직이는 각 — 보통 9°, **90° 벌어지는 자리만 18°** (0x24de6~0x24e06, 확정).
+ * dir −1(각이 커지는 쪽)은 90·180 에서, dir −2(작아지는 쪽)는 180·270 에서 18° 다.
  */
-export function menuWheelSlotOf(index: number, selectedIndex: number): number {
-  const count = MENU_WHEEL_ANGLES.length
-  return (((index - selectedIndex + MENU_WHEEL_SELECTED_SLOT) % count) + count) % count
-}
-
-/** 칸 번호 → 멈춰 있을 때의 각도 */
-export function menuWheelAngleOf(index: number, selectedIndex: number): number {
-  return MENU_WHEEL_ANGLES[menuWheelSlotOf(index, selectedIndex)]
+export function menuWheelStepOf(angle: number, direction: MenuTurnDirection): number {
+  if (direction === -1 && (angle === 90 || angle === 180)) return 18
+  if (direction === -2 && (angle === 180 || angle === 270)) return 18
+  return 9
 }
 
 /**
- * 두 각 사이의 짧은 쪽 차이 (−180, 180]. 표에서 이웃한 자리끼리는 늘 ±45° 아니면 ±90° 다.
+ * 배열 자리 `slot` 이 카운터 `counter` 일 때 놓이는 각.
+ * dir −1 이면 표값 + 걸음×카운터, −2 면 −. 360 을 넘으면 360 으로 잘리고(0x24e2e),
+ * 음수면 +360 한다(0x24e74). `direction` 이 null 이면 멈춰 있는 표값 그대로다.
  */
-export function menuWheelDeltaOf(from: number, to: number): number {
-  return ((((to - from + 540) % 360) + 360) % 360) - 180
+export function menuWheelAngleAt(
+  slot: number,
+  direction: MenuTurnDirection | null,
+  counter: number,
+): number {
+  const base = MENU_WHEEL_ANGLES[slot]
+  if (direction === null || counter <= 0) return base
+  const moved = menuWheelStepOf(base, direction) * Math.min(counter, MENU_WHEEL_TURN_TICKS)
+  const angle = direction === -1 ? base + moved : base - moved
+  if (angle > 360) return 360
+  return angle < 0 ? angle + 360 : angle
 }
 
 /**
- * 도는 도중의 각 — 카운터 0..5 를 5틱에 나눠 간다.
- * 차이가 45° 면 틱마다 9°, 90° 면 18° 로 떨어진다 (원본 0x24de6 의 ×9 / ×18 과 같다).
+ * 커서가 `cursor` 일 때 각도 표 자리마다 놓이는 칸 번호.
+ * 아랫단과 같은 0x24780 회전이라 "왼쪽으로 cursor 번 돌린 것" 과 같다 — 곧 `(cursor + 자리) % 6`.
  */
-export function menuWheelTurnAngleOf(from: number, to: number, counter: number): number {
-  const step = Math.min(Math.max(counter, 0), MENU_WHEEL_TURN_TICKS)
-  if (step >= MENU_WHEEL_TURN_TICKS) return to
-  return wrapDegrees(from + (menuWheelDeltaOf(from, to) * step) / MENU_WHEEL_TURN_TICKS)
+export function menuWheelOrderOf(cursor: number): number[] {
+  let order: number[] = [...MENU_WHEEL_ORDER]
+  for (let step = 0; step < cursor; step += 1) order = rotateMenuReel(order, -2)
+  return order
 }
 
-/** 칸 그림의 좌상단 — 기준점 가운데 맞춤 (0x24ecc: x − w/2, y − h/2) */
+/** 칸 그림의 좌상단 — 기준점 가운데 맞춤 (0x24fc4: x − w/2, y − h/2) */
 export function menuWheelLabelTopLeftOf(
   point: MenuWheelPoint,
   width: number,
@@ -149,27 +183,163 @@ export function menuWheelLabelTopLeftOf(
   return { x: point.x - Math.trunc(width / 2), y: point.y - Math.trunc(height / 2) }
 }
 
-// ──────────────────────── 세로 목록 (아랫단 = 게임시작 목록 7칸, 근사) ────────────────────────
+// ──────────────────────── 세로 릴 (아랫단 = 하위 목록 0x2524c) ────────────────────────
 
 /**
- * ⚠️ **아랫단(원본 하위 상태 5)은 바퀴가 아니다.**
- * 원본은 상태 5 에서도 같은 바퀴 판 0x24b1c 를 깔고 그 **위에** 하위 목록 0x2524c 를 더 그린다
- * (F-ui-layout 4-0). 그 하위 목록의 좌표는 아직 해독 안 됐고, 각도 표는 6칸뿐이라
- * 7칸이 어떻게 도는지 근거가 없다 → **지어내지 않고 지금 세로 목록을 그대로 둔다. 전부 근사다.**
- *
- * 겹침만 없앴다: 예전 값은 글자 높이 27 에 줄 간격 22 라 **줄마다 5px 씩 겹쳤다**.
- * 간격을 글자 그림 높이와 같은 **27** 로 올렸다 — 이보다 작으면 무조건 겹친다.
- *
- * 자리 계산: 배너 84 + 일곱 줄 189 + 설명 판 63 = 336 으로 화면(320)보다 16 크다.
- * 그래서 설명 판을 화면 바닥에 붙이고(257 + 63 = 320) 목록을 그 위 189px 에 꽉 채웠다
- * (68 + 189 = 257). 첫 줄만 배너 아랫단 16px 을 밟는다. **근사**다.
+ * **슬롯 표 0xceaf2** = s8[6][9]. 색인은 커서가 아니라 **상태 − 5** 다
+ * (0x25490 `r3 = 상태*9 + 표 − 0x2d`). 값은 항목 배열 `[0x1552d28]` 의 첨자이고,
+ * **−1 이면 그 슬롯은 건너뛴다** (0x2552c). 확정 — 바이너리에서 54바이트 그대로 읽었다.
  */
-export const MENU_LIST_TOP = 68
-/** 줄 간격 = 글자 그림 높이. 이보다 작으면 글자가 겹친다. */
-export const MENU_ROW_STEP = MENU_LABEL_HEIGHT
+export const MENU_REEL_SLOT_TABLE: readonly (readonly number[])[] = [
+  [-1, 5, 6, 7, 1, 2, 3, 4, -1], // 상태 5 게임시작 (7칸)
+  [-1, 6, 7, 8, 1, 2, 3, 4, 5], //  상태 6 스페셜 (8칸)
+  [-1, 5, 6, 7, 1, 2, 3, 4, -1], // 상태 7 도움말
+  [-1, -1, 5, 6, 1, 2, 3, 4, -1], // 상태 8 환경설정
+  [-1, -1, 5, 6, 2, 3, 4, -1, -1], // 상태 9 랭킹 (5칸)
+  [-1, -1, -1, 4, 3, -1, -1, -1, -1], // 상태 10 게임문의
+] as const
 
-/** 고른 줄 뒤에 까는 바 (세로 목록에서만 쓴다 — 4-2 에 바퀴용 선택 바 이야기는 없다) */
-export const MENU_SELECTION_BAR = { frame: 2, width: 125, height: 15 } as const
+/** 슬롯 표에서 상태 하나의 줄 */
+export function menuReelSlotRowOf(state: number): readonly number[] {
+  return MENU_REEL_SLOT_TABLE[state - 5] ?? MENU_REEL_SLOT_TABLE[0]
+}
+
+/**
+ * **항목 글자 표** — 상태 진입 때 ROM 에서 전역 `[0x1552d28]` 로 통째로 복사한다
+ * (상태 5 = 0x25b94 · 6 = 0x23d60 · 9 = 0x23d98, 각각 `memcpy(…, 0x24)` = u32 9개).
+ * 값은 **`ui/img_text` 프레임 번호**다 — `main_ui` 가 아니다 (0x2553e 가 img_text 전역
+ * `[0x1552aec]` 의 프레임 목록에서 뽑는다). 셋 다 바이너리에서 다시 읽어 확정했다.
+ */
+export const MENU_REEL_ITEM_FRAMES: Readonly<Record<number, readonly number[]>> = {
+  5: [-1, 6, 9, 12, 15, 18, 20, 23, -1], // 0xcea48
+  6: [-1, 7, 11, 189, 14, 17, 19, 21, 315], // 0xcea24
+  9: [-1, -1, 9, 12, 15, 18, 20, -1, -1], // 0xcea00
+}
+
+/** 상태별 항목 수 — 진입 코드가 `[obj+0xe9]` 에 박는 값 (5→7 · 6→8 · 9→5) */
+export const MENU_REEL_ITEM_COUNT: Readonly<Record<number, number>> = { 5: 7, 6: 8, 9: 5 }
+
+/** 표에서 −1(빈 자리)을 뺀, **항목 차례대로의** img_text 프레임 목록 */
+export function menuReelFrameListOf(frames: readonly number[]): number[] {
+  return frames.filter((frame) => frame !== -1)
+}
+
+/**
+ * **0x24780 그대로** — 배열에서 −1 이 아닌 구간만 찾아 한 칸 돌린다.
+ * dir −1 이면 오른쪽(구간 마지막 값이 맨 앞으로), −2 면 왼쪽(맨 앞 값이 마지막으로).
+ * 구간 밖(−1 자리)은 건드리지 않는다.
+ */
+export function rotateMenuReel(items: readonly number[], direction: MenuTurnDirection): number[] {
+  const next = [...items]
+  const first = next.findIndex((value) => value !== -1)
+  if (first < 0) return next
+  let last = next.length - 1
+  while (last > first && next[last] === -1) last -= 1
+
+  if (direction === -1) {
+    const carried = next[last]
+    for (let i = last; i > first; i -= 1) next[i] = next[i - 1]
+    next[first] = carried
+  } else {
+    const carried = next[first]
+    for (let i = first; i < last; i += 1) next[i] = next[i + 1]
+    next[last] = carried
+  }
+  return next
+}
+
+/**
+ * 항목 표와 같은 꼴(−1 자리까지)로 만든 "몇 번째 항목인가" 배열.
+ * 원본은 프레임 배열을 돌리지만, 같은 배열을 항목 차례로 채워 돌리면 화면 어느 슬롯에 어느
+ * 항목이 있는지 그대로 나온다 — 프레임 번호는 항목 차례로 따로 찾으면 된다.
+ */
+function menuReelIndexSource(frames: readonly number[]): number[] {
+  let seen = 0
+  return frames.map((frame) => {
+    if (frame === -1) return -1
+    const index = seen
+    seen += 1
+    return index
+  })
+}
+
+/**
+ * 커서가 `cursor` 일 때의 배열. 원본은 ↓ 를 누를 때마다 배열을 왼쪽으로 돌리고 커서를 +1 하므로
+ * (0x25328 · 0x253a6), 커서 칸수만큼 왼쪽으로 돌린 것과 결과가 같다.
+ */
+export function menuReelOrderOf(frames: readonly number[], cursor: number): number[] {
+  let order = menuReelIndexSource(frames)
+  for (let step = 0; step < cursor; step += 1) order = rotateMenuReel(order, -2)
+  return order
+}
+
+/**
+ * 화면 슬롯(1..7) → 그 칸에 놓인 항목 차례. 놓을 것이 없으면 null.
+ * 슬롯 표 값이 −1 이거나, 배열의 그 자리가 −1 이면 없다.
+ */
+export function menuReelEntryAtSlotOf(
+  frames: readonly number[],
+  slotRow: readonly number[],
+  cursor: number,
+  slot: number,
+): number | null {
+  const arrayIndex = slotRow[slot]
+  if (arrayIndex === undefined || arrayIndex === -1) return null
+  const entry = menuReelOrderOf(frames, cursor)[arrayIndex]
+  return entry === undefined || entry === -1 ? null : entry
+}
+
+/** 화면에 그리는 슬롯 번호 — 1..7 이고 **4 는 뺀다** (0x2562c `cmp #4 ; ble`) */
+export const MENU_REEL_SLOTS: readonly number[] = [1, 2, 3, 5, 6, 7]
+
+/**
+ * 릴 글자의 가운데 x = `scrW − 0x28` = **200** (0x255c4 · 0x255de).
+ * ⚠️ 화면 가운데(120)가 아니다 — 원본이 목록을 오른쪽으로 몰아 그린다.
+ * 바퀴 315° 칸이 (205,254) 인 것과 같은 자리다.
+ */
+export const MENU_REEL_TEXT_CENTER_X = SCREEN_WIDTH - 0x28
+
+/** 줄 간격 — 슬롯마다 20px (0x256c0 `adds r1,#0x14`) */
+export const MENU_REEL_ROW_STEP = 20
+
+/** 그림자 색 #212B70 — 0x255c8 `setColor(0x21, 0x2b, 0x70)` (확정) */
+export const MENU_REEL_SHADOW_COLOR = '#212b70'
+
+/** 그림자는 진짜 글자에서 (+1,+1) 자리에 **먼저** 찍는다 (x 는 0x27 vs 0x28, y 는 −6 vs −7) */
+export const MENU_REEL_SHADOW_OFFSET = { x: 1, y: 1 } as const
+
+/**
+ * 한 칸 옮길 때의 스크롤 값 `[0x1552d68]` — 키를 누른 프레임에 ±1 로 시작해서
+ * 매 갱신 ×4 하고(0x25386 `lsls #2`), 절댓값이 0x1f 를 넘으면 배열을 돌리고 0 으로 되돌린다.
+ * 그래서 실제로 그려지는 값은 **±1 → ±4 → ±16 → 0** 넉 장이다.
+ * 부호: ↑(dir −1) 이 **+**, ↓(dir −2) 가 **−** 다 (0x2534c~0x2535a).
+ */
+export const MENU_REEL_SCROLL_STEPS: readonly number[] = [1, 4, 16]
+
+/**
+ * 슬롯 글자의 좌상단 (0x255aa~0x2562a · 0x2562c~0x256b0, 확정). `base = scrH = 320`.
+ *   i ≤ 3 : (240 − w/2 − 0x28, base + (20i − 100) + 스크롤 − 7)
+ *   i ≥ 5 : (240 − w/2 − 0x28, base + 20i + 스크롤 − 0x3c)
+ * i == 4 는 아예 그리지 않는다 — 고른 칸은 설명 판이 대신 보여 준다.
+ *
+ * ⚠️ **아래 세 줄(360·380·400)은 240×320 화면 밖이다.** 계산 실수가 아니라 원본이 그렇다
+ * (같은 함수가 설명 판도 화면 아래 절반이 잘리게 놓는다 — `MENU_DESCRIPTION_PANEL` 주석 참고).
+ * 실제로 보이는 것은 **위 세 줄 + 설명 판 윗동강**뿐이다. 보이게 하려고 값을 비틀지 않았다.
+ */
+export function menuReelTextTopLeftOf(
+  slot: number,
+  width: number,
+  scroll: number,
+): MenuWheelPoint | null {
+  if (slot < 1 || slot > 7 || slot === 4) return null
+  const x = SCREEN_WIDTH - Math.trunc(width / 2) - 0x28
+  const y = slot <= 3
+    ? SCREEN_HEIGHT + (MENU_REEL_ROW_STEP * slot - 100) + scroll - 7
+    : SCREEN_HEIGHT + MENU_REEL_ROW_STEP * slot + scroll - 0x3c
+  return { x, y }
+}
+
+// ──────────────────────────────── 설명 판 ────────────────────────────────
 
 export interface MenuPanelBox {
   readonly frame: number
@@ -180,29 +350,52 @@ export interface MenuPanelBox {
 }
 
 /**
- * 설명 판 — 세로 목록 아래 가운데. 원본 좌표는 미해독이라 **추정**이다
- * (4-2: "main_ui/003 패널 위치는 원본 분기와 아직 대조 못 했다").
- * y 는 화면 바닥에 붙인 값이다: 320 − 63 = 257. 일곱 줄을 겹치지 않게 넣으려면 이만큼 필요했다.
+ * 설명 판 = `main_ui` **이미지** 3 (149×63). 자리는 두 함수가 따로 같은 식으로 구한다:
+ *   `x = scrW − 폭 + 5` = **96** (0x24db0 · 0x256fc)
+ *   `y = 320 − 높이/2`  = **289** (0x24dc0 · 0x25714)
+ *
+ * ⚠️ **판 아래 절반(289+63 = 352)은 화면 밖이다.** R6-sprite-leftovers 2절이 같은 좌표를
+ * 따로 확인해 뒀고, 오른쪽으로도 5px 삐져나간다(96+149 = 245). 원본 그대로 옮긴다.
  */
-export const MENU_DESCRIPTION_PANEL: MenuPanelBox = { frame: 3, x: 46, y: 257, width: 149, height: 63 }
+export const MENU_DESCRIPTION_PANEL: MenuPanelBox = {
+  frame: 3,
+  width: 149,
+  height: 63,
+  x: SCREEN_WIDTH - 149 + 5,
+  y: SCREEN_HEIGHT - (63 >> 1),
+}
+
+/** 설명 글을 쓰는 안쪽 칸 `(x+5, y+5, w−10, h−10)` — R6 2절 (0x25036 이후) */
+export const MENU_DESCRIPTION_TEXT_BOX = {
+  x: MENU_DESCRIPTION_PANEL.x + 5,
+  y: MENU_DESCRIPTION_PANEL.y + 5,
+  width: MENU_DESCRIPTION_PANEL.width - 10,
+  height: MENU_DESCRIPTION_PANEL.height - 10,
+} as const
 
 /**
- * 바퀴 단의 설명 판 — 바퀴가 화면 아래 반을 차지해 250 자리가 칸 글자와 겹친다.
- * 배너(~84)와 바퀴 맨 위 칸 글자(270° → y 213) 사이 빈 띠에 넣었다: 213 − 63 = **150**.
- * 원본 좌표가 아니라 **근사**다.
+ * 판 안 큰 글자(`main_ui` **프레임**)의 좌상단 — 0x25794~0x257c4 (확정).
+ * `(판x + (149 − w)/2 + 2, 판y + (63 − h)/2 + 5)`.
+ * 판이 이미 반쯤 화면 밖이라 27px 글자는 **윗 8px 만 보인다**. 원본 식 그대로다.
  */
-export const MENU_WHEEL_DESCRIPTION_PANEL: MenuPanelBox = { ...MENU_DESCRIPTION_PANEL, y: 150 }
-
-export function menuDescriptionPanelOf(isWheel: boolean): MenuPanelBox {
-  return isWheel ? MENU_WHEEL_DESCRIPTION_PANEL : MENU_DESCRIPTION_PANEL
+export function menuPanelLabelTopLeftOf(width: number, height: number): MenuWheelPoint {
+  return {
+    x: MENU_DESCRIPTION_PANEL.x + ((MENU_DESCRIPTION_PANEL.width - width) >> 1) + 2,
+    y: MENU_DESCRIPTION_PANEL.y + ((MENU_DESCRIPTION_PANEL.height - height) >> 1) + 5,
+  }
 }
 
-/** 줄 번호 → 글자 그림의 y */
-export function menuRowTopOf(index: number): number {
-  return MENU_LIST_TOP + index * MENU_ROW_STEP
+/**
+ * 판 왼쪽 위에 회색으로 찍는 상태 제목(img_text 프레임) — 0x257cc~0x257ee.
+ * 색은 `setColor(0x80,0x80,0x80)`, 자리는 `(판x + 8, 판y + 8)`, 효과 0xb(단색 찍기)다.
+ * 번호는 **0xcea6c[상태 − 5]** 라 윗단 칸 글자 표와 같은 표를 쓴다 (0x254aa).
+ */
+export const MENU_PANEL_HEADING_COLOR = '#808080'
+export function menuPanelHeadingTopLeftOf(): MenuWheelPoint {
+  return { x: MENU_DESCRIPTION_PANEL.x + 8, y: MENU_DESCRIPTION_PANEL.y + 8 }
 }
 
-/** 고른 줄의 바 y — 글자 가운데에 오도록 내린다 */
-export function selectionBarTopOf(index: number): number {
-  return menuRowTopOf(index) + Math.trunc((MENU_LABEL_HEIGHT - MENU_SELECTION_BAR.height) / 2)
+/** 상태 제목 img_text 프레임 — 0xcea6c[상태 − 5] (윗단 칸 글자 표와 같은 표) */
+export function menuPanelHeadingFrameOf(state: number): number | null {
+  return MENU_WHEEL_ITEM_FRAMES[state - 5] ?? null
 }

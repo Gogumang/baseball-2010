@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import {
-  MENU_LABEL_HEIGHT, MENU_ROW_STEP, MENU_WHEEL_ANGLES, MENU_WHEEL_CENTER,
-  MENU_WHEEL_ORDER, MENU_WHEEL_RINGS, MENU_WHEEL_SELECTED_SLOT, MENU_WHEEL_TURN_TICKS,
-  MENU_DESCRIPTION_PANEL, isMenuWheelAngleVisible, menuDescriptionPanelOf, menuRowTopOf,
-  menuWheelAngleOf, menuWheelDeltaOf, menuWheelLabelTopLeftOf, menuWheelPointOf,
-  menuWheelSlotOf, menuWheelTurnAngleOf,
+  MENU_DESCRIPTION_PANEL, MENU_DESCRIPTION_TEXT_BOX, MENU_LABEL_HEIGHT, MENU_REEL_ITEM_COUNT,
+  MENU_REEL_ITEM_FRAMES, MENU_REEL_ROW_STEP, MENU_REEL_SCROLL_STEPS, MENU_REEL_SHADOW_COLOR,
+  MENU_REEL_SLOTS, MENU_REEL_SLOT_TABLE, MENU_REEL_TEXT_CENTER_X, MENU_WHEEL_ANGLES,
+  MENU_WHEEL_CENTER, MENU_WHEEL_ITEM_FRAMES, MENU_WHEEL_ORDER, MENU_WHEEL_RINGS,
+  MENU_WHEEL_SELECTED_SLOT, MENU_WHEEL_TURN_TICKS, SCREEN_HEIGHT,
+  isMenuWheelAngleDrawn, menuPanelHeadingFrameOf, menuPanelHeadingTopLeftOf,
+  menuPanelLabelTopLeftOf, menuReelEntryAtSlotOf, menuReelFrameListOf, menuReelOrderOf,
+  menuReelSlotRowOf, menuReelTextTopLeftOf, menuWheelAngleAt, menuWheelLabelTopLeftOf,
+  menuWheelOrderOf, menuWheelPointOf, menuWheelStepOf, rotateMenuReel,
 } from '@/pages/main-menu/lib/mainMenuLayout'
 
-describe('반원 바퀴 — 원본 값 (F-ui-layout 4-2 확정)', () => {
+describe('반원 바퀴 — 원본 값 (0x24b1c, 확정)', () => {
   it('중심은 (120,320) 이고 테두리 원은 93·95·97 세 겹이다', () => {
     expect(MENU_WHEEL_CENTER).toEqual({ x: 120, y: 320 })
     expect(MENU_WHEEL_RINGS.map((ring) => ring.radius)).toEqual([93, 95, 97])
@@ -16,13 +20,14 @@ describe('반원 바퀴 — 원본 값 (F-ui-layout 4-2 확정)', () => {
     ])
   })
 
-  it('각도 표 0xcead4 와 순서 표 0xceae0 을 그대로 쓴다', () => {
+  it('각도 표 0xcead4 · 순서 표 0xceae0 · 칸 글자 표 0xcea6c 를 그대로 쓴다', () => {
     expect([...MENU_WHEEL_ANGLES]).toEqual([0, 45, 90, 180, 270, 315])
     expect([...MENU_WHEEL_ORDER]).toEqual([0, 1, 2, 3, 4, 5])
+    // 0xcea6c 를 binary.mod 에서 u32 6개로 직접 읽었다 — 게임문의만 5 가 아니라 26 이다
+    expect([...MENU_WHEEL_ITEM_FRAMES]).toEqual([0, 1, 2, 3, 4, 26])
   })
 
   it('칸 자리가 문서에 적힌 네 점과 같다', () => {
-    // 180 = 왼쪽 끝, 270 = 맨 위(선택), 315 = 오른쪽 위, 0 = 오른쪽 끝
     expect(menuWheelPointOf(180)).toEqual({ x: 27, y: 320 })
     expect(menuWheelPointOf(270)).toEqual({ x: 120, y: 227 })
     expect(menuWheelPointOf(0)).toEqual({ x: 233, y: 320 })
@@ -37,117 +42,192 @@ describe('반원 바퀴 — 원본 값 (F-ui-layout 4-2 확정)', () => {
     expect(menuWheelPointOf(271).x - menuWheelPointOf(269).x).toBeGreaterThanOrEqual(20)
   })
 
-  it('보이는 칸은 네 개뿐이다 — 45°·90° 는 화면 아래로 내려간다', () => {
-    const visible = MENU_WHEEL_ANGLES.filter(isMenuWheelAngleVisible)
-    expect([...visible]).toEqual([0, 180, 270, 315])
+  it('19 ≤ a ≤ 341 만 그린다 — 고른 칸(0°) 은 아예 안 그려진다 (0x24ef0)', () => {
+    expect(isMenuWheelAngleDrawn(0)).toBe(false)
+    expect(isMenuWheelAngleDrawn(18)).toBe(false)
+    expect(isMenuWheelAngleDrawn(19)).toBe(true)
+    expect(isMenuWheelAngleDrawn(341)).toBe(true)
+    expect(isMenuWheelAngleDrawn(342)).toBe(false)
+    expect(MENU_WHEEL_ANGLES[MENU_WHEEL_SELECTED_SLOT]).toBe(0)
   })
 })
 
-describe('바퀴 돌리기', () => {
-  it('고른 칸은 늘 맨 위 270° 에 온다', () => {
-    for (let selected = 0; selected < MENU_WHEEL_ANGLES.length; selected += 1) {
-      expect(menuWheelSlotOf(selected, selected)).toBe(MENU_WHEEL_SELECTED_SLOT)
-      expect(menuWheelAngleOf(selected, selected)).toBe(270)
+describe('바퀴 돌리기 — 배열이 돈다 (0x24c58 → 0x24780)', () => {
+  it('고른 칸은 늘 배열 0번이다', () => {
+    for (let cursor = 0; cursor < 6; cursor += 1) {
+      expect(menuWheelOrderOf(cursor)[0]).toBe(cursor)
     }
   })
 
-  it('여섯 칸이 각도 표 여섯 자리를 하나씩 차지한다', () => {
-    const slots = MENU_WHEEL_ANGLES.map((_, index) => menuWheelSlotOf(index, 2))
-    expect([...slots].sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4, 5])
+  it('여섯 칸이 여섯 자리를 하나씩 차지한다', () => {
+    const order = menuWheelOrderOf(2)
+    expect([...order].sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4, 5])
+    expect(order).toEqual([2, 3, 4, 5, 0, 1])
   })
 
-  it('한 칸 내려가면 다음 칸이 315° 에서 270° 로 올라온다', () => {
-    expect(menuWheelAngleOf(1, 0)).toBe(315)
-    expect(menuWheelAngleOf(1, 1)).toBe(270)
-    // 그때 고르고 있던 칸은 270° 에서 180° 로 내려간다 (90° 벌어진 자리)
-    expect(menuWheelAngleOf(0, 1)).toBe(180)
+  it('한 틱은 9°, 90° 벌어지는 자리만 18° 다 (0x24de6)', () => {
+    expect(menuWheelStepOf(315, -2)).toBe(9)
+    expect(menuWheelStepOf(270, -2)).toBe(18)
+    expect(menuWheelStepOf(180, -2)).toBe(18)
+    expect(menuWheelStepOf(180, -1)).toBe(18)
+    expect(menuWheelStepOf(90, -1)).toBe(18)
+    expect(menuWheelStepOf(90, -2)).toBe(9)
   })
 
-  it('도는 동안 45° 칸은 틱마다 9°, 90° 칸은 18° 움직인다', () => {
-    const smallSteps = [0, 1, 2, 3, 4, 5].map((counter) => menuWheelTurnAngleOf(315, 270, counter))
-    expect(smallSteps).toEqual([315, 306, 297, 288, 279, 270])
-
-    const wideSteps = [0, 1, 2, 3, 4, 5].map((counter) => menuWheelTurnAngleOf(270, 180, counter))
-    expect(wideSteps).toEqual([270, 252, 234, 216, 198, 180])
+  it('5틱이면 어느 자리든 이웃 자리의 각에 딱 맞는다', () => {
+    // ↓(−2) 는 각이 줄고, ↑(−1) 은 각이 는다 — 다섯 틱에 표의 이웃 각으로 떨어진다
+    const down = [0, 1, 2, 3, 4, 5].map((slot) => menuWheelAngleAt(slot, -2, MENU_WHEEL_TURN_TICKS))
+    expect(down).toEqual([315, 0, 45, 90, 180, 270])
+    const up = [0, 1, 2, 3, 4, 5].map((slot) => menuWheelAngleAt(slot, -1, MENU_WHEEL_TURN_TICKS))
+    // 0 자리는 360 으로 잘린다 (0x24e2e) — 360 은 0 과 같은 자리다
+    expect(up).toEqual([45, 90, 180, 270, 315, 360])
   })
 
-  it('0° 와 315° 사이는 짧은 쪽으로 돈다', () => {
-    expect(menuWheelDeltaOf(315, 0)).toBe(45)
-    expect(menuWheelDeltaOf(0, 315)).toBe(-45)
-    expect(menuWheelTurnAngleOf(315, 0, 1)).toBe(324)
+  it('도는 동안 315° 칸은 틱마다 9°, 270° 칸은 18° 움직인다', () => {
+    expect([0, 1, 2, 3, 4].map((n) => menuWheelAngleAt(5, -2, n))).toEqual([315, 306, 297, 288, 279])
+    expect([0, 1, 2, 3, 4].map((n) => menuWheelAngleAt(4, -2, n))).toEqual([270, 252, 234, 216, 198])
   })
 
-  it('카운터가 5(=한 칸 이동 틱수) 면 딱 목표 각이다', () => {
-    expect(MENU_WHEEL_TURN_TICKS).toBe(5)
-    expect(menuWheelTurnAngleOf(270, 180, MENU_WHEEL_TURN_TICKS)).toBe(180)
-    expect(menuWheelTurnAngleOf(270, 180, 99)).toBe(180)
+  it('칸 그림은 기준점 가운데 맞춤이다', () => {
+    expect(menuWheelLabelTopLeftOf({ x: 120, y: 227 }, 42, 10)).toEqual({ x: 99, y: 222 })
   })
 })
 
-describe('칸 글자가 서로 겹치지 않는다', () => {
-  /** main_ui/frames 원점표에서 읽은 처음 메뉴 6칸의 글자 폭 (높이는 전부 27) */
-  const TOP_LABEL_WIDTHS = [98, 73, 74, 97, 48, 95]
-  /** 게임시작 목록 7칸 (프레임 6·7·8·9·10·13·12) */
-  const MODE_LABEL_WIDTHS = [95, 97, 115, 98, 96, 95, 96]
-
-  interface Box { left: number; top: number; right: number; bottom: number }
-
-  const overlaps = (a: Box, b: Box) =>
-    a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
-
-  const boxesOnWheel = (selected: number): Box[] =>
-    TOP_LABEL_WIDTHS.map((width, index) => {
-      const point = menuWheelPointOf(menuWheelAngleOf(index, selected))
-      const topLeft = menuWheelLabelTopLeftOf(point, width, MENU_LABEL_HEIGHT)
-      return {
-        left: topLeft.x,
-        top: topLeft.y,
-        right: topLeft.x + width,
-        bottom: topLeft.y + MENU_LABEL_HEIGHT,
-      }
-    })
-
-  it('바퀴 — 어느 칸을 골라도 여섯 칸이 서로 안 겹친다', () => {
-    for (let selected = 0; selected < TOP_LABEL_WIDTHS.length; selected += 1) {
-      const boxes = boxesOnWheel(selected)
-      for (let i = 0; i < boxes.length; i += 1) {
-        for (let j = i + 1; j < boxes.length; j += 1) {
-          expect(overlaps(boxes[i], boxes[j])).toBe(false)
-        }
-      }
-    }
+describe('세로 릴 — 표 넷 (0x2524c, 확정)', () => {
+  it('슬롯 표 0xceaf2 는 s8[6][9] 이고 상태−5 로 색인한다', () => {
+    expect(MENU_REEL_SLOT_TABLE).toHaveLength(6)
+    expect([...menuReelSlotRowOf(5)]).toEqual([-1, 5, 6, 7, 1, 2, 3, 4, -1])
+    expect([...menuReelSlotRowOf(6)]).toEqual([-1, 6, 7, 8, 1, 2, 3, 4, 5])
+    expect([...menuReelSlotRowOf(9)]).toEqual([-1, -1, 5, 6, 2, 3, 4, -1, -1])
   })
 
-  it('바퀴 — 설명 판과도 안 겹친다', () => {
-    const wheelPanel = menuDescriptionPanelOf(true)
-    const panelBox: Box = {
-      left: wheelPanel.x,
-      top: wheelPanel.y,
-      right: wheelPanel.x + wheelPanel.width,
-      bottom: wheelPanel.y + wheelPanel.height,
-    }
-    for (let selected = 0; selected < TOP_LABEL_WIDTHS.length; selected += 1) {
-      for (const box of boxesOnWheel(selected)) expect(overlaps(box, panelBox)).toBe(false)
-    }
+  it('항목 글자 표는 img_text 프레임 번호다', () => {
+    expect([...MENU_REEL_ITEM_FRAMES[5]]).toEqual([-1, 6, 9, 12, 15, 18, 20, 23, -1])
+    expect([...MENU_REEL_ITEM_FRAMES[6]]).toEqual([-1, 7, 11, 189, 14, 17, 19, 21, 315])
+    expect([...MENU_REEL_ITEM_FRAMES[9]]).toEqual([-1, -1, 9, 12, 15, 18, 20, -1, -1])
   })
 
-  it('세로 목록 — 줄 간격이 글자 높이보다 작으면 안 된다', () => {
-    expect(MENU_ROW_STEP).toBeGreaterThanOrEqual(MENU_LABEL_HEIGHT)
+  it('표에서 −1 을 뺀 개수가 진입 코드의 항목 수와 같다', () => {
+    for (const state of [5, 6, 9]) {
+      expect(menuReelFrameListOf(MENU_REEL_ITEM_FRAMES[state])).toHaveLength(MENU_REEL_ITEM_COUNT[state])
+    }
+    expect(menuReelFrameListOf(MENU_REEL_ITEM_FRAMES[5])).toEqual([6, 9, 12, 15, 18, 20, 23])
+  })
+})
+
+describe('릴 회전 0x24780 — −1 이 아닌 구간만 돈다', () => {
+  it('dir −1 은 오른쪽, −2 는 왼쪽으로 한 칸 돌린다', () => {
+    const items = [-1, 1, 2, 3, 4, -1]
+    expect(rotateMenuReel(items, -1)).toEqual([-1, 4, 1, 2, 3, -1])
+    expect(rotateMenuReel(items, -2)).toEqual([-1, 2, 3, 4, 1, -1])
   })
 
-  it('세로 목록 — 일곱 줄이 서로도, 설명 판과도 안 겹친다', () => {
-    const boxes: Box[] = MODE_LABEL_WIDTHS.map((width, index) => {
-      const left = 120 - Math.trunc(width / 2)
-      const top = menuRowTopOf(index)
-      return { left, top, right: left + width, bottom: top + MENU_LABEL_HEIGHT }
-    })
-    for (let i = 0; i < boxes.length; i += 1) {
-      for (let j = i + 1; j < boxes.length; j += 1) {
-        expect(overlaps(boxes[i], boxes[j])).toBe(false)
-      }
+  it('구간 밖(−1 자리)은 그대로 둔다', () => {
+    expect(rotateMenuReel([-1, -1, 7, 8, -1], -2)).toEqual([-1, -1, 8, 7, -1])
+  })
+
+  it('커서만큼 왼쪽으로 돌린 것이 그 커서의 배열이다', () => {
+    const frames = MENU_REEL_ITEM_FRAMES[5]
+    expect(menuReelOrderOf(frames, 0)).toEqual([-1, 0, 1, 2, 3, 4, 5, 6, -1])
+    expect(menuReelOrderOf(frames, 1)).toEqual([-1, 1, 2, 3, 4, 5, 6, 0, -1])
+    expect(menuReelOrderOf(frames, 6)).toEqual([-1, 6, 0, 1, 2, 3, 4, 5, -1])
+  })
+})
+
+describe('릴 슬롯 배치', () => {
+  const frames = MENU_REEL_ITEM_FRAMES[5]
+  const row = menuReelSlotRowOf(5)
+
+  it('고른 칸은 늘 슬롯 4 이고, 슬롯 4 는 안 그린다', () => {
+    for (let cursor = 0; cursor < 7; cursor += 1) {
+      expect(menuReelEntryAtSlotOf(frames, row, cursor, 4)).toBe(cursor)
     }
-    const last = boxes[boxes.length - 1]
-    expect(last.bottom).toBeLessThanOrEqual(MENU_DESCRIPTION_PANEL.y)
-    expect(MENU_DESCRIPTION_PANEL.y + MENU_DESCRIPTION_PANEL.height).toBeLessThanOrEqual(320)
+    expect([...MENU_REEL_SLOTS]).toEqual([1, 2, 3, 5, 6, 7])
+    expect(menuReelTextTopLeftOf(4, 42, 0)).toBeNull()
+  })
+
+  it('위 세 줄은 고른 칸 **앞** 세 항목이다', () => {
+    // 커서 0(최근게임) 이면 위 세 줄은 4·5·6 = 대전모드·홈런더비·미션모드다
+    expect([1, 2, 3].map((slot) => menuReelEntryAtSlotOf(frames, row, 0, slot))).toEqual([4, 5, 6])
+    // 한 칸 내려가면 방금 고르고 있던 칸이 판 바로 위(슬롯 3)로 올라온다
+    expect([1, 2, 3].map((slot) => menuReelEntryAtSlotOf(frames, row, 1, slot))).toEqual([5, 6, 0])
+  })
+
+  it('아래 세 줄은 고른 칸 **뒤** 세 항목이다 (화면 밖이지만 원본은 그린다)', () => {
+    expect([5, 6, 7].map((slot) => menuReelEntryAtSlotOf(frames, row, 0, slot))).toEqual([1, 2, 3])
+  })
+
+  it('랭킹(상태 9)은 다섯 칸이 슬롯 2·3·4·5·6 에만 놓인다', () => {
+    const rankRow = menuReelSlotRowOf(9)
+    const rankFrames = MENU_REEL_ITEM_FRAMES[9]
+    const filled = [1, 2, 3, 4, 5, 6, 7]
+      .filter((slot) => menuReelEntryAtSlotOf(rankFrames, rankRow, 0, slot) !== null)
+    expect(filled).toEqual([2, 3, 4, 5, 6])
+  })
+})
+
+describe('릴 좌표 — 원본 식 그대로 (0x255aa · 0x2562c)', () => {
+  it('글자 가운데 x 는 240 − 0x28 = 200 이다', () => {
+    expect(MENU_REEL_TEXT_CENTER_X).toBe(200)
+    const width = 42
+    const left = menuReelTextTopLeftOf(1, width, 0)?.x
+    expect(left).toBe(200 - Math.trunc(width / 2))
+  })
+
+  it('줄 간격은 20px 이고, 위 세 줄은 233·253·273 이다', () => {
+    expect(MENU_REEL_ROW_STEP).toBe(20)
+    expect([1, 2, 3].map((slot) => menuReelTextTopLeftOf(slot, 42, 0)?.y)).toEqual([233, 253, 273])
+  })
+
+  it('아래 세 줄은 360·380·400 — 240×320 화면 밖이다 (원본 그대로)', () => {
+    const tops = [5, 6, 7].map((slot) => menuReelTextTopLeftOf(slot, 42, 0)?.y)
+    expect(tops).toEqual([360, 380, 400])
+    for (const top of tops) expect(top).toBeGreaterThan(SCREEN_HEIGHT)
+  })
+
+  it('i ≥ 5 는 i ≤ 3 과 다른 상수(0x3c)를 써서 47px 어긋난다 — 슬롯 4 를 뺀 자리보다 아래다', () => {
+    // 슬롯 3 이 273 이니 같은 식이면 슬롯 5 는 313 이어야 하는데 실제로는 360 이다
+    expect(menuReelTextTopLeftOf(5, 42, 0)!.y - (273 + 2 * MENU_REEL_ROW_STEP)).toBe(47)
+  })
+
+  it('스크롤은 ±1 → ±4 → ±16 석 장이고 글자를 그대로 민다', () => {
+    expect([...MENU_REEL_SCROLL_STEPS]).toEqual([1, 4, 16])
+    expect(menuReelTextTopLeftOf(1, 42, -16)?.y).toBe(233 - 16)
+    expect(menuReelTextTopLeftOf(1, 42, 16)?.y).toBe(233 + 16)
+  })
+
+  it('그림자 색은 #212B70 이다 (0x255c8)', () => {
+    expect(MENU_REEL_SHADOW_COLOR).toBe('#212b70')
+  })
+})
+
+describe('설명 판 — 두 단이 같은 자리에 놓는다 (0x24db0 · 0x256fc)', () => {
+  it('판은 (96,289) 에 149×63 이다', () => {
+    expect(MENU_DESCRIPTION_PANEL.x).toBe(96)
+    expect(MENU_DESCRIPTION_PANEL.y).toBe(289)
+    expect(MENU_DESCRIPTION_PANEL.width).toBe(149)
+    expect(MENU_DESCRIPTION_PANEL.height).toBe(63)
+  })
+
+  it('판 아래 절반과 오른쪽 5px 은 화면 밖이다 — 원본이 그렇다', () => {
+    expect(MENU_DESCRIPTION_PANEL.y + MENU_DESCRIPTION_PANEL.height).toBe(352)
+    expect(MENU_DESCRIPTION_PANEL.x + MENU_DESCRIPTION_PANEL.width).toBe(245)
+  })
+
+  it('글칸은 판에서 5px 씩 들어간 자리다', () => {
+    expect(MENU_DESCRIPTION_TEXT_BOX).toEqual({ x: 101, y: 294, width: 139, height: 53 })
+  })
+
+  it('판 안 큰 글자는 판 가운데에서 (+2,+5) 다 — 27px 글자는 윗 8px 만 보인다', () => {
+    const at = menuPanelLabelTopLeftOf(95, MENU_LABEL_HEIGHT)
+    expect(at).toEqual({ x: 96 + ((149 - 95) >> 1) + 2, y: 312 })
+    expect(SCREEN_HEIGHT - at.y).toBe(8)
+  })
+
+  it('판 왼쪽 위 회색 제목은 (판+8,판+8) 이고 번호는 0xcea6c[상태−5] 다', () => {
+    expect(menuPanelHeadingTopLeftOf()).toEqual({ x: 104, y: 297 })
+    expect(menuPanelHeadingFrameOf(5)).toBe(0) // 게임시작
+    expect(menuPanelHeadingFrameOf(6)).toBe(1) // 스페셜
+    expect(menuPanelHeadingFrameOf(9)).toBe(4) // 랭킹
   })
 })

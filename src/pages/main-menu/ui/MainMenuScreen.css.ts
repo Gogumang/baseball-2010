@@ -2,10 +2,11 @@ import { globalStyle, style } from '@vanilla-extract/css'
 import { theme } from '@/app/styles/theme.css'
 
 /*
- * 메인 메뉴는 원본 그림으로만 그린다 — 배너(mode_back/000), 글자(main_ui/frames),
- * 선택 바(main_ui/002), 설명 판(main_ui/003), 바퀴 가운데 공(main_ball). 좌표·색은
- * `lib/mainMenuLayout.ts` 가 들고 있다.
- * 윗단(처음 메뉴)은 원본 반원 바퀴, 아랫단(게임시작 목록)은 아직 세로 목록이다(근사).
+ * 메인 메뉴는 원본 그림으로만 그린다 — 배너(mode_back/000), 칸 글자(img_text/frames),
+ * 설명 판(main_ui/003)과 그 안 큰 글자(main_ui/frames), 바퀴 가운데 공(main_ball).
+ * 좌표·색은 `lib/mainMenuLayout.ts` 가 들고 있다.
+ * 윗단(처음 메뉴)은 반원 바퀴, 아랫단(게임시작 목록)은 세로 릴이고 **둘 다 배열이 도는 원본 모델**이다.
+ * 예전에 깔던 선택 바(main_ui/002)는 원본 아랫단에 없어서 뺐다.
  * 구석의 취소 버튼만 원본에 없다 — 원본은 CLR 키라 웹 임시로 둔다.
  */
 export const layer = style({ position: 'absolute', imageRendering: 'pixelated', pointerEvents: 'none' })
@@ -32,13 +33,32 @@ export const menuRow = style({
  */
 export const menuRowDimmed = style([menuRow, { opacity: 0.45 }])
 
-/** 설명 판 위에 얹는 글 */
+/**
+ * 글자 그림을 단색으로 찍는다 — 원본은 효과 0xb(단색)로 그린다
+ * (릴 글자 그림자 #212B70 = 0x255c8 · 설명 판 회색 제목 #808080 = 0x257cc).
+ * 그림을 마스크로 쓰고 배경색을 칠하면 같은 결과가 된다 (`pages/shop` 과 같은 방식).
+ */
+export const tintedLabel = style({
+  position: 'absolute',
+  pointerEvents: 'none',
+  maskSize: '100% 100%',
+  maskRepeat: 'no-repeat',
+  WebkitMaskSize: '100% 100%',
+  WebkitMaskRepeat: 'no-repeat',
+})
+
+/**
+ * 설명 판 안쪽 글칸 — 원본이 잘라 쓰는 `(판x+5, 판y+5, 판폭−10, 판높이−10)` 그대로다 (R6 2절).
+ * 판이 이미 화면 바닥에 반쯤 걸려 있어 아랫줄은 잘린다. **원본이 그렇다** — 위로 올리지 않는다.
+ * 그래서 가운데 맞춤이 아니라 **위에서부터** 쌓고, 칸 밖은 숨긴다.
+ */
 export const description = style({
   position: 'absolute',
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
-  justifyContent: 'center',
+  justifyContent: 'flex-start',
+  overflow: 'hidden',
   gap: '2px',
   color: theme.color.panelRaised,
   // 전역 글꼴(theme.font.body = 원본 synGak9_11 웹폰트)을 그대로 쓴다.
