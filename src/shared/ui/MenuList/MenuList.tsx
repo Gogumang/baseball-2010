@@ -42,10 +42,17 @@ export function MenuList({ items, onSelect, cursorStyle = '목록' }: MenuListPr
   const onSelectRef = useRef(onSelect)
   onSelectRef.current = onSelect
 
-  // 메뉴 구성이 바뀌면 커서를 첫 항목으로 되돌린다.
+  /**
+   * 메뉴 **구성이 바뀌면** 커서를 첫 항목으로 되돌린다.
+   *
+   * ⚠️ 배열 자체(`items`)를 의존성으로 쓰면 안 된다 — 부르는 쪽이 매 렌더 새 배열을 만드는
+   *    곳이 있어(`usePitcherManagementMenu` 의 `itemsOf` 등) **커서를 내려 둔 채 부모가 다시
+   *    그려지기만 해도 0 으로 튄다**. 그래서 **칸 이름을 이어 붙인 값**으로 견준다.
+   */
+  const itemsKey = items.map((item) => item.id).join('\u0000')
   useEffect(() => {
     setSelectedIndex(0)
-  }, [items])
+  }, [itemsKey])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
