@@ -81,6 +81,13 @@ import type {
   TeamEntryBatter,
   TeamGameAbilityContext,
 } from '@/features/play-team-game/model/teamGameRoster'
+import { rollOpponentAceIndex } from '@/entities/game/model/aceOpponent'
+import {
+  EMPTY_BATTER_GAME_RECORD,
+  judgeCpuPinchHit,
+  recordPlateAppearance,
+} from '@/entities/batting/model/pinchHitAi'
+import type { BatterGameRecord } from '@/entities/batting/model/pinchHitAi'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
@@ -99,7 +106,9 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
  *
  * ⚠️ **아직 안 옮긴 것** (원본에는 있다):
  *   - 엔트리 편집(0x55864) — 타순 첫 순서는 로스터 순서 그대로다
- *   - **CPU 대타**(0xac228, 경기당 1번) — 사람 쪽 대타만 들어왔다 (Q1 4절)
+ *   - AI 팀 **마투수**(0xb88c8) — 번호는 원본대로 뽑아 두지만(`opponentAcePitcherIndex`)
+ *     웹 투수 명단이 로스터 8칸 붙박이라 벤치에 넣을 자리가 없다
+ *   (**대타**는 사람·CPU 양쪽 다 들어왔다 — `pinchHit` 과 CPU 대타 0xac228, Q1 4절)
  *   (경기 중 **투수 교체**는 들어왔다: 자동으로 넘긴 타석에서 CPU 교체 AI(0xac428)가 양 팀 투수를
  *    바꾸고, 사람이 잡은 타석은 원본대로 `#` 메뉴가 바꾼다 — `changePitcher`·`canOpenPitcherChange`.
  *    공격 중 `#` 는 **대타**다 — `pinchHit`·`canOpenPinchHit`, R4 1a·1c)
@@ -171,10 +180,18 @@ export interface TeamGameOptions {
    * 벤치 타자 수 `team+0x28c` 를 하나 올린다 (`31046` · `b8898~b88b2`). 원본에서 마타자가
    * 타석에 서는 길은 **대타(`#`)뿐**이다 — 타순 아홉 칸에는 안 들어간다.
    *
-   * ⚠️ 원본은 같은 자리에서 **AI 팀에도** 마타자·마투수를 넣지만(`0x66968`·`0x66994` 로 고른
-   * 번호, `3105c`·`31070`), 그 두 함수는 안 읽었고 CPU 대타도 안 옮겨서 여기서는 우리 팀만 넣는다.
+   * 원본은 같은 자리에서 **AI 팀에도** 마타자를 넣는다 — 이 값으로 `0x66994` 를 굴려 나온 번호다
+   * (`3106c`). 그래서 이 칸은 상대 팀 마타자의 **입력**이기도 하다 (`rollOpponentAceIndex`).
    */
   readonly aceBatterId?: number
+  /**
+   * 준비 화면에서 고른 **마투수** 0~4 (준비 기록 `skin+0xbc` +0xe). 안 넘기면 없다.
+   *
+   * ⚠️ 웹 투수 명단은 아직 로스터 8칸 붙박이라 **마투수를 벤치에 넣는 `0xb88c8` 은 안 옮겼다**.
+   * 이 값이 지금 하는 일은 하나뿐이다 — 원본과 같은 차례로 `0x66968` 을 굴려 **AI 팀 마투수 번호**를
+   * 정하는 것이다 (`31058`). 굴림 차례를 원본에 맞추려면 값이 없어도 이 자리에서 굴려야 한다.
+   */
+  readonly acePitcherId?: number
   /** 이 경기에 쓸 수 있는 마구 횟수. 로스터 투수는 마구가 없어 기본 0 이다 */
   readonly magicCount?: number
   /** 화면 배치 side (투영 원점 표 0xcfb18 의 칸) */
@@ -257,6 +274,30 @@ export interface TeamGameProgress {
   readonly ourEntry: readonly TeamEntryBatter[]
   /** 벤치에 남은 우리 타자 수 (`team+0x28c`) — `#` 대타 화면의 진입 조건이다 */
   readonly ourBenchBatters: number
+  /**
+   * 상대 팀 **명단** — 우리 것과 같은 `team+0xe` 목록이다. CPU 대타(`0xac228`)가 이 목록을 바꾼다.
+   * 일반·대전모드에서는 `0x66994` 로 고른 AI 마타자가 벤치 첫 칸(9번)에 들어가 있다.
+   */
+  readonly opponentEntry: readonly TeamEntryBatter[]
+  /** 벤치에 남은 상대 타자 수 (`team+0x28c`) */
+  readonly opponentBenchBatters: number
+  /**
+   * 타순 칸별 이 경기 기록 (`team + 0x34 + 타순×0x18` 의 안타·적시타·타석) — `0xac228` 이 본다.
+   * 명단과 길이·차례가 같다: 대타가 두 칸을 맞바꾸고 빠진 칸을 지우면 기록도 같이 움직인다
+   * (원본 `0xaebe4` 도 24바이트 기록을 함께 옮긴다).
+   */
+  readonly ourEntryRecords: readonly BatterGameRecord[]
+  readonly opponentEntryRecords: readonly BatterGameRecord[]
+  /**
+   * `state[0xe]` — 이 경기에 CPU 대타를 이미 썼는가. 원본은 **경기에 한 칸**이라 양 팀을 합쳐 한 번뿐이다.
+   */
+  readonly cpuPinchHitUsed: boolean
+  /**
+   * `0x66968`·`0x66994` 가 뽑은 **AI 팀 마투수·마타자 번호** 0~4 (시즌모드는 −1 — `0x30f20` 을 안 탄다).
+   * 마타자는 `opponentEntry` 벤치 첫 칸에 들어가 있고, 마투수는 넣을 자리가 아직 없어 번호만 들고 있다.
+   */
+  readonly opponentAcePitcherIndex: number
+  readonly opponentAceBatterIndex: number
   /** `state[0xd]` — 교체 직후 한 투구 동안은 다시 안 바꾼다 (0xa5e72 가 투구마다 0 으로) */
   readonly pitcherJustChanged: boolean
   /** 이 타석의 준비(상태 0xe·0xf)를 이미 지났는가 */
@@ -324,16 +365,49 @@ function startingPitcherSlotsOf(
   return { opponent, ours: rollStartingPitcherIndex(random) }
 }
 
+/**
+ * 일반모드 경기 세우기 `0x30f20` 이 뽑는 **AI 팀 마선수 번호 둘**.
+ *
+ * ⚠️ **굴림 차례가 원본과 같아야 한다** — `0x30f20` 은 마투수(`31058`) → 마타자(`3106c`) →
+ * AI 선발(`3107a`) → 사람 선발(`31090`) 차례로 넉 장을 뽑는다. 그래서 여기가
+ * `startingPitcherSlotsOf` 보다 **먼저** 돌아야 한다.
+ *
+ * 시즌(모드 2)은 `0x30f20` 을 타지 않는다 — 마선수 고르는 화면도 없어 굴리지 않는다.
+ */
+function opponentAceIndexesOf(
+  options: TeamGameOptions,
+  random: RandomPort,
+): { readonly pitcher: number; readonly batter: number } {
+  if (options.mode === TEAM_GAME_MODE.시즌) return { pitcher: -1, batter: -1 }
+  // 31058: 0x66968(기록+0xe) → 31064: 0xb88c8(AI팀, v)
+  const pitcher = rollOpponentAceIndex(options.acePitcherId ?? NO_ACE_BATTER, random)
+  // 3106c: 0x66994(기록+0xd) → 31076: 0xb8870(AI팀, w)
+  const batter = rollOpponentAceIndex(options.aceBatterId ?? NO_ACE_BATTER, random)
+  return { pitcher, batter }
+}
+
 export function startTeamGame(options: TeamGameOptions, random: RandomPort): TeamGameProgress {
+  const opponentAces = opponentAceIndexesOf(options, random)
   const startingSlots = startingPitcherSlotsOf(options, random)
   // 0x30f20 의 순서 그대로 — 팀을 세운 뒤 고른 마타자를 벤치에 끼워 넣는다 (0xb8870)
   const ourEntry = withAceBatter(
     rosterEntryBattersOf(options.ourTeamId),
     options.aceBatterId ?? NO_ACE_BATTER,
   )
+  const opponentEntry = withAceBatter(
+    rosterEntryBattersOf(options.opponentTeamId),
+    opponentAces.batter,
+  )
   const initial: TeamGameProgress = {
     options,
     ourEntry,
+    opponentEntry,
+    ourEntryRecords: ourEntry.map(() => EMPTY_BATTER_GAME_RECORD),
+    opponentEntryRecords: opponentEntry.map(() => EMPTY_BATTER_GAME_RECORD),
+    cpuPinchHitUsed: false,
+    opponentAcePitcherIndex: opponentAces.pitcher,
+    opponentAceBatterIndex: opponentAces.batter,
+    opponentBenchBatters: Math.max(0, opponentEntry.length - BATTING_ORDER_SIZE),
     // 원본은 팀을 세울 때 이 칸을 채우고 마타자를 넣을 때 하나 올린다 — 결과가 명단 − 타순 아홉이다
     ourBenchBatters: Math.max(0, ourEntry.length - BATTING_ORDER_SIZE),
     // 타순 칸은 "사람이 서는 자리" 가 아니다 — 팀 경기는 아홉 칸을 모두 사람이 친다
@@ -426,11 +500,26 @@ function abilityContextOf(options: TeamGameOptions): TeamGameAbilityContext {
 }
 
 /**
- * 한 팀의 **명단** — 우리 팀은 대타로 바뀔 수 있어 진행 상태가 들고 있고, 상대는 로스터 그대로다.
- * (원본도 팀마다 `team+0xe` 목록 하나뿐이지만, CPU 대타는 안 옮겼다 — Q1 4절.)
+ * 한 팀의 **명단** — 양 팀 모두 대타로 바뀔 수 있어 진행 상태가 들고 있다
+ * (우리 쪽은 `#` 대타 `0xaf06c`, 상대 쪽은 CPU 대타 `0xac228`).
  */
 function entryBattersOf(progress: TeamGameProgress, teamId: number): readonly TeamEntryBatter[] {
-  return teamId === progress.options.ourTeamId ? progress.ourEntry : rosterEntryBattersOf(teamId)
+  return teamId === progress.options.ourTeamId ? progress.ourEntry : progress.opponentEntry
+}
+
+/** 타순 칸 기록에 타석 하나를 얹는다 (`0xa8024`) */
+function withPlateAppearance(
+  records: readonly BatterGameRecord[],
+  slot: number,
+  outcome: AtBatOutcome,
+  runsBattedIn: number,
+): readonly BatterGameRecord[] {
+  const next = [...records]
+  next[slot] = recordPlateAppearance(next[slot] ?? EMPTY_BATTER_GAME_RECORD, {
+    isHit: isHit(outcome),
+    runsBattedIn,
+  })
+  return next
 }
 
 /** 지금 타석에 선 우리 타자 (명단 칸 = 타순 칸) */
@@ -707,6 +796,7 @@ function finishBatterOutcome(
       game.inning !== before.inning || game.half !== before.half,
     ),
     ourHits: progress.ourHits + (isHit(outcome) ? 1 : 0),
+    ourEntryRecords: withPlateAppearance(progress.ourEntryRecords, slot, outcome, runsBattedIn),
     leaguePlateAppearances: [
       ...progress.leaguePlateAppearances,
       { teamId: progress.options.ourTeamId, battingOrderIndex: slot, outcome, runsBattedIn },
@@ -966,6 +1056,12 @@ function finishDefensiveAtBat(
       runsAllowed: progress.pitching.runsAllowed + applied.runsScored,
       allowedBaserunner: progress.pitching.allowedBaserunner || hit || walk,
     },
+    opponentEntryRecords: withPlateAppearance(
+      progress.opponentEntryRecords,
+      slot,
+      outcome,
+      applied.runsScored,
+    ),
     leaguePlateAppearances: [
       ...progress.leaguePlateAppearances,
       {
@@ -1037,6 +1133,10 @@ export function resolveDefensePlay(
  * (간이 엔진 중계)로 빠져 0xf 를 지나지 않는다. 그래서 여기서도 **사람이 잡은 타석에서만** 굴린다.
  */
 function prepareAtBat(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
+  // 사람 경기 타석 시작 0x3d954 는 **수비가 사람일 때** CPU 대타 0xac228 을 부른다 (0x3da6e).
+  // (수비가 CPU 면 그 자리에서 CPU 투수 교체 0xac428 로 간다 — 그쪽은 자동 타석에만 옮겨져 있다.)
+  // ⚠️ 돌발미션 판정과의 앞뒤 차례는 **미확인**이다 (0x3d954 를 끝까지 읽지 않았다).
+  if (isPitchTurn(progress)) progress = applyCpuPinchHit(progress, false, random)
   const session = progress.burst
   if (session === null) return { ...progress, atBatPrepared: true }
   const ours = isOurOffense(progress)
@@ -1334,30 +1434,132 @@ export function canOpenPinchHit(progress: TeamGameProgress): boolean {
 export function pinchHit(progress: TeamGameProgress, benchIndex: number): TeamGameProgress {
   if (progress.game.isFinished) return progress
   if (!availablePinchHitters(progress).includes(benchIndex)) return progress
-  const slot = progress.game.battingOrderIndex
-  const outgoing = progress.ourEntry[slot]
-  const incoming = progress.ourEntry[benchIndex]
-  if (outgoing === undefined || incoming === undefined) return progress
-
-  const entry = [...progress.ourEntry]
-  // 1·2. 수비 자리는 자리에 남고 선수만 바뀐다
-  entry[slot] = { ...incoming, position: outgoing.position }
-  entry[benchIndex] = { ...outgoing, position: incoming.position }
-  // 3. 빠진 선수를 명단에서 지운다
-  entry.splice(benchIndex, 1)
+  const swapped = substituteBatter(
+    progress.ourEntry,
+    progress.ourEntryRecords,
+    progress.game.battingOrderIndex,
+    benchIndex,
+  )
+  if (swapped === null) return progress
 
   return appendLog(
     {
       ...progress,
-      ourEntry: entry,
+      ourEntry: swapped.entry,
+      ourEntryRecords: swapped.records,
       // 4. 벤치 타자 수 −1
       ourBenchBatters: Math.max(0, progress.ourBenchBatters - 1),
       // 상태 0x16 → 0xd → 타석 초기화 0xa5bcc
       atBat: createAtBat(),
       atBatPrepared: false,
     },
-    `${progress.game.inning}회${progress.game.half} 대타 — ${outgoing.name} → ${incoming.name}`,
+    `${progress.game.inning}회${progress.game.half} 대타 — ${swapped.outgoing.name} → ${swapped.incoming.name}`,
     true,
+  )
+}
+
+/**
+ * **확정 `0xaebe4` 의 대타 가지 한 덩어리** — 사람 대타(`pinchHit`)와 CPU 대타(`0xac228`)가 같이 쓴다.
+ * 타순별 경기 기록 24바이트도 원본처럼 선수를 따라 움직인다 (`aed02~aed16`).
+ */
+function substituteBatter(
+  entryBefore: readonly TeamEntryBatter[],
+  recordsBefore: readonly BatterGameRecord[],
+  slot: number,
+  benchIndex: number,
+): {
+  readonly entry: readonly TeamEntryBatter[]
+  readonly records: readonly BatterGameRecord[]
+  readonly outgoing: TeamEntryBatter
+  readonly incoming: TeamEntryBatter
+} | null {
+  const outgoing = entryBefore[slot]
+  const incoming = entryBefore[benchIndex]
+  if (outgoing === undefined || incoming === undefined) return null
+
+  const entry = [...entryBefore]
+  // 1·2. 수비 자리는 자리에 남고 선수만 바뀐다
+  entry[slot] = { ...incoming, position: outgoing.position }
+  entry[benchIndex] = { ...outgoing, position: incoming.position }
+  const records = [...recordsBefore]
+  records[slot] = records[benchIndex] ?? EMPTY_BATTER_GAME_RECORD
+  records[benchIndex] = recordsBefore[slot] ?? EMPTY_BATTER_GAME_RECORD
+  // 3. 빠진 선수를 명단에서 지운다
+  entry.splice(benchIndex, 1)
+  records.splice(benchIndex, 1)
+
+  return { entry, records, outgoing, incoming }
+}
+
+/* ── CPU 대타 (0xac228) ──────────────────────────────────────────────────────── */
+
+/**
+ * **CPU 대타 한 번** — 타석 시작마다 공격 팀을 두고 `0xac228` 을 물어본다 (Q1 4절, `pinchHitAi`).
+ *
+ * 부르는 자리는 원본 둘을 그대로 옮긴 것이다:
+ *   - 자동으로 넘기는 타석: 간이 엔진 `0xc1ba4` 가 **공격 팀**을 두고 부른다 (`0xc1c50`) —
+ *     투수 교체 `0xac428` 보다 **먼저**. 공격이 우리 팀이어도 마찬가지다 (원본에 가림막이 없다).
+ *   - 사람이 잡은 타석: `0x3d954` 가 **수비가 사람일 때만** 부른다 (`0x3da6e`) — 곧 우리가
+ *     던지는 타석에서 상대 타순에만 선다.
+ *
+ * ⚠️ 원본이 보는 **장비 레벨 니블**(레코드 `+0x19`·`+0x1a`)은 웹 로스터 표에 없어 늘 0 으로 둔다.
+ */
+function applyCpuPinchHit(
+  progress: TeamGameProgress,
+  battingIsOurs: boolean,
+  random: RandomPort,
+): TeamGameProgress {
+  if (progress.game.isFinished) return progress
+  const entry = battingIsOurs ? progress.ourEntry : progress.opponentEntry
+  const records = battingIsOurs ? progress.ourEntryRecords : progress.opponentEntryRecords
+  const bench = battingIsOurs ? progress.ourBenchBatters : progress.opponentBenchBatters
+  const slot = battingIsOurs ? progress.game.battingOrderIndex : progress.opponentOrderIndex
+  const batter = entry[slot]
+  if (batter === undefined) return progress
+
+  const benchIndex = judgeCpuPinchHit(
+    {
+      alreadyUsedThisGame: progress.cpuPinchHitUsed,
+      batterIsAce: batter.aceIndex !== NO_ACE_BATTER,
+      // 원본은 명단 칸이 모자라도 team+0x28c 만 보고 rand(0, n) 을 돌린다 — 실제 칸 수로 자른다
+      benchBatters: Math.min(bench, Math.max(0, entry.length - BATTING_ORDER_SIZE)),
+      record: records[slot] ?? EMPTY_BATTER_GAME_RECORD,
+      runnerCount: runnerCountOf(progress.game.bases),
+      // 타석 시작에서만 부르므로 둘 다 0 이다 (state[4]·state[5])
+      strikes: progress.atBat.strikes,
+      balls: progress.atBat.balls,
+    },
+    random,
+  )
+  if (benchIndex < 0) return progress
+
+  const swapped = substituteBatter(entry, records, slot, BATTING_ORDER_SIZE + benchIndex)
+  if (swapped === null) return progress
+
+  const changed: TeamGameProgress = battingIsOurs
+    ? {
+        ...progress,
+        ourEntry: swapped.entry,
+        ourEntryRecords: swapped.records,
+        ourBenchBatters: Math.max(0, progress.ourBenchBatters - 1),
+      }
+    : {
+        ...progress,
+        opponentEntry: swapped.entry,
+        opponentEntryRecords: swapped.records,
+        opponentBenchBatters: Math.max(0, progress.opponentBenchBatters - 1),
+      }
+
+  return appendLog(
+    {
+      ...changed,
+      // state[0xe] = 1 — 경기에 한 번뿐이다
+      cpuPinchHitUsed: true,
+      // 상태 0x16 → 0xd → 타석 초기화 0xa5bcc
+      atBat: createAtBat(),
+    },
+    `${progress.game.inning}회${progress.game.half} ${battingIsOurs ? '우리' : '상대'} CPU 대타 — ${swapped.outgoing.name} → ${swapped.incoming.name}`,
+    false,
   )
 }
 
@@ -1537,7 +1739,9 @@ function advance(progress: TeamGameProgress, random: RandomPort): TeamGameProgre
 
 /** 자동으로 넘기는 우리 타석 — 원본도 같은 간이 엔진을 쓴다 (0xc11f0) */
 function playAutoOffenseAtBat(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
-  // 0xc262c 는 타석마다 먼저 0xc1ba4 를 부른다 — 우리가 공격 중이면 **상대 투수**를 본다
+  // 0xc262c 는 타석마다 먼저 0xc1ba4 를 부른다 — 그 안에서 CPU 대타(공격 팀)가 먼저다 (0xc1c50)
+  progress = applyCpuPinchHit(progress, true, random)
+  // 이어서 CPU 투수 교체 (0xc1ce2) — 우리가 공격 중이면 **상대 투수**를 본다
   progress = judgeAutoPitcherChange(progress, false, random)
   const { options } = progress
   const context = abilityContextOf(options)
@@ -1580,6 +1784,7 @@ function playAutoOffenseAtBat(progress: TeamGameProgress, random: RandomPort): T
         game.inning !== before.inning || game.half !== before.half,
       ),
       ourHits: progress.ourHits + (isHit(outcome) ? 1 : 0),
+      ourEntryRecords: withPlateAppearance(progress.ourEntryRecords, slot, outcome, runsBattedIn),
       leaguePlateAppearances: [
         ...progress.leaguePlateAppearances,
         { teamId: options.ourTeamId, battingOrderIndex: slot, outcome, runsBattedIn },
@@ -1594,7 +1799,9 @@ function playAutoOffenseAtBat(progress: TeamGameProgress, random: RandomPort): T
 
 /** 자동으로 넘기는 상대 타석 */
 function playAutoDefenseAtBat(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
-  // 우리가 수비 중인 자동 타석 — 0xc1ba4 가 **우리 투수**를 본다
+  // 0xc1ba4 안 차례 그대로 — CPU 대타(공격 = 상대 팀)가 먼저 (0xc1c50)
+  progress = applyCpuPinchHit(progress, false, random)
+  // 우리가 수비 중인 자동 타석 — 0xc1ba4 가 **우리 투수**를 본다 (0xc1ce2)
   progress = judgeAutoPitcherChange(progress, true, random)
   const { options } = progress
   const context = abilityContextOf(options)

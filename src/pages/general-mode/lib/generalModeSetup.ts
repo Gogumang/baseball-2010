@@ -125,10 +125,10 @@ export function aceIndexOfCell(cell: number): number {
  * - **마타자**(`+0xd`)는 경기 옵션으로 넘긴다 — 원본 경기 세우기 `0x30f20` 이 같은 칸으로
  *   `0xb8870(팀, k)` 를 불러 **벤치 첫 칸**에 넣는다 (`31046`). 타석에 서는 길은 대타뿐이다.
  *
- * ⚠️ 원본이 준비 화면에서 정하는 것 중 **구장과 마투수**는 `TeamGameOptions` 에 받을 칸이
- * 아직 없다. 준비 기록에는 그대로 들고 있으니(화면에도 나온다) 옵션에 칸이 생기면 여기서 넘기면 된다.
- * (마투수 `0xb88c8` 은 벤치 투수로 들어가고 `#` 투수 교체로 올라온다 — 웹 투수 명단은 아직
- *  로스터 8칸 붙박이라 넣을 자리가 없다.)
+ * ⚠️ 원본이 준비 화면에서 정하는 것 중 **구장**은 `TeamGameOptions` 에 받을 칸이 아직 없다.
+ * 준비 기록에는 그대로 들고 있으니(화면에도 나온다) 옵션에 칸이 생기면 여기서 넘기면 된다.
+ * 마투수는 넘기되 **벤치 투수로 넣는 `0xb88c8` 은 아직 안 옮겼다** — 웹 투수 명단이 로스터 8칸
+ * 붙박이라 넣을 자리가 없다. 지금은 `0x66968` 로 AI 팀 마투수 번호를 뽑는 입력으로만 쓰인다.
  */
 export function teamGameOptionsOf(
   setup: GeneralModeSetup,
@@ -146,6 +146,8 @@ export function teamGameOptionsOf(
     playerSide: setup.playerSide,
     // 고른 마타자는 벤치 첫 칸으로 들어간다 (0xb8870). NO_ACE(−1)면 아무도 안 들어간다
     aceBatterId: setup.aceBatterId,
+    // 마투수는 AI 팀 마투수를 뽑는 0x66968 의 입력이다 (31058) — 사람 쪽 벤치 투입은 아직 없다
+    acePitcherId: setup.acePitcherId,
     ...(extra.settings === undefined ? {} : { settings: extra.settings }),
     ...(extra.gaugeSettingOn === undefined ? {} : { gaugeSettingOn: extra.gaugeSettingOn }),
     ...(extra.runningModeManual === undefined ? {} : { runningModeManual: extra.runningModeManual }),

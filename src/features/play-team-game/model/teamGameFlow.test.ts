@@ -6,6 +6,7 @@ import {
   MATCH_SETTING_KIND,
   FULL_PLAY_SETTINGS,
 } from '@/features/play-team-game/model/matchSettings'
+import type { MatchProgressSettings } from '@/features/play-team-game/model/matchSettings'
 import {
   applyBatterOutcome,
   autoProgressCostOf,
@@ -714,5 +715,86 @@ describe('대타 (0xaf06c → 0xaebe4 의 +0x291 가지, R4 1a·1c)', () => {
   it('벤치가 아닌 칸(타순 안)은 대타로 못 고른다', () => {
     const { progress } = 공격시작()
     expect(pinchHit(progress, 3)).toBe(progress)
+  })
+})
+
+
+/* ── AI 팀 마선수(0x66968·0x66994)와 CPU 대타(0xac228) ─────────────────────── */
+
+/** 굴림 횟수를 세는 껍데기 */
+function 세는난수(inner: RandomPort): RandomPort & { readonly rolls: number[] } {
+  const rolls: number[] = []
+  return {
+    rolls,
+    next: () => inner.next(),
+    nextInRange(minimum, maximum) {
+      rolls.push(maximum)
+      return inner.nextInRange(minimum, maximum)
+    },
+    pick: (candidates) => inner.pick(candidates),
+  }
+}
+
+/** 어느 타석도 사람이 잡지 않는 설정 — 비트가 하나도 안 켜진 "상세" */
+const 전부자동: MatchProgressSettings = {
+  kind: MATCH_SETTING_KIND.상세,
+  value: 0,
+  battingOrderBits: 0,
+  pitchingInningBits: 0,
+  offenseRunnerBits: 0,
+  defenseRunnerBits: 0,
+}
+
+describe('일반모드 경기 세우기 0x30f20 — AI 팀 마선수', () => {
+  it('굴림 차례가 원본과 같다 — 마투수·마타자·AI 선발·사람 선발 (31058·3106c·3107a·31090)', () => {
+    const random = 세는난수(createSeededRandom(20100901))
+    startTeamGame(
+      { ...기본옵션, mode: 1, season: undefined, aceBatterId: 0, acePitcherId: 1, settings: FULL_PLAY_SETTINGS },
+      random,
+    )
+    // 0x66968·0x66994 는 rand(0,5), 선발 둘은 rand(0,4) 다
+    expect(random.rolls.slice(0, 4)).toEqual([5, 5, 4, 4])
+  })
+
+  it('시즌(모드 2)은 0x30f20 을 안 타서 마선수를 굴리지 않는다', () => {
+    const random = 세는난수(createSeededRandom(20100901))
+    const progress = startTeamGame({ ...기본옵션, aceBatterId: 0 }, random)
+    expect(random.rolls.slice(0, 1)).not.toEqual([5])
+    expect(progress.opponentAceBatterIndex).toBe(-1)
+  })
+
+  it('상대 팀 벤치 첫 칸(9번)에 AI 마타자가 들어간다 (31076: 0xb8870)', () => {
+    const { progress } = 시작({ mode: 1, season: undefined, aceBatterId: 2, acePitcherId: 3 })
+    expect(progress.opponentAceBatterIndex).toBeGreaterThanOrEqual(0)
+    expect(progress.opponentAceBatterIndex).toBeLessThanOrEqual(4)
+    expect(progress.opponentEntry).toHaveLength(13)
+    expect(progress.opponentEntry[9]?.aceIndex).toBe(progress.opponentAceBatterIndex)
+    expect(progress.opponentBenchBatters).toBe(4)
+  })
+
+  it('⚠️ 원본 버그: 사람이 마선수를 안 골라도 AI 는 마타자·마투수를 얻는다', () => {
+    const { progress } = 시작({ mode: 1, season: undefined })
+    expect(progress.opponentEntry).toHaveLength(13)
+    expect(progress.opponentAcePitcherIndex).toBeGreaterThanOrEqual(0)
+  })
+})
+
+describe('CPU 대타 0xac228 — 자동 타석에서', () => {
+  it('경기에 한 번까지만 나오고, 나오면 그 팀 명단이 한 칸 줄어든다', () => {
+    let 나온경기 = 0
+    for (let seed = 1; seed <= 24; seed += 1) {
+      const progress = startTeamGame(
+        { ...기본옵션, mode: 1, season: undefined, settings: 전부자동 },
+        createSeededRandom(seed * 7919),
+      )
+      expect(progress.game.isFinished).toBe(true)
+      // 명단은 우리 12(마타자 없음) · 상대 13(AI 마타자) 로 시작한다
+      const 줄어든칸 = 12 - progress.ourEntry.length + (13 - progress.opponentEntry.length)
+      // state[0xe] 는 경기에 한 칸이라 두 번 나올 수 없다
+      expect(줄어든칸).toBe(progress.cpuPinchHitUsed ? 1 : 0)
+      if (progress.cpuPinchHitUsed) 나온경기 += 1
+    }
+    // 배선이 살아 있다는 확인 — 24경기 중 한 번은 나온다
+    expect(나온경기).toBeGreaterThan(0)
   })
 })

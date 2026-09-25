@@ -4,7 +4,9 @@ import {
   derbyAcePitcherOf,
   missionOpponentOf,
   pitcherAbilityOf,
+  rollOpponentAceIndex,
 } from '@/entities/game/model/aceOpponent'
+import type { RandomPort } from '@/shared/api/random/randomPort'
 
 describe('ACE_PITCHERS', () => {
   it('원작 마선수 투수 5명이다', () => {
@@ -64,5 +66,29 @@ describe('홈런더비 마투수 난입 — 표 0xcfce8 = [1,2,3,4] (S13 5절 �
     expect(derbyAcePitcherOf(0)).toBeNull()
     expect(derbyAcePitcherOf(5)).toBeNull()
     expect([1, 2, 3, 4].every((stage) => derbyAcePitcherOf(stage)?.name !== '싸이커')).toBe(true)
+  })
+})
+
+describe('AI 팀 마선수 번호 0x66968 · 0x66994', () => {
+  /** rand(0,5) 가 낼 값을 정해 주는 난수 */
+  const 굴림 = (value: number): RandomPort => ({
+    next: () => 0,
+    nextInRange: (_minimum, maximum) => Math.min(value, maximum - 1),
+    pick: (candidates) => candidates[0] as never,
+  })
+
+  it('사람과 다른 번호가 나오면 그대로 쓴다', () => {
+    expect(rollOpponentAceIndex(0, 굴림(3))).toBe(3)
+  })
+
+  it('사람과 같으면 한 칸 내리고, 0 이면 4 로 올린다 (66980~66988)', () => {
+    expect(rollOpponentAceIndex(3, 굴림(3))).toBe(2)
+    expect(rollOpponentAceIndex(0, 굴림(0))).toBe(4)
+  })
+
+  it('⚠️ 원본 버그: 사람이 "없음"(−1)이어도 AI 는 늘 마선수를 얻는다 (ldrb 라 0xff 와 안 맞는다)', () => {
+    for (let value = 0; value <= 4; value += 1) {
+      expect(rollOpponentAceIndex(-1, 굴림(value))).toBe(value)
+    }
   })
 })
