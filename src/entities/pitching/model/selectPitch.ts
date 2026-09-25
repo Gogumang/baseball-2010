@@ -118,6 +118,10 @@ export function selectPitch(
     magicNumber: magicState.ballMagicNumber,
     // 0x46fa8 은 구질 22 일 때만 경기+0x1080 을 쓰고, 새 투구 준비 0x3d954 가 0 으로 지운다
     ballKind: isMagic ? magicBallKindOf(repertoire.magicId) : 0,
+    // 이펙트 가리개 — 경기+0xfc8 == 0x16 과 투수 레코드 +0x18·폼을 그대로 실어 보낸다
+    isMagicPitch: isMagic,
+    pitcherMagicNumber: repertoire.magicId,
+    pitcherForm: repertoire.form,
   }
 }
 

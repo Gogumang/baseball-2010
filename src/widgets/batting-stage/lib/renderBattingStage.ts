@@ -6,6 +6,7 @@ import { drawScenery } from '@/widgets/batting-stage/lib/renderScenery'
 import type { SceneryState } from '@/widgets/batting-stage/lib/renderScenery'
 import { judgeAnimationOf, judgeFrameAt, pitcherFrameAt, pitcherIdleFrameAt } from '@/widgets/batting-stage/lib/stageScenery'
 
+import { magicBallEffectFolderOf, magicBallEffectFrameAt } from '@/widgets/batting-stage/lib/magicBallEffect'
 import { drawParticles } from '@/widgets/particles/lib/renderParticles'
 import type { ParticleScene } from '@/entities/particle/model/particleScene'
 import { drawHud } from '@/widgets/batting-stage/lib/renderHud'
@@ -116,6 +117,8 @@ export function renderBattingStage(
   }
   if (scene.pitch !== null && scene.frame >= 0 && scene.frame < scene.pitch.frameCount) {
     drawBall(context, scene.pitch, scene.frame)
+    // 마구 이펙트는 원본에서도 공 **다음**에 그려 공 위에 얹힌다 (0x3b422 공 → 0x3b546 이펙트)
+    drawMagicBallEffect(context, scene.pitch, scene.frame)
   }
   if (scene.particles !== null && scene.particles !== undefined) {
     drawParticles(context, scene.particles)
@@ -256,6 +259,25 @@ function drawBall(context: CanvasRenderingContext2D, pitch: Pitch, frame: number
     context.fill()
     return
   }
+  context.drawImage(placed.image, Math.round(position.x) + placed.offsetX, Math.round(position.y) + placed.offsetY)
+}
+
+/**
+ * 마구 공 이펙트 (경기+0x1040, 0x3b546) — **공과 같은 화면 좌표**에 겹친다.
+ * 무엇을 언제 그리는지는 전부 `magicBallEffect.ts` 가 들고 있다.
+ */
+function drawMagicBallEffect(context: CanvasRenderingContext2D, pitch: Pitch, frame: number): void {
+  const folder = magicBallEffectFolderOf(pitch)
+  if (folder === null) return
+  // 원본이 쓰는 애니는 0 번 한 벌뿐이다 (effect_fire·effect_shinning 둘 다 [0,1,2,3])
+  const entries = frameAnimations(folder)?.[0]
+  if (entries === undefined) return
+  const frameIndex = magicBallEffectFrameAt(entries, frame)
+  if (frameIndex === null) return
+  const placed = placedFrame(folder, frameIndex)
+  if (placed === null) return
+
+  const position = ballPixelAt(pitch, frame)
   context.drawImage(placed.image, Math.round(position.x) + placed.offsetX, Math.round(position.y) + placed.offsetY)
 }
 

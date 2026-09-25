@@ -37,6 +37,20 @@ export interface Pitch {
   readonly magicNumber?: number
   /** ball.pzx 공 그림 종류 = 경기+0x1080 (0x46fa8) — 0 보통 · 1 불꽃 · 2 날개 */
   readonly ballKind?: number
+  /**
+   * 이번 공의 **구질이 마구(22)인가** = 경기+0xfc8 == 0x16.
+   * 원본 이펙트 세 곳이 전부 이 칸으로 열린다 — 공 이펙트 0x3b4e0 · 마선수 이펙트 0x46fc0 ·
+   * 투수 이펙트 0x3919e. 공 객체 +0x10(`magicNumber`)은 한 번 실리면 안 지워져서(H2 3-4)
+   * "이번 공이 마구인가" 를 못 말해 준다 — 그래서 칸을 따로 둔다.
+   */
+  readonly isMagicPitch?: boolean
+  /**
+   * 던진 **투수 레코드 +0x18** — 마구 번호(1~4) 또는 마선수 번호(5~9), 0 이면 없다.
+   * 이펙트 고르기는 공 +0x10 이 아니라 **늘 이 칸**을 본다 (0x3b4dc `ldrb r2,[투수,#0x18]`).
+   */
+  readonly pitcherMagicNumber?: number
+  /** 던진 투수 폼 = `rec[0xb] >> 4` (0xb6e24). 마구 4 는 `폼 >> 1 == 0` 일 때만 그림 이펙트를 쓴다 */
+  readonly pitcherForm?: number
 }
 
 /** 투수 레코드에서 온 폼·구질 (pitcherRepertoires) */
