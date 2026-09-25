@@ -359,44 +359,55 @@ function batterMinimumBaseOf(outcome: AtBatOutcome): number {
 /** 진행기 안에서 **제자리에서 바뀌는** 주자 한 명 */
 export interface MutableRunner {
   state: RunnerState
-  /** 최소 진루 루 — 타자주자만 결과 코드로 정해진다 */
+  /** 최소 진루 루 — 타자주자는 결과 코드가, 앞 주자들은 포스 사슬이 정한다 (`createPlayRunners`) */
   minimumBase: number
   /** 이미 득점 처리를 했는가 */
   counted: boolean
 }
 
 /**
- * 포스 판정 — 뒤 루가 모두 차 있어야 밀린다. 타자주자는 언제나 뛴다.
- * (원본 `requiredBasesOnBounce` 는 주자 번호와 목표 루를 비교하는 **다른** 계산이라 요구 루에만 쓴다.)
+ * 주자들을 세우면서 **포스 사슬**을 잇는다 — 이 진행기의 포스는 `0xaf918`(자동 진루 제어기)이 아니다.
+ *
+ * 원본에는 "이 타구는 2루타" 같은 결과 코드가 없다. 타자주자가 2루까지 가면 그게 2루타다.
+ * 그래서 원본의 포스 사슬 머리는 **언제나 "타자주자가 1루로 간다"** 한 칸이고,
+ * 그 뒤는 루가 이어 차 있는 만큼만 밀린다. 그리고 원본은 **한 루에 산 주자를 둘 놓지 않는다** —
+ * "루 b 의 주자" `0xa97a0` 이 `+0x8c`(목표 루) == b 인 주자를 **하나만** 집어 오고,
+ * 주루 키의 앞길·뒷길 검사(`0xa99a8` · `0xa9924`, 0xa9b04 에서 부른다)가 겹치는 루로는 못 보낸다 (I 3b).
+ *
+ * 웹판은 타자주자의 운명을 **타석 결과 코드가 먼저 정한다**(이 파일 머리말). 그러면 사슬 머리가
+ * 1루가 아니라 **결과 코드가 준 최소 루 M** 이 된다: 타자주자가 반드시 M 에 선다면 그 앞 주자는
+ * M+1, 그 앞은 M+2 … 에 서 있어야 원본이 절대 만들지 않는 "한 루에 둘" 이 안 생긴다.
+ *
+ * 그래서 **최소 진루 루 = min(홈, max(출발 루, M + 목록 번호))** 로 잇는다. 목록은 타자주자(0)부터
+ * 앞선 주자 쪽으로 빈 루를 건너뛰며 쌓이므로, 번호 k 는 "타자주자 앞으로 k 번째 주자" 다.
+ *
+ * ⚠️ **M = 1 일 때는 예전 `forcedFlagsOf` 와 한 톨도 다르지 않다.** 목록은 오름차순이라
+ * `출발루[k] ≥ k` 이고, 밀리는 조건 `1 + k > 출발루[k]` 는 `출발루[k] == k`, 곧
+ * "1루부터 내 앞까지 빈 루 없이 차 있다" 와 같은 말이다 — 땅볼·뜬공·단타는 그대로다.
+ *
+ * ⚠️ **근사**: M 이 2 이상인 타구(2·3루타)에서 사슬을 잇는 것은 웹판이 결과 코드를 먼저 정하기
+ *    때문에 필요한 **다리**다. 원본에는 대응하는 코드가 없다(원본은 애초에 M 을 미리 정하지 않는다).
+ *
+ * 포스로 밀리는(최소 루가 출발 루보다 큰) 주자만 첫 틱부터 뛴다.
+ * 나머지는 루에 붙어 있다가 자동 진루(0xaf918)가 보내 준다 — 그쪽은 **주루 수동이면 안 돈다**.
  */
-function forcedFlagsOf(bases: BaseState): { first: boolean; second: boolean; third: boolean } {
-  return {
-    first: true,
-    second: bases.first,
-    third: bases.first && bases.second,
-  }
-}
-
 function createPlayRunners(bases: BaseState, outcome: AtBatOutcome, speed: number): MutableRunner[] {
-  const forced = forcedFlagsOf(bases)
-  const runners: MutableRunner[] = []
-  const push = (fromBase: number, isForced: boolean, minimumBase: number) => {
-    const index = runners.length
-    // 포스로 밀리는 주자만 바로 뛴다. 나머지는 루에 붙어 있다가 자동 진루(0xaf918)가 보내 준다.
-    const targetBase = isForced ? fromBase + 1 : fromBase
-    runners.push({
+  const batterMinimum = batterMinimumBaseOf(outcome)
+  // 0 = 타자주자. 그 뒤는 **뒤 주자 → 앞선 주자** 순서다 (자동 진루가 목록 끝부터 = 앞선 주자부터 본다)
+  const fromBases = [0]
+  if (bases.first) fromBases.push(1)
+  if (bases.second) fromBases.push(2)
+  if (bases.third) fromBases.push(3)
+  return fromBases.map((fromBase, index) => {
+    // 홈보다 더 갈 곳은 없다 — 사슬이 만루 + 3루타처럼 넘치면 전부 홈에서 멈춘다
+    const minimumBase = Math.min(HOME_BASE, Math.max(fromBase, batterMinimum + index))
+    const targetBase = minimumBase > fromBase ? fromBase + 1 : fromBase
+    return {
       state: createRunner(index, fromBase, speed, { targetBase, isBatterRunner: index === 0 }),
       minimumBase,
       counted: false,
-    })
-  }
-  // 0 = 타자주자. 그 뒤는 **뒤 주자 → 앞선 주자** 순서다 (자동 진루가 목록 끝부터 = 앞선 주자부터 본다)
-  // 최소 진루 루는 **타자주자만** 결과 코드로 정해진다. 나머지는 포스로 밀리거나 자동 진루로만 간다.
-  push(0, true, batterMinimumBaseOf(outcome))
-  if (bases.first) push(1, forced.second, 1)
-  if (bases.second) push(2, forced.third, 2)
-  if (bases.third) push(3, forced.third, 3)
-  return runners
+    }
+  })
 }
 
 /**
@@ -949,6 +960,10 @@ export function stepDefensePlay(
             requiredBase: required[index],
             settled: false,
           }
+          // 포스가 풀린다 — 뜬 채로 잡히면 타자주자가 1루에 안 서므로 뒤에서 미는 힘이 사라진다.
+          // 원본 0xa9620 이 **모든 주자의 요구 루를 원래 루로** 되돌리는 것과 같은 자리다.
+          // (안 되돌리면 리터치한 주자가 곧바로 다시 뛰어 나가 포스 아웃을 당한다)
+          runner.minimumBase = runner.state.pitchBase
         }
       } else {
         // 굴러간 공 — 포스 요구 루를 세운다 (0xa95e8)

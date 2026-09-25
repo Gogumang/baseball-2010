@@ -50,6 +50,23 @@ function play(
   })
 }
 
+/** 주루 수동/자동까지 골라 돌린다 */
+function play2(
+  outcome: AtBatOutcome,
+  bases: BaseState,
+  outs: number,
+  runningMode: '수동' | '자동',
+): DefensePlayResult {
+  return runDefensePlay({
+    outcome,
+    trajectory: battedBallTrajectory(representativePatternOf(outcome)),
+    bases,
+    outs,
+    runAbility: 500,
+    runningMode,
+  })
+}
+
 describe('한 플레이 진행기 — 타자주자의 운명은 결과 코드, 나머지는 원본 수비 규칙', () => {
   it('삼진·볼넷·홈런은 수비를 돌릴 것이 없다', () => {
     expect(isBattedBallInPlay({ kind: '삼진' })).toBe(false)
@@ -785,5 +802,86 @@ describe('주루 수동/자동 — 설정 +0xbd 와 0xae690 (직접 뜬 것)', (
     }
 
     expect(굴림수('수동')).toBe(굴림수('자동'))
+  })
+})
+
+describe('포스 사슬 — 결과 코드가 준 최소 루가 앞 주자까지 민다 (`createPlayRunners`)', () => {
+  // 한 줄 규칙: **최소 진루 루 = min(홈, max(출발 루, 타자주자 최소 루 + 목록 번호))**.
+  //
+  // 왜 자동 진루(0xaf918)가 아니라 여기인가 — 원본에는 "이 타구는 2루타" 라는 결과 코드가 없다.
+  // 타자주자가 2루까지 가면 그게 2루타다. 그래서 원본의 포스 사슬 머리는 늘 "타자주자 → 1루" 고,
+  // 원본은 **한 루에 산 주자를 둘 놓지 않는다**("루 b 의 주자" 0xa97a0 이 +0x8c == b 인 주자를
+  // 하나만 집어 온다 · 주루 키의 앞길/뒷길 검사 0xa99a8 · 0xa9924, I 3b).
+  // 웹판은 결과 코드가 먼저 정하니 사슬 머리가 그 최소 루가 되어야 아귀가 맞는다.
+  const 진루 = (bases: BaseState) => [bases.first, bases.second, bases.third]
+
+  it('2루타 + 1루 주자: 수동이어도 1루 주자가 3루까지 밀린다 — 포스는 자동 제어기가 아니다', () => {
+    const 수동 = play2(이루타, 주자1루, 0, '수동')
+
+    // 예전에는 1루 주자가 타자주자와 함께 2루에 서 버려 `basesOf` 가 하나를 지웠다(증발).
+    expect(수동.advance.bases).toEqual({ first: false, second: true, third: true })
+    expect(수동.advance.runsScored).toBe(0)
+    expect(수동.advance.outsAdded).toBe(0)
+  })
+
+  it('2루타 + 1루 주자: 자동과 수동이 같은 자리에 선다 — 포스가 모드에 안 흔들린다', () => {
+    expect(play2(이루타, 주자1루, 0, '수동').advance).toEqual(
+      play2(이루타, 주자1루, 0, '자동').advance,
+    )
+  })
+
+  it('3루타 + 1루 주자: 1루 주자는 홈까지 밀려 득점한다', () => {
+    const 수동 = play2(삼루타, 주자1루, 0, '수동')
+
+    expect(수동.advance.bases).toEqual({ first: false, second: false, third: true })
+    expect(수동.advance.runsScored).toBe(1)
+  })
+
+  it('2루타 + 만루: 두 명이 밀려 들어온다', () => {
+    const 수동 = play2(이루타, 만루, 0, '수동')
+
+    expect(수동.advance.bases).toEqual({ first: false, second: true, third: true })
+    expect(수동.advance.runsScored).toBe(2)
+  })
+
+  it('3루타 + 만루: 사슬이 홈에서 멈춰 세 명이 다 들어온다', () => {
+    const 수동 = play2(삼루타, 만루, 0, '수동')
+
+    expect(수동.advance.bases).toEqual({ first: false, second: false, third: true })
+    expect(수동.advance.runsScored).toBe(3)
+  })
+
+  it('빈 루는 사슬을 끊는다 — 2루타 + 3루 주자뿐이면 3루 주자는 안 밀린다', () => {
+    const 수동 = play2(이루타, 주자3루, 0, '수동')
+
+    // 타자주자는 2루, 3루 주자는 포스가 아니니 수동에서는 제자리다 (자동 진루가 안 돈다)
+    expect(진루(수동.advance.bases)).toEqual([false, true, true])
+    expect(수동.advance.runsScored).toBe(0)
+  })
+
+  it('어느 갈래에서도 두 주자가 한 루에 겹치거나 앞 주자가 뒤로 밀리지 않는다', () => {
+    const 루상황: BaseState[] = [
+      EMPTY_BASES,
+      주자1루,
+      { first: false, second: true, third: false },
+      주자3루,
+      { first: true, second: true, third: false },
+      { first: true, second: false, third: true },
+      { first: false, second: true, third: true },
+      만루,
+    ]
+    for (const outcome of [땅볼아웃, 뜬공아웃, 직선타아웃, 단타, 이루타, 삼루타]) {
+      for (const bases of 루상황) {
+        for (const mode of ['자동', '수동'] as const) {
+          const 결과 = play2(outcome, bases, 0, mode)
+          const 칸수 = 진루(결과.advance.bases).filter(Boolean).length
+          const 주자수 = 1 + 진루(bases).filter(Boolean).length
+          const 자리 = `${outcome.kind}/${진루(bases).join()}/${mode}`
+          // **주자 수지 맞추기**: 득점 + 아웃 + 루에 선 주자 = 이 플레이에 있었던 주자 수.
+          // 둘이 한 루에 겹치면 `basesOf` 가 하나를 지워 이 합이 모자란다 — 증발을 바로 잡아낸다.
+          expect([자리, 결과.advance.runsScored + 결과.advance.outsAdded + 칸수]).toEqual([자리, 주자수])
+        }
+      }
+    }
   })
 })
