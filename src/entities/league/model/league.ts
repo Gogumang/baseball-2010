@@ -154,6 +154,27 @@ export function startPostseason(ranking: readonly number[]): PostseasonSeries {
   }
 }
 
+/**
+ * 포스트시즌에서 그 팀이 홈인가 원정인가 — `0xb7844` 의 **`리그+0x34 != 0`** 가지 (확정).
+ *
+ * ```
+ * b78e0: r3 = L + 0x35 ; r1 = (s8)[r3]        ; 라운드 r (2 준PO → 1 PO → 0 KS)
+ * b78e8: r2 = 1
+ * b78ea: bl 0xb7648                           ; = (s8) L[0x38 + 2*r + 1] = 대진 아랫 시드
+ * b78ee: eors r0, r5 ; rsbs r3,r0,#0 ; orrs r3,r0 ; lsrs r0,r3,#0x1f
+ *                                             ; → 아랫 시드면 0, 아니면 1
+ * ```
+ *
+ * 곧 **윗 시드가 늘 side 1(홈·후공), 아랫 시드가 늘 side 0(원정·선공)** 이다.
+ * 시리즈 몇 차전인지(`L+0x32`)는 보지 않는다 — 차수에 따라 홈이 도는 규칙이 원본에 없다.
+ * (대진 칸은 `0xb80a8` 이 `L[0x38]=1위, L[0x39]=미정, L[0x3a]=2위, L[0x3b]=미정,
+ *  L[0x3c]=3위, L[0x3d]=4위` 로 깔고, 시리즈가 끝나면 `0xb7724` 가 이긴 팀을
+ *  다음 라운드의 **칸 1**(아랫 시드)에 넣는다 — 웹 `advancePostseason` 과 같다.)
+ */
+export function postseasonSideOf(series: PostseasonSeries, team: number): number {
+  return team === series.teams[1] ? 1 - LEAGUE_SIDE_HOME : LEAGUE_SIDE_HOME
+}
+
 /** 한 경기 결과를 넣는다. 시리즈가 끝나면 이긴 팀이 다음 라운드의 아랫 시드로 올라간다 */
 export function advancePostseason(series: PostseasonSeries, winner: number): PostseasonSeries {
   if (series.round === '종료') return series

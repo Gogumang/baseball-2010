@@ -13,6 +13,7 @@ import {
   matchTeamOf,
   nationalCupMatchupOf,
   nationalCupRankingOf,
+  nationalCupSideOf,
   otherMatchOf,
   recordNationalCupResult,
 } from '@/entities/national-cup/model/nationalCup'
@@ -170,5 +171,24 @@ describe('대회 끝 판정', () => {
   it('단계가 0 이면 끝이다', () => {
     expect(isNationalCupOver({ ...createNationalCup(), stage: 0 })).toBe(true)
     expect(isNationalCupOver(createNationalCup())).toBe(false)
+  })
+})
+
+describe('nationalCupSideOf — 국가대항전 홈/원정 (0xb7844 의 리그+0xac 가지)', () => {
+  it('풀리그에서는 대한민국이 늘 대진 칸 0 이라 후공(홈)이다', () => {
+    let cup = createNationalCup()
+    for (let round = 0; round < 3; round += 1) {
+      expect(nationalCupSideOf(cup, KOREA_TEAM_ID)).toBe(1)
+      expect(nationalCupSideOf(cup, matchTeamOf(cup, cup.stage, 1))).toBe(0)
+      cup = endNationalCupDay(cup)
+    }
+  })
+
+  it('결승은 칸 0 = 풀리그 1위 라 대한민국이 2위면 선공(원정)이다', () => {
+    const 한국1위: NationalCup = { ...createNationalCup(), stage: 1, finalists: [10, 11] }
+    const 한국2위: NationalCup = { ...createNationalCup(), stage: 1, finalists: [11, 10] }
+
+    expect(nationalCupSideOf(한국1위, KOREA_TEAM_ID)).toBe(1)
+    expect(nationalCupSideOf(한국2위, KOREA_TEAM_ID)).toBe(0)
   })
 })

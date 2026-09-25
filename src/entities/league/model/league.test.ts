@@ -4,6 +4,7 @@ import {
   advancePostseason,
   leagueSideOf,
   opponentOf,
+  postseasonSideOf,
   rankingOf,
   recordLeagueResult,
   startPostseason,
@@ -91,5 +92,36 @@ describe('leagueSideOf — 홈/원정 배정 (0xb7844, R1 1절)', () => {
     const 큰쪽 = Math.max(0, 상대)
 
     expect(leagueSideOf(0, 큰쪽)).toBe(0)
+  })
+})
+
+describe('postseasonSideOf — 포스트시즌 홈/원정 (0xb7844 의 리그+0x34 가지)', () => {
+  const 순위 = [4, 1, 6, 0, 2, 3, 5, 7, 8, 9]
+
+  it('윗 시드(대진 칸 0)가 홈, 아랫 시드가 원정이다', () => {
+    const 준PO = startPostseason(순위)
+
+    expect(준PO.teams).toEqual([6, 0])
+    expect(postseasonSideOf(준PO, 6)).toBe(1)
+    expect(postseasonSideOf(준PO, 0)).toBe(0)
+  })
+
+  it('시리즈 몇 차전인지에 따라 홈이 돌지 않는다 — 원본에 그 규칙이 없다', () => {
+    let series = startPostseason(순위)
+    const 첫판 = postseasonSideOf(series, series.teams[0])
+    series = advancePostseason(series, 6)
+    series = advancePostseason(series, 0)
+
+    expect(series.round).toBe('준플레이오프')
+    expect(postseasonSideOf(series, series.teams[0])).toBe(첫판)
+  })
+
+  it('올라온 팀은 다음 라운드에서 아랫 시드(원정)가 된다 (0xb7724 가 칸 1 에 넣는다)', () => {
+    let series = startPostseason(순위)
+    for (let game = 0; game < 3; game += 1) series = advancePostseason(series, 0)
+
+    expect(series).toMatchObject({ round: '플레이오프', teams: [1, 0] })
+    expect(postseasonSideOf(series, 0)).toBe(0)
+    expect(postseasonSideOf(series, 1)).toBe(1)
   })
 })

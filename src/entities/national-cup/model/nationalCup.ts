@@ -224,6 +224,24 @@ export function nationalCupMatchupOf(cup: NationalCup): NationalCupMatchup | nul
 }
 
 /**
+ * 국가대항전에서 그 팀이 홈인가 원정인가 — `0xb7844` 의 **`리그+0xac != 0`** 가지 (확정).
+ *
+ * ```
+ * b7852: r3 = L + 0xad ; r1 = (s8)[r3]   ; 남은 단계 n
+ * b785a: r2 = 0
+ * b785c: bl 0xb7614                      ; = 대진 칸 0
+ * b7860: cmp r0, r5 ; beq 0xb78dc → r0 = 1 ; 아니면 r0 = 0
+ * ```
+ *
+ * 곧 **대진 칸 0 이 side 1(홈·후공)** 이다.
+ * 풀리그(`n` 4·3·2)의 칸 0 은 표 `0xd89bc` 상 늘 참가국 0 = 대한민국이라 **대한민국이 후공**이고,
+ * 결승(`n`=1)은 칸 0 = `L+0xae` = 풀리그 **순위 1위** 라 대한민국이 2위로 올라갔으면 **선공**이다.
+ */
+export function nationalCupSideOf(cup: NationalCup, team: number): number {
+  return matchTeamOf(cup, cup.stage, 0) === team ? 1 : 0
+}
+
+/**
  * 같은 라운드의 **둘째 경기** (CPU 끼리). 사람 경기 결과 장면 `0x4ea0c` 가
  * `L+0xad > 1`(풀리그 날)일 때만 `0xb7614(L,n,2)` vs `(L,n,3)` 을 시뮬한다 — 결승 날엔 없다.
  */

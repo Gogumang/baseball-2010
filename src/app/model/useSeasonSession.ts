@@ -23,7 +23,7 @@ import { recordLeagueResult } from '@/entities/league/model/league'
 import { playLeagueDay } from '@/entities/league/model/leagueDay'
 import { finishRegularSeason } from '@/entities/league/model/seasonEnd'
 import { runCpuPostseason } from '@/entities/league/model/postseasonPlay'
-import { advancePostseason } from '@/entities/league/model/league'
+import { advancePostseason, postseasonSideOf } from '@/entities/league/model/league'
 import { isMyTurn } from '@/entities/league/model/seasonEnd'
 import type { PostseasonSeries } from '@/entities/league/model/league'
 import { EMPTY_LEAGUE_PLAYER_STATS, recordLeaguePlateAppearances } from '@/entities/league/model/leaguePlayerStats'
@@ -36,7 +36,7 @@ import type { TeamGameOptions, TeamGameSummary } from '@/features/play-team-game
 import { FULL_PLAY_SETTINGS } from '@/features/play-team-game/model/matchSettings'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
-import { createNationalCup } from '@/entities/national-cup/model/nationalCup'
+import { createNationalCup, nationalCupSideOf } from '@/entities/national-cup/model/nationalCup'
 import { advanceNationalCupDay } from '@/entities/national-cup/model/nationalCupPlay'
 import { isSeasonNationalCupYear } from '@/entities/national-cup/model/nationalCupFlow'
 import type { NationalCupFinish } from '@/entities/national-cup/model/nationalCupFlow'
@@ -375,20 +375,22 @@ export function useSeasonSession(
    * 같은 날 나머지 네 경기를 돌리고(0xc2a48 — 승패 뒤집힘 버그 포함), 평가(0xa719c)를
    * 얹고 phase 를 "경기끝" 으로 두어 관중수입(0xe9)으로 넘어간다.
    */
-  /** 커리어·팀 상태에서 팀 경기 옵션을 만든다 (세 종류가 같은 화면을 쓴다) */
+  /**
+   * 커리어·팀 상태에서 팀 경기 옵션을 만든다 (세 종류가 같은 화면을 쓴다).
+   *
+   * `side` 는 원본 `0xb7844(리그, 팀)` 가 돌려주는 값 그대로다 — **1 = 홈(후공)**.
+   * 세 갈래(정규·포스트시즌·국가대항전)가 서로 다른 가지를 타므로 부르는 쪽이 골라 넣는다.
+   * 경기 준비 `0x6650` 이 그 값을 그대로 `경기[0x28 + side] = 팀번호` 로 꽂는다.
+   */
   const optionsFor = useCallback(
-    (opponent: number): TeamGameOptions | null => {
+    (opponent: number, side: number): TeamGameOptions | null => {
       if (save === null) return null
       const { record } = save.state
       return {
         mode: SEASON_GAME_MODE,
         ourTeamId: record.teamId,
         opponentTeamId: opponent,
-        // 홈/원정은 원본 0xb7844 가 정한다 — 홈(side 1)이면 말 공격(후공)이다.
-        // ⚠️ 포스트시즌·국가대항전은 일정표가 없어 이 식이 안 맞는다. 그쪽은 늘 후공이다
-        playerSide: leagueSideOf(record.games, record.teamId) === LEAGUE_SIDE_HOME
-          ? PLAYER_SIDE_LAST_BAT
-          : PLAYER_SIDE_FIRST_BAT,
+        playerSide: side === LEAGUE_SIDE_HOME ? PLAYER_SIDE_LAST_BAT : PLAYER_SIDE_FIRST_BAT,
         settings: FULL_PLAY_SETTINGS,
         // 코치는 SR+0x185 다 — 채용 화면(0xd7)이 채운 칸을 그대로 넘긴다 (−1 = 없음)
         season: { illness: record.illness, morale: save.state.teamMorale, coach: record.coach },
@@ -403,7 +405,11 @@ export function useSeasonSession(
 
   const playNextGame = useCallback(() => {
     if (save === null) return
-    const options = optionsFor(seasonOpponentOf(save.state.record))
+    // 정규시즌 가지 — 0xb7844 가 일정표 0xd89cb 로 정한다 (리그 날짜 L+0x32 = SR+0xb2)
+    const options = optionsFor(
+      seasonOpponentOf(save.state.record),
+      leagueSideOf(save.state.record.games, save.state.record.teamId),
+    )
     if (options === null) return
     setGameKind('정규')
     setGameOptions(options)
@@ -544,7 +550,11 @@ export function useSeasonSession(
     if (save === null || series === null) return
     const myTeam = save.state.record.teamId
     if (isMyTurn(series, myTeam)) {
-      const options = optionsFor(series.teams[0] === myTeam ? series.teams[1] : series.teams[0])
+      // 포스트시즌 가지 — 윗 시드(대진 칸 0)가 홈이다 (0xb7844 의 리그+0x34 가지)
+      const options = optionsFor(
+        series.teams[0] === myTeam ? series.teams[1] : series.teams[0],
+        postseasonSideOf(series, myTeam),
+      )
       if (options === null) return
       setGameKind('포스트시즌')
       setGameOptions(options)
@@ -566,14 +576,17 @@ export function useSeasonSession(
    * 대진은 대회 화면이 골라 주고, 끝나면 `finishGame` 이 `advanceNationalCupDay` 로 하루를 넘긴다.
    */
   const playCupGame = useCallback(
-    (_myTeam: number, opponent: number) => {
-      const options = optionsFor(opponent)
+    (myTeam: number, opponent: number) => {
+      const cup = save?.cup ?? null
+      if (cup === null) return
+      // 국가대항전 가지 — 대진 칸 0 이 홈이다. `myTeam` 은 원본 0xb7614 가 고른 대한민국(10)이다
+      const options = optionsFor(opponent, nationalCupSideOf(cup, myTeam))
       if (options === null) return
       setGameKind('국가대항전')
       setGameOptions(options)
       setScene(SEASON_SCENE_STATE.경기직전)
     },
-    [optionsFor],
+    [optionsFor, save],
   )
 
   /** 대회 끝 — 보상을 넣고 히든 팀을 연 뒤 관리 메뉴로 돌아간다 */
