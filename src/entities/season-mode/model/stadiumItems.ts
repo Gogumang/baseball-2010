@@ -206,6 +206,47 @@ export function boardBonusOf(record: SeasonRecord): number {
  */
 export const GRASS_HAS_NO_EFFECT = true
 
+// ── 잔디 = 타석 바닥 그림의 팔레트 (0x786c8, S3 6절 · 디스어셈으로 확정) ──────────
+//
+// 잔디는 관중석·전광판과 달리 **프레임을 안 고른다**. 구장 객체 `+0x2c` 에 달린 바닥 그림
+// (`stadium/attack.pzx`, 그리는 곳 `0x7725c`)의 팔레트를 `stadium/attack.mpl` 의 한 줄로
+// 통째로 갈아 끼운다.
+//
+// ```
+// 0x786c8(구장, idx, flag):
+//   786d0  [구장+0xc] = idx                       ; 넘어온 값을 그대로 적어 둔다
+//   786d4  줄 = flag 의 하위 바이트 ≠ 0 ? 1 − idx : idx
+//   786e6  줄 ≥ 0 이고 그림이 있으면 0xb9c34("stadium/attack.mpl", 그림, 줄) 로 다시 칠한다
+//   786f2  줄 < 0 이면 그림을 버리고 0xb9718("stadium/attack.pzx", 1, ".mpl", 줄) 로 다시 적재
+//          → 줄이 음수면 mpl 을 안 쓰므로 **PZX 안 기본 팔레트**가 된다
+// ```
+//
+// 부르는 곳은 여섯 군데인데 **전부 `idx = 잔디칸 − 1`, `flag = 1`** 이다:
+//   0x353ec→0x354b4 경기 준비(시즌 홈) · 0x62e4 · 0x7afa · 0x9c76 구장관리·상점 미리보기
+//   (0x3540a·0x3546a 는 대전 모드로, 업로드 레코드 `+0x11a`/`+0x11d` 를 **빼기 없이** 넘긴다)
+// 그래서 **줄 = 1 − (칸 − 1) = 2 − 칸** 이다.
+//
+// 구장 객체 생성자 `0x76ace` 가 `[구장+0xc] = −1` 로 두므로 시즌 홈경기가 아니면 기본색이다
+// (시즌 원정·일반·나리·미션은 0x354c0 으로 빠져 0x786c8 을 아예 안 부른다).
+
+/** `2 − 칸` 의 `2` — 잔디 칸 0 이 쓰는 줄 (0x786c8 의 `1 − (칸 − 1)`) */
+export const GRASS_TOP_PALETTE_ROW = 2
+
+/**
+ * 잔디 칸 → `stadium/attack.mpl` 줄 번호. **null 이면 mpl 을 안 쓰고 PZX 기본 팔레트**다.
+ *
+ * | 칸 | 이름(StrITEM) | 줄 | 색(1번 색) |
+ * |---|---|---|---|
+ * | 0 | 거친인조잔디 | 2 | `#7b7521` 누런 올리브 |
+ * | 1 | 인조잔디 | 1 | `#218a8c` 청록 — 설명 "항상 푸른색을 유지하며" |
+ * | 2 | 천연잔디 | 0 | `#217131` 짙은 녹색 |
+ * | 3 | 특급천연잔디 | **null** | `#427939` PZX 기본 |
+ */
+export function grassPaletteRowOf(slot: number): number | null {
+  const row = GRASS_TOP_PALETTE_ROW - slot
+  return row < 0 ? null : row
+}
+
 /**
  * 시즌 **홈경기** 타석 배경에 넘기는 세 값 — 경기 준비 `0x353ac~0x353e6` 이
  * 시즌 기록에서 구장 객체로 옮겨 담는 그대로다 (**확정**, 주소 다시 뜸).
@@ -214,9 +255,12 @@ export const GRASS_HAS_NO_EFFECT = true
  * 353ac  구장+0x88 = (s8)SR[0x1b8]      ; 관중석 칸
  * 353c2  구장+0x89 = (s8)SR[0x65] + 1   ; 관중 수 그림 단계
  * 353d2  구장+0x8a = (s8)SR[0x1b9]      ; 전광판 칸
+ * 353ec  0x786c8(구장, (s8)SR[0x1ba] − 1, 1)  ; 잔디 — **팔레트**라 세 칸과 길이 다르다
  * ```
  *
- * ⚠️ 잔디 칸(SR+0x1ba)은 여기 없다 — 프레임이 아니라 팔레트라 다른 길로 간다.
+ * ⚠️ 잔디는 구장 `+0x88`/`+0x89`/`+0x8a` 에 **안 들어간다** — 바닥 그림(`+0x2c`)의 팔레트를
+ *    갈아 끼운다(`grassPaletteRowOf`). 같은 준비 묶음에서 같은 조건(**시즌 홈경기**)일 때만
+ *    걸리므로 웹판은 한 다발로 같이 내려보낸다.
  */
 export interface SeasonStadiumScene {
   /** 구장+0x88 — 관중석 칸 0~6 (4~6 은 히든) */
@@ -225,6 +269,11 @@ export interface SeasonStadiumScene {
   readonly crowd: number
   /** 구장+0x8a — 전광판 칸 0~6 (4~6 은 히든) */
   readonly board: number
+  /**
+   * 바닥 그림 `stadium/attack` 의 `.mpl` 줄 (`0x786c8`). null 이면 PZX 기본 팔레트다.
+   * 프레임이 아니라 **팔레트**라 위 세 칸과 다른 길로 간다 — `grassPaletteRowOf` 참고.
+   */
+  readonly grassPalette: number | null
 }
 
 /**
@@ -240,5 +289,6 @@ export function seasonStadiumOf(record: SeasonRecord): SeasonStadiumScene {
     stand: record.stadiumEquipped[0] ?? 0,
     crowd: record.crowdLevel + 1,
     board: record.stadiumEquipped[1] ?? 0,
+    grassPalette: grassPaletteRowOf(record.stadiumEquipped[2] ?? 0),
   }
 }

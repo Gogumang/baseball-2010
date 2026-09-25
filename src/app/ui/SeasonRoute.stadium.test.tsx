@@ -81,7 +81,7 @@ describe('시즌 구장 배선 — 홈경기에만 장착 장비가 간다 (0x40
     expect(leagueSideOf(0, 0)).toBe(LEAGUE_SIDE_HOME)
 
     expect(경기를연다(레코드({ games: 0, stadiumEquipped: [3, 5, 2], crowdLevel: 2 })))
-      .toEqual({ stand: 3, crowd: 3, board: 5 })
+      .toEqual({ stand: 3, crowd: 3, board: 5, grassPalette: 0 })
   })
 
   it('⚠️ 원정경기면 안 넘긴다 — 일반 구장(0x77974)으로 그려져야 원본과 같다', () => {
@@ -92,6 +92,13 @@ describe('시즌 구장 배선 — 홈경기에만 장착 장비가 간다 (0x40
   })
 
   it('아무것도 안 샀으면 0번 칸이 가고, 관중은 만원 판정 0 + 1 = 1 단계다', () => {
-    expect(경기를연다(레코드({ games: 0 }))).toEqual({ stand: 0, crowd: 1, board: 0 })
+    expect(경기를연다(레코드({ games: 0 }))).toEqual({ stand: 0, crowd: 1, board: 0, grassPalette: 2 })
+  })
+
+  it('잔디도 같이 간다 — 칸 3(특급천연잔디)만 줄이 없어 기본 팔레트다 (0x786c8)', () => {
+    expect(경기를연다(레코드({ games: 0, stadiumEquipped: [0, 0, 3] })))
+      .toEqual({ stand: 0, crowd: 1, board: 0, grassPalette: null })
+    expect(경기를연다(레코드({ games: 0, stadiumEquipped: [0, 0, 1] })))
+      .toEqual({ stand: 0, crowd: 1, board: 0, grassPalette: 1 })
   })
 })

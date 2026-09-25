@@ -1,7 +1,8 @@
 import { BOARD_BOXES, FENCE_BOXES } from '@/shared/config/original/stadiumScene'
 import {
-  CLOUD_FRAMES, CROWD_FRAMES, FENCE_BOARD_FRAMES, FENCE_FRAMES, FENCE_SEASON_FRAMES, FIELD_BACKGROUND,
-  HIDDEN_BOARD_FRAMES, HIDDEN_FENCE_FRAMES, SCOREBOARD_FRAMES, TEAM_ICON, placedFrame, sprite,
+  CLOUD_FRAMES, CROWD_FRAMES, FENCE_BOARD_FRAMES, FENCE_FRAMES, FENCE_SEASON_FRAMES,
+  HIDDEN_BOARD_FRAMES, HIDDEN_FENCE_FRAMES, SCOREBOARD_FRAMES, TEAM_ICON, fieldBackground, placedFrame,
+  sprite,
 } from '@/widgets/batting-stage/lib/spriteLoader'
 import type { PlacedFrame } from '@/widgets/batting-stage/lib/spriteLoader'
 import { CLOUD_WRAP_WIDTH, cloudScrollAt, isCloudVisible, skyColorsOf, teamIconOf } from '@/widgets/batting-stage/lib/stageScenery'
@@ -32,8 +33,11 @@ import { ORIGINAL_COLORS } from '@/shared/config/design'
  * 시즌 구장 그리기에 들어가는 세 값 — 구장 객체 `+0x88`(관중석 칸) · `+0x89`(관중 단계) ·
  * `+0x8a`(전광판 칸). 경기 시작 준비 `0x353ac~0x353e6` 이 시즌 기록에서 옮겨 담는다 (R6 1절, **확정**).
  *
- * ⚠️ **잔디는 여기 없다.** 잔디 칸(`SR[0x1ba]`)은 프레임이 아니라 **팔레트**로 갈아 끼운다
- *    (`0x786c8(구장, 칸 − 1, 1)`, S3 문서). `+0x89` 는 잔디가 아니라 **관중 수 그림 단계**다.
+ * ⚠️ **잔디는 그 세 칸에 없다.** 잔디 칸(`SR[0x1ba]`)은 프레임이 아니라 바닥 그림
+ *    (`구장+0x2c` = `stadium/attack`, 그리는 곳 `0x7725c`)의 **팔레트**를 갈아 끼운다
+ *    (`0x786c8(구장, 칸 − 1, 1)` → `.mpl` 줄 `2 − 칸`, S3 문서 · `grassPaletteRowOf`).
+ *    같은 경기 준비 묶음이 같은 조건(시즌 홈경기)에서 걸므로 `grassPalette` 로 같이 받는다.
+ *    `+0x89` 는 잔디가 아니라 **관중 수 그림 단계**다.
  */
 export interface SeasonStadium {
   /**
@@ -52,6 +56,14 @@ export interface SeasonStadium {
   readonly crowd: number
   /** 전광판 칸 0~6 (구장+0x8a ← `SR[0x1b9]` = `record.stadiumEquipped[1]`). 4~6 은 `hidden_board_(칸−4)` */
   readonly board: number
+  /**
+   * 바닥 그림 `stadium/attack` 의 `.mpl` 줄 = `2 − 잔디 칸` (`0x786c8`). **null 이면 기본 팔레트**다.
+   *
+   * 칸 0 거친인조잔디 → 줄 2(누런 올리브) · 1 인조잔디 → 줄 1(청록) ·
+   * 2 천연잔디 → 줄 0(짙은 녹색) · 3 특급천연잔디 → null(PZX 기본, 밝은 녹색).
+   * 구장 객체 생성자 `0x76ace` 가 `[구장+0xc] = −1` 이라 **시즌 홈경기가 아니면 기본색**이다.
+   */
+  readonly grassPalette: number | null
 }
 
 export interface SceneryState {
@@ -168,7 +180,7 @@ export function drawScenery(context: CanvasRenderingContext2D, state: ScenerySta
   const colorIndex = drawSky(context, state)
   if (isCloudVisible(colorIndex)) drawClouds(context, state.tick)
   drawFence(context, state)
-  drawField(context)
+  drawField(context, state.seasonStadium?.grassPalette ?? null)
 }
 
 function drawSky(context: CanvasRenderingContext2D, state: SceneryState): number {
@@ -307,8 +319,13 @@ function drawScoreboardText(
   context.restore()
 }
 
-function drawField(context: CanvasRenderingContext2D): void {
-  const field = sprite(FIELD_BACKGROUND)
+/**
+ * 바닥(그라운드) — 원본 `0x7725c` 가 구장 객체 `+0x2c` 에 달린 `stadium/attack` 그림을 그린다.
+ * `grassPalette` 가 있으면 그 `.mpl` 줄로 칠한 그림을 쓴다 (잔디 = 팔레트, `0x786c8`).
+ * 칠하는 동안에는 구운 그림이 나가므로 첫 몇 프레임은 기본색이 보인다.
+ */
+function drawField(context: CanvasRenderingContext2D, grassPalette: number | null): void {
+  const field = fieldBackground(grassPalette)
   if (field === null) return
   context.drawImage(
     field,

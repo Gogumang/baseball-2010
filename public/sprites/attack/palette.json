@@ -1,6 +1,6 @@
 {
  "mpl": "stadium/attack.mpl",
- "select": "미해결 — 원본이 몇 번을 고르는지 아직 못 찾았다",
+ "select": "잔디 칸 v: 줄 2 − v (0 → 2 · 1 → 1 · 2 → 0 · 3 → 기본색) (0x786c8)",
  "baked": null,
  "colors": [
   "#ff00ff",

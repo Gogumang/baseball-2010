@@ -12,6 +12,7 @@ import {
   equipStadiumItem,
   isStadiumCollector,
   ownsStadiumItem,
+  grassPaletteRowOf,
   requiredPopularityOf,
   stadiumCollectorUnlocks,
   seasonStadiumOf,
@@ -189,9 +190,9 @@ describe('효과 — 관중석은 상한만, 전광판은 가산만 (0xa34b8)', 
 })
 
 describe('시즌 홈경기 구장 세 칸 — 경기 준비 0x353ac~0x353e6', () => {
-  it('관중석은 +0x1b8, 전광판은 +0x1b9 를 그대로 옮긴다 (잔디는 안 간다)', () => {
+  it('관중석은 +0x1b8, 전광판은 +0x1b9 를 그대로 옮긴다 (잔디는 프레임이 아니라 팔레트다)', () => {
     const record = 기본({ stadiumEquipped: [2, 5, 3] })
-    expect(seasonStadiumOf(record)).toEqual({ stand: 2, crowd: 1, board: 5 })
+    expect(seasonStadiumOf(record)).toEqual({ stand: 2, crowd: 1, board: 5, grassPalette: null })
   })
 
   it('관중 단계는 만원 판정 SR+0x65 에 1 을 더한 값이다 (0x353cc)', () => {
@@ -201,6 +202,26 @@ describe('시즌 홈경기 구장 세 칸 — 경기 준비 0x353ac~0x353e6', ()
   })
 
   it('히든 칸(4~6)도 그대로 넘어간다 — 그리는 쪽이 hidden_* 로 가른다', () => {
-    expect(seasonStadiumOf(기본({ stadiumEquipped: [6, 4, 0] }))).toEqual({ stand: 6, crowd: 1, board: 4 })
+    expect(seasonStadiumOf(기본({ stadiumEquipped: [6, 4, 0] })))
+      .toEqual({ stand: 6, crowd: 1, board: 4, grassPalette: 2 })
+  })
+})
+
+describe('잔디 = 바닥 그림 팔레트 — 0x786c8 (S3 6절)', () => {
+  it('칸 v 는 stadium/attack.mpl 의 줄 2 − v 를 쓴다 (0x786c8 의 `1 − (v − 1)`)', () => {
+    expect(grassPaletteRowOf(0)).toBe(2)
+    expect(grassPaletteRowOf(1)).toBe(1)
+    expect(grassPaletteRowOf(2)).toBe(0)
+  })
+
+  it('특급천연잔디(칸 3)만 줄이 음수라 mpl 을 안 쓰고 PZX 기본 팔레트로 돌아간다 (0x786f2)', () => {
+    expect(grassPaletteRowOf(3)).toBeNull()
+  })
+
+  it('seasonStadiumOf 가 SR+0x1ba 를 줄로 바꿔 같이 내려보낸다 (0x353ec)', () => {
+    expect(seasonStadiumOf(기본({ stadiumEquipped: [0, 0, 0] })).grassPalette).toBe(2)
+    expect(seasonStadiumOf(기본({ stadiumEquipped: [0, 0, 1] })).grassPalette).toBe(1)
+    expect(seasonStadiumOf(기본({ stadiumEquipped: [0, 0, 2] })).grassPalette).toBe(0)
+    expect(seasonStadiumOf(기본({ stadiumEquipped: [0, 0, 3] })).grassPalette).toBeNull()
   })
 })

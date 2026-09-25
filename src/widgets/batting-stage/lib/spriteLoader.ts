@@ -29,6 +29,18 @@ export const GAME_EFFECT_IMAGE = (index: number) =>
 export const GAME_EFFECT_FRAMES = './sprites/game_effect/frames'
 
 export const FIELD_BACKGROUND = './sprites/attack/000.png'
+/** 바닥 그림 폴더 — `stadium/attack.mpl` 의 잔디 팔레트가 여기 붙는다 */
+const FIELD_FOLDER = './sprites/attack'
+
+/**
+ * 바닥(그라운드) 그림. `paletteIndex` 는 `stadium/attack.mpl` 의 줄이고 **null 이면 구운 그림**
+ * (= PZX 안 기본 팔레트) 그대로다. 시즌 구장 잔디가 이 줄을 고른다 (`0x786c8`, S3 6절).
+ */
+export function fieldBackground(paletteIndex: number | null): HTMLImageElement | null {
+  return paletteIndex === null
+    ? sprite(FIELD_BACKGROUND)
+    : recoloredSprite(FIELD_FOLDER, FIELD_BACKGROUND, paletteIndex)
+}
 
 /**
  * 합성 프레임의 원점.
