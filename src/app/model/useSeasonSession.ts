@@ -43,6 +43,7 @@ import type { NationalCupFinish } from '@/entities/national-cup/model/nationalCu
 import { applySeasonReward, GAME_POINT_LIMIT, judgeSeasonEnding } from '@/entities/season-mode/model/seasonRewards'
 import type { LeagueFirstAward } from '@/entities/season-mode/model/seasonRewards'
 import type { SeasonAwardReward } from '@/widgets/season/lib/seasonAwardEvents'
+import { activeSound } from '@/shared/api/audio/soundPort'
 import {
   HELL_TRAINING_GAIN_RANGE, HELL_TRAINING_GAME_POINT, HELL_TRAINING_INDEX,
   HELL_TRAINING_MORALE_LOSS_RANGE,
@@ -210,6 +211,30 @@ function normalizeSeasonSave(saved: Partial<SeasonSave> | null): SeasonSave | nu
     roster: saved.roster ?? rosterOf(state.record.teamId),
     playerStats: saved.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS,
   }
+}
+
+/**
+ * **시즌 모드 경기 뒤 평가 징글** (36 좋음 · 37 보통 · 38 나쁨).
+ *
+ * 원본 시즌 상태 **0xe9(경기 뒤 관중·수입 창, 0xdea0)** 안 `0xdeae~0xdede` — 직접 떠서 옮겼다:
+ * ```
+ * 0000deae: adds r3,#0x4a ; ldrb r3,[r3] ; lsls/asrs #0x18   ; p = (s8)레코드[+0x4a]
+ * 0000deb6: cmp r3,#0 ; bge 0xdeca
+ * 0000debc: movs r1,#0x26        ; p < 0      → 38   (예약 0xdec4)
+ * 0000dece: cmp r3,#3 ; bgt 0xded8                   ; ★ 시즌 문턱은 3 (나만의리그는 1)
+ * 0000ded4: movs r1,#0x25        ; 0 ≤ p ≤ 3 → 37   (예약 0xdede)
+ * 0000deda: movs r1,#0x24        ; p > 3     → 36
+ * ```
+ * 나만의리그 쪽(0x12c96, 문턱 1)은 `useCareerSession.evaluationJingleIdOf` 가 따로 들고 있다 —
+ * **문턱만 다르고 모양이 같다**. 레코드 `+0x4a` 는 `SeasonRecord.lastPopularityChange` 다.
+ *
+ * ⚠️ 웹에는 예약(`0x6e498`)이 없어 즉시 울린다 — 원본도 이 창에서 다른 소리와 겹치지 않아
+ * 들리는 결과는 같다.
+ */
+const SEASON_EVALUATION_THRESHOLD = 3
+export function seasonEvaluationJingleIdOf(popularityChange: number): number {
+  if (popularityChange < 0) return 38
+  return popularityChange > SEASON_EVALUATION_THRESHOLD ? 36 : 37
 }
 
 /**
@@ -465,6 +490,8 @@ export function useSeasonSession(
         },
       })
       setGameOptions(null)
+      // 관중수입 창(0xe9)이 뜨면서 나는 평가 징글 36·37·38 (0xdec4/0xdede)
+      activeSound().play(seasonEvaluationJingleIdOf(evaluation.popularityChange))
       setScene(SEASON_SCENE_STATE.관중수입)
     },
     [commit, random, save],

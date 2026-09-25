@@ -71,6 +71,8 @@ describe('2스트라이크 번트 파울 아웃 (0x9d5e2~0x9d600)', () => {
       kind: '타구',
       outcome: { kind: '아웃', detail: '직선타아웃' },
       isBunt: false,
+      // 원본 판정 11 은 **조건 없이** 아웃 콜 62 다 — 수비 결과를 안 보게 표를 달아 보낸다
+      isBuntFoulOut: true,
     })
   })
 

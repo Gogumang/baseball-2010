@@ -144,8 +144,7 @@ export function contactSoundIdOf(input: ContactSoundInput): number | null {
  *
  * ⚠️ **추정**: 39 의 조건 `[sp+0xa4]+4 == 2` 가 **올린 뒤**의 스트라이크 수인지 올리기 전인지는
  * 문서에 없다. 여기서는 올린 뒤로 읽어 두 번째 스트라이크에 39 를 낸다.
- * ⚠️ 볼넷 뒤에 조건부로 예약되는 함성 **29** (`game[0x31+game[9]] == 1`)는 그 칸의 뜻이 미해결이라
- * 잇지 않았다.
+ * 볼넷 뒤에 조건부로 예약되는 함성 **29** 는 따로 `walkCheerSoundIdOf` 가 고른다.
  */
 export function pitchCallSoundIdOf(resolution: PitchResolution, atBat: AtBatState): number | null {
   switch (resolution.kind) {
@@ -159,6 +158,36 @@ export function pitchCallSoundIdOf(resolution: PitchResolution, atBat: AtBatStat
     case '타구':
       return null
   }
+}
+
+/** 관중 함성 — 볼넷 뒤 (판정 v3 의 뒤꼬리 0x51afa~0x51b02) */
+export const WALK_CHEER_SOUND = 29
+
+/**
+ * **볼넷 뒤의 관중 함성 29** — 원본 판정 v3(0x51aca)은 "Base on balls!"(24) 를 튼 **바로 뒤**
+ * 조건 하나를 보고 29 를 예약한다. 디스어셈 그대로다:
+ *
+ * ```
+ * 00051adc: ldr r0,[sp,#0xa4]        ; 경기 상태
+ * 00051ae0: movs r3,#9 ; ldrsb r3,[r0,r3]  ; state[9] = 공격 팀
+ * 00051ae4: adds r3,r3,r0 ; adds r3,#0x31 ; ldrb r3,[r3]
+ * 00051aee: cmp r3,#1 ; bne …           ; state[0x31 + 공격팀] != 1 이면 그냥 끝
+ * 00051afc: movs r1,#0x1d              ; 29
+ * 00051b02: bl request(소리, 29, 0)     ; 0x6e498 = 예약
+ * ```
+ *
+ * `state[0x31 + 팀]` 은 **그 팀을 CPU 가 조작하는가**다 (0 = 사람, 1 = CPU — Q1 3a·R4 1절·
+ * P7 2절이 같은 칸을 같은 뜻으로 읽는다). 곧 **CPU 가 타석에 서서 볼넷을 얻었을 때만** 나는
+ * 함성이고, 사람이 볼넷을 골랐을 때는 안 난다. 사람이 늘 공격인 화면(나만의리그 타자편·미션)에서는
+ * 원본에서도 한 번도 울리지 않는다.
+ *
+ * ⚠️ **웹에는 예약(`0x6e498`)이 없다.** 원본은 24 가 다 울린 뒤 29 를 잇지만, 웹 통로는 하나라
+ * 뒤 소리가 앞 소리를 끊는다 (`shared/api/audio/soundPort` 머리 주석). 소리가 나는 **조건**은
+ * 원본과 같고 **겹치는 방식**만 근사다.
+ */
+export function walkCheerSoundIdOf(outcome: AtBatOutcome | null, offenseIsCpu: boolean): number | null {
+  if (outcome?.kind !== '볼넷') return null
+  return offenseIsCpu ? WALK_CHEER_SOUND : null
 }
 
 /**
@@ -179,6 +208,11 @@ export interface DefenseCallContext {
   readonly throwBase?: number
   /** 송구 도착 틱. 송구가 없으면 −1 */
   readonly throwArrivalTick?: number
+  /**
+   * **2스트라이크 번트 파울 아웃**(원본 판정 v11)인가 — 서 있으면 두 칸을 보지 않고 곧장 62 다.
+   * `features/defense-play` 의 `DefensePlayInput.buntFoulOut` 이 그대로 들어온다.
+   */
+  readonly buntFoulOut?: boolean
 }
 
 /** 아웃 콜 두 가지 — 62 는 "잡아서/태그해서 낸 아웃", 20 은 "루에서 잡은 포스 아웃" */
@@ -216,7 +250,8 @@ const SAFE_CALL = 17
  *   **2 이면서 야수 +0x3b**(루에 닿아 있음, 0xb4312) 일 때 선다.
  *
  * → **62 = 잡아서·태그해서 낸 아웃**, **20 = 루에서 잡은 포스 아웃**.
- * (v11 = 2스트라이크 번트 파울 아웃도 62 다 — `battedBallOutcome.buntFoulOut` 참고.)
+ * (v11 = 2스트라이크 번트 파울 아웃도 62 다 — 이제 `DefenseCallContext.buntFoulOut` 으로 이었다.
+ * 원본은 그 아웃을 수비 시뮬레이션 없이 내므로 **두 칸을 아예 보지 않는다**.)
  *
  * ⚠️ `docs/re/L-sound-effects.md` 가 적던 "특수 모드" 는 오독이다. `0x1552d0c` 는 모드 플래그가
  * 아니라 **경기 상태 구조체 포인터**고, 두 칸은 이번 플레이의 아웃 종류다. 그 문서도 같이 고쳤다.
@@ -237,10 +272,23 @@ const SAFE_CALL = 17
  * 아웃 판정(0xb36d0)이 서지 않고 주자가 들어오는 **틱**에 v = 9 를 낸다. 즉 "아웃 될 뻔했는데
  * 살았다" 만이고 외야로 나간 안타는 이 길이 아니다. 웹 타석 모델에는 틱이 없어
  * **"안타인데 어느 루로 송구가 도착했다"** 로 근사했다.
+ *
+ * ⚠️ **도루에는 17 을 안 이었다.** 원본에서 17 을 내는 자리는 판정 v9 **하나뿐**이고
+ * (리터럴 `0x6ea6d`·`0x6e499` 를 부르는 65곳을 전수로 떠서 `movs r1,#0x11` 을 찾으면
+ * 0x51c3a·0x51c50 둘, 둘 다 v9 의 같은 갈래다 — 0x515bc·0x38e14·0xa1ebe 의 `#0x11` 은
+ * 소리가 아니라 다른 호출의 인자다), 도루도 **같은 길**로만 17 을 낸다:
+ * 도루 키(0x583)는 플레이 종류 9(0x3e07e)로 상태 0x17(수비 화면)에 들어가고, 그 안에서
+ * 포수 송구가 루에 닿아 야수가 공을 쥔 채 태그에 실패해야 v9 가 선다. 웹 도루
+ * (`entities/game/model/steal.attemptSteal`)는 **주력 표 굴림 하나**라 "송구가 도착했는가"
+ * 라는 칸 자체가 없다 — 성공할 때마다 17 을 내면 원본이 안 내는 자리에서도 울린다.
+ * 그래서 **잇지 않았다** (틱이 있는 도루 수비 시뮬레이션이 들어오면 그때 이을 자리다).
  */
 export function inPlayCallSoundIdOf(outcome: AtBatOutcome, play?: DefenseCallContext | null): number | null {
   if (outcome.kind === '홈런') return 11
   if (outcome.kind === '아웃') {
+    // 판정 v11(2스트라이크 번트 파울 아웃)은 **조건 없이** 62 다 (0x51b20 → 0x51b2e).
+    // 원본은 이 아웃을 수비 시뮬레이션 없이 그 자리에서 내므로 state[0x1f]·state[0x87] 을 아예 안 본다
+    if (play?.buntFoulOut === true) return CAUGHT_OUT_CALL
     // 수비 결과를 받았으면 원본과 같은 칸(state[0x1f]·state[0x87])을 본다.
     // 없으면 타석 결과로 근사한다 — 그때는 태그 몫을 알 길이 없어 뜬공/직선타만 62 다
     const caught = play?.caughtOnTheFly ?? (outcome.detail === '뜬공아웃' || outcome.detail === '직선타아웃')

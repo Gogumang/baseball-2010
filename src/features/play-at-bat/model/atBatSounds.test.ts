@@ -114,6 +114,14 @@ describe('플레이가 끝난 뒤의 콜', () => {
     expect(inPlayCallSoundIdOf({ kind: '아웃', detail: '뜬공아웃' }, { caughtOnTheFly: false })).toBe(20)
   })
 
+  it('state[0x87](마지막 판정이 태그) 가 서면 땅볼도 62 다 (0x51b44)', () => {
+    const 땅볼 = { kind: '아웃', detail: '땅볼아웃' } as const
+    expect(inPlayCallSoundIdOf(땅볼, { caughtOnTheFly: false, tagOut: true })).toBe(62)
+    expect(inPlayCallSoundIdOf(땅볼, { caughtOnTheFly: false, tagOut: false })).toBe(20)
+    // 두 칸은 OR 다 — 하나만 서도 62
+    expect(inPlayCallSoundIdOf(땅볼, { caughtOnTheFly: true, tagOut: false })).toBe(62)
+  })
+
   it('안타인데 루로 송구가 도착했으면 세이프 콜 17 (0xb442a 근사)', () => {
     expect(inPlayCallSoundIdOf({ kind: '안타', bases: 1 }, { throwBase: 1, throwArrivalTick: 20 })).toBe(17)
     // 송구가 없었으면 "아웃 될 뻔" 이 아니다 — 원본도 외야 안타에는 이 콜을 안 낸다

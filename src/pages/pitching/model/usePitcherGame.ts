@@ -17,6 +17,7 @@ import {
   deepHitCheerSoundIdOf,
   inPlayCallSoundIdOf,
   pitchCallSoundIdOf,
+  walkCheerSoundIdOf,
   PITCH_RELEASE_SOUND,
 } from '@/features/play-at-bat/model/atBatSounds'
 import { carryDistanceOf } from '@/entities/batting/model/battedBallFlight'
@@ -126,6 +127,11 @@ export function usePitcherGame(
             return [
               PITCH_RELEASE_SOUND,
               pitchCallSoundIdOf(resolution, nextAtBat),
+              // 볼넷 뒤 관중 함성 29 (0x51afa~0x51b02) — 원본은 **공격 팀이 CPU 조작**
+              // (`state[0x31 + state[9]] == 1`) 일 때만 예약한다. 투수편은 사람이 늘 수비라
+              // 타석에 서는 쪽이 언제나 CPU 다 → 조건이 늘 참이다.
+              // ⚠️ 웹에는 예약(0x6e498)이 없어 24 를 끊고 이어 난다 (조건만 원본과 같다)
+              walkCheerSoundIdOf(nextAtBat.outcome, true),
               // 인플레이 타구면 아웃 콜은 수비 화면이 끝난 뒤다
               after.pendingDefensePlay !== null || nextAtBat.outcome === null
                 ? null

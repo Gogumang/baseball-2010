@@ -77,6 +77,14 @@ export const ORIGINAL_SOUNDS: readonly OriginalSound[] = [
    * 즉 **"아웃 될 뻔했는데 살았다"** 만이고, 외야로 나간 안타는 이 길이 아니다.
    */
   { id: 17, role: 'voice', name: '"Safe!" 세이프', scene: '판정 v9 (0x51c14) — 야수가 루에서 공을 쥐었는데 아웃이 안 선 플레이 (0xb442a)' },
+  /*
+   * 17 을 내는 자리는 **원본에 하나뿐**이다 — 위 v9 갈래다. `0x6ea6d`(즉시)·`0x6e499`(예약)를
+   * 부르는 65곳을 전수로 떠서 `movs r1,#0x11` 을 찾으면 **0x51c3a·0x51c50** 둘뿐이고 둘 다
+   * 그 갈래의 두 가지다. (0x515bc·0x38e14·0xa1ebe 의 `#0x11` 은 소리가 아니라 다른 호출의 인자다.)
+   * 도루도 **같은 길**이다: 도루 키(0x583)는 플레이 종류 9(0x3e07e)로 상태 0x17(수비 화면)에
+   * 들어가고, 거기서 v9 가 서야 17 이 난다. 웹 도루는 주력 표 굴림 하나라 그 칸이 없어 안 이었다
+   * (`features/play-at-bat/model/atBatSounds.inPlayCallSoundIdOf` 끝 주석).
+   */
   { id: 18, role: 'voice', name: '"Strike!" 스트라이크', scene: '판정 v1 의 기본 갈래 (0x51aa2)' },
   { id: 20, role: 'voice', name: '아웃 콜 (루에서 잡은 포스 아웃)', scene: '판정 v13 (0x51b36) 기본 갈래 — state[0x1f]·state[0x87] 이 **둘 다 0** 일 때' },
   { id: 21, role: 'voice', name: '"Strike out!" 삼진', scene: '판정 v5 (0x51bf6) + 삼진 기록 0xa7c4d' },
@@ -95,8 +103,38 @@ export const ORIGINAL_SOUNDS: readonly OriginalSound[] = [
   { id: 26, role: 'effect', name: '투수 등판음 (마투수)', scene: '0x38b64 에서 등판 투수가 마선수일 때' },
   { id: 27, role: 'effect', name: '헛스윙 바람 소리 (필살 스윙)', scene: '0x51350 에서 스윙 객체 +0x10 ≠ 0, 또는 마선수 타자' },
   { id: 28, role: 'effect', name: '투구 순간 소리 (마구)', scene: '0x3f378 에서 상태 0x16 이거나 마투수의 마구' },
-  { id: 29, role: 'effect', name: '관중 함성 (볼넷 뒤 등)', scene: '0x51b0e 예약(+진동 200ms) · 0x43870 · 0x4c39a' },
-  { id: 30, role: 'effect', name: '관중 함성 (플레이가 이어질 때)', scene: '0x4657a 예약 · 0x51fd2 예약 — 0x51fb8 의 `0x357e0`(**타구 결과 코드** ∈ {24,25,26} = 홈런성) 이 **거짓**인 갈래' },
+  /**
+   * **29 를 예약하는 자리는 셋이다** (리터럴 `0x6e499` 를 부르는 18곳 전수 + `movs r1,#0x1d` 대조):
+   *   - `0x51b02` — 판정 v3(볼넷) 의 뒤꼬리. `state[0x31 + state[9]] == 1`, 곧 **공격 팀이 CPU 조작**
+   *     일 때만 (0x51adc~0x51af8). 웹은 투수편에 이었다 (`atBatSounds.walkCheerSoundIdOf`).
+   *     ⚠️ 앞서 "0x51b0e 예약(+진동 200ms)" 로 적던 것은 오독이다 — 0x51b0e 의 진동 200ms 는
+   *     **판정 v4(사구 23)** 쪽이고 볼넷과 다른 갈래다.
+   *   - `0x43870` — 수비 화면 선수 그리기(0x43618) 안, 선수 `+0xb8 == 6` 인 틱. `+0xb8 = 6` 은
+   *     **도루 송구**가 시작될 때 포수에게 달린다 (0x3e08c~0x3e092, I-controls 3절 플레이 종류 9).
+   *     같은 자리에서 `+0xec` 객체의 `+0x2e` 카운터를 1 올리고(0x270f = 9999 로 자름)
+   *     `0xa755d([[sp+0x60]+0x230], 3)` 을 부른다.
+   *     웹에는 도루 송구를 그리는 수비 화면이 없어 안 이었다.
+   *   - `0x4c39a` — 함수 이름을 못 밝힌 자리(0x4bbb0 부근, 호출이 포인터뿐이라 진입점 미확인).
+   *     번호는 `movs r6,#0x1d` (0x4c2f6·0x4c32e) 로 r6 에 실려 온다. 두 갈래 모두
+   *     `[0x1552cfc] + 팀*2 + 0x44c` halfword 의 한 비트를 XOR 로 뒤집은 뒤 예약한다 —
+   *     **그 비트의 뜻이 미확인**이라 웹에 안 이었다.
+   */
+  { id: 29, role: 'effect', name: '관중 함성 (CPU 타자의 볼넷 뒤 · 도루 송구)', scene: '볼넷 0x51b02(공격팀이 CPU) · 도루 송구 0x43870(선수 +0xb8 == 6) · 0x4c39a(조건 미확인)' },
+  /**
+   * **30 을 예약하는 자리는 둘이고, 둘 다 웹에 안 이었다.**
+   *   - `0x4657a` — 수비 화면(상태 0x17) 진입 0x46418 안. 조건은
+   *     `state[0x11] != 0` (0x46544) **그리고** 2루·3루에 주자(`0xa97a1(필드, 2|3)`, 0x46550·0x4655c)
+   *     **그리고** `0x357e0`(타구 결과 코드 24~26 = 홈런성)이 거짓.
+   *     ⚠️ 그런데 `state[0x11]` 을 **1 로 만드는 코드를 못 찾았다** — 짝수 정렬 전수 검색으로
+   *     `strb r_,[r_,#0x11]` 은 세 곳뿐이고(0xb67f4·0xb683a 는 플레이 초기화의 **0 쓰기**,
+   *     0xa88c0 은 다른 구조체), 레지스터 오프셋 쓰기(`movs rX,#0x11` → `strb rd,[rn,rX]`)도 0곳이다.
+   *     읽는 곳도 0x46544·0x464a8(둘 다 같은 함수) 뿐이다 → **원본에서 이 갈래는 서지 않는 것으로 보인다**(유력).
+   *   - `0x51fd2` — 경기 장면 메시지 핸들러(0x509a0)의 **메시지 0x13** 갈래(0x50a7a → 0x51fb8).
+   *     인자 p1(`[sp+0xec]`)은 주자 번호이고 그 갈래는 주자에게 `+0x78+0x1d`(득점/세이프)·`+0x1e`(끝남)
+   *     을 세운다 → **주자 한 명이 들어오는 알림**으로 보인다. 소리는 `0x357e0` 이 참이면 **60**,
+   *     아니면 **p1 == 0 일 때만 30** 이다. **p1 == 0 이 어느 주자인지 미확인**이라 안 이었다.
+   */
+  { id: 30, role: 'effect', name: '관중 함성 (주자가 들어올 때 · 수비 화면 진입)', scene: '0x51fd2 예약 — 주자 알림 메시지 0x13 에서 홈런성이 아니고 주자 번호 0 일 때 · 0x4657a 예약 — state[0x11] 조건이 서지 않아 실제로는 안 우는 것으로 보임' },
   { id: 31, role: 'jingle', name: '승리 징글 · 신기록(0x1f)', scene: '경기 결과 승리 · 홈런더비 최고 비거리 갱신(0x4f574) · 최고 기록 저장 +0x5c 갱신' },
   { id: 32, role: 'jingle', name: '패배 징글 · 기록 실패(0x20)', scene: '경기 결과 패배 · 신기록이 아닐 때 · 돌발미션 결과 1(실패)' },
   { id: 33, role: 'bgm', name: '경기 배경음', scene: '경기 장면 0x104 상태 0x21 자동진행 중계 (0x3abf0) · 0x48480 · 0x4258c' },
@@ -110,7 +148,13 @@ export const ORIGINAL_SOUNDS: readonly OriginalSound[] = [
    */
   { id: 36, role: 'jingle', name: '경기 평가 "좋음" · 돌발미션 성공(0x24)', scene: '경기 뒤 평가 창(시즌 0xdea0 = 0x105 상태 233 · 나리 0x12c96 = 0x106 상태 116) 인기도 변화 p 가 문턱 초과 · 돌발 결과 2 · 돌발 결과 대사 393' },
   { id: 37, role: 'jingle', name: '경기 평가 "보통" · 돌발미션 무효(0x25)', scene: '평가 창 p 가 0~문턱(시즌 3 · 나리 1) · 돌발 결과 3 (보상·페널티 없음)' },
-  { id: 38, role: 'jingle', name: '경기 평가 "나쁨"', scene: '평가 창 p 가 음수' },
+  /**
+   * 36·37·38 을 예약하는 자리는 **두 화면**이고 문턱만 다르다. 이제 둘 다 이었다:
+   *   - 나만의리그 상태 116 `0x12c96`(문턱 1) → `app/model/useCareerSession.evaluationJingleIdOf`
+   *   - **시즌 상태 0xe9** `0xdeae~0xdede`(문턱 3, `0xdece cmp r3,#3`)
+   *     → `app/model/useSeasonSession.seasonEvaluationJingleIdOf` (관중수입 창이 뜨는 자리)
+   */
+  { id: 38, role: 'jingle', name: '경기 평가 "나쁨"', scene: '평가 창 p 가 음수 (나리 0x12ca4 · 시즌 0xdebc)' },
   { id: 39, role: 'voice', name: '"Strike two!" 스트라이크(카운트 2)', scene: '판정 v1 에서 [sp+0xa4]+4 == 2' },
   { id: 40, role: 'bgm', name: '이벤트(스토리 대화) 배경음', scene: '0x106 상태 114 · 0x105 상태 211' },
   { id: 42, role: 'effect', name: '돌발미션 시작 (0x2a)', scene: '후보 추첨 뒤 대사 로드 0x8eba0 · 0x8e2dc' },
@@ -146,6 +190,13 @@ export const ORIGINAL_SOUNDS: readonly OriginalSound[] = [
    *   - `state[0x87]` = 아웃 판정 0xb36d0 결과가 3(태그성, 0xb394e) 이거나 2 + 야수 `+0x3b`(0xb4312)
    * v11 은 조건 없이 62 이고, 그 v11 은 **2스트라이크 번트 파울 아웃**(0x9d5e2~0x9d600)이다.
    * 그래서 62 = 잡아서·태그해서 낸 아웃 + 번트 파울 아웃, 20 = 루에서 잡은 포스 아웃.
+   *
+   * **v11 몫도 이제 이었다.** 웹은 그 아웃을 `직선타아웃` 으로 옮겨 수비 화면을 한 번 거치는데,
+   * 그대로 두면 수비 진행기 결과(`caughtOnTheFly`)에 끌려 20 으로 샐 수 있었다.
+   * `battedBallOutcome.isBuntFoulOut` → `PitchOutcomeDetail.isBuntFoulOut` →
+   * `DefensePlayInput.buntFoulOut` → `DefenseCallContext.buntFoulOut` 으로 실어 보내
+   * **조건 없이 62** 를 내게 했다 (나만의리그 타자편 `useCareerSession`).
+   * ⚠️ 팀경기 쪽(`features/play-team-game`)은 아직 그 표를 안 싣는다.
    */
   { id: 62, role: 'voice', name: '아웃 콜 (잡아서·태그해서 낸 아웃)', scene: '판정 v11 (0x51b20, 2스트라이크 번트 파울 아웃) · v13 에서 state[0x1f] 나 state[0x87] 이 선 갈래' },
 ]

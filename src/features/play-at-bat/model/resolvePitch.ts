@@ -51,6 +51,11 @@ export interface PitchOutcomeDetail {
   readonly hasSwung: boolean
   /** 번트 성공 타구인지. 미션 목표 판정에 쓴다 */
   readonly isBunt: boolean
+  /**
+   * **2스트라이크 번트 파울 아웃**(원본 판정 11, 0x9d5e2~0x9d600)인가.
+   * 아웃 콜을 조건 없이 **62** 로 내기 위한 표다 (`atBatSounds.inPlayCallSoundIdOf`).
+   */
+  readonly isBuntFoulOut?: boolean
   /** 방향까지 붙인 원본 결과 코드. 스윙하지 않았으면 null */
   readonly resultCode: number | null
   /**
@@ -172,6 +177,14 @@ export function resolvePitch(
   const detail: PitchOutcomeDetail =
     batted.kind === '파울'
       ? { resolution: { kind: '파울' }, hasSwung: true, isBunt: false, resultCode: code, contactSoundId }
-      : { resolution: { kind: '타구', outcome: batted.outcome }, hasSwung: true, isBunt: batted.isBunt, resultCode: code, contactSoundId }
+      : {
+          resolution: { kind: '타구', outcome: batted.outcome },
+          hasSwung: true,
+          isBunt: batted.isBunt,
+          // 판정 11(2스트라이크 번트 파울 아웃)은 아웃 콜이 조건 없이 62 다
+          isBuntFoulOut: batted.isBuntFoulOut === true,
+          resultCode: code,
+          contactSoundId,
+        }
   return { detail, deck: drawn.deck }
 }

@@ -23,7 +23,20 @@ import type { BattedBallPattern } from '@/shared/config/original/battedBallPatte
 export type BattedBallResult =
   | { readonly kind: '파울' }
   /** isBunt 는 번트 성공(코드 6~8) — 미션 번트 목표에 쓴다 */
-  | { readonly kind: '타구'; readonly outcome: AtBatOutcome; readonly isBunt: boolean }
+  | {
+      readonly kind: '타구'
+      readonly outcome: AtBatOutcome
+      readonly isBunt: boolean
+      /**
+       * **2스트라이크 번트 파울 아웃**(원본 판정 11)인가 — 아웃 콜을 가르는 데 쓴다.
+       *
+       * 원본은 판정 11 에서 **조건 없이 62** 를 낸다 (`0x51b20` → `0x51b2e movs r1,#0x3e`).
+       * 판정 13(수비가 낸 아웃)만 `state[0x1f]`·`state[0x87]` 을 보고 62/20 을 가른다.
+       * 웹은 이 아웃을 `직선타아웃` 으로 옮겨 두었는데(아래 `buntFoulOut` 주석) 그대로 두면
+       * 수비 진행기 결과(`caughtOnTheFly`)에 끌려가 20 이 날 수 있어, 이 칸으로 따로 알린다.
+       */
+      readonly isBuntFoulOut?: boolean
+    }
 
 /**
  * 수평각은 생성기가 저장한 원시값(w >> 23)으로 본다. 원본은 저장할 때 a 를 음수로 뒤집고
@@ -77,7 +90,13 @@ export interface BuntFoulSituation {
  *   2. 아웃 콜이 원본과 같은 **62** 가 된다 (`atBatSounds.inPlayCallSoundIdOf` — 판정 11 도 62 다).
  * 갈래를 새로 만들려면 `entities/at-bat` · `features/defense-play` 를 같이 고쳐야 해서 두지 않았다.
  */
-const buntFoulOut = fair({ kind: '아웃', detail: '직선타아웃' })
+const buntFoulOut: BattedBallResult = {
+  kind: '타구',
+  outcome: { kind: '아웃', detail: '직선타아웃' },
+  isBunt: false,
+  // 원본 판정 11 은 조건 없이 62 를 낸다 — 아웃 콜이 수비 결과에 끌려가지 않게 표를 달아 보낸다
+  isBuntFoulOut: true,
+}
 
 /**
  * 결과 코드·패턴 → 타석 결과. `situation` 을 주면 위 **2스트라이크 번트 파울 아웃** 규칙까지 본다.
