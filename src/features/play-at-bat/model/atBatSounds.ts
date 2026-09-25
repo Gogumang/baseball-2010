@@ -181,9 +181,11 @@ export const WALK_CHEER_SOUND = 29
  * 함성이고, 사람이 볼넷을 골랐을 때는 안 난다. 사람이 늘 공격인 화면(나만의리그 타자편·미션)에서는
  * 원본에서도 한 번도 울리지 않는다.
  *
- * ⚠️ **웹에는 예약(`0x6e498`)이 없다.** 원본은 24 가 다 울린 뒤 29 를 잇지만, 웹 통로는 하나라
- * 뒤 소리가 앞 소리를 끊는다 (`shared/api/audio/soundPort` 머리 주석). 소리가 나는 **조건**은
- * 원본과 같고 **겹치는 방식**만 근사다.
+ * **겹치는 방식도 원본과 같다** (앞서 "원본은 24 가 다 울린 뒤 29 를 잇는다" 로 적어 둔 것은 오독이다).
+ * `0x6e498` 은 큐가 아니라 **한 칸 예약 + 지금 소리 끊기**다 — 0x6e4b8 이 `0x6e258 stop` 을 부르고,
+ * 그 조건인 `obj[5]` 는 초기화 0x6e6a4 가 맨 끝에서 조건 없이 1 로 쓴다(0x6e84c). 그래서 원본에서도
+ * **같은 틱에 이어 부른 29 가 24 를 끊고**, 24 는 사실상 들리지 않는다.
+ * 웹 통로 하나(뒤 소리가 앞 소리를 끊는다)가 그 결과와 같다 — `shared/api/audio/soundPort` 머리 주석.
  */
 export function walkCheerSoundIdOf(outcome: AtBatOutcome | null, offenseIsCpu: boolean): number | null {
   if (outcome?.kind !== '볼넷') return null

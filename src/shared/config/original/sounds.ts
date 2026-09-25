@@ -3,6 +3,8 @@
  *
  * 원본은 `0x6ea6c play(obj, n, vol, loop)` 로 즉시 틀거나 `0x6e498 request(obj, n, loop)`
  * 로 예약한다. 경로는 `0x6e9d4` 의 `sprintf("%s/%03d.mmf", "sound", n)` 이다.
+ * 아래 표에서 "예약" 은 **큐가 아니다** — 한 칸짜리 자리를 덮어쓰고 울리던 소리를 끊은 뒤
+ * 다음 틱에 트는 것이라 즉시와 들리는 결과가 같다 (`shared/api/audio/soundPort` 머리 주석).
  * 웹판은 SMAF 를 브라우저가 못 읽어서 `tools/extract_sounds.py` 로 미리 구워 두고
  * `public/sounds/%03d.mp3` 를 튼다 — **파일 이름의 번호는 원본 번호 그대로**다.
  *

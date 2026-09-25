@@ -228,8 +228,8 @@ function normalizeSeasonSave(saved: Partial<SeasonSave> | null): SeasonSave | nu
  * 나만의리그 쪽(0x12c96, 문턱 1)은 `useCareerSession.evaluationJingleIdOf` 가 따로 들고 있다 —
  * **문턱만 다르고 모양이 같다**. 레코드 `+0x4a` 는 `SeasonRecord.lastPopularityChange` 다.
  *
- * ⚠️ 웹에는 예약(`0x6e498`)이 없어 즉시 울린다 — 원본도 이 창에서 다른 소리와 겹치지 않아
- * 들리는 결과는 같다.
+ * 웹은 `play` 로 낸다. `0x6e498` 은 큐가 아니라 **지금 소리를 끊고 한 칸을 덮어쓴 뒤 다음 틱에 트는**
+ * 것이라(`shared/api/audio/soundPort` 머리 주석) 통로가 하나인 웹의 `play` 와 들리는 결과가 같다.
  */
 const SEASON_EVALUATION_THRESHOLD = 3
 export function seasonEvaluationJingleIdOf(popularityChange: number): number {
