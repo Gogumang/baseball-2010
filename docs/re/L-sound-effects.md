@@ -368,9 +368,10 @@ ADPCM 샘플은 영어 심판 콜이다. 받아쓰기 결과 → 번호. 코드 
   | 타자 손 셋째 겹 | n ∈ {1,4,5} 이면 `item_bat_hand_{n}_1.pzx` → +0x44 (없으면 해제) | — | |
   | 타자 다리 | `item_bat_leg_0.pzx` + `item_bat_leg_0.mpl` 줄 n−1 | `item_bat_leg_7.pzx` + `item_bat_leg_7.mpl` 줄 n−8 | +0x28 |
   | 투수 머리 | `item_pit_head_{n}.pzx` | 같음 | +0x1c |
-  | 투수 손 | `item_pit_hand_0.pzx`+`.mpl` 줄 n−1 | `item_pit_hand_7.pzx`+`.mpl` 줄 n−8 | +0x20 |
+  | 투수 손 | `item_pit_hand_0.pzx`+`.mpl` 줄 n−1 (0x79870) | `item_pit_hand_7.pzx`+`.mpl` 줄 n−8 (0x79888) | +0x20 (0x7988e) |
   | 투수 몸 | 없음 | `item_pit_body_{n}.pzx` | |
-  | 투수 다리 | `item_pit_leg_0.pzx`+`.mpl` 줄 n−1 | `item_pit_leg_7.pzx`+`.mpl` 줄 n−8 | +0x28 |
+  | 투수 다리 | `item_pit_leg_0.pzx`+`.mpl` 줄 n−1 (0x79832) | `item_pit_leg_7.pzx`+`.mpl` 줄 n−8 (0x7984a) | +0x28 (0x79850) |
+  - 투수 쪽 갈래 순서 주의: 0x79790 의 부위 분기는 3(다리)이 **먼저** 나오고(0x7981a~0x79852) 1(손)이 뒤(0x79858~0x79890)다. 주소만 보고 위아래로 읽으면 손·다리가 뒤바뀐다.
   → 파일 44개 = 타자 머리 11 + 손 12(바탕 1 · 덧 4 · 셋째 3 · 7~10 넷) + 다리 2 + 투수 머리 11 + 손 2 + 몸 4 + 다리 2. public/sprites/item_* 44폴더(+item_icon)와 정확히 같다. ("57폴더"는 .mpl 포함 셈으로 보임)
 - 팔레트 입히기: 같은 PZX 를 .mpl 의 다른 줄로 칠해 색만 바꾼 등급을 만든다 → 웹에서는 decode_pzx 가 .mpl 줄별 PNG 를 만들어야 한다 (현재 public/sprites 는 기본색만일 가능성 — 미확인).
 - 겹침 순서: RALPH 노트 "순서표 0xd3a54" (0xd3a54 는 vtable 바로 뒤 바이트열 01 01 01 01 01 01 00 00 …) — 이번에 새로 읽지 않음.
