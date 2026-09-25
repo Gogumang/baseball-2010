@@ -13,7 +13,9 @@ import {
   menuReelTextTopLeftOf, menuWheelAngleAt, menuWheelLabelTopLeftOf, menuWheelOrderOf,
   menuWheelPointOf,
 } from '@/pages/main-menu/lib/mainMenuLayout'
+import { useMenuBand } from '@/pages/main-menu/model/useMenuBand'
 import { DescriptionPanel } from '@/pages/main-menu/ui/DescriptionPanel'
+import { MenuBand } from '@/pages/main-menu/ui/MenuBand'
 import { MenuWheel } from '@/pages/main-menu/ui/MenuWheel'
 import * as styles from '@/pages/main-menu/ui/MainMenuScreen.css'
 
@@ -60,6 +62,10 @@ const REEL_STATE = 5
  * (부르는 곳 0x2857c 등이 둘을 잇달아 부른다). 그래서 게임시작 목록 뒤로 처음 메뉴 칸 글자가
  * 그대로 비친다 — 보기에 이상해도 원본이 그렇다.
  *
+ * ⚠️ 아랫단에는 **바탕 띠**(오른쪽 80px, 바닥에서 160px 올라오는 #192E74 그라데이션)가 바퀴 위·
+ *    릴 글자 아래에 깔린다. 자라는 동안(넉 틱)은 릴 줄을 안 그린다 — 원본 0x254d8 그대로다.
+ *    **켜지는 조건만 근사**다 (`model/useMenuBand.ts` 주석 참고).
+ *
  * ⚠️ 원본 좌표대로 놓으면 아랫단 슬롯 5·6·7(y 360·380·400)과 **설명 판 아래 절반이 화면 밖**이다.
  *    보이는 것은 위 세 줄 + 판 윗동강뿐이다. 값을 비틀지 않았다 — `mainMenuLayout.ts` 주석 참고.
  */
@@ -102,6 +108,9 @@ export function MainMenuScreen({
   )
   /** 도는 동안은 **돌기 전 배열**을 그린다 (회전은 마지막 틱에 한 번 일어난다) */
   const shownCursor = turn.direction === null ? cursor : turn.fromCursor
+
+  // 아랫단 바탕 띠 — 자라는 동안은 릴 줄을 안 그린다 (0x254d8 이 줄 묶음을 통째로 건너뛴다)
+  const band = useMenuBand(!isWheel)
 
   const panelText = state.lockedNotice
     ?? (state.isConfirmingNewGame ? NEW_GAME_CONFIRM : (selected?.description ?? ''))
@@ -159,7 +168,7 @@ export function MainMenuScreen({
   const scroll = turn.direction === null
     ? 0
     : (turn.direction === -1 ? 1 : -1) * (MENU_REEL_SCROLL_STEPS[turn.counter] ?? 0)
-  const reelLabels = isWheel ? [] : MENU_REEL_SLOTS.map((slot) => {
+  const reelLabels = isWheel || band.isGrowing ? [] : MENU_REEL_SLOTS.map((slot) => {
     const entryIndex = menuReelEntryAtSlotOf(reelFrames, reelRow, shownCursor, slot)
     if (entryIndex === null) return null
     const frame = reelFrameList[entryIndex]
@@ -218,6 +227,9 @@ export function MainMenuScreen({
       {/* 바퀴 바닥 — 가운데 공 + 테두리 원 3겹 (확정). 두 단 다 깔린다. */}
       <MenuWheel />
       {wheelLabels}
+
+      {/* 바탕 띠 — 바퀴 위, 릴 글자 아래. 자라는 동안은 아래 릴 줄이 비어 있다 (원본 0x254d8) */}
+      {!isWheel && <MenuBand spread={band.spread} />}
 
       {/* 잠긴 칸도 목록에 그대로 나오고 커서도 지나간다 (R11 4-1) — 안내조차 없는 칸만 흐리게 (근사) */}
       {reelLabels}

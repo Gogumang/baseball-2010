@@ -4,8 +4,10 @@ import {
   MENU_REEL_ITEM_FRAMES, MENU_REEL_ROW_STEP, MENU_REEL_SCROLL_STEPS, MENU_REEL_SHADOW_COLOR,
   MENU_REEL_SLOTS, MENU_REEL_SLOT_TABLE, MENU_REEL_TEXT_CENTER_X, MENU_WHEEL_ANGLES,
   MENU_WHEEL_CENTER, MENU_WHEEL_ITEM_FRAMES, MENU_WHEEL_ORDER, MENU_WHEEL_RINGS,
-  MENU_WHEEL_SELECTED_SLOT, MENU_WHEEL_TURN_TICKS, SCREEN_HEIGHT,
-  isMenuWheelAngleDrawn, menuPanelHeadingFrameOf, menuPanelHeadingTopLeftOf,
+  MENU_WHEEL_SELECTED_SLOT, MENU_WHEEL_TURN_TICKS, SCREEN_HEIGHT, SCREEN_WIDTH,
+  MENU_BAND_COLOR, MENU_BAND_FIRST_SPREAD, MENU_BAND_GROW_TICKS, MENU_BAND_LEFT,
+  MENU_BAND_MAX_SPREAD, MENU_BAND_PIVOT_Y, MENU_BAND_RIGHT,
+  isMenuWheelAngleDrawn, menuBandAlphaAt, menuBandLinesOf, menuBandStateAt, menuPanelHeadingFrameOf, menuPanelHeadingTopLeftOf,
   menuPanelLabelTopLeftOf, menuReelEntryAtSlotOf, menuReelFrameListOf, menuReelOrderOf,
   menuReelSlotRowOf, menuReelTextTopLeftOf, menuWheelAngleAt, menuWheelLabelTopLeftOf,
   menuWheelOrderOf, menuWheelPointOf, menuWheelStepOf, rotateMenuReel,
@@ -229,5 +231,69 @@ describe('설명 판 — 두 단이 같은 자리에 놓는다 (0x24db0 · 0x256
     expect(menuPanelHeadingFrameOf(5)).toBe(0) // 게임시작
     expect(menuPanelHeadingFrameOf(6)).toBe(1) // 스페셜
     expect(menuPanelHeadingFrameOf(9)).toBe(4) // 랭킹
+  })
+})
+
+describe('아랫단 바탕 띠 — 0x253e8~0x2548e · 0x254d4~0x25516 (확정)', () => {
+  it('가로 구간은 폭−0x50 → 폭 = 160 → 240 이고 축은 y = 높이 = 320 이다', () => {
+    expect(MENU_BAND_LEFT).toBe(160)
+    expect(MENU_BAND_RIGHT).toBe(SCREEN_WIDTH)
+    expect(MENU_BAND_PIVOT_Y).toBe(SCREEN_HEIGHT)
+    // 릴 글자 가운데(폭−0x28 = 200)가 띠 한가운데다
+    expect((MENU_BAND_LEFT + MENU_BAND_RIGHT) / 2).toBe(MENU_REEL_TEXT_CENTER_X)
+  })
+
+  it('색은 0x192e74 다', () => {
+    expect(MENU_BAND_COLOR).toEqual({ r: 0x19, g: 0x2e, b: 0x74 })
+  })
+
+  it('알파는 254 에서 2씩 줄고 4 에서 멈춘다', () => {
+    expect(menuBandAlphaAt(0)).toBe(254)
+    expect(menuBandAlphaAt(1)).toBe(252)
+    expect(menuBandAlphaAt(124)).toBe(6)
+    expect(menuBandAlphaAt(125)).toBe(4)
+    expect(menuBandAlphaAt(126)).toBe(4)
+    expect(menuBandAlphaAt(MENU_BAND_MAX_SPREAD)).toBe(4)
+  })
+
+  it('멈추는 값은 폭/2(120) 가 아니라 높이/2(160) 다 — 0x254f0 이 부르는 것이 높이다', () => {
+    expect(MENU_BAND_MAX_SPREAD).toBe(160)
+    expect(MENU_BAND_MAX_SPREAD).not.toBe(SCREEN_WIDTH >> 1)
+  })
+
+  it('한 틱에 ×4 로 자라 1 → 4 → 16 → 64 → 160 을 그린다', () => {
+    expect(MENU_BAND_FIRST_SPREAD).toBe(1)
+    expect([0, 1, 2, 3, 4, 5].map((tick) => menuBandStateAt(tick).spread))
+      .toEqual([1, 4, 16, 64, 160, 160])
+  })
+
+  it('다 자랄 때까지 넉 틱이고 그동안만 릴 줄을 안 그린다', () => {
+    expect(MENU_BAND_GROW_TICKS).toBe(4)
+    expect([0, 1, 2, 3].map((tick) => menuBandStateAt(tick).isGrowing)).toEqual([true, true, true, true])
+    expect(menuBandStateAt(4).isGrowing).toBe(false)
+  })
+
+  it('선은 축 위아래로 대칭이고 같은 알파를 쓴다', () => {
+    const lines = menuBandLinesOf(2)
+    expect(lines).toEqual([
+      { y: 320, alpha: 254 }, { y: 320, alpha: 254 },
+      { y: 319, alpha: 252 }, { y: 321, alpha: 252 },
+      { y: 318, alpha: 250 }, { y: 322, alpha: 250 },
+    ])
+  })
+
+  it('다 자라면 화면에 보이는 것은 y 160~319 — 바닥에서 160px 올라온 띠다', () => {
+    const lines = menuBandLinesOf(MENU_BAND_MAX_SPREAD)
+    const visible = lines.filter((line) => line.y >= 0 && line.y < SCREEN_HEIGHT)
+    expect(Math.min(...visible.map((line) => line.y))).toBe(160)
+    expect(Math.max(...visible.map((line) => line.y))).toBe(319)
+    // 위 160줄만 남는다 — 축(y=320) 과 아래 절반 162줄은 원본에서도 버려진다
+    expect(visible.length).toBe(MENU_BAND_MAX_SPREAD)
+    expect(lines.length).toBe(2 * (MENU_BAND_MAX_SPREAD + 1))
+  })
+
+  it('[메뉴+0xe4] 가 0 이면 축 한 줄뿐이라 아무것도 안 보인다', () => {
+    const lines = menuBandLinesOf(0)
+    expect(lines.every((line) => line.y === SCREEN_HEIGHT)).toBe(true)
   })
 })
