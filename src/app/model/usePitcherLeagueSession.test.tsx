@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
+import { StrictMode } from 'react'
 import { describe, expect, it } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { usePitcherLeagueSession } from '@/app/model/usePitcherLeagueSession'
 import { NO_EQUIPPED_TITLE } from '@/entities/career/model/titles'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
+import { useGamePointWallet } from '@/entities/wallet/model/useGamePointWallet'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 
@@ -260,5 +262,121 @@ describe('옛 저장 불러오기', () => {
     store.save({ teamId: 1 } as object)
 
     expect(띄우기(store).result.current.career).toBeNull()
+  })
+})
+
+/**
+ * **G 지갑 다리** — 원본 G는 전역 기록 `mgr[+0x64]` 한 칸이라 모드·선수와 상관없이 하나다
+ * (`entities/wallet/model/gamePointWallet.ts` 머리글에 디스어셈). 투수편도 같은 칸을 본다.
+ */
+describe('G 지갑 다리 (전역 mgr[+0x64])', () => {
+  /** 지갑 저장 칸 — 여러 번 띄워도 값이 이어지게 바깥에 둔다 */
+  const 지갑저장 = (시작G: number): JsonStorePort => {
+    let 값: unknown = { gamePoint: 시작G }
+    return {
+      load: () => 값,
+      save: (value) => {
+        값 = value
+      },
+    }
+  }
+
+  /**
+   * 투수 세션과 지갑을 같이 띄운다 — 실제 App 배선과 같은 모양이다.
+   *
+   * ⚠️ **`StrictMode` 로 띄운다.** `main.tsx` 가 그렇게 띄우는데, 그러면 고리가 붙었다 떼고 다시
+   *    붙어 **한 번 더 돈다.** 그냥 띄우면 실제 브라우저에서만 나는 어긋남(지갑 1000 + 투수 1500
+   *    이 2500 이 아니라 1500 이 되던 것)을 테스트가 못 잡는다.
+   */
+  const 지갑띄우기 = (pitcherStore: JsonStorePort, walletStore: JsonStorePort, mergeStore: JsonStorePort) =>
+    renderHook(
+      () => {
+        const wallet = useGamePointWallet(walletStore)
+        return {
+          wallet,
+          session: usePitcherLeagueSession(pitcherStore, createSeededRandom(20100901), false, wallet, mergeStore),
+        }
+      },
+      { wrapper: StrictMode },
+    )
+
+  /** 옛 투수 저장 — G를 선수 안에 들고 있던 시절의 모양이다 */
+  const 옛투수저장 = (gamePoint: number): JsonStorePort => {
+    const store = 메모리저장()
+    store.save({ name: '옛투수', teamId: 5, gamePoint } as object)
+    return store
+  }
+
+  it('⚠️ 옛 투수 저장의 G는 지갑으로 이사한다 — 타자편 몫에 **더해진다**', () => {
+    // 타자편에서 옮겨 온 1000 + 투수편 저장에 남아 있던 1500.
+    // 원본은 한 칸이라 두 값이 따로 있을 수 없었고, 둘 다 0 에서 시작했으므로 합이 그 한 칸 값이다
+    const rendered = 지갑띄우기(옛투수저장(1500), 지갑저장(1000), 메모리저장())
+
+    expect(rendered.result.current.wallet.balance).toBe(2500)
+    // 선수가 내보이는 값도 같은 값이다 — 관리 화면 뱃지·구질 훈련 가드가 이 칸을 본다
+    expect(rendered.result.current.session.career?.gamePoint).toBe(2500)
+  })
+
+  it('⚠️ 이사는 **딱 한 번**이다 — 다시 띄워도 두 번 더해지지 않는다', () => {
+    const pitcherStore = 옛투수저장(1500)
+    const walletStore = 지갑저장(1000)
+    const mergeStore = 메모리저장()
+    지갑띄우기(pitcherStore, walletStore, mergeStore)
+
+    const 둘째판 = 지갑띄우기(pitcherStore, walletStore, mergeStore)
+
+    expect(둘째판.result.current.wallet.balance).toBe(2500)
+    expect(둘째판.result.current.session.career?.gamePoint).toBe(2500)
+  })
+
+  it('이사를 마친 뒤에는 **지갑이 이긴다** — 저장에 남은 옛 값이 지갑을 되돌리지 않는다', () => {
+    const mergeStore = 메모리저장()
+    mergeStore.save({ merged: true })
+
+    const rendered = 지갑띄우기(옛투수저장(1500), 지갑저장(1000), mergeStore)
+
+    expect(rendered.result.current.wallet.balance).toBe(1000)
+    expect(rendered.result.current.session.career?.gamePoint).toBe(1000)
+  })
+
+  it('선수 쪽에서 G가 움직이면(구질 훈련·엔딩 보너스) 지갑으로 옮겨 간다', () => {
+    const mergeStore = 메모리저장()
+    mergeStore.save({ merged: true })
+    const rendered = 지갑띄우기(옛투수저장(0), 지갑저장(1000), mergeStore)
+
+    // 구질 훈련 600 G 를 치른 꼴 — 화면이 계산해 돌려주는 자리(`actions.save`)다
+    act(() =>
+      rendered.result.current.session.actions.save({
+        ...rendered.result.current.session.career!,
+        gamePoint: rendered.result.current.session.career!.gamePoint - 600,
+      }),
+    )
+
+    expect(rendered.result.current.wallet.balance).toBe(400)
+    expect(rendered.result.current.session.career?.gamePoint).toBe(400)
+  })
+
+  it('⚠️ `?무한G` 는 보여 주는 값과 판정이 **같은 값**을 본다 — 이사는 미루고 저장도 안 건드린다', () => {
+    window.localStorage.setItem('compus-baseball/dev', '무한G')
+    try {
+      const pitcherStore = 옛투수저장(1500)
+      const mergeStore = 메모리저장()
+      const rendered = 지갑띄우기(pitcherStore, 지갑저장(1000), mergeStore)
+
+      // 지갑도 선수도 99999 — 예전처럼 "99999 인데 G 부족" 으로 어긋날 자리가 없다
+      expect(rendered.result.current.wallet.balance).toBe(99_999)
+      expect(rendered.result.current.session.career?.gamePoint).toBe(99_999)
+      // 표식이 서지 않아 스위치를 끄면 그때 이사한다. 저장의 옛 G도 그대로다
+      expect(mergeStore.load()).toBeNull()
+      expect((pitcherStore.load() as { gamePoint: number }).gamePoint).toBe(1500)
+    } finally {
+      window.localStorage.removeItem('compus-baseball/dev')
+    }
+  })
+
+  it('지갑을 안 넘기면 예전처럼 커리어 칸 하나로 돈다 (기존 테스트 자리)', () => {
+    const { result } = 띄우기(옛투수저장(1500))
+
+    expect(result.current.career?.gamePoint).toBe(1500)
   })
 })

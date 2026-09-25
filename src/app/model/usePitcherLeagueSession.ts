@@ -34,6 +34,7 @@ import type { PitcherGameOptions, PitcherGameSummary } from '@/features/play-pit
 import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
 import { MAXIMUM_GAME_POINT } from '@/entities/career/model/playerCareer'
 import { isInfiniteGamePointOn } from '@/shared/lib/dev/devOptions'
+import type { GamePointWalletSession } from '@/entities/wallet/model/useGamePointWallet'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
@@ -105,9 +106,19 @@ export function usePitcherLeagueSession(
   store: JsonStorePort,
   random: RandomPort,
   gaugeSettingOn: boolean,
+  /**
+   * 전역 G 지갑 (원본 `mgr[+0x64]`). 넘기면 **G의 주인이 지갑**이 되고 커리어 칸은 따라간다.
+   * 안 넘기면 예전처럼 커리어 칸 하나로만 돈다 — 테스트는 그대로 두면 된다.
+   */
+  wallet: GamePointWalletSession | null = null,
+  /** 옛 투수 G를 지갑으로 옮겼는지 적어 두는 칸 — 아래 **투수 G 이사** 참고 */
+  mergeStore: JsonStorePort | null = null,
 ): PitcherLeagueSession {
   const loaded = useRef<PitcherCareer | null>(null)
   if (loaded.current === null) loaded.current = normalizePitcherCareer(store.load())
+  /** 띄울 때 저장에 들어 있던 G — 다리가 갈아 끼우기 전의 값이라 첫 렌더에서 떠 둔다 */
+  const legacyGamePoint = useRef<number | null>(null)
+  if (legacyGamePoint.current === null) legacyGamePoint.current = loaded.current?.gamePoint ?? 0
 
   const [career, setCareer] = useState<PitcherCareer | null>(loaded.current)
   const [scene, setScene] = useState<PitcherScene>(career === null ? '등록' : '관리')
@@ -122,6 +133,58 @@ export function usePitcherLeagueSession(
   )
 
   /**
+   * **직전 값을 받아** 고쳐 넣는 저장 (`commit` 의 함수 꼴).
+   *
+   * 같은 프레임에 커리어를 고치는 자리가 둘(칭호 부여·지갑 다리)이라, 둘 다 자기가 본 옛 커리어를
+   * 통째로 덮어쓰면 **나중에 붙은 쪽이 앞의 결과를 지운다.** 실제로 `StrictMode`(main.tsx)가
+   * 고리를 다시 붙일 때 칭호 쪽이 옛 G를 되살려, 지갑 1000 + 투수 1500 이 2500 이 아니라 1500 이 됐다.
+   *
+   * ⚠️ 저장을 고치는 함수 안에서 하므로 `StrictMode` 에서는 **같은 값을 두 번 쓴다** — 값이 같아
+   *    문제는 없다.
+   */
+  const commitWith = useCallback(
+    (update: (current: PitcherCareer) => PitcherCareer) => {
+      setCareer((current) => {
+        if (current === null) return current
+        const next = update(current)
+        if (next === current) return current
+        store.save(next)
+        return next
+      })
+    },
+    [store],
+  )
+
+  /**
+   * **투수 G 이사** — 옛 투수 저장은 G를 `career.gamePoint` 안에 들고 있었다(시즌모드와 달리
+   * 저장에 실제로 들어 있다). 원본은 G가 전역 한 칸(`mgr[+0x64]`)이라 투수편만의 G가 애초에
+   * 있을 수 없다 — 웹이 나눠 둔 탓에 생긴 주머니라, 지갑으로 합칠 때 **타자편 몫에 더한다.**
+   *
+   * ⚠️ **왜 더하나** (타자편 이사와 겹치는 자리):
+   *   두 주머니 다 신인 지급분이 0 에서 시작한다 (`BALANCE.rookie.gamePoint === 0`). 그러니
+   *   타자편 B = (번 것 − 쓴 것), 투수편 P = (번 것 − 쓴 것) 이고, 원본처럼 한 칸이었다면
+   *   그 칸 값은 정확히 **B + P** 다. 어느 한쪽을 이기게 하면 다른 쪽에서 번 G가 통째로 사라진다.
+   *   (원본에 두 값이 따로 있던 적이 없으므로 "어느 쪽이 진짜냐"는 물음 자체가 웹의 사정이다.)
+   *
+   * 표식 칸(`mergeStore`)을 따로 두는 까닭: 이사를 마치면 커리어 칸은 지갑의 그림자라
+   * 저장만 봐서는 이미 옮겼는지 알 수 없다. 저장 형식 번호는 **올리지 않는다.**
+   *
+   * ⚠️ `?무한G` 면 지갑이 쓰기를 안 받는다 — 그대로 진행하면 표식만 서고 G가 사라지므로 **미룬다.**
+   */
+  const merged = useRef(false)
+  useEffect(() => {
+    if (wallet === null || mergeStore === null || merged.current) return
+    if (isInfiniteGamePointOn()) return
+    const done = (mergeStore.load() as { merged?: boolean } | null)?.merged === true
+    merged.current = true
+    if (done) return
+    // 표식을 먼저 적는다 — 중간에 다시 띄워도 두 번 더해지지 않는다
+    mergeStore.save({ merged: true })
+    const carried = legacyGamePoint.current ?? 0
+    if (carried !== 0) wallet.gain(carried)
+  }, [mergeStore, wallet])
+
+  /**
    * 칭호 판정 — 원본은 **관리 화면(105)에 들어올 때마다** 0x1a1c0 이 번호 순서로 검사한다 (P3 4절).
    * 맞는 것을 주면서 곧바로 장착까지 한다 (0x1b214 `선수+0x1c4 = i`).
    *
@@ -131,10 +194,64 @@ export function usePitcherLeagueSession(
    */
   useEffect(() => {
     if (career === null || scene !== '관리') return
-    const earned = evaluateNewPitcherTitles(career)
-    if (earned.length === 0) return
-    commit(awardPitcherTitles(career, earned))
-  }, [career, commit, scene])
+    if (evaluateNewPitcherTitles(career).length === 0) return
+    // 직전 값을 받아 붙인다 — 지갑 다리가 맞춰 둔 G를 옛 값으로 되돌리지 않는다 (`commitWith` 머리글)
+    commitWith((current) => {
+      const earned = evaluateNewPitcherTitles(current)
+      return earned.length === 0 ? current : awardPitcherTitles(current, earned)
+    })
+  }, [career, commitWith, scene])
+
+  /**
+   * **커리어 칸 ↔ 지갑 다리** — 타자편(`useCareerSession`)과 같은 모양이다.
+   *
+   * 원본은 G가 전역 한 칸이라 다리가 필요 없지만, 웹은 구질 훈련·지옥훈련·엔딩 보너스가 전부
+   * `PitcherCareer` 를 통째로 갈아 끼우는 식이라 커리어 칸을 아직 못 없앴다. 그래서 **나중에
+   * 바뀐 쪽이 이기게** 이어 둔다 — 지갑이 주인이고, 커리어 칸은 저장 호환용 그림자다.
+   *
+   * - 커리어 쪽 G가 움직였으면(훈련 비용·기록 달성 보상·엔딩 보너스) 그 값을 지갑으로 옮긴다.
+   * - 그 밖에 둘이 어긋나면 **지갑이 이긴다.** 선수를 불러온 참에 저장에 남은 옛 값이 지갑을
+   *   되돌리는 것을 막는다 (이사는 위 고리가 딱 한 번만 한다).
+   *
+   * ⚠️ **칭호 부여 고리 뒤에 둔다.** 둘이 같은 프레임에 커리어를 갈아 끼우는데, 칭호 쪽은 통째로
+   *    덮어쓰는 꼴이라 앞에 두면 다리가 맞춰 둔 G가 옛 값으로 되돌아간다. 뒤에 두고 **직전 값을
+   *    받아** 고치면(`setCareer(current => …)`) 칭호도 G도 둘 다 남는다.
+   *
+   * ⚠️ **같은 짝을 두 번 보면 아무것도 안 한다** (`lastSeen`). `StrictMode` 는 고리를 붙였다 떼고
+   *    다시 붙이는데(개발 빌드), 그때 두 번째 바퀴가 **옛 커리어 값**을 들고 돌아 "선수 쪽이
+   *    움직였다" 로 잘못 읽는다 — 실제로 지갑 1000 + 투수 1500 이 2500 이 아니라 1500 이 됐다.
+   */
+  const walletBalance = wallet?.balance ?? 0
+  const setWalletBalance = wallet?.setBalance
+  const bridge = useRef<{ career: number | null; wallet: number }>({
+    career: career?.gamePoint ?? null,
+    wallet: walletBalance,
+  })
+  /** 고리가 마지막으로 **본** 짝 (커리어 G, 지갑 G) — 같은 짝이면 한 번 더 돌지 않는다 */
+  const lastSeen = useRef<{ career: number | null; wallet: number } | null>(null)
+  useEffect(() => {
+    if (setWalletBalance === undefined) return
+    // ⚠️ `?무한G` 면 다리를 놓지 않는다 — 지갑이 늘 99999 라 그대로 두면 저장에 99999 가 적혀
+    //    스위치를 끈 뒤에도 값이 안 돌아온다 (devOptions: "저장에는 손대지 않는다").
+    //    보여 주는 값은 아래 `overriddenGamePoint` 가 이미 지갑 값으로 맞춘다.
+    if (isInfiniteGamePointOn()) return
+    const careerPoint = career === null ? null : career.gamePoint
+    const seen = lastSeen.current
+    if (seen !== null && seen.career === careerPoint && seen.wallet === walletBalance) return
+    lastSeen.current = { career: careerPoint, wallet: walletBalance }
+    const previous = bridge.current
+    if (career !== null && previous.career !== null && careerPoint !== previous.career) {
+      bridge.current = { career: career.gamePoint, wallet: career.gamePoint }
+      setWalletBalance(career.gamePoint)
+      return
+    }
+    if (career !== null && career.gamePoint !== walletBalance) {
+      bridge.current = { career: walletBalance, wallet: walletBalance }
+      commitWith((current) => ({ ...current, gamePoint: walletBalance }))
+      return
+    }
+    bridge.current = { career: careerPoint, wallet: walletBalance }
+  }, [career, commitWith, setWalletBalance, walletBalance])
 
   const create = useCallback(
     (name: string, profile: PitcherRookieProfile) => {
@@ -270,12 +387,18 @@ export function usePitcherLeagueSession(
   }, [])
 
   /**
-   * ⚠️ **테스트용** — `?무한G` 면 보여 주는 G 만 최대로 올린다 (`devOptions.ts`).
-   * 저장은 그대로라 스위치를 끄면 원래 값으로 돌아온다.
+   * 내보이는 커리어의 G 는 **지갑 값**이다 (원본 `mgr[+0x64]` 한 칸). 관리 화면 뱃지·구질 훈련
+   * 가격 판정·지옥훈련 가드가 다 이 `career.gamePoint` 를 읽으므로, 여기서 한 번 갈아 끼우면
+   * **보여 주는 값과 판정이 같은 값**을 본다.
+   *
+   * ⚠️ **테스트용** — `?무한G` 는 지갑 쪽에서 처리한다 (`useGamePointWallet`): `balance` 가 늘
+   *    99999 이고 쓰기는 먹히지 않는다. 지갑을 안 받은 자리(테스트)는 예전처럼 여기서 올린다.
+   *    저장은 그대로라 스위치를 끄면 원래 값으로 돌아온다.
    */
-  const shown = career !== null && isInfiniteGamePointOn()
-    ? { ...career, gamePoint: MAXIMUM_GAME_POINT }
-    : career
+  const overriddenGamePoint = wallet?.balance ?? (isInfiniteGamePointOn() ? MAXIMUM_GAME_POINT : null)
+  const shown = career === null || overriddenGamePoint === null || career.gamePoint === overriddenGamePoint
+    ? career
+    : { ...career, gamePoint: overriddenGamePoint }
 
   return {
     career: shown,

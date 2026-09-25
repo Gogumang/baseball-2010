@@ -43,6 +43,12 @@ const ACE_OPEN_KEY = 'compus-baseball/ace-open'
  * 옛 세이브에는 이 칸이 없다 — 없으면 `career.gamePoint` 를 그대로 옮겨 온다(이사).
  */
 const WALLET_KEY = 'compus-baseball/wallet'
+/**
+ * 투수편 G를 지갑으로 옮겼는지 적어 두는 칸 — 옛 투수 저장은 G를 선수 안에 들고 있었다.
+ * 이사를 마치면 선수 칸이 지갑의 그림자가 되어 저장만 봐서는 옮겼는지 알 수 없어 표식을 따로 둔다
+ * (근거는 `usePitcherLeagueSession` 의 **투수 G 이사** 머리글).
+ */
+const PITCHER_WALLET_MERGE_KEY = 'compus-baseball/pitcher-wallet-merged'
 
 const ENTRY_SCREENS: readonly Screen['kind'][] = ['타이틀', '메인메뉴', '도움말', '환경설정', '스페셜', '나리편선택', '팀선택', '선수등록', '홈런더비', '일반모드']
 
@@ -64,6 +70,7 @@ export function App() {
   const pitcherStore = useMemo(() => createLocalStorageJsonStore(PITCHER_KEY), [])
   const aceOpenStore = useMemo(() => createLocalStorageJsonStore(ACE_OPEN_KEY), [])
   const walletStore = useMemo(() => createLocalStorageJsonStore(WALLET_KEY), [])
+  const pitcherWalletMergeStore = useMemo(() => createLocalStorageJsonStore(PITCHER_WALLET_MERGE_KEY), [])
   /** 옛 세이브 이사거리 — 지갑 칸이 없던 시절 G는 나만의리그 선수 안에 들어 있었다 */
   const legacyGamePoint = useMemo(() => saveGame.load()?.gamePoint ?? null, [saveGame])
   const gameSettings = useGameSettings(settingsStore)
@@ -82,7 +89,14 @@ export function App() {
   // 전역 G 지갑 — 원본 `mgr[+0x64]`. 마선수 구매·미션·홈런더비가 다 이 한 칸을 본다
   const wallet = useGamePointWallet(walletStore, legacyGamePoint)
   const seasonSession = useSeasonSession(seasonStore, random, wallet)
-  const pitcherSession = usePitcherLeagueSession(pitcherStore, random, gameSettings.settings.pitchControl === '게이지')
+  // 투수편 G도 같은 지갑 한 칸이다 — 옛 투수 저장에 남은 G는 표식 칸을 보고 딱 한 번 옮겨 온다
+  const pitcherSession = usePitcherLeagueSession(
+    pitcherStore,
+    random,
+    gameSettings.settings.pitchControl === '게이지',
+    wallet,
+    pitcherWalletMergeStore,
+  )
   const careerSession = useCareerSession({ runner, random, saveGame, screen, setScreen, sound, wallet })
   // 미션 보상 G (0x4ef72) — 지갑으로 들어간다. 육성 선수가 없어도 사라지지 않는다
   const mission = useMissionSession({
