@@ -33,7 +33,12 @@ import {
   reputationCompleteGameOf,
 } from '@/entities/season-mode/model/seasonEvaluation'
 import type { CompleteGameFlags } from '@/entities/season-mode/model/seasonEvaluation'
-import type { CompleteGameKind } from '@/entities/season-mode/model/seasonReputation'
+import {
+  clearSeasonGameRecord,
+  recordSeasonGameEvent,
+  SEASON_RECORD_CODE,
+} from '@/entities/season-mode/model/seasonReputation'
+import type { CompleteGameKind, MySide } from '@/entities/season-mode/model/seasonReputation'
 import { createBurstSession, resolveBurst, tryTriggerBurst } from '@/entities/burst-mission/model/burstMissionSession'
 import type { BurstResolution, BurstSession } from '@/entities/burst-mission/model/burstMissionSession'
 import { burstResultBitsOf } from '@/entities/burst-mission/model/burstResultBits'
@@ -315,6 +320,26 @@ export interface TeamGameProgress {
   readonly ourEntryRecords: readonly BatterGameRecord[]
   readonly opponentEntryRecords: readonly BatterGameRecord[]
   /**
+   * **우리 타순 칸별 루타 목록** — 원본도 같은 24바이트 기록(`team + 0x34 + 타순×0x18`) 안에
+   * 루타 값 1~4 를 하나씩 밀어 넣는다 (`0xa86e0`). 사이클 판정 `0xa7610` 이 이 목록만 훑어
+   * 1·2·3·4 가 다 들어 있는지 본다.
+   *
+   * `0xa7610` 은 **공격측이 사람일 때만** 참을 돌려주므로(`a7644`: `st[0x31+st[9]] == 0`)
+   * 우리 타순만 들고 있으면 된다. 대타가 두 칸을 맞바꿀 때 기록 24바이트와 **같이 움직인다**
+   * (`aed02~aed16` — `substituteBatter`).
+   */
+  readonly ourHitBases: readonly (readonly number[])[]
+  /**
+   * **시즌 평판 평가 16칸** (`SR+0x1a0..0x1af`) — 경기 중 `0xa755c(ctx, k)` → `0xa3440(SR, k)`
+   * 이 한 칸씩 올리는 그 배열이다 (S4 2b·3절).
+   *
+   * 원본은 시즌 레코드를 직접 올리지만 웹 진행기는 시즌 세이브를 모르므로 여기에 쌓아 두고,
+   * `summaryOf` 가 실어 보내면 `useSeasonSession.finishGame` 이 `evaluateSeasonGame` 앞에서
+   * `record.gameRecord` 에 꽂는다. 지우는 곳은 **경기 직전 화면 한 곳뿐**이라(`0xa3424`)
+   * 여기서는 경기를 세울 때 한 번만 비운다.
+   */
+  readonly gameRecord: readonly number[]
+  /**
    * `state[0xe]` — 이 경기에 CPU 대타를 이미 썼는가. 원본은 **경기에 한 칸**이라 양 팀을 합쳐 한 번뿐이다.
    */
   readonly cpuPinchHitUsed: boolean
@@ -441,6 +466,8 @@ export function startTeamGame(options: TeamGameOptions, random: RandomPort): Tea
     opponentPitcherEntry,
     ourEntryRecords: ourEntry.map(() => EMPTY_BATTER_GAME_RECORD),
     opponentEntryRecords: opponentEntry.map(() => EMPTY_BATTER_GAME_RECORD),
+    ourHitBases: ourEntry.map(() => []),
+    gameRecord: clearSeasonGameRecord(),
     cpuPinchHitUsed: false,
     opponentAcePitcherIndex: opponentAces.pitcher,
     opponentAceBatterIndex: opponentAces.batter,
@@ -542,6 +569,104 @@ function abilityContextOf(options: TeamGameOptions): TeamGameAbilityContext {
  */
 function entryBattersOf(progress: TeamGameProgress, teamId: number): readonly TeamEntryBatter[] {
   return teamId === progress.options.ourTeamId ? progress.ourEntry : progress.opponentEntry
+}
+
+/* ── 시즌 평판 16칸 (0xa8024 → 0xa755c → 0xa3440) ─────────────────────────────── */
+
+/**
+ * 게이트 `0xa755c` 를 통과시켜 코드 몇 개를 한꺼번에 올린다.
+ *
+ * 원본 게이트는 (1) **모드 2(시즌)** 이고 (2) 시즌 레코드가 있고 (3) 코드 ≤ 5 면 공격측이,
+ * ≥ 6 이면 수비측이 **CPU** 일 때만 적는다. (2)는 부르는 쪽(시즌 세션)이 보장하고,
+ * (3)은 `recordSeasonGameEvent` 가 `mySide` 로 가른다 — 여기서는 (1)만 본다.
+ */
+function withSeasonRecord(
+  progress: TeamGameProgress,
+  mySide: MySide,
+  codes: readonly number[],
+): readonly number[] {
+  if (progress.options.mode !== TEAM_GAME_MODE.시즌) return progress.gameRecord
+  return codes.reduce(
+    (slots, code) => recordSeasonGameEvent(slots, code, mySide),
+    progress.gameRecord,
+  )
+}
+
+/** 사이클 판정 `0xa7610` — 그 타순 칸의 루타 목록에 1·2·3·4 가 다 들어 있는가 */
+function hasCycle(hitBases: readonly number[]): boolean {
+  return [1, 2, 3, 4].every((bases) => hitBases.includes(bases))
+}
+
+/**
+ * **우리 타석 하나**가 올리는 코드들 — `0xa8024` 의 안타 가지 차례 그대로다.
+ *
+ * ```
+ * a8490: [sp+0x14](안타인가) == 0 이면 안타 가지를 통째로 건너뛴다
+ * a8518:   k=7  안타 — **루타를 가르기 전이라 홈런·2루타·3루타도 함께 오른다**
+ * a856e:   k=8  [sp+0x10] == 2
+ * a85b8:   k=9  [sp+0x10] == 3
+ * a85be:   [sp+0x24](이 플레이 홈런 수) > 0 이면
+ * a8648~:   k=0xa/0xb/0xc/0xd — [sp+0x28](이 플레이 득점) 1/2/3/4
+ * a86e0:   루타 값을 타순 칸 기록 목록에 민다
+ * a878a:   k=0xe 사이클 — 플레이 **전** 판정 [sp+0x1c] 이 거짓인데 지금 참이면
+ * a8a46:  k=6  삼진 (수비가 CPU 인 쪽 — 내 타자가 당한 삼진)
+ * ```
+ */
+function offenseRecordOf(
+  outcome: AtBatOutcome,
+  runsBattedIn: number,
+  hitBasesBefore: readonly number[],
+): { readonly codes: readonly number[]; readonly hitBases: readonly number[] } {
+  const codes: number[] = []
+  let hitBases = hitBasesBefore
+  if (isHit(outcome)) {
+    const bases: number = outcome.kind === '안타' ? outcome.bases : 4
+    const cycleBefore = hasCycle(hitBases)
+    hitBases = [...hitBases, bases]
+    codes.push(SEASON_RECORD_CODE.안타)
+    if (bases === 2) codes.push(SEASON_RECORD_CODE.이루타)
+    if (bases === 3) codes.push(SEASON_RECORD_CODE.삼루타)
+    // 홈런 네 칸은 **타점**이 가른다 — 원본도 득점이 1~4 가 아니면 아무 칸도 안 올린다
+    if (outcome.kind === '홈런' && runsBattedIn >= 1 && runsBattedIn <= 4) {
+      codes.push(SEASON_RECORD_CODE.솔로홈런 + runsBattedIn - 1)
+    }
+    if (!cycleBefore && hasCycle(hitBases)) codes.push(SEASON_RECORD_CODE.사이클)
+  }
+  if (outcome.kind === '삼진') codes.push(SEASON_RECORD_CODE.내타자삼진)
+  return { codes, hitBases }
+}
+
+/**
+ * **내가 던진 타석 하나**가 올리는 코드들 — `0xa8024` 의 공통 꼬리다.
+ *
+ * ```
+ * a8a40: k=4  [sp+0x20](삼진 수) > 0 이고 **수비가 사람**이면 4 (아니면 6)
+ *             ⚠️ 값 인자가 없어 삼진이 둘이어도 +1 이다
+ * a8d6e: k=2  [sp+0x14](안타) — 피안타
+ * a8e76: k=5  [sp+0x30](이 플레이 아웃 수) == 2 이고 state[0x1a] 가 0 일 때 — 병살
+ * a8e8a: k=0  [sp+0x30] == 3 — 삼중살 (state[0x1a] 가 막지 않는다)
+ * ```
+ * ⚠️ `state[0x1a]` 는 "삼진 뒤 주자가 움직여 두 번째 아웃이 난 플레이" 표시다 (P7 F절).
+ * 웹에는 그 플레이(삼진 + 주자 아웃)가 없어 아웃 둘이 나는 타석은 늘 병살이다.
+ */
+function defenseRecordCodesOf(outcome: AtBatOutcome, outsAdded: number): readonly number[] {
+  const codes: number[] = []
+  if (outcome.kind === '삼진') codes.push(SEASON_RECORD_CODE.탈삼진)
+  if (isHit(outcome)) codes.push(SEASON_RECORD_CODE.피안타)
+  if (outsAdded === 2) codes.push(SEASON_RECORD_CODE.병살)
+  else if (outsAdded === 3) codes.push(SEASON_RECORD_CODE.삼중살)
+  return codes
+}
+
+/** 우리 타순 칸 하나의 루타 목록에 이번 루타를 얹는다 (`0xa86e0`) */
+function withHitBases(
+  lists: readonly (readonly number[])[],
+  slot: number,
+  hitBases: readonly number[],
+): readonly (readonly number[])[] {
+  const next = [...lists]
+  next[slot] = hitBases
+  return next
 }
 
 /** 타순 칸 기록에 타석 하나를 얹는다 (`0xa8024`) */
@@ -903,10 +1028,14 @@ function finishBatterOutcome(
   const slot = before.battingOrderIndex
   const inningEnded = before.outs + outsAdded >= OUTS_PER_INNING
   const isWalkOff = game.isFinished && runsBattedIn > 0 && game.ourScore > game.opponentScore
+  // 시즌 평판 16칸 — 우리 공격이라 **수비측(상대)이 CPU** 인 코드(≥ 6)만 선다
+  const offense = offenseRecordOf(outcome, runsBattedIn, progress.ourHitBases[slot] ?? [])
 
   const next: TeamGameProgress = {
     ...progress,
     game,
+    gameRecord: withSeasonRecord(progress, '공격', offense.codes),
+    ourHitBases: withHitBases(progress.ourHitBases, slot, offense.hitBases),
     lastDefensePlay: playback,
     atBat: createAtBat(),
     atBatPrepared: false,
@@ -1193,6 +1322,12 @@ function finishDefensiveAtBat(
       runsAllowed: progress.pitching.runsAllowed + applied.runsScored,
       allowedBaserunner: progress.pitching.allowedBaserunner || hit || walk,
     },
+    // 시즌 평판 16칸 — 우리 수비라 **공격측(상대)이 CPU** 인 코드(≤ 5)만 선다
+    gameRecord: withSeasonRecord(
+      progress,
+      '수비',
+      defenseRecordCodesOf(outcome, applied.outsAdded),
+    ),
     opponentEntryRecords: withPlateAppearance(
       progress.opponentEntryRecords,
       slot,
@@ -1592,6 +1727,7 @@ export function pinchHit(progress: TeamGameProgress, benchIndex: number): TeamGa
     progress.ourEntryRecords,
     progress.game.battingOrderIndex,
     benchIndex,
+    progress.ourHitBases,
   )
   if (swapped === null) return progress
 
@@ -1600,6 +1736,7 @@ export function pinchHit(progress: TeamGameProgress, benchIndex: number): TeamGa
       ...progress,
       ourEntry: swapped.entry,
       ourEntryRecords: swapped.records,
+      ourHitBases: swapped.hitBases ?? progress.ourHitBases,
       // 4. 벤치 타자 수 −1
       ourBenchBatters: Math.max(0, progress.ourBenchBatters - 1),
       // 상태 0x16 → 0xd → 타석 초기화 0xa5bcc
@@ -1620,9 +1757,12 @@ function substituteBatter(
   recordsBefore: readonly BatterGameRecord[],
   slot: number,
   benchIndex: number,
+  /** 우리 팀일 때만 넘긴다 — 사이클 판정은 사람 팀 타순만 본다 (`0xa7610` 의 `st[0x31+st[9]]`) */
+  hitBasesBefore?: readonly (readonly number[])[],
 ): {
   readonly entry: readonly TeamEntryBatter[]
   readonly records: readonly BatterGameRecord[]
+  readonly hitBases: readonly (readonly number[])[] | undefined
   readonly outgoing: TeamEntryBatter
   readonly incoming: TeamEntryBatter
 } | null {
@@ -1637,11 +1777,18 @@ function substituteBatter(
   const records = [...recordsBefore]
   records[slot] = records[benchIndex] ?? EMPTY_BATTER_GAME_RECORD
   records[benchIndex] = recordsBefore[slot] ?? EMPTY_BATTER_GAME_RECORD
+  // 루타 목록도 같은 24바이트 안에 있으니 함께 움직인다 (aed02~aed16)
+  const hitBases = hitBasesBefore === undefined ? undefined : [...hitBasesBefore]
+  if (hitBases !== undefined && hitBasesBefore !== undefined) {
+    hitBases[slot] = hitBasesBefore[benchIndex] ?? []
+    hitBases[benchIndex] = hitBasesBefore[slot] ?? []
+  }
   // 3. 빠진 선수를 명단에서 지운다
   entry.splice(benchIndex, 1)
   records.splice(benchIndex, 1)
+  hitBases?.splice(benchIndex, 1)
 
-  return { entry, records, outgoing, incoming }
+  return { entry, records, hitBases, outgoing, incoming }
 }
 
 /* ── CPU 대타 (0xac228) ──────────────────────────────────────────────────────── */
@@ -1686,7 +1833,13 @@ function applyCpuPinchHit(
   )
   if (benchIndex < 0) return progress
 
-  const swapped = substituteBatter(entry, records, slot, BATTING_ORDER_SIZE + benchIndex)
+  const swapped = substituteBatter(
+    entry,
+    records,
+    slot,
+    BATTING_ORDER_SIZE + benchIndex,
+    battingIsOurs ? progress.ourHitBases : undefined,
+  )
   if (swapped === null) return progress
 
   const changed: TeamGameProgress = battingIsOurs
@@ -1694,6 +1847,7 @@ function applyCpuPinchHit(
         ...progress,
         ourEntry: swapped.entry,
         ourEntryRecords: swapped.records,
+        ourHitBases: swapped.hitBases ?? progress.ourHitBases,
         ourBenchBatters: Math.max(0, progress.ourBenchBatters - 1),
       }
     : {
@@ -1913,6 +2067,7 @@ function playAutoOffenseAtBat(progress: TeamGameProgress, random: RandomPort): T
   )
   const runsBattedIn = game.ourScore - before.ourScore
   const slot = before.battingOrderIndex
+  const autoOffense = offenseRecordOf(outcome, runsBattedIn, progress.ourHitBases[slot] ?? [])
 
   return appendLog(
     {
@@ -1937,6 +2092,9 @@ function playAutoOffenseAtBat(progress: TeamGameProgress, random: RandomPort): T
       ),
       ourHits: progress.ourHits + (isHit(outcome) ? 1 : 0),
       ourEntryRecords: withPlateAppearance(progress.ourEntryRecords, slot, outcome, runsBattedIn),
+      // 자동으로 넘긴 타석도 원본은 같은 0xa8024 를 지난다 — 평판 16칸도 똑같이 오른다
+      gameRecord: withSeasonRecord(progress, '공격', autoOffense.codes),
+      ourHitBases: withHitBases(progress.ourHitBases, slot, autoOffense.hitBases),
       leaguePlateAppearances: [
         ...progress.leaguePlateAppearances,
         { teamId: options.ourTeamId, battingOrderIndex: slot, outcome, runsBattedIn },
@@ -2032,6 +2190,11 @@ export interface TeamGameSummary {
   /** 시즌 평가 `evaluateSeasonGame` 에 그대로 넘기는 두 칸 (인기도·평판이 서로 다른 이닝 칸을 본다) */
   readonly popularityCompleteGame: CompleteGameKind
   readonly reputationCompleteGame: CompleteGameKind
+  /**
+   * 시즌 평판 평가 16칸 (`SR+0x1a0..0x1af`) — 부르는 쪽이 `evaluateSeasonGame` **앞에서**
+   * `record.gameRecord` 에 꽂는다. 시즌(모드 2)이 아니면 전부 0 이다 (게이트 `0xa755c`).
+   */
+  readonly gameRecord: readonly number[]
 }
 
 export function summaryOf(progress: TeamGameProgress): TeamGameSummary {
@@ -2056,5 +2219,6 @@ export function summaryOf(progress: TeamGameProgress): TeamGameSummary {
     //    그래서 **연장 완투는 인기도만 보너스를 받는다** (P4 "원본 버그·이상" 3번)
     popularityCompleteGame: popularityCompleteGameOf(outs, game.inning - 1, flags),
     reputationCompleteGame: reputationCompleteGameOf(outs, REGULATION_LAST_INNING_INDEX, flags),
+    gameRecord: progress.gameRecord,
   }
 }

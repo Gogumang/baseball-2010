@@ -493,7 +493,10 @@ export function useSeasonSession(
         ),
       )
 
-      const evaluation = evaluateSeasonGame(record, {
+      // 경기 중 `0xa755c` 가 올린 평판 16칸을 시즌 레코드에 꽂는다 — 평가가 이 칸을 읽는다.
+      // 원본은 경기 장면이 SR+0x1a0 을 직접 올리므로 꽂는 자리가 따로 없다 (S4 2b·6절).
+      const played: SeasonRecord = { ...record, gameRecord: summary.gameRecord }
+      const evaluation = evaluateSeasonGame(played, {
         myRuns: summary.ourScore,
         opponentRuns: summary.opponentScore,
         won: summary.won,
@@ -502,7 +505,10 @@ export function useSeasonSession(
         reputationCompleteGame: summary.reputationCompleteGame,
         opponentTeamId: opponent,
       })
-      const evaluated = applySeasonGameEvaluation(save.state, evaluation)
+      const evaluated = applySeasonGameEvaluation(
+        { ...save.state, record: played },
+        evaluation,
+      )
 
       commit({
         ...save,

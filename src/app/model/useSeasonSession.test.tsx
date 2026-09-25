@@ -5,6 +5,7 @@ import { useSeasonSession } from '@/app/model/useSeasonSession'
 import { SEASON_GAME_COUNT } from '@/entities/season-mode/model/seasonRecord'
 import { SEASON_PHASE, SEASON_SCENE_STATE } from '@/entities/season-mode/model/seasonStateMachine'
 import { GAME_POINT_LIMIT } from '@/entities/season-mode/model/seasonRewards'
+import { clearSeasonGameRecord } from '@/entities/season-mode/model/seasonReputation'
 import { useGamePointWallet } from '@/entities/wallet/model/useGamePointWallet'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { TeamGameSummary } from '@/features/play-team-game/model/teamGameFlow'
@@ -38,6 +39,7 @@ const 요약 = (overrides: Partial<TeamGameSummary> = {}): TeamGameSummary => ({
   leaguePlateAppearances: [],
   popularityCompleteGame: null,
   reputationCompleteGame: null,
+  gameRecord: clearSeasonGameRecord(),
   ...overrides,
 })
 
@@ -110,6 +112,23 @@ describe('시즌 세션', () => {
     expect(result.current.scene).toBe(SEASON_SCENE_STATE.관중수입)
     // 경기를 치르면 이번 주기의 트레이닝·외출 표시를 지운다 (0x4f158)
     expect(result.current.state?.record.acted).toBe(false)
+  })
+
+  it('요약이 싣고 온 평판 16칸이 평가에 먹는다 (0xa3440 → 0xa6f1c)', () => {
+    const { result } = 띄우기()
+    act(() => result.current.actions.chooseTeam(0))
+    act(() => result.current.actions.playNextGame())
+    const 시작평판 = result.current.state?.record.reputation ?? 0
+
+    // 16칸이 비면 s = −1(상대 3점) + 2(승리) = 1 → 등급 +1 이다.
+    // 만루홈런 한 칸(S[13], ×5)을 세우면 s = 6 → 등급 +3 으로 올라간다.
+    const 기록 = clearSeasonGameRecord()
+    기록[13] = 1
+    act(() => result.current.actions.finishGame(요약({ gameRecord: 기록 })))
+
+    expect(result.current.state?.record.gameRecord).toEqual(기록)
+    expect(result.current.state?.record.lastReputationGrade).toBe(3)
+    expect(result.current.state?.record.reputation).toBe(시작평판 + 3)
   })
 
   it('수입을 확인하면 2경기 주기에 따라 다음이 갈린다 (afterGameNext)', () => {

@@ -36,6 +36,10 @@ import {
   throwPitch,
 } from '@/features/play-team-game/model/teamGameFlow'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
+import {
+  clearSeasonGameRecord,
+  seasonReputationChangeOf,
+} from '@/entities/season-mode/model/seasonReputation'
 import type { TeamGameOptions, TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
@@ -893,5 +897,110 @@ describe('환경설정 "송구" (+0xf4) — 0xae6c8', () => {
     const 시작한뒤 = startBatterOutcome(progress, 인플레이, random)
     // 이 자리는 throwMode 를 아예 안 싣는다 — 실어도 defenseIsCpu 가 먼저 참이라 결과가 같다
     expect(시작한뒤.pendingDefensePlay?.input.defenseIsCpu).toBe(true)
+  })
+})
+
+/* ── 시즌 평판 평가 16칸 (SR+0x1a0, S4 2b·3절) ───────────────────────────────── */
+
+describe('시즌 평판 16칸을 경기가 채운다 (0xa8024 → 0xa755c → 0xa3440)', () => {
+  const 홈런 = { kind: '홈런' } as const
+  const 삼진 = { kind: '삼진' } as const
+  const 일루타 = { kind: '안타', bases: 1 } as const
+  const 이루타 = { kind: '안타', bases: 2 } as const
+  const 삼루타 = { kind: '안타', bases: 3 } as const
+
+  /** 우리 공격 반 이닝을 만든다 (선공이면 1회 초가 우리 차례다) */
+  const 우리공격 = (seed = 20100901) => 시작({ playerSide: PLAYER_SIDE_FIRST_BAT }, seed)
+
+  it('경기를 세우면 16칸이 전부 0 이다 (0xa3424 memset 16)', () => {
+    const { progress } = 시작()
+    expect(progress.gameRecord).toEqual(Array.from({ length: 16 }, () => 0))
+  })
+
+  it('안타 칸 S[7] 은 홈런도 올린다 — a8518 이 루타를 가르기 전이다', () => {
+    const { progress, random } = 우리공격()
+    expect(applyBatterOutcome(progress, 홈런, random).gameRecord[7]).toBe(1)
+  })
+
+  it('2루타·3루타는 S[7] 과 S[8]/S[9] 를 둘 다 올린다 (a856e·a85b8)', () => {
+    const { progress, random } = 우리공격()
+    const 둘 = applyBatterOutcome(applyBatterOutcome(progress, 이루타, random), 삼루타, random)
+    expect(둘.gameRecord[7]).toBe(2)
+    expect(둘.gameRecord[8]).toBe(1)
+    expect(둘.gameRecord[9]).toBe(1)
+  })
+
+  it('홈런은 타점 1~4 가 S[10]~S[13] 을 가른다 (a8648/a867e/a868c/a86a4)', () => {
+    const { progress, random } = 우리공격()
+    const 솔로 = applyBatterOutcome(progress, 홈런, random)
+    expect(솔로.gameRecord[10]).toBe(1)
+    // 주자를 하나 세우고 친 홈런은 2점 홈런 칸이다
+    const 투런 = applyBatterOutcome(applyBatterOutcome(솔로, 일루타, random), 홈런, random)
+    expect(투런.gameRecord[11]).toBe(1)
+    expect(투런.gameRecord[10]).toBe(1)
+  })
+
+  it('내 타자 삼진은 S[6] 이다 (a8a46 — 수비가 CPU 인 쪽)', () => {
+    const { progress, random } = 우리공격()
+    const 친뒤 = applyBatterOutcome(progress, 삼진, random)
+    expect(친뒤.gameRecord[6]).toBe(1)
+    // 탈삼진 칸(뒤집혀 S[5])은 우리 공격에서 서지 않는다 — 게이트 0xa755c
+    expect(친뒤.gameRecord[5]).toBe(0)
+  })
+
+  it('사이클은 네 루타를 다 채운 그 타석에서 한 번만 선다 (a878a)', () => {
+    const { progress, random } = 우리공격()
+    // 같은 타순 칸이 돌아오도록 아홉 타석씩 띄워 친다
+    let 지금 = progress
+    const 한바퀴 = (outcome: Parameters<typeof applyBatterOutcome>[1]) => {
+      지금 = applyBatterOutcome(지금, outcome, random)
+      // 나머지 여덟 칸은 단타로 채워 아웃 없이 타순만 한 바퀴 돌린다
+      for (let i = 0; i < 8; i += 1) 지금 = applyBatterOutcome(지금, 일루타, random)
+    }
+    한바퀴(일루타)
+    한바퀴(이루타)
+    한바퀴(삼루타)
+    expect(지금.gameRecord[14]).toBe(0)
+    한바퀴(홈런)
+    expect(지금.gameRecord[14]).toBe(1)
+    // 한 번 더 쳐도 다시 서지 않는다 (a876e 의 [sp+0x1c])
+    한바퀴(일루타)
+    expect(지금.gameRecord[14]).toBe(1)
+  })
+
+  it('시즌(모드 2)이 아니면 한 칸도 안 오른다 — 게이트 0xa755c 의 `st[1] == 2`', () => {
+    const { progress, random } = 시작({ mode: 1, playerSide: PLAYER_SIDE_FIRST_BAT })
+    expect(applyBatterOutcome(progress, 홈런, random).gameRecord[7]).toBe(0)
+  })
+
+  it('요약이 16칸을 그대로 싣는다', () => {
+    const { progress, random } = 우리공격()
+    const 친뒤 = applyBatterOutcome(progress, 홈런, random)
+    expect(summaryOf(친뒤).gameRecord).toEqual(친뒤.gameRecord)
+  })
+})
+
+describe('한 경기를 끝까지 돌리면 16칸이 실제로 찬다', () => {
+  it('자동으로 소화한 시즌 한 경기 — 16칸과 평판 등급 (seed 20100901)', () => {
+    const random = createSeededRandom(20100901)
+    const 끝 = runAutoProgress(startTeamGame({ ...기본옵션, settings: 전부자동 }, random), random)
+    const summary = summaryOf(끝)
+
+    expect(summary.ourScore).toBe(7)
+    expect(summary.opponentScore).toBe(3)
+    expect(summary.pitching.outsRecorded).toBe(27)
+    // 피안타 7 · 탈삼진 18(뒤집혀 S[5]) · 내 타자 삼진 9 · 안타 14 · 2루타 5 · 2점 홈런 1
+    expect(summary.gameRecord).toEqual([0, 0, 7, 0, 0, 18, 9, 14, 5, 0, 0, 1, 0, 0, 0, 0])
+
+    const context = {
+      opponentRuns: summary.opponentScore,
+      myRuns: summary.ourScore,
+      won: summary.won,
+      completeGame: summary.reputationCompleteGame,
+    }
+    // 16칸이 비었을 때는 승리·완투·상대 득점만 남아 +2 였다
+    expect(seasonReputationChangeOf(clearSeasonGameRecord(), context)).toBe(2)
+    // 채워진 16칸으로는 상한 +6 까지 올라간다
+    expect(seasonReputationChangeOf(summary.gameRecord, context)).toBe(6)
   })
 })
