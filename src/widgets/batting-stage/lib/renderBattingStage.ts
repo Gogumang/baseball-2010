@@ -1,18 +1,18 @@
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import { BALL_FRAMES_PER_KIND } from '@/entities/pitching/model/pitchCurve'
 import { ballFrameIndexAt, ballPixelAt, platePixelOf } from '@/widgets/batting-stage/lib/trajectory'
-import { frameAnimations, JUDGE_FRAMES, PITCHER_FRAMES, placedFrame, sprite } from '@/widgets/batting-stage/lib/spriteLoader'
+import { frameAnimations, JUDGE_FRAMES, placedFrame, sprite } from '@/widgets/batting-stage/lib/spriteLoader'
 import { drawScenery } from '@/widgets/batting-stage/lib/renderScenery'
 import type { SceneryState } from '@/widgets/batting-stage/lib/renderScenery'
-import { judgeAnimationOf, judgeFrameAt, PITCHER_OVERLAY_FRAME_OFFSET, pitcherFrameAt, pitcherIdleFrameAt } from '@/widgets/batting-stage/lib/stageScenery'
+import { judgeAnimationOf, judgeFrameAt, pitcherFrameAt, pitcherIdleFrameAt } from '@/widgets/batting-stage/lib/stageScenery'
 
 import { drawParticles } from '@/widgets/particles/lib/renderParticles'
 import type { ParticleScene } from '@/entities/particle/model/particleScene'
 import { drawHud } from '@/widgets/batting-stage/lib/renderHud'
 import { drawFieldMap } from '@/widgets/batting-stage/lib/renderFieldMap'
 import { drawHomeRunBanner } from '@/widgets/batting-stage/lib/renderHomeRunBanner'
-import { batterLayersOf, layerPaletteIndexOf } from '@/widgets/batting-stage/lib/batterLayers'
-import type { BatterEquipment } from '@/widgets/batting-stage/lib/batterLayers'
+import { batterLayersOf, layerPaletteIndexOf, NO_PITCHER_EQUIPMENT, pitcherLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
+import type { BatterEquipment, PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
 
 import type { HudState } from '@/widgets/batting-stage/lib/renderHud'
 import { BATTER_SIDE, STAGE_SIDE, stageLayoutOf, toPixel } from '@/widgets/batting-stage/lib/stageLayout'
@@ -70,6 +70,15 @@ export interface StageScene {
   /** 마운드에 그릴 마선수. 없으면 평범한 투수라 그리지 않는다. */
   /** 화면에 겹쳐 그릴 경기 상황 */
   readonly hud: HudState | null
+  /**
+   * 마운드에 선 투수의 **장착 장비 등급** (0x79790 적재 · 0x79524 여섯 칸).
+   * 안 넘기면 맨몸 투수라 지금까지와 똑같이 바탕 f · f+22 두 겹만 그린다.
+   *
+   * ⚠️ 지금 이 칸을 채워 주는 화면이 **하나도 없다** — 타석 화면의 투수는 늘 **상대 팀 로스터
+   * 선수**인데 웹 로스터에는 장비 니블이 없기 때문이다. 넘길 데가 생기면
+   * `batterLayers.pitcherEquipmentOf(career.equipmentLevels)` 한 줄이면 된다.
+   */
+  readonly pitcherEquipment?: PitcherEquipment
   readonly acePitcher: {
     readonly framesUrl: string
     readonly frameCount: number
@@ -91,7 +100,7 @@ export function renderBattingStage(
     opponentTeamId: scene.hud?.opponentTeamId ?? null,
   })
   const progress = scene.pitch === null || scene.frame < 0 ? -1 : scene.frame / scene.pitch.frameCount
-  drawPitcher(context, scene.acePitcher, progress, scene.pitcherTick, scene.tick, side)
+  drawPitcher(context, scene.acePitcher, progress, scene.pitcherTick, scene.tick, side, scene.pitcherEquipment)
   drawBatter(context, scene.swingFrame, scene.shift, scene.bodyType, side, scene.batterSkinIndex, scene.batterTeamIndex, scene.batterEquipment)
   drawStrikeZone(context, side)
   if (scene.pitch !== null && scene.isEagleEyeEnabled) {
@@ -127,6 +136,7 @@ function drawPitcher(
   pitcherTick: number | null,
   tick: number,
   side: number,
+  equipment: PitcherEquipment = NO_PITCHER_EQUIPMENT,
 ): void {
   // 투수 앵커 (프레임 원점 = 발밑) — 원본 표 0xcfb18 의 side 칸
   const { x: MOUND_CENTER_X, y: MOUND_BOTTOM_Y } = stageLayoutOf(side).pitcherAnchor
@@ -135,10 +145,12 @@ function drawPitcher(
   if (ace === null) {
     // 투구 단계 표 (0x9e0b8) · 대기 동작 (state 2)
     const index = pitcherTick === null ? pitcherIdleFrameAt(tick) : pitcherFrameAt(PITCHER_FORM, pitcherTick)
-    // 원본 0x79524 는 바탕 프레임 f 위에 같은 그림의 f+22 를 한 번 더 겹친다 —
-    // 몸통·던지는 팔·글러브 안 공이 거기 들어 있다 (PITCHER_OVERLAY_FRAME_OFFSET 주석).
-    for (const layer of [index, index + PITCHER_OVERLAY_FRAME_OFFSET]) {
-      const frame = placedFrame(PITCHER_FRAMES, layer)
+    // 원본 0x79524 는 바탕 프레임 f · 머리 · 몸 · **바탕 f+22** · 손 · 다리 여섯 칸을 이 차례로 쌓는다.
+    // f+22 에 몸통·던지는 팔·글러브 안 공이 들어 있다 (PITCHER_OVERLAY_FRAME_OFFSET 주석).
+    // 장비 칸은 등급 줄(.mpl)로 색만 갈리므로 타자와 같은 `layerPaletteIndexOf` 를 그대로 쓴다 —
+    // 투수 폴더는 피부·팀 벌이 없어 뒤 두 인자는 무시된다 (`batterLayerPaletteIndex` 가 null).
+    for (const layer of pitcherLayersOf(index, equipment)) {
+      const frame = placedFrame(layer.folder, layer.frame, layerPaletteIndexOf(layer, 0, 0))
       if (frame === null) continue
       context.drawImage(frame.image, MOUND_CENTER_X + frame.offsetX, MOUND_BOTTOM_Y + frame.offsetY)
     }

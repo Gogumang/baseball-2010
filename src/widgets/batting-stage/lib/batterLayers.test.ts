@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { batterEquipmentOf, batterFrameAt, batterLayersOf, bodyTypeOf, equipmentGradeOf, layerPaletteIndexOf } from '@/widgets/batting-stage/lib/batterLayers'
+import { batterEquipmentOf, batterFrameAt, batterLayersOf, bodyTypeOf, equipmentGradeOf, layerPaletteIndexOf, pitcherEquipmentOf, pitcherLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
 
 const 파일 = (layers: ReturnType<typeof batterLayersOf>) => layers.map((layer) => `${layer.folder.split('/')[2]}:${layer.frame}`)
 
@@ -152,5 +152,45 @@ describe('타자 폼 → 몸통 종류 t = 폼 >> 1 (0x78ab0)', () => {
   it('장타형은 자세표도 갈린다 — 대기 다섯 칸 · 번트 12', () => {
     expect(batterFrameAt({ tick: 16, swingTick: null, isBunting: false, bodyType: bodyTypeOf(3) })).toBe(4)
     expect(batterFrameAt({ tick: 0, swingTick: null, isBunting: true, bodyType: bodyTypeOf(3) })).toBe(12)
+  })
+})
+
+describe('투수 장비 레이어 — 0x79790 적재 · 0x79524 여섯 칸', () => {
+  const 투수파일 = (layers: ReturnType<typeof pitcherLayersOf>) =>
+    layers.map((layer) => `${layer.folder.split('/')[2]}:${layer.frame}`)
+
+  it('맨몸이면 바탕 f 와 f+22 두 겹뿐이다 (3번 칸은 조건 없이 늘 쌓인다)', () => {
+    expect(투수파일(pitcherLayersOf(4))).toEqual(['pitcher:4', 'pitcher:26'])
+  })
+
+  it('칸 차례는 바탕 f · 머리 · 몸 · 바탕 f+22 · 손 · 다리 이고 아이템은 프레임 보정이 없다', () => {
+    expect(투수파일(pitcherLayersOf(4, { head: 0, hand: 0, body: 7, leg: 0 }))).toEqual([
+      'pitcher:4', 'item_pit_head_0:4', 'item_pit_body_7:4', 'pitcher:26', 'item_pit_hand_0:4', 'item_pit_leg_0:4',
+    ])
+  })
+
+  it('몸(부위 2)은 등급 6 이하면 아예 안 그린다 — 7 부터만 item_pit_body_{n} 이다', () => {
+    expect(투수파일(pitcherLayersOf(4, { head: -1, hand: -1, body: 6, leg: -1 }))).toEqual(['pitcher:4', 'pitcher:26'])
+    expect(투수파일(pitcherLayersOf(4, { head: -1, hand: -1, body: 10, leg: -1 }))[1]).toBe('item_pit_body_10:4')
+  })
+
+  it('손·다리는 _0 + 줄 n−1 · _7 + 줄 n−8 로 똑같이 갈린다 (n = 0·7 은 기본색)', () => {
+    const 줄 = (equipment: Parameters<typeof pitcherLayersOf>[1], folder: string) => {
+      const layer = pitcherLayersOf(4, equipment).find((candidate) => candidate.folder.includes(folder))
+      return layer === undefined ? undefined : layerPaletteIndexOf(layer, 2, 7)
+    }
+    const 없음 = { head: -1, hand: -1, body: -1, leg: -1 }
+    expect(줄({ ...없음, hand: 0 }, 'item_pit_hand_0')).toBeNull()
+    expect(줄({ ...없음, hand: 6 }, 'item_pit_hand_0')).toBe(5)
+    expect(줄({ ...없음, hand: 7 }, 'item_pit_hand_7')).toBeNull()
+    expect(줄({ ...없음, hand: 10 }, 'item_pit_hand_7')).toBe(2)
+    expect(줄({ ...없음, leg: 1 }, 'item_pit_leg_0')).toBe(0)
+    expect(줄({ ...없음, leg: 8 }, 'item_pit_leg_7')).toBe(0)
+  })
+
+  it('니블 묶음은 제구·구속·변화·체력 차례로 모자·글러브·아대·신발이 된다 (추정)', () => {
+    expect(pitcherEquipmentOf({ control: 3, velocity: 1, breaking: 0, stamina: 11 })).toEqual({
+      head: 2, hand: 0, body: -1, leg: 10,
+    })
   })
 })

@@ -5,8 +5,13 @@
  * 아이템 레이어(머리 +0x1c · 손 +0x14/+0x20/+0x44 · 다리 +0x28)는 장비 등급 순번 n 으로 고른다 —
  * `equipmentGradeOf`·`batterEquipmentOf` 주석 참고 (0x78fd8 적재 · 0x78cfc 겹치기, 디스어셈 확인).
  * 그림자는 +0x48 플래그일 때만 그리는데 플래그를 세우는 자리를 못 찾아 늘 그린다 (추정).
+ *
+ * 파일 끝에 **투수 장비 레이어**(0x79790 적재 · 0x79524 겹치기)도 같이 있다 — 같은
+ * `BatterLayer`·`layerPaletteIndexOf` 를 쓰기 때문이다. 두 쪽 차이는 `PitcherEquipment` 주석 참고.
  */
 import { outfitPaletteIndex } from '@/shared/lib/sprite/paletteSwap'
+import { PITCHER_FRAMES } from '@/widgets/batting-stage/lib/spriteLoader'
+import { PITCHER_OVERLAY_FRAME_OFFSET } from '@/widgets/batting-stage/lib/stageScenery'
 
 const SPRITES = './sprites'
 const BODY_FOLDERS = [`${SPRITES}/batter_balancer/frames`, `${SPRITES}/batter_sluger/frames`]
@@ -236,5 +241,113 @@ export function batterLayersOf(frame: number, bodyType: number, equipment: Batte
     const after = frame === GHOST_FRAMES[1] ? GHOST_SLOT_LATE : GHOST_SLOT
     slots.splice(after + 1, 0, ghost)
   }
+  return slots.filter((layer): layer is BatterLayer => layer !== null)
+}
+
+/* ── 투수 장비 레이어 (적재 0x79790 · 겹치기 0x79524 — 이번에 다시 떠서 확인했다) ───────── */
+
+/**
+ * **투수 장비 부위별 등급 순번** (0~10, −1 = 미장착).
+ *
+ * 적재 `0x79790(그림객체, 부위, n)` 은 타자 `0x78fd8` 과 **인자 모양이 똑같다** —
+ * 부위 0 머리(모자) · 1 손(글러브) · 2 몸(아대) · 3 다리(신발) 이고 `객체+0x3e+부위 = n`
+ * 이다 (0x797c2 `adds r3,r4,r7 / adds r3,#0x3e / strb r5,[r3]` — 타자도 0x79088 에서 같은 칸).
+ * `n < 0` 이면 슬롯 그림만 풀고 끝낸다 (0x797b2).
+ *
+ * **타자와 다른 곳 넷** (직접 대조했다):
+ *   1. 슬롯 주소가 **부위 번호와 1:1** 이다 — `+0x1c + 부위×4` (0x79792 `lsls r3,r1,#2`) 라
+ *      머리 +0x1c · 손 +0x20 · 몸 +0x24 · 다리 +0x28. 타자는 손이 +0x14(기본 배트 자리)·
+ *      덧그림 +0x20 · 셋째 겹 +0x44 로 흩어져 있다.
+ *   2. 부위 2 가 타자는 **그림 자체가 없고**(0x7907c `cmp r6,#2` → 반환), 투수는
+ *      **등급 7 이상만** `item_pit_body_{n}` 이 있다 (0x797b8~0x797c0 `부위 2 && n ≤ 6 → 반환`).
+ *   3. 손 파일 규칙이 타자는 `item_bat_hand` 한 장 + 줄 n−2 + 덧그림/셋째 겹인데,
+ *      투수는 **다리와 글자 하나까지 같은** `_0`/`_7` 두 장 + 줄 n−1 / n−8 이다.
+ *   4. 겹침 순서가 타자는 자세마다 바뀌는 표(0xd3a54)에 sluger +14 보정까지 있는데,
+ *      투수는 **고정 여섯 칸**이고 프레임 보정이 전혀 없다 (`pitcherLayersOf`).
+ */
+export interface PitcherEquipment {
+  /** 부위 0 모자 (StrITEM 44~54) */
+  readonly head: number
+  /** 부위 1 글러브 (55~65) */
+  readonly hand: number
+  /** 부위 2 아대·선글라스·스카우터… (66~76) — **등급 6 이하는 그림이 없다** */
+  readonly body: number
+  /** 부위 3 신발 (77~87) */
+  readonly leg: number
+}
+
+export const NO_PITCHER_EQUIPMENT: PitcherEquipment = { head: -1, hand: -1, body: -1, leg: -1 }
+
+/**
+ * 니블 묶음(`PitcherCareer.equipmentLevels` = 제구·구속·변화·체력) → 부위별 등급 순번.
+ * 니블 → 순번은 타자와 같은 `equipmentGradeOf`(n = 니블 − 1)다.
+ *
+ * ⚠️ **추정**: 부위 ↔ 능력치 짝은 타자 쪽 규칙("부위 i = 능력치 i", 0x10866 루프)을 그대로 옮긴 것이다 —
+ *    모자 = 제구 · 글러브 = 구속 · 아대 = 변화 · 신발 = 체력. 원본 투수 상점에서 부위와 능력치를
+ *    맺어 주는 자리는 아직 안 떴다 (웹 `pitcherCareer.effectiveAbilityOf` 도 이미 같은 차례를 쓴다).
+ */
+export function pitcherEquipmentOf(nibbles: {
+  control: number
+  velocity: number
+  breaking: number
+  stamina: number
+}): PitcherEquipment {
+  return {
+    head: equipmentGradeOf(nibbles.control),
+    hand: equipmentGradeOf(nibbles.velocity),
+    body: equipmentGradeOf(nibbles.breaking),
+    leg: equipmentGradeOf(nibbles.stamina),
+  }
+}
+
+const PITCHER_HEAD_FOLDER = (grade: number) => `${SPRITES}/item_pit_head_${grade}/frames`
+const PITCHER_BODY_FOLDER = (grade: number) => `${SPRITES}/item_pit_body_${grade}/frames`
+/** 기본 `_0`(등급 0~6) · 히든 `_7`(7~10) 두 장뿐이고 나머지는 `.mpl` 줄로 갈린다 */
+const PITCHER_HAND_FOLDERS = [`${SPRITES}/item_pit_hand_0/frames`, `${SPRITES}/item_pit_hand_7/frames`]
+const PITCHER_LEG_FOLDERS = [`${SPRITES}/item_pit_leg_0/frames`, `${SPRITES}/item_pit_leg_7/frames`]
+
+/**
+ * 손·다리 한 겹 — `_0` + 줄 n−1 (0x79870·0x79832) · `_7` + 줄 n−8 (0x79888·0x7984a).
+ * 줄이 음수(n = 0 · 7)면 **그림 기본색**이라 벌을 아예 안 붙인다 (0xb9718 넷째 인자 −1).
+ *
+ * ⚠️ 앞 작업 메모와 `public/sprites/item_pit_…` 폴더 `palette.json` 의 `select` 주석은 손과 다리의
+ *    주소가 **뒤바뀌어** 있다 — 0x79832·0x7984a 는 다리 가지([r7+0x28]), 0x79870·0x79888 이
+ *    손 가지([r7+0x20])다. 식(n−1 / n−8)은 두 부위가 같아 결과는 달라지지 않는다.
+ */
+function pitcherGradeLayer(folders: readonly string[], grade: number, frame: number): BatterLayer | null {
+  if (grade < 0) return null
+  const isHidden = grade >= FIRST_HIDDEN_GRADE
+  const folder = folders[isHidden ? 1 : 0]
+  const row = isHidden ? grade - 8 : grade - 1
+  return row < 0 ? { folder, frame } : { folder, frame, gradePaletteRow: row }
+}
+
+/**
+ * 자세 f 의 투수 레이어 여섯 칸 — 그리기 `0x79524` 의 `+0x3d < 0` 갈래가 쌓는 순서 그대로다
+ * (0x7961e~0x79692, 칸 배열 sp+0x4c / 프레임 배열 sp+0x34):
+ * ```
+ * 0 바탕 pitcher.pzx  프레임 f            [+0x0c]
+ * 1 머리 아이템       프레임 f            [+0x1c]  (obj[0x3e] ≥ 0 일 때만, 0x79644)
+ * 2 몸  아이템        프레임 f            [+0x24]  (obj[0x40] ≥ 0 일 때만, 0x79658)
+ * 3 바탕 pitcher.pzx  프레임 f + 0x16     [+0x0c]  ← 조건 없이 늘 쌓인다 (0x79664 adds r3,#0x16)
+ * 4 손  아이템        프레임 f            [+0x20]  (obj[0x3f] ≥ 0 일 때만, 0x79674)
+ * 5 다리 아이템       프레임 f            [+0x28]  (obj[0x41] ≥ 0 일 때만, 0x7968a)
+ * ```
+ * 빈 칸은 그리기 루프(0x7969a `cmp r2,#0 / beq`)가 건너뛴다 — 여기서도 `null` 을 걸러 낸다.
+ * **아이템 칸에는 프레임 보정이 없다** — 여섯 칸 모두 같은 f 이고 3번 칸만 +22 다.
+ */
+export function pitcherLayersOf(
+  frame: number,
+  equipment: PitcherEquipment = NO_PITCHER_EQUIPMENT,
+): BatterLayer[] {
+  const slots: (BatterLayer | null)[] = [
+    { folder: PITCHER_FRAMES, frame },
+    equipment.head < 0 ? null : { folder: PITCHER_HEAD_FOLDER(equipment.head), frame },
+    // 등급 6 이하는 원본이 그림 객체를 아예 안 만든다 — 칸이 비어 그리기 루프가 건너뛴다
+    equipment.body < FIRST_HIDDEN_GRADE ? null : { folder: PITCHER_BODY_FOLDER(equipment.body), frame },
+    { folder: PITCHER_FRAMES, frame: frame + PITCHER_OVERLAY_FRAME_OFFSET },
+    pitcherGradeLayer(PITCHER_HAND_FOLDERS, equipment.hand, frame),
+    pitcherGradeLayer(PITCHER_LEG_FOLDERS, equipment.leg, frame),
+  ]
   return slots.filter((layer): layer is BatterLayer => layer !== null)
 }
