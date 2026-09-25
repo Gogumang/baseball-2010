@@ -15,6 +15,7 @@ import {
   applySeasonGameEvaluation,
   evaluateSeasonGame,
 } from '@/entities/season-mode/model/seasonEvaluation'
+import { clearSeasonGameRecord } from '@/entities/season-mode/model/seasonReputation'
 import type { SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
 import type { TradeSettlement } from '@/entities/season-mode/model/playerTrade'
 import { EMPTY_LEAGUE, LEAGUE_SIDE_HOME, leagueSideOf, rankingOf } from '@/entities/league/model/league'
@@ -403,6 +404,29 @@ export function useSeasonSession(
     [save],
   )
 
+  /**
+   * 평판 기록 16칸(SR+0x1a0..0x1af)을 0 으로 — 원본 `0xa3424` = `memset(SR+0x1a0, 0, 16)`.
+   *
+   * **경기가 끝날 때가 아니라 시작할 때 지운다.** 부르는 곳은 경기 직전 경기정보 화면
+   * (시즌 상태 0xdd)의 "경기 시작" 키 `0x83cc` **한 곳뿐**이고, 거기서 곧장 경기 장면으로
+   * 넘어간다 (0x84ac `SR = [this+0xa0]` → `ldr r3,[0x85c8] = 0xa3425` → 0xa3424).
+   * 웹판에는 0xdd 정보 화면이 따로 없고 `경기직전` 장면이 곧 경기이므로, 그 장면으로
+   * 들어가는 세 갈래(정규·포스트시즌·국가대항전)가 같은 자리를 맡는다.
+   * 근거: `docs/re/S4-season-reputation.md` 2a·7절, `docs/re/R13-season-leftovers.md` 4절.
+   */
+  const clearGameRecord = useCallback(
+    (current: SeasonSave) => {
+      commit({
+        ...current,
+        state: {
+          ...current.state,
+          record: { ...current.state.record, gameRecord: clearSeasonGameRecord() },
+        },
+      })
+    },
+    [commit],
+  )
+
   const playNextGame = useCallback(() => {
     if (save === null) return
     // 정규시즌 가지 — 0xb7844 가 일정표 0xd89cb 로 정한다 (리그 날짜 L+0x32 = SR+0xb2)
@@ -411,10 +435,11 @@ export function useSeasonSession(
       leagueSideOf(save.state.record.games, save.state.record.teamId),
     )
     if (options === null) return
+    clearGameRecord(save)
     setGameKind('정규')
     setGameOptions(options)
     setScene(SEASON_SCENE_STATE.경기직전)
-  }, [optionsFor, save])
+  }, [clearGameRecord, optionsFor, save])
 
   /**
    * 경기가 끝났다 — 원본 차례 그대로 정산한다:
@@ -556,6 +581,7 @@ export function useSeasonSession(
         postseasonSideOf(series, myTeam),
       )
       if (options === null) return
+      clearGameRecord(save)
       setGameKind('포스트시즌')
       setGameOptions(options)
       return setScene(SEASON_SCENE_STATE.경기직전)
@@ -569,7 +595,7 @@ export function useSeasonSession(
         record: { ...save.state.record, postseasonChampion: advanced.champion ?? NO_CHAMPION },
       },
     })
-  }, [commit, optionsFor, random, save])
+  }, [clearGameRecord, commit, optionsFor, random, save])
 
   /**
    * 국가대항전 한 경기 — 원본대로 **사람이 대표팀을 조작한다** (시즌 221).
@@ -578,15 +604,16 @@ export function useSeasonSession(
   const playCupGame = useCallback(
     (myTeam: number, opponent: number) => {
       const cup = save?.cup ?? null
-      if (cup === null) return
+      if (save === null || cup === null) return
       // 국가대항전 가지 — 대진 칸 0 이 홈이다. `myTeam` 은 원본 0xb7614 가 고른 대한민국(10)이다
       const options = optionsFor(opponent, nationalCupSideOf(cup, myTeam))
       if (options === null) return
+      clearGameRecord(save)
       setGameKind('국가대항전')
       setGameOptions(options)
       setScene(SEASON_SCENE_STATE.경기직전)
     },
-    [optionsFor, save],
+    [clearGameRecord, optionsFor, save],
   )
 
   /** 대회 끝 — 보상을 넣고 히든 팀을 연 뒤 관리 메뉴로 돌아간다 */

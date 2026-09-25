@@ -86,6 +86,19 @@ describe('시즌 세션', () => {
     expect(result.current.state?.record.games).toBe(0)
   })
 
+  it('경기로 들어갈 때 평판 기록 16칸을 지운다 — 원본 0xa3424 는 **시작** 쪽 한 곳뿐이다', () => {
+    const { result } = 띄우기()
+    act(() => result.current.actions.chooseTeam(0))
+    const 레코드 = result.current.state?.record
+    if (레코드 === undefined) throw new Error('레코드가 없다')
+    act(() => result.current.actions.updateRecord({ ...레코드, gameRecord: [...레코드.gameRecord].fill(3) }))
+    expect(result.current.state?.record.gameRecord.every((칸) => 칸 === 3)).toBe(true)
+
+    act(() => result.current.actions.playNextGame())
+
+    expect(result.current.state?.record.gameRecord).toEqual(Array.from({ length: 16 }, () => 0))
+  })
+
   it('경기가 끝나면 경기 수가 오르고 관중수입 창으로 간다 (0xe9)', () => {
     const { result } = 띄우기()
     act(() => result.current.actions.chooseTeam(0))
