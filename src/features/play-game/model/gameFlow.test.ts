@@ -14,6 +14,7 @@ import { opponentOf } from '@/entities/league/model/league'
 import { advanceRunners, EMPTY_BASES } from '@/entities/game/model/baseState'
 import type { BaseState } from '@/entities/game/model/baseState'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
+import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 
 describe('startGame', () => {
   it('커리어 타순(9번)이면 플레이어는 아홉 번째 타자다', () => {
@@ -362,6 +363,102 @@ describe('주자 처리는 수비 화면이 끝나야 정해진다 (상태 0x17 
     expect(쪼개서.game).toEqual(한번에.game)
     expect(쪼개서.myStats).toEqual(한번에.myStats)
     expect(쪼개서.log.map((entry) => entry.text)).toEqual(한번에.log.map((entry) => entry.text))
+  })
+})
+
+describe('환경설정 "주루" 가 나만의리그 타자편에도 먹는다 (설정 +0xbd · 0xae690)', () => {
+  // 원본 배선(매 틱 도는 경기 장면 슬롯 2 = 0x524c0 안):
+  //   5261c: 설정 = 0x1f1d8([0x1400054])   /  52628: r1 = 설정+0xbd  /  5262e: 0xae690([장면+0x214], r1)
+  //          = (경기[0x31 + 경기[9](공격측)] == 1) || (설정+0xbd != 0)
+  //   그 값이 0 이면 52660 의 자동 진루 제어기(0xaf8c0 = vt8 = 0xaf918)를 통째로 안 돌린다.
+  // 타자편은 사람이 늘 공격이라 앞 항이 늘 거짓 → 설정이 그대로 먹는다.
+  const 깊은뜬공: BattedBallPattern = [90, 900, 1500, 0]
+  const 땅볼: BattedBallPattern = [45, 300, 200, 0]
+  const 뜬공아웃 = { kind: '아웃', detail: '뜬공아웃' } as const
+
+  function 내타석(bases: BaseState, outs: number, runningModeManual?: boolean): GameProgress {
+    const progress = startGame(createSeededRandom(20100901), 0, undefined, undefined, undefined, 0, runningModeManual)
+    return { ...progress, game: { ...progress.game, bases, outs, half: '말' } }
+  }
+
+  it('안 넘기면 자동이다 — 지금까지와 한 톨도 다르지 않다', () => {
+    const 기본 = startGame(createSeededRandom(20100901))
+
+    expect(기본.runningModeManual).toBe(false)
+  })
+
+  it('타구에 실어 보내는 값은 "사람 공격 + 설정" 이다 (0xae690 의 두 항)', () => {
+    const 자동 = startPlayerOutcome(내타석(EMPTY_BASES, 0, false), 뜬공아웃, createSeededRandom(3), { pattern: 깊은뜬공 })
+    const 수동 = startPlayerOutcome(내타석(EMPTY_BASES, 0, true), 뜬공아웃, createSeededRandom(3), { pattern: 깊은뜬공 })
+
+    // 타자편은 사람이 늘 공격이다 — 앞 항은 언제나 거짓이다
+    expect(자동.pendingDefensePlay!.offenseIsCpu).toBe(false)
+    expect(수동.pendingDefensePlay!.offenseIsCpu).toBe(false)
+    expect(자동.pendingDefensePlay!.runningMode).toBe('자동')
+    expect(수동.pendingDefensePlay!.runningMode).toBe('수동')
+  })
+
+  const 돌려보기 = (bases: BaseState, outs: number, manual: boolean, outcome: AtBatOutcome, pattern: BattedBallPattern) => {
+    const 진행중 = startPlayerOutcome(내타석(bases, outs, manual), outcome, createSeededRandom(3), { pattern })
+    return runDefensePlay(진행중.pendingDefensePlay!).advance
+  }
+
+  it('수동이면 태그업을 안 한다 — 3루 주자가 그 자리에 선다', () => {
+    const 주자3루: BaseState = { first: false, second: false, third: true }
+
+    expect(돌려보기(주자3루, 0, false, 뜬공아웃, 깊은뜬공)).toMatchObject({ runsScored: 1, outsAdded: 1 })
+    expect(돌려보기(주자3루, 0, true, 뜬공아웃, 깊은뜬공)).toMatchObject({
+      runsScored: 0,
+      outsAdded: 1,
+      bases: 주자3루,
+    })
+  })
+
+  it('수동이면 태그업을 시도하다 잡히는 일도 없다 — 2·3루 1아웃 깊은 뜬공', () => {
+    const 주자23루: BaseState = { first: false, second: true, third: true }
+
+    // 자동은 둘 다 뛰다가 하나가 홈(또는 3루)에서 잡혀 아웃이 하나 더 붙는다
+    expect(돌려보기(주자23루, 1, false, 뜬공아웃, 깊은뜬공)).toMatchObject({ outsAdded: 2 })
+    // 수동은 아무도 안 뛰므로 뜬공 아웃 하나로 끝나고 루 상황이 그대로다
+    expect(돌려보기(주자23루, 1, true, 뜬공아웃, 깊은뜬공)).toMatchObject({
+      outsAdded: 1,
+      runsScored: 0,
+      bases: 주자23루,
+    })
+  })
+
+  it('⚠️ 수동이어도 포스(밀려 뛰기)는 그대로 간다 — 자동 제어기와 무관한 자리다', () => {
+    const 주자1루: BaseState = { first: true, second: false, third: false }
+    const 만루: BaseState = { first: true, second: true, third: true }
+    const 땅볼아웃 = { kind: '아웃', detail: '땅볼아웃' } as const
+
+    expect(돌려보기(주자1루, 0, true, 땅볼아웃, 땅볼)).toEqual(돌려보기(주자1루, 0, false, 땅볼아웃, 땅볼))
+    expect(돌려보기(만루, 0, true, 땅볼아웃, 땅볼)).toEqual(돌려보기(만루, 0, false, 땅볼아웃, 땅볼))
+    // 만루 땅볼은 어느 쪽이든 3루 주자가 밀려 들어온다
+    expect(돌려보기(만루, 0, true, 땅볼아웃, 땅볼).runsScored).toBe(1)
+  })
+
+  it('난수 굴림 차례는 수동/자동에 한 톨도 안 흔들린다', () => {
+    const 굴림수 = (manual: boolean) => {
+      let calls = 0
+      let seed = 12345
+      const 하나 = () => {
+        calls += 1
+        seed = (seed * 1664525 + 1013904223) >>> 0
+        return (seed >>> 8) / 0x1000000
+      }
+      const random = {
+        next: 하나,
+        nextInRange: (minimum: number, maximum: number) => minimum + 하나() * (maximum - minimum),
+        pick: <T,>(candidates: readonly T[]) => candidates[Math.floor(하나() * candidates.length)],
+      }
+      const 시작 = 내타석({ first: true, second: true, third: true }, 0, manual)
+      const 진행중 = startPlayerOutcome(시작, { kind: '안타', bases: 1 }, random, { pattern: 땅볼 })
+      runDefensePlay({ ...진행중.pendingDefensePlay!, random })
+      return calls
+    }
+
+    expect(굴림수(true)).toBe(굴림수(false))
   })
 })
 

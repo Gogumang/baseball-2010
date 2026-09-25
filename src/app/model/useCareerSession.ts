@@ -131,6 +131,15 @@ interface CareerSessionInput {
    * 안 넘기면 예전처럼 커리어 칸 하나로만 돈다 — 테스트는 그대로 두면 된다.
    */
   readonly wallet?: GamePointWalletSession
+  /**
+   * 환경설정 "주루" 가 **수동**인가 (설정 레코드 +0xbd). 안 넘기면 자동이다 —
+   * 테스트는 그대로 두면 된다.
+   *
+   * 갈림길은 `0xae690` — `(경기[0x31 + 공격측] == 1) || (설정+0xbd != 0)` 이 거짓이면
+   * 자동 진루 제어기(`0xaf8c0`)를 통째로 안 돌린다. 나만의리그 타자편은 사람이 늘 공격이라
+   * 앞 항이 늘 거짓 → **설정이 그대로 먹는다.**
+   */
+  readonly runningModeManual?: boolean
 }
 
 /** 육성 모드 한 판 — 커리어·경기 진행·관리 커맨드를 한데 묶는다. */
@@ -142,6 +151,7 @@ export function useCareerSession({
   setScreen,
   sound,
   wallet,
+  runningModeManual = false,
 }: CareerSessionInput) {
   // 통로를 안 받으면 조용한 포트로 — 아래 자리들이 `sound` 가 있는지 매번 보지 않게 한다
   const silent = useMemo(() => createSilentSound(), [])
@@ -182,6 +192,21 @@ export function useCareerSession({
   progressRef.current = progress
   const careerRef = useRef(career)
   careerRef.current = career
+  // 경기를 세우는 `startMatch` 가 읽는다 — 설정이 바뀔 때마다 콜백 신원이 흔들리지 않게 ref 로 둔다
+  const runningModeManualRef = useRef(runningModeManual)
+  runningModeManualRef.current = runningModeManual
+
+  /**
+   * 경기 중에 환경설정 "주루" 를 바꾸면 **그 자리에서** 먹게 잇는다 — 원본은 이 칸(설정 +0xbd)을
+   * 매 틱 다시 읽으므로(`0x5261c`) 다음 경기까지 기다리지 않는다. 값이 같으면 손대지 않는다.
+   */
+  useEffect(() => {
+    const current = progressRef.current
+    if (current === null || current.runningModeManual === runningModeManual) return
+    const next = { ...current, runningModeManual }
+    progressRef.current = next
+    setProgress(next)
+  }, [runningModeManual])
 
   // 커리어가 바뀔 때마다 저장한다. 저장 실패는 게임 진행을 막지 않는다.
   useEffect(() => {
@@ -239,7 +264,10 @@ export function useCareerSession({
       /** 리그 날짜 카운터 g — 4인 로테이션이 본다 (`시즌+0xb2` 자리, 커리어는 `gamesPlayed`) */
       dayCounter = 0,
     ) => {
-      const started = startGame(random, ourTeamId, battingOrder, opponentTeamId, undefined, dayCounter)
+      // 환경설정 "주루" 를 경기에 태운다 — 타자편은 사람이 늘 공격이라 설정이 그대로 먹는다 (0xae690)
+      const started = startGame(
+        random, ourTeamId, battingOrder, opponentTeamId, undefined, dayCounter, runningModeManualRef.current,
+      )
       progressRef.current = started
       setProgress(started)
       runner.resetAtBat()

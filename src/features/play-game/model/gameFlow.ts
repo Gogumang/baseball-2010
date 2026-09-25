@@ -131,6 +131,18 @@ export interface GameProgress {
    * 커리어에 얹는다 (`applyBurstRewards`). 판정이 안 났으면 null 이다.
    */
   readonly lastBurstResolution: BurstResolution | null
+  /**
+   * 환경설정 "주루" 가 **수동**인가 (설정 레코드 +0xbd, 원본 기본은 자동).
+   *
+   * 갈림길은 `0xae690` — 매 틱 도는 경기 장면 슬롯 2(`0x524c0`) 안 `0x5262e` 가 설정 +0xbd 를
+   * 넣어 부른다: `반환 = (경기[0x31 + 공격측] == 1) || (설정+0xbd != 0)`. 그 값이 0 이면
+   * `0x52660` 의 자동 진루 제어기(`0xaf8c0` = vt8 = `0xaf918`)를 **통째로 안 돌린다**.
+   * 곧 **사람이 공격 중이고 설정이 수동일 때만** 자동 진루가 멎는다.
+   *
+   * ⚠️ 이 화면은 나만의리그 **타자편** 이라 사람이 늘 공격이다 — 설정이 그대로 먹는다.
+   * ⚠️ 수동이라고 주자가 굳는 것이 아니다. 밀려 뛰는 포스 진루는 자동 제어기와 무관하게 간다.
+   */
+  readonly runningModeManual: boolean
 }
 
 /**
@@ -171,6 +183,13 @@ export function startGame(
    * 안 넘기면 0 = 시즌 첫 경기라 두 팀 모두 로스터 0번이 선발이다 (원본 `g == 0` 이면 안 돌린다).
    */
   dayCounter = 0,
+  /**
+   * 환경설정 "주루" 가 수동인가 (설정 +0xbd). 안 넘기면 자동 — 지금까지와 한 톨도 다르지 않다.
+   *
+   * ⚠️ **근사**: 원본은 이 칸을 매 틱 다시 읽지만(`0x5261c`), 웹은 경기를 세울 때 한 번 받아
+   *    들고 다닌다. 경기 중에 설정을 바꾸는 길은 `useCareerSession` 이 이 칸을 갈아 끼워 잇는다.
+   */
+  runningModeManual = false,
 ): GameProgress {
   const initial: GameProgress = {
     game: createGame(battingOrder - 1, playerSide),
@@ -199,6 +218,7 @@ export function startGame(
     pendingDefensePlay: null,
     burst: createBurstSession(MY_LEAGUE_BATTER_MODE),
     lastBurstResolution: null,
+    runningModeManual,
   }
   return advanceUntilPlayerTurn(initial, random)
 }
@@ -305,6 +325,9 @@ function defensePlayInputOf(
     gameMode: MY_LEAGUE_BATTER_MODE,
     // 내 타석이므로 수비는 언제나 CPU 다 → 협살(AI 상태 8)이 돈다
     defenseIsCpu: true,
+    // 타자편은 사람이 늘 공격이다 — `0xae690` 의 앞 항이 늘 거짓이라 설정 +0xbd 혼자가 답을 정한다
+    offenseIsCpu: false,
+    runningMode: progress.runningModeManual ? '수동' : '자동',
     // 필살타법이 성공한 타구면 야수가 쥐지 않는다 (0x51800) — 타석 쪽이 확률 굴림을 하면 넘겨 준다
     isUncatchable: options.isUncatchable,
   }

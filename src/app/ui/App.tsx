@@ -97,7 +97,11 @@ export function App() {
     wallet,
     pitcherWalletMergeStore,
   )
-  const careerSession = useCareerSession({ runner, random, saveGame, screen, setScreen, sound, wallet })
+  const careerSession = useCareerSession({
+    runner, random, saveGame, screen, setScreen, sound, wallet,
+    // 환경설정 "주루" (설정 +0xbd) — 나리 타자편은 사람이 늘 공격이라 그대로 먹는다 (0xae690)
+    runningModeManual: gameSettings.settings.runningMode === '수동',
+  })
   // 미션 보상 G (0x4ef72) — 지갑으로 들어간다. 육성 선수가 없어도 사라지지 않는다
   const mission = useMissionSession({
     runner, random, missionRecord, screen, setScreen, sound,
