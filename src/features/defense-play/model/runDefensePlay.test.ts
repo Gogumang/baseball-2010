@@ -115,10 +115,16 @@ describe('한 플레이 진행기 — 타자주자의 운명은 결과 코드, �
     expect(play(땅볼아웃, EMPTY_BASES, 0).tagOut).toBe(false)
     expect(play(뜬공아웃, EMPTY_BASES, 0).tagOut).toBe(false)
     expect(play(단타, 만루, 0).tagOut).toBe(false)
-    // 만루 땅볼은 3번 주자가 태그로 잡힌다 (진행 기록 참고)
+    // ⚠️ 만루 땅볼은 **태그가 아니라 포스(루) 아웃**이다 — 3루 주자는 홈에 밀려 있고
+    //    공 쥔 야수가 홈을 밟고 있으니 0xb3890(2a)이 0xb380e(3a)를 덮어쓴다.
+    //    (2a 의 vt10 = 0xa9f60 은 `산 주자 수 > [주자+0x8c]`, 곧 **마지막으로 닿은 루**를 본다)
     const 만루땅볼 = play(땅볼아웃, 만루, 0)
-    expect(만루땅볼.tagOut).toBe(true)
-    expect(만루땅볼.log.some((줄) => 줄.includes('태그 아웃'))).toBe(true)
+    expect(만루땅볼.tagOut).toBe(false)
+    expect(만루땅볼.log.some((줄) => 줄.includes('루 아웃'))).toBe(true)
+    // 태그가 서는 것은 **포스가 아닌** 주자다 — 1·2루가 빈 3루 주자가 홈으로 뛰다 잡힌다
+    const 삼루땅볼 = play(땅볼아웃, 주자3루, 0)
+    expect(삼루땅볼.tagOut).toBe(true)
+    expect(삼루땅볼.log.some((줄) => 줄.includes('태그 아웃'))).toBe(true)
   })
 
   it('직선타를 잡히면 주자는 원래 루에 그대로 있다 (0xa9620 리터치)', () => {

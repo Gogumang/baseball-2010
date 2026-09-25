@@ -1310,7 +1310,18 @@ export function stepDefensePlay(
         position: stepToward(runner.state.position, target, runner.state.speed),
       }
       if (!isAtTarget(runner.state)) continue
-      runner.state = { ...runner.state, settled: true }
+      // 0xa040c 도착 — **+0x8c = +0x7c**(닿은 루를 "마지막으로 닿은 루" 로 굳힌다).
+      // 그 뒤 `+0x94 && +0x8c == +0x88` 이면 `+0x88 = -1, +0x94 = 0` 으로 요구 루가 풀린다.
+      const touched = runner.state.targetBase
+      runner.state = {
+        ...runner.state,
+        settled: true,
+        startBase: touched,
+        requiredBase:
+          runner.state.requiredBase !== NONE && runner.state.requiredBase === touched
+            ? NONE
+            : runner.state.requiredBase,
+      }
       // 결과 코드가 정한 루까지는 반드시 간다 (타자주자의 1·2·3루타). 한 루씩 이어 달린다
       if (runner.state.targetBase < runner.minimumBase) {
         startLeg(runner, runner.state.targetBase + 1)

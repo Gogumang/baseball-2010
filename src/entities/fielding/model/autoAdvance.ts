@@ -51,6 +51,14 @@ export function beatsThrow(runTicks: number, defenseTicks: number): boolean {
   return defenseTicks - 1 > runTicks
 }
 
+/**
+ * 진루 자리 `0xafa0e` 가 `vt48` 에 넘기는 루 = `0xb6228(주자+0x78)`:
+ * `r0 = [r0,#0x14]`(= **+0x8c 마지막으로 닿은 루**) ; `r0 <= 3` 이면 `r0 + 1` — 곧 **4 에서 멈춘다.**
+ */
+function nextBaseOf(runner: RunnerState): number {
+  return runner.startBase <= 3 ? runner.startBase + 1 : runner.startBase
+}
+
 export interface AutoAdvanceDecision {
   readonly runnerIndex: number
   /** 새 목표 루 (지금 목표 루 + 1) */
@@ -69,7 +77,7 @@ export interface AutoAdvanceInput extends DefenseContext {
 
 /** 기본 앞길 검사 — 가려는 루를 목표로 삼은 다른 주자가 없으면 비었다고 본다 */
 function defaultPathClear(runner: RunnerState, runners: readonly RunnerState[]): boolean {
-  const next = runner.targetBase + 1
+  const next = runner.startBase + 1
   return !runners.some(
     (other) => other.index !== runner.index && !other.isOut && other.targetBase === next,
   )
@@ -88,24 +96,28 @@ export function autoAdvanceDecisions(input: AutoAdvanceInput): readonly AutoAdva
   for (let index = runners.length - 1; index >= 0; index -= 1) {
     const runner = runners[index]
     if (runner === undefined || runner.isOut) continue
-    // 0xaf946~0xaf95a — 멈춘 주자(vt18 참)는 force 가 아니면 건너뜀
-    if (isRunnerStopped(runner) && input.force !== true) continue
+    // 0xaf950~0xaf95a — `r0 = vt18(주자) ; r0 != 0 → 계속 ; 아니면 force == 0 이면 건너뜀`.
+    // 곧 **루에 붙어 멈춘 주자는 언제나 보고, 달리는 중인 주자는 force 일 때만 본다.**
+    // ⚠️ 예전 줄은 이 조건이 **거꾸로**(멈춘 주자를 force 없이는 안 봄) 박혀 있었다.
+    // 부르는 자리(`runDefensePlay`)가 늘 `force: true` 라 겉으로 드러나지 않던 자리다.
+    if (!isRunnerStopped(runner) && input.force !== true) continue
 
     // ── 0xaf96e · 0xaf978 — **끝남(+0x111) 이나 +0x129 가 서 있으면 틱 비교 없이 한 루 진루** ──
     // 두 검사 모두 `bne 0xafa0e` 로 **진루 자리로 곧장 뛴다**. 그러니 이 갈래에서는
     // 종류 2·3·8 거르개도, vt94(잡힐 뜬공) 도, 0xaf284 틱 비교도, 앞길 검사(0xa9924)도 **안 본다**.
     if (play.finished || play.suppressed) {
-      decisions.push({ runnerIndex: runner.index, toBase: runner.targetBase + 1 })
+      decisions.push({ runnerIndex: runner.index, toBase: nextBaseOf(runner) })
       continue
     }
 
-    // 종류 7 은 틱 비교 없이 바로 진루한다 (목표가 이미 **투구 때 루**+2 이상이면 건너뜀)
-    // 0xaf97e: r3 = 주자+0x78 ; r2 = [r3,#0x14](= +0x8c 목표 루) ; r3 = [r3,#0x18](= **+0x90 투구 때 루**)
+    // 종류 7 은 틱 비교 없이 바로 진루한다 (이미 **투구 때 루**+2 에 닿았으면 건너뜀)
+    // 0xaf97e: r3 = 주자+0x78 ; r2 = [r3,#0x14](= **+0x8c 마지막으로 닿은 루**)
+    //          r3 = [r3,#0x18](= **+0x90 투구 때 루**)
     // 0xaf986: r3 += 2 ; cmp r2, r3 ; bge 0xafa30(건너뜀)
-    // ⚠️ 예전에는 `startBase`(원본 +0x84 쪽, 구간마다 바뀐다)를 봤다 — 원본은 +0x90 이라 안 바뀐다.
+    // 오른쪽 항은 +0x90 이라 안 바뀌고, 왼쪽 항은 +0x8c = 이 모델의 `startBase` 다.
     if (play.kind === 7) {
-      if (runner.targetBase >= runner.pitchBase + 2) continue
-      decisions.push({ runnerIndex: runner.index, toBase: runner.targetBase + 1 })
+      if (runner.startBase >= runner.pitchBase + 2) continue
+      decisions.push({ runnerIndex: runner.index, toBase: nextBaseOf(runner) })
       continue
     }
 
@@ -117,11 +129,12 @@ export function autoAdvanceDecisions(input: AutoAdvanceInput): readonly AutoAdva
     if (play.earliestCatchTick <= input.landingTick && !play.everHeld) return decisions
     if (SKIPPED_PLAY_KINDS.has(play.kind)) return decisions
 
-    const nextBase = (((runner.targetBase + 1) % 4) + 4) % 4
+    // 0xaf9b6: b = ([주자+0x8c] + 1) % 4 — 틱을 재는 루도 **마지막으로 닿은 루**에서 한 칸이다
+    const nextBase = (((runner.startBase + 1) % 4) + 4) % 4
     const runTicks = ticksToReach(runner.position, basePosition(nextBase), runner.speed) + 1
     const defenseTicks = defenseArrivalTicks(input, nextBase)
     if (beatsThrow(runTicks, defenseTicks) && pathClear(runner, runners)) {
-      decisions.push({ runnerIndex: runner.index, toBase: runner.targetBase + 1 })
+      decisions.push({ runnerIndex: runner.index, toBase: nextBaseOf(runner) })
     }
   }
   return decisions
@@ -158,36 +171,45 @@ export function autoAdvanceDecisions(input: AutoAdvanceInput): readonly AutoAdva
  *  첨자를 쓰는 이웃들도 모두 목록 번호다: `0xa97fc`(앞 번호의 산 주자) · `0xa97d4`(뒤 번호) ·
  *  `0xa9ad4`(포인터 → 번호). 루로 찾는 것은 `0xa97a0` 하나뿐이고 그건 `+0x8c` 로 찾는다.)
  *
- * ## ⚠️ 미해결 — 이 함수는 지금 **늘 `NONE` 만 돌려준다**
- * `index` 는 맞지만 왼쪽 항이 맞는지는 **확정 못 했다**. 원본 `+0x8c` 가 "목표 루" 가 아니라
- * **"마지막으로 닿은 루"** 로 읽히는 증거가 나왔다 (직접 뜬 것):
+ * ## ✅ 왼쪽 항은 **마지막으로 닿은 루(+0x8c)** 다 — 2026-09 확정
+ * 예전에는 `+0x8c` 를 "목표 루" 로 읽어 이 함수가 **늘 `NONE` 만 돌려주었다.** 원본 네 자리가
+ * 한목소리로 반대를 가리킨다 (전부 직접 뜬 것):
  * ```
- * a07b0 vt48(주자, b):  +0x80 = b ; d = b − [+0x8c] ; |d|>1 이면 [+0x8c] 에서 한 칸만(0xa0780/0xa0798, mod 4)
- *                       +0x84 = 옛 +0x7c ; +0x7c = 그 한 칸 ; 0xa0a18 이 **+0x7c 의 루 좌표로 이동 목표를 잡는다**
- * a040c 도착:           [+0x80] ≠ [+0x8c] 면 vt48([+0x80]) 로 이어 달리고, 그 뒤 **+0x8c = +0x7c**, +0xb9 = 0
- *                       +0x94 이고 +0x8c == +0x88 이면 +0x88 = −1, +0x94 = 0 (요구 루 풀림)
+ * a04e8 vt90(구간 진행률):  r7 = [주자+0x7c] ; r0 = [주자+0x8c]
+ *                           d1 = |루[+0x8c] − 루[+0x7c]| ; d2 = |루[+0x7c] − 지금 위치|
+ *                           돌려주는 값 = 100 − 100·d2/d1        ← **+0x8c 에서 +0x7c 로 간다**
+ * 9ff40 달리는 방향 그림:   r5 = [+0x7c] ; r4 = [+0x8c]
+ *                           r5==0 && r4==3 → r5 = 4 ;  r5==3 && r4==0 → r4 = 4   (홈 = 0 = 4)
+ *                           (r4,r5) 가 (0,1)·(1,2)·(2,3)·(3,4) 면 앞으로 가는 그림
+ * a07b0 vt48(주자, b):      +0x80 = b ; d = b − [+0x8c] ; |d|>1 이면 [+0x8c] 에서 한 칸(mod 4)
+ *                           +0x84 = 옛 +0x7c ; +0x7c = 그 한 칸 ; 0xa0a18 이 **루[+0x7c] 좌표**로 이동
+ * aa12a 득점:               주자+0x3b(도착) && [+0x8c] == 4 이면 홈을 밟은 것
  * ```
- * 곧 **+0x7c 가 향하는 루, +0x8c 는 마지막으로 닿은 루**다. 그러면 `+0x8c ≤ i` 는
- * "1루부터 내 앞까지 빈 루 없이 차 있다"(= 포스)가 되어 **타자주자부터 사슬 전원이 요구 루를 받는다.**
- * (문서 쪽도 갈린다: `R3-field-view.md` 101·280 과 `I-controls.md` 3c 는 **+0x7c 를 목표 루**로 적고,
- *  `P2-fielding-ai.md` 5b 만 반대로 적는다.)
+ * 그래서 "루 b 의 주자"(`0xa97a0`)도 `+0x8c == b` 로 찾고, `0xa0820`(vt88, 루에 세우기)은
+ * `+0x7c = +0x80 = +0x84 = +0x88 = +0x8c = +0x90 = b` 로 한꺼번에 적는다.
  *
- * 웹판은 `+0x8c → targetBase` 규약으로 모델 전체가 짜여 있어, 이 한 항만 웹 `startBase` 로 바꿔
- * 재어 봤다 (2026-09 측정):
- * | 상황 | 지금 | `startBase` 로 바꾸면 |
- * |---|---|---|
- * | 만루, 전원 뛰는 중 | `[없음, 없음, 없음, 없음]` | `[1, 2, 3, 4]` |
- * | 2·3루, 타자주자만 뛴다 | `[없음, 없음, 없음]` | `[1, 없음, 없음]` |
- * | 단타 + 1루 주자 | 아웃+0, 루 101 | **아웃+1**, 루 100 (1루 주자가 2루에서 포스 아웃) |
- * | 3루타 + 1루 주자 | 아웃+0 득점 1 | **아웃+1 득점 0** |
- * | 3루타 + 1·2루 | 아웃+1 득점 1 | **아웃+2 득점 0** |
- * 곧 **평범한 단타에서 1루 주자가 죽는다** — 송구 도착 틱·아웃 판정이 이 칸을 한 번도 안 받아 본
- * 채로 맞춰져 있었다는 뜻이다. 전체 테스트도 14개가 깨진다(바로 앞 커밋이 세운 포스 사슬 테스트 포함).
- * 에뮬레이터가 없어 어느 쪽이 원본과 같은지 확인할 길이 없으므로 **고치지 않고 그대로 둔다.**
- * 손대려면 `outJudgement`(0xb36d0)의 포스 가지와 송구 도착 틱을 함께 봐야 한다.
+ * 그러면 `[+0x8c] ≤ i` 는 "1루부터 내 앞까지 빈 루 없이 차 있다"(= 포스)가 되어
+ * **타자주자부터 사슬 전원이 요구 루를 받는다.** 목록 번호가 압축 목록 번호이기 때문이다:
+ * 1루가 비어 있으면 2루 주자의 닿은 루 2 가 번호 1 보다 커서 저절로 빠진다.
+ *
+ * ## 같이 고쳐야 넘어진다 — 앞 사람이 되돌린 이유
+ * 이 항만 `startBase` 로 바꾸면 **평범한 단타에서 1루 주자가 2루에서 죽는다.** 왼쪽 항이 틀려서가
+ * 아니라 **이 모델이 요구 루(+0x88)를 한 번도 안 풀어 주기 때문**이었다. 원본은 세 자리에서 푼다:
+ * `0xa040c`(도착: `+0x94 && +0x8c == +0x88` → `+0x88 = −1, +0x94 = 0`) · `0xaa0a8`(틱마다) ·
+ * `0xa9648`(아웃 뒤). 그래서 이번에는 넷을 함께 옮겼다:
+ * 1. 여기 `+0x8c → startBase`
+ * 2. `outJudgement.isStillForced`(vt10 = 0xa9f60) 의 `+0x8c → startBase`
+ * 3. `outJudgement.releaseForcesAfterOut`(0xa9648) 의 `+0x8c → startBase`
+ * 4. `runDefensePlay` 도착 자리에 `0xa040c` 의 `+0x8c = +0x7c` 와 요구 루 풀기
+ *
+ * 넷을 같이 넣고 **타구 6종 × 루 8상황 × 아웃 3 × 주루 3 × 송구 3 × 난수 2 = 3456 칸**을 전수로
+ * 재니 **아웃·득점·루 상황이 한 칸도 안 바뀌었고 난수 굴림 수도 11016 로 똑같다.** 바뀐 것은
+ * 판정 **종류**뿐이다: 만루 땅볼에서 3루 주자가 태그(3)가 아니라 **포스(2)** 로 죽고(27칸,
+ * 아웃·득점·루는 그대로), 깊은 뜬공 태그업에서 리터치를 마친 주자를 제 루에서 다시 잡지
+ * 못하게 되었다(12칸 — 위 4번이 고친 자리다).
  */
 export function requiredBasesOnBounce(runners: readonly RunnerState[]): readonly number[] {
-  return runners.map((runner, index) => (runner.targetBase <= index ? runner.pitchBase + 1 : NONE))
+  return runners.map((runner, index) => (runner.startBase <= index ? runner.pitchBase + 1 : NONE))
 }
 
 /**

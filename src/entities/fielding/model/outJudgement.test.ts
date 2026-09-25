@@ -51,17 +51,29 @@ describe('아웃 판정 0xb36d0 — 0/1/2/3 을 갈라서 돌려준다', () => {
   })
 
   it('3 = 태그 — 공 쥔 야수와의 거리가 499 이하이고 주자가 루에 안 붙었으면 아웃 (0xb380e)', () => {
-    const 주자 = [createRunner(0, 0, 335), 달리는중(createRunner(1, 1, 335, { targetBase: 2 }), 400)]
-    const 야수 = 루에선야수(3, 2)
+    // **포스가 아닌 주자**를 써야 태그 갈래만 남는다 — 1루가 빈 2루 주자다.
+    // (포스가 걸린 주자는 뒤의 2a 갈래가 같은 자리를 덮어써 루 아웃이 된다. 아래 시험 참고)
+    const 주자 = [createRunner(0, 0, 335), 달리는중(createRunner(1, 2, 335, { targetBase: 3 }), 400)]
+    const 야수 = 루에선야수(3, 3)
     expect(judgeOut({ ...문맥(야수, 주자, 3), skipRunnerIndexes: [0] })).toEqual({
       kind: OUT_KIND.TAG,
       runnerIndex: 1,
     })
   })
 
+  it('2a 가 3a 를 덮어쓴다 — 밀려 있는 주자는 달려가는 루(+0x7c)를 밟은 야수에게 루 아웃 (0xb3890)', () => {
+    // 1루 주자가 2루로 뛰는 중, 공 쥔 야수가 2루를 밟고 있다.
+    // 주자관리 vt10(0xa9f60)은 `산 주자 수 > [주자+0x8c]` — **닿은 루**가 아직 1이라 참이다.
+    const 주자 = [createRunner(0, 0, 335), 달리는중(createRunner(1, 1, 335, { targetBase: 2 }), 400)]
+    expect(judgeOut({ ...문맥(루에선야수(3, 2), 주자, 3), skipRunnerIndexes: [0] })).toEqual({
+      kind: OUT_KIND.BASE,
+      runnerIndex: 1,
+    })
+  })
+
   it('499 를 넘으면 아웃이 아니다 — 500 은 세이프다', () => {
-    const 주자 = [createRunner(0, 0, 335), 달리는중(createRunner(1, 1, 335, { targetBase: 2 }), 500)]
-    expect(judgeOut({ ...문맥(루에선야수(3, 2), 주자, 3), skipRunnerIndexes: [0] }).kind).toBe(OUT_KIND.NONE)
+    const 주자 = [createRunner(0, 0, 335), 달리는중(createRunner(1, 2, 335, { targetBase: 3 }), 500)]
+    expect(judgeOut({ ...문맥(루에선야수(3, 3), 주자, 3), skipRunnerIndexes: [0] }).kind).toBe(OUT_KIND.NONE)
   })
 
   it('루에 붙어 멈춘 주자는 태그가 안 된다 — 주자.vt18 = 0xbf3a0 (위치 == 목표점)', () => {
@@ -88,9 +100,10 @@ describe('아웃 판정 0xb36d0 — 0/1/2/3 을 갈라서 돌려준다', () => {
     })
   })
 
-  it('요구 루가 −1 이면 포스가 아니다 — 태그를 받아야 죽는다', () => {
-    const 주자 = [createRunner(0, 0, 335), 달리는중(createRunner(1, 1, 335, { targetBase: 2 }), 5000)]
-    expect(judgeOut({ ...문맥(루에선야수(3, 2), 주자, 3), skipRunnerIndexes: [0] }).kind).toBe(OUT_KIND.NONE)
+  it('요구 루가 −1 이고 밀려 있지도 않으면 아웃이 아니다 — 태그를 받아야 죽는다', () => {
+    // 1루가 빈 2루 주자 — 요구 루도 없고 vt10 도 거짓이라 2a·2b 가 둘 다 안 선다
+    const 주자 = [createRunner(0, 0, 335), 달리는중(createRunner(1, 2, 335, { targetBase: 3 }), 5000)]
+    expect(judgeOut({ ...문맥(루에선야수(3, 3), 주자, 3), skipRunnerIndexes: [0] }).kind).toBe(OUT_KIND.NONE)
   })
 
   it('앞선 주자부터 본다 — 뒤 주자와 앞 주자가 다 걸리면 번호가 큰 쪽이 먼저 죽는다', () => {
@@ -102,11 +115,16 @@ describe('아웃 판정 0xb36d0 — 0/1/2/3 을 갈라서 돌려준다', () => {
     expect(judgeOut({ ...문맥(루에선야수(3, 2), 주자, 3), skipRunnerIndexes: [0] }).runnerIndex).toBe(2)
   })
 
-  it('주자관리 vt10 = 0xa9f60 — "산 주자 수 > 목표 루" 일 때만 아직 밀려 있다', () => {
+  it('주자관리 vt10 = 0xa9f60 — "산 주자 수 > **마지막으로 닿은 루**(+0x8c)" 일 때 아직 밀려 있다', () => {
+    // 0xa9f60: `r2 = 주자+0x78 ; r3 = [r2,#0x14]`(= +0x8c) ; 산 주자 수 > r3 → 1.
+    // 곧 왼쪽 항은 **닿은 루**(이 모델의 `startBase`)다 — 뛰기 시작했다고 풀리지 않는다.
     const 루에붙은1루주자 = [createRunner(0, 0, 335, { targetBase: 1 }), createRunner(1, 1, 335, { targetBase: 1 })]
     expect(isStillForced(루에붙은1루주자, 1)).toBe(true)
     const 뛰기시작 = [createRunner(0, 0, 335, { targetBase: 1 }), createRunner(1, 1, 335, { targetBase: 2 })]
-    expect(isStillForced(뛰기시작, 1)).toBe(false)
+    expect(isStillForced(뛰기시작, 1)).toBe(true)
+    // 2루를 **밟고 나서야** 풀린다 (0xa040c 도착이 +0x8c = +0x7c 로 굳힌 뒤다)
+    const 이미2루 = [createRunner(0, 0, 335, { targetBase: 1 }), createRunner(1, 2, 335, { targetBase: 3 })]
+    expect(isStillForced(이미2루, 1)).toBe(false)
   })
 
   it('0xa9648 — 죽은 주자부터 뒤로, 요구 루가 목표 루보다 앞이면 포스를 푼다', () => {

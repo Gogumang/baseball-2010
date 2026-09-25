@@ -57,8 +57,9 @@ describe('자동 추가 진루 0xaf918 — "수비보다 2틱 이상 빠를 때�
   })
 
   it('수비가 한참 늦으면 앞선 주자부터 한 루씩 더 간다', () => {
-    // 2루로 달리는 주자. 3루수가 좌중간 깊이 끌려 나가 있어 3루 도착이 78틱 이나 된다
-    const 주자 = createRunner(1, 1, 주력500, { targetBase: 2 })
+    // **2루를 밟고 선** 주자. 3루수가 좌중간 깊이 끌려 나가 있어 3루 도착이 78틱 이나 된다.
+    // (원본이 재는 루는 `b = ([주자+0x8c] + 1) % 4` — **마지막으로 닿은 루**에서 한 칸이다)
+    const 주자 = createRunner(1, 2, 주력500)
     const 결정 = autoAdvanceDecisions(
       문맥({ ballHolderSlot: 8, catchFielderSlot: 8 }, [주자], { fielders: 끌려나간수비 }),
     )
@@ -71,7 +72,7 @@ describe('자동 추가 진루 0xaf918 — "수비보다 2틱 이상 빠를 때�
   })
 
   it('**잡힐 뜬공이면 아무도 안 뛴다** — 원본에 희생플라이 보장이 없는 이유', () => {
-    const 주자 = createRunner(1, 1, 주력500, { targetBase: 2 })
+    const 주자 = createRunner(1, 2, 주력500)
     const 문 = 문맥({ ballHolderSlot: 8, catchFielderSlot: 8, earliestCatchTick: 20 }, [주자], {
       fielders: 끌려나간수비,
     })
@@ -91,11 +92,12 @@ describe('자동 추가 진루 0xaf918 — "수비보다 2틱 이상 빠를 때�
 
   it('플레이가 끝났거나(+0x111) +0x129 면 틱 비교 없이 무조건 한 루 간다 (0xaf96e·0xaf978)', () => {
     const 주자 = createRunner(1, 2, 주력500, { targetBase: 2 })
-    // 멈춘 주자라 force 없이는 원본도 건너뛴다 (0xaf946)
+    // 달리는 중인 주자는 force 없이는 원본도 건너뛴다 (0xaf950)
+    const 달리는중 = createRunner(1, 2, 주력500, { targetBase: 3 })
     expect(
-      autoAdvanceDecisions(문맥({ ballHolderSlot: 8, catchFielderSlot: 8, finished: true }, [주자])),
+      autoAdvanceDecisions(문맥({ ballHolderSlot: 8, catchFielderSlot: 8, finished: true }, [달리는중])),
     ).toEqual([])
-    // force 를 주면 두 칸 모두 **진루 자리(0xafa0e)로 곧장 뛴다**
+    // 두 칸이 서면 **진루 자리(0xafa0e)로 곧장 뛴다**
     for (const play of [{ finished: true }, { suppressed: true }]) {
       expect(
         autoAdvanceDecisions({
@@ -128,46 +130,69 @@ describe('자동 추가 진루 0xaf918 — "수비보다 2틱 이상 빠를 때�
     ).toEqual([{ runnerIndex: 1, toBase: 3 }])
   })
 
-  it('멈춘 주자는 force 일 때만 본다', () => {
-    const 멈춤 = createRunner(1, 2, 주력500, { targetBase: 2 }) // 위치 == 목표 루
+  it('**달리는 중인 주자**가 force 일 때만 보이는 쪽이다 (0xaf950)', () => {
+    // 0xaf950: `r0 = vt18(주자) ; r0 != 0 → 계속` — 루에 붙어 멈춘 주자는 force 없이도 본다
+    const 멈춤 = createRunner(1, 2, 주력500) // 위치 == 목표 루
     const 문 = 문맥({ ballHolderSlot: 8, catchFielderSlot: 8 }, [멈춤], { fielders: 끌려나간수비 })
-    expect(autoAdvanceDecisions(문)).toEqual([])
+    expect(autoAdvanceDecisions(문)).toEqual([{ runnerIndex: 1, toBase: 3 }])
     expect(autoAdvanceDecisions({ ...문, force: true })).toEqual([{ runnerIndex: 1, toBase: 3 }])
+
+    // 달리는 중인 주자는 거꾸로다 — force 가 있어야 본다
+    const 달림 = createRunner(1, 2, 주력500, { targetBase: 3 })
+    const 문2 = 문맥({ ballHolderSlot: 8, catchFielderSlot: 8 }, [달림], { fielders: 끌려나간수비 })
+    expect(autoAdvanceDecisions(문2)).toEqual([])
+    // 재는 루는 **닿은 루(2)+1 = 3** 이라, 이미 3루로 뛰는 주자에게는 같은 루를 다시 이른다
+    expect(autoAdvanceDecisions({ ...문2, force: true })).toEqual([{ runnerIndex: 1, toBase: 3 }])
   })
 
   it('앞길이 막혀 있으면 안 간다 (0xa9924)', () => {
-    const 뒤 = createRunner(1, 1, 주력500, { targetBase: 2 })
-    const 앞 = createRunner(2, 2, 주력500, { targetBase: 3 })
+    const 뒤 = createRunner(1, 2, 주력500)
+    const 앞 = createRunner(2, 3, 주력500)
     const 문 = 문맥({ ballHolderSlot: 8, catchFielderSlot: 8 }, [뒤, 앞], { fielders: 끌려나간수비 })
-    // 앞 주자가 3루를 목표로 하고 있으니 뒤 주자는 3루로 못 간다
+    // 앞 주자가 3루를 딛고 있으니 뒤 주자는 3루로 못 간다 (앞 주자 혼자 홈으로 간다)
     expect(autoAdvanceDecisions(문).map((decision) => decision.runnerIndex)).toEqual([2])
     // 앞길 검사를 갈아 끼우면 둘 다 막힌다
     expect(autoAdvanceDecisions({ ...문, isPathClear: () => false })).toEqual([])
   })
 
   it('플레이 종류 7 은 틱을 안 보고 바로 간다 (투구 때 루+2 까지만)', () => {
-    const 주자 = createRunner(1, 0, 주력500, { targetBase: 1 })
+    const 주자 = createRunner(1, 1, 주력500, { pitchBase: 0 })
     expect(autoAdvanceDecisions(문맥({ kind: 7 }, [주자]))).toEqual([{ runnerIndex: 1, toBase: 2 }])
-    const 이미 = createRunner(1, 0, 주력500, { targetBase: 2 })
+    // 이미 투구 때 루+2 에 닿았으면 더 안 간다 (2 ≥ 0+2)
+    const 이미 = createRunner(1, 2, 주력500, { pitchBase: 0 })
     expect(autoAdvanceDecisions(문맥({ kind: 7 }, [이미]))).toEqual([])
   })
 
-  it('종류 7 의 기준은 **투구 때 루**(+0x90) 지 구간 출발 루가 아니다 (0xaf97e)', () => {
-    // 1루에서 출발해 2루를 밟고 3루로 가는 중: 투구 때 루 1, 구간 출발 루 2, 목표 3
-    const 두루째 = createRunner(1, 2, 주력500, { targetBase: 3, pitchBase: 1 })
-    // 3 ≥ 1+2 → 이미 두 루를 갔으니 더 안 간다. (구간 출발 루로 보면 3 ≥ 2+2 가 거짓이라 또 갔었다)
+  it('종류 7 은 **닿은 루(+0x8c) ≥ 투구 때 루(+0x90)+2** 면 멈춘다 (0xaf97e)', () => {
+    // 1루에서 출발해 3루까지 밟았다: 닿은 루 3, 투구 때 루 1 → 3 ≥ 1+2 이라 더 안 간다
+    const 두루째 = createRunner(1, 3, 주력500, { pitchBase: 1 })
     expect(autoAdvanceDecisions(문맥({ kind: 7 }, [두루째]))).toEqual([])
+    // 아직 한 루만 갔으면(2 < 1+2) 또 간다
+    const 한루째 = createRunner(1, 2, 주력500, { pitchBase: 1 })
+    expect(autoAdvanceDecisions(문맥({ kind: 7 }, [한루째]))).toEqual([{ runnerIndex: 1, toBase: 3 }])
   })
 })
 
 describe('포스와 태그업 — 요구 루 세우기', () => {
-  it('공이 땅에 닿으면 포스: 목표 루 ≤ 주자 번호면 요구 루 = 투구 때 루 + 1 (0xa95e8)', () => {
+  it('공이 땅에 닿으면 포스: **마지막으로 닿은 루**(+0x8c) ≤ 주자 번호면 요구 루 = 투구 때 루 + 1 (0xa95e8)', () => {
+    // 0xa95e8 이 보는 왼쪽 항은 `[주자+0x8c]` = **마지막으로 닿은 루**(이 모델의 `startBase`),
+    // 달려가는 루(+0x7c = `targetBase`)가 아니다. 뛰기 시작했다고 포스가 풀리지는 않는다.
     const 주자들 = [
       createRunner(0, 0, 주력500, { targetBase: 1, pitchBase: 0 }),
-      createRunner(1, 1, 주력500, { targetBase: 1, pitchBase: 1 }),
+      createRunner(1, 1, 주력500, { targetBase: 2, pitchBase: 1 }),
       createRunner(2, 2, 주력500, { targetBase: 3, pitchBase: 2 }),
     ]
-    expect(requiredBasesOnBounce(주자들)).toEqual([NONE, 2, NONE])
+    // 셋 다 아직 제 루를 딛고 있다(0·1·2) → 번호 0·1·2 이하라 전원 포스
+    expect(requiredBasesOnBounce(주자들)).toEqual([1, 2, 3])
+  })
+
+  it('앞선 루를 이미 밟았으면 포스가 풀린다 — 왼쪽 항이 **닿은 루**이기 때문 (0xa95e8)', () => {
+    const 주자들 = [
+      createRunner(0, 0, 주력500, { targetBase: 1, pitchBase: 0 }),
+      // 1루 주자가 이미 2루를 밟고 3루로 뛴다: 닿은 루 2 > 번호 1 → 요구 없음
+      createRunner(1, 2, 주력500, { targetBase: 3, pitchBase: 1 }),
+    ]
+    expect(requiredBasesOnBounce(주자들)).toEqual([1, NONE])
   })
 
   it('주자 번호는 빈 루를 건너뛴 **목록 번호**다 — 2루 주자만 있으면 번호 1 (0xa9a10·0xa93ac)', () => {
@@ -176,8 +201,9 @@ describe('포스와 태그업 — 요구 루 세우기', () => {
       createRunner(0, 0, 주력500, { targetBase: 1, pitchBase: 0 }),
       createRunner(1, 2, 주력500, { targetBase: 2, pitchBase: 2 }),
     ]
-    // 타자주자: 목표 1 > 번호 0 → 요구 없음. 2루 주자: 목표 2 > 번호 1 → 요구 없음(포스 아님).
-    expect(requiredBasesOnBounce(주자들)).toEqual([NONE, NONE])
+    // 타자주자: 닿은 루 0 ≤ 번호 0 → 요구 1루(타자주자는 언제나 포스다).
+    // 2루 주자: 닿은 루 2 > 번호 1 → 요구 없음 — **1루가 비었으니 포스가 아니다**.
+    expect(requiredBasesOnBounce(주자들)).toEqual([1, NONE])
 
     // 1·2루면 목록은 `[타자주자, 1루 주자, 2루 주자]` — 셋 다 포스다
     const 일이루 = [
