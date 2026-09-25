@@ -145,11 +145,18 @@ describe('자동 추가 진루 0xaf918 — "수비보다 2틱 이상 빠를 때�
     expect(autoAdvanceDecisions({ ...문, isPathClear: () => false })).toEqual([])
   })
 
-  it('플레이 종류 7 은 틱을 안 보고 바로 간다 (출발루+2 까지만)', () => {
+  it('플레이 종류 7 은 틱을 안 보고 바로 간다 (투구 때 루+2 까지만)', () => {
     const 주자 = createRunner(1, 0, 주력500, { targetBase: 1 })
     expect(autoAdvanceDecisions(문맥({ kind: 7 }, [주자]))).toEqual([{ runnerIndex: 1, toBase: 2 }])
     const 이미 = createRunner(1, 0, 주력500, { targetBase: 2 })
     expect(autoAdvanceDecisions(문맥({ kind: 7 }, [이미]))).toEqual([])
+  })
+
+  it('종류 7 의 기준은 **투구 때 루**(+0x90) 지 구간 출발 루가 아니다 (0xaf97e)', () => {
+    // 1루에서 출발해 2루를 밟고 3루로 가는 중: 투구 때 루 1, 구간 출발 루 2, 목표 3
+    const 두루째 = createRunner(1, 2, 주력500, { targetBase: 3, pitchBase: 1 })
+    // 3 ≥ 1+2 → 이미 두 루를 갔으니 더 안 간다. (구간 출발 루로 보면 3 ≥ 2+2 가 거짓이라 또 갔었다)
+    expect(autoAdvanceDecisions(문맥({ kind: 7 }, [두루째]))).toEqual([])
   })
 })
 
@@ -161,6 +168,24 @@ describe('포스와 태그업 — 요구 루 세우기', () => {
       createRunner(2, 2, 주력500, { targetBase: 3, pitchBase: 2 }),
     ]
     expect(requiredBasesOnBounce(주자들)).toEqual([NONE, 2, NONE])
+  })
+
+  it('주자 번호는 빈 루를 건너뛴 **목록 번호**다 — 2루 주자만 있으면 번호 1 (0xa9a10·0xa93ac)', () => {
+    // 원본 목록도 `[타자주자, 2루 주자]` 두 칸뿐이다. 2루 주자의 번호는 2 가 아니라 1.
+    const 주자들 = [
+      createRunner(0, 0, 주력500, { targetBase: 1, pitchBase: 0 }),
+      createRunner(1, 2, 주력500, { targetBase: 2, pitchBase: 2 }),
+    ]
+    // 타자주자: 목표 1 > 번호 0 → 요구 없음. 2루 주자: 목표 2 > 번호 1 → 요구 없음(포스 아님).
+    expect(requiredBasesOnBounce(주자들)).toEqual([NONE, NONE])
+
+    // 1·2루면 목록은 `[타자주자, 1루 주자, 2루 주자]` — 셋 다 포스다
+    const 일이루 = [
+      createRunner(0, 0, 주력500, { targetBase: 0, pitchBase: 0 }),
+      createRunner(1, 1, 주력500, { targetBase: 1, pitchBase: 1 }),
+      createRunner(2, 2, 주력500, { targetBase: 2, pitchBase: 2 }),
+    ]
+    expect(requiredBasesOnBounce(일이루)).toEqual([1, 2, 3])
   })
 
   it('뜬공을 잡으면 모두 원래 루로 돌아가 밟아야 한다 (0xa9620 태그업)', () => {
