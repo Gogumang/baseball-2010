@@ -45,6 +45,21 @@ interface DefenseScreenProps {
   readonly followPercent?: number
   /** 꺼 두면 카메라·애니가 멈춘다 (테스트·일시정지) */
   readonly isRunning?: boolean
+  /**
+   * 수비 바탕의 **잔디 팔레트 줄** — `stadium/defense.mpl` 의 줄 (`0x7885c`, S3 6-2).
+   *
+   * 타석 바닥을 칠하는 `0x786c8` 과 **명령어까지 같은 함수**다 (슬롯만 구장 `+0x2c` → `+0x14`,
+   * 문자열만 `stadium/attack.*` → `stadium/defense.*`). 셋째 인자 뒤집기 `줄 = 1 − idx` 도 같고,
+   * 리터럴 `0x0007885d` 는 온 파일에 딱 하나(풀 `0x352cc`)뿐이라 부르는 곳도 하나다 —
+   * 수비 화면 준비 `0x35218` 의 `0x3529c` 가 `(SR[0x1ba] − 1, 1)` 을 넘긴다. 곧 **줄 = 2 − 칸**
+   * 으로 타석 잔디와 **같은 값**이라, 줄을 내는 곳은 `grassPaletteRowOf` 하나면 된다.
+   * (예전 메모의 "주/야간 3벌" 은 틀렸다 — 벌 셋은 거친인조·인조·천연 잔디다.)
+   *
+   * null 이면 구운 그림 그대로다 = PZX 기본 팔레트 = 칸 3 특급천연잔디, 그리고 시즌 홈경기가
+   * 아닐 때의 색이기도 하다. ⚠️ 타석 준비(`0x352e8`)에 있는 **대전 모드 8·9 갈래가 여기엔 없다** —
+   * 수비 바탕은 `[app+0x1104] == 2`(시즌) 이고 홈경기일 때만 바뀐다.
+   */
+  readonly grassPalette?: number | null
   /** 화면 위에 얹을 것 — 조작 버튼·점수판 같은 것 */
   readonly children?: ReactNode
 }
@@ -123,9 +138,12 @@ export function DefenseScreen({
   state,
   followPercent = CAMERA_FOLLOW_PERCENT,
   isRunning = true,
+  grassPalette = null,
   children,
 }: DefenseScreenProps) {
   const update = useUpdateCounter(isRunning)
+  // 시즌 잔디 (`0x7885c`) — 아직 다 안 칠했거나 캔버스가 없으면 구운 그림을 그대로 쓴다.
+  const backgroundUrl = useRecoloredSprite(DEFENSE_BACKGROUND_URL, grassPalette)
   const bounds = cameraBoundsOf(styles.SCREEN_WIDTH, styles.SCREEN_HEIGHT)
   const target = cameraTargetOf(state)
 
@@ -182,7 +200,7 @@ export function DefenseScreen({
         <img
           className={styles.background}
           style={{ left: offset.x, top: offset.y, width: DEFENSE_BACKGROUND_WIDTH, height: DEFENSE_BACKGROUND_HEIGHT }}
-          src={DEFENSE_BACKGROUND_URL}
+          src={backgroundUrl}
           alt=""
           data-testid="defense-background-left"
         />
@@ -194,7 +212,7 @@ export function DefenseScreen({
             width: DEFENSE_BACKGROUND_WIDTH,
             height: DEFENSE_BACKGROUND_HEIGHT,
           }}
-          src={DEFENSE_BACKGROUND_URL}
+          src={backgroundUrl}
           alt=""
           data-testid="defense-background-right"
         />

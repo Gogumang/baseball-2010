@@ -38,6 +38,11 @@ interface DefensePlaybackProps {
   readonly onDone: (result?: DefensePlayResult) => void
   /** 다 본 뒤 잠깐 멈춰 두는 갱신 횟수 — 마지막 장면이 스치듯 지나가지 않게 */
   readonly holdUpdates?: number
+  /**
+   * 시즌 구장 잔디 — `stadium/defense.mpl` 줄 (`0x7885c`). `DefenseScreen` 과 같은 뜻이다.
+   * 시즌 **홈경기**에서만 값이 오고, 그 밖에는 null(구운 그림 = 칸 3 특급천연잔디)이다.
+   */
+  readonly grassPalette?: number | null
   readonly children?: React.ReactNode
 }
 
@@ -69,17 +74,29 @@ export function DefensePlayback({
   side,
   onDone,
   holdUpdates = DEFAULT_HOLD_UPDATES,
+  grassPalette = null,
   children,
 }: DefensePlaybackProps) {
   if (input !== undefined) {
     return (
-      <LivePlayback input={input} side={side} onDone={onDone} holdUpdates={holdUpdates}>
+      <LivePlayback
+        input={input}
+        side={side}
+        onDone={onDone}
+        holdUpdates={holdUpdates}
+        grassPalette={grassPalette}
+      >
         {children}
       </LivePlayback>
     )
   }
   return (
-    <RecordedPlayback ticks={ticks ?? []} onDone={onDone} holdUpdates={holdUpdates}>
+    <RecordedPlayback
+      ticks={ticks ?? []}
+      onDone={onDone}
+      holdUpdates={holdUpdates}
+      grassPalette={grassPalette}
+    >
       {children}
     </RecordedPlayback>
   )
@@ -89,6 +106,7 @@ interface RecordedPlaybackProps {
   readonly ticks: readonly DefenseViewState[]
   readonly onDone: (result?: DefensePlayResult) => void
   readonly holdUpdates: number
+  readonly grassPalette: number | null
   readonly children?: React.ReactNode
 }
 
@@ -101,7 +119,7 @@ interface RecordedPlaybackProps {
  * 펌블 동작(0xd)도 `fumbled` 칸도 실려 오지 않으므로 여기서는 알 길도 없다.
  * 두 갈래는 `input` 이 있으면 실시간, 없으면 재생으로 **서로 배타**라 겹쳐 울릴 일도 없다.
  */
-function RecordedPlayback({ ticks, onDone, holdUpdates, children }: RecordedPlaybackProps) {
+function RecordedPlayback({ ticks, onDone, holdUpdates, grassPalette, children }: RecordedPlaybackProps) {
   const update = useUpdateCounter(ticks.length > 0)
   const lastIndex = Math.max(0, ticks.length - 1)
   const index = Math.min(Math.floor(update / UPDATES_PER_TICK), lastIndex)
@@ -113,7 +131,11 @@ function RecordedPlayback({ ticks, onDone, holdUpdates, children }: RecordedPlay
 
   const state = ticks[index]
   if (state === undefined) return null
-  return <DefenseScreen state={state}>{children}</DefenseScreen>
+  return (
+    <DefenseScreen state={state} grassPalette={grassPalette}>
+      {children}
+    </DefenseScreen>
+  )
 }
 
 interface LivePlaybackProps {
@@ -121,6 +143,7 @@ interface LivePlaybackProps {
   readonly side?: ControlSide
   readonly onDone: (result?: DefensePlayResult) => void
   readonly holdUpdates: number
+  readonly grassPalette: number | null
   readonly children?: React.ReactNode
 }
 
@@ -131,7 +154,7 @@ interface LivePlaybackProps {
  * 여기서는 `keydown` 을 줄 세워 두고 **한 틱에 한 개씩** 진행기에 먹인다.
  * 키 → 뜻은 진행기 안에서 `inPlayCommandOf` 가 한다 — 표를 여기서 다시 만들지 않는다.
  */
-function LivePlayback({ input, side, onDone, holdUpdates, children }: LivePlaybackProps) {
+function LivePlayback({ input, side, onDone, holdUpdates, grassPalette, children }: LivePlaybackProps) {
   const update = useUpdateCounter(true)
   const stateRef = useRef<DefensePlayState | null>(null)
   const builtFromRef = useRef<DefensePlayInput | null>(null)
@@ -203,7 +226,11 @@ function LivePlayback({ input, side, onDone, holdUpdates, children }: LivePlayba
   }, [isFinished, onDone])
 
   if (view === null) return null
-  return <DefenseScreen state={view}>{children}</DefenseScreen>
+  return (
+    <DefenseScreen state={view} grassPalette={grassPalette}>
+      {children}
+    </DefenseScreen>
+  )
 }
 
 /**
