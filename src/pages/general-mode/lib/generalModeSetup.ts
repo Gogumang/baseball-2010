@@ -130,6 +130,8 @@ export function teamGameOptionsOf(
   extra: {
     readonly settings?: MatchProgressSettings
     readonly gaugeSettingOn?: boolean
+    /** 환경설정 "주루" 가 수동인가 (설정 +0xbd) — 사람이 공격일 때만 먹는다 (0xae690) */
+    readonly runningModeManual?: boolean
   } = {},
 ): TeamGameOptions {
   return {
@@ -139,5 +141,6 @@ export function teamGameOptionsOf(
     playerSide: setup.playerSide,
     ...(extra.settings === undefined ? {} : { settings: extra.settings }),
     ...(extra.gaugeSettingOn === undefined ? {} : { gaugeSettingOn: extra.gaugeSettingOn }),
+    ...(extra.runningModeManual === undefined ? {} : { runningModeManual: extra.runningModeManual }),
   }
 }

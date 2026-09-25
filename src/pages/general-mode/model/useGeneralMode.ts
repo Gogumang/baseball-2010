@@ -25,6 +25,8 @@ export interface UseGeneralModeOptions extends QuickStartOpenState {
   readonly initialSettings?: MatchProgressSettings
   /** 환경설정 "투구 게이지" (설정 +0x2d) — 원본 기본값은 꺼짐 */
   readonly gaugeSettingOn?: boolean
+  /** 환경설정 "주루" 가 수동인가 (설정 +0xbd) */
+  readonly runningModeManual?: boolean
 }
 
 export interface GeneralModeSession {
@@ -62,7 +64,7 @@ export interface GeneralModeSession {
  */
 export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSession {
   const {
-    random, isQuickStart = false, initialSettings, gaugeSettingOn,
+    random, isQuickStart = false, initialSettings, gaugeSettingOn, runningModeManual,
     openedHiddenTeamIds, openedAcePitcherIds, openedAceBatterIds,
   } = options
 
@@ -124,8 +126,12 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
   )
 
   const gameOptions = useMemo(
-    () => teamGameOptionsOf(flow.setup, { settings, ...(gaugeSettingOn === undefined ? {} : { gaugeSettingOn }) }),
-    [flow.setup, settings, gaugeSettingOn],
+    () => teamGameOptionsOf(flow.setup, {
+      settings,
+      ...(gaugeSettingOn === undefined ? {} : { gaugeSettingOn }),
+      ...(runningModeManual === undefined ? {} : { runningModeManual }),
+    }),
+    [flow.setup, settings, gaugeSettingOn, runningModeManual],
   )
 
   return { flow, settings, isPlaying, isSettingsOpen, gameOptions, actions }

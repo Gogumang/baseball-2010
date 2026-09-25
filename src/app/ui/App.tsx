@@ -171,6 +171,7 @@ export function App() {
           aceOpen.open(cell)
         }}
         gaugeSettingOn={gameSettings.settings.pitchControl === '게이지'}
+        runningModeManual={gameSettings.settings.runningMode === '수동'}
         // 한 판 치고 끝이라 정산할 곳이 없다 — 원본도 모드 1 은 저장에 아무것도 안 남긴다
         onFinish={() => setScreen({ kind: '메인메뉴' })}
         onExit={() => setScreen({ kind: '메인메뉴' })}

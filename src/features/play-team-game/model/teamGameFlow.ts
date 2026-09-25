@@ -151,6 +151,12 @@ export interface TeamGameOptions {
   readonly lineup?: readonly FieldingAssignment[]
   /** 환경설정 "투구 게이지" (설정 +0x2d) — **원본 기본값은 꺼짐** (K 5-2) */
   readonly gaugeSettingOn?: boolean
+  /**
+   * 환경설정 "주루" 가 **수동**인가 (설정 +0xbd). 안 넘기면 자동이다.
+   * 갈림길은 `0xae690` — `(경기[0x31 + 공격측] == 1) || (설정+0xbd != 0)` 이 거짓이면
+   * 자동 진루 제어기(0xaf8c0)를 통째로 안 돌린다. 곧 **사람이 공격일 때만** 설정이 먹는다.
+   */
+  readonly runningModeManual?: boolean
   /** 이 경기에 쓸 수 있는 마구 횟수. 로스터 투수는 마구가 없어 기본 0 이다 */
   readonly magicCount?: number
   /** 화면 배치 side (투영 원점 표 0xcfb18 의 칸) */
@@ -582,6 +588,9 @@ function batterDefenseInputOf(
     gameMode: progress.options.mode,
     // 상대 수비는 CPU 다 → 협살(AI 상태 8)이 돈다
     defenseIsCpu: true,
+    // 우리가 공격이다 — 여기서만 환경설정 "주루" 가 먹는다 (0xae690 의 둘째 항)
+    offenseIsCpu: false,
+    runningMode: progress.options.runningModeManual === true ? '수동' : '자동',
     // 필살타법이 성공한 타구면 야수가 쥐지 않는다 (0x51800)
     isUncatchable: options.isUncatchable,
   }
@@ -837,6 +846,8 @@ function defensiveDefenseInputOf(
     gameMode: progress.options.mode,
     // 이 타석의 수비는 **사람**이다 → 협살은 원본에서도 안 일어난다 (S8 1-4)
     defenseIsCpu: false,
+    // 공격이 CPU 라 0xae690 의 첫 항이 서서 설정과 무관하게 늘 자동 진루다
+    offenseIsCpu: true,
   }
 }
 

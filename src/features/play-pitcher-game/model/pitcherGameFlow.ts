@@ -607,6 +607,9 @@ function defensePlayInputOf(
     gameMode: PITCHER_EDITION_MODE,
     // 수비는 사람(나)이다 → 협살은 원본에서도 안 일어난다 (S8 1-4)
     defenseIsCpu: false,
+    // 공격이 CPU 라 `0xae690` 의 첫 항(`경기[0x31 + 공격측] == 1`)이 서서
+    // **환경설정 주루와 무관하게 늘 자동 진루**다 — 투수편은 사람이 언제나 수비다
+    offenseIsCpu: true,
   }
 }
 
