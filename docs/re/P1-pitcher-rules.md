@@ -306,11 +306,19 @@ T = 표 0xcfa58 (s8, 4행 × 10칸, 칸 = rep)
    k 는 배율표 0xd0410 = **[12, 20, 25, 30]** 을 골라, 무작위 각도(rand 1~360)·반지름(결과 그림 폭/2 + rand(−2,3)) 과 곱해 목표점을 옮기는 데 쓴다(>>16). 식의 나머지(좌표계)는 궤적 쪽이라 더 읽지 않았다.
 3. 마구는 늘 t=5.
 
-### 4-3. 웹판 차이
-- `src/entities/pitching/model/pitchCommand.ts:27-51`: PERFECT_WINDOW 0.06 / GOOD_WINDOW 0.2, 제구 +25/+5/−20, 구속 ×1.08/1/0.92 — **모두 원본에 없는 값**.
-  원본은 게이지 결과가 곧 t(0~5) 이고, t 는 (1) 능력치 배율 70~110% (2) 흩어짐 등급표 0xcfd60 두 곳에만 들어간다.
+### 4-3. 웹판 차이 — **고쳤다 (2026-09-25)**
+- ~~`src/entities/pitching/model/pitchCommand.ts:27-51`: PERFECT_WINDOW 0.06 / GOOD_WINDOW 0.2, 제구 +25/+5/−20,
+  구속 ×1.08/1/0.92~~ → **파일째 지웠다.** 투구 화면 둘(나리 투수편 `PitcherGameScreen`, 미션 투수 `PitchingScreen`)이
+  이제 **누른 칸 g(0~9)** 를 그대로 넘기고, 등급 t 는 `features/play-pitcher-game/model/pitcherPitch.ts` 의
+  `pitchGradeOf` 가 `gaugeGradeOf`(= `max(g−4, 1)`, 0x50e08) 로 뽑는다. `PERFECT`·`GOOD`·`BAD` 라는 말은 웹에서 사라졌다.
+  같이 지운 것: `pages/pitching/ui/PitchGauge.tsx`·`PitchGauge.css.ts`(좌우로 오가던 막대),
+  `app/model/useMissionSession.ts` 의 근사표 `MISSION_GAUGE_CELLS`.
+- 원본은 게이지 결과가 곧 t(0~5) 이고, t 는 (1) 능력치 배율 70~110% (2) 흩어짐 등급표 0xcfd60 두 곳에만 들어간다.
 - 게이지 기본값: 원본 설정 +0x2d 기본 0(게이지 끔, K 5-2). 끈 상태의 t 는 제구·체력 확률표 0xd896c.
+  웹도 게이지가 꺼져 있으면 코스를 고르는 순간 바로 던지고(게이지 단계 없음) `controlTierOf` 로 t 를 뽑는다 — 브라우저로 확인.
 - `pitchSpeedStage.ts` 의 TIER_PERCENT·식은 원본과 같다(확인).
+- 미션 "MAX투구게이지" 는 웹이 이제 **t == 5** 로 센다(0xa5e00 이 `R+0x158` 을 채우는 조건과 같은 줄).
+  ⚠️ 미션 레코드의 그 목표가 정말 같은 칸인지는 **미해결** — 달리 "MAX" 라 부를 값이 없어 맞춰 둔 것이다.
 
 ## 5. 투수편 경기 뒤 평가 — 인기도·평판·사기·감독 글 **확정** (기록 칸 뜻 일부 유력)
 

@@ -297,15 +297,19 @@ P.SLIDER · KNUCKLE), 0x15 = "????"(마구), 0x4a~0x50 = 마구 잔여 "SP X n" 
   **가장 좋은 t=5(칸 9)는 원이 사라진 바로 그 한 틱**이다. 설명서가 말하는 "PERFECT" 는 이 칸으로 보인다(유력 — 이름을 짓는 코드가 없어 확정 불가).
 
 ### 5. 웹판 차이 (파일:줄)
-- `src/entities/pitching/model/pitchCommand.ts:24` `GaugeResult = 'PERFECT' | 'GOOD' | 'BAD' | '사용안함'` —
-  **원본에 없는 이름 3개**다. 설명서 글(`src/shared/config/original/data/howto.json:5`)에서 따온 것으로 보인다.
-- `pitchCommand.ts:27-28` `PERFECT_WINDOW = 0.06` · `GOOD_WINDOW = 0.2`, `:38-51` 제구 +25/+5/−20 · 구속 ×1.08/1/0.92 —
-  원본에 없는 값(P1 4-3 이 이미 적음). 원본은 **칸 9개 중 어디서 눌렀나(g) → t(0~5)** 하나뿐이다.
-- `src/pages/pitching/ui/PitchGauge.tsx:13` · `PitchGauge.css.ts:23` · `PitchingScreen.tsx:121`
-  ("가운데에서 멈추면 PERFECT") — 원본은 **좌우로 오가는 막대가 아니라 가운데로 작아지는 원**이고,
-  "가운데" 가 아니라 **가장 작아진 마지막 칸**이 최고 등급이다.
-- `src/app/model/useMissionSession.ts:135` 가 `gauge === 'PERFECT'` 로 미션 진행을 센다 — 원본에서 이에 해당하는 칸은
-  **R+0x158(t == 5 투구 수, U-13 5절)** 인데 원본은 그 칸을 아무 데도 쓰지 않는다.
+**2026-09-25 에 다 고쳤다.** 아래는 고치기 전 기록이다.
+- ~~`src/entities/pitching/model/pitchCommand.ts:24` `GaugeResult = 'PERFECT' | 'GOOD' | 'BAD' | '사용안함'`~~ —
+  **원본에 없는 이름 3개**였다. 설명서 글(`src/shared/config/original/data/howto.json:5`)에서 따온 것으로 보인다. → 파일째 지웠다.
+- ~~`pitchCommand.ts:27-28` `PERFECT_WINDOW = 0.06` · `GOOD_WINDOW = 0.2`, `:38-51` 제구 +25/+5/−20 · 구속 ×1.08/1/0.92~~ —
+  원본에 없는 값(P1 4-3). 원본은 **칸 9개 중 어디서 눌렀나(g) → t(0~5)** 하나뿐이다. → 지웠다.
+- ~~`src/pages/pitching/ui/PitchGauge.tsx:13` · `PitchGauge.css.ts:23` · `PitchingScreen.tsx:121`
+  ("가운데에서 멈추면 PERFECT")~~ — 원본은 **좌우로 오가는 막대가 아니라 가운데로 작아지는 원**이고,
+  "가운데" 가 아니라 **가장 작아진 마지막 칸**이 최고 등급이다. → 미션 투구 화면도 나리 투수편과 같은
+  `PitchGradeGauge`(원 그림, 틱마다 한 칸) 를 쓰고 **칸 번호를 그대로** 넘긴다. 안내 문구도 지웠다.
+- ~~`src/app/model/useMissionSession.ts:135` 가 `gauge === 'PERFECT'` 로 미션 진행을 센다~~ → 이제 **t == 5** 로 센다
+  (0xa5e00 이 `R+0x158` 을 채우는 조건과 같은 줄, 5절). 미션 레코드 쪽 "MAX투구게이지" 가 같은 칸인지는 여전히 미해결.
+- 브라우저로 확인한 칸 ↔ 등급: `0→0 · 1~5→1 · 6→2 · 7→3 · 8→4 · 9→5 · 10 이상→0` — 4절 표와 같고,
+  칸 9 는 **커서 원이 사라진 한 틱**으로 화면에 나온다(원본 그대로).
 
 ---
 
