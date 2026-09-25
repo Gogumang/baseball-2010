@@ -13,6 +13,7 @@ import {
   checkSwingsExhausted,
   failSteal,
   giveUp as giveUpMission,
+  missionDefensePlayInputOf,
   recordSwing,
   startMission,
   tick as tickMission,
@@ -21,26 +22,38 @@ import type { MissionRun } from '@/entities/mission/model/missionRun'
 import {
   applyPitcherOutcome,
   checkPitchExhausted,
+  MISSION_PITCHER_MODE,
   recordPitch,
   startPitcherMission,
 } from '@/entities/mission/model/pitcherRun'
 import type { PitcherRun } from '@/entities/mission/model/pitcherRun'
 import { attemptSteal } from '@/entities/game/model/steal'
 import { missionOpponentOf, pitcherAbilityOf } from '@/entities/game/model/aceOpponent'
-import { buildPitch, courseOf } from '@/entities/pitching/model/pitchCommand'
 import type { GaugeResult } from '@/entities/pitching/model/pitchCommand'
 import { pitchAgainstBatter } from '@/entities/pitching/model/simulateBatter'
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
+import { buildHumanPitch, pitchGradeOf } from '@/features/play-pitcher-game/model/pitcherPitch'
+import type { PitcherRepertoire, PitcherStats } from '@/features/play-pitcher-game/model/pitcherPitch'
 import { ROOKIE_BATTER_ABILITY } from '@/entities/batting/model/batter'
+import { isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
+import type { DefensePlayInput, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
+import { carryDistanceOf } from '@/entities/batting/model/battedBallFlight'
+import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
-import { inPlayCallSoundIdOf, pitchCallSoundIdOf, PITCH_RELEASE_SOUND } from '@/features/play-at-bat/model/atBatSounds'
+import {
+  deepHitCheerSoundIdOf,
+  inPlayCallSoundIdOf,
+  pitchCallSoundIdOf,
+  PITCH_RELEASE_SOUND,
+} from '@/features/play-at-bat/model/atBatSounds'
 import { playSoundIds } from '@/app/model/useSound'
 import { createSilentSound } from '@/shared/api/audio/soundPort'
 import type { SoundPort } from '@/shared/api/audio/soundPort'
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { OriginalMission } from '@/shared/config/original/missions'
 import type { AcePlayer } from '@/shared/config/original/acePlayers'
+import { PITCH_TYPES } from '@/shared/config/original/pitchTypes'
 import type { PitchTypeInfo } from '@/shared/config/original/pitchTypes'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { MissionClearCounts, MissionRecordPort } from '@/shared/api/save/missionRecordPort'
@@ -74,6 +87,51 @@ export function missionPitcherAbility(mission: OriginalMission): PitcherAbility 
 /** 클리어 횟수 상한 — 원본은 s8 칸에 99 까지 센다 (0xa51d0) */
 const MAXIMUM_CLEARS = 99
 
+/**
+ * **수비 화면(상태 0x17)이 붙들고 있는 타구.**
+ *
+ * 원본 미션은 모드 5·6 짜리 **보통 경기**(장면 0x104)다 — 상태 표가 모드를 안 가른다.
+ * 맞은 공은 0x11 → 메시지 0x6aa → 0x13 → **늘 0x17**(`0xae5f0` 는 `movs r0,#0x17; bx lr` 한 줄,
+ * R10 8절 전이표) 이고, 0x17 이 끝나야 `0xae3e8` 이 다음 타석(0xd/0xf)으로 보낸다.
+ * 그래서 웹도 인플레이 타구에서 여기 멈춰 서서 화면이 틱을 다 돌리기를 기다린다.
+ */
+interface PendingMissionDefense {
+  readonly side: '타자' | '투수'
+  readonly input: DefensePlayInput
+  readonly outcome: AtBatOutcome
+  readonly isBunt: boolean
+  /** 타구 직전의 주자 수 — 결과 띠("2타점" 따위)가 이 값을 쓴다 */
+  readonly runnersOnBase: number
+}
+
+/**
+ * 게이지 결과 → 원본 게이지 칸 0~9 (`pitchGauge.gaugeGradeOf`, 0x50e08).
+ *
+ * ⚠️ **근사다.** 원본에는 PERFECT/GOOD/BAD 라는 글자도 판정도 없고 **누른 칸 g 하나**뿐이다
+ * (S5 U-15 확정 — `entities/pitcher-career/model/pitchGauge` 머리 주석). 웹 투구 화면은
+ * 칸 대신 세 글자를 넘겨 주므로 등급 t = max(g−4, 1) 이 1·3·5 로 갈리는 칸을 골라 붙였다.
+ * 화면이 칸을 넘겨 주게 되면 이 표는 지우면 된다.
+ */
+const MISSION_GAUGE_CELLS: Readonly<Record<GaugeResult, number>> = {
+  PERFECT: 9,
+  GOOD: 7,
+  BAD: 1,
+  사용안함: 0,
+}
+
+/**
+ * 미션 투수의 능력치·레퍼토리.
+ *
+ * ⚠️ **근사다.** 원본 미션 투수는 나리 투수편 저장(모드 5→3)이나 명예의 전당 투수다(Q2 3절).
+ * 웹 미션에는 아직 그 선수 레코드가 없어 등급 3 한가운데인 500 과 폼 0 을 쓴다.
+ */
+const MISSION_PITCHER_STATS: PitcherStats = { control: 500, velocity: 500, breaking: 500, stamina: 500 }
+const MISSION_PITCHER_REPERTOIRE: PitcherRepertoire = { pitchMask: 0, form: 0, magicNumber: 0 }
+/** 투영 원점 0xcfb18 의 칸 — 미션 상대 타자의 좌우를 알 길이 없어 1 로 둔다 (추정, 예전 그대로) */
+const MISSION_STAGE_SIDE = 1
+/** 미션 투수는 체력 레코드가 없다 — 늘 100% 로 둔다 (추정) */
+const MISSION_STAMINA_PERCENT = 100
+
 /** 미션 모드 한 판 — 타자편(MissionRun)과 투수편(PitcherRun)을 함께 다룬다. */
 export function useMissionSession({
   runner,
@@ -90,6 +148,9 @@ export function useMissionSession({
   const missionRunRef = useRef(missionRun)
   missionRunRef.current = missionRun
   const [pitcherRun, setPitcherRun] = useState<PitcherRun | null>(null)
+  const [pendingDefensePlay, setPendingDefensePlay] = useState<PendingMissionDefense | null>(null)
+  const pendingDefensePlayRef = useRef(pendingDefensePlay)
+  pendingDefensePlayRef.current = pendingDefensePlay
   /** 결과를 확인하고 돌아갈 때 마지막으로 한 편의 목록을 연다 */
   const [lastSide, setLastSide] = useState<OriginalMission['side']>('타자')
   const [clearCounts, setClearCounts] = useState<MissionClearCounts>(() => missionRecord.load())
@@ -118,15 +179,18 @@ export function useMissionSession({
     (detail: PitchOutcomeDetail) => {
       const nextAtBat = runner.applyPitch(detail.resolution)
       const hasSwung = detail.hasSwung
+      const outcome = isAtBatFinished(nextAtBat) ? nextAtBat.outcome : null
+      // 인플레이 타구면 수비 화면(상태 0x17)이 먼저 돈다 — 아웃·세이프 콜은 그 뒤다
+      const runsDefense = outcome !== null && isBattedBallInPlay(outcome)
       // 타구음 → 심판 콜 순서 (경기 장면과 같은 0x51408 이다).
-      // 미션은 수비 시뮬레이션을 따로 돌리지 않으므로 아웃 콜도 여기서 같이 난다
+      // 삼진·볼넷·홈런은 수비가 개입할 것이 없어 아웃 콜도 여기서 같이 난다 (0xae24c 갈래)
       playSoundIds(audio, [
         detail.contactSoundId,
         pitchCallSoundIdOf(detail.resolution, nextAtBat),
-        nextAtBat.outcome === null ? null : inPlayCallSoundIdOf(nextAtBat.outcome),
+        outcome === null || runsDefense ? null : inPlayCallSoundIdOf(outcome),
       ])
 
-      if (!isAtBatFinished(nextAtBat) || nextAtBat.outcome === null) {
+      if (outcome === null) {
         if (hasSwung) {
           setMissionRun((previous) =>
             previous === null ? previous : checkSwingsExhausted(recordSwing(previous)),
@@ -135,18 +199,32 @@ export function useMissionSession({
         return
       }
 
-      const outcome = nextAtBat.outcome
       const current = missionRunRef.current
+      const runnersOnBase = current === null ? 0 : runnerCountOf(current.bases)
+
+      if (runsDefense && current !== null) {
+        // 스윙 수만 먼저 줄이고 **루·아웃·목표는 한 톨도 건드리지 않는다** — 수비 화면이
+        // 다 돈 뒤 `finishDefensePlay` 가 한 번에 먹인다 (원본도 0x17 이 도는 동안 0xf 로 안 간다)
+        if (hasSwung) setMissionRun((previous) => (previous === null ? previous : recordSwing(previous)))
+        setPendingDefensePlay({
+          side: '타자',
+          input: missionDefensePlayInputOf(current.bases, current.outs, outcome, random),
+          outcome,
+          isBunt: detail.isBunt,
+          runnersOnBase,
+        })
+        runner.setIsPaused(true)
+        return
+      }
+
       setMissionRun((previous) => {
         if (previous === null) return previous
         const swung = hasSwung ? recordSwing(previous) : previous
         return applyMissionOutcome(swung, outcome, detail.isBunt)
       })
-      runner.pauseWithBanner(
-        describeOutcomeBanner(outcome, current === null ? 0 : runnerCountOf(current.bases)),
-      )
+      runner.pauseWithBanner(describeOutcomeBanner(outcome, runnersOnBase))
     },
-    [audio, runner],
+    [audio, random, runner],
   )
 
   /**
@@ -157,23 +235,59 @@ export function useMissionSession({
    * 조준점을 흔든다. 값의 뜻은 `shared/config/original/missions.ts` 의 `MISSION_AIM_SHAKES` 에 있다.
    *
    * ⚠️ 타자 미션은 표가 **전부 0** 이라 타자편에서는 늘 0 이다 (원본 그대로).
-   * ⚠️ **아직 못 꿴 곳**: 미션 모드의 투수 화면(`PitchingScreen` → `handleThrow`)은 경기 진행기가
-   *    아니라 `entities/pitching` 의 간단한 `buildPitch`(존 좌표 −1~1 모델)로 공을 만든다. 흔들림
-   *    값은 월드 좌표(±600·±400)라 그 모델에 그대로 못 넣는다 — 그 화면이 진행기로 옮겨 가면
-   *    이 값을 `throwPitch` 에 실어 주면 된다.
+   *
+   * 아래 `handleThrow` 가 이 값을 `buildHumanPitch` 에 실어 **실제로 흔든다**. 원본 0x39c5c 는
+   * 경기 장면 **상태 0x10(조준) 의 갱신 함수**이고(R10 2절 상태표) 그 안에서
+   * `[this+0x1788] != 0 && [this+0x1104] == 5`(= 미션 객체가 있고 모드 5 = 투수 미션) 일 때만
+   * 조건코드 1·2·3 갈래로 간다 — 즉 **원본 미션 투구도 보통 경기와 같은 조준·투구 길**이다.
+   * 그래서 웹도 존 좌표 근사(`pitchCommand.buildPitch`) 대신 진행기의 월드 좌표 투구를 쓴다.
    */
   const missionConditionCode =
     pitcherRun !== null && pitcherRun.status === '진행중' ? pitcherRun.mission.conditionCode
     : missionRun !== null && missionRun.status === '진행중' ? missionRun.mission.conditionCode
     : 0
 
-  /** 원작 투구 조작: 구질 → 코스 → 게이지. 타자는 자동으로 반응한다. */
+  /**
+   * 원작 투구 조작: 구질 → 코스 → 게이지. 타자는 자동으로 반응한다.
+   *
+   * 공은 나리 투수편과 **같은 진행기 부품**(`buildHumanPitch`)으로 만든다 — 원본 순서
+   * 0x50da8 구질 → 0x50e9c 코스 → **0x39c5c 조준 흔들림** → 0x4dc78 제구 흩어짐 그대로다.
+   * 조준점이 월드 좌표라야 미션 흔들림(±600·±400)이 뜻을 갖는다.
+   *
+   * ⚠️ 경기 상태(이닝·점수·로스터)는 미션 레코드에 없으므로 진행기 `PitcherGameProgress` 를
+   *    통째로 쓰지는 않는다 — 투구 한 개를 만드는 데 필요한 것만 위 상수로 채웠다.
+   */
   const handleThrow = (type: PitchTypeInfo, courseCell: number, gauge: GaugeResult) => {
     if (pitcherRun === null || pitcherRun.status !== '진행중') return
+    // 화면이 수비를 돌리는 동안에는 다음 공이 나가지 않는다 (원본 0x17 이 도는 동안 0xf 로 안 간다)
+    if (pendingDefensePlay !== null) return
 
-    const pitch = buildPitch(
-      { type, aim: courseOf(courseCell), gauge },
-      DEFAULT_PITCHER_ABILITY,
+    // 원본 구질 번호 1~21. 표에 없는 이름이면 1(FASTBALL)로 둔다
+    const typeNumber = Math.max(1, PITCH_TYPES.findIndex((candidate) => candidate.name === type.name) + 1)
+    const gaugeCell = MISSION_GAUGE_CELLS[gauge]
+    // 게이지를 안 쓴 공은 원본대로 제구·체력 확률표 0xd896c 로 등급을 뽑는다 (0x4dbac)
+    const grade = pitchGradeOf(
+      {
+        gaugeSettingOn: gauge !== '사용안함',
+        typeNumber,
+        gaugeCell,
+        effectiveControl: MISSION_PITCHER_STATS.control,
+        staminaPercent: MISSION_STAMINA_PERCENT,
+      },
+      random,
+    )
+    const pitch = buildHumanPitch(
+      {
+        typeNumber,
+        courseCell,
+        grade,
+        gaugeCell,
+        stats: MISSION_PITCHER_STATS,
+        repertoire: MISSION_PITCHER_REPERTOIRE,
+        side: MISSION_STAGE_SIDE,
+        // 조건코드 0 이면 `applyControlError` 가 난수를 한 톨도 안 뽑는다 = 예전과 같다
+        missionConditionCode,
+      },
       random,
     )
     // 마타자 미션은 원본 마선수 능력치로, 그 밖에는 평범한 타자로 상대한다.
@@ -184,6 +298,8 @@ export function useMissionSession({
     let nextRun = recordPitch(pitcherRun, gauge === 'PERFECT')
     const nextAtBat = runner.applyPitch(resolution)
     runner.setBannerText(describePitchResolution(resolution))
+    const outcome = isAtBatFinished(nextAtBat) ? nextAtBat.outcome : null
+    const runsDefense = outcome !== null && isBattedBallInPlay(outcome)
     // 투구 순간 소리 12 (0x3f378 — 투수 단계가 공을 놓는 칸에 닿을 때). 이어서 심판 콜.
     // ⚠️ 마구 갈래 28 은 잇지 않았다 — 이 자리가 던진 공이 마구인지 알 수 없다
     //    (`PitchTypeInfo` 에 마구 칸이 없고 미션 투수는 평범한 투수다).
@@ -192,17 +308,71 @@ export function useMissionSession({
     playSoundIds(audio, [
       PITCH_RELEASE_SOUND,
       pitchCallSoundIdOf(resolution, nextAtBat),
-      nextAtBat.outcome === null ? null : inPlayCallSoundIdOf(nextAtBat.outcome),
+      outcome === null || runsDefense ? null : inPlayCallSoundIdOf(outcome),
     ])
 
-    if (isAtBatFinished(nextAtBat) && nextAtBat.outcome !== null) {
-      nextRun = applyPitcherOutcome(nextRun, nextAtBat.outcome)
+    if (runsDefense && outcome !== null) {
+      // 수비 화면(0x17)이 돈다 — 실점·피안타·이닝 목표는 다 돌고 난 뒤에 센다
+      setPendingDefensePlay({
+        side: '투수',
+        input: missionDefensePlayInputOf(nextRun.bases, nextRun.outs, outcome, random, MISSION_PITCHER_MODE),
+        outcome,
+        isBunt: false,
+        runnersOnBase: runnerCountOf(nextRun.bases),
+      })
+      setPitcherRun(nextRun)
+      return
+    }
+    if (outcome !== null) {
+      nextRun = applyPitcherOutcome(nextRun, outcome, { random })
       runner.resetAtBat()
     } else {
       nextRun = checkPitchExhausted(nextRun)
     }
     setPitcherRun(nextRun)
   }
+
+  /**
+   * **수비 화면이 한 타구를 다 돌렸다** (`DefensePlayback` 의 `onDone`).
+   * 진루·아웃·실점이 **여기서야** 미션 상태가 된다 — 그 전까지는 타석 결과 코드만 정해져 있었다.
+   *
+   * 화면이 결과를 안 넘겨 주면 여기서 끝까지 돌려서라도 붙들어 둔 상태를 푼다 — 안 그러면
+   * 다음 타석이 영영 시작되지 않는다 (`useCareerSession.finishDefensePlay` 와 같은 자리).
+   */
+  const finishDefensePlay = useCallback(
+    (result?: DefensePlayResult) => {
+      const pending = pendingDefensePlayRef.current
+      if (pending === null) return
+      const played = result ?? runDefensePlay(pending.input)
+      setPendingDefensePlay(null)
+      // 플레이가 끝난 자리 — 아웃 콜(0x51b36)·세이프 콜(0x51c14)과 장타 함성은 여기서야 난다.
+      // 함성 60 은 원본이 **낙구 틱**에 내는 것이라 이 자리는 근사다 (atBatSounds 주석)
+      playSoundIds(audio, [
+        deepHitCheerSoundIdOf({
+          outcome: pending.outcome,
+          carryDistance: carryDistanceOf(pending.input.trajectory),
+          caughtOnTheFly: played.caughtOnTheFly,
+        }),
+        inPlayCallSoundIdOf(pending.outcome, played),
+      ])
+
+      if (pending.side === '투수') {
+        setPitcherRun((previous) =>
+          previous === null ? previous : applyPitcherOutcome(previous, pending.outcome, { played }),
+        )
+        runner.resetAtBat()
+        runner.setIsPaused(false)
+        return
+      }
+      setMissionRun((previous) =>
+        previous === null
+          ? previous
+          : applyMissionOutcome(previous, pending.outcome, pending.isBunt, random, played),
+      )
+      runner.pauseWithBanner(describeOutcomeBanner(pending.outcome, pending.runnersOnBase))
+    },
+    [audio, random, runner],
+  )
 
   /**
    * 미션을 깼을 때 — **클리어 횟수를 올리고 보상 G 를 준다** (0xa52b0, Q2 1a·1b).
@@ -221,11 +391,15 @@ export function useMissionSession({
   }
 
   const actions = {
+    /** 수비 화면이 끝났다 — 진루·아웃·실점을 이제 먹인다 */
+    finishDefensePlay,
+
     begin: (mission: OriginalMission) => {
       setLastSide(mission.side)
       runner.resetAtBat(mission.start)
       runner.setBannerText('')
       runner.setIsPaused(false)
+      setPendingDefensePlay(null)
 
       if (mission.side === '투수') {
         setPitcherRun(startPitcherMission(mission))
@@ -241,6 +415,7 @@ export function useMissionSession({
       runner.resetAtBat(mission.start)
       runner.setBannerText('')
       runner.setIsPaused(false)
+      setPendingDefensePlay(null)
       setMissionRun(startMission(mission))
       setScreen({ kind: '마선수대결', mission, ...pending })
     },
@@ -261,10 +436,12 @@ export function useMissionSession({
     },
 
     giveUpBatter: () => {
+      setPendingDefensePlay(null)
       if (missionRun !== null) setMissionRun(giveUpMission(missionRun))
     },
 
     giveUpPitcher: () => {
+      setPendingDefensePlay(null)
       if (pitcherRun !== null) setPitcherRun({ ...pitcherRun, status: '실패' })
     },
 
@@ -285,6 +462,6 @@ export function useMissionSession({
 
   return {
     missionRun, pitcherRun, clearedKeys, clearCounts, lastSide,
-    missionConditionCode, handleMissionPitch, handleThrow, actions,
+    missionConditionCode, pendingDefensePlay, handleMissionPitch, handleThrow, actions,
   }
 }

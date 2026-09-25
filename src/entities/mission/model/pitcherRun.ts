@@ -11,6 +11,8 @@ import { EMPTY_BASES } from '@/entities/game/model/baseState'
 import { isHit } from '@/entities/at-bat/model/atBatOutcome'
 import { limitOrNull, missionAdvance } from '@/entities/mission/model/missionRun'
 import type { MissionRun, MissionStatus } from '@/entities/mission/model/missionRun'
+import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
+import type { RandomPort } from '@/shared/api/random/randomPort'
 
 /**
  * 투수편 미션 진행.
@@ -80,8 +82,12 @@ function brokenConditionsOf(mission: OriginalMission, allowed: PitcherRun['allow
  * (태그업 0xa9620 + 자동 진루 0xaf918 "송구보다 2틱 이상 빠를 때만" + 2아웃 득점 보류)이다.
  * 실점(`allowed.runs`)·이닝 목표(`totalOuts`)가 이 결과를 그대로 받는다 (P2 7절 · U-02).
  */
-function advanceDefense(run: PitcherRun, outcome: AtBatOutcome) {
-  const advance = missionAdvance(run.bases, run.outs, outcome)
+function advanceDefense(run: PitcherRun, outcome: AtBatOutcome, options: PitcherOutcomeOptions) {
+  const advance = missionAdvance(run.bases, run.outs, outcome, {
+    random: options.random,
+    played: options.played,
+    gameMode: MISSION_PITCHER_MODE,
+  })
   const outs = run.outs + advance.outsAdded
   const isInningOver = outs >= OUTS_PER_INNING
   return {
@@ -92,11 +98,25 @@ function advanceDefense(run: PitcherRun, outcome: AtBatOutcome) {
   }
 }
 
+/** 미션 투수편 = 원본 전역 모드 **5** (타자편이 6 다 — Q2-mission-rewards 1-0 확정) */
+export const MISSION_PITCHER_MODE = 5
+
+export interface PitcherOutcomeOptions {
+  /** 주면 수비 진행기의 원본 확률 굴림(펌블·악송구·필살수비)이 돈다 */
+  readonly random?: RandomPort
+  /** 화면(상태 0x17)이 이미 다 돌린 수비 플레이. 주면 여기서 또 굴리지 않는다 */
+  readonly played?: DefensePlayResult
+}
+
 /** 타석이 끝났다. 목표를 채우면 성공, 한도·제한에 닿으면 실패다. */
-export function applyPitcherOutcome(run: PitcherRun, outcome: AtBatOutcome): PitcherRun {
+export function applyPitcherOutcome(
+  run: PitcherRun,
+  outcome: AtBatOutcome,
+  options: PitcherOutcomeOptions = {},
+): PitcherRun {
   if (run.status !== '진행중') return run
 
-  const defense = advanceDefense(run, outcome)
+  const defense = advanceDefense(run, outcome, options)
   const allowed = {
     runs: run.allowed.runs + defense.runsScored,
     hits: run.allowed.hits + (isHit(outcome) ? 1 : 0),

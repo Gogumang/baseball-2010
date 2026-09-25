@@ -42,8 +42,12 @@ interface MissionPlayScreenProps {
   readonly onSettingsChange?: (settings: GameSettings) => void
 }
 
-/** 미션 타자편 = 원본 전역 모드 5 — 경기 중 메뉴 표 0xcfcfc 의 **행 1**(다시하기가 있는 줄) */
-const MISSION_BATTER_MODE = 5
+/**
+ * 미션 타자편 = 원본 전역 모드 **6** — 경기 중 메뉴 표 0xcfcfc 의 **행 1**(다시하기가 있는 줄).
+ * 모드 5 가 XlsPITCHER_MISSION 을 올리는 투수편이다 (Q2-mission-rewards 1-0 확정).
+ * 행은 "모드 5~7 → 1" 이라 5·6 어느 쪽이든 같은 칸이 나온다.
+ */
+const MISSION_BATTER_MODE = 6
 type MenuOverlay = '조작방법' | '설정'
 
 export function MissionPlayScreen({

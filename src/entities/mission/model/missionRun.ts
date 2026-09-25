@@ -6,6 +6,7 @@ import { advanceRunners, runnerCountOf } from '@/entities/game/model/baseState'
 import type { AdvanceResult, BaseState } from '@/entities/game/model/baseState'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
+import type { DefensePlayInput, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
@@ -85,23 +86,62 @@ export function missionAdvance(
   bases: BaseState,
   outs: number,
   outcome: AtBatOutcome,
-  options: { readonly random?: RandomPort; readonly gameMode?: number } = {},
+  options: {
+    readonly random?: RandomPort
+    readonly gameMode?: number
+    /**
+     * **화면(상태 0x17)이 이미 틱까지 다 돌린 플레이.** 주면 여기서 다시 굴리지 않고 그 결과를
+     * 그대로 쓴다 — 한 타구에 두 번 굴리면 난수 차례가 어긋난다 (`gameFlow.resolveDefensePlay` 와 같은 자리).
+     */
+    readonly played?: DefensePlayResult
+  } = {},
 ): AdvanceResult {
   if (!isBattedBallInPlay(outcome)) return advanceRunners(bases, outcome, outs)
-  return runDefensePlay({
+  if (options.played !== undefined) return options.played.advance
+  return runDefensePlay(
+    missionDefensePlayInputOf(bases, outs, outcome, options.random, options.gameMode),
+  ).advance
+}
+
+/**
+ * 미션 인플레이 타구 하나를 수비 진행기에 넘길 꼴로 만든다 — 만드는 데 난수를 **한 톨도 쓰지 않는다**
+ * (굴림은 전부 진행기 안에서 돈다). 화면이 실시간으로 돌리는 갈래(`DefensePlayback` 의 `input`)와
+ * 여기서 바로 돌리는 갈래가 **같은 입력**을 쓰게 하려고 따로 뺐다.
+ */
+export function missionDefensePlayInputOf(
+  bases: BaseState,
+  outs: number,
+  outcome: AtBatOutcome,
+  random?: RandomPort,
+  gameMode?: number,
+): DefensePlayInput {
+  // 투수편 미션은 사람이 수비다 — 공격이 CPU 라 `0xae690` 의 첫 항이 서서 늘 자동 진루이고,
+  // 협살(AI 상태 8)은 `state[0x31 + 수비측] == 1` 이 아니라 안 돈다 (S8 1-4). 타자편은 그 반대다.
+  const isPitcherSide = gameMode === MISSION_PITCHER_SIDE_MODE
+  return {
     outcome,
     trajectory: battedBallTrajectory(representativePatternOf(outcome)),
     bases,
     outs,
-    random: options.random,
-    // 미션 타자편 = 전역 모드 5 · 투수편 = 6 (경기 중 메뉴 표 0xcfcfc 의 갈래).
+    random,
+    // 미션 투수편 = 전역 모드 5 · 타자편 = 6.
     // 둘 다 필살수비 기준을 손대지 않는 모드라 값만 흘려 보낸다.
-    gameMode: options.gameMode ?? MISSION_BATTER_MODE,
-  }).advance
+    gameMode: gameMode ?? MISSION_BATTER_MODE,
+    defenseIsCpu: !isPitcherSide,
+    offenseIsCpu: isPitcherSide,
+  }
 }
 
-/** 미션 타자편 = 원본 전역 모드 5 (투수편은 6) */
-export const MISSION_BATTER_MODE = 5
+/** `pitcherRun.MISSION_PITCHER_MODE` 와 같은 값 — 고리 import 를 피하려고 여기 다시 적었다 */
+const MISSION_PITCHER_SIDE_MODE = 5
+
+/**
+ * 미션 타자편 = 원본 전역 모드 **6** (투수편이 5 다).
+ * 모드 5 가 XlsPITCHER_MISSION 을 올린다 — H-modes 표의 "5 타자 · 6 투수" 는 거꾸로였다
+ * (Q2-mission-rewards 1-0 확정: 미션 객체가 `ldrsb [obj+0xbf]; cmp #6` 으로 편을 가르고,
+ * 6 이면 행 크기 0xa8=168(타자 표), 아니면 0xa5=165(투수 표)).
+ */
+export const MISSION_BATTER_MODE = 6
 
 /**
  * 공격 결과로 주자·아웃을 옮긴다. 3아웃이 되면 미션 시작 상황으로 되돌린다 —
@@ -111,8 +151,10 @@ export function advanceSituation(
   run: Pick<MissionRun, 'mission' | 'bases' | 'outs'>,
   outcome: AtBatOutcome,
   random?: RandomPort,
+  /** 화면이 이미 다 돌린 수비 플레이. 주면 여기서 다시 굴리지 않는다 */
+  played?: DefensePlayResult,
 ): { bases: BaseState; outs: number; runsScored: number } {
-  const advance = missionAdvance(run.bases, run.outs, outcome, { random })
+  const advance = missionAdvance(run.bases, run.outs, outcome, { random, played })
   const outs = run.outs + advance.outsAdded
   if (outs >= OUTS_PER_INNING) {
     return { bases: run.mission.start.runners, outs: run.mission.start.outs, runsScored: 0 }
@@ -136,16 +178,18 @@ export function checkSwingsExhausted<T extends MissionRun>(run: T): T {
  * 타석 하나가 끝났을 때. 목표를 채우면 즉시 성공, 제한을 넘기면 실패다.
  *
  * `random` 을 주면 수비 진행기의 원본 확률 굴림이 돈다 — 안 주면 지금까지와 같은 결정론이다.
+ * `played` 를 주면 **화면(상태 0x17)이 이미 돌린** 플레이의 결과를 그대로 먹인다.
  */
 export function applyOutcome(
   run: MissionRun,
   outcome: AtBatOutcome,
   isBunt = false,
   random?: RandomPort,
+  played?: DefensePlayResult,
 ): MissionRun {
   if (run.status !== '진행중') return run
 
-  const situation = advanceSituation(run, outcome, random)
+  const situation = advanceSituation(run, outcome, random, played)
   const progress = recordOutcome(
     run.progress,
     outcome,

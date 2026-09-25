@@ -5,6 +5,7 @@ import type { useMissionSession } from '@/app/model/useMissionSession'
 import { MissionSelectScreen, MissionBriefing } from '@/pages/mission-select/ui/MissionSelectScreen'
 import { MissionPlayScreen } from '@/pages/mission-play/ui/MissionPlayScreen'
 import { PitchingScreen } from '@/pages/pitching/ui/PitchingScreen'
+import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import { PITCH_TYPES } from '@/shared/config/original/pitchTypes'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -37,7 +38,24 @@ export function MissionRoutes({
   pitchControl,
   gameSettings,
 }: MissionRoutesProps) {
-  const { missionRun, pitcherRun, actions } = session
+  const { missionRun, pitcherRun, pendingDefensePlay, actions } = session
+
+  /**
+   * **수비 화면(상태 0x17)이 먼저다.** 미션도 모드 5·6 짜리 보통 경기(장면 0x104)라
+   * 맞은 공은 0x11 → 0x13 → **늘 0x17** 로 간다 (`0xae5f0` = `movs r0,#0x17`, R10 8절 전이표).
+   * 다 돌고 나서야 `0xae3e8` 이 다음 타석으로 보낸다 — 그 자리가 `finishDefensePlay` 다.
+   *
+   * 사람이 잡는 쪽(`side`)은 편에 따라 다르다: 타자 미션은 내가 공격(주루), 투수 미션은 내가 수비(송구).
+   */
+  if (pendingDefensePlay !== null) {
+    return (
+      <DefensePlayback
+        input={pendingDefensePlay.input}
+        side={pendingDefensePlay.side === '투수' ? '수비' : '공격'}
+        onDone={actions.finishDefensePlay}
+      />
+    )
+  }
 
   const selectScreen = (
     <MissionSelectScreen
