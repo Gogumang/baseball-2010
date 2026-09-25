@@ -4,6 +4,7 @@ import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { animationFolderOf, figurePosesOf, TRAINING_POPUP_UPDATES } from '@/shared/config/original/trainingAnimation'
 import type { TrainingPresentation } from '@/shared/config/original/trainingAnimation'
 import { animationStepAt, figurePoseAt } from '@/widgets/training-scene/lib/animationPlayback'
+import { batterEquipmentOf, NO_EQUIPMENT } from '@/widgets/batting-stage/lib/batterLayers'
 import { TrainingFigure } from '@/widgets/training-scene/ui/TrainingFigure'
 import { TrainingGauge } from '@/widgets/training-scene/ui/TrainingGauge'
 import * as styles from '@/widgets/training-scene/ui/TrainingScene.css'
@@ -30,12 +31,18 @@ interface TrainingSceneProps {
    * 안 넘기면 타격형으로 본다.
    */
   readonly battingTypeIndex?: number
+  /**
+   * **장착 장비 니블** = `career.equipmentLevels` (0 미장착 · 1~11 = 레벨+1).
+   * 원본 훈련 팝업 캐릭터도 관리 화면 그림 객체 그대로라 0x10810 의 니블 루프(0x10866)가
+   * 머리·손·다리 아이템 겹을 채워 준다 — `TrainingFigure` 주석 참고.
+   */
+  readonly equipmentLevels?: { readonly hit: number; readonly power: number; readonly run: number }
   /** 게이지가 가득 차면(60번 갱신) 불린다 */
   readonly onFinished?: () => void
 }
 
 /** 원작 훈련 팝업. presentation 이 바뀔 때마다 처음부터 튼다. */
-export function TrainingScene({ presentation, caption, battingTypeIndex = 0, onFinished }: TrainingSceneProps) {
+export function TrainingScene({ presentation, caption, battingTypeIndex = 0, equipmentLevels, onFinished }: TrainingSceneProps) {
   const folder = animationFolderOf(presentation?.file ?? 'raise_traning_ani')
   const origins = useFrameOrigins(folder)
   const animations = useAnimations(folder)
@@ -97,6 +104,7 @@ export function TrainingScene({ presentation, caption, battingTypeIndex = 0, onF
         {figure !== null && step !== null && (
           <TrainingFigure
             pose={figurePoseAt(figurePosesOf(figure, battingTypeIndex), step.entryIndex)}
+            equipment={equipmentLevels === undefined ? NO_EQUIPMENT : batterEquipmentOf(equipmentLevels)}
             x={ANCHOR.x + figure.offsetX}
             y={ANCHOR.y - figure.liftY}
           />

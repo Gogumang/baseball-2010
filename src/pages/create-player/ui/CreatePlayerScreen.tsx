@@ -135,6 +135,11 @@ export function CreatePlayerScreen({ teamId = DEFAULT_TEAM_ID, onCreate, onCance
         }}>
         {/* 열쇠가 폴더·프레임인 이유: 타입을 바꾸면 몸통 파일이 갈리는데, 그대로 두면 `useRecoloredSprite`
             가 앞 그림 주소를 한 번 더 내보내 엉뚱한 겹이 비친다 (상태가 한 박자 늦는다) */}
+        {/*
+          장비를 안 넘긴다 — 원본 등록 화면도 같은 그림 객체(0x10810)라 장비 니블 루프(0x10866)를
+          똑같이 돌지만, **아직 만들지 않은 선수**라 레코드 `rec[0x19]`·`rec[0x1a]` 니블이 모두 0 이고
+          `subs r2,니블,#1 ; bmi` 에서 네 부위가 다 걸러진다. 곧 원본도 여기서는 맨몸이다.
+        */}
         {batterLayersOf(FIGURE_POSE_FRAME, profile.battingTypeIndex).map((layer) => (
           <LayerSprite key={`${layer.folder}#${layer.frame}`} layer={layer}
             skinIndex={profile.skinIndex} teamIndex={teamId} />

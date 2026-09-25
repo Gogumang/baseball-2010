@@ -76,6 +76,8 @@ export function ManagementScreen(props: ManagementScreenProps) {
             caption={`${menu.playingMenuId}훈련`}
             // 장타형은 동작표가 따로다 (0xd4a18·0xd4a6c — F-6). 0 만 타격형이고 그 밖은 장타형이다
             battingTypeIndex={career.battingTypeIndex}
+            // 훈련 팝업 캐릭터도 0x10810 이 세운 그림 객체 그대로라 장착 장비를 입고 나온다
+            equipmentLevels={career.equipmentLevels}
             onFinished={menu.finishTraining} />
         </div>
       )}
