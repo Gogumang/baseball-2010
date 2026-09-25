@@ -45,9 +45,19 @@
   → 프레임 뜻: `5k` 바탕(관중석 k단) · `5k+1` 빈 좌석(관리 화면 미리보기) · `5k+2` 관중 적음(35% 이하) · `5k+3` 보통(35~80%) · `5k+4` 만원(≥80%, 대전모드 고정).
 - 관중석 4~6(트로피컬·콜로세움·스페이스, `[obj+0x88] > 3`)은 0x76ba4 가 `hidden_fence_{n−4}.pzx` 를 적재하고, 여기서는 이미지[0] 한 장 + 덧그림 `[0x89]+1` 번 이미지를 그린다(히든 구장도 관중 단계 그림을 가짐 — 그 PZX 의 이미지 1~4, 유력).
 - 전광판: `[obj+0x8a]` ≤ 3 → fence_board 프레임 [0x8a] (소형·중형·대형·초대형), > 3 → hidden_board_{n−4} 이미지[0].
+  - **전광판 화면(board_ani 흐르는 글자)** 은 그림과 따로다 (0x77726~0x777d8, 2026-09-25 재확인):
+    설정 +0x3a 가 켜져 있고 `[obj+0x8a] ∉ {0, 5}` 이고 `[obj+0x90]`(board_ani) 이 적재됐을 때만 그린다.
+    상자는 **전광판 그림 자신의 박스 0**(칸 3 이면 박스 2, 0x7776a)이고, 팀 아이콘도 칸 3 일 때만 그림의 박스 0·1 에 붙는다(0x77654).
+    건너뛰는 칸 0·5 는 실제로 `fence_board` 0 번과 `hidden_board_1` 에 **박스 데이터 자체가 없다** — 교차 검산 통과.
+  - 일반 경기 0x77974 쪽은 다르다: 상자를 **fence 프레임의 박스 2 로 박아 놓았고**(0x77d06 `movs r3,#2`) 종류를 안 본다.
 - **어느 경기가 이 함수를 쓰나** (경기 그리기 0x41000~0x4106a): 모드 2(시즌)이면서 홈 팀 == 우리 팀(0xb6bdd(…,1) == 시즌레코드[+1]) 또는 모드 8·9 → 0x77fe8 · **0x77494** · 0x7725c. 그 밖(시즌 원정 경기 포함, 일반모드)은 0x78578 → 기본 fence.pzf 11구장.
 - 좌우: 구장 객체 `+0x60` ≠ 0 → x = [obj+4]−1+스크롤−흔들림−10 에 효과 0 으로 그림. = 0 → x+0x1ea(바탕)/x+0x1e0(덧그림) 에 **효과 0x11(좌우 뒤집기)** 로 그림 → 구장 전체를 좌우로 뒤집어 그리는 모드가 있다(4항 참고).
-- 웹판: `src/widgets/batting-stage/lib/spriteLoader.ts:98` 가 fence(11장)만, `renderScenery.ts:67~84` 가 `FENCE_FRAMES[state.stadium]` + CROWD 로 그린다. fence_season 은 public/sprites 에 없음 → 시즌 홈 경기의 관중석 단계·관중 단계·전광판 단계 그림이 빠져 있다. 웹 FENCE_ANCHOR(`renderScenery.ts:29`, CAMERA.x−1−10) 은 원본의 `+0x60≠0` 가지와 같은 식.
+- 웹판 (2026-09-25 갱신): `renderScenery.ts` 의 `drawSeasonFenceParts` 가 이 길을 그린다 — `SceneryState.seasonStadium`
+  (`{ stand, crowd, board }` = 구장 +0x88·+0x89·+0x8a) 이 차 있으면 0x77494 묶음, 비어 있으면 예전대로 0x77974
+  (fence.pzf 11구장) 다. `spriteLoader.ts` 에 `FENCE_SEASON_FRAMES`·`HIDDEN_FENCE_FRAMES`·`FENCE_BOARD_FRAMES`·
+  `HIDDEN_BOARD_FRAMES` 를 더했고, 전광판 상자는 `shared/config/original/stadiumScene.ts` 의 `BOARD_BOXES` 를 쓴다.
+  ⚠️ **아직 부르는 쪽이 없다** — `app/ui/SeasonRoute.tsx` 가 `record.stadiumEquipped` 를 `TeamGameScreen → BattingStage`
+  로 내려 줘야 실제 경기 화면에 나온다. 웹 FENCE_ANCHOR(CAMERA.x−1−10) 은 원본의 `+0x60≠0` 가지와 같은 식.
 
 ## 2. 메인 메뉴 바퀴 칸별 main_ui 그림 분기 — 확정 (정정 포함)
 
