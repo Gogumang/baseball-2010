@@ -182,8 +182,9 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
         tick: nowTick,
         particles: particlesRef.current,
         resultTick: phaseRef.current === '결과' ? pitchTickAt(now, phaseStartedAtRef.current, tickLength) : 0,
-        // 구장 번호를 고르는 규칙(st+0x70)이 미확인이라 0 번 구장으로 둔다 (추정)
-        scenery: { skyRow, stadium: 0 },
+        // 일반 구장 번호를 고르는 규칙(st+0x70)이 미확인이라 0 번 구장으로 둔다 (추정).
+        // 시즌 구장 세 칸이 넘어오면 배경 묶음 자체가 0x77494 쪽으로 갈린다 (0x40ff0).
+        scenery: { skyRow, stadium: 0, seasonStadium: latestRef.current.seasonStadium },
       })
 
       animationHandle = requestAnimationFrame(frame)

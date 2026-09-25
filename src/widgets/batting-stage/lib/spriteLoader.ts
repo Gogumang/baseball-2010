@@ -166,3 +166,17 @@ export const FENCE_FRAMES = './sprites/fence/frames'
 export const CROWD_FRAMES = './sprites/ppl/frames'
 export const SCOREBOARD_FRAMES = './sprites/board_ani/frames'
 export const TEAM_ICON = (index: number) => `./sprites/team_s_icon/${String(index).padStart(3, '0')}.png`
+
+// ── 시즌 구장 (0x77494) ─────────────────────────────────────────────────────
+// 적재 0x76ba4 의 **시즌 쪽 가지**(두 번째 인자 ≠ 0)가 쓰는 파일들이다.
+// 일반 경기는 fence.pzf 한 벌만 쓰지만(위 FENCE_FRAMES), 시즌 홈경기·구장 화면은
+// 관중석 칸(+0x88)·관중 단계(+0x89)·전광판 칸(+0x8a) 셋으로 그림을 고른다 (R6 1절).
+
+/** 관중석 0~3 — `stadium/fence_season.pzf` (0x76c62). 한 관중석당 5칸씩 20칸 */
+export const FENCE_SEASON_FRAMES = './sprites/fence_season/frames'
+/** 관중석 4~6 = 히든 — `stadium/hidden_fence_(칸−4).pzx` (0x76ca2, 5칸씩) */
+export const HIDDEN_FENCE_FRAMES = (index: number) => `./sprites/hidden_fence_${index}/frames`
+/** 전광판 0~3 — `stadium/fence_board.pzx` (0x76d06), 프레임 번호 = 칸 */
+export const FENCE_BOARD_FRAMES = './sprites/fence_board/frames'
+/** 전광판 4~6 = 히든 — `stadium/hidden_board_(칸−4).pzx` (0x76d1c), 늘 프레임 0 */
+export const HIDDEN_BOARD_FRAMES = (index: number) => `./sprites/hidden_board_${index}/frames`

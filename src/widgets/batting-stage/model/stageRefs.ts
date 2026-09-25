@@ -10,6 +10,7 @@ import { createParticleScene } from '@/entities/particle/model/particleScene'
 import type { ParticleScene } from '@/entities/particle/model/particleScene'
 import type { BatterEquipment } from '@/widgets/batting-stage/lib/batterLayers'
 import type { StageScene } from '@/widgets/batting-stage/lib/renderBattingStage'
+import type { SeasonStadium } from '@/widgets/batting-stage/lib/renderScenery'
 import { PITCHER_RELEASE_TICKS } from '@/widgets/batting-stage/lib/stageScenery'
 
 /** 원본 경기 상태 — 대기·투구중 0xf/0x11 · **타격 0x13** · 결과 0x12/0x17 */
@@ -63,6 +64,11 @@ export interface StageLatest {
   readonly batterTeamIndex: number
   /** 장착 장비의 등급 순번 (부위별 −1 = 미장착) — 머리·손·다리 그림 슬롯을 채운다 */
   readonly batterEquipment: BatterEquipment
+  /**
+   * 시즌 구장 세 값 (관중석 칸·관중 단계·전광판 칸). 차 있으면 배경을 시즌 구장 0x77494 로 그린다 —
+   * 원본은 모드 2 의 **홈경기**(0x40ff0 `내 팀 == 홈팀`)와 대전 모드 8·9 에서만 그 길로 간다.
+   */
+  readonly seasonStadium?: SeasonStadium
   readonly isPaused: boolean
   readonly random: RandomPort
   readonly swingMode: SwingMode

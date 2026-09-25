@@ -23,6 +23,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import { STAGE_HEIGHT, STAGE_WIDTH } from '@/widgets/batting-stage/lib/renderBattingStage'
+import type { SeasonStadium } from '@/widgets/batting-stage/lib/renderScenery'
 import { describeResolution, isHomeRunResolution, situationOf } from '@/widgets/batting-stage/lib/stageText'
 import { ballFrameAt, useStageRefs } from '@/widgets/batting-stage/model/stageRefs'
 import type { AcePitcherFrames, StageHud } from '@/widgets/batting-stage/model/stageRefs'
@@ -69,6 +70,17 @@ interface BattingStageProps {
   readonly batterEquipmentLevels?: BatterAbility
   readonly batterSkillIds?: readonly number[]
   readonly recentAtBatCodes?: readonly number[]
+  /**
+   * **시즌 구장 세 값** — `{ stand: 관중석 칸, crowd: 관중 단계, board: 전광판 칸 }`.
+   * 넘기면 배경을 시즌 구장 0x77494 로 그려 **장착한 전광판**이 뒤에 선다.
+   *
+   * 원본 `0x40ff0` 은 **모드 2(시즌)이고 내 팀 == 홈팀**일 때만 이 묶음을 쓴다 — 원정이면
+   * 안 넘겨야 원본과 같다. 값은 `0x353ac~0x353e6` 이 시즌 기록에서 그대로 옮기므로
+   * `stand = record.stadiumEquipped[0]` · `board = record.stadiumEquipped[1]` 이다.
+   * `crowd` 는 아이템이 아니라 **관중 수 그림 단계**다 — 시즌 홈경기면 만원 판정 `SR[0x65]` + 1,
+   * 대전 모드면 3 고정이다 (`SeasonStadium` 주석 참고). 잔디 칸은 이 길로 들어가지 않는다.
+   */
+  readonly seasonStadium?: SeasonStadium
   /** 참이면 새 공을 던지지 않는다. 타석 결과 연출 중에 쓴다. */
   readonly isPaused: boolean
   readonly random: RandomPort
