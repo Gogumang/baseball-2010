@@ -245,6 +245,7 @@ export function TeamGameScreen({
       <DefensePlayback
         input={pending.input}
         side={pending.side}
+        grassPalette={seasonStadium?.grassPalette ?? null}
         onDone={actions.finishDefensePlay}
       />
     )
@@ -254,7 +255,13 @@ export function TeamGameScreen({
    * 이게 없으면 배트에 맞은 공이 어디로 갔는지 화면에 아예 안 나온다.
    */
   if (play !== null && play !== shownPlay && play.ticks.length > 0) {
-    return <DefensePlayback ticks={play.ticks} onDone={finishPlayback} />
+    return (
+      <DefensePlayback
+        ticks={play.ticks}
+        grassPalette={seasonStadium?.grassPalette ?? null}
+        onDone={finishPlayback}
+      />
+    )
   }
 
   // 경기 중 메뉴의 "조작방법"(0x3c212)·"설정"(0x3c326) — 원본도 경기 장면 위에 같은 화면을 얹는다

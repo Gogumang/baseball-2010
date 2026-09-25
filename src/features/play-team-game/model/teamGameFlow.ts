@@ -1027,10 +1027,22 @@ function pitchOnce(
   )
 
   const batter = entryStageAbilityOf(progress, options.opponentTeamId, progress.opponentOrderIndex)
-  const resolution = pitchAgainstBatter(pitch, batter, random, {
-    control: fatigued.control,
-    velocity: fatigued.velocity,
-  })
+  const resolution = pitchAgainstBatter(
+    pitch,
+    batter,
+    random,
+    {
+      control: fatigued.control,
+      velocity: fatigued.velocity,
+    },
+    // 원본 0x34334 는 state+4·+5·+6(S·B·O)과 주자 유무로 타격 표(0x9f190)의 행을 고른다
+    {
+      strikes: progress.atBat.strikes,
+      balls: progress.atBat.balls,
+      outs: progress.game.outs,
+      hasRunner: runnerCountOf(progress.game.bases) > 0,
+    },
+  )
 
   // 스태미나는 게이지 결과와 무관하다 — 인자가 (game, 구질) 뿐이다 (P1 3-1 확정)
   const stamina = drainStamina({
