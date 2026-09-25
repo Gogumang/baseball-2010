@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { BALANCE } from '@/shared/config/original/balance'
 import type { MenuItem } from '@/shared/ui'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -108,6 +108,10 @@ export interface PitcherManagementMenu {
   readonly notice: string
   readonly question: PitcherMenuQuestion | null
   readonly choice: PitcherMenuChoice | null
+  /** 두 갈래 팝업의 커서 (원본 `장면+0x166`) — 좌우 키가 옮긴다 */
+  readonly choiceIndex: number
+  /** 팝업 커서를 옮긴다 (마우스로 칸에 올렸을 때) */
+  readonly moveChoice: (index: number) => void
   readonly select: (id: string) => void
   /** 취소(−16) */
   readonly back: () => void
@@ -134,8 +138,16 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
   const [notice, setNotice] = useState('')
   const [question, setQuestion] = useState<PitcherMenuQuestion | null>(null)
   const [choice, setChoice] = useState<PitcherMenuChoice | null>(null)
+  /** 두 갈래 팝업(0x78·0x80)의 커서 — 원본 `장면+0x166`. 창을 열 때마다 0 에서 시작한다 */
+  const [choiceIndex, setChoiceIndex] = useState(0)
   /** 알림 창을 **닫을 때** 할 일 — 휴식 회복 판정 0x1b308 처럼 결과 창 뒤에 붙는 것들 */
   const [afterNotice, setAfterNotice] = useState<(() => void) | null>(null)
+
+  /** 두 갈래 팝업을 연다 — 커서는 늘 첫 칸부터다 (원본도 `+0x166` 을 0 으로 두고 연다) */
+  const openChoice = useCallback((next: PitcherMenuChoice) => {
+    setChoiceIndex(0)
+    setChoice(next)
+  }, [])
 
   /** 아직 옮기지 않은 화면으로 가는 칸 — 원본에는 없는 웹판 알림이다 */
   const openOrNotice = useCallback((open: (() => void) | undefined) => {
@@ -189,7 +201,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
   /** 팝업 0x78 — 마구/구질 두 갈래. 트레이닝(107)에서 열면 훈련 창, 선수정보(106)에서 열면 보기 창 */
   const openPitchWindow = useCallback(
     (isTraining: boolean) => {
-      setChoice({
+      openChoice({
         text: PITCHER_MANAGEMENT_TEXT.chooseItem,
         labels: PITCH_WINDOW_CHOICES,
         onChoose: (index) => {
@@ -210,7 +222,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
         },
       })
     },
-    [blockNoticeOf, career, runMagicTraining],
+    [blockNoticeOf, career, openChoice, runMagicTraining],
   )
 
   const selectCommand = useCallback(
@@ -256,7 +268,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
        * 0 이면 기본 엔트리 목록(0x5cfec), 그 밖이면 나리 판 목록(0x5796c) 이다 (R4 2c).
        * ⚠️ 두 갈래의 **이름표**는 문서에 없어 하는 일로 적었다 (`RECORD_WINDOW_CHOICES`).
        */
-      return setChoice({
+      return openChoice({
         text: PITCHER_MANAGEMENT_TEXT.chooseRecord,
         labels: RECORD_WINDOW_CHOICES,
         onChoose: (index) => {
@@ -266,7 +278,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
         },
       })
     },
-    [onOpenShop, openPitchWindow],
+    [onOpenShop, openChoice, openPitchWindow],
   )
 
   const selectTraining = useCallback(
@@ -360,6 +372,44 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     [choice],
   )
 
+  /*
+   * 두 갈래 팝업(0x78 구질/마구 · 0x80 기록실)의 **키**.
+   *
+   * 원본은 이 작은 창이 키를 직접 본다 — 좌우로 `장면+0x166` 을 토글하고, 확인 키로 고르며,
+   * 취소(−16)면 창만 닫는다 (그리기 0x190f8 · 키 0x19398 · R7 4절 149행).
+   *
+   * ⚠️ **웹판 버그를 고치는 자리다.** 팝업이 뜨면 커맨드 목록(`MenuList`)은 화면에서 내려가는데
+   *    팝업 쪽에는 키를 보는 데가 없어, 키보드로 몰면 **여기서 아무 키도 안 먹혀 앞으로도 뒤로도
+   *    못 갔다** (마우스로 칸을 눌러야만 진행됐다). 트레이닝 → 마구 길에서 실제로 막힌다.
+   *
+   * 알림·확인 상자(`MessageBox`)는 **잡는 단계**에서 `stopImmediatePropagation` 하므로,
+   * 그 위에 상자가 떠 있으면 이 고리에는 키가 오지 않는다 — 원본도 창 위 팝업이 키를 잡는다.
+   */
+  const choiceIndexRef = useRef(choiceIndex)
+  choiceIndexRef.current = choiceIndex
+  useEffect(() => {
+    if (choice === null) return
+    const count = choice.labels.length
+    const onKey = (event: KeyboardEvent) => {
+      const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
+      if (step !== 0) {
+        event.preventDefault()
+        return setChoiceIndex((previous) => (previous + step + count) % count)
+      }
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault()
+        return chooseOption(choiceIndexRef.current)
+      }
+      if (event.key === 'Escape' || event.key === 'Backspace') {
+        event.preventDefault()
+        // 취소(−16) — 고르지 않고 창만 닫는다
+        chooseOption(-1)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [choice, chooseOption])
+
   /**
    * 123 창 탭 1 — 마구 칸 i 를 고른다 (키 0x17cec).
    * 막히는 차례도 원본 그대로: 사용 중(StrMODE[69]) → 배운 수 부족([71]) → 확인([70]).
@@ -428,6 +478,8 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     notice,
     question,
     choice,
+    choiceIndex,
+    moveChoice: setChoiceIndex,
     select,
     back,
     dismissNotice,

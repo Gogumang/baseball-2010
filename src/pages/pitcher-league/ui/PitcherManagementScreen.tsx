@@ -109,14 +109,22 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
 
       {/*
         팝업 0x78 — StrMODE[59] "원하는 항목을 선택해주세요".
-        ⚠️ 원본은 좌우 키로 `+0x166` 을 토글하는 작은 창(그리기 0x190f8 · 키 0x19398)이다.
-        여기서는 두 칸 버튼으로 같은 고르기만 한다 (**원본 배치 미해독 — 근사**).
+        원본은 좌우 키로 `+0x166` 을 토글하고 확인으로 고르는 작은 창이다
+        (그리기 0x190f8 · 키 0x19398) — 키는 `usePitcherManagementMenu` 가 본다.
+        ⚠️ **원본 배치 미해독 — 근사**: 여기서는 두 칸 버튼을 가로로 놓고 고른 칸을 눌러 그린다.
       */}
       {menu.choice !== null && (
         <Panel heading={menu.choice.text}>
           <div className={styles.tabRow}>
             {menu.choice.labels.map((label, index) => (
-              <button key={label} type="button" className={styles.tab} onClick={() => menu.chooseOption(index)}>
+              <button
+                key={label}
+                type="button"
+                aria-pressed={index === menu.choiceIndex}
+                className={`${styles.tab} ${index === menu.choiceIndex ? styles.tabSelected : ''}`}
+                onPointerEnter={() => menu.moveChoice(index)}
+                onClick={() => menu.chooseOption(index)}
+              >
                 {label}
               </button>
             ))}

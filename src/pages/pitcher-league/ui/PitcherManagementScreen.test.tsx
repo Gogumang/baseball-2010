@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { StrictMode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { PitcherManagementScreen } from '@/pages/pitcher-league/ui/PitcherManagementScreen'
@@ -424,5 +425,119 @@ describe('칭호 목록 창 (기본정보 119 → 129)', () => {
     누르기('기본정보')
 
     expect(screen.queryByText('칭호')).toBeNull()
+  })
+})
+
+/**
+ * 두 갈래 팝업(0x78 구질/마구 · 0x80 기록실)의 **키**.
+ *
+ * 웹판은 팝업이 뜨면 커맨드 목록(`MenuList`)을 화면에서 내리는데, 팝업 쪽에 키를 보는 데가 없어
+ * **키보드로 몰면 여기서 아무 키도 안 먹혀 앞으로도 뒤로도 못 갔다**(마우스로만 진행됐다).
+ * 원본은 이 창이 키를 직접 본다 — 좌우로 `장면+0x166` 토글, 확인으로 고르기, 취소(−16)로 닫기
+ * (그리기 0x190f8 · 키 0x19398).
+ *
+ * ⚠️ 이 묶음은 **`StrictMode` 로** 띄운다 — 고리를 두 번 붙였다 떼는 자리에서 놓친 버그가 있었다.
+ */
+describe('두 갈래 팝업의 키 (0x19398 · StrictMode)', () => {
+  const 훈련가능투수 = () => 투수({ morale: 100, popularity: 5_000, gamePoint: 9_000 })
+
+  const 엄격화면 = (options: 화면옵션 = {}) =>
+    render(
+      <StrictMode>
+        <PitcherManagementScreen
+          career={options.career ?? 훈련가능투수()}
+          random={난수}
+          onSave={options.onSave ?? (() => {})}
+          onNextGame={options.onNextGame ?? (() => {})}
+          onOuting={options.onOuting}
+          onExit={options.onExit ?? (() => {})}
+        />
+      </StrictMode>,
+    )
+
+  const 키 = (key: string) => fireEvent.keyDown(window, { key })
+  /** 관리(105) → 트레이닝(107) → 칸 4(마구) 까지 **키만으로** 간다 */
+  const 키로마구칸까지 = () => {
+    키('ArrowDown')
+    키('Enter')
+    for (let i = 0; i < 4; i += 1) 키('ArrowDown')
+    키('Enter')
+  }
+
+  it('마우스 없이 키만으로 팝업까지 오고, 확인 키가 첫 칸(마구)을 고른다', () => {
+    엄격화면()
+
+    키로마구칸까지()
+    expect(screen.getByText('원하는 항목을 선택해주세요')).toBeTruthy()
+
+    키('Enter')
+
+    // StrMODE[66] "%d G포인트가 소모됩니다" — 마구 훈련 확인 팝업까지 왔다
+    expect(screen.getByText(/G포인트가 소모됩니다/)).toBeTruthy()
+  })
+
+  it('좌우 키가 `+0x166` 을 토글한다 — 오른쪽으로 옮기면 [구질] 이 열린다', () => {
+    엄격화면()
+
+    키로마구칸까지()
+    키('ArrowRight')
+    키('Enter')
+
+    expect(screen.getByText('구질 훈련')).toBeTruthy()
+  })
+
+  it('좌우는 칸 수로 감긴다 — 왼쪽 한 번이면 마지막 칸(구질)이다', () => {
+    엄격화면()
+
+    키로마구칸까지()
+    키('ArrowLeft')
+    키('Enter')
+
+    expect(screen.getByText('구질 훈련')).toBeTruthy()
+  })
+
+  it('취소(−16)는 팝업만 닫고 트레이닝 목록으로 돌려보낸다', () => {
+    엄격화면()
+
+    키로마구칸까지()
+    키('Escape')
+
+    expect(screen.queryByText('원하는 항목을 선택해주세요')).toBeNull()
+    expect(screen.queryByText('구질 훈련')).toBeNull()
+    // 107 목록이 그대로 있다 (칸 4 는 마구 레벨을 옆에 적는다)
+    expect(칸이름들()).toContain('마구레벨 0/4')
+  })
+
+  it('키만으로 마구 훈련 한 바퀴를 끝까지 돈다 — 확인 상자도 키로 닫힌다', () => {
+    const onSave = vi.fn()
+    엄격화면({ onSave })
+
+    키로마구칸까지()
+    키('Enter')
+    // StrMODE[66] 확인 팝업의 [예]
+    키('Enter')
+
+    expect(onSave).toHaveBeenCalled()
+    expect(screen.getByText(/마구 훈련 1\/4회/)).toBeTruthy()
+
+    // 결과 알림을 닫으면 105 허브로 돌아온다
+    키('Enter')
+    expect(칸이름들()).toEqual(['선수정보', '트레이닝', '휴식', '외출', '아이템', '다음경기'])
+  })
+
+  it('[기록실] 팝업(0x80)도 같은 키로 돈다 — 오른쪽 칸이 나리 판 성적이다', () => {
+    엄격화면()
+
+    // 105 → 106 선수정보 (커서 0 번 칸)
+    키('Enter')
+    // 106 칸 4 [기록실]
+    for (let i = 0; i < 4; i += 1) 키('ArrowDown')
+    키('Enter')
+    expect(screen.getByText('보고 싶은 기록을 선택해주세요')).toBeTruthy()
+
+    키('ArrowRight')
+    키('Enter')
+
+    expect(screen.queryByText('보고 싶은 기록을 선택해주세요')).toBeNull()
   })
 })

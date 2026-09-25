@@ -44,7 +44,6 @@ export function useMenuTurn(cursor: number, count: number, ticks: number): MenuT
       return undefined
     }
 
-    console.log('[turn] start', direction, from, cursor)
     setTurn({ fromCursor: from, direction, counter: 0 })
     const startedAt = performance.now()
     let handle = 0
@@ -55,7 +54,6 @@ export function useMenuTurn(cursor: number, count: number, ticks: number): MenuT
         setTurn(STILL)
         return
       }
-      console.log('[turn] tick', counter)
       setTurn({ fromCursor: from, direction, counter })
       handle = requestAnimationFrame(tick)
     }

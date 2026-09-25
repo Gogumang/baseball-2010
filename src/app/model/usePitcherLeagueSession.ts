@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import {
   applyPitcherGameResult,
@@ -394,11 +394,21 @@ export function usePitcherLeagueSession(
    * ⚠️ **테스트용** — `?무한G` 는 지갑 쪽에서 처리한다 (`useGamePointWallet`): `balance` 가 늘
    *    99999 이고 쓰기는 먹히지 않는다. 지갑을 안 받은 자리(테스트)는 예전처럼 여기서 올린다.
    *    저장은 그대로라 스위치를 끄면 원래 값으로 돌아온다.
+   *
+   * ⚠️ **값이 같으면 `career` 를 그대로 돌려준다** — 타자편 `useCareerSession` 과 같은 이유다.
+   *    G가 어긋나 갈아 끼울 때 매 렌더 **새 객체**를 만들면, 이 값을 프로프로 받는 화면이
+   *    아무것도 안 바뀌었는데도 계속 새 객체를 보게 된다. `useCareerSession` 에서는 그 새 객체가
+   *    저장 고리를 다시 돌려 **무한 렌더**까지 갔다 — 여기 고리들은 `career`(상태) 쪽을 보므로
+   *    지금은 안 돌지만, 같은 모양을 남겨 둘 까닭이 없다.
    */
   const overriddenGamePoint = wallet?.balance ?? (isInfiniteGamePointOn() ? MAXIMUM_GAME_POINT : null)
-  const shown = career === null || overriddenGamePoint === null || career.gamePoint === overriddenGamePoint
-    ? career
-    : { ...career, gamePoint: overriddenGamePoint }
+  const shown = useMemo(
+    () =>
+      career === null || overriddenGamePoint === null || career.gamePoint === overriddenGamePoint
+        ? career
+        : { ...career, gamePoint: overriddenGamePoint },
+    [career, overriddenGamePoint],
+  )
 
   return {
     career: shown,
