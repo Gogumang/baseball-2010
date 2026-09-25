@@ -100,20 +100,46 @@ export function hitParticleInputOf(
 }
 
 /**
- * **필살타법 연출이 쓰는 `.ptc`** — 스윙 중 그리기 `0x49aec` (H2 2-3 · 0x49c30 `ldrb r2,[r6,#0x18]`).
- * 필살 번호(선수 레코드 `+0x18`, 1~4) 로 고르고, 한 타석에 **한 번만** 쏜다 (경기 `+0x196b`).
+ * **필살타법 연출이 쓰는 `.ptc`** — 스윙 중 그리기 `0x49aec` (H2 2-3).
+ * 한 타석에 **한 번만** 쏜다 (경기 `+0x196b`, 0x49da4·0x49dfc).
+ *
+ * 0x49b4e 가 `0xb633d(타자)` = **마선수인가**(`rec[0xa]` 비트 0x40) 로 두 갈래를 가른다.
+ * - 거짓 → 0x49bfa: 필살 번호(선수 레코드 `+0x18`, 1~4) 로 고른다 (0x49c30 `ldrb r2,[r6,#0x18]`).
+ * - 참 → 0x49b7c: `0xb63a1(타자)` = **마선수 순번**(0~4) 으로 점프표 `0xd01e4` 를 탄다.
+ *
+ * 한 줄이 파티클을 **두 개까지** 쏜다 — 원본은 `sp+0x4c`(첫 id)·`sp+0x48`(둘째 id) 두 칸을 채워 두고
+ * 0x49dbc 와 0x49de0 에서 차례로 `0xbbc84(x, y, id, n, 0, −1, 0, 0)` 를 부른다. −1 인 칸은 건너뛴다.
  *
  * | 번호 | id → 파일 | 프레임 | y 보정 |
  * |---|---|---|---|
  * | 1 파워 스윙 | 1 → `002.ptc` | 6 | — |
  * | 2 플레임 스윙 | 11 → `012.ptc` | 3 | — |
  * | 3 토네이도 스윙 | 9 → `010.ptc` | 5 | +25 (0x49c84 `adds r3,#0x19`) |
+ * | 4 미라지/메테오 | 아래 참고 | 1 | — |
  *
- * ⚠️ **번호 4(미라지/메테오)는 뺐다.** 원본은 `0xb8e6d(타자)` 로 `013.ptc`(id 12) 와
- * `021.ptc`(id 20) 를 가르는데 그 함수가 무엇을 보는지 **아직 못 밝혔다** (H2 2-3 미해결).
- * 아무 번호나 꽂지 않는다.
- * ⚠️ **마타자(순번 0~4)도 뺐다.** 점프표 0xd01e4 로 010/019+020/014+002/021/018 을 고르는데
- * 웹 타석은 마타자 **순번**을 넘겨받지 않아 어느 줄인지 고를 수 없다.
+ * **번호 4 (0x49c8a)** 는 `0xb8e6d(타자)` 로 갈린다. 그 함수는 (직접 떴다)
+ * `b8e6e: ldrb r3,[r0,#0xb] ; lsrs r3,#4 ; subs r3,#2 ; cmp r3,#1 ; bhi → 거짓`
+ * = **폼 니블이 2·3 인가** = 타자 타입이 1(장타형)인가. 웹 `batterForm` 이 그 니블 그대로라
+ * `(batterForm >> 1) === 1` 이 같은 판정이다 (니블 2·3 일 때만 참이라 원본과 완전히 같다).
+ * - 참(장타형) → id 12 (`013.ptc`) · 프레임 1 (0x49c98 `movs r0,#0xc`)
+ * - 거짓(타격형) → id 20 (`021.ptc`) · 프레임 1 (0x49d42 `movs r0,#0x14`)
+ *   ⚠️ 원본은 이 갈래에서 파티클 **앞에** 경기 `+0xf18` 의 별도 그림을 한 장 더 그린다
+ *   (자리 = 표 `0xcfb34`(295, 351) / `0xcfb2c`(184, 351) 를 카메라로 옮긴 값, 좌우 뒤집기 `0xb63c1`).
+ *   그 그림 객체가 웹 타석에 아직 없어 **파티클만 옮겼다** — 그림은 미구현이다.
+ *
+ * **마타자 점프표 `0xd01e4`** (표 낱말을 직접 읽어 확인했다):
+ *
+ * | 순번 | 마타자 | 가는 곳 | 쏘는 것 |
+ * |---|---|---|---|
+ * | 0 | 메디카 | 0x49bb2 | 9 (`010.ptc`) · 2 |
+ * | 1 | 어거지죠 | 0x49bba | 18 (`019.ptc`) · 1 + 19 (`020.ptc`) · 1 |
+ * | 2 | 로제 | 0x49bde | 13 (`014.ptc`) · 1 + 1 (`002.ptc`) · 6 |
+ * | 3 | 크라이져 | 0x49bec | 20 (`021.ptc`) · 5, y +25 (0x49c80 → 0x49c84) |
+ * | 4 | 킹타이거 | 0x49bf2 | 17 (`018.ptc`) · 13 |
+ *
+ * 순번은 `ACE_PLAYERS` 중 `role === '타자'` 다섯의 배열 색인과 같다 (medica 0 … tiger 4).
+ * ⚠️ 어거지죠 줄은 `0xb63c1` 이 거짓이면 `sp+0x38` 에 17 을 따로 적어 두는데, 그 칸은 파티클이 아니라
+ *   뒤따르는 그리기(0x49d76)가 쓰는 값이라 **여기선 안 옮겼다**.
  */
 export interface SpecialSwingParticle {
   /** 0xbbc84 의 id — 파일은 `ptc/(id+1).ptc` */
@@ -130,8 +156,34 @@ export const SPECIAL_SWING_PARTICLES: Readonly<Record<number, SpecialSwingPartic
   3: { id: 9, img: 5, offsetY: 25 },
 }
 
-/** 필살 번호로 고른 파티클. 못 밝힌 번호(4·마타자)면 null */
-export function specialSwingParticleOf(swingNumber: number, isAceBatter: boolean): SpecialSwingParticle | null {
-  if (isAceBatter) return null
-  return SPECIAL_SWING_PARTICLES[swingNumber] ?? null
+/** 필살 번호 4 — 폼 니블 2·3(장타형)이면 013, 아니면 021 (0x49c8a → 0xb8e6d) */
+const MIRAGE_SLUGGER_PARTICLE: SpecialSwingParticle = { id: 12, img: 1, offsetY: 0 }
+const MIRAGE_CONTACT_PARTICLE: SpecialSwingParticle = { id: 20, img: 1, offsetY: 0 }
+
+/** 마타자 순번(0~4) → 쏘는 파티클. 점프표 0xd01e4 순서 그대로다 */
+export const ACE_BATTER_SPECIAL_PARTICLES: readonly (readonly SpecialSwingParticle[])[] = [
+  [{ id: 9, img: 2, offsetY: 0 }],
+  [{ id: 18, img: 1, offsetY: 0 }, { id: 19, img: 1, offsetY: 0 }],
+  [{ id: 13, img: 1, offsetY: 0 }, { id: 1, img: 6, offsetY: 0 }],
+  [{ id: 20, img: 5, offsetY: 25 }],
+  [{ id: 17, img: 13, offsetY: 0 }],
+]
+
+/**
+ * 이번 필살 스윙이 쏠 파티클들. 원본 순서대로 0~2개다.
+ *
+ * - `aceBatterIndex` 가 0 이상이면 마타자 점프표를 탄다 (필살 번호는 안 본다).
+ * - 아니면 필살 번호로 고른다. 모르는 번호면 빈 배열이다.
+ */
+export function specialSwingParticlesOf(
+  swingNumber: number,
+  batterForm: number,
+  aceBatterIndex = -1,
+): readonly SpecialSwingParticle[] {
+  if (aceBatterIndex >= 0) return ACE_BATTER_SPECIAL_PARTICLES[aceBatterIndex] ?? []
+  if (swingNumber === 4) {
+    return [(batterForm >> 1) === 1 ? MIRAGE_SLUGGER_PARTICLE : MIRAGE_CONTACT_PARTICLE]
+  }
+  const single = SPECIAL_SWING_PARTICLES[swingNumber]
+  return single === undefined ? [] : [single]
 }

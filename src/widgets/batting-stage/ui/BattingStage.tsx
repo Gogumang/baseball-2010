@@ -12,7 +12,7 @@ import {
   HIT_PARTICLE_IMAGE,
   hitParticleIdOf,
   hitParticleInputOf,
-  specialSwingParticleOf,
+  specialSwingParticlesOf,
 } from '@/widgets/batting-stage/lib/hitParticles'
 import { ballPixelAt } from '@/widgets/batting-stage/lib/trajectory'
 import { batterSideOfForm, stageLayoutOf } from '@/widgets/batting-stage/lib/stageLayout'
@@ -74,10 +74,18 @@ interface BattingStageProps {
   readonly random: RandomPort
   /**
    * **필살타법 레벨** (선수 기록 +0x201). 0 이면 못 배운 것이라 '0' 키를 눌러도 늘 실패한다.
-   * 마타자는 번호와 무관하게 30% 라 `isAceBatter` 로 따로 알린다 (H2 2-2).
+   * 마타자는 번호와 무관하게 30% 라 `aceBatterIndex` 로 따로 알린다 (H2 2-2).
    */
   readonly specialSwingLevel?: number
-  readonly isAceBatter?: boolean
+  /**
+   * **마타자 순번** (0~4). `ACE_PLAYERS` 중 `role === '타자'` 다섯의 배열 색인 그대로다
+   * (medica 0 · kao 1 · roze 2 · death 3 · tiger 4). 마타자가 아니면 −1 이거나 안 넘긴다.
+   *
+   * 원본은 `0xb63a0(타자)` 가 같은 값을 준다 — 마선수(`rec[0xa]` 비트 0x40)면 `rec[0xa] & 0x1f`,
+   * 아니면 −1 이다. 필살 연출 점프표 `0xd01e4` 가 이 순번으로 파티클을 고른다 (0x49b7c).
+   * 확률 쪽은 순번을 안 보고 "마타자인가" 만 본다 (H2 2-2 — 번호 무관 30%).
+   */
+  readonly aceBatterIndex?: number
   /**
    * 세 번째 인자는 **필살타법이 성공한 타구인가** — 성공하면 야수가 쥐지 않고 지나친다
    * (0x51800 → `features/defense-play` 의 `isUncatchable`).
@@ -86,7 +94,7 @@ interface BattingStageProps {
 }
 
 /** 원작 타석 화면. 그리기는 lib, 루프와 조작은 model이 맡는다. */
-export function BattingStage({ canBunt = false, swingMode = '일반', batterForm = 0, batterSkinIndex = 0, batterTeamIndex, batterEquipmentLevels, batterSkillIds = [], recentAtBatCodes = [], specialSwingLevel = 0, isAceBatter = false, ...props }: BattingStageProps) {
+export function BattingStage({ canBunt = false, swingMode = '일반', batterForm = 0, batterSkinIndex = 0, batterTeamIndex, batterEquipmentLevels, batterSkillIds = [], recentAtBatCodes = [], specialSwingLevel = 0, aceBatterIndex = -1, ...props }: BattingStageProps) {
   const refs = useStageRefs({
     ...props,
     canBunt,
@@ -123,14 +131,15 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
     const result = resolvePitch(pitch, swing, context, deck, latest.random)
     // 필살 스윙이면 여기서 굴린다 (0x34c74). 걸어 두지 않았으면 굴리지 않는다
     const isUncatchable = specialArmedRef.current
-      && rollSpecialSwing(specialSwingLevel, latest.random, isAceBatter)
+      && rollSpecialSwing(specialSwingLevel, latest.random, aceBatterIndex >= 0)
     // 필살 연출 파티클은 **성공 여부와 무관**하게 `S+0x10` 이 켜져 있으면 나간다 (0x49aec).
     // ⚠️ 원본은 상태 0x13 그리기에서 한 번(경기+0x196b) 쏘는데, 웹은 그 자리를 따로 두지 않아
     //    스윙이 판정되는 이 시점에 쏜다 — **때는 근사**고 고르는 번호만 원본 그대로다.
     if (specialArmedRef.current && swing !== null) {
-      const special = specialSwingParticleOf(specialSwingLevel, isAceBatter)
-      if (special !== null) {
-        const anchor = stageLayoutOf(batterSideOfForm(latest.batterForm)).batterAnchor
+      // 한 줄이 파티클을 두 개까지 쏜다 — 원본 0x49dbc·0x49de0 의 차례 그대로다
+      const specials = specialSwingParticlesOf(specialSwingLevel, latest.batterForm, aceBatterIndex)
+      const anchor = stageLayoutOf(batterSideOfForm(latest.batterForm)).batterAnchor
+      for (const special of specials) {
         emitParticles(
           particlesRef.current,
           particleConfigOf(special.id),
@@ -180,7 +189,7 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
     phaseRef.current = '결과'
     phaseStartedAtRef.current = now
     latest.onPitchResolved(result.detail, pitch, isUncatchable)
-  }, [isAceBatter, specialSwingLevel])
+  }, [aceBatterIndex, specialSwingLevel])
 
   /** 상태 0x13 을 끝내고 인플레이(0x17)로 넘긴다 — 시간이 다 됐거나 OK/'5' 로 건너뛸 때 */
   const commitHit = useCallback((now: number) => {

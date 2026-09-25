@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
+import { ACE_PLAYERS } from '@/shared/config/original/acePlayers'
 import {
   hitParticleIdOf,
   hitParticleInputOf,
   isStrongHit,
   isWeakHit,
   NORMAL_HIT_PARTICLE_ID,
-  specialSwingParticleOf,
+  specialSwingParticlesOf,
   STRONG_HIT_PARTICLE_ID,
 } from '@/widgets/batting-stage/lib/hitParticles'
 
@@ -82,20 +83,51 @@ describe('타격 불꽃 고르기 (0x49e64)', () => {
 })
 
 describe('필살타법 파티클 (0x49aec)', () => {
-  it('번호 1·2·3 은 각각 002·012·010 을 쓴다', () => {
-    expect([1, 2, 3].map((number) => specialSwingParticleOf(number, false)?.id)).toEqual([1, 11, 9])
+  it('번호 1·2·3 은 각각 002·012·010 을 하나씩 쓴다', () => {
+    expect([1, 2, 3].map((number) => specialSwingParticlesOf(number, 0).map((one) => one.id))).toEqual([[1], [11], [9]])
   })
 
   it('토네이도(3)는 25px 아래에서 터진다', () => {
-    expect(specialSwingParticleOf(3, false)?.offsetY).toBe(25)
+    expect(specialSwingParticlesOf(3, 0)[0]?.offsetY).toBe(25)
   })
 
-  it('못 밝힌 번호 4 와 마타자는 안 쏜다', () => {
-    expect(specialSwingParticleOf(4, false)).toBeNull()
-    expect(specialSwingParticleOf(1, true)).toBeNull()
+  it('번호 4 는 폼 니블 2·3(장타형)이면 013, 아니면 021 이다 (0xb8e6c)', () => {
+    // 폼 = 2 × 타입 + 손. 타입 0(타격형) 은 0·1, 타입 1(장타형) 은 2·3
+    expect([0, 1].map((form) => specialSwingParticlesOf(4, form)[0]?.id)).toEqual([20, 20])
+    expect([2, 3].map((form) => specialSwingParticlesOf(4, form)[0]?.id)).toEqual([12, 12])
+    expect(specialSwingParticlesOf(4, 2)[0]?.img).toBe(1)
+    expect(specialSwingParticlesOf(4, 0)[0]?.img).toBe(1)
   })
 
   it('안 배운 타자(0)는 안 쏜다', () => {
-    expect(specialSwingParticleOf(0, false)).toBeNull()
+    expect(specialSwingParticlesOf(0, 0)).toEqual([])
+  })
+
+  it('마타자 순번은 점프표 0xd01e4 그대로다', () => {
+    const 쏘는것 = [0, 1, 2, 3, 4].map((index) =>
+      specialSwingParticlesOf(0, 0, index).map((one) => [one.id, one.img]))
+    expect(쏘는것).toEqual([
+      [[9, 2]],
+      [[18, 1], [19, 1]],
+      [[13, 1], [1, 6]],
+      [[20, 5]],
+      [[17, 13]],
+    ])
+  })
+
+  it('크라이져(3)만 25px 아래에서 터진다', () => {
+    expect([0, 1, 2, 3, 4].map((index) => specialSwingParticlesOf(0, 0, index)[0]?.offsetY))
+      .toEqual([0, 0, 0, 25, 0])
+  })
+
+  it('마타자면 필살 번호는 안 본다 (0x49b4e 가 먼저 가른다)', () => {
+    expect(specialSwingParticlesOf(1, 0, 4).map((one) => one.id)).toEqual([17])
+  })
+
+  it('순번은 ACE_PLAYERS 타자 다섯의 배열 색인이다', () => {
+    const 마타자 = ACE_PLAYERS.filter((player) => player.role === '타자')
+    expect(마타자.map((player) => player.id)).toEqual(['medica', 'kao', 'roze', 'death', 'tiger'])
+    // 다섯 줄이 모두 채워져 있어야 점프표를 다 옮긴 것이다
+    expect(마타자.every((_, index) => specialSwingParticlesOf(0, 0, index).length > 0)).toBe(true)
   })
 })
