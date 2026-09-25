@@ -1,29 +1,42 @@
 import { useState } from 'react'
-import { BigResult, Hint, MenuList, Notice, Panel, PixelScreen } from '@/shared/ui'
+import { BigResult, Hint, MenuList, Panel, PixelScreen } from '@/shared/ui'
 import type { MenuItem } from '@/shared/ui'
 import { goalsOf } from '@/entities/mission/model/missionGoal'
 import { GoalBar } from '@/entities/mission/ui/GoalBar'
-import type { GaugeResult } from '@/entities/pitching/model/pitchCommand'
 import type { PitchTypeInfo } from '@/shared/config/original/pitchTypes'
 import type { PitcherRun } from '@/entities/mission/model/pitcherRun'
 import type { AtBatState } from '@/entities/at-bat/model/atBatState'
 import { CourseGrid } from '@/pages/pitching/ui/CourseGrid'
-import { PitchGauge } from '@/pages/pitching/ui/PitchGauge'
+import { PitchGradeGauge } from '@/pages/pitching/ui/PitchGradeGauge'
 
 /**
  * 투구 화면. 원작 설명서 <투구 조작>의 세 단계를 그대로 따른다:
  *   1. 구질 선택  2. 코스 선택  3. 투구 결정(게이지)
+ *
+ * ⚠️ 게이지가 넘겨 주는 것은 **누른 칸 g(0~9)** 하나다 — 원본에는 PERFECT/GOOD/BAD 라는
+ * 글자도 판정도 없다 (S5 U-15 확정, 누름 0x50e08). 등급 t = max(g−4, 1) 은 부르는 쪽
+ * (`pitcherPitch.pitchGradeOf`)이 원본 자리에서 뽑는다. 나리 투수편 `PitcherGameScreen` 과 같다.
  */
 type PitchPhase = '구질' | '코스' | '게이지'
 
 interface PitchingScreenProps {
   readonly run: PitcherRun
   readonly repertoire: readonly PitchTypeInfo[]
-  /** 환경설정 [투구] 가 게이지일 때만 3단계 게이지가 뜬다 (StrHOWTO[3], [30]) */
+  /** 환경설정 [투구] 가 게이지일 때만 3단계 게이지가 뜬다 (설정 +0x2d, 0x3f500) */
   readonly usesGauge: boolean
   readonly atBat: AtBatState
   readonly bannerText: string
-  readonly onThrow: (type: PitchTypeInfo, courseCell: number, gauge: GaugeResult) => void
+  /**
+   * 던진다. `gaugeCell` 은 게이지에서 **누른 칸 0~9**(안 눌렀거나 게이지를 안 쓰면 0),
+   * `gaugeSettingOn` 은 환경설정 [투구]가 게이지인가다 — 꺼져 있으면 원본이 제구·체력
+   * 확률표 0xd896c 로 등급을 뽑는다 (0x4dbac).
+   */
+  readonly onThrow: (
+    type: PitchTypeInfo,
+    courseCell: number,
+    gaugeCell: number,
+    gaugeSettingOn: boolean,
+  ) => void
   readonly onGiveUp: () => void
   readonly onFinish: () => void
 }
@@ -53,9 +66,10 @@ export function PitchingScreen({
     )
   }
 
-  const throwPitch = (gauge: GaugeResult) => {
+  /** 게이지에서 누른 칸 g 를 그대로 넘긴다 (0x50e08 — 칸이 1~9 가 아니면 부르는 쪽이 무시한다) */
+  const throwPitch = (gaugeCell: number) => {
     if (pitchType === null) return
-    onThrow(pitchType, courseCell, gauge)
+    onThrow(pitchType, courseCell, gaugeCell, true)
     setPhase('구질')
     setPitchType(null)
   }
@@ -104,8 +118,8 @@ export function PitchingScreen({
               if (usesGauge) {
                 setPhase('게이지')
               } else if (pitchType !== null) {
-                // 기본 투구 — 게이지 없이 바로 던진다
-                onThrow(pitchType, cell, '사용안함')
+                // 기본 투구 — 게이지 단계가 아예 없고, 등급은 제구·체력 표로 뽑힌다 (0x4dbac)
+                onThrow(pitchType, cell, 0, false)
                 setPhase('구질')
                 setPitchType(null)
               }
@@ -117,11 +131,9 @@ export function PitchingScreen({
 
       {phase === '게이지' && (
         <>
-          <Panel heading="3. 투구 결정">
-            <Notice>가운데에서 멈추면 PERFECT — 더 강한 공을 던집니다</Notice>
-          </Panel>
-          <PitchGauge onThrow={throwPitch} />
-          <Hint>누르면 던집니다</Hint>
+          {/* 원본에는 결과 글자가 없다 — 작아지는 원 한 장뿐이라 안내 문구도 붙이지 않는다 (S5 U-15) */}
+          <Panel heading="3. 투구 결정" />
+          <PitchGradeGauge onPress={throwPitch} />
         </>
       )}
     </PixelScreen>

@@ -29,7 +29,6 @@ import {
 import type { PitcherRun } from '@/entities/mission/model/pitcherRun'
 import { attemptSteal } from '@/entities/game/model/steal'
 import { missionOpponentOf, pitcherAbilityOf } from '@/entities/game/model/aceOpponent'
-import type { GaugeResult } from '@/entities/pitching/model/pitchCommand'
 import { pitchAgainstBatter } from '@/entities/pitching/model/simulateBatter'
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
@@ -105,19 +104,15 @@ interface PendingMissionDefense {
 }
 
 /**
- * 게이지 결과 → 원본 게이지 칸 0~9 (`pitchGauge.gaugeGradeOf`, 0x50e08).
+ * 게이지에서 t=5(최상)로 던진 공만 "MAX게이지" 로 센다.
  *
- * ⚠️ **근사다.** 원본에는 PERFECT/GOOD/BAD 라는 글자도 판정도 없고 **누른 칸 g 하나**뿐이다
- * (S5 U-15 확정 — `entities/pitcher-career/model/pitchGauge` 머리 주석). 웹 투구 화면은
- * 칸 대신 세 글자를 넘겨 주므로 등급 t = max(g−4, 1) 이 1·3·5 로 갈리는 칸을 골라 붙였다.
- * 화면이 칸을 넘겨 주게 되면 이 표는 지우면 된다.
+ * 원본에도 같은 칸이 있다 — 투수 평가 `R+0x158` 을 채우는 0xa5e00 이 `if t != 5 → return`
+ * 한 줄뿐이다(S5 5절 확정). 게이지를 끄고 던져 표에서 t=5 가 나온 공과 마구(늘 t=5)도 함께 센다.
+ *
+ * ⚠️ **유력/추정**: 미션 레코드의 "MAX투구게이지" 목표가 세는 칸이 이 `R+0x158` 과 같은지는
+ * 아직 못 밝혔다. t=5 말고 달리 "MAX" 라 부를 값이 없어 같은 줄로 둔다.
  */
-const MISSION_GAUGE_CELLS: Readonly<Record<GaugeResult, number>> = {
-  PERFECT: 9,
-  GOOD: 7,
-  BAD: 1,
-  사용안함: 0,
-}
+const MAX_GAUGE_GRADE = 5
 
 /**
  * 미션 투수의 능력치·레퍼토리.
@@ -257,18 +252,24 @@ export function useMissionSession({
    * ⚠️ 경기 상태(이닝·점수·로스터)는 미션 레코드에 없으므로 진행기 `PitcherGameProgress` 를
    *    통째로 쓰지는 않는다 — 투구 한 개를 만드는 데 필요한 것만 위 상수로 채웠다.
    */
-  const handleThrow = (type: PitchTypeInfo, courseCell: number, gauge: GaugeResult) => {
+  const handleThrow = (
+    type: PitchTypeInfo,
+    courseCell: number,
+    /** 게이지에서 **누른 칸 0~9** 그대로다 (0x50e08). 안 눌렀거나 게이지를 안 쓰면 0 */
+    gaugeCell: number,
+    /** 환경설정 [투구] 가 게이지인가 (설정 +0x2d, 0x3f500) */
+    gaugeSettingOn: boolean,
+  ) => {
     if (pitcherRun === null || pitcherRun.status !== '진행중') return
     // 화면이 수비를 돌리는 동안에는 다음 공이 나가지 않는다 (원본 0x17 이 도는 동안 0xf 로 안 간다)
     if (pendingDefensePlay !== null) return
 
     // 원본 구질 번호 1~21. 표에 없는 이름이면 1(FASTBALL)로 둔다
     const typeNumber = Math.max(1, PITCH_TYPES.findIndex((candidate) => candidate.name === type.name) + 1)
-    const gaugeCell = MISSION_GAUGE_CELLS[gauge]
-    // 게이지를 안 쓴 공은 원본대로 제구·체력 확률표 0xd896c 로 등급을 뽑는다 (0x4dbac)
+    // 게이지를 쓰면 칸에서 t = max(g−4, 1) 을, 안 쓰면 제구·체력 확률표 0xd896c 로 뽑는다 (0x4dbac)
     const grade = pitchGradeOf(
       {
-        gaugeSettingOn: gauge !== '사용안함',
+        gaugeSettingOn,
         typeNumber,
         gaugeCell,
         effectiveControl: MISSION_PITCHER_STATS.control,
@@ -295,7 +296,7 @@ export function useMissionSession({
     const batterAbility = opponent === null ? ROOKIE_BATTER_ABILITY : opponent.ability
     const resolution = pitchAgainstBatter(pitch, batterAbility, random)
 
-    let nextRun = recordPitch(pitcherRun, gauge === 'PERFECT')
+    let nextRun = recordPitch(pitcherRun, grade === MAX_GAUGE_GRADE)
     const nextAtBat = runner.applyPitch(resolution)
     runner.setBannerText(describePitchResolution(resolution))
     const outcome = isAtBatFinished(nextAtBat) ? nextAtBat.outcome : null

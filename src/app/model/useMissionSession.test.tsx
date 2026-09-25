@@ -136,8 +136,11 @@ function countingRandom() {
   return { port, drawn: () => draws }
 }
 
-/** 투수 미션 하나를 열고 한가운데(칸 4)로 PERFECT 공 하나를 던져, 그동안 뽑은 난수 수를 센다 */
-function drawsOfOnePitch(missionId: number) {
+/**
+ * 투수 미션 하나를 열고 한가운데(칸 4)로 공 하나를 던져, 그동안 뽑은 난수 수를 센다.
+ * 게이지는 **누른 칸** 으로 넘긴다 — 칸 9 가 등급 t=5(최상)다 (0x50e08 `t = max(g−4, 1)`).
+ */
+function drawsOfOnePitch(missionId: number, gaugeCell = 9, gaugeSettingOn = true) {
   const counter = countingRandom()
   const missionRecord: MissionRecordPort = { load: () => ({}), save: vi.fn() }
   let screen: Screen = { kind: '미션선택' }
@@ -159,12 +162,13 @@ function drawsOfOnePitch(missionId: number) {
   })
   const before = counter.drawn()
   act(() => {
-    rendered.result.current.session.handleThrow(PITCH_TYPES[0], 4, 'PERFECT')
+    rendered.result.current.session.handleThrow(PITCH_TYPES[0], 4, gaugeCell, gaugeSettingOn)
   })
   const drawn = counter.drawn() - before
   const banner = rendered.result.current.runner.bannerText
+  const maxGauges = rendered.result.current.session.pitcherRun?.perfectGauges ?? 0
   rendered.unmount()
-  return { drawn, banner }
+  return { drawn, banner, maxGauges }
 }
 
 describe('투수 미션 조준 흔들림 — 레코드 바이트 13 → 0x39c5c', () => {
@@ -184,6 +188,39 @@ describe('투수 미션 조준 흔들림 — 레코드 바이트 13 → 0x39c5c'
    */
   it('조건코드 3("난공불락의 철벽마무리")은 한가운데를 노려도 공이 딴 데로 간다', () => {
     expect(drawsOfOnePitch(10)).not.toEqual(drawsOfOnePitch(1))
+  })
+})
+
+/* ── ㉠-2 투구 게이지는 칸 번호를 그대로 받는다 (0x50e08) ───────────────────── */
+
+describe('투수 미션 투구 게이지 — 누른 칸 g 를 그대로 받는다', () => {
+  /**
+   * 원본 누름 0x50e08~0x50e34: `g 가 1~9 가 아니면 무시` → `t = max(g − 4, 1)`.
+   * 칸 9 만 최상 t=5 이고, 칸 8 은 t=4 다 (화면에서는 둘이 같은 그림이다 — S5 U-15 4절).
+   * "MAX게이지" 는 t=5 로 던진 공만 센다 (0xa5e00, S5 5절).
+   */
+  it('칸 9 만 MAX게이지로 센다 — 칸 8·7·1 은 안 센다', () => {
+    expect(drawsOfOnePitch(1, 9).maxGauges).toBe(1)
+    expect(drawsOfOnePitch(1, 8).maxGauges).toBe(0)
+    expect(drawsOfOnePitch(1, 7).maxGauges).toBe(0)
+    expect(drawsOfOnePitch(1, 1).maxGauges).toBe(0)
+  })
+
+  /** 칸이 1~9 밖이면 원본이 그냥 무시한다 = 안 누른 것과 같다 (0x50e1e `cmp r3,#8; bls`) */
+  it('칸 0 과 칸 10 이상은 무시한다 — 안 누른 것과 같다', () => {
+    expect(drawsOfOnePitch(1, 0).maxGauges).toBe(0)
+    expect(drawsOfOnePitch(1, 12).maxGauges).toBe(0)
+  })
+
+  /**
+   * ⚠️ **난수 차례가 게이지 칸으로 바뀌면 안 된다.** 게이지를 쓰는 공은 등급을 칸에서 바로
+   * 뽑으므로 굴림이 하나도 안 붙고(0x50e2a), 게이지를 끈 공만 제구·체력 표 0xd896c 굴림이
+   * 하나 더 붙는다 (0x4dbac → 0xb74bc).
+   */
+  it('게이지 칸이 달라져도 난수 차례는 같고, 게이지를 끄면 딱 한 번 더 뽑는다', () => {
+    const 칸별 = [1, 5, 7, 8, 9, 0, 12].map((cell) => drawsOfOnePitch(1, cell).drawn)
+    expect(new Set(칸별).size, `칸마다 난수 차례가 다르다: ${칸별.join(',')}`).toBe(1)
+    expect(drawsOfOnePitch(1, 0, false).drawn).toBe(칸별[0] + 1)
   })
 })
 
