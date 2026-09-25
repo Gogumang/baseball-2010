@@ -257,6 +257,11 @@ export function applyPlayerOutcome(
 export interface PlayerOutcomeOptions {
   readonly pattern?: BattedBallPattern
   readonly isUncatchable?: boolean
+  /**
+   * **2스트라이크 번트 파울 아웃**(원본 판정 11)인가 — 아웃 콜을 조건 없이 62 로 내기 위한 표다.
+   * `resolvePitch` 의 `PitchOutcomeDetail.isBuntFoulOut` 이 그대로 들어온다.
+   */
+  readonly buntFoulOut?: boolean
 }
 
 /**
@@ -330,6 +335,8 @@ function defensePlayInputOf(
     runningMode: progress.runningModeManual ? '수동' : '자동',
     // 필살타법이 성공한 타구면 야수가 쥐지 않는다 (0x51800) — 타석 쪽이 확률 굴림을 하면 넘겨 준다
     isUncatchable: options.isUncatchable,
+    // 판정 11(2스트라이크 번트 파울 아웃)이면 아웃 콜이 조건 없이 62 다 — 진행기는 안 본다
+    buntFoulOut: options.buntFoulOut,
   }
 }
 

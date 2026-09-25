@@ -398,7 +398,11 @@ export function useCareerSession({
       const runnersOnBase = [bases.first, bases.second, bases.third].filter(Boolean).length
       // 타석 결과(안타/아웃 코드)만 먼저 정한다 — 인플레이 타구면 주자 처리는 화면 뒤로 미뤄진다.
       // 필살타법이 성공한 타구면 야수가 쥐지 않는다 (0x51800)
-      const advanced = startPlayerOutcome(currentProgress, nextAtBat.outcome, random, { isUncatchable })
+      // 판정 11(2스트라이크 번트 파울 아웃)은 아웃 콜이 조건 없이 62 다 — 플레이 끝까지 실어 보낸다
+      const advanced = startPlayerOutcome(currentProgress, nextAtBat.outcome, random, {
+        isUncatchable,
+        buntFoulOut: detail.isBuntFoulOut,
+      })
       progressRef.current = advanced
       setProgress(advanced)
 
@@ -532,7 +536,7 @@ export function useCareerSession({
           carryDistance: carryDistanceOf(pending.trajectory),
           caughtOnTheFly: played.caughtOnTheFly,
         }),
-        inPlayCallSoundIdOf(pending.outcome, played),
+        inPlayCallSoundIdOf(pending.outcome, { ...played, buntFoulOut: pending.buntFoulOut }),
         ...gameStepSoundIdsOf(current, resolved),
       ])
       finishAtBat(resolved, pending.outcome, runnersOnBase)
@@ -558,7 +562,9 @@ export function useCareerSession({
       progressRef.current = next
       setProgress(next)
       // 도루 실패로 이닝이 끝나면 공수 교대 징글이 난다. 세이프 콜(17)은 잇지 않았다 —
-      // 원본 판정 v9 가 어떤 플레이에서 나는지 미해결이다
+      // 원본은 도루도 **수비 화면(플레이 종류 9, 0x3e07e)** 을 거쳐 판정 v9 로만 17 을 내는데,
+      // 그 v9 는 "포수 송구가 루에 닿아 야수가 공을 쥔 채 태그에 실패한 틱" 이다(0xb442a).
+      // 웹 도루는 주력 표 굴림 하나라 그 칸이 없다 (`atBatSounds.inPlayCallSoundIdOf` 주석)
       playSoundIds(audio, gameStepSoundIdsOf(current, next))
     },
 
