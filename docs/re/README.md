@@ -70,6 +70,7 @@
 | [S6-season-cleanup.md](S6-season-cleanup.md) | 국가대항전 뒷정리, 선수 `+0xa` 종류 비트, 선수영입 끼워넣기 |
 | [S4-season-reputation.md](S4-season-reputation.md) | 시즌 평판 평가 16칸의 뜻과 가중치 (점프표 4↔5 뒤집힘) |
 | [S3-stadium-items.md](S3-stadium-items.md) | 구장 아이템(관중석·전광판·잔디) 구매·교체·가격·히든 해금 |
+| [S11-home-away.md](S11-home-away.md) | 홈/원정(선공·후공) `0xb7844` 세 갈래, 포스트시즌 대진 칸, 국가대항전 구장 |
 | [R13-season-leftovers.md](R13-season-leftovers.md) | 시즌 잔여 상태, 포스트시즌 대진, 선수영입, 히든 장비 |
 | [Q2-mission-rewards.md](Q2-mission-rewards.md) | 미션 보상·클리어 횟수, 명예의 전당 선수 활용 |
 
