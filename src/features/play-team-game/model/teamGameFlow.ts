@@ -13,7 +13,9 @@ import type { GameState, PlayerSide } from '@/entities/game/model/gameState'
 import { advanceRunners } from '@/entities/game/model/baseState'
 import { attemptSteal, canStealFrom } from '@/entities/game/model/steal'
 import { playQuickAtBat } from '@/entities/game/model/quickAtBat'
-import type { QuickAtBatBatter } from '@/entities/game/model/quickAtBat'
+import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
+import type { PitcherAbility } from '@/entities/pitching/model/pitch'
+import type { PitcherRepertoire } from '@/shared/config/original/pitcherRepertoires'
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import { rollStartingPitcherIndex } from '@/entities/team/model/teamRoster'
 import { rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
@@ -54,7 +56,6 @@ import {
 } from '@/entities/pitching/model/pitcherChange'
 import type { MoundPitcherCounters } from '@/entities/pitching/model/pitcherChange'
 import { runnerCountOf } from '@/entities/game/model/baseState'
-import { PITCHERS_PER_TEAM } from '@/entities/team/model/teamRoster'
 import {
   buildHumanPitch,
   drainStamina,
@@ -69,16 +70,16 @@ import { FULL_PLAY_SETTINGS, isHumanControlled } from '@/features/play-team-game
 import type { MatchProgressSettings } from '@/features/play-team-game/model/matchSettings'
 import {
   entryBatterGameAbilities,
+  entryPitcherGameAbilities,
   NO_ACE_BATTER,
-  quickPitcherFor,
-  pitcherGameAbilities,
   rosterEntryBattersOf,
-  rosterRepertoireOf,
-  stagePitcherAbility,
+  rosterEntryPitchersOf,
   withAceBatter,
+  withAcePitcher,
 } from '@/features/play-team-game/model/teamGameRoster'
 import type {
   TeamEntryBatter,
+  TeamEntryPitcher,
   TeamGameAbilityContext,
 } from '@/features/play-team-game/model/teamGameRoster'
 import { rollOpponentAceIndex } from '@/entities/game/model/aceOpponent'
@@ -106,8 +107,6 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
  *
  * ⚠️ **아직 안 옮긴 것** (원본에는 있다):
  *   - 엔트리 편집(0x55864) — 타순 첫 순서는 로스터 순서 그대로다
- *   - AI 팀 **마투수**(0xb88c8) — 번호는 원본대로 뽑아 두지만(`opponentAcePitcherIndex`)
- *     웹 투수 명단이 로스터 8칸 붙박이라 벤치에 넣을 자리가 없다
  *   (**대타**는 사람·CPU 양쪽 다 들어왔다 — `pinchHit` 과 CPU 대타 0xac228, Q1 4절)
  *   (경기 중 **투수 교체**는 들어왔다: 자동으로 넘긴 타석에서 CPU 교체 AI(0xac428)가 양 팀 투수를
  *    바꾸고, 사람이 잡은 타석은 원본대로 `#` 메뉴가 바꾼다 — `changePitcher`·`canOpenPitcherChange`.
@@ -174,6 +173,22 @@ export interface TeamGameOptions {
    */
   readonly runningModeManual?: boolean
   /**
+   * 환경설정 "송구" 가 **수동**인가 (설정 +0xf4). 안 넘기면 **원본 기본값인 수동**이다.
+   *
+   * 갈림길은 `0xae6c8` — 직접 떴다 (`0xae690` 과 오프셋 한 글자만 다른 쌍둥이):
+   * ```
+   * ae6ce: r2 = [obj + 0x174]                       ; = 경기 상태
+   * ae6d4: r3 = (s8)경기[0xa]                       ; ★ 수비 측 (주루 쪽은 경기[9] = 공격 측)
+   * ae6de: r3 = 경기[0x31 + 수비측]
+   * ae6e6: r1 = (r3 == 1)                           ; 그 팀을 CPU 가 조작하는가
+   * ae6ee: 반환 = r1 || (인자 != 0)                  ; 인자 = 설정 +0xf4 (0 = 수동)
+   * ```
+   * 거짓이면 CPU 송구 결정 `0xafa60` 을 **아예 안 돌린다** (0x526ac, 예외 없음).
+   * 곧 **사람이 수비하는 타석에서만** 이 설정이 먹는다 — 우리 공격 타석은 수비가 CPU 라
+   * 앞 항이 늘 참이어서 설정과 무관하다. 그래서 이 칸은 `defensiveDefenseInputOf` 한 곳에만 간다.
+   */
+  readonly throwModeManual?: boolean
+  /**
    * 준비 화면에서 고른 **마타자** 0~4 (준비 기록 `skin+0xbc` +0xd). 안 넘기면 없다.
    *
    * 경기 세우기 `0x30f20` 이 `0xb8870(팀, 이 값)` 으로 마타자를 **벤치 첫 칸(9번)** 에 끼워 넣고
@@ -187,9 +202,13 @@ export interface TeamGameOptions {
   /**
    * 준비 화면에서 고른 **마투수** 0~4 (준비 기록 `skin+0xbc` +0xe). 안 넘기면 없다.
    *
-   * ⚠️ 웹 투수 명단은 아직 로스터 8칸 붙박이라 **마투수를 벤치에 넣는 `0xb88c8` 은 안 옮겼다**.
-   * 이 값이 지금 하는 일은 하나뿐이다 — 원본과 같은 차례로 `0x66968` 을 굴려 **AI 팀 마투수 번호**를
-   * 정하는 것이다 (`31058`). 굴림 차례를 원본에 맞추려면 값이 없어도 이 자리에서 굴려야 한다.
+   * 경기 세우기 `0x30f20` 이 `0xb88c8(팀, 이 값)` 으로 마투수를 **투수 명단 8번 칸**에 넣고
+   * 벤치 투수 수 `team+0x33` 을 하나 올린다 (`31042` · `b88f6~b8906`). 마타자의 9번과 **칸이 다르다**
+   * — `0xb521c` 의 `0x60` 가지가 8번이다 (`teamGameRoster.PITCHER_ENTRY_ACE_SLOT` 주석).
+   * 원본에서 마투수가 마운드에 서는 길은 **`#` 투수 교체(또는 CPU 교체 AI)** 뿐이다 — 선발이 아니다.
+   *
+   * 원본은 같은 자리에서 **AI 팀에도** 마투수를 넣는다 — 이 값으로 `0x66968` 을 굴려 나온 번호다
+   * (`31058`). 그래서 이 칸은 상대 팀 마투수의 **입력**이기도 하다 (`rollOpponentAceIndex`).
    */
   readonly acePitcherId?: number
   /** 이 경기에 쓸 수 있는 마구 횟수. 로스터 투수는 마구가 없어 기본 0 이다 */
@@ -259,6 +278,13 @@ export interface TeamGameProgress {
    */
   readonly ourPitcherIndex: number
   readonly opponentPitcherIndex: number
+  /**
+   * 우리 팀 **투수 명단** — 원본 `team+0x00` 의 "칸 → 투수" 목록이다 (0xb8950).
+   * 0번이 선발, 1번부터가 벤치이고, 고른 마투수는 **8번 칸**에 앉는다 (`withAcePitcher`).
+   */
+  readonly ourPitcherEntry: readonly TeamEntryPitcher[]
+  /** 상대 팀 투수 명단 — 일반·대전모드에서는 `0x66968` 이 고른 AI 마투수가 8번에 있다 */
+  readonly opponentPitcherEntry: readonly TeamEntryPitcher[]
   /** 이미 마운드를 밟은 투수 칸 — 벤치에서 빠진다 (`team+0x33` 이 줄어드는 자리, 0xaec22) */
   readonly ourUsedPitchers: readonly number[]
   readonly opponentUsedPitchers: readonly number[]
@@ -294,7 +320,7 @@ export interface TeamGameProgress {
   readonly cpuPinchHitUsed: boolean
   /**
    * `0x66968`·`0x66994` 가 뽑은 **AI 팀 마투수·마타자 번호** 0~4 (시즌모드는 −1 — `0x30f20` 을 안 탄다).
-   * 마타자는 `opponentEntry` 벤치 첫 칸에 들어가 있고, 마투수는 넣을 자리가 아직 없어 번호만 들고 있다.
+   * 마타자는 `opponentEntry` 벤치 첫 칸(9번)에, 마투수는 `opponentPitcherEntry` 8번 칸에 들어가 있다.
    */
   readonly opponentAcePitcherIndex: number
   readonly opponentAceBatterIndex: number
@@ -398,10 +424,21 @@ export function startTeamGame(options: TeamGameOptions, random: RandomPort): Tea
     rosterEntryBattersOf(options.opponentTeamId),
     opponentAces.batter,
   )
+  // 0x31042 · 0x31064 — 마타자와 **같은 자리에서** 마투수도 양 팀에 들어간다 (0xb88c8)
+  const ourPitcherEntry = withAcePitcher(
+    rosterEntryPitchersOf(options.ourTeamId),
+    options.acePitcherId ?? NO_ACE_BATTER,
+  )
+  const opponentPitcherEntry = withAcePitcher(
+    rosterEntryPitchersOf(options.opponentTeamId),
+    opponentAces.pitcher,
+  )
   const initial: TeamGameProgress = {
     options,
     ourEntry,
     opponentEntry,
+    ourPitcherEntry,
+    opponentPitcherEntry,
     ourEntryRecords: ourEntry.map(() => EMPTY_BATTER_GAME_RECORD),
     opponentEntryRecords: opponentEntry.map(() => EMPTY_BATTER_GAME_RECORD),
     cpuPinchHitUsed: false,
@@ -558,27 +595,100 @@ function entryQuickBatterOf(
   return { hit: ability[0], power: ability[1], run: ability[3], skillIds: [] }
 }
 
+/** 간이 타석 엔진이 보는 투수 — 제구·구속·체력만 쓴다 */
+function entryQuickPitcherOf(
+  progress: TeamGameProgress,
+  teamId: number,
+  slot: number,
+): QuickAtBatPitcher {
+  const ability = pitcherAbilitiesAt(progress, teamId, slot)
+  return { control: ability[0], velocity: ability[1], stamina: ability[3], skillIds: [] }
+}
+
 /** 지금 타석에 선 우리 타자의 경기용 능력치 */
 export function currentBatterAbility(progress: TeamGameProgress) {
   return entryStageAbilityOf(progress, progress.options.ourTeamId, progress.game.battingOrderIndex)
 }
 
+/**
+ * 한 팀의 **투수 명단** — 타자 명단과 짝을 이루는 원본 `team+0x00` 목록이다 (0xb8950).
+ * 0번이 선발, 1번부터가 벤치이고, 마투수가 있으면 8번에 앉아 있다 (`PITCHER_ENTRY_ACE_SLOT`).
+ */
+function pitcherEntriesOf(progress: TeamGameProgress, teamId: number): readonly TeamEntryPitcher[] {
+  return teamId === progress.options.ourTeamId
+    ? progress.ourPitcherEntry
+    : progress.opponentPitcherEntry
+}
+
+/** 투수 명단 한 칸 — 없는 칸이면 0번(선발)으로 떨어진다 */
+function pitcherEntryAt(
+  progress: TeamGameProgress,
+  teamId: number,
+  slot: number,
+): TeamEntryPitcher | undefined {
+  const entry = pitcherEntriesOf(progress, teamId)
+  return entry[slot] ?? entry[0]
+}
+
+/** 투수 명단 한 칸의 경기용 능력치 네 칸 (제구·구속·변화·체력) */
+function pitcherAbilitiesAt(
+  progress: TeamGameProgress,
+  teamId: number,
+  slot: number,
+): readonly number[] {
+  const entry = pitcherEntryAt(progress, teamId, slot)
+  if (entry === undefined) return [0, 0, 0, 0]
+  return entryPitcherGameAbilities(abilityContextOf(progress.options), teamId, entry)
+}
+
+/** 투수 명단 한 칸의 구질 표 (폼·마구·보유 구질) */
+function pitcherRepertoireAt(
+  progress: TeamGameProgress,
+  teamId: number,
+  slot: number,
+): PitcherRepertoire {
+  return (
+    pitcherEntryAt(progress, teamId, slot)?.repertoire ?? {
+      name: '',
+      form: 0,
+      magicId: 0,
+      pitchMask: 1,
+    }
+  )
+}
+
+/** 원본 0~999 를 타석 화면의 0~100 눈금으로 (다른 화면들이 쓰는 것과 같은 나눗셈) */
+const STAGE_PITCHER_DIVISOR = 10
+
 /** 지금 우리 타자를 상대하는 투수의 경기용 능력치 (0~100 눈금) */
-export function currentPitcherAbility(progress: TeamGameProgress) {
-  return stagePitcherAbility(
-    abilityContextOf(progress.options),
-    progress.options.opponentTeamId,
-    progress.opponentPitcherIndex,
+export function currentPitcherAbility(progress: TeamGameProgress): PitcherAbility {
+  const teamId = progress.options.opponentTeamId
+  const slot = progress.opponentPitcherIndex
+  const ability = pitcherAbilitiesAt(progress, teamId, slot)
+  const repertoire = pitcherRepertoireAt(progress, teamId, slot)
+  return {
+    control: Math.round(ability[0] / STAGE_PITCHER_DIVISOR),
+    velocity: Math.round(ability[1] / STAGE_PITCHER_DIVISOR),
+    breaking: Math.round(ability[2] / STAGE_PITCHER_DIVISOR),
+    repertoire: {
+      form: repertoire.form,
+      pitchMask: repertoire.pitchMask,
+      magicId: repertoire.magicId,
+    },
+  }
+}
+
+/** 지금 마운드에 선 상대 투수가 마투수면 `ACE_PITCHERS` 칸 0~4, 아니면 −1 */
+export function currentPitcherAceIndex(progress: TeamGameProgress): number {
+  return (
+    pitcherEntryAt(progress, progress.options.opponentTeamId, progress.opponentPitcherIndex)
+      ?.aceIndex ?? NO_ACE_BATTER
   )
 }
 
 /** 우리 선발 투수의 경기용 능력치 (제구·구속·변화·체력) */
 export function ourPitcherStats(progress: TeamGameProgress): PitcherStats {
-  const ability = pitcherGameAbilities(
-    abilityContextOf(progress.options),
-    progress.options.ourTeamId,
-    progress.ourPitcherIndex,
-  )
+  const ability = pitcherAbilitiesAt(progress, progress.options.ourTeamId, progress.ourPitcherIndex)
   return { control: ability[0], velocity: ability[1], breaking: ability[2], stamina: ability[3] }
 }
 
@@ -598,7 +708,7 @@ function defenseAbilitiesFor(
       position: player.position,
       defense: entryBatterGameAbilities(context, teamId, player, slot)[2],
     })),
-    pitcherGameAbilities(context, teamId, pitcherIndex)[2],
+    pitcherAbilitiesAt(progress, teamId, pitcherIndex)[2],
   )
 }
 
@@ -609,7 +719,11 @@ function runAbilityFor(progress: TeamGameProgress, teamId: number, battingOrderI
 
 /** 고를 수 있는 구질 칸 여섯 (0xb6d2c) */
 export function pitchSlotsFor(progress: TeamGameProgress): readonly PitchSlot[] {
-  const repertoire = rosterRepertoireOf(progress.options.ourTeamId, progress.ourPitcherIndex)
+  const repertoire = pitcherRepertoireAt(
+    progress,
+    progress.options.ourTeamId,
+    progress.ourPitcherIndex,
+  )
   return pitchSlotsOf({
     pitchMask: repertoire.pitchMask,
     form: repertoire.form,
@@ -669,6 +783,12 @@ function batterPitch(
 export interface BatterOutcomeOptions {
   readonly pattern?: BattedBallPattern
   readonly isUncatchable?: boolean
+  /**
+   * **2스트라이크 번트 파울 아웃**(원본 판정 11)인가 — 아웃 콜을 조건 없이 62 로 내기 위한 표다.
+   * `resolvePitch` 의 `PitchOutcomeDetail.isBuntFoulOut` 이 그대로 들어온다.
+   * 진행(아웃·진루·난수)에는 한 톨도 안 닿는다 — 소리 고르기만 본다.
+   */
+  readonly buntFoulOut?: boolean
 }
 
 /**
@@ -755,6 +875,8 @@ function batterDefenseInputOf(
     runningMode: progress.options.runningModeManual === true ? '수동' : '자동',
     // 필살타법이 성공한 타구면 야수가 쥐지 않는다 (0x51800)
     isUncatchable: options.isUncatchable,
+    // 판정 11(2스트라이크 번트 파울 아웃)이면 아웃 콜이 조건 없이 62 다 — 진행기는 안 본다
+    buntFoulOut: options.buntFoulOut,
   }
 }
 
@@ -876,7 +998,7 @@ function pitchOnce(
   const stats = ourPitcherStats(progress)
   const fatigued = fatiguedStatsOf(stats, progress.stamina)
   const staminaPercent = staminaPercentOf(progress.stamina)
-  const repertoire = rosterRepertoireOf(options.ourTeamId, progress.ourPitcherIndex)
+  const repertoire = pitcherRepertoireAt(progress, options.ourTeamId, progress.ourPitcherIndex)
   const grade = pitchGradeOf(
     {
       gaugeSettingOn: options.gaugeSettingOn === true,
@@ -1007,6 +1129,9 @@ function defensiveDefenseInputOf(
     defenseIsCpu: false,
     // 공격이 CPU 라 0xae690 의 첫 항이 서서 설정과 무관하게 늘 자동 진루다
     offenseIsCpu: true,
+    // 반대로 **송구는 여기서만 환경설정이 먹는다** — 0xae6c8 의 첫 항(`경기[0x31 + 수비측] == 1`)이
+    // 사람 수비라 거짓이다. 안 넘기면 원본 기본값인 수동이다
+    throwMode: progress.options.throwModeManual === false ? '자동' : '수동',
   }
 }
 
@@ -1210,7 +1335,12 @@ function judgeAutoPitcherChange(
   const current = defendingIsOurs ? progress.ourPitcherIndex : progress.opponentPitcherIndex
   const stamina = defendingIsOurs ? progress.stamina : progress.opponentStamina
   const counters = defendingIsOurs ? progress.ourPitcherCounters : progress.opponentPitcherCounters
-  const bench = benchIndexesOf(current, used)
+  const bench = benchIndexesOf(
+    current,
+    used,
+    pitcherEntriesOf(progress, defendingIsOurs ? progress.options.ourTeamId : progress.options.opponentTeamId)
+      .length,
+  )
   const defenseScore = defendingIsOurs ? game.ourScore : game.opponentScore
   const offenseScore = defendingIsOurs ? game.opponentScore : game.ourScore
 
@@ -1308,10 +1438,19 @@ export function replacementPitcherIndexOf(
   )
 }
 
-/** 벤치에 남은 투수 칸 (`team+0x33`) — 이미 던진 투수와 지금 투수는 빠진다 */
-function benchIndexesOf(current: number, used: readonly number[]): readonly number[] {
+/**
+ * 벤치에 남은 투수 칸 (`team+0x33`) — 이미 던진 투수와 지금 투수는 빠진다.
+ *
+ * 칸 수는 **투수 명단 길이**다. 원본도 `team+0x33 = 명부[0xc] − 1` 로 명부 길이에서 셈하므로
+ * (0xb896c), 마투수가 들어와 명부가 8 → 9 로 늘면 벤치 투수도 7 → 8 로 는다.
+ */
+function benchIndexesOf(
+  current: number,
+  used: readonly number[],
+  entryLength: number,
+): readonly number[] {
   const out: number[] = []
-  for (let index = 0; index < PITCHERS_PER_TEAM; index += 1) {
+  for (let index = 0; index < entryLength; index += 1) {
     if (index === current || used.includes(index)) continue
     out.push(index)
   }
@@ -1354,9 +1493,7 @@ function applyPitcherChange(
  */
 export function changePitcher(progress: TeamGameProgress, benchIndex: number): TeamGameProgress {
   if (progress.game.isFinished) return progress
-  if (!benchIndexesOf(progress.ourPitcherIndex, progress.ourUsedPitchers).includes(benchIndex)) {
-    return progress
-  }
+  if (!availablePitchers(progress).includes(benchIndex)) return progress
   return appendLog(
     applyPitcherChange(progress, true, benchIndex),
     `${progress.game.inning}회${progress.game.half} 투수 교체 — ${progress.ourPitcherIndex + 1}번 → ${benchIndex + 1}번`,
@@ -1366,7 +1503,11 @@ export function changePitcher(progress: TeamGameProgress, benchIndex: number): T
 
 /** 지금 바꿔 넣을 수 있는 우리 팀 투수 칸 — 화면의 투수 교체 목록이 쓴다 */
 export function availablePitchers(progress: TeamGameProgress): readonly number[] {
-  return benchIndexesOf(progress.ourPitcherIndex, progress.ourUsedPitchers)
+  return benchIndexesOf(
+    progress.ourPitcherIndex,
+    progress.ourUsedPitchers,
+    progress.ourPitcherEntry.length,
+  )
 }
 
 /**
@@ -1744,11 +1885,10 @@ function playAutoOffenseAtBat(progress: TeamGameProgress, random: RandomPort): T
   // 이어서 CPU 투수 교체 (0xc1ce2) — 우리가 공격 중이면 **상대 투수**를 본다
   progress = judgeAutoPitcherChange(progress, false, random)
   const { options } = progress
-  const context = abilityContextOf(options)
   const before = progress.game
   const play = playQuickAtBat(
     entryQuickBatterOf(progress, options.ourTeamId, before.battingOrderIndex),
-    quickPitcherFor(context, options.opponentTeamId, progress.opponentPitcherIndex),
+    entryQuickPitcherOf(progress, options.opponentTeamId, progress.opponentPitcherIndex),
     { inning: before.inning },
     random,
   )
@@ -1804,10 +1944,9 @@ function playAutoDefenseAtBat(progress: TeamGameProgress, random: RandomPort): T
   // 우리가 수비 중인 자동 타석 — 0xc1ba4 가 **우리 투수**를 본다 (0xc1ce2)
   progress = judgeAutoPitcherChange(progress, true, random)
   const { options } = progress
-  const context = abilityContextOf(options)
   const play = playQuickAtBat(
     entryQuickBatterOf(progress, options.opponentTeamId, progress.opponentOrderIndex),
-    quickPitcherFor(context, options.ourTeamId, progress.ourPitcherIndex),
+    entryQuickPitcherOf(progress, options.ourTeamId, progress.ourPitcherIndex),
     { inning: progress.game.inning },
     random,
   )
@@ -1831,8 +1970,8 @@ function playAutoDefenseAtBat(progress: TeamGameProgress, random: RandomPort): T
 
 /** 상대 투수의 체력 능력치 (칸 3) — 스태미나 용량 X 의 바탕 */
 function opponentPitcherStaminaAbility(progress: TeamGameProgress): number {
-  return pitcherGameAbilities(
-    abilityContextOf(progress.options),
+  return pitcherAbilitiesAt(
+    progress,
     progress.options.opponentTeamId,
     progress.opponentPitcherIndex,
   )[3]

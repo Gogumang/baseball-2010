@@ -114,6 +114,15 @@ export function missionDefensePlayInputOf(
   outcome: AtBatOutcome,
   random?: RandomPort,
   gameMode?: number,
+  /**
+   * 환경설정 "송구" 가 **수동**인가 (설정 +0xf4). 안 넘기면 **원본 기본값인 수동**이다.
+   *
+   * `0xae6c8` = `(경기[0x31 + 수비측] == 1) || (설정+0xf4 != 0)` 이고(ae6d4 `movs r3,#0xa`),
+   * 거짓이면 CPU 송구 결정 `0xafa60` 을 아예 안 돌린다. **투수편 미션은 사람이 수비**라
+   * 앞 항이 거짓이니 설정이 그대로 답이 된다. 타자편 미션은 수비가 CPU 라 앞 항이 늘 참이어서
+   * 이 값과 상관이 없다 — 그래서 아래도 투수편에만 싣는다.
+   */
+  throwModeManual?: boolean,
 ): DefensePlayInput {
   // 투수편 미션은 사람이 수비다 — 공격이 CPU 라 `0xae690` 의 첫 항이 서서 늘 자동 진루이고,
   // 협살(AI 상태 8)은 `state[0x31 + 수비측] == 1` 이 아니라 안 돈다 (S8 1-4). 타자편은 그 반대다.
@@ -129,6 +138,8 @@ export function missionDefensePlayInputOf(
     gameMode: gameMode ?? MISSION_BATTER_MODE,
     defenseIsCpu: !isPitcherSide,
     offenseIsCpu: isPitcherSide,
+    // 사람이 수비하는 투수편에서만 환경설정 송구가 먹는다 (0xae6c8 의 앞 항이 거짓)
+    ...(isPitcherSide ? { throwMode: throwModeManual === false ? '자동' : '수동' } : {}),
   }
 }
 

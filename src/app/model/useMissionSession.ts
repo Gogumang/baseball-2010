@@ -71,6 +71,13 @@ interface MissionSessionInput {
   readonly onGamePointReward?: (amount: number) => void
   /** 소리 통로 (원본 사운드 객체 `[0x1400058]`). 안 넘기면 아무 소리도 안 난다 */
   readonly sound?: SoundPort
+  /**
+   * 환경설정 "송구" 가 **수동**인가 (설정 +0xf4). 안 넘기면 원본 기본값인 수동이다.
+   * **투수편 미션은 사람이 수비**라 `0xae6c8` 의 앞 항(`경기[0x31 + 수비측] == 1`)이 거짓이어서
+   * 이 설정이 그대로 답이 된다 (타자편 미션은 수비가 CPU 라 상관이 없다 —
+   * `missionDefensePlayInputOf` 주석).
+   */
+  readonly throwModeManual?: boolean
 }
 
 /** 미션 상대. 원본 레코드의 마선수 순번이 있으면 그 마선수다 (타자 미션이면 마투수). */
@@ -136,6 +143,7 @@ export function useMissionSession({
   setScreen,
   onGamePointReward,
   sound,
+  throwModeManual,
 }: MissionSessionInput) {
   const silent = useMemo(() => createSilentSound(), [])
   const audio = sound ?? silent
@@ -294,7 +302,13 @@ export function useMissionSession({
     // 마타자 미션은 원본 마선수 능력치로, 그 밖에는 평범한 타자로 상대한다.
     const opponent = missionOpponent(pitcherRun.mission)
     const batterAbility = opponent === null ? ROOKIE_BATTER_ABILITY : opponent.ability
-    const resolution = pitchAgainstBatter(pitch, batterAbility, random)
+    // 원본 0x34334 가 보는 상황 — state 의 볼카운트·아웃과 주자 유무(0xa9599)
+    const resolution = pitchAgainstBatter(pitch, batterAbility, random, undefined, {
+      strikes: runner.atBatRef.current.strikes,
+      balls: runner.atBatRef.current.balls,
+      outs: pitcherRun.outs,
+      hasRunner: runnerCountOf(pitcherRun.bases) > 0,
+    })
 
     let nextRun = recordPitch(pitcherRun, grade === MAX_GAUGE_GRADE)
     const nextAtBat = runner.applyPitch(resolution)
@@ -316,7 +330,15 @@ export function useMissionSession({
       // 수비 화면(0x17)이 돈다 — 실점·피안타·이닝 목표는 다 돌고 난 뒤에 센다
       setPendingDefensePlay({
         side: '투수',
-        input: missionDefensePlayInputOf(nextRun.bases, nextRun.outs, outcome, random, MISSION_PITCHER_MODE),
+        input: missionDefensePlayInputOf(
+          nextRun.bases,
+          nextRun.outs,
+          outcome,
+          random,
+          MISSION_PITCHER_MODE,
+          // 사람이 수비다 — 환경설정 송구(+0xf4)가 그대로 0xae6c8 의 답이 된다
+          throwModeManual,
+        ),
         outcome,
         isBunt: false,
         runnersOnBase: runnerCountOf(nextRun.bases),

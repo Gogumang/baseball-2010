@@ -798,3 +798,100 @@ describe('CPU 대타 0xac228 — 자동 타석에서', () => {
     expect(나온경기).toBeGreaterThan(0)
   })
 })
+
+describe('마투수 등판 — 0xb88c8 → 0xb521c 의 0x60 가지 (8번 칸)', () => {
+  it('일반모드에서 고른 마투수가 투수 명단 8번 칸에 앉는다', () => {
+    const { progress } = 시작({ mode: 1, acePitcherId: 0 })
+    // 로스터 여덟(0~7) 뒤 8번이 마투수다 — 마타자의 9번과 칸이 다르다 (0xb521c 대 0xb53f0)
+    expect(progress.ourPitcherEntry).toHaveLength(9)
+    expect(progress.ourPitcherEntry[8]?.aceIndex).toBe(0)
+    expect(progress.ourPitcherEntry[8]?.name).toBe('싸이커')
+    expect(progress.ourPitcherEntry.slice(0, 8).every((p) => p.aceIndex === -1)).toBe(true)
+  })
+
+  it('마투수를 안 고르면 명단이 로스터 여덟 칸 그대로다', () => {
+    const { progress } = 시작({ mode: 1 })
+    expect(progress.ourPitcherEntry).toHaveLength(8)
+    expect(progress.opponentPitcherEntry.some((p) => p.aceIndex >= 0)).toBe(true)
+  })
+
+  it('AI 팀도 같은 자리에서 마투수를 하나 받는다 (0x31064)', () => {
+    const { progress } = 시작({ mode: 1, acePitcherId: 2 })
+    expect(progress.opponentAcePitcherIndex).toBeGreaterThanOrEqual(0)
+    expect(progress.opponentPitcherEntry[8]?.aceIndex).toBe(progress.opponentAcePitcherIndex)
+  })
+
+  it('마투수가 벤치 목록에 들어와 `#` 교체로 마운드에 설 수 있다', () => {
+    const { progress } = 시작({ mode: 1, acePitcherId: 1 })
+    // team+0x33 = 명부 − 1 이라 벤치가 일곱에서 여덟으로 는다
+    expect(availablePitchers(progress)).toContain(8)
+    const 바꾼뒤 = changePitcher(progress, 8)
+    expect(바꾼뒤.ourPitcherIndex).toBe(8)
+    // 마투수 능력치·구질이 그대로 마운드에 올라온다 (레오니 = 폼 7 · 마구 6)
+    expect(pitchSlotsFor(바꾼뒤).some((slot) => slot.isMagic)).toBe(true)
+    expect(ourPitcherStats(바꾼뒤).velocity).toBeGreaterThan(ourPitcherStats(progress).velocity)
+  })
+
+  it('시즌모드는 0x30f20 을 안 타므로 양 팀 모두 마투수가 없다', () => {
+    const { progress } = 시작({ mode: 2, acePitcherId: 3 })
+    expect(progress.ourPitcherEntry).toHaveLength(9)
+    expect(progress.opponentPitcherEntry).toHaveLength(8)
+  })
+
+  it('마투수를 넣어도 경기 세우기의 난수 굴림 수는 그대로다', () => {
+    const 굴림수 = (options: Partial<TeamGameOptions>) => {
+      const base = createSeededRandom(20100901)
+      let count = 0
+      const random: RandomPort = {
+        ...base,
+        nextInRange: (from: number, to: number) => {
+          count += 1
+          return base.nextInRange(from, to)
+        },
+      }
+      startTeamGame({ ...기본옵션, ...options }, random)
+      return count
+    }
+    // 마투수·마타자·AI 선발·사람 선발 넉 장 (0x31058·0x3106c·0x3107a·0x31090)
+    expect(굴림수({ mode: 1 })).toBe(4)
+    expect(굴림수({ mode: 1, acePitcherId: 0 })).toBe(4)
+    expect(굴림수({ mode: 1, acePitcherId: 0, aceBatterId: 0 })).toBe(4)
+  })
+})
+
+describe('환경설정 "송구" (+0xf4) — 0xae6c8', () => {
+  const 인플레이 = { kind: '안타', bases: 1 } as const
+
+  /** 사람이 던지는 타석에서 인플레이 타구가 나올 때까지 민다 */
+  const 사람수비타구 = (options: Partial<TeamGameOptions>) => {
+    const { progress, random } = 시작({ mode: 1, ...options })
+    let 현재 = progress
+    for (let step = 0; step < 2_000 && 현재.pendingDefensePlay === null; step += 1) {
+      if (isPitchTurn(현재)) {
+        현재 = startThrowPitch(현재, { typeNumber: 첫구질(현재), courseCell: 4, gaugeCell: 0 }, random)
+      } else if (isBatterTurn(현재)) {
+        현재 = applyBatterOutcome(현재, { kind: '아웃', detail: '뜬공아웃' }, random)
+      } else break
+    }
+    return 현재.pendingDefensePlay
+  }
+
+  it('사람이 던지는 타석은 설정이 그대로 먹는다 (수비가 사람이라 앞 항이 거짓)', () => {
+    const pending = 사람수비타구({ throwModeManual: false })
+    expect(pending?.side).toBe('수비')
+    expect(pending?.input.throwMode).toBe('자동')
+  })
+
+  it('안 넘기면 원본 기본값인 수동이다', () => {
+    const pending = 사람수비타구({})
+    expect(pending?.side).toBe('수비')
+    expect(pending?.input.throwMode).toBe('수동')
+  })
+
+  it('우리 공격 타석은 수비가 CPU 라 설정과 무관하다 (0xae6c8 의 앞 항이 참)', () => {
+    const { progress, random } = 시작({ mode: 1, throwModeManual: true })
+    const 시작한뒤 = startBatterOutcome(progress, 인플레이, random)
+    // 이 자리는 throwMode 를 아예 안 싣는다 — 실어도 defenseIsCpu 가 먼저 참이라 결과가 같다
+    expect(시작한뒤.pendingDefensePlay?.input.defenseIsCpu).toBe(true)
+  })
+})

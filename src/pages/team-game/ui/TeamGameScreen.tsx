@@ -10,7 +10,6 @@ import type { SeasonStadium } from '@/widgets/batting-stage/lib/renderScenery'
 import { staminaPercentOf } from '@/entities/pitcher-career/model/pitcherStamina'
 import { canSelectSlot } from '@/features/play-pitcher-game/model/pitcherPitch'
 import type { PitchSlot } from '@/features/play-pitcher-game/model/pitcherPitch'
-import { teamPitchers } from '@/entities/team/model/teamRoster'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
 import {
   autoProgressCostOf,
@@ -18,9 +17,14 @@ import {
   currentBatterAbility,
   currentBatterEntry,
   currentPitcherAbility,
+  currentPitcherAceIndex,
   pitchSlotsFor,
 } from '@/features/play-team-game/model/teamGameFlow'
-import type { TeamEntryBatter } from '@/features/play-team-game/model/teamGameRoster'
+import type {
+  TeamEntryBatter,
+  TeamEntryPitcher,
+} from '@/features/play-team-game/model/teamGameRoster'
+import { ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
 import type {
   TeamGameOptions,
   TeamGameSummary,
@@ -107,6 +111,8 @@ export function TeamGameScreen({
 }: TeamGameScreenProps) {
   const session = useTeamGame(options, random)
   const { progress, canBat, canPitch, summary, actions } = session
+  /** 지금 마운드에 선 상대 투수가 마투수면 그 선수 (0xb88c8 로 8번 칸에 앉은 그것) */
+  const opposingAcePitcher = ACE_PITCHERS[currentPitcherAceIndex(progress)] ?? null
 
   const [phase, setPhase] = useState<PitchPhase>('구질')
   const [slot, setSlot] = useState<PitchSlot | null>(null)
@@ -346,7 +352,7 @@ export function TeamGameScreen({
           />
         ) : isChangingPitcher ? (
           <PitcherChangeWindow
-            teamId={options.ourTeamId}
+            entry={progress.ourPitcherEntry}
             currentIndex={progress.ourPitcherIndex}
             benchIndexes={session.benchPitchers}
             onSelect={(benchIndex) => {
@@ -389,7 +395,16 @@ export function TeamGameScreen({
                 opponentTeamId: options.opponentTeamId,
               }}
               isEagleEyeEnabled={false}
-              acePitcher={null}
+              // 상대 팀 마투수(0xb88c8)가 교체로 올라오면 그림도 마선수 것이다
+              acePitcher={
+                opposingAcePitcher === null
+                  ? null
+                  : {
+                      framesUrl: opposingAcePitcher.framesUrl,
+                      frameCount: opposingAcePitcher.frameCount,
+                      stillUrl: opposingAcePitcher.stillUrl,
+                    }
+              }
               // 시즌 홈경기에서만 차 있다 — 차 있으면 배경이 시즌 구장(0x77494)으로 갈린다
               seasonStadium={seasonStadium}
               isPaused={burstLines !== null}
@@ -505,7 +520,7 @@ export function TeamGameScreen({
 }
 
 interface PitcherChangeWindowProps {
-  readonly teamId: number
+  readonly entry: readonly TeamEntryPitcher[]
   readonly currentIndex: number
   readonly benchIndexes: readonly number[]
   readonly onSelect: (benchIndex: number) => void
@@ -521,17 +536,16 @@ interface PitcherChangeWindowProps {
  * 대신 경기에서 실제로 쓰는 능력치 제구·구속·체력을 적는다. 창 배치도 웹 껍데기 그대로다.
  */
 function PitcherChangeWindow({
-  teamId,
+  entry,
   currentIndex,
   benchIndexes,
   onSelect,
 }: PitcherChangeWindowProps) {
-  const roster = teamPitchers(teamId)
   const describe = (index: number) => {
-    const player = roster[index]
+    const player = entry[index]
     if (player === undefined) return { label: `${index + 1}번`, detail: undefined }
     return {
-      label: player.name,
+      label: player.aceIndex >= 0 ? `${player.name} (마투수)` : player.name,
       detail: `제구 ${player.ability[0]} · 구속 ${player.ability[1]} · 체력 ${player.ability[3]}`,
     }
   }

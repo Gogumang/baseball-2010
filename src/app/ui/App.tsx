@@ -108,6 +108,8 @@ export function App() {
   const mission = useMissionSession({
     runner, random, missionRecord, screen, setScreen, sound,
     onGamePointReward: careerSession.actions.gainGamePoint,
+    // 환경설정 "송구" (설정 +0xf4) — 투수편 미션은 사람이 늘 수비라 그대로 먹는다 (0xae6c8)
+    throwModeManual: gameSettings.settings.throwMode === '수동',
   })
   const collection = useCollection(collectionStore, careerSession.career, isEveryMissionCleared(mission.clearedKeys))
   // 히든 오픈은 원본에서 전역 저장이라 선수에게도 알려 준다 (상점이 선수 기록으로 판정한다)
@@ -178,6 +180,8 @@ export function App() {
         }}
         gaugeSettingOn={gameSettings.settings.pitchControl === '게이지'}
         runningModeManual={gameSettings.settings.runningMode === '수동'}
+        // 환경설정 "송구" (설정 +0xf4) — 팀 경기는 사람이 **수비하는 타석**에서만 먹는다 (0xae6c8)
+        throwModeManual={gameSettings.settings.throwMode === '수동'}
         // 한 판 치고 끝이라 정산할 곳이 없다 — 원본도 모드 1 은 저장에 아무것도 안 남긴다
         onFinish={() => setScreen({ kind: '메인메뉴' })}
         onExit={() => setScreen({ kind: '메인메뉴' })}

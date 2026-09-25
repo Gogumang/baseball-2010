@@ -38,6 +38,8 @@ export interface GeneralModeScreenProps {
   readonly gaugeSettingOn?: boolean
   /** 환경설정 "주루" 가 수동인가 (설정 +0xbd) — 사람이 공격일 때만 먹는다 (0xae690) */
   readonly runningModeManual?: boolean
+  /** 환경설정 "송구" 가 수동인가 (설정 +0xf4) — 사람이 수비일 때만 먹는다 (0xae6c8) */
+  readonly throwModeManual?: boolean
   /** 경기가 끝나고 확인을 눌렀을 때 */
   readonly onFinish: (summary: TeamGameSummary) => void
   /**
@@ -66,7 +68,8 @@ export interface GeneralModeScreenProps {
 export function GeneralModeScreen(props: GeneralModeScreenProps) {
   const {
     random, isQuickStart = false, openedHiddenTeamIds, openedAcePitcherIds, openedAceBatterIds,
-    aceLevels, gamePoint, onOpenAce, stadiums, initialSettings, gaugeSettingOn, runningModeManual, onFinish, onExit,
+    aceLevels, gamePoint, onOpenAce, stadiums, initialSettings, gaugeSettingOn, runningModeManual,
+    throwModeManual, onFinish, onExit,
   } = props
 
   const session = useGeneralMode({
@@ -78,6 +81,7 @@ export function GeneralModeScreen(props: GeneralModeScreenProps) {
     ...(initialSettings === undefined ? {} : { initialSettings }),
     ...(gaugeSettingOn === undefined ? {} : { gaugeSettingOn }),
     ...(runningModeManual === undefined ? {} : { runningModeManual }),
+    ...(throwModeManual === undefined ? {} : { throwModeManual }),
   })
   const { flow, actions } = session
   const back = () => {

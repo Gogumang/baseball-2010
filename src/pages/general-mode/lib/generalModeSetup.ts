@@ -127,8 +127,8 @@ export function aceIndexOfCell(cell: number): number {
  *
  * ⚠️ 원본이 준비 화면에서 정하는 것 중 **구장**은 `TeamGameOptions` 에 받을 칸이 아직 없다.
  * 준비 기록에는 그대로 들고 있으니(화면에도 나온다) 옵션에 칸이 생기면 여기서 넘기면 된다.
- * 마투수는 넘기되 **벤치 투수로 넣는 `0xb88c8` 은 아직 안 옮겼다** — 웹 투수 명단이 로스터 8칸
- * 붙박이라 넣을 자리가 없다. 지금은 `0x66968` 로 AI 팀 마투수 번호를 뽑는 입력으로만 쓰인다.
+ * - **마투수**(`+0xe`)도 같은 자리에서 `0xb88c8(팀, k)` 로 **투수 명단 8번 칸**에 들어간다
+ *   (`31042`). 마타자의 9번과 칸이 다르다 — 마운드에 서는 길은 `#` 투수 교체뿐이다.
  */
 export function teamGameOptionsOf(
   setup: GeneralModeSetup,
@@ -137,6 +137,8 @@ export function teamGameOptionsOf(
     readonly gaugeSettingOn?: boolean
     /** 환경설정 "주루" 가 수동인가 (설정 +0xbd) — 사람이 공격일 때만 먹는다 (0xae690) */
     readonly runningModeManual?: boolean
+    /** 환경설정 "송구" 가 수동인가 (설정 +0xf4) — 사람이 수비일 때만 먹는다 (0xae6c8) */
+    readonly throwModeManual?: boolean
   } = {},
 ): TeamGameOptions {
   return {
@@ -146,10 +148,11 @@ export function teamGameOptionsOf(
     playerSide: setup.playerSide,
     // 고른 마타자는 벤치 첫 칸으로 들어간다 (0xb8870). NO_ACE(−1)면 아무도 안 들어간다
     aceBatterId: setup.aceBatterId,
-    // 마투수는 AI 팀 마투수를 뽑는 0x66968 의 입력이다 (31058) — 사람 쪽 벤치 투입은 아직 없다
+    // 고른 마투수는 투수 명단 8번 칸으로 들어간다 (0xb88c8). AI 팀 마투수(0x66968)의 입력이기도 하다
     acePitcherId: setup.acePitcherId,
     ...(extra.settings === undefined ? {} : { settings: extra.settings }),
     ...(extra.gaugeSettingOn === undefined ? {} : { gaugeSettingOn: extra.gaugeSettingOn }),
     ...(extra.runningModeManual === undefined ? {} : { runningModeManual: extra.runningModeManual }),
+    ...(extra.throwModeManual === undefined ? {} : { throwModeManual: extra.throwModeManual }),
   }
 }

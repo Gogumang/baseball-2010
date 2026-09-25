@@ -37,11 +37,12 @@ import {
   deepHitCheerSoundIdOf,
   inPlayCallSoundIdOf,
   pitchCallSoundIdOf,
+  walkCheerSoundIdOf,
   PITCH_RELEASE_SOUND,
 } from '@/features/play-at-bat/model/atBatSounds'
 import { carryDistanceOf } from '@/entities/batting/model/battedBallFlight'
 import { GAME_INTRO_SOUND, gameResultSoundIdOf } from '@/features/play-game/model/gameSounds'
-import { stepSoundIdsOf } from '@/pages/team-game/model/teamGameSounds'
+import { pitcherEntrySoundIdOf, stepSoundIdsOf } from '@/pages/team-game/model/teamGameSounds'
 import { activeSound, playSoundIds } from '@/shared/api/audio/soundPort'
 
 /**
@@ -150,7 +151,9 @@ export function useTeamGame(options: TeamGameOptions, random: RandomPort): TeamG
       // 인플레이 타구가 나오면 **여기서 멈춘다** — 주자 처리는 수비 화면이 끝난 뒤다 (상태 0x17)
       resolvePitch: (detail: PitchOutcomeDetail) =>
         step(
-          (current) => startBatterPitch(current, detail, random),
+          // 판정 11(2스트라이크 번트 파울 아웃)이면 아웃 콜이 조건 없이 62 다 — 플레이 끝까지 간다
+          (current) =>
+            startBatterPitch(current, detail, random, { buntFoulOut: detail.isBuntFoulOut }),
           // 타구음(0x515de~) → 심판 콜(0x51a94) 순서. 통로가 하나라 뒤 소리가 앞 소리를 끊는다.
           // 인플레이 타구면 아웃 콜은 여기서 안 난다 — 수비 화면이 끝난 뒤(`finishDefensePlay`)다
           (before, after) => {
@@ -184,6 +187,11 @@ export function useTeamGame(options: TeamGameOptions, random: RandomPort): TeamG
             return [
               PITCH_RELEASE_SOUND,
               pitchCallSoundIdOf(resolution, nextAtBat),
+              // 볼넷 뒤 관중 함성 29 (0x51afa~0x51b02) — 원본은 **공격 팀이 CPU 조작**
+              // (`state[0x31 + state[9]] == 1`, 0x51adc~0x51af8) 일 때만 예약한다.
+              // 이 자리는 사람이 던지는 타석이라 **타석에 선 쪽이 언제나 상대(CPU) 팀**이다.
+              // 우리 공격 반쪽에서는 공격이 사람이라 원본에서도 안 난다 — 그래서 여기에만 있다.
+              walkCheerSoundIdOf(nextAtBat.outcome, true),
               after.pendingDefensePlay !== null || nextAtBat.outcome === null
                 ? null
                 : inPlayCallSoundIdOf(nextAtBat.outcome),
@@ -191,7 +199,18 @@ export function useTeamGame(options: TeamGameOptions, random: RandomPort): TeamG
           },
         ),
       closeBurst: () => step((current) => closeBurstWindow(current)),
-      changePitcher: (benchIndex: number) => step((current) => changePitcher(current, benchIndex)),
+      changePitcher: (benchIndex: number) =>
+        step(
+          (current) => changePitcher(current, benchIndex),
+          // 교체 연출(상태 0x16)을 지나 상태 0xe 로 오면 등판음이 예약된다 (0x38b64 → 0x38c34).
+          // 올라온 투수가 마투수면 26, 2·3루에 주자가 있으면 15, 그 밖은 14 다
+          (_before, after) => [
+            pitcherEntrySoundIdOf({
+              isAce: (after.ourPitcherEntry[after.ourPitcherIndex]?.aceIndex ?? -1) >= 0,
+              bases: after.game.bases,
+            }),
+          ],
+        ),
       pinchHit: (benchIndex: number) => step((current) => pinchHit(current, benchIndex)),
       // 도루 실패로 이닝이 끝나면 공수 교대 징글이 난다. 세이프 콜(17)은 잇지 않았다 —
       // 원본 판정 v9 가 어떤 플레이에서 나는지 미해결이다
@@ -214,7 +233,11 @@ export function useTeamGame(options: TeamGameOptions, random: RandomPort): TeamG
               carryDistance: carryDistanceOf(pending.input.trajectory),
               caughtOnTheFly: played.caughtOnTheFly,
             }),
-            inPlayCallSoundIdOf(pending.outcome, played),
+            inPlayCallSoundIdOf(pending.outcome, {
+              ...played,
+              // 진행기 입력에 실어 온 판정 11 표 — 아웃 콜을 조건 없이 62 로 만든다
+              buntFoulOut: pending.input.buntFoulOut,
+            }),
           ],
         )
       },

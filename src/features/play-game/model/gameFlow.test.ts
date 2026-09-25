@@ -417,8 +417,16 @@ describe('환경설정 "주루" 가 나만의리그 타자편에도 먹는다 (�
   it('수동이면 태그업을 시도하다 잡히는 일도 없다 — 2·3루 1아웃 깊은 뜬공', () => {
     const 주자23루: BaseState = { first: false, second: true, third: true }
 
-    // 자동은 둘 다 뛰다가 하나가 홈(또는 3루)에서 잡혀 아웃이 하나 더 붙는다
-    expect(돌려보기(주자23루, 1, false, 뜬공아웃, 깊은뜬공)).toMatchObject({ outsAdded: 2 })
+    // 자동은 둘 다 리터치한 뒤 한 루씩 간다 — 3루 주자가 홈을 밟고 2루 주자가 3루에 선다.
+    // ⚠️ 예전에는 여기서 아웃이 하나 더 붙었다. 그것은 이 모델이 요구 루(+0x88)를 **한 번도
+    //    안 풀어 주던** 탓이다 — 원본 0xa040c 는 도착 때 `+0x8c == +0x88` 이면 +0x88 = −1 로
+    //    푼다(0xaa0a8 도 같은 일을 한다). 리터치를 즉시 성립으로 보는 이 모델에서는 되밟는
+    //    순간 포스가 풀리므로 **리터치를 마친 주자를 제 루에서 다시 잡을 수 없다.**
+    expect(돌려보기(주자23루, 1, false, 뜬공아웃, 깊은뜬공)).toMatchObject({
+      outsAdded: 1,
+      runsScored: 1,
+      bases: { first: false, second: false, third: true },
+    })
     // 수동은 아무도 안 뛰므로 뜬공 아웃 하나로 끝나고 루 상황이 그대로다
     expect(돌려보기(주자23루, 1, true, 뜬공아웃, 깊은뜬공)).toMatchObject({
       outsAdded: 1,

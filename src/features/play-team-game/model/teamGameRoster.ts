@@ -1,5 +1,8 @@
 import { TEAMS } from '@/shared/config/original/teams'
-import { ROSTER_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
+import {
+  ACE_PITCHER_REPERTOIRES,
+  ROSTER_PITCHER_REPERTOIRES,
+} from '@/shared/config/original/pitcherRepertoires'
 import type { PitcherRepertoire } from '@/shared/config/original/pitcherRepertoires'
 import {
   BATTERS_PER_TEAM,
@@ -8,7 +11,7 @@ import {
   teamPitchers,
 } from '@/entities/team/model/teamRoster'
 import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
-import { ACE_BATTERS } from '@/entities/game/model/aceOpponent'
+import { ACE_BATTERS, ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
 import { gameAbilitiesOf } from '@/features/play-team-game/model/gameAbilities'
@@ -195,8 +198,21 @@ export function rosterEntryBattersOf(teamId: number): readonly TeamEntryBatter[]
  * 고른 **마타자를 벤치 첫 칸(9번)에 끼워 넣는다** — 원본 `0xb8870(team, k)`:
  * `0x1f84c(저장, k)` 로 마타자 레코드를 꺼내 `0xb53f0(team, 레코드, 1)` 로 넣고, 성공하면
  * `team+0x27` 과 **벤치 타자 수 `team+0x28c`(= `0xa3<<2`)를 하나씩 올린다**
- * (`b8898~b88b2`). `0xb53f0` 의 `0x40`(마타자) 가지가 **9번 = 첫 벤치 칸**이고, 그 자리 선수가
- * 마타자가 아니면 한 칸 늘려 끼워 넣는다 (S6 3-5) — 그래서 명단이 12 → 13칸이 된다.
+ * (`b8898~b88b2`). `0xb53f0` 의 `0x40`(마타자) 가지가 **9번 = 첫 벤치 칸**이다.
+ *
+ * ⚠️ **끼워 넣는 방식은 "밀기" 가 아니라 "옛 9번을 맨 끝으로 옮기기" 다** (직접 떴다 — 앞서
+ * 웹이 쓰던 `splice` 는 오독이었다):
+ * ```
+ * b5418: cmp 타자수(=12), #9 ; ble b543a
+ * b541e:   0xb53d0(명부, 9) → &타자[9] ; 0xb6720(그 칸, 0x40, …) 이 참이면 r4 = 0 (덮어쓰고 −1)
+ * b543a: 0xb4e34(명부, 0)                      ; 타자 벡터를 한 칸 늘리고
+ * b544a:   memcpy(&타자[수−1], &타자[9], 0x30) ; 옛 9번을 **맨 끝(12번)으로** 옮긴 뒤
+ * b5462: memcpy(&타자[9], 레코드, 0x30)        ; 9번에 마타자를 넣는다
+ * b547a: return 9
+ * ```
+ * 곧 벤치 차례가 `[마타자, 옛10, 옛11, 옛9]` 가 된다 — 밀어 넣은 `[마타자, 옛9, 옛10, 옛11]` 이
+ * 아니다. 대타 화면 목록 차례와 CPU 대타 `0xaf06c(팀, rand(0, 벤치수), 0)` 가 고르는 선수가
+ * 달라지는 자리라 원본대로 맞춘다 (굴림 수는 그대로다).
  *
  * 일반모드 경기 세우기 `0x30f20` 이 준비 기록의 마타자 칸으로 이 함수를 부른다
  * (`31046: 0xb8870(teamA, [sp+0x45])`).
@@ -218,7 +234,15 @@ export function withAceBatter(
     aceIndex,
   }
   const out = [...entry]
-  out.splice(BATTING_ORDER_SLOTS, 0, inserted)
+  const seated = out[BATTING_ORDER_SLOTS]
+  // 이미 마타자가 앉아 있으면 원본은 늘리지 않고 그 자리를 덮어쓴다 (b5436 의 r4 = 0 가지)
+  if (seated !== undefined && seated.aceIndex >= 0) {
+    out[BATTING_ORDER_SLOTS] = inserted
+    return out
+  }
+  // 옛 9번은 맨 끝으로 옮긴다 (b544a) — 밀어 넣는 것이 아니다
+  if (seated !== undefined) out.push(seated)
+  out[BATTING_ORDER_SLOTS] = inserted
   return out
 }
 
@@ -237,5 +261,117 @@ export function entryBatterGameAbilities(
     teamAbilities: teamAbilitiesOf(context, teamId),
     season: context.season,
     assignment: isMyTeam ? context.lineup?.[lineupSlot] : undefined,
+  })
+}
+
+/* ── 명단(엔트리) 한 줄 — 투수 ───────────────────────────────────────────────── */
+
+/**
+ * 경기에 들어간 팀의 **투수 명단 한 칸** — 원본 `team[0 + 칸]` 이 가리키는 투수 레코드다.
+ *
+ * 타자 목록(`team+0xe`, 0x16칸)과 **짝을 이루는 목록이 하나 더 있다**: `team+0x00`, 0xe칸.
+ * 팀 세우기 `0xb891c` 가 두 목록을 나란히 채운다 (직접 떴다):
+ * ```
+ * b8950: r3 = 0      ; strb r3,[r5,r3] ; r3++ ; cmp r3,#0xd ; ble   → team[i]      = i  (i 0..13)
+ * b895a: r2 = 0      ; strb r2,[r3,#0xe] ; r2++ ; cmp r2,#0x15 ; ble → team[0xe+i] = i  (i 0..21)
+ * b896c: team[+0x33]  = 명부[0xc] − 1      ; 벤치 **투수** 수 = 투수 수 − 1 (선발 하나)
+ * b8988: team[+0x28c] = 명부[0x10] − 9     ; 벤치 타자 수 = 타자 수 − 9 (타순 아홉)
+ * ```
+ * 곧 **투수는 0번이 선발, 1번부터가 벤치**다 (타자가 0~8 타순, 9부터 벤치인 것과 같은 꼴).
+ */
+export interface TeamEntryPitcher {
+  readonly name: string
+  /** 제구 · 구속 · 변화 · 체력 (원본 0~999 눈금 그대로 = 레코드 +0xc 부터 u16 넷) */
+  readonly ability: readonly [number, number, number, number]
+  /** 폼·마구·보유 구질 (레코드 `+0xb>>4` · `+0x18` · `+0x1c`) */
+  readonly repertoire: PitcherRepertoire
+  /** 마투수면 `ACE_PITCHERS` 칸 0~4, 아니면 −1 */
+  readonly aceIndex: number
+}
+
+/**
+ * **마투수가 들어가는 칸 = 8번**. 마타자의 9번과 **다르다** — 직접 떠서 확인했다.
+ *
+ * `0xb88c8(팀, k)` → `0x1f824(저장, k)` 로 마투수 레코드를 꺼내 `0xb521c(명부, 레코드, 1)`:
+ * ```
+ * b523a: 0xb6720(레코드, 0x60, &b)      ; 레코드[0xa] & 0x60 이면 참 (b = [0xa] & 0x1f)
+ * b5244: cmp 명부[0xc], #8 ; ble b5266  ; 투수 수가 8 이하면 바로 늘린다
+ * b524a:   0xb51fc(명부, 8) → 8번 칸 ; 0xb6720(그 칸, 0x60, …) 이 참이면 r4 = 0 (덮어쓰고 −1 반환)
+ * b5266: 0xb4e34(명부, 1)              ; 투수 벡터를 한 칸 늘리고
+ * b527e:   memcpy(&투수[수−1], &투수[8], 0x30)   ; 옛 8번을 **맨 끝으로** 옮긴 뒤
+ * b528e: memcpy(&투수[8], 레코드, 0x30)          ; 8번에 마투수를 넣는다
+ * b52aa: return 8
+ * ```
+ * 마투수 레코드 다섯의 `+0xa` 는 **0x60·0x61·0x62·0x63·0x64** 다 (`XlsACE_PIT_DATA.zt1` 을
+ * 풀어 눈으로 확인). 비트 6 이 서 있어 늘 이 가지를 탄다. 마타자 쪽은 `+0xa` 가 0x40~0x44 라
+ * `0xb53f0` 의 `0x40` 가지 → **9번**이다. 로스터 투수는 여덟(칸 0~7, `+0xa` = 0~7)이므로
+ * 8번은 **한 칸 늘린 자리 = 맨 끝**이고, 옛 칸을 끝으로 옮기는 셈이 없다.
+ *
+ * ⚠️ 원본 그대로의 결말 하나: 8번에 이미 마투수가 있으면 **덮어쓰고 −1 을 돌려준다** →
+ * 부르는 쪽 `0xb88c8` 이 `team[+0x26]`·`team[+0x33]` 을 안 올린다 (b88ee `beq`).
+ */
+export const PITCHER_ENTRY_ACE_SLOT = 8
+
+/** 로스터 투수 여덟을 그대로 명단으로 — 0번이 선발, 1~7 이 벤치다 */
+export function rosterEntryPitchersOf(teamId: number): readonly TeamEntryPitcher[] {
+  return teamPitchers(teamId).map((player, slot) => ({
+    name: player.name,
+    ability: player.ability,
+    repertoire: rosterRepertoireOf(teamId, slot),
+    aceIndex: NO_ACE_BATTER,
+  }))
+}
+
+/**
+ * 고른 **마투수를 8번 칸에 끼워 넣는다** — `0xb88c8` → `0xb521c` 의 `0x60` 가지 (위 상수 주석).
+ * 성공하면 원본은 `team+0x26` 과 **벤치 투수 수 `team+0x33`** 을 하나씩 올린다 (`b88f6~b8906`) —
+ * 웹은 벤치 칸을 명단 길이에서 셈하므로 그 둘을 따로 들지 않는다.
+ *
+ * 마투수 능력치 네 칸의 뜻은 로스터 투수와 같다 — 레코드 `+0xc` 부터 u16 넷이고 **제구·구속·변화·체력**
+ * 이다 (`XlsACE_PIT_DATA` 싸이커 줄 `9e 02 26 02 34 03 2c 01` = 670·550·820·300 이 웹
+ * `acePlayers` 의 hit·power·defense·run 과 차례까지 같다).
+ */
+export function withAcePitcher(
+  entry: readonly TeamEntryPitcher[],
+  aceIndex: number,
+): readonly TeamEntryPitcher[] {
+  const ace = ACE_PITCHERS[aceIndex]
+  if (ace === undefined) return entry
+  const inserted: TeamEntryPitcher = {
+    name: ace.name,
+    ability: [ace.ability.hit, ace.ability.power, ace.ability.defense, ace.ability.run],
+    repertoire: ACE_PITCHER_REPERTOIRES[aceIndex] ?? {
+      name: ace.name,
+      form: 0,
+      magicId: 0,
+      pitchMask: 1,
+    },
+    aceIndex,
+  }
+  const out = [...entry]
+  const seated = out[PITCHER_ENTRY_ACE_SLOT]
+  // 이미 마투수가 앉아 있으면 원본은 늘리지 않고 그 자리를 덮어쓴다 (b5262 의 r4 = 0 가지)
+  if (seated !== undefined && seated.aceIndex >= 0) {
+    out[PITCHER_ENTRY_ACE_SLOT] = inserted
+    return out
+  }
+  // 옛 8번은 맨 끝으로 옮긴다 (b527e). 8칸짜리 로스터면 옮길 것이 없어 그냥 덧붙는 꼴이다
+  if (seated !== undefined) out.push(seated)
+  out[PITCHER_ENTRY_ACE_SLOT] = inserted
+  return out
+}
+
+/** 투수 명단 한 칸의 경기용 능력치 — `pitcherGameAbilities` 와 같은 보정을 명단 쪽으로 돌린 것 */
+export function entryPitcherGameAbilities(
+  context: TeamGameAbilityContext,
+  teamId: number,
+  entry: TeamEntryPitcher,
+): [number, number, number, number] {
+  return gameAbilitiesOf(entry.ability, {
+    mode: context.mode,
+    isPitcher: true,
+    isMyTeam: context.seasonTeamId === teamId,
+    teamAbilities: teamAbilitiesOf(context, teamId),
+    season: context.season,
   })
 }
