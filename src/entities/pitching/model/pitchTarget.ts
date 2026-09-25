@@ -23,15 +23,78 @@ const CORNER_X = [282, 332]
 const CORNER_Y = [280, 330]
 const OUTSIDE_X = [332, 382]
 const OUTSIDE_Y = [330, 380]
+/**
+ * 목표 종류 4 = **투구가 아니라 견제다** (0x34848, 직접 뜬 것 — 확정).
+ *
+ * 앞 주석은 "원본이 견제구를 던지지만 웹에는 견제가 없어 1 로 둔다 (추정)" 였는데, 그 "추정" 부분이
+ * 틀렸다. 점프표 `0xcfd94`[4] = `0x34848` 가지는 **목표점을 아예 만들지 않는다**:
+ * ```
+ * 34848: movs r1,#4 ; movs r0,#1 ; bl rand(0xbfa54)      ; ★ 루 = rand(1, 4)  → 1·2·3
+ * 34852: r0 = [장면+0x20c]            ; 주자관리
+ * 3485c: bl 0xa9878(주자관리, 루)      ; 그 루에 주자가 있나
+ * 34864: beq 0x34848                  ; ★ 없으면 **다시 굴린다** (루프)
+ * 34866: r0 = [1552d0c]              ; 경기 상태
+ * 3486c: r3 = state[0xa]             ; 측
+ * 34876: r3 = [장면 + r3*4 + 0xfa0] ; r0 = [r3+4]
+ * 3487c: movs r1,#0x10 ; movs r3,#0  ; bl 0xbfbac(수신처, 0x10, 루, 0)   ; ★ 메시지 0x10 = 견제
+ * 34886: b 0x348d6                    ; 그대로 끝 — 공을 안 던진다
+ * ```
+ * 곧 CPU 도 **사람과 똑같은 메시지 0x10 경로**(0x50f28 → 플레이 종류 4 · state[0x27] = 루 · 상태 0x17)로
+ * 견제를 건다. 0x34684 의 `종류 4 && (주자 0명 || 만루) → 1` 갈림이 있는 것도 이 때문이다 —
+ * 주자가 없으면 위 루프가 영영 안 끝난다.
+ *
+ * 가중치표(`pitchPatterns`)의 다섯째 칸 w4 가 **주자열 1·2 에서 3, 주자열 3(주자 없음)에서 0** 인 것도
+ * 같은 말이다: **주자가 있을 때 투구의 3% 가 견제**다.
+ *
+ * ⚠️ **웹은 아직 이 갈래가 없다** — 아래 `pitchTargetOf` 는 종류 4 를 종류 1(모서리)로 떨어뜨려
+ * **원본이 굴리지 않는 목표점 난수 4 번을 굴리고, 원본이 던지지 않는 공을 던진다.**
+ * 바로잡으려면 부르는 쪽(`selectPitch` → `widgets/batting-stage` · `features/play-team-game`)이
+ * "이 투구는 견제다" 로 갈라져 수비 화면(플레이 종류 4)을 열어야 하는데, 그 파일들이 이 작업의
+ * 구역 밖이라 **여기서는 고르는 함수(`cpuPickoffBaseOf`)만 원본대로 두고 배선은 남겨 둔다.**
+ * `pitchTargetOf` 의 동작은 한 톨도 안 건드렸다 — 난수 차례가 지금까지와 같아야 해서다.
+ */
 const PICKOFF_KIND = 4
 const FULL_BASES = 3
 const FLIP_CHANCE = 3
+const PICKOFF_BASE_LOW = 1
+const PICKOFF_BASE_HIGH = 4
 
 const signed = (random: RandomPort, value: number) => (randomIntegerBelow(random, 0, 2) === 0 ? value : -value)
 
+/**
+ * 목표 종류 4 가 **정말로 견제로 가는가** — 0x34684~0x3469a 의 갈림 그대로.
+ * 주자가 없거나 만루면 종류 1(모서리 투구)로 내려앉고, 그 밖(주자 1·2명)일 때만 견제다.
+ */
+export function isCpuPickoff(kind: number, situation: Pick<TargetSituation, 'runnerCount'>): boolean {
+  return (
+    kind === PICKOFF_KIND && situation.runnerCount !== 0 && situation.runnerCount !== FULL_BASES
+  )
+}
+
+/**
+ * CPU 가 견제할 루 (0x34848) — `rand(1, 4)` 를 **그 루에 주자가 있을 때까지 다시 굴린다**.
+ * 원본에 종료 조건이 없는 `do { } while` 이라, 주자가 하나도 없으면 영영 안 끝난다 — 그래서
+ * 부르기 전에 `isCpuPickoff` 로 걸러야 한다(원본 0x34684 갈림과 같은 자리).
+ *
+ * 돌려주는 루를 그대로 `entities/defense-controls/model/pickoff.pickoffPlayOf` 에 넣으면
+ * 사람 견제('3'/'1'/'7' → 0x53548)와 **같은 메시지 0x10 경로**가 된다.
+ */
+export function cpuPickoffBaseOf(
+  hasRunnerOnBase: (base: number) => boolean,
+  random: RandomPort,
+): 1 | 2 | 3 {
+  // 원본에는 없는 안전망 — 부르는 쪽이 `isCpuPickoff` 를 안 걸렀을 때 무한 루프를 막는다
+  for (let guard = 0; guard < 1000; guard += 1) {
+    const base = randomIntegerBelow(random, PICKOFF_BASE_LOW, PICKOFF_BASE_HIGH)
+    if (hasRunnerOnBase(base)) return base as 1 | 2 | 3
+  }
+  throw new Error('cpuPickoffBaseOf: 주자가 있는 루가 없다 — isCpuPickoff 로 먼저 걸러야 한다')
+}
+
 export function pitchTargetOf(kind: number, situation: TargetSituation, random: RandomPort): WorldPoint {
   const center = ZONE_CENTERS[situation.side] ?? ZONE_CENTERS[0]
-  // 종류 4 는 주자가 없거나 만루면 1 이다. 그 밖은 원본이 견제구(메시지 0x10)를 던지지만 웹에는 견제가 없어 1 로 둔다 (추정)
+  // 종류 4 는 주자가 없거나 만루면 1 이다 (0x34684). 그 밖은 원본이 **투구를 안 하고 견제로 빠지는데**
+  // (0x34848, 위 주석) 웹에는 그 갈래가 없어 여기서는 종류 1 로 둔다 — **알려진 어긋남**이다
   const effective =
     kind === PICKOFF_KIND && (situation.runnerCount === 0 || situation.runnerCount === FULL_BASES) ? 1 : kind
   switch (effective) {

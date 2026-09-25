@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { applyControlError, applyMissionAimShake, pitchTargetOf } from '@/entities/pitching/model/pitchTarget'
+import {
+  applyControlError,
+  applyMissionAimShake,
+  cpuPickoffBaseOf,
+  isCpuPickoff,
+  pitchTargetOf,
+} from '@/entities/pitching/model/pitchTarget'
 import { ZONE_CENTERS } from '@/entities/pitching/model/pitchCurve'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
@@ -33,9 +39,32 @@ describe('목표점 — 0x345fc', () => {
     expect(pitchTargetOf(3, { side: 1, batterSide: 1, runnerCount: 0 }, 차례난수([0, 0, 0.5, 0.5])).y).toBe(C.y - 330)
   })
 
-  it('종류 4(견제)는 주자가 0·3명이면 종류 1 이고, 그 밖은 웹에 견제가 없어 종류 1 로 둔다 (추정)', () => {
+  it('종류 4(견제)는 주자가 0·3명이면 종류 1 이고, 그 밖은 아직 웹에 견제 갈래가 없어 종류 1 로 둔다 (알려진 어긋남)', () => {
     const 종류1 = pitchTargetOf(1, { side: 1, batterSide: 1, runnerCount: 1 }, 차례난수([0.2, 0.3, 0, 0]))
     expect(pitchTargetOf(4, { side: 1, batterSide: 1, runnerCount: 1 }, 차례난수([0.2, 0.3, 0, 0]))).toEqual(종류1)
+  })
+})
+
+describe('CPU 견제 — 0x34684 갈림 · 0x34848 루 고르기', () => {
+  it('종류 4 는 주자가 1·2명일 때만 견제다 (0명·만루는 종류 1 투구)', () => {
+    expect(isCpuPickoff(4, { runnerCount: 1 })).toBe(true)
+    expect(isCpuPickoff(4, { runnerCount: 2 })).toBe(true)
+    expect(isCpuPickoff(4, { runnerCount: 0 })).toBe(false)
+    expect(isCpuPickoff(4, { runnerCount: 3 })).toBe(false)
+    for (const kind of [0, 1, 2, 3]) expect(isCpuPickoff(kind, { runnerCount: 1 })).toBe(false)
+  })
+
+  it('루 = rand(1, 4) — 첫 굴림이 맞으면 한 번만 굴린다', () => {
+    // rand(1,4) = 1 + floor(v × 3): v=0 → 1 · v=0.4 → 2 · v=0.7 → 3
+    expect(cpuPickoffBaseOf((base) => base === 1, 차례난수([0]))).toBe(1)
+    expect(cpuPickoffBaseOf((base) => base === 2, 차례난수([0.4]))).toBe(2)
+    expect(cpuPickoffBaseOf((base) => base === 3, 차례난수([0.7]))).toBe(3)
+  })
+
+  it('그 루에 주자가 없으면 **다시 굴린다** (0x34864 beq 0x34848)', () => {
+    // 1루·2루는 비었고 3루에만 주자가 있다 → 1, 2 를 뽑은 두 굴림은 버려진다
+    const random = 차례난수([0, 0.4, 0.7])
+    expect(cpuPickoffBaseOf((base) => base === 3, random)).toBe(3)
   })
 })
 

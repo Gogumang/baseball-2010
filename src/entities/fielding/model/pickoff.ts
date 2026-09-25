@@ -7,6 +7,24 @@ import { AI_STATE, type FielderState, type PlayView } from '@/entities/fielding/
  * **P2 1c 표의 "0xe → 플레이+0x127 바이트 루로" 는 오독**이었다 (S8 정정 2):
  * 실제로는 `[플레이+0x28] + 0x27` = **경기 상태 state[0x27]**(견제 대상 루)이고,
  * 상태 0xe 는 그 루로 `플레이.vt0x58(state[0x27], 0)` 송구를 부르는 네 줄짜리 분기다.
+ * ```
+ * b47da: ldr r1,[sp,#0x28]   ; P            b47e2: ldr r4,[r2,#0x58] ; 플레이 vt0x58 = 0xb2c90
+ * b47dc: ldr r3,[r1,#0x28]   ; state        b47ea: ldrsb r1,[r3,r1]  ; ★ state[0x27]
+ * b47e0: adds r3,#0x27                      b47ec: bl 베니어 r4       ; P.vt0x58(루, 0)
+ * ```
+ * 받는 쪽 `0xb2c90` 은 `커버 = [P+0xf0 + (루%4)*4]` 를 보고, **−1 이면 공 쥔 야수를 상태 6(직접 들고
+ * 뛰기)으로 돌리고**, 있으면 그 야수의 목표 루(`vt0x68`)가 그 루일 때만 실제로 던진다.
+ *
+ * ## 이 파일과 `entities/defense-controls/model/pickoff.ts` 는 한 몸이다
+ * 이쪽은 **수비 시뮬레이션 쪽 조각**(커버 배정·AI 상태·시작 상태), 저쪽은 **입력~메시지 0x10 쪽
+ * 조각**(키 표·`state[0x27]`·상태 0x17)이다. `PICKOFF_PLAY_KIND`·`RUNNER_LEAD_DISTANCE` 가 양쪽에
+ * 같은 값으로 있는 것은 그래서다 — 배선이 붙는 날 한쪽으로 모을 자리다.
+ *
+ * ## 아직 배선되지 않았다 (2026-09)
+ * `features/defense-play/model/runDefensePlay` 는 **종류 1(타구)만** 돌린다. 종류 4 를 받으려면
+ * 타구 궤적·타자주자·포구 예보가 없는 플레이를 견뎌야 하는데, 그 플레이가 끝나는 조건(결과 코드 9,
+ * `0xb4292`)이 **해독 금지 구역인 궤적 물리 루프 `0xb401c` 안**이고 S8 6-5 가 그 고리를 미해결로
+ * 남겨 두었다. 그래서 억지로 박지 않았다.
  */
 
 /** 견제 플레이 종류 (+0x118 = 4) */
@@ -37,6 +55,14 @@ export interface PickoffStart {
 /**
  * 견제 시작 (플레이 vt 0x18 의 종류 4 가지, 0xb28be~0xb2948).
  * 투수가 공을 쥔 상태로 시작하고 야수 넷을 루로 보낸 뒤 투수를 상태 0xe 로 만든다.
+ *
+ * 야수 넷이 달려가는 좌표는 원본이 표 `0xd86b0`(12바이트씩) 에서 그대로 복사하는데,
+ * 그 표는 주자용 `0xd78f0` 과 **15워드가 바이트까지 같다**(직접 떠서 확인). 그래서 여기서
+ * `basePosition`(0xd78f0) 을 쓰는 것이 맞다.
+ *
+ * ⚠️ `manualThrowBase` 는 **다리다**. 원본 견제 시작은 `P+0x160`(사람이 고른 송구 목표)을
+ * 건드리지 않는다 — 대상 루는 `state[0x27]` 에 들어 있고 AI 상태 0xe 가 매 틱 그 칸을 읽는다
+ * (0xb47da). 웹 진행기에는 `state[0x27]` 에 해당하는 칸이 없어 같은 뜻의 칸에 실어 둔 것이다.
  */
 export function startPickoff(targetBase: number): PickoffStart {
   const coverTargets = new Map<number, ReturnType<typeof basePosition>>()
