@@ -40,7 +40,9 @@
   | 0x353ca (경기 준비 0x352e8, 모드 2 시즌 & 우리 팀 홈) | 시즌레코드 **+0x65 + 1** = 만원 판정(0/1/2)+1 → 1·2·3 | 시즌 홈 경기 |
   | 0x3543c · 0x35496 (모드 8·9 대전) | 3 | 대전모드 |
   | 0x629a · 0x7aae · 0x9c2c · 0xe52e (시즌 관리 장면 구장 미리보기) | 0 | 구장관리·관리 화면 |
-  - +0x65 (J 4-7): 관중 ≥ 수용×80% → 2, > 35% → 1, 그 밖 0.
+  - +0x65 (J 4-7, **확정**): 0xa34b8 끝(0xa3690~0xa36ca)이 `관중 ≥ 수용×80/100 → 2 · > 수용×35/100 → 1 · 그 밖 0` 으로 쓴다.
+    ⚠️ 그 함수는 **경기가 끝난 뒤**(결과 장면 0x3a3e4) 돌므로 0x353c2 가 읽는 값은 **직전 경기의 것**이다 —
+    시즌 첫 경기는 0(+1 = 덧그림 1 = 빈 좌석 다음 장, 관중 적음)이다. 원본 그대로 옮긴다.
 - 그림(스크래치패드 snd/fence/fence_season/frames 눈 확인): 묶음 안 1번째 덧그림 = **빈 파란 좌석**, 2번 = 관중 드문드문, 3번 = 반쯤, 4번 = **꽉 참**.
   → 프레임 뜻: `5k` 바탕(관중석 k단) · `5k+1` 빈 좌석(관리 화면 미리보기) · `5k+2` 관중 적음(35% 이하) · `5k+3` 보통(35~80%) · `5k+4` 만원(≥80%, 대전모드 고정).
 - 관중석 4~6(트로피컬·콜로세움·스페이스, `[obj+0x88] > 3`)은 0x76ba4 가 `hidden_fence_{n−4}.pzx` 를 적재하고, 여기서는 이미지[0] 한 장 + 덧그림 `[0x89]+1` 번 이미지를 그린다(히든 구장도 관중 단계 그림을 가짐 — 그 PZX 의 이미지 1~4, 유력).
@@ -56,8 +58,14 @@
   (`{ stand, crowd, board }` = 구장 +0x88·+0x89·+0x8a) 이 차 있으면 0x77494 묶음, 비어 있으면 예전대로 0x77974
   (fence.pzf 11구장) 다. `spriteLoader.ts` 에 `FENCE_SEASON_FRAMES`·`HIDDEN_FENCE_FRAMES`·`FENCE_BOARD_FRAMES`·
   `HIDDEN_BOARD_FRAMES` 를 더했고, 전광판 상자는 `shared/config/original/stadiumScene.ts` 의 `BOARD_BOXES` 를 쓴다.
-  ⚠️ **아직 부르는 쪽이 없다** — `app/ui/SeasonRoute.tsx` 가 `record.stadiumEquipped` 를 `TeamGameScreen → BattingStage`
-  로 내려 줘야 실제 경기 화면에 나온다. 웹 FENCE_ANCHOR(CAMERA.x−1−10) 은 원본의 `+0x60≠0` 가지와 같은 식.
+  웹 FENCE_ANCHOR(CAMERA.x−1−10) 은 원본의 `+0x60≠0` 가지와 같은 식.
+  **부르는 쪽도 이었다 (2026-09-25):** `app/ui/SeasonRoute.tsx` → `TeamGameScreen` → `BattingStage` 로
+  `seasonStadium` 을 내린다. 값은 `entities/season-mode/model/stadiumItems.ts` 의 `seasonStadiumOf(record)`
+  (`stand = stadiumEquipped[0]` · `crowd = crowdLevel + 1` · `board = stadiumEquipped[1]`, 곧 0x353ac~0x353e6).
+  **홈경기일 때만** 내린다 — 원본 0x40ff0 의 `0xb6bdd(…,1) == SR[1]` 자리를 웹에서는 `playerSide`
+  (= `leagueSideOf`(0xb7844), side 1 = 후공 = 홈)로 가른다. 원정이면 `undefined` 라 0x77974 로 그린다.
+  눈으로 확인함: 홈 `[3,5,*]`→4단 관중석 + 고대의(hidden_board_1) 전광판, 홈 `[1,3,*]`→2단 + 초대형(팀 아이콘 둘),
+  홈 `[0,0,*]`→1단 + 소형, 원정→GAMEVIL 광고가 붙은 기본 fence.pzf 구장.
 
 ## 2. 메인 메뉴 바퀴 칸별 main_ui 그림 분기 — 확정 (정정 포함)
 

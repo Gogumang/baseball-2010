@@ -194,6 +194,9 @@ n = min(n, cap) ; n = max(n, 3000)
 → **J 4-7 의 식이 그대로 맞다**(표는 0xd7cc4 사본, 값은 0xd44f4 앞 14칸과 같다).
 - **잔디(`rec[0x1ba]`)는 어떤 계산에도 안 들어간다.** 읽는 곳이 전부 구장 그림/미리보기(0x7958·0x957c·0x7c450·0x352e8·0x71494 업로드)뿐이다 → **순수 겉모습**인데 1억·2억·3억을 받는다 (확정).
 - 관중석은 **상한**만, 전광판은 **가산**만 한다. 히든 3종(4·5·6)은 효과값이 4번과 같다(관중석 40000 · 전광판 +5000) → **히든은 성능이 아니라 겉모습**이다.
+- 같은 함수 끝(0xa3690~0xa36ca)이 **만원 판정 `rec[0x65]`** 를 쓴다 — `관중 ≥ 수용×80/100 → 2 · > 수용×35/100 → 1 · 그 밖 0`.
+  이 칸을 읽는 곳은 경기 준비 0x353c2(구장 `+0x89` = 값 + 1, 관중 수 그림 단계)와 대전 업로드 0x710e0 둘뿐이다 (J 4-7 참고).
+  ⚠️ 0xa34b8 은 **경기가 끝난 뒤** 도는 함수라 타석에 보이는 관중 수는 **직전 경기의 것**이다.
 
 ## 9. 웹판 대조 (읽기만 했다 — 고치지 않았다)
 
@@ -201,7 +204,7 @@ n = min(n, cap) ; n = max(n, 3000)
 |---|---|---|
 | 구장 아이템 전체 | 시즌 구단관리 상점(0x957c/0x7d90) + 구장관리 교체(0x7958) | **통째로 미구현**. 이름 문자열만 `src/shared/config/original/data/items.json:128-149`(관중석 126~132·전광판 133~139·잔디 140~143·설명 144~147) 에 있다 |
 | 관중 수·경기 수입 | 0xa34b8 (전광판 가산·관중석 상한·하한 3000) | 미구현. `src/shared/ui/StatusBar/StatusBar.tsx:15` 주석이 "관리 수치도 …·관중" 이라 적어 두었을 뿐 |
-| 구장 그림(히든 fence/board) | `stadium/hidden_fence_0~2`·`hidden_board_0~2` | `src/shared/config/original/stadiumScene.ts` 는 구장 0 고정, hidden_* 참조 0 (J 1-3 과 같은 상태) |
+| 구장 그림(히든 fence/board) | `stadium/hidden_fence_0~2`·`hidden_board_0~2` | **이어졌다 (2026-09-25)** — `widgets/batting-stage/lib/renderScenery.ts` 의 `drawSeasonFenceParts`(0x77494) 가 그리고, `app/ui/SeasonRoute.tsx` → `TeamGameScreen` → `BattingStage` 가 `seasonStadiumOf(record)`(`stadiumItems.ts`) 를 **홈경기일 때만** 내린다. R6 1절 참고 |
 | 히든 해금 id | 관중석 13·14·15 / 전광판 16·17·18 (app+0xe0) | `src/entities/career/model/equipment.ts:88-99` 은 **타자 장비 id 만** 다룬다(`BATTER_HIDDEN_ID_START`). 구장 id 13~18 은 없다 ⚠️ |
 | 컬렉터 판정 | `0xa38c4` = 기본 4칸 모두 보유 | 장비 쪽은 같은 꼴(`equipment.ts:92-93 isCollector`, 4칸). 구장 쪽은 없다 |
 | 해금 알림 뒷줄 | id 13~18 → StrCOMMON[141] `시즌모드에서 사용가능합니다` | `equipment.ts:103-105 hiddenOpenTextOf` 는 타자 장비 범위 밖이면 null → 구장 id 는 알림이 안 나온다 ⚠️ |
