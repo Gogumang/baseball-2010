@@ -89,14 +89,43 @@ describe('자동 추가 진루 0xaf918 — "수비보다 2틱 이상 빠를 때�
     }
   })
 
-  it('플레이가 끝났거나 +0x12a 가 서 있으면 안 본다', () => {
+  it('플레이가 끝났거나(+0x111) +0x129 면 틱 비교 없이 무조건 한 루 간다 (0xaf96e·0xaf978)', () => {
     const 주자 = createRunner(1, 2, 주력500, { targetBase: 2 })
+    // 멈춘 주자라 force 없이는 원본도 건너뛴다 (0xaf946)
     expect(
       autoAdvanceDecisions(문맥({ ballHolderSlot: 8, catchFielderSlot: 8, finished: true }, [주자])),
     ).toEqual([])
+    // force 를 주면 두 칸 모두 **진루 자리(0xafa0e)로 곧장 뛴다**
+    for (const play of [{ finished: true }, { suppressed: true }]) {
+      expect(
+        autoAdvanceDecisions({
+          ...문맥({ ballHolderSlot: 8, catchFielderSlot: 8, ...play }, [주자]),
+          force: true,
+        }),
+      ).toEqual([{ runnerIndex: 1, toBase: 3 }])
+    }
+  })
+
+  it('+0x111·+0x129 갈래는 종류 2·3·8 거르개도 "잡힐 뜬공" 도 안 본다 (0xaf9ac 앞에서 빠진다)', () => {
+    const 주자 = createRunner(1, 2, 주력500, { targetBase: 2 })
+    for (const kind of [2, 3, 8]) {
+      expect(
+        autoAdvanceDecisions({
+          ...문맥({ kind, ballHolderSlot: 8, catchFielderSlot: 8, finished: true }, [주자]),
+          force: true,
+        }),
+      ).toEqual([{ runnerIndex: 1, toBase: 3 }])
+    }
+    // vt94(잡힐 뜬공) 이고 아직 안 잡혔어도 마찬가지다
     expect(
-      autoAdvanceDecisions(문맥({ ballHolderSlot: 8, catchFielderSlot: 8, suppressed: true }, [주자])),
-    ).toEqual([])
+      autoAdvanceDecisions({
+        ...문맥(
+          { ballHolderSlot: 8, catchFielderSlot: 8, earliestCatchTick: 5, everHeld: false, suppressed: true },
+          [주자],
+        ),
+        force: true,
+      }),
+    ).toEqual([{ runnerIndex: 1, toBase: 3 }])
   })
 
   it('멈춘 주자는 force 일 때만 본다', () => {

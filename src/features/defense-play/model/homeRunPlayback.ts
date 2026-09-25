@@ -189,6 +189,8 @@ export function homeRunPlaybackOf(input: HomeRunPlaybackInput): DefensePlayResul
     catchTick: -1,
     isUncatchable: true,
     caughtOnTheFly: false,
+    // 홈런은 아웃 판정이 한 번도 안 돈다 — state[0x87] 은 초기값 0 그대로다
+    tagOut: false,
     throwBase: NONE,
     throwArrivalTick: -1,
     voidedRuns: 0,

@@ -131,7 +131,15 @@ export interface PlayView {
   readonly held: boolean
   /** 플레이가 끝났는가 (+0x111) */
   readonly finished: boolean
-  /** 자동 주루를 막는 칸 (+0x12a) */
+  /**
+   * 자동 주루의 **또 하나의 무조건 진루 갈래** (+0x129).
+   *
+   * ⚠️ 예전 주석의 `+0x12a` 는 오프셋 오독이었다 — 0xaf918 이 직접 뜨는 자리는
+   * `af964: subs r2,#7`(0x118 − 7 = **0x111**) · `af970: adds r2,#0x18`(0x111 + 0x18 = **0x129**) 다.
+   * `R3-field-view.md` 도 같은 두 칸을 `+0x111`·`+0x129` 로 적고 있다.
+   * 이름이 "막는 칸" 이었던 것도 거꾸로였다 — 이 칸이 서면 자동 진루가 **꺼지는 것이 아니라
+   * 틱 비교 없이 무조건 한 루 간다** (`autoAdvance.ts` 참고).
+   */
   readonly suppressed: boolean
   /** 송구를 해야 한다는 표시 (+0x128) */
   readonly wantsThrow: boolean

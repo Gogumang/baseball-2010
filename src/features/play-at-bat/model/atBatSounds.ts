@@ -170,6 +170,11 @@ export function pitchCallSoundIdOf(resolution: PitchResolution, atBat: AtBatStat
 export interface DefenseCallContext {
   /** 뜬 채로 잡았는가 (원본 `state[0x1f]`, 0xb2774 가 `vt90()==1` 일 때 1) */
   readonly caughtOnTheFly?: boolean
+  /**
+   * 아웃 판정(0xb36d0)이 **마지막으로 적은 아웃이 태그**였나 — 원본 `state[0x87]`.
+   * 수비 진행기 `DefensePlayResult.tagOut` 이 그대로 들어온다.
+   */
+  readonly tagOut?: boolean
   /** CPU 가 고른 송구 목표 루. −1 이면 안 던졌다 */
   readonly throwBase?: number
   /** 송구 도착 틱. 송구가 없으면 −1 */
@@ -219,13 +224,15 @@ const SAFE_CALL = 17
  * ⚠️ **근사인 곳**: 수비 결과를 안 넘기면 타석 결과 detail 로만 가른다 —
  * 뜬공·직선타 아웃은 잡은 아웃(62), 땅볼 아웃은 포스 아웃(20) 으로 본다.
  *
- * ⚠️ **`state[0x87]`(태그 몫)은 아직 못 잇는다.** 태그 아웃 갈래 자체는 이제 있다 —
- * `entities/fielding/model/outJudgement.ts` 의 `OUT_KIND.TAG`(3, 0xb380e) 가 그것이고
- * 진행기 `runDefensePlay` 의 `runOutJudgement` 가 매 틱 그 값을 받는다. 그런데 그 값은
- * **기록(`log`) 문자열로만 남고** `DefensePlayResult` 에 칸이 없어 여기까지 오지 않는다
- * (`rundownOuts` 는 협살로 잡은 태그 아웃만 세는 다른 칸이다). 그래서 태그 아웃은 지금도
- * `caughtOnTheFly` 가 거짓이라 **20 으로 샌다**. 진행기 쪽에 칸이 생기면 그때 잇는다 —
- * 뜻을 모르는 채로 다른 칸에 갖다 붙이지 않는다.
+ * **`state[0x87]`(태그 몫)은 이제 이었다** — `DefensePlayResult.tagOut` → `DefenseCallContext.tagOut`.
+ * 그 칸은 **"플레이 중 한 번이라도 태그" 가 아니라 "마지막 아웃 판정이 태그"** 다:
+ * 0xb36d0 은 `b36d8: strb 0,[state+0x87]` 로 **부를 때마다 머리에서 지우고** 시작하고,
+ * 결과 13 은 `b4540`("이번 틱 vt90 결과 ≠ 0") → `b4556 movs #0xd` → `b4562 vt44/vt54` 로
+ * **아웃이 난 그 틱 안에서** 화면까지 넘어간다. 그래서 0x51b36 이 읽는 값은 언제나
+ * "그 아웃을 낸 판정" 의 값이다 (자세한 근거는 `runDefensePlay.runOutJudgement` 주석).
+ *
+ * ⚠️ **0x87 의 나머지 절반(0xb4312: 결과 2 + 야수 `+0x3b`)은 안 옮겼다** — 그 칸이 웹 모델에
+ * 없다. 그래서 "루를 밟은 야수가 도착해 있던 포스 아웃" 은 원본이 62 를 낼 자리에서 20 이 난다.
  * ⚠️ **17 은 근사다.** 원본(0xb442a~0xb444a)은 야수가 그 루에서 **공을 쥔 채**(`+0xe0`) 있는데
  * 아웃 판정(0xb36d0)이 서지 않고 주자가 들어오는 **틱**에 v = 9 를 낸다. 즉 "아웃 될 뻔했는데
  * 살았다" 만이고 외야로 나간 안타는 이 길이 아니다. 웹 타석 모델에는 틱이 없어
@@ -234,9 +241,11 @@ const SAFE_CALL = 17
 export function inPlayCallSoundIdOf(outcome: AtBatOutcome, play?: DefenseCallContext | null): number | null {
   if (outcome.kind === '홈런') return 11
   if (outcome.kind === '아웃') {
-    // 수비 결과를 받았으면 원본과 같은 칸(state[0x1f])을 본다. 없으면 타석 결과로 근사한다
+    // 수비 결과를 받았으면 원본과 같은 칸(state[0x1f]·state[0x87])을 본다.
+    // 없으면 타석 결과로 근사한다 — 그때는 태그 몫을 알 길이 없어 뜬공/직선타만 62 다
     const caught = play?.caughtOnTheFly ?? (outcome.detail === '뜬공아웃' || outcome.detail === '직선타아웃')
-    return caught ? CAUGHT_OUT_CALL : FORCE_OUT_CALL
+    // 0x51b3a·0x51b44 — 두 칸 중 하나라도 서면 62 다 (`bne`/`beq` 두 갈래)
+    return caught || play?.tagOut === true ? CAUGHT_OUT_CALL : FORCE_OUT_CALL
   }
   if (outcome.kind === '안타' && play != null) {
     const thrown = (play.throwBase ?? -1) >= 0 && (play.throwArrivalTick ?? -1) >= 0

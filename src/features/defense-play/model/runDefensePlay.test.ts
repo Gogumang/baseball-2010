@@ -81,6 +81,21 @@ describe('한 플레이 진행기 — 타자주자의 운명은 결과 코드, �
     expect(play(땅볼아웃, EMPTY_BASES, 0).caughtOnTheFly).toBe(false)
   })
 
+  /**
+   * 원본 `state[0x87]` — 아웃 콜 62/20 을 가르는 칸(0x51b44). "한 번이라도" 가 아니라
+   * **마지막 아웃 판정이 태그였나** 다 (0xb36d0 이 부를 때마다 0 으로 지우고 시작한다).
+   */
+  it('tagOut = 마지막 아웃 판정이 태그였나 (state[0x87])', () => {
+    // 아웃 판정이 한 번도 태그를 내지 않는 평범한 땅볼·뜬공은 서지 않는다
+    expect(play(땅볼아웃, EMPTY_BASES, 0).tagOut).toBe(false)
+    expect(play(뜬공아웃, EMPTY_BASES, 0).tagOut).toBe(false)
+    expect(play(단타, 만루, 0).tagOut).toBe(false)
+    // 만루 땅볼은 3번 주자가 태그로 잡힌다 (진행 기록 참고)
+    const 만루땅볼 = play(땅볼아웃, 만루, 0)
+    expect(만루땅볼.tagOut).toBe(true)
+    expect(만루땅볼.log.some((줄) => 줄.includes('태그 아웃'))).toBe(true)
+  })
+
   it('직선타를 잡히면 주자는 원래 루에 그대로 있다 (0xa9620 리터치)', () => {
     const 결과 = play(직선타아웃, 만루, 0)
 

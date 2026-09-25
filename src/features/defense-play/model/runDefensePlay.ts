@@ -297,6 +297,18 @@ export interface DefensePlayResult {
   readonly isUncatchable: boolean
   /** 뜬공을 뜬 채로 잡았는가 (태그업이 걸리는 조건) */
   readonly caughtOnTheFly: boolean
+  /**
+   * **아웃 판정(0xb36d0)이 마지막으로 적은 아웃이 태그였나** — 원본 `state[0x87]`.
+   *
+   * 아웃 콜을 62("잡아서·태그해서 낸 아웃")로 낼지 20(루에서 잡은 포스 아웃)으로 낼지를
+   * 가르는 칸이다 (`play-at-bat/model/atBatSounds.ts` 의 `inPlayCallSoundIdOf`).
+   *
+   * **"한 번이라도" 가 아니라 "마지막 판정" 이다** — 근거는 `runOutJudgement` 주석에 적었다.
+   * 쓰는 자리는 원본 판정을 옮긴 두 곳뿐이다: `runOutJudgement` 와 협살 태그.
+   * 타자주자의 "선언된 운명"(`batterOutTick`)은 원본 판정이 아니라 이 진행기의 규약이라
+   * 이 칸을 건드리지 않는다 — **근사**다.
+   */
+  readonly tagOut: boolean
   /** CPU 가 고른 송구 목표 루. −1 이면 안 던졌다 */
   readonly throwBase: number
   /** 송구 도착 틱. 송구가 없으면 −1 */
@@ -493,6 +505,8 @@ export interface DefensePlayState {
   rundownThrowTo: number
   rundowns: number
   rundownOuts: number
+  /** 원본 `state[0x87]` — 마지막 아웃 판정이 태그였나 (`runOutJudgement` 주석) */
+  tagOut: boolean
 }
 
 /**
@@ -614,6 +628,7 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     rundownThrowTo: NONE,
     rundowns: 0,
     rundownOuts: 0,
+    tagOut: false,
   }
 }
 
@@ -683,6 +698,7 @@ export function stepDefensePlay(
   let rundownThrowTo = state.rundownThrowTo
   let rundowns = state.rundowns
   let rundownOuts = state.rundownOuts
+  let tagOut = state.tagOut
 
   const contextAt = (at: number): DefenseContext => ({
     play,
@@ -703,6 +719,35 @@ export function stepDefensePlay(
    *
    * ⚠️ **0번(타자주자)은 뺀다.** 이 진행기의 규약이 "타자주자의 운명은 결과 코드가 정한다" 여서,
    * 판정이 3루타 주자를 태그로 잡으면 기록과 어긋난다. 원본에는 이 제외가 없다 — **근사**다.
+   *
+   * ## `tagOut`(원본 `state[0x87]`)은 "한 번이라도" 가 아니라 **"마지막 판정"** 이다 — 직접 뜬 근거
+   * ```
+   * b36d2: ldr  r3,[r0,#0x28] ; b36d8: adds r3,#0x87 ; b36dc: strb r2(=0),[r3]
+   *        → 0xb36d0 은 **부를 때마다 머리에서 state[0x87] = 0** 으로 지우고 시작한다.
+   * b3940: cmp r1,#3 ; b394a: ldr r3,[r5,#0x28] ; b394e: adds r3,#0x87 ; b3950: strb r2(=1),[r3]
+   *        → 결과가 3(태그)일 때만 1 을 적고 곧바로 아웃 꼬리(0xb36fa)로 빠져 **그 자리에서 돌아온다**.
+   * b43cc: 이 플레이의 야수(0xb0c90)가 +0xe0(공 쥠) 이면 b43da 에서 **매 틱** vt90 을 부른다.
+   * ```
+   * 곧 그 칸은 **직전 0xb36d0 한 번의 결과**만 담는다. 그런데 읽는 자리가 언제인지가 중요하다:
+   * ```
+   * b4540: ldr r1,[sp,#0x34] ; cmp #0 ; beq …   ; **이번 틱의 vt90 결과**가 0 이 아니면
+   * b4546: state[0x1f] 면 플레이+0x12b = 1
+   * b4556: movs r4,#0xd ; str r4,[sp,#0x38]     ; **결과 코드 13**
+   * b4562: vt44(13) · vt54(13) → 화면 판정 스위치 0x51a94 의 v = 13 갈래
+   * 51b3a: ldrb r3,[r2,#0x1f] ≠ 0 → 62 / 51b44: ldrb state[0x87] ≠ 0 → 62 / 아니면 20
+   * ```
+   * 결과 코드 13 은 **아웃이 난 바로 그 틱의 끝**에서, 같은 틱 안에서 화면 쪽으로 넘어간다.
+   * 그러니 0x51b36 이 보는 `state[0x87]` 은 언제나 **그 아웃을 낸 판정의 값**이고,
+   * 아웃이 안 난 틱의 지우기(0xb36d8)는 **아무도 읽지 않아 보이지 않는다**.
+   *
+   * → 그래서 여기서는 **아웃이 적히는 자리에서만** 갈아 끼운다(덮어쓴다). 아웃이 안 난 판정으로
+   *   지우지 않는다 — 지워 봐야 원본에서 읽히지 않는 값이고, 웹은 콜을 **플레이 끝에 한 번**만
+   *   내므로 지우면 오히려 "그 아웃을 낸 판정" 을 잃는다. 아웃이 여럿이면 **마지막 아웃**이 이긴다.
+   *
+   * ⚠️ **원본 `state[0x87]` 의 나머지 절반(0xb4312)은 안 옮겼다.** 원본은 결과가 **2(루 아웃)**
+   *    이면서 그 야수의 `+0x3b`(목표점 도착 표시)가 서 있을 때도 이 칸을 세운다. `+0x3b` 는
+   *    이 모델에 없는 칸이고(위치==목표 vt18 과는 세우고 푸는 자리가 다르다) 억지로 vt18 로
+   *    바꿔 끼우면 **땅볼 포스 아웃이 죄다 62 로 뒤집힌다**. 뜻을 모르는 채로 박지 않는다.
    */
   const runOutJudgement = (): void => {
     if (play.finished) return
@@ -713,6 +758,8 @@ export function stepDefensePlay(
     markOut(victim)
     outs += 1
     outsAdded += 1
+    // 0xb394e — state[0x87] = (결과 == 3). 아웃이 적히는 이 자리에서만 갈아 끼운다 (위 주석)
+    tagOut = judged.kind === OUT_KIND.TAG
     // 결과 3(태그)이면 원본은 그 자리에서 협살을 끝낸다 (0xb3946 → 0xb26b8)
     if (judged.kind === OUT_KIND.TAG && rundown.runnerIndex === judged.runnerIndex) {
       rundownOuts += 1
@@ -1085,6 +1132,8 @@ export function stepDefensePlay(
               outs += 1
               outsAdded += 1
               rundownOuts += 1
+              // 이것도 0xb36d0 결과 3 이다 — state[0x87] = 1 (0xb394e)
+              tagOut = true
               released = true
               log.push(`${tick}틱 협살 태그 — ${rundown.runnerIndex}번 주자 아웃`)
             }
@@ -1254,6 +1303,7 @@ export function stepDefensePlay(
   state.rundownThrowTo = rundownThrowTo
   state.rundowns = rundowns
   state.rundownOuts = rundownOuts
+  state.tagOut = tagOut
   state.tick = tick + 1
   return state
 }
@@ -1286,6 +1336,7 @@ export function defensePlayResultOf(state: DefensePlayState): DefensePlayResult 
     catchTick: state.catchTick,
     isUncatchable: state.uncatchable,
     caughtOnTheFly: state.onTheFly,
+    tagOut: state.tagOut,
     throwBase: state.throwBase,
     throwArrivalTick: state.throwArrivalTick,
     voidedRuns: held.heldRuns + (held.scoreboardRuns - runsScored),
