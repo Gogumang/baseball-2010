@@ -14,6 +14,7 @@ import {
   ownsStadiumItem,
   requiredPopularityOf,
   stadiumCollectorUnlocks,
+  seasonStadiumOf,
   stadiumPriceOf,
   standCapacityOf,
 } from '@/entities/season-mode/model/stadiumItems'
@@ -184,5 +185,22 @@ describe('효과 — 관중석은 상한만, 전광판은 가산만 (0xa34b8)', 
     const 잔디3 = 기본({ stadiumEquipped: [2, 3, 3] })
     expect(standCapacityOf(잔디0)).toBe(standCapacityOf(잔디3))
     expect(boardBonusOf(잔디0)).toBe(boardBonusOf(잔디3))
+  })
+})
+
+describe('시즌 홈경기 구장 세 칸 — 경기 준비 0x353ac~0x353e6', () => {
+  it('관중석은 +0x1b8, 전광판은 +0x1b9 를 그대로 옮긴다 (잔디는 안 간다)', () => {
+    const record = 기본({ stadiumEquipped: [2, 5, 3] })
+    expect(seasonStadiumOf(record)).toEqual({ stand: 2, crowd: 1, board: 5 })
+  })
+
+  it('관중 단계는 만원 판정 SR+0x65 에 1 을 더한 값이다 (0x353cc)', () => {
+    expect(seasonStadiumOf(기본({ crowdLevel: 0 })).crowd).toBe(1)
+    expect(seasonStadiumOf(기본({ crowdLevel: 1 })).crowd).toBe(2)
+    expect(seasonStadiumOf(기본({ crowdLevel: 2 })).crowd).toBe(3)
+  })
+
+  it('히든 칸(4~6)도 그대로 넘어간다 — 그리는 쪽이 hidden_* 로 가른다', () => {
+    expect(seasonStadiumOf(기본({ stadiumEquipped: [6, 4, 0] }))).toEqual({ stand: 6, crowd: 1, board: 4 })
   })
 })

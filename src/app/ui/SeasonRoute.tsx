@@ -21,6 +21,8 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { useGameSettings } from '@/app/model/useGameSettings'
 import { seasonRanksOf } from '@/app/model/useSeasonSession'
 import type { SeasonSession } from '@/app/model/useSeasonSession'
+import { seasonStadiumOf } from '@/entities/season-mode/model/stadiumItems'
+import { PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 
 interface SeasonRouteProps {
   readonly session: SeasonSession
@@ -315,6 +317,13 @@ export function SeasonRoute({ session, random, gameSettings, onExit }: SeasonRou
         onSpendGamePoint={actions.spendGamePoint}
         settings={gameSettings.settings}
         onSettingsChange={gameSettings.setSettings}
+        // 장착한 관중석·전광판 — **홈경기일 때만** 넘긴다 (원본 0x40ff0: 모드 2 이고
+        // `0xb6bdc(경기, 1) == SR[1]`, 곧 내 팀이 side 1 = 홈일 때만 시즌 구장 0x77494).
+        // 웹에서 그 side 를 정하는 것은 `leagueSideOf`(0xb7844) 고, 그 값이 그대로
+        // `playerSide` 다 — side 1 = 후공 = 홈. 원정이면 undefined 라 일반 구장으로 그려진다
+        seasonStadium={
+          gameOptions.playerSide === PLAYER_SIDE_LAST_BAT ? seasonStadiumOf(state.record) : undefined
+        }
       />
     )
   }

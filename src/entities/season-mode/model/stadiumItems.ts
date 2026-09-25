@@ -205,3 +205,40 @@ export function boardBonusOf(record: SeasonRecord): number {
  * 그래서 관중 수 계산에 쓰는 함수가 여기 없다 — 없는 게 원본과 같다.
  */
 export const GRASS_HAS_NO_EFFECT = true
+
+/**
+ * 시즌 **홈경기** 타석 배경에 넘기는 세 값 — 경기 준비 `0x353ac~0x353e6` 이
+ * 시즌 기록에서 구장 객체로 옮겨 담는 그대로다 (**확정**, 주소 다시 뜸).
+ *
+ * ```
+ * 353ac  구장+0x88 = (s8)SR[0x1b8]      ; 관중석 칸
+ * 353c2  구장+0x89 = (s8)SR[0x65] + 1   ; 관중 수 그림 단계
+ * 353d2  구장+0x8a = (s8)SR[0x1b9]      ; 전광판 칸
+ * ```
+ *
+ * ⚠️ 잔디 칸(SR+0x1ba)은 여기 없다 — 프레임이 아니라 팔레트라 다른 길로 간다.
+ */
+export interface SeasonStadiumScene {
+  /** 구장+0x88 — 관중석 칸 0~6 (4~6 은 히든) */
+  readonly stand: number
+  /** 구장+0x89 — 관중 수 그림 단계 (0 빈 좌석 · 1 적음 · 2 보통 · 3 만원) */
+  readonly crowd: number
+  /** 구장+0x8a — 전광판 칸 0~6 (4~6 은 히든) */
+  readonly board: number
+}
+
+/**
+ * 시즌 기록 → 구장 객체 세 칸 (`0x353ac~0x353e6`).
+ *
+ * `crowd` 는 **만원 판정 `SR+0x65` + 1** 이다. 그 칸은 경기가 끝날 때 관중·수입 계산
+ * `0xa34b8` 끝에서 서고(`0xa36ae~0xa36ca`: 관중 ≥ 수용×80/100 → 2, > 수용×35/100 → 1, 그 밖 0),
+ * 다음 경기 준비가 그 값을 그대로 읽는다. 곧 타석에 뜨는 관중 수는 **직전 경기의 것**이고
+ * 첫 경기는 0(+1 = "적음")이다 — 원본 그대로다.
+ */
+export function seasonStadiumOf(record: SeasonRecord): SeasonStadiumScene {
+  return {
+    stand: record.stadiumEquipped[0] ?? 0,
+    crowd: record.crowdLevel + 1,
+    board: record.stadiumEquipped[1] ?? 0,
+  }
+}
