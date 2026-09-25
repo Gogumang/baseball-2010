@@ -13,7 +13,7 @@ import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { describeOutcome, isHit } from '@/entities/at-bat/model/atBatOutcome'
 import { playQuickAtBat } from '@/entities/game/model/quickAtBat'
 import { batterAt, teamBatters, teamPitchers, quickPitcherOf } from '@/entities/team/model/teamRoster'
-import { advanceRunners } from '@/entities/game/model/baseState'
+import { advanceRunners, runnerCountOf } from '@/entities/game/model/baseState'
 import {
   completeGameRecordIdsOf,
   gameEndRecordIdsOf,
@@ -502,10 +502,19 @@ export function startPitch(
   )
 
   const batter = opponentBatterAbility(options.opponentTeamId, progress.opponentOrderIndex)
-  const resolution = pitchAgainstBatter(pitch, batter, random, {
-    control: fatigued.control,
-    velocity: fatigued.velocity,
-  })
+  const resolution = pitchAgainstBatter(
+    pitch,
+    batter,
+    random,
+    { control: fatigued.control, velocity: fatigued.velocity },
+    // 원본 0x34334 가 보는 상황 — state 의 볼카운트·아웃과 주자 유무(0xa9599)
+    {
+      strikes: progress.atBat.strikes,
+      balls: progress.atBat.balls,
+      outs: progress.game.outs,
+      hasRunner: runnerCountOf(progress.game.bases) > 0,
+    },
+  )
 
   // 스태미나는 게이지 결과와 무관하다 — 인자가 (game, 구질) 뿐이다 (P1 3-1 확정)
   const stamina = drainStamina({
