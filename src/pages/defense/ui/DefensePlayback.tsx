@@ -15,6 +15,7 @@ import type {
   DefensePlayResult,
   DefensePlayState,
 } from '@/features/defense-play/model/runDefensePlay'
+import { activeSound } from '@/shared/api/audio/soundPort'
 
 interface DefensePlaybackProps {
   /**
@@ -43,6 +44,15 @@ interface DefensePlaybackProps {
 /** 원작 경기 루프는 한 갱신에 한 틱이다 (0xc2198) */
 const UPDATES_PER_TICK = 1
 const DEFAULT_HOLD_UPDATES = 8
+
+/**
+ * **펌블(공 놓침) 소리 53** — 원본은 야수 동작 `0xd` 를 거는 `0xa1e60` 이 그 자리에서 낸다
+ * (`shared/config/original/sounds` 53번: "선수 넘어짐 / 공 놓침", `+0xb4 = 15` 동안 먼지 애니).
+ *
+ * 펌블을 굴리는 곳은 진행기(`runDefensePlay` 의 0xb41d0 굴림)지만 그쪽은 순수 함수라 소리를 못 낸다 —
+ * 틱을 실제로 돌리는 **이 화면**이 원본과 같은 틱에 낸다.
+ */
+const FUMBLE_SOUND = 53
 
 /**
  * 수비 한 플레이를 보여 준다 — 갈래가 둘이다.
@@ -82,7 +92,15 @@ interface RecordedPlaybackProps {
   readonly children?: React.ReactNode
 }
 
-/** 미리 계산해 둔 틱을 차례대로 보여 주기만 한다 — 지금까지의 그 갈래 그대로다 */
+/**
+ * 미리 계산해 둔 틱을 차례대로 보여 주기만 한다 — 지금까지의 그 갈래 그대로다.
+ *
+ * ⚠️ **펌블 소리 53 은 여기서 내지 않는다.** 이 갈래로 오는 것은 홈런 비행(`homeRunPlayback`)뿐이고
+ * (`app/ui/GameRoute` · `TeamGameScreen` · `PitcherGameScreen` 셋 다 `play.ticks` 는 홈런 재생이다),
+ * 그 틱 묶음은 진행기를 돌리지 않아 펌블 자체가 없다. 화면 스냅샷(`DefenseViewState`)에는
+ * 펌블 동작(0xd)도 `fumbled` 칸도 실려 오지 않으므로 여기서는 알 길도 없다.
+ * 두 갈래는 `input` 이 있으면 실시간, 없으면 재생으로 **서로 배타**라 겹쳐 울릴 일도 없다.
+ */
 function RecordedPlayback({ ticks, onDone, holdUpdates, children }: RecordedPlaybackProps) {
   const update = useUpdateCounter(ticks.length > 0)
   const lastIndex = Math.max(0, ticks.length - 1)
@@ -122,6 +140,13 @@ function LivePlayback({ input, side, onDone, holdUpdates, children }: LivePlayba
   const startedAtRef = useRef(0)
   /** 아직 진행기에 안 먹인 키들 */
   const pressesRef = useRef<DefenseKeyPress[]>([])
+  /**
+   * 이 플레이에서 펌블 소리 53 을 이미 냈는가.
+   *
+   * 진행기는 펌블을 한 플레이에 한 번만 굴리지만(`!fumbled` 게이트), 갱신이 건너뛰어 여러 틱을
+   * 따라잡을 때 같은 갱신 안에서 두 번 보지 않게 여기서도 한 번으로 막는다.
+   */
+  const fumbleSoundPlayedRef = useRef(false)
   const [view, setView] = useState<DefenseViewState | null>(null)
   const [finishedAt, setFinishedAt] = useState<number | null>(null)
 
@@ -143,6 +168,7 @@ function LivePlayback({ input, side, onDone, holdUpdates, children }: LivePlayba
       stateRef.current = startDefensePlay(withSide(input, side))
       startedAtRef.current = update
       pressesRef.current = []
+      fumbleSoundPlayedRef.current = false
       setView(null)
       setFinishedAt(null)
     }
@@ -156,6 +182,12 @@ function LivePlayback({ input, side, onDone, holdUpdates, children }: LivePlayba
     while (running.tick < wanted && !isDefensePlayFinished(running)) {
       running = stepDefensePlay(running, pressesRef.current.shift() ?? null)
       moved = true
+      // 펌블 소리 53 — 진행기가 `state.fumbled` 를 세우는 **그 틱**에 낸다 (0xb41d0 굴림 → 동작 0xd).
+      // 플레이 끝에 몰아서 내면 아웃 콜(0x51b36)을 덮는다 — 소리 통로가 하나뿐이기 때문이다.
+      if (running.fumbled && !fumbleSoundPlayedRef.current) {
+        fumbleSoundPlayedRef.current = true
+        activeSound().play(FUMBLE_SOUND)
+      }
     }
     stateRef.current = running
     if (moved) setView(running.ticks[running.ticks.length - 1] ?? null)

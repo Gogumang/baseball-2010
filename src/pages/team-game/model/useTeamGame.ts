@@ -31,10 +31,12 @@ import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { applyPitchResolution } from '@/entities/at-bat/model/atBatState'
 import {
+  deepHitCheerSoundIdOf,
   inPlayCallSoundIdOf,
   pitchCallSoundIdOf,
   PITCH_RELEASE_SOUND,
 } from '@/features/play-at-bat/model/atBatSounds'
+import { carryDistanceOf } from '@/entities/batting/model/battedBallFlight'
 import { GAME_INTRO_SOUND, gameResultSoundIdOf } from '@/features/play-game/model/gameSounds'
 import { stepSoundIdsOf } from '@/pages/team-game/model/teamGameSounds'
 import { activeSound, playSoundIds } from '@/shared/api/audio/soundPort'
@@ -188,11 +190,22 @@ export function useTeamGame(options: TeamGameOptions, random: RandomPort): TeamG
       finishDefensePlay: (result?: DefensePlayResult) => {
         const pending = progressRef.current.pendingDefensePlay
         if (pending === null) return
+        // 결과를 못 받았으면 남은 틱을 여기서 끝까지 돌린다 — 붙든 상태는 반드시 푼다
+        const played = result ?? runDefensePlay(pending.input)
         step(
-          // 결과를 못 받았으면 남은 틱을 여기서 끝까지 돌린다 — 붙든 상태는 반드시 푼다
-          (current) => resolveDefensePlay(current, result ?? runDefensePlay(pending.input), random),
-          // 플레이가 끝난 자리 — 아웃 콜(0x51b36)·홈런 함성(11)은 여기서야 난다
-          () => [inPlayCallSoundIdOf(pending.outcome)],
+          (current) => resolveDefensePlay(current, played, random),
+          // 플레이가 끝난 자리 — 아웃 콜(0x51b36)·세이프 콜(0x51c14)·홈런 함성(11)은 여기서야 난다.
+          // **수비 결과를 함께 넘겨야** 원본이 보는 칸(state[0x1f])과 세이프 갈래가 열린다
+          // (`atBatSounds.inPlayCallSoundIdOf` 둘째 인자). 함성 60 은 원본이 **낙구 틱**에
+          // 내는 것이라 이 자리는 근사다 — 타자편(`useCareerSession`)과 같은 근사·같은 순서다
+          () => [
+            deepHitCheerSoundIdOf({
+              outcome: pending.outcome,
+              carryDistance: carryDistanceOf(pending.input.trajectory),
+              caughtOnTheFly: played.caughtOnTheFly,
+            }),
+            inPlayCallSoundIdOf(pending.outcome, played),
+          ],
         )
       },
     }),

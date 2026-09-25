@@ -9,6 +9,7 @@ import { usePitcherGame } from '@/pages/pitching/model/usePitcherGame'
 import type { PitcherGameOptions } from '@/pages/pitching/model/usePitcherGame'
 import { GAME_INTRO_SOUND } from '@/features/play-game/model/gameSounds'
 import { PITCH_RELEASE_SOUND } from '@/features/play-at-bat/model/atBatSounds'
+import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import { setActiveSound } from '@/shared/api/audio/soundPort'
 import type { SoundPort } from '@/shared/api/audio/soundPort'
 
@@ -83,5 +84,44 @@ describe('투수편 화면의 소리 배선', () => {
       act(() => result.current.actions.throwPitch({ typeNumber: 1, courseCell: 4, gaugeCell: 0 }))
     }
     expect(녹음.played.some((id) => [16, 18, 39, 21, 24, 25].includes(id))).toBe(true)
+  })
+
+  /**
+   * 세이프 17 · 함성 60 은 **수비 결과를 넘겨야** 열리는 갈래다 — 한동안 타자편
+   * (`useCareerSession`)만 넘겨 주어 투수편에서는 둘 다 안 났다.
+   */
+  it('안타인데 그 루로 송구가 도착했으면 세이프 17 이 난다 (0x51c14)', () => {
+    // 씨앗 1 은 첫 인플레이 타구가 **안타**다 (기본 씨앗은 그 앞에 감독 강판이 와 더 못 던진다)
+    const { result } = 띄우기(1)
+
+    // 인플레이 **안타**가 나올 때까지 던진다 — 무엇이 나올지는 난수가 정한다.
+    // 아웃이 걸린 타구는 그대로 흘려보내고, 중간에 뜨는 창(감독 대사·돌발)은 닫아 가며 이어 던진다
+    for (let pitch = 0; pitch < 400; pitch += 1) {
+      const 진행 = result.current.progress
+      if (진행.pendingDefensePlay !== null) {
+        if (진행.pendingDefensePlay.outcome.kind === '안타') break
+        act(() => result.current.actions.finishDefensePlay())
+        continue
+      }
+      if (진행.managerHookText !== null) {
+        act(() => result.current.actions.confirmManagerHook())
+        continue
+      }
+      if (진행.burst !== null && 진행.burst.current !== null) {
+        act(() => result.current.actions.closeBurst())
+        continue
+      }
+      if (!result.current.canPitch) break
+      act(() => result.current.actions.throwPitch({ typeNumber: 1, courseCell: 4, gaugeCell: 0 }))
+    }
+    const pending = result.current.progress.pendingDefensePlay
+    expect(pending?.outcome.kind).toBe('안타')
+
+    // 송구 칸만 원본 세이프 조건("아웃 될 뻔했는데 살았다")에 맞춰 둔다 — 나머지는 진행기 그대로다
+    const 결과 = { ...runDefensePlay(pending!), throwBase: 2, throwArrivalTick: 10 }
+    녹음.played.length = 0
+
+    act(() => result.current.actions.finishDefensePlay(결과))
+    expect(녹음.played).toContain(17)
   })
 })

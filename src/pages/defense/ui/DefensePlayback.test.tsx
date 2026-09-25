@@ -11,6 +11,8 @@ import type { DefensePlayInput, DefensePlayResult } from '@/features/defense-pla
 import type { BaseState } from '@/entities/game/model/baseState'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
+import { setActiveSound } from '@/shared/api/audio/soundPort'
+import type { RandomPort } from '@/shared/api/random/randomPort'
 
 /**
  * 수비 한 플레이 재생 (원본 경기 장면 상태 0x17).
@@ -137,6 +139,63 @@ describe('수비 재생 — 타구를 받아 실시간으로 돌리는 갈래 (�
       expect(결.throwBase).toBe(2)
       expect(결.log.some((line) => line.includes('사람이 2루로 송구 지시'))).toBe(true)
     } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  /**
+   * **펌블 소리 53** (야수 동작 0xd 를 거는 0xa1e60).
+   * 굴림은 진행기가 하지만 소리는 **틱을 도는 이 화면**이 낸다 — 플레이 끝에 몰아서 내면
+   * 아웃 콜(0x51b36)을 덮기 때문이다.
+   */
+  it('펌블이 난 그 틱에 53 을 한 번만 낸다 (0xb41d0 → 동작 0xd, 0xa1e60)', () => {
+    vi.useFakeTimers()
+    const 울린것: number[] = []
+    setActiveSound({
+      play: (id) => void 울린것.push(id),
+      playBgm: () => {},
+      stopBgm: () => {},
+      resumeBgm: () => {},
+      currentBgm: () => null,
+      setVolume: () => {},
+      getVolume: () => 100,
+    })
+    try {
+      // 굴림이 늘 0 을 내는 난수 — 펌블 기준(만분율)보다 작아 **반드시** 펌블이 난다
+      const 늘0: RandomPort = { next: () => 0, nextInRange: (minimum) => minimum, pick: (c) => c[0] }
+      const onDone = vi.fn()
+      render(<DefensePlayback input={{ ...타구(단타, 주자1루), random: 늘0 }} onDone={onDone} />)
+      끝까지(onDone)
+
+      expect(결과(onDone).fumbled).toBe(true)
+      expect(울린것.filter((id) => id === 53)).toEqual([53])
+    } finally {
+      setActiveSound(null)
+      vi.useRealTimers()
+    }
+  })
+
+  it('펌블이 없으면 53 을 내지 않는다 — 난수를 안 주면 굴림 자체가 안 돈다', () => {
+    vi.useFakeTimers()
+    const 울린것: number[] = []
+    setActiveSound({
+      play: (id) => void 울린것.push(id),
+      playBgm: () => {},
+      stopBgm: () => {},
+      resumeBgm: () => {},
+      currentBgm: () => null,
+      setVolume: () => {},
+      getVolume: () => 100,
+    })
+    try {
+      const onDone = vi.fn()
+      render(<DefensePlayback input={타구(단타, 주자1루)} onDone={onDone} />)
+      끝까지(onDone)
+
+      expect(결과(onDone).fumbled).toBe(false)
+      expect(울린것).not.toContain(53)
+    } finally {
+      setActiveSound(null)
       vi.useRealTimers()
     }
   })

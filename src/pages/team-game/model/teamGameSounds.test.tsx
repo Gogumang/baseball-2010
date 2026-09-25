@@ -122,6 +122,38 @@ describe('팀 경기 화면의 소리 배선', () => {
     expect(녹음.played[0]).toBe(20)
   })
 
+  /**
+   * 세이프 17 과 함성 60 은 **수비 결과를 넘겨야** 열리는 갈래다 — 한동안 타자편
+   * (`useCareerSession`)만 넘겨 주어 팀 경기에서는 둘 다 안 났다.
+   */
+  it('안타인데 그 루로 송구가 도착했으면 세이프 17 이 난다 (0x51c14)', () => {
+    const { result } = 띄우기({ playerSide: PLAYER_SIDE_FIRST_BAT })
+    act(() => result.current.actions.applyOutcome({ kind: '안타', bases: 1 }))
+
+    // 송구 칸만 원본 세이프 조건("아웃 될 뻔했는데 살았다")에 맞춰 둔다 — 나머지는 진행기 그대로다
+    const 결과 = {
+      ...runDefensePlay(result.current.pendingDefensePlay!.input),
+      throwBase: 2,
+      throwArrivalTick: 10,
+    }
+    녹음.played.length = 0
+
+    act(() => result.current.actions.finishDefensePlay(결과))
+    expect(녹음.played).toContain(17)
+  })
+
+  it('깊은 타구가 아무도 못 잡고 떨어지면 함성 60 이 난다 (0x52b62)', () => {
+    const { result } = 띄우기({ playerSide: PLAYER_SIDE_FIRST_BAT })
+    act(() => result.current.actions.applyOutcome({ kind: '안타', bases: 3 }))
+
+    const 결과 = runDefensePlay(result.current.pendingDefensePlay!.input)
+    expect(결과.caughtOnTheFly).toBe(false)
+    녹음.played.length = 0
+
+    act(() => result.current.actions.finishDefensePlay(결과))
+    expect(녹음.played).toContain(60)
+  })
+
   it('사람이 던지면 투구 순간 소리 12 가 먼저 난다 (0x3f378)', () => {
     const { result } = 띄우기({ playerSide: PLAYER_SIDE_LAST_BAT })
     // 우리가 후공이면 1회초는 우리 수비다
