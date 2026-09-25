@@ -8,6 +8,7 @@ import {
   teamPitchers,
 } from '@/entities/team/model/teamRoster'
 import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
+import { ACE_BATTERS } from '@/entities/game/model/aceOpponent'
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
 import { gameAbilitiesOf } from '@/features/play-team-game/model/gameAbilities'
@@ -152,4 +153,89 @@ export function rosterRepertoireOf(teamId: number, rosterSlot: number): PitcherR
     ROSTER_PITCHER_REPERTOIRES[index] ??
     ROSTER_PITCHER_REPERTOIRES[0] ?? { name: '', form: 0, magicId: 0, pitchMask: 1 }
   )
+}
+
+/* ── 명단(엔트리) 한 줄 ─────────────────────────────────────────────────────── */
+
+/**
+ * 경기에 들어간 팀의 **명단 한 칸** — 원본 `team[0xe + 칸]` 이 가리키는 선수 레코드다.
+ *
+ * 원본은 팀 구조체에 "칸 → 선수" 이름 목록 하나를 두고 (`team+0xe`, 0x16칸), **앞 아홉 칸이
+ * 타순**, 그 뒤가 벤치다 (벤치 타자 수 = `team+0x28c`). 대타 확정 `0xaebe4` 가 이 목록의 두 칸을
+ * 맞바꾸고 빠진 선수를 목록에서 지운다(`0xb95b1`) — 그래서 웹도 로스터 칸 번호를 바로 쓰지 않고
+ * 이 목록을 들고 다닌다.
+ */
+export interface TeamEntryBatter {
+  readonly name: string
+  /** 히트 · 파워 · 수비 · 주루 (원본 0~999 눈금 그대로) */
+  readonly ability: readonly [number, number, number, number]
+  /** 수비 위치 코드 = 레코드 `+0x1c & 0xf`. **0 은 자리 없는 후보(벤치)** 다 */
+  readonly position: number
+  /** 마타자면 `ACE_BATTERS` 칸 0~4, 아니면 −1 */
+  readonly aceIndex: number
+}
+
+/** 타순 아홉 칸 — 그 뒤가 벤치다 */
+export const BATTING_ORDER_SLOTS = 9
+
+/** 마선수가 아니라는 표시 (준비 기록 `skin+0xbc` +0xd 가 비었을 때와 같은 값) */
+export const NO_ACE_BATTER = -1
+
+/** 로스터 12명을 그대로 명단으로 — 앞 아홉이 타순, 9~11 이 벤치다 */
+export function rosterEntryBattersOf(teamId: number): readonly TeamEntryBatter[] {
+  return teamBatters(teamId).map((player) => ({
+    name: player.name,
+    ability: player.ability,
+    position: player.position ?? 0,
+    aceIndex: NO_ACE_BATTER,
+  }))
+}
+
+/**
+ * 고른 **마타자를 벤치 첫 칸(9번)에 끼워 넣는다** — 원본 `0xb8870(team, k)`:
+ * `0x1f84c(저장, k)` 로 마타자 레코드를 꺼내 `0xb53f0(team, 레코드, 1)` 로 넣고, 성공하면
+ * `team+0x27` 과 **벤치 타자 수 `team+0x28c`(= `0xa3<<2`)를 하나씩 올린다**
+ * (`b8898~b88b2`). `0xb53f0` 의 `0x40`(마타자) 가지가 **9번 = 첫 벤치 칸**이고, 그 자리 선수가
+ * 마타자가 아니면 한 칸 늘려 끼워 넣는다 (S6 3-5) — 그래서 명단이 12 → 13칸이 된다.
+ *
+ * 일반모드 경기 세우기 `0x30f20` 이 준비 기록의 마타자 칸으로 이 함수를 부른다
+ * (`31046: 0xb8870(teamA, [sp+0x45])`).
+ *
+ * ⚠️ **미확인**: 마타자 레코드의 수비 위치 니블(`+0x1c & 0xf`)은 저장 레코드에 있는 값이라
+ * 못 읽었다. 벤치에 들어가는 선수이므로 **0(자리 없음)** 으로 둔다 — 대타 확정이 이 니블을
+ * 옛 타자 것과 맞바꾸므로(0xaecce~0xacfe) 0 이어야 빠진 선수가 벤치로 내려간다.
+ */
+export function withAceBatter(
+  entry: readonly TeamEntryBatter[],
+  aceIndex: number,
+): readonly TeamEntryBatter[] {
+  const ace = ACE_BATTERS[aceIndex]
+  if (ace === undefined) return entry
+  const inserted: TeamEntryBatter = {
+    name: ace.name,
+    ability: [ace.ability.hit, ace.ability.power, ace.ability.defense, ace.ability.run],
+    position: 0,
+    aceIndex,
+  }
+  const out = [...entry]
+  out.splice(BATTING_ORDER_SLOTS, 0, inserted)
+  return out
+}
+
+/** 명단 한 칸의 경기용 능력치 — `batterGameAbilities` 와 같은 보정을 명단 쪽으로 돌린 것 */
+export function entryBatterGameAbilities(
+  context: TeamGameAbilityContext,
+  teamId: number,
+  entry: TeamEntryBatter,
+  lineupSlot: number,
+): [number, number, number, number] {
+  const isMyTeam = context.seasonTeamId === teamId
+  return gameAbilitiesOf(entry.ability, {
+    mode: context.mode,
+    isPitcher: false,
+    isMyTeam,
+    teamAbilities: teamAbilitiesOf(context, teamId),
+    season: context.season,
+    assignment: isMyTeam ? context.lineup?.[lineupSlot] : undefined,
+  })
 }

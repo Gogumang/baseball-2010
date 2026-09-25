@@ -3,12 +3,15 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import {
+  availablePinchHitters,
   availablePitchers,
+  canOpenPinchHit,
   canOpenPitcherChange,
   changePitcher,
   closeBurstWindow,
   isBatterTurn,
   isPitchTurn,
+  pinchHit,
   resolveDefensePlay,
   runAutoProgress,
   startBatterOutcome,
@@ -60,6 +63,10 @@ export interface TeamGameSession {
   readonly canChangePitcher: boolean
   /** 지금 벤치에서 올릴 수 있는 우리 투수 칸 */
   readonly benchPitchers: readonly number[]
+  /** `#` 로 대타 화면(상태 0xb)을 열 수 있는가 — 우리 공격 차례이고 벤치 타자가 있을 때 */
+  readonly canPinchHit: boolean
+  /** 지금 대타로 낼 수 있는 우리 명단 칸 (9번부터가 벤치다) */
+  readonly benchBatters: readonly number[]
   /** 지금 도루를 걸 수 있는 루 ('3' 1루 · '2' 2루) */
   readonly stealableBases: readonly StealBase[]
   /**
@@ -79,6 +86,8 @@ export interface TeamGameSession {
     readonly closeBurst: () => void
     /** `#` 교체 화면에서 벤치 투수 칸을 고른다 (R4 1a·1c) */
     readonly changePitcher: (benchIndex: number) => void
+    /** `#` 대타 화면에서 벤치 타자 칸을 고른다 (0xaf06c → 0xaebe4) */
+    readonly pinchHit: (benchIndex: number) => void
     /** 도루 (메시지 0x583) — 대상 주자가 선 루 */
     readonly steal: (base: StealBase) => void
     /** 경기 중 메뉴 '*' 의 자동진행 — **비용 검사는 화면이 먼저 한다** */
@@ -183,6 +192,7 @@ export function useTeamGame(options: TeamGameOptions, random: RandomPort): TeamG
         ),
       closeBurst: () => step((current) => closeBurstWindow(current)),
       changePitcher: (benchIndex: number) => step((current) => changePitcher(current, benchIndex)),
+      pinchHit: (benchIndex: number) => step((current) => pinchHit(current, benchIndex)),
       // 도루 실패로 이닝이 끝나면 공수 교대 징글이 난다. 세이프 콜(17)은 잇지 않았다 —
       // 원본 판정 v9 가 어떤 플레이에서 나는지 미해결이다
       steal: (base: StealBase) => step((current) => stealBase(current, base, random)),
@@ -224,6 +234,8 @@ export function useTeamGame(options: TeamGameOptions, random: RandomPort): TeamG
     summary,
     canChangePitcher: canOpenPitcherChange(progress),
     benchPitchers: availablePitchers(progress),
+    canPinchHit: canOpenPinchHit(progress),
+    benchBatters: availablePinchHitters(progress),
     stealableBases: stealableBases(progress),
     pendingDefensePlay: progress.pendingDefensePlay,
     actions,

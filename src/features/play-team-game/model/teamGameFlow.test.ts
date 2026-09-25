@@ -9,15 +9,19 @@ import {
 import {
   applyBatterOutcome,
   autoProgressCostOf,
+  availablePinchHitters,
   availablePitchers,
   canAutoProgress,
+  canOpenPinchHit,
   canOpenPitcherChange,
   changePitcher,
   currentBatterAbility,
+  currentBatterEntry,
   currentPitcherAbility,
   isBatterTurn,
   isPitchTurn,
   ourPitcherStats,
+  pinchHit,
   pitchSlotsFor,
   replacementPitcherIndexOf,
   resolveDefensePlay,
@@ -626,5 +630,89 @@ describe('주자 처리는 수비 화면이 끝나야 정해진다 (상태 0x17 
     expect(쪼개서.ourPitcherCounters).toEqual(한번에.ourPitcherCounters)
     expect(쪼개서.burst).toEqual(한번에.burst)
     expect(쪼개서.log.map((entry) => entry.text)).toEqual(한번에.log.map((entry) => entry.text))
+  })
+})
+
+describe('대타 (0xaf06c → 0xaebe4 의 +0x291 가지, R4 1a·1c)', () => {
+  const 공격시작 = (options: Partial<TeamGameOptions> = {}) =>
+    시작({ playerSide: PLAYER_SIDE_FIRST_BAT, ...options })
+
+  it('로스터 12명이면 타순 아홉 + 벤치 셋이다', () => {
+    const { progress } = 공격시작()
+    expect(progress.ourEntry).toHaveLength(12)
+    expect(progress.ourBenchBatters).toBe(3)
+    expect(availablePinchHitters(progress)).toEqual([9, 10, 11])
+  })
+
+  it('고른 마타자는 **벤치 첫 칸(9번)** 에 들어간다 (0xb8870 → 0xb53f0 의 0x40 가지)', () => {
+    const { progress } = 공격시작({ aceBatterId: 0 })
+    expect(progress.ourEntry).toHaveLength(13)
+    expect(progress.ourEntry[9]?.aceIndex).toBe(0)
+    expect(progress.ourEntry[9]?.name).toBe('메디카')
+    // 타순 아홉 칸은 그대로다 — 마타자가 타석에 서는 길은 대타뿐이다
+    expect(progress.ourEntry.slice(0, 9).every((player) => player.aceIndex < 0)).toBe(true)
+    expect(progress.ourBenchBatters).toBe(4)
+  })
+
+  it('우리 공격이고 벤치가 남아 있으면 `#` 대타를 열 수 있다 (수비 중에는 투수 교체다)', () => {
+    const { progress } = 공격시작()
+    expect(isBatterTurn(progress)).toBe(true)
+    expect(canOpenPinchHit(progress)).toBe(true)
+    expect(canOpenPitcherChange(progress)).toBe(false)
+
+    const 수비 = 시작({ playerSide: PLAYER_SIDE_LAST_BAT }).progress
+    expect(canOpenPinchHit(수비)).toBe(false)
+    expect(canOpenPitcherChange(수비)).toBe(true)
+  })
+
+  it('대타가 옛 타자의 수비 자리를 받고, 빠진 선수는 명단에서 지워진다 (재출장 없음)', () => {
+    const { progress } = 공격시작({ aceBatterId: 0 })
+    const 옛타자 = progress.ourEntry[0]!
+    const 대타 = progress.ourEntry[9]!
+    expect(대타.position).toBe(0)
+
+    const 뒤 = pinchHit(progress, 9)
+    expect(뒤.ourEntry[0]?.name).toBe(대타.name)
+    expect(뒤.ourEntry[0]?.position).toBe(옛타자.position)
+    expect(뒤.ourEntry).toHaveLength(12)
+    expect(뒤.ourEntry.some((player) => player.name === 옛타자.name)).toBe(false)
+    expect(뒤.ourBenchBatters).toBe(3)
+    expect(currentBatterEntry(뒤)?.aceIndex).toBe(0)
+  })
+
+  it('대타 타자의 능력치가 타석 화면에 그대로 간다', () => {
+    const { progress } = 공격시작({ aceBatterId: 2, mode: 1 })
+    const 뒤 = pinchHit(progress, 9)
+    // 로제 = 히트 580 · 파워 850 (XlsACE_BAT_DATA). 모드 1 은 팀 능력치 보정이 붙으므로
+    // 값 자체가 아니라 **바뀌었는지**만 본다
+    expect(currentBatterAbility(뒤)).not.toEqual(currentBatterAbility(progress))
+    expect(currentBatterAbility(뒤).power).toBeGreaterThan(currentBatterAbility(뒤).hit)
+  })
+
+  it('볼카운트는 0-0 으로 돌아간다 — 0x16 다음이 0xd 라 타석 초기화 0xa5bcc 를 지난다', () => {
+    const { progress } = 공격시작()
+    // 볼 셋 스트라이크 하나에서 대타를 내면 새 타자가 처음부터 친다
+    const 카운트 = { ...progress, atBat: { ...progress.atBat, balls: 3, strikes: 1 } }
+    const 뒤 = pinchHit(카운트, 9)
+    expect(뒤.atBat.balls).toBe(0)
+    expect(뒤.atBat.strikes).toBe(0)
+    // 타순 칸은 그대로다 — 같은 타석을 이어받는다
+    expect(뒤.game.battingOrderIndex).toBe(progress.game.battingOrderIndex)
+  })
+
+  it('벤치를 다 쓰면 더는 못 연다', () => {
+    const { progress } = 공격시작()
+    let 현재 = progress
+    for (const _ of [0, 1, 2]) 현재 = pinchHit(현재, 9)
+    expect(현재.ourBenchBatters).toBe(0)
+    expect(availablePinchHitters(현재)).toEqual([])
+    expect(canOpenPinchHit(현재)).toBe(false)
+    // 없는 칸을 고르면 아무 일도 안 난다
+    expect(pinchHit(현재, 9)).toBe(현재)
+  })
+
+  it('벤치가 아닌 칸(타순 안)은 대타로 못 고른다', () => {
+    const { progress } = 공격시작()
+    expect(pinchHit(progress, 3)).toBe(progress)
   })
 })

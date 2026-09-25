@@ -91,9 +91,28 @@ describe('팀 경기 화면 — 공격(타석) 차례', () => {
     띄우기({ playerSide: PLAYER_SIDE_FIRST_BAT })
 
     expect(screen.getByText('타석')).toBeTruthy()
-    expect(screen.getByText(/1번 타자/)).toBeTruthy()
+    // 안내줄은 타순 칸과 **명단에 선 타자 이름**을 적는다 (대타가 붙은 뒤로는 이름이 바뀐다)
+    expect(screen.getByText(/1번 /)).toBeTruthy()
     // 같은 화면에 투구 단계가 함께 뜨지 않는다 — 공수는 번갈아 돈다
     expect(screen.queryByText('1. 구질 선택')).toBeNull()
+  })
+
+  it("'#' 가 공격 중에는 **대타** 화면을 연다 (0x49598 의 공격 가지)", () => {
+    띄우기({ playerSide: PLAYER_SIDE_FIRST_BAT })
+    fireEvent.keyDown(window, { key: '#' })
+
+    expect(screen.getByText('대타 교체')).toBeTruthy()
+    // 수비 쪽 제목은 안 뜬다
+    expect(screen.queryByText('투수 교체')).toBeNull()
+  })
+
+  it('고른 마타자가 대타로 타석에 선다 (원본에서 마타자가 타석에 서는 유일한 길)', () => {
+    띄우기({ playerSide: PLAYER_SIDE_FIRST_BAT, aceBatterId: 0 })
+    fireEvent.keyDown(window, { key: '#' })
+    fireEvent.click(screen.getByText('메디카 (마타자)'))
+
+    expect(screen.queryByText('대타 교체')).toBeNull()
+    expect(screen.getByText(/1번 메디카/)).toBeTruthy()
   })
 })
 
