@@ -83,6 +83,7 @@ import { defenseArrivalTicks, secondBaseCoverSlot } from '@/entities/fielding/mo
 import { effectiveThrowSpeedOf, readyTicksOf, throwTicksToFielder } from '@/entities/fielding/model/throwPlan'
 import { chooseThrowTargetBase } from '@/entities/fielding/model/throwTargetBase'
 import { EMPTY_BASES, type AdvanceResult, type BaseState } from '@/entities/game/model/baseState'
+import type { ManualAutoMode } from '@/entities/settings/model/gameSettings'
 import { forecastCatch } from '@/features/defense-play/model/catchForecast'
 import {
   viewStateOf,
@@ -165,6 +166,32 @@ export interface DefensePlayInput {
    * 말해 줘야 알 수 있어서, 모르면 시작하지 않는 쪽이 안전하다.
    */
   readonly defenseIsCpu?: boolean
+  /**
+   * **공격을 CPU 가 맡았는가** — 자동 주루 제어기를 켜는 조건의 한쪽이다.
+   * 원본 `0xae690(x, 설정+0xbd)` 의 앞 항: `경기[0x31 + 경기[9](공격측)] == 1` (확정, 아래 참고).
+   *
+   * 안 주면 `false`(사람 공격)로 둔다 — 그러면 `runningMode` 혼자가 답을 정한다.
+   */
+  readonly offenseIsCpu?: boolean
+  /**
+   * **주루 수동/자동** (환경설정 옵션 +0xbd, 기본 자동). 안 주면 자동이다.
+   *
+   * 원본 배선(직접 뜬 것, 매 틱 도는 경기 장면 슬롯 2 = `0x524c0` 안):
+   * ```
+   * 5261c: 설정 = 0x1f1d8([0x1400054])
+   * 52628: r1 = 설정+0xbd                         ; 주루 수동(0)/자동(1)
+   * 5262e: bl 0xae690([장면+0x214], r1)
+   *        ae692~ae6be: r2 = [x+0x174](= 경기) ; 공격측 = 경기[9]
+   *                     반환 = (경기[0x31 + 공격측] == 1)  ||  (설정+0xbd != 0)
+   * 52638: 그 값이 0 이면 → 플레이+0x111(끝남)·+0x129 를 보고, 종류 7(홈런더비)이면 그래도 돈다
+   * 52660: 0xaf8c0(제어기 = 장면+0x210, 0)        ; = 제어기.vt8 = 0xaf918 자동 추가 진루
+   * ```
+   * 곧 **"공격이 CPU 거나 설정이 자동이면 자동 진루 제어기를 돌리고, 사람이 공격하면서 설정이
+   * 수동이면 아예 안 돌린다"**. 예외 셋(플레이 끝남 +0x111 · +0x129 · 종류 7)은 수동이어도 돈다.
+   *
+   * ⚠️ `경기+0x24` 는 이 갈림과 **아무 상관이 없다** — 아래 `autoBaserunning` 주석 참고.
+   */
+  readonly runningMode?: ManualAutoMode
   /** 사람 조작 (I-controls 0절 상태 0x17 표). 안 주면 전부 자동이다 */
   readonly controls?: DefensePlayControls
 
@@ -429,7 +456,24 @@ export interface DefensePlayState {
   catchTick: number
   fumbled: boolean
   errantThrow: boolean
-  /** 경기+0x24 — 자동 주루. 사람이 주루 키를 누르면 0 이 된다 (0x5209e) */
+  /**
+   * **경기+0x24** (전역 경기 구조체 `[0x1552d0c]` 의 바이트 한 칸) — "주자가 뛰는 중" 표시다.
+   *
+   * ⚠️ **자동 주루 스위치가 아니다.** `.text` 를 전부 훑어(오프셋 0x24 바이트 접근 24곳) 확인한
+   * 쓰는 곳·읽는 곳 전부:
+   *   - 쓰기 `0x3d960`(상태 0xf 진입 = 매 투구 시작) = 0, 같이 경기[0x14+i]·경기[0x90+i] 도 0
+   *   - 쓰기 `0x4648a`(상태 0x17 진입 0x46418) = 설정+0xbd
+   *   - 쓰기 `0x520b6`(진루 키 0x582) = 0 · `0x52240`(귀루 키 0x584) = 0 · `0x521dc`(도루) = 0
+   *   - 쓰기 `0xa9b86`·`0xa9ba8`(0xa9b04 가 주자를 실제로 움직인 순간) = **1** · `0xa9c40`(0xa9bd4) = 1
+   *   - **읽기는 딱 둘** — `0x3e0e6` 과 `0x521fa`. 그게 전부다.
+   * `0x3e0e6` 은 상태 0x12 진입(공 도착·스윙 판정) 안이고, 하는 일은
+   * "경기+0x24 ≠ 0 이고 (아웃 ≤ 1 또는 판정 ≠ 5) 이면 **플레이 종류 5(주자 움직임만) + 상태 0x17**",
+   * 곧 **투구가 끝난 뒤 수비 화면을 열지 말지**를 가른다(S8 5-3 의 state[0x24] "도루 중"과 같은 칸).
+   * `0x521fa` 는 도루 메시지 처리에서 경기[0x14+루]·경기[0x90+루] 를 세울지 가른다.
+   * → **자동 진루 0xaf918 을 막는 곳은 한 군데도 없다.** 그 갈림은 `input.runningMode` 주석의
+   *   `0xae690` 이다. 여기서는 원본이 세우고 지우는 칸을 그대로 들고만 있는다(읽는 쪽이 아직 없다 —
+   *   웹판에는 "종류 5 로 수비 화면 열기" 가 없다).
+   */
   autoBaserunning: boolean
   /** 주자관리+0x31c — 이번 플레이에서 이미 슬라이딩 효과음을 냈다 */
   slidingSoundPlayed: boolean
@@ -606,6 +650,10 @@ export function stepDefensePlay(
   const catchPoint = state.catchPoint
   const covers = state.covers
   const defenseIsCpu = state.defenseIsCpu
+  // 0xae690([장면+0x214], 설정+0xbd) — 공격이 CPU 거나 주루 설정이 자동이면 자동 진루 제어기가 돈다.
+  // 안 넘기면 원본 기본값(자동)이라 지금까지와 똑같이 논다.
+  const autoBaserunningEnabled =
+    input.offenseIsCpu === true || (input.runningMode ?? '자동') !== '수동'
   const runners = state.runners
   const ticks = state.ticks
   const log = state.log
@@ -1062,8 +1110,18 @@ export function stepDefensePlay(
 
     // ── 4. 자동 추가 진루 (0xaf918) ──
     // 멈춘 주자(루에 붙은 주자·태그업 대기)까지 보려면 force 가 필요하다 — 원본 인자 그대로다.
-    // 사람이 주루 키를 눌러 경기+0x24 가 0 이 된 플레이에서는 돌지 않는다 (I-controls 3b).
-    if (!play.finished && autoBaserunning) {
+    //
+    // **언제 도는가** — 원본 0x5261c~0x52668 (매 틱, 경기 장면 슬롯 2) 을 그대로 옮긴다:
+    //   0xae690 = (공격측이 CPU) || (설정+0xbd ≠ 0 = 자동) 이 참이면 돈다.
+    //   거짓이어도 플레이+0x111(끝남)·플레이+0x129·종류 7(홈런더비)이면 그래도 돈다.
+    // 곧 **사람이 공격하면서 주루 설정이 수동이면 자동 진루가 통째로 안 돈다.**
+    //
+    // ⚠️ 예전 줄은 `경기+0x24`(autoBaserunning)로 이 판단을 막았는데 **원본에는 그런 게이트가
+    //    없다** — 0x24 를 읽는 곳은 0x3e0e6·0x521fa 둘뿐이고 둘 다 자동 진루와 무관하다
+    //    (위 `autoBaserunning` 칸 주석). 그래서 그 항을 뺐다.
+    // (예외 중 `+0x111`·`+0x129` 는 여기서 뜻이 없다 — `autoAdvanceDecisions` 가 그 두 칸에
+    //  빈 목록을 돌려주기 때문이다. 원본 게이트 모양을 그대로 보이려고 항만 남겨 둔다.)
+    if (!play.finished && (autoBaserunningEnabled || play.suppressed || play.kind === 7)) {
       const decisions = autoAdvanceDecisions({ ...contextAt(tick), force: true })
       for (const decision of decisions) {
         const runner = runners[decision.runnerIndex]

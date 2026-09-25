@@ -700,3 +700,75 @@ describe('레이저 송구 반짝임이 화면까지 내려간다 (경기+0x19ad
     expect(결과.ticks.every((틱) => 틱.flash === null)).toBe(true)
   })
 })
+
+describe('주루 수동/자동 — 설정 +0xbd 와 0xae690 (직접 뜬 것)', () => {
+  // 원본 배선(경기 장면 슬롯 2 = 0x524c0 안, 매 틱):
+  //   5262e: 0xae690([장면+0x214], 설정+0xbd)
+  //          = (경기[0x31 + 경기[9](공격측)] == 1)  ||  (설정+0xbd != 0)
+  //   52638~5265e: 거짓이면 플레이+0x111·+0x129·종류 7 만 예외로 통과
+  //   52660: 0xaf8c0(장면+0x210, 0) = 제어기.vt8 = 0xaf918 자동 추가 진루
+  // ⚠️ 경기+0x24 는 이 갈림에 끼지 않는다 — 읽는 곳이 0x3e0e6·0x521fa 둘뿐이고
+  //    둘 다 "투구 뒤 종류 5 수비 화면을 열까" 와 도루 칸 세우기다.
+  const 깊은뜬공주자3루 = (extra: Partial<DefensePlayInput> = {}) =>
+    runDefensePlay({
+      outcome: 뜬공아웃,
+      trajectory: battedBallTrajectory(깊은뜬공),
+      bases: 주자3루,
+      outs: 0,
+      runAbility: 500,
+      ...extra,
+    })
+
+  it('자동이면 태그업으로 들어온다 — 안 넘겼을 때와 한 톨도 다르지 않다', () => {
+    const 안넘김 = 깊은뜬공주자3루()
+    const 자동 = 깊은뜬공주자3루({ runningMode: '자동' })
+
+    expect(안넘김.advance).toEqual(자동.advance)
+    expect(자동.advance.runsScored).toBe(1)
+  })
+
+  it('수동이면 자동 진루가 통째로 안 돈다 — 3루 주자가 그 자리에 선다', () => {
+    const 수동 = 깊은뜬공주자3루({ runningMode: '수동' })
+
+    expect(수동.advance.runsScored).toBe(0)
+    expect(수동.advance.bases.third).toBe(true)
+    // 뜬공 아웃 하나는 결과 코드가 정한 것이라 수동이어도 그대로다
+    expect(수동.advance.outsAdded).toBe(1)
+  })
+
+  it('공격이 CPU 면 설정이 수동이어도 돈다 — 0xae690 의 앞 항', () => {
+    const CPU공격 = 깊은뜬공주자3루({ runningMode: '수동', offenseIsCpu: true })
+
+    expect(CPU공격.advance).toEqual(깊은뜬공주자3루({ runningMode: '자동' }).advance)
+  })
+
+  it('수동이어도 사람이 진루 키를 누르면 주자는 뛴다 — 수동은 "사람이 전부 누른다" 는 뜻이다', () => {
+    const 가만히 = 깊은뜬공주자3루({ runningMode: '수동' })
+    const 눌렀다 = 깊은뜬공주자3루({ runningMode: '수동', controls: 계속누름('공격', '8') })
+
+    expect(가만히.log.some((line) => line.includes('진루'))).toBe(false)
+    expect(눌렀다.log.some((line) => line.includes('진루'))).toBe(true)
+    expect(눌렀다.advance.runsScored).toBe(1)
+  })
+
+  it('난수 굴림 차례는 수동/자동에 한 톨도 안 흔들린다', () => {
+    const 굴림수 = (mode: '수동' | '자동') => {
+      let calls = 0
+      let seed = 12345
+      const 하나 = () => {
+        calls += 1
+        seed = (seed * 1664525 + 1013904223) >>> 0
+        return (seed >>> 8) / 0x1000000
+      }
+      const random: RandomPort = {
+        next: 하나,
+        nextInRange: (minimum, maximum) => minimum + 하나() * (maximum - minimum),
+        pick: (candidates) => candidates[Math.floor(하나() * candidates.length)],
+      }
+      깊은뜬공주자3루({ runningMode: mode, random })
+      return calls
+    }
+
+    expect(굴림수('수동')).toBe(굴림수('자동'))
+  })
+})
