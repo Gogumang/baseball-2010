@@ -285,6 +285,18 @@ export const NO_PITCHER_EQUIPMENT: PitcherEquipment = { head: -1, hand: -1, body
  * ⚠️ **추정**: 부위 ↔ 능력치 짝은 타자 쪽 규칙("부위 i = 능력치 i", 0x10866 루프)을 그대로 옮긴 것이다 —
  *    모자 = 제구 · 글러브 = 구속 · 아대 = 변화 · 신발 = 체력. 원본 투수 상점에서 부위와 능력치를
  *    맺어 주는 자리는 아직 안 떴다 (웹 `pitcherCareer.effectiveAbilityOf` 도 이미 같은 차례를 쓴다).
+ *
+ * **원본에서 이 값이 어디서 와서 어디로 가는가** (0x108f8 · 0x10810 을 이번에 떠서 확인했다):
+ *   경기 장면을 세우는 0x108f8 은 **그림 한 칸**(장면+0xe4)만 만들고, 전역 모드(장면+0xcc)로
+ *   갈래를 탄다 — `mode == 4`(타자편)면 0x54 바이트 + 타자 그림 생성자 0x789f0,
+ *   **아니면 0x4c 바이트 + 투수 그림 생성자 0x79368** 이다 (0x109d4~0x109fc).
+ *   즉 **투수 장비를 입는 그림은 "내 투수"(모드 3 투수편) 하나뿐**이고, 타석 화면 마운드의
+ *   상대 투수는 이 객체가 아니다.
+ *   이어서 0x10a14 가 부르는 0x10810 의 루프(0x10866~0x1089a)가 **두 모드 공용**으로
+ *   선수 레코드 니블을 읽어 `그림객체->vtbl[0x14](부위 i, 니블−1)` 를 부른다 —
+ *   타자면 0x78fd8, **투수면 0x79790** 이다 (vtbl 0xd3a3c / 0xd3ce0, 둘 다 +0x14 칸).
+ *   니블 자리도 같다: 부위 0·1 = `rec[0x19]` 의 상·하위, 부위 2·3 = `rec[0x1a]` 의 상·하위이고
+ *   `니블 − 1 < 0` 이면 그 부위를 건너뛴다(미장착).
  */
 export function pitcherEquipmentOf(nibbles: {
   control: number
@@ -310,9 +322,10 @@ const PITCHER_LEG_FOLDERS = [`${SPRITES}/item_pit_leg_0/frames`, `${SPRITES}/ite
  * 손·다리 한 겹 — `_0` + 줄 n−1 (0x79870·0x79832) · `_7` + 줄 n−8 (0x79888·0x7984a).
  * 줄이 음수(n = 0 · 7)면 **그림 기본색**이라 벌을 아예 안 붙인다 (0xb9718 넷째 인자 −1).
  *
- * ⚠️ 앞 작업 메모와 `public/sprites/item_pit_…` 폴더 `palette.json` 의 `select` 주석은 손과 다리의
- *    주소가 **뒤바뀌어** 있다 — 0x79832·0x7984a 는 다리 가지([r7+0x28]), 0x79870·0x79888 이
- *    손 가지([r7+0x20])다. 식(n−1 / n−8)은 두 부위가 같아 결과는 달라지지 않는다.
+ * ⚠️ 0x79790 의 갈래 차례가 **다리(부위 3) 먼저 · 손(부위 1) 나중**이라 위에서 아래로 읽으면
+ *    손과 다리가 뒤집힌다. 0x79832·0x7984a 가 다리 가지(리터럴 `item/item_pit_leg_0|_7.mpl`,
+ *    `str r0,[r7,#0x28]`), 0x79870·0x79888 이 손 가지(`item/item_pit_hand_0|_7.mpl`,
+ *    `str r0,[r7,#0x20]`)다. `palette.json` 의 `select` 주석은 13a24c0 에서 이미 바로잡혔다.
  */
 function pitcherGradeLayer(folders: readonly string[], grade: number, frame: number): BatterLayer | null {
   if (grade < 0) return null
