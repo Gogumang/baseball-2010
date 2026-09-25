@@ -1,6 +1,6 @@
 {
  "mpl": "item/item_pit_hand_0.mpl",
- "select": "등급 n: 0 → 기본색 · 1~6 → 줄 n−1 (0x79832)",
+ "select": "등급 n: 0 → 기본색 · 1~6 → 줄 n−1 (0x79870)",
  "baked": null,
  "colors": [
   "#ff00ff",

@@ -1,6 +1,6 @@
 {
  "mpl": "item/item_pit_leg_7.mpl",
- "select": "등급 n: 7 → 기본색 · 8~10 → 줄 n−8 (0x79888)",
+ "select": "등급 n: 7 → 기본색 · 8~10 → 줄 n−8 (0x7984a)",
  "baked": null,
  "colors": [
   "#ff00ff",
