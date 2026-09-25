@@ -118,12 +118,23 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     expect(result.current.career?.postseason).not.toBeNull()
   })
 
-  it('45경기 전에는 관리 화면으로 돌아간다', () => {
-    const result = 판짜기({ gamesPlayed: 10 })
+  /**
+   * 2경기 주기 — 상태 116 의 끝 `0x12b98~0x12bb2` 가 `S+0xb2`(경기 수)의 비트0 을 보고
+   * 짝수면 105(관리), 홀수면 109(순위표 → 곧 다음 경기)로 간다. 모드 갈림이 없어
+   * **투수편도 타자편과 같은 2경기 주기**다.
+   */
+  it('짝수 경기 뒤에만 관리 화면이 열린다 (0x12b98 — 2경기 주기)', () => {
+    const 짝수 = 판짜기({ gamesPlayed: 9 })
+    경기치르기(짝수)
+    expect(짝수.current.career?.gamesPlayed).toBe(10)
+    expect(짝수.current.scene).toBe('관리')
 
-    경기치르기(result)
-
-    expect(result.current.scene).toBe('관리')
+    const 홀수 = 판짜기({ gamesPlayed: 10 })
+    경기치르기(홀수)
+    expect(홀수.current.career?.gamesPlayed).toBe(11)
+    // 109 순위표 화면이 웹에 없어 타자편과 같이 곧바로 다음 경기다
+    expect(홀수.current.scene).toBe('경기')
+    expect(홀수.current.gameOptions?.dayCounter).toBe(11)
   })
 
   it('1~6년차 연말은 새 시즌으로 이어진다 — 성적이 비고 연차가 오른다', () => {
@@ -178,8 +189,12 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     expect(result.current.career?.endingIndex).toBe(5)
   })
 
-  it('부상으로 20경기를 뛰면 경기 뒤 곧바로 부상 엔딩(0)이다 (B-7)', () => {
-    const result = 판짜기({ gamesPlayed: 10, isInjured: true, injuredGamesPlayed: 19 })
+  /**
+   * 부상 엔딩은 **관리 화면 진입**(105, 0x11910 → 0x11b32)의 첫 줄이라 관리 화면이 열리는
+   * 짝수 경기 뒤에만 굴러간다 — 그래서 9경기째에서 시작해 10경기로 맞춘다.
+   */
+  it('부상으로 20경기를 뛰면 관리 화면에 들어가며 부상 엔딩(0)이다 (B-7)', () => {
+    const result = 판짜기({ gamesPlayed: 9, isInjured: true, injuredGamesPlayed: 19 })
 
     경기치르기(result)
 
@@ -228,6 +243,47 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     expect(result.current.scene).toBe('등록')
     // 다시 띄워도 옛 선수가 살아나지 않는다
     expect(띄우기(store).result.current.career).toBeNull()
+  })
+
+  /**
+   * r_event 30~33 — 관리 화면(105)에서만 통과하고(trigger 0), 보상 종류 6 이
+   * `선수[0x204 + v] = 1`(0x8c5da~0x8c754) 로 히든 계열을 연다. v 가 곧 행 번호다.
+   */
+  describe('히든 변화구 오픈 이벤트 30~33', () => {
+    it('관리 화면에서 조건을 채우면 계열이 열린다 (30 → 행1)', () => {
+      const result = 판짜기({
+        season: 5,
+        gamesPlayed: 10,
+        ability: { control: 200, velocity: 250, breaking: 300, stamina: 100 },
+      })
+
+      expect(result.current.career?.hiddenPitchRows[1]).toBe(true)
+      expect(result.current.career?.seenEventIds).toContain('30')
+      // 조건을 덜 채운 31~33 은 아직 잠겨 있다
+      expect(result.current.career?.hiddenPitchRows[2]).toBe(false)
+      expect(result.current.career?.hiddenPitchRows[0]).toBe(false)
+    })
+
+    it('조건을 채운 것이 여럿이면 하나씩 연달아 열린다 (A 3절)', () => {
+      const result = 판짜기({
+        season: 7,
+        gamesPlayed: 10,
+        ability: { control: 300, velocity: 400, breaking: 600, stamina: 100 },
+      })
+
+      expect(result.current.career?.hiddenPitchRows).toEqual([false, true, true, true])
+      expect(result.current.career?.seenEventIds).toEqual(['30', '31', '32'])
+    })
+
+    it('조건을 못 채우면 열리지 않는다', () => {
+      const result = 판짜기({
+        season: 5,
+        gamesPlayed: 10,
+        ability: { control: 200, velocity: 250, breaking: 299, stamina: 100 },
+      })
+
+      expect(result.current.career?.hiddenPitchRows).toEqual([false, false, false, false])
+    })
   })
 })
 

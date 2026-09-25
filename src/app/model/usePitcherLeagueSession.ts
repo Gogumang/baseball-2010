@@ -9,9 +9,14 @@ import {
   gainPitcherMorale,
   gainPitcherPopularity,
   gainPitcherReputation,
+  isPitcherManagementCycleOpen,
   isPitcherSeasonFinished,
   startNextPitcherSeason,
 } from '@/entities/pitcher-career/model/pitcherCareer'
+import {
+  openHiddenPitchRow,
+  openableHiddenPitchEventOf,
+} from '@/entities/pitcher-career/model/pitchTraining'
 import {
   applyPitcherEndingBonus,
   canContinueAfterPitcherEnding,
@@ -209,6 +214,45 @@ export function usePitcherLeagueSession(
   }, [career, commitWith, scene])
 
   /**
+   * **히든 변화구 계열 오픈 — r_event 30~33** (J 4절 3-3 · A 1·3·5절).
+   *
+   * 네 레코드는 `r_event.zt1` 에서 대상 3(투수편) · trigger 0 · 반복 0 이고, 조건은 능력치 세 칸
+   * (종류 0 제구 · 1 구속 · 2 변화, 각각 ≥ 값) 이다. 보상은 **종류 6 값 v** 하나뿐이고,
+   * 보상 실행기 `0x8c460` 의 종류 6 갈래가 이렇게 처리한다:
+   * ```
+   *   8c5da: ldr  r0,[r6+0xb4]          ; mgr
+   *   8c5e0: ldr  r3,=0x7b985           ; 투수편인가 ([mgr+0x20] == 3)
+   *   8c5e2: bl   0xca9f8               ; 거짓이면 이 항목은 건너뛴다 (타자편에서는 무시)
+   *   8c5ee: ldr  r2,[r6+0x2f8]         ; 선수(커리어) 레코드
+   *   8c600: ldrsh r3,[…+0xa+2i]        ; v
+   *   8c602: adds r3,r3,r2
+   *   8c608: adds r3,r3,#0x204          ; 0x81 << 2
+   *   8c60a/8c754: movs r2,#1 ; strb r2,[r3]   ; 선수[0x204 + v] = 1
+   * ```
+   * `커리어+0x204+행` 이 곧 히든 계열 오픈 칸이므로 (J 3-2) **v = 행 번호**다 —
+   * 데이터의 v 는 30→1 · 31→2 · 32→3 · 33→0 이고 `HIDDEN_PITCH_EVENTS` 가 그대로 들고 있다.
+   *
+   * 발화 시점은 **관리 화면(105)에 있는 동안 매 갱신마다**다 (A 3절, 0x1cdec → 0x8be80 —
+   * trigger 0 은 화면코드 105·201 에서만 통과한다). 파일 순서로 훑어 처음 통과한 한 건이고,
+   * 통과한 것이 여럿이면 **하나씩 연달아** 나온다 — 여기서도 커리어가 바뀌면 이 고리가 다시 돌아
+   * 다음 것을 연다. 이미 열린 계열은 `openableHiddenPitchEventOf` 가 빼므로 두 번 열리지 않는다.
+   *
+   * ⚠️ 웹 투수편에는 이벤트 재생 화면(0x72)이 아직 없다 — 원본의 대사 두세 줄과 징글 36 은
+   *    건너뛰고 **보상만** 적용한다. `seenEventIds` 에는 원본대로 본 표시를 남긴다.
+   */
+  useEffect(() => {
+    if (career === null || scene !== '관리') return
+    if (openableHiddenPitchEventOf(career) === null) return
+    commitWith((current) => {
+      const event = openableHiddenPitchEventOf(current)
+      if (event === null) return current
+      const opened = openHiddenPitchRow(current, event.row)
+      if (opened === current) return current
+      return { ...opened, seenEventIds: [...current.seenEventIds, String(event.eventId)] }
+    })
+  }, [career, commitWith, scene])
+
+  /**
    * **커리어 칸 ↔ 지갑 다리** — 타자편(`useCareerSession`)과 같은 모양이다.
    *
    * 원본은 G가 전역 한 칸이라 다리가 필요 없지만, 웹은 구질 훈련·지옥훈련·엔딩 보너스가 전부
@@ -303,6 +347,31 @@ export function usePitcherLeagueSession(
         commit(evaluated)
         return setScene('시즌종료')
       }
+      /*
+       * **2경기 주기** — 상태 116 의 끝(0x12b74~0x12bb2)이 `S+0xb2`(경기 수)의 **비트0** 을 본다:
+       * ```
+       *   12b98: ldrb r3,[r2]        ; r2 = S+0xb2 = 경기 수 g
+       *   12b9a: movs r1,#0
+       *   12b9c: lsls r5,r3,#0x1f    ; 비트0 을 부호 자리로
+       *   12b9e: bmi  0x12ba2        ; 홀수면 건너뜀
+       *   12ba0: movs r1,#1          ; 짝수
+       *   12ba8: cmp  r1,#0 ; beq 0x12bb0
+       *   12bac: movs r1,#0x69       ; 105 관리 화면
+       *   12bb0: movs r1,#0x6d       ; 109 순위표
+       * ```
+       * 이 함수에는 **모드 갈림이 없다** — 장면 0x106 은 모드 3(투수편)·4(타자편)가 함께 쓰므로
+       * 투수편도 타자편과 **똑같이 2경기 주기**다 (재진입 분기 0x1c38e~0x1c3b8 도 같은 판정).
+       * 웹에는 109 순위표 화면이 없어 타자편(`useCareerSession.confirmGameResult`)과 같이 곧바로
+       * 다음 경기로 간다 (원본 109 → 142 → 144 → 경기 장면).
+       *
+       * ⚠️ **부상 엔딩 판정보다 앞에 둔다** — 부상 엔딩은 관리 화면 **진입**(105, 0x11910 → 0x11b32)의
+       *    첫 줄이라, 홀수 경기 뒤에는 105 에 들르지 않아 원본에서도 굴러가지 않는다.
+       */
+      if (!isPitcherManagementCycleOpen(evaluated)) {
+        commit(evaluated)
+        setGameOptions(pitcherGameOptionsOf(evaluated, { gaugeSettingOn, throwModeManual }))
+        return setScene('경기')
+      }
       // 관리 화면 진입 105(0x11910 → 0x11b32)의 첫 줄 — 부상 누적 20경기면 이벤트 500 → 엔딩 141 (B-7)
       const injury = pitcherInjuryEndingOf(evaluated)
       if (injury !== null) {
@@ -312,7 +381,7 @@ export function usePitcherLeagueSession(
       commit(evaluated)
       setScene('관리')
     },
-    [career, commit, gameOptions, random],
+    [career, commit, gameOptions, gaugeSettingOn, random, throwModeManual],
   )
 
   /** 새 시즌 처리 0x1b768 → 137 "N년차" 표지 → 105 관리 화면 (웹은 표지를 건너뛴다) */

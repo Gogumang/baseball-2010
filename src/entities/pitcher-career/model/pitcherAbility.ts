@@ -96,8 +96,13 @@ export function applyPitcherAbilityItem(
  */
 export const HIDDEN_PITCH_EVENTS: readonly {
   readonly eventId: number
-  /** 이 연차의 9경기째부터 뜬다 (r_event 기간 칸) */
-  readonly fromSeason: number
+  /**
+   * r_event 기간 칸 `[연차, 경기]` — 레코드 +9~+0xc 를 그대로 옮긴 것이다 (`r_event.zt1`).
+   * 판정은 날짜 창 `0xad110~0xad140`: `from=(a−1)·45+b`, `to=(c−1)·45+d`,
+   * `now=연차(0부터)·45 + 치른 경기 + 1` 로 두고 `from ≤ now ≤ to` (A 1절 8번).
+   */
+  readonly dateFrom: readonly [number, number]
+  readonly dateTo: readonly [number, number]
   readonly control: number
   readonly velocity: number
   readonly breaking: number
@@ -105,11 +110,20 @@ export const HIDDEN_PITCH_EVENTS: readonly {
   readonly row: number
   readonly pitchName: string
 }[] = [
-  { eventId: 30, fromSeason: 5, control: 200, velocity: 250, breaking: 300, row: 1, pitchName: 'P.SLIDER' },
-  { eventId: 31, fromSeason: 6, control: 250, velocity: 350, breaking: 250, row: 2, pitchName: 'KNUCKLE' },
-  { eventId: 32, fromSeason: 7, control: 300, velocity: 400, breaking: 600, row: 3, pitchName: 'SPECIAL' },
-  { eventId: 33, fromSeason: 8, control: 400, velocity: 700, breaking: 400, row: 0, pitchName: 'P.SINKER' },
+  { eventId: 30, dateFrom: [5, 9], dateTo: [13, 45], control: 200, velocity: 250, breaking: 300, row: 1, pitchName: 'P.SLIDER' },
+  { eventId: 31, dateFrom: [6, 9], dateTo: [13, 45], control: 250, velocity: 350, breaking: 250, row: 2, pitchName: 'KNUCKLE' },
+  { eventId: 32, dateFrom: [7, 9], dateTo: [13, 45], control: 300, velocity: 400, breaking: 600, row: 3, pitchName: 'SPECIAL' },
+  { eventId: 33, dateFrom: [8, 9], dateTo: [13, 45], control: 400, velocity: 700, breaking: 400, row: 0, pitchName: 'P.SINKER' },
 ]
+
+/*
+ * ⚠️ **`pitchName` 은 표 이름이지 이벤트 대사가 아니다.** 보상이 여는 것은 `row`(= 보상 종류 6 의 값,
+ * 0x8c5da → `선수[0x204+행] = 1`)이고, 행별 열4 구질 번호는 구질 훈련 표 `0xcc390` 이 정한다.
+ * 그런데 r_event 대사는 30 "파워싱커" · 31 "파워슬라이더" · 32 "너클볼" · 33 "자이로볼" 이라
+ * 여기 이름과 **한 칸씩 어긋난다**. 표 0xcc390 의 구질 **번호**(18~21)는 확정이지만 그 번호→이름
+ * 대응(`pitchTypes.ts` 를 1부터 센 것)은 J 3-2 가 **유력**이라고 적어 둔 것이라, 어긋남은
+ * 이름표 쪽 문제로 보인다. 판정에 쓰이는 값이 아니므로 **원본 데이터(row)를 그대로 두고** 적어만 둔다.
+ */
 
 /**
  * **아직 못 채운 것**: 구질 훈련 횟수 표(StrMODE[89] "%d/%d회")는 해독 문서에 값이 없다 (J 3-2 미해결).

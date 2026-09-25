@@ -1,3 +1,4 @@
+import { BALANCE } from '@/shared/config/original/balance'
 import { PITCH_TYPES } from '@/shared/config/original/pitchTypes'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { HIDDEN_PITCH_EVENTS } from '@/entities/pitcher-career/model/pitcherAbility'
@@ -18,6 +19,12 @@ import { HIDDEN_PITCH_EVENTS } from '@/entities/pitcher-career/model/pitcherAbil
  * 칸 상태는 `커리어+0x208 + (행·2 + 열%2)·4 + 1` = **단계**(0 없음 · 1 기본 습득 · 2 상위 습득),
  * 히든 오픈은 `커리어+0x204+행` 이다. 등록에서 고른 기본 변화구 두 개가 그 칸의 단계 1 이다 (J 3-1).
  */
+
+/**
+ * 한 시즌 경기 수 45 — 이벤트 날짜 창이 쓰는 값이다 (`0xad110` 의 상수 0x2d).
+ * `pitcherCareer` 에서 가져오면 값 수준 순환 가져오기가 생기므로 바탕값에서 곧장 읽는다.
+ */
+const GAMES_PER_SEASON = BALANCE.season.gamesPerSeason
 
 /** 표 0xcc390 — 행 4 × 열 5, 값은 구질 번호 (1 FASTBALL … 21 SPECIAL) */
 export const PITCH_TRAINING_TABLE: readonly (readonly number[])[] = [
@@ -156,15 +163,30 @@ export function openHiddenPitchRow(career: PitcherCareer, row: number): PitcherC
 }
 
 /**
- * 지금 능력치·연차로 열 수 있는 히든 계열 이벤트 — 관리 화면(trigger 0)이 보는 조건이다 (J 3-3).
- * 기간은 "해당 연차의 9경기째부터" 라 `season`·`gamesPlayed` 를 함께 본다.
+ * 지금 능력치·날짜로 열 수 있는 히든 계열 이벤트 — 관리 화면(trigger 0)이 보는 조건이다 (J 3-3).
+ *
+ * 날짜 창은 이벤트 판정 `0xacfbc` 의 8번(0xad110~0xad140)을 그대로 쓴다 — 타자편
+ * `story/model/storyScene.isInDateWindow` 와 같은 식이다:
+ * ```
+ *   ad110: movs r0,#0x2d            ; 45
+ *   ad112: muls r3,r0,r4 ; adds r3,r3,r2 ; subs r4,#0x2d   ; to   = 45·c + d − 45
+ *   ad11e: muls r1,r0,r7 ; adds r1,r1,r5 ; subs r1,#0x2d   ; from = 45·a + b − 45
+ *   ad124: [선수+0xb3]·45 + (s8)[선수+0xb2] + 1            ; now
+ *   ad13a: cmp r1,r2 ; bgt 실패      ; from > now
+ *   ad13e: cmp r4,r2 ; bge 통과      ; to  >= now
+ * ```
+ * ⚠️ 예전 판정은 `연차 == fromSeason && gamesPlayed < 9` 로 **한 경기 늦게** 열렸고
+ * (5년차 8경기째가 이미 `now = 4·45+8+1 = 189 = from` 이라 원본에서는 통과한다),
+ * 끝 날짜 **13년 45경기**를 아예 보지 않았다.
  */
 export function openableHiddenPitchEventOf(career: PitcherCareer): (typeof HIDDEN_PITCH_EVENTS)[number] | null {
+  const now = (career.season - 1) * GAMES_PER_SEASON + career.gamesPlayed + 1
   return (
     HIDDEN_PITCH_EVENTS.find((event) => {
       if (career.hiddenPitchRows[event.row]) return false
-      if (career.season < event.fromSeason) return false
-      if (career.season === event.fromSeason && career.gamesPlayed < 9) return false
+      const from = (event.dateFrom[0] - 1) * GAMES_PER_SEASON + event.dateFrom[1]
+      const to = (event.dateTo[0] - 1) * GAMES_PER_SEASON + event.dateTo[1]
+      if (now < from || now > to) return false
       return (
         career.ability.control >= event.control &&
         career.ability.velocity >= event.velocity &&

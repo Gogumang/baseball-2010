@@ -122,8 +122,26 @@ describe('히든 변화구 이벤트 조건 (J 3-3)', () => {
     expect(openableHiddenPitchEventOf(career)?.row).toBe(1)
   })
 
-  it('연차나 능력치가 모자라면 아무것도 열리지 않는다', () => {
+  it('능력치가 모자라면 아무것도 열리지 않는다', () => {
     expect(openableHiddenPitchEventOf(투수({ season: 5, gamesPlayed: 8 }))).toBeNull()
     expect(openableHiddenPitchEventOf(투수({ season: 5, gamesPlayed: 20 }))).toBeNull()
+  })
+
+  /**
+   * 날짜 창 `from=(a−1)·45+b`, `now=(연차−1)·45+경기+1` (0xad110~0xad140).
+   * 이벤트 30 은 `from = 4·45+9 = 189` 이고 5년차 **8경기째**가 이미 `now = 189` 다.
+   */
+  it('기간 첫 날은 5년차 8경기째다 — now 가 경기 수 + 1 이다 (0xad124)', () => {
+    const 능력 = { control: 200, velocity: 250, breaking: 300, stamina: 100 }
+
+    expect(openableHiddenPitchEventOf(투수({ season: 5, gamesPlayed: 8, ability: 능력 }))?.eventId).toBe(30)
+    expect(openableHiddenPitchEventOf(투수({ season: 5, gamesPlayed: 7, ability: 능력 }))).toBeNull()
+  })
+
+  it('기간 끝 13년 45경기를 지나면 더는 열리지 않는다 (to = 12·45+45 = 585)', () => {
+    const 능력 = { control: 200, velocity: 250, breaking: 300, stamina: 100 }
+
+    expect(openableHiddenPitchEventOf(투수({ season: 13, gamesPlayed: 44, ability: 능력 }))?.eventId).toBe(30)
+    expect(openableHiddenPitchEventOf(투수({ season: 13, gamesPlayed: 45, ability: 능력 }))).toBeNull()
   })
 })
