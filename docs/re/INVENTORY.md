@@ -5,7 +5,7 @@
 > 해독 여부는 [UNRESOLVED.md](UNRESOLVED.md) 를, 무엇을 옮길지는 [README.md](README.md) 의 우선순위를 본다.
 
 근거: StrHOWTO 36쪽 · StrMAINMENU 215 · StrMODE 231 · StrGAME 105 · StrCOMMON 144 · jar 에셋 전체 · src 참조 검색.
-표기: ✅ 웹판에 있음 · 🔎 해독 중(A~H) · ❌ 아무도 안 맡음 · 🌐 네트워크·결제 (서버 없이는 불가)
+표기: ✅ 웹판에 있음 · 🔎 해독 중(A~H) · ❌ 아무도 안 맡음 · ⛔ **원본에도 없다(죽은 자산) — 만들지 말 것** · 🌐 네트워크·결제 (서버 없이는 불가)
 
 ## 1. 경기 중 조작 (StrHOWTO 1~4, StrGAME 0~7)
 - ✅ 타격 좌우·스윙·번트·필살타법(0)·도루(1/2/3)
@@ -59,7 +59,15 @@
 
 ## 9. 소리·연출·에셋
 - ❌ **사운드 52개 (sound/*.mmf, 야마하 SMAF)** — 변환·재생 시점 전부 미착수
-- ❌ 필살기 연출 deadly_effect·effect_fire/meteor/tornado/power/shinning/frame/pitcher, 마선수 이펙트 8종(*_effect)
-- ❌ 콤보 그림 ui/combo.pzx, 전광판 board_ani, stadium_symbol, sky_effect_light, game_effect, player_effect, event_ani, trainning(미니게임), certi, touch
+- 🔎 **이펙트 그림 18폴더 — 정체·적재·조건은 전부 확정됐다 (R2 12~15절, 6차)**. 열쇠는 `게임+0xfc8 == 0x16`(이번 구질 22 = 마구)이다.
+  - ✅ `deadly_effect` (수비 포구 번쩍임, 필살기와 무관 — R2 2절) · `game_effect` (R2 3절 일부)
+  - ✅ **`effect_fire`·`effect_shinning`** — 마구 1·4(폼 묶음 0) 의 공 이펙트. 2026-09-25 이식 (웹 `magicBallEffect.ts`, R2 14-1)
+  - ❌ `effect_pitcher` (+0x1044) — 자리·프레임 확정, **`게임+0xfc8` 이 22 가 되는 틱을 못 찾아 시작 시점 미확정** (R2 14-0)
+  - ❌ 마선수 마구 이펙트 5종 `psyker·leony·bbmachine·ballantine·dragona` (+0x1038) — leony 만 투구 단계표까지 풀림 (R2 14-2)
+  - ❌ `player_effect` (+0x1030) — R2 4절
+  - ⛔ **`effect_frame`·`effect_power`·`effect_tornado`·`effect_meteor`·`medica_effect` 다섯은 그리는 코드가 없다** (R2 15절) → **이식 불필요**
+  - ❌ `sky_effect_light`·`sky_effect_light1` — 구장 배경 쪽이다. 팔레트 줄까지 확정 (R6 6절)
+- ⛔ 콤보 그림 ui/combo.pzx — **원본도 안 그린다** (R2 5절)
+- ❌ 전광판 board_ani, stadium_symbol, event_ani, trainning(미니게임), certi, touch
 - ❌ 장비 외형 스프라이트 57폴더(item_bat_*/item_pit_*) — 장착 시 겉모습
 - ❌ 데이터 파일: battingPattern.arr, pitchpattern_easy/hard.arr (난이도?) — 웹·도구 참조 0

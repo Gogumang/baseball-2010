@@ -270,12 +270,19 @@
 ### B-18. 연출 · 소리 · 글꼴 · 파티클 — 예상 크기 **상**
 
 - **소리**: 웹에 소리 코드가 **전혀 없다**. 원본 `sound/*.mmf` 52개(야마하 SMAF). 재생 시점 번호표는 `L` 8절·`R2` 8절에 있다(효과음 5/6/59 타구 강·보통·약, 7, 9, 8/27 헛스윙/필살, 12/28 투구/마구, 13 공수 교대, 14/15/26 투수 등판, 10 득점(유력), 17 Safe, 25 Foul, 53 공 놓침, 61 타석 시작, 0x1f 신기록, 0x20 실패, 0x24 성공, 0x25 무효). **진동**도 없다(환경설정 +0x3b, 100/200/300·500ms)
-- **경기 연출**: `deadly_effect`(수비 포구 번쩍임 + 줌 펀치 → 큰 OUT) · `game_effect`(강속구 불꽃 >151km/h, HOMERUN 글자, 타격 불꽃 2·3 + ptc 006/007, MAX 투구 링) · `player_effect`(투수 지친 눈 체력 ≤34%/≤19%, "!", 바람 줄, 수비 먼지·고리) · 삼진 양끝 파티클 ptc 008 · 마선수 등장 컷인(0x473f0) · 필살기 연출(`effect_fire/meteor/tornado/power/shinning/frame/pitcher`) · 마선수 이펙트 8종
+- **경기 연출**: `deadly_effect`(수비 포구 번쩍임 + 줌 펀치 → 큰 OUT) · `game_effect`(강속구 불꽃 >151km/h, HOMERUN 글자, 타격 불꽃 2·3 + ptc 006/007, MAX 투구 링) · `player_effect`(투수 지친 눈 체력 ≤34%/≤19%, "!", 바람 줄, 수비 먼지·고리) · 삼진 양끝 파티클 ptc 008 · 마선수 등장 컷인(0x473f0)
+- **이펙트 그림 16폴더 — 6차(R2 12~15절)에서 정체가 다 밝혀졌다. 남은 것은 아래 셋뿐이다**
+  - `effect_pitcher`(+0x1044) — 투수 앵커, 애니 0 8칸(마지막 칸 제외 = 7틱). **`게임+0xfc8` 이 22 로 바뀌는 틱만 찾으면 바로 붙는다** (R2 14-0)
+  - 마선수 마구 이펙트 5종(+0x1038, `0x46fa8`) — 투수 앵커. leony 는 투구 단계표 `0xd00dc` 까지 풀렸고, psyker·dragona 는 그림 1장을 `(단계−7)` 배율로 키운다. bbmachine·ballantine 갈래(`0x47250`)의 인자와 호출지가 남았다 (R2 14-2)
+  - `sky_effect_light`·`sky_effect_light1` — 밤 경기 하늘 조명. 팔레트 줄까지 확정 (R6 6절)
+  - ✅ **끝난 것**: 마구 1·4(폼 묶음 0) 의 공 이펙트 `effect_fire`/`effect_shinning` → 2026-09-25 이식 (`src/widgets/batting-stage/lib/magicBallEffect.ts`, R2 14-1)
+  - ⛔ **만들지 말 것**: `effect_frame`·`effect_power`·`effect_tornado`·`effect_meteor`·`medica_effect` — 원본에 그리는 코드가 없다 (R2 15절)
+- **아직 안 옮긴 작은 차이 — 마구 1 도 불꽃 공이 된다**: `0x3b55a` 가 **마구 번호 1** 에서 공 경로 번호 8 부터 `게임+0x1080 = 1`(ball.pzx 불꽃 묶음)로 바꾼다. 웹 `src/entities/pitcher-career/model/magicPitch.ts` 의 `MAGIC_BALL_KIND_BY_NUMBER = [0,0,0,0,0,0,0,0,2,1]` 에는 8(ballantine)→2 · 9(dragona)→1 만 있다. **투구를 고를 때가 아니라 그릴 때 프레임 8부터** 바뀌는 값이라 `magicBallKindOf` 가 아니라 `trajectory.ts:ballFrameIndexAt` 쪽에서 덮어야 맞다
 - **글꼴**: 원본 비트맵 한글 글꼴 `synGak9_11.ft2`(9×11 조합형 벌 글꼴) · `synGulimAsc5_11.ft2`(5×11 영문 94자). 웹은 Galmuri 웹 글꼴
 - **파티클**: `ptc/001~026.ptc`(51바이트 설정) + `ptc/ptcimg.pzx`. 웹은 없다 (`public/sprites/ptcimg/frames` 는 **합성된 그림이라 못 쓴다** — 파트 그림 `0NN.png` 를 써야 한다)
 - **그 밖**: `fence_season.pzf` 20프레임(시즌 구장 성장), 장비 외형 스프라이트 57폴더(`item_bat_*` / `item_pit_*`, 장착 시 겉모습 — 웹은 `batterLayers.ts:6,14` 가 다리 고정), 효과 0x10(확대/축소)·0x11(뒤집기)
-- **근거 문서**: `L-sound-effects.md` 1-A~1-E2·2-A·2-B·3절·5-A~5-D · `R2-game-effects.md` 2~11절 · `R5-font-particles.md` 1~10절 · `R6-sprite-leftovers.md` 1·3b·3c절
-- **이식 불필요(확정)**: `ui/combo.pzx` — **원본도 그리지 않는다**
+- **근거 문서**: `L-sound-effects.md` 1-A~1-E2·2-A·2-B·3절·5-A~5-D · `R2-game-effects.md` 2~11절 **및 12~15절(6차)** · `R5-font-particles.md` 1~10절 · `R6-sprite-leftovers.md` 1·3b·3c·**6**절
+- **이식 불필요(확정)**: `ui/combo.pzx` · 필살타법/타자 마선수 이펙트 그림 5폴더 — **원본도 그리지 않는다**
 
 ### B-19. 팀·피부 팔레트 — 예상 크기 **중**
 
@@ -383,6 +390,7 @@
 ### D-6. 죽은 코드로 닫은 것 (만들지 말 것)
 
 - `ui/combo.pzx` — 그리는 코드가 없다
+- **필살타법·타자 마선수 이펙트 그림** `effect_frame`·`effect_power`·`effect_tornado`·`effect_meteor`·`medica_effect` — `경기+0x1034`·`+0x103c` 에 싣기만 하고 그리는 코드가 없다 (R2 15절, 부재 증명 방법도 거기 있다)
 - 경기 상태 `0x20` — 경기 끝(`0x19`)의 쓰이지 않는 쌍둥이 번호. 들어오는 길이 **없다**
 - 야수 동작 `0x78` — "동작 5 의 세 번째 포즈로 정지" 인 상수, 따로 구현 불필요
 - 게이지 모드의 체력 0% 감점, USER_EVT 97~99(연속 4안타 강판)
