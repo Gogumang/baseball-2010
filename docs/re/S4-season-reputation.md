@@ -234,11 +234,24 @@ SR+0x62 (s16) = clamp(SR+0x62 + g, 0, 999) (a7158~a7176)
 - **지우기는 붙었다**(2026-09-25): `useSeasonSession.ts` 의 `clearGameRecord` 가 경기 장면으로 들어가는
   세 갈래(`playNextGame` 정규 · `continuePostseason` 포스트시즌 · `playCupGame` 국가대항전)에서 `clearSeasonGameRecord()` 를 넣는다.
   **원본도 경기 시작 쪽 한 곳뿐**이라(0x83cc, 상태 0xdd 의 경기 시작 키) 자리가 맞는다 — 경기가 끝날 때 지우는 곳은 없다.
-- **채우기는 아직 없다.** `recordSeasonGameEvent` 를 부르는 곳이 0 곳이라 `gameRecord` 는 늘 전부 0 이고,
-  평판 점수 s 는 승패·상대 득점·완투만으로 정해진다(삼진·병살·홈런·사이클이 전혀 안 먹는다).
-  넣을 자리는 팀 경기 진행기 `src/features/play-team-game/model/teamGameFlow.ts` 다 —
-  내 타석 정산 `finishBatterOutcome`(k=7·8·9·0xa~0xd·0xe)과 내가 던진 타석 정산(k=0·2·4·5).
-  `TeamGameSummary` 에 16칸을 실어 `useSeasonSession.finishGame` 이 `evaluateSeasonGame` 앞에서 레코드에 꽂으면 된다.
+- **채우기도 붙었다**(2026-09-25): 팀 경기 진행기 `teamGameFlow.ts` 가 `TeamGameProgress.gameRecord`
+  (길이 16, 경기를 세울 때 `clearSeasonGameRecord()`)에 쌓고, `summaryOf` 가 `TeamGameSummary.gameRecord` 로 실어 보내면
+  `useSeasonSession.finishGame` 이 `evaluateSeasonGame` **앞에서** `record.gameRecord` 에 꽂는다.
+  - 우리 타석 정산(`finishBatterOutcome` · 자동 타석 `playAutoOffenseAtBat`) → `offenseRecordOf`:
+    k=7 안타(홈런 포함) · k=8 2루타 · k=9 3루타 · k=0xa~0xd 홈런 타점별 · k=0xe 사이클 · k=6 내 타자 삼진.
+  - 내가 던진 타석 정산(`finishDefensiveAtBat`) → `defenseRecordCodesOf`:
+    k=4 탈삼진 · k=2 피안타 · k=5 아웃 2개(병살) · k=0 아웃 3개(삼중살).
+  - 사이클 판정 `0xa7610` 이 읽는 "타순 칸의 루타 목록"(`0xa86e0` 이 미는 그 목록)은
+    `TeamGameProgress.ourHitBases` 다 — 대타가 두 칸을 맞바꿀 때 24바이트 기록과 함께 움직인다.
+  - 게이트 `0xa755c` 의 **모드 2 검사**는 `withSeasonRecord` 가, **공/수 검사**는 `recordSeasonGameEvent(…, mySide)` 가 한다.
+- **아직 안 옮긴 칸 둘**:
+  - **S[1] 벤치클리어링(k=1, `0x3ab92`)** — 웹에 벤치클리어링 연출(R10 상태 0x1e, 사구 뒤 20%) 자체가 없다.
+    평판식이 `s −= S[1]` 로 **읽는 칸**이라 옮기면 값이 달라진다. 연출을 옮길 때 같이 넣어야 한다.
+  - **S[3] 수비 실수(k=3, `0x4385e`·`0x4390a`)** — 펌블·원바운드 송구에서 오르지만 **평판식이 읽지 않는다**. 그냥 둔다.
+- **병살 k=5 의 `state[0x1a]` 가드**(삼진 뒤 주자가 움직여 두 번째 아웃이 난 플레이는 병살로 안 친다)는
+  웹에 그 플레이가 없어 늘 거짓이다 — 아웃 둘이 나는 타석은 전부 병살로 센다.
+- **포스트시즌·국가대항전은 `finishGame` 이 `evaluateSeasonGame` 자체를 안 탄다**(웹의 옛 갈래).
+  원본은 모드 2 경기면 다 평가하므로(P4 4a) 여기는 **여전히 미이식**이다 — 16칸은 그 갈래에서도 정상으로 차 있다.
 - 끝까지 닿는가: **닿는다.** `record.reputation`(SR+0x62)을 `seasonAttendance.ts:attendanceOf` 가 그대로 기반값 p 로 읽는다
   (원본 0xa3590 `r4 = (s16)[SR+0x62]`) → 관중 수 → 수입 → 소지금. 연봉·트레이드는 평판을 읽지 않는다.
 - `src/entities/career/model/gameEvaluation.ts` 의 `reputationChangeOf` 는 **나리 평판(0xa6218)** 이다. 섞지 말 것 (5절).
