@@ -79,7 +79,11 @@ import {
   OUT_KIND,
   releaseForcesAfterOut,
 } from '@/entities/fielding/model/outJudgement'
-import { defenseArrivalTicks, secondBaseCoverSlot } from '@/entities/fielding/model/throwArrival'
+import {
+  autoThrowTargetBase,
+  defenseArrivalTicks,
+  secondBaseCoverSlot,
+} from '@/entities/fielding/model/throwArrival'
 import { effectiveThrowSpeedOf, readyTicksOf, throwTicksToFielder } from '@/entities/fielding/model/throwPlan'
 import { chooseThrowTargetBase } from '@/entities/fielding/model/throwTargetBase'
 import { EMPTY_BASES, type AdvanceResult, type BaseState } from '@/entities/game/model/baseState'
@@ -148,6 +152,15 @@ export interface DefensePlayInput {
    * 이미 공개된 두 노트의 읽기만 근거로 삼았고 물리식은 건드리지 않았다.
    */
   readonly isUncatchable?: boolean
+  /**
+   * **2스트라이크 번트 파울 아웃**(원본 판정 11)로 들어온 플레이인가 — 진행기는 이 칸을 보지 않는다.
+   *
+   * 원본은 판정 11 을 **수비 시뮬레이션 없이** 그 자리에서 내고 아웃 콜도 조건 없이 62 다
+   * (`0x51b20` → `0x51b2e movs r1,#0x3e`). 웹은 그 아웃을 `직선타아웃` 으로 옮겨 두어
+   * 수비 화면을 한 번 거치므로, 플레이가 끝나는 자리에서 콜을 고를 때
+   * (`play-at-bat/model/atBatSounds.inPlayCallSoundIdOf`) 이 표가 있어야 20 으로 새지 않는다.
+   */
+  readonly buntFoulOut?: boolean
   readonly maximumTicks?: number
   /**
    * 난수. **주면 원본 확률 굴림이 돈다** — 필살수비(0x66b30/0x66be4) · 펌블(0xb41d0) ·
@@ -192,6 +205,46 @@ export interface DefensePlayInput {
    * ⚠️ `경기+0x24` 는 이 갈림과 **아무 상관이 없다** — 아래 `autoBaserunning` 주석 참고.
    */
   readonly runningMode?: ManualAutoMode
+  /**
+   * **송구 수동/자동** (환경설정 옵션 +0xf4, **원본 기본 0 = 수동**). 안 주면 수동이다.
+   *
+   * 원본 배선은 바로 위 주루 갈림(`0xae690`)과 **판박이**다. 같은 경기 장면 슬롯 2
+   * (`0x524c0`, 매 틱) 안에서 주루 갈림 스물여섯 바이트 뒤에 붙어 있다 (직접 뜬 것):
+   * ```
+   * 52690: 설정 = 0x1f1d8([0x1400054])
+   * 5269c: r3 = 설정+0xf4 ; r1 = [r3]              ; 송구 수동(0)/자동(1)
+   * 526a4: bl 0xae6c8([장면+0x214], r1)
+   *        ae6ca~ae6f6: r2 = [x+0x174](= 경기) ; 수비측 = 경기[0xa](부호 있는 바이트)
+   *                     반환 = (경기[0x31 + 수비측] == 1)  ||  (설정+0xf4 != 0)
+   * 526ac: 그 값이 0 이면 건너뛴다                  ; ★ 주루와 달리 예외가 하나도 없다
+   * 526ae: 0xaf8e0(제어기 = 장면+0x210)             ; = 제어기.vt0xc = 0xafa60 CPU 송구 결정
+   * ```
+   * `0xae6c8` 은 `0xae690` 과 **오프셋 한 글자만 다른 쌍둥이**다 — `경기[9]`(공격측) 자리가
+   * `경기[0xa]`(수비측)이고 나머지는 한 명령도 다르지 않다.
+   *
+   * 곧 **"수비가 CPU 거나 설정이 자동이면 CPU 송구 결정을 돌리고, 사람이 수비하면서 설정이
+   * 수동이면 아예 안 돌린다"**.
+   *
+   * 그러면 사람 수비는 무엇으로 던지나 — **플레이 vt0x30 = `0xb1c90` 이 매 틱 따로 돈다**
+   * (`0xafa60` 과 무관하게 언제나 돈다, 0xb1c90 안에 CPU/사람 검사가 없다). 그 함수는
+   * `플레이+0x160`(사람이 방향키로 고른 목표, 메시지 0x588 → vt0x60 = `0xb3118`)이 −1 이 아니면
+   * 그 루로 던지고(0xb1f4e `r6 = [+0x160] + 1 ; bne 0xb203a` = 수동 가지),
+   * −1 이면 **앞선 주자부터 거꾸로 훑어 "주자 도착 틱 ≥ 송구 시간" 인 첫 루**를 고른다
+   * (0xb1f5e~0xb2038 = `throwArrival.autoThrowTargetBase`, I-controls 2b).
+   *
+   * 곧 **수동 송구 = 점수식 `0xafb24`(CPU 전용)가 아예 안 도는 것**이고, 사람이 키를 안 누르면
+   * `0xb1c90` 의 훨씬 단순한 "잡을 수 있는 앞선 루" 규칙이 대신 고른다.
+   *
+   * ⚠️ **옮기지 못한 한 가지**: `0xafa60` 은 이 갈림 말고 **경기 장면 메시지 처리기
+   * `0x509a0` 앞머리(0x509b4~0x509d0)에서도 조건 없이 한 번씩** 불린다 (S8 4-3, 확정).
+   * 웹에는 메시지 큐가 없어 그 자리를 옮길 길이 없다 — 여기서는 **매 틱 갈림만** 옮겼다.
+   * `0xafa60` 의 "홈 송구면 rand(0,100) ≤ 19 로 특수 송구" 굴림도 웹에 없다(난수 차례를 건드리게
+   * 되므로 지어 넣지 않는다).
+   *
+   * 배선: 사람이 수비하는 자리(`pitcherGameFlow` · `teamGameFlow` 수비 타석 · 투수편 미션)가
+   * 이 칸을 넘기면 된다. 안 넘기면 원본 기본값(수동)이다.
+   */
+  readonly throwMode?: ManualAutoMode
   /** 사람 조작 (I-controls 0절 상태 0x17 표). 안 주면 전부 자동이다 */
   readonly controls?: DefensePlayControls
 
@@ -680,6 +733,9 @@ export function stepDefensePlay(
   // 안 넘기면 원본 기본값(자동)이라 지금까지와 똑같이 논다.
   const autoBaserunningEnabled =
     input.offenseIsCpu === true || (input.runningMode ?? '자동') !== '수동'
+  // 0xae6c8([장면+0x214], 설정+0xf4) — 수비가 CPU 거나 송구 설정이 자동이면 CPU 송구 결정
+  // 제어기(0xaf8e0 → vt0xc = 0xafa60 → 점수식 0xafb24)가 돈다. 안 넘기면 원본 기본값(수동)이다.
+  const cpuThrowEnabled = input.defenseIsCpu === true || (input.throwMode ?? '수동') !== '수동'
   const runners = state.runners
   const ticks = state.ticks
   const log = state.log
@@ -975,12 +1031,16 @@ export function stepDefensePlay(
 
       // ── 송구 목표 루 ──
       // 사람이 방향키로 고른 목표(플레이+0x160)가 있으면 그 루가 먼저다 (0xb1c90 의 사람 가지).
-      // 안 골랐으면 CPU 점수식(0xafb24)이 고른다.
+      // 안 골랐으면 — **송구 설정 갈림**(`input.throwMode` 주석의 0x5269c·0xae6c8):
+      //   CPU 송구 결정이 도는 쪽(수비 CPU 또는 설정 자동)이면 점수식 0xafb24,
+      //   안 도는 쪽(사람 수비 + 설정 수동)이면 0xb1c90 제 자동 가지 = 앞선 주자부터 잡히는 루.
       const active = runners.filter((runner) => !runner.state.isOut && !runner.state.scored).length
       throwBase =
         play.manualThrowBase !== NONE
           ? play.manualThrowBase
-          : chooseThrowTargetBase({ ...contextAt(tick), activeRunnerCount: active })
+          : cpuThrowEnabled
+            ? chooseThrowTargetBase({ ...contextAt(tick), activeRunnerCount: active })
+            : autoThrowTargetBase(contextAt(tick))
       if (throwBase !== NONE) {
         // 레이저 송구 — 반짝임 창 안에 새로 누른 키가 들어왔고 공을 쥐었으면 특수 송구가 나간다 (0x400bc)
         laserThrow = canFireLaser({

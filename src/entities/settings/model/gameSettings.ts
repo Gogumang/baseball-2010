@@ -11,7 +11,9 @@ import {
  *   속도 — 원본 속도 표 다섯 단계
  *   투구 — 기본(게이지 OFF) / 게이지(ON). "게이지를 사용하면 기본 투구보다 더욱 강한 공"
  *   사운드 — soundLevel × 25 를 SoundPort.setVolume 에 넘긴다
- * 그 밖(진동·주루·송구·전광판)은 웹판에 해당 플레이·배선이 아직 없어 **값만** 들고 있다 —
+ *   주루 — `DefensePlayInput.runningMode` (0xae690)
+ *   송구 — `DefensePlayInput.throwMode` (0xae6c8)
+ * 그 밖(진동·전광판)은 웹판에 해당 플레이·배선이 아직 없어 **값만** 들고 있다 —
  * 원본 환경설정 화면에는 줄이 있으므로 칸은 그대로 둔다.
  */
 export type PitchControl = '기본' | '게이지'
@@ -66,7 +68,27 @@ export interface GameSettings {
    * 배선: `DefensePlayInput.runningMode`(+ `offenseIsCpu`) 로 넘긴다. 안 넘기면 자동이다.
    */
   readonly runningMode: ManualAutoMode
-  /** 송구 수동/자동 (옵션 +0xf4, 기본 수동). 웹에는 아직 송구 조작이 없어 값만 들고 있다 */
+  /**
+   * 송구 수동/자동 (옵션 +0xf4, **기본 수동**). 주루(+0xbd)와 판박이 갈림이다.
+   *
+   * 원본 배선(직접 뜬 것, 매 틱 도는 경기 장면 슬롯 2 = `0x524c0` 안, 주루 갈림 바로 아래):
+   * ```
+   * 52690: 설정 = 0x1f1d8([0x1400054])
+   * 5269c: r1 = 설정+0xf4                          ; 송구 수동(0)/자동(1)
+   * 526a4: bl 0xae6c8([장면+0x214], r1)
+   *        ae6ca~ae6f6: r2 = [x+0x174](= 경기) ; 수비측 = 경기[0xa]
+   *                     반환 = (경기[0x31 + 수비측] == 1)  ||  (설정+0xf4 != 0)
+   * 526ac: 그 값이 0 이면 건너뛴다                  ; 주루와 달리 예외가 하나도 없다
+   * 526ae: 0xaf8e0(제어기 = 장면+0x210)             ; = 제어기.vt0xc = 0xafa60 CPU 송구 결정
+   * ```
+   * 곧 **"사람이 수비하면서 설정이 수동이면 CPU 송구 결정(점수식 0xafb24)을 아예 안 돌린다"**.
+   * 그때 목표 루는 플레이 vt0x30 = `0xb1c90` 이 고른다 — 사람이 누른 목표(+0x160)가 먼저고,
+   * 안 눌렀으면 "앞선 주자부터 잡히는 첫 루"(`throwArrival.autoThrowTargetBase`)다.
+   *
+   * 배선: `DefensePlayInput.throwMode`(+ `defenseIsCpu`) 로 넘긴다. 안 넘기면 원본 기본값(수동)이다.
+   * 사람이 수비하는 자리 가운데 지금 이 설정을 넘기는 것은 **투수편**뿐이다
+   * (`pitcherGameOptions.throwModeManual`) — 대전모드 수비 타석·투수편 미션은 아직 안 넘긴다.
+   */
   readonly throwMode: ManualAutoMode
   /** 전광판 표시 여부 (옵션 +0x3a, 기본 켬). 웹에는 아직 전광판이 없어 값만 들고 있다 */
   readonly isScoreboardOn: boolean

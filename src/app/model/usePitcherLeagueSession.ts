@@ -113,6 +113,12 @@ export function usePitcherLeagueSession(
   wallet: GamePointWalletSession | null = null,
   /** 옛 투수 G를 지갑으로 옮겼는지 적어 두는 칸 — 아래 **투수 G 이사** 참고 */
   mergeStore: JsonStorePort | null = null,
+  /**
+   * 환경설정 "송구" 가 수동인가 (설정 +0xf4). 투수편은 사람이 언제나 수비라 이 값 하나가
+   * `0xae6c8` 의 답이 된다. **원본 기본값은 수동** 이라 안 넘기면 수동이다.
+   * (자리가 끝에 붙은 것은 앞의 인자 차례를 바꾸지 않으려는 것뿐이다.)
+   */
+  throwModeManual: boolean = true,
 ): PitcherLeagueSession {
   const loaded = useRef<PitcherCareer | null>(null)
   if (loaded.current === null) loaded.current = normalizePitcherCareer(store.load())
@@ -263,9 +269,9 @@ export function usePitcherLeagueSession(
 
   const beginGame = useCallback(() => {
     if (career === null) return
-    setGameOptions(pitcherGameOptionsOf(career, { gaugeSettingOn }))
+    setGameOptions(pitcherGameOptionsOf(career, { gaugeSettingOn, throwModeManual }))
     setScene('경기')
-  }, [career, gaugeSettingOn])
+  }, [career, gaugeSettingOn, throwModeManual])
 
   /**
    * 경기 뒤 정산 — 성적·스태미나·전적을 넣고, 같은 날 나머지 네 경기를 돌린 뒤

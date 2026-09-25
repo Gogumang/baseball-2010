@@ -166,6 +166,12 @@ export interface PitcherGameOptions {
   readonly reputation: number
   /** 환경설정 "투구 게이지" (설정 +0x2d) — **원본 기본값은 꺼짐** (K 5-2) */
   readonly gaugeSettingOn: boolean
+  /**
+   * 환경설정 "송구" 가 수동인가 (설정 +0xf4) — **원본 기본값은 수동(0)** 이다 (K 5-2).
+   * 투수편은 사람이 언제나 수비라 이 값이 그대로 `0xae6c8` 의 답이 된다
+   * (`DefensePlayInput.throwMode` 주석의 0x5269c 갈림). 안 넘기면 수동이다.
+   */
+  readonly throwModeManual?: boolean
   /** 투수 스킬 18 비겁자 (스태미나 두 배 소모) */
   readonly pitcherIsCoward?: boolean
   /** 투수 스킬 10 끈기 (소모 −1) */
@@ -610,6 +616,9 @@ function defensePlayInputOf(
     // 공격이 CPU 라 `0xae690` 의 첫 항(`경기[0x31 + 공격측] == 1`)이 서서
     // **환경설정 주루와 무관하게 늘 자동 진루**다 — 투수편은 사람이 언제나 수비다
     offenseIsCpu: true,
+    // 반대로 **송구는 여기서만 환경설정이 먹는다** — `0xae6c8` 의 첫 항(`경기[0x31 + 수비측] == 1`)이
+    // 사람 수비라 거짓이므로 설정 +0xf4 혼자가 답을 정한다. 원본 기본값은 **수동**이다.
+    throwMode: progress.options.throwModeManual === false ? '자동' : '수동',
   }
 }
 

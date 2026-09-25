@@ -50,7 +50,14 @@ function play(
   })
 }
 
-/** 주루 수동/자동까지 골라 돌린다 */
+/**
+ * 주루 수동/자동까지 골라 돌린다.
+ *
+ * 송구는 **자동으로 못 박는다** — 이 갈래를 쓰는 시험들은 포스 사슬을 보는 것이고,
+ * 송구 설정(+0xf4)의 원본 기본값은 수동이라 안 박아 두면 목표 루 고르는 함수가
+ * 점수식 0xafb24 에서 0xb1c90 으로 바뀌어 아웃·득점이 따라 흔들린다.
+ * 송구 갈림 자체는 아래 "송구 수동/자동" 묶음이 따로 본다.
+ */
 function play2(
   outcome: AtBatOutcome,
   bases: BaseState,
@@ -64,6 +71,7 @@ function play2(
     outs,
     runAbility: 500,
     runningMode,
+    throwMode: '자동',
   })
 }
 
@@ -883,5 +891,70 @@ describe('포스 사슬 — 결과 코드가 준 최소 루가 앞 주자까지 
         }
       }
     }
+  })
+})
+describe('송구 수동/자동 — 환경설정 +0xf4 (0x5269c → 0xae6c8 → 0xafa60)', () => {
+  // 원본 갈림(직접 뜬 것, 매 틱 도는 경기 장면 슬롯 2 = 0x524c0 안, 주루 갈림 바로 아래):
+  //   5269c: r1 = 설정+0xf4 ; 526a4: bl 0xae6c8([장면+0x214], r1)
+  //          → 반환 = (경기[0x31 + 경기[0xa](수비측)] == 1) || (설정+0xf4 != 0)
+  //   526ac: 0 이면 건너뛴다 ; 526ae: 0xaf8e0 = 제어기.vt0xc = 0xafa60 CPU 송구 결정 → 점수식 0xafb24
+  // 곧 사람이 수비하면서 설정이 수동이면 점수식이 아예 안 돈다. 그때 목표는 플레이 vt0x30 =
+  // 0xb1c90 이 고른다 — 사람이 누른 목표(+0x160)가 먼저고, 안 눌렀으면 "앞선 주자부터 잡히는 첫 루".
+  const 송구줄 = (result: DefensePlayResult) =>
+    result.log.find((line) => line.includes('루로') && line.includes('송구')) ?? '(송구 없음)'
+
+  const 만루단타 = (extra: Partial<DefensePlayInput> = {}): DefensePlayResult =>
+    runDefensePlay({
+      outcome: 단타,
+      trajectory: battedBallTrajectory(representativePatternOf(단타)),
+      bases: 만루,
+      outs: 0,
+      runAbility: 500,
+      ...extra,
+    })
+
+  it('안 넘기면 원본 기본값(수동)이다 — 설정 +0xf4 의 생성자 값이 0 이다', () => {
+    expect(송구줄(만루단타())).toBe(송구줄(만루단타({ throwMode: '수동' })))
+  })
+
+  it('수동이면 점수식 0xafb24 가 안 돌고 0xb1c90 이 앞선 주자의 루를 고른다', () => {
+    // 만루 단타 — 3루 주자가 홈(웹 루 번호 4 = 원본 표 0xd86b0 의 홈 사본)으로 간다
+    expect(만루단타({ throwMode: '수동' }).throwBase).toBe(4)
+    // 자동이면 점수식이 더 가까운 루를 고른다
+    expect(만루단타({ throwMode: '자동' }).throwBase).toBe(2)
+  })
+
+  it('수비가 CPU 면 설정이 수동이어도 점수식이 돈다 — 0xae6c8 의 앞 항', () => {
+    expect(만루단타({ throwMode: '수동', defenseIsCpu: true }).throwBase).toBe(
+      만루단타({ throwMode: '자동' }).throwBase,
+    )
+  })
+
+  it('수동이어도 사람이 송구 키를 누르면 그 루가 먼저다 — 0xb1c90 의 사람 가지(+0x160)', () => {
+    const 눌렀다 = 만루단타({ throwMode: '수동', controls: 계속누름('수비', '6') })
+
+    expect(눌렀다.throwBase).toBe(1)
+    expect(눌렀다.log.some((line) => line.includes('사람이 1루로 송구 지시'))).toBe(true)
+  })
+
+  it('난수 굴림 차례는 수동/자동에 한 톨도 안 흔들린다', () => {
+    const 굴림수 = (mode: '수동' | '자동') => {
+      let calls = 0
+      let seed = 20100901
+      const 하나 = () => {
+        calls += 1
+        seed = (seed * 1664525 + 1013904223) >>> 0
+        return (seed >>> 8) / 0x1000000
+      }
+      const random: RandomPort = {
+        next: 하나,
+        nextInRange: (minimum, maximum) => minimum + 하나() * (maximum - minimum),
+        pick: (candidates) => candidates[Math.floor(하나() * candidates.length)],
+      }
+      만루단타({ throwMode: mode, random })
+      return calls
+    }
+
+    expect(굴림수('수동')).toBe(굴림수('자동'))
   })
 })

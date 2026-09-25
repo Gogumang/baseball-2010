@@ -33,6 +33,7 @@ import type { PitcherCareer, PitcherGameOutcome } from '@/entities/pitcher-caree
  * magicCount      0xd84ff 표 (마구 번호별 4·5·6·7) + 혼신(투수 스킬 23) +2
  * teamMorale      모드별 팀 레코드 s16 +2 — XlsTEAM_DATA 의 둘째 u16 이 그 칸이고 전 팀 100 이다
  * gaugeSettingOn  환경설정 "투구 게이지" (설정 +0x2d). **원본 기본값은 꺼짐** (K 5-2)
+ * throwModeManual 환경설정 "송구" (설정 +0xf4). **원본 기본값은 수동** (K 5-2)
  * ```
  */
 
@@ -54,6 +55,8 @@ export function teamMoraleOf(teamId: number): number {
 export interface PitcherGameSettings {
   /** 환경설정 "투구 게이지" — 안 넘기면 **원본 기본값(꺼짐)** 이다 */
   readonly gaugeSettingOn?: boolean
+  /** 환경설정 "송구" 가 수동인가 (설정 +0xf4) — 안 넘기면 **원본 기본값(수동)** 이다 */
+  readonly throwModeManual?: boolean
   /** 라이벌전인가 — 경기 뒤 사기 변화가 두 배가 된다 */
   readonly isRivalGame?: boolean
   /** 상대 팀을 직접 정할 때 (국가대항전·연습 경기). 안 넘기면 일정표가 정한다 */
@@ -110,6 +113,8 @@ export function pitcherGameOptionsOf(
     reputation: career.reputation,
     // 원본 기본값은 꺼짐이다 — 환경설정에서 켠 값을 그대로 받아 넘긴다
     gaugeSettingOn: settings.gaugeSettingOn ?? false,
+    // 송구 +0xf4 의 원본 기본값은 **수동(0)** 이다 — 투수편은 사람이 늘 수비라 이 값이 그대로 먹는다
+    throwModeManual: settings.throwModeManual ?? true,
     pitcherIsCoward: hasPitcherSkill(career, COWARD_SKILL),
     pitcherEndures: hasPitcherSkill(career, ENDURE_SKILL),
     isRivalGame: settings.isRivalGame,

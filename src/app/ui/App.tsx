@@ -96,6 +96,8 @@ export function App() {
     gameSettings.settings.pitchControl === '게이지',
     wallet,
     pitcherWalletMergeStore,
+    // 환경설정 "송구" (설정 +0xf4) — 투수편은 사람이 늘 수비라 여기서만 이 설정이 먹는다 (0xae6c8)
+    gameSettings.settings.throwMode === '수동',
   )
   const careerSession = useCareerSession({
     runner, random, saveGame, screen, setScreen, sound, wallet,

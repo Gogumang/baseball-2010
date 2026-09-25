@@ -394,6 +394,9 @@ describe('주자 처리는 수비 화면이 끝나야 정해진다 (상태 0x17 
     expect(진행중.pendingDefensePlay!.outs).toBe(직전.game.outs)
     // 수비는 사람(나)이다 → 협살이 안 돈다 (S8 1-4)
     expect(진행중.pendingDefensePlay!.defenseIsCpu).toBe(false)
+    // 사람 수비라 `0xae6c8` 의 앞 항이 거짓 → 환경설정 송구(+0xf4)가 그대로 먹는다.
+    // 옵션을 안 넘겼으니 원본 기본값인 수동이다 (CPU 송구 결정 0xafa60 이 안 돈다)
+    expect(진행중.pendingDefensePlay!.throwMode).toBe('수동')
     // 경기 상태·기록은 한 톨도 안 바뀐다 — 다음 타석도 시작되지 않았다
     expect(진행중.game).toEqual(직전.game)
     expect(진행중.record).toEqual(직전.record)
