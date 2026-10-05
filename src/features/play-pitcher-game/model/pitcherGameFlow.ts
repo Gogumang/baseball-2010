@@ -10,7 +10,7 @@ import type { GameState, PlayerSide } from '@/entities/game/model/gameState'
 import { applyPitchResolution, createAtBat } from '@/entities/at-bat/model/atBatState'
 import type { AtBatState, PitchResolution } from '@/entities/at-bat/model/atBatState'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
-import { describeOutcome, isHit } from '@/entities/at-bat/model/atBatOutcome'
+import { describeOutcome, isFreePass, isHit } from '@/entities/at-bat/model/atBatOutcome'
 import { playQuickAtBat } from '@/entities/game/model/quickAtBat'
 import { batterAt, teamBatters, teamPitchers, quickPitcherOf } from '@/entities/team/model/teamRoster'
 import { advanceRunners, runnerCountOf } from '@/entities/game/model/baseState'
@@ -51,6 +51,7 @@ import {
   EMPTY_PITCHER_GAME_RECORD,
   recordBatterFaced,
   recordEntryLead,
+  recordHitByPitch,
   recordPitchGrade,
   saveSituationOf,
 } from '@/entities/pitcher-career/model/pitcherGameRecord'
@@ -60,6 +61,11 @@ import { staminaPercentOf } from '@/entities/pitcher-career/model/pitcherStamina
 import { createBurstSession, resolveBurst, tryTriggerBurst } from '@/entities/burst-mission/model/burstMissionSession'
 import type { BurstResolution, BurstSession } from '@/entities/burst-mission/model/burstMissionSession'
 import { burstResultBitsOf } from '@/entities/burst-mission/model/burstResultBits'
+import {
+  benchClearingEffectOf,
+  rollsIntoBenchClearing,
+  staminaAfterBenchClearing,
+} from '@/entities/game/model/benchClearing'
 import {
   addInningRuns,
   applyOpponentAtBat,
@@ -608,11 +614,42 @@ export function startPitch(
     // `atBat` 은 아직 안 비웠으므로 끝난 타석의 결과 코드·볼 카운트가 그대로 남아 있다.
     return { ...afterPitch, pendingDefensePlay: defensePlayInputOf(afterPitch, outcome, random) }
   }
+  // 사구면 상태 0x12 끝(0x4e74c)에서 벤치 클리어링을 굴린다 — 밀어내기 주루(0x17)·정산 0xa8024 보다 앞이다
+  const settled = withPitcherBenchClearing(afterPitch, outcome, random)
   // 내가 던진 타석이면 홈런도 날아가는 그림을 보여 준다 — 득점·주자는 아래 길이 그대로 정한다
-  const playback = homeRunPlaybackOf({ outcome, bases: afterPitch.game.bases })
+  const playback = homeRunPlaybackOf({ outcome, bases: settled.game.bases })
   return advance(
-    applyDefensivePlay(afterPitch, outcome, true, afterPitch.atBat.balls, null, playback),
+    applyDefensivePlay(settled, outcome, true, settled.atBat.balls, null, playback),
     random,
+  )
+}
+
+/**
+ * **사구 뒤 벤치 클리어링** (`entities/game/model/benchClearing`, R10 6절) — 내가 던진 공이라 수비는 사람(나)이다.
+ * 들어가면 0x3ab7c `0xaeab0(수비 팀, 1000)` — 지금 마운드의 내 스태미나(+0x2c) −1000, [0, 10000] 로 자른다.
+ * 시즌 평판 S[1](0xa755c(ctx, 1), 0x3ab92)도 부르지만 그 게이트는 **모드 2(시즌)** 만 적으므로 투수편(모드 3)에서는
+ * 아무것도 안 남는다. 홈런더비가 아니라 사구면 늘 한 번 굴린다 — **사구 타석만 난수를 하나 더 쓴다.**
+ * ⚠️ 연출 화면(양 팀이 마운드로 몰려나오는 100틱, 배경음 44)과 그 연출이 쓰는 난수는 없다.
+ */
+function withPitcherBenchClearing(
+  progress: PitcherGameProgress,
+  outcome: AtBatOutcome,
+  random: RandomPort,
+): PitcherGameProgress {
+  const entered = rollsIntoBenchClearing(
+    {
+      isHitByPitch: outcome.kind === '사구',
+      isHomeRunDerby: false,
+      burstInProgress: progress.burst !== null && progress.burst.current !== null,
+    },
+    random,
+  )
+  if (!entered) return progress
+  const effect = benchClearingEffectOf(true)
+  return appendLog(
+    { ...progress, stamina: staminaAfterBenchClearing(progress.stamina, effect.defenseStaminaLoss) },
+    `${progress.game.inning}회${progress.game.half} 벤치 클리어링`,
+    true,
   )
 }
 
@@ -828,6 +865,10 @@ function applyDefensivePlay(
   const previousLog = progress.opponentBatterLogs[slot] ?? { hits: 0, homeRuns: 0 }
   const hit = isHit(outcome)
   const walk = outcome.kind === '볼넷'
+  // 출루 허용 state[0x88]·투수 +0x2a·삼자범퇴 칸 ctx+0x184 는 볼넷·사구를 함께 본다
+  // (0xa8caa — 사구 플레이는 아웃이 없어 마지막 주자가 늘 살아 있다 · 0xa8e12/0xa8e36)
+  const freePass = isFreePass(outcome)
+  const hitByPitch = outcome.kind === '사구'
   const inningEnded = before.outs + applied.outsAdded >= OUTS_PER_INNING
 
   let decision = progress.decision
@@ -836,7 +877,7 @@ function applyDefensivePlay(
   }
 
   // R+0x184 — 안타·볼넷·사구가 나면 이 이닝은 더 이상 삼자범퇴가 아니다 (0xa80b4·0xa8e12)
-  const perfectInningFlag = progress.perfectInningFlag && !hit && !walk && applied.runsScored === 0
+  const perfectInningFlag = progress.perfectInningFlag && !hit && !freePass && applied.runsScored === 0
 
   const record: PitcherEvaluationRecord = mine
     ? {
@@ -844,6 +885,7 @@ function applyDefensivePlay(
         hitsAllowed: progress.record.hitsAllowed + (hit ? 1 : 0),
         strikeouts: progress.record.strikeouts + (outcome.kind === '삼진' ? 1 : 0),
         outsRecorded: progress.record.outsRecorded + applied.outsAdded,
+        // R+0x144 은 볼넷만이다 — 코드 0x1c 는 state[5] > 3 일 때뿐(0xa8e04), 사구는 아래 R+0x148(0x1d)
         walksAllowed: progress.record.walksAllowed + (walk ? 1 : 0),
         // 연속 탈삼진 — 삼진이 아닌 타석이 끼면 끊긴다 (R+0x14c, 0xa619e)
         strikeoutCombo: outcome.kind === '삼진' ? progress.record.strikeoutCombo + 1 : 0,
@@ -891,10 +933,10 @@ function applyDefensivePlay(
       : progress.recordIds,
     inningRuns: addInningRuns(progress.inningRuns, before.inning, applied.runsScored),
     record,
-    pitcherRecord: mine ? recordBatterFaced(progress.pitcherRecord, 0) : progress.pitcherRecord,
+    pitcherRecord: mine ? pitcherRecordAfterPlay(progress.pitcherRecord, hitByPitch) : progress.pitcherRecord,
     runsAllowedByMe: progress.runsAllowedByMe + (mine ? applied.runsScored : 0),
     teamHitsAllowed: progress.teamHitsAllowed + (hit ? 1 : 0),
-    teamWalksAllowed: progress.teamWalksAllowed + (walk ? 1 : 0),
+    teamWalksAllowed: progress.teamWalksAllowed + (freePass ? 1 : 0),
     teamRunsAllowed: progress.teamRunsAllowed + applied.runsScored,
     perfectInningFlag,
     opponentBatterLogs: {
@@ -937,6 +979,15 @@ function applyDefensivePlay(
     }`,
     mine,
   )
+}
+
+/**
+ * 정산 0xa8024 가 내 투수 기록 R 에 남기는 것 — R+0x138 타자 수(0xa8db0) 뒤 사구면 R+0x148 (코드 0x1d, 0xa8e2a).
+ * 두 코드 다 "수비팀 현재 투수가 본인" 필터(0x14~0x1f)를 지나므로 내가 던진 타석(`mine`)에서만 부른다.
+ */
+function pitcherRecordAfterPlay(record: PitcherGameRecord, hitByPitch: boolean): PitcherGameRecord {
+  const faced = recordBatterFaced(record, 0)
+  return hitByPitch ? recordHitByPitch(faced).record : faced
 }
 
 /** 한 점이 들어올 때마다 승·패·세이브 칸을 다시 잡는다 (0xa5c34) */
@@ -999,7 +1050,9 @@ function resolveBurstFor(
   const resolution = resolveBurst(
     progress.burst,
     burstResultBitsOf({
-      outcome,
+      // 사구도 B5(출루)·B11 을 켠다 (0xa882a "볼 4개 || 사구" · 0xa8bf4). burstResultBits 가 아직 '사구' 를
+      // 몰라 같은 비트를 내는 볼넷으로 넘긴다
+      outcome: outcome.kind === '사구' ? { kind: '볼넷' } : outcome,
       runsBattedIn: runsScored,
       outsBefore,
       outsAdded,

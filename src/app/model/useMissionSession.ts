@@ -30,6 +30,7 @@ import type { PitcherRun } from '@/entities/mission/model/pitcherRun'
 import { attemptSteal } from '@/entities/game/model/steal'
 import { missionOpponentOf, pitcherAbilityOf } from '@/entities/game/model/aceOpponent'
 import { pitchAgainstBatter } from '@/entities/pitching/model/simulateBatter'
+import { rollsIntoBenchClearing } from '@/entities/game/model/benchClearing'
 import { BATTER_SLOT, gameAbilityOf } from '@/features/play-team-game/model/gameAbilities'
 import { isMistakePitch } from '@/entities/pitching/model/mistakePitch'
 import { MAGIC_PITCH_TYPE_NUMBER } from '@/entities/pitcher-career/model/magicPitch'
@@ -430,6 +431,14 @@ export function useMissionSession({
       return
     }
     if (outcome !== null) {
+      // 사구면 상태 0x12 끝(0x4e74c)에서 벤치 클리어링을 굴린다 — 미션(모드 5)도 홈런더비가 아니라 늘 한 번 굴린다.
+      // 굴림이 돌발 검사보다 앞이라 돌발 유무와 무관하게 난수는 한 번 쓴다.
+      // ⚠️ 들어갔을 때의 효과(수비가 사람 → 0xaeab0 미션 투수 스태미나 −1000)는 웹 미션이 스태미나를
+      //    들고 있지 않아(`MISSION_STAMINA_PERCENT` 고정) 남길 자리가 없다. S[1] 은 시즌(모드 2)만 적는다.
+      rollsIntoBenchClearing(
+        { isHitByPitch: outcome.kind === '사구', isHomeRunDerby: false, burstInProgress: false },
+        random,
+      )
       nextRun = applyPitcherOutcome(nextRun, outcome, { random })
       runner.resetAtBat()
     } else {

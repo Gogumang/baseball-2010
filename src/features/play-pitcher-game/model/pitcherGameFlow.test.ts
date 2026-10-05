@@ -584,3 +584,59 @@ describe('실투 판정 0x33cbc — 투구 순간에 굴린다', () => {
     expect(마구.calls()).toBe(보통.calls() - 2)
   })
 })
+
+/**
+ * 내가 던진 공에 CPU 타자가 맞는다 — 0x35a20 (지켜본 공이 사각형 0xcfd50 안).
+ * 기본 배치 side 1(좌타)에서 바깥 칸 2 를 노린 직구가 흩어져 상자 [271, 309] 에 닿는 씨앗을 골랐다.
+ */
+describe('사구 — 내가 맞힌 타석 (0x35a20 → 0xa8024 · 벤치 클리어링)', () => {
+  const 바깥직구 = { typeNumber: 1, courseCell: 2, gaugeCell: 0 }
+  /** 사구지만 벤치 클리어링 굴림이 20 이상인 씨앗 · 굴림이 19 이하인 씨앗 */
+  const 사구씨앗 = 10
+  const 벤치씨앗 = 103
+
+  it('밀어내기 1루 · R+0x148 사구 칸 · 출루 허용(state[0x88]) · 삼자범퇴 칸이 깨진다 — R+0x144 볼넷은 그대로', () => {
+    const progress = startPitcherGame(기본옵션, 씨앗(1))
+    const 끝 = startPitch(progress, 바깥직구, 씨앗(사구씨앗))
+
+    expect(끝.lastResolution).toEqual({ kind: '사구' })
+    expect(끝.game.bases.first).toBe(true)
+    expect(끝.game.outs).toBe(0)
+    expect(끝.pitcherRecord.hitByPitch).toBe(1)
+    expect(끝.pitcherRecord.battersFaced).toBe(1)
+    expect(끝.record.walksAllowed).toBe(0)
+    expect(끝.teamWalksAllowed).toBe(1)
+    expect(끝.perfectInningFlag).toBe(false)
+    expect(summaryOf(끝).record.hitByPitch).toBe(1)
+    expect(끝.log.some((entry) => entry.text.includes('벤치 클리어링'))).toBe(false)
+  })
+
+  it('벤치 클리어링에 들어가면 수비(나)가 사람이라 내 스태미나 −1000', () => {
+    const progress = startPitcherGame(기본옵션, 씨앗(1))
+    const 보통 = startPitch(progress, 바깥직구, 씨앗(사구씨앗))
+    const 벤치 = startPitch(progress, 바깥직구, 씨앗(벤치씨앗))
+
+    expect(벤치.lastResolution).toEqual({ kind: '사구' })
+    // 공 하나의 스태미나 소모는 구질만 보므로 두 씨앗이 같다 — 차이는 0xaeab0(팀, 1000) 하나다
+    expect(보통.stamina - 벤치.stamina).toBe(1000)
+    expect(벤치.log.some((entry) => entry.text.includes('벤치 클리어링'))).toBe(true)
+    expect(벤치.game).toEqual(보통.game)
+  })
+
+  it('퍼펙트(기록 31)가 사구로 깨진다 — 출루 허용 칸이 볼넷+사구를 센다', () => {
+    const progress = startPitcherGame(기본옵션, 씨앗(1))
+    const 끝 = startPitch(progress, 바깥직구, 씨앗(사구씨앗))
+    expect(
+      completeGameRecordIdsOf({
+        mode: 3,
+        won: true,
+        pitchCourseConfirmed: true,
+        inningsPlayed: 9,
+        outsRecorded: 27,
+        hitsAllowed: 0,
+        walksAllowed: 끝.teamWalksAllowed,
+        runsAllowed: 0,
+      }),
+    ).not.toContain(31)
+  })
+})

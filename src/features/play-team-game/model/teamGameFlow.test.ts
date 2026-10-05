@@ -1364,3 +1364,47 @@ describe('사구 — 우리 타석 결과 4 와 벤치 클리어링 (상태 0x1e
     expect(사구끝.opponentPitcherCounters).toEqual(볼넷끝.opponentPitcherCounters)
   })
 })
+
+/**
+ * 우리가 던진 공에 CPU 타자가 맞는다 — 0x35a20. 기본 배치 side 1(좌타)에서 바깥 칸 2 를 노린 공이
+ * 흩어져 상자 [271, 309] 에 닿는 씨앗을 골랐다 (10: 벤치 클리어링 굴림 20 이상 · 103: 19 이하).
+ */
+describe('사구 — 우리 수비에서 CPU 타자가 맞는다 (0x35a20 · 벤치 클리어링 수비 사람 갈래)', () => {
+  function 맞히기(seed: number): { 전: TeamGameProgress; 후: TeamGameProgress } {
+    const { progress } = 시작()
+    const input = { typeNumber: 첫구질(progress), courseCell: 2, gaugeCell: 0 }
+    const 후 = startThrowPitch(progress, input, createSeededRandom(seed))
+    return { 전: progress, 후 }
+  }
+
+  it('밀어내기 1루 · 출루 허용 · 투수 볼넷+사구 칸', () => {
+    const { 후 } = 맞히기(10)
+    expect(후.lastResolution).toEqual({ kind: '사구' })
+    expect(후.pendingDefensePlay).toBeNull()
+    expect(후.game.bases.first).toBe(true)
+    expect(후.pitching.walksAllowed).toBe(1)
+    expect(후.pitching.allowedBaserunner).toBe(true)
+    expect(후.log.some((entry) => entry.text.includes('벤치 클리어링'))).toBe(false)
+  })
+
+  it('벤치 클리어링에 들어가면 우리 투수 스태미나 −1000 · 시즌 평판 S[1] +1 (공격측 CPU)', () => {
+    const 보통 = 맞히기(10).후
+    const 벤치 = 맞히기(103).후
+    expect(벤치.lastResolution).toEqual({ kind: '사구' })
+    expect(보통.stamina - 벤치.stamina).toBe(1000)
+    expect(벤치.gameRecord[1] - 보통.gameRecord[1]).toBe(1)
+    expect(벤치.game).toEqual(보통.game)
+    // 수비가 사람이라 상대(공격) 투수 투구 수는 건드리지 않는다
+    expect(벤치.opponentPitcherCounters).toEqual(보통.opponentPitcherCounters)
+    expect(벤치.log.some((entry) => entry.text.includes('벤치 클리어링'))).toBe(true)
+  })
+
+  it('시즌이 아니면(모드 ≠ 2) S[1] 이 안 남는다', () => {
+    const { progress } = 시작({ mode: 1 })
+    const input = { typeNumber: 첫구질(progress), courseCell: 2, gaugeCell: 0 }
+    const 벤치 = startThrowPitch(progress, input, createSeededRandom(103))
+    expect(벤치.lastResolution).toEqual({ kind: '사구' })
+    expect(벤치.log.some((entry) => entry.text.includes('벤치 클리어링'))).toBe(true)
+    expect(벤치.gameRecord).toEqual(progress.gameRecord)
+  })
+})

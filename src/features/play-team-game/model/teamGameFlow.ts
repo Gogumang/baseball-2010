@@ -46,7 +46,11 @@ import type { CompleteGameKind, MySide } from '@/entities/season-mode/model/seas
 import { createBurstSession, resolveBurst, tryTriggerBurst } from '@/entities/burst-mission/model/burstMissionSession'
 import type { BurstResolution, BurstSession } from '@/entities/burst-mission/model/burstMissionSession'
 import { burstResultBitsOf } from '@/entities/burst-mission/model/burstResultBits'
-import { benchClearingEffectOf, rollsIntoBenchClearing } from '@/entities/game/model/benchClearing'
+import {
+  benchClearingEffectOf,
+  rollsIntoBenchClearing,
+  staminaAfterBenchClearing,
+} from '@/entities/game/model/benchClearing'
 import { pitchAgainstBatter } from '@/entities/pitching/model/simulateBatter'
 import { isMistakePitch } from '@/entities/pitching/model/mistakePitch'
 import type { Pitch } from '@/entities/pitching/model/pitch'
@@ -1060,8 +1064,7 @@ export function startBatterOutcome(
  * 공격측이 CPU 일 때만 적히므로 우리 공격에서는 게이트에서 버려진다 (`withSeasonRecord` 가 그대로 가른다).
  * 홈런더비가 아니라 사구면 늘 한 번 굴린다 — **사구 타석만 난수를 하나 더 쓴다.**
  * ⚠️ 연출 화면(양 팀이 마운드로 몰려나오는 100틱, 배경음 44)과 그 연출이 쓰는 난수는 없다.
- * 우리가 던진 공에 CPU 타자가 맞는 쪽(코드 1 이 S[1] 에 남고 우리 투수 스태미나 −1000)은 CPU 타자 결정
- * (`entities/pitching`)이 아직 사구를 안 내서 이을 자리가 없다.
+ * 우리가 던진 공에 CPU 타자가 맞는 쪽(코드 1 이 S[1] 에 남고 우리 투수 스태미나 −1000)은 `withPitcherBenchClearing`.
  */
 function withBatterBenchClearing(
   progress: TeamGameProgress,
@@ -1361,7 +1364,9 @@ function pitchOnce(
   const outcome = afterPitch.atBat.outcome
   if (outcome === null) return afterPitch
 
-  const started = startDefensiveAtBat(afterPitch, outcome, true, random)
+  // 사구면 상태 0x12 끝(0x4e74c)에서 벤치 클리어링을 굴린다 — 밀어내기 주루(0x17)·정산 0xa8024 보다 앞이다
+  const cleared = withPitcherBenchClearing(afterPitch, outcome, random)
+  const started = startDefensiveAtBat(cleared, outcome, true, random)
   const pending = started.pendingDefensePlay
   // 수비 진행 중 — 화면이 틱을 돌리는 동안 경기를 붙들어 둔다 (원본 상태 0x17)
   if (pending === null) return advance(started, random)
@@ -1371,6 +1376,39 @@ function pitchOnce(
   return advance(
     finishDefensiveAtBat({ ...started, pendingDefensePlay: null }, outcome, true, result, result),
     random,
+  )
+}
+
+/**
+ * **사구 뒤 벤치 클리어링** (`entities/game/model/benchClearing`, R10 6절) — 우리가 던진 공이라 수비는 사람이다.
+ * 들어가면 0x3ab7c `0xaeab0(수비 팀, 1000)` — 지금 마운드의 우리 투수 스태미나(+0x2c) −1000, [0, 10000] 로 자른다.
+ * 시즌 평판 S[1](코드 1, 0x3ab92)은 코드 ≤ 5 라 공격측(상대)이 CPU 인 지금 남는다 — `withSeasonRecord` 가
+ * 시즌 팀 경기(모드 2)일 때만 적는다. 홈런더비가 아니라 사구면 늘 한 번 굴린다 — **사구 타석만 난수를 하나 더 쓴다.**
+ * ⚠️ 연출 화면(양 팀이 마운드로 몰려나오는 100틱, 배경음 44)과 그 연출이 쓰는 난수는 없다.
+ */
+function withPitcherBenchClearing(
+  progress: TeamGameProgress,
+  outcome: AtBatOutcome,
+  random: RandomPort,
+): TeamGameProgress {
+  const entered = rollsIntoBenchClearing(
+    {
+      isHitByPitch: outcome.kind === '사구',
+      isHomeRunDerby: false,
+      burstInProgress: progress.burst !== null && progress.burst.current !== null,
+    },
+    random,
+  )
+  if (!entered) return progress
+  const effect = benchClearingEffectOf(true)
+  return appendLog(
+    {
+      ...progress,
+      stamina: staminaAfterBenchClearing(progress.stamina, effect.defenseStaminaLoss),
+      gameRecord: withSeasonRecord(progress, '수비', [effect.seasonRecordCode]),
+    },
+    `${progress.game.inning}회${progress.game.half} 벤치 클리어링`,
+    true,
   )
 }
 
