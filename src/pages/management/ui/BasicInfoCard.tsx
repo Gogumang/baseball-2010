@@ -38,8 +38,9 @@ export function BasicInfoCard({ career }: { readonly career: PlayerCareer }) {
         기본정보 카드 0x15e20 은 그 그림 객체를 vtbl+0x10(0x78cfd)으로 그리기만 하므로
         머리·손·다리 아이템 겹이 그대로 같이 나온다 (0x78dde `ldrsb [fig+0x3e+부위]`).
         웹 `career.equipmentLevels` 가 그 니블을 그대로 들고 있다.
+        그림자는 끈다 — 같은 0x10810 의 0x1085c 가 `fig+0x48 = 0` 으로 둔다 (0x78dc6 이 슬롯 0 을 가른다).
       */}
-      {batterLayersOf(0, career.battingTypeIndex, batterEquipmentOf(career.equipmentLevels)).map((layer, index) => (
+      {batterLayersOf(0, career.battingTypeIndex, batterEquipmentOf(career.equipmentLevels), false).map((layer, index) => (
         <LayerSprite key={index} layer={layer} />
       ))}
       <RadarChart base={career.ability} shown={shown} />

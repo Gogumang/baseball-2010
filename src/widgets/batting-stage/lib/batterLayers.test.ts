@@ -46,6 +46,13 @@ describe('타자 레이어 — 0x78cfc (겹침 표 0xd3a54)', () => {
     expect(파일(batterLayersOf(9, 0))[2]).toBe('batter_ghost:3')
   })
 
+  it('fig+0x48 (0x78dc6): false 면 그림자 슬롯만 비우고, 기본값은 그림자를 낸다', () => {
+    expect(파일(batterLayersOf(4, 0))).toContain('batter_shadow:4')
+    expect(파일(batterLayersOf(4, 0, { head: 1, hand: 0, leg: 3 }, false)).some((name) => name.startsWith('batter_shadow'))).toBe(false)
+    expect(파일(batterLayersOf(13, 1, { head: 1, hand: 0, leg: 3 }, false)))
+      .toEqual(파일(batterLayersOf(13, 1, { head: 1, hand: 0, leg: 3 })).slice(1))
+  })
+
   it('sluger 는 몸통 외 레이어가 +14, 몸통 앞이 +13 이다', () => {
     expect(파일(batterLayersOf(0, 1))).toEqual([
       'batter_shadow:14', 'batter_sluger:0', 'batter_helmet:14', 'batter_batter:14', 'batter_sluger:13',

@@ -4,7 +4,16 @@
  *   bodyType t = 타자 폼 >> 1 (0 balancer · 1 sluger) — `bodyTypeOf` 참고.
  * 아이템 레이어(머리 +0x1c · 손 +0x14/+0x20/+0x44 · 다리 +0x28)는 장비 등급 순번 n 으로 고른다 —
  * `equipmentGradeOf`·`batterEquipmentOf` 주석 참고 (0x78fd8 적재 · 0x78cfc 겹치기, 디스어셈 확인).
- * 그림자는 +0x48 플래그일 때만 그리는데 플래그를 세우는 자리를 못 찾아 늘 그린다 (추정).
+ * 그림자는 `fig+0x48` 이 0 이 아닐 때만 그린다 — 그리기가 슬롯 배열 둘(sp+0x34·sp+0x58, 9칸)을
+ * 비운 뒤 `0x78dc6 cmp r3,#0 ; beq` 로 **슬롯 0(그림자)만** 가른다 (다른 슬롯은 +0x3e~+0x44 쪽).
+ * `+0x48` 을 쓰는 자리는 여섯뿐이고 다시 1 로 켜는 자리는 없다 (디스어셈 확인):
+ *   0x76826 = 1  타자·투수 공용 베이스 생성자 0x767ec (+0x18 batter_shadow · +0x2c batter_ghost)
+ *   0x1085c = 0  0x10810 마이리그 관리 공용 (기본정보 카드 · 훈련 팝업 125)
+ *   0x5238  = 0  0x5198 시즌 0xde·0xd9
+ *   0x55d4  = 0  0x5404 모드 0xdc 상점
+ *   0x613a  = 0  0x5f3c 상태 102 등록(선수 생성)
+ *   0x652d6 = 0  위젯 0x6517c
+ * 그래서 경기 타석·선수영입(0xe1dc)·명예의 전당 계열은 켜진 채다 — `withShadow` 기본값 true.
  *
  * 파일 끝에 **투수 장비 레이어**(0x79790 적재 · 0x79524 겹치기)도 같이 있다 — 같은
  * `BatterLayer`·`layerPaletteIndexOf` 를 쓰기 때문이다. 두 쪽 차이는 `PitcherEquipment` 주석 참고.
@@ -211,13 +220,19 @@ const GHOST_SLOT_LATE = 1
  * 슬롯 0~8 = 그림자 · 몸통 · 헬멧 · 머리아이템 · 배트(손) · 몸통앞 · 손덧그림 · 손셋째 · 다리.
  * 규칙 1·2·3 의 자리바꿈(0x78e54·0x78e66·0x78e88)을 슬롯 순서 표로 적어 둔 것이라
  * 아이템 슬롯도 그 표의 빈 자리에 그대로 들어간다 (바이트 단위로 다시 확인했다).
+ * `withShadow` = `fig+0x48` — false 면 슬롯 0 을 비운다 (0x78dc6, 파일 머리 주석의 여섯 자리 표).
  */
-export function batterLayersOf(frame: number, bodyType: number, equipment: BatterEquipment = NO_EQUIPMENT): BatterLayer[] {
+export function batterLayersOf(
+  frame: number,
+  bodyType: number,
+  equipment: BatterEquipment = NO_EQUIPMENT,
+  withShadow = true,
+): BatterLayer[] {
   const type = bodyType === 1 ? 1 : 0
   const adjust = type === 1 ? SLUGER_ADJUST : 0
   const body: BatterLayer = { folder: BODY_FOLDERS[type], frame }
   const front: BatterLayer = { folder: BODY_FOLDERS[type], frame: frame + FRONT_OFFSETS[type] }
-  const shadow: BatterLayer = { folder: SHADOW, frame: frame + adjust }
+  const shadow: BatterLayer | null = withShadow ? { folder: SHADOW, frame: frame + adjust } : null
   // 머리 장비가 등급 2 이상이면 원본은 **헬멧을 지운다** (0x78df4 — 헬멧 슬롯에 0 을 넣는다)
   const helmet: BatterLayer | null = equipment.head > 1 ? null : { folder: HELMET, frame: frame + adjust }
   const head = headItemLayer(equipment.head, frame + adjust)

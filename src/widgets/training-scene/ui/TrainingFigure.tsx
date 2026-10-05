@@ -12,7 +12,8 @@ import * as styles from '@/widgets/training-scene/ui/TrainingScene.css'
  * (0x109e6 `movs r0,#0x54` · 생성자 0x789f0)이고, 그 자리에서 바로 0x10810 으로 적재된다
  * (0x10a10 `ldr r1,[r5] ; bl 0x10810`). 그리기는 vtbl+0x10 = 0x78cfd 로 기본정보 카드와 같다.
  *
- * - 그림자는 팝업에서 끈다 — 0x1085c 가 `fig+0x48 = 0` 으로 두고 0x78dc6 이 그 칸을 본다.
+ * - 그림자는 팝업에서 끈다 — 0x1085c 가 `fig+0x48 = 0` 으로 두고 0x78dc6 이 그 칸을 본다
+ *   (`batterLayersOf` 넷째 인자 false).
  *   (적재 0x78ab0 은 그림자·잔상 파일을 아예 안 읽는다 — 몸통·헬멧·배트만 읽는다.)
  * - 잔상(batter_ghost)은 0x78eca 가 자세 8·9 에서 끼우지만 이 팝업에서 슬롯이 차는지
  *   확정하지 못해 예전처럼 뺀다. 뒤집지 않는다.
@@ -27,8 +28,8 @@ import * as styles from '@/widgets/training-scene/ui/TrainingScene.css'
 /** 몸통은 아직 타격형(balancer)만 그린다 — 위 주석의 "아직 반영 안 한 것" */
 const BODY_TYPE = 0
 
-/** 이 팝업에서 빼는 겹 — 그림자(확정) · 잔상(미확정) */
-const OMITTED = ['/batter_shadow/', '/batter_ghost/']
+/** 이 팝업에서 빼는 겹 — 잔상(미확정). 그림자는 `batterLayersOf(…, false)` 가 뺀다 */
+const OMITTED = ['/batter_ghost/']
 
 interface TrainingFigureProps {
   readonly pose: number
@@ -39,7 +40,7 @@ interface TrainingFigureProps {
 }
 
 export function TrainingFigure({ pose, x, y, equipment = NO_EQUIPMENT }: TrainingFigureProps) {
-  const layers = batterLayersOf(pose, BODY_TYPE, equipment)
+  const layers = batterLayersOf(pose, BODY_TYPE, equipment, false)
     .filter((layer) => !OMITTED.some((folder) => layer.folder.includes(folder)))
   return (
     <>

@@ -7,7 +7,7 @@ import {
 import type { RookieProfile } from '@/entities/career/model/playerCareer'
 import { TEAMS } from '@/shared/config/original/teams'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
-import { batterLayerPaletteIndex, batterLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
+import { batterLayerPaletteIndex, batterLayersOf, NO_EQUIPMENT } from '@/widgets/batting-stage/lib/batterLayers'
 import type { BatterLayer } from '@/widgets/batting-stage/lib/batterLayers'
 import { useRecoloredSprite } from '@/shared/lib/sprite/paletteSwap'
 // 원본은 등록 화면을 관리 화면 기본정보 카드(0x15e20)로 그린다 — 카드 좌표·레이더를 그대로 가져다 쓴다
@@ -139,8 +139,9 @@ export function CreatePlayerScreen({ teamId = DEFAULT_TEAM_ID, onCreate, onCance
           장비를 안 넘긴다 — 원본 등록 화면도 같은 그림 객체(0x10810)라 장비 니블 루프(0x10866)를
           똑같이 돌지만, **아직 만들지 않은 선수**라 레코드 `rec[0x19]`·`rec[0x1a]` 니블이 모두 0 이고
           `subs r2,니블,#1 ; bmi` 에서 네 부위가 다 걸러진다. 곧 원본도 여기서는 맨몸이다.
+          그림자는 끈다 — 상태 102 등록 0x5f3c 의 0x613a 가 `fig+0x48 = 0` 으로 둔다 (0x78dc6).
         */}
-        {batterLayersOf(FIGURE_POSE_FRAME, profile.battingTypeIndex).map((layer) => (
+        {batterLayersOf(FIGURE_POSE_FRAME, profile.battingTypeIndex, NO_EQUIPMENT, false).map((layer) => (
           <LayerSprite key={`${layer.folder}#${layer.frame}`} layer={layer}
             skinIndex={profile.skinIndex} teamIndex={teamId} />
         ))}
