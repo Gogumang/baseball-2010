@@ -46,8 +46,16 @@ describe('경기정보 다섯 줄', () => {
 
     expect(lines[3].user).toBe(ACE_PLAYERS[5 + 1].name)
     expect(lines[4].user).toBe(ACE_PLAYERS[3].name)
-    // ⚠️ 고른 마선수가 어느 팀에 들어가는지 문서에 없어 CPU 는 "-" 로 둔다
+    // 0x30f20 의 굴림을 안 넘기면(22 밖) CPU 칸은 "-" 다
     expect(lines[3].cpu).toBe(EMPTY_VALUE)
+  })
+
+  it('0x30f20 이 AI 팀에 넣은 선발·마선수를 CPU 칸에 적는다 (31064·31076·3107a)', () => {
+    const lines = generalModeMatchInfoLines(기록, null, { starterName: '굴린선발', acePitcherId: 2, aceBatterId: 4 })
+
+    expect(lines[2].cpu).toBe('굴린선발')
+    expect(lines[3].cpu).toBe(ACE_PLAYERS[5 + 2].name)
+    expect(lines[4].cpu).toBe(ACE_PLAYERS[4].name)
   })
 
   it('고른 마선수가 없으면 "-" 다', () => {

@@ -8,6 +8,7 @@ import {
   MATCH_INFO_LAYOUT, TAG, TEAM_LOGO_HALF, matchInfoRowY,
 } from '@/pages/general-mode/lib/prepareLayout'
 import { generalModeMatchInfoLines } from '@/pages/general-mode/lib/matchInfoLines'
+import type { CpuMatchInfo } from '@/pages/general-mode/lib/matchInfoLines'
 import type { GeneralModeSetup } from '@/pages/general-mode/lib/generalModeSetup'
 import * as styles from '@/pages/general-mode/ui/prepareScreen.css'
 
@@ -32,8 +33,10 @@ export interface MatchInfoScreenProps {
   readonly onCancel: () => void
   /** '4'/왼 → 유저 팀(메뉴+0xec = 1) · '6'/오른 → CPU 팀(0) 엔트리 편집 상태 23 */
   readonly onOpenEntry?: (isUserTeam: boolean) => void
-  /** 유저 팀 "선발" — 엔트리 편집이 고친 투수 0번 */
+  /** 유저 팀 "선발" — 0x30f20 의 0↔k 뒤(엔트리 편집이 고쳤으면 그것)의 투수 0번 */
   readonly userStarterName?: string | null
+  /** CPU 칸 — 0x30f20 이 세운 AI 팀의 선발·마선수 */
+  readonly cpuMatchInfo?: CpuMatchInfo | null
 }
 
 /**
@@ -51,11 +54,11 @@ export interface MatchInfoScreenProps {
  */
 export function MatchInfoScreen({
   setup, isQuickStart = false, gamePoint = 0, onStart, onOpenSettings, onRespin, onCancel, onOpenEntry,
-  userStarterName = null,
+  userStarterName = null, cpuMatchInfo = null,
 }: MatchInfoScreenProps) {
   const sltOrigins = useFrameOrigins(SLT_FRAME)
   const imgTextOrigins = useFrameOrigins(IMG_TEXT_FRAME)
-  const lines = generalModeMatchInfoLines(setup, userStarterName)
+  const lines = generalModeMatchInfoLines(setup, userStarterName, cpuMatchInfo)
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

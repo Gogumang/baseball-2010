@@ -303,10 +303,23 @@ export interface TeamGameOptions {
    *
    * 선발 칸은 따로 정한다 — 시즌은 지금처럼 `rotationSlotOf(dayCounter)`: 원본 시즌 저장 레코드는 g 번 돈 모양이고
    * 웹 차례는 돌기 전 모양이라(`seasonEntry.unrotatedPitchersOf`) g % 4 번 = 원본 0번이다 (40870f1).
+   * 일반모드는 `startingPitcherSlots.ours`(0x30f20 의 0↔k) — 편집기는 맞바꾼 모양을 보이고 되적을 때 되돌린다.
    *
-   * 넘기는 곳: 시즌 `seasonEntryOrderOf(save.roster)` (app `useSeasonSession.optionsFor`).
+   * 넘기는 곳: 시즌 `seasonEntryOrderOf(save.roster)` (app `useSeasonSession.optionsFor`) ·
+   * 일반모드 상태 23 이 고친 유저 팀 (`generalModeSetup.teamGameOptionsOf`).
    */
   readonly ourEntryOrder?: TeamEntryOrder
+  /**
+   * **이미 굴린 상대 마선수** 0~4 (`0x66968` 마투수 · `0x66994` 마타자). 있으면 `startTeamGame` 은 굴리지 않는다.
+   * 원본은 경기 장면 전에 굴린다 — 일반모드 상태 22 진입 `0x314b0` → `0x30f20`(31058·3106c).
+   * 그래서 경기정보·엔트리 화면이 이미 그 마선수를 본다.
+   */
+  readonly opponentAces?: { readonly pitcher: number; readonly batter: number }
+  /**
+   * **이미 굴린 선발 칸** (모드 1·8·9 — `0x30f20` 3107a AI · 31090 사람, `rollStartingPitcherIndex`).
+   * 있으면 `startTeamGame` 은 굴리지 않는다. 시즌(모드 2)은 보지 않는다 (로테이션이다).
+   */
+  readonly startingPitcherSlots?: { readonly opponent: number; readonly ours: number }
   /** 이 경기에 쓸 수 있는 마구 횟수. 로스터 투수는 마구가 없어 기본 0 이다 */
   readonly magicCount?: number
   /** 화면 배치 side (투영 원점 표 0xcfb18 의 칸) */
@@ -619,13 +632,55 @@ function startingPitcherSlotsOf(
     // 상대 칸만 다른 날짜를 받을 수 있다 — 국가대항전 상대국 슬롯은 매일 새로 복사된다 (`opponentDayCounter`)
     return { opponent: rotationSlotOf(options.opponentDayCounter ?? day), ours: rotationSlotOf(day) }
   }
+  // 일반모드는 상태 22 진입(0x30f20)에서 이미 굴렸다 — `rollTeamSetup`
+  if (options.startingPitcherSlots !== undefined) return options.startingPitcherSlots
   // 원본은 AI 팀 → 사람 팀 차례로 뽑는다 (0x31088 → 0x3109e)
   const opponent = rollStartingPitcherIndex(random)
   return { opponent, ours: rollStartingPitcherIndex(random) }
 }
 
 /**
- * 일반모드 경기 세우기 `0x30f20` 이 뽑는 **AI 팀 마선수 번호 둘**.
+ * **AI 팀 마선수 번호 둘**을 굴린다 — 마투수 `0x66968` → 마타자 `0x66994` 차례 (난수 2).
+ * 인자는 사람이 고른 마선수(준비 기록 `+0xe`·`+0xd`)다 — 겹치지 않는 번호가 나온다(`rollOpponentAceIndex`).
+ *
+ * 부르는 자리 (둘 다 경기 장면 **전**이다):
+ *   - 일반모드 경기 세우기 `0x30f20` (31058 → 31064 `0xb88c8(AI팀, v)` · 3106c → 31076 `0xb8870(AI팀, w)`)
+ *     — 상태 22 진입 `0x314b0`(이전 상태가 23 이 아니고 모드 1 일 때, 3158c)과 `*` 재굴림 끝(31290)이 부른다.
+ */
+export function rollOpponentAces(
+  acePitcherId: number,
+  aceBatterId: number,
+  random: RandomPort,
+): { readonly pitcher: number; readonly batter: number } {
+  const pitcher = rollOpponentAceIndex(acePitcherId, random)
+  const batter = rollOpponentAceIndex(aceBatterId, random)
+  return { pitcher, batter }
+}
+
+/** 일반모드 `0x30f20` 이 굴리는 넷 — 상대 마선수 둘과 선발 둘 */
+export interface TeamSetupRolls {
+  readonly opponentAces: { readonly pitcher: number; readonly batter: number }
+  readonly startingPitcherSlots: { readonly opponent: number; readonly ours: number }
+}
+
+/**
+ * **일반모드 경기 세우기 `0x30f20` 의 굴림 넷** — 마투수(31058) → 마타자(3106c) → AI 선발(3107a) →
+ * 사람 선발(31090). 원본은 이것을 **상태 22 진입**(`0x314b0` 3158c · 재굴림 끝 31290)에서 한다 — 그래서
+ * 경기정보·엔트리 편집(상태 23)이 이미 굴린 팀을 본다. 결과는 옵션 `opponentAces` · `startingPitcherSlots` 로 넘긴다.
+ */
+export function rollTeamSetup(
+  acePitcherId: number,
+  aceBatterId: number,
+  random: RandomPort,
+): TeamSetupRolls {
+  const opponentAces = rollOpponentAces(acePitcherId, aceBatterId, random)
+  // 3107a: 0xb8c94(AI팀, 0, rand(0,4)) → 31090: 0xb8c94(사람팀, 0, rand(0,4))
+  const opponent = rollStartingPitcherIndex(random)
+  return { opponentAces, startingPitcherSlots: { opponent, ours: rollStartingPitcherIndex(random) } }
+}
+
+/**
+ * 이 경기의 **AI 팀 마선수 번호 둘** — 미리 굴린 것(`opponentAces`)이 있으면 그것, 없으면 여기서 굴린다.
  *
  * ⚠️ **굴림 차례가 원본과 같아야 한다** — `0x30f20` 은 마투수(`31058`) → 마타자(`3106c`) →
  * AI 선발(`3107a`) → 사람 선발(`31090`) 차례로 넉 장을 뽑는다. 그래서 여기가
@@ -637,12 +692,9 @@ function opponentAceIndexesOf(
   options: TeamGameOptions,
   random: RandomPort,
 ): { readonly pitcher: number; readonly batter: number } {
+  if (options.opponentAces !== undefined) return options.opponentAces
   if (options.mode === TEAM_GAME_MODE.시즌) return { pitcher: -1, batter: -1 }
-  // 31058: 0x66968(기록+0xe) → 31064: 0xb88c8(AI팀, v)
-  const pitcher = rollOpponentAceIndex(options.acePitcherId ?? NO_ACE_BATTER, random)
-  // 3106c: 0x66994(기록+0xd) → 31076: 0xb8870(AI팀, w)
-  const batter = rollOpponentAceIndex(options.aceBatterId ?? NO_ACE_BATTER, random)
-  return { pitcher, batter }
+  return rollOpponentAces(options.acePitcherId ?? NO_ACE_BATTER, options.aceBatterId ?? NO_ACE_BATTER, random)
 }
 
 export function startTeamGame(options: TeamGameOptions, random: RandomPort): TeamGameProgress {

@@ -20,7 +20,8 @@ import { PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
 import type { PlayerSide } from '@/entities/game/model/gameState'
 import { TEAM_GAME_MODE } from '@/features/play-team-game/model/gameAbilities'
 import type { MatchProgressSettings } from '@/features/play-team-game/model/matchSettings'
-import type { TeamGameOptions } from '@/features/play-team-game/model/teamGameFlow'
+import type { TeamGameOptions, TeamSetupRolls } from '@/features/play-team-game/model/teamGameFlow'
+import type { TeamEntryOrder } from '@/features/play-team-game/model/teamGameRoster'
 
 /** 준비 기록 = skin+0xbc 16바이트 (R4 3a) */
 export interface GeneralModeSetup {
@@ -145,6 +146,16 @@ export function teamGameOptionsOf(
      * 일반모드는 저장이 없지만 이 칸은 전역 기록이라 스페셜·`0` 키 레벨업이 그대로 먹는다.
      */
     readonly aceLevels?: Readonly<Record<number, number>>
+    /**
+     * 상태 22 진입(`0x314b0` → `0x30f20`)에서 이미 굴린 넷 — 상대 마선수 둘과 선발 둘 (`rollTeamSetup`).
+     * 넘기면 경기는 굴리지 않고 이 값으로 선다 — 경기정보·엔트리 편집이 본 팀과 경기가 같다.
+     */
+    readonly teamSetupRolls?: TeamSetupRolls
+    /**
+     * 상태 23 엔트리 편집이 고친 유저 팀 차례 — **0↔k 맞바꿈 전** 모양(선발 칸 k 는 `teamSetupRolls` 가 든다).
+     * 고친 것은 그 경기 하나에만 남는다 (0x314b0 이 23 에서 돌아온 것이 아니면 0x30f20 으로 새로 세운다).
+     */
+    readonly ourEntryOrder?: TeamEntryOrder
   } = {},
 ): TeamGameOptions {
   return {
@@ -161,5 +172,12 @@ export function teamGameOptionsOf(
     ...(extra.runningModeManual === undefined ? {} : { runningModeManual: extra.runningModeManual }),
     ...(extra.throwModeManual === undefined ? {} : { throwModeManual: extra.throwModeManual }),
     ...(extra.aceLevels === undefined ? {} : { aceLevels: extra.aceLevels }),
+    ...(extra.teamSetupRolls === undefined
+      ? {}
+      : {
+          opponentAces: extra.teamSetupRolls.opponentAces,
+          startingPitcherSlots: extra.teamSetupRolls.startingPitcherSlots,
+        }),
+    ...(extra.ourEntryOrder === undefined ? {} : { ourEntryOrder: extra.ourEntryOrder }),
   }
 }

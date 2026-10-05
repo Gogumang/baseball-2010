@@ -2,12 +2,17 @@ import { useCallback, useMemo, useState } from 'react'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { FULL_PLAY_SETTINGS } from '@/features/play-team-game/model/matchSettings'
 import type { MatchProgressSettings } from '@/features/play-team-game/model/matchSettings'
-import type { TeamGameOptions } from '@/features/play-team-game/model/teamGameFlow'
+import { rollTeamSetup } from '@/features/play-team-game/model/teamGameFlow'
+import type { TeamGameOptions, TeamSetupRolls } from '@/features/play-team-game/model/teamGameFlow'
 import type { PlayerSide } from '@/entities/game/model/gameState'
+import { swapWithStarter } from '@/entities/pitcher-career/model/pitcherRotation'
 import {
   chooseAce, chooseAiTeam, chooseFirstBat, chooseStadium, chooseUserTeam, createFlowState,
   moveFirstBat, moveStadium, stepBack, withSetup,
 } from '@/pages/general-mode/lib/generalModeFlow'
+import { GENERAL_MODE_STEP } from '@/pages/general-mode/lib/generalModeSetup'
+import type { GeneralModeSetup } from '@/pages/general-mode/lib/generalModeSetup'
+import type { CpuMatchInfo } from '@/pages/general-mode/lib/matchInfoLines'
 import type { GeneralModeFlowState } from '@/pages/general-mode/lib/generalModeFlow'
 import { rollQuickStart } from '@/pages/general-mode/lib/quickStart'
 import type { QuickStartOpenState } from '@/pages/general-mode/lib/quickStart'
@@ -17,7 +22,7 @@ import {
 } from '@/entities/season-mode/model/entryEditor'
 import type { EntryEditorState, EntryKey } from '@/entities/season-mode/model/entryEditor'
 import {
-  seasonEntryListsOf, seasonRosterOfEntry, seasonStarterNameOf, tableRosterOf,
+  seasonEntryListsOf, seasonEntryOrderOf, seasonRosterOfEntry, seasonStarterNameOf, tableRosterOf,
 } from '@/entities/season-mode/model/seasonEntry'
 import type { SeasonEntryInput, SeasonEntryLists } from '@/entities/season-mode/model/seasonEntry'
 import type { SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
@@ -57,8 +62,10 @@ export interface GeneralModeSession {
   readonly flow: GeneralModeFlowState
   /** 상태 23 엔트리 편집 — 그 화면이 아니면 null */
   readonly entryEdit: GeneralModeEntryEdit | null
-  /** 경기정보 "선발" 줄의 유저 팀 값 — 엔트리 편집이 고친 투수 0번 (0x5e0e8) */
+  /** 경기정보 "선발" 줄의 유저 팀 값 — 0x30f20 의 0↔k 뒤(엔트리 편집이 고쳤으면 그것)의 투수 0번 (0x5e0e8) */
   readonly userStarterName: string | null
+  /** 경기정보 CPU 칸 — 0x30f20 이 세운 AI 팀의 선발·마선수. 상태 22 밖이면 null */
+  readonly cpuMatchInfo: CpuMatchInfo | null
   readonly settings: MatchProgressSettings
   /** 경기 장면(0x104)으로 넘어갔는가 */
   readonly isPlaying: boolean
@@ -103,15 +110,26 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
     openedHiddenTeamIds, openedAcePitcherIds, openedAceBatterIds,
   } = options
 
-  const [flow, setFlow] = useState<GeneralModeFlowState>(() =>
-    createFlowState({
+  /**
+   * 상태 22 진입 `0x314b0` — 빠른실행이면 기록을 통째로 굴리고(31500~31546), 모드 1 이면 이어서 **`0x30f20` 으로
+   * 경기를 세운다**(3158c): 상대 마선수 둘 → AI 선발 → 사람 선발 굴림 넷 (`rollTeamSetup`). 원본은 경기 장면이
+   * 아니라 여기서 굴리므로 경기정보·엔트리 편집(상태 23)이 이미 굴린 팀을 보고, OK 키(0x311a8)는 굴리지 않는다.
+   */
+  const [initial] = useState(() => {
+    const created = createFlowState({
       isQuickStart,
-      // 빠른실행은 상태 22 진입 함수(0x314b0)가 기록을 통째로 굴리고 들어간다
       ...(isQuickStart
         ? { setup: rollQuickStart(random, { openedHiddenTeamIds, openedAcePitcherIds, openedAceBatterIds }) }
         : {}),
-    }),
-  )
+    })
+    return {
+      flow: created,
+      rolls: created.step === GENERAL_MODE_STEP.경기정보 ? rollsOf(created.setup, random) : null,
+    }
+  })
+  const [flow, setFlow] = useState<GeneralModeFlowState>(initial.flow)
+  /** 0x30f20 이 굴린 넷 — 상태 22 에 들어올 때마다(23 에서 돌아온 것 말고) 새로 굴린다 */
+  const [rolls, setRolls] = useState<TeamSetupRolls | null>(initial.rolls)
   const [settings, setSettings] = useState<MatchProgressSettings>(initialSettings ?? FULL_PLAY_SETTINGS)
   const [isSettingsOpen, setSettingsOpen] = useState(false)
   const [isPlaying, setPlaying] = useState(false)
@@ -126,47 +144,58 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
 
   const respin = useCallback(() => {
     setUserEntryRoster(null)
-    setFlow((current) =>
-      withSetup(
-        current,
-        rollQuickStart(random, { openedHiddenTeamIds, openedAcePitcherIds, openedAceBatterIds }),
-      ),
-    )
+    // 재굴림이 멈추는 틱(0x311a8 의 31238 `cmp #0x14`)에 기록을 굴리고 곧장 0x30f20 (31290)
+    const setup = rollQuickStart(random, { openedHiddenTeamIds, openedAcePitcherIds, openedAceBatterIds })
+    setRolls(rollsOf(setup, random))
+    setFlow((current) => withSetup(current, setup))
   }, [random, openedHiddenTeamIds, openedAcePitcherIds, openedAceBatterIds])
 
-  const back = useCallback(() => {
-    setUserEntryRoster(null)
-    let canGoBack = true
-    setFlow((current) => {
-      const previous = stepBack(current)
-      if (previous === null) {
-        canGoBack = false
-        return current
+  /** 상태 21 OK — 마타자를 고르면 22 로 들어가며 0x30f20 이 굴린다 */
+  const selectAce = useCallback(
+    (cell: number) => {
+      const next = chooseAce(flow, cell)
+      if (next.step === GENERAL_MODE_STEP.경기정보 && flow.step !== GENERAL_MODE_STEP.경기정보) {
+        setUserEntryRoster(null)
+        setRolls(rollsOf(next.setup, random))
       }
-      return previous
-    })
-    return canGoBack
-  }, [])
+      setFlow(next)
+    },
+    [flow, random],
+  )
+
+  const back = useCallback(() => {
+    const previous = stepBack(flow)
+    if (previous === null) return false
+    setUserEntryRoster(null)
+    // 22 를 떠나면 0x30f20 이 세운 팀도 버린다 — 다시 들어오면 새로 굴린다
+    setRolls(null)
+    setFlow(previous)
+    return true
+  }, [flow])
 
   /**
-   * 엔트리 편집기가 보는 팀 — 유저 팀은 고친 명단(없으면 표), CPU 팀은 표.
-   * ⚠️ 원본은 22 들어옴에서 `0x30f20` 이 이미 마선수(8·9번)를 넣고 선발 0↔k 맞바꿈(난수)까지 한 팀을 보여 준다.
-   *    웹은 그 넷을 경기 시작(`startTeamGame`)에서 굴리므로 여기서는 **유저 팀 마선수만 끼우고** 선발 맞바꿈과
-   *    CPU 팀 마선수는 없다 (굴림 차례를 옮기려면 팀 경기 쪽을 고쳐야 한다).
+   * 엔트리 편집기가 보는 팀 — 22 들어옴의 `0x30f20` 이 세운 그대로: 마선수(유저 팀은 고른 것 · AI 팀은 굴린 것,
+   * 8·9번)를 넣고 선발 **0↔k 를 맞바꾼** 모양(3107a·31090 `0xb8c94`). 유저 팀은 고친 명단(없으면 표)에서 만든다.
+   * 고친 명단은 **맞바꾸기 전** 모양으로 들고 있다 — 경기는 그 차례에서 k 번을 선발로 세우므로(`startTeamGame`)
+   * 편집기의 투수 0번과 같은 투수다.
    */
   const entrySourceOf = useCallback(
     (isUserTeam: boolean): SeasonEntryInput => {
       const teamId = isUserTeam ? flow.setup.userTeamId : flow.setup.aiTeamId
+      const roster = (isUserTeam ? userEntryRoster : null) ?? tableRosterOf(teamId)
+      const starterSlot = rolls === null
+        ? 0
+        : isUserTeam ? rolls.startingPitcherSlots.ours : rolls.startingPitcherSlots.opponent
       return {
         teamId,
-        roster: (isUserTeam ? userEntryRoster : null) ?? tableRosterOf(teamId),
-        // 일반모드는 리그 로테이션이 없다 (선발은 0x30f20 의 무작위 맞바꿈)
+        roster: { ...roster, pitchers: swapWithStarter(roster.pitchers, starterSlot) },
+        // 일반모드는 리그 로테이션이 없다 (선발은 0x30f20 의 무작위 맞바꿈 — 위에서 이미 했다)
         dayCounter: 0,
-        acePitcherId: isUserTeam ? flow.setup.acePitcherId : -1,
-        aceBatterId: isUserTeam ? flow.setup.aceBatterId : -1,
+        acePitcherId: isUserTeam ? flow.setup.acePitcherId : (rolls?.opponentAces.pitcher ?? -1),
+        aceBatterId: isUserTeam ? flow.setup.aceBatterId : (rolls?.opponentAces.batter ?? -1),
       }
     },
-    [flow.setup, userEntryRoster],
+    [flow.setup, rolls, userEntryRoster],
   )
 
   const openEntry = useCallback(
@@ -191,15 +220,19 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
       let lists = outcome.lists
       if (lists !== entryEdit.lists && entryEdit.isUserTeam) {
         const source = entrySourceOf(true)
-        const roster = seasonRosterOfEntry(source.roster, lists, 0)
-        setUserEntryRoster(roster)
-        lists = seasonEntryListsOf({ ...source, roster })
+        const swapped = seasonRosterOfEntry(source.roster, lists, 0)
+        // 맞바꾼 모양으로 고친 것을 맞바꾸기 전 모양으로 되적는다 (맞바꿈은 제 자신이 되돌림이다)
+        setUserEntryRoster({
+          ...swapped,
+          pitchers: swapWithStarter(swapped.pitchers, rolls?.startingPitcherSlots.ours ?? 0),
+        })
+        lists = seasonEntryListsOf({ ...source, roster: swapped })
       }
       // 0x2a370: 1 이거나, 2 이면서 CPU 팀, 3 이면서 유저 팀이면 → 밀기 → 상태 22 (22 들어옴은 23 에서 왔으면 아무것도 안 한다)
       if (leavesEntryEditor(outcome.state.result, entryEdit.isUserTeam)) return setEntryEdit(null)
       setEntryEdit({ ...entryEdit, editor: outcome.state, lists, isAceLocked: outcome.isAceLocked })
     },
-    [entryEdit, entrySourceOf],
+    [entryEdit, entrySourceOf, rolls],
   )
 
   const pointEntryCursorAction = useCallback(
@@ -214,9 +247,17 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
     setEntryEdit((current) => (current === null ? null : { ...current, isAceLocked: false }))
   }, [])
 
-  const userStarterName = userEntryRoster === null
-    ? null
-    : seasonStarterNameOf(flow.setup.userTeamId, userEntryRoster, 0)
+  const isMatchInfo = flow.step === GENERAL_MODE_STEP.경기정보
+  const userStarterName = isMatchInfo && (rolls !== null || userEntryRoster !== null)
+    ? seasonStarterNameOf(flow.setup.userTeamId, entrySourceOf(true).roster, 0)
+    : null
+  const cpuMatchInfo: CpuMatchInfo | null = isMatchInfo && rolls !== null
+    ? {
+        starterName: seasonStarterNameOf(flow.setup.aiTeamId, entrySourceOf(false).roster, 0) ?? '-',
+        acePitcherId: rolls.opponentAces.pitcher,
+        aceBatterId: rolls.opponentAces.batter,
+      }
+    : null
 
   const actions = useMemo(
     () => ({
@@ -226,7 +267,7 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
       selectFirstBat: (side: PlayerSide) => setFlow((current) => chooseFirstBat(current, side)),
       moveStadium: (stadiumId: number) => setFlow((current) => moveStadium(current, stadiumId)),
       selectStadium: (stadiumId: number) => setFlow((current) => chooseStadium(current, stadiumId)),
-      selectAce: (cell: number) => setFlow((current) => chooseAce(current, cell)),
+      selectAce,
       respin,
       openSettings: () => setSettingsOpen(true),
       closeSettings: () => setSettingsOpen(false),
@@ -241,7 +282,7 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
       pointEntryCursor: pointEntryCursorAction,
       closeEntryAceLocked,
     }),
-    [respin, back, openEntry, pressEntryKeyAction, pointEntryCursorAction, closeEntryAceLocked],
+    [respin, selectAce, back, openEntry, pressEntryKeyAction, pointEntryCursorAction, closeEntryAceLocked],
   )
 
   const gameOptions = useMemo(
@@ -251,9 +292,19 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
       ...(runningModeManual === undefined ? {} : { runningModeManual }),
       ...(throwModeManual === undefined ? {} : { throwModeManual }),
       ...(aceLevels === undefined ? {} : { aceLevels }),
+      ...(rolls === null ? {} : { teamSetupRolls: rolls }),
+      // 고친 차례는 맞바꾸기 전 모양 — 선발 칸 k 는 teamSetupRolls 가 든다
+      ...(userEntryRoster === null ? {} : { ourEntryOrder: seasonEntryOrderOf(userEntryRoster) }),
     }),
-    [flow.setup, settings, gaugeSettingOn, runningModeManual, throwModeManual, aceLevels],
+    [flow.setup, settings, gaugeSettingOn, runningModeManual, throwModeManual, aceLevels, rolls, userEntryRoster],
   )
 
-  return { flow, entryEdit, userStarterName, settings, isPlaying, isSettingsOpen, gameOptions, actions }
+  return {
+    flow, entryEdit, userStarterName, cpuMatchInfo, settings, isPlaying, isSettingsOpen, gameOptions, actions,
+  }
+}
+
+/** `0x30f20` 의 굴림 넷 — 준비 기록의 마선수(`+0xe`·`+0xd`)가 상대 마선수 굴림의 입력이다 */
+function rollsOf(setup: GeneralModeSetup, random: RandomPort): TeamSetupRolls {
+  return rollTeamSetup(setup.acePitcherId, setup.aceBatterId, random)
 }

@@ -46,30 +46,44 @@ export function aceBatterNameOf(id: number): string {
   return ACE_PLAYERS[id]?.name ?? EMPTY_VALUE
 }
 
-/** 선발 = 투수 0번 (경기를 세울 때의 선발 뽑기 0x3107a 는 **경기 장면**에서 따로 돈다) */
+/** 선발 = 투수 0번 — 맞바꿈(0x30f20 의 0↔k)을 모를 때의 표 0번 */
 export function startingPitcherNameOf(teamId: number): string {
   return teamPitchers(teamId)[0]?.name ?? EMPTY_VALUE
 }
 
 /**
+ * 상태 22 진입 `0x314b0` → `0x30f20` 이 세운 **CPU 팀** — 굴린 선발(0↔k 뒤 투수 0번)과 마선수(0x66968·0x66994).
+ * 0xb56b5·0xb56e1 은 팀 레코드에서 마선수를 찾으므로 CPU 칸에는 0x30f20 이 AI 팀에 넣은 마선수가 나온다.
+ */
+export interface CpuMatchInfo {
+  readonly starterName: string
+  readonly acePitcherId: number
+  readonly aceBatterId: number
+}
+
+/**
  * 일반모드 경기정보 다섯 줄.
  *
- * ⚠️ 고른 마선수가 **어느 팀 레코드로 들어가는지** 원본 노트에 없다. 0xb56b5·0xb56e1 은 팀
- * 레코드에서 마선수를 찾을 뿐이라, 준비 화면에서 고른 한 쌍이 유저 팀에만 들어가는지 양 팀에
- * 들어가는지 알 수 없다. 여기서는 **유저 팀 쪽에만** 적고 CPU 는 "-" 로 둔다(근사).
+ * 마선수 칸은 팀 레코드 안 마선수 찾기(0xb56b5·0xb56e1)다 — 경기정보에 들어오기 전 `0x30f20` 이 유저 팀에는
+ * 고른 한 쌍을(31042·3104c), AI 팀에는 굴린 한 쌍을(31064·31076) 넣었다. `cpu` 를 안 넘기면(굴림 전) CPU 칸은
+ * 표 0번과 "-" 다.
  */
 export function generalModeMatchInfoLines(
   setup: GeneralModeSetup,
-  /** 유저 팀 "선발" — 엔트리 편집(상태 23)이 고친 투수 0번. 없으면 표의 0번 */
+  /** 유저 팀 "선발" — 0x30f20 의 0↔k 뒤(엔트리 편집 상태 23 이 고쳤으면 그것)의 투수 0번. 없으면 표의 0번 */
   userStarterName: string | null = null,
+  cpu: CpuMatchInfo | null = null,
 ): readonly MatchInfoLine[] {
   const values: readonly [string, string][] = [
     // 모드 1 은 순위·승패가 늘 "-" 다 (저장 레코드를 아예 읽지 않는다)
     [EMPTY_VALUE, EMPTY_VALUE],
     [EMPTY_VALUE, EMPTY_VALUE],
-    [userStarterName ?? startingPitcherNameOf(setup.userTeamId), startingPitcherNameOf(setup.aiTeamId)],
-    [acePitcherNameOf(setup.acePitcherId), EMPTY_VALUE],
-    [aceBatterNameOf(setup.aceBatterId), EMPTY_VALUE],
+    [
+      userStarterName ?? startingPitcherNameOf(setup.userTeamId),
+      cpu?.starterName ?? startingPitcherNameOf(setup.aiTeamId),
+    ],
+    [acePitcherNameOf(setup.acePitcherId), cpu === null ? EMPTY_VALUE : acePitcherNameOf(cpu.acePitcherId)],
+    [aceBatterNameOf(setup.aceBatterId), cpu === null ? EMPTY_VALUE : aceBatterNameOf(cpu.aceBatterId)],
   ]
   return values.map(([user, cpu], index) => ({
     labelFrame: MATCH_INFO_LABEL_FRAMES[index],

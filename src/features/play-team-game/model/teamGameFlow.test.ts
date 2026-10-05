@@ -36,6 +36,7 @@ import {
   runAutoProgress,
   resolveBenchClearing,
   pitchersOfRecordOf,
+  rollTeamSetup,
   startBatterOutcome,
   startTeamGame,
   startThrowPitch,
@@ -1772,5 +1773,33 @@ describe('엔트리 편집기(0x55864)가 고친 명단으로 경기를 세운�
     startTeamGame({ ...기본옵션, mode: 1, season: undefined }, 없음)
     startTeamGame({ ...기본옵션, mode: 1, season: undefined, ourEntryOrder: 차례 }, 있음)
     expect(있음.rolls.slice(0, 4)).toEqual(없음.rolls.slice(0, 4))
+  })
+})
+
+describe('미리 굴린 0x30f20 넷 — 일반모드 상태 22 진입(0x314b0)이 굴린다', () => {
+  it('rollTeamSetup 을 먼저 부르고 넘기면 경기는 같은 결과에 같은 난수 차례다 (위치만 앞당김)', () => {
+    const 옵션: TeamGameOptions = {
+      ...기본옵션, mode: 1, season: undefined, acePitcherId: 1, aceBatterId: 0, settings: 전부자동,
+    }
+    const 그대로 = startTeamGame(옵션, createSeededRandom(20100901))
+    const random = createSeededRandom(20100901)
+    const 굴림 = rollTeamSetup(1, 0, random)
+    const 앞당김 = startTeamGame({ ...옵션, ...굴림 }, random)
+    expect(앞당김.opponentAcePitcherIndex).toBe(그대로.opponentAcePitcherIndex)
+    expect(앞당김.opponentAceBatterIndex).toBe(그대로.opponentAceBatterIndex)
+    expect(앞당김.game).toEqual(그대로.game)
+    expect(앞당김.log).toEqual(그대로.log)
+  })
+
+  it('넘기면 startTeamGame 은 하나도 굴리지 않는다', () => {
+    const random = 세는난수(createSeededRandom(3))
+    startTeamGame(
+      {
+        ...기본옵션, mode: 1, season: undefined,
+        opponentAces: { pitcher: 2, batter: 3 }, startingPitcherSlots: { opponent: 1, ours: 2 },
+      },
+      random,
+    )
+    expect(random.rolls).toEqual([])
   })
 })
