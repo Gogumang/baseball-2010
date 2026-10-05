@@ -81,11 +81,11 @@ export interface StageScene {
    * 타석 화면 마운드의 상대 투수는 그 객체가 아니다 (`batterLayers.pitcherEquipmentOf` 주석).
    *
    * 웹에서 이 칸을 채우려면 먼저 두 가지가 있어야 한다:
-   *   1. **투수편 상점** — `PitcherCareer.equipmentLevels` 를 0 말고 다른 값으로 만드는 곳이
-   *      아직 없다 (타자편 `features/shop` 만 이식됐다).
+   *   1. 투수편 상점 — **이제 있다**: 투수편 장비 상점·장비착용(d15c14d, `features/shop/model/pitcherShopSelection`)이
+   *      `PitcherCareer.equipmentLevels` 니블을 채운다.
    *   2. **투수편 경기 화면의 투수 그림** — `pages/pitching/PitcherGameScreen` 은 캔버스 없이
-   *      패널로만 그려서 `BattingStage` 를 아예 쓰지 않는다.
-   * 둘이 생기면 `batterLayers.pitcherEquipmentOf(career.equipmentLevels)` 한 줄이면 된다.
+   *      패널로만 그려서 `BattingStage` 를 아예 쓰지 않는다. 남은 것은 이것 하나다.
+   * 그것이 생기면 `batterLayers.pitcherEquipmentOf(career.equipmentLevels)` 한 줄이면 된다.
    */
   readonly pitcherEquipment?: PitcherEquipment
   readonly acePitcher: {

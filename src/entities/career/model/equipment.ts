@@ -84,7 +84,7 @@ const COLLECTOR_LEVEL = 8
 /**
  * 타자 장비 오픈 id (헬멧 35~38 · 배트 39~42 · 밴드 43~46 · 슈즈 47~50, 0x61f5c).
  * 부위를 다 모았을 때 열리는 **컬렉터 id 는 타자 36·40·44·48** 이다 (R12 5절 확정).
- * 투수 쪽은 20·24·28·32 인데 웹에 투수편이 없어 아직 쓰지 않는다.
+ * 투수 쪽 컬렉터 id 20·24·28·32 는 투수편 장비(`entities/pitcher-career/model/pitcherEquipment.ts`)가 쓴다.
  */
 const BATTER_HIDDEN_ID_START = 35
 const HIDDEN_LEVELS_PER_PART = 4

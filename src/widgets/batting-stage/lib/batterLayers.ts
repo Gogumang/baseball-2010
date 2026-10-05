@@ -297,9 +297,9 @@ export const NO_PITCHER_EQUIPMENT: PitcherEquipment = { head: -1, hand: -1, body
  * 니블 묶음(`PitcherCareer.equipmentLevels` = 제구·구속·변화·체력) → 부위별 등급 순번.
  * 니블 → 순번은 타자와 같은 `equipmentGradeOf`(n = 니블 − 1)다.
  *
- * ⚠️ **추정**: 부위 ↔ 능력치 짝은 타자 쪽 규칙("부위 i = 능력치 i", 0x10866 루프)을 그대로 옮긴 것이다 —
- *    모자 = 제구 · 글러브 = 구속 · 아대 = 변화 · 신발 = 체력. 원본 투수 상점에서 부위와 능력치를
- *    맺어 주는 자리는 아직 안 떴다 (웹 `pitcherCareer.effectiveAbilityOf` 도 이미 같은 차례를 쓴다).
+ * 부위 ↔ 능력치 짝은 **확정**이다 — 모자 = 제구 · 글러브 = 구속 · 아대 = 변화 · 신발 = 체력.
+ *    능력치 효과 0xb6414 가 칸 k 에 니블 k(`rec[0x19 + k/2]`, k 짝수 = 상위)를 더하고, 투수 상점 구매(0x14a74)가
+ *    부위 row 를 같은 니블 row 에 넣는다 (d15c14d · `pitcherEquipment.ts`). 웹 `pitcherCareer.effectiveAbilityOf` 도 같은 차례다.
  *
  * **원본에서 이 값이 어디서 와서 어디로 가는가** (0x108f8 · 0x10810 을 이번에 떠서 확인했다):
  *   경기 장면을 세우는 0x108f8 은 **그림 한 칸**(장면+0xe4)만 만들고, 전역 모드(장면+0xcc)로
