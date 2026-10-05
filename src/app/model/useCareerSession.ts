@@ -3,11 +3,13 @@ import type { Screen } from '@/app/model/screen'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import { isAtBatFinished } from '@/entities/at-bat/model/atBatState'
 import { describeOutcomeBanner } from '@/entities/at-bat/model/resolutionText'
-import { resolveDefensePlay, startGame, startPlayerOutcome, stealBase, summaryOf, throwOpponentPitch } from '@/features/play-game/model/gameFlow'
+import { cpuPickoff, resolveDefensePlay, startGame, startPlayerOutcome, stealBase, summaryOf, throwOpponentPitch } from '@/features/play-game/model/gameFlow'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
+import { isPickoffPlayResult, pickoffCallSoundIdOf } from '@/features/defense-play/model/pickoffPlay'
+import type { PickoffBase } from '@/entities/defense-controls/model/pickoff'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import { EMPTY_AT_BAT_PITCH_TALLY, tallyPitch } from '@/features/play-at-bat/model/atBatPitchTally'
 import type { AtBatPitchTally } from '@/features/play-at-bat/model/atBatPitchTally'
@@ -596,6 +598,40 @@ export function useCareerSession({
       // 그 v9 는 "포수 송구가 루에 닿아 야수가 공을 쥔 채 태그에 실패한 틱" 이다(0xb442a).
       // 웹 도루는 주력 표 굴림 하나라 그 칸이 없다 (`atBatSounds.inPlayCallSoundIdOf` 주석)
       playSoundIds(audio, gameStepSoundIdsOf(current, next))
+    },
+
+    /**
+     * **CPU 투수의 견제** — 타석 화면(`BattingStage.onPickoff`)이 상대 투수 AI 가 목표점 대신 고른 루를 알려 준다
+     * (0x345fc 종류 4 → 0x34848 → 메시지 0x10). 견제 판은 `lastDefensePlay` 로 재생되고(GameRoute),
+     * 같은 타석·같은 볼카운트로 다음 공이 이어진다 (0xae3e8 → 상태 0xf).
+     *
+     * 판정 콜 — 세이프면 늘 17 (0x51c14 의 종류 4·5 갈래), 견제사면 62/20 (0x51b36).
+     * ⚠️ 원본은 공이 잡히는 **틱**에 낸다. 웹은 판을 미리 다 돌려 재생하므로 판을 연 자리에서 낸다 (팀경기와 같은 근사).
+     */
+    cpuPickoff: (base: PickoffBase) => {
+      const current = progressRef.current
+      if (current === null) return
+      const next = cpuPickoff(current, base, random)
+      if (next === current) return
+      progressRef.current = next
+      setProgress(next)
+      const play = next.lastDefensePlay
+      playSoundIds(audio, [
+        isPickoffPlayResult(play) ? pickoffCallSoundIdOf(play) : null,
+        ...gameStepSoundIdsOf(current, next),
+      ])
+      const interrupted =
+        next.game.isFinished || next.game.inning !== current.game.inning || next.game.half !== current.game.half
+      if (!interrupted) return
+      // 견제 판에서 반 이닝이 끝났거나(3아웃) 경기가 끝났다(끝내기 득점) — 내 타석이 끊긴다.
+      // 다음 내 타석은 새 볼카운트·새 파울 카운터로 (타석 초기화 0xa5bcc)
+      pitchTallyRef.current = EMPTY_AT_BAT_PITCH_TALLY
+      runner.resetAtBat()
+      if (!next.game.isFinished) return
+      const cup = cupGameRef.current
+      if (cup !== null) return finishCupGame(next, cup)
+      const currentCareer = careerRef.current
+      if (currentCareer !== null) finishGame(next, currentCareer)
     },
 
     /**

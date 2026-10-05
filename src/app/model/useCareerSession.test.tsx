@@ -370,3 +370,56 @@ describe('공마다 상대 투수 투구 수·스태미나 (0x3dec6 → 0xa5e14(
     }
   })
 })
+
+describe('CPU 견제 (0x345fc 종류 4 → 0x34848) — 타자편도 견제 판을 재생하고 같은 타석을 잇는다', () => {
+  const 볼: PitchOutcomeDetail = {
+    resolution: { kind: '볼' },
+    hasSwung: false,
+    isBunt: false,
+    resultCode: null,
+    contactSoundId: null,
+  }
+
+  it('주자 있는 루면 견제 판이 재생 칸에 들고 볼카운트·투구 수는 그대로다 — 빈 루면 아무 일도 없다', () => {
+    const saveGame = 메모리저장(createCareer('견제'))
+    const random = createSeededRandom(20100901)
+    const rendered = renderHook(() => {
+      const [screen, setScreen] = useState<Screen>({ kind: '메인메뉴' })
+      const runner = useAtBatRunner()
+      return { screen, runner, session: useCareerSession({ runner, random, saveGame, screen, setScreen }) }
+    })
+    try {
+      act(() => rendered.result.current.session.actions.continueSaved())
+      act(() => rendered.result.current.session.actions.runCommand('다음경기'))
+      act(() => rendered.result.current.session.actions.finishLoading())
+      // 볼넷으로 나가며 주자가 있는 내 타석이 올 때까지 돌린다
+      for (let atBat = 0; atBat < 9; atBat += 1) {
+        const { bases } = rendered.result.current.session.progress!.game
+        if (bases.first || bases.second || bases.third) break
+        for (let pitch = 0; pitch < 4; pitch += 1) act(() => rendered.result.current.session.handlePitchResolved(볼))
+        act(() => rendered.result.current.runner.resetAtBat())
+      }
+      const before = rendered.result.current.session.progress!
+      const { bases } = before.game
+      const occupied = bases.first ? 1 : bases.second ? 2 : bases.third ? 3 : null
+      const empty = !bases.first ? 1 : !bases.second ? 2 : !bases.third ? 3 : null
+      expect(occupied).not.toBeNull()
+      if (empty !== null) {
+        act(() => rendered.result.current.session.actions.cpuPickoff(empty))
+        expect(rendered.result.current.session.progress).toBe(before)
+      }
+      act(() => rendered.result.current.session.handlePitchResolved(볼))
+      const counted = rendered.result.current.session.progress!
+      act(() => rendered.result.current.session.actions.cpuPickoff(occupied!))
+      const after = rendered.result.current.session.progress!
+      expect(after.lastDefensePlay).not.toBeNull()
+      expect(after.lastDefensePlay).not.toBe(counted.lastDefensePlay)
+      expect(after.opponentMound.pitches).toBe(counted.opponentMound.pitches)
+      if (after.game.half === counted.game.half && !after.game.isFinished) {
+        expect(rendered.result.current.runner.atBat.balls).toBe(1)
+      }
+    } finally {
+      act(() => rendered.unmount())
+    }
+  })
+})

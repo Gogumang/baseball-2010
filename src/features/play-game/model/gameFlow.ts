@@ -32,6 +32,7 @@ import {
 } from '@/entities/team/model/teamRoster'
 import { staminaPercentOf } from '@/entities/pitcher-career/model/pitcherStamina'
 import {
+  lineupSlotOf,
   recordLineupPlay,
   rosterLineupOf,
   rosterSlotAt,
@@ -66,6 +67,11 @@ import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { defenseAbilitiesOf, isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayInput, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { homeRunPlaybackOf } from '@/features/defense-play/model/homeRunPlayback'
+import { PICKOFF_RESULT, runPickoffPlay } from '@/features/defense-play/model/pickoffPlay'
+import type { PickoffPlayResult } from '@/features/defense-play/model/pickoffPlay'
+import { PICKOFF_PLAY_KIND } from '@/entities/defense-controls/model/pickoff'
+import type { PickoffBase } from '@/entities/defense-controls/model/pickoff'
+import { EMPTY_BATTER_GAME_RECORD, recordPlateAppearance } from '@/entities/batting/model/pinchHitAi'
 import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
 import type { BurstResolution, BurstSession } from '@/entities/burst-mission/model/burstMissionSession'
 import { createBurstSession, resolveBurst, tryTriggerBurst } from '@/entities/burst-mission/model/burstMissionSession'
@@ -1202,6 +1208,102 @@ export function stealBase(progress: GameProgress, base: 1 | 2, random: RandomPor
     true,
   )
 }
+
+/**
+ * **CPU 투수의 견제** — 내 타석에서 상대(CPU) 투수 AI 가 목표점 대신 견제를 골랐다.
+ *
+ * ## 원본 길 (모드 4 에서도 돈다 — 확정)
+ * - CPU 조작 객체(vtable `0xd0a60`, 슬롯 3 = `0x53874`)가 수비일 때 이벤트 0xf 에 메시지 **0x644**(`0x53850`),
+ *   0x10 에 **0x645**(`0x53824`, `[+0x18] > 5`)를 보낸다. 모드는 안 본다.
+ * - 경기 장면 메시지 처리기 `0x509a0` 은 비교 나무다: `0x50b1e~0x50b24` 0x5de+0x66 = **0x644 → 0x51212**
+ *   (`0x344dc` 구질), `0x50ae0~0x50ae6` 0x6a9−0x64 = **0x645 → 0x5121c**(`0x345fc` 목표점). 여기도 모드 갈림이 없다.
+ * - `0x345fc` 의 모드 갈림은 `0x3460e` `+0x1104 == 7`(홈런더비) 하나뿐 → 모드 4 에서는 목표 종류 4 가
+ *   `0x34848` 견제(rand(1,4) 를 주자 있는 루까지 반복 → 메시지 0x10)로 간다 (I-controls 4a-2).
+ * - 메시지 0x10 → `0x50f28` → 플레이 종류 4 · 상태 0x17 → 판 끝 `0xae3e8`: 아웃 ≤ 2 면 **같은 타석 다음 공(0xf)**,
+ *   정산 `0xa8024` 는 불리지만 종류 4 라 타석 칸(+0x14)이 안 오른다.
+ *
+ * 여기는 **그 루가 정해진 뒤**다 — 루 굴림은 타석 화면(`selectPitch` 의 `cpuPickoff`)이 이미 했다.
+ * 볼카운트·타순·투구 수·스태미나는 그대로다(공을 안 던졌다 — `throwOpponentPitch` 를 안 부른다).
+ * 수비는 상대 팀, 주루는 환경설정 "주루"(`0xae690` 둘째 항, 타자편은 사람이 늘 공격).
+ * 난수는 견제 판 안의 **악송구 굴림(0xa1828) 1번 · 악송구면 +2번**뿐이다.
+ *
+ * 내 타석이 아니거나(경기 끝·수비 진행 중) 그 루가 비었으면 아무 일도 없다 — 같은 객체를 돌려준다
+ * (`0x34848` 은 주자 있는 루가 나올 때까지 굴리므로 빈 루가 들어오면 부르는 쪽 잘못이다).
+ *
+ * ⚠️ 미해결·근사 (`teamGameFlow.cpuPickoff` 와 같은 자리)
+ * - 견제사·진루·득점이 나면 루·아웃·점수·반 이닝 교대와 상대 투수 실점 A·B 에는 먹이지만, 0xa8024 의 나머지 칸
+ *   (평판 16칸·리그 기록·돌발 판정 0x8f414)이 견제 판에서 어떻게 도는지는 손대지 않았다.
+ * - 원본은 0xf 에 다시 들어서며 `0x3d954` 가 CPU 투수 교체(0xac428)를 다시 부른다 — 웹은 공마다도 안 다시 부르는
+ *   기존 근사라 견제 뒤에도 안 부른다 (반 이닝이 바뀌어 내 타석이 끊긴 때만 `advanceUntilPlayerTurn` 이 부른다).
+ * - 3아웃으로 내 타석이 끊기면 타순 커서를 안 민다(타석이 안 끝났다) — 다음 이닝 나부터 다시 선다.
+ */
+export function cpuPickoff(progress: GameProgress, base: PickoffBase, random: RandomPort): GameProgress {
+  const before = progress.game
+  if (before.isFinished || !isPlayerTurn(before) || progress.pendingDefensePlay !== null) return progress
+  if (!(base === 1 ? before.bases.first : base === 2 ? before.bases.second : before.bases.third)) return progress
+
+  const result: PickoffPlayResult = runPickoffPlay({
+    targetBase: base,
+    bases: before.bases,
+    outs: before.outs,
+    // 우리 공격이니 수비는 상대 팀이다 — 타구 진행기와 같은 아홉 칸·같은 주루 근사
+    defenseAbilities: opponentDefenseAbilitiesOf(progress),
+    runAbility: runnerRunAbilityOf(progress),
+    random,
+    // 타자편은 사람이 늘 공격이다 — 환경설정 "주루" 혼자가 자동 진루 제어기를 켠다 (0xae690)
+    offenseIsCpu: false,
+    runningMode: progress.runningModeManual ? '수동' : '자동',
+  })
+
+  // 정산 0xa8024 — 종류 4 라 타석 칸(+0x14)이 안 오르고 안타·적시타 가지도 안 선다 (pinchHitAi 게이트)
+  const slot = lineupSlotOf(before.battingOrderIndex)
+  const records = [...progress.ourLineup.records]
+  records[slot] = recordPlateAppearance(records[slot] ?? EMPTY_BATTER_GAME_RECORD, {
+    isHit: false,
+    runsBattedIn: 0,
+    playKind: PICKOFF_PLAY_KIND,
+  })
+  let next: GameProgress = { ...progress, lastDefensePlay: result, ourLineup: { ...progress.ourLineup, records } }
+
+  const advance = result.advance
+  const changed =
+    advance.outsAdded > 0 ||
+    advance.runsScored > 0 ||
+    advance.bases.first !== before.bases.first ||
+    advance.bases.second !== before.bases.second ||
+    advance.bases.third !== before.bases.third
+  let runs = 0
+  if (changed) {
+    // 타석이 끝난 것이 아니라 타순 커서는 그대로 둔다 — 결과 코드는 precomputed 가 있으면 안 읽는다
+    const game: GameState = {
+      ...applyAtBatOutcome(before, PICKOFF_OUTCOME_PLACEHOLDER, advance),
+      battingOrderIndex: before.battingOrderIndex,
+    }
+    runs = game.ourScore - before.ourScore
+    next = {
+      ...next,
+      game,
+      // 득점 처리 0xa5c34 는 1점마다 수비 팀 실점 A·B 를 올린다 (내 타석 정산과 같은 칸)
+      opponentMound: {
+        ...next.opponentMound,
+        runsAllowed: Math.min(MAXIMUM_PITCHER_COUNTER, next.opponentMound.runsAllowed + runs),
+      },
+      opponentInningRunsAllowed: Math.min(MAXIMUM_PITCHER_COUNTER, next.opponentInningRunsAllowed + runs),
+    }
+  }
+
+  const call = result.resultCode === PICKOFF_RESULT.OUT ? '견제사' : result.errantThrow ? '악송구' : '세이프'
+  next = appendLog(
+    next,
+    `${before.inning}회${before.half} 상대 ${base}루 견제 — ${call}${runs > 0 ? ` (${runs}점)` : ''}`,
+    true,
+  )
+  // 같은 타석이 이어지면(상태 0xf) 그대로 돌려준다. 반 이닝이 바뀌었거나 끝났으면 다음 내 차례까지 넘긴다
+  return isPlayerTurn(next.game) && !next.game.isFinished ? next : advanceUntilPlayerTurn(next, random)
+}
+
+/** `applyAtBatOutcome` 은 `precomputed` 를 받으면 결과 코드를 안 읽는다 — 견제에는 타석 결과가 없어 자리만 채운다 */
+const PICKOFF_OUTCOME_PLACEHOLDER: AtBatOutcome = { kind: '아웃', detail: '땅볼아웃' }
 
 /** 사람 팀(우리)이 공격 중인 정산의 0xa77f0 게이트 — 타자편 사람 쪽 플레이는 늘 이 방향이다 */
 function gatedOffenseRecords(recordIds: readonly number[]): number[] {

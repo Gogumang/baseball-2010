@@ -37,6 +37,12 @@ interface GameScreenProps {
    * 안 넘기면 도루 입구가 뜨지 않는다.
    */
   readonly onSteal?: (base: 1 | 2) => void
+  /**
+   * **CPU 투수의 견제** — 상대 투수 AI 가 목표점 대신 견제(종류 4, 0x34848)를 고르면 타석 화면이 공을 안 던지고
+   * 그 루를 알려 준다. 원본 0x345fc 는 홈런더비(모드 7)만 갈라 타자편(모드 4)도 견제한다.
+   * 안 넘기면 견제가 꺼진다(종류 4 → 1, `selectPitch` 주석).
+   */
+  readonly onPickoff?: (base: 1 | 2 | 3) => void
   /** 경기 중 메뉴 "설정" 칸이 열 환경설정 값. 안 넘기면 칸이 잠긴다 */
   readonly settings?: GameSettings
   readonly onSettingsChange?: (settings: GameSettings) => void
@@ -58,6 +64,7 @@ export function GameScreen({
   onPitchResolved,
   onQuit,
   onSteal,
+  onPickoff,
   settings,
   onSettingsChange,
 }: GameScreenProps) {
@@ -187,6 +194,7 @@ export function GameScreen({
           // 0 이면(아직 안 고름) '0' 키가 무시된다
           specialSwingNumber={career.specialSwingNumber}
           onPitchResolved={onPitchResolved}
+          onPickoff={onPickoff}
         />
       </div>
 

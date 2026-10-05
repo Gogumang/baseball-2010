@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   applyPlayerOutcome,
+  cpuPickoff,
   opponentPitcherAbilityOf,
   resolveDefensePlay,
   startGame,
@@ -23,6 +24,8 @@ import { advanceRunners, EMPTY_BASES } from '@/entities/game/model/baseState'
 import type { BaseState } from '@/entities/game/model/baseState'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
+import type { RandomPort } from '@/shared/api/random/randomPort'
+import { isPickoffPlayResult, PICKOFF_RESULT } from '@/features/defense-play/model/pickoffPlay'
 
 describe('startGame', () => {
   it('커리어 타순(9번)이면 플레이어는 아홉 번째 타자다', () => {
@@ -943,5 +946,83 @@ describe('내 타석의 공 하나 — 0xa5e14(ctx, 구질) (0x3dec6)', () => {
     const progress = startGame(createSeededRandom(1))
     const finished = { ...progress, game: { ...progress.game, isFinished: true } }
     expect(throwOpponentPitch(finished, 1, { batterIntimidates: false })).toBe(finished)
+  })
+})
+
+describe('CPU 견제 — 모드 4 도 0x345fc 종류 4 → 0x34848 → 메시지 0x10 (0x644/0x645 · 0x509a0 에 모드 갈림 없음)', () => {
+  /** 굴림 수를 센다 — 견제 판이 굴리는 것은 악송구 굴림(0xa1828)뿐이다 */
+  const 세는난수 = (seed: number) => {
+    const inner = createSeededRandom(seed)
+    const counter = { draws: 0 }
+    const random: RandomPort = {
+      next: () => {
+        counter.draws += 1
+        return inner.next()
+      },
+      nextInRange: (minimum, maximum) => {
+        counter.draws += 1
+        return inner.nextInRange(minimum, maximum)
+      },
+      pick: (candidates) => {
+        counter.draws += 1
+        return inner.pick(candidates)
+      },
+    }
+    return { random, counter }
+  }
+  const 주자 = (progress: GameProgress, bases: BaseState): GameProgress => ({
+    ...progress,
+    game: { ...progress.game, bases },
+  })
+
+  it('내 타석이 아니거나 그 루에 주자가 없으면 아무 일도 없다 — 같은 객체', () => {
+    const progress = startGame(createSeededRandom(20100905))
+    expect(isPlayerTurn(progress.game)).toBe(true)
+    const 판 = 주자(progress, { first: true, second: false, third: false })
+    expect(cpuPickoff(판, 2, createSeededRandom(1))).toBe(판)
+    const 끝 = { ...판, game: { ...판.game, isFinished: true } }
+    expect(cpuPickoff(끝, 1, createSeededRandom(1))).toBe(끝)
+    // 타구 진행 중(상태 0x17)에는 투구가 안 나간다
+    const 진행중 = startPlayerOutcome(판, { kind: '안타', bases: 1 }, createSeededRandom(1))
+    if (진행중.pendingDefensePlay !== null) expect(cpuPickoff(진행중, 1, createSeededRandom(1))).toBe(진행중)
+  })
+
+  it('견제는 공이 아니다 — 투구 수·스태미나·타순이 그대로고 재생할 견제 판만 생긴다', () => {
+    const progress = startGame(createSeededRandom(20100905))
+    const 판 = 주자(progress, { first: true, second: false, third: true })
+    const { random, counter } = 세는난수(7)
+    const after = cpuPickoff(판, 3, random)
+    expect(after).not.toBe(판)
+    const play = after.lastDefensePlay
+    if (!isPickoffPlayResult(play)) throw new Error('견제 판이 아니다')
+    expect(play.throwBase).toBe(3)
+    expect(play.ticks.length).toBeGreaterThan(0)
+    // 악송구 굴림 1번(악송구면 +2번)뿐이다
+    expect(counter.draws).toBe(play.errantThrow ? 3 : 1)
+    expect(after.opponentMound.pitches).toBe(판.opponentMound.pitches)
+    expect(after.opponentMound.stamina).toBe(판.opponentMound.stamina)
+    expect(after.game.battingOrderIndex).toBe(판.game.battingOrderIndex)
+    expect(after.myStats).toEqual(판.myStats)
+    expect(after.recentAtBatCodes).toEqual(판.recentAtBatCodes)
+    // 정산 0xa8024 는 종류 4 라 타석 칸(+0x14)이 안 오른다
+    expect(after.ourLineup.records).toEqual(판.ourLineup.records)
+    if (!play.errantThrow) {
+      // 루에 붙은 주자는 견제로 안 죽는다 (0xb36d0 · 0x4677a) — 결과 9
+      expect(play.resultCode).toBe(PICKOFF_RESULT.SAFE)
+      expect(after.game).toEqual(판.game)
+    }
+    expect(after.log[0]?.text).toContain('상대 3루 견제')
+    // 같은 타석 다음 공(0xae592 → 0xf)
+    expect(isPlayerTurn(after.game)).toBe(true)
+  })
+
+  it('견제를 끼워도 뒤 굴림 차례는 견제 판이 쓴 만큼만 밀린다', () => {
+    const progress = startGame(createSeededRandom(20100905))
+    const 판 = 주자(progress, { first: true, second: false, third: false })
+    const { random, counter } = 세는난수(5)
+    cpuPickoff(판, 1, random)
+    const 다시 = createSeededRandom(5)
+    for (let index = 0; index < counter.draws; index += 1) 다시.nextInRange(0, 10000)
+    expect(random.nextInRange(0, 10000)).toBe(다시.nextInRange(0, 10000))
   })
 })

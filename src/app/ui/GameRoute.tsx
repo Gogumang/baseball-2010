@@ -95,6 +95,8 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
         onPitchResolved={session.handlePitchResolved}
         onQuit={session.actions.quitGame}
         onSteal={session.actions.stealBase}
+        // CPU 견제 (0x345fc 종류 4 → 0x34848) — 판은 위 재생 갈래(`lastDefensePlay`)로 보인다
+        onPickoff={session.actions.cpuPickoff}
         settings={gameSettings.settings}
         onSettingsChange={gameSettings.setSettings}
       />
