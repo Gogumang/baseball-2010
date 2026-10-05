@@ -190,6 +190,17 @@ export interface PlayerCareer {
   /** 필살타법 레벨(+0x201) · 이번 레벨 누적 훈련 횟수(+0x200) */
   readonly specialSwingLevel: number
   readonly specialSwingSessions: number
+  /**
+   * **고른 필살타법 번호** — 선수 레코드 **+0x18** (H-4 · H2 1·2절 확정).
+   * 선수정보 칸 3 의 창(상태 0x7b, 키 0x17cec)에서 고른 칸의 표 값 `0xcc378[칸]` = 1~4 가 그대로 들어간다
+   * (0x18166~0x1816c `strb`). **"4 + 타입" 은 이름에만 쓰고 여기엔 안 들어간다** — 미라지·메테오 모두 4.
+   * 경기는 레벨(+0x201)이 아니라 **이 번호**만 본다: 0 이면 '0' 키가 무시되고(0x51e14 ← 0xaea30),
+   * 성공 확률은 표 `0xcfdbe[번호−1]` 이다(0x34c74).
+   *
+   * 0 = 아직 안 고름. ⚠️ 새 선수의 초깃값은 원본에서 못 짚었다(배우기 0xa3bac 는 이 칸을 안 쓴다 —
+   * 0xa3c26~0xa3cc6 확인). 0 으로 둔다(**추정**). 이 칸이 없던 옛 저장도 0 으로 채워진다.
+   */
+  readonly specialSwingNumber: number
   readonly battingOrder: number
   /** 목표 타순 경로 — 이벤트 487 에서 고른다. 고르기 전에는 null */
   readonly battingOrderPath: '4번' | '1번' | null
@@ -336,6 +347,7 @@ export function createCareer(name: string, profile: RookieProfile = DEFAULT_ROOK
     lotteryFirstPrizes: 0,
     specialSwingLevel: 0,
     specialSwingSessions: 0,
+    specialSwingNumber: 0,
     battingOrder: 9,
     battingOrderPath: null,
     lastMidSeasonGoalCount: 0,
@@ -428,6 +440,14 @@ export function gainGamePoint(career: PlayerCareer, amount: number): PlayerCaree
 
 export function gainMorale(career: PlayerCareer, amount: number): PlayerCareer {
   return { ...career, morale: clamp(career.morale + amount, 0, MAXIMUM_MORALE) }
+}
+
+/**
+ * 필살타법 창(상태 0x7b)에서 고른 번호를 선수 +0x18 에 쓴다 (0x1816c `strb`).
+ * 관리 주기 행동·G포인트는 건드리지 않는다 — 0x18150~0x1816e 사이 쓰기는 이 `strb` 하나뿐이다.
+ */
+export function selectSpecialSwingNumber(career: PlayerCareer, number: number): PlayerCareer {
+  return { ...career, specialSwingNumber: number }
 }
 
 /** 관리 주기의 행동 한 번을 쓴다. 경기를 치르면 다시 생긴다. */

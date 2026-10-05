@@ -181,8 +181,9 @@ export function GameScreen({
           }
           isPaused={isPaused || isMenuOpen}
           random={random}
-          // 필살타법 '0' (0x535a4 → 0x34c74). 레벨 0 이면 눌러도 늘 실패다 — 마타자는 30% 고정
-          specialSwingLevel={career.specialSwingLevel}
+          // 필살타법 '0' (0x535a4 → 0x51dee → 0x34c74). 레벨이 아니라 **고른 번호**(+0x18)를 넘긴다 —
+          // 0 이면(아직 안 고름) '0' 키가 무시된다
+          specialSwingNumber={career.specialSwingNumber}
           onPitchResolved={onPitchResolved}
         />
       </div>

@@ -86,6 +86,16 @@ describe('세이브 불러오기', () => {
     expect(loaded?.leaguePlayerStats.batters[51].homeRuns).toBe(9)
   })
 
+  /** 고른 필살타법 번호(+0x18)는 나중에 생긴 칸이다 — 옛 저장은 0(안 고름)으로 채우고, 고른 값은 오간다 */
+  it('고른 필살타법 번호는 옛 저장에서 0 이 되고, 저장한 번호는 그대로 돌아온다', () => {
+    writeSave(2, { ...ANCIENT_SAVE, specialSwingLevel: 3 })
+    expect(createLocalStorageSaveGame().load()).toMatchObject({ specialSwingLevel: 3, specialSwingNumber: 0 })
+
+    const save = createLocalStorageSaveGame()
+    save.save({ ...createCareer('저장'), specialSwingLevel: 4, specialSwingNumber: 4 })
+    expect(save.load()?.specialSwingNumber).toBe(4)
+  })
+
   it('알 수 없는 형식·깨진 JSON 은 새 게임으로 본다 (null)', () => {
     writeSave(99, ANCIENT_SAVE)
     expect(createLocalStorageSaveGame().load()).toBeNull()

@@ -79,7 +79,7 @@ describe('관리 화면 알림 상자', () => {
 
   /**
    * 원본은 훈련 칸 0~3 에만 StrMODE[85] "…훈련을 하시겠습니까?" 를 붙인다.
-   * 칸 4(필살타법)는 전용 화면(상태 0x6c)으로 가서 StrMODE[69]~[71] 을 쓴다 — 그 화면은 아직 없다.
+   * 칸 4(필살타법)는 전용 창(상태 0x6c, 키 0x17828)으로 가서 StrMODE[62]~[66] 을 쓴다.
    */
   it('능력 훈련 칸은 [%s훈련]을 하시겠습니까? 로 묻는다', () => {
     render(<ManagementScreen {...propsWith({})} />)
@@ -101,6 +101,53 @@ describe('관리 화면 알림 상자', () => {
       screen.queryByRole('dialog', { name: '알림' })?.textContent ?? '(창 없음)',
       '필살타법에 StrMODE[85] 질문이 붙었다',
     ).not.toContain('하시겠습니까')
+  })
+
+  it('필살타법 칸은 레벨 검사 없이 배우기 창(상태 0x6c)을 연다 — 연출로 곧장 넘어가지 않는다 (0x12e02)', () => {
+    const onTraining = vi.fn()
+    render(<ManagementScreen {...propsWith({ onTraining, isTrainingBlocked: () => true })} />)
+
+    clickCommand('트레이닝')
+    clickCommand('필살타법')
+
+    expect(screen.queryByRole('dialog', { name: '필살타법' }), '필살타법 창이 안 열렸다').not.toBeNull()
+    expect(onTraining).not.toHaveBeenCalled()
+  })
+
+  it('배우기 창의 칸 가드는 창이 맡는다 — 인기도가 모자라면 StrMODE[62] (0x17828)', () => {
+    const career = { ...createCareer('테스터'), popularity: 0, gamePoint: 9999 }
+    render(<ManagementScreen {...propsWith({ career })} />)
+
+    clickCommand('트레이닝')
+    clickCommand('필살타법')
+    fireEvent.click(screen.getByRole('button', { name: '파워 스윙' }))
+
+    expect(screen.queryByRole('dialog', { name: '알림' })?.textContent).toContain('인기도')
+  })
+
+  it('사기 0 이면 창을 열기 전에 막는다 (0x12d8a)', () => {
+    const onTrainingBlocked = vi.fn()
+    const career = { ...createCareer('테스터'), morale: 0 }
+    render(<ManagementScreen {...propsWith({ career, onTrainingBlocked })} />)
+
+    clickCommand('트레이닝')
+    clickCommand('필살타법')
+
+    expect(onTrainingBlocked).toHaveBeenCalledWith('필살타법')
+    expect(screen.queryByRole('dialog', { name: '필살타법' })).toBeNull()
+  })
+
+  it('선수정보 → 필살타법 창에서 고른 번호를 세션에 넘긴다 (+0x18, 0x1816c)', () => {
+    const onSelectSpecialSwing = vi.fn()
+    const career = { ...createCareer('테스터'), specialSwingLevel: 2 }
+    render(<ManagementScreen {...propsWith({ career, onSelectSpecialSwing })} />)
+
+    clickCommand('선수정보')
+    clickCommand('필살타법')
+    fireEvent.click(screen.getByRole('button', { name: '플레임 스윙' }))
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+
+    expect(onSelectSpecialSwing).toHaveBeenCalledWith(2)
   })
 
   it('알림이 떠 있는 동안 Enter 는 뒤쪽 커맨드를 고르지 않는다', () => {

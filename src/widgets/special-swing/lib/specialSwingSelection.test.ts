@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   NO_SPECIAL_SWING_NUMBER, specialSwingNameOf, specialSwingNumberOf, specialSwingPickOf,
+  specialSwingStoredNumberOf,
 } from '@/widgets/special-swing/lib/specialSwingSelection'
 
 /** 필살타법 창의 칸 규칙 (H-4 확정 · 키 처리 0x17cec) */
@@ -33,8 +34,19 @@ describe('기술 고르기 — 0x17cec', () => {
     expect(specialSwingPickOf(1, 0, 2, NO_SPECIAL_SWING_NUMBER).kind).toBe('묻기')
   })
 
-  it('배운 칸이면 StrMODE[70] 로 묻고, 바꿀 번호와 이름을 함께 준다', () => {
-    expect(specialSwingPickOf(3, 1, 4, 1)).toEqual({ kind: '묻기', number: 5, name: '메테오 스윙' })
+  it('배운 칸이면 StrMODE[70] 로 묻고, 저장할 번호(표 값)와 이름을 함께 준다', () => {
+    // 이름은 4 + 타입(메테오)이지만 +0x18 에 쓰는 값은 표 0xcc378[3] = 4 다 (0x1816c)
+    expect(specialSwingPickOf(3, 1, 4, 1)).toEqual({ kind: '묻기', number: 4, name: '메테오 스윙' })
+    expect(specialSwingPickOf(3, 0, 4, 1)).toEqual({ kind: '묻기', number: 4, name: '미라지 스윙' })
+  })
+
+  it('저장 번호는 1~4 뿐이다 — 타입을 안 더한다', () => {
+    expect([0, 1, 2, 3].map(specialSwingStoredNumberOf)).toEqual([1, 2, 3, 4])
+  })
+
+  it('⚠️ 원본 어긋남: 장타형이 메테오(저장 4)를 골라 두어도 다시 고르면 "사용 중" 이 아니라 또 묻는다', () => {
+    const stored = specialSwingStoredNumberOf(3)
+    expect(specialSwingPickOf(3, 1, 4, stored).kind).toBe('묻기')
   })
 
   it('"사용 중" 판정은 레벨이 아니라 **번호**로 한다 — 장타형 넷째 칸은 5 여야 걸린다', () => {

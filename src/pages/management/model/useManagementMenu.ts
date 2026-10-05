@@ -15,8 +15,12 @@ const SPECIAL_SWING_MENU_ID = '필살타법'
 
 type MenuKind = 'main' | SubMenuKind
 
-/** 관리 화면을 덮는 창 */
-export type ManagementOverlay = '기록실' | '필살타법' | '칭호'
+/**
+ * 관리 화면을 덮는 창.
+ * 필살타법 창은 그림(0x803d4)이 하나인데 상태가 둘이다 — 선수정보 칸 3 → 상태 0x7b(`'필살타법'`, 고르기) ·
+ * 트레이닝 칸 4 → 상태 0x6c(`'필살타법훈련'`, 배우기) (R7 4절).
+ */
+export type ManagementOverlay = '기록실' | '필살타법' | '필살타법훈련' | '칭호'
 
 /** 관리 화면 커서·하위 메뉴·훈련 연출 상태 */
 export function useManagementMenu(props: ManagementScreenProps) {
@@ -81,11 +85,15 @@ export function useManagementMenu(props: ManagementScreenProps) {
       return props.onSelect(id as ManagementCommand)
     }
     if (kind === '트레이닝') {
+      // 칸 4(필살타법)는 한계 검사(0x12e40~) 대신 0x12e02~0x12e2e 에서 **레벨 검사 없이** 곧장 창
+      // (상태 0x6c)을 연다. 그 앞의 사기 0 가드(0x12d8a, StrMODE[193])만 먼저 돈다 (R7 4절).
+      // 칸별 가드(이미 배움·인기도·선행·G 부족)는 창의 키 처리 0x17828 이 맡는다 → `SpecialSwingWindow`.
+      // StrMODE[85] 질문도 안 쓴다 — 창의 StrMODE[66] "배우시겠습니까?" 가 그 자리다.
+      if (id === SPECIAL_SWING_MENU_ID) {
+        if (props.career.morale <= 0) return props.onTrainingBlocked(id)
+        return setOverlay('필살타법훈련')
+      }
       if (props.isTrainingBlocked(id)) return props.onTrainingBlocked(id)
-      // StrMODE[85] 질문은 능력 훈련 칸 0~3 에만 붙는다. 칸 4(필살타법)는 원본에서
-      // 전용 화면(상태 0x6c, StrMODE[69]~[71])으로 가며 이 질문을 쓰지 않는다 —
-      // 그 화면이 아직 없어 연출로 바로 넘긴다.
-      if (id === SPECIAL_SWING_MENU_ID) return playback.start(id)
       return ask(`!C[!cFFFF00${id}훈련!cFFFFFF]을 하시겠습니까?`, () => playback.start(id))
     }
     if (kind === '아이템') return props.onOpenShop(id)
@@ -130,6 +138,11 @@ export function useManagementMenu(props: ManagementScreenProps) {
     isShowingBasicInfo,
     overlay,
     closeOverlay: () => setOverlay(null),
+    /** 필살타법 창(상태 0x6c)의 StrMODE[66] "예" — 원본은 상태 0x7d → 0x17f5c(연출 뒤 0xa3bac) */
+    startSpecialSwingTraining: () => {
+      setOverlay(null)
+      playback.start(SPECIAL_SWING_MENU_ID)
+    },
     cursor,
     parent,
     disabledIds,

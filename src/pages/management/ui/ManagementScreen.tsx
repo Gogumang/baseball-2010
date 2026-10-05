@@ -48,6 +48,11 @@ export interface ManagementScreenProps {
    * 안 넘기면 그 창이 열리지 않는다.
    */
   readonly onEquipTitle?: (title: string) => void
+  /**
+   * 필살타법 창(상태 0x7b)에서 기술을 골랐다 — 선수 +0x18 에 쓰고 저장한다 (0x1816c,
+   * `selectSpecialSwingNumber`). 안 넘기면 창이 고른 번호를 스스로만 들고 있다(저장 안 됨).
+   */
+  readonly onSelectSpecialSwing?: (number: number) => void
   /** 메인 메뉴로 나간다. 진행 상황은 이미 저장되어 있다. */
   readonly onExit: () => void
 }
@@ -97,7 +102,17 @@ export function ManagementScreen(props: ManagementScreenProps) {
         <TitleListWindow career={career} onEquip={props.onEquipTitle} onClose={menu.closeOverlay} />
       )}
       {menu.overlay === '필살타법' && (
-        <SpecialSwingWindow level={career.specialSwingLevel} sessions={career.specialSwingSessions} battingTypeIndex={career.battingTypeIndex} onClose={menu.closeOverlay} />
+        <SpecialSwingWindow level={career.specialSwingLevel} sessions={career.specialSwingSessions} battingTypeIndex={career.battingTypeIndex}
+          selectedNumber={props.onSelectSpecialSwing === undefined ? undefined : career.specialSwingNumber}
+          onSelectNumber={props.onSelectSpecialSwing}
+          onClose={menu.closeOverlay} />
+      )}
+      {menu.overlay === '필살타법훈련' && (
+        // G 부족([65])의 "예" 는 원본의 G 구매 페이지라 웹엔 갈 곳이 없다 — 창만 닫힌다
+        <SpecialSwingWindow mode="훈련" level={career.specialSwingLevel} sessions={career.specialSwingSessions}
+          battingTypeIndex={career.battingTypeIndex} selectedNumber={career.specialSwingNumber}
+          popularity={career.popularity} gamePoint={career.gamePoint}
+          onTrain={menu.startSpecialSwingTraining} onClose={menu.closeOverlay} />
       )}
       {props.detail !== null && <DetailPopup result={props.detail} onClose={props.onCloseDetail} />}
       {menu.question !== null && (

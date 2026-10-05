@@ -16,9 +16,18 @@ const 고정난수 = (value: number): RandomPort => ({
 })
 
 describe('성공 확률 표 0xcfdbe', () => {
-  it('레벨 1~5 가 15·20·25·25·30 % 다', () => {
+  it('번호 1~5 가 15·20·25·25·30 % 다 (색인 = 번호 − 1, 0x34cb0)', () => {
     expect(SPECIAL_SWING_PERCENTS).toEqual([15, 20, 25, 25, 30])
-    expect([1, 2, 3, 4, 5].map((level) => specialSwingPercentOf(level))).toEqual([15, 20, 25, 25, 30])
+    expect([1, 2, 3, 4, 5].map((swingNumber) => specialSwingPercentOf(swingNumber))).toEqual([15, 20, 25, 25, 30])
+  })
+
+  it('확률은 레벨이 아니라 고른 번호(+0x18)로 정한다 — 넷 다 배우고 파워 스윙(1)을 고르면 15 %', () => {
+    // 예전엔 레벨 4 를 넘겨 25 % 가 걸렸다
+    expect(specialSwingPercentOf(1)).toBe(15)
+  })
+
+  it('장타형 메테오 스윙도 저장 번호는 4 라 넷째 값 25 % 다 — 다섯째 30 은 안 쓰인다', () => {
+    expect(specialSwingPercentOf(4)).toBe(25)
   })
 
   it('마타자는 번호와 무관하게 30 % 다', () => {
@@ -27,12 +36,12 @@ describe('성공 확률 표 0xcfdbe', () => {
     expect(specialSwingPercentOf(0, true)).toBe(30)
   })
 
-  it('레벨 0(안 배움)은 0 % 라 굴려도 늘 실패다', () => {
+  it('번호 0(안 고름)은 0 % 라 굴려도 늘 실패다', () => {
     expect(specialSwingPercentOf(0)).toBe(0)
     expect(rollSpecialSwing(0, 고정난수(0))).toBe(false)
   })
 
-  it('레벨이 표보다 커도 마지막 칸으로 자른다', () => {
+  it('번호가 표보다 커도 마지막 칸으로 자른다', () => {
     expect(specialSwingPercentOf(9)).toBe(30)
   })
 })
@@ -43,7 +52,7 @@ describe('굴림 — `p·10 > rand(0, 1000)`', () => {
   })
 
   it('난수가 문턱과 같으면 실패다 (초과여야 성공)', () => {
-    // 레벨 1 = 15 % → 문턱 150
+    // 번호 1 = 15 % → 문턱 150
     expect(rollSpecialSwing(1, 고정난수(150 / 1000))).toBe(false)
     expect(rollSpecialSwing(1, 고정난수(149 / 1000))).toBe(true)
   })

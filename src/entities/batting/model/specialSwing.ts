@@ -15,23 +15,29 @@ import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
  * 되돌린다(0x34444). 부르는 쪽이 투구마다 다시 눌러야 한다.
  */
 
-/** 표 `0xcfdbe` — 필살타법 번호(레벨) 1~5 의 성공 확률 % */
+/**
+ * 표 `0xcfdbe` — 필살타법 **번호**(선수 +0x18) 1~5 의 성공 확률 %. 색인은 `번호 − 1` (0x34cb0).
+ * 저장 번호는 1~4 뿐이라(0x1816c) 다섯째 30 은 쓰이지 않는다 — 장타형 메테오도 번호 4 → 25%.
+ */
 export const SPECIAL_SWING_PERCENTS: readonly number[] = [15, 20, 25, 25, 30]
 /** 마타자는 번호와 무관하게 30% 다 (0x34c74) */
 export const ACE_BATTER_SPECIAL_SWING_PERCENT = 30
 /** `p·10 > rand(0, 1000)` — 원본이 천분율로 굴린다 */
 const RANDOM_LIMIT = 1000
 
-/** 그 타자의 성공 확률 % — 레벨 0(안 배움)이면 0 이라 굴려도 늘 실패다 */
-export function specialSwingPercentOf(level: number, isAceBatter = false): number {
+/**
+ * 그 타자의 성공 확률 % — **레벨(+0x201)이 아니라 고른 번호(+0x18)** 로 고른다.
+ * 번호 0(안 고름)이면 0 이다 (원본은 그때 '0' 키부터 무시한다 — 0x51e14).
+ */
+export function specialSwingPercentOf(swingNumber: number, isAceBatter = false): number {
   if (isAceBatter) return ACE_BATTER_SPECIAL_SWING_PERCENT
-  if (level <= 0) return 0
-  return SPECIAL_SWING_PERCENTS[Math.min(level, SPECIAL_SWING_PERCENTS.length) - 1] ?? 0
+  if (swingNumber <= 0) return 0
+  return SPECIAL_SWING_PERCENTS[Math.min(swingNumber, SPECIAL_SWING_PERCENTS.length) - 1] ?? 0
 }
 
 /** 필살 스윙이 성공했는가 — 성공하면 그 타구를 아무도 못 잡는다 */
-export function rollSpecialSwing(level: number, random: RandomPort, isAceBatter = false): boolean {
-  const percent = specialSwingPercentOf(level, isAceBatter)
+export function rollSpecialSwing(swingNumber: number, random: RandomPort, isAceBatter = false): boolean {
+  const percent = specialSwingPercentOf(swingNumber, isAceBatter)
   if (percent <= 0) return false
   return percent * 10 > randomIntegerBelow(random, 0, RANDOM_LIMIT)
 }
