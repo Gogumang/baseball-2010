@@ -361,3 +361,17 @@ describe('CPU 끼리 경기의 투수 교체·도루가 실제로 돈다', () =>
     expect(도루 / 경기수).toBeGreaterThan(1)
   })
 })
+
+describe('CPU 끼리 경기도 타순이 아홉 칸으로 이어진다 (team+0x32 · 0xaf020 의 mod 9, E 3b)', () => {
+  it('한 팀의 타석을 차례로 늘어놓으면 0~8 이 끊김 없이 돈다 — 이닝마다 1번부터가 아니다', () => {
+    for (const seed of [3, 17, 2010]) {
+      const score = simulateLeagueGame({ away: 1, home: 2 }, 씨앗난수(seed), 0)
+      for (const teamId of [1, 2]) {
+        const 칸들 = score.plateAppearances
+          .filter((appearance) => appearance.teamId === teamId)
+          .map((appearance) => appearance.battingOrderIndex)
+        expect(칸들, `씨앗 ${seed} 팀 ${teamId}`).toEqual(칸들.map((_slot, index) => index % 9))
+      }
+    }
+  })
+})

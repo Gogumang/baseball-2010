@@ -9,7 +9,7 @@ import { createCareer } from '@/entities/career/model/playerCareer'
  * 몸통 = 피부 × 15 + 팀 (0x78be8) · 헬멧 = 팀 (0x78c14). 예전엔 구운 색 그대로였다.
  */
 
-const 칠하기 = vi.hoisted(() => vi.fn((url: string) => url))
+const 칠하기 = vi.hoisted(() => vi.fn((url: string, _palette: number | null) => url))
 vi.mock('@/shared/lib/sprite/paletteSwap', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/shared/lib/sprite/paletteSwap')>()),
   useRecoloredSprite: 칠하기,

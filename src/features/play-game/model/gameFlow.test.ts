@@ -523,3 +523,34 @@ describe('나만의리그 타자편(모드 4) 선발은 4인 로테이션이다 
     expect(progress.opponentStartingPitcherIndex).toBe(0)
   })
 })
+
+describe('상대 타순은 이닝을 넘어 이어진다 (team+0x32 · 0xaf020 · 0xaebe4, E 3b)', () => {
+  /** 상대 팀 타석만 골라 낸다 — 우리 팀 동료 타석도 같은 목록에 쌓인다 */
+  const 상대타석 = (progress: GameProgress) =>
+    progress.leaguePlateAppearances.filter((appearance) => appearance.teamId === progress.opponentTeamId)
+
+  it('2회초 상대 첫 타자는 1회초 마지막 타자 다음 번이다 — 1번부터 다시가 아니다', () => {
+    for (const seed of [1, 7, 20100901]) {
+      let progress = startGame(createSeededRandom(seed))
+      // 사람은 후공(측 1)이라 첫 타석 전에 1회초가 끝나 있다
+      const 일회 = 상대타석(progress).length
+      expect(progress.opponentOrderIndex, `씨앗 ${seed}`).toBe(일회 % 9)
+
+      const random = createSeededRandom(seed + 1)
+      while (!progress.game.isFinished && 상대타석(progress).length === 일회) {
+        progress = applyPlayerOutcome(progress, { kind: '삼진' }, random)
+      }
+      const 이회첫타자 = 상대타석(progress)[일회]
+      expect(이회첫타자.battingOrderIndex, `씨앗 ${seed}`).toBe(일회 % 9)
+    }
+  })
+
+  it('상대 타순은 아홉 칸만 돈다 — 로스터 뒤 셋(벤치)은 타석에 안 선다', () => {
+    const random = createSeededRandom(31)
+    let progress = startGame(random)
+    while (!progress.game.isFinished) progress = applyPlayerOutcome(progress, { kind: '삼진' }, random)
+
+    const 칸들 = 상대타석(progress).map((appearance) => appearance.battingOrderIndex)
+    expect(칸들).toEqual(칸들.map((_slot, index) => index % 9))
+  })
+})

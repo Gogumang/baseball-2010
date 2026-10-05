@@ -64,6 +64,15 @@ export interface GameProgress {
    */
   readonly ourStartingPitcherIndex: number
   readonly opponentStartingPitcherIndex: number
+  /**
+   * 상대 팀의 지금 타순 칸 (팀 객체 `team+0x32`, 0~8) — **이닝이 바뀌어도 이어진다**.
+   *
+   * 타석이 끝나면 `0xaf020` 이 `team+0x293 = (team+0x32 + 1) mod 9` 로 대기값을 세우고, 다음 타석
+   * 시작 `0xaebe4` 가 그 값을 `team+0x32` 에 확정한다 (`aedee`). 이 칸을 쓰는 곳은 팀 초기화
+   * `0xb7c42`·경기 시작 `0x3a55a`·미션 시작 `0xaa888`/`0xaa89e`·확정 `0xaebe4` 넷뿐이라
+   * **이닝 전환에서 0 으로 되돌리는 코드가 없다** (E 3b 확정).
+   */
+  readonly opponentOrderIndex: number
   readonly myStats: SeasonStats
   /** 사용자 타석 인기도 점수 합 */
   readonly popularityPoints: number
@@ -201,6 +210,8 @@ export function startGame(
     // (P1 1-1 의 `else (모드 4): if g != 0: 0xb8c80(내 팀)` + 그 앞줄의 상대 팀). 무작위가 아니다.
     opponentStartingPitcherIndex: rotationSlotOf(dayCounter),
     ourStartingPitcherIndex: rotationSlotOf(dayCounter),
+    // 경기 시작 0x3a55a 가 0 으로 세운다 — 그 뒤로는 이닝을 넘어 이어진다
+    opponentOrderIndex: 0,
     myStats: EMPTY_SEASON_STATS,
     popularityPoints: 0,
     doublePlays: 0,
@@ -560,9 +571,8 @@ function triggerBurstForMyAtBat(progress: GameProgress, random: RandomPort): Gam
       isHumanTeamBatting: true,
       bases: progress.game.bases,
       outs: progress.game.outs,
-      // 상대 타순 슬롯(team+0x32)은 우리 공격 중에도 상대 팀 칸을 가리킨다 —
-      // 웹판은 이닝마다 1번부터 시작하는 근사라(playOpponentInning) 여기서는 0 이다
-      opponentBattingSlot: 0,
+      // 상대 타순 슬롯(team+0x32)은 우리 공격 중에도 상대 팀 칸을 가리킨다 — 다음 상대 타자 자리다
+      opponentBattingSlot: progress.opponentOrderIndex,
       hitsInGame: progress.myStats.hits,
       homeRunsInGame: progress.myStats.homeRuns,
       strikeoutsInGame: progress.pitching.strikeouts,
@@ -593,15 +603,19 @@ function advanceUntilPlayerTurn(
 
 /**
  * 상대 공격은 이닝 득점 확률표가 아니라 원본처럼 타석을 3아웃까지 돌려 점수를 읽는다 (0xc11f0).
- * 상대 타순은 웹판이 아직 따로 들고 있지 않아 이닝마다 1번부터 시작한다 (추정).
+ *
+ * 모드 4 도 사람이 필요 없는 타석은 간이 엔진으로 넘긴다 (0x48530 → 0xc262c, P1 1-3).
+ * 상대 타순은 `opponentOrderIndex`(team+0x32)에서 시작해 **이어진다** — 이닝마다 1번부터가 아니다
+ * (E 3b 확정: 이닝 전환에서 이 칸을 0 으로 되돌리는 코드가 없다). 타순은 아홉 칸을 돈다
+ * (`0xaf020` 의 `mod 9`) — 로스터 열두 명 중 뒤 셋(벤치)은 타순에 안 선다.
  */
 function playOpponentInning(progress: GameProgress, random: RandomPort): GameProgress {
   // 상대 타석도 장면 상태 0xf 를 지나므로 타석마다 돌발을 굴리고, 그 타석 결과로 판정한다
   let burst = progress.burst
   let resolution: BurstResolution | null = null
   const half = simulateHalfInning(
-    0,
-    (order) => batterAt(progress.opponentTeamId, order),
+    progress.opponentOrderIndex,
+    (order) => batterAt(progress.opponentTeamId, order % BATTING_ORDER_SIZE),
     startingPitcherOf(progress.ourTeamId, progress.ourStartingPitcherIndex),
     progress.game.inning,
     random,
@@ -639,6 +653,7 @@ function playOpponentInning(progress: GameProgress, random: RandomPort): GamePro
     {
       ...progress,
       game,
+      opponentOrderIndex: half.nextBattingOrderIndex % BATTING_ORDER_SIZE,
       burst,
       lastBurstResolution: resolution ?? progress.lastBurstResolution,
       pitching: {
@@ -656,6 +671,8 @@ function playOpponentInning(progress: GameProgress, random: RandomPort): GamePro
         ...half.plateAppearances.map((appearance) => ({
           teamId: progress.opponentTeamId,
           ...appearance,
+          // 타순 커서는 이닝 안에서 9 를 넘어 셀 수 있다 — 로스터 칸은 아홉 칸 안이다
+          battingOrderIndex: appearance.battingOrderIndex % BATTING_ORDER_SIZE,
         })),
       ],
     },
@@ -678,7 +695,8 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort): GameProg
             isHumanTeamBatting: true,
             bases: progress.game.bases,
             outs: progress.game.outs,
-            opponentBattingSlot: 0,
+            // 상대 타순 슬롯(team+0x32)은 우리 공격 중에도 상대 팀의 다음 타자 자리를 가리킨다
+            opponentBattingSlot: progress.opponentOrderIndex,
             hitsInGame: logBefore.stats.hits,
             homeRunsInGame: logBefore.stats.homeRuns,
             strikeoutsInGame: progress.pitching.strikeouts,

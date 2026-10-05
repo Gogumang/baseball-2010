@@ -110,6 +110,13 @@ export interface LeagueGameScore {
   readonly steals: number
 }
 
+/**
+ * 타순 칸 수. 팀 객체 `team+0xe..+0x16` 아홉 칸이 타순이고, 타석이 끝나면 `0xaf020` 이
+ * `(team+0x32 + 1) mod 9` 로 다음 칸을 세운다 (E 3b 확정). 로스터 열두 명 중 뒤 셋은 벤치라
+ * **타순에 서지 않는다** — 예전에는 커서를 12 로 나눠 벤치 셋까지 돌려 썼다(원본과 다름).
+ */
+const BATTING_ORDER_SIZE = 9
+
 /** 팀 투수 여덟 칸 (`team+0x0c`) — 벤치는 여기서 마운드와 이미 쓴 투수를 뺀 나머지다 */
 const ALL_PITCHER_SLOTS: readonly number[] = Array.from({ length: PITCHERS_PER_TEAM }, (_, slot) => slot)
 
@@ -162,7 +169,12 @@ export function simulateLeagueGame(
   /** 반 이닝이 내놓은 타석 결과를 공격 팀 것으로 적어 둔다 — 판정에는 손대지 않는다 */
   const collect = (teamId: number, half: HalfInningResult) => {
     for (const appearance of half.plateAppearances) {
-      plateAppearances.push({ teamId, ...appearance })
+      // 타순 커서는 이닝 안에서 9 를 넘어 셀 수 있다 — 로스터 칸은 타순 아홉 칸 안이다
+      plateAppearances.push({
+        teamId,
+        ...appearance,
+        battingOrderIndex: appearance.battingOrderIndex % BATTING_ORDER_SIZE,
+      })
     }
   }
   /**
@@ -192,7 +204,7 @@ export function simulateLeagueGame(
   for (let inning = 1; inning <= MAXIMUM_INNINGS; inning += 1) {
     const top = simulateHalfInning(
       awayOrder,
-      (order) => batterAt(matchup.away, order),
+      (order) => batterAt(matchup.away, order % BATTING_ORDER_SIZE),
       homePitcher,
       inning,
       random,
@@ -201,7 +213,7 @@ export function simulateLeagueGame(
       defenseOf(matchup.home, homeMound, homeRuns - awayRuns),
     )
     awayRuns += top.runs
-    awayOrder = top.nextBattingOrderIndex
+    awayOrder = top.nextBattingOrderIndex % BATTING_ORDER_SIZE
     homeMound = top.mound ?? homeMound
     steals += top.steals
     collect(matchup.away, top)
@@ -212,7 +224,7 @@ export function simulateLeagueGame(
 
     const bottom = simulateHalfInning(
       homeOrder,
-      (order) => batterAt(matchup.home, order),
+      (order) => batterAt(matchup.home, order % BATTING_ORDER_SIZE),
       awayPitcher,
       inning,
       random,
@@ -221,7 +233,7 @@ export function simulateLeagueGame(
       defenseOf(matchup.away, awayMound, awayRuns - homeRuns),
     )
     homeRuns += bottom.runs
-    homeOrder = bottom.nextBattingOrderIndex
+    homeOrder = bottom.nextBattingOrderIndex % BATTING_ORDER_SIZE
     awayMound = bottom.mound ?? awayMound
     steals += bottom.steals
     collect(matchup.home, bottom)
