@@ -1,0 +1,208 @@
+import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
+import {
+  gainPitcherMorale,
+  gainPitcherPopularity,
+  gainPitcherReputation,
+  ORIGINAL_MONEY_UNIT,
+} from '@/entities/pitcher-career/model/pitcherCareer'
+import {
+  judgePitcherEnding,
+  judgePitcherSeasonAwards,
+  pitcherRetirementEndingOf,
+  pitcherSalaryNegotiationRankOf,
+  pitcherYearEndStepOf,
+  PITCHER_RELEASE_ENDING,
+  PITCHER_RETIREMENT_ENDING,
+  recordPitcherSeasonMvp,
+} from '@/entities/pitcher-career/model/pitcherSeasonFlow'
+import { achievedPitcherGoalCount } from '@/entities/pitcher-career/model/pitcherYearGoals'
+import {
+  applySalaryChange,
+  ENDING_EVENT_IDS,
+  FINAL_RETIREMENT_EVENT_ID,
+  GOAL_INTRO_EVENT_ID,
+  goalResultEventId,
+  RELEASE_EVENT_ID,
+  RETIREMENT_CHOICE_EVENT_ID,
+  SALARY_ACCEPT_EVENT_ID,
+  SALARY_EVENT_ID,
+  SALARY_FIRM_EVENT_ID,
+  SALARY_POLITE_EVENT_ID,
+  salaryResultEventId,
+} from '@/entities/career/model/seasonFlow'
+import {
+  MVP_INTRO_EVENT_ID,
+  mvpResultEventId,
+  TITLE_INTRO_EVENT_ID,
+  titleResultEventId,
+} from '@/entities/awards/model/seasonAwards'
+import { EVENT_REWARD_KIND, rewardsIn } from '@/entities/story/model/eventReward'
+import type { EventReward } from '@/entities/story/model/eventReward'
+import { ORIGINAL_EVENTS } from '@/shared/config/original/events'
+import { BALANCE } from '@/shared/config/original/balance'
+
+/**
+ * 나만의리그 **투수편**(모드 3) 연말 이벤트 사슬 — 시즌 끝 상태 기계 0x1cdec 의 136 → 130 → 131 → 132.
+ *
+ * ```
+ *   136 (0x10bb0)  392 올해의 목표 → 0x8d0e0: k = 0xa3de8(career, 0) → 393(5) · 394(4) · 395(3) · 396(그 밖)
+ *   130 (0x19824)  0x8dad4 타이틀 → 370 → 0x8b04c: 371 + 수상 수 (372 +3 · 373 +6 · 374 +10 소지금)
+ *   131 (0x19774)  0x8dd60 MVP 판정(비트 career+0x1ca) → 375 → 0x8b370: 377(MVP) / 376
+ *   132 (0x10c54)  연말 — 판정 == 1 → 501 · 연차idx == 12 → 504 · idx > 5 → 502 · 그 밖 380
+ *   380 → 381 강경 / 382 정중 → 0x8d058: k = 0xa4d78 → 384~387 / 388~391 · 383 수락
+ *   502 → 380 / 496 → 380 / 503
+ * ```
+ * (B-season-awards.md B-1 · "시즌 끝 상태 순서" · 5a. 상태 함수는 모드 3·4 공용이고, 0x8b04c·0x8b370 의
+ * 나만의리그 갈래도 모드 3·4 를 가르지 않는다.)
+ *
+ * 이 파일은 **순수 함수**만 둔다 — 이벤트 재생·화면은 세션 몫이다. 쓰는 법:
+ *   1. 정규시즌·포스트시즌이 끝나면 `nextPitcherYearEndStep(career, [])` → 392 부터.
+ *   2. 이벤트에 **들어갈 때** `enterPitcherYearEndEvent` (375 는 그 앞에서 MVP 비트를 남긴다 — 상태 131).
+ *   3. 이벤트가 **끝날 때** `finishPitcherYearEndEvent` (그 이벤트의 보상 명령 7 을 원본대로).
+ *      선택지(380·502·496)는 이벤트 데이터의 `gotoEvent` 가 잇는다 — 본 번호를 `viewed` 에 쌓는다.
+ *   4. 사슬이 끊기면(선택지 없이 끝난 이벤트) 본 번호 전부로 `nextPitcherYearEndStep` 을 다시 부른다.
+ *
+ * ⚠️ 미해결·미이식: 상태 128(0x120a4)·114 의 내용, 홀수 연차 국가대표(상태 133, 461~464 — 판정은
+ *    `achievedPitcherGoalCount(career, '국가대표')` 로 셀 수 있다). 이 사슬은 132 의 380/502 뒤에서 끝난다.
+ */
+
+/** 393~396 — 목표 결과 */
+const GOAL_RESULT_EVENT_IDS: readonly number[] = [393, 394, 395, 396]
+/** 371~374 — 타이틀 결과 */
+const TITLE_RESULT_EVENT_IDS: readonly number[] = [371, 372, 373, 374]
+/** 376·377 — MVP 결과 */
+const MVP_RESULT_EVENT_IDS: readonly number[] = [376, 377]
+/** 384~391 — 연봉 결과 */
+const SALARY_RESULT_EVENT_IDS: readonly number[] = [384, 385, 386, 387, 388, 389, 390, 391]
+const INJURY_ENDING_EVENT_ID = 500
+const INJURY_ENDING = 0
+
+/** 연말 사슬의 다음 걸음 */
+export type PitcherYearEndEventStep =
+  | { readonly kind: '이벤트'; readonly eventId: number }
+  /** 383 수락 · 384~391 연봉 결과 뒤 — 새 시즌 처리 0x1b768 (`startNextPitcherSeason`) */
+  | { readonly kind: '새시즌' }
+  /** 500·501·503·504 뒤 — 엔딩 화면 141 */
+  | { readonly kind: '엔딩'; readonly endingIndex: number }
+
+/** 연말 분기 0x10c54 의 이벤트 번호 — `pitcherYearEndStepOf` 와 같은 판정을 번호로 낸다 */
+export function pitcherYearEndEventIdOf(career: PitcherCareer): number {
+  const step = pitcherYearEndStepOf(career)
+  if (step.kind === '엔딩') {
+    return step.endingIndex === PITCHER_RELEASE_ENDING ? RELEASE_EVENT_ID : FINAL_RETIREMENT_EVENT_ID
+  }
+  return step.kind === '은퇴선택' ? RETIREMENT_CHOICE_EVENT_ID : SALARY_EVENT_ID
+}
+
+/**
+ * 본 이벤트 번호들(`viewed`, 이번 연말에 본 것 전부)로 다음 걸음을 고른다.
+ * 타자편 `app/model/seasonEvents.nextSeasonStep` 과 같은 꼴이고, 그 사이에 130·131(370~377)이 든다.
+ * 늦은 단계부터 본다 — 앞 단계 번호가 `viewed` 에 남아 있어도 뒤 단계가 이긴다.
+ */
+export function nextPitcherYearEndStep(career: PitcherCareer, viewed: readonly number[]): PitcherYearEndEventStep {
+  const saw = (id: number) => viewed.includes(id)
+  const sawAny = (ids: readonly number[]) => viewed.some((id) => ids.includes(id))
+
+  if (viewed.some((id) => ENDING_EVENT_IDS.has(id))) {
+    const endingIndex = saw(INJURY_ENDING_EVENT_ID)
+      ? INJURY_ENDING
+      : saw(RELEASE_EVENT_ID)
+        ? PITCHER_RELEASE_ENDING
+        : saw(FINAL_RETIREMENT_EVENT_ID)
+          ? (judgePitcherEnding(career) ?? PITCHER_RETIREMENT_ENDING)
+          : pitcherRetirementEndingOf(career)
+    return { kind: '엔딩', endingIndex }
+  }
+  if (sawAny(SALARY_RESULT_EVENT_IDS) || saw(SALARY_ACCEPT_EVENT_ID)) return { kind: '새시즌' }
+  if (saw(SALARY_FIRM_EVENT_ID) || saw(SALARY_POLITE_EVENT_ID)) {
+    const choice = saw(SALARY_FIRM_EVENT_ID) ? SALARY_FIRM_EVENT_ID : SALARY_POLITE_EVENT_ID
+    return { kind: '이벤트', eventId: salaryResultEventId(choice, pitcherSalaryNegotiationRankOf(career)) }
+  }
+  // 상태 132 — 502·496 의 선택지는 데이터의 gotoEvent 로 380·503 에 이어진다
+  if (sawAny(MVP_RESULT_EVENT_IDS)) return { kind: '이벤트', eventId: pitcherYearEndEventIdOf(career) }
+  if (saw(MVP_INTRO_EVENT_ID)) {
+    // 0x8b370 — 상태 131 이 남긴 플래그(evt+0x388)를 읽는다. 웹은 그 해 MVP 비트가 같은 값이다
+    return { kind: '이벤트', eventId: mvpResultEventId(judgePitcherSeasonAwards(career).isMostValuablePlayer) }
+  }
+  if (sawAny(TITLE_RESULT_EVENT_IDS)) return { kind: '이벤트', eventId: MVP_INTRO_EVENT_ID }
+  if (saw(TITLE_INTRO_EVENT_ID)) {
+    return { kind: '이벤트', eventId: titleResultEventId(judgePitcherSeasonAwards(career).wonCount) }
+  }
+  if (sawAny(GOAL_RESULT_EVENT_IDS)) return { kind: '이벤트', eventId: TITLE_INTRO_EVENT_ID }
+  if (saw(GOAL_INTRO_EVENT_ID)) {
+    return { kind: '이벤트', eventId: goalResultEventId(achievedPitcherGoalCount(career, '연말')) }
+  }
+  return { kind: '이벤트', eventId: GOAL_INTRO_EVENT_ID }
+}
+
+/**
+ * 이벤트에 **들어가기 전** 상태 함수가 하는 일.
+ * 375 는 상태 131 이 0x8dd60 으로 MVP 를 판정하고 비트를 남긴 **뒤에** 튼다 (0x8ded2 → 0xa4d2c).
+ * 연봉 등급 k(0xa4d78)가 이 비트를 읽는다.
+ */
+export function enterPitcherYearEndEvent(career: PitcherCareer, eventId: number): PitcherCareer {
+  return eventId === MVP_INTRO_EVENT_ID ? recordPitcherSeasonMvp(career) : career
+}
+
+/** 이벤트 데이터의 보상 명령 7 (r_event) */
+export function pitcherYearEndRewardsOf(eventId: number): readonly EventReward[] {
+  const event = ORIGINAL_EVENTS.find((candidate) => candidate.id === eventId)
+  return event === undefined ? [] : rewardsIn(event.commands)
+}
+
+/**
+ * 목표 결과 이벤트의 **연차 보정** (0x8d508~0x8d5c4) — 나만의리그 갈래(0x7b999 거짓)는 모드 3·4 공용이다.
+ * y = 연차idx(0부터). 393·394·395 → 종류 0 +3y · 1 −2y · 3 +y / 396 → 종류 0 −4y · 1 −3y.
+ * 타자편 `entities/story/model/eventReward.ts` 의 같은 표를 투수편 쪽에 옮겨 적었다
+ * (그 함수는 `PlayerCareer` 만 받는다).
+ */
+const YEAR_ADJUSTED_EVENTS: Readonly<Record<number, Readonly<Record<number, number>>>> = {
+  393: { 0: 3, 1: -2, 3: 1 },
+  394: { 0: 3, 1: -2, 3: 1 },
+  395: { 0: 3, 1: -2, 3: 1 },
+  396: { 0: -4, 1: -3 },
+}
+
+function yearAdjusted(rewards: readonly EventReward[], eventId: number, season: number): readonly EventReward[] {
+  const table = YEAR_ADJUSTED_EVENTS[eventId]
+  const years = Math.max(0, season - 1)
+  if (table === undefined || years === 0) return rewards
+  return rewards.map((reward) => {
+    const perYear = table[reward.kind]
+    return perYear === undefined ? reward : { ...reward, value: reward.value + perYear * years }
+  })
+}
+
+const MAXIMUM_MONEY = BALANCE.limits.moneyUnits * ORIGINAL_MONEY_UNIT
+
+/**
+ * 보상 하나 (점프표 0xd4e50 — career 칸이라 모드 3·4 공용).
+ * 연말 사슬(370~396·501~504)에 나오는 종류는 0 인기도 · 1 평판 · 3 소지금(100만 단위, 상한 9999) ·
+ * 20 연봉 변동(0x8cac0) · 21 엔딩 진입(보상 처리는 무시 — 세션이 엔딩 화면으로 넘긴다) 뿐이다.
+ * 사기(2)도 같은 칸이라 함께 둔다. 그 밖의 종류는 이 사슬에 없어 다루지 않는다.
+ */
+function applyReward(career: PitcherCareer, reward: EventReward): PitcherCareer {
+  switch (reward.kind) {
+    case EVENT_REWARD_KIND.인기도:
+      return gainPitcherPopularity(career, reward.value)
+    case EVENT_REWARD_KIND.평판:
+      return gainPitcherReputation(career, reward.value)
+    case EVENT_REWARD_KIND.사기:
+      return gainPitcherMorale(career, reward.value)
+    case EVENT_REWARD_KIND.소지금:
+      return {
+        ...career,
+        money: Math.min(MAXIMUM_MONEY, Math.max(0, career.money + reward.value * ORIGINAL_MONEY_UNIT)),
+      }
+    case EVENT_REWARD_KIND.연봉:
+      return applySalaryChange(career, reward.value)
+    default:
+      return career
+  }
+}
+
+/** 이벤트가 **끝날 때** 그 이벤트의 보상을 준다 (393~396 은 연차 보정을 얹어서) */
+export function finishPitcherYearEndEvent(career: PitcherCareer, eventId: number): PitcherCareer {
+  const rewards = yearAdjusted(pitcherYearEndRewardsOf(eventId), eventId, career.season)
+  return rewards.reduce(applyReward, career)
+}

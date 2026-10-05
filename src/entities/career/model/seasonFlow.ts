@@ -171,11 +171,32 @@ const SALARY_RATE: readonly number[] = [30, 20, 10, -20, 20, 10, 5, -10, 0]
 const MAXIMUM_SALARY = 65_535
 
 /**
+ * 연봉협상에 필요한 칸 — 타자편 `PlayerCareer` 와 투수편 `PitcherCareer` 가 같은 커리어 칸
+ * (인기도 0xb6e79 · 시즌 시작 인기도 career+0x78 · 연봉 career+0x1c8)을 쓴다.
+ * 원본도 한 벌의 함수(0xa39fc · 0x8cac0)가 모드 3·4 를 같이 돈다.
+ */
+export interface SalaryHolder {
+  readonly popularity: number
+  readonly popularityAtSeasonStart: number
+  readonly salary: number
+}
+
+/**
+ * 380 제시액 (0x8bc4c → 0xa39fc). 상승분 = max(1, trunc((인기도 − 시즌 시작 인기도) / 4)),
+ * 새 연봉 = 상승분 + 현재 연봉. 단위는 100만원 한 칸 — 대사 "%s만 상승해서 %s만" 은 둘 다 ×100 해서
+ * 금액 서식 0x55cf4 로 찍는다.
+ */
+export function salaryOfferOf(career: SalaryHolder): { readonly raise: number; readonly salary: number } {
+  const raise = Math.max(1, Math.trunc((career.popularity - career.popularityAtSeasonStart) / 4))
+  return { raise, salary: raise + career.salary }
+}
+
+/**
  * 연봉 = base ± trunc(base × 변동률 / 100), base = max(1, trunc(인기도 상승/4)) + 이전 연봉 (0x8cac0).
  * 단위는 원본 그대로 100만원 한 칸이다 (관리 화면이 ×100 해서 만원으로 보여 준다).
  */
-export function applySalaryChange(career: PlayerCareer, code: number): PlayerCareer {
-  const base = Math.max(1, Math.trunc((career.popularity - career.popularityAtSeasonStart) / 4)) + career.salary
+export function applySalaryChange<C extends SalaryHolder>(career: C, code: number): C {
+  const base = salaryOfferOf(career).salary
   const rate = SALARY_RATE[code] ?? 0
   const change = Math.sign(rate) * Math.trunc((base * Math.abs(rate)) / 100)
   return { ...career, salary: Math.min(MAXIMUM_SALARY, base + change) }

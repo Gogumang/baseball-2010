@@ -504,28 +504,45 @@ YEAR_COUNT = 13
 GOAL_COUNT = 5
 # 선수 +0xb 상위 비트로 고르는 표 중 실제 값이 있는 것은 두 개다 (세 번째는 다른 데이터)
 BATTER_GOAL_TABLE_COUNT = 2
+# 투수 표 (0xa3de8 의 0xa3e56~0xa3e88): u16 0xd7e9a[연차idx·5 + i], 보직(0xb6ded)이 2(마무리)면
+# +0x82 바이트(65칸) 뒤 표. 두 표가 끝나는 곳이 곧 타자 표 0xd7f9e 다
+PITCHER_YEAR_GOAL_TABLE_VA = 0xD7E9A
+PITCHER_GOAL_TABLE_COUNT = 2
 
 
-def generate_year_goals() -> None:
-    """올해의 목표 — 연차 13 × 5칸 (타율×1000 · 안타 · 홈런 · 타점 · 인기도 상승), StrUSER_EVT[0]."""
-    binary = (EXTRACTED.parent / 'work' / 'jar' / 'binary.mod').read_bytes()
-    offset = BATTER_YEAR_GOAL_TABLE_VA - BINARY_VA_OFFSET
-    count = BATTER_GOAL_TABLE_COUNT * YEAR_COUNT * GOAL_COUNT
+def year_goal_tables(binary: bytes, va: int, table_count: int) -> str:
+    offset = va - BINARY_VA_OFFSET
+    count = table_count * YEAR_COUNT * GOAL_COUNT
     values = struct.unpack_from(f'<{count}H', binary, offset)
     tables = []
-    for table in range(BATTER_GOAL_TABLE_COUNT):
+    for table in range(table_count):
         rows = []
         for year in range(YEAR_COUNT):
             start = (table * YEAR_COUNT + year) * GOAL_COUNT
             rows.append('[' + ', '.join(str(v) for v in values[start:start + GOAL_COUNT]) + ']')
         tables.append('  [\n    ' + ',\n    '.join(rows) + ',\n  ]')
+    return ',\n'.join(tables) + ','
+
+
+def generate_year_goals() -> None:
+    """올해의 목표 — 연차 13 × 5칸 (타율×1000 · 안타 · 홈런 · 타점 · 인기도 상승), StrUSER_EVT[0]."""
+    binary = (EXTRACTED.parent / 'work' / 'jar' / 'binary.mod').read_bytes()
     lines = [
         '/**',
         ' * 타자 올해의 목표 (binary.mod 0xd7f9e). [표][연차−1] = [타율×1000, 안타, 홈런, 타점, 인기도 상승].',
         ' * 표는 선수 타입 비트(선수 +0xb)로 고른다.',
         ' */',
         'export const BATTER_YEAR_GOALS: readonly (readonly (readonly number[])[])[] = [',
-        ',\n'.join(tables) + ',',
+        year_goal_tables(binary, BATTER_YEAR_GOAL_TABLE_VA, BATTER_GOAL_TABLE_COUNT),
+        ']',
+        '',
+        '/**',
+        ' * 투수 올해의 목표 (binary.mod 0xd7e9a, 판정 0xa3de8). [표][연차−1] =',
+        ' * [방어율×100 (이하), 실점 +0x22 (이하), 승 (마무리는 세이브+승, 이상), 탈삼진 (이상), 인기도 상승 (이상)].',
+        ' * 표 0 = 보직(0xb6ded)이 마무리(2)가 아닐 때, 표 1 = 마무리 (+0x82 바이트 뒤).',
+        ' */',
+        'export const PITCHER_YEAR_GOALS: readonly (readonly (readonly number[])[])[] = [',
+        year_goal_tables(binary, PITCHER_YEAR_GOAL_TABLE_VA, PITCHER_GOAL_TABLE_COUNT),
         ']',
     ]
     write('yearGoals.ts', '\n'.join(lines) + '\n')

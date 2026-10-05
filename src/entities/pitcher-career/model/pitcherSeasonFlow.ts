@@ -4,11 +4,14 @@ import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import { EMPTY_LEAGUE_RECORD } from '@/entities/awards/model/leaderboard'
 import type { LeagueRecord } from '@/entities/awards/model/leaderboard'
 import {
+  hasMvpInSeason,
   judgeAwards,
+  judgeTitles,
   leaguePitcherRecordsOf,
+  MVP_SALARY_BONUS,
   recordMvpSeason,
-  salaryRankOf,
 } from '@/entities/awards/model/seasonAwards'
+import { achievedPitcherGoalCount } from '@/entities/pitcher-career/model/pitcherYearGoals'
 import type { AwardRole, SeasonAwards } from '@/entities/awards/model/seasonAwards'
 
 /**
@@ -20,13 +23,13 @@ import type { AwardRole, SeasonAwards } from '@/entities/awards/model/seasonAwar
  * 그래서 값만 `PitcherCareer` 에서 읽도록 옮겨 적었다 — 타자편 함수는 `PlayerCareer` 를 받아
  * 그대로 부를 수가 없다.
  *
- * **투수편이 타자편과 다른 곳**(그래서 여기 없는 것):
+ * **투수편이 타자편과 다른 곳**:
  *   - 올해의 목표(392·393~396)는 투수 표 `0xd7e9a` 를 쓰고 마무리면 `+0x82` 뒤 표다
- *     (B 7절 · B-9). 그 표가 `shared/config/original/yearGoals.ts` 에 **아직 안 뽑혀 있어**
- *     (생성기가 타자 표 0xd7f9e 만 읽는다) 달성 수를 셀 수 없다 → 목표 평가 단계를 넣지 않았다.
+ *     (B 7절 · B-9) → `pitcherYearGoals.ts`.
  *   - 개인 타이틀(130)·MVP(131)·연봉협상 등급 k 는 **이 파일 아래쪽에 붙었다**.
  *     리그 선수 기록표가 이제 투수 줄(아웃·실점·탈삼진·투구·승·패)도 쌓아서
  *     (`entities/league/model/leaguePlayerStats.ts`) 1위를 가릴 재료가 생겼다.
+ *   - 연말 이벤트 사슬(392 → 370 → 375 → 380/502…)과 보상은 `pitcherYearEnd.ts`.
  */
 
 /** 부상 상태로 이만큼 경기에 나가면 부상 엔딩 (0xa3a84 첫 줄 `+0x1b6 > 19`, B-7) */
@@ -199,14 +202,12 @@ export function pitcherLeagueRecordsOf(career: PitcherCareer): readonly LeagueRe
 /**
  * 투수편 시상 한 번.
  *
- * ⚠️ MVP 의 둘째 갈래 "올해의 목표(단계 2) 4개 이상" 은 **아직 셀 수 없다** — 투수 목표 표
- * 0xd7e9a(마무리는 +0x82 뒤)가 `shared/config/original/yearGoals.ts` 에 안 뽑혀 있어
- * (생성기가 타자 표 0xd7f9e 만 읽는다) 달성 수가 없다. 그래서 0 을 넘긴다:
- * 투수편 MVP 는 당분간 **타이틀 3개 독식** 쪽으로만 난다. 목표 표가 들어오면 이 줄만 고치면 된다.
+ * MVP 의 둘째 갈래 "올해의 목표 4개 이상" 은 0x8de84 `0xa3de8(career, 2)` — **단계 2**
+ * (방어율·실점 목표 −10%, 나머지 셋 +10%)로 센다 (`pitcherYearGoals.ts`).
  */
 export function judgePitcherSeasonAwards(career: PitcherCareer): SeasonAwards {
   return judgeAwards(
-    { teamId: career.teamId, name: career.name, achievedGoalCount: 0 },
+    { teamId: career.teamId, name: career.name, achievedGoalCount: achievedPitcherGoalCount(career, 'MVP') },
     pitcherLeagueRecordsOf(career),
     pitcherAwardRoleOf(career),
   )
@@ -223,10 +224,18 @@ export function recordPitcherSeasonMvp(career: PitcherCareer): PitcherCareer {
 }
 
 /**
- * 연봉협상 등급 k (0xa4d78) — 투수는 다승(마무리면 세이브)·탈삼진·방어율 1위 수 + MVP 면 2.
- * 연봉협상 이벤트(380~391)가 투수편 화면에 아직 없어 **값만 내 둔다** — 붙일 자리는
- * `app/model/usePitcherLeagueSession.ts` 의 `continueCareer`(502 "연봉 협상한다") 다.
+ * 연봉협상 등급 k (0xa4d78) — 투수(전역 모드 3)는 다승(마무리면 세이브)·탈삼진·방어율 1위가 내 선수면
+ * 각 +1 (0xa4df6~0xa4e9c, 규정 고정 인자 1), 그리고 **올해 MVP 비트**(career+0x1ca 의 bit[연차idx], 0xa4d40)면 +2.
+ *
+ * 원본은 MVP 를 다시 판정하지 않고 **상태 131 이 남긴 비트**를 읽는다 — 그래서 여기서도
+ * `mvpSeasonBits` 를 본다. 부르는 쪽은 그 전에 `recordPitcherSeasonMvp` 를 거쳐야 한다
+ * (`pitcherYearEnd.enterPitcherYearEndEvent` 가 375 에 들어갈 때 해 준다).
  */
 export function pitcherSalaryNegotiationRankOf(career: PitcherCareer): number {
-  return salaryRankOf(judgePitcherSeasonAwards(career))
+  // 0xa4e0e: 보직 0xb6705 가 **0 이 아니면** 세이브(종류 3) — 보직 1 도 세이브 쪽이다 (등록은 0·2 만 만든다)
+  const role: AwardRole = career.role === PITCHER_ROLE.starter ? '투수' : '마무리'
+  const wonCount = judgeTitles(pitcherLeagueRecordsOf(career), role).filter(
+    (title) => title.isMine,
+  ).length
+  return wonCount + (hasMvpInSeason(career.mvpSeasonBits, career.season) ? MVP_SALARY_BONUS : 0)
 }

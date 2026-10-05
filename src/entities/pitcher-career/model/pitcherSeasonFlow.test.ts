@@ -169,8 +169,10 @@ describe('투수편 개인 타이틀·MVP·연봉 등급 (0x8dad4 · 0x8dd60 · 
 
     expect(시상.wonCount).toBe(3)
     expect(시상.isMostValuablePlayer).toBe(true)
-    // 등급 k = 타이틀 3 + MVP 2 = 5 (강경 384 / 정중 388 자리)
-    expect(pitcherSalaryNegotiationRankOf(투수({ stats: 좋은성적 }))).toBe(5)
+    // 등급 k = 타이틀 3 + MVP 비트 2 = 5 (강경 384 / 정중 388 자리) — k 는 상태 131 이 남긴 비트를 읽는다
+    expect(pitcherSalaryNegotiationRankOf(recordPitcherSeasonMvp(투수({ stats: 좋은성적 })))).toBe(5)
+    // 비트를 안 남겼으면 타이틀 수만 센다 (0xa4d40 이 거짓)
+    expect(pitcherSalaryNegotiationRankOf(투수({ stats: 좋은성적 }))).toBe(3)
   })
 
   it('한 번도 안 던졌으면(아웃 0) 순위표에서 빠져 수상이 없다', () => {
@@ -198,19 +200,22 @@ describe('투수편 개인 타이틀·MVP·연봉 등급 (0x8dad4 · 0x8dd60 · 
       strikeouts: 10,
       wins: 30,
     }
-    const 시상 = judgePitcherSeasonAwards(
-      투수({
-        stats: 좋은성적,
-        leaguePlayerStats: { batters: {}, pitchers: { [leaguePitcherIdOf(1, 0)]: 나은CPU } },
-      }),
-    )
+    const 리그 = { batters: {}, pitchers: { [leaguePitcherIdOf(1, 0)]: 나은CPU } }
+    const 시상 = judgePitcherSeasonAwards(투수({ stats: 좋은성적, leaguePlayerStats: 리그 }))
     const 다승왕 = 시상.titles.find((칸) => 칸.name === '다승왕')
 
     expect(다승왕?.isMine).toBe(false)
     expect(다승왕?.teamId).toBe(1)
     expect(시상.wonCount).toBe(2)
-    // 세 칸을 다 못 먹었고 목표 달성 수를 못 세니 MVP 도 없다 (투수 목표 표 0xd7e9a 미이식)
-    expect(시상.isMostValuablePlayer).toBe(false)
+    // 세 칸을 다 못 먹어도 올해의 목표(단계 2) 4개면 MVP 다 — 1년차 [342, 60, 5, 44, 55] 중 인기도만 못 채웠다
+    expect(시상.isMostValuablePlayer).toBe(true)
+
+    // 실점 70 이면 방어율(466)·실점 두 목표가 빠져 3개 — MVP 가 아니다 (방어왕은 그대로 내 것)
+    const 실점많음 = judgePitcherSeasonAwards(
+      투수({ stats: { ...좋은성적, runsAllowed: 70 }, leaguePlayerStats: 리그 }),
+    )
+    expect(실점많음.wonCount).toBe(2)
+    expect(실점많음.isMostValuablePlayer).toBe(false)
   })
 
   it('MVP 면 그 해 비트가 career+0x1ca 에 남는다 (0xa4d2c)', () => {
