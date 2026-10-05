@@ -7,11 +7,13 @@ import { PitcherShopScreen } from '@/pages/shop/ui/PitcherShopScreen'
 import { EndingScreen } from '@/pages/ending/ui/EndingScreen'
 import { OutingMapScreen } from '@/pages/outing-map/ui/OutingMapScreen'
 import { StoryScreen } from '@/pages/story/ui/StoryScreen'
+import { awardWindowTextOf } from '@/pages/story/lib/awardWindows'
 import { PostseasonScreen } from '@/pages/season-end/ui/PostseasonScreen'
 import { MessageBox, ScreenOverlay } from '@/shared/ui'
 import { TEAMS } from '@/shared/config/original/teams'
 import {
   isContinuablePitcherEnding,
+  judgePitcherSeasonAwards,
   pitcherEndingBonusOf,
 } from '@/entities/pitcher-career/model/pitcherSeasonFlow'
 import { PITCHER_EDITION_MODE } from '@/entities/pitcher-career/model/pitcherRotation'
@@ -125,6 +127,13 @@ export function PitcherLeagueRoute({
             carried={story.carried}
             onMatch={(command, carry) =>
               renderAceMatch === undefined ? actions.abortStoryAtMatch(carry) : actions.beginAceMatch(command, carry)
+            }
+            // 370·375 의 system 3·4 — 타이틀(0x8b3bc, 투수 문구 79~81 · 마무리 82)·MVP(0x8b23c) 발표 창 (130·131 과 같은 판정)
+            systemWindowTextOf={(command) =>
+              awardWindowTextOf(command.sub, () => judgePitcherSeasonAwards(career), {
+                teamId: career.teamId,
+                name: career.name,
+              })
             }
           />
           </ScreenOverlay>

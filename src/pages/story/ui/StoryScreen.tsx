@@ -7,7 +7,7 @@ import type { EventReward } from '@/entities/story/model/eventReward'
 import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import { EventPortraits } from '@/widgets/event-portraits/ui/EventPortraits'
 import { useEventPlayback } from '@/pages/story/model/useEventPlayback'
-import type { MatchCommand } from '@/pages/story/model/useEventPlayback'
+import type { MatchCommand, SystemCommand } from '@/pages/story/model/useEventPlayback'
 import type { StoryCarry } from '@/entities/story/model/aceMatch'
 import * as styles from '@/pages/story/ui/StoryScreen.css'
 
@@ -35,13 +35,19 @@ interface StoryScreenProps {
    * undefined 를 돌려주면 기본(이름·팀). 안 넘기면 늘 기본이다.
    */
   readonly replacementsFor?: (eventId: number) => readonly string[] | undefined
+  /**
+   * system 3·4 — 타이틀(0x8b3bc)·MVP(0x8b23c) 발표 창의 글. null 이면 그 명령은 예전처럼 지나간다.
+   * 나만의리그 두 편이 시상 판정으로 채운다 (`pages/story/lib/awardWindows`).
+   */
+  readonly systemWindowTextOf?: (command: SystemCommand) => string | null
 }
 
 /** 원작 이벤트. 대사마다 원본이 정한 인물·표정·자리로 초상화를 띄운다. */
 export function StoryScreen({
   events, event, playerName, teamName, skinIndex, battingTypeIndex, onComplete, onMatch, carried, replacementsFor,
+  systemWindowTextOf,
 }: StoryScreenProps) {
-  const { step, portraits, next, jump } = useEventPlayback(events, event, onComplete, onMatch, carried)
+  const { step, portraits, next, jump } = useEventPlayback(events, event, onComplete, onMatch, carried, systemWindowTextOf)
   const command = step.command
 
   const speakerName =

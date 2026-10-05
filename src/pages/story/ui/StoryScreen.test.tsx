@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { StoryScreen } from '@/pages/story/ui/StoryScreen'
 import type { OriginalEvent } from '@/shared/config/original/eventTypes'
 
@@ -114,5 +114,55 @@ describe('StoryScreen — 이벤트별 %s 글 (replacementsFor)', () => {
     )
 
     expect(screen.getByText(/테스트만 상승해서 드래곤즈만이다/)).toBeTruthy()
+  })
+})
+
+describe('StoryScreen — system 3·4 발표 창 (0x8cf64 → 0x8b3bc · 0x8b23c)', () => {
+  const 발표이벤트 = {
+    ...이벤트,
+    commands: [
+      { op: 'say', text: '누가 잘했는지 볼까?', speaker: 0, format: 0, portraits: [] },
+      { op: 'reward', items: [{ kind: 3, value: 1 }] },
+      { op: 'system', sub: 3, arg: 77 },
+      { op: 'reward', items: [{ kind: 0, value: 2 }] },
+    ],
+  } as unknown as OriginalEvent
+
+  it('글을 주면 창에서 멈추고, 넘기면 창 뒤 명령까지 지나 끝난다 — 보상은 한 번씩만', () => {
+    const 끝: { rewards: readonly unknown[] }[] = []
+    const { container } = render(
+      <StoryScreen
+        events={[발표이벤트]}
+        event={발표이벤트}
+        playerName="테스트"
+        teamName="드래곤즈"
+        onComplete={(rewards) => 끝.push({ rewards })}
+        onMatch={() => {}}
+        systemWindowTextOf={(command) => (command.sub === 3 ? '!C[홈런왕] 선정!N서울 드래곤즈 테스트' : null)}
+      />,
+    )
+    const 대사창 = () => within(container).getByRole('button')
+    fireEvent.click(대사창())
+    expect(대사창().textContent).toContain('홈런왕')
+    expect(끝).toHaveLength(0)
+    fireEvent.click(대사창())
+    expect(끝).toHaveLength(1)
+    expect(끝[0].rewards).toHaveLength(2)
+  })
+
+  it('글을 안 주면 예전처럼 지나간다', () => {
+    const 끝: number[] = []
+    const { container } = render(
+      <StoryScreen
+        events={[발표이벤트]}
+        event={발표이벤트}
+        playerName="테스트"
+        teamName="드래곤즈"
+        onComplete={() => 끝.push(1)}
+        onMatch={() => {}}
+      />,
+    )
+    fireEvent.click(within(container).getByRole('button'))
+    expect(끝).toHaveLength(1)
   })
 })
