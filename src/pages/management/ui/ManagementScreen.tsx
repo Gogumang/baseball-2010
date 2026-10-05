@@ -16,6 +16,7 @@ import { StandingsWindow } from '@/widgets/standings/ui/StandingsWindow'
 // 리그 전적을 경기 결과에 잇는 일은 팀 리드 담당이라, 그때까지는 빈 리그(전부 0승 0패)를 보여 준다
 import { SpecialSwingWindow } from '@/widgets/special-swing/ui/SpecialSwingWindow'
 import { TitleListWindow } from '@/widgets/management/ui/TitleListWindow'
+import { SkillWindow } from '@/widgets/skill-window/ui/SkillWindow'
 import type { DetailResult } from '@/pages/management/lib/detailPopup'
 import * as styles from '@/pages/management/ui/ManagementScreen.css'
 
@@ -53,6 +54,13 @@ export interface ManagementScreenProps {
    * `selectSpecialSwingNumber`). 안 넘기면 창이 고른 번호를 스스로만 들고 있다(저장 안 됨).
    */
   readonly onSelectSpecialSwing?: (number: number) => void
+  /**
+   * 스킬 창(선수정보 "아이템/스킬", 하위 상태 122)의 장착·해제 — 대화 0x147b0 번호 4·3 → 0xa4b04(P, s, on).
+   * 안 넘기면 그 칸은 `onOpenPlayerInfo` 로 간다.
+   */
+  readonly onEquipSkill?: (skillId: number, on: boolean) => void
+  /** 같은 창의 슬롯 확장 — 대화 번호 6 (0x1484c) */
+  readonly onExpandSkillSlots?: () => void
   /** 메인 메뉴로 나간다. 진행 상황은 이미 저장되어 있다. */
   readonly onExit: () => void
 }
@@ -109,6 +117,10 @@ export function ManagementScreen(props: ManagementScreenProps) {
           selectedNumber={props.onSelectSpecialSwing === undefined ? undefined : career.specialSwingNumber}
           onSelectNumber={props.onSelectSpecialSwing}
           onClose={menu.closeOverlay} />
+      )}
+      {menu.overlay === '아이템/스킬' && props.onEquipSkill !== undefined && (
+        <SkillWindow career={career} onEquip={props.onEquipSkill}
+          onExpandSlots={props.onExpandSkillSlots ?? (() => {})} onClose={menu.closeOverlay} />
       )}
       {menu.overlay === '필살타법훈련' && (
         // G 부족([65])의 "예" 는 원본의 G 구매 페이지라 웹엔 갈 곳이 없다 — 창만 닫힌다

@@ -40,7 +40,8 @@ import {
 } from '@/entities/career/model/playerCareer'
 import { applyBurstRewards } from '@/entities/career/model/burstReward'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
-import { selectSpecialSwingNumber } from '@/entities/career/model/playerCareer'
+import { selectSpecialSwingNumber, setSkillEquipped } from '@/entities/career/model/playerCareer'
+import { expandSkillSlots } from '@/entities/career/model/skillEquip'
 import { awardTitles, equipTitle, evaluateNewTitles } from '@/entities/career/model/titles'
 import { blockReasonOf, runTraining } from '@/entities/career/model/training'
 import { trainingBlockTextOf, trainingOutcomeLinesOf } from '@/entities/career/model/trainingText'
@@ -653,8 +654,8 @@ export function useCareerSession({
     },
 
     /**
-     * [선수정보] 하위 메뉴. 원본 기본정보(레이더 차트)·아이템/스킬·필살타법 화면은 아직 없어
-     * 장비착용은 장착 상점으로, 나머지는 성적 화면으로 보낸다 (임시)
+     * [선수정보] 하위 메뉴 중 관리 화면이 직접 띄우지 않는 칸. 장비착용은 장착 상점으로, 나머지는 성적 화면으로
+     * 보낸다 (임시). 아이템/스킬은 이제 관리 화면의 스킬 창(`equipSkill`)이 맡는다 — 아이템 쪽은 아직 없다.
      */
     openPlayerInfo: (itemId: string) => {
       if (itemId === '장비착용') {
@@ -679,6 +680,23 @@ export function useCareerSession({
      */
     selectSpecialSwing: (number: number) => {
       setCareer((current) => (current === null ? current : selectSpecialSwingNumber(current, number)))
+    },
+
+    /** 스킬 창 대화 번호 4(장착)·3(해제) — 0x1483c `0xa4b04(P, s, on)`. 켜기 0xb663c 는 곧바로 저장(0x1f1e1)한다 — 웹은 커리어가 바뀌면 저장 효과가 돈다 */
+    equipSkill: (skillId: number, on: boolean) => {
+      setCareer((current) => (current === null ? current : setSkillEquipped(current, skillId, on)))
+    },
+
+    /**
+     * 스킬 창 대화 번호 6 — 슬롯 확장 (0x1484c). G 가 모자라면 아무것도 안 바뀐다(창이 StrMODE[65] 를 띄운다).
+     * G 는 `career.gamePoint` 를 깎으면 지갑 다리(위 `walletBridgeRef`)가 전역 G 에 옮긴다.
+     */
+    expandSkillSlots: () => {
+      setCareer((current) => {
+        if (current === null) return current
+        const result = expandSkillSlots(current)
+        return result.kind === '확장' ? result.career : current
+      })
     },
 
     confirmGameResult: () => {

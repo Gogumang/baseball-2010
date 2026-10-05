@@ -69,6 +69,8 @@ export function CareerRoutes({
       onOpenPlayerInfo={actions.openPlayerInfo}
       onEquipTitle={actions.equipTitle}
       onSelectSpecialSwing={actions.selectSpecialSwing}
+      onEquipSkill={actions.equipSkill}
+      onExpandSkillSlots={actions.expandSkillSlots}
       onExit={() => setScreen({ kind: '메인메뉴' })}
     />
   )

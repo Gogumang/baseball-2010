@@ -11,7 +11,11 @@ import {
   updateStreaks,
 } from '@/entities/career/model/gameEvaluation'
 
-const 선수 = (overrides: Partial<PlayerCareer> = {}): PlayerCareer => ({ ...createCareer('테스트'), ...overrides })
+const 선수 = (overrides: Partial<PlayerCareer> = {}): PlayerCareer => {
+  const base = createCareer('테스트')
+  // 얻은 스킬은 자리가 있으면 자동 장착된다(0xa4bd8) — 따로 안 주면 보유 = 장착으로 둔다
+  return { ...base, ...overrides, equippedSkillIds: overrides.equippedSkillIds ?? overrides.skillIds ?? base.equippedSkillIds }
+}
 const 기록 = (stats: Partial<typeof EMPTY_SEASON_STATS> = {}) => ({ ...EMPTY_SEASON_STATS, ...stats })
 
 describe('타석 인기도 점수 — 0xa59c0', () => {

@@ -14,8 +14,9 @@ import type { SaveGamePort } from '@/shared/api/save/saveGamePort'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 
 /**
- * 필살타법 "고른 번호"(선수 +0x18) 가 관리 화면 → 세션 → 저장까지 이어지는지 (05e1690 의 남은 배선).
- * 선수정보 칸 3 의 창(상태 0x7b)에서 고르면 0x1816c `strb` 로 표 값 1~4 가 들어간다.
+ * 관리 화면 창 → 세션 → 저장 흐름.
+ *   필살타법 "고른 번호"(선수 +0x18) — 선수정보 칸 3 의 창(상태 0x7b)에서 고르면 0x1816c `strb` 로 표 값 1~4.
+ *   스킬 창(선수정보 "아이템/스킬", 상태 122) — 대화 0x147b0 의 3 해제 · 4 장착 · 6 확장.
  */
 
 afterEach(cleanup)
@@ -80,5 +81,43 @@ describe('필살타법 고른 번호 세션 연결', () => {
 
     expect(latest.career?.specialSwingNumber).toBe(2)
     expect(box.saved?.specialSwingNumber).toBe(2)
+  })
+})
+
+describe('스킬 창 장착·해제·확장 세션 연결', () => {
+  const 열기 = () => {
+    fireEvent.click(screen.getByRole('button', { name: '선수정보' }))
+    fireEvent.click(screen.getByRole('button', { name: '아이템/스킬' }))
+  }
+
+  it('장착한 플러스 스킬을 해제하고 다시 장착한다 — 보유는 그대로다 (0xa4b04)', () => {
+    const { box, latest } = 띄우기(createCareer('테스터'))
+    열기()
+
+    fireEvent.click(screen.getByRole('button', { name: '병아리' }))
+    expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain('해제하시겠습니까')
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+    expect(latest.career?.equippedSkillIds).toEqual([8])
+    expect(latest.career?.skillIds).toEqual([0, 8])
+    expect(box.saved?.equippedSkillIds).toEqual([8])
+
+    fireEvent.click(screen.getByRole('button', { name: '병아리' }))
+    expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain('사용하시겠습니까')
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+    expect(latest.career?.equippedSkillIds).toEqual([8, 0])
+  })
+
+  it('가득 찬 채 고르면 5000 G 확장을 묻고, "예" 면 G 를 깎고 상한 8 로 넓힌다 (0x1484c)', () => {
+    const plus = [0, 1, 6, 7, 8, 9]
+    const { latest } = 띄우기({ ...createCareer('테스터'), skillIds: [...plus, 10], equippedSkillIds: plus, gamePoint: 6000 })
+    열기()
+
+    fireEvent.click(screen.getByRole('button', { name: '해결사' }))
+    expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain('5000')
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+
+    expect(latest.career?.skillSlotLevel).toBe(1)
+    expect(latest.career?.gamePoint).toBe(1000)
+    expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain('8개로 확장')
   })
 })

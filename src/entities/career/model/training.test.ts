@@ -11,6 +11,8 @@ const 선수 = (overrides: Partial<PlayerCareer> = {}): PlayerCareer => ({
   morale: 50,
   skillIds: [],
   ...overrides,
+  // 얻은 스킬은 자리가 있으면 자동 장착된다(0xa4bd8) — 따로 안 주면 보유 = 장착으로 둔다
+  equippedSkillIds: overrides.equippedSkillIds ?? overrides.skillIds ?? [],
 })
 const 메뉴 = (id: string) => TRAINING_MENUS.find((menu) => menu.id === id)!
 

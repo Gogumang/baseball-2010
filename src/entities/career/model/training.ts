@@ -2,7 +2,7 @@ import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { BALANCE } from '@/shared/config/original/balance'
-import { countTraining, gainAbility, gainMorale, hasSkill, spendCycleAction } from '@/entities/career/model/playerCareer'
+import { countTraining, gainAbility, gainMorale, isSkillEquipped, spendCycleAction } from '@/entities/career/model/playerCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { subItemMoraleRelief, subItemTrainingBonus } from '@/entities/career/model/subItems'
 import { abilityLimitOf } from '@/entities/career/model/abilityLimit'
@@ -76,6 +76,10 @@ export const SPECIAL_SWING_MAXIMUM_LEVEL = SPECIAL_SWING_REQUIRED_SESSIONS.lengt
 const SPECIAL_SWING_MORALE_RANGE: IntegerRange = BALANCE.specialSwing.moraleLossRange
 const ROOKIE_SKILL = BALANCE.training.rookieSkillId
 const WEAK_BODY_SKILL = BALANCE.training.weakBodySkillId
+/*
+ * 훈련 상승·사기 보정(0x17f5c)은 병아리(0)·몹쓸몸(3)을 **장착** 비트(0xa4bf8 — 0x17ffc·0x1827a·0x182e2·
+ * 0x18384·0x185ae·0x18612·0x18922)로 본다. 몹쓸몸은 마이너스라 보유 = 장착이다(0x18994 는 보유로 본다).
+ */
 
 function roll(random: RandomPort, range: IntegerRange): number {
   return randomIntegerBelow(random, range.minimum, range.maximumExclusive)
@@ -149,12 +153,12 @@ function runAbilityTraining(career: PlayerCareer, menu: TrainingMenu, random: Ra
   const [ability] = menu.abilities
   const rolled = roll(random, LEG_ABILITIES.has(ability) ? LEG_GAIN_RANGE : GAIN_RANGE)
   const typeBonus = TYPE_BONUS_ABILITY[career.battingTypeIndex] === ability ? TYPE_BONUS : 0
-  const skillGain = (hasSkill(career, ROOKIE_SKILL) ? 1 : 0) - (hasSkill(career, WEAK_BODY_SKILL) ? 2 : 0)
+  const skillGain = (isSkillEquipped(career, ROOKIE_SKILL) ? 1 : 0) - (isSkillEquipped(career, WEAK_BODY_SKILL) ? 2 : 0)
   const gains = { [ability]: rolled + typeBonus + skillGain + subItemTrainingBonus(career, ability) }
   const moraleLoss =
     roll(random, MORALE_LOSS_RANGE) -
-    (hasSkill(career, ROOKIE_SKILL) ? 1 : 0) +
-    (hasSkill(career, WEAK_BODY_SKILL) ? 2 : 0) -
+    (isSkillEquipped(career, ROOKIE_SKILL) ? 1 : 0) +
+    (isSkillEquipped(career, WEAK_BODY_SKILL) ? 2 : 0) -
     subItemMoraleRelief(career)
   const spent = spendCycleAction(gainMorale(career, -moraleLoss))
   return { menuId: menu.id, gains, typeBonus, moraleLoss, specialSwing: null, career: gainAbility(spent, gains) }
@@ -167,8 +171,8 @@ function runSpecialSwingTraining(career: PlayerCareer, menu: TrainingMenu, rando
   const isLevelUp = sessions >= required
   const moraleLoss =
     roll(random, SPECIAL_SWING_MORALE_RANGE) -
-    (hasSkill(career, ROOKIE_SKILL) ? 1 : 0) +
-    (hasSkill(career, WEAK_BODY_SKILL) ? 2 : 0) -
+    (isSkillEquipped(career, ROOKIE_SKILL) ? 1 : 0) +
+    (isSkillEquipped(career, WEAK_BODY_SKILL) ? 2 : 0) -
     subItemMoraleRelief(career)
   const spent = spendCycleAction(gainMorale(career, -moraleLoss))
   const trained: PlayerCareer = {

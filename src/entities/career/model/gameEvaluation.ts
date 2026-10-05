@@ -1,7 +1,7 @@
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import type { GameResult } from '@/entities/game/model/gameState'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
-import { applySkillReward, hasSkill } from '@/entities/career/model/playerCareer'
+import { applySkillReward, hasSkill, isSkillEquipped } from '@/entities/career/model/playerCareer'
 import type { SeasonStats } from '@/entities/career/model/seasonStats'
 
 /**
@@ -217,7 +217,8 @@ function moraleChangeOf(career: PlayerCareer, game: GameEvaluationInput, popular
   let change = game.result === '승' ? WIN_MORALE : NOT_WIN_MORALE
   if (isRivalGame(game.ourTeamId, game.opponentTeamId)) change *= 2
   if (change < 0 && popularityChange > 1) change += Math.trunc(popularityChange / 2)
-  return change + (hasSkill(career, LUCK_SKILL) ? 1 : 0)
+  // 행운은 장착 비트로 본다 (0xa741c → 0xa4bf8)
+  return change + (isSkillEquipped(career, LUCK_SKILL) ? 1 : 0)
 }
 
 /** 인기도 변화 −2~6 → 칸 0~8. 타순 2배 칸(0x1283c)은 투수편 전용이라 타자는 쓰지 않는다 (점검 7차) */

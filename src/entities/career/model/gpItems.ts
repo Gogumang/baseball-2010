@@ -1,6 +1,6 @@
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
-import { gainMorale, MAXIMUM_MORALE } from '@/entities/career/model/playerCareer'
+import { applySkillReward, gainMorale, isMinusSkill, isSkillEquipped, MAXIMUM_MORALE } from '@/entities/career/model/playerCareer'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { abilityLimitOf } from '@/entities/career/model/abilityLimit'
@@ -102,6 +102,22 @@ export interface GpItemResult {
   readonly prizeItemId?: number
 }
 
+/** 0xa4970~0xa499e 가 도는 스킬 번호 0~23 (`cmp r4,#0x17`) */
+const LAST_HYPNOSIS_SKILL_ID = 23
+
+/**
+ * 최면요법(8) — 0xa4970: 스킬 0~23 중 **장착(0xb62b4)이고 마이너스** 인 것마다 제거 0xa4430 을 부른다.
+ * 0xa4430 은 보유·장착을 끄고 해제 이력(+0x1d0, 0xa43fc)을 남긴다 — 보상 4 의 음수 갈래와 같은 함수다.
+ * 마이너스 스킬은 늘 장착이라 결과적으로 가진 마이너스 스킬이 다 지워진다.
+ */
+function removeEquippedMinusSkills(career: PlayerCareer): PlayerCareer {
+  let next = career
+  for (let skillId = 0; skillId <= LAST_HYPNOSIS_SKILL_ID; skillId += 1) {
+    if (isSkillEquipped(next, skillId) && isMinusSkill(skillId)) next = applySkillReward(next, -(skillId + 1))
+  }
+  return next
+}
+
 function applyEffect(career: PlayerCareer, id: number): PlayerCareer {
   if (id < ALL_ABILITY_ITEM) return raiseWithinLimit(career, [ABILITY_ORDER[id]])
   switch (id) {
@@ -112,7 +128,7 @@ function applyEffect(career: PlayerCareer, id: number): PlayerCareer {
     case 7:
       return cure(career)
     case 8:
-      return { ...career, skillIds: career.skillIds.filter((skill) => !MINUS_SKILL_IDS.has(skill)) }
+      return removeEquippedMinusSkills(career)
     case 9:
       return { ...career, eagleEyeGamesRemaining: Math.min(MAXIMUM_EAGLE_EYE_GAMES, career.eagleEyeGamesRemaining + EAGLE_EYE_GAMES) }
     default:

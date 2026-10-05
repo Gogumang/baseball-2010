@@ -1,6 +1,6 @@
 import type { SaveGamePort } from '@/shared/api/save/saveGamePort'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
-import { createCareer } from '@/entities/career/model/playerCareer'
+import { createCareer, rebuildEquippedSkillIds } from '@/entities/career/model/playerCareer'
 
 const STORAGE_KEY = 'compus-baseball/career'
 
@@ -105,6 +105,10 @@ function normalizeCareer(saved: PlayerCareer): PlayerCareer {
         : { pitchers: { ...saved.leaguePlayerStats.pitchers } }),
     },
     titleIds: saved.titleIds ?? [],
+    // 장착 칸(선수기록 +0x14)은 나중에 생긴 칸이다. 예전 웹엔 장착 창이 없어 장착은 모두 획득 때의 자동 장착
+    // (0xa4bd8 → 0xa4b04)뿐이었으므로, 보유 목록(얻은 차례)을 슬롯 단계 0 에서 다시 자동 장착해 세운다.
+    // 새 선수 기본값([0, 8])을 그대로 덮으면 마이너스 스킬이 빠지고 7번째 플러스부터도 켜져 버린다.
+    equippedSkillIds: saved.equippedSkillIds ?? rebuildEquippedSkillIds(saved.skillIds ?? base.skillIds),
     seenEventIds: saved.seenEventIds ?? [],
   }
 }

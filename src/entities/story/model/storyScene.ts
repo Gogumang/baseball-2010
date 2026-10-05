@@ -43,12 +43,17 @@ const LUCK_SKILL = 6
  * 유리몸(스킬 4) +10 · 행운(스킬 6) −20, 0 미만은 0 으로 자른다.
  * 앞서 웹은 사기 구간만 보고 보정을 빼먹고 있었다.
  */
-export function illnessChanceOf(morale: number, skillIds: readonly number[] = []): number {
+export function illnessChanceOf(
+  morale: number,
+  skillIds: readonly number[] = [],
+  equippedSkillIds: readonly number[] = skillIds,
+): number {
   const base = morale > 70 ? 0 : morale > 50 ? 2 : morale > 30 ? 4 : morale > 10 ? 7 : 14
+  // 유리몸은 보유(0xa3a74, 0xadba8) · 행운은 **장착**(0xa4bf8, 0xadbba)으로 본다
   const adjusted =
     base +
     (skillIds.includes(FRAGILE_SKILL) ? 10 : 0) -
-    (skillIds.includes(LUCK_SKILL) ? 20 : 0)
+    (equippedSkillIds.includes(LUCK_SKILL) ? 20 : 0)
   return Math.max(0, adjusted)
 }
 
@@ -117,7 +122,7 @@ function meetsConditions(event: OriginalEvent, career: PlayerCareer, random: Ran
         return meetsSkillReleaseCondition(career, condition.value)
       case CONDITION.질병:
         if (random === undefined || career.isSick || career.illnessCooldown > 0) return false
-        return random.nextInRange(0, PERCENT) < illnessChanceOf(career.morale, career.skillIds)
+        return random.nextInRange(0, PERCENT) < illnessChanceOf(career.morale, career.skillIds, career.equippedSkillIds)
       default:
         return false
     }

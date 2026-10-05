@@ -96,6 +96,27 @@ describe('세이브 불러오기', () => {
     expect(save.load()?.specialSwingNumber).toBe(4)
   })
 
+  /**
+   * 장착 칸(선수기록 +0x14)·슬롯 단계(+0x1c6)도 나중에 생긴 칸이다. 예전 웹엔 장착 창이 없었으니 장착은
+   * 획득 때의 자동 장착뿐 — 보유 목록을 얻은 차례대로 단계 0(상한 6)에서 다시 자동 장착해 세운다.
+   */
+  it('장착 칸이 없는 옛 저장은 보유 스킬을 얻은 차례대로 자동 장착해 세운다 (0xa4bd8 → 0xa4b04)', () => {
+    // 플러스 0,8,1,6,7,9 (여섯) → 21 은 상한에 걸려 못 끼고, 마이너스 3·17 은 상한과 무관하게 낀다
+    writeSave(2, { ...ANCIENT_SAVE, skillIds: [0, 8, 3, 1, 6, 7, 9, 21, 17] })
+
+    const loaded = createLocalStorageSaveGame().load()
+
+    expect(loaded?.equippedSkillIds).toEqual([0, 8, 3, 1, 6, 7, 9, 17])
+    expect(loaded?.skillSlotLevel).toBe(0)
+  })
+
+  it('저장한 장착 칸·슬롯 단계는 그대로 돌아온다', () => {
+    const save = createLocalStorageSaveGame()
+    save.save({ ...createCareer('저장'), skillIds: [0, 8, 6], equippedSkillIds: [0, 6], skillSlotLevel: 1 })
+
+    expect(save.load()).toMatchObject({ equippedSkillIds: [0, 6], skillSlotLevel: 1 })
+  })
+
   it('알 수 없는 형식·깨진 JSON 은 새 게임으로 본다 (null)', () => {
     writeSave(99, ANCIENT_SAVE)
     expect(createLocalStorageSaveGame().load()).toBeNull()

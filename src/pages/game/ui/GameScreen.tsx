@@ -155,7 +155,8 @@ export function GameScreen({
           // 안 넘기면 구운 벌(피부 0)과 맨몸으로 나간다
           batterSkinIndex={career.skinIndex}
           batterEquipmentLevels={career.equipmentLevels}
-          batterSkillIds={career.skillIds}
+          // 스윙 결과 0xab214 는 0xb62b4 = 장착 비트(+0x14)만 본다 — 보유 전부가 아니다
+          batterSkillIds={career.equippedSkillIds}
           recentAtBatCodes={progress.recentAtBatCodes}
           pitcherAbility={pitcherAbility}
           hud={{

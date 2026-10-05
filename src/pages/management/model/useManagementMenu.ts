@@ -20,7 +20,7 @@ type MenuKind = 'main' | SubMenuKind
  * 필살타법 창은 그림(0x803d4)이 하나인데 상태가 둘이다 — 선수정보 칸 3 → 상태 0x7b(`'필살타법'`, 고르기) ·
  * 트레이닝 칸 4 → 상태 0x6c(`'필살타법훈련'`, 배우기) (R7 4절).
  */
-export type ManagementOverlay = '기록실' | '필살타법' | '필살타법훈련' | '칭호'
+export type ManagementOverlay = '기록실' | '필살타법' | '필살타법훈련' | '칭호' | '아이템/스킬'
 
 /** 관리 화면 커서·하위 메뉴·훈련 연출 상태 */
 export function useManagementMenu(props: ManagementScreenProps) {
@@ -99,6 +99,8 @@ export function useManagementMenu(props: ManagementScreenProps) {
     if (kind === '아이템') return props.onOpenShop(id)
     if (id === '기본정보') return setIsShowingBasicInfo(true)
     if (id === '기록실' || id === '필살타법') return setOverlay(id)
+    // 아이템/스킬(하위 상태 122) — 스킬 장착 창. 세션이 장착을 받지 않으면 예전처럼 바깥에 맡긴다
+    if (id === '아이템/스킬' && props.onEquipSkill !== undefined) return setOverlay(id)
     props.onOpenPlayerInfo(id)
   }
 

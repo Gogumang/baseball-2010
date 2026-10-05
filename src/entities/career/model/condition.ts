@@ -1,6 +1,6 @@
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
-import { hasSkill, MAXIMUM_ABILITY } from '@/entities/career/model/playerCareer'
+import { hasSkill, isSkillEquipped, MAXIMUM_ABILITY } from '@/entities/career/model/playerCareer'
 import { equipmentBonusOf } from '@/entities/career/model/equipment'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -63,9 +63,10 @@ const reduceByPercent = (value: number, percent: number) =>
 export function equippedAbilityOf(career: PlayerCareer): BatterAbility {
   const adjust = (key: keyof BatterAbility) => {
     let value = clampAbility(career.ability[key] + equipmentBonusOf(career.equipmentLevels[key]))
-    if (hasSkill(career, POWERLESS_SKILL)) value = clampAbility(value - SKILL_PENALTY)
-    if (hasSkill(career, LEGEND_SKILL)) value = clampAbility(value + LEGEND_BONUS)
-    if (key === 'defense' && hasSkill(career, DEFENSE_PENALTY_SKILL)) value = clampAbility(value - SKILL_PENALTY)
+    // 0xb6414 는 0xb62b4 = 선수기록 +0x14 **장착** 비트를 본다 (H-modes 6절 "장착 칸")
+    if (isSkillEquipped(career, POWERLESS_SKILL)) value = clampAbility(value - SKILL_PENALTY)
+    if (isSkillEquipped(career, LEGEND_SKILL)) value = clampAbility(value + LEGEND_BONUS)
+    if (key === 'defense' && isSkillEquipped(career, DEFENSE_PENALTY_SKILL)) value = clampAbility(value - SKILL_PENALTY)
     return value
   }
   return { hit: adjust('hit'), power: adjust('power'), run: adjust('run'), defense: adjust('defense') }
@@ -108,8 +109,9 @@ const INJURY_ROLL_RANGE = 10_000
 export function trainingInjuryChanceOf(career: PlayerCareer, isSpecialSwing: boolean): number {
   const row = INJURY_CHANCE_BY_MORALE.find(([floor]) => career.morale > floor) ?? INJURY_CHANCE_BY_MORALE[4]
   let chance = isSpecialSwing ? row[2] : row[1]
+  // 0x1b4c4: 유리몸은 보유(0xa3a74, 0x1b550) · 행운은 장착(0xa4bf8, 0x1b562)
   if (hasSkill(career, GLASS_BODY_SKILL)) chance += GLASS_BODY_BONUS
-  if (hasSkill(career, LUCK_SKILL)) chance -= LUCK_REDUCTION
+  if (isSkillEquipped(career, LUCK_SKILL)) chance -= LUCK_REDUCTION
   return Math.max(0, chance)
 }
 

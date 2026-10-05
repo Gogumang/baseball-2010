@@ -15,6 +15,8 @@ const 선수 = (overrides: Partial<PlayerCareer> = {}): PlayerCareer => ({
   ability: { hit: 50, power: 50, run: 50, defense: 50 },
   skillIds: [],
   ...overrides,
+  // 얻은 스킬은 자리가 있으면 자동 장착된다(0xa4bd8) — 따로 안 주면 보유 = 장착으로 둔다
+  equippedSkillIds: overrides.equippedSkillIds ?? overrides.skillIds ?? [],
 })
 const 입원 = OUTING_PLACES.flatMap((place) => place.functions).find((f) => f.id === '입원')!
 

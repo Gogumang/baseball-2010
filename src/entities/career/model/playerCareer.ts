@@ -206,8 +206,17 @@ export interface PlayerCareer {
   readonly battingOrderPath: '4번' | '1번' | null
   /** 지난 중간평가 달성 수 (원본 +0x1cc) — 칭호 "전년 대비 성적 우수" */
   readonly lastMidSeasonGoalCount: number
-  /** 가진 스킬 번호 (0~39, original/skills). 원본 보유 비트 +0x1b8 */
+  /** 가진 스킬 번호 (0~39, original/skills). 원본 보유 비트 +0x1b8 — 얻은 차례대로 쌓인다 */
   readonly skillIds: readonly number[]
+  /**
+   * **장착한 스킬** — 선수기록 **+0x14** 비트 (H-modes 6절 "장착 칸", A 0절 정정).
+   * 경기 스킬 효과 0xb62b4·0xa4bf8 은 보유(+0x1b8)가 아니라 이 칸만 본다.
+   * 켜는 곳은 장착 동작 0xa4b04 하나(얻을 때 0xa4bd8 의 자동 장착 포함), 끄는 곳은 해제·제거(0xa4430)뿐이다.
+   * 마이너스 스킬은 상한을 안 보고 늘 장착되고 창에서 못 뺀다 → 마이너스는 보유 = 장착이다.
+   */
+  readonly equippedSkillIds: readonly number[]
+  /** 플러스 스킬 장착 슬롯 단계 L (선수 **+0x1c6**, s8 0~2) — 상한 `[6,8,10][L]` (0xd7e8e) */
+  readonly skillSlotLevel: number
   /** 연속 기록 (전역 저장 +0x1bc) — 2안타 이상 경기 · 홈런 경기 · 무안타 경기 */
   readonly streaks: { readonly multiHit: number; readonly homeRun: number; readonly hitless: number }
   readonly wins: number
@@ -352,6 +361,10 @@ export function createCareer(name: string, profile: RookieProfile = DEFAULT_ROOK
     battingOrderPath: null,
     lastMidSeasonGoalCount: 0,
     skillIds: STARTING_SKILL_IDS,
+    // 신인 스킬도 0xa4bd9 로 얻으니(0x11230) 그 자리에서 자동 장착된다 — 둘 다 플러스, 상한 6 안
+    equippedSkillIds: STARTING_SKILL_IDS,
+    // +0x1c6 을 쓰는 곳은 확장(0x148f8) 하나뿐 — 새 선수는 0 으로 본다 (추정: 신인 적재 0x10fb4 가 이 칸을 안 쓴다)
+    skillSlotLevel: 0,
     streaks: { multiHit: 0, homeRun: 0, hitless: 0 },
     wins: 0,
     draws: 0,
@@ -455,8 +468,73 @@ export function spendCycleAction(career: PlayerCareer): PlayerCareer {
   return { ...career, hasActedThisCycle: true }
 }
 
+/** 보유 비트(+0x1b8) — 0xa3a74. 칭호·엔딩·연속 기록·경기 뒤 카운터처럼 **보유** 를 보는 곳이 쓴다 */
 export function hasSkill(career: PlayerCareer, skillId: number): boolean {
   return career.skillIds.includes(skillId)
+}
+
+/**
+ * 장착 비트(선수기록 +0x14) — 0xa4bf8 / 0xb62b4. 경기 스킬 효과(0xab214·0xb6414)·훈련 상승(0x17f5c 의 0)·
+ * 행운(6: 부상 0x1b4c4 · 질병 0xadbb8 · 사기 0xa741c) 처럼 **장착** 을 보는 곳이 쓴다.
+ */
+export function isSkillEquipped(career: Pick<PlayerCareer, 'equippedSkillIds'>, skillId: number): boolean {
+  return career.equippedSkillIds.includes(skillId)
+}
+
+/** 플러스 스킬 장착 상한 표 0xd7e8e (= UI 쪽 0xcc4f4) — 슬롯 단계 L 0·1·2 */
+export const PLUS_SKILL_SLOT_LIMITS: readonly number[] = [6, 8, 10]
+/** 장착 수 세기 0xa4aa4 가 도는 번호 범위 0~23 (`cmp r4,#0x17`) */
+const LAST_COUNTED_SKILL_ID = 23
+
+/** 마이너스 스킬인가 — 0x5f350 비트1 (s ∈ 2~5 · 17~20). 표 0xd7e10 과 같은 묶음이다 */
+export function isMinusSkill(skillId: number): boolean {
+  return MINUS_SKILL_IDS.includes(skillId)
+}
+
+/** 지금 단계의 플러스 스킬 장착 상한 (0xd7e8e[+0x1c6]) */
+export function plusSkillSlotLimitOf(career: Pick<PlayerCareer, 'skillSlotLevel'>): number {
+  return PLUS_SKILL_SLOT_LIMITS[career.skillSlotLevel] ?? PLUS_SKILL_SLOT_LIMITS[0]
+}
+
+/** 장착한 플러스 스킬 수 — 0xa4aa4: 번호 0~23 중 장착이고 마이너스가 아닌 것만 센다 */
+export function equippedPlusSkillCountOf(career: Pick<PlayerCareer, 'equippedSkillIds'>): number {
+  return career.equippedSkillIds.filter((id) => id <= LAST_COUNTED_SKILL_ID && !isMinusSkill(id)).length
+}
+
+/**
+ * 장착 동작 0xa4b04(P, s, on) — **켜기는 이 함수에서만** 일어난다 (0xb663c 호출지는 여기 둘뿐).
+ *   on = false → 0xb66dc: 장착만 끈다 (보유는 그대로)
+ *   on = true  → 플러스 스킬이고 `상한 ≤ 장착 수` 면 아무 일도 안 한다(못 낌).
+ *                **마이너스 스킬은 상한을 안 본다** — 늘 장착된다. 이미 켜져 있으면 그대로(0xb663c 가 0 반환).
+ * 보유 여부는 보지 않는다 — 부르는 쪽(획득 0xa4bd8 · 창 0x147b0)이 맞춘다.
+ *
+ * ⚠️ 원본은 켤 때 저장 +0xf4~0xfb 에도 같은 비트를 OR 한다(뜻 미해결 — "한 번이라도 장착" 계열로 보임)
+ *    · 모드 4 면 팀 로스터 칸(0xb53d1)에도 켠다(같은 칸인지 유력). 웹은 둘 다 두지 않는다.
+ */
+export function setSkillEquipped(career: PlayerCareer, skillId: number, on: boolean): PlayerCareer {
+  if (!on) {
+    if (!isSkillEquipped(career, skillId)) return career
+    return { ...career, equippedSkillIds: career.equippedSkillIds.filter((id) => id !== skillId) }
+  }
+  if (!isMinusSkill(skillId) && plusSkillSlotLimitOf(career) <= equippedPlusSkillCountOf(career)) return career
+  if (isSkillEquipped(career, skillId)) return career
+  return { ...career, equippedSkillIds: [...career.equippedSkillIds, skillId] }
+}
+
+/**
+ * 장착 칸이 없는 옛 저장의 장착 칸 다시 세우기 — 웹에는 장착 창이 없었으므로 그동안의 장착은 **모두
+ * 획득 때의 자동 장착(0xa4bd8 → 0xa4b04(P,s,1))** 뿐이었다. 그래서 보유 목록(얻은 차례)을 슬롯 단계 0 에서
+ * 차례로 다시 자동 장착하면 원본이 그 선수에게 남겼을 장착과 같다.
+ * ⚠️ 어긋나는 한 가지: 플러스 스킬이 상한을 넘겨 못 낀 뒤 앞선 플러스 스킬이 보상으로 지워진 경우 —
+ *    원본은 빈자리를 다시 채우지 않지만 이 재구성은 채운다(웹 저장에 그 이력이 없다).
+ */
+export function rebuildEquippedSkillIds(skillIds: readonly number[]): readonly number[] {
+  let equipped: Pick<PlayerCareer, 'equippedSkillIds' | 'skillSlotLevel'> = { equippedSkillIds: [], skillSlotLevel: 0 }
+  for (const id of skillIds) {
+    if (!isMinusSkill(id) && plusSkillSlotLimitOf(equipped) <= equippedPlusSkillCountOf(equipped)) continue
+    if (!equipped.equippedSkillIds.includes(id)) equipped = { ...equipped, equippedSkillIds: [...equipped.equippedSkillIds, id] }
+  }
+  return equipped.equippedSkillIds
 }
 
 /** 마이너스 스킬 (표 0xd7e10) — 한 번 해제하면 다시 얻을 수 없다 */
@@ -471,17 +549,21 @@ export const MINUS_SKILL_IDS: readonly number[] = [2, 3, 4, 5, 17, 18, 19, 20]
 export function applySkillReward(career: PlayerCareer, value: number): PlayerCareer {
   const skillId = Math.abs(value) - 1
   if (value > 0) {
-    if (hasSkill(career, skillId)) return career
     if (career.removedMinusSkillIds.includes(skillId)) return career
-    return { ...career, skillIds: [...career.skillIds, skillId] }
+    // 획득 0xa4bd8 = 보유 비트를 켜고 **곧바로 0xa4b04(P, s, 1)** — 자리가 있으면 자동 장착.
+    // 이미 가진 스킬이어도 장착은 다시 시도한다(0xa4bd8 에 보유 검사가 없다) — 창에서 뺀 플러스 스킬이
+    // 다시 들어오면 자리가 있는 한 다시 끼워진다.
+    const owned = hasSkill(career, skillId) ? career : { ...career, skillIds: [...career.skillIds, skillId] }
+    return setSkillEquipped(owned, skillId, true)
   }
   if (!hasSkill(career, skillId)) return career
   const removed = MINUS_SKILL_IDS.includes(skillId) && !career.removedMinusSkillIds.includes(skillId)
-  return {
+  // 제거 0xa4430 = 보유 비트를 끄고 0xb66dd 로 장착도 끈다
+  return setSkillEquipped({
     ...career,
     skillIds: career.skillIds.filter((id) => id !== skillId),
     removedMinusSkillIds: removed ? [...career.removedMinusSkillIds, skillId] : career.removedMinusSkillIds,
-  }
+  }, skillId, false)
 }
 
 export function affectionOf(career: PlayerCareer, heroineId: string): number {

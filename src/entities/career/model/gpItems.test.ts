@@ -73,7 +73,14 @@ describe('GP 아이템 (타자, 0xa4488)', () => {
   })
 
   it('최면요법은 마이너스 스킬만 지운다 (StrMODE[124])', () => {
-    expect(applyGpItem(선수({ skillIds: [0, 5, 8, 17] }), 8, 보통).career.skillIds).toEqual([0, 8])
+    expect(applyGpItem(선수({ skillIds: [0, 5, 8, 17], equippedSkillIds: [0, 5, 8, 17] }), 8, 보통).career.skillIds).toEqual([0, 8])
+  })
+
+  it('최면요법은 제거 0xa4430 을 탄다 — 장착도 끄고 해제 이력(+0x1d0)을 남긴다 (0xa4970)', () => {
+    const after = applyGpItem(선수({ skillIds: [0, 5, 8, 17], equippedSkillIds: [0, 5, 8, 17] }), 8, 보통).career
+
+    expect(after.equippedSkillIds).toEqual([0, 8])
+    expect(after.removedMinusSkillIds).toEqual([5, 17])
   })
 
   it('또또상품권은 누적 2·5·10·20·40·70% 로 1~6등, 그 뒤 엄마상·메디카상·우정상·아차상 (표 0xd80b1)', () => {
