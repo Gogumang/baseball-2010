@@ -12,6 +12,8 @@ import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { pitcherEquipmentOf } from '@/widgets/batting-stage/lib/batterLayers'
 import { shopItemId } from '@/features/shop/model/shopSelection'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
+import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
+import { BATTER_GP_ITEMS } from '@/entities/career/model/gpItems'
 
 /** 나만의리그 투수편 한 판 (원본 모드 3, 장면 0x106) — 저장·장면 전환만 본다 */
 
@@ -665,5 +667,40 @@ describe('완투 계열 카운터 +0x1f0 — 옛 저장 호환', () => {
 
     const 둘째판 = 띄우기(store)
     expect(둘째판.result.current.career?.completeGameCounts).toEqual({ perfect: 0, noHitter: 0, shutout: 0, completeGame: 0 })
+  })
+})
+
+describe('기록연감 통계 고리 — 투수편 모드 3 (0x22e35 · 0x22c29 · 0xb663c)', () => {
+  const 통계띄우기 = (career: ReturnType<typeof createPitcherCareer>) => {
+    const store = 메모리저장()
+    store.save(career)
+    const events: AnnalsStatEvent[] = []
+    const rendered = renderHook(() =>
+      usePitcherLeagueSession(store, createSeededRandom(20100901), false, null, null, true, (event) => {
+        events.push(event)
+      }))
+    return { rendered, events }
+  }
+
+  it('관리 화면이 G 를 줄여 저장하면(슬롯 확장·마구·구질 훈련) 투수편 소모 GP(k 2)에 줄어든 만큼', () => {
+    const { rendered, events } = 통계띄우기({ ...createPitcherCareer('투수'), gamePoint: 6000 })
+    const career = rendered.result.current.career!
+    act(() => rendered.result.current.actions.save({ ...career, gamePoint: 1000, skillSlotLevel: 1 }))
+    act(() => rendered.result.current.actions.save({ ...rendered.result.current.career!, morale: 10 }))
+    expect(events).toEqual([{ kind: 'G사용', usage: 2, amount: 5000 }])
+  })
+
+  it('스킬을 새로 켜면 0xb663c(모드 3) 를 한 번 적는다', () => {
+    const { rendered, events } = 통계띄우기({ ...createPitcherCareer('투수'), skillIds: [40], equippedSkillIds: [] })
+    const career = rendered.result.current.career!
+    act(() => rendered.result.current.actions.save({ ...career, equippedSkillIds: [40] }))
+    act(() => rendered.result.current.actions.save({ ...rendered.result.current.career!, equippedSkillIds: [40] }))
+    expect(events).toEqual([{ kind: '스킬장착', mode: 3, skillId: 40 }])
+  })
+
+  it('GP 아이템 구매가 확정되면 0x22e35(3, 칸) + 0x22c29(2, 가격)', () => {
+    const { rendered, events } = 통계띄우기({ ...createPitcherCareer('투수'), gamePoint: 5000 })
+    act(() => rendered.result.current.actions.purchase(shopItemId('GP', 3)))
+    expect(events).toEqual([{ kind: 'GP아이템구매', mode: 3, index: 3, price: BATTER_GP_ITEMS[3].price }])
   })
 })

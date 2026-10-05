@@ -1,5 +1,5 @@
 import type { AnnalsStats } from '@/entities/collection/model/annalsStats'
-import { gamePointUsageOf, itemPurchaseCountOf } from '@/entities/collection/model/annalsStats'
+import { gamePointEarnedOf, gamePointUsageOf, itemPurchaseCountOf } from '@/entities/collection/model/annalsStats'
 import { STAT_NAME_FIRST_INDEX } from '@/pages/record/lib/statNames'
 
 /**
@@ -48,8 +48,10 @@ const STAT_CELLS: ReadonlyMap<number, StatCell> = new Map<number, StatCell>([
   ...range(40, 46).map((id): [number, StatCell] => [id, {
     nameIndex: 161 + id - 40, valueKind: '개수', valueOf: (stats) => itemPurchaseCountOf(stats, 2, id - 40),
   }]),
-  // 모드별 획득 GP (0x22c7d 가 쌓는다) — 웹은 아직 쌓지 않는다
-  ...range(48, 54).map((id): [number, StatCell] => [id, { nameIndex: 168 + id - 48, valueKind: 'G', valueOf: NOT_SAVED }]),
+  // 모드별 획득 GP (0x22c7d 가 쌓는다)
+  ...range(48, 54).map((id): [number, StatCell] => [id, {
+    nameIndex: 168 + id - 48, valueKind: 'G', valueOf: (stats) => gamePointEarnedOf(stats, id - 48),
+  }]),
   ...range(56, 63).map((id): [number, StatCell] => [id, {
     nameIndex: 175 + id - 56, valueKind: 'G', valueOf: (stats) => gamePointUsageOf(stats, id - 56),
   }]),

@@ -47,7 +47,7 @@ import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { selectSpecialSwingNumber, setSkillEquipped } from '@/entities/career/model/playerCareer'
 import { expandSkillSlots } from '@/entities/career/model/skillEquip'
 import { awardTitles, equipTitle, evaluateNewTitles } from '@/entities/career/model/titles'
-import { blockReasonOf, runTraining } from '@/entities/career/model/training'
+import { blockReasonOf, runTraining, specialSwingCostOf } from '@/entities/career/model/training'
 import { trainingBlockTextOf, trainingOutcomeLinesOf } from '@/entities/career/model/trainingText'
 import {
   outingBlockReasonOf,
@@ -60,6 +60,12 @@ import {
 import type { OutingResult } from '@/entities/career/model/outing'
 import { EVENT_TRIGGER, finishEvent, placeTriggerOf } from '@/entities/story/model/storyScene'
 import { selectShopItem } from '@/features/shop/model/shopSelection'
+import { BATTER_GP_ITEMS } from '@/entities/career/model/gpItems'
+import {
+  BATTER_LEAGUE_MODE, leagueUsageOf, skillEquipStatEventsOf,
+} from '@/entities/collection/model/annalsStats'
+import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
+import { EVENT_REWARD_KIND } from '@/entities/story/model/eventReward'
 import type { GpDetailOf } from '@/features/shop/model/shopSelection'
 import { hiddenOpenTextOf } from '@/entities/career/model/equipment'
 import type { RookieProfile } from '@/entities/career/model/playerCareer'
@@ -69,6 +75,8 @@ import {
   achievedGoalCount,
   applyEndingBonus,
   canContinueAfterEnding,
+  CONTINUE_COST_GAME_POINT,
+  endingBonusOf,
   continueAfterEnding,
   GOAL_INTRO_EVENT_ID,
   MID_SEASON_GAME,
@@ -159,7 +167,14 @@ interface CareerSessionInput {
    * 앞 항이 늘 거짓 → **설정이 그대로 먹는다.**
    */
   readonly runningModeManual?: boolean
+  /**
+   * 기록연감 통계 `[mgr+0xc8]` 에 한 건 쌓는다 (GP 아이템 0x22e35 · G 사용처 0x22c29 · 획득 GP 0x22c7d · 켠 스킬 0xb663c).
+   * 안 넘기면 아무것도 안 쌓는다 — 테스트는 그대로 두면 된다.
+   */
+  readonly recordStat?: (event: AnnalsStatEvent) => void
 }
+
+const NO_STAT = () => {}
 
 /** 육성 모드 한 판 — 커리어·경기 진행·관리 커맨드를 한데 묶는다. */
 export function useCareerSession({
@@ -171,6 +186,7 @@ export function useCareerSession({
   sound,
   wallet,
   runningModeManual = false,
+  recordStat = NO_STAT,
 }: CareerSessionInput) {
   // 통로를 안 받으면 조용한 포트로 — 아래 자리들이 `sound` 가 있는지 매번 보지 않게 한다
   const silent = useMemo(() => createSilentSound(), [])
@@ -235,6 +251,23 @@ export function useCareerSession({
     progressRef.current = next
     setProgress(next)
   }, [runningModeManual])
+
+  /**
+   * **켠 스킬 통계** (`0xb663c` → `[mgr+0xc8]+0xf4`, 모드 4). 원본은 장착 0xa4b04 가 새로 켤 때마다 비트를 OR 한다 —
+   * 켜는 길이 스킬 창(0x147b0)·획득 자동 장착(0xa4bd8, 이벤트·보상)으로 갈라져 있어, 커리어가 바뀔 때 앞뒤 장착 목록을
+   * 견줘 새로 켜진 것만 적는다. 선수를 불러오거나 새로 만들 때(앞이 없거나 다른 선수)는 견주지 않는다.
+   */
+  const equippedBeforeRef = useRef<{ name: string; ids: readonly number[] } | null>(null)
+  useEffect(() => {
+    const before = equippedBeforeRef.current
+    if (rawCareer === null) {
+      equippedBeforeRef.current = null
+      return
+    }
+    equippedBeforeRef.current = { name: rawCareer.name, ids: rawCareer.equippedSkillIds }
+    if (before === null || before.name !== rawCareer.name || before.ids === rawCareer.equippedSkillIds) return
+    skillEquipStatEventsOf(BATTER_LEAGUE_MODE, before.ids, rawCareer.equippedSkillIds).forEach(recordStat)
+  }, [rawCareer, recordStat])
 
   // 커리어가 바뀔 때마다 저장한다. 저장 실패는 게임 진행을 막지 않는다.
   useEffect(() => {
@@ -356,6 +389,8 @@ export function useCareerSession({
       const rolled = gainReputation(streak.career, streakReputation)
       const newTitles = evaluateNewTitles(rolled)
       setCareer(awardTitles(rolled, newTitles))
+      // 경기 끝 0x4ea0c: 기록 달성 G 합을 저장 G 에 더한 뒤 0x4ec82 `0x22c7d(액수, 모드 4)` 로 획득 GP 통계에 적는다
+      recordStat({ kind: 'G획득', mode: BATTER_LEAGUE_MODE, amount: gamePointRewardOf(summary) })
       setScreen({
         kind: '경기결과',
         summary,
@@ -365,7 +400,7 @@ export function useCareerSession({
         streakNotices: streak.notices,
       })
     },
-    [audio, random, setScreen],
+    [audio, random, recordStat, setScreen],
   )
 
   /**
@@ -531,6 +566,8 @@ export function useCareerSession({
     if (step.kind === '엔딩') {
       // 엔딩 보너스는 엔딩을 띄울 때 준다 (0x1220c). 부상·방출은 0 이다
       setCareer(applyEndingBonus({ ...viewed, endingIndex: step.endingIndex }, step.endingIndex))
+      // 보너스 팝업이 닫힐 때 0x1bc4a `0x22c7d(보너스, 모드)` — 웹은 보너스를 이 자리에서 준다
+      recordStat({ kind: 'G획득', mode: BATTER_LEAGUE_MODE, amount: endingBonusOf(step.endingIndex) })
       return setScreen({ kind: '엔딩', endingIndex: step.endingIndex })
     }
     if (step.kind === '새시즌') {
@@ -792,6 +829,7 @@ export function useCareerSession({
     },
 
     /** 스킬 창 대화 번호 4(장착)·3(해제) — 0x1483c `0xa4b04(P, s, on)`. 켜기 0xb663c 는 곧바로 저장(0x1f1e1)한다 — 웹은 커리어가 바뀌면 저장 효과가 돈다 */
+    // 켠 스킬 통계(0xb663c)는 위 장착 목록 비교가 적는다
     equipSkill: (skillId: number, on: boolean) => {
       setCareer((current) => (current === null ? current : setSkillEquipped(current, skillId, on)))
     },
@@ -801,11 +839,12 @@ export function useCareerSession({
      * G 는 `career.gamePoint` 를 깎으면 지갑 다리(위 `walletBridgeRef`)가 전역 G 에 옮긴다.
      */
     expandSkillSlots: () => {
-      setCareer((current) => {
-        if (current === null) return current
-        const result = expandSkillSlots(current)
-        return result.kind === '확장' ? result.career : current
-      })
+      if (career === null) return
+      const result = expandSkillSlots(career)
+      if (result.kind !== '확장') return
+      setCareer(result.career)
+      // 0x148d8 `0x22c29(모드 4 → 1, 비용)` — 타자편 소모 GP
+      recordStat({ kind: 'G사용', usage: leagueUsageOf(BATTER_LEAGUE_MODE), amount: career.gamePoint - result.career.gamePoint })
     },
 
     confirmGameResult: () => {
@@ -843,8 +882,12 @@ export function useCareerSession({
       const trained = awardTitles(outcome.career, evaluateNewTitles(outcome.career))
       setCareer(trained)
       const changes = trainingDetailChangesOf(outcome)
-      // 필살타법 — 상세 창 대신 알림 창 하나(관리 화면 알림 상자, [확인] → 관리 화면)
-      if (changes === null) return setManagementNotice(trainingOutcomeLinesOf(outcome).join('!N'))
+      // 필살타법 — 상세 창 대신 알림 창 하나(관리 화면 알림 상자, [확인] → 관리 화면).
+      // 비용은 훈련 적용 0xa3bac 종류 4 가 G 를 빼고 0xa3cac `0x22c29(모드 4 → 1, |비용|)` 로 적는다
+      if (changes === null) {
+        recordStat({ kind: 'G사용', usage: leagueUsageOf(BATTER_LEAGUE_MODE), amount: specialSwingCostOf(career) })
+        return setManagementNotice(trainingOutcomeLinesOf(outcome).join('!N'))
+      }
       setManagementDetail({
         before: career,
         after: trained,
@@ -925,6 +968,12 @@ export function useCareerSession({
       setShopNotice(selection.notice)
       setShopGpDetail(selection.detail ?? null)
       setCareer(awardTitles(selection.career, evaluateNewTitles(selection.career)))
+      // GP 칸 구매가 확정됐으면(G 를 뺐으면) 0x14ffe `0x22e35(모드 4, 칸)` → 0x1501e `0x22c29(1, 가격)`
+      const [tab, first] = itemId.split(':')
+      if (tab === 'GP' && selection.career !== career) {
+        const index = Number(first)
+        recordStat({ kind: 'GP아이템구매', mode: BATTER_LEAGUE_MODE, index, price: BATTER_GP_ITEMS[index].price })
+      }
     },
 
     /** GP 결과 창 닫기 — 콜백 0x1d649 는 팝업만 닫는다 (굴림 없음) */
@@ -942,6 +991,10 @@ export function useCareerSession({
     completeScene: (rewards: readonly EventReward[], viewedEventIds: readonly number[]) => {
       if (career === null || screen.kind !== '이벤트') return
       const viewed = applyEventRewards(finishEvent(career, viewedEventIds), rewards, random, screen.eventId)
+      // 이벤트 G 보상 0x8c6ac 는 한 줄마다 0x8c6e2 `0x22c7d(값, 전역 모드)` 로 적는다 (G 보상에는 연차 보정이 없다)
+      rewards
+        .filter((reward) => reward.kind === EVENT_REWARD_KIND.G포인트)
+        .forEach((reward) => recordStat({ kind: 'G획득', mode: BATTER_LEAGUE_MODE, amount: reward.value }))
       // 보상 7 로 열린 히든 장비 알림 (StrCOMMON[139]+[143])
       const openTexts = viewed.openedHiddenIds
         .filter((id) => !career.openedHiddenIds.includes(id))
@@ -1018,6 +1071,10 @@ export function useCareerSession({
     finishCup: (finish: NationalCupFinish) => {
       if (career === null) return
       const rewarded = applyEventRewards(career, careerNationalCupRewardItems(finish.reward), random)
+      // 우승 보상 팝업 0x26 닫힘 0x1bb14 `0x22c7d(1000, 모드 4)` — 보상이 없는 갈래는 부르지 않는다
+      if (finish.reward.gamePoint > 0) {
+        recordStat({ kind: 'G획득', mode: BATTER_LEAGUE_MODE, amount: finish.reward.gamePoint })
+      }
       const missing = finish.openedTeams.filter((id) => !rewarded.openedHiddenIds.includes(id))
       startNewSeason({ ...rewarded, openedHiddenIds: [...rewarded.openedHiddenIds, ...missing] })
     },
@@ -1028,6 +1085,8 @@ export function useCareerSession({
       if (!canContinueAfterEnding(career, career.endingIndex)) return false
       const continued = continueAfterEnding(career)
       setCareer(continued)
+      // 팝업 0x32 예 → 0x1bdc6 `0x22c29(모드 4 → 1, 5000)`
+      recordStat({ kind: 'G사용', usage: leagueUsageOf(BATTER_LEAGUE_MODE), amount: CONTINUE_COST_GAME_POINT })
       setScreen({ kind: '관리' })
       setManagementCheck(continued.season === career.season ? '무작위포함' : '고정')
       return true

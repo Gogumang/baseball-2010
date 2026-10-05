@@ -75,6 +75,8 @@ import { isInfiniteGamePointOn } from '@/shared/lib/dev/devOptions'
 import type { GamePointWalletSession } from '@/entities/wallet/model/useGamePointWallet'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { GAME_POINT_USAGE } from '@/entities/collection/model/annalsStats'
+import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 
 /**
  * 시즌 모드 한 판 (원본 게임 모드 2, 장면 0x105).
@@ -350,6 +352,8 @@ export function useSeasonSession(
   random: RandomPort,
   wallet: GamePointWalletSession | null = null,
   aceLevels?: Readonly<Record<number, number>>,
+  /** 기록연감 통계 `[mgr+0xc8]` 에 한 건 쌓는다 (G 사용처 0x22c29 — 시즌은 k 3). 안 넘기면 안 쌓는다 */
+  recordStat?: (event: AnnalsStatEvent) => void,
 ): SeasonSession {
   const loaded = useRef<SeasonSave | null>(null)
   if (loaded.current === null) loaded.current = normalizeSeasonSave(store.load() as Partial<SeasonSave> | null)
@@ -422,10 +426,13 @@ export function useSeasonSession(
    */
   const spendGamePoint = useCallback(
     (cost: number) => {
+      // 시즌이 G 를 쓰는 자리 셋 — 트레이드 0xd152 · 지옥훈련 0xa2fee(500) · 자동진행 0x3c862(모드 2 → k 3, |값|) —
+      // 모두 G 를 뺀 뒤 `0x22c29(mgr, 3, 액수)` 로 시즌 소모 GP 에 적는다. 시즌 GP 아이템(0x7cd8·0x8058)은 웹에 없다
+      recordStat?.({ kind: 'G사용', usage: GAME_POINT_USAGE.season, amount: Math.abs(cost) })
       if (wallet !== null) return wallet.spend(cost)
       setOwnGamePoints((points) => Math.max(0, points - cost))
     },
-    [wallet],
+    [recordStat, wallet],
   )
 
   const commit = useCallback(

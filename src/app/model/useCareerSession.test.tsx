@@ -18,6 +18,8 @@ import { gamePointRewardOf } from '@/entities/career/model/playerCareer'
 import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
 import { summaryOf } from '@/features/play-game/model/gameFlow'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
+import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
+import { BATTER_GP_ITEMS } from '@/entities/career/model/gpItems'
 
 /**
  * 나만의리그 연말 국가대표 사슬 — 연봉 사슬이 끝나면 상태 133(선발 판정)이 끼고,
@@ -516,5 +518,73 @@ describe('외출 126 — 효과 팝업 → 105 (0x15234 · 0x1575c)', () => {
     expect(rendered.result.current.session.outingResult).toBeNull()
     expect(rendered.result.current.screen).toEqual({ kind: '관리' })
     expect(rendered.result.current.session.managementNotice).toBe('!C부상에서 회복 되었습니다.')
+  })
+})
+
+describe('기록연감 통계 고리 [mgr+0xc8] — 타자편 모드 4 (0x22e35 · 0x22c29 · 0x22c7d · 0xb663c)', () => {
+  const 통계띄우기 = (career: PlayerCareer) => {
+    const saveGame = 메모리저장(career)
+    const random = createSeededRandom(20100901)
+    const events: AnnalsStatEvent[] = []
+    const recordStat = (event: AnnalsStatEvent) => {
+      events.push(event)
+    }
+    const rendered = renderHook(() => {
+      const [screen, setScreen] = useState<Screen>({ kind: '메인메뉴' })
+      const runner = useAtBatRunner()
+      return { screen, setScreen, session: useCareerSession({ runner, random, saveGame, screen, setScreen, recordStat }) }
+    })
+    act(() => rendered.result.current.session.actions.continueSaved())
+    return { rendered, events }
+  }
+
+  it('필살타법 훈련은 0xa3cac — 타자편 소모 GP(k 1)에 그 레벨 비용을 적는다', () => {
+    const { rendered, events } = 통계띄우기({ ...createCareer('필살'), morale: 50, gamePoint: 600 })
+    act(() => rendered.result.current.session.actions.runTrainingMenu('필살타법'))
+    expect(events).toEqual([{ kind: 'G사용', usage: 1, amount: 500 }])
+    act(() => rendered.unmount())
+  })
+
+  it('슬롯 확장은 0x148d8 — 성공할 때만 비용을 적는다', () => {
+    const { rendered, events } = 통계띄우기({ ...createCareer('확장'), gamePoint: 5000 })
+    act(() => rendered.result.current.session.actions.expandSkillSlots())
+    expect(events).toEqual([{ kind: 'G사용', usage: 1, amount: 5000 }])
+    act(() => rendered.result.current.session.actions.expandSkillSlots())
+    expect(events).toHaveLength(1)
+    act(() => rendered.unmount())
+  })
+
+  it('스킬을 새로 켤 때만 0xb663c 비트를 적는다 — 이미 켜진 스킬·끄기는 안 적는다', () => {
+    const { rendered, events } = 통계띄우기({ ...createCareer('스킬'), skillIds: [20], equippedSkillIds: [] })
+    act(() => rendered.result.current.session.actions.equipSkill(20, true))
+    act(() => rendered.result.current.session.actions.equipSkill(20, true))
+    act(() => rendered.result.current.session.actions.equipSkill(20, false))
+    expect(events).toEqual([{ kind: '스킬장착', mode: 4, skillId: 20 }])
+    act(() => rendered.unmount())
+  })
+
+  it('GP 아이템 구매가 확정되면 0x22e35(4, 칸) + 0x22c29(1, 가격), G 가 모자라면 안 적는다', () => {
+    const { rendered, events } = 통계띄우기({ ...createCareer('상점'), gamePoint: 0 })
+    act(() => rendered.result.current.session.actions.purchase('GP:3:0'))
+    expect(events).toEqual([])
+    act(() => rendered.unmount())
+
+    const 넉넉 = 통계띄우기({ ...createCareer('상점'), gamePoint: 5000 })
+    act(() => 넉넉.rendered.result.current.session.actions.purchase('GP:3:0'))
+    expect(넉넉.events).toEqual([{ kind: 'GP아이템구매', mode: 4, index: 3, price: BATTER_GP_ITEMS[3].price }])
+    act(() => 넉넉.rendered.unmount())
+  })
+
+  it('국가대항전 우승 보상은 0x1bb14 — 획득 GP(모드 4)에 1000', () => {
+    const { rendered, events } = 통계띄우기(목표달성선수({ popularity: 100, gamePoint: 0 }))
+    연봉사슬끝내기(rendered)
+    이벤트보기(rendered, [461, 463])
+    act(() =>
+      rendered.result.current.session.actions.finishCup({
+        champion: 10, isKoreaChampion: true, koreaInFinal: true, reward: careerNationalCupRewardOf(10), openedTeams: [],
+      }),
+    )
+    expect(events.filter((event) => event.kind === 'G획득')).toEqual([{ kind: 'G획득', mode: 4, amount: 1000 }])
+    act(() => rendered.unmount())
   })
 })

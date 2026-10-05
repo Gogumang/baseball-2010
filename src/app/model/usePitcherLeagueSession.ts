@@ -22,6 +22,8 @@ import {
   applyPitcherEndingBonus,
   canContinueAfterPitcherEnding,
   continueAfterPitcherEnding,
+  PITCHER_CONTINUE_COST_GAME_POINT,
+  pitcherEndingBonusOf,
   pitcherInjuryEndingOf,
   pitcherRetirementEndingOf,
   pitcherYearEndStepOf,
@@ -44,6 +46,11 @@ import type { GamePointWalletSession } from '@/entities/wallet/model/useGamePoin
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { selectPitcherShopItem } from '@/features/shop/model/pitcherShopSelection'
+import { BATTER_GP_ITEMS } from '@/entities/career/model/gpItems'
+import {
+  leagueUsageOf, PITCHER_LEAGUE_MODE, skillEquipStatEventsOf,
+} from '@/entities/collection/model/annalsStats'
+import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 import type { GpDetailOf } from '@/features/shop/model/shopSelection'
 import type { PitcherShopTab } from '@/features/shop/model/pitcherShopSelection'
 import { outingBlockReasonOf, outingBlockTextOf, performOuting } from '@/entities/career/model/outing'
@@ -156,6 +163,8 @@ function normalizePitcherCareer(raw: unknown): PitcherCareer | null {
   }
 }
 
+const NO_STAT = () => {}
+
 export function usePitcherLeagueSession(
   store: JsonStorePort,
   random: RandomPort,
@@ -173,6 +182,11 @@ export function usePitcherLeagueSession(
    * (자리가 끝에 붙은 것은 앞의 인자 차례를 바꾸지 않으려는 것뿐이다.)
    */
   throwModeManual: boolean = true,
+  /**
+   * 기록연감 통계 `[mgr+0xc8]` 에 한 건 쌓는다 (GP 아이템 0x22e35 · G 사용처 0x22c29 · 획득 GP 0x22c7d · 켠 스킬 0xb663c, 모드 3).
+   * 안 넘기면 아무것도 안 쌓는다.
+   */
+  recordStat: (event: AnnalsStatEvent) => void = NO_STAT,
 ): PitcherLeagueSession {
   const loaded = useRef<PitcherCareer | null>(null)
   if (loaded.current === null) loaded.current = normalizePitcherCareer(store.load())
@@ -181,6 +195,23 @@ export function usePitcherLeagueSession(
   if (legacyGamePoint.current === null) legacyGamePoint.current = loaded.current?.gamePoint ?? 0
 
   const [career, setCareer] = useState<PitcherCareer | null>(loaded.current)
+
+  /**
+   * **켠 스킬 통계** (`0xb663c` → `[mgr+0xc8]+0xf8`, 모드 3) — 장착 0xa4b04 가 새로 켤 때마다 비트를 OR 한다.
+   * 켜는 길(스킬 창 0x147b0 · 획득 자동 장착 0xa4bd8)이 어디든 앞뒤 장착 목록을 견줘 새로 켜진 것만 적는다.
+   * 불러오기·새 선수(앞이 없거나 다른 선수)는 견주지 않는다.
+   */
+  const equippedBeforeRef = useRef<{ name: string; ids: readonly number[] } | null>(null)
+  useEffect(() => {
+    const before = equippedBeforeRef.current
+    if (career === null) {
+      equippedBeforeRef.current = null
+      return
+    }
+    equippedBeforeRef.current = { name: career.name, ids: career.equippedSkillIds }
+    if (before === null || before.name !== career.name || before.ids === career.equippedSkillIds) return
+    skillEquipStatEventsOf(PITCHER_LEAGUE_MODE, before.ids, career.equippedSkillIds).forEach(recordStat)
+  }, [career, recordStat])
   const [scene, setScene] = useState<PitcherScene>(career === null ? '등록' : '관리')
   const [gameOptions, setGameOptions] = useState<PitcherGameOptions | null>(null)
 
@@ -379,6 +410,8 @@ export function usePitcherLeagueSession(
         gamePointReward: recordGamePointsOf(summary.recordIds),
       })
       const recorded = applyPitcherGameResult(career, outcome)
+      // 경기 끝 0x4ea0c: 기록 달성 G 를 저장 G 에 더한 뒤 0x4ec82 `0x22c7d(액수, 모드 3)` 로 획득 GP 통계에 적는다
+      recordStat({ kind: 'G획득', mode: PITCHER_LEAGUE_MODE, amount: outcome.gamePointReward })
       const day = applyPitcherLeagueDay(recorded, random)
       const seasoned = applyPitcherPostseasonProgress(applyPitcherSeasonEnd(day), random)
       /*
@@ -442,7 +475,7 @@ export function usePitcherLeagueSession(
       commit(counted)
       setScene('관리')
     },
-    [career, commit, gameOptions, gaugeSettingOn, random, throwModeManual],
+    [career, commit, gameOptions, gaugeSettingOn, random, recordStat, throwModeManual],
   )
 
   /** 새 시즌 처리 0x1b768 → 137 "N년차" 표지 → 105 관리 화면 (웹은 표지를 건너뛴다) */
@@ -471,6 +504,8 @@ export function usePitcherLeagueSession(
     if (step.kind === '엔딩') {
       // 엔딩 보너스는 엔딩을 띄울 때 준다 (0x1220c). 부상·방출은 0 이다
       commit(applyPitcherEndingBonus({ ...awarded, endingIndex: step.endingIndex }, step.endingIndex))
+      // 보너스 팝업이 닫힐 때 0x1bc4a `0x22c7d(보너스, 모드 3)` — 웹은 보너스를 이 자리에서 준다
+      recordStat({ kind: 'G획득', mode: PITCHER_LEAGUE_MODE, amount: pitcherEndingBonusOf(step.endingIndex) })
       return setScene('엔딩')
     }
     if (step.kind === '은퇴선택') {
@@ -491,17 +526,20 @@ export function usePitcherLeagueSession(
     if (career === null) return
     const endingIndex = pitcherRetirementEndingOf(career)
     commit(applyPitcherEndingBonus({ ...career, endingIndex }, endingIndex))
+    recordStat({ kind: 'G획득', mode: PITCHER_LEAGUE_MODE, amount: pitcherEndingBonusOf(endingIndex) })
     setScene('엔딩')
-  }, [career, commit])
+  }, [career, commit, recordStat])
 
   /** 엔딩 141 의 팝업 0x32 — 5000 G포인트로 이어하기 */
   const continueAfterEnding = useCallback(() => {
     if (career === null || career.endingIndex === null) return false
     if (!canContinueAfterPitcherEnding(career, career.endingIndex)) return false
     commit(continueAfterPitcherEnding(career))
+    // 팝업 0x32 예 → 0x1bdc6 `0x22c29(모드 3 → 2, 5000)`
+    recordStat({ kind: 'G사용', usage: leagueUsageOf(PITCHER_LEAGUE_MODE), amount: PITCHER_CONTINUE_COST_GAME_POINT })
     setScene('관리')
     return true
-  }, [career, commit])
+  }, [career, commit, recordStat])
 
   /**
    * 엔딩을 다 본 뒤 — 선수를 지운다 (145 틀이 `+0x278` 을 켜고 메인 메뉴 장면 0x103 으로 나가는 자리).
@@ -575,8 +613,31 @@ export function usePitcherLeagueSession(
       // G 를 안 쓴 칸(장비·서브·착용)은 저장의 G 칸을 건드리지 않는다 — `?무한G` 의 99999 가 저장에 새지 않게
       const spentGamePoint = selection.career.gamePoint !== merged.gamePoint
       commit(spentGamePoint ? selection.career : { ...selection.career, gamePoint: career.gamePoint })
+      // GP 칸 구매 확정 — 0x14ffe `0x22e35(모드 3, 칸)` → 0x1501e `0x22c29(2, 가격)` (가격 표는 두 편 공용)
+      const [tab, first] = itemId.split(':')
+      if (tab === 'GP' && spentGamePoint) {
+        const index = Number(first)
+        recordStat({ kind: 'GP아이템구매', mode: PITCHER_LEAGUE_MODE, index, price: BATTER_GP_ITEMS[index].price })
+      }
     },
-    [career, commit, random, shown],
+    [career, commit, random, recordStat, shown],
+  )
+
+  /**
+   * 관리 화면(구질 훈련 창 포함)이 계산해 돌려준 커리어를 저장한다 — `actions.save`.
+   *
+   * 이 길로 G 가 줄어드는 것은 세 가지뿐이고, 원본은 셋 다 G 를 뺀 뒤 `0x22c29(모드 3 → 2, 비용)` 로 투수편 소모 GP 에 적는다:
+   * 슬롯 확장(0x148d8) · 마구 훈련(훈련 적용 0xa3bac 종류 4 → 0xa3cac) · 구질 훈련(종류 5 → 0xa3d76).
+   * 화면 쪽(관리 메뉴·구질 훈련 창)은 다른 작업 구역이라 여기서 보이는 G 와 견줘 줄어든 만큼을 적는다
+   * (세 길 모두 G 가 모자라면 막혀 0 으로 잘리는 일이 없어 줄어든 값 = 비용).
+   */
+  const saveFromScreen = useCallback(
+    (next: PitcherCareer) => {
+      const spent = shown === null ? 0 : shown.gamePoint - next.gamePoint
+      commit(next)
+      if (spent > 0) recordStat({ kind: 'G사용', usage: leagueUsageOf(PITCHER_LEAGUE_MODE), amount: spent })
+    },
+    [commit, recordStat, shown],
   )
 
   /**
@@ -650,7 +711,7 @@ export function usePitcherLeagueSession(
     outingRecoveryNotice,
     actions: {
       create,
-      save: commit,
+      save: saveFromScreen,
       goto,
       beginGame,
       finishGame,

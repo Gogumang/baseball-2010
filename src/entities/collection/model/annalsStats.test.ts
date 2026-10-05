@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  addGamePointUsage, applyAnnalsStat, countItemPurchase, EMPTY_ANNALS_STATS, GAME_POINT_USAGE_LIMIT,
+  addGamePointEarned, addGamePointUsage, applyAnnalsStat, gamePointEarnedOf, skillEquipStatEventsOf, countItemPurchase, EMPTY_ANNALS_STATS, GAME_POINT_USAGE_LIMIT,
   gamePointUsageOf, itemPurchaseCountOf, markSkillEquipped, normalizeAnnalsStats,
 } from '@/entities/collection/model/annalsStats'
 
@@ -64,12 +64,41 @@ describe('켠 스킬 비트 0xb663c (+0xf4 · +0xf8)', () => {
   })
 })
 
+describe('획득 GP 0x22c7d (+0x8c)', () => {
+  it('점프표 0xcda88 — 1→0 · 4→1 · 3→2 · 2→3 · 8·9→4 · 5·6→5 · 7→6', () => {
+    const modes = [1, 4, 3, 2, 8, 9, 5, 6, 7]
+    const stats = modes.reduce((current, mode) => addGamePointEarned(current, 10, mode), EMPTY_ANNALS_STATS)
+    expect(stats.gamePointEarned).toEqual([10, 10, 10, 10, 20, 20, 10])
+    expect(gamePointEarnedOf(stats, 4)).toBe(20)
+  })
+
+  it('모드 0·10 은 무시하고, 더한 값을 0~99999999 로 자른다', () => {
+    expect(addGamePointEarned(EMPTY_ANNALS_STATS, 10, 0)).toBe(EMPTY_ANNALS_STATS)
+    expect(addGamePointEarned(EMPTY_ANNALS_STATS, 10, 10)).toBe(EMPTY_ANNALS_STATS)
+    const stats = addGamePointEarned(EMPTY_ANNALS_STATS, 300, 4)
+    expect(gamePointEarnedOf(addGamePointEarned(stats, -500, 4), 1)).toBe(0)
+    expect(gamePointEarnedOf(addGamePointEarned(stats, GAME_POINT_USAGE_LIMIT, 4), 1)).toBe(GAME_POINT_USAGE_LIMIT)
+  })
+
+  it("'G획득' 사건이 모드 칸에 쌓인다", () => {
+    expect(applyAnnalsStat(EMPTY_ANNALS_STATS, { kind: 'G획득', mode: 3, amount: 40 }).gamePointEarned[2]).toBe(40)
+  })
+})
+
+describe('새로 켜진 스킬만 사건으로', () => {
+  it('앞에 없던 번호만 낸다', () => {
+    expect(skillEquipStatEventsOf(4, [1, 2], [1, 2, 7])).toEqual([{ kind: '스킬장착', mode: 4, skillId: 7 }])
+    expect(skillEquipStatEventsOf(3, [1, 2], [2])).toEqual([])
+  })
+})
+
 describe('저장에서 읽기', () => {
   it('깨진 칸만 0 으로 되돌린다', () => {
     const stats = normalizeAnnalsStats({ itemPurchaseCounts: [1], gamePointUsage: [1, 2, 3, 4, 5, 6, 7, 8], batterEquippedSkillBits: 'x' })
     expect(stats.itemPurchaseCounts).toEqual(EMPTY_ANNALS_STATS.itemPurchaseCounts)
     expect(stats.gamePointUsage).toEqual([1, 2, 3, 4, 5, 6, 7, 8])
     expect(stats.batterEquippedSkillBits).toBe(0)
+    expect(stats.gamePointEarned).toEqual(EMPTY_ANNALS_STATS.gamePointEarned)
     expect(normalizeAnnalsStats(undefined)).toEqual(EMPTY_ANNALS_STATS)
   })
 })

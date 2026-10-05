@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { addGamePointEarned, EMPTY_ANNALS_STATS } from '@/entities/collection/model/annalsStats'
 import {
   INITIAL_SECRET_CODE_STATE, statCellOf, statPageCellsOf, statTotalTextOf, statValueTextOf, typeSecretDigit,
 } from '@/pages/record/lib/statCells'
@@ -24,6 +25,12 @@ describe('통계 칸 번호 = 쪽 × 8 + 줄', () => {
     expect(statValueTextOf('횟수', 3)).toBe('3회')
     expect(statValueTextOf('개수', 2)).toBe('2개')
     expect(statValueTextOf('G', 5000)).toBe('5000G')
+  })
+
+  it('칸 48~54 는 획득 GP 0x2325d(i) = +0x8c 칸 i 다', () => {
+    const stats = addGamePointEarned(EMPTY_ANNALS_STATS, 120, 4)
+    expect(statCellOf(49)?.valueOf(stats)).toBe(120)
+    expect(statCellOf(48)?.valueOf(stats)).toBe(0)
   })
 
   it('합계는 쪽 6·7 만 — 0x58801(…, 6·7) 이 4·5 만 더해 늘 0G 다 (원본 버그)', () => {

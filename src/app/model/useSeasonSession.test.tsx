@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
+import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 import { useSeasonSession } from '@/app/model/useSeasonSession'
 import { SEASON_GAME_COUNT } from '@/entities/season-mode/model/seasonRecord'
 import { SEASON_PHASE, SEASON_SCENE_STATE } from '@/entities/season-mode/model/seasonStateMachine'
@@ -777,5 +778,17 @@ describe('엔트리 편집 0xe0 (0x63dc · 0x7044 · 편집기 0x55864)', () => 
     act(() => result.current.actions.closeEntryAceLocked())
     act(() => result.current.actions.pressEntryKey('취소'))
     expect(result.current.scene).toBe(SEASON_SCENE_STATE.경기정보)
+  })
+})
+
+describe('기록연감 통계 고리 — 시즌 G 사용처 k 3 (0xd152 · 0xa2fee · 0x3c862)', () => {
+  it('시즌이 G 를 쓸 때마다 시즌 소모 GP 에 |액수| 를 적는다', () => {
+    const events: AnnalsStatEvent[] = []
+    const { result } = renderHook(() =>
+      useSeasonSession(메모리저장(), createSeededRandom(20100901), null, undefined, (event) => {
+        events.push(event)
+      }))
+    act(() => result.current.actions.spendGamePoint(500))
+    expect(events).toEqual([{ kind: 'G사용', usage: 3, amount: 500 }])
   })
 })

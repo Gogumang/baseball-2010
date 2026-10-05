@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Screen } from '@/app/model/screen'
 import { useAtBatRunner } from '@/app/model/useAtBatRunner'
 import { useCareerSession } from '@/app/model/useCareerSession'
@@ -12,6 +12,7 @@ import { createLocalStorageMissionRecord } from '@/shared/api/save/localStorageM
 import { createLocalStorageJsonStore } from '@/shared/api/save/localStorageJsonStore'
 import { useCollection } from '@/app/model/useCollection'
 import { GAME_POINT_USAGE } from '@/entities/collection/model/annalsStats'
+import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 import { isEveryMissionCleared } from '@/entities/mission/model/missionGoal'
 import { aceMatchMissionOf, matchResultEventOf } from '@/entities/story/model/aceMatch'
 import { modeBatterOf } from '@/app/model/modeBatter'
@@ -97,7 +98,13 @@ export function App() {
   const aceLevels = useAceLevels(aceLevelStore)
   // 전역 G 지갑 — 원본 `mgr[+0x64]`. 마선수 구매·미션·홈런더비가 다 이 한 칸을 본다
   const wallet = useGamePointWallet(walletStore, legacyGamePoint)
-  const seasonSession = useSeasonSession(seasonStore, random, wallet, aceLevels.levels)
+  /**
+   * 기록연감 통계 한 건 쌓기 (0x22e35 · 0x22c29 · 0x22c7d · 0xb663c) — 기록연감 훅은 세션 커리어를 받아 세션보다 늦게 서므로
+   * 세션들에는 이 고정 콜백을 넘기고 기록연감이 선 뒤 진짜 함수를 꽂는다.
+   */
+  const recordStatRef = useRef<(event: AnnalsStatEvent) => void>(() => {})
+  const recordStat = useCallback((event: AnnalsStatEvent) => recordStatRef.current(event), [])
+  const seasonSession = useSeasonSession(seasonStore, random, wallet, aceLevels.levels, recordStat)
   // 투수편 G도 같은 지갑 한 칸이다 — 옛 투수 저장에 남은 G는 표식 칸을 보고 딱 한 번 옮겨 온다
   const pitcherSession = usePitcherLeagueSession(
     pitcherStore,
@@ -107,11 +114,13 @@ export function App() {
     pitcherWalletMergeStore,
     // 환경설정 "송구" (설정 +0xf4) — 투수편은 사람이 늘 수비라 여기서만 이 설정이 먹는다 (0xae6c8)
     gameSettings.settings.throwMode === '수동',
+    recordStat,
   )
   const careerSession = useCareerSession({
     runner, random, saveGame, screen, setScreen, sound, wallet,
     // 환경설정 "주루" (설정 +0xbd) — 나리 타자편은 사람이 늘 공격이라 그대로 먹는다 (0xae690)
     runningModeManual: gameSettings.settings.runningMode === '수동',
+    recordStat,
   })
   // 미션 보상 G (0x4ef72) — 지갑으로 들어간다. 육성 선수가 없어도 사라지지 않는다
   const mission = useMissionSession({
@@ -128,6 +137,10 @@ export function App() {
     isEveryMissionCleared(mission.clearedKeys),
     pitcherSession.career?.openedHiddenIds,
   )
+  const { recordStat: recordCollectionStat } = collection
+  useEffect(() => {
+    recordStatRef.current = recordCollectionStat
+  }, [recordCollectionStat])
   // 히든 오픈은 원본에서 전역 저장이라 선수에게도 알려 준다 (상점이 선수 기록으로 판정한다)
   const { syncOpenedHidden } = careerSession.actions
   const openedHiddenIds = collection.collection.openedHiddenIds
