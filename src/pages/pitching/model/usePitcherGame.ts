@@ -6,6 +6,7 @@ import {
   giveUpPitching,
   isPitchTurn,
   pickoff,
+  resolveBenchClearing,
   resolveDefensePlay,
   startPitch,
   startPitcherGame,
@@ -66,6 +67,16 @@ export interface PitcherGameSession {
     readonly confirmManagerHook: () => void
     /** 돌발 창 닫기 */
     readonly closeBurst: () => void
+    /**
+     * 벤치 클리어링 연출(상태 0x1e)이 끝났다 — 인자는 틱 10 의 갱신이 돌았는가.
+     * 진행기 `resolveBenchClearing` 이 그 굴림 8 번을 내고 붙든 사구를 먹인다.
+     */
+    readonly finishBenchClearing: (reachedTargetTick: boolean) => void
+    /**
+     * 경기 끝 결과 판(상태 0x18)에서 OK — 정산(0x19)으로 넘어간다. 승리 31 · 패배 32 징글은
+     * 0x19 진입(결과 적재 0x4ea0c)이 내므로 이 자리에서 낸다.
+     */
+    readonly enterSettlement: () => void
   }
 }
 
@@ -101,17 +112,12 @@ export function usePitcherGame(
       playSoundIds(audio, [
         ...(soundsOf === undefined ? [] : soundsOf(current, after)),
         ...stepSoundIdsOf(current, after),
-        // 승리 31 · 패배 32 징글 (상태 0x19 결과 적재 0x4ea0c). 무승부는 원본이 어느 쪽을 내는지
-        // 문서에 없어 `gameResultSoundIdOf` 가 비워 둔다
-        ...(after.game.isFinished && !current.game.isFinished
-          ? [gameResultSoundIdOf(summaryOf(after).result)]
-          : []),
       ])
     }
   }, [audio])
 
-  // 경기 시작 인트로 예약음 61 (상태 0xc 진입 0x3b148).
-  // ⚠️ 웹에는 인트로 화면이 없어 **경기가 서는 자리**에 둔다 — 근사다
+  // 경기 시작 인트로 예약음 61 (상태 0xc 진입 0x3b148) — 모드 3 은 적재 상태 8 끝에서 0xc 로 오므로
+  // 화면(`PitcherGameScreen` 의 `GameIntro`)이 서는 자리, 곧 경기가 서는 자리다
   useEffect(() => {
     playSoundIds(audio, [GAME_INTRO_SOUND])
     // 경기 한 판에 한 번 — 고리가 살아 있는 동안 다시 내지 않는다
@@ -191,8 +197,16 @@ export function usePitcherGame(
       giveUp: () => step((current) => giveUpPitching(current, random)),
       confirmManagerHook: () => step((current) => closeManagerHookWindow(current, random)),
       closeBurst: () => step((current) => closeBurstWindow(current)),
+      finishBenchClearing: (reachedTargetTick: boolean) =>
+        step((current) => resolveBenchClearing(current, { reachedTargetTick }, random)),
+      enterSettlement: () => {
+        const finished = progressRef.current
+        if (!finished.game.isFinished) return
+        // 무승부는 원본이 어느 쪽을 내는지 문서에 없어 `gameResultSoundIdOf` 가 비워 둔다
+        playSoundIds(audio, [gameResultSoundIdOf(summaryOf(finished).result)])
+      },
     }),
-    [random, step],
+    [audio, random, step],
   )
 
   const summary = useMemo(

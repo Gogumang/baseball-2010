@@ -100,6 +100,10 @@ import type {
   PitcherEvaluationRecord,
   PitcherGameEvaluation,
 } from '@/features/play-pitcher-game/model/pitcherGameEvaluation'
+import { rollHalfInningFielders } from '@/features/play-game/model/halfInningBoard'
+import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
+import { pitcherOfRecordNamesOf } from '@/features/play-game/model/gameDecisions'
+import type { PitcherOfRecordNames } from '@/features/play-game/model/gameDecisions'
 
 /**
  * 나만의리그 **투수편**(원본 모드 3) 경기 진행기.
@@ -324,6 +328,21 @@ export interface PitcherGameProgress {
    * 한 번에 비워져 나온다 — 밖에서 보면 예전과 똑같다.
    */
   readonly pendingDefensePlay: DefensePlayInput | null
+  /**
+   * **벤치 클리어링 연출 중**(상태 0x1e). 내가 던진 공이 사구이고 20/99 굴림에 걸리면 진입(0x3a5f0)의 굴림 45 번까지
+   * 쓰고 여기 사구 결과를 붙든 채 멈춘다 — 밀어내기 주루·정산·다음 타석은 화면이 연출을 끝내고
+   * `resolveBenchClearing` 을 부를 때 비로소 돈다 (원본도 출구 0xae24c 뒤에야 0x17 로 간다).
+   */
+  readonly pendingBenchClearing: { readonly outcome: AtBatOutcome } | null
+  /**
+   * 마지막으로 **OK 를 기다리며 선** 공수 교대 판(상태 0x18 교대 가지) — 화면은 `serial` 이 바뀌면 판을 띄운다.
+   * 모드 3 에서는 1회초 판(인트로 0xc 끝 → 0x18)만 설 수 있다 — `withHalfInningBoard` 머리말.
+   */
+  readonly halfInningBoard: { readonly serial: number; readonly inning: number; readonly half: GameState['half'] } | null
+  /** 마지막으로 사람이 던진 타석의 반 이닝 — 반 이닝이 바뀐 뒤 첫 사람 타석인지 가린다 */
+  readonly lastHumanHalf: { readonly inning: number; readonly half: GameState['half'] } | null
+  /** 그 뒤로 자동(간이 엔진, 상태 0x21) 타석이 지났는가 — 지났으면 0x18 이 판 없이 넘어간다 (4fab6) */
+  readonly autoSinceHuman: boolean
   readonly burst: BurstSession | null
   readonly lastBurstResolution: BurstResolution | null
   readonly log: readonly PitcherGameLogEntry[]
@@ -451,6 +470,10 @@ export function startPitcherGame(
     moundStrikeoutCombo: 0,
     lastDefensePlay: null,
     pendingDefensePlay: null,
+    pendingBenchClearing: null,
+    halfInningBoard: null,
+    lastHumanHalf: null,
+    autoSinceHuman: false,
     // 경기 장면은 모드 2·3·4 일 때만 돌발 객체를 만든다 (0x48658)
     burst: createBurstSession(PITCHER_EDITION_MODE),
     lastBurstResolution: null,
@@ -473,6 +496,8 @@ export function isPitchTurn(progress: PitcherGameProgress): boolean {
     progress.onMound &&
     progress.managerHookText === null &&
     progress.pendingDefensePlay === null &&
+    // 벤치 클리어링 연출(0x1e)이 도는 동안도 0xf 로 안 돌아간다
+    progress.pendingBenchClearing === null &&
     progress.game.half === opponentHalfOf(progress.game)
   )
 }
@@ -515,6 +540,10 @@ export function throwPitch(
   random: RandomPort,
 ): PitcherGameProgress {
   const started = startPitch(progress, input, random)
+  // 벤치 클리어링도 끼어들 사람이 없으면 100틱을 다 본 것으로 친다 — 틱 10 의 굴림 8 번까지 나간다
+  if (started.pendingBenchClearing !== null) {
+    return resolveBenchClearing(started, { reachedTargetTick: true }, random)
+  }
   const pending = started.pendingDefensePlay
   if (pending === null) return started
   // 미리 다 돌려 버린다 — `runDefensePlay` 는 스테퍼를 끝까지 도는 얇은 껍데기다.
@@ -648,12 +677,44 @@ export function startPitch(
   }
   // 사구면 상태 0x12 끝(0x4e74c)에서 벤치 클리어링을 굴린다 — 밀어내기 주루(0x17)·정산 0xa8024 보다 앞이다
   const settled = withPitcherBenchClearing(afterPitch, outcome, random)
+  if (settled !== afterPitch) {
+    // 들어갔다 — 진입 0x3a5f0 이 공격 9명을 흩뿌리며 45 번 굴리고, 연출이 끝날 때까지 붙든다
+    rollBenchClearingEntry(random)
+    return { ...settled, pendingBenchClearing: { outcome } }
+  }
+  return finishNonPlayOutcome(settled, outcome, random)
+}
+
+/** 인플레이가 아닌 타석 끝(삼진·볼넷·사구·홈런) — 0xae24c 의 보통 길 뒤 0x17(밀어내기)·정산 0xa8024 */
+function finishNonPlayOutcome(
+  progress: PitcherGameProgress,
+  outcome: AtBatOutcome,
+  random: RandomPort,
+): PitcherGameProgress {
   // 내가 던진 타석이면 홈런도 날아가는 그림을 보여 준다 — 득점·주자는 아래 길이 그대로 정한다
-  const playback = homeRunPlaybackOf({ outcome, bases: settled.game.bases })
+  const playback = homeRunPlaybackOf({ outcome, bases: progress.game.bases })
   return advance(
-    applyDefensivePlay(settled, outcome, true, settled.atBat.balls, null, playback),
+    applyDefensivePlay(progress, outcome, true, progress.atBat.balls, null, playback),
     random,
   )
+}
+
+/**
+ * **벤치 클리어링 연출이 끝났다** — 출구 0xae24c (100틱 뒤 화면 전환이 끝났거나 OK·'5' 로 건너뜀).
+ *
+ * `reachedTargetTick` = 틱 10 의 갱신(0x401d4)이 돌았는가. 돌았으면 그때 수비 8명 목표를 굴린 8 번이 나갔다
+ * (`features/play-game/model/benchClearingScene` 머리말) — 화면은 굴림을 직접 하지 않고 여기로 알린다.
+ * 그 뒤 사구는 보통 길 그대로다(밀어내기 주루·R+0x148 사구 칸·다음 타석).
+ */
+export function resolveBenchClearing(
+  progress: PitcherGameProgress,
+  scene: { readonly reachedTargetTick: boolean },
+  random: RandomPort,
+): PitcherGameProgress {
+  const pending = progress.pendingBenchClearing
+  if (pending === null) return progress
+  if (scene.reachedTargetTick) rollBenchClearingTargets(random)
+  return finishNonPlayOutcome({ ...progress, pendingBenchClearing: null }, pending.outcome, random)
 }
 
 /**
@@ -661,7 +722,7 @@ export function startPitch(
  * 들어가면 0x3ab7c `0xaeab0(수비 팀, 1000)` — 지금 마운드의 내 스태미나(+0x2c) −1000, [0, 10000] 로 자른다.
  * 시즌 평판 S[1](0xa755c(ctx, 1), 0x3ab92)도 부르지만 그 게이트는 **모드 2(시즌)** 만 적으므로 투수편(모드 3)에서는
  * 아무것도 안 남는다. 홈런더비가 아니라 사구면 늘 한 번 굴린다 — **사구 타석만 난수를 하나 더 쓴다.**
- * ⚠️ 연출 화면(양 팀이 마운드로 몰려나오는 100틱, 배경음 44)과 그 연출이 쓰는 난수는 없다.
+ * 들어가면 부르는 쪽이 연출(상태 0x1e)을 붙든다 — `startPitch` · `resolveBenchClearing`.
  */
 function withPitcherBenchClearing(
   progress: PitcherGameProgress,
@@ -1327,7 +1388,7 @@ function advance(progress: PitcherGameProgress, random: RandomPort): PitcherGame
     if (current.managerHookText !== null) return current
 
     if (current.game.half === ourHalfOf(current.game)) {
-      current = playTeammateAtBat(current, random)
+      current = markAuto(playTeammateAtBat(current, random))
       continue
     }
 
@@ -1337,12 +1398,59 @@ function advance(progress: PitcherGameProgress, random: RandomPort): PitcherGame
     }
 
     if (current.onMound) {
-      if (!current.atBatPrepared) current = prepareAtBat(current, random)
-      return current
+      if (current.atBatPrepared) return current
+      // 상태 0x18(1회초 판) → 0xd → 0xe(강판 판정) → 0xf(돌발) 차례 — 판의 굴림이 타석 준비보다 앞이다
+      const prepared = prepareAtBat(withHalfInningBoard(current, random), random)
+      return {
+        ...prepared,
+        lastHumanHalf: { inning: prepared.game.inning, half: prepared.game.half },
+        autoSinceHuman: false,
+      }
     }
-    current = playDefensiveAtBat(current, random)
+    current = markAuto(playDefensiveAtBat(current, random))
   }
   throw new Error('투수편 경기 자동 진행이 끝나지 않았습니다 — 진행 규칙을 확인하세요')
+}
+
+/** 사람이 안 잡은 타석(간이 엔진)이 지났다는 표시 */
+function markAuto(progress: PitcherGameProgress): PitcherGameProgress {
+  return progress.autoSinceHuman ? progress : { ...progress, autoSinceHuman: true }
+}
+
+/**
+ * 사람 타석 앞에 **공수 교대 판(상태 0x18)이 서는가** — 서면 틱 0 의 0x3fac4 가 36 번 굴린다
+ * (`features/play-game/model/halfInningBoard` 머리말 · 팀 경기 `withHalfInningBoard` 와 같은 규칙).
+ *
+ * 판은 0x4f928 틱 0 에서 **앞 장면이 0x21 이 아니고 `0xc2198(sim, 1)` 이 거짓**(다음 장면을 사람이 잡음)일 때만 선다.
+ * 모드 3 의 `0xc2198 → 0xc1e04` 는 점프표 0xd90c0 의 칸 2 = **0xc1eac** 로 간다 (디스어셈 확인):
+ * ```
+ * c1eac: r3 = st[0x31 + st[9]]           ; 공격 팀이 사람 팀(0)인가
+ *        사람 팀 공격이면 → 1 (자동)       ; 우리 공격은 늘 0x21 — 투수편 주인공은 타석에 안 선다
+ *        아니면 0xc1d38(sim) — 모드 3: 0xae8e9(수비 팀) 현재 투수가 0xb6389(내 선수)인가
+ *          참 → 0 (사람 장면)  · 거짓 → 1 (자동 — 선발이 아닌 날 · 강판 뒤)
+ * ```
+ * 그래서 모드 3 에서는:
+ * - 내 수비 반 이닝이 끝나면 다음은 우리 공격(자동)이라 곧장 0x21 — 판 없음.
+ * - 우리 공격(0x21)이 끝나 오는 0x18 은 앞 장면이 0x21 이라 자동 OK — 판 없음. 구원 등판(8회)도 0x21 뒤라 판 없음.
+ * - **1회초 판**: 인트로 0xc 끝(0x39e3c)은 모드 1 이 아니면 늘 0x18 로 보낸다 → 후공(상대가 1회초 공격)이고
+ *   오늘 선발이 나면 첫 장면이 사람 장면이라 판이 선다. 선공이면 첫 장면이 우리 공격(0x21)이라 안 선다.
+ * 웹은 "앞서 자동 타석이 없었고(`autoSinceHuman`) 반 이닝이 바뀌었다(`lastHumanHalf`)" 로 같은 자리를 잡는다 —
+ * 모드 3 에서 이것이 참인 때는 위 1회초 판뿐이다.
+ */
+function withHalfInningBoard(progress: PitcherGameProgress, random: RandomPort): PitcherGameProgress {
+  if (progress.autoSinceHuman) return progress
+  const { game } = progress
+  const last = progress.lastHumanHalf
+  if (last !== null && last.inning === game.inning && last.half === game.half) return progress
+  rollHalfInningFielders(random)
+  return {
+    ...progress,
+    halfInningBoard: {
+      serial: (progress.halfInningBoard?.serial ?? 0) + 1,
+      inning: game.inning,
+      half: game.half,
+    },
+  }
 }
 
 function shouldEnterNow(progress: PitcherGameProgress): boolean {
@@ -1556,6 +1664,29 @@ export interface PitcherGameSummary {
    * 선발이면 경기 시작부터 참이고, 구원은 8회에 올라오는 순간 참이 된다.
    */
   readonly hasEntered: boolean
+}
+
+/**
+ * 결과 판 세 줄(승리투수·패전투수·세이브)의 이름 — 상태 0x18 그리기 0x4fe9c 가 state+0x44/0x50/0x5c 를
+ * 거르지 않고 그대로 읽는다(`0xb62c0(0xb8b60(팀[측], 번호))`). 측 2(없음)면 그 줄은 빈다.
+ *
+ * 투수편 진행기는 등번호 대신 세 자리 표지(`MY_PITCHER_NUMBER` 나 · 동료 · 상대)로 적는다 —
+ * 동료는 내가 안 던지는 동안 마운드에 서는 `ourOtherPitcherIndex`, 상대는 `opponentPitcherIndex` 칸이다
+ * (진행기가 그 두 투수만 마운드에 세우므로 이름도 그 칸이다). 내 이름은 진행기 옵션에 없어 부르는 쪽이 준다.
+ */
+export function pitchersOfRecordOf(progress: PitcherGameProgress, myName: string | null): PitcherOfRecordNames {
+  const { options } = progress
+  return pitcherOfRecordNamesOf(progress.decision, progress.game.playerSide, (isOurTeam, number) => {
+    if (!isOurTeam) return rosterPitcherName(options.opponentTeamId, opponentPitcherIndex(options))
+    if (number === MY_PITCHER_NUMBER) return myName ?? undefined
+    return rosterPitcherName(options.ourTeamId, ourOtherPitcherIndex(options))
+  })
+}
+
+/** `quickPitcherAt` 과 같은 칸의 이름 */
+function rosterPitcherName(teamId: number, index: number): string | undefined {
+  const roster = teamPitchers(teamId)
+  return roster[index % roster.length]?.name
 }
 
 /** 방어율 `0xb6ce8` = 아웃>0 ? min(9999, trunc(실점 × 2700 / 아웃)) : (실점>0 ? 9999 : 0) */

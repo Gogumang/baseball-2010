@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
+import type { RandomPort } from '@/shared/api/random/randomPort'
 import { completeGameRecordIdsOf, recordGamePointsOf } from '@/entities/game/model/gameRecords'
 import { advanceRunners } from '@/entities/game/model/baseState'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
@@ -7,7 +8,7 @@ import { BURST_TABLES } from '@/entities/burst-mission/model/burstMissionRow'
 import { MAXIMUM_BURSTS_PER_GAME } from '@/entities/burst-mission/model/burstMissionSession'
 import { BURST_GOAL } from '@/entities/burst-mission/model/burstMissionJudge'
 import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
-import { PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
+import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import {
   closeManagerHookWindow,
   earnedRunAverageOf,
@@ -15,6 +16,8 @@ import {
   isPitchTurn,
   pickoff,
   pitchSlotsFor,
+  pitchersOfRecordOf,
+  resolveBenchClearing,
   resolveDefensePlay,
   startPitch,
   startPitcherGame,
@@ -426,8 +429,9 @@ describe('주자 처리는 수비 화면이 끝나야 정해진다 (상태 0x17 
   })
 
   it('붙드는 것은 인플레이 타구뿐이다 — 삼진·볼넷은 곧장 끝난다', () => {
-    // 씨앗 3 은 게이지 끈 공의 흩어짐 반지름을 t + 3 칸으로 고친 뒤(0x4dce0) 300 개 안에 삼진·볼넷이 안 나와 1 로 옮겼다
-    const random = 씨앗(1)
+    // 씨앗 3 은 게이지 끈 공의 흩어짐 반지름을 t + 3 칸으로 고친 뒤(0x4dce0) 300 개 안에 삼진·볼넷이 안 나와 1 로 옮겼다.
+    // 1회초 판(0x18)의 걸음 굴림 36 개가 첫 타석 준비 앞에 끼면서 1 → 3 으로 다시 옮겼다
+    const random = 씨앗(3)
     let current = startPitcherGame(기본옵션, random)
     const 붙든결과: string[] = []
     let 안붙든타석 = 0
@@ -613,7 +617,7 @@ describe('사구 — 내가 맞힌 타석 (0x35a20 → 0xa8024 · 벤치 클리�
     expect(끝.log.some((entry) => entry.text.includes('벤치 클리어링'))).toBe(false)
   })
 
-  it('벤치 클리어링에 들어가면 수비(나)가 사람이라 내 스태미나 −1000', () => {
+  it('벤치 클리어링에 들어가면 수비(나)가 사람이라 내 스태미나 −1000 — 연출(0x1e)에서 사구를 붙든다', () => {
     const progress = startPitcherGame(기본옵션, 씨앗(1))
     const 보통 = startPitch(progress, 바깥직구, 씨앗(사구씨앗))
     const 벤치 = startPitch(progress, 바깥직구, 씨앗(벤치씨앗))
@@ -622,7 +626,36 @@ describe('사구 — 내가 맞힌 타석 (0x35a20 → 0xa8024 · 벤치 클리�
     // 공 하나의 스태미나 소모는 구질만 보므로 두 씨앗이 같다 — 차이는 0xaeab0(팀, 1000) 하나다
     expect(보통.stamina - 벤치.stamina).toBe(1000)
     expect(벤치.log.some((entry) => entry.text.includes('벤치 클리어링'))).toBe(true)
-    expect(벤치.game).toEqual(보통.game)
+    // 밀어내기 주루·정산은 연출이 끝나야 돈다 — 그 동안 다음 공이 안 나간다
+    expect(벤치.pendingBenchClearing).toEqual({ outcome: { kind: '사구' } })
+    expect(벤치.game).toEqual(progress.game)
+    expect(isPitchTurn(벤치)).toBe(false)
+
+    const 풀림 = resolveBenchClearing(벤치, { reachedTargetTick: true }, 씨앗(7))
+    expect(풀림.pendingBenchClearing).toBeNull()
+    expect(풀림.game).toEqual(보통.game)
+    expect(풀림.pitcherRecord.hitByPitch).toBe(1)
+  })
+
+  it('연출이 끝나면 사구를 보통 길로 먹인다 — 틱 10 을 지났으면 그 앞에 굴림 8 번이 끼어든다 (0x401d4)', () => {
+    const progress = startPitcherGame(기본옵션, 씨앗(1))
+    const 벤치 = startPitch(progress, 바깥직구, 씨앗(벤치씨앗))
+    expect(벤치.pendingBenchClearing).not.toBeNull()
+
+    const 다봄 = resolveBenchClearing(벤치, { reachedTargetTick: true }, 씨앗(11))
+    const 앞당김 = 씨앗(11)
+    for (let 번 = 0; 번 < 8; 번 += 1) 앞당김.next()
+    const 건너뜀 = resolveBenchClearing(벤치, { reachedTargetTick: false }, 앞당김)
+    expect(다봄.game).toEqual(건너뜀.game)
+    expect(다봄.log.map((entry) => entry.text)).toEqual(건너뜀.log.map((entry) => entry.text))
+  })
+
+  it('미리 다 돌리는 껍데기(throwPitch)는 연출을 끝까지 본 것으로 친다', () => {
+    const progress = startPitcherGame(기본옵션, 씨앗(1))
+    const 끝 = throwPitch(progress, 바깥직구, 씨앗(벤치씨앗))
+    expect(끝.lastResolution).toEqual({ kind: '사구' })
+    expect(끝.pendingBenchClearing).toBeNull()
+    expect(끝.game.bases.first).toBe(true)
   })
 
   it('퍼펙트(기록 31)가 사구로 깨진다 — 출루 허용 칸이 볼넷+사구를 센다', () => {
@@ -715,5 +748,62 @@ describe('포스트시즌 게이트 0xa56dc (모드 3 갈래 0xa571c — S+0xb4 
   it('정규시즌 같은 경기는 센다', () => {
     const 끝 = 끝까지던지기(startPitcherGame(기본옵션, 씨앗(3)), 3)
     expect(summaryOf(끝).record.outsRecorded).toBeGreaterThan(0)
+  })
+})
+
+/**
+ * 공수 교대 판(상태 0x18 교대 가지) — 0x4f928 틱 0 은 앞 장면이 0x21 이 아니고 `0xc2198(sim, 1)` 이 거짓일 때만 판을 세운다.
+ * 모드 3 의 0xc1e04 칸(0xc1eac)은 우리 공격을 늘 자동(0x21)으로, 상대 공격은 내 투수가 마운드에 있을 때만 사람 장면으로 본다
+ * → 판이 서는 것은 인트로 뒤 **1회초 판** 하나뿐이고, 그것도 후공·오늘 선발일 때만이다.
+ */
+describe('공수 교대 판 (상태 0x18) — 모드 3 은 1회초 판만', () => {
+  it('후공·선발이면 1회초 판이 서고, 경기 내내 다른 판은 안 선다', () => {
+    const 시작 = startPitcherGame(기본옵션, 씨앗(20100901))
+    expect(시작.halfInningBoard).toEqual({ serial: 1, inning: 1, half: '초' })
+
+    const 끝 = 끝까지던지기(시작, 4)
+    expect(끝.halfInningBoard?.serial).toBe(1)
+  })
+
+  it('선공이면 첫 장면이 우리 공격(자동)이라 판이 안 선다', () => {
+    const 시작 = startPitcherGame({ ...기본옵션, playerSide: PLAYER_SIDE_FIRST_BAT }, 씨앗(20100901))
+    expect(isPitchTurn(시작)).toBe(true)
+    expect(시작.halfInningBoard).toBeNull()
+  })
+
+  it('구원(8회 등판)은 앞이 자동 장면이라 판 없이 곧장 던진다', () => {
+    const 시작 = startPitcherGame({ ...기본옵션, role: PITCHER_ROLE.relief }, 씨앗(20100901))
+    if (isPitchTurn(시작)) expect(시작.game.inning).toBe(8)
+    expect(시작.halfInningBoard).toBeNull()
+  })
+
+  it('판이 서면 0x3fac4 의 걸음 굴림 36 개가 첫 타석 준비(0xe 강판·0xf 돌발)보다 앞에 끼어든다', () => {
+    /** 앞 n 개는 고정값, 그 뒤는 씨앗 77 */
+    const 앞값 = (n: number, value: number): RandomPort => {
+      const rest = 씨앗(77)
+      let 번 = 0
+      return { ...rest, next: () => (번++ < n ? value : rest.next()) }
+    }
+    // 판이 첫 36 개를 먹고 버리므로 그 값이 무엇이든 경기는 같다
+    const 낮음 = startPitcherGame(기본옵션, 앞값(36, 0.001))
+    const 높음 = startPitcherGame(기본옵션, 앞값(36, 0.999))
+    expect(낮음).toEqual(높음)
+    // 하나라도 타석 준비 쪽으로 새면 갈린다 — 이 비교가 실제로 무언가를 재는지 확인
+    const 새는낮음 = startPitcherGame(기본옵션, 앞값(37, 0.001))
+    const 새는높음 = startPitcherGame(기본옵션, 앞값(37, 0.999))
+    expect(새는낮음).not.toEqual(새는높음)
+  })
+})
+
+describe('경기 끝 결과 판의 승·패·세 이름 (0x4fe9c — state+0x44/0x50/0x5c)', () => {
+  it('내 결정 코드와 같은 줄에 내 이름이 서고, 측 2(없음)면 null 이다', () => {
+    const 끝 = 끝까지던지기(startPitcherGame(기본옵션, 씨앗(20100901)), 4)
+    const 이름 = pitchersOfRecordOf(끝, '나투수')
+    const 코드 = summaryOf(끝).decisionCode
+    if (코드 === 1) expect(이름.win).toBe('나투수')
+    if (코드 === 2) expect(이름.loss).toBe('나투수')
+    if (코드 === 3) expect(이름.save).toBe('나투수')
+    expect(이름.win === null).toBe(끝.decision.winner.side === 2)
+    expect(이름.loss === null).toBe(끝.decision.loser.side === 2)
   })
 })

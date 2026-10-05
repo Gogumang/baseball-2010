@@ -66,8 +66,9 @@ describe('투수편 화면의 소리 배선', () => {
   })
 
   it('한 개 던지면 투구 순간 소리 12 가 먼저, 이어서 심판 콜이 난다 (0x3f378 → 0x51a94)', () => {
-    // 게이지 끈 공의 흩어짐을 t + 3 칸(0x4dce0)으로 고친 뒤 기본 씨앗은 한가운데 공이 다 인플레이라 1 로 옮겼다
-    const { result } = 띄우기(1)
+    // 게이지 끈 공의 흩어짐을 t + 3 칸(0x4dce0)으로 고친 뒤 기본 씨앗은 한가운데 공이 다 인플레이라 1 로 옮겼다.
+    // 1회초 판(0x18)의 걸음 굴림 36 개가 첫 타석 준비 앞에 끼면서 첫 공이 인플레이가 되어 2 로 옮겼다
+    const { result } = 띄우기(2)
     expect(result.current.canPitch).toBe(true)
     녹음.played.length = 0
 
@@ -94,8 +95,9 @@ describe('투수편 화면의 소리 배선', () => {
   it('안타인데 그 루로 송구가 도착했으면 세이프 17 이 난다 (0x51c14)', () => {
     // 씨앗 6 은 첫 인플레이 타구가 **안타**다 (기본 씨앗은 그 앞에 감독 강판이 와 더 못 던진다).
     // CPU 타자 타이밍이 원본 0x340f8 로 바뀌며 굴림 수가 늘어 1 → 6 으로 옮겼다.
-    // 실투 판정 0x33cbc 가 공마다 rand(0,100) 을 하나 더 굴리게 되어 6 → 2 로 옮겼다
-    const { result } = 띄우기(2)
+    // 실투 판정 0x33cbc 가 공마다 rand(0,100) 을 하나 더 굴리게 되어 6 → 2 로 옮겼다.
+    // 1회초 판(0x18)의 걸음 굴림 36 개가 첫 타석 준비 앞에 끼면서 2 → 3 으로 옮겼다
+    const { result } = 띄우기(3)
 
     // 인플레이 **안타**가 나올 때까지 던진다 — 무엇이 나올지는 난수가 정한다.
     // 아웃이 걸린 타구는 그대로 흘려보내고, 중간에 뜨는 창(감독 대사·돌발)은 닫아 가며 이어 던진다
@@ -126,5 +128,18 @@ describe('투수편 화면의 소리 배선', () => {
 
     act(() => result.current.actions.finishDefensePlay(결과))
     expect(녹음.played).toContain(17)
+  })
+
+  it('승리 31 · 패배 32 징글은 경기가 끝난 자리가 아니라 결과 판 OK 뒤 정산(0x19 진입 0x4ea0c)에서 난다', () => {
+    // 등판이 없는 날은 경기를 세우는 자리에서 이미 끝나 있다
+    const { result } = renderHook(() =>
+      usePitcherGame({ ...기본옵션, dayCounter: 3 }, createSeededRandom(5)),
+    )
+    expect(result.current.summary).not.toBeNull()
+    expect(녹음.played.some((id) => id === 31 || id === 32)).toBe(false)
+
+    act(() => result.current.actions.enterSettlement())
+    const 결과 = result.current.summary!.result
+    if (결과 !== '무') expect(녹음.played.at(-1)).toBe(결과 === '승' ? 31 : 32)
   })
 })

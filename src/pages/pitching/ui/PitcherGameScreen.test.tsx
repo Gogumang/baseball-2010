@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
-import { PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
+import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
 import { ORIGINAL_USER_EVENTS } from '@/shared/config/original/userEvents'
@@ -48,14 +48,24 @@ const 기본옵션: PitcherGameOptions = {
   gaugeSettingOn: false,
 }
 
-const 띄우기 = (options: Partial<PitcherGameOptions> = {}, seed = 20100901) =>
-  render(
+/**
+ * 화면을 띄우고 경기 시작 연출을 넘긴다 — 인트로(상태 0xc)는 '5' 로 건너뛰고, 1회초 판(0x18)이 섰으면 OK.
+ * 기본 옵션은 후공·선발이라 1회초 판이 선다 (진행기 `withHalfInningBoard`).
+ */
+const 띄우기 = (options: Partial<PitcherGameOptions> = {}, seed = 20100901) => {
+  const rendered = render(
     <PitcherGameScreen
       options={{ ...기본옵션, ...options }}
       random={createSeededRandom(seed)}
       onFinish={vi.fn()}
     />,
   )
+  fireEvent.keyDown(window, { key: '5' })
+  if (screen.queryByRole('button', { name: '메뉴' }) === null && screen.queryByText(/^\d+회[초말]$/) !== null) {
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+  }
+  return rendered
+}
 
 describe('투수편 경기 화면', () => {
   it('등판일이면 1단계 구질 고르기가 뜬다 (상태 0xf)', () => {
@@ -81,8 +91,9 @@ describe('투수편 경기 화면', () => {
 
   it('환경설정 게이지가 꺼져 있으면 코스를 확정하는 순간 던진다 (원본 기본값)', () => {
     // 첫 공이 인플레이면 수비 화면이 덮는다 — 게이지 끈 공의 흩어짐을 t + 3 칸(0x4dce0)으로 고친 뒤
-    // 기본 씨앗의 첫 공이 인플레이가 되어, 첫 공이 볼·스트라이크인 씨앗 1 로 옮겼다
-    띄우기({}, 1)
+    // 기본 씨앗의 첫 공이 인플레이가 되어, 첫 공이 볼·스트라이크인 씨앗 1 로 옮겼다.
+    // 1회초 판(0x18)의 걸음 굴림 36 개가 첫 타석 준비 앞에 끼면서 1 → 2 로 옮겼다
+    띄우기({}, 2)
     fireEvent.click(screen.getByText('FASTBALL'))
     fireEvent.click(screen.getAllByRole('button', { name: /[◎·]/ })[0])
 
@@ -122,12 +133,50 @@ describe('투수편 경기 화면', () => {
     expect(screen.queryByText('아니오')).toBeNull()
   })
 
-  it('등판일이 아니면 경기가 끝나 있어 결과 화면이 뜬다', () => {
-    띄우기({ dayCounter: 3 })
+  it('등판일이 아니면 경기가 끝나 있어 결과 판(0x18) 뒤 정산 화면이 뜬다', () => {
+    vi.useFakeTimers()
+    try {
+      띄우기({ dayCounter: 3 })
+      // 경기 끝 결과 판 — 승·패·세 세 줄, 처음 10틱은 OK 가 안 먹는다
+      expect(screen.getByAltText('세이브')).toBeTruthy()
+      act(() => void vi.advanceTimersByTime(millisecondsPerFrame() * 10))
+      fireEvent.keyDown(window, { key: '5' })
+    } finally {
+      vi.useRealTimers()
+    }
 
     expect(screen.getByText('경기 결과')).toBeTruthy()
     // 감독 평가 글은 StrUSER_EVT 에서 온다
     expect(ORIGINAL_USER_EVENTS.length).toBeGreaterThan(38)
+  })
+})
+
+describe('경기 시작 연출 (인트로 0xc → 1회초 판 0x18)', () => {
+  it('인트로가 먼저 서고, 후공·선발이면 그 뒤 1회초 판이 OK 를 기다린다 — 그 동안 메뉴 키가 안 먹는다', () => {
+    render(<PitcherGameScreen options={기본옵션} random={createSeededRandom(1)} onFinish={vi.fn()} />)
+    expect(screen.getByText(/VS/)).toBeTruthy()
+    expect(screen.queryByText('1. 구질 선택')).toBeNull()
+
+    fireEvent.keyDown(window, { key: '5' })
+    expect(screen.getByText('1회초')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '메뉴' })).toBeNull()
+    fireEvent.keyDown(window, { key: '*' })
+    expect(screen.queryByText('조작방법')).toBeNull()
+
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(screen.getByText('1. 구질 선택')).toBeTruthy()
+  })
+
+  it('선공이면 첫 장면이 우리 공격(자동)이라 판 없이 곧장 던진다', () => {
+    render(
+      <PitcherGameScreen
+        options={{ ...기본옵션, playerSide: PLAYER_SIDE_FIRST_BAT }}
+        random={createSeededRandom(1)}
+        onFinish={vi.fn()}
+      />,
+    )
+    fireEvent.keyDown(window, { key: '5' })
+    expect(screen.getByText('1. 구질 선택')).toBeTruthy()
   })
 })
 

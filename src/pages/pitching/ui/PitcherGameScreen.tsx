@@ -9,7 +9,7 @@ import type { BurstMissionRow } from '@/entities/burst-mission/model/burstMissio
 import { staminaPercentOf } from '@/entities/pitcher-career/model/pitcherStamina'
 import { canSelectSlot } from '@/features/play-pitcher-game/model/pitcherPitch'
 import type { PitchSlot } from '@/features/play-pitcher-game/model/pitcherPitch'
-import { pitchSlotsFor } from '@/features/play-pitcher-game/model/pitcherGameFlow'
+import { pitchSlotsFor, pitchersOfRecordOf } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import type {
   PitcherGameOptions,
   PitcherGameSummary,
@@ -24,6 +24,15 @@ import { PitchGradeGauge } from '@/pages/pitching/ui/PitchGradeGauge'
 import { ManagerHookWindow } from '@/pages/pitching/ui/ManagerHookWindow'
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
+import { TEAMS } from '@/shared/config/original/teams'
+import { activeSound } from '@/shared/api/audio/soundPort'
+import { HALF_INNING_JINGLE_TICK } from '@/features/play-game/model/halfInningBoard'
+import { HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
+import { hasGameIntro } from '@/widgets/game-scene/lib/introSchedule'
+import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
+import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
+import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
+import { GameEndBoard } from '@/widgets/game-scene/ui/GameEndBoard'
 import * as styles from '@/pages/pitching/ui/PitcherGameScreen.css'
 
 /**
@@ -37,6 +46,12 @@ import * as styles from '@/pages/pitching/ui/PitcherGameScreen.css'
  *
  * ⚠️ 원본 코스 커서의 칸 수·좌표는 해독 문서에 없다 — 설명서 <투구 조작> 2단계를 따라 3×3 격자로 둔다
  * (`features/play-pitcher-game/model/pitcherPitch.courseTargetOf` 주석 참조).
+ *
+ * 경기 장면 연출(`widgets/game-scene`, 타자편·팀 경기와 같은 부품):
+ *   0xc  경기 시작 인트로 — 모드 3 도 적재 상태 8 끝에서 온다(54틱, OK·'5' 건너뛰기). 효과음 61 은 `usePitcherGame`.
+ *   0x18 1회초 판 — 후공이고 오늘 선발일 때만 선다(진행기 `withHalfInningBoard`). 틱 2 에 징글 13.
+ *   0x1e 벤치 클리어링 — 내가 던진 사구가 20/99 에 걸리면(소리 44·OK 건너뛰기).
+ *   0x18 경기 끝 결과 판 — 점수 두 개와 승·패·세 세 줄, 10틱 입력 잠금 → OK → 정산(0x19, 아래 요약 화면).
  */
 type PitchPhase = '구질' | '코스' | '게이지'
 /** 경기 화면을 덮는 하위 화면 — 경기 중 메뉴가 연다 */
@@ -55,6 +70,11 @@ interface PitcherGameScreenProps {
   /** 경기 중 메뉴 "설정" 칸이 열 환경설정 값. 안 넘기면 칸이 잠긴다 */
   readonly settings?: GameSettings
   readonly onSettingsChange?: (settings: GameSettings) => void
+  /**
+   * 내 투수 이름 — 경기 끝 결과 판의 승·패·세 줄이 내 이름을 적을 때 쓴다(진행기 옵션에는 이름이 없다).
+   * 안 넘기면 내 줄은 이름 칸이 빈다.
+   */
+  readonly pitcherName?: string
 }
 
 export function PitcherGameScreen({
@@ -64,9 +84,22 @@ export function PitcherGameScreen({
   onQuit,
   settings,
   onSettingsChange,
+  pitcherName,
 }: PitcherGameScreenProps) {
   const session = usePitcherGame(options, random)
   const { progress, canPitch, summary, actions } = session
+  const audio = activeSound()
+  /** 경기 시작 인트로(상태 0xc)가 끝났는가 — 모드 3 은 인트로가 선다 (`hasGameIntro`) */
+  const [isIntroDone, setIntroDone] = useState(!hasGameIntro(PITCHER_CAREER_MODE))
+  /** OK 로 닫은 마지막 공수 교대 판(상태 0x18 교대 가지)의 번호 */
+  const [closedBoardSerial, setClosedBoardSerial] = useState(0)
+  /** 경기 끝 결과 판(0x18)에서 OK 를 눌러 정산(0x19)으로 넘어갔는가 */
+  const [isEndBoardClosed, setEndBoardClosed] = useState(false)
+  const board = progress.halfInningBoard
+  const isHalfInningBoardOpen = board !== null && board.serial !== closedBoardSerial && summary === null
+  const isBenchClearing = progress.pendingBenchClearing !== null
+  /** 공용 키 0x498d4 의 상태 범위(0xd~0x15) 밖 — 인트로 0xc · 판 0x18 · 벤치 클리어링 0x1e */
+  const isSceneShowing = !isIntroDone || isHalfInningBoardOpen || isBenchClearing || summary !== null
 
   const [phase, setPhase] = useState<PitchPhase>('구질')
   const [isMenuOpen, setMenuOpen] = useState(false)
@@ -93,6 +126,7 @@ export function PitcherGameScreen({
    * ('#' 는 이 모드에서 교체 화면이 아니라 "그만 던지시겠습니까"(StrGAME[104])로 간다 — I-controls 4b.)
    */
   useEffect(() => {
+    if (isSceneShowing) return
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat || event.key !== '*') return
       event.preventDefault()
@@ -100,7 +134,7 @@ export function PitcherGameScreen({
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [])
+  }, [isSceneShowing])
 
   const burst = progress.burst
   const resolution = progress.lastBurstResolution
@@ -121,6 +155,7 @@ export function PitcherGameScreen({
   const acceptsPickoff =
     canPitch &&
     !isReplaying &&
+    !isSceneShowing &&
     phase === '구질' &&
     !isMenuOpen &&
     !asksGiveUp &&
@@ -157,6 +192,23 @@ export function PitcherGameScreen({
    *
    * 다 돌면 `onDone` 이 그 결과를 경기 상태에 먹인다 — **주자 처리는 그때 처음 정해진다.**
    */
+  /**
+   * 경기 시작 인트로 — 적재(상태 8) 끝에서 모드 1~4 만 0xc 로 온다. 54틱 또는 OK 뒤 1회초 판(0x18)이나 첫 타석.
+   * 진행기는 경기를 세울 때 이미 첫 사람 타석까지(등판이 없는 날은 경기 끝까지) 밀어 두었지만 인트로는 난수를 안 쓰므로
+   * 차례는 같다. 등판 없이 끝난 경기도 원본은 인트로 → 0x18 → 0x21(자동) → 결과 판 순서로 지나므로 인트로부터 보인다.
+   */
+  if (!isIntroDone) {
+    const side0Team = options.playerSide === 0 ? options.ourTeamId : options.opponentTeamId
+    const side1Team = options.playerSide === 0 ? options.opponentTeamId : options.ourTeamId
+    return (
+      <GameIntro
+        awayName={TEAMS[side0Team]?.name ?? ''}
+        homeName={TEAMS[side1Team]?.name ?? ''}
+        onDone={() => setIntroDone(true)}
+      />
+    )
+  }
+
   if (progress.pendingDefensePlay !== null) {
     return (
       <DefensePlayback
@@ -171,6 +223,29 @@ export function PitcherGameScreen({
     return <DefensePlayback ticks={play.ticks} onDone={finishPlayback} />
   }
 
+  // 사구 뒤 벤치 클리어링 (상태 0x1e) — 타석이 붙들린 채 연출이 돈다. 진입 굴림 45 번은 진행기가 이미 썼다
+  if (progress.pendingBenchClearing !== null) {
+    return <BenchClearingScene onDone={actions.finishBenchClearing} />
+  }
+
+  /**
+   * 공수 교대 판 — 진행기가 판을 세울 때 0x3fac4 의 굴림 36 개를 이미 썼다. 징글 13 은 판의 틱 2 (0x4f7ac).
+   * 모드 3 에서는 1회초 판만 선다 (진행기 `withHalfInningBoard` 머리말).
+   */
+  if (isHalfInningBoardOpen && board !== null) {
+    return (
+      <HalfInningBoard
+        key={board.serial}
+        inning={board.inning}
+        half={board.half}
+        onTick={(tick) => {
+          if (tick === HALF_INNING_JINGLE_TICK) audio.play(HALF_INNING_SOUND)
+        }}
+        onConfirm={() => setClosedBoardSerial(board.serial)}
+      />
+    )
+  }
+
   // 경기 중 메뉴의 "조작방법"(0x3c212)·"설정"(0x3c326)
   if (overlay === '조작방법') return <HelpScreen onBack={() => setOverlay(null)} />
   if (overlay === '설정' && settings !== undefined && onSettingsChange !== undefined) {
@@ -181,6 +256,24 @@ export function PitcherGameScreen({
         onChange={onSettingsChange}
         onResetCareer={() => {}}
         onBack={() => setOverlay(null)}
+      />
+    )
+  }
+
+  // 경기 끝 결과 판(상태 0x18 경기 끝 가지) — OK 뒤에 정산(0x19) 자리인 아래 요약 화면으로 간다
+  if (summary !== null && !isEndBoardClosed) {
+    const names = pitchersOfRecordOf(progress, pitcherName ?? null)
+    // 측 0(선공) 점수가 왼쪽 — 사람 팀은 `playerSide` 측에 앉는다
+    const ourSide = progress.game.playerSide
+    return (
+      <GameEndBoard
+        side0Score={ourSide === 0 ? progress.game.ourScore : progress.game.opponentScore}
+        side1Score={ourSide === 1 ? progress.game.ourScore : progress.game.opponentScore}
+        names={[names.win, names.loss, names.save]}
+        onConfirm={() => {
+          setEndBoardClosed(true)
+          actions.enterSettlement()
+        }}
       />
     )
   }
