@@ -27,6 +27,14 @@ interface PitchingScreenProps {
   readonly atBat: AtBatState
   readonly bannerText: string
   /**
+   * 이 판의 **남은 마구 횟수** = 팀+0x28 (0xaea10). `isMagicType` 과 함께 넘기면 마구 칸을 원본처럼 막는다:
+   * 키 '0' → 메시지 7 → 0x50da8 이 `구질 == 22` 면 `0xaea10 > 0` 일 때만 받고(0x50db8 `bgt`), 아니면 그대로
+   * 빠진다(0x523aa) — 구질이 안 바뀌고 다음 단계로도 안 간다. 안 넘기면 막지 않는다.
+   */
+  readonly magicRemaining?: number
+  /** 메뉴 항목이 마구 칸(구질 22)인가 — 구질 표 `PitchTypeInfo` 에 마구 자리가 없어 부르는 쪽이 가른다 */
+  readonly isMagicType?: (type: PitchTypeInfo) => boolean
+  /**
    * 던진다. `gaugeCell` 은 게이지에서 **누른 칸 0~9**(안 눌렀거나 게이지를 안 쓰면 0),
    * `gaugeSettingOn` 은 환경설정 [투구]가 게이지인가다 — 꺼져 있으면 원본이 제구·체력
    * 확률표 0xd896c 로 등급을 뽑는다 (0x4dbac).
@@ -47,6 +55,8 @@ export function PitchingScreen({
   usesGauge,
   atBat,
   bannerText,
+  magicRemaining,
+  isMagicType,
   onThrow,
   onGiveUp,
   onFinish,
@@ -74,12 +84,19 @@ export function PitchingScreen({
     setPitchType(null)
   }
 
+  /** 마구 칸인데 남은 횟수가 0 이하 — 0x50db8 이 키를 버린다 */
+  const isBlockedMagic = (type: PitchTypeInfo): boolean =>
+    magicRemaining !== undefined && isMagicType?.(type) === true && magicRemaining <= 0
+
   const typeItems: MenuItem[] = repertoire.map((type) => ({
     id: type.name,
     label: type.name,
-    detail: `구속 ${Math.round(type.speed * 100)} · 변화 ${Math.round(
-      (Math.abs(type.horizontalBreak) + Math.abs(type.verticalBreak)) * 100,
-    )}`,
+    detail:
+      isMagicType?.(type) === true && magicRemaining !== undefined
+        ? `마구 · 남은 ${magicRemaining}회${magicRemaining <= 0 ? ' (못 던짐)' : ''}`
+        : `구속 ${Math.round(type.speed * 100)} · 변화 ${Math.round(
+            (Math.abs(type.horizontalBreak) + Math.abs(type.verticalBreak)) * 100,
+          )}`,
   }))
 
   return (
@@ -100,7 +117,7 @@ export function PitchingScreen({
             items={typeItems}
             onSelect={(id) => {
               const found = repertoire.find((type) => type.name === id)
-              if (found === undefined) return
+              if (found === undefined || isBlockedMagic(found)) return
               setPitchType(found)
               setPhase('코스')
             }}
