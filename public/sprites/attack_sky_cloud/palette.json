@@ -1,6 +1,6 @@
 {
  "mpl": "stadium/attack_sky_cloud.mpl",
- "select": "미해결 — 원본이 몇 번을 고르는지 아직 못 찾았다",
+ "select": "줄 = 하늘 색 번호 v − 1 (v ≤ 8 일 때만 싣는다, v = 0 이면 −1 = 구운 벌). v = 표 0xd37a4[행][min(이닝,12)] — 구장 배경 적재 0x76fd0 (R6 6절)",
  "baked": null,
  "colors": [
   "#ff00ff",

@@ -1,11 +1,14 @@
 import { BOARD_BOXES, FENCE_BOXES } from '@/shared/config/original/stadiumScene'
 import {
   CLOUD_FRAMES, CROWD_FRAMES, FENCE_BOARD_FRAMES, FENCE_FRAMES, FENCE_SEASON_FRAMES,
-  HIDDEN_BOARD_FRAMES, HIDDEN_FENCE_FRAMES, SCOREBOARD_FRAMES, TEAM_ICON, fieldBackground, placedFrame,
-  sprite,
+  HIDDEN_BOARD_FRAMES, HIDDEN_FENCE_FRAMES, SCOREBOARD_FRAMES, SKY_LIGHT_FRAMES, TEAM_ICON, fieldBackground,
+  frameAnimations, placedFrame, sprite,
 } from '@/widgets/batting-stage/lib/spriteLoader'
 import type { PlacedFrame } from '@/widgets/batting-stage/lib/spriteLoader'
-import { CLOUD_WRAP_WIDTH, cloudScrollAt, isCloudVisible, skyColorsOf, teamIconOf } from '@/widgets/batting-stage/lib/stageScenery'
+import {
+  CLOUD_WRAP_WIDTH, SKY_LIGHT_LAST_COLOR_INDEX, cloudPaletteRowOf, cloudScrollAt, isCloudVisible, skyColorsOf,
+  skyLightFrameAt, skyLightPaletteRowOf, teamIconOf,
+} from '@/widgets/batting-stage/lib/stageScenery'
 import { BATTER_SIDE, STAGE_HEIGHT, STAGE_LAYOUT, STAGE_SIDE, STAGE_WIDTH } from '@/widgets/batting-stage/lib/stageLayout'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 
@@ -17,7 +20,7 @@ import { ORIGINAL_COLORS } from '@/shared/config/design'
  * | 모드 2(시즌)이고 내 팀 == 홈팀 · 모드 8·9(대전) | 0x41038 (직접 나열) | **0x77494** — 시즌 구장 |
  * | 그 밖 (일반·나리·미션·홈런더비, 시즌 원정) | 0x78578 | **0x77974** — 일반 구장 |
  *
- * 둘 다 하늘 0x77fe8 → 구장 → 바닥 0x7725c 차례다.
+ * 둘 다 하늘 0x77fe8 → 구장 → 바닥 0x7725c → **하늘 조명 0x78490** 차례다 (0x78578 · 0x41038~0x4106a).
  * 좌표는 카메라 오프셋 (−120, −70) 을 뺀 화면 좌표다. 적혀 있는 수치는 좌타(side 1) 기준이다.
  *
  * - **0x77974**(일반): 구장 번호 `st+0x70` 하나로 `fence.pzf` 프레임을 고르고, 팀 아이콘·전광판
@@ -94,11 +97,20 @@ export interface SceneryState {
    *    `record.stadiumEquipped` 를 `TeamGameScreen → BattingStage` 로 내려 줘야 한다.
    */
   readonly seasonStadium?: SeasonStadium
+  /**
+   * 게임 모드(전역 `0x1552d10`). 하늘 조명 0x78490 이 **모드 5·6(미션)·7(홈런더비)** 에서는 안 그린다
+   * (0x784a2~0x784b0). 생략하면 그 셋이 아닌 것으로 본다 — ⚠️ 부르는 쪽(`BattingStage`)이 아직 안 넘긴다.
+   */
+  readonly gameMode?: number
 }
 
 const CAMERA = { x: -120, y: -70 }
 const SKY_GRADIENT = { top: 10, bottom: 118, end: 178 }
 const CLOUD_COUNT = 3
+/** 하늘 조명을 안 그리는 모드 — 5 투수 미션 · 6 타자 미션 · 7 홈런더비 (0x784a6~0x784b0) */
+const SKY_LIGHT_HIDDEN_MODES: readonly number[] = [5, 6, 7]
+/** 하늘을 단색으로 칠하고 조명도 안 그리는 구장 번호 (0x78046 · 0x784c6 `cmp #8`) */
+const FLAT_SKY_STADIUM = 8
 /** 좌타 펜스 기준점 (−121 − 10, −70 + 3) */
 const FENCE_ANCHOR = { x: CAMERA.x - 1 - 10, y: CAMERA.y + 3 }
 const MISSION_TEAM_ICON = 11
@@ -178,9 +190,10 @@ export function drawScenery(context: CanvasRenderingContext2D, state: ScenerySta
   context.fillStyle = ORIGINAL_COLORS.black
   context.fillRect(0, 0, STAGE_WIDTH, STAGE_HEIGHT)
   const colorIndex = drawSky(context, state)
-  if (isCloudVisible(colorIndex)) drawClouds(context, state.tick)
+  if (isCloudVisible(colorIndex)) drawClouds(context, state.tick, cloudPaletteRowOf(colorIndex))
   drawFence(context, state)
   drawField(context, state.seasonStadium?.grassPalette ?? null)
+  drawSkyLight(context, state, colorIndex)
 }
 
 function drawSky(context: CanvasRenderingContext2D, state: SceneryState): number {
@@ -197,9 +210,10 @@ function drawSky(context: CanvasRenderingContext2D, state: SceneryState): number
   return colorIndex
 }
 
-function drawClouds(context: CanvasRenderingContext2D, tick: number): void {
+/** 구름 (0x782d6~) — 그림은 0x76fd0 이 `.mpl` 줄 `v − 1` 로 실어 둔 것이다 (`cloudPaletteRowOf`) */
+function drawClouds(context: CanvasRenderingContext2D, tick: number, paletteRow: number | null): void {
   for (let index = 0; index < CLOUD_COUNT; index += 1) {
-    const frame = placedFrame(CLOUD_FRAMES, index)
+    const frame = placedFrame(CLOUD_FRAMES, index, paletteRow)
     if (frame === null) continue
     const x = CAMERA.x + cloudScrollAt(index, tick) + frame.offsetX
     const y = CAMERA.y + frame.offsetY
@@ -317,6 +331,41 @@ function drawScoreboardText(
   // 글자는 상자 왼쪽 끝 + 이동값(구장+0x8c) 에 그린다 — 틱마다 1px 씩 흘러간다 (0x77fb4)
   context.drawImage(board.image, left + scoreboardScrollX(box[2], tick), top + board.offsetY)
   context.restore()
+}
+
+/**
+ * **하늘 조명** `sky_effect_light` (구장+0x38) — 그리기 `0x78490(구장, y, 움직임)`, 바닥 **다음** 맨 위 겹.
+ * ```
+ * 78494: 구장+0x50(= 장면 상태, 0x3f07c) == 0x19(정산) → 안 그림
+ * 784a2: 모드(0x1552d10) ∈ {5, 6, 7} → 안 그림
+ * 784b2: +0x38 이 안 실렸거나(v > 7) · y 인자 ≠ 0 · 구장+0x70 == 8 → 안 그림
+ * 784d6: v = 표0xd37a4[행][열] > 7 → 안 그림
+ * 784ea: (x0, y0) = 프레임0.vt18() ; w = 프레임0[+0x12]
+ * 78526: 애니 0 을 (화면폭 − x0 − w, 0) 에 그린다 (0x93c44)
+ * 7853c: 움직임 인자면 0x93d90(한 칸) · 0x93cfc(애니, 1)(되풀이)  ; 0x40ff0: 움직임 = 장면 상태 ≠ 0x11
+ * ```
+ * 프레임 원점이 (163, 0) 폭 77 이라 `240 − 163 − 77 = 0` — **애니 기준점이 화면 (0, 0)** 이고 그림은 오른쪽
+ * 위 구석(163~240)에 붙는다. vt18 을 "프레임 0 의 원점" 으로 읽은 것은 유력이다(원점 + 폭이 화면폭과 꼭 맞는다).
+ *
+ * **근사**: 원본은 투구 비행(상태 0x11) 동안 애니를 멈추지만 이 그리기는 장면 상태를 몰라 타석 틱으로 늘 돌린다.
+ * 상태 0x19(정산)·y 인자 ≠ 0 은 타석 화면에서 일어나지 않아 뺐다.
+ * ⚠️ 함께 실리는 `sky_effect_light1`(구장+0x3c) 은 **그리는 자리를 못 찾았다** — 구장 클래스(0x76a00~0x79000)와
+ * 장면+0xf10 을 거쳐 +0x38/+0x3c 를 읽는 곳을 전수로 훑어도 0x78490 의 +0x38 뿐이다. 그래서 안 그린다.
+ */
+function drawSkyLight(context: CanvasRenderingContext2D, state: SceneryState, colorIndex: number): void {
+  if (state.gameMode !== undefined && SKY_LIGHT_HIDDEN_MODES.includes(state.gameMode)) return
+  if (state.stadium === FLAT_SKY_STADIUM) return
+  if (colorIndex > SKY_LIGHT_LAST_COLOR_INDEX) return
+  const entries = frameAnimations(SKY_LIGHT_FRAMES)?.[0]
+  if (entries === undefined) return
+  const frameIndex = skyLightFrameAt(entries, state.tick)
+  if (frameIndex === null) return
+  const paletteRow = skyLightPaletteRowOf(colorIndex)
+  const first = placedFrame(SKY_LIGHT_FRAMES, 0, paletteRow)
+  const frame = placedFrame(SKY_LIGHT_FRAMES, frameIndex, paletteRow)
+  if (first === null || frame === null) return
+  const originX = STAGE_WIDTH - first.offsetX - first.image.width
+  context.drawImage(frame.image, originX + frame.offsetX, frame.offsetY)
 }
 
 /**

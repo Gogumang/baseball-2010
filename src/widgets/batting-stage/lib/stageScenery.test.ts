@@ -3,8 +3,11 @@ import {
   CLOUD_WRAP_WIDTH,
   PITCHER_OVERLAY_FRAME_OFFSET,
   PITCHER_RELEASE_TICKS,
+  cloudPaletteRowOf,
   cloudScrollAt,
   isCloudVisible,
+  skyLightFrameAt,
+  skyLightPaletteRowOf,
   judgeAnimationOf,
   judgeFrameAt,
   pitcherFrameAt,
@@ -96,5 +99,25 @@ describe('판정 글자 재생 — 한 번만 돈다', () => {
 describe('펜스 팀 아이콘 — team_s_icon', () => {
   it('팀 번호 그대로, 14 는 10, 10 이상은 11', () => {
     expect([0, 9, 10, 14].map(teamIconOf)).toEqual([0, 9, 11, 10])
+  })
+})
+
+describe('하늘 그림 팔레트 줄 — 0x76fd0', () => {
+  it('구름은 줄 v − 1, v = 0 이면 구운 벌 (attack_sky_cloud 8벌 = v 1~8)', () => {
+    expect([0, 1, 5, 8].map(cloudPaletteRowOf)).toEqual([null, 0, 4, 7])
+  })
+
+  it('조명은 v ≤ 1 이면 구운 벌, 아니면 줄 v − 2 (sky_effect_light 6벌 = v 2~7)', () => {
+    expect([0, 1, 2, 7].map(skyLightPaletteRowOf)).toEqual([null, null, 0, 5])
+  })
+
+  it('조명 애니는 되풀이다 — 0x93cfc(애니, 1)', () => {
+    const entries = [
+      { frame: 0, delay: 2 },
+      { frame: 1, delay: 0 },
+      { frame: 2, delay: 1 },
+    ]
+    // 칸 길이 max(1, 지연) = 2 · 1 · 1 → 4틱에 한 바퀴
+    expect([0, 1, 2, 3, 4, 5, 6].map((tick) => skyLightFrameAt(entries, tick))).toEqual([0, 0, 1, 2, 0, 0, 1])
   })
 })

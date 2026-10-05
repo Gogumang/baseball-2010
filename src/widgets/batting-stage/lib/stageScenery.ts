@@ -29,9 +29,50 @@ export function cloudScrollAt(cloudIndex: number, tick: number): number {
   return wrapped === 0 ? 0 : -wrapped
 }
 
-/** 색 번호 9 미만일 때만 구름을 그린다. 원본은 팔레트 번호−1 로 색을 바꾸지만 팔레트는 아직 옮기지 않았다 (추정) */
+/** 색 번호 9 미만일 때만 구름을 그린다 — 0x76ff6 (`v > 8` 이면 구름 그림을 아예 안 싣는다) · 0x782ea */
 export function isCloudVisible(colorIndex: number): boolean {
   return colorIndex < NIGHT_COLOR_INDEX
+}
+
+/**
+ * 하늘 그림 팔레트 줄 — 구장 배경 적재 `0x76fd0` (R6 6절, 다시 떠서 확인).
+ * ```
+ * 76fd0: 열 = min(구장+0x18 = 경기[0x6b], 12) ; v = (s8) 표0xd37a4[13·구장+0x10 + 열]   ; = skyColorsOf 의 colorIndex
+ * 76ff6: v ≤ 8 → 0xb9719("stadium/attack_sky_cloud.pzx", 1, ".mpl", v − 1)     → 구장+0x34
+ * 77028:        0xb9719("effect/sky_effect_light1.pzx", 1, 0, −1)             → 구장+0x3c (늘, 팔레트 없음)
+ * 7703e: v ≤ 7 → 0xb9719("effect/sky_effect_light.pzx", 1, ".mpl", v ≤ 1 ? −1 : v − 2) → 구장+0x38
+ * ```
+ * 줄 −1 은 0xb9719 에 "팔레트 없음" = **구운 벌**이라 웹에서는 null 이다.
+ * 같은 하늘(열이 그대로)이면 0x76fd8 이 다시 안 싣는다 — 값이 v 하나로만 정해지므로 웹은 매번 셈해도 같다.
+ */
+export function cloudPaletteRowOf(colorIndex: number): number | null {
+  return colorIndex >= 1 ? colorIndex - 1 : null
+}
+
+/** 하늘 조명 `sky_effect_light` 를 싣는가 — 0x7703e `cmp #7 / bgt` (그리기 0x784d8 도 같은 검사를 다시 한다) */
+export const SKY_LIGHT_LAST_COLOR_INDEX = 7
+
+export function skyLightPaletteRowOf(colorIndex: number): number | null {
+  return colorIndex <= 1 ? null : colorIndex - 2
+}
+
+/**
+ * 하늘 조명 애니 칸 — 0x78490 이 그린 뒤 `0x93d90`(한 칸 넘기기) · `0x93cfc(애니, 1)`(되풀이로 켜기)를
+ * 부르므로 **끝나면 처음으로 돌아가는** 되풀이다. 칸 길이는 판정 글자와 같은 `max(1, 지연)` 틱(0x93d90).
+ */
+export function skyLightFrameAt(
+  entries: readonly { frame: number; delay: number }[],
+  tick: number,
+): number | null {
+  if (entries.length === 0) return null
+  const total = entries.reduce((sum, entry) => sum + Math.max(1, entry.delay), 0)
+  let remaining = Math.max(0, tick) % total
+  for (const entry of entries) {
+    const length = Math.max(1, entry.delay)
+    if (remaining < length) return entry.frame
+    remaining -= length
+  }
+  return entries[entries.length - 1].frame
 }
 
 /** 투구 단계 → pitcher.pzx 프레임 (0x9e0b8, 폼 k 는 두 개씩 같은 표 — 홀수 폼은 좌우 반전) */

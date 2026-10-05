@@ -174,6 +174,8 @@ export const PITCHER_FRAMES = './sprites/pitcher/frames'
 
 /** 타석 배경 폴더 (위치 분석 6차) */
 export const CLOUD_FRAMES = './sprites/attack_sky_cloud/frames'
+/** 하늘 조명 `effect/sky_effect_light.pzx` — 구장+0x38, 그리기 0x78490 */
+export const SKY_LIGHT_FRAMES = './sprites/sky_effect_light/frames'
 export const FENCE_FRAMES = './sprites/fence/frames'
 export const CROWD_FRAMES = './sprites/ppl/frames'
 export const SCOREBOARD_FRAMES = './sprites/board_ani/frames'
