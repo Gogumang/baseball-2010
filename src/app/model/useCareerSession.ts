@@ -389,8 +389,12 @@ export function useCareerSession({
       current?.battingOrder,
       // 상대는 일정표(정규시즌)나 지금 시리즈(포스트시즌)가 정한다 — 무작위가 아니다
       current === null || current === undefined ? undefined : nextOpponentOf(current),
-      // 오늘까지 치른 경기 수가 곧 날짜 카운터 g 다 — 양 팀 선발이 네 경기마다 한 바퀴 돈다
-      current?.gamesPlayed ?? 0,
+      // 날짜 카운터 g = S+0xb2(= L+0x32) — 경기 준비 0x1c46c 가 0x1c576 에서 읽고 0이 아니면 두 팀 로테이션을 돌린다.
+      // 정규시즌은 오늘까지 치른 경기 수다. 포스트시즌은 **시리즈 안 경기 수**다: 대진을 까는 0xb80a8 이 0(b811c),
+      // 시리즈가 끝나면 0xb7724 가 −1(b777a), 하루 끝 0xb818c 가 +1(b819a) — CPU 끼리 경기(0xc2760 → 0xb818c)도
+      // 같은 칸을 올리지만 내 시리즈가 열리면 0 부터 다시 센다. 무승부가 없어 두 팀 승수 합이다
+      // (CPU 쪽 `playCpuSeriesGame` 과 같은 근사). 커리어 `gamesPlayed` 는 내 경기만 세므로 g 로 쓰지 않는다.
+      series === null ? (current?.gamesPlayed ?? 0) : series.wins[0] + series.wins[1],
       // 포스트시즌 — 경기 준비 0x1c46c(0x1c484)·장면 0x39fdc 모드 3·4 가지(0x3a164 → [sp+0x3c])가
       // `0xb7844(L, 내 팀)` 의 `L+0x34 != 0` 갈래로 측을 정한다: 대진 윗 시드(칸 0)가 홈·후공, 아랫 시드가 원정·선공.
       // ⚠️ 정규시즌도 원본은 같은 0xb7844(일정표 0xd89cb · 9일 주기 뒤집기)인데 웹 타자편은 아직 늘 후공이다.
@@ -925,6 +929,10 @@ export function useCareerSession({
       if (career === null) return
       // 포스트시즌 경기 뒤 — 116 이 [114 → 128] 로 대진 화면에 돌아간다 (R9 8절). 관리 주기·중간평가를 안 탄다.
       // 45번째 경기도 대진을 열지만(0xb818c) 그 뒤는 136(시즌종료) 사슬이라 경기 수로 가른다.
+      // ⚠️ 미해결: 원본 116 끝(0x12b74~0x12b94)은 S+0xb4 ≠ 0 이면 **S+0xb2(= L+0x32) == 0 → 뒤 136, 아니면 128** 로 가른다.
+      //    시리즈가 끝나는 경기는 0xb7724 가 L+0x32 = −1(b777a), 하루 끝이 +1 → 0 이라, 원본은 내 시리즈가 끝난 경기 뒤
+      //    136(392 목표 평가)부터 사슬을 다시 도는 것으로 읽힌다. 이벤트 시작 0x8bdc9 가 본 이벤트를 다시 트는지 확인
+      //    못 해 옮기지 않았다 — 웹은 포스트시즌 경기 뒤 늘 128 이다.
       if (career.postseason !== null && career.gamesPlayed > GAMES_PER_SEASON) return enterPostseason(career)
       if (isSeasonFinished(career)) return setScreen({ kind: '시즌종료' })
       // 22경기 뒤 중간평가 (0x11910 → 0x11e84)

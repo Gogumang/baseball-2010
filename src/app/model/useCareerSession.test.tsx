@@ -693,6 +693,16 @@ describe('타자편 포스트시즌 대진 128 — 사람이 친다 (0x120a4 · 
     expect(윗시드.result.current.session.progress?.game.playerSide).toBe(PLAYER_SIDE_LAST_BAT)
   })
 
+  it('포스트시즌 날짜 카운터 g 는 시리즈 안 경기 수다 (L+0x32 — 0xb80a8 0 · 0xb7724 −1 · 0xb818c +1)', () => {
+    // 준PO 3위(2) 대 4위(3), 1승 1패 뒤 셋째 경기 — g = 2. 커리어 경기 수(47)는 g 가 아니다
+    const 대진 = { ...startPostseason([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]), wins: [1, 1] as [number, number] }
+    const rendered = 띄우기(시즌끝선수({ teamId: 2, gamesPlayed: 47, postseason: 대진, regularSeasonRewardTaken: true }))
+    act(() => rendered.result.current.session.actions.confirmGameResult())
+    act(() => rendered.result.current.session.actions.pressPostseason())
+    expect(rendered.result.current.session.progress?.ourStartingPitcherIndex).toBe(2)
+    expect(rendered.result.current.session.progress?.opponentStartingPitcherIndex).toBe(2)
+  })
+
   it('포스트시즌 경기 결과 [확인] 은 관리 주기 대신 대진 128 로 돌아간다', () => {
     const rendered = 띄우기(시즌끝선수({ gamesPlayed: 47, regularSeasonRewardTaken: true }))
     act(() => rendered.result.current.session.actions.confirmGameResult())
