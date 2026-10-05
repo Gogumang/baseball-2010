@@ -237,6 +237,37 @@ describe('CPU 번트 — 원본 0x3445a', () => {
   })
 })
 
+/**
+ * 실투 0x34376 — 표 굴림 뒤에 choice 를 0(치기)으로 덮고, 타이밍 K = 10000 으로 d = 0.
+ */
+describe('실투면 CPU 타자는 치기로 간다 — 0x34376 · 0x34162', () => {
+  it('표에서 지켜보기를 뽑아도 친다 (표 굴림은 그대로 한다)', () => {
+    const random = 각본([0.99])
+    expect(cpuSwingChoiceOf(한가운데, 타자(500), random, 무사주자없음, true)).toBe('치기')
+    expect(random.used()).toBe(1)
+  })
+
+  it('번트 칸을 뽑아도 치기다', () => {
+    expect(cpuSwingChoiceOf(한가운데, 타자(500), 각본([0.65]), 무사주자없음, true)).toBe('치기')
+  })
+
+  it('존 밖이면 쫓아가기 굴림은 그대로 한다 — 실투가 무조건 스윙은 아니다', () => {
+    const 저멀리: Pitch = { ...한가운데, plate: { x: 3.0, y: 0 } }
+    const random = 각본([0.99, 0.5])
+    expect(cpuSwingChoiceOf(저멀리, 타자(500), random, 무사주자없음, true)).toBeNull()
+    expect(random.used()).toBe(2)
+  })
+
+  it('pitchAgainstBatter 는 실투면 지켜볼 공도 휘두르고 타이밍이 정확하다', () => {
+    // 표 0.99(지켜보기) → 실투로 치기 → 타이밍 0.9999 도 K=10000 밑 → d=0
+    const 굴림 = [0.99, 0.9999, 0.99, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+    expect(pitchAgainstBatter(한가운데, 타자(500), 각본(굴림), undefined, 무사주자없음).kind).toBe('스트라이크')
+    expect(
+      pitchAgainstBatter(한가운데, 타자(500), 각본(굴림), undefined, 무사주자없음, { isMistakePitch: true }).kind,
+    ).not.toBe('스트라이크')
+  })
+})
+
 describe('pitchAgainstBatter', () => {
   it('존 밖 공을 안 휘두르면 볼이다', () => {
     const random = createSeededRandom(20100901)

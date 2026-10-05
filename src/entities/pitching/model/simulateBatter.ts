@@ -82,14 +82,18 @@ export type CpuSwingChoice = '치기' | '번트'
  * ```
  * 난수는 **표 뽑기 한 번은 늘**, **존 밖이고 휘두를 마음이 있을 때만 한 번 더** 돈다.
  *
- * ⚠️ 아직 안 옮긴 것 — 원본은 실투(0x33cbc)면 choice 를 0 으로 **강제**하고,
- *    h 는 실효 히트(0xb570d: 컨디션·스킬 보정)다. 웹에는 둘 다 없어 날 히트를 쓴다.
+ * **실투**(0x33cbc → `[+0xf98].byte8`, `mistakePitch.ts`)면 표 굴림 **뒤에** choice 를 0(치기)으로
+ * 덮는다 (0x34376~0x3438e). 표 굴림은 그대로 하고, 존 밖이면 쫓아가기 굴림도 그대로 한다 —
+ * 실투가 "무조건 휘두른다" 는 뜻은 아니다.
+ *
+ * ⚠️ 아직 안 옮긴 것 — h 는 실효 히트(0xb570d: 컨디션·스킬 보정)다. 웹에는 없어 날 히트를 쓴다.
  */
 export function cpuSwingChoiceOf(
   pitch: Pitch,
   ability: BatterAbility,
   random: RandomPort,
   situation: BatterSituation = UNWIRED_SITUATION,
+  isMistakePitch = false,
 ): CpuSwingChoice | null {
   const odds = battingPatternOdds(
     situation.strikes,
@@ -98,7 +102,9 @@ export function cpuSwingChoiceOf(
     situation.hasRunner,
   )
   // 0x9f224 — rand(0,100), 위끝 제외
-  const choice = battingPatternChoiceOf(odds, randomIntegerBelow(random, 0, 100))
+  const drawn = battingPatternChoiceOf(odds, randomIntegerBelow(random, 0, 100))
+  // 0x34376 — 실투면 뽑은 것을 버리고 0(치기)
+  const choice = isMistakePitch ? '치기' : drawn
   if (choice === '지켜보기') return null
 
   const zone = swingZoneOf(pitch.plate)
@@ -116,8 +122,9 @@ export function willSwing(
   ability: BatterAbility,
   random: RandomPort,
   situation: BatterSituation = UNWIRED_SITUATION,
+  isMistakePitch = false,
 ): boolean {
-  return cpuSwingChoiceOf(pitch, ability, random, situation) !== null
+  return cpuSwingChoiceOf(pitch, ability, random, situation, isMistakePitch) !== null
 }
 
 /** 0x3445a — 번트 종류 rand(1,4) → 1·2·3 (사람 번트 키 '8'=1 · '7'=2 · '9'=3 과 같은 칸 +0xfdc) */
@@ -143,6 +150,12 @@ export function cpuBuntKindOf(choice: CpuSwingChoice, isMagicBatter: boolean, ra
 export interface CpuBatterTraits {
   /** 마선수인가 (0xb633d = 선수 레코드 [10] 비트6) — 마선수는 번트하지 않는다 */
   readonly isMagicBatter?: boolean
+  /**
+   * 이 공이 실투인가 — 투구 순간 0x33cbc(`isMistakePitch`)가 정한 값. 부르는 쪽이 궤적을 만든 뒤
+   * (0x4dea0 은 궤적 준비 0x9e669 다음) 이 함수보다 **먼저** 굴려 넘긴다.
+   * 참이면 표 선택이 치기로 강제되고 타이밍이 늘 d = 0 이다.
+   */
+  readonly isMistakePitch?: boolean
 }
 
 /** 스윙 프레임 F = N − 2 + d — d = 0 이 타이밍 100 이다 (0x34be0) */
@@ -202,7 +215,8 @@ export function pitchAgainstBatter(
   situation: BatterSituation = UNWIRED_SITUATION,
   traits: CpuBatterTraits = {},
 ): PitchResolution {
-  const choice = cpuSwingChoiceOf(pitch, batter, random, situation)
+  const isMistake = traits.isMistakePitch === true
+  const choice = cpuSwingChoiceOf(pitch, batter, random, situation, isMistake)
   if (choice === null) {
     return isInsideStrikeZone(pitch.plate)
       ? { kind: '스트라이크', isSwinging: false }
@@ -210,7 +224,7 @@ export function pitchAgainstBatter(
   }
 
   // 원본 0x34334 → 0x340f8: F = N − 2 + d
-  const frame = pitch.frameCount - SWEET_FRAME_OFFSET + cpuSwingTimingOffsetOf(batter.hit, random)
+  const frame = pitch.frameCount - SWEET_FRAME_OFFSET + cpuSwingTimingOffsetOf(batter.hit, random, isMistake)
   // 0x3445a — 타이밍 굴림 **뒤**에 번트 종류
   const buntKind = cpuBuntKindOf(choice, traits.isMagicBatter === true, random)
   const result = swingResultOf(
