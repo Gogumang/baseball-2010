@@ -10,6 +10,8 @@ import { FirstBatStadiumScreen } from '@/pages/general-mode/ui/FirstBatStadiumSc
 import type { StadiumEntry } from '@/pages/general-mode/ui/FirstBatStadiumScreen'
 import { MatchInfoScreen } from '@/pages/general-mode/ui/MatchInfoScreen'
 import { MatchSettingsWindow } from '@/pages/general-mode/ui/MatchSettingsWindow'
+import { EntryEditorScreen } from '@/widgets/entry-editor'
+import { TEAMS } from '@/shared/config/original/teams'
 
 export interface GeneralModeScreenProps {
   readonly random: RandomPort
@@ -157,15 +159,36 @@ export function GeneralModeScreen(props: GeneralModeScreenProps) {
         />
       )
     default:
+      // 상태 23 엔트리 편집 — 그리기 0x2e070 (엔트리 목록 창 0x5cfec + 머리띠 6/7), 키 0x2a370 → 0x55864
+      if (session.entryEdit !== null) {
+        const { entryEdit } = session
+        return (
+          <EntryEditorScreen
+            editor={entryEdit.editor}
+            lists={entryEdit.lists}
+            teamName={`${TEAMS[entryEdit.teamId]?.name ?? ''} ${entryEdit.isUserTeam ? '(PLAYER)' : '(COM)'}`}
+            isAceLocked={entryEdit.isAceLocked}
+            {...(gamePoint === undefined ? {} : { gamePoint })}
+            onKey={actions.pressEntryKey}
+            onMoveCursor={actions.pointEntryCursor}
+            onCloseAceLocked={actions.closeEntryAceLocked}
+          />
+        )
+      }
       return (
         <>
           <MatchInfoScreen
             setup={flow.setup}
             isQuickStart={flow.isQuickStart}
+            userStarterName={session.userStarterName}
             onStart={actions.start}
             onOpenSettings={actions.openSettings}
             onRespin={actions.respin}
             onCancel={back}
+            onOpenEntry={(isUserTeam) => {
+              // 설정 창이 열려 있으면 키가 창으로 간다 (0x311a8 skin+0x2ba)
+              if (!session.isSettingsOpen) actions.openEntry(isUserTeam)
+            }}
           />
           {session.isSettingsOpen && (
             <MatchSettingsWindow

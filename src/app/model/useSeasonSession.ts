@@ -33,7 +33,7 @@ import { EMPTY_LEAGUE_PLAYER_STATS, recordLeaguePlateAppearances } from '@/entit
 import type { LeaguePlayerStats } from '@/entities/league/model/leaguePlayerStats'
 import { startNextYear } from '@/entities/season-mode/model/seasonRecord'
 import { SEASON_END_CHAIN } from '@/entities/season-mode/model/seasonStateMachine'
-import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
+import { teamBatters } from '@/entities/team/model/teamRoster'
 import { TEAMS } from '@/shared/config/original/teams'
 import type { TeamGameOptions, TeamGameSummary } from '@/features/play-team-game/model/teamGameFlow'
 import { FULL_PLAY_SETTINGS } from '@/features/play-team-game/model/matchSettings'
@@ -42,6 +42,15 @@ import {
   PRE_GAME_ACES_START, SQUAD_PURPOSE, cancelPreGameAce, choosePreGameAce, matchInfoCancelScene,
 } from '@/entities/season-mode/model/preGameFlow'
 import type { PreGameAces, SquadPurpose } from '@/entities/season-mode/model/preGameFlow'
+import {
+  leavesEntryEditor, openEntryEditor, pointEntryCursor, pressEntryKey,
+} from '@/entities/season-mode/model/entryEditor'
+import type { EntryEditorState, EntryKey } from '@/entities/season-mode/model/entryEditor'
+import {
+  seasonEntryListsOf, seasonRosterOfEntry, seasonStarterNameOf, tableRosterOf,
+} from '@/entities/season-mode/model/seasonEntry'
+import type { SeasonEntryInput, SeasonEntryLists } from '@/entities/season-mode/model/seasonEntry'
+import { HALL_OF_FAME_FIRST_ID } from '@/entities/season-mode/model/playerRecruit'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
 import { createNationalCup, nationalCupSideOf } from '@/entities/national-cup/model/nationalCup'
@@ -124,6 +133,13 @@ export interface SeasonSession {
   readonly isMatchSettingsOpen: boolean
   /** 시즌 칸(m = 1)의 경기진행 설정 — 경기 옵션 `settings` 로 간다 */
   readonly matchSettings: MatchProgressSettings
+  /** 엔트리 편집 0xe0 — 그 장면이 아니면 null */
+  readonly entryEdit: SeasonEntryEdit | null
+  /**
+   * 경기정보 0xdd "선발" 줄의 내 팀 값 — 엔트리 편집이 고친 명단의 투수 0번(0x5e0e8). 경기 전 흐름 밖이면 null.
+   * ⚠️ 웹 팀 경기는 아직 이 명단을 안 받는다 (`seasonEntry.seasonEntryOrderOf` 주석).
+   */
+  readonly matchInfoStarterName: string | null
   readonly notice: string
   readonly actions: SeasonActions
 }
@@ -154,6 +170,14 @@ export interface SeasonActions {
   readonly toggleMatchSettings: () => void
   /** 설정 창 확인 "예" — 시즌 칸에 되쓰고 닫는다 (0x60376) */
   readonly applyMatchSettings: (settings: MatchProgressSettings) => void
+  /** 0xdd 의 '4'/왼(유저 팀 · this+0x120 = 1) · '6'/오른(CPU 팀 · 0) → 0xe0 엔트리 편집 */
+  readonly openEntryEdit: (isUserTeam: boolean) => void
+  /** 0xe0 의 키 — 편집기 0x55864 를 돌리고 끝 코드면 0xdd 로 (0x7044) */
+  readonly pressEntryKey: (key: EntryKey) => void
+  /** 0xe0 — 웹 전용, 줄을 눌러 커서를 옮긴다 */
+  readonly pointEntryCursor: (index: number) => void
+  /** 0xe0 — 마선수 잠금 팝업을 닫는다 */
+  readonly closeEntryAceLocked: () => void
   readonly confirmIncome: (record: SeasonRecord) => void
   /** 국가대항전 한 경기 — 사람이 대표팀을 조작한다 */
   readonly playCupGame: (myTeam: number, opponent: number) => void
@@ -207,6 +231,18 @@ interface SeasonSave {
   readonly matchSettingsSeen?: boolean
 }
 
+/** 엔트리 편집 0xe0 한 판 — 편집 객체 `[this+0xa8]` 와 그 목록 */
+export interface SeasonEntryEdit {
+  /** this+0x120 — 1 유저 팀(편집 가능) · 0 CPU 팀(보기 전용) */
+  readonly isUserTeam: boolean
+  /** 이름을 빌려 온 팀 번호 */
+  readonly teamId: number
+  readonly editor: EntryEditorState
+  readonly lists: SeasonEntryLists
+  /** 마선수를 고르려 해서 StrTEXT 0xd200c 팝업이 떠 있다 */
+  readonly isAceLocked: boolean
+}
+
 /** 0xd7 → 0xdd 를 지나 치를 경기 한 판 */
 export interface PendingSeasonGame {
   readonly kind: SeasonGameKind
@@ -217,22 +253,27 @@ export interface PendingSeasonGame {
 /**
  * 시즌 로스터를 팀 명단 표에서 만든다 — 원본 선수 레코드 구조가 안 풀려 **근사**다.
  * 칸 번호(`+0xa & 0x1f`)만 순서대로 채우고 종류 비트는 0(기본 선수)으로 둔다.
+ * 타자 수비 위치(`+0x1c & 0xf`)는 표의 값을 넣는다 — 엔트리 편집(0xb5e99·0xb5fe5)과 트레이드 자리 벌점이
+ * 이 칸을 본다. 스태미나(+0x2c)는 웹 팀 명단 표에 칸이 없어 0 이다 — 영입 화면은 이 칸을 안 본다.
  */
 function rosterOf(teamId: number): SeasonTeamRoster {
+  return tableRosterOf(teamId)
+}
+
+/**
+ * 엔트리 편집이 생기기 전 세이브는 타자 수비 위치를 모두 0 으로 적었다 — 그대로면 엔트리 편집의
+ * 수비위치 탭이 아무것도 못 바꾸고(0xb5fe5 는 둘 다 ≠ 0 일 때만) 트레이드 벌점도 늘 10 이다.
+ * **모든 타자가 0 일 때만** 리그 선수(id < 0xb4)의 표 값으로 채운다 (영입 선수는 그대로).
+ */
+function withTablePositions(roster: SeasonTeamRoster, teamId: number): SeasonTeamRoster {
+  if (roster.batters.some((player) => (player.fieldPosition & 0xf) !== 0)) return roster
+  const table = teamBatters(teamId)
   return {
-    pitchers: teamPitchers(teamId).map((_player, slot) => ({
-      id: slot,
-      kindByte: slot,
-      fieldPosition: 0,
-      // 원본 +0x2c. 웹 팀 명단 표에 스태미나 칸이 없어 0 으로 둔다 — 영입 화면은 이 칸을 안 본다
-      stamina: 0,
-    })),
-    batters: teamBatters(teamId).map((_player, slot) => ({
-      id: slot,
-      kindByte: slot,
-      fieldPosition: 0,
-      stamina: 0,
-    })),
+    ...roster,
+    batters: roster.batters.map((player) => {
+      const position = player.id < HALL_OF_FAME_FIRST_ID ? table[player.id]?.position ?? 0 : 0
+      return { ...player, fieldPosition: (player.fieldPosition & ~0xf) | position }
+    }),
   }
 }
 
@@ -264,7 +305,9 @@ function normalizeSeasonSave(saved: Partial<SeasonSave> | null): SeasonSave | nu
     ...saved,
     state,
     league: saved.league ?? EMPTY_LEAGUE,
-    roster: saved.roster ?? rosterOf(state.record.teamId),
+    roster: saved.roster === undefined
+      ? rosterOf(state.record.teamId)
+      : withTablePositions(saved.roster, state.record.teamId),
     playerStats: saved.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS,
   }
 }
@@ -344,6 +387,13 @@ export function useSeasonSession(
   const [isMatchSettingsOpen, setIsMatchSettingsOpen] = useState(false)
   /** 전역 저장 app+0xe0 — 열린 구장 히든 아이템 id (S3 7절). 위 칸과 같은 자리에 둔다 */
   const [openedStadiumIds, setOpenedStadiumIds] = useState<readonly number[]>([])
+  /** 엔트리 편집 0xe0 — 편집 객체와 목록 */
+  const [entryEdit, setEntryEdit] = useState<SeasonEntryEdit | null>(null)
+  /**
+   * 국가대항전 대한민국 명단 — 원본은 저장의 대표팀 슬롯 `+0x918`(대회 내내 이어진다)을 고친다.
+   * ⚠️ 웹 세이브에 그 칸이 없어 **경기정보에 새로 들어올 때마다 표에서 다시 만든다** — 그 경기 하나에만 남는다.
+   */
+  const [cupEntryRoster, setCupEntryRoster] = useState<SeasonTeamRoster | null>(null)
 
   /**
    * 지금 들고 있는 G — **화면도 판정도 이 값 하나만 본다.**
@@ -577,6 +627,7 @@ export function useSeasonSession(
   const enterMatchInfo = useCallback(
     (current: SeasonSave, pending: PendingSeasonGame) => {
       setPendingGame(pending)
+      setCupEntryRoster(null)
       const firstTime = current.matchSettingsSeen !== true
       if (firstTime) commit({ ...current, matchSettingsSeen: true })
       setIsMatchSettingsOpen(firstTime)
@@ -665,6 +716,111 @@ export function useSeasonSession(
     },
     [commit, save],
   )
+
+  /**
+   * 0xe0 의 유저 팀 명단 — 정규·포스트시즌은 시즌 세이브 명단(+ 0xd7 에서 고른 마선수), 국가대항전은
+   * 대한민국 명단(마선수 없음, 0x6548 66ae). 로테이션 날짜는 경기 옵션과 같은 값이다.
+   */
+  const userEntrySourceOf = useCallback(
+    (current: SeasonSave, pending: PendingSeasonGame): SeasonEntryInput => {
+      const dayCounter = pending.options.dayCounter ?? 0
+      if (pending.kind === '국가대항전') {
+        const teamId = pending.options.ourTeamId
+        return {
+          teamId, roster: cupEntryRoster ?? tableRosterOf(teamId), dayCounter, acePitcherId: -1, aceBatterId: -1,
+        }
+      }
+      return {
+        teamId: current.state.record.teamId,
+        roster: current.roster,
+        dayCounter,
+        acePitcherId: preGameAces.pitcher,
+        aceBatterId: preGameAces.batter,
+      }
+    },
+    [cupEntryRoster, preGameAces],
+  )
+
+  /**
+   * 0xdd '4'/왼 · '6'/오른 (0x83cc) → this+0x120 = 1/0, 밀기 4/3 → 0xe0. 들어옴 0x63dc 가 그 팀 레코드로
+   * 편집기를 세운다 — 편집 가능 = this+0x120 (CPU 팀은 보기 전용), 첫 탭은 투수.
+   * CPU 팀 명단은 웹에서 붙박이 표다 (원본이 넣는 굴린 마선수는 웹 팀 경기가 안 넣으므로 목록에도 없다).
+   */
+  const openEntryEdit = useCallback(
+    (isUserTeam: boolean) => {
+      if (save === null || pendingGame === null) return
+      const { options } = pendingGame
+      const source: SeasonEntryInput = isUserTeam
+        ? userEntrySourceOf(save, pendingGame)
+        : {
+          teamId: options.opponentTeamId,
+          roster: tableRosterOf(options.opponentTeamId),
+          dayCounter: options.opponentDayCounter ?? options.dayCounter ?? 0,
+          acePitcherId: -1,
+          aceBatterId: -1,
+        }
+      setEntryEdit({
+        isUserTeam,
+        teamId: source.teamId,
+        editor: openEntryEditor(isUserTeam),
+        lists: seasonEntryListsOf(source),
+        isAceLocked: false,
+      })
+      setScene(SEASON_SCENE_STATE.엔트리편집)
+    },
+    [pendingGame, save, userEntrySourceOf],
+  )
+
+  /**
+   * 0xe0 키 `0x7044` — 편집기 `0x55864` 를 돌리고 끝 코드 `[ed+0x338]` 을 본다:
+   * 1 → 0xdd · 2 → CPU 팀일 때만 0xdd · 3 → 유저 팀일 때만 0xdd. 0xdd 로 돌아오면 들어옴 0x6548 이
+   * 이전 상태 0xe0 을 보고 아무것도 안 한다(설정 창 자동 열기·명단 다시 세우기 없음) — 그래서 장면만 바꾼다.
+   *
+   * 유저 팀 명단이 바뀌면 곧장 시즌 세이브에 적는다. 원본은 저장 객체의 팀 레코드를 바로 고치고 파일 쓰기는
+   * 0xdd 의 경기 시작(0x22754)이 하므로, ⚠️ 경기를 시작하지 않고 끄면 원본은 고친 것이 날아가지만 웹은 남는다.
+   */
+  const pressEntryKeyAction = useCallback(
+    (key: EntryKey) => {
+      if (entryEdit === null || entryEdit.isAceLocked) return
+      const outcome = pressEntryKey(entryEdit.editor, entryEdit.lists, key)
+      let lists = outcome.lists
+      if (lists !== entryEdit.lists && entryEdit.isUserTeam && save !== null && pendingGame !== null) {
+        const source = userEntrySourceOf(save, pendingGame)
+        const roster = seasonRosterOfEntry(source.roster, lists, source.dayCounter)
+        if (pendingGame.kind === '국가대항전') setCupEntryRoster(roster)
+        else commit({ ...save, roster })
+        // 명단 첨자를 새 명단에 맞춰 다시 세운다 (줄 순서는 같다)
+        lists = seasonEntryListsOf({ ...source, roster })
+      }
+      if (leavesEntryEditor(outcome.state.result, entryEdit.isUserTeam)) {
+        setEntryEdit(null)
+        setScene(SEASON_SCENE_STATE.경기정보)
+        return
+      }
+      setEntryEdit({ ...entryEdit, editor: outcome.state, lists, isAceLocked: outcome.isAceLocked })
+    },
+    [commit, entryEdit, pendingGame, save, userEntrySourceOf],
+  )
+
+  const pointEntryCursorAction = useCallback(
+    (index: number) => {
+      if (entryEdit === null || entryEdit.isAceLocked) return
+      setEntryEdit({ ...entryEdit, editor: pointEntryCursor(entryEdit.editor, entryEdit.lists, index) })
+    },
+    [entryEdit],
+  )
+
+  const closeEntryAceLocked = useCallback(() => {
+    setEntryEdit((current) => (current === null ? null : { ...current, isAceLocked: false }))
+  }, [])
+
+  /** 0xdd "선발" 줄 — 내 팀 명단(엔트리 편집 결과)의 투수 0번 */
+  const matchInfoStarterName = save !== null && pendingGame !== null
+    ? (() => {
+      const source = userEntrySourceOf(save, pendingGame)
+      return seasonStarterNameOf(source.teamId, source.roster, source.dayCounter)
+    })()
+    : null
 
   /**
    * 취소 `0x48ea`: 이전 상태가 0xc9 일 때만 0xc9 로 돌아간다. 관리 메뉴 갱신이 phase 를 3 으로
@@ -1156,6 +1312,8 @@ export function useSeasonSession(
     pendingGame,
     isMatchSettingsOpen,
     matchSettings: save?.matchSettings ?? FULL_PLAY_SETTINGS,
+    entryEdit,
+    matchInfoStarterName,
     gameKind,
     leagueFirstAwardedBits,
     // 지갑이 주인이다 (`?무한G` 도 지갑 안에서 갈린다) — 위 `gamePoints` 주석 참고
@@ -1168,6 +1326,8 @@ export function useSeasonSession(
       openNextGame, confirmNextGame, cancelNextGame, confirmIncome,
       choosePreGameAce: choosePreGameAceAction, cancelPreGameAce: cancelPreGameAceAction,
       startPendingGame, cancelMatchInfo, toggleMatchSettings, applyMatchSettings,
+      openEntryEdit, pressEntryKey: pressEntryKeyAction, pointEntryCursor: pointEntryCursorAction,
+      closeEntryAceLocked,
       playCupGame, finishCup, finishGame, continuePostseason,
       runTraining, runOuting, nextSeasonEndStep, awardLeagueFirst, spendGamePoint, finishSeason,
       openStadiumItems, markEndingSeen, clearNotice, quit,

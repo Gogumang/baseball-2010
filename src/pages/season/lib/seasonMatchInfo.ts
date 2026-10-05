@@ -79,6 +79,11 @@ export interface SeasonMatchInfoInput {
   readonly acePitcherId: number
   /** 내 팀에 넣은 마타자 0..4 (없으면 −1) */
   readonly aceBatterId: number
+  /**
+   * 내 팀 "선발" 값 — 엔트리 편집(0xe0)이 고친 명단의 투수 0번 (`seasonEntry.seasonStarterNameOf`).
+   * 없으면 붙박이 표의 로테이션 칸으로 셈한다.
+   */
+  readonly myStarterName?: string | null
 }
 
 const LABELS = ['순위', '승패', '선발', '마투수', '마타자'] as const
@@ -125,7 +130,10 @@ export function seasonMatchInfoLines(input: SeasonMatchInfoInput): readonly Matc
   const values: readonly (readonly [string, string])[] = [
     [rankTextOf(input, myTeamId), rankTextOf(input, opponentTeamId)],
     [winLossTextOf(input, myTeamId), winLossTextOf(input, opponentTeamId)],
-    [starterNameOf(myTeamId, input.dayCounter), starterNameOf(opponentTeamId, input.opponentDayCounter ?? input.dayCounter)],
+    [
+      input.myStarterName ?? starterNameOf(myTeamId, input.dayCounter),
+      starterNameOf(opponentTeamId, input.opponentDayCounter ?? input.dayCounter),
+    ],
     [acePitcherNameOf(input.acePitcherId), EMPTY_VALUE],
     [aceBatterNameOf(input.aceBatterId), EMPTY_VALUE],
   ]

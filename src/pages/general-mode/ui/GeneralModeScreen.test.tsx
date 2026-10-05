@@ -121,3 +121,30 @@ describe('경기진행 설정', () => {
     expect(screen.queryByRole('dialog', { name: '경기진행 설정' })).toBeNull()
   })
 })
+
+describe('엔트리 편집 (상태 23, 편집기 0x55864)', () => {
+  const 줄이름 = (index: number) =>
+    screen.getByTestId(`엔트리-줄-${index}`).querySelectorAll('span')[1]?.textContent ?? ''
+
+  it("'4' 로 유저 팀 투수 엔트리를 열고, 0번과 2번을 바꾸면 경기정보 선발이 바뀐다 — '6' 으로 돌아온다", () => {
+    띄우기({ isQuickStart: true })
+    fireEvent.keyDown(window, { key: '4' })
+    const 둘째 = 줄이름(2)
+    for (const key of ['5', 'ArrowDown', 'ArrowDown', '5']) fireEvent.keyDown(window, { key })
+    expect(줄이름(0)).toBe(둘째)
+
+    // 유저 팀은 오른쪽 끝(3)으로 경기정보에 돌아간다 (0x2a370)
+    fireEvent.keyDown(window, { key: '6' })
+    expect(screen.getByTestId('경기정보-선발-유저').textContent).toBe(둘째)
+  })
+
+  it("'6' 으로 연 CPU 팀 엔트리는 보기 전용이다 — OK 해도 순서가 그대로다", () => {
+    띄우기({ isQuickStart: true })
+    fireEvent.keyDown(window, { key: '6' })
+    const 첫째 = 줄이름(0)
+    for (const key of ['5', 'ArrowDown', '5']) fireEvent.keyDown(window, { key })
+    expect(줄이름(0)).toBe(첫째)
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.getByRole('button', { name: '경기 시작' })).toBeTruthy()
+  })
+})

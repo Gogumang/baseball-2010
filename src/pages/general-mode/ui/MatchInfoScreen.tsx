@@ -30,6 +30,10 @@ export interface MatchInfoScreenProps {
   /** '*' — 빠른실행 결정사항 다시 굴리기 */
   readonly onRespin: () => void
   readonly onCancel: () => void
+  /** '4'/왼 → 유저 팀(메뉴+0xec = 1) · '6'/오른 → CPU 팀(0) 엔트리 편집 상태 23 */
+  readonly onOpenEntry?: (isUserTeam: boolean) => void
+  /** 유저 팀 "선발" — 엔트리 편집이 고친 투수 0번 */
+  readonly userStarterName?: string | null
 }
 
 /**
@@ -43,15 +47,15 @@ export interface MatchInfoScreenProps {
  *   - OK → 경기 시작   ·   `0` → 경기진행 설정 (일반모드만)   ·   `*` → 빠른실행 재굴림
  *   - CLR → 빠른실행이면 모드 목록으로, 아니면 마선수(상태 21) 의 마타자 단계로
  *
- * ⚠️ 여기 없는 것: 좌·우 키의 **엔트리 편집**(상태 23, 편집기 0x55864). 엔트리 편집기는 일반·시즌·
- *    나만의리그·에디트가 함께 쓰는 큰 화면이고 웹판에 아직 하나도 없다 (R4 5절).
+ *   - '4'/왼 → 유저 팀 · '6'/오른 → CPU 팀(보기 전용) **엔트리 편집**(상태 23, 편집기 0x55864)
  */
 export function MatchInfoScreen({
-  setup, isQuickStart = false, gamePoint = 0, onStart, onOpenSettings, onRespin, onCancel,
+  setup, isQuickStart = false, gamePoint = 0, onStart, onOpenSettings, onRespin, onCancel, onOpenEntry,
+  userStarterName = null,
 }: MatchInfoScreenProps) {
   const sltOrigins = useFrameOrigins(SLT_FRAME)
   const imgTextOrigins = useFrameOrigins(IMG_TEXT_FRAME)
-  const lines = generalModeMatchInfoLines(setup)
+  const lines = generalModeMatchInfoLines(setup, userStarterName)
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -69,12 +73,21 @@ export function MatchInfoScreen({
       }
       if (event.key === 'Escape') {
         event.preventDefault()
-        onCancel()
+        return onCancel()
+      }
+      // 0x311a8: '4'/왼 → 메뉴+0xec = 1 (유저 팀) · '6'/오른 → 0 (CPU 팀) → 상태 23
+      if (onOpenEntry !== undefined && (event.key === 'ArrowLeft' || event.key === '4')) {
+        event.preventDefault()
+        return onOpenEntry(true)
+      }
+      if (onOpenEntry !== undefined && (event.key === 'ArrowRight' || event.key === '6')) {
+        event.preventDefault()
+        onOpenEntry(false)
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [isQuickStart, onStart, onOpenSettings, onRespin, onCancel])
+  }, [isQuickStart, onStart, onOpenSettings, onRespin, onCancel, onOpenEntry])
 
   const { anchorA, anchorB, firstBatTag } = MATCH_INFO_LAYOUT
   const isUserFirstBat = setup.playerSide === PLAYER_SIDE_FIRST_BAT

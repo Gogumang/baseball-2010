@@ -8,6 +8,8 @@ import {
   SeasonMatchInfoScreen, seasonMatchInfoLines,
 } from '@/pages/season'
 import { AceSelectScreen } from '@/pages/general-mode'
+import { EntryEditorScreen } from '@/widgets/entry-editor'
+import { TEAMS } from '@/shared/config/original/teams'
 import {
   DEFAULT_OPENED_ACE_BATTER_IDS, DEFAULT_OPENED_ACE_PITCHER_IDS,
 } from '@/pages/general-mode/lib/generalModeSetup'
@@ -166,6 +168,7 @@ export function SeasonRoute({ session, random, gameSettings, onExit, aceSelect }
             ...(options.opponentDayCounter === undefined ? {} : { opponentDayCounter: options.opponentDayCounter }),
             acePitcherId: isCup ? -1 : session.preGameAces.pitcher,
             aceBatterId: isCup ? -1 : session.preGameAces.batter,
+            myStarterName: session.matchInfoStarterName,
           })}
           myTeamId={options.ourTeamId}
           opponentTeamId={options.opponentTeamId}
@@ -181,6 +184,9 @@ export function SeasonRoute({ session, random, gameSettings, onExit, aceSelect }
           onCancel={() => {
             if (!session.isMatchSettingsOpen) actions.cancelMatchInfo()
           }}
+          onOpenEntry={(isUserTeam) => {
+            if (!session.isMatchSettingsOpen) actions.openEntryEdit(isUserTeam)
+          }}
         />
         {session.isMatchSettingsOpen && (
           <MatchSettingsWindow
@@ -190,6 +196,23 @@ export function SeasonRoute({ session, random, gameSettings, onExit, aceSelect }
           />
         )}
       </>
+    )
+  }
+
+  // 엔트리 편집 0xe0 — 엔트리 목록 창 0x5cfec + 머리띠 (그림 0xb074), 키 0x7044 → 편집기 0x55864
+  if (scene === SEASON_SCENE_STATE.엔트리편집 && session.entryEdit !== null) {
+    const { entryEdit } = session
+    return (
+      <EntryEditorScreen
+        editor={entryEdit.editor}
+        lists={entryEdit.lists}
+        teamName={`${TEAMS[entryEdit.teamId]?.name ?? ''} ${entryEdit.isUserTeam ? '(PLAYER)' : '(COM)'}`}
+        isAceLocked={entryEdit.isAceLocked}
+        gamePoint={session.gamePoints}
+        onKey={actions.pressEntryKey}
+        onMoveCursor={actions.pointEntryCursor}
+        onCloseAceLocked={actions.closeEntryAceLocked}
+      />
     )
   }
 

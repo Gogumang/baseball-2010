@@ -58,12 +58,16 @@ export function startingPitcherNameOf(teamId: number): string {
  * 레코드에서 마선수를 찾을 뿐이라, 준비 화면에서 고른 한 쌍이 유저 팀에만 들어가는지 양 팀에
  * 들어가는지 알 수 없다. 여기서는 **유저 팀 쪽에만** 적고 CPU 는 "-" 로 둔다(근사).
  */
-export function generalModeMatchInfoLines(setup: GeneralModeSetup): readonly MatchInfoLine[] {
+export function generalModeMatchInfoLines(
+  setup: GeneralModeSetup,
+  /** 유저 팀 "선발" — 엔트리 편집(상태 23)이 고친 투수 0번. 없으면 표의 0번 */
+  userStarterName: string | null = null,
+): readonly MatchInfoLine[] {
   const values: readonly [string, string][] = [
     // 모드 1 은 순위·승패가 늘 "-" 다 (저장 레코드를 아예 읽지 않는다)
     [EMPTY_VALUE, EMPTY_VALUE],
     [EMPTY_VALUE, EMPTY_VALUE],
-    [startingPitcherNameOf(setup.userTeamId), startingPitcherNameOf(setup.aiTeamId)],
+    [userStarterName ?? startingPitcherNameOf(setup.userTeamId), startingPitcherNameOf(setup.aiTeamId)],
     [acePitcherNameOf(setup.acePitcherId), EMPTY_VALUE],
     [aceBatterNameOf(setup.aceBatterId), EMPTY_VALUE],
   ]

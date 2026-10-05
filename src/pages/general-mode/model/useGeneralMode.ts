@@ -12,6 +12,15 @@ import type { GeneralModeFlowState } from '@/pages/general-mode/lib/generalModeF
 import { rollQuickStart } from '@/pages/general-mode/lib/quickStart'
 import type { QuickStartOpenState } from '@/pages/general-mode/lib/quickStart'
 import { teamGameOptionsOf } from '@/pages/general-mode/lib/generalModeSetup'
+import {
+  leavesEntryEditor, openEntryEditor, pointEntryCursor, pressEntryKey,
+} from '@/entities/season-mode/model/entryEditor'
+import type { EntryEditorState, EntryKey } from '@/entities/season-mode/model/entryEditor'
+import {
+  seasonEntryListsOf, seasonRosterOfEntry, seasonStarterNameOf, tableRosterOf,
+} from '@/entities/season-mode/model/seasonEntry'
+import type { SeasonEntryInput, SeasonEntryLists } from '@/entities/season-mode/model/seasonEntry'
+import type { SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
 
 export interface UseGeneralModeOptions extends QuickStartOpenState {
   readonly random: RandomPort
@@ -33,8 +42,23 @@ export interface UseGeneralModeOptions extends QuickStartOpenState {
   readonly aceLevels?: Readonly<Record<number, number>>
 }
 
+/** 상태 23 엔트리 편집 한 판 (편집 객체 [메뉴+0x120]) */
+export interface GeneralModeEntryEdit {
+  /** 메뉴+0xec — 1 유저 팀(편집 가능) · 0 CPU 팀(보기 전용) */
+  readonly isUserTeam: boolean
+  readonly teamId: number
+  readonly editor: EntryEditorState
+  readonly lists: SeasonEntryLists
+  /** 마선수를 고르려 해서 StrTEXT 0xd200c 팝업이 떠 있다 */
+  readonly isAceLocked: boolean
+}
+
 export interface GeneralModeSession {
   readonly flow: GeneralModeFlowState
+  /** 상태 23 엔트리 편집 — 그 화면이 아니면 null */
+  readonly entryEdit: GeneralModeEntryEdit | null
+  /** 경기정보 "선발" 줄의 유저 팀 값 — 엔트리 편집이 고친 투수 0번 (0x5e0e8) */
+  readonly userStarterName: string | null
   readonly settings: MatchProgressSettings
   /** 경기 장면(0x104)으로 넘어갔는가 */
   readonly isPlaying: boolean
@@ -58,6 +82,13 @@ export interface GeneralModeSession {
     readonly start: () => void
     /** CLR. 더 뒤가 없으면 `false` 를 돌려준다 — 부르는 쪽이 모드 목록으로 나가면 된다 */
     readonly back: () => boolean
+    /** 경기정보 '4'/왼(유저 팀, 메뉴+0xec = 1) · '6'/오른(CPU 팀, 0) → 상태 23 (0x311a8) */
+    readonly openEntry: (isUserTeam: boolean) => void
+    /** 상태 23 의 키 — 편집기 0x55864, 끝 코드면 22 로 (0x2a370) */
+    readonly pressEntryKey: (key: EntryKey) => void
+    /** 상태 23 — 웹 전용, 줄을 눌러 커서를 옮긴다 */
+    readonly pointEntryCursor: (index: number) => void
+    readonly closeEntryAceLocked: () => void
   }
 }
 
@@ -84,8 +115,17 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
   const [settings, setSettings] = useState<MatchProgressSettings>(initialSettings ?? FULL_PLAY_SETTINGS)
   const [isSettingsOpen, setSettingsOpen] = useState(false)
   const [isPlaying, setPlaying] = useState(false)
+  const [entryEdit, setEntryEdit] = useState<GeneralModeEntryEdit | null>(null)
+  /**
+   * 유저 팀 레코드(저장 칸 `0x1f875(저장, 쪽)`)를 엔트리 편집이 고친 것. 원본은 상태 22 들어옴 `0x314b0` 이
+   * 이전 상태가 23 이 아닐 때마다 `0x30f20` 으로 경기를 새로 세우므로(314c8 `cmp [메뉴+0x28], #0x17`)
+   * 21 로 물러났다 오거나 재굴림하면 고친 것이 사라진다 — 웹도 그때 비운다.
+   * 나갈 때 `0x2a370` 이 두 팀을 저장 칸 0x32·0x33(이어하기 칸과 같은 자리, R10)에 적지만 웹에는 이어하기가 없다.
+   */
+  const [userEntryRoster, setUserEntryRoster] = useState<SeasonTeamRoster | null>(null)
 
   const respin = useCallback(() => {
+    setUserEntryRoster(null)
     setFlow((current) =>
       withSetup(
         current,
@@ -95,6 +135,7 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
   }, [random, openedHiddenTeamIds, openedAcePitcherIds, openedAceBatterIds])
 
   const back = useCallback(() => {
+    setUserEntryRoster(null)
     let canGoBack = true
     setFlow((current) => {
       const previous = stepBack(current)
@@ -106,6 +147,76 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
     })
     return canGoBack
   }, [])
+
+  /**
+   * 엔트리 편집기가 보는 팀 — 유저 팀은 고친 명단(없으면 표), CPU 팀은 표.
+   * ⚠️ 원본은 22 들어옴에서 `0x30f20` 이 이미 마선수(8·9번)를 넣고 선발 0↔k 맞바꿈(난수)까지 한 팀을 보여 준다.
+   *    웹은 그 넷을 경기 시작(`startTeamGame`)에서 굴리므로 여기서는 **유저 팀 마선수만 끼우고** 선발 맞바꿈과
+   *    CPU 팀 마선수는 없다 (굴림 차례를 옮기려면 팀 경기 쪽을 고쳐야 한다).
+   */
+  const entrySourceOf = useCallback(
+    (isUserTeam: boolean): SeasonEntryInput => {
+      const teamId = isUserTeam ? flow.setup.userTeamId : flow.setup.aiTeamId
+      return {
+        teamId,
+        roster: (isUserTeam ? userEntryRoster : null) ?? tableRosterOf(teamId),
+        // 일반모드는 리그 로테이션이 없다 (선발은 0x30f20 의 무작위 맞바꿈)
+        dayCounter: 0,
+        acePitcherId: isUserTeam ? flow.setup.acePitcherId : -1,
+        aceBatterId: isUserTeam ? flow.setup.aceBatterId : -1,
+      }
+    },
+    [flow.setup, userEntryRoster],
+  )
+
+  const openEntry = useCallback(
+    (isUserTeam: boolean) => {
+      const source = entrySourceOf(isUserTeam)
+      setEntryEdit({
+        isUserTeam,
+        teamId: source.teamId,
+        // 0x2648c: 0x5561c(ed, &팀, 메뉴+0xec ≠ 0, 1, 1) — CPU 팀은 보기 전용, 첫 탭은 투수
+        editor: openEntryEditor(isUserTeam),
+        lists: seasonEntryListsOf(source),
+        isAceLocked: false,
+      })
+    },
+    [entrySourceOf],
+  )
+
+  const pressEntryKeyAction = useCallback(
+    (key: EntryKey) => {
+      if (entryEdit === null || entryEdit.isAceLocked) return
+      const outcome = pressEntryKey(entryEdit.editor, entryEdit.lists, key)
+      let lists = outcome.lists
+      if (lists !== entryEdit.lists && entryEdit.isUserTeam) {
+        const source = entrySourceOf(true)
+        const roster = seasonRosterOfEntry(source.roster, lists, 0)
+        setUserEntryRoster(roster)
+        lists = seasonEntryListsOf({ ...source, roster })
+      }
+      // 0x2a370: 1 이거나, 2 이면서 CPU 팀, 3 이면서 유저 팀이면 → 밀기 → 상태 22 (22 들어옴은 23 에서 왔으면 아무것도 안 한다)
+      if (leavesEntryEditor(outcome.state.result, entryEdit.isUserTeam)) return setEntryEdit(null)
+      setEntryEdit({ ...entryEdit, editor: outcome.state, lists, isAceLocked: outcome.isAceLocked })
+    },
+    [entryEdit, entrySourceOf],
+  )
+
+  const pointEntryCursorAction = useCallback(
+    (index: number) => {
+      if (entryEdit === null || entryEdit.isAceLocked) return
+      setEntryEdit({ ...entryEdit, editor: pointEntryCursor(entryEdit.editor, entryEdit.lists, index) })
+    },
+    [entryEdit],
+  )
+
+  const closeEntryAceLocked = useCallback(() => {
+    setEntryEdit((current) => (current === null ? null : { ...current, isAceLocked: false }))
+  }, [])
+
+  const userStarterName = userEntryRoster === null
+    ? null
+    : seasonStarterNameOf(flow.setup.userTeamId, userEntryRoster, 0)
 
   const actions = useMemo(
     () => ({
@@ -125,8 +236,12 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
       },
       start: () => setPlaying(true),
       back,
+      openEntry,
+      pressEntryKey: pressEntryKeyAction,
+      pointEntryCursor: pointEntryCursorAction,
+      closeEntryAceLocked,
     }),
-    [respin, back],
+    [respin, back, openEntry, pressEntryKeyAction, pointEntryCursorAction, closeEntryAceLocked],
   )
 
   const gameOptions = useMemo(
@@ -140,5 +255,5 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
     [flow.setup, settings, gaugeSettingOn, runningModeManual, throwModeManual, aceLevels],
   )
 
-  return { flow, settings, isPlaying, isSettingsOpen, gameOptions, actions }
+  return { flow, entryEdit, userStarterName, settings, isPlaying, isSettingsOpen, gameOptions, actions }
 }

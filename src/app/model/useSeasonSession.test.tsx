@@ -5,6 +5,8 @@ import { useSeasonSession } from '@/app/model/useSeasonSession'
 import { SEASON_GAME_COUNT } from '@/entities/season-mode/model/seasonRecord'
 import { SEASON_PHASE, SEASON_SCENE_STATE } from '@/entities/season-mode/model/seasonStateMachine'
 import { PRE_GAME_ACE_PHASE, SQUAD_PURPOSE } from '@/entities/season-mode/model/preGameFlow'
+import { ENTRY_SUB_TAB, ENTRY_TAB } from '@/entities/season-mode/model/entryEditor'
+import { teamPitchers } from '@/entities/team/model/teamRoster'
 import { FULL_PLAY_SETTINGS } from '@/features/play-team-game/model/matchSettings'
 import { GAME_POINT_LIMIT } from '@/entities/season-mode/model/seasonRewards'
 import { clearSeasonGameRecord } from '@/entities/season-mode/model/seasonReputation'
@@ -709,5 +711,71 @@ describe('경기 전 흐름 0xd8 → 0xd7 → 0xdd → 0xe1', () => {
     const { result } = 다음경기확인()
     act(() => result.current.actions.goto(SEASON_SCENE_STATE.선수단))
     expect(result.current.squadPurpose).toBe(SQUAD_PURPOSE.코치채용)
+  })
+})
+
+describe('엔트리 편집 0xe0 (0x63dc · 0x7044 · 편집기 0x55864)', () => {
+  const 경기정보까지 = (store: JsonStorePort = 메모리저장()) => {
+    const rendered = 띄우기(store)
+    act(() => rendered.result.current.actions.chooseTeam(0))
+    act(() => rendered.result.current.actions.openNextGame())
+    act(() => rendered.result.current.actions.confirmNextGame())
+    act(() => rendered.result.current.actions.choosePreGameAce(0))
+    act(() => rendered.result.current.actions.choosePreGameAce(5))
+    act(() => rendered.result.current.actions.toggleMatchSettings())
+    return rendered
+  }
+
+  it("'4' 는 유저 팀 엔트리를 투수 탭으로 연다 — 고른 마투수가 8번, 마타자가 9번에 앉아 있다", () => {
+    const { result } = 경기정보까지()
+    act(() => result.current.actions.openEntryEdit(true))
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.엔트리편집)
+    const edit = result.current.entryEdit
+    expect(edit?.editor.tab).toBe(ENTRY_TAB.투수)
+    expect(edit?.editor.subTab).toBe(ENTRY_SUB_TAB.타순)
+    expect(edit?.lists.pitchers[8]?.isAce).toBe(true)
+    expect(edit?.lists.batters[9]?.isAce).toBe(true)
+  })
+
+  it('선발을 바꾸면 시즌 명단에 남고, 오른쪽 끝(3)으로 경기정보에 돌아오면 "선발" 줄이 바뀐다 — 설정 창은 다시 안 열린다', () => {
+    const store = 메모리저장()
+    const { result } = 경기정보까지(store)
+    act(() => result.current.actions.openEntryEdit(true))
+    for (const key of ['확인', '아래', '아래', '확인'] as const) act(() => result.current.actions.pressEntryKey(key))
+    expect(result.current.roster.pitchers.map((p) => p.id).slice(0, 3)).toEqual([2, 1, 0])
+    expect(result.current.matchInfoStarterName).toBe(teamPitchers(0)[2]?.name)
+
+    act(() => result.current.actions.pressEntryKey('오른'))
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.경기정보)
+    expect(result.current.entryEdit).toBeNull()
+    expect(result.current.isMatchSettingsOpen).toBe(false)
+    // 저장에도 남는다 — 다음 경기까지 이어진다
+    expect((store.load() as { roster: { pitchers: { id: number }[] } }).roster.pitchers[0]?.id).toBe(2)
+  })
+
+  it("'6' 은 CPU 팀 엔트리 — 보기 전용이라 OK 가 안 먹고, 왼쪽 끝(2)으로 돌아온다", () => {
+    const { result } = 경기정보까지()
+    const before = result.current.roster
+    act(() => result.current.actions.openEntryEdit(false))
+    expect(result.current.entryEdit?.editor.subTab).toBe(ENTRY_SUB_TAB.보기전용)
+    for (const key of ['확인', '아래', '확인'] as const) act(() => result.current.actions.pressEntryKey(key))
+    expect(result.current.roster).toBe(before)
+    act(() => result.current.actions.pressEntryKey('오른'))
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.엔트리편집)
+    act(() => result.current.actions.pressEntryKey('왼'))
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.경기정보)
+  })
+
+  it('마선수 줄을 고르면 팝업이 뜨고 닫기 전에는 키를 안 받는다', () => {
+    const { result } = 경기정보까지()
+    act(() => result.current.actions.openEntryEdit(true))
+    act(() => result.current.actions.pointEntryCursor(8))
+    act(() => result.current.actions.pressEntryKey('확인'))
+    expect(result.current.entryEdit?.isAceLocked).toBe(true)
+    act(() => result.current.actions.pressEntryKey('취소'))
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.엔트리편집)
+    act(() => result.current.actions.closeEntryAceLocked())
+    act(() => result.current.actions.pressEntryKey('취소'))
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.경기정보)
   })
 })

@@ -34,6 +34,8 @@ export interface SeasonMatchInfoScreenProps {
   readonly onOpenSettings: () => void
   /** CLR — 국가대항전이면 0xf4, 아니면 0xd7 (0x844e) */
   readonly onCancel: () => void
+  /** '4'/왼 → 유저 팀(true) · '6'/오른 → CPU 팀(false) 엔트리 편집 0xe0 (this+0x120) */
+  readonly onOpenEntry?: (isUserTeam: boolean) => void
 }
 
 /**
@@ -42,11 +44,11 @@ export interface SeasonMatchInfoScreenProps {
  * 목록 k 4 는 일반모드 경기정보(메인 메뉴 상태 22)와 **같은 배치**라 그 좌표(`prepareLayout`)를 그대로 쓰고,
  * 값 줄만 시즌 갈래(`seasonMatchInfoLines`)다. 키는 `0x83cc` (`entities/season-mode/model/preGameFlow.ts`).
  *
- * ⚠️ 여기 없는 것: 좌·우('4'/'6') 키의 **엔트리 편집 0xe0**(편집기 0x55864, this+0x120 1 유저 팀 · 0 CPU 팀).
- *    엔트리 편집기는 일반·시즌·나만의리그가 함께 쓰는 큰 화면이고 웹판에 아직 없다 (R4 5절).
+ * 좌·우('4'/'6') 키는 **엔트리 편집 0xe0**(편집기 0x55864)으로 간다 — '4' 는 this+0x120 = 1 유저 팀,
+ * '6' 은 0 CPU 팀(보기 전용).
  */
 export function SeasonMatchInfoScreen({
-  lines, myTeamId, opponentTeamId, playerSide, gamePoint = 0, onStart, onOpenSettings, onCancel,
+  lines, myTeamId, opponentTeamId, playerSide, gamePoint = 0, onStart, onOpenSettings, onCancel, onOpenEntry,
 }: SeasonMatchInfoScreenProps) {
   const sltOrigins = useFrameOrigins(SLT_FRAME)
   const imgTextOrigins = useFrameOrigins(IMG_TEXT_FRAME)
@@ -63,12 +65,21 @@ export function SeasonMatchInfoScreen({
       }
       if (event.key === 'Escape') {
         event.preventDefault()
-        onCancel()
+        return onCancel()
+      }
+      // 0x83cc: −3·'4' → this+0x120 = 1 (유저 팀) · −4·'6' → 0 (CPU 팀) → 0xe0
+      if (onOpenEntry !== undefined && (event.key === 'ArrowLeft' || event.key === '4')) {
+        event.preventDefault()
+        return onOpenEntry(true)
+      }
+      if (onOpenEntry !== undefined && (event.key === 'ArrowRight' || event.key === '6')) {
+        event.preventDefault()
+        onOpenEntry(false)
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [onStart, onOpenSettings, onCancel])
+  }, [onStart, onOpenSettings, onCancel, onOpenEntry])
 
   const { anchorA, anchorB, firstBatTag } = MATCH_INFO_LAYOUT
   const isUserFirstBat = playerSide === PLAYER_SIDE_FIRST_BAT
@@ -150,7 +161,7 @@ export function SeasonMatchInfoScreen({
         0 경기설정
       </Button>
       <div className={styles.hintLine}>
-        <Hint>Enter 경기 시작 · 0 경기설정</Hint>
+        <Hint>Enter 경기 시작 · 0 경기설정 · ←/→ 엔트리</Hint>
       </div>
 
       {/* 머리띠(제목 12 "경기정보")·바닥띠 — 원본 공용 목록 k 4 도 이 둘을 얹는다 (P6 1-1 · 2a-6) */}
