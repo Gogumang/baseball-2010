@@ -78,6 +78,9 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { GAME_POINT_USAGE } from '@/entities/collection/model/annalsStats'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 
+/** 시즌모드 = 원본 모드 2 (0x22c7d 의 획득 GP 칸 3) */
+const SEASON_STAT_MODE = 2
+
 /**
  * 시즌 모드 한 판 (원본 게임 모드 2, 장면 0x105).
  *
@@ -854,6 +857,13 @@ export function useSeasonSession(
       const { record } = save.state
       const opponent = summary.opponentTeamId
 
+      // 경기 끝 0x4ea0c 는 모드가 5·6(미션)이 아니면 **갈래(정규·포스트시즌·국가대항전)를 가르기 전에**
+      // 기록 달성 G 합 [scene+0x17f4] 를 저장 G(+0x64)에 더하고(4ec5a, 99999 상한) 0x4ec82 `0x22c7d(합, 모드 2)` 로
+      // 획득 GP 통계에 적는다. 합은 요약이 싣고 온다(fc7f196 — 자동진행 뒤 기록은 이미 막혀 있다)
+      const earned = summary.gamePoints ?? 0
+      if (earned !== 0) gainGamePoint(earned)
+      recordStat?.({ kind: 'G획득', mode: SEASON_STAT_MODE, amount: earned })
+
       // 경기 중 `0xa755c` 가 올린 평판 16칸 — 원본은 경기 장면이 SR+0x1a0 을 직접 올리므로
       // **갈래와 상관없이** 레코드에 남는다 (S4 2b·6절). 웹은 요약이 싣고 와서 여기서 꽂는다.
       const played: SeasonRecord = { ...record, gameRecord: summary.gameRecord }
@@ -957,7 +967,7 @@ export function useSeasonSession(
       activeSound().play(seasonEvaluationJingleIdOf(evaluation.popularityChange))
       setScene(SEASON_SCENE_STATE.관중수입)
     },
-    [commit, gameKind, gameOptions, random, save],
+    [commit, gainGamePoint, gameKind, gameOptions, random, recordStat, save],
   )
 
   /** 관중수입 창에서 확인 — 정산된 레코드를 받아 경기 뒤 마무리로 간다 (0xf1) */

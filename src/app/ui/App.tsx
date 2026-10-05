@@ -67,6 +67,9 @@ const MISSION_SCREENS: readonly Screen['kind'][] = [
   '투수미션',
 ]
 
+/** 일반모드 = 원본 모드 1 (0x22c7d 의 획득 GP 칸 0) */
+const GENERAL_STAT_MODE = 1
+
 /** 화면 분기만 한다. 상태와 규칙은 model의 훅 세 개가 나눠 갖는다. */
 export function App() {
   const saveGame = useMemo(() => createLocalStorageSaveGame(), [])
@@ -232,8 +235,14 @@ export function App() {
         runningModeManual={gameSettings.settings.runningMode === '수동'}
         // 환경설정 "송구" (설정 +0xf4) — 팀 경기는 사람이 **수비하는 타석**에서만 먹는다 (0xae6c8)
         throwModeManual={gameSettings.settings.throwMode === '수동'}
-        // 한 판 치고 끝이라 정산할 곳이 없다 — 원본도 모드 1 은 저장에 아무것도 안 남긴다
-        onFinish={() => setScreen({ kind: '메인메뉴' })}
+        // 한 판 치고 끝이라 선수 정산은 없지만, 경기 끝 0x4ea0c 는 모드 1 에서도 기록 달성 G 합을 전역 G(+0x64)에
+        // 더하고(4ec5a, 99999 상한) 0x4ec82 `0x22c7d(합, 모드 1)` 로 획득 GP 통계(칸 0 일반)에 적는다 (fc7f196)
+        onFinish={(summary) => {
+          const earned = summary.gamePoints ?? 0
+          if (earned !== 0) wallet.gain(earned)
+          recordStat({ kind: 'G획득', mode: GENERAL_STAT_MODE, amount: earned })
+          setScreen({ kind: '메인메뉴' })
+        }}
         onExit={() => setScreen({ kind: '메인메뉴' })}
       />
     )

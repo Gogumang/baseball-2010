@@ -792,3 +792,21 @@ describe('기록연감 통계 고리 — 시즌 G 사용처 k 3 (0xd152 · 0xa2f
     expect(events).toEqual([{ kind: 'G사용', usage: 3, amount: 500 }])
   })
 })
+
+describe('팀 경기 기록 달성 G (경기 끝 0x4ea0c 4ec5a → 0x4ec82)', () => {
+  it('요약의 gamePoints 를 시즌 G 에 더하고 획득 GP(모드 2)에 적는다', () => {
+    const events: AnnalsStatEvent[] = []
+    const { result } = renderHook(() =>
+      useSeasonSession(메모리저장(), createSeededRandom(20100901), null, undefined, (event) => {
+        events.push(event)
+      }))
+    act(() => result.current.actions.chooseTeam(0))
+    act(() => result.current.actions.playNextGame())
+    const before = result.current.gamePoints
+
+    act(() => result.current.actions.finishGame(요약({ recordIds: [1], gamePoints: 25 })))
+
+    expect(result.current.gamePoints).toBe(before + 25)
+    expect(events).toEqual([{ kind: 'G획득', mode: 2, amount: 25 }])
+  })
+})
