@@ -233,7 +233,8 @@ export function initialPlayView(kind = 1): PlayView {
 
 /**
  * 주자 하나. 타자주자는 0xa93ac 이 만들고, 루에 있던 주자는 0xa9374 가 한 칸씩 민다.
- * 루 위에 있는 주자는 **루 좌표에 비트까지 정확히** 선다 (리드 폭이 없다 — S8 6절).
+ * 루 위에 있는 주자는 **루 좌표에 비트까지 정확히** 선다 (리드 폭이라는 값은 없다 — S8 6절).
+ * 다만 수비 판이 열릴 때 `0x3d7b8` 이 주자 틱을 몇 번 몰아서 돌린다 — `runnerLead` (지금은 도루 판만 붙였다).
  */
 export function createRunner(
   index: number,

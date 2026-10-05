@@ -10,6 +10,7 @@ import {
   type RunnerState,
 } from '@/entities/fielding/model/fieldingState'
 import { PICKOFF_COVER_OF_BASE } from '@/entities/fielding/model/pickoff'
+import { applyRunnerLead, runnerLeadOf } from '@/entities/fielding/model/runnerLead'
 import { STEAL_PLAY_KIND, stealTargetBaseOf, type StealBase } from '@/entities/fielding/model/stealStart'
 import type { BaseState } from '@/entities/game/model/baseState'
 import type { ManualAutoMode } from '@/entities/settings/model/gameSettings'
@@ -61,15 +62,17 @@ import {
  * 잡으려 해 1루로 던진다. 타구 진행기 결과와 그 테스트 여섯 개가 함께 바뀌는 일이라 이 판에서는 고치지 않았다.
  *
  * ## 난수 — 이 판이 굴리는 것
- * 송구가 나갈 때 악송구 굴림(0xa1828) 한 번(악송구면 +2). CPU 송구가 홈을 고르면 그 앞에 특수 송구 굴림
- * `rand(0,100)` 한 번. 그 밖은 없다.
+ * 판이 열릴 때 도루 주자마다 리드 덧틱 `rand(0,9)` 한 번(`0x3d7b8`, 주자 목록 차례). 그다음 송구가 나갈 때
+ * 악송구 굴림(0xa1828) 한 번(악송구면 +2). CPU 송구가 홈을 고르면 그 앞에 특수 송구 굴림 `rand(0,100)` 한 번.
  *
- * ## ⚠️ 미해결 — 주자의 출발 시각
- * 원본은 도루를 투구 중(상태 0x11, CPU 는 그 10번째 틱)에 걸고 판은 공이 도착한 뒤(0x12) 연다.
- * 그 사이 주자가 미리 움직이는지는 **못 확정했다** — 주자 틱(vt0xc = 0xa01cc)을 부르는 자리를 찾지 못했다
- * (주자관리 vt14 = 0xaa008 은 상태 0x17 갱신 0x524c0 에서만 부르지만 아웃 주자 퇴장만 다룬다).
- * 여기서는 견제 판과 같이 **판이 열리는 순간 제 루 위에서 출발**한다(S8 6절: 주자는 루 좌표에 정확히 선다).
- * 그래서 송구가 제대로 가면 도루는 거의 늘 잡힌다 — 원본도 그런지는 이 칸이 풀려야 안다.
+ * ## 주자의 출발 시각 — 판이 열릴 때 이미 달려 나가 있다 (확정, `entities/fielding/model/runnerLead`)
+ * 도루는 투구 중(상태 0x11, CPU 는 그 10번째 틱)에 걸고 판은 공이 도착한 뒤(0x12 → 0x17) 연다.
+ * 그 사이 주자 틱(vt0xc = 0xa01cc)은 **한 번도 안 돈다** — 주자·야수 틱 고리 `[장면+0x1e4].vt8` 은
+ * 공용 갱신 0x3f060 이 상태 0x17 에서만 부른다(0x3f0c6). 대신 상태 0x17 진입 `0x46418` 이 플레이 시작
+ * (0xb2950) 뒤 주자마다 `0x3d7b8` 을 불러 **틱을 몰아서 돌린다**:
+ * - 도루 주자: 루 좌표에서 다음 루로 `0xcffa8`[루] = 15(1루)·14(2·3루) + max(rand(0,9), 3) 틱
+ * - 도루 안 한 주자: 다음 루로 `0xcffb0`[루] = 6·13·7 틱(번트 종류가 서 있으면 +3) 간 뒤 **목표를 제 루로 되돌린다**
+ *   — 판이 열리면 제 루로 돌아오는 중이라 그 루로 공이 가면 태그될 수 있다.
  */
 export interface StealPlayInput {
   /** 투구 때 루 상황 */
@@ -89,6 +92,8 @@ export interface StealPlayInput {
   readonly runAbility?: number
   /** 주자 속도에 더하는 팀 등급 (전역 모드 1·2·8 에서만, R3 4절) */
   readonly runnerTeamGrade?: number
+  /** 장면 +0xfdc — 이번 투구의 번트 종류 (도루 안 한 주자의 리드 +3, `0x3d7b8`). 기본 0 */
+  readonly buntKind?: number
   /** 주면 악송구(0xa1828)·특수 송구(0xafa60) 굴림이 돈다 */
   readonly random?: RandomPort
   readonly defenseIsCpu?: boolean
@@ -149,9 +154,16 @@ export function runStealPlay(input: StealPlayInput): StealPlayResult {
     const speed = runnerSpeedOf(ability, input.runnerTeamGrade ?? 0)
     const runner = createRunner(runners.length + 1, base, speed, { isBatterRunner: false })
     // 0xa9bd4 → vt48(0xb6228) — 출발한 주자의 목표 루는 한 루 앞
-    runners.push(
-      input.stealingFrom.includes(base) ? { ...runner, targetBase: stealTargetBaseOf(base) } : runner,
-    )
+    const stealing = input.stealingFrom.includes(base)
+    const started = stealing ? { ...runner, targetBase: stealTargetBaseOf(base) } : runner
+    // 0x46418 → 0x3d7b8: 플레이 시작 뒤 주자 목록 차례로 리드 틱을 몰아서 돌린다 (도루 주자는 rand(0,9) 한 번)
+    const lead = runnerLeadOf(started, {
+      playKind: STEAL_PLAY_KIND,
+      stealing,
+      buntKind: input.buntKind,
+      random: input.random,
+    })
+    runners.push(applyRunnerLead(started, lead))
   })
 
   const result = runRunnerPlay({
