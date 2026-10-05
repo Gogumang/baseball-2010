@@ -84,7 +84,7 @@ export function MissionRoutes({
       <MissionPlayScreen
         run={missionRun}
         ability={ability}
-        pitcherAbility={missionPitcherAbility(missionRun.mission)}
+        pitcherAbility={missionPitcherAbility(missionRun.mission, session.aceLevels)}
         opponent={missionOpponent(missionRun.mission)}
         atBat={runner.atBat}
         isPaused={runner.isPaused}

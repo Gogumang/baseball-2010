@@ -60,6 +60,7 @@ import type { PitchTypeInfo } from '@/shared/config/original/pitchTypes'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { MissionClearCounts, MissionRecordPort } from '@/shared/api/save/missionRecordPort'
 import { missionRewardOf } from '@/entities/mission/model/missionReward'
+import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
 
 interface MissionSessionInput {
   readonly runner: AtBatRunner
@@ -81,6 +82,13 @@ interface MissionSessionInput {
    * `missionDefensePlayInputOf` 주석).
    */
   readonly throwModeManual?: boolean
+  /**
+   * 마선수 레벨 `mgr[0x13a + idx]` (idx 0~4 마투수 · 5~9 마타자 → 0~4 = Lv1~5).
+   * 0xb6414 가 마선수 능력치마다 배율 0xd88aa[레벨] 을 곱한다 (`entities/mission/model/aceLevel`).
+   * ⚠️ 웹엔 아직 이 저장도, 올리는 화면(스페셜 마선수 레벨업 0x5fb24)도 없어 앱은 넘기지 않는다 —
+   *    그러면 새 저장 값(0x9f26c 가 0 으로 채움) = Lv1 = 60% 다. 레벨업을 옮길 때 여기로 넘기면 된다.
+   */
+  readonly aceLevels?: Readonly<Record<number, number>>
 }
 
 /** 미션 상대. 원본 레코드의 마선수 순번이 있으면 그 마선수다 (타자 미션이면 마투수). */
@@ -88,9 +96,36 @@ export function missionOpponent(mission: OriginalMission): AcePlayer | null {
   return missionOpponentOf(mission.side === '타자' ? '투수' : '타자', mission.opponentAce)
 }
 
-export function missionPitcherAbility(mission: OriginalMission): PitcherAbility {
+/**
+ * 미션 마선수의 **레벨 배율을 먹은** 능력치 네 칸 (마선수가 아니면 null).
+ *
+ * 마선수 레코드는 실효 능력치 0xb6414 첫 단계에서 `v · 0xd88aa[레벨] / 100` 을 먹는다
+ * (b6438~b646a — 모드·플래그·칸을 가리지 않는다). 레벨 = `mgr[0x13a + 순번(+5 타자)]`.
+ * 그 뒤 장비·스킬(플래그 1) → 0xb570c 의 0..999 자르기 순서다.
+ */
+export function missionOpponentAbility(
+  mission: OriginalMission,
+  aceLevels?: Readonly<Record<number, number>>,
+): BatterAbility | null {
   const opponent = missionOpponent(mission)
-  return opponent === null ? DEFAULT_PITCHER_ABILITY : pitcherAbilityOf(opponent)
+  if (opponent === null) return null
+  const level = aceLevelOf(aceLevels, aceLevelSlotOf(opponent.role, mission.opponentAce))
+  return aceAbilityAtLevel(opponent.ability, level)
+}
+
+/**
+ * 타자 미션 상대 투수 능력치. 마투수면 레벨 배율(0xb6414)을 먼저 곱한 네 칸을 투구 엔진 눈금으로 줄인다
+ * — 마타자와 같은 0xb6414 라 투수 칸(제구·구속·변화·체력)도 똑같이 먹는다.
+ */
+export function missionPitcherAbility(
+  mission: OriginalMission,
+  aceLevels?: Readonly<Record<number, number>>,
+): PitcherAbility {
+  const opponent = missionOpponent(mission)
+  const ability = missionOpponentAbility(mission, aceLevels)
+  return opponent === null || ability === null
+    ? DEFAULT_PITCHER_ABILITY
+    : pitcherAbilityOf({ ...opponent, ability })
 }
 
 /** 클리어 횟수 상한 — 원본은 s8 칸에 99 까지 센다 (0xa51d0) */
@@ -147,6 +182,7 @@ export function useMissionSession({
   onGamePointReward,
   sound,
   throwModeManual,
+  aceLevels,
 }: MissionSessionInput) {
   const silent = useMemo(() => createSilentSound(), [])
   const audio = sound ?? silent
@@ -322,13 +358,12 @@ export function useMissionSession({
     )
     // 마타자 미션은 원본 마선수 능력치로, 그 밖에는 평범한 타자로 상대한다.
     const opponent = missionOpponent(pitcherRun.mission)
-    const rawBatter = opponent === null ? ROOKIE_BATTER_ABILITY : opponent.ability
+    // 마타자는 0xb6414 첫 단계에서 레벨 배율 0xd88aa[mgr[0x13f + 순번]] 을 네 칸 모두 먹는다
+    const rawBatter = missionOpponentAbility(pitcherRun.mission, aceLevels) ?? ROOKIE_BATTER_ABILITY
     // CPU 타자 결정 0x34334 의 h 는 **경기용 히트** 0xb570d(ctx, 0, 타자, 1, 90, 1) 다 (ce462ce).
     // 미션 모드 5 에서 0xb570c 는 나만의리그 갈래(모드 3·4)도 시즌 갈래(2)도 안 타고, 체력 인자 90 은
     // 감소가 없고, 팀 능력치 마스크 {1,2,8,9} 에도 없다 → 0xb6414 값을 0..999 로 자른 것이다.
-    // ⚠️ 미해결: 마타자면 0xb6414 가 먼저 **마선수 레벨 배율** 0xd88aa[레벨] = 60~100% 를 곱한다
-    //    (b6440~b646a, 레벨 = 전역 기록 [0x13f + 순번]). 이 세션은 마선수 레벨을 받지 않아 배율을
-    //    못 곱한다 — 날 값 그대로다. 스킬 보정(+0x14)도 표에 없다.
+    // ⚠️ 미해결: 0xb6414 스킬 보정(+0x14, 플래그 1)은 마선수 표에 스킬 비트가 없어 못 붙인다.
     const batterAbility = {
       ...rawBatter,
       hit: gameAbilityOf({
@@ -532,7 +567,7 @@ export function useMissionSession({
   }
 
   return {
-    missionRun, pitcherRun, clearedKeys, clearCounts, lastSide,
+    missionRun, pitcherRun, clearedKeys, clearCounts, lastSide, aceLevels,
     missionConditionCode, pendingDefensePlay, handleMissionPitch, handleThrow, actions,
   }
 }

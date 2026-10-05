@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
-import { useMissionSession } from '@/app/model/useMissionSession'
+import { missionOpponentAbility, missionPitcherAbility, useMissionSession } from '@/app/model/useMissionSession'
 import { useAtBatRunner } from '@/app/model/useAtBatRunner'
 import type { Screen } from '@/app/model/screen'
 import { aceMatchMissionOf, EMPTY_STORY_CARRY } from '@/entities/story/model/aceMatch'
@@ -295,5 +295,31 @@ describe('미션 인플레이 타구는 수비 화면을 거친다 — 0x13 → 
     expect(rendered.result.current.session.pendingDefensePlay).toBeNull()
     expect(rendered.result.current.session.missionRun?.outs).toBe(2)
     rendered.unmount()
+  })
+})
+
+describe('미션 마선수의 레벨 배율 0xd88aa (0xb6414)', () => {
+  const 로제미션 = MISSIONS.find((mission) => mission.side === '투수' && mission.opponentAce === 3)
+  const 레오니미션 = MISSIONS.find((mission) => mission.side === '타자' && mission.opponentAce === 2)
+
+  it('투수 미션 마타자(로제, 칸 7)는 레벨이 없으면 Lv1 = 60% 를 먹는다', () => {
+    if (로제미션 === undefined) throw new Error('로제 미션이 없다')
+    expect(missionOpponentAbility(로제미션)).toEqual({ hit: 348, power: 510, run: 192, defense: 360 })
+    expect(missionOpponentAbility(로제미션, { 7: 4 })).toEqual({ hit: 580, power: 850, run: 320, defense: 600 })
+    // 다른 칸(마투수 2) 레벨은 상관없다
+    expect(missionOpponentAbility(로제미션, { 2: 4 })).toEqual({ hit: 348, power: 510, run: 192, defense: 360 })
+  })
+
+  it('타자 미션 마투수(레오니, 칸 1)도 같은 배율을 먹은 뒤 투구 엔진 눈금으로 줄인다', () => {
+    if (레오니미션 === undefined) throw new Error('레오니 미션이 없다')
+    // 레오니 580·850·580 → 60% = 348·510·348 → /10 반올림
+    expect(missionPitcherAbility(레오니미션)).toMatchObject({ control: 35, velocity: 51, breaking: 35 })
+    expect(missionPitcherAbility(레오니미션, { 1: 4 })).toMatchObject({ control: 58, velocity: 85, breaking: 58 })
+  })
+
+  it('마선수가 아닌 미션은 배율이 없다', () => {
+    const 일반 = MISSIONS.find((mission) => mission.opponentAce === 0)
+    if (일반 === undefined) throw new Error('일반 미션이 없다')
+    expect(missionOpponentAbility(일반)).toBeNull()
   })
 })
