@@ -413,6 +413,7 @@ export function TeamGameScreen({
               aceBatterIndex={currentBatterEntry(progress)?.aceIndex ?? -1}
               // 팀 경기는 "내 선수" 보너스가 없다 — 그 보너스는 나만의리그 판정에만 있다 (0xab214)
               swingMode="일반"
+              gameMode={options.mode}
               pitcherAbility={currentPitcherAbility(progress)}
               hud={{
                 inning: game.inning,

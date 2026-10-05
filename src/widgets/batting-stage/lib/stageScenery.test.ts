@@ -6,6 +6,7 @@ import {
   cloudPaletteRowOf,
   cloudScrollAt,
   isCloudVisible,
+  isSkyLightModeShown,
   skyLightFrameAt,
   skyLightPaletteRowOf,
   judgeAnimationOf,
@@ -119,5 +120,15 @@ describe('하늘 그림 팔레트 줄 — 0x76fd0', () => {
     ]
     // 칸 길이 max(1, 지연) = 2 · 1 · 1 → 4틱에 한 바퀴
     expect([0, 1, 2, 3, 4, 5, 6].map((tick) => skyLightFrameAt(entries, tick))).toEqual([0, 0, 1, 2, 0, 0, 1])
+  })
+})
+
+describe('하늘 조명 모드 검사 — 0x784a2~0x784b0', () => {
+  it('모드 5(투수 미션)·6(타자 미션)·7(홈런더비)이면 안 그린다', () => {
+    expect([5, 6, 7].map(isSkyLightModeShown)).toEqual([false, false, false])
+  })
+
+  it('그 밖의 모드(일반 1·시즌 2·나리 3·4·대전 8·9)와 모드를 모를 때는 그린다', () => {
+    expect([1, 2, 3, 4, 8, 9, undefined].map(isSkyLightModeShown)).toEqual([true, true, true, true, true, true, true])
   })
 })

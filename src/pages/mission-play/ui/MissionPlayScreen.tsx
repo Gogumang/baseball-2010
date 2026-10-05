@@ -141,6 +141,7 @@ export function MissionPlayScreen({
         <BattingStage
           batterAbility={ability}
           swingMode="미션"
+          gameMode={MISSION_BATTER_MODE}
           pitcherAbility={pitcherAbility}
           isEagleEyeEnabled={false}
           // 시작 상황을 원본 HUD 에 보인다. 미션 팀 로고는 레코드에 없어 기본 두 팀을 쓴다 (추정)

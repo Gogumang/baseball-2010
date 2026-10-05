@@ -6,7 +6,7 @@ import {
 } from '@/widgets/batting-stage/lib/spriteLoader'
 import type { PlacedFrame } from '@/widgets/batting-stage/lib/spriteLoader'
 import {
-  CLOUD_WRAP_WIDTH, SKY_LIGHT_LAST_COLOR_INDEX, cloudPaletteRowOf, cloudScrollAt, isCloudVisible, skyColorsOf,
+  CLOUD_WRAP_WIDTH, SKY_LIGHT_LAST_COLOR_INDEX, cloudPaletteRowOf, isSkyLightModeShown, cloudScrollAt, isCloudVisible, skyColorsOf,
   skyLightFrameAt, skyLightPaletteRowOf, teamIconOf,
 } from '@/widgets/batting-stage/lib/stageScenery'
 import { BATTER_SIDE, STAGE_HEIGHT, STAGE_LAYOUT, STAGE_SIDE, STAGE_WIDTH } from '@/widgets/batting-stage/lib/stageLayout'
@@ -99,7 +99,7 @@ export interface SceneryState {
   readonly seasonStadium?: SeasonStadium
   /**
    * 게임 모드(전역 `0x1552d10`). 하늘 조명 0x78490 이 **모드 5·6(미션)·7(홈런더비)** 에서는 안 그린다
-   * (0x784a2~0x784b0). 생략하면 그 셋이 아닌 것으로 본다 — ⚠️ 부르는 쪽(`BattingStage`)이 아직 안 넘긴다.
+   * (0x784a2~0x784b0). 생략하면 그 셋이 아닌 것으로 본다. `BattingStage` 의 `gameMode` 가 그대로 내려온다.
    */
   readonly gameMode?: number
 }
@@ -107,8 +107,6 @@ export interface SceneryState {
 const CAMERA = { x: -120, y: -70 }
 const SKY_GRADIENT = { top: 10, bottom: 118, end: 178 }
 const CLOUD_COUNT = 3
-/** 하늘 조명을 안 그리는 모드 — 5 투수 미션 · 6 타자 미션 · 7 홈런더비 (0x784a6~0x784b0) */
-const SKY_LIGHT_HIDDEN_MODES: readonly number[] = [5, 6, 7]
 /** 하늘을 단색으로 칠하고 조명도 안 그리는 구장 번호 (0x78046 · 0x784c6 `cmp #8`) */
 const FLAT_SKY_STADIUM = 8
 /** 좌타 펜스 기준점 (−121 − 10, −70 + 3) */
@@ -353,7 +351,7 @@ function drawScoreboardText(
  * 장면+0xf10 을 거쳐 +0x38/+0x3c 를 읽는 곳을 전수로 훑어도 0x78490 의 +0x38 뿐이다. 그래서 안 그린다.
  */
 function drawSkyLight(context: CanvasRenderingContext2D, state: SceneryState, colorIndex: number): void {
-  if (state.gameMode !== undefined && SKY_LIGHT_HIDDEN_MODES.includes(state.gameMode)) return
+  if (!isSkyLightModeShown(state.gameMode)) return
   if (state.stadium === FLAT_SKY_STADIUM) return
   if (colorIndex > SKY_LIGHT_LAST_COLOR_INDEX) return
   const entries = frameAnimations(SKY_LIGHT_FRAMES)?.[0]

@@ -69,6 +69,8 @@ export interface StageLatest {
    * 원본은 모드 2 의 **홈경기**(0x40ff0 `내 팀 == 홈팀`)와 대전 모드 8·9 에서만 그 길로 간다.
    */
   readonly seasonStadium?: SeasonStadium
+  /** 게임 모드(전역 `0x1552d10`) — 하늘 조명 0x78490 이 모드 5·6·7 에서 안 그린다 */
+  readonly gameMode?: number
   readonly isPaused: boolean
   readonly random: RandomPort
   readonly swingMode: SwingMode

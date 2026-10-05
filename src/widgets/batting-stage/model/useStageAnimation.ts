@@ -201,7 +201,13 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
         resultTick: phaseRef.current === '결과' ? pitchTickAt(now, phaseStartedAtRef.current, tickLength) : 0,
         // 일반 구장 번호를 고르는 규칙(st+0x70)이 미확인이라 0 번 구장으로 둔다 (추정).
         // 시즌 구장 세 칸이 넘어오면 배경 묶음 자체가 0x77494 쪽으로 갈린다 (0x40ff0).
-        scenery: { skyRow, stadium: 0, seasonStadium: latestRef.current.seasonStadium },
+        scenery: {
+          skyRow,
+          stadium: 0,
+          seasonStadium: latestRef.current.seasonStadium,
+          // 하늘 조명 0x78490 은 모드 5·6·7(미션·홈런더비)에서 안 그린다
+          gameMode: latestRef.current.gameMode,
+        },
       })
 
       animationHandle = requestAnimationFrame(frame)

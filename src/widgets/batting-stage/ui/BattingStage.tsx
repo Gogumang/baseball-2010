@@ -81,6 +81,12 @@ interface BattingStageProps {
    * 대전 모드면 3 고정이다 (`SeasonStadium` 주석 참고). 잔디 칸은 이 길로 들어가지 않는다.
    */
   readonly seasonStadium?: SeasonStadium
+  /**
+   * **게임 모드** = 원본 전역 `0x1552d10` (1 일반 · 2 시즌 · 4 나리 타자편 · 6 타자 미션 · 7 홈런더비 · 8·9 대전).
+   * 지금은 하늘 조명 `0x78490` 만 본다 — 모드 5·6·7 이면 조명을 안 그린다 (0x784a2~0x784b0).
+   * 안 넘기면 그 셋이 아닌 것으로 본다.
+   */
+  readonly gameMode?: number
   /** 참이면 새 공을 던지지 않는다. 타석 결과 연출 중에 쓴다. */
   readonly isPaused: boolean
   readonly random: RandomPort

@@ -144,6 +144,7 @@ export function HomeRunDerbyScreen({
           batterEquipmentLevels={batterEquipmentLevels}
           pitcherAbility={pitcher.ability}
           swingMode="일반"
+          gameMode={DERBY_MODE}
           isEagleEyeEnabled={false}
           // 홈런더비는 일반 점수판을 안 그린다 (0x4c4bc 가 0x373d0 대신 0x45a54 로 간다)
           hud={null}
