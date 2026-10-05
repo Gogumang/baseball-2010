@@ -18,6 +18,7 @@ import {
   currentBatterEntry,
   currentPitcherAbility,
   currentPitcherAceIndex,
+  opponentMagicStateOf,
   pitchSlotsFor,
   pitchersOfRecordOf,
   specialSwingRemainingAt,
@@ -535,6 +536,8 @@ export function TeamGameScreen({
               seasonStadium={seasonStadium}
               // 상대 마투수의 마구 횟수 0xd8509[mgr[0x13a + 순번]] (0xaebe4) — 전역 마선수 레벨 칸
               aceLevels={options.aceLevels}
+              // 상대 팀+0x28 과 공+0x10 은 진행기가 든다 — 공 객체는 경기에 하나라 사람 투구와 칸을 함께 쓴다
+              cpuMagic={opponentMagicStateOf(progress)}
               isPaused={burstLines !== null}
               random={random}
               onPitchResolved={(detail, _pitch, isUncatchable) => actions.resolvePitch(detail, isUncatchable)}

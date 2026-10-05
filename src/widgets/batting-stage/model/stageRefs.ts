@@ -76,6 +76,8 @@ export interface StageLatest {
    * 없으면 모두 Lv1(0) 이다.
    */
   readonly aceLevels?: Readonly<Record<number, number>>
+  /** 부르는 쪽이 드는 CPU 마구 상태 (팀+0x28 · 공+0x10) — `BattingStage` 의 같은 이름 props 주석 참고 */
+  readonly cpuMagic?: { readonly remaining: number; readonly ballMagicNumber: number }
   readonly isPaused: boolean
   readonly random: RandomPort
   readonly swingMode: SwingMode

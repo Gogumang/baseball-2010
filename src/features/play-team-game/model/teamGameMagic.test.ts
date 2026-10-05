@@ -1,15 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
-import { PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
+import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import { PITCHER_ENTRY_ACE_SLOT } from '@/features/play-team-game/model/teamGameRoster'
 import {
+  applyBatterPitch,
   availablePitchers,
   changePitcher,
+  isBatterTurn,
   isPitchTurn,
+  opponentMagicStateOf,
   startTeamGame,
   startThrowPitch,
 } from '@/features/play-team-game/model/teamGameFlow'
-import type { TeamGameOptions } from '@/features/play-team-game/model/teamGameFlow'
+import type { TeamGameOptions, TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow'
 
 const 기본옵션: TeamGameOptions = {
   mode: 1,
@@ -58,5 +61,64 @@ describe('우리 팀 마구 횟수 팀+0x28 — 0xaebe4 가 마운드에 오른 
   it('일반 투수는 구질 22 를 던질 수 없다 (0x50db8 — 남은 0 이면 무시)', () => {
     const progress = 시작()
     expect(startThrowPitch(progress, 마구, createSeededRandom(3))).toBe(progress)
+  })
+})
+
+describe('공 객체는 경기에 하나 — 사람 투구와 CPU 투구가 공+0x10 을 함께 쓴다 (경기+0xf98)', () => {
+  const 공 = (pitchTypeNumber: number) => ({
+    resolution: { kind: '볼' } as const,
+    hasSwung: false,
+    isBunt: false,
+    resultCode: null,
+    pitchTypeNumber,
+  })
+
+  /** 우리 공격 · 상대 투수를 마투수(레오니, +0x18 = 6)로 바꿔 세운 판 */
+  function 상대마투수(ballMagicNumber: number): TeamGameProgress {
+    const base = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
+    return {
+      ...base,
+      opponentPitcherEntry: base.opponentPitcherEntry.map((pitcher, slot) =>
+        slot === base.opponentPitcherIndex
+          ? { ...pitcher, aceIndex: 1, repertoire: { ...pitcher.repertoire, magicId: 6 } }
+          : pitcher,
+      ),
+      opponentMagicRemaining: 3,
+      ballMagicNumber,
+    }
+  }
+
+  it('상대 로스터 투수는 남은 0 — 타석 화면은 진행기 값을 받는다', () => {
+    const progress = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
+    expect(opponentMagicStateOf(progress)).toEqual({ remaining: 0, ballMagicNumber: 0 })
+  })
+
+  it('공이 비어 있으면 CPU 의 첫 마구는 소모되지 않는다 (0x345fc 의 공+0x10 ≠ 0 조건) — 그 뒤로는 준다', () => {
+    const progress = 상대마투수(0)
+    expect(isBatterTurn(progress)).toBe(true)
+    const 첫 = applyBatterPitch(progress, 공(22), createSeededRandom(1))
+    expect(첫.opponentMagicRemaining).toBe(3)
+    expect(첫.ballMagicNumber).toBe(6)
+    const 둘 = applyBatterPitch(첫, 공(22), createSeededRandom(1))
+    expect(둘.opponentMagicRemaining).toBe(2)
+    // 직구는 공+0x10 을 안 지운다 (0x3de10 만 쓴다)
+    const 직구 = applyBatterPitch(둘, 공(1), createSeededRandom(1))
+    expect(직구.opponentMagicRemaining).toBe(2)
+    expect(직구.ballMagicNumber).toBe(6)
+  })
+
+  it('사람이 먼저 마구를 던져 공에 번호가 남아 있으면 CPU 의 첫 마구도 소모된다 — 공 칸은 CPU 번호로 바뀐다', () => {
+    const 첫 = applyBatterPitch(상대마투수(2), 공(22), createSeededRandom(1))
+    expect(첫.opponentMagicRemaining).toBe(2)
+    expect(첫.ballMagicNumber).toBe(6)
+    expect(opponentMagicStateOf(첫)).toEqual({ remaining: 2, ballMagicNumber: 6 })
+  })
+
+  it('CPU 마구 뒤 사람 공에도 그 공+0x10 이 남는다 — 사람이 마구를 안 던져도 0x34d6c 투수 쪽이 선다', () => {
+    const 공남음 = { ...시작(), ballMagicNumber: 6 }
+    expect(isPitchTurn(공남음)).toBe(true)
+    const 직구 = startThrowPitch(공남음, { typeNumber: 1, courseCell: 4, gaugeCell: 0 }, createSeededRandom(3))
+    expect(직구.lastPitch?.magicNumber).toBe(6)
+    expect(직구.ballMagicNumber).toBe(6)
   })
 })

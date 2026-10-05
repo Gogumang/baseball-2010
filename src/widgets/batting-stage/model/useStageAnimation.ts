@@ -64,12 +64,16 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
      * 안 넘기면 남은 횟수가 늘 0 이라 마구가 아예 안 나가고, 매 투구 새로 만들면
      * 마구 조건(0x344dc)이 볼카운트 48칸 중 36칸에서 참이라 **투구마다 마구**가 된다.
      *
-     * ⚠️ **근사**: 마운드에 선 투수가 바뀌면 새로 만든다. 원본 칸은 팀 것이라
-     *    구원 투수가 남은 횟수를 물려받는지 새로 받는지가 **확인되지 않았다** —
-     *    그 칸을 세우는 자리를 아직 못 읽었다.
+     * 마운드에 선 투수가 바뀌면 새로 만든다 — 남은 횟수는 원본도 그렇다: 교체 가지가 팀+0x28 을 −1 로
+     *    비우고(0xaebe4 aec7a) 같은 함수 끝이 새 투수로 채운다. ⚠️ 다만 공+0x10 은 경기에 하나라 원본은
+     *    이어지는데 여기서는 0 으로 돌아가고, 화면이 내려가면(반 이닝) 둘 다 잃는다 — 그래서 사람 투구와 공을
+     *    함께 드는 진행기는 `cpuMagic` 으로 넘긴다(팀 경기).
      */
     let magic: { readonly magicId: number; readonly state: MagicPitchGameState } | null = null
-    const magicStateOf = (repertoire: PitcherRepertoireInfo | undefined) => {
+    const magicStateOf = (repertoire: PitcherRepertoireInfo | undefined): MagicPitchGameState => {
+      // 부르는 쪽이 팀+0x28·공+0x10 을 들면 그 사본 — 고친 값은 버리고 부르는 쪽이 같은 차례로 다시 고친다
+      const held = latestRef.current.cpuMagic
+      if (held !== undefined) return { remaining: held.remaining, ballMagicNumber: held.ballMagicNumber }
       const info = repertoire ?? DEFAULT_REPERTOIRE
       if (magic === null || magic.magicId !== info.magicId) {
         // 0xaebe4: 마투수(0xb633d)면 횟수 = 0xd8509[mgr[0x13a + 순번(0xb63a1)]] — 레벨은 상태를 세울 때 한 번 읽는다

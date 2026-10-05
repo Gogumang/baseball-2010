@@ -96,6 +96,14 @@ interface BattingStageProps {
    * 안 넘기면 모두 Lv1 = 3 회다.
    */
   readonly aceLevels?: Readonly<Record<number, number>>
+  /**
+   * **부르는 쪽이 드는 CPU 마구 상태** — 수비 팀 남은 마구 팀+0x28 과 경기에 하나뿐인 공 객체 +0x10.
+   * 넘기면 화면은 자기 마구 상태를 만들지 않고 **공마다 이 값의 사본**으로 구질을 고른다(0x344dc·0x345fc·0x3de10).
+   * 던진 뒤 값은 부르는 쪽이 `onPitchResolved` 의 구질 번호로 같은 차례를 밟아 고친다(`advanceMagicPitchGameState`).
+   * 원본 공 객체는 사람 투구와 CPU 투구가 함께 쓰므로, 두 쪽을 다 드는 진행기(팀 경기)가 넘긴다.
+   * 안 넘기면 예전처럼 화면이 투수마다 상태를 세운다.
+   */
+  readonly cpuMagic?: { readonly remaining: number; readonly ballMagicNumber: number }
   /** 참이면 새 공을 던지지 않는다. 타석 결과 연출 중에 쓴다. */
   readonly isPaused: boolean
   readonly random: RandomPort

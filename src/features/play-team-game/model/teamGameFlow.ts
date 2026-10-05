@@ -56,6 +56,8 @@ import { specialSwingCountOf } from '@/entities/batting/model/specialSwing'
 import { aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
 import { isMistakePitch } from '@/entities/pitching/model/mistakePitch'
 import type { Pitch } from '@/entities/pitching/model/pitch'
+import { advanceMagicPitchGameState } from '@/entities/pitching/model/magicPitchGame'
+import type { MagicPitchGameState } from '@/entities/pitching/model/magicPitchGame'
 import {
   MAGIC_PITCH_TYPE_NUMBER,
   ballMagicNumberAfterPitch,
@@ -613,11 +615,21 @@ export interface TeamGameProgress {
    */
   readonly magicRemaining: number
   /**
-   * **공 객체 +0x10** — 사람 투수가 던진 공에 실린 마구 번호 (0x3de10, H2 3-4). 되돌리는 코드가 없어
-   * 한 번 마구를 던진 뒤로는 직구·변화구에도 남는다. CPU 타석 판정의 보정 구조체 0x34d6c 투수 쪽이 본다.
+   * **상대 팀 남은 마구 횟수** = 상대 팀 s8 [+0x28] — `magicRemaining` 과 같은 규칙(`magicCountOfPitcher`)으로
+   * 선발·교체 때 채운다. 사람 타석에서 CPU 구질 고르기 0x344dc 가 보고 소모 0x345fc 가 줄인다(`throwOpponentPitch`).
+   * 타석 화면(`BattingStage.cpuMagic`)은 이 값의 사본으로 고를 뿐이라 반 이닝·화면을 건너도 이어진다.
+   */
+  readonly opponentMagicRemaining: number
+  /**
+   * **공 객체 +0x10** — 이번 공에 실린 마구 번호 (0x3de10, H2 3-4). 되돌리는 코드가 없어
+   * 한 번 마구를 던진 뒤로는 직구·변화구에도 남는다. 타석 판정의 보정 구조체 0x34d6c 투수 쪽이 본다.
    *
-   * ⚠️ 미해결: 원본 공 객체는 경기에 하나라 CPU 투수가 던진 마구(사람 타석, `widgets/batting-stage` 의
-   *    `MagicPitchGameState`)와 칸을 함께 쓴다. 웹은 두 쪽이 따로 들고 있어 반 이닝을 건너 이어지지 않는다.
+   * 원본 공 객체(경기+0xf98)는 **경기에 하나**라 사람 투구(0x50e9c → 0x3de10)와 CPU 투구(0x345fc → 0x3de10)가
+   * 이 한 칸을 함께 쓴다 — 그래서 결과가 갈린다:
+   *   ① CPU 소모 조건 `구질 22 && 공+0x10 ≠ 0 && 남은 > 0`(0x34894~0x348d2) — 사람이 먼저 마구를 던졌으면
+   *      CPU 의 그 경기 첫 마구도 **공짜가 아니다**(따로 들면 늘 공짜).
+   *   ② 0x34d6c 투수 쪽은 공+0x10 ≠ 0 이면 **지금 수비 투수**(0xae83c)로 칸을 고른다 — CPU 마구 뒤 사람 마투수의
+   *      직구에도(사람이 아직 마구를 안 던졌어도) 그 마투수 레벨 보정이 붙고, 사람 마구 뒤 CPU 마투수 공도 같다.
    */
   readonly ballMagicNumber: number
   /**
@@ -835,6 +847,10 @@ export function startTeamGame(options: TeamGameOptions, random: RandomPort): Tea
     stamina: ourPitcherStaminas[startingSlots.ours] ?? FULL_STAMINA,
     // 팀 new 0xb891c 가 팀+0x28 을 −1 로 두고(b89b4~b89ba) 첫 타석 준비(상태 0xd 0x48d50 → 0xaebe4)가 선발로 채운다
     magicRemaining: magicCountOfPitcher(ourPitcherEntry[startingSlots.ours] ?? ourPitcherEntry[0], options.aceLevels),
+    opponentMagicRemaining: magicCountOfPitcher(
+      opponentPitcherEntry[startingSlots.opponent] ?? opponentPitcherEntry[0],
+      options.aceLevels,
+    ),
     // 공 객체 new — +0x10 = 0 (0x1239 new 의 0 채움은 원본 미확인 — H2 3-4)
     ballMagicNumber: 0,
     ourSpecialSwingRemaining: UNFILLED_SPECIAL_SWINGS,
@@ -1441,6 +1457,17 @@ export function currentPitcherAbility(progress: TeamGameProgress): PitcherAbilit
   }
 }
 
+/**
+ * 사람 타석의 CPU 투수가 구질을 고를 때 볼 마구 상태 — 상대 팀+0x28 과 경기에 하나뿐인 공+0x10.
+ * 타석 화면(`BattingStage.cpuMagic`)에 넘기면 화면이 따로 상태를 세우지 않는다.
+ */
+export function opponentMagicStateOf(progress: TeamGameProgress): {
+  readonly remaining: number
+  readonly ballMagicNumber: number
+} {
+  return { remaining: progress.opponentMagicRemaining, ballMagicNumber: progress.ballMagicNumber }
+}
+
 /** 지금 마운드에 선 상대 투수가 마투수면 `ACE_PITCHERS` 칸 0~4, 아니면 −1 */
 export function currentPitcherAceIndex(progress: TeamGameProgress): number {
   return (
@@ -1610,8 +1637,21 @@ function withFoulRecords(progress: TeamGameProgress, isFoul: boolean): TeamGameP
  */
 function throwOpponentPitch(progress: TeamGameProgress, pitchTypeNumber: number | undefined): TeamGameProgress {
   if (pitchTypeNumber === undefined) return progress
+  // 소모 0x345fc(`공+0x10 ≠ 0` 일 때만) → 싣기 0x3de10 — 타석 화면이 이 값의 사본으로 고른 구질을 같은 차례로 밟는다.
+  // 공은 사람 투구와 함께 쓰는 한 칸이다 (`ballMagicNumber` 주석)
+  const magic: MagicPitchGameState = {
+    remaining: progress.opponentMagicRemaining,
+    ballMagicNumber: progress.ballMagicNumber,
+  }
+  advanceMagicPitchGameState(
+    magic,
+    pitchTypeNumber,
+    pitcherRepertoireAt(progress, progress.options.opponentTeamId, progress.opponentPitcherIndex).magicId,
+  )
   return {
     ...progress,
+    opponentMagicRemaining: magic.remaining,
+    ballMagicNumber: magic.ballMagicNumber,
     opponentStamina: drainStamina({
       stamina: progress.opponentStamina,
       typeNumber: pitchTypeNumber,
@@ -2882,6 +2922,10 @@ function applyPitcherChange(
       progress.opponentStamina,
     ),
     opponentStamina: progress.opponentPitcherStaminas[nextIndex] ?? FULL_STAMINA,
+    opponentMagicRemaining: magicCountOfPitcher(
+      pitcherEntryAt(progress, progress.options.opponentTeamId, nextIndex),
+      progress.options.aceLevels,
+    ),
     opponentPitcherCounters: EMPTY_MOUND_COUNTERS,
   }
 }
