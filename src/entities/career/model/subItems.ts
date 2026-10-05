@@ -91,6 +91,11 @@ export function subItemMoraleRelief(career: Pick<PlayerCareer, 'subItemIds'>): n
 }
 
 const OUTING_ITEM = { 팬미팅: 5, 외식: 6, 입원: 7, 야구교실: 8, CF촬영: 9 } as const
+
+/** 외출 기능에 붙는 서브 아이템 번호 (`기록[0x5d + 장소]` — 화보집·외식회원증·보험증서·야구교본·명품정장). 없으면 null */
+export function outingSubItemIdOf(functionId: string): number | null {
+  return functionId in OUTING_ITEM ? OUTING_ITEM[functionId as keyof typeof OUTING_ITEM] : null
+}
 const CF_BONUS_MONEY = 400
 
 /**

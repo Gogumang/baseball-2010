@@ -116,6 +116,9 @@ export function CareerRoutes({
           // 이벤트도 외출 행동이라 이번 주기에 이미 무언가 했으면 [!] 가 없다
           eventPlaceIds={career.hasActedThisCycle ? new Set() : session.eventPlaceIds}
           onEnter={actions.enterPlace}
+          // 126 효과 팝업 → [확인] → 105 (입원 회복 글은 관리 화면 알림으로)
+          resultText={session.outingResult?.effectText ?? null}
+          onCloseResult={actions.closeOutingResult}
         />
       )
 

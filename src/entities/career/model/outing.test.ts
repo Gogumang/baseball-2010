@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   outingBlockReasonOf,
+  performOuting,
   runOuting,
   recoverAfterRest,
   restBlockReasonOf,
@@ -152,5 +153,39 @@ describe('runRest', () => {
 
   it('사기가 100 이면 아파도 휴식을 거절한다 (0x1261c, StrMODE[91])', () => {
     expect(restBlockReasonOf(선수({ morale: 100, isInjured: true }))).toBe('사기최고')
+  })
+})
+
+describe('126 결과 팝업 글 — 효과 0x15234 · 입원 회복 0x1575c', () => {
+  const 상승 = '!c00CC00상승!cFFFFFF하였습니다'
+  const 하락 = '!cFF0000하락!cFFFFFF하였습니다'
+
+  it('줄 차례는 인기도 → 평판 → 소지금 → 사기, 굴린 값이 0 인 칸은 줄이 없다', () => {
+    const outcome = performOuting(선수({ money: 9999, popularity: 9000 }), 기능('CF촬영'), 최소)
+    expect(outcome.effectText).toBe(`!C인기도 2${상승}!N평판 8${상승}!N소지금 800${상승}!N사기 16${하락}!N`)
+    expect(outcome.recoveryText).toBe('')
+  })
+
+  it('서브 아이템 보정은 (부호 값) 으로 붙고, 끝에 노란 아이템 이름 + [195] "효과" 줄이 붙는다', () => {
+    const outcome = performOuting(선수({ money: 9999, popularity: 9000, subItemIds: [5] }), 기능('팬미팅'), 최소)
+    expect(outcome.effectText).toBe(
+      `!C인기도 6(+2)${상승}!N소지금 500${하락}!N사기 2${상승}!N!N!cFFFF00화보집 효과`,
+    )
+  })
+
+  it('보험증서 입원은 소지금 0(+200) 상승 — 상승·하락은 굴림+보정 ≥ 0 으로 고른다 (원본 그대로)', () => {
+    const 환자 = 선수({ money: 9999, subItemIds: [7], isSick: true, illnessName: '감기', illnessRemaining: 3, isInjured: true, injuryRemaining: 3 })
+    const outcome = performOuting(환자, 기능('입원'), 최소)
+    expect(outcome.effectText).toBe(`!C소지금 0(+200)${상승}!N사기 4(+1)${상승}!N!N!cFFFF00보험증서 효과`)
+    // 질병 [206] 뒤 부상은 "!N" 으로 잇는다 (질병 글이 없으면 "!C")
+    expect(outcome.recoveryText).toBe('!C다음 질병이 치료되었습니다!N[!cFFFF00감기!cFFFFFF]!N부상에서 회복 되었습니다.')
+    expect(performOuting({ ...환자, isSick: false, illnessName: null }, 기능('입원'), 최소).recoveryText).toBe(
+      '!C부상에서 회복 되었습니다.',
+    )
+  })
+
+  it('낫지 않으면 회복 글이 없다', () => {
+    const 환자 = 선수({ money: 9999, isSick: true, illnessName: '감기', illnessRemaining: 3 })
+    expect(performOuting(환자, 기능('입원'), 최대).recoveryText).toBe('')
   })
 })

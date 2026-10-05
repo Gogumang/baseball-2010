@@ -45,7 +45,8 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { selectPitcherShopItem } from '@/features/shop/model/pitcherShopSelection'
 import type { GpDetailOf } from '@/features/shop/model/shopSelection'
 import type { PitcherShopTab } from '@/features/shop/model/pitcherShopSelection'
-import { outingBlockReasonOf, outingBlockTextOf, runOuting } from '@/entities/career/model/outing'
+import { outingBlockReasonOf, outingBlockTextOf, performOuting } from '@/entities/career/model/outing'
+import type { OutingResult } from '@/entities/career/model/outing'
 import { OUTING_PLACES } from '@/shared/config/outingPlaces'
 import type { OutingPlace } from '@/shared/config/outingPlaces'
 import { PITCHER_MANAGEMENT_TEXT } from '@/pages/pitcher-league/lib/pitcherManagementMenu'
@@ -75,8 +76,12 @@ export interface PitcherLeagueSession {
   readonly shopNotice: string
   /** 상점 GP 결과 창 (0x872a1) — 칸 0~4·6 구매 뒤. 닫아도 굴림 없이 상점 그대로 (0x1d649) */
   readonly shopGpDetail: GpDetailOf<PitcherCareer> | null
-  /** 외출 지도(112·113)에서 마지막으로 고른 장소 기능의 결과·막힘 알림 */
+  /** 외출 지도(112·113)에서 고른 장소 기능의 막힘 알림 (결과는 `outingResult` 팝업) */
   readonly outingNotice: string
+  /** 126 효과 팝업(0x15234) 과 이어질 입원 회복 글(0x1575c) — 효과 팝업이 떠 있지 않으면 null */
+  readonly outingResult: OutingResult | null
+  /** 126 에서 105 로 돌아온 뒤 관리 화면 위에 남는 입원 회복 팝업 글 (0x1575c `0xbbef8(글, 1, 1, 1)`). 없으면 '' */
+  readonly outingRecoveryNotice: string
   readonly actions: {
     readonly create: (name: string, profile: PitcherRookieProfile) => void
     /** 바뀐 커리어를 그대로 저장한다 (구질 훈련처럼 화면이 계산해 돌려줄 때) */
@@ -108,6 +113,10 @@ export interface PitcherLeagueSession {
     readonly runOutingFunction: (functionId: string) => void
     /** 113 칸 0 [들어가기] — 투수편 이벤트 재생(114)이 아직 없어 알림만 띄운다 (미해결) */
     readonly enterOutingPlace: (place: OutingPlace) => void
+    /** 126 효과 팝업 [확인] → (입원이면 회복 글) → 105 (틀 0x1575c) */
+    readonly closeOutingResult: () => void
+    /** 105 위 입원 회복 팝업 [확인] */
+    readonly dismissOutingRecoveryNotice: () => void
     readonly reset: () => void
   }
 }
@@ -562,13 +571,18 @@ export function usePitcherLeagueSession(
    * 서브 아이템 5~9(`기록[0x5d+장소]`) 보정도 거기서 붙는다.
    *
    * 외출은 G 를 쓰지 않으므로 지갑 그림자(`shown`)가 아닌 저장 쪽 커리어로 돌리고 그대로 저장한다.
-   * 결과 알림은 타자편 웹(`useCareerSession.runOutingFunction`)과 같은 꼴이다 —
-   * ⚠️ 원본은 126 에서 연출 팝업(0x85074) 뒤 효과 글(StrMODE[22]~[25])을 띄우고 105 로 돌아가는데,
-   *    타자편 웹도 아직 지도에 남아 한 줄 알림만 띄운다. 두 편을 함께 고칠 자리다 (**근사**).
+   * 126 흐름은 원본 그대로다 (두 편 같은 코드): 진입 0x11da8 → 연출 0x85074 (60 갱신, 확인 키 0x105c8 로 건너뜀)
+   * → 연출 끝(0x84e58)에 효과 0x15234 가 굴리고 **효과 팝업**(StrMODE[22]·[23]·[25]·[24] 줄 + 서브 아이템 [195])을
+   * 지도 위에 띄운다 → 팝업이 닫히면 틀 0x1575c 가 입원이면 회복을 굴려 **회복 글 팝업**을 띄우고 **105** 로 간다.
+   * 그 사이 다른 굴림이 없어 웹은 고를 때 한 번에 굴린다 (차례 같음).
+   * ⚠️ 미해결: 연출 그림(0x84ea0 — event_ani 애니 [1,0,2,4,3][장소] · event_char_1 +30 · event_char_0 +0x5d)은 아직 옮기지 않았다.
    */
   const [outingNotice, setOutingNotice] = useState('')
+  const [outingResult, setOutingResult] = useState<OutingResult | null>(null)
+  const [outingRecoveryNotice, setOutingRecoveryNotice] = useState('')
   const openOuting = useCallback(() => {
     setOutingNotice('')
+    setOutingResult(null)
     setScene('외출')
   }, [])
   const runOutingFunction = useCallback(
@@ -580,11 +594,20 @@ export function usePitcherLeagueSession(
       if (outingFunction === undefined) return
       const reason = outingBlockReasonOf(career, outingFunction)
       if (reason !== null) return setOutingNotice(outingBlockTextOf(reason, outingFunction))
-      commit(runOuting(career, outingFunction, random))
-      setOutingNotice(`${outingFunction.name} — ${outingFunction.description}`)
+      const outcome = performOuting(career, outingFunction, random)
+      commit(outcome.career)
+      setOutingNotice('')
+      setOutingResult({ effectText: outcome.effectText, recoveryText: outcome.recoveryText })
     },
     [career, commit, random],
   )
+  const closeOutingResult = useCallback(() => {
+    if (outingResult === null) return
+    setOutingResult(null)
+    setOutingRecoveryNotice(outingResult.recoveryText)
+    setScene('관리')
+  }, [outingResult])
+  const dismissOutingRecoveryNotice = useCallback(() => setOutingRecoveryNotice(''), [])
   /*
    * ⚠️ **미해결**: [들어가기] 는 원본에서 배정된 장소 이벤트(0x8ce58 — 대상 1·3 의 trigger 2~6)를, 없으면
    * 빈 장소 이벤트 440+장소를 114 로 재생한다 (빈 장소는 행동을 안 쓴다, 0x1c014). 투수편 웹에는 이벤트
@@ -608,6 +631,8 @@ export function usePitcherLeagueSession(
     shopNotice,
     shopGpDetail,
     outingNotice,
+    outingResult,
+    outingRecoveryNotice,
     actions: {
       create,
       save: commit,
@@ -625,6 +650,8 @@ export function usePitcherLeagueSession(
       openOuting,
       runOutingFunction,
       enterOutingPlace,
+      closeOutingResult,
+      dismissOutingRecoveryNotice,
       reset,
     },
   }

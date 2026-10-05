@@ -6,6 +6,7 @@ import { PitcherGameScreen } from '@/pages/pitching/ui/PitcherGameScreen'
 import { PitcherShopScreen } from '@/pages/shop/ui/PitcherShopScreen'
 import { EndingScreen } from '@/pages/ending/ui/EndingScreen'
 import { OutingMapScreen } from '@/pages/outing-map/ui/OutingMapScreen'
+import { MessageBox } from '@/shared/ui'
 import {
   isContinuablePitcherEnding,
   pitcherEndingBonusOf,
@@ -134,19 +135,28 @@ export function PitcherLeagueRoute({
         // ⚠️ 미해결: 장소 이벤트 배정(0x8cdc0)·재생(114)이 투수편 웹에 없어 [!] 를 띄우지 않는다
         eventPlaceIds={NO_EVENT_PLACES}
         onEnter={actions.enterOutingPlace}
+        // 126 효과 팝업 → [확인] → 105 (입원 회복 글은 관리 화면 위 팝업으로)
+        resultText={session.outingResult?.effectText ?? null}
+        onCloseResult={actions.closeOutingResult}
       />
     )
   }
 
   return (
-    <PitcherManagementScreen
-      career={career}
-      random={random}
-      onSave={actions.save}
-      onNextGame={actions.beginGame}
-      onOuting={actions.openOuting}
-      onOpenShop={actions.openShop}
-      onExit={onExit}
-    />
+    <>
+      <PitcherManagementScreen
+        career={career}
+        random={random}
+        onSave={actions.save}
+        onNextGame={actions.beginGame}
+        onOuting={actions.openOuting}
+        onOpenShop={actions.openShop}
+        onExit={onExit}
+      />
+      {/* 126 → 105 뒤 남는 입원 회복 팝업 (0x1575c `0xbbef8(글, 1, 1, 1)`) */}
+      {session.outingRecoveryNotice !== '' && (
+        <MessageBox text={session.outingRecoveryNotice} buttons={['확인']} onAnswer={actions.dismissOutingRecoveryNotice} />
+      )}
+    </>
   )
 }

@@ -589,7 +589,32 @@ describe('투수편 외출 (112 지도 · 113 장소 — 타자편과 같은 코
     expect(saved.money).toBe(900)
     expect(saved.hasActedThisCycle).toBe(true)
     expect(saved.outingsThisSeason).toBe(1)
-    expect(result.current.outingNotice).toBe('외식 — 사기를 대폭 회복한다. 소지금을 소모한다')
+    // 126 효과 팝업이 지도 위에 뜬다 (StrMODE[25] 소지금 · [24] 사기 + 외식회원증 보정 · [195] 효과 줄)
+    expect(result.current.outingResult?.effectText).toMatch(/^!C소지금 100!cFF0000하락!cFFFFFF하였습니다!N사기 \d+\(\+4\)!c00CC00상승!cFFFFFF하였습니다!N!N!cFFFF00외식회원증 효과$/)
+    expect(result.current.scene).toBe('외출')
+
+    // [확인] → 105 (입원이 아니라 회복 글 없음)
+    act(() => result.current.actions.closeOutingResult())
+    expect(result.current.outingResult).toBeNull()
+    expect(result.current.scene).toBe('관리')
+    expect(result.current.outingRecoveryNotice).toBe('')
+  })
+
+  it('입원: 효과 팝업을 닫으면 105 로 가고 회복 글이 관리 화면 위에 남는다 (0x1575c)', () => {
+    const { result } = 띄우기()
+    act(() => result.current.actions.create('투수', 신인))
+    act(() =>
+      result.current.actions.save({ ...result.current.career!, morale: 50, money: 1000, isInjured: true, injuryRemaining: 1 }),
+    )
+    act(() => result.current.actions.openOuting())
+    act(() => result.current.actions.runOutingFunction('입원'))
+    act(() => result.current.actions.closeOutingResult())
+
+    expect(result.current.scene).toBe('관리')
+    // 남은 기간 1 → 먼저 −1 해 0 이면 반드시 낫는다
+    expect(result.current.outingRecoveryNotice).toBe('!C부상에서 회복 되었습니다.')
+    act(() => result.current.actions.dismissOutingRecoveryNotice())
+    expect(result.current.outingRecoveryNotice).toBe('')
   })
 
   it('막히면 원문 알림만 띄우고 커리어는 그대로다 (StrMODE[62])', () => {

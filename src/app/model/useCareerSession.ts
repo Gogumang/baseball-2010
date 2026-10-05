@@ -3,7 +3,7 @@ import type { Screen } from '@/app/model/screen'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import { isAtBatFinished } from '@/entities/at-bat/model/atBatState'
 import { describeOutcomeBanner } from '@/entities/at-bat/model/resolutionText'
-import { cpuPickoff, resolveDefensePlay, startGame, startPlayerOutcome, stealBase, summaryOf, throwOpponentPitch } from '@/features/play-game/model/gameFlow'
+import { cpuPickoff, resolveBenchClearing, resolveDefensePlay, startGame, startPlayerOutcome, stealBase, summaryOf, throwOpponentPitch } from '@/features/play-game/model/gameFlow'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
@@ -52,11 +52,12 @@ import { trainingBlockTextOf, trainingOutcomeLinesOf } from '@/entities/career/m
 import {
   outingBlockReasonOf,
   outingBlockTextOf,
+  performOuting,
   recoverAfterRest,
   restBlockReasonOf,
-  runOuting,
   runRest,
 } from '@/entities/career/model/outing'
+import type { OutingResult } from '@/entities/career/model/outing'
 import { EVENT_TRIGGER, finishEvent, placeTriggerOf } from '@/entities/story/model/storyScene'
 import { selectShopItem } from '@/features/shop/model/shopSelection'
 import type { GpDetailOf } from '@/features/shop/model/shopSelection'
@@ -201,6 +202,8 @@ export function useCareerSession({
   /** 상점 GP 결과 창 (0x872a1) — 칸 0~4·6 구매 뒤. 닫아도 굴림 없이 상점 그대로 (0x1d649) */
   const [shopGpDetail, setShopGpDetail] = useState<GpDetailOf<PlayerCareer> | null>(null)
   const [outingNotice, setOutingNotice] = useState('')
+  /** 상태 126 결과 팝업 두 장 — 효과 글(0x15234)과 입원 회복 글(0x1575c). 효과 팝업이 떠 있지 않으면 null */
+  const [outingResult, setOutingResult] = useState<OutingResult | null>(null)
   const [managementNotice, setManagementNotice] = useState('')
   /** 상세정보 결과 창 (0x8a0a4) — 닫을 때 훈련은 부상, 휴식은 회복을 굴린다 */
   const [managementDetail, setManagementDetail] = useState<ManagementDetail | null>(null)
@@ -455,6 +458,11 @@ export function useCareerSession({
         runner.setIsPaused(true)
         return
       }
+      // 사구 뒤 벤치 클리어링 연출(상태 0x1e) — 화면이 연출을 끝낼 때(`finishBenchClearing`)까지 붙든다
+      if (advanced.pendingBenchClearing !== null) {
+        runner.setIsPaused(true)
+        return
+      }
       // 홈런·삼진·볼넷은 수비를 기다리지 않는다 — 홈런 함성(11)과 진행 소리를 여기서 낸다
       playSoundIds(audio, [
         inPlayCallSoundIdOf(nextAtBat.outcome),
@@ -587,8 +595,29 @@ export function useCareerSession({
     [audio, finishAtBat, random],
   )
 
+  /**
+   * 벤치 클리어링 연출이 끝났다 (`BenchClearingScene` 의 `onDone`) — 출구 0xae24c 뒤 사구를 보통 길로 먹인다.
+   * `reachedTargetTick` 이면 틱 10 의 굴림 8 번을 진행기가 먼저 낸다.
+   */
+  const finishBenchClearing = useCallback(
+    (reachedTargetTick: boolean) => {
+      const current = progressRef.current
+      const pending = current?.pendingBenchClearing ?? null
+      if (current === null || pending === null) return
+      const { bases } = current.game
+      const runnersOnBase = [bases.first, bases.second, bases.third].filter(Boolean).length
+      const resolved = resolveBenchClearing(current, { reachedTargetTick }, random)
+      progressRef.current = resolved
+      setProgress(resolved)
+      playSoundIds(audio, [inPlayCallSoundIdOf(pending.outcome), ...gameStepSoundIdsOf(current, resolved)])
+      finishAtBat(resolved, pending.outcome, runnersOnBase)
+    },
+    [audio, finishAtBat, random],
+  )
+
   const actions = {
     syncOpenedHidden,
+    finishBenchClearing,
 
     /** 수비 화면이 끝났다 — 주자 처리를 이제 먹인다 */
     finishDefensePlay,
@@ -717,6 +746,7 @@ export function useCareerSession({
       }
       if (command === '외출') {
         setOutingNotice('')
+        setOutingResult(null)
         // trigger 1 — 외출 지도에 들어설 때 먼저 보는 이벤트
         const event = story.eventFor(career, EVENT_TRIGGER.외출)
         if (event !== null) return setScreen({ kind: '이벤트', eventId: event.id, context: '외출진입' })
@@ -868,9 +898,24 @@ export function useCareerSession({
       const reason = outingBlockReasonOf(career, outingFunction)
       if (reason !== null) return setOutingNotice(outingBlockTextOf(reason, outingFunction))
 
-      const updated = runOuting(career, outingFunction, random)
-      setOutingNotice(`${outingFunction.name} — ${outingFunction.description}`)
-      setCareer(awardTitles(updated, evaluateNewTitles(updated)))
+      // 113 → 126: 원본은 연출(0x85074) 뒤 효과(0x15234)를 굴려 효과 팝업을 지도 위에 띄우고, 그 팝업이 닫히면
+      // 입원 회복(0x1575c)을 굴린다. 그 사이 다른 굴림이 없어 여기서 한 번에 굴려도 차례가 같다.
+      // ⚠️ 미해결: 126 연출 그림(0x84ea0 — event_ani · event_char_1 · event_char_0 세 겹)은 아직 옮기지 않았다.
+      const outcome = performOuting(career, outingFunction, random)
+      setOutingNotice('')
+      setOutingResult({ effectText: outcome.effectText, recoveryText: outcome.recoveryText })
+      setCareer(awardTitles(outcome.career, evaluateNewTitles(outcome.career)))
+    },
+
+    /**
+     * 126 효과 팝업 [확인] — 틀 0x1575c: 입원이면 회복 글 팝업(코드 1)을 띄우고, 어느 쪽이든 **105(관리)** 로 간다.
+     * 회복 팝업은 105 위에 남으므로 관리 화면 알림 상자로 띄운다.
+     */
+    closeOutingResult: () => {
+      if (outingResult === null) return
+      setOutingResult(null)
+      if (outingResult.recoveryText !== '') setManagementNotice(outingResult.recoveryText)
+      setScreen({ kind: '관리' })
     },
 
     /** 상점에서 한 칸을 고른다 (장착·서브·GP — shopSelection) */
@@ -1005,6 +1050,7 @@ export function useCareerSession({
     shopNotice,
     shopGpDetail,
     outingNotice,
+    outingResult,
     managementNotice,
     managementDetail,
     loadingTip,

@@ -11,7 +11,8 @@ import { HOSPITAL_RECOVERY, REST_RECOVERY, rollRecovery } from '@/entities/caree
 import type { RecoverableCareer } from '@/entities/career/model/recovery'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
-import { applyOutingSubItems } from '@/entities/career/model/subItems'
+import { applyOutingSubItems, outingSubItemIdOf, SUB_ITEMS } from '@/entities/career/model/subItems'
+import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 
 /**
  * 외출 커맨드 — 2010판에서 신규 추가된 기능이다.
@@ -87,7 +88,7 @@ function rollRange(random: RandomPort, [first, second]: OutingRange): number {
   return sign * randomIntegerBelow(random, Math.abs(first), Math.abs(second))
 }
 
-/** 효과 표의 난수를 뽑는다 — 순서(인기도 → 평판 → 사기)는 추정 */
+/** 효과 표의 난수를 뽑는다 — 순서 인기도 → 평판 → 사기 (0x1524c · 0x1526e · 0x1528e, G 3-2 확정) */
 export function rollOutingEffect(effect: OutingEffect, random: RandomPort): RolledOutingEffect {
   return {
     moneyCost: effect.moneyCost,
@@ -98,13 +99,98 @@ export function rollOutingEffect(effect: OutingEffect, random: RandomPort): Roll
   }
 }
 
-export function runOuting<T extends OutingCareer>(career: T, outingFunction: OutingFunction, random: RandomPort): T {
+/**
+ * 상태 126 장소 기능 한 번의 결과 — 커리어와 원본 팝업 두 장의 글.
+ *   `effectText`   — 효과 0x15234 가 끝에 띄우는 팝업 `0xbbef8(글, 1, 코드 3, 1)` 의 글
+ *   `recoveryText` — 그 팝업이 닫힌 뒤 126 틀 0x1575c 가 입원(장소 2)일 때 만드는 회복 글. 없으면 ''
+ *                    (글이 있을 때만 팝업 `0xbbef8(글, 1, 1, 1)` 을 띄우고, 어느 쪽이든 곧장 105 로 간다)
+ */
+export interface OutingResult {
+  readonly effectText: string
+  readonly recoveryText: string
+}
+export interface OutingOutcome<T extends OutingCareer> extends OutingResult {
+  readonly career: T
+}
+
+const MODE_TEXT_POPULARITY = 22
+const MODE_TEXT_REPUTATION = 23
+const MODE_TEXT_MORALE = 24
+const MODE_TEXT_MONEY = 25
+const MODE_TEXT_RISE = 83
+const MODE_TEXT_FALL = 84
+const MODE_TEXT_EFFECT = 195
+const MODE_TEXT_ILLNESS_CURED = 206
+
+/**
+ * 효과 한 줄 (0x15382~0x1541a 와 같은 꼴 네 번) — **굴린 값(보정 전)이 0 이면 줄이 없다**.
+ *   이름 StrMODE[n] + " " + |굴림+보정| + (보정 ≠ 0 이면 "(" + 부호 + |보정| + ")") + ([83] 상승 | [84] 하락) + "!N"
+ * 상승·하락은 **굴림+보정 ≥ 0** 으로 고른다 (0x153fa). 숫자와 [83]·[84] 사이에 띄어쓰기가 없다 (원본 그대로).
+ */
+function effectLineOf(nameId: number, rolled: number, bonus: number): string {
+  if (rolled === 0) return ''
+  const total = rolled + bonus
+  const bonusText = bonus === 0 ? '' : `(${bonus > 0 ? '+' : '-'}${Math.abs(bonus)})`
+  const verb = ORIGINAL_MODE_TEXT[total >= 0 ? MODE_TEXT_RISE : MODE_TEXT_FALL]
+  return `${ORIGINAL_MODE_TEXT[nameId]} ${Math.abs(total)}${bonusText}${verb}!N`
+}
+
+/**
+ * 효과 팝업 글 (0x15378~0x156da). "!C" 뒤에 줄 차례는 **인기도 → 평판 → 소지금 → 사기** 다
+ * (StrMODE[22] · [23] · [25] · [24]). 소지금은 기록 단위(100만)에 ×100 해 찍으므로 웹 단위(만원) 그대로다.
+ * 서브 아이템(`기록[0x5d+장소]`)이 있으면 "!N" + "!cFFFF00" + 아이템 이름(0x845d4 = 이름표 93+장소) + " " + [195] "효과".
+ */
+function outingEffectTextOf(
+  outingFunction: OutingFunction,
+  rolled: RolledOutingEffect,
+  applied: RolledOutingEffect,
+  ownsSubItem: boolean,
+): string {
+  const subItemId = outingSubItemIdOf(outingFunction.id)
+  const lines =
+    effectLineOf(MODE_TEXT_POPULARITY, rolled.popularityGain, applied.popularityGain - rolled.popularityGain) +
+    effectLineOf(MODE_TEXT_REPUTATION, rolled.reputationGain, applied.reputationGain - rolled.reputationGain) +
+    effectLineOf(MODE_TEXT_MONEY, -rolled.moneyCost, rolled.moneyCost - applied.moneyCost) +
+    effectLineOf(MODE_TEXT_MORALE, rolled.moraleGain, applied.moraleGain - rolled.moraleGain)
+  const subItemLine =
+    ownsSubItem && subItemId !== null
+      ? `!N!cFFFF00${SUB_ITEMS[subItemId].name} ${ORIGINAL_MODE_TEXT[MODE_TEXT_EFFECT]}`
+      : ''
+  return `!C${lines}${subItemLine}`
+}
+
+/**
+ * 입원 회복 글 (0x157ba~0x158d2). 질병이 나으면 sprintf(StrMODE[206], 병 이름) ·
+ * 부상이 나으면 (앞 글이 있으면 "!N", 없으면 "!C") + "부상에서 회복 되었습니다."(0xcca04).
+ */
+function hospitalRecoveryTextOf(before: RecoverableCareer, after: RecoverableCareer): string {
+  const illness =
+    before.isSick && !after.isSick
+      ? ORIGINAL_MODE_TEXT[MODE_TEXT_ILLNESS_CURED].replace('%s', before.illnessName ?? '')
+      : ''
+  const injury = before.isInjured && !after.isInjured ? `${illness === '' ? '!C' : '!N'}부상에서 회복 되었습니다.` : ''
+  return illness + injury
+}
+
+/**
+ * 상태 126 장소 기능 — 효과 0x15234 (→ 입원이면 회복 0x1575c).
+ * 굴림 차례는 원본 그대로: 인기도 → 평판 → 사기 bfa55 세 번, 입원이면 이어서 질병·부상 bfa55(0,100) (아픈 칸만).
+ * 원본은 효과를 연출 끝(0x84e58)에, 회복을 효과 팝업이 닫힐 때 굴린다 — 그 사이 다른 굴림이 없어 차례는 같다.
+ */
+export function performOuting<T extends OutingCareer>(
+  career: T,
+  outingFunction: OutingFunction,
+  random: RandomPort,
+): OutingOutcome<T> {
   const blockReason = outingBlockReasonOf(career, outingFunction)
   if (blockReason !== null) {
     throw new Error(`외출할 수 없습니다 (${blockReason}): ${outingFunction.name}`)
   }
 
-  const effect = applyOutingSubItems(career, outingFunction.id, rollOutingEffect(outingFunction.effect, random))
+  const rolled = rollOutingEffect(outingFunction.effect, random)
+  const effect = applyOutingSubItems(career, outingFunction.id, rolled)
+  const subItemId = outingSubItemIdOf(outingFunction.id)
+  const ownsSubItem = subItemId !== null && career.subItemIds.includes(subItemId)
   // 반영 범위는 원본 그대로 (0x152f4~0x15374): 인기도 0..9999 · 평판 0..999 · 사기 0..100 (두 모드 같은 한계)
   const gained: T = {
     ...career,
@@ -115,7 +201,14 @@ export function runOuting<T extends OutingCareer>(career: T, outingFunction: Out
     popularity: clamp(career.popularity + effect.popularityGain, MAXIMUM_POPULARITY),
     reputation: clamp(career.reputation + effect.reputationGain, MAXIMUM_REPUTATION),
   }
-  return effect.healsInjury ? rollRecovery(gained, HOSPITAL_RECOVERY, random).career : gained
+  const effectText = outingEffectTextOf(outingFunction, rolled, effect, ownsSubItem)
+  if (!effect.healsInjury) return { career: gained, effectText, recoveryText: '' }
+  const recovered = rollRecovery(gained, HOSPITAL_RECOVERY, random).career
+  return { career: recovered, effectText, recoveryText: hospitalRecoveryTextOf(gained, recovered) }
+}
+
+export function runOuting<T extends OutingCareer>(career: T, outingFunction: OutingFunction, random: RandomPort): T {
+  return performOuting(career, outingFunction, random).career
 }
 
 /**

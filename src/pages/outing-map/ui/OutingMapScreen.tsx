@@ -4,6 +4,7 @@ import type { OutingPlace } from '@/shared/config/outingPlaces'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { OutingMap } from '@/pages/outing-map/ui/OutingMap'
 import { PlaceBubble } from '@/pages/outing-map/ui/PlaceBubble'
+import { MessageBox } from '@/shared/ui'
 
 interface OutingMapScreenProps {
   /** 이번 주기에 행동했는지만 본다 — 타자편·투수편 커리어가 둘 다 들어온다 (원본 모드 3·4 공용 상태 112·113) */
@@ -14,6 +15,12 @@ interface OutingMapScreenProps {
   /** 원작: [!] 장소에서 [들어가기]를 고르면 특별 이벤트가 발생한다 — 이벤트가 기다리는 장소 */
   readonly eventPlaceIds: ReadonlySet<string>
   readonly onEnter: (place: OutingPlace) => void
+  /**
+   * 상태 126 효과 팝업 글 (0x15234 끝 `0xbbef8(글, 1, 코드 3, 1)`) — 지도 위에 뜬다 (126 그리기 0x16874 가
+   * 지도 0x7ea64 를 그대로 그린다). null 이면 팝업 없음. [확인] 으로 닫으면 `onCloseResult`.
+   */
+  readonly resultText?: string | null
+  readonly onCloseResult?: () => void
 }
 
 /**
@@ -21,7 +28,9 @@ interface OutingMapScreenProps {
  * 지도는 원본 프레임 배치 그대로다. 장소를 고르면 **지도 위 말풍선**(박스 3, 70×42)에
  * [들어가기]/[기능] 두 칸만 띄운다 (0x7ee1a, F-2 2-7) — 전체 화면 목록이 아니다.
  */
-export function OutingMapScreen({ career, noticeText, onRun, onBack, eventPlaceIds, onEnter }: OutingMapScreenProps) {
+export function OutingMapScreen({
+  career, noticeText, onRun, onBack, eventPlaceIds, onEnter, resultText = null, onCloseResult,
+}: OutingMapScreenProps) {
   const [openPlace, setOpenPlace] = useState<OutingPlace | null>(null)
   const [selectedPlaceId, setSelectedPlaceId] = useState(OUTING_PLACES[0].id)
 
@@ -48,6 +57,9 @@ export function OutingMapScreen({ career, noticeText, onRun, onBack, eventPlaceI
           }}
           onClose={() => setOpenPlace(null)}
         />
+      )}
+      {resultText !== null && (
+        <MessageBox text={resultText} buttons={['확인']} onAnswer={() => onCloseResult?.()} />
       )}
     </OutingMap>
   )

@@ -501,3 +501,20 @@ describe('외출 장소 기능 가드 (113 키 0x16cf0) — 막히면 원문 알
     expect(rendered.result.current.session.career).toBe(before)
   })
 })
+
+describe('외출 126 — 효과 팝업 → 105 (0x15234 · 0x1575c)', () => {
+  it('장소 기능을 고르면 효과 팝업이 뜨고, [확인] 이면 관리 화면으로 가며 입원 회복 글은 관리 알림이 된다', () => {
+    const rendered = 띄우기({ ...createCareer('외출'), morale: 50, money: 1000, isInjured: true, injuryRemaining: 1 })
+    act(() => rendered.result.current.setScreen({ kind: '외출' }))
+
+    act(() => rendered.result.current.session.actions.runOutingFunction('입원'))
+    expect(rendered.result.current.session.outingResult?.effectText).toMatch(/^!C소지금 200!cFF0000하락/)
+    expect(rendered.result.current.session.career?.hasActedThisCycle).toBe(true)
+    expect(rendered.result.current.screen).toEqual({ kind: '외출' })
+
+    act(() => rendered.result.current.session.actions.closeOutingResult())
+    expect(rendered.result.current.session.outingResult).toBeNull()
+    expect(rendered.result.current.screen).toEqual({ kind: '관리' })
+    expect(rendered.result.current.session.managementNotice).toBe('!C부상에서 회복 되었습니다.')
+  })
+})
