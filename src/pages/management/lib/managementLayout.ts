@@ -132,9 +132,8 @@ export const STATUS_BOXES = {
 export const MORALE_LABEL_FRAME = 84
 export const MESSAGE_COLORS = { fill: ORIGINAL_COLORS.bandDark, edge: ORIGINAL_COLORS.messageLineEdge }
 export const MORALE_GAUGE_BACKGROUND = ORIGINAL_COLORS.gaugeBackground
+/** 상태 아이콘 줄 전진 = 박스 폭 20 + 2 (0x7ddb6). 아이콘 번호·조건은 `ui/StatusIconRow` */
 export const STATUS_ICON_STEP = 22
-/** 상태 아이콘 mode_ui 프레임 — 효과 남은 경기 · 부상 · 질병 (필드 뜻은 추정) */
-export const STATUS_ICON_FRAMES = { effect: 85, injury: 86, illness: 88 }
 
 const MAXIMUM_MORALE = 100
 const GAUGE_COLUMN_COUNT = STATUS_BOXES.moraleGauge.width - 1
