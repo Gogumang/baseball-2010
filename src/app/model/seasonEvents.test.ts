@@ -1,13 +1,51 @@
 import { describe, expect, it } from 'vitest'
-import { nextSeasonStep } from '@/app/model/seasonEvents'
+import { batterSalaryNegotiationRankOf, enterSeasonEvent, nextSeasonStep } from '@/app/model/seasonEvents'
 import { createCareer } from '@/entities/career/model/playerCareer'
 
 const 선수 = (overrides = {}) => ({ ...createCareer('테스트'), ...overrides })
 
 describe('nextSeasonStep — 연말 이벤트 연결', () => {
-  it('392 뒤에는 목표 결과, 결과 뒤에는 포스트시즌 대진 128 (연말 이벤트는 128 이 끝난 뒤)', () => {
+  it('392 → 목표 결과 → 130 타이틀 370 → 371+수상 수 → 131 MVP 375 → 376/377 → 포스트시즌 대진 128', () => {
     expect(nextSeasonStep(선수(), [392])).toEqual({ kind: '이벤트', eventId: 396 })
-    expect(nextSeasonStep(선수({ season: 3 }), [396])).toEqual({ kind: '포스트시즌' })
+    expect(nextSeasonStep(선수({ season: 3 }), [396])).toEqual({ kind: '이벤트', eventId: 370 })
+    // 리그 기록표가 비어 있으면 1위가 없다 — 수상 0 → 371
+    expect(nextSeasonStep(선수(), [370])).toEqual({ kind: '이벤트', eventId: 371 })
+    expect(nextSeasonStep(선수(), [372])).toEqual({ kind: '이벤트', eventId: 375 })
+    expect(nextSeasonStep(선수(), [375])).toEqual({ kind: '이벤트', eventId: 376 })
+    expect(nextSeasonStep(선수({ season: 3 }), [377])).toEqual({ kind: '포스트시즌' })
+    expect(nextSeasonStep(선수(), [376])).toEqual({ kind: '포스트시즌' })
+  })
+
+  it('MVP 결과는 375 진입 때 남긴 그 해 비트(0x8b370 ← evt+0x388)를 읽는다', () => {
+    // 2년차 비트(1 << 1)
+    expect(nextSeasonStep(선수({ season: 2, mvpSeasonBits: 0b10 }), [375])).toEqual({ kind: '이벤트', eventId: 377 })
+    expect(nextSeasonStep(선수({ season: 3, mvpSeasonBits: 0b10 }), [375])).toEqual({ kind: '이벤트', eventId: 376 })
+  })
+
+  it('연봉 등급 k 의 MVP 몫(+2)도 비트를 읽는다 — 재판정이 아니다 (0xa4d40)', () => {
+    // 타이틀 0 · 비트 있음 → k = 2 → 강경 386
+    expect(batterSalaryNegotiationRankOf(선수({ mvpSeasonBits: 0b1 }))).toBe(2)
+    expect(nextSeasonStep(선수({ mvpSeasonBits: 0b1 }), [380, 381])).toEqual({ kind: '이벤트', eventId: 386 })
+  })
+
+  it('375 에 들어가기 전에 MVP 판정 비트를 남긴다 — 다른 이벤트는 그대로 (0x19774 → 0x8dd60)', () => {
+    const career = 선수()
+    expect(enterSeasonEvent(career, 370)).toBe(career)
+    // 리그 기록표가 비어 타이틀이 없으면 MVP 가 아니다 — 비트 그대로
+    expect(enterSeasonEvent(career, 375).mvpSeasonBits).toBe(0)
+  })
+
+  it('혼자 3관왕이면 370 결과는 374, 375 진입 때 그 해 비트가 서고 결과는 377 이다', () => {
+    const 삼관왕 = 선수({
+      season: 2,
+      stats: { ...createCareer('테스트').stats, atBats: 300, hits: 150, homeRuns: 60, runsBattedIn: 150 },
+    })
+    expect(nextSeasonStep(삼관왕, [370])).toEqual({ kind: '이벤트', eventId: 374 })
+    const entered = enterSeasonEvent(삼관왕, 375)
+    expect(entered.mvpSeasonBits).toBe(0b10)
+    expect(nextSeasonStep(entered, [375])).toEqual({ kind: '이벤트', eventId: 377 })
+    // 3관왕 + MVP 비트 = 5 → 강경 384
+    expect(nextSeasonStep(entered, [380, 381])).toEqual({ kind: '이벤트', eventId: 384 })
   })
 
   it('강경·정중을 고르면 연봉 결과 이벤트로, 결과나 수락 뒤에는 새 시즌', () => {

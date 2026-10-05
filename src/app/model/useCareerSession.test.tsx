@@ -625,9 +625,28 @@ describe('타자편 포스트시즌 대진 128 — 사람이 친다 (0x120a4 · 
     ...overrides,
   })
 
-  it('목표 결과(393~396) 뒤에 대진 128 로 가고, 정규시즌 1위면 [191] 보상 팝업 0xb 가 뜬다', () => {
-    const rendered = 띄우기(시즌끝선수())
+  it('목표 결과 뒤 130 타이틀(370) → 131 MVP(375) — 375 를 틀 때 MVP 비트를 남긴다 (0x19774 → 0x8dd60)', () => {
+    const 삼관왕 = 시즌끝선수({
+      season: 2,
+      stats: { ...createCareer('포스트').stats, atBats: 300, hits: 150, homeRuns: 60, runsBattedIn: 150 },
+    })
+    const rendered = 띄우기(삼관왕)
     이벤트보기(rendered, [396])
+    expect(rendered.result.current.screen).toEqual({ kind: '이벤트', eventId: 370, context: '시즌' })
+    expect(rendered.result.current.session.career?.mvpSeasonBits).toBe(0)
+
+    이벤트보기(rendered, [370])
+    expect(rendered.result.current.screen).toEqual({ kind: '이벤트', eventId: 374, context: '시즌' })
+    이벤트보기(rendered, [374])
+    expect(rendered.result.current.screen).toEqual({ kind: '이벤트', eventId: 375, context: '시즌' })
+    expect(rendered.result.current.session.career?.mvpSeasonBits).toBe(0b10)
+    이벤트보기(rendered, [375])
+    expect(rendered.result.current.screen).toEqual({ kind: '이벤트', eventId: 377, context: '시즌' })
+  })
+
+  it('MVP 결과(376/377) 뒤에 대진 128 로 가고, 정규시즌 1위면 [191] 보상 팝업 0xb 가 뜬다', () => {
+    const rendered = 띄우기(시즌끝선수())
+    이벤트보기(rendered, [376])
     expect(rendered.result.current.screen).toEqual({ kind: '포스트시즌', popup: { kind: '정규시즌우승' } })
 
     // 팝업이 떠 있으면 키가 안 먹는다
@@ -645,7 +664,7 @@ describe('타자편 포스트시즌 대진 128 — 사람이 친다 (0x120a4 · 
 
   it('[확인] — CPU 끼리 내 차례(1위는 한국시리즈)까지 돌고 머물렀다가, 다음 [확인]에 내 경기를 연다', () => {
     const rendered = 띄우기(시즌끝선수({ regularSeasonRewardTaken: true }))
-    이벤트보기(rendered, [396])
+    이벤트보기(rendered, [376])
     expect(rendered.result.current.screen).toEqual({ kind: '포스트시즌', popup: null })
 
     act(() => rendered.result.current.session.actions.pressPostseason())

@@ -78,7 +78,7 @@ import type { GpDetailOf } from '@/features/shop/model/shopSelection'
 import { hiddenOpenTextOf } from '@/entities/career/model/equipment'
 import type { RookieProfile } from '@/entities/career/model/playerCareer'
 import { useStorySchedule } from '@/app/model/useStorySchedule'
-import { nextSeasonStep } from '@/app/model/seasonEvents'
+import { enterSeasonEvent, nextSeasonStep } from '@/app/model/seasonEvents'
 import {
   achievedGoalCount,
   applyEndingBonus,
@@ -101,7 +101,6 @@ import type { ManagementDetail } from '@/app/model/managementDetail'
 import { restDetailChangesOf, trainingDetailChangesOf } from '@/pages/management/lib/detailPopup'
 import { evaluateGame, updateStreaks } from '@/entities/career/model/gameEvaluation'
 import type { GameEvaluation } from '@/entities/career/model/gameEvaluation'
-import { recordSeasonMvp } from '@/entities/awards/model/seasonAwards'
 import type { EventReward } from '@/entities/story/model/eventReward'
 import type { ManagementCommand } from '@/pages/management/ui/ManagementScreen'
 import { OUTING_PLACES } from '@/shared/config/outingPlaces'
@@ -566,11 +565,10 @@ export function useCareerSession({
 
   /**
    * 새 시즌 처리 `0x1b768` → 137 "N년차" → 105 관리 화면.
-   * 시즌이 끝나면 시상을 하고 **MVP 비트를 남긴다** (0x8dd60 → career+0x1ca).
-   * 새 시즌으로 넘어가도 지우지 않는다 — 통산 MVP 를 보는 칭호가 이것을 읽는다.
+   * MVP 비트(career+0x1ca)는 여기서가 아니라 상태 131 이 375 를 틀기 전에 남긴다 (`enterSeasonEvent`).
    */
   const startNewSeason = (finished: PlayerCareer) => {
-    const next = startNextSeason(recordSeasonMvp(finished))
+    const next = startNextSeason(finished)
     setCareer(awardTitles(next, evaluateNewTitles(next)))
     setScreen({ kind: '관리' })
     setManagementCheck('고정')
@@ -611,7 +609,8 @@ export function useCareerSession({
       return enterPostseason(viewed)
     }
     if (step.kind === '이벤트') {
-      setCareer(viewed)
+      // 상태 함수가 이벤트를 틀기 전에 하는 일 — 131 은 375 앞에서 MVP 비트를 남긴다
+      setCareer(enterSeasonEvent(viewed, step.eventId))
       return setScreen({ kind: '이벤트', eventId: step.eventId, context: '시즌' })
     }
     if (step.kind === '엔딩') {

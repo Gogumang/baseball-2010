@@ -5,10 +5,10 @@ import { BATTER_YEAR_GOALS } from '@/shared/config/original/yearGoals'
 
 /**
  * 나만의리그 한 해의 흐름 — 누락 탐색 에이전트가 binary.mod 에서 읽은 규칙.
- *   22경기 뒤 중간평가(0x11e84) → 45경기 뒤 목표 평가 392 → 393~396 → 연말(0x10c54)
+ *   22경기 뒤 중간평가(0x11e84) → 45경기 뒤 목표 평가 392 → 393~396 → 타이틀 370 → 371~374
+ *   → MVP 375 → 376/377 → 포스트시즌 대진 128 → 연말(0x10c54)
  *   연말: 방출 501 · 13년차 은퇴식 504 · 7년차 이상 은퇴 선택 502 · 그 밖 연봉협상 380
- * **아직 없는 것**: 포스트시즌·한국시리즈, 개인 타이틀(370~374)·MVP(375~377), 국가대표(461~464),
- * 부상 누적 엔딩(500). 타이틀이 없으니 연봉 등급은 늘 0 이다.
+ * 사슬 잇기는 `app/model/seasonEvents.nextSeasonStep`, 타이틀·MVP 판정은 `entities/awards/model/seasonAwards`.
  */
 export const MID_SEASON_GAME = 22
 export const GOAL_INTRO_EVENT_ID = 392
