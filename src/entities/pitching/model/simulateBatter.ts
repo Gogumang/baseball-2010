@@ -86,7 +86,11 @@ export type CpuSwingChoice = '치기' | '번트'
  * 덮는다 (0x34376~0x3438e). 표 굴림은 그대로 하고, 존 밖이면 쫓아가기 굴림도 그대로 한다 —
  * 실투가 "무조건 휘두른다" 는 뜻은 아니다.
  *
- * ⚠️ 아직 안 옮긴 것 — h 는 실효 히트(0xb570d: 컨디션·스킬 보정)다. 웹에는 없어 날 히트를 쓴다.
+ * h 는 **경기용 히트** `0xb570d(ctx=0xb8681(팀), 0, 타자, 1, 90, 1)` 다 (0x343be~0x343d4 —
+ * 지켜보기면 부르지 않는다). 셋째 인자 1 은 보정 적용, 다섯째 90 은 체력 인자라 피로 감소가 없다
+ * (P7 G1) — 장비·스킬·질병·부상·사기·팀 보정이 붙은 값이다. 이 모듈은 넘겨받은 `ability.hit` 를
+ * 그 값으로 믿는다: 타이밍 0x340f8 도 같은 식으로 다시 부른다(0x3413e).
+ * ⚠️ 부르는 쪽이 날 레코드 히트를 넘기면 원본과 달라진다 (`pitchAgainstBatter` 주석 참고).
  */
 export function cpuSwingChoiceOf(
   pitch: Pitch,
@@ -206,6 +210,10 @@ const DEFAULT_PITCHER_STATS = { control: 500, velocity: 500 }
  * 휘두를지는 원본 0x34334(battingPattern.arr) 그대로다 — `cpuSwingChoiceOf` 참고.
  * **언제** 휘두를지는 원본 0x340f8 — `cpuSwingTimingOffsetOf` 참고.
  * 표에서 번트 칸이 뽑히면 타이밍 뒤에 rand(1,4) 로 번트 종류를 정한다 (`cpuBuntKindOf`, 마선수 제외).
+ *
+ * `batter` 는 **경기용 능력치**(0xb570c/0xb570d, 체력 인자 90)여야 한다 — 쫓아가기 문턱과
+ * 타이밍 K 가 그 히트를 본다. 팀 경기는 `entryBatterGameAbilities` 값을 넘기지만,
+ * ⚠️ 투수편(`opponentBatterAbility`)·투수 미션은 아직 날 레코드 값을 넘긴다.
  */
 export function pitchAgainstBatter(
   pitch: Pitch,
