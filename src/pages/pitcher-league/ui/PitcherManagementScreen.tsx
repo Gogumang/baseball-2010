@@ -4,8 +4,6 @@ import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import { TitleListWindow } from '@/widgets/management/ui/TitleListWindow'
 import { SkillWindow } from '@/widgets/skill-window/ui/SkillWindow'
-import { pitcherSkillTableIdOf } from '@/entities/pitcher-career/model/pitcherCareer'
-import { ORIGINAL_SKILLS } from '@/shared/config/original/skills'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { PitcherShopTab } from '@/features/shop/model/pitcherShopSelection'
 import { usePitcherManagementMenu } from '@/pages/pitcher-league/model/usePitcherManagementMenu'
@@ -61,9 +59,6 @@ function titleViewOf(career: PitcherCareer): PlayerCareer {
   return { ...createCareer(career.name), titleIds: career.titleIds, equippedTitle: career.equippedTitle }
 }
 
-/** 스킬 창 이름 — 0x8457c 가 모드 3 이면 비트 8 부터 표 번호 비트+16 을 읽는다 */
-const pitcherSkillNameOf = (skillBit: number) => ORIGINAL_SKILLS[pitcherSkillTableIdOf(skillBit)]?.name ?? ''
-
 export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
   const { career } = props
   const menu = usePitcherManagementMenu(props)
@@ -115,7 +110,8 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
       {menu.subWindow === '아이템/스킬' && (
         <SkillWindow
           career={career}
-          skillNameOf={pitcherSkillNameOf}
+          // 0x7b970 이 거짓 — 딱지 150 "투수" · 이름 0x8457c(비트 8 부터 표 번호 비트+16) · 서브아이템 능력치 StrMODE[40+i]
+          side="투수"
           onEquip={menu.equipSkill}
           onExpandSlots={menu.expandSkillSlots}
           onClose={menu.closeWindow}
