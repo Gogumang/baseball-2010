@@ -17,6 +17,15 @@ describe('상세정보 결과 창 — 0x872a0 · 0x872d4', () => {
     ])
   })
 
+  it('현재값은 0xb6415(기록, k, 1) — 장비는 넣고 질병·부상·사기 감소는 안 넣는다 (0x18cf6)', () => {
+    const before = { ...선수, morale: 10, isInjured: true, isSick: true }
+    const after = { ...before, equipmentLevels: { ...선수.equipmentLevels, power: 1 } }
+
+    const rows = detailRowsOf(before, after)
+    expect(rows[0]).toMatchObject({ current: 선수.ability.hit, change: 0 })
+    expect(rows[1]).toMatchObject({ current: 선수.ability.power + 30, change: 30 })
+  })
+
   it('i 번째 줄 y = 76 + 17(i+1) − 4', () => {
     expect([0, 4].map(DETAIL_ROW_TOP)).toEqual([89, 157])
   })

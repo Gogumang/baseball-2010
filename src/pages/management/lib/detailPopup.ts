@@ -1,7 +1,7 @@
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { MAXIMUM_MORALE } from '@/entities/career/model/playerCareer'
-import { effectiveAbilityOf } from '@/entities/career/model/condition'
+import { equippedAbilityOf } from '@/entities/career/model/condition'
 import { abilityLimitOf } from '@/entities/career/model/abilityLimit'
 
 /**
@@ -43,9 +43,15 @@ export interface DetailRow {
   readonly change: number
 }
 
+/**
+ * 현재값은 `0xb6415(기록, k, 1)` = 0xb6414 (장비·장착 스킬까지) 다 — 훈련 0x18cf6 · 휴식 0x18f7c · GP 0x14f42 모두
+ * 0xb570c 를 거치지 않으니 질병·부상·사기 감소는 안 먹는다. 최대값은 0x5e864 가 채운 타입 한계(+0x118).
+ * ⚠️ 미해결: 원본 변화량 칸(훈련 0x18c58 에서 0 으로 비운 뒤 훈련한 칸 k 에만 [sp+0x34] 를 넣는다)은
+ *   전후 차이가 아니라 굴린 값을 그대로 넘긴다. 웹은 아직 전후 0xb6414 값의 차이로 둔다.
+ */
 export function detailRowsOf(before: PlayerCareer, after: PlayerCareer): DetailRow[] {
-  const previous = effectiveAbilityOf(before)
-  const current = effectiveAbilityOf(after)
+  const previous = equippedAbilityOf(before)
+  const current = equippedAbilityOf(after)
   const limits = abilityLimitOf(after.battingTypeIndex)
   return [
     ...ABILITY_ROWS.map(([key, labelFrame]) => ({

@@ -1,7 +1,7 @@
 import { ORIGINAL_TITLES } from '@/shared/config/original/titles'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { hasSkill, isSeasonFinished } from '@/entities/career/model/playerCareer'
-import { effectiveAbilityOf } from '@/entities/career/model/condition'
+import { equippedAbilityOf } from '@/entities/career/model/condition'
 import { battingAverageOf } from '@/entities/career/model/seasonStats'
 import { careerMvpCount, hasBackToBackMvp, hasMvpInSeason } from '@/entities/awards/model/seasonAwards'
 import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
@@ -228,7 +228,7 @@ export function titleSubjectOfBatter(career: PlayerCareer): TitleSubject {
   }
 }
 
-/** 실효 능력치 999 — 원본은 `0xb6414(...) > 998` 이다 (P3 7절) */
+/** 실효 능력치 999 — 원본은 `0xb6415(기록, k, 1) > 998` 이다 (P3 7절, 0x1ad9a~0x1adfc) */
 const MAXED_ABILITY = 998
 /** 필살타법/마구 4단계 — `s8 +0x201 > 3` (0x1ae04). 필드 뜻은 조건 문구로 붙인 것이라 **유력**이다 */
 const ALL_SPECIAL_SWING_LEVELS = 3
@@ -239,6 +239,7 @@ type BatterRule = (career: PlayerCareer) => boolean
  * 타자편 전용 칭호 32~47 (P3 7절). 번호가 빠진 것:
  *   38 하이브리드 — `통산 도루 ≥ 100 && 홈런 ≥ 150`. 웹 SeasonStats 에 **도루 칸이 없다**.
  *   44 바람의 아들 — `실효 주루 > 799 && 통산 도루 ≥ 200`. 같은 이유.
+ *      (넣을 때 "실효 주루" 는 0x1ad14~0x1ad22 `0xb6415(기록, 3, 1) > 799` = `equippedAbilityOf().run` 이다)
  */
 const BATTER_RULES: Readonly<Record<number, BatterRule>> = {
   // 32 괴물 타자 · 33 국민 타자 — 투수편 48·49 와 같은 식이다
@@ -256,8 +257,9 @@ const BATTER_RULES: Readonly<Record<number, BatterRule>> = {
   // 원본은 **6년차 18경기째 딱 한 순간**만 본다 (P3 9절) — `>=` 면 그 뒤로 계속 판정한다
   43: (career) =>
     isSixthYearCheckPoint(titleSubjectOfBatter(career)) && (battingAverageOf(career.careerStats) ?? 0) >= FOUR_TENTHS,
-  // 45 5툴 플레이어 — 실효 능력 넷 모두 999 (0x1ad7e). 장비·스킬·사기까지 본 값이다
-  45: (career) => Object.values(effectiveAbilityOf(career)).every((value) => value > MAXED_ABILITY),
+  // 45 5툴 플레이어 — 모드 4 갈래(0x1ad94 `cmp #4`)는 k = 0~3 넷 모두 `0xb6415(기록, k, 1) > 998` (0x1ad9a~0x1adfc).
+  // 0xb570c 가 아니라 0xb6414 를 바로 읽으니 장비·장착 스킬까지만 보고 **질병·부상·사기 감소는 안 본다**
+  45: (career) => Object.values(equippedAbilityOf(career)).every((value) => value > MAXED_ABILITY),
   // 46 약속된 승리의 타자 — 필살타법 4단계 모두 훈련 (0x1ae04). **근사다** — +0x201 의 뜻은 유력이다
   46: (career) => career.specialSwingLevel > ALL_SPECIAL_SWING_LEVELS,
   47: (career) => career.cycleHitGames >= 2, // 사이클링 히트 2회

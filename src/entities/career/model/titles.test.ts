@@ -267,8 +267,15 @@ describe('새로 옮긴 판정 (P3 5·6·7절)', () => {
 
     expect(evaluateNewTitles(선수({ ability: 만렙 }))).toContain('5툴 플레이어')
     expect(evaluateNewTitles(선수({ ability: { ...만렙, run: 998 } }))).not.toContain('5툴 플레이어')
-    // 사기가 낮으면 실효값이 깎여서 못 받는다 — 원본도 0xb6414 실효값을 본다
-    expect(evaluateNewTitles(선수({ ability: 만렙, morale: 10 }))).not.toContain('5툴 플레이어')
+    // 0xb6415(기록, k, 1) 을 바로 본다 — 질병·부상·사기 감소(0xb570c)는 안 먹는다
+    expect(evaluateNewTitles(선수({ ability: 만렙, morale: 10 }))).toContain('5툴 플레이어')
+    expect(evaluateNewTitles(선수({ ability: 만렙, isInjured: true, isSick: true }))).toContain('5툴 플레이어')
+    // 장비 보너스는 들어간다 — 주루 998 + 장비 니블 1(+30) 이면 999 로 잘려 받는다
+    expect(
+      evaluateNewTitles(선수({ ability: { ...만렙, run: 998 }, equipmentLevels: { hit: 0, power: 0, defense: 0, run: 1 } })),
+    ).toContain('5툴 플레이어')
+    // 장착한 무력감(5)은 −100 이라 못 받는다
+    expect(evaluateNewTitles(선수({ ability: 만렙, skillIds: [5], equippedSkillIds: [5] }))).not.toContain('5툴 플레이어')
   })
 
   it('필살타법 4단계면 "약속된 승리의 타자" (0x1ae04, +0x201 > 3 — 근사다)', () => {

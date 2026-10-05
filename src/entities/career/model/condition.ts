@@ -23,7 +23,7 @@ const INJURY_DURATION = 3
 const ILLNESS_ABILITY_CUT = 30
 const INJURY_ABILITY_CUT = 60
 
-/** 실효 능력치 스킬 보정 (0xb6414, 누락 탐색 5차) — 스킬 20 은 수비(인덱스 2)만 */
+/** 실효 능력치 스킬 보정 (0xb6414, 누락 탐색 5차) — 스킬 20 은 수비(칸 2)만 (0xb652c `cmp #2`) */
 const POWERLESS_SKILL = 5
 const LEGEND_SKILL = 7
 const DEFENSE_PENALTY_SKILL = 20
@@ -48,22 +48,41 @@ const reduceByPercent = (value: number, percent: number) =>
   value - Math.trunc((value * percent) / 100)
 
 /**
- * 경기에 쓰는 능력치 (0xb570c 순서, 단계마다 0~999 로 자른다):
- *   1. 0xb6414 — 마선수 배율(육성 선수는 100%) → 장착 레벨 보너스 +30~250 → 스킬 보정
- *      (무력감 −100 · 전설 +50 · 스킬 20 수비 −100)
- *   2. **그 뒤에** 질병 −30% → 부상 −60% 를 **둘 다 차례로** (G-1 확정)
- *   3. 마지막으로 사기 감소: 31~50 −10% · 11~30 −20% · ≤10 −50%
+ * 경기에 쓰는 능력치 `0xb570c(…, k, 기록, 1, 체력인자, …)` — 모드 3·4 이고 내 선수(0xb6389)일 때의 갈래
+ * (디스어셈 0xb570c~0xb5b18 을 다시 읽었다, 투수편 b48dde5 와 같은 코드):
+ *   1. 0xb6414(기록, k, 1) = `equippedAbilityOf` (아래)
+ *   2. 질병 +5 켜짐이면 `v += (−30·v)/100` (0xb5784 `lsls #4; subs; lsls #1` = −30, 나눗셈 0xca7b5 = 0 쪽 버림)
+ *   3. 부상 +0x1b5 > 0 이면 `v += (−60·v)/100` (0xb57b4 `lsls #4; subs; lsls #2` = −60) — 질병 다음에 **차례로**
+ *   4. 사기(0xa3a25) > 50 그대로 · 31~50 `v += v/−10` · 11~30 `v += v/−5` · ≤ 10 `v −= trunc(v/2)` (0xb57c4~0xb5802)
+ *      — `v·p/100` 을 0 쪽 버림한 것과 정수에서 같은 값이라 `reduceByPercent` 로 쓴다
+ *   5. 체력% 피로 0xb58e6 — 타자 쪽 부르는 곳(0x7ba44 기본정보 = 0x5b, 0xb5b50 = 0x5a)은 인자가 54 를 넘어 그대로다
+ *   6. 팀 능력치(0xb592c, 모드 1·2·8·9 만)·코치 스킬 14(0xb5a16, 투수만)·모드 2 갈래 — 타자 육성(모드 4)엔 없다
+ *   7. **맨 끝 한 번만** 0..999 로 자른다 (0xb5b06) — 중간 단계에는 자르기가 없다
+ * 1 의 결과가 이미 0..999 이고 2~4 는 0 이상인 값을 줄이기만 하니, 끝 자르기는 타자편에선 값을 바꾸지 않는다.
  *
  * 앞서 웹은 ① 부상·질병 중 하나만 ② 장비 보정 **전에** 곱하고 ③ 사기 감소가 없었다 — 셋 다 고쳤다.
  */
 /**
- * **0xb6414 까지만** 본 능력치 — 장착 레벨 보너스와 스킬 보정을 넣고, 부상·질병·사기는 빼고.
- * 이벤트 조건 20(스킬 획득)이 보는 "실효" 가 이 값이다 (A-4 의 `0xb6414(기록, i, 1)`).
+ * **0xb6414(기록, k, 1)** — 장착 레벨 보너스와 스킬 보정까지, 부상·질병·사기는 빼고.
+ * 0xb570c 를 거치지 않고 0xb6415 를 바로 읽는 곳이 이 값을 본다:
+ *   이벤트 조건 20(스킬 획득, 0xa4488 · A-4) · 칭호 44·45(0x1ad1a·0x1ad9a) ·
+ *   훈련/휴식/GP 결과 상세 창의 현재값(0x18cf6 · 0x18f7c · 0x14f42).
+ * (`0xb6415(기록, k, 0)` 은 기본 능력치 — 훈련 "능력치 최대" 0x12ec0 · GP 상점 0x13874 가 본다.)
+ *
+ * 디스어셈 차례 (0xb6414~0xb653e):
+ *   0. 마선수 배율 0xb63a0 — 육성 선수는 0xb633c 거짓이라 −1 → 건너뛴다.
+ *      (타자일 때 레벨 칸 +5 를 더하는 0xb644c 도 이 갈래 안이라 육성 선수와 상관없다)
+ *   1. 장비 니블 n ≥ 1 이면 0xd8890[n−1] 을 더하고 999 로 자른다 (0xb6494~0xb64a8, 바닥 없음)
+ *   2. 스킬 5 장착 → −100, 0 아래면 0 (0xb64b0~0xb64c8) — 네 칸 모두
+ *   3. 스킬 7 장착 → +50, 999 로 자른다 (0xb64ca~0xb64e4) — 네 칸 모두
+ *   4. 냉정 22(제구 +10%) 는 `0xb6278`(투수인가) 참일 때만 → 타자 레코드엔 없다
+ *   5. 스킬 20 장착 ∧ 칸 2(수비) → −100, 0 아래면 0 (0xb6512~0xb653c, `0xb6278` 거짓일 때만)
+ * 장착 여부는 모두 0xb62b4 = 선수기록 +0x14 **장착** 비트 (H-modes 6절 "장착 칸").
+ * 기본 능력치·장비 보너스가 0 이상이라 1 의 `clampAbility` 바닥은 값을 바꾸지 않는다.
  */
 export function equippedAbilityOf(career: PlayerCareer): BatterAbility {
   const adjust = (key: keyof BatterAbility) => {
     let value = clampAbility(career.ability[key] + equipmentBonusOf(career.equipmentLevels[key]))
-    // 0xb6414 는 0xb62b4 = 선수기록 +0x14 **장착** 비트를 본다 (H-modes 6절 "장착 칸")
     if (isSkillEquipped(career, POWERLESS_SKILL)) value = clampAbility(value - SKILL_PENALTY)
     if (isSkillEquipped(career, LEGEND_SKILL)) value = clampAbility(value + LEGEND_BONUS)
     if (key === 'defense' && isSkillEquipped(career, DEFENSE_PENALTY_SKILL)) value = clampAbility(value - SKILL_PENALTY)
@@ -72,17 +91,16 @@ export function equippedAbilityOf(career: PlayerCareer): BatterAbility {
   return { hit: adjust('hit'), power: adjust('power'), run: adjust('run'), defense: adjust('defense') }
 }
 
+/** 피로 없는 0xb570c — 0xb6414 → 질병 → 부상 → 사기 → 맨 끝 0..999 자르기 (0xb5b06) */
 export function effectiveAbilityOf(career: PlayerCareer): BatterAbility {
   const moraleCut = MORALE_ABILITY_CUTS.find(([limit]) => career.morale <= limit)?.[1] ?? 0
   const equipped = equippedAbilityOf(career)
   const adjust = (key: keyof BatterAbility) => {
-    // 2. 질병 → 부상 차례로
     let value = equipped[key]
-    if (career.isSick) value = clampAbility(reduceByPercent(value, ILLNESS_ABILITY_CUT))
-    if (career.isInjured) value = clampAbility(reduceByPercent(value, INJURY_ABILITY_CUT))
-    // 3. 사기 감소
-    if (moraleCut > 0) value = clampAbility(reduceByPercent(value, moraleCut))
-    return value
+    if (career.isSick) value = reduceByPercent(value, ILLNESS_ABILITY_CUT)
+    if (career.isInjured) value = reduceByPercent(value, INJURY_ABILITY_CUT)
+    if (moraleCut > 0) value = reduceByPercent(value, moraleCut)
+    return clampAbility(value)
   }
   return { hit: adjust('hit'), power: adjust('power'), run: adjust('run'), defense: adjust('defense') }
 }
