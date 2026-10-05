@@ -375,6 +375,14 @@ export function simulateHalfInning(
  * 타석 하나를 돌리기 **전에** 수비 팀 투수를 바꿀지 본다 (0xc1ba4 → 0xac428 → 0xabfcc → 0xaf09c).
  * 안 바꾸면 받은 마운드를 그대로 돌려준다.
  *
+ * 반 이닝 엔진 밖에서도 쓴다 — 나만의리그 타자편은 우리 공격 타석(동료 간이 타석 `0xc1ba4`,
+ * 사람 타석 시작 `0x3d954`)에서 **상대 투수**를 이 판정으로 바꾼다 (`features/play-game`).
+ *
+ * 최소 벤치 인자(`0xac428` 의 일곱째 인자 `[sp+0x58]`)는 **0** 이다: 간이 엔진 `0xc1c8c~0xc1cdc` 가
+ * `max(r7, 0)` 을 넘기는데 r7 은 모드 3 갈래(내 구원 투수 찾기)에서만 벤치 번호가 되고 그 밖에는
+ * −1 이다. 사람 타석 시작 `0x3da34` 도 0 을 넘긴다. 곧 벤치가 **한 명이라도** 남으면 바꿀 수 있다
+ * (`judgePitcherChange` 의 기본값 1 은 이 두 자리와 맞지 않는다).
+ *
  * ⚠️ 원본 `0xc1ba4` 의 첫 갈래(모드 3 에서 **8회**에 벤치 마선수로 교체 — CORRECTIONS 2절이
  * "7회" 를 8회로 정정했다)는 **나만의리그 투수편 전용**이라 CPU 끼리의 리그 경기에는 없다.
  * 그 갈래는 `entities/pitcher-career/model/pitcherRotation` 이 이미 갖고 있다.
@@ -382,7 +390,7 @@ export function simulateHalfInning(
  * ⚠️ **웹 로스터에 보직(`+0xb` 하위 2비트)이 없다** — 선발(0)로 본다. 역할 0·1 은 같은 갈래라
  * 결과가 같고, 마무리(2) 갈래만 못 탄다. **근사다.**
  */
-function changePitcherIfNeeded(
+export function changePitcherIfNeeded(
   defense: HalfInningDefense,
   mound: HalfInningMound,
   situation: {
@@ -403,6 +411,8 @@ function changePitcherIfNeeded(
     role: PITCHER_ROLE.starter,
     stamina: mound.stamina,
     benchCount: bench.length,
+    // 0xc1cd8 `[sp+0xc] = max(r7, 0)` — 모드 3 갈래 밖에서는 r7 = −1 이라 0 (위 주석)
+    minimumBench: 0,
     justChanged: mound.justChanged,
     lead: situation.lead,
     inningIndex: situation.inningIndex,
@@ -450,7 +460,7 @@ function changePitcherIfNeeded(
  * 깎는다 (`features/play-team-game` 의 `drainQuickPitcher` 와 같은 근사). 깎이는 총량은 같고,
  * 한 타석 **안에서** 보는 체력%만 한 타석 늦는다.
  */
-function drainQuickPitcher(
+export function drainQuickPitcher(
   defense: HalfInningDefense,
   mound: HalfInningMound,
   pitchCount: number,

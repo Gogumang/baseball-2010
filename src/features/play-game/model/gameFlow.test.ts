@@ -554,3 +554,58 @@ describe('상대 타순은 이닝을 넘어 이어진다 (team+0x32 · 0xaf020 �
     expect(칸들).toEqual(칸들.map((_slot, index) => index % 9))
   })
 })
+
+describe('타자편 경기에서도 양 팀 투수가 지치고 바뀐다 (0xc1ba4 → 0xac428 · 0xa5e14 · 0x3d954)', () => {
+  const 끝까지 = (seed: number, outcome: AtBatOutcome) => {
+    const random = createSeededRandom(seed)
+    let progress = startGame(random, 3)
+    while (!progress.game.isFinished) progress = applyPlayerOutcome(progress, outcome, random)
+    return progress
+  }
+
+  it('선발이 마운드에서 시작하고, 상대 투수는 동료 타석에 던진 만큼 지친다', () => {
+    const progress = startGame(createSeededRandom(20100901), 3)
+
+    expect(progress.ourMound.pitcherSlot).toBe(progress.ourStartingPitcherIndex)
+    // 1회초 상대 공격을 우리 투수가 던졌다
+    expect(progress.ourMound.pitches).toBeGreaterThan(0)
+    expect(progress.ourMound.stamina).toBeLessThan(10_000)
+  })
+
+  it('동료 간이 타석이 상대 투수 투구 수·스태미나를 깎는다', () => {
+    const random = createSeededRandom(5)
+    let progress = startGame(random, 3)
+    progress = applyPlayerOutcome(progress, { kind: '삼진' }, random)
+    // 내 다음 타석까지 동료 여덟 명 중 몇은 쳤다(또는 이닝이 바뀌었다)
+    const 투구 = progress.opponentMound.pitches + progress.opponentMound.usedSlots.length
+
+    expect(투구).toBeGreaterThan(0)
+  })
+
+  it('여러 경기를 돌리면 양 팀 모두 교체가 나온다 — 예전엔 선발이 끝까지 던졌다', () => {
+    let 상대교체 = 0
+    let 우리교체 = 0
+    for (let seed = 1; seed <= 20; seed += 1) {
+      const progress = 끝까지(seed, { kind: '홈런' })
+      상대교체 += progress.opponentMound.usedSlots.length
+      우리교체 += progress.ourMound.usedSlots.length
+    }
+
+    expect(상대교체).toBeGreaterThan(0)
+    expect(우리교체).toBeGreaterThan(0)
+  })
+
+  it('내 타석 점수도 상대 투수 실점 B 에 붙는다', () => {
+    const random = createSeededRandom(11)
+    let progress = startGame(random, 3)
+    const 투수 = progress.opponentMound.pitcherSlot
+    const 실점전 = progress.opponentMound.runsAllowed
+    const 점수전 = progress.game.ourScore
+    progress = applyPlayerOutcome(progress, { kind: '홈런' }, random)
+    if (progress.opponentMound.pitcherSlot !== 투수) return // 그 사이 바뀌었으면 카운터가 0 으로 밀렸다
+
+    // 홈런 뒤 동료 타석·다음 이닝 점수도 같은 투수에게 붙으므로 '적어도' 내 점수만큼은 늘었다
+    expect(progress.opponentMound.runsAllowed - 실점전).toBeGreaterThanOrEqual(1)
+    expect(progress.game.ourScore - 점수전).toBeGreaterThanOrEqual(1)
+  })
+})

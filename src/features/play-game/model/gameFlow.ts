@@ -12,9 +12,24 @@ import {
   resultOf,
 } from '@/entities/game/model/gameState'
 import type { GameState, PlayerSide } from '@/entities/game/model/gameState'
-import { simulateQuickAtBat } from '@/entities/game/model/quickAtBat'
-import { simulateHalfInning } from '@/entities/game/model/simulateHalfInning'
-import { batterAt, startingPitcherOf, teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
+import { playQuickAtBat } from '@/entities/game/model/quickAtBat'
+import {
+  changePitcherIfNeeded,
+  drainQuickPitcher,
+  simulateHalfInning,
+  startingMoundOf,
+} from '@/entities/game/model/simulateHalfInning'
+import type { HalfInningDefense, HalfInningMound } from '@/entities/game/model/simulateHalfInning'
+import {
+  PITCHERS_PER_TEAM,
+  batterAt,
+  quickPitcherOf,
+  startingPitcherOf,
+  teamBatters,
+  teamPitchers,
+} from '@/entities/team/model/teamRoster'
+import { staminaPercentOf } from '@/entities/pitcher-career/model/pitcherStamina'
+import { runnerCountOf } from '@/entities/game/model/baseState'
 import { rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
 import { opponentOf } from '@/entities/league/model/league'
 import type { GameSummary } from '@/entities/game/model/gameSummary'
@@ -73,6 +88,21 @@ export interface GameProgress {
    * **이닝 전환에서 0 으로 되돌리는 코드가 없다** (E 3b 확정).
    */
   readonly opponentOrderIndex: number
+  /**
+   * 양 팀 마운드 — 지금 던지는 투수 칸과 그 스태미나(`+0x2c`)·투구 수(`+0x27c`)·실점 B(`+0x280`)·
+   * 이미 내려간 투수. 선발 칸(`…StartingPitcherIndex`)에서 시작해 **CPU 교체 AI(0xac428)가 바꾼다**.
+   *
+   * 모드 4 는 사람이 필요 없는 타석을 간이 엔진 `0xc262c` 로 넘기고, 그 루프는 타석마다 먼저
+   * `0xc1ba4` 로 수비 팀 투수 교체를 본다 (P1 1-3·S5 2절). 사람 타석 시작 `0x3d954` 도 수비가 CPU
+   * 면 같은 `0xac428` 을 부른다 (`0x3da3e`, Q1 4절). 투구마다 `0xa5e14` 가 스태미나를 깎는다.
+   */
+  readonly ourMound: HalfInningMound
+  readonly opponentMound: HalfInningMound
+  /**
+   * 상대 투수의 **이번 이닝 실점 A(`+0x284`)** — 반 이닝 교대 `0xa5b00` 이 0 으로 되돌린다.
+   * 우리 투수 쪽 A 는 상대 공격을 한 번에 도는 `simulateHalfInning` 이 안에서 센다.
+   */
+  readonly opponentInningRunsAllowed: number
   readonly myStats: SeasonStats
   /** 사용자 타석 인기도 점수 합 */
   readonly popularityPoints: number
@@ -212,6 +242,11 @@ export function startGame(
     ourStartingPitcherIndex: rotationSlotOf(dayCounter),
     // 경기 시작 0x3a55a 가 0 으로 세운다 — 그 뒤로는 이닝을 넘어 이어진다
     opponentOrderIndex: 0,
+    // 선발이 막 올라온 마운드 — ⚠️ 원본 스태미나는 시즌 내내 이어지는 레코드 값(+0x2c)인데
+    // 웹 로스터는 투수별 스태미나를 저장하지 않아 가득에서 시작한다 (leagueDay 와 같은 근사)
+    ourMound: startingMoundOf(rotationSlotOf(dayCounter)),
+    opponentMound: startingMoundOf(rotationSlotOf(dayCounter)),
+    opponentInningRunsAllowed: 0,
     myStats: EMPTY_SEASON_STATS,
     popularityPoints: 0,
     doublePlays: 0,
@@ -415,6 +450,19 @@ function finishPlayerOutcome(
     {
       ...progress,
       game: nextGame,
+      // 내 타석에서 난 점수도 상대 투수 실점 A·B 에 붙는다. 공을 하나라도 던졌으니 교체 직후
+      // 표시(state[0xd])도 내려가 있다 (0xa5e72).
+      // ⚠️ **투구 수·스태미나 소모는 빠져 있다** — 사람 타석의 투구 수가 이 함수로 들어오지 않는다
+      //    (타석 화면이 공 하나마다 0xa5e14 를 대신해 줄 길이 아직 없다).
+      opponentMound: {
+        ...progress.opponentMound,
+        runsAllowed: Math.min(MAXIMUM_PITCHER_COUNTER, progress.opponentMound.runsAllowed + runsBattedIn),
+        justChanged: false,
+      },
+      opponentInningRunsAllowed: Math.min(
+        MAXIMUM_PITCHER_COUNTER,
+        progress.opponentInningRunsAllowed + runsBattedIn,
+      ),
       lastDefensePlay: playback,
       burst: resolution === null ? progress.burst : resolution.session,
       // ⚠️ 아직 안 보여 준 판정을 지우지 않는다 — 돌발은 이제 동료·상대 타석에서도 나므로
@@ -456,7 +504,8 @@ function finishPlayerOutcome(
  * 칸 0(투수)은 오늘 상대 선발의 능력치 칸 2 다 (`defenseAbilitiesOf` 주석 — ⚠️ 원본 그대로).
  */
 function opponentDefenseAbilitiesOf(progress: GameProgress): readonly number[] {
-  const pitcher = teamPitchers(progress.opponentTeamId)[progress.opponentStartingPitcherIndex]
+  // 수비 칸 0 은 지금 마운드에 선 투수다 — 교체되면 바뀐다
+  const pitcher = teamPitchers(progress.opponentTeamId)[progress.opponentMound.pitcherSlot]
   return defenseAbilitiesOf(
     teamBatters(progress.opponentTeamId).map((player) => ({
       position: player.position,
@@ -592,7 +641,11 @@ function advanceUntilPlayerTurn(
   for (let step = 0; step < MAXIMUM_AUTO_STEPS; step += 1) {
     if (current.game.isFinished) return current
     // 내 타석이 오면 그 자리가 곧 타석 준비(0xf)다 — 돌발을 굴리고 넘긴다
-    if (isPlayerTurn(current.game)) return triggerBurstForMyAtBat(current, random)
+    if (isPlayerTurn(current.game)) {
+      // 사람 타석 시작 0x3d954 — 수비(상대)가 CPU 라 먼저 CPU 투수 교체(0xac428, 0x3da3e)를 보고,
+      // 메시지 1 뒤에 돌발(0x8f158)을 굴린다 (R10 상태 0xf 표)
+      return triggerBurstForMyAtBat(changeOpponentPitcher(current, random), random)
+    }
     // 우리가 공격하는 반 이닝은 측이 정한다 — '초' 고정이 아니다 (측 0 선공 · 측 1 후공)
     current = current.game.half === ourHalfOf(current.game)
       ? playTeammateAtBat(current, random)
@@ -645,6 +698,12 @@ function playOpponentInning(progress: GameProgress, random: RandomPort): GamePro
         if (judged.judgement !== null) resolution = judged
       },
     },
+    // 우리 투수도 CPU 가 던진다 — 타석마다 0xc1ba4 → 0xac428 교체, 투구마다 0xa5e14 소모
+    quickDefenseOf(
+      progress.ourTeamId,
+      progress.ourMound,
+      progress.game.ourScore - progress.game.opponentScore,
+    ),
   )
   const runs = half.runs
   const game = applyOpponentInning(progress.game, runs)
@@ -654,6 +713,9 @@ function playOpponentInning(progress: GameProgress, random: RandomPort): GamePro
       ...progress,
       game,
       opponentOrderIndex: half.nextBattingOrderIndex % BATTING_ORDER_SIZE,
+      ourMound: half.mound ?? progress.ourMound,
+      // 상대 공격이 끝나면 우리 공격 반 이닝이 시작된다 — 교대 0xa5b00 이 A 를 0 으로 되돌린다
+      opponentInningRunsAllowed: 0,
       burst,
       lastBurstResolution: resolution ?? progress.lastBurstResolution,
       pitching: {
@@ -683,6 +745,8 @@ function playOpponentInning(progress: GameProgress, random: RandomPort): GamePro
 
 /** 동료 타석도 원본은 같은 간이 타석 엔진을 쓴다 — 우리 팀 명단의 실제 능력치가 들어간다 */
 function playTeammateAtBat(progress: GameProgress, random: RandomPort): GameProgress {
+  // 0xc262c 는 타석마다 먼저 0xc1ba4 를 부른다 — 우리가 공격 중이니 **상대 투수**를 본다 (0xc1ce2)
+  progress = changeOpponentPitcher(progress, random)
   // 상태 0xf — 동료 타석 준비에서도 돌발을 굴린다 (K 4절 1-6)
   const slotBefore = progress.game.battingOrderIndex
   const logBefore = progress.teammateLogs[slotBefore] ?? EMPTY_BATTER_GAME_LOG
@@ -703,12 +767,16 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort): GameProg
           }),
           random,
         )
-  const outcome = simulateQuickAtBat(
+  const opponentDefense = opponentQuickDefenseOf(progress)
+  const mound = progress.opponentMound
+  const play = playQuickAtBat(
     batterAt(progress.ourTeamId, progress.game.battingOrderIndex),
-    startingPitcherOf(progress.opponentTeamId, progress.opponentStartingPitcherIndex),
+    // 간이 엔진이 보는 투수 체력은 체력%(0xaebb0)다 — 마운드의 살아 있는 값을 넘긴다
+    { ...opponentDefense.pitcherAt(mound.pitcherSlot), stamina: staminaPercentOf(mound.stamina) },
     { inning: progress.game.inning },
     random,
   )
+  const outcome = play.outcome
   // 동료 타석은 원본도 간이 엔진(0xc262c)이 돌린다 — **간이 엔진에는 희생플라이가 없다** (E-2 확정).
   // 사람 타석과 달리 수비 시뮬레이션이 돌지 않으므로 `quickEngine` 갈래를 쓴다.
   const game = applyAtBatOutcome(
@@ -751,6 +819,18 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort): GameProg
       lastBurstResolution:
         resolved !== null && resolved.judgement !== null ? resolved : progress.lastBurstResolution,
       teammateLogs: { ...progress.teammateLogs, [slot]: recorded.log },
+      opponentMound: {
+        ...mound,
+        stamina: drainQuickPitcher(opponentDefense, mound, play.pitches),
+        runsAllowed: Math.min(MAXIMUM_PITCHER_COUNTER, mound.runsAllowed + runsBattedIn),
+        pitches: mound.pitches + play.pitches,
+        // 투구마다 state[0xd] 가 내려간다 (0xa5e72)
+        justChanged: false,
+      },
+      opponentInningRunsAllowed: Math.min(
+        MAXIMUM_PITCHER_COUNTER,
+        progress.opponentInningRunsAllowed + runsBattedIn,
+      ),
       recordIds: [...progress.recordIds, ...recorded.recordIds],
       // 동료 타석도 우리 팀 선수 레코드에 쌓인다 — 타순 칸이 곧 로스터 칸이다 (`batterAt` 과 같은 자리)
       leaguePlateAppearances: [
@@ -761,6 +841,69 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort): GameProg
     `${progress.game.inning}회${progress.game.half} ${progress.game.battingOrderIndex + 1}번 — ${describeOutcome(outcome)}${
       runsBattedIn > 0 ? ` (${runsBattedIn}점)` : ''
     }`,
+    false,
+  )
+}
+
+/** 원본 실점 카운터 A·B 는 99 에서 자른다 (P7 E1) */
+const MAXIMUM_PITCHER_COUNTER = 99
+
+/** 팀 투수 여덟 칸 (`team+0x0c`) — 벤치는 여기서 마운드와 이미 쓴 투수를 뺀 나머지다 */
+const ALL_PITCHER_SLOTS: readonly number[] = Array.from({ length: PITCHERS_PER_TEAM }, (_unused, slot) => slot)
+
+/**
+ * 한 팀의 수비 쪽 재료 (`HalfInningDefense`) — `leagueDay.defenseOf` 와 같은 모양이다.
+ *
+ * `bothTeamsAreCpu` 는 **거짓**이다: 모드 3·4 경기 준비 `0x3a20a` 가 `0xb6c18(state, 내 팀, 0)`·
+ * `(state, 상대, 1)` 로 내 팀을 사람 팀으로 적는다 (R8 · S11). 그래서 마무리 투입 굴림 `0xac360`
+ * 이 CPU 끼리 경기와 달리 **실제로 굴러간다** (`0xb6c20`).
+ *
+ * ⚠️ 팀 사기(`0x66e44` 의 `V[+2]`)는 이 화면이 들고 있지 않아 100 으로 본다 — **근사다**.
+ */
+function quickDefenseOf(teamId: number, mound: HalfInningMound, lead: number): HalfInningDefense {
+  const roster = teamPitchers(teamId)
+  return {
+    mound,
+    pitcherSlots: ALL_PITCHER_SLOTS,
+    pitcherAt: (slot) => quickPitcherOf(roster[slot % roster.length]),
+    // 투수 능력치 순서는 제구·구속·변화·**체력** (칸 3)
+    staminaAbilityAt: (slot) => roster[slot % roster.length].ability[3],
+    lead,
+    bothTeamsAreCpu: false,
+  }
+}
+
+/** 우리가 공격 중일 때 상대 팀 수비 — 리드는 상대 점수 − 우리 점수 */
+function opponentQuickDefenseOf(progress: GameProgress): HalfInningDefense {
+  return quickDefenseOf(
+    progress.opponentTeamId,
+    progress.opponentMound,
+    progress.game.opponentScore - progress.game.ourScore,
+  )
+}
+
+/**
+ * 우리 공격 타석 하나를 시작하기 전에 **상대 투수**를 바꿀지 본다 — `0xac428` 한 번.
+ *
+ * 부르는 자리는 원본 둘이다: 동료 타석(간이 엔진 `0xc1ba4` 의 `0xc1ce2`)과 내 타석 시작
+ * (`0x3d954` 의 `0x3da3e` — 수비가 CPU 이고 `0x66864` 가 참일 때. 리그 경기는 미션이 아니라 참이다).
+ * 바꾸면 카운터(+0x27c·+0x280·+0x284)가 한꺼번에 0 이 된다 (교체 0xaec64).
+ */
+function changeOpponentPitcher(progress: GameProgress, random: RandomPort): GameProgress {
+  if (progress.game.isFinished) return progress
+  const before = progress.opponentMound
+  const after = changePitcherIfNeeded(opponentQuickDefenseOf(progress), before, {
+    // 원본 이닝은 0-기준이다 (state+0x6b)
+    inningIndex: progress.game.inning - 1,
+    lead: progress.game.opponentScore - progress.game.ourScore,
+    runnerCount: runnerCountOf(progress.game.bases),
+    inningRunsAllowed: progress.opponentInningRunsAllowed,
+    random,
+  })
+  if (after === before) return progress
+  return appendLog(
+    { ...progress, opponentMound: after, opponentInningRunsAllowed: 0 },
+    `${progress.game.inning}회${progress.game.half} 상대 투수 교체`,
     false,
   )
 }

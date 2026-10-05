@@ -173,6 +173,22 @@ describe('반 이닝의 CPU 투수 교체·체력 소모 (0xc1ba4 → 0xac428 ·
     expect(합((줄) => 줄.pitches)).toBe(result.pitches)
   })
 
+  it('벤치가 한 명만 남아도 바꾼다 — 간이 엔진의 최소 벤치 인자는 0 이다 (0xc1cd8 `max(r7, 0)`)', () => {
+    const result = simulateHalfInning(
+      0,
+      () => 타자(500),
+      투수(500),
+      1,
+      씨앗난수(3),
+      undefined,
+      undefined,
+      수비(마운드({ runsAllowed: 5, pitches: 80 }), [0, 1]),
+    )
+
+    expect(result.mound?.pitcherSlot).toBe(1)
+    expect(result.mound?.usedSlots).toEqual([0])
+  })
+
   /** 도루는 투구 판정 경로(0xc1818) 뒤에만 굴린다 — 실패가 없어 주자를 잃지 않는다 (E-5) */
   it('발 빠른 타선은 도루를 만들어 낸다 — 실패가 없어 아웃이 늘지 않는다', () => {
     const random = 씨앗난수(4242)
