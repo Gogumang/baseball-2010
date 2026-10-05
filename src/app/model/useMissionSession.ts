@@ -41,6 +41,7 @@ import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
 import { buildHumanPitch, pitchGradeOf } from '@/features/play-pitcher-game/model/pitcherPitch'
 import { isModeMagicPitchType, modePitcherMagicRemainingOf, modePitcherOf } from '@/app/model/modePitcher'
+import { pitchReleaseSoundIdOf } from '@/widgets/batting-stage/lib/pitchReleaseSound'
 import type { ModePitcher } from '@/app/model/modePitcher'
 import { ROOKIE_BATTER_ABILITY } from '@/entities/batting/model/batter'
 import { isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
@@ -55,7 +56,6 @@ import {
   deepHitCheerSoundIdOf,
   inPlayCallSoundIdOf,
   pitchCallSoundIdOf,
-  PITCH_RELEASE_SOUND,
 } from '@/features/play-at-bat/model/atBatSounds'
 import { playSoundIds } from '@/app/model/useSound'
 import { createSilentSound } from '@/shared/api/audio/soundPort'
@@ -539,13 +539,13 @@ export function useMissionSession({
     runner.setBannerText(describePitchResolution(resolution))
     const outcome = isAtBatFinished(nextAtBat) ? nextAtBat.outcome : null
     const runsDefense = outcome !== null && isBattedBallInPlay(outcome)
-    // 투구 순간 소리 12 (0x3f378 — 투수 단계가 공을 놓는 칸에 닿을 때). 이어서 심판 콜.
-    // ⚠️ 마구 갈래 28 은 아직 잇지 않았다 — 0x3f378 은 `구질 22 || (마투수 && 공+0x10 ≠ 0)` 이면 28 인데(H2 3-6),
-    //    28 의 뜻은 '유력'이고 팀 경기·투수편 투구음도 아직 12 하나라 함께 정할 일이다.
+    // 투구 순간 소리 (0x3f378 — 투수 단계가 공을 놓는 칸에 닿을 때). 이어서 심판 콜.
     // ⚠️ **근사**: 웹은 던지는 순간에 결과가 다 나오므로 투구음과 심판 콜이 붙어 버린다.
     //    통로가 하나라 뒤 소리가 앞 소리를 끊는다 (원본은 공이 날아가는 동안이 사이에 있다).
     playSoundIds(audio, [
-      PITCH_RELEASE_SOUND,
+      // 0x3f378 3f46a — 구질 22 면 28. 미션 투수는 육성·명예 투수(비트7)라 0xb633d 가 거짓이어서
+      // 공+0x10 갈래(3f488)는 안 탄다 → 투수 +0x18 을 0 으로 넘긴다 (b008959)
+      pitchReleaseSoundIdOf({ typeNumber, pitcherMagicNumber: 0, ballMagicNumber: nextBallMagicNumber }),
       pitchCallSoundIdOf(resolution, nextAtBat),
       outcome === null || runsDefense ? null : inPlayCallSoundIdOf(outcome),
     ])
