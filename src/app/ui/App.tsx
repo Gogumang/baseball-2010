@@ -120,7 +120,13 @@ export function App() {
     throwModeManual: gameSettings.settings.throwMode === '수동',
     aceLevels: aceLevels.levels,
   })
-  const collection = useCollection(collectionStore, careerSession.career, isEveryMissionCleared(mission.clearedKeys))
+  // 투수편이 연 히든(장비 컬렉터 20·24·28·32)도 같은 전역 표 `app+0xc0` 에 모은다 (0x62368)
+  const collection = useCollection(
+    collectionStore,
+    careerSession.career,
+    isEveryMissionCleared(mission.clearedKeys),
+    pitcherSession.career?.openedHiddenIds,
+  )
   // 히든 오픈은 원본에서 전역 저장이라 선수에게도 알려 준다 (상점이 선수 기록으로 판정한다)
   const { syncOpenedHidden } = careerSession.actions
   const openedHiddenIds = collection.collection.openedHiddenIds

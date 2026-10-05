@@ -9,14 +9,43 @@ import type { Collection } from '@/entities/collection/model/collection'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 
-/** 기록연감·명예의 전당. 선수가 얻는 닉네임·스킬·엔딩을 계속 모은다. */
-export function useCollection(store: JsonStorePort, career: PlayerCareer | null, isEveryMissionCleared: boolean) {
+const NO_IDS: readonly number[] = []
+
+/**
+ * 히든 오픈 id 를 전역 표에 더한다 — 이미 다 있으면 같은 객체를 돌려줘 저장·렌더를 되풀이하지 않는다.
+ * 원본 해금표는 모드와 상관없는 전역 `app+0xc0`(0x9f69c / 0x62368) 하나다.
+ */
+export function mergeOpenedHiddenIds(collection: Collection, openedHiddenIds: readonly number[]): Collection {
+  const missing = openedHiddenIds.filter(
+    (id, index) => !collection.openedHiddenIds.includes(id) && openedHiddenIds.indexOf(id) === index,
+  )
+  return missing.length === 0 ? collection : { ...collection, openedHiddenIds: [...collection.openedHiddenIds, ...missing] }
+}
+
+/**
+ * 기록연감·명예의 전당. 선수가 얻는 닉네임·스킬·엔딩을 계속 모은다.
+ *
+ * `pitcherOpenedHiddenIds` — 나리 **투수편** 커리어가 연 히든 id. 투수 장비 컬렉터(0xa5020 → 0x62368,
+ * id 20·24·28·32)는 원본에서 타자편과 같은 전역 표 `app+0xc0` 에 켜진다(d15c14d). 웹 투수 커리어는 제
+ * `openedHiddenIds` 에만 남겨 왔으니 여기서 기록연감으로 모은다. 투수편 칭호·스킬은 타자편과 번호가 달라
+ * 여기에 섞지 않는다.
+ */
+export function useCollection(
+  store: JsonStorePort,
+  career: PlayerCareer | null,
+  isEveryMissionCleared: boolean,
+  pitcherOpenedHiddenIds: readonly number[] = NO_IDS,
+) {
   const [collection, setCollection] = useState<Collection>(() => normalizeCollection(store.load()))
 
   useEffect(() => {
     if (career === null) return
     setCollection((previous) => mergeCareerIntoCollection(previous, career))
   }, [career])
+
+  useEffect(() => {
+    setCollection((previous) => mergeOpenedHiddenIds(previous, pitcherOpenedHiddenIds))
+  }, [pitcherOpenedHiddenIds])
 
   useEffect(() => {
     setCollection((previous) => openHiddenForMissions(previous, isEveryMissionCleared))
