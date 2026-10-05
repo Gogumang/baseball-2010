@@ -94,6 +94,7 @@ import {
   pitcherOfRecordNamesOf,
 } from '@/features/play-game/model/gameDecisions'
 import type { MoundBySide, PitcherOfRecordNames } from '@/features/play-game/model/gameDecisions'
+import { rollHalfInningFielders } from '@/features/play-game/model/halfInningBoard'
 
 export interface GameLogEntry {
   readonly id: number
@@ -252,6 +253,11 @@ export interface GameProgress {
    * `resolveBenchClearing` 을 부를 때 비로소 돈다 (원본도 출구 0xae24c 뒤에야 0x17 로 간다).
    */
   readonly pendingBenchClearing: { readonly outcome: AtBatOutcome } | null
+  /**
+   * **1회초 판**(상태 0x18 교대 가지가 OK 를 기다림) — 섰으면 그 판, 아니면 null. 화면은 첫 타석 앞에 띄운다.
+   * 모드 4 에서 판이 설 수 있는 것은 이 하나뿐이다 (`withFirstInningBoard` 머리말).
+   */
+  readonly halfInningBoard: { readonly serial: number; readonly inning: number; readonly half: GameState['half'] } | null
 }
 
 /**
@@ -342,8 +348,33 @@ export function startGame(
     // 경기 상태 초기화 0xb6814 — 셋 다 측 2(없음)
     decisions: EMPTY_DECISION_STATE,
     pendingBenchClearing: null,
+    halfInningBoard: null,
   }
-  return advanceUntilPlayerTurn(initial, random)
+  return advanceUntilPlayerTurn(withFirstInningBoard(initial, random), random)
+}
+
+/**
+ * **1회초 판** — 인트로 0xc 의 끝(0x39e3c)은 모드 1 이 아니면 늘 0x18 로 보내고, 0x18 틱 0(0x4f928)은
+ * 앞 장면이 0x21 이 아니고 `0xc2198(sim, 1)` 이 거짓(다음 장면을 사람이 잡음)일 때만 판을 세운다.
+ * 모드 4 의 0xc1e04 칸(점프표 0xd90c0 칸 3 = **0xc1ed6**, 디스어셈 확인):
+ * ```
+ * c1ed6: 0xc1d38(sim) — 모드 4: 0xae945(공격 팀) 지금 타자가 0xb6389(내 선수)인가
+ *        거짓 → 1 (자동)
+ *        참   → st[0x31 + st[9]] == 0(공격 팀이 사람 팀) 이면 0 (사람 장면) · 아니면 1
+ * ```
+ * 경기 첫 장면은 1회초(측 0 공격) 1번 타자다 → **선공이고 내가 1번 타자**면 사람 장면이라 판이 선다.
+ * 그 밖의 반 이닝은 앞 장면이 늘 0x21(자동)이다 — 남의 타석은 모두 자동이고, 0x21 이 내 차례에서 멈추며
+ * 오는 0x18 은 4fab6 이 자동 OK 로 넘긴다(판 없음). 내 타석으로 반 이닝이 끝나도 다음은 상대 공격(자동)이다.
+ *
+ * 판이 서면 틱 0 의 0x3fac4 가 전역 rand 36 개를 쓴다 — 첫 타석 준비 0x3d954(CPU 투수 교체 0xac428 · 돌발 0x8f158)보다 앞.
+ */
+function withFirstInningBoard(progress: GameProgress, random: RandomPort): GameProgress {
+  if (!isPlayerTurn(progress.game)) return progress
+  rollHalfInningFielders(random)
+  return {
+    ...progress,
+    halfInningBoard: { serial: 1, inning: progress.game.inning, half: progress.game.half },
+  }
 }
 
 /**

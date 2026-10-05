@@ -8,6 +8,7 @@ import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
 import { startGame } from '@/features/play-game/model/gameFlow'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import { GameScreen } from '@/pages/game/ui/GameScreen'
+import { PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
 
 afterEach(cleanup)
 
@@ -87,5 +88,25 @@ describe('도루 (0x53610 → 메시지 0x583)', () => {
     띄우기({}, { first: true, second: false, third: false })
 
     expect(screen.queryByRole('button', { name: /도루/ })).toBeNull()
+  })
+})
+
+describe('1회초 판 (상태 0x18) — 선공·1번 타자', () => {
+  const 선공1번 = () => startGame(createSeededRandom(3), 0, 1, undefined, PLAYER_SIDE_FIRST_BAT)
+
+  it('판이 먼저 서서 OK 를 기다리고, 그 동안 메뉴 키가 안 먹는다 — OK 뒤 타석', () => {
+    띄우기({ progress: 선공1번() })
+    expect(screen.getByText('1회초')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '메뉴' })).toBeNull()
+    fireEvent.keyDown(window, { key: '*' })
+    expect(screen.queryByText('조작방법')).toBeNull()
+
+    fireEvent.keyDown(window, { key: '5' })
+    expect(screen.getByRole('button', { name: '메뉴' })).toBeTruthy()
+  })
+
+  it('첫 공이 나간 뒤(수비 재생으로 화면이 다시 올라와도) 판이 다시 서지 않는다', () => {
+    띄우기({ progress: 선공1번(), atBat: { ...createAtBat(), strikes: 1 } })
+    expect(screen.getByRole('button', { name: '메뉴' })).toBeTruthy()
   })
 })

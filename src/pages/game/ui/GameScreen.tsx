@@ -9,6 +9,10 @@ import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import { effectiveAbilityOf } from '@/entities/career/model/condition'
 import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
+import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
+import { HALF_INNING_JINGLE_TICK } from '@/features/play-game/model/halfInningBoard'
+import { HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
+import { activeSound } from '@/shared/api/audio/soundPort'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import type { AtBatState } from '@/entities/at-bat/model/atBatState'
@@ -102,12 +106,16 @@ export function GameScreen({
   ).filter((base) => canStealFrom(base))
 
   const isBenchClearing = progress.pendingBenchClearing !== null
+  /** OK 로 1회초 판을 닫았는가 */
+  const [isBoardClosed, setBoardClosed] = useState(false)
+  const board = progress.halfInningBoard ?? null
+  const isHalfInningBoardOpen = !isBoardClosed && board !== null && isAtFirstPitchOf(progress, atBat)
   /** 원본 공용 키 처리 0x498d4 — '*' 메뉴 · 도루 '3'/'2' */
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat) return
-      // 벤치 클리어링(0x1e) 중에는 공용 키가 안 열린다
-      if (isBenchClearing) return
+      // 벤치 클리어링(0x1e)·1회초 판(0x18) 중에는 공용 키가 안 열린다 (0x498d4 의 상태 범위 밖)
+      if (isBenchClearing || isHalfInningBoardOpen) return
       if (event.key === '*') {
         event.preventDefault()
         return setMenuOpen((open) => !open)
@@ -121,11 +129,28 @@ export function GameScreen({
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [isBenchClearing, isMenuOpen, onSteal, overlay, stealableBases])
+  }, [isBenchClearing, isHalfInningBoardOpen, isMenuOpen, onSteal, overlay, stealableBases])
 
   // 사구 뒤 벤치 클리어링 (상태 0x1e) — 타석이 붙들린 채 연출이 돈다. 공용 키 '*'·도루도 0x1e 에서는 안 열린다
   if (progress.pendingBenchClearing !== null && onBenchClearingDone !== undefined) {
     return <BenchClearingScene onDone={onBenchClearingDone} />
+  }
+
+  /**
+   * 1회초 판(상태 0x18) — 선공·1번 타자일 때만 진행기가 세운다(`gameFlow.withFirstInningBoard`, 굴림 36 개는 그때 썼다).
+   * 징글 13 은 판의 틱 2 (0x4f7ac). OK → 0xae3a0 → 0xd → 첫 타석.
+   */
+  if (isHalfInningBoardOpen && board !== null) {
+    return (
+      <HalfInningBoard
+        inning={board.inning}
+        half={board.half}
+        onTick={(tick) => {
+          if (tick === HALF_INNING_JINGLE_TICK) activeSound().play(HALF_INNING_SOUND)
+        }}
+        onConfirm={() => setBoardClosed(true)}
+      />
+    )
   }
 
   // 경기 중 메뉴의 "조작방법"(0x3c212)·"설정"(0x3c326)
@@ -250,5 +275,25 @@ export function GameScreen({
         <BigResult>{bannerText}</BigResult>
       )}
     </PixelScreen>
+  )
+}
+
+/**
+ * 판이 아직 OK 를 기다리는 자리인가 — 경기 첫 타석의 첫 공 전(아웃·주자·점수 없고 볼카운트 0-0).
+ * 이 화면은 수비 재생 동안 앱이 내렸다 다시 올리므로(닫힘 상태가 사라진다) 판이 다시 서지 않게
+ * 경기가 한 걸음이라도 나갔으면 판을 안 띄운다. 1회초 판은 경기 첫 장면에만 서므로 이것으로 충분하다.
+ */
+function isAtFirstPitchOf(progress: GameProgress, atBat: AtBatState): boolean {
+  const { game } = progress
+  return (
+    game.inning === 1 &&
+    game.outs === 0 &&
+    game.ourScore === 0 &&
+    game.opponentScore === 0 &&
+    !game.bases.first &&
+    !game.bases.second &&
+    !game.bases.third &&
+    atBat.balls === 0 &&
+    atBat.strikes === 0
   )
 }

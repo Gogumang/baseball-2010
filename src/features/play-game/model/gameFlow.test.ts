@@ -1080,3 +1080,36 @@ describe('승·패·세 칸 — 결과 판(0x4fe9c)이 그대로 읽는 state+0x
     }
   })
 })
+
+/**
+ * 1회초 판(상태 0x18) — 모드 4 의 0xc1e04 칸 0xc1ed6 은 내 타자가 타석에 선 사람 팀 공격만 사람 장면으로 본다.
+ * 인트로 뒤 첫 장면이 그것이면(선공·1번 타자) 판이 서고, 그 밖의 반 이닝 앞은 늘 0x21(자동)이라 판이 없다.
+ */
+describe('1회초 판 (상태 0x18) — 선공·1번 타자일 때만', () => {
+  /** 앞 n 개는 고정값, 그 뒤는 씨앗 77 */
+  const 앞값 = (n: number, value: number): RandomPort => {
+    const rest = createSeededRandom(77)
+    let 번 = 0
+    return { ...rest, next: () => (번++ < n ? value : rest.next()) }
+  }
+
+  it('선공·1번 타자면 판이 서고, 후공이거나 1번이 아니면 안 선다', () => {
+    const 선공1번 = startGame(createSeededRandom(3), 0, 1, undefined, PLAYER_SIDE_FIRST_BAT)
+    expect(선공1번.halfInningBoard).toEqual({ serial: 1, inning: 1, half: '초' })
+    expect(isPlayerTurn(선공1번.game)).toBe(true)
+
+    expect(startGame(createSeededRandom(3), 0, 1).halfInningBoard).toBeNull()
+    expect(startGame(createSeededRandom(3), 0, 2, undefined, PLAYER_SIDE_FIRST_BAT).halfInningBoard).toBeNull()
+  })
+
+  it('판의 걸음 굴림 36 개(0x3fac4)가 첫 타석 준비보다 앞에 끼어든다 — 값은 버려진다', () => {
+    const 세우기 = (n: number, value: number) => startGame(앞값(n, value), 0, 1, undefined, PLAYER_SIDE_FIRST_BAT)
+    // 판이 첫 36 개를 먹고 버리므로 그 값이 무엇이든 경기는 같다
+    expect(세우기(36, 0.001)).toEqual(세우기(36, 0.999))
+    // 경기를 세우는 동안 쓴 굴림 = 판 36 + 첫 타석 준비(1회초 첫 타석이라 CPU 투수 교체·돌발 후보가 없어 0)
+    let 수 = 0
+    const 씨 = createSeededRandom(77)
+    startGame({ ...씨, next: () => { 수 += 1; return 씨.next() } }, 0, 1, undefined, PLAYER_SIDE_FIRST_BAT)
+    expect(수).toBe(36)
+  })
+})

@@ -62,8 +62,9 @@ export function gameResultSoundIdOf(result: GameResult): number | null {
  * 상태 0x21 로 넘긴다(0x48530 → 0xc262c). 내 타석이 3아웃으로 끝나면 다음 반 이닝은 상대 공격이라
  * 0x18 이 틱 0 에 곧장 0x21 로 가고(4facc), 0x21 에서 온 0x18 은 판 없이 스스로 OK 한다(4fb08) —
  * 어느 쪽도 틱 2 의 징글(0x4f7ac)에 닿지 않는다.
- * ⚠️ 남은 가지: 내 팀이 선공이고 내가 1번이라 1회초 첫 타석이 곧 내 타석이면 1회초 판(인트로 → 0x18)이
- *    서서 징글 13·굴림 36(0x3fac4)이 난다. 웹 타자편은 이 판을 아직 안 세운다.
+ * 단 하나, 내 팀이 선공이고 내가 1번이라 1회초 첫 타석이 곧 내 타석이면 1회초 판(인트로 → 0x18)이 선다 —
+ * 진행기 `gameFlow.withFirstInningBoard` 가 굴림 36(0x3fac4)을 쓰고, 징글 13 은 화면(`GameScreen` 의
+ * `HalfInningBoard`)이 판의 틱 2 에 낸다.
  */
 export function gameStepSoundIdsOf(before: GameProgress, after: GameProgress): readonly number[] {
   const ids: number[] = []
