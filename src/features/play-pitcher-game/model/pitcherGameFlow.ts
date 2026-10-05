@@ -30,6 +30,7 @@ import { PICKOFF_RESULT, runPickoffPlay } from '@/features/defense-play/model/pi
 import { pickoffPlayForKey, PICKOFF_PLAY_KIND } from '@/entities/defense-controls/model/pickoff'
 import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
 import { pitchAgainstBatter } from '@/entities/pitching/model/simulateBatter'
+import { isMistakePitch } from '@/entities/pitching/model/mistakePitch'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
@@ -179,6 +180,12 @@ export interface PitcherGameOptions {
   readonly pitcherIsCoward?: boolean
   /** 투수 스킬 10 끈기 (소모 −1) */
   readonly pitcherEndures?: boolean
+  /** 투수 비트 16 안정감 (스킬 32) — 주자 2명 이상이면 실투율 −5 (0x33d6c) */
+  readonly pitcherIsSteady?: boolean
+  /** 투수 비트 17 새가슴 (스킬 33) — 2루 주자가 있으면 실투율 +10 (0x33d9c) */
+  readonly pitcherIsTimid?: boolean
+  /** 투수 비트 22 냉정 (스킬 38) — 실투율 −10 (0x33dca) */
+  readonly pitcherIsCool?: boolean
   /** 라이벌전인가 (경기 뒤 사기 ×2) */
   readonly isRivalGame?: boolean
   /** 행운 스킬 (경기 뒤 사기 +1) */
@@ -504,6 +511,27 @@ export function startPitch(
     random,
   )
 
+  // 실투 판정 0x33cbc — 투구 순간 0x4dc78 이 궤적 준비 0x9e669 **뒤**(0x4dea0)에 부른다.
+  // 등급 뽑기(0x4dbac)·제구 흩어짐 굴림이 다 끝난 뒤이고, CPU 타자 결정 0x34334 보다 앞이다.
+  // 마구가 아니면 rand(0,100) 을 늘 한 번 굴린다.
+  const isMistake = isMistakePitch(
+    {
+      isMagicPitch: isMagic,
+      grade,
+      // 0xb570d(ctx, 1, 투수, 1, 90, 1) — 칸 1 구속, 체력 인자 90 이라 피로 감소가 없다.
+      // `options.stats` 가 곧 장비·스킬·컨디션을 먹인 실효값이다 (`fatiguedStatsOf` 주석)
+      effectiveVelocity: options.stats.velocity,
+      runnerCount: runnerCountOf(progress.game.bases),
+      hasSecondBaseRunner: progress.game.bases.second,
+      // 상대 타자의 스킬 22(0xb62b4)를 웹 로스터가 들고 있지 않아 늘 거짓이다 (drainStamina 와 같다)
+      batterIntimidates: false,
+      pitcherIsSteady: options.pitcherIsSteady === true,
+      pitcherIsTimid: options.pitcherIsTimid === true,
+      pitcherIsCool: options.pitcherIsCool === true,
+    },
+    random,
+  )
+
   const batter = opponentBatterAbility(options.opponentTeamId, progress.opponentOrderIndex)
   const resolution = pitchAgainstBatter(
     pitch,
@@ -517,6 +545,7 @@ export function startPitch(
       outs: progress.game.outs,
       hasRunner: runnerCountOf(progress.game.bases) > 0,
     },
+    { isMistakePitch: isMistake },
   )
 
   // 스태미나는 게이지 결과와 무관하다 — 인자가 (game, 구질) 뿐이다 (P1 3-1 확정)

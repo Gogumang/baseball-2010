@@ -537,3 +537,50 @@ describe('견제 — 구질 고르기(0xf)에서 3·1·7 (0x53548 → 0x50f28 �
     expect(isPitchTurn(after)).toBe(true)
   })
 })
+
+/**
+ * `index` 번째 next() 만 `hit` 을, 나머지는 늘 `rest` 를 내는 각본 난수 — 굴림 수도 센다.
+ * nextInRange·pick 은 실투·타자 결정 길에서 쓰이지 않지만 next() 와 같은 값으로 돌린다.
+ */
+function 각본난수(rest: number, index = -1, hit = rest) {
+  let calls = 0
+  const value = () => {
+    const out = calls === index ? hit : rest
+    calls += 1
+    return out
+  }
+  return {
+    next: value,
+    nextInRange: (minimum: number, maximum: number) => minimum + value() * (maximum - minimum),
+    pick: <T,>(candidates: readonly T[]) => candidates[Math.floor(value() * candidates.length)],
+    calls: () => calls,
+  }
+}
+
+describe('실투 판정 0x33cbc — 투구 순간에 굴린다', () => {
+  it('궤적 뒤 · CPU 타자 결정 앞에서 rand(0,100) 한 번 — 실투면 지켜볼 공도 친다', () => {
+    const 등판 = startPitcherGame(기본옵션, 씨앗(20100901))
+
+    // 모든 굴림이 0.7 이면 공이 존 안에 머물고, 실투가 아니며(70 ≥ p) 타자는 표에서 지켜보기를 뽑는다
+    const 평소 = 각본난수(0.7)
+    const 지켜봄 = startPitch(등판, 한가운데직구, 평소)
+    expect(지켜봄.lastResolution).toEqual({ kind: '스트라이크', isSwinging: false })
+    // 지켜보면 타자 쪽은 표 굴림 하나뿐이다 — 그 바로 앞 굴림이 실투 판정이다
+    const 실투자리 = 평소.calls() - 2
+
+    // 그 한 굴림만 0 으로 바꾸면 실투(p > 0) → 표 선택이 치기로 강제되어 휘두른다
+    const 실투 = startPitch(등판, 한가운데직구, 각본난수(0.7, 실투자리, 0))
+    expect(실투.lastResolution?.kind).toBe('타구')
+  })
+
+  it('마구(22)는 굴림 없이 실투가 아니다 — 굴림이 하나 적다', () => {
+    const 등판 = startPitcherGame(기본옵션, 씨앗(20100901))
+    const 보통 = 각본난수(0.99)
+    startPitch(등판, 한가운데직구, 보통)
+    const 마구 = 각본난수(0.99)
+    const 던짐 = startPitch(등판, { typeNumber: 22, courseCell: 4, gaugeCell: 0 }, 마구)
+    expect(던짐.lastPitch).not.toBeNull()
+    // 마구는 등급 뽑기(0x4dbac)도 굴리지 않는다(늘 5) — 실투 굴림까지 둘이 빠진다
+    expect(마구.calls()).toBe(보통.calls() - 2)
+  })
+})

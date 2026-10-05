@@ -10,7 +10,7 @@ import { isMyStartDay } from '@/entities/pitcher-career/model/pitcherRotation'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import {
   effectivePitcherAbilityOf,
-  hasPitcherSkill,
+  isPitcherSkillEquipped,
   nextPitcherOpponentOf,
   pitcherFormOfCareer,
 } from '@/entities/pitcher-career/model/pitcherCareer'
@@ -37,10 +37,22 @@ import type { PitcherCareer, PitcherGameOutcome } from '@/entities/pitcher-caree
  * ```
  */
 
-/** 투수 스킬 번호 — P1 3-1 · S5 가 가리키는 세 개만 확정이다 */
+/**
+ * 경기에 실리는 투수 스킬은 모두 **장착** 비트(선수기록 +0x14)로 본다 — 보유(+0x1b8)가 아니다:
+ *   비겁자 18 · 끈기 10 스태미나 소모 0xa5e14 (0xb62b4 — 0xa5f32 · 0xa5f54)
+ *   혼신 23 마구 횟수 0xaebe4 (0xb62b4 — 0xaef08) · 실투 0x33cbc (0xb62b4) · 행운 6 경기 뒤 사기 0xa719c (0xa4bf8 — 0xa741c)
+ * 투수 스킬 번호 — P1 3-1 · S5 가 가리키는 세 개만 확정이다
+ */
 const COWARD_SKILL = 18
 const ENDURE_SKILL = 10
 const SPIRIT_SKILL = 23
+/**
+ * 실투 판정 0x33cbc 가 보는 투수 비트 (0xb62b4(투수, 비트)) — skills.json 번호로는 32 안정감 ·
+ * 33 새가슴 · 38 냉정이다. 커리어 `skillIds` 는 위 셋(18 = 34 비겁자 …)처럼 **투수 비트 번호**로 든다.
+ */
+const STEADY_SKILL = 16
+const TIMID_SKILL = 17
+const COOL_SKILL = 22
 /** 행운 스킬 6 — 경기 뒤 사기 +1 (pitcherGameEvaluation 의 `hasLuckSkill`) */
 const LUCK_SKILL = 6
 
@@ -107,7 +119,7 @@ export function pitcherGameOptionsOf(
       number: career.selectedMagicNumber,
       isAce: false,
       aceLevel: 0,
-      hasSpiritSkill: hasPitcherSkill(career, SPIRIT_SKILL),
+      hasSpiritSkill: isPitcherSkillEquipped(career, SPIRIT_SKILL),
     }),
     teamMorale: settings.teamMorale ?? teamMoraleOf(career.teamId),
     reputation: career.reputation,
@@ -115,10 +127,13 @@ export function pitcherGameOptionsOf(
     gaugeSettingOn: settings.gaugeSettingOn ?? false,
     // 송구 +0xf4 의 원본 기본값은 **수동(0)** 이다 — 투수편은 사람이 늘 수비라 이 값이 그대로 먹는다
     throwModeManual: settings.throwModeManual ?? true,
-    pitcherIsCoward: hasPitcherSkill(career, COWARD_SKILL),
-    pitcherEndures: hasPitcherSkill(career, ENDURE_SKILL),
+    pitcherIsCoward: isPitcherSkillEquipped(career, COWARD_SKILL),
+    pitcherEndures: isPitcherSkillEquipped(career, ENDURE_SKILL),
+    pitcherIsSteady: isPitcherSkillEquipped(career, STEADY_SKILL),
+    pitcherIsTimid: isPitcherSkillEquipped(career, TIMID_SKILL),
+    pitcherIsCool: isPitcherSkillEquipped(career, COOL_SKILL),
     isRivalGame: settings.isRivalGame,
-    hasLuckSkill: hasPitcherSkill(career, LUCK_SKILL),
+    hasLuckSkill: isPitcherSkillEquipped(career, LUCK_SKILL),
     stageSide: settings.stageSide,
   }
 }

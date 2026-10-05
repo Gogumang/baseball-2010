@@ -1238,3 +1238,38 @@ describe('견제 — 메시지 0x10 → 0x50f28 → 플레이 종류 4 (사람 �
     expect(견제후투구.pitchCount).toBe(그냥.pitchCount)
   })
 })
+
+/** `index` 번째 굴림만 `hit` 을, 나머지는 늘 `rest` 를 내는 각본 난수 — 굴림 수도 센다 */
+function 각본난수(rest: number, index = -1, hit = rest) {
+  let calls = 0
+  const value = () => {
+    const out = calls === index ? hit : rest
+    calls += 1
+    return out
+  }
+  return {
+    next: value,
+    nextInRange: (minimum: number, maximum: number) => minimum + value() * (maximum - minimum),
+    pick: <T,>(candidates: readonly T[]) => candidates[Math.floor(value() * candidates.length)],
+    calls: () => calls,
+  }
+}
+
+describe('실투 판정 0x33cbc — 사람이 던지는 공', () => {
+  it('궤적 뒤 · CPU 타자 결정 앞에서 rand(0,100) 한 번 — 실투면 지켜볼 공도 친다', () => {
+    const { progress } = 시작()
+    const input = { typeNumber: 첫구질(progress), courseCell: 4, gaugeCell: 0 }
+
+    // 모든 굴림이 0.7 이면 존 안 공이고, 실투가 아니며(70 ≥ p) 타자는 지켜본다
+    const 평소 = 각본난수(0.7)
+    expect(startThrowPitch(progress, input, 평소).lastResolution).toEqual({
+      kind: '스트라이크',
+      isSwinging: false,
+    })
+    // 지켜보면 타자 쪽 굴림은 표 하나뿐이다 — 그 바로 앞이 실투 판정이다
+    const 실투자리 = 평소.calls() - 2
+
+    const 실투 = startThrowPitch(progress, input, 각본난수(0.7, 실투자리, 0))
+    expect(실투.lastResolution?.kind).toBe('타구')
+  })
+})

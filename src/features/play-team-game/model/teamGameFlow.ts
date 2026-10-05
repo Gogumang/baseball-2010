@@ -47,6 +47,7 @@ import { createBurstSession, resolveBurst, tryTriggerBurst } from '@/entities/bu
 import type { BurstResolution, BurstSession } from '@/entities/burst-mission/model/burstMissionSession'
 import { burstResultBitsOf } from '@/entities/burst-mission/model/burstResultBits'
 import { pitchAgainstBatter } from '@/entities/pitching/model/simulateBatter'
+import { isMistakePitch } from '@/entities/pitching/model/mistakePitch'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import { MAGIC_PITCH_TYPE_NUMBER } from '@/entities/pitcher-career/model/magicPitch'
 import {
@@ -1237,6 +1238,26 @@ function pitchOnce(
     random,
   )
 
+  // 실투 판정 0x33cbc — 투구 순간 0x4dc78 이 궤적 준비 0x9e669 **뒤**(0x4dea0)에 부른다.
+  // 등급 뽑기·제구 흩어짐 굴림 뒤, CPU 타자 결정 0x34334 앞이다. 마구가 아니면 rand(0,100) 한 번.
+  const isMistake = isMistakePitch(
+    {
+      isMagicPitch: isMagic,
+      grade,
+      // 0xb570d(ctx, 1, 투수, 1, 90, 1) — 칸 1 구속, 체력 인자 90 이라 피로 감소가 없다.
+      // `ourPitcherStats` 가 곧 그 경기용 값(질병·사기·팀 능력치·코치, 피로 전)이다
+      effectiveVelocity: stats.velocity,
+      runnerCount: runnerCountOf(progress.game.bases),
+      hasSecondBaseRunner: progress.game.bases.second,
+      // 웹 로스터·마선수 표에 스킬 비트(+0x14)가 없어 타자 22 · 투수 16·17·22 를 늘 거짓으로 둔다
+      batterIntimidates: false,
+      pitcherIsSteady: false,
+      pitcherIsTimid: false,
+      pitcherIsCool: false,
+    },
+    random,
+  )
+
   const batter = entryStageAbilityOf(progress, options.opponentTeamId, progress.opponentOrderIndex)
   const resolution = pitchAgainstBatter(
     pitch,
@@ -1253,6 +1274,7 @@ function pitchOnce(
       outs: progress.game.outs,
       hasRunner: runnerCountOf(progress.game.bases) > 0,
     },
+    { isMistakePitch: isMistake },
   )
 
   // 스태미나는 게이지 결과와 무관하다 — 인자가 (game, 구질) 뿐이다 (P1 3-1 확정)

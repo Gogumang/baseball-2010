@@ -30,6 +30,8 @@ import type { PitcherRun } from '@/entities/mission/model/pitcherRun'
 import { attemptSteal } from '@/entities/game/model/steal'
 import { missionOpponentOf, pitcherAbilityOf } from '@/entities/game/model/aceOpponent'
 import { pitchAgainstBatter } from '@/entities/pitching/model/simulateBatter'
+import { isMistakePitch } from '@/entities/pitching/model/mistakePitch'
+import { MAGIC_PITCH_TYPE_NUMBER } from '@/entities/pitcher-career/model/magicPitch'
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
 import { buildHumanPitch, pitchGradeOf } from '@/features/play-pitcher-game/model/pitcherPitch'
@@ -299,16 +301,41 @@ export function useMissionSession({
       },
       random,
     )
+    // 실투 판정 0x33cbc — 투구 순간 0x4dc78 이 궤적 준비 0x9e669 **뒤**(0x4dea0)에 부른다.
+    // 미션도 같은 투구 길이다(위 주석). 마구가 아니면 rand(0,100) 을 늘 한 번 굴린다.
+    const isMistake = isMistakePitch(
+      {
+        isMagicPitch: typeNumber === MAGIC_PITCH_TYPE_NUMBER,
+        grade,
+        // 0xb570d(ctx, 1, 투수, 1, 90, 1) — 칸 1 구속. ⚠️ 미션 투수 레코드가 없어 근사값 500 이다
+        effectiveVelocity: MISSION_PITCHER_STATS.velocity,
+        runnerCount: runnerCountOf(pitcherRun.bases),
+        hasSecondBaseRunner: pitcherRun.bases.second,
+        // ⚠️ 미션 투수·마타자 레코드의 스킬 비트(+0x14)가 웹에 없어 넷 다 거짓으로 둔다
+        batterIntimidates: false,
+        pitcherIsSteady: false,
+        pitcherIsTimid: false,
+        pitcherIsCool: false,
+      },
+      random,
+    )
     // 마타자 미션은 원본 마선수 능력치로, 그 밖에는 평범한 타자로 상대한다.
     const opponent = missionOpponent(pitcherRun.mission)
     const batterAbility = opponent === null ? ROOKIE_BATTER_ABILITY : opponent.ability
     // 원본 0x34334 가 보는 상황 — state 의 볼카운트·아웃과 주자 유무(0xa9599)
-    const resolution = pitchAgainstBatter(pitch, batterAbility, random, undefined, {
-      strikes: runner.atBatRef.current.strikes,
-      balls: runner.atBatRef.current.balls,
-      outs: pitcherRun.outs,
-      hasRunner: runnerCountOf(pitcherRun.bases) > 0,
-    })
+    const resolution = pitchAgainstBatter(
+      pitch,
+      batterAbility,
+      random,
+      undefined,
+      {
+        strikes: runner.atBatRef.current.strikes,
+        balls: runner.atBatRef.current.balls,
+        outs: pitcherRun.outs,
+        hasRunner: runnerCountOf(pitcherRun.bases) > 0,
+      },
+      { isMistakePitch: isMistake },
+    )
 
     let nextRun = recordPitch(pitcherRun, grade === MAX_GAUGE_GRADE)
     const nextAtBat = runner.applyPitch(resolution)
