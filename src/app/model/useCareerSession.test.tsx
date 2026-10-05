@@ -334,3 +334,39 @@ describe('연속 파울 기록 32·33 (0xa7dbc) — 실제 타석에서 경기 �
     }
   })
 })
+
+describe('공마다 상대 투수 투구 수·스태미나 (0x3dec6 → 0xa5e14(ctx, 구질))', () => {
+  const 볼 = (pitchTypeNumber?: number): PitchOutcomeDetail => ({
+    resolution: { kind: '볼' },
+    hasSwung: false,
+    isBunt: false,
+    resultCode: null,
+    contactSoundId: null,
+    ...(pitchTypeNumber === undefined ? {} : { pitchTypeNumber }),
+  })
+
+  it('구질 번호가 실린 공마다 투구 수 +1 과 스태미나가 깎이고, 번호가 없으면 그대로다', () => {
+    const saveGame = 메모리저장(createCareer('투구수'))
+    const random = createSeededRandom(20100901)
+    const rendered = renderHook(() => {
+      const [screen, setScreen] = useState<Screen>({ kind: '메인메뉴' })
+      const runner = useAtBatRunner()
+      return { screen, runner, session: useCareerSession({ runner, random, saveGame, screen, setScreen }) }
+    })
+    try {
+      act(() => rendered.result.current.session.actions.continueSaved())
+      act(() => rendered.result.current.session.actions.runCommand('다음경기'))
+      act(() => rendered.result.current.session.actions.finishLoading())
+      const before = rendered.result.current.session.progress!.opponentMound
+      act(() => rendered.result.current.session.handlePitchResolved(볼(1)))
+      act(() => rendered.result.current.session.handlePitchResolved(볼(18)))
+      const after = rendered.result.current.session.progress!.opponentMound
+      expect(after.pitches).toBe(before.pitches + 2)
+      expect(after.stamina).toBeLessThan(before.stamina)
+      act(() => rendered.result.current.session.handlePitchResolved(볼()))
+      expect(rendered.result.current.session.progress!.opponentMound).toEqual(after)
+    } finally {
+      act(() => rendered.unmount())
+    }
+  })
+})

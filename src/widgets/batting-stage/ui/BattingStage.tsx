@@ -142,7 +142,7 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
    * 새 투구 준비 `0x34334` 가 0 으로 되돌리므로 **공마다 다시 눌러야 한다** (H2 2-2).
    */
   const specialArmedRef = useRef(false)
-  const { pitchRef, phaseRef, phaseStartedAtRef, resultTextRef, homeRunStartedAtRef, swingStartedAtRef, shiftRef, buntRef, deckRef, pendingHitRef, particlesRef, latestRef } = refs
+  const { pitchRef, pitchTypeNumberRef, phaseRef, phaseStartedAtRef, resultTextRef, homeRunStartedAtRef, swingStartedAtRef, shiftRef, buntRef, deckRef, pendingHitRef, particlesRef, latestRef } = refs
 
   const finishPitch = useCallback((swing: BattingSwing | null, now: number) => {
     const pitch = pitchRef.current
@@ -160,7 +160,11 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
     }
     // 걸어 둔 필살은 스윙 객체 +0x10 에 실린다 (0x51e40) — 헛스윙 바람 소리 27 이 이걸 본다 (0x5132e)
     const judgedSwing = swing !== null && specialArmedRef.current ? { ...swing, isSpecial: true } : swing
-    const result = resolvePitch(pitch, judgedSwing, context, deck, latest.random)
+    const resolved = resolvePitch(pitch, judgedSwing, context, deck, latest.random)
+    // 구질 번호(game+0xfc8)를 실어 보낸다 — 받는 쪽이 0xa5e14 처럼 상대 투수 투구 수·스태미나를 깎는다
+    const pitchTypeNumber = pitchTypeNumberRef.current
+    const result =
+      pitchTypeNumber === null ? resolved : { ...resolved, detail: { ...resolved.detail, pitchTypeNumber } }
     // 필살 스윙이면 여기서 굴린다 (0x34c74). 걸어 두지 않았으면 굴리지 않는다
     const isUncatchable = specialArmedRef.current
       && rollSpecialSwing(specialSwingNumber, latest.random, aceBatterIndex >= 0)

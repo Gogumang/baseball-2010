@@ -89,6 +89,8 @@ export interface StageLatest {
 export interface StageRefs {
   readonly canvasRef: RefObject<HTMLCanvasElement>
   readonly pitchRef: MutableRefObject<Pitch | null>
+  /** 지금 날아가는 공의 구질 번호 1~22 (`game+0xfc8`) — `pitchRef` 와 함께 세운다. 판정 detail 에 실어 보낸다 */
+  readonly pitchTypeNumberRef: MutableRefObject<number | null>
   readonly phaseRef: MutableRefObject<StagePhase>
   readonly phaseStartedAtRef: MutableRefObject<number>
   readonly resultTextRef: MutableRefObject<string>
@@ -122,6 +124,7 @@ export function useStageRefs(latest: StageLatest): StageRefs {
   return {
     canvasRef: useRef<HTMLCanvasElement>(null),
     pitchRef: useRef<Pitch | null>(null),
+    pitchTypeNumberRef: useRef<number | null>(null),
     phaseRef: useRef<StagePhase>('대기'),
     phaseStartedAtRef: useRef(0),
     resultTextRef: useRef(''),

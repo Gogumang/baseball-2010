@@ -34,6 +34,7 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
   const {
     canvasRef,
     pitchRef,
+    pitchTypeNumberRef,
     phaseRef,
     phaseStartedAtRef,
     resultTextRef,
@@ -115,6 +116,7 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
             return
           }
           pitchRef.current = choice.pitch
+          pitchTypeNumberRef.current = choice.pitchTypeNumber
           // 새 투구가 시작하면 홈런 글자 연출을 끈다 (원본 +0x1960 을 다음 플레이가 지우는 자리)
           homeRunStartedAtRef.current = -1
           phaseRef.current = '투구중'

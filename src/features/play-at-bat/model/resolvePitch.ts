@@ -71,6 +71,12 @@ export interface PitchOutcomeDetail {
    * 받는 쪽(`app/model`)이 `pitchCallSoundIdOf` 로 따로 고른다.
    */
   readonly contactSoundId?: number | null
+  /**
+   * 이 공의 **구질 번호** 1~22 (`game+0xfc8`). 원본은 공이 손을 떠날 때(0x3de10 의 0x3dec6)
+   * `0xa5e14(ctx, 구질)` 로 상대 투수 투구 수·스태미나를 깎는다 — 받는 쪽이 그 일을 하라고 싣는다.
+   * 타석 화면(`BattingStage`)이 CPU 공에 채운다. 견제는 공이 아니라 여기 오지 않는다.
+   */
+  readonly pitchTypeNumber?: number
 }
 
 /** 존 좌표 1.0 이 원본 픽셀 몇 개인가 — 33px 존의 절반 (stageLayout 과 같은 값) */

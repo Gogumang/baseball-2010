@@ -541,18 +541,35 @@ export function drainQuickPitcher(
   mound: HalfInningMound,
   pitchCount: number,
 ): number {
+  let stamina = mound.stamina
+  for (let pitch = 0; pitch < pitchCount; pitch += 1) {
+    stamina = drainPitcherForPitch(defense, { ...mound, stamina }, QUICK_PITCH_TYPE, false)
+  }
+  return stamina
+}
+
+/**
+ * **공 하나**의 스태미나 소모 (0xa5e14 의 0xa5f0e~ → 0xaeb08) — 구질을 아는 사람 타석용.
+ * c = 0x66ef0(구질), 타자 스킬 22 압도(`0xb62b4(현재 타자, 22)`)면 ×2.
+ * 상대 CPU 투수의 스킬 18 비겁자·10 끈기는 웹 로스터에 스킬 비트(+0x14)가 없어 늘 거짓이다.
+ * 용량 X 는 `drainQuickPitcher` 와 같다 (사기·첫 투수 보너스, 0x66e44).
+ */
+export function drainPitcherForPitch(
+  defense: HalfInningDefense,
+  mound: HalfInningMound,
+  pitchTypeNumber: number,
+  batterIntimidates: boolean,
+): number {
   const capacity = staminaCapacityOf(
     defense.staminaAbilityAt(mound.pitcherSlot),
     defense.morale ?? 100,
     mound.usedSlots.length === 0,
   )
   const cost = pitchStaminaCostOf({
-    pitchTypeNumber: QUICK_PITCH_TYPE,
-    batterIntimidates: false,
+    pitchTypeNumber,
+    batterIntimidates,
     pitcherIsCoward: false,
     pitcherEndures: false,
   })
-  let stamina = mound.stamina
-  for (let pitch = 0; pitch < pitchCount; pitch += 1) stamina = consumeStamina(stamina, cost, capacity)
-  return stamina
+  return consumeStamina(mound.stamina, cost, capacity)
 }

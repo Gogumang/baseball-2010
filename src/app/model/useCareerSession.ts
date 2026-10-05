@@ -3,7 +3,7 @@ import type { Screen } from '@/app/model/screen'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import { isAtBatFinished } from '@/entities/at-bat/model/atBatState'
 import { describeOutcomeBanner } from '@/entities/at-bat/model/resolutionText'
-import { resolveDefensePlay, startGame, startPlayerOutcome, stealBase, summaryOf } from '@/features/play-game/model/gameFlow'
+import { resolveDefensePlay, startGame, startPlayerOutcome, stealBase, summaryOf, throwOpponentPitch } from '@/features/play-game/model/gameFlow'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
@@ -118,6 +118,9 @@ function evaluationJingleIdOf(popularityChange: number): number {
   if (popularityChange < 0) return 38
   return popularityChange > MY_LEAGUE_EVALUATION_THRESHOLD ? 36 : 37
 }
+
+/** 타자 스킬 22 압도 — 상대 투수 투구 스태미나 소모 ×2 (0xa5f0e) */
+const INTIMIDATE_SKILL_ID = 22
 
 interface CareerSessionInput {
   readonly runner: AtBatRunner
@@ -396,6 +399,16 @@ export function useCareerSession({
 
   const handlePitchResolved = useCallback(
     (detail: PitchOutcomeDetail, _pitch?: unknown, isUncatchable?: boolean) => {
+      // 공이 손을 떠날 때 상대 투수 투구 수·스태미나를 깎는다 (0x3dec6 → 0xa5e14(ctx, 구질)).
+      // 타자 스킬 22 압도(0xb62b4(현재 타자, 22) — 장착 비트)면 소모 ×2
+      const beforePitch = progressRef.current
+      if (beforePitch !== null && detail.pitchTypeNumber !== undefined) {
+        const thrown = throwOpponentPitch(beforePitch, detail.pitchTypeNumber, {
+          batterIntimidates: careerRef.current?.equippedSkillIds.includes(INTIMIDATE_SKILL_ID) ?? false,
+        })
+        progressRef.current = thrown
+        setProgress(thrown)
+      }
       const nextAtBat = runner.applyPitch(detail.resolution)
       // 공마다 연속 파울(ctx+0x15f)을 센다 — 32·33 은 타석 결과와 함께 gameFlow 로 넘긴다 (0xa7dbc)
       const tally = tallyPitch(pitchTallyRef.current, detail.resolution)

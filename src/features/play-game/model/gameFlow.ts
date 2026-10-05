@@ -15,6 +15,7 @@ import type { GameState, PlayerSide } from '@/entities/game/model/gameState'
 import { playQuickAtBat } from '@/entities/game/model/quickAtBat'
 import {
   changePitcherIfNeeded,
+  drainPitcherForPitch,
   drainQuickPitcher,
   simulateHalfInning,
   startingMoundOf,
@@ -357,6 +358,39 @@ export interface PlayerOutcomeOptions {
 }
 
 /**
+ * **내 타석에서 상대 투수가 공 하나를 던졌다** — 원본은 공이 손을 떠날 때(상태 0x11 진입 0x3de10 의
+ * 0x3dec6) `0xa5e14(ctx, 구질 = game+0xfc8)` 를 부른다 (P1 3-1):
+ *   P+0x28·ctx+0x16c·수비팀+0x27c += 1 · state[0xd] = 0(0xa5e72) ·
+ *   c = 0x66ef0(구질), 0xb62b4(현재 타자, 22) || 0xb62b4(P, 18) 이면 ×2, 0xb62b4(P, 10) 이면 −1 → 0xaeb08
+ * 웹은 이 중 마운드 칸(투구 수 `+0x27c` · 스태미나 `+0x2c` · `justChanged`)만 든다 — 동료 간이 타석
+ * (`drainQuickPitcher`)과 같은 칸이다. 시즌 누계 P+0x28·반 이닝 투구 수 ctx+0x16c·타석 투구 수 ctx+0x161 은
+ * 타자편 진행기에 칸이 없다.
+ *
+ * 공마다 부른다 — 판정이 난 공(`PitchOutcomeDetail.pitchTypeNumber`)마다 한 번. 견제는 공이 아니라 안 부른다.
+ * 깎은 스태미나는 다음 타석 시작의 CPU 교체(0xac428)와 동료 간이 타석이 본다. 난수는 쓰지 않는다.
+ *
+ * `batterIntimidates` = 타석에 선 내 선수가 타자 스킬 22 압도를 **장착**했는가.
+ * 상대 투수 스킬 18·10 은 웹 로스터에 스킬 비트가 없어 늘 거짓이다 (`drainPitcherForPitch`).
+ */
+export function throwOpponentPitch(
+  progress: GameProgress,
+  pitchTypeNumber: number,
+  options: { readonly batterIntimidates: boolean },
+): GameProgress {
+  if (progress.game.isFinished) return progress
+  const mound = progress.opponentMound
+  return {
+    ...progress,
+    opponentMound: {
+      ...mound,
+      stamina: drainPitcherForPitch(opponentQuickDefenseOf(progress), mound, pitchTypeNumber, options.batterIntimidates),
+      pitches: mound.pitches + 1,
+      justChanged: false,
+    },
+  }
+}
+
+/**
  * 타석 결과만 먼저 정한다 — **인플레이 타구면 주자 처리를 뒤로 미룬다.**
  *
  * 인플레이 타구는 진행기에 넘길 `DefensePlayInput` 만 만들어 `pendingDefensePlay` 에 얹고
@@ -555,8 +589,7 @@ function finishPlayerOutcome(
       game: nextGame,
       // 내 타석에서 난 점수도 상대 투수 실점 A·B 에 붙는다. 공을 하나라도 던졌으니 교체 직후
       // 표시(state[0xd])도 내려가 있다 (0xa5e72).
-      // ⚠️ **투구 수·스태미나 소모는 빠져 있다** — 사람 타석의 투구 수가 이 함수로 들어오지 않는다
-      //    (타석 화면이 공 하나마다 0xa5e14 를 대신해 줄 길이 아직 없다).
+      // 투구 수·스태미나는 공이 손을 떠날 때마다 `throwOpponentPitch` 가 이미 깎았다 (0xa5e14).
       opponentMound: {
         ...progress.opponentMound,
         runsAllowed: Math.min(MAXIMUM_PITCHER_COUNTER, progress.opponentMound.runsAllowed + runsBattedIn),

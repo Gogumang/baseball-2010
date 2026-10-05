@@ -7,6 +7,7 @@ import {
   startPlayerOutcome,
   stealBase,
   summaryOf,
+  throwOpponentPitch,
 } from '@/features/play-game/model/gameFlow'
 import { EMPTY_AT_BAT_PITCH_TALLY, tallyPitch } from '@/features/play-at-bat/model/atBatPitchTally'
 import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
@@ -910,5 +911,37 @@ describe('사구 뒤 벤치 클리어링 (상태 0x1e, 20%) — 내 타석', () 
     const 끝 = startPlayerOutcome(돌발중, { kind: '사구' }, 첫굴림(0, 3))
 
     expect(끝.log.some((entry) => entry.text.includes('벤치 클리어링'))).toBe(false)
+  })
+})
+
+describe('내 타석의 공 하나 — 0xa5e14(ctx, 구질) (0x3dec6)', () => {
+  it('공마다 상대 투수 투구 수 +1 · 구질별 소모 · 교체 직후 표시를 내린다', () => {
+    const progress = startGame(createSeededRandom(20100901))
+    const mound0 = { ...progress.opponentMound, justChanged: true }
+    const before = { ...progress, opponentMound: mound0 }
+    const 직구 = throwOpponentPitch(before, 1, { batterIntimidates: false })
+    const 히든 = throwOpponentPitch(before, 18, { batterIntimidates: false })
+    expect(직구.opponentMound.pitches).toBe(mound0.pitches + 1)
+    expect(직구.opponentMound.justChanged).toBe(false)
+    // 직구 9 < 히든 13 — 구질이 소모를 가른다 (0x66ef0)
+    expect(직구.opponentMound.stamina).toBeLessThan(mound0.stamina)
+    expect(히든.opponentMound.stamina).toBeLessThan(직구.opponentMound.stamina)
+    // 다른 칸은 그대로다
+    expect(직구.game).toBe(before.game)
+  })
+
+  it('타자 압도(스킬 22)면 소모가 두 배 — 직구 c 9 → 18 (0xa5f0e)', () => {
+    const progress = startGame(createSeededRandom(20100901))
+    const 보통 = throwOpponentPitch(progress, 1, { batterIntimidates: false })
+    const 압도 = throwOpponentPitch(progress, 1, { batterIntimidates: true })
+    const 보통소모 = progress.opponentMound.stamina - 보통.opponentMound.stamina
+    const 압도소모 = progress.opponentMound.stamina - 압도.opponentMound.stamina
+    expect(압도소모).toBeGreaterThan(보통소모)
+  })
+
+  it('경기가 끝났으면 아무것도 안 한다', () => {
+    const progress = startGame(createSeededRandom(1))
+    const finished = { ...progress, game: { ...progress.game, isFinished: true } }
+    expect(throwOpponentPitch(finished, 1, { batterIntimidates: false })).toBe(finished)
   })
 })

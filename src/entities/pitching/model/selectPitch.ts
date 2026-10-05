@@ -55,6 +55,11 @@ export interface CpuPitchThrow {
   readonly kind: '투구'
   readonly pitch: Pitch
   /**
+   * 구질 번호 1~22 (`game+0xfc8`) — 공이 손을 떠날 때(0x3de10 의 0x3dec6) `0xa5e14(ctx, 구질)` 이
+   * 상대 투수 투구 수·스태미나를 깎는 데 쓴다 (`pitchStaminaCostOf`, 0x66ef0).
+   */
+  readonly pitchTypeNumber: number
+  /**
    * 실투 판정 0x33cbc 의 결과 (참이면 원본은 `[scene+0xf98].byte8 = 4`, 0x4deae).
    *
    * ⚠️ **미해결 — 사람 타석에서의 쓰임을 아직 옮기지 않았다.** 원본 0x4dc78 은 실투면 그 자리에서
@@ -209,7 +214,7 @@ export function selectPitch(
     pitcherMagicNumber: repertoire.magicId,
     pitcherForm: repertoire.form,
   }
-  return { kind: '투구', pitch, isMistakePitch: isMistake }
+  return { kind: '투구', pitch, pitchTypeNumber: typeNumber, isMistakePitch: isMistake }
 }
 
 /**

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { simulateHalfInning, startingMoundOf } from '@/entities/game/model/simulateHalfInning'
-import type { HalfInningMound } from '@/entities/game/model/simulateHalfInning'
+import { drainPitcherForPitch, drainQuickPitcher, simulateHalfInning, startingMoundOf } from '@/entities/game/model/simulateHalfInning'
+import type { HalfInningDefense, HalfInningMound } from '@/entities/game/model/simulateHalfInning'
 import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
 import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -202,5 +202,36 @@ describe('반 이닝의 CPU 투수 교체·체력 소모 (0xc1ba4 → 0xac428 ·
 
     expect(steals).toBeGreaterThan(0)
     expect(outs).toBe(40 * 3)
+  })
+})
+
+describe('공 하나 소모 drainPitcherForPitch — 0xa5e14 의 0xa5f0e~ → 0xaeb08', () => {
+  const 수비: HalfInningDefense = {
+    mound: startingMoundOf(0),
+    pitcherSlots: [0, 1, 2, 3, 4, 5, 6, 7],
+    pitcherAt: () => {
+      throw new Error('안 쓴다')
+    },
+    staminaAbilityAt: () => 500,
+    lead: 0,
+  }
+
+  it('직구 다섯 개는 간이 엔진의 다섯 공(drainQuickPitcher)과 같다', () => {
+    let mound = startingMoundOf(0)
+    for (let index = 0; index < 5; index += 1) {
+      mound = { ...mound, stamina: drainPitcherForPitch(수비, mound, 1, false) }
+    }
+    expect(mound.stamina).toBe(drainQuickPitcher(수비, startingMoundOf(0), 5))
+  })
+
+  it('구질별 소모 9 · 11 · 12 · 13 순으로 더 깎인다 (0x66ef0)', () => {
+    const 남은 = [1, 2, 10, 18].map((type) => drainPitcherForPitch(수비, startingMoundOf(0), type, false))
+    expect([...남은].sort((a, b) => b - a)).toEqual(남은)
+    expect(new Set(남은).size).toBe(4)
+  })
+
+  it('타자 압도면 c ×2 — 직구 둘과 같다', () => {
+    const 압도 = drainPitcherForPitch(수비, startingMoundOf(0), 1, true)
+    expect(FULL_STAMINA - 압도).toBeGreaterThan(FULL_STAMINA - drainPitcherForPitch(수비, startingMoundOf(0), 1, false))
   })
 })
