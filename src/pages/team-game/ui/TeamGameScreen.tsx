@@ -25,6 +25,7 @@ import {
 import { GameEndBoard } from '@/widgets/game-scene/ui/GameEndBoard'
 import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
 import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
+import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 import { hasGameIntro } from '@/widgets/game-scene/lib/introSchedule'
 import { HALF_INNING_JINGLE_TICK } from '@/features/play-game/model/halfInningBoard'
 import { HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
@@ -139,8 +140,8 @@ export function TeamGameScreen({
   const [closedBoardSerial, setClosedBoardSerial] = useState(0)
   const board = progress.halfInningBoard
   const isHalfInningBoardOpen = board !== null && board.serial !== closedBoardSerial && summary === null
-  /** 인트로·교대 판이 화면을 덮고 있는가 — 경기 키(0x498d4)가 안 먹는다 */
-  const isSceneCovering = !isIntroDone || isHalfInningBoardOpen
+  /** 인트로·교대 판·벤치 클리어링이 화면을 덮고 있는가 — 경기 키(0x498d4)가 안 먹는다 */
+  const isSceneCovering = !isIntroDone || isHalfInningBoardOpen || progress.pendingBenchClearing !== null
   /** 이미 다 보여 준 수비 플레이 — 같은 플레이를 두 번 재생하지 않는다 */
   const [shownPlay, setShownPlay] = useState<DefensePlayResult | null>(null)
   const play = progress.lastDefensePlay
@@ -343,6 +344,11 @@ export function TeamGameScreen({
         onDone={finishPlayback}
       />
     )
+  }
+
+  // 사구 뒤 벤치 클리어링 (상태 0x1e) — 타석이 붙들린 채 연출이 돈다 (진입 굴림 45 번은 진행기가 이미 썼다)
+  if (progress.pendingBenchClearing !== null) {
+    return <BenchClearingScene onDone={actions.finishBenchClearing} />
   }
 
   /**

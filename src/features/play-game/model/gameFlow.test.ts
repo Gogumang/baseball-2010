@@ -8,6 +8,7 @@ import {
   startPlayerOutcome,
   stealBase,
   summaryOf,
+  resolveBenchClearing,
   throwOpponentPitch,
 } from '@/features/play-game/model/gameFlow'
 import { EMPTY_AT_BAT_PITCH_TALLY, tallyPitch } from '@/features/play-at-bat/model/atBatPitchTally'
@@ -896,15 +897,40 @@ describe('사구 뒤 벤치 클리어링 (상태 0x1e, 20%) — 내 타석', () 
     expect(사구끝.log.some((entry) => entry.text.includes('벤치 클리어링'))).toBe(false)
   })
 
-  it('들어가면 상대(CPU 수비) 투수 투구 수가 10 늘고 나머지 차례는 같다', () => {
+  it('들어가면 상대(CPU 수비) 투수 투구 수가 10 늘고, 진입 굴림 45 번까지 쓰고 연출(0x1e)에서 붙든다', () => {
     const 시작 = 내타석(EMPTY_BASES, 0)
-    const 들어감 = startPlayerOutcome(시작, { kind: '사구' }, 첫굴림(0, 3))
-    const 안들어감 = startPlayerOutcome(시작, { kind: '사구' }, 첫굴림(0.9, 3))
+    let 굴림 = 0
+    const 첫 = 첫굴림(0, 6)
+    const 세는 = { ...첫, next: () => { 굴림 += 1; return 첫.next() } }
+    const 들어감 = startPlayerOutcome(시작, { kind: '사구' }, 세는)
 
-    expect(들어감.game).toEqual(안들어감.game)
-    expect(들어감.opponentMound.pitcherSlot).toBe(안들어감.opponentMound.pitcherSlot)
-    expect(들어감.opponentMound.pitches - 안들어감.opponentMound.pitches).toBe(10)
+    // 들어가기 굴림 1 + 진입 0x3a5f0 의 45 — 밀어내기 주루·다음 타석은 아직 안 돌았다
+    expect(굴림).toBe(46)
+    expect(들어감.pendingBenchClearing).toEqual({ outcome: { kind: '사구' } })
+    expect(들어감.game).toEqual(시작.game)
+    expect(들어감.opponentMound.pitches - 시작.opponentMound.pitches).toBe(10)
     expect(들어감.log.some((entry) => entry.text.includes('벤치 클리어링'))).toBe(true)
+  })
+
+  it('연출이 끝나면(0xae24c) 사구를 보통 길로 먹인다 — 틱 10 을 지났으면 그 앞에 굴림 8 번이 끼어든다', () => {
+    const 시작 = 내타석(EMPTY_BASES, 0)
+    const 들어감 = startPlayerOutcome(시작, { kind: '사구' }, 첫굴림(0, 6))
+
+    const 다봄 = resolveBenchClearing(들어감, { reachedTargetTick: true }, createSeededRandom(11))
+    // 건너뛴 쪽에 같은 난수를 8 번 앞당겨 주면 둘이 똑같이 흘러가야 한다
+    const 앞당김 = createSeededRandom(11)
+    for (let 번 = 0; 번 < 8; 번 += 1) 앞당김.next()
+    const 건너뜀 = resolveBenchClearing(들어감, { reachedTargetTick: false }, 앞당김)
+
+    expect(다봄.pendingBenchClearing).toBeNull()
+    expect(다봄.game).toEqual(건너뜀.game)
+    expect(다봄.log.map((entry) => entry.text)).toEqual(건너뜀.log.map((entry) => entry.text))
+  })
+
+  it('미리 다 돌리는 껍데기(applyPlayerOutcome)는 연출을 끝까지 본 것으로 친다', () => {
+    const 시작 = 내타석(EMPTY_BASES, 0)
+    const 끝 = applyPlayerOutcome(시작, { kind: '사구' }, 첫굴림(0, 6))
+    expect(끝.pendingBenchClearing).toBeNull()
   })
 
   it('돌발이 진행 중이면 굴림은 쓰지만 들어가지 않는다 (0x8eb94)', () => {

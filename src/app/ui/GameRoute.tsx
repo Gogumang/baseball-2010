@@ -123,6 +123,8 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
         onSteal={session.actions.stealBase}
         // CPU 견제 (0x345fc 종류 4 → 0x34848) — 판은 위 재생 갈래(`lastDefensePlay`)로 보인다
         onPickoff={session.actions.cpuPickoff}
+        // 사구 뒤 벤치 클리어링 연출(상태 0x1e)이 끝나면 사구를 먹인다
+        onBenchClearingDone={session.actions.finishBenchClearing}
         settings={gameSettings.settings}
         onSettingsChange={gameSettings.setSettings}
       />

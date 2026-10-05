@@ -163,7 +163,7 @@ export const ORIGINAL_SOUNDS: readonly OriginalSound[] = [
   { id: 39, role: 'voice', name: '"Strike two!" 스트라이크(카운트 2)', scene: '판정 v1 에서 [sp+0xa4]+4 == 2' },
   { id: 40, role: 'bgm', name: '이벤트(스토리 대화) 배경음', scene: '0x106 상태 114 · 0x105 상태 211' },
   { id: 42, role: 'effect', name: '돌발미션 시작 (0x2a)', scene: '후보 추첨 뒤 대사 로드 0x8eba0 · 0x8e2dc' },
-  { id: 44, role: 'bgm', name: '용도 미해결 (loop 목록에 든다)', scene: '0x3a8e0 끝에서 예약 — 무엇을 기록하는 함수인지 못 밝혔다' },
+  { id: 44, role: 'bgm', name: '벤치 클리어링 (loop 목록에 든다)', scene: '경기 상태 0x1e 진입 0x3a5f0 꼬리 0x3aba4 — 0x6e498(음, 0x2c, 0) 예약, 나갈 때 0x6e418 로 끊는다' },
   { id: 46, role: 'bgm', name: '엔딩 배경음', scene: '0x106 상태 141 엔딩 화면 · 0x105 상태 245 예약' },
   { id: 48, role: 'effect', name: '용도 미해결', scene: '부르는 곳을 못 찾았다' },
   { id: 50, role: 'effect', name: '용도 미해결', scene: '부르는 곳을 못 찾았다' },

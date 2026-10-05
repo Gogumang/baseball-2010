@@ -8,6 +8,7 @@ import { HelpScreen } from '@/pages/help/ui/HelpScreen'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import { effectiveAbilityOf } from '@/entities/career/model/condition'
 import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
+import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import type { AtBatState } from '@/entities/at-bat/model/atBatState'
@@ -51,6 +52,11 @@ interface GameScreenProps {
   /** 경기 중 메뉴 "설정" 칸이 열 환경설정 값. 안 넘기면 칸이 잠긴다 */
   readonly settings?: GameSettings
   readonly onSettingsChange?: (settings: GameSettings) => void
+  /**
+   * 벤치 클리어링 연출(상태 0x1e)이 끝났다 — `progress.pendingBenchClearing` 이 차 있는 동안 타석 대신 연출을 띄운다.
+   * 인자는 틱 10 의 갱신이 돌았는가 (진행기 `resolveBenchClearing` 이 그 굴림 8 번을 낸다).
+   */
+  readonly onBenchClearingDone?: (reachedTargetTick: boolean) => void
 }
 
 /** 나만의리그 타자편 = 원본 전역 모드 4 — 경기 중 메뉴 표 0xcfcfc 의 **행 2**(네 칸)다 */
@@ -73,6 +79,7 @@ export function GameScreen({
   onPickoff,
   settings,
   onSettingsChange,
+  onBenchClearingDone,
 }: GameScreenProps) {
   const [isMenuOpen, setMenuOpen] = useState(false)
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
@@ -94,10 +101,13 @@ export function GameScreen({
       ].filter((base) => base !== null) as (1 | 2)[])
   ).filter((base) => canStealFrom(base))
 
+  const isBenchClearing = progress.pendingBenchClearing !== null
   /** 원본 공용 키 처리 0x498d4 — '*' 메뉴 · 도루 '3'/'2' */
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat) return
+      // 벤치 클리어링(0x1e) 중에는 공용 키가 안 열린다
+      if (isBenchClearing) return
       if (event.key === '*') {
         event.preventDefault()
         return setMenuOpen((open) => !open)
@@ -111,7 +121,12 @@ export function GameScreen({
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [isMenuOpen, onSteal, overlay, stealableBases])
+  }, [isBenchClearing, isMenuOpen, onSteal, overlay, stealableBases])
+
+  // 사구 뒤 벤치 클리어링 (상태 0x1e) — 타석이 붙들린 채 연출이 돈다. 공용 키 '*'·도루도 0x1e 에서는 안 열린다
+  if (progress.pendingBenchClearing !== null && onBenchClearingDone !== undefined) {
+    return <BenchClearingScene onDone={onBenchClearingDone} />
+  }
 
   // 경기 중 메뉴의 "조작방법"(0x3c212)·"설정"(0x3c326)
   if (overlay === '조작방법') return <HelpScreen onBack={() => setOverlay(null)} />

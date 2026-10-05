@@ -14,6 +14,7 @@ import {
   isPitchTurn,
   pickoff,
   pinchHit,
+  resolveBenchClearing,
   resolveDefensePlay,
   runAutoProgress,
   startBatterOutcome,
@@ -116,6 +117,11 @@ export interface TeamGameSession {
      * 붙들어 둔 상태를 푼다 — 안 그러면 다음 타석이 영영 시작되지 않는다.
      */
     readonly finishDefensePlay: (result?: DefensePlayResult) => void
+    /**
+     * 벤치 클리어링 연출(상태 0x1e)이 끝났다 (`BenchClearingScene` 의 `onDone`) — 출구 0xae24c 뒤 사구를 먹인다.
+     * `reachedTargetTick` 이면 틱 10 의 굴림 8 번을 진행기가 먼저 낸다.
+     */
+    readonly finishBenchClearing: (reachedTargetTick: boolean) => void
   }
 }
 
@@ -239,6 +245,8 @@ export function useTeamGame(options: TeamGameOptions, random: RandomPort): TeamG
       // 원본 판정 v9 가 어떤 플레이에서 나는지 미해결이다
       steal: (base: StealBase) => step((current) => stealBase(current, base, random)),
       autoProgress: () => step((current) => runAutoProgress(current, random)),
+      finishBenchClearing: (reachedTargetTick: boolean) =>
+        step((current) => resolveBenchClearing(current, { reachedTargetTick }, random)),
       finishDefensePlay: (result?: DefensePlayResult) => {
         const pending = progressRef.current.pendingDefensePlay
         if (pending === null) return

@@ -81,6 +81,7 @@ import type { BurstResolution, BurstSession } from '@/entities/burst-mission/mod
 import { createBurstSession, resolveBurst, tryTriggerBurst } from '@/entities/burst-mission/model/burstMissionSession'
 import { burstResultBitsOf } from '@/entities/burst-mission/model/burstResultBits'
 import { benchClearingEffectOf, rollsIntoBenchClearing } from '@/entities/game/model/benchClearing'
+import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
 import { ROSTER_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
@@ -241,6 +242,12 @@ export interface GameProgress {
    * 경기 끝 결과 판(상태 0x18, 0x4fe9c)이 이 셋을 그대로 읽어 세 줄로 그린다 (`pitchersOfRecordOf`).
    */
   readonly decisions: DecisionState
+  /**
+   * **벤치 클리어링 연출 중**(상태 0x1e). 사구 타석이 20/99 굴림에 걸리면 진입(0x3a5f0)의 굴림 45 번까지 쓰고
+   * 여기 사구 결과를 붙든 채 멈춘다 — 밀어내기 주루·정산·다음 타석은 화면이 연출을 끝내고
+   * `resolveBenchClearing` 을 부를 때 비로소 돈다 (원본도 출구 0xae24c 뒤에야 0x17 로 간다).
+   */
+  readonly pendingBenchClearing: { readonly outcome: AtBatOutcome } | null
 }
 
 /**
@@ -330,6 +337,7 @@ export function startGame(
     runningModeManual,
     // 경기 상태 초기화 0xb6814 — 셋 다 측 2(없음)
     decisions: EMPTY_DECISION_STATE,
+    pendingBenchClearing: null,
   }
   return advanceUntilPlayerTurn(initial, random)
 }
@@ -356,7 +364,11 @@ export function applyPlayerOutcome(
   random: RandomPort,
   options: PlayerOutcomeOptions = {},
 ): GameProgress {
-  const started = startPlayerOutcome(progress, outcome, random, options)
+  let started = startPlayerOutcome(progress, outcome, random, options)
+  // 벤치 클리어링도 끼어들 사람이 없으면 100틱을 다 본 것으로 친다 — 틱 10 의 굴림 8 번까지 나간다
+  if (started.pendingBenchClearing !== null) {
+    return resolveBenchClearing(started, { reachedTargetTick: true }, random)
+  }
   const pending = started.pendingDefensePlay
   if (pending === null) return started
   // 미리 다 돌려 버린다 — `runDefensePlay` 는 스테퍼를 끝까지 도는 얇은 껍데기다.
@@ -436,7 +448,12 @@ export function startPlayerOutcome(
   if (progress.game.isFinished) return progress
   progress = withFoulRecords(progress, options.foulRecordIds)
   // 사구면 상태 0x12 끝(0x4e74c)에서 벤치 클리어링을 굴린다 — 밀어내기 주루·정산보다 앞이다
-  progress = withBenchClearing(progress, outcome, random)
+  const cleared = withBenchClearing(progress, outcome, random)
+  if (cleared !== progress) {
+    // 들어갔다 — 진입 0x3a5f0 이 공격 9명을 흩뿌리며 45 번 굴리고, 연출이 끝날 때까지 붙든다
+    rollBenchClearingEntry(random)
+    return { ...cleared, pendingBenchClearing: { outcome } }
+  }
   if (!isBattedBallInPlay(outcome)) {
     // 홈런은 날아가는 그림만 따로 만들어 재생시킨다 — 점수는 타석 쪽이 이미 맞게 한다
     const playback = homeRunPlaybackOf({ outcome, bases: progress.game.bases, pattern: options.pattern })
@@ -463,11 +480,30 @@ export function resolveDefensePlay(
 }
 
 /**
+ * **벤치 클리어링 연출이 끝났다** — 출구 0xae24c (100틱 뒤 화면 전환이 끝났거나 OK·'5' 로 건너뜀).
+ *
+ * `reachedTargetTick` = 틱 10 의 갱신이 돌았는가. 돌았으면 그때 수비 8명 목표를 굴린 8 번이 나갔다
+ * (`benchClearingScene` 머리말) — 화면은 굴림을 직접 하지 않고 여기로 알린다. 그 뒤 사구는 보통 길 그대로다.
+ */
+export function resolveBenchClearing(
+  progress: GameProgress,
+  scene: { readonly reachedTargetTick: boolean },
+  random: RandomPort,
+): GameProgress {
+  const pending = progress.pendingBenchClearing
+  if (pending === null) return progress
+  if (scene.reachedTargetTick) rollBenchClearingTargets(random)
+  const cleared = { ...progress, pendingBenchClearing: null }
+  const playback = homeRunPlaybackOf({ outcome: pending.outcome, bases: cleared.game.bases })
+  return finishPlayerOutcome(cleared, pending.outcome, random, null, playback)
+}
+
+/**
  * **사구 뒤 벤치 클리어링** (`entities/game/model/benchClearing`, R10 6절).
  * 내 타석이라 수비는 늘 CPU 다 → 들어가면 상대 투수 투구 수(`+0x27c`) +10 (0x3ab82).
  * 시즌 평판 S[1](코드 1)은 게이트상 내 팀이 수비일 때만 남아 여기서는 안 오른다 — 타자편은 S 칸도 안 든다.
  * 홈런더비가 아니므로 사구면 늘 한 번 굴린다 — **사구 타석만 난수를 하나 더 쓴다.**
- * ⚠️ 연출 화면(양 팀이 마운드로 몰려나오는 100틱)과 그 연출이 쓰는 난수는 없다 — benchClearing 머리 주석.
+ * 들어가면 부르는 쪽이 연출(상태 0x1e)을 붙든다 — `startPlayerOutcome` · `resolveBenchClearing`.
  */
 function withBenchClearing(progress: GameProgress, outcome: AtBatOutcome, random: RandomPort): GameProgress {
   const entered = rollsIntoBenchClearing(

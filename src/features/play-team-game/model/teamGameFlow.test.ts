@@ -31,6 +31,7 @@ import {
   replacementPitcherIndexOf,
   resolveDefensePlay,
   runAutoProgress,
+  resolveBenchClearing,
   pitchersOfRecordOf,
   startBatterOutcome,
   startTeamGame,
@@ -1475,7 +1476,9 @@ describe('사구 — 우리 타석 결과 4 와 벤치 클리어링 (상태 0x1e
     const 들어감 = startBatterOutcome(progress, { kind: '사구' }, 첫굴림(0, 3))
     const 안들어감 = startBatterOutcome(progress, { kind: '사구' }, 첫굴림(0.9, 3))
 
-    expect(들어감.game).toEqual(안들어감.game)
+    // 들어가면 연출(상태 0x1e)에서 사구를 붙든다 — 밀어내기는 연출이 끝난 뒤 (`teamBenchClearing.test`)
+    expect(들어감.pendingBenchClearing).toEqual({ side: '공격', outcome: { kind: '사구' } })
+    expect(들어감.game).toEqual(progress.game)
     expect(들어감.opponentPitcherCounters.pitches - 안들어감.opponentPitcherCounters.pitches).toBe(10)
     expect(들어감.gameRecord).toEqual(안들어감.gameRecord)
     expect(들어감.gameRecord[1]).toBe(0)
@@ -1521,7 +1524,9 @@ describe('사구 — 우리 수비에서 CPU 타자가 맞는다 (0x35a20 · 벤
     expect(벤치.lastResolution).toEqual({ kind: '사구' })
     expect(보통.stamina - 벤치.stamina).toBe(1000)
     expect(벤치.gameRecord[1] - 보통.gameRecord[1]).toBe(1)
-    expect(벤치.game).toEqual(보통.game)
+    // 연출(상태 0x1e)에서 붙든다 — 끝나면 보통 길(밀어내기 1루)
+    expect(벤치.pendingBenchClearing).toEqual({ side: '수비', outcome: { kind: '사구' } })
+    expect(resolveBenchClearing(벤치, { reachedTargetTick: false }, createSeededRandom(1)).game.bases.first).toBe(true)
     // 수비가 사람이라 상대(공격) 투수 투구 수는 건드리지 않는다
     expect(벤치.opponentPitcherCounters).toEqual(보통.opponentPitcherCounters)
     expect(벤치.log.some((entry) => entry.text.includes('벤치 클리어링'))).toBe(true)
