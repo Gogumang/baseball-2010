@@ -19,12 +19,16 @@ import type { PitcherRepertoire } from '@/shared/config/original/pitcherRepertoi
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import { rollStartingPitcherIndex } from '@/entities/team/model/teamRoster'
 import { rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
-import { applyOpponentAtBat } from '@/features/play-pitcher-game/model/pitcherGameState'
+import { applyOpponentAtBat, applyOpponentRunnerPlay } from '@/features/play-pitcher-game/model/pitcherGameState'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { defenseAbilitiesOf, isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayInput, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import type { ControlSide } from '@/entities/defense-controls/model/defenseKeys'
 import { homeRunPlaybackOf } from '@/features/defense-play/model/homeRunPlayback'
+import { PICKOFF_RESULT, runPickoffPlay } from '@/features/defense-play/model/pickoffPlay'
+import type { PickoffPlayResult } from '@/features/defense-play/model/pickoffPlay'
+import { PICKOFF_PLAY_KIND, pickoffPlayForKey } from '@/entities/defense-controls/model/pickoff'
+import type { PickoffBase } from '@/entities/defense-controls/model/pickoff'
 import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 import type { LeaguePlateAppearance } from '@/entities/league/model/leaguePlayerStats'
@@ -710,17 +714,24 @@ function withHitBases(
   return next
 }
 
-/** 타순 칸 기록에 타석 하나를 얹는다 (`0xa8024`) */
+/**
+ * 타순 칸 기록에 플레이 하나를 얹는다 (`0xa8024`).
+ *
+ * `outcome` 이 null 이면 **타석 결과 없이 끝난 판**(견제 = 플레이 종류 4)이다 — 원본도 견제 판 끝
+ * `0xae3e8` 이 `0xa8024` 를 부르지만(`0xae57e~0xae5b2`) `state[0x26] = 4` 라 타석 칸(+0x14)이 안 오르고,
+ * 안타·적시타 칸은 안타 가지(`0xa86e0`) 안이라 애초에 안 선다. 게이트는 `recordPlateAppearance` 의 `playKind` 다.
+ */
 function withPlateAppearance(
   records: readonly BatterGameRecord[],
   slot: number,
-  outcome: AtBatOutcome,
+  outcome: AtBatOutcome | null,
   runsBattedIn: number,
 ): readonly BatterGameRecord[] {
   const next = [...records]
   next[slot] = recordPlateAppearance(next[slot] ?? EMPTY_BATTER_GAME_RECORD, {
-    isHit: isHit(outcome),
+    isHit: outcome !== null && isHit(outcome),
     runsBattedIn,
+    ...(outcome === null ? { playKind: PICKOFF_PLAY_KIND } : {}),
   })
   return next
 }
@@ -1432,6 +1443,165 @@ export function resolveDefensePlay(
     return finishBatterOutcome(cleared, pending.outcome, random, result, null)
   }
   return advance(finishDefensiveAtBat(cleared, pending.outcome, true, result, null), random)
+}
+
+/* ── 견제 (메시지 0x10 → 0x50f28 → 플레이 종류 4) ─────────────────────────────── */
+
+/**
+ * **사람 투수의 견제** — 구질 고르기(상태 0xf)에서 '3' 1루 · '1' 2루 · '7' 3루 (0x53548 → 메시지 0x10 → 0x50f28).
+ * 투수편 `pitcherGameFlow.pickoff` 와 같은 길이다.
+ *
+ * 그 루에 주자가 없거나 견제 키가 아니면 **아무 일도 없다**(원본도 키를 먹고 끝난다 — 같은 객체를 돌려준다).
+ * 견제는 투구가 아니다: 투구 수·스태미나·볼카운트·마구 횟수·상대 타순을 건드리지 않는다 (0x10~0x12 를 안 지난다).
+ *
+ * 수비 화면은 `runPickoffPlay` 가 미리 끝까지 돌린 틱을 `lastDefensePlay` 로 재생한다 — 견제 중에는 사람이
+ * 바꿀 것이 없어서다(`pickoffPlay` 머리 주석). 난수는 그 안의 **악송구 굴림(0xa1828) 1번 · 악송구면 +2번**뿐이다.
+ */
+export function pickoff(progress: TeamGameProgress, webKey: string, random: RandomPort): TeamGameProgress {
+  if (!isPitchTurn(progress) || !progress.atBatPrepared) return progress
+  const bases = progress.game.bases
+  const play = pickoffPlayForKey(webKey, (base) => hasRunnerOn(bases, base))
+  if (play === null) return progress
+  const result = runPickoffPlay({
+    targetBase: play.targetBase,
+    bases,
+    outs: progress.game.outs,
+    // 우리가 수비 중이다 — 아홉 칸은 우리 팀, 주자는 상대 (타구 진행기 `defensiveDefenseInputOf` 와 같은 근사:
+    // 주자 모두가 지금 타자의 주루를 쓴다)
+    defenseAbilities: defenseAbilitiesFor(progress, progress.options.ourTeamId, progress.ourPitcherIndex),
+    runAbility: runAbilityFor(progress, progress.options.opponentTeamId, progress.opponentOrderIndex),
+    random,
+    // 공격이 CPU 라 자동 진루 제어기(0xaf918)가 돈다 (0xae690 첫 항)
+    offenseIsCpu: true,
+  })
+  return applyPickoffPlay(progress, result, '수비', random)
+}
+
+/**
+ * **CPU 투수의 견제** — 사람이 칠 차례에 CPU 투수 AI 목표점 고르기 `0x345fc` 가 종류 4 를 뽑으면
+ * 목표점을 안 만들고 `0x34848` 이 `rand(1,4)` 를 주자 있는 루가 나올 때까지 굴려 **사람 견제와 같은
+ * 메시지 0x10** 을 보낸다(I-controls 4a-2). 공은 안 던진다 — 상태 0x11 예약(0x34888)을 안 지난다.
+ *
+ * 여기는 **그 루가 정해진 뒤**(메시지 0x10 이후)다. 루를 고르는 굴림(`entities/pitching/model/pitchTarget`
+ * 의 `isCpuPickoff` · `cpuPickoffBaseOf`)은 CPU 투구를 고르는 자리(`selectPitch` — 지금은
+ * `widgets/batting-stage/model/useStageAnimation`)에서 굴려야 차례가 원본과 같다: 구질(0x344dc) →
+ * 목표 종류(0x9eeac) → **견제 루(0x34848, 주자 있는 루까지 반복)** 이고, 그 뒤 목표점·제구·곡선 굴림은 없다.
+ * ⚠️ 그 자리는 이 작업 구역 밖이라 아직 이 함수를 부르는 곳이 없다 — 타석 화면이 "이번 투구는 견제" 를
+ *    알려 주면(`TeamGameSession.actions.cpuPickoff`) 그대로 이어진다.
+ *
+ * 그 루가 비었으면 원본 루프가 거기서 안 멈추므로 부르는 쪽 잘못이다 — 아무 일도 없다.
+ */
+export function cpuPickoff(progress: TeamGameProgress, base: PickoffBase, random: RandomPort): TeamGameProgress {
+  if (!isBatterTurn(progress) || !progress.atBatPrepared) return progress
+  const bases = progress.game.bases
+  if (!hasRunnerOn(bases, base)) return progress
+  const result = runPickoffPlay({
+    targetBase: base,
+    bases,
+    outs: progress.game.outs,
+    // 우리 공격이니 수비는 상대 팀이다
+    defenseAbilities: defenseAbilitiesFor(progress, progress.options.opponentTeamId, progress.opponentPitcherIndex),
+    runAbility: runAbilityFor(progress, progress.options.ourTeamId, progress.game.battingOrderIndex),
+    random,
+    // 우리가 공격이다 — 환경설정 "주루" 가 먹는다 (0xae690 의 둘째 항)
+    offenseIsCpu: false,
+    runningMode: progress.options.runningModeManual === true ? '수동' : '자동',
+  })
+  return applyPickoffPlay(progress, result, '공격', random)
+}
+
+function hasRunnerOn(bases: GameState['bases'], base: number): boolean {
+  return base === 1 ? bases.first : base === 2 ? bases.second : base === 3 ? bases.third : false
+}
+
+/** `applyAtBatOutcome` 은 `precomputed` 를 받으면 결과 코드를 안 읽는다 — 견제에는 타석 결과가 없어 자리만 채운다 */
+const PICKOFF_OUTCOME_PLACEHOLDER: AtBatOutcome = { kind: '아웃', detail: '땅볼아웃' }
+
+/**
+ * 견제 한 판을 경기 상태에 먹인다 — 원본 견제 판 끝 `0xae3e8` 의 길이다.
+ *
+ * - `0xae576~0xae592`: `state[0x26]` 이 4 면 (아웃 ≤ 2 이고 다른 갈래에 안 걸리면) 다음 상태 **0xf**(같은 타석,
+ *   다음 공) — 볼카운트·타순 그대로 두고 `atBatPrepared` 도 그대로 둔다.
+ * - `0xae5a8`: 그리고 정산 `0xa8024` 를 부른다 — **종류 4 라 타석 칸(+0x14)이 안 오른다**(`withPlateAppearance`
+ *   에 결과 null). 타석에 서 있는 타자(사람 수비면 상대 타순 칸, 사람 공격이면 우리 타순 칸)의 칸이다.
+ *
+ * ⚠️ 미해결·근사
+ * - 원본은 0xf 에 다시 들어서며 진입 `0x3d954` 가 CPU 대타(0xac228)·CPU 투수 교체(0xac428)를 다시 부른다.
+ *   웹은 공마다도 이것을 안 다시 부르므로(`prepareAtBat` 은 타석 시작에만) 견제 뒤에도 안 부른다 — 기존 근사와 같다.
+ * - 견제사·진루는 이 모드에서 사실상 안 난다(웹 도루는 그 자리에서 끝나 루를 떠난 주자가 없다). 그래도 진행기가
+ *   아웃·진루를 내면 경기 상태(루·아웃·점수·반 이닝 교대)에는 먹인다. 그때 `0xa8024` 의 나머지 칸(투수 아웃 수·
+ *   평판 16칸·리그 기록·돌발 판정 0x8f414)이 견제 판에서 어떻게 도는지는 손대지 않았다 — 타순도 안 민다
+ *   (`applyOpponentRunnerPlay` 주석과 같은 미해결).
+ */
+function applyPickoffPlay(
+  progress: TeamGameProgress,
+  result: PickoffPlayResult,
+  humanSide: ControlSide,
+  random: RandomPort,
+): TeamGameProgress {
+  const before = progress.game
+  const advanceResult = result.advance
+  const humanDefends = humanSide === '수비'
+  const changed =
+    advanceResult.outsAdded > 0 ||
+    advanceResult.runsScored > 0 ||
+    advanceResult.bases.first !== before.bases.first ||
+    advanceResult.bases.second !== before.bases.second ||
+    advanceResult.bases.third !== before.bases.third
+
+  let next: TeamGameProgress = humanDefends
+    ? {
+        ...progress,
+        lastDefensePlay: result,
+        opponentEntryRecords: withPlateAppearance(progress.opponentEntryRecords, progress.opponentOrderIndex, null, 0),
+      }
+    : {
+        ...progress,
+        lastDefensePlay: result,
+        ourEntryRecords: withPlateAppearance(progress.ourEntryRecords, before.battingOrderIndex, null, 0),
+      }
+
+  let runs = 0
+  if (changed) {
+    let game: GameState
+    if (humanDefends) {
+      const applied = applyOpponentRunnerPlay(before, progress.opponentOrderIndex, advanceResult)
+      game = applied.game
+      runs = applied.runsScored
+    } else {
+      // 타석이 끝난 것이 아니라 타순 커서는 그대로 둔다
+      game = {
+        ...applyAtBatOutcome(before, PICKOFF_OUTCOME_PLACEHOLDER, advanceResult),
+        battingOrderIndex: before.battingOrderIndex,
+      }
+      runs = game.ourScore - before.ourScore
+    }
+    const halfChanged = game.half !== before.half || game.inning !== before.inning
+    next = {
+      ...next,
+      game,
+      // 득점 처리 0xa5c34 는 1점마다 수비 팀 A·B 를 올린다 (P7 E1)
+      ...(humanDefends
+        ? {
+            ourPitcherCounters: addRunsToCounters(progress.ourPitcherCounters, runs, 0, halfChanged),
+            pitching: { ...progress.pitching, runsAllowed: progress.pitching.runsAllowed + runs },
+          }
+        : {
+            opponentPitcherCounters: addRunsToCounters(progress.opponentPitcherCounters, runs, 0, halfChanged),
+          }),
+      ...(halfChanged ? { atBat: createAtBat(), atBatPrepared: false } : {}),
+    }
+  }
+
+  const call = result.resultCode === PICKOFF_RESULT.OUT ? '견제사' : result.errantThrow ? '악송구' : '세이프'
+  next = appendLog(
+    next,
+    `${before.inning}회${before.half} ${humanDefends ? '' : '상대 '}${result.targetBase}루 견제 — ${call}${
+      runs > 0 ? ` (${runs}${humanDefends ? '실점' : '점'})` : ''
+    }`,
+    true,
+  )
+  return changed ? advance(next, random) : next
 }
 
 /* ── 타석 준비 · 돌발 ─────────────────────────────────────────────────────────── */

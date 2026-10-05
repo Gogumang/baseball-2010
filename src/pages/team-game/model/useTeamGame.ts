@@ -9,8 +9,10 @@ import {
   canOpenPitcherChange,
   changePitcher,
   closeBurstWindow,
+  cpuPickoff,
   isBatterTurn,
   isPitchTurn,
+  pickoff,
   pinchHit,
   resolveDefensePlay,
   runAutoProgress,
@@ -32,6 +34,8 @@ import type {
 } from '@/features/play-team-game/model/teamGameFlow'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
+import { isPickoffPlayResult, pickoffCallSoundIdOf } from '@/features/defense-play/model/pickoffPlay'
+import type { PickoffBase } from '@/entities/defense-controls/model/pickoff'
 import { applyPitchResolution } from '@/entities/at-bat/model/atBatState'
 import {
   deepHitCheerSoundIdOf,
@@ -83,6 +87,16 @@ export interface TeamGameSession {
     readonly applyOutcome: (outcome: AtBatOutcome) => void
     /** 구질·코스·게이지 칸을 정해 한 개 던진다 */
     readonly throwPitch: (input: TeamPitchInput) => void
+    /**
+     * 구질 고르기(상태 0xf)에서 눌린 키 — '3'/'1'/'7' 이고 그 루에 주자가 있으면 견제 한 판을 돌린다
+     * (0x53548 → 0x50f28). 아니면 아무 일도 없다.
+     */
+    readonly pickoff: (key: string) => void
+    /**
+     * CPU 투수가 견제를 걸었다 (0x34848 이 고른 루로 메시지 0x10). 사람이 칠 차례에만 먹는다.
+     * ⚠️ 부르는 곳이 아직 없다 — CPU 투구를 고르는 타석 화면(`widgets/batting-stage`)이 알려 줘야 한다.
+     */
+    readonly cpuPickoff: (base: PickoffBase) => void
     /** 돌발 창 닫기 */
     readonly closeBurst: () => void
     /** `#` 교체 화면에서 벤치 투수 칸을 고른다 (R4 1a·1c) */
@@ -198,6 +212,12 @@ export function useTeamGame(options: TeamGameOptions, random: RandomPort): TeamG
             ]
           },
         ),
+      // 판정 콜 — 세이프면 늘 17 (0x51c14 의 종류 4·5 갈래), 견제사면 62/20 (0x51b36).
+      // ⚠️ 원본은 공이 잡히는 **틱**에 낸다. 웹은 견제 판을 미리 다 돌려 재생하므로 판을 연 자리에서 낸다
+      // — 투수편(`usePitcherGame.pickoff`)과 같은 근사다
+      pickoff: (key: string) => step((current) => pickoff(current, key, random), pickoffCallSoundsOf),
+      cpuPickoff: (base: PickoffBase) =>
+        step((current) => cpuPickoff(current, base, random), pickoffCallSoundsOf),
       closeBurst: () => step((current) => closeBurstWindow(current)),
       changePitcher: (benchIndex: number) =>
         step(
@@ -263,6 +283,13 @@ export function useTeamGame(options: TeamGameOptions, random: RandomPort): TeamG
     pendingDefensePlay: progress.pendingDefensePlay,
     actions,
   }
+}
+
+/** 견제 판이 새로 열렸으면 그 판정 콜 하나 */
+function pickoffCallSoundsOf(before: TeamGameProgress, after: TeamGameProgress): readonly (number | null)[] {
+  return after.lastDefensePlay !== before.lastDefensePlay && isPickoffPlayResult(after.lastDefensePlay)
+    ? [pickoffCallSoundIdOf(after.lastDefensePlay)]
+    : []
 }
 
 export type {

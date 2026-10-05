@@ -16,12 +16,14 @@ import {
   canOpenPinchHit,
   canOpenPitcherChange,
   changePitcher,
+  cpuPickoff,
   currentBatterAbility,
   currentBatterEntry,
   currentPitcherAbility,
   isBatterTurn,
   isPitchTurn,
   ourPitcherStats,
+  pickoff,
   pinchHit,
   pitchSlotsFor,
   replacementPitcherIndexOf,
@@ -36,6 +38,7 @@ import {
   throwPitch,
 } from '@/features/play-team-game/model/teamGameFlow'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
+import { isPickoffPlayResult, PICKOFF_RESULT } from '@/features/defense-play/model/pickoffPlay'
 import {
   clearSeasonGameRecord,
   seasonReputationChangeOf,
@@ -1050,5 +1053,124 @@ describe('한 경기를 끝까지 돌리면 16칸이 실제로 찬다', () => {
     expect(seasonReputationChangeOf(clearSeasonGameRecord(), context)).toBe(2)
     // 채워진 16칸으로는 상한 +6 까지 올라간다
     expect(seasonReputationChangeOf(summary.gameRecord, context)).toBe(6)
+  })
+})
+
+describe('견제 — 메시지 0x10 → 0x50f28 → 플레이 종류 4 (사람 수비 0x53548 · CPU 0x34848)', () => {
+  const 주자 = (progress: TeamGameProgress, bases: TeamGameProgress['game']['bases']): TeamGameProgress => ({
+    ...progress,
+    game: { ...progress.game, bases },
+  })
+  /** 굴림 수를 센다 — 견제 판이 굴리는 것은 악송구 굴림(0xa1828)뿐이다 */
+  const 세는난수 = (seed: number) => {
+    const inner = createSeededRandom(seed)
+    const counter = { draws: 0 }
+    const random: RandomPort = {
+      next: () => {
+        counter.draws += 1
+        return inner.next()
+      },
+      nextInRange: (minimum, maximum) => {
+        counter.draws += 1
+        return inner.nextInRange(minimum, maximum)
+      },
+      pick: (candidates) => {
+        counter.draws += 1
+        return inner.pick(candidates)
+      },
+    }
+    return { random, counter }
+  }
+
+  it('사람 수비: 그 루에 주자가 없거나 견제 키가 아니면 아무 일도 없다 — 같은 객체를 돌려준다', () => {
+    const { progress, random } = 시작()
+    const 판 = 주자(progress, { first: true, second: false, third: false })
+    expect(isPitchTurn(판)).toBe(true)
+    expect(pickoff(판, '1', random)).toBe(판) // 2루 견제인데 2루가 비었다
+    expect(pickoff(판, '2', random)).toBe(판) // 견제 키가 아니다
+    // 칠 차례에는 사람 견제 키가 없다 (0x53548 은 수비일 때만)
+    const { progress: 공격 } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
+    const 공격판 = 주자(공격, { first: true, second: false, third: false })
+    expect(pickoff(공격판, '3', random)).toBe(공격판)
+  })
+
+  it('사람 수비: 견제는 투구가 아니다 — 투구 수·스태미나·볼카운트·타순이 그대로고 재생할 판만 생긴다', () => {
+    const { progress } = 시작()
+    const 판 = 주자(progress, { first: true, second: false, third: true })
+    const { random, counter } = 세는난수(7)
+    const after = pickoff(판, '7', random)
+    expect(after).not.toBe(판)
+    expect(after.pitchCount).toBe(판.pitchCount)
+    expect(after.stamina).toBe(판.stamina)
+    expect(after.magicRemaining).toBe(판.magicRemaining)
+    expect(after.atBat).toEqual(판.atBat)
+    expect(after.opponentOrderIndex).toBe(판.opponentOrderIndex)
+    expect(after.game).toEqual(판.game)
+    expect(after.atBatPrepared).toBe(true)
+    expect(isPickoffPlayResult(after.lastDefensePlay)).toBe(true)
+    const play = after.lastDefensePlay
+    if (!isPickoffPlayResult(play)) throw new Error('견제 판이 아니다')
+    expect(play.throwBase).toBe(3)
+    expect(play.ticks.length).toBeGreaterThan(0)
+    // 루에 붙은 주자는 견제로 안 죽는다 (0xb36d0 · 0x4677a) — 악송구가 아니면 결과 9
+    if (!play.errantThrow) expect(play.resultCode).toBe(PICKOFF_RESULT.SAFE)
+    // 악송구 굴림 1번(악송구면 +2번)뿐이다
+    expect(counter.draws).toBe(play.errantThrow ? 3 : 1)
+    expect(after.log[0]?.text).toContain('3루 견제')
+    // 다시 던질 수 있다 — 상태 0xf 로 돌아온다 (0xae592)
+    expect(isPitchTurn(after)).toBe(true)
+  })
+
+  it('정산 0xa8024 는 종류 4 라 타석 칸(+0x14)이 안 오른다 — 대타 AI(0xac228) 가 보는 그 칸', () => {
+    const { progress } = 시작()
+    const 판 = 주자(progress, { first: true, second: false, third: false })
+    const after = pickoff(판, '3', createSeededRandom(3))
+    expect(after.opponentEntryRecords).toEqual(판.opponentEntryRecords)
+    expect(after.leaguePlateAppearances).toEqual(판.leaguePlateAppearances)
+
+    const { progress: 공격 } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
+    const 공격판 = 주자(공격, { first: false, second: true, third: false })
+    const cpu = cpuPickoff(공격판, 2, createSeededRandom(3))
+    expect(cpu).not.toBe(공격판)
+    expect(cpu.ourEntryRecords).toEqual(공격판.ourEntryRecords)
+  })
+
+  it('CPU 견제: 사람이 칠 차례에만, 주자 있는 루에만 걸린다 — 타석은 그대로 이어진다', () => {
+    const { progress } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
+    const 판 = 주자(progress, { first: true, second: false, third: false })
+    expect(isBatterTurn(판)).toBe(true)
+    // 0x34848 은 주자 있는 루까지 다시 굴리므로 빈 루가 들어오면 부르는 쪽 잘못이다
+    expect(cpuPickoff(판, 2, createSeededRandom(1))).toBe(판)
+    const { random, counter } = 세는난수(11)
+    const after = cpuPickoff(판, 1, random)
+    const play = after.lastDefensePlay
+    if (!isPickoffPlayResult(play)) throw new Error('견제 판이 아니다')
+    expect(play.throwBase).toBe(1)
+    expect(counter.draws).toBe(play.errantThrow ? 3 : 1)
+    expect(after.atBat).toEqual(판.atBat)
+    expect(after.game.battingOrderIndex).toBe(판.game.battingOrderIndex)
+    expect(isBatterTurn(after)).toBe(true)
+    expect(after.log[0]?.text).toContain('상대 1루 견제')
+    // 던질 차례에는 CPU 견제가 없다 (CPU 가 공을 쥔 쪽이 아니다)
+    const { progress: 수비 } = 시작()
+    const 수비판 = 주자(수비, { first: true, second: false, third: false })
+    expect(cpuPickoff(수비판, 1, createSeededRandom(1))).toBe(수비판)
+  })
+
+  it('견제를 끼워도 기존 경로의 난수 차례는 그대로다 — 견제 판의 굴림만큼만 밀린다', () => {
+    const { progress } = 시작()
+    const 판 = 주자(progress, { first: true, second: false, third: false })
+    const 투구 = { typeNumber: 첫구질(판), courseCell: 4, gaugeCell: 0 }
+    const 그냥 = throwPitch(판, 투구, createSeededRandom(5))
+    // 견제 판이 굴린 수만큼 앞에서 먹여 둔 난수와 같은 차례가 된다
+    const { random, counter } = 세는난수(5)
+    const 견제뒤 = pickoff(판, '3', random)
+    const 소모 = counter.draws
+    const 다시 = createSeededRandom(5)
+    for (let index = 0; index < 소모; index += 1) 다시.nextInRange(0, 10000)
+    const 기준 = throwPitch(판, 투구, 다시)
+    const 견제후투구 = throwPitch(견제뒤, 투구, random)
+    expect(견제후투구.lastResolution).toEqual(기준.lastResolution)
+    expect(견제후투구.pitchCount).toBe(그냥.pitchCount)
   })
 })
