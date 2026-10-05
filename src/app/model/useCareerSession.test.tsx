@@ -2,7 +2,8 @@
 import { useState } from 'react'
 import { describe, expect, it } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
-import { useCareerSession } from '@/app/model/useCareerSession'
+import { applyGameEvaluation, isEvaluatedGame, useCareerSession } from '@/app/model/useCareerSession'
+import { startPostseason } from '@/entities/league/model/league'
 import { useAtBatRunner } from '@/app/model/useAtBatRunner'
 import type { Screen } from '@/app/model/screen'
 import { createCareer } from '@/entities/career/model/playerCareer'
@@ -586,5 +587,21 @@ describe('기록연감 통계 고리 [mgr+0xc8] — 타자편 모드 4 (0x22e35 
     )
     expect(events.filter((event) => event.kind === 'G획득')).toEqual([{ kind: 'G획득', mode: 4, amount: 1000 }])
     act(() => rendered.unmount())
+  })
+})
+
+describe('타자편 경기 뒤 평가 게이트 (0x4f216 · 0x4f268 → 0xa719c)', () => {
+  const 평가 = { popularityChange: 5, reputationChange: 3, moraleChange: -4 }
+
+  it('정규시즌 경기는 인기도 → 평판 → 사기를 얹는다', () => {
+    const career = { ...createCareer('평가'), popularity: 100, reputation: 100, morale: 50 }
+    expect(isEvaluatedGame(career)).toBe(true)
+    expect(applyGameEvaluation(career, 평가, true)).toMatchObject({ popularity: 105, reputation: 103, morale: 46 })
+  })
+
+  it('포스트시즌 경기(경기 전 커리어에 대진이 서 있으면)는 평가하지 않는다', () => {
+    const career = { ...createCareer('평가'), postseason: startPostseason([0, 1, 2, 3, 4, 5, 6, 7]) }
+    expect(isEvaluatedGame(career)).toBe(false)
+    expect(applyGameEvaluation(career, 평가, false)).toBe(career)
   })
 })

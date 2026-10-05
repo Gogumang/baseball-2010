@@ -91,6 +91,7 @@ import { rollTrainingInjury } from '@/entities/career/model/condition'
 import type { ManagementDetail } from '@/app/model/managementDetail'
 import { restDetailChangesOf, trainingDetailChangesOf } from '@/pages/management/lib/detailPopup'
 import { evaluateGame, updateStreaks } from '@/entities/career/model/gameEvaluation'
+import type { GameEvaluation } from '@/entities/career/model/gameEvaluation'
 import { recordSeasonMvp } from '@/entities/awards/model/seasonAwards'
 import type { EventReward } from '@/entities/story/model/eventReward'
 import type { ManagementCommand } from '@/pages/management/ui/ManagementScreen'
@@ -175,6 +176,31 @@ interface CareerSessionInput {
 }
 
 const NO_STAT = () => {}
+
+/**
+ * **경기 뒤 평가 0xa719c 는 정규시즌 경기만 탄다** (모드 4 도 투수편과 같은 갈래, 6921426).
+ *
+ * 유일한 호출지 0x4ea0c 안 0x4f274 앞에서 0x4f216 이 L+0xac(국가대항전)면, 0x4f268 이 L+0x34(포스트시즌)면
+ * 0x4f29a(하루 끝)로 건너뛴다. 이 갈래에는 모드 갈림이 없다. 국가대항전 경기는 웹도 `finishCupGame` 이 커리어 정산을
+ * 아예 안 타므로 남는 것은 포스트시즌이다. 포스트시즌 표시는 45번째 경기의 하루 끝(0xb818c → 0xb80a8)에야 서므로
+ * **경기 전 커리어**로 가른다 — 45번째 경기는 평가된다.
+ */
+export function isEvaluatedGame(careerBeforeGame: Pick<PlayerCareer, 'postseason'>): boolean {
+  return careerBeforeGame.postseason === null
+}
+
+/** 평가(인기도 → 평판 → 사기, 0xa719c)를 얹는다 — 평가하지 않는 경기면 그대로 */
+export function applyGameEvaluation(
+  career: PlayerCareer,
+  evaluation: Pick<GameEvaluation, 'popularityChange' | 'reputationChange' | 'moraleChange'>,
+  isEvaluated: boolean,
+): PlayerCareer {
+  if (!isEvaluated) return career
+  return gainMorale(
+    gainReputation(gainPopularity(career, evaluation.popularityChange), evaluation.reputationChange),
+    evaluation.moraleChange,
+  )
+}
 
 /** 육성 모드 한 판 — 커리어·경기 진행·관리 커맨드를 한데 묶는다. */
 export function useCareerSession({
@@ -366,22 +392,19 @@ export function useCareerSession({
         gameResultSoundIdOf(summary.result),
         evaluationJingleIdOf(evaluation.popularityChange),
       ])
-      const evaluated = gainMorale(
-        gainReputation(
-          gainPopularity(
-            // 같은 날 나머지 네 경기도 원본대로 치러 순위표에 넣는다 (0xc2a48)
-            // 45경기째면 정규시즌을 닫고, 포스트시즌은 내 차례가 올 때까지 CPU 끼리 돌린다 (0x13da0)
-            applyPostseasonProgress(
-              applySeasonEnd(applyLeagueDay(applyGameResult(currentCareer, summary), summary.ourTeamId, random)),
-              random,
-            ),
-            evaluation.popularityChange,
-          ),
-          evaluation.reputationChange,
-        ),
-        evaluation.moraleChange,
+      // 같은 날 나머지 네 경기도 원본대로 치러 순위표에 넣는다 (0xc2a48)
+      // 45경기째면 정규시즌을 닫고, 포스트시즌은 내 차례가 올 때까지 CPU 끼리 돌린다 (0x13da0)
+      const settled = applyPostseasonProgress(
+        applySeasonEnd(applyLeagueDay(applyGameResult(currentCareer, summary), summary.ourTeamId, random)),
+        random,
       )
+      const evaluated = applyGameEvaluation(settled, evaluation, isEvaluatedGame(currentCareer))
       // 스킬 조건용 경기 뒤 카운터 — 사기까지 반영된 뒤에 센다 (A-4)
+      // ⚠️ 미해결: 이 카운터(0x12bc2~0x12c3c)와 연속 기록(0x8a6fc @0x12b6e)은 평가 0xa719c 밖, 상태 116 쪽이다.
+      //    포스트시즌에 116 이 그대로 돌고 그때 +0x4a(인기도 변화)가 무엇인지 안 읽어 예전대로 둔다.
+      //    또 포스트시즌엔 정산 0xa8024 의 [sp+0x34] = 0xa56dc(현재 타자) 가 거짓이라 내 타자 기록 칸 쓰기 아홉 곳
+      //    (0xa8362·0xa8498·0xa84d6·0xa8538·0xa8578·0xa85c4·0xa8866·0xa895c …)이 막힌다 — 어느 칸이 웹 `applyGameResult`
+      //    의 어느 줄인지 아직 다 짝짓지 못해 기록은 그대로 센다.
       const counted = countGameForSkills(evaluated, evaluation.popularityChange)
       const streak = updateStreaks(counted, summary.stats)
       const streakReputation = streak.notices.reduce((total, notice) => total + notice.reputationChange, 0)
