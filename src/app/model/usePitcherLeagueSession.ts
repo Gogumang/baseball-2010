@@ -12,12 +12,37 @@ import {
   gainPitcherReputation,
   isPitcherManagementCycleOpen,
   isPitcherSeasonFinished,
+  spendPitcherCycleAction,
   startNextPitcherSeason,
 } from '@/entities/pitcher-career/model/pitcherCareer'
+import { openableHiddenPitchEventOf } from '@/entities/pitcher-career/model/pitchTraining'
 import {
-  openHiddenPitchRow,
-  openableHiddenPitchEventOf,
-} from '@/entities/pitcher-career/model/pitchTraining'
+  enterPitcherYearEndEvent,
+  finishPitcherYearEndEvent,
+  nextPitcherYearEndStep,
+} from '@/entities/pitcher-career/model/pitcherYearEnd'
+import { applyPitcherEventRewards, finishPitcherEvent } from '@/entities/pitcher-career/model/pitcherEventReward'
+import { pitcherPlaceEventOf } from '@/entities/pitcher-career/model/pitcherStoryScene'
+import { achievedPitcherGoalCount } from '@/entities/pitcher-career/model/pitcherYearGoals'
+import {
+  careerNationalTeamEventId,
+  isCareerNationalCupYear,
+  NATIONAL_CUP_EVENT,
+} from '@/entities/national-cup/model/nationalCupFlow'
+import {
+  MID_SEASON_GAME,
+  midSeasonEventId,
+  midSeasonTitlesOf,
+  RETIREMENT_CHOICE_EVENT_ID,
+  salaryOfferOf,
+  SALARY_EVENT_ID,
+} from '@/entities/career/model/seasonFlow'
+import { emptyPlaceEventId, isEmptyPlaceEventId } from '@/entities/career/model/battingOrder'
+import { EVENT_REWARD_KIND } from '@/entities/story/model/eventReward'
+import type { EventReward } from '@/entities/story/model/eventReward'
+import type { StoryCarry } from '@/entities/story/model/aceMatch'
+import type { OriginalEvent } from '@/shared/config/original/eventTypes'
+import { formatOriginalMoney } from '@/features/shop/model/shopSelection'
 import {
   applyPitcherEndingBonus,
   canContinueAfterPitcherEnding,
@@ -25,9 +50,6 @@ import {
   PITCHER_CONTINUE_COST_GAME_POINT,
   pitcherEndingBonusOf,
   pitcherInjuryEndingOf,
-  pitcherRetirementEndingOf,
-  pitcherYearEndStepOf,
-  recordPitcherSeasonMvp,
 } from '@/entities/pitcher-career/model/pitcherSeasonFlow'
 import {
   awardPitcherTitles,
@@ -68,10 +90,27 @@ import { PITCHER_MANAGEMENT_TEXT } from '@/pages/pitcher-league/lib/pitcherManag
 
 /**
  * 화면 유니온 — 원본 장면 0x106 의 상태 번호를 괄호에 적는다.
- *   등록(101~104) · 관리(105) · 경기(144) · 시즌종료(136 자리) · 연말(132) · 엔딩(141) ·
- *   상점(111 장비 상점 / 121 장비착용 — 어느 쪽인지는 `shopTab`) · 외출(112 지도 · 113 장소)
+ *   등록(101~104) · 관리(105) · 경기(144) · 시즌종료(136 자리) · 연말(132 — 502 갈림길 화면) · 엔딩(141) ·
+ *   상점(111 장비 상점 / 121 장비착용 — 어느 쪽인지는 `shopTab`) · 외출(112 지도 · 113 장소) ·
+ *   이벤트(114 이벤트 재생 — 무엇을 틀었는지는 `story`)
  */
-export type PitcherScene = '등록' | '관리' | '경기' | '시즌종료' | '연말' | '엔딩' | '상점' | '외출'
+export type PitcherScene = '등록' | '관리' | '경기' | '시즌종료' | '연말' | '엔딩' | '상점' | '외출' | '이벤트'
+
+/**
+ * 이벤트 재생(상태 114)을 **어디서** 틀었나 — 끝난 뒤 갈 곳(장면+0x24 "뒤 상태")이 이것으로 갈린다.
+ *   관리     105 의 자동 발동(trigger 0) — 히든 변화구 30~33. 뒤 = 105
+ *   중간평가 117 (0x11e84 `[다음 114, 뒤 105]`) — 452~454
+ *   연말     136 · 130 · 131 · 132 · 133 사슬 (392 → … → 380/502 → 461/462)
+ *   장소     113 [들어가기] (0x16c64 `[다음 114, 뒤 113]`) — 끝 처리 0x1c014 가 빈 장소가 아니면 행동을 쓰고 105 로
+ */
+export type PitcherStoryContext = '관리' | '중간평가' | '연말' | '장소'
+
+export interface PitcherStory {
+  readonly eventId: number
+  readonly context: PitcherStoryContext
+  /** 연말 사슬에서 **앞서** 본 이벤트 번호 (이번 재생 것은 재생기가 넘긴다) */
+  readonly viewed: readonly number[]
+}
 
 export interface PitcherLeagueSession {
   readonly career: PitcherCareer | null
@@ -90,6 +129,16 @@ export interface PitcherLeagueSession {
   readonly outingResult: OutingResult | null
   /** 126 에서 105 로 돌아온 뒤 관리 화면 위에 남는 입원 회복 팝업 글 (0x1575c `0xbbef8(글, 1, 1, 1)`). 없으면 '' */
   readonly outingRecoveryNotice: string
+  /** 지금 재생하는 이벤트 (장면 '이벤트'). 아니면 null */
+  readonly story: PitcherStory | null
+  /** r_event 본문 — 커리어가 생긴 뒤 따로 불러온다(535KB 별도 묶음). 오기 전에는 null */
+  readonly storyEvents: readonly OriginalEvent[] | null
+  /** 외출 지도 [!] — 장소 이벤트 배정 0x8cdc0 이 이벤트를 넣은 장소 id */
+  readonly eventPlaceIds: ReadonlySet<string>
+  /** 이벤트 번호별 `%s` 글 — 380 연봉 제시액(0x8bc4c → 금액 서식 0x55cf4). 기본이면 undefined */
+  readonly storyReplacementsFor: (eventId: number) => readonly string[] | undefined
+  /** 이벤트 재생 뒤 관리 화면 위에 띄울 알림 (옮기지 않은 갈래). 없으면 '' */
+  readonly storyNotice: string
   readonly actions: {
     readonly create: (name: string, profile: PitcherRookieProfile) => void
     /** 바뀐 커리어를 그대로 저장한다 (구질 훈련처럼 화면이 계산해 돌려줄 때) */
@@ -97,11 +146,11 @@ export interface PitcherLeagueSession {
     readonly goto: (scene: PitcherScene) => void
     readonly beginGame: () => void
     readonly finishGame: (summary: PitcherGameSummary) => void
-    /** 시즌 끝 화면 [다음] → 연말 분기 132 (엔딩 · 은퇴 선택 · 새 시즌) */
+    /** 시즌 끝 화면 [다음] → 연말 사슬 136 → 130 → 131 → 132 (→ 133) 을 이벤트 392 부터 튼다 */
     readonly beginYearEnd: () => void
-    /** 연말 502 "연봉 협상한다" → 새 시즌 처리 0x1b768 → 137 → 105 */
+    /** 연말 502 "연봉 협상한다" → 이벤트 380 (연봉협상) */
     readonly continueCareer: () => void
-    /** 연말 502 "은퇴한다" → 496 → 503 → 엔딩 화면 141 */
+    /** 연말 502 "은퇴한다" → 이벤트 496 (→ 503 → 엔딩 화면 141) */
     readonly retire: () => void
     /** 엔딩 141 의 팝업 0x32 — 5000 G포인트로 이어하기. 모자라면 false */
     readonly continueAfterEnding: () => boolean
@@ -119,12 +168,17 @@ export interface PitcherLeagueSession {
     readonly openOuting: () => void
     /** 113 장소 기능 — 가드 0x16cf0 → 효과 0x15234 (→ 입원 회복 0x1575c). 모드 3·4 공용 (`outing.ts`) */
     readonly runOutingFunction: (functionId: string) => void
-    /** 113 칸 0 [들어가기] — 투수편 이벤트 재생(114)이 아직 없어 알림만 띄운다 (미해결) */
+    /** 113 칸 0 [들어가기] — 배정된 장소 이벤트(0x8ce58), 없으면 빈 장소 440+장소를 114 로 튼다 */
     readonly enterOutingPlace: (place: OutingPlace) => void
     /** 126 효과 팝업 [확인] → (입원이면 회복 글) → 105 (틀 0x1575c) */
     readonly closeOutingResult: () => void
     /** 105 위 입원 회복 팝업 [확인] */
     readonly dismissOutingRecoveryNotice: () => void
+    /** 이벤트 재생이 끝났다 — 지나온 보상과 본 이벤트 번호 (114 틀 0x1c014) */
+    readonly completeStory: (rewards: readonly EventReward[], viewedEventIds: readonly number[]) => void
+    /** 이벤트가 경기 명령(마선수 대결)에 닿았다 — 투수편 대결은 옮기지 않았다 (미해결) */
+    readonly abortStoryAtMatch: (carry: StoryCarry) => void
+    readonly dismissStoryNotice: () => void
     readonly reset: () => void
   }
 }
@@ -164,6 +218,11 @@ function normalizePitcherCareer(raw: unknown): PitcherCareer | null {
 }
 
 const NO_STAT = () => {}
+
+/** 496 "정말로 은퇴하려는 거냐?" — 502 "은퇴한다" 의 gotoEvent (선택지 380 / 503) */
+const RETIREMENT_CONFIRM_EVENT_ID = 496
+/** 연봉 칸 한 단위(100만원)를 금액 서식(만원 단위)으로 — 0x8bc4c 의 ×100 */
+const MONEY_TEXT_SCALE = 100
 
 export function usePitcherLeagueSession(
   store: JsonStorePort,
@@ -214,6 +273,30 @@ export function usePitcherLeagueSession(
   }, [career, recordStat])
   const [scene, setScene] = useState<PitcherScene>(career === null ? '등록' : '관리')
   const [gameOptions, setGameOptions] = useState<PitcherGameOptions | null>(null)
+  const [story, setStory] = useState<PitcherStory | null>(null)
+  const [storyNotice, setStoryNotice] = useState('')
+
+  /** 이벤트 재생(114)으로 — 뒤 상태는 `story.context` 가 정한다 */
+  const openStory = useCallback((next: PitcherStory) => {
+    setStory(next)
+    setScene('이벤트')
+  }, [])
+
+  /**
+   * r_event 본문(events.ts, 535KB)은 첫 화면에 필요 없어 커리어가 생긴 뒤 따로 불러온다 — 타자편
+   * `useStorySchedule` 과 같은 방식(번들러가 별도 청크로 자른다). 오기 전에는 장소 이벤트가 없는 것으로 본다.
+   */
+  const [storyEvents, setStoryEvents] = useState<readonly OriginalEvent[] | null>(null)
+  useEffect(() => {
+    if (career === null || storyEvents !== null) return
+    let isActive = true
+    void import('@/shared/config/original/events').then((module) => {
+      if (isActive) setStoryEvents(module.ORIGINAL_EVENTS)
+    })
+    return () => {
+      isActive = false
+    }
+  }, [career, storyEvents])
 
   const commit = useCallback(
     (next: PitcherCareer) => {
@@ -294,43 +377,42 @@ export function usePitcherLeagueSession(
   }, [career, commitWith, scene])
 
   /**
-   * **히든 변화구 계열 오픈 — r_event 30~33** (J 4절 3-3 · A 1·3·5절).
+   * **관리 화면(105)에 들어올 때 트는 이벤트** — 원본은 두 자리에서 이벤트를 고른다:
    *
-   * 네 레코드는 `r_event.zt1` 에서 대상 3(투수편) · trigger 0 · 반복 0 이고, 조건은 능력치 세 칸
-   * (종류 0 제구 · 1 구속 · 2 변화, 각각 ≥ 값) 이다. 보상은 **종류 6 값 v** 하나뿐이고,
-   * 보상 실행기 `0x8c460` 의 종류 6 갈래가 이렇게 처리한다:
-   * ```
-   *   8c5da: ldr  r0,[r6+0xb4]          ; mgr
-   *   8c5e0: ldr  r3,=0x7b985           ; 투수편인가 ([mgr+0x20] == 3)
-   *   8c5e2: bl   0xca9f8               ; 거짓이면 이 항목은 건너뛴다 (타자편에서는 무시)
-   *   8c5ee: ldr  r2,[r6+0x2f8]         ; 선수(커리어) 레코드
-   *   8c600: ldrsh r3,[…+0xa+2i]        ; v
-   *   8c602: adds r3,r3,r2
-   *   8c608: adds r3,r3,#0x204          ; 0x81 << 2
-   *   8c60a/8c754: movs r2,#1 ; strb r2,[r3]   ; 선수[0x204 + v] = 1
-   * ```
-   * `커리어+0x204+행` 이 곧 히든 계열 오픈 칸이므로 (J 3-2) **v = 행 번호**다 —
-   * 데이터의 v 는 30→1 · 31→2 · 32→3 · 33→0 이고 `HIDDEN_PITCH_EVENTS` 가 그대로 들고 있다.
-   *
-   * 발화 시점은 **관리 화면(105)에 있는 동안 매 갱신마다**다 (A 3절, 0x1cdec → 0x8be80 —
-   * trigger 0 은 화면코드 105·201 에서만 통과한다). 파일 순서로 훑어 처음 통과한 한 건이고,
-   * 통과한 것이 여럿이면 **하나씩 연달아** 나온다 — 여기서도 커리어가 바뀌면 이 고리가 다시 돌아
-   * 다음 것을 연다. 이미 열린 계열은 `openableHiddenPitchEventOf` 가 빼므로 두 번 열리지 않는다.
-   *
-   * ⚠️ 웹 투수편에는 이벤트 재생 화면(0x72)이 아직 없다 — 원본의 대사 두세 줄과 징글 36 은
-   *    건너뛰고 **보상만** 적용한다. `seenEventIds` 에는 원본대로 본 표시를 남긴다.
+   * 1. **진입 0x11910 의 곁가지**(0x11b24~0x11c1c) — 부상 엔딩 → 미션 복귀 → 연초 115 → **중간평가 117** → 타순 138
+   *    차례로 하나만 줄에 넣는다. 117 은 `S+0xb2(경기 수) == 22 && 0xa4280(기록, 타자편?, 연차idx) == 0` 일 때다:
+   *    ```
+   *      11bda: ldrb r3,[S+0xb2] ; cmp r3,#0x16 ; bne 0x11c10
+   *      11be8: ldrb r2,[S+0xb3] ; r1 = (모드 == 4) ; bl 0xa4281   ; (기록[0x180] >> (연차idx + (r1 ? 0 : 13))) & 1
+   *      11c06: bne 0x11c10 ; movs r1,#0x75 → 0xbcb49(117)
+   *    ```
+   *    그 비트는 보상 실행기 끝(0x8cbaa)이 452~454 를 마칠 때 켠다 (`pitcherEventReward` · `midSeasonEvaluatedYears`).
+   *    부상 엔딩은 `finishGame` 이 이미 보았고, 연초 115 는 투수편 웹에 아직 없다.
+   * 2. **틀마다 자동 발동**(0x1cf9c → 0x8be80, trigger 0) — 투수편 웹은 **히든 변화구 30~33** 만 본다
+   *    (`openableHiddenPitchEventOf`, J 3-3 · A 3절). 네 레코드는 대상 3 · trigger 0 · 조건 능력치 셋(제구·구속·변화)
+   *    이고 보상은 종류 6 값 v 하나 — 0x8c5da 의 투수편 갈래가 `선수[0x204 + v] = 1` 로 계열 v 를 연다.
+   *    통과한 것이 여럿이면 하나씩 연달아 나온다 (끝나면 105 로 돌아와 다시 본다).
+   *    ⚠️ 그 밖의 trigger 0 이벤트(대상 1·3 — 1·5·11·13·34·400~437·490 …)의 자동 발동은 아직 잇지 않았다.
    */
   useEffect(() => {
-    if (career === null || scene !== '관리') return
-    if (openableHiddenPitchEventOf(career) === null) return
-    commitWith((current) => {
-      const event = openableHiddenPitchEventOf(current)
-      if (event === null) return current
-      const opened = openHiddenPitchRow(current, event.row)
-      if (opened === current) return current
-      return { ...opened, seenEventIds: [...current.seenEventIds, String(event.eventId)] }
-    })
-  }, [career, commitWith, scene])
+    if (career === null || scene !== '관리' || story !== null) return
+    if (career.gamesPlayed === MID_SEASON_GAME && !career.midSeasonEvaluatedYears.includes(career.season - 1)) {
+      /*
+       * 117 진입 0x11e84: k = 0xa3de9(S, 1) (투수 갈래 — 방어율 칸 그대로, 나머지 넷 >>1) →
+       * k ∈ {4,5} 452 · k ≤ 1 454 · 그 밖 453. 칭호 1(1년차·k > 4) · 9(2년차~·지난 k ≤ 1·k > 4) 를
+       * +0x270 에 넣고(0x11ee6~0x11f4a, 공통 칭호라 두 편 같다) 끝에 +0x1cc = k (0x11f5a).
+       */
+      const achieved = achievedPitcherGoalCount(career, '중간')
+      // 직전 값을 받아 고친다 — 같은 프레임의 칭호·지갑 고리가 고친 것을 덮지 않게 (`commitWith` 머리글)
+      commitWith((current) => {
+        const titles = midSeasonTitlesOf(current, achieved).filter((title) => !current.titleIds.includes(title))
+        return { ...awardPitcherTitles(current, titles), lastMidSeasonGoalCount: achieved }
+      })
+      return openStory({ eventId: midSeasonEventId(achieved), context: '중간평가', viewed: [] })
+    }
+    const hiddenPitch = openableHiddenPitchEventOf(career)
+    if (hiddenPitch !== null) openStory({ eventId: hiddenPitch.eventId, context: '관리', viewed: [] })
+  }, [career, commitWith, openStory, scene, story])
 
   /**
    * **커리어 칸 ↔ 지갑 다리** — 타자편(`useCareerSession`)과 같은 모양이다.
@@ -487,48 +569,86 @@ export function usePitcherLeagueSession(
     [commit],
   )
 
+  /** 엔딩 141 로 — 보너스는 엔딩을 띄울 때 준다 (0x1220c). 부상·방출은 0 이다 */
+  const enterEnding = useCallback(
+    (finished: PitcherCareer, endingIndex: number) => {
+      commit(applyPitcherEndingBonus({ ...finished, endingIndex }, endingIndex))
+      // 보너스 팝업이 닫힐 때 0x1bc4a `0x22c7d(보너스, 모드 3)` — 웹은 보너스를 이 자리에서 준다
+      recordStat({ kind: 'G획득', mode: PITCHER_LEAGUE_MODE, amount: pitcherEndingBonusOf(endingIndex) })
+      setScene('엔딩')
+    },
+    [commit, recordStat],
+  )
+
+  /** 연말 사슬의 이벤트 하나를 튼다 — 들어가기 전에 상태 함수가 하는 일(375 앞 MVP 판정 131)을 먼저 */
+  const openYearEndEvent = useCallback(
+    (current: PitcherCareer, eventId: number, viewed: readonly number[]) => {
+      commit(enterPitcherYearEndEvent(current, eventId))
+      openStory({ eventId, context: '연말', viewed })
+    },
+    [commit, openStory],
+  )
+
   /**
-   * 시즌 끝 화면 [다음] → 연말 상태 132 의 분기.
+   * 연말 사슬의 다음 걸음 — 이번 연말에 본 이벤트 전부(`viewed`)로 고른다 (`nextPitcherYearEndStep`).
    *
-   * 그 앞에 **상태 130(타이틀 0x8dad4) · 131(MVP 0x8dd60)** 이 있다 — 웹은 발표 화면(370·375)이
-   * 아직 없어 **판정만** 하고 지나간다. `recordPitcherSeasonMvp` 가 리그 투수 순위표에서 다승
-   * (마무리면 세이브)·탈삼진·방어율 1위를 가려 MVP 면 `career+0x1ca` 비트를 남긴다.
-   * 발표 화면과 보상(372~374 소지금 +3/+6/+10 · 377 인기도+20 평판+30 소지금+10)은
-   * 화면이 생기면 이 자리에 끼우면 된다.
+   * ```
+   *   136 392 → 393~396 · 130 370 → 371~374 · 131 375 → 376/377 · (128 포스트시즌 — 아래 ⚠️)
+   *   132 501(방출)/504(은퇴식) → 141 · 502 → 380/496 · 380 → 381/382 → 384~391 / 383
+   *       줄 [114 → 133] — 연차idx 짝수(1·3·5·7·9·11년차)면 0x10cec 가 133 을 뒤 상태로 넣는다
+   *   133 0x1a090: 0xa3de9(S, 3) > 3 → 461(선발) → 463 출전 / 464 거절 · 아니면 462(탈락)
+   *   114 끝 0x1c014: 뒤 == 132 → 새 시즌 0x1b768 → 137 → 105
+   * ```
+   * 국가대표 판정의 목표 단계 3 은 투수 갈래(0xa3e56 표 그대로)다 — `achievedPitcherGoalCount(_, '국가대표')`.
+   *
+   * ⚠️ 미해결·근사 (타자편 `useCareerSession.continueSeason` 과 같은 자리):
+   *   - 463 출전 → 134 국가대항전 순위 화면 → 142 → 투수 경기: 투수편 국가대항전은 옮기지 않았다.
+   *     알림을 띄우고 새 시즌으로 넘긴다 (대회 보상·히든 팀 오픈 없음).
+   *   - 462 탈락: 원본은 뒤 = 105 로만 적혀 있고 새 시즌 처리가 안 보인다 — 타자편과 같이 새 시즌으로 넘긴다.
+   *   - 128 (131 뒤 포스트시즌 대진 · 정규시즌 우승 StrMODE[191] 인기도+10/소지금+500만 · 한국시리즈 우승 [190]
+   *     인기도+15/평판+25/소지금+1000만, 틀 0x15984): 투수편 웹은 45경기 뒤 곧장 시즌종료로 와서 포스트시즌을
+   *     사람이 치르지 않는다 — 128 없이 131 에서 132 로 간다.
    */
+  const continueYearEnd = useCallback(
+    (current: PitcherCareer, viewed: readonly number[]) => {
+      if (viewed.includes(NATIONAL_CUP_EVENT.출전)) {
+        setStoryNotice(PITCHER_MANAGEMENT_TEXT.notPorted)
+        return startNewSeason(current)
+      }
+      // 464 거절은 S+0x12c = 0 으로 곧 새 시즌 (P5) · 462 탈락은 근사 (위 머리글)
+      if (viewed.includes(NATIONAL_CUP_EVENT.거절) || viewed.includes(NATIONAL_CUP_EVENT.탈락)) {
+        return startNewSeason(current)
+      }
+      const step = nextPitcherYearEndStep(current, viewed)
+      if (step.kind === '이벤트') return openYearEndEvent(current, step.eventId, viewed)
+      if (step.kind === '엔딩') return enterEnding(current, step.endingIndex)
+      // 연차idx 는 **끝난 해**의 것이라 새 시즌을 올리기 전에 본다 (0x10ce6~0x10cf8)
+      if (isCareerNationalCupYear(current.season - 1)) {
+        const eventId = careerNationalTeamEventId(achievedPitcherGoalCount(current, '국가대표'))
+        return openYearEndEvent(current, eventId, viewed)
+      }
+      startNewSeason(current)
+    },
+    [enterEnding, openYearEndEvent, startNewSeason],
+  )
+
+  /** 시즌 끝 화면 [다음] → 136 의 이벤트 392 "올해의 목표" 부터 연말 사슬을 튼다 */
   const beginYearEnd = useCallback(() => {
     if (career === null) return
-    // 130 → 131 (MVP 비트) → 132 순서다. 연말 분기는 인기도·평판만 보므로 시상이 앞서도 값은 같다
-    const awarded = recordPitcherSeasonMvp(career)
-    const step = pitcherYearEndStepOf(awarded)
-    if (step.kind === '엔딩') {
-      // 엔딩 보너스는 엔딩을 띄울 때 준다 (0x1220c). 부상·방출은 0 이다
-      commit(applyPitcherEndingBonus({ ...awarded, endingIndex: step.endingIndex }, step.endingIndex))
-      // 보너스 팝업이 닫힐 때 0x1bc4a `0x22c7d(보너스, 모드 3)` — 웹은 보너스를 이 자리에서 준다
-      recordStat({ kind: 'G획득', mode: PITCHER_LEAGUE_MODE, amount: pitcherEndingBonusOf(step.endingIndex) })
-      return setScene('엔딩')
-    }
-    if (step.kind === '은퇴선택') {
-      commit(awarded)
-      return setScene('연말')
-    }
-    startNewSeason(awarded)
-  }, [career, commit, startNewSeason])
+    continueYearEnd(career, [])
+  }, [career, continueYearEnd])
 
-  /** 502 "연봉 협상한다" — 연봉협상 이벤트가 아직 없어 곧바로 새 시즌이다 (pitcherSeasonFlow 머리글) */
+  /** 502 "연봉 협상한다 (다음연차 진행)" → 380 (502 의 선택지 gotoEvent) */
   const continueCareer = useCallback(() => {
     if (career === null) return
-    startNewSeason(career)
-  }, [career, startNewSeason])
+    openYearEndEvent(career, SALARY_EVENT_ID, [RETIREMENT_CHOICE_EVENT_ID])
+  }, [career, openYearEndEvent])
 
-  /** 502 "은퇴한다" → 496 → 503 → 엔딩 141 */
+  /** 502 "은퇴한다" → 496 "정말로 은퇴하려는 거냐?" (→ 503 → 엔딩 141 / → 380) */
   const retire = useCallback(() => {
     if (career === null) return
-    const endingIndex = pitcherRetirementEndingOf(career)
-    commit(applyPitcherEndingBonus({ ...career, endingIndex }, endingIndex))
-    recordStat({ kind: 'G획득', mode: PITCHER_LEAGUE_MODE, amount: pitcherEndingBonusOf(endingIndex) })
-    setScene('엔딩')
-  }, [career, commit, recordStat])
+    openYearEndEvent(career, RETIREMENT_CONFIRM_EVENT_ID, [RETIREMENT_CHOICE_EVENT_ID])
+  }, [career, openYearEndEvent])
 
   /** 엔딩 141 의 팝업 0x32 — 5000 G포인트로 이어하기 */
   const continueAfterEnding = useCallback(() => {
@@ -684,18 +804,103 @@ export function usePitcherLeagueSession(
     setScene('관리')
   }, [outingResult])
   const dismissOutingRecoveryNotice = useCallback(() => setOutingRecoveryNotice(''), [])
-  /*
-   * ⚠️ **미해결**: [들어가기] 는 원본에서 배정된 장소 이벤트(0x8ce58 — 대상 1·3 의 trigger 2~6)를, 없으면
-   * 빈 장소 이벤트 440+장소를 114 로 재생한다 (빈 장소는 행동을 안 쓴다, 0x1c014). 투수편 웹에는 이벤트
-   * 재생(114)·[!] 배정(0x8cdc0)이 아직 없어 알림만 띄운다 — 행동·외출 횟수는 건드리지 않는다.
+  /**
+   * 외출 지도 [!] — 지도 진입 0x118e4 → 0x8cdc0 이 장소마다 파일 순서 첫 이벤트(대상 1·3, trigger 2~6)를 넣는다.
+   * 모드 갈림이 없는 코드라 판정만 투수 갈래(`pitcherStoryScene`)로 본다. 무작위는 굴리지 않는다.
    */
-  const enterOutingPlace = useCallback((_place: OutingPlace) => {
-    setOutingNotice(PITCHER_MANAGEMENT_TEXT.notPorted)
-  }, [])
+  const eventPlaceIds = useMemo(() => {
+    if (career === null || storyEvents === null) return new Set<string>()
+    return new Set(
+      OUTING_PLACES.filter((place) => pitcherPlaceEventOf(career, storyEvents, place.frame) !== null).map(
+        (place) => place.id,
+      ),
+    )
+  }, [career, storyEvents])
+
+  /**
+   * 113 칸 0 [들어가기] (키 0x16c64): `0x8ce59` 가 배정된 이벤트를 부르고, 없으면 이벤트 440+장소
+   * (`0x8bdc9(0x1b8 + [+0xe0]+0x184)`)를 부르며 +0x167 = 1(빈 장소). 그리고 `[다음 114, 뒤 113]`.
+   * 이 칸에는 행동·인기도 가드가 없다 (가드 0x16cf0 은 칸 1 장소 기능 쪽이다).
+   */
+  const enterOutingPlace = useCallback(
+    (place: OutingPlace) => {
+      if (career === null || storyEvents === null) return
+      setOutingNotice('')
+      const event = pitcherPlaceEventOf(career, storyEvents, place.frame)
+      openStory({ eventId: event?.id ?? emptyPlaceEventId(place.frame), context: '장소', viewed: [] })
+    },
+    [career, openStory, storyEvents],
+  )
+
+  /** 380 "올해 네 연봉은 %s만 상승해서 %s만이다" — 0x8bc4c 가 상승분·새 연봉을 ×100 해서 금액 서식 0x55cf4 로 */
+  const storyReplacementsFor = useCallback(
+    (eventId: number): readonly string[] | undefined => {
+      if (career === null || eventId !== SALARY_EVENT_ID) return undefined
+      const offer = salaryOfferOf(career)
+      return [formatOriginalMoney(offer.raise * MONEY_TEXT_SCALE), formatOriginalMoney(offer.salary * MONEY_TEXT_SCALE)]
+    },
+    [career],
+  )
+
+  /**
+   * 이벤트 재생(114)이 끝났다 — 틀 0x1c014.
+   * 보상은 재생기가 지나온 보상 명령(0x8c460, 모드 3 갈래 `applyPitcherEventRewards`)이고, 본 이벤트는 모두
+   * 본 표시를 남긴다. 그 뒤 갈 곳은 뒤 상태(`story.context`)로 갈린다:
+   *   장소     +0x167 == 0 → S+4 = 1(행동함) · S+0x6a(외출 수)++ → 105 / 빈 장소(440~444) → 113 (행동 안 씀)
+   *   연말     다음 사슬 (`continueYearEnd`)
+   *   그 밖    뒤 = 105
+   * G 보상(종류 10)은 한 줄마다 0x8c6e2 `0x22c7d(값, 모드 3)` 로 획득 GP 통계에 적는다.
+   */
+  const completeStory = useCallback(
+    (rewards: readonly EventReward[], viewedEventIds: readonly number[]) => {
+      if (career === null || story === null) return
+      const rewarded =
+        story.context === '연말'
+          ? finishPitcherYearEndEvent(career, story.eventId, rewards)
+          : applyPitcherEventRewards(career, rewards, random, story.eventId)
+      const viewed = finishPitcherEvent(rewarded, viewedEventIds)
+      rewards
+        .filter((reward) => reward.kind === EVENT_REWARD_KIND.G포인트)
+        .forEach((reward) => recordStat({ kind: 'G획득', mode: PITCHER_LEAGUE_MODE, amount: reward.value }))
+      setStory(null)
+      if (story.context === '연말') return continueYearEnd(viewed, [...story.viewed, ...viewedEventIds])
+      if (story.context === '장소') {
+        if (isEmptyPlaceEventId(story.eventId)) {
+          commit(viewed)
+          return setScene('외출')
+        }
+        commit(spendPitcherCycleAction({ ...viewed, outingsThisSeason: viewed.outingsThisSeason + 1 }))
+        return setScene('관리')
+      }
+      commit(viewed)
+      setScene('관리')
+    },
+    [career, commit, continueYearEnd, random, recordStat, story],
+  )
+
+  /**
+   * ⚠️ **미해결**: 경기 명령(r_event `match`) — 투수편 장소 이벤트 113·123·127·150·153·192·196·207·211·217·221·225·229
+   * (대상 3)는 마선수 대결로 나간다 (원본은 미션 장면 → 돌아와 105 진입이 +0x176 을 보고 140 결과 이벤트).
+   * 투수편 대결은 옮기지 않았다 — 그때까지 지나온 보상·본 이벤트만 남기고 알림과 함께 105 로 돌아간다
+   * (행동·외출 수는 쓰지 않는다). 결과 이벤트로 이어지는 뒷 이벤트는 그래서 열리지 않는다.
+   */
+  const abortStoryAtMatch = useCallback(
+    (carry: StoryCarry) => {
+      if (career === null || story === null) return
+      const rewarded = applyPitcherEventRewards(career, carry.rewards, random, story.eventId)
+      commit(finishPitcherEvent(rewarded, carry.viewedEventIds))
+      setStory(null)
+      setStoryNotice(PITCHER_MANAGEMENT_TEXT.notPorted)
+      setScene('관리')
+    },
+    [career, commit, random, story],
+  )
+  const dismissStoryNotice = useCallback(() => setStoryNotice(''), [])
 
   const reset = useCallback(() => {
     setCareer(null)
     setGameOptions(null)
+    setStory(null)
     setScene('등록')
   }, [])
 
@@ -709,6 +914,11 @@ export function usePitcherLeagueSession(
     outingNotice,
     outingResult,
     outingRecoveryNotice,
+    story,
+    storyEvents,
+    eventPlaceIds,
+    storyReplacementsFor,
+    storyNotice,
     actions: {
       create,
       save: saveFromScreen,
@@ -728,6 +938,9 @@ export function usePitcherLeagueSession(
       enterOutingPlace,
       closeOutingResult,
       dismissOutingRecoveryNotice,
+      completeStory,
+      abortStoryAtMatch,
+      dismissStoryNotice,
       reset,
     },
   }

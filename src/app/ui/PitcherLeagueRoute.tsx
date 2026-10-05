@@ -6,7 +6,9 @@ import { PitcherGameScreen } from '@/pages/pitching/ui/PitcherGameScreen'
 import { PitcherShopScreen } from '@/pages/shop/ui/PitcherShopScreen'
 import { EndingScreen } from '@/pages/ending/ui/EndingScreen'
 import { OutingMapScreen } from '@/pages/outing-map/ui/OutingMapScreen'
-import { MessageBox } from '@/shared/ui'
+import { StoryScreen } from '@/pages/story/ui/StoryScreen'
+import { MessageBox, ScreenOverlay } from '@/shared/ui'
+import { TEAMS } from '@/shared/config/original/teams'
 import {
   isContinuablePitcherEnding,
   pitcherEndingBonusOf,
@@ -15,8 +17,6 @@ import { PITCHER_EDITION_MODE } from '@/entities/pitcher-career/model/pitcherRot
 import type { PitcherLeagueSession } from '@/app/model/usePitcherLeagueSession'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { useGameSettings } from '@/app/model/useGameSettings'
-
-const NO_EVENT_PLACES: ReadonlySet<string> = new Set()
 
 interface PitcherLeagueRouteProps {
   readonly session: PitcherLeagueSession
@@ -35,8 +35,9 @@ interface PitcherLeagueRouteProps {
  * 관리 화면 안의 선수정보·트레이닝·구질 훈련·휴식은 `PitcherManagementScreen` 이 스스로 돈다.
  *
  * [외출] → **112 외출 지도** 는 타자편 화면(`OutingMapScreen`)을 그대로 쓴다 — 원본 모드 3·4 가 같은 상태·
- * 같은 코드(지도 0x7ea64 · 장소 0x16c64 · 효과 0x15234)를 돈다. 다만 [!] 표시(장소 이벤트 배정 0x8cdc0)는
- * 투수편 이벤트 재생이 아직 없어 비워 둔다 (**미해결**).
+ * 같은 코드(지도 0x7ea64 · 장소 0x16c64 · 효과 0x15234 · [!] 배정 0x8cdc0)를 돈다.
+ * **114 이벤트 재생**은 타자편 `StoryScreen` 을 그대로 쓴다 — 원본도 모드 3·4 가 같은 재생기(0x8be20 · 0x8b804)다.
+ * 주인공 초상화는 피부 팔레트만 따른다: 장타형 +8(0x63a70)은 `모드 == 4` 일 때만이라 투수는 늘 +0 이다.
  * 상점은 [아이템] → 110 → **111 상점**(장비·서브·GP) · [선수정보] → **121 장비착용** 이 `PitcherShopScreen` 으로 간다.
  */
 export function PitcherLeagueRoute({
@@ -60,6 +61,47 @@ export function PitcherLeagueRoute({
         onSettingsChange={gameSettings.setSettings}
       />
     )
+  }
+
+  const management = (
+    <PitcherManagementScreen
+      career={career}
+      random={random}
+      onSave={actions.save}
+      onNextGame={actions.beginGame}
+      onOuting={actions.openOuting}
+      onOpenShop={actions.openShop}
+      onExit={onExit}
+    />
+  )
+
+  if (scene === '이벤트' && session.story !== null) {
+    const { story } = session
+    const event = session.storyEvents?.find((candidate) => candidate.id === story.eventId)
+    // 이벤트 본문이 오기 전에는 관리 화면을 깔아 둔다
+    if (session.storyEvents !== null && event !== undefined) {
+      // 대사창은 그 상태의 화면 위에 얹힌다 — 105 에서 튼 것(자동 발동·중간평가 117)은 관리 화면 위다
+      const isOverManagement = story.context === '관리' || story.context === '중간평가'
+      return (
+        <>
+          {isOverManagement && management}
+          <ScreenOverlay>
+          <StoryScreen
+            key={`${story.context}:${event.id}`}
+            events={session.storyEvents}
+            event={event}
+            playerName={career.name}
+            teamName={(TEAMS[career.teamId] ?? TEAMS[0]).name}
+            skinIndex={career.skinIndex}
+            battingTypeIndex={0}
+            replacementsFor={session.storyReplacementsFor}
+            onComplete={actions.completeStory}
+            onMatch={(_command, carry) => actions.abortStoryAtMatch(carry)}
+          />
+          </ScreenOverlay>
+        </>
+      )
+    }
   }
 
   if (scene === '시즌종료') {
@@ -133,8 +175,8 @@ export function PitcherLeagueRoute({
         onRun={actions.runOutingFunction}
         // 112 취소 → 105 (키 0x13ba4)
         onBack={() => actions.goto('관리')}
-        // ⚠️ 미해결: 장소 이벤트 배정(0x8cdc0)·재생(114)이 투수편 웹에 없어 [!] 를 띄우지 않는다
-        eventPlaceIds={NO_EVENT_PLACES}
+        // 장소 이벤트 배정 0x8cdc0 — 장소마다 파일 순서 첫 이벤트(대상 1·3)
+        eventPlaceIds={session.eventPlaceIds}
         onEnter={actions.enterOutingPlace}
         // 126 효과 팝업 → [확인] → 105 (입원 회복 글은 관리 화면 위 팝업으로)
         resultText={session.outingResult?.effectText ?? null}
@@ -145,18 +187,14 @@ export function PitcherLeagueRoute({
 
   return (
     <>
-      <PitcherManagementScreen
-        career={career}
-        random={random}
-        onSave={actions.save}
-        onNextGame={actions.beginGame}
-        onOuting={actions.openOuting}
-        onOpenShop={actions.openShop}
-        onExit={onExit}
-      />
+      {management}
       {/* 126 → 105 뒤 남는 입원 회복 팝업 (0x1575c `0xbbef8(글, 1, 1, 1)`) */}
       {session.outingRecoveryNotice !== '' && (
         <MessageBox text={session.outingRecoveryNotice} buttons={['확인']} onAnswer={actions.dismissOutingRecoveryNotice} />
+      )}
+      {/* 이벤트 뒤 옮기지 않은 갈래 알림 (투수 마선수 대결 · 투수편 국가대항전) */}
+      {session.storyNotice !== '' && session.outingRecoveryNotice === '' && (
+        <MessageBox text={session.storyNotice} buttons={['확인']} onAnswer={actions.dismissStoryNotice} />
       )}
     </>
   )

@@ -9,10 +9,9 @@ import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCaree
  * "연봉 협상한다" → 380(다음 연차), "은퇴한다" → 496 → 503 → 엔딩 화면 141 로 간다
  * (B-season-awards.md 6절 "연말 분기(상태 132)" · `events.json` 의 502·496·503).
  *
- * ⚠️ **웹판 근사**: 투수편에는 아직 이벤트 재생기가 붙어 있지 않다 — 타자편의
- * `StoryScreen`/`applyEventRewards` 는 `PlayerCareer` 를 받아 그대로 쓸 수가 없다.
- * 그래서 대사 연출 없이 **같은 갈림길만** 화면 한 장으로 옮겼다. 선택지 글은 원본 502 의 것을
- * 그대로 적었고, 496 의 되묻기(“정말로 은퇴하려는 거냐?”) 한 단계는 빠져 있다.
+ * 연말 사슬은 이제 이벤트 재생기(114, `StoryScreen`)가 502 를 대사·선택지 그대로 튼다 — 이 화면은 같은
+ * 갈림길을 한 장으로 보여 주는 곁길이다. 고르면 원본 선택지의 gotoEvent 와 같은 이벤트로 간다:
+ * "연봉 협상한다" → 380, "은퇴한다" → 496(“정말로 은퇴하려는 거냐?”).
  */
 export function PitcherYearEndScreen({
   career,
@@ -20,9 +19,9 @@ export function PitcherYearEndScreen({
   onRetire,
 }: {
   readonly career: PitcherCareer
-  /** "연봉 협상한다" — 380 자리, 새 시즌 처리 0x1b768 로 */
+  /** "연봉 협상한다" — 이벤트 380 (연봉협상) */
   readonly onContinueCareer: () => void
-  /** "은퇴한다" — 496 → 503 → 엔딩 화면 141 로 */
+  /** "은퇴한다" — 이벤트 496 (→ 503 → 엔딩 화면 141) */
   readonly onRetire: () => void
 }) {
   // 원본 502 의 선택지 글 그대로 (색 마크업은 뺀다)

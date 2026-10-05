@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { StrictMode } from 'react'
 import { describe, expect, it } from 'vitest'
-import { act, renderHook } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { usePitcherLeagueSession } from '@/app/model/usePitcherLeagueSession'
 import { startPostseason } from '@/entities/league/model/league'
 import { NO_EQUIPPED_TITLE } from '@/entities/career/model/titles'
@@ -14,6 +14,10 @@ import { shopItemId } from '@/features/shop/model/shopSelection'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 import { BATTER_GP_ITEMS } from '@/entities/career/model/gpItems'
+import { ORIGINAL_EVENTS } from '@/shared/config/original/events'
+import { rewardsIn } from '@/entities/story/model/eventReward'
+import type { EventReward } from '@/entities/story/model/eventReward'
+import { OUTING_PLACES } from '@/shared/config/outingPlaces'
 
 /** 나만의리그 투수편 한 판 (원본 모드 3, 장면 0x106) — 저장·장면 전환만 본다 */
 
@@ -38,6 +42,31 @@ const 신인 = {
 
 const 띄우기 = (store: JsonStorePort = 메모리저장()) =>
   renderHook(() => usePitcherLeagueSession(store, createSeededRandom(20100901), false))
+
+type 판 = ReturnType<typeof 띄우기>['result']
+
+const 이벤트 = (id: number) => ORIGINAL_EVENTS.find((event) => event.id === id)!
+
+/**
+ * 재생기(StoryScreen)가 하는 일을 대신한다 — 지금 이벤트의 보상 명령을 모두 지나고, 선택지를 고르면
+ * 그 이벤트로 이어 가 그 보상까지 모아 끝낸다 (`useEventPlayback` 의 onComplete 와 같은 꼴).
+ */
+function 이벤트끝내기(result: 판, ...고른것: number[]) {
+  const story = result.current.story!
+  const viewed = [story.eventId, ...고른것]
+  const rewards: EventReward[] = viewed.flatMap((id) => rewardsIn(이벤트(id).commands))
+  act(() => result.current.actions.completeStory(rewards, viewed))
+  return viewed
+}
+
+/** 연말 사슬을 끝까지 돈다 — 선택지 이벤트는 `고르기` 가 고른 번호로 (380 → 383 수락이 기본) */
+function 연말끝까지(result: 판, 고르기: Readonly<Record<number, readonly number[]>> = { 380: [383] }): number[] {
+  const 본것: number[] = []
+  for (let guard = 0; guard < 30 && result.current.scene === '이벤트' && result.current.story?.context === '연말'; guard += 1) {
+    본것.push(...이벤트끝내기(result, ...(고르기[result.current.story.eventId] ?? [])))
+  }
+  return 본것
+}
 
 describe('투수편 세션', () => {
   it('커리어가 없으면 등록부터다', () => {
@@ -166,54 +195,142 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     expect(홀수.current.gameOptions?.dayCounter).toBe(11)
   })
 
-  it('1~6년차 연말은 새 시즌으로 이어진다 — 성적이 비고 연차가 오른다', () => {
-    const result = 판짜기({ season: 3, gamesPlayed: 45 })
+  it('1~6년차 연말은 392 부터 사슬을 돌고 380 수락(383) 뒤 새 시즌이다 — 짝수 연차라 국가대표 판정은 없다', () => {
+    const result = 판짜기({ season: 2, gamesPlayed: 45, popularity: 300 })
 
     act(() => result.current.actions.beginYearEnd())
+    expect(result.current.scene).toBe('이벤트')
+    expect(result.current.story).toEqual({ eventId: 392, context: '연말', viewed: [] })
 
+    const 본것 = 연말끝까지(result)
+
+    // 136 392 → 393~396 · 130 370 → 371~374 · 131 375 → 376/377 · 132 380 → 383
+    expect(본것[0]).toBe(392)
+    expect(본것.slice(2, 3)).toEqual([370])
+    expect(본것).toContain(375)
+    expect(본것.slice(-2)).toEqual([380, 383])
     expect(result.current.scene).toBe('관리')
-    expect(result.current.career?.season).toBe(4)
+    expect(result.current.career?.season).toBe(3)
     expect(result.current.career?.gamesPlayed).toBe(0)
   })
 
-  it('7년차 인기도 499 이하면 연말이 곧 방출 엔딩(1)이다', () => {
+  it('380 의 %s 는 상승분·새 연봉 ×100 을 금액 서식(0x55cf4)으로 — 새 연봉 105 는 "1억500" (%03d)', () => {
+    const result = 판짜기({ season: 2, gamesPlayed: 45, popularity: 300, popularityAtSeasonStart: 100, salary: 50 })
+
+    // 상승분 = max(1, (300 − 100) / 4) = 50 → "5000" · 새 연봉 100 → "1억"
+    expect(result.current.storyReplacementsFor(380)).toEqual(['5000', '1억'])
+    expect(result.current.storyReplacementsFor(381)).toBeUndefined()
+
+    act(() => result.current.actions.save({ ...result.current.career!, salary: 55 }))
+    expect(result.current.storyReplacementsFor(380)).toEqual(['5000', '1억500'])
+  })
+
+  it('강경 요구(381)는 연봉 등급 k 로 384~387 중 하나를 더 보고 새 시즌이다', () => {
+    const result = 판짜기({ season: 2, gamesPlayed: 45, popularity: 300 })
+    act(() => result.current.actions.beginYearEnd())
+
+    const 본것 = 연말끝까지(result, { 380: [381] })
+
+    expect(본것.slice(-3, -1)).toEqual([380, 381])
+    expect([384, 385, 386, 387]).toContain(본것.at(-1))
+    expect(result.current.career?.season).toBe(3)
+  })
+
+  it('MVP 비트는 375 에 들어가기 전에 선다 (상태 131 → 0xa4d2c)', () => {
+    const result = 판짜기({ season: 2, gamesPlayed: 45 })
+    act(() => result.current.actions.beginYearEnd())
+    while (result.current.story?.eventId !== 375) 이벤트끝내기(result)
+    // 리그 기록이 비어 있어 1위가 아니다 — 판정은 했지만 비트는 서지 않는다 (376 으로 간다)
+    이벤트끝내기(result)
+    expect(result.current.story?.eventId).toBe(376)
+  })
+
+  it('홀수 해(연차idx 짝수) 연말 뒤에는 국가대표 판정 133 — 목표 4개 미만이면 462 탈락 → 새 시즌', () => {
+    const result = 판짜기({ season: 3, gamesPlayed: 45 })
+    act(() => result.current.actions.beginYearEnd())
+
+    const 본것 = 연말끝까지(result)
+
+    expect(본것.slice(-1)).toEqual([462])
+    expect(result.current.scene).toBe('관리')
+    expect(result.current.career?.season).toBe(4)
+  })
+
+  it('국가대표 선발(461) → 거절(464)은 평판 −20 뒤 곧 새 시즌, 출전(463)은 미해결 알림과 함께 새 시즌', () => {
+    // 목표 단계 3 (표 그대로) 넷 이상 — 방어율 0(안 던짐)·실점 0 · 탈삼진·승·인기도는 크게
+    const 잘함 = {
+      season: 1,
+      gamesPlayed: 45,
+      popularity: 2000,
+      popularityAtSeasonStart: 0,
+      stats: { ...createPitcherCareer('x').stats, wins: 30, strikeouts: 300 },
+    }
+    const 거절 = 판짜기(잘함)
+    act(() => 거절.current.actions.beginYearEnd())
+    const 본것 = 연말끝까지(거절, { 380: [383], 461: [464] })
+    expect(본것.slice(-2)).toEqual([461, 464])
+    expect(거절.current.career?.season).toBe(2)
+    expect(본것).toContain(383)
+    expect(거절.current.storyNotice).toBe('')
+
+    const 출전 = 판짜기(잘함)
+    act(() => 출전.current.actions.beginYearEnd())
+    연말끝까지(출전, { 380: [383], 461: [463] })
+    expect(출전.current.scene).toBe('관리')
+    expect(출전.current.career?.season).toBe(2)
+    expect(출전.current.storyNotice).not.toBe('')
+  })
+
+  it('7년차 인기도 499 이하면 연말 사슬 끝이 방출(501) → 엔딩(1)이다', () => {
     const result = 판짜기({ season: 7, gamesPlayed: 45, popularity: 400 })
 
     act(() => result.current.actions.beginYearEnd())
+    const 본것 = 연말끝까지(result)
 
+    expect(본것.at(-1)).toBe(501)
     expect(result.current.scene).toBe('엔딩')
     expect(result.current.career?.endingIndex).toBe(1)
   })
 
-  it('7~12년차 연말은 은퇴 선택(502)이 뜨고, 은퇴를 고르면 엔딩으로 간다', () => {
+  it('7~12년차 연말은 은퇴 선택(502) — "은퇴한다"(496) → "은퇴한다"(503) 면 엔딩으로 간다', () => {
     const result = 판짜기({ season: 9, gamesPlayed: 45, popularity: 1600, gamePoint: 0 })
 
     act(() => result.current.actions.beginYearEnd())
-    expect(result.current.scene).toBe('연말')
+    const 본것 = 연말끝까지(result, { 502: [496, 503] })
 
-    act(() => result.current.actions.retire())
-
+    expect(본것.slice(-3)).toEqual([502, 496, 503])
     expect(result.current.scene).toBe('엔딩')
     expect(result.current.career?.endingIndex).toBe(5)
     // 엔딩 보너스 0xcc40c[5] = 12000 G 를 띄울 때 준다 (0x1220c)
     expect(result.current.career?.gamePoint).toBe(12_000)
   })
 
-  it('은퇴 선택에서 연봉협상을 고르면 다음 연차로 이어진다', () => {
-    const result = 판짜기({ season: 9, gamesPlayed: 45, popularity: 1600 })
+  it('은퇴 선택에서 연봉협상(380)을 고르면 다음 연차로 이어진다', () => {
+    const result = 판짜기({ season: 10, gamesPlayed: 45, popularity: 1600 })
     act(() => result.current.actions.beginYearEnd())
 
-    act(() => result.current.actions.continueCareer())
+    연말끝까지(result, { 502: [380, 383] })
 
     expect(result.current.scene).toBe('관리')
-    expect(result.current.career?.season).toBe(10)
+    expect(result.current.career?.season).toBe(11)
+  })
+
+  it('502 갈림길 화면(연말)의 버튼도 같은 이벤트로 — 연봉협상 380 · 은퇴 496', () => {
+    const result = 판짜기({ season: 10, gamesPlayed: 45, popularity: 1600 })
+    act(() => result.current.actions.continueCareer())
+    expect(result.current.story).toEqual({ eventId: 380, context: '연말', viewed: [502] })
+
+    act(() => result.current.actions.retire())
+    expect(result.current.story).toEqual({ eventId: 496, context: '연말', viewed: [502] })
   })
 
   it('마지막 해(13년차)는 연말이 반드시 엔딩이다 (은퇴식 504)', () => {
     const result = 판짜기({ season: 13, gamesPlayed: 45, popularity: 1600 })
 
     act(() => result.current.actions.beginYearEnd())
+    const 본것 = 연말끝까지(result)
 
+    expect(본것.at(-1)).toBe(504)
     expect(result.current.scene).toBe('엔딩')
     expect(result.current.career?.endingIndex).toBe(5)
   })
@@ -279,40 +396,138 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
    * `선수[0x204 + v] = 1`(0x8c5da~0x8c754) 로 히든 계열을 연다. v 가 곧 행 번호다.
    */
   describe('히든 변화구 오픈 이벤트 30~33', () => {
-    it('관리 화면에서 조건을 채우면 계열이 열린다 (30 → 행1)', () => {
+    it('관리 화면에서 조건을 채우면 이벤트 30 을 튼다 — 끝나면 보상 종류 6 이 계열을 연다 (30 → 행1)', () => {
       const result = 판짜기({
         season: 5,
         gamesPlayed: 10,
         ability: { control: 200, velocity: 250, breaking: 300, stamina: 100 },
       })
 
+      // 대사는 재생기가 보여 준다 — 끝나기 전에는 아직 닫혀 있다
+      expect(result.current.scene).toBe('이벤트')
+      expect(result.current.story).toEqual({ eventId: 30, context: '관리', viewed: [] })
+      expect(result.current.career?.hiddenPitchRows[1]).toBe(false)
+
+      이벤트끝내기(result)
+
+      expect(result.current.scene).toBe('관리')
       expect(result.current.career?.hiddenPitchRows[1]).toBe(true)
       expect(result.current.career?.seenEventIds).toContain('30')
       // 조건을 덜 채운 31~33 은 아직 잠겨 있다
       expect(result.current.career?.hiddenPitchRows[2]).toBe(false)
       expect(result.current.career?.hiddenPitchRows[0]).toBe(false)
+      expect(result.current.story).toBeNull()
     })
 
-    it('조건을 채운 것이 여럿이면 하나씩 연달아 열린다 (A 3절)', () => {
+    it('조건을 채운 것이 여럿이면 하나씩 연달아 나온다 (A 3절)', () => {
       const result = 판짜기({
         season: 7,
         gamesPlayed: 10,
         ability: { control: 300, velocity: 400, breaking: 600, stamina: 100 },
       })
 
+      const 본것: number[] = []
+      while (result.current.scene === '이벤트') 본것.push(...이벤트끝내기(result))
+
+      expect(본것).toEqual([30, 31, 32])
       expect(result.current.career?.hiddenPitchRows).toEqual([false, true, true, true])
       expect(result.current.career?.seenEventIds).toEqual(['30', '31', '32'])
     })
 
-    it('조건을 못 채우면 열리지 않는다', () => {
+    it('조건을 못 채우면 틀지 않는다', () => {
       const result = 판짜기({
         season: 5,
         gamesPlayed: 10,
         ability: { control: 200, velocity: 250, breaking: 299, stamina: 100 },
       })
 
+      expect(result.current.scene).toBe('관리')
       expect(result.current.career?.hiddenPitchRows).toEqual([false, false, false, false])
     })
+  })
+
+  /**
+   * 117 중간평가 — 105 진입(0x11bda~0x11c0c)이 경기 수 22 이고 그 해 비트(0xa4280)가 꺼져 있으면 튼다.
+   * 비트는 452~454 의 보상을 마칠 때 0x8cbaa 가 켠다.
+   */
+  describe('중간평가 117 (0x11e84)', () => {
+    it('22경기 뒤 관리 화면에 들어오면 목표 단계 1 의 달성 수로 452~454 를 틀고, 끝나면 그 해 다시 안 튼다', () => {
+      const result = 판짜기({ gamesPlayed: 21, popularity: 100, reputation: 100, morale: 50 })
+      경기치르기(result)
+
+      expect(result.current.career?.gamesPlayed).toBe(22)
+      expect(result.current.story?.context).toBe('중간평가')
+      const eventId = result.current.story!.eventId
+      expect([452, 453, 454]).toContain(eventId)
+      expect(result.current.career?.lastMidSeasonGoalCount).toBeGreaterThanOrEqual(0)
+
+      이벤트끝내기(result)
+
+      expect(result.current.scene).toBe('관리')
+      expect(result.current.career?.midSeasonEvaluatedYears).toEqual([0])
+      // 다시 관리 화면에 들어와도 (같은 22경기) 또 틀지 않는다
+      act(() => result.current.actions.goto('외출'))
+      act(() => result.current.actions.goto('관리'))
+      expect(result.current.scene).toBe('관리')
+    })
+
+    it('1년차에 다섯 개를 모두 이루면 칭호 1 "떠오르는 샛별" 을 준다 (0x11ee6)', () => {
+      const result = 판짜기({
+        gamesPlayed: 22,
+        popularity: 500,
+        popularityAtSeasonStart: 0,
+        stats: { ...createPitcherCareer('x').stats, wins: 30, strikeouts: 300 },
+      })
+
+      expect(result.current.story?.eventId).toBe(452)
+      expect(result.current.career?.lastMidSeasonGoalCount).toBe(5)
+      expect(result.current.career?.titleIds).toContain('떠오르는 샛별')
+    })
+  })
+})
+
+describe('외출 [!] · [들어가기] (0x8cdc0 · 0x16c64 · 114)', () => {
+  const 판짜기 = async (career: Record<string, unknown>) => {
+    const { result } = 띄우기()
+    act(() => result.current.actions.create('투수', 신인))
+    act(() => result.current.actions.save({ ...result.current.career!, ...career }))
+    await waitFor(() => expect(result.current.storyEvents).not.toBeNull())
+    return result
+  }
+
+  it('[!] 는 대상 1·3 장소 이벤트가 있는 장소에만 — [들어가기] 는 그 이벤트를 틀고 끝나면 행동을 쓰고 105', async () => {
+    // 1년차 13경기째 — 경기장(trigger 2) 230 (1년 13경기 ~) 이 선다
+    const result = await 판짜기({ gamesPlayed: 12 })
+    act(() => result.current.actions.openOuting())
+    const 경기장 = OUTING_PLACES.find((place) => result.current.eventPlaceIds.has(place.id))!
+    expect(경기장).toBeDefined()
+
+    act(() => result.current.actions.enterOutingPlace(경기장))
+    expect(result.current.story?.context).toBe('장소')
+    const eventId = result.current.story!.eventId
+    expect(eventId).toBeLessThan(440)
+
+    이벤트끝내기(result)
+
+    expect(result.current.scene).toBe('관리')
+    expect(result.current.career?.hasActedThisCycle).toBe(true)
+    expect(result.current.career?.outingsThisSeason).toBe(1)
+    expect(result.current.career?.seenEventIds).toContain(String(eventId))
+  })
+
+  it('이벤트가 없는 장소는 빈 장소 440+장소 — 행동을 안 쓰고 지도(113)로 돌아온다', async () => {
+    const result = await 판짜기({ gamesPlayed: 0 })
+    act(() => result.current.actions.openOuting())
+    const 빈곳 = OUTING_PLACES.find((place) => !result.current.eventPlaceIds.has(place.id))!
+
+    act(() => result.current.actions.enterOutingPlace(빈곳))
+    expect(result.current.story?.eventId).toBe(439 + 빈곳.frame)
+
+    이벤트끝내기(result)
+
+    expect(result.current.scene).toBe('외출')
+    expect(result.current.career?.hasActedThisCycle).toBe(false)
+    expect(result.current.career?.outingsThisSeason).toBe(0)
   })
 })
 
