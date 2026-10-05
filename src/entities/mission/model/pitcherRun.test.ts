@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   applyPitcherOutcome,
+  baserunnerAllowedOf,
   checkPitchExhausted,
   recordPitch,
   startPitcherMission,
@@ -173,12 +174,18 @@ describe('이닝 단위 미션 — 노히트노런 · 퍼펙트게임', () => {
     expect(run.status).toBe('실패')
   })
 
-  it('볼넷은 노히트노런을 깨지 않는다', () => {
+  /**
+   * 노히트노런 *목표 막대*(`recordPitcherOutcome`)는 볼넷으로 깨지지 않지만, 13번 레코드의 넷째 실패 한도
+   * +0xa3 = 1 ↔ R+0x130(출루 허용)이 볼넷 타자로 1 이 되어 **미션은 실패**다 (아래 '넷째 실패 한도' 묶음).
+   */
+  it('볼넷은 노히트노런 막대는 지키지만 13번 미션은 출루 허용 한도로 실패다', () => {
     let run = startPitcherMission(노히트노런)
 
     run = applyPitcherOutcome(run, { kind: '볼넷' })
 
-    expect(run.status).toBe('진행중')
+    expect(run.progress.counts['노히트노런']).toBe(0)
+    expect(run.progress.brokenConditions).toEqual(['무출루'])
+    expect(run.status).toBe('실패')
   })
 
   it('볼넷은 퍼펙트게임을 깬다 — 주자를 내보내면 안 된다', () => {
@@ -232,5 +239,60 @@ describe('수비 진행 — 미션도 수비 시뮬레이션이 돌린다 (P2 7�
 
     expect(run.totalOuts).toBe(2)
     expect(run.allowed.runs).toBe(0)
+  })
+})
+
+describe('넷째 실패 한도 +0xa3 ↔ R+0x130 출루 허용 (정산 0xa8c86 · 판정 0xaaccc)', () => {
+  const 노히트노런 = PITCHER_MISSIONS.find((m) => m.id === 13)!
+  const 퍼펙트 = PITCHER_MISSIONS.find((m) => m.id === 14)!
+
+  it('원본 표에서 +0xa3 이 1 인 것은 투수 13·14 번뿐이다', () => {
+    expect(PITCHER_MISSIONS.filter((m) => m.failLimits.baserunners > 0).map((m) => m.id)).toEqual([13, 14])
+  })
+
+  it('노히트노런(13번)도 볼넷 하나로 실패다 — 볼넷 타자가 주자 목록(종류 2 → 0xa93ac)에 든다', () => {
+    const run = applyPitcherOutcome(startPitcherMission(노히트노런), { kind: '볼넷' })
+    expect(run.allowed.baserunner).toBe(1)
+    expect(run.progress.brokenConditions).toContain('무출루')
+    expect(run.status).toBe('실패')
+  })
+
+  it('사구도 13·14 번을 깬다 — 판정 4 도 같은 종류 2 (0x3e1b4)', () => {
+    expect(applyPitcherOutcome(startPitcherMission(노히트노런), { kind: '사구' }).status).toBe('실패')
+    const perfect = applyPitcherOutcome(startPitcherMission(퍼펙트), { kind: '사구' })
+    expect(perfect.progress.brokenConditions).toEqual(['무출루'])
+    expect(perfect.status).toBe('실패')
+  })
+
+  it('삼진·아웃은 출루가 아니다 — 13번은 계속 간다', () => {
+    let run = applyPitcherOutcome(startPitcherMission(노히트노런), { kind: '삼진' })
+    expect(run.allowed.baserunner).toBe(0)
+    run = applyPitcherOutcome(run, { kind: '아웃', detail: '뜬공아웃' })
+    expect(run.status).toBe('진행중')
+  })
+
+  it('다른 미션은 볼넷 하나로 이 한도에 안 걸린다 (한도 0)', () => {
+    const run = applyPitcherOutcome(startPitcherMission(연속삼진쇼), { kind: '볼넷' })
+    expect(run.progress.brokenConditions).not.toContain('무출루')
+  })
+})
+
+describe('baserunnerAllowedOf — 주자 목록 마지막 원소가 살아 있나 (0xa8c5c~0xa8c86)', () => {
+  const EMPTY = { first: false, second: false, third: false }
+  const FIRST = { first: true, second: false, third: false }
+
+  it('빈 루: 타자주자가 루에 남으면 1, 홈런처럼 득점하면 0 (+0x96 이 선다)', () => {
+    expect(baserunnerAllowedOf(EMPTY, { kind: '안타', bases: 1 }, FIRST, 0)).toBe(true)
+    expect(baserunnerAllowedOf(EMPTY, { kind: '홈런' }, EMPTY, 1)).toBe(false)
+    expect(baserunnerAllowedOf(EMPTY, { kind: '아웃', detail: '땅볼아웃' }, EMPTY, 0)).toBe(false)
+  })
+
+  it('빈 루 삼진은 목록이 비어 0 이다', () => {
+    expect(baserunnerAllowedOf(EMPTY, { kind: '삼진' }, EMPTY, 0)).toBe(false)
+  })
+
+  it('주자가 있으면 맨 앞 주자를 본다 — 삼진으로 남은 1루 주자는 1, 득점하면 0', () => {
+    expect(baserunnerAllowedOf(FIRST, { kind: '삼진' }, FIRST, 0)).toBe(true)
+    expect(baserunnerAllowedOf({ first: false, second: false, third: true }, { kind: '안타', bases: 1 }, FIRST, 1)).toBe(false)
   })
 })

@@ -7,7 +7,8 @@ import {
   OUTS_PER_INNING,
   recordPitcherOutcome,
 } from '@/entities/mission/model/missionGoal'
-import { EMPTY_BASES } from '@/entities/game/model/baseState'
+import { EMPTY_BASES, runnerCountOf } from '@/entities/game/model/baseState'
+import type { BaseState } from '@/entities/game/model/baseState'
 import { isHit } from '@/entities/at-bat/model/atBatOutcome'
 import { limitOrNull, missionAdvance } from '@/entities/mission/model/missionRun'
 import type { MissionRun, MissionStatus } from '@/entities/mission/model/missionRun'
@@ -29,8 +30,19 @@ export interface PitcherRun extends MissionRun {
   readonly perfectGauges: number
   /** 지금까지 잡은 아웃 수 (이닝 목표 계산용) */
   readonly totalOuts: number
-  /** 허용한 실점·피안타·볼넷(사구 제외) — 레코드 실패 한도와 비교한다 (0xaac76~0xaacd6) */
-  readonly allowed: { readonly runs: number; readonly hits: number; readonly walks: number }
+  /** 허용한 실점·피안타·볼넷(사구 제외)·출루 허용 — 레코드 실패 한도와 비교한다 (0xaac76~0xaaccc) */
+  readonly allowed: {
+    readonly runs: number
+    readonly hits: number
+    readonly walks: number
+    /**
+     * R+0x130 — **누계가 아니라 방금 정산한 플레이 하나의 값**(0/1). 정산 0xa8c86 이
+     * `0xa57f8(R, 0x17, r5)` 로 넣고 점프표 0xd8218[0x17] = 0xa591c 가 `strb (r5 != 0)` 로 **덮어쓴다**.
+     * 판정 0xaaa6c 은 정산 바로 뒤에 돌고(0xae24c: 0xae36a → 0xae382 · 0xae3e8: 0xae5b0 → 0xae5c4)
+     * 실패(2)는 다음 판정부터 맨 앞(0xaaa8e)에서 돌아가 버려 그대로 남는다.
+     */
+    readonly baserunner: number
+  }
 }
 
 export { inningGoalOf, OUTS_PER_INNING } from '@/entities/mission/model/missionGoal'
@@ -48,7 +60,7 @@ export function startPitcherMission(mission: OriginalMission): PitcherRun {
     bases: mission.start.runners,
     outs: mission.start.outs,
     totalOuts: 0,
-    allowed: { runs: 0, hits: 0, walks: 0 },
+    allowed: { runs: 0, hits: 0, walks: 0, baserunner: 0 },
   }
 }
 
@@ -65,7 +77,7 @@ export function recordPitch(run: PitcherRun, wasPerfectGauge: boolean): PitcherR
 }
 
 /**
- * 한도에 닿으면 깨지는 조건 이름 — 실점 → 무실점, 피안타 → 무안타, 볼넷 → 무사사구.
+ * 한도에 닿으면 깨지는 조건 이름 — 실점 → 무실점, 피안타 → 무안타, 볼넷 → 무사사구, 출루 허용 → 무출루.
  *
  * 원본 판정 0xaac76~0xaacd6 은 레코드 바이트(행+0xa0)의 니블을 투수 기록 R 칸과 견준다
  * (`0xaa940`: 한도 > 0 이고 칸 ≥ 한도면 실패 2):
@@ -73,10 +85,11 @@ export function recordPitch(run: PitcherRun, wasPerfectGauge: boolean): PitcherR
  * "무사사구" 한도가 보는 R+0x144 는 **볼넷만**이다 — 코드 0x1c 는 볼 카운트 state[5] > 3 일 때뿐(0xa8e04~0xa8e0e)이고
  * 사구는 R+0x148(코드 0x1d, 0xa8e2a)로 따로 간다. 그래서 사구는 이 한도를 채우지 않는다 (이름과 달리 — 원본 그대로).
  *
- * ⚠️ 미해결: 넷째 한도 +0xa3 ↔ R+0x130 (투수 13·14 번이 1) 은 옮기지 않았다. R+0x130 은 정산 0xa8c86 이
- *   주자 목록 마지막 원소가 살아 있으면 1 로 두는 칸인데(`pitcherGameRecord.recordAllowedBaserunner`),
- *   볼넷·사구 타자가 그 목록에 드는지 확인하지 못했다 — 들면 노히트노런(13번)도 볼넷 하나로 실패가 된다.
- *   또 R+0x128(실점)은 P1 5-1 에 따르면 쓰는 곳이 없어 원본에선 늘 0 일 수 있다(유력) — 웹은 실점을 센다.
+ * 넷째 한도 +0xa3(s8, `0xaacca ldrsb`) ↔ R+0x130 (`0xaacc6 ldrb [r6,#0xc]`, r6 = R+0x124) — `0xaaccc bl 0xaa940` — 투수 13·14 번만 1 이다.
+ *   R+0x130 은 `baserunnerAllowedOf` 가 옮겼다. 볼넷·사구 타자도 주자 목록에 들므로 **노히트노런(13번)도
+ *   볼넷·사구 하나로 실패**다 — 원본 그대로.
+ *
+ * ⚠️ R+0x128(실점)은 P1 5-1 에 따르면 쓰는 곳이 없어 원본에선 늘 0 일 수 있다(유력) — 웹은 실점을 센다.
  */
 function brokenConditionsOf(mission: OriginalMission, allowed: PitcherRun['allowed']): string[] {
   const limits = mission.failLimits
@@ -85,6 +98,7 @@ function brokenConditionsOf(mission: OriginalMission, allowed: PitcherRun['allow
     reached(allowed.runs, limits.runs) ? '무실점' : null,
     reached(allowed.hits, limits.hits) ? '무안타' : null,
     reached(allowed.walks, limits.walks) ? '무사사구' : null,
+    reached(allowed.baserunner, limits.baserunners) ? '무출루' : null,
   ].filter((name): name is string => name !== null)
 }
 
@@ -104,6 +118,8 @@ function advanceDefense(run: PitcherRun, outcome: AtBatOutcome, options: Pitcher
   const outs = run.outs + advance.outsAdded
   const isInningOver = outs >= OUTS_PER_INNING
   return {
+    /** 3아웃으로 비우기 **전**의 루 — 정산(0xa8024)이 보는 주자 목록은 이닝 정리보다 앞이다 */
+    basesAfterPlay: advance.bases,
     bases: isInningOver ? EMPTY_BASES : advance.bases,
     outs: isInningOver ? 0 : outs,
     runsScored: advance.runsScored,
@@ -135,6 +151,8 @@ export function applyPitcherOutcome(
     hits: run.allowed.hits + (isHit(outcome) ? 1 : 0),
     // R+0x144 = 볼넷만 (사구는 R+0x148 — `brokenConditionsOf` 머리글)
     walks: run.allowed.walks + (outcome.kind === '볼넷' ? 1 : 0),
+    // R+0x130 = 이번 플레이 하나의 값 (덮어쓴다)
+    baserunner: baserunnerAllowedOf(run.bases, outcome, defense.basesAfterPlay, defense.runsScored) ? 1 : 0,
   }
   const progress = recordPitcherOutcome(
     run.progress,
@@ -157,6 +175,47 @@ export function applyPitcherOutcome(
     allowed,
   }
   return { ...next, status: judgeStatus(next) }
+}
+
+/**
+ * R+0x130 "출루 허용" — 정산 0xa8024 안 0xa8c2e~0xa8c86 (R15 11-1 · P7 A1-1, 직접 다시 뜸).
+ *
+ * ```
+ * a8c5c  for i in 0 .. 0xa9598(주자관리)−1:          ; 주자 목록 = [타자주자?, 1루, 2루, 3루 중 찬 루] 오름차순
+ * a8c66    r3 = 0xa9564(관리, i)+0x96                ; 아웃 표시 (득점해도 0xa9520 이 같은 칸을 세운다)
+ * a8c6a    r5 = 0 ; if r3 == 0 → r5 = 1             ; ⚠️ 루프 안에서 0 으로 되돌린다 → **마지막 원소 하나만** 본다
+ * a8c86  0xa57f8(R, 0x17, r5)                       ; R+0x130 = (r5 != 0)
+ * ```
+ * 목록(I 3b-1): 투구 전 `0xa9a10` 이 찬 루를 **3 → 2 → 1 루 순서로 맨 앞에 끼워** `[1루, 2루, 3루]` 오름차순을 만들고,
+ * 상태 0x17 진입 `0x46418` 이 타자주자를 `0xa93ac` 로 **맨 앞에** 하나 더 끼운다. 그 조건은 0x464a8~0x464cc:
+ * `state[0x11] != 0 || 플레이 종류 ∈ {2, 3} || state[0x1a]`, 그리고 종류 ≠ 8. 볼넷(판정 3, 0x3e1ae)·사구(판정 4,
+ * 0x3e1b4)는 **둘 다 종류 2**(0x3e1cc `movs r1,#2` → 0xb0cb8)라 타자주자가 목록에 든다. 삼진은 상태 0x17 을 안 거친다
+ * (0xae24c 가 판정 5 를 바로 정산 0xa8024 로 보낸다, 0xae360) → 타자주자 없음.
+ * 그래서 **마지막 원소 = 투구 때 맨 앞 주자(가장 높은 루), 주자가 없으면 타자주자**다.
+ *
+ * - 주자가 없었다: 마지막 = 타자주자. 살아서 루에 남았는가 = 플레이 뒤 루가 비지 않았는가
+ *   (타자주자 말고는 루에 설 사람이 없다). 홈런·그라운드 홈런은 득점해 +0x96 이 서므로 0 이다(원본 그대로).
+ * - 주자가 있었다: 마지막 = 그때의 맨 앞 주자. 그 주자가 살아 루에 남았는가.
+ *   ⚠️ **근사**: 웹 진행기는 주자 하나하나의 운명(+0x95·+0x96)을 밖으로 내주지 않는다(`DefensePlayResult`).
+ *   그래서 "득점이 없고, 플레이 뒤 가장 높은 찬 루가 그 주자의 출발 루 이상" 으로 본다 — 앞 주자가 잡히고
+ *   뒤 주자가 그 루 이상까지 간 플레이는 잘못 1 이 된다. 이 한도(+0xa3)가 서 있는 13·14 번은 **빈 루로 시작**하고
+ *   첫 출루가 곧 이 한도로 실패이므로, 주자가 있는 채로 이 갈래에 닿는 일은 진행 중인 미션에선 없다.
+ */
+export function baserunnerAllowedOf(
+  basesBefore: BaseState,
+  outcome: AtBatOutcome,
+  basesAfterPlay: BaseState,
+  runsScored: number,
+): boolean {
+  const leadBase = basesBefore.third ? 3 : basesBefore.second ? 2 : basesBefore.first ? 1 : 0
+  if (leadBase === 0) {
+    // 타자주자가 목록에 드는 플레이: 볼넷·사구(종류 2)·타구. 삼진은 목록이 빈 채로 정산된다.
+    if (outcome.kind === '삼진') return false
+    return runnerCountOf(basesAfterPlay) > 0
+  }
+  if (runsScored > 0) return false
+  const highestAfter = basesAfterPlay.third ? 3 : basesAfterPlay.second ? 2 : basesAfterPlay.first ? 1 : 0
+  return highestAfter >= leadBase
 }
 
 /** 이닝으로 목표를 재는 미션(노히트노런·퍼펙트게임)은 (9 − 시작 이닝 + 1) × 3 아웃을 잡으면 성공이다. */
