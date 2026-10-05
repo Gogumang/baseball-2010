@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { playCpuSeriesGame, runCpuPostseason } from '@/entities/league/model/postseasonPlay'
+import {
+  playCpuSeriesGame,
+  playCpuSeriesGameWithStamina,
+  runCpuPostseason,
+  runCpuPostseasonWithStamina,
+} from '@/entities/league/model/postseasonPlay'
 import { startPostseason } from '@/entities/league/model/league'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
@@ -60,5 +65,39 @@ describe('runCpuPostseason — 내 차례까지 자동 소화 (0x13da0)', () => 
   it('같은 씨앗이면 같은 포스트시즌이 나온다', () => {
     expect(runCpuPostseason(startPostseason(순위), 9, 씨앗난수(77)))
       .toEqual(runCpuPostseason(startPostseason(순위), 9, 씨앗난수(77)))
+  })
+})
+
+describe('스태미나 +0x2c 를 잇는다 (0xc2760 — 하루 끝 0xb818c 포스트시즌 갈래는 회복 없음)', () => {
+  it('표를 안 넘기면 예전과 같은 경기가 나온다 (모두 10000)', () => {
+    expect(playCpuSeriesGameWithStamina(startPostseason(순위), 씨앗난수(7)).series)
+      .toEqual(playCpuSeriesGame(startPostseason(순위), 씨앗난수(7)))
+    expect(runCpuPostseasonWithStamina(startPostseason(순위), 9, 씨앗난수(77)).series)
+      .toEqual(runCpuPostseason(startPostseason(순위), 9, 씨앗난수(77)))
+  })
+
+  it('한 경기는 두 팀 표만 고치고 다른 팀 표는 그대로 둔다', () => {
+    const 시작 = startPostseason(순위)
+    const 남의표 = [1, 2, 3, 4, 5, 6, 7, 8]
+    const 결과 = playCpuSeriesGameWithStamina(시작, 씨앗난수(7), { 9: 남의표 })
+    expect(결과.pitcherStaminas[9]).toBe(남의표)
+    expect(Object.keys(결과.pitcherStaminas).map(Number).sort()).toEqual([...시작.teams, 9].sort())
+    const 깎임 = [...결과.pitcherStaminas[시작.teams[0]]!, ...결과.pitcherStaminas[시작.teams[1]]!]
+    expect(깎임.some((value) => value < 10_000)).toBe(true)
+  })
+
+  it('넘긴 값으로 선다 — 깎인 표는 다음 경기로 이어지고 회복되지 않는다', () => {
+    const 결과 = runCpuPostseasonWithStamina(startPostseason(순위), 9, 씨앗난수(4242))
+    for (const staminas of Object.values(결과.pitcherStaminas)) {
+      for (const value of staminas) {
+        expect(value).toBeGreaterThanOrEqual(0)
+        expect(value).toBeLessThanOrEqual(10_000)
+      }
+    }
+    const 낮은표 = Object.fromEntries(순위.map((team) => [team, Array.from({ length: 8 }, () => 500)]))
+    const 지친쪽 = runCpuPostseasonWithStamina(startPostseason(순위), 9, 씨앗난수(4242), 낮은표)
+    for (const staminas of Object.values(지친쪽.pitcherStaminas)) {
+      for (const value of staminas) expect(value).toBeLessThanOrEqual(500)
+    }
   })
 })

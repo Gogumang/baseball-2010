@@ -25,7 +25,7 @@ import type { League } from '@/entities/league/model/league'
 import { recordLeagueResult } from '@/entities/league/model/league'
 import { playLeagueDay } from '@/entities/league/model/leagueDay'
 import { finishRegularSeason } from '@/entities/league/model/seasonEnd'
-import { runCpuPostseason } from '@/entities/league/model/postseasonPlay'
+import { runCpuPostseasonWithStamina } from '@/entities/league/model/postseasonPlay'
 import { advancePostseason, postseasonSideOf } from '@/entities/league/model/league'
 import { isMyTurn } from '@/entities/league/model/seasonEnd'
 import type { PostseasonSeries } from '@/entities/league/model/league'
@@ -1032,13 +1032,20 @@ export function useSeasonSession(
           const series = save.series ?? null
           if (series === null) return
           const winner = won ? record.teamId : opponent
-          const advanced = runCpuPostseason(advancePostseason(series, winner), record.teamId, random)
           // 4f268 → 4f29a 0xb818c(포스트시즌 갈래는 스태미나를 안 건드린다) → 4f2bc 열 팀 +20%.
-          // ⚠️ CPU 끼리 포스트시즌 경기(runCpuPostseason, 0xc2760)의 소모·그날 하루 끝은 웹 리그 쪽이 스태미나를
-          //    받지 않아 빠져 있다 — 그 팀들은 깎이지도 회복되지도 않는다
+          // 그 뒤 결산 0xef 키 0x9dc8 이 CPU 끼리 경기 0xc2760 을 돌린다 — 회복이 **끝난** 표로 서고 깎인 값이
+          // 그대로 남는다(0xc2760 의 하루 끝 0xb818c 포스트시즌 갈래는 회복이 없고, 0xb617c 는 0x4ea0c 에서만 불린다)
           const rested = withDayEndRecovery(withGameEndStamina(save, summary))
+          const cpu = runCpuPostseasonWithStamina(
+            advancePostseason(series, winner),
+            record.teamId,
+            random,
+            rested.cpuPitcherStaminas,
+          )
+          const advanced = cpu.series
           commit({
             ...rested,
+            cpuPitcherStaminas: cpu.pitcherStaminas,
             series: advanced,
             state: {
               ...save.state,
@@ -1183,9 +1190,12 @@ export function useSeasonSession(
       // 0xef 키: 내 팀이 X/Y 면 this+0x11c = 1 → 0xd7 (P4 4b) — 정규시즌과 같은 경기 전 흐름이다
       return enterPreGameSquad({ kind: '포스트시즌', options })
     }
-    const advanced = runCpuPostseason(series, myTeam, random)
+    // 0xc2760 은 CPU 팀 투수 레코드 +0x2c 를 깎기만 한다 — 회복(0xb617c)은 다음 내 경기 끝 0x4ea0c 에서다
+    const cpu = runCpuPostseasonWithStamina(series, myTeam, random, save.cpuPitcherStaminas)
+    const advanced = cpu.series
     commit({
       ...save,
+      cpuPitcherStaminas: cpu.pitcherStaminas,
       series: advanced,
       state: {
         ...save.state,

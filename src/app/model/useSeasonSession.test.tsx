@@ -960,6 +960,27 @@ describe('투수 스태미나 +0x2c — 첫날 6850 0xb6190 · 하루 끝 4f2bc 
     expect(result.current.roster.pitchers.every((p) => p.stamina === 4000)).toBe(true)
   })
 
+  it('CPU 끼리 포스트시즌 경기(0xc2760)도 표로 서서 깎인 값을 남긴다 — 회복은 없다', () => {
+    const store = 메모리저장()
+    const rendered = 띄우기(store)
+    const { result } = rendered
+    act(() => result.current.actions.chooseTeam(0))
+    act(() => result.current.actions.confirmIncome({
+      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
+    }))
+    const 전 = (store.load() as 저장모양).cpuPitcherStaminas ?? {}
+    for (let i = 0; i < 4 && result.current.pendingGame === null; i += 1) {
+      act(() => result.current.actions.continuePostseason())
+    }
+    const 뒤 = (store.load() as 저장모양).cpuPitcherStaminas ?? {}
+    const 깎인팀 = Object.keys(뒤).filter((team) =>
+      (뒤[Number(team)] ?? []).some((value, slot) => value < (전[Number(team)]?.[slot] ?? 10_000)))
+    expect(깎인팀.length).toBeGreaterThan(0)
+    for (const staminas of Object.values(뒤)) {
+      for (const value of staminas) expect(value).toBeGreaterThanOrEqual(0)
+    }
+  })
+
   it('국가대항전은 넘기지도 받지도 않는다 — 대한민국·상대국 모두 10000, 시즌 명단 값은 그대로', () => {
     const rendered = 띄우기()
     const { result } = rendered
