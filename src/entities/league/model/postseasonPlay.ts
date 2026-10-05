@@ -2,6 +2,7 @@ import { advancePostseason } from '@/entities/league/model/league'
 import type { PostseasonSeries } from '@/entities/league/model/league'
 import { simulateLeagueGame } from '@/entities/league/model/leagueDay'
 import { isMyTurn } from '@/entities/league/model/seasonEnd'
+import { rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
 /**
@@ -11,6 +12,26 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
  *   - `playCpuSeriesGame`(0xc2760) 이 한 경기를 연출 없이 돌리고 승패를 기록한 뒤 날짜를 넘긴다
  *   - `autoRunCpuPostseason`(0x13da0) 이 그 시리즈가 끝날 때까지, 그리고 내 차례가 나올 때까지 반복한다
  * 경기 자체는 정규시즌과 같은 타석 엔진을 쓴다 — 포스트시즌 전용 계산은 없다.
+ *
+ * **선발도 정규시즌 CPU 경기와 같은 준비 함수 `0xc239c` 가 정한다** (c28c0 `0xc239c(sim, 모드, L, X, Y)`):
+ * ```
+ * c24fc  mode = [sp+0x1c]          ; 시즌 0x9dc8(9eba) 은 SR[0] = 2, 나만의리그 0x13da0(13e8a) 은 장면+0xcc = 3·4
+ * c24fe  mode == 2 → g = (s8)(0x1f55c()+0xb2)  ; 시즌 저장 레코드 = L+0x32
+ *        mode 3·4 → g = (s8)(0x1fa2c()+0xb2)   ; 나만의리그 레코드
+ *        g != 0 → 0xb8c80(팀A) ; 0xb8c80(팀B)   ; c2518·c2542 — 0xb5ca8 로테이션 한 칸 (S5 U-16)
+ * ```
+ * 선발은 늘 로스터 투수 0번이다(0xb891c `team[i] = i`). `(L+0x32) % 4` 를 `state+0x2e+side` 에 쓰는
+ * `0xb6c2c`(c2414·c244e)는 이 길에서 **읽히지 않는다** — 그 칸을 읽는 `0xb6c34` 의 호출지는 국가대항전 준비
+ * `0xc2c4c`(c2d18) 하나뿐이다. 그래서 P1 1-0 의 "포스트시즌 0xc2c4c ← 0xc2dac" 는 국가대항전 쪽이고, 포스트시즌
+ * 0xc2760 에는 `rand(0,4)` 선발도 `% 4` 맞바꿈도 없다.
+ *
+ * 포스트시즌의 g 는 **시리즈 안에서 치른 경기 수**다: 대진을 까는 `0xb80a8` 이 L+0x32 = 0(b811c)으로 놓고,
+ * 시리즈가 끝나는 승 기록 `0xb7724` 가 L+0x32 = −1(b777a)로 놓아 하루 끝 `0xb818c`(b819a, 늘 +1)가 다음 시리즈
+ * 첫 경기를 0 으로 만든다. 무승부가 없으니 g = 두 팀 승수의 합이다.
+ *
+ * ⚠️ 원본 로테이션은 로스터 레코드를 제자리에서 섞어(영구) **앞 시리즈에서 돈 칸이 다음 시리즈로 이어지지만**,
+ * 웹은 정규시즌과 같이 g 하나로 셈한다(`rotationSlotOf` 주석 — **근사**). 준PO·PO 를 치르고 올라온 팀의
+ * 이월분(그 시리즈 경기 수 − 1 칸)은 시리즈 대진에 남지 않아 빠진다 — 미해결.
  */
 /** 한 시리즈는 최대 7경기다. 대진이 셋이라 넉넉히 잡은 안전망 (원본에는 없다) */
 const MAXIMUM_GAMES = 40
@@ -42,7 +63,9 @@ export function playCpuSeriesGameWithStamina(
   const away = series.teams[1]
   const home = series.teams[0]
   // 윗 시드가 홈이다 — 0xb7844 는 포스트시즌에서 series[s][1](올라온 아랫 시드)을 슬롯 1 로 둔다
-  const score = simulateLeagueGame({ away, home }, random, undefined, {
+  // 선발 = 이 시리즈 g 번 돈 로스터의 0번 (0xc239c c24fc~c254e, 위 주석) — 굴림이 없다
+  const day = series.wins[0] + series.wins[1]
+  const score = simulateLeagueGame({ away, home }, random, rotationSlotOf(day), {
     away: pitcherStaminas[away],
     home: pitcherStaminas[home],
   })

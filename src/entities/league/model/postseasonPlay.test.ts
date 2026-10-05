@@ -5,7 +5,8 @@ import {
   runCpuPostseason,
   runCpuPostseasonWithStamina,
 } from '@/entities/league/model/postseasonPlay'
-import { startPostseason } from '@/entities/league/model/league'
+import { advancePostseason, startPostseason } from '@/entities/league/model/league'
+import { simulateLeagueGame } from '@/entities/league/model/leagueDay'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
 function 씨앗난수(seed: number): RandomPort {
@@ -99,5 +100,52 @@ describe('스태미나 +0x2c 를 잇는다 (0xc2760 — 하루 끝 0xb818c 포�
     for (const staminas of Object.values(지친쪽.pitcherStaminas)) {
       for (const value of staminas) expect(value).toBeLessThanOrEqual(500)
     }
+  })
+})
+
+describe('선발은 0xc239c 의 로테이션이다 — 시리즈 안 경기 수 g 로 돈다 (c24fc~c254e, rand(0,4) 없음)', () => {
+  /** 난수를 몇 번 불렀는지 세는 감싸개 */
+  function 세는난수(seed: number) {
+    const 바탕 = 씨앗난수(seed)
+    const 범위: Array<readonly [number, number]> = []
+    const port: RandomPort = {
+      next: () => 바탕.next(),
+      nextInRange: (minimum, maximum) => {
+        범위.push([minimum, maximum])
+        return 바탕.nextInRange(minimum, maximum)
+      },
+      pick: (candidates) => 바탕.pick(candidates),
+    }
+    return { port, 범위 }
+  }
+
+  it('양 팀 모두 rotationSlotOf(두 팀 승수 합) 칸이 선발이고 같은 난수로 같은 경기가 된다', () => {
+    const 시작 = startPostseason(순위)
+    // 1승 1패 뒤 셋째 경기 = g 2
+    const 둘째뒤 = advancePostseason(advancePostseason(시작, 시작.teams[0]), 시작.teams[1])
+    for (const [series, g] of [[시작, 0], [둘째뒤, 2]] as const) {
+      const 기대 = simulateLeagueGame({ away: series.teams[1], home: series.teams[0] }, 씨앗난수(31), g)
+      const 승자 = 기대.awayRuns > 기대.homeRuns ? series.teams[1] : series.teams[0]
+      expect(playCpuSeriesGame(series, 씨앗난수(31))).toEqual(advancePostseason(series, 승자))
+    }
+  })
+
+  it('경기 준비에서 rand(0,4) 를 부르지 않는다 — 선발 굴림이 없다', () => {
+    const 시작 = startPostseason(순위)
+    const 세기 = 세는난수(5)
+    playCpuSeriesGame(시작, 세기.port)
+    const 그대로 = 세는난수(5)
+    simulateLeagueGame({ away: 시작.teams[1], home: 시작.teams[0] }, 그대로.port, 0)
+    expect(세기.범위).toEqual(그대로.범위)
+  })
+
+  it('새 시리즈 첫 경기는 다시 0번이다 — 시리즈가 끝나면 g 가 0 으로 돈다 (b777a −1 → b819a +1)', () => {
+    const 시작 = startPostseason(순위)
+    let series = 시작
+    for (let game = 0; game < 3; game += 1) series = advancePostseason(series, 시작.teams[0])
+    expect(series.round).toBe('플레이오프')
+    const 기대 = simulateLeagueGame({ away: series.teams[1], home: series.teams[0] }, 씨앗난수(8), 0)
+    const 승자 = 기대.awayRuns > 기대.homeRuns ? series.teams[1] : series.teams[0]
+    expect(playCpuSeriesGame(series, 씨앗난수(8))).toEqual(advancePostseason(series, 승자))
   })
 })
