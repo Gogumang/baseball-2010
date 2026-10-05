@@ -386,7 +386,7 @@ describe('경기 중 투수 교체 (0xc1ba4 → 0xac428)', () => {
     const 바꾼뒤 = changePitcher(progress, 후보[0])
     expect(바꾼뒤.ourPitcherIndex).toBe(후보[0])
     expect(바꾼뒤.ourUsedPitchers).toContain(progress.ourPitcherIndex)
-    // 새 투수는 스태미나가 가득이고 카운터가 0 이다 (0xaec64 memset)
+    // 새 투수는 제 레코드 스태미나로 서고(시작 값을 안 넘기면 10000) 카운터가 0 이다 (0xaec64 memset)
     expect(바꾼뒤.stamina).toBe(10_000)
     expect(바꾼뒤.ourPitcherCounters).toEqual({ inningRunsAllowed: 0, runsAllowed: 0, pitches: 0 })
     // state[0xd] — 다음 한 투구 동안은 다시 안 바뀐다
@@ -1820,5 +1820,57 @@ describe('시즌 상대 팀 마선수 — 0xdd 진입 0x6548 (66ee 0x66968 → 6
     const progress = startTeamGame({ ...기본옵션, acePitcherId: 1, aceBatterId: 2 }, random)
     expect(random.rolls.slice(0, 2)).not.toEqual([5, 5])
     expect(progress.opponentAcePitcherIndex).toBe(-1)
+  })
+})
+
+describe('투수 스태미나를 경기 사이에 잇는다 — 레코드 +0x2c (a583fe0)', () => {
+  const 전부자동설정 = { ...FULL_PLAY_SETTINGS, kind: MATCH_SETTING_KIND.상세, value: 0 } as const
+
+  it('선발은 넘긴 시작 스태미나로 선다 — 명단 차례로 찾는다', () => {
+    const { progress } = 시작({
+      dayCounter: 1,
+      ourEntryOrder: { batters: Array.from({ length: 12 }, (_u, i) => ({ rosterSlot: i, position: 0 })), pitchers: [0, 1, 2, 3, 4, 5, 6, 7] },
+      ourPitcherStaminas: [10_000, 6_000, 10_000, 10_000],
+      opponentPitcherStaminas: [10_000, 4_500],
+    })
+    expect(progress.stamina).toBe(6_000)
+    expect(progress.opponentStamina).toBe(4_500)
+    // 모자란 칸·마투수는 10000
+    expect(progress.ourPitcherStaminas[7]).toBe(10_000)
+  })
+
+  it('내려간 투수의 깎인 값은 남고 올라온 투수는 제 값으로 선다', () => {
+    const { progress } = 시작({ ourPitcherStaminas: [10_000, 3_000] })
+    const 깎임 = { ...progress, stamina: 7_000 }
+    const 바꾼뒤 = changePitcher(깎임, 1)
+    expect(바꾼뒤.stamina).toBe(3_000)
+    expect(바꾼뒤.ourPitcherStaminas[0]).toBe(7_000)
+  })
+
+  it('요약의 끝 스태미나는 명단 차례 그대로이고 던진 투수는 깎여 있다 (간이 엔진 소모 0xa5e14 포함)', () => {
+    const { progress } = 시작({ settings: 전부자동설정, acePitcherId: 0 })
+    expect(progress.game.isFinished).toBe(true)
+    const summary = summaryOf(progress)
+    // 마투수는 빼고 표 여덟 칸
+    expect(summary.ourPitcherStaminas).toHaveLength(8)
+    expect(summary.opponentPitcherStaminas).toHaveLength(8)
+    expect(summary.ourPitcherStaminas?.[0]).toBeLessThan(10_000)
+    expect(summary.opponentPitcherStaminas?.[0]).toBeLessThan(10_000)
+    // 안 던진 투수는 그대로
+    const 던진칸 = new Set([...progress.ourUsedPitchers, progress.ourPitcherIndex])
+    summary.ourPitcherStaminas?.forEach((value, index) => {
+      if (!던진칸.has(index)) expect(value).toBe(10_000)
+    })
+  })
+
+  it('끝 값을 다음 경기에 넘기면 그 투수가 깎인 채로 선다', () => {
+    const 첫경기 = summaryOf(시작({ settings: 전부자동설정 }).progress)
+    // 사람이 첫 공을 잡는 설정이라 아직 한 공도 안 나갔다 (후공 — 1회초 우리 수비)
+    const { progress } = 시작({ ourPitcherStaminas: 첫경기.ourPitcherStaminas }, 99)
+    expect(progress.pitchCount).toBe(0)
+    // 같은 날(g = 0)이면 같은 선발 — 깎인 값에서 시작한다
+    expect(progress.ourPitcherIndex).toBe(0)
+    expect(progress.stamina).toBe(첫경기.ourPitcherStaminas?.[0])
+    expect(progress.stamina).toBeLessThan(10_000)
   })
 })

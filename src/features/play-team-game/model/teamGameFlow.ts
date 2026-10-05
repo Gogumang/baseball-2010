@@ -327,6 +327,17 @@ export interface TeamGameOptions {
    * 정규·포스트시즌은 참, 국가대항전·0xdd 를 지나지 않는 길은 거짓(기본).
    */
   readonly seasonOpponentAces?: boolean
+  /**
+   * **경기 시작 때 투수 스태미나** `+0x2c` (0~10000) — 투수 명단 차례(`ourEntryOrder.pitchers`, 없으면 표 칸)
+   * 마다 하나. 안 넘기거나 모자란 칸은 10000 이다. 마투수(명단 밖 저장 레코드 `0x1f824`)의 값은 못 읽어 늘 10000.
+   *
+   * 원본 투수 레코드 +0x2c 는 경기용 칸이 아니라 **시즌 내내 이어지는 값**이다 (a583fe0): 정규시즌은 첫날만 열 팀
+   * `0xb6190` = 10000 이고 그 뒤로는 하루 끝 `0xb617c` 가 +20% 만 채운다 — 경기에서 깎인 값이 다음 경기로 이어진다.
+   * 끝 값은 `summaryOf(...).ourPitcherStaminas` 로 나온다. 저장·하루 끝 회복은 부르는 쪽 몫이다.
+   */
+  readonly ourPitcherStaminas?: readonly number[]
+  /** 상대 팀 투수 시작 스태미나 — 표 칸 차례. 뜻은 `ourPitcherStaminas` 와 같다 */
+  readonly opponentPitcherStaminas?: readonly number[]
   /** 이 경기에 쓸 수 있는 마구 횟수. 로스터 투수는 마구가 없어 기본 0 이다 */
   readonly magicCount?: number
   /** 화면 배치 side (투영 원점 표 0xcfb18 의 칸) */
@@ -465,6 +476,14 @@ export interface TeamGameProgress {
   readonly opponentUsedPitchers: readonly number[]
   /** 지금 상대 투수의 스태미나 0~10000 (`+0x2c`). 우리 쪽은 `stamina` 가 들고 있다 */
   readonly opponentStamina: number
+  /**
+   * **투수 명단 칸마다의 스태미나** `+0x2c` — 원본은 투수 레코드마다 들고 있다. 소모·벤치 클리어링은 지금 투수
+   * 레코드(`0xae83c`)의 +0x2c 를 깎고(`0xaeab0`), 교체 실행 `0xaebe4` 에는 +0x2c 쓰기가 없다(직접 떴다) —
+   * 그래서 내려간 투수는 깎인 값이 남고 올라온 투수는 **제 레코드 값**으로 선다. 지금 마운드 칸은 `stamina` ·
+   * `opponentStamina` 가 들고 있고 이 배열의 그 칸은 **올라설 때의 값**이다 (내려갈 때 되적는다).
+   */
+  readonly ourPitcherStaminas: readonly number[]
+  readonly opponentPitcherStaminas: readonly number[]
   /** 지금 우리·상대 투수의 실점 카운터 A·B 와 투구 수 (`team+0x27c` 묶음, P7 E1) */
   readonly ourPitcherCounters: MoundPitcherCounters
   readonly opponentPitcherCounters: MoundPitcherCounters
@@ -707,6 +726,17 @@ function opponentAceIndexesOf(
   return rollOpponentAces(options.acePitcherId ?? NO_ACE_BATTER, options.aceBatterId ?? NO_ACE_BATTER, random)
 }
 
+/** 시작 스태미나 배열을 명단 칸으로 — 명단 차례(`orderIndex`)로 찾고, 없는 칸·마투수는 10000 */
+function pitcherStaminasOf(
+  entry: readonly TeamEntryPitcher[],
+  given: readonly number[] | undefined,
+): readonly number[] {
+  return entry.map((pitcher) => {
+    const value = pitcher.orderIndex >= 0 ? given?.[pitcher.orderIndex] : undefined
+    return value === undefined ? FULL_STAMINA : Math.max(0, Math.min(FULL_STAMINA, value))
+  })
+}
+
 export function startTeamGame(options: TeamGameOptions, random: RandomPort): TeamGameProgress {
   const opponentAces = opponentAceIndexesOf(options, random)
   const startingSlots = startingPitcherSlotsOf(options, random)
@@ -732,6 +762,8 @@ export function startTeamGame(options: TeamGameOptions, random: RandomPort): Tea
     rosterEntryPitchersOf(options.opponentTeamId),
     opponentAces.pitcher,
   )
+  const ourPitcherStaminas = pitcherStaminasOf(ourPitcherEntry, options.ourPitcherStaminas)
+  const opponentPitcherStaminas = pitcherStaminasOf(opponentPitcherEntry, options.opponentPitcherStaminas)
   const initial: TeamGameProgress = {
     options,
     ourEntry,
@@ -768,12 +800,15 @@ export function startTeamGame(options: TeamGameOptions, random: RandomPort): Tea
     ourPitcherIndex: startingSlots.ours,
     ourUsedPitchers: [],
     opponentUsedPitchers: [],
-    opponentStamina: FULL_STAMINA,
+    // 선발은 제 레코드 +0x2c 로 선다 (시즌 정규는 경기 사이에 이어진 값 — a583fe0)
+    opponentStamina: opponentPitcherStaminas[startingSlots.opponent] ?? FULL_STAMINA,
+    ourPitcherStaminas,
+    opponentPitcherStaminas,
     ourPitcherCounters: EMPTY_MOUND_COUNTERS,
     opponentPitcherCounters: EMPTY_MOUND_COUNTERS,
     pitcherJustChanged: false,
     atBatPrepared: false,
-    stamina: FULL_STAMINA,
+    stamina: ourPitcherStaminas[startingSlots.ours] ?? FULL_STAMINA,
     magicRemaining: options.magicCount ?? 0,
     pitchCount: 0,
     lastPitch: null,
@@ -2512,6 +2547,7 @@ function judgeAutoPitcherChange(
   })
   if (!decision.replace) return progress
 
+  const benchStaminas = defendingIsOurs ? progress.ourPitcherStaminas : progress.opponentPitcherStaminas
   const next = replacementPitcherIndexOf(
     bench,
     {
@@ -2521,6 +2557,8 @@ function judgeAutoPitcherChange(
       lead: defenseScore - offenseScore,
       runnerCount: runnerCountOf(game.bases),
       currentStamina: stamina,
+      // 0xabfcc 는 벤치 투수 레코드의 +0x2c 를 견준다 — 경기 사이에 이어진 값이 그대로 들어간다
+      benchStaminaOf: (index) => benchStaminas[index] ?? FULL_STAMINA,
     },
     random,
   )
@@ -2557,6 +2595,8 @@ export interface ReplacementPickInput {
   readonly runnerCount: number
   /** 지금 마운드에 선 투수의 스태미나 */
   readonly currentStamina: number
+  /** 벤치 투수 칸의 스태미나 `+0x2c` — 안 넘기면 모두 가득으로 본다 */
+  readonly benchStaminaOf?: (index: number) => number
 }
 
 /**
@@ -2595,7 +2635,9 @@ export function replacementPitcherIndexOf(
     )
   if (picksBenchLast) return bench.length === 0 ? -1 : bench[bench.length - 1]
   return chooseReplacementPitcher(
-    bench.map((index) => ({ index })),
+    bench.map((index) =>
+      input.benchStaminaOf === undefined ? { index } : { index, stamina: input.benchStaminaOf(index) },
+    ),
     {
       inningIndex: input.inningIndex,
       // 0xabfcc 의 다섯째 인자가 마무리 플래그다 (V3-E)
@@ -2625,8 +2667,9 @@ function benchIndexesOf(
 }
 
 /**
- * 교체 실행 `0xaf09c` → `0xaebe4`. 새 투수는 스태미나가 가득이고 카운터가 0 이며,
+ * 교체 실행 `0xaf09c` → `0xaebe4`. 새 투수는 **제 레코드 스태미나**(`+0x2c`)로 서고 카운터가 0 이며,
  * `state[0xd]` 가 서서 **다음 한 투구 동안**은 다시 바뀌지 않는다 (0xaec64 memset · 0xa5e72).
+ * 내려간 투수의 깎인 스태미나는 그 칸에 남는다 (`ourPitcherStaminas` 주석).
  */
 function applyPitcherChange(
   progress: TeamGameProgress,
@@ -2644,8 +2687,8 @@ function applyPitcherChange(
       ...base,
       ourUsedPitchers: [...progress.ourUsedPitchers, progress.ourPitcherIndex],
       ourPitcherIndex: nextIndex,
-      // 웹 로스터에는 투수별 누적 스태미나가 없다 — 새 투수는 가득 찬 채로 올라온다 (근사)
-      stamina: FULL_STAMINA,
+      ourPitcherStaminas: withValueAt(progress.ourPitcherStaminas, progress.ourPitcherIndex, progress.stamina),
+      stamina: progress.ourPitcherStaminas[nextIndex] ?? FULL_STAMINA,
       ourPitcherCounters: EMPTY_MOUND_COUNTERS,
       pitchCount: 0,
       // 기록달성이 보는 R 은 **새 투수의** 경기 기록이다(0xb8cec = team+0x244+4·team[0]) — 이 경기에 처음 서니 0
@@ -2656,9 +2699,22 @@ function applyPitcherChange(
     ...base,
     opponentUsedPitchers: [...progress.opponentUsedPitchers, progress.opponentPitcherIndex],
     opponentPitcherIndex: nextIndex,
-    opponentStamina: FULL_STAMINA,
+    opponentPitcherStaminas: withValueAt(
+      progress.opponentPitcherStaminas,
+      progress.opponentPitcherIndex,
+      progress.opponentStamina,
+    ),
+    opponentStamina: progress.opponentPitcherStaminas[nextIndex] ?? FULL_STAMINA,
     opponentPitcherCounters: EMPTY_MOUND_COUNTERS,
   }
+}
+
+/** 배열 한 칸만 바꾼 새 배열 — 칸이 없으면 그대로 */
+function withValueAt(values: readonly number[], index: number, value: number): readonly number[] {
+  if (index < 0 || index >= values.length) return values
+  const next = [...values]
+  next[index] = value
+  return next
 }
 
 /**
@@ -3383,6 +3439,29 @@ export interface TeamGameSummary {
   readonly recordIds?: readonly number[]
   /** 위 기록의 G — `recordGamePointsOf` (0xcfbf8 표). 저장 G 에 더하는 것은 부르는 쪽(앱 세션)의 몫이다 */
   readonly gamePoints?: number
+  /**
+   * **경기가 끝났을 때의 투수 스태미나** `+0x2c` — 옵션 `ourPitcherStaminas` 와 같은 차례(명단 차례, 마투수 뺌).
+   * 원본은 이 값이 레코드에 남아 다음 경기로 이어진다 — 시즌 저장에 되적고 하루 끝 회복(`0xb617c` +20%,
+   * 포스트시즌은 `0xb818c` 가 내 팀만 10000)을 거는 것은 부르는 쪽 몫이다 (a583fe0).
+   */
+  readonly ourPitcherStaminas?: readonly number[]
+  /** 상대 팀 투수의 끝 스태미나 — 표 칸 차례 (`opponentPitcherStaminas` 와 같은 차례) */
+  readonly opponentPitcherStaminas?: readonly number[]
+}
+
+/** 명단 칸별 스태미나(지금 마운드 칸은 `current`)를 명단 차례로 되돌린다 — 마투수는 뺀다 */
+function orderedPitcherStaminasOf(
+  entry: readonly TeamEntryPitcher[],
+  staminas: readonly number[],
+  moundIndex: number,
+  current: number,
+): readonly number[] {
+  const out: number[] = []
+  entry.forEach((pitcher, index) => {
+    if (pitcher.orderIndex < 0) return
+    out[pitcher.orderIndex] = index === moundIndex ? current : (staminas[index] ?? FULL_STAMINA)
+  })
+  return Array.from(out, (value) => value ?? FULL_STAMINA)
 }
 
 export function summaryOf(progress: TeamGameProgress): TeamGameSummary {
@@ -3411,5 +3490,17 @@ export function summaryOf(progress: TeamGameProgress): TeamGameSummary {
     gameRecord: progress.gameRecord,
     recordIds,
     gamePoints: recordGamePointsOf(recordIds),
+    ourPitcherStaminas: orderedPitcherStaminasOf(
+      progress.ourPitcherEntry,
+      progress.ourPitcherStaminas,
+      progress.ourPitcherIndex,
+      progress.stamina,
+    ),
+    opponentPitcherStaminas: orderedPitcherStaminasOf(
+      progress.opponentPitcherEntry,
+      progress.opponentPitcherStaminas,
+      progress.opponentPitcherIndex,
+      progress.opponentStamina,
+    ),
   }
 }

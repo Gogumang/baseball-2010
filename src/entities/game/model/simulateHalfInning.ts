@@ -176,6 +176,9 @@ export interface HalfInningPitcherChange {
   readonly runnerCount: number
   /** 이 반 이닝에 교체 전까지 들어온 점수 */
   readonly runsBefore: number
+  /** 내려간 투수 칸과 그 순간 스태미나 `+0x2c` — 레코드에 남아 다음 경기로 이어진다 (a583fe0) */
+  readonly outgoingPitcherSlot: number
+  readonly outgoingStamina: number
 }
 
 /** 투수 한 명이 이 이닝에 남긴 줄 */
@@ -200,6 +203,11 @@ export interface HalfInningDefense {
   readonly pitcherAt: (pitcherSlot: number) => QuickAtBatPitcher
   /** 그 칸 투수의 **체력 실효 능력치(칸 3)** — 스태미나 용량 X 의 바탕 (0x66e44) */
   readonly staminaAbilityAt: (pitcherSlot: number) => number
+  /**
+   * 그 칸 **벤치 투수의 지금 스태미나** `+0x2c` — 올라올 때 이 값으로 서고, 새 투수 고르기 0xabfcc 가 견준다.
+   * 원본 레코드 값은 경기 사이에 이어진다 (a583fe0). 안 넘기면 가득으로 본다.
+   */
+  readonly staminaAt?: (pitcherSlot: number) => number
   /** 이 반 이닝이 시작될 때의 리드 (수비 점수 − 공격 점수) */
   readonly lead: number
   /** 팀 사기 (0x66e44 의 `V[+2]`). 모르면 100 */
@@ -341,16 +349,18 @@ export function simulateHalfInning(
           random,
         })
         if (changed !== mound) {
-          mound = changed
-          substituted = true
-          // 교체 0xaec64 가 +0x27c·+0x280·+0x284 를 한꺼번에 0 으로 민다
-          inningRunsAllowed = 0
           pitcherChanges.push({
             pitcherSlot: changed.pitcherSlot,
             outs,
             runnerCount: runnerCountOf(bases),
             runsBefore: runs,
+            outgoingPitcherSlot: mound.pitcherSlot,
+            outgoingStamina: mound.stamina,
           })
+          mound = changed
+          substituted = true
+          // 교체 0xaec64 가 +0x27c·+0x280·+0x284 를 한꺼번에 0 으로 민다
+          inningRunsAllowed = 0
         }
       }
       if (!substituted) break
@@ -542,7 +552,9 @@ export function changePitcherIfNeeded(
   const next = replacementPitcherSlotOf(
     // ⚠️ 벤치 투수의 스태미나를 따로 들고 다니지 않아 **다 가득**으로 본다 — 스태미나가 같으면
     //    0xabfcc 가 벤치 번호가 작은 쪽을 고른다. **근사다.**
-    bench.map((slot) => ({ index: slot })),
+    bench.map((slot) =>
+      defense.staminaAt === undefined ? { index: slot } : { index: slot, stamina: defense.staminaAt(slot) },
+    ),
     {
       saveSituation: decision.saveSituation,
       inningIndex: situation.inningIndex,
@@ -556,12 +568,11 @@ export function changePitcherIfNeeded(
   if (next < 0) return mound
 
   // 교체 0xaec64 는 카운터(+0x27c·+0x280·+0x284)를 한꺼번에 0 으로 민다.
-  // ⚠️ 올라온 투수의 스태미나는 원본이 **시즌 내내 이어지는 레코드 값**(+0x2c)을 그대로 쓰는데,
-  //    웹 리그는 투수별 스태미나를 저장하지 않아 **가득**에서 시작한다 — **근사다.**
-  //    (경기 사이 회복 0xb60e0 은 `pitcherStamina.recoverStaminaAfterGameDay` 에 이미 있다.)
+  // 올라온 투수의 스태미나는 **제 레코드 값**(+0x2c)이다 — 교체 실행 0xaebe4 에 +0x2c 쓰기가 없다.
+  // 부르는 쪽이 `staminaAt` 을 안 넘기면(투수별 스태미나를 안 드는 길) 가득으로 본다 — **근사다.**
   return {
     pitcherSlot: next,
-    stamina: FULL_STAMINA,
+    stamina: defense.staminaAt?.(next) ?? FULL_STAMINA,
     runsAllowed: 0,
     pitches: 0,
     usedSlots: [...mound.usedSlots, mound.pitcherSlot],

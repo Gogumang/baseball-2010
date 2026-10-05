@@ -23,6 +23,7 @@ import {
   teamPitchers,
 } from '@/entities/team/model/teamRoster'
 import { rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
+import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
 import {
   EMPTY_LEAGUE_PLAYER_STATS,
   recordLeaguePitcherAppearances,
@@ -116,6 +117,22 @@ export interface LeagueGameScore {
    * 들어온 선수의 타석은 `plateAppearances` 에 그 선수의 로스터 칸으로 이미 들어 있다.
    */
   readonly pinchHits: number
+  /**
+   * 경기가 끝났을 때 **두 팀 투수 칸(0~7)별 스태미나** `+0x2c` — 넘긴 시작 값에서 간이 엔진 소모(0xa5e14 → 0xaeb08,
+   * 투구마다)를 뺀 것. 원본은 레코드에 남아 다음 경기로 이어진다 (a583fe0). 저장과 하루 끝 회복은 부르는 쪽 몫이다.
+   */
+  readonly pitcherStaminas: { readonly away: readonly number[]; readonly home: readonly number[] }
+}
+
+/** 투수 칸별 스태미나 — 모자란 칸은 가득 */
+function staminaTableOf(given: readonly number[] | undefined): number[] {
+  return ALL_PITCHER_SLOTS.map((slot) => given?.[slot] ?? FULL_STAMINA)
+}
+
+/** 반 이닝이 내놓은 교체(내려간 투수 값)와 끝 마운드를 칸별 표에 되적는다 */
+function chargeStaminas(table: number[], half: HalfInningResult, mound: HalfInningMound | undefined): void {
+  for (const change of half.pitcherChanges ?? []) table[change.outgoingPitcherSlot] = change.outgoingStamina
+  if (mound !== undefined) table[mound.pitcherSlot] = mound.stamina
 }
 
 /**
@@ -135,7 +152,12 @@ const ALL_PITCHER_SLOTS: readonly number[] = Array.from({ length: PITCHERS_PER_T
  * 0xac360 이 첫 줄에서 0 을 돌려준다 (`state[0x31+0]==1 && state[0x31+1]==1`, 0xb6c20).
  * 그래서 리그 경기의 새 투수는 **늘 0xabfcc** 로 고른다.
  */
-function defenseOf(teamId: number, mound: HalfInningMound, lead: number): HalfInningDefense {
+function defenseOf(
+  teamId: number,
+  mound: HalfInningMound,
+  lead: number,
+  staminas: readonly number[],
+): HalfInningDefense {
   const roster = teamPitchers(teamId)
   return {
     mound,
@@ -143,6 +165,8 @@ function defenseOf(teamId: number, mound: HalfInningMound, lead: number): HalfIn
     pitcherAt: (slot) => quickPitcherOf(roster[slot % roster.length]),
     // 투수 능력치 순서는 제구·구속·변화·**체력** (칸 3)
     staminaAbilityAt: (slot) => roster[slot % roster.length].ability[3],
+    // 벤치 투수는 제 레코드 값으로 올라온다 — 경기 사이에 이어진 값
+    staminaAt: (slot) => staminas[slot] ?? FULL_STAMINA,
     lead,
     bothTeamsAreCpu: true,
   }
@@ -159,6 +183,11 @@ export function simulateLeagueGame(
   matchup: LeagueMatchup,
   random: RandomPort,
   startingPitcherSlot?: number,
+  /**
+   * 두 팀 투수 칸(0~7)별 **시작 스태미나** `+0x2c` — 정규시즌은 첫날만 10000(`0xb6190`)이고 그 뒤로는 경기에서
+   * 깎인 값에 하루 끝 `0xb617c` +20% 만 더한 값이다 (a583fe0). 안 넘기면 모두 10000.
+   */
+  startingStaminas?: { readonly away?: readonly number[]; readonly home?: readonly number[] },
 ): LeagueGameScore {
   // 선발은 경기를 세울 때 로스터 앞 4명 중 하나로 정해진다 (0x3107a·0x31090, S13 1-4b)
   // 칸 번호를 먼저 정해 두는 것은 **투수 기록을 그 칸에 쌓아야** 하기 때문이다.
@@ -206,8 +235,10 @@ export function simulateLeagueGame(
     pitched.set(defenseTeamId, team)
   }
 
-  let awayMound = startingMoundOf(awaySlot)
-  let homeMound = startingMoundOf(homeSlot)
+  const awayStaminas = staminaTableOf(startingStaminas?.away)
+  const homeStaminas = staminaTableOf(startingStaminas?.home)
+  let awayMound = startingMoundOf(awaySlot, awayStaminas[awaySlot])
+  let homeMound = startingMoundOf(homeSlot, homeStaminas[homeSlot])
   /**
    * 양 팀 명단(`team+0xe`) — 간이 엔진 `0xc1ba4` 가 타석마다 먼저 공격 팀을 두고 **CPU 대타**
    * `0xac228` 을 부른다 (`0xc1c50`, Q1 4절). 막음 칸 `state[0xe]` 는 두 팀 공용 한 칸이지만 **공마다** 내려가므로
@@ -229,11 +260,12 @@ export function simulateLeagueGame(
       random,
       undefined,
       undefined,
-      defenseOf(matchup.home, homeMound, homeRuns - awayRuns),
+      defenseOf(matchup.home, homeMound, homeRuns - awayRuns, homeStaminas),
       { lineup: awayLineup, batterOf: (slot) => batterAt(matchup.away, slot), pinchHitUsed },
     )
     awayRuns += top.runs
     awayOrder = top.nextBattingOrderIndex % BATTING_ORDER_SIZE
+    chargeStaminas(homeStaminas, top, top.mound)
     homeMound = top.mound ?? homeMound
     awayLineup = top.lineup ?? awayLineup
     pinchHitUsed = top.pinchHitUsed ?? pinchHitUsed
@@ -253,11 +285,12 @@ export function simulateLeagueGame(
       random,
       undefined,
       undefined,
-      defenseOf(matchup.away, awayMound, awayRuns - homeRuns),
+      defenseOf(matchup.away, awayMound, awayRuns - homeRuns, awayStaminas),
       { lineup: homeLineup, batterOf: (slot) => batterAt(matchup.home, slot), pinchHitUsed },
     )
     homeRuns += bottom.runs
     homeOrder = bottom.nextBattingOrderIndex % BATTING_ORDER_SIZE
+    chargeStaminas(awayStaminas, bottom, bottom.mound)
     awayMound = bottom.mound ?? awayMound
     homeLineup = bottom.lineup ?? homeLineup
     pinchHitUsed = bottom.pinchHitUsed ?? pinchHitUsed
@@ -296,13 +329,26 @@ export function simulateLeagueGame(
     ...linesOf(matchup.home, homeSlot, awayWon ? '패' : '승'),
   ]
 
-  return { awayRuns, homeRuns, plateAppearances, pitcherAppearances, steals, pinchHits }
+  return {
+    awayRuns,
+    homeRuns,
+    plateAppearances,
+    pitcherAppearances,
+    steals,
+    pinchHits,
+    pitcherStaminas: { away: awayStaminas, home: homeStaminas },
+  }
 }
 
 /** 하루치 경기가 남긴 것 — 순위표와 **선수 기록표** 두 벌이다 */
 export interface LeagueDayResult {
   readonly league: League
   readonly playerStats: LeaguePlayerStats
+  /**
+   * 팀 번호 → 투수 칸(0~7)별 스태미나 — 넘긴 표에 오늘 치른 CPU 끼리 경기의 소모를 먹인 것(안 치른 팀은 그대로,
+   * 표에 없던 팀은 10000 에서 시작). 하루 끝 회복(`0xb617c` +20%)은 아직 안 건 값이다.
+   */
+  readonly pitcherStaminas: Readonly<Record<number, readonly number[]>>
 }
 
 /**
@@ -319,13 +365,21 @@ export function playLeagueDay(
   myTeamId: number,
   random: RandomPort,
   playerStats: LeaguePlayerStats = EMPTY_LEAGUE_PLAYER_STATS,
+  /** 팀 번호 → 투수 칸별 시작 스태미나 (`simulateLeagueGame` 의 `startingStaminas`). 안 넘기면 모두 10000 */
+  pitcherStaminas: Readonly<Record<number, readonly number[]>> = {},
 ): LeagueDayResult {
   const plateAppearances: LeaguePlateAppearance[] = []
   const pitcherAppearances: LeaguePitcherAppearance[] = []
+  const staminas: Record<number, readonly number[]> = { ...pitcherStaminas }
   const played = matchupsOf(day).reduce((current, matchup) => {
     if (matchup.away === myTeamId || matchup.home === myTeamId) return current
     // 하루가 끝날 때마다 팀마다 로테이션이 한 칸 돈다 (0xb5ca8, S5 U-16) — 날짜가 선발을 정한다
-    const score = simulateLeagueGame(matchup, random, rotationSlotOf(day))
+    const score = simulateLeagueGame(matchup, random, rotationSlotOf(day), {
+      away: staminas[matchup.away],
+      home: staminas[matchup.home],
+    })
+    staminas[matchup.away] = score.pitcherStaminas.away
+    staminas[matchup.home] = score.pitcherStaminas.home
     plateAppearances.push(...score.plateAppearances)
     pitcherAppearances.push(...score.pitcherAppearances)
     // ⚠️ 원본 버그를 그대로 옮긴 것 (0xc2a48, R1 확정 · DECISIONS 2026-09-20 ①):
@@ -343,5 +397,6 @@ export function playLeagueDay(
       recordLeaguePlateAppearances(playerStats, plateAppearances),
       pitcherAppearances,
     ),
+    pitcherStaminas: staminas,
   }
 }

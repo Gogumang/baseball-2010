@@ -396,3 +396,46 @@ describe('CPU 끼리 경기에도 CPU 대타가 나온다 (0xc1ba4 → 0xac228 �
     expect(여러번).toBeGreaterThan(0)
   })
 })
+
+describe('CPU 끼리 경기도 투수 스태미나를 잇는다 — 레코드 +0x2c (a583fe0)', () => {
+  it('던진 투수만 깎여 나오고 안 던진 칸은 그대로다', () => {
+    const score = simulateLeagueGame({ away: 1, home: 2 }, createSeededRandom(5), 0)
+    expect(score.pitcherStaminas.away[0]).toBeLessThan(10_000)
+    expect(score.pitcherStaminas.home[0]).toBeLessThan(10_000)
+    const 던진칸 = new Set(
+      score.pitcherAppearances.filter((line) => line.teamId === 1).map((line) => line.pitcherSlot),
+    )
+    score.pitcherStaminas.away.forEach((value, slot) => {
+      if (!던진칸.has(slot)) expect(value).toBe(10_000)
+    })
+  })
+
+  it('선발은 넘긴 시작 값으로 선다 — 그보다 늘지 않는다', () => {
+    const score = simulateLeagueGame({ away: 1, home: 2 }, createSeededRandom(5), 0, {
+      away: [2_000, 10_000, 10_000, 10_000, 10_000, 10_000, 10_000, 10_000],
+    })
+    expect(score.pitcherStaminas.away[0]).toBeLessThanOrEqual(2_000)
+  })
+
+  it('안 넘기면 예전과 같은 경기다 (시작 값 10000 = 기본)', () => {
+    const 기본 = simulateLeagueGame({ away: 3, home: 7 }, createSeededRandom(11), 1)
+    const 가득 = simulateLeagueGame({ away: 3, home: 7 }, createSeededRandom(11), 1, {
+      away: Array(8).fill(10_000),
+      home: Array(8).fill(10_000),
+    })
+    expect(가득).toEqual(기본)
+  })
+
+  it('playLeagueDay 는 오늘 치른 팀의 표를 고쳐 돌려준다 — 내 팀 표는 그대로', () => {
+    const 내팀표 = [5_000, 5_000, 5_000, 5_000, 5_000, 5_000, 5_000, 5_000]
+    const { pitcherStaminas } = playLeagueDay(EMPTY_LEAGUE, 0, 4, 씨앗난수(5), EMPTY_LEAGUE_PLAYER_STATS, { 4: 내팀표 })
+    expect(pitcherStaminas[4]).toBe(내팀표)
+    const 친팀 = matchupsOf(0).flatMap((matchup) => [matchup.away, matchup.home]).filter((team) => team !== 4 && team !== opponentOfFour())
+    for (const team of 친팀) expect(pitcherStaminas[team]?.[rotationSlotOf(0)]).toBeLessThan(10_000)
+  })
+})
+
+function opponentOfFour(): number {
+  const matchup = matchupsOf(0).find((candidate) => candidate.away === 4 || candidate.home === 4)
+  return matchup === undefined ? -1 : matchup.away === 4 ? matchup.home : matchup.away
+}
