@@ -19,9 +19,11 @@ import { BALANCE } from '@/shared/config/original/balance'
  * 피안타·실점을 셀 수 있게 되면서 가능해졌다.
  * 삼진 계열 16~23 과 삼구 삼자범퇴 25 도 들어왔다 — 투구 판정 경로(0xc1818)를 옮기면서 공 수·볼 카운트를
  * 셀 수 있게 된 덕이다.
- * 남은 아홉 가지(5 대타 홈런 · 6·7 백투백 · 8 도루 성공 · 24 도루 저지 · 26·27 병살·삼중살 ·
- * 32·33 연속 파울 · 36 필살송구 아웃)는 **판정 함수만 있고 아직 배선되지 않았다** — 이 파일 아래쪽,
- * 함수마다 "배선 자리" 를 적어 두었다. 붙기 전까지는 그만큼 원본보다 G 수입이 적다.
+ * 남은 아홉 가지 중 나만의리그 타자편(gameFlow)에 붙은 것: 6·7 백투백 · 8 도루 성공 · 32·33 연속 파울
+ * (파울은 타석 화면이 `atBatPitchTally` 를 넘겨야 실제로 들어온다). 24 도루 저지는 사람 공격 중 도루라
+ * 게이트에서 버려진다. 5 대타 홈런은 타자편에서 **원본도 나오지 않는다**(CPU 대타는 플래그를 안 세운다).
+ * 26·27 병살·삼중살 · 36 필살송구 아웃은 사람 수비 화면에서만 쌓인다 — 타자편엔 그 화면이 없다.
+ * 함수마다 "배선 자리" 를 적어 두었다.
  * 상대 공격은 이제 원본 간이 타석(0xc11f0)으로 돌지만 아직 타격 결과만 만든다 —
  * 삼진 콤보·병살·삼자범퇴 같은 투구·수비 사건을 세려면 수비 쪽 상태(state+0x88~0x8a)를 더 옮겨야 한다.
  * 경기 중 누계를 화면에 실시간으로 보여 주는 것(0xa77f0)도 아직 없다.
@@ -238,9 +240,14 @@ const PLAY_RECORD = {
  * → "사람 팀이 대타를 낸 **그 타석** 의 홈런". 홈런 단계 1~4 와 **함께** 준다.
  * ⚠️ **유력**: 타석 초기화(상태 0xd)가 교체(0xb → 0x16)보다 먼저 돈다는 순서에 기댄다 —
  *    거꾸로면 플래그가 곧바로 지워져 5 는 영영 안 나온다 (R8 5-3).
- * 배선 자리: gameFlow.ts 에는 없다 — 나만의리그 타자편에는 사람 대타가 없다. 대타가 있는 쪽
- *   (teamGameFlow 의 `pinchHit` 뒤 첫 타석 결과 처리)에서 그 타석이 대타 타석인지 넘겨야 한다.
- *   gameFlow.ts 에 대타가 생기면 `finishPlayerOutcome` 의 `recordBatterAtBat` 바로 뒤.
+ * 배선 자리: gameFlow.ts 에는 **원본대로 없다**. 785796d 가 넣은 CPU 대타(`0xac228`)도 5 를 못 낸다 —
+ *   ctx+0x160 을 1 로 세우는 0xa5bf0 은 호출지가 사람 경기 장면 상태 0x16(0x3d458 의 0x3d57e·0x3d64c)
+ *   하나뿐이고(`re xref 0xa5bf0`), 간이 엔진 루프 0xc262c 는 0xc1ba4(→ 0xac228 대타, 0xc2662) 뒤
+ *   0xa5bcc(0xc26b6)로 플래그를 **지우기만** 한다. 사람 타석 시작 0x3d954 가 0xac228 을 부르는 갈래는
+ *   수비 팀이 사람일 때(state[0x31+state[0xa]] ≠ 1, 0x3d9e4)뿐이라 그때 공격 팀은 CPU 이고,
+ *   0xa5bf0(ctx, 0) 은 공격 팀이 사람이 아니면 세우지 않는다(0xa5c0a~0xa5c1c).
+ *   → 사람 팀이 **사람 경기 장면에서 낸 대타**만 5 를 받는다. 대타가 있는 쪽(teamGameFlow 의 `pinchHit`
+ *   뒤 첫 타석 결과 처리)에서 그 타석이 대타 타석인지 넘겨야 한다.
  */
 export function pinchHitHomeRunRecordIdsOf(input: {
   readonly isHomeRun: boolean
@@ -266,9 +273,9 @@ export interface BackToBackInput {
  *                                      사구 @a8bf8.
  * 3연속이면 두 번째에 6, 세 번째에 7. 7 뒤 0 으로 돌아가므로 다섯 번째 연속 홈런에서 다시 6.
  * 도루 같은 주자 플레이(종류 5, 타석 완료 아님)는 카운터를 건드리지 않는다 — 이 함수를 부르지 말 것.
- * 배선 자리: gameFlow.ts `finishPlayerOutcome`(사용자 타석, recordBatterAtBat 옆)과 `playTeammateAtBat`
- *   (동료 타석 — 간이 엔진도 0xa8024 를 지난다)에서 humanOffense = true 로, `playOpponentInning` 의
- *   상대 타석마다 humanOffense = false 로 부른다. 카운터는 GameProgress 에 한 칸(팀 단위)으로 둔다.
+ * 배선: gameFlow.ts `finishPlayerOutcome`(사용자 타석)과 `playTeammateAtBat`(동료 타석 — 간이 엔진도
+ *   0xa8024 를 지난다)에서 humanOffense = true 로, `playOpponentInning` 의 상대 타석마다 humanOffense = false
+ *   로 부른다. 카운터는 `GameProgress.homeRunStreak` 한 칸(팀 단위)이다.
  */
 export function backToBackRecordOf(input: BackToBackInput): { readonly streak: number; readonly recordIds: number[] } {
   if (!input.isHomeRun || !input.humanOffense) return { streak: 0, recordIds: [] }
@@ -302,8 +309,8 @@ export interface StealPlayRunner {
  *   (나) 아무도 안 잡혔으면 도루를 걸었고 루가 바뀐(출발 ≠ 지금) 주자**마다** 8
  * 한 명이라도 잡히면 나머지가 살아도 8 은 없다. 게이트상 8 은 사람 공격, 24 는 사람 수비 때만 남는다.
  * 간이 엔진의 자동 도루(0xc1818 끝)는 0xa77f0 을 부르지 않는다 → 동료 타석 자동 도루에는 붙이지 말 것.
- * 배선 자리: gameFlow.ts `stealBase` — 성공 갈래(`도루 성공` 로그)에서 runners 하나(출발 ≠ 지금)로,
- *   실패 갈래에서 잡힌 주자로 부르면 원본대로 8 / (24 후보 → 사람 공격이라 게이트에서 버림)이 된다.
+ * 배선: gameFlow.ts `stealBase` — 성공 갈래는 runners 하나(출발 ≠ 지금)로 8, 실패 갈래는 잡힌 주자로
+ *   24 후보 → 사람 공격이라 `passesRecordTeamGate` 에서 버린다.
  *   24 가 실제로 쌓이는 곳은 사람 수비 화면(투수편·팀 경기의 CPU 도루 수비)이다.
  */
 export function stealPlayRecordIdsOf(input: {
@@ -331,8 +338,8 @@ export function stealPlayRecordIdsOf(input: {
  * 그러니 "공 하나로 생긴 플레이" 의 아웃 수다.
  *   아웃 2 → 주자 달리는 중 삼진(state[0x1a], 0xb6c3c)이 아니면 26 · 아웃 3 → 27 (state[0x1a] 와 무관)
  * 플레이 종류와 무관하게 매 정산 본다. 게이트상 사람 수비 때만 남는다.
- * 배선 자리: gameFlow.ts 에는 없다 — `playOpponentInning` 은 간이 엔진이라 한 타석 아웃이 하나다(E-9),
- *   사용자 타석의 병살은 사람 공격이라 게이트에서 버려진다. 사람 수비 화면(투수편 pitcherGameFlow,
+ * 배선 자리: gameFlow.ts 에는 **붙이지 않는다** — `playOpponentInning` 은 간이 엔진이라 한 타석 아웃이
+ *   하나다(E-9), 사용자 타석의 병살은 사람 공격이라 게이트에서 버려진다. 사람 수비 화면(투수편 pitcherGameFlow,
  *   팀 경기 수비)의 플레이 정산에서 outsInPlay 로 부른다.
  */
 export function multiOutPlayRecordIdsOf(input: {
@@ -352,9 +359,9 @@ export function multiOutPlayRecordIdsOf(input: {
  * 0 으로: 타석 초기화 0xa5bcc, 그리고 공 도착 판정 0x3dfac 끝의 0xa5fdc → 파울 아닌 공이 오면 끊긴다
  *   (⚠️ **유력** — 0x3dfac 의 모든 갈래가 끝을 지나는지는 안 봤다. 리셋은 부르는 쪽이 0 을 넘겨 한다).
  * 게이트상 사람 공격 때만.
- * 배선 자리: gameFlow.ts 는 타석 결과만 받으므로 공 하나하나의 파울을 모른다 — 사용자 타석의 투구 루프
- *   (play-at-bat 의 공 판정)에서 파울마다 부르고, 모인 id 를 `applyPlayerOutcome` → `finishPlayerOutcome` 의
- *   recordIds 에 함께 얹는다. 동료 타석(`playTeammateAtBat`)에는 붙이지 말 것.
+ * 배선: 공마다 `features/play-at-bat/model/atBatPitchTally.tallyPitch` 가 부르고(파울 아닌 공이면 0 으로),
+ *   모인 id 를 `startPlayerOutcome`(·`applyPlayerOutcome`) 의 `foulRecordIds` 로 넘기면 gameFlow 가 얹는다.
+ *   동료 타석(`playTeammateAtBat`)에는 붙이지 않는다.
  */
 export function foulRecordOf(foulStreak: number): { readonly foulStreak: number; readonly recordIds: number[] } {
   const next = foulStreak + 1
@@ -368,7 +375,7 @@ export function foulRecordOf(foulStreak: number): { readonly foulStreak: number;
  * 이 플레이 아웃 수(sp+0x30) > 0 이고 state[0x8b](레이저 송구 뒤 아웃 결과)가 서 있으면 36 을 주고
  * state[0x8b] 를 0 으로. **아웃이 없으면 플래그를 지우지 않는다** — 지우는 strb 가 BL 뒤에만 있다.
  * 게이트상 사람 수비 때만, 사람 수비 화면이 있어야 한다.
- * 배선 자리: gameFlow.ts 에는 없다(타자편 수비는 간이 엔진). 사람 수비 플레이 정산(투수편·팀 경기 수비)에서
+ * 배선 자리: gameFlow.ts 에는 **붙이지 않는다**(타자편 수비는 간이 엔진, 내 타석의 CPU 송구는 게이트에서 버려진다). 사람 수비 플레이 정산(투수편·팀 경기 수비)에서
  *   돌려받은 laserThrowFlag 를 상태에 되돌려 둔다.
  */
 export function laserThrowOutRecordOf(input: {
@@ -380,4 +387,46 @@ export function laserThrowOutRecordOf(input: {
     return { laserThrowFlag: false, recordIds: [PLAY_RECORD.laserThrowOut] }
   }
   return { laserThrowFlag: input.laserThrowFlag, recordIds: [] }
+}
+
+/** 게이트를 건너뛰는 번호 — 28~31 완투 계열 · 37~39 점수차 승 (0xa7818 의 마스크 0xe0f, k − 28) */
+const UNGATED_RECORD_MASK = 0xe0f
+const UNGATED_RECORD_FROM = 28
+const LAST_OFFENSE_ONLY_RECORD = 15
+const FIRST_LATE_OFFENSE_RECORD = 32
+const LAST_RECORD = 39
+const FIRST_DEFENSE_RECORD = 16
+const LAST_DEFENSE_RECORD = 31
+
+/**
+ * 지급 게이트 0xa77f0 의 팀 방향 (R8 1절 — a7818 · a785e · a78bc, 확정).
+ *   28~31·37~39 → 무조건
+ *   공격 팀이 사람 → k ≤ 15 또는 32 ≤ k ≤ 39, 단 36 은 아님
+ *   (그렇지 않고) 수비 팀이 사람 → 16 ≤ k ≤ 31 또는 k == 36
+ *   둘 다 아니면 버린다.
+ * `elif` 라 공격 팀이 사람이면 수비 계열은 수비 팀이 누구든 버려진다.
+ * 자동진행·모드 5~7 조건은 여기서 보지 않는다 — 지금 웹 화면들엔 해당이 없다(파일 머리 주석).
+ */
+export function passesRecordTeamGate(
+  recordId: number,
+  sides: { readonly offenseIsHuman: boolean; readonly defenseIsHuman: boolean },
+): boolean {
+  const shifted = recordId - UNGATED_RECORD_FROM
+  if (shifted >= 0 && shifted <= LAST_RECORD - UNGATED_RECORD_FROM && ((1 << shifted) & UNGATED_RECORD_MASK) !== 0) {
+    return true
+  }
+  if (sides.offenseIsHuman) {
+    return (
+      recordId !== PLAY_RECORD.laserThrowOut &&
+      ((recordId >= 0 && recordId <= LAST_OFFENSE_ONLY_RECORD) ||
+        (recordId >= FIRST_LATE_OFFENSE_RECORD && recordId <= LAST_RECORD))
+    )
+  }
+  if (sides.defenseIsHuman) {
+    return (
+      (recordId >= FIRST_DEFENSE_RECORD && recordId <= LAST_DEFENSE_RECORD) ||
+      recordId === PLAY_RECORD.laserThrowOut
+    )
+  }
+  return false
 }

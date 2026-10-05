@@ -4,8 +4,12 @@ import {
   resolveDefensePlay,
   startGame,
   startPlayerOutcome,
+  stealBase,
   summaryOf,
 } from '@/features/play-game/model/gameFlow'
+import { EMPTY_AT_BAT_PITCH_TALLY, tallyPitch } from '@/features/play-at-bat/model/atBatPitchTally'
+import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
+import { gamePointRewardOf } from '@/entities/career/model/playerCareer'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import { isPlayerTurn, PLAYER_BATTING_ORDER_INDEX, PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
@@ -644,5 +648,150 @@ describe('타자편 경기에도 CPU 대타가 나온다 (0xc1ba4 → 0xac228, �
 
       expect(progress.ourLineup.rosterSlots[내칸], `씨앗 ${seed}`).toBe(내칸)
     }
+  })
+})
+
+describe('기록달성 남은 것 — 타자편 배선 (6·7 백투백 · 8·24 도루 · 32·33 연속 파울)', () => {
+  /** 플레이어 차례가 올 때까지 — 아웃이 아니라 볼넷으로 버티면 경기가 길어지니 그냥 아웃으로 넘긴다 */
+  const 내차례들 = (seed: number, 결과: AtBatOutcome = { kind: '아웃', detail: '땅볼아웃' }) => {
+    const random = createSeededRandom(seed)
+    const 차례: GameProgress[] = []
+    let progress = startGame(random)
+    while (!progress.game.isFinished && 차례.length < 60) {
+      차례.push(progress)
+      progress = applyPlayerOutcome(progress, 결과, random)
+    }
+    return { 차례, 끝: progress }
+  }
+
+  it('6 백투백 — 앞 타석까지 팀 홈런 하나가 이어졌으면 내 홈런에 6 이 붙는다 (0xa794c)', () => {
+    const random = createSeededRandom(5)
+    const 시작 = { ...startGame(random), homeRunStreak: 1 }
+    const n = 시작.recordIds.length
+    const 뒤 = applyPlayerOutcome(시작, { kind: '홈런' }, random)
+
+    // 내 타석 기록 = [홈런 단계 1~4, 6] — 이 경기 첫 안타·첫 홈런이라 연타석·멀티홈런은 없다
+    const [단계, 백투백] = 뒤.recordIds.slice(n, n + 2)
+    expect(단계).toBeGreaterThanOrEqual(1)
+    expect(단계).toBeLessThanOrEqual(4)
+    expect(백투백).toBe(6)
+  })
+
+  it('7 백투백투백 — 둘이 이어졌으면 7 을 주고 카운터를 0 으로', () => {
+    const random = createSeededRandom(5)
+    const 시작 = { ...startGame(random), homeRunStreak: 2 }
+    const n = 시작.recordIds.length
+    const 뒤 = applyPlayerOutcome(시작, { kind: '홈런' }, random)
+
+    expect(뒤.recordIds.slice(n, n + 2)[1]).toBe(7)
+  })
+
+  it('카운터 없이 친 홈런에는 6·7 이 안 붙는다', () => {
+    const random = createSeededRandom(5)
+    const 시작 = startGame(random)
+    const n = 시작.recordIds.length
+    const 뒤 = applyPlayerOutcome(시작, { kind: '홈런' }, random)
+
+    expect(뒤.recordIds.slice(n, n + 2)).not.toContain(6)
+  })
+
+  it('내 차례의 카운터 = 직전에 이어진 동료 홈런 수 (mod 3) — 상대 공격·홈런 아닌 타석이 끊는다', () => {
+    let 홈런이어짐 = 0
+    for (const seed of [1, 2, 3, 7, 42, 777, 20100901]) {
+      for (const progress of 내차례들(seed, { kind: '홈런' }).차례) {
+        // 로그는 새것이 앞이다 — 내 타석·상대 공격·홈런 아닌 동료 타석에서 멈춘다 (교체·대타 줄은 건너뛴다)
+        let 이어짐 = 0
+        for (const entry of progress.log) {
+          if (!entry.text.includes(' — ')) continue
+          if (entry.isMine || entry.text.includes('상대 공격')) {
+            if (entry.isMine && entry.text.includes('홈런')) 이어짐 += 1
+            if (entry.text.includes('상대 공격') || !entry.text.includes('홈런')) break
+            continue
+          }
+          if (!entry.text.endsWith('홈런') && !/홈런 \(\d+점\)$/.test(entry.text)) break
+          이어짐 += 1
+        }
+        if (이어짐 > 0) 홈런이어짐 += 1
+        expect(progress.homeRunStreak, `씨앗 ${seed} · ${progress.log[0]?.text}`).toBe(이어짐 % 3)
+      }
+    }
+    expect(홈런이어짐).toBeGreaterThan(0)
+  })
+
+  it('6·7 금액이 경기 끝 G 수입(0x4ea0c)에 들어간다', () => {
+    const random = createSeededRandom(5)
+    const 시작 = { ...startGame(random), homeRunStreak: 1 }
+    const 뒤 = applyPlayerOutcome(시작, { kind: '홈런' }, random)
+    let progress = 뒤
+    while (!progress.game.isFinished) progress = applyPlayerOutcome(progress, { kind: '삼진' }, random)
+    const summary = summaryOf(progress)
+
+    expect(summary.recordIds).toContain(6)
+    expect(gamePointRewardOf(summary)).toBe(recordGamePointsOf(summary.recordIds))
+    expect(gamePointRewardOf(summary)).toBeGreaterThanOrEqual(20)
+  })
+
+  it('8 도루 성공 — 내 팀 공격 중 도루가 살면 기록 8, 잡히면 24 후보는 게이트(0xa77f0)에서 버린다', () => {
+    let 성공 = 0
+    let 실패 = 0
+    for (let seed = 1; seed <= 40; seed += 1) {
+      const random = createSeededRandom(seed)
+      const 시작 = startGame(random)
+      // 1루에 주자를 세우고(2루 빈칸) 도루를 건다
+      const 주자있음: GameProgress = {
+        ...시작,
+        game: { ...시작.game, bases: { first: true, second: false, third: false } },
+      }
+      const n = 주자있음.recordIds.length
+      const 뒤 = stealBase(주자있음, 1, random)
+      const 새기록 = 뒤.recordIds.slice(n)
+      if (뒤.log[0]?.text.includes('도루 성공')) {
+        성공 += 1
+        expect(새기록).toEqual([8])
+      } else {
+        실패 += 1
+        expect(새기록).toEqual([])
+      }
+    }
+    expect(성공).toBeGreaterThan(0)
+    expect(실패).toBeGreaterThan(0)
+  })
+
+  it('8 은 G 2 — 도루 하나가 경기 끝 수입을 2 올린다', () => {
+    expect(recordGamePointsOf([8])).toBe(2)
+    expect(recordGamePointsOf([24])).toBe(3)
+  })
+
+  it('32·33 연속 파울 — 타석 집계가 넘긴 id 를 타석 결과 앞에 얹고, G 수입에 들어간다', () => {
+    let 집계 = EMPTY_AT_BAT_PITCH_TALLY
+    for (let i = 0; i < 4; i += 1) 집계 = tallyPitch(집계, { kind: '파울' })
+    expect(집계.foulRecordIds).toEqual([32, 33])
+
+    const random = createSeededRandom(9)
+    const 시작 = startGame(random)
+    const n = 시작.recordIds.length
+    let progress = applyPlayerOutcome(시작, { kind: '삼진' }, random, { foulRecordIds: 집계.foulRecordIds })
+    expect(progress.recordIds.slice(n, n + 2)).toEqual([32, 33])
+    while (!progress.game.isFinished) progress = applyPlayerOutcome(progress, { kind: '삼진' }, random)
+
+    const summary = summaryOf(progress)
+    const 파울없이 = (() => {
+      const r = createSeededRandom(9)
+      let p = startGame(r)
+      while (!p.game.isFinished) p = applyPlayerOutcome(p, { kind: '삼진' }, r)
+      return gamePointRewardOf(summaryOf(p))
+    })()
+    // 파울 기록은 난수를 쓰지 않으므로 나머지 경기는 똑같다 — 차이는 32(3G)+33(5G)
+    expect(gamePointRewardOf(summary) - 파울없이).toBe(8)
+  })
+
+  it('인플레이 타구로 주자 처리가 미뤄져도 파울 기록은 그 자리에서 들어간다', () => {
+    const random = createSeededRandom(9)
+    const 시작 = startGame(random)
+    const n = 시작.recordIds.length
+    const 미룸 = startPlayerOutcome(시작, { kind: '안타', bases: 1 }, random, { foulRecordIds: [32] })
+
+    expect(미룸.pendingDefensePlay).not.toBeNull()
+    expect(미룸.recordIds.slice(n)).toEqual([32])
   })
 })

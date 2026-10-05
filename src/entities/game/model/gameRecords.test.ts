@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { atBatRecordIdsOf, gameEndRecordIdsOf, recordGamePointsOf, RECORD_NAMES, completeGameRecordIdsOf, strikeoutRecordIdsOf, threePitchInningRecordIdsOf, pinchHitHomeRunRecordIdsOf, backToBackRecordOf, stealPlayRecordIdsOf, multiOutPlayRecordIdsOf, foulRecordOf, laserThrowOutRecordOf } from '@/entities/game/model/gameRecords'
+import { atBatRecordIdsOf, gameEndRecordIdsOf, recordGamePointsOf, RECORD_NAMES, completeGameRecordIdsOf, strikeoutRecordIdsOf, threePitchInningRecordIdsOf, pinchHitHomeRunRecordIdsOf, backToBackRecordOf, stealPlayRecordIdsOf, multiOutPlayRecordIdsOf, foulRecordOf, laserThrowOutRecordOf, passesRecordTeamGate } from '@/entities/game/model/gameRecords'
 import type { CompleteGameInput, StrikeoutRecordInput, StealPlayRunner } from '@/entities/game/model/gameRecords'
 
 const 타석 = (overrides = {}) => ({
@@ -220,5 +220,30 @@ describe('남은 아홉 가지 — 판정 함수 (R8 5절·4-4)', () => {
 
   it('금액표 — 5·6·7·8·24·26·27·32·33·36', () => {
     expect([5, 6, 7, 8, 24, 26, 27, 32, 33, 36].map((id) => recordGamePointsOf([id]))).toEqual([10, 20, 40, 2, 3, 2, 100, 3, 5, 3])
+  })
+})
+
+describe('지급 게이트 0xa77f0 의 팀 방향 (R8 1절)', () => {
+  const 공격 = { offenseIsHuman: true, defenseIsHuman: false }
+  const 수비 = { offenseIsHuman: false, defenseIsHuman: true }
+
+  it('사람 공격이면 0~15·32~35 만, 36 과 수비 계열은 버린다', () => {
+    expect([0, 5, 6, 7, 8, 15, 32, 33, 35].every((id) => passesRecordTeamGate(id, 공격))).toBe(true)
+    expect([16, 24, 26, 27, 36].some((id) => passesRecordTeamGate(id, 공격))).toBe(false)
+  })
+
+  it('사람 수비면 16~31·36 만', () => {
+    expect([16, 24, 26, 27, 36].every((id) => passesRecordTeamGate(id, 수비))).toBe(true)
+    expect([0, 8, 32].some((id) => passesRecordTeamGate(id, 수비))).toBe(false)
+  })
+
+  it('공격이 사람이면 수비도 사람이어도 수비 계열은 버린다 (elif)', () => {
+    expect(passesRecordTeamGate(24, { offenseIsHuman: true, defenseIsHuman: true })).toBe(false)
+  })
+
+  it('28~31·37~39 는 게이트를 건너뛴다 — 둘 다 CPU 여도 통과', () => {
+    const 없음 = { offenseIsHuman: false, defenseIsHuman: false }
+    expect([28, 29, 30, 31, 37, 38, 39].every((id) => passesRecordTeamGate(id, 없음))).toBe(true)
+    expect([0, 16, 36].some((id) => passesRecordTeamGate(id, 없음))).toBe(false)
   })
 })

@@ -49,7 +49,13 @@ import { attemptSteal, canStealFrom } from '@/entities/game/model/steal'
 import type { BaseState } from '@/entities/game/model/baseState'
 import { atBatPenaltyCounts, atBatPopularityPoints, EMPTY_REPUTATION_COUNTS } from '@/entities/career/model/gameEvaluation'
 import type { ReputationCounts } from '@/entities/career/model/gameEvaluation'
-import { completeGameRecordIdsOf, gameEndRecordIdsOf } from '@/entities/game/model/gameRecords'
+import {
+  backToBackRecordOf,
+  completeGameRecordIdsOf,
+  gameEndRecordIdsOf,
+  passesRecordTeamGate,
+  stealPlayRecordIdsOf,
+} from '@/entities/game/model/gameRecords'
 import { EMPTY_BATTER_GAME_LOG, recordBatterAtBat } from '@/entities/game/model/batterGameLog'
 import type { BatterGameLog } from '@/entities/game/model/batterGameLog'
 import type { LeaguePlateAppearance } from '@/entities/league/model/leaguePlayerStats'
@@ -135,6 +141,12 @@ export interface GameProgress {
   readonly recordIds: readonly number[]
   /** 이어진 연타석 안타 수 */
   readonly consecutiveHits: number
+  /**
+   * 사람 팀(우리 팀) 연속 홈런 카운터 `ctx+0x162` — 백투백 6·7 판정(`0xa794c`)이 본다.
+   * **팀 단위 한 칸**이다: 내 타석·동료 타석의 홈런이 이어서 센다. 홈런이 아닌 결과로 끝난 타석은
+   * 공격 팀과 무관하게 0 으로, 상대 팀 홈런도 0 으로 되돌린다. 도루는 건드리지 않는다.
+   */
+  readonly homeRunStreak: number
   /**
    * 동료 타순(0~8)별 이 경기 기록. 원본은 기록을 팀 단위로 세므로 동료 타석도 G포인트가 된다
    * (0xa77f0 게이트는 공격 팀만 보고, 0xa8024 의 "본인인가" 필터는 개인 통산 성적에만 걸린다).
@@ -276,6 +288,7 @@ export function startGame(
     recentAtBatCodes: [],
     recordIds: [],
     consecutiveHits: 0,
+    homeRunStreak: 0,
     teammateLogs: {},
     leaguePlateAppearances: [],
     pitching: { hitsAllowed: 0, walksAllowed: 0, outsRecorded: 0, strikeouts: 0, strikeoutCombo: 0 },
@@ -329,6 +342,14 @@ export interface PlayerOutcomeOptions {
    * `resolvePitch` 의 `PitchOutcomeDetail.isBuntFoulOut` 이 그대로 들어온다.
    */
   readonly buntFoulOut?: boolean
+  /**
+   * 이 타석 투구 중에 난 **연속 파울 기록**(32·33, `0xa7dbc`) — 타석 쪽 집계
+   * (`features/play-at-bat/model/atBatPitchTally`)의 `foulRecordIds` 를 그대로 넘긴다.
+   * 원본은 파울이 난 그 순간 `0x51408` v=7 갈래에서 지급하므로 타석 결과보다 **먼저** 얹는다 —
+   * 인플레이 타구로 주자 처리가 뒤로 미뤄져도 이 기록은 이 자리에서 들어간다.
+   * 사람 타석에서만 나온다(간이 엔진 동료 타석에는 파울 판정 0x51408 이 없다).
+   */
+  readonly foulRecordIds?: readonly number[]
 }
 
 /**
@@ -348,6 +369,7 @@ export function startPlayerOutcome(
   options: PlayerOutcomeOptions = {},
 ): GameProgress {
   if (progress.game.isFinished) return progress
+  progress = withFoulRecords(progress, options.foulRecordIds)
   if (!isBattedBallInPlay(outcome)) {
     // 홈런은 날아가는 그림만 따로 만들어 재생시킨다 — 점수는 타석 쪽이 이미 맞게 한다
     const playback = homeRunPlaybackOf({ outcome, bases: progress.game.bases, pattern: options.pattern })
@@ -371,6 +393,14 @@ export function resolveDefensePlay(
   const pending = progress.pendingDefensePlay
   if (pending === null) return progress
   return finishPlayerOutcome({ ...progress, pendingDefensePlay: null }, pending.outcome, random, result, null)
+}
+
+/**
+ * 연속 파울 기록을 얹는다 — 공격 계열(32·33)이라 0xa77f0 게이트는 사람 공격(내 타석)에서 통과한다.
+ */
+function withFoulRecords(progress: GameProgress, foulRecordIds: readonly number[] | undefined): GameProgress {
+  const passed = gatedOffenseRecords(foulRecordIds ?? [])
+  return passed.length === 0 ? progress : { ...progress, recordIds: [...progress.recordIds, ...passed] }
 }
 
 /**
@@ -447,7 +477,13 @@ function finishPlayerOutcome(
   )
   const myStats = recorded.log.stats
   const consecutiveHits = recorded.log.consecutiveHits
-  const recordIds = recorded.recordIds
+  // 백투백 6·7 — 정산 0xa8024 의 홈런 갈래(@a8606)가 0xa794c 를 부른다. 공격 팀이 사람 팀(우리)이다
+  const backToBack = backToBackRecordOf({
+    streak: progress.homeRunStreak,
+    humanOffense: true,
+    isHomeRun: outcome.kind === '홈런',
+  })
+  const recordIds = [...recorded.recordIds, ...backToBack.recordIds]
 
   // 돌발 판정은 타석이 끝나는 자리에서 한다 (0x4e6d4 → 0x8f414). 결과비트가 0 이거나
   // 목표 5번이면 판정이 나지 않고 돌발이 그대로 살아 다음 타석으로 넘어간다.
@@ -494,6 +530,7 @@ function finishPlayerOutcome(
         resolution !== null && resolution.judgement !== null ? resolution : progress.lastBurstResolution,
       myStats,
       consecutiveHits,
+      homeRunStreak: backToBack.streak,
       recordIds: [...progress.recordIds, ...recordIds],
       popularityPoints: progress.popularityPoints + points,
       recentAtBatCodes: [...progress.recentAtBatCodes, atBatRecordCodeOf(outcome)].slice(-RECENT_AT_BAT_COUNT),
@@ -736,6 +773,12 @@ function playOpponentInning(progress: GameProgress, random: RandomPort): GamePro
   )
   const runs = half.runs
   const game = applyOpponentInning(progress.game, runs)
+  // 상대 타석도 정산 0xa8024 를 지난다 — 공격 팀이 사람이 아니라 백투백 카운터는 결과와 무관하게 0 이 된다
+  const homeRunStreak = half.plateAppearances.reduce(
+    (streak, appearance) =>
+      backToBackRecordOf({ streak, humanOffense: false, isHomeRun: appearance.outcome.kind === '홈런' }).streak,
+    progress.homeRunStreak,
+  )
 
   return appendLog(
     {
@@ -747,6 +790,7 @@ function playOpponentInning(progress: GameProgress, random: RandomPort): GamePro
       opponentInningRunsAllowed: 0,
       opponentLineup: half.lineup ?? progress.opponentLineup,
       pinchHitUsed: half.pinchHitUsed ?? progress.pinchHitUsed,
+      homeRunStreak,
       burst,
       lastBurstResolution: resolution ?? progress.lastBurstResolution,
       pitching: {
@@ -827,6 +871,12 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort): GameProg
     outcome,
     runsBattedIn,
   )
+  // 간이 엔진 타석도 0xa8024 를 지난다 — 동료 홈런도 같은 팀 카운터로 이어 센다 (0xa794c)
+  const backToBack = backToBackRecordOf({
+    streak: progress.homeRunStreak,
+    humanOffense: true,
+    isHomeRun: outcome.kind === '홈런',
+  })
   // 타석이 끝나는 자리 — 동료 타석에서 뜬 돌발도 **그 타석 결과로** 판정된다 (0x8f414)
   const outsAdded = advanceRunners(progress.game.bases, outcome, progress.game.outs, {
     quickEngine: true,
@@ -868,7 +918,8 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort): GameProg
         MAXIMUM_PITCHER_COUNTER,
         progress.opponentInningRunsAllowed + runsBattedIn,
       ),
-      recordIds: [...progress.recordIds, ...recorded.recordIds],
+      recordIds: [...progress.recordIds, ...recorded.recordIds, ...backToBack.recordIds],
+      homeRunStreak: backToBack.streak,
       // 동료 타석도 우리 팀 선수 레코드에 쌓인다 — 타순 칸이 곧 로스터 칸이다 (`batterAt` 과 같은 자리)
       leaguePlateAppearances: [
         ...progress.leaguePlateAppearances,
@@ -1016,11 +1067,22 @@ export function stealBase(progress: GameProgress, base: 1 | 2, random: RandomPor
   // 도루 판정은 주력(`run`)만 본다 (표 0xd9064) — 나머지 칸은 안 쓴다
   const result = attemptSteal({ hit: runner.hit, power: runner.power, defense: 0, run: runner.run }, random)
 
+  // 주자 플레이(종류 5) 정산 0xa8024 @a83c6·@a83de — 도루를 건 주자 하나가 다음 루를 노렸다
+  const stealRunner = {
+    stealStarted: true,
+    fromBase: base,
+    targetBase: base + 1,
+    finished: true,
+  }
   if (result === '실패') {
     const outs = game.outs + 1
     const bases = base === 1 ? { ...game.bases, first: false } : { ...game.bases, second: false }
+    // 잡히면 24(도루 저지) 후보가 나오지만 수비 계열이라 0xa77f0 게이트에서 버려진다 — 지금 공격 팀이 사람이다
+    const recordIds = gatedOffenseRecords(
+      stealPlayRecordIdsOf({ isRunnerPlay: true, runners: [{ ...stealRunner, currentBase: base, safe: false }] }),
+    )
     return appendLog(
-      { ...progress, game: { ...game, outs, bases } },
+      { ...progress, game: { ...game, outs, bases }, recordIds: [...progress.recordIds, ...recordIds] },
       `${game.inning}회${game.half} 도루 실패 — 아웃`,
       true,
     )
@@ -1028,7 +1090,20 @@ export function stealBase(progress: GameProgress, base: 1 | 2, random: RandomPor
   const bases = base === 1
     ? { ...game.bases, first: false, second: true }
     : { ...game.bases, second: false, third: true }
-  return appendLog({ ...progress, game: { ...game, bases } }, `${game.inning}회${game.half} 도루 성공`, true)
+  // 루를 옮긴 도루 주자마다 8(도루 성공) — 공격 계열이라 사람 공격에서 통과한다
+  const recordIds = gatedOffenseRecords(
+    stealPlayRecordIdsOf({ isRunnerPlay: true, runners: [{ ...stealRunner, currentBase: base + 1, safe: true }] }),
+  )
+  return appendLog(
+    { ...progress, game: { ...game, bases }, recordIds: [...progress.recordIds, ...recordIds] },
+    `${game.inning}회${game.half} 도루 성공`,
+    true,
+  )
+}
+
+/** 사람 팀(우리)이 공격 중인 정산의 0xa77f0 게이트 — 타자편 사람 쪽 플레이는 늘 이 방향이다 */
+function gatedOffenseRecords(recordIds: readonly number[]): number[] {
+  return recordIds.filter((id) => passesRecordTeamGate(id, { offenseIsHuman: true, defenseIsHuman: false }))
 }
 
 export function summaryOf(progress: GameProgress): GameSummary {
