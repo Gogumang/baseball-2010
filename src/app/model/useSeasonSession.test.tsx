@@ -14,6 +14,7 @@ import { clearSeasonGameRecord } from '@/entities/season-mode/model/seasonReputa
 import { useGamePointWallet } from '@/entities/wallet/model/useGamePointWallet'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { TeamGameSummary } from '@/features/play-team-game/model/teamGameFlow'
+import { rollOpponentAces } from '@/features/play-team-game/model/teamGameFlow'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 
 /** 시즌 모드 한 판을 잇는 훅 (원본 장면 0x105) — 저장·장면 전환만 본다 */
@@ -424,6 +425,8 @@ describe('시즌 끝 사슬', () => {
     act(() => result.current.actions.startPendingGame())
     // 경기[0x28+내side] = 10 — 시즌 팀(3) 명단이 아니라 대표팀 명단으로 친다
     expect(result.current.gameOptions?.ourTeamId).toBe(10)
+    // 국가대항전은 0x6548 66ae 에서 마선수 싣기·굴리기를 건너뛴다
+    expect(result.current.gameOptions?.opponentAces).toBeUndefined()
     expect(result.current.gameOptions?.opponentTeamId).toBe(11)
 
     act(() => result.current.actions.finishGame(요약({
@@ -676,6 +679,47 @@ describe('경기 전 흐름 0xd8 → 0xd7 → 0xdd → 0xe1', () => {
     expect(result.current.gameOptions?.acePitcherId).toBe(1)
     expect(result.current.gameOptions?.aceBatterId).toBe(3)
     expect(result.current.gameOptions?.settings).toEqual(설정)
+  })
+
+  it('0xdd 에 들어올 때 상대 마선수 둘을 굴린다 — 마투수 0x66968 → 마타자 0x66994 (0x6548 66ee·6700, rand 2)', () => {
+    const { result } = 다음경기확인()
+    act(() => result.current.actions.choosePreGameAce(1))
+    act(() => result.current.actions.choosePreGameAce(8))
+    // chooseTeam~0xd7 은 굴리지 않으므로 같은 씨앗의 첫 두 굴림이다
+    const 기대 = rollOpponentAces(1, 3, createSeededRandom(20100901))
+    expect(result.current.pendingGame?.options.opponentAces).toEqual(기대)
+    expect(기대.pitcher).not.toBe(1)
+    expect(기대.batter).not.toBe(3)
+
+    // CPU 팀 엔트리(보기 전용)도 그 마선수를 8·9번에 보인다
+    act(() => result.current.actions.toggleMatchSettings())
+    act(() => result.current.actions.openEntryEdit(false))
+    expect(result.current.entryEdit?.lists.pitchers[8]?.isAce).toBe(true)
+    expect(result.current.entryEdit?.lists.batters[9]?.isAce).toBe(true)
+    act(() => result.current.actions.pressEntryKey('왼'))
+
+    // 0xe0 에서 돌아와도 다시 굴리지 않고(6556 → 6850) 경기는 그 값으로 선다
+    act(() => result.current.actions.startPendingGame())
+    expect(result.current.gameOptions?.opponentAces).toEqual(기대)
+  })
+
+  it('0xdd CLR → 0xd7 → 0xdd 로 다시 들어오면 다시 굴린다 — 들어올 때마다 +2', () => {
+    // 난수 줄기 하나를 렌더 사이에 이어 쓴다 (띄우기는 렌더마다 새 씨앗을 만든다)
+    const 줄기 = createSeededRandom(20100901)
+    const store = 메모리저장()
+    const { result } = renderHook(() => useSeasonSession(store, 줄기))
+    act(() => result.current.actions.chooseTeam(0))
+    act(() => result.current.actions.openNextGame())
+    act(() => result.current.actions.confirmNextGame())
+    act(() => result.current.actions.choosePreGameAce(0))
+    act(() => result.current.actions.choosePreGameAce(5))
+    act(() => result.current.actions.toggleMatchSettings())
+    act(() => result.current.actions.cancelMatchInfo())
+    act(() => result.current.actions.choosePreGameAce(0))
+    act(() => result.current.actions.choosePreGameAce(5))
+    const random = createSeededRandom(20100901)
+    rollOpponentAces(0, 0, random)
+    expect(result.current.pendingGame?.options.opponentAces).toEqual(rollOpponentAces(0, 0, random))
   })
 
   it('설정 창은 한 번 열리고 나면 다음 경기정보에서는 저절로 안 열린다 (저장 +0x11e)', () => {

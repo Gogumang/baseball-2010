@@ -168,6 +168,7 @@ export function SeasonRoute({ session, random, gameSettings, onExit, aceSelect }
             ...(options.opponentDayCounter === undefined ? {} : { opponentDayCounter: options.opponentDayCounter }),
             acePitcherId: isCup ? -1 : session.preGameAces.pitcher,
             aceBatterId: isCup ? -1 : session.preGameAces.batter,
+            opponentAces: options.opponentAces ?? null,
             myStarterName: session.matchInfoStarterName,
           })}
           myTeamId={options.ourTeamId}

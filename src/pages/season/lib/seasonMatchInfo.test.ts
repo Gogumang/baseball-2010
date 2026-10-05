@@ -6,6 +6,7 @@ import {
   POSTSEASON_RANK_TEXT, nationalCupMatchInfoRankOf, seasonMatchInfoLines,
 } from '@/pages/season/lib/seasonMatchInfo'
 import type { SeasonMatchInfoInput } from '@/pages/season/lib/seasonMatchInfo'
+import { aceBatterNameOf, acePitcherNameOf } from '@/pages/general-mode/lib/matchInfoLines'
 
 const 기본: SeasonMatchInfoInput = {
   league: EMPTY_LEAGUE, series: null, cup: null, inPostseason: false,
@@ -22,6 +23,15 @@ describe('시즌 경기정보 값 줄 (0x5dcc0 모드 2)', () => {
     expect(선발.user).toBe(teamPitchers(0)[1]?.name)
     expect(마투수).toMatchObject({ user: '-', cpu: '-' })
     expect(마타자).toMatchObject({ user: '-', cpu: '-' })
+  })
+
+  it('상대 마선수 칸은 0xdd 진입에서 굴린 값이다 (0x6548 66f8·670a → 0xb56b5·0xb56e1)', () => {
+    const [, , , 마투수, 마타자] = seasonMatchInfoLines({
+      ...기본, acePitcherId: 0, aceBatterId: 1, opponentAces: { pitcher: 2, batter: 3 },
+    })
+    expect(마투수).toMatchObject({ user: acePitcherNameOf(0), cpu: acePitcherNameOf(2) })
+    expect(마타자).toMatchObject({ user: aceBatterNameOf(1), cpu: aceBatterNameOf(3) })
+    expect(마투수.cpu).not.toBe('-')
   })
 
   it('포스트시즌이면 순위 칸이 "--" 이고 승패는 이번 시리즈다 (0xb7908 L+0x34 갈래)', () => {

@@ -79,6 +79,8 @@ export interface SeasonMatchInfoInput {
   readonly acePitcherId: number
   /** 내 팀에 넣은 마타자 0..4 (없으면 −1) */
   readonly aceBatterId: number
+  /** 0xdd 진입 0x6548 이 상대 팀에 넣은 마투수·마타자 0..4 (`0x66968`·`0x66994`). 없으면(국가대항전) "-" */
+  readonly opponentAces?: { readonly pitcher: number; readonly batter: number } | null
   /**
    * 내 팀 "선발" 값 — 엔트리 편집(0xe0)이 고친 명단의 투수 0번 (`seasonEntry.seasonStarterNameOf`).
    * 없으면 붙박이 표의 로테이션 칸으로 셈한다.
@@ -120,9 +122,9 @@ function starterNameOf(team: number, dayCounter: number): string {
 /**
  * 시즌 경기정보 다섯 줄.
  *
- * ⚠️ 상대 마선수: 원본 0x6548 은 정규·포스트시즌에서 상대 팀에도 `0x66968`·`0x66994` 로 굴린 마투수·마타자를
- *    넣는다. 웹 팀 경기(`features/play-team-game` `opponentAceIndexesOf`)는 모드 2 에서 굴리지 않고 넣지도
- *    않으므로, 여기서도 웹이 실제로 치르는 명단대로 상대 칸을 "-" 로 둔다.
+ * 상대 마선수: 원본 0x6548 은 정규·포스트시즌에서 상대 팀에도 `0x66968`·`0x66994` 로 굴린 마투수·마타자를
+ * 넣는다(66f8·670a) — 0xb56b5·0xb56e1 이 팀 레코드에서 그 마선수를 찾아 보인다. 웹은 0xdd 진입에서 굴린
+ * 값(경기 옵션 `opponentAces`)을 받는다. 국가대항전은 안 넣어(66ae) "-" 다.
  * 국가대항전 상대 선발은 day 0 이면 0번 · 그 뒤로는 늘 1번이다(7dd3826) — `opponentDayCounter` 로 받는다.
  */
 export function seasonMatchInfoLines(input: SeasonMatchInfoInput): readonly MatchInfoLine[] {
@@ -134,8 +136,8 @@ export function seasonMatchInfoLines(input: SeasonMatchInfoInput): readonly Matc
       input.myStarterName ?? starterNameOf(myTeamId, input.dayCounter),
       starterNameOf(opponentTeamId, input.opponentDayCounter ?? input.dayCounter),
     ],
-    [acePitcherNameOf(input.acePitcherId), EMPTY_VALUE],
-    [aceBatterNameOf(input.aceBatterId), EMPTY_VALUE],
+    [acePitcherNameOf(input.acePitcherId), acePitcherNameOf(input.opponentAces?.pitcher ?? -1)],
+    [aceBatterNameOf(input.aceBatterId), aceBatterNameOf(input.opponentAces?.batter ?? -1)],
   ]
   return values.map(([user, cpu], index) => ({
     labelFrame: MATCH_INFO_LABEL_FRAMES[index],

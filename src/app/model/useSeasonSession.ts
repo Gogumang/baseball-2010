@@ -36,6 +36,7 @@ import { SEASON_END_CHAIN } from '@/entities/season-mode/model/seasonStateMachin
 import { teamBatters } from '@/entities/team/model/teamRoster'
 import { TEAMS } from '@/shared/config/original/teams'
 import type { TeamGameOptions, TeamGameSummary } from '@/features/play-team-game/model/teamGameFlow'
+import { rollOpponentAces } from '@/features/play-team-game/model/teamGameFlow'
 import { FULL_PLAY_SETTINGS } from '@/features/play-team-game/model/matchSettings'
 import type { MatchProgressSettings } from '@/features/play-team-game/model/matchSettings'
 import {
@@ -257,7 +258,10 @@ export interface SeasonEntryEdit {
 /** 0xd7 → 0xdd 를 지나 치를 경기 한 판 */
 export interface PendingSeasonGame {
   readonly kind: SeasonGameKind
-  /** 두 팀·측·날짜가 선 옵션 — 마선수(rec+0xe·+0xd)와 설정은 0xdd 확인 때 얹는다 */
+  /**
+   * 두 팀·측·날짜가 선 옵션 — 내 마선수(rec+0xe·+0xd)와 설정은 0xdd 확인 때 얹는다.
+   * 상대 마선수(`opponentAces`)는 0xdd 에 들어올 때 굴려 여기 싣는다 (정규·포스트시즌만).
+   */
   readonly options: TeamGameOptions
 }
 
@@ -624,8 +628,14 @@ export function useSeasonSession(
   }, [])
 
   /**
-   * 0xdd 경기정보로 — 들어옴 0x6548: 저장 +0x11e 가 0 이면 **경기진행 설정 창을 저절로 열고** 그 칸을 1 로
-   * 써서 저장한다 (6564~659c). 두 팀 명단·마선수·로테이션은 웹에서는 경기를 세울 때(`startTeamGame`) 한다.
+   * 0xdd 경기정보로 — 들어옴 0x6548 (이전 상태가 0xe0 이면 6556 에서 곧장 6850 으로 — 웹은 0xe0 에서 돌아올 때
+   * 이 함수를 안 부른다):
+   *   - 저장 +0x11e 가 0 이면 **경기진행 설정 창을 저절로 열고** 그 칸을 1 로 써서 저장한다 (6564~659c).
+   *   - 국가대항전(SR+0x12c)이 아니면(66ae) 0xd7 에서 고른 마선수를 내 팀에 싣고(66da·66e6) 이어 **상대 팀 마선수를
+   *     굴린다** — `v = 0x66968(rec+0xe)`(66ee) → `0xb88c8(상대, v)`(66f8) · `w = 0x66994(rec+0xd)`(6700) →
+   *     `0xb8870(상대, w)`(670a). 이 둘(rand 2)이 0xdd 진입의 유일한 굴림이다. 웹은 굴린 값을 옵션 `opponentAces` 로
+   *     싣고 경기정보·CPU 엔트리 화면이 같은 값을 본다. 다시 0xd7 → 0xdd 로 들어오면 다시 굴린다(원본 그대로).
+   *   - 두 팀 명단 세우기(0xb891c)·로테이션(0xb8c80)은 웹에서는 경기를 세울 때(`startTeamGame`) 한다.
    *
    * **투수 스태미나 (P1 3절 · 직접 떴다)** — 투수 레코드 +0x2c 는 경기용 칸이 아니라 **시즌 내내 이어지는 값**이다.
    *   - `0xb6190(팀)` = 그 팀 투수 전원(팀+0xc 명, 팀+0x14 배열, 0x30 간격) +0x2c = 10000 (b6192~b61aa, 확정).
@@ -640,14 +650,18 @@ export function useSeasonSession(
    * CPU 끼리 경기(간이 엔진)의 소모가 함께 있어야 한다 — 이 세션 안에서만으로는 못 한다.
    */
   const enterMatchInfo = useCallback(
-    (current: SeasonSave, pending: PendingSeasonGame) => {
-      setPendingGame(pending)
+    (current: SeasonSave, pending: PendingSeasonGame, aces: PreGameAces | null) => {
+      setPendingGame(
+        pending.kind === '국가대항전' || aces === null
+          ? pending
+          : { ...pending, options: { ...pending.options, opponentAces: rollOpponentAces(aces.pitcher, aces.batter, random) } },
+      )
       const firstTime = current.matchSettingsSeen !== true
       if (firstTime) commit({ ...current, matchSettingsSeen: true })
       setIsMatchSettingsOpen(firstTime)
       setScene(SEASON_SCENE_STATE.경기정보)
     },
-    [commit],
+    [commit, random],
   )
 
   /** 확인 `0x48fc`: `SR+0xb4`(포스트시즌) ? 0xef : (this+0x11c = 1, 0xd7 선수단 → 0xdd → 경기) */
@@ -669,7 +683,7 @@ export function useSeasonSession(
       if (save === null || pendingGame === null) return
       const step = choosePreGameAce(preGameAces, cell)
       setPreGameAces(step.aces)
-      if (step.kind === '경기정보') enterMatchInfo(save, pendingGame)
+      if (step.kind === '경기정보') enterMatchInfo(save, pendingGame, step.aces)
     },
     [enterMatchInfo, pendingGame, preGameAces, save],
   )
@@ -764,7 +778,7 @@ export function useSeasonSession(
   /**
    * 0xdd '4'/왼 · '6'/오른 (0x83cc) → this+0x120 = 1/0, 밀기 4/3 → 0xe0. 들어옴 0x63dc 가 그 팀 레코드로
    * 편집기를 세운다 — 편집 가능 = this+0x120 (CPU 팀은 보기 전용), 첫 탭은 투수.
-   * CPU 팀 명단은 웹에서 붙박이 표다 (원본이 넣는 굴린 마선수는 웹 팀 경기가 안 넣으므로 목록에도 없다).
+   * CPU 팀 명단은 웹에서 붙박이 표에 0xdd 진입에서 굴린 마선수(`opponentAces`, 0x6548 66f8·670a)를 8·9번에 끼운다.
    */
   const openEntryEdit = useCallback(
     (isUserTeam: boolean) => {
@@ -776,8 +790,8 @@ export function useSeasonSession(
           teamId: options.opponentTeamId,
           roster: tableRosterOf(options.opponentTeamId),
           dayCounter: options.opponentDayCounter ?? options.dayCounter ?? 0,
-          acePitcherId: -1,
-          aceBatterId: -1,
+          acePitcherId: options.opponentAces?.pitcher ?? -1,
+          aceBatterId: options.opponentAces?.batter ?? -1,
         }
       setEntryEdit({
         isUserTeam,
@@ -1096,7 +1110,7 @@ export function useSeasonSession(
           dayCounter: cup.day,
           opponentDayCounter: cup.day === 0 ? 0 : 1,
         },
-      })
+      }, null)
     },
     [enterMatchInfo, optionsFor, save],
   )
