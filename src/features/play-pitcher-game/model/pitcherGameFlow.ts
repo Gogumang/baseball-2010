@@ -152,6 +152,25 @@ function recordsAllowed(progress: PitcherGameProgress): boolean {
   return !progress.simpleEngineRunning
 }
 
+/**
+ * `0xa56dc(R, 내 투수, …)` — 내 투수의 기록을 **셀 대상인가**. 모드 3 갈래(점프표 0xd8204[1] → 0xa571c)는
+ * 시즌 객체 S(0x1fa2d)의 **+0xb4(포스트시즌)·+0x12c(국가대항전)가 둘 다 0** 일 때만 참이다
+ * (그 다음 마선수 0xb633d 검사는 투수편 내 투수에게 늘 통과).
+ *
+ * 이 게이트가 거짓이면 원본은 아무것도 세지 않는다:
+ *   - 사건 함수 0xa57f8 의 코드 0x14~0x1f (0xa5844~0xa585a) — R+0x124~+0x150: 피안타 0x12c · 탈삼진 0x134(+연속 0x14c) ·
+ *     타자 수 0x138 · 아웃 0x13c · 볼넷 0x144 · 사구 0x148 · 등판 때 앞섬 0x150 ·
+ *     (코드 0x20 R+0x154 삼자범퇴 이닝 · 0x21 R+0x158 은 이 게이트 밖이라 그대로 센다)
+ *   - 정산 0xa8024 의 R+0x128 (0xa8f3c) · 레코드 +0x22 실점 (0xa8ef4) · +0x20 아웃 · +0x26 탈삼진 ([sp+0x38], 0xa8cb0·0xa8d00)
+ * 웹 `seasonDelta` 의 아웃·탈삼진·실점은 이 R 칸에서 나오므로 함께 0 이 된다 (원본 +0x20·+0x26·+0x22 와 같다).
+ *
+ * ⚠️ 투수편 웹엔 국가대항전이 없어 포스트시즌만 본다. 또 웹은 45경기가 끝나면 곧장 시즌종료로 가서
+ *    사람이 포스트시즌 경기를 던지지 않는다 — 지금은 닿지 않는 길이지만 원본대로 걸어 둔다.
+ */
+function countsMyPitcherRecord(progress: PitcherGameProgress): boolean {
+  return !progress.options.isPostseason
+}
+
 export interface PitcherGameOptions {
   readonly ourTeamId: number
   readonly opponentTeamId: number
@@ -753,7 +772,9 @@ export function pickoff(
     ...progress,
     lastDefensePlay: result,
     // 0xa8d98 — 종류 4 는 R+0x138 을 안 올린다 (그대로 돌려받는다)
-    pitcherRecord: recordBatterFaced(progress.pitcherRecord, PICKOFF_PLAY_KIND),
+    pitcherRecord: countsMyPitcherRecord(progress)
+      ? recordBatterFaced(progress.pitcherRecord, PICKOFF_PLAY_KIND)
+      : progress.pitcherRecord,
   }
   if (changed) {
     const applied = applyOpponentRunnerPlay(before, progress.opponentOrderIndex, advanceResult)
@@ -762,7 +783,10 @@ export function pickoff(
       decision = applyRunScoredFor(progress, decision, run, true)
     }
     const halfChanged = applied.game.half !== before.half || applied.game.inning !== before.inning
-    const pickoffCharged = chargedRunsOfFates(result.runnerFates, before.outs + advanceResult.outsAdded)
+    // 포스트시즌이면 0xa56dc 가 거짓이라 R+0x128 · +0x22 를 안 센다 (`countsMyPitcherRecord`)
+    const pickoffCharged = countsMyPitcherRecord(progress)
+      ? chargedRunsOfFates(result.runnerFates, before.outs + advanceResult.outsAdded)
+      : 0
     next = {
       ...next,
       game: applied.game,
@@ -927,8 +951,9 @@ function applyDefensivePlay(
    * ⚠️ 미해결(근사): ① 강판 뒤 간이 엔진 타석은 주자 운명이 없어 점수판 득점(`runsScored`)을 쓰고, 내 주자가
    *   이 플레이에서 아웃되고 뒤 주자가 들어온 경우(드묾)는 뒤 주자 득점을 내 것으로 세며, 남은 내 주자 수는
    *   `min(남은 수, 루의 주자 수)` 로 줄인다. 간이 엔진의 3아웃 갈래도 점수판 득점으로 대신한다.
-   *   ② 원본은 포스트시즌·국가대항전이면 0xa56dc 가 거짓이라 아예 안 센다(사건 함수 0xa57f8 의 다른 R 칸도
-   *   같은 게이트다) — 웹은 이 게이트를 어느 R 칸에도 걸지 않았으므로 여기서도 걸지 않는다 (미해결, 따로 옮길 것).
+   *
+   * 포스트시즌이면 0xa56dc 가 거짓이라 R+0x128 · +0x22 와 0xa57f8 의 R 칸(코드 0x14~0x1f)을 하나도 안 센다
+   * (`countsMyPitcherRecord`). 남겨 둔 주자 수(`inheritedRunners`)의 장부는 그대로 줄인다 — 세는 일만 막힌다.
    */
   const chargedToMe = mine
     ? chargedRunsOfMyPlay(before.bases, outcome, defensePlay, before.outs + applied.outsAdded, applied.runsScored)
@@ -938,8 +963,13 @@ function applyDefensivePlay(
       ? 0
       : Math.min(progress.inheritedRunners - chargedToMe, runnerCountOf(applied.game.bases))
 
-  const playedRecord: PitcherEvaluationRecord = mine
-    ? {
+  const counts = countsMyPitcherRecord(progress)
+  const playedRecord: PitcherEvaluationRecord = !mine
+    ? progress.record
+    : !counts
+      // 게이트 밖인 코드 0x20(R+0x154 삼자범퇴 이닝)만 센다
+      ? { ...progress.record, perfectInnings: progress.record.perfectInnings + (inningEnded && perfectInningFlag ? 1 : 0) }
+      : {
         ...progress.record,
         hitsAllowed: progress.record.hitsAllowed + (hit ? 1 : 0),
         strikeouts: progress.record.strikeouts + (outcome.kind === '삼진' ? 1 : 0),
@@ -951,10 +981,10 @@ function applyDefensivePlay(
         // R+0x154 — 삼자범퇴 이닝 (S5 정정 4: "무안타" 가 아니라 아무도 안 내보낸 이닝이다)
         perfectInnings: progress.record.perfectInnings + (inningEnded && perfectInningFlag ? 1 : 0),
       }
-    : progress.record
+  const chargedCounted = counts ? chargedToMe : 0
   const record: PitcherEvaluationRecord =
-    chargedToMe > 0
-      ? { ...playedRecord, runsAllowedField: playedRecord.runsAllowedField + chargedToMe }
+    chargedCounted > 0
+      ? { ...playedRecord, runsAllowedField: playedRecord.runsAllowedField + chargedCounted }
       : playedRecord
 
   // 0xb8cec — 지금 마운드에 선 우리 투수의 경기 기록 R[0](삼진)·R[1](연속 삼진).
@@ -996,8 +1026,8 @@ function applyDefensivePlay(
       : progress.recordIds,
     inningRuns: addInningRuns(progress.inningRuns, before.inning, applied.runsScored),
     record,
-    pitcherRecord: mine ? pitcherRecordAfterPlay(progress.pitcherRecord, hitByPitch) : progress.pitcherRecord,
-    runsAllowedByMe: progress.runsAllowedByMe + chargedToMe,
+    pitcherRecord: mine && counts ? pitcherRecordAfterPlay(progress.pitcherRecord, hitByPitch) : progress.pitcherRecord,
+    runsAllowedByMe: progress.runsAllowedByMe + chargedCounted,
     inheritedRunners,
     teamHitsAllowed: progress.teamHitsAllowed + (hit ? 1 : 0),
     teamWalksAllowed: progress.teamWalksAllowed + (freePass ? 1 : 0),
@@ -1355,8 +1385,13 @@ function enterAsRelief(progress: PitcherGameProgress): PitcherGameProgress {
       onMound: true,
       hasEntered: true,
       decision,
-      pitcherRecord: recordEntryLead(progress.pitcherRecord, situation),
-      record: { ...progress.record, leadingAtEntry: situation.leading },
+      // R+0x150 (코드 0x1f) — 포스트시즌이면 0xa56dc 가 거짓이라 안 적는다
+      ...(countsMyPitcherRecord(progress)
+        ? {
+            pitcherRecord: recordEntryLead(progress.pitcherRecord, situation),
+            record: { ...progress.record, leadingAtEntry: situation.leading },
+          }
+        : {}),
       // 기록 18~23 은 **현재 투수**의 R[0]·R[1] 을 보므로 투수가 바뀌면 0 부터 다시 센다 (R8 4-2)
       moundStrikeouts: 0,
       moundStrikeoutCombo: 0,

@@ -378,13 +378,23 @@ export function usePitcherLeagueSession(
       const recorded = applyPitcherGameResult(career, outcome)
       const day = applyPitcherLeagueDay(recorded, random)
       const seasoned = applyPitcherPostseasonProgress(applyPitcherSeasonEnd(day), random)
-      const evaluated = gainPitcherMorale(
-        gainPitcherReputation(
-          gainPitcherPopularity(seasoned, summary.evaluation.popularityChange),
-          summary.evaluation.reputationChange,
-        ),
-        summary.evaluation.moraleChange,
-      )
+      /*
+       * 경기 뒤 평가 0xa719c(인기도 0xa690c → 평판 0xa6218 → 사기)는 **정규시즌 경기만** 탄다. 유일한 호출지
+       * 0x4ea0c 안 0x4f274 앞에서 0x4f216(L+0xac 국가대항전)·0x4f268(L+0x34 포스트시즌)이 0x4f29a(하루 끝)로
+       * 건너뛰고, 이 갈래에는 모드 갈림이 없다(0x4f1a2 의 모드 2 곁가지 뒤 0x4f216 으로 합류) → 모드 3 도 같다.
+       * 포스트시즌 표시는 45번째 경기의 하루 끝(0xb818c → 0xb80a8)에야 서므로 그 경기는 평가된다 —
+       * 경기 전 커리어(`career.postseason`)로 가른다. (웹 투수편엔 국가대항전이 없다.)
+       */
+      const isEvaluated = career.postseason === null
+      const evaluated = isEvaluated
+        ? gainPitcherMorale(
+            gainPitcherReputation(
+              gainPitcherPopularity(seasoned, summary.evaluation.popularityChange),
+              summary.evaluation.reputationChange,
+            ),
+            summary.evaluation.moraleChange,
+          )
+        : seasoned
       setGameOptions(null)
 
       // 경기 뒤 평가 116 의 끝 — 정규시즌이 닫혔으면 시즌 끝 사슬(136→…→132)로 간다.

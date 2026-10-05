@@ -3,6 +3,7 @@ import { StrictMode } from 'react'
 import { describe, expect, it } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { usePitcherLeagueSession } from '@/app/model/usePitcherLeagueSession'
+import { startPostseason } from '@/entities/league/model/league'
 import { NO_EQUIPPED_TITLE } from '@/entities/career/model/titles'
 import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
@@ -109,6 +110,26 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     act(() => result.current.actions.save({ ...result.current.career!, ...career }))
     return result
   }
+
+  it('경기 뒤 평가(0xa719c)는 정규시즌만 — 포스트시즌 경기는 0x4f268 이 건너뛴다, 45번째 경기는 평가된다', () => {
+    const 평가요약 = { ...경기요약, evaluation: { popularityChange: 7, reputationChange: 3, moraleChange: -5 } } as typeof 경기요약
+    const 정규 = 판짜기({ gamesPlayed: 44, popularity: 100, reputation: 100, morale: 50 })
+    act(() => 정규.current.actions.beginGame())
+    act(() => 정규.current.actions.finishGame(평가요약))
+    expect(정규.current.career).toMatchObject({ popularity: 107, morale: 45 })
+    expect(정규.current.career?.reputation).not.toBe(100)
+
+    const 포스트 = 판짜기({
+      gamesPlayed: 45,
+      popularity: 100,
+      reputation: 100,
+      morale: 50,
+      postseason: startPostseason([3, 0, 1, 2, 4, 5, 6, 7]),
+    })
+    act(() => 포스트.current.actions.beginGame())
+    act(() => 포스트.current.actions.finishGame(평가요약))
+    expect(포스트.current.career).toMatchObject({ popularity: 100, reputation: 100, morale: 50 })
+  })
 
   it('45경기째를 치르면 정규시즌이 닫히고 시즌종료 화면으로 간다 (0xb818c)', () => {
     const result = 판짜기({ gamesPlayed: 44 })

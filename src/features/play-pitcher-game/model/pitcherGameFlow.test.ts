@@ -686,3 +686,34 @@ describe('R+0x128 · 레코드 +0x22 — 득점 주자를 내보낸 투수에게
     expect(끝.record.runsAllowedField).toBe(0)
   })
 })
+
+describe('포스트시즌 게이트 0xa56dc (모드 3 갈래 0xa571c — S+0xb4 포스트시즌이면 거짓)', () => {
+  it('포스트시즌 경기는 R 칸(코드 0x14~0x1f)·R+0x128·+0x22 를 하나도 안 센다 — 삼자범퇴 이닝(0x20)만 센다', () => {
+    let 확인 = false
+    for (let seed = 1; seed <= 40 && !확인; seed += 1) {
+      const 끝 = 끝까지던지기(startPitcherGame({ ...기본옵션, isPostseason: true }, 씨앗(seed)), seed)
+      if (!끝.game.isFinished || 끝.pitchCount === 0 || 끝.teamRunsAllowed === 0) continue
+      확인 = true
+      const 요약 = summaryOf(끝)
+      expect(요약.record).toMatchObject({
+        hitsAllowed: 0,
+        strikeouts: 0,
+        outsRecorded: 0,
+        walksAllowed: 0,
+        hitByPitch: 0,
+        strikeoutCombo: 0,
+        runsAllowedField: 0,
+        leadingAtEntry: false,
+      })
+      expect(끝.pitcherRecord.battersFaced).toBe(0)
+      expect(끝.runsAllowedByMe).toBe(0)
+      expect(요약.seasonDelta).toMatchObject({ outs: 0, strikeouts: 0, runsAllowed: 0 })
+    }
+    expect(확인).toBe(true)
+  })
+
+  it('정규시즌 같은 경기는 센다', () => {
+    const 끝 = 끝까지던지기(startPitcherGame(기본옵션, 씨앗(3)), 3)
+    expect(summaryOf(끝).record.outsRecorded).toBeGreaterThan(0)
+  })
+})
