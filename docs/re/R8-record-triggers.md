@@ -346,3 +346,7 @@ a8000: state[0x8c] = 0
 - **37~39** — 같다(웹 `gameEndRecordIdsOf`, 음수 차이면 없음 = 원본의 "사람 팀 승리"). 동점은 원본도 차 0 이라 없음.
 - **웹 주석 정정거리**: `gameRecords.ts:21` "경기 중 누계를 실시간으로 보여 주는 것(0xa77f0)도 아직 없다" 는 최근 커밋 23aaed1 로 달라졌을 수 있음(확인 안 함). `:109` "항상 집계" 는 위 28~31 항목대로 틀림.
 
+
+## 10. 웹 판정 함수 (2026-10) — 배선 전
+남은 아홉 가지의 판정 순수 함수가 `src/entities/game/model/gameRecords.ts` 에 들어갔다: `pinchHitHomeRunRecordIdsOf`(5, 순서 유력) · `backToBackRecordOf`(6·7) · `stealPlayRecordIdsOf`(8·24) · `multiOutPlayRecordIdsOf`(26·27) · `foulRecordOf`(32·33, 리셋 유력) · `laserThrowOutRecordOf`(36). 0xa77f0 게이트 방향은 부르는 쪽이 맞춘다.
+재확인 두 가지: ① 게이트(0xa785e~)는 공격 팀이 사람이면 **수비 계열 번호를 그 자리에서 버리고**(0xa7882·0xa7886 → 0xa792e) 수비 쪽 검사로 넘어가지 않는다. ② 36 의 `state[0x8b] = 0` 은 BL 뒤(0xa8110~0xa8116)에만 있어 **아웃이 없는 정산에서는 플래그가 남는다**.

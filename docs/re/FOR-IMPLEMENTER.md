@@ -277,7 +277,7 @@
   - `sky_effect_light`·`sky_effect_light1` — 밤 경기 하늘 조명. 팔레트 줄까지 확정 (R6 6절)
   - ✅ **끝난 것**: 마구 1·4(폼 묶음 0) 의 공 이펙트 `effect_fire`/`effect_shinning` → 2026-09-25 이식 (`src/widgets/batting-stage/lib/magicBallEffect.ts`, R2 14-1)
   - ⛔ **만들지 말 것**: `effect_frame`·`effect_power`·`effect_tornado`·`effect_meteor`·`medica_effect` — 원본에 그리는 코드가 없다 (R2 15절)
-- **아직 안 옮긴 작은 차이 — 마구 1 도 불꽃 공이 된다**: `0x3b55a` 가 **마구 번호 1** 에서 공 경로 번호 8 부터 `게임+0x1080 = 1`(ball.pzx 불꽃 묶음)로 바꾼다. 웹 `src/entities/pitcher-career/model/magicPitch.ts` 의 `MAGIC_BALL_KIND_BY_NUMBER = [0,0,0,0,0,0,0,0,2,1]` 에는 8(ballantine)→2 · 9(dragona)→1 만 있다. **투구를 고를 때가 아니라 그릴 때 프레임 8부터** 바뀌는 값이라 `magicBallKindOf` 가 아니라 `trajectory.ts:ballFrameIndexAt` 쪽에서 덮어야 맞다
+- **아직 안 옮긴 작은 차이 — 마구 1 (과 폼 묶음 0 인 마구 4) 도 불꽃 공이 된다** *(2026-10: 판정 함수 `magicPitch.ts:magicBallKindAtPath` 는 생겼고, 배선만 남았다 — 마구 4 폼 묶음 0 도 같은 갈래 0x3b546 이라 불꽃이다)*: `0x3b55a` 가 **마구 번호 1** 에서 공 경로 번호 8 부터 `게임+0x1080 = 1`(ball.pzx 불꽃 묶음)로 바꾼다. 웹 `src/entities/pitcher-career/model/magicPitch.ts` 의 `MAGIC_BALL_KIND_BY_NUMBER = [0,0,0,0,0,0,0,0,2,1]` 에는 8(ballantine)→2 · 9(dragona)→1 만 있다. **투구를 고를 때가 아니라 그릴 때 프레임 8부터** 바뀌는 값이라 `magicBallKindOf` 가 아니라 `trajectory.ts:ballFrameIndexAt` 쪽에서 덮어야 맞다
 - **글꼴**: 원본 비트맵 한글 글꼴 `synGak9_11.ft2`(9×11 조합형 벌 글꼴) · `synGulimAsc5_11.ft2`(5×11 영문 94자). 웹은 Galmuri 웹 글꼴
 - **파티클**: `ptc/001~026.ptc`(51바이트 설정) + `ptc/ptcimg.pzx`. 웹은 없다 (`public/sprites/ptcimg/frames` 는 **합성된 그림이라 못 쓴다** — 파트 그림 `0NN.png` 를 써야 한다)
 - **그 밖**: `fence_season.pzf` 20프레임(시즌 구장 성장), 장비 외형 스프라이트 57폴더(`item_bat_*` / `item_pit_*`, 장착 시 겉모습 — 웹은 `batterLayers.ts:6,14` 가 다리 고정), 효과 0x10(확대/축소)·0x11(뒤집기)
