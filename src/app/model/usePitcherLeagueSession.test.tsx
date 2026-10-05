@@ -569,3 +569,39 @@ describe('투수편 상점 — 장비(111 · 121) · 서브 · GP', () => {
     expect(result.current.career).toBe(before)
   })
 })
+
+describe('투수편 외출 (112 지도 · 113 장소 — 타자편과 같은 코드)', () => {
+  it('[외출] 은 지도로 가고, 장소 기능은 효과를 저장한다 — 서브 아이템 외식회원증 +4', () => {
+    const store = 메모리저장()
+    const { result } = 띄우기(store)
+    act(() => result.current.actions.create('투수', 신인))
+    act(() => result.current.actions.save({ ...result.current.career!, morale: 50, money: 1000, subItemIds: [6] }))
+
+    act(() => result.current.actions.openOuting())
+    expect(result.current.scene).toBe('외출')
+
+    act(() => result.current.actions.runOutingFunction('외식'))
+
+    const saved = store.load() as { morale: number; money: number; hasActedThisCycle: boolean; outingsThisSeason: number }
+    // 외식 사기 bfa55(25,31) + 외식회원증 4 → 79 이상 85 이하 · 소지금 −100(만원)
+    expect(saved.morale).toBeGreaterThanOrEqual(79)
+    expect(saved.morale).toBeLessThanOrEqual(85)
+    expect(saved.money).toBe(900)
+    expect(saved.hasActedThisCycle).toBe(true)
+    expect(saved.outingsThisSeason).toBe(1)
+    expect(result.current.outingNotice).toBe('외식 — 사기를 대폭 회복한다. 소지금을 소모한다')
+  })
+
+  it('막히면 원문 알림만 띄우고 커리어는 그대로다 (StrMODE[62])', () => {
+    const { result } = 띄우기()
+    act(() => result.current.actions.create('투수', 신인))
+    act(() => result.current.actions.save({ ...result.current.career!, popularity: 0 }))
+    const before = result.current.career
+
+    act(() => result.current.actions.openOuting())
+    act(() => result.current.actions.runOutingFunction('팬미팅'))
+
+    expect(result.current.outingNotice).toBe('인기도가 부족합니다. 필요한 인기도 : 600')
+    expect(result.current.career).toBe(before)
+  })
+})

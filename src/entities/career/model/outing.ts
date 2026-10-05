@@ -1,13 +1,14 @@
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import {
   gainMorale,
-  gainPopularity,
-  gainReputation,
   MAXIMUM_MORALE,
+  MAXIMUM_POPULARITY,
+  MAXIMUM_REPUTATION,
   spendCycleAction,
 } from '@/entities/career/model/playerCareer'
 import type { OutingEffect, OutingFunction, OutingRange, RolledOutingEffect } from '@/shared/config/outingPlaces'
 import { HOSPITAL_RECOVERY, REST_RECOVERY, rollRecovery } from '@/entities/career/model/recovery'
+import type { RecoverableCareer } from '@/entities/career/model/recovery'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { applyOutingSubItems } from '@/entities/career/model/subItems'
@@ -21,6 +22,23 @@ import { applyOutingSubItems } from '@/entities/career/model/subItems'
 export type OutingBlockReason = '소지금부족' | '이미행동함' | '건강함' | '인기도부족' | '사기최고'
 
 /**
+ * 외출이 읽고 쓰는 칸만 추린 것 — **타자편·투수편이 함께 쓴다.**
+ *
+ * 원본 모드 3(투수편)·4(타자편)는 한 장면 0x106 의 같은 상태 112·113·126 을 돈다 (디스어셈 확정):
+ *   - 105 커맨드 칸 3(점프표 0xcc540 → 0x126be)은 모드를 보지 않고 곧장 상태 0x70(112) 로 간다.
+ *   - 112 진입 0x118e4(지도 적재 0x7f49c · [!] 배정 0x8cdc0) · 113 키·가드 0x16c64 · 효과 0x15234 ·
+ *     입원 회복 0x1575c 어디에도 모드 갈림이 없다 — 표(0xcc402 · 0xcc344 · 0xcc358 · 0xcc34e · 0xcc33a)와
+ *     서브 아이템 칸(`기록[0x5d + 장소]`, 점프표 0xcc6c4)·인기도 +0x48 · 평판 +0x62 · 소지금 +2 · 사기 0xa3a45 를
+ *     장면의 기록(`[장면+0xb0]`)에 그대로 쓴다.
+ * 그래서 커리어 타입을 묶지 않고 이 칸들을 가진 것이면 무엇이든 받는다 (`PlayerCareer`·`PitcherCareer`).
+ */
+export type OutingCareer = RecoverableCareer &
+  Pick<
+    PlayerCareer,
+    'hasActedThisCycle' | 'popularity' | 'reputation' | 'morale' | 'money' | 'subItemIds' | 'outingsThisSeason'
+  >
+
+/**
  * 외출 막힘 판정 — **원본 0x16cf0 의 순서 그대로**다 (G-3 확정):
  *   1. 필요 인기도 `0xcc402[장소]` > 인기도 → StrMODE[62]
  *   2. 비용 > 소지금 → StrMODE[77]
@@ -31,7 +49,7 @@ export type OutingBlockReason = '소지금부족' | '이미행동함' | '건강�
  * (0x16d42) → 보험증서가 있어 실제로는 공짜인 입원도 소지금이 모자라면 막힌다.
  */
 export function outingBlockReasonOf(
-  career: PlayerCareer,
+  career: OutingCareer,
   outingFunction: OutingFunction,
 ): OutingBlockReason | null {
   if (career.hasActedThisCycle) return '이미행동함'
@@ -45,6 +63,24 @@ export function outingBlockReasonOf(
   if (outingFunction.id === '외식' && career.morale >= MAXIMUM_MORALE) return '사기최고'
   return null
 }
+
+/** 막힘 알림 원문 — StrMODE[62] · [77] · [196] · [91] (색 표식 `!C`·`!N`·`!c…` 은 뺐다), 이미 행동함은 r_event_txt[176] */
+export function outingBlockTextOf(reason: OutingBlockReason, outingFunction: OutingFunction): string {
+  switch (reason) {
+    case '인기도부족':
+      return `인기도가 부족합니다. 필요한 인기도 : ${outingFunction.requiredPopularity}`
+    case '소지금부족':
+      return '소지금이 부족합니다'
+    case '건강함':
+      return '건강한 상태입니다 입원할 필요가 없습니다'
+    case '사기최고':
+      return '사기 최고 상태입니다'
+    case '이미행동함':
+      return '트레이닝·휴식·외출은 한 번에 한 가지만 할 수 있습니다'
+  }
+}
+
+const clamp = (value: number, maximum: number) => Math.min(maximum, Math.max(0, value))
 
 function rollRange(random: RandomPort, [first, second]: OutingRange): number {
   const sign = first < 0 ? -1 : 1
@@ -62,22 +98,23 @@ export function rollOutingEffect(effect: OutingEffect, random: RandomPort): Roll
   }
 }
 
-export function runOuting(career: PlayerCareer, outingFunction: OutingFunction, random: RandomPort): PlayerCareer {
+export function runOuting<T extends OutingCareer>(career: T, outingFunction: OutingFunction, random: RandomPort): T {
   const blockReason = outingBlockReasonOf(career, outingFunction)
   if (blockReason !== null) {
     throw new Error(`외출할 수 없습니다 (${blockReason}): ${outingFunction.name}`)
   }
 
   const effect = applyOutingSubItems(career, outingFunction.id, rollOutingEffect(outingFunction.effect, random))
-  const paid: PlayerCareer = {
-    ...spendCycleAction(career),
+  // 반영 범위는 원본 그대로 (0x152f4~0x15374): 인기도 0..9999 · 평판 0..999 · 사기 0..100 (두 모드 같은 한계)
+  const gained: T = {
+    ...career,
+    hasActedThisCycle: true,
     outingsThisSeason: career.outingsThisSeason + 1,
     money: Math.max(0, career.money - effect.moneyCost),
+    morale: clamp(career.morale + effect.moraleGain, MAXIMUM_MORALE),
+    popularity: clamp(career.popularity + effect.popularityGain, MAXIMUM_POPULARITY),
+    reputation: clamp(career.reputation + effect.reputationGain, MAXIMUM_REPUTATION),
   }
-  const gained = gainReputation(
-    gainPopularity(gainMorale(paid, effect.moraleGain), effect.popularityGain),
-    effect.reputationGain,
-  )
   return effect.healsInjury ? rollRecovery(gained, HOSPITAL_RECOVERY, random).career : gained
 }
 

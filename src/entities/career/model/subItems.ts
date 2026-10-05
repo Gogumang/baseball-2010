@@ -7,8 +7,7 @@ import type { RolledOutingEffect } from '@/shared/config/outingPlaces'
  *   이름   StrITEM[88~97] · 효과 문구 StrITEM[148~154]
  *   가격   표 0xcc430 × 10 (100만원 단위) — 웹판 소지금은 만원이라 × 1000
  *   보유   선수 +0x58+k 플래그, 영구 (0x14d12)
- *   효과   k 0~4 는 코드에서 확인. k 5~9 는 효과 문구대로 넣었고 **값은 원본과 같음이 확정**됐다 (G 0절) —
- *          다만 코드에서 어디에 적용되는지는 아직 못 짚었다
+ *   효과   k 0~4 는 훈련 0x17f5c, k 5~9 는 외출 효과 0x15234 (`기록[0x5d + 장소]`, 점프표 0xcc6c4) — 둘 다 확정
  */
 export interface SubItem {
   readonly id: number
@@ -94,8 +93,11 @@ export function subItemMoraleRelief(career: Pick<PlayerCareer, 'subItemIds'>): n
 const OUTING_ITEM = { 팬미팅: 5, 외식: 6, 입원: 7, 야구교실: 8, CF촬영: 9 } as const
 const CF_BONUS_MONEY = 400
 
-/** 외출 기능 효과에 서브 아이템 보정을 더한다 — 값은 확정, 원본의 적용 지점만 미확인 (G 0절) */
-export function applyOutingSubItems(career: PlayerCareer, functionId: string, effect: RolledOutingEffect): RolledOutingEffect {
+/**
+ * 외출 기능 효과에 서브 아이템 보정을 더한다 — 0x15234 가 `기록[0x5d + 장소]` 를 보고 점프표 0xcc6c4 로 더한다
+ * (0x152a2~0x152de — 굴린 사기의 부호 뒤집기 0x152e0 는 보정에 걸리지 않고, 반영 때 더한다). 모드 갈림이 없어 투수편도 같다.
+ */
+export function applyOutingSubItems(career: Pick<PlayerCareer, 'subItemIds'>, functionId: string, effect: RolledOutingEffect): RolledOutingEffect {
   const owns = (name: keyof typeof OUTING_ITEM) => functionId === name && hasSubItem(career, OUTING_ITEM[name])
   if (owns('팬미팅')) return { ...effect, popularityGain: effect.popularityGain + 2 }
   if (owns('외식')) return { ...effect, moraleGain: effect.moraleGain + 4 }

@@ -6,7 +6,8 @@ import { OutingMap } from '@/pages/outing-map/ui/OutingMap'
 import { PlaceBubble } from '@/pages/outing-map/ui/PlaceBubble'
 
 interface OutingMapScreenProps {
-  readonly career: PlayerCareer
+  /** 이번 주기에 행동했는지만 본다 — 타자편·투수편 커리어가 둘 다 들어온다 (원본 모드 3·4 공용 상태 112·113) */
+  readonly career: Pick<PlayerCareer, 'hasActedThisCycle'>
   readonly noticeText: string
   readonly onRun: (activityId: string) => void
   readonly onBack: () => void

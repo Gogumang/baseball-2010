@@ -45,6 +45,10 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { selectPitcherShopItem } from '@/features/shop/model/pitcherShopSelection'
 import type { GpDetailOf } from '@/features/shop/model/shopSelection'
 import type { PitcherShopTab } from '@/features/shop/model/pitcherShopSelection'
+import { outingBlockReasonOf, outingBlockTextOf, runOuting } from '@/entities/career/model/outing'
+import { OUTING_PLACES } from '@/shared/config/outingPlaces'
+import type { OutingPlace } from '@/shared/config/outingPlaces'
+import { PITCHER_MANAGEMENT_TEXT } from '@/pages/pitcher-league/lib/pitcherManagementMenu'
 
 /**
  * 나만의리그 **투수편**(원본 게임 모드 3, 장면 0x106) 한 판.
@@ -56,9 +60,9 @@ import type { PitcherShopTab } from '@/features/shop/model/pitcherShopSelection'
 /**
  * 화면 유니온 — 원본 장면 0x106 의 상태 번호를 괄호에 적는다.
  *   등록(101~104) · 관리(105) · 경기(144) · 시즌종료(136 자리) · 연말(132) · 엔딩(141) ·
- *   상점(111 장비 상점 / 121 장비착용 — 어느 쪽인지는 `shopTab`)
+ *   상점(111 장비 상점 / 121 장비착용 — 어느 쪽인지는 `shopTab`) · 외출(112 지도 · 113 장소)
  */
-export type PitcherScene = '등록' | '관리' | '경기' | '시즌종료' | '연말' | '엔딩' | '상점'
+export type PitcherScene = '등록' | '관리' | '경기' | '시즌종료' | '연말' | '엔딩' | '상점' | '외출'
 
 export interface PitcherLeagueSession {
   readonly career: PitcherCareer | null
@@ -71,6 +75,8 @@ export interface PitcherLeagueSession {
   readonly shopNotice: string
   /** 상점 GP 결과 창 (0x872a1) — 칸 0~4·6 구매 뒤. 닫아도 굴림 없이 상점 그대로 (0x1d649) */
   readonly shopGpDetail: GpDetailOf<PitcherCareer> | null
+  /** 외출 지도(112·113)에서 마지막으로 고른 장소 기능의 결과·막힘 알림 */
+  readonly outingNotice: string
   readonly actions: {
     readonly create: (name: string, profile: PitcherRookieProfile) => void
     /** 바뀐 커리어를 그대로 저장한다 (구질 훈련처럼 화면이 계산해 돌려줄 때) */
@@ -96,6 +102,12 @@ export interface PitcherLeagueSession {
      */
     readonly purchase: (itemId: string, globalOpenedHiddenIds?: readonly number[]) => void
     readonly closeShopGpDetail: () => void
+    /** 105 커맨드 칸 3 [외출] → 상태 112 외출 지도 (0x126be — 모드 갈림 없음) */
+    readonly openOuting: () => void
+    /** 113 장소 기능 — 가드 0x16cf0 → 효과 0x15234 (→ 입원 회복 0x1575c). 모드 3·4 공용 (`outing.ts`) */
+    readonly runOutingFunction: (functionId: string) => void
+    /** 113 칸 0 [들어가기] — 투수편 이벤트 재생(114)이 아직 없어 알림만 띄운다 (미해결) */
+    readonly enterOutingPlace: (place: OutingPlace) => void
     readonly reset: () => void
   }
 }
@@ -543,6 +555,45 @@ export function usePitcherLeagueSession(
     [career, commit, random, shown],
   )
 
+  /**
+   * **외출 (상태 112 지도 → 113 장소 → 126 기능)** — 원본 모드 3 은 타자편과 같은 상태·같은 코드를 돈다
+   * (105 칸 3 = 0x126be → 0x70, 진입 0x118e4 · 키 0x13ba4 · 0x16c64 · 효과 0x15234 · 입원 회복 0x1575c 에 모드 갈림 없음).
+   * 그래서 지도·장소·효과 표·굴림 차례(인기도 → 평판 → 사기 → 입원이면 질병·부상)를 타자편 `runOuting` 그대로 쓴다.
+   * 서브 아이템 5~9(`기록[0x5d+장소]`) 보정도 거기서 붙는다.
+   *
+   * 외출은 G 를 쓰지 않으므로 지갑 그림자(`shown`)가 아닌 저장 쪽 커리어로 돌리고 그대로 저장한다.
+   * 결과 알림은 타자편 웹(`useCareerSession.runOutingFunction`)과 같은 꼴이다 —
+   * ⚠️ 원본은 126 에서 연출 팝업(0x85074) 뒤 효과 글(StrMODE[22]~[25])을 띄우고 105 로 돌아가는데,
+   *    타자편 웹도 아직 지도에 남아 한 줄 알림만 띄운다. 두 편을 함께 고칠 자리다 (**근사**).
+   */
+  const [outingNotice, setOutingNotice] = useState('')
+  const openOuting = useCallback(() => {
+    setOutingNotice('')
+    setScene('외출')
+  }, [])
+  const runOutingFunction = useCallback(
+    (functionId: string) => {
+      if (career === null) return
+      const outingFunction = OUTING_PLACES.flatMap((place) => place.functions).find(
+        (candidate) => candidate.id === functionId,
+      )
+      if (outingFunction === undefined) return
+      const reason = outingBlockReasonOf(career, outingFunction)
+      if (reason !== null) return setOutingNotice(outingBlockTextOf(reason, outingFunction))
+      commit(runOuting(career, outingFunction, random))
+      setOutingNotice(`${outingFunction.name} — ${outingFunction.description}`)
+    },
+    [career, commit, random],
+  )
+  /*
+   * ⚠️ **미해결**: [들어가기] 는 원본에서 배정된 장소 이벤트(0x8ce58 — 대상 1·3 의 trigger 2~6)를, 없으면
+   * 빈 장소 이벤트 440+장소를 114 로 재생한다 (빈 장소는 행동을 안 쓴다, 0x1c014). 투수편 웹에는 이벤트
+   * 재생(114)·[!] 배정(0x8cdc0)이 아직 없어 알림만 띄운다 — 행동·외출 횟수는 건드리지 않는다.
+   */
+  const enterOutingPlace = useCallback((_place: OutingPlace) => {
+    setOutingNotice(PITCHER_MANAGEMENT_TEXT.notPorted)
+  }, [])
+
   const reset = useCallback(() => {
     setCareer(null)
     setGameOptions(null)
@@ -556,6 +607,7 @@ export function usePitcherLeagueSession(
     shopTab,
     shopNotice,
     shopGpDetail,
+    outingNotice,
     actions: {
       create,
       save: commit,
@@ -570,6 +622,9 @@ export function usePitcherLeagueSession(
       openShop,
       purchase,
       closeShopGpDetail,
+      openOuting,
+      runOutingFunction,
+      enterOutingPlace,
       reset,
     },
   }
