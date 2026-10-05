@@ -11,6 +11,7 @@ import { createLocalStorageSaveGame } from '@/shared/api/save/localStorageSaveGa
 import { createLocalStorageMissionRecord } from '@/shared/api/save/localStorageMissionRecord'
 import { createLocalStorageJsonStore } from '@/shared/api/save/localStorageJsonStore'
 import { useCollection } from '@/app/model/useCollection'
+import { GAME_POINT_USAGE } from '@/entities/collection/model/annalsStats'
 import { isEveryMissionCleared } from '@/entities/mission/model/missionGoal'
 import { aceMatchMissionOf, matchResultEventOf } from '@/entities/story/model/aceMatch'
 import { modeBatterOf } from '@/app/model/modeBatter'
@@ -138,13 +139,16 @@ export function App() {
     openedAcePitcherIds: aceOpen.openedAcePitcherIds,
     openedAceBatterIds: aceOpen.openedAceBatterIds,
     levels: aceLevels.levels,
+    // 0xa41a · 0x5fc1a — 저장 뒤 0x22c29(mgr, 0 마선수, 값) 로 사용처 통계에 적는다
     onOpenAce: (cell: number) => {
       wallet.spend(aceOpenPriceOf(cell))
       aceOpen.open(cell)
+      collection.recordStat({ kind: 'G사용', usage: GAME_POINT_USAGE.ace, amount: aceOpenPriceOf(cell) })
     },
     onLevelUp: (cell: number, cost: number) => {
       wallet.spend(cost)
       aceLevels.levelUp(cell)
+      collection.recordStat({ kind: 'G사용', usage: GAME_POINT_USAGE.ace, amount: cost })
     },
   }
 

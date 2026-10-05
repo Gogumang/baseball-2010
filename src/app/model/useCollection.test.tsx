@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
-import { renderHook } from '@testing-library/react'
+import { act, renderHook } from '@testing-library/react'
 import { mergeOpenedHiddenIds, useCollection } from '@/app/model/useCollection'
 import { normalizeCollection } from '@/entities/collection/model/collection'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
@@ -30,5 +30,17 @@ describe('기록연감 히든 오픈 — 전역 표 app+0xc0 하나', () => {
 
     expect(mergeOpenedHiddenIds(collection, [20, 28, 28]).openedHiddenIds).toEqual([3, 20, 28])
     expect(mergeOpenedHiddenIds(collection, [20])).toBe(collection)
+  })
+})
+
+describe('기록연감 통계 기록 [mgr+0xc8]', () => {
+  it('한 건을 쌓고 곧바로 저장한다 (0x22c29 → 0x1f1e1)', () => {
+    const store = 메모리저장()
+    const { result } = renderHook(() => useCollection(store, null, false))
+
+    act(() => result.current.recordStat({ kind: 'G사용', usage: 0, amount: 3000 }))
+
+    expect(result.current.collection.stats.gamePointUsage[0]).toBe(3000)
+    expect((store.saved as { stats: { gamePointUsage: number[] } }).stats.gamePointUsage[0]).toBe(3000)
   })
 })

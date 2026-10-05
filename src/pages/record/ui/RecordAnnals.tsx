@@ -14,6 +14,11 @@ import {
   tabIconXOf, tabNameXOf, tabSlotXOf,
 } from '@/pages/record/lib/recordAnnalsLayout'
 import { STAT_NAMES } from '@/pages/record/lib/statNames'
+import {
+  INITIAL_SECRET_CODE_STATE, UNLOCKED_STAT_PAGE_COUNT, statNameOffsetOf, statPageCellsOf, statTotalTextOf,
+  statValueTextOf, typeSecretDigit,
+} from '@/pages/record/lib/statCells'
+import type { AnnalsStats } from '@/entities/collection/model/annalsStats'
 import * as styles from '@/pages/record/ui/RecordAnnals.css'
 
 const SLT_FRAME = './sprites/slt_frame'
@@ -41,17 +46,23 @@ interface RecordAnnalsProps {
  * 박스 0 `(2/31/60/89/118, 2, 72, 17)` 을 읽어 확정했다(S12 1절). 간격은 29 다.
  * 원본은 **고른 탭의 이름 하나만** img_text 로 그리고, 안 고른 탭은 막대 그림 안의 아이콘이다.
  *
- * ⚠️ 탭 0 기록·탭 4 통계는 원본이 **달성 횟수**를 보여 주는데 웹은 그 누계를 아직 저장하지 않는다.
- * 이름만 원본 줄 배치로 보여 주고 값은 비워 둔다.
- * 탭 4 의 줄 이름은 StrMAINMENU[129~182] 를 그대로 옮긴 `lib/statNames.ts` 다.
+ * ⚠️ 탭 0 기록은 원본이 **달성 횟수**를 보여 주는데 웹은 그 누계를 아직 저장하지 않는다 — 이름만 보인다.
+ * 탭 4 통계는 칸 번호(쪽 × 8 + 줄)마다 이름·값이 정해진 `lib/statCells.ts` 대로 그린다. 값은 웹이 쌓는
+ * GP 아이템 구매 수·사용처별 소모 GP 만 있고, 플레이 시간·우승 횟수·획득 GP 는 비운다.
+ * 아이템·GP 쪽(2~7)은 숫자 키로 **"1212123"** 을 쳐야 열린다 (`typeSecretDigit`, 0x2b7a0).
+ *   ⚠️ 원본은 센 수·열림 표시를 메인 메뉴 객체에 두어(만들 때 0x234d4 만 지운다) 들어올 때(0x2407c) 버퍼만 비우지만,
+ *   웹은 이 화면을 열 때마다 처음부터 센다 (근사).
  */
 export function RecordAnnals({ collection, onBack }: RecordAnnalsProps) {
   const [tab, setTab] = useState(0)
   const [page, setPage] = useState(0)
   const [cursor, setCursor] = useState(0)
+  const [secretCode, setSecretCode] = useState(INITIAL_SECRET_CODE_STATE)
   const frames = useFrameOrigins(SLT_FRAMES)
   const textFrames = useFrameOrigins(IMG_TEXT)
 
+  // 쪽 넘기기 한도 — 통계 탭은 비밀 번호가 열려 있으면 8쪽 (0x2ba32 · 0x2ba8c). 쪽 번호 "/전체" 는 늘 표 값이다
+  const pageLimit = tab === 4 && secretCode.isUnlocked ? UNLOCKED_STAT_PAGE_COUNT : TAB_PAGE_COUNTS[tab]
   const pageCount = TAB_PAGE_COUNTS[tab]
   const changeTab = (next: number) => {
     setTab((next + TAB_COUNT) % TAB_COUNT)
@@ -69,10 +80,12 @@ export function RecordAnnals({ collection, onBack }: RecordAnnalsProps) {
         event.preventDefault()
         return onBack()
       }
+      // 숫자 키는 아직 안 열렸으면 비밀 번호 버퍼에 쌓인다 (0x2b7b4~0x2b838, 탭과 상관없다)
+      if (/^[0-9]$/.test(event.key)) setSecretCode((previous) => typeSecretDigit(previous, event.key))
       const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
-      if (step !== 0 && pageCount > 0) {
+      if (step !== 0 && pageLimit > 0) {
         event.preventDefault()
-        setPage((previous) => (previous + step + pageCount) % pageCount)
+        setPage((previous) => (previous + step + pageLimit) % pageLimit)
       }
     }
     window.addEventListener('keydown', onKeyDown)
@@ -169,9 +182,9 @@ export function RecordAnnals({ collection, onBack }: RecordAnnalsProps) {
         />
       )}
 
-      {(tab === 0 || tab === 4) && (
-        <ListRows page={page} names={tab === 0 ? RECORD_NAMES : STAT_NAMES} />
-      )}
+      {tab === 0 && <ListRows page={page} names={RECORD_NAMES} />}
+
+      {tab === 4 && <StatRows page={page} stats={collection.stats} />}
 
       {tab === 1 && (
         <>
@@ -193,9 +206,15 @@ export function RecordAnnals({ collection, onBack }: RecordAnnalsProps) {
         <TotalRow
           frames={frames}
           textFrames={textFrames}
-          owned={tab === 2 ? collection.skills.length : collection.titles.length}
-          total={tab === 2 ? ORIGINAL_SKILLS.length : TITLE_NAMES.length}
+          value={tab === 2
+            ? `${collection.skills.length}/${ORIGINAL_SKILLS.length}`
+            : `${collection.titles.length}/${TITLE_NAMES.length}`}
         />
+      )}
+
+      {tab === 4 && (
+        // 통계 합계는 `"!R!cFFFF00…G"` 오른쪽 맞춤 (0x58870)
+        <TotalRow frames={frames} textFrames={textFrames} value={statTotalTextOf(page) ?? ''} isRightAligned />
       )}
 
       <Button variant="corner" className={styles.backButton} onClick={onBack}>
@@ -315,14 +334,39 @@ function ListRows({ page, names }: { readonly page: number; readonly names: read
   )
 }
 
+/** 통계 탭의 1열 8줄 — 칸 번호 = 쪽 × 8 + 줄, 빈 번호는 아무것도 안 그린다 (0x7a08c) */
+function StatRows({ page, stats }: { readonly page: number; readonly stats: AnnalsStats }) {
+  return (
+    <>
+      {statPageCellsOf(page).map((cell, row) => {
+        if (cell === null) return null
+        const top = LIST_GRID.firstY + LIST_GRID.step * row
+        const value = cell.valueOf(stats)
+        return (
+          <div key={cell.nameIndex}>
+            <div className={styles.rowText} style={{ left: LIST_GRID.x, top, width: LIST_GRID.width }}>
+              {STAT_NAMES[statNameOffsetOf(cell)]}
+            </div>
+            {value !== null && (
+              <div className={styles.statValue} style={{ left: LIST_GRID.x, top, width: LIST_GRID.width }}>
+                {statValueTextOf(cell.valueKind, value)}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </>
+  )
+}
+
 /** 아래 합계 줄 — 프레임 15 + 노란 네모 38 + img_text 269 "전체합계", 값은 노랑 */
 function TotalRow({
-  frames, textFrames, owned, total,
+  frames, textFrames, value, isRightAligned = false,
 }: {
   readonly frames: ReturnType<typeof useFrameOrigins>
   readonly textFrames: ReturnType<typeof useFrameOrigins>
-  readonly owned: number
-  readonly total: number
+  readonly value: string
+  readonly isRightAligned?: boolean
 }) {
   return (
     <>
@@ -333,8 +377,9 @@ function TotalRow({
         x={TOTAL_ROW.labelX} y={TOTAL_ROW.y} />
       <FrameSprite folder={SLT_FRAMES} frame={TOTAL_ROW.frame} origins={frames}
         x={TOTAL_ROW.frameX} y={TOTAL_ROW.y - 3} />
-      <div className={styles.totalValue} style={{ left: TOTAL_ROW.frameX, top: TOTAL_ROW.y + 1, width: 101 }}>
-        {owned}/{total}
+      <div className={styles.totalValue}
+        style={{ left: TOTAL_ROW.frameX, top: TOTAL_ROW.y + 1, width: 101, textAlign: isRightAligned ? 'right' : undefined }}>
+        {value}
       </div>
     </>
   )

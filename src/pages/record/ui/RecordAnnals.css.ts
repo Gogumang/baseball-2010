@@ -71,6 +71,17 @@ export const rowText = style({
   pointerEvents: 'none',
 })
 
+/** 통계 줄 값 `"!R!cffff00…"` — 노랑 오른쪽 맞춤 (0x7a08c) */
+export const statValue = style({
+  position: 'absolute',
+  color: ORIGINAL_COLORS.highlightYellow,
+  textAlign: 'right',
+  fontSize: '11px',
+  lineHeight: '11px',
+  whiteSpace: 'nowrap',
+  pointerEvents: 'none',
+})
+
 /** `"!C!cffff00%d/%d"` — 합계는 노랑 가운데 */
 export const totalValue = style({
   position: 'absolute',

@@ -10,6 +10,7 @@ import {
   cellPositionOf, tabIconXOf, tabNameXOf, tabSlotXOf,
 } from '@/pages/record/lib/recordAnnalsLayout'
 import { STAT_NAMES } from '@/pages/record/lib/statNames'
+import { applyAnnalsStat } from '@/entities/collection/model/annalsStats'
 
 /**
  * 기록연감 (0x2e29c — P6 2c). 탭 다섯이 192 판 위에 놓이고
@@ -108,8 +109,59 @@ describe('기록연감 칸 격자', () => {
     expect(STAT_NAMES).toHaveLength(182 - 129 + 1)
     expect(STAT_NAMES[0]).toBe('일반 모드')
     expect(STAT_NAMES[STAT_NAMES.length - 1]).toBe('선물 받은 GP')
-    // 한 쪽은 8줄이다 (0x79ed5 … 18, 1열, 8줄)
-    for (const name of STAT_NAMES.slice(0, 8)) expect(screen.getByText(name)).toBeTruthy()
+    // 쪽 0 = 칸 0~6 플레이 시간 [129]~[135] — 칸 7 은 비어 있다 (0x7a08c)
+    for (const name of STAT_NAMES.slice(0, 7)) expect(screen.getByText(name)).toBeTruthy()
+    expect(screen.queryByText(STAT_NAMES[7])).toBeNull()
+  })
+
+  it('통계 탭은 비밀 번호 없이 2쪽만 돈다 — 쪽 1 은 [136]~[140] 다섯 줄', () => {
+    띄우기()
+    fireEvent.click(screen.getByRole('button', { name: '통계' }))
+
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(screen.getByText('2/2')).toBeTruthy()
+    expect(screen.getByText('나리 타자편 우승')).toBeTruthy()
+    expect(screen.getByText('이벤트 미션 다운')).toBeTruthy()
+
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(screen.getByText('1/2')).toBeTruthy()
+  })
+
+  it('"1212123" 을 치면 아이템·GP 쪽이 열린다 — 쪽 번호 전체는 표 값 2 그대로 (0x2e6c8)', () => {
+    const stats = applyAnnalsStat(EMPTY_COLLECTION.stats, { kind: 'GP아이템구매', mode: 4, index: 1, price: 300 })
+    띄우기({ collection: { ...EMPTY_COLLECTION, stats } })
+    fireEvent.click(screen.getByRole('button', { name: '통계' }))
+    for (const key of '1212123') fireEvent.keyDown(window, { key })
+
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+
+    expect(screen.getByText('3/2')).toBeTruthy()
+    expect(screen.getByText('타자 붕붕드링크')).toBeTruthy()
+    expect(screen.getByText('1개')).toBeTruthy()
+  })
+
+  it('비밀 번호가 틀리면 열리지 않는다 — 다시 쳐도 센 수가 7 에 멈춰 있다', () => {
+    띄우기()
+    fireEvent.click(screen.getByRole('button', { name: '통계' }))
+    for (const key of '12121241212123') fireEvent.keyDown(window, { key })
+
+    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+    expect(screen.getByText('2/2')).toBeTruthy()
+  })
+
+  it('마지막 쪽(소모 GP)은 사용처별 값을 보이고 합계는 원본 버그대로 0G 다', () => {
+    const stats = applyAnnalsStat(EMPTY_COLLECTION.stats, { kind: 'G사용', usage: 0, amount: 3000 })
+    띄우기({ collection: { ...EMPTY_COLLECTION, stats } })
+    fireEvent.click(screen.getByRole('button', { name: '통계' }))
+    for (const key of '1212123') fireEvent.keyDown(window, { key })
+
+    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+
+    expect(screen.getByText('마선수 소모 GP')).toBeTruthy()
+    expect(screen.getByText('3000G')).toBeTruthy()
+    // 나머지 일곱 줄 0G + 합계 0G
+    expect(screen.getAllByText('0G')).toHaveLength(8)
   })
 
   it('스킬·닉네임 탭은 아래에 전체합계를 보여 준다', () => {

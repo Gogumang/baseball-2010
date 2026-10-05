@@ -517,8 +517,9 @@ export function equippedPlusSkillCountOf(career: Pick<PlayerCareer, 'equippedSki
  * 보유 여부는 보지 않는다 — 부르는 쪽(획득 0xa4bd8 · 창 0x147b0)이 맞춘다.
  * 모드 3(투수편)도 같은 함수를 탄다 — 갈림은 팀 칸 고르기(모드 4 0xb53d1 · 모드 3 0xb51fd(팀, 0))뿐이라 칸 꼴만 받는다.
  *
- * ⚠️ 원본은 켤 때 저장 +0xf4~0xfb 에도 같은 비트를 OR 한다(뜻 미해결 — "한 번이라도 장착" 계열로 보임)
- *    · 모드 4 면 팀 로스터 칸(0xb53d1)에도 켠다(같은 칸인지 유력). 웹은 둘 다 두지 않는다.
+ * ⚠️ 원본은 켤 때 통계 기록 `[mgr+0xc8]` 의 +0xf4(모드 4)·+0xf8(모드 3) 에도 같은 비트를 OR 한다 — "한 번이라도 켠 스킬",
+ *    읽는 곳은 전부 수집 보상 k=5 "스킬 모두 수집"(0x28f8a) 하나다. 저장 칸·함수는 `collection/model/annalsStats.ts`
+ *    (`markSkillEquipped`)에 있고 **부르는 자리는 아직 잇지 않았다** · 모드 4 면 팀 로스터 칸(0xb53d1)에도 켠다(같은 칸인지 유력).
  */
 export function setSkillEquipped<T extends Pick<PlayerCareer, 'equippedSkillIds' | 'skillSlotLevel'>>(
   career: T,

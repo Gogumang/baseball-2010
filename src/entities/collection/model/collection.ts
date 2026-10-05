@@ -1,5 +1,7 @@
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
+import { EMPTY_ANNALS_STATS, normalizeAnnalsStats } from '@/entities/collection/model/annalsStats'
+import type { AnnalsStats } from '@/entities/collection/model/annalsStats'
 
 /**
  * 스페셜 메뉴의 기록연감·명예의 전당 (StrHOWTO[28]). 선수 한 명이 아니라 게임 전체에 쌓인다.
@@ -23,9 +25,13 @@ export interface Collection {
   readonly hallOfFame: readonly HallOfFamer[]
   /** 열린 히든 id (0x62368 — 원본 전역 저장) */
   readonly openedHiddenIds: readonly number[]
+  /** 통계 기록 `[mgr+0xc8]` 중 웹이 채우는 칸 — GP 아이템 구매 수·G 사용처·켠 스킬 비트 (`annalsStats.ts`) */
+  readonly stats: AnnalsStats
 }
 
-export const EMPTY_COLLECTION: Collection = { titles: [], skills: [], endings: [], hallOfFame: [], openedHiddenIds: [] }
+export const EMPTY_COLLECTION: Collection = {
+  titles: [], skills: [], endings: [], hallOfFame: [], openedHiddenIds: [], stats: EMPTY_ANNALS_STATS,
+}
 
 const union = <T>(left: readonly T[], right: readonly T[]): T[] => [...new Set([...left, ...right])]
 
@@ -96,5 +102,12 @@ export function normalizeCollection(raw: unknown): Collection {
   }
   const hallOfFame = Array.isArray(candidate.hallOfFame) ? candidate.hallOfFame.filter(isHallOfFamer) : []
   const openedHiddenIds = isNumberArray(candidate.openedHiddenIds) ? candidate.openedHiddenIds : []
-  return { titles: candidate.titles, skills: candidate.skills, endings: candidate.endings, hallOfFame, openedHiddenIds }
+  return {
+    titles: candidate.titles,
+    skills: candidate.skills,
+    endings: candidate.endings,
+    hallOfFame,
+    openedHiddenIds,
+    stats: normalizeAnnalsStats(candidate.stats),
+  }
 }

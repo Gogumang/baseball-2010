@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   mergeCareerIntoCollection,
   normalizeCollection,
@@ -6,6 +6,8 @@ import {
   registerHallOfFame,
 } from '@/entities/collection/model/collection'
 import type { Collection } from '@/entities/collection/model/collection'
+import { applyAnnalsStat } from '@/entities/collection/model/annalsStats'
+import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 
@@ -61,5 +63,10 @@ export function useCollection(
     return result.kind
   }
 
-  return { collection, register }
+  /** 통계 기록 `[mgr+0xc8]` 에 한 건 쌓는다 (0x22e35 · 0x22c29 · 0xb663c) — 원본도 곧바로 저장(0x1f1e1)한다 */
+  const recordStat = useCallback((event: AnnalsStatEvent) => {
+    setCollection((previous) => ({ ...previous, stats: applyAnnalsStat(previous.stats, event) }))
+  }, [])
+
+  return { collection, register, recordStat }
 }
