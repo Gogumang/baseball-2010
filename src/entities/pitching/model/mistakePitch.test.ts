@@ -6,7 +6,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 const 보통: MistakePitchInput = {
   isMagicPitch: false,
   grade: 3,
-  effectiveControl: 500,
+  effectiveVelocity: 500,
   runnerCount: 0,
   hasSecondBaseRunner: false,
   batterIntimidates: false,
@@ -35,17 +35,17 @@ describe('실투 확률 p — 원본 0x33cbc', () => {
     // t=1: 500 × 80% = 400 → 등급 3 → 8 − 3 + 5 = 10
     expect(mistakePercentOf({ ...보통, grade: 1 })).toBe(10)
     // t=5: 999 × 110% = 1098 → 등급 7 → 8 − 7 − 2 = −1 → 1 로 바닥
-    expect(mistakePercentOf({ ...보통, grade: 5, effectiveControl: 999 })).toBe(1)
+    expect(mistakePercentOf({ ...보통, grade: 5, effectiveVelocity: 999 })).toBe(1)
   })
 
   it('등급 경계는 이하 비교다 — 125 는 0, 126 은 1 (0xbbe98)', () => {
-    expect(mistakePercentOf({ ...보통, effectiveControl: 125 })).toBe(8)
-    expect(mistakePercentOf({ ...보통, effectiveControl: 126 })).toBe(7)
+    expect(mistakePercentOf({ ...보통, effectiveVelocity: 125 })).toBe(8)
+    expect(mistakePercentOf({ ...보통, effectiveVelocity: 126 })).toBe(7)
   })
 
-  it('게이지를 안 누르면(t = 0) 제구와 무관하게 20', () => {
-    expect(mistakePercentOf({ ...보통, grade: 0, effectiveControl: 999 })).toBe(20)
-    expect(mistakePercentOf({ ...보통, grade: 0, effectiveControl: 0 })).toBe(20)
+  it('게이지를 안 누르면(t = 0) 능력치와 무관하게 20', () => {
+    expect(mistakePercentOf({ ...보통, grade: 0, effectiveVelocity: 999 })).toBe(20)
+    expect(mistakePercentOf({ ...보통, grade: 0, effectiveVelocity: 0 })).toBe(20)
   })
 
   it('스킬 — 압도 +5 · 안정감(주자 2명↑) −5 · 새가슴(2루 주자) +10 · 냉정 −10', () => {

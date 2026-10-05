@@ -10,7 +10,7 @@ import { abilityGradeOf } from '@/entities/fielding/model/fieldGeometry'
  *
  * ```
  * 33cc8  if scene[+0xfc8](구질) == 22: scene[+0x19d4] = 0; return 0      ; 마구는 실투 없음 (굴림도 없다)
- * 33cfc  c = 0xb570d(ctx, 1, 투수, 1, 90, 1)                              ; 경기용 제구 (체력 인자 90 = 피로 감소 없음)
+ * 33cfc  c = 0xb570d(ctx, 1, 투수, 1, 90, 1)                              ; 경기용 **칸 1 = 구속** (체력 인자 90 = 피로 감소 없음)
  * 33d0a  p = 8 − 0xbbe98(0x66d70(c, t)) + 0x66da8(t)                     ; t = scene[+0x17c0] 투구 등급 0~5
  *          0x66d70: t ≤ 5 면 c × 표0xd2589[t] / 100, 아니면 c 그대로
  *          0x66da8: t ≤ 5 면 표0xd257d[t], 아니면 0
@@ -26,16 +26,22 @@ import { abilityGradeOf } from '@/entities/fielding/model/fieldGeometry'
  * 스킬 비트는 0xb62b4(선수, 비트) — 투수 스킬 번호는 비트 + 16 이라 16·17·22 는 skills.json
  * 32 안정감 · 33 새가슴 · 38 냉정 이고, 타자 22 는 22 압도다.
  *
+ * ⚠️ **c 는 제구가 아니라 구속이다** (원본 그대로). 0xb570c 의 둘째 인자 r1 이 칸 번호이고
+ *    (`0xb6415(선수, r1, 1)` → 레코드 `+0xc + 2·칸`), 33cf8 이 `movs r1, #1` 을 넣는다. 투수 칸은
+ *    0 제구 · 1 구속 · 2 변화 · 3 체력이다 (R7 3절 — 아이템 붕붕드링크가 +0xe = 구속을 올린다).
+ *    같은 투구 순간의 등급 뽑기 0x4dbac 은 `movs r1, #0`(4dc26) 으로 **제구**를 본다 — 두 자리가
+ *    서로 다른 칸을 본다. 배율표 0xd2589 를 거치는 0x66d70 도 구속 단계가 쓰는 함수다.
+ *    Q1 문서와 bbaac91 은 이 값을 "제구" 라 적었지만 칸 번호가 1 이다 — 지어내지 않고 칸 그대로 따른다.
  * ⚠️ 원본 그대로: 36 더티볼(설명 "실투율 +5%", 투수 비트 20)은 이 함수가 **보지 않는다**.
  * ⚠️ 주자 수 0xa9889 는 "루 0~3 중 주자가 있는 칸 수" 다 (I-controls). 투구 순간에는 0(타자)
  *    칸이 비어 있어 1~3루 주자 수와 같다고 보고 부르는 쪽이 그 값을 넘긴다.
  */
 
-/** 표 0xd2589 (s8) — 등급 t 별 제구 배율 % */
-const CONTROL_PERCENT_BY_GRADE: readonly number[] = [70, 80, 90, 100, 105, 110]
+/** 표 0xd2589 (s8) — 등급 t 별 능력치 배율 % (0x66d70) */
+const ABILITY_PERCENT_BY_GRADE: readonly number[] = [70, 80, 90, 100, 105, 110]
 /** 표 0xd257d (s8) — 등급 t 별 더하는 값 */
 const MISTAKE_BONUS_BY_GRADE: readonly number[] = [10, 5, 0, 0, -1, -2]
-/** 0x33d14 — 8 − 제구 등급 */
+/** 0x33d14 — 8 − 능력치 등급 */
 const MISTAKE_BASE = 8
 const MISTAKE_FLOOR = 1
 /** 0x33d3e — 게이지를 안 누르면(t = 0) 20 */
@@ -50,8 +56,11 @@ export interface MistakePitchInput {
   readonly isMagicPitch: boolean
   /** 투구 등급 t 0~5 (scene+0x17c0) — 게이지면 `gaugeGradeOf`, 아니면 0x4dbac 값 */
   readonly grade: number
-  /** 경기용 제구 `0xb570d(ctx, 1, 투수, 1, 90, 1)` — 장비·스킬·컨디션 보정 뒤, 체력 감소 없음 */
-  readonly effectiveControl: number
+  /**
+   * 경기용 **구속**(투수 칸 1) `0xb570d(ctx, 1, 투수, 1, 90, 1)` — 장비·스킬·컨디션 보정 뒤,
+   * 체력 감소 없음. ⚠️ 제구가 아니다 (머리 주석)
+   */
+  readonly effectiveVelocity: number
   /** 1~3루 주자 수 (0xa9889) */
   readonly runnerCount: number
   /** 2루 주자가 있는가 (0xa97a1(_, 2)) */
@@ -70,7 +79,7 @@ export interface MistakePitchInput {
 export function mistakePercentOf(input: Omit<MistakePitchInput, 'isMagicPitch'>): number {
   const t = input.grade
   const scaled =
-    t >= 0 && t <= 5 ? Math.trunc((input.effectiveControl * CONTROL_PERCENT_BY_GRADE[t]) / 100) : input.effectiveControl
+    t >= 0 && t <= 5 ? Math.trunc((input.effectiveVelocity * ABILITY_PERCENT_BY_GRADE[t]) / 100) : input.effectiveVelocity
   const bonus = t >= 0 && t <= 5 ? MISTAKE_BONUS_BY_GRADE[t] : 0
   let p = Math.max(MISTAKE_BASE - abilityGradeOf(scaled) + bonus, MISTAKE_FLOOR)
   if (t === 0) p = UNPRESSED_MISTAKE_PERCENT
