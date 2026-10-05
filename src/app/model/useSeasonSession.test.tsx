@@ -149,6 +149,58 @@ describe('시즌 세션', () => {
     expect(상대승).toBe(측 === 0 ? 0 : 1)
   })
 
+  it('관리 메뉴의 다음경기는 0xd8 로 가며 phase 를 4 로 남긴다 — 다시 띄우면 0xd8 이다 (0x4cb8)', () => {
+    const store = 메모리저장()
+    const { result } = 띄우기(store)
+    act(() => result.current.actions.chooseTeam(0))
+
+    act(() => result.current.actions.openNextGame())
+
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.다음경기)
+    expect(result.current.state?.record.phase).toBe(SEASON_PHASE.다음경기)
+    expect(result.current.gameOptions).toBeNull()
+    expect(띄우기(store).result.current.scene).toBe(SEASON_SCENE_STATE.다음경기)
+  })
+
+  it('0xd8 취소는 관리 메뉴에서 왔을 때만 돌아간다 (0x48ea) — phase 도 3 으로', () => {
+    const { result } = 띄우기()
+    act(() => result.current.actions.chooseTeam(0))
+    act(() => result.current.actions.openNextGame())
+
+    act(() => result.current.actions.cancelNextGame())
+
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.관리메뉴)
+    expect(result.current.state?.record.phase).toBe(SEASON_PHASE.기본)
+  })
+
+  it('홀수 경기 뒤 0xd8 은 취소가 안 먹고, 확인하면 경기로 간다', () => {
+    const { result } = 띄우기()
+    act(() => result.current.actions.chooseTeam(0))
+    act(() => result.current.actions.playNextGame())
+    act(() => result.current.actions.finishGame(요약()))
+    act(() => result.current.actions.confirmIncome(result.current.state!.record))
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.다음경기)
+    expect(result.current.state?.record.phase).toBe(SEASON_PHASE.다음경기)
+
+    act(() => result.current.actions.cancelNextGame())
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.다음경기)
+
+    act(() => result.current.actions.confirmNextGame())
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.경기직전)
+    expect(result.current.gameKind).toBe('정규')
+  })
+
+  it('포스트시즌 중 0xd8 확인은 결산 0xef 로 간다 (0x48fc SR+0xb4)', () => {
+    const { result } = 띄우기()
+    act(() => result.current.actions.chooseTeam(0))
+    act(() => result.current.actions.updateRecord({ ...result.current.state!.record, inPostseason: true }))
+    act(() => result.current.actions.goto(SEASON_SCENE_STATE.다음경기))
+
+    act(() => result.current.actions.confirmNextGame())
+
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.시즌결산)
+  })
+
   it('수입을 확인하면 2경기 주기에 따라 다음이 갈린다 (afterGameNext)', () => {
     const { result } = 띄우기()
     act(() => result.current.actions.chooseTeam(0))

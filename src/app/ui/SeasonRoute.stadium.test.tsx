@@ -71,7 +71,8 @@ function 시즌화면({ store }: { readonly store: JsonStorePort }) {
 function 경기를연다(record: SeasonRecord) {
   받은Prop.값 = undefined
   render(<시즌화면 store={메모리저장({ state: { record } })} />)
-  fireEvent.click(screen.getByRole('button', { name: 'OK' }))
+  // 다음경기 0xd8 의 확인 (키 0x48d0 −5)
+  fireEvent.click(screen.getByRole('button', { name: '확인' }))
   return 받은Prop.값
 }
 

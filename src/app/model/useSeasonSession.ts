@@ -118,6 +118,12 @@ export interface SeasonActions {
   /** 트레이드 한 번이 끝났다 (0xe7) — 커맨드 표시·명단·G 를 **한 번에** 적어 넣는다 */
   readonly finishTrade: (settlement: TradeSettlement) => void
   readonly playNextGame: () => void
+  /** 관리 메뉴의 "다음경기" — 다음경기 화면 0xd8 로 (들어옴 0x4cb8: phase = 4 · 저장) */
+  readonly openNextGame: () => void
+  /** 다음경기 화면의 확인 (0x48d0) — 포스트시즌이면 결산 0xef, 아니면 경기로 */
+  readonly confirmNextGame: () => void
+  /** 다음경기 화면의 취소 (0x48ea) — 관리 메뉴에서 왔을 때만 관리 메뉴로 돌아간다 */
+  readonly cancelNextGame: () => void
   readonly confirmIncome: (record: SeasonRecord) => void
   /** 국가대항전 한 경기 — 사람이 대표팀을 조작한다 */
   readonly playCupGame: (myTeam: number, opponent: number) => void
@@ -279,6 +285,11 @@ export function useSeasonSession(
    * 지갑을 넘기면 이 칸은 놀고 `wallet.balance` 가 유일한 값이다.
    */
   const [ownGamePoints, setOwnGamePoints] = useState(0)
+  /**
+   * 다음경기 화면(0xd8)에 **관리 메뉴에서** 들어왔는가 — 원본 키 0x48ea 가 보는 이전 상태
+   * `this+0x24 == 0xc9` 자리다. 경기 뒤(0xf1)·저장에서 바로 들어오면 거짓이라 취소가 안 먹는다.
+   */
+  const [nextGameFromMenu, setNextGameFromMenu] = useState(false)
   /** 전역 저장 app+0xe0 — 열린 구장 히든 아이템 id (S3 7절). 위 칸과 같은 자리에 둔다 */
   const [openedStadiumIds, setOpenedStadiumIds] = useState<readonly number[]>([])
 
@@ -454,6 +465,54 @@ export function useSeasonSession(
   }, [clearGameRecord, optionsFor, save])
 
   /**
+   * 다음경기 화면 0xd8 에 들어간다 — 들어옴 `0x4cb8`:
+   * ```
+   * 4cc2  SR+0x50(phase) = 4
+   * 4cc8  이전 상태 ≠ 0xd7 이면 0x1fded(app) · 0x22755(app, 1)   ; 저장
+   * 4ce0  [this+0x90] vtable+0x14(0, 0)                          ; 보조 객체 초기화(뜻 미해독)
+   * ```
+   * phase 4 가 저장에 남으므로 이 화면에서 끄고 다시 들어오면 **관리 메뉴가 아니라 0xd8** 로 온다
+   * (진입 분기 0xcb 는 짝수 경기라도 phase ∈ {1,3} 일 때만 관리 메뉴다).
+   */
+  const nextGameEntered = useCallback(
+    (current: SeasonSave, fromMenu: boolean) => {
+      commit({
+        ...current,
+        state: { ...current.state, record: { ...current.state.record, phase: SEASON_PHASE.다음경기 } },
+      })
+      setNextGameFromMenu(fromMenu)
+      setScene(SEASON_SCENE_STATE.다음경기)
+    },
+    [commit],
+  )
+
+  const openNextGame = useCallback(() => {
+    if (save === null) return
+    nextGameEntered(save, true)
+  }, [nextGameEntered, save])
+
+  /** 확인 `0x48fc`: `SR+0xb4`(포스트시즌) ? 0xef : (this+0x11c = 1, 0xd7 선수단 → 0xdd → 경기) */
+  const confirmNextGame = useCallback(() => {
+    if (save === null) return
+    if (save.state.record.inPostseason) return setScene(SEASON_SCENE_STATE.시즌결산)
+    // ⚠️ 0xd7 선수단(경기 전 엔트리)·0xdd 경기정보 화면은 웹에 없어 곧장 경기로 간다
+    playNextGame()
+  }, [playNextGame, save])
+
+  /**
+   * 취소 `0x48ea`: 이전 상태가 0xc9 일 때만 0xc9 로 돌아간다. 관리 메뉴 갱신이 phase 를 3 으로
+   * 되쓰므로(0x4f8c) 같이 3(기본)으로 돌려 둔다 — 안 그러면 다시 띄울 때 0xd8 로 샌다.
+   */
+  const cancelNextGame = useCallback(() => {
+    if (save === null || !nextGameFromMenu) return
+    commit({
+      ...save,
+      state: { ...save.state, record: { ...save.state.record, phase: SEASON_PHASE.기본 } },
+    })
+    setScene(SEASON_SCENE_STATE.관리메뉴)
+  }, [commit, nextGameFromMenu, save])
+
+  /**
    * 경기가 끝났다 — 원본 차례 그대로 정산한다:
    * 내 경기를 전적에 넣고, 같은 날 나머지 네 경기를 돌리고(0xc2a48 — 승패 뒤집힘 버그 포함),
    * 선수 기록표에 **양 팀 타석**을 쌓고(0xa8024), 평가(0xa719c)를 얹은 뒤 관중수입(0xe9)으로 간다.
@@ -603,9 +662,12 @@ export function useSeasonSession(
         // 원본 시즌 끝 사슬의 첫 칸 (0xee → 시상 셋 → 정규시즌순위 → 결산)
         return setScene(SEASON_END_CHAIN[0].state)
       }
-      setScene(afterGameNext(settled))
+      const next = afterGameNext(settled)
+      // 홀수 경기 뒤는 관리 메뉴를 건너뛰고 곧장 0xd8 — 들어옴 0x4cb8 이 phase 를 4 로 둔다
+      if (next === SEASON_SCENE_STATE.다음경기) return nextGameEntered({ ...save, state: { ...save.state, record: settled } }, false)
+      setScene(next)
     },
-    [commit, gameKind, random, save],
+    [commit, nextGameEntered, save],
   )
 
   /**
@@ -910,7 +972,8 @@ export function useSeasonSession(
     cup: save?.cup ?? null,
     notice,
     actions: {
-      chooseTeam, goto, updateRecord, updateRoster, finishTrade, playNextGame, confirmIncome,
+      chooseTeam, goto, updateRecord, updateRoster, finishTrade, playNextGame,
+      openNextGame, confirmNextGame, cancelNextGame, confirmIncome,
       playCupGame, finishCup, finishGame, continuePostseason,
       runTraining, runOuting, nextSeasonEndStep, awardLeagueFirst, spendGamePoint, finishSeason,
       openStadiumItems, markEndingSeen, clearNotice, quit,

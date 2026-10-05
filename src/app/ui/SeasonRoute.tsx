@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import {
-  GameIncomeScreen, PlayerRecruitScreen, PostseasonStartScreen, RegularSeasonRankScreen,
+  GameIncomeScreen, NextGameScreen, PlayerRecruitScreen, PostseasonStartScreen, RegularSeasonRankScreen,
   SeasonEndingScreen, SeasonGoalsScreen, SeasonItemMenuScreen, SeasonManagementScreen, SeasonMvpScreen,
   SeasonOutingScreen, SeasonSummaryScreen, SeasonTeamMenuScreen, SeasonTitleAwardScreen,
   SeasonTrainingScreen, StadiumShopScreen, TradeScreen, CoachHireScreen, SEASON_MVP_LEADER_KINDS,
@@ -11,10 +11,9 @@ import { leaderOf } from '@/entities/awards/model/leaderboard'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { TeamSelectScreen } from '@/pages/create-player/ui/TeamSelectScreen'
 import { MessageBox, RawScreen } from '@/shared/ui'
-import { SEASON_SCENE_STATE, seasonOpponentOf } from '@/entities/season-mode/model/seasonStateMachine'
+import { SEASON_SCENE_STATE } from '@/entities/season-mode/model/seasonStateMachine'
 import { applySeasonReward, judgeSeasonEnding } from '@/entities/season-mode/model/seasonRewards'
 import type { PostseasonSeries } from '@/entities/league/model/league'
-import { TEAMS } from '@/shared/config/original/teams'
 import { NationalCupScreen } from '@/pages/national-cup/ui/NationalCupScreen'
 import { TeamGameScreen } from '@/pages/team-game/ui/TeamGameScreen'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -71,7 +70,8 @@ export function SeasonRoute({ session, random, gameSettings, onExit }: SeasonRou
       <SeasonManagementScreen
         state={state}
         onSelect={(item, target) => {
-          if (item === '다음경기') return actions.playNextGame()
+          // 관리 메뉴 칸 5 → 0xd8 다음경기 (점프표 0xcbe40). 경기는 그 화면의 확인에서 시작한다
+          if (item === '다음경기') return actions.openNextGame()
           actions.goto(target)
         }}
         onExit={onExit}
@@ -336,17 +336,8 @@ export function SeasonRoute({ session, random, gameSettings, onExit }: SeasonRou
   }
 
   if (scene === SEASON_SCENE_STATE.다음경기) {
-    // ⚠️ 다음경기 화면(0xd8 — 상대·선발 소개)은 웹에 아직 없다. 확인 한 번으로 경기를 치른다
-    const opponent = TEAMS[seasonOpponentOf(state.record)]?.name ?? ''
-    return (
-      <RawScreen>
-        <MessageBox
-          text={`${state.record.games + 1}번째 경기!N상대: ${opponent}`}
-          buttons={['OK']}
-          onAnswer={actions.playNextGame}
-        />
-      </RawScreen>
-    )
+    // 0xd8 — 리그 순위표 한 장 (그림 0xae24 → 0x7f070). 확인은 경기로, 취소는 관리 메뉴에서 왔을 때만
+    return <NextGameScreen league={league} onConfirm={actions.confirmNextGame} onCancel={actions.cancelNextGame} />
   }
 
   return (

@@ -119,3 +119,7 @@ export type {
 export {
   HALL_OF_FAME_BATTER_SLOTS, HALL_OF_FAME_PITCHER_SLOTS,
 } from '@/widgets/season/lib/recruitList'
+
+/** 다음경기 0xd8 — 순위표 한 장 (그림 0xae24 · 키 0x48d0) */
+export { NextGameScreen } from '@/pages/season/ui/NextGameScreen'
+export type { NextGameScreenProps } from '@/pages/season/ui/NextGameScreen'
