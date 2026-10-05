@@ -1,11 +1,11 @@
 import { TEAMS } from '@/shared/config/original/teams'
 import type { PlayerSide } from '@/entities/game/model/gameState'
-import { DEFAULT_PLAYER_SIDE, startsToday } from '@/features/play-pitcher-game/model/pitcherGameFlow'
+import { startsToday } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import type {
   PitcherGameOptions,
   PitcherGameSummary,
 } from '@/features/play-pitcher-game/model/pitcherGameFlow'
-import { leagueGamePlayerSideOf } from '@/entities/career/model/leagueGameSetup'
+import { leagueDayCounterOf, leagueGamePlayerSideOf } from '@/entities/career/model/leagueGameSetup'
 import { magicPitchCountOf } from '@/entities/pitcher-career/model/magicPitch'
 import { isMyStartDay } from '@/entities/pitcher-career/model/pitcherRotation'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
@@ -28,7 +28,8 @@ import type { PitcherCareer, PitcherGameOutcome } from '@/entities/pitcher-caree
  * playerSide      내 팀의 측 = 0xb7844(L, 내 팀) — 1 홈(후공) · 0 원정(선공) (`leagueGamePlayerSideOf`)
  * opponentTeamId  일정표(0xd89cb)나 지금 포스트시즌 시리즈 — nextPitcherOpponentOf
  * careerYearIndex 연차 idx = 레코드 +0xb3 (0부터) — 0xab214 의 내 투수 보너스 400 − 40×연차
- * dayCounter      리그 날짜 카운터 g = 시즌+0xb2. 하루 끝 0xb818c 가 +1 하므로 **지금까지 치른 경기 수**다
+ * dayCounter      리그 날짜 카운터 g = 시즌+0xb2. 정규시즌은 **지금까지 치른 경기 수**(하루 끝 0xb818c 가 +1),
+ *                 포스트시즌은 그 시리즈에서 치른 경기 수 (`leagueDayCounterOf`)
  * role/positionCode  레코드 +0xb&3 · +0xa&0x1f
  * stats           0xb570c 를 체력% 피로 앞까지 — 0xb6415(P, i, 1)(장비·장착 스킬) → 질병 → 부상 → 사기.
  *                 끝 자르기(0..999)는 피로 뒤 `fatiguedStatsOf` 가 한다 (냉정 22 제구는 999 를 넘을 수 있다)
@@ -94,14 +95,15 @@ export function pitcherGameOptionsOf(
   return {
     ourTeamId: career.teamId,
     opponentTeamId: settings.opponentTeamId ?? nextPitcherOpponentOf(career),
-    // 내 팀의 측 — 경기 준비 0x1c46c(0x1c4f0)의 `0xb7844(L, 내 팀)`. 정규시즌은 일정표 0xd89cb · 9일 주기 뒤집기다
-    // (`leagueGamePlayerSideOf`). 포스트시즌은 아직 예전처럼 후공이다
-    playerSide:
-      settings.playerSide ?? (career.postseason === null ? leagueGamePlayerSideOf(career) : DEFAULT_PLAYER_SIDE),
+    // 내 팀의 측 — 경기 준비 0x1c46c(0x1c4f0)의 `0xb7844(L, 내 팀)` (모드 3·4 공용). 정규시즌은 일정표 0xd89cb ·
+    // 9일 주기 뒤집기, 포스트시즌은 대진 윗 시드(칸 0)가 홈·후공 · 아랫 시드가 원정·선공이다 (`leagueGamePlayerSideOf`)
+    playerSide: settings.playerSide ?? leagueGamePlayerSideOf(career),
     role: career.role,
     positionCode: career.positionCode,
-    // g = 시즌+0xb2. 시즌 첫 경기가 0 이고 하루가 끝날 때마다 1 늘어난다 (0xb818c)
-    dayCounter: career.gamesPlayed,
+    // g = 시즌+0xb2(= L+0x32) — 경기 준비 0x1c46c 가 0x1c576 에서 읽는다 (모드 3·4 공용). 정규시즌은 치른 경기 수,
+    // 포스트시즌은 **시리즈 안 경기 수**다: 대진 0xb80a8 이 0(b811c), 시리즈 끝 0xb7724 가 −1(b777a), 하루 끝 +1(b819a).
+    // 커리어 `gamesPlayed` 는 내 경기만 세므로 포스트시즌 g 가 아니다 (`leagueDayCounterOf`, 타자편 5b78dc1 과 같다)
+    dayCounter: leagueDayCounterOf(career),
     // 0xab214 내 투수 보너스 aP = 400 − 40 × rec[0xb3] — +0xb3 은 연차 idx(0부터, A 0절 "+0x33 = +0xb3")
     careerYearIndex: career.season - 1,
     isPostseason: career.postseason !== null,

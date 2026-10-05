@@ -10,7 +10,7 @@ import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCare
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import { DEFAULT_PLAYER_SIDE, startPitcherGame } from '@/features/play-pitcher-game/model/pitcherGameFlow'
-import { opponentOf } from '@/entities/league/model/league'
+import { opponentOf, startPostseason } from '@/entities/league/model/league'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
@@ -48,6 +48,18 @@ describe('경기 옵션 조립 — 커리어 → PitcherGameOptions', () => {
 
   it('날짜 카운터 g 는 지금까지 치른 경기 수다 (시즌+0xb2, 0xb818c 가 +1)', () => {
     expect(pitcherGameOptionsOf(투수({ gamesPlayed: 7 })).dayCounter).toBe(7)
+  })
+
+  it('포스트시즌 g 는 시리즈 안 경기 수, 측은 대진 시드 — 윗 시드 후공 · 아랫 시드 선공 (L+0x32 · 0xb7844)', () => {
+    // 준PO 3위(2) 대 4위(3), 한 경기씩 나눠 가진 셋째 경기
+    const series = { ...startPostseason([0, 1, 2, 3]), wins: [1, 1] as const }
+    const 윗시드 = pitcherGameOptionsOf(투수({ teamId: 2, gamesPlayed: 47, postseason: series }))
+    expect(윗시드.dayCounter).toBe(2)
+    expect(윗시드.playerSide).toBe(PLAYER_SIDE_LAST_BAT)
+    expect(윗시드.isPostseason).toBe(true)
+    const 아랫시드 = pitcherGameOptionsOf(투수({ teamId: 3, gamesPlayed: 47, postseason: series }))
+    expect(아랫시드.dayCounter).toBe(2)
+    expect(아랫시드.playerSide).toBe(PLAYER_SIDE_FIRST_BAT)
   })
 
   it('연차 idx 는 레코드 +0xb3 = 시즌 − 1 이다 (0xab214 내 투수 보너스 400 − 40×연차)', () => {
