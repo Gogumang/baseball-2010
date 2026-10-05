@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   applyPlayerOutcome,
+  opponentPitcherAbilityOf,
   resolveDefensePlay,
   startGame,
   startPlayerOutcome,
@@ -10,6 +11,8 @@ import {
 import { EMPTY_AT_BAT_PITCH_TALLY, tallyPitch } from '@/features/play-at-bat/model/atBatPitchTally'
 import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
 import { gamePointRewardOf } from '@/entities/career/model/playerCareer'
+import { teamPitchers } from '@/entities/team/model/teamRoster'
+import { ROSTER_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import { isPlayerTurn, PLAYER_BATTING_ORDER_INDEX, PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
@@ -793,5 +796,28 @@ describe('기록달성 남은 것 — 타자편 배선 (6·7 백투백 · 8·24 
 
     expect(미룸.pendingDefensePlay).not.toBeNull()
     expect(미룸.recordIds.slice(n)).toEqual([32])
+  })
+})
+
+describe('내 타석의 상대 투수 — 지금 마운드 투수의 능력치 (0xae83c)', () => {
+  it('로스터 투수 밑값 ÷ 10 과 그 레코드의 구질 표를 넘긴다', () => {
+    const progress = startGame(createSeededRandom(1), 0, 9, 3)
+    const slot = progress.opponentMound.pitcherSlot
+    const 투수 = teamPitchers(3)[slot]
+    const 능력 = opponentPitcherAbilityOf(progress)
+
+    expect(능력.control).toBe(Math.round(투수.ability[0] / 10))
+    expect(능력.velocity).toBe(Math.round(투수.ability[1] / 10))
+    expect(능력.breaking).toBe(Math.round(투수.ability[2] / 10))
+    expect(능력.repertoire?.pitchMask).toBe(ROSTER_PITCHER_REPERTOIRES[3 * 8 + slot].pitchMask)
+  })
+
+  it('CPU 교체로 마운드 칸이 바뀌면 바뀐 투수가 던진다', () => {
+    const progress = startGame(createSeededRandom(1), 0, 9, 3)
+    const 다른칸 = (progress.opponentMound.pitcherSlot + 5) % 8
+    const 바뀜 = opponentPitcherAbilityOf({ ...progress, opponentMound: { ...progress.opponentMound, pitcherSlot: 다른칸 } })
+
+    expect(바뀜.repertoire?.pitchMask).toBe(ROSTER_PITCHER_REPERTOIRES[3 * 8 + 다른칸].pitchMask)
+    expect(바뀜.control).toBe(Math.round(teamPitchers(3)[다른칸].ability[0] / 10))
   })
 })

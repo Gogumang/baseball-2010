@@ -2,11 +2,11 @@ import { useCallback, useState } from 'react'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import type { useCareerSession } from '@/app/model/useCareerSession'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
+import { opponentPitcherAbilityOf } from '@/features/play-game/model/gameFlow'
 import { GameScreen } from '@/pages/game/ui/GameScreen'
 import { LoadingTip } from '@/widgets/loading-tip/ui/LoadingTip'
 import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 import { ScreenOverlay } from '@/shared/ui'
-import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
 import { pitcherAbilityOf } from '@/entities/game/model/aceOpponent'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -87,7 +87,8 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
         career={career}
         progress={progress}
         atBat={runner.atBat}
-        pitcherAbility={progress.aceOpponent === null ? DEFAULT_PITCHER_ABILITY : pitcherAbilityOf(progress.aceOpponent)}
+        // 지금 마운드의 상대 투수 — CPU 교체(0xac428)가 바꾸면 바뀐 투수가 던진다 (0xae83c)
+        pitcherAbility={progress.aceOpponent === null ? opponentPitcherAbilityOf(progress) : pitcherAbilityOf(progress.aceOpponent)}
         isPaused={runner.isPaused || burstLines !== null}
         bannerText={runner.bannerText}
         random={random}

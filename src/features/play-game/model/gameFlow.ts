@@ -69,6 +69,9 @@ import { representativePatternOf } from '@/features/defense-play/model/represent
 import type { BurstResolution, BurstSession } from '@/entities/burst-mission/model/burstMissionSession'
 import { createBurstSession, resolveBurst, tryTriggerBurst } from '@/entities/burst-mission/model/burstMissionSession'
 import { burstResultBitsOf } from '@/entities/burst-mission/model/burstResultBits'
+import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
+import type { PitcherAbility } from '@/entities/pitching/model/pitch'
+import { ROSTER_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
 
 export interface GameLogEntry {
   readonly id: number
@@ -573,6 +576,35 @@ function opponentDefenseAbilitiesOf(progress: GameProgress): readonly number[] {
     })),
     pitcher?.ability[2],
   )
+}
+
+/** 원본 0~999 를 타석 화면의 0~100 눈금으로 — 팀 경기 `currentPitcherAbility` 와 같은 나눗셈 */
+const STAGE_PITCHER_DIVISOR = 10
+
+/**
+ * **내 타석에서 공을 던지는 상대 투수**의 타석 화면용 능력치 — 지금 마운드(`opponentMound.pitcherSlot`) 투수.
+ *
+ * 원본 사람 타석은 수비 팀의 현재 투수 `0xae83c(팀)` → `0xb89dc(팀, team[0])`(team[0] = 등판 칸,
+ * P1 E-6)을 본다 — 공이 나갈 때(0x3de10 의 0x3de38·0xa5e14 의 0xa5e2a)도 같은 함수다. 그 칸은 CPU 교체
+ * `0xac428`(사람 타석 시작 0x3da3e·간이 엔진 0xc1ce2)이 바꾸므로 교체 뒤에는 바뀐 투수가 던진다.
+ * 모드 4 는 팀 능력치 보정(마스크 0x306)이 없어 로스터 밑값 그대로다 (`opponentDefenseAbilitiesOf` 와 같다).
+ * 폼·구질·마구는 같은 레코드의 +0xb · +0x1c · +0x18 (`ROSTER_PITCHER_REPERTOIRES`, 전역 번호 팀 × 8 + 칸).
+ *
+ * ⚠️ 마선수 등판(`aceOpponent`)은 부르는 쪽이 `pitcherAbilityOf` 로 따로 고른다 — 정규 리그 경기엔 없다.
+ */
+export function opponentPitcherAbilityOf(progress: GameProgress): PitcherAbility {
+  const slot = progress.opponentMound.pitcherSlot
+  const pitcher = teamPitchers(progress.opponentTeamId)[slot]
+  const repertoire = ROSTER_PITCHER_REPERTOIRES[progress.opponentTeamId * PITCHERS_PER_TEAM + slot]
+  if (pitcher === undefined) return DEFAULT_PITCHER_ABILITY
+  return {
+    control: Math.round(pitcher.ability[0] / STAGE_PITCHER_DIVISOR),
+    velocity: Math.round(pitcher.ability[1] / STAGE_PITCHER_DIVISOR),
+    breaking: Math.round(pitcher.ability[2] / STAGE_PITCHER_DIVISOR),
+    ...(repertoire === undefined
+      ? {}
+      : { repertoire: { form: repertoire.form, pitchMask: repertoire.pitchMask, magicId: repertoire.magicId } }),
+  }
 }
 
 /**
