@@ -1708,6 +1708,11 @@ function judgeAutoPitcherChange(
     role: PITCHER_ROLE.starter,
     stamina,
     benchCount: bench.length,
+    // 0xac428 의 일곱째 인자(`[sp+0x58]`)는 0xc1cd8 이 넘기는 `[sp+0x10] = max(r7, 0)` 이다.
+    // r7 은 0xc1bbc 에서 −1 로 서고 모드 3(투수편) 갈래(0xc1bc6~0xc1c48)에서만 벤치 번호가 된다 —
+    // 팀 경기 모드(1·2·8·9)는 그 갈래를 안 타 늘 −1 → **0** 이다. 곧 벤치가 한 명만 남아도 바꾼다
+    // (`judgePitcherChange` 의 기본값 1 은 이 자리와 맞지 않는다).
+    minimumBench: 0,
     justChanged: progress.pitcherJustChanged,
     lead: defenseScore - offenseScore,
     // 원본 이닝은 0-기준이다 (state+0x6b)

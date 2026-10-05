@@ -303,6 +303,26 @@ describe('경기 중 투수 교체 (0xc1ba4 → 0xac428)', () => {
     expect(changePitcher(progress, progress.ourPitcherIndex)).toBe(progress)
     expect(changePitcher(progress, 99)).toBe(progress)
   })
+
+  it('벤치 투수가 **한 명**만 남아도 바꾼다 — 0xac428 의 최소 벤치 인자는 0 (0xc1cd8 max(r7,0), r7 = −1)', () => {
+    const { progress, random } = 시작()
+    const 남길칸 = progress.ourPitcherEntry.length - 1
+    const 다쓴칸 = progress.ourPitcherEntry
+      .map((_unused, index) => index)
+      .filter((index) => index !== progress.ourPitcherIndex && index !== 남길칸)
+    // 1회초 우리 수비 — 이닝 실점 A = 3 > 2 라 첫 자동 타석의 0xac428 이 교체를 부른다
+    const 한명남음: TeamGameProgress = {
+      ...progress,
+      ourUsedPitchers: 다쓴칸,
+      ourPitcherCounters: { inningRunsAllowed: 3, runsAllowed: 3, pitches: 0 },
+    }
+    expect(availablePitchers(한명남음)).toEqual([남길칸])
+
+    const 뒤 = runAutoProgress(한명남음, random)
+
+    expect(뒤.ourPitcherIndex).toBe(남길칸)
+    expect(뒤.ourUsedPitchers).toContain(progress.ourPitcherIndex)
+  })
 })
 
 describe('자동진행 (경기 중 메뉴 동작 4 = 0x3c60c)', () => {
