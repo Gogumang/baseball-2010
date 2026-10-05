@@ -30,6 +30,7 @@ import type { PitcherRun } from '@/entities/mission/model/pitcherRun'
 import { attemptSteal } from '@/entities/game/model/steal'
 import { missionOpponentOf, pitcherAbilityOf } from '@/entities/game/model/aceOpponent'
 import { pitchAgainstBatter } from '@/entities/pitching/model/simulateBatter'
+import { BATTER_SLOT, gameAbilityOf } from '@/features/play-team-game/model/gameAbilities'
 import { isMistakePitch } from '@/entities/pitching/model/mistakePitch'
 import { MAGIC_PITCH_TYPE_NUMBER } from '@/entities/pitcher-career/model/magicPitch'
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
@@ -321,7 +322,23 @@ export function useMissionSession({
     )
     // 마타자 미션은 원본 마선수 능력치로, 그 밖에는 평범한 타자로 상대한다.
     const opponent = missionOpponent(pitcherRun.mission)
-    const batterAbility = opponent === null ? ROOKIE_BATTER_ABILITY : opponent.ability
+    const rawBatter = opponent === null ? ROOKIE_BATTER_ABILITY : opponent.ability
+    // CPU 타자 결정 0x34334 의 h 는 **경기용 히트** 0xb570d(ctx, 0, 타자, 1, 90, 1) 다 (ce462ce).
+    // 미션 모드 5 에서 0xb570c 는 나만의리그 갈래(모드 3·4)도 시즌 갈래(2)도 안 타고, 체력 인자 90 은
+    // 감소가 없고, 팀 능력치 마스크 {1,2,8,9} 에도 없다 → 0xb6414 값을 0..999 로 자른 것이다.
+    // ⚠️ 미해결: 마타자면 0xb6414 가 먼저 **마선수 레벨 배율** 0xd88aa[레벨] = 60~100% 를 곱한다
+    //    (b6440~b646a, 레벨 = 전역 기록 [0x13f + 순번]). 이 세션은 마선수 레벨을 받지 않아 배율을
+    //    못 곱한다 — 날 값 그대로다. 스킬 보정(+0x14)도 표에 없다.
+    const batterAbility = {
+      ...rawBatter,
+      hit: gameAbilityOf({
+        mode: MISSION_PITCHER_MODE,
+        base: rawBatter.hit,
+        isPitcher: false,
+        slot: BATTER_SLOT.히트,
+        isMyTeam: false,
+      }),
+    }
     // 원본 0x34334 가 보는 상황 — state 의 볼카운트·아웃과 주자 유무(0xa9599)
     const resolution = pitchAgainstBatter(
       pitch,

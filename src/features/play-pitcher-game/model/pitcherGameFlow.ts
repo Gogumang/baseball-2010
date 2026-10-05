@@ -30,6 +30,7 @@ import { PICKOFF_RESULT, runPickoffPlay } from '@/features/defense-play/model/pi
 import { pickoffPlayForKey, PICKOFF_PLAY_KIND } from '@/entities/defense-controls/model/pickoff'
 import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
 import { pitchAgainstBatter } from '@/entities/pitching/model/simulateBatter'
+import { BATTER_SLOT, gameAbilityOf } from '@/features/play-team-game/model/gameAbilities'
 import { isMistakePitch } from '@/entities/pitching/model/mistakePitch'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -335,12 +336,34 @@ function quickPitcherAt(teamId: number, index: number) {
   return quickPitcherOf(roster[index % roster.length])
 }
 
-/** 상대 타순 칸의 타자 능력치 (히트·파워·수비·주루 — 레코드 순서 그대로) */
+/**
+ * 상대 타순 칸의 타자 능력치 (히트·파워·수비·주루 — 레코드 순서 그대로).
+ *
+ * **히트는 경기용 값**이다 — CPU 타자 결정 0x34334 가 `0xb570d(ctx, 0, 타자, 1, 90, 1)` 로 읽는다
+ * (Q1 1b, ce462ce). 모드 3 에서 0xb570c 는:
+ * ```
+ * b5728  v = 0xb6415(타자, 0, 1)          ; 마선수 배율 → 장비 → 스킬
+ * b574a  모드 3·4: 0xb6389(타자) 거짓(내 육성 선수가 아니다) → b58e6
+ * b58e6  체력 인자 90 → 감소 없음
+ * b593a  팀 능력치 — 모드 마스크 0x306 = {1,2,8,9} 라 모드 3 은 없다
+ *        코치 — 모드 2 만 · 0..999 로 자른다
+ * ```
+ * 그래서 `gameAbilityOf(모드 3, 내 팀 아님)` = 날 값을 0..999 로 자른 값이다.
+ * ⚠️ 0xb6414 의 스킬 보정(5 −100 · 7 +50)은 웹 로스터에 스킬 비트(+0x14)가 없어 못 붙인다 — 미해결.
+ *    상대 로스터는 마선수도 장비도 없어 그 둘은 원래 0 이다.
+ * 파워·수비·주루는 이 길이 아니라(0xab214·수비·주루가 저마다 부른다) 여기서 손대지 않는다.
+ */
 function opponentBatterAbility(teamId: number, orderIndex: number) {
   const roster = teamBatters(teamId)
   const player = roster[orderIndex % roster.length]
   return {
-    hit: player.ability[0],
+    hit: gameAbilityOf({
+      mode: PITCHER_EDITION_MODE,
+      base: player.ability[0],
+      isPitcher: false,
+      slot: BATTER_SLOT.히트,
+      isMyTeam: false,
+    }),
     power: player.ability[1],
     defense: player.ability[2],
     run: player.ability[3],

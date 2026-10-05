@@ -249,8 +249,9 @@ const DEFAULT_PITCHER_STATS = { control: 500, velocity: 500 }
  * 표에서 번트 칸이 뽑히면 타이밍 뒤에 rand(1,4) 로 번트 종류를 정한다 (`cpuBuntKindOf`, 마선수 제외).
  *
  * `batter` 는 **경기용 능력치**(0xb570c/0xb570d, 체력 인자 90)여야 한다 — 쫓아가기 문턱과
- * 타이밍 K 가 그 히트를 본다. 팀 경기는 `entryBatterGameAbilities` 값을 넘기지만,
- * ⚠️ 투수편(`opponentBatterAbility`)·투수 미션은 아직 날 레코드 값을 넘긴다.
+ * 타이밍 K 가 그 히트를 본다. 팀 경기는 `entryBatterGameAbilities`, 투수편은 `opponentBatterAbility`
+ * (모드 3 `gameAbilityOf`), 투수 미션은 모드 5 `gameAbilityOf` 값을 넘긴다.
+ * ⚠️ 미션 마타자의 레벨 배율(0xb6414 의 0xd88aa)과 로스터 스킬 보정은 아직 못 붙인다 (부르는 쪽 주석).
  */
 export function pitchAgainstBatter(
   pitch: Pitch,
