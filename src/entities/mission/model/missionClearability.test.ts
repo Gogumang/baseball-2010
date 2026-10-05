@@ -232,6 +232,12 @@ describe('판정 규칙', () => {
     expect(applyPitcherOutcome(startPitcherMission(findMission('투수', 14)), { kind: '볼넷' }).status).toBe('실패')
   })
 
+  it('사구는 무사사구 한도를 채우지 않는다 — 한도가 보는 R+0x144 는 볼넷만 (0xa8e04 · 0xaacae)', () => {
+    const run = applyPitcherOutcome(startPitcherMission(findMission('투수', 14)), { kind: '사구' })
+    expect(run.allowed.walks).toBe(0)
+    expect(run.progress.brokenConditions).not.toContain('무사사구')
+  })
+
   it('투수 1번은 실점 한도 2 — 1실점까지는 버틴다', () => {
     let run = startPitcherMission(findMission('투수', 1))
     run = applyPitcherOutcome(run, HOME_RUN)

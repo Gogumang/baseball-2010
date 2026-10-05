@@ -29,7 +29,7 @@ export interface PitcherRun extends MissionRun {
   readonly perfectGauges: number
   /** 지금까지 잡은 아웃 수 (이닝 목표 계산용) */
   readonly totalOuts: number
-  /** 허용한 실점·피안타·볼넷 — 레코드 실패 한도와 비교한다 (0xaac76~0xaacd6) */
+  /** 허용한 실점·피안타·볼넷(사구 제외) — 레코드 실패 한도와 비교한다 (0xaac76~0xaacd6) */
   readonly allowed: { readonly runs: number; readonly hits: number; readonly walks: number }
 }
 
@@ -64,7 +64,20 @@ export function recordPitch(run: PitcherRun, wasPerfectGauge: boolean): PitcherR
   }
 }
 
-/** 한도에 닿으면 깨지는 조건 이름 — 실점 → 무실점, 피안타 → 무안타, 볼넷 → 무사사구 */
+/**
+ * 한도에 닿으면 깨지는 조건 이름 — 실점 → 무실점, 피안타 → 무안타, 볼넷 → 무사사구.
+ *
+ * 원본 판정 0xaac76~0xaacd6 은 레코드 바이트(행+0xa0)의 니블을 투수 기록 R 칸과 견준다
+ * (`0xaa940`: 한도 > 0 이고 칸 ≥ 한도면 실패 2):
+ *   +0xa1 아래 ↔ R+0x128(실점) · +0xa2 위 ↔ **R+0x144(볼넷)** · +0xa2 아래 ↔ R+0x12c(피안타) · +0xa3 ↔ R+0x130(출루 허용, u8)
+ * "무사사구" 한도가 보는 R+0x144 는 **볼넷만**이다 — 코드 0x1c 는 볼 카운트 state[5] > 3 일 때뿐(0xa8e04~0xa8e0e)이고
+ * 사구는 R+0x148(코드 0x1d, 0xa8e2a)로 따로 간다. 그래서 사구는 이 한도를 채우지 않는다 (이름과 달리 — 원본 그대로).
+ *
+ * ⚠️ 미해결: 넷째 한도 +0xa3 ↔ R+0x130 (투수 13·14 번이 1) 은 옮기지 않았다. R+0x130 은 정산 0xa8c86 이
+ *   주자 목록 마지막 원소가 살아 있으면 1 로 두는 칸인데(`pitcherGameRecord.recordAllowedBaserunner`),
+ *   볼넷·사구 타자가 그 목록에 드는지 확인하지 못했다 — 들면 노히트노런(13번)도 볼넷 하나로 실패가 된다.
+ *   또 R+0x128(실점)은 P1 5-1 에 따르면 쓰는 곳이 없어 원본에선 늘 0 일 수 있다(유력) — 웹은 실점을 센다.
+ */
 function brokenConditionsOf(mission: OriginalMission, allowed: PitcherRun['allowed']): string[] {
   const limits = mission.failLimits
   const reached = (count: number, limit: number) => limit > 0 && count >= limit
@@ -120,6 +133,7 @@ export function applyPitcherOutcome(
   const allowed = {
     runs: run.allowed.runs + defense.runsScored,
     hits: run.allowed.hits + (isHit(outcome) ? 1 : 0),
+    // R+0x144 = 볼넷만 (사구는 R+0x148 — `brokenConditionsOf` 머리글)
     walks: run.allowed.walks + (outcome.kind === '볼넷' ? 1 : 0),
   }
   const progress = recordPitcherOutcome(

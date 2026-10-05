@@ -1,4 +1,5 @@
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
+import { isFreePass } from '@/entities/at-bat/model/atBatOutcome'
 import type { OriginalMission } from '@/shared/config/original/missions'
 import { MISSIONS } from '@/shared/config/original/missions'
 
@@ -187,9 +188,11 @@ export function recordPitcherOutcome(
   counts['삼진콤보'] = combo
 
   // 노히트노런·퍼펙트게임은 허용하는 순간 0 으로 돌아가고, 그 전까지는 잡은 아웃 수만큼 쌓인다
-  // (목표가 이닝×3 아웃이다). 볼넷은 노히트노런을 깨지 않지만 아웃도 아니다.
+  // (목표가 이닝×3 아웃이다). 볼넷·사구는 노히트노런을 깨지 않지만 아웃도 아니다.
+  // 퍼펙트는 **사구도** 깬다 — 원본 퍼펙트 판정은 볼넷 R+0x144 와 함께 사구 R+0x148 이 0 이어야 한다
+  // (미션 0xaabfc~0xaac12 `R+0x128·0x12c·0x144·0x148·0x130 모두 0` · 선발형 인기도 0xa6b0a 도 같다).
   const isHitAllowed = outcome.kind === '안타' || outcome.kind === '홈런'
-  const isRunnerAllowed = isHitAllowed || outcome.kind === '볼넷'
+  const isRunnerAllowed = isHitAllowed || isFreePass(outcome)
   const outGained = outcome.kind === '삼진' || outcome.kind === '아웃' ? 1 : 0
   counts['노히트노런'] = isHitAllowed ? 0 : (progress.counts['노히트노런'] ?? 0) + outGained
   counts['퍼펙트게임'] = isRunnerAllowed ? 0 : (progress.counts['퍼펙트게임'] ?? 0) + outGained

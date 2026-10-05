@@ -207,6 +207,15 @@ describe('투수편 목표 판정', () => {
     expect(progress.counts['퍼펙트게임']).toBe(0)
   })
 
+  it('사구도 노히트노런은 지키고 퍼펙트게임은 깬다 — 퍼펙트 판정이 R+0x148 을 본다 (0xaac12 · 0xa6b0a)', () => {
+    let progress = createProgress()
+    progress = recordPitcherOutcome(progress, { kind: '아웃', detail: '땅볼아웃' }, 0)
+    progress = recordPitcherOutcome(progress, { kind: '사구' }, 0)
+
+    expect(progress.counts['노히트노런']).toBe(1)
+    expect(progress.counts['퍼펙트게임']).toBe(0)
+  })
+
   it('한도에 닿아 깨진 조건을 한 번씩만 남긴다', () => {
     let progress = createProgress()
     progress = recordPitcherOutcome(progress, { kind: '안타', bases: 1 }, 0, [])
