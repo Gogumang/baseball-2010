@@ -76,7 +76,11 @@ export interface StealPlayInput {
   readonly bases: BaseState
   /** 출발한 주자들의 루 — 0xa9bd4 가 받아들인 것만 (`canStartSteal`) */
   readonly stealingFrom: readonly StealBase[]
-  /** 투구 판정을 반영한 뒤의 아웃 수 (1아웃 이하 삼진이면 그 아웃까지 넣는다) */
+  /**
+   * state[6] — 판이 열릴 때의 아웃 수 = **이 투구 전의 아웃 수**. 0x3dfac 는 투구 판정 v 를 판정 칸
+   * `[scene+0x10ac]` 에 적어 둘 뿐 아웃은 올리지 않고 곧장 상태 0x17 로 간다 — 1아웃 이하 삼진이면
+   * 그 삼진 아웃은 판이 끝난 뒤 판정 칸을 읽는 쪽이 올린다(읽는 자리는 안 떴다 — 유력).
+   */
   readonly outs: number
   /** 수비 9명 능력치 (칸 순서) */
   readonly defenseAbilities?: readonly number[]
