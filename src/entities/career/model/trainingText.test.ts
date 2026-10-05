@@ -8,6 +8,8 @@ const 결과 = (overrides: Partial<TrainingOutcome> = {}): TrainingOutcome => ({
   gains: { hit: 5 },
   typeBonus: 1,
   moraleLoss: 6,
+  rolledGain: 4,
+  rolledMoraleLoss: 6,
   specialSwing: null,
   career: createCareer('테스트'),
   ...overrides,

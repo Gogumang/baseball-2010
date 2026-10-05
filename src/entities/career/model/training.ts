@@ -41,6 +41,12 @@ export interface TrainingOutcome {
   readonly gains: Partial<BatterAbility>
   readonly typeBonus: number
   readonly moraleLoss: number
+  /**
+   * 굴린 값 그대로 — 보너스(타입·스킬·서브 아이템)와 자르기 전. 상세 결과 창 변화량이 이 값을 쓴다
+   * (0x18d14 훈련 칸 [sp+0x34] · 0x18d36 사기 칸 −[sp+0x38]). 필살타법은 상승 굴림이 없어 0.
+   */
+  readonly rolledGain: number
+  readonly rolledMoraleLoss: number
   readonly specialSwing: SpecialSwingProgress | null
   readonly career: PlayerCareer
 }
@@ -163,7 +169,10 @@ function runAbilityTraining(career: PlayerCareer, menu: TrainingMenu, random: Ra
     (isSkillEquipped(career, WEAK_BODY_SKILL) ? 2 : 0) -
     subItemMoraleRelief(career)
   const spent = spendCycleAction(gainMorale(career, -moraleLoss))
-  return { menuId: menu.id, gains, typeBonus, moraleLoss, specialSwing: null, career: gainAbility(spent, gains) }
+  return {
+    menuId: menu.id, gains, typeBonus, moraleLoss, rolledGain: rolled, rolledMoraleLoss,
+    specialSwing: null, career: gainAbility(spent, gains),
+  }
 }
 
 function runSpecialSwingTraining(career: PlayerCareer, menu: TrainingMenu, random: RandomPort): TrainingOutcome {
@@ -171,8 +180,9 @@ function runSpecialSwingTraining(career: PlayerCareer, menu: TrainingMenu, rando
   const required = SPECIAL_SWING_REQUIRED_SESSIONS[level]
   const sessions = career.specialSwingSessions + 1
   const isLevelUp = sessions >= required
+  const rolledMoraleLoss = roll(random, SPECIAL_SWING_MORALE_RANGE)
   const moraleLoss =
-    roll(random, SPECIAL_SWING_MORALE_RANGE) -
+    rolledMoraleLoss -
     (isSkillEquipped(career, ROOKIE_SKILL) ? 1 : 0) +
     (isSkillEquipped(career, WEAK_BODY_SKILL) ? 2 : 0) -
     subItemMoraleRelief(career)
@@ -189,6 +199,8 @@ function runSpecialSwingTraining(career: PlayerCareer, menu: TrainingMenu, rando
     gains: {},
     typeBonus: 0,
     moraleLoss,
+    rolledGain: 0,
+    rolledMoraleLoss,
     specialSwing: { sessions, required, isLevelUp },
     career: trained,
   }

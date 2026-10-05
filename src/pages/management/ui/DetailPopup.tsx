@@ -42,7 +42,7 @@ export function DetailPopup({ result, onClose }: DetailPopupProps) {
       <FrameSprite folder={MODE_UI} frame={DETAIL_TABLE_FRAME} origins={origins} x={0} y={DETAIL_Y_OFFSET} />
       <img className={styles.layer} alt="" src={imageOf(IMG_TEXT, DETAIL_HEADER.frame)}
         style={{ left: valueCenter - Math.trunc(widthOf(DETAIL_HEADER.frame) / 2), top: DETAIL_HEADER.box.y + 3 }} />
-      {detailRowsOf(result.before, result.after).map((row, index) => {
+      {detailRowsOf(result.before, result.after, result.changes).map((row, index) => {
         const top = DETAIL_ROW_TOP(index)
         return (
           <div key={row.labelFrame}>
