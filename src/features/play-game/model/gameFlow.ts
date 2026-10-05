@@ -99,6 +99,7 @@ import {
 } from '@/features/play-game/model/gameDecisions'
 import type { MoundBySide, PitcherOfRecordNames } from '@/features/play-game/model/gameDecisions'
 import { rollHalfInningFielders } from '@/features/play-game/model/halfInningBoard'
+import { rosterPitcherRoleOf } from '@/entities/pitching/model/pitcherChange'
 import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
 import {
@@ -1190,8 +1191,12 @@ const ALL_PITCHER_SLOTS: readonly number[] = Array.from({ length: PITCHERS_PER_T
  * 한 팀의 수비 쪽 재료 (`HalfInningDefense`) — `leagueDay.defenseOf` 와 같은 모양이다.
  *
  * `bothTeamsAreCpu` 는 **거짓**이다: 모드 3·4 경기 준비 `0x3a20a` 가 `0xb6c18(state, 내 팀, 0)`·
- * `(state, 상대, 1)` 로 내 팀을 사람 팀으로 적는다 (R8 · S11). 그래서 마무리 투입 굴림 `0xac360`
- * 이 CPU 끼리 경기와 달리 **실제로 굴러간다** (`0xb6c20`).
+ * `(state, 상대, 1)` 로 내 팀을 사람 팀으로 적는다 (R8 · S11). 그래도 마무리 투입 굴림 `0xac360` 은
+ * **벤치에 마선수가 있을 때만(0xb8a8d)** 돈다 — 로스터 투수에는 마선수가 없어 이 경기에서는 안 굴러간다.
+ *
+ * 보직(`+0xb & 3`, 0xb6dec)은 로스터 칸 표 `rosterPitcherRoleOf`(칸 0~3 선발 · 4~6 중간 · 7 마무리)로 넘긴다 —
+ * 판정 0xac428 이 마운드 보직을, 새 투수 고르기 0xabfcc 가 벤치 보직을 본다. 안 넘기면 모두 선발로 보여
+ * 9회 이후 마무리 상황마다 매 타자 투수가 바뀐다(58066a1 뒤의 회귀).
  *
  * ⚠️ 팀 사기(`0x66e44` 의 `V[+2]`)는 이 화면이 들고 있지 않아 100 으로 본다 — **근사다**.
  */
@@ -1205,6 +1210,7 @@ function quickDefenseOf(teamId: number, mound: HalfInningMound, lead: number): H
     staminaAbilityAt: (slot) => roster[slot % roster.length].ability[3],
     lead,
     bothTeamsAreCpu: false,
+    roleAt: rosterPitcherRoleOf,
   }
 }
 
