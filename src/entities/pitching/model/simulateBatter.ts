@@ -150,6 +150,43 @@ export function cpuBuntKindOf(choice: CpuSwingChoice, isMagicBatter: boolean, ra
   return randomIntegerBelow(random, BUNT_KIND_MINIMUM, BUNT_KIND_LIMIT)
 }
 
+/** 0x34468 의 마타자 필살 판단에 드는 값 */
+export interface CpuSpecialSwingInput {
+  /** 마선수인가 (0xb633d = 선수 레코드 [10] 비트6) */
+  readonly isMagicBatter: boolean
+  /** 고른 필살 번호 — 선수 +0x18 (u8). 0 이면 안 고른 것 */
+  readonly swingNumber: number
+  /** 이 경기 남은 횟수 — s8 팀[+0x29 + 타순(+0x32)] */
+  readonly remaining: number
+}
+
+/**
+ * CPU 타자의 이번 스윙 필살 번호 (`[scene+0xf9c]+0x10`) — 원본 0x34442~0x34488. 0 이면 보통 스윙.
+ *
+ * ```
+ * 34444  [+0xf9c][+0x10] = 0                                  ; 새 공마다 지운다
+ * 34446  if choice == 1 and not 0xb633d(타자): 번트 (필살 없음)
+ * 34468  elif 0xb633d(타자) and 0xaea30(팀) != 0:
+ * 34488      [+0xf9c][+0x10] = 타자[+0x18]
+ * 0xaea30(팀) = 타자[+0x18] == 0 ? 0 : s8 팀[+0x29 + 팀[+0x32]]
+ * ```
+ * 즉 **마타자는 휘두를 때마다, 번호가 있고 남은 횟수가 0 이 아니면 무조건 필살**이다 —
+ * 번트 칸을 뽑아도 필살 스윙이다. 일반 CPU 타자는 번호가 있어도 절대 쓰지 않는다
+ * (S+0x10 에 CPU 가 쓰는 곳은 여기 하나, Q1 5절). 난수는 쓰지 않는다.
+ *
+ * ⚠️ 미해결 — 이 값을 **잇지 않았다.** 필살 스윙의 효과(0xab214 에 넘기는 보정 구조체
+ *    0x34d6c 타자 쪽: 히트·파워 +150~220 · B·C %), 실제 스윙 순간의 횟수 차감(0x4e136),
+ *    타구가 날 때의 성공 굴림(0x34c74 → `rollSpecialSwing`, 마타자 30%)이 이 길에 하나도 없다.
+ *    특히 0x34c74 굴림이 0xab214 굴림들 사이 어디에 끼는지 확인하지 않아 난수 차례를 지어낼 수
+ *    없다. 사람 타석(resolvePitch)도 보정 구조체를 swingResultOf 에 싣지 않는다.
+ */
+export function cpuSpecialSwingNumberOf(input: CpuSpecialSwingInput): number {
+  // 일반 타자는 번트든 치기든 0, 마타자는 번트 갈래(0x34446)로 안 가니 표 선택과 무관하다
+  if (!input.isMagicBatter) return 0
+  if (input.swingNumber === 0) return 0
+  return input.remaining !== 0 ? input.swingNumber : 0
+}
+
 /** 부르는 쪽이 넘기는 CPU 타자의 성질 */
 export interface CpuBatterTraits {
   /** 마선수인가 (0xb633d = 선수 레코드 [10] 비트6) — 마선수는 번트하지 않는다 */

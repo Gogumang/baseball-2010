@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   cpuBuntKindOf,
+  cpuSpecialSwingNumberOf,
   cpuSwingChoiceOf,
   cpuSwingTimingOffsetOf,
   pitchAgainstBatter,
@@ -265,6 +266,27 @@ describe('실투면 CPU 타자는 치기로 간다 — 0x34376 · 0x34162', () =
     expect(
       pitchAgainstBatter(한가운데, 타자(500), 각본(굴림), undefined, 무사주자없음, { isMistakePitch: true }).kind,
     ).not.toBe('스트라이크')
+  })
+})
+
+describe('CPU 마타자 필살 — 원본 0x34468~0x34488', () => {
+  const 마타자 = { isMagicBatter: true, swingNumber: 3, remaining: 2 }
+
+  it('마타자는 번호가 있고 남은 횟수가 있으면 늘 필살이다', () => {
+    expect(cpuSpecialSwingNumberOf(마타자)).toBe(3)
+  })
+
+  it('남은 횟수가 0 이거나 번호가 없으면 보통 스윙', () => {
+    expect(cpuSpecialSwingNumberOf({ ...마타자, remaining: 0 })).toBe(0)
+    expect(cpuSpecialSwingNumberOf({ ...마타자, swingNumber: 0 })).toBe(0)
+  })
+
+  it('남은 횟수는 s8 이라 0 이 아니기만 하면 된다 (원본 `cmp r0,#0 ; beq`)', () => {
+    expect(cpuSpecialSwingNumberOf({ ...마타자, remaining: -1 })).toBe(3)
+  })
+
+  it('일반 CPU 타자는 번호가 있어도 절대 쓰지 않는다', () => {
+    expect(cpuSpecialSwingNumberOf({ ...마타자, isMagicBatter: false })).toBe(0)
   })
 })
 
