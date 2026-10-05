@@ -110,7 +110,22 @@ import type {
   TeamGameAbilityContext,
 } from '@/features/play-team-game/model/teamGameRoster'
 import { rollOpponentAceIndex } from '@/entities/game/model/aceOpponent'
-import { passesRecordTeamGate, pinchHitHomeRunRecordIdsOf } from '@/entities/game/model/gameRecords'
+import {
+  backToBackRecordOf,
+  completeGameRecordIdsOf,
+  foulRecordOf,
+  gameEndRecordIdsOf,
+  laserThrowOutRecordOf,
+  multiOutPlayRecordIdsOf,
+  passesRecordTeamGate,
+  pinchHitHomeRunRecordIdsOf,
+  recordGamePointsOf,
+  stealPlayRecordIdsOf,
+  strikeoutRecordIdsOf,
+  threePitchInningRecordIdsOf,
+} from '@/entities/game/model/gameRecords'
+import { EMPTY_BATTER_GAME_LOG, recordBatterAtBat } from '@/entities/game/model/batterGameLog'
+import type { BatterGameLog } from '@/entities/game/model/batterGameLog'
 import {
   EMPTY_BATTER_GAME_RECORD,
   judgeCpuPinchHit,
@@ -308,6 +323,44 @@ export interface TeamPitchingLine {
 }
 
 /**
+ * 기록달성 판정이 보는 원본 칸 (R8 4절 표·5절·6절).
+ */
+export interface TeamRecordTally {
+  /** `ctx+0x162` — 사람 팀 연속 홈런 수 (백투백 6·7). 홈런 아닌 타석·상대 타석이면 0 (0xa794c · 5-4) */
+  readonly homeRunStreak: number
+  /** `ctx+0x15f` — 이 타석 연속 파울 (32·33). 파울 아닌 공(0xa5fdc, 유력)·타석 초기화(0xa5bcc)에서 0 */
+  readonly foulStreak: number
+  /** `ctx+0x161` — 이 타석 투구 수 (16 삼구 삼진). 타석 초기화 0xa5bcc 에서 0 — 교체 연출 뒤 타석은 이어받는다 */
+  readonly atBatPitches: number
+  /** `ctx+0x16c` — 이 반 이닝 투구 수 (25 삼구 삼자범퇴). 반 이닝 시작 0xa5b00 에서 0 — 반 이닝 열쇠로 가른다 */
+  readonly halfInningPitches: { readonly inning: number; readonly half: GameState['half']; readonly pitches: number }
+  /** 우리 **현재** 투수 경기 기록 `R = team+0x244+4·team[0]` 의 R[0] 삼진 · R[1] 연속 삼진 · R[3] 잡은 아웃 */
+  readonly moundStrikeouts: number
+  readonly moundStrikeoutCombo: number
+  readonly moundOuts: number
+  /** `state[0x8c]` — 이 경기에서 사람이 투구 코스를 한 번이라도 확정했는가 (유일한 1 쓰기 0x50e9c) */
+  readonly pitchCourseConfirmed: boolean
+  /**
+   * `[ctx+0x24]` 첫 바이트 — 자동진행(유료 0x50794·0x52c50 → 0xc1b48 이 1)이 걸렸는가. 0xa77f0 첫 게이트(a77f2)가
+   * 이것이 서 있으면 아무것도 안 준다. 0 으로 되돌리는 곳은 시뮬 초기화 0xc0dac(경기 시작) 뿐이다 —
+   * ⚠️ "자동진행 뒤로는 기록 없음" 은 R8 1절의 **유력** 해석이다(중단 질문 0x1e 가 되돌리는지는 0xc0ea8 에서 못 봤다).
+   */
+  readonly autoProgressed: boolean
+}
+
+const EMPTY_RECORD_TALLY: TeamRecordTally = {
+  homeRunStreak: 0,
+  foulStreak: 0,
+  atBatPitches: 0,
+  halfInningPitches: { inning: 1, half: '초', pitches: 0 },
+  moundStrikeouts: 0,
+  moundStrikeoutCombo: 0,
+  moundOuts: 0,
+  pitchCourseConfirmed: false,
+  autoProgressed: false,
+}
+
+/**
  * 화면이 실시간으로 돌리는 한 타구 — 진행기에 넘길 것과, 그것이 끝난 뒤 어느 길로 먹일지.
  *
  * `side` 는 **사람이 어느 쪽을 잡는가** 다 — 조작 객체 `[+0xc]` (0 공격 · 1 수비).
@@ -449,10 +502,24 @@ export interface TeamGameProgress {
    */
   readonly pinchHitHomeRunHalf: { readonly inning: number; readonly half: GameState['half'] } | null
   /**
-   * 이 경기에서 쌓인 **기록달성 번호** (지급 `0xa77f0` 게이트를 지난 것).
-   * ⚠️ 팀 경기는 아직 **5 대타 홈런만** 잇는다 — 나머지 번호와 경기 중 G 누계(`0xd8158`)·지급은 없다.
+   * 이 경기에서 쌓인 **기록달성 번호** (지급 `0xa77f0` 게이트를 지난 것) — 경기 끝 0xa7de8 몫(28~31·37~39)은
+   * `summaryOf` 가 덧붙인다.
+   *
+   * 원본은 팀 경기에서도 쌓고 준다: 0xa77f0 은 모드 5·6·7 만 막고(a780a) 경기 끝 0x4ea0c 는 모드 5·6 만 다른 갈래로
+   * 보낸 뒤(4eb64) 나머지 모드는 `scene+0x17f4 = Σ 횟수 × 0xcfbf8[k]`(4ebe0~4ec36)를 저장 G(+0x64)에 더한다(4ec5a,
+   * 99999 상한). 방향 게이트(공격 0~15·32~39 / 수비 16~31·36)는 `passesRecordTeamGate`, 자동진행 뒤 막힘은
+   * `recordTally.autoProgressed`.
    */
   readonly recordIds: readonly number[]
+  /** 기록달성 판정이 보는 원본 칸들 (경기 객체 ctx · 경기 상태 state · 우리 투수 경기 기록 R) */
+  readonly recordTally: TeamRecordTally
+  /**
+   * **우리 타순 칸별 이번 경기 타석 결과** — 원본은 같은 24바이트 기록(`team + 0x34 + 타순×0x18`)에 결과 코드를
+   * 쌓고(0xa908d) 연타석(0xa7b90)·한 타자 홈런(0xa7b00)·볼넷(0xa7a7c)·사이클(0xa7610)이 이 목록을 본다.
+   * 명단과 길이·차례가 같고 대타가 두 칸을 맞바꿀 때 **같이 움직인다** (`aed02~aed16` — `substituteBatter`).
+   * 기록달성의 방향 게이트가 "공격 팀이 사람" 이라 우리 타순만 들고 있으면 된다.
+   */
+  readonly ourBatterLogs: readonly BatterGameLog[]
   /**
    * 사람 경기 장면에서 지난 **대타 교체 연출(상태 0x16)** 의 마지막 한 번 — 소리 고리가 앞뒤를 견준다.
    * `by` 가 'CPU' 면 0xf 진입 `0x3d954` 의 CPU 대타(3da70 → 22 @3da88 → 0x16), '사람' 이면 `#` 교체 창의 OK.
@@ -598,6 +665,8 @@ export function startTeamGame(options: TeamGameOptions, random: RandomPort): Tea
     cpuPinchHitUsed: false,
     pinchHitHomeRunHalf: null,
     recordIds: [],
+    recordTally: EMPTY_RECORD_TALLY,
+    ourBatterLogs: ourEntry.map(() => EMPTY_BATTER_GAME_LOG),
     scenePinchHit: null,
     scenePitcherChange: null,
     opponentAcePitcherIndex: opponentAces.pitcher,
@@ -734,6 +803,178 @@ function ourTeamMoraleOf(options: TeamGameOptions): number {
  */
 function entryBattersOf(progress: TeamGameProgress, teamId: number): readonly TeamEntryBatter[] {
   return teamId === progress.options.ourTeamId ? progress.ourEntry : progress.opponentEntry
+}
+
+/* ── 기록달성 (0xa8024 등 → 지급 0xa77f0) ─────────────────────────────────────── */
+
+/**
+ * 지급 게이트 `0xa77f0` 을 지나 기록을 쌓는다 (R8 1절).
+ * a77f2 자동진행 뒤면 다 버리고, 번호마다 방향(a7818·a785e·a78bc)을 본다 — 팀 경기에서 사람 팀은 우리 팀 하나라
+ * 우리 공격이면 공격 팀이, 우리 수비면 수비 팀이 사람이다. 모드 5·6·7 갈래(a780a)는 팀 경기에 없다.
+ */
+function withGameRecords(
+  progress: TeamGameProgress,
+  recordIds: readonly number[],
+  humanOffense: boolean,
+): TeamGameProgress {
+  if (recordIds.length === 0 || progress.recordTally.autoProgressed) return progress
+  const passed = recordIds.filter((id) =>
+    passesRecordTeamGate(id, { offenseIsHuman: humanOffense, defenseIsHuman: !humanOffense }),
+  )
+  return passed.length === 0 ? progress : { ...progress, recordIds: [...progress.recordIds, ...passed] }
+}
+
+/**
+ * **우리 타석 하나의 기록달성** — 정산 `0xa8024` 의 안타 갈래(5-3)와 범타·볼넷·사구 갈래(5-4).
+ *
+ * - 0 3루타 · 1~4 홈런 단계 · 9~11 연타석 · 12~14 한 타자 홈런 · 15 사이클 · 34·35 한 타자 볼넷 —
+ *   타순 칸 결과 목록(`ourBatterLogs`)으로 가린다(`recordBatterAtBat`, 타자편 동료 타석과 같은 함수).
+ * - 6·7 백투백 — `ctx+0x162` (`backToBackRecordOf`). 홈런 아닌 결과면 0.
+ * - 5 대타 홈런 — 사람이 대타를 낸 그 타석의 홈런 (`ctx+0x160`).
+ * 사람 장면 타석과 간이 엔진 타석(0xc11f0·0xc15a4 도 같은 0xa8024 를 지난다) 둘 다 여기로 온다.
+ */
+function withOurAtBatRecords(
+  progress: TeamGameProgress,
+  slot: number,
+  outcome: AtBatOutcome,
+  runsBattedIn: number,
+  isPinchHitAtBat: boolean,
+): TeamGameProgress {
+  const recorded = recordBatterAtBat(progress.ourBatterLogs[slot] ?? EMPTY_BATTER_GAME_LOG, outcome, runsBattedIn)
+  const isHomeRun = outcome.kind === '홈런'
+  const backToBack = backToBackRecordOf({
+    streak: progress.recordTally.homeRunStreak,
+    humanOffense: true,
+    isHomeRun,
+  })
+  const ourBatterLogs = [...progress.ourBatterLogs]
+  ourBatterLogs[slot] = recorded.log
+  return withGameRecords(
+    { ...progress, ourBatterLogs, recordTally: { ...progress.recordTally, homeRunStreak: backToBack.streak } },
+    [
+      ...recorded.recordIds,
+      ...backToBack.recordIds,
+      // a8764 — 홈런이고 ctx+0x160 이 서 있으면
+      ...pinchHitHomeRunRecordIdsOf({ isHomeRun, isPinchHitAtBat }),
+    ],
+    true,
+  )
+}
+
+/** 지금 반 이닝에 던진 공 수 (`ctx+0x16c`) — 반 이닝이 바뀌었으면 0xa5b00 이 0 으로 되돌린 것이다 */
+function halfInningPitchesOf(tally: TeamRecordTally, game: GameState): number {
+  const half = tally.halfInningPitches
+  return half.inning === game.inning && half.half === game.half ? half.pitches : 0
+}
+
+/** 공 `pitches` 개를 반 이닝 투구 수에 더한다 (0xa5e14 의 a5e4e) */
+function withHalfInningPitches(tally: TeamRecordTally, game: GameState, pitches: number): TeamRecordTally {
+  return {
+    ...tally,
+    halfInningPitches: {
+      inning: game.inning,
+      half: game.half,
+      pitches: halfInningPitchesOf(tally, game) + pitches,
+    },
+  }
+}
+
+/**
+ * **우리 수비 타석 하나의 기록달성** — 사람 장면·간이 엔진 공통.
+ *
+ * - 16 삼구 삼진 · 17 풀카운트 삼진 — 삼진 처리 `0xa7c4c` (이 타석 투구 수 `ctx+0x161` == 3 · 볼 3).
+ * - 18~20 삼진 콤보 · 21~23 한 투수 10/15/20삼진 — `0xa7998`, 우리 **현재** 투수의 R[1]·R[0].
+ *   삼진 아닌 결과로 끝난 타석이면 R[1] = 0 (0xa8fb2~). 플레이 종류 4·5(견제·주자만)는 이 길로 안 온다.
+ * - 25 삼구 삼자범퇴 — 아웃 처리 `0xa7d0c`: 반 이닝 투구 수(`ctx+0x16c`) == 3 이고 3아웃.
+ * - 26·27 병살·삼중살 — 한 플레이 아웃 2·3 (`0xa8e58`). 주자 달리는 중 삼진(state[0x1a])은 웹에 없어 늘 거짓.
+ * - 36 필살송구 아웃 — 레이저 송구가 나간 플레이의 결과가 아웃(0x46892 `+0x10ac == 0xd` → state[0x8b] = 1)이고
+ *   이 플레이 아웃이 있으면 (0xa80f8). ⚠️ "결과 코드 0xd" 를 타석 결과 '아웃' 으로 본다 — **근사**.
+ * 상대 타석은 공격 팀이 사람이 아니라 백투백 카운터 `ctx+0x162` 를 0 으로 (0xa794c · 5-4).
+ */
+function withOurDefenseRecords(
+  progress: TeamGameProgress,
+  play: {
+    readonly outcome: AtBatOutcome
+    readonly outsBefore: number
+    readonly outsAdded: number
+    /** 이 타석 투구 수 (`ctx+0x161`) */
+    readonly atBatPitches: number
+    /** 끝났을 때 볼 (`state[5]`) */
+    readonly balls: number
+    /** 반 이닝 투구 수 (`ctx+0x16c`) — 이 타석의 공까지 든 값 */
+    readonly halfInningPitches: number
+    /** 이 플레이에서 레이저 송구가 나갔는가 (`DefensePlayResult.laserThrow`) */
+    readonly laserThrow: boolean
+  },
+): TeamGameProgress {
+  const tally = progress.recordTally
+  const strikeout = play.outcome.kind === '삼진'
+  const moundStrikeouts = tally.moundStrikeouts + (strikeout ? 1 : 0)
+  const moundStrikeoutCombo = strikeout ? tally.moundStrikeoutCombo + 1 : 0
+  const outs = play.outsBefore + play.outsAdded
+  const recordIds = [
+    ...(strikeout
+      ? strikeoutRecordIdsOf({
+          pitches: play.atBatPitches,
+          balls: play.balls,
+          comboCount: moundStrikeoutCombo,
+          pitcherStrikeouts: moundStrikeouts,
+        })
+      : []),
+    ...laserThrowOutRecordOf({
+      laserThrowFlag: play.laserThrow && play.outcome.kind === '아웃',
+      outsInPlay: play.outsAdded,
+    }).recordIds,
+    ...multiOutPlayRecordIdsOf({ outsInPlay: play.outsAdded, strikeoutWhileRunning: false }),
+    ...(strikeout ? [] : threePitchInningRecordIdsOf(play.halfInningPitches, outs)),
+  ]
+  return withGameRecords(
+    {
+      ...progress,
+      recordTally: {
+        ...tally,
+        homeRunStreak: 0,
+        moundStrikeouts,
+        moundStrikeoutCombo,
+        moundOuts: tally.moundOuts + play.outsAdded,
+      },
+    },
+    recordIds,
+    false,
+  )
+}
+
+/**
+ * **경기 끝 기록** — `0xa7de8`(0x4ea0c 가 부른다): 37~39 점수차 승 · 28~31 완투 계열. 둘 다 0xa77f0 의 방향 게이트는
+ * 건너뛰지만 자동진행 게이트(a77f2)는 지난다.
+ *
+ * 이긴 팀은 `0xb69c8`: 팀 1 점수(state[0x7f]) > 팀 0 점수면 팀 1, **아니면(동점 포함) 팀 0** 을 보고 그 팀의
+ * `state[0x31+팀] == 0`(사람)인지 본다 — 팀 0 = 선공(측 0). 그래서 비긴 경기는 우리가 선공일 때 "이긴 경기" 다
+ * (원본 그대로 — 점수차 0 이라 37~39 는 안 나오지만 완투 계열은 나올 수 있다).
+ * 완투 계열은 그 밖에 모드 ≠ 4 · `state[0x8c]`(사람이 코스를 확정한 적 있음) · 우리 **현재** 투수 R[3] == 3 × 치른 이닝.
+ * 피안타·출루·실점은 팀 단위 칸 state[0x89]·[0x88]·[0x8a] 다 (`pitching`).
+ */
+function gameEndRecordIdsFor(progress: TeamGameProgress): readonly number[] {
+  // 0x4ea0c 는 경기가 끝나야 부른다 — 도중의 요약에는 안 붙인다
+  if (progress.recordTally.autoProgressed || !progress.game.isFinished) return []
+  const game = progress.game
+  const won =
+    game.ourScore > game.opponentScore || (game.ourScore === game.opponentScore && ourHalfOf(game) === '초')
+  if (!won) return []
+  return [
+    ...gameEndRecordIdsOf(game.ourScore - game.opponentScore),
+    ...completeGameRecordIdsOf({
+      mode: progress.options.mode,
+      won,
+      pitchCourseConfirmed: progress.recordTally.pitchCourseConfirmed,
+      // state[0x6b] + 1 — 치른 이닝 전부 (연장이면 그만큼)
+      inningsPlayed: game.inning,
+      outsRecorded: progress.recordTally.moundOuts,
+      hitsAllowed: progress.pitching.hitsAllowed,
+      walksAllowed: progress.pitching.walksAllowed,
+      runsAllowed: progress.pitching.runsAllowed,
+    }),
+  ]
 }
 
 /* ── 시즌 평판 16칸 (0xa8024 → 0xa755c → 0xa3440) ─────────────────────────────── */
@@ -1129,11 +1370,31 @@ function batterPitch(
 ): TeamGameProgress {
   if (!isBatterTurn(progress)) return progress
   progress = throwOpponentPitch(progress, detail.pitchTypeNumber)
+  progress = withFoulRecords(progress, detail.resolution.kind === '파울')
   const atBat = applyPitchResolution(progress.atBat, detail.resolution)
   const outcome = atBat.outcome
   // 판정 A(0xae24c)의 "그 밖 → 0xf" — 같은 타석 다음 공. 0xf 진입 0x3d954 가 CPU 투수 교체를 다시 묻는다
   if (outcome === null) return enterPitchSelection({ ...progress, atBat }, random)
   return applyOutcome({ ...progress, atBat }, outcome, random, options)
+}
+
+/**
+ * **32·33 연속 파울** — 파울 판정 `0x51408` 의 v = 7 갈래가 `0xa7dbc` 로 `ctx+0x15f` 를 올리고 3·4 에서 준다(사람 공격).
+ * 파울이 아닌 공이 오면 공 도착 판정 `0x3dfac` 끝의 `0xa5fdc` 가 0 으로 되돌린다 — ⚠️ R8 4-4 의 **유력**
+ * (0x3dfac 의 모든 갈래가 끝을 지나는지는 안 봤다). 타석 초기화 0xa5bcc 도 지운다(`prepareAtBat`).
+ */
+function withFoulRecords(progress: TeamGameProgress, isFoul: boolean): TeamGameProgress {
+  if (!isFoul) {
+    return progress.recordTally.foulStreak === 0
+      ? progress
+      : { ...progress, recordTally: { ...progress.recordTally, foulStreak: 0 } }
+  }
+  const fouled = foulRecordOf(progress.recordTally.foulStreak)
+  return withGameRecords(
+    { ...progress, recordTally: { ...progress.recordTally, foulStreak: fouled.foulStreak } },
+    fouled.recordIds,
+    true,
+  )
 }
 
 /**
@@ -1365,14 +1626,11 @@ function finishBatterOutcome(
   const isWalkOff = game.isFinished && runsBattedIn > 0 && game.ourScore > game.opponentScore
   // 시즌 평판 16칸 — 우리 공격이라 **수비측(상대)이 CPU** 인 코드(≥ 6)만 선다
   const offense = offenseRecordOf(outcome, runsBattedIn, progress.ourHitBases[slot] ?? [])
-  // 기록 5 대타 홈런 (a8764) — 사람 공격이라 게이트(0xa77f0 a785e)를 지난다
-  const pinchHitRecords = pinchHitHomeRunRecordIdsOf({
-    isHomeRun: outcome.kind === '홈런',
-    isPinchHitAtBat: isPinchHitAtBat(progress),
-  }).filter((id) => passesRecordTeamGate(id, { offenseIsHuman: true, defenseIsHuman: false }))
+  // 기록달성 (0xa8024 → 0xa77f0) — 사람 공격이라 공격 계열이 게이트를 지난다. 5 대타 홈런은 ctx+0x160 을 본다
+  const recorded = withOurAtBatRecords(progress, slot, outcome, runsBattedIn, isPinchHitAtBat(progress))
 
   const next: TeamGameProgress = {
-    ...progress,
+    ...recorded,
     game,
     // 득점 처리 0xa5c34 — 한 점씩 승·패·세 칸을 고친다
     decisions: decisionsAfterPlay(progress.decisions, before, game, moundsOf(progress)),
@@ -1383,7 +1641,6 @@ function finishBatterOutcome(
     atBatPrepared: false,
     // 다음 타석 시작 0x48d50 → 0xa5bcc 가 ctx+0x160 을 지운다
     pinchHitHomeRunHalf: null,
-    recordIds: pinchHitRecords.length === 0 ? progress.recordIds : [...progress.recordIds, ...pinchHitRecords],
     // 우리 타석의 득점은 **상대 투수**의 A·B 로 들어간다 (0xa5c34 는 수비 팀 칸을 올린다)
     opponentPitcherCounters: addRunsToCounters(
       progress.opponentPitcherCounters,
@@ -1573,6 +1830,17 @@ function pitchOnce(
     pitcherJustChanged: false,
     // 같은 0xa5e14 가 state[0xe](CPU 대타 막음)도 내린다 (a5e7c)
     cpuPinchHitUsed: false,
+    // 0xa5e14 가 이 타석·반 이닝 투구 수(ctx+0x161 a5eda · +0x16c a5e4e)를 올린다.
+    // 코스를 확정했으니(0x50e9c) state[0x8c] = 1 — 완투 계열의 조건이다
+    recordTally: withHalfInningPitches(
+      {
+        ...progress.recordTally,
+        atBatPitches: progress.recordTally.atBatPitches + 1,
+        pitchCourseConfirmed: true,
+      },
+      progress.game,
+      1,
+    ),
     ourPitcherCounters: {
       ...progress.ourPitcherCounters,
       pitches: progress.ourPitcherCounters.pitches + 1,
@@ -1766,8 +2034,19 @@ function finishDefensiveAtBat(
     ),
   }
 
+  // 기록달성 (0xa7c4c · 0xa7998 · 0xa7d0c · 0xa8024 → 0xa77f0) — 사람 수비라 수비 계열이 게이트를 지난다
+  const recorded = withOurDefenseRecords(next, {
+    outcome,
+    outsBefore: before.outs,
+    outsAdded: applied.outsAdded,
+    atBatPitches: progress.recordTally.atBatPitches,
+    balls: progress.atBat.balls,
+    halfInningPitches: halfInningPitchesOf(progress.recordTally, before),
+    laserThrow: defensePlay?.laserThrow ?? false,
+  })
+
   const resolved = mine
-    ? resolveBurstFor(next, {
+    ? resolveBurstFor(recorded, {
         outcome,
         runsBattedIn: applied.runsScored,
         outsBefore: before.outs,
@@ -1777,7 +2056,7 @@ function finishDefensiveAtBat(
         humanTeamWalkOff:
           applied.game.isFinished && applied.game.ourScore > applied.game.opponentScore,
       })
-    : next
+    : recorded
 
   return appendLog(
     resolved,
@@ -1986,7 +2265,15 @@ function applyPickoffPlay(
  * 곧장 간다.
  */
 function prepareAtBat(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
-  return readyAtBat(progress.cpuPinchHitUsed ? { ...progress, cpuPinchHitUsed: false } : progress, random)
+  return readyAtBat(
+    {
+      ...progress,
+      cpuPinchHitUsed: false,
+      // 같은 0x48d50 의 타석 초기화 0xa5bcc — 연속 파울 ctx+0x15f · 타석 투구 수 ctx+0x161 = 0
+      recordTally: { ...progress.recordTally, foulStreak: 0, atBatPitches: 0 },
+    },
+    random,
+  )
 }
 
 /**
@@ -2281,6 +2568,8 @@ function applyPitcherChange(
       stamina: FULL_STAMINA,
       ourPitcherCounters: EMPTY_MOUND_COUNTERS,
       pitchCount: 0,
+      // 기록달성이 보는 R 은 **새 투수의** 경기 기록이다(0xb8cec = team+0x244+4·team[0]) — 이 경기에 처음 서니 0
+      recordTally: { ...progress.recordTally, moundStrikeouts: 0, moundStrikeoutCombo: 0, moundOuts: 0 },
     }
   }
   return {
@@ -2390,6 +2679,7 @@ export function pinchHit(progress: TeamGameProgress, benchIndex: number): TeamGa
     progress.game.battingOrderIndex,
     benchIndex,
     progress.ourHitBases,
+    progress.ourBatterLogs,
   )
   if (swapped === null) return progress
 
@@ -2399,6 +2689,7 @@ export function pinchHit(progress: TeamGameProgress, benchIndex: number): TeamGa
       ourEntry: swapped.entry,
       ourEntryRecords: swapped.records,
       ourHitBases: swapped.hitBases ?? progress.ourHitBases,
+      ourBatterLogs: swapped.logs ?? progress.ourBatterLogs,
       // 4. 벤치 타자 수 −1
       ourBenchBatters: Math.max(0, progress.ourBenchBatters - 1),
       // 상태 0x16 → 0xd: 이전 상태가 0x16 이라 0xb6764·0xa5bcc 를 건너뛴다 — 카운트를 그대로 둔다
@@ -2434,10 +2725,13 @@ function substituteBatter(
   benchIndex: number,
   /** 우리 팀일 때만 넘긴다 — 사이클 판정은 사람 팀 타순만 본다 (`0xa7610` 의 `st[0x31+st[9]]`) */
   hitBasesBefore?: readonly (readonly number[])[],
+  /** 우리 팀일 때만 넘긴다 — 기록달성이 보는 타석 결과 목록도 같은 24바이트 안이다 */
+  logsBefore?: readonly BatterGameLog[],
 ): {
   readonly entry: readonly TeamEntryBatter[]
   readonly records: readonly BatterGameRecord[]
   readonly hitBases: readonly (readonly number[])[] | undefined
+  readonly logs: readonly BatterGameLog[] | undefined
   readonly outgoing: TeamEntryBatter
   readonly incoming: TeamEntryBatter
 } | null {
@@ -2458,12 +2752,18 @@ function substituteBatter(
     hitBases[slot] = hitBasesBefore[benchIndex] ?? []
     hitBases[benchIndex] = hitBasesBefore[slot] ?? []
   }
+  const logs = logsBefore === undefined ? undefined : [...logsBefore]
+  if (logs !== undefined && logsBefore !== undefined) {
+    logs[slot] = logsBefore[benchIndex] ?? EMPTY_BATTER_GAME_LOG
+    logs[benchIndex] = logsBefore[slot] ?? EMPTY_BATTER_GAME_LOG
+  }
   // 3. 빠진 선수를 명단에서 지운다
   entry.splice(benchIndex, 1)
   records.splice(benchIndex, 1)
   hitBases?.splice(benchIndex, 1)
+  logs?.splice(benchIndex, 1)
 
-  return { entry, records, hitBases, outgoing, incoming }
+  return { entry, records, hitBases, logs, outgoing, incoming }
 }
 
 /* ── CPU 대타 (0xac228) ──────────────────────────────────────────────────────── */
@@ -2521,6 +2821,7 @@ function applyCpuPinchHit(
     slot,
     BATTING_ORDER_SIZE + benchIndex,
     battingIsOurs ? progress.ourHitBases : undefined,
+    battingIsOurs ? progress.ourBatterLogs : undefined,
   )
   if (swapped === null) return progress
 
@@ -2530,6 +2831,7 @@ function applyCpuPinchHit(
         ourEntry: swapped.entry,
         ourEntryRecords: swapped.records,
         ourHitBases: swapped.hitBases ?? progress.ourHitBases,
+        ourBatterLogs: swapped.logs ?? progress.ourBatterLogs,
         ourBenchBatters: Math.max(0, progress.ourBenchBatters - 1),
       }
     : {
@@ -2609,7 +2911,8 @@ export function canAutoProgress(progress: TeamGameProgress): boolean {
 export function runAutoProgress(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
   // 수비 진행 중에는 손대지 않는다 — 붙들어 둔 타구를 버리고 다음 타석으로 넘어가면 안 된다
   if (progress.pendingDefensePlay !== null) return progress
-  let current = progress
+  // 자동진행 전환 0xc1b48 이 [ctx+0x24] 첫 바이트를 1 로 — 이 뒤로 0xa77f0 은 기록을 안 준다 (a77f2, 유력)
+  let current: TeamGameProgress = { ...progress, recordTally: { ...progress.recordTally, autoProgressed: true } }
   for (let step = 0; step < MAXIMUM_AUTO_STEPS; step += 1) {
     if (current.game.isFinished) return current
     if (isVersusMode(current.options.mode) && current.game.inning - 1 > AUTO_PROGRESS_LAST_INNING_INDEX) {
@@ -2667,8 +2970,15 @@ export function stealBase(
       base === 1
         ? { ...before.bases, first: false, second: true }
         : { ...before.bases, second: false, third: true }
+    // 주자 플레이(종류 5) 정산 0xa8024 @a83c6 — 도루를 걸고 루를 옮긴 주자마다 8 (사람 공격이라 게이트를 지난다)
+    const recordIds = stealPlayRecordIdsOf({
+      isRunnerPlay: true,
+      runners: [
+        { stealStarted: true, fromBase: base, currentBase: base + 1, targetBase: base + 1, finished: true, safe: true },
+      ],
+    })
     return appendLog(
-      { ...progress, game: { ...before, bases } },
+      withGameRecords({ ...progress, game: { ...before, bases } }, recordIds, true),
       `${before.inning}회${before.half} ${base}루 주자 도루 성공`,
       true,
     )
@@ -2827,9 +3137,12 @@ function playAutoOffenseAtBat(progress: TeamGameProgress, random: RandomPort): T
   const slot = before.battingOrderIndex
   const autoOffense = offenseRecordOf(outcome, runsBattedIn, progress.ourHitBases[slot] ?? [])
 
+  // 간이 엔진 타석도 같은 0xa8024 → 0xa77f0 을 지난다 — 기록달성도 똑같이 쌓인다 (대타 홈런 5 는 c26b6 이 지워 없다)
+  const recorded = withOurAtBatRecords(progress, slot, outcome, runsBattedIn, false)
+
   return appendLog(
     {
-      ...progress,
+      ...recorded,
       game,
       // 간이 엔진 득점(0xc0fb4·0xc1054)도 같은 0xa5c34 를 부른다
       decisions: decisionsAfterPlay(progress.decisions, before, game, moundsOf(progress)),
@@ -2886,6 +3199,14 @@ function playAutoDefenseAtBat(progress: TeamGameProgress, random: RandomPort): T
   return startDefensiveAtBat(
     {
       ...progress,
+      // 간이 엔진도 공마다 0xa5e14 가 이 타석·반 이닝 투구 수(ctx+0x161·+0x16c)를 올리고, 0xc1818 이 볼카운트
+      // state[4]·[5] 를 쓴다 — 삼진(0xa7c4c)·아웃(0xa7d0c) 기록 판정이 그 값을 본다
+      recordTally: withHalfInningPitches(
+        { ...progress.recordTally, atBatPitches: play.pitches },
+        progress.game,
+        play.pitches,
+      ),
+      atBat: createAtBat({ balls: play.balls, strikes: 0 }),
       // 투구마다 state[0xd]·state[0xe] 가 내려간다 (0xa5e14 의 a5e72·a5e7c, c26ca)
       pitcherJustChanged: false,
       cpuPinchHitUsed: false,
@@ -2975,9 +3296,18 @@ export interface TeamGameSummary {
    * `record.gameRecord` 에 꽂는다. 시즌(모드 2)이 아니면 전부 0 이다 (게이트 `0xa755c`).
    */
   readonly gameRecord: readonly number[]
+  /**
+   * 이 경기 **기록달성 번호** — 경기 중 쌓인 것 + 경기 끝 0xa7de8 몫(37~39 점수차 승 · 28~31 완투 계열).
+   * 원본 경기 끝 0x4ea0c 는 모드 5·6 이 아니면 `Σ 횟수 × 0xcfbf8[k]` 를 저장 G(+0x64)에 더한다(4ebe0~4ec5a, 99999 상한).
+   * (`summaryOf` 는 늘 채운다. 선택 칸인 것은 이 칸을 아직 안 읽는 앱 쪽 시험용 요약들이 그대로 맞게 하려는 것뿐이다.)
+   */
+  readonly recordIds?: readonly number[]
+  /** 위 기록의 G — `recordGamePointsOf` (0xcfbf8 표). 저장 G 에 더하는 것은 부르는 쪽(앱 세션)의 몫이다 */
+  readonly gamePoints?: number
 }
 
 export function summaryOf(progress: TeamGameProgress): TeamGameSummary {
+  const recordIds = [...progress.recordIds, ...gameEndRecordIdsFor(progress)]
   const game = progress.game
   const flags: CompleteGameFlags = {
     allowedBaserunner: progress.pitching.allowedBaserunner,
@@ -3000,5 +3330,7 @@ export function summaryOf(progress: TeamGameProgress): TeamGameSummary {
     popularityCompleteGame: popularityCompleteGameOf(outs, game.inning - 1, flags),
     reputationCompleteGame: reputationCompleteGameOf(outs, REGULATION_LAST_INNING_INDEX, flags),
     gameRecord: progress.gameRecord,
+    recordIds,
+    gamePoints: recordGamePointsOf(recordIds),
   }
 }

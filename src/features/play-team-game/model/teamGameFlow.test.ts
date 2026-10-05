@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { createAtBat } from '@/entities/at-bat/model/atBatState'
+import { EMPTY_BATTER_GAME_LOG, recordBatterAtBat } from '@/entities/game/model/batterGameLog'
+import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import {
   INNING_VALUE,
@@ -501,8 +503,12 @@ describe('도루 (0x53610 → 메시지 0x583)', () => {
     for (const next of 성공) {
       expect(next.game.bases.first).toBe(false)
       expect(next.game.outs).toBe(progress.game.outs)
+      // 기록 8 도루 성공 (0xa8024 @a83c6) — 사람 공격이라 게이트를 지난다
+      expect(next.recordIds).toEqual([...progress.recordIds, 8])
     }
     for (const next of 실패) {
+      // 24 도루 저지 후보는 사람 공격이라 게이트(0xa77f0 a785e)에서 버려진다
+      expect(next.recordIds).toEqual(progress.recordIds)
       expect(next.game.outs).toBe(progress.game.outs + 1)
       // 타석은 이어진다 — 타순 커서가 넘어가지 않는다
       expect(next.game.battingOrderIndex).toBe(progress.game.battingOrderIndex)
@@ -887,11 +893,12 @@ describe('대타 (0xaf06c → 0xaebe4 의 +0x291 가지, R4 1a·1c)', () => {
     expect(뒤.scenePinchHit).toMatchObject({ serial: 1, by: '사람' })
 
     const 친뒤 = applyBatterOutcome(뒤, { kind: '홈런' }, random)
-    expect(친뒤.recordIds).toEqual([5])
+    // 홈런 단계(솔로 1)와 **함께** 준다 (a8642 · a8764)
+    expect(친뒤.recordIds).toEqual([1, 5])
     expect(친뒤.pinchHitHomeRunHalf).toBeNull()
 
     // 대타 없이 친 홈런은 5 가 아니다
-    expect(applyBatterOutcome(progress, { kind: '홈런' }, random).recordIds).toEqual([])
+    expect(applyBatterOutcome(progress, { kind: '홈런' }, random).recordIds).toEqual([1])
   })
 
   it('대타 타석이 홈런이 아니면 5 는 없고 칸만 지워진다 — 반 이닝이 바뀐 칸도 안 먹는다', () => {
@@ -902,7 +909,7 @@ describe('대타 (0xaf06c → 0xaebe4 의 +0x291 가지, R4 1a·1c)', () => {
     expect(아웃.pinchHitHomeRunHalf).toBeNull()
 
     const 지난칸 = { ...뒤, pinchHitHomeRunHalf: { inning: 뒤.game.inning + 1, half: 뒤.game.half } }
-    expect(applyBatterOutcome(지난칸, { kind: '홈런' }, random).recordIds).toEqual([])
+    expect(applyBatterOutcome(지난칸, { kind: '홈런' }, random).recordIds).toEqual([1])
   })
 
   it('벤치를 다 쓰면 더는 못 연다', () => {
@@ -1617,5 +1624,103 @@ describe('공수 교대 판 (상태 0x18 교대 가지 — 앞뒤 장면이 모�
     }
     // 1회초 판 · 1회말 판 · 2회초 판
     expect(current.halfInningBoard).toEqual({ serial: 3, inning: 2, half: '초' })
+  })
+})
+
+describe('기록달성 — 팀 경기도 0xa77f0 으로 쌓고 경기 끝 0x4ea0c 가 G 로 준다 (모드 1·2·8·9)', () => {
+  const 우리공격 = () => 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
+  const 공 = (kind: '볼' | '파울') => ({
+    resolution: kind === '볼' ? ({ kind: '볼' } as const) : ({ kind: '파울' } as const),
+    hasSwung: kind === '파울',
+    isBunt: false,
+    resultCode: null,
+    pitchTypeNumber: 1,
+  })
+
+  it('3루타 0 · 홈런 단계 1~4 — 우리 타석 정산 (a85b2 · a8642~a869e)', () => {
+    const { progress, random } = 우리공격()
+    expect(applyBatterOutcome(progress, { kind: '안타', bases: 3 }, random).recordIds).toEqual([0])
+    const 만루 = { ...progress, game: { ...progress.game, bases: { first: true, second: true, third: true } } }
+    expect(applyBatterOutcome(만루, { kind: '홈런' }, random).recordIds).toEqual([4])
+  })
+
+  it('백투백 6 — 우리 팀 연속 타석 홈런, 홈런 아닌 결과가 끼면 끊긴다 (ctx+0x162, 0xa794c)', () => {
+    const { progress, random } = 우리공격()
+    const 한방 = applyBatterOutcome(progress, { kind: '홈런' }, random)
+    expect(한방.recordTally.homeRunStreak).toBe(1)
+    const 두방 = applyBatterOutcome(한방, { kind: '홈런' }, random)
+    expect(두방.recordIds).toEqual([1, 1, 6])
+    const 끊김 = applyBatterOutcome(한방, { kind: '아웃', detail: '뜬공아웃' }, random)
+    expect(끊김.recordTally.homeRunStreak).toBe(0)
+  })
+
+  it('연타석·한 타자 볼넷은 타순 칸 결과 목록으로 본다 — 대타가 오면 목록도 같이 움직인다 (aed02~aed16)', () => {
+    const { progress, random } = 우리공격()
+    const 슬롯 = progress.game.battingOrderIndex
+    const 두번안타 = recordBatterAtBat(
+      recordBatterAtBat(EMPTY_BATTER_GAME_LOG, { kind: '안타', bases: 1 }, 0).log,
+      { kind: '안타', bases: 1 },
+      0,
+    ).log
+    const 판 = { ...progress, ourBatterLogs: progress.ourBatterLogs.map((log, index) => (index === 슬롯 ? 두번안타 : log)) }
+    // 세 번째 연속 안타 → 9 연타석 x3 (0xa7b90)
+    expect(applyBatterOutcome(판, { kind: '안타', bases: 1 }, random).recordIds).toEqual([9])
+    // 대타가 들어오면 그 칸은 벤치 선수의 빈 목록이다 — 이어지지 않는다
+    expect(applyBatterOutcome(pinchHit(판, 9), { kind: '안타', bases: 1 }, random).recordIds).toEqual([])
+  })
+
+  it('32·33 연속 파울 — 공마다, 파울 아닌 공이면 끊긴다 (0xa7dbc · 0xa5fdc 유력)', () => {
+    const { progress } = 우리공격()
+    const random = createSeededRandom(1)
+    let 판 = progress
+    for (let 번 = 0; 번 < 4; 번 += 1) 판 = applyBatterPitch(판, 공('파울'), random)
+    expect(판.recordIds).toEqual([32, 33])
+    const 끊김 = applyBatterPitch(applyBatterPitch(progress, 공('파울'), random), 공('볼'), random)
+    expect(끊김.recordTally.foulStreak).toBe(0)
+  })
+
+  it('경기 끝 0xa7de8 — 10점차 승 37, 완투 계열은 코스 확정·현재 투수 아웃 == 3×이닝 일 때만', () => {
+    const { progress } = 시작()
+    const 끝 = (tally: Partial<TeamGameProgress['recordTally']>, runsAllowed: number) => ({
+      ...progress,
+      game: { ...progress.game, inning: 9, ourScore: 10, opponentScore: 0, isFinished: true },
+      pitching: { ...progress.pitching, outsRecorded: 27, hitsAllowed: 3, runsAllowed },
+      recordTally: { ...progress.recordTally, ...tally },
+    })
+    // 사람이 공을 한 번도 안 던졌으면(state[0x8c] = 0) 완투 계열은 없다
+    expect(summaryOf(끝({ moundOuts: 27 }, 0)).recordIds).toEqual([37])
+    // 완봉 29 — 피안타는 있으나 실점 0
+    const 완봉 = summaryOf(끝({ moundOuts: 27, pitchCourseConfirmed: true }, 0))
+    expect(완봉.recordIds).toEqual([37, 29])
+    expect(완봉.gamePoints).toBe(recordGamePointsOf([37, 29]))
+    // 구원으로 올라온 현재 투수는 3×이닝 아웃을 못 채운다
+    expect(summaryOf(끝({ moundOuts: 20, pitchCourseConfirmed: true }, 0)).recordIds).toEqual([37])
+  })
+
+  it('자동진행(0xc1b48 → [ctx+0x24] = 1) 뒤로는 아무 기록도 없다 (a77f2, 유력)', () => {
+    const { progress, random } = 우리공격()
+    const 끝 = runAutoProgress(progress, random)
+    expect(끝.recordTally.autoProgressed).toBe(true)
+    expect(summaryOf(끝).recordIds).toEqual(progress.recordIds)
+    expect(summaryOf(끝).gamePoints).toBe(0)
+  })
+
+  it('경기진행 설정으로 넘긴 타석(간이 엔진)은 자동진행이 아니라 기록이 쌓인다 — 게이트를 지난 번호뿐이다', () => {
+    let 쌓인경기 = 0
+    const 수비기록 = new Set<number>()
+    for (let seed = 1; seed <= 12; seed += 1) {
+      const progress = startTeamGame({ ...기본옵션, settings: 전부자동 }, createSeededRandom(seed * 7919))
+      expect(progress.game.isFinished).toBe(true)
+      const summary = summaryOf(progress)
+      const ids = summary.recordIds ?? []
+      if (ids.length > 0) 쌓인경기 += 1
+      // 간이 엔진에는 파울(0x51408)·필살송구가 없다
+      expect(ids.filter((id) => id === 32 || id === 33 || id === 36)).toEqual([])
+      for (const id of ids) if (id >= 16 && id <= 27) 수비기록.add(id)
+      expect(summary.gamePoints).toBe(recordGamePointsOf(ids))
+    }
+    expect(쌓인경기).toBeGreaterThan(0)
+    // 우리 수비 간이 타석의 삼진도 우리 팀 기록이다 (모드 1·2 는 우리 팀이 사람 팀 — 0xa7c4c · 0xa7998)
+    expect(수비기록.size).toBeGreaterThan(0)
   })
 })
