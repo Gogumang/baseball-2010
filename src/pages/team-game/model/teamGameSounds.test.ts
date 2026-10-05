@@ -5,6 +5,7 @@ import {
   PITCHER_CHANGE_SOUND,
   PITCHER_ENTRY_SOUND,
   pinchHitSoundIdsOf,
+  scenePitcherChangeSoundIdsOf,
   pitcherEntrySoundIdOf,
 } from '@/pages/team-game/model/teamGameSounds'
 
@@ -58,5 +59,33 @@ describe('대타 교체 소리 (pinchHitSoundIdsOf)', () => {
     const 같은 = { serial: 2, by: 'CPU' as const, incomingIsAce: false }
     expect(pinchHitSoundIdsOf(진행(같은), 진행(같은))).toEqual([])
     expect(pinchHitSoundIdsOf(진행(null), 진행(null))).toEqual([])
+  })
+})
+
+/** 사람 장면 CPU 투수 교체 — 0xf 진입 22(3da88) → 0x16 → 0xe 투수 등판음(0x38b64 투수 가지) */
+describe('CPU 투수 교체 소리 (scenePitcherChangeSoundIdsOf)', () => {
+  const 진행 = (
+    scenePitcherChange: { serial: number; incomingIsAce: boolean } | null,
+    bases = { second: false, third: false },
+  ) => ({ scenePitcherChange, game: { bases } })
+
+  it('22 다음 등판음 — 마투수 26 · 2·3루 주자 15 · 그 밖 14', () => {
+    expect(scenePitcherChangeSoundIdsOf(진행(null), 진행({ serial: 1, incomingIsAce: false }))).toEqual([
+      PITCHER_CHANGE_SOUND,
+      PITCHER_ENTRY_SOUND,
+    ])
+    expect(scenePitcherChangeSoundIdsOf(진행(null), 진행({ serial: 1, incomingIsAce: true }))).toEqual([
+      PITCHER_CHANGE_SOUND,
+      ACE_ENTRY_SOUND,
+    ])
+    expect(
+      scenePitcherChangeSoundIdsOf(진행(null), 진행({ serial: 1, incomingIsAce: false }, { second: true, third: false })),
+    ).toEqual([PITCHER_CHANGE_SOUND, PITCHER_ENTRY_CRISIS_SOUND])
+  })
+
+  it('교체가 없던 걸음에는 아무 소리도 없다', () => {
+    const 같은 = { serial: 3, incomingIsAce: false }
+    expect(scenePitcherChangeSoundIdsOf(진행(같은), 진행(같은))).toEqual([])
+    expect(scenePitcherChangeSoundIdsOf(진행(null), 진행(null))).toEqual([])
   })
 })

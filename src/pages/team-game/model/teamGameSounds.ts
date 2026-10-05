@@ -56,8 +56,7 @@ export function stepSoundIdsOf(
  * (0x3af06; 상태→진입 함수 표는 docs/re/I-controls.md 1절 "0xb 0x3ae08(교체)").
  * 같은 22 를 트는 다른 자리는 타석 준비 0xf 진입 `0x3d954` 에서 CPU 대타(`0xac228`, 3da70)나 CPU 투수 교체
  * (`0xac428`, 3da3e)가 걸려 교체 연출 0x16 으로 넘어갈 때(3da88 `0x6ea6d(소리, 0x16, −1, 0)` → 3da94 상태 0x16)다.
- * CPU 대타 쪽은 `pinchHitSoundIdsOf` 가 잇는다. CPU 투수 교체 쪽은 웹이 사람 장면에서 그 판정을 안 돌려
- * (`teamGameFlow.prepareAtBat` 주석) 아직 없다.
+ * CPU 대타 쪽은 `pinchHitSoundIdsOf`, CPU 투수 교체 쪽은 `scenePitcherChangeSoundIdsOf` 가 잇는다.
  *
  * ⚠️ L 노트가 0x3ae08 을 "경기 중 창" 으로 적어 두었지만 **경기 중 메뉴('\*', 0x3c158)에서는
  *    안 난다** — 0x3c158 이 트는 것은 소리 크기 미리듣기 5 뿐이다 (L 1-F).
@@ -104,9 +103,8 @@ export interface PitcherEntrySoundInput {
  * 0x3d458 의 대타 예약 `0xae9a0(공격팀, 1)` 가지)도 번호를 **똑같이** 26/15/14 로 고른다 — 공격 팀 타자
  * `0xae89d([게임+0x220])`(38c4c)를 보고, 예약이 아니라 즉시(38cd4 `0x6ea6d`)다. → `pinchHitSoundIdsOf`.
  *
- * ⚠️ **웹이 안 이은 자리**: CPU 투수 교체는 웹에서 *자동으로 넘기는 타석* 안에서만 일어나는데,
- * 원본의 그 자리는 간이 엔진(`0xc1ba4`)이라 연출·소리가 없다. 그래서 `#` 로 사람이 바꾼
- * 교체에만 이었다.
+ * 이은 자리: `#` 로 사람이 바꾼 교체(`useTeamGame.changePitcher`)와 사람 장면 0xf 진입 `0x3d954` 의 CPU 투수
+ * 교체(`scenePitcherChangeSoundIdsOf`). 간이 엔진(`0xc1ba4`)의 CPU 교체는 연출이 없어 소리도 없다.
  */
 export function pitcherEntrySoundIdOf(input: PitcherEntrySoundInput): number {
   if (input.isAce) return ACE_ENTRY_SOUND
@@ -148,4 +146,36 @@ export function pinchHitSoundIdsOf(
   if (cue === null || cue === before.scenePinchHit) return []
   const entry = pitcherEntrySoundIdOf({ isAce: cue.incomingIsAce, bases: after.game.bases })
   return cue.by === 'CPU' ? [PITCHER_CHANGE_SOUND, entry] : [entry]
+}
+
+/* ── CPU 투수 교체 소리 (사람 장면 0xf 진입 0x3d954 → 교체 연출 0x16) ───────────────── */
+
+/** 사람 장면에서 지난 CPU 투수 교체 한 번 — `TeamGameProgress.scenePitcherChange` 와 같은 모양 */
+export interface ScenePitcherChangeCue {
+  readonly serial: number
+  readonly incomingIsAce: boolean
+}
+
+export interface ScenePitcherChangeSoundProgress {
+  readonly scenePitcherChange: ScenePitcherChangeCue | null
+  readonly game: { readonly bases: { readonly second: boolean; readonly third: boolean } }
+}
+
+/**
+ * **CPU 투수 교체가 교체 연출(상태 0x16)을 지나 새 투수가 설 때 나는 소리** — 원본 순서대로.
+ *
+ * 1. **"Time!" 22**: 0xf 진입 `0x3d954` 가 `0xac428`(3da3e, 수비 팀이 CPU 일 때) 참을 받자마자
+ *    `0x6ea6d(소리, 0x16, −1, 0)`(3da88) 를 부르고 상태 0x16 을 예약한다 (3da94). CPU 대타와 같은 자리다.
+ * 2. 0x16 진입 `0x3d458` 이 투수 교체 예약 `0xae9a0(수비팀, 0)`(team[+0x290])을 보고 `+0x195c` 비트1 을 세운다
+ *    (0x3d58c) → 0xd → 0xe 에서 `0x38b64` 투수 가지가 **올라온 투수**로 26/15/14 를 예약한다 (`pitcherEntrySoundIdOf`).
+ *
+ * 간이 엔진(0xc1ba4)의 CPU 교체는 연출이 없어 진행기가 `scenePitcherChange` 를 안 바꾼다 — 소리도 없다.
+ */
+export function scenePitcherChangeSoundIdsOf(
+  before: ScenePitcherChangeSoundProgress,
+  after: ScenePitcherChangeSoundProgress,
+): readonly number[] {
+  const cue = after.scenePitcherChange
+  if (cue === null || cue === before.scenePitcherChange) return []
+  return [PITCHER_CHANGE_SOUND, pitcherEntrySoundIdOf({ isAce: cue.incomingIsAce, bases: after.game.bases })]
 }

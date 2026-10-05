@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
+import { createAtBat } from '@/entities/at-bat/model/atBatState'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import {
   INNING_VALUE,
@@ -175,6 +176,46 @@ describe('사람이 치는 타석', () => {
     expect(after.game.ourScore).toBe(progress.game.ourScore + 1)
     const 마지막 = play!.ticks[play!.ticks.length - 1]
     expect(마지막.runners.every((runner) => runner.base === 0)).toBe(true)
+  })
+})
+
+describe('사람 장면 0xf 진입 0x3d954 — 공마다 CPU 투수 교체(0xac428)·CPU 대타(0xac228)를 다시 묻는다', () => {
+  const 볼 = { resolution: { kind: '볼' } as const, hasSwung: false, isBunt: false, resultCode: null, pitchTypeNumber: 1 }
+  /** 우리 공격 · 상대 투수가 다 지쳐 0xac428 이 바꾸는 판 (0-기준 이닝 0 · 체력 0) */
+  const 지친상대 = () => {
+    const { progress } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
+    return { ...progress, opponentStamina: 0 }
+  }
+
+  it('볼 하나 뒤 같은 타석 다음 공(판정 A → 0xf)에서 상대 투수를 바꾸고, 카운트는 이어받는다 (0x16 → 0xd 가 지우기를 건너뜀)', () => {
+    const 판 = 지친상대()
+    const 뒤 = applyBatterPitch(판, 볼, createSeededRandom(1))
+    expect(뒤.opponentPitcherIndex).not.toBe(판.opponentPitcherIndex)
+    expect(뒤.opponentUsedPitchers).toEqual([판.opponentPitcherIndex])
+    expect(뒤.atBat.balls).toBe(1)
+    expect(뒤.atBatPrepared).toBe(true)
+    // 22 → 0x16 → 0xe 등판음을 위한 표시 — 한 번
+    expect(뒤.scenePitcherChange?.serial).toBe(1)
+    // 교체 뒤 state[0xd] 가 서 있어 다시 들어선 0xf(0x16 → 0xd → 0xe → 0xf)는 곧장 빠진다
+    expect(뒤.pitcherJustChanged).toBe(true)
+  })
+
+  it('돌발이 진행 중이면(0x8eb94) 건너뛴다', () => {
+    const 판 = 지친상대()
+    const row = { id: 1 } as unknown as NonNullable<NonNullable<TeamGameProgress['burst']>['current']>
+    const 돌발중 = { ...판, burst: { ...판.burst!, current: row } }
+    const 뒤 = applyBatterPitch(돌발중, 볼, createSeededRandom(1))
+    expect(뒤.opponentPitcherIndex).toBe(판.opponentPitcherIndex)
+    expect(뒤.scenePitcherChange).toBeNull()
+  })
+
+  it('타석이 끝난 공(볼넷)은 0xf 로 안 돌아가 묻지 않는다 — 새 타석 준비(0xd → 0xe → 0xf)에서 묻는다', () => {
+    const 판 = { ...지친상대(), atBat: createAtBat({ balls: 3, strikes: 0 }) }
+    const 뒤 = applyBatterPitch(판, 볼, createSeededRandom(1))
+    expect(뒤.game.bases.first).toBe(true)
+    // 다음 타자의 타석 준비(prepareAtBat)에서 0x3d954 가 바꿨다 — 새 타석이라 카운트는 0-0
+    expect(뒤.opponentPitcherIndex).not.toBe(판.opponentPitcherIndex)
+    expect(뒤.atBat.balls).toBe(0)
   })
 })
 

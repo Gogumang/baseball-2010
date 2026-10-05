@@ -464,6 +464,12 @@ export interface TeamGameProgress {
     readonly incomingIsAce: boolean
   } | null
   /**
+   * 사람 경기 장면에서 지난 **CPU 투수 교체 연출(상태 0x16)** 의 마지막 한 번 — 0xf 진입 `0x3d954` 의 0xac428
+   * (3da3e, 수비 팀이 CPU 일 때) → "Time!" 22(3da88) → 0x16 → 0xe 투수 등판음(0x38b64 투수 가지).
+   * `incomingIsAce` 는 올라온 투수가 마투수인가(`0xb633c`). 간이 엔진 교체는 연출이 없어 이 칸을 안 바꾼다.
+   */
+  readonly scenePitcherChange: { readonly serial: number; readonly incomingIsAce: boolean } | null
+  /**
    * `0x66968`·`0x66994` 가 뽑은 **AI 팀 마투수·마타자 번호** 0~4 (시즌모드는 −1 — `0x30f20` 을 안 탄다).
    * 마타자는 `opponentEntry` 벤치 첫 칸(9번)에, 마투수는 `opponentPitcherEntry` 8번 칸에 들어가 있다.
    */
@@ -593,6 +599,7 @@ export function startTeamGame(options: TeamGameOptions, random: RandomPort): Tea
     pinchHitHomeRunHalf: null,
     recordIds: [],
     scenePinchHit: null,
+    scenePitcherChange: null,
     opponentAcePitcherIndex: opponentAces.pitcher,
     opponentAceBatterIndex: opponentAces.batter,
     opponentBenchBatters: Math.max(0, opponentEntry.length - BATTING_ORDER_SIZE),
@@ -1124,7 +1131,8 @@ function batterPitch(
   progress = throwOpponentPitch(progress, detail.pitchTypeNumber)
   const atBat = applyPitchResolution(progress.atBat, detail.resolution)
   const outcome = atBat.outcome
-  if (outcome === null) return { ...progress, atBat }
+  // 판정 A(0xae24c)의 "그 밖 → 0xf" — 같은 타석 다음 공. 0xf 진입 0x3d954 가 CPU 투수 교체를 다시 묻는다
+  if (outcome === null) return enterPitchSelection({ ...progress, atBat }, random)
   return applyOutcome({ ...progress, atBat }, outcome, random, options)
 }
 
@@ -1575,7 +1583,8 @@ function pitchOnce(
   }
 
   const outcome = afterPitch.atBat.outcome
-  if (outcome === null) return afterPitch
+  // 판정 A(0xae24c)의 "그 밖 → 0xf" — 같은 타석 다음 공. 0xf 진입 0x3d954 가 CPU 대타를 다시 묻는다
+  if (outcome === null) return enterPitchSelection(afterPitch, random)
 
   // 사구면 상태 0x12 끝(0x4e74c)에서 벤치 클리어링을 굴린다 — 밀어내기 주루(0x17)·정산 0xa8024 보다 앞이다
   const cleared = withPitcherBenchClearing(afterPitch, outcome, random)
@@ -1885,8 +1894,8 @@ const PICKOFF_OUTCOME_PLACEHOLDER: AtBatOutcome = { kind: '아웃', detail: '땅
  *   에 결과 null). 타석에 서 있는 타자(사람 수비면 상대 타순 칸, 사람 공격이면 우리 타순 칸)의 칸이다.
  *
  * ⚠️ 미해결·근사
- * - 원본은 0xf 에 다시 들어서며 진입 `0x3d954` 가 CPU 대타(0xac228)·CPU 투수 교체(0xac428)를 다시 부른다.
- *   웹은 공마다도 이것을 안 다시 부르므로(`prepareAtBat` 은 타석 시작에만) 견제 뒤에도 안 부른다 — 기존 근사와 같다.
+ * - 0xf 에 다시 들어서며 진입 `0x3d954` 가 CPU 대타(0xac228)·CPU 투수 교체(0xac428)를 다시 부른다 —
+ *   `enterPitchSelection` (공마다 다시 들어서는 것과 같은 자리).
  * - 견제사·진루는 이 모드에서 사실상 안 난다(웹 도루는 그 자리에서 끝나 루를 떠난 주자가 없다). 그래도 진행기가
  *   아웃·진루를 내면 경기 상태(루·아웃·점수·반 이닝 교대)에는 먹인다. 그때 `0xa8024` 의 나머지 칸(투수 아웃 수·
  *   평판 16칸·리그 기록·돌발 판정 0x8f414)이 견제 판에서 어떻게 도는지는 손대지 않았다 — 타순도 안 민다
@@ -1960,13 +1969,33 @@ function applyPickoffPlay(
     }`,
     true,
   )
-  return changed ? advance(next, random) : next
+  // 아웃 ≤ 2 면 같은 타석 다음 공 0xf (ae592) — 0xf 진입 0x3d954 가 교체를 다시 묻는다.
+  // 반 이닝이 넘어갔으면 advance 가 새 타석(prepareAtBat)을 세운다
+  if (!changed) return enterPitchSelection(next, random)
+  const advanced = advance(next, random)
+  return advanced === next ? enterPitchSelection(next, random) : advanced
 }
 
 /* ── 타석 준비 · 돌발 ─────────────────────────────────────────────────────────── */
 
 /**
- * 타석 준비 (상태 0xe → 0xf 전이의 **돌발 발동 판정 0x8f158**).
+ * **새 타석** — 상태 0xd 진입 `0x48d50` 부터 0xe → 0xf 까지.
+ *
+ * 0xd 는 이전 상태가 교체 연출 0x16 이 아니면 `state[0xe] = 0` 을 쓴다 (48eb0~48eb6). 이 함수로 오는 것은 늘
+ * 새 타석이다 — 교체 연출 뒤 다시 들어오는 길(0x16 → 0xd 건너뜀)은 `enterPitchSelection` 이 `readyAtBat` 으로
+ * 곧장 간다.
+ */
+function prepareAtBat(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
+  return readyAtBat(progress.cpuPinchHitUsed ? { ...progress, cpuPinchHitUsed: false } : progress, random)
+}
+
+/**
+ * 상태 0xe 의 확인(메시지 1) → **0xf 예약 · 돌발 발동 판정 0x8f158 · 0xf 진입 `0x3d954`** 차례.
+ *
+ * 메시지 1 처리 `0x50c18` 은 `0xbcb48(…, 0xf)` 로 0xf 를 **예약만** 하고(R10 69행 — 다음 틱에 옮긴다) 곧바로
+ * 돌발 객체가 있으면 `0x8f158` 을 굴린다. 발동하면 `0xbcb48(…, 0x1b)` 로 예약을 덮어 0xf 에 들어가지 않고, 돌발
+ * 창(0x1b)을 닫은 뒤(0x3b032) 0xf 에 들어간다. 그러니 **돌발 굴림이 0xf 진입보다 먼저**고, 발동했으면 0xf 진입의
+ * 교체 판정은 진행 중인 돌발(`0x8eb94`) 때문에 건너뛴다 (`enterPitchSelection`).
  *
  * 돌발미션 표는 시즌(모드 2)에만 있다 — 경기 장면이 모드 2·3·4 에서만 객체를 만든다 (0x48658).
  * 시즌 표 56행은 **사람 팀이 공격이면 0~30(타자형), 수비면 31~55(투수형)** 로 갈린다 (0x8f000).
@@ -1974,16 +2003,9 @@ function applyPickoffPlay(
  * **근사**: 원본은 경기 장면이 지나는 모든 타석에서 굴리지만, 자동 진행 구간은 상태 0x21
  * (간이 엔진 중계)로 빠져 0xf 를 지나지 않는다. 그래서 여기서도 **사람이 잡은 타석에서만** 굴린다.
  */
-function prepareAtBat(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
-  // 상태 0xd 진입 0x48d50 — 이전 상태가 교체 연출 0x16 이 아니면 state[0xe] = 0 (48eb0~48eb6).
-  // 이 길로 오는 것은 새 타석뿐이다(교체 연출 뒤 재진입은 이 함수를 안 지난다)
-  progress = progress.cpuPinchHitUsed ? { ...progress, cpuPinchHitUsed: false } : progress
-  // 사람 경기 타석 시작 0x3d954 는 **수비가 사람일 때** CPU 대타 0xac228 을 부른다 (0x3da6e).
-  // (수비가 CPU 면 그 자리에서 CPU 투수 교체 0xac428 로 간다 — 그쪽은 자동 타석에만 옮겨져 있다.)
-  // ⚠️ 돌발미션 판정과의 앞뒤 차례는 **미확인**이다 (0x3d954 를 끝까지 읽지 않았다).
-  if (isPitchTurn(progress)) progress = applyCpuPinchHit(progress, false, random, true)
+function readyAtBat(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
   const session = progress.burst
-  if (session === null) return { ...progress, atBatPrepared: true }
+  if (session === null) return enterPitchSelection({ ...progress, atBatPrepared: true }, random)
   const ours = isOurOffense(progress)
   const next = tryTriggerBurst(
     session,
@@ -2006,7 +2028,41 @@ function prepareAtBat(progress: TeamGameProgress, random: RandomPort): TeamGameP
     },
     random,
   )
-  return { ...progress, burst: next, atBatPrepared: true }
+  return enterPitchSelection({ ...progress, burst: next, atBatPrepared: true }, random)
+}
+
+/**
+ * **상태 0xf 진입 `0x3d954`** — 사람 장면에서 공 하나를 고르기 전마다 돈다.
+ *
+ * 0xf 에 들어서는 길은 셋이다: 새 타석의 0xe 확인(`readyAtBat`), 인플레이 없이 끝난 공의 다음 공(판정 A
+ * `0xae24c` 의 "그 밖 → 0xf" — 볼·스트라이크·파울), 견제 판 끝(판정 B `0xae3e8` 의 ae592). 그때마다:
+ *
+ * ```
+ * 3d9e4  r2 = (state[0x31 + state[0xa]] == 1)            ; 수비 팀이 CPU 인가
+ *   참:  3d9fc  돌발 객체가 있고 0x8eb94(진행 중) 참 → 건너뜀
+ *        3da0e  0x66864() 거짓 → 건너뜀                    ; 모드 5·6 의 일부 미션만 거짓 — 팀 경기는 늘 참
+ *        3da3e  r0 = 0xac428(…, 수비 팀, …, state, [sp]=ctx, 0, 0, 0)   ; CPU 투수 교체
+ *   거짓: 3da44  돌발 진행 중 → 건너뜀
+ *        3da70  r0 = 0xac228(…, 공격 팀, 주자관리, state)   ; CPU 대타
+ * 3da74  r0 참 → 3da88 소리 0x16("Time!") · 3da94 상태 0x16(교체 연출) 예약
+ * ```
+ * 0x16 → 0xd(이전 상태 0x16 이라 카운트·타석 초기화·state[0xe] 지우기를 건너뜀, 48e94) → 0xe → 0xf 로 다시
+ * 들어온다 — `readyAtBat` 을 다시 지난다(돌발 굴림 포함). 그때는 바뀐 쪽 막음 칸(state[0xd]·[0xe])이 서 있어
+ * 같은 판정이 곧장 빠지므로 고리는 한 번 더 돌고 끝난다. 이 함수 안에 다른 굴림은 없다(3d954~3ddd6 의 호출을 다 봤다).
+ *
+ * 0xac428 의 인자는 간이 엔진(0xc1ba4 의 0xc1ce2)과 같다 — 팀 경기 모드(1·2·8·9)에서 `[sp+4]`(모드 3)·`[sp+0xc]`
+ * (최소 벤치)가 둘 다 0 이다 — 그래서 `judgeAutoPitcherChange` 를 그대로 쓴다.
+ */
+function enterPitchSelection(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
+  if (progress.game.isFinished || !isHumanTurn(progress)) return progress
+  // 3d9fc · 3da44 — 돌발 진행 중(0x8eb94 = obj+0xc ≠ −1)이면 두 판정 모두 건너뛴다
+  if (progress.burst !== null && progress.burst.current !== null) return progress
+  const changed = isOurOffense(progress)
+    ? judgeAutoPitcherChange(progress, false, random, true)
+    : applyCpuPinchHit(progress, false, random, true)
+  if (changed === progress) return progress
+  // 22 → 0x16 → 0xd(지우기 건너뜀) → 0xe → 0xf
+  return readyAtBat(changed, random)
 }
 
 /** 타석이 끝나는 자리에서 돌발을 판정한다 (0x8f414) */
@@ -2039,10 +2095,12 @@ export function closeBurstWindow(progress: TeamGameProgress): TeamGameProgress {
 /* ── 경기 중 투수 교체 (0xc1ba4 → 0xac428 · 0xabfcc · 0xaf09c) ───────────────── */
 
 /**
- * 간이 타석 하나를 돌리기 **전에** 수비 팀 투수 교체를 판정한다 (0xc262c 가 타석마다 0xc1ba4 를 부른다).
+ * **CPU 투수 교체 `0xac428`** 한 번 — 부르는 자리는 둘이다.
+ *   - 간이 타석 하나를 돌리기 **전에** (0xc262c 가 타석마다 0xc1ba4 를 부른다, 0xc1ce2) — 양 팀 모두.
+ *   - 사람 장면 0xf 진입 `0x3d954` 의 3da3e — **수비 팀이 CPU 일 때**(우리 공격), 공마다 (`enterPitchSelection`).
  *
  * `defendingIsOurs` 가 참이면 우리 팀이 수비(= 우리 투수), 거짓이면 상대 투수를 본다.
- * 사람이 직접 던지는 타석은 이 길을 지나지 않는다 — 그때는 `#` 메뉴(`changePitcher`)뿐이다.
+ * 사람이 직접 던지는 타석은 우리 투수를 이 길로 바꾸지 않는다 — 그때는 `#` 메뉴(`changePitcher`)뿐이다.
  *
  * ⚠️ 원본 `0xc1ba4` 의 첫 갈래(모드 3 에서 8회에 벤치 마선수로 교체)는 **투수편 전용**이라 여기 없다.
  */
@@ -2050,6 +2108,8 @@ function judgeAutoPitcherChange(
   progress: TeamGameProgress,
   defendingIsOurs: boolean,
   random: RandomPort,
+  /** 사람 경기 장면 `0x3d954` 에서 불렀는가 — 그러면 22 → 교체 연출 0x16 → 0xe 등판음을 지난다 */
+  inScene = false,
 ): TeamGameProgress {
   const game = progress.game
   const used = defendingIsOurs ? progress.ourUsedPitchers : progress.opponentUsedPitchers
@@ -2099,8 +2159,22 @@ function judgeAutoPitcherChange(
   )
   if (next < 0) return progress
 
+  const changed = applyPitcherChange(progress, defendingIsOurs, next)
   return appendLog(
-    applyPitcherChange(progress, defendingIsOurs, next),
+    inScene
+      ? {
+          ...changed,
+          // 3da88 "Time!" 22 → 0x16 진입 0x3d458 이 투수 교체 예약(team[+0x290])을 보고 +0x195c 비트1 → 0xe 등판음
+          scenePitcherChange: {
+            serial: (progress.scenePitcherChange?.serial ?? 0) + 1,
+            incomingIsAce:
+              (pitcherEntriesOf(
+                progress,
+                defendingIsOurs ? progress.options.ourTeamId : progress.options.opponentTeamId,
+              )[next]?.aceIndex ?? -1) >= 0,
+          },
+        }
+      : changed,
     `${game.inning}회${game.half} ${defendingIsOurs ? '우리' : '상대'} 투수 교체 — ${current + 1}번 → ${next + 1}번`,
     false,
   )
@@ -2395,13 +2469,14 @@ function substituteBatter(
 /* ── CPU 대타 (0xac228) ──────────────────────────────────────────────────────── */
 
 /**
- * **CPU 대타 한 번** — 타석 시작마다 공격 팀을 두고 `0xac228` 을 물어본다 (Q1 4절, `pinchHitAi`).
+ * **CPU 대타 한 번** — 공격 팀을 두고 `0xac228` 을 물어본다 (Q1 4절, `pinchHitAi`).
  *
  * 부르는 자리는 원본 둘을 그대로 옮긴 것이다:
  *   - 자동으로 넘기는 타석: 간이 엔진 `0xc1ba4` 가 **공격 팀**을 두고 부른다 (`0xc1c50`) —
  *     투수 교체 `0xac428` 보다 **먼저**. 공격이 우리 팀이어도 마찬가지다 (원본에 가림막이 없다).
- *   - 사람이 잡은 타석: `0x3d954` 가 **수비가 사람일 때만** 부른다 (`0x3da6e`) — 곧 우리가
- *     던지는 타석에서 상대 타순에만 선다.
+ *   - 사람이 잡은 타석: 0xf 진입 `0x3d954` 가 **수비가 사람일 때만** 부른다 (`0x3da6e`) — 곧 우리가
+ *     던지는 타석에서 상대 타순에만 선다. 0xf 는 **공마다** 다시 들어서므로 카운트가 붙은 채로도 묻는다
+ *     (`enterPitchSelection` — 카운트가 있으면 확률이 `>> (볼+스트라이크+1)` 로 준다).
  *
  * 막음 칸 `state[0xe]`(`cpuPinchHitUsed`)은 공마다 내려가므로(`0xa5e14` a5e7c) **한 경기에 여러 번** 나올 수 있다 —
  * 벤치 수·타순 칸 기록(타석 둘 이상·적시타 없음·안타 하나 이하)이 실제 상한이다.
@@ -2432,7 +2507,7 @@ function applyCpuPinchHit(
       benchBatters: Math.min(bench, Math.max(0, entry.length - BATTING_ORDER_SIZE)),
       record: records[slot] ?? EMPTY_BATTER_GAME_RECORD,
       runnerCount: runnerCountOf(progress.game.bases),
-      // 타석 시작에서만 부르므로 둘 다 0 이다 (state[4]·state[5])
+      // state[4]·state[5] — 간이 엔진은 타석 시작이라 0, 사람 장면은 공마다 다시 물어 그때의 카운트다
       strikes: progress.atBat.strikes,
       balls: progress.atBat.balls,
     },
@@ -2469,9 +2544,9 @@ function applyCpuPinchHit(
       ...changed,
       // state[0xe] = 1 (ac33e) — 다음 공(0xa5e14)이 나갈 때까지 다시 묻지 않는다
       cpuPinchHitUsed: true,
-      // 타석 시작에서만 부르므로 카운트는 이미 0-0 이다 — 간이 엔진은 0xc0ee8 → 0xb6764 가 먼저 지우고,
-      // 사람 장면은 0x16 → 0xd 가 지우기를 건너뛰지만 그 전 0xd 가 이미 지웠다
-      atBat: createAtBat(),
+      // 간이 엔진은 타석 시작이라 카운트가 이미 0-0 이다(0xc0ee8 → 0xb6764). 사람 장면은 공마다 0xf 에서 묻고
+      // 0x16 → 0xd 가 카운트 지우기(0xb6764)를 건너뛰므로(48e94) **카운트를 이어받는다**
+      atBat: inScene ? progress.atBat : createAtBat(),
       // 사람 장면이면 22(3da88) → 0x16 연출 → 0xe 타자 등판음. 공격 팀이 CPU 라 ctx+0x160 은 안 선다 (a5c1c)
       ...(inScene
         ? {

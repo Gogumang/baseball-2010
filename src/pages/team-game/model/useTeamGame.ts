@@ -48,7 +48,12 @@ import {
 import { carryDistanceOf } from '@/entities/batting/model/battedBallFlight'
 import { hasGameIntro } from '@/widgets/game-scene/lib/introSchedule'
 import { GAME_INTRO_SOUND, gameResultSoundIdOf } from '@/features/play-game/model/gameSounds'
-import { pinchHitSoundIdsOf, pitcherEntrySoundIdOf, stepSoundIdsOf } from '@/pages/team-game/model/teamGameSounds'
+import {
+  pinchHitSoundIdsOf,
+  pitcherEntrySoundIdOf,
+  scenePitcherChangeSoundIdsOf,
+  stepSoundIdsOf,
+} from '@/pages/team-game/model/teamGameSounds'
 import { activeSound, playSoundIds } from '@/shared/api/audio/soundPort'
 
 /**
@@ -151,6 +156,8 @@ export function useTeamGame(options: TeamGameOptions, random: RandomPort): TeamG
         ...stepSoundIdsOf(current, after),
         // 대타 교체 연출(상태 0x16)을 지났으면 — CPU 대타는 다음 타석 준비(0xf 진입)에서 서므로 걸음 끝에 둔다
         ...pinchHitSoundIdsOf(current, after),
+        // 사람 장면 CPU 투수 교체(0x3d954 → 0xac428)도 같은 0x16 연출 — 22 뒤 올라온 투수 등판음
+        ...scenePitcherChangeSoundIdsOf(current, after),
         // 경기 결과 징글 31/32 — 상태 0x19(결과 적재 0x4ea0c)에서 난다.
         // 무승부는 원본이 어느 쪽을 내는지 문서에 없어 `gameResultSoundIdOf` 가 비워 둔다
         ...(after.game.isFinished && !current.game.isFinished
