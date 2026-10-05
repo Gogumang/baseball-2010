@@ -78,7 +78,7 @@ import type { GpDetailOf } from '@/features/shop/model/shopSelection'
 import { hiddenOpenTextOf } from '@/entities/career/model/equipment'
 import type { RookieProfile } from '@/entities/career/model/playerCareer'
 import { useStorySchedule } from '@/app/model/useStorySchedule'
-import { enterSeasonEvent, nextSeasonStep } from '@/app/model/seasonEvents'
+import { enterSeasonEvent, nextSeasonStep, resumePointOf } from '@/app/model/seasonEvents'
 import {
   achievedGoalCount,
   applyEndingBonus,
@@ -597,12 +597,17 @@ export function useCareerSession({
    * 원본은 131(MVP) 뒤와, 포스트시즌 경기 뒤(100 → 116 → 114 → 128)에 여기로 온다.
    */
   const enterPostseason = (current: PlayerCareer) => {
+    // 진입 0x120a4 — S+0x50 = 0xf · 저장 (이어하기는 S+0xb4 갈래로 128 에 돌아온다)
+    setCareer(current.seasonEndState === 128 ? current : { ...current, seasonEndState: 128 })
     setScreen({ kind: '포스트시즌', popup: regularSeasonPopupOnEnter(current) })
   }
 
-  /** 128 이 끝났다 (팝업 7 · 8 닫힘 → 132 연말) — 연말 0x10c54 의 이벤트(501/504/502/380)를 튼다 */
+  /**
+   * 128 이 끝났다 (팝업 7 · 8 닫힘 → 132 연말) — 연말 0x10c54 의 이벤트(501/504/502/380)를 튼다.
+   * 132 진입이 S+0x50 = 9 · 저장(0x10c60) — 팝업 8 보상과 **같은 커리어 갱신**으로 적어 이어하기가 보상을 다시 주지 않는다.
+   */
   const finishPostseason = (finished: PlayerCareer) => {
-    setCareer(finished)
+    setCareer({ ...finished, seasonEndState: 132 })
     setScreen({ kind: '이벤트', eventId: yearEndEventId(finished), context: '시즌' })
   }
 
@@ -622,10 +627,7 @@ export function useCareerSession({
     }
 
     const step = nextSeasonStep(viewed, viewedEventIds)
-    if (step.kind === '포스트시즌') {
-      setCareer(viewed)
-      return enterPostseason(viewed)
-    }
+    if (step.kind === '포스트시즌') return enterPostseason(viewed)
     if (step.kind === '이벤트') {
       // 상태 함수가 이벤트를 틀기 전에 하는 일 — 131 은 375 앞에서 MVP 비트를 남긴다
       setCareer(enterSeasonEvent(viewed, step.eventId))
@@ -825,12 +827,25 @@ export function useCareerSession({
       setCareer(null)
     },
 
+    /**
+     * 이어하기 — 상태 100 진입 0x1c154 의 S+0x50 분기 (`resumePointOf`).
+     * 시즌 끝 사슬 안이면 그 상태로 돌아가 그 상태가 진입에서 하는 일을 다시 한다 — 136·130·131·132 는 이벤트를 다시 틀고,
+     * 128 은 진입 0x120a4 를 다시 밟는다(S+0x77 이 서 있으면 정규시즌 우승 팝업을 다시 안 띄운다).
+     * 팝업 7·8 은 저장되지 않는다 — 원본도 128 [확인]이 우승 팀 발표부터 다시 띄우고, 팝업 8 보상은 132 진입과 함께 적힌다.
+     */
     continueSaved: () => {
       if (savedCareer === null) return
+      setShouldForgetRepeatable(true)
+      const point = resumePointOf(savedCareer)
+      if (point.kind === '이벤트') {
+        setCareer(enterSeasonEvent(savedCareer, point.eventId))
+        return setScreen({ kind: '이벤트', eventId: point.eventId, context: '시즌' })
+      }
+      if (point.kind === '포스트시즌') return enterPostseason(savedCareer)
       setCareer(savedCareer)
+      if (point.kind === '시즌종료') return setScreen({ kind: '시즌종료' })
       setScreen({ kind: '관리' })
       setManagementCheck('고정')
-      setShouldForgetRepeatable(true)
     },
 
     runCommand: (command: ManagementCommand) => {
@@ -1160,6 +1175,8 @@ export function useCareerSession({
     /** 시즌 성적 화면 뒤 — 올해의 목표 결과(392)부터 연말 이벤트를 잇는다 */
     beginYearEnd: () => {
       if (career === null) return
+      // 136 진입 0x10bb0 — S+0x50 = 0xb · 저장 뒤 392
+      setCareer(enterSeasonEvent(career, GOAL_INTRO_EVENT_ID))
       setScreen({ kind: '이벤트', eventId: GOAL_INTRO_EVENT_ID, context: '시즌' })
     },
 

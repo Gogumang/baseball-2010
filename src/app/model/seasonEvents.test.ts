@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { batterSalaryNegotiationRankOf, enterSeasonEvent, nextSeasonStep } from '@/app/model/seasonEvents'
+import { batterSalaryNegotiationRankOf, enterSeasonEvent, nextSeasonStep, resumePointOf } from '@/app/model/seasonEvents'
+import { startPostseason } from '@/entities/league/model/league'
 import { createCareer } from '@/entities/career/model/playerCareer'
 
 const 선수 = (overrides = {}) => ({ ...createCareer('테스트'), ...overrides })
@@ -30,7 +31,8 @@ describe('nextSeasonStep — 연말 이벤트 연결', () => {
 
   it('375 에 들어가기 전에 MVP 판정 비트를 남긴다 — 다른 이벤트는 그대로 (0x19774 → 0x8dd60)', () => {
     const career = 선수()
-    expect(enterSeasonEvent(career, 370)).toBe(career)
+    expect(enterSeasonEvent(career, 371)).toBe(career)
+    expect(enterSeasonEvent(career, 370)).toEqual({ ...career, seasonEndState: 130 })
     // 리그 기록표가 비어 타이틀이 없으면 MVP 가 아니다 — 비트 그대로
     expect(enterSeasonEvent(career, 375).mvpSeasonBits).toBe(0)
   })
@@ -58,5 +60,30 @@ describe('nextSeasonStep — 연말 이벤트 연결', () => {
   it('은퇴 선택(502 → 496 → 503)은 엔딩 판정표로, 방출(501)은 엔딩 1 로 끝난다', () => {
     expect(nextSeasonStep(선수({ season: 8, popularity: 1600 }), [502, 496, 503])).toEqual({ kind: '엔딩', endingIndex: 5 })
     expect(nextSeasonStep(선수({ season: 7, popularity: 10 }), [501])).toEqual({ kind: '엔딩', endingIndex: 1 })
+  })
+})
+
+describe('이어하기 분기 0x1c154 — S+0x50(seasonEndState)', () => {
+  it('상태 진입이 S+0x50 을 쓴다 — 136(392) 0xb · 130(370) 0xc · 131(375) 0xe', () => {
+    expect(enterSeasonEvent(선수(), 392).seasonEndState).toBe(136)
+    expect(enterSeasonEvent(선수(), 370).seasonEndState).toBe(130)
+    expect(enterSeasonEvent(선수(), 375).seasonEndState).toBe(131)
+  })
+
+  it('136·130·131·132 는 그 상태가 트는 이벤트로 돌아간다', () => {
+    expect(resumePointOf(선수({ seasonEndState: 136 }))).toEqual({ kind: '이벤트', eventId: 392 })
+    expect(resumePointOf(선수({ seasonEndState: 130 }))).toEqual({ kind: '이벤트', eventId: 370 })
+    expect(resumePointOf(선수({ seasonEndState: 131 }))).toEqual({ kind: '이벤트', eventId: 375 })
+    // 132 연말 0x10c54 — 1~6년차는 연봉협상 380, 7년차 이상은 502
+    expect(resumePointOf(선수({ seasonEndState: 132 }))).toEqual({ kind: '이벤트', eventId: 380 })
+    expect(resumePointOf(선수({ seasonEndState: 132, season: 8, popularity: 1600 }))).toEqual({ kind: '이벤트', eventId: 502 })
+  })
+
+  it('포스트시즌 중 0xf 는 128, 대진만 열리고 사슬 전이면 시즌종료(116 → 136), 그 밖은 관리', () => {
+    const 대진 = startPostseason([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+    expect(resumePointOf(선수({ seasonEndState: 128, postseason: 대진 }))).toEqual({ kind: '포스트시즌' })
+    expect(resumePointOf(선수({ postseason: 대진 }))).toEqual({ kind: '시즌종료' })
+    expect(resumePointOf(선수())).toEqual({ kind: '관리' })
+    expect(resumePointOf(선수({ seasonEndState: 132, endingIndex: 1 }))).toEqual({ kind: '관리' })
   })
 })

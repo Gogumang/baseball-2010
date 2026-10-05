@@ -1,4 +1,4 @@
-import type { PlayerCareer } from '@/entities/career/model/playerCareer'
+import type { PlayerCareer, SeasonEndState } from '@/entities/career/model/playerCareer'
 import {
   achievedGoalCount,
   ENDING_EVENT_IDS,
@@ -10,6 +10,7 @@ import {
   SALARY_FIRM_EVENT_ID,
   SALARY_POLITE_EVENT_ID,
   salaryResultEventId,
+  yearEndEventId,
 } from '@/entities/career/model/seasonFlow'
 import {
   careerLeagueRecordsOf,
@@ -67,7 +68,59 @@ export function batterSalaryNegotiationRankOf(career: PlayerCareer): number {
  * 번호는 `nextSeasonStep` 이 같은 순위표로 다시 센다(사이에 성적이 바뀌는 일이 없다).
  */
 export function enterSeasonEvent(career: PlayerCareer, eventId: number): PlayerCareer {
-  return eventId === MVP_INTRO_EVENT_ID ? recordSeasonMvp(career) : career
+  const state = SEASON_END_STATE_OF_EVENT[eventId]
+  // 상태 진입이 S+0x50 을 쓰고 저장한다 — 이어하기가 이 값으로 돌아온다 (`seasonEndState`)
+  const entered = state === undefined || career.seasonEndState === state ? career : { ...career, seasonEndState: state }
+  return eventId === MVP_INTRO_EVENT_ID ? recordSeasonMvp(entered) : entered
+}
+
+/** 이벤트를 트는 시즌 끝 상태 — 136 이 392, 130 이 370, 131 이 375 를 진입에서 튼다 */
+const SEASON_END_STATE_OF_EVENT: Readonly<Partial<Record<number, SeasonEndState>>> = {
+  [GOAL_INTRO_EVENT_ID]: 136,
+  [TITLE_INTRO_EVENT_ID]: 130,
+  [MVP_INTRO_EVENT_ID]: 131,
+}
+
+/** 이어하기(상태 100 진입 0x1c154)가 돌아갈 곳 */
+export type ResumePoint =
+  /** S+0x50 == 0xb · 0xc · 0xe · 9 → 136 · 130 · 131 · 132 — 그 상태가 진입에서 트는 이벤트로 */
+  | { readonly kind: '이벤트'; readonly eventId: number }
+  /** S+0xb4(포스트시즌 중) ≠ 0 이고 S+0x50 이 위 값이 아님 → 128 대진 */
+  | { readonly kind: '포스트시즌' }
+  /** S+0x50 == 2(경기 뒤) → 116 → [114 → 136] — 45번째 경기 뒤 아직 136 에 안 들어갔다 */
+  | { readonly kind: '시즌종료' }
+  /** 그 밖 — 웹은 관리 화면 (원본은 S+0xb2 짝수 · S+0x50 ∈ {1,3} 이면 105, 아니면 109) */
+  | { readonly kind: '관리' }
+
+/**
+ * 이어하기 분기 0x1c154 (R9 2b):
+ * ```
+ * S+0x50 == 0xb → 136 · 9 → 132 · 0xc|0xd → 130 · 0xe → 131   (1c276~1c296)
+ * 그 밖: S+0x12c → 134 · S+0xb4 ≠ 0 → 128(S+0x50 0xf)          (1c2a2~)
+ * ```
+ * 웹은 국가대항전(S+0x12c)을 저장하지 않고, S+0x50 == 2(116 경기 뒤 평가)는 45번째 경기 뒤 자리만 옮긴다 —
+ * 그 자리는 대진이 열렸고(`postseason`) 시즌 끝 사슬엔 아직 안 들어간 때다. 웹의 116 대응은 결과 화면이라
+ * 다시 못 띄우므로 그 다음 화면인 '시즌종료'(→ 136)로 돌아간다.
+ * ⚠️ 132 뒤 국가대표 133·국가대항전 134 는 S+0x50 을 안 바꾼다(0x1a090·0x19f30 머리 확인) — 원본도 132 로 돌아가
+ *    연말 이벤트를 다시 튼다. 엔딩 141(S+0x50 = 6, 0x1230e)·그 밖 0xa 갈래는 웹이 아직 따로 돌아가지 않는다.
+ */
+export function resumePointOf(career: PlayerCareer): ResumePoint {
+  // 엔딩 141 은 S+0x50 = 6(0x1230e) 갈래다 — 웹 이어하기는 엔딩으로 돌아가지 않는다(예전 그대로 관리 화면)
+  if (career.endingIndex !== null) return { kind: '관리' }
+  switch (career.seasonEndState) {
+    case 136:
+      return { kind: '이벤트', eventId: GOAL_INTRO_EVENT_ID }
+    case 130:
+      return { kind: '이벤트', eventId: TITLE_INTRO_EVENT_ID }
+    case 131:
+      return { kind: '이벤트', eventId: MVP_INTRO_EVENT_ID }
+    case 132:
+      return { kind: '이벤트', eventId: yearEndEventId(career) }
+    default:
+      break
+  }
+  if (career.postseason === null) return { kind: '관리' }
+  return career.seasonEndState === 128 ? { kind: '포스트시즌' } : { kind: '시즌종료' }
 }
 
 /**

@@ -725,6 +725,54 @@ describe('타자편 포스트시즌 대진 128 — 사람이 친다 (0x120a4 · 
     expect(rendered.result.current.screen).toEqual({ kind: '이벤트', eventId: 380, context: '시즌' })
   })
 
+  it('이어하기 — 128 에서 저장했으면 대진으로 돌아오고, 정규시즌 우승 보상은 다시 안 준다 (S+0x50 0xf · S+0x77)', () => {
+    const 받음 = 시즌끝선수({ seasonEndState: 128, regularSeasonRewardTaken: true, popularity: 1010, money: 1500 })
+    const rendered = 띄우기(받음)
+    expect(rendered.result.current.screen).toEqual({ kind: '포스트시즌', popup: null })
+    expect(rendered.result.current.session.career).toMatchObject({ popularity: 1010, money: 1500 })
+
+    // 보상 팝업을 닫기 전에 끊겼으면(S+0x77 == 0) 진입이 팝업을 다시 띄운다 — 보상은 한 번이다
+    const 안받음 = 띄우기(시즌끝선수({ seasonEndState: 128 }))
+    expect(안받음.result.current.screen).toEqual({ kind: '포스트시즌', popup: { kind: '정규시즌우승' } })
+  })
+
+  it('이어하기 — 팝업 8 보상은 132 진입과 함께 적혀, 다시 열면 연말 이벤트로 가고 보상이 겹치지 않는다', () => {
+    const 끝난대진 = { ...startPostseason([0, 1, 2, 3]), round: '종료' as const, teams: [0, 1] as const, champion: 0 }
+    const saveGame = 메모리저장(시즌끝선수({ gamesPlayed: 50, postseason: 끝난대진, regularSeasonRewardTaken: true, seasonEndState: 128 }))
+    const 열기 = () => {
+      const random = createSeededRandom(1)
+      const rendered = renderHook(() => {
+        const [screen, setScreen] = useState<Screen>({ kind: '메인메뉴' })
+        const runner = useAtBatRunner()
+        return { screen, setScreen, session: useCareerSession({ runner, random, saveGame, screen, setScreen }) }
+      })
+      act(() => rendered.result.current.session.actions.continueSaved())
+      return rendered
+    }
+    const 처음 = 열기()
+    expect(처음.result.current.screen).toEqual({ kind: '포스트시즌', popup: null })
+    act(() => 처음.result.current.session.actions.pressPostseason())
+    act(() => 처음.result.current.session.actions.closePostseasonPopup())
+    act(() => 처음.result.current.session.actions.closePostseasonPopup())
+    expect(처음.result.current.session.career).toMatchObject({ popularity: 1015, reputation: 325, money: 2000, seasonEndState: 132 })
+
+    const 다시 = 열기()
+    expect(다시.result.current.screen).toEqual({ kind: '이벤트', eventId: 380, context: '시즌' })
+    expect(다시.result.current.session.career).toMatchObject({ popularity: 1015, reputation: 325, money: 2000 })
+  })
+
+  it('이어하기 — 130·131 에서 끊겼으면 그 이벤트(370·375)부터 다시 튼다', () => {
+    expect(띄우기(시즌끝선수({ seasonEndState: 130 })).result.current.screen).toEqual({ kind: '이벤트', eventId: 370, context: '시즌' })
+    expect(띄우기(시즌끝선수({ seasonEndState: 131 })).result.current.screen).toEqual({ kind: '이벤트', eventId: 375, context: '시즌' })
+  })
+
+  it('새 시즌 처리 0x1b768 이 S+0x50 을 벗어난다 — 연봉 수락 뒤 이어하기는 관리 화면', () => {
+    const rendered = 띄우기(시즌끝선수({ season: 2, seasonEndState: 132 }))
+    expect(rendered.result.current.screen).toEqual({ kind: '이벤트', eventId: 380, context: '시즌' })
+    이벤트보기(rendered, [380, 383])
+    expect(rendered.result.current.session.career?.seasonEndState).toBeNull()
+  })
+
   it('다른 팀 우승 — 팝업 7 만 닫고 보상 없이 연말로', () => {
     const 끝난대진 = { ...startPostseason([0, 1, 2, 3]), round: '종료' as const, teams: [1, 2] as const, champion: 1 }
     const rendered = 띄우기(시즌끝선수({ gamesPlayed: 46, postseason: 끝난대진, regularSeasonRewardTaken: true }))
