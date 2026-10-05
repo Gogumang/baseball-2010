@@ -104,7 +104,8 @@ describe('경기 시작', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '경기 시작' }))
 
-    expect(screen.getByText('1회초')).toBeTruthy()
+    // 팀 경기 장면은 경기 시작 인트로(상태 0xc, 모드 1)부터 선다
+    expect(screen.getByText(/VS/)).toBeTruthy()
   })
 })
 

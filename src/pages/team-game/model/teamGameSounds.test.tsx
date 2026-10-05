@@ -16,11 +16,14 @@ import { setActiveSound } from '@/shared/api/audio/soundPort'
 import type { SoundPort } from '@/shared/api/audio/soundPort'
 
 /**
- * 1회초 판(상태 0x18, 인트로 끝 → 0x18) — 첫 사람 타석 앞에 판이 서면 OK 로 닫는다.
- * 판은 경기 화면(PixelScreen)을 통째로 덮으므로 '메뉴' 소프트키가 없다.
+ * 경기 시작 인트로(상태 0xc)와 1회초 판(0x18) — 첫 사람 타석 앞에 서면 OK 로 넘긴다.
+ * 둘 다 경기 화면(PixelScreen)을 통째로 덮으므로 '메뉴' 소프트키가 없다.
  */
 const 판닫기 = () => {
-  if (screen.queryByRole('button', { name: '메뉴' }) === null) fireEvent.keyDown(window, { key: 'Enter' })
+  for (let 번 = 0; 번 < 2; 번 += 1) {
+    if (screen.queryByRole('button', { name: '메뉴' }) !== null) return
+    fireEvent.keyDown(window, { key: 'Enter' })
+  }
 }
 
 /**

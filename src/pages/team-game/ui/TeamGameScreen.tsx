@@ -24,6 +24,8 @@ import {
 } from '@/features/play-team-game/model/teamGameFlow'
 import { GameEndBoard } from '@/widgets/game-scene/ui/GameEndBoard'
 import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
+import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
+import { hasGameIntro } from '@/widgets/game-scene/lib/introSchedule'
 import { HALF_INNING_JINGLE_TICK } from '@/features/play-game/model/halfInningBoard'
 import { HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
 import type {
@@ -131,10 +133,14 @@ export function TeamGameScreen({
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
   /** 경기 끝 결과 판(0x18)에서 OK 를 눌러 정산(0x19)으로 넘어갔는가 */
   const [isEndBoardClosed, setEndBoardClosed] = useState(false)
+  /** 경기 시작 인트로(상태 0xc)를 다 봤는가 — 모드 1·2 만 선다 (대전 8·9 는 없다) */
+  const [isIntroDone, setIntroDone] = useState(!hasGameIntro(options.mode))
   /** OK 로 닫은 마지막 공수 교대 판(상태 0x18 교대 가지)의 번호 */
   const [closedBoardSerial, setClosedBoardSerial] = useState(0)
   const board = progress.halfInningBoard
   const isHalfInningBoardOpen = board !== null && board.serial !== closedBoardSerial && summary === null
+  /** 인트로·교대 판이 화면을 덮고 있는가 — 경기 키(0x498d4)가 안 먹는다 */
+  const isSceneCovering = !isIntroDone || isHalfInningBoardOpen
   /** 이미 다 보여 준 수비 플레이 — 같은 플레이를 두 번 재생하지 않는다 */
   const [shownPlay, setShownPlay] = useState<DefensePlayResult | null>(null)
   const play = progress.lastDefensePlay
@@ -167,7 +173,7 @@ export function TeamGameScreen({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat) return
       // 공수 교대 판(0x18)에는 공용 키 0x498d4 의 '*'·'#'·도루가 안 열린다 (그 상태 범위 밖)
-      if (isHalfInningBoardOpen) return
+      if (isSceneCovering) return
       // 수비 진행 중(상태 0x17)에는 이 키들이 원본에서도 안 먹는다 — '*' 는 경기 상태 0xd~0x15,
       // '#' 는 0xe·0xf 일 때만 열리고(0x498d4), 그 사이 키는 주루·송구가 가져간다
       if (isDefenseInPlay) return
@@ -211,7 +217,7 @@ export function TeamGameScreen({
     actions,
     changeWindow,
     isDefenseInPlay,
-    isHalfInningBoardOpen,
+    isSceneCovering,
     isMenuOpen,
     isStealable,
     overlay,
@@ -241,7 +247,7 @@ export function TeamGameScreen({
   const acceptsPickoff =
     canPitch &&
     !isReplaying &&
-    !isHalfInningBoardOpen &&
+    !isSceneCovering &&
     !isDefenseInPlay &&
     phase === '구질' &&
     !isMenuOpen &&
@@ -262,6 +268,21 @@ export function TeamGameScreen({
   const game = progress.game
   const staminaPercent = staminaPercentOf(progress.stamina)
 
+  /**
+   * 경기 시작 인트로 — 적재(상태 8) 끝에서 모드 1~4 만 0xc 로 온다. 54틱 또는 OK 뒤 1회초 판(0x18)이나 첫 타석.
+   * 효과음 61 은 진입 예약음이라 `useTeamGame` 이 경기를 세울 때 낸다.
+   */
+  if (!isIntroDone && summary === null) {
+    const side0Team = options.playerSide === 0 ? options.ourTeamId : options.opponentTeamId
+    const side1Team = options.playerSide === 0 ? options.opponentTeamId : options.ourTeamId
+    return (
+      <GameIntro
+        awayName={TEAMS[side0Team]?.name ?? ''}
+        homeName={TEAMS[side1Team]?.name ?? ''}
+        onDone={() => setIntroDone(true)}
+      />
+    )
+  }
   if (summary !== null && !isEndBoardClosed) {
     const names = pitchersOfRecordOf(progress)
     // 측 0(선공) 점수가 왼쪽 — 사람 팀은 `playerSide` 측에 앉는다

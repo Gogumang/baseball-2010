@@ -45,6 +45,7 @@ import {
   PITCH_RELEASE_SOUND,
 } from '@/features/play-at-bat/model/atBatSounds'
 import { carryDistanceOf } from '@/entities/batting/model/battedBallFlight'
+import { hasGameIntro } from '@/widgets/game-scene/lib/introSchedule'
 import { GAME_INTRO_SOUND, gameResultSoundIdOf } from '@/features/play-game/model/gameSounds'
 import { pinchHitSoundIdsOf, pitcherEntrySoundIdOf, stepSoundIdsOf } from '@/pages/team-game/model/teamGameSounds'
 import { activeSound, playSoundIds } from '@/shared/api/audio/soundPort'
@@ -154,10 +155,10 @@ export function useTeamGame(options: TeamGameOptions, random: RandomPort): TeamG
     }
   }, [audio])
 
-  // 경기 시작 인트로 예약음 61 (상태 0xc 진입 0x3b148).
-  // ⚠️ 웹에는 인트로 화면(270→0 을 5씩 54틱)이 없어 **경기가 서는 자리**에 둔다 — 근사다
+  // 경기 시작 인트로 예약음 61 (상태 0xc 진입 0x3b148) — 화면(`TeamGameScreen` 의 `GameIntro`)이 서는 자리다.
+  // 인트로는 모드 1~4 만 선다(적재 상태 8 끝 0x48b20) — 대전(8·9)은 0xc 를 안 지나 이 소리도 없다
   useEffect(() => {
-    playSoundIds(audio, [GAME_INTRO_SOUND])
+    if (hasGameIntro(options.mode)) playSoundIds(audio, [GAME_INTRO_SOUND])
     // 경기 한 판에 한 번 — 고리가 살아 있는 동안 다시 내지 않는다
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

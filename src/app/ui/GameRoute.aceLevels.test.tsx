@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render } from '@testing-library/react'
+import { cleanup, fireEvent, render } from '@testing-library/react'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import { createAtBat } from '@/entities/at-bat/model/atBatState'
@@ -51,6 +51,8 @@ const 띄우기 = (aceLevels?: Readonly<Record<number, number>>) => {
       {...(aceLevels === undefined ? {} : { aceLevels })}
     />,
   )
+  // 경기 시작 인트로(상태 0xc)를 OK 로 건너뛴다
+  fireEvent.keyDown(window, { key: 'Enter' })
   return 받은것[받은것.length - 1]!
 }
 

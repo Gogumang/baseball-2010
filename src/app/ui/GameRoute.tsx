@@ -16,6 +16,8 @@ import type { DefensePlayResult } from '@/features/defense-play/model/runDefense
 import type { BurstMissionRow } from '@/entities/burst-mission/model/burstMissionRow'
 import { BurstMissionWindow } from '@/widgets/burst-mission/ui/BurstMissionWindow'
 import { ORIGINAL_BURST_TABLES } from '@/shared/config/original/burstMissions'
+import { TEAMS } from '@/shared/config/original/teams'
+import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
 
 interface GameRouteProps {
   readonly session: ReturnType<typeof useCareerSession>
@@ -60,12 +62,28 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
     : null
   const closeProposal = useCallback(() => setShownProposal(proposal), [proposal])
   const { closeBurstResult } = session.actions
+  /**
+   * 경기 시작 인트로(상태 0xc) — 적재(상태 8, 웹은 로딩 팁) 끝에서 모드 1~4 만 온다. 타자편은 모드 4 라 선다.
+   * 효과음 61 은 진입 예약음이라 세션이 로딩을 끝낼 때(`finishLoading`) 이미 낸다. 난수는 안 쓴다.
+   */
+  const [isIntroDone, setIntroDone] = useState(false)
 
   if (session.loadingTip !== null) {
     return (
       <RawScreen>
         <LoadingTip tip={session.loadingTip} onDone={session.actions.finishLoading} />
       </RawScreen>
+    )
+  }
+  if (!isIntroDone) {
+    const side0Team = progress.game.playerSide === 0 ? progress.ourTeamId : progress.opponentTeamId
+    const side1Team = progress.game.playerSide === 0 ? progress.opponentTeamId : progress.ourTeamId
+    return (
+      <GameIntro
+        awayName={TEAMS[side0Team]?.name ?? ''}
+        homeName={TEAMS[side1Team]?.name ?? ''}
+        onDone={() => setIntroDone(true)}
+      />
     )
   }
   // 사람이 주루를 잡는 갈래가 먼저다 — 진행 중인 타구가 있으면 그것을 실시간으로 돌린다

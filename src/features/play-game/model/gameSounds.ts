@@ -29,7 +29,8 @@ export const BURST_START_SOUND = 42
 
 /**
  * 경기 시작 인트로 — 상태 0xc 진입 예약음 (0x3b148, R10 2절).
- * ⚠️ 웹에는 인트로 화면(270→0 을 5씩 54틱)이 없어 **로딩이 끝나는 자리**에 둔다 — 근사다.
+ * 인트로 화면(`widgets/game-scene` `GameIntro`, 54틱)은 로딩(적재 상태 8)이 끝나는 자리에 서므로 그때 낸다.
+ * 모드 1~4 만 인트로가 있다 (`hasGameIntro`).
  */
 export const GAME_INTRO_SOUND = 61
 

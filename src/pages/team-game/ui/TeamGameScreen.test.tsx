@@ -9,11 +9,14 @@ import { DEFENSE_BACKGROUND_URL } from '@/pages/defense/lib/defenseView'
 import type { TeamGameOptions } from '@/features/play-team-game/model/teamGameFlow'
 
 /**
- * 1회초 판(상태 0x18, 인트로 끝 → 0x18) — 첫 사람 타석 앞에 판이 서면 OK 로 닫는다.
- * 판은 경기 화면(PixelScreen)을 통째로 덮으므로 '메뉴' 소프트키가 없다.
+ * 경기 시작 인트로(상태 0xc)와 1회초 판(0x18) — 첫 사람 타석 앞에 서면 OK 로 넘긴다.
+ * 둘 다 경기 화면(PixelScreen)을 통째로 덮으므로 '메뉴' 소프트키가 없다.
  */
 const 판닫기 = () => {
-  if (screen.queryByRole('button', { name: '메뉴' }) === null) fireEvent.keyDown(window, { key: 'Enter' })
+  for (let 번 = 0; 번 < 2; 번 += 1) {
+    if (screen.queryByRole('button', { name: '메뉴' }) !== null) return
+    fireEvent.keyDown(window, { key: 'Enter' })
+  }
 }
 
 afterEach(cleanup)
@@ -248,5 +251,34 @@ describe('투수 교체 (#)', () => {
     띄우기({ playerSide: PLAYER_SIDE_FIRST_BAT })
 
     expect(screen.queryByRole('button', { name: '# 교체' })).toBeNull()
+  })
+})
+
+describe('경기 시작 인트로 (상태 0xc)', () => {
+  it('시즌(모드 2)은 인트로가 54틱 서고 다 지나면 1회초 판으로 넘어간다', () => {
+    vi.useFakeTimers()
+    render(
+      <TeamGameScreen options={기본옵션} random={createSeededRandom(20100901)} onFinish={vi.fn()} onQuit={vi.fn()} />,
+    )
+    expect(screen.getByText(/VS/)).toBeTruthy()
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 53))
+    expect(screen.queryByText(/VS/)).toBeTruthy()
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
+    expect(screen.queryByText(/VS/)).toBeNull()
+    // 1회초 판(0x18) — 판은 OK 를 기다린다
+    expect(screen.getByText('1회초')).toBeTruthy()
+    vi.useRealTimers()
+  })
+
+  it('대전(모드 8)은 0xc 를 안 지난다 — 인트로가 없다 (0x48b20)', () => {
+    render(
+      <TeamGameScreen
+        options={{ ...기본옵션, mode: 8 }}
+        random={createSeededRandom(20100901)}
+        onFinish={vi.fn()}
+        onQuit={vi.fn()}
+      />,
+    )
+    expect(screen.queryByText(/VS/)).toBeNull()
   })
 })
