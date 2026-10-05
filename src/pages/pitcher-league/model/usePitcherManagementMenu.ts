@@ -14,6 +14,7 @@ import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbil
 import {
   MAGIC_MAXIMUM_LEVEL,
   PITCHER_TRAINING_MENUS,
+  PITCHER_TYPE_NAMES,
   pitcherTrainingBlockReasonOf,
   runPitcherTraining,
 } from '@/entities/pitcher-career/model/pitcherManagement'
@@ -175,7 +176,10 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
       const slot = PITCHER_ABILITY_ORDER.indexOf(ability)
       onSave(outcome.career)
       setKind('관리')
-      setNotice(trainingResultOf(PITCHER_ABILITY_NAMES[slot] ?? menu.name, outcome.gains[ability] ?? 0))
+      const result = trainingResultOf(PITCHER_ABILITY_NAMES[slot] ?? menu.name, outcome.gains[ability] ?? 0)
+      // 타입 보너스 줄 — "[" + 타입 이름(0x1400080 [2+타입]) + "]" + StrMODE[194] (0x187a8~0x187f2)
+      const typeLine = outcome.typeBonus > 0 ? `!N[${PITCHER_TYPE_NAMES[career.typeIndex] ?? ''}] 타입 보너스 +1` : ''
+      setNotice(`${result}${typeLine}`)
     },
     [career, onSave, random],
   )

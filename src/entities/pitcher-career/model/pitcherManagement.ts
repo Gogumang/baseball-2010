@@ -12,6 +12,7 @@ import {
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { PITCHER_ABILITY_NAMES, PITCHER_ABILITY_ORDER } from '@/entities/pitcher-career/model/pitcherAbility'
 import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbility'
+import { PITCHER_TYPE_BONUS_ABILITY } from '@/entities/pitcher-career/model/pitcherRegistration'
 
 /**
  * 투수편 **관리 주기·훈련** — 타자편과 다른 점만 모았다.
@@ -19,16 +20,19 @@ import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbil
  * **같은 것** (한 코드가 모드 3·4 를 함께 돈다):
  *   - 관리 화면은 **2경기마다** 열린다 (StrHOWTO[11] · 관리 장면 상태 116, R9 요약).
  *   - 한 주기에 트레이닝·휴식·외출 중 **한 가지**만 (r_event_txt[176]).
- *   - 훈련 한 번의 상승·사기 감소 수치는 훈련 함수 `0x17f5c` → `0xa3bac` 종류 0~3 로 **칸 번호로만 갈린다**.
+ *   - 훈련 함수 `0x17f5c` 하나가 두 모드를 돈다. 칸 0~3 은 0x186c4 로 가서 **사기 감소 bfa55(5,8) 를 먼저**
+ *     ([sp+0x38]) 굴리고 **상승을 다음**([sp+0x34], 0x18704) 굴린다 — 타자편과 같은 차례다.
  *   - 사기 0 이면 막힘 StrMODE[193] · 능력치가 한계면 StrMODE[192] (0x12e40).
  *
- * **다른 것**:
+ * **다른 것** (0x17f5c 안의 `[장면+0xcc] == 4` 갈림, 디스어셈 확정):
  *   - 능력 칸이 제구·구속·변화·체력이고, **한계 표를 보직으로 고른다** (0xa44f4, R7 3절).
+ *   - 상승 범위 (0x186d6~0x18702): 타자는 칸 2·3(수비·주루)이 bfa55(5,8) 인데, 투수는 **칸 3(체력)만** (5,8) 이고
+ *     칸 0·1·2 는 (4,7) 이다.
+ *   - 타입 보너스 +1 (0x18786~0x187a6): 투수는 칸 0(제구)·타입 1 · 칸 1(구속)·타입 0 · 칸 2(변화)·타입 2.
+ *     타입 = 기록 `+0xb >> 5` (등록 시작 보너스 `PITCHER_TYPE_BONUS_ABILITY` 와 같은 짝). 글은 "[타입 이름] 타입 보너스 +1"
+ *     (이름 = 표 0x1400080 [2 + 타입] 오버핸드·사이드암·언더스로, StrMODE[194]).
  *   - 훈련 **칸 4** 가 필살타법 창(상태 0x6c)이 아니라 **상태 0x78** 을 연다 (0x12dc0, R7 4절 149행) —
  *     그 창에 마구(필살 창 탭 0·1 의 투수 쪽)와 **구질 훈련**(`pitchTraining.ts`)이 함께 있다.
- *
- * **못 채운 것**: 투수 타입(3가지)에 붙는 훈련 보너스 칸이 문서에 없다. 타자편은 "배팅 타입 → 히트/파워
- * +1"(StrMODE[194], 0x186e0)인데 투수 쪽 대응을 찾지 못했다 — **보너스를 0 으로 두고 자리만 남긴다**.
  */
 
 interface IntegerRange {
@@ -37,7 +41,13 @@ interface IntegerRange {
 }
 
 const GAIN_RANGE: IntegerRange = BALANCE.training.gainRange
+/** 투수는 칸 3(체력)만 bfa55(5,8) — 0x186f4 `cmp k,#3` */
 const SLOW_GAIN_RANGE: IntegerRange = BALANCE.training.legGainRange
+const STAMINA_SLOT = 3
+/** 타입 보너스 +1 (0x18750 · 0x187a8 의 [sp+0xe8+k] += 1) */
+const TYPE_BONUS = 1
+/** 타입 이름 — 표 0x1400080 [2 + 타입] (0x187be `ldr r1,[r3,#8]`) */
+export const PITCHER_TYPE_NAMES: readonly string[] = ['오버핸드', '사이드암', '언더스로']
 const MORALE_LOSS_RANGE: IntegerRange = BALANCE.training.moraleLossRange
 const ROOKIE_SKILL = BALANCE.training.rookieSkillId
 const WEAK_BODY_SKILL = BALANCE.training.weakBodySkillId
@@ -107,7 +117,16 @@ export interface PitcherMagicProgress {
 export interface PitcherTrainingOutcome {
   readonly menuId: string
   readonly gains: Partial<PitcherAbility>
+  /** 타입 보너스 (0 또는 1) — 글 "[타입] 타입 보너스 +1" 을 붙일지 */
+  readonly typeBonus: number
   readonly moraleLoss: number
+  /**
+   * 굴린 값 그대로 — 보너스(타입·스킬)와 자르기 전. 타자편 `TrainingOutcome.rolledGain` 과 같은 칸이다
+   * (0x18d14 훈련 칸 [sp+0x34] · 0x18d36 사기 칸 −[sp+0x38], 결과 창 0x872a1 은 두 모드 공용).
+   * 마구는 상승 굴림이 없어 0. ⚠️ 투수편엔 아직 상세 결과 창이 없어 알림만 쓴다.
+   */
+  readonly rolledGain: number
+  readonly rolledMoraleLoss: number
   readonly magic: PitcherMagicProgress | null
   readonly career: PitcherCareer
 }
@@ -116,13 +135,7 @@ function roll(random: RandomPort, range: IntegerRange): number {
   return randomIntegerBelow(random, range.minimum, range.maximumExclusive)
 }
 
-/**
- * 훈련 한 번 (0x17f5c → 0xa3bac).
- *
- * ⚠️ **근사**: 칸 0·1 은 `bfa55(4,7)`, 칸 2·3 은 `bfa55(5,8)` 로 둔다. 원본은 칸 **번호**로 갈리는
- * 한 코드(0x186e0)라 투수도 같은 갈림을 탈 것으로 본다 — 투수 전용 수치는 문서에 없다 (**추정**).
- * 타입 보너스는 대응 칸을 못 찾아 0 이다 (위 모듈 주석 참조).
- */
+/** 훈련 한 번 (0x17f5c → 0xa3bad). 범위·타입 보너스 갈림은 위 모듈 주석 (디스어셈 확정) */
 export function runPitcherTraining(
   career: PitcherCareer,
   menu: PitcherTrainingMenu,
@@ -135,9 +148,10 @@ export function runPitcherTraining(
     : runAbilityTraining(career, menu, menu.ability, random)
 }
 
-function moraleLossOf(career: PitcherCareer, random: RandomPort, range: IntegerRange): number {
+/** 굴린 사기 감소에 병아리 −1 · 몹쓸몸 +2 ([sp+0xf8]) 를 더한다 */
+function moraleLossOf(career: PitcherCareer, rolledMoraleLoss: number): number {
   return (
-    roll(random, range) -
+    rolledMoraleLoss -
     (isPitcherSkillEquipped(career, ROOKIE_SKILL) ? 1 : 0) +
     (isPitcherSkillEquipped(career, WEAK_BODY_SKILL) ? 2 : 0)
   )
@@ -150,16 +164,22 @@ function runAbilityTraining(
   random: RandomPort,
 ): PitcherTrainingOutcome {
   const slot = PITCHER_ABILITY_ORDER.indexOf(ability)
-  const rolled = roll(random, slot >= 2 ? SLOW_GAIN_RANGE : GAIN_RANGE)
+  // 굴리는 차례: 사기 bfa55(5,8) → [sp+0x38] (0x186c4) 이 **먼저**, 상승 bfa55 → [sp+0x34] (0x18704) 가 다음
+  const rolledMoraleLoss = roll(random, MORALE_LOSS_RANGE)
+  const rolled = roll(random, slot === STAMINA_SLOT ? SLOW_GAIN_RANGE : GAIN_RANGE)
+  const typeBonus = PITCHER_TYPE_BONUS_ABILITY[career.typeIndex] === ability ? TYPE_BONUS : 0
   const skillGain =
     (isPitcherSkillEquipped(career, ROOKIE_SKILL) ? 1 : 0) - (isPitcherSkillEquipped(career, WEAK_BODY_SKILL) ? 2 : 0)
-  const gains: Partial<PitcherAbility> = { [ability]: rolled + skillGain }
-  const moraleLoss = moraleLossOf(career, random, MORALE_LOSS_RANGE)
+  const gains: Partial<PitcherAbility> = { [ability]: rolled + typeBonus + skillGain }
+  const moraleLoss = moraleLossOf(career, rolledMoraleLoss)
   const spent = spendPitcherCycleAction(gainPitcherMorale(career, -moraleLoss))
   return {
     menuId: menu.id,
     gains,
+    typeBonus,
     moraleLoss,
+    rolledGain: rolled,
+    rolledMoraleLoss,
     magic: null,
     career: countPitcherTraining(gainPitcherAbility(spent, gains), menu.id),
   }
@@ -174,7 +194,8 @@ function runMagicTraining(
   const required = MAGIC_REQUIRED_SESSIONS[level]
   const sessions = career.magicSessions + 1
   const isLevelUp = sessions >= required
-  const moraleLoss = moraleLossOf(career, random, MAGIC_MORALE_RANGE)
+  const rolledMoraleLoss = roll(random, MAGIC_MORALE_RANGE)
+  const moraleLoss = moraleLossOf(career, rolledMoraleLoss)
   const spent = spendPitcherCycleAction(gainPitcherMorale(career, -moraleLoss))
   const trained: PitcherCareer = {
     ...spent,
@@ -186,7 +207,10 @@ function runMagicTraining(
   return {
     menuId: menu.id,
     gains: {},
+    typeBonus: 0,
     moraleLoss,
+    rolledGain: 0,
+    rolledMoraleLoss,
     magic: { sessions, required, isLevelUp },
     career: countPitcherTraining(trained, menu.id),
   }

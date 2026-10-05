@@ -54,14 +54,51 @@ describe('투수 훈련 메뉴 — 타자편과 다른 점', () => {
   })
 })
 
-describe('능력 훈련 (0x17f5c → 0xa3bac 종류 0~3, 칸 번호로만 갈린다 — 추정)', () => {
-  it('제구·구속은 4~6, 변화·체력은 5~7 오른다', () => {
-    const before = 투수()
+describe('능력 훈련 (0x17f5c → 0x186c4 · 0xa3bad, 모드 갈림은 디스어셈 확정)', () => {
+  it('제구·구속·변화는 4~6, 체력만 5~7 오른다 (0x186f4 — 투수는 칸 3 만 bfa55(5,8))', () => {
+    // 타입 1(사이드암)은 제구에만 보너스가 붙어 구속·변화·체력은 굴린 값 그대로다
+    const before = 투수({ typeIndex: 1 })
 
-    expect(runPitcherTraining(before, 메뉴('제구'), 최소).career.ability.control).toBe(before.ability.control + 4)
-    expect(runPitcherTraining(before, 메뉴('제구'), 최대).career.ability.control).toBe(before.ability.control + 6)
+    expect(runPitcherTraining(before, 메뉴('구속'), 최소).career.ability.velocity).toBe(before.ability.velocity + 4)
+    expect(runPitcherTraining(before, 메뉴('구속'), 최대).career.ability.velocity).toBe(before.ability.velocity + 6)
+    expect(runPitcherTraining(before, 메뉴('변화'), 최소).career.ability.breaking).toBe(before.ability.breaking + 4)
+    expect(runPitcherTraining(before, 메뉴('변화'), 최대).career.ability.breaking).toBe(before.ability.breaking + 6)
     expect(runPitcherTraining(before, 메뉴('체력'), 최소).career.ability.stamina).toBe(before.ability.stamina + 5)
     expect(runPitcherTraining(before, 메뉴('체력'), 최대).career.ability.stamina).toBe(before.ability.stamina + 7)
+  })
+
+  it('사기 감소를 먼저, 상승을 다음에 굴린다 (0x186c4 → 0x18704)', () => {
+    const 차례 = [0, 0.999]
+    let index = 0
+    const 순서난수: RandomPort = {
+      next: () => 차례[index++],
+      nextInRange: (minimum, maximum) => minimum + 차례[index++] * (maximum - minimum),
+      pick: (candidates) => candidates[0],
+    }
+    const before = 투수({ typeIndex: 1 })
+    const outcome = runPitcherTraining(before, 메뉴('구속'), 순서난수)
+
+    // 첫 굴림(0) = 사기 5, 둘째 굴림(0.999) = 상승 6
+    expect(outcome.rolledMoraleLoss).toBe(5)
+    expect(outcome.rolledGain).toBe(6)
+    expect(outcome.career.ability.velocity).toBe(before.ability.velocity + 6)
+    expect(outcome.career.morale).toBe(50 - 5)
+  })
+
+  it('타입 보너스 +1 — 타입 0 구속 · 타입 1 제구 · 타입 2 변화 (0x18786~0x187a6)', () => {
+    const 칸 = ['제구', '구속', '변화', '체력'] as const
+    const 키 = ['control', 'velocity', 'breaking', 'stamina'] as const
+    const 보너스 = (typeIndex: number) =>
+      칸.map((id) => runPitcherTraining(투수({ typeIndex }), 메뉴(id), 최소).typeBonus)
+    expect(보너스(0)).toEqual([0, 1, 0, 0])
+    expect(보너스(1)).toEqual([1, 0, 0, 0])
+    expect(보너스(2)).toEqual([0, 0, 1, 0])
+
+    const before = 투수({ typeIndex: 2 })
+    const outcome = runPitcherTraining(before, 메뉴('변화'), 최소)
+    expect(outcome.career.ability[키[2]]).toBe(before.ability.breaking + 4 + 1)
+    // 굴린 값(결과 창 변화량 칸)에는 보너스가 안 들어간다
+    expect(outcome.rolledGain).toBe(4)
   })
 
   it('병아리(0)·몹쓸몸(3)은 **장착** 비트로 본다 — 가졌어도 장착이 아니면 보정이 없다 (0x17f5c → 0xa4bf8)', () => {
