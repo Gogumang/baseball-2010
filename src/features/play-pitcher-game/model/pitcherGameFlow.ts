@@ -14,6 +14,7 @@ import { describeOutcome, isFreePass, isHit } from '@/entities/at-bat/model/atBa
 import { playQuickAtBat } from '@/entities/game/model/quickAtBat'
 import { batterAt, teamBatters, teamPitchers, quickPitcherOf } from '@/entities/team/model/teamRoster'
 import { advanceRunners, runnerCountOf } from '@/entities/game/model/baseState'
+import type { BaseState } from '@/entities/game/model/baseState'
 import {
   completeGameRecordIdsOf,
   gameEndRecordIdsOf,
@@ -27,6 +28,7 @@ import { defenseAbilitiesOf, isBattedBallInPlay, runDefensePlay } from '@/featur
 import type { DefensePlayInput, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { homeRunPlaybackOf } from '@/features/defense-play/model/homeRunPlayback'
 import { PICKOFF_RESULT, runPickoffPlay } from '@/features/defense-play/model/pickoffPlay'
+import { chargedRunsOfFates, runnerFatesWithoutPlay } from '@/features/defense-play/model/runnerFates'
 import { pickoffPlayForKey, PICKOFF_PLAY_KIND } from '@/entities/defense-controls/model/pickoff'
 import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
 import { pitchAgainstBatter } from '@/entities/pitching/model/simulateBatter'
@@ -760,16 +762,18 @@ export function pickoff(
       decision = applyRunScoredFor(progress, decision, run, true)
     }
     const halfChanged = applied.game.half !== before.half || applied.game.inning !== before.inning
+    const pickoffCharged = chargedRunsOfFates(result.runnerFates, before.outs + advanceResult.outsAdded)
     next = {
       ...next,
       game: applied.game,
       decision,
       inningRuns: addInningRuns(progress.inningRuns, before.inning, applied.runsScored),
-      // 견제는 내가 마운드에 있을 때만이라 들어온 주자는 모두 내가 내보낸 주자다 (R+0x128 · +0x22)
-      runsAllowedByMe: progress.runsAllowedByMe + applied.runsScored,
+      // 견제는 내가 마운드에 있을 때만이라 들어온 주자는 모두 내가 내보낸 주자다 (R+0x128 · +0x22).
+      // 견제도 정산 0xa8024 를 지난다(I 4a-3) — 주자 운명으로 센다 (`chargedRunsOfFates`)
+      runsAllowedByMe: progress.runsAllowedByMe + pickoffCharged,
       record: {
         ...progress.record,
-        runsAllowedField: progress.record.runsAllowedField + applied.runsScored,
+        runsAllowedField: progress.record.runsAllowedField + pickoffCharged,
       },
       teamRunsAllowed: progress.teamRunsAllowed + applied.runsScored,
     }
@@ -916,16 +920,18 @@ function applyDefensivePlay(
    * - 강판 뒤에는 남겨 둔 내 주자(`inheritedRunners`)만 내 실점이다. 주자는 서로 앞지를 수 없어 내 주자가 늘 앞쪽에
    *   있으므로 **득점은 내 주자부터** 센다.
    *
-   * ⚠️ 미해결(근사): 진행기(`AdvanceResult`)는 주자별 운명을 내주지 않는다. 그래서 ① 내 주자가 이 플레이에서
-   *   아웃되고 뒤 주자가 들어온 경우(드묾)는 뒤 주자 득점을 내 것으로 세고, 남은 내 주자 수는
-   *   `min(남은 수, 루의 주자 수)` 로 줄인다. ② 3아웃으로 끝난 플레이에서 원본은 목록 0번 주자가 살았으면 보류됐다
-   *   날아간 득점까지 세고 죽었으면 하나도 안 세는데(0xa8ec0), 웹 `runsScored` 는 점수판 득점이라 그 갈래만
-   *   다를 수 있다 (9d039b6 · pitcherRun 과 같은 근사).
-   *   ③ 원본은 포스트시즌·국가대항전이면 0xa56dc 가 거짓이라 아예 안 센다(사건 함수 0xa57f8 의 다른 R 칸도
+   * 내가 던진 타석은 주자 운명(`runnerFates`, 90c7864)으로 센다 — 인플레이 타구는 진행기 결과, 삼진·볼넷·사구·홈런은
+   *   `runnerFatesWithoutPlay`. 그래서 3아웃 갈래(0xa8ec0: 목록 0번 주자가 살았으면 보류됐다 날아간 득점까지 세고,
+   *   죽었으면 하나도 안 센다)도 원본대로다. `outsAfterPlay` 는 3아웃 정리 전의 아웃 수.
+   *
+   * ⚠️ 미해결(근사): ① 강판 뒤 간이 엔진 타석은 주자 운명이 없어 점수판 득점(`runsScored`)을 쓰고, 내 주자가
+   *   이 플레이에서 아웃되고 뒤 주자가 들어온 경우(드묾)는 뒤 주자 득점을 내 것으로 세며, 남은 내 주자 수는
+   *   `min(남은 수, 루의 주자 수)` 로 줄인다. 간이 엔진의 3아웃 갈래도 점수판 득점으로 대신한다.
+   *   ② 원본은 포스트시즌·국가대항전이면 0xa56dc 가 거짓이라 아예 안 센다(사건 함수 0xa57f8 의 다른 R 칸도
    *   같은 게이트다) — 웹은 이 게이트를 어느 R 칸에도 걸지 않았으므로 여기서도 걸지 않는다 (미해결, 따로 옮길 것).
    */
   const chargedToMe = mine
-    ? applied.runsScored
+    ? chargedRunsOfMyPlay(before.bases, outcome, defensePlay, before.outs + applied.outsAdded, applied.runsScored)
     : Math.min(applied.runsScored, progress.inheritedRunners)
   const inheritedRunners =
     mine || inningEnded
@@ -1037,6 +1043,23 @@ function applyDefensivePlay(
     }`,
     mine,
   )
+}
+
+/**
+ * 내가 던진 타석 하나가 R+0x128 · +0x22 에 더하는 수 (`chargedRunsOfFates`, 0xa8ea4~0xa8f6e).
+ * 인플레이 타구는 진행기가 낸 운명, 그 밖(삼진·볼넷·사구·홈런)은 진행기 없이 정해지는 운명을 쓴다.
+ * 진행기 결과가 없는 인플레이 타구(일어나지 않지만)는 점수판 득점으로 대신한다.
+ */
+function chargedRunsOfMyPlay(
+  basesBefore: BaseState,
+  outcome: AtBatOutcome,
+  defensePlay: DefensePlayResult | null,
+  outsAfterPlay: number,
+  runsScored: number,
+): number {
+  if (defensePlay !== null) return chargedRunsOfFates(defensePlay.runnerFates, outsAfterPlay)
+  if (outcome.kind === '안타' || outcome.kind === '아웃') return runsScored
+  return chargedRunsOfFates(runnerFatesWithoutPlay(basesBefore, outcome), outsAfterPlay)
 }
 
 /**
