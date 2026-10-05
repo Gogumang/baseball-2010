@@ -96,6 +96,7 @@ import {
 import type { BatterGameRecord } from '@/entities/batting/model/pinchHitAi'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { TEAMS } from '@/shared/config/original/teams'
 
 /**
  * **사람이 팀을 조작하는 경기** — 원본 게임 모드 **1 일반 · 2 시즌 · 8·9 대전** 이 쓰는 경기다
@@ -140,6 +141,10 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
  * 포스트시즌·국가대항전도 같은 화면을 쓴다 — `mode` 는 그대로 2 이고 상대 팀만 바뀐다.
  */
 
+/** 팀 사기 = 팀 레코드 s16 +2 = XlsTEAM_DATA 둘째 u16 (전 팀 100) */
+const TEAM_MORALE_VALUE_INDEX = 1
+const DEFAULT_TEAM_MORALE = 100
+
 /** 자동 진행이 끝나지 않는 상황을 막는 안전장치 (원본에는 없다) */
 const MAXIMUM_AUTO_STEPS = 2_000
 const MAXIMUM_LOG_LENGTH = 40
@@ -160,9 +165,20 @@ export interface TeamGameOptions {
   /** 시즌 팀 질병·사기·코치 (모드 2에서만 쓰인다) */
   readonly season?: SeasonTeamCondition
   /**
+   * **시즌 팀 번호** `[시즌+1]` (0~9) — 모드 2 에서만 본다. 안 넘기면 `ourTeamId` 와 같다고 본다
+   * (정규·포스트시즌은 내 팀이 곧 시즌 팀이다).
+   *
+   * 질병·보직·사기 세 보정은 `0xb5804` 에서 `[시즌+1] == 팀레코드+0` 으로 **선수의 팀 번호**와
+   * 비교한다 (b580e `ldrsb [S+1]` · b5816 `ldrsh [팀레코드+0]` · b581a `bne`).
+   * 국가대항전은 내 팀이 대한민국(10)이라 시즌 팀(0~9)과 같을 수 없어서 **아무 팀에도 안 붙는다**.
+   * 그래서 국가대항전을 부르는 쪽은 `ourTeamId: 10` 과 함께 원래 시즌 팀을 여기에 넘겨야 한다.
+   */
+  readonly seasonTeamId?: number
+  /**
    * 리그 날짜 카운터 g (`리그+0x32` = `시즌+0xb2` = 시즌 레코드의 `games`) — **모드 2 에서만** 본다.
    * 시즌모드 경기 직전 화면 `0x6548` 이 `0xb8c80` 으로 양 팀 4인 로테이션을 한 칸 돌리는 자리다
    * (R13 4절). 안 넘기면 0 = 시즌 첫 경기라 두 팀 모두 로스터 0번이 선발이다.
+   * 국가대항전 중에는 같은 칸 `L+0x32` 가 **대회 날짜**다 (0xb7bf0 이 0 으로 놓는다).
    */
   readonly dayCounter?: number
   /** 팀별 능력치 네 칸. 안 넘기면 XlsTEAM_DATA 값 */
@@ -555,12 +571,37 @@ export function isPitchTurn(progress: TeamGameProgress): boolean {
 function abilityContextOf(options: TeamGameOptions): TeamGameAbilityContext {
   return {
     mode: options.mode,
-    // 내 팀 보정 셋(질병·보직·사기)은 시즌모드에서만 붙는다 (0xb581a)
-    seasonTeamId: options.mode === TEAM_GAME_MODE.시즌 ? options.ourTeamId : -1,
+    // 내 팀 보정 셋(질병·보직·사기)은 시즌모드에서만 붙는다 (0xb581a).
+    // 비교 대상은 [시즌+1] = 시즌 팀 번호다 (0xb5804) — 국가대항전의 대한민국(10)과는 안 맞는다
+    seasonTeamId: options.mode === TEAM_GAME_MODE.시즌 ? seasonTeamIdOf(options) : -1,
     season: options.season,
     teamAbilities: options.teamAbilities,
     lineup: options.lineup,
   }
+}
+
+/** 시즌 팀 번호 `[시즌+1]` — 안 넘기면 내 팀이 곧 시즌 팀이다 (정규·포스트시즌) */
+function seasonTeamIdOf(options: TeamGameOptions): number {
+  return options.seasonTeamId ?? options.ourTeamId
+}
+
+/**
+ * 스태미나 용량이 보는 **내 팀 사기** — `0x66e44(V, 투수, 첫투수)` 의 `V+2`.
+ *
+ * `V` 는 소모 `0xaeb08` 이 `0x1f9a9(g, 모드, 팀+0x25)` 로 얻는 **투수 팀의 팀 레코드**다.
+ * 팀 번호 비교(`0xb5804`) 같은 건 없고 그냥 그 팀 레코드의 +2 를 읽는다. 모드 2 가지
+ * `0x1f570` 은 국가대항전 중(`S+0x12c` ≠ 0)이면 팀 10 을 리그 배열이 아닌 **대표팀 슬롯
+ * `base+0x918`** 로 돌린다 (1f58a~1f59c). 그 슬롯은 대회를 시작할 때 `0xb7bf0 → 0x205c0` 이
+ * 마스터 팀 데이터(XlsTEAM_DATA)에서 새로 만들어 사기가 **원본 표값 100** 이다 (S6 2-2).
+ *
+ * 그래서 시즌 팀으로 치는 경기만 시즌 사기(팀 레코드 +2)를 쓰고, 국가대항전의 대한민국은
+ * 표값을 쓴다. 다른 모드는 지금까지처럼 넘긴 사기(없으면 100)다.
+ */
+function ourTeamMoraleOf(options: TeamGameOptions): number {
+  if (options.mode === TEAM_GAME_MODE.시즌 && seasonTeamIdOf(options) !== options.ourTeamId) {
+    return TEAMS[options.ourTeamId]?.values[TEAM_MORALE_VALUE_INDEX] ?? DEFAULT_TEAM_MORALE
+  }
+  return options.season?.morale ?? DEFAULT_TEAM_MORALE
 }
 
 /**
@@ -1178,7 +1219,7 @@ function pitchOnce(
     stamina: progress.stamina,
     typeNumber: input.typeNumber,
     staminaAbility: stats.stamina,
-    teamMorale: options.season?.morale ?? 100,
+    teamMorale: ourTeamMoraleOf(options),
     // 경기 중 교체를 아직 안 옮겨서 선발이 곧 "첫 투수" 다
     isFirstPitcher: true,
     // 상대 타자의 스킬 22(0xb62b4)를 웹 로스터가 들고 있지 않아 늘 거짓이다
@@ -2127,7 +2168,7 @@ function playAutoDefenseAtBat(progress: TeamGameProgress, random: RandomPort): T
       stamina: drainQuickPitcher(
         progress.stamina,
         ourPitcherStats(progress).stamina,
-        progress.options.season?.morale ?? 100,
+        ourTeamMoraleOf(progress.options),
         progress.ourUsedPitchers.length === 0,
         play.pitches,
       ),

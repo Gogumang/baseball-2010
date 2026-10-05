@@ -183,6 +183,54 @@ describe('경기용 능력치가 화면까지 이어진다', () => {
     const 나쁨 = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT, season: { illness: 0, morale: 5, coach: -1 } })
     expect(currentBatterAbility(나쁨.progress).hit).toBe(currentBatterAbility(좋음.progress).hit - 200)
   })
+
+  /*
+   * 국가대항전 — 내 팀은 대한민국(10), 시즌 팀은 그대로(여기선 3).
+   * 질병·보직·사기 보정은 0xb5804 의 `[시즌+1] == 팀레코드+0` 을 타서 10 ≠ 3 이라 아무 팀에도 안 붙는다.
+   */
+  const 대회 = (season: { illness: number; morale: number; coach: number }) =>
+    시작({
+      playerSide: PLAYER_SIDE_FIRST_BAT,
+      ourTeamId: 10,
+      seasonTeamId: 3,
+      opponentTeamId: 11,
+      season,
+    })
+
+  it('국가대항전 대한민국에는 시즌 팀의 질병·사기 감점이 안 붙는다 (0xb5804 [시즌+1] ≠ 10)', () => {
+    const 좋음 = 대회({ illness: 0, morale: 100, coach: -1 })
+    const 나쁨 = 대회({ illness: 5, morale: 5, coach: -1 })
+    expect(currentBatterAbility(나쁨.progress)).toEqual(currentBatterAbility(좋음.progress))
+    expect(currentPitcherAbility(나쁨.progress)).toEqual(currentPitcherAbility(좋음.progress))
+    expect(ourPitcherStats(나쁨.progress)).toEqual(ourPitcherStats(좋음.progress))
+  })
+
+  it('시즌 팀으로 치면 같은 상태에서 감점이 붙는다 — seasonTeamId 를 안 넘기면 ourTeamId 가 시즌 팀이다', () => {
+    const 좋음 = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT, ourTeamId: 3, season: { illness: 0, morale: 100, coach: -1 } })
+    const 나쁨 = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT, ourTeamId: 3, seasonTeamId: 3, season: { illness: 5, morale: 5, coach: -1 } })
+    expect(currentBatterAbility(나쁨.progress).hit).toBeLessThan(currentBatterAbility(좋음.progress).hit)
+  })
+})
+
+describe('스태미나가 보는 팀 사기 (0x66e44 의 팀 레코드 +2)', () => {
+  const 한공 = (options: Partial<TeamGameOptions>) => {
+    const { progress, random } = 시작({ playerSide: PLAYER_SIDE_LAST_BAT, ...options })
+    const after = throwPitch(progress, { typeNumber: 첫구질(progress), courseCell: 4, gaugeCell: 0 }, random)
+    return progress.stamina - after.stamina
+  }
+
+  it('시즌 팀은 시즌 사기가 낮으면 더 많이 깎인다', () => {
+    const 좋음 = 한공({ ourTeamId: 3, season: { illness: 0, morale: 100, coach: -1 } })
+    const 나쁨 = 한공({ ourTeamId: 3, season: { illness: 0, morale: 5, coach: -1 } })
+    expect(나쁨).toBeGreaterThan(좋음)
+  })
+
+  it('국가대항전 대한민국은 대표팀 슬롯(base+0x918)의 표값 사기 100 을 쓴다 — 시즌 사기와 무관', () => {
+    const 대회 = { ourTeamId: 10, seasonTeamId: 3, opponentTeamId: 11 }
+    const 좋음 = 한공({ ...대회, season: { illness: 0, morale: 100, coach: -1 } })
+    const 나쁨 = 한공({ ...대회, season: { illness: 0, morale: 5, coach: -1 } })
+    expect(나쁨).toBe(좋음)
+  })
 })
 
 describe('경기 한 판을 끝까지', () => {

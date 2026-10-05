@@ -391,6 +391,9 @@ export function useSeasonSession(
       return {
         mode: SEASON_GAME_MODE,
         ourTeamId: record.teamId,
+        // [시즌+1] — 질병·보직·사기 보정(0xb5804)이 선수 팀 번호와 견주는 값. 국가대항전은
+        // ourTeamId 만 대한민국(10)으로 바뀌고 이 값은 시즌 팀 그대로라 보정이 아무 팀에도 안 붙는다
+        seasonTeamId: record.teamId,
         opponentTeamId: opponent,
         playerSide: side === LEAGUE_SIDE_HOME ? PLAYER_SIDE_LAST_BAT : PLAYER_SIDE_FIRST_BAT,
         settings: FULL_PLAY_SETTINGS,
@@ -637,7 +640,15 @@ export function useSeasonSession(
       //   65e2 cmp r5,#0xa — 칸 0 이 10 이 아니면 둘을 맞바꿈 → [sp+0x18] = 내 팀 = 늘 10
       //   664c 0xb6bd4(경기, 내side, [sp+0x18]) — 경기[0x28+내side] = 10
       // 시즌모드는 대표팀 명단을 안 건드려 팀 10 기본 명단 그대로 친다 (P5 1b·2절, 0x1f9a9 호출 없음)
-      setGameOptions({ ...options, ourTeamId: myTeam })
+      //
+      // 날짜 카운터도 시즌 경기 수가 아니라 **대회 날짜**다. 경기 준비 0x6548 의 로테이션
+      // (670e~673e: `S+0xb2` ≠ 0 이면 양 팀에 0xb8c80 → 0xb5ca8)이 보는 `S+0xb2` = `L+0x32` 를
+      // 대회 초기화 0xb7bf0 이 0 으로 놓고(b7c42) 하루 끝 0xb818c 가 1 씩 올린다 = cup.day.
+      // 대한민국 슬롯(base+0x918)은 대회마다 마스터에서 새로 만들어(0x205c0) 0번부터 돌므로
+      // 내 팀 선발은 rotationSlotOf(cup.day) 와 같다.
+      // ⚠️ 미해결: 상대국 슬롯(base+0x934)을 채우는 자리를 못 읽어(S6 미해결 b) 상대 선발 칸이
+      //    같은 셈을 따르는지는 모른다 — 웹은 양 팀에 같은 칸을 쓴다.
+      setGameOptions({ ...options, ourTeamId: myTeam, dayCounter: cup.day })
       setScene(SEASON_SCENE_STATE.경기직전)
     },
     [clearGameRecord, optionsFor, save],

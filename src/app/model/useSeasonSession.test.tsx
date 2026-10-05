@@ -359,6 +359,39 @@ describe('시즌 끝 사슬', () => {
     expect(cup.losses[0] + cup.losses[1] + cup.losses[2] + cup.losses[3]).toBe(2)
   })
 
+  it('국가대항전 옵션은 시즌 팀 번호를 따로 넘기고 날짜 카운터는 대회 날짜다 (0xb5804 · 0x6548 670e)', () => {
+    const { result } = 띄우기()
+    act(() => result.current.actions.chooseTeam(3))
+    act(() => result.current.actions.confirmIncome({
+      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
+    }))
+    act(() => result.current.actions.updateRecord({ ...result.current.state!.record, yearIndex: 2 }))
+    act(() => result.current.actions.finishSeason())
+
+    act(() => result.current.actions.playCupGame(10, 11))
+    // 내 팀은 대한민국(10)이지만 [시즌+1] 은 시즌 팀(3) 그대로 — 질병·보직·사기 보정이 아무 팀에도 안 붙는다
+    expect(result.current.gameOptions?.ourTeamId).toBe(10)
+    expect(result.current.gameOptions?.seasonTeamId).toBe(3)
+    expect(result.current.gameOptions?.dayCounter).toBe(result.current.cup!.day)
+
+    act(() => result.current.actions.finishGame(요약({ ourTeamId: 10, opponentTeamId: 11 })))
+    const day = result.current.cup!.day
+    expect(day).toBe(1)
+    const games = result.current.state!.record.games
+    act(() => result.current.actions.playCupGame(10, 12))
+    // 시즌 경기 수(SR+0xb2 의 시즌 값)가 아니라 대회 하루 넘기기가 올린 L+0x32 다
+    expect(result.current.gameOptions?.dayCounter).toBe(day)
+    expect(games).not.toBe(day)
+  })
+
+  it('정규 경기 옵션의 시즌 팀 번호는 내 팀과 같다', () => {
+    const { result } = 띄우기()
+    act(() => result.current.actions.chooseTeam(4))
+    act(() => result.current.actions.playNextGame())
+    expect(result.current.gameOptions?.ourTeamId).toBe(4)
+    expect(result.current.gameOptions?.seasonTeamId).toBe(4)
+  })
+
   it('짝수 연차는 결산 뒤 국가대항전이 열린다', () => {
     const { result } = 띄우기()
     act(() => result.current.actions.chooseTeam(0))
