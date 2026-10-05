@@ -296,3 +296,15 @@ describe('baserunnerAllowedOf — 주자 목록 마지막 원소가 살아 있�
     expect(baserunnerAllowedOf({ first: false, second: false, third: true }, { kind: '안타', bases: 1 }, FIRST, 1)).toBe(false)
   })
 })
+
+describe('실점 한도 +0xa1 ↔ R+0x128 — 정산 0xa8f56 이 득점 주자마다 직접 올린다', () => {
+  it('투수 7번(실점 한도 1, 피안타 한도 0)은 솔로 홈런 하나로 무실점이 깨져 실패다', () => {
+    const 에이스 = PITCHER_MISSIONS.find((m) => m.id === 7)!
+    expect(에이스.failLimits).toMatchObject({ runs: 1, hits: 0 })
+
+    const run = applyPitcherOutcome(startPitcherMission(에이스), { kind: '홈런' })
+    expect(run.allowed.runs).toBe(1)
+    expect(run.progress.brokenConditions).toEqual(['무실점'])
+    expect(run.status).toBe('실패')
+  })
+})
