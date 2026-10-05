@@ -738,10 +738,13 @@ export function useSeasonSession(
       //   대한민국: 대회 첫날 새로 만든 슬롯이 L+0x32 ≠ 0 인 날마다 한 칸씩 → 선발 = cup.day % 4 (확정)
       //   상대국:  매일 마스터에서 새로 덮인 슬롯을 그날 한 번만 돌린다 → 선발 = day 0 이면 0번,
       //            그 뒤로는 **늘 1번** — cup.day % 4 를 따르지 않는다 (확정)
-      // ⚠️ 웹 팀 경기(features/play-team-game `startingPitcherSlotsOf`)는 양 팀에 rotationSlotOf(dayCounter)
-      //    하나를 쓰고 상대 칸을 따로 받을 옵션이 없다 — 그 파일(구역 밖)에 상대 날짜 칸이 생기기 전까지는
-      //    상대국 선발이 cup.day % 4 로 어긋난다.
-      setGameOptions({ ...options, ourTeamId: myTeam, dayCounter: cup.day })
+      //   → 상대 칸만 `opponentDayCounter` 로 따로 넘긴다 (0 이면 0번, 1 이면 rotationSlotOf(1) = 1번)
+      setGameOptions({
+        ...options,
+        ourTeamId: myTeam,
+        dayCounter: cup.day,
+        opponentDayCounter: cup.day === 0 ? 0 : 1,
+      })
       setScene(SEASON_SCENE_STATE.경기직전)
     },
     [clearGameRecord, optionsFor, save],

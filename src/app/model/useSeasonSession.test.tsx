@@ -443,6 +443,8 @@ describe('시즌 끝 사슬', () => {
     expect(result.current.gameOptions?.ourTeamId).toBe(10)
     expect(result.current.gameOptions?.seasonTeamId).toBe(3)
     expect(result.current.gameOptions?.dayCounter).toBe(result.current.cup!.day)
+    // 상대국 슬롯은 매일 마스터에서 새로 복사돼 그날 한 번만 돈다 — 첫날 0번, 그 뒤 늘 1번 (7dd3826)
+    expect(result.current.gameOptions?.opponentDayCounter).toBe(0)
 
     act(() => result.current.actions.finishGame(요약({ ourTeamId: 10, opponentTeamId: 11 })))
     const day = result.current.cup!.day
@@ -451,6 +453,7 @@ describe('시즌 끝 사슬', () => {
     act(() => result.current.actions.playCupGame(10, 12))
     // 시즌 경기 수(SR+0xb2 의 시즌 값)가 아니라 대회 하루 넘기기가 올린 L+0x32 다
     expect(result.current.gameOptions?.dayCounter).toBe(day)
+    expect(result.current.gameOptions?.opponentDayCounter).toBe(1)
     expect(games).not.toBe(day)
   })
 
