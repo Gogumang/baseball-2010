@@ -244,11 +244,16 @@ export function seasonEvaluationJingleIdOf(popularityChange: number): number {
  * @param wallet 전역 G 지갑(`useGamePointWallet`). 넘기면 **지갑이 G 의 주인**이고
  *   시즌은 자기 주머니를 안 쓴다. 안 넘기면 예전처럼 세션 주머니로 논다(테스트용) —
  *   그 자리는 새로 고치면 사라진다.
+ * @param aceLevels 전역 마선수 레벨 열 칸(`mgr[0x13a..0x143]`, `useAceLevels().levels`).
+ *   시즌 경기 옵션에 그대로 실어 명단 마선수 능력치 배율 `0xd88aa`(0xb6414 첫 단계)와
+ *   상대 마투수 마구 횟수 `0xd8509` 가 이 값을 보게 한다 — 시즌이라고 따로 보는 칸은 없다.
+ *   안 넘기면 팀 경기 쪽 기본(전부 Lv1 = 60%)이다.
  */
 export function useSeasonSession(
   store: JsonStorePort,
   random: RandomPort,
   wallet: GamePointWalletSession | null = null,
+  aceLevels?: Readonly<Record<number, number>>,
 ): SeasonSession {
   const loaded = useRef<SeasonSave | null>(null)
   if (loaded.current === null) loaded.current = normalizeSeasonSave(store.load() as Partial<SeasonSave> | null)
@@ -404,9 +409,11 @@ export function useSeasonSession(
         // 안 넘기면 0 고정이라 늘 로스터 0번이 선발이었다 (0xb5ca8 로테이션이 안 돈다)
         dayCounter: record.games,
         teamAbilities: save.state.teamAbilities,
+        // 마선수 레벨 — 0xb6414 가 모드를 가리지 않고 전역 mgr[0x13a + i] 를 읽는다 (b9f896b·e2ee55a)
+        aceLevels,
       }
     },
-    [save],
+    [aceLevels, save],
   )
 
   /**

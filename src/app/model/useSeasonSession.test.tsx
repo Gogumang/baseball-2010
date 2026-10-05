@@ -402,6 +402,14 @@ describe('시즌 끝 사슬', () => {
     expect(games).not.toBe(day)
   })
 
+  it('시즌 경기 옵션에 전역 마선수 레벨을 싣는다 — 0xb6414 는 모드를 안 가린다', () => {
+    const 레벨 = { 0: 3, 6: 2 }
+    const { result } = renderHook(() => useSeasonSession(메모리저장(), createSeededRandom(20100901), null, 레벨))
+    act(() => result.current.actions.chooseTeam(0))
+    act(() => result.current.actions.playNextGame())
+    expect(result.current.gameOptions?.aceLevels).toEqual(레벨)
+  })
+
   it('정규 경기 옵션의 시즌 팀 번호는 내 팀과 같다', () => {
     const { result } = 띄우기()
     act(() => result.current.actions.chooseTeam(4))
