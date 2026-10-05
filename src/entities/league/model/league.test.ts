@@ -4,7 +4,9 @@ import {
   advancePostseason,
   leagueSideOf,
   opponentOf,
+  postseasonGameOf,
   postseasonSideOf,
+  postseasonStarterSlotOf,
   rankingOf,
   recordLeagueResult,
   startPostseason,
@@ -61,6 +63,31 @@ describe('포스트시즌 — 0xb80a8 계단식', () => {
   it('시리즈 중간에는 승수만 는다', () => {
     const series = advancePostseason(advancePostseason(startPostseason(순위), 6), 0)
     expect(series).toMatchObject({ round: '준플레이오프', wins: [1, 1] })
+  })
+
+  it('시리즈가 끝나면 두 팀이 돈 로테이션(경기 수 − 1)이 쌓여 다음 시리즈로 이어진다 (0xb5ca8 · L+0x32)', () => {
+    let series = startPostseason(순위)
+    // 준PO 6 vs 0 — 0 이 3승 2패(5경기) → 둘 다 4칸
+    for (const winner of [0, 6, 0, 6, 0]) series = advancePostseason(series, winner)
+    expect(series.rotations).toEqual({ 6: 4, 0: 4 })
+    // PO 1 vs 0 — 1 이 3연승(3경기) → 둘 다 2칸 더
+    for (let game = 0; game < 3; game += 1) series = advancePostseason(series, 1)
+    expect(series.rotations).toEqual({ 6: 4, 0: 6, 1: 2 })
+  })
+
+  it('선발 칸 = 정규 44칸 + 이어 온 칸 + 이 시리즈 g, 4 로 돈다', () => {
+    let series = startPostseason(순위)
+    expect(postseasonStarterSlotOf(series, 6)).toBe(0)
+    series = advancePostseason(series, 6)
+    expect(postseasonGameOf(series)).toBe(1)
+    expect(postseasonStarterSlotOf(series, 0)).toBe(1)
+    for (let game = 0; game < 2; game += 1) series = advancePostseason(series, 6)
+    // PO 첫 경기: 기다린 2위(1) 는 0번, 3경기를 치르고 올라온 6 은 2번
+    expect(series.round).toBe('플레이오프')
+    expect(postseasonStarterSlotOf(series, 1)).toBe(0)
+    expect(postseasonStarterSlotOf(series, 6)).toBe(2)
+    // 옛 저장(칸 없음)은 0 칸으로 본다
+    expect(postseasonStarterSlotOf({ ...series, rotations: undefined }, 6)).toBe(0)
   })
 
   it('4위 이내면 진출이다', () => {

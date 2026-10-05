@@ -157,13 +157,20 @@ describe('선발은 0xc239c 의 로테이션이다 — 시리즈 안 경기 수 
     expect(세기.범위).toEqual(그대로.범위)
   })
 
-  it('새 시리즈 첫 경기는 다시 0번이다 — 시리즈가 끝나면 g 가 0 으로 돈다 (b777a −1 → b819a +1)', () => {
+  it('새 시리즈 g 는 0 부터지만 앞 시리즈에서 돈 칸이 이어진다 — 3경기 준PO 를 이긴 팀은 2칸 더 돈 채로 PO 에 선다', () => {
     const 시작 = startPostseason(순위)
     let series = 시작
     for (let game = 0; game < 3; game += 1) series = advancePostseason(series, 시작.teams[0])
     expect(series.round).toBe('플레이오프')
-    expect(playCpuSeriesGame(series, createSeededRandom(8))).toEqual(
-      advancePostseason(series, 기대승자(series, 8, 0)),
-    )
+    // 윗 시드(2위, 기다린 팀) = 0번 · 올라온 팀 = (44 + 2) % 4 = 2번
+    for (const seed of [8, 9, 10]) {
+      const random = createSeededRandom(seed)
+      const rolls = rollCpuGamePrep(random)
+      const 기대 = simulateLeagueGame({ away: series.teams[0], home: series.teams[1] }, random, { away: 0, home: 2 }, undefined, {
+        aces: { away: rolls.teamA, home: rolls.teamB },
+      })
+      const 승자 = 기대.awayRuns > 기대.homeRuns ? series.teams[1] : series.teams[0]
+      expect(playCpuSeriesGame(series, createSeededRandom(seed))).toEqual(advancePostseason(series, 승자))
+    }
   })
 })

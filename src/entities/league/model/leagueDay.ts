@@ -329,7 +329,11 @@ function defenseOf(
 export function simulateLeagueGame(
   matchup: LeagueMatchup,
   random: RandomPort,
-  startingPitcherSlot?: number,
+  /**
+   * 선발 칸 — 수 하나면 양 팀 같은 칸, `{ away, home }` 이면 명단마다 따로(포스트시즌은 앞 시리즈에서 이어 온 칸이
+   * 팀마다 달라 `postseasonStarterSlotOf` 가 팀별로 준다).
+   */
+  startingPitcherSlot?: number | { readonly away: number; readonly home: number },
   /**
    * 두 팀 투수 칸(0~7)별 **시작 스태미나** `+0x2c` — 정규시즌은 첫날만 10000(`0xb6190`)이고 그 뒤로는 경기에서
    * 깎인 값에 하루 끝 `0xb617c` +20% 만 더한 값이다 (a583fe0). 안 넘기면 모두 10000.
@@ -350,8 +354,10 @@ export function simulateLeagueGame(
   // 선발은 경기를 세울 때 로스터 앞 4명 중 하나로 정해진다 (0x3107a·0x31090, S13 1-4b)
   // 칸 번호를 먼저 정해 두는 것은 **투수 기록을 그 칸에 쌓아야** 하기 때문이다.
   // 난수를 부르는 횟수·순서는 예전과 같다(팀마다 한 번씩).
-  const awaySlot = startingPitcherSlot ?? rollStartingPitcherIndex(random)
-  const homeSlot = startingPitcherSlot ?? rollStartingPitcherIndex(random)
+  const awaySlot =
+    typeof startingPitcherSlot === 'object' ? startingPitcherSlot.away : startingPitcherSlot ?? rollStartingPitcherIndex(random)
+  const homeSlot =
+    typeof startingPitcherSlot === 'object' ? startingPitcherSlot.home : startingPitcherSlot ?? rollStartingPitcherIndex(random)
   // 선발 능력은 아래 `defenseOf` 가 마운드 칸으로 다시 집으므로, 이 둘은 수비 쪽을 넘기지 않는
   // 길(포스트시즌 한 경기 등)에서 쓰는 기본값이다
   const awayPitcher = startingPitcherOf(matchup.away, awaySlot)

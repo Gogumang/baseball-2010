@@ -1,4 +1,4 @@
-import { LEAGUE_SIDE_HOME, advancePostseason } from '@/entities/league/model/league'
+import { LEAGUE_SIDE_HOME, advancePostseason, postseasonStarterSlotOf } from '@/entities/league/model/league'
 import type { PostseasonSeries } from '@/entities/league/model/league'
 import {
   cpuGameAcesOf,
@@ -7,7 +7,6 @@ import {
   simulateLeagueGame,
 } from '@/entities/league/model/leagueDay'
 import { isMyTurn } from '@/entities/league/model/seasonEnd'
-import { rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
 /**
@@ -34,9 +33,9 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
  * 시리즈가 끝나는 승 기록 `0xb7724` 가 L+0x32 = −1(b777a)로 놓아 하루 끝 `0xb818c`(b819a, 늘 +1)가 다음 시리즈
  * 첫 경기를 0 으로 만든다. 무승부가 없으니 g = 두 팀 승수의 합이다.
  *
- * ⚠️ 원본 로테이션은 로스터 레코드를 제자리에서 섞어(영구) **앞 시리즈에서 돈 칸이 다음 시리즈로 이어지지만**,
- * 웹은 정규시즌과 같이 g 하나로 셈한다(`rotationSlotOf` 주석 — **근사**). 준PO·PO 를 치르고 올라온 팀의
- * 이월분(그 시리즈 경기 수 − 1 칸)은 시리즈 대진에 남지 않아 빠진다 — 미해결.
+ * 원본 로테이션은 로스터 레코드를 제자리에서 섞어(영구) **앞 시리즈에서 돈 칸이 다음 시리즈로 이어진다** —
+ * 준PO·PO 를 치르고 올라온 팀은 그 시리즈 경기 수 − 1 칸을 더 돈 채로 다음 시리즈를 시작한다. 시리즈가 끝날 때
+ * `advancePostseason` 이 `series.rotations` 에 쌓고 `postseasonStarterSlotOf` 가 팀마다 셈한다.
  */
 /** 한 시리즈는 최대 7경기다. 대진이 셋이라 넉넉히 잡은 안전망 (원본에는 없다) */
 const MAXIMUM_GAMES = 40
@@ -73,14 +72,18 @@ export function playCpuSeriesGameWithStamina(
   const y = series.teams[0]
   // ⚠️ 준비 0xc239c 는 칸 sX 의 팀 객체에 Y 의 명단을 싣는다 (`cpuGameSidesOf`) — 초 공격은 **윗 시드의 선수**다
   const sides = cpuGameSidesOf(x, y, 1 - LEAGUE_SIDE_HOME)
-  // 선발 = 이 시리즈 g 번 돈 로스터의 0번 (0xc239c c24fc~c254e, 위 주석) — 굴림이 없다
-  const day = series.wins[0] + series.wins[1]
+  // 선발 = 정규 44 칸 + 앞 시리즈에서 이어 온 칸 + 이 시리즈 g 칸을 돈 레코드의 0번 (0xc239c c24fc~c254e,
+  // 위 주석) — 굴림이 없고, 이어 온 칸이 팀마다 달라 선발 칸도 팀마다 다르다
+  const starters = {
+    away: postseasonStarterSlotOf(series, sides.away),
+    home: postseasonStarterSlotOf(series, sides.home),
+  }
   // 경기 준비의 굴림 다섯 (c2464~c24ea) — 팀 A = 칸 sX(초)의 객체 = 윗 시드 명단
   const rolls = rollCpuGamePrep(random)
   const score = simulateLeagueGame(
     sides,
     random,
-    rotationSlotOf(day),
+    starters,
     { away: pitcherStaminas[sides.away], home: pitcherStaminas[sides.home] },
     { aces: cpuGameAcesOf(rolls, 1 - LEAGUE_SIDE_HOME), aceLevels },
   )

@@ -133,6 +133,49 @@ export interface PostseasonSeries {
   readonly wins: readonly [number, number]
   readonly winsNeeded: number
   readonly champion: number | null
+  /**
+   * 앞서 **끝난** 포스트시즌 시리즈에서 팀마다 돈 로테이션 수 (팀 번호 → 횟수). 없으면 0.
+   *
+   * 원본 로테이션 `0xb5ca8` 은 팀 레코드를 제자리에서 섞어(영구) 경기 준비마다 g ≠ 0 이면 한 칸 돈다
+   * (CPU 경기 `0xc239c` c24fc~c254e · 사람 경기 `0x6548` 670e~673e). 포스트시즌 g(`L+0x32`)는 시리즈마다 0 부터라
+   * n 경기 시리즈에서 두 팀이 n − 1 칸씩 돌고, 그 칸이 **다음 시리즈로 이어진다**. `advancePostseason` 이 시리즈가
+   * 끝날 때 쌓는다 (옛 저장에는 없다 — 0 으로 본다).
+   */
+  readonly rotations?: Readonly<Record<number, number>>
+}
+
+/**
+ * 정규시즌 날 수 — 일정표 0xd89cb 9일 × 5 = 45일 (`SEASON_GAME_COUNT` 와 같은 값).
+ * g = 0..44 중 g ≠ 0 인 44일에 팀마다 로테이션이 한 칸 돈다 → 포스트시즌은 44 칸 돈 레코드로 시작한다(44 % 4 = 0).
+ */
+const REGULAR_SEASON_DAYS = 45
+
+/** 로테이션 칸 수 (0xb5ca8 — 투수 0~3) */
+const POSTSEASON_ROTATION_SIZE = 4
+
+/**
+ * 포스트시즌 경기의 **그 팀 선발 칸** — 정규시즌 44 칸 + 앞 시리즈에서 이어 온 칸 + 이 시리즈 g 칸을 돈 레코드의 0번.
+ * 웹 로스터는 붙박이 표라 섞는 대신 칸 번호를 셈한다 (`pitcherRotation.rotationSlotOf` 와 같은 근사).
+ *
+ * ⚠️ 근사가 갈리는 자리: 원본은 섞인 레코드가 저장에 남아 **새 시즌으로도** 이어지고, 투수편 내 팀의 0↔k 맞바꿈
+ * (0xa4f60)·엔트리 편집 같은 다른 뒤섞임과 겹친다 — 여기서는 이 시즌 정규 44 칸 + 포스트시즌 칸만 센다.
+ */
+export function postseasonStarterSlotOf(series: PostseasonSeries, team: number): number {
+  return postseasonRotationTurnsOf(series, team) % POSTSEASON_ROTATION_SIZE
+}
+
+/** 이번 포스트시즌 경기를 준비할 때까지 그 팀 레코드가 돈 로테이션 수 — 정규 44 + 앞 시리즈 이월 + 이 시리즈 g */
+export function postseasonRotationTurnsOf(series: PostseasonSeries, team: number): number {
+  return REGULAR_SEASON_DAYS - 1 + (series.rotations?.[team] ?? 0) + postseasonGameOf(series)
+}
+
+/**
+ * 포스트시즌 날짜 카운터 g = `L+0x32` — **이 시리즈에서 치른 경기 수**. 대진을 까는 `0xb80a8` 이 0(b811c),
+ * 시리즈가 끝나는 승 기록 `0xb7724` 가 −1(b777a), 하루 끝 `0xb818c` 가 늘 +1(b819a) → 새 시리즈 첫 경기는 0.
+ * 무승부가 없어 두 팀 승수의 합이다.
+ */
+export function postseasonGameOf(series: PostseasonSeries): number {
+  return series.wins[0] + series.wins[1]
 }
 
 /** 시리즈 길이 표 [7, 5, 5] — 라운드 2(준PO) → 1(PO) → 0(KS) */
@@ -181,9 +224,16 @@ export function advancePostseason(series: PostseasonSeries, winner: number): Pos
   const side = series.teams[0] === winner ? 0 : 1
   const wins: [number, number] = side === 0 ? [series.wins[0] + 1, series.wins[1]] : [series.wins[0], series.wins[1] + 1]
   if (wins[side] < series.winsNeeded) return { ...series, wins }
-  if (series.round === '한국시리즈') return { ...series, wins, round: '종료', champion: winner }
+  // 시리즈가 끝났다 — n 경기 동안 두 팀은 g = 1..n−1 에서 한 칸씩, n − 1 칸 돌았다 (레코드에 남는다)
+  const turned = wins[0] + wins[1] - 1
+  const rotations = {
+    ...series.rotations,
+    [series.teams[0]]: (series.rotations?.[series.teams[0]] ?? 0) + turned,
+    [series.teams[1]]: (series.rotations?.[series.teams[1]] ?? 0) + turned,
+  }
+  if (series.round === '한국시리즈') return { ...series, wins, rotations, round: '종료', champion: winner }
   const next = series.round === '준플레이오프' ? '플레이오프' : '한국시리즈'
   const topSeed = series.qualifiers[next === '플레이오프' ? 1 : 0]
-  return { ...series, round: next, teams: [topSeed, winner], wins: [0, 0], winsNeeded: WINS_NEEDED[next] }
+  return { ...series, round: next, teams: [topSeed, winner], wins: [0, 0], winsNeeded: WINS_NEEDED[next], rotations }
 }
 
