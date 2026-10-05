@@ -124,7 +124,8 @@ describe('선발은 0xc239c 의 로테이션이다 — 시리즈 안 경기 수 
     // 1승 1패 뒤 셋째 경기 = g 2
     const 둘째뒤 = advancePostseason(advancePostseason(시작, 시작.teams[0]), 시작.teams[1])
     for (const [series, g] of [[시작, 0], [둘째뒤, 2]] as const) {
-      const 기대 = simulateLeagueGame({ away: series.teams[1], home: series.teams[0] }, 씨앗난수(31), g)
+      // 초 공격은 윗 시드의 선수 · 점수를 덜 낸 명단의 팀이 이긴다 (0xc239c 칸·명단 엇갈림 + c28f8)
+      const 기대 = simulateLeagueGame({ away: series.teams[0], home: series.teams[1] }, 씨앗난수(31), g)
       const 승자 = 기대.awayRuns > 기대.homeRuns ? series.teams[1] : series.teams[0]
       expect(playCpuSeriesGame(series, 씨앗난수(31))).toEqual(advancePostseason(series, 승자))
     }
@@ -135,7 +136,7 @@ describe('선발은 0xc239c 의 로테이션이다 — 시리즈 안 경기 수 
     const 세기 = 세는난수(5)
     playCpuSeriesGame(시작, 세기.port)
     const 그대로 = 세는난수(5)
-    simulateLeagueGame({ away: 시작.teams[1], home: 시작.teams[0] }, 그대로.port, 0)
+    simulateLeagueGame({ away: 시작.teams[0], home: 시작.teams[1] }, 그대로.port, 0)
     expect(세기.범위).toEqual(그대로.범위)
   })
 
@@ -144,7 +145,7 @@ describe('선발은 0xc239c 의 로테이션이다 — 시리즈 안 경기 수 
     let series = 시작
     for (let game = 0; game < 3; game += 1) series = advancePostseason(series, 시작.teams[0])
     expect(series.round).toBe('플레이오프')
-    const 기대 = simulateLeagueGame({ away: series.teams[1], home: series.teams[0] }, 씨앗난수(8), 0)
+    const 기대 = simulateLeagueGame({ away: series.teams[0], home: series.teams[1] }, 씨앗난수(8), 0)
     const 승자 = 기대.awayRuns > 기대.homeRuns ? series.teams[1] : series.teams[0]
     expect(playCpuSeriesGame(series, 씨앗난수(8))).toEqual(advancePostseason(series, 승자))
   })

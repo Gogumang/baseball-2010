@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { matchupsOf, playLeagueDay, simulateLeagueGame } from '@/entities/league/model/leagueDay'
+import { cpuGameSidesOf, matchupsOf, playLeagueDay, simulateLeagueGame } from '@/entities/league/model/leagueDay'
 import {
   EMPTY_LEAGUE,
   LEAGUE_SIDE_HOME,
@@ -439,3 +439,24 @@ function opponentOfFour(): number {
   const matchup = matchupsOf(0).find((candidate) => candidate.away === 4 || candidate.home === 4)
   return matchup === undefined ? -1 : matchup.away === 4 ? matchup.home : matchup.away
 }
+
+describe('0xc239c 는 칸의 팀 번호와 명단을 엇갈려 앉힌다 (c2494·c24ce — 0xb891c(팀객체[sX], 모드, Y))', () => {
+  it('칸 sX 에는 Y 의 선수가 선다 — 홈 X 면 X 의 선수가 초 공격, 원정 X 면 Y 의 선수가 초 공격', () => {
+    expect(cpuGameSidesOf(3, 7)).toEqual({ away: 3, home: 7 })
+    expect(cpuGameSidesOf(3, 7, 1 - LEAGUE_SIDE_HOME)).toEqual({ away: 7, home: 3 })
+  })
+
+  it('정규 0xc2a48 — 홈 팀 선수가 먼저 치고, 점수를 더 낸 명단의 팀이 승이다 (동점이면 원정 승)', () => {
+    const day = 4
+    const myTeam = 0
+    const played = playLeagueDay(EMPTY_LEAGUE, day, myTeam, createSeededRandom(17))
+    const random = createSeededRandom(17)
+    const wins = Array.from({ length: LEAGUE_TEAM_COUNT }, () => 0)
+    for (const matchup of matchupsOf(day)) {
+      if (matchup.away === myTeam || matchup.home === myTeam) continue
+      const score = simulateLeagueGame({ away: matchup.home, home: matchup.away }, random, rotationSlotOf(day))
+      wins[score.awayRuns > score.homeRuns ? matchup.home : matchup.away] += 1
+    }
+    expect(played.league.wins).toEqual(wins)
+  })
+})

@@ -1,6 +1,6 @@
-import { advancePostseason } from '@/entities/league/model/league'
+import { LEAGUE_SIDE_HOME, advancePostseason } from '@/entities/league/model/league'
 import type { PostseasonSeries } from '@/entities/league/model/league'
-import { simulateLeagueGame } from '@/entities/league/model/leagueDay'
+import { cpuGameSidesOf, simulateLeagueGame } from '@/entities/league/model/leagueDay'
 import { isMyTurn } from '@/entities/league/model/seasonEnd'
 import { rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -60,16 +60,23 @@ export function playCpuSeriesGameWithStamina(
   pitcherStaminas: PitcherStaminaTable = {},
 ): CpuPostseasonResult {
   if (series.round === '종료') return { series, pitcherStaminas }
-  const away = series.teams[1]
-  const home = series.teams[0]
-  // 윗 시드가 홈이다 — 0xb7844 는 포스트시즌에서 series[s][1](올라온 아랫 시드)을 슬롯 1 로 둔다
+  // 9eba·13e8a: 0xc2760(…, X = 0xb7648(L, r, 1) = 아랫 시드, Y = 0xb7648(L, r, 0) = 윗 시드).
+  // 0xb7844 의 포스트시즌 가지는 아랫 시드를 칸 0(초), 윗 시드를 칸 1(말)에 둔다 (`postseasonSideOf`).
+  const x = series.teams[1]
+  const y = series.teams[0]
+  // ⚠️ 준비 0xc239c 는 칸 sX 의 팀 객체에 Y 의 명단을 싣는다 (`cpuGameSidesOf`) — 초 공격은 **윗 시드의 선수**다
+  const sides = cpuGameSidesOf(x, y, 1 - LEAGUE_SIDE_HOME)
   // 선발 = 이 시리즈 g 번 돈 로스터의 0번 (0xc239c c24fc~c254e, 위 주석) — 굴림이 없다
   const day = series.wins[0] + series.wins[1]
-  const score = simulateLeagueGame({ away, home }, random, rotationSlotOf(day), {
-    away: pitcherStaminas[away],
-    home: pitcherStaminas[home],
+  const score = simulateLeagueGame(sides, random, rotationSlotOf(day), {
+    away: pitcherStaminas[sides.away],
+    home: pitcherStaminas[sides.home],
   })
-  const winner = score.awayRuns > score.homeRuns ? away : home
+  // c28e2~c290a: `score(sX) > score(sY)` 면 X 승, 아니면(동점 포함) Y 승. 칸 sX(초)에서 친 것은 Y 의 선수라
+  // **점수를 덜 낸 명단의 팀이 이긴다** — 원본 버그 그대로 (R1 항목 4 는 명단 엇갈림을 못 보고 "정상" 으로 읽었다)
+  const winner = score.awayRuns > score.homeRuns ? x : y
+  const away = sides.away
+  const home = sides.home
   return {
     series: advancePostseason(series, winner),
     pitcherStaminas: {

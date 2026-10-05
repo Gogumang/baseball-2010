@@ -175,6 +175,9 @@ function defenseOf(
 /**
  * 한 경기를 9이닝(동점이면 연장)까지 돌린다.
  *
+ * `matchup` 은 **명단**으로 본 두 팀이다 — `away` 의 선수가 초(칸 0), `home` 의 선수가 말(칸 1)에 공격한다.
+ * CPU 끼리 경기 준비는 칸의 팀 번호와 명단이 엇갈리므로 부르는 쪽이 `cpuGameSidesOf` 로 바꿔 넘긴다.
+ *
  * `startingPitcherSlot` 을 주면 **양 팀 모두 그 칸**이 선발이다 — 정규 리그와 포스트시즌(0xc2760)은 같은 준비
  * `0xc239c` 의 4인 로테이션(`0xb8c80` → `0xb5ca8`, 포스트시즌은 시리즈 안 경기 수가 g), 국가대항전은 준비
  * `0xc2c4c` 가 `L+0x32 % 4` 로 0↔k 맞바꿈(`0xb6c34` → `0xb8c94`)을 한다. CPU 끼리 경기에 `rand(0,4)` 선발은 없다.
@@ -346,6 +349,32 @@ export function simulateLeagueGame(
   }
 }
 
+/**
+ * CPU 끼리 경기 준비 `0xc239c(sim, 모드, L, X, Y)` 가 **명단을 앉히는 칸** — 공격 차례(칸 0 = 초, 칸 1 = 말)로 본
+ * 두 팀의 **선수**다. 돌려주는 `away` 의 선수가 먼저 공격하고, `home` 의 선수가 나중에 공격한다.
+ *
+ * 직접 떴다 (스택 인자 Y = `[sp+0x34]`, X = `[sp+0x18]`):
+ * ```
+ * c23d4  sX = 0xb7844(L, X) ; c23de  sY = 0xb7844(L, Y)
+ * c2418  0xb6bd4(state, sX, X)              ; state[0x28+sX] = X   (팀 번호 칸 — 점수 칸 st+0x7e+s 와 같은 번호)
+ * c2452  0xb6bd4(state, sY, Y)              ; state[0x28+sY] = Y
+ * c2494  0xb891c(팀객체[sX], 모드, **Y**, −1)  ; ← 칸 sX 의 팀 객체 +0x25 = Y
+ * c24ce  0xb891c(팀객체[sY], 모드, **X**, −1)  ; ← 칸 sY 의 팀 객체 +0x25 = X
+ * ```
+ * 팀 객체는 `엔진+0x6c + 칸×4` 에 있고 간이 엔진이 공격 팀을 `[엔진+0x6c + st[9]×4]` 로 집는다(c19b8), 선수 레코드는
+ * `0xb8680(팀객체)` 이 모드 2·3·4 에서 `팀객체+0x25` 의 팀 번호로 꺼낸다(b869e → 0x1f570). 곧 **칸 sX 에서 치고 던지는
+ * 것은 Y 의 선수**다. 국가대항전 준비 `0xc2c4c` 도 같은 꼴이다(c2cb6 칸 1 = X 인데 c2d06 칸 0 객체 ← X).
+ *
+ * 점수 `st+0x7e+s` 는 그 칸에서 친 선수의 득점이므로, 승패를 칸으로 매기는 두 경기 함수의 결과가 R1 의 해석과 갈린다:
+ * - 정규 `0xc2a48`: X = 홈(side 1). `score(0) > score(1)` → X 승 — 칸 0 은 X 의 선수라 **더 낸 쪽이 이긴다**.
+ * - 포스트시즌 `0xc2760`: X = 아랫 시드(side 0). `score(sX) > score(sY)` → X 승 — 칸 sX 는 Y 의 선수라
+ *   **덜 낸 쪽이 이긴다**(원본 버그, 그대로 옮긴다).
+ */
+export function cpuGameSidesOf(x: number, y: number, sideOfX: number = LEAGUE_SIDE_HOME): LeagueMatchup {
+  // 칸 sX 에는 Y 의 선수, 칸 sY 에는 X 의 선수
+  return sideOfX === LEAGUE_SIDE_HOME ? { away: x, home: y } : { away: y, home: x }
+}
+
 /** 하루치 경기가 남긴 것 — 순위표와 **선수 기록표** 두 벌이다 */
 export interface LeagueDayResult {
   readonly league: League
@@ -359,7 +388,8 @@ export interface LeagueDayResult {
 
 /**
  * 하루치 경기를 리그 전적에 넣는다. `myTeamId` 가 낀 경기는 사람이 직접 치르므로 건너뛴다.
- * 원본에 무승부가 없어 어느 한쪽이 반드시 승이 되고, **원본은 진 팀에 승을 준다** (아래 주석).
+ * 원본에 무승부가 없어 어느 한쪽이 반드시 승이 되고, 점수를 더 낸 **명단**의 팀이 이긴다 — 칸과 명단이 엇갈려
+ * 원정 팀 선수가 말 공격을 한다 (`cpuGameSidesOf`, 아래 주석).
  *
  * 원본은 이 경기들도 사람 경기와 같은 기록 함수 0xa8024 를 부르므로 **선수별 성적이 함께 쌓인다**
  * (B-2 확정). 그래서 `playerStats` 를 받아 쌓은 것을 돌려준다 — 이 표가 개인 타이틀·MVP·
@@ -379,19 +409,21 @@ export function playLeagueDay(
   const staminas: Record<number, readonly number[]> = { ...pitcherStaminas }
   const played = matchupsOf(day).reduce((current, matchup) => {
     if (matchup.away === myTeamId || matchup.home === myTeamId) return current
+    // ⚠️ 칸과 명단이 엇갈린다 (0xc239c, 직접 떴다 — `cpuGameSidesOf` 주석): 홈 팀(A목록 X)의 **선수**가 칸 0
+    //    (초 공격)에, 원정 팀(Y)의 선수가 칸 1(말 공격)에 선다. 그래서 X 명단을 먼저 공격으로 돌린다.
+    const sides = cpuGameSidesOf(matchup.home, matchup.away)
     // 하루가 끝날 때마다 팀마다 로테이션이 한 칸 돈다 (0xb5ca8, S5 U-16) — 날짜가 선발을 정한다
-    const score = simulateLeagueGame(matchup, random, rotationSlotOf(day), {
-      away: staminas[matchup.away],
-      home: staminas[matchup.home],
+    const score = simulateLeagueGame(sides, random, rotationSlotOf(day), {
+      away: staminas[sides.away],
+      home: staminas[sides.home],
     })
-    staminas[matchup.away] = score.pitcherStaminas.away
-    staminas[matchup.home] = score.pitcherStaminas.home
+    staminas[sides.away] = score.pitcherStaminas.away
+    staminas[sides.home] = score.pitcherStaminas.home
     plateAppearances.push(...score.plateAppearances)
     pitcherAppearances.push(...score.pitcherAppearances)
-    // ⚠️ 원본 버그를 그대로 옮긴 것 (0xc2a48, R1 확정 · DECISIONS 2026-09-20 ①):
-    //    `원정 득점 > 홈 득점` 이면 **홈** 에 승을, 아니면 **원정** 에 승을 준다 — 늘 진 팀이 이긴다.
-    //    상대전적도 같이 뒤집히고, 동점이면 원정 승이다.
-    //    포스트시즌 0xc2760 은 같은 함수를 쓰면서도 정상이라, 목록 포인터를 엇갈려 넘긴 실수 하나로 설명된다.
+    // 기록 c2b80~c2bca (R1 항목 3): `score(칸 0) > score(칸 1)` 이면 A(X = 홈)에 승, 아니면 B(Y = 원정)에 승 —
+    // 동점이면 원정 승. R1 은 이것을 "진 팀에 승" 으로 읽었지만 칸 0 에서 친 것은 **X 의 선수**라
+    // (위 엇갈림) **점수를 더 낸 명단의 팀이 이긴다**. 상대전적도 같은 쪽으로 쌓인다.
     return score.awayRuns > score.homeRuns
       ? recordLeagueResult(current, matchup.home, matchup.away)
       : recordLeagueResult(current, matchup.away, matchup.home)
