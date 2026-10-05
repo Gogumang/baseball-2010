@@ -3,7 +3,8 @@ import type { Screen } from '@/app/model/screen'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import { isAtBatFinished } from '@/entities/at-bat/model/atBatState'
 import { describeOutcomeBanner } from '@/entities/at-bat/model/resolutionText'
-import { cpuPickoff, resolveBenchClearing, resolveDefensePlay, spendMySpecialSwing, startGame, startPlayerOutcome, stealBase, summaryOf, throwOpponentPitch } from '@/features/play-game/model/gameFlow'
+import { arrivePitch, cpuPickoff, resolveBenchClearing, resolveDefensePlay, spendMySpecialSwing, startGame, startPlayerOutcome, startSteal, summaryOf, throwOpponentPitch } from '@/features/play-game/model/gameFlow'
+import type { StealBase } from '@/entities/fielding/model/stealStart'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
@@ -120,8 +121,8 @@ import {
 } from '@/entities/national-cup/model/nationalCupFlow'
 import type { NationalCupFinish } from '@/entities/national-cup/model/nationalCupFlow'
 import type { GamePointWalletSession } from '@/entities/wallet/model/useGamePointWallet'
-import { LEAGUE_SIDE_HOME, postseasonSideOf } from '@/entities/league/model/league'
-import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
+import { leagueDayCounterOf, leagueGamePlayerSideOf } from '@/entities/career/model/leagueGameSetup'
+import { PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import type { PlayerSide } from '@/entities/game/model/gameState'
 
 /**
@@ -383,26 +384,19 @@ export function useCareerSession({
   const beginGame = useCallback(() => {
     const current = careerRef.current
     cupGameRef.current = null
-    const series = current?.postseason ?? null
     startMatch(
       current?.teamId ?? 0,
       current?.battingOrder,
       // 상대는 일정표(정규시즌)나 지금 시리즈(포스트시즌)가 정한다 — 무작위가 아니다
       current === null || current === undefined ? undefined : nextOpponentOf(current),
       // 날짜 카운터 g = S+0xb2(= L+0x32) — 경기 준비 0x1c46c 가 0x1c576 에서 읽고 0이 아니면 두 팀 로테이션을 돌린다.
-      // 정규시즌은 오늘까지 치른 경기 수다. 포스트시즌은 **시리즈 안 경기 수**다: 대진을 까는 0xb80a8 이 0(b811c),
-      // 시리즈가 끝나면 0xb7724 가 −1(b777a), 하루 끝 0xb818c 가 +1(b819a) — CPU 끼리 경기(0xc2760 → 0xb818c)도
-      // 같은 칸을 올리지만 내 시리즈가 열리면 0 부터 다시 센다. 무승부가 없어 두 팀 승수 합이다
-      // (CPU 쪽 `playCpuSeriesGame` 과 같은 근사). 커리어 `gamesPlayed` 는 내 경기만 세므로 g 로 쓰지 않는다.
-      series === null ? (current?.gamesPlayed ?? 0) : series.wins[0] + series.wins[1],
-      // 포스트시즌 — 경기 준비 0x1c46c(0x1c484)·장면 0x39fdc 모드 3·4 가지(0x3a164 → [sp+0x3c])가
-      // `0xb7844(L, 내 팀)` 의 `L+0x34 != 0` 갈래로 측을 정한다: 대진 윗 시드(칸 0)가 홈·후공, 아랫 시드가 원정·선공.
-      // ⚠️ 정규시즌도 원본은 같은 0xb7844(일정표 0xd89cb · 9일 주기 뒤집기)인데 웹 타자편은 아직 늘 후공이다.
-      series === null || current === null || current === undefined
-        ? PLAYER_SIDE_LAST_BAT
-        : postseasonSideOf(series, current.teamId) === LEAGUE_SIDE_HOME
-          ? PLAYER_SIDE_LAST_BAT
-          : PLAYER_SIDE_FIRST_BAT,
+      // 정규시즌은 오늘까지 치른 경기 수, 포스트시즌은 **시리즈 안 경기 수**다 (`leagueDayCounterOf` — b811c · b777a · b819a).
+      // 커리어 `gamesPlayed` 는 내 경기만 세므로 포스트시즌 g 로 쓰지 않는다.
+      current === null || current === undefined ? 0 : leagueDayCounterOf(current),
+      // 내 팀의 측 — 경기 준비 0x1c46c(0x1c4f0)·장면 0x39fdc 모드 3·4 가지(0x3a164 → [sp+0x3c])가 정규시즌·포스트시즌
+      // 가리지 않고 `0xb7844(L, 내 팀)` 로 정한다: 정규시즌은 일정표 0xd89cb · 9일 주기 뒤집기(`leagueSideOf`),
+      // 포스트시즌은 대진 윗 시드(칸 0)가 홈·후공, 아랫 시드가 원정·선공 (`leagueGamePlayerSideOf`).
+      current === null || current === undefined ? PLAYER_SIDE_LAST_BAT : leagueGamePlayerSideOf(current),
     )
   }, [startMatch])
 
@@ -516,6 +510,29 @@ export function useCareerSession({
       pitchTallyRef.current = tally
       // 타구음(0x515de~) → 심판 콜(0x51a94) 순서. 통로가 하나라 뒤 소리가 앞 소리를 끊는다
       playSoundIds(audio, [detail.contactSoundId, pitchCallSoundIdOf(detail.resolution, nextAtBat)])
+      // 공 도착 0x3dfac — 못 맞힌 공이면 0.1% 폭투·포일(종류 9)이나 출발한 도루(종류 5) 판을 연다 (`arrivePitch`)
+      const beforeArrival = progressRef.current
+      const arrival =
+        beforeArrival === null
+          ? null
+          : arrivePitch(beforeArrival, { resolution: detail.resolution, outcomeAfter: nextAtBat.outcome }, random)
+      if (beforeArrival !== null && arrival !== null && arrival.progress !== beforeArrival) {
+        progressRef.current = arrival.progress
+        setProgress(arrival.progress)
+        // 판정 콜(도루 17 · 62/20, 폭투 17) 뒤 공수 교대 소리 — 원본은 판 안의 그 틱에 낸다 (견제와 같은 근사)
+        playSoundIds(audio, [arrival.play?.callSoundId ?? null, ...gameStepSoundIdsOf(beforeArrival, arrival.progress)])
+      }
+      if (arrival !== null && arrival.interrupted) {
+        // 판에서 반 이닝·경기가 끝났다 — 내 타석이 끊긴다 (견제사와 같은 길)
+        pitchTallyRef.current = EMPTY_AT_BAT_PITCH_TALLY
+        runner.resetAtBat()
+        if (!arrival.progress.game.isFinished) return
+        const cup = cupGameRef.current
+        if (cup !== null) return finishCupGame(arrival.progress, cup)
+        const currentCareer = careerRef.current
+        if (currentCareer !== null) finishGame(arrival.progress, currentCareer)
+        return
+      }
       if (!isAtBatFinished(nextAtBat) || nextAtBat.outcome === null) return
 
       // 타석이 끝났다 — 다음 타석은 새 카운터로 (타석 초기화 0xa5bcc 가 ctx+0x15f 를 지운다)
@@ -533,6 +550,7 @@ export function useCareerSession({
         isUncatchable,
         buntFoulOut: detail.isBuntFoulOut,
         foulRecordIds: tally.foulRecordIds,
+        arrivalPlay: arrival?.play ?? null,
       })
       progressRef.current = advanced
       setProgress(advanced)
@@ -555,7 +573,7 @@ export function useCareerSession({
       ])
       finishAtBat(advanced, nextAtBat.outcome, runnersOnBase)
     },
-    [audio, finishAtBat, random, runner],
+    [audio, finishAtBat, finishCupGame, finishGame, random, runner],
   )
 
   const story = useStorySchedule(career)
@@ -731,21 +749,16 @@ export function useCareerSession({
     finishDefensePlay,
 
     /**
-     * 도루 (원본 키 '3' 1루 주자 · '2' 2루 주자 → `0x53610`).
-     * 성공하면 한 루 나가고 실패하면 아웃 하나가 는다 — 판정은 진행기가 한다.
+     * 도루 출발 (원본 키 '3' 1루 · '2' 2루 · '1' 3루 주자 → `0x53610` → 0x583 → `0xa9bd4`).
+     * 주자를 출발만 시킨다 — 판정은 공이 도착할 때 도루 판(종류 5)이 한다 (`arrivePitch`). 난수·소리 없음.
      */
-    stealBase: (base: 1 | 2) => {
+    stealBase: (base: StealBase) => {
       const current = progressRef.current
       if (current === null) return
-      const next = stealBase(current, base, random)
+      const next = startSteal(current, base)
       if (next === current) return
       progressRef.current = next
       setProgress(next)
-      // 도루 실패로 이닝이 끝나면 공수 교대 징글이 난다. 세이프 콜(17)은 잇지 않았다 —
-      // 원본은 도루도 **수비 화면(플레이 종류 9, 0x3e07e)** 을 거쳐 판정 v9 로만 17 을 내는데,
-      // 그 v9 는 "포수 송구가 루에 닿아 야수가 공을 쥔 채 태그에 실패한 틱" 이다(0xb442a).
-      // 웹 도루는 주력 표 굴림 하나라 그 칸이 없다 (`atBatSounds.inPlayCallSoundIdOf` 주석)
-      playSoundIds(audio, gameStepSoundIdsOf(current, next))
     },
 
     /**

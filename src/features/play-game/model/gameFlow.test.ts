@@ -9,7 +9,8 @@ import {
   spendMySpecialSwing,
   UNFILLED_SPECIAL_SWING_COUNT,
   startPlayerOutcome,
-  stealBase,
+  startSteal,
+  arrivePitch,
   summaryOf,
   resolveBenchClearing,
   throwOpponentPitch,
@@ -747,10 +748,8 @@ describe('기록달성 남은 것 — 타자편 배선 (6·7 백투백 · 8·24 
     expect(gamePointRewardOf(summary)).toBeGreaterThanOrEqual(20)
   })
 
-  it('8 도루 성공 — 내 팀 공격 중 도루가 살면 기록 8, 잡히면 24 후보는 게이트(0xa77f0)에서 버린다', () => {
-    let 성공 = 0
-    let 실패 = 0
-    for (let seed = 1; seed <= 40; seed += 1) {
+  it('8 도루 성공 — 키는 출발만 시키고(난수 없음) 공이 도착하면 도루 판(종류 5)이 연다, 살면 기록 8', () => {
+    for (let seed = 1; seed <= 20; seed += 1) {
       const random = createSeededRandom(seed)
       const 시작 = startGame(random)
       // 1루에 주자를 세우고(2루 빈칸) 도루를 건다
@@ -759,18 +758,42 @@ describe('기록달성 남은 것 — 타자편 배선 (6·7 백투백 · 8·24 
         game: { ...시작.game, bases: { first: true, second: false, third: false } },
       }
       const n = 주자있음.recordIds.length
-      const 뒤 = stealBase(주자있음, 1, random)
-      const 새기록 = 뒤.recordIds.slice(n)
-      if (뒤.log[0]?.text.includes('도루 성공')) {
-        성공 += 1
-        expect(새기록).toEqual([8])
-      } else {
-        실패 += 1
-        expect(새기록).toEqual([])
-      }
+      const 출발 = startSteal(주자있음, 1)
+      expect(출발.stealingFrom).toEqual([1])
+      expect(출발.game).toBe(주자있음.game)
+      expect(startSteal(출발, 1)).toBe(출발)
+      const { progress: 뒤, play } = arrivePitch(출발, { resolution: { kind: '볼' }, outcomeAfter: null }, random)
+      expect(뒤.stealingFrom).toEqual([])
+      if (play?.kind !== 5) continue // 0.1% 폭투·포일이 먼저 섰다
+      // CPU 수비는 리드 뒤 잡을 루가 없어 던지지 않는다 — 도루 주자는 2루에 닿는다
+      expect(뒤.game.bases).toEqual({ first: false, second: true, third: false })
+      expect(뒤.recordIds.slice(n)).toEqual([8])
+      expect(뒤.lastDefensePlay).toBe(play.result)
+      expect(뒤.log[0]?.text).toContain('도루 성공')
     }
-    expect(성공).toBeGreaterThan(0)
-    expect(실패).toBeGreaterThan(0)
+  })
+
+  it('도루 없이 못 맞힌 공이면 rollPassedBall 한 번만 굴리고 판이 없다 · 맞힌 공은 굴리지 않는다', () => {
+    const random = createSeededRandom(5)
+    const 시작 = startGame(random)
+    let rolls = 0
+    const 세는: RandomPort = {
+      next: () => {
+        rolls += 1
+        return 0.5
+      },
+      nextInRange: (minimum, maximum) => {
+        rolls += 1
+        return minimum + 0.5 * (maximum - minimum)
+      },
+      pick: (candidates) => candidates[0],
+    }
+    const 볼 = arrivePitch(시작, { resolution: { kind: '볼' }, outcomeAfter: null }, 세는)
+    expect(볼.play).toBeNull()
+    expect(볼.progress).toBe(시작)
+    expect(rolls).toBe(1)
+    arrivePitch(시작, { resolution: { kind: '파울' }, outcomeAfter: null }, 세는)
+    expect(rolls).toBe(1)
   })
 
   it('8 은 G 2 — 도루 하나가 경기 끝 수입을 2 올린다', () => {

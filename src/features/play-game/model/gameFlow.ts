@@ -52,7 +52,6 @@ import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
 import type { SeasonStats } from '@/entities/career/model/seasonStats'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { advanceRunners } from '@/entities/game/model/baseState'
-import { attemptSteal, canStealFrom } from '@/entities/game/model/steal'
 import type { BaseState } from '@/entities/game/model/baseState'
 import { atBatPenaltyCounts, atBatPopularityPoints, EMPTY_REPUTATION_COUNTS } from '@/entities/career/model/gameEvaluation'
 import type { ReputationCounts } from '@/entities/career/model/gameEvaluation'
@@ -61,7 +60,6 @@ import {
   completeGameRecordIdsOf,
   gameEndRecordIdsOf,
   passesRecordTeamGate,
-  stealPlayRecordIdsOf,
 } from '@/entities/game/model/gameRecords'
 import { EMPTY_BATTER_GAME_LOG, recordBatterAtBat } from '@/entities/game/model/batterGameLog'
 import type { BatterGameLog } from '@/entities/game/model/batterGameLog'
@@ -101,6 +99,16 @@ import {
 } from '@/features/play-game/model/gameDecisions'
 import type { MoundBySide, PitcherOfRecordNames } from '@/features/play-game/model/gameDecisions'
 import { rollHalfInningFielders } from '@/features/play-game/model/halfInningBoard'
+import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
+import type { StealBase } from '@/entities/fielding/model/stealStart'
+import {
+  arrivalApplicationOf,
+  arrivesUnhit,
+  pitchJudgementOf,
+  runPitchArrivalPlay,
+  startHumanSteal,
+  type PitchArrivalPlay,
+} from '@/features/defense-play/model/pitchArrivalPlay'
 
 export interface GameLogEntry {
   readonly id: number
@@ -276,6 +284,12 @@ export interface GameProgress {
    * ⚠️ −1 로 처음 깔아 두는 자리(팀 초기화)는 찾지 못했다 — 0 으로 깔리면 필살이 아예 안 나가므로 −1 로 본다.
    */
   readonly specialSwingRemaining: number
+  /**
+   * **이번 투구에 출발한 주자들의 루** — state[0x14 + 루] (도루 메시지 0x583 → `0xa9bd4`).
+   * 공이 나는 동안(상태 0x11) 사람 키 '3'·'2'·'1' 로 쌓이고(`startSteal`, 난수 없음), 공이 도착하면
+   * (`arrivePitch`) 도루 판(종류 5)을 열거나 그냥 지워진다. 인플레이 타구면 타구 판의 리드(0x3d7b8)가 이 칸을 본다.
+   */
+  readonly stealingFrom: readonly StealBase[]
 }
 
 /** `team[+0x29 + 타순]` 의 "아직 안 채움" 값 — `0xaebe4` 가 음수를 보고 채운다 */
@@ -371,6 +385,7 @@ export function startGame(
     pendingBenchClearing: null,
     halfInningBoard: null,
     specialSwingRemaining: UNFILLED_SPECIAL_SWING_COUNT,
+    stealingFrom: [],
   }
   return advanceUntilPlayerTurn(withFirstInningBoard(initial, random), random)
 }
@@ -450,6 +465,12 @@ export interface PlayerOutcomeOptions {
    * 사람 타석에서만 나온다(간이 엔진 동료 타석에는 파울 판정 0x51408 이 없다).
    */
   readonly foulRecordIds?: readonly number[]
+  /**
+   * 이 공이 도착하며 연 주자 판(`arrivePitch`). 낫아웃(종류 9 · `'batterRuns'`)이면 그 판의 advance 가 곧 이 삼진
+   * 타석의 진루다. 그 밖(볼넷·사구·삼진 + 도루·폭투)은 `arrivePitch` 가 이미 주자 판으로 먹였으니
+   * 재생 칸만 지킨다 — 이 타석 결과가 재생 칸을 비우면 판이 화면에 안 나온다.
+   */
+  readonly arrivalPlay?: PitchArrivalPlay | null
 }
 
 /**
@@ -514,11 +535,20 @@ export function startPlayerOutcome(
     return { ...cleared, pendingBenchClearing: { outcome } }
   }
   if (!isBattedBallInPlay(outcome)) {
+    const arrival = options.arrivalPlay ?? null
+    // 낫아웃 — 폭투·포일 판의 진루(타자주자 포함)를 이 삼진 타석의 진루로 먹인다 (0x3e0d0 state[0x1a])
+    if (arrival !== null && arrivalApplicationOf(arrival) === 'batterRuns') {
+      return finishPlayerOutcome(withoutSteal(progress), outcome, random, arrival.result, arrival.result)
+    }
     // 홈런은 날아가는 그림만 따로 만들어 재생시킨다 — 점수는 타석 쪽이 이미 맞게 한다
-    const playback = homeRunPlaybackOf({ outcome, bases: progress.game.bases, pattern: options.pattern })
-    return finishPlayerOutcome(progress, outcome, random, null, playback)
+    const playback =
+      homeRunPlaybackOf({ outcome, bases: progress.game.bases, pattern: options.pattern }) ?? arrival?.result ?? null
+    return finishPlayerOutcome(withoutSteal(progress), outcome, random, null, playback)
   }
-  return { ...progress, pendingDefensePlay: defensePlayInputOf(progress, outcome, random, options) }
+  return {
+    ...withoutSteal(progress),
+    pendingDefensePlay: defensePlayInputOf(progress, outcome, random, options),
+  }
 }
 
 /**
@@ -1353,61 +1383,158 @@ export function spendMySpecialSwing(progress: GameProgress, remaining: number): 
 }
 
 /**
- * 도루 한 번 (원본 키 처리 `0x53610` → 메시지 `0x583`, 판정 표 `0xd9064`).
+ * **도루 출발** — 공이 나는 동안(상태 0x11) 사람 키 '3'·'2'·'1'(`0x53610` → 메시지 0x583 → `0xa9bd4`).
  *
- * `base` 는 **대상 주자가 선 루**다 — 키 '3' 이 1루 주자, '2' 가 2루 주자이고
- * 3루 주자(키 '1')는 원본이 홈 도루를 걸지 않는다 (`canStealFrom`).
+ * `base` 는 **대상 주자가 선 루**다. 주자를 출발만 시킨다 — 성공·실패는 공이 도착한 뒤(`arrivePitch`) 여는
+ * 도루 판(종류 5)에서 포수 송구와 주자 도착이 겨뤄 정한다(`features/defense-play/model/stealPlay`).
+ * 간이 엔진 표 0xd9064 는 CPU 끼리 경기 전용이라 여기서는 안 쓴다. 3루 주자도 홈으로 뛴다(0xb6228).
+ * 받아들이는 문턱은 `canStartSteal`(0xa97a0 · 0xa9924 앞길 검사) — 같은 투구에 앞 주자가 이미 출발했으면 겹도루.
+ * **난수 없음.**
  *
- * ⚠️ **근사**: 웹 `GameState` 는 루에 선 주자가 누구인지 모른다. 원본은 주자 객체가 제 능력치를
- * 들고 있지만, 여기서는 **1루 주자 = 직전 타자 · 2루 주자 = 그 앞 타자**로 타순을 거꾸로 세어
- * 주력을 꺼낸다. 성공하면 한 루 나가고, 실패하면 아웃 하나가 는다.
+ * ⚠️ 원본은 상태 0x11(공이 나는 동안)에만 키를 받는다. 웹 타석 화면은 공의 비행 단계를 밖으로 알리지 않아
+ *    타석 화면이 떠 있는 동안 받고, 다음에 도착하는 공에 붙인다 — 투구 전(0xf)에 누른 키도 그 공의 도루가 된다.
  */
-export function stealBase(progress: GameProgress, base: 1 | 2, random: RandomPort): GameProgress {
+export function startSteal(progress: GameProgress, base: StealBase): GameProgress {
   const { game } = progress
-  if (game.isFinished || game.half !== ourHalfOf(game)) return progress
-  if (!canStealFrom(base)) return progress
-  const occupied = base === 1 ? game.bases.first : game.bases.second
-  const nextBaseTaken = base === 1 ? game.bases.second : game.bases.third
-  if (!occupied || nextBaseTaken) return progress
+  if (game.isFinished || !isPlayerTurn(game) || progress.pendingDefensePlay !== null) return progress
+  const stealingFrom = startHumanSteal(game.bases, progress.stealingFrom, base)
+  if (stealingFrom === progress.stealingFrom) return progress
+  return { ...progress, stealingFrom }
+}
 
-  const slotsBack = base === 1 ? 1 : 2
-  const slot = (game.battingOrderIndex - slotsBack + BATTING_ORDER_SIZE) % BATTING_ORDER_SIZE
-  const runner = batterAt(progress.ourTeamId, rosterSlotAt(progress.ourLineup, slot))
-  // 도루 판정은 주력(`run`)만 본다 (표 0xd9064) — 나머지 칸은 안 쓴다
-  const result = attemptSteal({ hit: runner.hit, power: runner.power, defense: 0, run: runner.run }, random)
+/** 지금 출발시킬 수 있는 루 — 화면의 도루 키 안내용 (`canStartSteal`) */
+export function stealableBasesOf(progress: GameProgress): readonly StealBase[] {
+  const { game } = progress
+  if (game.isFinished || !isPlayerTurn(game) || progress.pendingDefensePlay !== null) return []
+  return ([1, 2, 3] as const).filter(
+    (base) => startHumanSteal(game.bases, progress.stealingFrom, base) !== progress.stealingFrom,
+  )
+}
 
-  // 주자 플레이(종류 5) 정산 0xa8024 @a83c6·@a83de — 도루를 건 주자 하나가 다음 루를 노렸다
-  const stealRunner = {
-    stealStarted: true,
-    fromBase: base,
-    targetBase: base + 1,
-    finished: true,
+/** 공 도착 한 걸음의 결과 */
+export interface PitchArrivalStep {
+  readonly progress: GameProgress
+  /** 열린 주자 판 (종류 9 폭투·포일 · 종류 5 도루). 없으면 null */
+  readonly play: PitchArrivalPlay | null
+  /** 판에서 반 이닝·경기가 끝나 이 타석이 끊겼다 — 타석 결과를 먹이지 말고 타석을 새로 시작한다 */
+  readonly interrupted: boolean
+}
+
+/**
+ * **공 도착** — 상태 0x12 진입 `0x3dfac` (`features/defense-play/model/pitchArrivalPlay`).
+ *
+ * 내 타석의 공 하나가 판정된 뒤 타석 결과를 먹이기 **앞**에 부른다. `outcomeAfter` 는 이 공을 먹인 뒤의 타석 결과
+ * (볼넷·삼진·사구면 그 결과, 아니면 null) — 투구 판정 v(0x9d57c)를 고르는 데 쓴다.
+ * - 맞힌 공(파울·타구)은 0x3dfac 를 안 지난다. 파울이면 출발이 풀리고, 타구면 출발 칸을 타구 판이 읽는다.
+ * - 못 맞힌 공: `rollPassedBall` 1번 → 종류 9(폭투·포일) / 종류 5(도루) / 없음.
+ *   판이 열리면 그 advance 를 견제와 같은 주자 판 꼴(타순 그대로)로 먹이고 재생 칸(`lastDefensePlay`)에 넣는다.
+ *   낫아웃(종류 9 + 삼진 + 타자주자)만은 여기서 안 먹인다 — `startPlayerOutcome` 의 `arrivalPlay` 로 넘기면 그 판의
+ *   advance 가 곧 삼진 타석의 진루가 된다.
+ * - 기록: 도루 판의 8(도루 성공)은 사람 공격이라 0xa77f0 게이트를 지나고 24(도루 저지)는 버려진다.
+ *
+ * 난수: `rollPassedBall` 1번(매 못 맞힌 공) → 판이 열리면 그 안의 굴림 (`runPitchArrivalPlay`).
+ */
+export function arrivePitch(
+  progress: GameProgress,
+  pitch: { readonly resolution: PitchResolution; readonly outcomeAfter: AtBatOutcome | null },
+  random: RandomPort,
+): PitchArrivalStep {
+  const before = progress.game
+  if (before.isFinished || !isPlayerTurn(before) || progress.pendingDefensePlay !== null) {
+    return { progress, play: null, interrupted: false }
   }
-  if (result === '실패') {
-    const outs = game.outs + 1
-    const bases = base === 1 ? { ...game.bases, first: false } : { ...game.bases, second: false }
-    // 잡히면 24(도루 저지) 후보가 나오지만 수비 계열이라 0xa77f0 게이트에서 버려진다 — 지금 공격 팀이 사람이다
-    const recordIds = gatedOffenseRecords(
-      stealPlayRecordIdsOf({ isRunnerPlay: true, runners: [{ ...stealRunner, currentBase: base, safe: false }] }),
-    )
-    return appendLog(
-      { ...progress, game: { ...game, outs, bases }, recordIds: [...progress.recordIds, ...recordIds] },
-      `${game.inning}회${game.half} 도루 실패 — 아웃`,
-      true,
-    )
+  if (!arrivesUnhit(pitch.resolution)) {
+    const next = pitch.resolution.kind === '타구' ? progress : withoutSteal(progress)
+    return { progress: next, play: null, interrupted: false }
   }
-  const bases = base === 1
-    ? { ...game.bases, first: false, second: true }
-    : { ...game.bases, second: false, third: true }
-  // 루를 옮긴 도루 주자마다 8(도루 성공) — 공격 계열이라 사람 공격에서 통과한다
-  const recordIds = gatedOffenseRecords(
-    stealPlayRecordIdsOf({ isRunnerPlay: true, runners: [{ ...stealRunner, currentBase: base + 1, safe: true }] }),
+  const cleared = withoutSteal(progress)
+  const play = runPitchArrivalPlay(
+    {
+      gameMode: MY_LEAGUE_BATTER_MODE,
+      pitchJudgement: pitchJudgementOf(pitch.resolution, pitch.outcomeAfter),
+      stealingFrom: progress.stealingFrom,
+      bases: before.bases,
+      outs: before.outs,
+      // 우리 공격이니 수비는 상대 팀 — 타구 진행기와 같은 아홉 칸
+      defenseAbilities: opponentDefenseAbilitiesOf(progress),
+      runAbilities: runAbilitiesOnBaseOf(progress),
+      defenseIsCpu: true,
+      // 타자편은 사람이 늘 공격이다 — 환경설정 "주루" 혼자가 자동 진루 제어기를 켠다 (0xae690)
+      offenseIsCpu: false,
+      runningMode: progress.runningModeManual ? '수동' : '자동',
+    },
+    random,
   )
-  return appendLog(
-    { ...progress, game: { ...game, bases }, recordIds: [...progress.recordIds, ...recordIds] },
-    `${game.inning}회${game.half} 도루 성공`,
-    true,
-  )
+  if (play === null) return { progress: cleared, play: null, interrupted: false }
+  if (arrivalApplicationOf(play) === 'batterRuns') return { progress: cleared, play, interrupted: false }
+
+  let next = withRunnerOnlyPlay(cleared, play.result)
+  const recordIds = gatedOffenseRecords(play.recordIds)
+  if (recordIds.length > 0) next = { ...next, recordIds: [...next.recordIds, ...recordIds] }
+  next = appendLog(next, `${before.inning}회${before.half} ${describeArrivalPlay(play)}`, true)
+  const interrupted =
+    next.game.isFinished || next.game.inning !== before.inning || next.game.half !== before.half
+  if (interrupted && !next.game.isFinished) next = advanceUntilPlayerTurn(next, random)
+  return { progress: next, play, interrupted }
+}
+
+function describeArrivalPlay(play: PitchArrivalPlay): string {
+  const runs = play.result.advance.runsScored
+  const tail = runs > 0 ? ` (${runs}점)` : ''
+  if (play.kind === 9) return `폭투·포일${tail}`
+  if (play.result.caughtFrom.length > 0) return `도루 실패 — 아웃${tail}`
+  if (play.result.stolenFrom.length > 0) return `도루 성공${tail}`
+  return `도루${tail}`
+}
+
+function withoutSteal(progress: GameProgress): GameProgress {
+  return progress.stealingFrom.length === 0 ? progress : { ...progress, stealingFrom: [] }
+}
+
+/**
+ * 루별 주자 주루 — ⚠️ **근사**: 웹 `GameState` 는 루에 선 주자가 누구인지 모른다. 1루 주자 = 직전 타자 ·
+ * 2루 = 그 앞 · 3루 = 그 앞으로 타순을 거꾸로 세어 꺼낸다 (예전 도루 표 굴림과 같은 근사).
+ */
+function runAbilitiesOnBaseOf(progress: GameProgress): Partial<Record<0 | 1 | 2 | 3, number>> {
+  const runOf = (slotsBack: number) => {
+    const slot = (progress.game.battingOrderIndex - slotsBack + BATTING_ORDER_SIZE) % BATTING_ORDER_SIZE
+    return batterAt(progress.ourTeamId, rosterSlotAt(progress.ourLineup, slot)).run
+  }
+  return { 0: runnerRunAbilityOf(progress), 1: runOf(1), 2: runOf(2), 3: runOf(3) }
+}
+
+/**
+ * 주자만 움직인 판(견제 종류 4 · 도루 종류 5 · 폭투 종류 9)의 advance 를 먹인다 — 타석이 끝난 것이 아니라
+ * 타순 커서는 그대로다. 득점은 상대 투수 실점 A·B 에 붙는다(득점 처리 0xa5c34). 재생 칸에 판을 넣는다.
+ */
+function withRunnerOnlyPlay(progress: GameProgress, result: DefensePlayResult): GameProgress {
+  const before = progress.game
+  let next: GameProgress = { ...progress, lastDefensePlay: result }
+  const advance = result.advance
+  const changed =
+    advance.outsAdded > 0 ||
+    advance.runsScored > 0 ||
+    advance.bases.first !== before.bases.first ||
+    advance.bases.second !== before.bases.second ||
+    advance.bases.third !== before.bases.third
+  if (!changed) return next
+  // 결과 코드는 precomputed 가 있으면 안 읽는다
+  const game: GameState = {
+    ...applyAtBatOutcome(before, RUNNER_PLAY_OUTCOME_PLACEHOLDER, advance),
+    battingOrderIndex: before.battingOrderIndex,
+  }
+  const runs = game.ourScore - before.ourScore
+  next = {
+    ...next,
+    game,
+    decisions: decisionsAfterPlay(next.decisions, before, game, moundsOf(next)),
+    opponentMound: {
+      ...next.opponentMound,
+      runsAllowed: Math.min(MAXIMUM_PITCHER_COUNTER, next.opponentMound.runsAllowed + runs),
+    },
+    opponentInningRunsAllowed: Math.min(MAXIMUM_PITCHER_COUNTER, next.opponentInningRunsAllowed + runs),
+  }
+  return next
 }
 
 /**
@@ -1464,34 +1591,9 @@ export function cpuPickoff(progress: GameProgress, base: PickoffBase, random: Ra
     runsBattedIn: 0,
     playKind: PICKOFF_PLAY_KIND,
   })
-  let next: GameProgress = { ...progress, lastDefensePlay: result, ourLineup: { ...progress.ourLineup, records } }
-
-  const advance = result.advance
-  const changed =
-    advance.outsAdded > 0 ||
-    advance.runsScored > 0 ||
-    advance.bases.first !== before.bases.first ||
-    advance.bases.second !== before.bases.second ||
-    advance.bases.third !== before.bases.third
-  let runs = 0
-  if (changed) {
-    // 타석이 끝난 것이 아니라 타순 커서는 그대로 둔다 — 결과 코드는 precomputed 가 있으면 안 읽는다
-    const game: GameState = {
-      ...applyAtBatOutcome(before, PICKOFF_OUTCOME_PLACEHOLDER, advance),
-      battingOrderIndex: before.battingOrderIndex,
-    }
-    runs = game.ourScore - before.ourScore
-    next = {
-      ...next,
-      game,
-      // 득점 처리 0xa5c34 는 1점마다 수비 팀 실점 A·B 를 올린다 (내 타석 정산과 같은 칸)
-      opponentMound: {
-        ...next.opponentMound,
-        runsAllowed: Math.min(MAXIMUM_PITCHER_COUNTER, next.opponentMound.runsAllowed + runs),
-      },
-      opponentInningRunsAllowed: Math.min(MAXIMUM_PITCHER_COUNTER, next.opponentInningRunsAllowed + runs),
-    }
-  }
+  // 득점 처리 0xa5c34 는 1점마다 수비 팀 실점 A·B 와 승·패·세 칸을 고친다 (내 타석 정산과 같은 칸)
+  let next = withRunnerOnlyPlay({ ...progress, ourLineup: { ...progress.ourLineup, records } }, result)
+  const runs = next.game.ourScore - before.ourScore
 
   const call = result.resultCode === PICKOFF_RESULT.OUT ? '견제사' : result.errantThrow ? '악송구' : '세이프'
   next = appendLog(
@@ -1503,8 +1605,8 @@ export function cpuPickoff(progress: GameProgress, base: PickoffBase, random: Ra
   return isPlayerTurn(next.game) && !next.game.isFinished ? next : advanceUntilPlayerTurn(next, random)
 }
 
-/** `applyAtBatOutcome` 은 `precomputed` 를 받으면 결과 코드를 안 읽는다 — 견제에는 타석 결과가 없어 자리만 채운다 */
-const PICKOFF_OUTCOME_PLACEHOLDER: AtBatOutcome = { kind: '아웃', detail: '땅볼아웃' }
+/** `applyAtBatOutcome` 은 `precomputed` 를 받으면 결과 코드를 안 읽는다 — 주자 판에는 타석 결과가 없어 자리만 채운다 */
+const RUNNER_PLAY_OUTCOME_PLACEHOLDER: AtBatOutcome = { kind: '아웃', detail: '땅볼아웃' }
 
 /** 사람 팀(우리)이 공격 중인 정산의 0xa77f0 게이트 — 타자편 사람 쪽 플레이는 늘 이 방향이다 */
 function gatedOffenseRecords(recordIds: readonly number[]): number[] {

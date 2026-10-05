@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { BigResult, Hint, PixelScreen } from '@/shared/ui'
 import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
-import { canStealFrom } from '@/entities/game/model/steal'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
 import { HelpScreen } from '@/pages/help/ui/HelpScreen'
@@ -14,7 +13,9 @@ import { HALF_INNING_JINGLE_TICK } from '@/features/play-game/model/halfInningBo
 import { HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
-import { mySpecialSwingRemainingOf } from '@/features/play-game/model/gameFlow'
+import { mySpecialSwingRemainingOf, stealableBasesOf } from '@/features/play-game/model/gameFlow'
+import { stealBaseOfKey } from '@/features/defense-play/model/pitchArrivalPlay'
+import type { StealBase } from '@/entities/fielding/model/stealStart'
 import { RUTHLESS_SKILL_ID } from '@/entities/batting/model/specialSwing'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import type { AtBatState } from '@/entities/at-bat/model/atBatState'
@@ -44,11 +45,11 @@ interface GameScreenProps {
   /** 경기를 그만두고 메인 메뉴로 (이 경기 기록은 사라진다) */
   readonly onQuit: () => void
   /**
-   * **도루** (원본 0x53610 → 메시지 0x583). 인자는 대상 주자가 선 루다 —
-   * 원본 키는 '3' 1루 주자 · '2' 2루 주자이고, 3루 주자(키 '1')는 원본이 홈 도루를 걸지 않는다.
+   * **도루 출발** (원본 0x53610 → 메시지 0x583 → 0xa9bd4). 인자는 대상 주자가 선 루다 —
+   * 키 '3' 1루 주자 · '2' 2루 주자 · '1' 3루 주자(홈으로). 판정은 공이 도착할 때 도루 판이 한다.
    * 안 넘기면 도루 입구가 뜨지 않는다.
    */
-  readonly onSteal?: (base: 1 | 2) => void
+  readonly onSteal?: (base: StealBase) => void
   /**
    * **CPU 투수의 견제** — 상대 투수 AI 가 목표점 대신 견제(종류 4, 0x34848)를 고르면 타석 화면이 공을 안 던지고
    * 그 루를 알려 준다. 원본 0x345fc 는 홈런더비(모드 7)만 갈라 타자편(모드 4)도 견제한다.
@@ -103,22 +104,15 @@ export function GameScreen({
    */
   const earnedGamePoint = recordGamePointsOf(progress.recordIds)
 
-  /** 지금 도루를 걸 수 있는 루 — 앞 루가 비어 있어야 한다. 3루 주자는 빠진다 (`canStealFrom`) */
-  const bases = progress.game.bases
-  const stealableBases = (onSteal === undefined
-    ? []
-    : ([
-        bases.first && !bases.second ? 1 : null,
-        bases.second && !bases.third ? 2 : null,
-      ].filter((base) => base !== null) as (1 | 2)[])
-  ).filter((base) => canStealFrom(base))
+  /** 지금 출발시킬 수 있는 루 — `canStartSteal`(0xa9924 앞길 검사). 이번 공에 이미 출발한 주자는 빠진다 */
+  const stealableBases = onSteal === undefined ? [] : stealableBasesOf(progress)
 
   const isBenchClearing = progress.pendingBenchClearing !== null
   /** OK 로 1회초 판을 닫았는가 */
   const [isBoardClosed, setBoardClosed] = useState(false)
   const board = progress.halfInningBoard ?? null
   const isHalfInningBoardOpen = !isBoardClosed && board !== null && isAtFirstPitchOf(progress, atBat)
-  /** 원본 공용 키 처리 0x498d4 — '*' 메뉴 · 도루 '3'/'2' */
+  /** 원본 공용 키 처리 0x498d4 — '*' 메뉴 · 도루 '3'/'2'/'1' */
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat) return
@@ -129,7 +123,7 @@ export function GameScreen({
         return setMenuOpen((open) => !open)
       }
       if (isMenuOpen || overlay !== null) return
-      const base = event.key === '3' ? 1 : event.key === '2' ? 2 : null
+      const base = stealBaseOfKey(event.key)
       if (base !== null && stealableBases.includes(base)) {
         event.preventDefault()
         onSteal?.(base)
@@ -288,6 +282,7 @@ export function GameScreen({
           탭·Space·5 스윙 · 좌우 끝 탭·←→(4·6) 타자 이동
           {stealableBases.includes(1) && ' · 3 도루(1루)'}
           {stealableBases.includes(2) && ' · 2 도루(2루)'}
+          {stealableBases.includes(3) && ' · 1 도루(3루)'}
         </Hint>
       ) : (
         <BigResult>{bannerText}</BigResult>
