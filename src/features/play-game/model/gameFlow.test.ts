@@ -545,13 +545,20 @@ describe('상대 타순은 이닝을 넘어 이어진다 (team+0x32 · 0xaf020 �
     }
   })
 
-  it('상대 타순은 아홉 칸만 돈다 — 로스터 뒤 셋(벤치)은 타석에 안 선다', () => {
-    const random = createSeededRandom(31)
-    let progress = startGame(random)
-    while (!progress.game.isFinished) progress = applyPlayerOutcome(progress, { kind: '삼진' }, random)
+  it('상대 타순은 아홉 칸만 돈다 — 로스터 뒤 셋(벤치)은 CPU 대타로 들어온 한 명 말고는 안 선다', () => {
+    for (let seed = 30; seed < 40; seed += 1) {
+      const random = createSeededRandom(seed)
+      let progress = startGame(random)
+      while (!progress.game.isFinished) progress = applyPlayerOutcome(progress, { kind: '삼진' }, random)
 
-    const 칸들 = 상대타석(progress).map((appearance) => appearance.battingOrderIndex)
-    expect(칸들).toEqual(칸들.map((_slot, index) => index % 9))
+      const 칸들 = 상대타석(progress).map((appearance) => appearance.battingOrderIndex)
+      // 대타(0xac228)가 들어온 타순 칸은 그 뒤로 벤치 선수의 로스터 칸(9~11)으로 적힌다
+      칸들.forEach((칸, index) => {
+        expect(칸 === index % 9 || 칸 >= 9, `씨앗 ${seed} ${index}번째 타석`).toBe(true)
+      })
+      // 대타는 경기에 한 번(state[0xe]) — 벤치에서 나온 선수는 많아야 한 명이다
+      expect(new Set(칸들.filter((칸) => 칸 >= 9)).size).toBeLessThanOrEqual(1)
+    }
   })
 })
 
@@ -607,5 +614,35 @@ describe('타자편 경기에서도 양 팀 투수가 지치고 바뀐다 (0xc1b
     // 홈런 뒤 동료 타석·다음 이닝 점수도 같은 투수에게 붙으므로 '적어도' 내 점수만큼은 늘었다
     expect(progress.opponentMound.runsAllowed - 실점전).toBeGreaterThanOrEqual(1)
     expect(progress.game.ourScore - 점수전).toBeGreaterThanOrEqual(1)
+  })
+})
+
+describe('타자편 경기에도 CPU 대타가 나온다 (0xc1ba4 → 0xac228, 경기에 한 번)', () => {
+  it('여러 경기를 돌리면 대타가 나오고, 한 경기에 두 번은 없다 (state[0xe])', () => {
+    let 대타경기 = 0
+    for (let seed = 1; seed <= 20; seed += 1) {
+      const random = createSeededRandom(seed)
+      let progress = startGame(random, 2)
+      while (!progress.game.isFinished) {
+        progress = applyPlayerOutcome(progress, { kind: '삼진' }, random)
+      }
+      // 로그는 최근 40줄만 남으므로 명단으로 센다 — 벤치가 줄어든 팀이 대타를 쓴 팀이다
+      const 대타로그 = (3 - progress.ourLineup.benchBatters) + (3 - progress.opponentLineup.benchBatters)
+      expect(대타로그, `씨앗 ${seed}`).toBeLessThanOrEqual(1)
+      expect(대타로그 === 1, `씨앗 ${seed}`).toBe(progress.pinchHitUsed)
+      if (progress.pinchHitUsed) 대타경기 += 1
+    }
+    expect(대타경기).toBeGreaterThan(0)
+  })
+
+  it('나는 대타로 안 바뀐다 — 내 타순 칸은 늘 내 자리다', () => {
+    for (let seed = 1; seed <= 20; seed += 1) {
+      const random = createSeededRandom(seed)
+      let progress = startGame(random, 2)
+      while (!progress.game.isFinished) progress = applyPlayerOutcome(progress, { kind: '삼진' }, random)
+      const 내칸 = progress.game.playerOrderIndex
+
+      expect(progress.ourLineup.rosterSlots[내칸], `씨앗 ${seed}`).toBe(내칸)
+    }
   })
 })

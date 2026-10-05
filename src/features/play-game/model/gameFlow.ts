@@ -21,6 +21,7 @@ import {
 } from '@/entities/game/model/simulateHalfInning'
 import type { HalfInningDefense, HalfInningMound } from '@/entities/game/model/simulateHalfInning'
 import {
+  BATTERS_PER_TEAM,
   PITCHERS_PER_TEAM,
   batterAt,
   quickPitcherOf,
@@ -29,6 +30,13 @@ import {
   teamPitchers,
 } from '@/entities/team/model/teamRoster'
 import { staminaPercentOf } from '@/entities/pitcher-career/model/pitcherStamina'
+import {
+  recordLineupPlay,
+  rosterLineupOf,
+  rosterSlotAt,
+  tryQuickCpuPinchHit,
+} from '@/entities/game/model/quickLineup'
+import type { QuickLineup } from '@/entities/game/model/quickLineup'
 import { runnerCountOf } from '@/entities/game/model/baseState'
 import { rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
 import { opponentOf } from '@/entities/league/model/league'
@@ -103,6 +111,16 @@ export interface GameProgress {
    * 우리 투수 쪽 A 는 상대 공격을 한 번에 도는 `simulateHalfInning` 이 안에서 센다.
    */
   readonly opponentInningRunsAllowed: number
+  /**
+   * 양 팀 명단(`team+0xe`)과 타순 칸별 이 경기 기록 — **CPU 대타** `0xac228` 이 보고 바꾼다.
+   * 간이 엔진 `0xc1ba4` 는 공격 팀이 누구든 가림막 없이 부르므로(`0xc1c50`) 우리 동료 타석에서도
+   * 대타가 나온다. 내 타석은 사람이 잡아 간이 엔진을 안 지나고(0xc2198 → 0xc1e04), 사람 타석
+   * 시작 `0x3d954` 는 수비가 CPU 면 투수 교체만 본다 — 그래서 **나는 대타로 안 바뀐다**.
+   */
+  readonly ourLineup: QuickLineup
+  readonly opponentLineup: QuickLineup
+  /** `state[0xe]` — 이 경기에 CPU 대타를 썼는가. 경기에 한 칸이라 양 팀 합쳐 **한 번**이다 */
+  readonly pinchHitUsed: boolean
   readonly myStats: SeasonStats
   /** 사용자 타석 인기도 점수 합 */
   readonly popularityPoints: number
@@ -247,6 +265,9 @@ export function startGame(
     ourMound: startingMoundOf(rotationSlotOf(dayCounter)),
     opponentMound: startingMoundOf(rotationSlotOf(dayCounter)),
     opponentInningRunsAllowed: 0,
+    ourLineup: rosterLineupOf(BATTERS_PER_TEAM),
+    opponentLineup: rosterLineupOf(BATTERS_PER_TEAM),
+    pinchHitUsed: false,
     myStats: EMPTY_SEASON_STATS,
     popularityPoints: 0,
     doublePlays: 0,
@@ -463,6 +484,8 @@ function finishPlayerOutcome(
         MAXIMUM_PITCHER_COUNTER,
         progress.opponentInningRunsAllowed + runsBattedIn,
       ),
+      // 내 타석도 같은 정산 0xa8024 가 타순 칸 기록(안타·적시타·타석)을 세운다
+      ourLineup: recordLineupPlay(progress.ourLineup, progress.game.battingOrderIndex, outcome, runsBattedIn),
       lastDefensePlay: playback,
       burst: resolution === null ? progress.burst : resolution.session,
       // ⚠️ 아직 안 보여 준 판정을 지우지 않는다 — 돌발은 이제 동료·상대 타석에서도 나므로
@@ -523,7 +546,7 @@ function opponentDefenseAbilitiesOf(progress: GameProgress): readonly number[] {
  * 누상 주자가 누구인지 `GameState` 가 들고 있지 않은 것도 `stealBase` 와 같은 한계다.
  */
 function runnerRunAbilityOf(progress: GameProgress): number {
-  return batterAt(progress.ourTeamId, progress.game.battingOrderIndex).run
+  return batterAt(progress.ourTeamId, rosterSlotAt(progress.ourLineup, progress.game.battingOrderIndex)).run
 }
 
 /**
@@ -704,6 +727,12 @@ function playOpponentInning(progress: GameProgress, random: RandomPort): GamePro
       progress.ourMound,
       progress.game.ourScore - progress.game.opponentScore,
     ),
+    // 상대 타자는 명단에서 고르고, 타석마다 CPU 대타(0xac228)를 먼저 본다
+    {
+      lineup: progress.opponentLineup,
+      batterOf: (rosterSlot) => batterAt(progress.opponentTeamId, rosterSlot),
+      pinchHitUsed: progress.pinchHitUsed,
+    },
   )
   const runs = half.runs
   const game = applyOpponentInning(progress.game, runs)
@@ -716,6 +745,8 @@ function playOpponentInning(progress: GameProgress, random: RandomPort): GamePro
       ourMound: half.mound ?? progress.ourMound,
       // 상대 공격이 끝나면 우리 공격 반 이닝이 시작된다 — 교대 0xa5b00 이 A 를 0 으로 되돌린다
       opponentInningRunsAllowed: 0,
+      opponentLineup: half.lineup ?? progress.opponentLineup,
+      pinchHitUsed: half.pinchHitUsed ?? progress.pinchHitUsed,
       burst,
       lastBurstResolution: resolution ?? progress.lastBurstResolution,
       pitching: {
@@ -732,20 +763,25 @@ function playOpponentInning(progress: GameProgress, random: RandomPort): GamePro
         ...progress.leaguePlateAppearances,
         ...half.plateAppearances.map((appearance) => ({
           teamId: progress.opponentTeamId,
-          ...appearance,
-          // 타순 커서는 이닝 안에서 9 를 넘어 셀 수 있다 — 로스터 칸은 아홉 칸 안이다
-          battingOrderIndex: appearance.battingOrderIndex % BATTING_ORDER_SIZE,
+          // 실제로 선 선수의 로스터 칸 — 대타가 들어오면 타순 칸과 갈린다
+          battingOrderIndex: appearance.rosterSlot ?? appearance.battingOrderIndex % BATTING_ORDER_SIZE,
+          outcome: appearance.outcome,
+          runsBattedIn: appearance.runsBattedIn,
         })),
       ],
     },
-    `${progress.game.inning}회${progress.game.half} 상대 공격 — ${runs}점`,
+    `${progress.game.inning}회${progress.game.half} 상대 공격 — ${runs}점${half.pinchHits
+      .map((pinch) => ` (${(pinch.battingOrderIndex % BATTING_ORDER_SIZE) + 1}번 CPU 대타)`)
+      .join('')}`,
     false,
   )
 }
 
 /** 동료 타석도 원본은 같은 간이 타석 엔진을 쓴다 — 우리 팀 명단의 실제 능력치가 들어간다 */
 function playTeammateAtBat(progress: GameProgress, random: RandomPort): GameProgress {
-  // 0xc262c 는 타석마다 먼저 0xc1ba4 를 부른다 — 우리가 공격 중이니 **상대 투수**를 본다 (0xc1ce2)
+  // 0xc262c 는 타석마다 먼저 0xc1ba4 를 부른다 — 그 안에서 CPU 대타(공격 = 우리 팀)가 먼저다 (0xc1c50)
+  progress = applyOurCpuPinchHit(progress, random)
+  // 이어서 CPU 투수 교체 — 우리가 공격 중이니 **상대 투수**를 본다 (0xc1ce2)
   progress = changeOpponentPitcher(progress, random)
   // 상태 0xf — 동료 타석 준비에서도 돌발을 굴린다 (K 4절 1-6)
   const slotBefore = progress.game.battingOrderIndex
@@ -770,7 +806,7 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort): GameProg
   const opponentDefense = opponentQuickDefenseOf(progress)
   const mound = progress.opponentMound
   const play = playQuickAtBat(
-    batterAt(progress.ourTeamId, progress.game.battingOrderIndex),
+    batterAt(progress.ourTeamId, rosterSlotAt(progress.ourLineup, progress.game.battingOrderIndex)),
     // 간이 엔진이 보는 투수 체력은 체력%(0xaebb0)다 — 마운드의 살아 있는 값을 넘긴다
     { ...opponentDefense.pitcherAt(mound.pitcherSlot), stamina: staminaPercentOf(mound.stamina) },
     { inning: progress.game.inning },
@@ -819,6 +855,7 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort): GameProg
       lastBurstResolution:
         resolved !== null && resolved.judgement !== null ? resolved : progress.lastBurstResolution,
       teammateLogs: { ...progress.teammateLogs, [slot]: recorded.log },
+      ourLineup: recordLineupPlay(progress.ourLineup, slot, outcome, runsBattedIn),
       opponentMound: {
         ...mound,
         stamina: drainQuickPitcher(opponentDefense, mound, play.pitches),
@@ -835,7 +872,12 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort): GameProg
       // 동료 타석도 우리 팀 선수 레코드에 쌓인다 — 타순 칸이 곧 로스터 칸이다 (`batterAt` 과 같은 자리)
       leaguePlateAppearances: [
         ...progress.leaguePlateAppearances,
-        { teamId: progress.ourTeamId, battingOrderIndex: slot, outcome, runsBattedIn },
+        {
+          teamId: progress.ourTeamId,
+          battingOrderIndex: rosterSlotAt(progress.ourLineup, slot),
+          outcome,
+          runsBattedIn,
+        },
       ],
     },
     `${progress.game.inning}회${progress.game.half} ${progress.game.battingOrderIndex + 1}번 — ${describeOutcome(outcome)}${
@@ -879,6 +921,38 @@ function opponentQuickDefenseOf(progress: GameProgress): HalfInningDefense {
     progress.opponentTeamId,
     progress.opponentMound,
     progress.game.opponentScore - progress.game.ourScore,
+  )
+}
+
+/**
+ * 동료 간이 타석 시작의 **CPU 대타** `0xac228` — 공격 팀(우리)을 두고 한 번 물어본다 (`0xc1c50`).
+ *
+ * 들어오면 그 타순 칸의 이 경기 기록도 들어온 선수 것(벤치라 비어 있다)으로 바뀐다 — 원본은
+ * 24바이트 기록을 선수와 함께 옮긴다 (`aed02~aed16`). 그래서 동료 기록(`teammateLogs`)도 그
+ * 칸을 비운다.
+ */
+function applyOurCpuPinchHit(progress: GameProgress, random: RandomPort): GameProgress {
+  if (progress.game.isFinished) return progress
+  const slot = progress.game.battingOrderIndex
+  const pinch = tryQuickCpuPinchHit(
+    progress.ourLineup,
+    slot,
+    { alreadyUsedThisGame: progress.pinchHitUsed, runnerCount: runnerCountOf(progress.game.bases) },
+    random,
+  )
+  if (pinch === null) return progress
+  const teammateLogs = { ...progress.teammateLogs }
+  delete teammateLogs[slot]
+  return appendLog(
+    {
+      ...progress,
+      ourLineup: pinch.lineup,
+      // state[0xe] = 1 — 경기에 한 번뿐이다 (ac338)
+      pinchHitUsed: true,
+      teammateLogs,
+    },
+    `${progress.game.inning}회${progress.game.half} ${slot + 1}번 CPU 대타`,
+    false,
   )
 }
 
@@ -938,7 +1012,7 @@ export function stealBase(progress: GameProgress, base: 1 | 2, random: RandomPor
 
   const slotsBack = base === 1 ? 1 : 2
   const slot = (game.battingOrderIndex - slotsBack + BATTING_ORDER_SIZE) % BATTING_ORDER_SIZE
-  const runner = batterAt(progress.ourTeamId, slot)
+  const runner = batterAt(progress.ourTeamId, rosterSlotAt(progress.ourLineup, slot))
   // 도루 판정은 주력(`run`)만 본다 (표 0xd9064) — 나머지 칸은 안 쓴다
   const result = attemptSteal({ hit: runner.hit, power: runner.power, defense: 0, run: runner.run }, random)
 

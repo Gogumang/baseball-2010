@@ -12,7 +12,9 @@ import type {
   HalfInningMound,
   HalfInningResult,
 } from '@/entities/game/model/simulateHalfInning'
+import { rosterLineupOf } from '@/entities/game/model/quickLineup'
 import {
+  BATTERS_PER_TEAM,
   PITCHERS_PER_TEAM,
   batterAt,
   quickPitcherOf,
@@ -108,6 +110,11 @@ export interface LeagueGameScore {
    * 웹 리그 선수 기록표(`LeagueBatterLine`)에는 도루 칸이 없어 **경기 합계만** 내놓는다.
    */
   readonly steals: number
+  /**
+   * 이 경기에 들어온 CPU 대타 (0xac228) — `state[0xe]` 가 경기에 한 칸이라 **0 이나 1** 이다.
+   * 들어온 선수의 타석은 `plateAppearances` 에 그 선수의 로스터 칸으로 이미 들어 있다.
+   */
+  readonly pinchHits: number
 }
 
 /**
@@ -169,11 +176,12 @@ export function simulateLeagueGame(
   /** 반 이닝이 내놓은 타석 결과를 공격 팀 것으로 적어 둔다 — 판정에는 손대지 않는다 */
   const collect = (teamId: number, half: HalfInningResult) => {
     for (const appearance of half.plateAppearances) {
-      // 타순 커서는 이닝 안에서 9 를 넘어 셀 수 있다 — 로스터 칸은 타순 아홉 칸 안이다
+      // 선수 기록은 **실제로 선 선수의 로스터 칸**에 쌓는다 — CPU 대타가 들어오면 타순 칸과 갈린다
       plateAppearances.push({
         teamId,
-        ...appearance,
-        battingOrderIndex: appearance.battingOrderIndex % BATTING_ORDER_SIZE,
+        battingOrderIndex: appearance.rosterSlot ?? appearance.battingOrderIndex % BATTING_ORDER_SIZE,
+        outcome: appearance.outcome,
+        runsBattedIn: appearance.runsBattedIn,
       })
     }
   }
@@ -199,7 +207,16 @@ export function simulateLeagueGame(
 
   let awayMound = startingMoundOf(awaySlot)
   let homeMound = startingMoundOf(homeSlot)
+  /**
+   * 양 팀 명단(`team+0xe`) — 간이 엔진 `0xc1ba4` 가 타석마다 먼저 공격 팀을 두고 **CPU 대타**
+   * `0xac228` 을 부른다 (`0xc1c50`, Q1 4절). 대타 한 번은 **경기에 한 번**이다 — `state[0xe]` 가
+   * 두 팀 공용 한 칸이라 어느 쪽이든 먼저 쓰면 끝이다.
+   */
+  let awayLineup = rosterLineupOf(BATTERS_PER_TEAM)
+  let homeLineup = rosterLineupOf(BATTERS_PER_TEAM)
+  let pinchHitUsed = false
   let steals = 0
+  let pinchHits = 0
 
   for (let inning = 1; inning <= MAXIMUM_INNINGS; inning += 1) {
     const top = simulateHalfInning(
@@ -211,11 +228,15 @@ export function simulateLeagueGame(
       undefined,
       undefined,
       defenseOf(matchup.home, homeMound, homeRuns - awayRuns),
+      { lineup: awayLineup, batterOf: (slot) => batterAt(matchup.away, slot), pinchHitUsed },
     )
     awayRuns += top.runs
     awayOrder = top.nextBattingOrderIndex % BATTING_ORDER_SIZE
     homeMound = top.mound ?? homeMound
+    awayLineup = top.lineup ?? awayLineup
+    pinchHitUsed = top.pinchHitUsed ?? pinchHitUsed
     steals += top.steals
+    pinchHits += top.pinchHits.length
     collect(matchup.away, top)
     charge(matchup.home, top)
 
@@ -231,11 +252,15 @@ export function simulateLeagueGame(
       undefined,
       undefined,
       defenseOf(matchup.away, awayMound, awayRuns - homeRuns),
+      { lineup: homeLineup, batterOf: (slot) => batterAt(matchup.home, slot), pinchHitUsed },
     )
     homeRuns += bottom.runs
     homeOrder = bottom.nextBattingOrderIndex % BATTING_ORDER_SIZE
     awayMound = bottom.mound ?? awayMound
+    homeLineup = bottom.lineup ?? homeLineup
+    pinchHitUsed = bottom.pinchHitUsed ?? pinchHitUsed
     steals += bottom.steals
+    pinchHits += bottom.pinchHits.length
     collect(matchup.home, bottom)
     charge(matchup.away, bottom)
 
@@ -269,7 +294,7 @@ export function simulateLeagueGame(
     ...linesOf(matchup.home, homeSlot, awayWon ? '패' : '승'),
   ]
 
-  return { awayRuns, homeRuns, plateAppearances, pitcherAppearances, steals }
+  return { awayRuns, homeRuns, plateAppearances, pitcherAppearances, steals, pinchHits }
 }
 
 /** 하루치 경기가 남긴 것 — 순위표와 **선수 기록표** 두 벌이다 */

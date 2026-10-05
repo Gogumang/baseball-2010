@@ -11,6 +11,7 @@ import { BATTERS_PER_TEAM, PITCHERS_PER_TEAM, startingPitcherOf } from '@/entiti
 import { rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
 import { EMPTY_LEAGUE_PLAYER_STATS } from '@/entities/league/model/leaguePlayerStats'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createSeededRandom } from '@/shared/api/random/seededRandom'
 
 function 씨앗난수(seed: number): RandomPort {
   let state = seed
@@ -373,5 +374,20 @@ describe('CPU 끼리 경기도 타순이 아홉 칸으로 이어진다 (team+0x3
         expect(칸들, `씨앗 ${seed} 팀 ${teamId}`).toEqual(칸들.map((_slot, index) => index % 9))
       }
     }
+  })
+})
+
+describe('CPU 끼리 경기에도 CPU 대타가 나온다 (0xc1ba4 → 0xac228 · Q1 4절)', () => {
+  it('여러 경기를 돌리면 대타가 나오고, 한 경기에 많아야 한 번이다 (state[0xe] 는 경기에 한 칸)', () => {
+    let 대타 = 0
+    for (let seed = 1; seed <= 30; seed += 1) {
+      const score = simulateLeagueGame({ away: 1, home: 2 }, createSeededRandom(seed), 0)
+      expect(score.pinchHits, `씨앗 ${seed}`).toBeLessThanOrEqual(1)
+      대타 += score.pinchHits
+      // 대타로 들어온 벤치 선수(로스터 9~11)의 타석은 그 선수 칸에 쌓인다
+      const 벤치타석 = score.plateAppearances.filter((appearance) => appearance.battingOrderIndex >= 9)
+      expect(벤치타석.length > 0, `씨앗 ${seed}`).toBe(score.pinchHits > 0)
+    }
+    expect(대타).toBeGreaterThan(0)
   })
 })

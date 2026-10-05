@@ -25,6 +25,12 @@ import {
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { strikeoutRecordIdsOf, threePitchInningRecordIdsOf } from '@/entities/game/model/gameRecords'
+import {
+  recordLineupPlay,
+  rosterSlotAt,
+  tryQuickCpuPinchHit,
+} from '@/entities/game/model/quickLineup'
+import type { QuickLineup } from '@/entities/game/model/quickLineup'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 
 /**
@@ -49,6 +55,18 @@ export interface HalfInningPlateAppearance {
   readonly outcome: AtBatOutcome
   /** 이 플레이로 실제로 들어온 점수 (+0x2a 타점). 3아웃으로 지워진 득점은 빠진다 */
   readonly runsBattedIn: number
+  /**
+   * 실제로 타석에 선 선수의 로스터 칸 (`offense` 를 넘겼을 때만). 대타가 들어오면 타순 칸과
+   * 로스터 칸이 갈린다 — 선수 기록은 이 칸에 쌓아야 한다.
+   */
+  readonly rosterSlot?: number
+}
+
+/** 이 이닝에 들어온 CPU 대타 한 번 (0xac228) */
+export interface HalfInningPinchHit {
+  readonly battingOrderIndex: number
+  readonly outgoingRosterSlot: number
+  readonly incomingRosterSlot: number
 }
 
 export interface HalfInningResult {
@@ -80,6 +98,26 @@ export interface HalfInningResult {
   readonly pitcherLines: readonly HalfInningPitcherLine[]
   /** 이닝이 끝났을 때의 마운드 — 다음 이닝에 그대로 넘긴다 (`defense` 를 넘겼을 때만) */
   readonly mound?: HalfInningMound
+  /** 이닝이 끝났을 때의 공격 팀 명단 (`offense` 를 넘겼을 때만) — 다음 공격에 그대로 넘긴다 */
+  readonly lineup?: QuickLineup
+  /** `state[0xe]` — 이 경기에 CPU 대타를 썼는가 (`offense` 를 넘겼을 때만). 양 팀 공용 한 칸이다 */
+  readonly pinchHitUsed?: boolean
+  /** 이 이닝에 들어온 CPU 대타 */
+  readonly pinchHits: readonly HalfInningPinchHit[]
+}
+
+/* ── 공격 쪽: 명단과 CPU 대타 (0xc1ba4 → 0xac228 → 0xaebe4) ───────────────────── */
+
+/**
+ * 반 이닝을 도는 동안 공격 팀이 쓰는 것 — 이것을 넘기면 **타석마다 CPU 대타**(0xac228)가 돌고
+ * 타자를 명단(`team+0xe`)에서 고른다. 안 넘기면 `batterAt` 이 고르는 예전 길 그대로다.
+ */
+export interface HalfInningOffense {
+  readonly lineup: QuickLineup
+  /** 그 로스터 칸 타자의 간이 타석용 능력 */
+  readonly batterOf: (rosterSlot: number) => QuickAtBatBatter
+  /** `state[0xe]` — 이 경기에 CPU 대타를 이미 썼는가 (경기에 한 칸, 양 팀 공용) */
+  readonly pinchHitUsed: boolean
 }
 
 /* ── 수비 쪽: 마운드와 투수 교체 (0xc1ba4 → 0xac428 · 0xabfcc · 0xaf09c) ─────── */
@@ -202,6 +240,7 @@ export function simulateHalfInning(
   before: HalfInningPitching = EMPTY_HALF_INNING_PITCHING,
   hooks: HalfInningHooks = {},
   defense?: HalfInningDefense,
+  offense?: HalfInningOffense,
 ): HalfInningResult {
   let bases = EMPTY_BASES
   let outs = 0
@@ -216,6 +255,14 @@ export function simulateHalfInning(
   const recordIds: number[] = []
   const plateAppearances: HalfInningPlateAppearance[] = []
   let mound = defense?.mound
+  let lineup = offense?.lineup
+  let pinchHitUsed = offense?.pinchHitUsed
+  const pinchHits: HalfInningPinchHit[] = []
+  /** 이 타순 커서에 지금 선 타자 — 명단이 있으면 명단에서, 없으면 예전처럼 `batterAt` 으로 */
+  const batterOn = (cursor: number): QuickAtBatBatter =>
+    offense !== undefined && lineup !== undefined
+      ? offense.batterOf(rosterSlotAt(lineup, cursor))
+      : batterAt(cursor)
   /**
    * **A(`+0x284`)** 이 투수의 이번 이닝 실점. 이닝 교대 0xa5b00 이 0 으로 되돌리므로
    * 반 이닝마다 0 에서 시작한다 (P7 E1).
@@ -234,6 +281,25 @@ export function simulateHalfInning(
   }
 
   for (let faced = 0; faced < MAXIMUM_BATTERS && outs < OUTS_PER_INNING; faced += 1) {
+    // 0xc1ba4 안 차례 그대로 — **CPU 대타(공격 팀)가 먼저**다 (0xc1c50, 투수 교체 0xc1ce2 보다 앞)
+    if (lineup !== undefined && pinchHitUsed !== undefined) {
+      const pinch = tryQuickCpuPinchHit(
+        lineup,
+        order,
+        { alreadyUsedThisGame: pinchHitUsed, runnerCount: runnerCountOf(bases) },
+        random,
+      )
+      if (pinch !== null) {
+        lineup = pinch.lineup
+        // state[0xe] = 1 — 경기에 한 번뿐이다 (ac338)
+        pinchHitUsed = true
+        pinchHits.push({
+          battingOrderIndex: order,
+          outgoingRosterSlot: pinch.outgoingRosterSlot,
+          incomingRosterSlot: pinch.incomingRosterSlot,
+        })
+      }
+    }
     // 간이 타석 루프 0xc262c 는 **타석마다 먼저** 0xc1ba4 를 불러 수비 팀 투수 교체를 판정한다
     if (defense !== undefined && mound !== undefined) {
       const changed = changePitcherIfNeeded(defense, mound, {
@@ -265,7 +331,8 @@ export function simulateHalfInning(
       defense !== undefined && mound !== undefined
         ? { ...defense.pitcherAt(mound.pitcherSlot), stamina: staminaPercentOf(mound.stamina) }
         : pitcher
-    const play = playQuickAtBat(batterAt(order), facing, { inning }, random, {
+    const rosterSlot = lineup !== undefined ? rosterSlotAt(lineup, order) : undefined
+    const play = playQuickAtBat(batterOn(order), facing, { inning }, random, {
       /**
        * 투구 판정 경로 뒤에만 도루를 굴린다 (0xc1818, E-5). **실패가 없어** 주자를 잃지 않는다.
        *
@@ -278,7 +345,7 @@ export function simulateHalfInning(
       onPitchJudged: () => {
         const base = quickStealBaseOf(bases)
         if (base === null) return
-        const runner = batterAt(Math.max(0, order - base))
+        const runner = batterOn(Math.max(0, order - base))
         const stolen = quickEngineSteal(
           bases,
           { hit: 0, power: 0, defense: 0, run: runner.run },
@@ -322,7 +389,13 @@ export function simulateHalfInning(
     const scored = outs >= OUTS_PER_INNING && advanced.outsAdded > 0 ? 0 : advanced.runsScored
     runs += scored
     // 판정은 그대로 두고 **결과만 내보낸다** — 원본이 0xa8024 로 흘려보내는 자리다
-    plateAppearances.push({ battingOrderIndex: order, outcome, runsBattedIn: scored })
+    plateAppearances.push(
+      rosterSlot === undefined
+        ? { battingOrderIndex: order, outcome, runsBattedIn: scored }
+        : { battingOrderIndex: order, outcome, runsBattedIn: scored, rosterSlot },
+    )
+    // 타순 칸 기록(안타·적시타·타석) — 다음 CPU 대타 판정이 본다 (0xa8024)
+    if (lineup !== undefined) lineup = recordLineupPlay(lineup, order, outcome, scored)
     // 타석이 끝나는 자리 — 원본은 여기서 돌발 결과비트로 판정한다 (0x8f414)
     hooks.onAtBatEnd?.({
       outcome,
@@ -368,6 +441,9 @@ export function simulateHalfInning(
     steals,
     pitcherLines: [...lines.values()],
     mound,
+    lineup,
+    pinchHitUsed,
+    pinchHits,
   }
 }
 
