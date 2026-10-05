@@ -46,12 +46,14 @@ const OUTSIDE_Y = [330, 380]
  * 가중치표(`pitchPatterns`)의 다섯째 칸 w4 가 **주자열 1·2 에서 3, 주자열 3(주자 없음)에서 0** 인 것도
  * 같은 말이다: **주자가 있을 때 투구의 3% 가 견제**다.
  *
- * ⚠️ **웹은 아직 이 갈래가 없다** — 아래 `pitchTargetOf` 는 종류 4 를 종류 1(모서리)로 떨어뜨려
- * **원본이 굴리지 않는 목표점 난수 4 번을 굴리고, 원본이 던지지 않는 공을 던진다.**
- * 바로잡으려면 부르는 쪽(`selectPitch` → `widgets/batting-stage` · `features/play-team-game`)이
- * "이 투구는 견제다" 로 갈라져 수비 화면(플레이 종류 4)을 열어야 하는데, 그 파일들이 이 작업의
- * 구역 밖이라 **여기서는 고르는 함수(`cpuPickoffBaseOf`)만 원본대로 두고 배선은 남겨 둔다.**
- * `pitchTargetOf` 의 동작은 한 톨도 안 건드렸다 — 난수 차례가 지금까지와 같아야 해서다.
+ * **웹도 이 갈래를 탄다** (b98bf04): `selectPitch` 가 `targetKindOf` 다음에 `isCpuPickoff` 면
+ * `cpuPickoffBaseOf` 로 루를 굴려 `{ kind: '견제', base }` 를 돌려주고, 목표점·제구·곡선·마구 상태는
+ * 건드리지 않는다. `BattingStage` 의 `onPickoff` 가 그 루를 받아 공 없이 대기로 돌아가고,
+ * 팀 경기(`TeamGameScreen` → `actions.cpuPickoff`)가 견제 판(플레이 종류 4)을 돌린다.
+ *
+ * ⚠️ 단, 견제는 `selectPitch` 에 여섯째 인자 `cpuPickoff` 를 넘길 때만 켜진다(= `BattingStage` 에
+ * `onPickoff` 를 넘긴 화면만 — 지금은 팀 경기뿐). 안 넘기면 `pitchTargetOf` 가 예전처럼 종류 4 를
+ * 모서리 투구로 떨어뜨려 **원본이 굴리지 않는 목표점 난수를 굴리고 원본이 던지지 않는 공을 던진다** (미해결).
  */
 const PICKOFF_KIND = 4
 const FULL_BASES = 3
@@ -93,8 +95,9 @@ export function cpuPickoffBaseOf(
 
 export function pitchTargetOf(kind: number, situation: TargetSituation, random: RandomPort): WorldPoint {
   const center = ZONE_CENTERS[situation.side] ?? ZONE_CENTERS[0]
-  // 종류 4 는 주자가 없거나 만루면 1 이다 (0x34684). 그 밖은 원본이 **투구를 안 하고 견제로 빠지는데**
-  // (0x34848, 위 주석) 웹에는 그 갈래가 없어 여기서는 종류 1 로 둔다 — **알려진 어긋남**이다
+  // 종류 4 는 주자가 없거나 만루면 1 이다 (0x34684). 그 밖은 원본이 **투구를 안 하고 견제로 빠진다**
+  // (0x34848, 위 주석) — 견제가 켜진 `selectPitch` 는 여기 오기 전에 갈라진다. 견제가 꺼진 채로 여기 오면
+  // 모서리 투구로 던진다 — **알려진 어긋남**이다
   const effective =
     kind === PICKOFF_KIND && (situation.runnerCount === 0 || situation.runnerCount === FULL_BASES) ? 1 : kind
   switch (effective) {
