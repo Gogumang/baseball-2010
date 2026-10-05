@@ -99,6 +99,8 @@ import {
   entryPitcherGameAbilities,
   NO_ACE_BATTER,
   NO_ROSTER_SLOT,
+  entryBattersOfOrder,
+  entryPitchersOfOrder,
   rosterEntryBattersOf,
   rosterEntryPitchersOf,
   withAceBatter,
@@ -106,6 +108,7 @@ import {
 } from '@/features/play-team-game/model/teamGameRoster'
 import type {
   TeamEntryBatter,
+  TeamEntryOrder,
   TeamEntryPitcher,
   TeamGameAbilityContext,
 } from '@/features/play-team-game/model/teamGameRoster'
@@ -293,6 +296,17 @@ export interface TeamGameOptions {
    * 넷째 인자로 넘기고 그 세션이 싣는다 (69d6bcc · 6402929). 웹에 대전모드(8·9) 팀 경기는 아직 없다.
    */
   readonly aceLevels?: Readonly<Record<number, number>>
+  /**
+   * **엔트리 편집기(0x55864)가 고친 내 팀 명단 차례** — 있으면 붙박이 표 차례(`rosterEntryBattersOf` ·
+   * `rosterEntryPitchersOf`) 대신 이 차례로 타순·벤치·투수 명단을 세운다 (`teamGameRoster.TeamEntryOrder`).
+   * 마선수는 이 뒤에 지금처럼 끼운다(마투수 8번 · 마타자 9번).
+   *
+   * 선발 칸은 따로 정한다 — 시즌은 지금처럼 `rotationSlotOf(dayCounter)`: 원본 시즌 저장 레코드는 g 번 돈 모양이고
+   * 웹 차례는 돌기 전 모양이라(`seasonEntry.unrotatedPitchersOf`) g % 4 번 = 원본 0번이다 (40870f1).
+   *
+   * 넘기는 곳: 시즌 `seasonEntryOrderOf(save.roster)` (app `useSeasonSession.optionsFor`).
+   */
+  readonly ourEntryOrder?: TeamEntryOrder
   /** 이 경기에 쓸 수 있는 마구 횟수. 로스터 투수는 마구가 없어 기본 0 이다 */
   readonly magicCount?: number
   /** 화면 배치 side (투영 원점 표 0xcfb18 의 칸) */
@@ -634,9 +648,11 @@ function opponentAceIndexesOf(
 export function startTeamGame(options: TeamGameOptions, random: RandomPort): TeamGameProgress {
   const opponentAces = opponentAceIndexesOf(options, random)
   const startingSlots = startingPitcherSlotsOf(options, random)
-  // 0x30f20 의 순서 그대로 — 팀을 세운 뒤 고른 마타자를 벤치에 끼워 넣는다 (0xb8870)
+  // 0x30f20 의 순서 그대로 — 팀을 세운 뒤 고른 마타자를 벤치에 끼워 넣는다 (0xb8870).
+  // 엔트리 편집기가 고친 차례가 있으면 그 차례가 곧 팀 레코드다 (0xb891c 는 첨자만 든다)
+  const ourOrder = options.ourEntryOrder
   const ourEntry = withAceBatter(
-    rosterEntryBattersOf(options.ourTeamId),
+    ourOrder === undefined ? rosterEntryBattersOf(options.ourTeamId) : entryBattersOfOrder(options.ourTeamId, ourOrder),
     options.aceBatterId ?? NO_ACE_BATTER,
   )
   const opponentEntry = withAceBatter(
@@ -645,7 +661,9 @@ export function startTeamGame(options: TeamGameOptions, random: RandomPort): Tea
   )
   // 0x31042 · 0x31064 — 마타자와 **같은 자리에서** 마투수도 양 팀에 들어간다 (0xb88c8)
   const ourPitcherEntry = withAcePitcher(
-    rosterEntryPitchersOf(options.ourTeamId),
+    ourOrder === undefined
+      ? rosterEntryPitchersOf(options.ourTeamId)
+      : entryPitchersOfOrder(options.ourTeamId, ourOrder),
     options.acePitcherId ?? NO_ACE_BATTER,
   )
   const opponentPitcherEntry = withAcePitcher(

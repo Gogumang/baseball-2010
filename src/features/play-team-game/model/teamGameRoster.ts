@@ -25,9 +25,10 @@ import type {
  * 팀 경기에 서는 선수의 **경기용 능력치**를 만든다 (J-4 를 로스터 표에 먹이는 자리).
  *
  * 웹판 로스터(`shared/config/original/roster.ts`)는 이름·능력치 네 칸뿐인 붙박이 표라
- * 원본 선수 레코드의 보직(+0xb)·수비 자리(+0x1c)·스킬 비트(+0x14)가 없다. 그래서
- * **보직 불일치 −20% 의 입력은 부르는 쪽이 `lineup` 으로 넘긴다** — 엔트리 편집 화면
- * (0x55864, 아직 웹에 없다)이 생기면 그 화면이 채워 줄 자리다. 안 넘기면 벌점이 없다.
+ * 원본 선수 레코드의 보직(+0xb)·스킬 비트(+0x14)가 없다. 그래서
+ * **보직 불일치 −20% 의 입력은 부르는 쪽이 `lineup` 으로 넘긴다** — 안 넘기면 벌점이 없다.
+ * 엔트리 편집기(0x55864, `entities/season-mode/model/entryEditor`)가 고친 타순·수비 위치(+0x1c)·투수 차례는
+ * `TeamGameOptions.ourEntryOrder` 로 들어와 명단을 세운다 (`entryBattersOfOrder` · `entryPitchersOfOrder`).
  */
 
 /** XlsTEAM_DATA 한 줄의 u16 6개 중 뒤 4개가 팀 능력치다 (앞 둘은 id·100) */
@@ -338,6 +339,12 @@ export interface TeamEntryPitcher {
   readonly repertoire: PitcherRepertoire
   /** 마투수면 `ACE_PITCHERS` 칸 0~4, 아니면 −1 */
   readonly aceIndex: number
+  /**
+   * 경기를 세울 때 받은 **명단 차례**에서 몇 번째였나 — `ourEntryOrder.pitchers`(없으면 표 칸) 의 첨자.
+   * 마투수는 명단 밖이라 −1. 시작·끝 스태미나(`TeamGameOptions.ourPitcherStaminas` · 요약)를 이 차례로 잇는다
+   * (마투수가 8번에 들어오면 옛 8번이 맨 끝으로 가 명단 칸과 갈릴 수 있다).
+   */
+  readonly orderIndex: number
 }
 
 /**
@@ -370,7 +377,79 @@ export function rosterEntryPitchersOf(teamId: number): readonly TeamEntryPitcher
     ability: player.ability,
     repertoire: rosterRepertoireOf(teamId, slot),
     aceIndex: NO_ACE_BATTER,
+    orderIndex: slot,
   }))
+}
+
+/* ── 엔트리 편집이 고친 명단 ────────────────────────────────────────────────────── */
+
+/**
+ * **엔트리 편집기(0x55864)가 고친 명단 차례** — 원본은 편집기가 팀 레코드(시즌 저장 안 `0x1f570`, 일반모드는
+ * 경기용 팀 `0x30f20` 이 세운 것)의 선수 배열을 그 자리에서 맞바꾸고, 경기용 팀 객체 `0xb891c` 는
+ * `team[i] = i` 첨자만 들고 선수를 같은 레코드에서 읽는다(`0xb8680`) — 곧 **고친 차례가 곧 그 경기의 타순·벤치·
+ * 투수 차례**다. 시즌은 `entities/season-mode` 의 `seasonEntryOrderOf(save.roster)` 가 만든다.
+ *
+ * - `batters[i]` = 명단 i 번째 타자의 **로스터 칸**(붙박이 표 첨자)과 **수비 위치**(+0x1c 하위 니블, 0 = 벤치).
+ *   앞 아홉이 타순, 그 뒤가 벤치다.
+ * - `pitchers[i]` = 투수 명단 i 번째의 로스터 칸. 선발 칸은 따로 정한다(시즌 `rotationSlotOf(g)` — 저장 레코드가
+ *   g 번 돌기 전 모양이라 원본의 "g 번 돈 배열의 0번" 과 같다 · 일반모드는 0x30f20 의 0↔k).
+ */
+export interface TeamEntryOrder {
+  readonly batters: readonly { readonly rosterSlot: number; readonly position: number }[]
+  readonly pitchers: readonly number[]
+}
+
+/**
+ * 차례의 로스터 칸 하나하나를 붙박이 표 칸으로 — 표에 없는 칸(영입 선수 `rosterSlot` −1 · 범위 밖)은
+ * **아직 안 쓴 표 칸을 작은 번호부터** 채운다.
+ *
+ * ⚠️ 근사: 영입해 온 나리·명예 선수(id ≥ 0xb4)는 웹 붙박이 표에 이름·능력치가 없어 경기에 세울 수 없다
+ * (트레이드·영입 화면과 같은 한계). 지어내지 않으려고 그 팀 표 선수로 자리만 채운다.
+ */
+function tableSlotsOfOrder(slots: readonly number[], tableSize: number): readonly number[] {
+  const isTableSlot = (slot: number) => Number.isInteger(slot) && slot >= 0 && slot < tableSize
+  const used = new Set(slots.filter(isTableSlot))
+  let spare = 0
+  return slots.map((slot) => {
+    if (isTableSlot(slot)) return slot
+    while (spare < tableSize && used.has(spare)) spare += 1
+    const filled = spare < tableSize ? spare : 0
+    used.add(filled)
+    return filled
+  })
+}
+
+/** 고친 차례로 세운 타자 명단 — 수비 위치는 차례가 든 값(편집기가 고친 +0x1c)이다 */
+export function entryBattersOfOrder(teamId: number, order: TeamEntryOrder): readonly TeamEntryBatter[] {
+  const table = teamBatters(teamId)
+  const slots = tableSlotsOfOrder(order.batters.map((batter) => batter.rosterSlot), table.length)
+  return order.batters.map((batter, index) => {
+    const rosterSlot = slots[index] ?? 0
+    const player = table[rosterSlot]
+    return {
+      name: player?.name ?? '',
+      ability: player?.ability ?? [0, 0, 0, 0],
+      position: batter.position & 0xf,
+      aceIndex: NO_ACE_BATTER,
+      rosterSlot,
+    }
+  })
+}
+
+/** 고친 차례로 세운 투수 명단 — 0번이 저장 레코드의 0번이다 (선발 칸은 부르는 쪽이 정한다) */
+export function entryPitchersOfOrder(teamId: number, order: TeamEntryOrder): readonly TeamEntryPitcher[] {
+  const table = teamPitchers(teamId)
+  const slots = tableSlotsOfOrder(order.pitchers, table.length)
+  return slots.map((slot, orderIndex) => {
+    const player = table[slot]
+    return {
+      name: player?.name ?? '',
+      ability: player?.ability ?? [0, 0, 0, 0],
+      repertoire: rosterRepertoireOf(teamId, slot),
+      aceIndex: NO_ACE_BATTER,
+      orderIndex,
+    }
+  })
 }
 
 /**
@@ -398,6 +477,7 @@ export function withAcePitcher(
       pitchMask: 1,
     },
     aceIndex,
+    orderIndex: NO_ACE_BATTER,
   }
   const out = [...entry]
   const seated = out[PITCHER_ENTRY_ACE_SLOT]

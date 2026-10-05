@@ -193,11 +193,11 @@ export function seasonStarterNameOf(teamId: number, roster: SeasonTeamRoster, da
 }
 
 /**
- * **팀 경기에 넘길 내 팀 명단 순서** — 웹 팀 경기(`features/play-team-game`)가 아직 받는 칸이 없어 쓰는 곳이 없다.
+ * **팀 경기에 넘길 내 팀 명단 순서** — 팀 경기 옵션 `ourEntryOrder`(`teamGameRoster.TeamEntryOrder`)로 받는다.
  *
- * 받는 쪽이 할 일: 타자 명단을 `rosterEntryBattersOf(팀)` 대신 이 순서(로스터 칸 + 수비 위치)로 세우고,
- * 투수 명단도 이 순서로 세운 뒤 **선발 칸은 지금처럼 `rotationSlotOf(dayCounter)`** 를 쓰면 원본의
- * "g 번 돈 배열의 0번" 과 같다. 영입 선수(id ≥ 0xb4 · 0xfe)는 표에 없어 `rosterSlot` 이 −1 이다.
+ * 받는 쪽은 타자 명단을 이 순서(로스터 칸 + 수비 위치)로, 투수 명단도 이 순서로 세우고 **선발 칸은
+ * `rotationSlotOf(dayCounter)`** 를 쓴다 — 원본의 "g 번 돈 배열의 0번" 과 같다. 영입 선수(id ≥ 0xb4 · 0xfe)는
+ * 표에 없어 `rosterSlot` 이 −1 이다 (받는 쪽이 안 쓴 표 칸으로 채운다 — 근사).
  */
 export interface SeasonEntryOrder {
   readonly batters: readonly { readonly rosterSlot: number; readonly position: number }[]

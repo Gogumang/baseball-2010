@@ -1724,3 +1724,53 @@ describe('기록달성 — 팀 경기도 0xa77f0 으로 쌓고 경기 끝 0x4ea0
     expect(수비기록.size).toBeGreaterThan(0)
   })
 })
+
+describe('엔트리 편집기(0x55864)가 고친 명단으로 경기를 세운다 — ourEntryOrder', () => {
+  const 차례 = {
+    // 표 타자 열둘을 거꾸로 — 수비 위치도 차례가 든 값이다
+    batters: Array.from({ length: 12 }, (_unused, index) => ({ rosterSlot: 11 - index, position: index < 9 ? index + 1 : 0 })),
+    pitchers: [3, 2, 1, 0, 4, 5, 6, 7],
+  }
+
+  it('타순·벤치·수비 위치가 차례 그대로다 (0xb891c 는 첨자만 든다)', () => {
+    const { progress } = 시작({ ourEntryOrder: 차례 })
+    expect(progress.ourEntry.map((batter) => batter.rosterSlot)).toEqual(차례.batters.map((batter) => batter.rosterSlot))
+    expect(progress.ourEntry.map((batter) => batter.position)).toEqual(차례.batters.map((batter) => batter.position))
+    expect(progress.ourBenchBatters).toBe(3)
+    // 상대 팀은 표 차례 그대로
+    expect(progress.opponentEntry.map((batter) => batter.rosterSlot)).toEqual(Array.from({ length: 12 }, (_u, i) => i))
+  })
+
+  it('시즌 선발은 차례의 rotationSlotOf(g) 번 — 원본 "g 번 돈 레코드의 0번" 과 같다', () => {
+    for (const dayCounter of [0, 1, 2, 3, 4, 5]) {
+      const { progress } = 시작({ ourEntryOrder: 차례, dayCounter })
+      expect(progress.ourPitcherIndex).toBe(dayCounter % 4)
+      expect(progress.ourPitcherEntry[progress.ourPitcherIndex]?.orderIndex).toBe(dayCounter % 4)
+      // 차례 [3,2,1,0,…] 의 g%4 번 = 표 3−g%4 번 투수
+      const 표선발 = startTeamGame({ ...기본옵션, dayCounter: 3 - (dayCounter % 4) }, createSeededRandom(1))
+      expect(progress.ourPitcherEntry[progress.ourPitcherIndex]?.name).toBe(
+        표선발.ourPitcherEntry[표선발.ourPitcherIndex]?.name,
+      )
+    }
+  })
+
+  it('표에 없는 칸(영입 선수 −1)은 안 쓴 표 칸을 작은 번호부터 채운다 (근사)', () => {
+    const { progress } = 시작({
+      ourEntryOrder: {
+        batters: [{ rosterSlot: -1, position: 2 }, ...Array.from({ length: 11 }, (_u, i) => ({ rosterSlot: i + 1, position: 0 }))],
+        pitchers: [-1, 1, 2, 3, 4, 5, 6, 7],
+      },
+    })
+    expect(progress.ourEntry[0]?.rosterSlot).toBe(0)
+    expect(progress.ourEntry[0]?.position).toBe(2)
+    expect(progress.ourPitcherEntry[0]?.name).toBe(startTeamGame(기본옵션, createSeededRandom(1)).ourPitcherEntry[0]?.name)
+  })
+
+  it('명단을 넘겨도 경기 세우기의 난수 굴림은 그대로다', () => {
+    const 없음 = 세는난수(createSeededRandom(7))
+    const 있음 = 세는난수(createSeededRandom(7))
+    startTeamGame({ ...기본옵션, mode: 1, season: undefined }, 없음)
+    startTeamGame({ ...기본옵션, mode: 1, season: undefined, ourEntryOrder: 차례 }, 있음)
+    expect(있음.rolls.slice(0, 4)).toEqual(없음.rolls.slice(0, 4))
+  })
+})
