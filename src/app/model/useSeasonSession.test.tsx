@@ -333,6 +333,32 @@ describe('시즌 끝 사슬', () => {
     expect(후.record.gameRecord).toEqual(기록)
   })
 
+  it('국가대항전 내 팀은 시즌 팀이 아니라 대한민국(10)이고, 이긴 경기가 대한민국 승으로 쌓인다 (0x6548 65e2)', () => {
+    const { result } = 띄우기()
+    act(() => result.current.actions.chooseTeam(3))
+    act(() => result.current.actions.confirmIncome({
+      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
+    }))
+    act(() => result.current.actions.updateRecord({ ...result.current.state!.record, yearIndex: 2 }))
+    act(() => result.current.actions.finishSeason())
+
+    act(() => result.current.actions.playCupGame(10, 11))
+    // 경기[0x28+내side] = 10 — 시즌 팀(3) 명단이 아니라 대표팀 명단으로 친다
+    expect(result.current.gameOptions?.ourTeamId).toBe(10)
+    expect(result.current.gameOptions?.opponentTeamId).toBe(11)
+
+    act(() => result.current.actions.finishGame(요약({
+      ourTeamId: result.current.gameOptions!.ourTeamId, opponentTeamId: 11,
+    })))
+
+    const cup = result.current.cup!
+    // 참가국 칸 차례 = 한·일·쿠·미. 대한민국 1승, 일본 1패
+    expect(cup.wins[0]).toBe(1)
+    expect(cup.losses[1]).toBe(1)
+    expect(cup.wins[0] + cup.wins[1] + cup.wins[2] + cup.wins[3]).toBe(2)
+    expect(cup.losses[0] + cup.losses[1] + cup.losses[2] + cup.losses[3]).toBe(2)
+  })
+
   it('짝수 연차는 결산 뒤 국가대항전이 열린다', () => {
     const { result } = 띄우기()
     act(() => result.current.actions.chooseTeam(0))

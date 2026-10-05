@@ -481,8 +481,12 @@ export function useSeasonSession(
         }
         const cup = save.cup ?? null
         if (cup === null) return
-        const winner = summary.won ? record.teamId : opponent
-        const loser = summary.won ? opponent : record.teamId
+        // 내 쪽은 시즌 팀(SR[1], 0~9)이 아니라 **경기에 들어간 대한민국(10)** 이다 — 0x6548 국가대항전
+        // 가지(65e2 `cmp r5,#0xa`)가 경기[0x28+side] 에 10 을 꽂았고, 결과 장면 0x4ea0c 는 그 경기 팀으로
+        // 0xb76dc/0xb77e0 을 부른다. 시즌 팀 번호를 넘기면 참가국 표(10~13)에 없어 대한민국 승패가 안 쌓이고
+        // 결승을 이겨도 우승국(L+0xc4)이 15 로 남았다. 커리어 `finishCupGame` 과 같이 요약의 팀 번호를 쓴다
+        const winner = summary.won ? summary.ourTeamId : opponent
+        const loser = summary.won ? opponent : summary.ourTeamId
         commit({
           ...save,
           cup: advanceNationalCupDay(cup, winner, loser, random),
@@ -628,7 +632,12 @@ export function useSeasonSession(
       if (options === null) return
       clearGameRecord(save)
       setGameKind('국가대항전')
-      setGameOptions(options)
+      // 내 팀도 시즌 팀이 아니라 **대한민국(10)** 이다 — 경기 준비 0x6548 의 국가대항전 가지:
+      //   65c6 [sp+0x18] = 0xb7614(L,n,0) · 65da [sp+0x14] = 0xb7614(L,n,1)
+      //   65e2 cmp r5,#0xa — 칸 0 이 10 이 아니면 둘을 맞바꿈 → [sp+0x18] = 내 팀 = 늘 10
+      //   664c 0xb6bd4(경기, 내side, [sp+0x18]) — 경기[0x28+내side] = 10
+      // 시즌모드는 대표팀 명단을 안 건드려 팀 10 기본 명단 그대로 친다 (P5 1b·2절, 0x1f9a9 호출 없음)
+      setGameOptions({ ...options, ourTeamId: myTeam })
       setScene(SEASON_SCENE_STATE.경기직전)
     },
     [clearGameRecord, optionsFor, save],
