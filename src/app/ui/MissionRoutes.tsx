@@ -6,6 +6,7 @@ import { MissionSelectScreen, MissionBriefing } from '@/pages/mission-select/ui/
 import { MissionPlayScreen } from '@/pages/mission-play/ui/MissionPlayScreen'
 import { PitchingScreen } from '@/pages/pitching/ui/PitchingScreen'
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
+import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 import type { ModeBatter } from '@/app/model/modeBatter'
 import { modePitchMenuOf } from '@/app/model/modePitcher'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -54,6 +55,11 @@ export function MissionRoutes({
         onDone={actions.finishDefensePlay}
       />
     )
+  }
+
+  // 투수 미션 사구 뒤 벤치 클리어링 연출(상태 0x1e) — 투수편 `PitcherGameScreen` 과 같은 위젯이다
+  if (session.pendingBenchClearing !== null) {
+    return <BenchClearingScene onDone={actions.finishBenchClearing} />
   }
 
   // CPU 견제 한 판 — 세션이 이미 다 돌려 먹였다. 화면은 재생만 한다 (나만의리그 `GameRoute` 의 lastDefensePlay 와 같은 꼴)

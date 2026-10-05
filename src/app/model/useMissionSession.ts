@@ -32,6 +32,7 @@ import { attemptSteal } from '@/entities/game/model/steal'
 import { missionOpponentOf, pitcherAbilityOf } from '@/entities/game/model/aceOpponent'
 import { pitchAgainstBatter } from '@/entities/pitching/model/simulateBatter'
 import { rollsIntoBenchClearing } from '@/entities/game/model/benchClearing'
+import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
 import { BATTER_SLOT, gameAbilityOf } from '@/features/play-team-game/model/gameAbilities'
 import { isMistakePitch } from '@/entities/pitching/model/mistakePitch'
 import { MAGIC_PITCH_TYPE_NUMBER } from '@/entities/pitcher-career/model/magicPitch'
@@ -200,6 +201,16 @@ export function useMissionSession({
   pendingDefensePlayRef.current = pendingDefensePlay
   /** 다 돌려 놓은 CPU 견제 한 판 — 화면이 재생을 마치면 비운다 (`actions.finishPickoffReplay`) */
   const [pickoffReplay, setPickoffReplay] = useState<PickoffPlayResult | null>(null)
+  /**
+   * **벤치 클리어링 연출(상태 0x1e)이 붙들고 있는 사구** — 투수 미션 전용.
+   * 원본 미션(모드 5)도 보통 경기 장면 0x104 라 상태 0x12 갱신 0x4e6d4 의 끝 0x4e72c~0x4e776 을 그대로 탄다:
+   * 거르는 것은 플레이 종류 8(홈런더비, 0x4e740)과 사구 아님(0x4e748)뿐이고 모드를 읽지 않는다.
+   * 진입 0x3a5f0 도 모드·미션 칸을 안 본다 → 연출과 그 전역 rand(진입 45 · 틱 10 의 8)가 미션에서도 돈다.
+   * 출구 0xae24c 뒤에야 사구가 보통 길(밀어내기·정산)을 간다 — `finishBenchClearing`.
+   */
+  const [pendingBenchClearing, setPendingBenchClearing] = useState<
+    { readonly run: PitcherRun; readonly outcome: AtBatOutcome } | null
+  >(null)
   /** 결과를 확인하고 돌아갈 때 마지막으로 한 편의 목록을 연다 */
   const [lastSide, setLastSide] = useState<OriginalMission['side']>('타자')
   const [clearCounts, setClearCounts] = useState<MissionClearCounts>(() => missionRecord.load())
@@ -329,6 +340,8 @@ export function useMissionSession({
     if (pitcherRun === null || pitcherRun.status !== '진행중') return
     // 화면이 수비를 돌리는 동안에는 다음 공이 나가지 않는다 (원본 0x17 이 도는 동안 0xf 로 안 간다)
     if (pendingDefensePlay !== null) return
+    // 벤치 클리어링 연출(0x1e)이 도는 동안에도 다음 공은 없다
+    if (pendingBenchClearing !== null) return
 
     // 원본 구질 번호 1~21. 표에 없는 이름이면 1(FASTBALL)로 둔다
     const typeNumber = Math.max(1, PITCH_TYPES.findIndex((candidate) => candidate.name === type.name) + 1)
@@ -454,10 +467,17 @@ export function useMissionSession({
       // 굴림이 돌발 검사보다 앞이라 돌발 유무와 무관하게 난수는 한 번 쓴다.
       // ⚠️ 들어갔을 때의 효과(수비가 사람 → 0xaeab0 미션 투수 스태미나 −1000)는 웹 미션이 스태미나를
       //    들고 있지 않아(`MISSION_STAMINA_PERCENT` 고정) 남길 자리가 없다. S[1] 은 시즌(모드 2)만 적는다.
-      rollsIntoBenchClearing(
+      const entersBenchClearing = rollsIntoBenchClearing(
         { isHitByPitch: outcome.kind === '사구', isHomeRunDerby: false, burstInProgress: false },
         random,
       )
+      if (entersBenchClearing) {
+        // 진입 0x3a5f0 — 공격 9명 자리·목표 굴림 45 번이 곧바로 나간다. 사구는 연출이 끝날 때까지 붙든다
+        rollBenchClearingEntry(random)
+        setPendingBenchClearing({ run: nextRun, outcome })
+        setPitcherRun(nextRun)
+        return
+      }
       nextRun = applyPitcherOutcome(nextRun, outcome, { random })
       runner.resetAtBat()
     } else {
@@ -529,6 +549,20 @@ export function useMissionSession({
     /** 수비 화면이 끝났다 — 진루·아웃·실점을 이제 먹인다 */
     finishDefensePlay,
 
+    /**
+     * **벤치 클리어링 연출이 끝났다** — 출구 0xae24c (`BenchClearingScene` 의 `onDone`).
+     * 틱 10 의 갱신 0x401d4 에 닿았으면 수비 8명 목표 굴림 8 번이 그때 나갔다 — 화면 대신 여기서 굴린다.
+     * 그 뒤 사구는 보통 길 그대로다 (투수편 진행기 `resolveBenchClearing` 과 같은 차례).
+     */
+    finishBenchClearing: (reachedTargetTick: boolean) => {
+      const pending = pendingBenchClearing
+      if (pending === null) return
+      setPendingBenchClearing(null)
+      if (reachedTargetTick) rollBenchClearingTargets(random)
+      setPitcherRun(applyPitcherOutcome(pending.run, pending.outcome, { random }))
+      runner.resetAtBat()
+    },
+
     begin: (mission: OriginalMission) => {
       setLastSide(mission.side)
       runner.resetAtBat(mission.start)
@@ -536,6 +570,7 @@ export function useMissionSession({
       runner.setIsPaused(false)
       setPendingDefensePlay(null)
       setPickoffReplay(null)
+      setPendingBenchClearing(null)
 
       if (mission.side === '투수') {
         setPitcherRun(startPitcherMission(mission))
@@ -553,6 +588,7 @@ export function useMissionSession({
       runner.setIsPaused(false)
       setPendingDefensePlay(null)
       setPickoffReplay(null)
+      setPendingBenchClearing(null)
       setMissionRun(startMission(mission))
       setScreen({ kind: '마선수대결', mission, ...pending })
     },
@@ -613,11 +649,13 @@ export function useMissionSession({
     giveUpBatter: () => {
       setPendingDefensePlay(null)
       setPickoffReplay(null)
+      setPendingBenchClearing(null)
       if (missionRun !== null) setMissionRun(giveUpMission(missionRun))
     },
 
     giveUpPitcher: () => {
       setPendingDefensePlay(null)
+      setPendingBenchClearing(null)
       if (pitcherRun !== null) setPitcherRun({ ...pitcherRun, status: '실패' })
     },
 
@@ -638,6 +676,6 @@ export function useMissionSession({
 
   return {
     missionRun, pitcherRun, clearedKeys, clearCounts, lastSide, aceLevels, pitcher,
-    missionConditionCode, pendingDefensePlay, pickoffReplay, handleMissionPitch, handleThrow, actions,
+    missionConditionCode, pendingDefensePlay, pendingBenchClearing, pickoffReplay, handleMissionPitch, handleThrow, actions,
   }
 }

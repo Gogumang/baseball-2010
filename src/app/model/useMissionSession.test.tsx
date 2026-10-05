@@ -407,3 +407,90 @@ describe('투수 미션 투수는 투수편 커리어의 0xb6414 값으로 던�
     expect(drawsOfOnePitch(1, 0, false, 강투수).drawn).toBe(drawsOfOnePitch(1, 0, false).drawn)
   })
 })
+
+/* ── 투수 미션 사구 뒤 벤치 클리어링 연출 (상태 0x1e) ───────────────────────────── */
+
+/** 씨앗 난수를 감싸 뽑은 수를 센다 */
+function countedSeeded(seed: number) {
+  const inner = createSeededRandom(seed)
+  let draws = 0
+  const port: RandomPort = {
+    next: () => {
+      draws += 1
+      return inner.next()
+    },
+    nextInRange: (minimum: number, maximum: number) => {
+      draws += 1
+      return inner.nextInRange(minimum, maximum)
+    },
+    pick: <T,>(candidates: readonly T[]) => {
+      draws += 1
+      return inner.pick(candidates)
+    },
+  }
+  return { port, drawn: () => draws }
+}
+
+const CORNER_CELLS = [0, 2, 6, 8, 3, 5]
+
+/** 씨앗을 넘겨 가며 투수 미션 1 에 공을 던지다 벤치 클리어링에 들어간 자리를 찾는다 */
+function sessionInBenchClearing() {
+  const mission = MISSIONS.find((row) => row.side === '투수' && row.id === 1)
+  if (mission === undefined) throw new Error('투수 미션 1 이 없다')
+  for (let seed = 1; seed < 400; seed += 1) {
+    const counter = countedSeeded(seed)
+    const missionRecord: MissionRecordPort = { load: () => ({}), save: vi.fn() }
+    let screen: Screen = { kind: '미션선택' }
+    const setScreen = vi.fn((next: Screen) => {
+      screen = next
+    })
+    const rendered = renderHook(() =>
+      useMissionSession({ runner: useAtBatRunner(), random: counter.port, missionRecord, screen, setScreen }),
+    )
+    act(() => rendered.result.current.actions.begin(mission))
+    for (let pitch = 0; pitch < 60; pitch += 1) {
+      // 인플레이 타구(수비 화면)나 미션 끝이면 같은 미션을 다시 세운다
+      if (rendered.result.current.pitcherRun?.status !== '진행중' || rendered.result.current.pendingDefensePlay !== null) {
+        act(() => rendered.result.current.actions.begin(mission))
+      }
+      const current = rendered.result.current
+      const before = counter.drawn()
+      // 구석 칸들을 돌려 가며 게이지 없이 — 사구가 나올 만한 자리
+      act(() => current.handleThrow(PITCH_TYPES[0], CORNER_CELLS[pitch % CORNER_CELLS.length], 0, false))
+      if (rendered.result.current.pendingBenchClearing !== null) {
+        return { rendered, counter, drawnByThrow: counter.drawn() - before }
+      }
+    }
+    rendered.unmount()
+  }
+  throw new Error('벤치 클리어링에 들어가는 씨앗을 못 찾았다')
+}
+
+describe('투수 미션 사구 뒤 벤치 클리어링 — 0x4e72c → 0x1e 는 모드를 안 가른다 (홈런더비만 제외)', () => {
+  it('들어가면 사구를 붙들고 다음 공을 막는다 — 연출이 끝나야 사구가 먹힌다', () => {
+    const { rendered } = sessionInBenchClearing()
+    const held = rendered.result.current
+    expect(held.pendingBenchClearing?.outcome.kind).toBe('사구')
+    const run = held.pitcherRun
+    act(() => held.handleThrow(PITCH_TYPES[0], 4, 0, false))
+    expect(rendered.result.current.pitcherRun).toBe(run)
+
+    act(() => rendered.result.current.actions.finishBenchClearing(false))
+    expect(rendered.result.current.pendingBenchClearing).toBeNull()
+  })
+
+  /** 출구에서 틱 10(0x401d4)에 닿았으면 수비 목표 굴림 8 번이 더 나간다 */
+  it('틱 10 에 닿고 끝나면 건너뛴 것보다 난수를 8 번 더 쓴다', () => {
+    const skipped = sessionInBenchClearing()
+    const beforeSkip = skipped.counter.drawn()
+    act(() => skipped.rendered.result.current.actions.finishBenchClearing(false))
+    const skipDraws = skipped.counter.drawn() - beforeSkip
+
+    const watched = sessionInBenchClearing()
+    const beforeWatch = watched.counter.drawn()
+    act(() => watched.rendered.result.current.actions.finishBenchClearing(true))
+    expect(watched.counter.drawn() - beforeWatch).toBe(skipDraws + 8)
+    // 진입 0x3a5f0 의 45 번은 던지는 순간 이미 나갔다
+    expect(watched.drawnByThrow).toBeGreaterThanOrEqual(45 + 1)
+  })
+})
