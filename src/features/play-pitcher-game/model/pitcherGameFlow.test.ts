@@ -246,6 +246,55 @@ describe('돌발미션', () => {
 
     expect(끝.burst?.triggeredCount ?? 0).toBeLessThanOrEqual(MAXIMUM_BURSTS_PER_GAME)
   })
+
+  /**
+   * 0x8f158 은 메시지 1 의 인자 0xe 갈래(0x50c42) 한 곳 — 사람 장면에서만 돈다. 모드 3 의 0xc1eac 는 우리 공격을
+   * 늘 자동(0x21), 수비는 "지금 투수가 내 선수인가" 로 가른다. 그래서 구원 대기 중(1~7회)의 자동 타석은 굴리지 않는다.
+   */
+  it('구원 대기 중 자동 타석에서는 돌발이 안 뜬다 — 뜨면 내 첫 타석 준비에서 뜬 채로 온다', () => {
+    const 구원 = { ...기본옵션, role: PITCHER_ROLE.relief }
+    let 뜬경기 = 0
+    for (let seed = 1; seed <= 40; seed += 1) {
+      const progress = startPitcherGame(구원, 씨앗(seed))
+      expect(progress.onMound, `씨앗 ${seed}`).toBe(true)
+      if ((progress.burst?.triggeredCount ?? 0) === 0) continue
+      뜬경기 += 1
+      // 자동 타석에서 떴다면 그 자리에서 판정되거나(예전 웹) 0x21 진입에서 내려가 비어 있었을 것이다
+      expect(progress.burst?.current, `씨앗 ${seed}`).not.toBeNull()
+      expect(progress.lastBurstResolution, `씨앗 ${seed}`).toBeNull()
+    }
+
+    expect(뜬경기).toBeGreaterThan(0)
+  })
+
+  it('내 수비 반 이닝에서 판정 못 받고 남은 돌발은 다음 자동 타석 앞(0x8f628)에서 판정 없이 내려간다', () => {
+    const 시작 = startPitcherGame(기본옵션, 씨앗(20100901))
+    const 행 = BURST_TABLES.PITCHER[0]
+    // 목표 5 는 판정을 안 한다 — 결과비트가 무엇이든 남는다 (0x8f414)
+    let progress: PitcherGameProgress = {
+      ...시작,
+      game: { ...시작.game, outs: 2 },
+      burst: 시작.burst === null ? null : { ...시작.burst, current: { ...행, goal: 5 }, triggeredCount: 1 },
+    }
+    const random = 씨앗(5)
+    const 반이닝 = { inning: progress.game.inning, half: progress.game.half }
+    for (let pitch = 0; pitch < 300; pitch += 1) {
+      if (progress.game.isFinished) break
+      if (progress.game.inning !== 반이닝.inning || progress.game.half !== 반이닝.half) break
+      if (progress.managerHookText !== null) {
+        progress = closeManagerHookWindow(progress, random)
+        continue
+      }
+      // 같은 반 이닝 안의 사람 타석 사이에서는 남아 있다
+      expect(progress.burst?.current?.goal).toBe(5)
+      progress = throwPitch(progress, 한가운데직구, random)
+    }
+
+    expect(progress.burst?.current).toBeNull()
+    expect(progress.burst?.judgement).toBeNull()
+    expect(progress.burst?.triggeredCount).toBe(MAXIMUM_BURSTS_PER_GAME)
+    expect(progress.lastBurstResolution).toBeNull()
+  })
 })
 
 describe('경기 뒤', () => {

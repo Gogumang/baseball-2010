@@ -74,45 +74,69 @@ describe('경기 진행기와 돌발미션', () => {
   })
 })
 
-describe('모든 타석 준비에서 굴린다 (K 4절 1-6)', () => {
+describe('굴리는 타석은 내 타석뿐 — 동료·상대 타석은 자동진행(0x21)이다', () => {
   /**
-   * 예전에는 **내 타석에서만** 굴려 원본보다 발동이 드물었다. 원본은 경기 장면이 지나는
-   * 모든 타석(동료·상대 포함)의 상태 0xf 에서 굴린다 — 굴리는 횟수가 늘어난 만큼 발동률이 오른다.
+   * 0x8f158 을 부르는 곳은 메시지 1 의 인자 0xe 갈래(0x50c42) 한 곳이고, 판정 0x8f414 는 사람 장면의 0x12·0x17 끝뿐이다.
+   * 모드 4 는 0xc1ed6 이 "공격 팀 지금 타자가 내 선수인가" 만 보므로 동료·상대 타석은 늘 0x21 — 굴림도 판정도 없다.
+   * 예전 웹은 K 4절 1-6 "매 타석 시작 때" 를 동료·상대 타석까지로 읽어 거기서도 굴렸다.
    */
-  const 발동한_경기수 = (씨앗수: number) => {
-    let count = 0
-    for (let seed = 1; seed <= 씨앗수; seed += 1) {
+  const 내차례 = (seed: number) => {
+    const progress = startGame(씨앗(seed))
+    return { ...progress, burst: progress.burst === null ? null : { ...progress.burst, current: null } }
+  }
+
+  it('자동 타석은 돌발 상태와 상관없이 같은 난수를 먹는다 — 발동을 이미 썼든 안 썼든 경기가 같게 흐른다', () => {
+    for (const seed of [1, 2, 3, 42, 777, 20100901]) {
+      const 남음 = 내차례(seed)
+      const 씀 = {
+        ...남음,
+        burst: 남음.burst === null ? null : { ...남음.burst, triggeredCount: MAXIMUM_BURSTS_PER_GAME },
+      }
+
+      // 내 타석 → (동료·상대 자동 타석) → 다음 내 타석 준비. 굴림은 맨 끝 내 타석 준비에서만 갈린다
+      const 가 = applyPlayerOutcome(남음, { kind: '삼진' }, 씨앗(seed + 100))
+      const 나 = applyPlayerOutcome(씀, { kind: '삼진' }, 씨앗(seed + 100))
+
+      expect(가.game, `씨앗 ${seed}`).toEqual(나.game)
+      expect(가.log, `씨앗 ${seed}`).toEqual(나.log)
+    }
+  })
+
+  it('발동은 늘 내 타석 준비에서 난다 — 뜬 채로 내 타석에 돌려준다', () => {
+    let 뜬경기 = 0
+    for (let seed = 1; seed <= 40; seed += 1) {
       let progress = startGame(씨앗(seed))
       const random = 씨앗(seed + 1)
       for (let step = 0; step < 200 && !progress.game.isFinished; step += 1) {
         if ((progress.burst?.triggeredCount ?? 0) > 0) break
         progress = applyPlayerOutcome(progress, { kind: '삼진' }, random)
       }
-      if ((progress.burst?.triggeredCount ?? 0) > 0) count += 1
+      if ((progress.burst?.triggeredCount ?? 0) === 0) continue
+      뜬경기 += 1
+      // 자동 타석에서 떴다면 거기서 판정되거나 0x21 진입에서 내려가 비어 있었을 것이다
+      expect(progress.burst?.current, `씨앗 ${seed}`).not.toBeNull()
     }
-    return count
-  }
 
-  it('한 경기를 끝까지 돌리면 거의 모든 시드에서 돌발이 한 번 뜬다', () => {
-    // 내 타석에서만 굴리던 때는 시드 40개 중 절반도 안 떴다
-    expect(발동한_경기수(40)).toBeGreaterThan(30)
+    expect(뜬경기).toBeGreaterThan(0)
   })
 
-  it('동료·상대 타석에서 뜬 돌발도 그 타석 결과로 판정된다 — 경기당 한 번에서 멈춘다', () => {
-    let 판정난_경기 = 0
-    for (let seed = 1; seed <= 20; seed += 1) {
-      let progress = startGame(씨앗(seed))
-      const random = 씨앗(seed + 7)
-      for (let step = 0; step < 200 && !progress.game.isFinished; step += 1) {
-        progress = applyPlayerOutcome(progress, { kind: '삼진' }, random)
-      }
-
-      expect(progress.burst?.triggeredCount).toBeLessThanOrEqual(MAXIMUM_BURSTS_PER_GAME)
-      if (progress.burst?.judgement != null) 판정난_경기 += 1
+  it('내 타석에서 판정을 못 받고 남은 돌발은 다음 자동 타석 앞(0x21 진입 0x8f628)에서 판정 없이 내려간다', () => {
+    const progress = 내차례(20100901)
+    const 행 = BURST_TABLES.BATTER[0]
+    // 목표 5 는 점프표 칸만 있고 판정을 안 한다 — 결과비트가 무엇이든 남는다 (0x8f414)
+    const 남는돌발 = {
+      ...progress,
+      burst: progress.burst === null ? null : { ...progress.burst, current: { ...행, goal: 5 }, triggeredCount: 1 },
+      lastBurstResolution: null,
     }
 
-    // 판정 자리가 내 타석에만 있었다면 동료·상대 타석에서 뜬 돌발이 끝까지 걸린 채로 남는다
-    expect(판정난_경기).toBeGreaterThan(10)
+    const after = applyPlayerOutcome(남는돌발, { kind: '삼진' }, 씨앗(3))
+
+    expect(after.burst?.current).toBeNull()
+    expect(after.burst?.judgement).toBeNull()
+    // 발동 횟수는 그대로라 이 경기에서는 다시 안 뜬다
+    expect(after.burst?.triggeredCount).toBe(MAXIMUM_BURSTS_PER_GAME)
+    expect(after.lastBurstResolution).toBeNull()
   })
 })
 

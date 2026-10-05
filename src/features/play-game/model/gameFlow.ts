@@ -78,7 +78,12 @@ import type { PickoffBase } from '@/entities/defense-controls/model/pickoff'
 import { EMPTY_BATTER_GAME_RECORD, recordPlateAppearance } from '@/entities/batting/model/pinchHitAi'
 import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
 import type { BurstResolution, BurstSession } from '@/entities/burst-mission/model/burstMissionSession'
-import { createBurstSession, resolveBurst, tryTriggerBurst } from '@/entities/burst-mission/model/burstMissionSession'
+import {
+  cancelBurst,
+  createBurstSession,
+  resolveBurst,
+  tryTriggerBurst,
+} from '@/entities/burst-mission/model/burstMissionSession'
 import { burstResultBitsOf } from '@/entities/burst-mission/model/burstResultBits'
 import { benchClearingEffectOf, rollsIntoBenchClearing } from '@/entities/game/model/benchClearing'
 import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
@@ -657,7 +662,8 @@ function finishPlayerOutcome(
   const recordIds = [...recorded.recordIds, ...backToBack.recordIds]
 
   // 돌발 판정은 타석이 끝나는 자리에서 한다 (0x4e6d4 → 0x8f414). 결과비트가 0 이거나
-  // 목표 5번이면 판정이 나지 않고 돌발이 그대로 살아 다음 타석으로 넘어간다.
+  // 목표 5번이면 판정이 나지 않고 돌발이 남지만, 다음 타석은 늘 자동진행(0x21)이라 그 진입(0x8f628)에서
+  // 판정 없이 내려간다 (`withoutPendingBurst`).
   const resolution =
     progress.burst === null
       ? null
@@ -697,8 +703,8 @@ function finishPlayerOutcome(
       ourLineup: recordLineupPlay(progress.ourLineup, progress.game.battingOrderIndex, outcome, runsBattedIn),
       lastDefensePlay: playback,
       burst: resolution === null ? progress.burst : resolution.session,
-      // ⚠️ 아직 안 보여 준 판정을 지우지 않는다 — 돌발은 이제 동료·상대 타석에서도 나므로
-      //    여기서 null 로 덮으면 그 보상이 화면에 안 뜬 채 사라진다. 지우는 것은 창을 닫을 때뿐이다
+      // 아직 안 보여 준 판정을 지우지 않는다 — 지우는 것은 창을 닫을 때뿐이다.
+      // (판정은 이제 내 타석 끝에서만 나므로 앞 판정이 안 보인 채 남을 일은 없다 — 안전하게 둔다)
       lastBurstResolution:
         resolution !== null && resolution.judgement !== null ? resolution : progress.lastBurstResolution,
       myStats,
@@ -838,14 +844,22 @@ const BATTING_ORDER_SIZE = 9
 /**
  * 타석 준비에서 돌발미션 발동을 굴린다 (장면 상태 0xf → 0x8f158).
  *
- * 원본은 경기 장면이 지나는 **모든 타석** 준비에서 굴린다 (K 4절 1-6, 확정) — 내 타석뿐 아니라
- * 동료 타석·상대 타석도 같은 상태 0xf 를 지난다. 웹도 이제 세 자리에서 모두 굴린다:
- *   내 타석(`advanceUntilPlayerTurn`) · 동료 타석(`playTeammateAtBat`) ·
- *   상대 타석(`simulateHalfInning` 의 `onAtBatStart` 갈고리).
- * 예전에는 내 타석에서만 굴려 **발동이 원본보다 드물었다.**
+ * ## 굴리는 타석은 **사람 장면(0xd → 0xe → 0xf)을 지나는 타석뿐** — 타자편은 내 타석뿐이다 (2026-10-05 디스어셈 전수)
+ * ```
+ * 0x8f158(발동)  부르는 곳 1곳 — 리터럴 0x50d8c ← 0x50c42: 메시지 1 "확인" 의 인자 0xe 갈래(0x50c26~0x50c56).
+ *               상태 0xe(등판·확인) → 0xf 로 넘기며 굴리고, 뜨면 0x1b. 0xe 는 0xd 에서만 오고 0xd 는 A·B·C
+ *               (0xae24c·0xae3e8·0xae3a0)의 "다음 타자" 로만 온다 — 모두 사람 장면이다.
+ * 0x8f414(판정)  부르는 곳 2곳 — 0x4e7ca(상태 0x12 갱신 0x4e6d4 끝) · 0x52a8e(상태 0x17 인플레이 끝 0x528b0).
+ * 0x8f628(내림)  부르는 곳 2곳 — 0x21 진입 0x3abf0 · 0x18 진입 0x3ac90(반 이닝 뒤집힐 때) (`cancelBurst`).
+ * 간이 엔진 0xc262c · 0x21 갱신 0x48480 의 호출 그래프(8단, 풀의 함수 포인터 포함)에는 셋 다 없다.
+ * ```
+ * 모드 4 에서 어느 타석이 사람 장면인가 — 0xc1e04 점프표 0xd90c0 칸 3 = 0xc1ed6:
+ * 0xc1d38(공격 팀 지금 타자가 0xb6389 내 선수인가) 거짓 → 1(자동). 그래서 **동료 타석·상대 반 이닝은 늘 0x21** 이다.
+ * 내 타석이 끝나는 자리(0x4e7ae · 0x528b0 → 0x35108 → 0x350d4)도 `0xc1e04` 가 참(다음이 자동)이면 다음 상태
+ * +0x1b6c 를 **0x21** 로 덮는다 — 다음 타자는 늘 동료나 상대라 내 타석 뒤에는 늘 0x21 진입(0x8f628)이 온다.
  *
- * 판정도 같은 자리를 따라간다 — 동료·상대 타석에서 뜬 돌발은 **그 타석 결과로** 판정된다
- * (0x8f414 는 타석이 끝나는 자리마다 돈다).
+ * ⚠️ K 4절 1-6 의 "매 타석 시작 때" 는 **0xf 를 지나는 타석마다** 라는 뜻이다. 예전 웹은 이것을 동료·상대 타석까지로
+ * 읽어 세 자리(내 타석·동료 `playTeammateAtBat`·상대 `onAtBatStart`)에서 굴리고 판정했다 — 원본에 없는 굴림이었다.
  *
  * 상대 마선수(b0=10~22)는 웹판 로스터가 아직 들고 있지 않아 그 조건 행은 걸리지 않는다.
  */
@@ -904,17 +918,50 @@ function advanceUntilPlayerTurn(
   for (let step = 0; step < MAXIMUM_AUTO_STEPS; step += 1) {
     if (current.game.isFinished) return current
     // 내 타석이 오면 그 자리가 곧 타석 준비(0xf)다 — 돌발을 굴리고 넘긴다
-    if (isPlayerTurn(current.game)) {
-      // 사람 타석 시작 0x3d954 — 수비(상대)가 CPU 라 먼저 CPU 투수 교체(0xac428, 0x3da3e)를 보고,
-      // 메시지 1 뒤에 돌발(0x8f158)을 굴린다 (R10 상태 0xf 표)
-      return triggerBurstForMyAtBat(changeOpponentPitcher(current, random), random)
-    }
+    if (isPlayerTurn(current.game)) return prepareMyAtBat(current, random)
+    // 내 차례가 아니면 원본은 자동진행(0x21)이다 — 진입 0x3abf0 이 남은 돌발을 판정 없이 내린다 (0x8f628).
+    // 동료·상대 타석은 0xf 를 안 지나므로 돌발을 굴리지도 판정하지도 않는다 (`burstContextOf` 머리말)
+    current = withoutPendingBurst(current)
     // 우리가 공격하는 반 이닝은 측이 정한다 — '초' 고정이 아니다 (측 0 선공 · 측 1 후공)
     current = current.game.half === ourHalfOf(current.game)
       ? playTeammateAtBat(current, random)
       : playOpponentInning(current, random)
   }
   throw new Error('경기 자동 진행이 끝나지 않았습니다 — 진행 규칙을 확인하세요')
+}
+
+/**
+ * 내 타석 준비 — 상태 0xe 확인(메시지 1) → 0xf 진입 `0x3d954` 차례 (디스어셈 0x50c18~0x50c56).
+ * ```
+ * 0x50c26  0xbcb48(…, 0xf)  — 0xf 를 **예약만** 한다 (다음 틱에 옮김)
+ * 0x50c42  돌발 객체가 있으면 0x8f158 — 뜨면 예약을 0x1b(돌발 창)로 덮는다
+ * (다음 틱) 0xf 진입 0x3d954: 수비 팀이 CPU(3d9e4) → 돌발 진행 중(0x8eb94, 3d9fc)이면 건너뜀,
+ *           아니면 CPU 투수 교체 0xac428(3da3e). 바뀌면 0x16 → 0xd → 0xe → 메시지 1 → **0x8f158 을 다시** → 0xf 진입
+ * ```
+ * 그래서 돌발 굴림이 상대 투수 교체보다 **앞**이고, 돌발이 뜨면 교체는 보지 않는다. 교체가 나면 돌발을 한 번 더 굴린 뒤
+ * 0xf 진입을 다시 지난다 (팀 경기 `readyAtBat`·`enterPitchSelection` 과 같은 차례).
+ */
+function prepareMyAtBat(progress: GameProgress, random: RandomPort): GameProgress {
+  let current = triggerBurstForMyAtBat(progress, random)
+  // 0xf 진입은 교체가 날 때마다 다시 온다 — 바뀐 쪽 막음 칸(state[0xd])이 서 있어 두 번째 판정에서 멈춘다
+  for (let entry = 0; entry < MAXIMUM_SUBSTITUTION_CALLS; entry += 1) {
+    if (current.game.isFinished) return current
+    if (current.burst !== null && current.burst.current !== null) return current
+    const changed = changeOpponentPitcher(current, random)
+    if (changed === current) return current
+    current = triggerBurstForMyAtBat(changed, random)
+  }
+  return current
+}
+
+/**
+ * 자동진행(0x21) 진입 0x3abf0 의 `0x8f628` — 판정 못 받고 남은 돌발을 내린다. 굴림 없음.
+ * 내 타석에서 뜬 돌발이 결과비트 0 으로 살아남았을 때만 일이 있다 (`cancelBurst` 머리말).
+ */
+function withoutPendingBurst(progress: GameProgress): GameProgress {
+  if (progress.burst === null) return progress
+  const burst = cancelBurst(progress.burst)
+  return burst === progress.burst ? progress : { ...progress, burst }
 }
 
 /**
@@ -926,9 +973,8 @@ function advanceUntilPlayerTurn(
  * (`0xaf020` 의 `mod 9`) — 로스터 열두 명 중 뒤 셋(벤치)은 타순에 안 선다.
  */
 function playOpponentInning(progress: GameProgress, random: RandomPort): GameProgress {
-  // 상대 타석도 장면 상태 0xf 를 지나므로 타석마다 돌발을 굴리고, 그 타석 결과로 판정한다
-  let burst = progress.burst
-  let resolution: BurstResolution | null = null
+  // 상대 반 이닝은 모드 4 에서 늘 자동진행(0x21, 0xc1ed6)이라 상태 0xf 를 안 지난다 —
+  // 돌발을 굴리지도(0x8f158) 판정하지도(0x8f414) 않는다 (`burstContextOf` 머리말)
   const half = simulateHalfInning(
     progress.opponentOrderIndex,
     (order) => batterAt(progress.opponentTeamId, order % BATTING_ORDER_SIZE),
@@ -936,31 +982,7 @@ function playOpponentInning(progress: GameProgress, random: RandomPort): GamePro
     progress.game.inning,
     random,
     { strikeoutCombo: progress.pitching.strikeoutCombo, strikeouts: progress.pitching.strikeouts },
-    {
-      onAtBatStart: (state) => {
-        if (burst === null) return
-        burst = tryTriggerBurst(
-          burst,
-          burstContextOf(progress, {
-            isHumanTeamBatting: false,
-            bases: state.bases,
-            outs: state.outs,
-            opponentBattingSlot: state.battingOrderIndex % BATTING_ORDER_SIZE,
-            // 상대 타자의 이번 경기 안타·홈런 칸을 웹판이 아직 안 들고 있다 (기록 +0x12·+0x13)
-            hitsInGame: 0,
-            homeRunsInGame: 0,
-            strikeoutsInGame: state.strikeoutsSoFar,
-          }),
-          random,
-        )
-      },
-      onAtBatEnd: (state) => {
-        if (burst === null) return
-        const judged = resolveBurst(burst, burstResultBitsOf(state))
-        burst = judged.session
-        if (judged.judgement !== null) resolution = judged
-      },
-    },
+    {},
     // 우리 투수도 CPU 가 던진다 — 타석마다 0xc1ba4 → 0xac428 교체, 투구마다 0xa5e14 소모
     quickDefenseOf(
       progress.ourTeamId,
@@ -996,8 +1018,6 @@ function playOpponentInning(progress: GameProgress, random: RandomPort): GamePro
       opponentLineup: half.lineup ?? progress.opponentLineup,
       pinchHitUsed: half.pinchHitUsed ?? progress.pinchHitUsed,
       homeRunStreak,
-      burst,
-      lastBurstResolution: resolution ?? progress.lastBurstResolution,
       pitching: {
         hitsAllowed: progress.pitching.hitsAllowed + half.hits,
         walksAllowed: progress.pitching.walksAllowed + half.walks,
@@ -1039,26 +1059,7 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort): GameProg
     if (substituted === progress) break
     progress = substituted
   }
-  // 상태 0xf — 동료 타석 준비에서도 돌발을 굴린다 (K 4절 1-6)
-  const slotBefore = progress.game.battingOrderIndex
-  const logBefore = progress.teammateLogs[slotBefore] ?? EMPTY_BATTER_GAME_LOG
-  const triggered =
-    progress.burst === null
-      ? null
-      : tryTriggerBurst(
-          progress.burst,
-          burstContextOf(progress, {
-            isHumanTeamBatting: true,
-            bases: progress.game.bases,
-            outs: progress.game.outs,
-            // 상대 타순 슬롯(team+0x32)은 우리 공격 중에도 상대 팀의 다음 타자 자리를 가리킨다
-            opponentBattingSlot: progress.opponentOrderIndex,
-            hitsInGame: logBefore.stats.hits,
-            homeRunsInGame: logBefore.stats.homeRuns,
-            strikeoutsInGame: progress.pitching.strikeouts,
-          }),
-          random,
-        )
+  // 동료 타석은 자동진행(0x21) 안의 간이 타석이라 상태 0xf 를 안 지난다 — 돌발 굴림(0x8f158)·판정(0x8f414) 없음
   const opponentDefense = opponentQuickDefenseOf(progress)
   const mound = progress.opponentMound
   const play = playQuickAtBat(
@@ -1089,25 +1090,6 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort): GameProg
     humanOffense: true,
     isHomeRun: outcome.kind === '홈런',
   })
-  // 타석이 끝나는 자리 — 동료 타석에서 뜬 돌발도 **그 타석 결과로** 판정된다 (0x8f414)
-  const outsAdded = advanceRunners(progress.game.bases, outcome, progress.game.outs, {
-    quickEngine: true,
-  }).outsAdded
-  const resolved =
-    triggered === null
-      ? null
-      : resolveBurst(
-          triggered,
-          burstResultBitsOf({
-            outcome,
-            runsBattedIn,
-            outsBefore: progress.game.outs,
-            outsAdded,
-            inningEnded: progress.game.outs + outsAdded >= OUTS_PER_INNING,
-            humanTeamWalkOff:
-              game.isFinished && runsBattedIn > 0 && game.ourScore > game.opponentScore,
-          }),
-        )
 
   return appendLog(
     {
@@ -1115,9 +1097,6 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort): GameProg
       game,
       // 간이 엔진 득점(0xc0fb4·0xc1054)도 같은 0xa5c34 를 부른다
       decisions: decisionsAfterPlay(progress.decisions, progress.game, game, moundsOf(progress)),
-      burst: resolved === null ? triggered ?? progress.burst : resolved.session,
-      lastBurstResolution:
-        resolved !== null && resolved.judgement !== null ? resolved : progress.lastBurstResolution,
       teammateLogs: { ...progress.teammateLogs, [slot]: recorded.log },
       ourLineup: recordLineupPlay(progress.ourLineup, slot, outcome, runsBattedIn),
       opponentMound: {

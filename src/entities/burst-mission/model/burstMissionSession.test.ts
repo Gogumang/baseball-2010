@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   MAXIMUM_BURSTS_PER_GAME,
   canTriggerBurst,
+  cancelBurst,
   createBurstSession,
   resolveBurst,
   tryTriggerBurst,
@@ -141,5 +142,25 @@ describe('판정 (0x8f414) — 타석이 끝날 때', () => {
     const session = createBurstSession(BURST_MODE.나리타자)!
 
     expect(resolveBurst(session, B.홈런)).toEqual({ session, row: null, judgement: null, deltas: [] })
+  })
+})
+
+describe('판정 없이 내리기 (0x8f628) — 자동진행 진입·반 이닝 교대', () => {
+  const 발동된세션 = () =>
+    tryTriggerBurst(createBurstSession(BURST_MODE.나리타자)!, 상황, 언제나통과(), [안타미션])
+
+  it('현재 행과 결과 상태만 비운다 — 발동 횟수는 그대로라 이 경기에서는 다시 안 뜬다', () => {
+    const 내림 = cancelBurst(발동된세션())
+
+    expect(내림.current).toBeNull()
+    expect(내림.judgement).toBeNull()
+    expect(내림.triggeredCount).toBe(1)
+    expect(canTriggerBurst(내림)).toBe(false)
+  })
+
+  it('내릴 것이 없으면 같은 세션을 돌려준다', () => {
+    const session = createBurstSession(BURST_MODE.나리타자)!
+
+    expect(cancelBurst(session)).toBe(session)
   })
 })

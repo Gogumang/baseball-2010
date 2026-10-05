@@ -60,7 +60,12 @@ import {
 import type { PitcherGameRecord } from '@/entities/pitcher-career/model/pitcherGameRecord'
 import { MAGIC_PITCH_TYPE_NUMBER } from '@/entities/pitcher-career/model/magicPitch'
 import { staminaPercentOf } from '@/entities/pitcher-career/model/pitcherStamina'
-import { createBurstSession, resolveBurst, tryTriggerBurst } from '@/entities/burst-mission/model/burstMissionSession'
+import {
+  cancelBurst,
+  createBurstSession,
+  resolveBurst,
+  tryTriggerBurst,
+} from '@/entities/burst-mission/model/burstMissionSession'
 import type { BurstResolution, BurstSession } from '@/entities/burst-mission/model/burstMissionSession'
 import { burstResultBitsOf } from '@/entities/burst-mission/model/burstResultBits'
 import {
@@ -120,7 +125,7 @@ import type { PitcherOfRecordNames } from '@/features/play-game/model/gameDecisi
  * 0xf  구질 고르기   ← 0xe → 0xf 전이에서 **돌발 발동 판정 0x8f158**. 참이면 0x1b(돌발 창)
  * 0x10 코스 고르기   ← 확정(OK)에서 마구 횟수가 줄어든다 (0x50e9c)
  * 0x11 게이지 + 투구
- * 0x12 / 0x13       못 맞힌 공 / 맞은 공 — 타석이 끝나면 **돌발 결과 판정 0x8f414**
+ * 0x12 / 0x13       못 맞힌 공 / 맞은 공 — 타석이 끝나면 **돌발 결과 판정 0x8f414** (0x12 끝 · 0x17 끝)
  * 0x17 인플레이
  * 0x18 공수 교대 · 경기 끝
  * 0x21 강판 뒤 자동진행 (간이 엔진이 남은 경기를 끝까지)
@@ -1106,15 +1111,11 @@ function applyDefensivePlay(
     endedInningIndex: applied.game.inning - 1,
   }
 
-  // 0x8f414 는 **타석이 끝나는 자리마다** 돈다 — 동료·상대 타석에서 뜬 돌발도 그 결과로 판정된다
-  const resolved = resolveBurstFor(
-    next,
-    outcome,
-    applied.runsScored,
-    before.outs,
-    applied.outsAdded,
-    inningEnded,
-  )
+  // 0x8f414 는 사람 장면의 타석 끝(0x12 갱신 0x4e6d4 · 0x17 끝 0x528b0)에서만 돈다 — 내가 던진 타석만.
+  // 내가 마운드에 없는 타석은 간이 엔진(0x21)이라 판정이 없다 (`triggerBurstAtPrep` 머리말)
+  const resolved = mine
+    ? resolveBurstFor(next, outcome, applied.runsScored, before.outs, applied.outsAdded, inningEnded)
+    : next
   const halfChanged = applied.game.half !== before.half || applied.game.inning !== before.inning
   const closed: PitcherGameProgress = halfChanged
     ? {
@@ -1270,23 +1271,26 @@ function prepareAtBat(progress: PitcherGameProgress, random: RandomPort): Pitche
     }
   }
 
-  return { ...triggerBurstAtPrep(progress, false, random), hookFlags: hook.flags, atBatPrepared: true }
+  return { ...triggerBurstAtPrep(progress, random), hookFlags: hook.flags, atBatPrepared: true }
 }
 
 /**
  * 상태 0xf(타석 준비)의 **돌발 발동 판정** (0x8f158).
  *
- * 원본은 경기 장면이 지나는 **모든 타석** 준비에서 굴린다 (K 4절 1-6, 확정) — 내가 던지는 타석뿐
- * 아니라 동료 타석·내가 마운드에 없는 수비 타석도 같은 자리를 지난다. 예전에는 내가 던지는
- * 타석에서만 굴려 발동이 원본보다 드물었다.
- *
- * 다만 **강판 뒤(상태 0x21 = 간이 엔진 중계)에는 0xf 를 지나지 않는다** — 그래서 굴리지 않는다.
+ * ## 굴리는 타석은 **내가 던지는 타석뿐** (2026-10-05 디스어셈 전수)
+ * 0x8f158 을 부르는 곳은 메시지 1 "확인" 의 인자 0xe 갈래 한 곳(리터럴 0x50d8c ← 0x50c42)뿐이다 — 상태 0xe → 0xf.
+ * 판정 0x8f414 도 사람 장면의 두 자리(0x12 갱신 0x4e6d4 · 0x17 끝 0x528b0)뿐이고, 간이 엔진 0xc262c · 0x21 갱신
+ * 0x48480 의 호출 그래프에는 둘 다 없다. 모드 3 의 사람 장면 판정 0xc1e04 → 점프표 0xd90c0 칸 2 = 0xc1eac:
+ * ```
+ * 공격 팀이 사람 팀(st[0x31+st[9]] == 0) → 1 (자동)          ; 동료 타석은 늘 0x21
+ * 아니면 0xc1d38 — 수비 팀 지금 투수가 0xb6389 내 선수인가 → 참 0 (사람) · 거짓 1 (자동)
+ * ```
+ * 그래서 동료 타석·내가 마운드에 없는 수비 타석(구원 대기·선발 아닌 날·강판 뒤)은 모두 0x21 이라 굴리지 않는다.
+ * 타석 끝(0x4e7ae · 0x528b0 → 0x35108 → 0x350d4)도 다음이 자동이면 다음 상태를 0x21 로 덮는다.
+ * ⚠️ 예전 웹은 K 4절 1-6 "매 타석 시작 때" 를 동료·수비 자동 타석까지로 읽어 거기서도 굴렸다 — 원본에 없는 굴림이었다.
+ * 남은 돌발은 자동 타석 앞(0x21 진입 0x3abf0 · 0x18 진입 0x3ac90 의 0x8f628)에서 내린다 (`withoutPendingBurst`).
  */
-function triggerBurstAtPrep(
-  progress: PitcherGameProgress,
-  isHumanTeamBatting: boolean,
-  random: RandomPort,
-): PitcherGameProgress {
+function triggerBurstAtPrep(progress: PitcherGameProgress, random: RandomPort): PitcherGameProgress {
   const session = progress.burst
   if (session === null || progress.simpleEngineRunning) return progress
   const log = progress.opponentBatterLogs[progress.opponentOrderIndex] ?? { hits: 0, homeRuns: 0 }
@@ -1294,8 +1298,8 @@ function triggerBurstAtPrep(
     session,
     {
       // 투수편 XlsPITCHER_BURST 44행의 목표는 전부 아웃 계열이라 사람 팀 공격 갈래가 따로 없다
-      // (표를 가르는 것은 시즌 모드뿐 — 0x8f000)
-      isHumanTeamBatting,
+      // (표를 가르는 것은 시즌 모드뿐 — 0x8f000). 내가 던지는 타석은 늘 상대 공격이다
+      isHumanTeamBatting: false,
       bases: progress.game.bases,
       outs: progress.game.outs,
       // 원본 이닝은 0-기준이다 (game+0x6b)
@@ -1388,7 +1392,8 @@ function advance(progress: PitcherGameProgress, random: RandomPort): PitcherGame
     if (current.managerHookText !== null) return current
 
     if (current.game.half === ourHalfOf(current.game)) {
-      current = markAuto(playTeammateAtBat(current, random))
+      // 우리 공격은 모드 3 에서 늘 자동진행(0x21, 0xc1eac) — 진입 0x3abf0 이 남은 돌발을 내린다 (0x8f628)
+      current = markAuto(playTeammateAtBat(withoutPendingBurst(current), random))
       continue
     }
 
@@ -1407,9 +1412,21 @@ function advance(progress: PitcherGameProgress, random: RandomPort): PitcherGame
         autoSinceHuman: false,
       }
     }
-    current = markAuto(playDefensiveAtBat(current, random))
+    // 내가 마운드에 없는 수비 타석도 자동진행(0x21) — 같은 진입이 남은 돌발을 내린다
+    current = markAuto(playDefensiveAtBat(withoutPendingBurst(current), random))
   }
   throw new Error('투수편 경기 자동 진행이 끝나지 않았습니다 — 진행 규칙을 확인하세요')
+}
+
+/**
+ * 자동진행(0x21) 진입 0x3abf0 · 공수 교대(0x18) 진입 0x3ac90 의 `0x8f628` — 판정 못 받고 남은 돌발을 내린다. 굴림 없음.
+ * 모드 3 에서 사람 장면(내가 던지는 수비 반 이닝) 뒤에는 늘 자동 타석(우리 공격·강판 뒤)이 오므로
+ * 자동 타석 앞에서 한 번 내리면 두 자리를 다 덮는다 (`cancelBurst` 머리말).
+ */
+function withoutPendingBurst(progress: PitcherGameProgress): PitcherGameProgress {
+  if (progress.burst === null) return progress
+  const burst = cancelBurst(progress.burst)
+  return burst === progress.burst ? progress : { ...progress, burst }
 }
 
 /** 사람이 안 잡은 타석(간이 엔진)이 지났다는 표시 */
@@ -1520,19 +1537,18 @@ function playDefensiveAtBat(
   random: RandomPort,
 ): PitcherGameProgress {
   const { options } = progress
-  // 상태 0xf — 내가 마운드에 없어도 장면은 타석 준비를 지난다 (강판 뒤 0x21 은 제외)
-  const prepared = triggerBurstAtPrep(progress, false, random)
+  // 내가 마운드에 없는 수비 타석은 자동진행(0x21) 안의 간이 타석 — 상태 0xf 를 안 지나 돌발을 굴리지 않는다
   const play = playQuickAtBat(
-    batterAt(options.opponentTeamId, prepared.opponentOrderIndex),
+    batterAt(options.opponentTeamId, progress.opponentOrderIndex),
     quickPitcherAt(options.ourTeamId, ourOtherPitcherIndex(options)),
-    { inning: prepared.game.inning },
+    { inning: progress.game.inning },
     random,
   )
   return applyDefensivePlay(
     {
-      ...prepared,
+      ...progress,
       atBatPitches: play.pitches,
-      halfInningPitches: prepared.halfInningPitches + play.pitches,
+      halfInningPitches: progress.halfInningPitches + play.pitches,
     },
     play.outcome,
     false,
@@ -1549,8 +1565,7 @@ function playTeammateAtBat(
   random: RandomPort,
 ): PitcherGameProgress {
   const { options } = progress
-  // 상태 0xf — 동료 타석 준비에서도 굴린다 (K 4절 1-6)
-  progress = triggerBurstAtPrep(progress, true, random)
+  // 동료 타석은 자동진행(0x21) 안의 간이 타석 — 상태 0xf 를 안 지나 돌발 굴림(0x8f158)·판정(0x8f414)이 없다
   const before = progress.game
   const outcome = playQuickAtBat(
     batterAt(options.ourTeamId, before.battingOrderIndex),
@@ -1571,17 +1586,6 @@ function playTeammateAtBat(
   }
   const slot = before.battingOrderIndex
   const halfChanged = game.half !== before.half || game.inning !== before.inning
-  const outsAdded = advanceRunners(before.bases, outcome, before.outs, { quickEngine: true }).outsAdded
-  // 타석이 끝나는 자리 — 동료 타석에서 뜬 돌발도 그 타석 결과로 판정된다 (0x8f414)
-  const judged = resolveBurstFor(
-    // 끝내기 비트(0xa89f0)는 **타석이 끝난 뒤의** 점수로 본다
-    { ...progress, game },
-    outcome,
-    runs,
-    before.outs,
-    outsAdded,
-    before.outs + outsAdded >= OUTS_PER_INNING,
-  )
   // 모드 3 은 내 팀 전체가 사람 팀이라 **공격 게이트도 열린다** (0x3a20a) —
   // 간이 엔진이 돌린 동료 타석도 같은 0xa8024 를 지나 타격 기록(0~15·34·35)이 된다 (R8 1절·8절).
   const recorded = recordBatterAtBat(
@@ -1592,8 +1596,6 @@ function playTeammateAtBat(
   return appendLog(
     {
       ...progress,
-      burst: judged.burst,
-      lastBurstResolution: judged.lastBurstResolution,
       game,
       decision,
       endedInningIndex: game.inning - 1,

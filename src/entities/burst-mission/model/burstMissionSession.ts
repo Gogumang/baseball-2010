@@ -99,3 +99,18 @@ export function resolveBurst(session: BurstSession, resultBits: number): BurstRe
     deltas: burstRewardDeltasOf(row, judgement),
   }
 }
+
+/**
+ * 진행 중인 돌발을 **판정 없이 내린다** — `0x8f628(돌발)`: obj+0x21c(결과 상태) = −1, obj+0xc(현재 행) = −1.
+ *
+ * 디스어셈(0x8f628~0x8f636)은 이 두 칸만 쓴다 — 발동 횟수 obj+0x228 은 그대로라 **경기당 한 번은 이미 쓴 것**이 되고,
+ * 보상·페널티·대사·효과음도 없다. 굴림도 없다.
+ * 부르는 곳은 둘뿐이다 (리터럴 0x3ac8c · 0x3adfc 전수):
+ * - 상태 0x21(자동진행) 진입 `0x3abf0` — 사람 장면에서 자동 타석으로 넘어갈 때마다.
+ * - 상태 0x18(공수 교대) 진입 `0x3ac90` — 경기가 안 끝났고 `0xb6b6c`(아웃 > 2 → 초/말 뒤집기)가 참일 때.
+ * 그래서 사람 타석에서 뜬 돌발이 결과비트 0 으로 판정을 못 받고 남으면, 다음 자동 타석이나 반 이닝 교대에서 사라진다.
+ */
+export function cancelBurst(session: BurstSession): BurstSession {
+  if (session.current === null && session.judgement === null) return session
+  return { ...session, current: null, judgement: null }
+}
