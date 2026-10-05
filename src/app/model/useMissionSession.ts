@@ -36,11 +36,11 @@ import { rollsIntoBenchClearing } from '@/entities/game/model/benchClearing'
 import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
 import { BATTER_SLOT, gameAbilityOf } from '@/features/play-team-game/model/gameAbilities'
 import { isMistakePitch } from '@/entities/pitching/model/mistakePitch'
-import { MAGIC_PITCH_TYPE_NUMBER } from '@/entities/pitcher-career/model/magicPitch'
+import { MAGIC_PITCH_TYPE_NUMBER, ballMagicNumberAfterPitch } from '@/entities/pitcher-career/model/magicPitch'
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
 import { buildHumanPitch, pitchGradeOf } from '@/features/play-pitcher-game/model/pitcherPitch'
-import { modePitcherOf } from '@/app/model/modePitcher'
+import { isModeMagicPitchType, modePitcherMagicRemainingOf, modePitcherOf } from '@/app/model/modePitcher'
 import type { ModePitcher } from '@/app/model/modePitcher'
 import { ROOKIE_BATTER_ABILITY } from '@/entities/batting/model/batter'
 import { isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
@@ -262,6 +262,18 @@ export function useMissionSession({
    */
   const [batterSpecialSwingStored, setBatterSpecialSwingStored] = useState(UNFILLED_SPECIAL_SWING)
   const [opponentSpecialSwingStored, setOpponentSpecialSwingStored] = useState(UNFILLED_SPECIAL_SWING)
+  /**
+   * **투수 미션 마구 남은 칸** s8 팀[+0x28] — −1 = 안 채움(팀 new 0xb891c). 0xaebe4 가 미션 투수로 채우고
+   * (`modePitcherMagicRemainingOf`) 코스 확정 0x50e9c 가 줄인다. 미션 한 판(새 경기)마다 −1 로 돌아간다.
+   */
+  const [pitcherMagicStored, setPitcherMagicStored] = useState(UNFILLED_SPECIAL_SWING)
+  /**
+   * **공 객체 +0x10** — 투수 미션 사람 공에 실린 마구 번호 (0x3de10). 되돌리는 줄이 없어 마구 뒤 공에도 남는다(H2 3-4).
+   * 경기 시작 0 (0x1239 new 의 0 채움은 원본 미확인 — 팀 경기 `ballMagicNumber` 와 같다).
+   * 미션에서는 CPU 가 이 공을 던질 일이 없다 — 투수 미션은 사람만 던지고 타자 미션은 사람이 안 던진다.
+   */
+  const [ballMagicNumber, setBallMagicNumber] = useState(0)
+  const pitcherMagicRemaining = modePitcherMagicRemainingOf(pitcherMagicStored, pitcher)
   /** 결과를 확인하고 돌아갈 때 마지막으로 한 편의 목록을 연다 */
   const [lastSide, setLastSide] = useState<OriginalMission['side']>('타자')
   const [clearCounts, setClearCounts] = useState<MissionClearCounts>(() => missionRecord.load())
@@ -398,8 +410,13 @@ export function useMissionSession({
     // 벤치 클리어링 연출(0x1e)이 도는 동안에도 다음 공은 없다
     if (pendingBenchClearing !== null) return
 
-    // 원본 구질 번호 1~21. 표에 없는 이름이면 1(FASTBALL)로 둔다
-    const typeNumber = Math.max(1, PITCH_TYPES.findIndex((candidate) => candidate.name === type.name) + 1)
+    // 원본 구질 번호 1~21, 메뉴의 마구 칸은 22 (0xb6d6a). 표에 없는 이름이면 1(FASTBALL)로 둔다
+    const isMagic = isModeMagicPitchType(type)
+    const typeNumber = isMagic
+      ? MAGIC_PITCH_TYPE_NUMBER
+      : Math.max(1, PITCH_TYPES.findIndex((candidate) => candidate.name === type.name) + 1)
+    // 0x50db8 — 구질 22 는 남은 마구(0xaea10) > 0 일 때만 받는다. 아니면 무시 (난수 없음)
+    if (isMagic && pitcherMagicRemaining <= 0) return
     // 게이지를 쓰면 칸에서 t = max(g−4, 1) 을, 안 쓰면 제구·체력 확률표 0xd896c 로 뽑는다 (0x4dbac)
     const grade = pitchGradeOf(
       {
@@ -411,10 +428,7 @@ export function useMissionSession({
       },
       random,
     )
-    // 공+0x10(마구 번호, 0x3de10)은 싣지 않는다 — 미션 구질 메뉴에 마구 칸이 없어(`modePitchMenuOf`, 9fe86db)
-    // 구질 22 가 나올 길이 없으니 원본도 0 그대로다. ⚠️ 마구 칸이 열리면 남은 횟수(0xaebe4 · 0xd84ff/0xd8509)와
-    // 코스 확정 소모 0x50e9c → 0x3de10 싣기(`ballMagicNumberAfterPitch`, 되돌리지 않음)를 여기 이어야 한다
-    const pitch = buildHumanPitch(
+    const builtPitch = buildHumanPitch(
       {
         typeNumber,
         courseCell,
@@ -428,6 +442,23 @@ export function useMissionSession({
       },
       random,
     )
+    // 코스 확정 0x50e9c 가 남은 마구를 먼저 줄이고(`0xae9c4(팀, 남은−1)`), 상태 0x11 진입 0x3de10 이 그 **뒤**에
+    // `구질 == 22 && 남은 > 0` 이면 공+0x10 = 투수 +0x18 — 마지막 한 개(1 → 0)는 안 싣는다. 되돌리는 줄이 없다 (H2 3-4).
+    // CPU 타석 판정의 보정 구조체 0x34d6c 투수 쪽이 이 칸을 본다 — 미션 투수는 비트7 이라 n = 공+0x10 − 1 칸
+    const magicRemainingAfter = isMagic ? pitcherMagicRemaining - 1 : pitcherMagicRemaining
+    const nextBallMagicNumber = ballMagicNumberAfterPitch(
+      ballMagicNumber,
+      typeNumber,
+      pitcher.repertoire.magicNumber,
+      magicRemainingAfter,
+    )
+    setPitcherMagicStored(magicRemainingAfter)
+    setBallMagicNumber(nextBallMagicNumber)
+    const pitch = {
+      ...builtPitch,
+      magicNumber: nextBallMagicNumber,
+      pitcherMagicNumber: pitcher.repertoire.magicNumber,
+    }
     // 실투 판정 0x33cbc — 투구 순간 0x4dc78 이 궤적 준비 0x9e669 **뒤**(0x4dea0)에 부른다.
     // 미션도 같은 투구 길이다(위 주석). 마구가 아니면 rand(0,100) 을 늘 한 번 굴린다.
     const isMistake = isMistakePitch(
@@ -502,8 +533,8 @@ export function useMissionSession({
     const outcome = isAtBatFinished(nextAtBat) ? nextAtBat.outcome : null
     const runsDefense = outcome !== null && isBattedBallInPlay(outcome)
     // 투구 순간 소리 12 (0x3f378 — 투수 단계가 공을 놓는 칸에 닿을 때). 이어서 심판 콜.
-    // ⚠️ 마구 갈래 28 은 잇지 않았다 — 이 자리가 던진 공이 마구인지 알 수 없다
-    //    (`PitchTypeInfo` 에 마구 칸이 없고 미션 투수는 평범한 투수다).
+    // ⚠️ 마구 갈래 28 은 아직 잇지 않았다 — 0x3f378 은 `구질 22 || (마투수 && 공+0x10 ≠ 0)` 이면 28 인데(H2 3-6),
+    //    28 의 뜻은 '유력'이고 팀 경기·투수편 투구음도 아직 12 하나라 함께 정할 일이다.
     // ⚠️ **근사**: 웹은 던지는 순간에 결과가 다 나오므로 투구음과 심판 콜이 붙어 버린다.
     //    통로가 하나라 뒤 소리가 앞 소리를 끊는다 (원본은 공이 날아가는 동안이 사이에 있다).
     playSoundIds(audio, [
@@ -642,9 +673,11 @@ export function useMissionSession({
 
     begin: (mission: OriginalMission) => {
       setLastSide(mission.side)
-      // 새 경기 — 필살 남은 칸은 0xaebe4 가 다시 채운다
+      // 새 경기 — 필살·마구 남은 칸은 0xaebe4 가 다시 채운다 (팀 new 0xb891c 가 −1), 공 객체도 새것
       setBatterSpecialSwingStored(UNFILLED_SPECIAL_SWING)
       setOpponentSpecialSwingStored(UNFILLED_SPECIAL_SWING)
+      setPitcherMagicStored(UNFILLED_SPECIAL_SWING)
+      setBallMagicNumber(0)
       runner.resetAtBat(mission.start)
       runner.setBannerText('')
       runner.setIsPaused(false)
@@ -759,6 +792,6 @@ export function useMissionSession({
   return {
     missionRun, pitcherRun, clearedKeys, clearCounts, lastSide, aceLevels, pitcher,
     missionConditionCode, pendingDefensePlay, pendingBenchClearing, pickoffReplay, handleMissionPitch, handleThrow, actions,
-    batterSpecialSwingStored,
+    batterSpecialSwingStored, pitcherMagicRemaining,
   }
 }

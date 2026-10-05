@@ -126,8 +126,9 @@ export function MissionRoutes({
     return (
       <PitchingScreen
         run={pitcherRun}
-        // 미션 투수(나리 투수편 저장 · 명예 투수)의 구질 칸 0xb6d2c — `modePitcherOf` 를 세션이 들고 있다
-        repertoire={modePitchMenuOf(session.pitcher)}
+        // 미션 투수(나리 투수편 저장 · 명예 투수)의 구질 칸 0xb6d2c — `modePitcherOf` 를 세션이 들고 있다.
+        // 칸 5 마구(+0x18 ≠ 0)는 이 미션 한 판의 남은 횟수 팀+0x28 (0xaebe4 가 0xd84ff[+0x18] 로 채운다)과 함께
+        repertoire={modePitchMenuOf(session.pitcher, session.pitcherMagicRemaining)}
         usesGauge={pitchControl === '게이지'}
         atBat={runner.atBat}
         bannerText={runner.bannerText}

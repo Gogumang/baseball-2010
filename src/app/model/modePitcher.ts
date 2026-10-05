@@ -10,6 +10,7 @@ import {
   rookiePitcherAbilityOf,
   rookiePitchMaskOf,
 } from '@/entities/pitcher-career/model/pitcherRegistration'
+import { magicPitchCountOf } from '@/entities/pitcher-career/model/magicPitch'
 import { fatiguedStatsOf, pitchSlotsOf } from '@/features/play-pitcher-game/model/pitcherPitch'
 import { PITCH_TYPES } from '@/shared/config/original/pitchTypes'
 import type { PitchTypeInfo } from '@/shared/config/original/pitchTypes'
@@ -56,6 +57,8 @@ export interface ModePitcher {
   readonly isTimid: boolean
   /** 실투 0x33cbc — 38 냉정 (−10%) */
   readonly isCool: boolean
+  /** 마구 횟수 0xaebe4 — 39 혼신 (투수 비트 23, 장착 `0xb62b4(P, 0x17)`) +2 */
+  readonly hasSpiritSkill: boolean
 }
 
 /** 미션 투수 체력 — 미션 경기에 체력 기록을 두지 않아 늘 100% (useMissionSession `MISSION_STAMINA_PERCENT` 와 같은 추정) */
@@ -65,6 +68,7 @@ const MISSION_STAMINA = 10000
 const STEADY_SKILL = 16
 const TIMID_SKILL = 17
 const COOL_SKILL = 22
+const SPIRIT_SKILL = 23
 
 function rookieModePitcher(): ModePitcher {
   const profile = DEFAULT_PITCHER_ROOKIE_PROFILE
@@ -79,6 +83,7 @@ function rookieModePitcher(): ModePitcher {
     isSteady: false,
     isTimid: false,
     isCool: false,
+    hasSpiritSkill: false,
   }
 }
 
@@ -95,18 +100,58 @@ export function modePitcherOf(career: PitcherCareer | null): ModePitcher {
     isSteady: isPitcherSkillEquipped(career, STEADY_SKILL),
     isTimid: isPitcherSkillEquipped(career, TIMID_SKILL),
     isCool: isPitcherSkillEquipped(career, COOL_SKILL),
+    hasSpiritSkill: isPitcherSkillEquipped(career, SPIRIT_SKILL),
   }
 }
 
 /**
- * 투구 화면 구질 메뉴 — 구질 칸 6개 `0xb6d2c`(`pitchSlotsOf`) 중 빈 칸이 아닌 일반 구질을 칸 차례대로.
- * 예전에는 미션 투수가 늘 `PITCH_TYPES` 앞 다섯(FASTBALL~SHOOT)을 던졌다.
- * ⚠️ 미해결: 마구 칸(칸 5, +0x18 ≠ 0)은 뺀다 — 웹 미션은 마구 남은 횟수(타석 교대 0xaebe4)를 들고 있지 않고,
- *    투구 화면이 받는 `PitchTypeInfo` 에 마구 자리가 없다.
+ * **미션 투수의 한 경기 마구 횟수** — 팀+0x28 (0xaea10). 미션도 보통 경기 장면이라 팀 new 0xb891c 가 칸을 −1 로 두고
+ * 첫 타석 준비(상태 0xd 0x48d50 → 0xaebe4 aee9a~aef24)가 마운드 투수로 채운다:
+ * `+0x18 == 0 → 0`, 마선수가 아니므로(미션 투수는 비트7 — 0xb633d 거짓) u8 0xd84ff[+0x18] = 0·4·5·6·7, 혼신(23 장착) +2.
+ * 미션은 투수가 바뀌지 않아 한 판에 한 번 주어진다. `stored` 가 0 이상이면(이미 채워 줄인 값) 그대로다.
  */
-export function modePitchMenuOf(pitcher: ModePitcher): readonly PitchTypeInfo[] {
+export function modePitcherMagicRemainingOf(stored: number, pitcher: ModePitcher): number {
+  if (stored >= 0) return stored
+  return magicPitchCountOf({
+    number: pitcher.repertoire.magicNumber,
+    isAce: false,
+    aceLevel: 0,
+    hasSpiritSkill: pitcher.hasSpiritSkill,
+  })
+}
+
+/** `modePitchMenuOf` 가 만든 마구 칸 — 화면이 돌려준 항목이 마구인지 가른다 (구질 표에 마구 자리가 없어서) */
+const MAGIC_MENU_ITEMS = new WeakSet<PitchTypeInfo>()
+
+/** 화면이 돌려준 구질이 `modePitchMenuOf` 의 마구 칸(구질 22)인가 */
+export function isModeMagicPitchType(type: PitchTypeInfo): boolean {
+  return MAGIC_MENU_ITEMS.has(type)
+}
+
+/**
+ * 투구 화면 구질 메뉴 — 구질 칸 6개 `0xb6d2c`(`pitchSlotsOf`) 중 빈 칸이 아닌 것을 칸 차례대로.
+ * 예전에는 미션 투수가 늘 `PITCH_TYPES` 앞 다섯(FASTBALL~SHOOT)을 던졌다.
+ *
+ * 마구 칸(칸 5, `+0x18 ≠ 0` 이면 0xb6d6a 가 22 를 넣는다)도 넣는다 — 키 '0' → 메시지 7 → 0x50da8 은 모드를 안 보고,
+ * `구질 == 22` 면 남은 횟수(0xaea10) > 0 일 때만 받는다(0x50db8). 이름은 번호·폼으로 고른 StrCOMMON 이름에
+ * 남은 횟수를 붙인다. 구질 표(`PitchTypeInfo`)에 마구 자리가 없어 구속·변화 칸은 0 이다 — 고른 뒤 무엇을 던질지는
+ * 부르는 쪽이 `isModeMagicPitchType` 으로 가른다.
+ * ⚠️ 근사: 투구 화면(pages/pitching)이 칸을 막는 기능이 없어, 남은 0 일 때는 고른 뒤 던질 때 무시한다(0x50db8 자리).
+ */
+export function modePitchMenuOf(pitcher: ModePitcher, magicRemaining = 0): readonly PitchTypeInfo[] {
   return pitchSlotsOf(pitcher.repertoire)
-    .filter((slot) => slot.typeNumber !== 0 && !slot.isMagic)
-    .map((slot) => PITCH_TYPES[slot.typeNumber - 1])
+    .filter((slot) => slot.typeNumber !== 0)
+    .map((slot) => {
+      if (!slot.isMagic) return PITCH_TYPES[slot.typeNumber - 1]
+      const item: PitchTypeInfo = {
+        name: `${slot.name} (남은 ${magicRemaining}회)`,
+        horizontalBreak: 0,
+        verticalBreak: 0,
+        speed: 0,
+        flightSteps: [],
+      }
+      MAGIC_MENU_ITEMS.add(item)
+      return item
+    })
     .filter((type): type is PitchTypeInfo => type !== undefined)
 }

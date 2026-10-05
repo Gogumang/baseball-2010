@@ -17,7 +17,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { MISSIONS } from '@/shared/config/original/missions'
 import { PITCH_TYPES } from '@/shared/config/original/pitchTypes'
 import { runPickoffPlay } from '@/features/defense-play/model/pickoffPlay'
-import { modePitcherOf } from '@/app/model/modePitcher'
+import { isModeMagicPitchType, modePitchMenuOf, modePitcherOf } from '@/app/model/modePitcher'
 import type { ModePitcher } from '@/app/model/modePitcher'
 import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 
@@ -541,5 +541,54 @@ describe('미션의 필살 남은 칸 — 0xaebe4 가 채우고 0x4e136 이 줄�
 
   it('일반 타자가 상대인 투수 미션은 필살이 없다 (CPU 일반 타자는 S+0x10 을 안 쓴다)', () => {
     expect(missionOpponentSpecialSwingOf(미션(1, '투수'), -1)).toBeNull()
+  })
+})
+
+/* ── 투수 미션 마구 — 0xb6d6a 칸 5 · 0xaebe4 팀+0x28 · 0x50e9c 소모 · 0x3de10 공+0x10 ─────────────── */
+
+describe('투수 미션 마구 — 남은 횟수 팀+0x28 과 공+0x10', () => {
+  const 마구투수 = modePitcherOf({ ...createPitcherCareer('테스트'), selectedMagicNumber: 2 })
+
+  function 마구세션() {
+    const mission = MISSIONS.find((row) => row.side === '투수' && row.id === 1)
+    if (mission === undefined) throw new Error('투수 미션 1 이 없다')
+    const missionRecord: MissionRecordPort = { load: () => ({}), save: vi.fn() }
+    let screen: Screen = { kind: '미션선택' }
+    const setScreen = vi.fn((next: Screen) => {
+      screen = next
+    })
+    const rendered = renderHook(() =>
+      useMissionSession({
+        runner: useAtBatRunner(), random: createSeededRandom(5), missionRecord, screen, setScreen, pitcher: 마구투수,
+      }),
+    )
+    act(() => rendered.result.current.actions.begin(mission))
+    return { rendered, mission }
+  }
+
+  const 마구칸 = (remaining: number) => modePitchMenuOf(마구투수, remaining).find(isModeMagicPitchType)!
+
+  it('웨이브 볼(+0x18 = 2)은 0xd84ff[2] = 5 회 — 던질 때마다 줄고 다시 세우면 새로 채운다', () => {
+    const { rendered, mission } = 마구세션()
+    expect(rendered.result.current.pitcherMagicRemaining).toBe(5)
+    act(() => rendered.result.current.handleThrow(마구칸(5), 4, 0, false))
+    expect(rendered.result.current.pitcherMagicRemaining).toBe(4)
+    act(() => rendered.result.current.actions.begin(mission))
+    expect(rendered.result.current.pitcherMagicRemaining).toBe(5)
+  })
+
+  it('남은 0 이면 구질 22 를 무시한다 (0x50db8) — 공도 난수도 안 나간다', () => {
+    const { rendered } = 마구세션()
+    for (let thrown = 0; thrown < 5; thrown += 1) {
+      if (rendered.result.current.pitcherRun?.status !== '진행중' || rendered.result.current.pendingDefensePlay !== null) {
+        return
+      }
+      act(() => rendered.result.current.handleThrow(마구칸(5 - thrown), 4, 0, false))
+    }
+    expect(rendered.result.current.pitcherMagicRemaining).toBe(0)
+    if (rendered.result.current.pitcherRun?.status !== '진행중' || rendered.result.current.pendingDefensePlay !== null) return
+    const before = rendered.result.current.pitcherRun
+    act(() => rendered.result.current.handleThrow(마구칸(0), 4, 0, false))
+    expect(rendered.result.current.pitcherRun).toBe(before)
   })
 })

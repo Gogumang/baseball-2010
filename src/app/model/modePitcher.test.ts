@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { modePitchMenuOf, modePitcherOf } from '@/app/model/modePitcher'
+import {
+  isModeMagicPitchType,
+  modePitchMenuOf,
+  modePitcherMagicRemainingOf,
+  modePitcherOf,
+} from '@/app/model/modePitcher'
 import { createPitcherCareer, equippedPitcherAbilityOf } from '@/entities/pitcher-career/model/pitcherCareer'
 import { rookiePitcherAbilityOf } from '@/entities/pitcher-career/model/pitcherRegistration'
 import { PITCH_TYPES } from '@/shared/config/original/pitchTypes'
@@ -41,13 +46,32 @@ describe('투수 미션 투수 — 0x213c0 모드 5→3 나리 투수편 저장 
     expect(modePitcherOf(장착)).toMatchObject({ isSteady: true, isTimid: true, isCool: false })
   })
 
-  it('구질 메뉴는 그 투수의 구질 칸(0xb6d2c)이다 — 마구 칸은 빠진다', () => {
+  it('구질 메뉴는 그 투수의 구질 칸(0xb6d2c)이다 — +0x18 ≠ 0 이면 칸 5 마구(0xb6d6a)가 남은 횟수와 함께 붙는다', () => {
     // 신인 등록은 FASTBALL + 고른 기본 변화구 둘 (칸 1 → 3 H.FAST, 칸 4 → 7 CURVE)
-    const names = modePitchMenuOf(modePitcherOf({ ...투수, selectedMagicNumber: 1 })).map((type) => type.name)
+    const menu = modePitchMenuOf(modePitcherOf({ ...투수, selectedMagicNumber: 1 }), 4)
+    const names = menu.map((type) => type.name)
     expect(names).toContain(PITCH_TYPES[0].name)
     expect(names).toContain(PITCH_TYPES[2].name)
     expect(names).toContain(PITCH_TYPES[6].name)
-    expect(names).toHaveLength(3)
+    expect(names).toHaveLength(4)
+    // 마구 1 = 파이어 볼 (StrCOMMON 31)
+    expect(names[3]).toBe('파이어 볼 (남은 4회)')
+    expect(menu.map(isModeMagicPitchType)).toEqual([false, false, false, true])
+    // 마구를 안 고른 투수는 칸 5 가 비어 있다
+    expect(modePitchMenuOf(modePitcherOf(투수))).toHaveLength(3)
+  })
+
+  it('마구 횟수 0xaebe4 — u8 0xd84ff[+0x18] = 0·4·5·6·7, 혼신(23 장착) +2, 이미 채운 값은 그대로', () => {
+    expect(modePitcherMagicRemainingOf(-1, modePitcherOf(투수))).toBe(0)
+    expect(modePitcherMagicRemainingOf(-1, modePitcherOf({ ...투수, selectedMagicNumber: 1 }))).toBe(4)
+    expect(modePitcherMagicRemainingOf(-1, modePitcherOf({ ...투수, selectedMagicNumber: 4 }))).toBe(7)
+    const 혼신 = modePitcherOf({ ...투수, selectedMagicNumber: 3, skillIds: [23], equippedSkillIds: [23] })
+    expect(혼신.hasSpiritSkill).toBe(true)
+    expect(modePitcherMagicRemainingOf(-1, 혼신)).toBe(8)
+    // 보유만 하고 장착 안 하면 없다 (0xb62b4 는 장착 비트)
+    expect(modePitcherOf({ ...투수, selectedMagicNumber: 3, skillIds: [23] }).hasSpiritSkill).toBe(false)
+    expect(modePitcherMagicRemainingOf(2, 혼신)).toBe(2)
+    expect(modePitcherMagicRemainingOf(-1, modePitcherOf(null))).toBe(0)
   })
 
   it('투수가 없으면 신인 투수(등록 기본 프로필)·스킬 없음 — 원본에 없는 대체', () => {
