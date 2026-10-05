@@ -1,7 +1,9 @@
 import { Panel } from '@/shared/ui'
 import { TEAMS } from '@/shared/config/original/teams'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
-import { GAMES_PER_SEASON, seasonEarnedRunAverageOf } from '@/entities/pitcher-career/model/pitcherCareer'
+import {
+  GAMES_PER_SEASON, hasPitcherSkill, isPitcherSkillEquipped, seasonEarnedRunAverageOf,
+} from '@/entities/pitcher-career/model/pitcherCareer'
 import { staminaPercentOf } from '@/entities/pitcher-career/model/pitcherStamina'
 import { PITCHER_ROLE_LABELS, pitcherRoleChoiceOf } from '@/entities/pitcher-career/model/pitcherRegistration'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
@@ -9,6 +11,10 @@ import {
   gamesUntilNextStartOf,
   todayAssignmentOf,
 } from '@/pages/pitcher-league/model/pitcherGameOptions'
+import {
+  HELPLESSNESS_SKILL_ID, LUCK_SKILL_ID, StatusIconRow, statusIconFramesFrom,
+} from '@/pages/management/ui/StatusIconRow'
+import type { StatusIconState } from '@/pages/management/ui/StatusIconRow'
 import * as styles from '@/pages/pitcher-league/ui/PitcherManagementScreen.css'
 
 /**
@@ -54,10 +60,33 @@ export function nextStartTextOf(career: PitcherCareer): string {
   return gamesUntilNextStartOf(career) === 0 ? '오늘' : `${gamesUntilNextStartOf(career)}경기 뒤`
 }
 
+/**
+ * 상태 아이콘 줄의 조건 — 투수편(모드 3)도 0x7d34c 의 같은 줄을 탄다. 모드 갈림은 시즌(모드 2, 0x7b998) 하나뿐이라
+ * 행운 91 · 이글아이 85 · 질병 86 · 부상 87 · 무력감 88 다섯을 타자편과 똑같이 본다.
+ * 이글아이 칸은 선수 +0x54 를 보지만, 문서상 그 칸을 올리는 곳은 타자 GP 칸 9(이글아이)·시즌 GP 칸 4 뿐이고
+ * 투수편 GP 칸 9 는 십전대보탕(스태미나 100%)이다 (K 104·536줄, P4 6절). 그래서 투수 커리어엔 그 칸이 없고 0 으로 둔다.
+ */
+export function pitcherStatusIconStateOf(career: PitcherCareer): StatusIconState {
+  return {
+    isLuckEquipped: isPitcherSkillEquipped(career, LUCK_SKILL_ID),
+    eagleEyeGamesRemaining: 0,
+    isSick: career.isSick,
+    isInjured: career.isInjured,
+    hasHelplessness: hasPitcherSkill(career, HELPLESSNESS_SKILL_ID),
+  }
+}
+
 export function PitcherStatusBoard({ career }: PitcherStatusBoardProps) {
   const team = TEAMS[career.teamId]?.name ?? ''
+  const iconState = pitcherStatusIconStateOf(career)
   return (
     <>
+      {statusIconFramesFrom(iconState).length > 0 && (
+        <div className={styles.statusIconRow}>
+          {/* 줄 상자가 이미 박스 11 의 y 자리라 세로 원점을 −45 로 되돌린다 */}
+          <StatusIconRow state={iconState} originY={-45} />
+        </div>
+      )}
       <Panel heading={`${career.name} · ${team}`}>
         <Row label="연차" value={`${career.season}년차`} />
         <Row label="경기" value={`${seasonGameOf(career.gamesPlayed)}/${GAMES_PER_SEASON}`} />

@@ -86,3 +86,15 @@ export const tabSelected = style({
   color: ORIGINAL_COLORS.highlightYellow,
   borderColor: ORIGINAL_COLORS.highlightYellow,
 })
+
+/**
+ * 상태 아이콘 줄 자리 — 원본 상태판 0x7d34c 의 박스 11 (4,45,20,19).
+ * ⚠️ 이 화면은 공용 판 근사라 세로 자리는 판 흐름을 따르고, 아이콘 x·22px 간격만 원본 박스대로 둔다.
+ * 본문 안쪽 여백(10px)만큼 왼쪽으로 당겨 화면 x 를 맞춘다.
+ */
+export const statusIconRow = style({
+  position: 'relative',
+  flexShrink: 0,
+  height: '19px',
+  marginLeft: '-10px',
+})
