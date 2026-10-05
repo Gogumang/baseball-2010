@@ -21,8 +21,8 @@ import {
   inPlayCallSoundIdOf,
   pitchCallSoundIdOf,
   walkCheerSoundIdOf,
-  PITCH_RELEASE_SOUND,
 } from '@/features/play-at-bat/model/atBatSounds'
+import { pitchReleaseSoundIdOf } from '@/widgets/batting-stage/lib/pitchReleaseSound'
 import { carryDistanceOf } from '@/entities/batting/model/battedBallFlight'
 import { GAME_INTRO_SOUND, gameResultSoundIdOf } from '@/features/play-game/model/gameSounds'
 // 진행 소리(공수 교대 13 · 돌발 42/36/37)는 팀경기와 같은 자리다 — 같은 경기 장면(0x104)이라
@@ -135,16 +135,21 @@ export function usePitcherGame(
       throwPitch: (input: PitchInput) =>
         step(
           (current) => startPitch(current, input, random),
-          // 투구 순간 소리 12 (0x3f378) → 심판 콜(0x51a94). 통로가 하나라 뒤 소리가 앞을 끊는다.
-          // ⚠️ 마구 갈래 28 은 안 이었다 — 이 자리가 던진 공이 마구인지 가를 칸이 없다
+          // 투구 순간 소리 12 / 마구 28 (0x3f378) → 심판 콜(0x51a94). 통로가 하나라 뒤 소리가 앞을 끊는다.
+          // 내 투수는 육성(rec+0xa 비트7)이라 0xb633d 가 거짓 — 구질 22 일 때만 28 이다
           (before, after) => {
+            const releaseSound = pitchReleaseSoundIdOf({
+              typeNumber: input.typeNumber,
+              pitcherMagicNumber: after.lastPitch?.pitcherMagicNumber ?? 0,
+              ballMagicNumber: after.lastPitch?.magicNumber ?? 0,
+            })
             const resolution = after.lastResolution
-            if (resolution === null) return [PITCH_RELEASE_SOUND]
+            if (resolution === null) return [releaseSound]
             // 진행기가 타석이 끝나면 볼카운트를 새 타석으로 되돌리므로, 심판 콜이 보는
             // "이 공을 먹인 뒤" 의 카운트는 여기서 따로 만든다
             const nextAtBat = applyPitchResolution(before.atBat, resolution)
             return [
-              PITCH_RELEASE_SOUND,
+              releaseSound,
               pitchCallSoundIdOf(resolution, nextAtBat),
               // 볼넷 뒤 관중 함성 29 (0x51afa~0x51b02) — 원본은 **공격 팀이 CPU 조작**
               // (`state[0x31 + state[9]] == 1`) 일 때만 예약한다. 투수편은 사람이 늘 수비라

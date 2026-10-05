@@ -71,7 +71,7 @@ export const ORIGINAL_SOUNDS: readonly OriginalSound[] = [
    */
   { id: 10, role: 'effect', name: '주자 슬라이딩', scene: '주루 슬라이딩 0x518da(예약 0x5199c) · 자동 슬라이딩 0x519c4·0x5268c — 한 플레이 한 번(주자관리 +0x31c 잠금)' },
   { id: 11, role: 'effect', name: '홈런 함성', scene: '판정 v8·v12 (0x51c82) + 홈런 이벤트 0xa5fed · 0x527ce 예약' },
-  { id: 12, role: 'effect', name: '투구 순간 소리 (보통)', scene: '0x3f378 — 투수 단계가 공을 놓는 칸에 닿을 때' },
+  { id: 12, role: 'effect', name: '투구 순간 소리 (보통)', scene: '0x3f378 — 투수 단계가 공을 놓는 칸에 닿을 때 (28 갈래가 아니면). 사람·CPU 투구 모두' },
   { id: 13, role: 'jingle', name: '공수 교대 징글', scene: '경기 상태 0x18 갱신 0x4f7ac — 상태 틱 2 에 한 번' },
   { id: 14, role: 'effect', name: '투수 등판음 (보통)', scene: '0x38b64, 경기 상태 0xe 투수 첫 등장' },
   { id: 15, role: 'effect', name: '투수 등판음 (득점권 위기)', scene: '같은 자리에서 2·3루에 주자가 있을 때' },
@@ -107,7 +107,7 @@ export const ORIGINAL_SOUNDS: readonly OriginalSound[] = [
   { id: 25, role: 'voice', name: '"Foul!" 파울', scene: '판정 v7 (0x51c5c) — game_judge 글자 애니 4 · 0x5284a 예약' },
   { id: 26, role: 'effect', name: '투수 등판음 (마투수)', scene: '0x38b64 에서 등판 투수가 마선수일 때' },
   { id: 27, role: 'effect', name: '헛스윙 바람 소리 (필살 스윙)', scene: '0x51350 에서 스윙 객체 +0x10 ≠ 0, 또는 마선수 타자' },
-  { id: 28, role: 'effect', name: '투구 순간 소리 (마구)', scene: '0x3f378 에서 상태 0x16 이거나 마투수의 마구' },
+  { id: 28, role: 'effect', name: '투구 순간 소리 (마구)', scene: '0x3f378 3f46a~3f498 — 구질(게임+0xfc8) 22 이거나, 수비 팀 투수가 마선수(0xb633d)이고 공+0x10 ≠ 0 (안 지워져 첫 마구 뒤로 계속, H2 3-4)' },
   /**
    * **29 를 예약하는 자리는 셋이다** (리터럴 `0x6e499` 를 부르는 18곳 전수 + `movs r1,#0x1d` 대조):
    *   - `0x51b02` — 판정 v3(볼넷) 의 뒤꼬리. `state[0x31 + state[9]] == 1`, 곧 **공격 팀이 CPU 조작**

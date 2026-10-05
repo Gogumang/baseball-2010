@@ -88,6 +88,24 @@ describe('투수편 화면의 소리 배선', () => {
     expect(녹음.played.some((id) => [16, 18, 39, 21, 24, 25].includes(id))).toBe(true)
   })
 
+  it('마구(구질 22)를 던지면 투구 순간 소리가 28 이다 — 내 투수는 육성이라 그 뒤 직구는 다시 12 (0x3f378)', () => {
+    const { result } = 띄우기(2)
+    expect(result.current.canPitch).toBe(true)
+    녹음.played.length = 0
+    act(() => result.current.actions.throwPitch({ typeNumber: 22, courseCell: 4, gaugeCell: 0 }))
+    expect(녹음.played[0]).toBe(28)
+
+    // 다음 공을 던질 수 있는 자리까지 넘긴다 (인플레이면 수비 화면을 닫는다)
+    for (let step = 0; step < 20 && !result.current.canPitch; step += 1) {
+      if (result.current.progress.pendingDefensePlay === null) break
+      act(() => result.current.actions.finishDefensePlay())
+    }
+    if (!result.current.canPitch) return
+    녹음.played.length = 0
+    act(() => result.current.actions.throwPitch({ typeNumber: 1, courseCell: 4, gaugeCell: 0 }))
+    expect(녹음.played[0]).toBe(PITCH_RELEASE_SOUND)
+  })
+
   /**
    * 세이프 17 · 함성 60 은 **수비 결과를 넘겨야** 열리는 갈래다 — 한동안 타자편
    * (`useCareerSession`)만 넘겨 주어 투수편에서는 둘 다 안 났다.

@@ -44,8 +44,8 @@ import {
   inPlayCallSoundIdOf,
   pitchCallSoundIdOf,
   walkCheerSoundIdOf,
-  PITCH_RELEASE_SOUND,
 } from '@/features/play-at-bat/model/atBatSounds'
+import { pitchReleaseSoundIdOf } from '@/widgets/batting-stage/lib/pitchReleaseSound'
 import { carryDistanceOf } from '@/entities/batting/model/battedBallFlight'
 import { hasGameIntro } from '@/widgets/game-scene/lib/introSchedule'
 import { GAME_INTRO_SOUND, gameResultSoundIdOf } from '@/features/play-game/model/gameSounds'
@@ -219,15 +219,21 @@ export function useTeamGame(options: TeamGameOptions, random: RandomPort): TeamG
       throwPitch: (input: TeamPitchInput) =>
         step(
           (current) => startThrowPitch(current, input, random),
-          // 투구 순간 소리 12 (0x3f378). ⚠️ 마구 갈래 28 은 안 이었다 — 이 자리가 마구인지 못 가른다.
+          // 투구 순간 소리 12 / 마구 28 (0x3f378) — 구질 22, 또는 마투수(rec+0xa 비트6)의 공+0x10 ≠ 0.
+          // 공+0x10 은 안 지워져(H2 3-4) 마투수는 첫 마구 뒤로 모든 공이 28 이다 (원본 그대로).
           // ⚠️ **근사**: 웹은 던지는 순간에 판정까지 다 나와 투구음과 심판 콜이 붙는다 (통로가 하나라
           //    뒤 소리가 앞 소리를 끊는다). 원본은 공이 날아가는 동안이 사이에 있다
           (before, after) => {
+            const releaseSound = pitchReleaseSoundIdOf({
+              typeNumber: input.typeNumber,
+              pitcherMagicNumber: after.lastPitch?.pitcherMagicNumber ?? 0,
+              ballMagicNumber: after.lastPitch?.magicNumber ?? 0,
+            })
             const resolution = after.lastResolution
-            if (resolution === null) return [PITCH_RELEASE_SOUND]
+            if (resolution === null) return [releaseSound]
             const nextAtBat = applyPitchResolution(before.atBat, resolution)
             return [
-              PITCH_RELEASE_SOUND,
+              releaseSound,
               pitchCallSoundIdOf(resolution, nextAtBat),
               // 볼넷 뒤 관중 함성 29 (0x51afa~0x51b02) — 원본은 **공격 팀이 CPU 조작**
               // (`state[0x31 + state[9]] == 1`, 0x51adc~0x51af8) 일 때만 예약한다.

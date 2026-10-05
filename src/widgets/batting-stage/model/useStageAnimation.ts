@@ -15,6 +15,8 @@ import { ballFrameAt, pitchTickAt } from '@/widgets/batting-stage/model/stageRef
 import { clearParticles, tickParticles } from '@/entities/particle/model/particleScene'
 import { preloadPtcParts } from '@/widgets/particles/lib/renderParticles'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
+import { activeSound } from '@/shared/api/audio/soundPort'
+import { pitchReleaseSoundIdOf } from '@/widgets/batting-stage/lib/pitchReleaseSound'
 import type { StageRefs } from '@/widgets/batting-stage/model/stageRefs'
 
 /** 다음 투구까지의 준비 시간 */
@@ -83,6 +85,8 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
       }
       return magic.state
     }
+    /** 투구 순간 소리를 이미 낸 공 — 0x3f378 은 투수 단계가 놓는 칸에 **닿는 틱 한 번만** 낸다(`cmp r6,r4 ; bne`) */
+    let releaseSoundPitch: object | null = null
     // 하늘 표 행 = 구장 팀 데이터 +0xb2 — 웹은 팀 데이터에 그 칸이 없어 원본의 대체 규칙 rand(0,6) 을 쓴다 (추정)
     const skyRow = randomIntegerBelow(latestRef.current.random, 0, SKY_ROW_COUNT)
 
@@ -136,6 +140,18 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
       const pitch = pitchRef.current
       if (phaseRef.current === '투구중' && pitch !== null) {
         const frame = ballFrameAt(now, phaseStartedAtRef.current, millisecondsPerFrame())
+        // 투구 순간 소리 12 / 28 (0x3f378) — 공 프레임이 서는 틱(릴리스 단계 도달, `ballFrameAt` 0)에 한 번.
+        // 사람이 칠 때 CPU 투수가 던지는 공이다 — 원본 식은 던지는 쪽을 가르지 않는다(사람 투구는 각 진행 고리가 낸다)
+        if (frame >= 0 && releaseSoundPitch !== pitch) {
+          releaseSoundPitch = pitch
+          activeSound().play(
+            pitchReleaseSoundIdOf({
+              typeNumber: pitchTypeNumberRef.current ?? 0,
+              pitcherMagicNumber: pitch.pitcherMagicNumber ?? 0,
+              ballMagicNumber: pitch.magicNumber ?? 0,
+            }),
+          )
+        }
         const bunt = buntRef.current
         // 번트 자세는 공이 플레이트에 닿는 순간(N−1) 판정한다 — 판정 시점은 추정
         if (bunt !== null && frame >= pitch.frameCount - 1) {
