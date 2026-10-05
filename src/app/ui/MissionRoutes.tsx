@@ -7,13 +7,10 @@ import { MissionPlayScreen } from '@/pages/mission-play/ui/MissionPlayScreen'
 import { PitchingScreen } from '@/pages/pitching/ui/PitchingScreen'
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
 import type { ModeBatter } from '@/app/model/modeBatter'
-import { PITCH_TYPES } from '@/shared/config/original/pitchTypes'
+import { modePitchMenuOf } from '@/app/model/modePitcher'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { PitchControl } from '@/entities/settings/model/gameSettings'
 import type { useGameSettings } from '@/app/model/useGameSettings'
-
-/** 원작 구질 선택은 다섯 자리다 (StrHOWTO <투구 조작>) */
-const PITCHER_REPERTOIRE_SIZE = 5
 
 interface MissionRoutesProps {
   readonly screen: Screen
@@ -119,7 +116,8 @@ export function MissionRoutes({
     return (
       <PitchingScreen
         run={pitcherRun}
-        repertoire={PITCH_TYPES.slice(0, PITCHER_REPERTOIRE_SIZE)}
+        // 미션 투수(나리 투수편 저장 · 명예 투수)의 구질 칸 0xb6d2c — `modePitcherOf` 를 세션이 들고 있다
+        repertoire={modePitchMenuOf(session.pitcher)}
         usesGauge={pitchControl === '게이지'}
         atBat={runner.atBat}
         bannerText={runner.bannerText}

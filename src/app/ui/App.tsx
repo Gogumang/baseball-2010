@@ -16,6 +16,7 @@ import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 import { isEveryMissionCleared } from '@/entities/mission/model/missionGoal'
 import { aceMatchMissionOf, matchResultEventOf } from '@/entities/story/model/aceMatch'
 import { modeBatterOf } from '@/app/model/modeBatter'
+import { modePitcherOf } from '@/app/model/modePitcher'
 import type { AceMatchStarter } from '@/app/ui/CareerRoutes'
 import { useGameSettings } from '@/app/model/useGameSettings'
 import { useSceneBgm, useSceneEnterSound, useSound } from '@/app/model/useSound'
@@ -125,6 +126,7 @@ export function App() {
     runningModeManual: gameSettings.settings.runningMode === '수동',
     recordStat,
   })
+  const pitcherMissionPitcher = useMemo(() => modePitcherOf(pitcherSession.career), [pitcherSession.career])
   // 미션 보상 G (0x4ef72) — 지갑으로 들어간다. 육성 선수가 없어도 사라지지 않는다
   const mission = useMissionSession({
     runner, random, missionRecord, screen, setScreen, sound,
@@ -132,6 +134,9 @@ export function App() {
     // 환경설정 "송구" (설정 +0xf4) — 투수편 미션은 사람이 늘 수비라 그대로 먹는다 (0xae6c8)
     throwModeManual: gameSettings.settings.throwMode === '수동',
     aceLevels: aceLevels.levels,
+    // 투수 미션(모드 5)은 0x213c0 이 5→3 으로 나리 투수편 저장을 올리고 0x1fbd0 이 그 투수(또는 명예 투수)를 준다.
+    // 투수편 세션은 시작할 때 저장을 올려 두므로 `career` 가 곧 저장된 투수다 (`modePitcherOf`)
+    pitcher: pitcherMissionPitcher,
   })
   // 투수편이 연 히든(장비 컬렉터 20·24·28·32)도 같은 전역 표 `app+0xc0` 에 모은다 (0x62368)
   const collection = useCollection(

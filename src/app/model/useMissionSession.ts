@@ -38,7 +38,8 @@ import { MAGIC_PITCH_TYPE_NUMBER } from '@/entities/pitcher-career/model/magicPi
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
 import { buildHumanPitch, pitchGradeOf } from '@/features/play-pitcher-game/model/pitcherPitch'
-import type { PitcherRepertoire, PitcherStats } from '@/features/play-pitcher-game/model/pitcherPitch'
+import { modePitcherOf } from '@/app/model/modePitcher'
+import type { ModePitcher } from '@/app/model/modePitcher'
 import { ROOKIE_BATTER_ABILITY } from '@/entities/batting/model/batter'
 import { isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayInput, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
@@ -94,6 +95,11 @@ interface MissionSessionInput {
    * 값을 넘긴다 (28af409). 안 넘기면 새 저장 값(0x9f26c 가 0 으로 채움) = Lv1 = 60% 로 본다.
    */
   readonly aceLevels?: Readonly<Record<number, number>>
+  /**
+   * 투수 미션(모드 5)에서 던지는 투수 — 나리 투수편 저장(0x213c0 5→3) 또는 명예 투수(0x1fbd0)의
+   * 0xb6414 능력치·레퍼토리·실투 스킬 (`modePitcherOf`). 안 넘기면 신인 투수다 (원본에 없는 대체).
+   */
+  readonly pitcher?: ModePitcher
 }
 
 /** 미션 상대. 원본 레코드의 마선수 순번이 있으면 그 마선수다 (타자 미션이면 마투수). */
@@ -164,14 +170,6 @@ interface PendingMissionDefense {
  */
 const MAX_GAUGE_GRADE = 5
 
-/**
- * 미션 투수의 능력치·레퍼토리.
- *
- * ⚠️ **근사다.** 원본 미션 투수는 나리 투수편 저장(모드 5→3)이나 명예의 전당 투수다(Q2 3절).
- * 웹 미션에는 아직 그 선수 레코드가 없어 등급 3 한가운데인 500 과 폼 0 을 쓴다.
- */
-const MISSION_PITCHER_STATS: PitcherStats = { control: 500, velocity: 500, breaking: 500, stamina: 500 }
-const MISSION_PITCHER_REPERTOIRE: PitcherRepertoire = { pitchMask: 0, form: 0, magicNumber: 0 }
 /** 투영 원점 0xcfb18 의 칸 — 미션 상대 타자의 좌우를 알 길이 없어 1 로 둔다 (추정, 예전 그대로) */
 const MISSION_STAGE_SIDE = 1
 /** 미션 투수는 체력 레코드가 없다 — 늘 100% 로 둔다 (추정) */
@@ -188,7 +186,9 @@ export function useMissionSession({
   sound,
   throwModeManual,
   aceLevels,
+  pitcher: pitcherInput,
 }: MissionSessionInput) {
+  const pitcher = useMemo(() => pitcherInput ?? modePitcherOf(null), [pitcherInput])
   const silent = useMemo(() => createSilentSound(), [])
   const audio = sound ?? silent
   const [missionRun, setMissionRun] = useState<MissionRun | null>(null)
@@ -338,7 +338,7 @@ export function useMissionSession({
         gaugeSettingOn,
         typeNumber,
         gaugeCell,
-        effectiveControl: MISSION_PITCHER_STATS.control,
+        effectiveControl: pitcher.stats.control,
         staminaPercent: MISSION_STAMINA_PERCENT,
       },
       random,
@@ -349,8 +349,8 @@ export function useMissionSession({
         courseCell,
         grade,
         gaugeCell,
-        stats: MISSION_PITCHER_STATS,
-        repertoire: MISSION_PITCHER_REPERTOIRE,
+        stats: pitcher.stats,
+        repertoire: pitcher.repertoire,
         side: MISSION_STAGE_SIDE,
         // 조건코드 0 이면 `applyControlError` 가 난수를 한 톨도 안 뽑는다 = 예전과 같다
         missionConditionCode,
@@ -363,15 +363,16 @@ export function useMissionSession({
       {
         isMagicPitch: typeNumber === MAGIC_PITCH_TYPE_NUMBER,
         grade,
-        // 0xb570d(ctx, 1, 투수, 1, 90, 1) — 칸 1 구속. ⚠️ 미션 투수 레코드가 없어 근사값 500 이다
-        effectiveVelocity: MISSION_PITCHER_STATS.velocity,
+        // 0xb570d(ctx, 1, 투수, 1, 90, 1) — 칸 1 구속. 모드 5 는 0xb6414 를 0..999 로 자른 값 (`modePitcherOf`)
+        effectiveVelocity: pitcher.stats.velocity,
         runnerCount: runnerCountOf(pitcherRun.bases),
         hasSecondBaseRunner: pitcherRun.bases.second,
-        // ⚠️ 미션 투수·마타자 레코드의 스킬 비트(+0x14)가 웹에 없어 넷 다 거짓으로 둔다
+        // ⚠️ 마타자 레코드의 스킬 비트(+0x14)가 웹 마선수 표에 없어 압도 22 는 거짓으로 둔다
         batterIntimidates: false,
-        pitcherIsSteady: false,
-        pitcherIsTimid: false,
-        pitcherIsCool: false,
+        // 미션 투수의 장착 비트 0xb62b4 — 32 안정감 · 33 새가슴 · 38 냉정 (투수 비트 16·17·22)
+        pitcherIsSteady: pitcher.isSteady,
+        pitcherIsTimid: pitcher.isTimid,
+        pitcherIsCool: pitcher.isCool,
       },
       random,
     )
@@ -636,7 +637,7 @@ export function useMissionSession({
   }
 
   return {
-    missionRun, pitcherRun, clearedKeys, clearCounts, lastSide, aceLevels,
+    missionRun, pitcherRun, clearedKeys, clearCounts, lastSide, aceLevels, pitcher,
     missionConditionCode, pendingDefensePlay, pickoffReplay, handleMissionPitch, handleThrow, actions,
   }
 }

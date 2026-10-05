@@ -11,6 +11,9 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { MISSIONS } from '@/shared/config/original/missions'
 import { PITCH_TYPES } from '@/shared/config/original/pitchTypes'
 import { runPickoffPlay } from '@/features/defense-play/model/pickoffPlay'
+import { modePitcherOf } from '@/app/model/modePitcher'
+import type { ModePitcher } from '@/app/model/modePitcher'
+import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 
 /**
  * 이벤트 112 의 match 명령이 여는 마선수 대결 — 이기면 114, 지면 115 로 돌아가야 한다.
@@ -141,7 +144,7 @@ function countingRandom() {
  * 투수 미션 하나를 열고 한가운데(칸 4)로 공 하나를 던져, 그동안 뽑은 난수 수를 센다.
  * 게이지는 **누른 칸** 으로 넘긴다 — 칸 9 가 등급 t=5(최상)다 (0x50e08 `t = max(g−4, 1)`).
  */
-function drawsOfOnePitch(missionId: number, gaugeCell = 9, gaugeSettingOn = true) {
+function drawsOfOnePitch(missionId: number, gaugeCell = 9, gaugeSettingOn = true, pitcher?: ModePitcher) {
   const counter = countingRandom()
   const missionRecord: MissionRecordPort = { load: () => ({}), save: vi.fn() }
   let screen: Screen = { kind: '미션선택' }
@@ -152,7 +155,7 @@ function drawsOfOnePitch(missionId: number, gaugeCell = 9, gaugeSettingOn = true
     const runner = useAtBatRunner()
     return {
       runner,
-      session: useMissionSession({ runner, random: counter.port, missionRecord, screen, setScreen }),
+      session: useMissionSession({ runner, random: counter.port, missionRecord, screen, setScreen, pitcher }),
     }
   })
 
@@ -367,5 +370,40 @@ describe('타자 미션 CPU 견제 — 0x345fc 종류 4 → 0x34848 → 0x50f28 
     expect(rendered.result.current.session.missionRun).toBe(before)
     expect(rendered.result.current.session.pickoffReplay).toBeNull()
     rendered.unmount()
+  })
+})
+
+/* ── 투수 미션 투수 = 나리 투수편 저장 (0x213c0 5→3 · 0x1fbd0) ───────────────── */
+
+describe('투수 미션 투수는 투수편 커리어의 0xb6414 값으로 던진다 (`modePitcherOf`)', () => {
+  const 강투수 = modePitcherOf({
+    ...createPitcherCareer('테스트'),
+    ability: { control: 900, velocity: 900, breaking: 900, stamina: 900 },
+    skillIds: [16, 17, 22],
+    equippedSkillIds: [16, 17, 22],
+  })
+
+  it('세션이 넘겨받은 투수를 그대로 내놓는다 — 안 넘기면 신인 투수', () => {
+    const missionRecord: MissionRecordPort = { load: () => ({}), save: vi.fn() }
+    const screen: Screen = { kind: '미션선택' }
+    const rendered = renderHook(() =>
+      useMissionSession({
+        runner: useAtBatRunner(), random: createSeededRandom(1), missionRecord, screen, setScreen: vi.fn(),
+        pitcher: 강투수,
+      }),
+    )
+    expect(rendered.result.current.pitcher).toBe(강투수)
+    const bare = renderHook(() =>
+      useMissionSession({
+        runner: useAtBatRunner(), random: createSeededRandom(1), missionRecord, screen, setScreen: vi.fn(),
+      }),
+    )
+    expect(bare.result.current.pitcher).toEqual(modePitcherOf(null))
+  })
+
+  /** 실투 0x33cbc 는 구속·스킬이 확률 p 만 바꾸고 rand(0,100) 은 늘 한 번이다 — 난수 차례는 투수와 무관 */
+  it('투수가 바뀌어도 공 하나의 난수 수는 같다', () => {
+    expect(drawsOfOnePitch(1, 9, true, 강투수).drawn).toBe(drawsOfOnePitch(1, 9, true).drawn)
+    expect(drawsOfOnePitch(1, 0, false, 강투수).drawn).toBe(drawsOfOnePitch(1, 0, false).drawn)
   })
 })
