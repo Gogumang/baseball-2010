@@ -68,7 +68,15 @@ export type Screen =
    * 나만의리그 포스트시즌 대진 (원본 상태 128). 대진은 `career.postseason` 이 들고, 화면은 그 위에 뜬
    * 알림 팝업(0xb 정규시즌 우승 · 7 우승 팀 발표 · 8 한국시리즈 우승)만 들고 다닌다.
    */
-  | { readonly kind: '포스트시즌'; readonly popup: PostseasonPopup | null }
+  | {
+      readonly kind: '포스트시즌'
+      readonly popup: PostseasonPopup | null
+      /**
+       * 128 의 **이전 상태가 1**(상태 100 재진입 → 1 → 128, 곧 이어하기)인가 — 진입 0x120a4 가 이때만 배경음 4 를 튼다
+       * (0x120a6 `[장면+0x28] == 1`). 131 뒤·경기 뒤(116 → 114 → 128)는 이전 상태가 114 다. 없으면 거짓.
+       */
+      readonly fromReentry?: boolean
+    }
   /**
    * 나만의리그 국가대항전 (원본 상태 134 순위 · 135 매치업 — 화면 한 벌이 둘을 같이 돈다).
    *

@@ -648,14 +648,14 @@ describe('타자편 포스트시즌 대진 128 — 사람이 친다 (0x120a4 · 
   it('MVP 결과(376/377) 뒤에 대진 128 로 가고, 정규시즌 1위면 [191] 보상 팝업 0xb 가 뜬다', () => {
     const rendered = 띄우기(시즌끝선수())
     이벤트보기(rendered, [376])
-    expect(rendered.result.current.screen).toEqual({ kind: '포스트시즌', popup: { kind: '정규시즌우승' } })
+    expect(rendered.result.current.screen).toEqual({ kind: '포스트시즌', popup: { kind: '정규시즌우승' }, fromReentry: false })
 
     // 팝업이 떠 있으면 키가 안 먹는다
     act(() => rendered.result.current.session.actions.pressPostseason())
     expect(rendered.result.current.session.career?.postseason?.round).toBe('준플레이오프')
 
     act(() => rendered.result.current.session.actions.closePostseasonPopup())
-    expect(rendered.result.current.screen).toEqual({ kind: '포스트시즌', popup: null })
+    expect(rendered.result.current.screen).toEqual({ kind: '포스트시즌', popup: null, fromReentry: false })
     expect(rendered.result.current.session.career).toMatchObject({
       popularity: 1010,
       money: 1500,
@@ -666,10 +666,10 @@ describe('타자편 포스트시즌 대진 128 — 사람이 친다 (0x120a4 · 
   it('[확인] — CPU 끼리 내 차례(1위는 한국시리즈)까지 돌고 머물렀다가, 다음 [확인]에 내 경기를 연다', () => {
     const rendered = 띄우기(시즌끝선수({ regularSeasonRewardTaken: true }))
     이벤트보기(rendered, [376])
-    expect(rendered.result.current.screen).toEqual({ kind: '포스트시즌', popup: null })
+    expect(rendered.result.current.screen).toEqual({ kind: '포스트시즌', popup: null, fromReentry: false })
 
     act(() => rendered.result.current.session.actions.pressPostseason())
-    expect(rendered.result.current.screen).toEqual({ kind: '포스트시즌', popup: null })
+    expect(rendered.result.current.screen).toEqual({ kind: '포스트시즌', popup: null, fromReentry: false })
     const series = rendered.result.current.session.career?.postseason
     expect(series?.round).toBe('한국시리즈')
     expect(series?.teams[0]).toBe(0)
@@ -706,7 +706,7 @@ describe('타자편 포스트시즌 대진 128 — 사람이 친다 (0x120a4 · 
   it('포스트시즌 경기 결과 [확인] 은 관리 주기 대신 대진 128 로 돌아간다', () => {
     const rendered = 띄우기(시즌끝선수({ gamesPlayed: 47, regularSeasonRewardTaken: true }))
     act(() => rendered.result.current.session.actions.confirmGameResult())
-    expect(rendered.result.current.screen).toEqual({ kind: '포스트시즌', popup: null })
+    expect(rendered.result.current.screen).toEqual({ kind: '포스트시즌', popup: null, fromReentry: false })
   })
 
   it('내 팀 우승 — 팝업 7 [137] → 팝업 8 [190] 보상 → 연말(132) 이벤트', () => {
@@ -714,10 +714,10 @@ describe('타자편 포스트시즌 대진 128 — 사람이 친다 (0x120a4 · 
     const rendered = 띄우기(시즌끝선수({ gamesPlayed: 50, postseason: 끝난대진, regularSeasonRewardTaken: true }))
     act(() => rendered.result.current.session.actions.confirmGameResult())
     act(() => rendered.result.current.session.actions.pressPostseason())
-    expect(rendered.result.current.screen).toEqual({ kind: '포스트시즌', popup: { kind: '우승발표', champion: 0 } })
+    expect(rendered.result.current.screen).toEqual({ kind: '포스트시즌', popup: { kind: '우승발표', champion: 0 } , fromReentry: false })
 
     act(() => rendered.result.current.session.actions.closePostseasonPopup())
-    expect(rendered.result.current.screen).toEqual({ kind: '포스트시즌', popup: { kind: '한국시리즈우승' } })
+    expect(rendered.result.current.screen).toEqual({ kind: '포스트시즌', popup: { kind: '한국시리즈우승' }, fromReentry: false })
 
     act(() => rendered.result.current.session.actions.closePostseasonPopup())
     expect(rendered.result.current.session.career).toMatchObject({ popularity: 1015, reputation: 325, money: 2000 })
@@ -728,12 +728,12 @@ describe('타자편 포스트시즌 대진 128 — 사람이 친다 (0x120a4 · 
   it('이어하기 — 128 에서 저장했으면 대진으로 돌아오고, 정규시즌 우승 보상은 다시 안 준다 (S+0x50 0xf · S+0x77)', () => {
     const 받음 = 시즌끝선수({ seasonEndState: 128, regularSeasonRewardTaken: true, popularity: 1010, money: 1500 })
     const rendered = 띄우기(받음)
-    expect(rendered.result.current.screen).toEqual({ kind: '포스트시즌', popup: null })
+    expect(rendered.result.current.screen).toEqual({ kind: '포스트시즌', popup: null, fromReentry: true })
     expect(rendered.result.current.session.career).toMatchObject({ popularity: 1010, money: 1500 })
 
     // 보상 팝업을 닫기 전에 끊겼으면(S+0x77 == 0) 진입이 팝업을 다시 띄운다 — 보상은 한 번이다
     const 안받음 = 띄우기(시즌끝선수({ seasonEndState: 128 }))
-    expect(안받음.result.current.screen).toEqual({ kind: '포스트시즌', popup: { kind: '정규시즌우승' } })
+    expect(안받음.result.current.screen).toEqual({ kind: '포스트시즌', popup: { kind: '정규시즌우승' }, fromReentry: true })
   })
 
   it('이어하기 — 팝업 8 보상은 132 진입과 함께 적혀, 다시 열면 연말 이벤트로 가고 보상이 겹치지 않는다', () => {
@@ -750,7 +750,7 @@ describe('타자편 포스트시즌 대진 128 — 사람이 친다 (0x120a4 · 
       return rendered
     }
     const 처음 = 열기()
-    expect(처음.result.current.screen).toEqual({ kind: '포스트시즌', popup: null })
+    expect(처음.result.current.screen).toEqual({ kind: '포스트시즌', popup: null, fromReentry: true })
     act(() => 처음.result.current.session.actions.pressPostseason())
     act(() => 처음.result.current.session.actions.closePostseasonPopup())
     act(() => 처음.result.current.session.actions.closePostseasonPopup())

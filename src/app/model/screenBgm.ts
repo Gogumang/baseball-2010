@@ -47,8 +47,21 @@ export const SCREEN_BGM = {
   엔딩: 46,
 } as const satisfies Partial<Record<Screen['kind'], number>>
 
+/**
+ * 포스트시즌 대진 128 의 배경음 — 진입 0x120a4 의 첫 줄(0x120a6~0x120be):
+ * ```
+ * if [장면+0x28](이전 상태) == 1:  0x6ea6d(소리, 4, −1, 1)   ; 관리 화면 배경음 4 를 반복으로
+ * ```
+ * 이전 상태 1 은 상태 100(재진입)이 거쳐 보내는 자원 적재 칸이라 **이어하기로 돌아온 때**뿐이다.
+ * 그 밖에는 128 이 배경음을 안 건드린다 — 들어오는 길(131 뒤 · 경기 뒤 116)이 모두 이벤트 재생 114 를
+ * 지나오고 114 진입 0x11d00 이 배경음 40 을 트므로 그 40 이 이어진다. 웹은 경기 뒤 116 → 114 화면이 없어
+ * 그 자리를 여기서 40 으로 채운다.
+ */
+const POSTSEASON_REENTRY_BGM = 4
+
 /** 이 화면에서 틀 배경음. 바꾸지 않는 화면이면 null */
 export function screenBgmOf(screen: Screen): number | null {
+  if (screen.kind === '포스트시즌') return screen.fromReentry === true ? POSTSEASON_REENTRY_BGM : SCREEN_BGM.이벤트
   const table: Partial<Record<string, number>> = SCREEN_BGM
   return table[screen.kind] ?? null
 }

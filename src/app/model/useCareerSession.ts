@@ -596,10 +596,11 @@ export function useCareerSession({
    * 포스트시즌 대진 128 로 — 진입 0x120a4 가 정규시즌 우승 팝업(0xb)을 띄울지 정한다.
    * 원본은 131(MVP) 뒤와, 포스트시즌 경기 뒤(100 → 116 → 114 → 128)에 여기로 온다.
    */
-  const enterPostseason = (current: PlayerCareer) => {
+  const enterPostseason = (current: PlayerCareer, fromReentry = false) => {
     // 진입 0x120a4 — S+0x50 = 0xf · 저장 (이어하기는 S+0xb4 갈래로 128 에 돌아온다)
     setCareer(current.seasonEndState === 128 ? current : { ...current, seasonEndState: 128 })
-    setScreen({ kind: '포스트시즌', popup: regularSeasonPopupOnEnter(current) })
+    // 이어하기(100 → 1 → 128)면 이전 상태가 1 이라 배경음 4 (`screenBgmOf`)
+    setScreen({ kind: '포스트시즌', popup: regularSeasonPopupOnEnter(current), fromReentry })
   }
 
   /**
@@ -841,7 +842,7 @@ export function useCareerSession({
         setCareer(enterSeasonEvent(savedCareer, point.eventId))
         return setScreen({ kind: '이벤트', eventId: point.eventId, context: '시즌' })
       }
-      if (point.kind === '포스트시즌') return enterPostseason(savedCareer)
+      if (point.kind === '포스트시즌') return enterPostseason(savedCareer, true)
       setCareer(savedCareer)
       if (point.kind === '시즌종료') return setScreen({ kind: '시즌종료' })
       setScreen({ kind: '관리' })
@@ -1148,7 +1149,7 @@ export function useCareerSession({
       if (screen.kind !== '포스트시즌' || screen.popup !== null) return
       const result = pressPostseasonBracket(career.postseason, career.teamId, random)
       if (result.kind === '우승발표') {
-        return setScreen({ kind: '포스트시즌', popup: { kind: '우승발표', champion: result.champion } })
+        return setScreen({ ...screen, popup: { kind: '우승발표', champion: result.champion } })
       }
       if (result.kind === '내경기') return beginGame()
       setCareer({ ...career, postseason: result.series })
@@ -1161,11 +1162,11 @@ export function useCareerSession({
       if (popup.kind === '정규시즌우승') {
         // 팝업 0xb — 보상을 얹고 128 에 머문다
         setCareer(applyRegularSeasonReward(career, REGULAR_SEASON_HIDDEN_ID.타자편))
-        return setScreen({ kind: '포스트시즌', popup: null })
+        return setScreen({ ...screen, popup: null })
       }
       if (popup.kind === '우승발표') {
         const next = popupAfterChampion(career, popup.champion)
-        if (next !== null) return setScreen({ kind: '포스트시즌', popup: next })
+        if (next !== null) return setScreen({ ...screen, popup: next })
         return finishPostseason(career)
       }
       // 팝업 8 — 한국시리즈 우승 보상 뒤 132
