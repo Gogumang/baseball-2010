@@ -1,6 +1,8 @@
 import { isInsideStrikeZone } from '@/shared/lib/geometry/coordinate'
 import { isPitchInHitByPitchBox } from '@/entities/pitching/model/hitByPitch'
 import { swingResultOf } from '@/entities/batting/model/swingResult'
+import { pitcherBoostSideOf, swingBoostOf } from '@/entities/batting/model/swingBoost'
+import { remainingAfterSpecialSwing, rollSpecialSwing } from '@/entities/batting/model/specialSwing'
 import { timingOf } from '@/entities/batting/model/swingTiming'
 import { hitDirectionOf } from '@/entities/batting/model/hitDirection'
 import { outcomeOfPattern, randomPattern } from '@/entities/batting/model/battedBallOutcome'
@@ -175,11 +177,8 @@ export interface CpuSpecialSwingInput {
  * 번트 칸을 뽑아도 필살 스윙이다. 일반 CPU 타자는 번호가 있어도 절대 쓰지 않는다
  * (S+0x10 에 CPU 가 쓰는 곳은 여기 하나, Q1 5절). 난수는 쓰지 않는다.
  *
- * ⚠️ 미해결 — 이 값을 **잇지 않았다.** 필살 스윙의 효과(0xab214 에 넘기는 보정 구조체
- *    0x34d6c 타자 쪽: 히트·파워 +150~220 · B·C %), 실제 스윙 순간의 횟수 차감(0x4e136),
- *    타구가 날 때의 성공 굴림(0x34c74 → `rollSpecialSwing`, 마타자 30%)이 이 길에 하나도 없다.
- *    특히 0x34c74 굴림이 0xab214 굴림들 사이 어디에 끼는지 확인하지 않아 난수 차례를 지어낼 수
- *    없다. 사람 타석(resolvePitch)도 보정 구조체를 swingResultOf 에 싣지 않는다.
+ * `pitchAgainstBatterDetailed` 가 이 값을 잇는다 — 보정 구조체 0x34d6c 타자 쪽(마타자 레벨 표),
+ * 스윙 순간 소모 0x4e136, 맞은 공의 성공 굴림 0x34c74(마타자 30%).
  */
 export function cpuSpecialSwingNumberOf(input: CpuSpecialSwingInput): number {
   // 일반 타자는 번트든 치기든 0, 마타자는 번트 갈래(0x34446)로 안 가니 표 선택과 무관하다
@@ -198,6 +197,36 @@ export interface CpuBatterTraits {
    * 참이면 표 선택이 치기로 강제되고 타이밍이 늘 d = 0 이다.
    */
   readonly isMistakePitch?: boolean
+  /**
+   * 마타자 필살 (0x34468~0x34488). `isMagicBatter` 일 때만 본다. 안 넘기면 필살을 쓰지 않는다(예전 동작).
+   *   swingNumber = 선수 +0x18 (마타자 5~9) · remaining = 이 경기 남은 횟수 s8 팀[+0x29 + 타순]
+   *   aceOrder·aceLevel = 0x34d6c 의 k = 레벨·5 + 순번 (`mgr[0x13f + 순번]`)
+   */
+  readonly specialSwing?: {
+    readonly swingNumber: number
+    readonly remaining: number
+    readonly aceOrder?: number
+    readonly aceLevel?: number
+  }
+  /**
+   * 0x34d6c 투수 쪽 — 사람 투수의 공에 실린 마구(`pitch.magicNumber` = P+0x10)를 볼 때 마투수 레벨.
+   * 공에 번호가 없으면(사용자 투구는 아직 안 실음) 쓰이지 않는다.
+   */
+  readonly pitcherAceLevel?: number
+}
+
+/** `pitchAgainstBatterDetailed` 의 결과 — 필살 칸을 부르는 쪽에 돌려준다 */
+export interface CpuPitchOutcome {
+  readonly resolution: PitchResolution
+  /** 이번 스윙이 필살인가 (S+0x10 ≠ 0) */
+  readonly isSpecialSwing: boolean
+  /**
+   * 스윙 뒤 남은 필살 횟수 — 0x4e136 이 스윙 틱에 −1 한 값. 필살을 안 썼으면 넘겨받은 값 그대로,
+   * `traits.specialSwing` 을 안 넘겼으면 null.
+   */
+  readonly specialSwingRemaining: number | null
+  /** 필살 성공 — 0x517e6 이 "송구공" 비트를 단 타구 (야수가 쥐지 못한다) */
+  readonly isUncatchable: boolean
 }
 
 /** 스윙 프레임 F = N − 2 + d — d = 0 이 타이밍 100 이다 (0x34be0) */
@@ -264,7 +293,37 @@ export function pitchAgainstBatter(
   situation: BatterSituation = UNWIRED_SITUATION,
   traits: CpuBatterTraits = {},
 ): PitchResolution {
+  return pitchAgainstBatterDetailed(pitch, batter, random, pitcher, situation, traits).resolution
+}
+
+/**
+ * `pitchAgainstBatter` 에 마타자 필살 칸을 더 돌려준다. 원본 차례:
+ * ```
+ * 0x34334  표 굴림 → (존 밖이면) 쫓기 굴림 → 0x340f8 타이밍 굴림 → 번트 종류 굴림 → S+0x10 (난수 없음)
+ * 0x4e136  스윙 틱: S+0x10 ≠ 0 && 남은 > 0 이면 남은 − 1
+ * 0x51294  0x34d6c 보정 구조체 → 0xab214 (번트 r100 · contact · B · C · 15/18)
+ *          헛스윙이면 여기서 끝 (0x5135c → 0x51840)
+ * 0x51430~ 방향 · 타구 패턴
+ * 0x517e6  S+0x10 ≠ 0 이면 0x34c74 의 p(마타자 30) 로 p·10 > rand(0,1000)
+ *          ── 그 뒤 수비 (웹은 outcomeOfPattern 대체 근사)
+ * ```
+ */
+export function pitchAgainstBatterDetailed(
+  pitch: Pitch,
+  batter: BatterAbility,
+  random: RandomPort,
+  pitcher: { readonly control: number; readonly velocity: number } = DEFAULT_PITCHER_STATS,
+  situation: BatterSituation = UNWIRED_SITUATION,
+  traits: CpuBatterTraits = {},
+): CpuPitchOutcome {
   const isMistake = traits.isMistakePitch === true
+  const remainingBefore = traits.specialSwing?.remaining ?? null
+  const unswung = (resolution: PitchResolution): CpuPitchOutcome => ({
+    resolution,
+    isSpecialSwing: false,
+    specialSwingRemaining: remainingBefore,
+    isUncatchable: false,
+  })
   const choice = cpuSwingChoiceOf(pitch, batter, random, situation, isMistake)
   if (choice === null) {
     // 사구가 볼·스트라이크보다 먼저다 — 상태 0x12 진입 0x3dfac 가 0x35a20 을 맨 먼저 불러 state[0x12] 에
@@ -274,16 +333,40 @@ export function pitchAgainstBatter(
     // 스윙(0x4e0e0~ 의 vtable +0x14/+0x18)이 안 나가 스윙 객체 +0xd·+0xe 가 0 이다 → 상자 판정까지 간다.
     // 좌타 뒤집기는 0xb63c0(현재 타자)이고, 화면 배치 side(+0x17e1)는 타석 시작 0x3b084 가 같은
     // 0xb63c1(타자)로 정한 값이라 둘이 같다 — 웹 CPU 타자는 손 정보가 없어 `pitch.stageSide` 를 쓴다.
-    if (isPitchInHitByPitchBox(pitch, pitch.stageSide)) return { kind: '사구' }
-    return isInsideStrikeZone(pitch.plate)
-      ? { kind: '스트라이크', isSwinging: false }
-      : { kind: '볼' }
+    if (isPitchInHitByPitchBox(pitch, pitch.stageSide)) return unswung({ kind: '사구' })
+    return unswung(isInsideStrikeZone(pitch.plate) ? { kind: '스트라이크', isSwinging: false } : { kind: '볼' })
   }
 
   // 원본 0x34334 → 0x340f8: F = N − 2 + d
   const frame = pitch.frameCount - SWEET_FRAME_OFFSET + cpuSwingTimingOffsetOf(batter.hit, random, isMistake)
   // 0x3445a — 타이밍 굴림 **뒤**에 번트 종류
   const buntKind = cpuBuntKindOf(choice, traits.isMagicBatter === true, random)
+  // 0x34468~0x34488 — 마타자는 남은 횟수가 있으면 무조건 필살 (난수 없음)
+  const special = traits.specialSwing
+  const specialNumber =
+    special === undefined
+      ? 0
+      : cpuSpecialSwingNumberOf({
+          isMagicBatter: traits.isMagicBatter === true,
+          swingNumber: special.swingNumber,
+          remaining: special.remaining,
+        })
+  const isSpecialSwing = specialNumber !== 0
+  // 0x4e136 — 스윙 틱에 소모 (결과와 무관)
+  const remainingAfter =
+    remainingBefore === null ? null : isSpecialSwing ? remainingAfterSpecialSwing(remainingBefore) : remainingBefore
+  // 0x34d6c — 타자 쪽은 S+0x10, 투수 쪽은 공+0x10 (사람 투수 공에 마구가 실렸을 때만)
+  const boost = swingBoostOf(
+    {
+      number: specialNumber,
+      // 일반 CPU 타자는 S+0x10 을 쓰지 않으므로(0x34488 만 쓴다) 필살 번호가 있으면 마타자다
+      isAce: true,
+      aceOrder: special?.aceOrder ?? 0,
+      aceLevel: special?.aceLevel ?? 0,
+      isOwnPlayer: false,
+    },
+    pitcherBoostSideOf(pitch.magicNumber ?? 0, pitch.pitcherMagicNumber ?? 0, () => traits.pitcherAceLevel ?? 0),
+  )
   const result = swingResultOf(
     {
       horizontalError: Math.round(pitch.plate.x * ZONE_HALF_PIXELS),
@@ -294,6 +377,7 @@ export function pitchAgainstBatter(
       batter,
       pitcher,
       mode: '일반',
+      boost,
       isPitcherExhausted: false,
       batterSkillIds: [],
       pitcherSkillIds: [],
@@ -301,15 +385,25 @@ export function pitchAgainstBatter(
     },
     random,
   )
-  if (result.kind === '헛스윙') return { kind: '스트라이크', isSwinging: true }
+  const swung = (resolution: PitchResolution, isUncatchable: boolean): CpuPitchOutcome => ({
+    resolution,
+    isSpecialSwing,
+    specialSwingRemaining: remainingAfter,
+    isUncatchable,
+  })
+  // 헛스윙은 0x5135c → 0x51840 — 필살 굴림이 없다
+  if (result.kind === '헛스윙') return swung({ kind: '스트라이크', isSwinging: true }, false)
 
   const code = result.code + hitDirectionOf({ code: result.code, frame, frameCount: pitch.frameCount, batterSide: 0 }, random)
+  const pattern = randomPattern(code, random)
+  // 0x517e6 — 방향·패턴 뒤, 수비(대체 근사) 앞. 마타자는 0x34c74 가 번호와 무관하게 30%
+  const isUncatchable = isSpecialSwing && rollSpecialSwing(specialNumber, random, true)
   // 2스트라이크 번트 파울은 아웃 (0x9d5e2) — 사람 타석(resolvePitch)과 같은 판정이다
-  const batted = outcomeOfPattern(code, randomPattern(code, random), random, {
+  const batted = outcomeOfPattern(code, pattern, random, {
     strikes: situation.strikes,
     buntKind,
   })
-  return batted.kind === '파울' ? { kind: '파울' } : { kind: '타구', outcome: batted.outcome }
+  return swung(batted.kind === '파울' ? { kind: '파울' } : { kind: '타구', outcome: batted.outcome }, isUncatchable)
 }
 
 const ZONE_HALF_PIXELS = 16.5

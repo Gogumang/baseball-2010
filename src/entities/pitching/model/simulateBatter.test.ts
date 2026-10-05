@@ -5,6 +5,7 @@ import {
   cpuSwingChoiceOf,
   cpuSwingTimingOffsetOf,
   pitchAgainstBatter,
+  pitchAgainstBatterDetailed,
   willSwing,
 } from '@/entities/pitching/model/simulateBatter'
 import type { BatterSituation } from '@/entities/pitching/model/simulateBatter'
@@ -393,5 +394,55 @@ describe('pitchAgainstBatter — 사구 0x35a20', () => {
 
   it('궤적이 없는 공은 판정 좌표가 없어 사구가 없다', () => {
     expect(pitchAgainstBatter(크게빠진공, 타자(500), 각본([0.99]), undefined, 무사주자없음)).toEqual({ kind: '볼' })
+  })
+})
+
+describe('pitchAgainstBatterDetailed — CPU 마타자 필살 (0x34488 → 0x4e136 → 0x34d6c → 0x517e6)', () => {
+  const 마타자 = { isMagicBatter: true, specialSwing: { swingNumber: 7, remaining: 2, aceOrder: 2, aceLevel: 4 } }
+
+  it('맞은 공이면 방향·패턴 뒤에 rand(0,1000) 하나를 더 굴리고(30% — 0 이면 성공), 남은 횟수를 1 줄인다', () => {
+    const 보통 = 각본([0])
+    const 필살 = 각본([0])
+    const a = pitchAgainstBatterDetailed(한가운데, 타자(500), 보통, undefined, undefined, { isMagicBatter: true })
+    const b = pitchAgainstBatterDetailed(한가운데, 타자(500), 필살, undefined, undefined, 마타자)
+    expect(a.resolution.kind).toBe('타구')
+    expect(a).toMatchObject({ isSpecialSwing: false, specialSwingRemaining: null, isUncatchable: false })
+    expect(b).toMatchObject({ isSpecialSwing: true, specialSwingRemaining: 1, isUncatchable: true })
+    expect(필살.used()).toBe(보통.used() + 1)
+  })
+
+  it('헛스윙이면 굴리지 않지만 횟수는 준다 — 소모는 스윙 틱(0x4e136)이라 결과와 무관', () => {
+    // 표 0 · 타이밍 0·0 · 번트 r100 0 · contact 0.9 (hit 0 vs 구속 1300 → contact 6250 미만)
+    const 값 = [0, 0, 0, 0, 0.9]
+    const 보통 = 각본(값)
+    const 필살 = 각본(값)
+    const 강투수 = { control: 1300, velocity: 1300 }
+    const a = pitchAgainstBatterDetailed(한가운데, 타자(0), 보통, 강투수, undefined, { ...마타자, specialSwing: undefined })
+    const b = pitchAgainstBatterDetailed(한가운데, 타자(0), 필살, 강투수, undefined, 마타자)
+    expect(a.resolution).toEqual({ kind: '스트라이크', isSwinging: true })
+    expect(b.resolution).toEqual({ kind: '스트라이크', isSwinging: true })
+    expect(b).toMatchObject({ isSpecialSwing: true, specialSwingRemaining: 1, isUncatchable: false })
+    expect(필살.used()).toBe(보통.used())
+  })
+
+  it('남은 횟수 0 이거나 일반 타자면 필살이 없다 — 굴림 차례도 그대로', () => {
+    const 기준 = 각본([0])
+    pitchAgainstBatterDetailed(한가운데, 타자(500), 기준)
+    const 없음 = 각본([0])
+    const 일반 = 각본([0])
+    expect(
+      pitchAgainstBatterDetailed(한가운데, 타자(500), 없음, undefined, undefined, { ...마타자, specialSwing: { swingNumber: 7, remaining: 0 } }),
+    ).toMatchObject({ isSpecialSwing: false, specialSwingRemaining: 0 })
+    expect(
+      pitchAgainstBatterDetailed(한가운데, 타자(500), 일반, undefined, undefined, { ...마타자, isMagicBatter: false }),
+    ).toMatchObject({ isSpecialSwing: false, specialSwingRemaining: 2 })
+    expect(없음.used()).toBe(기준.used())
+    expect(일반.used()).toBe(기준.used())
+  })
+
+  it('pitchAgainstBatter 는 판정만 돌려준다 (같은 난수 차례)', () => {
+    const a = pitchAgainstBatter(한가운데, 타자(600), createSeededRandom(42), undefined, undefined, 마타자)
+    const b = pitchAgainstBatterDetailed(한가운데, 타자(600), createSeededRandom(42), undefined, undefined, 마타자)
+    expect(a).toEqual(b.resolution)
   })
 })
