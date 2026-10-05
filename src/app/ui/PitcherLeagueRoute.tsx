@@ -52,6 +52,7 @@ export function PitcherLeagueRoute({
     return (
       <PitcherGameScreen
         options={gameOptions}
+        pitcherName={career.name}
         random={random}
         onFinish={actions.finishGame}
         onQuit={() => actions.goto('관리')}
