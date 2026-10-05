@@ -17,6 +17,7 @@ import {
   resolveBenchClearing,
   resolveDefensePlay,
   runAutoProgress,
+  spendOurSpecialSwing,
   startBatterOutcome,
   startBatterPitch,
   startTeamGame,
@@ -88,8 +89,16 @@ export interface TeamGameSession {
    */
   readonly pendingDefensePlay: PendingDefensePlay | null
   readonly actions: {
-    /** 타석 화면이 판정한 공 하나 */
-    readonly resolvePitch: (detail: PitchOutcomeDetail) => void
+    /**
+     * 타석 화면이 판정한 공 하나. `isUncatchable` 은 필살타법이 성공한 타구(0x517e6 → 0x51800)인가 —
+     * 수비 화면의 야수가 쥐지 못한다.
+     */
+    readonly resolvePitch: (detail: PitchOutcomeDetail, isUncatchable?: boolean) => void
+    /**
+     * 사람 타석의 필살 스윙이 나갔다 (0x4e136) — `BattingStage` 의 `onSpecialSwingUsed` 를 그대로 잇는다.
+     * 인자는 줄인 뒤 남은 횟수다.
+     */
+    readonly specialSwingUsed: (remaining: number) => void
     /** 타석 결과를 통째로 (자동 소화·테스트용) */
     readonly applyOutcome: (outcome: AtBatOutcome) => void
     /** 구질·코스·게이지 칸을 정해 한 개 던진다 */
@@ -179,11 +188,14 @@ export function useTeamGame(options: TeamGameOptions, random: RandomPort): TeamG
   const actions = useMemo(
     () => ({
       // 인플레이 타구가 나오면 **여기서 멈춘다** — 주자 처리는 수비 화면이 끝난 뒤다 (상태 0x17)
-      resolvePitch: (detail: PitchOutcomeDetail) =>
+      resolvePitch: (detail: PitchOutcomeDetail, isUncatchable?: boolean) =>
         step(
           // 판정 11(2스트라이크 번트 파울 아웃)이면 아웃 콜이 조건 없이 62 다 — 플레이 끝까지 간다
           (current) =>
-            startBatterPitch(current, detail, random, { buntFoulOut: detail.isBuntFoulOut }),
+            startBatterPitch(current, detail, random, {
+              buntFoulOut: detail.isBuntFoulOut,
+              isUncatchable: isUncatchable === true,
+            }),
           // 타구음(0x515de~) → 심판 콜(0x51a94) 순서. 통로가 하나라 뒤 소리가 앞 소리를 끊는다.
           // 인플레이 타구면 아웃 콜은 여기서 안 난다 — 수비 화면이 끝난 뒤(`finishDefensePlay`)다
           (before, after) => {
@@ -235,6 +247,7 @@ export function useTeamGame(options: TeamGameOptions, random: RandomPort): TeamG
       cpuPickoff: (base: PickoffBase) =>
         step((current) => cpuPickoff(current, base, random), pickoffCallSoundsOf),
       closeBurst: () => step((current) => closeBurstWindow(current)),
+      specialSwingUsed: (remaining: number) => step((current) => spendOurSpecialSwing(current, remaining)),
       changePitcher: (benchIndex: number) =>
         step(
           (current) => changePitcher(current, benchIndex),

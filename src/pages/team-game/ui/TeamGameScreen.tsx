@@ -20,6 +20,7 @@ import {
   currentPitcherAceIndex,
   pitchSlotsFor,
   pitchersOfRecordOf,
+  specialSwingRemainingAt,
   substitutionDetailAbilities,
 } from '@/features/play-team-game/model/teamGameFlow'
 import { GameEndBoard } from '@/widgets/game-scene/ui/GameEndBoard'
@@ -495,8 +496,12 @@ export function TeamGameScreen({
               batterAbility={currentBatterAbility(progress)}
               // 마타자가 대타로 올라오면 필살 연출 점프표(0xd01e4)가 이 순번을 본다
               aceBatterIndex={currentBatterEntry(progress)?.aceIndex ?? -1}
-              // 팀 경기는 "내 선수" 보너스가 없다 — 그 보너스는 나만의리그 판정에만 있다 (0xab214)
+              // 팀 경기(모드 1·2·8·9)는 판정 묶음 '일반' — "내 선수" 보너스(모드 3·4)도 타자 미션 +100(모드 6)도 없다 (0xab214)
               swingMode="일반"
+              // 타순 칸별 이 경기 남은 필살 횟수 s8 팀[+0x29 + 타순] (0xaea30) — 진행기가 든다. 0xaebe4 처럼 칸이 비면
+              // 그 타자로 채운 값이다: 마타자 0xd84fa[레벨], 그 밖은 +0x18 == 0 이라 0 ('0' 키 무시, 0x51e14)
+              specialSwingRemaining={specialSwingRemainingAt(progress, '우리')}
+              onSpecialSwingUsed={(remaining) => actions.specialSwingUsed(remaining)}
               // ⚠️ 미해결: `batterSkillIds` 를 안 넘긴다 — 팀 경기 명단(`TeamEntryBatter`)·로스터 표에 선수 스킬 비트(+0x14)가
               //    없다. 그래서 실투 판정 0x33cbc 의 타자 비트 22 압도(+5)와 0xa5e14 의 압도 ×2 가 늘 거짓이다
               gameMode={options.mode}
@@ -532,7 +537,7 @@ export function TeamGameScreen({
               aceLevels={options.aceLevels}
               isPaused={burstLines !== null}
               random={random}
-              onPitchResolved={(detail) => actions.resolvePitch(detail)}
+              onPitchResolved={(detail, _pitch, isUncatchable) => actions.resolvePitch(detail, isUncatchable)}
               // CPU 투수 견제 (0x345fc 종류 4 → 0x34848 → 메시지 0x10) — 루가 정해진 뒤는 진행기가 판을 돌린다
               onPickoff={(base) => actions.cpuPickoff(base)}
             />

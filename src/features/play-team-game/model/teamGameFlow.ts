@@ -51,7 +51,9 @@ import {
   rollsIntoBenchClearing,
   staminaAfterBenchClearing,
 } from '@/entities/game/model/benchClearing'
-import { pitchAgainstBatter } from '@/entities/pitching/model/simulateBatter'
+import { pitchAgainstBatterDetailed } from '@/entities/pitching/model/simulateBatter'
+import { specialSwingCountOf } from '@/entities/batting/model/specialSwing'
+import { aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
 import { isMistakePitch } from '@/entities/pitching/model/mistakePitch'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import { MAGIC_PITCH_TYPE_NUMBER } from '@/entities/pitcher-career/model/magicPitch'
@@ -603,6 +605,13 @@ export interface TeamGameProgress {
   /** 우리 투수 스태미나 0~10000 (레코드 +0x2c) */
   readonly stamina: number
   readonly magicRemaining: number
+  /**
+   * **타순 칸별 이 경기 남은 필살 횟수** = s8 팀[+0x29 + 타순] (0xaea30 이 읽고 0xae9e8 이 쓴다). 아홉 칸.
+   * −1 은 "아직 안 채움" — 타석 교대 0xaebe4 가 그 타순 선수로 채운다(`specialSwingRemainingAt`).
+   * 대타 교체(0xaede0) 때 그 칸을 −1 로 되돌린다. 이닝이 바뀌어도 다시 차지 않는다 (H2 1-2).
+   */
+  readonly ourSpecialSwingRemaining: readonly number[]
+  readonly opponentSpecialSwingRemaining: readonly number[]
   readonly pitchCount: number
   readonly lastPitch: Pitch | null
   readonly lastResolution: PitchResolution | null
@@ -810,6 +819,8 @@ export function startTeamGame(options: TeamGameOptions, random: RandomPort): Tea
     atBatPrepared: false,
     stamina: ourPitcherStaminas[startingSlots.ours] ?? FULL_STAMINA,
     magicRemaining: options.magicCount ?? 0,
+    ourSpecialSwingRemaining: UNFILLED_SPECIAL_SWINGS,
+    opponentSpecialSwingRemaining: UNFILLED_SPECIAL_SWINGS,
     pitchCount: 0,
     lastPitch: null,
     lastResolution: null,
@@ -1240,6 +1251,62 @@ function withLeaguePlateAppearance(
 /** 지금 타석에 선 우리 타자 (명단 칸 = 타순 칸) */
 export function currentBatterEntry(progress: TeamGameProgress): TeamEntryBatter | undefined {
   return progress.ourEntry[progress.game.battingOrderIndex]
+}
+
+/** 필살 남은 칸의 "아직 안 채움" (0xaebe4 가 음수일 때만 채운다) */
+const UNFILLED_SPECIAL_SWING = -1
+const UNFILLED_SPECIAL_SWINGS: readonly number[] = Array.from({ length: BATTING_ORDER_SIZE }, () => UNFILLED_SPECIAL_SWING)
+
+/** 마선수 레코드 +0x18 = 순번 + 5 (H2 4-1) */
+const ACE_SPECIAL_NUMBER_OFFSET = 5
+
+/**
+ * 명단 한 칸 타자의 **한 경기 필살 횟수** — 타석 교대 0xaebe4 가 채우는 값 (`specialSwingCountOf`).
+ *   마타자: s8 0xd84fa[레벨] — 레벨 = 전역 기록 `mgr[0x13f + 순번]` (`options.aceLevels`, 양 팀 모두 같은 전역 칸)
+ *   그 밖:  `+0x18 == 0 → 0` — 팀 경기 명단은 리그 로스터와 마선수뿐이고 일반 레코드 +0x18 은 모두 0 이다 (H2 4-2)
+ * ⚠️ 미해결: 스킬 23 무자비 +1 (0xb62b4(B, 0x17)) — 팀 경기 명단(`TeamEntryBatter`)·로스터 표·마선수 표에
+ *    스킬 비트(+0x14)가 없어 늘 거짓으로 둔다.
+ */
+function specialSwingCountFor(progress: TeamGameProgress, batter: TeamEntryBatter | undefined): number {
+  if (batter === undefined || batter.aceIndex === NO_ACE_BATTER) return 0
+  return specialSwingCountOf({
+    swingNumber: batter.aceIndex + ACE_SPECIAL_NUMBER_OFFSET,
+    isAceBatter: true,
+    aceLevel: aceBatterLevelOf(progress, batter.aceIndex),
+    hasRuthlessSkill: false,
+  })
+}
+
+/** 마타자 순번의 레벨 0~4 = `mgr[0x13f + 순번]` */
+function aceBatterLevelOf(progress: TeamGameProgress, aceIndex: number): number {
+  return aceLevelOf(progress.options.aceLevels, aceLevelSlotOf('타자', aceIndex + 1))
+}
+
+/**
+ * 지금 타순 칸의 **남은 필살 횟수** = 0xaea30 — 칸이 −1 이면 0xaebe4 처럼 그 타자의 횟수로 채운 값을 돌려준다.
+ * `side` 가 '우리' 면 사람 타석(`BattingStage` 의 `specialSwingRemaining`), '상대' 면 사람이 던지는 CPU 타석.
+ */
+export function specialSwingRemainingAt(progress: TeamGameProgress, side: '우리' | '상대'): number {
+  const ours = side === '우리'
+  const slot = ours ? progress.game.battingOrderIndex : progress.opponentOrderIndex
+  const stored = (ours ? progress.ourSpecialSwingRemaining : progress.opponentSpecialSwingRemaining)[slot]
+  if (stored !== undefined && stored >= 0) return stored
+  return specialSwingCountFor(progress, (ours ? progress.ourEntry : progress.opponentEntry)[slot])
+}
+
+function withSpecialSwingSlot(cells: readonly number[], slot: number, value: number): readonly number[] {
+  if (slot < 0 || slot >= cells.length || cells[slot] === value) return cells
+  return cells.map((cell, index) => (index === slot ? value : cell))
+}
+
+/**
+ * 사람 타석의 필살 스윙이 나갔다 — 스윙 틱 0x4e136 의 `0xae9e8(팀, 남은 − 1)`. `remaining` 은 `BattingStage` 의
+ * `onSpecialSwingUsed` 가 넘긴 줄인 뒤 값이다. 난수는 쓰지 않는다.
+ */
+export function spendOurSpecialSwing(progress: TeamGameProgress, remaining: number): TeamGameProgress {
+  if (!isBatterTurn(progress)) return progress
+  const cells = withSpecialSwingSlot(progress.ourSpecialSwingRemaining, progress.game.battingOrderIndex, remaining)
+  return cells === progress.ourSpecialSwingRemaining ? progress : { ...progress, ourSpecialSwingRemaining: cells }
 }
 
 /** 명단 한 칸의 경기용 능력치 네 칸 — 없는 칸이면 0 이다 */
@@ -1897,7 +1964,12 @@ function pitchOnce(
   )
 
   const batter = entryStageAbilityOf(progress, options.opponentTeamId, progress.opponentOrderIndex)
-  const resolution = pitchAgainstBatter(
+  // 0xb633d(타자) — 레코드 +0xa 비트 6. 명단에 끼운 마타자(`withAceBatter`)만 참이다
+  const aceBatterIndex =
+    entryBattersOf(progress, options.opponentTeamId)[progress.opponentOrderIndex]?.aceIndex ?? NO_ACE_BATTER
+  const isMagicBatter = aceBatterIndex >= 0
+  const ourRepertoireAce = repertoire.magicId >= ACE_SPECIAL_NUMBER_OFFSET
+  const thrown = pitchAgainstBatterDetailed(
     pitch,
     batter,
     random,
@@ -1914,12 +1986,29 @@ function pitchOnce(
     },
     {
       isMistakePitch: isMistake,
-      // 0xb633d(타자) — 레코드 +0xa 비트 6. 명단에 끼운 마타자(`withAceBatter`)만 참이다
-      isMagicBatter:
-        (entryBattersOf(progress, options.opponentTeamId)[progress.opponentOrderIndex]?.aceIndex ??
-          NO_ACE_BATTER) >= 0,
+      isMagicBatter,
+      // 마타자 필살 0x34468~0x34488 — 남은 칸(0xaea30)이 0 이 아니면 휘두를 때마다 필살이다 (난수 없음).
+      // 번호 = 마선수 +0x18 = 순번 + 5, 보정 구조체 k = 레벨·5 + 순번
+      ...(isMagicBatter
+        ? {
+            specialSwing: {
+              swingNumber: aceBatterIndex + ACE_SPECIAL_NUMBER_OFFSET,
+              remaining: specialSwingRemainingAt(progress, '상대'),
+              aceOrder: aceBatterIndex,
+              aceLevel: aceBatterLevelOf(progress, aceBatterIndex),
+            },
+          }
+        : {}),
+      // 0x34d6c 투수 쪽 — 공+0x10 이 서 있고 우리 투수가 마투수면 `mgr[0x13a + 순번]`
+      pitcherAceLevel: ourRepertoireAce
+        ? aceLevelOf(options.aceLevels, aceLevelSlotOf('투수', repertoire.magicId - ACE_SPECIAL_NUMBER_OFFSET + 1))
+        : 0,
+      // 팀 경기 모드 1·2·8·9 는 판정 묶음 '일반' — 수비(우리)가 사람이라 hit·power 쪽 −10 (0xab5c0).
+      // 내 선수 보너스(모드 3·4)·투수 미션 +100(모드 5)은 없다 — 팀 명단에 비트7 선수가 없다
+      swingMode: '일반',
     },
   )
+  const resolution = thrown.resolution
 
   // 스태미나는 게이지 결과와 무관하다 — 인자가 (game, 구질) 뿐이다 (P1 3-1 확정)
   const stamina = drainStamina({
@@ -1940,6 +2029,15 @@ function pitchOnce(
     stamina,
     // ⚠️ 마구 횟수는 **코스 확정(OK)** 때 줄어든다 — 구질을 고른 순간이 아니다 (0x50e9c)
     magicRemaining: isMagic ? progress.magicRemaining - 1 : progress.magicRemaining,
+    // 0x4e136 — CPU 마타자의 필살 스윙이 나간 틱에 그 타순 칸 −1 (헛스윙도)
+    opponentSpecialSwingRemaining:
+      thrown.specialSwingRemaining === null
+        ? progress.opponentSpecialSwingRemaining
+        : withSpecialSwingSlot(
+            progress.opponentSpecialSwingRemaining,
+            progress.opponentOrderIndex,
+            thrown.specialSwingRemaining,
+          ),
     pitchCount: progress.pitchCount + 1,
     // 투구마다 state[0xd] 가 내려간다 (0xa5e72) — 그 뒤라야 다시 교체를 볼 수 있다
     pitcherJustChanged: false,
@@ -1977,7 +2075,8 @@ function pitchOnce(
     const held: TeamGameProgress = { ...cleared, pendingBenchClearing: { side: '수비', outcome } }
     return defer ? held : resolveBenchClearing(held, { reachedTargetTick: true }, random)
   }
-  const started = startDefensiveAtBat(cleared, outcome, true, random)
+  // 0x517e6 — CPU 마타자 필살이 성공한 타구는 "송구공" 비트(0xaf180)가 서서 야수가 쥐지 못한다
+  const started = startDefensiveAtBat(cleared, outcome, true, random, thrown.isUncatchable)
   const pending = started.pendingDefensePlay
   // 수비 진행 중 — 화면이 틱을 돌리는 동안 경기를 붙들어 둔다 (원본 상태 0x17)
   if (pending === null) return advance(started, random)
@@ -2037,6 +2136,8 @@ function startDefensiveAtBat(
   outcome: AtBatOutcome,
   mine: boolean,
   random: RandomPort,
+  /** 필살 성공 타구인가 (0x517e6 → 0x51800) — 사람이 던진 타석의 CPU 마타자만 */
+  isUncatchable = false,
 ): TeamGameProgress {
   if (!(mine && isBattedBallInPlay(outcome))) {
     // 내가 던진 타석이면 홈런도 날아가는 그림을 보여 준다 (자동으로 넘긴 타석은 재생 자체가 없다)
@@ -2045,7 +2146,11 @@ function startDefensiveAtBat(
   }
   return {
     ...progress,
-    pendingDefensePlay: { side: '수비', input: defensiveDefenseInputOf(progress, outcome, random), outcome },
+    pendingDefensePlay: {
+      side: '수비',
+      input: defensiveDefenseInputOf(progress, outcome, random, isUncatchable),
+      outcome,
+    },
   }
 }
 
@@ -2057,10 +2162,12 @@ function defensiveDefenseInputOf(
   progress: TeamGameProgress,
   outcome: AtBatOutcome,
   random: RandomPort,
+  isUncatchable: boolean,
 ): DefensePlayInput {
   const before = progress.game
   return {
     outcome,
+    isUncatchable,
     trajectory: battedBallTrajectory(representativePatternOf(outcome)),
     bases: before.bases,
     outs: before.outs,
@@ -2828,6 +2935,12 @@ export function pinchHit(progress: TeamGameProgress, benchIndex: number): TeamGa
       ourBatterLogs: swapped.logs ?? progress.ourBatterLogs,
       // 4. 벤치 타자 수 −1
       ourBenchBatters: Math.max(0, progress.ourBenchBatters - 1),
+      // 0xaede0 — 그 타순의 필살 남은 칸을 −1 로 되돌려 들어온 선수가 자기 횟수를 새로 받는다 (H2 1-2)
+      ourSpecialSwingRemaining: withSpecialSwingSlot(
+        progress.ourSpecialSwingRemaining,
+        progress.game.battingOrderIndex,
+        UNFILLED_SPECIAL_SWING,
+      ),
       // 상태 0x16 → 0xd: 이전 상태가 0x16 이라 0xb6764·0xa5bcc 를 건너뛴다 — 카운트를 그대로 둔다
       atBat: progress.atBat,
       atBatPrepared: false,
@@ -2968,12 +3081,19 @@ function applyCpuPinchHit(
         ourHitBases: swapped.hitBases ?? progress.ourHitBases,
         ourBatterLogs: swapped.logs ?? progress.ourBatterLogs,
         ourBenchBatters: Math.max(0, progress.ourBenchBatters - 1),
+        // 0xaede0 — 대타가 선 타순의 필살 남은 칸을 −1 로 (새 선수가 0xaebe4 에서 자기 횟수를 받는다)
+        ourSpecialSwingRemaining: withSpecialSwingSlot(progress.ourSpecialSwingRemaining, slot, UNFILLED_SPECIAL_SWING),
       }
     : {
         ...progress,
         opponentEntry: swapped.entry,
         opponentEntryRecords: swapped.records,
         opponentBenchBatters: Math.max(0, progress.opponentBenchBatters - 1),
+        opponentSpecialSwingRemaining: withSpecialSwingSlot(
+          progress.opponentSpecialSwingRemaining,
+          slot,
+          UNFILLED_SPECIAL_SWING,
+        ),
       }
 
   return appendLog(
