@@ -105,9 +105,27 @@ const ADVANCE_BY_KEY: Partial<Readonly<Record<OriginalKey, RunnerTarget>>> = {
 /**
  * 주루 — 귀루 (0x5331c, 메시지 0x584).
  * '3' → 1루 주자 · '1' → 2루 주자 · '7' → 3루 주자 · CLR → 전원.
- * 원본에서 귀루 셋('3'/'1'/'7')은 `[+0x1c] & 0xf0 == 0` 일 때만 먹는다. 그 비트가 무슨 뜻인지는
- * 아직 못 읽었다 (미해결) — 여기서는 `canReturn` 인자로 빼 두고 기본값은 "먹는다" 로 둔다.
- * '전원 귀루'(CLR)에는 그 조건이 없다.
+ * 원본에서 귀루 셋('3'/'1'/'7')은 `[조작+0x1c] & 0xf0 == 0` 일 때만 먹는다(0x53370·0x53380·0x53390).
+ * '전원 귀루'(CLR, 0x533a6)·진루·OK 슬라이딩·송구에는 그 조건이 없다.
+ *
+ * ## `[조작+0x1c]` = **키 몸짓 비트** — 직접 떠서 확정
+ * 조작 객체 슬롯 2 = `0x53290` 이 `[+0x18] = r1(경기 상태) · [+0x14] = r2(키) · [+0x1c] = r3` 를 적는다.
+ * 그것을 부르는 경기 장면 키 분배 `0x498d4` 는 사람 조작 객체에게 **한 틱에 세 번까지** 준다:
+ * ```
+ * 49a3a: 이번 틱에 새로 눌렸으면(경기+0x34)   vt8(상태, 키 = 경기+0x40, **r3 = 0**)
+ * 49a5c: 경기+0x50(누르고 있는 키) ≠ 0 이면    vt8(상태, 키 = 경기+0x50, r3 = 경기+0x6c)
+ * 49a80: 경기+0x54(뗀 키) ≠ 0 이면             vt8(상태, 키 = 경기+0x54, r3 = 경기+0x6c)
+ * ```
+ * `경기+0x6c` 는 키 처리 `0xbca04`(this = 경기+0x18, 그래서 칸 +0x54) 가 매 틱 새로 짓는다:
+ *   비트 0~3 = 같은 키를 3틱 안에 거듭 누른 횟수(bca5e) · **비트 4~7 = 누르고 있은 단계 수**
+ *   (4틱마다 +1, 상한 0xf0 — bcac4) · 비트 8 = 길게 눌렀다 뗌(bca9a) · 비트 9 = 뗌(bcaf6).
+ * 그리고 `0x536bc` 는 `[+0x1c] ≠ 0` 이면 비트 9 가 선 사건은 상태 0x11 로만, 아니면 상태 0x17(0x53420)
+ * 로만 보낸다(536f8~5370c). 곧 상태 0x17 에 `[+0x1c] & 0xf0 ≠ 0` 으로 들어오는 것은 **누르고 있어서
+ * 생긴 반복 사건뿐**이고, 새로 누른 키는 늘 `[+0x1c] = 0` 이라 게이트를 그냥 지난다.
+ * → **귀루 셋은 꾹 누르고 있어도 되풀이되지 않는다.** 진루·CLR·OK·송구는 누르고 있으면 4틱마다 거듭 나간다.
+ *
+ * 웹에는 그 4틱 반복 대신 브라우저 키 반복(`KeyboardEvent.repeat`)이 있어 그것을 같은 사건으로 본다
+ * (`isHoldRepeat`). 반복 간격이 원본 4틱과 다른 것은 입력 층의 **근사**다.
  */
 const RETURN_BY_KEY: Partial<Readonly<Record<OriginalKey, RunnerTarget>>> = {
   '3': 1,
@@ -142,8 +160,11 @@ const PICKOFF_BY_KEY: Partial<Readonly<Record<OriginalKey, 1 | 2 | 3>>> = {
 }
 
 export interface InPlayKeyOptions {
-  /** 귀루 셋('3'/'1'/'7')의 게이트 `[+0x1c] & 0xf0 == 0` (뜻 미해결). 기본 true */
-  readonly canReturn?: boolean
+  /**
+   * 키를 **누르고 있어서** 생긴 반복 사건인가 — 원본 `[조작+0x1c] & 0xf0 ≠ 0`(경기+0x6c 비트 4~7).
+   * 참이면 귀루 셋('3'/'1'/'7')이 안 먹는다. 기본 false(새로 누른 키 = `[+0x1c] = 0`).
+   */
+  readonly isHoldRepeat?: boolean
 }
 
 /**
@@ -175,7 +196,8 @@ export function inPlayCommandOf(
 
   const back = RETURN_BY_KEY[key]
   if (back === undefined) return null
-  return (options.canReturn ?? true) ? { kind: '귀루', runner: back } : null
+  // 0x53370·0x53380·0x53390: `tst [+0x1c], #0xf0 ; bne` — 누르고 있는 반복 사건이면 버린다
+  return options.isHoldRepeat === true ? null : { kind: '귀루', runner: back }
 }
 
 /** 경기 상태 0xf (구질 고르기) 에서 사람이 수비일 때의 견제 키 (0x53548) */

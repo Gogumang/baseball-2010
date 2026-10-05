@@ -581,6 +581,35 @@ describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
     expect(결과.log.some((line) => line.includes('태그 아웃 (0xb36d0 결과 3)'))).toBe(true)
   })
 
+  it('같은 귀루 키도 **누르고 있어서 되풀이된 사건**이면 안 먹는다 — 원본 [조작+0x1c] & 0xf0 (0x53370~0x53390)', () => {
+    // 바로 위 시험과 같은 판에서 키만 "반복"(브라우저 KeyboardEvent.repeat = 원본 경기+0x6c 비트 4~7)으로 준다.
+    const 같은판 = (isRepeat: boolean) =>
+      runDefensePlay({
+        outcome: 이루타,
+        trajectory: battedBallTrajectory(representativePatternOf(이루타)),
+        bases: { first: true, second: true, third: false },
+        outs: 0,
+        defenseIsCpu: true,
+        controls: { side: '공격', keyAt: (tick) => (tick === 33 ? { key: '3', isRepeat } : null) },
+      })
+    const 반복 = 같은판(true)
+
+    expect(반복.log.some((line) => line.includes('귀루'))).toBe(false)
+    expect(반복.log.some((line) => line.includes('태그 아웃 (0xb36d0 결과 3)'))).toBe(false)
+    // 새로 누른 키(반복 아님)는 그대로 먹는다
+    expect(같은판(false).log.some((line) => line.includes('귀루'))).toBe(true)
+    // 전원 귀루(CLR)는 게이트가 없어 반복이어도 먹는다
+    const 전원 = runDefensePlay({
+      outcome: 이루타,
+      trajectory: battedBallTrajectory(representativePatternOf(이루타)),
+      bases: { first: true, second: true, third: false },
+      outs: 0,
+      defenseIsCpu: true,
+      controls: { side: '공격', keyAt: (tick) => (tick === 33 ? { key: 'Escape', isRepeat: true } : null) },
+    })
+    expect(전원.log.some((line) => line.includes('귀루'))).toBe(true)
+  })
+
   it('타자주자는 협살 대상이 아니다 — 타자주자의 운명은 결과 코드가 정한다 (근사)', () => {
     // 3루타는 타자주자가 반드시 3루까지 간다. 협살이 그를 잡으면 기록과 어긋난다
     const 결과 = runDefensePlay({

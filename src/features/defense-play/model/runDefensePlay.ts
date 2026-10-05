@@ -343,8 +343,6 @@ export interface DefensePlayControls {
   readonly side: ControlSide
   /** 이 틱에 눌린 키. 없으면 null */
   keyAt(tick: number): DefenseKeyPress | null
-  /** 귀루 셋('3'/'1'/'7')의 게이트 `[+0x1c] & 0xf0 == 0` (뜻 미해결). 기본 true */
-  readonly canReturn?: boolean
 }
 
 export interface DefensePlayResult {
@@ -830,9 +828,27 @@ export function stepDefensePlay(
    *   내므로 지우면 오히려 "그 아웃을 낸 판정" 을 잃는다. 아웃이 여럿이면 **마지막 아웃**이 이긴다.
    *
    * ⚠️ **원본 `state[0x87]` 의 나머지 절반(0xb4312)은 안 옮겼다.** 원본은 결과가 **2(루 아웃)**
-   *    이면서 그 야수의 `+0x3b`(목표점 도착 표시)가 서 있을 때도 이 칸을 세운다. `+0x3b` 는
-   *    이 모델에 없는 칸이고(위치==목표 vt18 과는 세우고 푸는 자리가 다르다) 억지로 vt18 로
-   *    바꿔 끼우면 **땅볼 포스 아웃이 죄다 62 로 뒤집힌다**. 뜻을 모르는 채로 박지 않는다.
+   *    이면서 그 야수의 `+0x3b` 가 서 있을 때도 이 칸을 세운다. 억지로 vt18(위치 == 목표)로
+   *    바꿔 끼우면 **땅볼 포스 아웃이 죄다 62 로 뒤집힌다**(앞 시도).
+   *
+   *    2026-10 에 둘레를 더 떴다(직접 뜬 것):
+   *    - `+0x3b` 의 뜻은 **확정**이다. 야수 vtable `0xd7934` 의 vt30 도 주자와 같은 `0xbf0dc` 라,
+   *      갱신 머리에서 지우고(bf0e6) 목표점에 **막 닿은 갱신에서만** 1 이 된다(bf146) — 한 틱짜리 맥박.
+   *    - 0xb4300~0xb4314 는 **타구 포구 틱 구역**(`b42ce`)에만 있다. 들어오는 길은 공 쥐기
+   *      `b42c8 0xb2710` 과 필살타법 타구 `b4290`(메시지 0xbc3) 둘뿐이고, 틱마다 도는 `b43da` 판정은
+   *      이 칸을 결과 2 로 세우지 않는다. 그 구역은 `b42e0`: `0xa99d8`(막 닿은 산 주자가 있나) ||
+   *      야수+0x3b 면 vt90 을 **한 번 더** 부르고(b42f2), 그 결과가 2 이고 야수+0x3b 면 1 을 적는다.
+   *    - 결과 2 는 공 쥔 야수의 발밑 루(`0xa0ae4`, 좌표 **비트까지** 같음)가 주자의 루와 같아야 서는데,
+   *      포구 틱의 야수는 목표점 = 포구점에 서 있다. 포구점이 루 좌표와 비트까지 같을 때만 닿는 갈래라
+   *      실제로는 거의 안 선다.
+   *    여기에 **새로 드러난 어긋남 하나**: 포구 틱에는 vt90 이 두 번 돈다 — 쥐기 안(0xb2758) 한 번,
+   *    그 뒤 `b42f2` 또는 `b43de` 한 번(쥐기가 야수+0xe0 = 1 을 세우니 둘 중 하나는 반드시 돈다).
+   *    두 번째도 머리(b36dc)에서 `state[0x87] = 0` 으로 지우므로, **쥐기 판정이 태그 아웃(3)을 내고
+   *    두 번째가 0 이면 결과 코드 13 을 읽는 b4540 시점의 칸은 0** 이다(콜 20). 이 진행기는 쥐기 판정의
+   *    태그를 그대로 들고 가 62 를 낸다. 고치려면 "그 틱의 **마지막** 판정" 을 원본 차례대로 맞춰야 하는데,
+   *    포구 틱 뒤의 판정(웹은 이동 뒤 6b)이 원본에서 이동 갱신 앞인지 뒤인지가 `0xb401c`(해독 금지 구역)와
+   *    장면 갱신 고리에 있어 확정하지 못했다. 아웃·세이프와 난수는 안 바뀌고 콜 소리만 걸린 자리라
+   *    **에뮬레이터로 확인하기 전에는 그대로 둔다.**
    */
   const runOutJudgement = (): void => {
     if (play.finished) return
@@ -875,8 +891,9 @@ export function stepDefensePlay(
     // 예전에는 `input.controls?.keyAt(tick)` 로 미리 물어봤다. 이제는 **이번 틱에 눌린 키**를 받는다
     const press = key
     if (input.controls !== undefined && press !== null) {
+      // 누르고 있어서 되풀이된 키는 귀루 셋이 안 먹는다 — 원본 `[조작+0x1c] & 0xf0`(경기+0x6c 비트 4~7)
       const command = inPlayCommandOf(press.key, input.controls.side, {
-        canReturn: input.controls.canReturn,
+        isHoldRepeat: press.isRepeat === true,
       })
       if (command !== null && !play.finished) {
         if (command.kind === '송구') {

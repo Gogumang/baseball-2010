@@ -248,6 +248,6 @@ function withSide(input: DefensePlayInput, side?: ControlSide): DefensePlayInput
   if (side === undefined) return input
   return {
     ...input,
-    controls: { side, keyAt: () => null, canReturn: input.controls?.canReturn },
+    controls: { side, keyAt: () => null },
   }
 }

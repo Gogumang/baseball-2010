@@ -33,11 +33,20 @@ describe('키 → 동작 표 — 원본 0x5331c · 0x533c8 · 0x53548', () => {
     })
   })
 
-  it('귀루 셋만 [+0x1c] & 0xf0 게이트를 탄다 — 막히면 전원 귀루(CLR)는 그대로 먹는다', () => {
-    expect(inPlayCommandOf('3', '공격', { canReturn: false })).toBeNull()
-    expect(inPlayCommandOf('1', '공격', { canReturn: false })).toBeNull()
-    expect(inPlayCommandOf('7', '공격', { canReturn: false })).toBeNull()
-    expect(inPlayCommandOf('Escape', '공격', { canReturn: false })).toEqual({ kind: '귀루', runner: '전원' })
+  it('귀루 셋만 [+0x1c] & 0xf0 게이트를 탄다 — 누르고 있는 반복 사건이면 안 먹고, 전원 귀루(CLR)는 먹는다', () => {
+    // [+0x1c] 비트 4~7 = 경기+0x6c 의 "누르고 있은 단계 수" (0xbca04 bcac4). 새로 누른 키는 0 이다 (0x49a44)
+    expect(inPlayCommandOf('3', '공격', { isHoldRepeat: true })).toBeNull()
+    expect(inPlayCommandOf('1', '공격', { isHoldRepeat: true })).toBeNull()
+    expect(inPlayCommandOf('7', '공격', { isHoldRepeat: true })).toBeNull()
+    expect(inPlayCommandOf('Escape', '공격', { isHoldRepeat: true })).toEqual({ kind: '귀루', runner: '전원' })
+    expect(inPlayCommandOf('3', '공격', { isHoldRepeat: false })).toEqual({ kind: '귀루', runner: 1 })
+  })
+
+  it('누르고 있어도 진루·OK 슬라이딩·송구는 그대로 먹는다 — 게이트는 귀루 셋에만 있다 (0x5335e·0x53430·0x533c8)', () => {
+    expect(inPlayCommandOf('2', '공격', { isHoldRepeat: true })).toEqual({ kind: '진루', runner: 1 })
+    expect(inPlayCommandOf('0', '공격', { isHoldRepeat: true })).toEqual({ kind: '진루', runner: '전원' })
+    expect(inPlayCommandOf('Enter', '공격', { isHoldRepeat: true })).toEqual({ kind: '슬라이딩' })
+    expect(inPlayCommandOf('6', '수비', { isHoldRepeat: true })).toEqual({ kind: '송구', target: 1 })
   })
 
   it('송구는 홈 8 · 1루 6 · 2루 2 · 3루 4 다 (메시지 0x588)', () => {
