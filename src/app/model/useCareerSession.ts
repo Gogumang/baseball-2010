@@ -120,6 +120,9 @@ import {
 } from '@/entities/national-cup/model/nationalCupFlow'
 import type { NationalCupFinish } from '@/entities/national-cup/model/nationalCupFlow'
 import type { GamePointWalletSession } from '@/entities/wallet/model/useGamePointWallet'
+import { LEAGUE_SIDE_HOME, postseasonSideOf } from '@/entities/league/model/league'
+import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
+import type { PlayerSide } from '@/entities/game/model/gameState'
 
 /**
  * **경기 뒤 평가 창의 좋음·보통·나쁨 징글** (36 · 37 · 38).
@@ -358,10 +361,12 @@ export function useCareerSession({
       opponentTeamId: number | undefined,
       /** 리그 날짜 카운터 g — 4인 로테이션이 본다 (`시즌+0xb2` 자리, 커리어는 `gamesPlayed`) */
       dayCounter = 0,
+      /** 내 팀이 앉는 측 (`0xb7844` → `경기[0x28+side]`). 안 주면 후공 — 정규시즌·국가대항전 자리 */
+      playerSide: PlayerSide = PLAYER_SIDE_LAST_BAT,
     ) => {
       // 환경설정 "주루" 를 경기에 태운다 — 타자편은 사람이 늘 공격이라 설정이 그대로 먹는다 (0xae690)
       const started = startGame(
-        random, ourTeamId, battingOrder, opponentTeamId, undefined, dayCounter, runningModeManualRef.current,
+        random, ourTeamId, battingOrder, opponentTeamId, playerSide, dayCounter, runningModeManualRef.current,
       )
       progressRef.current = started
       setProgress(started)
@@ -378,6 +383,7 @@ export function useCareerSession({
   const beginGame = useCallback(() => {
     const current = careerRef.current
     cupGameRef.current = null
+    const series = current?.postseason ?? null
     startMatch(
       current?.teamId ?? 0,
       current?.battingOrder,
@@ -385,6 +391,14 @@ export function useCareerSession({
       current === null || current === undefined ? undefined : nextOpponentOf(current),
       // 오늘까지 치른 경기 수가 곧 날짜 카운터 g 다 — 양 팀 선발이 네 경기마다 한 바퀴 돈다
       current?.gamesPlayed ?? 0,
+      // 포스트시즌 — 경기 준비 0x1c46c(0x1c484)·장면 0x39fdc 모드 3·4 가지(0x3a164 → [sp+0x3c])가
+      // `0xb7844(L, 내 팀)` 의 `L+0x34 != 0` 갈래로 측을 정한다: 대진 윗 시드(칸 0)가 홈·후공, 아랫 시드가 원정·선공.
+      // ⚠️ 정규시즌도 원본은 같은 0xb7844(일정표 0xd89cb · 9일 주기 뒤집기)인데 웹 타자편은 아직 늘 후공이다.
+      series === null || current === null || current === undefined
+        ? PLAYER_SIDE_LAST_BAT
+        : postseasonSideOf(series, current.teamId) === LEAGUE_SIDE_HOME
+          ? PLAYER_SIDE_LAST_BAT
+          : PLAYER_SIDE_FIRST_BAT,
     )
   }, [startMatch])
 

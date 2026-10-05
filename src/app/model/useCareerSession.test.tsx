@@ -7,6 +7,7 @@ import { EMPTY_LEAGUE, LEAGUE_TEAM_COUNT, startPostseason } from '@/entities/lea
 import { useAtBatRunner } from '@/app/model/useAtBatRunner'
 import type { Screen } from '@/app/model/screen'
 import { createCareer } from '@/entities/career/model/playerCareer'
+import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { SALARY_ACCEPT_EVENT_ID } from '@/entities/career/model/seasonFlow'
 import { careerNationalCupRewardOf } from '@/entities/national-cup/model/nationalCupFlow'
@@ -676,6 +677,20 @@ describe('타자편 포스트시즌 대진 128 — 사람이 친다 (0x120a4 · 
     act(() => rendered.result.current.session.actions.pressPostseason())
     expect(rendered.result.current.screen).toEqual({ kind: '경기' })
     expect(rendered.result.current.session.progress?.opponentTeamId).toBe(series?.teams[1])
+  })
+
+  it('홈/원정은 0xb7844 포스트시즌 갈래 — 대진 윗 시드(칸 0)가 후공, 아랫 시드는 선공이다', () => {
+    // 준PO 는 3위(2) 대 4위(3) — 4위는 아랫 시드라 선공
+    const 아랫시드 = 띄우기(시즌끝선수({ teamId: 3, gamesPlayed: 46, regularSeasonRewardTaken: true }))
+    act(() => 아랫시드.result.current.session.actions.confirmGameResult())
+    act(() => 아랫시드.result.current.session.actions.pressPostseason())
+    expect(아랫시드.result.current.screen).toEqual({ kind: '경기' })
+    expect(아랫시드.result.current.session.progress?.game.playerSide).toBe(PLAYER_SIDE_FIRST_BAT)
+
+    const 윗시드 = 띄우기(시즌끝선수({ teamId: 2, gamesPlayed: 46, regularSeasonRewardTaken: true }))
+    act(() => 윗시드.result.current.session.actions.confirmGameResult())
+    act(() => 윗시드.result.current.session.actions.pressPostseason())
+    expect(윗시드.result.current.session.progress?.game.playerSide).toBe(PLAYER_SIDE_LAST_BAT)
   })
 
   it('포스트시즌 경기 결과 [확인] 은 관리 주기 대신 대진 128 로 돌아간다', () => {
