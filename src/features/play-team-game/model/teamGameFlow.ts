@@ -43,7 +43,7 @@ import {
   SEASON_RECORD_CODE,
 } from '@/entities/season-mode/model/seasonReputation'
 import type { CompleteGameKind, MySide } from '@/entities/season-mode/model/seasonReputation'
-import { createBurstSession, resolveBurst, tryTriggerBurst } from '@/entities/burst-mission/model/burstMissionSession'
+import { cancelBurst, createBurstSession, resolveBurst, tryTriggerBurst } from '@/entities/burst-mission/model/burstMissionSession'
 import type { BurstResolution, BurstSession } from '@/entities/burst-mission/model/burstMissionSession'
 import { burstResultBitsOf } from '@/entities/burst-mission/model/burstResultBits'
 import {
@@ -3047,7 +3047,10 @@ export function runAutoProgress(progress: TeamGameProgress, random: RandomPort):
   // 수비 진행 중에는 손대지 않는다 — 붙들어 둔 타구를 버리고 다음 타석으로 넘어가면 안 된다
   if (progress.pendingDefensePlay !== null) return progress
   // 자동진행 전환 0xc1b48 이 [ctx+0x24] 첫 바이트를 1 로 — 이 뒤로 0xa77f0 은 기록을 안 준다 (a77f2, 유력)
-  let current: TeamGameProgress = { ...progress, recordTally: { ...progress.recordTally, autoProgressed: true } }
+  let current: TeamGameProgress = withoutPendingBurst({
+    ...progress,
+    recordTally: { ...progress.recordTally, autoProgressed: true },
+  })
   for (let step = 0; step < MAXIMUM_AUTO_STEPS; step += 1) {
     if (current.game.isFinished) return current
     if (isVersusMode(current.options.mode) && current.game.inning - 1 > AUTO_PROGRESS_LAST_INNING_INDEX) {
@@ -3172,17 +3175,41 @@ function advance(progress: TeamGameProgress, random: RandomPort): TeamGameProgre
     if (current.game.isFinished) return current
     if (isHumanTurn(current)) {
       if (current.atBatPrepared) return current
-      // 상태 0x18(공수 교대·1회초 판) → 0xd → 0xe → 0xf(타석 준비) 차례 — 판의 굴림이 타석 준비보다 앞이다
-      const prepared = prepareAtBat(withHalfInningBoard(current, random), random)
+      // 상태 0x18(공수 교대·1회초 판) → 0xd → 0xe → 0xf(타석 준비) 차례 — 판의 굴림이 타석 준비보다 앞이다.
+      // 반 이닝이 뒤집혔으면 0x18 진입 0x3ac90 이 남은 돌발을 먼저 내린다 (0xe 메시지 1 의 굴림 0x8f158 보다 앞)
+      const prepared = prepareAtBat(withHalfInningBoard(withoutBurstOnHalfFlip(current), random), random)
       return {
         ...prepared,
         lastHumanHalf: { inning: prepared.game.inning, half: prepared.game.half },
         autoSinceHuman: false,
       }
     }
-    current = playAutoAtBat(current, random)
+    // 상태 0x21 진입 0x3abf0 — 사람 장면에서 뜬 채 남은 돌발을 판정 없이 내린다 (0x8f628)
+    current = playAutoAtBat(withoutPendingBurst(current), random)
   }
   throw new Error('팀 경기 자동 진행이 끝나지 않았습니다 — 진행 규칙을 확인하세요')
+}
+
+/**
+ * **남은 돌발을 판정 없이 내린다** — `0x8f628` (`cancelBurst`, 굴림 없음 · obj+0x21c·+0xc 만 −1).
+ * 부르는 곳은 상태 0x21(자동진행) 진입 `0x3abf0` 과 0x18 뒤집힘 진입 `0x3ac90` 둘뿐이다.
+ * 돌발 객체는 시즌(모드 2)에만 있어 다른 모드에서는 아무 일도 없다.
+ */
+function withoutPendingBurst(progress: TeamGameProgress): TeamGameProgress {
+  if (progress.burst === null) return progress
+  const burst = cancelBurst(progress.burst)
+  return burst === progress.burst ? progress : { ...progress, burst }
+}
+
+/**
+ * 상태 0x18 진입 `0x3ac90` — 경기가 안 끝났고 `0xb6b6c`(아웃 > 2 → 초/말 뒤집기)가 참이면 `0x8f628`.
+ * 사람이 잡은 마지막 반 이닝(`lastHumanHalf`)과 지금 반 이닝이 다르면 그 사이에 뒤집힘이 있었다
+ * (그 사이 자동 타석이 있었으면 0x21 진입이 이미 내렸다 — 두 번 내려도 같다).
+ */
+function withoutBurstOnHalfFlip(progress: TeamGameProgress): TeamGameProgress {
+  const last = progress.lastHumanHalf
+  if (last === null || (last.inning === progress.game.inning && last.half === progress.game.half)) return progress
+  return withoutPendingBurst(progress)
 }
 
 /** 자동 타석 하나 (간이 엔진, 상태 0x21) — 지났다는 표시를 남긴다 */
