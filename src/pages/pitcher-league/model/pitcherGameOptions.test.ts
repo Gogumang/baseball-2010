@@ -39,6 +39,10 @@ describe('경기 옵션 조립 — 커리어 → PitcherGameOptions', () => {
     expect(pitcherGameOptionsOf(투수({ gamesPlayed: 7 })).dayCounter).toBe(7)
   })
 
+  it('연차 idx 는 레코드 +0xb3 = 시즌 − 1 이다 (0xab214 내 투수 보너스 400 − 40×연차)', () => {
+    expect(pitcherGameOptionsOf(투수({ season: 3 })).careerYearIndex).toBe(2)
+  })
+
   it('능력치는 실효값이고 스태미나 용량의 바탕은 체력 칸이다 (0xb6415(P, 3, 1))', () => {
     const career = 투수({ ability: { control: 300, velocity: 400, breaking: 200, stamina: 500 } })
     const options = pitcherGameOptionsOf(career)

@@ -25,6 +25,7 @@ import type { PitcherCareer, PitcherGameOutcome } from '@/entities/pitcher-caree
  * ```
  * ourTeamId       커리어 소속 팀
  * opponentTeamId  일정표(0xd89cb)나 지금 포스트시즌 시리즈 — nextPitcherOpponentOf
+ * careerYearIndex 연차 idx = 레코드 +0xb3 (0부터) — 0xab214 의 내 투수 보너스 400 − 40×연차
  * dayCounter      리그 날짜 카운터 g = 시즌+0xb2. 하루 끝 0xb818c 가 +1 하므로 **지금까지 치른 경기 수**다
  * role/positionCode  레코드 +0xb&3 · +0xa&0x1f
  * stats           0xb570c 를 체력% 피로 앞까지 — 0xb6415(P, i, 1)(장비·장착 스킬) → 질병 → 부상 → 사기.
@@ -96,6 +97,8 @@ export function pitcherGameOptionsOf(
     positionCode: career.positionCode,
     // g = 시즌+0xb2. 시즌 첫 경기가 0 이고 하루가 끝날 때마다 1 늘어난다 (0xb818c)
     dayCounter: career.gamesPlayed,
+    // 0xab214 내 투수 보너스 aP = 400 − 40 × rec[0xb3] — +0xb3 은 연차 idx(0부터, A 0절 "+0x33 = +0xb3")
+    careerYearIndex: career.season - 1,
     isPostseason: career.postseason !== null,
     stats: {
       control: ability.control,
