@@ -40,6 +40,7 @@ import {
 } from '@/entities/career/model/playerCareer'
 import { applyBurstRewards } from '@/entities/career/model/burstReward'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
+import { selectSpecialSwingNumber } from '@/entities/career/model/playerCareer'
 import { awardTitles, equipTitle, evaluateNewTitles } from '@/entities/career/model/titles'
 import { blockReasonOf, runTraining } from '@/entities/career/model/training'
 import { trainingBlockTextOf, trainingOutcomeLinesOf } from '@/entities/career/model/trainingText'
@@ -670,6 +671,14 @@ export function useCareerSession({
      */
     equipTitle: (title: string) => {
       setCareer((current) => (current === null ? current : equipTitle(current, title)))
+    },
+
+    /**
+     * 필살타법 창(상태 0x7b)에서 고른 번호(표 값 1~4)를 선수 +0x18 에 쓴다 (0x1816c `strb`).
+     * 경기의 '0' 키(0x51e14)와 성공 확률(0x34c74)은 이 번호만 본다.
+     */
+    selectSpecialSwing: (number: number) => {
+      setCareer((current) => (current === null ? current : selectSpecialSwingNumber(current, number)))
     },
 
     confirmGameResult: () => {
