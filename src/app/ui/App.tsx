@@ -24,6 +24,7 @@ import { usePitcherLeagueSession } from '@/app/model/usePitcherLeagueSession'
 import { PitcherLeagueRoute } from '@/app/ui/PitcherLeagueRoute'
 import { GeneralModeScreen, aceOpenPriceOf, useAceOpen } from '@/pages/general-mode'
 import { useGamePointWallet } from '@/entities/wallet/model/useGamePointWallet'
+import { useAceLevels } from '@/entities/mission/model/useAceLevels'
 import { ROOKIE_BATTER_ABILITY } from '@/entities/batting/model/batter'
 
 const SETTINGS_KEY = 'compus-baseball/settings'
@@ -37,6 +38,11 @@ const PITCHER_KEY = 'compus-baseball/pitcher-league'
  * 옛 세이브에는 이 칸이 아예 없다 — 없으면 정규화가 기본 개방 둘(싸이커·메디카)만 켠다.
  */
 const ACE_OPEN_KEY = 'compus-baseball/ace-open'
+/**
+ * 마선수 레벨 열 칸 — 원본 전역 기록 `mgr[0x13a..0x143]` (올리는 곳은 레벨업 0x5fb24 하나).
+ * 옛 세이브에는 이 칸이 없다 — 없으면 새 저장 기본값(0x9f26c)처럼 모두 0 = Lv1 이다.
+ */
+const ACE_LEVEL_KEY = 'compus-baseball/ace-level'
 /**
  * **G포인트 지갑** — 원본 전역 기록 `mgr[+0x64]` 한 칸이다 (`entities/wallet` 머리글에 디스어셈).
  * 모드와 상관없이 하나라 커리어·시즌 저장과 **따로** 둔다.
@@ -69,6 +75,7 @@ export function App() {
   const seasonStore = useMemo(() => createLocalStorageJsonStore(SEASON_KEY), [])
   const pitcherStore = useMemo(() => createLocalStorageJsonStore(PITCHER_KEY), [])
   const aceOpenStore = useMemo(() => createLocalStorageJsonStore(ACE_OPEN_KEY), [])
+  const aceLevelStore = useMemo(() => createLocalStorageJsonStore(ACE_LEVEL_KEY), [])
   const walletStore = useMemo(() => createLocalStorageJsonStore(WALLET_KEY), [])
   const pitcherWalletMergeStore = useMemo(() => createLocalStorageJsonStore(PITCHER_WALLET_MERGE_KEY), [])
   /** 옛 세이브 이사거리 — 지갑 칸이 없던 시절 G는 나만의리그 선수 안에 들어 있었다 */
@@ -86,6 +93,8 @@ export function App() {
   const runner = useAtBatRunner()
   // 마선수 오픈 플래그 — 원본 전역 기록 `mgr[0x30..0x39]`
   const aceOpen = useAceOpen(aceOpenStore)
+  // 마선수 레벨 — 원본 전역 기록 `mgr[0x13a..0x143]`. 미션 마선수 배율(0xb6414)이 이 값을 본다
+  const aceLevels = useAceLevels(aceLevelStore)
   // 전역 G 지갑 — 원본 `mgr[+0x64]`. 마선수 구매·미션·홈런더비가 다 이 한 칸을 본다
   const wallet = useGamePointWallet(walletStore, legacyGamePoint)
   const seasonSession = useSeasonSession(seasonStore, random, wallet)
@@ -110,12 +119,29 @@ export function App() {
     onGamePointReward: careerSession.actions.gainGamePoint,
     // 환경설정 "송구" (설정 +0xf4) — 투수편 미션은 사람이 늘 수비라 그대로 먹는다 (0xae6c8)
     throwModeManual: gameSettings.settings.throwMode === '수동',
+    aceLevels: aceLevels.levels,
   })
   const collection = useCollection(collectionStore, careerSession.career, isEveryMissionCleared(mission.clearedKeys))
   // 히든 오픈은 원본에서 전역 저장이라 선수에게도 알려 준다 (상점이 선수 기록으로 판정한다)
   const { syncOpenedHidden } = careerSession.actions
   const openedHiddenIds = collection.collection.openedHiddenIds
   useEffect(() => syncOpenedHidden(openedHiddenIds), [syncOpenedHidden, openedHiddenIds])
+
+  // 마선수 오픈(0xa3e2 · 0xa3f6)·레벨업(0x5fbee · 0x5fc0a) — 모자람 판정은 화면이 이미 했다.
+  // `spend` 의 자르기 [0, 99999] 가 원본 clamp 와 같다. 일반모드(상태 21)·스페셜(상태 28)이 같이 쓴다
+  const aceSelect = {
+    openedAcePitcherIds: aceOpen.openedAcePitcherIds,
+    openedAceBatterIds: aceOpen.openedAceBatterIds,
+    levels: aceLevels.levels,
+    onOpenAce: (cell: number) => {
+      wallet.spend(aceOpenPriceOf(cell))
+      aceOpen.open(cell)
+    },
+    onLevelUp: (cell: number, cost: number) => {
+      wallet.spend(cost)
+      aceLevels.levelUp(cell)
+    },
+  }
 
   /** 이벤트 match → 공략 레코드 대결. 레코드가 없는 team 은 없지만, 만나면 패배 결과로 넘긴다 (추정) */
   const startAceMatch: AceMatchStarter = (command, carried, context) => {
@@ -167,17 +193,17 @@ export function App() {
         openedHiddenTeamIds={collection.collection.openedHiddenIds}
         // 마선수 오픈 플래그(mgr[0x30+idx]) — 이제 저장에서 읽는다. 새 저장이면 기본 개방분
         // (싸이커·메디카) 둘만 켜져 있다 (K-bursts-special.md K-3 3-3)
-        openedAcePitcherIds={aceOpen.openedAcePitcherIds}
-        openedAceBatterIds={aceOpen.openedAceBatterIds}
+        openedAcePitcherIds={aceSelect.openedAcePitcherIds}
+        openedAceBatterIds={aceSelect.openedAceBatterIds}
+        // 마선수 레벨(mgr[0x13a+칸]) — 이름 막대 LV 와 `0` 키 레벨업 창이 쓴다
+        aceLevels={aceSelect.levels}
+        onLevelUpAce={aceSelect.onLevelUp}
         // 원본 G포인트는 전역 기록(`mgr+0x64`)이라 모드와 상관없이 하나다 — 지갑을 그대로 본다.
         // 육성 선수가 없어도 값이 있고, 육성 선수가 있으면 그쪽 화면과 같은 값이다.
         gamePoint={wallet.balance}
         // "예" → G를 빼고 플래그를 세운다 (0xa3e2 · 0xa3f6). 모자람 판정은 화면이 이미 했다.
         // `spend` 의 자르기 [0, 99999] 와 "모자라면 한 푼도 안 깎는다" 가 원본 0xa3dc~0xa3f4 와 같다.
-        onOpenAce={(cell) => {
-          wallet.spend(aceOpenPriceOf(cell))
-          aceOpen.open(cell)
-        }}
+        onOpenAce={aceSelect.onOpenAce}
         gaugeSettingOn={gameSettings.settings.pitchControl === '게이지'}
         runningModeManual={gameSettings.settings.runningMode === '수동'}
         // 환경설정 "송구" (설정 +0xf4) — 팀 경기는 사람이 **수비하는 타석**에서만 먹는다 (0xae6c8)
@@ -203,7 +229,7 @@ export function App() {
   }
 
   if (ENTRY_SCREENS.includes(screen.kind) || careerSession.career === null) {
-    return <EntryRoutes screen={screen} setScreen={setScreen} session={careerSession} gameSettings={gameSettings} collection={collection.collection} random={random} wallet={wallet} />
+    return <EntryRoutes screen={screen} setScreen={setScreen} session={careerSession} gameSettings={gameSettings} collection={collection.collection} random={random} wallet={wallet} aceSelect={aceSelect} />
   }
 
   return (

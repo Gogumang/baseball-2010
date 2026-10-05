@@ -5,6 +5,8 @@ import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { ACE_PLAYERS } from '@/shared/config/original/acePlayers'
 import { aceOpenPopupTextOf, aceOpensWithGamePoint } from '@/shared/config/original/aceOpen'
 import { ACE_OPEN_SHORTAGE_POPUP, aceOpenPriceOf } from '@/pages/general-mode/lib/aceOpenState'
+import { ACE_LEVEL_UP_TEXT, aceLevelOf, isAceMaxLevel } from '@/entities/mission/model/aceLevel'
+import { AceLevelUpWindow } from '@/widgets/ace-level-up/ui/AceLevelUpWindow'
 import { ACE_LAYOUT, LOCKED_CIRCLES, NAME_BAR, TAG, aceCellPositionOf } from '@/pages/general-mode/lib/prepareLayout'
 import { ACE_PER_ROLE, ACE_PHASE, aceIndexOfCell, aceRoleOfCell } from '@/pages/general-mode/lib/generalModeSetup'
 import type { AcePhase } from '@/pages/general-mode/lib/generalModeSetup'
@@ -35,11 +37,21 @@ export interface AceSelectScreenProps {
   /** 저장 +0x35..0x39 — 열린 마타자 번호 0~4 */
   readonly openedAceBatterIds?: readonly number[]
   /**
-   * 마선수 레벨 — 이름 막대 글은 `"!C!cFFFFFF%s !cFFFF00LV.%d"` (0xd2498) 다.
-   * ⚠️ **값이 없어 못 채운 자리**: 레벨은 스페셜 마선수 화면(상태 28)이 올리는 저장 값이고
-   *    웹판에는 아직 그 저장이 없다. 없으면 이름만 그린다.
+   * 마선수 레벨 — 전역 저장 `mgr[0x13a + 칸]` (0~4, `entities/mission/model/useAceLevels`).
+   * 이름 막대 글은 `"!C!cFFFFFF%s !cFFFF00LV.%d"` (0xd2498) 이고 %d 는 **레벨 + 1** 이다
+   * (0x64b34 `ldrsb r4,[mgr+0x13a+칸]` → 0x64b40 `adds r4,#1`). 칸이 비면 새 저장 값 0 = LV.1.
    */
   readonly levels?: Readonly<Record<number, number>>
+  /**
+   * 하위 상태 — `'고르기'` = 상태 21(일반모드 마선수, 갱신 0x29df8) · `'레벨업'` = 상태 28(스페셜 마선수
+   * 선택, 갱신 0x2af20). 28 은 OK 도 레벨업 쪽으로 가고(고르기가 없다) 두 줄을 다 오간다.
+   */
+  readonly mode?: '고르기' | '레벨업'
+  /**
+   * 레벨업 확정 (0x5fbee · 0x5fc0a) — 받는 쪽이 레벨을 올리고 G `cost` 를 뺀다.
+   * 안 넘기면 `0` 키 레벨업 창을 열지 않는다.
+   */
+  readonly onLevelUp?: (cell: number, cost: number) => void
   /** 머리띠 G포인트 — 들고 있는 곳에서만 넘긴다 (팀 고르기 화면과 같은 규칙) */
   readonly gamePoint?: number
   /**
@@ -69,13 +81,17 @@ export interface AceSelectScreenProps {
  * 나가고, 들고 있는 G가 가격보다 **적으면** 대신 부족 팝업(0xcc214)이 뜬다 — 자세한 것은
  * `lib/aceOpenState.ts` 의 머리글을 볼 것.
  *
+ * **레벨업**: 상태 21 은 `0` 키, 상태 28(`mode="레벨업"`, 스페셜 마선수 선택)은 OK·`0` 키로
+ * 레벨업 창 `widgets/ace-level-up` 을 연다 (`requestLevelUp` 머리글). 바닥띠 517 = "0레벨업" + 되돌아가기.
+ *
  * ⚠️ 여기 없는 것:
- *   - `0` 키의 레벨업 하위 창 (하위 단계 1·2·10, K 3-3 쪽). 레벨업 비용 표는 이 표가 아니다.
+ *   - 바닥띠의 "0레벨업" 그림(프레임 9) — `ScreenFrame` 이 되돌아가기만 그린다.
+ *   - 상태 28 의 위/아래 키(−1·−2·'2'·'8')가 뒤집는 `skin+0xd0` — A 딱지를 안 그리는 k 11 에선 보이는 것이 없다.
  *   - 열린 마선수 자리의 애니메이션 `[skin+0x138]` — 여기서는 정지 그림을 쓴다.
  */
 export function AceSelectScreen({
-  phase, openedAcePitcherIds = [], openedAceBatterIds = [], levels, gamePoint = 0,
-  onOpenAce, onSelect, onCancel,
+  phase, openedAcePitcherIds = [], openedAceBatterIds = [], levels, mode = '고르기', gamePoint = 0,
+  onOpenAce, onLevelUp, onSelect, onCancel,
 }: AceSelectScreenProps) {
   const imgTextOrigins = useFrameOrigins(IMG_TEXT_FRAME)
   const cellCount = ACE_LAYOUT.grid.columns * ACE_LAYOUT.grid.rows
@@ -85,6 +101,11 @@ export function AceSelectScreen({
   const [hintCell, setHintCell] = useState<number | null>(null)
   /** G가 모자라 뜬 부족 팝업 (0xa46e → 0xaa00, 팝업 id 0x20) */
   const [isShortageOpen, setIsShortageOpen] = useState(false)
+  /** 레벨업 창이 열린 칸 — `skin+0x31c`(열림)·`+0x31d`(칸). null 이면 닫힘 */
+  const [levelUpCell, setLevelUpCell] = useState<number | null>(null)
+  /** StrCOMMON[40] "최고 레벨입니다" 알림 */
+  const [isMaxLevelOpen, setIsMaxLevelOpen] = useState(false)
+  const isLevelUpMode = mode === '레벨업'
 
   useEffect(() => {
     setCursor(phase === ACE_PHASE.마투수 ? 0 : ACE_PER_ROLE)
@@ -95,14 +116,34 @@ export function AceSelectScreen({
       ? openedAcePitcherIds.includes(aceIndexOfCell(cell))
       : openedAceBatterIds.includes(aceIndexOfCell(cell))
 
-  /** 지금 단계의 줄만 고를 수 있다 — 원본도 단계에 맞는 줄에서만 OK 를 받는다 */
-  const isCellSelectable = (cell: number) => aceRoleOfCell(cell) === phase && isCellOpen(cell)
+  /**
+   * 지금 단계의 줄만 고를 수 있다 — 원본도 단계에 맞는 줄에서만 OK 를 받는다.
+   * 상태 28 은 고르기가 없고 OK 가 레벨업 쪽이라 어느 칸이든 누를 수 있다.
+   */
+  const isCellSelectable = (cell: number) =>
+    isLevelUpMode || (aceRoleOfCell(cell) === phase && isCellOpen(cell))
+
+  /**
+   * **레벨업 요청** — 상태 21 의 `0` 키(0x29efc `cmp r5,#0x30`) · 상태 28 의 OK·`0` 키(0x2b00a·0x2affc).
+   * 두 갱신 함수가 같은 순서로 판정한다 (0x29f02~0x29fbc · 0x2b02c~0x2b124):
+   *   1. 잠긴 칸(`mgr[0x30+칸] == 0`) → 오픈 힌트 팝업 (칸 4·9 는 [42], 그 밖 [43]) — 오픈과 같은 길
+   *   2. 레벨 > 3 → StrCOMMON[40] "최고 레벨입니다" 알림
+   *   3. 그 밖 → 레벨업 창 열기 (+0x31c = 1, +0x31d = 칸)
+   * 상태 21 의 잠긴 칸 팝업은 원본도 단계와 상관없이 뜬다 (0x29f34 가 줄을 안 본다).
+   */
+  const requestLevelUp = (cell: number) => {
+    if (onLevelUp === undefined) return
+    if (!isCellOpen(cell)) return setHintCell(cell)
+    if (isAceMaxLevel(aceLevelOf(levels, cell))) return setIsMaxLevelOpen(true)
+    setLevelUpCell(cell)
+  }
 
   /**
    * OK 한 번 — 열린 칸이면 고르고, **잠긴 칸이면 오픈 힌트 팝업**을 띄운다 (0xa248 → 0xa68e).
    * 팝업은 단계에 맞는 줄에서만 띄운다 (OK 를 받는 줄이 거기뿐이다).
    */
   const pressCell = (cell: number) => {
+    if (isLevelUpMode) return requestLevelUp(cell)
     if (isCellSelectable(cell)) return onSelect(cell)
     if (aceRoleOfCell(cell) === phase) setHintCell(cell)
   }
@@ -123,7 +164,7 @@ export function AceSelectScreen({
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       // 팝업이 떠 있는 동안에는 격자 키를 받지 않는다 — MessageBox 가 답을 가져간다
-      if (hintCell !== null || isShortageOpen) return
+      if (hintCell !== null || isShortageOpen || isMaxLevelOpen || levelUpCell !== null) return
       const step =
         event.key === 'ArrowRight' ? 1
         : event.key === 'ArrowLeft' ? -1
@@ -139,6 +180,11 @@ export function AceSelectScreen({
         pressCell(cursor)
         return
       }
+      if (event.key === '0') {
+        event.preventDefault()
+        requestLevelUp(cursor)
+        return
+      }
       if (event.key === 'Escape') {
         event.preventDefault()
         onCancel()
@@ -152,7 +198,7 @@ export function AceSelectScreen({
   const { anchorA, anchorB } = ACE_LAYOUT
   const cursorPlayer = acePlayerOfCell(cursor)
   const isCursorOpen = isCellOpen(cursor)
-  const cursorLevel = levels?.[cursor]
+  const cursorLevel = aceLevelOf(levels, cursor)
 
   return (
     <RawScreen>
@@ -194,7 +240,7 @@ export function AceSelectScreen({
       <span className={styles.centeredText} data-testid="마선수-이름"
         style={{ left: anchorA.x + NAME_BAR.dx, top: anchorA.y + NAME_BAR.textDy, width: NAME_BAR.width }}>
         {isCursorOpen && cursorPlayer !== undefined
-          ? `${cursorPlayer.name}${cursorLevel === undefined ? '' : ` LV.${cursorLevel}`}`
+          ? `${cursorPlayer.name} LV.${cursorLevel + 1}`
           : LOCK_LABEL}
       </span>
 
@@ -225,7 +271,7 @@ export function AceSelectScreen({
             disabled={!isCellSelectable(cell)}
             className={`${styles.cell} ${cell === cursor ? styles.cellSelected : ''}`}
             style={{ left: x, top: y, width: ACE_LAYOUT.grid.cell, height: ACE_LAYOUT.grid.cell }}
-            onClick={() => onSelect(cell)}
+            onClick={() => (isLevelUpMode ? requestLevelUp(cell) : onSelect(cell))}
             onMouseEnter={() => setCursor(cell)}
           >
             {open && player !== undefined
@@ -239,7 +285,9 @@ export function AceSelectScreen({
       {/* 원본에 없는 웹 전용 안내 — 흐름 배치라 (0,0) 에 떨어져 머리띠를 가리던 것을 제자리로 옮겼다 */}
       <div className={styles.hintLine}>
         <Hint>
-          {phase === ACE_PHASE.마투수 ? '마투수를 고르세요' : '마타자를 고르세요'} — 방향키 이동 · Enter 결정
+          {isLevelUpMode
+            ? '마선수 레벨업 — 방향키 이동 · Enter/0 레벨업'
+            : `${phase === ACE_PHASE.마투수 ? '마투수를 고르세요' : '마타자를 고르세요'} — 방향키 이동 · Enter 결정${onLevelUp === undefined ? '' : ' · 0 레벨업'}`}
         </Hint>
       </div>
 
@@ -269,6 +317,22 @@ export function AceSelectScreen({
           text={ACE_OPEN_SHORTAGE_POPUP}
           buttons={['예', '아니오']}
           onAnswer={() => setIsShortageOpen(false)}
+        />
+      )}
+
+      {/* StrCOMMON[40] — 최고 레벨 알림 (0x2b0e4 · 0x29f8a, 버튼 하나) */}
+      {isMaxLevelOpen && (
+        <MessageBox text={ACE_LEVEL_UP_TEXT.maxLevel} buttons={['OK']} onAnswer={() => setIsMaxLevelOpen(false)} />
+      )}
+
+      {/* 레벨업 창 0x5f394 · 0x5fb24 — 머리띠 위에 겹친다 (갱신 함수가 목록보다 먼저 키를 넘긴다) */}
+      {levelUpCell !== null && onLevelUp !== undefined && (
+        <AceLevelUpWindow
+          cell={levelUpCell}
+          level={aceLevelOf(levels, levelUpCell)}
+          gamePoint={gamePoint}
+          onLevelUp={onLevelUp}
+          onClose={() => setLevelUpCell(null)}
         />
       )}
     </RawScreen>

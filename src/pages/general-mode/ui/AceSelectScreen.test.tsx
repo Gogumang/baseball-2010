@@ -240,16 +240,16 @@ describe('G포인트로 오픈하기', () => {
 })
 
 describe('이름 막대', () => {
-  it('커서가 짚은 마선수 이름을 적는다', () => {
+  it('커서가 짚은 마선수 이름과 LV 를 적는다 — 레벨이 없으면 새 저장 값 0 = LV.1', () => {
     띄우기()
 
-    expect(screen.getByTestId('마선수-이름').textContent).toBe(ACE_PLAYERS[5].name)
+    expect(screen.getByTestId('마선수-이름').textContent).toBe(`${ACE_PLAYERS[5].name} LV.1`)
   })
 
-  it('레벨을 받으면 "이름 LV.n" 이 된다 (0xd2498)', () => {
+  it('LV 는 저장 값 + 1 이다 (0xd2498 · 0x64b40 adds #1)', () => {
     띄우기({ levels: { 0: 3 } })
 
-    expect(screen.getByTestId('마선수-이름').textContent).toBe(`${ACE_PLAYERS[5].name} LV.3`)
+    expect(screen.getByTestId('마선수-이름').textContent).toBe(`${ACE_PLAYERS[5].name} LV.4`)
   })
 
   it('잠긴 칸에서는 LOCK 이다', () => {
@@ -273,5 +273,80 @@ describe('머리띠·바닥띠 (ScreenFrame)', () => {
     fireEvent.click(screen.getByRole('button', { name: '되돌아가기' }))
 
     expect(onCancel).toHaveBeenCalled()
+  })
+})
+
+describe('레벨업 — 상태 21 의 0 키 · 상태 28 의 OK (0x29efc · 0x2b02c)', () => {
+  it('상태 21: 0 키가 레벨업 창을 열고 예+OK 면 비용과 함께 알린다', () => {
+    const onLevelUp = vi.fn()
+    띄우기({ onLevelUp, gamePoint: 3000 })
+
+    fireEvent.keyDown(window, { key: '0' })
+    expect(screen.getByRole('dialog', { name: '마선수 레벨업' })).toBeTruthy()
+    fireEvent.keyDown(window, { key: 'Enter' })
+
+    expect(onLevelUp).toHaveBeenCalledWith(0, 3000)
+    expect(screen.queryByRole('dialog', { name: '마선수 레벨업' })).toBeNull()
+  })
+
+  it('onLevelUp 이 없으면 0 키는 아무 일도 없다', () => {
+    띄우기()
+
+    fireEvent.keyDown(window, { key: '0' })
+
+    expect(screen.queryByRole('dialog', { name: '마선수 레벨업' })).toBeNull()
+  })
+
+  it('G가 모자라면 부족 팝업만 뜨고 창은 열린 채다 (0x5fbd0 → +0x314 = 1)', () => {
+    const onLevelUp = vi.fn()
+    const { container } = 띄우기({ onLevelUp, gamePoint: 2999 })
+
+    fireEvent.keyDown(window, { key: '0' })
+    fireEvent.keyDown(window, { key: 'Enter' })
+
+    expect(onLevelUp).not.toHaveBeenCalled()
+    expect(container.textContent).toContain('부족합니다')
+    expect(screen.getByRole('dialog', { name: '마선수 레벨업' })).toBeTruthy()
+  })
+
+  it('"아니오" 로 옮긴 뒤 OK 는 닫기만 한다 (0x5fb9e)', () => {
+    const onLevelUp = vi.fn()
+    띄우기({ onLevelUp, gamePoint: 99999 })
+
+    fireEvent.keyDown(window, { key: '0' })
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    fireEvent.keyDown(window, { key: 'Enter' })
+
+    expect(onLevelUp).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog', { name: '마선수 레벨업' })).toBeNull()
+  })
+
+  it('레벨 4(LV.5)면 창 대신 StrCOMMON[40] 최고 레벨 알림이다', () => {
+    const { container } = 띄우기({ onLevelUp: vi.fn(), levels: { 0: 4 } })
+
+    fireEvent.keyDown(window, { key: '0' })
+
+    expect(container.textContent).toContain('최고 레벨입니다')
+    expect(screen.queryByRole('dialog', { name: '마선수 레벨업' })).toBeNull()
+  })
+
+  it('상태 28(mode 레벨업): OK 가 고르기 대신 레벨업 창을 열고, 아랫줄도 연다', () => {
+    const onSelect = vi.fn()
+    const onLevelUp = vi.fn()
+    띄우기({ mode: '레벨업', onSelect, onLevelUp, gamePoint: 99999, levels: { 7: 2 } })
+
+    fireEvent.click(칸들()[7])
+    fireEvent.keyDown(window, { key: 'Enter' })
+
+    expect(onSelect).not.toHaveBeenCalled()
+    expect(onLevelUp).toHaveBeenCalledWith(7, 9000)
+  })
+
+  it('상태 28: 잠긴 칸은 오픈 힌트 팝업이다', () => {
+    const { container } = 띄우기({ mode: '레벨업', onLevelUp: vi.fn(), openedAceBatterIds: [] })
+
+    fireEvent.click(칸들()[7])
+
+    expect(container.textContent).toContain('마선수 오픈 힌트')
   })
 })

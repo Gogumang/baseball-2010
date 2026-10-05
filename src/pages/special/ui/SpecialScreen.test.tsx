@@ -75,12 +75,24 @@ describe('스페셜 칸 고르기', () => {
     expect(screen.getByText(/통신이 필요합니다/)).toBeTruthy()
   })
 
-  it('아직 안 만든 칸도 안내를 띄운다 — 마선수선택·에디트', () => {
+  it('아직 안 만든 칸도 안내를 띄운다 — 에디트', () => {
     띄우기()
 
     fireEvent.click(칸('에디트'))
 
     expect(screen.getByText(/아직 만들지 않았습니다/)).toBeTruthy()
+  })
+
+  it('마선수선택 칸은 앱이 꽂은 상태 28 화면으로 가고, 그 화면의 되돌아가기는 목록으로 온다', () => {
+    const renderAceSelect = vi.fn((onBack: () => void) => (
+      <button type="button" onClick={onBack}>마선수-화면</button>
+    ))
+    띄우기({ renderAceSelect })
+
+    fireEvent.click(칸('마선수선택'))
+    fireEvent.click(screen.getByRole('button', { name: '마선수-화면' }))
+
+    expect(칸('마선수선택')).toBeTruthy()
   })
 
   it('기록연감 칸은 기록연감 화면으로 간다', () => {

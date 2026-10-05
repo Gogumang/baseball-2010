@@ -24,7 +24,12 @@ export function isAceMagicNumber(magicNumber: number): boolean {
 }
 
 export interface MagicPitchGameOptions {
-  /** 마투수 레벨 0~4 (`s8 전역기록[0x13a + 순번]`). 웹엔 마선수 레벨이 없어 0 = Lv1 로 둔다 (근사) */
+  /**
+   * 마투수 레벨 0~4 (`s8 전역기록[0x13a + 순번]` — 타석 교대 0xaebe4 가 이 칸으로 0xd8509 를 색인한다, H2 1-2).
+   * 저장은 이제 있다(`entities/mission/model/useAceLevels`, 레벨업 0x5fb24). 안 넘기면 0 = Lv1 이다.
+   * ⚠️ 유일한 부르는 곳 `widgets/batting-stage/model/useStageAnimation` 이 아직 레벨을 안 넘긴다
+   *    (레퍼토리만 보고 마투수 칸 번호를 모른다) — 마투수 마구는 지금 늘 Lv1 횟수 3 이다.
+   */
   readonly aceLevel?: number
   /** 투수 스킬 23 혼신 (마구 횟수 +2). CPU 투수 스킬을 아직 읽지 않아 기본 false (근사) */
   readonly hasSpiritSkill?: boolean

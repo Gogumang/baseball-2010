@@ -60,7 +60,8 @@ export const SPECIAL_ITEMS: readonly SpecialItem[] = [
   {
     id: '마선수선택', labelFrame: 19, labelWidth: 118, labelHeight: 27, state: 28,
     description: '마선수의 오픈이나 레벨을!N관리할 수 있습니다', // [20]
-    availability: '아직', blockedText: '마선수 선택은!N아직 만들지 않았습니다',
+    // 상태 28 (그리기 0x2df78 · 갱신 0x2af20) — 화면은 앱이 `renderAceSelect` 로 꽂는다 (pages 끼리 import 금지)
+    availability: '됨',
   },
   {
     id: '에디트', labelFrame: 20, labelWidth: 73, labelHeight: 27, state: 29,

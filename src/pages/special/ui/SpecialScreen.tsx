@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
 import type { Collection } from '@/entities/collection/model/collection'
 import { HALL_OF_FAME_BATTER_SLOTS } from '@/entities/collection/model/collection'
@@ -19,10 +20,17 @@ const IMG_TEXT_FRAMES = './sprites/img_text/frames'
 
 const imageSrc = (folder: string, id: number) => `${folder}/${String(id).padStart(3, '0')}.png`
 
-type SpecialView = '목록' | '기록연감' | '명예의 전당'
+type SpecialView = '목록' | '기록연감' | '명예의 전당' | '마선수선택'
 
 interface SpecialScreenProps {
   readonly collection: Collection
+  /**
+   * **스페셜 마선수 선택** (하위 상태 28 — 그리기 0x2df78 · 갱신 0x2af20): 마선수 오픈·레벨업 격자.
+   * 화면은 `pages/general-mode` 의 마선수 고르기(`mode="레벨업"`)라 앱이 꽂아 준다.
+   * `onBack` 은 CLR — 원본도 상태 6(이 목록)으로 돌아간다 (0x2b126 → 0xbcb49(…, 6)).
+   * 안 넘기면 칸을 눌러도 아무 일이 없다.
+   */
+  readonly renderAceSelect?: (onBack: () => void) => ReactNode
   readonly onBack: () => void
 }
 
@@ -34,14 +42,15 @@ interface SpecialScreenProps {
  * **15 G포인트충전 · 16 G포인트선물 · 17 친구추천 · 18 명예의전당 · 19 마선수선택 · 20 에디트 ·
  * 21 기록연감 · 28 선물받기** (표 0xceb2f 확정).
  *
- * 오프라인 웹판에서 실제로 도는 칸은 **명예의전당·기록연감** 둘뿐이지만, 원본에 있는 칸을 지우지 않고
+ * 오프라인 웹판에서 실제로 도는 칸은 **명예의전당·마선수선택·기록연감** 셋뿐이지만, 원본에 있는 칸을 지우지 않고
  * 여덟 칸을 다 그린다. 나머지는 흐리게 그리고 누르면 안내를 띄운다
- * (통신 기능 = 충전·선물·친구추천·선물받기 / 아직 안 만든 화면 = 마선수선택·에디트).
+ * (통신 기능 = 충전·선물·친구추천·선물받기 / 아직 안 만든 화면 = 에디트). 마선수선택(상태 28)은
+ * 앱이 `renderAceSelect` 로 꽂는다.
  *
  * ⚠️ 근사한 곳: 줄 y(원본은 굴러가는 목록이라 여덟 줄을 한 번에 세우려고 간격을 벌렸다 — `ROW` 주석),
  * 바퀴는 호와 공만(칸 여섯은 메인 메뉴 몫), 배경은 원본이 무엇을 까는지 아직 못 읽어 검정 그대로다.
  */
-export function SpecialScreen({ collection, onBack }: SpecialScreenProps) {
+export function SpecialScreen({ collection, renderAceSelect, onBack }: SpecialScreenProps) {
   const [view, setView] = useState<SpecialView>('목록')
   const [cursor, setCursor] = useState(0)
   const [notice, setNotice] = useState<string | null>(null)
@@ -50,6 +59,7 @@ export function SpecialScreen({ collection, onBack }: SpecialScreenProps) {
     const item = SPECIAL_ITEMS[index]
     setCursor(index)
     if (item.availability !== '됨') return setNotice(item.blockedText ?? '')
+    if (item.id === '마선수선택') return renderAceSelect === undefined ? undefined : setView('마선수선택')
     setView(item.id === '기록연감' ? '기록연감' : '명예의 전당')
   }
 
@@ -76,6 +86,10 @@ export function SpecialScreen({ collection, onBack }: SpecialScreenProps) {
 
   if (view === '기록연감') {
     return <RecordAnnals collection={collection} onBack={() => setView('목록')} />
+  }
+
+  if (view === '마선수선택' && renderAceSelect !== undefined) {
+    return <>{renderAceSelect(() => setView('목록'))}</>
   }
 
   if (view === '명예의 전당') {

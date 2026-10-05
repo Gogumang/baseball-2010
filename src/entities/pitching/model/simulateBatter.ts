@@ -252,7 +252,9 @@ const DEFAULT_PITCHER_STATS = { control: 500, velocity: 500 }
  * `batter` 는 **경기용 능력치**(0xb570c/0xb570d, 체력 인자 90)여야 한다 — 쫓아가기 문턱과
  * 타이밍 K 가 그 히트를 본다. 팀 경기는 `entryBatterGameAbilities`, 투수편은 `opponentBatterAbility`
  * (모드 3 `gameAbilityOf`), 투수 미션은 모드 5 `gameAbilityOf` 값을 넘긴다.
- * ⚠️ 미션 마타자의 레벨 배율(0xb6414 의 0xd88aa)과 로스터 스킬 보정은 아직 못 붙인다 (부르는 쪽 주석).
+ * 미션 마타자는 부르는 쪽(`useMissionSession` 의 `missionOpponentAbility`)이 레벨 배율(0xb6414 의
+ * 0xd88aa[`mgr[0x13a+칸]`])을 먼저 곱해 넘긴다 — 레벨은 전역 저장(`useAceLevels`)이고 스페셜 마선수
+ * 레벨업(0x5fb24)이 올린다. ⚠️ 로스터 스킬 보정(0xb6414 플래그 1)은 아직 못 붙인다 (부르는 쪽 주석).
  */
 export function pitchAgainstBatter(
   pitch: Pitch,

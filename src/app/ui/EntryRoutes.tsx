@@ -21,6 +21,7 @@ import type { useGameSettings } from '@/app/model/useGameSettings'
 import type { Collection } from '@/entities/collection/model/collection'
 import type { GamePointWalletSession } from '@/entities/wallet/model/useGamePointWallet'
 import { SpecialScreen } from '@/pages/special/ui/SpecialScreen'
+import { ACE_PHASE, AceSelectScreen } from '@/pages/general-mode'
 import { TitleScreen } from '@/pages/title/ui/TitleScreen'
 import { MainMenuScreen } from '@/pages/main-menu/ui/MainMenuScreen'
 import { CreatePlayerScreen } from '@/pages/create-player/ui/CreatePlayerScreen'
@@ -37,10 +38,18 @@ interface EntryRoutesProps {
   readonly random: RandomPort
   /** 전역 G 지갑 (원본 `mgr[+0x64]`) — 홈런더비 결과창의 "보유 G" 가 이 값이다 (0x461f2) */
   readonly wallet: GamePointWalletSession
+  /** 스페셜 마선수 선택(상태 28)이 쓰는 마선수 오픈·레벨 저장과 두 동작 (앱이 일반모드와 같이 쓴다) */
+  readonly aceSelect?: {
+    readonly openedAcePitcherIds: readonly number[]
+    readonly openedAceBatterIds: readonly number[]
+    readonly levels: Readonly<Record<number, number>>
+    readonly onOpenAce: (cell: number) => void
+    readonly onLevelUp: (cell: number, cost: number) => void
+  }
 }
 
 /** 커리어가 아직 없을 때의 화면 — 타이틀 → 메인 메뉴(도움말) → 선수 등록. */
-export function EntryRoutes({ screen, setScreen, session, gameSettings, collection, random, wallet }: EntryRoutesProps) {
+export function EntryRoutes({ screen, setScreen, session, gameSettings, collection, random, wallet, aceSelect }: EntryRoutesProps) {
   const [isMissionBlocked, setMissionBlocked] = useState(false)
   /** 홈런더비 최고 비거리 (저장 +0x5c) — 원본은 게임 전체 저장에 두므로 커리어와 따로 둔다 */
   const derbyStore = useMemo(() => createLocalStorageJsonStore(DERBY_BEST_KEY), [])
@@ -59,7 +68,29 @@ export function EntryRoutes({ screen, setScreen, session, gameSettings, collecti
   }
 
   if (screen.kind === '스페셜') {
-    return <SpecialScreen collection={collection} onBack={() => setScreen({ kind: '메인메뉴' })} />
+    return (
+      <SpecialScreen
+        collection={collection}
+        // 상태 28 = 공용 목록 k 11 + 레벨업 창 0x5f395 — OK·`0` 이 오픈/레벨업, CLR 이 상태 6 으로 (0x2af20)
+        {...(aceSelect === undefined ? {} : {
+          renderAceSelect: (onBack: () => void) => (
+            <AceSelectScreen
+              mode="레벨업"
+              phase={ACE_PHASE.마투수}
+              openedAcePitcherIds={aceSelect.openedAcePitcherIds}
+              openedAceBatterIds={aceSelect.openedAceBatterIds}
+              levels={aceSelect.levels}
+              gamePoint={wallet.balance}
+              onOpenAce={aceSelect.onOpenAce}
+              onLevelUp={aceSelect.onLevelUp}
+              onSelect={() => undefined}
+              onCancel={onBack}
+            />
+          ),
+        })}
+        onBack={() => setScreen({ kind: '메인메뉴' })}
+      />
+    )
   }
 
   if (screen.kind === '환경설정') {

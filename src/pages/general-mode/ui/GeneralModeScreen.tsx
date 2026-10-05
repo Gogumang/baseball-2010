@@ -21,8 +21,10 @@ export interface GeneralModeScreenProps {
   readonly openedAcePitcherIds?: readonly number[]
   /** 저장 +0x35..0x39 — 열린 마타자 0~4 */
   readonly openedAceBatterIds?: readonly number[]
-  /** 마선수 레벨 (격자 칸 번호 → 레벨). 없으면 이름만 나온다 */
+  /** 마선수 레벨 (격자 칸 번호 → 레벨 0~4, 전역 `mgr[0x13a+칸]`). 없으면 모두 0 = LV.1 */
   readonly aceLevels?: Readonly<Record<number, number>>
+  /** 마선수 고르기의 `0` 키 레벨업 확정 (0x5fbee) — 받는 쪽이 레벨을 올리고 G `cost` 를 뺀다 */
+  readonly onLevelUpAce?: (cell: number, cost: number) => void
   /**
    * 들고 있는 G포인트 (원본은 전역 기록 `mgr+0x64`, 웹판은 육성 선수 칸).
    * 마선수 오픈 값과 머리띠 숫자가 이것을 본다.
@@ -68,7 +70,7 @@ export interface GeneralModeScreenProps {
 export function GeneralModeScreen(props: GeneralModeScreenProps) {
   const {
     random, isQuickStart = false, openedHiddenTeamIds, openedAcePitcherIds, openedAceBatterIds,
-    aceLevels, gamePoint, onOpenAce, stadiums, initialSettings, gaugeSettingOn, runningModeManual,
+    aceLevels, onLevelUpAce, gamePoint, onOpenAce, stadiums, initialSettings, gaugeSettingOn, runningModeManual,
     throwModeManual, onFinish, onExit,
   } = props
 
@@ -144,6 +146,7 @@ export function GeneralModeScreen(props: GeneralModeScreenProps) {
           {...(aceLevels === undefined ? {} : { levels: aceLevels })}
           {...(gamePoint === undefined ? {} : { gamePoint })}
           {...(onOpenAce === undefined ? {} : { onOpenAce })}
+          {...(onLevelUpAce === undefined ? {} : { onLevelUp: onLevelUpAce })}
           onSelect={actions.selectAce}
           onCancel={back}
         />
