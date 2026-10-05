@@ -83,6 +83,9 @@ export function ManagementScreen(props: ManagementScreenProps) {
             battingTypeIndex={career.battingTypeIndex}
             // 훈련 팝업 캐릭터도 0x10810 이 세운 그림 객체 그대로라 장착 장비를 입고 나온다
             equipmentLevels={career.equipmentLevels}
+            // 몸통 = 피부 × 15 + 팀 · 헬멧 = 팀 (기본정보 카드와 같은 0x10810 → 0x78be8·0x78c14)
+            skinIndex={career.skinIndex}
+            teamIndex={career.teamId}
             onFinished={menu.finishTraining} />
         </div>
       )}

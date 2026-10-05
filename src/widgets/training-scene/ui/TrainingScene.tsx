@@ -37,12 +37,15 @@ interface TrainingSceneProps {
    * 머리·손·다리 아이템 겹을 채워 준다 — `TrainingFigure` 주석 참고.
    */
   readonly equipmentLevels?: { readonly hit: number; readonly power: number; readonly run: number }
+  /** 피부 번호 · 내 팀 — 몸통·헬멧 팔레트 (0x10810 → 0x78be8·0x78c14). 안 넘기면 구운 색 그대로 */
+  readonly skinIndex?: number
+  readonly teamIndex?: number
   /** 게이지가 가득 차면(60번 갱신) 불린다 */
   readonly onFinished?: () => void
 }
 
 /** 원작 훈련 팝업. presentation 이 바뀔 때마다 처음부터 튼다. */
-export function TrainingScene({ presentation, caption, battingTypeIndex = 0, equipmentLevels, onFinished }: TrainingSceneProps) {
+export function TrainingScene({ presentation, caption, battingTypeIndex = 0, equipmentLevels, skinIndex, teamIndex, onFinished }: TrainingSceneProps) {
   const folder = animationFolderOf(presentation?.file ?? 'raise_traning_ani')
   const origins = useFrameOrigins(folder)
   const animations = useAnimations(folder)
@@ -105,6 +108,8 @@ export function TrainingScene({ presentation, caption, battingTypeIndex = 0, equ
           <TrainingFigure
             pose={figurePoseAt(figurePosesOf(figure, battingTypeIndex), step.entryIndex)}
             equipment={equipmentLevels === undefined ? NO_EQUIPMENT : batterEquipmentOf(equipmentLevels)}
+            skinIndex={skinIndex}
+            teamIndex={teamIndex}
             x={ANCHOR.x + figure.offsetX}
             y={ANCHOR.y - figure.liftY}
           />

@@ -1,6 +1,6 @@
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useRecoloredSprite } from '@/shared/lib/sprite/paletteSwap'
-import { batterLayersOf, NO_EQUIPMENT } from '@/widgets/batting-stage/lib/batterLayers'
+import { batterLayersOf, layerPaletteIndexOf, NO_EQUIPMENT } from '@/widgets/batting-stage/lib/batterLayers'
 import type { BatterEquipment, BatterLayer } from '@/widgets/batting-stage/lib/batterLayers'
 import * as styles from '@/widgets/training-scene/ui/TrainingScene.css'
 
@@ -22,7 +22,12 @@ import * as styles from '@/widgets/training-scene/ui/TrainingScene.css'
  * **장착 아이템**(item_bat_*)은 0x10810 의 니블 루프(0x10866 — 부위 0~3, `rec[0x19]`·`rec[0x1a]`
  * 니블, `n = 니블 − 1`, 미장착이면 건너뜀 → vtbl+0x14 = 0x78fd9)가 넣어 주므로 여기서도 입는다.
  *
- * **아직 반영 안 한 것**: 타입별 sluger 몸통 · 피부/팀 팔레트(.mpl). 장비 등급 줄만 갈아 끼운다.
+ * **몸통·헬멧 팔레트** — 기본정보 카드(8ab32a0)와 같은 적재 0x10810 → 0x78ab0 이다 (C-1):
+ *   r1 = `[[this+0xb0]+1]`(내 팀) · r3 = `rec[0xb]` bit2-3(피부)
+ *   78be8: 몸통 팔레트 = 피부 × 15 + 팀 · 78c14: 헬멧 팔레트 = 팀
+ * 장비 손·다리는 등급 줄이 먼저다 (`layerPaletteIndexOf`).
+ *
+ * **아직 반영 안 한 것**: 타입별 sluger 몸통.
  */
 
 /** 몸통은 아직 타격형(balancer)만 그린다 — 위 주석의 "아직 반영 안 한 것" */
@@ -37,15 +42,21 @@ interface TrainingFigureProps {
   readonly y: number
   /** 장착 장비 등급 순번. 안 넘기면 맨몸이다 */
   readonly equipment?: BatterEquipment
+  /** 피부 번호(`rec[0xb]` bit2-3) · 내 팀 — 몸통(피부 × 15 + 팀)·헬멧(팀) 팔레트. 안 넘기면 구운 색 그대로 */
+  readonly skinIndex?: number
+  readonly teamIndex?: number
 }
 
-export function TrainingFigure({ pose, x, y, equipment = NO_EQUIPMENT }: TrainingFigureProps) {
+export function TrainingFigure({ pose, x, y, equipment = NO_EQUIPMENT, skinIndex, teamIndex }: TrainingFigureProps) {
   const layers = batterLayersOf(pose, BODY_TYPE, equipment, false)
     .filter((layer) => !OMITTED.some((folder) => layer.folder.includes(folder)))
   return (
     <>
       {layers.map((layer, index) => (
-        <FigureLayer key={`${layer.folder}#${index}`} layer={layer} x={x} y={y} />
+        <FigureLayer key={`${layer.folder}#${index}`} layer={layer} x={x} y={y}
+          paletteIndex={skinIndex === undefined || teamIndex === undefined
+            ? layer.gradePaletteRow ?? null
+            : layerPaletteIndexOf(layer, skinIndex, teamIndex)} />
       ))}
     </>
   )
@@ -55,15 +66,16 @@ interface FigureLayerProps {
   readonly layer: BatterLayer
   readonly x: number
   readonly y: number
+  readonly paletteIndex: number | null
 }
 
 /**
  * 겹 하나. 장비 손·다리는 **등급 줄(.mpl)** 로 갈아 끼워야 색이 맞는다 —
  * 장비 폴더는 `palette.json` 의 `baked` 가 null 이라 줄 0 도 갈아 끼운다 (`batterLayers` 주석).
  */
-function FigureLayer({ layer, x, y }: FigureLayerProps) {
+function FigureLayer({ layer, x, y, paletteIndex }: FigureLayerProps) {
   const key = String(layer.frame).padStart(3, '0')
-  const src = useRecoloredSprite(`${layer.folder}/${key}.png`, layer.gradePaletteRow ?? null)
+  const src = useRecoloredSprite(`${layer.folder}/${key}.png`, paletteIndex)
   const origin = useFrameOrigins(layer.folder)?.[key]
   if (origin === undefined) return null
   return (
