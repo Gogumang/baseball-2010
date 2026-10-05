@@ -49,6 +49,8 @@ import type { EventReward } from '@/entities/story/model/eventReward'
 import type { StoryCarry } from '@/entities/story/model/aceMatch'
 import type { OriginalEvent } from '@/shared/config/original/eventTypes'
 import { formatOriginalMoney } from '@/features/shop/model/shopSelection'
+import { hiddenOpenTextOf } from '@/entities/career/model/equipment'
+import { pitcherHiddenOpenTextOf } from '@/entities/pitcher-career/model/pitcherEquipment'
 import {
   applyPitcherEndingBonus,
   canContinueAfterPitcherEnding,
@@ -145,7 +147,7 @@ export interface PitcherLeagueSession {
   readonly eventPlaceIds: ReadonlySet<string>
   /** 이벤트 번호별 `%s` 글 — 380 연봉 제시액(0x8bc4c → 금액 서식 0x55cf4). 기본이면 undefined */
   readonly storyReplacementsFor: (eventId: number) => readonly string[] | undefined
-  /** 이벤트 재생 뒤 관리 화면 위에 띄울 알림 (옮기지 않은 갈래). 없으면 '' */
+  /** 이벤트 재생 뒤 띄울 알림 — 히든 오픈(보상 7) 팝업 글 · 옮기지 않은 갈래. 없으면 '' */
   readonly storyNotice: string
   readonly actions: {
     readonly create: (name: string, profile: PitcherRookieProfile) => void
@@ -226,6 +228,25 @@ function normalizePitcherCareer(raw: unknown): PitcherCareer | null {
 }
 
 const NO_STAT = () => {}
+
+/** 보상 종류 7 — 히든 오픈 |v| */
+const HIDDEN_OPEN_REWARD_KIND = 7
+
+/**
+ * 보상 종류 7 의 알림 글 — 0x8c60e 가 `0x62368(…, |v|, 1)` 을 부른다. 셋째 인자 1 이면 이미 열렸는지(0x61f5c)를
+ * 보지 않고 **늘** 팝업(0x74ef5)을 띄운다: StrCOMMON[139] "히든 아이템 오픈!! [%s]" + 쓰는 곳 줄
+ * (id ≤ 18 [141] 시즌 · ≤ 34 [142] 투수편 · ≤ 50 [143] 타자편, 0x62420~0x62480). 글은 상점 알림과 같은 함수로 만든다.
+ */
+function hiddenOpenNoticeOf(rewards: readonly EventReward[]): string {
+  return rewards
+    .filter((reward) => reward.kind === HIDDEN_OPEN_REWARD_KIND)
+    .map((reward) => {
+      const id = Math.abs(reward.value)
+      return pitcherHiddenOpenTextOf(id) ?? hiddenOpenTextOf(id)
+    })
+    .filter((text): text is string => text !== null)
+    .join('!N')
+}
 
 /** 496 "정말로 은퇴하려는 거냐?" — 502 "은퇴한다" 의 gotoEvent (선택지 380 / 503) */
 const RETIREMENT_CONFIRM_EVENT_ID = 496
@@ -947,6 +968,8 @@ export function usePitcherLeagueSession(
       rewards
         .filter((reward) => reward.kind === EVENT_REWARD_KIND.G포인트)
         .forEach((reward) => recordStat({ kind: 'G획득', mode: PITCHER_LEAGUE_MODE, amount: reward.value }))
+      const hiddenNotice = hiddenOpenNoticeOf(rewards)
+      if (hiddenNotice !== '') setStoryNotice(hiddenNotice)
       setStory(null)
       if (story.context === '연말') return continueYearEnd(viewed, [...story.viewed, ...viewedEventIds])
       if (story.context === '연초') {

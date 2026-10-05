@@ -194,7 +194,7 @@ export function PitcherLeagueRoute({
       {session.outingRecoveryNotice !== '' && (
         <MessageBox text={session.outingRecoveryNotice} buttons={['확인']} onAnswer={actions.dismissOutingRecoveryNotice} />
       )}
-      {/* 이벤트 뒤 옮기지 않은 갈래 알림 (투수 마선수 대결 · 투수편 국가대항전) */}
+      {/* 이벤트 뒤 알림 — 히든 오픈(보상 7, 0x62368) · 옮기지 않은 갈래(투수편 국가대항전) */}
       {session.storyNotice !== '' && session.outingRecoveryNotice === '' && (
         <MessageBox text={session.storyNotice} buttons={['확인']} onAnswer={actions.dismissStoryNotice} />
       )}

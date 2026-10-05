@@ -581,6 +581,16 @@ describe('외출 [!] · [들어가기] (0x8cdc0 · 0x16c64 · 114)', () => {
     expect(result.current.career?.seenEventIds).toContain(String(eventId))
   })
 
+  it('보상 종류 7(히든 오픈)은 0x62368 팝업 글을 띄운다 — 투수 id 19~34 는 [142] 투수편, 35~ 는 [143] 타자편', async () => {
+    const result = await 판짜기({ gamesPlayed: 0 })
+    act(() => result.current.actions.openOuting())
+    act(() => result.current.actions.enterOutingPlace(OUTING_PLACES[0]))
+    act(() => result.current.actions.completeStory([{ kind: 7, value: 19 }, { kind: 7, value: 43 }], [result.current.story!.eventId]))
+
+    expect(result.current.career?.openedHiddenIds).toEqual([19, 43])
+    expect(result.current.storyNotice).toMatch(/^히든 아이템 오픈!! \[.+\] 나만의리그 투수편에서 사용가능합니다!N히든 아이템 오픈!! \[.+\] 나만의리그 타자편에서 사용가능합니다$/)
+  })
+
   it('이벤트가 없는 장소는 빈 장소 440+장소 — 행동을 안 쓰고 지도(113)로 돌아온다', async () => {
     const result = await 판짜기({ gamesPlayed: 0 })
     act(() => result.current.actions.openOuting())
