@@ -344,3 +344,54 @@ describe('pitchAgainstBatter', () => {
     expect(a).toEqual(b)
   })
 })
+
+/**
+ * CPU 타자도 사람 타석과 같은 상태 0x12 진입 0x3dfac → 0x35a20 을 지난다.
+ * 지켜본 공(0x34334 가 스윙 예약을 안 한 공)이 사각형 0xcfd50 안에 닿으면 사구다.
+ */
+describe('pitchAgainstBatter — 사구 0x35a20', () => {
+  /** 도착점 하나짜리 궤적 — 판정 좌표는 궤적 마지막 점의 `projectToPlate` 다 */
+  const 도착 = (x: number, stageSide: number, plate = { x: -2.5, y: 0 }): Pitch => ({
+    ...한가운데,
+    plate,
+    worldPath: [
+      { x: 19501, y: 1110, z: 24500 },
+      { x, y: 1202, z: 29705 },
+    ],
+    stageSide,
+  })
+
+  it('지켜본 공이 좌타 상자 [271, 309] 안이면 사구 — 표 굴림 한 번 뒤 난수를 더 안 쓴다', () => {
+    // side 1: (21450, 1202, 29705) → 판정 좌표 (289, 325). 표 굴림 99 → 지켜보기
+    const random = 각본([0.99])
+    expect(pitchAgainstBatter(도착(21450, 1), 타자(500), random, undefined, 무사주자없음)).toEqual({ kind: '사구' })
+    expect(random.used()).toBe(1)
+  })
+
+  it('우타(side 0)는 뒤집지 않은 상자 [171, 209] — (18400 → 181) 이 사구', () => {
+    expect(pitchAgainstBatter(도착(18400, 0), 타자(500), 각본([0.99]), undefined, 무사주자없음)).toEqual({
+      kind: '사구',
+    })
+    // 같은 월드 점을 좌타 배치(side 1)로 보면 (186) 상자 밖이라 볼이다
+    expect(pitchAgainstBatter(도착(19700, 1), 타자(500), 각본([0.99]), undefined, 무사주자없음)).toEqual({
+      kind: '볼',
+    })
+  })
+
+  it('치기를 뽑았어도 존 밖 공을 안 쫓으면(스윙 예약 없음) 상자 판정까지 간다', () => {
+    // 표 0 → 치기 · 존 밖(구역 3) 쫓기 굴림 9999 > 250 − h/4 → 지켜봄
+    const random = 각본([0, 0.9999])
+    expect(pitchAgainstBatter(도착(21450, 1), 타자(500), random, undefined, 무사주자없음)).toEqual({ kind: '사구' })
+    expect(random.used()).toBe(2)
+  })
+
+  it('휘두르면 상자 안이어도 사구가 아니다 (스윙 객체 +0xd ≠ 0)', () => {
+    // 표 0 → 치기 · 쫓기 굴림 0 → 휘두른다
+    const result = pitchAgainstBatter(도착(21450, 1), 타자(500), 각본([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]), undefined, 무사주자없음)
+    expect(result.kind).not.toBe('사구')
+  })
+
+  it('궤적이 없는 공은 판정 좌표가 없어 사구가 없다', () => {
+    expect(pitchAgainstBatter(크게빠진공, 타자(500), 각본([0.99]), undefined, 무사주자없음)).toEqual({ kind: '볼' })
+  })
+})
