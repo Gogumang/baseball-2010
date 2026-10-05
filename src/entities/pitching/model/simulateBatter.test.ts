@@ -1,9 +1,29 @@
 import { describe, expect, it } from 'vitest'
-import { pitchAgainstBatter, willSwing } from '@/entities/pitching/model/simulateBatter'
+import {
+  cpuSwingTimingOffsetOf,
+  pitchAgainstBatter,
+  willSwing,
+} from '@/entities/pitching/model/simulateBatter'
 import type { BatterSituation } from '@/entities/pitching/model/simulateBatter'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { BatterAbility } from '@/entities/batting/model/batter'
+import type { RandomPort } from '@/shared/api/random/randomPort'
+
+/** 정해 둔 값을 차례로 내주고, 몇 번 굴렸는지 센다 */
+function 각본(values: readonly number[]): RandomPort & { readonly used: () => number } {
+  let used = 0
+  return {
+    next: () => {
+      const value = values[Math.min(used, values.length - 1)]
+      used += 1
+      return value
+    },
+    nextInRange: () => 0,
+    pick: <T,>(c: readonly T[]) => c[0],
+    used: () => used,
+  }
+}
 
 const 한가운데: Pitch = {
   type: '직구',
@@ -109,6 +129,62 @@ describe('willSwing — 난수 굴림 차례', () => {
 
   it('존 밖에서 휘두를 마음이 있으면 한 번 더 돈다', () => {
     expect(굴림수(존밖, 무사주자없음, [0.0])).toBe(2)
+  })
+})
+
+/**
+ * 타이밍 0x340f8 — K = h/4 + 2900. 첫 굴림 rand(0,10000) < K 면 [0,0] 표(굴림 2번),
+ * 아니면 둘째 굴림 < K·19/10 이면 [0,1] 표, 그 밖 [0,1,−1] 표 (둘 다 굴림 3번).
+ */
+describe('cpuSwingTimingOffsetOf — 원본 0x340f8', () => {
+  it('첫 굴림이 K 밑이면 늘 0 이고 굴림은 두 번이다', () => {
+    // 히트 0 → K = 2900. 0.2899 → 2899 < 2900
+    const random = 각본([0.2899, 0.99])
+    expect(cpuSwingTimingOffsetOf(0, random)).toBe(0)
+    expect(random.used()).toBe(2)
+  })
+
+  it('첫 굴림이 K 와 같으면 둘째 갈래로 간다 — 비교는 `<` 다', () => {
+    // 2900 은 K=2900 을 못 넘는다 → 둘째 rand 0 < 5510 → [0,1][1] = +1
+    const random = 각본([0.29, 0, 0.99])
+    expect(cpuSwingTimingOffsetOf(0, random)).toBe(1)
+    expect(random.used()).toBe(3)
+  })
+
+  it('둘째 문턱은 K·19/10 이다 — 히트 0 이면 5510', () => {
+    expect(cpuSwingTimingOffsetOf(0, 각본([0.5, 0.5509, 0]))).toBe(0)
+    // 5510 은 못 넘는다 → 셋째 표 [0,1,−1], rand(0,3)=2 → −1
+    const random = 각본([0.5, 0.551, 0.9])
+    expect(cpuSwingTimingOffsetOf(0, random)).toBe(-1)
+    expect(random.used()).toBe(3)
+  })
+
+  it('히트는 K 를 h/4 만큼 올린다 — 999 면 K = 3149', () => {
+    expect(cpuSwingTimingOffsetOf(999, 각본([0.3148, 0.99]))).toBe(0)
+    // 3149 는 못 넘는다 → 둘째 rand 0 < 5983 → [0,1][0] = 0, 굴림 3번
+    const random = 각본([0.3149, 0, 0])
+    expect(cpuSwingTimingOffsetOf(999, random)).toBe(0)
+    expect(random.used()).toBe(3)
+  })
+
+  it('실투면 K = 10000 — 늘 첫 갈래라 d = 0, 굴림 두 번', () => {
+    const random = 각본([0.9999, 0.99])
+    expect(cpuSwingTimingOffsetOf(0, random, true)).toBe(0)
+    expect(random.used()).toBe(2)
+  })
+
+  it('히트 0 분포는 d=0 59.2% · +1 30.2% · −1 10.6% 이다', () => {
+    const random = createSeededRandom(20101005)
+    const counts = new Map<number, number>()
+    const attempts = 40000
+    for (let i = 0; i < attempts; i += 1) {
+      const d = cpuSwingTimingOffsetOf(0, random)
+      counts.set(d, (counts.get(d) ?? 0) + 1)
+    }
+    expect((counts.get(0) ?? 0) / attempts).toBeCloseTo(0.592, 1)
+    expect((counts.get(1) ?? 0) / attempts).toBeCloseTo(0.302, 1)
+    expect((counts.get(-1) ?? 0) / attempts).toBeCloseTo(0.106, 1)
+    expect([...counts.keys()].sort()).toEqual([-1, 0, 1])
   })
 })
 

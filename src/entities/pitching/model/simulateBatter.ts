@@ -5,7 +5,6 @@ import { hitDirectionOf } from '@/entities/batting/model/hitDirection'
 import { outcomeOfPattern, randomPattern } from '@/entities/batting/model/battedBallOutcome'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import type { BatterAbility } from '@/entities/batting/model/batter'
-import { ABILITY_SCALE } from '@/entities/batting/model/batter'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -109,9 +108,45 @@ export function willSwing(
   return true
 }
 
-/** 상대 CPU 타자의 타이밍 흔들림(프레임) — 히트 0 이면 ±4, 999 면 ±1 (추정) */
-const MAXIMUM_TIMING_SPREAD = 4
+/** 스윙 프레임 F = N − 2 + d — d = 0 이 타이밍 100 이다 (0x34be0) */
 const SWEET_FRAME_OFFSET = 2
+/** 0x340f8 — K = h/4 + 2900 (0xb54) */
+const TIMING_BASE = 2900
+/** 0x340f8 — 실투면 K = 10000 (0x2710) 이라 첫 굴림이 늘 통과한다 */
+const MISTAKE_TIMING_K = 10000
+/** 0x340f8 — 두 번째 문턱 K × 19 / 10 */
+const SECOND_TIMING_NUMERATOR = 19
+const SECOND_TIMING_DENOMINATOR = 10
+/** 표 0xcfd84 · 0xcfd88 · 0xcfd8c (s8, 앞 2·2·3 칸만 쓴다) */
+const TIMING_OFFSETS_EXACT: readonly number[] = [0, 0]
+const TIMING_OFFSETS_LATE: readonly number[] = [0, 1]
+const TIMING_OFFSETS_WIDE: readonly number[] = [0, 1, -1]
+
+/**
+ * CPU 타자의 스윙 프레임 어긋남 d — 원본 0x340f8 (0x34334 가 휘두르기로 정한 뒤 바로 부른다).
+ *
+ * ```
+ * K = h/4 + 2900                     ; h 음수면 (h+3)>>2 = 0 쪽 버림
+ * if 실투(+0xf98.byte8 ≠ 0): K = 10000
+ * if   rand(0,10000) < K        : d = [0,0][rand(0,2)]       ; 늘 0
+ * elif rand(0,10000) < K*19/10  : d = [0,1][rand(0,2)]
+ * else                          : d = [0,1,−1][rand(0,3)]
+ * F = N − 2 + d
+ * ```
+ * 난수는 **첫 갈래 2번, 나머지 3번** 돈다 — 첫 갈래의 표가 [0,0] 이라 결과는 늘 0 이지만 굴림은 한다.
+ * 히트 영향은 아주 작다 (h=0 이면 d=0 59.2% · +1 30.2% · −1 10.6%).
+ */
+export function cpuSwingTimingOffsetOf(hit: number, random: RandomPort, isMistakePitch = false): number {
+  const k = isMistakePitch ? MISTAKE_TIMING_K : truncated(hit / 4) + TIMING_BASE
+  if (randomIntegerBelow(random, 0, 10000) < k) {
+    return TIMING_OFFSETS_EXACT[randomIntegerBelow(random, 0, TIMING_OFFSETS_EXACT.length)]
+  }
+  const second = truncated((k * SECOND_TIMING_NUMERATOR) / SECOND_TIMING_DENOMINATOR)
+  if (randomIntegerBelow(random, 0, 10000) < second) {
+    return TIMING_OFFSETS_LATE[randomIntegerBelow(random, 0, TIMING_OFFSETS_LATE.length)]
+  }
+  return TIMING_OFFSETS_WIDE[randomIntegerBelow(random, 0, TIMING_OFFSETS_WIDE.length)]
+}
 /** 투수편 투수 능력치를 아직 넘겨받지 않아 쓰는 기본값 (추정) */
 const DEFAULT_PITCHER_STATS = { control: 500, velocity: 500 }
 
@@ -119,7 +154,7 @@ const DEFAULT_PITCHER_STATS = { control: 500, velocity: 500 }
  * 투수편 한 구의 결과. 플레이어가 던지고 타자는 자동으로 반응한다.
  * 휘두른 뒤는 타자편과 같은 원본 스윙 결과(0xab214) → 방향 → 타구 패턴 → 대체 근사를 쓴다.
  * 휘두를지는 원본 0x34334(battingPattern.arr) 그대로다 — `willSwing` 참고.
- * ⚠️ **언제** 휘두를지(아래 흔들림)는 아직 추정이다 — 원본은 0x340f8 의 {−1,0,+1} 분포다.
+ * **언제** 휘두를지는 원본 0x340f8 — `cpuSwingTimingOffsetOf` 참고.
  * ⚠️ 번트도 아직 없다 — 원본은 표에서 번트 칸이 뽑히면 rand(1,4) 로 번트 종류를 정한다.
  */
 export function pitchAgainstBatter(
@@ -135,8 +170,8 @@ export function pitchAgainstBatter(
       : { kind: '볼' }
   }
 
-  const spread = Math.max(1, Math.round(MAXIMUM_TIMING_SPREAD * (1 - batter.hit / ABILITY_SCALE)))
-  const frame = pitch.frameCount - SWEET_FRAME_OFFSET + randomIntegerBelow(random, -spread, spread + 1)
+  // 원본 0x34334 → 0x340f8: F = N − 2 + d
+  const frame = pitch.frameCount - SWEET_FRAME_OFFSET + cpuSwingTimingOffsetOf(batter.hit, random)
   const result = swingResultOf(
     {
       horizontalError: Math.round(pitch.plate.x * ZONE_HALF_PIXELS),
