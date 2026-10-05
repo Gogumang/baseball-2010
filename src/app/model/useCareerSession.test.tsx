@@ -414,6 +414,23 @@ describe('훈련·휴식 결과 창 — 변화량은 굴린 값 그대로, 필�
     }
   })
 
+  it('필살타법: 상세 창 대신 알림 창 하나 — [확인] 이면 관리 화면 그대로, 부상을 안 굴린다', () => {
+    // 사기 0 근처면 부상 확률이 가장 높다 — 굴렸다면 걸릴 수 있는 자리다
+    const rendered = 관리띄우기({ ...createCareer('필살'), morale: 5, gamePoint: 600 })
+    try {
+      act(() => rendered.result.current.session.actions.runTrainingMenu('필살타법'))
+      const { session } = rendered.result.current
+      expect(session.managementDetail).toBeNull()
+      expect(session.managementNotice).toContain('!N')
+      expect(session.managementNotice).toContain('사기')
+      const trained = session.career
+      act(() => rendered.result.current.session.actions.dismissManagementNotice())
+      expect(rendered.result.current.session.managementNotice).toBe('')
+      expect(rendered.result.current.session.career?.isInjured).toBe(trained?.isInjured)
+    } finally {
+      act(() => rendered.unmount())
+    }
+  })
 })
 
 describe('CPU 견제 (0x345fc 종류 4 → 0x34848) — 타자편도 견제 판을 재생하고 같은 타석을 잇는다', () => {

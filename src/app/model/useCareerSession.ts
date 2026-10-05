@@ -783,7 +783,16 @@ export function useCareerSession({
       beginGame()
     },
 
-    /** [트레이닝] 하위 메뉴 — 연출이 끝난 뒤 불린다. 결과는 관리 화면 알림으로 보인다 */
+    /**
+     * [트레이닝] 하위 메뉴 — 연출이 끝난 뒤 불린다 (훈련 결과 0x17f5c).
+     *
+     * 칸 0~3(능력치 훈련)은 상세 결과 창(0x872a1)을 띄우고, 창의 키 처리(0x1d63c → 0x1b4c4)가 닫힐 때 부상을 굴린다.
+     * **필살타법(칸 4)은 다른 길이다** — `0x18bd8` `[sp+0x40](칸) == 4` 면 결과 글([sp+0xfc]: StrMODE[87] 또는 [86]
+     * `!N` 사기)을 **알림 창** `0xbbef8(글, 1, 코드 4, 1)`(OK 한 개)에 띄우고 곧장 공통 끝(0x18d66)으로 간다.
+     * 그 창이 닫히면 상태 125 의 틀 `0x18dd8` 이 "팝업 닫힘 · 코드 4 · 결과 0/0x14" 를 보고 **105(관리 화면)** 로만 간다.
+     * 부상 굴림 0x1b4c4 는 상세 창 콜백(0x1d63c)에서만 불리므로 **필살타법 뒤에는 부상을 굴리지 않는다.**
+     * (0x1b4c4 안의 "칸 == 4 면 필살 확률" 갈래는 그래서 원본에서도 안 걸린다 — 그대로 둔다.)
+     */
     runTrainingMenu: (menuId: string) => {
       const menu = TRAINING_MENUS.find((candidate) => candidate.id === menuId)
       if (career === null || menu === undefined) return
@@ -791,13 +800,17 @@ export function useCareerSession({
       const outcome = runTraining(career, menu, random)
       const trained = awardTitles(outcome.career, evaluateNewTitles(outcome.career))
       setCareer(trained)
+      const changes = trainingDetailChangesOf(outcome)
+      // 필살타법 — 상세 창 대신 알림 창 하나(관리 화면 알림 상자, [확인] → 관리 화면)
+      if (changes === null) return setManagementNotice(trainingOutcomeLinesOf(outcome).join('!N'))
       setManagementDetail({
         before: career,
         after: trained,
         messages: trainingOutcomeLinesOf(outcome),
         // 변화량 칸은 굴린 값 그대로 — 훈련 칸 [sp+0x34] · 사기 칸 −[sp+0x38] (0x18d0e~0x18d38)
-        changes: trainingDetailChangesOf(outcome),
-        afterClose: { kind: '훈련', isSpecialSwing: outcome.specialSwing !== null },
+        changes,
+        // 이 창은 칸 0~3 에서만 뜬다 — 0x1b4c4 가 보는 칸은 4 가 아니다
+        afterClose: { kind: '훈련', isSpecialSwing: false },
       })
     },
 
