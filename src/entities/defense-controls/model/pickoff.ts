@@ -37,18 +37,27 @@
  */
 
 import { pickoffCommandOf } from '@/entities/defense-controls/model/defenseKeys'
+import {
+  PICKOFF_COVER_OF_BASE,
+  PICKOFF_PLAY_KIND,
+  RUNNER_LEAD_DISTANCE,
+} from '@/entities/fielding/model/pickoff'
+import { AI_STATE } from '@/entities/fielding/model/fieldingState'
+
+/**
+ * 플레이 종류 4 = 견제 (플레이+0x118, 0x50f56 이 씀) · 리드 폭 0 (S8 6절 확정).
+ * 예전에는 이 파일과 `entities/fielding/model/pickoff` 가 같은 값을 따로 들고 있었다 —
+ * 배선이 붙으면서 **수비 시뮬레이션 쪽 하나로 모으고 여기서는 다시 내보내기만 한다.**
+ */
+export { PICKOFF_PLAY_KIND, RUNNER_LEAD_DISTANCE }
 
 /** 견제 대상은 1·2·3루뿐이다 (0x50f28 `루 > 0`) */
 export type PickoffBase = 1 | 2 | 3
 
-/** 플레이 종류 4 = 견제 (플레이+0x118, 0x50f56 이 씀) */
-export const PICKOFF_PLAY_KIND = 4
 /** 견제가 들어가는 경기 상태 = 0x17 (수비 화면 인플레이) */
 export const PICKOFF_GAME_STATE = 0x17
-/** 견제 송구를 맡는 수비 AI 상태 = 0xe (0xb47da) */
-export const PICKOFF_AI_STATE = 0xe
-/** 리드 폭은 원본에 없다 — 주자는 루 좌표 위에 정확히 선다 (S8 6절 확정) */
-export const RUNNER_LEAD_DISTANCE = 0
+/** 견제 송구를 맡는 수비 AI 상태 = 0xe (0xb47da) — `fieldingState.AI_STATE.PICKOFF` 와 같은 칸 */
+export const PICKOFF_AI_STATE = AI_STATE.PICKOFF
 
 /**
  * 견제 때 루 커버 야수 = **루 번호 + 1 로 고정** (0xb28be~0xb2948: `for b = 0..3: 야수(b+1) → 루 b`).
@@ -58,7 +67,8 @@ export const RUNNER_LEAD_DISTANCE = 0
  * 견제에는 적용되지 않는다. 원본 그대로 옮긴다.
  */
 export function pickoffCoverFielderOf(base: 0 | PickoffBase): number {
-  return base + 1
+  // 표 `PICKOFF_COVER_OF_BASE` = [1, 2, 3, 4] — 수비 시뮬레이션 쪽과 같은 표를 읽는다
+  return PICKOFF_COVER_OF_BASE[base]
 }
 
 export interface PickoffInput {
@@ -95,6 +105,7 @@ export function pickoffPlayOf(input: PickoffInput): PickoffPlay | null {
  *
  * 돌려주는 것이 `null` 이 아니면 그대로 수비 화면(상태 0x17)을 플레이 종류 4 로 열면 된다 —
  * 원본에는 별도 "견제 아웃 확률" 이 없고, 주자 귀루 대 송구의 시뮬레이션이 판정 전부다 (I-controls 4a).
+ * 부르는 곳: `features/play-pitcher-game/model/pitcherGameFlow.pickoff` (나리 투수편 구질 고르기).
  */
 export function pickoffPlayForKey(
   webKey: string,

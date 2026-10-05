@@ -13,6 +13,7 @@ import {
   earnedRunAverageOf,
   giveUpPitching,
   isPitchTurn,
+  pickoff,
   pitchSlotsFor,
   resolveDefensePlay,
   startPitch,
@@ -502,5 +503,37 @@ describe('미션 조준 흔들림을 진행기가 실어 나른다', () => {
 
   it('세기 3 을 실으면 공이 달라진다', () => {
     expect(던진공(3)?.plate).not.toEqual(던진공()?.plate)
+  })
+})
+
+describe('견제 — 구질 고르기(0xf)에서 3·1·7 (0x53548 → 0x50f28 → 종류 4)', () => {
+  const 주자있는판 = (bases: PitcherGameProgress['game']['bases']): PitcherGameProgress => {
+    const progress = startPitcherGame(기본옵션, 씨앗(3))
+    return { ...progress, game: { ...progress.game, bases } }
+  }
+
+  it('그 루에 주자가 없거나 견제 키가 아니면 아무 일도 없다 — 같은 객체를 돌려준다', () => {
+    const progress = 주자있는판({ first: true, second: false, third: false })
+    expect(isPitchTurn(progress)).toBe(true)
+    expect(pickoff(progress, '1', 씨앗(1))).toBe(progress) // 2루 견제인데 2루가 비었다
+    expect(pickoff(progress, '2', 씨앗(1))).toBe(progress) // 견제 키가 아니다
+  })
+
+  it('견제는 투구가 아니다 — 투구 수·스태미나·볼카운트·타자 상대 수가 그대로고 재생할 판만 생긴다', () => {
+    const progress = 주자있는판({ first: true, second: false, third: false })
+    const after = pickoff(progress, '3', 씨앗(1))
+    expect(after).not.toBe(progress)
+    expect(after.pitchCount).toBe(progress.pitchCount)
+    expect(after.stamina).toBe(progress.stamina)
+    expect(after.atBat).toEqual(progress.atBat)
+    expect(after.atBatPitches).toBe(progress.atBatPitches)
+    expect(after.pitcherRecord).toEqual(progress.pitcherRecord)
+    expect(after.opponentOrderIndex).toBe(progress.opponentOrderIndex)
+    expect(after.game).toEqual(progress.game)
+    expect(after.lastDefensePlay?.throwBase).toBe(1)
+    expect(after.lastDefensePlay?.ticks.length).toBeGreaterThan(0)
+    expect(after.log[0]?.text).toContain('1루 견제')
+    // 다시 던질 수 있다 — 상태 0xf 로 돌아온다
+    expect(isPitchTurn(after)).toBe(true)
   })
 })

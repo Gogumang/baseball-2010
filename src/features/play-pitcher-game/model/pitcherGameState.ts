@@ -78,6 +78,29 @@ export function applyOpponentAtBat(
 }
 
 /**
+ * **타석을 끝내지 않는 플레이**(견제 = 종류 4)의 루·아웃·점수를 반영한다.
+ *
+ * 경기 상태 전이(끝내기·콜드·반 이닝 교대)는 `applyOpponentAtBat` 과 같은 거울로 재사용하고,
+ * **타순 커서만 그대로 둔다** — 타석이 끝난 것이 아니어서다(정산 0xa8024 의 타석 칸도 `state[0x26] ∈ {4,5}`
+ * 로 안 오른다). `applyAtBatOutcome` 은 `precomputed` 를 받으면 결과 코드를 읽지 않으므로 넘기는 코드는
+ * 자리만 채운다.
+ *
+ * ⚠️ 미해결: 견제사로 3아웃이 되면 원본이 다음 이닝 첫 타자를 **같은 타자**로 두는지 문서에 없다.
+ *    타순을 미는 자리가 0xa8024 공통 꼬리 안인지 밖인지를 아직 안 떴다 — 여기서는 안 민다.
+ */
+export function applyOpponentRunnerPlay(
+  game: GameState,
+  opponentOrderIndex: number,
+  advance: AdvanceResult,
+): OpponentAtBatResult {
+  const applied = applyOpponentAtBat(game, opponentOrderIndex, RUNNER_PLAY_PLACEHOLDER, advance)
+  return { ...applied, opponentOrderIndex }
+}
+
+/** `precomputed` 가 있으면 안 읽히는 자리 채움 — 견제에는 타석 결과 코드가 없다 */
+const RUNNER_PLAY_PLACEHOLDER: AtBatOutcome = { kind: '아웃', detail: '땅볼아웃' }
+
+/**
  * 이닝별 실점 표 — 원본 `state+0x6c + (이닝%9)·2 + 측` 을 읽는 `0xb6988` 자리다.
  * 감독 강판 3번 사유("한 이닝 4실점")가 이 값을 본다 (P1 2-1).
  *

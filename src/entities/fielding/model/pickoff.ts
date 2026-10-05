@@ -17,14 +17,15 @@ import { AI_STATE, type FielderState, type PlayView } from '@/entities/fielding/
  *
  * ## 이 파일과 `entities/defense-controls/model/pickoff.ts` 는 한 몸이다
  * 이쪽은 **수비 시뮬레이션 쪽 조각**(커버 배정·AI 상태·시작 상태), 저쪽은 **입력~메시지 0x10 쪽
- * 조각**(키 표·`state[0x27]`·상태 0x17)이다. `PICKOFF_PLAY_KIND`·`RUNNER_LEAD_DISTANCE` 가 양쪽에
- * 같은 값으로 있는 것은 그래서다 — 배선이 붙는 날 한쪽으로 모을 자리다.
+ * 조각**(키 표·`state[0x27]`·상태 0x17)이다. 예전에는 `PICKOFF_PLAY_KIND`·`RUNNER_LEAD_DISTANCE` 가
+ * 양쪽에 같은 값으로 따로 있었는데, 배선이 붙으면서 **이 파일 하나로 모았다** — 저쪽은 여기서 가져다
+ * 다시 내보내기만 한다(커버 표 `PICKOFF_COVER_OF_BASE` 도 저쪽 `pickoffCoverFielderOf` 가 여기를 읽는다).
  *
- * ## 아직 배선되지 않았다 (2026-09)
- * `features/defense-play/model/runDefensePlay` 는 **종류 1(타구)만** 돌린다. 종류 4 를 받으려면
- * 타구 궤적·타자주자·포구 예보가 없는 플레이를 견뎌야 하는데, 그 플레이가 끝나는 조건(결과 코드 9,
- * `0xb4292`)이 **해독 금지 구역인 궤적 물리 루프 `0xb401c` 안**이고 S8 6-5 가 그 고리를 미해결로
- * 남겨 두었다. 그래서 억지로 박지 않았다.
+ * ## 배선 (2026-10)
+ * 진행기는 `features/defense-play/model/pickoffPlay` 다 — 타구 진행기 `runDefensePlay` 는 타자주자·
+ * 타구 궤적·포구 예보를 전제로 짜여 있어 종류 4 를 그 안에 끼우지 않고 **따로 짧게** 돌린다.
+ * 끝 조건(결과 코드 9, `0xb4292`)은 S8 6-5 가 2026-09-25 에 닫았다 — "커버 야수가 루 b 위에서 공을
+ * 잡았고, b 에 마지막으로 닿은 산 주자가 제 목표점에 서 있다" 면 세이프(9)다.
  */
 
 /** 견제 플레이 종류 (+0x118 = 4) */

@@ -5,6 +5,7 @@ import {
   closeManagerHookWindow,
   giveUpPitching,
   isPitchTurn,
+  pickoff,
   resolveDefensePlay,
   startPitch,
   startPitcherGame,
@@ -12,6 +13,7 @@ import {
 } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
+import { isPickoffPlayResult, pickoffCallSoundIdOf } from '@/features/defense-play/model/pickoffPlay'
 import { applyPitchResolution } from '@/entities/at-bat/model/atBatState'
 import {
   deepHitCheerSoundIdOf,
@@ -51,6 +53,11 @@ export interface PitcherGameSession {
      * 인플레이 타구가 되면 **거기서 멈춘다** — 주자 처리는 수비 화면이 끝난 뒤다.
      */
     readonly throwPitch: (input: PitchInput) => void
+    /**
+     * 구질 고르기(상태 0xf)에서 눌린 키 — '3'/'1'/'7' 이고 그 루에 주자가 있으면 견제 한 판을 돌린다
+     * (0x53548 → 0x50f28). 아니면 아무 일도 없다.
+     */
+    readonly pickoff: (key: string) => void
     /** 수비 화면이 한 타구를 다 돌렸다 (`DefensePlayback` 의 `onDone`) */
     readonly finishDefensePlay: (result?: DefensePlayResult) => void
     /** `#` 스스로 강판 (StrGAME[104] 에 "예") */
@@ -170,6 +177,17 @@ export function usePitcherGame(
                 ],
         )
       },
+      pickoff: (key: string) =>
+        step(
+          (current) => pickoff(current, key, random),
+          // 판정 콜 — 세이프면 늘 17 (0x51c14 의 종류 4·5 갈래), 견제사면 62/20 (0x51b36).
+          // ⚠️ 원본은 공이 잡히는 **틱**에 낸다. 웹은 견제 판을 미리 다 돌려 재생하므로 판을 연 자리에서 낸다
+          // — 홈런 비행 재생과 같은 근사다
+          (before, after) =>
+            after.lastDefensePlay !== before.lastDefensePlay && isPickoffPlayResult(after.lastDefensePlay)
+              ? [pickoffCallSoundIdOf(after.lastDefensePlay)]
+              : [],
+        ),
       giveUp: () => step((current) => giveUpPitching(current, random)),
       confirmManagerHook: () => step((current) => closeManagerHookWindow(current, random)),
       closeBurst: () => step((current) => closeBurstWindow(current)),

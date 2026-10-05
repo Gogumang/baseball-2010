@@ -26,6 +26,8 @@ import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { defenseAbilitiesOf, isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayInput, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { homeRunPlaybackOf } from '@/features/defense-play/model/homeRunPlayback'
+import { PICKOFF_RESULT, runPickoffPlay } from '@/features/defense-play/model/pickoffPlay'
+import { pickoffPlayForKey, PICKOFF_PLAY_KIND } from '@/entities/defense-controls/model/pickoff'
 import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
 import { pitchAgainstBatter } from '@/entities/pitching/model/simulateBatter'
 import type { Pitch } from '@/entities/pitching/model/pitch'
@@ -59,6 +61,7 @@ import { burstResultBitsOf } from '@/entities/burst-mission/model/burstResultBit
 import {
   addInningRuns,
   applyOpponentAtBat,
+  applyOpponentRunnerPlay,
   clearInningRuns,
   inningRunsOf,
 } from '@/features/play-pitcher-game/model/pitcherGameState'
@@ -589,6 +592,104 @@ export function resolveDefensePlay(
     ),
     random,
   )
+}
+
+/**
+ * **견제** — 구질 고르기(상태 0xf)에서 '3'/'1'/'7' (0x53548 → 메시지 0x10 → 0x50f28 → 상태 0x17 종류 4).
+ *
+ * 그 루에 주자가 없거나 견제 키가 아니면 **아무 일도 없다**(원본도 키를 먹고 끝난다 — 같은 객체를 돌려준다).
+ * 견제는 투구가 아니다: 투구 수·스태미나·볼카운트·마구 횟수를 건드리지 않고(0x10~0x12 를 안 지난다),
+ * 정산 0xa8024 가 불려도 `state[0x26] = 4` 라 **타자 상대 수(R+0x138)·타석 수(+0x14)가 안 오른다**
+ * (`recordBatterFaced` · `pinchHitAi.recordPlateAppearance`).
+ *
+ * 수비 화면은 `runPickoffPlay` 가 미리 끝까지 돌린 틱을 `lastDefensePlay` 로 재생한다 — 견제 중에는 사람이
+ * 바꿀 것이 없어서다(`pickoffPlay` 머리 주석). 난수는 그 안의 **악송구 굴림(0xa1828) 1번 · 악송구면 +2번**뿐이다.
+ *
+ * ⚠️ 견제사·홈인은 이 모드에서 사실상 안 난다 — 사람 경기의 CPU 도루(0x520de)는 투구 모션 10프레임에만
+ *    걸리고 견제는 상태 0xf 에서만 들어와 겹치지 않으며(Q1 3b), 웹 투수편에는 CPU 도루 자체가 아직 없다.
+ *    그래도 진행기가 아웃·진루를 내면 경기 상태(루·아웃·점수·반 이닝 교대)에는 먹인다. 그때 0xa8024 의
+ *    나머지 기록 칸(투수 아웃 수·돌발 판정 등)이 견제 판에서 어떻게 도는지는 **미해결**이라 손대지 않는다.
+ */
+export function pickoff(
+  progress: PitcherGameProgress,
+  webKey: string,
+  random: RandomPort,
+): PitcherGameProgress {
+  if (!isPitchTurn(progress) || !progress.atBatPrepared) return progress
+  const bases = progress.game.bases
+  const play = pickoffPlayForKey(webKey, (base) =>
+    base === 1 ? bases.first : base === 2 ? bases.second : bases.third,
+  )
+  if (play === null) return progress
+
+  const result = runPickoffPlay({
+    targetBase: play.targetBase,
+    bases,
+    outs: progress.game.outs,
+    // 수비 아홉 칸은 우리 팀, 칸 0 은 나 — 타구 진행기와 같은 원본 버그(칸 0 은 변화)까지 그대로
+    defenseAbilities: defenseAbilitiesOf(
+      teamBatters(progress.options.ourTeamId).map((player) => ({
+        position: player.position,
+        defense: player.ability[2],
+      })),
+      progress.options.stats.breaking,
+    ),
+    runAbility: opponentBatterAbility(progress.options.opponentTeamId, progress.opponentOrderIndex).run,
+    random,
+    offenseIsCpu: true,
+  })
+
+  const advanceResult = result.advance
+  const changed =
+    advanceResult.outsAdded > 0 ||
+    advanceResult.runsScored > 0 ||
+    advanceResult.bases.first !== bases.first ||
+    advanceResult.bases.second !== bases.second ||
+    advanceResult.bases.third !== bases.third
+  const before = progress.game
+  let next: PitcherGameProgress = {
+    ...progress,
+    lastDefensePlay: result,
+    // 0xa8d98 — 종류 4 는 R+0x138 을 안 올린다 (그대로 돌려받는다)
+    pitcherRecord: recordBatterFaced(progress.pitcherRecord, PICKOFF_PLAY_KIND),
+  }
+  if (changed) {
+    const applied = applyOpponentRunnerPlay(before, progress.opponentOrderIndex, advanceResult)
+    let decision = progress.decision
+    for (let run = 1; run <= applied.runsScored; run += 1) {
+      decision = applyRunScoredFor(progress, decision, run, true)
+    }
+    const halfChanged = applied.game.half !== before.half || applied.game.inning !== before.inning
+    next = {
+      ...next,
+      game: applied.game,
+      decision,
+      inningRuns: addInningRuns(progress.inningRuns, before.inning, applied.runsScored),
+      runsAllowedByMe: progress.runsAllowedByMe + applied.runsScored,
+      teamRunsAllowed: progress.teamRunsAllowed + applied.runsScored,
+    }
+    if (halfChanged) {
+      next = {
+        ...next,
+        inningRuns: clearInningRuns(next.inningRuns, applied.game.inning),
+        perfectInningFlag: true,
+        halfInningPitches: 0,
+        atBat: createAtBat(),
+        atBatPitches: 0,
+        atBatPrepared: false,
+        endedInningIndex: applied.game.inning - 1,
+      }
+    }
+  }
+  const call = result.resultCode === PICKOFF_RESULT.OUT ? '견제사' : result.errantThrow ? '악송구' : '세이프'
+  next = appendLog(
+    next,
+    `${before.inning}회${before.half} ${play.targetBase}루 견제 — ${call}${
+      advanceResult.runsScored > 0 ? ` (${advanceResult.runsScored}실점)` : ''
+    }`,
+    true,
+  )
+  return changed ? advance(next, random) : next
 }
 
 /**

@@ -57,7 +57,9 @@ export interface BatterGameRecord {
    * `0xa8024` 의 **공통 꼬리**다 — 안타 가지(`0xa86e0`)도 `0xa8946` 을 거쳐 여기로 내려오고,
    * 아웃 가지도 `0xa89f4` 에서 여기로 떨어진다. 막는 것은 `state[0x26] ∈ {4,5}`
    * (플레이 종류 4 견제 · 5 주자만) 하나뿐이라, **타자가 끝낸 플레이마다** 올라간다.
-   * (웹에는 견제·주자만 플레이가 없어 타석마다 세면 된다.)
+   * **견제로 끝난 판은 정산(0xa8024)이 불려도 이 칸을 안 올린다** — `recordPlateAppearance` 의
+   * `playKind` 인자가 그 게이트다. (예전 주석 "웹에는 견제가 없어 타석마다 세면 된다" 는
+   * 사람 견제가 붙으면서 거짓이 되어 고쳤다.)
    */
   readonly plateAppearances: number
 }
@@ -68,15 +70,28 @@ export const EMPTY_BATTER_GAME_RECORD: BatterGameRecord = {
   plateAppearances: 0,
 }
 
-/** 타석 하나를 기록에 얹는다 (`0xa8024` 의 세 칸만) */
+/**
+ * 정산 `0xa8024` 의 타석 수 게이트 — `state[0x26]`(이번 플레이 종류)이 4(견제)·5(주자만)면
+ * 공통 꼬리 `0xa8ac6` 의 `+0x14` 올림을 건너뛴다. 투수 쪽 `R+0x138`(0xa8d98) 을 막는 것과 같은 칸이다
+ * (`entities/pitcher-career/model/pitcherGameRecord.RUNNER_ONLY_PLAY_KINDS`).
+ */
+const RUNNER_ONLY_PLAY_KINDS: readonly number[] = [4, 5]
+
+/**
+ * 플레이 하나를 기록에 얹는다 (`0xa8024` 의 세 칸만).
+ *
+ * `playKind` 는 원본 `state[0x26]` — 안 주면 1(타구)이다. 견제(4)·주자만(5)으로 끝난 판은
+ * **타석 수(+0x14)를 안 올린다.** 안타·적시타 칸은 안타 가지(0xa86e0) 안이라 그런 판에서는 애초에 안 선다.
+ */
 export function recordPlateAppearance(
   record: BatterGameRecord,
-  play: { readonly isHit: boolean; readonly runsBattedIn: number },
+  play: { readonly isHit: boolean; readonly runsBattedIn: number; readonly playKind?: number },
 ): BatterGameRecord {
+  const countsAsPlateAppearance = !RUNNER_ONLY_PLAY_KINDS.includes(play.playKind ?? 1)
   return {
     hits: record.hits + (play.isHit ? 1 : 0),
     runScoringHits: record.runScoringHits + (play.isHit && play.runsBattedIn > 0 ? 1 : 0),
-    plateAppearances: record.plateAppearances + 1,
+    plateAppearances: record.plateAppearances + (countsAsPlateAppearance ? 1 : 0),
   }
 }
 

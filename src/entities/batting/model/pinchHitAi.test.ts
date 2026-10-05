@@ -110,4 +110,16 @@ describe('타순 칸 기록 0xa8024', () => {
         .runScoringHits,
     ).toBe(0)
   })
+
+  it('견제(4)·주자만(5)으로 끝난 판은 타석 수를 안 올린다 — 0xa8024 의 state[0x26] 게이트', () => {
+    const 한타석 = recordPlateAppearance(EMPTY_BATTER_GAME_RECORD, { isHit: false, runsBattedIn: 0 })
+    for (const playKind of [4, 5]) {
+      expect(
+        recordPlateAppearance(한타석, { isHit: false, runsBattedIn: 0, playKind }),
+        `종류 ${playKind}`,
+      ).toEqual(한타석)
+    }
+    // 종류를 안 주면 타구(1)다 — 지금까지와 똑같이 센다
+    expect(recordPlateAppearance(한타석, { isHit: false, runsBattedIn: 0, playKind: 1 }).plateAppearances).toBe(2)
+  })
 })

@@ -112,6 +112,32 @@ export function PitcherGameScreen({
       ? null
       : (ORIGINAL_BURST_TABLES[burst.table].lines[burstRow.index] ?? null)
 
+  /**
+   * **견제** — 구질 고르기(상태 0xf)에서만 '3' 1루 · '1' 2루 · '7' 3루 (0x53548, 설명서 <투구 조작>).
+   * 코스·게이지 단계는 원본도 다른 상태(0x10·0x11)라 받지 않는다. 그 루에 주자가 없으면 진행기가 키를 먹고 끝낸다.
+   */
+  // 견제 판(또는 홈런 비행)을 재생하는 동안은 원본도 상태 0x17 이라 0xf 키를 안 받는다
+  const isReplaying = play !== null && play !== shownPlay && play.ticks.length > 0
+  const acceptsPickoff =
+    canPitch &&
+    !isReplaying &&
+    phase === '구질' &&
+    !isMenuOpen &&
+    !asksGiveUp &&
+    overlay === null &&
+    burstLines === null &&
+    progress.managerHookText === null
+  const { pickoff } = actions
+  useEffect(() => {
+    if (!acceptsPickoff) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat) return
+      pickoff(event.key)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [acceptsPickoff, pickoff])
+
   const throwWith = (gaugeCell: number) => {
     if (slot === null) return
     actions.throwPitch({ typeNumber: slot.typeNumber, courseCell, gaugeCell })
@@ -141,7 +167,7 @@ export function PitcherGameScreen({
     )
   }
   // 홈런 비행처럼 조작할 것이 없는 장면만 예전대로 재생 갈래로 간다
-  if (play !== null && play !== shownPlay && play.ticks.length > 0) {
+  if (isReplaying) {
     return <DefensePlayback ticks={play.ticks} onDone={finishPlayback} />
   }
 
