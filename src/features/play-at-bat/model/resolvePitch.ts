@@ -6,6 +6,7 @@ import { timingOf } from '@/entities/batting/model/swingTiming'
 import { hitDirectionOf } from '@/entities/batting/model/hitDirection'
 import { drawPattern, outcomeOfPattern } from '@/entities/batting/model/battedBallOutcome'
 import { contactSoundIdOf } from '@/features/play-at-bat/model/atBatSounds'
+import { rollSpecialSwing } from '@/entities/batting/model/specialSwing'
 import type { PatternDeck } from '@/entities/batting/model/battedBallOutcome'
 import { isInsideStrikeZone } from '@/shared/lib/geometry/coordinate'
 import type { BatterAbility } from '@/entities/batting/model/batter'
@@ -23,8 +24,9 @@ export interface BattingSwing {
   /** 0 스윙 · 1~3 번트 종류 */
   readonly buntKind: number
   /**
-   * 이번 스윙에 필살타법을 실었는가 — 스윙 객체 `S+0x10`(필살 번호) ≠ 0 (0x51e40).
-   * 헛스윙 바람 소리를 8 대신 27 로 바꾼다 (0x51350). 안 넘기면 보통 스윙이다.
+   * 필살타법 스윙인가 — 스윙 객체 `S+0x10`(필살 번호) ≠ 0 (0x51e40). '0' 키(메시지 0x6a6)는 일반 스윙
+   * (0x6a5 → 0x51db6)과 똑같이 **그 틱에 스윙을 예약**하고 S+0x10 만 다르게 쓴다 — 따로 거는 단계는 없다.
+   * 헛스윙 바람 소리를 8 대신 27 로 바꾸고 (0x51350), 맞으면 성공 굴림 0x34c74 를 한다. 안 넘기면 보통 스윙이다.
    */
   readonly isSpecial?: boolean
 }
@@ -54,6 +56,11 @@ export interface BattingContext {
    * 원본은 판정 바로 앞(0x51294)에서 매번 만든다 — 타석 화면이 `swingBoostOf` 로 채운다. 안 넘기면 0.
    */
   readonly swingBoost?: SwingBoost
+  /**
+   * 필살 성공 굴림(0x34c74)이 볼 값 — 고른 번호(+0x18)와 마타자 여부. `swing.isSpecial` 일 때만 쓴다.
+   * 안 넘기면 번호 0 으로 보아 확률 0 (굴리지 않는다).
+   */
+  readonly specialSwing?: { readonly number: number; readonly isAceBatter: boolean }
 }
 
 export interface PitchOutcomeDetail {
@@ -157,13 +164,22 @@ export function resolvePitch(
   context: BattingContext,
   deck: PatternDeck,
   random: RandomPort,
-): { readonly detail: PitchOutcomeDetail; readonly deck: PatternDeck } {
+): {
+  readonly detail: PitchOutcomeDetail
+  readonly deck: PatternDeck
+  /**
+   * 필살타법이 성공한 타구인가 — 0x517e6 `p·10 > rand(0,1000)` 이 참이면 0xaf180(…, 4, 0, −1) 이 "송구공" 비트를 단다
+   * (야수가 쥐지 않고 지나친다, `features/defense-play` 의 `isUncatchable`).
+   */
+  readonly isUncatchable: boolean
+} {
   if (swing === null) {
     // 사구가 볼·스트라이크보다 먼저다 (0x9d57c 첫머리 0x9d582 — state[0x12] 면 곧장 4)
     if (isHitByPitch(pitch, context.situation.batterSide)) {
       return {
         detail: { resolution: { kind: '사구' }, hasSwung: false, isBunt: false, resultCode: null, contactSoundId: null },
         deck,
+        isUncatchable: false,
       }
     }
     const resolution: PitchResolution = isInsideStrikeZone(pitch.plate)
@@ -172,6 +188,7 @@ export function resolvePitch(
     return {
       detail: { resolution, hasSwung: false, isBunt: false, resultCode: null, contactSoundId: null },
       deck,
+      isUncatchable: false,
     }
   }
 
@@ -210,7 +227,8 @@ export function resolvePitch(
       resultCode: null,
       pattern: null,
     })
-    return { detail: { resolution, hasSwung: true, isBunt: false, resultCode: null, contactSoundId }, deck }
+    // 헛스윙(경기+0xfd2 == 0)은 0x5135c 에서 0x51840 으로 건너뛰어 필살 굴림이 없다
+    return { detail: { resolution, hasSwung: true, isBunt: false, resultCode: null, contactSoundId }, deck, isUncatchable: false }
   }
 
   const direction = hitDirectionOf(
@@ -219,6 +237,11 @@ export function resolvePitch(
   )
   const code = result.code + direction
   const drawn = drawPattern(deck, code, random)
+  // 필살 성공 굴림 0x34c74 → 0x517e6 — 맞은 공(0xfd2 ≠ 0)이면 어느 갈래든 0x517c8 로 모여
+  // 방향·패턴을 고른 **뒤**, 수비(웹은 아래 대체 근사 outcomeOfPattern)보다 **앞**에서 굴린다
+  const isUncatchable =
+    swing.isSpecial === true &&
+    rollSpecialSwing(context.specialSwing?.number ?? 0, random, context.specialSwing?.isAceBatter === true)
   // 2스트라이크 번트 파울은 아웃이다 (0x9d5e2~0x9d600). `situation.strikes` 는 이 공을 먹이기
   // 전의 카운트라 원본 `(s8)state[4] > 1` 과 같은 자리다
   const batted = outcomeOfPattern(code, drawn.pattern, random, {
@@ -245,5 +268,5 @@ export function resolvePitch(
           resultCode: code,
           contactSoundId,
         }
-  return { detail, deck: drawn.deck }
+  return { detail, deck: drawn.deck, isUncatchable }
 }

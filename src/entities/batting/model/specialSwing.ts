@@ -41,3 +41,60 @@ export function rollSpecialSwing(swingNumber: number, random: RandomPort, isAceB
   if (percent <= 0) return false
   return percent * 10 > randomIntegerBelow(random, 0, RANDOM_LIMIT)
 }
+
+/**
+ * 표 `0xd84f0` (u8) — 육성·일반 타자의 **한 경기 필살 횟수**, 색인 = 고른 번호(+0x18).
+ * 0 파워 없음 · 1 파워 2 · 2 플레임 3 · 3 토네이도 4 · 4 미라지·메테오 5 (색인 5~ 는 안 쓰임 — H2 1-2).
+ */
+export const SPECIAL_SWING_COUNT_BY_NUMBER: readonly number[] = [0, 2, 3, 4, 5, 5]
+/** 표 `0xd84fa` (s8) — 마타자 레벨(`mgr[0x13f + 순번]`) 0~4 별 횟수 */
+export const SPECIAL_SWING_COUNT_BY_ACE_LEVEL: readonly number[] = [2, 2, 3, 4, 5]
+/** 타자 스킬 23 무자비 — "필살타법 횟수 +1" (StrCOMMON 78) */
+export const RUTHLESS_SKILL_ID = 23
+const RUTHLESS_SKILL_BONUS = 1
+
+/**
+ * 한 경기 필살 횟수 — 타석 교대·교체 처리 `0xaebe4` 가 **남은 칸이 음수일 때만** 채운다 (H2 1-2):
+ * ```
+ * B+0x18 == 0           → 0
+ * 마타자(0xb633d)        → s8 0xd84fa[레벨]
+ * 아니면                 → u8 0xd84f0[B+0x18]
+ * 스킬 23 (0xb62b4(B, 0x17)) 이면 +1
+ * ```
+ * 칸은 팀의 **타순별**(팀+0x29+타순)이라 경기 전체에 한 번 주어지고 이닝이 바뀌어도 다시 차지 않는다.
+ * 대타 등 교체 때만 −1(빈 칸)로 되돌려 새 선수가 자기 횟수를 받는다.
+ */
+export function specialSwingCountOf(input: {
+  /** 선수 +0x18. 마타자는 5~9 */
+  readonly swingNumber: number
+  readonly isAceBatter: boolean
+  /** 마타자 레벨 0~4 */
+  readonly aceLevel?: number
+  /** 스킬 23 장착 (0xb62b4 = 장착 비트) */
+  readonly hasRuthlessSkill?: boolean
+}): number {
+  if (input.swingNumber === 0) return 0
+  const base = input.isAceBatter
+    ? (SPECIAL_SWING_COUNT_BY_ACE_LEVEL[Math.min(Math.max(input.aceLevel ?? 0, 0), SPECIAL_SWING_COUNT_BY_ACE_LEVEL.length - 1)] ?? 0)
+    : (SPECIAL_SWING_COUNT_BY_NUMBER[Math.min(Math.max(input.swingNumber, 0), SPECIAL_SWING_COUNT_BY_NUMBER.length - 1)] ?? 0)
+  return base + (input.hasRuthlessSkill === true ? RUTHLESS_SKILL_BONUS : 0)
+}
+
+/**
+ * '0' 키를 받는가 — 메시지 0x6a6 처리 `0x51e14`: `0xaea30(팀) == 0` 이면 무시.
+ * 0xaea30 = `타자+0x18 == 0 ? 0 : s8 팀[+0x29 + 타순]` 이라 **0 만** 막는다(−1 "안 채움" 은 통과).
+ * `remaining` 을 모르면(undefined) 횟수 제한 없이 번호만 본다.
+ */
+export function canSpecialSwing(swingNumber: number, isAceBatter: boolean, remaining?: number): boolean {
+  // 마선수 레코드 +0x18 은 늘 5~9 라 마타자는 번호 가드에 안 걸린다 (H2 4-1)
+  if (swingNumber === 0 && !isAceBatter) return false
+  return remaining !== 0
+}
+
+/**
+ * 실제 스윙이 나가는 틱 `0x4e136`: `S+0x10 ≠ 0 && 0xaea30(팀) > 0` 이면 `0xae9e8(팀, 남은 − 1)`.
+ * 결과와 무관하다 — 헛스윙이어도 줄어든다. 음수(안 채움)·0 은 그대로 둔다.
+ */
+export function remainingAfterSpecialSwing(remaining: number): number {
+  return remaining > 0 ? remaining - 1 : remaining
+}

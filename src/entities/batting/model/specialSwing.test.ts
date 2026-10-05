@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest'
 import {
   ACE_BATTER_SPECIAL_SWING_PERCENT,
   SPECIAL_SWING_PERCENTS,
+  canSpecialSwing,
+  remainingAfterSpecialSwing,
   rollSpecialSwing,
+  specialSwingCountOf,
   specialSwingPercentOf,
 } from '@/entities/batting/model/specialSwing'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -61,5 +64,35 @@ describe('굴림 — `p·10 > rand(0, 1000)`', () => {
     const 난수 = 고정난수(200 / 1000)
     expect(rollSpecialSwing(1, 난수)).toBe(false)
     expect(rollSpecialSwing(5, 고정난수(200 / 1000))).toBe(true)
+  })
+})
+
+describe('한 경기 횟수 — 표 0xd84f0 · 0xd84fa (0xaebe4)', () => {
+  it('육성·일반 타자는 번호별 2·3·4·5, 번호 0 이면 0', () => {
+    expect([0, 1, 2, 3, 4].map((swingNumber) => specialSwingCountOf({ swingNumber, isAceBatter: false }))).toEqual([0, 2, 3, 4, 5])
+  })
+
+  it('마타자는 레벨별 2·2·3·4·5 (번호 5~9 와 무관)', () => {
+    expect([0, 1, 2, 3, 4].map((aceLevel) => specialSwingCountOf({ swingNumber: 7, isAceBatter: true, aceLevel }))).toEqual([2, 2, 3, 4, 5])
+  })
+
+  it('스킬 23 무자비는 +1', () => {
+    expect(specialSwingCountOf({ swingNumber: 4, isAceBatter: false, hasRuthlessSkill: true })).toBe(6)
+    expect(specialSwingCountOf({ swingNumber: 0, isAceBatter: false, hasRuthlessSkill: true })).toBe(0)
+  })
+})
+
+describe("'0' 키 가드 0x51e14 · 소모 0x4e136", () => {
+  it('남은 횟수 0 이면 무시, 음수(안 채움)는 통과, 모르면 번호만 본다', () => {
+    expect(canSpecialSwing(2, false, 0)).toBe(false)
+    expect(canSpecialSwing(2, false, 1)).toBe(true)
+    expect(canSpecialSwing(2, false, -1)).toBe(true)
+    expect(canSpecialSwing(2, false)).toBe(true)
+    expect(canSpecialSwing(0, false)).toBe(false)
+    expect(canSpecialSwing(0, true, 3)).toBe(true)
+  })
+
+  it('양수일 때만 1 줄인다', () => {
+    expect([3, 1, 0, -1].map(remainingAfterSpecialSwing)).toEqual([2, 0, 0, -1])
   })
 })

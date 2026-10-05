@@ -182,3 +182,48 @@ describe('resolvePitch — 보정 구조체 0x34d6c 를 판정에 싣는다', ()
     expect(보정.detail.resultCode! >= 15).toBe(true)
   })
 })
+
+describe('resolvePitch — 필살 성공 굴림 0x34c74 → 0x517e6', () => {
+  /** 뽑은 횟수를 센다. 값은 늘 같은 v */
+  const 세는 = (value: number) => {
+    let count = 0
+    const random: RandomPort = {
+      next: () => {
+        count += 1
+        return value
+      },
+      nextInRange: () => 0,
+      pick: (items) => items[0],
+    }
+    return { random, count: () => count }
+  }
+  const 덱 = () => createPatternDeck(createSeededRandom(11))
+  const 필살상황: BattingContext = { ...상황, specialSwing: { number: 1, isAceBatter: false } }
+
+  it('맞은 공이면 방향·패턴 뒤에 rand(0,1000) 하나를 더 굴린다 — 0 이면 15·10 > 0 이라 성공', () => {
+    const 보통 = 세는(0)
+    const 필살 = 세는(0)
+    const a = resolvePitch(직구(), { frame: 16, shift: 0, buntKind: 0 }, 필살상황, 덱(), 보통.random)
+    const b = resolvePitch(직구(), { frame: 16, shift: 0, buntKind: 0, isSpecial: true }, 필살상황, 덱(), 필살.random)
+    expect(a.detail.resultCode).not.toBeNull()
+    expect(a.isUncatchable).toBe(false)
+    expect(b.isUncatchable).toBe(true)
+    expect(필살.count()).toBe(보통.count() + 1)
+  })
+
+  it('헛스윙이면 굴리지 않는다 — 0xfd2 == 0 은 0x51840 으로 건너뛴다', () => {
+    // 타이밍 54 → contact 6480 이라 0.9999 는 헛스윙
+    const 보통 = 세는(0.9999)
+    const 필살 = 세는(0.9999)
+    const a = resolvePitch(직구(), { frame: 14, shift: 0, buntKind: 0 }, 필살상황, 덱(), 보통.random)
+    const b = resolvePitch(직구(), { frame: 14, shift: 0, buntKind: 0, isSpecial: true }, 필살상황, 덱(), 필살.random)
+    expect(a.detail.resolution).toEqual({ kind: '스트라이크', isSwinging: true })
+    expect(b.isUncatchable).toBe(false)
+    expect(필살.count()).toBe(보통.count())
+  })
+
+  it('보통 스윙은 굴리지 않는다', () => {
+    const 필살 = 세는(0)
+    expect(resolvePitch(직구(), { frame: 16, shift: 0, buntKind: 0 }, 필살상황, 덱(), 필살.random).isUncatchable).toBe(false)
+  })
+})

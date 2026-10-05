@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef } from 'react'
+import { useCallback, useMemo } from 'react'
 import { resolvePitch } from '@/features/play-at-bat/model/resolvePitch'
 import type { BattingSwing } from '@/features/play-at-bat/model/resolvePitch'
 import { nextBatterShift } from '@/features/play-at-bat/model/batterShift'
@@ -29,7 +29,7 @@ import { ballFrameAt, useStageRefs } from '@/widgets/batting-stage/model/stageRe
 import type { AcePitcherFrames, StageHud } from '@/widgets/batting-stage/model/stageRefs'
 import { useStageAnimation } from '@/widgets/batting-stage/model/useStageAnimation'
 import { useStageControls } from '@/widgets/batting-stage/model/useStageControls'
-import { rollSpecialSwing } from '@/entities/batting/model/specialSwing'
+import { canSpecialSwing, remainingAfterSpecialSwing } from '@/entities/batting/model/specialSwing'
 import { pitcherBoostSideOf, swingBoostOf } from '@/entities/batting/model/swingBoost'
 import { aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
 import * as styles from '@/widgets/batting-stage/ui/BattingStage.css'
@@ -116,6 +116,18 @@ interface BattingStageProps {
    */
   readonly aceBatterIndex?: number
   /**
+   * 지금 타자의 **이 경기 남은 필살 횟수** = s8 팀[+0x29 + 타순] (`0xaea30`). 채우는 값은
+   * `specialSwingCountOf` (표 0xd84f0 · 0xd84fa, 스킬 23 +1 — 타석 교대 0xaebe4 가 남은 칸이 음수일 때만 채운다).
+   * 0 이면 '0' 키를 무시한다 (0x51e14). **안 넘기면 횟수 제한 없이** 번호만 본다(예전 동작).
+   */
+  readonly specialSwingRemaining?: number
+  /**
+   * 필살 스윙이 실제로 나가 남은 횟수가 줄 때 부른다 — `0x4e136`: `S+0x10 ≠ 0 && 남은 > 0` 이면 −1.
+   * 결과와 무관하다(헛스윙도). 인자는 줄인 뒤의 남은 횟수다 — 받는 쪽이 그 값을 다시 `specialSwingRemaining` 으로 넘긴다.
+   * `specialSwingRemaining` 이 양수일 때만 부른다.
+   */
+  readonly onSpecialSwingUsed?: (remaining: number) => void
+  /**
    * 세 번째 인자는 **필살타법이 성공한 타구인가** — 성공하면 야수가 쥐지 않고 지나친다
    * (0x51800 → `features/defense-play` 의 `isUncatchable`).
    */
@@ -133,7 +145,7 @@ interface BattingStageProps {
 }
 
 /** 원작 타석 화면. 그리기는 lib, 루프와 조작은 model이 맡는다. */
-export function BattingStage({ canBunt = false, swingMode = '일반', batterForm = 0, batterSkinIndex = 0, batterTeamIndex, batterEquipmentLevels, batterSkillIds = [], recentAtBatCodes = [], specialSwingNumber = 0, aceBatterIndex = -1, ...props }: BattingStageProps) {
+export function BattingStage({ canBunt = false, swingMode = '일반', batterForm = 0, batterSkinIndex = 0, batterTeamIndex, batterEquipmentLevels, batterSkillIds = [], recentAtBatCodes = [], specialSwingNumber = 0, aceBatterIndex = -1, specialSwingRemaining, onSpecialSwingUsed, ...props }: BattingStageProps) {
   const refs = useStageRefs({
     ...props,
     canBunt,
@@ -146,11 +158,6 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
     batterSkillIds,
     recentAtBatCodes,
   })
-  /**
-   * 이번 공에 필살타법을 걸어 두었는가 (`S+0x10`).
-   * 새 투구 준비 `0x34334` 가 0 으로 되돌리므로 **공마다 다시 눌러야 한다** (H2 2-2).
-   */
-  const specialArmedRef = useRef(false)
   const { pitchRef, pitchTypeNumberRef, phaseRef, phaseStartedAtRef, resultTextRef, homeRunStartedAtRef, swingStartedAtRef, shiftRef, buntRef, deckRef, pendingHitRef, particlesRef, latestRef } = refs
 
   const finishPitch = useCallback((swing: BattingSwing | null, now: number) => {
@@ -170,7 +177,7 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
       swingBoost: swingBoostOf(
         {
           // S+0x10 = 타자 +0x18 (0x51e40). 마타자 레코드 +0x18 은 5~9 (H2 4-1) — 0 만 아니면 된다
-          number: swing !== null && specialArmedRef.current ? (aceBatterIndex >= 0 ? aceBatterIndex + 5 : specialSwingNumber) : 0,
+          number: swing?.isSpecial === true ? (aceBatterIndex >= 0 ? aceBatterIndex + 5 : specialSwingNumber) : 0,
           isAce: aceBatterIndex >= 0,
           aceOrder: Math.max(aceBatterIndex, 0),
           aceLevel: aceBatterIndex >= 0 ? aceLevelOf(latest.aceLevels, aceLevelSlotOf('타자', aceBatterIndex + 1)) : 0,
@@ -181,21 +188,20 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
           aceLevelOf(latest.aceLevels, aceLevelSlotOf('투수', order + 1)),
         ),
       ),
+      // 필살 성공 굴림 0x34c74 — 확률은 번호(+0x18)로, 마타자는 30% (판정 안에서 맞은 공일 때만 굴린다)
+      specialSwing: { number: specialSwingNumber, isAceBatter: aceBatterIndex >= 0 },
     }
-    // 걸어 둔 필살은 스윙 객체 +0x10 에 실린다 (0x51e40) — 헛스윙 바람 소리 27 이 이걸 본다 (0x5132e)
-    const judgedSwing = swing !== null && specialArmedRef.current ? { ...swing, isSpecial: true } : swing
-    const resolved = resolvePitch(pitch, judgedSwing, context, deck, latest.random)
+    const resolved = resolvePitch(pitch, swing, context, deck, latest.random)
     // 구질 번호(game+0xfc8)를 실어 보낸다 — 받는 쪽이 0xa5e14 처럼 상대 투수 투구 수·스태미나를 깎는다
     const pitchTypeNumber = pitchTypeNumberRef.current
     const result =
       pitchTypeNumber === null ? resolved : { ...resolved, detail: { ...resolved.detail, pitchTypeNumber } }
-    // 필살 스윙이면 여기서 굴린다 (0x34c74). 걸어 두지 않았으면 굴리지 않는다
-    const isUncatchable = specialArmedRef.current
-      && rollSpecialSwing(specialSwingNumber, latest.random, aceBatterIndex >= 0)
+    // 필살 성공(0x34c74 → 0x517e6)은 판정이 방향·패턴 뒤에 굴려 실어 준다 — 헛스윙이면 굴리지 않는다
+    const isUncatchable = resolved.isUncatchable
     // 필살 연출 파티클은 **성공 여부와 무관**하게 `S+0x10` 이 켜져 있으면 나간다 (0x49aec).
     // ⚠️ 원본은 상태 0x13 그리기에서 한 번(경기+0x196b) 쏘는데, 웹은 그 자리를 따로 두지 않아
     //    스윙이 판정되는 이 시점에 쏜다 — **때는 근사**고 고르는 번호만 원본 그대로다.
-    if (specialArmedRef.current && swing !== null) {
+    if (swing?.isSpecial === true) {
       // 한 줄이 파티클을 두 개까지 쏜다 — 원본 0x49dbc·0x49de0 의 차례 그대로다
       const specials = specialSwingParticlesOf(specialSwingNumber, latest.batterForm, aceBatterIndex)
       const anchor = stageLayoutOf(batterSideOfForm(latest.batterForm)).batterAnchor
@@ -209,7 +215,6 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
         )
       }
     }
-    specialArmedRef.current = false
     deckRef.current = result.deck
     buntRef.current = null
     const resultText = describeResolution(result.detail)
@@ -292,17 +297,24 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
       moveBatter: (direction: -1 | 1) => {
         shiftRef.current = nextBatterShift(shiftRef.current, direction)
       },
-      /** '0' 은 **이번 공에** 필살타법을 건다 — 스윙은 따로 해야 한다 (0x535a4 → 0x6a6) */
+      /**
+       * '0' 은 **그 자리에서 필살 스윙**이다 (0x535a4 → 메시지 0x6a6 → 0x51dee). 일반 스윙(0x6a5 → 0x51db6)과
+       * 똑같이 경기+0xfe0 = 1 · +0xfdc(번트) = 0 · +0xfd8 = 지금 틱으로 스윙을 예약하고, S+0x10 에 0 대신
+       * 타자 +0x18 을 쓰는 것만 다르다 (0x51e40). 상태 0x11(공이 나는 중)·S+4 가 아니면 무시한다.
+       */
       specialSwing: (now: number) => {
         if (!isFlying(now)) return
-        // 0x51e14: 남은 횟수 0xaea30 이 0 이면 무시 — 번호(+0x18)가 0 이면 늘 0 이다.
-        // 마선수 레코드 +0x18 은 늘 5~9 라 마타자는 이 가드에 안 걸린다 (H2 5절).
-        // ⚠️ 한 경기 횟수(표 0xd84f0 · 0xd84fa, 소모 0x4e136)는 아직 안 옮겼다 — 번호만 있으면 무제한이다.
-        if (specialSwingNumber === 0 && aceBatterIndex < 0) return
-        specialArmedRef.current = true
+        // 0x51e14: 남은 횟수 0xaea30 이 0 이면 무시 — 번호(+0x18)가 0 이면 늘 0 이다
+        if (!canSpecialSwing(specialSwingNumber, aceBatterIndex >= 0, specialSwingRemaining)) return
+        swingStartedAtRef.current = now
+        // 0x4e136: 스윙이 나가는 틱에 남은 > 0 이면 −1 (결과와 무관)
+        if (specialSwingRemaining !== undefined && specialSwingRemaining > 0) {
+          onSpecialSwingUsed?.(remainingAfterSpecialSwing(specialSwingRemaining))
+        }
+        finishPitch({ frame: frameNow(now), shift: shiftRef.current, buntKind: 0, isSpecial: true }, now)
       },
     }
-  }, [commitHit, finishPitch, specialSwingNumber, aceBatterIndex])
+  }, [commitHit, finishPitch, specialSwingNumber, aceBatterIndex, specialSwingRemaining, onSpecialSwingUsed])
 
   useStageAnimation(refs, finishPitch, commitHit)
   const pointerHandlers = useStageControls(refs, actions)

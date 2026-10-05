@@ -13,14 +13,15 @@ export interface StageActions {
   readonly toggleBunt: (kind: number, now: number) => void
   readonly moveBatter: (direction: -1 | 1) => void
   /**
-   * **필살타법** — 원본 `0x535a4` 의 '0' 가지(메시지 **0x6a6**, I-controls 0절).
+   * **필살타법** — 원본 `0x535a4` 의 '0' 가지(메시지 **0x6a6**, I-controls 0절). 거는 단계 없이
+   * **그 자리에서 필살 스윙**이 나간다 (0x51dee — 일반 스윙 0x51db6 과 같은 예약, S+0x10 만 다르다).
    *
    * 성공하면 그 타구에 "송구공" 비트가 붙어 **야수가 잡지 못한다** (0x51800, S13 6절 확정) —
    * 판정 쪽은 `features/defense-play` 의 `isUncatchable` 이 이미 받아 준다.
    *
-   * ⚠️ 이 고리는 **키만** 받는다. 스윙을 필살로 굴리는 확률(0x34c74 — 레벨별 15·20·25·25·30%,
-   * 마타자 30%)과 그 결과를 타석 판정에 태우는 길은 `widgets/batting-stage/ui/BattingStage` 가
-   * `specialSwing` 을 넘겨 줘야 이어진다. 안 넘기면 '0' 키는 아무 일도 하지 않는다.
+   * 이 고리는 **키만** 받는다. 남은 횟수 가드(0x51e14)·소모(0x4e136)·성공 굴림(0x34c74 — 번호별
+   * 15·20·25·25%, 마타자 30%)은 `widgets/batting-stage/ui/BattingStage` 가 맡는다.
+   * 안 넘기면 '0' 키는 아무 일도 하지 않는다.
    */
   readonly specialSwing?: (now: number) => void
 }
