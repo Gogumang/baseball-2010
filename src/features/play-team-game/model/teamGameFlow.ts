@@ -1,5 +1,5 @@
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
-import { describeOutcome, isHit } from '@/entities/at-bat/model/atBatOutcome'
+import { describeOutcome, isFreePass, isHit } from '@/entities/at-bat/model/atBatOutcome'
 import { applyPitchResolution, createAtBat } from '@/entities/at-bat/model/atBatState'
 import type { AtBatState, PitchResolution } from '@/entities/at-bat/model/atBatState'
 import {
@@ -256,13 +256,14 @@ export interface TeamGameLogEntry {
 export interface TeamPitchingLine {
   readonly outsRecorded: number
   readonly hitsAllowed: number
+  /** 볼넷 + 사구 — 투수 +0x2a 와 같은 셈 (0xa8b58 · 0xa8bd2) */
   readonly walksAllowed: number
   readonly runsAllowed: number
   /**
    * `state+0x88` 출루 허용.
    * ⚠️ 원본은 이 칸을 **주자 목록의 마지막 원소만** 보고 세워서 야수선택이 퍼펙트를 안 깬다
    * (CORRECTIONS 2-1, S5 확정). 웹판에는 야수선택이 없어 차이가 드러나지 않으므로
-   * 안타·볼넷이면 세우는 것으로 둔다 (**근사**).
+   * 안타·볼넷·사구면 세우는 것으로 둔다 (**근사** — 사구는 아웃 없는 플레이라 원본도 늘 선다, 확정).
    */
   readonly allowedBaserunner: boolean
 }
@@ -1451,7 +1452,8 @@ function finishDefensiveAtBat(
   )
   const slot = progress.opponentOrderIndex
   const hit = isHit(outcome)
-  const walk = outcome.kind === '볼넷'
+  // 출루 허용 state[0x88] 와 투수 +0x2a 는 볼넷·사구를 함께 센다 (0xa8caa — 사구 플레이는 아웃이 없어 늘 선다)
+  const walk = isFreePass(outcome)
   const inningEnded = before.outs + applied.outsAdded >= OUTS_PER_INNING
 
   const next: TeamGameProgress = {
