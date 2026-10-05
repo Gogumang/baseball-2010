@@ -49,7 +49,14 @@ import { expandSkillSlots } from '@/entities/career/model/skillEquip'
 import { awardTitles, equipTitle, evaluateNewTitles } from '@/entities/career/model/titles'
 import { blockReasonOf, runTraining } from '@/entities/career/model/training'
 import { trainingBlockTextOf, trainingOutcomeLinesOf } from '@/entities/career/model/trainingText'
-import { recoverAfterRest, restBlockReasonOf, runOuting, runRest } from '@/entities/career/model/outing'
+import {
+  outingBlockReasonOf,
+  outingBlockTextOf,
+  recoverAfterRest,
+  restBlockReasonOf,
+  runOuting,
+  runRest,
+} from '@/entities/career/model/outing'
 import { EVENT_TRIGGER, finishEvent, placeTriggerOf } from '@/entities/story/model/storyScene'
 import { selectShopItem } from '@/features/shop/model/shopSelection'
 import type { GpDetailOf } from '@/features/shop/model/shopSelection'
@@ -856,6 +863,10 @@ export function useCareerSession({
         (candidate) => candidate.id === functionId,
       )
       if (career === null || outingFunction === undefined) return
+      // 113 가드 0x16cf0 — 막히면 원문 팝업(StrMODE[62]·[77]·[196]·[91])만 띄우고 113 에 남는다 (굴림 없음).
+      // 앞서 웹은 판정 없이 runOuting 을 불러 막힌 기능을 고르면 예외가 났다.
+      const reason = outingBlockReasonOf(career, outingFunction)
+      if (reason !== null) return setOutingNotice(outingBlockTextOf(reason, outingFunction))
 
       const updated = runOuting(career, outingFunction, random)
       setOutingNotice(`${outingFunction.name} — ${outingFunction.description}`)

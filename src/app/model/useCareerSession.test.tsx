@@ -485,3 +485,19 @@ describe('CPU 견제 (0x345fc 종류 4 → 0x34848) — 타자편도 견제 판�
     }
   })
 })
+
+describe('외출 장소 기능 가드 (113 키 0x16cf0) — 막히면 원문 알림만', () => {
+  it.each([
+    ['소지금 부족(StrMODE[77])', { money: 0 }, '외식', '소지금이 부족합니다'],
+    ['인기도 부족(StrMODE[62])', { popularity: 0 }, '팬미팅', '인기도가 부족합니다. 필요한 인기도 : 600'],
+    ['건강한데 입원(StrMODE[196])', { isInjured: false, isSick: false, money: 9999 }, '입원', '건강한 상태입니다 입원할 필요가 없습니다'],
+  ] as const)('%s — 예외 없이 알림을 띄우고 커리어는 그대로다', (_label, overrides, functionId, notice) => {
+    const rendered = 띄우기({ ...createCareer('외출'), morale: 50, ...overrides })
+    const before = rendered.result.current.session.career
+
+    act(() => rendered.result.current.session.actions.runOutingFunction(functionId))
+
+    expect(rendered.result.current.session.outingNotice).toBe(notice)
+    expect(rendered.result.current.session.career).toBe(before)
+  })
+})
