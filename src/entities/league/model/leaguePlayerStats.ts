@@ -115,15 +115,21 @@ export const EMPTY_LEAGUE_PLAYER_STATS: LeaguePlayerStats = { batters: {} }
 /** 타석 하나 — 어느 팀 타순 몇 번이 무엇을 쳤고 몇 점을 냈는가 */
 export interface LeaguePlateAppearance {
   readonly teamId: number
-  /** 간이 엔진이 쓰는 타순 커서. 12 명을 돌려 쓰므로 나머지로 로스터 칸을 정한다 */
+  /**
+   * 그 타석에 **실제로 선 선수의 로스터 칸** (0~11) — 이름은 옛것이라 "타순" 이지만 타순 커서가 아니다.
+   * 원본 타순은 명단 `team+0xe` 아홉 칸을 `mod 9` 로 돈다(`0xaf020`) — 벤치 셋(9~11)은 타순에 서지
+   * 않는다. 부르는 쪽(`gameFlow`·`leagueDay`)이 타순 칸을 `mod 9` 로 접거나, CPU 대타(`0xac228`)로
+   * 명단이 바뀌었으면 들어온 선수의 로스터 칸(벤치 9~11 일 수 있다)을 넘긴다.
+   */
   readonly battingOrderIndex: number
   readonly outcome: AtBatOutcome
   readonly runsBattedIn: number
 }
 
 /**
- * 타자 전역 번호 — `teamRoster.batterAt` 가 `roster[타순 % 12]` 로 고르는 것과 같은 칸이다.
- * 음수 타순이 들어올 일은 없지만, 나머지 연산이 음수를 내지 않도록 한 번 더 감싼다.
+ * 타자 전역 번호 — `팀 × 12 + 로스터 칸` (`teamRoster.teamBatters` 가 자르는 칸 그대로).
+ * 받는 값은 이미 로스터 칸(0~11)이다(`LeaguePlateAppearance.battingOrderIndex` 주석). `% 12` 는
+ * 칸을 돌려 쓰려는 것이 아니라 범위 밖·음수 값이 들어와도 표 밖을 가리키지 않게 감싸는 것뿐이다.
  */
 export function leagueBatterIdOf(teamId: number, battingOrderIndex: number): number {
   const slot = ((battingOrderIndex % BATTERS_PER_TEAM) + BATTERS_PER_TEAM) % BATTERS_PER_TEAM
