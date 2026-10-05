@@ -7,6 +7,7 @@ import {
 } from '@/entities/fielding/model/fieldGeometry'
 import {
   fielderArrivalTicks,
+  isRunnerStopped,
   NONE,
   type DefenseContext,
   type FielderState,
@@ -85,22 +86,38 @@ export function shouldReleaseThrow(receiver: FielderState, holder: FielderState,
  * 사람이 방향키를 안 눌렀을 때의 자동 송구 목표 0xb1c90 (I-controls 2b).
  * **앞선 주자부터(인덱스 큰 쪽) 거꾸로** 보며 `주자 도착 틱 ≥ 송구 시간` 인 첫 루를 고른다.
  * CPU 수비는 이 함수 대신 점수식 0xafb24 를 쓴다 (플레이+0x160 이 늘 −1 이라 사람 쪽 전용).
+ * ```
+ * b1f86: R+0x96(아웃) → 건너뜀
+ * b1fa8: R.vt18() (= 위치 == 목표점, 이미 도착) → 건너뜀
+ * b1fc6: 주자 틱 = 0xbefec(R) ; 송구 = 공가진야수.vtC0() + 공가진야수.vtB8(0xd86b0[R.vt68()])
+ * b2022: 주자 틱 ≥ 송구 → 그 루
+ * b2036: 아무도 못 잡으면 sp+0x44 에 **마지막으로 본 산 주자의 vt68** 이 남은 채 0xb203a(커버 배치)로 간다
+ * ```
+ * 도착 검사보다 루 적기(b1fa2)가 먼저라, 루에 붙어 선 주자는 "잡을 대상" 에선 빠져도 그 루가 남을 수 있다.
+ * ⚠️ 원본과 아직 다른 곳 (이번에 안 고침 — 0xb203a 뒤 갈래를 다 안 떴다):
+ * - 송구 시간의 둘째 항: 원본은 `0xb0c90(P)`(= P+0x130 공 가진 야수)의 vtB8 인데 여기는 커버 야수의 것을 쓴다
+ * - 원본 고리에는 커버(+0xf0) 검사가 없다(여기는 커버 없는 루를 건너뛴다)
  */
 export function autoThrowTargetBase(context: DefenseContext): number {
   const { play, fielders, runners } = context
   if (play.manualThrowBase !== NONE) return play.manualThrowBase
   const holder = fielders[play.ballHolderSlot]
+  // b1f6c: 고리 앞에서 맨 끝 주자의 목표 루(vt68)를 먼저 적어 둔다 — 주자가 없으면 −1(+0x160) 그대로
+  let base = runners.length > 0 ? runners[runners.length - 1].targetBase : NONE
   for (let index = runners.length - 1; index >= 0; index -= 1) {
     const runner = runners[index]
     if (runner.isOut) continue
-    const base = runner.targetBase
+    // b1fa2: 도착 검사(b1fa8)보다 **먼저** 적는다 — 건너뛴 주자의 루도 남는다
+    base = runner.targetBase
+    if (isRunnerStopped(runner)) continue
     const coverSlot = play.coverOfBase[((base % 4) + 4) % 4] ?? NONE
     if (coverSlot === NONE) continue
     const runnerTicks = ticksToReach(runner.position, basePosition(base), runner.speed)
     const throwTicks = fielderArrivalTicks(holder) + throwTicksTo(fielders[coverSlot], basePosition(base))
     if (runnerTicks >= throwTicks) return base
   }
-  return NONE
+  // b2036 → b203a: 아무도 못 잡으면 마지막으로 본 산 주자의 루가 남은 채 커버 배치로 간다
+  return base
 }
 
 /**

@@ -84,10 +84,10 @@ describe('도루 한 판 — 종류 5 (0xb2950 · 0xb1c90 · 0xb36d0 · 0xb4292)
     expect(errant.advance.bases).toEqual({ ...EMPTY_BASES, second: true })
   })
 
-  it('리드 덧틱이 크면(rand 8 → 23 틱) 송구할 루가 없어 결과 코드 없이 2루에 닿는다', () => {
+  it('리드 덧틱이 크면(rand 8 → 23 틱) 잡을 루가 없어도 자동 규칙은 마지막으로 본 주자의 루로 던진다(b2036) — 세이프', () => {
     const result = runStealPlay({ bases: 일루, stealingFrom: [1], outs: 0, runAbility: 500, random: 세는난수(0.95) })
-    expect(result.throwBase).toBe(-1)
-    expect(result.resultCode).toBeNull()
+    expect(result.throwBase).toBe(2)
+    expect(result.resultCode).toBe(RUNNER_PLAY_RESULT.SAFE)
     expect(result.stolenFrom).toEqual([1])
   })
 

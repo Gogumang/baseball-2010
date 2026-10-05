@@ -65,7 +65,14 @@ interface BaseCandidate {
 }
 
 /**
- * 플레이 vt 0x80 = 0xb1b54 — "내 목표 루가 바로 앞 주자가 떠난 루" = 포스로 밀려 가는 주자 (S7 3-0).
+ * 플레이 vt 0x80 = 0xb1b54 — "내가 마지막으로 닿은 루가 바로 앞 주자가 달려가는 루" = 포스로 밀려 가는 주자 (S7 3-0).
+ * ```
+ * b1b56: i == 0 → 1                        ; 타자주자는 늘 1
+ * b1b5a: P+0x112 == 0 → 0                  ; 공을 한 번도 안 쥐었다
+ * b1b66: R = [P+0x1c][i] ; Q = [P+0x1c][i−1]
+ * b1b72: R+0x78+0x14 (= +0x8c 닿은 루) == Q+0x7c (달려가는 루) → 1
+ * ```
+ * (예전 웹은 `R.+0x7c == Q.+0x8c` 로 거꾸로 읽었다 — +0x7c/+0x8c 이름을 바로잡은 54c4e87 뒤에 남은 자리)
  */
 export function isForcedRunner(play: PlayView, runners: readonly RunnerState[], index: number): boolean {
   if (index === 0) return true // 타자주자는 늘 1
@@ -73,7 +80,7 @@ export function isForcedRunner(play: PlayView, runners: readonly RunnerState[], 
   const runner = runners[index]
   const previous = runners[index - 1]
   if (runner === undefined || previous === undefined) return false
-  return runner.targetBase === previous.startBase
+  return runner.startBase === previous.targetBase
 }
 
 /**
@@ -102,7 +109,18 @@ function toSignedByte(value: number): number {
   return byte > 127 ? byte - 256 : byte
 }
 
-/** 후보표를 채운다 (S7 2절) */
+/**
+ * 후보표를 채운다 (S7 2절). 주자 칸은 **+0x7c(달려가는 루)** 다 — 직접 뜬 것:
+ * ```
+ * afbae: 칸 = [R+0x78+4] & 3                       ; +0x7c
+ * afbc6: +0x96(아웃) → 건너뜀
+ * afbd0: +0x94 && +0x88 ≥ 0 && !+0x98 이면          ; 판정끝 · 요구 루 · 타자주자 아님
+ * afbe6:   표[+0x88 & 3].force = 1
+ * afbf4:   +0x7c > +0x88 → 표[+0x88 & 3].runTick = vt0xa0 (한 루 더) , 아니면 0xbefec (남은 틱)
+ * afc36: 아니면 표[칸].runTick = 0xbefec
+ * afc40: 표[칸].forced = 플레이.vt0x80(i)            ; ★ +0x88 갈래여도 forced 는 +0x7c 칸에 적는다
+ * ```
+ */
 function buildCandidates(input: ThrowTargetInput): BaseCandidate[] {
   const { play, runners } = input
   const table: BaseCandidate[] = Array.from({ length: 4 }, () => ({
@@ -115,15 +133,14 @@ function buildCandidates(input: ThrowTargetInput): BaseCandidate[] {
 
   runners.forEach((runner, index) => {
     if (runner.isOut) return
-    let slot: number
+    const slot = wrap(runner.targetBase)
     if (runner.settled && runner.requiredBase >= 0 && !runner.isBatterRunner) {
-      slot = wrap(runner.requiredBase)
-      table[slot].force = true
+      const requiredSlot = wrap(runner.requiredBase)
+      table[requiredSlot].force = true
       // 되돌아가야 하면 "한 루 더 가는 총 틱"(vt0xa0), 앞으로 가면 남은 틱(0xbefec)
-      table[slot].runTick =
-        runner.startBase > runner.requiredBase ? runnerOneMoreBaseTicks(runner) : runnerRemainingTicks(runner)
+      table[requiredSlot].runTick =
+        runner.targetBase > runner.requiredBase ? runnerOneMoreBaseTicks(runner) : runnerRemainingTicks(runner)
     } else {
-      slot = wrap(runner.startBase)
       table[slot].runTick = runnerRemainingTicks(runner)
     }
     table[slot].forced = isForcedRunner(play, runners, index)
@@ -259,7 +276,8 @@ export function describeThrowTarget(input: ThrowTargetInput): ThrowTargetDebug {
           termB -= reach >= oneMore ? LATE_PENALTY : NEAR_PENALTY
           continue
         }
-        if (runner.startBase === base) {
+        // b0026: [R+0x7c] == 루 — 홈으로 가는 주자(+0x7c = 4)는 홈(0)과 같지 않다 (원본 그대로 자르지 않는다)
+        if (runner.targetBase === base) {
           if (outside) termB += base === 0 ? 5004 : 5000 + base
           if (!isRunnerStopped(runner)) termB += 10_000
         } else if (nextBase === base && outside) {

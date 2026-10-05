@@ -1001,12 +1001,14 @@ describe('송구 수동/자동 — 환경설정 +0xf4 (0x5269c → 0xae6c8 → 0
 })
 
 describe('CPU 홈 송구 20% 특수 송구 — 0xafa60 → 0xb2c90 → 0xb3444 → 0xa1620', () => {
-  // 2루 주자 단타를 투수가 잡아 CPU 점수식이 홈을 고르는 타구 (웹 근사 궤적 기준)
+  // 만루 단타를 투수가 잡아 CPU 가 홈을 고르는 타구 (웹 근사 궤적 기준).
+  // 0xafb24 후보표를 원본대로 +0x7c 칸으로 읽은 뒤로(throwTargetBase) 2루 주자 단타는 타자주자를 잡으러
+  // 1루로 던진다 — 홈이 포스인 만루로 바꿨다.
   const 홈송구 = (value: number) =>
     runDefensePlay({
       outcome: 단타,
       trajectory: battedBallTrajectory([90, 600, 300, 0]),
-      bases: { first: false, second: true, third: false },
+      bases: { first: true, second: true, third: true },
       outs: 0,
       runAbility: 500,
       defenseIsCpu: true,

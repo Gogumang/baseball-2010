@@ -41,7 +41,8 @@ const 입력 = (
 })
 
 const 타자주자 = createRunner(0, 0, 주력500, { targetBase: 1 })
-const 삼루주자 = createRunner(1, 3, 주력500, { targetBase: 0 })
+/** 홈으로 가는 3루 주자 — 원본 +0x7c 는 4 다(0xb6228 · 0xa07b0) */
+const 삼루주자 = createRunner(1, 3, 주력500, { targetBase: 4 })
 const 만루플레이: Partial<PlayView> = {
   coverOfBase: [1, 2, 3, 4],
   ballHolderSlot: 5,
@@ -87,10 +88,11 @@ describe('플레이 vt 0x80 = 0xb1b54 — 포스로 밀려 가는 주자인가',
     expect(isForcedRunner(initialPlayView(1), [타자주자, 삼루주자], 1)).toBe(false)
   })
 
-  it('내 목표 루가 바로 앞 주자가 떠난 루면 1 이다', () => {
-    expect(isForcedRunner(play, [타자주자, 삼루주자], 1)).toBe(true)
-    const 안밀림 = createRunner(1, 2, 주력500, { targetBase: 3 })
-    expect(isForcedRunner(play, [타자주자, 안밀림], 1)).toBe(false)
+  it('내가 닿은 루(+0x8c)가 바로 앞 주자가 달려가는 루(+0x7c)면 1 이다 (b1b72)', () => {
+    const 일루주자 = createRunner(1, 1, 주력500, { targetBase: 2 })
+    expect(isForcedRunner(play, [타자주자, 일루주자], 1)).toBe(true)
+    // 3루 주자는 타자주자가 1루로 가도 밀리지 않는다
+    expect(isForcedRunner(play, [타자주자, 삼루주자], 1)).toBe(false)
   })
 })
 
@@ -98,25 +100,28 @@ describe('점수식 0xafb24 — 후보표와 최종 점수 (난이도 0 = 점수
   const 상황 = 입력(만루플레이, [타자주자, 삼루주자])
   const 결과 = describeThrowTarget(상황)
 
-  it('후보표: 주자 도착 틱은 "그 주자가 떠난 루" 칸에 들어간다 (2-2 그대로)', () => {
-    expect(결과.candidates.map((candidate) => candidate.runTick)).toEqual([23, NONE, NONE, 23])
+  it('후보표: 주자 도착 틱은 "그 주자가 달려가는 루(+0x7c)" 칸에 들어간다 (0xafbae)', () => {
+    // 타자주자 → 1루 칸, 홈으로 가는 3루 주자(+0x7c = 4) → 4 & 3 = 홈 칸
+    expect(결과.candidates.map((candidate) => candidate.runTick)).toEqual([23, 23, NONE, NONE])
     expect(결과.candidates.map((candidate) => candidate.defTick)).toEqual([16, 12, 9, 7])
+    // forced(vt0x80)도 +0x7c 칸에 — 타자주자(늘 1)의 1루만 선다
+    expect(결과.candidates.map((candidate) => candidate.forced)).toEqual([false, true, false, false])
   })
 
-  it('여유 = 주자 틱 − 수비 틱, 확실한 아웃 후보에만 적힌다', () => {
-    expect(결과.margins).toEqual([7, NONE, NONE, 16])
+  it('여유 = 주자 틱 − 수비 틱, 확실한 아웃 후보(포스 = 타자주자의 1루)에만 적힌다', () => {
+    expect(결과.margins).toEqual([NONE, 11, NONE, NONE])
   })
 
   it('루 기본 점수는 표 0xd85ac 대로 홈이 가장 크다', () => {
     expect(BASE_SCORE).toEqual([4000, 1000, 2000, 3000])
   })
 
-  it('홈 보너스 10000000 이 첫 루·둘째 루 양쪽에 붙는다 — 그래서 "3루 → 홈" 병살 조합이 최고점이다', () => {
-    // 홈 직송구 = 10004000(A) + 2×115011 + 500(B) = 10234522
-    // 3루 송구 뒤 홈 = 3000 + 10004000(A) + 2×115019 + 100004 + 500(B) = 10337542
+  it('불확실한 홈 보너스 1000000 — 난이도 0 의 점수식은 밀리지 않는 3루 주자라도 홈을 고른다', () => {
+    // 홈 = 4000 + 1000000(A) + 2×10000 + 500(B) = 1024500 — 둘째 루 항은 확실(effective)한 첫 루에만 붙는다
+    // 1루 = 1000(A) + 2×(100011 + 5001(밖·1루) + 10000(달리는 중)) + 500(B) = 231524
     // 후보가 없는 루도 바닥값 500 은 받는다 (`+500`)
-    expect(결과.topScores).toEqual([10_234_522, 500, 500, 10_337_542])
-    expect(결과.chosen).toBe(3)
+    expect(결과.topScores).toEqual([1_024_500, 231_524, 500, 500])
+    expect(결과.chosen).toBe(0)
   })
 
   it('난이도 0~1 에서는 점수식, 2 이상에서는 "여유 최대" 규칙으로 바뀐다', () => {
@@ -129,7 +134,7 @@ describe('점수식 0xafb24 — 후보표와 최종 점수 (난이도 0 = 점수
     const 어려움 = describeThrowTarget({ ...상황, difficulty: 3 })
     const 최대 = 어려움.margins.indexOf(Math.max(...어려움.margins))
     expect(어려움.chosen).toBe(최대)
-    expect(어려움.chosen).toBe(3)
+    expect(어려움.chosen).toBe(1)
   })
 
   it('난이도가 3 이상이면 확실한 후보가 없어도 늘 "여유 최대" 로 간다', () => {
@@ -137,6 +142,23 @@ describe('점수식 0xafb24 — 후보표와 최종 점수 (난이도 0 = 점수
       입력({ ballHolderSlot: 3, catchFielderSlot: 3 }, [], { activeRunnerCount: 1, difficulty: 3 }),
     )
     expect(후보없음.sure).toBe(true)
+  })
+})
+
+describe('도루 주자 — 떠난 루가 아니라 달려가는 루로 던진다', () => {
+  it('1루 → 2루 도루 주자는 2루 칸에 들어가 포수가 2루를 고른다 (예전 웹은 1루 칸)', () => {
+    const 포수보유 = 기본야수.map((fielder, slot) => (slot === 1 ? { ...fielder, holdingBall: true } : fielder))
+    const 도루주자 = createRunner(1, 1, 주력500, { targetBase: 2 })
+    const 결과 = describeThrowTarget(
+      입력(
+        { ...initialPlayView(5), coverOfBase: [1, 2, 3, 4], ballHolderSlot: 1, catchFielderSlot: 1, everHeld: true, held: true },
+        [도루주자],
+        { fielders: 포수보유, landingTick: 0, difficulty: 2 },
+      ),
+    )
+    expect(결과.candidates.map((candidate) => candidate.runTick)).toEqual([NONE, NONE, 23, NONE])
+    expect(결과.margins).toEqual([NONE, NONE, 8, NONE])
+    expect(결과.chosen).toBe(2)
   })
 })
 

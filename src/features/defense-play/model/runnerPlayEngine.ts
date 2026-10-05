@@ -231,7 +231,7 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
         ? manualThrowBase
         : cpuThrowEnabled
           ? chooseThrowTargetBase({ ...contextAt(tick), activeRunnerCount: active })
-          : autoThrowTargetBase(withArrivedRunnersSkipped(contextAt(tick)))
+          : autoThrowTargetBase(contextAt(tick))
     if (base === NONE) return
     // CPU 홈 송구 20% 특수 송구 (0xafa60 `afad2`) — 점수식이 홈을 골랐을 때만 한 번 굴린다
     const cpuSpecial =
@@ -512,19 +512,6 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
 }
 
 const wrapBase = (base: number) => ((base % 4) + 4) % 4
-
-/**
- * 0xb1c90 자동 가지(0xb1f5e~0xb2038)는 **처리 끝(+0x96) 주자와 이미 도착한 주자(vt18)를 건너뛴다**
- * (I-controls 2b). `throwArrival.autoThrowTargetBase` 는 아웃만 건너뛰어, 루에 선 주자를 "도착 틱 0 ≥ 송구 0"
- * 으로 잡을 수 있다고 본다 — 그래서 여기서 도착한 주자를 아웃 칸으로 가려서 넘긴다(목록 번호는 그대로).
- * (타구 진행기는 그 함수를 그대로 쓴다 — 고치면 그쪽 결과가 바뀌므로 이 판에서만 가린다.)
- */
-function withArrivedRunnersSkipped(context: DefenseContext): DefenseContext {
-  return {
-    ...context,
-    runners: context.runners.map((runner) => (isAtTarget(runner) ? { ...runner, isOut: true } : runner)),
-  }
-}
 
 function isAtTarget(runner: RunnerState): boolean {
   return isSamePoint(runner.position, basePosition(runner.targetBase))
