@@ -1274,7 +1274,13 @@ function pitchOnce(
       outs: progress.game.outs,
       hasRunner: runnerCountOf(progress.game.bases) > 0,
     },
-    { isMistakePitch: isMistake },
+    {
+      isMistakePitch: isMistake,
+      // 0xb633d(타자) — 레코드 +0xa 비트 6. 명단에 끼운 마타자(`withAceBatter`)만 참이다
+      isMagicBatter:
+        (entryBattersOf(progress, options.opponentTeamId)[progress.opponentOrderIndex]?.aceIndex ??
+          NO_ACE_BATTER) >= 0,
+    },
   )
 
   // 스태미나는 게이지 결과와 무관하다 — 인자가 (game, 구질) 뿐이다 (P1 3-1 확정)

@@ -334,7 +334,11 @@ export function useMissionSession({
         outs: pitcherRun.outs,
         hasRunner: runnerCountOf(pitcherRun.bases) > 0,
       },
-      { isMistakePitch: isMistake },
+      {
+        isMistakePitch: isMistake,
+        // 0xb633d(타자) — 마타자 미션의 상대는 마선수 레코드(+0xa 비트 6)라 번트 칸을 뽑아도 친다
+        isMagicBatter: opponent !== null,
+      },
     )
 
     let nextRun = recordPitch(pitcherRun, grade === MAX_GAUGE_GRADE)

@@ -45,6 +45,8 @@ import {
 } from '@/entities/season-mode/model/seasonReputation'
 import type { TeamGameOptions, TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { battingPatternOdds } from '@/shared/config/original/battingPatterns'
+import { ACE_BATTERS } from '@/entities/game/model/aceOpponent'
 
 const 기본옵션: TeamGameOptions = {
   mode: 2,
@@ -1271,5 +1273,47 @@ describe('실투 판정 0x33cbc — 사람이 던지는 공', () => {
 
     const 실투 = startThrowPitch(progress, input, 각본난수(0.7, 실투자리, 0))
     expect(실투.lastResolution?.kind).toBe('타구')
+  })
+})
+
+describe('마타자 0xb633d — 번트 칸을 뽑아도 친다', () => {
+  /** `index` 번째 굴림만 `hit`, 나머지는 0.7 */
+  function 굴림(index: number, hit: number) {
+    return 각본난수(0.7, index, hit)
+  }
+
+  it('같은 굴림에서 일반 타자는 번트, 마타자는 치기 칸과 똑같이 휘두른다', () => {
+    const { progress } = 시작()
+    const input = { typeNumber: 첫구질(progress), courseCell: 4, gaugeCell: 0 }
+    // 표 굴림 자리 = 0.7 일 때 지켜보는 공의 마지막 굴림
+    const 기준 = 각본난수(0.7)
+    startThrowPitch(progress, input, 기준)
+    const 표자리 = 기준.calls() - 1
+
+    // 1루 주자 · 무사 — 표에 번트 칸이 있는 행
+    const 주자있음: TeamGameProgress = {
+      ...progress,
+      game: { ...progress.game, bases: { first: true, second: false, third: false } },
+    }
+    const odds = battingPatternOdds(0, 0, 0, true)
+    expect(odds.bunt).toBeGreaterThan(0)
+    const 번트굴림 = (odds.swing + odds.bunt / 2) / 100
+    const 치기굴림 = odds.swing / 2 / 100
+
+    const ace = ACE_BATTERS[0]
+    const 마타자: TeamGameProgress = {
+      ...주자있음,
+      opponentEntry: 주자있음.opponentEntry.map((entry, slot) =>
+        slot === 주자있음.opponentOrderIndex
+          ? { ...entry, aceIndex: 0, ability: [ace.ability.hit, ace.ability.power, ace.ability.defense, ace.ability.run] }
+          : entry,
+      ),
+    }
+    const 일반번트 = startThrowPitch(주자있음, input, 굴림(표자리, 번트굴림)).lastResolution
+    const 마번트 = startThrowPitch(마타자, input, 굴림(표자리, 번트굴림)).lastResolution
+    const 마치기 = startThrowPitch(마타자, input, 굴림(표자리, 치기굴림)).lastResolution
+
+    expect(마번트).toEqual(마치기)
+    expect(일반번트).not.toEqual(마번트)
   })
 })
