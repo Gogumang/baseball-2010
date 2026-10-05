@@ -63,3 +63,16 @@ export const infoValue = style([
   { fontSize: '11px', lineHeight: '15px', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden' },
 ])
 
+
+/**
+ * 레이더 숫자를 단색으로 찍는다 — 원본 0x5ad94 가 색이 있으면 0x6aff8 에 효과 0xb(단색)를 넘긴다.
+ * 그림을 마스크로 쓰고 배경색을 칠하면 같은 결과가 된다 (`pages/shop`·`pages/main-menu` 와 같은 방식).
+ */
+export const tintedGlyph = style({
+  position: 'absolute',
+  pointerEvents: 'none',
+  maskSize: '100% 100%',
+  maskRepeat: 'no-repeat',
+  WebkitMaskSize: '100% 100%',
+  WebkitMaskRepeat: 'no-repeat',
+})
