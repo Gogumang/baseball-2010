@@ -11,7 +11,10 @@ import {
   cpuSpecialThrowOf,
   defenseAbilitiesOf,
   isBattedBallInPlay,
+  isDefensePlayFinished,
   runDefensePlay,
+  startDefensePlay,
+  stepDefensePlay,
 } from '@/features/defense-play/model/runDefensePlay'
 import type {
   DefensePlayControls,
@@ -1006,5 +1009,41 @@ describe('CPU 홈 송구 20% 특수 송구 — 0xafa60 → 0xb2c90 → 0xb3444 �
     if (!특수.special) return
     expect(특수.thrower.throwSpeed).toBe(Math.trunc((야수[8].throwSpeed * 130) / 100))
     expect(throwTicksToFielder(특수.thrower, 야수[1])).toBeLessThan(throwTicksToFielder(야수[8], 야수[1]))
+  })
+})
+
+describe('슬라이딩 효과음 10 — 사람 키 0x5199c · 자동 0x5268c', () => {
+  const 땅볼1루: DefensePlayInput = {
+    outcome: 땅볼아웃,
+    trajectory: battedBallTrajectory([92, 698, 565, 0]),
+    bases: 주자1루,
+    outs: 0,
+    runAbility: 500,
+    throwMode: '자동',
+  }
+  const 소리틱 = (input: DefensePlayInput) => {
+    let state = startDefensePlay(input)
+    const ticks: number[] = []
+    while (!isDefensePlayFinished(state)) {
+      const tick = state.tick
+      state = stepDefensePlay(state)
+      if (state.slidingSoundThisTick) ticks.push(tick)
+    }
+    return { ticks, log: state.log }
+  }
+
+  it('송구가 향하는 루로 6틱 안에 닿는 주자는 키 없이 슬라이딩하고 그 틱에 소리가 난다 (0xb030c)', () => {
+    const { ticks, log } = 소리틱(땅볼1루)
+    const 자동 = log.filter((line) => line.includes('자동 슬라이딩'))
+    expect(자동.length).toBeGreaterThan(0)
+    expect(ticks).toEqual(자동.map((line) => Number.parseInt(line, 10)))
+  })
+
+  it('자동 슬라이딩은 슬라이딩 중인 주자를 다시 세지 않아 주자마다 한 번이다', () => {
+    const { log } = 소리틱(땅볼1루)
+    const 주자들 = log
+      .filter((line) => line.includes('자동 슬라이딩'))
+      .flatMap((line) => line.split('주자 ')[1].split('·'))
+    expect(new Set(주자들).size).toBe(주자들.length)
   })
 })

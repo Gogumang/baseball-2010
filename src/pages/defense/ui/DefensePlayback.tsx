@@ -16,6 +16,7 @@ import type {
   DefensePlayState,
 } from '@/features/defense-play/model/runDefensePlay'
 import { activeSound } from '@/shared/api/audio/soundPort'
+import { SLIDING_SOUND_EFFECT } from '@/entities/defense-controls/model/sliding'
 
 interface DefensePlaybackProps {
   /**
@@ -211,6 +212,10 @@ function LivePlayback({ input, side, onDone, holdUpdates, grassPalette, children
         fumbleSoundPlayedRef.current = true
         activeSound().play(FUMBLE_SOUND)
       }
+      // 슬라이딩 소리 10 — 진행기가 그 틱에 낸다고 표시한 대로 낸다. 한 플레이 한 번 잠금(+0x31c)은
+      // 사람 키 갈래에만 있고 진행기가 이미 걸었다 — 자동 갈래(0x5268c)는 잠금이 없어 여기서도 안 막는다.
+      // 원본 입구는 예약 0x6e498 이지만 그것도 지금 소리를 끊는 한 칸이라 통로 하나 `play` 와 같다.
+      if (running.slidingSoundThisTick) activeSound().play(SLIDING_SOUND_EFFECT)
     }
     stateRef.current = running
     if (moved) setView(running.ticks[running.ticks.length - 1] ?? null)

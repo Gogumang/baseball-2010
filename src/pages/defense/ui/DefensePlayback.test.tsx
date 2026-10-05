@@ -213,3 +213,40 @@ describe('수비 재생 — 타구를 받아 실시간으로 돌리는 갈래 (�
     }
   })
 })
+
+describe('슬라이딩 소리 10 (0x5268c · 0x5199c)', () => {
+  it('자동 슬라이딩이 걸린 틱마다 10 을 낸다 — 진행기의 slidingSoundThisTick 그대로', () => {
+    vi.useFakeTimers()
+    const 울린것: number[] = []
+    setActiveSound({
+      play: (id) => void 울린것.push(id),
+      playBgm: () => {},
+      stopBgm: () => {},
+      resumeBgm: () => {},
+      currentBgm: () => null,
+      setVolume: () => {},
+      getVolume: () => 100,
+    })
+    try {
+      const input: DefensePlayInput = {
+        outcome: { kind: '아웃', detail: '땅볼아웃' },
+        trajectory: battedBallTrajectory([92, 698, 565, 0]),
+        bases: 주자1루,
+        outs: 0,
+        runAbility: 500,
+        throwMode: '자동',
+      }
+      const 자동 = runDefensePlay(input).log.filter((line) => line.includes('자동 슬라이딩'))
+      expect(자동.length).toBeGreaterThan(0)
+
+      const onDone = vi.fn()
+      render(<DefensePlayback input={input} onDone={onDone} />)
+      끝까지(onDone)
+
+      expect(울린것.filter((id) => id === 10)).toHaveLength(자동.length)
+    } finally {
+      setActiveSound(null)
+      vi.useRealTimers()
+    }
+  })
+})

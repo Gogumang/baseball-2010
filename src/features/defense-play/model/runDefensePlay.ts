@@ -20,6 +20,7 @@ import {
   LASER_WINDOW_FIRST_TICK,
 } from '@/entities/defense-controls/model/laserThrow'
 import {
+  autoSlideRunnerIndexes,
   slideOnKey,
   SLIDING_SPEED_BONUS,
   type SlidingRunner,
@@ -562,6 +563,12 @@ export interface DefensePlayState {
   autoBaserunning: boolean
   /** 주자관리+0x31c — 이번 플레이에서 이미 슬라이딩 효과음을 냈다 */
   slidingSoundPlayed: boolean
+  /**
+   * **방금 돈 틱에서 슬라이딩 효과음 10 을 낸다.** 진행기는 순수 함수라 소리를 못 내므로
+   * 틱을 실제로 돌리는 수비 재생(`DefensePlayback`)이 이 칸을 보고 그 틱에 낸다.
+   * 사람 키 0x5199c(+0x31c 잠금으로 한 플레이 한 번) · 자동 0x5268c(잠금 없음, 슬라이딩시킨 수 > 0) 둘 다 여기로 온다.
+   */
+  slidingSoundThisTick: boolean
   /** 경기+0x19ad(반짝임) */
   laserShining: boolean
   /** 경기+0x19ae(레이저 확정) */
@@ -692,6 +699,7 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     errantThrow: false,
     autoBaserunning: true,
     slidingSoundPlayed: false,
+    slidingSoundThisTick: false,
     laserShining: false,
     laserConfirmed: false,
     laserRolled: false,
@@ -765,6 +773,7 @@ export function stepDefensePlay(
   let errantThrow = state.errantThrow
   let autoBaserunning = state.autoBaserunning
   let slidingSoundPlayed = state.slidingSoundPlayed
+  let slidingSoundThisTick = false
   let laserShining = state.laserShining
   let laserConfirmed = state.laserConfirmed
   let laserRolled = state.laserRolled
@@ -884,7 +893,10 @@ export function stepDefensePlay(
             isSoundPlaying: false,
             hasPlayedSoundThisPlay: slidingSoundPlayed,
           })
-          if (decision.playsSound) slidingSoundPlayed = true
+          if (decision.playsSound) {
+            slidingSoundPlayed = true
+            slidingSoundThisTick = true
+          }
           for (const index of decision.slidRunnerIndexes) {
             const runner = runners[index]
             if (runner.state.sliding) continue
@@ -1291,6 +1303,39 @@ export function stepDefensePlay(
       }
     }
 
+    // ── 4b. 자동 슬라이딩 (0x52670 → 0xaf8fc → 제어기 vt10 = 0xb030c) ──
+    // 원본은 경기 장면 슬롯 2 에서 자동 진루(0x52660) **바로 뒤**, CPU 송구 결정(0x526ae) 앞에 매 틱 돈다.
+    // 사람/CPU·주루 설정 갈림이 없다. 슬라이딩시킨 주자가 하나라도 있으면 그 자리에서 효과음 10
+    // (0x5267e `ble` → 0x5268c request(10)) — 사람 키와 달리 +0x31c 잠금도, 소리 재생 중 검사도 없다.
+    //
+    // ⚠️ 원본 그대로: 0xb030c 는 `주자+0x7c == 계획[+0xf]` 를 **mod 4 없이** 견준다(b0368~b036c).
+    // 홈으로 가는 주자의 목표 루는 4(루 표 [4] = 홈 사본)이고 송구 목표 홈은 0 이라 **홈 송구로는 자동
+    // 슬라이딩이 걸리지 않는다.** 고치지 않는다.
+    //
+    // **근사**: 원본 T = 계획[5](1구간 틱) − 공+0x68 이다. 웹은 송구 도착 틱 하나만 들고 있어
+    // `송구 도착 틱 − 지금 틱` 을 쓴다(중계 송구면 원본은 첫 구간만 본다). "공.vt18() 거짓" 은
+    // 송구가 날아가는 중으로 읽었다(R3 3-3). 메시지 처리기 0x519a4 의 같은 호출은 웹에 메시지 큐가 없어 뺐다.
+    if (!play.finished) {
+      const slid = autoSlideRunnerIndexes({
+        isThrowInFlight: throwArrivalTick >= 0 && tick < throwArrivalTick,
+        throwTargetBase: throwArrivalTick >= 0 && tick < throwArrivalTick ? throwBase : NONE,
+        throwArrivalTicks: throwArrivalTick - tick,
+        runners: runners.map(slidingRunnerOf),
+      })
+      for (const index of slid) {
+        const runner = runners[index]
+        runner.state = {
+          ...runner.state,
+          sliding: true,
+          speed: runner.state.speed + SLIDING_SPEED_BONUS,
+        }
+      }
+      if (slid.length > 0) {
+        slidingSoundThisTick = true
+        log.push(`${tick}틱 자동 슬라이딩 — 주자 ${slid.join('·')}`)
+      }
+    }
+
     // ── 5. 화면 스냅샷 ──
     ticks.push(
       viewStateOf({
@@ -1411,6 +1456,7 @@ export function stepDefensePlay(
   state.errantThrow = errantThrow
   state.autoBaserunning = autoBaserunning
   state.slidingSoundPlayed = slidingSoundPlayed
+  state.slidingSoundThisTick = slidingSoundThisTick
   state.laserShining = laserShining
   state.laserConfirmed = laserConfirmed
   state.laserRolled = laserRolled

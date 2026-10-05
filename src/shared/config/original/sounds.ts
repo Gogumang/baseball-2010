@@ -64,7 +64,10 @@ export const ORIGINAL_SOUNDS: readonly OriginalSound[] = [
    *   - 0x519c4 · 0x5268c — 자동 슬라이딩: 제어기 `0xaf8fc`(송구가 향하는 루로 6틱 안에 닿는
    *     주자를 슬라이딩시킨 수) > 0 이면 바로.
    * 세 자리 어디에도 득점·홈인과 엮인 칸이 없다. 근거: docs/re/R3-field-view.md 3-1·3-2·3-3.
-   * 웹은 슬라이딩 키 자체가 아직 없어 **배선하지 않았다**.
+   * 웹 배선: 진행기(`runDefensePlay`)가 사람 키(OK, `defenseKeys.inPlayCommandOf` 의 '슬라이딩')와
+   * 자동 슬라이딩(매 틱 `autoSlideRunnerIndexes`) 둘 다에서 `slidingSoundThisTick` 을 세우고,
+   * 수비 재생(`pages/defense` 의 `DefensePlayback`)이 그 틱에 낸다. 메시지 처리기 쪽 0x519c4 는
+   * 웹에 메시지 큐가 없어 매 틱 갈래(0x5268c)로만 옮겼다.
    */
   { id: 10, role: 'effect', name: '주자 슬라이딩', scene: '주루 슬라이딩 0x518da(예약 0x5199c) · 자동 슬라이딩 0x519c4·0x5268c — 한 플레이 한 번(주자관리 +0x31c 잠금)' },
   { id: 11, role: 'effect', name: '홈런 함성', scene: '판정 v8·v12 (0x51c82) + 홈런 이벤트 0xa5fed · 0x527ce 예약' },
