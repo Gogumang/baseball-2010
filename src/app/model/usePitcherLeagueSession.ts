@@ -43,6 +43,7 @@ import type { GamePointWalletSession } from '@/entities/wallet/model/useGamePoin
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { selectPitcherShopItem } from '@/features/shop/model/pitcherShopSelection'
+import type { GpDetailOf } from '@/features/shop/model/shopSelection'
 import type { PitcherShopTab } from '@/features/shop/model/pitcherShopSelection'
 
 /**
@@ -68,6 +69,8 @@ export interface PitcherLeagueSession {
   readonly shopTab: PitcherShopTab
   /** 상점에서 마지막으로 고른 칸의 결과 알림 (막힘·구매 완료·히든 오픈) */
   readonly shopNotice: string
+  /** 상점 GP 결과 창 (0x872a1) — 칸 0~4·6 구매 뒤. 닫아도 굴림 없이 상점 그대로 (0x1d649) */
+  readonly shopGpDetail: GpDetailOf<PitcherCareer> | null
   readonly actions: {
     readonly create: (name: string, profile: PitcherRookieProfile) => void
     /** 바뀐 커리어를 그대로 저장한다 (구질 훈련처럼 화면이 계산해 돌려줄 때) */
@@ -92,6 +95,7 @@ export interface PitcherLeagueSession {
      * `globalOpenedHiddenIds` 는 기록연감의 전역 해금 id (원본 `app+0xc0` 표) — 커리어 것과 합쳐 본다.
      */
     readonly purchase: (itemId: string, globalOpenedHiddenIds?: readonly number[]) => void
+    readonly closeShopGpDetail: () => void
     readonly reset: () => void
   }
 }
@@ -502,11 +506,14 @@ export function usePitcherLeagueSession(
 
   const [shopTab, setShopTab] = useState<PitcherShopTab>('장착')
   const [shopNotice, setShopNotice] = useState('')
+  const [shopGpDetail, setShopGpDetail] = useState<GpDetailOf<PitcherCareer> | null>(null)
+  const closeShopGpDetail = useCallback(() => setShopGpDetail(null), [])
 
   /** [아이템] → 110 → 111 장비 상점 · [선수정보] → 121 장비착용. 취소는 `goto('관리')` (원본 111 → 110 → 105) */
   const openShop = useCallback((tab: PitcherShopTab) => {
     setShopTab(tab)
     setShopNotice('')
+    setShopGpDetail(null)
     setScene('상점')
   }, [])
 
@@ -527,6 +534,7 @@ export function usePitcherLeagueSession(
       const merged = missing.length === 0 ? shown : { ...shown, openedHiddenIds: [...shown.openedHiddenIds, ...missing] }
       const selection = selectPitcherShopItem(merged, itemId, random)
       setShopNotice(selection.notice)
+      setShopGpDetail(selection.detail ?? null)
       if (selection.career === merged) return
       // G 를 안 쓴 칸(장비·서브·착용)은 저장의 G 칸을 건드리지 않는다 — `?무한G` 의 99999 가 저장에 새지 않게
       const spentGamePoint = selection.career.gamePoint !== merged.gamePoint
@@ -547,6 +555,7 @@ export function usePitcherLeagueSession(
     gameOptions,
     shopTab,
     shopNotice,
+    shopGpDetail,
     actions: {
       create,
       save: commit,
@@ -560,6 +569,7 @@ export function usePitcherLeagueSession(
       finishEnding,
       openShop,
       purchase,
+      closeShopGpDetail,
       reset,
     },
   }

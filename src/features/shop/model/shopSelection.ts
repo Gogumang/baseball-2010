@@ -14,9 +14,28 @@ export function shopItemId(tab: ShopTab, first: number, second = 0): string {
   return `${tab}:${first}:${second}`
 }
 
+/**
+ * GP 아이템 구매 뒤 상세 결과 창(0x872a1)을 띄우는 칸 — **0~4 · 6** 만 (0x14f28 · 0x15030, 두 모드 공용).
+ * 이 칸들은 효과 0xa4488 이 팝업 버퍼 0x1552af4 에 써 둔 알림을 0x15044 가 지우고(0x1400428, 0x200 바이트)
+ * 창 글 "[이름] 구매!N효과 : 효과"(0x15096~0x15180)로 바꿔 쓴다 — **알림 팝업은 따로 안 뜬다.**
+ * 나머지 5·7·8·9 는 0x15214 `0xbbef9(버퍼, 1, −1, 1)` 로 알림만 띄운다.
+ */
+export function opensGpDetailWindow(index: number): boolean {
+  return index <= 4 || index === 6
+}
+
+/** 상세 결과 창 재료 — 줄은 화면(pages/shop)이 세운다. `before` 는 효과 전, `after` 는 효과 뒤 기록 */
+export interface GpDetailOf<T> {
+  readonly itemIndex: number
+  readonly before: T
+  readonly after: T
+}
+
 export interface ShopSelection {
   readonly career: PlayerCareer
   readonly notice: string
+  /** GP 칸 0~4·6 을 샀을 때만 — 창을 닫으면 상점 그대로(콜백 0x1d649 는 닫기만, 굴림 없음) */
+  readonly detail?: GpDetailOf<PlayerCareer> | null
 }
 
 const EQUIPMENT_BLOCK_TEXT: Readonly<Record<Exclude<EquipmentBlockReason, '인기도부족'>, string>> = {
@@ -118,5 +137,8 @@ export function selectShopItem(career: PlayerCareer, itemId: string, random: Ran
   const purchase = purchaseGpItem(career, index, random)
   if (purchase.kind === '거절') return { career, notice: 'G포인트가 부족합니다' }
   const { result } = purchase
+  if (opensGpDetailWindow(index)) {
+    return { career: result.career, notice: '', detail: { itemIndex: index, before: career, after: result.career } }
+  }
   return { career: result.career, notice: gpItemNoticeOf(index, result.lotteryPrize, result.prizeItemId) }
 }

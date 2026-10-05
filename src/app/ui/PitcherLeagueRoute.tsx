@@ -37,7 +37,7 @@ interface PitcherLeagueRouteProps {
 export function PitcherLeagueRoute({
   session, random, openedHiddenIds = [], gameSettings, onExit,
 }: PitcherLeagueRouteProps) {
-  const { career, scene, gameOptions, shopTab, shopNotice, actions } = session
+  const { career, scene, gameOptions, shopTab, shopNotice, shopGpDetail, actions } = session
 
   if (career === null || scene === '등록') {
     return <PitcherCreateFlow openedHiddenIds={openedHiddenIds} onCreate={actions.create} onCancel={onExit} />
@@ -110,6 +110,8 @@ export function PitcherLeagueRoute({
         tab={shopTab}
         career={shopCareer}
         noticeText={shopNotice}
+        gpDetail={shopGpDetail}
+        onCloseGpDetail={actions.closeShopGpDetail}
         onPurchase={(itemId) => actions.purchase(itemId, openedHiddenIds)}
         // 111 취소 → 110, 121 취소 → 106 이지만 웹 관리 화면은 다시 열 때 105 부터다 (근사)
         onBack={() => actions.goto('관리')}

@@ -4,7 +4,8 @@ import {
   pitcherEquipmentItemOf, pitcherHiddenOpenTextOf, purchasePitcherEquipment,
 } from '@/entities/pitcher-career/model/pitcherEquipment'
 import type { PitcherEquipmentBlockReason } from '@/entities/pitcher-career/model/pitcherEquipment'
-import { formatOriginalMoney } from '@/features/shop/model/shopSelection'
+import { formatOriginalMoney, opensGpDetailWindow } from '@/features/shop/model/shopSelection'
+import type { GpDetailOf } from '@/features/shop/model/shopSelection'
 import { SUB_ITEM_BLOCK_TEXT, purchaseSubItem, subItemBlockReasonOf } from '@/entities/career/model/subItems'
 import {
   PITCHER_GP_ITEMS,
@@ -27,6 +28,8 @@ export type PitcherShopTab = '장착' | '서브' | 'GP' | '착용'
 export interface PitcherShopSelection {
   readonly career: PitcherCareer
   readonly notice: string
+  /** GP 칸 0~4·6 — 타자편과 같은 상세 결과 창 (0x14a74 모드 공용, `opensGpDetailWindow`) */
+  readonly detail?: GpDetailOf<PitcherCareer> | null
 }
 
 const BLOCK_TEXT: Readonly<Record<Exclude<PitcherEquipmentBlockReason, '인기도부족'>, string>> = {
@@ -105,6 +108,9 @@ export function selectPitcherShopItem(career: PitcherCareer, itemId: string, ran
     const purchase = purchasePitcherGpItem(career, part, random)
     if (purchase.kind === '거절') return { career, notice: NOT_ENOUGH_GAME_POINT_TEXT }
     const { result } = purchase
+    if (opensGpDetailWindow(part)) {
+      return { career: result.career, notice: '', detail: { itemIndex: part, before: career, after: result.career } }
+    }
     return { career: result.career, notice: pitcherGpItemNoticeOf(part, result.lotteryPrize, result.prizeItemId) }
   }
   if (tab === '착용') {

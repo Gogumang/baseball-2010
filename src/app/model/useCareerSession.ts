@@ -52,6 +52,7 @@ import { trainingBlockTextOf, trainingOutcomeLinesOf } from '@/entities/career/m
 import { recoverAfterRest, restBlockReasonOf, runOuting, runRest } from '@/entities/career/model/outing'
 import { EVENT_TRIGGER, finishEvent, placeTriggerOf } from '@/entities/story/model/storyScene'
 import { selectShopItem } from '@/features/shop/model/shopSelection'
+import type { GpDetailOf } from '@/features/shop/model/shopSelection'
 import { hiddenOpenTextOf } from '@/entities/career/model/equipment'
 import type { RookieProfile } from '@/entities/career/model/playerCareer'
 import { useStorySchedule } from '@/app/model/useStorySchedule'
@@ -190,6 +191,8 @@ export function useCareerSession({
   const [progress, setProgress] = useState<GameProgress | null>(null)
 
   const [shopNotice, setShopNotice] = useState('')
+  /** 상점 GP 결과 창 (0x872a1) — 칸 0~4·6 구매 뒤. 닫아도 굴림 없이 상점 그대로 (0x1d649) */
+  const [shopGpDetail, setShopGpDetail] = useState<GpDetailOf<PlayerCareer> | null>(null)
   const [outingNotice, setOutingNotice] = useState('')
   const [managementNotice, setManagementNotice] = useState('')
   /** 상세정보 결과 창 (0x8a0a4) — 닫을 때 훈련은 부상, 휴식은 회복을 굴린다 */
@@ -717,6 +720,7 @@ export function useCareerSession({
     /** [아이템] 하위 메뉴 → 그 탭의 상점 */
     openShop: (tab: string) => {
       setShopNotice('')
+      setShopGpDetail(null)
       setScreen({ kind: '아이템', tab })
     },
 
@@ -727,6 +731,7 @@ export function useCareerSession({
     openPlayerInfo: (itemId: string) => {
       if (itemId === '장비착용') {
         setShopNotice('')
+        setShopGpDetail(null)
         return setScreen({ kind: '아이템', tab: '착용' })
       }
       setScreen({ kind: '성적' })
@@ -862,8 +867,12 @@ export function useCareerSession({
       if (career === null) return
       const selection = selectShopItem(career, itemId, random)
       setShopNotice(selection.notice)
+      setShopGpDetail(selection.detail ?? null)
       setCareer(awardTitles(selection.career, evaluateNewTitles(selection.career)))
     },
+
+    /** GP 결과 창 닫기 — 콜백 0x1d649 는 팝업만 닫는다 (굴림 없음) */
+    closeShopGpDetail: () => setShopGpDetail(null),
 
     /** [!] 장소에서 [들어가기] — 그 장소(trigger 2~6)의 이벤트를 본다 */
     enterPlace: (place: OutingPlace) => {
@@ -983,6 +992,7 @@ export function useCareerSession({
     career,
     progress,
     shopNotice,
+    shopGpDetail,
     outingNotice,
     managementNotice,
     managementDetail,

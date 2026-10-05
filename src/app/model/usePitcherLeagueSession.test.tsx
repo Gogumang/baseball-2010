@@ -448,7 +448,13 @@ describe('G 지갑 다리 (전역 mgr[+0x64])', () => {
     // 6 영지버섯 300 G — 사기 +40
     act(() => rendered.result.current.session.actions.purchase(shopItemId('GP', 6)))
 
-    expect(rendered.result.current.session.shopNotice).toBe('사기 +40 회복되었습니다')
+    // 칸 6 은 알림 대신 상세 결과 창 (0x15030 → 0x872a1) — 알림 버퍼는 창 글로 바뀐다
+    expect(rendered.result.current.session.shopNotice).toBe('')
+    expect(rendered.result.current.session.shopGpDetail?.itemIndex).toBe(6)
+    expect(rendered.result.current.session.shopGpDetail?.before.morale).toBe(50)
+    act(() => rendered.result.current.session.actions.closeShopGpDetail())
+    expect(rendered.result.current.session.shopGpDetail).toBeNull()
+    expect(rendered.result.current.session.scene).toBe('상점')
     expect(rendered.result.current.wallet.balance).toBe(700)
     expect(rendered.result.current.session.career?.gamePoint).toBe(700)
     expect((pitcherStore.load() as { morale: number }).morale).toBe(90)

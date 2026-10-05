@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { EQUIPMENT_PARTS } from '@/entities/career/model/equipment'
@@ -10,12 +10,19 @@ import type { ShopEntry } from '@/pages/shop/lib/shopEntries'
 import type { ShopWindowKindName } from '@/pages/shop/lib/shopLayout'
 import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import { ShopWindow } from '@/pages/shop/ui/ShopWindow'
+import { DetailWindow } from '@/pages/management/ui/DetailPopup'
+import type { DetailView } from '@/pages/management/lib/detailPopup'
+import { batterGpDetailViewOf } from '@/pages/shop/lib/gpDetailView'
+import type { GpDetailOf } from '@/features/shop/model/shopSelection'
 
 interface ShopScreenProps {
   /** 관리 화면 [아이템] 하위 메뉴에서 고른 탭 */
   readonly initialTab: string
   readonly career: PlayerCareer
   readonly noticeText: string
+  /** GP 칸 0~4·6 을 산 뒤의 상세 결과 창 재료 (`selectShopItem` 의 detail) */
+  readonly gpDetail?: GpDetailOf<PlayerCareer> | null
+  readonly onCloseGpDetail?: () => void
   readonly onPurchase: (itemId: string) => void
   readonly onBack: () => void
 }
@@ -32,7 +39,9 @@ const PART_NAMES = EQUIPMENT_PARTS.map((part) => part.name)
  * 창은 **mode_ui 프레임 33 박스 6개 + 프레임 34 격자 10칸** 으로 그린다 (P6 3절).
  * 앞서 웹은 글자 탭 + MenuList 였다.
  */
-export function ShopScreen({ initialTab, career, noticeText, onPurchase, onBack }: ShopScreenProps) {
+export function ShopScreen({
+  initialTab, career, noticeText, gpDetail = null, onCloseGpDetail, onPurchase, onBack,
+}: ShopScreenProps) {
   const tab = TABS.find((candidate) => candidate === initialTab) ?? '장착'
   return (
     <ShopScreenView
@@ -44,6 +53,8 @@ export function ShopScreen({ initialTab, career, noticeText, onPurchase, onBack 
       gamePoint={career.gamePoint}
       title="나만의리그타자편"
       noticeText={noticeText}
+      detail={gpDetail === null ? null : batterGpDetailViewOf(gpDetail)}
+      onCloseDetail={onCloseGpDetail}
       onPurchase={onPurchase}
       onBack={onBack}
     />
@@ -63,6 +74,12 @@ export interface ShopScreenViewProps {
   readonly gamePoint: number
   readonly title: ScreenFrameTitle
   readonly noticeText: string
+  /**
+   * GP 아이템 결과 창 (0x872a1) — 구매 확정 0x14a74 가 칸 0~4·6 에서 알림 대신 띄운다.
+   * 닫기 콜백 0x1d649 는 닫기 키(−16 · −5 · '5')에 팝업만 닫는다(0x742a9) — 굴림 없이 상점(상태 111) 그대로다.
+   */
+  readonly detail?: DetailView | null
+  readonly onCloseDetail?: () => void
   readonly onPurchase: (itemId: string) => void
   readonly onBack: () => void
 }
@@ -72,7 +89,7 @@ export interface ShopScreenViewProps {
  * 원본도 키 처리 0x13460 · 구매 확정 0x14a74 · 창 0x81dc0 이 한 벌이고 모드로 표만 갈린다 (R12 1a).
  */
 export function ShopScreenView({
-  kind, entriesOf, questionOf, partNames, money, gamePoint, title, noticeText, onPurchase, onBack,
+  kind, entriesOf, questionOf, partNames, money, gamePoint, title, noticeText, detail = null, onCloseDetail, onPurchase, onBack,
 }: ShopScreenViewProps) {
   const [part, setPart] = useState(0)
   const [cursor, setCursor] = useState(0)
@@ -83,6 +100,19 @@ export function ShopScreenView({
 
   const entries = entriesOf(part)
   const isNoticeOpen = noticeText !== '' && noticeText !== dismissedNotice
+  const isDetailOpen = detail !== null
+
+  /** 결과 창 닫기 키 — 확인·취소 (관리 화면 결과 창과 같은 처리) */
+  useEffect(() => {
+    if (!isDetailOpen) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Enter' && event.key !== 'Escape') return
+      event.preventDefault()
+      onCloseDetail?.()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [isDetailOpen, onCloseDetail])
 
   const select = (index: number) => {
     const entry = entries[index]
@@ -113,7 +143,7 @@ export function ShopScreenView({
         onMoveCursor={setCursor}
         onSelect={select}
         money={money}
-        isKeyEnabled={pending === null && blockNotice === null && !isNoticeOpen}
+        isKeyEnabled={pending === null && blockNotice === null && !isNoticeOpen && !isDetailOpen}
         partTabs={partNames === undefined ? undefined : { names: partNames, current: part, onChange: changePart }}
       />
       <ScreenFrame title={title} gamePoint={gamePoint} onBack={onBack} />
@@ -127,7 +157,10 @@ export function ShopScreenView({
       {pending === null && blockNotice !== null && (
         <MessageBox text={`!C${blockNotice}`} buttons={['확인']} onAnswer={() => setBlockNotice(null)} />
       )}
-      {pending === null && blockNotice === null && isNoticeOpen && (
+      {detail !== null && (
+        <DetailWindow rows={detail.rows} messages={detail.messages} onClose={() => onCloseDetail?.()} />
+      )}
+      {pending === null && blockNotice === null && !isDetailOpen && isNoticeOpen && (
         <MessageBox text={`!C${noticeText}`} buttons={['확인']} onAnswer={() => setDismissedNotice(noticeText)} />
       )}
     </RawScreen>

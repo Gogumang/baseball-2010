@@ -126,6 +126,8 @@ export function CareerRoutes({
           initialTab={screen.tab}
           career={career}
           noticeText={session.shopNotice}
+          gpDetail={session.shopGpDetail}
+          onCloseGpDetail={actions.closeShopGpDetail}
           onPurchase={actions.purchase}
           onBack={backToManagement}
         />

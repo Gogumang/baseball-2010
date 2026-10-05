@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
-import { formatOriginalMoney, purchaseQuestionOf, shopItemId, selectShopItem } from '@/features/shop/model/shopSelection'
+import { formatOriginalMoney, opensGpDetailWindow, purchaseQuestionOf, shopItemId, selectShopItem } from '@/features/shop/model/shopSelection'
 
 const 선수 = (overrides: Partial<PlayerCareer> = {}): PlayerCareer => ({ ...createCareer('테스트'), ...overrides })
 const 난수 = createSeededRandom(1)
@@ -74,7 +74,19 @@ describe('상점 선택 — 0x14a74', () => {
   it('서브 아이템과 GP 아이템도 산다', () => {
     expect(selectShopItem(선수({ money: 20000 }), shopItemId('서브', 0), 난수).notice).toBe('[표적판] 구매 완료')
     const gp = selectShopItem(선수({ gamePoint: 300, morale: 10 }), shopItemId('GP', 6), 난수)
-    expect([gp.notice, gp.career.morale, gp.career.gamePoint]).toEqual(['사기 +40 회복되었습니다', 50, 0])
+    // 칸 6 은 알림 대신 상세 결과 창 (0x15030) — 알림 글은 비고 창 재료가 나온다
+    expect([gp.notice, gp.career.morale, gp.career.gamePoint]).toEqual(['', 50, 0])
+    expect(gp.detail?.itemIndex).toBe(6)
+    expect(gp.detail?.before.morale).toBe(10)
+    expect(gp.detail?.after).toBe(gp.career)
     expect(selectShopItem(선수({ gamePoint: 0 }), shopItemId('GP', 6), 난수).notice).toBe('G포인트가 부족합니다')
+  })
+
+  it('GP 결과 창은 칸 0~4·6 만 — 5·7·8·9 는 알림 그대로 (0x14f28 · 0x15030)', () => {
+    expect([0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(opensGpDetailWindow))
+      .toEqual([true, true, true, true, true, false, true, false, false, false])
+    const sick = selectShopItem(선수({ gamePoint: 500, isSick: true, illnessName: '감기', illnessRemaining: 3 }), shopItemId('GP', 7), 난수)
+    expect(sick.detail ?? null).toBeNull()
+    expect(sick.notice).toBe('부상 및 질병이 모두 치료 되었습니다')
   })
 })

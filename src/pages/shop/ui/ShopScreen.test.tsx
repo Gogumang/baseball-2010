@@ -46,3 +46,31 @@ describe('상점 구매 확인', () => {
     expect(screen.queryByRole('dialog', { name: '알림' })).toBeNull()
   })
 })
+
+describe('GP 결과 창 (0x872a1)', () => {
+  it('detail 이 있으면 결과 창이 뜨고 목록 키는 막힌다 — Enter 로 닫으면 onCloseGpDetail 만 (굴림 없음)', () => {
+    const before = { ...createCareer('테스터'), gamePoint: 9999, morale: 30 }
+    const after = { ...before, morale: 70 }
+    const onPurchase = vi.fn()
+    const onClose = vi.fn()
+    render(
+      <ShopScreen
+        initialTab="GP"
+        career={after}
+        noticeText=""
+        gpDetail={{ itemIndex: 6, before, after }}
+        onCloseGpDetail={onClose}
+        onPurchase={onPurchase}
+        onBack={vi.fn()}
+      />,
+    )
+    expect(screen.queryByRole('dialog', { name: '상세정보' })).not.toBeNull()
+    expect(screen.getByText('[영지버섯] 구매')).toBeTruthy()
+
+    pressKey('Enter')
+
+    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('dialog', { name: '알림' }), '목록이 같은 Enter 로 구매를 물으면 안 된다').toBeNull()
+    expect(onPurchase).not.toHaveBeenCalled()
+  })
+})

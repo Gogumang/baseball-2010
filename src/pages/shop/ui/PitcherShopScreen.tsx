@@ -3,12 +3,17 @@ import { pitcherPurchaseQuestionOf } from '@/features/shop/model/pitcherShopSele
 import type { PitcherShopTab } from '@/features/shop/model/pitcherShopSelection'
 import { PITCHER_PART_NAMES, pitcherShopEntriesOf } from '@/pages/shop/lib/pitcherShopEntries'
 import { ShopScreenView } from '@/pages/shop/ui/ShopScreen'
+import { pitcherGpDetailViewOf } from '@/pages/shop/lib/gpDetailView'
+import type { GpDetailOf } from '@/features/shop/model/shopSelection'
 
 interface PitcherShopScreenProps {
   /** '장착'·'서브'·'GP' = [아이템] → 110 → 상점(111, 창 종류 3·1·2) · '착용' = [선수정보] → 장비착용(121) */
   readonly tab: PitcherShopTab
   readonly career: PitcherCareer
   readonly noticeText: string
+  /** GP 칸 0~4·6 을 산 뒤의 상세 결과 창 재료 — 이름표 340~343 · 최대값 `pitcherAbilityLimitsOf` */
+  readonly gpDetail?: GpDetailOf<PitcherCareer> | null
+  readonly onCloseGpDetail?: () => void
   readonly onPurchase: (itemId: string) => void
   readonly onBack: () => void
 }
@@ -22,7 +27,9 @@ interface PitcherShopScreenProps {
  * 웹 창은 부위를 탭으로 고른다. 그 차이는 타자편 `ShopWindow` 주석과 같고 투수만의 배치는 따로 없다.
  * 창 오른쪽 캐릭터 미리보기(0x7e765)는 타자편에서도 아직 안 그린다.
  */
-export function PitcherShopScreen({ tab, career, noticeText, onPurchase, onBack }: PitcherShopScreenProps) {
+export function PitcherShopScreen({
+  tab, career, noticeText, gpDetail = null, onCloseGpDetail, onPurchase, onBack,
+}: PitcherShopScreenProps) {
   return (
     <ShopScreenView
       kind={tab}
@@ -33,6 +40,8 @@ export function PitcherShopScreen({ tab, career, noticeText, onPurchase, onBack 
       gamePoint={career.gamePoint}
       title="나만의리그투수편"
       noticeText={noticeText}
+      detail={gpDetail === null ? null : pitcherGpDetailViewOf(gpDetail)}
+      onCloseDetail={onCloseGpDetail}
       onPurchase={onPurchase}
       onBack={onBack}
     />

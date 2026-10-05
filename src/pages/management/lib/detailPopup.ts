@@ -37,6 +37,8 @@ const ABILITY_ROWS: readonly (readonly [keyof BatterAbility, number])[] = [
   ['run', 339],
 ]
 const MORALE_LABEL_FRAME = 84
+/** 타자 이름표 다섯 칸 (히트·파워·수비·주루·사기) — 상점 GP 창(pages/shop)이 쓴다 */
+export const BATTER_DETAIL_LABEL_FRAMES: readonly number[] = [...ABILITY_ROWS.map(([, frame]) => frame), MORALE_LABEL_FRAME]
 /**
  * 투수 이름표 — 0x87314 `0x7b984(창)`(= 창+0x20 == 3, 모드 3)이면 앞 네 칸을 img_text **340·341·342·343** 으로
  * 바꿔 쓴다 (0x8734c~0x8736e). 사기 칸 84 는 그대로다.
@@ -93,7 +95,7 @@ export function detailRowsFromSlots(
  *     사기 칸 보너스는 **감소량 쪽 부호 그대로**([sp+0xf8] — 0x18a16 이 [sp+0x38] 에 더한다)라 안마기·병아리는 −1, 몹쓸몸은 +2 다.
  *     필살타법(칸 4)은 0x18bd8 에서 다른 길로 가 이 창을 띄우지 않는다.
  *   휴식 (0x18ede 비움 → 0x18fb4): 능력치 칸 0, 사기 칸 = 회복 굴림 bfa55(10,16) [sp+0x10] 그대로 (100 자르기 전).
- *   GP 아이템 (0x14ea8 비움 → 0x14f5c~0x14fa4): `gpItemDetailChangesOf` (상점 화면 미연결).
+ *   GP 아이템 (0x14ea8 비움 → 0x14f5c~0x14fa4): `gpItemDetailChangesOf` (상점 화면 `pages/shop/lib/gpDetailView.ts`).
  */
 export interface DetailChanges {
   readonly ability: BatterAbility
@@ -145,7 +147,7 @@ export function detailRowsOf(before: PlayerCareer, after: PlayerCareer, changes?
     run: current.run - previous.run,
   }
   return detailRowsFromSlots(
-    [...ABILITY_ROWS.map(([, frame]) => frame), MORALE_LABEL_FRAME],
+    BATTER_DETAIL_LABEL_FRAMES,
     slotsOf(current, after.morale),
     slotsOf(limits, MAXIMUM_MORALE),
     changes ? slotsOf(changes.ability, changes.morale) : slotsOf(difference, after.morale - before.morale),
@@ -163,7 +165,7 @@ export function detailRowsOf(before: PlayerCareer, after: PlayerCareer, changes?
  *   (0x14f92 에서 한 번 읽고 다시 안 읽는다 — 영지버섯이면 오르기 전 사기가 보인다. 원본 그대로).
  *   최대값은 한계 · 사기 100. 창을 닫으면 콜백 0x1d649 (닫기 키에 0x742a9 만 — 굴림 없음).
  * `baseBefore` 는 효과 전 `0xb6415(기록,k,0)` (장비·스킬 뺀 값), `limits` 는 그 모드의 한계 네 칸이다.
- * ⚠️ 창을 띄우는 상점 화면(pages/shop)은 아직 이 창을 쓰지 않고 알림만 띄운다 — 미연결.
+ * 상점 화면이 `pages/shop/lib/gpDetailView.ts` 로 줄을 세워 띄운다.
  */
 const GP_ABILITY_CHANGE = 10
 const GP_MORALE_CHANGE = 40
