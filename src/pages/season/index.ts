@@ -123,3 +123,9 @@ export {
 /** 다음경기 0xd8 — 순위표 한 장 (그림 0xae24 · 키 0x48d0) */
 export { NextGameScreen } from '@/pages/season/ui/NextGameScreen'
 export type { NextGameScreenProps } from '@/pages/season/ui/NextGameScreen'
+
+/** 경기 직전 경기정보 0xdd — 공용 목록 k 4 + 시즌 값 줄 (0x5dcc0 모드 2 갈래) */
+export { SeasonMatchInfoScreen } from '@/pages/season/ui/SeasonMatchInfoScreen'
+export type { SeasonMatchInfoScreenProps } from '@/pages/season/ui/SeasonMatchInfoScreen'
+export { seasonMatchInfoLines, nationalCupMatchInfoRankOf, POSTSEASON_RANK_TEXT } from '@/pages/season/lib/seasonMatchInfo'
+export type { SeasonMatchInfoInput } from '@/pages/season/lib/seasonMatchInfo'

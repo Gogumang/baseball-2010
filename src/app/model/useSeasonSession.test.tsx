@@ -4,6 +4,8 @@ import { act, renderHook } from '@testing-library/react'
 import { useSeasonSession } from '@/app/model/useSeasonSession'
 import { SEASON_GAME_COUNT } from '@/entities/season-mode/model/seasonRecord'
 import { SEASON_PHASE, SEASON_SCENE_STATE } from '@/entities/season-mode/model/seasonStateMachine'
+import { PRE_GAME_ACE_PHASE, SQUAD_PURPOSE } from '@/entities/season-mode/model/preGameFlow'
+import { FULL_PLAY_SETTINGS } from '@/features/play-team-game/model/matchSettings'
 import { GAME_POINT_LIMIT } from '@/entities/season-mode/model/seasonRewards'
 import { clearSeasonGameRecord } from '@/entities/season-mode/model/seasonReputation'
 import { useGamePointWallet } from '@/entities/wallet/model/useGamePointWallet'
@@ -186,8 +188,10 @@ describe('시즌 세션', () => {
     expect(result.current.scene).toBe(SEASON_SCENE_STATE.다음경기)
 
     act(() => result.current.actions.confirmNextGame())
-    expect(result.current.scene).toBe(SEASON_SCENE_STATE.경기직전)
-    expect(result.current.gameKind).toBe('정규')
+    // 0x48fc: this+0x11c = 1 → 0xd7 경기 전 마선수 고르기 (마투수부터)
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.선수단)
+    expect(result.current.squadPurpose).toBe(SQUAD_PURPOSE.경기전)
+    expect(result.current.gameOptions).toBeNull()
   })
 
   it('포스트시즌 중 0xd8 확인은 결산 0xef 로 간다 (0x48fc SR+0xb4)', () => {
@@ -384,6 +388,7 @@ describe('시즌 끝 사슬', () => {
     act(() => result.current.actions.updateRecord({ ...result.current.state!.record, yearIndex: 2 }))
     act(() => result.current.actions.finishSeason())
     act(() => result.current.actions.playCupGame(10, 11))
+    act(() => result.current.actions.startPendingGame())
     expect(result.current.gameKind).toBe('국가대항전')
     const 전 = result.current.state!
 
@@ -413,6 +418,7 @@ describe('시즌 끝 사슬', () => {
     act(() => result.current.actions.finishSeason())
 
     act(() => result.current.actions.playCupGame(10, 11))
+    act(() => result.current.actions.startPendingGame())
     // 경기[0x28+내side] = 10 — 시즌 팀(3) 명단이 아니라 대표팀 명단으로 친다
     expect(result.current.gameOptions?.ourTeamId).toBe(10)
     expect(result.current.gameOptions?.opponentTeamId).toBe(11)
@@ -439,6 +445,7 @@ describe('시즌 끝 사슬', () => {
     act(() => result.current.actions.finishSeason())
 
     act(() => result.current.actions.playCupGame(10, 11))
+    act(() => result.current.actions.startPendingGame())
     // 내 팀은 대한민국(10)이지만 [시즌+1] 은 시즌 팀(3) 그대로 — 질병·보직·사기 보정이 아무 팀에도 안 붙는다
     expect(result.current.gameOptions?.ourTeamId).toBe(10)
     expect(result.current.gameOptions?.seasonTeamId).toBe(3)
@@ -451,6 +458,7 @@ describe('시즌 끝 사슬', () => {
     expect(day).toBe(1)
     const games = result.current.state!.record.games
     act(() => result.current.actions.playCupGame(10, 12))
+    act(() => result.current.actions.startPendingGame())
     // 시즌 경기 수(SR+0xb2 의 시즌 값)가 아니라 대회 하루 넘기기가 올린 L+0x32 다
     expect(result.current.gameOptions?.dayCounter).toBe(day)
     expect(result.current.gameOptions?.opponentDayCounter).toBe(1)
@@ -515,8 +523,9 @@ describe('포스트시즌', () => {
     act(() => result.current.actions.continuePostseason())
 
     if (첫시리즈.teams.includes(내팀)) {
-      expect(result.current.scene).toBe(SEASON_SCENE_STATE.경기직전)
-      expect(result.current.gameKind).toBe('포스트시즌')
+      // 0xef 키도 this+0x11c = 1 → 0xd7 경기 전 마선수 고르기로 간다
+      expect(result.current.scene).toBe(SEASON_SCENE_STATE.선수단)
+      expect(result.current.pendingGame?.kind).toBe('포스트시즌')
     } else {
       // 내 차례가 오거나 우승이 정해질 때까지 돌린다
       const series = result.current.series!
@@ -623,5 +632,82 @@ describe('전역 G 지갑 (mgr[+0x64])', () => {
     act(() => result.current.actions.spendGamePoint(500))
 
     expect(result.current.gamePoints).toBe(1500)
+  })
+})
+
+describe('경기 전 흐름 0xd8 → 0xd7 → 0xdd → 0xe1', () => {
+  const 다음경기확인 = () => {
+    const rendered = 띄우기()
+    act(() => rendered.result.current.actions.chooseTeam(0))
+    act(() => rendered.result.current.actions.openNextGame())
+    act(() => rendered.result.current.actions.confirmNextGame())
+    return rendered
+  }
+
+  it('마투수 → 마타자를 고르면 0xdd 경기정보로, 처음이면 경기진행 설정 창이 저절로 열린다 (0x6548 6564)', () => {
+    const { result } = 다음경기확인()
+    expect(result.current.preGameAces.phase).toBe(PRE_GAME_ACE_PHASE.마투수)
+
+    act(() => result.current.actions.choosePreGameAce(2))
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.선수단)
+    expect(result.current.preGameAces).toEqual({ phase: PRE_GAME_ACE_PHASE.마타자, pitcher: 2, batter: -1 })
+
+    act(() => result.current.actions.choosePreGameAce(6))
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.경기정보)
+    expect(result.current.isMatchSettingsOpen).toBe(true)
+    expect(result.current.pendingGame?.kind).toBe('정규')
+  })
+
+  it('0xdd 확인이면 고른 마선수를 내 팀에 싣고 경기로 간다 — 설정은 시즌 칸 값이다', () => {
+    const { result } = 다음경기확인()
+    act(() => result.current.actions.choosePreGameAce(1))
+    act(() => result.current.actions.choosePreGameAce(8))
+    const 설정 = { ...FULL_PLAY_SETTINGS, kind: 1, value: 2 }
+    act(() => result.current.actions.applyMatchSettings(설정))
+    expect(result.current.isMatchSettingsOpen).toBe(false)
+
+    act(() => result.current.actions.startPendingGame())
+
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.경기직전)
+    expect(result.current.gameKind).toBe('정규')
+    expect(result.current.gameOptions?.acePitcherId).toBe(1)
+    expect(result.current.gameOptions?.aceBatterId).toBe(3)
+    expect(result.current.gameOptions?.settings).toEqual(설정)
+  })
+
+  it('설정 창은 한 번 열리고 나면 다음 경기정보에서는 저절로 안 열린다 (저장 +0x11e)', () => {
+    const { result } = 다음경기확인()
+    act(() => result.current.actions.choosePreGameAce(0))
+    act(() => result.current.actions.choosePreGameAce(5))
+    expect(result.current.isMatchSettingsOpen).toBe(true)
+    act(() => result.current.actions.toggleMatchSettings())
+
+    // 0xdd CLR → 0xd7 다시 들어옴(마투수부터) → 다시 0xdd
+    act(() => result.current.actions.cancelMatchInfo())
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.선수단)
+    expect(result.current.preGameAces.phase).toBe(PRE_GAME_ACE_PHASE.마투수)
+    act(() => result.current.actions.choosePreGameAce(0))
+    act(() => result.current.actions.choosePreGameAce(5))
+    expect(result.current.isMatchSettingsOpen).toBe(false)
+  })
+
+  it('0xd7 CLR — 마타자 단계는 마투수로, 마투수 단계는 0xd8 로 돌아가고 그때는 0xd8 취소가 안 먹는다', () => {
+    const { result } = 다음경기확인()
+    act(() => result.current.actions.choosePreGameAce(0))
+    act(() => result.current.actions.cancelPreGameAce())
+    expect(result.current.preGameAces.phase).toBe(PRE_GAME_ACE_PHASE.마투수)
+
+    act(() => result.current.actions.cancelPreGameAce())
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.다음경기)
+    expect(result.current.pendingGame).toBeNull()
+    // 이전 상태가 0xd7 이라 0x48ea 가 0xc9 로 안 보낸다
+    act(() => result.current.actions.cancelNextGame())
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.다음경기)
+  })
+
+  it('구단관리 코치채용으로 가면 선수단 용도가 코치채용(2)이다', () => {
+    const { result } = 다음경기확인()
+    act(() => result.current.actions.goto(SEASON_SCENE_STATE.선수단))
+    expect(result.current.squadPurpose).toBe(SQUAD_PURPOSE.코치채용)
   })
 })

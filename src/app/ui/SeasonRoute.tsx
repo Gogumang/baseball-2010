@@ -5,7 +5,14 @@ import {
   SeasonOutingScreen, SeasonSummaryScreen, SeasonTeamMenuScreen, SeasonTitleAwardScreen,
   SeasonTrainingScreen, StadiumShopScreen, TradeScreen, CoachHireScreen, SEASON_MVP_LEADER_KINDS,
   seasonAwardRewardOf, seasonMvpResultEventId, seasonTitleResultEventId,
+  SeasonMatchInfoScreen, seasonMatchInfoLines,
 } from '@/pages/season'
+import { AceSelectScreen } from '@/pages/general-mode'
+import {
+  DEFAULT_OPENED_ACE_BATTER_IDS, DEFAULT_OPENED_ACE_PITCHER_IDS,
+} from '@/pages/general-mode/lib/generalModeSetup'
+import { MatchSettingsWindow } from '@/pages/match-settings'
+import { SQUAD_PURPOSE } from '@/entities/season-mode/model/preGameFlow'
 import { judgeTitles, leagueRecordsOf } from '@/entities/awards/model/seasonAwards'
 import { leaderOf } from '@/entities/awards/model/leaderboard'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
@@ -30,6 +37,18 @@ interface SeasonRouteProps {
   readonly gameSettings: ReturnType<typeof useGameSettings>
   /** 시즌모드에서 나간다 — 메인 메뉴로 (원본은 `0xbc290(앱, 0x103)`) */
   readonly onExit: () => void
+  /**
+   * 마선수 오픈 플래그(`mgr[0x30..0x39]`)·레벨(`mgr[0x13a..]`)과 오픈·레벨업 처리 — 경기 전 마선수 고르기
+   * 0xd7 이 일반모드 상태 21 과 **같은 전역 칸**을 본다(0xa248 의 `저장[0x30 + 칸]`). 앱의 `aceSelect` 를
+   * 그대로 넘기면 된다. 안 넘기면 새 저장 기본 개방분(싸이커·메디카)만 열려 있고 오픈·레벨업이 안 된다.
+   */
+  readonly aceSelect?: {
+    readonly openedAcePitcherIds: readonly number[]
+    readonly openedAceBatterIds: readonly number[]
+    readonly levels: Readonly<Record<number, number>>
+    readonly onOpenAce: (cell: number) => void
+    readonly onLevelUp: (cell: number, cost: number) => void
+  }
 }
 
 /**
@@ -41,7 +60,7 @@ interface SeasonRouteProps {
  * **아직 화면이 없는 장면**(연초 목표 0xd4 등)은
  * 알림을 띄우고 관리 메뉴로 되돌린다 — 조용히 아무것도 안 하는 것보다 낫다.
  */
-export function SeasonRoute({ session, random, gameSettings, onExit }: SeasonRouteProps) {
+export function SeasonRoute({ session, random, gameSettings, onExit, aceSelect }: SeasonRouteProps) {
   const { state, scene, league, roster, playerStats, series, cup, gameOptions, notice, actions } = session
 
   const ranks = useMemo(
@@ -114,9 +133,67 @@ export function SeasonRoute({ session, random, gameSettings, onExit }: SeasonRou
     )
   }
 
-  // 코치채용 — 원본은 **선수단 화면 0xd7** 을 `this+0x11c = 2` 로 띄운다 (P4 1b).
-  // ⚠️ 웹에는 그 `this+0x11c` 칸이 없고 경기 전 엔트리 화면(=1)도 아직 없다. 0xd7 로 오는 길이
-  //    지금은 구단관리-코치채용 하나뿐이라 여기서 바로 코치채용을 띄운다 — **근사다**
+  // 선수단 0xd7, this+0x11c = 1 — **경기 전 마선수 고르기**. 그림 0xaa24 가 공용 목록 k 2 + 0x5f395 +
+  // 머리띠(4 "마선수선택", 바닥 0x205)로 일반모드 상태 21 과 같은 화면이라 그 화면을 그대로 쓴다
+  if (scene === SEASON_SCENE_STATE.선수단 && session.squadPurpose === SQUAD_PURPOSE.경기전) {
+    return (
+      <AceSelectScreen
+        phase={session.preGameAces.phase}
+        openedAcePitcherIds={aceSelect?.openedAcePitcherIds ?? DEFAULT_OPENED_ACE_PITCHER_IDS}
+        openedAceBatterIds={aceSelect?.openedAceBatterIds ?? DEFAULT_OPENED_ACE_BATTER_IDS}
+        {...(aceSelect === undefined ? {} : {
+          levels: aceSelect.levels, onOpenAce: aceSelect.onOpenAce, onLevelUp: aceSelect.onLevelUp,
+        })}
+        gamePoint={session.gamePoints}
+        onSelect={actions.choosePreGameAce}
+        onCancel={actions.cancelPreGameAce}
+      />
+    )
+  }
+
+  // 경기 직전 경기정보 0xdd — 목록 k 4 + 경기진행 설정 창 0x6042c (그림 0xb398)
+  if (scene === SEASON_SCENE_STATE.경기정보 && session.pendingGame !== null) {
+    const { options, kind } = session.pendingGame
+    const isCup = kind === '국가대항전'
+    return (
+      <>
+        <SeasonMatchInfoScreen
+          lines={seasonMatchInfoLines({
+            league, series, cup, inPostseason: state.record.inPostseason,
+            myTeamId: options.ourTeamId,
+            opponentTeamId: options.opponentTeamId,
+            dayCounter: options.dayCounter ?? 0,
+            ...(options.opponentDayCounter === undefined ? {} : { opponentDayCounter: options.opponentDayCounter }),
+            acePitcherId: isCup ? -1 : session.preGameAces.pitcher,
+            aceBatterId: isCup ? -1 : session.preGameAces.batter,
+          })}
+          myTeamId={options.ourTeamId}
+          opponentTeamId={options.opponentTeamId}
+          playerSide={options.playerSide}
+          gamePoint={session.gamePoints}
+          onStart={() => {
+            // 설정 창이 열려 있으면 키가 모두 창으로 간다 (0x83f2 메뉴+0x2ba)
+            if (!session.isMatchSettingsOpen) actions.startPendingGame()
+          }}
+          onOpenSettings={() => {
+            if (!session.isMatchSettingsOpen) actions.toggleMatchSettings()
+          }}
+          onCancel={() => {
+            if (!session.isMatchSettingsOpen) actions.cancelMatchInfo()
+          }}
+        />
+        {session.isMatchSettingsOpen && (
+          <MatchSettingsWindow
+            settings={session.matchSettings}
+            onConfirm={actions.applyMatchSettings}
+            onClose={actions.toggleMatchSettings}
+          />
+        )}
+      </>
+    )
+  }
+
+  // 코치채용 — 선수단 화면 0xd7 을 `this+0x11c = 2` 로 띄운 것 (P4 1b, 구단관리 칸 3)
   if (scene === SEASON_SCENE_STATE.선수단) {
     return (
       <CoachHireScreen

@@ -37,6 +37,11 @@ import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { TEAMS } from '@/shared/config/original/teams'
 import type { TeamGameOptions, TeamGameSummary } from '@/features/play-team-game/model/teamGameFlow'
 import { FULL_PLAY_SETTINGS } from '@/features/play-team-game/model/matchSettings'
+import type { MatchProgressSettings } from '@/features/play-team-game/model/matchSettings'
+import {
+  PRE_GAME_ACES_START, SQUAD_PURPOSE, cancelPreGameAce, choosePreGameAce, matchInfoCancelScene,
+} from '@/entities/season-mode/model/preGameFlow'
+import type { PreGameAces, SquadPurpose } from '@/entities/season-mode/model/preGameFlow'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
 import { createNationalCup, nationalCupSideOf } from '@/entities/national-cup/model/nationalCup'
@@ -106,6 +111,19 @@ export interface SeasonSession {
   readonly openedStadiumIds: readonly number[]
   /** 진행 중인 국가대항전. 없으면 null (원본 L+0xa8~ 칸) */
   readonly cup: NationalCup | null
+  /** 선수단 화면 0xd7 의 용도 `this+0x11c` — 1 경기 전 마선수 고르기 · 2 코치채용 */
+  readonly squadPurpose: SquadPurpose
+  /** 0xd7 경기 전 마선수 고르기의 단계(메뉴+0xd0)와 고른 칸(rec+0xe · rec+0xd) */
+  readonly preGameAces: PreGameAces
+  /**
+   * 0xd7 → 0xdd 를 지나 치를 경기 — 옵션은 이미 섰고 마선수·설정만 시작할 때 얹는다.
+   * 경기정보 화면이 두 팀·날짜를 여기서 읽는다. 경기 전 흐름 밖이면 null.
+   */
+  readonly pendingGame: PendingSeasonGame | null
+  /** 경기진행 설정 창(0x5fef4)이 열려 있는가 — 경기정보 0xdd 의 메뉴+0x2ba */
+  readonly isMatchSettingsOpen: boolean
+  /** 시즌 칸(m = 1)의 경기진행 설정 — 경기 옵션 `settings` 로 간다 */
+  readonly matchSettings: MatchProgressSettings
   readonly notice: string
   readonly actions: SeasonActions
 }
@@ -124,6 +142,18 @@ export interface SeasonActions {
   readonly confirmNextGame: () => void
   /** 다음경기 화면의 취소 (0x48ea) — 관리 메뉴에서 왔을 때만 관리 메뉴로 돌아간다 */
   readonly cancelNextGame: () => void
+  /** 0xd7 경기 전 마선수 고르기의 OK — 마투수 → 마타자 → 0xdd (0xa734) */
+  readonly choosePreGameAce: (cell: number) => void
+  /** 0xd7 의 CLR — 마타자 → 마투수, 마투수 → 포스트시즌 0xef · 그 밖 0xd8 (0xa900) */
+  readonly cancelPreGameAce: () => void
+  /** 0xdd 의 OK — 평판 16칸을 지우고 경기로 (0x847e → 0xe1) */
+  readonly startPendingGame: () => void
+  /** 0xdd 의 CLR — 국가대항전이면 대회 쪽, 아니면 0xd7 (0x844e) */
+  readonly cancelMatchInfo: () => void
+  /** 0xdd 의 '0' — 경기진행 설정 창 열고 닫기 (0x857a) */
+  readonly toggleMatchSettings: () => void
+  /** 설정 창 확인 "예" — 시즌 칸에 되쓰고 닫는다 (0x60376) */
+  readonly applyMatchSettings: (settings: MatchProgressSettings) => void
   readonly confirmIncome: (record: SeasonRecord) => void
   /** 국가대항전 한 경기 — 사람이 대표팀을 조작한다 */
   readonly playCupGame: (myTeam: number, opponent: number) => void
@@ -165,6 +195,23 @@ interface SeasonSave {
   readonly ranking?: readonly number[]
   /** 진행 중인 국가대항전 (L+0xa8~0xc3). 대회 밖이면 null */
   readonly cup?: NationalCup | null
+  /**
+   * 경기진행 설정 시즌 칸 (저장 +0x12c+m 계열, m = 1). ⚠️ 원본은 **전역 저장**이라 시즌을 새로 해도
+   * 남지만 웹에는 그 전역 저장 객체가 없어 시즌 저장에 둔다 — 근사.
+   */
+  readonly matchSettings?: MatchProgressSettings
+  /**
+   * 저장 +0x11e — 경기진행 설정 창을 한 번 봤는가. 0 이면 0xdd 들어옴 0x6548 이 창을 저절로 열고 1 로 쓴다.
+   * ⚠️ 위 칸과 같은 까닭으로 시즌 저장에 둔다 — 근사.
+   */
+  readonly matchSettingsSeen?: boolean
+}
+
+/** 0xd7 → 0xdd 를 지나 치를 경기 한 판 */
+export interface PendingSeasonGame {
+  readonly kind: SeasonGameKind
+  /** 두 팀·측·날짜가 선 옵션 — 마선수(rec+0xe·+0xd)와 설정은 0xdd 확인 때 얹는다 */
+  readonly options: TeamGameOptions
 }
 
 /**
@@ -290,6 +337,11 @@ export function useSeasonSession(
    * `this+0x24 == 0xc9` 자리다. 경기 뒤(0xf1)·저장에서 바로 들어오면 거짓이라 취소가 안 먹는다.
    */
   const [nextGameFromMenu, setNextGameFromMenu] = useState(false)
+  /** 선수단 0xd7 의 `this+0x11c` — 구단관리 코치채용은 2, 경기 전 흐름은 1 */
+  const [squadPurpose, setSquadPurpose] = useState<SquadPurpose>(SQUAD_PURPOSE.코치채용)
+  const [preGameAces, setPreGameAces] = useState<PreGameAces>(PRE_GAME_ACES_START)
+  const [pendingGame, setPendingGame] = useState<PendingSeasonGame | null>(null)
+  const [isMatchSettingsOpen, setIsMatchSettingsOpen] = useState(false)
   /** 전역 저장 app+0xe0 — 열린 구장 히든 아이템 id (S3 7절). 위 칸과 같은 자리에 둔다 */
   const [openedStadiumIds, setOpenedStadiumIds] = useState<readonly number[]>([])
 
@@ -413,7 +465,8 @@ export function useSeasonSession(
         seasonTeamId: record.teamId,
         opponentTeamId: opponent,
         playerSide: side === LEAGUE_SIDE_HOME ? PLAYER_SIDE_LAST_BAT : PLAYER_SIDE_FIRST_BAT,
-        settings: FULL_PLAY_SETTINGS,
+        // 경기진행 설정 시즌 칸 — 0xdd 의 '0' 창이 고친 값. 한 번도 안 고쳤으면 웹판 기본(모든 이닝 직접)
+        settings: save.matchSettings ?? FULL_PLAY_SETTINGS,
         // 코치는 SR+0x185 다 — 채용 화면(0xd7)이 채운 칸을 그대로 넘긴다 (−1 = 없음)
         season: { illness: record.illness, morale: save.state.teamMorale, coach: record.coach },
         // 리그 날짜 카운터 g = SR+0xb2(치른 경기 수) — 양 팀 선발이 네 경기마다 한 바퀴 돈다.
@@ -433,8 +486,7 @@ export function useSeasonSession(
    * **경기가 끝날 때가 아니라 시작할 때 지운다.** 부르는 곳은 경기 직전 경기정보 화면
    * (시즌 상태 0xdd)의 "경기 시작" 키 `0x83cc` **한 곳뿐**이고, 거기서 곧장 경기 장면으로
    * 넘어간다 (0x84ac `SR = [this+0xa0]` → `ldr r3,[0x85c8] = 0xa3425` → 0xa3424).
-   * 웹판에는 0xdd 정보 화면이 따로 없고 `경기직전` 장면이 곧 경기이므로, 그 장면으로
-   * 들어가는 세 갈래(정규·포스트시즌·국가대항전)가 같은 자리를 맡는다.
+   * 웹판은 0xdd 의 확인(`startPendingGame`)과, 화면을 건너뛰는 `playNextGame` 이 이 자리를 맡는다.
    * 근거: `docs/re/S4-season-reputation.md` 2a·7절, `docs/re/R13-season-leftovers.md` 4절.
    */
   const clearGameRecord = useCallback(
@@ -450,6 +502,10 @@ export function useSeasonSession(
     [commit],
   )
 
+  /**
+   * 경기 전 화면(0xd7·0xdd)을 **건너뛰고** 곧장 정규 경기로 — 마선수 없이 저장된 설정으로 친다.
+   * 원본에는 이런 길이 없다. 화면은 쓰지 않고 테스트·디버그용으로만 남긴다.
+   */
   const playNextGame = useCallback(() => {
     if (save === null) return
     // 정규시즌 가지 — 0xb7844 가 일정표 0xd89cb 로 정한다 (리그 날짜 L+0x32 = SR+0xb2)
@@ -469,7 +525,7 @@ export function useSeasonSession(
    * ```
    * 4cc2  SR+0x50(phase) = 4
    * 4cc8  이전 상태 ≠ 0xd7 이면 0x1fded(app) · 0x22755(app, 1)   ; 저장
-   * 4ce0  [this+0x90] vtable+0x14(0, 0)                          ; 보조 객체 초기화(뜻 미해독)
+   * 4ce0  [this+0x90] vtable+0x14(0, 0)                          ; 1×1 격자 커서를 (0,0) 에 — 보이는 일 없음 (NextGameScreen 주석)
    * ```
    * phase 4 가 저장에 남으므로 이 화면에서 끄고 다시 들어오면 **관리 메뉴가 아니라 0xd8** 로 온다
    * (진입 분기 0xcb 는 짝수 경기라도 phase ∈ {1,3} 일 때만 관리 메뉴다).
@@ -491,13 +547,112 @@ export function useSeasonSession(
     nextGameEntered(save, true)
   }, [nextGameEntered, save])
 
+  /**
+   * 0xd7 경기 전 마선수 고르기로 (this+0x11c = 1). 들어옴 0x5268 이 메뉴+0xd0 = 1 이라 늘 마투수부터다.
+   */
+  const enterPreGameSquad = useCallback((pending: PendingSeasonGame) => {
+    setPendingGame(pending)
+    setSquadPurpose(SQUAD_PURPOSE.경기전)
+    setPreGameAces(PRE_GAME_ACES_START)
+    setIsMatchSettingsOpen(false)
+    setScene(SEASON_SCENE_STATE.선수단)
+  }, [])
+
+  /**
+   * 0xdd 경기정보로 — 들어옴 0x6548: 저장 +0x11e 가 0 이면 **경기진행 설정 창을 저절로 열고** 그 칸을 1 로
+   * 써서 저장한다 (6564~659c). 두 팀 명단·마선수·로테이션은 웹에서는 경기를 세울 때(`startTeamGame`) 한다.
+   */
+  const enterMatchInfo = useCallback(
+    (current: SeasonSave, pending: PendingSeasonGame) => {
+      setPendingGame(pending)
+      const firstTime = current.matchSettingsSeen !== true
+      if (firstTime) commit({ ...current, matchSettingsSeen: true })
+      setIsMatchSettingsOpen(firstTime)
+      setScene(SEASON_SCENE_STATE.경기정보)
+    },
+    [commit],
+  )
+
   /** 확인 `0x48fc`: `SR+0xb4`(포스트시즌) ? 0xef : (this+0x11c = 1, 0xd7 선수단 → 0xdd → 경기) */
   const confirmNextGame = useCallback(() => {
     if (save === null) return
     if (save.state.record.inPostseason) return setScene(SEASON_SCENE_STATE.시즌결산)
-    // ⚠️ 0xd7 선수단(경기 전 엔트리)·0xdd 경기정보 화면은 웹에 없어 곧장 경기로 간다
-    playNextGame()
-  }, [playNextGame, save])
+    // 정규시즌 가지 — 0xb7844 가 일정표 0xd89cb 로 정한다 (리그 날짜 L+0x32 = SR+0xb2)
+    const options = optionsFor(
+      seasonOpponentOf(save.state.record),
+      leagueSideOf(save.state.record.games, save.state.record.teamId),
+    )
+    if (options === null) return
+    enterPreGameSquad({ kind: '정규', options })
+  }, [enterPreGameSquad, optionsFor, save])
+
+  /** 0xd7 OK (0xa734) — 잠긴 칸 팝업·레벨업 창은 화면(`AceSelectScreen`)이 한다 */
+  const choosePreGameAceAction = useCallback(
+    (cell: number) => {
+      if (save === null || pendingGame === null) return
+      const step = choosePreGameAce(preGameAces, cell)
+      setPreGameAces(step.aces)
+      if (step.kind === '경기정보') enterMatchInfo(save, pendingGame)
+    },
+    [enterMatchInfo, pendingGame, preGameAces, save],
+  )
+
+  /**
+   * 0xd7 CLR (0xa900). 마투수 단계에서 나가면 포스트시즌 0xef · 그 밖 0xd8 이다.
+   * 0xd8 로 돌아가면 들어옴 0x4cb8 이 다시 돌지만 **이전 상태가 0xd7** 이라 저장하지 않고,
+   * 그 화면의 취소(0x48ea, 이전 상태 == 0xc9 일 때만)도 먹지 않는다 — 원본 그대로.
+   */
+  const cancelPreGameAceAction = useCallback(() => {
+    if (save === null) return
+    const step = cancelPreGameAce(preGameAces, save.state.record.inPostseason)
+    if (step.kind === '고르기') return setPreGameAces(step.aces)
+    setPendingGame(null)
+    if (step.scene === SEASON_SCENE_STATE.다음경기) return nextGameEntered(save, false)
+    setScene(step.scene)
+  }, [nextGameEntered, preGameAces, save])
+
+  /**
+   * 0xdd OK (0x847e~0x8532): 저장 · 평판 16칸 지움(0xa3424) · 0xe1 → 경기 장면.
+   * 정규·포스트시즌이면 0xd7 에서 고른 마선수가 내 팀에 들어간다(0x6548 66ae~670a, 국가대항전은 안 넣는다).
+   */
+  const startPendingGame = useCallback(() => {
+    if (save === null || pendingGame === null) return
+    const withAces = pendingGame.kind === '국가대항전'
+      ? {}
+      : { acePitcherId: preGameAces.pitcher, aceBatterId: preGameAces.batter }
+    clearGameRecord(save)
+    setIsMatchSettingsOpen(false)
+    setGameKind(pendingGame.kind)
+    setGameOptions({
+      ...pendingGame.options,
+      settings: save.matchSettings ?? FULL_PLAY_SETTINGS,
+      ...withAces,
+    })
+    setPendingGame(null)
+    setScene(SEASON_SCENE_STATE.경기직전)
+  }, [clearGameRecord, pendingGame, preGameAces, save])
+
+  /** 0xdd CLR (0x844e) — 국가대항전이면 0xf4(웹은 대회 화면), 아니면 0xd7 을 다시 들어온다(0x5268) */
+  const cancelMatchInfo = useCallback(() => {
+    if (pendingGame === null) return
+    setIsMatchSettingsOpen(false)
+    const next = matchInfoCancelScene(pendingGame.kind === '국가대항전')
+    if (next === SEASON_SCENE_STATE.선수단) return enterPreGameSquad(pendingGame)
+    setPendingGame(null)
+    setScene(next)
+  }, [enterPreGameSquad, pendingGame])
+
+  /** 0xdd '0' (0x857a) — `0x5fef4(메뉴, 열림 뒤집기)` */
+  const toggleMatchSettings = useCallback(() => setIsMatchSettingsOpen((open) => !open), [])
+
+  const applyMatchSettings = useCallback(
+    (settings: MatchProgressSettings) => {
+      setIsMatchSettingsOpen(false)
+      if (save === null) return
+      commit({ ...save, matchSettings: settings })
+    },
+    [commit, save],
+  )
 
   /**
    * 취소 `0x48ea`: 이전 상태가 0xc9 일 때만 0xc9 로 돌아간다. 관리 메뉴 갱신이 phase 를 3 으로
@@ -686,10 +841,8 @@ export function useSeasonSession(
         postseasonSideOf(series, myTeam),
       )
       if (options === null) return
-      clearGameRecord(save)
-      setGameKind('포스트시즌')
-      setGameOptions(options)
-      return setScene(SEASON_SCENE_STATE.경기직전)
+      // 0xef 키: 내 팀이 X/Y 면 this+0x11c = 1 → 0xd7 (P4 4b) — 정규시즌과 같은 경기 전 흐름이다
+      return enterPreGameSquad({ kind: '포스트시즌', options })
     }
     const advanced = runCpuPostseason(series, myTeam, random)
     commit({
@@ -700,7 +853,7 @@ export function useSeasonSession(
         record: { ...save.state.record, postseasonChampion: advanced.champion ?? NO_CHAMPION },
       },
     })
-  }, [clearGameRecord, commit, optionsFor, random, save])
+  }, [commit, enterPreGameSquad, optionsFor, random, save])
 
   /**
    * 국가대항전 한 경기 — 원본대로 **사람이 대표팀을 조작한다** (시즌 221).
@@ -713,8 +866,6 @@ export function useSeasonSession(
       // 국가대항전 가지 — 대진 칸 0 이 홈이다. `myTeam` 은 원본 0xb7614 가 고른 대한민국(10)이다
       const options = optionsFor(opponent, nationalCupSideOf(cup, myTeam))
       if (options === null) return
-      clearGameRecord(save)
-      setGameKind('국가대항전')
       // 내 팀도 시즌 팀이 아니라 **대한민국(10)** 이다 — 경기 준비 0x6548 의 국가대항전 가지:
       //   65c6 [sp+0x18] = 0xb7614(L,n,0) · 65da [sp+0x14] = 0xb7614(L,n,1)
       //   65e2 cmp r5,#0xa — 칸 0 이 10 이 아니면 둘을 맞바꿈 → [sp+0x18] = 내 팀 = 늘 10
@@ -739,15 +890,19 @@ export function useSeasonSession(
       //   상대국:  매일 마스터에서 새로 덮인 슬롯을 그날 한 번만 돌린다 → 선발 = day 0 이면 0번,
       //            그 뒤로는 **늘 1번** — cup.day % 4 를 따르지 않는다 (확정)
       //   → 상대 칸만 `opponentDayCounter` 로 따로 넘긴다 (0 이면 0번, 1 이면 rotationSlotOf(1) = 1번)
-      setGameOptions({
-        ...options,
-        ourTeamId: myTeam,
-        dayCounter: cup.day,
-        opponentDayCounter: cup.day === 0 ? 0 : 1,
+      //
+      // 대회는 0xd7 을 안 지나고 0xf4 → 0xdd 로 바로 간다 (키 0x4a18) — 마선수도 안 넣는다(0x6548 66ae)
+      enterMatchInfo(save, {
+        kind: '국가대항전',
+        options: {
+          ...options,
+          ourTeamId: myTeam,
+          dayCounter: cup.day,
+          opponentDayCounter: cup.day === 0 ? 0 : 1,
+        },
       })
-      setScene(SEASON_SCENE_STATE.경기직전)
     },
-    [clearGameRecord, optionsFor, save],
+    [enterMatchInfo, optionsFor, save],
   )
 
   /** 대회 끝 — 보상을 넣고 히든 팀을 연 뒤 관리 메뉴로 돌아간다 */
@@ -967,7 +1122,11 @@ export function useSeasonSession(
     commit({ ...save, state: { ...save.state, record: { ...save.state.record, endingSeen: true } } })
   }, [commit, save])
 
-  const goto = useCallback((next: SeasonSceneState) => setScene(next), [])
+  const goto = useCallback((next: SeasonSceneState) => {
+    // 구단관리 칸 3 코치채용 → this+0x11c = 2, 0xd7 (키 0x4e40)
+    if (next === SEASON_SCENE_STATE.선수단) setSquadPurpose(SQUAD_PURPOSE.코치채용)
+    setScene(next)
+  }, [])
   const clearNotice = useCallback(() => setNotice(''), [])
   const quit = useCallback(() => setScene(SEASON_SCENE_STATE.팀고르기), [])
 
@@ -980,6 +1139,11 @@ export function useSeasonSession(
     series: save?.series ?? null,
     ranking: save?.ranking ?? [],
     gameOptions,
+    squadPurpose,
+    preGameAces,
+    pendingGame,
+    isMatchSettingsOpen,
+    matchSettings: save?.matchSettings ?? FULL_PLAY_SETTINGS,
     gameKind,
     leagueFirstAwardedBits,
     // 지갑이 주인이다 (`?무한G` 도 지갑 안에서 갈린다) — 위 `gamePoints` 주석 참고
@@ -990,6 +1154,8 @@ export function useSeasonSession(
     actions: {
       chooseTeam, goto, updateRecord, updateRoster, finishTrade, playNextGame,
       openNextGame, confirmNextGame, cancelNextGame, confirmIncome,
+      choosePreGameAce: choosePreGameAceAction, cancelPreGameAce: cancelPreGameAceAction,
+      startPendingGame, cancelMatchInfo, toggleMatchSettings, applyMatchSettings,
       playCupGame, finishCup, finishGame, continuePostseason,
       runTraining, runOuting, nextSeasonEndStep, awardLeagueFirst, spendGamePoint, finishSeason,
       openStadiumItems, markEndingSeen, clearNotice, quit,
