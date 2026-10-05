@@ -1378,7 +1378,7 @@ describe('사구 — 우리 수비에서 CPU 타자가 맞는다 (0x35a20 · 벤
   }
 
   it('밀어내기 1루 · 출루 허용 · 투수 볼넷+사구 칸', () => {
-    const { 후 } = 맞히기(10)
+    const { 후 } = 맞히기(35)
     expect(후.lastResolution).toEqual({ kind: '사구' })
     expect(후.pendingDefensePlay).toBeNull()
     expect(후.game.bases.first).toBe(true)
@@ -1388,8 +1388,8 @@ describe('사구 — 우리 수비에서 CPU 타자가 맞는다 (0x35a20 · 벤
   })
 
   it('벤치 클리어링에 들어가면 우리 투수 스태미나 −1000 · 시즌 평판 S[1] +1 (공격측 CPU)', () => {
-    const 보통 = 맞히기(10).후
-    const 벤치 = 맞히기(103).후
+    const 보통 = 맞히기(35).후
+    const 벤치 = 맞히기(1179).후
     expect(벤치.lastResolution).toEqual({ kind: '사구' })
     expect(보통.stamina - 벤치.stamina).toBe(1000)
     expect(벤치.gameRecord[1] - 보통.gameRecord[1]).toBe(1)
@@ -1402,7 +1402,7 @@ describe('사구 — 우리 수비에서 CPU 타자가 맞는다 (0x35a20 · 벤
   it('시즌이 아니면(모드 ≠ 2) S[1] 이 안 남는다', () => {
     const { progress } = 시작({ mode: 1 })
     const input = { typeNumber: 첫구질(progress), courseCell: 2, gaugeCell: 0 }
-    const 벤치 = startThrowPitch(progress, input, createSeededRandom(103))
+    const 벤치 = startThrowPitch(progress, input, createSeededRandom(1179))
     expect(벤치.lastResolution).toEqual({ kind: '사구' })
     expect(벤치.log.some((entry) => entry.text.includes('벤치 클리어링'))).toBe(true)
     expect(벤치.gameRecord).toEqual(progress.gameRecord)

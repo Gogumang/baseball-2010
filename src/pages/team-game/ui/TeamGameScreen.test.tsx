@@ -43,7 +43,7 @@ describe('팀 경기 화면 — 수비(투구) 차례', () => {
   })
 
   it('게이지 설정이 꺼져 있으면 코스를 확정하는 순간 던진다 (원본 기본값)', () => {
-    띄우기()
+    띄우기({}, 1)
     fireEvent.click(screen.getByText('FASTBALL'))
     fireEvent.click(screen.getAllByRole('button', { name: /[◎·]/ })[0])
 
