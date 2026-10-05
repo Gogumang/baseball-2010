@@ -176,7 +176,20 @@ export interface TeamEntryBatter {
   readonly position: number
   /** 마타자면 `ACE_BATTERS` 칸 0~4, 아니면 −1 */
   readonly aceIndex: number
+  /**
+   * 이 선수의 **로스터 칸**(리그 로스터 12명 중 몇 번째인가) — 마타자는 리그 로스터 선수가 아니라
+   * `NO_ROSTER_SLOT` 이다.
+   *
+   * 원본 명단 `team+0xe` 는 처음에 `team[0xe+i] = i` 로 서고(`0xb891c` 의 b895a) 대타 확정
+   * `0xaebe4` 가 칸을 맞바꾸고 지운다 — 곧 명단 한 칸은 **선수 레코드를 가리키는 번호**다. 기록 함수
+   * `0xa8024` 는 그 선수 레코드에 쌓으므로 대타가 들어온 뒤에는 타순 칸과 로스터 칸이 갈린다.
+   * 선수 객체째 옮기는 웹 명단에서는 이 칸이 선수를 따라간다.
+   */
+  readonly rosterSlot: number
 }
+
+/** 리그 로스터 선수가 아니다 (마타자 — `0x1f84c` 로 저장에서 꺼낸 레코드) */
+export const NO_ROSTER_SLOT = -1
 
 /** 타순 아홉 칸 — 그 뒤가 벤치다 */
 export const BATTING_ORDER_SLOTS = 9
@@ -186,11 +199,12 @@ export const NO_ACE_BATTER = -1
 
 /** 로스터 12명을 그대로 명단으로 — 앞 아홉이 타순, 9~11 이 벤치다 */
 export function rosterEntryBattersOf(teamId: number): readonly TeamEntryBatter[] {
-  return teamBatters(teamId).map((player) => ({
+  return teamBatters(teamId).map((player, rosterSlot) => ({
     name: player.name,
     ability: player.ability,
     position: player.position ?? 0,
     aceIndex: NO_ACE_BATTER,
+    rosterSlot,
   }))
 }
 
@@ -232,6 +246,7 @@ export function withAceBatter(
     ability: [ace.ability.hit, ace.ability.power, ace.ability.defense, ace.ability.run],
     position: 0,
     aceIndex,
+    rosterSlot: NO_ROSTER_SLOT,
   }
   const out = [...entry]
   const seated = out[BATTING_ORDER_SLOTS]

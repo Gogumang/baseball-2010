@@ -81,6 +81,7 @@ import {
   entryBatterGameAbilities,
   entryPitcherGameAbilities,
   NO_ACE_BATTER,
+  NO_ROSTER_SLOT,
   rosterEntryBattersOf,
   rosterEntryPitchersOf,
   withAceBatter,
@@ -736,6 +737,31 @@ function withPlateAppearance(
   return next
 }
 
+/**
+ * 리그 선수 기록표에 타석 하나를 쌓는다 — **지금 그 타순 칸에 선 선수의 로스터 칸**으로.
+ *
+ * 원본 기록 함수 `0xa8024` 는 명단 칸(`team+0xe`)이 가리키는 선수 레코드에 쌓는다. 명단 칸은 대타
+ * 확정 `0xaebe4` 가 맞바꾸고 지우므로(`aed02~aed16`) 대타가 들어온 뒤에는 타순 칸 번호와 로스터 칸이
+ * 갈린다 — 타순 칸 번호로 쌓으면 기록이 빠진 선수나 엉뚱한 선수에게 붙는다 (`entities/game` 의
+ * `quickLineup` 이 간이 엔진 경기에서 같은 자리를 고친 785796d 와 같은 이치다).
+ *
+ * 마타자(`NO_ROSTER_SLOT`)는 리그 로스터 선수가 아니라 표에 칸이 없다 — 원본도 저장에서 꺼낸 마타자
+ * 레코드(`0x1f84c`)에 쌓으므로 리그 로스터 선수 기록은 오르지 않는다. 그래서 빼고 넘긴다.
+ * (마타자는 일반·대전모드에만 들어오고 리그 기록표를 쓰는 시즌모드에는 없다.)
+ */
+function withLeaguePlateAppearance(
+  appearances: readonly LeaguePlateAppearance[],
+  teamId: number,
+  entry: readonly TeamEntryBatter[],
+  slot: number,
+  outcome: AtBatOutcome,
+  runsBattedIn: number,
+): readonly LeaguePlateAppearance[] {
+  const rosterSlot = entry[slot]?.rosterSlot ?? slot
+  if (rosterSlot === NO_ROSTER_SLOT) return appearances
+  return [...appearances, { teamId, battingOrderIndex: rosterSlot, outcome, runsBattedIn }]
+}
+
 /** 지금 타석에 선 우리 타자 (명단 칸 = 타순 칸) */
 export function currentBatterEntry(progress: TeamGameProgress): TeamEntryBatter | undefined {
   return progress.ourEntry[progress.game.battingOrderIndex]
@@ -1100,10 +1126,14 @@ function finishBatterOutcome(
     ),
     ourHits: progress.ourHits + (isHit(outcome) ? 1 : 0),
     ourEntryRecords: withPlateAppearance(progress.ourEntryRecords, slot, outcome, runsBattedIn),
-    leaguePlateAppearances: [
-      ...progress.leaguePlateAppearances,
-      { teamId: progress.options.ourTeamId, battingOrderIndex: slot, outcome, runsBattedIn },
-    ],
+    leaguePlateAppearances: withLeaguePlateAppearance(
+      progress.leaguePlateAppearances,
+      progress.options.ourTeamId,
+      progress.ourEntry,
+      slot,
+      outcome,
+      runsBattedIn,
+    ),
   }
 
   const resolved = resolveBurstFor(next, {
@@ -1386,15 +1416,14 @@ function finishDefensiveAtBat(
       outcome,
       applied.runsScored,
     ),
-    leaguePlateAppearances: [
-      ...progress.leaguePlateAppearances,
-      {
-        teamId: progress.options.opponentTeamId,
-        battingOrderIndex: slot,
-        outcome,
-        runsBattedIn: applied.runsScored,
-      },
-    ],
+    leaguePlateAppearances: withLeaguePlateAppearance(
+      progress.leaguePlateAppearances,
+      progress.options.opponentTeamId,
+      progress.opponentEntry,
+      slot,
+      outcome,
+      applied.runsScored,
+    ),
   }
 
   const resolved = mine
@@ -1922,8 +1951,8 @@ export function canOpenPinchHit(progress: TeamGameProgress): boolean {
  *      받는다 (`aecde~aecfe`: `0xb8e85(옛 타자, pb, 1)` · `0xb8e85(새 타자, pa, 1)`).
  *   2. 명단 두 칸을 맞바꾼다 (`aed02~aed14`).
  *   3. `0xb95b1` 로 뒤를 한 칸 당겨 **빠진 선수를 명단에서 지운다** — 재출장은 없다 (`aed16`).
- *      (원본은 타순별 경기 기록 24바이트도 같이 옮기고 당긴다 — 웹 `leaguePlateAppearances` 는
- *      타순 칸으로만 쌓아서 옮길 것이 없다.)
+ *      (원본은 타순별 경기 기록 24바이트도 같이 옮기고 당긴다. 리그 기록표 `leaguePlateAppearances`
+ *      는 명단 칸이 든 **로스터 칸**(`TeamEntryBatter.rosterSlot`)으로 쌓으므로 선수를 따라간다.)
  *   4. 벤치 타자 수 `team+0x28c` 를 하나 줄인다 (0 밑으로는 안 간다, `aed9c~aedae`).
  *
  * 볼카운트가 **0-0 으로 돌아가는 것도 원본 그대로**다: 상태 0x16 다음이 0xd 이고, 그 진입
@@ -2310,10 +2339,14 @@ function playAutoOffenseAtBat(progress: TeamGameProgress, random: RandomPort): T
       // 자동으로 넘긴 타석도 원본은 같은 0xa8024 를 지난다 — 평판 16칸도 똑같이 오른다
       gameRecord: withSeasonRecord(progress, '공격', autoOffense.codes),
       ourHitBases: withHitBases(progress.ourHitBases, slot, autoOffense.hitBases),
-      leaguePlateAppearances: [
-        ...progress.leaguePlateAppearances,
-        { teamId: options.ourTeamId, battingOrderIndex: slot, outcome, runsBattedIn },
-      ],
+      leaguePlateAppearances: withLeaguePlateAppearance(
+        progress.leaguePlateAppearances,
+        options.ourTeamId,
+        progress.ourEntry,
+        slot,
+        outcome,
+        runsBattedIn,
+      ),
     },
     `${before.inning}회${before.half} ${(slot % BATTING_ORDER_SIZE) + 1}번 — ${describeOutcome(outcome)}${
       runsBattedIn > 0 ? ` (${runsBattedIn}점)` : ''

@@ -791,6 +791,28 @@ describe('대타 (0xaf06c → 0xaebe4 의 +0x291 가지, R4 1a·1c)', () => {
     const { progress } = 공격시작()
     expect(pinchHit(progress, 3)).toBe(progress)
   })
+
+  it('대타가 친 타석은 **대타 선수의 로스터 칸**으로 리그 기록에 쌓인다 — 타순 칸이 아니다 (0xa8024)', () => {
+    const { progress, random } = 공격시작()
+    const 타순칸 = progress.game.battingOrderIndex
+    // 벤치 둘째 칸(로스터 10번)을 낸다 — 빠진 타순 칸 선수의 로스터 칸과 다르다
+    const 뒤 = pinchHit(progress, 10)
+    expect(currentBatterEntry(뒤)?.rosterSlot).toBe(10)
+
+    const 친뒤 = applyBatterOutcome(뒤, { kind: '아웃', detail: '뜬공아웃' }, random)
+    const 새기록 = 친뒤.leaguePlateAppearances.slice(progress.leaguePlateAppearances.length)
+    expect(새기록[0]).toMatchObject({ teamId: 기본옵션.ourTeamId, battingOrderIndex: 10 })
+    expect(새기록[0]?.battingOrderIndex).not.toBe(타순칸)
+  })
+
+  it('마타자는 리그 로스터 선수가 아니라 리그 기록표에 안 쌓인다 (원본은 마타자 레코드에 쌓는다)', () => {
+    const { progress, random } = 공격시작({ aceBatterId: 0, mode: 1, season: undefined })
+    const 뒤 = pinchHit(progress, 9)
+    const 친뒤 = applyBatterOutcome(뒤, { kind: '아웃', detail: '뜬공아웃' }, random)
+    const 새기록 = 친뒤.leaguePlateAppearances.slice(progress.leaguePlateAppearances.length)
+    // 사람 타석 하나가 끝났지만 우리 팀 첫 기록은 마타자 것이 아니다 — 빠졌다
+    expect(새기록.filter((appearance) => appearance.teamId === 기본옵션.ourTeamId && appearance.battingOrderIndex === 0)).toEqual([])
+  })
 })
 
 
@@ -870,6 +892,28 @@ describe('CPU 대타 0xac228 — 자동 타석에서', () => {
       if (progress.cpuPinchHitUsed) 나온경기 += 1
     }
     // 배선이 살아 있다는 확인 — 24경기 중 한 번은 나온다
+    expect(나온경기).toBeGreaterThan(0)
+  })
+
+  it('CPU 대타가 들어오면 그 뒤 타석은 들어온 벤치 선수(로스터 9번 이후)의 리그 기록에 쌓인다', () => {
+    let 나온경기 = 0
+    for (let seed = 1; seed <= 24; seed += 1) {
+      const progress = startTeamGame(
+        { ...기본옵션, settings: 전부자동 },
+        createSeededRandom(seed * 7919),
+      )
+      expect(progress.game.isFinished).toBe(true)
+      if (!progress.cpuPinchHitUsed) continue
+      나온경기 += 1
+      // 시즌(모드 2)은 마타자가 없어 명단 12 → 대타 한 번에 11 이다
+      const 대타팀 =
+        progress.ourEntry.length < 12 ? 기본옵션.ourTeamId : 기본옵션.opponentTeamId
+      const 벤치칸기록 = progress.leaguePlateAppearances.filter(
+        (appearance) => appearance.teamId === 대타팀 && appearance.battingOrderIndex >= 9,
+      )
+      // 예전에는 타순 칸(0~8)으로만 쌓여 벤치 선수 기록이 하나도 없고 빠진 선수에게 붙었다
+      expect(벤치칸기록.length, `씨앗 ${seed * 7919}`).toBeGreaterThan(0)
+    }
     expect(나온경기).toBeGreaterThan(0)
   })
 })
