@@ -14,6 +14,11 @@ import { GAME_RECORD_SIZE } from '@/entities/season-mode/model/seasonRecord'
 /** 기록 코드 k — `0xa755c(ctx, k)` 에 넘기는 값 */
 export const SEASON_RECORD_CODE = {
   삼중살: 0,
+  /**
+   * 벤치 클리어링 — 상태 0x1e 진입 0x3a5f0 의 꼬리 0x3ab92 가 `0xa755c(ctx, 1)` (사구 뒤 20%).
+   * 코드 ≤ 5 라 **내 팀이 수비**(내 투수가 맞힌 사구)일 때만 S[1] 이 오른다. 평판식은 `s −= S[1]` (a6f96).
+   * 들어가는 판정과 효과는 `entities/game/model/benchClearing` 이 맡는다.
+   */
   벤치클리어링: 1,
   피안타: 2,
   수비실수: 3,

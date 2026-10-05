@@ -46,6 +46,7 @@ import type { CompleteGameKind, MySide } from '@/entities/season-mode/model/seas
 import { createBurstSession, resolveBurst, tryTriggerBurst } from '@/entities/burst-mission/model/burstMissionSession'
 import type { BurstResolution, BurstSession } from '@/entities/burst-mission/model/burstMissionSession'
 import { burstResultBitsOf } from '@/entities/burst-mission/model/burstResultBits'
+import { benchClearingEffectOf, rollsIntoBenchClearing } from '@/entities/game/model/benchClearing'
 import { pitchAgainstBatter } from '@/entities/pitching/model/simulateBatter'
 import { isMistakePitch } from '@/entities/pitching/model/mistakePitch'
 import type { Pitch } from '@/entities/pitching/model/pitch'
@@ -1026,7 +1027,7 @@ export function applyBatterOutcome(
  * 다음 투구가 나가지 않는 것이 이 칸의 뜻이다 (원본 상태 0x17 이 도는 동안 0xf 로 안 돌아간다).
  *
  * 우리 공격 타석이므로 사람이 잡는 쪽은 **공격(주루 0x5331c)** 이다 (I 0절 상태 0x17 표).
- * 삼진·볼넷·홈런은 수비가 개입할 것이 없어 여기서 곧장 끝낸다.
+ * 삼진·볼넷·사구·홈런은 수비가 개입할 것이 없어 여기서 곧장 끝낸다. 사구는 그 앞에서 벤치 클리어링을 굴린다.
  */
 export function startBatterOutcome(
   progress: TeamGameProgress,
@@ -1035,6 +1036,8 @@ export function startBatterOutcome(
   options: BatterOutcomeOptions = {},
 ): TeamGameProgress {
   if (progress.game.isFinished) return progress
+  // 사구면 상태 0x12 끝(0x4e74c)에서 벤치 클리어링을 굴린다 — 밀어내기 주루·정산보다 앞이다
+  progress = withBatterBenchClearing(progress, outcome, random)
   if (!isBattedBallInPlay(outcome)) {
     // 홈런도 공이 날아가는 그림은 나와야 한다 — 진루·득점은 그대로 두고 **보여 줄 틱만** 만든다
     const playback = homeRunPlaybackOf({ outcome, bases: progress.game.bases, pattern: options.pattern })
@@ -1048,6 +1051,46 @@ export function startBatterOutcome(
       outcome,
     },
   }
+}
+
+/**
+ * **사구 뒤 벤치 클리어링** (`entities/game/model/benchClearing`, R10 6절) — 우리 타석이라 수비(상대)는 CPU 다.
+ * 들어가면 상대 투수 투구 수(`+0x27c`) +10 (0x3ab82). 시즌 평판 S[1](코드 1, 0x3ab92)도 부르지만 코드 ≤ 5 는
+ * 공격측이 CPU 일 때만 적히므로 우리 공격에서는 게이트에서 버려진다 (`withSeasonRecord` 가 그대로 가른다).
+ * 홈런더비가 아니라 사구면 늘 한 번 굴린다 — **사구 타석만 난수를 하나 더 쓴다.**
+ * ⚠️ 연출 화면(양 팀이 마운드로 몰려나오는 100틱, 배경음 44)과 그 연출이 쓰는 난수는 없다.
+ * 우리가 던진 공에 CPU 타자가 맞는 쪽(코드 1 이 S[1] 에 남고 우리 투수 스태미나 −1000)은 CPU 타자 결정
+ * (`entities/pitching`)이 아직 사구를 안 내서 이을 자리가 없다.
+ */
+function withBatterBenchClearing(
+  progress: TeamGameProgress,
+  outcome: AtBatOutcome,
+  random: RandomPort,
+): TeamGameProgress {
+  const entered = rollsIntoBenchClearing(
+    {
+      isHitByPitch: outcome.kind === '사구',
+      isHomeRunDerby: false,
+      burstInProgress: progress.burst !== null && progress.burst.current !== null,
+    },
+    random,
+  )
+  if (!entered) return progress
+  const effect = benchClearingEffectOf(false)
+  return appendLog(
+    {
+      ...progress,
+      opponentPitcherCounters: addRunsToCounters(
+        progress.opponentPitcherCounters,
+        0,
+        effect.defensePitchCountGain,
+        false,
+      ),
+      gameRecord: withSeasonRecord(progress, '공격', [effect.seasonRecordCode]),
+    },
+    `${progress.game.inning}회${progress.game.half} 벤치 클리어링`,
+    true,
+  )
 }
 
 /**
@@ -1716,7 +1759,10 @@ function resolveBurstFor(
   },
 ): TeamGameProgress {
   if (progress.burst === null) return progress
-  const resolution = resolveBurst(progress.burst, burstResultBitsOf(play))
+  // 사구도 B5(출루)·B11 을 켠다 (0xa882a "볼 4개 || 사구" · 0xa8bf4). burstResultBits 가 아직 '사구' 를
+  // 몰라 같은 비트를 내는 볼넷으로 넘긴다
+  const outcome: AtBatOutcome = play.outcome.kind === '사구' ? { kind: '볼넷' } : play.outcome
+  const resolution = resolveBurst(progress.burst, burstResultBitsOf({ ...play, outcome }))
   return {
     ...progress,
     burst: resolution.session,

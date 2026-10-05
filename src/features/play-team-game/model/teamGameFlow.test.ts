@@ -1317,3 +1317,50 @@ describe('마타자 0xb633d — 번트 칸을 뽑아도 친다', () => {
     expect(일반번트).not.toEqual(마번트)
   })
 })
+
+describe('사구 — 우리 타석 결과 4 와 벤치 클리어링 (상태 0x1e, 20%)', () => {
+  /** 첫 next() 만 정해 두고 나머지는 씨앗 난수에 맡긴다 */
+  function 첫굴림(value: number, seed: number): RandomPort {
+    const rest = createSeededRandom(seed)
+    let first = true
+    return {
+      next: () => {
+        if (!first) return rest.next()
+        first = false
+        return value
+      },
+      nextInRange: (minimum: number, maximum: number) => rest.nextInRange(minimum, maximum),
+      pick: <T,>(items: readonly T[]) => rest.pick(items),
+    }
+  }
+
+  it('사구는 붙들 것이 없어 곧장 끝나고 1루가 찬다', () => {
+    const { progress } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
+    const 끝 = startBatterOutcome(progress, { kind: '사구' }, 첫굴림(0.9, 3))
+
+    expect(끝.pendingDefensePlay).toBeNull()
+    expect(끝.game.bases.first).toBe(true)
+  })
+
+  it('들어가면 상대 투수 투구 수 +10 — 우리 공격이라 시즌 평판 S[1] 은 게이트에서 버려진다', () => {
+    const { progress } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
+    const 들어감 = startBatterOutcome(progress, { kind: '사구' }, 첫굴림(0, 3))
+    const 안들어감 = startBatterOutcome(progress, { kind: '사구' }, 첫굴림(0.9, 3))
+
+    expect(들어감.game).toEqual(안들어감.game)
+    expect(들어감.opponentPitcherCounters.pitches - 안들어감.opponentPitcherCounters.pitches).toBe(10)
+    expect(들어감.gameRecord).toEqual(안들어감.gameRecord)
+    expect(들어감.gameRecord[1]).toBe(0)
+    expect(들어감.log.some((entry) => entry.text.includes('벤치 클리어링'))).toBe(true)
+    expect(안들어감.log.some((entry) => entry.text.includes('벤치 클리어링'))).toBe(false)
+  })
+
+  it('안 들어가면 굴림 한 번 말고는 볼넷과 같은 차례다', () => {
+    const { progress } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
+    const 사구끝 = startBatterOutcome(progress, { kind: '사구' }, 첫굴림(0.9, 3))
+    const 볼넷끝 = startBatterOutcome(progress, { kind: '볼넷' }, createSeededRandom(3))
+
+    expect(사구끝.game).toEqual(볼넷끝.game)
+    expect(사구끝.opponentPitcherCounters).toEqual(볼넷끝.opponentPitcherCounters)
+  })
+})

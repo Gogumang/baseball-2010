@@ -69,6 +69,7 @@ import { representativePatternOf } from '@/features/defense-play/model/represent
 import type { BurstResolution, BurstSession } from '@/entities/burst-mission/model/burstMissionSession'
 import { createBurstSession, resolveBurst, tryTriggerBurst } from '@/entities/burst-mission/model/burstMissionSession'
 import { burstResultBitsOf } from '@/entities/burst-mission/model/burstResultBits'
+import { benchClearingEffectOf, rollsIntoBenchClearing } from '@/entities/game/model/benchClearing'
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
 import { ROSTER_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
@@ -364,6 +365,7 @@ export interface PlayerOutcomeOptions {
  * 주자 처리·기록·돌발 판정은 화면이 다 돌고 `resolveDefensePlay` 를 부를 때 한 번에 한다.
  *
  * 삼진·볼넷·사구·홈런은 수비가 개입할 것이 없어 여기서 곧장 끝낸다 (0xc11f0 과 같은 규칙).
+ * 사구는 그 앞에서 벤치 클리어링을 굴린다 (`withBenchClearing`).
  */
 export function startPlayerOutcome(
   progress: GameProgress,
@@ -373,6 +375,8 @@ export function startPlayerOutcome(
 ): GameProgress {
   if (progress.game.isFinished) return progress
   progress = withFoulRecords(progress, options.foulRecordIds)
+  // 사구면 상태 0x12 끝(0x4e74c)에서 벤치 클리어링을 굴린다 — 밀어내기 주루·정산보다 앞이다
+  progress = withBenchClearing(progress, outcome, random)
   if (!isBattedBallInPlay(outcome)) {
     // 홈런은 날아가는 그림만 따로 만들어 재생시킨다 — 점수는 타석 쪽이 이미 맞게 한다
     const playback = homeRunPlaybackOf({ outcome, bases: progress.game.bases, pattern: options.pattern })
@@ -402,6 +406,37 @@ export function resolveDefensePlay(
 const HIT_BY_PITCH_RING_CODE = 9
 function ringCodeOf(outcome: AtBatOutcome): number {
   return outcome.kind === '사구' ? HIT_BY_PITCH_RING_CODE : atBatRecordCodeOf(outcome)
+}
+
+/**
+ * **사구 뒤 벤치 클리어링** (`entities/game/model/benchClearing`, R10 6절).
+ * 내 타석이라 수비는 늘 CPU 다 → 들어가면 상대 투수 투구 수(`+0x27c`) +10 (0x3ab82).
+ * 시즌 평판 S[1](코드 1)은 게이트상 내 팀이 수비일 때만 남아 여기서는 안 오른다 — 타자편은 S 칸도 안 든다.
+ * 홈런더비가 아니므로 사구면 늘 한 번 굴린다 — **사구 타석만 난수를 하나 더 쓴다.**
+ * ⚠️ 연출 화면(양 팀이 마운드로 몰려나오는 100틱)과 그 연출이 쓰는 난수는 없다 — benchClearing 머리 주석.
+ */
+function withBenchClearing(progress: GameProgress, outcome: AtBatOutcome, random: RandomPort): GameProgress {
+  const entered = rollsIntoBenchClearing(
+    {
+      isHitByPitch: outcome.kind === '사구',
+      isHomeRunDerby: false,
+      burstInProgress: progress.burst !== null && progress.burst.current !== null,
+    },
+    random,
+  )
+  if (!entered) return progress
+  const effect = benchClearingEffectOf(false)
+  return appendLog(
+    {
+      ...progress,
+      opponentMound: {
+        ...progress.opponentMound,
+        pitches: progress.opponentMound.pitches + effect.defensePitchCountGain,
+      },
+    },
+    `${progress.game.inning}회${progress.game.half} 벤치 클리어링`,
+    true,
+  )
 }
 
 /**

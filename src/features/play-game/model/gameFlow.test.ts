@@ -861,3 +861,54 @@ describe('사구 — 사람 타석 결과 4 (0x35a20 → 0x9d57c) 를 경기에 
     expect(끝.recordIds.filter((id) => id === 34 || id === 35)).toEqual([])
   })
 })
+
+describe('사구 뒤 벤치 클리어링 (상태 0x1e, 20%) — 내 타석', () => {
+  function 내타석(bases: BaseState, outs: number): GameProgress {
+    const progress = startGame(createSeededRandom(20100901))
+    return { ...progress, game: { ...progress.game, bases, outs, half: '말' } }
+  }
+  /** 첫 next() 만 정해 두고 나머지는 씨앗 난수에 맡긴다 */
+  function 첫굴림(value: number, seed: number) {
+    const rest = createSeededRandom(seed)
+    let first = true
+    return {
+      next: () => {
+        if (!first) return rest.next()
+        first = false
+        return value
+      },
+      nextInRange: (minimum: number, maximum: number) => rest.nextInRange(minimum, maximum),
+      pick: <T,>(items: readonly T[]) => rest.pick(items),
+    }
+  }
+
+  it('사구는 맨 먼저 한 번 굴린다 — 안 들어가면 그 한 번 말고는 볼넷과 같은 차례다', () => {
+    const 시작 = 내타석(EMPTY_BASES, 0)
+    const 사구끝 = startPlayerOutcome(시작, { kind: '사구' }, 첫굴림(0.9, 3))
+    const 볼넷끝 = startPlayerOutcome(시작, { kind: '볼넷' }, createSeededRandom(3))
+
+    expect(사구끝.game).toEqual(볼넷끝.game)
+    expect(사구끝.opponentMound).toEqual(볼넷끝.opponentMound)
+    expect(사구끝.log.some((entry) => entry.text.includes('벤치 클리어링'))).toBe(false)
+  })
+
+  it('들어가면 상대(CPU 수비) 투수 투구 수가 10 늘고 나머지 차례는 같다', () => {
+    const 시작 = 내타석(EMPTY_BASES, 0)
+    const 들어감 = startPlayerOutcome(시작, { kind: '사구' }, 첫굴림(0, 3))
+    const 안들어감 = startPlayerOutcome(시작, { kind: '사구' }, 첫굴림(0.9, 3))
+
+    expect(들어감.game).toEqual(안들어감.game)
+    expect(들어감.opponentMound.pitcherSlot).toBe(안들어감.opponentMound.pitcherSlot)
+    expect(들어감.opponentMound.pitches - 안들어감.opponentMound.pitches).toBe(10)
+    expect(들어감.log.some((entry) => entry.text.includes('벤치 클리어링'))).toBe(true)
+  })
+
+  it('돌발이 진행 중이면 굴림은 쓰지만 들어가지 않는다 (0x8eb94)', () => {
+    const 시작 = 내타석(EMPTY_BASES, 0)
+    const row = { id: 1 } as unknown as NonNullable<NonNullable<GameProgress['burst']>['current']>
+    const 돌발중 = { ...시작, burst: { ...시작.burst!, current: row } }
+    const 끝 = startPlayerOutcome(돌발중, { kind: '사구' }, 첫굴림(0, 3))
+
+    expect(끝.log.some((entry) => entry.text.includes('벤치 클리어링'))).toBe(false)
+  })
+})
