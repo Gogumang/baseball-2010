@@ -81,6 +81,14 @@ import {
 import type { PitchSlot, PitcherStats } from '@/features/play-pitcher-game/model/pitcherPitch'
 import { TEAM_GAME_MODE } from '@/features/play-team-game/model/gameAbilities'
 import type { FieldingAssignment, SeasonTeamCondition } from '@/features/play-team-game/model/gameAbilities'
+import { EMPTY_DECISION_STATE } from '@/features/play-pitcher-game/model/winLossSave'
+import type { DecisionState } from '@/features/play-pitcher-game/model/winLossSave'
+import {
+  decisionsAfterPitcherChange,
+  decisionsAfterPlay,
+  pitcherOfRecordNamesOf,
+} from '@/features/play-game/model/gameDecisions'
+import type { MoundBySide, PitcherOfRecordNames } from '@/features/play-game/model/gameDecisions'
 import { FULL_PLAY_SETTINGS, isHumanControlled } from '@/features/play-team-game/model/matchSettings'
 import type { MatchProgressSettings } from '@/features/play-team-game/model/matchSettings'
 import {
@@ -325,6 +333,11 @@ const EMPTY_PITCHING_LINE: TeamPitchingLine = {
 export interface TeamGameProgress {
   readonly options: TeamGameOptions
   readonly game: GameState
+  /**
+   * **승·패·세 투수 칸** state+0x44/0x50/0x5c (S1). 한 점마다(0xa5c34)·투수 교체마다(0xa60c0) 고친다.
+   * 경기 끝 결과 판(상태 0x18, 0x4fe9c)이 그대로 읽는다 (`pitchersOfRecordOf`). 칸 번호 = 투수 명단 칸.
+   */
+  readonly decisions: DecisionState
   /** 지금 타석의 볼 카운트 (사람이 잡은 타석에서만 찬다) */
   readonly atBat: AtBatState
   /** 상대 타순 커서 0~8 */
@@ -565,6 +578,8 @@ export function startTeamGame(options: TeamGameOptions, random: RandomPort): Tea
     ourBenchBatters: Math.max(0, ourEntry.length - BATTING_ORDER_SIZE),
     // 타순 칸은 "사람이 서는 자리" 가 아니다 — 팀 경기는 아홉 칸을 모두 사람이 친다
     game: createGame(-1, options.playerSide),
+    // 경기 상태 초기화 0xb6814 — 셋 다 측 2(없음)
+    decisions: EMPTY_DECISION_STATE,
     atBat: createAtBat(),
     opponentOrderIndex: 0,
     opponentPitcherIndex: startingSlots.opponent,
@@ -1290,6 +1305,8 @@ function finishBatterOutcome(
   const next: TeamGameProgress = {
     ...progress,
     game,
+    // 득점 처리 0xa5c34 — 한 점씩 승·패·세 칸을 고친다
+    decisions: decisionsAfterPlay(progress.decisions, before, game, moundsOf(progress)),
     gameRecord: withSeasonRecord(progress, '공격', offense.codes),
     ourHitBases: withHitBases(progress.ourHitBases, slot, offense.hitBases),
     lastDefensePlay: playback,
@@ -1630,6 +1647,7 @@ function finishDefensiveAtBat(
   const next: TeamGameProgress = {
     ...progress,
     game: applied.game,
+    decisions: decisionsAfterPlay(progress.decisions, before, applied.game, moundsOf(progress)),
     opponentOrderIndex: applied.opponentOrderIndex,
     lastDefensePlay: playback ?? progress.lastDefensePlay,
     atBat: createAtBat(),
@@ -2102,7 +2120,12 @@ function applyPitcherChange(
   ours: boolean,
   nextIndex: number,
 ): TeamGameProgress {
-  const base = { ...progress, pitcherJustChanged: true }
+  // 교체 자리에서 세이브 후보를 잡는다 (0xa60c0 — 수비 측의 새 투수, 그 순간 이닝·아웃·주자)
+  const decisions = decisionsAfterPitcherChange(progress.decisions, progress.game, {
+    our: ours ? nextIndex : progress.ourPitcherIndex,
+    opponent: ours ? progress.opponentPitcherIndex : nextIndex,
+  })
+  const base = { ...progress, pitcherJustChanged: true, decisions }
   if (ours) {
     return {
       ...base,
@@ -2594,6 +2617,8 @@ function playAutoOffenseAtBat(progress: TeamGameProgress, random: RandomPort): T
     {
       ...progress,
       game,
+      // 간이 엔진 득점(0xc0fb4·0xc1054)도 같은 0xa5c34 를 부른다
+      decisions: decisionsAfterPlay(progress.decisions, before, game, moundsOf(progress)),
       atBat: createAtBat(),
       atBatPrepared: false,
       // 투구마다 state[0xd] 가 내려간다 (0xa5e72)
@@ -2687,6 +2712,21 @@ function addRunsToCounters(
     inningRunsAllowed: halfChanged ? 0 : Math.min(99, counters.inningRunsAllowed + runs),
     pitches: counters.pitches + pitches,
   }
+}
+
+/** 측별 지금 마운드 투수 칸 — 승·패·세 칸이 "그 순간 마운드에 선 투수" 로 적는다 */
+function moundsOf(progress: TeamGameProgress): MoundBySide {
+  return { our: progress.ourPitcherIndex, opponent: progress.opponentPitcherIndex }
+}
+
+/**
+ * 결과 판 세 줄(승리투수·패전투수·세이브)의 이름 — 상태 0x18 그리기 0x4fe9c 가 state+0x44/0x50/0x5c 를
+ * 거르지 않고 그대로 읽는다(`0xb62c0(0xb8b60(팀[측], 번호))`). 측 2(없음)면 그 줄은 빈다.
+ */
+export function pitchersOfRecordOf(progress: TeamGameProgress): PitcherOfRecordNames {
+  return pitcherOfRecordNamesOf(progress.decisions, progress.game.playerSide, (isOurTeam, index) =>
+    (isOurTeam ? progress.ourPitcherEntry : progress.opponentPitcherEntry)[index]?.name,
+  )
 }
 
 function appendLog(progress: TeamGameProgress, text: string, isMine: boolean): TeamGameProgress {

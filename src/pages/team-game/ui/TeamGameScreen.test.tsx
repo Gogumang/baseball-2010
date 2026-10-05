@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import { TeamGameScreen } from '@/pages/team-game/ui/TeamGameScreen'
@@ -174,6 +175,7 @@ describe('경기 중 메뉴 (표 0xcfcfc 행 0)', () => {
   })
 
   it('G포인트가 넉넉하면 비용을 알리고 경기를 자동으로 소화한다', () => {
+    vi.useFakeTimers()
     const onSpendGamePoint = vi.fn()
     render(
       <TeamGameScreen
@@ -190,8 +192,15 @@ describe('경기 중 메뉴 (표 0xcfcfc 행 0)', () => {
     fireEvent.click(screen.getByText('예'))
 
     expect(onSpendGamePoint).toHaveBeenCalledWith(30)
-    // 시즌 경기는 끝까지 소화된다 — 결과 화면이 뜬다
+    // 시즌 경기는 끝까지 소화된다 — 상태 0x18 경기 끝 결과 판(승·패·세 세 줄)이 먼저 뜬다
+    expect(screen.getByAltText('승리투수')).toBeTruthy()
+    // 처음 10틱은 OK 가 안 먹고(경기+0x32), 그 뒤 OK → 정산(0x19) 자리인 요약 화면
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(screen.queryByText('경기 결과')).toBeNull()
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 10))
+    fireEvent.keyDown(window, { key: 'Enter' })
     expect(screen.getByText('경기 결과')).toBeTruthy()
+    vi.useRealTimers()
   })
 
   it('대전모드(8)는 100 G 다', () => {

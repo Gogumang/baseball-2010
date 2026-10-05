@@ -1026,3 +1026,23 @@ describe('CPU 견제 — 모드 4 도 0x345fc 종류 4 → 0x34848 → 메시지
     expect(random.nextInRange(0, 10000)).toBe(다시.nextInRange(0, 10000))
   })
 })
+
+describe('승·패·세 칸 — 결과 판(0x4fe9c)이 그대로 읽는 state+0x44/0x50/0x5c', () => {
+  it('경기 끝까지 돌리면 진 팀이 있는 한 패전 투수 이름이 그 팀 투수 명단에서 나온다', () => {
+    for (const seed of [1, 2, 3, 4, 5]) {
+      const random = createSeededRandom(seed)
+      let progress = startGame(random)
+      for (let step = 0; step < 200 && !progress.game.isFinished; step += 1) {
+        progress = applyPlayerOutcome(progress, { kind: step % 3 === 0 ? '홈런' : '삼진' }, random)
+      }
+      const summary = summaryOf(progress)
+      const names = summary.pitchersOfRecord
+      expect(names).toBeDefined()
+      if (summary.result === '무') continue
+      // 패전 투수 = 지는 팀의 그 순간 마운드 투수 — 이닝 조건이 없어 진 팀이 점수를 내줬다면 늘 있다
+      const loserTeam = summary.result === '승' ? summary.opponentTeamId : summary.ourTeamId
+      const loserNames = teamPitchers(loserTeam).map((player) => player.name)
+      expect(loserNames).toContain(names?.loss)
+    }
+  })
+})

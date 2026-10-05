@@ -20,7 +20,11 @@ import {
   simulateHalfInning,
   startingMoundOf,
 } from '@/entities/game/model/simulateHalfInning'
-import type { HalfInningDefense, HalfInningMound } from '@/entities/game/model/simulateHalfInning'
+import type {
+  HalfInningDefense,
+  HalfInningMound,
+  HalfInningPitcherChange,
+} from '@/entities/game/model/simulateHalfInning'
 import {
   BATTERS_PER_TEAM,
   PITCHERS_PER_TEAM,
@@ -80,6 +84,15 @@ import { benchClearingEffectOf, rollsIntoBenchClearing } from '@/entities/game/m
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
 import { ROSTER_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
+import { EMPTY_DECISION_STATE } from '@/features/play-pitcher-game/model/winLossSave'
+import type { DecisionState } from '@/features/play-pitcher-game/model/winLossSave'
+import {
+  decisionsAfterPitcherChange,
+  decisionsAfterPlay,
+  decisionsAfterRuns,
+  pitcherOfRecordNamesOf,
+} from '@/features/play-game/model/gameDecisions'
+import type { MoundBySide, PitcherOfRecordNames } from '@/features/play-game/model/gameDecisions'
 
 export interface GameLogEntry {
   readonly id: number
@@ -223,6 +236,11 @@ export interface GameProgress {
    * ⚠️ 수동이라고 주자가 굳는 것이 아니다. 밀려 뛰는 포스 진루는 자동 제어기와 무관하게 간다.
    */
   readonly runningModeManual: boolean
+  /**
+   * **승·패·세 투수 칸** state+0x44/0x50/0x5c (S1). 득점마다(0xa5c34)·투수 교체마다(0xa60c0) 고친다.
+   * 경기 끝 결과 판(상태 0x18, 0x4fe9c)이 이 셋을 그대로 읽어 세 줄로 그린다 (`pitchersOfRecordOf`).
+   */
+  readonly decisions: DecisionState
 }
 
 /**
@@ -310,6 +328,8 @@ export function startGame(
     burst: createBurstSession(MY_LEAGUE_BATTER_MODE),
     lastBurstResolution: null,
     runningModeManual,
+    // 경기 상태 초기화 0xb6814 — 셋 다 측 2(없음)
+    decisions: EMPTY_DECISION_STATE,
   }
   return advanceUntilPlayerTurn(initial, random)
 }
@@ -586,6 +606,8 @@ function finishPlayerOutcome(
     {
       ...progress,
       game: nextGame,
+      // 득점 처리 0xa5c34 — 내 타석에서 난 점수도 한 점씩 승·패·세 칸을 고친다
+      decisions: decisionsAfterPlay(progress.decisions, progress.game, nextGame, moundsOf(progress)),
       // 내 타석에서 난 점수도 상대 투수 실점 A·B 에 붙는다. 공을 하나라도 던졌으니 교체 직후
       // 표시(state[0xd])도 내려가 있다 (0xa5e72).
       // 투구 수·스태미나는 공이 손을 떠날 때마다 `throwOpponentPitch` 가 이미 깎았다 (0xa5e14).
@@ -881,6 +903,7 @@ function playOpponentInning(progress: GameProgress, random: RandomPort): GamePro
   )
   const runs = half.runs
   const game = applyOpponentInning(progress.game, runs)
+  const decisions = opponentHalfDecisionsOf(progress, half.runs, half.pitcherChanges ?? [])
   // 상대 타석도 정산 0xa8024 를 지난다 — 공격 팀이 사람이 아니라 백투백 카운터는 결과와 무관하게 0 이 된다
   const homeRunStreak = half.plateAppearances.reduce(
     (streak, appearance) =>
@@ -894,6 +917,7 @@ function playOpponentInning(progress: GameProgress, random: RandomPort): GamePro
       game,
       opponentOrderIndex: half.nextBattingOrderIndex % BATTING_ORDER_SIZE,
       ourMound: half.mound ?? progress.ourMound,
+      decisions,
       // 상대 공격이 끝나면 우리 공격 반 이닝이 시작된다 — 교대 0xa5b00 이 A 를 0 으로 되돌린다
       opponentInningRunsAllowed: 0,
       opponentLineup: half.lineup ?? progress.opponentLineup,
@@ -1009,6 +1033,8 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort): GameProg
     {
       ...progress,
       game,
+      // 간이 엔진 득점(0xc0fb4·0xc1054)도 같은 0xa5c34 를 부른다
+      decisions: decisionsAfterPlay(progress.decisions, progress.game, game, moundsOf(progress)),
       burst: resolved === null ? triggered ?? progress.burst : resolved.session,
       lastBurstResolution:
         resolved !== null && resolved.judgement !== null ? resolved : progress.lastBurstResolution,
@@ -1135,9 +1161,70 @@ function changeOpponentPitcher(progress: GameProgress, random: RandomPort): Game
   })
   if (after === before) return progress
   return appendLog(
-    { ...progress, opponentMound: after, opponentInningRunsAllowed: 0 },
+    {
+      ...progress,
+      opponentMound: after,
+      opponentInningRunsAllowed: 0,
+      // 교체 자리에서 세이브 후보를 잡는다 (0xa60c0 — 수비 측 = 상대)
+      decisions: decisionsAfterPitcherChange(progress.decisions, progress.game, {
+        our: progress.ourMound.pitcherSlot,
+        opponent: after.pitcherSlot,
+      }),
+    },
     `${progress.game.inning}회${progress.game.half} 상대 투수 교체`,
     false,
+  )
+}
+
+/** 측별 지금 마운드 투수 칸 — 승·패·세 칸이 "그 순간 마운드에 선 투수" 로 적는다 */
+function moundsOf(progress: GameProgress): MoundBySide {
+  return { our: progress.ourMound.pitcherSlot, opponent: progress.opponentMound.pitcherSlot }
+}
+
+/**
+ * 상대 공격 반 이닝(간이 엔진)의 승·패·세 칸 — 교체 자리를 경계로 점수를 나눠 한 점씩 먹인다.
+ * 교체 전 점수는 이전 투수, 교체 뒤 점수는 새 투수가 마운드에 있을 때 난 것이다 (0xc26a2 → 0xa60c0).
+ */
+function opponentHalfDecisionsOf(
+  progress: GameProgress,
+  runs: number,
+  changes: readonly HalfInningPitcherChange[],
+): DecisionState {
+  let decisions = progress.decisions
+  let ourSlot = progress.ourMound.pitcherSlot
+  let counted = 0
+  const scoredGame = (scored: number): GameState => ({
+    ...progress.game,
+    opponentScore: progress.game.opponentScore + scored,
+  })
+  for (const change of changes) {
+    decisions = decisionsAfterRuns(decisions, scoredGame(counted), change.runsBefore - counted, {
+      our: ourSlot,
+      opponent: progress.opponentMound.pitcherSlot,
+    })
+    counted = change.runsBefore
+    ourSlot = change.pitcherSlot
+    decisions = decisionsAfterPitcherChange(
+      decisions,
+      scoredGame(counted),
+      { our: ourSlot, opponent: progress.opponentMound.pitcherSlot },
+      change.outs,
+      change.runnerCount,
+    )
+  }
+  return decisionsAfterRuns(decisions, scoredGame(counted), runs - counted, {
+    our: ourSlot,
+    opponent: progress.opponentMound.pitcherSlot,
+  })
+}
+
+/**
+ * 결과 판 세 줄(승리투수·패전투수·세이브)의 이름 — 상태 0x18 그리기 0x4fe9c 가 state+0x44/0x50/0x5c 를
+ * 거르지 않고 그대로 읽는다. 측 2(없음)면 그 줄은 빈다.
+ */
+export function pitchersOfRecordOf(progress: GameProgress): PitcherOfRecordNames {
+  return pitcherOfRecordNamesOf(progress.decisions, progress.game.playerSide, (isOurTeam, slot) =>
+    teamPitchers(isOurTeam ? progress.ourTeamId : progress.opponentTeamId)[slot]?.name,
   )
 }
 
@@ -1339,6 +1426,7 @@ export function summaryOf(progress: GameProgress): GameSummary {
     ourTeamId: progress.ourTeamId,
     opponentTeamId: progress.opponentTeamId,
     leaguePlateAppearances: progress.leaguePlateAppearances,
+    pitchersOfRecord: pitchersOfRecordOf(progress),
   }
 }
 

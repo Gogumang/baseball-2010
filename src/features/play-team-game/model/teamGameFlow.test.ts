@@ -31,6 +31,7 @@ import {
   replacementPitcherIndexOf,
   resolveDefensePlay,
   runAutoProgress,
+  pitchersOfRecordOf,
   startBatterOutcome,
   startTeamGame,
   startThrowPitch,
@@ -1514,5 +1515,18 @@ describe('사구 — 우리 수비에서 CPU 타자가 맞는다 (0x35a20 · 벤
     expect(벤치.lastResolution).toEqual({ kind: '사구' })
     expect(벤치.log.some((entry) => entry.text.includes('벤치 클리어링'))).toBe(true)
     expect(벤치.gameRecord).toEqual(progress.gameRecord)
+  })
+})
+
+describe('승·패·세 칸 — 결과 판(0x4fe9c)이 읽는 state+0x44/0x50/0x5c', () => {
+  it('끝까지 돌린 경기의 패전 투수는 진 팀 투수 명단에서 나온다 (0xa5c34 — 이닝 조건 없음)', () => {
+    for (const seed of [11, 12, 13]) {
+      const random = createSeededRandom(seed)
+      const 끝 = runAutoProgress(startTeamGame(기본옵션, random), random)
+      const summary = summaryOf(끝)
+      if (summary.result === '무') continue
+      const 진팀 = summary.result === '승' ? 끝.opponentPitcherEntry : 끝.ourPitcherEntry
+      expect(진팀.map((투수) => 투수.name)).toContain(pitchersOfRecordOf(끝).loss)
+    }
   })
 })

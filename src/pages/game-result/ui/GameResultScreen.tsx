@@ -1,9 +1,8 @@
 import { useState } from 'react'
 import {
-  BigResult, Button, DialogueBox, MarkupText, Notice, Panel, PixelScreen, RawScreen, SpriteNumber,
-  StatGrid, TitleTag,
+  BigResult, Button, DialogueBox, MarkupText, Notice, Panel, PixelScreen, RawScreen, StatGrid, TitleTag,
 } from '@/shared/ui'
-import { glyphsWidthOf, numberGlyphsOf } from '@/shared/lib/pixelNumber/pixelNumber'
+import { EndBoardRows } from '@/widgets/game-scene/ui/EndBoardRows'
 import type { GameEvaluation, StreakNotice } from '@/entities/career/model/gameEvaluation'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { ORIGINAL_USER_EVENTS } from '@/shared/config/original/userEvents'
@@ -11,14 +10,11 @@ import type { GameSummary } from '@/entities/game/model/gameSummary'
 import { RECORD_NAMES } from '@/entities/game/model/gameRecords'
 import { battingAverageOf, formatBattingAverage } from '@/entities/career/model/seasonStats'
 import {
-  BAND, LOSE_DIM_OPACITY, NO_RECORD_TEXT, PITCHER_LABELS, PITCHER_ROWS, PITCHER_ROW_X,
-  RESULT_SPRITES, REWARD_TEXT, SCORE_GLYPH_HEIGHT, SCORE_SLOTS, TITLE_BAR,
-  pitcherLabelPositionOf, pitcherNameBoxOf, pitcherRowTopOf,
+  BAND, LOSE_DIM_OPACITY, NO_RECORD_TEXT, RESULT_SPRITES, REWARD_TEXT, TITLE_BAR,
 } from '@/pages/game-result/lib/gameResultLayout'
 import * as styles from '@/pages/game-result/ui/GameResultScreen.css'
 
 const GAME_UI_FRAMES = './sprites/game_ui/frames'
-const IMG_TEXT_FRAMES = './sprites/img_text/frames'
 const RESULT_FRAMES = './sprites/result/frames'
 
 const frameSrc = (folder: string, frame: number) => `${folder}/${String(frame).padStart(3, '0')}.png`
@@ -38,12 +34,10 @@ const resultSpriteOf = (result: GameSummary['result']) =>
  * 경기 끝(0xa7de8)에 셋을 확정한다 (S1-win-loss-save.md 2~4절 확정 — 웹판 판정은
  * `features/play-pitcher-game/model/winLossSave.ts` 가 그대로 갖고 있다).
  *
- * ⚠️ **값이 없어 못 채우는 칸**: 이 화면을 쓰는 타자편(`app/ui/CareerRoutes.tsx`)의
- * `gameFlow.ts` 는 투수를 팀 하나로 뭉뚱그려 돌려 **마운드에 누가 섰는지를 기록하지 않는다**.
- * `GameSummary` 에도 그 칸이 없다. 그래서 여기서는 **받을 자리(`pitcherNames`)만 열어 두고**
- * 안 넘기면 원본의 "측 == 2 = 없음" 과 같이 이름 칸을 비운다 (R10 5절).
- * 투수편(마운드 교체)이 타자편에 들어오면 `gameEndDecisionOf(...)` 의 셋을 이름으로 바꿔
- * 이 prop 으로 넘기면 된다.
+ * 타자편 `gameFlow` 가 득점·교체마다 그 칸을 세어(`features/play-game/model/gameDecisions`)
+ * `GameSummary.pitchersOfRecord` 로 실어 보낸다. 결과 판(0x4fe9c)은 경기 끝 거르기(0xa7de8)를
+ * 거치지 않은 칸을 그대로 그리므로 세이브 줄도 후보가 있으면 이름이 나온다.
+ * `pitcherNames` 를 넘기면 그것이 먼저다. 둘 다 없으면 원본 "측 == 2 = 없음" 처럼 비운다 (R10 5절).
  */
 const EMPTY_PITCHER_NAMES: readonly (string | null)[] = [null, null, null]
 
@@ -57,8 +51,8 @@ export interface PitcherOfRecordNames {
 interface GameResultScreenProps {
   readonly summary: GameSummary
   /**
-   * 승리투수·패전투수·세이브 이름. 타자편은 마운드 투수를 기록하지 않아 아직 넘길 값이 없다 —
-   * 안 넘기면 세 줄 모두 빈 칸이다 (원본도 "없음" 이면 비운다).
+   * 승리투수·패전투수·세이브 이름. 안 넘기면 `summary.pitchersOfRecord` 를 쓰고, 그것도 없으면
+   * 세 줄 모두 빈 칸이다 (원본도 "없음" 이면 비운다).
    */
   readonly pitcherNames?: PitcherOfRecordNames
   readonly gamePointReward: number
@@ -101,10 +95,10 @@ export function GameResultScreen({
 }: GameResultScreenProps) {
   const [isDetailOpen, setIsDetailOpen] = useState(false)
   const { stats } = summary
+  // 진행기가 요약에 실어 보낸 이름이 기본이다 (`gameFlow.pitchersOfRecordOf` — 득점 0xa5c34·교체 0xa60c0 로 센 칸)
+  const names = pitcherNames ?? summary.pitchersOfRecord
   const rowNames =
-    pitcherNames === undefined
-      ? EMPTY_PITCHER_NAMES
-      : [pitcherNames.win, pitcherNames.loss, pitcherNames.save]
+    names === undefined ? EMPTY_PITCHER_NAMES : [names.win, names.loss, names.save]
 
   if (isDetailOpen) {
     return (
@@ -178,8 +172,6 @@ export function GameResultScreen({
   }
 
   const resultSprite = resultSpriteOf(summary.result)
-  const awayGlyphs = numberGlyphsOf(summary.opponentScore)
-  const homeGlyphs = numberGlyphsOf(summary.ourScore)
 
   return (
     <RawScreen>
@@ -210,55 +202,9 @@ export function GameResultScreen({
         alt={summary.result === '승' ? 'YOU WIN' : 'YOU LOSE'}
       />
 
-      {/* 5. 두 팀 점수 — 왼쪽이 측 0(초 = 상대), 오른쪽이 측 1(말 = 우리) (0x4fe9c) */}
-      {/* 기준점은 가로 가운데로 본다 (0x585ac 의 마지막 인자 2 = 가로 가운데 정렬) */}
-      <SpriteNumber
-        glyphs={awayGlyphs}
-        right={SCORE_SLOTS.away.x + Math.round(glyphsWidthOf(awayGlyphs) / 2)}
-        boxTop={SCORE_SLOTS.away.y}
-        boxHeight={SCORE_GLYPH_HEIGHT}
-      />
-      <SpriteNumber
-        glyphs={homeGlyphs}
-        right={SCORE_SLOTS.home.x + Math.round(glyphsWidthOf(homeGlyphs) / 2)}
-        boxTop={SCORE_SLOTS.home.y}
-        boxHeight={SCORE_GLYPH_HEIGHT}
-      />
-
-      {/* 6. 승리투수·패전투수·세이브 세 줄 (표 0xd0470 = img_text 388·389·329) */}
-      {PITCHER_LABELS.map((label, row) => {
-        const labelPosition = pitcherLabelPositionOf(row)
-        const nameBox = pitcherNameBoxOf(row)
-        const name = rowNames[row]
-        return (
-          <div key={label.frame}>
-            <img
-              className={styles.sprite}
-              style={{ left: PITCHER_ROW_X, top: pitcherRowTopOf(row) }}
-              src={frameSrc(GAME_UI_FRAMES, PITCHER_ROWS.labelPlate.frame)}
-              alt=""
-            />
-            <img
-              className={styles.sprite}
-              style={{ left: nameBox.x, top: nameBox.y }}
-              src={frameSrc(GAME_UI_FRAMES, PITCHER_ROWS.namePlate.frame)}
-              alt=""
-            />
-            <img
-              className={styles.sprite}
-              style={{ left: labelPosition.x, top: labelPosition.y }}
-              src={frameSrc(IMG_TEXT_FRAMES, label.frame)}
-              alt={label.name}
-            />
-            <div
-              className={styles.pitcherName}
-              style={{ left: nameBox.x, top: nameBox.y, width: nameBox.width, height: nameBox.height }}
-            >
-              {name ?? ''}
-            </div>
-          </div>
-        )
-      })}
+      {/* 5·6. 두 팀 점수와 승리투수·패전투수·세이브 세 줄 — 상태 0x18 결과 판(0x4fe9c)과 같은 부품이다.
+          왼쪽이 측 0(초 = 상대), 오른쪽이 측 1(말 = 우리) */}
+      <EndBoardRows side0Score={summary.opponentScore} side1Score={summary.ourScore} names={rowNames} />
 
       {/* 7. 보상·기록 글 (F-7 5 유력 — 판 좌표를 못 정해 줄만 둔다) */}
       <div className={styles.rewardText} style={{ left: REWARD_TEXT.x, top: REWARD_TEXT.y, width: REWARD_TEXT.width }}>

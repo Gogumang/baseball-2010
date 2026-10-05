@@ -22,8 +22,9 @@
  * 자리가 부딪혀 안 옮겼다.
  */
 
+import { PITCHER_ROWS, pitcherRowTopOf } from '@/widgets/game-scene/lib/endBoardLayout'
+
 const SCREEN_WIDTH = 240
-const SCREEN_HEIGHT = 320
 
 /** 패배면 화면 전체를 검정 **단계 8** 로 어둡게 (0x4a42a~0x4a444, F-7 1 확정) */
 export const LOSE_DIM_STAGE = 8
@@ -57,72 +58,18 @@ export const RESULT_SPRITES = {
   패: { frame: 1, x: 40, y: 33, width: 162, height: 31 },
 } as const
 
-/**
- * 두 팀 점수 `0xb69b0(st, 0/1)` 을 (W/2 − 64, H/2 − 7) 과 (W/2 + 67, H/2 − 7) 에
- * (R10 5절 0x4fe9c 확정). 왼쪽이 측 0(초 = 원정), 오른쪽이 측 1(말 = 홈).
- * 웹은 `gameState.ts:24` 대로 **플레이어 팀이 홈(말)** 이라 오른쪽이 우리 점수다.
- *
- * ⚠️ 숫자 글꼴은 원본이 `0x585ac(…, 프레임 0x46, 값, x, y, 6, …, 2)` 로 그리는데
- * game_ui 프레임 0x46(70) 은 32×15 파란 판이라 숫자꼴이 아니다 — 어느 스프라이트의 0x46 인지
- * 못 맞춰 웹은 HUD 와 같은 num.pzx 숫자(F-3-1 확정)를 쓴다. 마지막 인자 2 = 가로 가운데 정렬로 본다.
- */
-export const SCORE_SLOTS = {
-  away: { x: SCREEN_WIDTH / 2 - 64, y: SCREEN_HEIGHT / 2 - 7 },
-  home: { x: SCREEN_WIDTH / 2 + 67, y: SCREEN_HEIGHT / 2 - 7 },
-} as const
-/** num.pzx 숫자 한 줄 높이 */
-export const SCORE_GLYPH_HEIGHT = 10
-
-/**
- * 승·패·세 투수 3줄 (0x4fe9c, R10 5절 확정).
- * 바탕은 game_ui 프레임 0x5d(93, 54×15 = 딱지 칸) · 0x5e(94, 55×15 = 이름 칸),
- * y = H/2 + 33 + i × (줄높이 + 1) = 193 · 209 · 225.
- *
- * ⚠️ 줄의 x 는 원본 코드에 안 적혀 있다 — 두 칸(54+55=109)을 화면 가로 가운데로 모았다 (근사).
- */
-export const PITCHER_ROWS = {
-  count: 3,
-  firstY: SCREEN_HEIGHT / 2 + 33,
-  rowHeight: 15,
-  /** 줄 간격 = 줄높이 + 1 */
-  step: 16,
-  labelPlate: { frame: 93, width: 54, height: 15 },
-  namePlate: { frame: 94, width: 55, height: 15 },
-} as const
-
-const ROWS_WIDTH = PITCHER_ROWS.labelPlate.width + PITCHER_ROWS.namePlate.width
-export const PITCHER_ROW_X = Math.floor((SCREEN_WIDTH - ROWS_WIDTH) / 2)
-
-/** 줄 딱지 = img_text 표 0xd0470 = [388, 389, 329] (S10 1·2절에서 렌더해 읽음 — 확정) */
-export const PITCHER_LABELS = [
-  { frame: 388, width: 42, height: 10, name: '승리투수' },
-  { frame: 389, width: 43, height: 10, name: '패전투수' },
-  { frame: 329, width: 31, height: 10, name: '세이브' },
-] as const
-
-export function pitcherRowTopOf(row: number) {
-  return PITCHER_ROWS.firstY + PITCHER_ROWS.step * row
-}
-
-/** 딱지 그림을 딱지 칸 가운데에 놓는다 */
-export function pitcherLabelPositionOf(row: number) {
-  const label = PITCHER_LABELS[row]
-  return {
-    x: PITCHER_ROW_X + Math.floor((PITCHER_ROWS.labelPlate.width - label.width) / 2),
-    y: pitcherRowTopOf(row) + Math.floor((PITCHER_ROWS.rowHeight - label.height) / 2),
-  }
-}
-
-/** 이름 칸 — 원본 글은 `"!C!cffffff%s"`(0xcf2e0) 가운데 맞춤 흰 글씨다 */
-export function pitcherNameBoxOf(row: number) {
-  return {
-    x: PITCHER_ROW_X + PITCHER_ROWS.labelPlate.width,
-    y: pitcherRowTopOf(row),
-    width: PITCHER_ROWS.namePlate.width,
-    height: PITCHER_ROWS.rowHeight,
-  }
-}
-
+// 점수 두 개와 승·패·세 세 줄은 상태 0x18 결과 판(0x4fe9c) 몫이라 경기 장면 위젯이 들고 있다 —
+// 팀 경기의 결과 판(`widgets/game-scene/ui/GameEndBoard`)과 같은 자리를 쓴다.
+export {
+  PITCHER_LABELS,
+  PITCHER_ROWS,
+  PITCHER_ROW_X,
+  SCORE_GLYPH_HEIGHT,
+  SCORE_SLOTS,
+  pitcherLabelPositionOf,
+  pitcherNameBoxOf,
+  pitcherRowTopOf,
+} from '@/widgets/game-scene/lib/endBoardLayout'
 /**
  * 보상·기록 글 (F-7 5 유력): "!R%d회" · "!C기록이 없습니다!" · "승리 추가 보상[!cffff00 … G포인트]".
  * 원본은 176×202 판 안에 넣는데 그 판 좌표가 '유력' 이라(위 머리말) 판은 안 그리고

@@ -19,8 +19,10 @@ import {
   currentPitcherAbility,
   currentPitcherAceIndex,
   pitchSlotsFor,
+  pitchersOfRecordOf,
   substitutionDetailAbilities,
 } from '@/features/play-team-game/model/teamGameFlow'
+import { GameEndBoard } from '@/widgets/game-scene/ui/GameEndBoard'
 import type {
   TeamEntryBatter,
   TeamEntryPitcher,
@@ -65,7 +67,9 @@ import * as styles from '@/pages/team-game/ui/TeamGameScreen.css'
  * 교체 연출(상태 0x16)은 **소리만** 잇는다 — 대타 등판음·"Time!" 22 는 `useTeamGame` 걸음 끝이 낸다(1e1f5f2).
  * 그 연출 그림(0x4da30)은 없다.
  * 원본에 있고 여기 없는 것: 교체 연출 0x16 의 그림, 자동진행 **중계 화면**(상태 0x21),
- * 공수 교대 화면(0x18)·경기 끝 결과 판의 승·패·세 투수 세 줄.
+ * 공수 교대 화면(0x18 의 교대 가지).
+ * 경기가 끝나면 상태 0x18 의 **경기 끝 결과 판**(`widgets/game-scene` `GameEndBoard`)을 먼저 띄우고,
+ * OK 뒤에 정산(0x19) 자리인 요약 화면으로 간다.
  */
 const smallLogoUrlOf = (teamId: number) => `./sprites/team_logo_ini/${String(teamId).padStart(3, '0')}.png`
 
@@ -122,6 +126,8 @@ export function TeamGameScreen({
   const [courseCell, setCourseCell] = useState(4)
   const [isMenuOpen, setMenuOpen] = useState(false)
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
+  /** 경기 끝 결과 판(0x18)에서 OK 를 눌러 정산(0x19)으로 넘어갔는가 */
+  const [isEndBoardClosed, setEndBoardClosed] = useState(false)
   /** 이미 다 보여 준 수비 플레이 — 같은 플레이를 두 번 재생하지 않는다 */
   const [shownPlay, setShownPlay] = useState<DefensePlayResult | null>(null)
   const play = progress.lastDefensePlay
@@ -245,6 +251,19 @@ export function TeamGameScreen({
   const game = progress.game
   const staminaPercent = staminaPercentOf(progress.stamina)
 
+  if (summary !== null && !isEndBoardClosed) {
+    const names = pitchersOfRecordOf(progress)
+    // 측 0(선공) 점수가 왼쪽 — 사람 팀은 `playerSide` 측에 앉는다
+    const ourSide = progress.game.playerSide
+    return (
+      <GameEndBoard
+        side0Score={ourSide === 0 ? game.ourScore : game.opponentScore}
+        side1Score={ourSide === 1 ? game.ourScore : game.opponentScore}
+        names={[names.win, names.loss, names.save]}
+        onConfirm={() => setEndBoardClosed(true)}
+      />
+    )
+  }
   if (summary !== null) {
     return (
       <PixelScreen

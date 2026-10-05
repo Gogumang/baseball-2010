@@ -98,6 +98,12 @@ export interface HalfInningResult {
   readonly pitcherLines: readonly HalfInningPitcherLine[]
   /** 이닝이 끝났을 때의 마운드 — 다음 이닝에 그대로 넘긴다 (`defense` 를 넘겼을 때만) */
   readonly mound?: HalfInningMound
+  /**
+   * 이 이닝에 난 투수 교체 — 일어난 차례대로 (`defense` 를 넘겼을 때만 찬다).
+   * 원본 간이 엔진은 교체 자리(0xc26a2)에서 세이브 후보 `0xa60c0` 을 부른다 — 그 판정이 보는
+   * 그 순간의 아웃·주자 수·이 이닝 실점을 남긴다 (S1 4절).
+   */
+  readonly pitcherChanges?: readonly HalfInningPitcherChange[]
   /** 이닝이 끝났을 때의 공격 팀 명단 (`offense` 를 넘겼을 때만) — 다음 공격에 그대로 넘긴다 */
   readonly lineup?: QuickLineup
   /** `state[0xe]` — 이 경기에 CPU 대타를 썼는가 (`offense` 를 넘겼을 때만). 양 팀 공용 한 칸이다 */
@@ -151,6 +157,15 @@ export function startingMoundOf(pitcherSlot: number, stamina: number = FULL_STAM
     usedSlots: [],
     justChanged: false,
   }
+}
+
+/** 반 이닝 안의 투수 교체 한 번 — 바뀐 **뒤**의 투수 칸과 그 순간의 판 */
+export interface HalfInningPitcherChange {
+  readonly pitcherSlot: number
+  readonly outs: number
+  readonly runnerCount: number
+  /** 이 반 이닝에 교체 전까지 들어온 점수 */
+  readonly runsBefore: number
 }
 
 /** 투수 한 명이 이 이닝에 남긴 줄 */
@@ -258,6 +273,7 @@ export function simulateHalfInning(
   let lineup = offense?.lineup
   let pinchHitUsed = offense?.pinchHitUsed
   const pinchHits: HalfInningPinchHit[] = []
+  const pitcherChanges: HalfInningPitcherChange[] = []
   /** 이 타순 커서에 지금 선 타자 — 명단이 있으면 명단에서, 없으면 예전처럼 `batterAt` 으로 */
   const batterOn = (cursor: number): QuickAtBatBatter =>
     offense !== undefined && lineup !== undefined
@@ -313,6 +329,12 @@ export function simulateHalfInning(
         mound = changed
         // 교체 0xaec64 가 +0x27c·+0x280·+0x284 를 한꺼번에 0 으로 민다
         inningRunsAllowed = 0
+        pitcherChanges.push({
+          pitcherSlot: changed.pitcherSlot,
+          outs,
+          runnerCount: runnerCountOf(bases),
+          runsBefore: runs,
+        })
       }
     }
     // 상태 0xf — 타석 준비. 원본은 여기서 돌발미션 발동을 굴린다 (0x8f158)
@@ -441,6 +463,7 @@ export function simulateHalfInning(
     steals,
     pitcherLines: [...lines.values()],
     mound,
+    pitcherChanges,
     lineup,
     pinchHitUsed,
     pinchHits,

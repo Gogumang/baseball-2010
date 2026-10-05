@@ -182,3 +182,12 @@ describe('웹 전용 단추', () => {
     expect(screen.getByText('오늘의 성적')).toBeTruthy()
   })
 })
+
+describe('승·패·세 이름', () => {
+  it('요약에 실린 이름(gameFlow.pitchersOfRecordOf)을 세 줄에 적는다', () => {
+    띄우기(요약({ pitchersOfRecord: { win: '승투', loss: '패투', save: null } }))
+
+    expect(screen.getByText('승투')).toBeTruthy()
+    expect(screen.getByText('패투')).toBeTruthy()
+  })
+})
