@@ -1131,7 +1131,7 @@ describe('마투수 등판 — 0xb88c8 → 0xb521c 의 0x60 가지 (8번 칸)', 
     expect(aceLeveledAbility([600, 700, 800, 999], '타자', -1, { 5: 0 })).toEqual([600, 700, 800, 999])
   })
 
-  it('시즌모드는 0x30f20 을 안 타므로 양 팀 모두 마투수가 없다', () => {
+  it('시즌모드는 0x30f20 을 안 타므로 seasonOpponentAces 가 없으면 상대 팀 마투수가 없다', () => {
     const { progress } = 시작({ mode: 2, acePitcherId: 3 })
     expect(progress.ourPitcherEntry).toHaveLength(9)
     expect(progress.opponentPitcherEntry).toHaveLength(8)
@@ -1801,5 +1801,24 @@ describe('미리 굴린 0x30f20 넷 — 일반모드 상태 22 진입(0x314b0)�
       random,
     )
     expect(random.rolls).toEqual([])
+  })
+})
+
+describe('시즌 상대 팀 마선수 — 0xdd 진입 0x6548 (66ee 0x66968 → 6700 0x66994)', () => {
+  it('seasonOpponentAces 면 상대 팀에 마투수 8번·마타자 9번이 들어간다 — 난수 +2 (rand(0,5) 둘)', () => {
+    const random = 세는난수(createSeededRandom(20100901))
+    const progress = startTeamGame({ ...기본옵션, acePitcherId: 1, aceBatterId: 2, seasonOpponentAces: true }, random)
+    expect(random.rolls.slice(0, 2)).toEqual([5, 5])
+    expect(progress.opponentAcePitcherIndex).not.toBe(1)
+    expect(progress.opponentAceBatterIndex).not.toBe(2)
+    expect(progress.opponentPitcherEntry[8]?.aceIndex).toBe(progress.opponentAcePitcherIndex)
+    expect(progress.opponentEntry[9]?.aceIndex).toBe(progress.opponentAceBatterIndex)
+  })
+
+  it('표시가 없으면(국가대항전·0xdd 를 안 지나는 길) 굴리지 않는다', () => {
+    const random = 세는난수(createSeededRandom(20100901))
+    const progress = startTeamGame({ ...기본옵션, acePitcherId: 1, aceBatterId: 2 }, random)
+    expect(random.rolls.slice(0, 2)).not.toEqual([5, 5])
+    expect(progress.opponentAcePitcherIndex).toBe(-1)
   })
 })

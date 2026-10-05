@@ -311,8 +311,8 @@ export interface TeamGameOptions {
   readonly ourEntryOrder?: TeamEntryOrder
   /**
    * **이미 굴린 상대 마선수** 0~4 (`0x66968` 마투수 · `0x66994` 마타자). 있으면 `startTeamGame` 은 굴리지 않는다.
-   * 원본은 경기 장면 전에 굴린다 — 일반모드 상태 22 진입 `0x314b0` → `0x30f20`(31058·3106c).
-   * 그래서 경기정보·엔트리 화면이 이미 그 마선수를 본다.
+   * 원본은 경기 장면 전에 굴린다 — 일반모드 상태 22 진입 `0x314b0` → `0x30f20`(31058·3106c) ·
+   * 시즌 0xdd 진입 `0x6548`(66ea·66fc). 그래서 경기정보·엔트리 화면이 이미 그 마선수를 본다.
    */
   readonly opponentAces?: { readonly pitcher: number; readonly batter: number }
   /**
@@ -320,6 +320,13 @@ export interface TeamGameOptions {
    * 있으면 `startTeamGame` 은 굴리지 않는다. 시즌(모드 2)은 보지 않는다 (로테이션이다).
    */
   readonly startingPitcherSlots?: { readonly opponent: number; readonly ours: number }
+  /**
+   * **시즌 상대 팀 마선수를 굴려 넣는가** (모드 2 에서만 본다, `opponentAces` 가 없을 때).
+   * 원본 0xdd 진입 `0x6548` 은 국가대항전(SR+0x12c)이 아니면 내 팀에 고른 마선수를 싣고(66da·66e6) 이어
+   * **상대 팀에도** `0x66968(rec+0xe)`(66ee) → `0x66994(rec+0xd)`(6700) 로 굴린 마선수를 넣는다(66f8·670a).
+   * 정규·포스트시즌은 참, 국가대항전·0xdd 를 지나지 않는 길은 거짓(기본).
+   */
+  readonly seasonOpponentAces?: boolean
   /** 이 경기에 쓸 수 있는 마구 횟수. 로스터 투수는 마구가 없어 기본 0 이다 */
   readonly magicCount?: number
   /** 화면 배치 side (투영 원점 표 0xcfb18 의 칸) */
@@ -564,7 +571,8 @@ export interface TeamGameProgress {
    */
   readonly scenePitcherChange: { readonly serial: number; readonly incomingIsAce: boolean } | null
   /**
-   * `0x66968`·`0x66994` 가 뽑은 **AI 팀 마투수·마타자 번호** 0~4 (시즌모드는 −1 — `0x30f20` 을 안 탄다).
+   * `0x66968`·`0x66994` 가 뽑은 **AI 팀 마투수·마타자 번호** 0~4 — 일반모드 `0x30f20` · 시즌 정규·포스트시즌
+   * 0xdd 진입 `0x6548`(`seasonOpponentAces`). 굴리지 않은 경기(국가대항전 등)는 −1.
    * 마타자는 `opponentEntry` 벤치 첫 칸(9번)에, 마투수는 `opponentPitcherEntry` 8번 칸에 들어가 있다.
    */
   readonly opponentAcePitcherIndex: number
@@ -646,6 +654,7 @@ function startingPitcherSlotsOf(
  * 부르는 자리 (둘 다 경기 장면 **전**이다):
  *   - 일반모드 경기 세우기 `0x30f20` (31058 → 31064 `0xb88c8(AI팀, v)` · 3106c → 31076 `0xb8870(AI팀, w)`)
  *     — 상태 22 진입 `0x314b0`(이전 상태가 23 이 아니고 모드 1 일 때, 3158c)과 `*` 재굴림 끝(31290)이 부른다.
+ *   - 시즌 0xdd 진입 `0x6548` (국가대항전이 아닐 때 66ee → 66f8 · 6700 → 670a, 상대 팀 `[sp+4]`).
  */
 export function rollOpponentAces(
   acePitcherId: number,
@@ -686,14 +695,15 @@ export function rollTeamSetup(
  * AI 선발(`3107a`) → 사람 선발(`31090`) 차례로 넉 장을 뽑는다. 그래서 여기가
  * `startingPitcherSlotsOf` 보다 **먼저** 돌아야 한다.
  *
- * 시즌(모드 2)은 `0x30f20` 을 타지 않는다 — 마선수 고르는 화면도 없어 굴리지 않는다.
+ * 시즌(모드 2)은 `0x30f20` 을 타지 않는다 — `seasonOpponentAces` 가 서 있을 때만 0xdd 진입 `0x6548` 의
+ * 굴림 둘을 여기서 한다 (국가대항전은 안 굴린다).
  */
 function opponentAceIndexesOf(
   options: TeamGameOptions,
   random: RandomPort,
 ): { readonly pitcher: number; readonly batter: number } {
   if (options.opponentAces !== undefined) return options.opponentAces
-  if (options.mode === TEAM_GAME_MODE.시즌) return { pitcher: -1, batter: -1 }
+  if (options.mode === TEAM_GAME_MODE.시즌 && options.seasonOpponentAces !== true) return { pitcher: -1, batter: -1 }
   return rollOpponentAces(options.acePitcherId ?? NO_ACE_BATTER, options.aceBatterId ?? NO_ACE_BATTER, random)
 }
 
