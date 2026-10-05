@@ -186,6 +186,7 @@ export function App() {
         random={random}
         gameSettings={gameSettings}
         onExit={() => setScreen({ kind: '메인메뉴' })}
+        aceSelect={aceSelect}
       />
     )
   }
