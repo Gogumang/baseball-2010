@@ -642,3 +642,47 @@ describe('사구 — 내가 맞힌 타석 (0x35a20 → 0xa8024 · 벤치 클리�
     ).not.toContain(31)
   })
 })
+
+describe('R+0x128 · 레코드 +0x22 — 득점 주자를 내보낸 투수에게 매긴다 (정산 0xa8ea4~0xa8f60)', () => {
+  it('내가 끝까지 던진 경기는 평가 칸 R+0x128 이 내 실점(+0x22)과 같다 — 늘 0 이 아니다', () => {
+    let 요약: ReturnType<typeof summaryOf> | null = null
+    for (let seed = 1; seed <= 40 && 요약 === null; seed += 1) {
+      const 끝 = 끝까지던지기(startPitcherGame(기본옵션, 씨앗(seed)), seed)
+      if (!끝.game.isFinished || 끝.runsAllowedByMe === 0) continue
+      요약 = summaryOf(끝)
+    }
+
+    expect(요약).not.toBeNull()
+    expect(요약!.record.runsAllowedField).toBeGreaterThan(0)
+    expect(요약!.record.runsAllowedField).toBe(요약!.seasonDelta.runsAllowed)
+  })
+
+  it('강판 때 루에 남긴 주자가 들어오면 내 실점이다 (주자+0x30 = 나) — 뒤에 나간 주자 득점은 아니다', () => {
+    const progress = startPitcherGame(기본옵션, 씨앗(20100901))
+    const 만루 = {
+      ...progress,
+      game: { ...progress.game, bases: { first: true, second: true, third: true } },
+    }
+    let 찾음 = false
+    for (let seed = 1; seed <= 60 && !찾음; seed += 1) {
+      const 끝 = giveUpPitching(만루, 씨앗(seed))
+      if (끝.runsAllowedByMe === 0) continue
+      찾음 = true
+      // 남겨 둔 주자는 셋이라 내 실점은 셋을 넘지 않는다 — 팀 실점과 달리 강판 뒤 새 주자 득점은 빠진다
+      expect(끝.runsAllowedByMe).toBeLessThanOrEqual(3)
+      expect(끝.record.runsAllowedField).toBe(끝.runsAllowedByMe)
+      expect(끝.inheritedRunners).toBe(0)
+    }
+
+    expect(찾음).toBe(true)
+  })
+
+  it('빈 루에서 강판하면 남은 경기 실점은 하나도 내 것이 아니다', () => {
+    const progress = startPitcherGame(기본옵션, 씨앗(20100901))
+    const 끝 = giveUpPitching(progress, 씨앗(9))
+
+    expect(끝.teamRunsAllowed).toBeGreaterThanOrEqual(0)
+    expect(끝.runsAllowedByMe).toBe(0)
+    expect(끝.record.runsAllowedField).toBe(0)
+  })
+})

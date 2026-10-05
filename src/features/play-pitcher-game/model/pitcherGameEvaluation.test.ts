@@ -13,6 +13,7 @@ import {
   managerCommentIndexOf,
   moraleChangeOf,
   popularityChangeOf,
+  reputationPartsOf,
 } from '@/features/play-pitcher-game/model/pitcherGameEvaluation'
 import type {
   PitcherEvaluationContext,
@@ -46,9 +47,14 @@ describe('완투 계열 판정', () => {
     expect(completeGameKindOf({ ...완투기록, outsRecorded: 24 }, 선발)).toBe('없음')
   })
 
-  it('⚠️ 원본 버그 그대로 — R+0x128(실점)이 늘 0 이라 완투가 늘 완봉으로 센다', () => {
-    // 팀은 5점을 내줬는데도 평가 칸은 0 이라 "완봉" 이 된다
-    expect(completeGameKindOf(완투기록, { ...선발, teamRunsAllowed: 5 })).toBe('완봉')
+  it('완봉/완투는 R+0x128(내 실점)로 가른다 — 정산 0xa8f56 이 득점 주자마다 올린다 (0xa6bd8)', () => {
+    expect(completeGameKindOf(완투기록, 선발)).toBe('완봉')
+    expect(completeGameKindOf({ ...완투기록, runsAllowedField: 2 }, { ...선발, teamRunsAllowed: 2 })).toBe('완투')
+  })
+
+  it('실점이 있으면 노히트·퍼펙트도 아니다 (0xa6b2c · 0xa6b7c)', () => {
+    const 무안타실점 = { ...완투기록, hitsAllowed: 0, walksAllowed: 0, runsAllowedField: 1 }
+    expect(completeGameKindOf(무안타실점, 선발)).toBe('완투')
   })
 
   it('피안타가 0 이면 노히트, 볼넷·사구까지 0 이면 퍼펙트다', () => {
@@ -194,5 +200,38 @@ describe('한꺼번에', () => {
     expect(결과.completeGame).toBe('완봉')
     expect(결과.managerCommentIndex).toBeGreaterThanOrEqual(2)
     expect(결과.moraleChange).toBe(5)
+  })
+})
+
+describe('R+0x128(내 실점)이 평가에 들어간다 — P1 5-1 "늘 0" 정정 (9d039b6)', () => {
+  it('선발 완투 승: 완봉(5) → 완투(3) 로 인기도 점수가 2 줄고, 선발 실점 항(음수 비교 0xa6c92)은 여전히 안 걸린다', () => {
+    // 완봉: 5 + 탈삼진 8 → 4 + 아웃 27 → 3 = 12 → p 12 · 완투: 3 + 4 + 3 = 10 → p 10
+    expect(popularityChangeOf(완투기록, 선발)).toBe(12)
+    expect(popularityChangeOf({ ...완투기록, runsAllowedField: 2 }, 선발)).toBe(10)
+    // 실점 9 라도 음수 비교라 실점 항 자체는 0 이다 — 완투 갈래 점수만 다르다
+    expect(popularityChangeOf({ ...완투기록, runsAllowedField: 9 }, 선발)).toBe(10)
+  })
+
+  it('구원 인기도 실점 항: > 4 → −4 · > 3 → −2 · > 0 → −1 (0xa6d2a)', () => {
+    const 기록 = { ...EMPTY_PITCHER_EVALUATION_RECORD, outsRecorded: 3, strikeouts: 3 }
+    const p = (runs: number) => popularityChangeOf({ ...기록, runsAllowedField: runs }, 구원)
+    // 무실점: 0 + 3(삼진 3) + 5(승) + 0(1이닝) = 8 → 5 · 1실점: 7 → 4 · 4실점: 6 → 4 · 5실점: 4 → 3
+    expect([p(0), p(1), p(4), p(5)]).toEqual([5, 4, 4, 3])
+  })
+
+  it('평판: 구원 무실점 +1 은 실점이 나면 빠지고, 2·3 실점 −3 · 4 이상 −5 (0xa65d6 · 0xa663c)', () => {
+    const 기록 = { ...EMPTY_PITCHER_EVALUATION_RECORD, outsRecorded: 3, hitsAllowed: 3 }
+    const 무실점 = reputationPartsOf(기록, 구원, 0)
+    expect(reputationPartsOf({ ...기록, runsAllowedField: 1 }, 구원, 0)).toEqual({ gain: 무실점.gain - 1, penalty: 무실점.penalty })
+    expect(reputationPartsOf({ ...기록, runsAllowedField: 3 }, 구원, 0).penalty).toBe(무실점.penalty - 3)
+    expect(reputationPartsOf({ ...기록, runsAllowedField: 4 }, 구원, 0).penalty).toBe(무실점.penalty - 5)
+  })
+
+  it('평판: 선발 4·5 실점 −3 · 6 이상 −5 (0xa651c~0xa653a)', () => {
+    const 기록 = { ...완투기록, outsRecorded: 18 }
+    const 기준 = reputationPartsOf(기록, 선발, 0).penalty
+    expect(reputationPartsOf({ ...기록, runsAllowedField: 3 }, 선발, 0).penalty).toBe(기준)
+    expect(reputationPartsOf({ ...기록, runsAllowedField: 5 }, 선발, 0).penalty).toBe(기준 - 3)
+    expect(reputationPartsOf({ ...기록, runsAllowedField: 6 }, 선발, 0).penalty).toBe(기준 - 5)
   })
 })

@@ -33,11 +33,18 @@ export interface PitcherEvaluationRecord {
   /** R+0x124 — 1 승 · 2 패 · 3 세이브 · 0 없음 */
   readonly decisionCode: number
   /**
-   * R+0x128 — 평가 식이 "실점" 처럼 쓰는 칸.
+   * R+0x128 — 내 투수에게 매겨진 실점 (득점 주자를 내보낸 투수가 나일 때 주자마다 +1).
    *
-   * ⚠️ **원본 버그 그대로**: 이 칸에 값을 넣는 코드가 원본 어디에도 없다(P1 5-1, 유력).
-   * 그래서 **늘 0** 이고, 아래 식의 실점 항은 한 번도 걸리지 않는다 —
-   * 그 바람에 **완투 승리가 늘 완봉으로 세어진다.** 기본값 0 을 그대로 쓴다.
+   * 정산 0xa8024 의 주자 루프가 **사건 함수 0xa57f8 을 거치지 않고 직접** 올린다 (0xa8f56, 9d039b6):
+   * 주자+0x95(득점)가 선 주자마다 P = 0xb8c44(수비 팀, 주자+0x30), `0xb6388(P)`(육성·명전 비트7) &&
+   * `0xa56dc(R, P, 0)` 이면 `R+0x128 += 1`. 세는 쪽은 `pitcherGameFlow.applyDefensivePlay` 의 `chargedToMe`.
+   * (P1 5-1 의 "채우는 코드가 없어 늘 0(유력)" 은 틀렸다 — 그래서 완투가 늘 완봉이 되는 일도 없다.)
+   *
+   * 평가가 이 칸을 읽는 곳 (전수, 상수 0x128 을 만드는 자리):
+   * - 인기도 0xa690c: 퍼펙트 0xa6b2c · 노히트 0xa6b7c · 완봉/완투 0xa6bd8 · 선발 실점 항 0xa6c92(음수 비교) ·
+   *   구원 실점 항 0xa6d1c·0xa6dd6 (`> 4 → −4 · > 3 → −2 · > 0 → −1`)
+   * - 평판 0xa6218: 선발 0xa651c (`> 5 → −5`, `4·5 → −3`) · 구원 0xa65d6 (`== 0 → +1`) · 0xa663c (`2·3 → −3`, `> 3 → −5`)
+   * - 0xa726c (0xa719c 모드 3): career+0x1d8 묶음 +2 바이트에 그대로 적는다 (이 파일 밖)
    */
   readonly runsAllowedField: number
 }
@@ -159,8 +166,9 @@ function starterOutPoints(outs: number): number {
 }
 
 /**
- * ⚠️ **원본 그대로**: 실점 항의 비교가 **음수**다 (`≤ −6 → −4 · ≤ −5 → −2 · ≤ −3 → −1`).
- * R+0x128 이 늘 0 이라 한 번도 걸리지 않는다. 식 모양을 그대로 남긴다.
+ * ⚠️ **원본 버그 그대로**: 실점 항의 비교가 **음수**다 (`≤ −6 → −4 · ≤ −5 → −2 · ≤ −3 → −1`).
+ * 0xa6c92: `ldr r3,[R+0x128] ; adds r3,#6 ; bgt` 처럼 **더해서** 0 과 견준다 — 실점은 0 이상이라
+ * 이 항은 실점이 나도 한 번도 걸리지 않는다 (선발 인기도는 완봉/완투 갈래로만 실점을 본다).
  */
 function starterRunPoints(runsAllowedField: number): number {
   if (runsAllowedField <= -6) return -4
@@ -301,7 +309,7 @@ function starterReputationParts(
   if (record.hitsAllowed > 9) penalty -= 5
   if (trunc(record.outsRecorded / 3) <= 1) penalty -= 2
   if (record.walksAllowed > 2) penalty -= 2
-  // ⚠️ R+0x128 이 늘 0 이라 아래 두 줄은 걸리지 않는다 (원본 그대로 남긴다)
+  // R+0x128 > 5 → −5, 4·5 → −3 (0xa651c~0xa653a)
   if (record.runsAllowedField > 5) penalty -= 5
   else if (record.runsAllowedField >= 4) penalty -= 3
 
@@ -327,7 +335,7 @@ function reliefReputationParts(
 
   if (record.perfectInnings > 0) gain += 1
   if (trunc(record.outsRecorded / 3) > 2) gain += 2
-  // ⚠️ 늘 참이다 — R+0x128 이 0 이므로 구원은 공짜로 +1 을 받는다 (원본 그대로)
+  // 무실점이면 +1 (0xa65d6)
   if (record.runsAllowedField === 0) gain += 1
   if (record.hitsAllowed === 0) gain += 3
   else if (record.hitsAllowed === 1) gain += 2

@@ -238,8 +238,18 @@ export interface PitcherGameProgress {
   readonly record: PitcherEvaluationRecord
   /** 투구 수 (레코드 +0x28 · R+0x140) */
   readonly pitchCount: number
-  /** 내가 마운드에 있는 동안 내준 실점 — 방어율(레코드 +0x22)에 해당한다 */
+  /**
+   * 내 투수에게 매겨진 실점 — 레코드 +0x22(방어율)이고 평가 칸 R+0x128 과 같은 값이다.
+   * 둘 다 정산 0xa8024 의 같은 주자 루프(0xa8ea4~0xa8f60)가 **득점 주자를 내보낸 투수**(주자+0x30)에게
+   * 매긴다 — 마운드에 있는 동안의 득점 + 강판 때 남겨 둔 주자(`inheritedRunners`)의 득점.
+   */
   readonly runsAllowedByMe: number
+  /**
+   * 강판 때 루에 남겨 두고 내려온 **내 주자** 수 (주자+0x30 = 내 투수). 마운드에 있는 동안은 늘 0 이다.
+   * 원본은 주자마다 내보낸 투수를 적어 두므로(0xa93ac 넷째 인자 → 주자+0x30) 강판 뒤 간이 엔진
+   * 타석(0xc1054 등도 정산 0xa8024 를 부른다)에서 이 주자가 들어와도 내 실점이다.
+   */
+  readonly inheritedRunners: number
   /** state+0x88 볼넷 · +0x89 피안타 · +0x8a 실점 — 우리 팀 투수 **전체**가 내준 것 */
   readonly teamWalksAllowed: number
   readonly teamHitsAllowed: number
@@ -406,6 +416,7 @@ export function startPitcherGame(
     record: EMPTY_PITCHER_EVALUATION_RECORD,
     pitchCount: 0,
     runsAllowedByMe: 0,
+    inheritedRunners: 0,
     teamWalksAllowed: 0,
     teamHitsAllowed: 0,
     teamRunsAllowed: 0,
@@ -754,7 +765,12 @@ export function pickoff(
       game: applied.game,
       decision,
       inningRuns: addInningRuns(progress.inningRuns, before.inning, applied.runsScored),
+      // 견제는 내가 마운드에 있을 때만이라 들어온 주자는 모두 내가 내보낸 주자다 (R+0x128 · +0x22)
       runsAllowedByMe: progress.runsAllowedByMe + applied.runsScored,
+      record: {
+        ...progress.record,
+        runsAllowedField: progress.record.runsAllowedField + applied.runsScored,
+      },
       teamRunsAllowed: progress.teamRunsAllowed + applied.runsScored,
     }
     if (halfChanged) {
@@ -879,7 +895,44 @@ function applyDefensivePlay(
   // R+0x184 — 안타·볼넷·사구가 나면 이 이닝은 더 이상 삼자범퇴가 아니다 (0xa80b4·0xa8e12)
   const perfectInningFlag = progress.perfectInningFlag && !hit && !freePass && applied.runsScored === 0
 
-  const record: PitcherEvaluationRecord = mine
+  /**
+   * 이 플레이에서 **내 투수에게 매겨지는** 실점 — R+0x128 과 레코드 +0x22 (정산 0xa8024 주자 루프):
+   * ```
+   * a8ea4  for 주자 in 주자 목록:
+   * a8eb2    주자+0x95(득점) == 0 → 건너뜀
+   * a8ec0    아웃 == 3 이고 목록 0번 주자+0x96(아웃) != 0 → 건너뜀
+   * a8ee4    P = 0xb8c44(수비 팀, 주자+0x30)          ; 그 주자를 내보낸 투수
+   * a8ef4    0xa56dc(R, P, 0) 이면 P+0x22(실점)++
+   * a8f3c    0xb6388(P)(+0xa 비트7 = 육성·명전) && 0xa56dc(R, P, 0) 이면
+   * a8f56      R+0x128 += 1
+   * ```
+   * 모드 3 의 0xa56dc(R, P, 0) 갈래(0xa571c)는 "시즌 객체 S(0x1fa2d)+0x12c(국가대항전)·+0xb4(포스트시즌)가 둘 다 0
+   * 이고 P 가 마선수(0xb633d, 비트6)가 아님" 이다. 투수편의 내 투수는 육성 선수라 비트7 이 서고 마선수가 아니므로
+   * **내가 내보낸 주자가 들어올 때마다 1** 이다. 일반 선수인 동료 투수는 비트7 이 없어
+   * R+0x128 에 안 든다(+0x22 에는 든다 — 웹은 동료 투수 레코드를 따로 두지 않는다).
+   *
+   * - 마운드에 있는 동안(`mine`)의 주자는 모두 내 주자다 — 선발은 경기 시작부터, 구원은 8회 0아웃(빈 루)에 올라오므로
+   *   남의 주자를 물려받는 일이 없다 (`shouldEnterNow`).
+   * - 강판 뒤에는 남겨 둔 내 주자(`inheritedRunners`)만 내 실점이다. 주자는 서로 앞지를 수 없어 내 주자가 늘 앞쪽에
+   *   있으므로 **득점은 내 주자부터** 센다.
+   *
+   * ⚠️ 미해결(근사): 진행기(`AdvanceResult`)는 주자별 운명을 내주지 않는다. 그래서 ① 내 주자가 이 플레이에서
+   *   아웃되고 뒤 주자가 들어온 경우(드묾)는 뒤 주자 득점을 내 것으로 세고, 남은 내 주자 수는
+   *   `min(남은 수, 루의 주자 수)` 로 줄인다. ② 3아웃으로 끝난 플레이에서 원본은 목록 0번 주자가 살았으면 보류됐다
+   *   날아간 득점까지 세고 죽었으면 하나도 안 세는데(0xa8ec0), 웹 `runsScored` 는 점수판 득점이라 그 갈래만
+   *   다를 수 있다 (9d039b6 · pitcherRun 과 같은 근사).
+   *   ③ 원본은 포스트시즌·국가대항전이면 0xa56dc 가 거짓이라 아예 안 센다(사건 함수 0xa57f8 의 다른 R 칸도
+   *   같은 게이트다) — 웹은 이 게이트를 어느 R 칸에도 걸지 않았으므로 여기서도 걸지 않는다 (미해결, 따로 옮길 것).
+   */
+  const chargedToMe = mine
+    ? applied.runsScored
+    : Math.min(applied.runsScored, progress.inheritedRunners)
+  const inheritedRunners =
+    mine || inningEnded
+      ? 0
+      : Math.min(progress.inheritedRunners - chargedToMe, runnerCountOf(applied.game.bases))
+
+  const playedRecord: PitcherEvaluationRecord = mine
     ? {
         ...progress.record,
         hitsAllowed: progress.record.hitsAllowed + (hit ? 1 : 0),
@@ -893,6 +946,10 @@ function applyDefensivePlay(
         perfectInnings: progress.record.perfectInnings + (inningEnded && perfectInningFlag ? 1 : 0),
       }
     : progress.record
+  const record: PitcherEvaluationRecord =
+    chargedToMe > 0
+      ? { ...playedRecord, runsAllowedField: playedRecord.runsAllowedField + chargedToMe }
+      : playedRecord
 
   // 0xb8cec — 지금 마운드에 선 우리 투수의 경기 기록 R[0](삼진)·R[1](연속 삼진).
   // 삼진 아닌 결과로 끝난 타석마다 콤보가 끊긴다 (R8 5-5).
@@ -934,7 +991,8 @@ function applyDefensivePlay(
     inningRuns: addInningRuns(progress.inningRuns, before.inning, applied.runsScored),
     record,
     pitcherRecord: mine ? pitcherRecordAfterPlay(progress.pitcherRecord, hitByPitch) : progress.pitcherRecord,
-    runsAllowedByMe: progress.runsAllowedByMe + (mine ? applied.runsScored : 0),
+    runsAllowedByMe: progress.runsAllowedByMe + chargedToMe,
+    inheritedRunners,
     teamHitsAllowed: progress.teamHitsAllowed + (hit ? 1 : 0),
     teamWalksAllowed: progress.teamWalksAllowed + (freePass ? 1 : 0),
     teamRunsAllowed: progress.teamRunsAllowed + applied.runsScored,
@@ -1157,6 +1215,8 @@ export function giveUpPitching(
         ...progress,
         onMound: false,
         simpleEngineRunning: true,
+        // 루에 남겨 둔 주자는 주자+0x30 이 나라서 들어오면 내 실점이다 (0xa8ee4)
+        inheritedRunners: runnerCountOf(progress.game.bases),
         // 새 투수의 기록이 되므로 0 부터. (어차피 강판 뒤에는 기록 게이트가 닫힌다)
         moundStrikeouts: 0,
         moundStrikeoutCombo: 0,
@@ -1186,6 +1246,8 @@ export function closeManagerHookWindow(
         managerHookText: null,
         onMound: false,
         simpleEngineRunning: true,
+        // 루에 남겨 둔 주자는 주자+0x30 이 나라서 들어오면 내 실점이다 (0xa8ee4)
+        inheritedRunners: runnerCountOf(progress.game.bases),
         moundStrikeouts: 0,
         moundStrikeoutCombo: 0,
         atBatPrepared: false,
