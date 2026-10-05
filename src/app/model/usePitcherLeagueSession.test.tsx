@@ -251,7 +251,7 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     expect(result.current.career?.postseason).not.toBeNull()
   })
 
-  it('131 뒤 128 포스트시즌 — 내 차례면 내가 선발로 던지고 결과 뒤 128 로, 끝나면 우승 발표 → 132(380)', () => {
+  it('131 뒤 128 포스트시즌 — 내 차례면 내가 선발로 던지고 결과 뒤 128 로, 시리즈가 끝난 경기 뒤는 136 사슬을 다시 돌고, 끝나면 우승 발표 → 132(380)', () => {
     const result = 판짜기({
       season: 2,
       gamesPlayed: 45,
@@ -264,11 +264,21 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     expect(result.current.scene).toBe('포스트시즌')
 
     const 경기들: boolean[] = []
-    for (let guard = 0; guard < 40 && result.current.scene !== '이벤트'; guard += 1) {
+    let 다시돈사슬 = 0
+    for (let guard = 0; guard < 80 && result.current.scene !== '이벤트'; guard += 1) {
       if (result.current.scene === '경기') {
         // 포스트시즌은 0xa4f60 이 −2(그대로) — 늘 내 투수가 선발이다
         경기들.push(result.current.gameOptions!.isPostseason)
         act(() => result.current.actions.finishGame(경기요약))
+        // 116 끝: 시리즈가 이어지면 128, 내 시리즈가 끝났으면(g == 0) 136 시즌 끝 사슬을 다시 돈다
+        expect(['포스트시즌', '시즌종료']).toContain(result.current.scene)
+        continue
+      }
+      if (result.current.scene === '시즌종료') {
+        다시돈사슬 += 1
+        act(() => result.current.actions.beginYearEnd())
+        expect(result.current.story?.eventId).toBe(392)
+        expect([376, 377]).toContain(연말끝까지(result).at(-1))
         expect(result.current.scene).toBe('포스트시즌')
         continue
       }
@@ -278,6 +288,8 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
 
     expect(경기들.length).toBeGreaterThan(0)
     expect(경기들.every(Boolean)).toBe(true)
+    // 1위(3)는 한국시리즈 하나만 치른다 — 그 시리즈가 끝난 경기 뒤 한 번
+    expect(다시돈사슬).toBe(1)
     expect(result.current.career?.postseason?.round).toBe('종료')
     expect(result.current.story).toMatchObject({ eventId: 380, context: '연말' })
   })

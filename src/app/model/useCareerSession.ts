@@ -40,7 +40,6 @@ import {
   startNextSeason,
   gainGamePoint,
   countGameForSkills,
-  GAMES_PER_SEASON,
   MAXIMUM_GAME_POINT,
 } from '@/entities/career/model/playerCareer'
 import {
@@ -432,7 +431,9 @@ export function useCareerSession({
       // 부상은 경기 뒤가 아니라 훈련 결과 창을 닫을 때 굴린다 (0x1b4c4)
       const rolled = gainReputation(streak.career, streakReputation)
       const newTitles = evaluateNewTitles(rolled)
-      setCareer(awardTitles(rolled, newTitles))
+      // 경기 뒤 평가 116 진입 0x1278c 가 S+0x50 = 2 · 저장 — 시즌 끝 사슬 상태를 벗어난다 (이어하기는 116 의 끝처럼 가른다)
+      const awarded = awardTitles(rolled, newTitles)
+      setCareer(awarded.seasonEndState === null ? awarded : { ...awarded, seasonEndState: null })
       // 경기 끝 0x4ea0c: 기록 달성 G 합을 저장 G 에 더한 뒤 0x4ec82 `0x22c7d(액수, 모드 4)` 로 획득 GP 통계에 적는다
       recordStat({ kind: 'G획득', mode: BATTER_LEAGUE_MODE, amount: gamePointRewardOf(summary) })
       setScreen({
@@ -956,13 +957,18 @@ export function useCareerSession({
 
     confirmGameResult: () => {
       if (career === null) return
-      // 포스트시즌 경기 뒤 — 116 이 [114 → 128] 로 대진 화면에 돌아간다 (R9 8절). 관리 주기·중간평가를 안 탄다.
-      // 45번째 경기도 대진을 열지만(0xb818c) 그 뒤는 136(시즌종료) 사슬이라 경기 수로 가른다.
-      // ⚠️ 미해결: 원본 116 끝(0x12b74~0x12b94)은 S+0xb4 ≠ 0 이면 **S+0xb2(= L+0x32) == 0 → 뒤 136, 아니면 128** 로 가른다.
-      //    시리즈가 끝나는 경기는 0xb7724 가 L+0x32 = −1(b777a), 하루 끝이 +1 → 0 이라, 원본은 내 시리즈가 끝난 경기 뒤
-      //    136(392 목표 평가)부터 사슬을 다시 도는 것으로 읽힌다. 이벤트 시작 0x8bdc9 가 본 이벤트를 다시 트는지 확인
-      //    못 해 옮기지 않았다 — 웹은 포스트시즌 경기 뒤 늘 128 이다.
-      if (career.postseason !== null && career.gamesPlayed > GAMES_PER_SEASON) return enterPostseason(career)
+      // 경기 뒤 평가 116 의 끝(0x12b74~0x12b94) — S+0xb4(포스트시즌 중) ≠ 0 이면 **S+0xb2(= L+0x32) == 0 → [114 → 136],
+      // 아니면 [114 → 128]** 이다. 관리 주기·중간평가를 안 탄다 (R9 116절).
+      //   - 45번째 경기: 하루 끝 0xb818c 가 대진 0xb80a8 을 열며 L+0x32 = 0 → 136(392 목표 평가) 사슬.
+      //   - 시리즈가 끝난 내 경기: 0xb76dc 의 0xb7724 가 L+0x32 = −1(b777a), 곧이어 하루 끝 0xb818c(0x4f29c)가 +1 → 0 이라
+      //     **136 부터 사슬을 다시 돈다.** 136 진입 0x10bb0 은 0x8bdc9(392) 를 그대로 부르고, 0x8bdc8 → 0xae170 은
+      //     레코드를 번호로 찾아 틀 뿐 본 표시를 보지 않는다 — 392 → 130(370) → 131(375) 가 보상째 다시 나오고 128 로 온다.
+      //     원본 동작 그대로 옮긴다 (미션·대결 같은 반복 가드가 없는 자리다).
+      //   - 그 밖 포스트시즌 경기: 128.
+      if (career.postseason !== null) {
+        if (leagueDayCounterOf(career) === 0) return setScreen({ kind: '시즌종료' })
+        return enterPostseason(career)
+      }
       if (isSeasonFinished(career)) return setScreen({ kind: '시즌종료' })
       // 22경기 뒤 중간평가 (0x11910 → 0x11e84)
       if (career.gamesPlayed === MID_SEASON_GAME) {

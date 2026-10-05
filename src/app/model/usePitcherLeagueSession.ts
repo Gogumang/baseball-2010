@@ -22,6 +22,7 @@ import {
   pitcherResumePointOf,
 } from '@/entities/pitcher-career/model/pitcherYearEnd'
 import type { PitcherResumePoint } from '@/entities/pitcher-career/model/pitcherYearEnd'
+import { leagueDayCounterOf } from '@/entities/career/model/leagueGameSetup'
 import {
   applyKoreanSeriesReward,
   applyRegularSeasonReward,
@@ -685,10 +686,18 @@ export function usePitcherLeagueSession(
       setGameOptions(null)
 
       /*
-       * 포스트시즌 경기 뒤 — 116 의 끝(0x12b74)이 S+0xb4 ≠ 0 이고 경기 수 ≠ 0 이면 [114 → 128] (R9 116절).
-       * 관리 주기·부상 엔딩·중간평가를 타지 않는다. 45번째 경기는 경기 전 대진이 없어 아래 시즌종료로 간다.
+       * 포스트시즌 경기 뒤 — 116 의 끝(0x12b74~0x12b94)이 S+0xb4 ≠ 0 이면 **S+0xb2(= L+0x32) == 0 → [114 → 136],
+       * 아니면 [114 → 128]** (R9 116절, 모드 갈림 없음). 관리 주기·부상 엔딩·중간평가를 타지 않는다.
+       * 내 시리즈가 끝난 경기는 0xb7724 가 L+0x32 = −1(b777a), 하루 끝 0xb818c(0x4f29c)가 +1 → 0 이라 136 부터 사슬을
+       * **다시 돈다** — 136 진입 0x10bb0 이 0x8bdc9(392) 를 본 표시 없이 다시 튼다(0x8bdc8 → 0xae170). 원본 그대로다.
+       * 45번째 경기는 경기 전 대진이 없어 아래 시즌종료로 간다(그때도 L+0x32 = 0 → 136 이다).
        */
       if (career.postseason !== null) {
+        if (leagueDayCounterOf(counted) === 0) {
+          // 116 진입 0x1278c 의 S+0x50 = 2 — 사슬 상태를 벗어난다 (이어하기도 116 의 끝처럼 136 으로)
+          commit({ ...counted, seasonEndState: null })
+          return setScene('시즌종료')
+        }
         // 128 진입 0x120a4 — S+0x50 = 0xf · 저장 (116 진입 0x1278c 의 2 를 곧바로 덮는다)
         commit({ ...counted, seasonEndState: 128 })
         setPostseasonPopup(regularSeasonPopupOnEnter(counted))

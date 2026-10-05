@@ -1,4 +1,5 @@
 import type { PlayerCareer, SeasonEndState } from '@/entities/career/model/playerCareer'
+import { leagueDayCounterOf } from '@/entities/career/model/leagueGameSetup'
 import {
   achievedGoalCount,
   ENDING_EVENT_IDS,
@@ -87,7 +88,7 @@ export type ResumePoint =
   | { readonly kind: '이벤트'; readonly eventId: number }
   /** S+0xb4(포스트시즌 중) ≠ 0 이고 S+0x50 이 위 값이 아님 → 128 대진 */
   | { readonly kind: '포스트시즌' }
-  /** S+0x50 == 2(경기 뒤) → 116 → [114 → 136] — 45번째 경기 뒤 아직 136 에 안 들어갔다 */
+  /** S+0x50 == 2(경기 뒤) → 116 → g == 0 이면 [114 → 136] — 45번째 경기 뒤 · 내 시리즈가 끝난 경기 뒤 */
   | { readonly kind: '시즌종료' }
   /** 그 밖 — 웹은 관리 화면 (원본은 S+0xb2 짝수 · S+0x50 ∈ {1,3} 이면 105, 아니면 109) */
   | { readonly kind: '관리' }
@@ -98,9 +99,9 @@ export type ResumePoint =
  * S+0x50 == 0xb → 136 · 9 → 132 · 0xc|0xd → 130 · 0xe → 131   (1c276~1c296)
  * 그 밖: S+0x12c → 134 · S+0xb4 ≠ 0 → 128(S+0x50 0xf)          (1c2a2~)
  * ```
- * 웹은 국가대항전(S+0x12c)을 저장하지 않고, S+0x50 == 2(116 경기 뒤 평가)는 45번째 경기 뒤 자리만 옮긴다 —
- * 그 자리는 대진이 열렸고(`postseason`) 시즌 끝 사슬엔 아직 안 들어간 때다. 웹의 116 대응은 결과 화면이라
- * 다시 못 띄우므로 그 다음 화면인 '시즌종료'(→ 136)로 돌아간다.
+ * 웹은 국가대항전(S+0x12c)을 저장하지 않는다. S+0x50 == 2(116 경기 뒤 평가 — 웹은 경기 뒤 `seasonEndState` null)는
+ * 대진이 있을 때만 옮긴다: 116 의 끝(0x12b74)이 g(= L+0x32) == 0 이면 136, 아니면 128 이다. 웹의 116 대응은 결과 화면이라
+ * 다시 못 띄우므로 그 다음 화면('시즌종료' → 136 · 128)으로 돌아간다.
  * ⚠️ 132 뒤 국가대표 133·국가대항전 134 는 S+0x50 을 안 바꾼다(0x1a090·0x19f30 머리 확인) — 원본도 132 로 돌아가
  *    연말 이벤트를 다시 튼다. 엔딩 141(S+0x50 = 6, 0x1230e)·그 밖 0xa 갈래는 웹이 아직 따로 돌아가지 않는다.
  */
@@ -120,7 +121,9 @@ export function resumePointOf(career: PlayerCareer): ResumePoint {
       break
   }
   if (career.postseason === null) return { kind: '관리' }
-  return career.seasonEndState === 128 ? { kind: '포스트시즌' } : { kind: '시즌종료' }
+  if (career.seasonEndState === 128) return { kind: '포스트시즌' }
+  // 경기 뒤(S+0x50 == 2 → 116) — 116 의 끝처럼 g == 0 이면 136(시즌 끝 화면), 아니면 128
+  return leagueDayCounterOf(career) === 0 ? { kind: '시즌종료' } : { kind: '포스트시즌' }
 }
 
 /**

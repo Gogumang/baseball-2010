@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { describe, expect, it } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { applyGameEvaluation, isEvaluatedGame, useCareerSession } from '@/app/model/useCareerSession'
-import { EMPTY_LEAGUE, LEAGUE_TEAM_COUNT, startPostseason } from '@/entities/league/model/league'
+import { advancePostseason, EMPTY_LEAGUE, LEAGUE_TEAM_COUNT, startPostseason } from '@/entities/league/model/league'
 import { useAtBatRunner } from '@/app/model/useAtBatRunner'
 import type { Screen } from '@/app/model/screen'
 import { createCareer } from '@/entities/career/model/playerCareer'
@@ -692,13 +692,14 @@ describe('타자편 포스트시즌 대진 128 — 사람이 친다 (0x120a4 · 
 
   it('홈/원정은 0xb7844 포스트시즌 갈래 — 대진 윗 시드(칸 0)가 후공, 아랫 시드는 선공이다', () => {
     // 준PO 는 3위(2) 대 4위(3) — 4위는 아랫 시드라 선공
-    const 아랫시드 = 띄우기(시즌끝선수({ teamId: 3, gamesPlayed: 46, regularSeasonRewardTaken: true }))
+    const 진행중 = { ...startPostseason([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]), wins: [1, 0] as [number, number] }
+    const 아랫시드 = 띄우기(시즌끝선수({ teamId: 3, gamesPlayed: 46, postseason: 진행중, regularSeasonRewardTaken: true }))
     act(() => 아랫시드.result.current.session.actions.confirmGameResult())
     act(() => 아랫시드.result.current.session.actions.pressPostseason())
     expect(아랫시드.result.current.screen).toEqual({ kind: '경기' })
     expect(아랫시드.result.current.session.progress?.game.playerSide).toBe(PLAYER_SIDE_FIRST_BAT)
 
-    const 윗시드 = 띄우기(시즌끝선수({ teamId: 2, gamesPlayed: 46, regularSeasonRewardTaken: true }))
+    const 윗시드 = 띄우기(시즌끝선수({ teamId: 2, gamesPlayed: 46, postseason: 진행중, regularSeasonRewardTaken: true }))
     act(() => 윗시드.result.current.session.actions.confirmGameResult())
     act(() => 윗시드.result.current.session.actions.pressPostseason())
     expect(윗시드.result.current.session.progress?.game.playerSide).toBe(PLAYER_SIDE_LAST_BAT)
@@ -714,16 +715,53 @@ describe('타자편 포스트시즌 대진 128 — 사람이 친다 (0x120a4 · 
     expect(rendered.result.current.session.progress?.opponentStartingPitcherIndex).toBe(2)
   })
 
-  it('포스트시즌 경기 결과 [확인] 은 관리 주기 대신 대진 128 로 돌아간다', () => {
-    const rendered = 띄우기(시즌끝선수({ gamesPlayed: 47, regularSeasonRewardTaken: true }))
+  it('포스트시즌 경기 결과 [확인] 은 관리 주기 대신 대진 128 로 돌아간다 — 시리즈가 이어질 때 (116 끝 g ≠ 0)', () => {
+    const 진행중 = { ...startPostseason([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]), teams: [0, 2] as const, wins: [1, 1] as [number, number] }
+    const rendered = 띄우기(시즌끝선수({ gamesPlayed: 47, postseason: 진행중, regularSeasonRewardTaken: true }))
     act(() => rendered.result.current.session.actions.confirmGameResult())
     expect(rendered.result.current.screen).toEqual({ kind: '포스트시즌', popup: null, fromReentry: false })
+  })
+
+  it('내 시리즈가 끝난 경기 뒤는 116 끝 g == 0 → 136 — 시즌 끝 사슬(392 → 370 → 375)을 다시 돌고 128 로 (0x12b74~0x12b94)', () => {
+    // 준PO 3위(2) 대 4위(3) 2승 1패에서 내가(2) 이겨 시리즈를 끝냈다 — 다음 라운드(PO)가 막 열려 g = 0
+    const 끝난준PO = advancePostseason({ ...startPostseason([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]), wins: [2, 1] }, 2)
+    expect(끝난준PO.round).toBe('플레이오프')
+    const rendered = 띄우기(
+      시즌끝선수({ teamId: 2, gamesPlayed: 49, postseason: 끝난준PO, regularSeasonRewardTaken: true, seasonEndState: 128 }),
+    )
+    // 이어하기는 128 — 경기 결과 화면에서 [확인] 했다 치고 116 의 끝을 밟는다
+    act(() => rendered.result.current.session.actions.confirmGameResult())
+    expect(rendered.result.current.screen).toEqual({ kind: '시즌종료' })
+    act(() => rendered.result.current.session.actions.beginYearEnd())
+    expect(rendered.result.current.screen).toEqual({ kind: '이벤트', eventId: 392, context: '시즌' })
+    expect(rendered.result.current.session.career?.seasonEndState).toBe(136)
+    이벤트보기(rendered, [396])
+    expect(rendered.result.current.screen).toEqual({ kind: '이벤트', eventId: 370, context: '시즌' })
+    이벤트보기(rendered, [371])
+    expect(rendered.result.current.screen).toEqual({ kind: '이벤트', eventId: 375, context: '시즌' })
+    이벤트보기(rendered, [376])
+    // 다시 128 — 정규시즌 우승 보상(S+0x77)은 이미 받아 팝업이 없다
+    expect(rendered.result.current.screen).toEqual({ kind: '포스트시즌', popup: null, fromReentry: false })
+    expect(rendered.result.current.session.career?.postseason).toEqual(끝난준PO)
+  })
+
+  it('경기 뒤(116, S+0x50 = 2)에 끊긴 이어하기도 116 의 끝처럼 — g == 0 이면 시즌 끝, 아니면 128', () => {
+    const 끝난준PO = advancePostseason({ ...startPostseason([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]), wins: [2, 1] }, 2)
+    expect(띄우기(시즌끝선수({ teamId: 2, gamesPlayed: 49, postseason: 끝난준PO })).result.current.screen).toEqual({
+      kind: '시즌종료',
+    })
+    const 진행중 = { ...startPostseason([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]), wins: [1, 1] as [number, number] }
+    expect(
+      띄우기(시즌끝선수({ teamId: 2, gamesPlayed: 47, postseason: 진행중, regularSeasonRewardTaken: true })).result.current
+        .screen,
+    ).toEqual({ kind: '포스트시즌', popup: null, fromReentry: true })
   })
 
   it('내 팀 우승 — 팝업 7 [137] → 팝업 8 [190] 보상 → 연말(132) 이벤트', () => {
     const 끝난대진 = { ...startPostseason([0, 1, 2, 3]), round: '종료' as const, teams: [0, 1] as const, champion: 0 }
     const rendered = 띄우기(시즌끝선수({ gamesPlayed: 50, postseason: 끝난대진, regularSeasonRewardTaken: true }))
-    act(() => rendered.result.current.session.actions.confirmGameResult())
+    // 한국시리즈를 끝낸 경기 뒤 116 은 g == 0 → 136 사슬을 다시 돌아 131 뒤 128 로 온다
+    이벤트보기(rendered, [376])
     act(() => rendered.result.current.session.actions.pressPostseason())
     expect(rendered.result.current.screen).toEqual({ kind: '포스트시즌', popup: { kind: '우승발표', champion: 0 } , fromReentry: false })
 
@@ -787,7 +825,7 @@ describe('타자편 포스트시즌 대진 128 — 사람이 친다 (0x120a4 · 
   it('다른 팀 우승 — 팝업 7 만 닫고 보상 없이 연말로', () => {
     const 끝난대진 = { ...startPostseason([0, 1, 2, 3]), round: '종료' as const, teams: [1, 2] as const, champion: 1 }
     const rendered = 띄우기(시즌끝선수({ gamesPlayed: 46, postseason: 끝난대진, regularSeasonRewardTaken: true }))
-    act(() => rendered.result.current.session.actions.confirmGameResult())
+    이벤트보기(rendered, [376])
     act(() => rendered.result.current.session.actions.pressPostseason())
     act(() => rendered.result.current.session.actions.closePostseasonPopup())
     expect(rendered.result.current.session.career).toMatchObject({ popularity: 1000, reputation: 300, money: 1000 })
