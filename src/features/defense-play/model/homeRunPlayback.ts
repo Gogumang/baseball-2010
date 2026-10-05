@@ -24,6 +24,7 @@ import {
 } from '@/features/defense-play/model/defensePlayView'
 import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
+import { runnerFatesWithoutPlay } from '@/features/defense-play/model/runnerFates'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 
 /**
@@ -198,6 +199,8 @@ export function homeRunPlaybackOf(input: HomeRunPlaybackInput): DefensePlayResul
     errantThrow: false,
     specialDefense: { jumpUnlocked: false, slideUnlocked: false },
     laserThrow: false,
+    // 타자주자 + 루의 주자 전원 홈 — 원본도 상태 0x17 주자 틱(0xaa0a8)이 하나하나 +0x95·+0x96 을 세운다
+    runnerFates: runnerFatesWithoutPlay(input.bases, input.outcome),
     log: [`홈런 — ${lastBallTick}틱에 담장을 넘었다 (${ticks.length}틱 재생)`],
   }
 }

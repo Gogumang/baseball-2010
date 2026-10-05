@@ -99,6 +99,7 @@ import { chooseThrowTargetBase, isSpecialThrow } from '@/entities/fielding/model
 import { EMPTY_BASES, type AdvanceResult, type BaseState } from '@/entities/game/model/baseState'
 import type { ManualAutoMode } from '@/entities/settings/model/gameSettings'
 import { forecastCatch } from '@/features/defense-play/model/catchForecast'
+import { runnerFateOf, type RunnerFate } from '@/features/defense-play/model/runnerFates'
 import {
   viewStateOf,
   type ActionMemory,
@@ -391,6 +392,13 @@ export interface DefensePlayResult {
   readonly rundowns?: number
   /** 협살로 잡은 아웃 수 */
   readonly rundownOuts?: number
+  /**
+   * **주자 목록의 운명** — 원본 목록 순서 그대로(`[타자주자?, 1루?, 2루?, 3루?]`, `runnerFates.ts` 머리말).
+   * 정산 `0xa8024` 가 읽는 +0x95(득점)·+0x96(처리 끝)을 옮긴 것이라 R+0x128(실점)·R+0x130(출루 허용)을
+   * 원본대로 셀 수 있다 (`chargedRunsOfFates` · `baserunnerAllowedOfFates`).
+   * 점수판 득점(`advance.runsScored`)과 달리 **3아웃으로 날아간 보류 득점의 주자도 `scored` 다**.
+   */
+  readonly runnerFates: readonly RunnerFate[]
   /** 사람이 읽을 진행 기록 — 테스트가 "왜 그렇게 됐나" 를 확인할 때 쓴다 */
   readonly log: readonly string[]
 }
@@ -1526,6 +1534,8 @@ export function defensePlayResultOf(state: DefensePlayState): DefensePlayResult 
     laserThrow: state.laserThrow,
     rundowns: state.rundowns,
     rundownOuts: state.rundownOuts,
+    // 진행기 주자 배열이 곧 원본 목록 순서다 — 0 = 타자주자, 그 뒤 찬 루 오름차순 (`createPlayRunners`)
+    runnerFates: runners.map((runner) => runnerFateOf(runner.state)),
     log: state.log,
   }
 }

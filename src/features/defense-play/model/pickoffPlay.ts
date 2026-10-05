@@ -31,6 +31,7 @@ import { EMPTY_BASES, type BaseState } from '@/entities/game/model/baseState'
 import type { ManualAutoMode } from '@/entities/settings/model/gameSettings'
 import { viewStateOf, type ActionMemory, type DefensePlayView } from '@/features/defense-play/model/defensePlayView'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
+import { runnerFateOf } from '@/features/defense-play/model/runnerFates'
 
 /**
  * **견제 한 판** — 플레이 종류 4 를 틱 단위로 돌린다 (0x50f28 → 상태 0x17 → 0xb28be · 0xb47da · 0xb4292).
@@ -350,6 +351,8 @@ export function runPickoffPlay(input: PickoffPlayInput): PickoffPlayResult {
     laserThrow: false,
     rundowns: 0,
     rundownOuts: 0,
+    // 목록 = 찬 루 오름차순, 타자주자 없음 (종류 4 — 위 "상태 0x17 진입" 주석)
+    runnerFates: runners.map((runner) => runnerFateOf(runner.state)),
     log,
   }
 }
