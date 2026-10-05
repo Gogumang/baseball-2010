@@ -278,6 +278,8 @@ export interface PitcherCareer {
   readonly league: League
   readonly leaguePlayerStats: LeaguePlayerStats
   readonly regularSeasonFirstCount: number
+  /** 정규시즌 우승 보상을 받았는가 S+0x77 — 128 팝업 0xb 닫힘이 켜고 새 시즌 0x1b7c0 이 지운다 (`postseasonFlow`) */
+  readonly regularSeasonRewardTaken: boolean
   readonly postseason: PostseasonSeries | null
   readonly lastMidSeasonGoalCount: number
   /**
@@ -368,6 +370,7 @@ export function createPitcherCareer(
     league: EMPTY_LEAGUE,
     leaguePlayerStats: EMPTY_LEAGUE_PLAYER_STATS,
     regularSeasonFirstCount: 0,
+    regularSeasonRewardTaken: false,
     postseason: null,
     lastMidSeasonGoalCount: 0,
     midSeasonEvaluatedYears: [],
@@ -712,6 +715,7 @@ export function startNextPitcherSeason(career: PitcherCareer): PitcherCareer {
     league: EMPTY_LEAGUE,
     leaguePlayerStats: EMPTY_LEAGUE_PLAYER_STATS,
     postseason: null,
+    regularSeasonRewardTaken: false,
     wins: 0,
     draws: 0,
     losses: 0,

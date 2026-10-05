@@ -5,10 +5,12 @@ import {
   enterPitcherYearEndEvent,
   finishPitcherYearEndEvent,
   nextPitcherYearEndStep,
+  PITCHER_POSTSEASON_STEP_ID,
   pitcherYearEndEventIdOf,
   pitcherYearEndRewardsOf,
 } from '@/entities/pitcher-career/model/pitcherYearEnd'
 import { salaryOfferOf } from '@/entities/career/model/seasonFlow'
+import { startPostseason } from '@/entities/league/model/league'
 import { ORIGINAL_EVENTS } from '@/shared/config/original/events'
 
 /** 이벤트 한 편을 그 이벤트의 보상 명령으로 끝낸다 — 세션은 재생기가 지나온 보상을 넘긴다 */
@@ -135,5 +137,17 @@ describe('연말 이벤트 보상 (명령 7, 점프표 0xd4e50)', () => {
     const 잘함 = 투수({ season: 2, stats: 좋은성적 })
     expect(enterPitcherYearEndEvent(잘함, 375).mvpSeasonBits).toBe(1 << 1)
     expect(enterPitcherYearEndEvent(잘함, 370)).toBe(잘함)
+  })
+})
+
+describe('128 포스트시즌 걸음', () => {
+  it('376/377 뒤 대진이 있으면 128, 128 을 마친 표식이 있으면 132 의 이벤트', () => {
+    const 대진 = 투수({ season: 2, postseason: startPostseason([0, 1, 2, 3, 4, 5, 6, 7]) })
+    expect(nextPitcherYearEndStep(대진, [392, 393, 370, 371, 375, 376])).toEqual({ kind: '포스트시즌' })
+    expect(nextPitcherYearEndStep(대진, [392, 393, 370, 371, 375, 376, PITCHER_POSTSEASON_STEP_ID])).toEqual({
+      kind: '이벤트',
+      eventId: 380,
+    })
+    expect(nextPitcherYearEndStep({ ...대진, postseason: null }, [375, 376])).toEqual({ kind: '이벤트', eventId: 380 })
   })
 })

@@ -58,9 +58,9 @@ import type { OriginalEvent } from '@/shared/config/original/eventTypes'
  * 사이 상태 (R9 확정):
  *   - **114** = 이벤트 재생(진입 0x11d00 · 키 0x13b88 · 틀 0x1c014). 각 상태가 `[다음 114, 뒤 X]` 로 이벤트를 틀고,
  *     끝나면 뒤 상태 X 로 간다. 뒤가 132 면 새 시즌 0x1b768 → 137 → 105. 웹 투수편은 `StoryScreen` 이 이 자리다.
- *   - **128** = 포스트시즌 대진(진입 0x120a4 · 키 0x13da0 · 틀 0x15984) — 131 과 132 사이. 정규시즌 1위면
- *     StrMODE[191](인기도 +10 · 소지금 +500만), 한국시리즈 우승이면 [190](인기도 +15 · 평판 +25 · 소지금 +1000만).
- *     ⚠️ 투수편 웹은 포스트시즌을 사람이 치르지 않아(45경기 뒤 곧 시즌종료) 128 이 없다 — 이 사슬은 131 에서 132 로 간다.
+ *   - **128** = 포스트시즌 대진(진입 0x120a4 · 키 0x13da0 · 틀 0x15984) — 131 과 132 사이. 사슬은 `'포스트시즌'` 걸음을
+ *     내고, 세션이 공용 모델 `postseasonFlow` 로 128 을 돌린 뒤 본 번호에 `PITCHER_POSTSEASON_STEP_ID` 를 얹어
+ *     다시 부르면 132 로 간다. 대진이 없으면(정규시즌이 안 닫힘) 곧장 132.
  *   - **133** = 국가대표 선발(0x1a090) — 132 가 연차idx 짝수면 뒤 상태로 넣는다. 사슬 밖이라 세션이 잇는다
  *     (`achievedPitcherGoalCount(career, '국가대표')` → 461/462).
  */
@@ -83,6 +83,11 @@ export type PitcherYearEndEventStep =
   | { readonly kind: '새시즌' }
   /** 500·501·503·504 뒤 — 엔딩 화면 141 */
   | { readonly kind: '엔딩'; readonly endingIndex: number }
+  /** 131(376/377) 뒤 — 포스트시즌 대진 128 */
+  | { readonly kind: '포스트시즌' }
+
+/** 128 을 마쳤다는 표시 — 이벤트 번호가 아니라 사슬의 `viewed` 에 얹는 웹 표식이다 */
+export const PITCHER_POSTSEASON_STEP_ID = -128
 
 /** 연말 분기 0x10c54 의 이벤트 번호 — `pitcherYearEndStepOf` 와 같은 판정을 번호로 낸다 */
 export function pitcherYearEndEventIdOf(career: PitcherCareer): number {
@@ -118,7 +123,11 @@ export function nextPitcherYearEndStep(career: PitcherCareer, viewed: readonly n
     return { kind: '이벤트', eventId: salaryResultEventId(choice, pitcherSalaryNegotiationRankOf(career)) }
   }
   // 상태 132 — 502·496 의 선택지는 데이터의 gotoEvent 로 380·503 에 이어진다
-  if (sawAny(MVP_RESULT_EVENT_IDS)) return { kind: '이벤트', eventId: pitcherYearEndEventIdOf(career) }
+  if (sawAny(MVP_RESULT_EVENT_IDS)) {
+    // 131 → 128 → 132. 128 은 대진(L+0x34)이 있을 때만이다 — 정규시즌이 닫히면 0xb818c 가 늘 연다
+    if (!saw(PITCHER_POSTSEASON_STEP_ID) && career.postseason !== null) return { kind: '포스트시즌' }
+    return { kind: '이벤트', eventId: pitcherYearEndEventIdOf(career) }
+  }
   if (saw(MVP_INTRO_EVENT_ID)) {
     // 0x8b370 — 상태 131 이 남긴 플래그(evt+0x388)를 읽는다. 웹은 그 해 MVP 비트가 같은 값이다
     return { kind: '이벤트', eventId: mvpResultEventId(judgePitcherSeasonAwards(career).isMostValuablePlayer) }

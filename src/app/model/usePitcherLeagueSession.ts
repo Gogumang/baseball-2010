@@ -3,7 +3,6 @@ import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCaree
 import {
   applyPitcherGameResult,
   applyPitcherLeagueDay,
-  applyPitcherPostseasonProgress,
   applyPitcherSeasonEnd,
   countCompleteGame,
   createPitcherCareer,
@@ -19,7 +18,17 @@ import {
   enterPitcherYearEndEvent,
   finishPitcherYearEndEvent,
   nextPitcherYearEndStep,
+  PITCHER_POSTSEASON_STEP_ID,
 } from '@/entities/pitcher-career/model/pitcherYearEnd'
+import {
+  applyKoreanSeriesReward,
+  applyRegularSeasonReward,
+  popupAfterChampion,
+  pressPostseasonBracket,
+  regularSeasonPopupOnEnter,
+  REGULAR_SEASON_HIDDEN_ID,
+} from '@/entities/career/model/postseasonFlow'
+import type { PostseasonPopup } from '@/entities/career/model/postseasonFlow'
 import { applyPitcherEventRewards, finishPitcherEvent } from '@/entities/pitcher-career/model/pitcherEventReward'
 import {
   PITCHER_YEAR_START_EVENT,
@@ -103,10 +112,10 @@ import { PITCHER_MANAGEMENT_TEXT } from '@/pages/pitcher-league/lib/pitcherManag
  * 화면 유니온 — 원본 장면 0x106 의 상태 번호를 괄호에 적는다.
  *   등록(101~104) · 관리(105) · 경기(144) · 시즌종료(136 자리) · 연말(132 — 502 갈림길 화면) · 엔딩(141) ·
  *   상점(111 장비 상점 / 121 장비착용 — 어느 쪽인지는 `shopTab`) · 외출(112 지도 · 113 장소) ·
- *   이벤트(114 이벤트 재생 — 무엇을 틀었는지는 `story`)
+ *   이벤트(114 이벤트 재생 — 무엇을 틀었는지는 `story`) · 포스트시즌(128 대진 — 팝업은 `postseasonPopup`)
  */
 export type PitcherScene =
-  | '등록' | '관리' | '경기' | '시즌종료' | '연말' | '엔딩' | '상점' | '외출' | '이벤트' | '마선수대결'
+  | '등록' | '관리' | '경기' | '시즌종료' | '연말' | '엔딩' | '상점' | '외출' | '이벤트' | '마선수대결' | '포스트시즌'
 
 /**
  * 이벤트 재생(상태 114)을 **어디서** 틀었나 — 끝난 뒤 갈 곳(장면+0x24 "뒤 상태")이 이것으로 갈린다.
@@ -166,6 +175,8 @@ export interface PitcherLeagueSession {
   readonly eventPlaceIds: ReadonlySet<string>
   /** 이벤트 번호별 `%s` 글 — 380 연봉 제시액(0x8bc4c → 금액 서식 0x55cf4). 기본이면 undefined */
   readonly storyReplacementsFor: (eventId: number) => readonly string[] | undefined
+  /** 128 대진 위 팝업 (0xb 정규시즌 우승 · 7 우승 팀 발표 · 8 한국시리즈 우승). 없으면 null */
+  readonly postseasonPopup: PostseasonPopup | null
   /** 치르는 마선수 대결 (장면 '마선수대결'). 아니면 null */
   readonly aceMatch: PitcherAceMatch | null
   /** 이벤트 재생 뒤 띄울 알림 — 히든 오픈(보상 7) 팝업 글 · 옮기지 않은 갈래. 없으면 '' */
@@ -214,6 +225,10 @@ export interface PitcherLeagueSession {
     /** 대결이 끝났다 — 105 진입이 +0x176 을 보고 140 → 결과 이벤트 resultEvents[이김 ? 0 : 1] */
     readonly finishAceMatch: (isWin: boolean) => void
     readonly dismissStoryNotice: () => void
+    /** 128 [다음] — 키 0x13da0 (끝났으면 우승 발표 · 내 차례면 경기 · 아니면 CPU 끼리) */
+    readonly pressPostseason: () => void
+    /** 128 팝업 닫힘 — 틀 0x15984 */
+    readonly closePostseasonPopup: () => void
     readonly reset: () => void
   }
 }
@@ -329,6 +344,10 @@ export function usePitcherLeagueSession(
   const [gameOptions, setGameOptions] = useState<PitcherGameOptions | null>(null)
   const [story, setStory] = useState<PitcherStory | null>(null)
   const [storyNotice, setStoryNotice] = useState('')
+  /** 128 로 넘어가며 접어 둔 연말 사슬의 본 번호 — 128 이 끝나면 여기서 132 로 잇는다 */
+  const yearEndViewedRef = useRef<readonly number[]>([])
+  const [postseasonPopup, setPostseasonPopup] = useState<PostseasonPopup | null>(null)
+
 
   /** 이벤트 재생(114)으로 — 뒤 상태는 `story.context` 가 정한다 */
   const openStory = useCallback((next: PitcherStory) => {
@@ -606,7 +625,9 @@ export function usePitcherLeagueSession(
       // 경기 끝 0x4ea0c: 기록 달성 G 를 저장 G 에 더한 뒤 0x4ec82 `0x22c7d(액수, 모드 3)` 로 획득 GP 통계에 적는다
       recordStat({ kind: 'G획득', mode: PITCHER_LEAGUE_MODE, amount: outcome.gamePointReward })
       const day = applyPitcherLeagueDay(recorded, random)
-      const seasoned = applyPitcherPostseasonProgress(applyPitcherSeasonEnd(day), random)
+      // 45경기째면 하루 끝(0xb818c)이 정규시즌을 닫고 대진(0xb80a8)을 연다. CPU 끼리의 포스트시즌 경기는
+      // 여기서 돌리지 않는다 — 원본은 대진 128 의 [확인](0x13da0)에서 돌린다 (`pressPostseasonBracket`)
+      const seasoned = applyPitcherSeasonEnd(day)
       /*
        * 경기 뒤 평가 0xa719c(인기도 0xa690c → 평판 0xa6218 → 사기)는 **정규시즌 경기만** 탄다. 유일한 호출지
        * 0x4ea0c 안 0x4f274 앞에서 0x4f216(L+0xac 국가대항전)·0x4f268(L+0x34 포스트시즌)이 0x4f29a(하루 끝)로
@@ -628,6 +649,15 @@ export function usePitcherLeagueSession(
       const counted = isEvaluated ? countCompleteGame(evaluated, summary.evaluation.countedCompleteGame) : evaluated
       setGameOptions(null)
 
+      /*
+       * 포스트시즌 경기 뒤 — 116 의 끝(0x12b74)이 S+0xb4 ≠ 0 이고 경기 수 ≠ 0 이면 [114 → 128] (R9 116절).
+       * 관리 주기·부상 엔딩·중간평가를 타지 않는다. 45번째 경기는 경기 전 대진이 없어 아래 시즌종료로 간다.
+       */
+      if (career.postseason !== null) {
+        commit(counted)
+        setPostseasonPopup(regularSeasonPopupOnEnter(counted))
+        return setScene('포스트시즌')
+      }
       // 경기 뒤 평가 116 의 끝 — 정규시즌이 닫혔으면 시즌 끝 사슬(136→…→132)로 간다.
       // 45경기를 다 치렀는지는 `isPitcherSeasonFinished`(0xb818c) 가 본다.
       if (isPitcherSeasonFinished(counted)) {
@@ -716,9 +746,7 @@ export function usePitcherLeagueSession(
    *   - 463 출전 → 134 국가대항전 순위 화면 → 142 → 투수 경기: 투수편 국가대항전은 옮기지 않았다.
    *     알림을 띄우고 새 시즌으로 넘긴다 (대회 보상·히든 팀 오픈 없음).
    *   - 462 탈락: 원본은 뒤 = 105 로만 적혀 있고 새 시즌 처리가 안 보인다 — 타자편과 같이 새 시즌으로 넘긴다.
-   *   - 128 (131 뒤 포스트시즌 대진 · 정규시즌 우승 StrMODE[191] 인기도+10/소지금+500만 · 한국시리즈 우승 [190]
-   *     인기도+15/평판+25/소지금+1000만, 틀 0x15984): 투수편 웹은 45경기 뒤 곧장 시즌종료로 와서 포스트시즌을
-   *     사람이 치르지 않는다 — 128 없이 131 에서 132 로 간다.
+   *   (128 포스트시즌 대진은 131 과 132 사이 — 아래 `pressPostseason` · `closePostseasonPopup`)
    */
   const continueYearEnd = useCallback(
     (current: PitcherCareer, viewed: readonly number[]) => {
@@ -731,6 +759,13 @@ export function usePitcherLeagueSession(
         return startNewSeason(current)
       }
       const step = nextPitcherYearEndStep(current, viewed)
+      if (step.kind === '포스트시즌') {
+        // 131 뒤 128 진입 0x120a4 — 정규시즌 우승 보상을 아직 안 받았고 1위면 팝업 0xb
+        yearEndViewedRef.current = viewed
+        commit(current)
+        setPostseasonPopup(regularSeasonPopupOnEnter(current))
+        return setScene('포스트시즌')
+      }
       if (step.kind === '이벤트') return openYearEndEvent(current, step.eventId, viewed)
       if (step.kind === '엔딩') return enterEnding(current, step.endingIndex)
       // 연차idx 는 **끝난 해**의 것이라 새 시즌을 올리기 전에 본다 (0x10ce6~0x10cf8)
@@ -1082,6 +1117,45 @@ export function usePitcherLeagueSession(
   )
   const dismissStoryNotice = useCallback(() => setStoryNotice(''), [])
 
+  /** 128 이 끝났다 (팝업 7 · 8 닫힘 → 132 연말) — 접어 둔 연말 사슬을 이어 연말 0x10c54 의 이벤트로 */
+  const finishPostseason = useCallback(
+    (finished: PitcherCareer) => {
+      setPostseasonPopup(null)
+      continueYearEnd(finished, [...yearEndViewedRef.current, PITCHER_POSTSEASON_STEP_ID])
+    },
+    [continueYearEnd],
+  )
+
+  /**
+   * 대진 128 [다음] — 키 0x13da0 (팝업이 떠 있으면 키가 안 먹는다, 0x1d06a 의 0x754f9).
+   * 끝났으면 [137] 우승 팀 발표(팝업 7) · 지금 라운드에 내 팀이 있으면 경기(142 → 144 → 경기 장면 — 웹은 곧장)
+   * · 아니면 CPU 끼리 내 차례/끝까지 돌리고 128 에 머문다.
+   * 투수편 경기는 `isPostseason` 이라 0xa4f60 이 −2(그대로)를 돌려 **로스터 0번 = 내 투수가 늘 선발**이다 (P1 1-2) —
+   * 정규시즌처럼 짝수 날만이 아니다.
+   */
+  const pressPostseason = useCallback(() => {
+    if (career === null || career.postseason === null || scene !== '포스트시즌' || postseasonPopup !== null) return
+    const result = pressPostseasonBracket(career.postseason, career.teamId, random)
+    if (result.kind === '우승발표') return setPostseasonPopup({ kind: '우승발표', champion: result.champion })
+    if (result.kind === '내경기') return beginGame()
+    commit({ ...career, postseason: result.series })
+  }, [beginGame, career, commit, postseasonPopup, random, scene])
+
+  /** 128 팝업 닫힘 — 틀 0x15984. 0xb 는 보상 뒤 128 에 머물고(해금 0x32 — 투수편), 7 → (내 팀 우승이면 8) → 132 */
+  const closePostseasonPopup = useCallback(() => {
+    if (career === null || scene !== '포스트시즌' || postseasonPopup === null) return
+    if (postseasonPopup.kind === '정규시즌우승') {
+      commit(applyRegularSeasonReward(career, REGULAR_SEASON_HIDDEN_ID.투수편))
+      return setPostseasonPopup(null)
+    }
+    if (postseasonPopup.kind === '우승발표') {
+      const next = popupAfterChampion(career, postseasonPopup.champion)
+      if (next !== null) return setPostseasonPopup(next)
+      return finishPostseason(career)
+    }
+    finishPostseason(applyKoreanSeriesReward(career))
+  }, [career, commit, finishPostseason, postseasonPopup, scene])
+
   const reset = useCallback(() => {
     setCareer(null)
     setGameOptions(null)
@@ -1106,6 +1180,7 @@ export function usePitcherLeagueSession(
     storyReplacementsFor,
     storyNotice,
     aceMatch,
+    postseasonPopup,
     actions: {
       create,
       save: saveFromScreen,
@@ -1130,6 +1205,8 @@ export function usePitcherLeagueSession(
       beginAceMatch,
       finishAceMatch,
       dismissStoryNotice,
+      pressPostseason,
+      closePostseasonPopup,
       reset,
     },
   }

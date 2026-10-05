@@ -7,6 +7,7 @@ import { PitcherShopScreen } from '@/pages/shop/ui/PitcherShopScreen'
 import { EndingScreen } from '@/pages/ending/ui/EndingScreen'
 import { OutingMapScreen } from '@/pages/outing-map/ui/OutingMapScreen'
 import { StoryScreen } from '@/pages/story/ui/StoryScreen'
+import { PostseasonScreen } from '@/pages/season-end/ui/PostseasonScreen'
 import { MessageBox, ScreenOverlay } from '@/shared/ui'
 import { TEAMS } from '@/shared/config/original/teams'
 import {
@@ -37,7 +38,7 @@ interface PitcherLeagueRouteProps {
  * 나만의리그 **투수편** 라우팅 (원본 게임 모드 3, 장면 0x106).
  *
  * 등록(0x65 → 0x66) → 관리(상태 105 허브) → 경기 → 정산 한 바퀴를 돌다가,
- * 45경기를 다 치르면 **시즌종료(136 자리) → 연말(132) → 엔딩(141)** 로 빠진다.
+ * 45경기를 다 치르면 **시즌종료(136 자리) → 130·131 → 포스트시즌 대진(128) → 연말(132) → 엔딩(141)** 로 빠진다.
  * 관리 화면 안의 선수정보·트레이닝·구질 훈련·휴식은 `PitcherManagementScreen` 이 스스로 돈다.
  *
  * [외출] → **112 외출 지도** 는 타자편 화면(`OutingMapScreen`)을 그대로 쓴다 — 원본 모드 3·4 가 같은 상태·
@@ -134,6 +135,18 @@ export function PitcherLeagueRoute({
 
   if (scene === '마선수대결' && session.aceMatch !== null && renderAceMatch !== undefined) {
     return <>{renderAceMatch(session.aceMatch, actions.finishAceMatch)}</>
+  }
+
+  // 128 포스트시즌 대진 — 타자편과 같은 화면·같은 상태 함수(모드 갈림은 해금 id 하나, `postseasonFlow`)
+  if (scene === '포스트시즌') {
+    return (
+      <PostseasonScreen
+        series={career.postseason}
+        popup={session.postseasonPopup}
+        onConfirm={actions.pressPostseason}
+        onClosePopup={actions.closePostseasonPopup}
+      />
+    )
   }
 
   if (scene === '시즌종료') {

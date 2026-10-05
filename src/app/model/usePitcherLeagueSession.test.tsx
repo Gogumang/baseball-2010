@@ -191,6 +191,37 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     expect(result.current.career?.postseason).not.toBeNull()
   })
 
+  it('131 뒤 128 포스트시즌 — 내 차례면 내가 선발로 던지고 결과 뒤 128 로, 끝나면 우승 발표 → 132(380)', () => {
+    const result = 판짜기({
+      season: 2,
+      gamesPlayed: 45,
+      popularity: 300,
+      postseason: startPostseason([3, 0, 1, 2, 4, 5, 6, 7]),
+    })
+    act(() => result.current.actions.beginYearEnd())
+    const 본것 = 연말끝까지(result)
+    expect([376, 377]).toContain(본것[본것.length - 1])
+    expect(result.current.scene).toBe('포스트시즌')
+
+    const 경기들: boolean[] = []
+    for (let guard = 0; guard < 40 && result.current.scene !== '이벤트'; guard += 1) {
+      if (result.current.scene === '경기') {
+        // 포스트시즌은 0xa4f60 이 −2(그대로) — 늘 내 투수가 선발이다
+        경기들.push(result.current.gameOptions!.isPostseason)
+        act(() => result.current.actions.finishGame(경기요약))
+        expect(result.current.scene).toBe('포스트시즌')
+        continue
+      }
+      if (result.current.postseasonPopup !== null) act(() => result.current.actions.closePostseasonPopup())
+      else act(() => result.current.actions.pressPostseason())
+    }
+
+    expect(경기들.length).toBeGreaterThan(0)
+    expect(경기들.every(Boolean)).toBe(true)
+    expect(result.current.career?.postseason?.round).toBe('종료')
+    expect(result.current.story).toMatchObject({ eventId: 380, context: '연말' })
+  })
+
   /**
    * 2경기 주기 — 상태 116 의 끝 `0x12b98~0x12bb2` 가 `S+0xb2`(경기 수)의 비트0 을 보고
    * 짝수면 105(관리), 홀수면 109(순위표 → 곧 다음 경기)로 간다. 모드 갈림이 없어
