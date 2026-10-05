@@ -171,7 +171,7 @@ jar 파일 287개(META-INF 빼고): pzx 142 · mmf 52 · zt1 30 · ptc 26 · mpl
 | 에셋 | 근거 | 필요도 | 설명 |
 |---|---|---|---|
 | **ace/defender_<마선수> 10개** (medica·psyker·leony·bbmachine·ballantine·dragona·kao·roze·death·tiger) | 이름 표 0xd3f10(20바이트 간격) ← 0x79a54(수비수 그림 적재, I 에 한 줄) · 0x7998c(0) · 부르는 곳 0x3a5f0(경기 상태 30 진입)·0x3fac4·0x47cc8 | **중** | 마선수가 수비에 설 때 쓰는 수비 스프라이트 고르기 규칙. 웹 src 참조 0. R3(수비 화면)에 붙이면 됨 |
-| bat/batter_ghost.pzx | 0xd3748 ← 0x767ec(0x88, 문서 0) | 하 | 웹 src 2곳이 이미 씀 — 원본 쓰임(언제 그리나) 확인만 |
+| bat/batter_ghost.pzx | 0xd3748 *(정정: 0xd3744 — R6 7-2)* ← 0x767ec(0x88, 문서 0) | 하 | 웹 src 2곳이 이미 씀 — 원본 쓰임(언제 그리나) 확인만 |
 | ui/gpoint.pzx | 0xd1ffc ← 0x5390c(0x218, 문서 0) | 하 | G포인트 아이콘/숫자. 웹 src 2곳 사용 |
 | ace/ace_icon.pzx | 0xcc1d8 ← 0x781a·0x249a4·0x26378 | 하 | 마선수 아이콘. 웹 src 2곳 사용 |
 | ace/batter_death·kao·roze·tiger, pitcher_<마선수> 5 | 개별 이름 0, 웹 src 1곳씩 | 하 | 웹이 이미 씀. 원본 선택 규칙은 L 2-A·H 에 묶음으로 |

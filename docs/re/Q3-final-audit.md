@@ -130,7 +130,7 @@ jar 안 파일(META-INF·binary.mod 제외) = **285개**: pzx 142 · mmf 52 · z
 | `ace/batter_death·kao·roze·tiger.pzx` (4) | 이름표 **0xd3b08~0xd3b60** ← 타자 몸통 적재 **0x78ab0**(0x78b02 의 마선수 분기). C 127행은 일반 분기(balancer/sluger)만 적었다 | src 가 경로만 씀 | 하 — 마선수 타자 몸통. C 에 한 줄 덧붙이면 끝 |
 | `ace/pitcher_ballantine·bbmachine·dragona·leony·psyker.pzx` (5) | 이름표 **0xd3d78~0xd3de0** ← 투수 그림 적재 **0x793b0**(C 124행·R6 149행이 함수만 적음) | src 가 경로만 씀 | 하 — 마투수 그림 |
 | `ace/ace_icon.pzx` | 문자열 0xcc1dc | src 2곳 사용 | 하 |
-| `bat/batter_ghost.pzx` | 문자열 0xd3748 ← 0x767ec(0x88 바이트, 문서 0) | src 2곳 사용 | 하 — 스윙 잔상으로 보임(짐작) |
+| `bat/batter_ghost.pzx` | 문자열 0xd3748 *(정정: 0xd3744 — R6 7-2)* ← 0x767ec(0x88 바이트, 문서 0) | src 2곳 사용 | 하 — 스윙 잔상으로 보임(짐작) |
 | `ui/gpoint.pzx` | 문자열 0xd1ffc ← **0x5390c**(0x218, 문서 0) | src 2곳 사용 | 하 — G포인트 아이콘·숫자 |
 | `logo.pzx` | 앱 시작 로고 | src 사용 | 하 — 게임빌 로고 한 장 |
 
@@ -200,7 +200,7 @@ U-01~U-63 과 하나씩 맞대 보고 **겹치는 것은 뺐다**(예: 목록 �
 | **N-1** | **마선수 타자 몸통·마투수 그림을 고르는 분기** | 이름표 **0xd3b08~0xd3b60**(ace/batter_death·kao·roze·tiger) ← **0x78ab0**(0x78b02) · 이름표 **0xd3d78~0xd3de0**(ace/pitcher_ballantine·bbmachine·dragona·leony·psyker) ← **0x793b0** | 하 | C 문서가 같은 두 함수의 **일반 선수 갈래만** 적었다. 마선수 갈래(번호 → 표 index)가 비어 있다. 웹 `acePlayers.ts` 는 경로만 가지고 있다 |
 | **N-2** | **아이템 설명 줄 조립 `0x82400`** (0x7ea, `!N효과 : !cFFFF00` + StrITEM) | 0x82400 ← 0x81dc0 | 하~중 | R12 4절은 **형제 함수 0x837ea(구장 아이템)**만 다뤘다. 일반 아이템 설명 창이 효과 문구를 어떻게 만드는지가 빈다 |
 | **N-3** | **r_event 레코드 파서 9종 (표 0xd84a0)** | 0xadd10 ← 0x8be20(시즌 211 · 나리 114), 칸 0xac858·0xac8f0·0xac94c·0xac9b8·0xaca00·0xaca30·0xaca64 | 하 | L 40행이 "해석기 0x8cf64 가 명령 종류 9칸 표 0xd4ec0 을 탄다" 고 한 그 9종을 **읽어 들이는 쪽**. A 가 r_event 형식을 이미 확정했으니 규칙 구멍은 아니다(유력) |
-| **N-4** | **안 다뤄진 에셋 13개** | 3절 표 | 하 | ace_icon · ace/batter_×4 · ace/pitcher_×5 · bat/batter_ghost(0xd3748←0x767ec) · ui/gpoint(0xd1ffc←0x5390c) · logo.pzx |
+| **N-4** | **안 다뤄진 에셋 13개** | 3절 표 | 하 | ace_icon · ace/batter_×4 · ace/pitcher_×5 · bat/batter_ghost(0xd3748 *(정정: 0xd3744)*←0x767ec) · ui/gpoint(0xd1ffc←0x5390c) · logo.pzx |
 | **N-5** | **StrTIP 74줄(경기 로딩 팁)을 고르는 규칙** | StrTIP 표 · 로딩 화면 | 하 | 웹은 8곳에서 팁을 쓰는데 **원본이 어떤 순서·조건으로 고르는지**(무작위인지, 모드별인지)가 어느 문서에도 없다 |
 | **N-6** | **이벤트 스크립트 창 그리기 `0x86c90`(0x34c)·`0x86fdc`** | 0x8cf64 점프표에서 부름 | 하 | Q0 이 한 번 적었으나 어느 R 노트도 가져가지 않았다. (0x86fdc 의 "목표 표 읽는 줄" 만 U-23 과 겹친다) |
 | **N-7** | **글 입력 창 그리기 안쪽 `0x2d4c0`(0x668)** | ← 0x306bc (메인 메뉴 상태 38) | 하 | R11 이 입력 규칙(글자 수·저장)은 확정했고 **그리기 배치**만 남았다 |
