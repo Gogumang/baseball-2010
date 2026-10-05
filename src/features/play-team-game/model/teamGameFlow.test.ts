@@ -47,6 +47,7 @@ import type { TeamGameOptions, TeamGameProgress } from '@/features/play-team-gam
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { battingPatternOdds } from '@/shared/config/original/battingPatterns'
 import { ACE_BATTERS } from '@/entities/game/model/aceOpponent'
+import { aceLeveledAbility } from '@/features/play-team-game/model/teamGameRoster'
 
 const 기본옵션: TeamGameOptions = {
   mode: 2,
@@ -943,7 +944,8 @@ describe('마투수 등판 — 0xb88c8 → 0xb521c 의 0x60 가지 (8번 칸)', 
   })
 
   it('마투수가 벤치 목록에 들어와 `#` 교체로 마운드에 설 수 있다', () => {
-    const { progress } = 시작({ mode: 1, acePitcherId: 1 })
+    // 레벨 배율(0xb6414)을 100% 로 두어 날 능력치끼리 견준다 — 레오니는 순번 1 = 칸 1
+    const { progress } = 시작({ mode: 1, acePitcherId: 1, aceLevels: { 1: 4 } })
     // team+0x33 = 명부 − 1 이라 벤치가 일곱에서 여덟으로 는다
     expect(availablePitchers(progress)).toContain(8)
     const 바꾼뒤 = changePitcher(progress, 8)
@@ -951,6 +953,23 @@ describe('마투수 등판 — 0xb88c8 → 0xb521c 의 0x60 가지 (8번 칸)', 
     // 마투수 능력치·구질이 그대로 마운드에 올라온다 (레오니 = 폼 7 · 마구 6)
     expect(pitchSlotsFor(바꾼뒤).some((slot) => slot.isMagic)).toBe(true)
     expect(ourPitcherStats(바꾼뒤).velocity).toBeGreaterThan(ourPitcherStats(progress).velocity)
+  })
+
+  it('마투수 능력치는 0xb6414 첫 단계에서 0xd88aa[mgr[0x13a + 순번]] 배율을 먹는다 — 모드 1 도 (팀 보정은 그 뒤)', () => {
+    const 구속 = (aceLevels?: Readonly<Record<number, number>>) =>
+      ourPitcherStats(changePitcher(시작({ mode: 1, acePitcherId: 1, ...(aceLevels === undefined ? {} : { aceLevels }) }).progress, 8))
+        .velocity
+    // 레오니 구속 850: Lv1 60% = 510 · Lv5 100% = 850. 팀 능력치 보정은 더하기라 차이가 그대로 남는다
+    expect(구속({ 1: 4 }) - 구속()).toBe(850 - 510)
+    // 안 넘기면 새 저장 기본값 Lv1 과 같다. 다른 칸(마타자 칸 6)의 레벨은 상관없다
+    expect(구속({ 1: 0, 6: 4 })).toBe(구속())
+  })
+
+  it('마선수 레벨 배율 — 타자는 칸 +5 (0xb6442), 마선수가 아니면 그대로', () => {
+    expect(aceLeveledAbility([600, 700, 800, 900], '타자', 0, { 0: 4, 5: 2 })).toEqual([480, 560, 640, 720])
+    expect(aceLeveledAbility([600, 700, 800, 900], '투수', 0, { 0: 4, 5: 2 })).toEqual([600, 700, 800, 900])
+    expect(aceLeveledAbility([600, 700, 800, 900], '투수', 4, undefined)).toEqual([360, 420, 480, 540])
+    expect(aceLeveledAbility([600, 700, 800, 999], '타자', -1, { 5: 0 })).toEqual([600, 700, 800, 999])
   })
 
   it('시즌모드는 0x30f20 을 안 타므로 양 팀 모두 마투수가 없다', () => {

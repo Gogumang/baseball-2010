@@ -596,6 +596,7 @@ function abilityContextOf(options: TeamGameOptions): TeamGameAbilityContext {
     season: options.season,
     teamAbilities: options.teamAbilities,
     lineup: options.lineup,
+    aceLevels: options.aceLevels,
   }
 }
 

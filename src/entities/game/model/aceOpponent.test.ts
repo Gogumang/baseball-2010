@@ -30,6 +30,15 @@ describe('pitcherAbilityOf', () => {
     })
   })
 
+  it('레벨을 넘기면 0xb6414 배율 0xd88aa[mgr[0x13a + 순번]] 을 먼저 곱한다 — 순번 = ACE_PITCHERS 차례', () => {
+    const leony = ACE_PITCHERS[1]
+    // 레오니 제구 580·구속 850·변화 580 → Lv1 60% = 348·510·348
+    expect(pitcherAbilityOf(leony, {})).toMatchObject({ control: 35, velocity: 51, breaking: 35 })
+    expect(pitcherAbilityOf(leony, { 1: 4 })).toMatchObject(pitcherAbilityOf(leony))
+    // 다른 칸 레벨은 상관없다
+    expect(pitcherAbilityOf(leony, { 0: 4, 6: 4 })).toEqual(pitcherAbilityOf(leony, {}))
+  })
+
   it('마선수는 일반 투수보다 강하다', () => {
     for (const ace of ACE_PITCHERS) {
       const ability = pitcherAbilityOf(ace)

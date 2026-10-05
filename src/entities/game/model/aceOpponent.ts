@@ -3,6 +3,7 @@ import type { AcePlayer } from '@/shared/config/original/acePlayers'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
 import { ACE_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
 
 /**
  * 마선수 등판.
@@ -95,14 +96,28 @@ export function missionOpponentOf(opponentRole: AcePlayer['role'], order: number
  */
 const PITCHER_ENGINE_DIVISOR = 10
 
-export function pitcherAbilityOf(ace: AcePlayer): PitcherAbility {
+/**
+ * `aceLevels`(마선수 레벨 열 칸 `mgr[0x13a..0x143]`)를 넘기면 네 칸에 **레벨 배율**을 먼저 곱한다 —
+ * 실효 능력치 0xb6414 첫 단계 `v · 0xd88aa[mgr[0x13a + 순번]] / 100` (모드를 가리지 않는다, aa9ab0d).
+ * 순번은 `ACE_PITCHERS` 차례(= XlsACE_PIT_DATA 줄 차례, 0xb63a1)다.
+ *
+ * 안 넘기면 배율을 안 곱한다 — 이미 배율을 먹인 능력치를 넣는 미션(`useMissionSession`)이 그렇게 쓴다.
+ * ⚠️ 나만의리그 마선수 대결(`app/ui/GameRoute`)·홈런더비(`entities/home-run-derby/model/derbyPitcher`)는
+ *    아직 레벨을 안 넘긴다(다른 작업 구역) — 원본은 거기서도 배율을 먹는다.
+ */
+export function pitcherAbilityOf(ace: AcePlayer, aceLevels?: Readonly<Record<number, number>>): PitcherAbility {
   // 투구 엔진은 아직 0~100 눈금이라 경계에서 줄인다 — 원본 투구식 이식 때 없앤다
   // 폼·보유 구질은 같은 표(XlsACE_PIT_DATA)의 +0xb · +0x1c 에서 온다 — 마구(+0x18)는 아직 쓰지 않는다
   const repertoire = ACE_PITCHER_REPERTOIRES.find((candidate) => candidate.name === ace.name)
+  const order = ACE_PITCHERS.findIndex((candidate) => candidate.id === ace.id)
+  const ability =
+    aceLevels === undefined || order < 0
+      ? ace.ability
+      : aceAbilityAtLevel(ace.ability, aceLevelOf(aceLevels, aceLevelSlotOf('투수', order + 1)))
   return {
-    control: Math.round(ace.ability.hit / PITCHER_ENGINE_DIVISOR),
-    velocity: Math.round(ace.ability.power / PITCHER_ENGINE_DIVISOR),
-    breaking: Math.round(ace.ability.defense / PITCHER_ENGINE_DIVISOR),
+    control: Math.round(ability.hit / PITCHER_ENGINE_DIVISOR),
+    velocity: Math.round(ability.power / PITCHER_ENGINE_DIVISOR),
+    breaking: Math.round(ability.defense / PITCHER_ENGINE_DIVISOR),
     ...(repertoire === undefined ? {} : { repertoire: { form: repertoire.form, pitchMask: repertoire.pitchMask, magicId: repertoire.magicId } }),
   }
 }

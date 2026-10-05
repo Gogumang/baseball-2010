@@ -15,6 +15,7 @@ import { ACE_BATTERS, ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
 import { gameAbilitiesOf } from '@/features/play-team-game/model/gameAbilities'
+import { aceLevelOf, aceLevelSlotOf, applyAceLevelRate } from '@/entities/mission/model/aceLevel'
 import type {
   FieldingAssignment,
   SeasonTeamCondition,
@@ -46,6 +47,41 @@ export interface TeamGameAbilityContext {
   readonly teamAbilities?: readonly (readonly number[])[]
   /** 내 팀 타순 칸(0~11)별 수비 자리·보직 — 보직 불일치 판정 입력 */
   readonly lineup?: readonly FieldingAssignment[]
+  /**
+   * 마선수 레벨 열 칸 = 원본 전역 기록 `mgr[0x13a..0x143]` (칸 0~4 마투수 · 5~9 마타자 → 0~4).
+   * 마선수 명단 칸의 네 능력치가 0xb6414 첫 단계에서 `v · 0xd88aa[레벨] / 100` 을 먹는다 —
+   * 모드를 가리지 않고, 사람 팀·AI 팀 마선수 모두 **같은 전역 칸**을 본다 (`aceLeveledAbility`).
+   * 안 넘기면 모두 Lv1(0) = 60% 다 (새 저장 기본값 0x9f26c).
+   */
+  readonly aceLevels?: Readonly<Record<number, number>>
+}
+
+/**
+ * **마선수 레벨 배율** — 실효 능력치 0xb6414 의 첫 단계 (0xb570c 가 맨 앞 b5720 에서 부른다):
+ * ```
+ * b6426  v = s16 rec[+0xc + 2·칸]
+ * b6438  i = 0xb63a0(rec)              ; 마선수(+0xa 비트 6)면 +0xa & 0x1f = 순번, 아니면 −1
+ * b6442  if !0xb6278(rec): i += 5      ; 타자면 +5
+ * b6458  lv = s8 mgr[0x13a + i]
+ * b645e  v = v · s8 0xd88aa[lv] / 100  ; 0 쪽 버림, 자르지 않는다. 0xd88aa = [60,70,80,90,100]
+ * ```
+ * 모드·플래그·칸을 가리지 않으니 팀 경기(모드 1·2·8·9)의 마선수도 이 배율 **뒤에** 시즌·팀 보정을 먹는다.
+ * 마선수가 아니면(순번 −1) 그대로다.
+ */
+export function aceLeveledAbility(
+  ability: readonly [number, number, number, number],
+  role: '타자' | '투수',
+  aceIndex: number,
+  levels: Readonly<Record<number, number>> | undefined,
+): readonly [number, number, number, number] {
+  if (aceIndex < 0) return ability
+  const level = aceLevelOf(levels, aceLevelSlotOf(role, aceIndex + 1))
+  return [
+    applyAceLevelRate(ability[0], level),
+    applyAceLevelRate(ability[1], level),
+    applyAceLevelRate(ability[2], level),
+    applyAceLevelRate(ability[3], level),
+  ]
 }
 
 function teamAbilitiesOf(context: TeamGameAbilityContext, teamId: number): readonly number[] {
@@ -269,7 +305,7 @@ export function entryBatterGameAbilities(
   lineupSlot: number,
 ): [number, number, number, number] {
   const isMyTeam = context.seasonTeamId === teamId
-  return gameAbilitiesOf(entry.ability, {
+  return gameAbilitiesOf(aceLeveledAbility(entry.ability, '타자', entry.aceIndex, context.aceLevels), {
     mode: context.mode,
     isPitcher: false,
     isMyTeam,
@@ -382,7 +418,7 @@ export function entryPitcherGameAbilities(
   teamId: number,
   entry: TeamEntryPitcher,
 ): [number, number, number, number] {
-  return gameAbilitiesOf(entry.ability, {
+  return gameAbilitiesOf(aceLeveledAbility(entry.ability, '투수', entry.aceIndex, context.aceLevels), {
     mode: context.mode,
     isPitcher: true,
     isMyTeam: context.seasonTeamId === teamId,
