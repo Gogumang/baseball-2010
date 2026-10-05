@@ -34,14 +34,9 @@ const 판정 = (judgement: BurstResolution['judgement']): BurstResolution =>
   ({ session: {} as BurstSession, row: 돌발행, judgement, deltas: [] })
 
 describe('공수 교대 징글 13 (경기 상태 0x18, 0x4f7ac)', () => {
-  it('반 이닝이 바뀌면 낸다', () => {
-    expect(gameStepSoundIdsOf(진행({ half: '초' }), 진행({ half: '말' }))).toEqual([HALF_INNING_SOUND])
-  })
-
-  it('이닝이 넘어가도 낸다', () => {
-    expect(gameStepSoundIdsOf(진행({ inning: 1, half: '말' }), 진행({ inning: 2, half: '초' }))).toEqual([
-      HALF_INNING_SOUND,
-    ])
+  it('타자편은 반 이닝이 바뀌어도 진행 걸음에서 내지 않는다 — 0x18 이 판 없이 0x21 로 빠진다 (4facc·4fb08)', () => {
+    expect(gameStepSoundIdsOf(진행({ half: '초' }), 진행({ half: '말' }))).not.toContain(HALF_INNING_SOUND)
+    expect(gameStepSoundIdsOf(진행({ inning: 1, half: '말' }), 진행({ inning: 2, half: '초' }))).toEqual([])
   })
 
   it('같은 반 이닝이면 내지 않는다', () => {
@@ -78,10 +73,10 @@ describe('돌발미션', () => {
     expect(gameStepSoundIdsOf(판정남, 진행({ resolution: null }))).toEqual([])
   })
 
-  it('한 걸음에 판정과 교대와 새 발동이 겹치면 원본 순서(판정 → 교대 → 발동)로 담는다', () => {
-    const before = 진행({ half: '초', burstCurrent: 돌발행 })
+  it('한 걸음에 판정과 새 발동이 겹치면 원본 순서(판정 → 발동)로 담는다', () => {
+    const before = 진행({ half: '초' })
     const after = 진행({ half: '말', burstCurrent: 돌발행, resolution: 판정('성공') })
-    expect(gameStepSoundIdsOf(before, after)).toEqual([36, HALF_INNING_SOUND])
+    expect(gameStepSoundIdsOf(before, after)).toEqual([36, BURST_START_SOUND])
   })
 })
 

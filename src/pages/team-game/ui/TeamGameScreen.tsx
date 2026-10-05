@@ -23,6 +23,9 @@ import {
   substitutionDetailAbilities,
 } from '@/features/play-team-game/model/teamGameFlow'
 import { GameEndBoard } from '@/widgets/game-scene/ui/GameEndBoard'
+import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
+import { HALF_INNING_JINGLE_TICK } from '@/features/play-game/model/halfInningBoard'
+import { HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
 import type {
   TeamEntryBatter,
   TeamEntryPitcher,
@@ -67,7 +70,7 @@ import * as styles from '@/pages/team-game/ui/TeamGameScreen.css'
  * 교체 연출(상태 0x16)은 **소리만** 잇는다 — 대타 등판음·"Time!" 22 는 `useTeamGame` 걸음 끝이 낸다(1e1f5f2).
  * 그 연출 그림(0x4da30)은 없다.
  * 원본에 있고 여기 없는 것: 교체 연출 0x16 의 그림, 자동진행 **중계 화면**(상태 0x21),
- * 공수 교대 화면(0x18 의 교대 가지).
+ * 공수 교대 판(0x18 교대 가지)의 그림 — 흐름·굴림·징글만 `HalfInningBoard` 로 잇는다.
  * 경기가 끝나면 상태 0x18 의 **경기 끝 결과 판**(`widgets/game-scene` `GameEndBoard`)을 먼저 띄우고,
  * OK 뒤에 정산(0x19) 자리인 요약 화면으로 간다.
  */
@@ -128,6 +131,10 @@ export function TeamGameScreen({
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
   /** 경기 끝 결과 판(0x18)에서 OK 를 눌러 정산(0x19)으로 넘어갔는가 */
   const [isEndBoardClosed, setEndBoardClosed] = useState(false)
+  /** OK 로 닫은 마지막 공수 교대 판(상태 0x18 교대 가지)의 번호 */
+  const [closedBoardSerial, setClosedBoardSerial] = useState(0)
+  const board = progress.halfInningBoard
+  const isHalfInningBoardOpen = board !== null && board.serial !== closedBoardSerial && summary === null
   /** 이미 다 보여 준 수비 플레이 — 같은 플레이를 두 번 재생하지 않는다 */
   const [shownPlay, setShownPlay] = useState<DefensePlayResult | null>(null)
   const play = progress.lastDefensePlay
@@ -159,6 +166,8 @@ export function TeamGameScreen({
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat) return
+      // 공수 교대 판(0x18)에는 공용 키 0x498d4 의 '*'·'#'·도루가 안 열린다 (그 상태 범위 밖)
+      if (isHalfInningBoardOpen) return
       // 수비 진행 중(상태 0x17)에는 이 키들이 원본에서도 안 먹는다 — '*' 는 경기 상태 0xd~0x15,
       // '#' 는 0xe·0xf 일 때만 열리고(0x498d4), 그 사이 키는 주루·송구가 가져간다
       if (isDefenseInPlay) return
@@ -202,6 +211,7 @@ export function TeamGameScreen({
     actions,
     changeWindow,
     isDefenseInPlay,
+    isHalfInningBoardOpen,
     isMenuOpen,
     isStealable,
     overlay,
@@ -231,6 +241,7 @@ export function TeamGameScreen({
   const acceptsPickoff =
     canPitch &&
     !isReplaying &&
+    !isHalfInningBoardOpen &&
     !isDefenseInPlay &&
     phase === '구질' &&
     !isMenuOpen &&
@@ -309,6 +320,24 @@ export function TeamGameScreen({
         ticks={play.ticks}
         grassPalette={seasonStadium?.grassPalette ?? null}
         onDone={finishPlayback}
+      />
+    )
+  }
+
+  /**
+   * 공수 교대 판 — 그 반 이닝을 끝낸 플레이(0x17)를 다 본 뒤, 다음 사람 타석(0xd → 0xf) 앞에 선다.
+   * 진행기가 판을 세울 때 0x3fac4 의 굴림 36 개를 이미 썼다. 징글 13 은 판의 틱 2 (0x4f7ac).
+   */
+  if (isHalfInningBoardOpen && board !== null) {
+    return (
+      <HalfInningBoard
+        key={board.serial}
+        inning={board.inning}
+        half={board.half}
+        onTick={(tick) => {
+          if (tick === HALF_INNING_JINGLE_TICK) audio.play(HALF_INNING_SOUND)
+        }}
+        onConfirm={() => setClosedBoardSerial(board.serial)}
       />
     )
   }

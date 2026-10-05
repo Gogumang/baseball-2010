@@ -81,6 +81,7 @@ import {
 import type { PitchSlot, PitcherStats } from '@/features/play-pitcher-game/model/pitcherPitch'
 import { TEAM_GAME_MODE } from '@/features/play-team-game/model/gameAbilities'
 import type { FieldingAssignment, SeasonTeamCondition } from '@/features/play-team-game/model/gameAbilities'
+import { introSkipsFirstBoard, rollHalfInningFielders } from '@/features/play-game/model/halfInningBoard'
 import { EMPTY_DECISION_STATE } from '@/features/play-pitcher-game/model/winLossSave'
 import type { DecisionState } from '@/features/play-pitcher-game/model/winLossSave'
 import {
@@ -338,6 +339,15 @@ export interface TeamGameProgress {
    * 경기 끝 결과 판(상태 0x18, 0x4fe9c)이 그대로 읽는다 (`pitchersOfRecordOf`). 칸 번호 = 투수 명단 칸.
    */
   readonly decisions: DecisionState
+  /**
+   * 마지막으로 **OK 를 기다리며 선** 공수 교대 판(상태 0x18 교대 가지) — 화면은 `serial` 이 바뀌면 판을 띄운다.
+   * 판은 앞 장면이 사람 장면이고 다음 장면도 사람 장면일 때만 선다 (`features/play-game/model/halfInningBoard`).
+   */
+  readonly halfInningBoard: { readonly serial: number; readonly inning: number; readonly half: GameState['half'] } | null
+  /** 마지막으로 사람이 잡은 타석의 반 이닝 — 반 이닝이 바뀐 뒤 첫 사람 타석인지 가린다 */
+  readonly lastHumanHalf: { readonly inning: number; readonly half: GameState['half'] } | null
+  /** 그 뒤로 자동(간이 엔진, 상태 0x21) 타석이 지났는가 — 지났으면 0x18 이 판 없이 넘어간다 (4fab6) */
+  readonly autoSinceHuman: boolean
   /** 지금 타석의 볼 카운트 (사람이 잡은 타석에서만 찬다) */
   readonly atBat: AtBatState
   /** 상대 타순 커서 0~8 */
@@ -580,6 +590,9 @@ export function startTeamGame(options: TeamGameOptions, random: RandomPort): Tea
     game: createGame(-1, options.playerSide),
     // 경기 상태 초기화 0xb6814 — 셋 다 측 2(없음)
     decisions: EMPTY_DECISION_STATE,
+    halfInningBoard: null,
+    lastHumanHalf: null,
+    autoSinceHuman: false,
     atBat: createAtBat(),
     opponentOrderIndex: 0,
     opponentPitcherIndex: startingSlots.opponent,
@@ -2464,9 +2477,7 @@ export function runAutoProgress(progress: TeamGameProgress, random: RandomPort):
     if (isVersusMode(current.options.mode) && current.game.inning - 1 > AUTO_PROGRESS_LAST_INNING_INDEX) {
       break
     }
-    current = isOurOffense(current)
-      ? playAutoOffenseAtBat(current, random)
-      : playAutoDefenseAtBat(current, random)
+    current = playAutoAtBat(current, random)
   }
   // 자동진행이 멈춘 자리부터는 평소대로 — 다음 사람 차례에서 선다
   return advance(current, random)
@@ -2577,13 +2588,51 @@ function advance(progress: TeamGameProgress, random: RandomPort): TeamGameProgre
   for (let step = 0; step < MAXIMUM_AUTO_STEPS; step += 1) {
     if (current.game.isFinished) return current
     if (isHumanTurn(current)) {
-      return current.atBatPrepared ? current : prepareAtBat(current, random)
+      if (current.atBatPrepared) return current
+      // 상태 0x18(공수 교대·1회초 판) → 0xd → 0xe → 0xf(타석 준비) 차례 — 판의 굴림이 타석 준비보다 앞이다
+      const prepared = prepareAtBat(withHalfInningBoard(current, random), random)
+      return {
+        ...prepared,
+        lastHumanHalf: { inning: prepared.game.inning, half: prepared.game.half },
+        autoSinceHuman: false,
+      }
     }
-    current = isOurOffense(current)
-      ? playAutoOffenseAtBat(current, random)
-      : playAutoDefenseAtBat(current, random)
+    current = playAutoAtBat(current, random)
   }
   throw new Error('팀 경기 자동 진행이 끝나지 않았습니다 — 진행 규칙을 확인하세요')
+}
+
+/** 자동 타석 하나 (간이 엔진, 상태 0x21) — 지났다는 표시를 남긴다 */
+function playAutoAtBat(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
+  const played = isOurOffense(progress)
+    ? playAutoOffenseAtBat(progress, random)
+    : playAutoDefenseAtBat(progress, random)
+  return played.autoSinceHuman ? played : { ...played, autoSinceHuman: true }
+}
+
+/**
+ * 사람 타석 앞에 **공수 교대 판(상태 0x18)이 서는가** — 서면 틱 0 의 0x3fac4 가 36 번 굴린다.
+ *
+ * - 앞 장면이 자동진행 중계(0x21)였으면 판 없이 넘어간다 (4fab6 → 4fb08 자동 OK) — `autoSinceHuman`.
+ * - 같은 반 이닝의 다음 타석이면 0x18 을 안 지난다 (0x18 은 3아웃·1회초에만 들어온다).
+ * - 경기 첫 타석이면 인트로 0xc 끝이 0x18 로 보내는데, 모드 1·이닝/전체 설정이면 곧장 0xd 다 (0x39e3c).
+ * - 다음 장면을 사람이 잡는 것은 여기 왔다는 것 자체가 말해 준다(`isHumanTurn` — 0xc2198 거짓 자리).
+ */
+function withHalfInningBoard(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
+  if (progress.autoSinceHuman) return progress
+  const { game } = progress
+  const last = progress.lastHumanHalf
+  if (last !== null && last.inning === game.inning && last.half === game.half) return progress
+  if (last === null && introSkipsFirstBoard(progress.options.mode, settingsOf(progress))) return progress
+  rollHalfInningFielders(random)
+  return {
+    ...progress,
+    halfInningBoard: {
+      serial: (progress.halfInningBoard?.serial ?? 0) + 1,
+      inning: game.inning,
+      half: game.half,
+    },
+  }
 }
 
 /** 자동으로 넘기는 우리 타석 — 원본도 같은 간이 엔진을 쓴다 (0xc11f0) */

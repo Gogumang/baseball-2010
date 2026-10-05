@@ -16,6 +16,14 @@ import { setActiveSound } from '@/shared/api/audio/soundPort'
 import type { SoundPort } from '@/shared/api/audio/soundPort'
 
 /**
+ * 1회초 판(상태 0x18, 인트로 끝 → 0x18) — 첫 사람 타석 앞에 판이 서면 OK 로 닫는다.
+ * 판은 경기 화면(PixelScreen)을 통째로 덮으므로 '메뉴' 소프트키가 없다.
+ */
+const 판닫기 = () => {
+  if (screen.queryByRole('button', { name: '메뉴' }) === null) fireEvent.keyDown(window, { key: 'Enter' })
+}
+
+/**
  * **팀 경기 화면까지 소리가 가는지** 본다 — 번호를 고르는 규칙 자체는
  * `features/play-at-bat/model/atBatSounds.test.ts` 가, 효과음 뒤 배경음 복귀는
  * `shared/api/audio/webAudioSound.test.ts` 가 따로 못 박는다.
@@ -79,8 +87,8 @@ describe('진행 소리 고르기 — `gameSounds.gameStepSoundIdsOf` 와 같은
     lastBurstResolution: null,
   })
 
-  it('반 이닝이 바뀌면 공수 교대 징글 13 (상태 0x18, 0x4f7ac)', () => {
-    expect(stepSoundIdsOf(진행('초', 1), 진행('말', 1))).toEqual([HALF_INNING_SOUND])
+  it('반 이닝이 바뀌어도 걸음 소리에는 13 이 없다 — 판이 설 때만 화면이 틱 2 에 낸다 (0x4f7ac)', () => {
+    expect(stepSoundIdsOf(진행('초', 1), 진행('말', 1))).not.toContain(HALF_INNING_SOUND)
   })
 
   it('경기가 끝나며 바뀐 것이면 13 을 안 낸다 — 그 자리는 결과 징글이다 (R10 2절)', () => {
@@ -187,6 +195,7 @@ describe('`#` 투수 교체 화면 — "Time!" 22 (상태 0xb 진입 0x3af06)', 
         onQuit={() => {}}
       />,
     )
+    판닫기()
     녹음.played.length = 0
 
     fireEvent.click(screen.getByRole('button', { name: '# 교체' }))
@@ -205,6 +214,7 @@ describe('`#` 투수 교체 화면 — "Time!" 22 (상태 0xb 진입 0x3af06)', 
         onQuit={() => {}}
       />,
     )
+    판닫기()
     녹음.played.length = 0
 
     fireEvent.click(screen.getByRole('button', { name: '메뉴' }))

@@ -35,3 +35,15 @@ export const cover = style({
   inset: 0,
   zIndex: 30,
 })
+
+/** 원본 판 그림 대신 놓는 웹 전용 글자 — 가운데 */
+export const webCaption = style({
+  position: 'absolute',
+  left: 0,
+  right: 0,
+  top: '150px',
+  textAlign: 'center',
+  color: ORIGINAL_COLORS.text,
+  fontSize: '13px',
+  pointerEvents: 'none',
+})

@@ -8,6 +8,14 @@ import { TeamGameScreen } from '@/pages/team-game/ui/TeamGameScreen'
 import { DEFENSE_BACKGROUND_URL } from '@/pages/defense/lib/defenseView'
 import type { TeamGameOptions } from '@/features/play-team-game/model/teamGameFlow'
 
+/**
+ * 1회초 판(상태 0x18, 인트로 끝 → 0x18) — 첫 사람 타석 앞에 판이 서면 OK 로 닫는다.
+ * 판은 경기 화면(PixelScreen)을 통째로 덮으므로 '메뉴' 소프트키가 없다.
+ */
+const 판닫기 = () => {
+  if (screen.queryByRole('button', { name: '메뉴' }) === null) fireEvent.keyDown(window, { key: 'Enter' })
+}
+
 afterEach(cleanup)
 
 const 기본옵션: TeamGameOptions = {
@@ -18,8 +26,8 @@ const 기본옵션: TeamGameOptions = {
   season: { illness: 0, morale: 100, coach: -1 },
 }
 
-const 띄우기 = (options: Partial<TeamGameOptions> = {}, seed = 20100901) =>
-  render(
+const 띄우기 = (options: Partial<TeamGameOptions> = {}, seed = 20100901) => {
+  const rendered = render(
     <TeamGameScreen
       options={{ ...기본옵션, ...options }}
       random={createSeededRandom(seed)}
@@ -27,6 +35,9 @@ const 띄우기 = (options: Partial<TeamGameOptions> = {}, seed = 20100901) =>
       onQuit={vi.fn()}
     />,
   )
+  판닫기()
+  return rendered
+}
 
 describe('팀 경기 화면 — 수비(투구) 차례', () => {
   it('후공이면 1회초가 우리 수비라 구질 고르기가 뜬다 (상태 0xf)', () => {
@@ -44,7 +55,7 @@ describe('팀 경기 화면 — 수비(투구) 차례', () => {
   })
 
   it('게이지 설정이 꺼져 있으면 코스를 확정하는 순간 던진다 (원본 기본값)', () => {
-    띄우기({}, 1)
+    띄우기({}, 2)
     fireEvent.click(screen.getByText('FASTBALL'))
     fireEvent.click(screen.getAllByRole('button', { name: /[◎·]/ })[0])
 
@@ -164,6 +175,7 @@ describe('경기 중 메뉴 (표 0xcfcfc 행 0)', () => {
         onSpendGamePoint={onSpendGamePoint}
       />,
     )
+    판닫기()
     fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
     fireEvent.click(screen.getByText('자동진행'))
 
@@ -187,6 +199,7 @@ describe('경기 중 메뉴 (표 0xcfcfc 행 0)', () => {
         onSpendGamePoint={onSpendGamePoint}
       />,
     )
+    판닫기()
     fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
     fireEvent.click(screen.getByText('자동진행'))
     fireEvent.click(screen.getByText('예'))
@@ -214,6 +227,7 @@ describe('경기 중 메뉴 (표 0xcfcfc 행 0)', () => {
         onSpendGamePoint={vi.fn()}
       />,
     )
+    판닫기()
     fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
     fireEvent.click(screen.getByText('자동진행'))
 

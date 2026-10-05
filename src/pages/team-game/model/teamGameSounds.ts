@@ -1,6 +1,6 @@
 import { BURST_SOUND } from '@/entities/burst-mission/model/burstMissionJudge'
 import type { BurstResolution } from '@/entities/burst-mission/model/burstMissionSession'
-import { BURST_START_SOUND, HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
+import { BURST_START_SOUND } from '@/features/play-game/model/gameSounds'
 
 /**
  * 경기 **진행**에서 나는 소리 — `features/play-game/model/gameSounds` 의 `gameStepSoundIdsOf`
@@ -27,9 +27,10 @@ export interface SoundStepProgress {
  * 진행 한 걸음 사이에 울릴 번호들 — 원본이 나는 순서대로 담는다.
  *
  * 1. **돌발 판정** (0x8f414 → 0x8e5b8): 성공 36 · 실패 32 · 무효 37.
- * 2. **공수 교대** 13 (0x4f7ac): 반 이닝이 바뀌었고 경기가 안 끝났을 때
- *    (R10 2절 — 경기 끝이면 13 대신 결과 징글이 난다).
- * 3. **돌발 발동** 42 (0x8f000): 새 돌발이 떴을 때.
+ * 2. **돌발 발동** 42 (0x8f000): 새 돌발이 떴을 때.
+ *
+ * 공수 교대 징글 13(0x4f7ac)은 **판이 서서 OK 를 기다릴 때만** 틱 2 에 난다 — 반 이닝이 바뀔 때마다가
+ * 아니다(자동진행 중계 0x21 로 빠지면 안 난다). 그래서 판을 띄우는 `TeamGameScreen` 이 낸다.
  */
 export function stepSoundIdsOf(
   before: SoundStepProgress,
@@ -41,9 +42,6 @@ export function stepSoundIdsOf(
   if (resolution !== null && resolution !== before.lastBurstResolution && resolution.judgement !== null) {
     ids.push(BURST_SOUND[resolution.judgement])
   }
-
-  const halfChanged = after.game.half !== before.game.half || after.game.inning !== before.game.inning
-  if (halfChanged && !after.game.isFinished) ids.push(HALF_INNING_SOUND)
 
   if (before.burst?.current == null && after.burst?.current != null) ids.push(BURST_START_SOUND)
 

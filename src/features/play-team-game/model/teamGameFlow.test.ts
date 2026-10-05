@@ -1530,3 +1530,27 @@ describe('승·패·세 칸 — 결과 판(0x4fe9c)이 읽는 state+0x44/0x50/0x
     }
   })
 })
+
+describe('공수 교대 판 (상태 0x18 교대 가지 — 앞뒤 장면이 모두 사람일 때만 선다)', () => {
+  it('시즌(모드 2) 첫 타석이 사람이면 1회초 판이 선다 — 인트로 0xc 끝이 0x18 로 보낸다', () => {
+    const { progress } = 시작()
+    expect(progress.halfInningBoard).toEqual({ serial: 1, inning: 1, half: '초' })
+  })
+
+  it('일반(모드 1)·이닝/전체 설정이면 인트로가 곧장 0xd 로 가 1회초 판이 없다 (0x39e3c)', () => {
+    const { progress } = 시작({ mode: 1, season: undefined })
+    expect(progress.halfInningBoard).toBeNull()
+  })
+
+  it('전부 사람이 잡으면 반 이닝이 바뀔 때마다 판이 하나씩 선다', () => {
+    const { progress, random } = 시작()
+    let current = progress
+    for (let step = 0; step < 400 && current.game.inning === 1; step += 1) {
+      current = isPitchTurn(current)
+        ? throwPitch(current, { typeNumber: 첫구질(current), courseCell: 4, gaugeCell: 0 }, random)
+        : applyBatterOutcome(current, { kind: '아웃', detail: '뜬공아웃' }, random)
+    }
+    // 1회초 판 · 1회말 판 · 2회초 판
+    expect(current.halfInningBoard).toEqual({ serial: 3, inning: 2, half: '초' })
+  })
+})

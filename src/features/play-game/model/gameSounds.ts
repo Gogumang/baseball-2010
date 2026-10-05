@@ -15,7 +15,13 @@ import type { GameProgress } from '@/features/play-game/model/gameFlow'
  *       docs/re/R10-game-states.md (상태 0x18 · 0xc) · docs/re/K-bursts-special.md 4절.
  */
 
-/** 공수 교대 징글 — 경기 상태 0x18 의 틱 2 에 한 번 (0x4f7ac) */
+/**
+ * 공수 교대 징글 — 경기 상태 0x18 의 틱 2 에 한 번 (0x4f7ac).
+ * 0x4f7ac 는 `+0x1784 == 0`(자동진행 중계에서 오지 않음)일 때만 돌고, 0x18 이 틱 0 에 중계(0x21)로
+ * 빠지거나 자동 OK 로 넘어가면 틱 2 가 오지 않는다 — **판이 서서 OK 를 기다릴 때만** 난다
+ * (`features/play-game/model/halfInningBoard`). 그래서 진행 걸음 소리(`gameStepSoundIdsOf`)에는 없고
+ * 판을 띄우는 화면이 낸다.
+ */
 export const HALF_INNING_SOUND = 13
 
 /** 돌발미션 시작 — 후보 추첨 뒤 대사를 싣고 나서 (0x8f000 → 효과음 0x2a) */
@@ -49,13 +55,14 @@ export function gameResultSoundIdOf(result: GameResult): number | null {
  * 진행 한 걸음 사이에 울릴 번호들 — 원본이 나는 순서대로 담는다.
  *
  * 1. **돌발 판정** (타석이 끝나는 자리, 0x8f414 → 0x8e5b8): 성공 36 · 실패 32 · 무효 37.
- * 2. **공수 교대** 13: 반 이닝이 바뀌었고 경기가 안 끝났을 때
- *    (R10 2절 — 경기 끝이면 13 을 안 낸다).
- * 3. **돌발 발동** 42: 다음 타석 준비에서 새 돌발이 떴을 때.
+ * 2. **돌발 발동** 42: 다음 타석 준비에서 새 돌발이 떴을 때.
  *
- * ⚠️ **근사인 곳**: 웹 진행기는 내 차례가 올 때까지 상대 공격·동료 타석을 한 걸음에 몰아 돌리므로
- * 반 이닝을 **여러 번** 넘길 수 있다. 원본은 교대마다 한 번 울리지만 여기서는 걸음마다 한 번만
- * 낸다 — 통로가 하나라 몰아서 여러 번 내도 마지막 하나만 들린다.
+ * **공수 교대 징글 13 은 여기 없다.** 나만의리그 타자편(모드 4)은 사람이 필요 없는 타석을 자동진행 중계
+ * 상태 0x21 로 넘긴다(0x48530 → 0xc262c). 내 타석이 3아웃으로 끝나면 다음 반 이닝은 상대 공격이라
+ * 0x18 이 틱 0 에 곧장 0x21 로 가고(4facc), 0x21 에서 온 0x18 은 판 없이 스스로 OK 한다(4fb08) —
+ * 어느 쪽도 틱 2 의 징글(0x4f7ac)에 닿지 않는다.
+ * ⚠️ 남은 가지: 내 팀이 선공이고 내가 1번이라 1회초 첫 타석이 곧 내 타석이면 1회초 판(인트로 → 0x18)이
+ *    서서 징글 13·굴림 36(0x3fac4)이 난다. 웹 타자편은 이 판을 아직 안 세운다.
  */
 export function gameStepSoundIdsOf(before: GameProgress, after: GameProgress): readonly number[] {
   const ids: number[] = []
@@ -64,10 +71,6 @@ export function gameStepSoundIdsOf(before: GameProgress, after: GameProgress): r
   if (resolution !== null && resolution !== before.lastBurstResolution && resolution.judgement !== null) {
     ids.push(BURST_SOUND[resolution.judgement])
   }
-
-  const halfChanged =
-    after.game.half !== before.game.half || after.game.inning !== before.game.inning
-  if (halfChanged && !after.game.isFinished) ids.push(HALF_INNING_SOUND)
 
   if (before.burst?.current == null && after.burst?.current != null) ids.push(BURST_START_SOUND)
 
