@@ -13,7 +13,7 @@ import { createLocalStorageJsonStore } from '@/shared/api/save/localStorageJsonS
 import { useCollection } from '@/app/model/useCollection'
 import { isEveryMissionCleared } from '@/entities/mission/model/missionGoal'
 import { aceMatchMissionOf, matchResultEventOf } from '@/entities/story/model/aceMatch'
-import { effectiveAbilityOf } from '@/entities/career/model/condition'
+import { modeBatterOf } from '@/app/model/modeBatter'
 import type { AceMatchStarter } from '@/app/ui/CareerRoutes'
 import { useGameSettings } from '@/app/model/useGameSettings'
 import { useSceneBgm, useSceneEnterSound, useSound } from '@/app/model/useSound'
@@ -25,7 +25,6 @@ import { PitcherLeagueRoute } from '@/app/ui/PitcherLeagueRoute'
 import { GeneralModeScreen, aceOpenPriceOf, useAceOpen } from '@/pages/general-mode'
 import { useGamePointWallet } from '@/entities/wallet/model/useGamePointWallet'
 import { useAceLevels } from '@/entities/mission/model/useAceLevels'
-import { ROOKIE_BATTER_ABILITY } from '@/entities/batting/model/batter'
 
 const SETTINGS_KEY = 'compus-baseball/settings'
 const COLLECTION_KEY = 'compus-baseball/collection'
@@ -163,10 +162,10 @@ export function App() {
         session={mission}
         runner={runner}
         random={random}
-        // 마선수 대결은 육성 선수의 경기용 능력치(장비·스킬·부상 반영)로 친다
-        // 미션 진입을 육성 선수가 있을 때만 열어 두므로(EntryRoutes, Q2 3-1) 여기 신인 능력치는
-        // 저장을 불러오는 중 같은 짧은 순간에만 쓰인다 — 원본에는 신인 대체가 없다
-        ability={careerSession.career === null ? ROOKIE_BATTER_ABILITY : effectiveAbilityOf(careerSession.career)}
+        // 미션(모드 6)은 0x213c0(앱, 4, 0) 으로 나리 타자편 저장을 올린다 — 진행 중 커리어가 없으면
+        // 저장된 선수다. 능력치는 0xb6414(장비·스킬)까지만: 0xb570c 의 질병·부상·사기 감소는 모드 3·4 갈래라
+        // 미션에서는 안 먹는다 (`modeBatterOf`). 마선수 대결(이벤트)도 같은 화면이다.
+        ability={modeBatterOf(careerSession.career ?? careerSession.savedCareer).ability}
         pitchControl={gameSettings.settings.pitchControl}
         gameSettings={gameSettings}
       />
