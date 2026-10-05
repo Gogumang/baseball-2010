@@ -26,7 +26,7 @@ import { recordLeagueResult } from '@/entities/league/model/league'
 import { playLeagueDay } from '@/entities/league/model/leagueDay'
 import { finishRegularSeason } from '@/entities/league/model/seasonEnd'
 import { runCpuPostseasonWithStamina } from '@/entities/league/model/postseasonPlay'
-import { advancePostseason, postseasonSideOf } from '@/entities/league/model/league'
+import { advancePostseason, postseasonRotationTurnsOf, postseasonSideOf } from '@/entities/league/model/league'
 import { isMyTurn } from '@/entities/league/model/seasonEnd'
 import type { PostseasonSeries } from '@/entities/league/model/league'
 import { EMPTY_LEAGUE_PLAYER_STATS, recordLeaguePlateAppearances } from '@/entities/league/model/leaguePlayerStats'
@@ -1184,13 +1184,19 @@ export function useSeasonSession(
     const myTeam = save.state.record.teamId
     if (isMyTurn(series, myTeam)) {
       // 포스트시즌 가지 — 윗 시드(대진 칸 0)가 홈이다 (0xb7844 의 리그+0x34 가지)
-      const options = optionsFor(
-        series.teams[0] === myTeam ? series.teams[1] : series.teams[0],
-        postseasonSideOf(series, myTeam),
-      )
+      const opponent = series.teams[0] === myTeam ? series.teams[1] : series.teams[0]
+      const options = optionsFor(opponent, postseasonSideOf(series, myTeam))
       if (options === null) return
+      // 날짜 카운터는 시즌 경기 수가 아니라 **이 시리즈의 g**(L+0x32 — 0xb80a8 b811c 0 · 0xb7724 b777a −1 ·
+      // 0xb818c b819a +1)이고, 경기 준비 0x6548 의 로테이션(670e~673e)이 g ≠ 0 이면 양 팀 레코드를 한 칸 돌린다.
+      // 레코드는 영구로 섞이므로 정규 44칸과 앞 시리즈에서 돈 칸이 팀마다 얹힌다 (`postseasonRotationTurnsOf`)
+      const postseasonOptions = {
+        ...options,
+        dayCounter: postseasonRotationTurnsOf(series, myTeam),
+        opponentDayCounter: postseasonRotationTurnsOf(series, opponent),
+      }
       // 0xef 키: 내 팀이 X/Y 면 this+0x11c = 1 → 0xd7 (P4 4b) — 정규시즌과 같은 경기 전 흐름이다
-      return enterPreGameSquad({ kind: '포스트시즌', options })
+      return enterPreGameSquad({ kind: '포스트시즌', options: postseasonOptions })
     }
     // 0xc2760 은 CPU 팀 투수 레코드 +0x2c 를 깎기만 한다 — 회복(0xb617c)은 다음 내 경기 끝 0x4ea0c 에서다
     const cpu = runCpuPostseasonWithStamina(series, myTeam, random, save.cpuPitcherStaminas, aceLevels)

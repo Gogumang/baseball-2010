@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 import { useSeasonSession } from '@/app/model/useSeasonSession'
+import { postseasonGameOf, postseasonRotationTurnsOf } from '@/entities/league/model/league'
 import { SEASON_GAME_COUNT } from '@/entities/season-mode/model/seasonRecord'
 import { SEASON_PHASE, SEASON_SCENE_STATE } from '@/entities/season-mode/model/seasonStateMachine'
 import { PRE_GAME_ACE_PHASE, SQUAD_PURPOSE } from '@/entities/season-mode/model/preGameFlow'
@@ -537,6 +538,23 @@ describe('포스트시즌', () => {
       const series = result.current.series!
       expect(series.round === '종료' || series.teams.includes(내팀)).toBe(true)
     }
+  })
+
+  it('포스트시즌 사람 경기의 날짜 카운터는 시리즈 g 다 — 정규 44칸 + 앞 시리즈 이월이 팀마다 얹힌다 (0x6548 670e)', () => {
+    const { result } = 시즌끝()
+    const 내팀 = result.current.state!.record.teamId
+    for (let i = 0; i < 4 && result.current.pendingGame === null; i += 1) {
+      act(() => result.current.actions.continuePostseason())
+    }
+    expect(result.current.pendingGame?.kind).toBe('포스트시즌')
+    if (result.current.pendingGame === null) return
+    const series = result.current.series!
+    const 상대 = series.teams[0] === 내팀 ? series.teams[1] : series.teams[0]
+    const options = result.current.pendingGame.options
+    // 시즌 경기 수(45)가 아니다 — 0xb80a8 이 L+0x32 를 0 으로 놓는다
+    expect(options.dayCounter).toBe(postseasonRotationTurnsOf(series, 내팀))
+    expect(options.opponentDayCounter).toBe(postseasonRotationTurnsOf(series, 상대))
+    expect(postseasonGameOf(series)).toBe(series.wins[0] + series.wins[1])
   })
 
   it('포스트시즌은 정규시즌 1~4위만 올라간다', () => {
