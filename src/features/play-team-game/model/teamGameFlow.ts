@@ -100,6 +100,7 @@ import type {
   TeamGameAbilityContext,
 } from '@/features/play-team-game/model/teamGameRoster'
 import { rollOpponentAceIndex } from '@/entities/game/model/aceOpponent'
+import { passesRecordTeamGate, pinchHitHomeRunRecordIdsOf } from '@/entities/game/model/gameRecords'
 import {
   EMPTY_BATTER_GAME_RECORD,
   judgeCpuPinchHit,
@@ -393,8 +394,40 @@ export interface TeamGameProgress {
   readonly gameRecord: readonly number[]
   /**
    * `state[0xe]` — 이 경기에 CPU 대타를 이미 썼는가. 원본은 **경기에 한 칸**이라 양 팀을 합쳐 한 번뿐이다.
+   *
+   * ⚠️ 미해결: 사람 경기 장면의 타석 시작 `0x48d50` 이 이전 상태(`scene+0x28`)가 0x16 이 아니면
+   *    `state[0xe] = 0` 을 쓴다 (48eb0~48eb6, 0xa5bcc 바로 뒤). 그러면 사람 장면에서는 "타석마다 한 번" 이라
+   *    0xf 에 공마다 다시 들어와도 한 번만 묻게 막는 칸으로 보인다. 간이 엔진(0xc262c·0xc0ee8)에는 지우는 곳을
+   *    못 찾았다. 둘이 섞이는 웹 흐름에서 어떻게 셈할지 정하지 못해 아직 "경기에 한 번" 그대로 둔다.
    */
   readonly cpuPinchHitUsed: boolean
+  /**
+   * **대타 홈런 칸 `ctx+0x160`** — 사람 팀이 대타를 낸 그 타석인가. 세운 반 이닝을 같이 들어 반 이닝이 바뀌면
+   * 저절로 무효다 (다음 타석 시작이 지우는 것과 같은 결과).
+   *
+   * - 세우는 곳: 교체 연출 상태 0x16 진입 `0x3d458` 의 `0xa5bf0(ctx, 0)`(3d57e) 하나 — 대타 예약 `team[+0x291]` 이
+   *   서 있고 **공격 팀이 사람**일 때만 1 (a5c04~a5c26). 웹은 사람 대타 `pinchHit` 뿐이다.
+   * - 지우는 곳: 타석 초기화 `0xa5bcc` (ctx+0x15f·0x160·0x161·+0x2c·+0x188 = 0). 사람 장면 타석 시작 `0x48d50` 이
+   *   부르지만 **이전 상태 `scene+0x28` 이 0x16 이면 건너뛴다** (48e94 `cmp r3,#0x16 ; beq 48eb8`) — 그래서 대타를
+   *   낸 바로 그 타석에서는 칸이 살아 있다. 간이 엔진 `0xc262c` 는 타석마다 지운다(c26b6).
+   * - 쓰는 곳: 정산 0xa8024 안타 갈래 a8764 — 홈런이고 이 칸이 서 있으면 기록 5 (`pinchHitHomeRunRecordIdsOf`).
+   */
+  readonly pinchHitHomeRunHalf: { readonly inning: number; readonly half: GameState['half'] } | null
+  /**
+   * 이 경기에서 쌓인 **기록달성 번호** (지급 `0xa77f0` 게이트를 지난 것).
+   * ⚠️ 팀 경기는 아직 **5 대타 홈런만** 잇는다 — 나머지 번호와 경기 중 G 누계(`0xd8158`)·지급은 없다.
+   */
+  readonly recordIds: readonly number[]
+  /**
+   * 사람 경기 장면에서 지난 **대타 교체 연출(상태 0x16)** 의 마지막 한 번 — 소리 고리가 앞뒤를 견준다.
+   * `by` 가 'CPU' 면 0xf 진입 `0x3d954` 의 CPU 대타(3da70 → 22 @3da88 → 0x16), '사람' 이면 `#` 교체 창의 OK.
+   * `incomingIsAce` 는 들어온 타자 레코드의 `0xb633c`(+0xa & 0x40) — 등판음 0x38b64 타자 가지가 본다.
+   */
+  readonly scenePinchHit: {
+    readonly serial: number
+    readonly by: '사람' | 'CPU'
+    readonly incomingIsAce: boolean
+  } | null
   /**
    * `0x66968`·`0x66994` 가 뽑은 **AI 팀 마투수·마타자 번호** 0~4 (시즌모드는 −1 — `0x30f20` 을 안 탄다).
    * 마타자는 `opponentEntry` 벤치 첫 칸(9번)에, 마투수는 `opponentPitcherEntry` 8번 칸에 들어가 있다.
@@ -522,6 +555,9 @@ export function startTeamGame(options: TeamGameOptions, random: RandomPort): Tea
     ourHitBases: ourEntry.map(() => []),
     gameRecord: clearSeasonGameRecord(),
     cpuPinchHitUsed: false,
+    pinchHitHomeRunHalf: null,
+    recordIds: [],
+    scenePinchHit: null,
     opponentAcePitcherIndex: opponentAces.pitcher,
     opponentAceBatterIndex: opponentAces.batter,
     opponentBenchBatters: Math.max(0, opponentEntry.length - BATTING_ORDER_SIZE),
@@ -1245,6 +1281,11 @@ function finishBatterOutcome(
   const isWalkOff = game.isFinished && runsBattedIn > 0 && game.ourScore > game.opponentScore
   // 시즌 평판 16칸 — 우리 공격이라 **수비측(상대)이 CPU** 인 코드(≥ 6)만 선다
   const offense = offenseRecordOf(outcome, runsBattedIn, progress.ourHitBases[slot] ?? [])
+  // 기록 5 대타 홈런 (a8764) — 사람 공격이라 게이트(0xa77f0 a785e)를 지난다
+  const pinchHitRecords = pinchHitHomeRunRecordIdsOf({
+    isHomeRun: outcome.kind === '홈런',
+    isPinchHitAtBat: isPinchHitAtBat(progress),
+  }).filter((id) => passesRecordTeamGate(id, { offenseIsHuman: true, defenseIsHuman: false }))
 
   const next: TeamGameProgress = {
     ...progress,
@@ -1254,6 +1295,9 @@ function finishBatterOutcome(
     lastDefensePlay: playback,
     atBat: createAtBat(),
     atBatPrepared: false,
+    // 다음 타석 시작 0x48d50 → 0xa5bcc 가 ctx+0x160 을 지운다
+    pinchHitHomeRunHalf: null,
+    recordIds: pinchHitRecords.length === 0 ? progress.recordIds : [...progress.recordIds, ...pinchHitRecords],
     // 우리 타석의 득점은 **상대 투수**의 A·B 로 들어간다 (0xa5c34 는 수비 팀 칸을 올린다)
     opponentPitcherCounters: addRunsToCounters(
       progress.opponentPitcherCounters,
@@ -1847,7 +1891,7 @@ function prepareAtBat(progress: TeamGameProgress, random: RandomPort): TeamGameP
   // 사람 경기 타석 시작 0x3d954 는 **수비가 사람일 때** CPU 대타 0xac228 을 부른다 (0x3da6e).
   // (수비가 CPU 면 그 자리에서 CPU 투수 교체 0xac428 로 간다 — 그쪽은 자동 타석에만 옮겨져 있다.)
   // ⚠️ 돌발미션 판정과의 앞뒤 차례는 **미확인**이다 (0x3d954 를 끝까지 읽지 않았다).
-  if (isPitchTurn(progress)) progress = applyCpuPinchHit(progress, false, random)
+  if (isPitchTurn(progress)) progress = applyCpuPinchHit(progress, false, random, true)
   const session = progress.burst
   if (session === null) return { ...progress, atBatPrepared: true }
   const ours = isOurOffense(progress)
@@ -2156,13 +2200,17 @@ export function canOpenPinchHit(progress: TeamGameProgress): boolean {
  *      는 명단 칸이 든 **로스터 칸**(`TeamEntryBatter.rosterSlot`)으로 쌓으므로 선수를 따라간다.)
  *   4. 벤치 타자 수 `team+0x28c` 를 하나 줄인다 (0 밑으로는 안 간다, `aed9c~aedae`).
  *
- * 볼카운트가 **0-0 으로 돌아가는 것도 원본 그대로**다: 상태 0x16 다음이 0xd 이고, 그 진입
- * `0x48d50` 이 타석 초기화 `0xa5bcc` 를 부른다 (R8 · R10 8절 표). 곧 볼 셋에서 대타를 내면
- * 새 타자가 **처음부터** 친다.
+ * **볼카운트는 이어받는다** — 원본 그대로다. 상태 0x16 다음이 0xd 인데 그 진입 `0x48d50` 은 이전 상태
+ * (`scene+0x28`)가 0x16 이면 카운트 지우기 `0xb6764(state)`(state[4]·[5]·[0x14..0x17]·[0xa4..0xa7] = 0)와
+ * 타석 초기화 `0xa5bcc(ctx)` 를 **건너뛴다** (48e94 `cmp r3,#0x16 ; beq 48eb8`). 곧 볼 셋에서 대타를 내면 새 타자가
+ * 볼 셋에서 친다. (앞 판은 "0-0 으로 돌아간다" 로 옮겼는데 이 건너뛰기를 안 읽은 것이었다.)
  *
- * ⚠️ **안 옮긴 것**: 교체 연출(상태 0x16)과 그 자리에서 서는 "대타 홈런" 기록 칸(`ctx+0x160`,
- * `0xa5bf0`). 원본은 0x16 에서 세우고 바로 다음 0xd 의 타석 초기화가 지우는 모양이라
- * 순서가 **미해결**이다 (R8 19행) — 기록 5번은 웹에도 아직 없다.
+ * 같은 까닭으로 **대타 홈런 칸 `ctx+0x160`** 이 그 타석 동안 살아 있다: 0x16 진입 `0x3d458` 이 대타 예약을 보고
+ * `0xa5bf0(ctx, 0)`(3d57e)으로 세우고(공격 팀이 사람일 때만), 다음 0xd 가 안 지운다 → 이 타석의 홈런은 기록 5
+ * (`pinchHitHomeRunHalf` · `finishBatterOutcome`).
+ *
+ * ⚠️ 원본은 0xd → 0xe → 0xf 를 다시 지나며 `0x3d954`(돌발 판정 0x8f158 등)를 다시 돈다 — 웹은 `atBatPrepared` 를
+ *    내려 두는 것까지만 한다 (기존 그대로).
  */
 export function pinchHit(progress: TeamGameProgress, benchIndex: number): TeamGameProgress {
   if (progress.game.isFinished) return progress
@@ -2184,13 +2232,26 @@ export function pinchHit(progress: TeamGameProgress, benchIndex: number): TeamGa
       ourHitBases: swapped.hitBases ?? progress.ourHitBases,
       // 4. 벤치 타자 수 −1
       ourBenchBatters: Math.max(0, progress.ourBenchBatters - 1),
-      // 상태 0x16 → 0xd → 타석 초기화 0xa5bcc
-      atBat: createAtBat(),
+      // 상태 0x16 → 0xd: 이전 상태가 0x16 이라 0xb6764·0xa5bcc 를 건너뛴다 — 카운트를 그대로 둔다
+      atBat: progress.atBat,
       atBatPrepared: false,
+      // 0x3d458 → 0xa5bf0(ctx, 0): 사람 공격이라 ctx+0x160 = 1
+      pinchHitHomeRunHalf: { inning: progress.game.inning, half: progress.game.half },
+      scenePinchHit: {
+        serial: (progress.scenePinchHit?.serial ?? 0) + 1,
+        by: '사람',
+        incomingIsAce: swapped.incoming.aceIndex !== NO_ACE_BATTER,
+      },
     },
     `${progress.game.inning}회${progress.game.half} 대타 — ${swapped.outgoing.name} → ${swapped.incoming.name}`,
     true,
   )
+}
+
+/** 지금 타석이 사람 팀이 대타를 낸 그 타석인가 (`ctx+0x160`) — 반 이닝이 바뀌었으면 이미 지워진 칸이다 */
+function isPinchHitAtBat(progress: TeamGameProgress): boolean {
+  const armed = progress.pinchHitHomeRunHalf
+  return armed !== null && armed.inning === progress.game.inning && armed.half === progress.game.half
 }
 
 /**
@@ -2253,6 +2314,8 @@ function applyCpuPinchHit(
   progress: TeamGameProgress,
   battingIsOurs: boolean,
   random: RandomPort,
+  /** 사람 경기 장면의 타석 시작 `0x3d954` 에서 불렀는가 — 그러면 교체 연출 0x16 을 지난다 (간이 엔진은 안 지난다) */
+  inScene = false,
 ): TeamGameProgress {
   if (progress.game.isFinished) return progress
   const entry = battingIsOurs ? progress.ourEntry : progress.opponentEntry
@@ -2307,8 +2370,19 @@ function applyCpuPinchHit(
       ...changed,
       // state[0xe] = 1 — 경기에 한 번뿐이다
       cpuPinchHitUsed: true,
-      // 상태 0x16 → 0xd → 타석 초기화 0xa5bcc
+      // 타석 시작에서만 부르므로 카운트는 이미 0-0 이다 — 간이 엔진은 0xc0ee8 → 0xb6764 가 먼저 지우고,
+      // 사람 장면은 0x16 → 0xd 가 지우기를 건너뛰지만 그 전 0xd 가 이미 지웠다
       atBat: createAtBat(),
+      // 사람 장면이면 22(3da88) → 0x16 연출 → 0xe 타자 등판음. 공격 팀이 CPU 라 ctx+0x160 은 안 선다 (a5c1c)
+      ...(inScene
+        ? {
+            scenePinchHit: {
+              serial: (progress.scenePinchHit?.serial ?? 0) + 1,
+              by: 'CPU' as const,
+              incomingIsAce: swapped.incoming.aceIndex !== NO_ACE_BATTER,
+            },
+          }
+        : {}),
     },
     `${progress.game.inning}회${progress.game.half} ${battingIsOurs ? '우리' : '상대'} CPU 대타 — ${swapped.outgoing.name} → ${swapped.incoming.name}`,
     false,
@@ -2493,6 +2567,8 @@ function advance(progress: TeamGameProgress, random: RandomPort): TeamGameProgre
 function playAutoOffenseAtBat(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
   // 0xc262c 는 타석마다 먼저 0xc1ba4 를 부른다 — 그 안에서 CPU 대타(공격 팀)가 먼저다 (0xc1c50)
   progress = applyCpuPinchHit(progress, true, random)
+  // 이어 c26b6 0xa5bcc 가 대타 홈런 칸 ctx+0x160 을 지운다 — 간이 엔진 타석은 기록 5 를 못 낸다
+  if (progress.pinchHitHomeRunHalf !== null) progress = { ...progress, pinchHitHomeRunHalf: null }
   // 이어서 CPU 투수 교체 (0xc1ce2) — 우리가 공격 중이면 **상대 투수**를 본다
   progress = judgeAutoPitcherChange(progress, false, random)
   const { options } = progress

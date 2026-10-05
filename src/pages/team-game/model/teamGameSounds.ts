@@ -56,8 +56,10 @@ export function stepSoundIdsOf(
  *
  * 원본 상태 0xb 진입 `0x3ae08` 은 마지막에 조건 없이 `play(소리, 0x16, -1, 0)` 를 부른다
  * (0x3af06; 상태→진입 함수 표는 docs/re/I-controls.md 1절 "0xb 0x3ae08(교체)").
- * 같은 22 를 트는 다른 자리는 타석 준비 0xf 진입에서 CPU 대타가 걸려 교체 연출 0x16 으로
- * 넘어갈 때(0x3da88)뿐이다 — 웹에는 CPU 대타 연출이 없어 그 쪽은 안 이었다.
+ * 같은 22 를 트는 다른 자리는 타석 준비 0xf 진입 `0x3d954` 에서 CPU 대타(`0xac228`, 3da70)나 CPU 투수 교체
+ * (`0xac428`, 3da3e)가 걸려 교체 연출 0x16 으로 넘어갈 때(3da88 `0x6ea6d(소리, 0x16, −1, 0)` → 3da94 상태 0x16)다.
+ * CPU 대타 쪽은 `pinchHitSoundIdsOf` 가 잇는다. CPU 투수 교체 쪽은 웹이 사람 장면에서 그 판정을 안 돌려
+ * (`teamGameFlow.prepareAtBat` 주석) 아직 없다.
  *
  * ⚠️ L 노트가 0x3ae08 을 "경기 중 창" 으로 적어 두었지만 **경기 중 메뉴('\*', 0x3c158)에서는
  *    안 난다** — 0x3c158 이 트는 것은 소리 크기 미리듣기 5 뿐이다 (L 1-F).
@@ -100,9 +102,9 @@ export interface PitcherEntrySoundInput {
  * 예약 칸이 비어 있어 0x16 을 지나지 않기 때문이다.
  * (문서 R2 8절이 "투수 첫 등장(유력)" 으로 적어 둔 자리를 여기서 확정으로 바꿨다.)
  *
- * ⚠️ 같은 함수의 **타자 가지**(인자 3 이 0, `+0x195c` 비트0, `0xae9a0(공격팀, 1)` = 대타 예약)도
- * 번호를 **똑같이** 26/15/14 로 고른다 — 다만 예약이 아니라 즉시(0x38cd4 → 0x6ea6c)다.
- * 웹에는 대타 연출이 없어 그 쪽은 안 이었다.
+ * 같은 함수의 **타자 가지**(인자 3 이 0 — 타자 그리기 0x49e64 가 49f76 에서 부른다, `+0x195c` 비트0 =
+ * 0x3d458 의 대타 예약 `0xae9a0(공격팀, 1)` 가지)도 번호를 **똑같이** 26/15/14 로 고른다 — 공격 팀 타자
+ * `0xae89d([게임+0x220])`(38c4c)를 보고, 예약이 아니라 즉시(38cd4 `0x6ea6d`)다. → `pinchHitSoundIdsOf`.
  *
  * ⚠️ **웹이 안 이은 자리**: CPU 투수 교체는 웹에서 *자동으로 넘기는 타석* 안에서만 일어나는데,
  * 원본의 그 자리는 간이 엔진(`0xc1ba4`)이라 연출·소리가 없다. 그래서 `#` 로 사람이 바꾼
@@ -111,4 +113,41 @@ export interface PitcherEntrySoundInput {
 export function pitcherEntrySoundIdOf(input: PitcherEntrySoundInput): number {
   if (input.isAce) return ACE_ENTRY_SOUND
   return input.bases.second || input.bases.third ? PITCHER_ENTRY_CRISIS_SOUND : PITCHER_ENTRY_SOUND
+}
+
+/* ── 대타 교체 소리 (교체 연출 상태 0x16 을 지날 때) ─────────────────────────────── */
+
+/** 사람 경기 장면에서 지난 대타 교체 한 번 — `TeamGameProgress.scenePinchHit` 과 같은 모양 */
+export interface ScenePinchHitCue {
+  readonly serial: number
+  readonly by: '사람' | 'CPU'
+  readonly incomingIsAce: boolean
+}
+
+export interface PinchHitSoundProgress {
+  readonly scenePinchHit: ScenePinchHitCue | null
+  readonly game: { readonly bases: { readonly second: boolean; readonly third: boolean } }
+}
+
+/**
+ * **대타가 교체 연출(상태 0x16)을 지나 타석에 설 때 나는 소리** — 원본 순서대로.
+ *
+ * 1. CPU 대타면 먼저 **"Time!" 22**: 0xf 진입 `0x3d954` 가 `0xac228` 참을 받자마자 `0x6ea6d(소리, 0x16, −1, 0)`
+ *    (3da88) 를 부르고 상태 0x16 을 예약한다 (3da94). 사람 대타는 이 22 를 `#` 교체 창 진입(0x3ae08)에서 이미
+ *    냈다 — 화면(`TeamGameScreen`)이 창을 열 때 낸다 — 그래서 여기서는 안 낸다.
+ * 2. 0x16 진입 `0x3d458` 이 대타 예약을 보고 `+0x195c` 비트0(마선수면 5)·`+0x1959` 를 세우고 → 0xd → 0xe 에서
+ *    타자 그리기 `0x49e64` → `0x38b64(…, 0)` 타자 가지가 **들어온 타자**로 26/15/14 를 즉시 낸다
+ *    (마선수 26 · 2루나 3루 주자 15 · 그 밖 14 — 투수 가지와 같은 고르기, `pitcherEntrySoundIdOf`).
+ *
+ * 사람 장면을 안 지난 CPU 대타(간이 엔진 0xc1ba4)는 연출도 소리도 없다 — 진행기가 `scenePinchHit` 을 안 바꾼다.
+ * ⚠️ 0x38b64 는 `[게임+0xf10]+0x64 == 0` 일 때만 낸다(38b78) — 그 칸의 뜻은 안 읽었다.
+ */
+export function pinchHitSoundIdsOf(
+  before: PinchHitSoundProgress,
+  after: PinchHitSoundProgress,
+): readonly number[] {
+  const cue = after.scenePinchHit
+  if (cue === null || cue === before.scenePinchHit) return []
+  const entry = pitcherEntrySoundIdOf({ isAce: cue.incomingIsAce, bases: after.game.bases })
+  return cue.by === 'CPU' ? [PITCHER_CHANGE_SOUND, entry] : [entry]
 }

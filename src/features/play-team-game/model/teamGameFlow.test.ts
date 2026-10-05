@@ -817,15 +817,40 @@ describe('대타 (0xaf06c → 0xaebe4 의 +0x291 가지, R4 1a·1c)', () => {
     expect(currentBatterAbility(뒤).power).toBeGreaterThan(currentBatterAbility(뒤).hit)
   })
 
-  it('볼카운트는 0-0 으로 돌아간다 — 0x16 다음이 0xd 라 타석 초기화 0xa5bcc 를 지난다', () => {
+  it('볼카운트는 이어받는다 — 0x48d50 이 이전 상태 0x16 이면 0xb6764·0xa5bcc 를 건너뛴다 (48e94)', () => {
     const { progress } = 공격시작()
-    // 볼 셋 스트라이크 하나에서 대타를 내면 새 타자가 처음부터 친다
+    // 볼 셋 스트라이크 하나에서 대타를 내면 새 타자가 그 카운트에서 친다
     const 카운트 = { ...progress, atBat: { ...progress.atBat, balls: 3, strikes: 1 } }
     const 뒤 = pinchHit(카운트, 9)
-    expect(뒤.atBat.balls).toBe(0)
-    expect(뒤.atBat.strikes).toBe(0)
+    expect(뒤.atBat.balls).toBe(3)
+    expect(뒤.atBat.strikes).toBe(1)
     // 타순 칸은 그대로다 — 같은 타석을 이어받는다
     expect(뒤.game.battingOrderIndex).toBe(progress.game.battingOrderIndex)
+  })
+
+  it('대타가 그 타석에서 홈런을 치면 기록 5 (ctx+0x160, a8764) — 다음 타석은 칸이 지워져 안 붙는다', () => {
+    const { progress, random } = 공격시작()
+    const 뒤 = pinchHit(progress, 9)
+    expect(뒤.pinchHitHomeRunHalf).not.toBeNull()
+    expect(뒤.scenePinchHit).toMatchObject({ serial: 1, by: '사람' })
+
+    const 친뒤 = applyBatterOutcome(뒤, { kind: '홈런' }, random)
+    expect(친뒤.recordIds).toEqual([5])
+    expect(친뒤.pinchHitHomeRunHalf).toBeNull()
+
+    // 대타 없이 친 홈런은 5 가 아니다
+    expect(applyBatterOutcome(progress, { kind: '홈런' }, random).recordIds).toEqual([])
+  })
+
+  it('대타 타석이 홈런이 아니면 5 는 없고 칸만 지워진다 — 반 이닝이 바뀐 칸도 안 먹는다', () => {
+    const { progress, random } = 공격시작()
+    const 뒤 = pinchHit(progress, 9)
+    const 아웃 = applyBatterOutcome(뒤, { kind: '아웃', detail: '뜬공아웃' }, random)
+    expect(아웃.recordIds).toEqual([])
+    expect(아웃.pinchHitHomeRunHalf).toBeNull()
+
+    const 지난칸 = { ...뒤, pinchHitHomeRunHalf: { inning: 뒤.game.inning + 1, half: 뒤.game.half } }
+    expect(applyBatterOutcome(지난칸, { kind: '홈런' }, random).recordIds).toEqual([])
   })
 
   it('벤치를 다 쓰면 더는 못 연다', () => {
@@ -941,6 +966,8 @@ describe('CPU 대타 0xac228 — 자동 타석에서', () => {
       const 줄어든칸 = 12 - progress.ourEntry.length + (13 - progress.opponentEntry.length)
       // state[0xe] 는 경기에 한 칸이라 두 번 나올 수 없다
       expect(줄어든칸).toBe(progress.cpuPinchHitUsed ? 1 : 0)
+      // 간이 엔진(0xc1ba4) 대타는 교체 연출 0x16 을 안 지난다 — 소리 고리에 아무것도 안 남긴다
+      expect(progress.scenePinchHit).toBeNull()
       if (progress.cpuPinchHitUsed) 나온경기 += 1
     }
     // 배선이 살아 있다는 확인 — 24경기 중 한 번은 나온다

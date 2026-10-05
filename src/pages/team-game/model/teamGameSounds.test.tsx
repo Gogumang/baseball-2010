@@ -112,6 +112,16 @@ describe('팀 경기 화면의 소리 배선', () => {
     expect(녹음.played).toEqual([8, 18])
   })
 
+  it('사람 대타를 확정하면 들어온 타자 등판음이 난다 (0x16 → 0xe, 0x38b64 타자 가지 38cd4)', () => {
+    const { result } = 띄우기({ playerSide: PLAYER_SIDE_FIRST_BAT })
+    녹음.played.length = 0
+
+    act(() => result.current.actions.pinchHit(result.current.benchBatters[0]!))
+
+    // 시즌 명단 벤치 첫 칸은 마선수가 아니고, 1회 첫 타석이라 루가 비었다 → 14
+    expect(녹음.played).toEqual([14])
+  })
+
   it('인플레이 타구의 아웃 콜(20)은 수비 화면이 끝난 뒤에야 난다 (0x51b36)', () => {
     const { result } = 띄우기({ playerSide: PLAYER_SIDE_FIRST_BAT })
     녹음.played.length = 0
