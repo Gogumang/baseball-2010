@@ -551,6 +551,47 @@ describe('자동 발동 (0x1cf9c → 0x8be80 → 0xadc70) · 연초 115', () => 
   })
 })
 
+describe('마선수 대결 (match → 투수 미션 team−1 → 140 결과 이벤트)', () => {
+  it('대결로 나갔다가 이기면 resultEvents[0] 을 앞 이벤트가 모은 것과 함께 틀고, 끝나면 105 — 행동은 안 쓴다', async () => {
+    const { result } = 띄우기()
+    act(() => result.current.actions.create('투수', 신인))
+    await 이벤트불러오기(result)
+    첫이벤트넘기기(result)
+    while (result.current.scene === '이벤트') 이벤트끝내기(result)
+    act(() => result.current.actions.openOuting())
+    act(() => result.current.actions.enterOutingPlace(OUTING_PLACES[0]))
+
+    const 앞보상 = { rewards: [{ kind: 0, value: 5 }], viewedEventIds: [113] }
+    act(() => result.current.actions.beginAceMatch({ op: 'match', team: 16, resultEvents: [114, 115] }, 앞보상))
+    expect(result.current.scene).toBe('마선수대결')
+    expect(result.current.aceMatch?.mission).toMatchObject({ side: '투수', id: 16 })
+
+    act(() => result.current.actions.finishAceMatch(true))
+    expect(result.current.story).toEqual({ eventId: 114, context: '대결결과', viewed: [], carried: 앞보상 })
+
+    const 인기도 = result.current.career!.popularity
+    act(() => result.current.actions.completeStory(앞보상.rewards, [113, 114]))
+    expect(result.current.scene).toBe('관리')
+    expect(result.current.career?.popularity).toBe(인기도 + 5)
+    expect(result.current.career?.seenEventIds).toEqual(expect.arrayContaining(['113', '114']))
+    expect(result.current.career?.hasActedThisCycle).toBe(false)
+    expect(result.current.career?.outingsThisSeason).toBe(0)
+  })
+
+  it('지면 resultEvents[1]', async () => {
+    const { result } = 띄우기()
+    act(() => result.current.actions.create('투수', 신인))
+    await 이벤트불러오기(result)
+    첫이벤트넘기기(result)
+    while (result.current.scene === '이벤트') 이벤트끝내기(result)
+    act(() => result.current.actions.openOuting())
+    act(() => result.current.actions.enterOutingPlace(OUTING_PLACES[0]))
+    act(() => result.current.actions.beginAceMatch({ op: 'match', team: 20, resultEvents: [124, 125] }, { rewards: [], viewedEventIds: [123] }))
+    act(() => result.current.actions.finishAceMatch(false))
+    expect(result.current.story?.eventId).toBe(125)
+  })
+})
+
 describe('외출 [!] · [들어가기] (0x8cdc0 · 0x16c64 · 114)', () => {
   const 판짜기 = async (career: Record<string, unknown>) => {
     const { result } = 띄우기()

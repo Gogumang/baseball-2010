@@ -46,7 +46,10 @@ import {
 import { emptyPlaceEventId, isEmptyPlaceEventId } from '@/entities/career/model/battingOrder'
 import { EVENT_REWARD_KIND } from '@/entities/story/model/eventReward'
 import type { EventReward } from '@/entities/story/model/eventReward'
+import { aceMatchMissionOf, matchResultEventOf } from '@/entities/story/model/aceMatch'
 import type { StoryCarry } from '@/entities/story/model/aceMatch'
+import type { OriginalMission } from '@/shared/config/original/missions'
+import type { EventCommand } from '@/shared/config/original/eventTypes'
 import type { OriginalEvent } from '@/shared/config/original/eventTypes'
 import { formatOriginalMoney } from '@/features/shop/model/shopSelection'
 import { hiddenOpenTextOf } from '@/entities/career/model/equipment'
@@ -102,7 +105,8 @@ import { PITCHER_MANAGEMENT_TEXT } from '@/pages/pitcher-league/lib/pitcherManag
  *   상점(111 장비 상점 / 121 장비착용 — 어느 쪽인지는 `shopTab`) · 외출(112 지도 · 113 장소) ·
  *   이벤트(114 이벤트 재생 — 무엇을 틀었는지는 `story`)
  */
-export type PitcherScene = '등록' | '관리' | '경기' | '시즌종료' | '연말' | '엔딩' | '상점' | '외출' | '이벤트'
+export type PitcherScene =
+  | '등록' | '관리' | '경기' | '시즌종료' | '연말' | '엔딩' | '상점' | '외출' | '이벤트' | '마선수대결'
 
 /**
  * 이벤트 재생(상태 114)을 **어디서** 틀었나 — 끝난 뒤 갈 곳(장면+0x24 "뒤 상태")이 이것으로 갈린다.
@@ -112,15 +116,30 @@ export type PitcherScene = '등록' | '관리' | '경기' | '시즌종료' | '�
  *   중간평가 117 (0x11e84 `[다음 114, 뒤 105]`) — 452~454
  *   연말     136 · 130 · 131 · 132 · 133 사슬 (392 → … → 380/502 → 461/462)
  *   장소     113 [들어가기] (0x16c64 `[다음 114, 뒤 113]`) — 끝 처리 0x1c014 가 빈 장소가 아니면 행동을 쓰고 105 로
+ *   대결결과 140 (0x10df8 `[다음 114, 뒤 105]`) — 마선수 대결에서 돌아와 결과 이벤트
  */
-export type PitcherStoryContext = '관리' | '연초' | '지도' | '중간평가' | '연말' | '장소'
+export type PitcherStoryContext = '관리' | '연초' | '지도' | '중간평가' | '연말' | '장소' | '대결결과'
 
 export interface PitcherStory {
   readonly eventId: number
   readonly context: PitcherStoryContext
   /** 연말 사슬에서 **앞서** 본 이벤트 번호 (이번 재생 것은 재생기가 넘긴다) */
   readonly viewed: readonly number[]
+  /** 대결 결과 이벤트(140)면 대결 앞 이벤트가 모아 둔 보상·본 이벤트 — 재생기가 이어 받는다 */
+  readonly carried?: StoryCarry
 }
+
+/**
+ * 마선수 대결 (r_event `match` = SYS 8, 0x8d734) — 투수편은 `g[0x175] = team − 1` 로 **투수 미션 레코드**를 고르고
+ * 미션 장면(모드 5)에서 사람이 던진다 (S13 4-1 · Q2 1b). 결과는 저장 +0x177 에 적고 장면 0x106 으로 돌아온다.
+ */
+export interface PitcherAceMatch {
+  readonly mission: OriginalMission
+  readonly resultEvents: readonly number[]
+  readonly carried: StoryCarry
+}
+
+type MatchCommand = Extract<EventCommand, { op: 'match' }>
 
 export interface PitcherLeagueSession {
   readonly career: PitcherCareer | null
@@ -147,6 +166,8 @@ export interface PitcherLeagueSession {
   readonly eventPlaceIds: ReadonlySet<string>
   /** 이벤트 번호별 `%s` 글 — 380 연봉 제시액(0x8bc4c → 금액 서식 0x55cf4). 기본이면 undefined */
   readonly storyReplacementsFor: (eventId: number) => readonly string[] | undefined
+  /** 치르는 마선수 대결 (장면 '마선수대결'). 아니면 null */
+  readonly aceMatch: PitcherAceMatch | null
   /** 이벤트 재생 뒤 띄울 알림 — 히든 오픈(보상 7) 팝업 글 · 옮기지 않은 갈래. 없으면 '' */
   readonly storyNotice: string
   readonly actions: {
@@ -186,8 +207,12 @@ export interface PitcherLeagueSession {
     readonly dismissOutingRecoveryNotice: () => void
     /** 이벤트 재생이 끝났다 — 지나온 보상과 본 이벤트 번호 (114 틀 0x1c014) */
     readonly completeStory: (rewards: readonly EventReward[], viewedEventIds: readonly number[]) => void
-    /** 이벤트가 경기 명령(마선수 대결)에 닿았다 — 투수편 대결은 옮기지 않았다 (미해결) */
+    /** 이벤트가 경기 명령(마선수 대결)에 닿았다 — 대결 화면이 없을 때: 지나온 보상만 남기고 105 (근사) */
     readonly abortStoryAtMatch: (carry: StoryCarry) => void
+    /** 경기 명령 → 투수 미션 레코드 team−1 로 마선수 대결 (장면 '마선수대결') */
+    readonly beginAceMatch: (command: MatchCommand, carry: StoryCarry) => void
+    /** 대결이 끝났다 — 105 진입이 +0x176 을 보고 140 → 결과 이벤트 resultEvents[이김 ? 0 : 1] */
+    readonly finishAceMatch: (isWin: boolean) => void
     readonly dismissStoryNotice: () => void
     readonly reset: () => void
   }
@@ -981,6 +1006,11 @@ export function usePitcherLeagueSession(
         commit(viewed)
         return setScene('외출')
       }
+      // 140 → 뒤 105. 대결로 나간 장소 이벤트는 0x1c014 의 장소 끝 처리(행동·외출 수)를 지나지 않는다 (아래 `beginAceMatch`)
+      if (story.context === '대결결과') {
+        commit(viewed)
+        return setScene('관리')
+      }
       if (story.context === '장소') {
         if (isEmptyPlaceEventId(story.eventId)) {
           commit(viewed)
@@ -996,10 +1026,10 @@ export function usePitcherLeagueSession(
   )
 
   /**
-   * ⚠️ **미해결**: 경기 명령(r_event `match`) — 투수편 장소 이벤트 113·123·127·150·153·192·196·207·211·217·221·225·229
-   * (대상 3)는 마선수 대결로 나간다 (원본은 미션 장면 → 돌아와 105 진입이 +0x176 을 보고 140 결과 이벤트).
-   * 투수편 대결은 옮기지 않았다 — 그때까지 지나온 보상·본 이벤트만 남기고 알림과 함께 105 로 돌아간다
-   * (행동·외출 수는 쓰지 않는다). 결과 이벤트로 이어지는 뒷 이벤트는 그래서 열리지 않는다.
+   * 경기 명령(r_event `match`) — 투수편 장소 이벤트 113·123·127·150·153·192·196·207·211·217·221·225·229 (대상 3).
+   *
+   * **대결 화면이 없을 때의 근사** (`abortStoryAtMatch`): 그때까지 지나온 보상·본 이벤트만 남기고 알림과 함께 105
+   * (행동·외출 수는 쓰지 않는다). 결과 이벤트는 열리지 않는다.
    */
   const abortStoryAtMatch = useCallback(
     (carry: StoryCarry) => {
@@ -1012,12 +1042,51 @@ export function usePitcherLeagueSession(
     },
     [career, commit, random, story],
   )
+
+  /**
+   * **마선수 대결** — SYS 8(0x8d734 → 0x8d764)이 `g[0x175] = team − 1`(투수편 미션 레코드 번호)를 적고 미션 장면으로 나간다.
+   * 그때까지 지나온 보상·본 이벤트는 재생기가 들고(`carry`) 결과 이벤트로 넘긴다 — 타자편과 같은 꼴.
+   * 이벤트 데이터의 team 은 16~20 뿐이라 투수 미션 16~20 "메디카·킹타이거·로제·크라이져·어거지죠" (목표 아웃) 에 떨어진다.
+   * 장소 이벤트가 114 에서 끝나지 않고 장면을 떠나므로 0x1c014 의 장소 끝 처리(행동 · 외출 수)는 돌지 않는다 (유력).
+   */
+  const [aceMatch, setAceMatch] = useState<PitcherAceMatch | null>(null)
+  const beginAceMatch = useCallback(
+    (command: MatchCommand, carry: StoryCarry) => {
+      if (career === null || story === null) return
+      const mission = aceMatchMissionOf(command.team, '투수')
+      if (mission === null) return abortStoryAtMatch(carry)
+      setStory(null)
+      setAceMatch({ mission, resultEvents: command.resultEvents, carried: carry })
+      setScene('마선수대결')
+    },
+    [abortStoryAtMatch, career, story],
+  )
+
+  /**
+   * 대결이 끝나 장면 0x106 으로 돌아왔다 — 미션 끝이 결과를 저장 +0x177 에 적고(0x4efc6~0x4f018, G 없음) 원래 모드로 돌린다.
+   * 105 진입 곁가지(0x11b6c~0x11bbe)가 전역 +0x176 을 보고 **현재를 112 로** 두고 다음 = 140 → 진입 0x10df8 이 결과 바이트로
+   * resultEvents[이김 ? 0 : 1] 을 0x8bdc9 로 부르고 `[다음 114, 뒤 105]` (0x10e40). 140 은 115·117 보다 앞이다.
+   */
+  const finishAceMatch = useCallback(
+    (isWin: boolean) => {
+      if (aceMatch === null) return
+      setAceMatch(null)
+      openStory({
+        eventId: matchResultEventOf(aceMatch.resultEvents, isWin),
+        context: '대결결과',
+        viewed: [],
+        carried: aceMatch.carried,
+      })
+    },
+    [aceMatch, openStory],
+  )
   const dismissStoryNotice = useCallback(() => setStoryNotice(''), [])
 
   const reset = useCallback(() => {
     setCareer(null)
     setGameOptions(null)
     setStory(null)
+    setAceMatch(null)
     setScene('등록')
   }, [])
 
@@ -1036,6 +1105,7 @@ export function usePitcherLeagueSession(
     eventPlaceIds,
     storyReplacementsFor,
     storyNotice,
+    aceMatch,
     actions: {
       create,
       save: saveFromScreen,
@@ -1057,6 +1127,8 @@ export function usePitcherLeagueSession(
       dismissOutingRecoveryNotice,
       completeStory,
       abortStoryAtMatch,
+      beginAceMatch,
+      finishAceMatch,
       dismissStoryNotice,
       reset,
     },

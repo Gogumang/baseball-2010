@@ -14,7 +14,8 @@ import {
   pitcherEndingBonusOf,
 } from '@/entities/pitcher-career/model/pitcherSeasonFlow'
 import { PITCHER_EDITION_MODE } from '@/entities/pitcher-career/model/pitcherRotation'
-import type { PitcherLeagueSession } from '@/app/model/usePitcherLeagueSession'
+import type { ReactNode } from 'react'
+import type { PitcherAceMatch, PitcherLeagueSession } from '@/app/model/usePitcherLeagueSession'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { useGameSettings } from '@/app/model/useGameSettings'
 
@@ -25,6 +26,11 @@ interface PitcherLeagueRouteProps {
   /** 경기 중 메뉴 "설정" 칸 */
   readonly gameSettings: ReturnType<typeof useGameSettings>
   readonly onExit: () => void
+  /**
+   * 마선수 대결 화면 — 투수 미션 레코드(team − 1)를 사람이 던지는 미션 장면(모드 5). 끝나면 `onFinish(이겼나)`.
+   * 안 넘기면 대결을 열지 않고 예전처럼 지나온 보상만 남기고 105 로 돌아간다 (`abortStoryAtMatch`).
+   */
+  readonly renderAceMatch?: (match: PitcherAceMatch, onFinish: (isWin: boolean) => void) => ReactNode
 }
 
 /**
@@ -41,7 +47,7 @@ interface PitcherLeagueRouteProps {
  * 상점은 [아이템] → 110 → **111 상점**(장비·서브·GP) · [선수정보] → **121 장비착용** 이 `PitcherShopScreen` 으로 간다.
  */
 export function PitcherLeagueRoute({
-  session, random, openedHiddenIds = [], gameSettings, onExit,
+  session, random, openedHiddenIds = [], gameSettings, onExit, renderAceMatch,
 }: PitcherLeagueRouteProps) {
   const { career, scene, gameOptions, shopTab, shopNotice, shopGpDetail, actions } = session
 
@@ -96,9 +102,10 @@ export function PitcherLeagueRoute({
     const event = session.storyEvents?.find((candidate) => candidate.id === story.eventId)
     // 이벤트 본문이 오기 전에는 관리 화면을 깔아 둔다
     if (session.storyEvents !== null && event !== undefined) {
-      // 대사창은 그 상태의 화면 위에 얹힌다 — 105 에서 튼 것(자동 발동·연초 115·중간평가 117)은 관리 화면 위,
+      // 대사창은 그 상태의 화면 위에 얹힌다 — 105 에서 튼 것(자동 발동·연초 115·중간평가 117·대결 결과 140)은 관리 화면 위,
       // 112 자동 발동은 지도 위다
-      const isOverManagement = story.context === '관리' || story.context === '중간평가' || story.context === '연초'
+      const isOverManagement =
+        story.context === '관리' || story.context === '중간평가' || story.context === '연초' || story.context === '대결결과'
       return (
         <>
           {isOverManagement && management}
@@ -114,12 +121,19 @@ export function PitcherLeagueRoute({
             battingTypeIndex={0}
             replacementsFor={session.storyReplacementsFor}
             onComplete={actions.completeStory}
-            onMatch={(_command, carry) => actions.abortStoryAtMatch(carry)}
+            carried={story.carried}
+            onMatch={(command, carry) =>
+              renderAceMatch === undefined ? actions.abortStoryAtMatch(carry) : actions.beginAceMatch(command, carry)
+            }
           />
           </ScreenOverlay>
         </>
       )
     }
+  }
+
+  if (scene === '마선수대결' && session.aceMatch !== null && renderAceMatch !== undefined) {
+    return <>{renderAceMatch(session.aceMatch, actions.finishAceMatch)}</>
   }
 
   if (scene === '시즌종료') {
