@@ -10,6 +10,7 @@ import {
   popularityChangeOf,
   popularityCompleteGameOf,
   reputationCompleteGameOf,
+  seasonGameIsEvaluated,
 } from '@/entities/season-mode/model/seasonEvaluation'
 import { SEASON_RECORD_CODE, recordSeasonGameEvent } from '@/entities/season-mode/model/seasonReputation'
 
@@ -137,5 +138,21 @@ describe('경기 뒤 평가 묶음', () => {
       { popularityChange: 0, reputationChange: 0, moraleChange: -20 },
     )
     expect(뒤.teamMorale).toBe(0)
+  })
+})
+
+describe('평가가 도는 갈래 — 경기 끝 0x4ea0c 의 4f216·4f268 가드', () => {
+  it('정규시즌 경기만 0x4f274 의 평가 0xa719c 를 부른다', () => {
+    expect(seasonGameIsEvaluated({ nationalCup: false, postseason: false })).toBe(true)
+  })
+
+  it('포스트시즌(L+0x34)이면 4f268 에서 하루 끝 4f29a 로 건너뛴다', () => {
+    expect(seasonGameIsEvaluated({ nationalCup: false, postseason: true })).toBe(false)
+  })
+
+  it('국가대항전(L+0xac)이면 4f216 에서 CPU 경기만 돌리고 4f29a 로 건너뛴다', () => {
+    expect(seasonGameIsEvaluated({ nationalCup: true, postseason: false })).toBe(false)
+    // 4f216 이 먼저 보므로 두 칸이 다 서도 평가는 없다
+    expect(seasonGameIsEvaluated({ nationalCup: true, postseason: true })).toBe(false)
   })
 })

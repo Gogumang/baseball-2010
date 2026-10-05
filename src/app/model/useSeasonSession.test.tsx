@@ -305,6 +305,34 @@ describe('시즌 끝 사슬', () => {
     expect(둘째판.result.current.scene).toBe(SEASON_SCENE_STATE.관리메뉴)
   })
 
+  it('국가대항전 경기는 평가를 안 탄다 — 인기도·평판·사기가 그대로다 (0x4ea0c 4f216)', () => {
+    const { result } = 띄우기()
+    act(() => result.current.actions.chooseTeam(0))
+    act(() => result.current.actions.confirmIncome({
+      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
+    }))
+    act(() => result.current.actions.updateRecord({ ...result.current.state!.record, yearIndex: 2 }))
+    act(() => result.current.actions.finishSeason())
+    act(() => result.current.actions.playCupGame(10, 11))
+    expect(result.current.gameKind).toBe('국가대항전')
+    const 전 = result.current.state!
+
+    // 정규시즌이면 만루홈런(S[13]) 한 칸으로 평판 등급 +3 이 될 경기다
+    const 기록 = clearSeasonGameRecord()
+    기록[13] = 1
+    act(() => result.current.actions.finishGame(요약({ ourTeamId: 10, opponentTeamId: 11, gameRecord: 기록 })))
+
+    const 후 = result.current.state!
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.국가대항전)
+    expect(후.record.reputation).toBe(전.record.reputation)
+    expect(후.record.lastReputationGrade).toBe(전.record.lastReputationGrade)
+    expect(후.record.popularity).toBe(전.record.popularity)
+    expect(후.record.lastPopularityChange).toBe(전.record.lastPopularityChange)
+    expect(후.teamMorale).toBe(전.teamMorale)
+    // 16칸 자체는 SR+0x1a0 에 남는다 — 읽는 곳(0xa6f1c)이 안 돌 뿐이다
+    expect(후.record.gameRecord).toEqual(기록)
+  })
+
   it('짝수 연차는 결산 뒤 국가대항전이 열린다', () => {
     const { result } = 띄우기()
     act(() => result.current.actions.chooseTeam(0))

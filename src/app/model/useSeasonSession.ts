@@ -14,6 +14,7 @@ import {
 import {
   applySeasonGameEvaluation,
   evaluateSeasonGame,
+  seasonGameIsEvaluated,
 } from '@/entities/season-mode/model/seasonEvaluation'
 import { clearSeasonGameRecord } from '@/entities/season-mode/model/seasonReputation'
 import type { SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
@@ -445,6 +446,7 @@ export function useSeasonSession(
    * 경기가 끝났다 — 원본 차례 그대로 정산한다:
    * 내 경기를 전적에 넣고, 같은 날 나머지 네 경기를 돌리고(0xc2a48 — 승패 뒤집힘 버그 포함),
    * 선수 기록표에 **양 팀 타석**을 쌓고(0xa8024), 평가(0xa719c)를 얹은 뒤 관중수입(0xe9)으로 간다.
+   * 평가는 **정규시즌 경기만** 받는다 — 포스트시즌·국가대항전은 원본 0x4ea0c 가 건너뛴다.
    */
   const finishGame = useCallback(
     (summary: TeamGameSummary) => {
@@ -452,29 +454,40 @@ export function useSeasonSession(
       const { record } = save.state
       const opponent = summary.opponentTeamId
 
-      // 포스트시즌·국가대항전은 리그 전적·수입 정산을 타지 않는다
-      if (gameKind === '포스트시즌') {
-        const series = save.series ?? null
-        if (series === null) return
-        const winner = summary.won ? record.teamId : opponent
-        const advanced = runCpuPostseason(advancePostseason(series, winner), record.teamId, random)
-        commit({
-          ...save,
-          series: advanced,
-          state: {
-            ...save.state,
-            record: { ...record, postseasonChampion: advanced.champion ?? NO_CHAMPION },
-          },
-        })
-        setGameOptions(null)
-        return setScene(SEASON_SCENE_STATE.시즌결산)
-      }
-      if (gameKind === '국가대항전') {
+      // 경기 중 `0xa755c` 가 올린 평판 16칸 — 원본은 경기 장면이 SR+0x1a0 을 직접 올리므로
+      // **갈래와 상관없이** 레코드에 남는다 (S4 2b·6절). 웹은 요약이 싣고 와서 여기서 꽂는다.
+      const played: SeasonRecord = { ...record, gameRecord: summary.gameRecord }
+
+      // 포스트시즌·국가대항전은 리그 전적·수입 정산도, **평가 0xa719c 도** 타지 않는다.
+      // 원본 경기 끝 0x4ea0c 가 L+0xac(4f216)·L+0x34(4f268)이면 0x4f274 의 평가 호출을 건너뛴다
+      // (`seasonGameIsEvaluated` 주석). 그래서 이 두 갈래에서 찬 16칸은 읽히지 않고 다음 경기 직전에 지워진다.
+      const stage = { nationalCup: gameKind === '국가대항전', postseason: gameKind === '포스트시즌' }
+      if (!seasonGameIsEvaluated(stage)) {
+        if (stage.postseason) {
+          const series = save.series ?? null
+          if (series === null) return
+          const winner = summary.won ? record.teamId : opponent
+          const advanced = runCpuPostseason(advancePostseason(series, winner), record.teamId, random)
+          commit({
+            ...save,
+            series: advanced,
+            state: {
+              ...save.state,
+              record: { ...played, postseasonChampion: advanced.champion ?? NO_CHAMPION },
+            },
+          })
+          setGameOptions(null)
+          return setScene(SEASON_SCENE_STATE.시즌결산)
+        }
         const cup = save.cup ?? null
         if (cup === null) return
         const winner = summary.won ? record.teamId : opponent
         const loser = summary.won ? opponent : record.teamId
-        commit({ ...save, cup: advanceNationalCupDay(cup, winner, loser, random) })
+        commit({
+          ...save,
+          cup: advanceNationalCupDay(cup, winner, loser, random),
+          state: { ...save.state, record: played },
+        })
         setGameOptions(null)
         return setScene(SEASON_SCENE_STATE.국가대항전)
       }
@@ -493,9 +506,8 @@ export function useSeasonSession(
         ),
       )
 
-      // 경기 중 `0xa755c` 가 올린 평판 16칸을 시즌 레코드에 꽂는다 — 평가가 이 칸을 읽는다.
-      // 원본은 경기 장면이 SR+0x1a0 을 직접 올리므로 꽂는 자리가 따로 없다 (S4 2b·6절).
-      const played: SeasonRecord = { ...record, gameRecord: summary.gameRecord }
+      // 평가가 위에서 꽂은 16칸(played.gameRecord)을 읽는다. 원본 차례는 내 경기 전적 → 평가 →
+      // 나머지 네 경기 → 하루 끝이지만, 평가는 리그를 읽지 않아 웹처럼 하루를 먼저 돌려도 값이 같다.
       const evaluation = evaluateSeasonGame(played, {
         myRuns: summary.ourScore,
         opponentRuns: summary.opponentScore,
@@ -531,7 +543,7 @@ export function useSeasonSession(
       activeSound().play(seasonEvaluationJingleIdOf(evaluation.popularityChange))
       setScene(SEASON_SCENE_STATE.관중수입)
     },
-    [commit, random, save],
+    [commit, gameKind, random, save],
   )
 
   /** 관중수입 창에서 확인 — 정산된 레코드를 받아 경기 뒤 마무리로 간다 (0xf1) */

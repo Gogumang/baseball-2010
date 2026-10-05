@@ -10,10 +10,45 @@ import type { CompleteGameKind, SeasonGameContext } from '@/entities/season-mode
 
 /**
  * 시즌모드 경기 뒤 팀 평가 — 인기도 `0xa6734` · 평판 `0xa6f1c` · 사기 `0xa7442`.
- * 부르는 곳은 경기 끝 `0x4ea0c → 0x4f274 → 0xa719c` 의 **모드 2 갈래 `0xa7442`** 이고,
- * 조건은 `[obj+0x1c](=SR) ≠ 0` 뿐이라 **정규시즌·포스트시즌·국가대항전을 가리지 않는다**.
- * 근거: `docs/re/P4-season-flow.md` 4a 절 (확정).
+ * 부르는 곳은 경기 끝 `0x4ea0c → 0x4f274 → 0xa719c` 의 **모드 2 갈래 `0xa7442`** 다.
+ * `0xa719c` **안쪽** 조건은 `[obj+0x1c](=SR) ≠ 0` 뿐이지만(`docs/re/P4-season-flow.md` 4a),
+ * **부르는 쪽 `0x4ea0c` 가 포스트시즌·국가대항전이면 이 호출을 건너뛴다** — `seasonGameIsEvaluated` 참고.
+ * (P4 4a 의 "포스트시즌·국가대항전 포함" 은 안쪽만 보고 쓴 줄이라 틀렸다. 호출지는 `re xref 0xa719c`
+ * → 리터럴 `0x4f484` 를 읽는 `0x4f274` 한 곳뿐이다.)
  */
+
+/** 경기 끝 `0x4ea0c` 가 보는 리그 칸 둘 (`L = scene+0xf0c`) */
+export interface SeasonLeagueStage {
+  /** `L+0xac` — 국가대항전 진행 중 (P5 "0x12c 충돌 정리") */
+  readonly nationalCup: boolean
+  /** `L+0x34` — 포스트시즌 진행 중 (R1, P4 4b) */
+  readonly postseason: boolean
+}
+
+/**
+ * 이 경기 뒤에 평가 `0xa719c` 가 도는가 — **정규시즌 경기만** 돈다.
+ *
+ * 경기 끝 `0x4ea0c` 의 꼬리 차례 (capstone 으로 직접 떴다):
+ * ```
+ * 4f0a6/4f11c: 0xb76dc(L, 이긴 팀) · 4f12e: 0xb77e0(L, 진 팀)   ; 내 경기 결과를 리그에 적는다
+ * 4f216: L+0xac(국가대항전) ≠ 0 →
+ *          L+0xad > 1(풀리그 날)이면 0xc2dac 로 같은 라운드 둘째 경기를 CPU 로 → 4f29a
+ *          (결승 날이면 그냥 4f29a)                                       ; **평가 없음**
+ * 4f268: L+0x34(포스트시즌) ≠ 0 → 4f29a                                   ; **평가 없음**
+ * 4f274: 0xa719c(평가)                                                    ; 정규시즌만
+ * 4f294: 0xc2a48(같은 날 나머지 네 경기)
+ * 4f29a: 0xb818c(리그 하루 끝)
+ * ```
+ * 그래서 정규시즌의 차례는 **내 경기 전적 → 평가 → 나머지 경기 → 하루 끝** 이다.
+ * 평가는 리그를 읽지 않으므로 웹이 하루를 먼저 돌리고 평가해도 값은 같다.
+ *
+ * 포스트시즌·국가대항전 경기도 게이트 `0xa755c`(모드 2 · SR 있음)를 통과하므로 평판 16칸은
+ * 차지만, 그 칸을 읽는 곳은 `0xa6f1c` 하나뿐이라(S4 4절) **어디에도 쓰이지 않고**
+ * 다음 경기 직전 `0xa3424` 에서 지워진다.
+ */
+export function seasonGameIsEvaluated(stage: SeasonLeagueStage): boolean {
+  return !stage.nationalCup && !stage.postseason
+}
 
 /**
  * 완투 판정 — 사람 팀 현재 투수의 아웃 수 `p[3]` 이 `이닝×3+3` 과 같은가.
