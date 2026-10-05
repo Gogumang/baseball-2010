@@ -13,6 +13,8 @@ import {
   MAGIC_BALL_KIND_BY_NUMBER,
   ballMagicNumberAfterPitch,
   magicBallKindOf,
+  magicBallKindAtPath,
+  FIRE_BALL_FIRST_PATH_INDEX,
   canSelectMagicPitch,
   derbyPitchTypeOf,
   magicPitchCorrectionOf,
@@ -203,5 +205,37 @@ describe('공 그림 종류 (경기+0x1080, 0x46fa8)', () => {
   it('표 밖 번호는 보통 공이다', () => {
     expect(magicBallKindOf(10)).toBe(0)
     expect(MAGIC_BALL_KIND_BY_NUMBER).toHaveLength(10)
+  })
+})
+
+describe('날아가는 도중의 공 그림 종류 (경기+0x1080, 0x3b55e)', () => {
+  const 공 = (overrides = {}) => ({
+    isMagicPitch: true,
+    magicNumber: 1,
+    pitcherForm: 0,
+    pathIndex: FIRE_BALL_FIRST_PATH_INDEX,
+    selectedBallKind: 0,
+    ...overrides,
+  })
+
+  it('마구 1 은 경로 번호 8 부터 불꽃(1)이다 — 7 까지는 던질 때 값', () => {
+    expect(magicBallKindAtPath(공({ pathIndex: 7 }))).toBe(0)
+    expect(magicBallKindAtPath(공({ pathIndex: 8 }))).toBe(1)
+    expect(magicBallKindAtPath(공({ pathIndex: 20 }))).toBe(1)
+  })
+
+  it('마구 4 는 폼 >> 1 == 0 일 때만 같은 갈래(3b546)라 불꽃이 된다', () => {
+    expect(magicBallKindAtPath(공({ magicNumber: 4, pitcherForm: 1 }))).toBe(1)
+    expect(magicBallKindAtPath(공({ magicNumber: 4, pitcherForm: 2 }))).toBe(0)
+  })
+
+  it('마구 2·3 과 마투수(5~9)는 이 갈래가 없다 — 던질 때 값 그대로', () => {
+    expect([2, 3, 5, 6, 7].map((magicNumber) => magicBallKindAtPath(공({ magicNumber })))).toEqual([0, 0, 0, 0, 0])
+    expect(magicBallKindAtPath(공({ magicNumber: 8, selectedBallKind: magicBallKindOf(8) }))).toBe(2)
+    expect(magicBallKindAtPath(공({ magicNumber: 9, selectedBallKind: magicBallKindOf(9) }))).toBe(1)
+  })
+
+  it('마구가 아닌 공(구질 22 아님)은 바꾸지 않는다', () => {
+    expect(magicBallKindAtPath(공({ isMagicPitch: false }))).toBe(0)
   })
 })

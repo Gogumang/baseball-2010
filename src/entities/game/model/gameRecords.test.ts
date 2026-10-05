@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { atBatRecordIdsOf, gameEndRecordIdsOf, recordGamePointsOf, RECORD_NAMES, completeGameRecordIdsOf, strikeoutRecordIdsOf, threePitchInningRecordIdsOf } from '@/entities/game/model/gameRecords'
-import type { CompleteGameInput, StrikeoutRecordInput } from '@/entities/game/model/gameRecords'
+import { atBatRecordIdsOf, gameEndRecordIdsOf, recordGamePointsOf, RECORD_NAMES, completeGameRecordIdsOf, strikeoutRecordIdsOf, threePitchInningRecordIdsOf, pinchHitHomeRunRecordIdsOf, backToBackRecordOf, stealPlayRecordIdsOf, multiOutPlayRecordIdsOf, foulRecordOf, laserThrowOutRecordOf } from '@/entities/game/model/gameRecords'
+import type { CompleteGameInput, StrikeoutRecordInput, StealPlayRunner } from '@/entities/game/model/gameRecords'
 
 const 타석 = (overrides = {}) => ({
   outcome: { kind: '아웃', detail: '땅볼아웃' } as const,
@@ -144,5 +144,81 @@ describe('삼진 계열 기록 — 16~23·25 (0xa7c4c·0xa7d0c)', () => {
     expect(threePitchInningRecordIdsOf(4, 3)).toEqual([])
     // 3아웃으로 끝나지 않았으면 주지 않는다
     expect(threePitchInningRecordIdsOf(3, 2)).toEqual([])
+  })
+})
+
+describe('남은 아홉 가지 — 판정 함수 (R8 5절·4-4)', () => {
+  it('5 대타 홈런 — 대타 타석의 홈런만 (0xa8024 @a8764)', () => {
+    expect(pinchHitHomeRunRecordIdsOf({ isHomeRun: true, isPinchHitAtBat: true })).toEqual([5])
+    expect(pinchHitHomeRunRecordIdsOf({ isHomeRun: true, isPinchHitAtBat: false })).toEqual([])
+    expect(pinchHitHomeRunRecordIdsOf({ isHomeRun: false, isPinchHitAtBat: true })).toEqual([])
+  })
+
+  it('6·7 백투백 — 2 에서 6, 3 에서 7 을 주고 0 으로, 다섯 번째에 다시 6 (0xa794c)', () => {
+    let streak = 0
+    const ids: number[][] = []
+    for (let i = 0; i < 5; i += 1) {
+      const step = backToBackRecordOf({ streak, humanOffense: true, isHomeRun: true })
+      streak = step.streak
+      ids.push(step.recordIds)
+    }
+    expect(ids).toEqual([[], [6], [7], [], [6]])
+  })
+
+  it('백투백 카운터 — 홈런 아닌 타석·상대 팀 홈런은 0 으로', () => {
+    expect(backToBackRecordOf({ streak: 1, humanOffense: true, isHomeRun: false })).toEqual({ streak: 0, recordIds: [] })
+    expect(backToBackRecordOf({ streak: 1, humanOffense: false, isHomeRun: true })).toEqual({ streak: 0, recordIds: [] })
+  })
+
+  const 주자 = (overrides: Partial<StealPlayRunner> = {}): StealPlayRunner => ({
+    stealStarted: true,
+    fromBase: 1,
+    currentBase: 2,
+    targetBase: 2,
+    finished: true,
+    safe: true,
+    ...overrides,
+  })
+
+  it('8 도루 성공 — 루를 옮긴 도루 주자마다 하나 (0xa8024 @a83c6)', () => {
+    expect(stealPlayRecordIdsOf({ isRunnerPlay: true, runners: [주자(), 주자({ fromBase: 2, currentBase: 3, targetBase: 3 })] })).toEqual([8, 8])
+    expect(stealPlayRecordIdsOf({ isRunnerPlay: true, runners: [주자({ stealStarted: false })] })).toEqual([])
+  })
+
+  it('24 도루 저지 — 하나라도 잡히면 한 번만 주고 8 은 없다 (@a83de)', () => {
+    const 잡힘 = 주자({ currentBase: 1, safe: false })
+    expect(stealPlayRecordIdsOf({ isRunnerPlay: true, runners: [잡힘, 주자({ fromBase: 2, currentBase: 3, targetBase: 3 })] })).toEqual([24])
+    expect(stealPlayRecordIdsOf({ isRunnerPlay: true, runners: [잡힘, { ...잡힘, fromBase: 2, targetBase: 3 }] })).toEqual([24])
+  })
+
+  it('주자 플레이(종류 5)가 아닌 정산에서는 둘 다 없다', () => {
+    expect(stealPlayRecordIdsOf({ isRunnerPlay: false, runners: [주자()] })).toEqual([])
+  })
+
+  it('26·27 병살·삼중살 — 공 하나 플레이의 아웃 2·3, 주자 달리는 중 삼진이면 26 없음 (@a8e70·a8e84)', () => {
+    expect([1, 2, 3].map((outsInPlay) => multiOutPlayRecordIdsOf({ outsInPlay, strikeoutWhileRunning: false }))).toEqual([[], [26], [27]])
+    expect(multiOutPlayRecordIdsOf({ outsInPlay: 2, strikeoutWhileRunning: true })).toEqual([])
+    expect(multiOutPlayRecordIdsOf({ outsInPlay: 3, strikeoutWhileRunning: true })).toEqual([27])
+  })
+
+  it('32·33 연속 파울 — 세 번째 32, 네 번째 33, 그 뒤는 없음 (0xa7dbc)', () => {
+    let foulStreak = 0
+    const ids: number[][] = []
+    for (let i = 0; i < 6; i += 1) {
+      const step = foulRecordOf(foulStreak)
+      foulStreak = step.foulStreak
+      ids.push(step.recordIds)
+    }
+    expect(ids).toEqual([[], [], [32], [33], [], []])
+  })
+
+  it('36 필살송구 — 아웃이 있을 때만 주고 지운다, 아웃이 없으면 플래그가 남는다 (@a810c)', () => {
+    expect(laserThrowOutRecordOf({ laserThrowFlag: true, outsInPlay: 1 })).toEqual({ laserThrowFlag: false, recordIds: [36] })
+    expect(laserThrowOutRecordOf({ laserThrowFlag: true, outsInPlay: 0 })).toEqual({ laserThrowFlag: true, recordIds: [] })
+    expect(laserThrowOutRecordOf({ laserThrowFlag: false, outsInPlay: 2 })).toEqual({ laserThrowFlag: false, recordIds: [] })
+  })
+
+  it('금액표 — 5·6·7·8·24·26·27·32·33·36', () => {
+    expect([5, 6, 7, 8, 24, 26, 27, 32, 33, 36].map((id) => recordGamePointsOf([id]))).toEqual([10, 20, 40, 2, 3, 2, 100, 3, 5, 3])
   })
 })
