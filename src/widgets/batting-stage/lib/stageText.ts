@@ -86,6 +86,7 @@ export function pitchSituationOf(hud: HudState | null, batterForm = 0): PitchSit
     balls: hud?.balls ?? 0,
     outs: hud?.outs ?? 0,
     runnerCount: Number(bases.first) + Number(bases.second) + Number(bases.third),
+    hasSecondBaseRunner: bases.second,
     batterSide: batterSideOfForm(batterForm),
     side: batterSideOfForm(batterForm),
   }

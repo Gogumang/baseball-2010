@@ -22,6 +22,8 @@ const WIND_UP_MILLISECONDS = 850
 const RESULT_DISPLAY_MILLISECONDS = 1150
 const SPECIAL_PITCH = 'SPECIAL'
 const SKY_ROW_COUNT = 6
+/** 타자 스킬 22 압도 (skills.json 22) — 상대 투수 실투율 +5 */
+const INTIMIDATE_SKILL_ID = 22
 
 type FinishPitch = (swing: BattingSwing | null, now: number) => void
 /** 상태 0x13 을 끝내고 인플레이로 넘기는 고리 */
@@ -101,6 +103,8 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
                   hasRunnerOnBase: (base) =>
                     base === 1 ? bases.first : base === 2 ? bases.second : base === 3 ? bases.third : false,
                 },
+            // 실투 판정 0x33cbc 의 타자 비트 22 압도 — 0xb62b4 는 **장착** 비트라 장착 스킬 번호로 본다
+            latestRef.current.batterSkillIds.includes(INTIMIDATE_SKILL_ID),
           )
           if (choice.kind === '견제') {
             // 0x34848 → 메시지 0x10: 공을 안 던진다(상태 0x11 예약 0x34888 을 안 지난다).

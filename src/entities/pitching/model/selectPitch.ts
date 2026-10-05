@@ -19,6 +19,7 @@ import {
   magicPitchRecordIndexOf,
 } from '@/entities/pitcher-career/model/magicPitch'
 import { advanceMagicPitchGameState } from '@/entities/pitching/model/magicPitchGame'
+import { isMistakePitch } from '@/entities/pitching/model/mistakePitch'
 import type { MagicPitchGameState } from '@/entities/pitching/model/magicPitchGame'
 
 /** 투구 엔진 능력치(0~100)를 원본 눈금(0~999)으로 — 투수편 이식 전 임시 경계 */
@@ -28,6 +29,8 @@ export interface PitchSituation extends CountSituation {
   readonly batterSide: number
   /** 화면 배치 side */
   readonly side: number
+  /** 2루 주자가 있는가 (0xa97a1(_, 2)) — 실투 판정 0x33cbc 의 투수 비트 17 새가슴 조건. 안 넘기면 없음 */
+  readonly hasSecondBaseRunner?: boolean
 }
 
 /**
@@ -51,6 +54,20 @@ function plateOf(target: WorldPoint, side: number) {
 export interface CpuPitchThrow {
   readonly kind: '투구'
   readonly pitch: Pitch
+  /**
+   * 실투 판정 0x33cbc 의 결과 (참이면 원본은 `[scene+0xf98].byte8 = 4`, 0x4deae).
+   *
+   * ⚠️ **미해결 — 사람 타석에서의 쓰임을 아직 옮기지 않았다.** 원본 0x4dc78 은 실투면 그 자리에서
+   *    (0x4debc~0x4df5e) 공을 다시 놓는다:
+   *      4dec0  N(scene+0x109c) = 구질(scene+0xfc8) == 1 ? 0x12(18) : 0x14(20)
+   *      4df1e  0x9e301(공 궤적)
+   *      4df22  목표점 = 표 0xcfbcc[scene+0x17e1](타자 좌우별 존 한가운데, (19415|20585, 1202, 29705))
+   *      4df5e  0x9e3c9(공 궤적, 투수판 0xcfa8c, 그 목표점)
+   *    목표점·비행 틱 수는 확정이지만 경로를 다시 짜는 0x9e301·0x9e3c9 는 궤적 코드라 해석하지 않았다
+   *    (pitch.zt1 데이터를 그대로 쓰는 방침). 그래서 지금 웹 공은 실투여도 원래 곡선으로 날아간다.
+   *    CPU 타자가 칠 때의 쓰임(0x34334 강제 치기·0x340f8 K = 10000)은 사람 타석과 상관없다.
+   */
+  readonly isMistakePitch: boolean
 }
 
 /**
@@ -76,6 +93,7 @@ export interface CpuPickoffInput {
 /**
  * CPU 투구 — 원본 순서 그대로 난수를 뽑는다:
  *   구질(0x344dc) → 목표 종류(0x9eeac) → 목표점(0x345fc) → 제구 등급(0xb74bc) → 제구 오차(0x4dc78) → 곡선
+ *   → 실투 판정(0x33cbc, 0x4dea0 — 마구가 아니면 rand(0,100) 한 번)
  * 목표 종류가 4(견제)이고 주자가 1·2명이면(`isCpuPickoff`, 0x34684) 목표점을 만들지 않고 0x34848 이
  * **견제 루**를 굴린 뒤 끝난다 — 목표점·제구 등급·제구 오차·곡선 굴림이 **없다** (`{ kind: '견제' }`).
  *   0x51214 bl 0x344dc(구질) → 0x5121e bl 0x345fc(→ 0x9eeac 종류 → 종류 4 면 0x34848 루프 → 메시지 0x10 → 0x348d6 끝)
@@ -114,6 +132,11 @@ export function selectPitch(
    *    견제를 받아 줄 진행기가 없는 호출처(나만의리그 타자편·미션 — 다른 작업 구역)가 깨지지 않게 둔 것이다.
    */
   cpuPickoff?: CpuPickoffInput,
+  /**
+   * 타석의 (사람) 타자가 스킬 22 압도를 **장착**했는가 (0xb62b4(타자, 22)) — 실투율 +5 (0x33d52).
+   * 안 넘기면 거짓.
+   */
+  batterIntimidates = false,
 ): CpuPitchChoice {
   const repertoire = pitcher.repertoire ?? DEFAULT_REPERTOIRE
   const magicState = magic ?? { remaining: 0, ballMagicNumber: 0 }
@@ -146,6 +169,26 @@ export function selectPitch(
   })
   const type = PITCH_TYPES[typeNumber - 1] ?? PITCH_TYPES[0]
 
+  // 실투 판정 0x33cbc — 0x4dc78 이 궤적 준비 0x9e669(4de86) **뒤** 4dea0 에서 부른다. 사람이 칠 때도
+  // CPU 투수의 공마다 돈다. 마구가 아니면 rand(0,100) 한 번 (마구면 굴림 없음).
+  //  t = scene+0x17c0 = 0x4dbac 가 돌려준 제구 등급 0xb74bc 값 (4dcbe) = `controlTier`
+  //  c = 0xb570d(ctx, 1, 투수, 1, 90, 1) — 경기용 칸 1 **구속**. CPU 투수의 경기용 값은 아래 `stats.velocity` 다
+  const isMistake = isMistakePitch(
+    {
+      isMagicPitch: isMagic,
+      grade: controlTier,
+      effectiveVelocity: stats.velocity,
+      runnerCount: situation.runnerCount,
+      hasSecondBaseRunner: situation.hasSecondBaseRunner === true,
+      batterIntimidates,
+      // 상대 CPU 투수의 스킬 비트(+0x14)를 웹 로스터·마선수 표가 들고 있지 않아 16·17·22 는 늘 거짓이다
+      pitcherIsSteady: false,
+      pitcherIsTimid: false,
+      pitcherIsCool: false,
+    },
+    random,
+  )
+
   advanceMagicPitchGameState(magicState, typeNumber, repertoire.magicId)
 
   const pitch: Pitch = {
@@ -166,7 +209,7 @@ export function selectPitch(
     pitcherMagicNumber: repertoire.magicId,
     pitcherForm: repertoire.form,
   }
-  return { kind: '투구', pitch }
+  return { kind: '투구', pitch, isMistakePitch: isMistake }
 }
 
 /**

@@ -248,3 +248,60 @@ describe('flightMillisecondsOf — 사용자 투구(투수편)용', () => {
     }
   })
 })
+
+describe('selectPitch 실투 판정 0x33cbc — 사람이 칠 때도 CPU 공마다 (0x4dea0)', () => {
+  /** 굴림 값을 적어 두고, 지정한 차례만 바꿔 다시 내는 난수 */
+  function 기록난수(base: () => number, 바꿀: Map<number, number> = new Map()) {
+    const values: number[] = []
+    const random = {
+      next: () => {
+        const index = values.length
+        const value = 바꿀.get(index) ?? base()
+        values.push(value)
+        return value
+      },
+      nextInRange: () => {
+        throw new Error('nextInRange 는 안 쓴다')
+      },
+      pick: <T,>(candidates: readonly T[]) => candidates[0],
+    }
+    return { random, values }
+  }
+
+  it('마구가 아니면 곡선 뒤 rand(0,100) 을 한 번 더 굴린다 — 그 굴림이 0 이면 실투, 99 면 아니다', () => {
+    const seed = createSeededRandom(77)
+    const 처음 = 기록난수(() => seed.next())
+    const 공1 = selectChoice(투수(60), 상황, 처음.random)
+    expect(공1.kind).toBe('투구')
+    const 마지막 = 처음.values.length - 1
+    const 다시 = (value: number) => {
+      const 재생 = [...처음.values]
+      const { random } = 기록난수(() => 재생.shift() ?? 0, new Map([[마지막, value]]))
+      return selectChoice(투수(60), 상황, random)
+    }
+    const 실투 = 다시(0)
+    const 정상 = 다시(0.995)
+    expect(실투.kind === '투구' && 실투.isMistakePitch).toBe(true)
+    expect(정상.kind === '투구' && 정상.isMistakePitch).toBe(false)
+    // 공 자체(구질·경로)는 같다 — 실투 굴림은 맨 끝이다
+    expect(실투.kind === '투구' && 정상.kind === '투구' && 실투.pitch).toEqual(정상.kind === '투구' && 정상.pitch)
+  })
+
+  it('타자 압도(스킬 22)는 실투율 +5 — 굴림 값 7.x% 에서 갈린다 (구속 600·등급 그대로 p 를 넘는다)', () => {
+    const seed = createSeededRandom(77)
+    const 처음 = 기록난수(() => seed.next())
+    const 공1 = selectChoice(투수(60), 상황, 처음.random)
+    if (공1.kind !== '투구') throw new Error('견제')
+    const 마지막 = 처음.values.length - 1
+    // p 는 등급·구속으로 정해진다. 압도면 같은 굴림 값에서도 p+5 로 견주므로 실투가 되는 경계가 5 오른다
+    const 결과 = (roll: number, intimidates: boolean) => {
+      const 재생 = [...처음.values]
+      const { random } = 기록난수(() => 재생.shift() ?? 0, new Map([[마지막, roll / 100]]))
+      const choice = selectChoice(투수(60), 상황, random, 'hard', undefined, undefined, intimidates)
+      return choice.kind === '투구' && choice.isMistakePitch
+    }
+    const 경계 = Array.from({ length: 100 }, (_, roll) => roll).find((roll) => !결과(roll, false)) ?? 100
+    const 압도경계 = Array.from({ length: 100 }, (_, roll) => roll).find((roll) => !결과(roll, true)) ?? 100
+    expect(압도경계 - 경계).toBe(5)
+  })
+})
