@@ -545,23 +545,27 @@ export function rebuildEquippedSkillIds(skillIds: readonly number[]): readonly n
 /** 마이너스 스킬 (표 0xd7e10) — 한 번 해제하면 다시 얻을 수 없다 */
 export const MINUS_SKILL_IDS: readonly number[] = [2, 3, 4, 5, 17, 18, 19, 20]
 
+/** 스킬 보상이 건드리는 칸 — 모드 3(투수편) 레코드도 같은 칸이라(0xa4430 · 0xa4bd8 공용) 꼴만 받는다 */
+export type SkillRewardCareer = Pick<PlayerCareer, 'skillIds' | 'removedMinusSkillIds' | 'equippedSkillIds' | 'skillSlotLevel'>
+
 /**
  * 보상 종류 4 — 양수 n 은 스킬 n−1 획득, 음수 −n 은 스킬 n−1 해제 (0x8c5bc).
  *
  * **마이너스 스킬을 해제하면 `+0x1d0+k` 플래그가 서서 다시 얻지 못한다** (0xa4430, A-6).
  * 획득 쪽도 그 플래그를 보고 막는다 — 웹에 통째로 빠져 있던 규칙이다.
  */
-export function applySkillReward(career: PlayerCareer, value: number): PlayerCareer {
+export function applySkillReward<T extends SkillRewardCareer>(career: T, value: number): T {
   const skillId = Math.abs(value) - 1
+  const owns = career.skillIds.includes(skillId)
   if (value > 0) {
     if (career.removedMinusSkillIds.includes(skillId)) return career
     // 획득 0xa4bd8 = 보유 비트를 켜고 **곧바로 0xa4b04(P, s, 1)** — 자리가 있으면 자동 장착.
     // 이미 가진 스킬이어도 장착은 다시 시도한다(0xa4bd8 에 보유 검사가 없다) — 창에서 뺀 플러스 스킬이
     // 다시 들어오면 자리가 있는 한 다시 끼워진다.
-    const owned = hasSkill(career, skillId) ? career : { ...career, skillIds: [...career.skillIds, skillId] }
+    const owned = owns ? career : { ...career, skillIds: [...career.skillIds, skillId] }
     return setSkillEquipped(owned, skillId, true)
   }
-  if (!hasSkill(career, skillId)) return career
+  if (!owns) return career
   const removed = MINUS_SKILL_IDS.includes(skillId) && !career.removedMinusSkillIds.includes(skillId)
   // 제거 0xa4430 = 보유 비트를 끄고 0xb66dd 로 장착도 끈다
   return setSkillEquipped({

@@ -32,8 +32,7 @@ interface PitcherLeagueRouteProps {
  *
  * `onOuting` 은 투수편 외출(112) 화면이 생기면 그때 넘긴다 —
  * 지금은 그 칸을 누르면 화면이 "아직 옮기지 않은 화면입니다" 를 띄운다.
- * 상점은 [아이템] → 110 → **111 장비 상점** · [선수정보] → **121 장비착용** 이 `PitcherShopScreen` 으로 간다
- * (서브·GP 아이템은 아직 — 관리 화면이 알림으로 막는다).
+ * 상점은 [아이템] → 110 → **111 상점**(장비·서브·GP) · [선수정보] → **121 장비착용** 이 `PitcherShopScreen` 으로 간다.
  */
 export function PitcherLeagueRoute({
   session, random, openedHiddenIds = [], gameSettings, onExit,

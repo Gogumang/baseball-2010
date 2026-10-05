@@ -51,8 +51,7 @@ const trainingTotalOf = (career: PitcherCareer) =>
 
 /**
  * 투수 커리어를 공통 판정이 보는 값으로 옮긴다.
- *
- * ⚠️ 투수 커리어에는 **또또복권 칸(+0x185/+0x186)이 없다** — 0 으로 넘겨서 칭호 21·22 는 아직 나오지 않는다.
+ * 또또복권 칸(+0x185/+0x186)은 투수 GP 아이템(`pitcherItems.ts`)이 센다 — 칭호 21·22 도 두 편 같다.
  */
 export function titleSubjectOfPitcher(career: PitcherCareer): TitleSubject {
   return {
@@ -66,8 +65,8 @@ export function titleSubjectOfPitcher(career: PitcherCareer): TitleSubject {
     championships: career.regularSeasonFirstCount,
     trainingTotal: trainingTotalOf(career),
     outingsLastSeason: career.outingsLastSeason,
-    lotteryFirstPrizes: 0,
-    lotteryPurchases: 0,
+    lotteryFirstPrizes: career.lotteryFirstPrizes,
+    lotteryPurchases: career.lotteryPurchases,
     seenEventIds: career.seenEventIds,
     // 칭호 판정 0x1a1c0 은 **보유** 비트(0xa3a74 — 0x1a380·0x1a768)를 본다. 장착이 아니다
     hasLegendSkill: hasPitcherSkill(career, LEGEND_SKILL),

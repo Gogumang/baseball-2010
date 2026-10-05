@@ -437,6 +437,23 @@ describe('G 지갑 다리 (전역 mgr[+0x64])', () => {
     expect(rendered.result.current.session.career?.gamePoint).toBe(400)
   })
 
+  it('투수 GP 아이템을 사면 지갑 G 가 줄고 효과가 저장에 든다 (0x14a74 kind 2 — 전역 G)', () => {
+    const mergeStore = 메모리저장()
+    mergeStore.save({ merged: true })
+    const pitcherStore = 옛투수저장(0)
+    const rendered = 지갑띄우기(pitcherStore, 지갑저장(1000), mergeStore)
+    act(() => rendered.result.current.session.actions.save({ ...rendered.result.current.session.career!, morale: 50 }))
+
+    act(() => rendered.result.current.session.actions.openShop('GP'))
+    // 6 영지버섯 300 G — 사기 +40
+    act(() => rendered.result.current.session.actions.purchase(shopItemId('GP', 6)))
+
+    expect(rendered.result.current.session.shopNotice).toBe('사기 +40 회복되었습니다')
+    expect(rendered.result.current.wallet.balance).toBe(700)
+    expect(rendered.result.current.session.career?.gamePoint).toBe(700)
+    expect((pitcherStore.load() as { morale: number }).morale).toBe(90)
+  })
+
   it('⚠️ `?무한G` 는 보여 주는 값과 판정이 **같은 값**을 본다 — 이사는 미루고 저장도 안 건드린다', () => {
     window.localStorage.setItem('compus-baseball/dev', '무한G')
     try {
@@ -462,7 +479,7 @@ describe('G 지갑 다리 (전역 mgr[+0x64])', () => {
   })
 })
 
-describe('투수편 장비 상점 (111 · 121)', () => {
+describe('투수편 상점 — 장비(111 · 121) · 서브 · GP', () => {
   it('장비를 사면 소지금·장착 니블이 저장에 들어가고, 투수 그림 등급(0x79790)이 그 니블을 받는다', () => {
     const store = 메모리저장()
     const { result } = 띄우기(store)
@@ -488,6 +505,50 @@ describe('투수편 장비 상점 (111 · 121)', () => {
     act(() => result.current.actions.openShop('착용'))
     expect(result.current.shopTab).toBe('착용')
     expect(result.current.shopNotice).toBe('')
+  })
+
+  it('서브 아이템을 사면 소지금이 줄고 보유가 저장에 든다 (0x14c8c) — 같은 칸을 또 사면 StrMODE[78]', () => {
+    const store = 메모리저장()
+    const { result } = 띄우기(store)
+    act(() => result.current.actions.create('투수', 신인))
+    act(() => result.current.actions.save({ ...result.current.career!, money: 20_000 }))
+
+    act(() => result.current.actions.openShop('서브'))
+    expect(result.current.shopTab).toBe('서브')
+    act(() => result.current.actions.purchase(shopItemId('서브', 0)))
+
+    expect(result.current.shopNotice).toBe('[표적판] 구매 완료')
+    expect(result.current.career?.money).toBe(5_000)
+    expect((store.load() as { subItemIds: number[] }).subItemIds).toEqual([0])
+
+    act(() => result.current.actions.purchase(shopItemId('서브', 0)))
+    expect(result.current.shopNotice).toBe('이미 가지고 있는 아이템입니다')
+  })
+
+  it('또또상품권은 **한 번만** 굴린다 — 알림과 저장이 같은 결과다', () => {
+    let rolls = 0
+    const 세는난수 = {
+      next: () => {
+        rolls += 1
+        return 0
+      },
+      nextInRange: (minimum: number) => minimum,
+      pick: <T,>(candidates: readonly T[]) => candidates[0],
+    }
+    const { result } = renderHook(() => usePitcherLeagueSession(메모리저장(), 세는난수, false))
+    act(() => result.current.actions.create('투수', 신인))
+    act(() => result.current.actions.save({ ...result.current.career!, gamePoint: 1000, money: 0 }))
+    rolls = 0
+
+    act(() => result.current.actions.purchase(shopItemId('GP', 5)))
+
+    expect(rolls).toBe(1)
+    // 굴림 0 → 1등 1억 (0xd80b1 · 0xd80a7)
+    expect(result.current.shopNotice).toBe('1등 당첨!! [1억] 획득!')
+    expect(result.current.career?.money).toBe(10_000)
+    expect(result.current.career?.lotteryPurchases).toBe(1)
+    expect(result.current.career?.lotteryFirstPrizes).toBe(1)
+    expect(result.current.career?.gamePoint).toBe(700)
   })
 
   it('전역 해금이 없으면 히든 칸은 막힌다 — 커리어는 그대로', () => {

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { BALANCE } from '@/shared/config/original/balance'
 import type { MenuItem } from '@/shared/ui'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import type { PitcherShopTab } from '@/features/shop/model/pitcherShopSelection'
 import {
   pitcherAbilityLimitsOf,
   pitcherFormOfCareer,
@@ -88,10 +89,10 @@ export interface UsePitcherManagementMenuInput {
   /** [외출] 상태 112. 투수편 외출 지도가 아직 없으면 넘기지 않는다 */
   readonly onOuting?: () => void
   /**
-   * 111 장비 상점('장착') · 121 장비착용('착용') 을 연다. 안 넘기면 그 칸은 "옮기지 않은 화면" 알림이다.
-   * [아이템] 은 먼저 110 하위 메뉴를 띄우고, 거기서 '장착' 을 골라야 여기로 온다.
+   * 111 상점('장착' 장비 · '서브' · 'GP') · 121 장비착용('착용') 을 연다. 안 넘기면 그 칸은 "옮기지 않은 화면" 알림이다.
+   * [아이템] 은 먼저 110 하위 메뉴를 띄우고, 거기서 고른 칸이 창 종류가 된다 (키 0x11478, 모드 갈림 없음).
    */
-  readonly onOpenShop?: (tab: '장착' | '착용') => void
+  readonly onOpenShop?: (tab: PitcherShopTab) => void
   /** 105 취소 — 메인 메뉴 장면 0x103 */
   readonly onExit: () => void
 }
@@ -322,11 +323,11 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     [blockNoticeOf, career, openPitchWindow, runAbilityTraining],
   )
 
-  /** 110 아이템 하위 메뉴 — '장착' 만 111 장비 상점으로 간다 (서브·GP 는 아직 투수 표가 없다) */
+  /** 110 아이템 하위 메뉴 — 고른 칸(장착·서브·GP)이 곧 111 상점의 창 종류(3·1·2)다 */
   const selectItemMenu = useCallback(
     (id: string) => {
-      if (id === '장착') return openOrNotice(onOpenShop && (() => onOpenShop('장착')))
-      return setNotice(PITCHER_MANAGEMENT_TEXT.notPorted)
+      if (id !== '장착' && id !== '서브' && id !== 'GP') return undefined
+      return openOrNotice(onOpenShop && (() => onOpenShop(id)))
     },
     [onOpenShop, openOrNotice],
   )

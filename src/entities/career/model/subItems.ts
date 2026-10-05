@@ -49,14 +49,20 @@ export const SUB_ITEM_BLOCK_TEXT: Readonly<Record<'소지금부족' | '이미보
 
 export type SubItemBlockReason = '소지금부족' | '이미보유'
 
-export const hasSubItem = (career: PlayerCareer, id: number) => career.subItemIds.includes(id)
+/**
+ * 서브 아이템이 건드리는 칸 — 상점 키 0x1364e · 구매 확정 0x14c8c 에 모드 갈림이 없고 기록 `+0x58+k` · 소지금 `+2` 를
+ * 두 모드가 같이 쓴다. 그래서 투수편(`PitcherCareer`)도 이 함수들을 그대로 탄다.
+ */
+export type SubItemCareer = Pick<PlayerCareer, 'money' | 'subItemIds'>
 
-export function subItemBlockReasonOf(career: PlayerCareer, id: number): SubItemBlockReason | null {
+export const hasSubItem = (career: Pick<PlayerCareer, 'subItemIds'>, id: number) => career.subItemIds.includes(id)
+
+export function subItemBlockReasonOf(career: SubItemCareer, id: number): SubItemBlockReason | null {
   if (hasSubItem(career, id)) return '이미보유'
   return career.money < SUB_ITEMS[id].price ? '소지금부족' : null
 }
 
-export function purchaseSubItem(career: PlayerCareer, id: number): PlayerCareer {
+export function purchaseSubItem<T extends SubItemCareer>(career: T, id: number): T {
   const blockReason = subItemBlockReasonOf(career, id)
   if (blockReason !== null) throw new Error(`서브 아이템을 살 수 없습니다 (${blockReason}): ${SUB_ITEMS[id].name}`)
   return { ...career, money: career.money - SUB_ITEMS[id].price, subItemIds: [...career.subItemIds, id] }
@@ -68,11 +74,20 @@ const TRAINING_ITEM_BONUS = 2
 const MASSAGE_CHAIR = 4
 
 export function subItemTrainingBonus(career: PlayerCareer, ability: keyof BatterAbility): number {
-  return hasSubItem(career, TRAINING_ITEM_OF[ability]) ? TRAINING_ITEM_BONUS : 0
+  return subItemSlotTrainingBonus(career, TRAINING_ITEM_OF[ability])
 }
 
-/** 자동안마기 — 훈련 사기 감소량 −1 (+0x5c) */
-export function subItemMoraleRelief(career: PlayerCareer): number {
+/**
+ * 훈련 칸 k 의 +2 — 0x187f6 이 `기록[0x58 + k]` 를 **칸 번호로** 본다 (모드 갈림 없음).
+ * 그래서 투수편은 표적판 = 제구 · 1톤 바벨 = 구속 · 모래주머니 = 변화 · 하드타이어 = 체력 이다
+ * (창 설명 줄 StrITEM[148] "%s 훈련 시 +2" 의 %s 도 투수면 StrMODE[40+k], 0x82938~0x8296a).
+ */
+export function subItemSlotTrainingBonus(career: Pick<PlayerCareer, 'subItemIds'>, slot: number): number {
+  return slot >= 0 && slot < MASSAGE_CHAIR && hasSubItem(career, slot) ? TRAINING_ITEM_BONUS : 0
+}
+
+/** 자동안마기 — 훈련 사기 감소량 −1 (+0x5c). 두 모드 공용 0x17f5c 가 본다 (능력치 훈련 0x188cc · 필살타법/마구 0x18036) */
+export function subItemMoraleRelief(career: Pick<PlayerCareer, 'subItemIds'>): number {
   return hasSubItem(career, MASSAGE_CHAIR) ? 1 : 0
 }
 

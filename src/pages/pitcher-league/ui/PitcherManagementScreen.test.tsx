@@ -2,6 +2,7 @@
 import { StrictMode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import type { PitcherShopTab } from '@/features/shop/model/pitcherShopSelection'
 import { PitcherManagementScreen } from '@/pages/pitcher-league/ui/PitcherManagementScreen'
 import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
@@ -36,7 +37,7 @@ interface 화면옵션 {
   readonly onNextGame?: () => void
   readonly onExit?: () => void
   readonly onOuting?: () => void
-  readonly onOpenShop?: (tab: '장착' | '착용') => void
+  readonly onOpenShop?: (tab: PitcherShopTab) => void
 }
 
 const 화면 = (options: 화면옵션 = {}) =>
@@ -602,14 +603,15 @@ describe('[아이템] 110 하위 메뉴 → 111 장비 상점 · [장비착용] 
     expect(onOpenShop).toHaveBeenLastCalledWith('착용')
   })
 
-  it('투수 서브·GP 아이템은 아직 옮기지 않았다 — 알림만 뜬다', () => {
+  it('[서브]·[GP] 도 같은 111 상점으로 간다 — 고른 칸이 창 종류 1·2 다 (키 0x11478)', () => {
     const onOpenShop = vi.fn()
     화면({ onOpenShop })
 
     누르기('아이템')
     누르기('서브')
+    expect(onOpenShop).toHaveBeenLastCalledWith('서브')
 
-    expect(onOpenShop).not.toHaveBeenCalled()
-    expect(screen.getByText('아직 옮기지 않은 화면입니다')).toBeTruthy()
+    누르기('GP')
+    expect(onOpenShop).toHaveBeenLastCalledWith('GP')
   })
 })

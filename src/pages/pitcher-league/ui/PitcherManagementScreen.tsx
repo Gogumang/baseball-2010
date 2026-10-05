@@ -7,6 +7,7 @@ import { SkillWindow } from '@/widgets/skill-window/ui/SkillWindow'
 import { pitcherSkillTableIdOf } from '@/entities/pitcher-career/model/pitcherCareer'
 import { ORIGINAL_SKILLS } from '@/shared/config/original/skills'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import type { PitcherShopTab } from '@/features/shop/model/pitcherShopSelection'
 import { usePitcherManagementMenu } from '@/pages/pitcher-league/model/usePitcherManagementMenu'
 import { PitcherStatusBoard } from '@/pages/pitcher-league/ui/PitcherStatusBoard'
 import { PitcherBasicInfoPanel } from '@/pages/pitcher-league/ui/PitcherBasicInfoPanel'
@@ -40,10 +41,10 @@ export interface PitcherManagementScreenProps {
   /** [외출] 상태 112. 투수편 외출 지도가 아직 없으면 넘기지 않는다 — 그러면 칸이 알림만 띄운다 */
   readonly onOuting?: () => void
   /**
-   * 111 장비 상점('장착', [아이템] → 110 하위 메뉴 칸 0) · 121 장비착용('착용', [선수정보] 칸 1).
+   * 111 상점('장착'·'서브'·'GP', [아이템] → 110 하위 메뉴 칸 0·1·2) · 121 장비착용('착용', [선수정보] 칸 1).
    * 안 넘기면 그 칸은 알림만 띄운다 ([아이템/스킬] 122 는 화면이 스킬 창을 띄운다)
    */
-  readonly onOpenShop?: (tab: '장착' | '착용') => void
+  readonly onOpenShop?: (tab: PitcherShopTab) => void
   /** 105 취소 — 메인 메뉴 장면 0x103 */
   readonly onExit: () => void
 }

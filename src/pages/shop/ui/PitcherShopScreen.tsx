@@ -5,7 +5,7 @@ import { PITCHER_PART_NAMES, pitcherShopEntriesOf } from '@/pages/shop/lib/pitch
 import { ShopScreenView } from '@/pages/shop/ui/ShopScreen'
 
 interface PitcherShopScreenProps {
-  /** '장착' = [아이템] → 장비 상점(111) · '착용' = [선수정보] → 장비착용(121) */
+  /** '장착'·'서브'·'GP' = [아이템] → 110 → 상점(111, 창 종류 3·1·2) · '착용' = [선수정보] → 장비착용(121) */
   readonly tab: PitcherShopTab
   readonly career: PitcherCareer
   readonly noticeText: string
@@ -14,7 +14,8 @@ interface PitcherShopScreenProps {
 }
 
 /**
- * 투수편(모드 3) 장비 상점 · 장비착용 — 타자편과 **같은 창**(0x81dc0, 창 종류 3)에 투수 표만 얹는다.
+ * 투수편(모드 3) 장비 상점 · 서브·GP 아이템 상점 · 장비착용 — 타자편과 **같은 창**(0x81dc0, 창 종류 3·1·2)에
+ * 투수 표만 얹는다.
  * 원본도 장면 0x106 의 상태 111(키 0x13460) · 121(키 0x17ad0) 을 두 모드가 함께 쓴다 (R9 3절 · R12).
  *
  * ⚠️ **배치는 타자편 상점 화면 그대로(근사)** — 원본 장비 창은 목록 행이 부위인데(R12 1b-가)
@@ -27,7 +28,7 @@ export function PitcherShopScreen({ tab, career, noticeText, onPurchase, onBack 
       kind={tab}
       entriesOf={(part) => pitcherShopEntriesOf(career, tab, part)}
       questionOf={(itemId) => pitcherPurchaseQuestionOf(career, itemId)}
-      partNames={PITCHER_PART_NAMES}
+      partNames={tab === '장착' || tab === '착용' ? PITCHER_PART_NAMES : undefined}
       money={career.money}
       gamePoint={career.gamePoint}
       title="나만의리그투수편"

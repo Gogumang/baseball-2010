@@ -476,45 +476,6 @@ export function usePitcherLeagueSession(
 
   const goto = useCallback((next: PitcherScene) => setScene(next), [])
 
-  const [shopTab, setShopTab] = useState<PitcherShopTab>('장착')
-  const [shopNotice, setShopNotice] = useState('')
-
-  /** [아이템] → 110 → 111 장비 상점 · [선수정보] → 121 장비착용. 취소는 `goto('관리')` (원본 111 → 110 → 105) */
-  const openShop = useCallback((tab: PitcherShopTab) => {
-    setShopTab(tab)
-    setShopNotice('')
-    setScene('상점')
-  }, [])
-
-  /**
-   * 장비 구매·착용. 소지금·보유·니블·컬렉터 해금이 커리어에 들어가고 곧바로 저장한다
-   * (원본 0x14a74 도 `0x22755(app, 1)` 로 바로 저장한다). G 는 장비가 건드리지 않는다 — 소지금 칸이다.
-   * 해금표는 원본에서 전역이라 기록연감 것을 커리어 것에 얹어 판정하고, 얹은 채로 저장한다
-   * (타자편 `syncOpenedHidden` 과 같은 방식).
-   */
-  const purchase = useCallback(
-    (itemId: string, globalOpenedHiddenIds: readonly number[] = []) => {
-      if (career === null) return
-      const withGlobal = (current: PitcherCareer): PitcherCareer => {
-        const missing = globalOpenedHiddenIds.filter((id) => !current.openedHiddenIds.includes(id))
-        return missing.length === 0 ? current : { ...current, openedHiddenIds: [...current.openedHiddenIds, ...missing] }
-      }
-      setShopNotice(selectPitcherShopItem(withGlobal(career), itemId).notice)
-      commitWith((current) => {
-        const merged = withGlobal(current)
-        const selected = selectPitcherShopItem(merged, itemId).career
-        return selected === merged ? current : selected
-      })
-    },
-    [career, commitWith],
-  )
-
-  const reset = useCallback(() => {
-    setCareer(null)
-    setGameOptions(null)
-    setScene('등록')
-  }, [])
-
   /**
    * 내보이는 커리어의 G 는 **지갑 값**이다 (원본 `mgr[+0x64]` 한 칸). 관리 화면 뱃지·구질 훈련
    * 가격 판정·지옥훈련 가드가 다 이 `career.gamePoint` 를 읽으므로, 여기서 한 번 갈아 끼우면
@@ -538,6 +499,47 @@ export function usePitcherLeagueSession(
         : { ...career, gamePoint: overriddenGamePoint },
     [career, overriddenGamePoint],
   )
+
+  const [shopTab, setShopTab] = useState<PitcherShopTab>('장착')
+  const [shopNotice, setShopNotice] = useState('')
+
+  /** [아이템] → 110 → 111 장비 상점 · [선수정보] → 121 장비착용. 취소는 `goto('관리')` (원본 111 → 110 → 105) */
+  const openShop = useCallback((tab: PitcherShopTab) => {
+    setShopTab(tab)
+    setShopNotice('')
+    setScene('상점')
+  }, [])
+
+  /**
+   * 장비·서브·GP 구매와 장비 착용. 바뀐 칸이 커리어에 들어가고 곧바로 저장한다
+   * (원본 0x14a74 도 `0x22755(app, 1)` 로 바로 저장한다).
+   * 해금표는 원본에서 전역이라 기록연감 것을 커리어 것에 얹어 판정하고, 얹은 채로 저장한다
+   * (타자편 `syncOpenedHidden` 과 같은 방식).
+   *
+   * GP 아이템은 G 를 쓰고(전역 `mgr+0x64`) 또또상품권은 난수를 굴리므로 **한 번만** 고른다 —
+   * 보이는 커리어(`shown`, G = 지갑 값)로 고르고 그 결과를 그대로 저장하면, 바뀐 G 는 지갑 다리가 지갑으로 옮긴다
+   * (구질 훈련·마구 훈련이 G 를 쓰는 길과 같다).
+   */
+  const purchase = useCallback(
+    (itemId: string, globalOpenedHiddenIds: readonly number[] = []) => {
+      if (career === null || shown === null) return
+      const missing = globalOpenedHiddenIds.filter((id) => !shown.openedHiddenIds.includes(id))
+      const merged = missing.length === 0 ? shown : { ...shown, openedHiddenIds: [...shown.openedHiddenIds, ...missing] }
+      const selection = selectPitcherShopItem(merged, itemId, random)
+      setShopNotice(selection.notice)
+      if (selection.career === merged) return
+      // G 를 안 쓴 칸(장비·서브·착용)은 저장의 G 칸을 건드리지 않는다 — `?무한G` 의 99999 가 저장에 새지 않게
+      const spentGamePoint = selection.career.gamePoint !== merged.gamePoint
+      commit(spentGamePoint ? selection.career : { ...selection.career, gamePoint: career.gamePoint })
+    },
+    [career, commit, random, shown],
+  )
+
+  const reset = useCallback(() => {
+    setCareer(null)
+    setGameOptions(null)
+    setScene('등록')
+  }, [])
 
   return {
     career: shown,

@@ -222,6 +222,12 @@ export interface PitcherCareer {
   readonly illnessRemaining: number
   readonly illnessCooldown: number
   readonly mvpSeasonBits: number
+  /**
+   * 또또상품권 구매 수(+0x186, 상한 200) · 1등 수(+0x185) — GP 아이템 5 를 쓰는 0xa4488 이 두 모드 공용으로
+   * 기록에 센다 (타자편 `PlayerCareer` 와 같은 칸). 칭호 21·22 가 본다.
+   */
+  readonly lotteryPurchases: number
+  readonly lotteryFirstPrizes: number
   readonly seasonPopularityGain: number
   readonly popularityAtSeasonStart: number
   readonly hasSeenYearGoalWindow: boolean
@@ -302,6 +308,8 @@ export function createPitcherCareer(
     illnessRemaining: 0,
     illnessCooldown: 0,
     mvpSeasonBits: 0,
+    lotteryPurchases: 0,
+    lotteryFirstPrizes: 0,
     seasonPopularityGain: 0,
     popularityAtSeasonStart: STARTING_POPULARITY,
     hasSeenYearGoalWindow: false,

@@ -13,6 +13,7 @@ import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCaree
 import { PITCHER_ABILITY_NAMES, PITCHER_ABILITY_ORDER } from '@/entities/pitcher-career/model/pitcherAbility'
 import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbility'
 import { PITCHER_TYPE_BONUS_ABILITY } from '@/entities/pitcher-career/model/pitcherRegistration'
+import { subItemMoraleRelief, subItemSlotTrainingBonus } from '@/entities/career/model/subItems'
 
 /**
  * 투수편 **관리 주기·훈련** — 타자편과 다른 점만 모았다.
@@ -148,12 +149,16 @@ export function runPitcherTraining(
     : runAbilityTraining(career, menu, menu.ability, random)
 }
 
-/** 굴린 사기 감소에 병아리 −1 · 몹쓸몸 +2 ([sp+0xf8]) 를 더한다 */
+/**
+ * 굴린 사기 감소에 병아리 −1 · 몹쓸몸 +2 · 자동안마기(서브 4, `기록+0x5c`) −1 ([sp+0xf8]) 을 더한다.
+ * 자동안마기는 능력치 갈래 0x188cc · 필살/마구 갈래 0x18036 모두 모드 갈림 없이 본다.
+ */
 function moraleLossOf(career: PitcherCareer, rolledMoraleLoss: number): number {
   return (
     rolledMoraleLoss -
     (isPitcherSkillEquipped(career, ROOKIE_SKILL) ? 1 : 0) +
-    (isPitcherSkillEquipped(career, WEAK_BODY_SKILL) ? 2 : 0)
+    (isPitcherSkillEquipped(career, WEAK_BODY_SKILL) ? 2 : 0) -
+    subItemMoraleRelief(career)
   )
 }
 
@@ -170,7 +175,9 @@ function runAbilityTraining(
   const typeBonus = PITCHER_TYPE_BONUS_ABILITY[career.typeIndex] === ability ? TYPE_BONUS : 0
   const skillGain =
     (isPitcherSkillEquipped(career, ROOKIE_SKILL) ? 1 : 0) - (isPitcherSkillEquipped(career, WEAK_BODY_SKILL) ? 2 : 0)
-  const gains: Partial<PitcherAbility> = { [ability]: rolled + typeBonus + skillGain }
+  // 서브 아이템 0~3 은 훈련 칸 k 로 `기록[0x58+k]` 를 본다 (0x187f6, 모드 공용) — 표적판 = 제구 … 하드타이어 = 체력
+  const subItemGain = subItemSlotTrainingBonus(career, slot)
+  const gains: Partial<PitcherAbility> = { [ability]: rolled + typeBonus + skillGain + subItemGain }
   const moraleLoss = moraleLossOf(career, rolledMoraleLoss)
   const spent = spendPitcherCycleAction(gainPitcherMorale(career, -moraleLoss))
   return {

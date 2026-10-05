@@ -160,3 +160,28 @@ describe('관리 주기', () => {
     expect(gamesUntilManagementOf(투수({ gamesPlayed: 2 }))).toBe(0)
   })
 })
+
+describe('서브 아이템 효과 (0x17f5c 모드 공용)', () => {
+  it('서브 0~3 은 훈련 칸 k 로 `기록[0x58+k]` 를 본다 — 표적판 = 제구 +2 (0x187f6)', () => {
+    const before = 투수({ typeIndex: 2, subItemIds: [0] })
+    const outcome = runPitcherTraining(before, 메뉴('제구'), 최소)
+
+    expect(outcome.career.ability.control).toBe(before.ability.control + 4 + 2)
+    // 굴린 값에는 안 들어간다 (결과 창 [sp+0x34])
+    expect(outcome.rolledGain).toBe(4)
+    expect(runPitcherTraining(before, 메뉴('구속'), 최소).career.ability.velocity).toBe(before.ability.velocity + 4)
+  })
+
+  it('하드타이어(3)는 체력 훈련 +2', () => {
+    const before = 투수({ typeIndex: 2, subItemIds: [3] })
+    expect(runPitcherTraining(before, 메뉴('체력'), 최소).career.ability.stamina).toBe(before.ability.stamina + 5 + 2)
+  })
+
+  it('자동안마기(4)는 능력치·마구 훈련 모두 사기 감소 −1 (0x188cc · 0x18036)', () => {
+    const 안마 = 투수({ subItemIds: [4], popularity: 200, gamePoint: 5000 })
+
+    expect(runPitcherTraining(안마, 메뉴('제구'), 최소).moraleLoss).toBe(4)
+    expect(runPitcherTraining(투수({ popularity: 200, gamePoint: 5000 }), 메뉴('마구'), 최소).moraleLoss).toBe(9)
+    expect(runPitcherTraining(안마, 메뉴('마구'), 최소).moraleLoss).toBe(8)
+  })
+})
