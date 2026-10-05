@@ -96,7 +96,7 @@ export function App() {
   const aceLevels = useAceLevels(aceLevelStore)
   // 전역 G 지갑 — 원본 `mgr[+0x64]`. 마선수 구매·미션·홈런더비가 다 이 한 칸을 본다
   const wallet = useGamePointWallet(walletStore, legacyGamePoint)
-  const seasonSession = useSeasonSession(seasonStore, random, wallet)
+  const seasonSession = useSeasonSession(seasonStore, random, wallet, aceLevels.levels)
   // 투수편 G도 같은 지갑 한 칸이다 — 옛 투수 저장에 남은 G는 표식 칸을 보고 딱 한 번 옮겨 온다
   const pitcherSession = usePitcherLeagueSession(
     pitcherStore,
