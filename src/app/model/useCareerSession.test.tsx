@@ -14,6 +14,10 @@ import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { SaveGamePort } from '@/shared/api/save/saveGamePort'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 import { useGamePointWallet } from '@/entities/wallet/model/useGamePointWallet'
+import { gamePointRewardOf } from '@/entities/career/model/playerCareer'
+import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
+import { summaryOf } from '@/features/play-game/model/gameFlow'
+import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 
 /**
  * 나만의리그 연말 국가대표 사슬 — 연봉 사슬이 끝나면 상태 133(선발 판정)이 끼고,
@@ -266,5 +270,67 @@ describe('G 지갑 다리 (전역 mgr[+0x64])', () => {
     // 지갑 500 + 우승 보상 1000
     expect(rendered.result.current.wallet.balance).toBe(1500)
     expect(rendered.result.current.session.career?.gamePoint).toBe(1500)
+  })
+})
+
+describe('연속 파울 기록 32·33 (0xa7dbc) — 실제 타석에서 경기 기록까지', () => {
+  const 공 = (resolution: PitchOutcomeDetail['resolution']): PitchOutcomeDetail => ({
+    resolution,
+    hasSwung: resolution.kind !== '볼',
+    isBunt: false,
+    resultCode: null,
+    contactSoundId: null,
+  })
+  const 파울 = 공({ kind: '파울' })
+  const 헛스윙 = 공({ kind: '스트라이크', isSwinging: true })
+
+  const 경기띄우기 = () => {
+    const saveGame = 메모리저장(createCareer('파울'))
+    const random = createSeededRandom(20100901)
+    const rendered = renderHook(() => {
+      const [screen, setScreen] = useState<Screen>({ kind: '메인메뉴' })
+      const runner = useAtBatRunner()
+      return { screen, runner, session: useCareerSession({ runner, random, saveGame, screen, setScreen }) }
+    })
+    act(() => rendered.result.current.session.actions.continueSaved())
+    act(() => rendered.result.current.session.actions.runCommand('다음경기'))
+    act(() => rendered.result.current.session.actions.finishLoading())
+    return rendered
+  }
+  /** 반 이닝 시뮬레이션이 남기는 수비 기록(16~)은 빼고 연속 파울 둘만 본다 */
+  const 파울기록 = (recordIds: readonly number[] | undefined) =>
+    (recordIds ?? []).filter((id) => id === 32 || id === 33)
+  const 던지기 = (rendered: ReturnType<typeof 경기띄우기>, pitches: readonly PitchOutcomeDetail[]) => {
+    for (const pitch of pitches) act(() => rendered.result.current.session.handlePitchResolved(pitch))
+  }
+
+  it('한 타석 파울 넷이면 32·33 이 경기 기록에 들어가고 G 수입이 된다', () => {
+    const rendered = 경기띄우기()
+    try {
+      expect(rendered.result.current.screen).toEqual({ kind: '경기' })
+      던지기(rendered, [파울, 파울, 파울, 파울, 헛스윙])
+
+      const progress = rendered.result.current.session.progress
+      expect(파울기록(progress?.recordIds)).toEqual([32, 33])
+      // 경기 요약 → G 수입(0x4ea0c)까지 32·33 몫이 들어간다
+      const summary = summaryOf(progress!)
+      const 나머지 = summary.recordIds.filter((id) => id !== 32 && id !== 33)
+      expect(recordGamePointsOf([32, 33])).toBeGreaterThan(0)
+      expect(gamePointRewardOf(summary)).toBe(recordGamePointsOf(나머지) + recordGamePointsOf([32, 33]))
+    } finally {
+      act(() => rendered.unmount())
+    }
+  })
+
+  it('타석이 바뀌면 카운터가 새로 시작한다 — 두 타석에 걸친 파울은 이어지지 않는다', () => {
+    const rendered = 경기띄우기()
+    try {
+      던지기(rendered, [파울, 파울, 헛스윙])
+      act(() => rendered.result.current.runner.resetAtBat())
+      던지기(rendered, [파울, 헛스윙, 헛스윙])
+      expect(파울기록(rendered.result.current.session.progress?.recordIds)).toEqual([])
+    } finally {
+      act(() => rendered.unmount())
+    }
   })
 })

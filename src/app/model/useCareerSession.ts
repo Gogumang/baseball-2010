@@ -9,6 +9,8 @@ import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
+import { EMPTY_AT_BAT_PITCH_TALLY, tallyPitch } from '@/features/play-at-bat/model/atBatPitchTally'
+import type { AtBatPitchTally } from '@/features/play-at-bat/model/atBatPitchTally'
 import { deepHitCheerSoundIdOf, inPlayCallSoundIdOf, pitchCallSoundIdOf } from '@/features/play-at-bat/model/atBatSounds'
 import { carryDistanceOf } from '@/entities/batting/model/battedBallFlight'
 import {
@@ -194,6 +196,11 @@ export function useCareerSession({
   progressRef.current = progress
   const careerRef = useRef(career)
   careerRef.current = career
+  /**
+   * 지금 타석의 공 수·연속 파울 (`atBatPitchTally`). 타석 결과(`AtBatState`)에 남지 않아 따로 든다 —
+   * 타석이 끝나거나 경기를 세우거나 나갈 때 비운다.
+   */
+  const pitchTallyRef = useRef<AtBatPitchTally>(EMPTY_AT_BAT_PITCH_TALLY)
   // 경기를 세우는 `startMatch` 가 읽는다 — 설정이 바뀔 때마다 콜백 신원이 흔들리지 않게 ref 로 둔다
   const runningModeManualRef = useRef(runningModeManual)
   runningModeManualRef.current = runningModeManual
@@ -273,6 +280,7 @@ export function useCareerSession({
       progressRef.current = started
       setProgress(started)
       runner.resetAtBat()
+      pitchTallyRef.current = EMPTY_AT_BAT_PITCH_TALLY
       runner.setBannerText('')
       runner.setIsPaused(true)
       setLoadingTip(pickLoadingTip(random))
@@ -389,9 +397,15 @@ export function useCareerSession({
   const handlePitchResolved = useCallback(
     (detail: PitchOutcomeDetail, _pitch?: unknown, isUncatchable?: boolean) => {
       const nextAtBat = runner.applyPitch(detail.resolution)
+      // 공마다 연속 파울(ctx+0x15f)을 센다 — 32·33 은 타석 결과와 함께 gameFlow 로 넘긴다 (0xa7dbc)
+      const tally = tallyPitch(pitchTallyRef.current, detail.resolution)
+      pitchTallyRef.current = tally
       // 타구음(0x515de~) → 심판 콜(0x51a94) 순서. 통로가 하나라 뒤 소리가 앞 소리를 끊는다
       playSoundIds(audio, [detail.contactSoundId, pitchCallSoundIdOf(detail.resolution, nextAtBat)])
       if (!isAtBatFinished(nextAtBat) || nextAtBat.outcome === null) return
+
+      // 타석이 끝났다 — 다음 타석은 새 카운터로 (타석 초기화 0xa5bcc 가 ctx+0x15f 를 지운다)
+      pitchTallyRef.current = EMPTY_AT_BAT_PITCH_TALLY
 
       const currentProgress = progressRef.current
       if (currentProgress === null) return
@@ -404,6 +418,7 @@ export function useCareerSession({
       const advanced = startPlayerOutcome(currentProgress, nextAtBat.outcome, random, {
         isUncatchable,
         buntFoulOut: detail.isBuntFoulOut,
+        foulRecordIds: tally.foulRecordIds,
       })
       progressRef.current = advanced
       setProgress(advanced)
@@ -826,6 +841,7 @@ export function useCareerSession({
       progressRef.current = null
       setProgress(null)
       runner.resetAtBat()
+      pitchTallyRef.current = EMPTY_AT_BAT_PITCH_TALLY
       runner.setIsPaused(true)
       setScreen({ kind: '메인메뉴' })
     },
