@@ -592,3 +592,102 @@ describe('투수 미션 마구 — 남은 횟수 팀+0x28 과 공+0x10', () => {
     expect(rendered.result.current.pitcherRun).toBe(before)
   })
 })
+
+/* ── 투수편 마선수 대결 (SYS 8 → 투수 미션 team − 1 → +0x177) ─────────────────── */
+
+describe('투수편 마선수 대결 — 투수 미션 team − 1 을 던지고 이겼나(+0x177 = 미션객체+0xbc)를 돌려준다', () => {
+  /** 메디카(team 16 → 투수 미션 레코드 15 · 웹 id 16)를 끝날 때까지 한가운데 직구로 던진다 */
+  function playPitcherAceMatch(seed: number, options: { giveUp?: boolean } = {}) {
+    const save = vi.fn()
+    const missionRecord: MissionRecordPort = { load: () => ({}), save }
+    const onGamePointReward = vi.fn()
+    const setScreen = vi.fn()
+    const random = createSeededRandom(seed)
+    const pitcher = modePitcherOf(createPitcherCareer('대결투수'))
+    const screen: Screen = { kind: '투수편' }
+    const rendered = renderHook(() => {
+      const runner = useAtBatRunner()
+      return useMissionSession({ runner, random, missionRecord, screen, setScreen, onGamePointReward, pitcher })
+    })
+    const mission = aceMatchMissionOf(16, '투수')
+    if (mission === null) throw new Error('투수 미션 16 이 없다')
+
+    act(() => rendered.result.current.actions.beginPitcherAceMatch(mission))
+    const started = rendered.result.current
+    if (options.giveUp === true) act(() => rendered.result.current.actions.giveUpPitcher())
+    for (let pitch = 0; pitch < 20 && rendered.result.current.pitcherRun?.status === '진행중'; pitch += 1) {
+      const session = rendered.result.current
+      if (session.pendingDefensePlay !== null) {
+        act(() => session.actions.finishDefensePlay())
+        continue
+      }
+      if (session.pendingBenchClearing !== null) {
+        act(() => session.actions.finishBenchClearing(false))
+        continue
+      }
+      act(() => session.handleThrow(PITCH_TYPES[0], 4, 9, true))
+    }
+    const status = rendered.result.current.pitcherRun?.status
+    let isWin: boolean | null = null
+    act(() => {
+      isWin = rendered.result.current.actions.finishPitcherAceMatch()
+    })
+    const after = rendered.result.current
+    rendered.unmount()
+    return { mission, pitcher, started, status, isWin, after, save, onGamePointReward, setScreen }
+  }
+
+  it('투수 미션 16 "메디카 공략" 을 투수편 내 투수로 세우고 앱 화면은 그대로 둔다 (투수편 라우트가 그린다)', () => {
+    const { mission, pitcher, started, setScreen } = playPitcherAceMatch(1)
+
+    expect(mission).toMatchObject({ side: '투수', id: 16, name: '메디카', goalCounts: { 아웃: 1 } })
+    expect(started.pitcherAceMatchMission).toBe(mission)
+    expect(started.pitcherRun?.mission).toBe(mission)
+    expect(started.pitcher).toBe(pitcher)
+    expect(setScreen).not.toHaveBeenCalled()
+  })
+
+  it('아웃을 잡으면(성공) 이겼다 — 미션 클리어 기록·G 보상은 없다 (0x4ef3e 의 +0x176 갈래)', () => {
+    const { status, isWin, after, save, onGamePointReward } = playPitcherAceMatch(1)
+
+    expect(status).toBe('성공')
+    expect(isWin).toBe(true)
+    expect(after.pitcherRun).toBeNull()
+    expect(after.pitcherAceMatchMission).toBeNull()
+    expect(save).not.toHaveBeenCalled()
+    expect(onGamePointReward).not.toHaveBeenCalled()
+  })
+
+  it('실패하면 졌다', () => {
+    const { status, isWin } = playPitcherAceMatch(5)
+
+    expect(status).toBe('실패')
+    expect(isWin).toBe(false)
+  })
+
+  it('포기도 실패라 졌다', () => {
+    const { isWin } = playPitcherAceMatch(1, { giveUp: true })
+
+    expect(isWin).toBe(false)
+  })
+
+  it('대결 중이 아니면 끝낼 것이 없다 (null) — 보통 투수 미션의 끝(finishPitcher)과 섞이지 않는다', () => {
+    const missionRecord: MissionRecordPort = { load: () => ({}), save: vi.fn() }
+    const screen: Screen = { kind: '미션선택' }
+    const rendered = renderHook(() => {
+      const runner = useAtBatRunner()
+      return useMissionSession({ runner, random: createSeededRandom(1), missionRecord, screen, setScreen: vi.fn() })
+    })
+    const ordinary = MISSIONS.find((row) => row.side === '투수' && row.id === 1)
+    if (ordinary === undefined) throw new Error('투수 미션 1 이 없다')
+    act(() => rendered.result.current.actions.begin(ordinary))
+
+    let result: boolean | null = true
+    act(() => {
+      result = rendered.result.current.actions.finishPitcherAceMatch()
+    })
+    expect(result).toBeNull()
+    expect(rendered.result.current.pitcherRun).not.toBeNull()
+    rendered.unmount()
+  })
+})

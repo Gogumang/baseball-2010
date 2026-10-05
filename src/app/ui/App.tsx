@@ -5,7 +5,7 @@ import { useCareerSession } from '@/app/model/useCareerSession'
 import { useMissionSession } from '@/app/model/useMissionSession'
 import { CareerRoutes } from '@/app/ui/CareerRoutes'
 import { EntryRoutes } from '@/app/ui/EntryRoutes'
-import { MissionRoutes } from '@/app/ui/MissionRoutes'
+import { MissionRoutes, PitcherAceMatchRoute } from '@/app/ui/MissionRoutes'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { createLocalStorageSaveGame } from '@/shared/api/save/localStorageSaveGame'
 import { createLocalStorageMissionRecord } from '@/shared/api/save/localStorageMissionRecord'
@@ -262,6 +262,17 @@ export function App() {
         openedHiddenIds={collection.collection.openedHiddenIds}
         gameSettings={gameSettings}
         onExit={() => setScreen({ kind: '메인메뉴' })}
+        // 마선수 대결 (SYS 8 → 투수 미션 team − 1) — 미션 세션이 투수편 내 투수(`pitcherMissionPitcher`)로 던지고
+        // 이겼나를 돌려주면 투수편 세션이 140 → resultEvents[이김 ? 0 : 1] → 105 로 잇는다
+        renderAceMatch={(match, onFinish) => (
+          <PitcherAceMatchRoute
+            mission={match.mission}
+            session={mission}
+            runner={runner}
+            pitchControl={gameSettings.settings.pitchControl}
+            onFinish={onFinish}
+          />
+        )}
       />
     )
   }

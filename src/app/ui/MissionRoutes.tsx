@@ -1,3 +1,5 @@
+import { useEffect, useRef } from 'react'
+import type { ReactNode } from 'react'
 import type { Screen } from '@/app/model/screen'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import { missionBatterSpecialSwingRemainingOf, missionOpponent, missionPitcherAbility } from '@/app/model/useMissionSession'
@@ -12,6 +14,7 @@ import { modePitchMenuOf } from '@/app/model/modePitcher'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { PitchControl } from '@/entities/settings/model/gameSettings'
 import type { useGameSettings } from '@/app/model/useGameSettings'
+import type { OriginalMission } from '@/shared/config/original/missions'
 
 interface MissionRoutesProps {
   readonly screen: Screen
@@ -37,35 +40,11 @@ export function MissionRoutes({
   pitchControl,
   gameSettings,
 }: MissionRoutesProps) {
-  const { missionRun, pitcherRun, pendingDefensePlay, actions } = session
+  const { missionRun, pitcherRun, actions } = session
   const { ability } = batter
 
-  /**
-   * **수비 화면(상태 0x17)이 먼저다.** 미션도 모드 5·6 짜리 보통 경기(장면 0x104)라
-   * 맞은 공은 0x11 → 0x13 → **늘 0x17** 로 간다 (`0xae5f0` = `movs r0,#0x17`, R10 8절 전이표).
-   * 다 돌고 나서야 `0xae3e8` 이 다음 타석으로 보낸다 — 그 자리가 `finishDefensePlay` 다.
-   *
-   * 사람이 잡는 쪽(`side`)은 편에 따라 다르다: 타자 미션은 내가 공격(주루), 투수 미션은 내가 수비(송구).
-   */
-  if (pendingDefensePlay !== null) {
-    return (
-      <DefensePlayback
-        input={pendingDefensePlay.input}
-        side={pendingDefensePlay.side === '투수' ? '수비' : '공격'}
-        onDone={actions.finishDefensePlay}
-      />
-    )
-  }
-
-  // 투수 미션 사구 뒤 벤치 클리어링 연출(상태 0x1e) — 투수편 `PitcherGameScreen` 과 같은 위젯이다
-  if (session.pendingBenchClearing !== null) {
-    return <BenchClearingScene onDone={actions.finishBenchClearing} />
-  }
-
-  // CPU 견제 한 판 — 세션이 이미 다 돌려 먹였다. 화면은 재생만 한다 (나만의리그 `GameRoute` 의 lastDefensePlay 와 같은 꼴)
-  if (session.pickoffReplay !== null) {
-    return <DefensePlayback ticks={session.pickoffReplay.ticks} onDone={actions.finishPickoffReplay} />
-  }
+  const overlay = missionOverlayOf(session)
+  if (overlay !== null) return overlay
 
   const selectScreen = (
     <MissionSelectScreen
@@ -140,4 +119,86 @@ export function MissionRoutes({
   }
 
   return selectScreen
+}
+
+/**
+ * 공 사이에 끼어드는 화면 — 수비·벤치 클리어링·견제 재생. 없으면 null.
+ *
+ * **수비 화면(상태 0x17)이 먼저다.** 미션도 모드 5·6 짜리 보통 경기(장면 0x104)라
+ * 맞은 공은 0x11 → 0x13 → **늘 0x17** 로 간다 (`0xae5f0` = `movs r0,#0x17`, R10 8절 전이표).
+ * 다 돌고 나서야 `0xae3e8` 이 다음 타석으로 보낸다 — 그 자리가 `finishDefensePlay` 다.
+ *
+ * 사람이 잡는 쪽(`side`)은 편에 따라 다르다: 타자 미션은 내가 공격(주루), 투수 미션은 내가 수비(송구).
+ */
+function missionOverlayOf(session: ReturnType<typeof useMissionSession>): ReactNode | null {
+  const { pendingDefensePlay, actions } = session
+  if (pendingDefensePlay !== null) {
+    return (
+      <DefensePlayback
+        input={pendingDefensePlay.input}
+        side={pendingDefensePlay.side === '투수' ? '수비' : '공격'}
+        onDone={actions.finishDefensePlay}
+      />
+    )
+  }
+
+  // 투수 미션 사구 뒤 벤치 클리어링 연출(상태 0x1e) — 투수편 `PitcherGameScreen` 과 같은 위젯이다
+  if (session.pendingBenchClearing !== null) {
+    return <BenchClearingScene onDone={actions.finishBenchClearing} />
+  }
+
+  // CPU 견제 한 판 — 세션이 이미 다 돌려 먹였다. 화면은 재생만 한다 (나만의리그 `GameRoute` 의 lastDefensePlay 와 같은 꼴)
+  if (session.pickoffReplay !== null) {
+    return <DefensePlayback ticks={session.pickoffReplay.ticks} onDone={actions.finishPickoffReplay} />
+  }
+  return null
+}
+
+interface PitcherAceMatchRouteProps {
+  /** SYS 8 이 고른 투수 미션 레코드 (team − 1, `aceMatchMissionOf(team, '투수')`) */
+  readonly mission: OriginalMission
+  readonly session: ReturnType<typeof useMissionSession>
+  readonly runner: AtBatRunner
+  readonly pitchControl: PitchControl
+  /** 대결이 끝났다 — 저장 +0x177 의 결과 바이트 (이겼나) */
+  readonly onFinish: (isWin: boolean) => void
+}
+
+/**
+ * **투수편 마선수 대결 화면** — 투수편 라우트의 `renderAceMatch` 가 그린다.
+ * 원본은 투수편 장면(0x106)을 떠나 미션 장면(모드 5)으로 가서 보통 투수 미션과 같은 투구 화면으로 던지고,
+ * 끝나면 결과 화면에서 재도전 커서 없이(0x407f0 의 +0x176 갈래) 원래 모드로 돌아온다 (0x4b328 · 0x4090c).
+ * 들어서면 `beginPitcherAceMatch` 로 미션을 세우고, 결과 [확인]에서 `finishPitcherAceMatch` 의 이겼나를 넘긴다.
+ */
+export function PitcherAceMatchRoute({ mission, session, runner, pitchControl, onFinish }: PitcherAceMatchRouteProps) {
+  const beginRef = useRef(session.actions.beginPitcherAceMatch)
+  beginRef.current = session.actions.beginPitcherAceMatch
+  useEffect(() => {
+    beginRef.current(mission)
+  }, [mission])
+
+  const overlay = missionOverlayOf(session)
+  if (overlay !== null) return overlay
+
+  // 미션을 세우기 전(첫 그림) — 아무것도 안 그린다
+  const { pitcherRun, actions } = session
+  if (pitcherRun === null || session.pitcherAceMatchMission !== mission) return null
+
+  return (
+    <PitchingScreen
+      run={pitcherRun}
+      repertoire={modePitchMenuOf(session.pitcher, session.pitcherMagicRemaining)}
+      usesGauge={pitchControl === '게이지'}
+      atBat={runner.atBat}
+      bannerText={runner.bannerText}
+      onThrow={session.handleThrow}
+      // ⚠️ 근사: 원본 경기 중 메뉴 나가기 0x40140 은 모드 5·6 이면 0xa5368(obj,0) 뒤 메인 메뉴(장면 0x103)로 간다 —
+      //    +0x176 이 서 있을 때 어디로 가는지는 안 읽었다. 웹은 보통 미션처럼 '실패' 로 두어 패배 결과로 잇는다.
+      onGiveUp={actions.giveUpPitcher}
+      onFinish={() => {
+        const isWin = actions.finishPitcherAceMatch()
+        if (isWin !== null) onFinish(isWin)
+      }}
+    />
+  )
 }

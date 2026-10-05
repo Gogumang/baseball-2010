@@ -274,6 +274,12 @@ export function useMissionSession({
    */
   const [ballMagicNumber, setBallMagicNumber] = useState(0)
   const pitcherMagicRemaining = modePitcherMagicRemainingOf(pitcherMagicStored, pitcher)
+  /**
+   * **투수편 마선수 대결로 연 투수 미션** — 아니면 null. 원본은 SYS 8(0x8d7e8)이 `g[0x175] = team − 1` ·
+   * `g[0x176] = 1`(대기 표시)을 적고 미션 장면(모드 5)으로 나간다 (S13 4-1). 웹은 화면을 투수편 라우트가 그리므로
+   * (`renderAceMatch`) 앱 화면(`screen`)을 '투수미션' 으로 바꾸지 않고 이 칸으로 대결 중임을 안다.
+   */
+  const [pitcherAceMatchMission, setPitcherAceMatchMission] = useState<OriginalMission | null>(null)
   /** 결과를 확인하고 돌아갈 때 마지막으로 한 편의 목록을 연다 */
   const [lastSide, setLastSide] = useState<OriginalMission['side']>('타자')
   const [clearCounts, setClearCounts] = useState<MissionClearCounts>(() => missionRecord.load())
@@ -285,7 +291,8 @@ export function useMissionSession({
 
   // 미션 제한 시간. 타자편·투수편 모두 진행 중일 때만 1초씩 흘린다.
   const isBatterRunning = (screen.kind === '미션진행' || screen.kind === '마선수대결') && missionRun?.status === '진행중'
-  const isPitcherRunning = screen.kind === '투수미션' && pitcherRun?.status === '진행중'
+  const isPitcherRunning =
+    (screen.kind === '투수미션' || pitcherAceMatchMission !== null) && pitcherRun?.status === '진행중'
   useEffect(() => {
     if (!isBatterRunning && !isPitcherRunning) return
     const handle = window.setInterval(() => {
@@ -650,6 +657,20 @@ export function useMissionSession({
     missionRecord.save(next)
   }
 
+  /** 새 경기 — 필살·마구 남은 칸은 0xaebe4 가 다시 채운다 (팀 new 0xb891c 가 −1), 공 객체도 새것 */
+  const resetForNewMatch = (mission: OriginalMission) => {
+    setBatterSpecialSwingStored(UNFILLED_SPECIAL_SWING)
+    setOpponentSpecialSwingStored(UNFILLED_SPECIAL_SWING)
+    setPitcherMagicStored(UNFILLED_SPECIAL_SWING)
+    setBallMagicNumber(0)
+    runner.resetAtBat(mission.start)
+    runner.setBannerText('')
+    runner.setIsPaused(false)
+    setPendingDefensePlay(null)
+    setPickoffReplay(null)
+    setPendingBenchClearing(null)
+  }
+
   const actions = {
     /** 수비 화면이 끝났다 — 진루·아웃·실점을 이제 먹인다 */
     finishDefensePlay,
@@ -673,17 +694,9 @@ export function useMissionSession({
 
     begin: (mission: OriginalMission) => {
       setLastSide(mission.side)
-      // 새 경기 — 필살·마구 남은 칸은 0xaebe4 가 다시 채운다 (팀 new 0xb891c 가 −1), 공 객체도 새것
-      setBatterSpecialSwingStored(UNFILLED_SPECIAL_SWING)
-      setOpponentSpecialSwingStored(UNFILLED_SPECIAL_SWING)
-      setPitcherMagicStored(UNFILLED_SPECIAL_SWING)
-      setBallMagicNumber(0)
-      runner.resetAtBat(mission.start)
-      runner.setBannerText('')
-      runner.setIsPaused(false)
-      setPendingDefensePlay(null)
-      setPickoffReplay(null)
-      setPendingBenchClearing(null)
+      resetForNewMatch(mission)
+      // 목록에서 고른 보통 미션 — 투수편 대결 표시는 내린다
+      setPitcherAceMatchMission(null)
 
       if (mission.side === '투수') {
         setPitcherRun(startPitcherMission(mission))
@@ -706,6 +719,44 @@ export function useMissionSession({
       setPendingBenchClearing(null)
       setMissionRun(startMission(mission))
       setScreen({ kind: '마선수대결', mission, ...pending })
+    },
+
+    /**
+     * **투수편 마선수 대결** — 투수편 장소 이벤트의 `match`(SYS 8, 0x8d7e8)가 고른 **투수 미션 레코드 team − 1**
+     * (16~20 메디카·킹타이거·로제·크라이져·어거지죠, 목표 아웃 1 · 투구 5 · 실점·피안타·볼넷 한도 1)를
+     * 미션 장면(모드 5)과 같은 투구 길로 던진다. 던지는 투수는 세션의 `pitcher` — 0x1fbd0 은 `+0x176 ≠ 0` 이면
+     * 명예 투수 갈래를 안 타고 늘 나리 투수편 저장 [저장+0x3c] 선수다 (`modePitcherOf(투수편 career)`).
+     * 상대 명부 0xb86e2 도 `+0x176` 이 서 있고 원래 모드(g[0xf6])가 시즌(2)이 아니면 기본 팀 명부라 보통 미션과 같다.
+     *
+     * 화면 전환은 하지 않는다 — 투수편 라우트가 `PitcherAceMatchRoute` 를 그린다.
+     */
+    beginPitcherAceMatch: (mission: OriginalMission) => {
+      if (mission.side !== '투수') return
+      resetForNewMatch(mission)
+      setPitcherRun(startPitcherMission(mission))
+      setPitcherAceMatchMission(mission)
+    },
+
+    /**
+     * 투수편 마선수 대결이 끝났다 — **이겼나**를 돌려준다 (대결 중이 아니면 null).
+     *
+     * 원본 경기 뒤 0x4ea0c 의 모드 5·6 갈래: 0x4ef3e 가 `g[0x11f]`·`g[0x176]` 이 서 있으면 G 보상을 건너뛰고,
+     * 0x4f004~0x4f018 이 `g[0x177] = [미션객체+0xbc]` 를 적는다 — +0xbc 는 미션 끝 0x509a0 → 0xa5368(obj, 목표 달성?)
+     * 이 적은 **성공 여부**다. 105 진입 0x10df8 이 이 바이트로 `resultEvents[이김 ? 0 : 1]` 을 고른다 (0x10e40).
+     * 그래서 이김 = 미션 상태 '성공'. 미션 클리어 G 보상은 없다 (`rememberCleared` 를 안 부른다).
+     *
+     * ⚠️ 미해결: 0xa5368(obj, 1) 은 플래그를 안 보고 `[obj+0xbd] ≤ 15` 면 클리어 횟수 칸(전역 +0x150 + 편×16 + idx)을
+     *    올린다. 대결에서 +0xbd 가 `g[0x175]`(= team − 1 = 15~19)로 채워지는지 못 찾았다 — 그렇다면 team 16(메디카,
+     *    레코드 15)을 이겼을 때만 투수 15번 칸이 오른다. 웹은 대결을 클리어 기록에 남기지 않는다(타자 대결과 같다).
+     */
+    finishPitcherAceMatch: (): boolean | null => {
+      if (pitcherRun === null || pitcherAceMatchMission === null) return null
+      const isWin = pitcherRun.status === '성공'
+      setPitcherRun(null)
+      setPitcherAceMatchMission(null)
+      setPendingDefensePlay(null)
+      setPendingBenchClearing(null)
+      return isWin
     },
 
     finishAceMatch: () => {
@@ -790,7 +841,7 @@ export function useMissionSession({
   }
 
   return {
-    missionRun, pitcherRun, clearedKeys, clearCounts, lastSide, aceLevels, pitcher,
+    missionRun, pitcherRun, pitcherAceMatchMission, clearedKeys, clearCounts, lastSide, aceLevels, pitcher,
     missionConditionCode, pendingDefensePlay, pendingBenchClearing, pickoffReplay, handleMissionPitch, handleThrow, actions,
     batterSpecialSwingStored, pitcherMagicRemaining,
   }
