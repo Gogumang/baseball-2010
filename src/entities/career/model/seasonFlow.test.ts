@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
+import { effectiveAbilityOf, equippedAbilityOf } from '@/entities/career/model/condition'
 import {
   achievedGoalCount,
   applyEndingBonus,
@@ -162,5 +163,14 @@ describe('엔딩 뒤 — 0x1220c', () => {
     const continued = continueAfterEnding(선수({ gamePoint: 5000, endingIndex: 0, season: 3, gamesPlayed: 20, isInjured: true }))
 
     expect([continued.season, continued.gamesPlayed, continued.isInjured]).toEqual([3, 20, false])
+  })
+
+  it('부상 엔딩 이어하기는 남은 부상 기간(+0x1b5)·부상 경기 수(+0x1b6)도 0 으로 지운다 (0x1bddc~0x1bdfa)', () => {
+    const injured = 선수({ gamePoint: 5000, endingIndex: 0, isInjured: true, injuryRemaining: 2, injuredGamesPlayed: 20 })
+    const continued = continueAfterEnding(injured)
+
+    expect([continued.isInjured, continued.injuryRemaining, continued.injuredGamesPlayed]).toEqual([false, 0, 0])
+    // 부상 −60%(0xb57b4) 는 풀린 뒤 남지 않는다
+    expect(effectiveAbilityOf(continued)).toEqual(equippedAbilityOf(continued))
   })
 })

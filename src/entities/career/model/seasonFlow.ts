@@ -140,7 +140,8 @@ const INJURY_ENDING = 0
  */
 export function continueAfterEnding(career: PlayerCareer): PlayerCareer {
   const paid: PlayerCareer = { ...career, gamePoint: career.gamePoint - CONTINUE_COST_GAME_POINT, endingIndex: null }
-  if (career.endingIndex === INJURY_ENDING) return { ...paid, isInjured: false, injuredGamesPlayed: 0 }
+  // 0x1bddc~0x1bdfa: 부상 기간 +0x1b5 · +0x1ce · 부상 경기 수 +0x1b6 을 0 으로 (원본 부상 판정은 +0x1b5 > 0)
+  if (career.endingIndex === INJURY_ENDING) return { ...paid, isInjured: false, injuryRemaining: 0, injuredGamesPlayed: 0 }
   return startNextSeason(paid)
 }
 

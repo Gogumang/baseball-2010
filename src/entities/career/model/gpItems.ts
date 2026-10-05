@@ -67,12 +67,19 @@ const MAXIMUM_EAGLE_EYE_GAMES = 99
 /** 마이너스 스킬 — 원본은 0x5f350 비트1 로 가른다. 표를 아직 못 읽어 효과 문구가 불리한 타자·공통 스킬로 둔다 (추정) */
 const MINUS_SKILL_IDS: ReadonlySet<number> = new Set([2, 3, 4, 5, 17, 18, 19, 20])
 
+/**
+ * 종합건강진단(7)·복권 메디카상 (0xa4888 · 0xa492e, 같은 코드 두 벌) — 원본은 조건 없이 지운다:
+ * 질병 +5 = 0 · 기간 +6 = [0xd80d2] = 0 · 쿨다운 +0x7c = 20 · 부상 기간 +0x1b5 = 0 · +0x1ce = 0 · 부상 경기 수 +0x1b6 = 0.
+ * 원본 부상 판정은 +0x1b5 > 0 (0xb57b4) 이라 남은 기간도 반드시 0 으로 맞춘다.
+ */
 const cure = (career: PlayerCareer): PlayerCareer => ({
   ...career,
   isInjured: false,
+  injuryRemaining: 0,
   injuredGamesPlayed: 0,
   isSick: false,
   illnessName: null,
+  illnessRemaining: 0,
   illnessCooldown: CURE_COOLDOWN,
 })
 

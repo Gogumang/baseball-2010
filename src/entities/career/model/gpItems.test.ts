@@ -66,8 +66,14 @@ describe('GP 아이템 (타자, 0xa4488)', () => {
 
   it('영지버섯 사기 +40 (상한 100) · 종합건강진단은 부상·질병 치료 · 이글아이는 20경기(상한 99)', () => {
     expect(applyGpItem(선수({ morale: 30 }), 6, 보통).career.morale).toBe(70)
-    expect(applyGpItem(선수({ isInjured: true, isSick: true, illnessName: '감기' }), 7, 보통).career).toMatchObject({
-      isInjured: false, isSick: false, illnessName: null, illnessCooldown: 20,
+    expect(
+      applyGpItem(
+        선수({ isInjured: true, injuryRemaining: 2, injuredGamesPlayed: 5, isSick: true, illnessName: '감기', illnessRemaining: 3 }),
+        7,
+        보통,
+      ).career,
+    ).toMatchObject({
+      isInjured: false, injuryRemaining: 0, injuredGamesPlayed: 0, isSick: false, illnessName: null, illnessRemaining: 0, illnessCooldown: 20,
     })
     expect(applyGpItem(선수({ eagleEyeGamesRemaining: 90 }), 9, 보통).career.eagleEyeGamesRemaining).toBe(99)
   })
