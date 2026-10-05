@@ -992,10 +992,41 @@ function batterPitch(
   ) => TeamGameProgress,
 ): TeamGameProgress {
   if (!isBatterTurn(progress)) return progress
+  progress = throwOpponentPitch(progress, detail.pitchTypeNumber)
   const atBat = applyPitchResolution(progress.atBat, detail.resolution)
   const outcome = atBat.outcome
   if (outcome === null) return { ...progress, atBat }
   return applyOutcome({ ...progress, atBat }, outcome, random, options)
+}
+
+/**
+ * 사람 타석에서 **상대 CPU 투수가 공 하나를 던졌다** — 공이 손을 떠날 때(상태 0x11 진입 0x3de10 의 0x3dec6)
+ * `0xa5e14(ctx, game+0xfc8 = 구질)` 이 수비 팀 투수를 깎는다 (P1 3-1, 4099ec6 과 같은 자리):
+ *   투구 수 +1 (`team+0x27c` 묶음) · state[0xd] = 0 (`pitcherJustChanged`) · 스태미나 −c·용량 (0xaeb08)
+ *   c = 0x66ef0(구질), 타자 스킬 22 압도 또는 투수 스킬 18 이면 ×2, 투수 스킬 10 이면 −1.
+ * 용량 X 는 간이 타석 쪽(`drainQuickPitcher`)과 같은 입력이다 — 상대 팀 사기 100 · 첫 투수 보너스(0x66e44).
+ *
+ * ⚠️ 미해결: 타자 스킬 22 압도 — 팀 경기 명단(`TeamEntryBatter`)에 스킬 비트(+0x14)가 없어 늘 거짓이다.
+ *    상대 CPU 투수 스킬 18·10 도 같은 까닭으로 늘 거짓.
+ * 구질이 없으면(`PitchOutcomeDetail.pitchTypeNumber` 를 안 실은 호출) 깎지 않는다. 난수는 쓰지 않는다.
+ */
+function throwOpponentPitch(progress: TeamGameProgress, pitchTypeNumber: number | undefined): TeamGameProgress {
+  if (pitchTypeNumber === undefined) return progress
+  return {
+    ...progress,
+    opponentStamina: drainStamina({
+      stamina: progress.opponentStamina,
+      typeNumber: pitchTypeNumber,
+      staminaAbility: opponentPitcherStaminaAbility(progress),
+      teamMorale: 100,
+      isFirstPitcher: progress.opponentUsedPitchers.length === 0,
+      batterIntimidates: false,
+      pitcherIsCoward: false,
+      pitcherEndures: false,
+    }),
+    opponentPitcherCounters: addRunsToCounters(progress.opponentPitcherCounters, 0, 1, false),
+    pitcherJustChanged: false,
+  }
 }
 
 export interface BatterOutcomeOptions {

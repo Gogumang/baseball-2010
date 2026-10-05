@@ -413,6 +413,8 @@ export function TeamGameScreen({
               aceBatterIndex={currentBatterEntry(progress)?.aceIndex ?? -1}
               // 팀 경기는 "내 선수" 보너스가 없다 — 그 보너스는 나만의리그 판정에만 있다 (0xab214)
               swingMode="일반"
+              // ⚠️ 미해결: `batterSkillIds` 를 안 넘긴다 — 팀 경기 명단(`TeamEntryBatter`)·로스터 표에 선수 스킬 비트(+0x14)가
+              //    없다. 그래서 실투 판정 0x33cbc 의 타자 비트 22 압도(+5)와 0xa5e14 의 압도 ×2 가 늘 거짓이다
               gameMode={options.mode}
               pitcherAbility={currentPitcherAbility(progress)}
               hud={{

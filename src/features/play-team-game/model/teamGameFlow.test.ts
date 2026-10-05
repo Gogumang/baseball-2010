@@ -9,6 +9,7 @@ import {
 import type { MatchProgressSettings } from '@/features/play-team-game/model/matchSettings'
 import {
   applyBatterOutcome,
+  applyBatterPitch,
   autoProgressCostOf,
   availablePinchHitters,
   availablePitchers,
@@ -171,6 +172,42 @@ describe('사람이 치는 타석', () => {
     expect(after.game.ourScore).toBe(progress.game.ourScore + 1)
     const 마지막 = play!.ticks[play!.ticks.length - 1]
     expect(마지막.runners.every((runner) => runner.base === 0)).toBe(true)
+  })
+})
+
+describe('사람 타석의 공마다 상대 투수를 깎는다 — 0x3dec6 의 0xa5e14(ctx, 구질)', () => {
+  const 볼 = (pitchTypeNumber?: number) => ({
+    resolution: { kind: '볼' } as const,
+    hasSwung: false,
+    isBunt: false,
+    resultCode: null,
+    ...(pitchTypeNumber === undefined ? {} : { pitchTypeNumber }),
+  })
+
+  it('투구 수 +1 · 스태미나는 구질 소모 0x66ef0 만큼 — 난수는 안 쓴다', () => {
+    const { progress } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
+    const random = createSeededRandom(1)
+    const 직구 = applyBatterPitch(progress, 볼(1), random)
+    expect(직구.opponentPitcherCounters.pitches).toBe(progress.opponentPitcherCounters.pitches + 1)
+    expect(직구.opponentStamina).toBeLessThan(progress.opponentStamina)
+    expect(직구.pitcherJustChanged).toBe(false)
+    // 굴림이 없다 — 같은 씨앗이 그대로 서 있다
+    expect(random.next()).toBe(createSeededRandom(1).next())
+  })
+
+  it('같은 공 수면 결과는 구질 소모를 따른다 — 마구(22)는 직구와 같은 9', () => {
+    const { progress } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
+    const random = createSeededRandom(1)
+    expect(applyBatterPitch(progress, 볼(22), random).opponentStamina).toBe(
+      applyBatterPitch(progress, 볼(1), random).opponentStamina,
+    )
+  })
+
+  it('구질을 안 실은 공(옛 호출)은 깎지 않는다', () => {
+    const { progress } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
+    const after = applyBatterPitch(progress, 볼(), createSeededRandom(1))
+    expect(after.opponentStamina).toBe(progress.opponentStamina)
+    expect(after.opponentPitcherCounters).toEqual(progress.opponentPitcherCounters)
   })
 })
 
