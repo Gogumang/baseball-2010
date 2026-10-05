@@ -8,6 +8,7 @@ import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayInput, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
+import { runnerFatesWithoutPlay, type RunnerFate } from '@/features/defense-play/model/runnerFates'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
 /**
@@ -96,11 +97,33 @@ export function missionAdvance(
     readonly played?: DefensePlayResult
   } = {},
 ): AdvanceResult {
-  if (!isBattedBallInPlay(outcome)) return advanceRunners(bases, outcome, outs)
-  if (options.played !== undefined) return options.played.advance
-  return runDefensePlay(
-    missionDefensePlayInputOf(bases, outs, outcome, options.random, options.gameMode),
-  ).advance
+  return missionPlay(bases, outs, outcome, options).advance
+}
+
+/** 미션 타석 하나의 결과 — 진루·아웃·득점에 **주자 목록의 운명**(정산 0xa8024 가 읽는 +0x95·+0x96)을 붙인 것 */
+export interface MissionPlay {
+  readonly advance: AdvanceResult
+  /** 원본 목록 순서(`[타자주자?, 1루?, 2루?, 3루?]`)의 운명 — `features/defense-play/model/runnerFates` */
+  readonly runnerFates: readonly RunnerFate[]
+}
+
+/**
+ * `missionAdvance` 와 **같은 길·같은 굴림**으로 돌리고 주자 운명까지 내준다.
+ * 인플레이 타구는 진행기 결과의 `runnerFates`, 삼진·볼넷·사구·홈런은 `runnerFatesWithoutPlay` 다.
+ */
+export function missionPlay(
+  bases: BaseState,
+  outs: number,
+  outcome: AtBatOutcome,
+  options: Parameters<typeof missionAdvance>[3] = {},
+): MissionPlay {
+  if (!isBattedBallInPlay(outcome)) {
+    return { advance: advanceRunners(bases, outcome, outs), runnerFates: runnerFatesWithoutPlay(bases, outcome) }
+  }
+  const played =
+    options.played ??
+    runDefensePlay(missionDefensePlayInputOf(bases, outs, outcome, options.random, options.gameMode))
+  return { advance: played.advance, runnerFates: played.runnerFates }
 }
 
 /**

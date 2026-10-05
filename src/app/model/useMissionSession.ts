@@ -490,6 +490,7 @@ export function useMissionSession({
       ])
 
       if (pending.side === '투수') {
+        // `played.runnerFates`(주자별 +0x95·+0x96)로 실점 R+0x128 · 출루 허용 R+0x130 을 원본대로 센다
         setPitcherRun((previous) =>
           previous === null ? previous : applyPitcherOutcome(previous, pending.outcome, { played }),
         )

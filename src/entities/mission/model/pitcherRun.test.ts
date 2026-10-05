@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   applyPitcherOutcome,
-  baserunnerAllowedOf,
   checkPitchExhausted,
   recordPitch,
   startPitcherMission,
@@ -9,6 +8,11 @@ import {
   OUTS_PER_INNING,
 } from '@/entities/mission/model/pitcherRun'
 import { PITCHER_MISSIONS } from '@/entities/mission/model/missionGoal'
+import type { PitcherRun } from '@/entities/mission/model/pitcherRun'
+import { missionDefensePlayInputOf } from '@/entities/mission/model/missionRun'
+import { runDefensePlay, type DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
+import type { RunnerFate } from '@/features/defense-play/model/runnerFates'
+import type { AdvanceResult } from '@/entities/game/model/baseState'
 
 const 혼이실린 = PITCHER_MISSIONS.find((m) => m.name === '혼이 실린 스트라이크')!
 const 착각하지마 = PITCHER_MISSIONS.find((m) => m.name.includes('착각하지마'))!
@@ -277,23 +281,81 @@ describe('넷째 실패 한도 +0xa3 ↔ R+0x130 출루 허용 (정산 0xa8c86 �
   })
 })
 
-describe('baserunnerAllowedOf — 주자 목록 마지막 원소가 살아 있나 (0xa8c5c~0xa8c86)', () => {
+/** 진행기가 돌린 결과에서 진루·운명만 바꿔 끼운 플레이 — 원본 목록 순서의 운명을 그대로 먹인다 */
+function playedWith(advance: AdvanceResult, runnerFates: readonly RunnerFate[]): DefensePlayResult {
+  const base = runDefensePlay(
+    missionDefensePlayInputOf({ first: false, second: false, third: false }, 0, { kind: '안타', bases: 1 }),
+  )
+  return { ...base, advance, runnerFates }
+}
+const fate = (fromBase: number, scored: boolean, retired: boolean): RunnerFate => ({ fromBase, scored, retired })
+
+describe('R+0x130 — 주자 목록 마지막 원소의 +0x96 (0xa8c5c~0xa8c86)', () => {
+  const 노히트노런 = PITCHER_MISSIONS.find((m) => m.id === 13)!
   const EMPTY = { first: false, second: false, third: false }
   const FIRST = { first: true, second: false, third: false }
+  const withBases = (bases: typeof EMPTY): PitcherRun => ({ ...startPitcherMission(노히트노런), bases })
 
-  it('빈 루: 타자주자가 루에 남으면 1, 홈런처럼 득점하면 0 (+0x96 이 선다)', () => {
-    expect(baserunnerAllowedOf(EMPTY, { kind: '안타', bases: 1 }, FIRST, 0)).toBe(true)
-    expect(baserunnerAllowedOf(EMPTY, { kind: '홈런' }, EMPTY, 1)).toBe(false)
-    expect(baserunnerAllowedOf(EMPTY, { kind: '아웃', detail: '땅볼아웃' }, EMPTY, 0)).toBe(false)
+  it('빈 루: 타자주자가 루에 남으면 1, 홈런처럼 득점하면 0 (+0x96 이 선다), 땅볼 아웃이면 0', () => {
+    expect(applyPitcherOutcome(withBases(EMPTY), { kind: '안타', bases: 1 }).allowed.baserunner).toBe(1)
+    expect(applyPitcherOutcome(withBases(EMPTY), { kind: '홈런' }).allowed.baserunner).toBe(0)
+    expect(applyPitcherOutcome(withBases(EMPTY), { kind: '아웃', detail: '땅볼아웃' }).allowed.baserunner).toBe(0)
   })
 
   it('빈 루 삼진은 목록이 비어 0 이다', () => {
-    expect(baserunnerAllowedOf(EMPTY, { kind: '삼진' }, EMPTY, 0)).toBe(false)
+    expect(applyPitcherOutcome(withBases(EMPTY), { kind: '삼진' }).allowed.baserunner).toBe(0)
   })
 
   it('주자가 있으면 맨 앞 주자를 본다 — 삼진으로 남은 1루 주자는 1, 득점하면 0', () => {
-    expect(baserunnerAllowedOf(FIRST, { kind: '삼진' }, FIRST, 0)).toBe(true)
-    expect(baserunnerAllowedOf({ first: false, second: false, third: true }, { kind: '안타', bases: 1 }, FIRST, 1)).toBe(false)
+    expect(applyPitcherOutcome(withBases(FIRST), { kind: '삼진' }).allowed.baserunner).toBe(1)
+    const 득점 = playedWith(
+      { bases: FIRST, runsScored: 1, outsAdded: 0 },
+      [fate(0, false, false), fate(3, true, true)],
+    )
+    const run = applyPitcherOutcome(withBases({ ...EMPTY, third: true }), { kind: '안타', bases: 1 }, { played: 득점 })
+    expect(run.allowed.baserunner).toBe(0)
+  })
+
+  it('앞 주자가 잡히고 뒤 주자가 그 루까지 간 플레이는 0 이다 — 예전 근사("가장 높은 찬 루 ≥ 출발 루")는 1 이었다', () => {
+    // 1·2루, 2루 주자가 3루에서 잡히고 1루 주자는 2루, 타자는 1루
+    const 앞주자아웃 = playedWith(
+      { bases: { first: true, second: true, third: false }, runsScored: 0, outsAdded: 1 },
+      [fate(0, false, false), fate(1, false, false), fate(2, false, true)],
+    )
+    const run = applyPitcherOutcome(
+      withBases({ first: true, second: true, third: false }),
+      { kind: '안타', bases: 1 },
+      { played: 앞주자아웃 },
+    )
+    expect(run.allowed.baserunner).toBe(0)
+  })
+})
+
+describe('R+0x128 3아웃 갈래 — 목록 0번이 끝났으면 0, 살았으면 +0x95 수 (0xa8ec0)', () => {
+  const 에이스 = PITCHER_MISSIONS.find((m) => m.id === 7)!
+  const 두아웃 = (): PitcherRun => ({
+    ...startPitcherMission(에이스),
+    bases: { first: true, second: false, third: true },
+    outs: 2,
+  })
+
+  it('타자주자는 살고 다른 주자가 셋째 아웃 — 날아간 보류 득점도 실점이다', () => {
+    const played = playedWith(
+      { bases: { first: true, second: false, third: false }, runsScored: 0, outsAdded: 1 },
+      [fate(0, false, false), fate(1, false, true), fate(3, true, true)],
+    )
+    const run = applyPitcherOutcome(두아웃(), { kind: '안타', bases: 1 }, { played })
+    expect(run.allowed.runs).toBe(1)
+    expect(run.progress.brokenConditions).toContain('무실점')
+  })
+
+  it('타자주자가 셋째 아웃이면 그 플레이 득점은 하나도 안 센다', () => {
+    const played = playedWith(
+      { bases: { first: false, second: true, third: false }, runsScored: 0, outsAdded: 1 },
+      [fate(0, false, true), fate(1, false, false), fate(3, true, true)],
+    )
+    const run = applyPitcherOutcome(두아웃(), { kind: '아웃', detail: '땅볼아웃' }, { played })
+    expect(run.allowed.runs).toBe(0)
   })
 })
 
