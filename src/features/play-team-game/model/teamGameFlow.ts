@@ -249,6 +249,10 @@ export interface TeamGameOptions {
    * 명단의 마선수(사람 팀·AI 팀 모두)가 능력치 0xb6414 첫 단계에서 `0xd88aa[레벨]` 배율을 먹고,
    * 상대 마투수의 마구 횟수 0xd8509[레벨] 도 이 칸을 본다 (타석 화면이 `BattingStage.aceLevels` 로 받는다).
    * 안 넘기면 모두 Lv1(0) — 배율 60% · 마구 3 회다.
+   *
+   * 넘기는 곳: 일반모드는 `generalModeSetup.teamGameOptionsOf(extra.aceLevels)` 가 App 의
+   * `useAceLevels().levels` 를 싣는다 (ded2d81). 시즌(국가대항전 포함)은 App 이 같은 값을 `useSeasonSession`
+   * 넷째 인자로 넘기고 그 세션이 싣는다 (69d6bcc · 6402929). 웹에 대전모드(8·9) 팀 경기는 아직 없다.
    */
   readonly aceLevels?: Readonly<Record<number, number>>
   /** 이 경기에 쓸 수 있는 마구 횟수. 로스터 투수는 마구가 없어 기본 0 이다 */
