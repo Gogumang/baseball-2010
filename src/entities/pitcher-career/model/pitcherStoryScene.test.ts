@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
-import { isPitcherEventEligible, pitcherPlaceEventOf } from '@/entities/pitcher-career/model/pitcherStoryScene'
+import {
+  isPitcherEventEligible,
+  meetsPitcherSkillCondition,
+  pitcherPlaceEventOf,
+  scanPitcherEventFrom,
+} from '@/entities/pitcher-career/model/pitcherStoryScene'
+import { countReleaseTrainingStreak } from '@/entities/pitcher-career/model/pitcherManagement'
 import { ORIGINAL_EVENTS } from '@/shared/config/original/events'
 
 const 투수 = (overrides: Partial<PitcherCareer> = {}): PitcherCareer => ({ ...createPitcherCareer('테스트'), ...overrides })
@@ -41,5 +47,67 @@ describe('장소 배정 0x8cdc0', () => {
   it('본 이벤트는 건너뛰고 다음 것을 넣는다', () => {
     const 본뒤 = 투수({ gamesPlayed: 30, seenEventIds: ['230'] })
     expect(pitcherPlaceEventOf(본뒤, ORIGINAL_EVENTS, 1)?.id).toBe(231)
+  })
+})
+
+describe('조건 20/21 투수 갈래 (0xd8408 · 0xd8454 의 모드 3 쪽)', () => {
+  it('424 닥터K(투수 비트 11) — 통산 탈삼진 ≥ 500 (0xad4f8), 이미 가졌으면 불발', () => {
+    const 통산 = (strikeouts: number) => ({ ...createPitcherCareer('x').careerStats, strikeouts })
+    expect(meetsPitcherSkillCondition(투수({ careerStats: 통산(499) }), 'acquire', 12)).toBe(false)
+    expect(meetsPitcherSkillCondition(투수({ careerStats: 통산(500) }), 'acquire', 12)).toBe(true)
+    expect(meetsPitcherSkillCondition(투수({ careerStats: 통산(500), skillIds: [11] }), 'acquire', 12)).toBe(false)
+    // 통산 칸은 s16 로 읽는다 — 32768 을 넘으면 음수라 불발
+    expect(meetsPitcherSkillCondition(투수({ careerStats: 통산(40000) }), 'acquire', 12)).toBe(false)
+  })
+
+  it('428 비겁자(18) — 이번 시즌 이닝이 16경기에 ≤ 14 · 36경기에 ≤ 32, 그 해 해제한 적 있으면 불발', () => {
+    const 시즌 = (outs: number) => ({ ...createPitcherCareer('x').stats, outs })
+    expect(meetsPitcherSkillCondition(투수({ gamesPlayed: 16, stats: 시즌(44) }), 'acquire', 19)).toBe(true)
+    expect(meetsPitcherSkillCondition(투수({ gamesPlayed: 16, stats: 시즌(45) }), 'acquire', 19)).toBe(false)
+    expect(meetsPitcherSkillCondition(투수({ gamesPlayed: 17, stats: 시즌(0) }), 'acquire', 19)).toBe(false)
+    expect(
+      meetsPitcherSkillCondition(투수({ gamesPlayed: 16, stats: 시즌(0), removedMinusSkillIds: [18] }), 'acquire', 19),
+    ).toBe(false)
+  })
+
+  it('해제 429·431·433 — 해제 카운터 +0x73 · +0x72 · +0x70 > 7', () => {
+    const 카운터 = (slot: number, count: number) => [0, 0, 0, 0, 0].map((value, index) => (index === slot ? count : value))
+    expect(meetsPitcherSkillCondition(투수({ skillIds: [18], releaseTrainingStreaks: 카운터(3, 7) }), 'release', 19)).toBe(false)
+    expect(meetsPitcherSkillCondition(투수({ skillIds: [18], releaseTrainingStreaks: 카운터(3, 8) }), 'release', 19)).toBe(true)
+    expect(meetsPitcherSkillCondition(투수({ skillIds: [19], releaseTrainingStreaks: 카운터(2, 8) }), 'release', 20)).toBe(true)
+    expect(meetsPitcherSkillCondition(투수({ skillIds: [20], releaseTrainingStreaks: 카운터(0, 8) }), 'release', 21)).toBe(true)
+    // 못 가졌으면 해제 불발
+    expect(meetsPitcherSkillCondition(투수({ releaseTrainingStreaks: 카운터(0, 8) }), 'release', 21)).toBe(false)
+  })
+
+  it('미이식 갈래(먹튀·몹쓸몸·유리몸·무력감·전설·좌우타UP·투지)는 불발로 둔다', () => {
+    for (const value of [3, 4, 5, 6, 8, 13, 14, 15]) {
+      expect(meetsPitcherSkillCondition(투수({ season: 13, gamesPlayed: 30, morale: 0 }), 'acquire', value)).toBe(false)
+    }
+  })
+})
+
+describe('해제 카운터 +0x70+칸 (훈련 0x18a80 모드 3)', () => {
+  it('가진 스킬과 맞는 칸이면 +1, 아니면 다섯 칸 모두 0', () => {
+    const 비겁 = 투수({ skillIds: [18] })
+    const 한번 = countReleaseTrainingStreak(비겁, 3)
+    expect(한번.releaseTrainingStreaks).toEqual([0, 0, 0, 1, 0])
+    expect(countReleaseTrainingStreak(한번, 0).releaseTrainingStreaks).toEqual([0, 0, 0, 0, 0])
+    // 스킬이 없으면 같은 칸이어도 세지 않는다
+    expect(countReleaseTrainingStreak(투수(), 3).releaseTrainingStreaks).toEqual([0, 0, 0, 0, 0])
+  })
+})
+
+describe('자동 발동 훑기 0xadc70', () => {
+  it('커서에서 이어 훑고 당첨 레코드에 멈춘다 — 끝까지 없으면 0 으로 되감고 없음', () => {
+    const 첫날 = 투수()
+    const 첫 = scanPitcherEventFrom(첫날, ORIGINAL_EVENTS, 0, 0)
+    expect(첫.event?.id).toBe(1)
+    const 다음 = scanPitcherEventFrom({ ...첫날, seenEventIds: ['1'] }, ORIGINAL_EVENTS, 0, 첫.cursor)
+    expect(다음.event?.id).toBe(34)
+    expect(scanPitcherEventFrom({ ...첫날, seenEventIds: ['1', '34'] }, ORIGINAL_EVENTS, 0, 다음.cursor)).toEqual({
+      event: null,
+      cursor: 0,
+    })
   })
 })

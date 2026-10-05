@@ -75,16 +75,34 @@ export function PitcherLeagueRoute({
     />
   )
 
+  const outingMap = (
+    <OutingMapScreen
+      career={career}
+      noticeText={session.outingNotice}
+      onRun={actions.runOutingFunction}
+      // 112 취소 → 105 (키 0x13ba4)
+      onBack={() => actions.goto('관리')}
+      // 장소 이벤트 배정 0x8cdc0 — 장소마다 파일 순서 첫 이벤트(대상 1·3)
+      eventPlaceIds={session.eventPlaceIds}
+      onEnter={actions.enterOutingPlace}
+      // 126 효과 팝업 → [확인] → 105 (입원 회복 글은 관리 화면 위 팝업으로)
+      resultText={session.outingResult?.effectText ?? null}
+      onCloseResult={actions.closeOutingResult}
+    />
+  )
+
   if (scene === '이벤트' && session.story !== null) {
     const { story } = session
     const event = session.storyEvents?.find((candidate) => candidate.id === story.eventId)
     // 이벤트 본문이 오기 전에는 관리 화면을 깔아 둔다
     if (session.storyEvents !== null && event !== undefined) {
-      // 대사창은 그 상태의 화면 위에 얹힌다 — 105 에서 튼 것(자동 발동·중간평가 117)은 관리 화면 위다
-      const isOverManagement = story.context === '관리' || story.context === '중간평가'
+      // 대사창은 그 상태의 화면 위에 얹힌다 — 105 에서 튼 것(자동 발동·연초 115·중간평가 117)은 관리 화면 위,
+      // 112 자동 발동은 지도 위다
+      const isOverManagement = story.context === '관리' || story.context === '중간평가' || story.context === '연초'
       return (
         <>
           {isOverManagement && management}
+          {story.context === '지도' && outingMap}
           <ScreenOverlay>
           <StoryScreen
             key={`${story.context}:${event.id}`}
@@ -167,23 +185,7 @@ export function PitcherLeagueRoute({
     )
   }
 
-  if (scene === '외출') {
-    return (
-      <OutingMapScreen
-        career={career}
-        noticeText={session.outingNotice}
-        onRun={actions.runOutingFunction}
-        // 112 취소 → 105 (키 0x13ba4)
-        onBack={() => actions.goto('관리')}
-        // 장소 이벤트 배정 0x8cdc0 — 장소마다 파일 순서 첫 이벤트(대상 1·3)
-        eventPlaceIds={session.eventPlaceIds}
-        onEnter={actions.enterOutingPlace}
-        // 126 효과 팝업 → [확인] → 105 (입원 회복 글은 관리 화면 위 팝업으로)
-        resultText={session.outingResult?.effectText ?? null}
-        onCloseResult={actions.closeOutingResult}
-      />
-    )
-  }
+  if (scene === '외출') return outingMap
 
   return (
     <>

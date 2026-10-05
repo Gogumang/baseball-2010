@@ -240,6 +240,12 @@ export interface PitcherCareer {
   readonly trainingCounts: Readonly<Record<string, number>>
   readonly seasonStartTrainingCounts: Readonly<Record<string, number>>
   readonly consecutiveTrainingCounts: Readonly<Record<string, number>>
+  /**
+   * 마이너스 스킬 해제 카운터 `+0x70 + 칸` (5칸, s8). 훈련 0x18a80 의 모드 3 갈래: 비겁자 18 을 **가진 채** 칸 3(체력) ·
+   * 깃털 19 & 칸 2(변화) · 더티볼 20 & 칸 0(제구) 이면 그 칸 +1, 그 밖의 훈련이면 다섯 칸 모두 0.
+   * 조건 21(0xadad0~)이 `> 7` 로 해제 이벤트를 연다. (`consecutiveTrainingCounts` 는 웹의 칸별 연속 수라 다르다.)
+   */
+  readonly releaseTrainingStreaks: readonly number[]
   readonly hasActedThisCycle: boolean
   readonly outingsThisSeason: number
   /** 지난 시즌 외출 수 — 칭호 25·26 이 새 시즌 첫 경기 전에 본다 (타자편 `outingsLastSeason` 과 같은 칸) */
@@ -339,6 +345,7 @@ export function createPitcherCareer(
     trainingCounts: {},
     seasonStartTrainingCounts: {},
     consecutiveTrainingCounts: {},
+    releaseTrainingStreaks: [0, 0, 0, 0, 0],
     hasActedThisCycle: false,
     outingsThisSeason: 0,
     outingsLastSeason: 0,

@@ -15,14 +15,20 @@ import {
   spendPitcherCycleAction,
   startNextPitcherSeason,
 } from '@/entities/pitcher-career/model/pitcherCareer'
-import { openableHiddenPitchEventOf } from '@/entities/pitcher-career/model/pitchTraining'
 import {
   enterPitcherYearEndEvent,
   finishPitcherYearEndEvent,
   nextPitcherYearEndStep,
 } from '@/entities/pitcher-career/model/pitcherYearEnd'
 import { applyPitcherEventRewards, finishPitcherEvent } from '@/entities/pitcher-career/model/pitcherEventReward'
-import { pitcherPlaceEventOf } from '@/entities/pitcher-career/model/pitcherStoryScene'
+import {
+  PITCHER_YEAR_START_EVENT,
+  PITCHER_YEAR_START_EVENT_ID,
+  pitcherOpeningScanOf,
+  pitcherPlaceEventOf,
+  scanPitcherEventFrom,
+} from '@/entities/pitcher-career/model/pitcherStoryScene'
+import { EVENT_TRIGGER } from '@/entities/story/model/storyScene'
 import { achievedPitcherGoalCount } from '@/entities/pitcher-career/model/pitcherYearGoals'
 import {
   careerNationalTeamEventId,
@@ -98,12 +104,14 @@ export type PitcherScene = '등록' | '관리' | '경기' | '시즌종료' | '�
 
 /**
  * 이벤트 재생(상태 114)을 **어디서** 틀었나 — 끝난 뒤 갈 곳(장면+0x24 "뒤 상태")이 이것으로 갈린다.
- *   관리     105 의 자동 발동(trigger 0) — 히든 변화구 30~33. 뒤 = 105
+ *   관리     105 의 자동 발동(0x1cf9c — trigger 0 · 오프닝 451). 뒤 = 105
+ *   연초     115 (0x16aac `[다음 114, 뒤 105]`) — 내장 이벤트 `PITCHER_YEAR_START_EVENT`
+ *   지도     112 의 자동 발동(trigger 1). 뒤 = 112
  *   중간평가 117 (0x11e84 `[다음 114, 뒤 105]`) — 452~454
  *   연말     136 · 130 · 131 · 132 · 133 사슬 (392 → … → 380/502 → 461/462)
  *   장소     113 [들어가기] (0x16c64 `[다음 114, 뒤 113]`) — 끝 처리 0x1c014 가 빈 장소가 아니면 행동을 쓰고 105 로
  */
-export type PitcherStoryContext = '관리' | '중간평가' | '연말' | '장소'
+export type PitcherStoryContext = '관리' | '연초' | '지도' | '중간평가' | '연말' | '장소'
 
 export interface PitcherStory {
   readonly eventId: number
@@ -131,7 +139,7 @@ export interface PitcherLeagueSession {
   readonly outingRecoveryNotice: string
   /** 지금 재생하는 이벤트 (장면 '이벤트'). 아니면 null */
   readonly story: PitcherStory | null
-  /** r_event 본문 — 커리어가 생긴 뒤 따로 불러온다(535KB 별도 묶음). 오기 전에는 null */
+  /** r_event 본문 + 연초 115 내장 이벤트 — 커리어가 생긴 뒤 따로 불러온다(535KB 별도 묶음). 오기 전에는 null */
   readonly storyEvents: readonly OriginalEvent[] | null
   /** 외출 지도 [!] — 장소 이벤트 배정 0x8cdc0 이 이벤트를 넣은 장소 id */
   readonly eventPlaceIds: ReadonlySet<string>
@@ -286,17 +294,30 @@ export function usePitcherLeagueSession(
    * r_event 본문(events.ts, 535KB)은 첫 화면에 필요 없어 커리어가 생긴 뒤 따로 불러온다 — 타자편
    * `useStorySchedule` 과 같은 방식(번들러가 별도 청크로 자른다). 오기 전에는 장소 이벤트가 없는 것으로 본다.
    */
-  const [storyEvents, setStoryEvents] = useState<readonly OriginalEvent[] | null>(null)
+  const [fileEvents, setFileEvents] = useState<readonly OriginalEvent[] | null>(null)
   useEffect(() => {
-    if (career === null || storyEvents !== null) return
+    if (career === null || fileEvents !== null) return
     let isActive = true
     void import('@/shared/config/original/events').then((module) => {
-      if (isActive) setStoryEvents(module.ORIGINAL_EVENTS)
+      if (isActive) setFileEvents(module.ORIGINAL_EVENTS)
     })
     return () => {
       isActive = false
     }
-  }, [career, storyEvents])
+  }, [career, fileEvents])
+  /** 재생기에 넘기는 목록 — 파일 이벤트 뒤에 연초 115 내장 이벤트를 붙인다 (훑기·배정은 파일 것만 본다) */
+  const storyEvents = useMemo(
+    () => (fileEvents === null ? null : [...fileEvents, PITCHER_YEAR_START_EVENT]),
+    [fileEvents],
+  )
+
+  /**
+   * 이벤트 레코드 커서 (0xadc70 의 reader+0x28) — 105·112 자동 발동이 함께 쓴다.
+   * ⚠️ 근사: 원본 reader 는 장면이 들고 저장에 없다 — 웹은 세션 동안만 든다 (타자편 `useStorySchedule` 과 같다).
+   */
+  const cursorRef = useRef(0)
+  /** 새 선수 플래그 (장면+0x165) — 등록(104)에서 100 으로 왔을 때 켜진다 (0x1c3be). 오프닝 451 을 부른다 */
+  const newPlayerRef = useRef(false)
 
   const commit = useCallback(
     (next: PitcherCareer) => {
@@ -377,25 +398,69 @@ export function usePitcherLeagueSession(
   }, [career, commitWith, scene])
 
   /**
-   * **관리 화면(105)에 들어올 때 트는 이벤트** — 원본은 두 자리에서 이벤트를 고른다:
-   *
-   * 1. **진입 0x11910 의 곁가지**(0x11b24~0x11c1c) — 부상 엔딩 → 미션 복귀 → 연초 115 → **중간평가 117** → 타순 138
-   *    차례로 하나만 줄에 넣는다. 117 은 `S+0xb2(경기 수) == 22 && 0xa4280(기록, 타자편?, 연차idx) == 0` 일 때다:
-   *    ```
-   *      11bda: ldrb r3,[S+0xb2] ; cmp r3,#0x16 ; bne 0x11c10
-   *      11be8: ldrb r2,[S+0xb3] ; r1 = (모드 == 4) ; bl 0xa4281   ; (기록[0x180] >> (연차idx + (r1 ? 0 : 13))) & 1
-   *      11c06: bne 0x11c10 ; movs r1,#0x75 → 0xbcb49(117)
-   *    ```
-   *    그 비트는 보상 실행기 끝(0x8cbaa)이 452~454 를 마칠 때 켠다 (`pitcherEventReward` · `midSeasonEvaluatedYears`).
-   *    부상 엔딩은 `finishGame` 이 이미 보았고, 연초 115 는 투수편 웹에 아직 없다.
-   * 2. **틀마다 자동 발동**(0x1cf9c → 0x8be80, trigger 0) — 투수편 웹은 **히든 변화구 30~33** 만 본다
-   *    (`openableHiddenPitchEventOf`, J 3-3 · A 3절). 네 레코드는 대상 3 · trigger 0 · 조건 능력치 셋(제구·구속·변화)
-   *    이고 보상은 종류 6 값 v 하나 — 0x8c5da 의 투수편 갈래가 `선수[0x204 + v] = 1` 로 계열 v 를 연다.
-   *    통과한 것이 여럿이면 하나씩 연달아 나온다 (끝나면 105 로 돌아와 다시 본다).
-   *    ⚠️ 그 밖의 trigger 0 이벤트(대상 1·3 — 1·5·11·13·34·400~437·490 …)의 자동 발동은 아직 잇지 않았다.
+   * 자동 발동 한 번 — 0x8be80 → 0xadc70 (커서에서 이어 훑기). 끝까지 없으면 커서가 0 으로 되감기고 그 호출은 "없음" 이라
+   * 원본은 **다음 틀**에 처음부터 다시 훑는다 — 웹은 그 두 번째 틀까지 한 번에 본다(커서가 0 이 아니었을 때만).
    */
+  const scanAuto = useCallback(
+    (current: PitcherCareer, events: readonly OriginalEvent[], trigger: number, rolling: RandomPort | undefined) => {
+      const from = cursorRef.current
+      let scan = scanPitcherEventFrom(current, events, trigger, from, rolling)
+      if (scan.event === null && from > 0) scan = scanPitcherEventFrom(current, events, trigger, 0, rolling)
+      cursorRef.current = scan.cursor
+      return scan.event
+    },
+    [],
+  )
+
+  /**
+   * **관리 화면(105)의 이벤트** — 원본은 한 틀 안에서 두 자리가 차례로 돈다 (R9 2절 · A 3절):
+   *
+   * 1. **진입 0x11910 의 곁가지**(0x11b24~0x11c1c) — 부상 엔딩 → 미션 복귀 140 → **연초 115**(S+0x1b7 == 0) →
+   *    **중간평가 117**(경기 수 22 · 그 해 비트 꺼짐) 중 하나를 다음 상태로 예약한다 (투수편엔 138 타순이 없다).
+   * 2. **자동 발동 0x1cf9c** — 현재 상태가 105 면 **매 틀**:
+   *    ```
+   *      1cfa6: 장면+0x165(새 선수) ≠ 0 → 0x8bde0(모드 3 → 451) · [다음 114, 뒤 105] · 플래그 지움   ; 예약을 덮는다
+   *      1cfdc: 다음 상태 ∈ {114, 115} 면 건너뜀                                                  ; 115 는 막고 117 은 안 막는다
+   *      1cfe4: 전역 +0x11f · +0x176 이 서 있으면 건너뜀
+   *      1d02c: 0x8be80(…, 화면코드 105) 찾으면 [다음 114, 뒤 105]                                ; 117 예약을 덮는다
+   *    ```
+   *    그래서 한 번 들어올 때의 차례는 **451 → 115 → (trigger 0 이벤트들) → 117** 이다 — 덮인 예약은 이벤트에서
+   *    105 로 돌아와 진입이 다시 돌 때 또 선다. 판정은 모드 3(대상 1·3, `isPitcherEventEligible`)이고, 히든 변화구 30~33
+   *    (대상 3 · 능력치 조건)도 이 훑기 안에서 나온다.
+   *
+   * 부상 엔딩은 `finishGame` 이 이미 보았다. 117 은 S+0xb2 == 22 && 0xa4280 == 0 (아래), 그 비트는 보상 실행기 끝(0x8cbaa)이 켠다.
+   *
+   * ⚠️ 근사 — 원본은 105 에 머무는 **매 틀** 훑고, 조건 22(질병 490)는 틀마다 rand 를 굴린다. 웹은 105 에 **들어올 때**
+   *    (경기·이벤트·다른 화면에서 돌아올 때) 한 번 굴려 훑고, 105 에 머문 채 커리어가 바뀌면(훈련·아이템) 굴림 없이 다시
+   *    훑는다 — 타자편(`useCareerSession` 의 '무작위포함'/'고정')과 같은 꼴이다. 틀 수를 따라 굴리지 않으므로 질병이 원본보다 드물다.
+   */
+  const wasIdleAtManagementRef = useRef(false)
   useEffect(() => {
-    if (career === null || scene !== '관리' || story !== null) return
+    const isIdle = career !== null && scene === '관리' && story === null && fileEvents !== null
+    if (!isIdle) {
+      wasIdleAtManagementRef.current = false
+      return
+    }
+    const isArrival = !wasIdleAtManagementRef.current
+    wasIdleAtManagementRef.current = true
+    if (!isArrival) {
+      const event = scanAuto(career, fileEvents, EVENT_TRIGGER.관리, undefined)
+      if (event !== null) openStory({ eventId: event.id, context: '관리', viewed: [] })
+      return
+    }
+    if (newPlayerRef.current) {
+      newPlayerRef.current = false
+      const opening = pitcherOpeningScanOf(fileEvents, cursorRef.current)
+      cursorRef.current = opening.cursor
+      if (opening.event !== null) return openStory({ eventId: opening.event.id, context: '관리', viewed: [] })
+    }
+    if (!career.hasSeenYearGoalWindow) {
+      // 115 진입 0x16aac: 0x8a681 로 내장 이벤트를 세우고 `0xa4ee9(S)` — 마이너스 스킬 해제 기록 +0x1d0~+0x1d7 을 지운다
+      commitWith((current) => (current.removedMinusSkillIds.length === 0 ? current : { ...current, removedMinusSkillIds: [] }))
+      return openStory({ eventId: PITCHER_YEAR_START_EVENT_ID, context: '연초', viewed: [] })
+    }
+    const event = scanAuto(career, fileEvents, EVENT_TRIGGER.관리, random)
+    if (event !== null) return openStory({ eventId: event.id, context: '관리', viewed: [] })
     if (career.gamesPlayed === MID_SEASON_GAME && !career.midSeasonEvaluatedYears.includes(career.season - 1)) {
       /*
        * 117 진입 0x11e84: k = 0xa3de9(S, 1) (투수 갈래 — 방어율 칸 그대로, 나머지 넷 >>1) →
@@ -408,11 +473,9 @@ export function usePitcherLeagueSession(
         const titles = midSeasonTitlesOf(current, achieved).filter((title) => !current.titleIds.includes(title))
         return { ...awardPitcherTitles(current, titles), lastMidSeasonGoalCount: achieved }
       })
-      return openStory({ eventId: midSeasonEventId(achieved), context: '중간평가', viewed: [] })
+      openStory({ eventId: midSeasonEventId(achieved), context: '중간평가', viewed: [] })
     }
-    const hiddenPitch = openableHiddenPitchEventOf(career)
-    if (hiddenPitch !== null) openStory({ eventId: hiddenPitch.eventId, context: '관리', viewed: [] })
-  }, [career, commitWith, openStory, scene, story])
+  }, [career, commitWith, fileEvents, openStory, random, scanAuto, scene, story])
 
   /**
    * **커리어 칸 ↔ 지갑 다리** — 타자편(`useCareerSession`)과 같은 모양이다.
@@ -468,6 +531,8 @@ export function usePitcherLeagueSession(
   const create = useCallback(
     (name: string, profile: PitcherRookieProfile) => {
       commit(createPitcherCareer(name, profile))
+      // 등록 104 → 100 진입 끝(0x1c3be)이 이전 상태 104 를 보고 새 선수 플래그를 켠다 → 105 첫 틀에 오프닝 451
+      newPlayerRef.current = true
       setScene('관리')
     },
     [commit],
@@ -809,13 +874,33 @@ export function usePitcherLeagueSession(
    * 모드 갈림이 없는 코드라 판정만 투수 갈래(`pitcherStoryScene`)로 본다. 무작위는 굴리지 않는다.
    */
   const eventPlaceIds = useMemo(() => {
-    if (career === null || storyEvents === null) return new Set<string>()
+    if (career === null || fileEvents === null) return new Set<string>()
     return new Set(
-      OUTING_PLACES.filter((place) => pitcherPlaceEventOf(career, storyEvents, place.frame) !== null).map(
+      OUTING_PLACES.filter((place) => pitcherPlaceEventOf(career, fileEvents, place.frame) !== null).map(
         (place) => place.id,
       ),
     )
-  }, [career, storyEvents])
+  }, [career, fileEvents])
+
+  /**
+   * **외출 지도(112)의 자동 발동** — 0x1cf9c 는 현재 상태가 112 일 때도 같은 훑기를 화면코드 112 로 돈다
+   * (trigger 1: 10 "병원이…?" · 401 인기도 3000). 찾으면 `[다음 114, 뒤 112]` — 끝나면 지도로 돌아온다.
+   * 웹의 '외출' 장면은 112 지도와 113 장소를 함께 그려, 효과 팝업이 떠 있지 않을 때를 112 로 본다.
+   * 굴림은 105 와 같은 근사(들어올 때만 rand 를 넘긴다 — trigger 1 이벤트엔 무작위 조건이 없다).
+   */
+  const wasIdleAtMapRef = useRef(false)
+  useEffect(() => {
+    const isIdle =
+      career !== null && scene === '외출' && story === null && outingResult === null && fileEvents !== null
+    if (!isIdle) {
+      wasIdleAtMapRef.current = false
+      return
+    }
+    const isArrival = !wasIdleAtMapRef.current
+    wasIdleAtMapRef.current = true
+    const event = scanAuto(career, fileEvents, EVENT_TRIGGER.외출, isArrival ? random : undefined)
+    if (event !== null) openStory({ eventId: event.id, context: '지도', viewed: [] })
+  }, [career, fileEvents, openStory, outingResult, random, scanAuto, scene, story])
 
   /**
    * 113 칸 0 [들어가기] (키 0x16c64): `0x8ce59` 가 배정된 이벤트를 부르고, 없으면 이벤트 440+장소
@@ -824,12 +909,12 @@ export function usePitcherLeagueSession(
    */
   const enterOutingPlace = useCallback(
     (place: OutingPlace) => {
-      if (career === null || storyEvents === null) return
+      if (career === null || fileEvents === null) return
       setOutingNotice('')
-      const event = pitcherPlaceEventOf(career, storyEvents, place.frame)
+      const event = pitcherPlaceEventOf(career, fileEvents, place.frame)
       openStory({ eventId: event?.id ?? emptyPlaceEventId(place.frame), context: '장소', viewed: [] })
     },
-    [career, openStory, storyEvents],
+    [career, fileEvents, openStory],
   )
 
   /** 380 "올해 네 연봉은 %s만 상승해서 %s만이다" — 0x8bc4c 가 상승분·새 연봉을 ×100 해서 금액 서식 0x55cf4 로 */
@@ -864,6 +949,15 @@ export function usePitcherLeagueSession(
         .forEach((reward) => recordStat({ kind: 'G획득', mode: PITCHER_LEAGUE_MODE, amount: reward.value }))
       setStory(null)
       if (story.context === '연말') return continueYearEnd(viewed, [...story.viewed, ...viewedEventIds])
+      if (story.context === '연초') {
+        // 내장 이벤트라 본 표시는 없다. 목표 창이 닫히면 0x7fe90 이 S+0x1b7 = 1 (해마다 한 번)
+        commit({ ...rewarded, hasSeenYearGoalWindow: true })
+        return setScene('관리')
+      }
+      if (story.context === '지도') {
+        commit(viewed)
+        return setScene('외출')
+      }
       if (story.context === '장소') {
         if (isEmptyPlaceEventId(story.eventId)) {
           commit(viewed)

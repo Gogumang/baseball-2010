@@ -47,6 +47,21 @@ type 판 = ReturnType<typeof 띄우기>['result']
 
 const 이벤트 = (id: number) => ORIGINAL_EVENTS.find((event) => event.id === id)!
 
+/** r_event 본문은 따로 불러온다 — 자동 발동은 그 뒤부터 돈다 */
+async function 이벤트불러오기(result: { current: { storyEvents: unknown } }) {
+  await waitFor(() => expect(result.current.storyEvents).not.toBeNull())
+}
+
+/** 새 선수의 첫 105 — 오프닝 451(새 선수 플래그 0x1cfa6) → 연초 115 를 넘긴다 */
+function 첫이벤트넘기기(result: 판) {
+  for (let guard = 0; guard < 5; guard += 1) {
+    const story = result.current.story
+    if (result.current.scene !== '이벤트' || story === null) return
+    if (story.eventId !== 451 && story.context !== '연초') return
+    이벤트끝내기(result)
+  }
+}
+
 /**
  * 재생기(StoryScreen)가 하는 일을 대신한다 — 지금 이벤트의 보상 명령을 모두 지나고, 선택지를 고르면
  * 그 이벤트로 이어 가 그 보상까지 모아 끝낸다 (`useEventPlayback` 의 onComplete 와 같은 꼴).
@@ -54,7 +69,7 @@ const 이벤트 = (id: number) => ORIGINAL_EVENTS.find((event) => event.id === i
 function 이벤트끝내기(result: 판, ...고른것: number[]) {
   const story = result.current.story!
   const viewed = [story.eventId, ...고른것]
-  const rewards: EventReward[] = viewed.flatMap((id) => rewardsIn(이벤트(id).commands))
+  const rewards: EventReward[] = viewed.flatMap((id) => rewardsIn(이벤트(id)?.commands ?? []))
   act(() => result.current.actions.completeStory(rewards, viewed))
   return viewed
 }
@@ -396,12 +411,14 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
    * `선수[0x204 + v] = 1`(0x8c5da~0x8c754) 로 히든 계열을 연다. v 가 곧 행 번호다.
    */
   describe('히든 변화구 오픈 이벤트 30~33', () => {
-    it('관리 화면에서 조건을 채우면 이벤트 30 을 튼다 — 끝나면 보상 종류 6 이 계열을 연다 (30 → 행1)', () => {
+    it('관리 화면에서 조건을 채우면 이벤트 30 을 튼다 — 끝나면 보상 종류 6 이 계열을 연다 (30 → 행1)', async () => {
       const result = 판짜기({
         season: 5,
         gamesPlayed: 10,
         ability: { control: 200, velocity: 250, breaking: 300, stamina: 100 },
       })
+      await 이벤트불러오기(result)
+      첫이벤트넘기기(result)
 
       // 대사는 재생기가 보여 준다 — 끝나기 전에는 아직 닫혀 있다
       expect(result.current.scene).toBe('이벤트')
@@ -419,27 +436,32 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
       expect(result.current.story).toBeNull()
     })
 
-    it('조건을 채운 것이 여럿이면 하나씩 연달아 나온다 (A 3절)', () => {
+    it('조건을 채운 것이 여럿이면 하나씩 연달아 나온다 (A 3절)', async () => {
       const result = 판짜기({
         season: 7,
         gamesPlayed: 10,
         ability: { control: 300, velocity: 400, breaking: 600, stamina: 100 },
       })
+      await 이벤트불러오기(result)
+      첫이벤트넘기기(result)
 
       const 본것: number[] = []
       while (result.current.scene === '이벤트') 본것.push(...이벤트끝내기(result))
 
       expect(본것).toEqual([30, 31, 32])
       expect(result.current.career?.hiddenPitchRows).toEqual([false, true, true, true])
-      expect(result.current.career?.seenEventIds).toEqual(['30', '31', '32'])
+      // 451 은 새 선수 오프닝, 115 내장 이벤트는 본 표시를 남기지 않는다
+      expect(result.current.career?.seenEventIds).toEqual(['451', '30', '31', '32'])
     })
 
-    it('조건을 못 채우면 틀지 않는다', () => {
+    it('조건을 못 채우면 틀지 않는다', async () => {
       const result = 판짜기({
         season: 5,
         gamesPlayed: 10,
         ability: { control: 200, velocity: 250, breaking: 299, stamina: 100 },
       })
+      await 이벤트불러오기(result)
+      첫이벤트넘기기(result)
 
       expect(result.current.scene).toBe('관리')
       expect(result.current.career?.hiddenPitchRows).toEqual([false, false, false, false])
@@ -451,8 +473,10 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
    * 비트는 452~454 의 보상을 마칠 때 0x8cbaa 가 켠다.
    */
   describe('중간평가 117 (0x11e84)', () => {
-    it('22경기 뒤 관리 화면에 들어오면 목표 단계 1 의 달성 수로 452~454 를 틀고, 끝나면 그 해 다시 안 튼다', () => {
+    it('22경기 뒤 관리 화면에 들어오면 목표 단계 1 의 달성 수로 452~454 를 틀고, 끝나면 그 해 다시 안 튼다', async () => {
       const result = 판짜기({ gamesPlayed: 21, popularity: 100, reputation: 100, morale: 50 })
+      await 이벤트불러오기(result)
+      첫이벤트넘기기(result)
       경기치르기(result)
 
       expect(result.current.career?.gamesPlayed).toBe(22)
@@ -471,13 +495,15 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
       expect(result.current.scene).toBe('관리')
     })
 
-    it('1년차에 다섯 개를 모두 이루면 칭호 1 "떠오르는 샛별" 을 준다 (0x11ee6)', () => {
+    it('1년차에 다섯 개를 모두 이루면 칭호 1 "떠오르는 샛별" 을 준다 (0x11ee6)', async () => {
       const result = 판짜기({
         gamesPlayed: 22,
         popularity: 500,
         popularityAtSeasonStart: 0,
         stats: { ...createPitcherCareer('x').stats, wins: 30, strikeouts: 300 },
       })
+      await 이벤트불러오기(result)
+      첫이벤트넘기기(result)
 
       expect(result.current.story?.eventId).toBe(452)
       expect(result.current.career?.lastMidSeasonGoalCount).toBe(5)
@@ -486,12 +512,52 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
   })
 })
 
+describe('자동 발동 (0x1cf9c → 0x8be80 → 0xadc70) · 연초 115', () => {
+  it('새 선수의 첫 105 — 오프닝 451 → 연초 115(내장 이벤트) → trigger 0 이벤트를 파일 순서로 (1 → 34)', async () => {
+    const { result } = 띄우기()
+    act(() => result.current.actions.create('투수', 신인))
+    act(() => result.current.actions.save({ ...result.current.career!, removedMinusSkillIds: [3] }))
+    await 이벤트불러오기(result)
+
+    const 본것: (number | string)[] = []
+    for (let guard = 0; guard < 10 && result.current.scene === '이벤트'; guard += 1) {
+      const story = result.current.story!
+      본것.push(story.context === '연초' ? '연초' : story.eventId)
+      if (story.context === '연초') expect(result.current.career?.removedMinusSkillIds).toEqual([])
+      이벤트끝내기(result)
+    }
+
+    expect(본것).toEqual([451, '연초', 1, 34])
+    expect(result.current.career?.hasSeenYearGoalWindow).toBe(true)
+    // 내장 이벤트는 본 표시가 없다
+    expect(result.current.career?.seenEventIds).toEqual(['451', '1', '34'])
+  })
+
+  it('외출 지도(112)에 들어오면 trigger 1 이벤트를 틀고 끝나면 지도로 돌아온다 (401 인기도 3000)', async () => {
+    const { result } = 띄우기()
+    act(() => result.current.actions.create('투수', 신인))
+    await 이벤트불러오기(result)
+    첫이벤트넘기기(result)
+    while (result.current.scene === '이벤트') 이벤트끝내기(result)
+    act(() => result.current.actions.save({ ...result.current.career!, popularity: 3000 }))
+    act(() => result.current.actions.openOuting())
+
+    expect(result.current.story).toEqual({ eventId: 401, context: '지도', viewed: [] })
+    이벤트끝내기(result)
+    expect(result.current.scene).toBe('외출')
+    expect(result.current.career?.seenEventIds).toContain('401')
+    // 스킬 보상 4 (값 2 → 스킬 1)
+    expect(result.current.career?.skillIds).toContain(1)
+  })
+})
+
 describe('외출 [!] · [들어가기] (0x8cdc0 · 0x16c64 · 114)', () => {
   const 판짜기 = async (career: Record<string, unknown>) => {
     const { result } = 띄우기()
     act(() => result.current.actions.create('투수', 신인))
     act(() => result.current.actions.save({ ...result.current.career!, ...career }))
-    await waitFor(() => expect(result.current.storyEvents).not.toBeNull())
+    await 이벤트불러오기(result)
+    첫이벤트넘기기(result)
     return result
   }
 

@@ -188,7 +188,7 @@ function runAbilityTraining(
     rolledGain: rolled,
     rolledMoraleLoss,
     magic: null,
-    career: countPitcherTraining(gainPitcherAbility(spent, gains), menu.id),
+    career: countReleaseTrainingStreak(countPitcherTraining(gainPitcherAbility(spent, gains), menu.id), slot),
   }
 }
 
@@ -234,6 +234,29 @@ export function countPitcherTraining(career: PitcherCareer, menuId: string): Pit
     trainingCounts: { ...career.trainingCounts, [menuId]: (career.trainingCounts[menuId] ?? 0) + 1 },
     consecutiveTrainingCounts: { [menuId]: (career.consecutiveTrainingCounts[menuId] ?? 0) + 1 },
   }
+}
+
+/** 해제 카운터를 올리는 (스킬 비트, 훈련 칸) 짝 — 0x18a80~0x18b58 의 모드 3 갈래 (0xa3a75 = **보유** 비트) */
+const RELEASE_STREAK_PAIRS: readonly (readonly [skill: number, slot: number])[] = [
+  [18, 3], // 비겁자 · 체력
+  [19, 2], // 깃털 · 변화
+  [20, 0], // 더티볼 · 제구
+]
+const RELEASE_STREAK_SLOTS = 5
+/** 칸은 s8 (ldrsb · strb) */
+const toInt8 = (value: number) => ((value & 0xff) << 24) >> 24
+
+/**
+ * 능력치 훈련 뒤 해제 카운터 `+0x70 + 칸` (0x18b5a · 0x18b70) — 맞는 짝이면 그 칸 +1, 아니면 다섯 칸 모두 0.
+ * ⚠️ 미해결: 마구 칸(상태 0x78 창)이 이 자리(0x17f5c 의 0x18a5c 뒤)를 지나는지 못 짚었다 — 마구 훈련은 건드리지 않는다.
+ */
+export function countReleaseTrainingStreak(career: PitcherCareer, slot: number): PitcherCareer {
+  const counts = career.releaseTrainingStreaks ?? new Array<number>(RELEASE_STREAK_SLOTS).fill(0)
+  const matches = RELEASE_STREAK_PAIRS.some(([skill, pairSlot]) => pairSlot === slot && career.skillIds.includes(skill))
+  const next = matches
+    ? counts.map((count, index) => (index === slot ? toInt8(count + 1) : count))
+    : new Array<number>(RELEASE_STREAK_SLOTS).fill(0)
+  return { ...career, releaseTrainingStreaks: next }
 }
 
 /** 이번 시즌 훈련 수 = 통산 − 새 시즌 사본 (A-4) */
