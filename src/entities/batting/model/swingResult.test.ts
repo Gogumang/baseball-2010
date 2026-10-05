@@ -55,12 +55,12 @@ describe('swingFactorsOf — 0xab214 중간값 (디컴파일 대조)', () => {
     expect(swingFactorsOf(기본입력({ timing: 0 })).contact).toBe(0)
   })
 
-  it('마선수가 없으면 나만의리그도 일반 계수(280·200·400, K 500)를 쓴다', () => {
+  it('내 선수(비트7)가 없으면 나만의리그도 일반 계수(280·200·400, K 500)를 쓴다', () => {
     expect(swingFactorsOf(기본입력({ mode: '나만의리그' }))).toEqual(swingFactorsOf(기본입력()))
   })
 
-  it('나만의리그에서 타자가 마선수면 400−35×레벨 보너스가 붙고 계수가 250·400·430·K 1000 으로 바뀐다', () => {
-    const factors = swingFactorsOf(기본입력({ mode: '나만의리그', isBatterAce: true, aceBonusLevel: 0 }))
+  it('나만의리그에서 타자가 육성·명전(비트7)이면 400−35×연차 보너스가 붙고 계수가 250·400·430·K 1000 으로 바뀐다', () => {
+    const factors = swingFactorsOf(기본입력({ mode: '나만의리그', isBatterOwnPlayer: true, careerYearIndex: 0 }))
 
     // H = P = 300+400 − 300 = 400, contact = trunc((trunc(400×1000/1000)+1200) × 100 / 10)
     expect(factors.contact).toBe(16000)
@@ -70,29 +70,29 @@ describe('swingFactorsOf — 0xab214 중간값 (디컴파일 대조)', () => {
     expect(factors.homeRun).toBe(4774)
   })
 
-  it('레벨이 오르면 마선수 보너스가 줄고 0 에서 멈춘다 (타자 35/레벨 · 투수 40/레벨 — 레벨 출처는 미해결)', () => {
-    const 레벨0 = swingFactorsOf(기본입력({ mode: '나만의리그', isBatterAce: true, aceBonusLevel: 0 }))
-    const 레벨10 = swingFactorsOf(기본입력({ mode: '나만의리그', isBatterAce: true, aceBonusLevel: 10 }))
-    const 레벨20 = swingFactorsOf(기본입력({ mode: '나만의리그', isBatterAce: true, aceBonusLevel: 20 }))
+  it('연차가 오르면 내 선수 보너스가 줄고 0 에서 멈춘다 (타자 35/년 · 투수 40/년 — 저장 레코드 +0xb3, 0xab3e2)', () => {
+    const 레벨0 = swingFactorsOf(기본입력({ mode: '나만의리그', isBatterOwnPlayer: true, careerYearIndex: 0 }))
+    const 레벨10 = swingFactorsOf(기본입력({ mode: '나만의리그', isBatterOwnPlayer: true, careerYearIndex: 10 }))
+    const 레벨20 = swingFactorsOf(기본입력({ mode: '나만의리그', isBatterOwnPlayer: true, careerYearIndex: 20 }))
 
-    // 레벨 10 이면 400−350 = 50, 레벨 20 이면 음수라 0 으로 막는다
+    // 연차 10 이면 400−350 = 50, 레벨 20 이면 음수라 0 으로 막는다
     expect(레벨10.contact).toBeLessThan(레벨0.contact)
     expect(레벨20.contact).toBeLessThan(레벨10.contact)
-    expect(레벨20.contact).toBe(swingFactorsOf(기본입력({ mode: '나만의리그', isBatterAce: true, aceBonusLevel: 99 })).contact)
+    expect(레벨20.contact).toBe(swingFactorsOf(기본입력({ mode: '나만의리그', isBatterOwnPlayer: true, careerYearIndex: 99 })).contact)
   })
 
-  it('나만의리그에서 투수가 마선수면 투수 능력에 400−40×레벨이 더해져 타자가 불리해진다', () => {
+  it('나만의리그에서 투수가 비트7 이면 투수 능력에 400−40×연차가 더해져 타자가 불리해진다', () => {
     const 보통 = swingFactorsOf(기본입력({ mode: '나만의리그' }))
-    const 마투수 = swingFactorsOf(기본입력({ mode: '나만의리그', isPitcherAce: true, aceBonusLevel: 0 }))
+    const 마투수 = swingFactorsOf(기본입력({ mode: '나만의리그', isPitcherOwnPlayer: true, careerYearIndex: 0 }))
 
     // H = 300 − (300+400) = −400 이라 contact 가 떨어진다
     expect(마투수.contact).toBeLessThan(보통.contact)
     expect(마투수.solid).toBeLessThan(보통.solid)
   })
 
-  it('미션에서 마선수 투수는 보너스가 100 이고 계수는 일반 그대로다', () => {
-    const 미션 = swingFactorsOf(기본입력({ mode: '미션', isPitcherAce: true }))
-    const 리그 = swingFactorsOf(기본입력({ mode: '나만의리그', isPitcherAce: true, aceBonusLevel: 0 }))
+  it('투수 미션(모드 5)에서 비트7 투수는 보너스가 100 이고 계수는 일반 그대로다 (0xab42a)', () => {
+    const 미션 = swingFactorsOf(기본입력({ mode: '투수미션', isPitcherOwnPlayer: true }))
+    const 리그 = swingFactorsOf(기본입력({ mode: '나만의리그', isPitcherOwnPlayer: true, careerYearIndex: 0 }))
 
     expect(미션.contact).toBeLessThan(swingFactorsOf(기본입력()).contact)
     expect(미션.contact).toBeGreaterThan(리그.contact)
@@ -181,5 +181,41 @@ describe('보정 구조체 0x34d6c — 필살타법·마구 (0xab4dc · 0xabd92)
       isSolid: true,
     })
     expect(random.draws).toHaveLength(4)
+  })
+})
+
+describe('내 선수 비트7 · 팀 조작 보정 (0xab3d4 · 0xab5c0)', () => {
+  const 보통 = () => swingFactorsOf(기본입력())
+
+  it('타자 미션(모드 6) 판정은 비트7 투수에게 +100 을 주지 않는다 — 그 갈래는 모드 5 뿐', () => {
+    expect(swingFactorsOf(기본입력({ mode: '미션', isPitcherOwnPlayer: true }))).toEqual(보통())
+  })
+
+  it('모드 3·4 밖에서 수비 팀이 사람이면 hit·power 쪽 −10 — 능력치 −10 과 같다 (contact 포함)', () => {
+    expect(swingFactorsOf(기본입력({ isDefenseHuman: true }))).toEqual(
+      swingFactorsOf(기본입력({ batter: { hit: 290, power: 290 } })),
+    )
+    expect(swingFactorsOf(기본입력({ mode: '투수미션', isDefenseHuman: true }))).toEqual(
+      swingFactorsOf(기본입력({ batter: { hit: 290, power: 290 } })),
+    )
+  })
+
+  it('나리(모드 3·4)는 수비가 사람이어도 −10 이 없다', () => {
+    expect(swingFactorsOf(기본입력({ mode: '나만의리그', isDefenseHuman: true }))).toEqual(보통())
+  })
+
+  it('타자 미션(모드 6)에서 공격이 사람이면 +100 — 다른 모드·CPU 공격은 없다', () => {
+    expect(swingFactorsOf(기본입력({ mode: '미션', isOffenseHuman: true }))).toEqual(
+      swingFactorsOf(기본입력({ batter: { hit: 400, power: 400 } })),
+    )
+    expect(swingFactorsOf(기본입력({ isOffenseHuman: true }))).toEqual(보통())
+    expect(swingFactorsOf(기본입력({ mode: '미션' }))).toEqual(보통())
+  })
+
+  it('−10 은 배율 뒤에 붙는다 — 투수 쪽이 아니라 hit·power 쪽에서 바로 뺀다', () => {
+    // 배율 130(등급 5)이어도 정확히 10 이다: 타자 −10 과 같고, 투수 +10 (×1.3 = 13) 과는 다르다
+    expect(swingFactorsOf(기본입력({ controlTier: 5, isDefenseHuman: true }))).toEqual(
+      swingFactorsOf(기본입력({ controlTier: 5, batter: { hit: 290, power: 290 } })),
+    )
   })
 })

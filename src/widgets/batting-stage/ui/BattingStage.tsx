@@ -44,7 +44,7 @@ interface BattingStageProps {
   readonly acePitcher: AcePitcherFrames | null
   /** 번트를 쓸 수 있는지 */
   readonly canBunt?: boolean
-  /** 판정 모드 — 나만의리그는 "내 선수" 보너스가 붙는다 (0xab214) */
+  /** 판정 모드 — 나만의리그(모드 3·4)는 "내 선수"(비트7) 보너스, '미션'(모드 6)은 사람 공격 +100 (0xab214) */
   readonly swingMode?: SwingMode
   /**
    * **타자 폼** = 원본 선수 레코드 `rec[0xb]` 의 윗니블 `2 × 타입 + 손` (C 5절 0x16f9a).
@@ -122,6 +122,13 @@ interface BattingStageProps {
    */
   readonly specialSwingRemaining?: number
   /**
+   * 타자가 **육성·명전 선수**(선수 레코드 `rec[0xa]` 비트7, `0xb6389`)인가. 나리(swingMode '나만의리그')에서
+   * 내 선수 보너스 `400 − 35 × 연차` 와 그 계수(K 1000 …)를 켠다 (0xab3d4 · 0xab628). 안 넘기면 거짓(예전 동작).
+   */
+  readonly isBatterOwnPlayer?: boolean
+  /** 나리 연차 idx (0 = 1년차, 저장 레코드 +0xb3 — 웹 커리어 `season − 1`). 안 넘기면 0 */
+  readonly careerYearIndex?: number
+  /**
    * 필살 스윙이 실제로 나가 남은 횟수가 줄 때 부른다 — `0x4e136`: `S+0x10 ≠ 0 && 남은 > 0` 이면 −1.
    * 결과와 무관하다(헛스윙도). 인자는 줄인 뒤의 남은 횟수다 — 받는 쪽이 그 값을 다시 `specialSwingRemaining` 으로 넘긴다.
    * `specialSwingRemaining` 이 양수일 때만 부른다.
@@ -145,7 +152,7 @@ interface BattingStageProps {
 }
 
 /** 원작 타석 화면. 그리기는 lib, 루프와 조작은 model이 맡는다. */
-export function BattingStage({ canBunt = false, swingMode = '일반', batterForm = 0, batterSkinIndex = 0, batterTeamIndex, batterEquipmentLevels, batterSkillIds = [], recentAtBatCodes = [], specialSwingNumber = 0, aceBatterIndex = -1, specialSwingRemaining, onSpecialSwingUsed, ...props }: BattingStageProps) {
+export function BattingStage({ canBunt = false, swingMode = '일반', batterForm = 0, batterSkinIndex = 0, batterTeamIndex, batterEquipmentLevels, batterSkillIds = [], recentAtBatCodes = [], specialSwingNumber = 0, aceBatterIndex = -1, specialSwingRemaining, onSpecialSwingUsed, isBatterOwnPlayer = false, careerYearIndex = 0, ...props }: BattingStageProps) {
   const refs = useStageRefs({
     ...props,
     canBunt,
@@ -171,8 +178,11 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
       mode: latest.swingMode,
       batterSkillIds: latest.batterSkillIds,
       situation: situationOf(latest.hud, latest.recentAtBatCodes, latest.batterForm),
-      // 마선수가 등판했으면 원본 isAce 가 켜진 것과 같다 (0xab214 의 마선수 계수·보너스)
-      isPitcherAce: latest.acePitcher !== null,
+      // 내 선수 보너스·계수는 비트7(육성·명전)만 본다 — 마선수(비트6) 등판은 해당하지 않는다 (0xb6389).
+      // 마구 번호(+0x18) 1~4 를 가진 투수는 비트7 이다 (일반 레코드 +0x18 은 모두 0 — H2 4-2)
+      isBatterOwnPlayer,
+      isPitcherOwnPlayer: (pitch.pitcherMagicNumber ?? 0) >= 1 && (pitch.pitcherMagicNumber ?? 0) <= 4,
+      careerYearIndex,
       // 보정 구조체 0x34d6c — 판정 바로 앞(0x51294)에서 이번 스윙(S+0x10)·공(P+0x10)으로 만든다
       swingBoost: swingBoostOf(
         {
@@ -254,7 +264,7 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
     phaseRef.current = '결과'
     phaseStartedAtRef.current = now
     latest.onPitchResolved(result.detail, pitch, isUncatchable)
-  }, [aceBatterIndex, specialSwingNumber])
+  }, [aceBatterIndex, specialSwingNumber, isBatterOwnPlayer, careerYearIndex])
 
   /** 상태 0x13 을 끝내고 인플레이(0x17)로 넘긴다 — 시간이 다 됐거나 OK/'5' 로 건너뛸 때 */
   const commitHit = useCallback((now: number) => {

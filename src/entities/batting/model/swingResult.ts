@@ -25,10 +25,22 @@ import type { SwingBoost } from '@/entities/batting/model/swingBoost'
  * ```
  * hit 쪽 값은 contact 식에도 들어간다 (0xab648 `K·hit/1000 + 1200`) — 구조체가 contact 를 안 바꾼다는
  * H2 2절의 말은 존 시작값(sp34) 이야기다.
- * 팀 플래그로 켜지는 ±10(원본 모드 3·4 가 아닐 때)·+100(모드 6) 보정도 뺐다 — 어떤 웹 모드가
- * 원본 모드 번호에 해당하는지 확정하지 못했다.
+ *
+ * **팀 조작 보정** (0xab5c0~0xab5fc, 확정):
+ * ```
+ * if 모드(0x1552d10) ∉ {3,4}:  if state[0x31 + state[0xa]] == 0 (수비 팀을 사람이 조작):  hit 쪽·power 쪽 −10
+ * if 모드 == 6:                if state[0x31 + state[9]]   == 0 (공격 팀을 사람이 조작):  hit 쪽·power 쪽 +100
+ * ```
+ * 0xb6c20(state, 팀) = s8 state[0x31 + 팀] (0 이면 사람 — J 노트), state[9] 공격 · state[0xa] 수비.
+ * 존 시작값 배율(sp34) 뒤, contact 식 앞이라 contact 에도 들어간다. 0xab5fe 의 셋째 호출은 결과를 버린다.
+ *
+ * ⚠️ 미해결: 홈런더비(모드 7, sp44)는 contact 식이 다른 갈래(0xab69a~)로 가는데 웹은 아직 그 갈래가 없다.
  */
-export type SwingMode = '일반' | '나만의리그' | '미션'
+/**
+ * 판정이 보는 원본 모드(0x1552d10) 묶음 —
+ * '나만의리그' = 모드 3·4 (투수편·타자편) · '미션' = 모드 6 (**타자** 미션) · '투수미션' = 모드 5 · '일반' = 그 밖.
+ */
+export type SwingMode = '일반' | '나만의리그' | '미션' | '투수미션'
 
 export interface SwingResultInput {
   /** 공 도착점 − 기준점 + 타자 좌우 이동 (원본 픽셀, ±40 으로 자름) */
@@ -43,21 +55,30 @@ export interface SwingResultInput {
   readonly batter: { readonly hit: number; readonly power: number }
   readonly pitcher: { readonly control: number; readonly velocity: number }
   readonly mode: SwingMode
-  /** 타자가 마선수인가 (원본 isAce = 선수 레코드 [10] 의 부호 비트, 0xb6388) */
-  readonly isBatterAce?: boolean
-  readonly isPitcherAce?: boolean
   /**
-   * 마선수 보너스 aB·aP 를 깎는 레벨 값 (0xab214 의 `base − perLevel × 레벨`).
-   *
-   * ⚠️ **이 값이 어디서 오는지는 해독 문서에 없다.** 예전 주석은 "팀 데이터 +0xb3" 이라고 적었지만
-   * 그런 칸은 문서 어디에도 없다 — `+0xb3` 은 시즌·선수 레코드의 **연차 idx** 다 (P4·P3·S6).
-   * 가장 그럴듯한 후보는 **마선수 레벨 0~4** (`u8 mgr[0x13a + idx]`, S9 확정 · H2 2절)다.
-   * 마선수의 다른 효과(히트·파워 +150~220, B +15~20%, C +6~9%)를 모두 그 레벨이 고르기 때문이다.
-   * 다만 0xab214 가 이 값을 읽어 오는 자리는 아직 해독되지 않아 **지어내서 잇지 않는다.**
-   *
-   * 안 넘기면 0 이고, 그러면 보너스가 표의 최댓값(타자 400 · 투수 400) 그대로다.
+   * 타자가 **육성·명전 선수**인가 = `0xb6389` (선수 레코드 `rec[0xa]` 비트7 — 등록 타자 0xa0 · 투수 0x80, C 노트).
+   * ⚠️ 마선수는 비트6 이고 비트7 이 **꺼져 있다** (rec[0xa] = 0x40~0x44 · 0x60~0x64, R3·S6 바이트 확인) —
+   * 예전 이름 `isBatterAce`·`isPitcherAce` 는 이 비트를 마선수로 잘못 읽은 것이었다.
    */
-  readonly aceBonusLevel?: number
+  readonly isBatterOwnPlayer?: boolean
+  /** 투수가 육성·명전 선수인가 (0xb6389, 같은 비트) */
+  readonly isPitcherOwnPlayer?: boolean
+  /**
+   * **나리 연차 idx** (0 = 1년차) — 내 선수 보너스 `D[0x1d8] − D[0x1da] × 연차` 를 깎는 값.
+   * ```
+   * ab3e2: rec = 0x1f8d4(전역 저장 [0x1400054], (s8)state[1])   ; 모드 4 → [저장+0xbc]+0x11c (타자편)
+   *                                                              ; 모드 3 → [저장+0xb8]+0x11c (투수편), 그 밖 0
+   * ab3f2: aB = D[0x1d8] − D[0x1da] × u8 rec[0xb3] (음수면 0)   ; 투수 aP 는 0xab494 에서 D[0x1dc] − D[0x1de] ×
+   * ```
+   * `+0x11c` 레코드는 시즌 레코드(`[저장+0xb4]+0x11c`, P4 0x1f55c)와 같은 꼴이고 `+0xb3` 은 **연차 idx** 다
+   * (B·P3·P5 — 연말 0x1b768 이 1 씩 올린다). 웹 커리어의 `season` 은 1 부터라 `season − 1` 이다.
+   * 안 넘기면 0 = 보너스 최대(타자·투수 400).
+   */
+  readonly careerYearIndex?: number
+  /** 공격 팀을 사람이 조작하는가 (state[0x31 + state[9]] == 0) — 모드 6 의 +100. 안 넘기면 거짓 */
+  readonly isOffenseHuman?: boolean
+  /** 수비 팀을 사람이 조작하는가 (state[0x31 + state[0xa]] == 0) — 모드 3·4 밖의 −10. 안 넘기면 거짓 */
+  readonly isDefenseHuman?: boolean
   /** 보정 구조체 0x34d6c (필살타법·마구). 안 넘기면 0 (보통 스윙에 마구가 실리지 않은 공) */
   readonly boost?: SwingBoost
   readonly isPitcherExhausted: boolean
@@ -92,15 +113,19 @@ const CENTER_FACTORS = [10_000, 500, 350] as const
 const TIER_MULTIPLIERS = BALANCE.swing.pitchGradeMultipliers
 const NEUTRAL_MULTIPLIER = 100
 /**
- * 마선수 보너스 — d_level.dat 0x1d8·0x1da(타자), 0x1dc·0x1de(투수).
- * `base − perLevel × aceBonusLevel` 이고 0 에서 멈춘다 (레벨의 출처는 `aceBonusLevel` 주석 참고).
+ * 내 선수(비트7) 보너스 — d_level.dat 0x1d8·0x1da(타자), 0x1dc·0x1de(투수) (객체 오프셋).
+ * `base − perLevel × 연차 idx` 이고 0 에서 멈춘다 (`careerYearIndex` 주석 참고). 모드 3·4 에서만.
  */
 const ACE_BONUS = {
   batter: { base: BALANCE.swing.aceBonus.batterBase, perLevel: BALANCE.swing.aceBonus.batterPerLevel },
   pitcher: { base: BALANCE.swing.aceBonus.pitcherBase, perLevel: BALANCE.swing.aceBonus.pitcherPerLevel },
 }
-/** 미션(원본 모드 5)에서 마선수 투수에게만 붙는 고정 보너스 */
+/** 투수 미션(원본 모드 5)에서 비트7 투수에게 붙는 고정 보너스 (0xab42a~0xab442) */
 const MISSION_ACE_PITCHER_BONUS = BALANCE.swing.missionAcePitcherBonus
+/** 0xab5d2 `subs #0xa` — 모드 3·4 밖에서 수비 팀이 사람일 때 (코드 리터럴) */
+const TEAM_HUMAN_DEFENSE_PENALTY = 10
+/** 0xab5f6 `adds #0x64` — 모드 6(타자 미션)에서 공격 팀이 사람일 때 (코드 리터럴) */
+const BATTER_MISSION_HUMAN_BONUS = 100
 /**
  * 원본이 B·C 에 각각 더하는 param_15 × 500. 두 호출자 모두 param_15 로 1 만 넘긴다 —
  * 1 이 아닌 값이 오는 경로는 미해독이라 상수로 뒀다.
@@ -133,29 +158,35 @@ export function swingFactorsOf(input: SwingResultInput): SwingFactors {
   const vertical = Math.abs(clampError(input.verticalError))
   const [baseContact, baseSolid, baseHomeRun] = startingFactors(horizontal, vertical)
 
-  // 마선수 보너스와 마선수 계수는 육성(원본 모드 3·4 = 나만의리그)에서만 켜진다.
+  // 내 선수 보너스와 그 계수는 나리(원본 모드 3·4)에서만 켜진다 (sp40, 0xab2ce~0xab2d8)
   const isCareerMode = input.mode === '나만의리그'
-  const aceBonusLevel = input.aceBonusLevel ?? 0
-  const aceBonusOf = ({ base, perLevel }: { base: number; perLevel: number }) =>
-    Math.max(0, base - perLevel * aceBonusLevel)
-  const batterBonus = isCareerMode && input.isBatterAce === true ? aceBonusOf(ACE_BONUS.batter) : 0
-  const pitcherBonus = isCareerMode && input.isPitcherAce === true
-    ? aceBonusOf(ACE_BONUS.pitcher)
-    : input.mode === '미션' && input.isPitcherAce === true
+  const yearIndex = input.careerYearIndex ?? 0
+  const ownBonusOf = ({ base, perLevel }: { base: number; perLevel: number }) =>
+    Math.max(0, base - perLevel * yearIndex)
+  const batterBonus = isCareerMode && input.isBatterOwnPlayer === true ? ownBonusOf(ACE_BONUS.batter) : 0
+  const pitcherBonus = isCareerMode && input.isPitcherOwnPlayer === true
+    ? ownBonusOf(ACE_BONUS.pitcher)
+    : input.mode === '투수미션' && input.isPitcherOwnPlayer === true
       ? MISSION_ACE_PITCHER_BONUS
       : 0
-  // 마선수 계수는 육성 모드에서 타자·투수 중 한쪽이라도 마선수일 때만 쓴다
-  const isAceFormula = isCareerMode && (input.isBatterAce === true || input.isPitcherAce === true)
+  // 그 계수(K 1000 …)는 나리에서 타자·투수 중 한쪽이라도 비트7 일 때만 쓴다 (0xab628~0xab646)
+  const isAceFormula = isCareerMode && (input.isBatterOwnPlayer === true || input.isPitcherOwnPlayer === true)
+  // 팀 조작 보정 0xab5c0~0xab5fc — 모드 3·4 밖에서 수비가 사람이면 −10, 모드 6 에서 공격이 사람이면 +100
+  const teamAdjust =
+    (!isCareerMode && input.isDefenseHuman === true ? -TEAM_HUMAN_DEFENSE_PENALTY : 0) +
+    (input.mode === '미션' && input.isOffenseHuman === true ? BATTER_MISSION_HUMAN_BONUS : 0)
 
   const boost = input.boost ?? NO_SWING_BOOST
   const multiplier = input.controlTier < 0 ? NEUTRAL_MULTIPLIER : TIER_MULTIPLIERS[Math.min(input.controlTier, 5)]
   // 0xab4dc~0xab5a2 — 구조체 out[0]·out[2] 는 타자 쪽, out[4]·out[6] 은 투수 쪽(배율 앞)에 더한다
   const hitEdge =
     input.batter.hit + boost.batterHit + batterBonus -
-    trunc((multiplier * (input.pitcher.velocity + boost.pitcherVelocity + pitcherBonus)) / 100)
+    trunc((multiplier * (input.pitcher.velocity + boost.pitcherVelocity + pitcherBonus)) / 100) +
+    teamAdjust
   const powerEdge =
     input.batter.power + boost.batterPower + batterBonus -
-    trunc((multiplier * (input.pitcher.control + boost.pitcherControl + pitcherBonus)) / 100)
+    trunc((multiplier * (input.pitcher.control + boost.pitcherControl + pitcherBonus)) / 100) +
+    teamAdjust
   const scaledContact = trunc((baseContact * (300 - multiplier)) / 200)
 
   const contact = input.buntKind > 0

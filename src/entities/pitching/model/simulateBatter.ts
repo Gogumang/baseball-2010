@@ -1,6 +1,7 @@
 import { isInsideStrikeZone } from '@/shared/lib/geometry/coordinate'
 import { isPitchInHitByPitchBox } from '@/entities/pitching/model/hitByPitch'
 import { swingResultOf } from '@/entities/batting/model/swingResult'
+import type { SwingMode } from '@/entities/batting/model/swingResult'
 import { pitcherBoostSideOf, swingBoostOf } from '@/entities/batting/model/swingBoost'
 import { remainingAfterSpecialSwing, rollSpecialSwing } from '@/entities/batting/model/specialSwing'
 import { timingOf } from '@/entities/batting/model/swingTiming'
@@ -213,6 +214,16 @@ export interface CpuBatterTraits {
    * 공에 번호가 없으면(사용자 투구는 아직 안 실음) 쓰이지 않는다.
    */
   readonly pitcherAceLevel?: number
+  /**
+   * 판정 모드 (0x1552d10 묶음) — 투수편(모드 3) '나만의리그' · 투수 미션(모드 5) '투수미션' · 팀 경기 '일반'.
+   * 넘기면 이 타석의 수비 팀이 사람이라는 것도 함께 판정에 싣는다 — 모드 3·4 밖이면 hit·power 쪽 −10
+   * (0xab5c0, state[0x31 + 수비] == 0). **안 넘기면 예전처럼 '일반' 이고 팀 조작 보정을 하지 않는다.**
+   */
+  readonly swingMode?: SwingMode
+  /** 던지는 사람 투수가 육성·명전(비트7)인가 — 나리 보너스(모드 3)·투수 미션 +100(모드 5). 안 넘기면 거짓 */
+  readonly isPitcherOwnPlayer?: boolean
+  /** 나리 연차 idx (저장 레코드 +0xb3) — 투수 보너스 400 − 40 × 연차. 안 넘기면 0 */
+  readonly careerYearIndex?: number
 }
 
 /** `pitchAgainstBatterDetailed` 의 결과 — 필살 칸을 부르는 쪽에 돌려준다 */
@@ -376,7 +387,12 @@ export function pitchAgainstBatterDetailed(
       controlTier: pitch.controlTier,
       batter,
       pitcher,
-      mode: '일반',
+      mode: traits.swingMode ?? '일반',
+      isPitcherOwnPlayer: traits.isPitcherOwnPlayer,
+      careerYearIndex: traits.careerYearIndex,
+      // 사람이 던지고 CPU 가 치는 타석 — 모드를 넘겨받았을 때만 팀 조작 보정을 싣는다
+      isOffenseHuman: false,
+      isDefenseHuman: traits.swingMode !== undefined,
       boost,
       isPitcherExhausted: false,
       batterSkillIds: [],

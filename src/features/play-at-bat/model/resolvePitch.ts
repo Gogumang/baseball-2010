@@ -39,18 +39,13 @@ export interface BattingContext {
   readonly batterSkillIds: readonly number[]
   readonly situation: SwingSituation
   /**
-   * 마선수가 던지고 있는가 — 원본 isAce = 선수 레코드 `+0xa` 부호비트 (0xb6388).
-   * 마선수 등판을 아는 화면(`widgets/batting-stage`)이 넘긴다.
+   * 타자·투수가 **육성·명전 선수**(rec[0xa] 비트7, `0xb6389`)인가 — 나리(모드 3·4)의 내 선수 보너스와 계수,
+   * 투수 미션(모드 5)의 +100 을 켠다. 마선수(비트6)는 해당하지 않는다. 안 넘기면 거짓.
    */
-  readonly isPitcherAce?: boolean
-  /**
-   * 마선수 보너스를 깎는 레벨 (0xab214 의 aB·aP). 안 넘기면 0 = **보너스 최대**다.
-   *
-   * ⚠️ 예전 주석이 적은 "팀 레벨(팀 데이터 +0xb3)" 은 **해독 문서에 근거가 없다** — 그 오프셋은
-   * 연차 idx 다. 값의 출처는 `entities/batting/model/swingResult.ts` 의 `aceBonusLevel` 주석에
-   * 모아 두었다(유력 후보 = 마선수 레벨 `mgr[0x13a+idx]` 0~4). 앱이 그 값을 알게 되면 여기로 넘기면 된다.
-   */
-  readonly aceBonusLevel?: number
+  readonly isBatterOwnPlayer?: boolean
+  readonly isPitcherOwnPlayer?: boolean
+  /** 나리 연차 idx (0 = 1년차, 저장 레코드 +0xb3) — 내 선수 보너스를 깎는다. 안 넘기면 0 = 보너스 최대 */
+  readonly careerYearIndex?: number
   /**
    * 이번 스윙·공의 **보정 구조체 0x34d6c** (필살타법 = 타자 쪽, 공에 실린 마구 = 투수 쪽).
    * 원본은 판정 바로 앞(0x51294)에서 매번 만든다 — 타석 화면이 `swingBoostOf` 로 채운다. 안 넘기면 0.
@@ -206,8 +201,12 @@ export function resolvePitch(
         velocity: context.pitcher.velocity * PITCHER_ORIGINAL_SCALE,
       },
       mode: context.mode,
-      isPitcherAce: context.isPitcherAce,
-      aceBonusLevel: context.aceBonusLevel,
+      isBatterOwnPlayer: context.isBatterOwnPlayer,
+      isPitcherOwnPlayer: context.isPitcherOwnPlayer,
+      careerYearIndex: context.careerYearIndex,
+      // 이 판정은 사람이 치는 타석이다 — 공격 팀 사람, 수비 팀 CPU (0xb6c20)
+      isOffenseHuman: true,
+      isDefenseHuman: false,
       boost: context.swingBoost,
       isPitcherExhausted: false,
       batterSkillIds: context.batterSkillIds,
