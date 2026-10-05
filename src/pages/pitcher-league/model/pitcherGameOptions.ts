@@ -9,10 +9,11 @@ import { magicPitchCountOf } from '@/entities/pitcher-career/model/magicPitch'
 import { isMyStartDay } from '@/entities/pitcher-career/model/pitcherRotation'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import {
-  effectivePitcherAbilityOf,
+  equippedPitcherAbilityOf,
   isPitcherSkillEquipped,
   nextPitcherOpponentOf,
   pitcherFormOfCareer,
+  unclampedGamePitcherAbilityOf,
 } from '@/entities/pitcher-career/model/pitcherCareer'
 import type { PitcherCareer, PitcherGameOutcome } from '@/entities/pitcher-career/model/pitcherCareer'
 
@@ -26,8 +27,9 @@ import type { PitcherCareer, PitcherGameOutcome } from '@/entities/pitcher-caree
  * opponentTeamId  일정표(0xd89cb)나 지금 포스트시즌 시리즈 — nextPitcherOpponentOf
  * dayCounter      리그 날짜 카운터 g = 시즌+0xb2. 하루 끝 0xb818c 가 +1 하므로 **지금까지 치른 경기 수**다
  * role/positionCode  레코드 +0xb&3 · +0xa&0x1f
- * stats           0xb6415(P, i, 1) = 장비·부상·질병·사기까지 반영한 실효 능력치
- * staminaAbility  그 실효 능력치의 **체력 칸**(칸 3) — 스태미나 용량 X 의 바탕
+ * stats           0xb570c 를 체력% 피로 앞까지 — 0xb6415(P, i, 1)(장비·장착 스킬) → 질병 → 부상 → 사기.
+ *                 끝 자르기(0..999)는 피로 뒤 `fatiguedStatsOf` 가 한다 (냉정 22 제구는 999 를 넘을 수 있다)
+ * staminaAbility  `0xb6415(P, 3, 1)` 의 **체력 칸** — 스태미나 용량 X 의 바탕 (부상·질병·사기는 안 탄다)
  * stamina         레코드 +0x2c (경기 사이에 이어진다)
  * repertoire      +0x1c 구질 마스크 · 폼(= 2×타입+손) · +0x18 마구 번호(= 마구 레벨)
  * magicCount      0xd84ff 표 (마구 번호별 4·5·6·7) + 혼신(투수 스킬 23) +2
@@ -85,7 +87,7 @@ export function pitcherGameOptionsOf(
   career: PitcherCareer,
   settings: PitcherGameSettings = {},
 ): PitcherGameOptions {
-  const ability = effectivePitcherAbilityOf(career)
+  const ability = unclampedGamePitcherAbilityOf(career)
   return {
     ourTeamId: career.teamId,
     opponentTeamId: settings.opponentTeamId ?? nextPitcherOpponentOf(career),
@@ -101,8 +103,8 @@ export function pitcherGameOptionsOf(
       breaking: ability.breaking,
       stamina: ability.stamina,
     },
-    // 용량 X 의 바탕은 **체력 칸의 실효값** 하나다 (0x66e44 가 0xb6415(P, 3, 1) 로 읽는다)
-    staminaAbility: ability.stamina,
+    // 용량 X 의 바탕은 **체력 칸** 하나다 — 0x66e44 가 0xb570c 가 아니라 0xb6415(P, 3, 1) 를 바로 읽는다(0x66e5c)
+    staminaAbility: equippedPitcherAbilityOf(career).stamina,
     stamina: career.stamina,
     repertoire: {
       pitchMask: career.pitchMask,

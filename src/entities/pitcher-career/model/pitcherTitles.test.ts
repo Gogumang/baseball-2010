@@ -96,6 +96,15 @@ describe('투수편 칭호 — 이름은 48~63, 비트는 타자편 32~47 과 �
     expect(evaluateNewPitcherTitles(투수({ ability: { ...만렙, breaking: 998 } }))).not.toContain('초음속 폭격기')
   })
 
+  it('초음속 폭격기는 0xb6415(P, k, 1) 을 본다 — 장착 스킬은 타고 부상·사기 감소는 안 탄다 (0x1add2)', () => {
+    const 만렙 = { control: 999, velocity: 999, breaking: 999, stamina: 1 }
+
+    expect(evaluateNewPitcherTitles(투수({ ability: 만렙, isInjured: true, morale: 5 }))).toContain('초음속 폭격기')
+    const 거의 = { control: 950, velocity: 950, breaking: 950, stamina: 1 }
+    expect(evaluateNewPitcherTitles(투수({ ability: 거의, skillIds: [0, 8, 7], equippedSkillIds: [0, 8, 7] }))).toContain('초음속 폭격기')
+    expect(evaluateNewPitcherTitles(투수({ ability: 거의, skillIds: [0, 8, 7], equippedSkillIds: [0, 8] }))).not.toContain('초음속 폭격기')
+  })
+
   it('마구 4단계를 다 배우면 마탄의 투수다 (0x1ae04 — +0x201 > 3, 근사다)', () => {
     expect(evaluateNewPitcherTitles(투수({ magicLevel: 3 }))).not.toContain('마탄의 투수')
     expect(evaluateNewPitcherTitles(투수({ magicLevel: 4 }))).toContain('마탄의 투수')

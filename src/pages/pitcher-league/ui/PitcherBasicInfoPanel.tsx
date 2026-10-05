@@ -72,7 +72,7 @@ export function PitcherBasicInfoPanel({ career }: PitcherBasicInfoPanelProps) {
 
       <Panel heading="실효 능력치">
         <StatGrid entries={effectiveEntries} />
-        <Hint>장비 → 질병 → 부상 → 사기 차례로 깎인 값이다 (0xb570c)</Hint>
+        <Hint>장비 → 장착 스킬 → 질병 → 부상 → 사기 차례로 매긴 값이다 (0xb570c)</Hint>
       </Panel>
     </>
   )

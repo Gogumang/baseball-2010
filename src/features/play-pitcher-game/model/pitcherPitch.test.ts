@@ -139,6 +139,14 @@ describe('체력%에 따른 능력치 감소 (0xb58e6)', () => {
   it('체력 칸(능력치 3)은 감소 대상이 아니다 — 용량 계산의 바탕이라 그대로 둔다', () => {
     expect(fatiguedStatsOf(능력, 0).stamina).toBe(400)
   })
+
+  it('0..999 자르기는 피로 뒤다 — 999 를 넘은 제구(냉정 22)가 먼저 깎인다 (0xb5b06)', () => {
+    const 넘침 = { ...능력, control: 1098 }
+
+    expect(fatiguedStatsOf(넘침, FULL_STAMINA).control).toBe(999)
+    // 체력 40%: 1098 − trunc(1098/10) = 989 (먼저 잘랐다면 900)
+    expect(fatiguedStatsOf(넘침, 4000).control).toBe(989)
+  })
 })
 
 describe('코스 칸', () => {

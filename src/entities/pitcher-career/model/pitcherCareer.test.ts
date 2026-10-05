@@ -12,6 +12,7 @@ import {
   seasonEarnedRunAverageOf,
   setPitcherSkillEquipped,
   startNextPitcherSeason,
+  unclampedGamePitcherAbilityOf,
 } from '@/entities/pitcher-career/model/pitcherCareer'
 import type { PitcherCareer, PitcherGameOutcome } from '@/entities/pitcher-career/model/pitcherCareer'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
@@ -73,13 +74,71 @@ describe('실효 능력치 — 0xb6414 → 0xb570c (G-1 차례)', () => {
     expect(equippedPitcherAbilityOf(career).control).toBeGreaterThan(career.ability.control)
   })
 
-  it('질병 −30% → 부상 −50% → 사기 감소 차례로 깎는다', () => {
+  it('질병 −30% → 부상 −60% → 사기 감소 차례로 깎는다 (0xb5784 · 0xb57b4)', () => {
+    const career = 투수({ ability: { control: 100, velocity: 100, breaking: 100, stamina: 100 }, isInjured: true })
+
+    // 부상: 100 + trunc(−60×100/100) = 40
+    expect(effectivePitcherAbilityOf(career).control).toBe(40)
+    // 질병 먼저(70), 부상 다음(70 − trunc(70×60/100) = 28)
+    expect(effectivePitcherAbilityOf({ ...career, isSick: true }).control).toBe(28)
+  })
+
+  it('질병 −30% 에 사기 감소가 이어 붙는다', () => {
     const career =투수({ ability: { control: 100, velocity: 100, breaking: 100, stamina: 100 }, isSick: true })
 
     // 100 − trunc(100×30/100) = 70
     expect(effectivePitcherAbilityOf(career).control).toBe(70)
     // 사기 10 이하면 −50% 가 더 붙는다: 70 − 35 = 35
     expect(effectivePitcherAbilityOf({ ...career, morale: 5 }).control).toBe(35)
+  })
+})
+
+describe('실효 능력치 스킬 보정 — 0xb6414 (장착 비트 0xb62b4)', () => {
+  const 능력 = { control: 500, velocity: 400, breaking: 300, stamina: 200 }
+  const 장착 = (...ids: number[]) => 투수({ ability: 능력, skillIds: [0, 8, ...ids], equippedSkillIds: [0, 8, ...ids] })
+
+  it('5 는 네 칸 모두 −100, 0 아래면 0 (0xb64b0)', () => {
+    expect(equippedPitcherAbilityOf(장착(5))).toEqual({ control: 400, velocity: 300, breaking: 200, stamina: 100 })
+    expect(equippedPitcherAbilityOf({ ...장착(5), ability: { ...능력, stamina: 60 } }).stamina).toBe(0)
+  })
+
+  it('7 은 네 칸 모두 +50, 999 로 자른다 (0xb64ca)', () => {
+    expect(equippedPitcherAbilityOf(장착(7))).toEqual({ control: 550, velocity: 450, breaking: 350, stamina: 250 })
+    expect(equippedPitcherAbilityOf({ ...장착(7), ability: { ...능력, velocity: 980 } }).velocity).toBe(999)
+  })
+
+  it('22 냉정은 제구(칸 0)만 +trunc(v/10) 이고 999 로 자르지 않는다 (0xb64e6~0xb6510)', () => {
+    expect(equippedPitcherAbilityOf(장착(22))).toEqual({ control: 550, velocity: 400, breaking: 300, stamina: 200 })
+    expect(equippedPitcherAbilityOf({ ...장착(22), ability: { ...능력, control: 507 } }).control).toBe(557)
+    expect(equippedPitcherAbilityOf({ ...장착(22), ability: { ...능력, control: 999 } }).control).toBe(1098)
+  })
+
+  it('타자 스킬 20(수비 −100)은 투수 레코드(0xb6278 참)에 붙지 않는다', () => {
+    expect(equippedPitcherAbilityOf(장착(20))).toEqual(능력)
+  })
+
+  it('차례는 장비(999 자름) → 5 → 7 → 22 다', () => {
+    const career = { ...장착(5, 7, 22), ability: { ...능력, control: 980 }, equipmentLevels: { control: 1, velocity: 0, breaking: 0, stamina: 0 } }
+
+    // 980 + 30 → 999 → 899 → 949 → 949 + 94 = 1043
+    expect(equippedPitcherAbilityOf(career).control).toBe(1043)
+  })
+
+  it('보유만 하고 장착하지 않으면 보정이 없다', () => {
+    const career = 투수({ ability: 능력, skillIds: [0, 8, 5, 7, 22], equippedSkillIds: [0, 8] })
+
+    expect(equippedPitcherAbilityOf(career)).toEqual(능력)
+    expect(effectivePitcherAbilityOf(career)).toEqual(능력)
+  })
+
+  it('0xb570c 는 맨 끝에서만 0..999 로 자른다 — 999 를 넘은 제구에 질병이 먼저 붙는다', () => {
+    const career = { ...장착(22), ability: { ...능력, control: 999 }, isSick: true }
+
+    // 1098 − trunc(1098×30/100) = 769 (먼저 999 로 잘랐다면 700)
+    expect(unclampedGamePitcherAbilityOf(career).control).toBe(769)
+    expect(effectivePitcherAbilityOf(career).control).toBe(769)
+    expect(unclampedGamePitcherAbilityOf({ ...career, isSick: false }).control).toBe(1098)
+    expect(effectivePitcherAbilityOf({ ...career, isSick: false }).control).toBe(999)
   })
 })
 

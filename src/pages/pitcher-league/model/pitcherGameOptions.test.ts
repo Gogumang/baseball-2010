@@ -47,6 +47,30 @@ describe('경기 옵션 조립 — 커리어 → PitcherGameOptions', () => {
     expect(options.staminaAbility).toBe(500)
   })
 
+  it('stats 는 0xb570c 를 피로 앞까지 — 장착 스킬·부상이 붙고 999 로는 아직 자르지 않는다', () => {
+    const career = 투수({
+      ability: { control: 999, velocity: 400, breaking: 200, stamina: 500 },
+      skillIds: [0, 8, 7, 22],
+    })
+
+    // 제구 999 → 7 +50 → 999 → 22 +99 = 1098. 끝 자르기는 피로 뒤 fatiguedStatsOf 가 한다
+    expect(pitcherGameOptionsOf(career).stats).toEqual({ control: 1098, velocity: 450, breaking: 250, stamina: 550 })
+  })
+
+  it('staminaAbility 는 0xb6415(P, 3, 1) 이라 장착 스킬은 타고 부상·질병·사기는 안 탄다 (0x66e5c)', () => {
+    const career = 투수({
+      ability: { control: 300, velocity: 400, breaking: 200, stamina: 500 },
+      skillIds: [0, 8, 7],
+      isInjured: true,
+      morale: 5,
+    })
+    const options = pitcherGameOptionsOf(career)
+
+    expect(options.staminaAbility).toBe(550)
+    // 경기 능력치 쪽은 부상 −60% → 사기 −50% : 550 → 220 → 110
+    expect(options.stats.stamina).toBe(110)
+  })
+
   /*
    * 예전에는 배운 수(magicLevel)를 그대로 레코드 +0x18 로 넘겼다. 원본은 123 창에서 **고른 번호**
    * (+0x18)만 경기에 싣고 배운 수는 고를 수 있는 번호의 상한일 뿐이라(H2 1-2) 고른 번호로 바꿨다.

@@ -406,14 +406,37 @@ export function pitcherAbilityLimitsOf(career: PitcherCareer): PitcherAbility {
 }
 
 /**
- * `0xb6414(기록, i, 1)` 까지 본 능력치 — 장착 레벨 보너스만 넣는다.
- *
- * 투수 스킬 보정(무기력·전설 같은 타자 쪽 스킬 번호)은 **투수 번호가 문서에 없어** 넣지 않는다.
- * 넣어야 할 값은 StrSKILL 의 투수 항목에서 와야 한다 (P1 3-1 이 가리키는 스킬 10·18·26 만 확정).
+ * 실효 능력치 스킬 보정 (0xb6414 — 0xb64b0~0xb653c). 모두 **장착** 비트 0xb62b4(선수기록 +0x14) 를 본다.
+ *   5 −100 · 7 +50 은 네 칸 모두, 22 는 `0xb6278(선수)`(투수인가) 참이고 칸 0(제구)일 때만.
+ *   타자 스킬 20(수비 −100)은 `0xb6278` 거짓일 때만이라 투수 레코드에는 붙지 않는다.
+ */
+const POWERLESS_SKILL = 5
+const LEGEND_SKILL = 7
+const COOL_SKILL = 22
+const SKILL_PENALTY = 100
+const LEGEND_BONUS = 50
+/** 냉정 22: `v += v / 10` (0xb6506~0xb6510, 나눗셈 0xca7b5 = 0 쪽 버림) */
+const COOL_CONTROL_DIVISOR = 10
+
+/**
+ * `0xb6414(기록, i, 1)` — 육성 선수라 마선수 배율(0xb63a0 = −1)은 건너뛰고, 원본 차례 그대로:
+ *   1. 장비 니블 보너스 0xd8890[n−1] 을 더하고 999 로 자른다 (0xb6494~0xb64a8, 바닥 없음)
+ *   2. 5 장착이면 −100, 0 아래면 0 (0xb64b0~0xb64c8)
+ *   3. 7 장착이면 +50, 999 로 자른다 (0xb64ca~0xb64e4)
+ *   4. 투수이고 22 장착이고 칸 0(제구)이면 `v += trunc(v/10)` — **자르지 않는다** (0xb64e6~0xb6510)
+ *      그래서 제구는 999 를 넘을 수 있다(최대 999 + 99). 칭호 0x1ad7e 는 이 값을 `> 998` 로 보고,
+ *      경기용 0xb570c 는 맨 끝(0xb5b06)에서야 0..999 로 자른다.
  */
 export function equippedPitcherAbilityOf(career: PitcherCareer): PitcherAbility {
-  const adjust = (key: keyof PitcherAbility) =>
-    clamp(career.ability[key] + equipmentBonusOf(career.equipmentLevels[key]), 0, MAXIMUM_ABILITY)
+  const adjust = (key: keyof PitcherAbility) => {
+    let value = Math.min(MAXIMUM_ABILITY, career.ability[key] + equipmentBonusOf(career.equipmentLevels[key]))
+    if (isPitcherSkillEquipped(career, POWERLESS_SKILL)) value = Math.max(0, value - SKILL_PENALTY)
+    if (isPitcherSkillEquipped(career, LEGEND_SKILL)) value = Math.min(MAXIMUM_ABILITY, value + LEGEND_BONUS)
+    if (key === 'control' && isPitcherSkillEquipped(career, COOL_SKILL)) {
+      value += Math.trunc(value / COOL_CONTROL_DIVISOR)
+    }
+    return value
+  }
   return {
     control: adjust('control'),
     velocity: adjust('velocity'),
@@ -423,18 +446,25 @@ export function equippedPitcherAbilityOf(career: PitcherCareer): PitcherAbility 
 }
 
 /**
- * 경기용 실효 능력치 `0xb570c` — 장비 보정 뒤에 **질병 → 부상 → 사기 감소** 차례다 (G-1).
- * 타자편 `condition.ts` 와 같은 코드를 쓰므로 비율도 같다.
+ * 경기용 실효 능력치 `0xb570c` — 0xb6414 뒤에 **질병 → 부상 → 사기 감소** 차례다 (G-1).
+ * 모드 3·4 이고 내 선수(0xb6389)일 때의 갈래로, 타자편 `condition.ts` 와 같은 코드다:
+ *   질병 `v += (−30·v)/100` (0xb5784) · 부상 `v += (−60·v)/100` (0xb57b4 `lsls #4; subs; lsls #2` = −60)
  */
 const ILLNESS_ABILITY_CUT = 30
-const INJURY_ABILITY_CUT = 50
+const INJURY_ABILITY_CUT = 60
 const MORALE_ABILITY_CUTS: readonly (readonly [number, number])[] = [
   [10, 50],
   [30, 20],
   [50, 10],
 ]
 
-export function effectivePitcherAbilityOf(career: PitcherCareer): PitcherAbility {
+/**
+ * 0xb570c 를 체력% 피로(0xb58e6) **앞까지** 돌린 값 — 0..999 로 **아직 자르지 않았다**.
+ * 원본은 피로·팀 능력치·코치까지 더한 뒤 맨 끝(0xb5b06)에서 한 번만 자르므로,
+ * 피로를 따로 먹이는 투구 흐름(`fatiguedStatsOf`)은 이 값을 받아 피로 뒤에 자른다.
+ * 냉정 22 로 999 를 넘은 제구가 피로로 깎일 때만 차이가 난다.
+ */
+export function unclampedGamePitcherAbilityOf(career: PitcherCareer): PitcherAbility {
   const moraleCut = MORALE_ABILITY_CUTS.find(([limit]) => career.morale <= limit)?.[1] ?? 0
   const equipped = equippedPitcherAbilityOf(career)
   const adjust = (key: keyof PitcherAbility) => {
@@ -442,8 +472,20 @@ export function effectivePitcherAbilityOf(career: PitcherCareer): PitcherAbility
     if (career.isSick) value = reduceByPercent(value, ILLNESS_ABILITY_CUT)
     if (career.isInjured) value = reduceByPercent(value, INJURY_ABILITY_CUT)
     if (moraleCut > 0) value = reduceByPercent(value, moraleCut)
-    return clamp(value, 0, MAXIMUM_ABILITY)
+    return value
   }
+  return {
+    control: adjust('control'),
+    velocity: adjust('velocity'),
+    breaking: adjust('breaking'),
+    stamina: adjust('stamina'),
+  }
+}
+
+/** 피로 없는(체력 인자 > 54) 0xb570c — 맨 끝 0..999 자르기(0xb5b06)까지 한 값. 화면 표시용 실효값 */
+export function effectivePitcherAbilityOf(career: PitcherCareer): PitcherAbility {
+  const unclamped = unclampedGamePitcherAbilityOf(career)
+  const adjust = (key: keyof PitcherAbility) => clamp(unclamped[key], 0, MAXIMUM_ABILITY)
   return {
     control: adjust('control'),
     velocity: adjust('velocity'),

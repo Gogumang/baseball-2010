@@ -1,6 +1,6 @@
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import {
-  effectivePitcherAbilityOf,
+  equippedPitcherAbilityOf,
   hasPitcherSkill,
   isPitcherSeasonFinished,
   seasonEarnedRunAverageOf,
@@ -30,7 +30,7 @@ import {
 
 /** 전설 스킬은 공통 비트 7 이라 두 편이 같다 */
 const LEGEND_SKILL = 7
-/** 실효 능력치 999 — 원본은 `0xb6414(...) > 998` */
+/** 능력치 999 — 원본은 `0xb6414(..., 1) > 998` */
 const MAXED_ABILITY = 998
 /** 마구 4단계 모두 훈련 — `s8 +0x201 > 3` (0x1ae04). 필드 뜻은 **유력**이라 근사다 */
 const ALL_MAGIC_LEVELS = 3
@@ -101,9 +101,11 @@ const PITCHER_RULES: Readonly<Record<number, PitcherRule>> = {
   59: (career) =>
     isSixthYearCheckPoint(titleSubjectOfPitcher(career)) &&
     seasonEarnedRunAverageOf(career.careerStats) <= ZERO_ERA_LIMIT,
-  // 61 초음속 폭격기 — 실효 제구·구속·변화가 모두 999 (0x1ad7e). 체력은 보지 않는다
+  // 61 초음속 폭격기 — 제구·구속·변화가 모두 999 (0x1ad7e). 체력은 보지 않는다.
+  // 원본은 경기용 0xb570c 가 아니라 `0xb6415(P, k, 1)` 을 바로 부른다(0x1add2~0x1adfc) — 장비·장착 스킬까지,
+  // 부상·질병·사기 감소는 빼고. 냉정 22 로 999 를 넘은 제구도 그대로 `> 998` 이다
   61: (career) => {
-    const ability = effectivePitcherAbilityOf(career)
+    const ability = equippedPitcherAbilityOf(career)
     return ability.control > MAXED_ABILITY && ability.velocity > MAXED_ABILITY && ability.breaking > MAXED_ABILITY
   },
   // 62 마탄의 투수 — 마구 4단계 모두 훈련 (0x1ae04, `s8 +0x201 > 3`). **근사다** — 필드 뜻이 유력이다

@@ -26,6 +26,7 @@ import {
   consumeStamina,
   abilityAfterFatigue,
 } from '@/entities/pitcher-career/model/pitcherStamina'
+import { MAXIMUM_PITCHER_ABILITY } from '@/entities/pitcher-career/model/pitcherAbility'
 
 /**
  * 투수편에서 **사람이 던지는 한 개의 공** (P1 3절 스태미나 · 4절 게이지, 궤적은 원본 표 그대로).
@@ -286,16 +287,20 @@ export function drainStamina(input: StaminaDrainInput): number {
   return consumeStamina(input.stamina, cost, capacity)
 }
 
+const clampFatigued = (value: number) => Math.min(MAXIMUM_PITCHER_ABILITY, Math.max(0, value))
+
 /**
  * 체력%가 깎아 놓은 실효 능력치 (0xb570c → 0xb58e6). 투구 화면 0x34968 이 이 값으로 등급·구속을 낸다.
- * 장비·스킬 보정은 웹 투수편에 아직 선수 레코드가 없어 넣지 못한다 — 부르는 쪽이 이미 반영해 넘긴다.
+ * 장비·스킬·컨디션은 부르는 쪽이 이미 반영해 넘긴다 (투수편 `unclampedGamePitcherAbilityOf`).
+ * 0xb570c 는 피로 **뒤** 맨 끝(0xb5b06)에서 0..999 로 자르므로 여기서 자른다 —
+ * 냉정 22 로 999 를 넘은 제구가 피로로 깎일 때 먼저 자른 값과 달라진다.
  */
 export function fatiguedStatsOf(stats: PitcherStats, stamina: number): PitcherStats {
   const percent = staminaPercentOf(stamina)
   return {
-    control: abilityAfterFatigue(stats.control, percent),
-    velocity: abilityAfterFatigue(stats.velocity, percent),
-    breaking: abilityAfterFatigue(stats.breaking, percent),
+    control: clampFatigued(abilityAfterFatigue(stats.control, percent)),
+    velocity: clampFatigued(abilityAfterFatigue(stats.velocity, percent)),
+    breaking: clampFatigued(abilityAfterFatigue(stats.breaking, percent)),
     stamina: stats.stamina,
   }
 }
