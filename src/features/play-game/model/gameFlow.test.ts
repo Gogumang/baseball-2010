@@ -568,8 +568,9 @@ describe('상대 타순은 이닝을 넘어 이어진다 (team+0x32 · 0xaf020 �
       칸들.forEach((칸, index) => {
         expect(칸 === index % 9 || 칸 >= 9, `씨앗 ${seed} ${index}번째 타석`).toBe(true)
       })
-      // 대타는 경기에 한 번(state[0xe]) — 벤치에서 나온 선수는 많아야 한 명이다
-      expect(new Set(칸들.filter((칸) => 칸 >= 9)).size).toBeLessThanOrEqual(1)
+      // 벤치에서 나와 타석에 선 선수는 쓴 대타 수(벤치 수 team+0x28c 가 준 만큼)를 넘지 않는다 —
+      // state[0xe] 는 공마다 내려가(0xa5e14 a5e7c) 대타는 경기에 여러 번 나올 수 있다
+      expect(new Set(칸들.filter((칸) => 칸 >= 9)).size).toBeLessThanOrEqual(3 - progress.opponentLineup.benchBatters)
     }
   })
 })
@@ -629,22 +630,24 @@ describe('타자편 경기에서도 양 팀 투수가 지치고 바뀐다 (0xc1b
   })
 })
 
-describe('타자편 경기에도 CPU 대타가 나온다 (0xc1ba4 → 0xac228, 경기에 한 번)', () => {
-  it('여러 경기를 돌리면 대타가 나오고, 한 경기에 두 번은 없다 (state[0xe])', () => {
+describe('타자편 경기에도 CPU 대타가 나온다 (0xc1ba4 → 0xac228)', () => {
+  it('state[0xe] 는 공마다 내려간다(0xa5e14 a5e7c) — 한 경기에 여러 번 나올 수 있다', () => {
     let 대타경기 = 0
+    let 여러번 = 0
     for (let seed = 1; seed <= 20; seed += 1) {
       const random = createSeededRandom(seed)
       let progress = startGame(random, 2)
       while (!progress.game.isFinished) {
         progress = applyPlayerOutcome(progress, { kind: '삼진' }, random)
       }
-      // 로그는 최근 40줄만 남으므로 명단으로 센다 — 벤치가 줄어든 팀이 대타를 쓴 팀이다
-      const 대타로그 = (3 - progress.ourLineup.benchBatters) + (3 - progress.opponentLineup.benchBatters)
-      expect(대타로그, `씨앗 ${seed}`).toBeLessThanOrEqual(1)
-      expect(대타로그 === 1, `씨앗 ${seed}`).toBe(progress.pinchHitUsed)
-      if (progress.pinchHitUsed) 대타경기 += 1
+      // 로그는 최근 40줄만 남으므로 명단으로 센다 — 벤치가 줄어든 만큼이 그 팀이 쓴 대타다
+      const 대타수 = (3 - progress.ourLineup.benchBatters) + (3 - progress.opponentLineup.benchBatters)
+      if (대타수 > 0) 대타경기 += 1
+      if (대타수 >= 2) 여러번 += 1
     }
     expect(대타경기).toBeGreaterThan(0)
+    // 예전 "경기에 한 번" 이면 나올 수 없는 경기가 실제로 있다
+    expect(여러번).toBeGreaterThan(0)
   })
 
   it('나는 대타로 안 바뀐다 — 내 타순 칸은 늘 내 자리다', () => {
@@ -957,6 +960,11 @@ describe('내 타석의 공 하나 — 0xa5e14(ctx, 구질) (0x3dec6)', () => {
     expect(히든.opponentMound.stamina).toBeLessThan(직구.opponentMound.stamina)
     // 다른 칸은 그대로다
     expect(직구.game).toBe(before.game)
+  })
+
+  it('같은 0xa5e14 가 CPU 대타 막음 칸 state[0xe] 도 내린다 (a5e7c)', () => {
+    const progress = { ...startGame(createSeededRandom(20100901)), pinchHitUsed: true }
+    expect(throwOpponentPitch(progress, 1, { batterIntimidates: false }).pinchHitUsed).toBe(false)
   })
 
   it('타자 압도(스킬 22)면 소모가 두 배 — 직구 c 9 → 18 (0xa5f0e)', () => {

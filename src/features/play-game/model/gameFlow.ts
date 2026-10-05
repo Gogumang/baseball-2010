@@ -150,7 +150,11 @@ export interface GameProgress {
    */
   readonly ourLineup: QuickLineup
   readonly opponentLineup: QuickLineup
-  /** `state[0xe]` — 이 경기에 CPU 대타를 썼는가. 경기에 한 칸이라 양 팀 합쳐 **한 번**이다 */
+  /**
+   * `state[0xe]` — 다음 공이 나가기 전까지 CPU 대타를 다시 묻지 않게 막는 칸 (양 팀 공용 한 칸).
+   * "경기에 한 번" 이 아니다 — 공마다 투구 처리 `0xa5e14` 가 내린다(a5e7c, a5e72 의 state[0xd] 바로 뒤).
+   * 세우는 곳은 `0xac228`(ac33e) 하나다.
+   */
   readonly pinchHitUsed: boolean
   readonly myStats: SeasonStats
   /** 사용자 타석 인기도 점수 합 */
@@ -425,6 +429,8 @@ export function throwOpponentPitch(
       pitches: mound.pitches + 1,
       justChanged: false,
     },
+    // 같은 0xa5e14 가 state[0xe](CPU 대타 막음)도 내린다 (a5e7c)
+    pinchHitUsed: false,
   }
 }
 
@@ -989,12 +995,19 @@ function playOpponentInning(progress: GameProgress, random: RandomPort): GamePro
   )
 }
 
+/** 한 타석 앞에서 `0xc1ba4` 를 다시 부르는 상한 — 대타 한 번 · 투수 한 번 · 마지막 빈 부름 */
+const MAXIMUM_SUBSTITUTION_CALLS = 3
+
 /** 동료 타석도 원본은 같은 간이 타석 엔진을 쓴다 — 우리 팀 명단의 실제 능력치가 들어간다 */
 function playTeammateAtBat(progress: GameProgress, random: RandomPort): GameProgress {
-  // 0xc262c 는 타석마다 먼저 0xc1ba4 를 부른다 — 그 안에서 CPU 대타(공격 = 우리 팀)가 먼저다 (0xc1c50)
-  progress = applyOurCpuPinchHit(progress, random)
-  // 이어서 CPU 투수 교체 — 우리가 공격 중이니 **상대 투수**를 본다 (0xc1ce2)
-  progress = changeOpponentPitcher(progress, random)
+  // 0xc262c 는 타석마다 먼저 0xc1ba4 를 부른다 — CPU 대타(공격 = 우리 팀, 0xc1c50) 뒤 CPU 투수 교체
+  // (우리가 공격 중이니 **상대 투수**, 0xc1ce2). 하나라도 바뀌면 0xc262c 가 공 없이 돌아갔다가(c266c) 같은
+  // 타석으로 0xc1ba4 를 다시 지난다 — 바뀐 쪽은 state[0xe]·state[0xd] 로 빠지고 안 바뀐 쪽은 다시 판정한다
+  for (let call = 0; call < MAXIMUM_SUBSTITUTION_CALLS; call += 1) {
+    const substituted = changeOpponentPitcher(applyOurCpuPinchHit(progress, random), random)
+    if (substituted === progress) break
+    progress = substituted
+  }
   // 상태 0xf — 동료 타석 준비에서도 돌발을 굴린다 (K 4절 1-6)
   const slotBefore = progress.game.battingOrderIndex
   const logBefore = progress.teammateLogs[slotBefore] ?? EMPTY_BATTER_GAME_LOG
@@ -1084,6 +1097,8 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort): GameProg
         // 투구마다 state[0xd] 가 내려간다 (0xa5e72)
         justChanged: false,
       },
+      // 같은 0xa5e14 가 state[0xe](CPU 대타 막음)도 내린다 (a5e7c)
+      pinchHitUsed: false,
       opponentInningRunsAllowed: Math.min(
         MAXIMUM_PITCHER_COUNTER,
         progress.opponentInningRunsAllowed + runsBattedIn,
@@ -1168,7 +1183,7 @@ function applyOurCpuPinchHit(progress: GameProgress, random: RandomPort): GamePr
     {
       ...progress,
       ourLineup: pinch.lineup,
-      // state[0xe] = 1 — 경기에 한 번뿐이다 (ac338)
+      // state[0xe] = 1 (ac33e) — 다음 공(0xa5e14 a5e7c)이 나갈 때까지 다시 묻지 않는다
       pinchHitUsed: true,
       teammateLogs,
     },
