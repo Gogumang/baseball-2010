@@ -736,6 +736,8 @@ MISSION_RUNNER_OFFSET = 5
 PITCHER_RUN_LIMIT = (161, 0, 0xF)
 PITCHER_WALK_LIMIT = (162, 4, 0xF)
 PITCHER_HIT_LIMIT = (162, 0, 0xF)
+# 넷째 한도 +0xa3 (s8, 0xaacca ldrsb) ↔ 투수 기록 R+0x130 출루 허용(0/1) — 판정 0xaaccc
+PITCHER_BASERUNNER_LIMIT_OFFSET = 0xA3
 
 
 def nibble(row: bytes, field: tuple) -> int:
@@ -774,10 +776,11 @@ def start_of(row: bytes) -> str:
 
 def fail_limits_of(row: bytes, side: str) -> str:
     if side != '투수':
-        return '{ runs: 0, walks: 0, hits: 0 }'
+        return '{ runs: 0, walks: 0, hits: 0, baserunners: 0 }'
+    baserunners = struct.unpack_from('<b', row, PITCHER_BASERUNNER_LIMIT_OFFSET)[0]
     return (
         f"{{ runs: {nibble(row, PITCHER_RUN_LIMIT)}, walks: {nibble(row, PITCHER_WALK_LIMIT)}, "
-        f"hits: {nibble(row, PITCHER_HIT_LIMIT)} }}"
+        f"hits: {nibble(row, PITCHER_HIT_LIMIT)}, baserunners: {baserunners} }}"
     )
 
 
@@ -826,8 +829,17 @@ def generate_missions() -> None:
         '    readonly ourScore: number',
         '    readonly opponentScore: number',
         '  }',
-        '  /** 투수편 실패 한도 — 실점·볼넷·피안타가 이 값에 닿으면 실패. 0 이면 없음 */',
-        '  readonly failLimits: { readonly runs: number; readonly walks: number; readonly hits: number }',
+        '  /**',
+        '   * 투수편 실패 한도 — 실점·볼넷·피안타가 이 값에 닿으면 실패. 0 이면 없음.',
+        '   * `baserunners` 는 레코드 넷째 한도 **+0xa3**(s8)로, 투수 기록 R+0x130(출루 허용, 0/1)과 견준다',
+        '   * (판정 0xaaccc). 원본 표에서 1 인 것은 투수 13·14 번뿐이다.',
+        '   */',
+        '  readonly failLimits: {',
+        '    readonly runs: number',
+        '    readonly walks: number',
+        '    readonly hits: number',
+        '    readonly baserunners: number',
+        '  }',
         '}',
         '',
         '/** 원본 XlsBATTER_MISSION / XlsPITCHER_MISSION */',
