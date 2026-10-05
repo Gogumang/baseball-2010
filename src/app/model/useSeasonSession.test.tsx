@@ -865,6 +865,164 @@ describe('엔트리 편집 0xe0 (0x63dc · 0x7044 · 편집기 0x55864)', () => 
   })
 })
 
+describe('투수 스태미나 +0x2c — 첫날 6850 0xb6190 · 하루 끝 4f2bc 0xb617c (+20%)', () => {
+  type 저장모양 = { cpuPitcherStaminas?: Record<number, number[]>; roster: { pitchers: { stamina: number }[] } }
+  const 경기까지 = (rendered: ReturnType<typeof 띄우기>) => {
+    act(() => rendered.result.current.actions.openNextGame())
+    act(() => rendered.result.current.actions.confirmNextGame())
+    act(() => rendered.result.current.actions.choosePreGameAce(0))
+    act(() => rendered.result.current.actions.choosePreGameAce(5))
+    if (rendered.result.current.isMatchSettingsOpen) act(() => rendered.result.current.actions.toggleMatchSettings())
+    act(() => rendered.result.current.actions.startPendingGame())
+    return rendered.result.current.gameOptions!
+  }
+
+  it('새 시즌은 열 팀 모두 10000 이고 경기 옵션에 내 명단 차례·상대 표 칸 차례로 싣는다', () => {
+    const store = 메모리저장()
+    const rendered = 띄우기(store)
+    act(() => rendered.result.current.actions.chooseTeam(0))
+    const options = 경기까지(rendered)
+
+    expect(options.ourPitcherStaminas).toEqual(rendered.result.current.roster.pitchers.map(() => 10_000))
+    expect(options.opponentPitcherStaminas).toEqual(teamPitchers(options.opponentTeamId).map(() => 10_000))
+    expect(Object.keys((store.load() as 저장모양).cpuPitcherStaminas ?? {})).toHaveLength(9)
+  })
+
+  it('정규 경기 끝 값이 저장에 남고 하루 끝에 열 팀 +20% — 다음 경기는 그 값으로 선다', () => {
+    const store = 메모리저장()
+    const rendered = 띄우기(store)
+    const { result } = rendered
+    act(() => result.current.actions.chooseTeam(0))
+    const options = 경기까지(rendered)
+    const 투수수 = result.current.roster.pitchers.length
+    const 내끝 = Array.from({ length: 투수수 }, (_v, i) => (i === 0 ? 3000 : i === 1 ? 9000 : 10_000))
+    const 상대끝 = teamPitchers(options.opponentTeamId).map((_p, i) => (i === 0 ? 1000 : 10_000))
+
+    act(() => result.current.actions.finishGame(요약({
+      opponentTeamId: options.opponentTeamId, ourPitcherStaminas: 내끝, opponentPitcherStaminas: 상대끝,
+    })))
+
+    expect(result.current.roster.pitchers.map((p) => p.stamina).slice(0, 3)).toEqual([5000, 10_000, 10_000])
+    const 저장 = store.load() as 저장모양
+    expect(저장.cpuPitcherStaminas?.[options.opponentTeamId]?.[0]).toBe(3000)
+    // 같은 날 CPU 끼리 경기도 그 표로 치러 깎이고 회복된다 — 값은 0..10000 안에 있다
+    for (const staminas of Object.values(저장.cpuPitcherStaminas ?? {})) {
+      for (const value of staminas) expect(value).toBeGreaterThanOrEqual(0)
+    }
+
+    // 둘째 날(SR+0xb2 = 1)은 첫날 고리를 안 탄다 — 이어진 값으로 선다
+    act(() => result.current.actions.confirmIncome(result.current.state!.record))
+    const 다음 = 경기까지(rendered)
+    expect(다음.ourPitcherStaminas?.[0]).toBe(5000)
+    expect(다음.opponentPitcherStaminas).toEqual((store.load() as 저장모양).cpuPitcherStaminas?.[다음.opponentTeamId])
+  })
+
+  it('시즌 첫날(경기 수 0)에 0xdd 에 들어오면 깎인 값도 10000 으로 채운다 (6850) — 그 뒤 날은 안 채운다', () => {
+    const rendered = 띄우기()
+    const { result } = rendered
+    act(() => result.current.actions.chooseTeam(0))
+    const 깎인명단 = (stamina: number) => ({
+      ...result.current.roster,
+      pitchers: result.current.roster.pitchers.map((p) => ({ ...p, stamina })),
+    })
+    act(() => result.current.actions.updateRoster(깎인명단(100)))
+    expect(경기까지(rendered).ourPitcherStaminas?.[0]).toBe(10_000)
+
+    act(() => result.current.actions.updateRecord({ ...result.current.state!.record, games: 2 }))
+    act(() => result.current.actions.updateRoster(깎인명단(100)))
+    expect(경기까지(rendered).ourPitcherStaminas?.[0]).toBe(100)
+  })
+
+  it('포스트시즌 하루 끝도 열 팀 +20% 뿐 — 내 팀을 10000 으로 채우지 않는다 (0xb818c L+0x34 갈래는 b8228 로 끝)', () => {
+    const store = 메모리저장()
+    const rendered = 띄우기(store)
+    const { result } = rendered
+    act(() => result.current.actions.chooseTeam(0))
+    act(() => result.current.actions.confirmIncome({
+      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
+    }))
+    // 내 차례가 올 때까지 결산 0xef 를 진행시킨다 (CPU 시리즈는 0x13da0 이 돌린다)
+    for (let i = 0; i < 4 && result.current.pendingGame === null; i += 1) {
+      act(() => result.current.actions.continuePostseason())
+    }
+    expect(result.current.pendingGame?.kind).toBe('포스트시즌')
+    act(() => result.current.actions.choosePreGameAce(0))
+    act(() => result.current.actions.choosePreGameAce(5))
+    if (result.current.isMatchSettingsOpen) act(() => result.current.actions.toggleMatchSettings())
+    act(() => result.current.actions.startPendingGame())
+    const options = result.current.gameOptions!
+    const 내끝 = result.current.roster.pitchers.map(() => 2000)
+
+    act(() => result.current.actions.finishGame(요약({
+      opponentTeamId: options.opponentTeamId, ourPitcherStaminas: 내끝,
+    })))
+
+    expect(result.current.roster.pitchers.every((p) => p.stamina === 4000)).toBe(true)
+  })
+
+  it('국가대항전은 넘기지도 받지도 않는다 — 대한민국·상대국 모두 10000, 시즌 명단 값은 그대로', () => {
+    const rendered = 띄우기()
+    const { result } = rendered
+    act(() => result.current.actions.chooseTeam(3))
+    act(() => result.current.actions.confirmIncome({
+      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
+    }))
+    act(() => result.current.actions.updateRecord({ ...result.current.state!.record, yearIndex: 2 }))
+    act(() => result.current.actions.finishSeason())
+    const 전 = result.current.roster
+    act(() => result.current.actions.playCupGame(10, 11))
+    act(() => result.current.actions.startPendingGame())
+    expect(result.current.gameOptions?.ourPitcherStaminas).toBeUndefined()
+    expect(result.current.gameOptions?.opponentPitcherStaminas).toBeUndefined()
+
+    act(() => result.current.actions.finishGame(요약({
+      ourTeamId: 10, opponentTeamId: 11, ourPitcherStaminas: [0, 0, 0],
+    })))
+    expect(result.current.roster).toEqual(전)
+  })
+
+  it('스태미나 표가 없는 옛 저장은 10000 으로 채운다 — 명단 투수의 0(표에서 만든 값)도', () => {
+    const store = 메모리저장()
+    const 첫판 = 띄우기(store)
+    act(() => 첫판.result.current.actions.chooseTeam(2))
+    const 옛저장 = { ...(store.load() as 저장모양) }
+    delete 옛저장.cpuPitcherStaminas
+    store.save({ ...옛저장, roster: { ...옛저장.roster, pitchers: 옛저장.roster.pitchers.map((p) => ({ ...p, stamina: 0 })) } })
+
+    const 둘째판 = 띄우기(store)
+    expect(둘째판.result.current.roster.pitchers.every((p) => p.stamina === 10_000)).toBe(true)
+    act(() => 둘째판.result.current.actions.updateRecord({ ...둘째판.result.current.state!.record, games: 1 }))
+    const options = 경기까지(둘째판)
+    expect(options.opponentPitcherStaminas).toEqual(teamPitchers(options.opponentTeamId).map(() => 10_000))
+  })
+
+  it('트레이드로 데려온 투수는 그 팀 표의 스태미나를 들고 온다', () => {
+    const store = 메모리저장()
+    const rendered = 띄우기(store)
+    const { result } = rendered
+    act(() => result.current.actions.chooseTeam(0))
+    const options = 경기까지(rendered)
+    act(() => result.current.actions.finishGame(요약({
+      opponentTeamId: options.opponentTeamId,
+      opponentPitcherStaminas: teamPitchers(options.opponentTeamId).map((_p, i) => (i === 2 ? 1000 : 10_000)),
+    })))
+    const 표 = (store.load() as 저장모양).cpuPitcherStaminas![options.opponentTeamId]!
+    const roster = result.current.roster
+    const 데려옴 = { id: 2, kindByte: roster.pitchers[1]!.kindByte, fieldPosition: 0, stamina: 0 }
+
+    act(() => result.current.actions.finishTrade({
+      record: result.current.state!.record,
+      roster: { ...roster, pitchers: roster.pitchers.map((p, i) => (i === 1 ? 데려옴 : p)) },
+      gamePointCost: 0,
+      isSuccess: true,
+      acquiredTeamId: options.opponentTeamId,
+    }))
+
+    expect(result.current.roster.pitchers[1]?.stamina).toBe(표[2])
+    expect(result.current.roster.pitchers[0]).toBe(roster.pitchers[0])
+  })
+})
+
 describe('기록연감 통계 고리 — 시즌 G 사용처 k 3 (0xd152 · 0xa2fee · 0x3c862)', () => {
   it('시즌이 G 를 쓸 때마다 시즌 소모 GP 에 |액수| 를 적는다', () => {
     const events: AnnalsStatEvent[] = []

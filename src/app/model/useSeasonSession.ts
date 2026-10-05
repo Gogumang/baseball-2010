@@ -33,7 +33,8 @@ import { EMPTY_LEAGUE_PLAYER_STATS, recordLeaguePlateAppearances } from '@/entit
 import type { LeaguePlayerStats } from '@/entities/league/model/leaguePlayerStats'
 import { startNextYear } from '@/entities/season-mode/model/seasonRecord'
 import { SEASON_END_CHAIN } from '@/entities/season-mode/model/seasonStateMachine'
-import { teamBatters } from '@/entities/team/model/teamRoster'
+import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
+import { FULL_STAMINA, recoverStaminaAfterGameDay } from '@/entities/pitcher-career/model/pitcherStamina'
 import { TEAMS } from '@/shared/config/original/teams'
 import type { TeamGameOptions, TeamGameSummary } from '@/features/play-team-game/model/teamGameFlow'
 import { rollOpponentAces } from '@/features/play-team-game/model/teamGameFlow'
@@ -241,6 +242,12 @@ interface SeasonSave {
    * ⚠️ 위 칸과 같은 까닭으로 시즌 저장에 둔다 — 근사.
    */
   readonly matchSettingsSeen?: boolean
+  /**
+   * **다른 아홉 팀의 투수 스태미나** `+0x2c` — 팀 번호 → 붙박이 표 칸 차례(`teamPitchers(팀)`)의 값.
+   * 내 팀 값은 `roster.pitchers[i].stamina` 다. 원본은 시즌 저장의 팀 레코드(0x1f570)마다 투수 레코드에 들어 있어
+   * 시즌 내내 이어진다 (a583fe0 · `seasonStamina` 주석). 이 칸이 없는 옛 저장은 모두 10000 으로 채운다.
+   */
+  readonly cpuPitcherStaminas?: Readonly<Record<number, readonly number[]>>
 }
 
 /** 엔트리 편집 0xe0 한 판 — 편집 객체 `[this+0xa8]` 와 그 목록 */
@@ -269,10 +276,10 @@ export interface PendingSeasonGame {
  * 시즌 로스터를 팀 명단 표에서 만든다 — 원본 선수 레코드 구조가 안 풀려 **근사**다.
  * 칸 번호(`+0xa & 0x1f`)만 순서대로 채우고 종류 비트는 0(기본 선수)으로 둔다.
  * 타자 수비 위치(`+0x1c & 0xf`)는 표의 값을 넣는다 — 엔트리 편집(0xb5e99·0xb5fe5)과 트레이드 자리 벌점이
- * 이 칸을 본다. 스태미나(+0x2c)는 웹 팀 명단 표에 칸이 없어 0 이다 — 영입 화면은 이 칸을 안 본다.
+ * 이 칸을 본다. 스태미나(+0x2c)는 10000 — 시즌 시작 0xb6cc4 · 첫날 6850 의 0xb6190 과 같다.
  */
 function rosterOf(teamId: number): SeasonTeamRoster {
-  return tableRosterOf(teamId)
+  return withFullRosterStamina(tableRosterOf(teamId))
 }
 
 /**
@@ -293,6 +300,98 @@ function withTablePositions(roster: SeasonTeamRoster, teamId: number): SeasonTea
 }
 
 const EMPTY_ROSTER: SeasonTeamRoster = { pitchers: [], batters: [] }
+
+/*
+ * ## 시즌 투수 스태미나 `+0x2c` — 경기 사이에 이어지는 값 (직접 떴다)
+ * ```
+ * 0x6548 0xdd 진입 6850  SR+0xb2 == 0(시즌 첫날)이면 i = 0..9: 0xb6190(0x1f9a9(저장, 모드, i))  ; 열 팀 전원 10000
+ * 0x4ea0c 경기 끝        정규: 내 경기 → 4f296 CPU 경기 0xc2a48 → 4f29a 하루 끝 0xb818c
+ *                        포스트시즌(L+0x34)·국가대항전(L+0xac): 4f268/4f230 → 곧장 4f29a 0xb818c
+ *                        → 모드 2 면 4f2bc: i = 0..9: 0xb617c(0x1f570(저장, i))  ; 열 팀 모두 +20% (0xb60e0)
+ * 0xb818c 하루 끝        L+0xac(국가대항전) 갈래만 b81e0 0xb6190(팀 10) = 대한민국 10000.
+ *                        L+0x34(포스트시즌)는 b8228 에서 곧장 끝 — **내 팀을 10000 으로 채우지 않는다**.
+ * ```
+ * - 그래서 정규시즌·포스트시즌 모두 하루 끝은 "열 팀 +20%" 하나다. a583fe0 의 "포스트시즌은 하루 끝 0xb818c 가 내 팀만
+ *   10000" 은 P1 의 유력을 옮긴 것인데, 그 10000 은 대회 갈래(L+0xac) 안에 있다 — P5 가 이미 대한민국으로 고쳐 읽었다.
+ * - 국가대항전 중에는 0x1f570 이 팀 10 을 +0x918, 나머지를 상대국 슬롯 +0x934 로 돌리므로 리그 열 팀 레코드는 안
+ *   움직인다. 대한민국은 매일 10000 이라 웹 팀 경기 기본값(늘 10000)과 같다 — 넘기지도 받지도 않는다.
+ * - 회복량 0x66ed0 은 모드 3 이 아니면 늘 20%다 (`staminaRecoveryPercentOf`).
+ */
+
+/** 리그 열 팀 0..9 — 6850 · 4f2bc 의 `cmp #9` 고리 */
+const LEAGUE_TEAM_COUNT = 10
+const SEASON_STAMINA_RECOVERY = { mode: 2, isMine: false, isStarterRole: false } as const
+
+/** `0xb6190` — 다른 아홉 팀 투수 전원 10000 */
+function fullCpuPitcherStaminas(myTeamId: number): Record<number, readonly number[]> {
+  const table: Record<number, readonly number[]> = {}
+  for (let team = 0; team < LEAGUE_TEAM_COUNT; team += 1) {
+    if (team !== myTeamId) table[team] = teamPitchers(team).map(() => FULL_STAMINA)
+  }
+  return table
+}
+
+/** `0xb6190` — 내 팀 투수 전원 10000 */
+function withFullRosterStamina(roster: SeasonTeamRoster): SeasonTeamRoster {
+  return { ...roster, pitchers: roster.pitchers.map((player) => ({ ...player, stamina: FULL_STAMINA })) }
+}
+
+/** 시즌 첫날 6850 — 열 팀 모두 0xb6190 */
+function withSeasonFirstDayStamina(save: SeasonSave): SeasonSave {
+  return {
+    ...save,
+    roster: withFullRosterStamina(save.roster),
+    cpuPitcherStaminas: fullCpuPitcherStaminas(save.state.record.teamId),
+  }
+}
+
+/**
+ * 경기 끝 스태미나를 되적는다 — 내 팀은 명단 차례(요약 `ourPitcherStaminas`), 상대는 표 칸 차례.
+ * 요약에 없는 칸은 그대로 둔다.
+ */
+function withGameEndStamina(save: SeasonSave, summary: TeamGameSummary): SeasonSave {
+  const ours = summary.ourPitcherStaminas
+  const theirs = summary.opponentPitcherStaminas
+  return {
+    ...save,
+    roster: ours === undefined ? save.roster : {
+      ...save.roster,
+      pitchers: save.roster.pitchers.map((player, index) => {
+        const stamina = ours[index]
+        return stamina === undefined ? player : { ...player, stamina }
+      }),
+    },
+    cpuPitcherStaminas: theirs === undefined
+      ? save.cpuPitcherStaminas
+      : { ...save.cpuPitcherStaminas, [summary.opponentTeamId]: theirs },
+  }
+}
+
+/** 하루 끝 4f2bc — 열 팀 모두 `0xb617c` (투수마다 +20%, 10000 에서 자름) */
+function withDayEndRecovery(save: SeasonSave): SeasonSave {
+  const recover = (stamina: number) => recoverStaminaAfterGameDay(stamina, SEASON_STAMINA_RECOVERY)
+  const table: Record<number, readonly number[]> = {}
+  for (const [team, staminas] of Object.entries(save.cpuPitcherStaminas ?? {})) {
+    table[Number(team)] = staminas.map(recover)
+  }
+  return {
+    ...save,
+    roster: {
+      ...save.roster,
+      pitchers: save.roster.pitchers.map((player) => ({ ...player, stamina: recover(player.stamina) })),
+    },
+    cpuPitcherStaminas: table,
+  }
+}
+
+/** 팀 경기 옵션의 시작 스태미나 — 내 팀은 명단 차례, 상대는 표 칸 차례 (정규·포스트시즌만) */
+function staminaOptionsOf(save: SeasonSave, opponentTeamId: number): Partial<TeamGameOptions> {
+  const opponent = save.cpuPitcherStaminas?.[opponentTeamId]
+  return {
+    ourPitcherStaminas: save.roster.pitchers.map((player) => player.stamina),
+    ...(opponent === undefined ? {} : { opponentPitcherStaminas: opponent }),
+  }
+}
 
 /** SR+0xb7 = 0xf 는 "우승팀 미정" 이다 (P4 1a) */
 const NO_CHAMPION = 0xf
@@ -316,14 +415,19 @@ const HOSPITAL_PLACE = SEASON_OUTING_PLACES.indexOf('병원')
 function normalizeSeasonSave(saved: Partial<SeasonSave> | null): SeasonSave | null {
   if (saved === null || saved === undefined || typeof saved !== 'object') return null
   const state = normalizeSeasonState(saved.state)
+  const roster = saved.roster === undefined
+    ? rosterOf(state.record.teamId)
+    : withTablePositions(saved.roster, state.record.teamId)
+  // 스태미나 표가 생기기 전 저장은 명단 투수를 0(표에서 만든 값)으로 적었고 경기는 늘 10000 으로 쳤다 —
+  // 그 값 그대로 10000 으로 채운다
+  const staminaKnown = saved.cpuPitcherStaminas !== undefined
   return {
     ...saved,
     state,
     league: saved.league ?? EMPTY_LEAGUE,
-    roster: saved.roster === undefined
-      ? rosterOf(state.record.teamId)
-      : withTablePositions(saved.roster, state.record.teamId),
+    roster: staminaKnown ? roster : withFullRosterStamina(roster),
     playerStats: saved.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS,
+    cpuPitcherStaminas: saved.cpuPitcherStaminas ?? fullCpuPitcherStaminas(state.record.teamId),
   }
 }
 
@@ -462,6 +566,7 @@ export function useSeasonSession(
         series: null,
         ranking: [],
         cup: null,
+        cpuPitcherStaminas: fullCpuPitcherStaminas(teamId),
       }
       commit(next)
       setScene(SEASON_SCENE_STATE.관리메뉴)
@@ -494,10 +599,21 @@ export function useSeasonSession(
   const finishTrade = useCallback(
     (settlement: TradeSettlement) => {
       if (save === null) return
+      // 데려온 투수(applyTrade 가 바꾼 한 칸)는 그 팀 표의 스태미나를 들고 온다 — 표 명단 값(0)이 아니다
+      const fromTable = settlement.acquiredTeamId === undefined
+        ? undefined
+        : save.cpuPitcherStaminas?.[settlement.acquiredTeamId]
+      const roster: SeasonTeamRoster = {
+        ...settlement.roster,
+        pitchers: settlement.roster.pitchers.map((player, index) =>
+          player === save.roster.pitchers[index]
+            ? player
+            : { ...player, stamina: fromTable?.[player.id] ?? FULL_STAMINA }),
+      }
       commit({
         ...save,
         state: { ...save.state, record: settlement.record },
-        roster: settlement.roster,
+        roster,
       })
       spendGamePoint(settlement.gamePointCost)
     },
@@ -585,7 +701,7 @@ export function useSeasonSession(
     if (options === null) return
     clearGameRecord(save)
     setGameKind('정규')
-    setGameOptions(options)
+    setGameOptions({ ...options, ...staminaOptionsOf(save, options.opponentTeamId) })
     setScene(SEASON_SCENE_STATE.경기직전)
   }, [clearGameRecord, optionsFor, save])
 
@@ -636,18 +752,17 @@ export function useSeasonSession(
    *     `0xb8870(상대, w)`(670a). 이 둘(rand 2)이 0xdd 진입의 유일한 굴림이다. 웹은 굴린 값을 옵션 `opponentAces` 로
    *     싣고 경기정보·CPU 엔트리 화면이 같은 값을 본다. 다시 0xd7 → 0xdd 로 들어오면 다시 굴린다(원본 그대로).
    *   - 두 팀 명단 세우기(0xb891c)·로테이션(0xb8c80)은 웹에서는 경기를 세울 때(`startTeamGame`) 한다.
+   *   - 6850: `SR+0xb2 == 0`(시즌 첫날)이면 열 팀 투수 전원 10000 (`withSeasonFirstDayStamina`, 모듈 머리 주석).
+   *     포스트시즌은 날짜가 45 를 넘어 계속 오르므로(0xb818c 머리 L+0x32++) 닿지 않는다. 국가대항전 첫날도 이 고리를
+   *     돌지만 대회 중 0x1f9a9 는 상대국 슬롯을 돌려주므로 리그 팀은 안 바뀐다 — 웹은 건너뛴다.
    *
    * **투수 스태미나 (P1 3절 · 직접 떴다)** — 투수 레코드 +0x2c 는 경기용 칸이 아니라 **시즌 내내 이어지는 값**이다.
    *   - `0xb6190(팀)` = 그 팀 투수 전원(팀+0xc 명, 팀+0x14 배열, 0x30 간격) +0x2c = 10000 (b6192~b61aa, 확정).
-   *   - 정규시즌: 이 들어옴 `6850` 이 `SR+0xb2 == 0`(시즌 첫날)일 때만 열 팀 모두 0xb6190. 그 뒤로는 하루가
-   *     끝날 때마다 0x4ea0c 가 열 팀 모두 `0xb617c` → 투수마다 +20%(모드 2 는 내 선수 구분이 없다)만 회복하고,
-   *     경기에서 깎인 값(0xaeb08)이 다음 경기로 **이어진다**. 포스트시즌은 하루 끝 0xb818c 가 내 팀만 10000.
+   *   - 정규·포스트시즌: 첫날 6850 뒤로는 하루 끝 4f2bc 의 열 팀 `0xb617c`(+20%)만 회복한다 — 경기에서 깎인 값(0xaeb08)이
+   *     다음 경기로 **이어진다**. 내 팀은 `roster.pitchers[i].stamina`, 다른 아홉 팀은 `cpuPitcherStaminas` 에 두고
+   *     경기 옵션 `ourPitcherStaminas`·`opponentPitcherStaminas` 로 넘겨 요약으로 받는다 (`finishGame`).
    *   - 국가대항전: 대회 초기화 b7c88 과 하루 끝 0xb818c 대회 갈래가 **대한민국을 매일 10000** 으로 채우고,
-   *     상대국은 매일 마스터에서 새로 복사된다(0x20648) — 마스터 국가대표 레코드는 경기에 안 쓰여 10000 그대로(유력).
-   * 웹 팀 경기(`startTeamGame`·교체)는 **양 팀 모든 투수를 늘 10000 에서** 시작한다. 그래서 국가대항전은 원본과
-   * 같고, ⚠️ **정규시즌은 다르다** — 로테이션 투수가 회복 덜 된 채(4경기 사이 +20%씩) 나오는 원본과 달리 늘 만땅이다.
-   * 고치려면 시즌 저장에 팀별·투수별 스태미나 칸, 팀 경기 옵션에 시작 스태미나 입력·요약에 끝 스태미나 출력,
-   * CPU 끼리 경기(간이 엔진)의 소모가 함께 있어야 한다 — 이 세션 안에서만으로는 못 한다.
+   *     상대국은 매일 마스터에서 새로 복사된다(0x20648) — 웹 팀 경기 기본값(늘 10000)과 같아 넘기지 않는다.
    */
   const enterMatchInfo = useCallback(
     (current: SeasonSave, pending: PendingSeasonGame, aces: PreGameAces | null) => {
@@ -657,7 +772,12 @@ export function useSeasonSession(
           : { ...pending, options: { ...pending.options, opponentAces: rollOpponentAces(aces.pitcher, aces.batter, random) } },
       )
       const firstTime = current.matchSettingsSeen !== true
-      if (firstTime) commit({ ...current, matchSettingsSeen: true })
+      const firstDay = pending.kind !== '국가대항전' && !current.state.record.inPostseason
+        && current.state.record.games === 0
+      if (firstTime || firstDay) {
+        const seen = firstTime ? { ...current, matchSettingsSeen: true } : current
+        commit(firstDay ? withSeasonFirstDayStamina(seen) : seen)
+      }
       setIsMatchSettingsOpen(firstTime)
       setScene(SEASON_SCENE_STATE.경기정보)
     },
@@ -713,9 +833,8 @@ export function useSeasonSession(
       : { acePitcherId: preGameAces.pitcher, aceBatterId: preGameAces.batter }
     // 0xdd 에서 엔트리 편집(0xe0)을 다녀왔으면 명단이 바뀌었다 — 경기는 지금 저장 레코드 차례로 선다.
     // 국가대항전은 대표팀 슬롯(+0x918) 명단이다
-    const roster = pendingGame.kind === '국가대항전'
-      ? save.cupRoster ?? tableRosterOf(pendingGame.options.ourTeamId)
-      : save.roster
+    const isCup = pendingGame.kind === '국가대항전'
+    const roster = isCup ? save.cupRoster ?? tableRosterOf(pendingGame.options.ourTeamId) : save.roster
     clearGameRecord(save)
     setIsMatchSettingsOpen(false)
     setGameKind(pendingGame.kind)
@@ -723,6 +842,8 @@ export function useSeasonSession(
       ...pendingGame.options,
       settings: save.matchSettings ?? FULL_PLAY_SETTINGS,
       ourEntryOrder: seasonEntryOrderOf(roster),
+      // 투수 스태미나 +0x2c — 시즌 내내 이어진 값으로 선다. 국가대항전은 두 팀 모두 10000(기본)이다
+      ...(isCup ? {} : staminaOptionsOf(save, pendingGame.options.opponentTeamId)),
       ...withAces,
     })
     setPendingGame(null)
@@ -911,8 +1032,12 @@ export function useSeasonSession(
           if (series === null) return
           const winner = won ? record.teamId : opponent
           const advanced = runCpuPostseason(advancePostseason(series, winner), record.teamId, random)
+          // 4f268 → 4f29a 0xb818c(포스트시즌 갈래는 스태미나를 안 건드린다) → 4f2bc 열 팀 +20%.
+          // ⚠️ CPU 끼리 포스트시즌 경기(runCpuPostseason, 0xc2760)의 소모·그날 하루 끝은 웹 리그 쪽이 스태미나를
+          //    받지 않아 빠져 있다 — 그 팀들은 깎이지도 회복되지도 않는다
+          const rested = withDayEndRecovery(withGameEndStamina(save, summary))
           commit({
-            ...save,
+            ...rested,
             series: advanced,
             state: {
               ...save.state,
@@ -942,6 +1067,8 @@ export function useSeasonSession(
       const afterMyGame = won
         ? recordLeagueResult(save.league, record.teamId, opponent)
         : recordLeagueResult(save.league, opponent, record.teamId)
+      // 내 경기의 끝 스태미나를 되적고 → 같은 날 CPU 경기 0xc2a48 이 그 표로 치러 깎고 → 하루 끝 4f2bc 열 팀 +20%
+      const afterGameStamina = withGameEndStamina(save, summary)
       const day = playLeagueDay(
         afterMyGame,
         record.games,
@@ -951,7 +1078,9 @@ export function useSeasonSession(
           save.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS,
           summary.leaguePlateAppearances,
         ),
+        afterGameStamina.cpuPitcherStaminas,
       )
+      const rested = withDayEndRecovery({ ...afterGameStamina, cpuPitcherStaminas: day.pitcherStaminas })
 
       // 평가가 위에서 꽂은 16칸(played.gameRecord)을 읽는다. 원본 차례는 내 경기 전적 → 평가 →
       // 나머지 네 경기 → 하루 끝이지만, 평가는 리그를 읽지 않아 웹처럼 하루를 먼저 돌려도 값이 같다.
@@ -971,7 +1100,7 @@ export function useSeasonSession(
       )
 
       commit({
-        ...save,
+        ...rested,
         league: day.league,
         playerStats: day.playerStats,
         state: {

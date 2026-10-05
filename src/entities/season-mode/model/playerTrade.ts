@@ -148,6 +148,11 @@ export interface TradeSettlement {
   /** 이번에 쓴 G (저장+0x64 에서 나간다) */
   readonly gamePointCost: number
   readonly isSuccess: boolean
+  /**
+   * 데려온 선수의 팀 — 성공한 투수 트레이드면 세션이 그 팀 표의 스태미나(+0x2c)를 데려온 투수에 옮긴다.
+   * 원본은 선수 레코드(0x30 바이트)째 옮기므로 +0x2c 도 따라온다(유력 — 맞바꾸는 루틴은 미해독).
+   */
+  readonly acquiredTeamId?: number
 }
 
 /**

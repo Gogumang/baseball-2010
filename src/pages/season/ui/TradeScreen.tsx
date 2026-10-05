@@ -161,6 +161,7 @@ export function TradeScreen({ state, roster, gamePoints, random, onTrade, onBack
       // 비용은 성공·실패와 상관없이 나간다 (0xcf24 는 굴리기 전에 깎는다)
       gamePointCost: tradeBoostCostOf(boost),
       isSuccess,
+      acquiredTeamId: step.teamId,
     })
     setNotice(isSuccess ? TRADE_SUCCESS : TRADE_FAILURE)
     setDone(true)
