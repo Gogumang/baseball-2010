@@ -56,7 +56,11 @@ import { specialSwingCountOf } from '@/entities/batting/model/specialSwing'
 import { aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
 import { isMistakePitch } from '@/entities/pitching/model/mistakePitch'
 import type { Pitch } from '@/entities/pitching/model/pitch'
-import { MAGIC_PITCH_TYPE_NUMBER, ballMagicNumberAfterPitch } from '@/entities/pitcher-career/model/magicPitch'
+import {
+  MAGIC_PITCH_TYPE_NUMBER,
+  ballMagicNumberAfterPitch,
+  magicPitchCountOf,
+} from '@/entities/pitcher-career/model/magicPitch'
 import {
   consumeStamina,
   FULL_STAMINA,
@@ -290,7 +294,8 @@ export interface TeamGameOptions {
   /**
    * **마선수 레벨 열 칸** = 원본 전역 기록 `mgr[0x13a..0x143]` (`entities/mission/model/useAceLevels` 의 `levels`).
    * 명단의 마선수(사람 팀·AI 팀 모두)가 능력치 0xb6414 첫 단계에서 `0xd88aa[레벨]` 배율을 먹고,
-   * 상대 마투수의 마구 횟수 0xd8509[레벨] 도 이 칸을 본다 (타석 화면이 `BattingStage.aceLevels` 로 받는다).
+   * 마투수의 마구 횟수 0xd8509[레벨] 도 이 칸을 본다 — 우리 마투수는 진행기가(`magicCountOfPitcher`),
+   * 상대 마투수는 타석 화면이 `BattingStage.aceLevels` 로 받는다.
    * 안 넘기면 모두 Lv1(0) — 배율 60% · 마구 3 회다.
    *
    * 넘기는 곳: 일반모드는 `generalModeSetup.teamGameOptionsOf(extra.aceLevels)` 가 App 의
@@ -340,8 +345,6 @@ export interface TeamGameOptions {
   readonly ourPitcherStaminas?: readonly number[]
   /** 상대 팀 투수 시작 스태미나 — 표 칸 차례. 뜻은 `ourPitcherStaminas` 와 같다 */
   readonly opponentPitcherStaminas?: readonly number[]
-  /** 이 경기에 쓸 수 있는 마구 횟수. 로스터 투수는 마구가 없어 기본 0 이다 */
-  readonly magicCount?: number
   /** 화면 배치 side (투영 원점 표 0xcfb18 의 칸) */
   readonly stageSide?: number
 }
@@ -604,6 +607,10 @@ export interface TeamGameProgress {
   readonly atBatPrepared: boolean
   /** 우리 투수 스태미나 0~10000 (레코드 +0x2c) */
   readonly stamina: number
+  /**
+   * **우리 팀 남은 마구 횟수** = s8 팀[+0x28] (0xaea10 이 읽고 0xae9c4 가 쓴다) — 팀당 한 칸이다.
+   * 마운드에 오른 투수로 채운다(`magicCountOfPitcher`): 선발은 경기 시작, 구원은 교체 때.
+   */
   readonly magicRemaining: number
   /**
    * **공 객체 +0x10** — 사람 투수가 던진 공에 실린 마구 번호 (0x3de10, H2 3-4). 되돌리는 코드가 없어
@@ -826,7 +833,8 @@ export function startTeamGame(options: TeamGameOptions, random: RandomPort): Tea
     pitcherJustChanged: false,
     atBatPrepared: false,
     stamina: ourPitcherStaminas[startingSlots.ours] ?? FULL_STAMINA,
-    magicRemaining: options.magicCount ?? 0,
+    // 팀 new 0xb891c 가 팀+0x28 을 −1 로 두고(b89b4~b89ba) 첫 타석 준비(상태 0xd 0x48d50 → 0xaebe4)가 선발로 채운다
+    magicRemaining: magicCountOfPitcher(ourPitcherEntry[startingSlots.ours] ?? ourPitcherEntry[0], options.aceLevels),
     // 공 객체 new — +0x10 = 0 (0x1239 new 의 0 채움은 원본 미확인 — H2 3-4)
     ballMagicNumber: 0,
     ourSpecialSwingRemaining: UNFILLED_SPECIAL_SWINGS,
@@ -2797,9 +2805,44 @@ function benchIndexesOf(
 }
 
 /**
+ * 마운드에 오른 투수의 **한 경기 마구 횟수** — 팀+0x28 을 채우는 `0xaebe4` (aee9a~aef24, H2 1-2):
+ * ```
+ * aee9a  P = 0xae83c(팀) ; P+0x18 == 0 → 0xae9c4(팀, 0)          ; 마구 없음
+ * aeea8  0xaea10(팀) < 0 일 때만:
+ * aeeb6    마투수 0xb633d(P) → n = s8 0xd8509[ s8 mgr[0x13a + 순번 0xb63a1(P)] ]   ; [3,4,5,6,7]
+ *          아니면           → n = u8 0xd84ff[ P+0x18 ]                          ; [0,4,5,6,7…]
+ * aef06    스킬 23(0xb62b4(P, 0x17)) 이면 n += 2
+ * ```
+ * 칸이 −1 이 되는 곳은 팀 new(0xb891c, b89b4~b89ba)와 투수 교체(aec7a · aee3e) 뿐이라, 이 값은 **그 투수가
+ * 마운드에 오를 때 한 번** 주어지고 이닝이 바뀌어도 다시 차지 않는다.
+ * 쓰기 0xae9c4 는 지금 투수 +0x18 이 0 이면 칸을 안 건드리지만, 읽기 0xaea10 도 그때 0 을 주므로 0 과 같다.
+ *
+ * ⚠️ 미해결: 스킬 23 혼신(+2) — 팀 경기 명단(`TeamEntryPitcher`)·로스터·마선수 표에 스킬 비트(+0x14)가 없어 늘 거짓.
+ */
+function magicCountOfPitcher(
+  pitcher: TeamEntryPitcher | undefined,
+  aceLevels: TeamGameOptions['aceLevels'],
+): number {
+  if (pitcher === undefined) return 0
+  const isAce = pitcher.aceIndex >= 0
+  return magicPitchCountOf({
+    number: pitcher.repertoire.magicId,
+    isAce,
+    // 레벨 = 전역 기록 mgr[0x13a + 순번] — 마투수는 열 칸 중 앞 다섯 (aeec8~aeee4)
+    aceLevel: isAce ? aceLevelOf(aceLevels, aceLevelSlotOf('투수', pitcher.aceIndex + 1)) : 0,
+    hasSpiritSkill: false,
+  })
+}
+
+/**
  * 교체 실행 `0xaf09c` → `0xaebe4`. 새 투수는 **제 레코드 스태미나**(`+0x2c`)로 서고 카운터가 0 이며,
  * `state[0xd]` 가 서서 **다음 한 투구 동안**은 다시 바뀌지 않는다 (0xaec64 memset · 0xa5e72).
  * 내려간 투수의 깎인 스태미나는 그 칸에 남는다 (`ourPitcherStaminas` 주석).
+ *
+ * 마구 횟수 팀+0x28: 교체 가지(aebfe~aec8a)가 투수 명단 0번 ↔ 고른 칸을 맞바꾼 뒤 `0xae9c4(팀, −1)` 로 칸을 비우고
+ * 같은 함수 끝(aee9a~)이 **새 투수로 다시 채운다** (`magicCountOfPitcher`). 내려간 투수의 남은 횟수는 버려진다.
+ * 내려간 투수는 다시 오를 수 없다 — 맞바꾼 뒤 0xb95b0 이 벤치 칸을 돌려 그를 맨 끝으로 보내고 벤치 투수 수
+ * 팀+0x33 을 하나 줄인다(aec1e~aec32) (웹은 `ourUsedPitchers` 로 벤치에서 뺀다).
  */
 function applyPitcherChange(
   progress: TeamGameProgress,
@@ -2819,6 +2862,10 @@ function applyPitcherChange(
       ourPitcherIndex: nextIndex,
       ourPitcherStaminas: withValueAt(progress.ourPitcherStaminas, progress.ourPitcherIndex, progress.stamina),
       stamina: progress.ourPitcherStaminas[nextIndex] ?? FULL_STAMINA,
+      magicRemaining: magicCountOfPitcher(
+        pitcherEntryAt(progress, progress.options.ourTeamId, nextIndex),
+        progress.options.aceLevels,
+      ),
       ourPitcherCounters: EMPTY_MOUND_COUNTERS,
       pitchCount: 0,
       // 기록달성이 보는 R 은 **새 투수의** 경기 기록이다(0xb8cec = team+0x244+4·team[0]) — 이 경기에 처음 서니 0
