@@ -69,6 +69,7 @@ export function titleSubjectOfPitcher(career: PitcherCareer): TitleSubject {
     lotteryFirstPrizes: 0,
     lotteryPurchases: 0,
     seenEventIds: career.seenEventIds,
+    // 칭호 판정 0x1a1c0 은 **보유** 비트(0xa3a74 — 0x1a380·0x1a768)를 본다. 장착이 아니다
     hasLegendSkill: hasPitcherSkill(career, LEGEND_SKILL),
   }
 }

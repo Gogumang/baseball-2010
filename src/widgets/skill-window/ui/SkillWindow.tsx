@@ -23,10 +23,18 @@ const TEXT = {
   확장됨: 136,
 } as const
 const textOf = (index: number) => ORIGINAL_MODE_TEXT[index] ?? ''
-const nameOf = (skillId: number) => ORIGINAL_SKILLS[skillId]?.name ?? ''
+const batterSkillNameOf = (skillId: number) => ORIGINAL_SKILLS[skillId]?.name ?? ''
+
+/** 창이 보는 칸 — 투수편(모드 3)도 같은 창(0x13140·0x147b0)을 쓰므로 칸 꼴만 받는다 */
+export type SkillWindowCareer = Pick<PlayerCareer, 'skillIds' | 'equippedSkillIds' | 'skillSlotLevel' | 'gamePoint'>
 
 interface SkillWindowProps {
-  readonly career: PlayerCareer
+  readonly career: SkillWindowCareer
+  /**
+   * 비트 → 이름 (0x8457c). 안 넘기면 타자편(표 번호 = 비트). 투수편은 비트 8 부터 표 번호 비트+16 이다
+   * (`pitcherSkillTableIdOf`).
+   */
+  readonly skillNameOf?: (skillId: number) => string
   /** 대화 번호 4(장착)·3(해제) 의 "예" — 0x1483c `0xa4b04(P, s, on)` */
   readonly onEquip: (skillId: number, on: boolean) => void
   /** 대화 번호 6(확장) 의 "예" — 0x1484c. G 가 넉넉할 때만 부른다 */
@@ -54,7 +62,8 @@ type Prompt =
  *    장착한 줄만 색을 바꾼다(근사). 아이템 쪽은 아직 없다.
  * ⚠️ G 부족 [65] 의 "예"(0xbcb49(장면, 0x8b) — 구매 화면으로 보임)는 웹에 갈 곳이 없어 닫기만 한다.
  */
-export function SkillWindow({ career, onEquip, onExpandSlots, onClose }: SkillWindowProps) {
+export function SkillWindow({ career, skillNameOf, onEquip, onExpandSlots, onClose }: SkillWindowProps) {
+  const nameOf = skillNameOf ?? batterSkillNameOf
   const skills = career.skillIds
   const [cursor, setCursor] = useState(0)
   const [prompt, setPrompt] = useState<Prompt | null>(null)

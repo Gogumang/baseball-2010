@@ -37,7 +37,7 @@ import {
 } from '@/pages/pitcher-league/model/pitcherGameOptions'
 import type { PitcherGameOptions, PitcherGameSummary } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
-import { MAXIMUM_GAME_POINT } from '@/entities/career/model/playerCareer'
+import { MAXIMUM_GAME_POINT, rebuildEquippedSkillIds } from '@/entities/career/model/playerCareer'
 import { isInfiniteGamePointOn } from '@/shared/lib/dev/devOptions'
 import type { GamePointWalletSession } from '@/entities/wallet/model/useGamePointWallet'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
@@ -104,6 +104,13 @@ function normalizePitcherCareer(raw: unknown): PitcherCareer | null {
     stats: { ...base.stats, ...saved.stats },
     careerStats: { ...base.careerStats, ...saved.careerStats },
     leaguePlayerStats: { ...base.leaguePlayerStats, ...saved.leaguePlayerStats },
+    /*
+     * 장착 칸(선수기록 +0x14)은 나중에 생긴 칸이다 — 바탕의 신인 값([0, 8])을 그대로 두면 보유와 어긋난다.
+     * 예전 웹엔 장착 창이 없어 장착은 모두 획득 때의 자동 장착(0xa4bd8 → 0xa4b04, 모드 3 도 같다)뿐이었으므로
+     * 타자편 저장(`localStorageSaveGame`)과 같이 보유 목록(얻은 차례)을 단계 0 에서 다시 자동 장착해 세운다.
+     * 슬롯 단계(+0x1c6)는 바탕의 0 이 그대로 들어간다.
+     */
+    equippedSkillIds: saved.equippedSkillIds ?? rebuildEquippedSkillIds(saved.skillIds ?? base.skillIds),
   }
 }
 

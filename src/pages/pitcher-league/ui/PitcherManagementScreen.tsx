@@ -3,6 +3,9 @@ import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCaree
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import { TitleListWindow } from '@/widgets/management/ui/TitleListWindow'
+import { SkillWindow } from '@/widgets/skill-window/ui/SkillWindow'
+import { pitcherSkillTableIdOf } from '@/entities/pitcher-career/model/pitcherCareer'
+import { ORIGINAL_SKILLS } from '@/shared/config/original/skills'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { usePitcherManagementMenu } from '@/pages/pitcher-league/model/usePitcherManagementMenu'
 import { PitcherStatusBoard } from '@/pages/pitcher-league/ui/PitcherStatusBoard'
@@ -36,7 +39,7 @@ export interface PitcherManagementScreenProps {
   readonly onNextGame: () => void
   /** [외출] 상태 112. 투수편 외출 지도가 아직 없으면 넘기지 않는다 — 그러면 칸이 알림만 띄운다 */
   readonly onOuting?: () => void
-  /** [아이템]·[장비착용]·[아이템/스킬] 상태 110·121·122. 투수편 상점이 없으면 넘기지 않는다 */
+  /** [아이템]·[장비착용] 상태 110·121. 투수편 상점이 없으면 넘기지 않는다 ([아이템/스킬] 122 는 화면이 스킬 창을 띄운다) */
   readonly onOpenShop?: () => void
   /** 105 취소 — 메인 메뉴 장면 0x103 */
   readonly onExit: () => void
@@ -52,6 +55,9 @@ export interface PitcherManagementScreenProps {
 function titleViewOf(career: PitcherCareer): PlayerCareer {
   return { ...createCareer(career.name), titleIds: career.titleIds, equippedTitle: career.equippedTitle }
 }
+
+/** 스킬 창 이름 — 0x8457c 가 모드 3 이면 비트 8 부터 표 번호 비트+16 을 읽는다 */
+const pitcherSkillNameOf = (skillBit: number) => ORIGINAL_SKILLS[pitcherSkillTableIdOf(skillBit)]?.name ?? ''
 
 export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
   const { career } = props
@@ -100,6 +106,16 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
         />
       )}
       {menu.subWindow === '기록실' && <PitcherRecordPanel career={career} tab={menu.recordWindowTab} />}
+      {/* 스킬 창 — 하위 상태 122. 타자편 위젯을 그대로 쓴다 (키 0x13140 · 대화 0x147b0 에 모드 갈림이 없다) */}
+      {menu.subWindow === '아이템/스킬' && (
+        <SkillWindow
+          career={career}
+          skillNameOf={pitcherSkillNameOf}
+          onEquip={menu.equipSkill}
+          onExpandSlots={menu.expandSkillSlots}
+          onClose={menu.closeWindow}
+        />
+      )}
 
       {menu.subWindow === null && menu.choice === null && (
         <Panel heading={menu.kind === '관리' ? '커맨드' : menu.kind}>

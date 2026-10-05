@@ -13,10 +13,11 @@ import { DEFAULT_PLAYER_SIDE, startPitcherGame } from '@/features/play-pitcher-g
 import { opponentOf } from '@/entities/league/model/league'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
-const 투수 = (overrides: Partial<PitcherCareer> = {}): PitcherCareer => ({
-  ...createPitcherCareer('테스트'),
-  ...overrides,
-})
+const 투수 = (overrides: Partial<PitcherCareer> = {}): PitcherCareer => {
+  const base = createPitcherCareer('테스트')
+  // 얻은 스킬은 자리가 있으면 자동 장착된다(0xa4bd8) — 따로 안 주면 보유 = 장착으로 둔다
+  return { ...base, ...overrides, equippedSkillIds: overrides.equippedSkillIds ?? overrides.skillIds ?? base.equippedSkillIds }
+}
 
 const 난수: RandomPort = {
   next: () => 0.5,
@@ -74,6 +75,21 @@ describe('경기 옵션 조립 — 커리어 → PitcherGameOptions', () => {
     expect(options.pitcherIsCoward).toBe(true)
     expect(options.pitcherEndures).toBe(true)
     expect(options.hasLuckSkill).toBe(true)
+  })
+
+  it('경기 스킬은 **장착** 칸(+0x14)만 본다 — 가졌어도 장착이 아니면 꺼진다 (0xa5e14 · 0xaebe4 · 0x33cbc 는 0xb62b4, 0xa741c 는 0xa4bf8)', () => {
+    const 보유만 = 투수({ skillIds: [18, 10, 6, 16, 17, 22, 23], equippedSkillIds: [], magicLevel: 2, selectedMagicNumber: 2 })
+    const options = pitcherGameOptionsOf(보유만)
+
+    expect(options.pitcherIsCoward).toBe(false)
+    expect(options.pitcherEndures).toBe(false)
+    expect(options.hasLuckSkill).toBe(false)
+    expect(options.pitcherIsSteady).toBe(false)
+    expect(options.pitcherIsTimid).toBe(false)
+    expect(options.pitcherIsCool).toBe(false)
+    // 혼신 23 의 +2 도 장착일 때만이다
+    expect(options.magicCount).toBe(5)
+    expect(pitcherGameOptionsOf({ ...보유만, equippedSkillIds: [23] }).magicCount).toBe(7)
   })
 
   it('팀 사기는 팀 레코드 s16 +2 — 전 팀 100 이다', () => {

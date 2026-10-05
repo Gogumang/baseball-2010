@@ -9,6 +9,7 @@ import type { LeaguePlayerStats } from '@/entities/league/model/leaguePlayerStat
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { equipmentBonusOf } from '@/entities/career/model/equipment'
 import { NO_EQUIPPED_TITLE } from '@/entities/career/model/titles'
+import { isSkillEquipped, setSkillEquipped } from '@/entities/career/model/playerCareer'
 import {
   MAXIMUM_PITCHER_ABILITY,
   PITCHER_ABILITY_ORDER,
@@ -38,6 +39,7 @@ import type { PitcherRookieProfile } from '@/entities/pitcher-career/model/pitch
  *   - 인기도 `+0x4a` · 평판 `+0x62`(경기 뒤 평가 0xa6218·0xa690c 가 모드로만 갈린다, P1 5-2·5-3)
  *   - 사기(0xa73c4 는 **한 줄만** 투수편 선발용으로 갈린다, P1 5-4) · 소지금 · 연봉 · G포인트
  *   - 스킬 보유 비트 `+0x1b8` · 마이너스 스킬 해제 플래그 `+0x1d0+k` · 칭호 · 서브 아이템 `+0x58+k`
+ *   - 스킬 **장착** 비트 = 선수기록 `+0x14` · 슬롯 단계 `P+0x1c6` (장착 동작 0xa4b04 가 모드 3·4 공용)
  *   - 장비 니블(부위 4칸) · 히든 오픈 (컬렉터 해금 id 만 투수 20·24·28·32 로 다르다, R12 5절)
  *   - 부상·질병·관리 주기 행동 플래그 · 외출 횟수 · 이벤트 진행 · 올해의 목표 칸
  *   - 리그 전적·리그 선수 성적·포스트시즌 (같은 0xb76dc·0xc2a48 을 쓴다)
@@ -176,7 +178,19 @@ export interface PitcherCareer {
   readonly morale: number
   readonly money: number
   readonly salary: number
+  /**
+   * 가진 스킬 — 보유 비트 `+0x1b8`. 번호는 **투수 비트 번호 0~23** 이다 — 8 이상은 표(skills.json) 번호
+   * `비트 + 16` 의 투수 스킬이다 (이름 0x8457c: 모드 3 이면 StrCOMMON[71 + 비트], `pitcherSkillTableIdOf`).
+   */
   readonly skillIds: readonly number[]
+  /**
+   * **장착한 스킬** — 선수기록 `+0x14` 비트 (타자편 `PlayerCareer.equippedSkillIds` 와 같은 칸, H-modes 6절 "장착 칸").
+   * 모드 3 의 기록은 0x1fc74 → 0x1fbd0 = `[저장+0x3c]` 다. 경기 스킬 효과(0xb62b4)·훈련(0x17f5c 의 0xa4bf8)·
+   * 경기 뒤 사기(0xa741c)는 보유가 아니라 이 칸만 본다.
+   */
+  readonly equippedSkillIds: readonly number[]
+  /** 플러스 스킬 장착 슬롯 단계 L (`P+0x1c6`, 0~2) — 상한 `[6,8,10][L]` (0xd7e8e) */
+  readonly skillSlotLevel: number
   readonly removedMinusSkillIds: readonly number[]
   readonly titleIds: readonly string[]
   /**
@@ -259,6 +273,10 @@ export function createPitcherCareer(
     money: STARTING_MONEY,
     salary: STARTING_SALARY,
     skillIds: STARTING_SKILL_IDS,
+    // 신인 스킬은 공통 초기화 0x11230 이 0xa4bd9 로 얻는다 — 그 자리에서 자동 장착(0xa4b04(P,s,1))된다
+    equippedSkillIds: STARTING_SKILL_IDS,
+    // +0x1c6 을 쓰는 곳은 확장(0x148f8) 하나뿐 — 새 선수는 0 으로 본다 (타자편과 같은 추정)
+    skillSlotLevel: 0,
     removedMinusSkillIds: [],
     titleIds: [],
     // 선수 +0x1c4 는 만들 때 −1 이다 — 기본정보 카드가 그 값이면 칭호 줄을 안 그린다 (0x11292)
@@ -343,8 +361,39 @@ export function gainPitcherAbility(career: PitcherCareer, gains: Partial<Pitcher
   return { ...career, ability }
 }
 
+/** 보유 비트(+0x1b8) — 0xa3a74. 엔딩 전설(0xa3ade)·칭호(0x1a1c0)처럼 **보유** 를 보는 곳이 쓴다 */
 export function hasPitcherSkill(career: PitcherCareer, skillId: number): boolean {
   return career.skillIds.includes(skillId)
+}
+
+/**
+ * 장착 비트(선수기록 +0x14) — 0xb62b4 / 0xa4bf8. 투수 경기의 스태미나 소모(0xa5e14 의 18·10)·마구 횟수
+ * (0xaebe4 의 23)·실투(0x33cbc)·경기 뒤 사기 행운(0xa741c)·훈련 병아리/몹쓸몸(0x17f5c)이 이 칸을 본다.
+ */
+export function isPitcherSkillEquipped(career: PitcherCareer, skillId: number): boolean {
+  return isSkillEquipped(career, skillId)
+}
+
+/**
+ * 장착 동작 0xa4b04(P, s, on) — 타자편 `setSkillEquipped` 를 그대로 탄다 (모드 3 도 같은 함수, 상한 0xd7e8e[P+0x1c6]).
+ * ⚠️ 모드 3 은 켤 때 팀 칸 `0xb51fd(팀, 0)` 에도 켜는데(0xa4b7a) 끌 때는 기록만 끈다(0xa4b96) —
+ *    그 칸이 기록(`[저장+0x3c]`)과 같은 칸인지 못 짚어 웹은 한 칸으로 둔다 (미해결, 모드 4 와 같은 물음).
+ */
+export function setPitcherSkillEquipped(career: PitcherCareer, skillId: number, on: boolean): PitcherCareer {
+  return setSkillEquipped(career, skillId, on)
+}
+
+/** 마지막 공통 스킬 비트 — 0x8457c: 비트 ≤ 7 이면 두 편 같은 이름 */
+const LAST_SHARED_SKILL_BIT = 7
+/** 모드 3 은 비트 8 부터 이름 칸을 16 칸 밀어 읽는다 (StrCOMMON[0x47 + 비트] = [55 + (비트 + 16)]) */
+const PITCHER_SKILL_TABLE_OFFSET = 16
+
+/**
+ * 투수 스킬 비트 → 표(skills.json·StrSKILL) 번호. 이름 함수 0x8457c(s):
+ *   `s ≤ 7 → StrCOMMON[0x37 + s]` · 그 밖에 모드 4(0x7b970) 면 `[0x37 + s]`, 아니면 `[0x47 + s]`.
+ */
+export function pitcherSkillTableIdOf(skillBit: number): number {
+  return skillBit <= LAST_SHARED_SKILL_BIT ? skillBit : skillBit + PITCHER_SKILL_TABLE_OFFSET
 }
 
 export function spendPitcherCycleAction(career: PitcherCareer): PitcherCareer {

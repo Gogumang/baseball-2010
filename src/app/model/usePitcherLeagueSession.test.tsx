@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { usePitcherLeagueSession } from '@/app/model/usePitcherLeagueSession'
 import { NO_EQUIPPED_TITLE } from '@/entities/career/model/titles'
+import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import { useGamePointWallet } from '@/entities/wallet/model/useGamePointWallet'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
@@ -311,6 +312,28 @@ describe('옛 저장 불러오기', () => {
 
     expect(result.current.career?.titleIds).toEqual(['이름 없는 신인', '닥터 K'])
     expect(result.current.career?.equippedTitle).toBe(NO_EQUIPPED_TITLE)
+  })
+
+  /**
+   * 장착 칸(+0x14)·슬롯 단계(+0x1c6)도 나중에 생긴 칸이다. 예전 웹엔 장착 창이 없었으니 장착은 획득 때의
+   * 자동 장착뿐 — 타자편 저장과 같이 보유 목록을 얻은 차례대로 단계 0(상한 6)에서 다시 자동 장착해 세운다.
+   */
+  it('장착 칸이 없는 옛 저장은 보유 스킬을 얻은 차례대로 자동 장착해 세운다 (0xa4bd8 → 0xa4b04)', () => {
+    const store = 메모리저장()
+    // 플러스 0,8,1,6,7,9 (여섯) → 21 은 상한에 걸려 못 끼고, 마이너스 3·18 은 상한과 무관하게 낀다
+    store.save({ name: '옛투수', skillIds: [0, 8, 3, 1, 6, 7, 9, 21, 18] } as object)
+
+    const { result } = 띄우기(store)
+
+    expect(result.current.career?.equippedSkillIds).toEqual([0, 8, 3, 1, 6, 7, 9, 18])
+    expect(result.current.career?.skillSlotLevel).toBe(0)
+  })
+
+  it('저장한 장착 칸·슬롯 단계는 그대로 돌아온다', () => {
+    const store = 메모리저장()
+    store.save({ ...createPitcherCareer('저장'), skillIds: [0, 8, 6], equippedSkillIds: [0, 6], skillSlotLevel: 1 })
+
+    expect(띄우기(store).result.current.career).toMatchObject({ equippedSkillIds: [0, 6], skillSlotLevel: 1 })
   })
 
   it('이름이 없는 값은 커리어로 보지 않는다', () => {

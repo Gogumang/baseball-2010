@@ -5,7 +5,7 @@ import {
   GAMES_PER_MANAGEMENT_CYCLE,
   gainPitcherAbility,
   gainPitcherMorale,
-  hasPitcherSkill,
+  isPitcherSkillEquipped,
   pitcherAbilityLimitsOf,
   spendPitcherCycleAction,
 } from '@/entities/pitcher-career/model/pitcherCareer'
@@ -41,6 +41,10 @@ const SLOW_GAIN_RANGE: IntegerRange = BALANCE.training.legGainRange
 const MORALE_LOSS_RANGE: IntegerRange = BALANCE.training.moraleLossRange
 const ROOKIE_SKILL = BALANCE.training.rookieSkillId
 const WEAK_BODY_SKILL = BALANCE.training.weakBodySkillId
+/*
+ * 병아리(0)·몹쓸몸(3)은 훈련 함수 0x17f5c 가 **장착** 비트(0xa4bf8 — 0x17ffc·0x1827a·0x182e2·0x18384·
+ * 0x185ae·0x18612·0x18922)로 본다. 함수가 모드 3·4 공용이라 투수도 같다 (타자편 training.ts 와 같은 갈래).
+ */
 
 /** 마구 레벨 훈련 — 필살타법 창(0x17828)이 투수 탭에도 같은 표를 쓴다 (H-4 · R7 4절) */
 const MAGIC_REQUIRED_SESSIONS: readonly number[] = BALANCE.specialSwing.requiredSessions
@@ -134,8 +138,8 @@ export function runPitcherTraining(
 function moraleLossOf(career: PitcherCareer, random: RandomPort, range: IntegerRange): number {
   return (
     roll(random, range) -
-    (hasPitcherSkill(career, ROOKIE_SKILL) ? 1 : 0) +
-    (hasPitcherSkill(career, WEAK_BODY_SKILL) ? 2 : 0)
+    (isPitcherSkillEquipped(career, ROOKIE_SKILL) ? 1 : 0) +
+    (isPitcherSkillEquipped(career, WEAK_BODY_SKILL) ? 2 : 0)
   )
 }
 
@@ -148,7 +152,7 @@ function runAbilityTraining(
   const slot = PITCHER_ABILITY_ORDER.indexOf(ability)
   const rolled = roll(random, slot >= 2 ? SLOW_GAIN_RANGE : GAIN_RANGE)
   const skillGain =
-    (hasPitcherSkill(career, ROOKIE_SKILL) ? 1 : 0) - (hasPitcherSkill(career, WEAK_BODY_SKILL) ? 2 : 0)
+    (isPitcherSkillEquipped(career, ROOKIE_SKILL) ? 1 : 0) - (isPitcherSkillEquipped(career, WEAK_BODY_SKILL) ? 2 : 0)
   const gains: Partial<PitcherAbility> = { [ability]: rolled + skillGain }
   const moraleLoss = moraleLossOf(career, random, MORALE_LOSS_RANGE)
   const spent = spendPitcherCycleAction(gainPitcherMorale(career, -moraleLoss))

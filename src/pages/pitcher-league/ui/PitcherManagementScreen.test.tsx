@@ -26,6 +26,8 @@ const 투수 = (overrides: Partial<PitcherCareer> = {}): PitcherCareer => ({
   morale: 50,
   skillIds: [],
   ...overrides,
+  // 얻은 스킬은 자리가 있으면 자동 장착된다(0xa4bd8) — 따로 안 주면 보유 = 장착으로 둔다
+  equippedSkillIds: overrides.equippedSkillIds ?? overrides.skillIds ?? [],
 })
 
 interface 화면옵션 {
@@ -223,6 +225,39 @@ describe('선수정보 하위 메뉴 (상태 106 · 점프표 0xcc69c)', () => {
       '구질',
       '기록실',
     ])
+  })
+
+  it('[아이템/스킬] 은 스킬 창(122)이다 — 비트 8 부터 투수 이름(비트+16)으로 늘어놓고, 해제하면 장착만 끈다 (0x8457c · 0xa4b04)', () => {
+    const onSave = vi.fn()
+    화면({ career: 투수({ skillIds: [0, 8] }), onSave })
+
+    누르기('선수정보')
+    누르기('아이템/스킬')
+    // 비트 8 = 표 24 "신선함" (타자편이면 "의외성")
+    expect(screen.queryByRole('button', { name: '의외성' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '신선함' }))
+    expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain('해제하시겠습니까')
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+
+    const saved = onSave.mock.calls[0][0] as PitcherCareer
+    expect(saved.equippedSkillIds).toEqual([0])
+    expect(saved.skillIds).toEqual([0, 8])
+  })
+
+  it('스킬 창이 가득 차면 5000 G 확장을 묻고, "예" 면 G 를 깎고 단계 1(상한 8)로 저장한다 (0x1484c)', () => {
+    const onSave = vi.fn()
+    const plus = [0, 1, 6, 7, 8, 9]
+    화면({ career: 투수({ skillIds: [...plus, 10], equippedSkillIds: plus, gamePoint: 6000 }), onSave })
+
+    누르기('선수정보')
+    누르기('아이템/스킬')
+    // 비트 10 = 표 26 "끈기"
+    fireEvent.click(screen.getByRole('button', { name: '끈기' }))
+    expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain('5000')
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+
+    expect(onSave.mock.calls[0][0]).toMatchObject({ skillSlotLevel: 1, gamePoint: 1000 })
+    expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain('8개로 확장')
   })
 
   it('[구질] 은 팝업 0x78 을 거쳐 보기 창(123)으로 간다 — 훈련 창이 아니다', () => {

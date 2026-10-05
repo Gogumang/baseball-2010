@@ -18,6 +18,8 @@ const 투수 = (overrides: Partial<PitcherCareer> = {}): PitcherCareer => ({
   morale: 50,
   skillIds: [],
   ...overrides,
+  // 얻은 스킬은 자리가 있으면 자동 장착된다(0xa4bd8) — 따로 안 주면 보유 = 장착으로 둔다
+  equippedSkillIds: overrides.equippedSkillIds ?? overrides.skillIds ?? [],
 })
 const 메뉴 = (id: string) => PITCHER_TRAINING_MENUS.find((menu) => menu.id === id)!
 
@@ -60,6 +62,17 @@ describe('능력 훈련 (0x17f5c → 0xa3bac 종류 0~3, 칸 번호로만 갈린
     expect(runPitcherTraining(before, 메뉴('제구'), 최대).career.ability.control).toBe(before.ability.control + 6)
     expect(runPitcherTraining(before, 메뉴('체력'), 최소).career.ability.stamina).toBe(before.ability.stamina + 5)
     expect(runPitcherTraining(before, 메뉴('체력'), 최대).career.ability.stamina).toBe(before.ability.stamina + 7)
+  })
+
+  it('병아리(0)·몹쓸몸(3)은 **장착** 비트로 본다 — 가졌어도 장착이 아니면 보정이 없다 (0x17f5c → 0xa4bf8)', () => {
+    const before = 투수()
+    const 장착 = 투수({ skillIds: [0], equippedSkillIds: [0] })
+    const 보유만 = 투수({ skillIds: [0], equippedSkillIds: [] })
+
+    expect(runPitcherTraining(장착, 메뉴('제구'), 최소).career.ability.control).toBe(before.ability.control + 5)
+    expect(runPitcherTraining(장착, 메뉴('제구'), 최소).moraleLoss).toBe(4)
+    expect(runPitcherTraining(보유만, 메뉴('제구'), 최소).career.ability.control).toBe(before.ability.control + 4)
+    expect(runPitcherTraining(보유만, 메뉴('제구'), 최소).moraleLoss).toBe(5)
   })
 
   it('훈련하면 사기가 떨어지고 이번 주기의 행동을 쓴다', () => {

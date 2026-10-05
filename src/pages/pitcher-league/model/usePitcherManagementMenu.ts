@@ -2,7 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { BALANCE } from '@/shared/config/original/balance'
 import type { MenuItem } from '@/shared/ui'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { pitcherAbilityLimitsOf, pitcherFormOfCareer } from '@/entities/pitcher-career/model/pitcherCareer'
+import {
+  pitcherAbilityLimitsOf,
+  pitcherFormOfCareer,
+  setPitcherSkillEquipped,
+} from '@/entities/pitcher-career/model/pitcherCareer'
+import { expandSkillSlots } from '@/entities/career/model/skillEquip'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { PITCHER_ABILITY_NAMES, PITCHER_ABILITY_ORDER } from '@/entities/pitcher-career/model/pitcherAbility'
 import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbility'
@@ -56,8 +61,8 @@ import {
  */
 
 export type PitcherMenuKind = '관리' | '선수정보' | '트레이닝'
-/** 하위 창 — 원본 상태 119 · 123 · 108 · 124 자리 */
-export type PitcherMenuWindow = '기본정보' | '구질목록' | '구질훈련' | '기록실' | null
+/** 하위 창 — 원본 상태 119 · 123 · 108 · 124 · 122(아이템/스킬) 자리 */
+export type PitcherMenuWindow = '기본정보' | '구질목록' | '구질훈련' | '기록실' | '아이템/스킬' | null
 
 export interface PitcherMenuQuestion {
   readonly text: string
@@ -80,7 +85,7 @@ export interface UsePitcherManagementMenuInput {
   readonly onNextGame: () => void
   /** [외출] 상태 112. 투수편 외출 지도가 아직 없으면 넘기지 않는다 */
   readonly onOuting?: () => void
-  /** [아이템]·[장비착용]·[아이템/스킬] 상태 110·121·122. 투수편 상점이 없으면 넘기지 않는다 */
+  /** [아이템]·[장비착용] 상태 110·121. 투수편 상점이 없으면 넘기지 않는다 */
   readonly onOpenShop?: () => void
   /** 105 취소 — 메인 메뉴 장면 0x103 */
   readonly onExit: () => void
@@ -121,6 +126,10 @@ export interface PitcherManagementMenu {
   readonly closeWindow: () => void
   /** 구질 훈련 창(108)이 돌려준 커리어를 저장한다 */
   readonly saveTrainedPitch: (career: PitcherCareer) => void
+  /** 스킬 창(122) 대화 번호 4(장착)·3(해제) — 0x1483c `0xa4b04(P, s, on)` */
+  readonly equipSkill: (skillId: number, on: boolean) => void
+  /** 스킬 창(122) 대화 번호 6 — 슬롯 확장 0x1484c. G 가 모자라면 아무것도 안 바뀐다 */
+  readonly expandSkillSlots: () => void
 }
 
 /** 마구 훈련 G포인트 — 필살타법 창과 같은 표 (BALANCE.specialSwing, H-4 · R7 4절) */
@@ -261,7 +270,12 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
   const selectPlayerInfo = useCallback(
     (id: string) => {
       if (id === '기본정보') return setSubWindow('기본정보')
-      if (id === '장비착용' || id === '아이템/스킬') return openOrNotice(onOpenShop)
+      if (id === '장비착용') return openOrNotice(onOpenShop)
+      /*
+       * [아이템/스킬] 하위 상태 122 — 스킬 창. 메뉴 표 0xcc69c 와 확인 키 0x13140 · 대화 0x147b0 에
+       * 모드 갈림이 없어 투수편도 타자편과 같은 창이다 (이름만 0x8457c 가 모드 3 이면 비트+16 칸을 읽는다).
+       */
+      if (id === '아이템/스킬') return setSubWindow('아이템/스킬')
       if (id === '구질') return openPitchWindow(false)
       /*
        * [기록실] — StrMODE[74] 두 갈래 팝업(0x80)이 `장면+0x164` 를 정하고 **124** 로 간다.
@@ -278,7 +292,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
         },
       })
     },
-    [onOpenShop, openChoice, openPitchWindow],
+    [onOpenShop, openChoice, openPitchWindow, openOrNotice],
   )
 
   const selectTraining = useCallback(
@@ -461,6 +475,18 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     [onSave],
   )
 
+  /** 0xa4b04 켜기는 0xb663c 가 곧바로 저장(0x1f1e1)한다 — 웹은 `onSave` 가 저장이다 */
+  const equipSkill = useCallback(
+    (skillId: number, on: boolean) => onSave(setPitcherSkillEquipped(career, skillId, on)),
+    [career, onSave],
+  )
+
+  /** G 는 `career.gamePoint` 를 깎으면 세션의 지갑 다리가 전역 G 에 옮긴다 (`usePitcherLeagueSession`) */
+  const expandPitcherSkillSlots = useCallback(() => {
+    const result = expandSkillSlots(career)
+    if (result.kind === '확장') onSave(result.career)
+  }, [career, onSave])
+
   const items = itemsOf(kind, career)
 
   return {
@@ -487,6 +513,8 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     chooseOption,
     closeWindow,
     saveTrainedPitch,
+    equipSkill,
+    expandSkillSlots: expandPitcherSkillSlots,
   }
 }
 

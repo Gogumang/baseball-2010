@@ -59,6 +59,7 @@ export function judgePitcherEnding(career: PitcherCareer): number | null {
   if (year < FIRST_ENDING_YEAR) return null
   if (year === FIRST_ENDING_YEAR && popularity <= 499) return PITCHER_RELEASE_ENDING
   if (year >= FINAL_YEAR) {
+    // 전설은 **보유** 비트로 본다 (0xa3ade → 0xa3a74, +0x1b8) — 장착 칸(+0x14)이 아니다
     if (popularity > 3500 && career.skillIds.includes(LEGEND_SKILL)) return 9
     if (popularity > 3000 && reputation > 699 && money > 399) return 8
     if (popularity > 2500 && reputation > 499) return 7

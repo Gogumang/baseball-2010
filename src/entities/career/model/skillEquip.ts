@@ -33,7 +33,10 @@ export function skillSlotExpansionCostOf(career: Pick<PlayerCareer, 'skillSlotLe
  */
 export type SkillConfirmKind = '해제불가' | '해제확인' | '장착확인' | '확장확인' | '최대'
 
-export function skillConfirmKindOf(career: PlayerCareer, skillId: number): SkillConfirmKind {
+/** 창·확장이 보는 칸 — 모드 3(투수편)도 같은 0x13140·0x147b0 을 타므로 칸 꼴만 받는다 */
+export type SkillSlots = Pick<PlayerCareer, 'equippedSkillIds' | 'skillSlotLevel'>
+
+export function skillConfirmKindOf(career: SkillSlots, skillId: number): SkillConfirmKind {
   if (isMinusSkill(skillId)) return '해제불가'
   if (isSkillEquipped(career, skillId)) return '해제확인'
   if (equippedPlusSkillCountOf(career) < plusSkillSlotLimitOf(career)) return '장착확인'
@@ -51,11 +54,11 @@ export function unequipSkill(career: PlayerCareer, skillId: number): PlayerCaree
   return setSkillEquipped(career, skillId, false)
 }
 
-export type SkillSlotExpansion =
+export type SkillSlotExpansion<T = PlayerCareer> =
   /** StrMODE[65] "G포인트가 부족합니다 … 구매 페이지로 이동하시겠습니까?" (2,2) */
   | { readonly kind: 'G포인트부족' }
   /** StrMODE[136] "플러스 스킬 장착 슬롯이 %d개로 확장되었습니다" — `slots` = 0xcc4f4[새 L] */
-  | { readonly kind: '확장'; readonly career: PlayerCareer; readonly slots: number }
+  | { readonly kind: '확장'; readonly career: T; readonly slots: number }
 
 /**
  * 대화 번호 6 — 슬롯 확장 (0x1484c, 확정).
@@ -63,11 +66,11 @@ export type SkillSlotExpansion =
  *   아니면 G −= 비용(0~99999 로 자름), **L = min(L + 1, 2)** 를 +0x1c6 에 쓰고 StrMODE[136].
  * ⚠️ 그 사이 0x22c29(저장, 모드 4 면 1 아니면 2, 비용) 을 부르는데 뜻을 못 짚었다 — 웹은 두지 않는다(미해결).
  */
-export function expandSkillSlots(career: PlayerCareer): SkillSlotExpansion {
+export function expandSkillSlots<T extends SkillSlots & Pick<PlayerCareer, 'gamePoint'>>(career: T): SkillSlotExpansion<T> {
   const cost = skillSlotExpansionCostOf(career)
   if (career.gamePoint < cost) return { kind: 'G포인트부족' }
   const level = Math.min(career.skillSlotLevel + 1, MAXIMUM_SKILL_SLOT_LEVEL)
-  const next: PlayerCareer = {
+  const next: T = {
     ...career,
     gamePoint: Math.min(MAXIMUM_GAME_POINT, Math.max(0, career.gamePoint - cost)),
     skillSlotLevel: level,

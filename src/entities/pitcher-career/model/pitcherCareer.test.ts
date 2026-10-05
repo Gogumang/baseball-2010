@@ -8,7 +8,9 @@ import {
   isPitcherManagementCycleOpen,
   pitcherAbilityLimitsOf,
   pitcherFormOfCareer,
+  pitcherSkillTableIdOf,
   seasonEarnedRunAverageOf,
+  setPitcherSkillEquipped,
   startNextPitcherSeason,
 } from '@/entities/pitcher-career/model/pitcherCareer'
 import type { PitcherCareer, PitcherGameOutcome } from '@/entities/pitcher-career/model/pitcherCareer'
@@ -138,5 +140,34 @@ describe('시즌 넘기기 · 방어율', () => {
     expect(seasonEarnedRunAverageOf({ ...투수().stats, outs: 27, runsAllowed: 3 })).toBe(300)
     expect(seasonEarnedRunAverageOf({ ...투수().stats, outs: 0, runsAllowed: 1 })).toBe(9999)
     expect(seasonEarnedRunAverageOf(투수().stats)).toBe(0)
+  })
+})
+
+describe('스킬 장착 칸 (선수기록 +0x14) — 모드 3 도 장착 동작 0xa4b04 를 탄다', () => {
+  it('신인 스킬 0·8 은 얻는 자리(0x11230 → 0xa4bd9)에서 자동 장착되고 슬롯 단계는 0 이다', () => {
+    const career = createPitcherCareer('테스트')
+
+    expect(career.equippedSkillIds).toEqual(career.skillIds)
+    expect(career.skillSlotLevel).toBe(0)
+  })
+
+  it('플러스 스킬은 상한 [6,8,10][+0x1c6] 에서 못 끼고, 마이너스(18 비겁자)는 상한을 안 본다', () => {
+    const plus = [0, 1, 6, 7, 8, 9]
+    const full = 투수({ skillIds: [...plus, 10, 18], equippedSkillIds: plus })
+
+    expect(setPitcherSkillEquipped(full, 10, true).equippedSkillIds).toEqual(plus)
+    expect(setPitcherSkillEquipped(full, 18, true).equippedSkillIds).toEqual([...plus, 18])
+    expect(setPitcherSkillEquipped({ ...full, skillSlotLevel: 1 }, 10, true).equippedSkillIds).toEqual([...plus, 10])
+    // 해제는 장착만 끈다 — 보유는 그대로다 (0xb66dc)
+    const off = setPitcherSkillEquipped(full, 6, false)
+    expect(off.equippedSkillIds).toEqual([0, 1, 7, 8, 9])
+    expect(off.skillIds).toEqual(full.skillIds)
+  })
+
+  it('이름 칸은 0x8457c 대로 비트 ≤ 7 은 그대로, 8 부터는 표 번호 비트+16 이다 (모드 3)', () => {
+    expect(pitcherSkillTableIdOf(6)).toBe(6)
+    expect(pitcherSkillTableIdOf(8)).toBe(24)
+    expect(pitcherSkillTableIdOf(18)).toBe(34)
+    expect(pitcherSkillTableIdOf(23)).toBe(39)
   })
 })
