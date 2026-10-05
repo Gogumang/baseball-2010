@@ -1,6 +1,7 @@
 import { swingResultOf } from '@/entities/batting/model/swingResult'
 import type { SwingMode } from '@/entities/batting/model/swingResult'
 import type { SwingSituation } from '@/entities/batting/model/swingSkills'
+import type { SwingBoost } from '@/entities/batting/model/swingBoost'
 import { timingOf } from '@/entities/batting/model/swingTiming'
 import { hitDirectionOf } from '@/entities/batting/model/hitDirection'
 import { drawPattern, outcomeOfPattern } from '@/entities/batting/model/battedBallOutcome'
@@ -48,6 +49,11 @@ export interface BattingContext {
    * 모아 두었다(유력 후보 = 마선수 레벨 `mgr[0x13a+idx]` 0~4). 앱이 그 값을 알게 되면 여기로 넘기면 된다.
    */
   readonly aceBonusLevel?: number
+  /**
+   * 이번 스윙·공의 **보정 구조체 0x34d6c** (필살타법 = 타자 쪽, 공에 실린 마구 = 투수 쪽).
+   * 원본은 판정 바로 앞(0x51294)에서 매번 만든다 — 타석 화면이 `swingBoostOf` 로 채운다. 안 넘기면 0.
+   */
+  readonly swingBoost?: SwingBoost
 }
 
 export interface PitchOutcomeDetail {
@@ -185,6 +191,7 @@ export function resolvePitch(
       mode: context.mode,
       isPitcherAce: context.isPitcherAce,
       aceBonusLevel: context.aceBonusLevel,
+      boost: context.swingBoost,
       isPitcherExhausted: false,
       batterSkillIds: context.batterSkillIds,
       pitcherSkillIds: [],

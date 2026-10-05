@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { swingFactorsOf, swingResultOf } from '@/entities/batting/model/swingResult'
 import type { SwingResultInput } from '@/entities/batting/model/swingResult'
+import { NO_SWING_BOOST } from '@/entities/batting/model/swingBoost'
+import type { SwingBoost } from '@/entities/batting/model/swingBoost'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
 const 기본입력 = (overrides: Partial<SwingResultInput> = {}): SwingResultInput => ({
@@ -139,5 +141,45 @@ describe('swingResultOf — 판정 순서', () => {
   it('타자 스킬 18 은 B 를 10% 깎는다', () => {
     const 기본 = swingFactorsOf(기본입력())
     expect(swingFactorsOf(기본입력({ batterSkillIds: [18] })).solid).toBe(기본.solid - Math.trunc(기본.solid / 10))
+  })
+})
+
+describe('보정 구조체 0x34d6c — 필살타법·마구 (0xab4dc · 0xabd92)', () => {
+  const 보정 = (overrides: Partial<SwingBoost>): SwingBoost => ({ ...NO_SWING_BOOST, ...overrides })
+
+  it('out[0]·out[2] 는 타자 히트·파워에 그대로 더한다 — 능력치 +150 과 같다 (contact 에도 들어간다)', () => {
+    expect(swingFactorsOf(기본입력({ boost: 보정({ batterHit: 150, batterPower: 150 }) }))).toEqual(
+      swingFactorsOf(기본입력({ batter: { hit: 450, power: 450 } })),
+    )
+  })
+
+  it('out[4]·out[6] 은 투수 구속·제구에 배율 **앞**에 더한다', () => {
+    const 결과 = swingFactorsOf(기본입력({ controlTier: 5, boost: 보정({ pitcherVelocity: 180, pitcherControl: 200 }) }))
+    expect(결과).toEqual(swingFactorsOf(기본입력({ controlTier: 5, pitcher: { velocity: 480, control: 500 } })))
+  })
+
+  it('out[0xa]·out[0xb] 는 스킬 보정 뒤에 B += B·%/100, C += C·%/100 (0 쪽 버림)', () => {
+    const 스킬만 = swingFactorsOf(기본입력({ batterSkillIds: [18] }))
+    const 결과 = swingFactorsOf(기본입력({ batterSkillIds: [18], boost: 보정({ solidPercent: 15, homeRunPercent: 6 }) }))
+    expect(결과.contact).toBe(스킬만.contact)
+    expect(결과.solid).toBe(스킬만.solid + Math.trunc((스킬만.solid * 15) / 100))
+    expect(결과.homeRun).toBe(스킬만.homeRun + Math.trunc((스킬만.homeRun * 6) / 100))
+  })
+
+  it('마구 % 도 타자 B·C 를 **올린다** — 원본 부호 그대로', () => {
+    const 마구 = swingFactorsOf(기본입력({ boost: 보정({ pitcherVelocity: 150, pitcherControl: 150, solidPercent: 10, homeRunPercent: 7 }) }))
+    const 능력만 = swingFactorsOf(기본입력({ pitcher: { velocity: 450, control: 450 } }))
+    expect(마구.solid).toBe(능력만.solid + Math.trunc((능력만.solid * 10) / 100))
+    expect(마구.homeRun).toBe(능력만.homeRun + Math.trunc((능력만.homeRun * 7) / 100))
+  })
+
+  it('상한(B 9000 · C 4500)은 % 를 더한 **뒤**에 판정에서 자른다 — 난수 차례는 그대로', () => {
+    const random = 순서난수([0, 0, 0, 0])
+    expect(swingResultOf(기본입력({ boost: 보정({ batterHit: 220, batterPower: 220, solidPercent: 20, homeRunPercent: 9 }) }), random)).toEqual({
+      kind: '타구',
+      code: 24,
+      isSolid: true,
+    })
+    expect(random.draws).toHaveLength(4)
   })
 })

@@ -3,6 +3,8 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { applySwingSkills } from '@/entities/batting/model/swingSkills'
 import type { SwingSituation } from '@/entities/batting/model/swingSkills'
+import { NO_SWING_BOOST } from '@/entities/batting/model/swingBoost'
+import type { SwingBoost } from '@/entities/batting/model/swingBoost'
 
 /**
  * 스윙 결과 (binary.mod 0xab214 — 디컴파일 전문 대조). 정수 나눗셈은 모두 0쪽으로 자른다.
@@ -13,8 +15,16 @@ import type { SwingSituation } from '@/entities/batting/model/swingSkills'
  * 하드코딩 폴백(0xb6f28)과 값이 완전히 같다. 아래 상수는 그 표에서 가져왔다.
  * 능력치 이름(히트·파워 / 제구·구속)은 StrMODE 순서로 붙였다.
  *
- * **생략**: 존 보정 네 쌍(batPower·batExtra·pitPower·pitExtra 와 pctA~D) — 원본은 투구 존
- * 구조체 12바이트를 그대로 받는데 웹판에는 그 구조체가 아직 없다.
+ * 12바이트 스택 인자(예전 주석의 "존 보정 네 쌍·pctA~D")는 투구 존이 아니라 **필살타법·마구 보정
+ * 구조체 0x34d6c** 다 — `boost` 로 받는다 (`swingBoost.ts`). 쓰이는 자리:
+ * ```
+ * ab4dc: hit 쪽   = eff(타자 히트) + out[0] + aB − 배율·(eff(투수 구속) + out[4] + aP)/100
+ * ab502: power 쪽 = eff(타자 파워) + out[2] + aB − 배율·(eff(투수 제구) + out[6] + aP)/100
+ * abd92: (스킬 보정 뒤) if out[0xa]: B += B·out[0xa]/100 ; if out[0xb]: C += C·out[0xb]/100
+ * abdcc: if out[8]: B += …  ; if out[9]: C += …     ; 0x34d6c 가 늘 0 으로 채운다
+ * ```
+ * hit 쪽 값은 contact 식에도 들어간다 (0xab648 `K·hit/1000 + 1200`) — 구조체가 contact 를 안 바꾼다는
+ * H2 2절의 말은 존 시작값(sp34) 이야기다.
  * 팀 플래그로 켜지는 ±10(원본 모드 3·4 가 아닐 때)·+100(모드 6) 보정도 뺐다 — 어떤 웹 모드가
  * 원본 모드 번호에 해당하는지 확정하지 못했다.
  */
@@ -48,6 +58,8 @@ export interface SwingResultInput {
    * 안 넘기면 0 이고, 그러면 보너스가 표의 최댓값(타자 400 · 투수 400) 그대로다.
    */
   readonly aceBonusLevel?: number
+  /** 보정 구조체 0x34d6c (필살타법·마구). 안 넘기면 0 (보통 스윙에 마구가 실리지 않은 공) */
+  readonly boost?: SwingBoost
   readonly isPitcherExhausted: boolean
   readonly batterSkillIds: readonly number[]
   readonly pitcherSkillIds: readonly number[]
@@ -135,9 +147,15 @@ export function swingFactorsOf(input: SwingResultInput): SwingFactors {
   // 마선수 계수는 육성 모드에서 타자·투수 중 한쪽이라도 마선수일 때만 쓴다
   const isAceFormula = isCareerMode && (input.isBatterAce === true || input.isPitcherAce === true)
 
+  const boost = input.boost ?? NO_SWING_BOOST
   const multiplier = input.controlTier < 0 ? NEUTRAL_MULTIPLIER : TIER_MULTIPLIERS[Math.min(input.controlTier, 5)]
-  const hitEdge = input.batter.hit + batterBonus - trunc((multiplier * (input.pitcher.velocity + pitcherBonus)) / 100)
-  const powerEdge = input.batter.power + batterBonus - trunc((multiplier * (input.pitcher.control + pitcherBonus)) / 100)
+  // 0xab4dc~0xab5a2 — 구조체 out[0]·out[2] 는 타자 쪽, out[4]·out[6] 은 투수 쪽(배율 앞)에 더한다
+  const hitEdge =
+    input.batter.hit + boost.batterHit + batterBonus -
+    trunc((multiplier * (input.pitcher.velocity + boost.pitcherVelocity + pitcherBonus)) / 100)
+  const powerEdge =
+    input.batter.power + boost.batterPower + batterBonus -
+    trunc((multiplier * (input.pitcher.control + boost.pitcherControl + pitcherBonus)) / 100)
   const scaledContact = trunc((baseContact * (300 - multiplier)) / 200)
 
   const contact = input.buntKind > 0
@@ -163,7 +181,10 @@ export function swingFactorsOf(input: SwingResultInput): SwingFactors {
   const homeRun = trunc(((baseHomeRun + exhausted + homeRunWeight + SWING_STRENGTH_BONUS) * timingScale) / 100)
 
   const skilled = applySwingSkills({ solid, homeRun }, input.batterSkillIds, input.pitcherSkillIds, input.situation)
-  return { contact, solid: skilled.solid, homeRun: skilled.homeRun }
+  // 0xabd92~0xabe02 — 스킬 보정 뒤, 상한(0xabeba) 앞. 마구 % 도 부호가 양수라 타자 쪽을 올린다 (원본 그대로)
+  const boostedSolid = skilled.solid + trunc((skilled.solid * boost.solidPercent) / 100)
+  const boostedHomeRun = skilled.homeRun + trunc((skilled.homeRun * boost.homeRunPercent) / 100)
+  return { contact, solid: boostedSolid, homeRun: boostedHomeRun }
 }
 
 /** 원본 난수 순서: 번트용 rand(0,100) → contact → B → C → 15/18 경계 */

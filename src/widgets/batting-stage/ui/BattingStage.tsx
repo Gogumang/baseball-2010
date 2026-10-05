@@ -30,6 +30,8 @@ import type { AcePitcherFrames, StageHud } from '@/widgets/batting-stage/model/s
 import { useStageAnimation } from '@/widgets/batting-stage/model/useStageAnimation'
 import { useStageControls } from '@/widgets/batting-stage/model/useStageControls'
 import { rollSpecialSwing } from '@/entities/batting/model/specialSwing'
+import { pitcherBoostSideOf, swingBoostOf } from '@/entities/batting/model/swingBoost'
+import { aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
 import * as styles from '@/widgets/batting-stage/ui/BattingStage.css'
 
 interface BattingStageProps {
@@ -164,6 +166,21 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
       situation: situationOf(latest.hud, latest.recentAtBatCodes, latest.batterForm),
       // 마선수가 등판했으면 원본 isAce 가 켜진 것과 같다 (0xab214 의 마선수 계수·보너스)
       isPitcherAce: latest.acePitcher !== null,
+      // 보정 구조체 0x34d6c — 판정 바로 앞(0x51294)에서 이번 스윙(S+0x10)·공(P+0x10)으로 만든다
+      swingBoost: swingBoostOf(
+        {
+          // S+0x10 = 타자 +0x18 (0x51e40). 마타자 레코드 +0x18 은 5~9 (H2 4-1) — 0 만 아니면 된다
+          number: swing !== null && specialArmedRef.current ? (aceBatterIndex >= 0 ? aceBatterIndex + 5 : specialSwingNumber) : 0,
+          isAce: aceBatterIndex >= 0,
+          aceOrder: Math.max(aceBatterIndex, 0),
+          aceLevel: aceBatterIndex >= 0 ? aceLevelOf(latest.aceLevels, aceLevelSlotOf('타자', aceBatterIndex + 1)) : 0,
+          // 번호(+0x18)를 가진 비마선수는 육성·명전(비트7)뿐이다 — 일반 선수 레코드는 +0x18 이 모두 0 (H2 4-2)
+          isOwnPlayer: aceBatterIndex < 0 && specialSwingNumber > 0,
+        },
+        pitcherBoostSideOf(pitch.magicNumber ?? 0, pitch.pitcherMagicNumber ?? 0, (order) =>
+          aceLevelOf(latest.aceLevels, aceLevelSlotOf('투수', order + 1)),
+        ),
+      ),
     }
     // 걸어 둔 필살은 스윙 객체 +0x10 에 실린다 (0x51e40) — 헛스윙 바람 소리 27 이 이걸 본다 (0x5132e)
     const judgedSwing = swing !== null && specialArmedRef.current ? { ...swing, isSpecial: true } : swing

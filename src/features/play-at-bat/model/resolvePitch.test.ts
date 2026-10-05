@@ -155,3 +155,30 @@ describe('resolvePitch — 스윙한 경우', () => {
     else expect(detail.resolution.kind).toBe('파울')
   })
 })
+
+describe('resolvePitch — 보정 구조체 0x34d6c 를 판정에 싣는다', () => {
+  /** 앞 몇 개만 정하고 나머지는 0.5 */
+  const 앞값 = (values: readonly number[]): RandomPort => {
+    let index = 0
+    return {
+      next: () => {
+        const value = values[index] ?? 0.5
+        index += 1
+        return value
+      },
+      nextInRange: () => 0,
+      pick: (items) => items[0],
+    }
+  }
+  const 덱 = () => createPatternDeck(createSeededRandom(7))
+  const 필살 = { batterHit: 220, batterPower: 220, pitcherVelocity: 0, pitcherControl: 0, solidPercent: 20, homeRunPercent: 9 }
+
+  it('같은 난수에서 B 굴림이 보정 없이는 못 넘고 필살 보정으로는 넘는다 — 잘 맞은 타구(15·18·24 계열)가 된다', () => {
+    // 번트 r100 → contact 0 → B 0.7 (7000 — 보통 5548 · 필살 7621) → C 0.99 → 15/18 경계
+    const 보통 = resolvePitch(직구(), { frame: 16, shift: 0, buntKind: 0 }, 상황, 덱(), 앞값([0, 0, 0.7, 0.99]))
+    const 보정 = resolvePitch(직구(), { frame: 16, shift: 0, buntKind: 0 }, { ...상황, swingBoost: 필살 }, 덱(), 앞값([0, 0, 0.7, 0.99]))
+    expect(보통.detail.resultCode).not.toBeNull()
+    expect(보통.detail.resultCode! < 15).toBe(true)
+    expect(보정.detail.resultCode! >= 15).toBe(true)
+  })
+})
