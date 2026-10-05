@@ -754,6 +754,46 @@ describe('엔트리 편집 0xe0 (0x63dc · 0x7044 · 편집기 0x55864)', () => 
     expect((store.load() as { roster: { pitchers: { id: number }[] } }).roster.pitchers[0]?.id).toBe(2)
   })
 
+  it('경기는 고친 명단 차례로 선다 — 옵션 ourEntryOrder = 시즌 저장 레코드 차례 (0xb891c → 0xb8680)', () => {
+    const { result } = 경기정보까지()
+    act(() => result.current.actions.openEntryEdit(true))
+    for (const key of ['확인', '아래', '아래', '확인', '오른'] as const) act(() => result.current.actions.pressEntryKey(key))
+    act(() => result.current.actions.startPendingGame())
+
+    const order = result.current.gameOptions?.ourEntryOrder
+    expect(order?.pitchers.slice(0, 3)).toEqual([2, 1, 0])
+    expect(order?.batters.length).toBe(result.current.roster.batters.length)
+    expect(order?.batters[0]).toEqual({
+      rosterSlot: result.current.roster.batters[0]!.id,
+      position: result.current.roster.batters[0]!.fieldPosition & 0xf,
+    })
+  })
+
+  it('국가대항전 대한민국 명단(+0x918)은 대회 내내 남는다 — 다음 대회 경기도 고친 차례로 선다', () => {
+    const { result } = 띄우기()
+    act(() => result.current.actions.chooseTeam(3))
+    act(() => result.current.actions.confirmIncome({
+      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
+    }))
+    act(() => result.current.actions.updateRecord({ ...result.current.state!.record, yearIndex: 2 }))
+    act(() => result.current.actions.finishSeason())
+    act(() => result.current.actions.playCupGame(10, 11))
+    act(() => result.current.actions.toggleMatchSettings())
+    act(() => result.current.actions.openEntryEdit(true))
+    for (const key of ['확인', '아래', '아래', '확인', '오른'] as const) act(() => result.current.actions.pressEntryKey(key))
+    // 시즌 팀 명단은 그대로다
+    expect(result.current.roster.pitchers.map((p) => p.id).slice(0, 3)).toEqual([0, 1, 2])
+    act(() => result.current.actions.startPendingGame())
+    expect(result.current.gameOptions?.ourEntryOrder?.pitchers.slice(0, 3)).toEqual([2, 1, 0])
+    act(() => result.current.actions.finishGame(요약({ ourTeamId: 10, opponentTeamId: 11 })))
+
+    act(() => result.current.actions.playCupGame(10, 12))
+    expect(result.current.matchInfoStarterName).not.toBeNull()
+    act(() => result.current.actions.startPendingGame())
+    // 둘째 날도 같은 슬롯 — 로테이션은 날짜로 셈하고 명단 차례는 이어진다
+    expect(result.current.gameOptions?.ourEntryOrder?.pitchers.slice(0, 3)).toEqual([2, 1, 0])
+  })
+
   it("'6' 은 CPU 팀 엔트리 — 보기 전용이라 OK 가 안 먹고, 왼쪽 끝(2)으로 돌아온다", () => {
     const { result } = 경기정보까지()
     const before = result.current.roster

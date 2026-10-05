@@ -37,8 +37,8 @@ import type { EntryBatterRow, EntryLists, EntryPitcherRow } from '@/entities/sea
  * - 상대 팀(this+0x120 = 0)은 보기 전용이라 고칠 일이 없다. 웹은 상대 팀 명단을 붙박이 표에서 만든다.
  *   원본은 상대 팀에도 굴린 마선수(`0x66968`·`0x66994`)를 넣는다 — 팀 경기는 옵션 `seasonOpponentAces`(경기 시작에서
  *   굴림) 또는 `opponentAces`(미리 굴린 값)로 받는다. 0xdd 진입에서 미리 굴려 이 목록에 끼우는 것은 부르는 쪽 몫이다.
- * - 국가대항전의 대한민국 레코드(`+0x918`)는 대회 내내 이어지지만 웹 세이브에 그 칸이 없어 **그 경기 하나에만**
- *   남는다(`useSeasonSession` 의 대회 명단).
+ * - 국가대항전의 대한민국 레코드(`+0x918`)는 대회 내내 이어진다 — 웹은 시즌 세이브의 `cupRoster` 에 둔다
+ *   (`useSeasonSession`, 대회를 열 때 표에서 채우고 대회가 끝나면 비운다).
  */
 
 /** 편집기 목록 한 줄 (타자) */

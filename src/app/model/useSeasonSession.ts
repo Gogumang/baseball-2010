@@ -47,13 +47,13 @@ import {
 } from '@/entities/season-mode/model/entryEditor'
 import type { EntryEditorState, EntryKey } from '@/entities/season-mode/model/entryEditor'
 import {
-  seasonEntryListsOf, seasonRosterOfEntry, seasonStarterNameOf, tableRosterOf,
+  seasonEntryListsOf, seasonEntryOrderOf, seasonRosterOfEntry, seasonStarterNameOf, tableRosterOf,
 } from '@/entities/season-mode/model/seasonEntry'
 import type { SeasonEntryInput, SeasonEntryLists } from '@/entities/season-mode/model/seasonEntry'
 import { HALL_OF_FAME_FIRST_ID } from '@/entities/season-mode/model/playerRecruit'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
-import { createNationalCup, nationalCupSideOf } from '@/entities/national-cup/model/nationalCup'
+import { KOREA_TEAM_ID, createNationalCup, nationalCupSideOf } from '@/entities/national-cup/model/nationalCup'
 import { advanceNationalCupDay } from '@/entities/national-cup/model/nationalCupPlay'
 import { isSeasonNationalCupYear } from '@/entities/national-cup/model/nationalCupFlow'
 import type { NationalCupFinish } from '@/entities/national-cup/model/nationalCupFlow'
@@ -142,7 +142,7 @@ export interface SeasonSession {
   readonly entryEdit: SeasonEntryEdit | null
   /**
    * 경기정보 0xdd "선발" 줄의 내 팀 값 — 엔트리 편집이 고친 명단의 투수 0번(0x5e0e8). 경기 전 흐름 밖이면 null.
-   * ⚠️ 웹 팀 경기는 아직 이 명단을 안 받는다 (`seasonEntry.seasonEntryOrderOf` 주석).
+   * 팀 경기도 같은 명단 차례로 선다 (옵션 `ourEntryOrder`).
    */
   readonly matchInfoStarterName: string | null
   readonly notice: string
@@ -224,6 +224,12 @@ interface SeasonSave {
   readonly ranking?: readonly number[]
   /** 진행 중인 국가대항전 (L+0xa8~0xc3). 대회 밖이면 null */
   readonly cup?: NationalCup | null
+  /**
+   * 국가대항전 대한민국 명단 — 원본 저장의 대표팀 슬롯 `+0x918`. 대회 초기화 `b7c72 0x205c0` 이 마스터 팀 10 을
+   * 깊은 복사해 채우고 **대회 내내 남는다**(하루 끝 0xb818c 는 스태미나만 다시 채우고 명단은 안 건드린다) —
+   * 엔트리 편집(0xe0)이 고친 차례가 다음 대회 경기로 이어진다. 대회 밖이면 null(없으면 표에서 만든다).
+   */
+  readonly cupRoster?: SeasonTeamRoster | null
   /**
    * 경기진행 설정 시즌 칸 (저장 +0x12c+m 계열, m = 1). ⚠️ 원본은 **전역 저장**이라 시즌을 새로 해도
    * 남지만 웹에는 그 전역 저장 객체가 없어 시즌 저장에 둔다 — 근사.
@@ -396,11 +402,6 @@ export function useSeasonSession(
   const [openedStadiumIds, setOpenedStadiumIds] = useState<readonly number[]>([])
   /** 엔트리 편집 0xe0 — 편집 객체와 목록 */
   const [entryEdit, setEntryEdit] = useState<SeasonEntryEdit | null>(null)
-  /**
-   * 국가대항전 대한민국 명단 — 원본은 저장의 대표팀 슬롯 `+0x918`(대회 내내 이어진다)을 고친다.
-   * ⚠️ 웹 세이브에 그 칸이 없어 **경기정보에 새로 들어올 때마다 표에서 다시 만든다** — 그 경기 하나에만 남는다.
-   */
-  const [cupEntryRoster, setCupEntryRoster] = useState<SeasonTeamRoster | null>(null)
 
   /**
    * 지금 들고 있는 G — **화면도 판정도 이 값 하나만 본다.**
@@ -535,6 +536,10 @@ export function useSeasonSession(
         teamAbilities: save.state.teamAbilities,
         // 마선수 레벨 — 0xb6414 가 모드를 가리지 않고 전역 mgr[0x13a + i] 를 읽는다 (b9f896b·e2ee55a)
         aceLevels,
+        // 시즌 저장의 팀 레코드 차례 그대로 — 경기용 팀 객체 0xb891c 는 첨자만 들고 선수는 0xb8680 으로 같은
+        // 레코드(0x1f570)에서 읽으므로 엔트리 편집(0xe0)이 고친 차례가 곧 타순·벤치·투수 차례다 (c041959).
+        // 경기정보 뒤에 편집이 끼면 `startPendingGame` 이 고친 명단으로 다시 싣는다
+        ourEntryOrder: seasonEntryOrderOf(save.roster),
       }
     },
     [aceLevels, save],
@@ -637,7 +642,6 @@ export function useSeasonSession(
   const enterMatchInfo = useCallback(
     (current: SeasonSave, pending: PendingSeasonGame) => {
       setPendingGame(pending)
-      setCupEntryRoster(null)
       const firstTime = current.matchSettingsSeen !== true
       if (firstTime) commit({ ...current, matchSettingsSeen: true })
       setIsMatchSettingsOpen(firstTime)
@@ -693,12 +697,18 @@ export function useSeasonSession(
     const withAces = pendingGame.kind === '국가대항전'
       ? {}
       : { acePitcherId: preGameAces.pitcher, aceBatterId: preGameAces.batter }
+    // 0xdd 에서 엔트리 편집(0xe0)을 다녀왔으면 명단이 바뀌었다 — 경기는 지금 저장 레코드 차례로 선다.
+    // 국가대항전은 대표팀 슬롯(+0x918) 명단이다
+    const roster = pendingGame.kind === '국가대항전'
+      ? save.cupRoster ?? tableRosterOf(pendingGame.options.ourTeamId)
+      : save.roster
     clearGameRecord(save)
     setIsMatchSettingsOpen(false)
     setGameKind(pendingGame.kind)
     setGameOptions({
       ...pendingGame.options,
       settings: save.matchSettings ?? FULL_PLAY_SETTINGS,
+      ourEntryOrder: seasonEntryOrderOf(roster),
       ...withAces,
     })
     setPendingGame(null)
@@ -737,7 +747,7 @@ export function useSeasonSession(
       if (pending.kind === '국가대항전') {
         const teamId = pending.options.ourTeamId
         return {
-          teamId, roster: cupEntryRoster ?? tableRosterOf(teamId), dayCounter, acePitcherId: -1, aceBatterId: -1,
+          teamId, roster: current.cupRoster ?? tableRosterOf(teamId), dayCounter, acePitcherId: -1, aceBatterId: -1,
         }
       }
       return {
@@ -748,7 +758,7 @@ export function useSeasonSession(
         aceBatterId: preGameAces.batter,
       }
     },
-    [cupEntryRoster, preGameAces],
+    [preGameAces],
   )
 
   /**
@@ -797,8 +807,8 @@ export function useSeasonSession(
       if (lists !== entryEdit.lists && entryEdit.isUserTeam && save !== null && pendingGame !== null) {
         const source = userEntrySourceOf(save, pendingGame)
         const roster = seasonRosterOfEntry(source.roster, lists, source.dayCounter)
-        if (pendingGame.kind === '국가대항전') setCupEntryRoster(roster)
-        else commit({ ...save, roster })
+        // 국가대항전은 대표팀 슬롯 +0x918 — 대회 내내 남는다
+        commit(pendingGame.kind === '국가대항전' ? { ...save, cupRoster: roster } : { ...save, roster })
         // 명단 첨자를 새 명단에 맞춰 다시 세운다 (줄 순서는 같다)
         lists = seasonEntryListsOf({ ...source, roster })
       }
@@ -1068,7 +1078,8 @@ export function useSeasonSession(
       //   b7ca4 0x20648(g, 모드, b7614(L, 4, 1))  ; 첫날 상대 = 마스터 팀 복사 → +0x934
       //   b81e0 0xb818c 대회 갈래(L+0xac): L+0x32++ · L+0xad-- · 팀10 스태미나 10000 다시 ·
       //   b8216 0x20648(g, 모드, b7614(L, L+0xad, 1), 그게 10 이면 칸 0)  ; **하루마다 다음 상대를 마스터에서 새로**
-      // 웹은 경기마다 teamBatters/teamPitchers(10·상대) 마스터 명단으로 치므로 명단 자체는 같다.
+      // 대한민국 명단은 저장의 `cupRoster`(+0x918, 대회 초기화에서 표로 채움)라 엔트리 편집이 대회 내내 남는다.
+      // 상대국은 매일 마스터에서 새로 덮이므로 웹의 붙박이 표와 같다.
       //
       // 선발 — 로테이션 0xb5ca8 은 **팀 레코드를 제자리에서** 한 칸 당긴다(셈이 아니라 상태다):
       //   대한민국: 대회 첫날 새로 만든 슬롯이 L+0x32 ≠ 0 인 날마다 한 칸씩 → 선발 = cup.day % 4 (확정)
@@ -1101,6 +1112,7 @@ export function useSeasonSession(
         //    그대로 두면 다음 정규 경기마다 다시 대회 화면으로 샌다 (S6 1절).
         state: { ...save.state, record: { ...record, nationalCupChampion: finish.champion } },
         cup: null,
+        cupRoster: null,
       })
       setNotice(
         finish.openedTeams.length === 0
@@ -1268,6 +1280,8 @@ export function useSeasonSession(
         ...save,
         state: { ...save.state, record: { ...record, nationalCup: true } },
         cup: createNationalCup(),
+        // b7c72 0x205c0 — 대표팀 슬롯 +0x918 을 마스터 팀 10 으로 새로 채운다
+        cupRoster: tableRosterOf(KOREA_TEAM_ID),
       })
       return setScene(SEASON_SCENE_STATE.국가대항전)
     }
