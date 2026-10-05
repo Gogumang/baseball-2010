@@ -1818,7 +1818,7 @@ export function cpuSpecialThrowOf(
  * 특수 송구의 도착 틱 — `defenseArrivalTicks`(0xaf284) 의 "커버 있음" 갈래를 **중계 없이,
  * 속도만 +0xd8 로 바꿔** 그대로 따른다 (특수면 0xb3444 가 중계를 끼우지 않는다).
  */
-function specialThrowArrivalTicks(context: DefenseContext, base: number, thrower: FielderState): number {
+export function specialThrowArrivalTicks(context: DefenseContext, base: number, thrower: FielderState): number {
   const { play, fielders } = context
   const cover = fielders[play.coverOfBase[wrapBase(base)] ?? NONE]
   if (cover === undefined) return defenseArrivalTicks(context, base)
