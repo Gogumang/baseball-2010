@@ -11,6 +11,7 @@ import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCaree
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import { DEFAULT_PLAYER_SIDE, startPitcherGame } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { opponentOf } from '@/entities/league/model/league'
+import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
 const 투수 = (overrides: Partial<PitcherCareer> = {}): PitcherCareer => {
@@ -33,6 +34,16 @@ describe('경기 옵션 조립 — 커리어 → PitcherGameOptions', () => {
     expect(options.ourTeamId).toBe(3)
     expect(options.opponentTeamId).toBe(opponentOf(4, 3))
     expect(options.playerSide).toBe(DEFAULT_PLAYER_SIDE)
+  })
+
+  it('정규시즌 측은 0xb7844 일정표 갈래 — 짝 중 번호가 큰 팀은 첫 9일 원정(선공)이다', () => {
+    // 0일째 1 대 0 — 1 이 원정
+    expect(pitcherGameOptionsOf(투수({ teamId: 1, gamesPlayed: 0 })).playerSide).toBe(PLAYER_SIDE_FIRST_BAT)
+    expect(pitcherGameOptionsOf(투수({ teamId: 0, gamesPlayed: 0 })).playerSide).toBe(PLAYER_SIDE_LAST_BAT)
+    // 9일째부터는 뒤집혀 1 이 홈
+    expect(pitcherGameOptionsOf(투수({ teamId: 1, gamesPlayed: 9 })).playerSide).toBe(PLAYER_SIDE_LAST_BAT)
+    // 직접 준 측이 이긴다
+    expect(pitcherGameOptionsOf(투수({ teamId: 1 }), { playerSide: PLAYER_SIDE_LAST_BAT }).playerSide).toBe(PLAYER_SIDE_LAST_BAT)
   })
 
   it('날짜 카운터 g 는 지금까지 치른 경기 수다 (시즌+0xb2, 0xb818c 가 +1)', () => {

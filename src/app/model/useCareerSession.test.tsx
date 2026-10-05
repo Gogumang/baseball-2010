@@ -679,6 +679,17 @@ describe('타자편 포스트시즌 대진 128 — 사람이 친다 (0x120a4 · 
     expect(rendered.result.current.session.progress?.opponentTeamId).toBe(series?.teams[1])
   })
 
+  it('정규시즌 홈/원정도 0xb7844 — 일정표 짝 중 번호가 큰 팀은 첫 9일 원정이라 선공이다', () => {
+    // 0일째 1 대 0 — 1 이 원정(선공), 0 은 홈(후공)
+    const 원정 = 띄우기({ ...createCareer('원정'), teamId: 1 })
+    act(() => 원정.result.current.session.actions.runCommand('다음경기'))
+    expect(원정.result.current.session.progress?.game.playerSide).toBe(PLAYER_SIDE_FIRST_BAT)
+
+    const 홈 = 띄우기({ ...createCareer('홈'), teamId: 0 })
+    act(() => 홈.result.current.session.actions.runCommand('다음경기'))
+    expect(홈.result.current.session.progress?.game.playerSide).toBe(PLAYER_SIDE_LAST_BAT)
+  })
+
   it('홈/원정은 0xb7844 포스트시즌 갈래 — 대진 윗 시드(칸 0)가 후공, 아랫 시드는 선공이다', () => {
     // 준PO 는 3위(2) 대 4위(3) — 4위는 아랫 시드라 선공
     const 아랫시드 = 띄우기(시즌끝선수({ teamId: 3, gamesPlayed: 46, regularSeasonRewardTaken: true }))

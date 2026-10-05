@@ -362,7 +362,7 @@ export function useCareerSession({
       opponentTeamId: number | undefined,
       /** 리그 날짜 카운터 g — 4인 로테이션이 본다 (`시즌+0xb2` 자리, 커리어는 `gamesPlayed`) */
       dayCounter = 0,
-      /** 내 팀이 앉는 측 (`0xb7844` → `경기[0x28+side]`). 안 주면 후공 — 정규시즌·국가대항전 자리 */
+      /** 내 팀이 앉는 측 (`0xb7844` → `경기[0x28+side]`). 안 주면 후공 — 국가대항전 자리 (그 갈래는 아직 안 옮겼다) */
       playerSide: PlayerSide = PLAYER_SIDE_LAST_BAT,
     ) => {
       // 환경설정 "주루" 를 경기에 태운다 — 타자편은 사람이 늘 공격이라 설정이 그대로 먹는다 (0xae690)
