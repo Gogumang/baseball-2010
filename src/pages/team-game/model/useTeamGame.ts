@@ -127,6 +127,11 @@ export interface TeamGameSession {
      * `reachedTargetTick` 이면 틱 10 의 굴림 8 번을 진행기가 먼저 낸다.
      */
     readonly finishBenchClearing: (reachedTargetTick: boolean) => void
+    /**
+     * 경기 끝 결과 판(상태 0x18)에서 OK — 정산(0x19)으로 넘어간다. 승리 31 · 패배 32 징글은 경기가 끝나는 자리가
+     * 아니라 **0x19 진입(결과 적재 0x4ea0c)** 이 내므로 이 자리에서 낸다 (투수편 c016ab0 과 같은 자리).
+     */
+    readonly enterSettlement: () => void
   }
 }
 
@@ -158,11 +163,6 @@ export function useTeamGame(options: TeamGameOptions, random: RandomPort): TeamG
         ...pinchHitSoundIdsOf(current, after),
         // 사람 장면 CPU 투수 교체(0x3d954 → 0xac428)도 같은 0x16 연출 — 22 뒤 올라온 투수 등판음
         ...scenePitcherChangeSoundIdsOf(current, after),
-        // 경기 결과 징글 31/32 — 상태 0x19(결과 적재 0x4ea0c)에서 난다.
-        // 무승부는 원본이 어느 쪽을 내는지 문서에 없어 `gameResultSoundIdOf` 가 비워 둔다
-        ...(after.game.isFinished && !current.game.isFinished
-          ? [gameResultSoundIdOf(summaryOf(after).result)]
-          : []),
       ])
       return after
     }
@@ -279,8 +279,14 @@ export function useTeamGame(options: TeamGameOptions, random: RandomPort): TeamG
           ],
         )
       },
+      enterSettlement: () => {
+        const finished = progressRef.current
+        if (!finished.game.isFinished) return
+        // 무승부는 원본이 어느 쪽을 내는지 문서에 없어 `gameResultSoundIdOf` 가 비워 둔다
+        playSoundIds(audio, [gameResultSoundIdOf(summaryOf(finished).result)])
+      },
     }),
-    [random, step],
+    [audio, random, step],
   )
 
   const summary = useMemo(

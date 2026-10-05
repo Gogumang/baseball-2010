@@ -293,7 +293,11 @@ export function TeamGameScreen({
         side0Score={ourSide === 0 ? game.ourScore : game.opponentScore}
         side1Score={ourSide === 1 ? game.ourScore : game.opponentScore}
         names={[names.win, names.loss, names.save]}
-        onConfirm={() => setEndBoardClosed(true)}
+        onConfirm={() => {
+          setEndBoardClosed(true)
+          // 정산 0x19 진입 — 승리 31 · 패배 32 징글 (0x4ea0c)
+          actions.enterSettlement()
+        }}
       />
     )
   }
