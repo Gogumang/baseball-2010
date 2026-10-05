@@ -64,8 +64,12 @@ function truncated(value: number): number {
   return value < 0 ? Math.ceil(value) : Math.floor(value)
 }
 
+/** 0x34334 가 휘두르기로 정한 뒤의 갈래 — 표에서 뽑은 choice 0(치기)·1(번트) */
+export type CpuSwingChoice = '치기' | '번트'
+
 /**
- * CPU 타자가 휘두르는가 — 원본 0x34334 (사람이 투구할 때만 도는 길, 부르는 곳 0x51f26).
+ * CPU 타자가 휘두르는가, 휘두른다면 표에서 무엇을 뽑았나 — 원본 0x34334
+ * (사람이 투구할 때만 도는 길, 부르는 곳 0x51f26). 지켜보면 null.
  *
  * ```
  * choice = 0x9f224(0x9f190(pat, S, B, O, 주자))   ; rand(0,100) 한 번
@@ -81,12 +85,12 @@ function truncated(value: number): number {
  * ⚠️ 아직 안 옮긴 것 — 원본은 실투(0x33cbc)면 choice 를 0 으로 **강제**하고,
  *    h 는 실효 히트(0xb570d: 컨디션·스킬 보정)다. 웹에는 둘 다 없어 날 히트를 쓴다.
  */
-export function willSwing(
+export function cpuSwingChoiceOf(
   pitch: Pitch,
   ability: BatterAbility,
   random: RandomPort,
   situation: BatterSituation = UNWIRED_SITUATION,
-): boolean {
+): CpuSwingChoice | null {
   const odds = battingPatternOdds(
     situation.strikes,
     situation.balls,
@@ -95,17 +99,50 @@ export function willSwing(
   )
   // 0x9f224 — rand(0,100), 위끝 제외
   const choice = battingPatternChoiceOf(odds, randomIntegerBelow(random, 0, 100))
-  if (choice === '지켜보기') return false
+  if (choice === '지켜보기') return null
 
   const zone = swingZoneOf(pitch.plate)
   // 히트가 높을수록 덜 쫓는다. 원본 비교는 `rand > 문턱` 이면 그만둔다 = 같으면 쫓는다.
-  if (zone === 3) {
-    return randomIntegerBelow(random, 0, 10000) <= 250 - truncated(ability.hit / 4)
+  if (zone === 3 && randomIntegerBelow(random, 0, 10000) > 250 - truncated(ability.hit / 4)) return null
+  if (zone === 2 && randomIntegerBelow(random, 0, 10000) > 2000 - truncated((ability.hit * 3) / 2)) {
+    return null
   }
-  if (zone === 2) {
-    return randomIntegerBelow(random, 0, 10000) <= 2000 - truncated((ability.hit * 3) / 2)
-  }
-  return true
+  return choice
+}
+
+/** CPU 타자가 휘두르는가 — `cpuSwingChoiceOf` 에서 치기·번트를 가리지 않은 것 */
+export function willSwing(
+  pitch: Pitch,
+  ability: BatterAbility,
+  random: RandomPort,
+  situation: BatterSituation = UNWIRED_SITUATION,
+): boolean {
+  return cpuSwingChoiceOf(pitch, ability, random, situation) !== null
+}
+
+/** 0x3445a — 번트 종류 rand(1,4) → 1·2·3 (사람 번트 키 '8'=1 · '7'=2 · '9'=3 과 같은 칸 +0xfdc) */
+const BUNT_KIND_MINIMUM = 1
+const BUNT_KIND_LIMIT = 4
+
+/**
+ * 휘두르기로 정한 뒤 번트 종류 — 원본 0x34446~0x34464 (타이밍 0x340f8 **다음**에 돈다).
+ *
+ * ```
+ * scene[+0xfdc] = 0
+ * if choice == 1 and not 0xb633d(타자): scene[+0xfdc] = rand(1,4)   ; 번트 1~3
+ * ```
+ * 마선수(0xb633d = 레코드 [10] 비트6)는 번트 칸을 뽑아도 번트하지 않고 그냥 친다.
+ * 난수는 번트할 때만 한 번 돈다. 0 이면 보통 스윙이다.
+ */
+export function cpuBuntKindOf(choice: CpuSwingChoice, isMagicBatter: boolean, random: RandomPort): number {
+  if (choice !== '번트' || isMagicBatter) return 0
+  return randomIntegerBelow(random, BUNT_KIND_MINIMUM, BUNT_KIND_LIMIT)
+}
+
+/** 부르는 쪽이 넘기는 CPU 타자의 성질 */
+export interface CpuBatterTraits {
+  /** 마선수인가 (0xb633d = 선수 레코드 [10] 비트6) — 마선수는 번트하지 않는다 */
+  readonly isMagicBatter?: boolean
 }
 
 /** 스윙 프레임 F = N − 2 + d — d = 0 이 타이밍 100 이다 (0x34be0) */
@@ -153,9 +190,9 @@ const DEFAULT_PITCHER_STATS = { control: 500, velocity: 500 }
 /**
  * 투수편 한 구의 결과. 플레이어가 던지고 타자는 자동으로 반응한다.
  * 휘두른 뒤는 타자편과 같은 원본 스윙 결과(0xab214) → 방향 → 타구 패턴 → 대체 근사를 쓴다.
- * 휘두를지는 원본 0x34334(battingPattern.arr) 그대로다 — `willSwing` 참고.
+ * 휘두를지는 원본 0x34334(battingPattern.arr) 그대로다 — `cpuSwingChoiceOf` 참고.
  * **언제** 휘두를지는 원본 0x340f8 — `cpuSwingTimingOffsetOf` 참고.
- * ⚠️ 번트도 아직 없다 — 원본은 표에서 번트 칸이 뽑히면 rand(1,4) 로 번트 종류를 정한다.
+ * 표에서 번트 칸이 뽑히면 타이밍 뒤에 rand(1,4) 로 번트 종류를 정한다 (`cpuBuntKindOf`, 마선수 제외).
  */
 export function pitchAgainstBatter(
   pitch: Pitch,
@@ -163,8 +200,10 @@ export function pitchAgainstBatter(
   random: RandomPort,
   pitcher: { readonly control: number; readonly velocity: number } = DEFAULT_PITCHER_STATS,
   situation: BatterSituation = UNWIRED_SITUATION,
+  traits: CpuBatterTraits = {},
 ): PitchResolution {
-  if (!willSwing(pitch, batter, random, situation)) {
+  const choice = cpuSwingChoiceOf(pitch, batter, random, situation)
+  if (choice === null) {
     return isInsideStrikeZone(pitch.plate)
       ? { kind: '스트라이크', isSwinging: false }
       : { kind: '볼' }
@@ -172,12 +211,14 @@ export function pitchAgainstBatter(
 
   // 원본 0x34334 → 0x340f8: F = N − 2 + d
   const frame = pitch.frameCount - SWEET_FRAME_OFFSET + cpuSwingTimingOffsetOf(batter.hit, random)
+  // 0x3445a — 타이밍 굴림 **뒤**에 번트 종류
+  const buntKind = cpuBuntKindOf(choice, traits.isMagicBatter === true, random)
   const result = swingResultOf(
     {
       horizontalError: Math.round(pitch.plate.x * ZONE_HALF_PIXELS),
       verticalError: -Math.round(pitch.plate.y * ZONE_HALF_PIXELS) || 0,
       timing: timingOf(frame, pitch.frameCount, false),
-      buntKind: 0,
+      buntKind,
       controlTier: pitch.controlTier,
       batter,
       pitcher,
@@ -192,7 +233,11 @@ export function pitchAgainstBatter(
   if (result.kind === '헛스윙') return { kind: '스트라이크', isSwinging: true }
 
   const code = result.code + hitDirectionOf({ code: result.code, frame, frameCount: pitch.frameCount, batterSide: 0 }, random)
-  const batted = outcomeOfPattern(code, randomPattern(code, random), random)
+  // 2스트라이크 번트 파울은 아웃 (0x9d5e2) — 사람 타석(resolvePitch)과 같은 판정이다
+  const batted = outcomeOfPattern(code, randomPattern(code, random), random, {
+    strikes: situation.strikes,
+    buntKind,
+  })
   return batted.kind === '파울' ? { kind: '파울' } : { kind: '타구', outcome: batted.outcome }
 }
 

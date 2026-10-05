@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  cpuBuntKindOf,
+  cpuSwingChoiceOf,
   cpuSwingTimingOffsetOf,
   pitchAgainstBatter,
   willSwing,
@@ -185,6 +187,53 @@ describe('cpuSwingTimingOffsetOf — 원본 0x340f8', () => {
     expect((counts.get(1) ?? 0) / attempts).toBeCloseTo(0.302, 1)
     expect((counts.get(-1) ?? 0) / attempts).toBeCloseTo(0.106, 1)
     expect([...counts.keys()].sort()).toEqual([-1, 0, 1])
+  })
+})
+
+/**
+ * 번트 0x34446~0x34464 — 표에서 번트 칸(choice 1)이 뽑히고 마선수가 아니면 rand(1,4) 로 종류 1~3.
+ * 타이밍 0x340f8 **다음**에 굴린다.
+ */
+describe('CPU 번트 — 원본 0x3445a', () => {
+  it('표의 번트 칸을 뽑으면 번트를 고른다', () => {
+    // 0-0 주자 없음 = [60, 10, 30] → rand 65 는 번트
+    expect(cpuSwingChoiceOf(한가운데, 타자(500), 각본([0.65]), 무사주자없음)).toBe('번트')
+    expect(cpuSwingChoiceOf(한가운데, 타자(500), 각본([0.59]), 무사주자없음)).toBe('치기')
+    expect(cpuSwingChoiceOf(한가운데, 타자(500), 각본([0.7]), 무사주자없음)).toBeNull()
+  })
+
+  it('번트 종류는 rand(1,4) — 1·2·3 이고 한 번 굴린다', () => {
+    const kinds = [0, 0.34, 0.67, 0.9999].map((v) => cpuBuntKindOf('번트', false, 각본([v])))
+    expect(kinds).toEqual([1, 2, 3, 3])
+    const random = 각본([0.5])
+    cpuBuntKindOf('번트', false, random)
+    expect(random.used()).toBe(1)
+  })
+
+  it('치기거나 마선수면 번트하지 않고 굴리지도 않는다', () => {
+    const random = 각본([0.5])
+    expect(cpuBuntKindOf('치기', false, random)).toBe(0)
+    expect(cpuBuntKindOf('번트', true, random)).toBe(0)
+    expect(random.used()).toBe(0)
+  })
+
+  it('번트 칸이 뽑힌 공은 번트 결과(성공 6~8 · 실패 12~14 → 희생번트 등)로 끝난다', () => {
+    // 표 65(번트) → 타이밍 첫 갈래 2번 → 번트 종류 rand(1,4) 0 → 1 → 0xab214 번트 굴림 0 → 성공 코드 6
+    const random = 각본([0.65, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    const result = pitchAgainstBatter(한가운데, 타자(500), random, undefined, 무사주자없음)
+    expect(result).toEqual({ kind: '타구', outcome: { kind: '아웃', detail: '땅볼아웃' } })
+  })
+
+  it('마선수는 번트 칸을 뽑아도 휘두른다', () => {
+    // 같은 굴림으로 보통 타자는 희생번트, 마선수는 0xab214 보통 스윙(첫 굴림들이 0 이라 강타)이다
+    const 굴림 = [0.65, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    expect(pitchAgainstBatter(한가운데, 타자(500), 각본(굴림), undefined, 무사주자없음)).toEqual({
+      kind: '타구',
+      outcome: { kind: '아웃', detail: '땅볼아웃' },
+    })
+    expect(
+      pitchAgainstBatter(한가운데, 타자(500), 각본(굴림), undefined, 무사주자없음, { isMagicBatter: true }),
+    ).toEqual({ kind: '타구', outcome: { kind: '안타', bases: 2 } })
   })
 })
 
