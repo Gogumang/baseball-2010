@@ -3,7 +3,7 @@ import { useRecoloredSprite } from '@/shared/lib/sprite/paletteSwap'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { effectiveAbilityOf } from '@/entities/career/model/condition'
 import { TEAMS } from '@/shared/config/original/teams'
-import { batterEquipmentOf, batterLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
+import { batterEquipmentOf, batterLayersOf, layerPaletteIndexOf } from '@/widgets/batting-stage/lib/batterLayers'
 import type { BatterLayer } from '@/widgets/batting-stage/lib/batterLayers'
 import {
   BATTING_TYPE_NAMES, FIGURE_BOX, FIGURE_FOOT, INFO_BOARD, POSITION_NAMES, RIGHT_PANEL, SIDE_NAMES, SKIN_NAMES,
@@ -41,7 +41,7 @@ export function BasicInfoCard({ career }: { readonly career: PlayerCareer }) {
         그림자는 끈다 — 같은 0x10810 의 0x1085c 가 `fig+0x48 = 0` 으로 둔다 (0x78dc6 이 슬롯 0 을 가른다).
       */}
       {batterLayersOf(0, career.battingTypeIndex, batterEquipmentOf(career.equipmentLevels), false).map((layer, index) => (
-        <LayerSprite key={index} layer={layer} />
+        <LayerSprite key={index} layer={layer} skinIndex={career.skinIndex} teamIndex={career.teamId} />
       ))}
       <RadarChart base={career.ability} shown={shown} />
       <div className={styles.cardPanel} style={{ left: INFO_BOARD.x, top: INFO_BOARD.y, width: INFO_BOARD.width, height: INFO_BOARD.height, background: INFO_BOARD.color }} />
@@ -56,13 +56,21 @@ export function BasicInfoCard({ career }: { readonly career: PlayerCareer }) {
  * `FrameSprite` 를 못 쓰고 `<img>` 를 직접 놓는 이유는 등록 화면 `LayerSprite` 와 같다 —
  * 칠한 그림이 데이터 URL 이라 `src` 를 밖에서 넣어야 한다.
  *
- * ⚠️ 몸통(피부 × 15 + 팀, 0x78be8)·헬멧(팀, 0x78c14) 팔레트는 아직 안 붙였다 —
- * 이 카드는 예전부터 구운 색 그대로였고, 이번 손질은 **장비**만 붙인다.
+ * 몸통·헬멧은 **피부 × 15 + 팀** · **팀** 벌로 칠한다 (`layerPaletteIndexOf`). 근거 C-1:
+ *   0x10810 이 그림 적재(vtbl+8 = 0x78ab0)에 넘기는 값 — r1 = `[[this+0xb0]+1]`(내 팀, 셋업 0x173b0 이
+ *   쓰는 그 칸) · r3 = `rec[0xb]` bit2-3(피부)
+ *   78be8: 몸통 "bat/batter_balancer|sluger" 팔레트 = 피부 × 15 + 팀
+ *   78c14: 헬멧 "bat/batter_helmet" 팔레트 = 팀
+ * 장비 손·다리는 등급 줄이 먼저다 — 한 겹이 두 벌을 같이 쓰는 일은 없다.
  */
-function LayerSprite({ layer }: { readonly layer: BatterLayer }) {
+function LayerSprite({ layer, skinIndex, teamIndex }: {
+  readonly layer: BatterLayer
+  readonly skinIndex: number
+  readonly teamIndex: number
+}) {
   const origins = useFrameOrigins(layer.folder)
   const key = String(layer.frame).padStart(3, '0')
-  const src = useRecoloredSprite(`${layer.folder}/${key}.png`, layer.gradePaletteRow ?? null)
+  const src = useRecoloredSprite(`${layer.folder}/${key}.png`, layerPaletteIndexOf(layer, skinIndex, teamIndex))
   const origin = origins?.[key]
   if (origin === undefined) return null
   return (
