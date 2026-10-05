@@ -86,8 +86,8 @@ interface MissionSessionInput {
   /**
    * 마선수 레벨 `mgr[0x13a + idx]` (idx 0~4 마투수 · 5~9 마타자 → 0~4 = Lv1~5).
    * 0xb6414 가 마선수 능력치마다 배율 0xd88aa[레벨] 을 곱한다 (`entities/mission/model/aceLevel`).
-   * ⚠️ 웹엔 아직 이 저장도, 올리는 화면(스페셜 마선수 레벨업 0x5fb24)도 없어 앱은 넘기지 않는다 —
-   *    그러면 새 저장 값(0x9f26c 가 0 으로 채움) = Lv1 = 60% 다. 레벨업을 옮길 때 여기로 넘기면 된다.
+   * 앱은 전역 저장 칸(`useAceLevels`, 올리는 곳은 레벨업 창 0x5fb24 하나 — 스페셜 마선수 · 일반모드 `0` 키)의
+   * 값을 넘긴다 (28af409). 안 넘기면 새 저장 값(0x9f26c 가 0 으로 채움) = Lv1 = 60% 로 본다.
    */
   readonly aceLevels?: Readonly<Record<number, number>>
 }
