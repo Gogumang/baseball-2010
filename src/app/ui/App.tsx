@@ -165,7 +165,7 @@ export function App() {
         // 미션(모드 6)은 0x213c0(앱, 4, 0) 으로 나리 타자편 저장을 올린다 — 진행 중 커리어가 없으면
         // 저장된 선수다. 능력치는 0xb6414(장비·스킬)까지만: 0xb570c 의 질병·부상·사기 감소는 모드 3·4 갈래라
         // 미션에서는 안 먹는다 (`modeBatterOf`). 마선수 대결(이벤트)도 같은 화면이다.
-        ability={modeBatterOf(careerSession.career ?? careerSession.savedCareer).ability}
+        batter={modeBatterOf(careerSession.career ?? careerSession.savedCareer)}
         pitchControl={gameSettings.settings.pitchControl}
         gameSettings={gameSettings}
       />

@@ -6,7 +6,7 @@ import { MissionSelectScreen, MissionBriefing } from '@/pages/mission-select/ui/
 import { MissionPlayScreen } from '@/pages/mission-play/ui/MissionPlayScreen'
 import { PitchingScreen } from '@/pages/pitching/ui/PitchingScreen'
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
-import type { BatterAbility } from '@/entities/batting/model/batter'
+import type { ModeBatter } from '@/app/model/modeBatter'
 import { PITCH_TYPES } from '@/shared/config/original/pitchTypes'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { PitchControl } from '@/entities/settings/model/gameSettings'
@@ -21,7 +21,8 @@ interface MissionRoutesProps {
   readonly session: ReturnType<typeof useMissionSession>
   readonly runner: AtBatRunner
   readonly random: RandomPort
-  readonly ability: BatterAbility
+  /** 치는 육성 타자 — 0xb6414 능력치와 장착 스킬 (`modeBatterOf`) */
+  readonly batter: ModeBatter
   /** 경기 중 메뉴 "설정" 칸 */
   readonly gameSettings: ReturnType<typeof useGameSettings>
   readonly pitchControl: PitchControl
@@ -34,11 +35,12 @@ export function MissionRoutes({
   session,
   runner,
   random,
-  ability,
+  batter,
   pitchControl,
   gameSettings,
 }: MissionRoutesProps) {
   const { missionRun, pitcherRun, pendingDefensePlay, actions } = session
+  const { ability } = batter
 
   /**
    * **수비 화면(상태 0x17)이 먼저다.** 미션도 모드 5·6 짜리 보통 경기(장면 0x104)라
@@ -84,6 +86,7 @@ export function MissionRoutes({
       <MissionPlayScreen
         run={missionRun}
         ability={ability}
+        batterSkillIds={batter.skillIds}
         pitcherAbility={missionPitcherAbility(missionRun.mission, session.aceLevels)}
         opponent={missionOpponent(missionRun.mission)}
         atBat={runner.atBat}

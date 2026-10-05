@@ -20,6 +20,11 @@ import type { AcePlayer } from '@/shared/config/original/acePlayers'
 interface MissionPlayScreenProps {
   readonly run: MissionRun
   readonly ability: BatterAbility
+  /**
+   * 치는 선수의 **장착** 스킬 (0xb62b4 — 선수 기록 +0x14). 미션은 나리 타자편 저장을 올리므로 그 선수 것이다.
+   * 압도 22 면 CPU 실투율 +5 (0x33d52). 안 넘기면 스킬 없음.
+   */
+  readonly batterSkillIds?: readonly number[]
   readonly pitcherAbility: PitcherAbility
   /** 마투수 미션의 상대. 일반 투수면 null */
   readonly opponent: AcePlayer | null
@@ -53,6 +58,7 @@ type MenuOverlay = '조작방법' | '설정'
 export function MissionPlayScreen({
   run,
   ability,
+  batterSkillIds,
   pitcherAbility,
   opponent,
   atBat,
@@ -140,6 +146,7 @@ export function MissionPlayScreen({
       <div className={styles.stageArea}>
         <BattingStage
           batterAbility={ability}
+          batterSkillIds={batterSkillIds}
           swingMode="미션"
           gameMode={MISSION_BATTER_MODE}
           pitcherAbility={pitcherAbility}

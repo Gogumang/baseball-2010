@@ -218,6 +218,18 @@ export function useMissionSession({
     return () => window.clearInterval(handle)
   }, [isBatterRunning, isPitcherRunning])
 
+  /**
+   * 타자 미션의 공 하나.
+   *
+   * **상대 투수 투구 소모 0xa5e14 는 잇지 않는다 (원본은 탄다).** 공이 손을 떠날 때 부르는 0x3dec6 →
+   * 0xa5e14(ctx, 구질) 에는 모드 갈래가 없어(0x3de10~0x3dec8 · 0xa5e14~0xa5f62 확인) 미션(모드 6)에서도
+   * 투구 수 +1 · 스태미나 −c(×2 압도 22) 가 돈다. 그런데 깎인 체력이 쓰이는 두 곳이 웹 미션에 없다:
+   *   - CPU 투수 교체 0xac428 — 미션 객체(scene+0xf28 +0xc ≠ −1)면 건너뛴다 (Q1 4절, 유력)
+   *   - 체력% 0xaebb0 → CPU 제구 등급 0x4dbac · 피로 0xb58e6 — 웹 CPU 투구 `selectPitch` 는 체력%를
+   *     받지 않는다 (나만의리그 경기도 같다 — `throwOpponentPitch` 가 깎은 체력은 교체·간이 타석만 본다)
+   * 받을 곳 없이 칸만 두면 죽은 상태라 `detail.pitchTypeNumber` 는 버린다. `selectPitch` 가 체력%를 받게 되면
+   * 미션 상대 마운드(시작 스태미나 — 미확인)를 두고 여기서 깎아야 한다.
+   */
   const handleMissionPitch = useCallback(
     (detail: PitchOutcomeDetail) => {
       const nextAtBat = runner.applyPitch(detail.resolution)

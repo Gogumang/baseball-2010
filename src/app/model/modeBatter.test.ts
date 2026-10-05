@@ -21,7 +21,12 @@ describe('미션·홈런더비 타자 — 0xb570c 모드 5·6·7 = 0xb6414', () 
     expect(modeBatterOf(장비선수).ability.hit).toBeGreaterThan(선수.ability.hit)
   })
 
-  it('선수가 없으면 신인 능력치', () => {
-    expect(modeBatterOf(null).ability).toEqual(ROOKIE_BATTER_ABILITY)
+  it('스킬은 장착한 것만 (0xb62b4 장착 비트)', () => {
+    const 스킬선수 = { ...선수, skillIds: [22, 7], equippedSkillIds: [22] }
+    expect(modeBatterOf(스킬선수).skillIds).toEqual([22])
+  })
+
+  it('선수가 없으면 신인 능력치·스킬 없음', () => {
+    expect(modeBatterOf(null)).toEqual({ ability: ROOKIE_BATTER_ABILITY, skillIds: [] })
   })
 })

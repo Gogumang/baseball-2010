@@ -158,11 +158,13 @@ export function EntryRoutes({ screen, setScreen, session, gameSettings, collecti
   if (screen.kind === '홈런더비') {
     const career = session.career ?? session.savedCareer
     if (career === null) return null
+    const derbyBatter = modeBatterOf(career)
     return (
       <HomeRunDerbyScreen
         // 원본은 모드 7 로 들어갈 때 0x213c0(앱,4,0) 으로 나만의리그 타자편 저장을 올린다.
         // 능력치는 0xb6414 까지 — 0xb570c 의 질병·부상·사기 감소는 모드 3·4 갈래라 안 먹는다 (`modeBatterOf`)
-        ability={modeBatterOf(career).ability}
+        ability={derbyBatter.ability}
+        batterSkillIds={derbyBatter.skillIds}
         // 같은 저장을 올리니 겉모습도 그 선수 것이다 — 폼(몸통·손)·피부·장비
         batterForm={career.battingTypeIndex * 2 + career.battingSide}
         batterSkinIndex={career.skinIndex}

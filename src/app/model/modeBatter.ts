@@ -18,14 +18,19 @@ import type { PlayerCareer } from '@/entities/career/model/playerCareer'
  * 팀 능력치(0xb592c)는 모드 1·2·8·9 만이라 결과가 0xb6414 와 같다.
  * 앞서 웹은 `effectiveAbilityOf`(감소 포함)를 써서 아프거나 사기가 낮은 선수가 미션·홈런더비에서 약해졌다.
  *
- * 선수가 없으면(저장을 불러오는 짧은 순간) 신인 능력치 — 원본에는 이 대체가 없다
+ * 스킬은 선수 기록 +0x14 의 **장착** 비트(0xb62b4)를 그대로 본다 — 저장을 올리니 장착 스킬이 그대로 산다
+ * (압도 22: 실투율 +5 0x33d52 · 투구 소모 ×2 0xa5f0e, 스윙 스킬 등). 모드를 가리는 갈래는 없다.
+ *
+ * 선수가 없으면(저장을 불러오는 짧은 순간) 신인 능력치·스킬 없음 — 원본에는 이 대체가 없다
  * (미션·홈런더비 진입은 선수가 있을 때만 열린다, EntryRoutes · Q2 3-1).
  */
 export interface ModeBatter {
   readonly ability: BatterAbility
+  /** 장착 스킬 id (`career.equippedSkillIds`) — 타석 화면 `batterSkillIds` 로 간다 */
+  readonly skillIds: readonly number[]
 }
 
 export function modeBatterOf(career: PlayerCareer | null): ModeBatter {
-  if (career === null) return { ability: ROOKIE_BATTER_ABILITY }
-  return { ability: equippedAbilityOf(career) }
+  if (career === null) return { ability: ROOKIE_BATTER_ABILITY, skillIds: [] }
+  return { ability: equippedAbilityOf(career), skillIds: career.equippedSkillIds }
 }

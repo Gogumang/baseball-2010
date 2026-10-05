@@ -29,6 +29,11 @@ interface HomeRunDerbyScreenProps {
   readonly batterForm?: number
   readonly batterSkinIndex?: number
   readonly batterEquipmentLevels?: BatterAbility
+  /**
+   * 치는 선수의 **장착** 스킬 (0xb62b4 — 선수 기록 +0x14). 같은 저장을 올리니 그 선수 것이다.
+   * 압도 22 면 CPU 실투율 +5 (0x33d52). 안 넘기면 스킬 없음.
+   */
+  readonly batterSkillIds?: readonly number[]
   readonly random: RandomPort
   /** 저장된 최고 비거리 (저장 +0x5c, u16) */
   readonly bestDistance: number
@@ -62,6 +67,7 @@ export function HomeRunDerbyScreen({
   batterForm,
   batterSkinIndex,
   batterEquipmentLevels,
+  batterSkillIds,
   random,
   bestDistance,
   gamePoint,
@@ -142,6 +148,7 @@ export function HomeRunDerbyScreen({
           batterForm={batterForm}
           batterSkinIndex={batterSkinIndex}
           batterEquipmentLevels={batterEquipmentLevels}
+          batterSkillIds={batterSkillIds}
           pitcherAbility={pitcher.ability}
           swingMode="일반"
           gameMode={DERBY_MODE}
