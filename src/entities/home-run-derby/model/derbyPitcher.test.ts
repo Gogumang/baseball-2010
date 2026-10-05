@@ -36,4 +36,17 @@ describe('홈런더비 상대 투수 (S13 5절 확정)', () => {
   it('표 밖(5 이상)이면 마투수가 없다', () => {
     expect(derbyPitcherOf(5).ace).toBeNull()
   })
+
+  it('레벨을 넘기면 난입 마투수가 0xb6414 배율 0xd88aa[mgr[0x13a + 순번]] 을 먹는다 — 모드 7 도 가리지 않는다', () => {
+    // 단계 1 = 레오니 = 순번 1 = 칸 1. 구속 850 → Lv1 60% 510 · Lv5 100% 850
+    expect(derbyPitcherOf(1, {}).ability).toMatchObject({ control: 35, velocity: 51, breaking: 35 })
+    expect(derbyPitcherOf(1, { 1: 4 }).ability).toEqual(derbyPitcherOf(1).ability)
+    // 단계 4 = 드래고나 = 칸 4 — 다른 칸 레벨은 상관없다
+    expect(derbyPitcherOf(4, { 1: 4 }).ability).toEqual(derbyPitcherOf(4, {}).ability)
+    expect(derbyPitcherOf(4, { 4: 4 }).ability).toEqual(derbyPitcherOf(4).ability)
+  })
+
+  it('단계 0 일반 투수는 레벨과 상관없다', () => {
+    expect(derbyPitcherOf(0, { 0: 4, 1: 4 }).ability).toEqual(derbyPitcherOf(0).ability)
+  })
 })

@@ -200,7 +200,8 @@ export function App() {
         // (싸이커·메디카) 둘만 켜져 있다 (K-bursts-special.md K-3 3-3)
         openedAcePitcherIds={aceSelect.openedAcePitcherIds}
         openedAceBatterIds={aceSelect.openedAceBatterIds}
-        // 마선수 레벨(mgr[0x13a+칸]) — 이름 막대 LV 와 `0` 키 레벨업 창이 쓴다
+        // 마선수 레벨(mgr[0x13a+칸]) — 이름 막대 LV·`0` 키 레벨업 창, 그리고 경기 속 마선수
+        // 능력치 배율(0xb6414)·상대 마투수 마구 횟수(0xaebe4)가 같은 칸을 본다
         aceLevels={aceSelect.levels}
         onLevelUpAce={aceSelect.onLevelUp}
         // 원본 G포인트는 전역 기록(`mgr+0x64`)이라 모드와 상관없이 하나다 — 지갑을 그대로 본다.
@@ -248,6 +249,8 @@ export function App() {
       onRegisterHallOfFame={collection.register}
       onAceMatch={startAceMatch}
       gameSettings={gameSettings}
+      // 마선수 대결의 상대 마투수도 전역 레벨 칸을 본다 (0xb6414 배율 · 0xaebe4 마구 횟수)
+      aceLevels={aceLevels.levels}
     />
   )
 }

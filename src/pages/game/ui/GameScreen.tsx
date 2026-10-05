@@ -24,6 +24,11 @@ interface GameScreenProps {
   readonly progress: GameProgress
   readonly atBat: AtBatState
   readonly pitcherAbility: PitcherAbility
+  /**
+   * 마선수 레벨 열 칸 (전역 `mgr[0x13a..0x143]`, 격자 칸 → 0~4). 상대 마투수의 마구 횟수
+   * 0xd8509[레벨] (0xaebe4) 이 이 칸을 본다 — 안 넘기면 Lv1(3 회).
+   */
+  readonly aceLevels?: Readonly<Record<number, number>>
   readonly isPaused: boolean
   readonly bannerText: string
   readonly random: RandomPort
@@ -58,6 +63,7 @@ export function GameScreen({
   progress,
   atBat,
   pitcherAbility,
+  aceLevels,
   isPaused,
   bannerText,
   random,
@@ -167,6 +173,8 @@ export function GameScreen({
           batterSkillIds={career.equippedSkillIds}
           recentAtBatCodes={progress.recentAtBatCodes}
           pitcherAbility={pitcherAbility}
+          // 마선수 대결의 상대 마투수 마구 횟수 = 0xd8509[mgr[0x13a + 순번]] (0xaebe4)
+          aceLevels={aceLevels}
           hud={{
             inning: progress.game.inning,
             half: progress.game.half,

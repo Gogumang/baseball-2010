@@ -29,6 +29,8 @@ export interface UseGeneralModeOptions extends QuickStartOpenState {
   readonly runningModeManual?: boolean
   /** 환경설정 "송구" 가 수동인가 (설정 +0xf4) — 사람이 수비하는 타석에서만 먹는다 (0xae6c8) */
   readonly throwModeManual?: boolean
+  /** 마선수 레벨 열 칸 (전역 `mgr[0x13a..0x143]`) — 경기 옵션 `aceLevels` 로 그대로 넘긴다 */
+  readonly aceLevels?: Readonly<Record<number, number>>
 }
 
 export interface GeneralModeSession {
@@ -66,7 +68,7 @@ export interface GeneralModeSession {
  */
 export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSession {
   const {
-    random, isQuickStart = false, initialSettings, gaugeSettingOn, runningModeManual, throwModeManual,
+    random, isQuickStart = false, initialSettings, gaugeSettingOn, runningModeManual, throwModeManual, aceLevels,
     openedHiddenTeamIds, openedAcePitcherIds, openedAceBatterIds,
   } = options
 
@@ -133,8 +135,9 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
       ...(gaugeSettingOn === undefined ? {} : { gaugeSettingOn }),
       ...(runningModeManual === undefined ? {} : { runningModeManual }),
       ...(throwModeManual === undefined ? {} : { throwModeManual }),
+      ...(aceLevels === undefined ? {} : { aceLevels }),
     }),
-    [flow.setup, settings, gaugeSettingOn, runningModeManual, throwModeManual],
+    [flow.setup, settings, gaugeSettingOn, runningModeManual, throwModeManual, aceLevels],
   )
 
   return { flow, settings, isPlaying, isSettingsOpen, gameOptions, actions }

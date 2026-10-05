@@ -102,8 +102,8 @@ const PITCHER_ENGINE_DIVISOR = 10
  * 순번은 `ACE_PITCHERS` 차례(= XlsACE_PIT_DATA 줄 차례, 0xb63a1)다.
  *
  * 안 넘기면 배율을 안 곱한다 — 이미 배율을 먹인 능력치를 넣는 미션(`useMissionSession`)이 그렇게 쓴다.
- * ⚠️ 나만의리그 마선수 대결(`app/ui/GameRoute`)·홈런더비(`entities/home-run-derby/model/derbyPitcher`)는
- *    아직 레벨을 안 넘긴다(다른 작업 구역) — 원본은 거기서도 배율을 먹는다.
+ * 나만의리그 마선수 대결(`app/ui/GameRoute`)·홈런더비 난입 마투수(`entities/home-run-derby/model/derbyPitcher`)는
+ * 앱의 전역 레벨 칸을 넘긴다 — 원본도 거기서 배율을 먹는다.
  */
 export function pitcherAbilityOf(ace: AcePlayer, aceLevels?: Readonly<Record<number, number>>): PitcherAbility {
   // 투구 엔진은 아직 0~100 눈금이라 경계에서 줄인다 — 원본 투구식 이식 때 없앤다

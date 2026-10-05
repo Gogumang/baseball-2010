@@ -20,6 +20,11 @@ export interface HomeRunDerbyOptions {
   readonly bestDistance: number
   /** 10구(+보너스)가 다 끝났을 때 한 번 불린다 — 최고 기록·G 를 저장할 곳에 알린다 */
   readonly onFinish?: (result: DerbyResult) => void
+  /**
+   * 마선수 레벨 열 칸 (전역 `mgr[0x13a..0x143]`). 단계 1~4 난입 마투수가 능력치 배율
+   * 0xd88aa(0xb6414) 로 이 칸을 본다 — `derbyPitcherOf` 머리말.
+   */
+  readonly aceLevels?: Readonly<Record<number, number>>
 }
 
 export interface HomeRunDerbySession {
@@ -47,7 +52,7 @@ export interface HomeRunDerbySession {
  * 패턴을 내보내지 않는다 — `derbyBattedBallOf` 가 같은 결과 코드의 원본 패턴을 한 장 골라
  * `battedBallFlight` 로 궤적을 만든다 (근사, 그 파일 머리말 참고).
  */
-export function useHomeRunDerby({ random, bestDistance, onFinish }: HomeRunDerbyOptions): HomeRunDerbySession {
+export function useHomeRunDerby({ random, bestDistance, onFinish, aceLevels }: HomeRunDerbyOptions): HomeRunDerbySession {
   const [run, setRun] = useState<DerbyRun>(createDerbyRun)
   const [banner, setBanner] = useState('')
   const [isPaused, setIsPaused] = useState(false)
@@ -142,7 +147,7 @@ export function useHomeRunDerby({ random, bestDistance, onFinish }: HomeRunDerby
 
   return {
     run,
-    pitcher: derbyPitcherOf(run.stage),
+    pitcher: derbyPitcherOf(run.stage, aceLevels),
     banner,
     isPaused,
     isEventZoneShown,

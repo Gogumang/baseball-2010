@@ -34,6 +34,11 @@ interface HomeRunDerbyScreenProps {
    * 압도 22 면 CPU 실투율 +5 (0x33d52). 안 넘기면 스킬 없음.
    */
   readonly batterSkillIds?: readonly number[]
+  /**
+   * 마선수 레벨 열 칸 (전역 `mgr[0x13a..0x143]`, 격자 칸 → 0~4). 난입 마투수 능력치 배율
+   * 0xd88aa(0xb6414)·마구 횟수 0xd8509(0xaebe4)가 본다. 안 넘기면 배율 없이 날 값 · 마구 Lv1.
+   */
+  readonly aceLevels?: Readonly<Record<number, number>>
   readonly random: RandomPort
   /** 저장된 최고 비거리 (저장 +0x5c, u16) */
   readonly bestDistance: number
@@ -68,6 +73,7 @@ export function HomeRunDerbyScreen({
   batterSkinIndex,
   batterEquipmentLevels,
   batterSkillIds,
+  aceLevels,
   random,
   bestDistance,
   gamePoint,
@@ -76,7 +82,7 @@ export function HomeRunDerbyScreen({
   settings,
   onSettingsChange,
 }: HomeRunDerbyScreenProps) {
-  const session = useHomeRunDerby({ random, bestDistance, onFinish })
+  const session = useHomeRunDerby({ random, bestDistance, onFinish, aceLevels })
   const tick = useUpdateCounter()
   const [isMenuOpen, setMenuOpen] = useState(false)
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
@@ -150,6 +156,7 @@ export function HomeRunDerbyScreen({
           batterEquipmentLevels={batterEquipmentLevels}
           batterSkillIds={batterSkillIds}
           pitcherAbility={pitcher.ability}
+          aceLevels={aceLevels}
           swingMode="일반"
           gameMode={DERBY_MODE}
           isEagleEyeEnabled={false}

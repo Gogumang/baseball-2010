@@ -44,15 +44,22 @@ export interface DerbyPitcher {
 /**
  * 단계 → 상대 투수.
  *
+ * `aceLevels`(마선수 레벨 열 칸 `mgr[0x13a..0x143]`)를 넘기면 마투수 능력치에 **레벨 배율**을 곱한다.
+ * 난입(0x48d50)이 마투수 레코드를 0x30 바이트 통째로 복사하므로 `+0xa = 0x60 + 순번` 도 따라온다 —
+ * 실효 능력치 0xb6414 는 모드를 안 가리고 `0xb633c`(+0xa 비트 6 = 마선수)·`0xb6394`(순번)로
+ * `v · 0xd88aa[mgr[0x13a + 순번]] / 100` (b6438~b6466) 을 먹인다. 투구 판정들(0xab214 · 0x34334 …)은
+ * 상대 투수 능력치를 0xb570c → 0xb6414 로 읽으니 홈런더비(모드 7)의 마투수도 같은 배율을 탄다.
+ * 안 넘기면 배율 없이 날 값이다.
+ *
  * ⚠️ **근사**: 단계 ≥ 1 에서 원본은 **구질 22(마구)만** 던지는데, 이식판 `selectPitch` 는
  * 마구를 아예 목록에 넣지 않는다 (B-스플라인 레코드와 남은 횟수가 미해독 —
  * `entities/pitching/model/selectPitch` 머리말). 그래서 여기서는 마투수 레코드가 가진
  * 보통 구질을 그대로 쓴다. 마구가 들어오면 이 함수만 고치면 된다.
  */
-export function derbyPitcherOf(stage: number): DerbyPitcher {
+export function derbyPitcherOf(stage: number, aceLevels?: Readonly<Record<number, number>>): DerbyPitcher {
   // 구질은 단계만 보고 갈린다 — `0x344dc` 가 `단계 > 0 ? 0x16 : 1` 이다
   const pitchType = stage > 0 ? DERBY_MAGIC_PITCH_TYPE : DERBY_ORDINARY_PITCH_TYPE
   const ace = derbyAcePitcherOf(stage)
   if (ace === null) return { stage, ace: null, ability: ORDINARY_DERBY_PITCHER, pitchType }
-  return { stage, ace, ability: pitcherAbilityOf(ace), pitchType }
+  return { stage, ace, ability: pitcherAbilityOf(ace, aceLevels), pitchType }
 }

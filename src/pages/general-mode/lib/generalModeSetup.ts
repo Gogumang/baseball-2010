@@ -139,6 +139,12 @@ export function teamGameOptionsOf(
     readonly runningModeManual?: boolean
     /** 환경설정 "송구" 가 수동인가 (설정 +0xf4) — 사람이 수비일 때만 먹는다 (0xae6c8) */
     readonly throwModeManual?: boolean
+    /**
+     * 마선수 레벨 열 칸 (전역 `mgr[0x13a..0x143]`, 격자 칸 → 0~4). 명단 마선수(사람·AI 팀)의
+     * 능력치 배율 0xd88aa(0xb6414 첫 단계)와 상대 마투수 마구 횟수 0xd8509(0xaebe4)가 본다.
+     * 일반모드는 저장이 없지만 이 칸은 전역 기록이라 스페셜·`0` 키 레벨업이 그대로 먹는다.
+     */
+    readonly aceLevels?: Readonly<Record<number, number>>
   } = {},
 ): TeamGameOptions {
   return {
@@ -154,5 +160,6 @@ export function teamGameOptionsOf(
     ...(extra.gaugeSettingOn === undefined ? {} : { gaugeSettingOn: extra.gaugeSettingOn }),
     ...(extra.runningModeManual === undefined ? {} : { runningModeManual: extra.runningModeManual }),
     ...(extra.throwModeManual === undefined ? {} : { throwModeManual: extra.throwModeManual }),
+    ...(extra.aceLevels === undefined ? {} : { aceLevels: extra.aceLevels }),
   }
 }

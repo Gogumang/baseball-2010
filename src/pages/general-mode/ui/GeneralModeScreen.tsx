@@ -21,7 +21,10 @@ export interface GeneralModeScreenProps {
   readonly openedAcePitcherIds?: readonly number[]
   /** 저장 +0x35..0x39 — 열린 마타자 0~4 */
   readonly openedAceBatterIds?: readonly number[]
-  /** 마선수 레벨 (격자 칸 번호 → 레벨 0~4, 전역 `mgr[0x13a+칸]`). 없으면 모두 0 = LV.1 */
+  /**
+   * 마선수 레벨 (격자 칸 번호 → 레벨 0~4, 전역 `mgr[0x13a+칸]`). 없으면 모두 0 = LV.1.
+   * 이름 막대 LV 와 경기 속 마선수 능력치 배율·상대 마투수 마구 횟수가 함께 본다.
+   */
   readonly aceLevels?: Readonly<Record<number, number>>
   /** 마선수 고르기의 `0` 키 레벨업 확정 (0x5fbee) — 받는 쪽이 레벨을 올리고 G `cost` 를 뺀다 */
   readonly onLevelUpAce?: (cell: number, cost: number) => void
@@ -84,6 +87,8 @@ export function GeneralModeScreen(props: GeneralModeScreenProps) {
     ...(gaugeSettingOn === undefined ? {} : { gaugeSettingOn }),
     ...(runningModeManual === undefined ? {} : { runningModeManual }),
     ...(throwModeManual === undefined ? {} : { throwModeManual }),
+    // 고르기 화면 LV 와 같은 칸이 경기 속 마선수 배율·마구 횟수도 정한다 (0xb6414 · 0xaebe4)
+    ...(aceLevels === undefined ? {} : { aceLevels }),
   })
   const { flow, actions } = session
   const back = () => {

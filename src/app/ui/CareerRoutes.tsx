@@ -34,6 +34,8 @@ interface CareerRoutesProps {
   readonly onAceMatch: AceMatchStarter
   /** 경기 중 메뉴 "설정" 칸이 열 환경설정 — 안 넘기면 그 칸이 잠긴다 */
   readonly gameSettings: ReturnType<typeof useGameSettings>
+  /** 마선수 레벨 열 칸 (전역 `mgr[0x13a..0x143]`) — 마선수 대결 경기(`GameRoute`)가 본다 */
+  readonly aceLevels?: Readonly<Record<number, number>>
 }
 
 export type AceMatchStarter = (command: MatchCommand, carried: StoryCarry, context: StoryContext) => void
@@ -49,6 +51,7 @@ export function CareerRoutes({
   onRegisterHallOfFame,
   onAceMatch,
   gameSettings,
+  aceLevels,
 }: CareerRoutesProps) {
   const { actions } = session
   const backToManagement = () => setScreen({ kind: '관리' })
@@ -86,6 +89,7 @@ export function CareerRoutes({
           random={random}
           career={career}
           gameSettings={gameSettings}
+          aceLevels={aceLevels}
         />
       )
 

@@ -169,6 +169,8 @@ export function EntryRoutes({ screen, setScreen, session, gameSettings, collecti
         batterForm={career.battingTypeIndex * 2 + career.battingSide}
         batterSkinIndex={career.skinIndex}
         batterEquipmentLevels={career.equipmentLevels}
+        // 단계 1~4 난입 마투수도 전역 마선수 레벨을 본다 — 0xb6414 는 모드 7 도 가리지 않는다
+        aceLevels={aceSelect?.levels}
         random={random}
         bestDistance={derbyBest}
         // 보유 G 는 전역 기록 `mgr[+0x64]` 다 (0x461f2) — 선수 칸이 아니라 지갑을 본다

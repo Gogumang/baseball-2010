@@ -24,6 +24,12 @@ interface GameRouteProps {
   readonly random: RandomPort
   readonly career: PlayerCareer
   readonly gameSettings: ReturnType<typeof useGameSettings>
+  /**
+   * 마선수 레벨 열 칸 (전역 `mgr[0x13a..0x143]`). 마선수 대결의 상대 마투수가 능력치 배율
+   * 0xd88aa(0xb6414 첫 단계 — 모드를 가리지 않는다)와 마구 횟수 0xd8509(0xaebe4)로 이 칸을 본다.
+   * 안 넘기면 배율 없이 날 값이다.
+   */
+  readonly aceLevels?: Readonly<Record<number, number>>
 }
 
 /**
@@ -39,7 +45,7 @@ interface GameRouteProps {
  * 돌발미션이 발동하면 **타석 화면 위에** 창을 얹는다 (원본 상태 0x1b, K 4절 1-6).
  * 창이 떠 있는 동안 타석을 멈춰 둔다 — 원본도 장면 상태가 0xf 를 떠나 있어 투구가 나가지 않는다.
  */
-export function GameRoute({ session, progress, runner, random, career, gameSettings }: GameRouteProps) {
+export function GameRoute({ session, progress, runner, random, career, gameSettings, aceLevels }: GameRouteProps) {
   /** 이미 다 보여 준 플레이 — 같은 플레이를 두 번 재생하지 않으려고 기억해 둔다 */
   const [shownPlay, setShownPlay] = useState<DefensePlayResult | null>(null)
   const play = progress.lastDefensePlay
@@ -87,8 +93,10 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
         career={career}
         progress={progress}
         atBat={runner.atBat}
-        // 지금 마운드의 상대 투수 — CPU 교체(0xac428)가 바꾸면 바뀐 투수가 던진다 (0xae83c)
-        pitcherAbility={progress.aceOpponent === null ? opponentPitcherAbilityOf(progress) : pitcherAbilityOf(progress.aceOpponent)}
+        // 지금 마운드의 상대 투수 — CPU 교체(0xac428)가 바꾸면 바뀐 투수가 던진다 (0xae83c).
+        // 마선수 대결의 마투수는 0xb6414 첫 단계 `v · 0xd88aa[mgr[0x13a + 순번]] / 100` 을 먹는다
+        pitcherAbility={progress.aceOpponent === null ? opponentPitcherAbilityOf(progress) : pitcherAbilityOf(progress.aceOpponent, aceLevels)}
+        aceLevels={aceLevels}
         isPaused={runner.isPaused || burstLines !== null}
         bannerText={runner.bannerText}
         random={random}
