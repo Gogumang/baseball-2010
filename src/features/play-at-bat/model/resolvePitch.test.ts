@@ -62,6 +62,15 @@ describe('resolvePitch — 스윙한 경우', () => {
 
     expect(detail.resolution).toEqual({ kind: '스트라이크', isSwinging: true })
     expect(detail.hasSwung).toBe(true)
+    expect(detail.contactSoundId).toBe(8)
+  })
+
+  it('필살타법을 실은 헛스윙은 바람 소리가 27 이다 (스윙 +0x10 ≠ 0, 0x5132e) — 예전엔 늘 8', () => {
+    const deck = createPatternDeck(고정(0))
+    const { detail } = resolvePitch(직구(), { frame: 0, shift: 0, buntKind: 0, isSpecial: true }, 상황, deck, 고정(0))
+
+    expect(detail.resolution).toEqual({ kind: '스트라이크', isSwinging: true })
+    expect(detail.contactSoundId).toBe(27)
   })
 
   it('제때(F = N−2) 한가운데를 치면 반드시 맞는다 — 결과는 파울·타구 중 하나', () => {

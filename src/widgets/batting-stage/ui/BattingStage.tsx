@@ -142,7 +142,9 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
       // 마선수가 등판했으면 원본 isAce 가 켜진 것과 같다 (0xab214 의 마선수 계수·보너스)
       isPitcherAce: latest.acePitcher !== null,
     }
-    const result = resolvePitch(pitch, swing, context, deck, latest.random)
+    // 걸어 둔 필살은 스윙 객체 +0x10 에 실린다 (0x51e40) — 헛스윙 바람 소리 27 이 이걸 본다 (0x5132e)
+    const judgedSwing = swing !== null && specialArmedRef.current ? { ...swing, isSpecial: true } : swing
+    const result = resolvePitch(pitch, judgedSwing, context, deck, latest.random)
     // 필살 스윙이면 여기서 굴린다 (0x34c74). 걸어 두지 않았으면 굴리지 않는다
     const isUncatchable = specialArmedRef.current
       && rollSpecialSwing(specialSwingNumber, latest.random, aceBatterIndex >= 0)

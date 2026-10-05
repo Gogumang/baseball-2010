@@ -29,6 +29,18 @@ describe('타구 순간 소리 (0x515de~0x5164a)', () => {
     expect(contactSoundIdOf({ hasSwung: true, hasHit: false, buntKind: 0, resultCode: null, pattern: null })).toBe(8)
   })
 
+  it('필살타법을 실은 헛스윙은 27 이다 — 스윙 객체 +0x10 ≠ 0 (0x5132e)', () => {
+    expect(contactSoundIdOf({
+      hasSwung: true, hasHit: false, buntKind: 0, isSpecialSwing: true, resultCode: null, pattern: null,
+    })).toBe(27)
+  })
+
+  it('필살이어도 번트 자세 헛스윙은 소리가 없다 — +8 검사가 +0x10 보다 먼저다 (0x51328)', () => {
+    expect(contactSoundIdOf({
+      hasSwung: true, hasHit: false, buntKind: 1, isSpecialSwing: true, resultCode: null, pattern: null,
+    })).toBeNull()
+  })
+
   it('번트 자세로 못 맞히면 바람 소리도 안 난다 — 원본 조건이 스윙 +8 == 0 이다', () => {
     expect(contactSoundIdOf({ hasSwung: true, hasHit: false, buntKind: 2, resultCode: null, pattern: null })).toBeNull()
   })

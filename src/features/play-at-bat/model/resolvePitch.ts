@@ -21,6 +21,11 @@ export interface BattingSwing {
   readonly shift: number
   /** 0 스윙 · 1~3 번트 종류 */
   readonly buntKind: number
+  /**
+   * 이번 스윙에 필살타법을 실었는가 — 스윙 객체 `S+0x10`(필살 번호) ≠ 0 (0x51e40).
+   * 헛스윙 바람 소리를 8 대신 27 로 바꾼다 (0x51350). 안 넘기면 보통 스윙이다.
+   */
+  readonly isSpecial?: boolean
 }
 
 export interface BattingContext {
@@ -143,11 +148,12 @@ export function resolvePitch(
   )
   if (result.kind === '헛스윙') {
     const resolution: PitchResolution = { kind: '스트라이크', isSwinging: true }
-    // 헛스윙 바람 소리 8 (0x51350) — 필살 스윙·마선수 타자의 27 은 그 값이 여기까지 오지 않는다
+    // 헛스윙 바람 소리 8 / 필살 스윙 27 (0x51350)
     const contactSoundId = contactSoundIdOf({
       hasSwung: true,
       hasHit: false,
       buntKind: swing.buntKind,
+      isSpecialSwing: swing.isSpecial === true,
       resultCode: null,
       pattern: null,
     })

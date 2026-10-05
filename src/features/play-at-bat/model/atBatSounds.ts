@@ -94,6 +94,8 @@ export interface ContactSoundInput {
   readonly hasHit: boolean
   /** 스윙 객체 `+8` — 웹은 번트 종류가 그 자리다 (0 이면 보통 스윙) */
   readonly buntKind: number
+  /** 스윙 객체 `+0x10`(필살 번호) ≠ 0 — 필살타법을 실은 스윙인가 (0x51e40). 안 넘기면 아니다 */
+  readonly isSpecialSwing?: boolean
   /** 방향까지 붙인 결과 코드 (원본 `게임+0xfd4`). 맞지 않았으면 null */
   readonly resultCode: number | null
   /** 이 타구에 쓰인 원본 패턴. 맞지 않았으면 null */
@@ -105,6 +107,7 @@ export interface ContactSoundInput {
  *
  * | 조건 | 번호 |
  * |---|---|
+ * | 맞지 않음 · 스윙 `+8` == 0 · `+0x10` ≠ 0 (0x5132e) | **27** 필살 스윙 바람 소리 |
  * | 맞지 않음 · 스윙 `+8` == 0 (0x51350) | **8** 헛스윙 바람 소리 |
  * | 0x392ac 참 (큰 타구) | **7** |
  * | 스윙 `+8` ≠ 0 (0x51606) | **9** |
@@ -112,13 +115,25 @@ export interface ContactSoundInput {
  * | 0x39304 참 (약한 타구) | **59** |
  * | 그 밖 | **6** |
  *
- * ⚠️ **못 옮긴 갈래**: 필살 스윙·마선수 타자의 헛스윙은 8 대신 **27** 이다 (스윙 객체 `+0x10` ≠ 0,
- * 또는 0x4e24a 의 "현재 타자가 마선수"). 웹은 그 두 값을 타석 화면(`widgets/batting-stage`)만 알고
- * `resolvePitch` 로 넘겨 주지 않아 여기서는 늘 8 이 된다.
+ * ```
+ * 51322  [게임+0xfd2](맞음) != 0 → 타구음 갈래
+ * 51328  S+8(번트) != 0 → 소리 없음
+ * 5132e  S+0x10 != 0 ? 0x1b(27) : 8  → 0x6ea6d(소리, −1, 0)
+ * ```
+ *
+ * ⚠️ **못 옮긴 갈래 — 마선수 27**: 같은 짝 27/8 이 투구 비행 갱신 0x4e060 안에도 있다
+ * (0x4e21c~0x4e24a: `0xb633d(현재 타자)` = 마선수면 27). 그 자리는 **스윙이 맞힐 프레임**
+ * (0xb9270: `S+0x18 == 3 && S+0x1c == 1`)에 이르렀는데 공이 타자 근처(|Δ깊이| ≤ 3000, 0x4e1e4)가
+ * **아닐 때** — 판정(0x6aa → 0xab214)을 아예 안 타는 헛스윙이다. 웹은 모든 스윙을 판정에 태우고
+ * 공 깊이도 따로 들고 있지 않아 그 갈래를 가를 수가 없다. 그래서 여기선 판정 쪽(0x51350)만 옮겼고,
+ * 마선수 타자의 판정 헛스윙은 원본도 `+0x10` 만 보므로 8(필살을 안 실었으면)이 맞다.
  */
 export function contactSoundIdOf(input: ContactSoundInput): number | null {
   if (!input.hasSwung) return null
-  if (!input.hasHit) return input.buntKind === 0 ? 8 : null
+  if (!input.hasHit) {
+    if (input.buntKind !== 0) return null
+    return input.isSpecialSwing === true ? 27 : 8
+  }
   if (input.resultCode !== null && input.pattern !== null && isBigHit(input.resultCode, input.pattern)) return 7
   if (input.buntKind !== 0) return 9
   if (input.pattern === null) return 6
