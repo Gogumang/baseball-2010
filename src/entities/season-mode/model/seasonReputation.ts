@@ -93,8 +93,20 @@ export interface SeasonGameContext {
   readonly opponentRuns: number
   /** 내 팀 득점 R(u) */
   readonly myRuns: number
-  /** 이겼는가 (`0xb69c8`) — ⚠️ 동점이면 칸 0 쪽이 이긴 것으로 본다 */
+  /** 이겼는가 (`0xb69c8`) — ⚠️ 동점이면 칸 0 쪽이 이긴 것으로 본다 (`seasonHumanWonOf`) */
   readonly won: boolean
+  /**
+   * 두 팀 점수가 같은가. 평판식의 −2 · +2 는 `0xb69c8` 이 아니라 **진 칸 `0xb6a4c`** · **이긴 칸
+   * `0xb6a0c`** 를 내 칸 u 와 견주는데, 동점이면 둘 다 0 을 돌려준다 (S4 4절 정정 2026-09-25):
+   * ```
+   * a6f7e  0xb6a4c(st) == u → s −= 2     ; R(1) < R(0) ? 1 : 0, 동점 0
+   * a6fba  0xb6a0c(st) == u → s += 2     ; R(1) > R(0) ? 1 : 0, 동점 0
+   * ```
+   * 그래서 동점이면 **u == 0(선공) 쪽은 −2·+2 를 둘 다** 받고 u == 1(후공) 쪽은 둘 다 못 받는다.
+   * 동점에서 `won`(0xb69c8) 은 곧 "u == 0" 이므로 −2 문은 `tied ? won : !won` 이 된다.
+   * 안 넘기면 동점이 아닌 것으로 본다 — 원본 시즌 경기는 동점으로 끝나지 않는다(S1 6절).
+   */
+  readonly tied?: boolean
   /**
    * 승리 + 정규 완투일 때의 등급. 평판식은 `st+0x69`(정규 마지막 이닝)로 완투를 재고
    * 인기도식은 `st+0x6b`(현재 이닝)로 잰다 — **연장 완투는 인기도만 받는다**(원본 그대로).
@@ -140,10 +152,11 @@ const dividedByThree = (value: number) => Math.trunc(value / 3)
  * 한 경기의 평판 점수 s — 원본 `0xa6f1c` (S4 4절 · P4 4a).
  *
  * ```
- * R(o) > 4 → s = −4 ; R(o) == 4 → s −= 2 ; 패배 → s −= 2 ; R(o) == 3 → s −= 1
+ * R(o) > 4 → s = −4 ; R(o) == 4 → s −= 2 ; 진 칸 == u → s −= 2 ; R(o) == 3 → s −= 1
  * s −= S[1]                        ; 벤치클리어링
  * s += S[5] / 3                    ; 탈삼진   ⚠️ 뒤집힌 칸
- * 승리 → s += 2 ; 승리 && 완투 → 퍼펙트 7 / 노히트 6 / 완봉 4 / 그 밖 3
+ * 이긴 칸 == u → s += 2 ; 승리 && 완투 → 퍼펙트 7 / 노히트 6 / 완봉 4 / 그 밖 3
+ * (동점이면 진 칸·이긴 칸이 둘 다 0 이라 선공 쪽이 −2·+2 를 함께 받는다 — `tied`)
  * s += 4·S[0]                      ; 삼중살
  * s −= 2·(S[4] / 3)                ; 병살     ⚠️ 뒤집힌 칸 — 잡을수록 깎인다
  * s −= S[6] / 3                    ; 내 타자 삼진
@@ -158,11 +171,13 @@ export function seasonReputationScoreOf(slots: readonly number[], context: Seaso
   let score = 0
   if (context.opponentRuns > 4) score = -4
   else if (context.opponentRuns === 4) score -= 2
-  if (!context.won) score -= 2
+  // 진 칸 0xb6a4c == u — 동점이면 진 칸이 0 이라 선공(u 0)이 깎인다 (`tied` 주석)
+  if (context.tied === true ? context.won : !context.won) score -= 2
   if (context.opponentRuns === 3) score -= 1
 
   score -= s[1]
   score += dividedByThree(s[5])
+  // 이긴 칸 0xb6a0c == u 의 +2 와 완투 문 0xb69c8 은 동점에서도 같은 값(u == 0)이라 한 문으로 둔다
   if (context.won) {
     score += 2
     if (context.completeGame !== null) score += REPUTATION_COMPLETE_GAME[context.completeGame]

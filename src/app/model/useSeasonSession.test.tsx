@@ -131,6 +131,24 @@ describe('시즌 세션', () => {
     expect(result.current.state?.record.reputation).toBe(시작평판 + 3)
   })
 
+  it('동점으로 끝난 경기는 **선공(칸 0) 쪽 승**으로 리그에 적는다 — 0x4f072 `R(1) > R(0)` 가 아니면 칸 0 승', () => {
+    const { result } = 띄우기()
+    act(() => result.current.actions.chooseTeam(0))
+    act(() => result.current.actions.playNextGame())
+    const 측 = result.current.gameOptions!.playerSide
+    const 상대 = result.current.gameOptions!.opponentTeamId
+
+    act(() => result.current.actions.finishGame(요약({
+      result: '무', won: false, ourScore: 2, opponentScore: 2, opponentTeamId: 상대,
+    })))
+
+    const 내승 = result.current.league.wins[0] ?? 0
+    const 상대승 = result.current.league.wins[상대] ?? 0
+    // 리그 하루의 나머지 네 경기는 0·상대 팀을 안 건드린다
+    expect(내승).toBe(측 === 0 ? 1 : 0)
+    expect(상대승).toBe(측 === 0 ? 0 : 1)
+  })
+
   it('수입을 확인하면 2경기 주기에 따라 다음이 갈린다 (afterGameNext)', () => {
     const { result } = 띄우기()
     act(() => result.current.actions.chooseTeam(0))

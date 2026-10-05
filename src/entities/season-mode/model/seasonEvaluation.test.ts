@@ -11,6 +11,7 @@ import {
   popularityCompleteGameOf,
   reputationCompleteGameOf,
   seasonGameIsEvaluated,
+  seasonHumanWonOf,
 } from '@/entities/season-mode/model/seasonEvaluation'
 import { SEASON_RECORD_CODE, recordSeasonGameEvent } from '@/entities/season-mode/model/seasonReputation'
 
@@ -154,5 +155,36 @@ describe('평가가 도는 갈래 — 경기 끝 0x4ea0c 의 4f216·4f268 가드
     expect(seasonGameIsEvaluated({ nationalCup: true, postseason: false })).toBe(false)
     // 4f216 이 먼저 보므로 두 칸이 다 서도 평가는 없다
     expect(seasonGameIsEvaluated({ nationalCup: true, postseason: true })).toBe(false)
+  })
+})
+
+describe('사람 팀 승리 0xb69c8 — 이긴 칸 = R(1) > R(0) ? 1 : 0', () => {
+  it('점수가 갈리면 점수가 많은 쪽이 이긴다 — 칸과 상관없다', () => {
+    expect(seasonHumanWonOf(5, 3, 0)).toBe(true)
+    expect(seasonHumanWonOf(5, 3, 1)).toBe(true)
+    expect(seasonHumanWonOf(2, 3, 0)).toBe(false)
+    expect(seasonHumanWonOf(2, 3, 1)).toBe(false)
+  })
+
+  it('동점이면 선공(칸 0)이 이긴다 — 후공이면 진다', () => {
+    expect(seasonHumanWonOf(4, 4, 0)).toBe(true)
+    expect(seasonHumanWonOf(4, 4, 1)).toBe(false)
+  })
+
+  it('동점 평가 — 선공은 인기도·사기를 승리로 받고 평판은 −2·+2 가 함께 붙는다', () => {
+    const 맥락 = {
+      myRuns: 2, opponentRuns: 2, popularityCompleteGame: null, reputationCompleteGame: null, opponentTeamId: 3,
+    } as const
+    const 선공 = evaluateSeasonGame(상태().record, { ...맥락, won: true, tied: true })
+    expect(선공.popularityChange).toBe(popularityChangeOf(true, 2, 2, null))
+    expect(선공.moraleChange).toBe(moraleChangeOf(true, false))
+    // s = −2 + 2 = 0 → 등급 0
+    expect(선공.reputationChange).toBe(0)
+    const 후공 = evaluateSeasonGame(상태().record, { ...맥락, won: false, tied: true })
+    expect(후공.popularityChange).toBe(popularityChangeOf(false, 2, 2, null))
+    expect(후공.moraleChange).toBe(moraleChangeOf(false, false))
+    // s = 0 (−2 가 안 붙는다) → 등급 0. 동점이 아닌 패배면 s = −2 → 등급 −1
+    expect(후공.reputationChange).toBe(0)
+    expect(evaluateSeasonGame(상태().record, { ...맥락, won: false }).reputationChange).toBe(-1)
   })
 })

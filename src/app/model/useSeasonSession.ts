@@ -15,6 +15,7 @@ import {
   applySeasonGameEvaluation,
   evaluateSeasonGame,
   seasonGameIsEvaluated,
+  seasonHumanWonOf,
 } from '@/entities/season-mode/model/seasonEvaluation'
 import { clearSeasonGameRecord } from '@/entities/season-mode/model/seasonReputation'
 import type { SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
@@ -461,6 +462,15 @@ export function useSeasonSession(
       // **갈래와 상관없이** 레코드에 남는다 (S4 2b·6절). 웹은 요약이 싣고 와서 여기서 꽂는다.
       const played: SeasonRecord = { ...record, gameRecord: summary.gameRecord }
 
+      // 승패는 원본 셈 `0xb69c8`·`0x4f072` 로 다시 낸다 — 이긴 칸 = R(1) > R(0) ? 1 : 0 이라
+      // **동점이면 선공(칸 0) 쪽이 이긴다**. 요약의 `won`(내 점수 > 상대 점수)은 동점을 패로 본다.
+      // 원본 시즌 경기는 동점으로 끝나지 않으니(S1 6절) 웹 이닝 안전망에 닿았을 때만 갈린다.
+      // 사람 칸은 이 경기 옵션의 `playerSide` 다 (`state[0x31 + 칸] == 0`)
+      const tied = summary.ourScore === summary.opponentScore
+      const won = gameOptions === null
+        ? summary.won
+        : seasonHumanWonOf(summary.ourScore, summary.opponentScore, gameOptions.playerSide)
+
       // 포스트시즌·국가대항전은 리그 전적·수입 정산도, **평가 0xa719c 도** 타지 않는다.
       // 원본 경기 끝 0x4ea0c 가 L+0xac(4f216)·L+0x34(4f268)이면 0x4f274 의 평가 호출을 건너뛴다
       // (`seasonGameIsEvaluated` 주석). 그래서 이 두 갈래에서 찬 16칸은 읽히지 않고 다음 경기 직전에 지워진다.
@@ -469,7 +479,7 @@ export function useSeasonSession(
         if (stage.postseason) {
           const series = save.series ?? null
           if (series === null) return
-          const winner = summary.won ? record.teamId : opponent
+          const winner = won ? record.teamId : opponent
           const advanced = runCpuPostseason(advancePostseason(series, winner), record.teamId, random)
           commit({
             ...save,
@@ -488,8 +498,8 @@ export function useSeasonSession(
         // 가지(65e2 `cmp r5,#0xa`)가 경기[0x28+side] 에 10 을 꽂았고, 결과 장면 0x4ea0c 는 그 경기 팀으로
         // 0xb76dc/0xb77e0 을 부른다. 시즌 팀 번호를 넘기면 참가국 표(10~13)에 없어 대한민국 승패가 안 쌓이고
         // 결승을 이겨도 우승국(L+0xc4)이 15 로 남았다. 커리어 `finishCupGame` 과 같이 요약의 팀 번호를 쓴다
-        const winner = summary.won ? summary.ourTeamId : opponent
-        const loser = summary.won ? opponent : summary.ourTeamId
+        const winner = won ? summary.ourTeamId : opponent
+        const loser = won ? opponent : summary.ourTeamId
         commit({
           ...save,
           cup: advanceNationalCupDay(cup, winner, loser, random),
@@ -499,7 +509,7 @@ export function useSeasonSession(
         return setScene(SEASON_SCENE_STATE.국가대항전)
       }
 
-      const afterMyGame = summary.won
+      const afterMyGame = won
         ? recordLeagueResult(save.league, record.teamId, opponent)
         : recordLeagueResult(save.league, opponent, record.teamId)
       const day = playLeagueDay(
@@ -518,7 +528,8 @@ export function useSeasonSession(
       const evaluation = evaluateSeasonGame(played, {
         myRuns: summary.ourScore,
         opponentRuns: summary.opponentScore,
-        won: summary.won,
+        won,
+        tied,
         // 완투 두 칸이 이제 실제로 채워진다 — 인기도와 평판이 서로 다른 이닝 칸을 본다
         popularityCompleteGame: summary.popularityCompleteGame,
         reputationCompleteGame: summary.reputationCompleteGame,
@@ -550,7 +561,7 @@ export function useSeasonSession(
       activeSound().play(seasonEvaluationJingleIdOf(evaluation.popularityChange))
       setScene(SEASON_SCENE_STATE.관중수입)
     },
-    [commit, gameKind, random, save],
+    [commit, gameKind, gameOptions, random, save],
   )
 
   /** 관중수입 창에서 확인 — 정산된 레코드를 받아 경기 뒤 마무리로 간다 (0xf1) */

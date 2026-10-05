@@ -115,6 +115,15 @@ describe('평판식 0xa6f1c', () => {
     expect(점수('완투')).toBe(2 + 3)
   })
 
+  it('동점이면 선공(won 참)은 −2·+2 를 둘 다 받고 후공(won 거짓)은 둘 다 못 받는다 (0xb6a4c·0xb6a0c 가 둘 다 0)', () => {
+    const 동점 = { ...기본맥락, tied: true }
+    expect(seasonReputationScoreOf(빈칸(), { ...동점, won: true })).toBe(-2 + 2)
+    expect(seasonReputationScoreOf(빈칸(), { ...동점, won: false })).toBe(0)
+    // 완투 문은 0xb69c8 — 동점이면 선공 쪽만 받는다
+    expect(seasonReputationScoreOf(빈칸(), { ...동점, won: true, completeGame: '완투' })).toBe(-2 + 2 + 3)
+    expect(seasonReputationScoreOf(빈칸(), { ...동점, won: false, completeGame: '완투' })).toBe(0)
+  })
+
   it('완투 보너스는 이겼을 때만 붙는다', () => {
     expect(seasonReputationScoreOf(빈칸(), { ...기본맥락, won: false, completeGame: '퍼펙트' })).toBe(패배기본)
   })

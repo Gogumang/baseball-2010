@@ -159,11 +159,40 @@ export function moraleChangeOf(won: boolean, rival: boolean): number {
   return rival ? d * 2 : d
 }
 
+/**
+ * 사람 팀이 이겼는가 — 원본 `0xb69c8` (S4 4절 표).
+ * ```
+ * b69ce  r4 = R(1) ; r0 = R(0)              ; R(s) = 0xb69b0 = (s8)st[0x7e+s]
+ * b69dc  R(1) > R(0) ? st[0x32] : st[0x31]  ; 이긴 칸 = 0xb6a0c 와 같은 셈 (동점이면 칸 0)
+ * b69f4  그 칸 == 0(사람) → 참
+ * ```
+ * 칸 0 = 선공(1회 초 공격), 칸 1 = 후공이다 (`PlayerSide`). 그래서 **동점이면 선공 쪽이 이긴다.**
+ *
+ * 경기 끝 `0x4ea0c` 가 리그·포스트시즌·국가대항전에 적는 승패도 같은 셈이다:
+ * ```
+ * 4f072  r5 = R(1) ; r0 = R(0) ; cmp ; ble 4f114
+ * 4f09e  R(1) > R(0): 0xb76dc(L, 팀[칸1]) · 0xb77e0(L, 팀[칸0])
+ * 4f114  그 밖(동점 포함): 0xb76dc(L, 팀[칸0]) · 0xb77e0(L, 팀[칸1])
+ * ```
+ * 곧 경기 하나의 **승패·인기도(0xa6734)·사기(0xa73bc)·평판의 완투 문(0xa6fc0)** 이 모두 이 값 하나를 본다.
+ *
+ * ⚠️ 원본 시즌 경기(모드 2)는 동점으로 끝나지 않는다 — 경기 끝 요청 0x50cb0 이 모드 5·6 이 아니면
+ *    동점을 무시하고 연장을 돌린다 (S1 6절 · E 3d). 웹은 이닝 안전망 `MAXIMUM_INNINGS` 에 닿으면
+ *    동점으로 끝나므로, 그때 원본 코드 모양 그대로 판정하려고 둔다.
+ */
+export function seasonHumanWonOf(myRuns: number, opponentRuns: number, mySide: 0 | 1): boolean {
+  const runsOf = (side: 0 | 1) => (side === mySide ? myRuns : opponentRuns)
+  const winnerSide = runsOf(1) > runsOf(0) ? 1 : 0
+  return winnerSide === mySide
+}
+
 export interface SeasonGameEvaluationInput {
   readonly myRuns: number
   readonly opponentRuns: number
-  /** `0xb69c8` — ⚠️ **동점이면 칸 0(먼저 공격한 쪽)이 이긴 것으로 본다**(원본 그대로) */
+  /** `0xb69c8` — ⚠️ **동점이면 칸 0(먼저 공격한 쪽)이 이긴 것으로 본다**(원본 그대로, `seasonHumanWonOf`) */
   readonly won: boolean
+  /** 동점인가 — 평판의 −2·+2 문만 갈린다 (`SeasonGameContext.tied`). 안 넘기면 동점 아님 */
+  readonly tied?: boolean
   /** 인기도용 완투 등급 (`popularityCompleteGameOf`) */
   readonly popularityCompleteGame: CompleteGameKind
   /** 평판용 완투 등급 (`reputationCompleteGameOf`) */
@@ -187,6 +216,7 @@ export function evaluateSeasonGame(
     opponentRuns: input.opponentRuns,
     myRuns: input.myRuns,
     won: input.won,
+    tied: input.tied,
     completeGame: input.reputationCompleteGame,
   }
   return {
