@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyOutcome, giveUp, missionAdvance, startMission, tick } from '@/entities/mission/model/missionRun'
+import { applyOutcome, applyPickoff, giveUp, missionAdvance, startMission, tick } from '@/entities/mission/model/missionRun'
 import { MISSIONS } from '@/shared/config/original/missions'
 
 const 첫걸음 = MISSIONS.find((m) => m.name === '명품 타자의 첫 걸음')!
@@ -182,5 +182,32 @@ describe('giveUp', () => {
     const 성공 = { ...startMission(첫걸음), status: '성공' as const }
 
     expect(giveUp(성공)).toBe(성공)
+  })
+})
+
+describe('applyPickoff — CPU 견제 한 판 (메시지 0x10 → 종류 4 → 0xae3e8)', () => {
+  const 번트의달인 = MISSIONS.find((m) => m.side === '타자' && m.id === 2)!
+
+  it('견제사는 아웃만 늘리고 남은 타석·목표는 그대로다 (종류 4 는 타석이 아니다)', () => {
+    const run = startMission(번트의달인)
+    const next = applyPickoff(run, { bases: { first: false, second: false, third: false }, runsScored: 0, outsAdded: 1 })
+
+    expect(next.outs).toBe(run.outs + 1)
+    expect(next.bases.first).toBe(false)
+    expect(next.remainingPlateAppearances).toBe(run.remainingPlateAppearances)
+    expect(next.progress).toBe(run.progress)
+    expect(next.status).toBe('진행중')
+  })
+
+  it('세이프면 루가 그대로다', () => {
+    const run = startMission(번트의달인)
+    expect(applyPickoff(run, { bases: run.bases, runsScored: 0, outsAdded: 0 }).bases).toEqual(run.bases)
+  })
+
+  it('3아웃이면 도루 실패와 같이 시작 상황으로 되돌린다', () => {
+    const run = { ...startMission(번트의달인), outs: 2 }
+    const next = applyPickoff(run, { bases: { first: false, second: false, third: false }, runsScored: 0, outsAdded: 1 })
+    expect(next.outs).toBe(번트의달인.start.outs)
+    expect(next.bases).toEqual(번트의달인.start.runners)
   })
 })

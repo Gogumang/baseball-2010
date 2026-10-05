@@ -8,6 +8,7 @@ import { matchResultEventOf } from '@/entities/story/model/aceMatch'
 import { runnerCountOf } from '@/entities/game/model/baseState'
 import {
   applyOutcome as applyMissionOutcome,
+  applyPickoff,
   applySteal,
   canSteal,
   checkSwingsExhausted,
@@ -41,6 +42,9 @@ import type { PitcherRepertoire, PitcherStats } from '@/features/play-pitcher-ga
 import { ROOKIE_BATTER_ABILITY } from '@/entities/batting/model/batter'
 import { isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayInput, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
+import { pickoffCallSoundIdOf, runPickoffPlay } from '@/features/defense-play/model/pickoffPlay'
+import type { PickoffPlayResult } from '@/features/defense-play/model/pickoffPlay'
+import type { PickoffBase } from '@/entities/defense-controls/model/pickoff'
 import { carryDistanceOf } from '@/entities/batting/model/battedBallFlight'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
@@ -194,6 +198,8 @@ export function useMissionSession({
   const [pendingDefensePlay, setPendingDefensePlay] = useState<PendingMissionDefense | null>(null)
   const pendingDefensePlayRef = useRef(pendingDefensePlay)
   pendingDefensePlayRef.current = pendingDefensePlay
+  /** 다 돌려 놓은 CPU 견제 한 판 — 화면이 재생을 마치면 비운다 (`actions.finishPickoffReplay`) */
+  const [pickoffReplay, setPickoffReplay] = useState<PickoffPlayResult | null>(null)
   /** 결과를 확인하고 돌아갈 때 마지막으로 한 편의 목록을 연다 */
   const [lastSide, setLastSide] = useState<OriginalMission['side']>('타자')
   const [clearCounts, setClearCounts] = useState<MissionClearCounts>(() => missionRecord.load())
@@ -527,6 +533,7 @@ export function useMissionSession({
       runner.setBannerText('')
       runner.setIsPaused(false)
       setPendingDefensePlay(null)
+      setPickoffReplay(null)
 
       if (mission.side === '투수') {
         setPitcherRun(startPitcherMission(mission))
@@ -543,6 +550,7 @@ export function useMissionSession({
       runner.setBannerText('')
       runner.setIsPaused(false)
       setPendingDefensePlay(null)
+      setPickoffReplay(null)
       setMissionRun(startMission(mission))
       setScreen({ kind: '마선수대결', mission, ...pending })
     },
@@ -554,6 +562,44 @@ export function useMissionSession({
       setScreen({ kind: '이벤트', eventId, context: screen.context, carried: screen.carried })
     },
 
+    /**
+     * **CPU 투수의 견제** — 타석 화면(`BattingStage.onPickoff`)이 상대 투수 AI 가 목표점 대신 고른 루를 알려 준다.
+     *
+     * 원본 길은 미션(모드 6)에서도 그대로 돈다 (직접 재역어셈):
+     * CPU 조작 객체 0x53874 → 0x53824 `[+0x18] > 5` → 메시지 0x645 → 0x509a0 → 0x5121c → `0x345fc`
+     * (모드 갈림은 0x3460e `+0x1104 == 7` 홈런더비 하나) → 종류 4 → `0x34848` 루 굴림 → 메시지 0x10 →
+     * `0x50f28`(루 > 0 · 0xa9878 주자 있음 → 종류 4 · 상태 0x17, 모드·미션 객체를 안 본다).
+     * 미션 객체로 걸러지는 0x66864 는 CPU 투수 교체 0x3d954·0xc1ba4 에서만 불린다(xref) — 견제 길에는 없다.
+     *
+     * 판은 바로 다 돌려 진루·아웃을 먹이고(`applyPickoff`), 화면은 `pickoffReplay` 를 재생한다(나만의리그와 같은 꼴).
+     * 볼카운트·남은 타석·스윙은 그대로다 — 공을 안 던졌다.
+     * 수비 능력치·주루는 미션 타구(`missionDefensePlayInputOf`)와 같은 기본값이다: 아홉 칸 기본 능력치, 사람 공격,
+     * 주루 설정은 안 넘긴다(진행기 기본 = 자동) — 미션 세션에는 환경설정 "주루" 가 들어오지 않는다(근사, 타구와 같다).
+     *
+     * 판정 콜 — 세이프면 늘 17 (0x51c14 의 종류 4·5 갈래), 견제사면 62/20 (0x51b36).
+     * ⚠️ 원본은 공이 잡히는 **틱**에 낸다. 웹은 판을 미리 다 돌려 재생하므로 판을 연 자리에서 낸다 (팀경기·나만의리그와 같은 근사).
+     */
+    cpuPickoff: (base: PickoffBase) => {
+      const current = missionRunRef.current
+      if (current === null || current.status !== '진행중') return
+      if (pendingDefensePlayRef.current !== null) return
+      if (!(base === 1 ? current.bases.first : base === 2 ? current.bases.second : current.bases.third)) return
+      const result = runPickoffPlay({
+        targetBase: base,
+        bases: current.bases,
+        outs: current.outs,
+        random,
+        // 타자 미션은 사람이 공격이다 (`missionDefensePlayInputOf` 의 offenseIsCpu 와 같다)
+        offenseIsCpu: false,
+      })
+      setMissionRun((previous) => (previous === null ? previous : applyPickoff(previous, result.advance)))
+      playSoundIds(audio, [pickoffCallSoundIdOf(result)])
+      if (result.ticks.length > 0) setPickoffReplay(result)
+    },
+
+    /** 견제 판 재생이 끝났다 */
+    finishPickoffReplay: () => setPickoffReplay(null),
+
     /** 원작 미션 '기동력은 나의 힘' — 번트와 도루를 1개씩 */
     steal: (ability: BatterAbility) => {
       if (missionRun === null || !canSteal(missionRun)) return
@@ -564,6 +610,7 @@ export function useMissionSession({
 
     giveUpBatter: () => {
       setPendingDefensePlay(null)
+      setPickoffReplay(null)
       if (missionRun !== null) setMissionRun(giveUpMission(missionRun))
     },
 
@@ -589,6 +636,6 @@ export function useMissionSession({
 
   return {
     missionRun, pitcherRun, clearedKeys, clearCounts, lastSide, aceLevels,
-    missionConditionCode, pendingDefensePlay, handleMissionPitch, handleThrow, actions,
+    missionConditionCode, pendingDefensePlay, pickoffReplay, handleMissionPitch, handleThrow, actions,
   }
 }

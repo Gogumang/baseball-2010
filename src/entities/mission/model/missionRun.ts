@@ -252,6 +252,26 @@ export function applySteal(run: MissionRun): MissionRun {
   return { ...run, bases, progress, status: isCleared(run.mission, progress) ? '성공' : '진행중' }
 }
 
+/**
+ * **CPU 투수의 견제 한 판**이 끝났다 — 진행기(`runPickoffPlay`)가 낸 진루·아웃만 먹인다.
+ *
+ * 원본은 메시지 0x10 → `0x50f28`(모드 갈림 없음) → 플레이 종류 4 · 상태 0x17 → 판 끝 `0xae3e8` 에서
+ * 정산 0xa8024 와 미션 판정 0xaaa6c(0xae5c4)를 부른다. 종류 4 는 타석이 아니라(state[0x26], 0xa8d98)
+ * 남은 타석·스윙은 그대로이고, 안타·타점 가지도 안 선다 — 목표 칸은 하나도 안 움직인다.
+ *
+ * 3아웃이면 도루 실패(`failSteal`)·타구(`advanceSituation`)와 같이 미션 시작 상황으로 되돌린다 (같은 추정).
+ * ⚠️ 악송구로 들어온 득점은 타점이 아니라 목표에 안 들고, 화면 점수(시작 점수 + 타점)에도 안 보인다 — 웹 미션은
+ *    득점 칸을 따로 들지 않는다(근사).
+ */
+export function applyPickoff(run: MissionRun, advance: AdvanceResult): MissionRun {
+  if (run.status !== '진행중') return run
+  const outs = run.outs + advance.outsAdded
+  if (outs >= OUTS_PER_INNING) {
+    return { ...run, bases: run.mission.start.runners, outs: run.mission.start.outs }
+  }
+  return { ...run, bases: advance.bases, outs }
+}
+
 /** 도루 실패 — 주자가 죽는다 */
 export function failSteal(run: MissionRun): MissionRun {
   if (!canSteal(run)) return run

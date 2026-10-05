@@ -59,6 +59,11 @@ export function MissionRoutes({
     )
   }
 
+  // CPU 견제 한 판 — 세션이 이미 다 돌려 먹였다. 화면은 재생만 한다 (나만의리그 `GameRoute` 의 lastDefensePlay 와 같은 꼴)
+  if (session.pickoffReplay !== null) {
+    return <DefensePlayback ticks={session.pickoffReplay.ticks} onDone={actions.finishPickoffReplay} />
+  }
+
   const selectScreen = (
     <MissionSelectScreen
       clearedKeys={session.clearedKeys}
@@ -94,6 +99,10 @@ export function MissionRoutes({
         bannerText={runner.bannerText}
         random={random}
         onPitchResolved={session.handleMissionPitch}
+        // 상대 마투수 마구 횟수 0xd8509[레벨] (타석 교대 0xaebe4) — 안 넘기면 늘 Lv1 의 3회다
+        aceLevels={session.aceLevels}
+        // CPU 견제 (0x345fc 종류 4 → 0x34848 → 메시지 0x10) — 미션(모드 6)에서도 돈다
+        onPickoff={actions.cpuPickoff}
         onSteal={() => actions.steal(ability)}
         onGiveUp={actions.giveUpBatter}
         onFinish={screen.kind === '마선수대결' ? actions.finishAceMatch : actions.finishBatter}

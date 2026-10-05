@@ -50,3 +50,31 @@ describe('미션 타석은 치는 선수의 장착 스킬을 타석 화면에 �
     expect(stageProps.last?.batterSkillIds).toEqual(압도)
   })
 })
+
+describe('미션 타석은 마선수 레벨과 CPU 견제 콜백을 타석 화면에 넘긴다', () => {
+  it('aceLevels(마구 횟수 0xd8509) · onPickoff(0x345fc 종류 4)', () => {
+    const mission = MISSIONS.find((candidate) => candidate.side === '타자' && candidate.opponentAce > 0)!
+    const levels = { 1: 3 }
+    const onPickoff = vi.fn()
+    render(
+      <MissionPlayScreen
+        run={startMission(mission)}
+        ability={ROOKIE_BATTER_ABILITY}
+        pitcherAbility={DEFAULT_PITCHER_ABILITY}
+        opponent={null}
+        atBat={createAtBat()}
+        isPaused={false}
+        bannerText=""
+        random={createSeededRandom(1)}
+        aceLevels={levels}
+        onPickoff={onPickoff}
+        onPitchResolved={vi.fn()}
+        onGiveUp={vi.fn()}
+        onFinish={vi.fn()}
+        onSteal={vi.fn()}
+      />,
+    )
+    expect(stageProps.last?.aceLevels).toBe(levels)
+    expect(stageProps.last?.onPickoff).toBe(onPickoff)
+  })
+})

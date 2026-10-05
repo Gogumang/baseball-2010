@@ -35,6 +35,16 @@ interface MissionPlayScreenProps {
   readonly onPitchResolved: (detail: PitchOutcomeDetail, pitch: Pitch) => void
   readonly onGiveUp: () => void
   readonly onFinish: () => void
+  /**
+   * 마선수 레벨 열 칸 (`useAceLevels` 의 `levels`) — `BattingStage` 로 그대로 넘긴다.
+   * 상대 마투수의 마구 횟수가 `0xd8509[레벨]` = [3,4,5,6,7] 을 따른다 (타석 교대 0xaebe4). 안 넘기면 Lv1 = 3회.
+   */
+  readonly aceLevels?: Readonly<Record<number, number>>
+  /**
+   * **CPU 투수의 견제** — `BattingStage.onPickoff` 로 그대로 넘긴다. 미션(모드 6)도 견제 길에 모드·미션 갈림이 없다
+   * (0x50f28 · 0x345fc 의 갈림은 홈런더비 하나). 안 넘기면 견제가 꺼진다.
+   */
+  readonly onPickoff?: (base: 1 | 2 | 3) => void
   /** 도루 목표가 있는 미션에서만 쓴다 */
   readonly onSteal: () => void
   /**
@@ -66,6 +76,8 @@ export function MissionPlayScreen({
   bannerText,
   random,
   onPitchResolved,
+  aceLevels,
+  onPickoff,
   onGiveUp,
   onFinish,
   onSteal,
@@ -172,7 +184,9 @@ export function MissionPlayScreen({
           canBunt={canBunt}
           isPaused={isPaused || isOver}
           random={random}
+          aceLevels={aceLevels}
           onPitchResolved={onPitchResolved}
+          onPickoff={onPickoff}
         />
 
         <div className={styles.overlay}>

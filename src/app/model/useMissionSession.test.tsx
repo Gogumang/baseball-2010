@@ -10,6 +10,7 @@ import type { MissionRecordPort } from '@/shared/api/save/missionRecordPort'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { MISSIONS } from '@/shared/config/original/missions'
 import { PITCH_TYPES } from '@/shared/config/original/pitchTypes'
+import { runPickoffPlay } from '@/features/defense-play/model/pickoffPlay'
 
 /**
  * 이벤트 112 의 match 명령이 여는 마선수 대결 — 이기면 114, 지면 115 로 돌아가야 한다.
@@ -321,5 +322,50 @@ describe('미션 마선수의 레벨 배율 0xd88aa (0xb6414)', () => {
     const 일반 = MISSIONS.find((mission) => mission.opponentAce === 0)
     if (일반 === undefined) throw new Error('일반 미션이 없다')
     expect(missionOpponentAbility(일반)).toBeNull()
+  })
+})
+
+describe('타자 미션 CPU 견제 — 0x345fc 종류 4 → 0x34848 → 0x50f28 (모드 6 에도 갈림 없음)', () => {
+  it('주자 있는 루면 견제 판을 돌려 진루·아웃을 먹이고 재생할 판을 남긴다 — 타석·볼카운트는 그대로', () => {
+    const rendered = setUpBatterMission(1) // 1사 3루
+    const before = rendered.result.current.session.missionRun!
+    // 세션 난수(씨앗 7)는 시작에서 안 쓰인다 — 같은 씨앗으로 같은 판을 돌린 값과 같아야 한다
+    const expected = runPickoffPlay({
+      targetBase: 3,
+      bases: before.bases,
+      outs: before.outs,
+      random: createSeededRandom(7),
+      offenseIsCpu: false,
+    })
+
+    act(() => {
+      rendered.result.current.session.actions.cpuPickoff(3)
+    })
+
+    const after = rendered.result.current.session.missionRun!
+    expect(rendered.result.current.session.pickoffReplay?.advance).toEqual(expected.advance)
+    expect(after.outs).toBe(before.outs + expected.advance.outsAdded)
+    expect(after.remainingPlateAppearances).toBe(before.remainingPlateAppearances)
+    expect(after.progress).toBe(before.progress)
+    expect(rendered.result.current.runner.atBat.balls).toBe(0)
+
+    act(() => {
+      rendered.result.current.session.actions.finishPickoffReplay()
+    })
+    expect(rendered.result.current.session.pickoffReplay).toBeNull()
+    rendered.unmount()
+  })
+
+  it('빈 루면 아무 일도 없다 (0x34848 은 주자 있는 루만 고른다)', () => {
+    const rendered = setUpBatterMission(1)
+    const before = rendered.result.current.session.missionRun
+
+    act(() => {
+      rendered.result.current.session.actions.cpuPickoff(1)
+    })
+
+    expect(rendered.result.current.session.missionRun).toBe(before)
+    expect(rendered.result.current.session.pickoffReplay).toBeNull()
+    rendered.unmount()
   })
 })
