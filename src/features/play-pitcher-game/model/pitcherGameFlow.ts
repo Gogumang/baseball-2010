@@ -229,6 +229,12 @@ export interface PitcherGameOptions {
   readonly hasLuckSkill?: boolean
   /** 화면 배치 side (투영 원점 표 0xcfb18 의 칸) */
   readonly stageSide?: number
+  /**
+   * 나리 연차 idx — 저장 레코드 `+0xb3` (0 = 1년차). 0xab214 의 내 투수 보너스 `aP = D[0x1dc] − D[0x1de] × idx`
+   * (ab41c) 가 본다. 모드 3 의 레코드는 `0x1f8d4(저장, 3)` = `[저장+0xb8]+0x11c` 다.
+   * ⚠️ 안 넘기면 0(1년차, 보너스 최대) — 옵션을 짜는 쪽(`pitcherGameOptions`)이 아직 안 넘긴다.
+   */
+  readonly careerYearIndex?: number
 }
 
 export interface PitcherGameLogEntry {
@@ -350,6 +356,13 @@ export interface PitcherGameProgress {
   readonly autoSinceHuman: boolean
   readonly burst: BurstSession | null
   readonly lastBurstResolution: BurstResolution | null
+  /**
+   * **공 객체 +0x10** (경기+0xf98) — 공에 실린 마구 번호. 0x34d6c 투수 쪽 보정(구속·제구 +150~220 · B/C %)이 본다.
+   * 상태 0x11 진입 `0x3de10` 만 쓴다 (H2 3-4): `구질 == 22 && 0xaea10(수비 팀) > 0` 이면 `+0x10 = 투수+0x18`.
+   * 마구 횟수는 그보다 앞(코스 확정 0x50e9c)에서 줄어 **마지막 한 번(1 → 0)은 새로 안 싣는다**.
+   * 되돌리는 곳이 없어 한 번 실린 번호는 경기 내내 직구·변화구에도 남는다 — 원본 그대로 옮긴다.
+   */
+  readonly ballMagicNumber: number
   readonly log: readonly PitcherGameLogEntry[]
   readonly nextLogId: number
   /** 경기가 끝난(또는 지금 치르는) 이닝 인덱스 (0-기준) */
@@ -482,6 +495,7 @@ export function startPitcherGame(
     // 경기 장면은 모드 2·3·4 일 때만 돌발 객체를 만든다 (0x48658)
     burst: createBurstSession(PITCHER_EDITION_MODE),
     lastBurstResolution: null,
+    ballMagicNumber: 0,
     log: [],
     nextLogId: 1,
     endedInningIndex: 0,
@@ -589,7 +603,11 @@ export function startPitch(
     },
     random,
   )
-  const pitch = buildHumanPitch(
+  // 0x50e9c(코스 확정) 마구 소모 → 0x3de10(0x11 진입) 공+0x10 싣기 차례 — 소모 뒤 남은 > 0 일 때만 싣는다
+  const magicRemaining = isMagic ? progress.magicRemaining - 1 : progress.magicRemaining
+  const ballMagicNumber =
+    isMagic && magicRemaining > 0 ? options.repertoire.magicNumber : progress.ballMagicNumber
+  const builtPitch = buildHumanPitch(
     {
       typeNumber: input.typeNumber,
       courseCell: input.courseCell,
@@ -605,6 +623,13 @@ export function startPitch(
     },
     random,
   )
+  const pitch: Pitch = {
+    ...builtPitch,
+    // P+0x10 — 0x34d6c 투수 쪽 번호. 내 투수는 육성(비트7)이라 1~4 면 표 칸 n = 번호 − 1 (pitcherBoostSideOf)
+    magicNumber: ballMagicNumber,
+    // 던진 투수 레코드 +0x18
+    pitcherMagicNumber: options.repertoire.magicNumber,
+  }
 
   // 실투 판정 0x33cbc — 투구 순간 0x4dc78 이 궤적 준비 0x9e669 **뒤**(0x4dea0)에 부른다.
   // 등급 뽑기(0x4dbac)·제구 흩어짐 굴림이 다 끝난 뒤이고, CPU 타자 결정 0x34334 보다 앞이다.
@@ -640,7 +665,14 @@ export function startPitch(
       outs: progress.game.outs,
       hasRunner: runnerCountOf(progress.game.bases) > 0,
     },
-    { isMistakePitch: isMistake },
+    {
+      isMistakePitch: isMistake,
+      // 모드 3 — 0xab214 의 팀 조작 보정(−10)은 모드 3·4 밖에서만이라 안 붙는다
+      swingMode: '나만의리그',
+      // ab3d0 sp40 = (모드 == 3 || 4) · ab41c 0xb6389(투수) = 내 육성 투수 rec[0xa] 비트7
+      isPitcherOwnPlayer: true,
+      careerYearIndex: options.careerYearIndex ?? 0,
+    },
   )
 
   // 스태미나는 게이지 결과와 무관하다 — 인자가 (game, 구질) 뿐이다 (P1 3-1 확정)
@@ -661,7 +693,8 @@ export function startPitch(
     ...progress,
     stamina,
     // ⚠️ 마구 횟수는 **코스 확정(OK)** 때 줄어든다 — 구질을 고른 순간이 아니다 (0x50e9c)
-    magicRemaining: isMagic ? progress.magicRemaining - 1 : progress.magicRemaining,
+    magicRemaining,
+    ballMagicNumber,
     pitchCount: progress.pitchCount + 1,
     // ctx+0x161 · ctx+0x16c — 투구 처리 0xa5e14 가 공 하나마다 둘 다 올린다
     atBatPitches: progress.atBatPitches + 1,

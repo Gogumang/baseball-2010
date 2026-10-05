@@ -624,7 +624,8 @@ describe('실투 판정 0x33cbc — 투구 순간에 굴린다', () => {
 
     // 그 한 굴림만 0 으로 바꾸면 실투(p > 0) → 표 선택이 치기로 강제되어 휘두른다
     const 실투 = startPitch(등판, 한가운데직구, 각본난수(0.7, 실투자리, 0))
-    expect(실투.lastResolution?.kind).toBe('타구')
+    // 휘둘렀다 — 맞혔는지는 0xab214 몫이다(내 투수 보너스 aP 400 이 붙은 뒤로 이 각본은 헛스윙이 된다)
+    expect(실투.lastResolution).toEqual({ kind: '스트라이크', isSwinging: true })
   })
 
   it('마구(22)는 굴림 없이 실투가 아니다 — 굴림이 하나 적다', () => {
@@ -854,5 +855,40 @@ describe('경기 끝 결과 판의 승·패·세 이름 (0x4fe9c — state+0x44/
     if (코드 === 3) expect(이름.save).toBe('나투수')
     expect(이름.win === null).toBe(끝.decision.winner.side === 2)
     expect(이름.loss === null).toBe(끝.decision.loser.side === 2)
+  })
+})
+
+describe('투수 쪽 보정 0x34d6c — 공+0x10 (0x3de10) · 내 투수 보너스 (0xab214)', () => {
+  const 마구 = { typeNumber: 22, courseCell: 4, gaugeCell: 0 }
+
+  /** 타석이 이어지는 동안(사람 차례) 한 공을 던진다 — 인플레이면 수비까지 미리 돌린다 */
+  const 한공 = (progress: PitcherGameProgress, input: typeof 마구, random: RandomPort) =>
+    throwPitch(progress, input, random)
+
+  it('마구를 던지면 공에 번호가 실리고, 그 뒤 직구에도 남는다 (되돌리는 곳이 없다)', () => {
+    const random = 씨앗(3)
+    let progress = startPitcherGame(기본옵션, random)
+    expect(progress.ballMagicNumber).toBe(0)
+    progress = 한공(progress, 한가운데직구, random)
+    expect(progress.lastPitch?.magicNumber).toBe(0)
+    // 내 투수 레코드 +0x18 은 늘 실린다 (이펙트·보정 쪽 판별)
+    expect(progress.lastPitch?.pitcherMagicNumber).toBe(1)
+
+    progress = 한공(progress, 마구, random)
+    expect(progress.magicRemaining).toBe(3)
+    expect(progress.ballMagicNumber).toBe(1)
+    expect(progress.lastPitch?.magicNumber).toBe(1)
+
+    progress = 한공(progress, 한가운데직구, random)
+    expect(progress.lastPitch?.magicNumber).toBe(1)
+  })
+
+  it('마지막 한 번(남은 1 → 0)은 새로 싣지 않는다 — 소모 0x50e9c 가 0x3de10 보다 앞이다', () => {
+    const random = 씨앗(3)
+    let progress = startPitcherGame({ ...기본옵션, magicCount: 1 }, random)
+    progress = 한공(progress, 마구, random)
+    expect(progress.magicRemaining).toBe(0)
+    expect(progress.ballMagicNumber).toBe(0)
+    expect(progress.lastPitch?.magicNumber).toBe(0)
   })
 })
