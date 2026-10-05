@@ -29,6 +29,7 @@ import {
 } from '@/entities/team/model/teamRoster'
 import { rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
 import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
+import { rosterPitcherRoleOf } from '@/entities/pitching/model/pitcherChange'
 import {
   EMPTY_LEAGUE_PLAYER_STATS,
   recordLeaguePitcherAppearances,
@@ -306,6 +307,12 @@ function defenseOf(
     staminaAt: (slot) => staminas[slot] ?? FULL_STAMINA,
     lead,
     bothTeamsAreCpu: true,
+    // 보직 `+0xb & 3` — 로스터 투수 표 칸 0~3 선발 · 4~6 중간 · 7 마무리 (0xb6dec). 로테이션 0xb5ca8 은 선발 넷만
+    // 섞어 칸의 보직이 그대로다. 마투수(8번)의 보직은 저장 레코드라 모른다 → 선발로 본다(changePitcherIfNeeded)
+    roleAt: rosterPitcherRoleOf,
+    // 마선수 0xb633c(+0xa 비트6) — 마투수 8번 칸. 마운드면 특수 문턱(ac4f2), 벤치에 있으면 0xb8a8d 가 참이라
+    // 마무리 굴림 0xac360 을 지나고(CPU 끼리라 0xb6c20 이 늘 거짓), 0xabfcc 는 고르지 않는다(ac084)
+    isSpecialPitcherAt: (slot) => slot === ACE_PITCHER_SLOT && acePitcher !== undefined,
   }
 }
 

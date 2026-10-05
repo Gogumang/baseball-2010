@@ -18,7 +18,11 @@ import {
 } from '@/entities/league/model/league'
 import { BATTERS_PER_TEAM, PITCHERS_PER_TEAM, startingPitcherOf } from '@/entities/team/model/teamRoster'
 import { rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
-import { EMPTY_LEAGUE_PLAYER_STATS } from '@/entities/league/model/leaguePlayerStats'
+import {
+  EMPTY_LEAGUE_PLAYER_STATS,
+  leaguePitcherIdOf,
+  leaguePitcherLineOf,
+} from '@/entities/league/model/leaguePlayerStats'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 
@@ -323,11 +327,16 @@ describe('CPU 끼리 경기가 선발 투수 기록도 쌓는다 (0xa8024 · 경
     // 동점이면 연장을 가므로 딱 떨어지지는 않는다
     expect(합((줄) => 줄.outs)).toBeGreaterThanOrEqual(225 * 51)
     expect(합((줄) => 줄.outs)).toBeLessThan(225 * 60)
-    // 로테이션 네 칸이 선발을 다 맡으므로 10팀 × 4 = 40명이 규정 이닝(45)을 채운다.
-    // (구원으로 올라오는 투수도 대개 그 네 칸이다 — 웹 로스터에 보직이 없어 벤치 번호가 작은
-    //  쪽부터 고르기 때문이다. `chooseReplacementPitcher` 주석 참고)
-    expect(줄들.filter((줄) => Math.trunc(줄.outs / 3) >= 45)).toHaveLength(40)
-    // ⚠️ 방어율은 **규정 이닝을 채운 선발만** 본다 — 몇 타자 만에 내려간 구원은 0.00 이나
+    // 보직 `+0xb & 3` = 표 칸 [0,0,0,0,1,1,1,2] (rosterPitcherRoleOf). 로테이션 네 칸(선발)은 10팀 × 4 = 40명 모두
+    // 규정 이닝(45)을 채운다. 구원은 0xabfcc 가 보직을 보고 고르므로 중간(4~6)이 먼저 오르고, 9회 이후 마무리
+    // 상황(ac574)에는 마무리(7)가 오른다 — 중간 첫 칸이 규정 이닝을 넘기는 팀도 있다.
+    const 이닝 = (팀: number, 칸: number) => Math.trunc(leaguePitcherLineOf(stats, leaguePitcherIdOf(팀, 칸)).outs / 3)
+    for (let 팀 = 0; 팀 < LEAGUE_TEAM_COUNT; 팀 += 1) {
+      for (let 칸 = 0; 칸 < 4; 칸 += 1) expect(이닝(팀, 칸)).toBeGreaterThanOrEqual(45)
+      // 마무리도 실제로 마운드에 선다 — 보직을 모르던 때는 벤치 번호 순이라 7번이 거의 안 나왔다
+      expect(이닝(팀, 7)).toBeGreaterThan(0)
+    }
+    // ⚠️ 방어율은 **규정 이닝을 채운 투수만** 본다 — 몇 타자 만에 내려간 구원은 0.00 이나
     //    무한대가 나오고, 원본 순위표도 이닝이 적은 투수를 뺀다
     for (const 줄 of 줄들.filter((줄) => Math.trunc(줄.outs / 3) >= 45)) {
       const 방어율 = (줄.runsAllowed * 2700) / 줄.outs / 100
@@ -580,5 +589,17 @@ describe('같은 레코드를 쓰는 두 명단 — 국가대항전 CPU 경기 (
     }
     // 같은 선발이 양쪽 마운드에서 한 값을 깎으므로 교체 시점이 달라진다
     expect(달라짐).toBeGreaterThan(0)
+  })
+})
+
+describe('CPU 끼리 경기의 수비 객체는 보직과 마선수를 넘긴다 (0xac428 ac574~ac5c2 · 0xb8a8d · 0xabfcc)', () => {
+  it('9회 마무리 상황마다 매 타자 투수를 바꾸지 않는다 — 마무리(보직 2)가 올라오면 그대로 간다', () => {
+    let 줄수 = 0
+    const 경기 = 200
+    for (let seed = 1; seed <= 경기; seed += 1) {
+      줄수 += simulateLeagueGame({ away: 1, home: 2 }, createSeededRandom(seed), seed % 4).pitcherAppearances.length
+    }
+    // 보직을 안 넘기면 모두 선발로 보여 마무리 상황마다 교체가 서 두 팀 합 평균 6 을 넘었다
+    expect(줄수 / 경기).toBeLessThan(5)
   })
 })
