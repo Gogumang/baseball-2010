@@ -42,6 +42,8 @@ import { isInfiniteGamePointOn } from '@/shared/lib/dev/devOptions'
 import type { GamePointWalletSession } from '@/entities/wallet/model/useGamePointWallet'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { selectPitcherShopItem } from '@/features/shop/model/pitcherShopSelection'
+import type { PitcherShopTab } from '@/features/shop/model/pitcherShopSelection'
 
 /**
  * 나만의리그 **투수편**(원본 게임 모드 3, 장면 0x106) 한 판.
@@ -52,15 +54,20 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 
 /**
  * 화면 유니온 — 원본 장면 0x106 의 상태 번호를 괄호에 적는다.
- *   등록(101~104) · 관리(105) · 경기(144) · 시즌종료(136 자리) · 연말(132) · 엔딩(141)
+ *   등록(101~104) · 관리(105) · 경기(144) · 시즌종료(136 자리) · 연말(132) · 엔딩(141) ·
+ *   상점(111 장비 상점 / 121 장비착용 — 어느 쪽인지는 `shopTab`)
  */
-export type PitcherScene = '등록' | '관리' | '경기' | '시즌종료' | '연말' | '엔딩'
+export type PitcherScene = '등록' | '관리' | '경기' | '시즌종료' | '연말' | '엔딩' | '상점'
 
 export interface PitcherLeagueSession {
   readonly career: PitcherCareer | null
   readonly scene: PitcherScene
   /** 지금 경기를 세울 옵션. 경기 장면이 아니면 null */
   readonly gameOptions: PitcherGameOptions | null
+  /** 상점 장면의 창 — '장착' 111 장비 상점 · '착용' 121 장비착용 */
+  readonly shopTab: PitcherShopTab
+  /** 상점에서 마지막으로 고른 칸의 결과 알림 (막힘·구매 완료·히든 오픈) */
+  readonly shopNotice: string
   readonly actions: {
     readonly create: (name: string, profile: PitcherRookieProfile) => void
     /** 바뀐 커리어를 그대로 저장한다 (구질 훈련처럼 화면이 계산해 돌려줄 때) */
@@ -78,6 +85,13 @@ export interface PitcherLeagueSession {
     readonly continueAfterEnding: () => boolean
     /** 엔딩을 다 본 뒤 — 선수를 지운다 (145 틀이 메인 메뉴로 나가는 자리) */
     readonly finishEnding: () => void
+    /** 111 장비 상점 · 121 장비착용을 연다 */
+    readonly openShop: (tab: PitcherShopTab) => void
+    /**
+     * 상점·장비착용에서 한 칸을 고른다 (확인을 마친 뒤) — 0x13460 → 0x14a74 / 0x17ad0.
+     * `globalOpenedHiddenIds` 는 기록연감의 전역 해금 id (원본 `app+0xc0` 표) — 커리어 것과 합쳐 본다.
+     */
+    readonly purchase: (itemId: string, globalOpenedHiddenIds?: readonly number[]) => void
     readonly reset: () => void
   }
 }
@@ -462,6 +476,39 @@ export function usePitcherLeagueSession(
 
   const goto = useCallback((next: PitcherScene) => setScene(next), [])
 
+  const [shopTab, setShopTab] = useState<PitcherShopTab>('장착')
+  const [shopNotice, setShopNotice] = useState('')
+
+  /** [아이템] → 110 → 111 장비 상점 · [선수정보] → 121 장비착용. 취소는 `goto('관리')` (원본 111 → 110 → 105) */
+  const openShop = useCallback((tab: PitcherShopTab) => {
+    setShopTab(tab)
+    setShopNotice('')
+    setScene('상점')
+  }, [])
+
+  /**
+   * 장비 구매·착용. 소지금·보유·니블·컬렉터 해금이 커리어에 들어가고 곧바로 저장한다
+   * (원본 0x14a74 도 `0x22755(app, 1)` 로 바로 저장한다). G 는 장비가 건드리지 않는다 — 소지금 칸이다.
+   * 해금표는 원본에서 전역이라 기록연감 것을 커리어 것에 얹어 판정하고, 얹은 채로 저장한다
+   * (타자편 `syncOpenedHidden` 과 같은 방식).
+   */
+  const purchase = useCallback(
+    (itemId: string, globalOpenedHiddenIds: readonly number[] = []) => {
+      if (career === null) return
+      const withGlobal = (current: PitcherCareer): PitcherCareer => {
+        const missing = globalOpenedHiddenIds.filter((id) => !current.openedHiddenIds.includes(id))
+        return missing.length === 0 ? current : { ...current, openedHiddenIds: [...current.openedHiddenIds, ...missing] }
+      }
+      setShopNotice(selectPitcherShopItem(withGlobal(career), itemId).notice)
+      commitWith((current) => {
+        const merged = withGlobal(current)
+        const selected = selectPitcherShopItem(merged, itemId).career
+        return selected === merged ? current : selected
+      })
+    },
+    [career, commitWith],
+  )
+
   const reset = useCallback(() => {
     setCareer(null)
     setGameOptions(null)
@@ -496,6 +543,8 @@ export function usePitcherLeagueSession(
     career: shown,
     scene,
     gameOptions,
+    shopTab,
+    shopNotice,
     actions: {
       create,
       save: commit,
@@ -507,6 +556,8 @@ export function usePitcherLeagueSession(
       retire,
       continueAfterEnding,
       finishEnding,
+      openShop,
+      purchase,
       reset,
     },
   }

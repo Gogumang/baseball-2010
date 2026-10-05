@@ -33,6 +33,7 @@ import { equipPitcherTitle } from '@/entities/pitcher-career/model/pitcherTitles
 import { pitchTypeNameOf } from '@/entities/pitcher-career/model/pitchTraining'
 import {
   PITCHER_COMMAND_SLOTS,
+  PITCHER_ITEM_SLOTS,
   PITCHER_MANAGEMENT_TEXT,
   PITCHER_PLAYER_INFO_SLOTS,
   PITCH_WINDOW_CHOICES,
@@ -60,7 +61,7 @@ import {
  * 훈련은 칸 0~3 도, 마구(125)도 끝나면 **105** 로 돌아간다 (R9 8절 표의 107 줄).
  */
 
-export type PitcherMenuKind = '관리' | '선수정보' | '트레이닝'
+export type PitcherMenuKind = '관리' | '선수정보' | '트레이닝' | '아이템'
 /** 하위 창 — 원본 상태 119 · 123 · 108 · 124 · 122(아이템/스킬) 자리 */
 export type PitcherMenuWindow = '기본정보' | '구질목록' | '구질훈련' | '기록실' | '아이템/스킬' | null
 
@@ -85,8 +86,11 @@ export interface UsePitcherManagementMenuInput {
   readonly onNextGame: () => void
   /** [외출] 상태 112. 투수편 외출 지도가 아직 없으면 넘기지 않는다 */
   readonly onOuting?: () => void
-  /** [아이템]·[장비착용] 상태 110·121. 투수편 상점이 없으면 넘기지 않는다 */
-  readonly onOpenShop?: () => void
+  /**
+   * 111 장비 상점('장착') · 121 장비착용('착용') 을 연다. 안 넘기면 그 칸은 "옮기지 않은 화면" 알림이다.
+   * [아이템] 은 먼저 110 하위 메뉴를 띄우고, 거기서 '장착' 을 골라야 여기로 온다.
+   */
+  readonly onOpenShop?: (tab: '장착' | '착용') => void
   /** 105 취소 — 메인 메뉴 장면 0x103 */
   readonly onExit: () => void
 }
@@ -240,7 +244,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
       if (id === '트레이닝') return setKind('트레이닝')
       if (id === '다음경기') return onNextGame()
       if (id === '외출') return openOrNotice(onOuting)
-      if (id === '아이템') return openOrNotice(onOpenShop)
+      if (id === '아이템') return setKind('아이템')
       // [휴식] — 가드(0x12682) 뒤 StrMODE[90] 확인 팝업 0x2a → 상태 127
       const reason = pitcherRestBlockReasonOf(career)
       if (reason === '이미행동함') return setNotice(PITCHER_MANAGEMENT_TEXT.alreadyActed)
@@ -264,13 +268,13 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
         },
       })
     },
-    [career, onNextGame, onOpenShop, onOuting, onSave, openOrNotice, random],
+    [career, onNextGame, onOuting, onSave, openOrNotice, random],
   )
 
   const selectPlayerInfo = useCallback(
     (id: string) => {
       if (id === '기본정보') return setSubWindow('기본정보')
-      if (id === '장비착용') return openOrNotice(onOpenShop)
+      if (id === '장비착용') return openOrNotice(onOpenShop && (() => onOpenShop('착용')))
       /*
        * [아이템/스킬] 하위 상태 122 — 스킬 창. 메뉴 표 0xcc69c 와 확인 키 0x13140 · 대화 0x147b0 에
        * 모드 갈림이 없어 투수편도 타자편과 같은 창이다 (이름만 0x8457c 가 모드 3 이면 비트+16 칸을 읽는다).
@@ -314,14 +318,24 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     [blockNoticeOf, career, openPitchWindow, runAbilityTraining],
   )
 
+  /** 110 아이템 하위 메뉴 — '장착' 만 111 장비 상점으로 간다 (서브·GP 는 아직 투수 표가 없다) */
+  const selectItemMenu = useCallback(
+    (id: string) => {
+      if (id === '장착') return openOrNotice(onOpenShop && (() => onOpenShop('장착')))
+      return setNotice(PITCHER_MANAGEMENT_TEXT.notPorted)
+    },
+    [onOpenShop, openOrNotice],
+  )
+
   const select = useCallback(
     (id: string) => {
       setNotice('')
       if (kind === '관리') return selectCommand(id as PitcherManagementCommand)
       if (kind === '선수정보') return selectPlayerInfo(id)
+      if (kind === '아이템') return selectItemMenu(id)
       return selectTraining(id)
     },
-    [kind, selectCommand, selectPlayerInfo, selectTraining],
+    [kind, selectCommand, selectItemMenu, selectPlayerInfo, selectTraining],
   )
 
   const closeWindow = useCallback(() => {
@@ -522,6 +536,7 @@ function itemsOf(kind: PitcherMenuKind, career: PitcherCareer): readonly MenuIte
   if (kind === '선수정보') {
     return PITCHER_PLAYER_INFO_SLOTS.map((slot) => ({ id: slot.id, label: slot.id }))
   }
+  if (kind === '아이템') return PITCHER_ITEM_SLOTS.map((slot) => ({ id: slot.id, label: slot.id }))
   if (kind === '트레이닝') {
     // 칸 0~3 은 "지금 값 / 보직 한계"(0xa44f4), 칸 4(마구)는 레벨을 옆에 적는다
     const limits = pitcherAbilityLimitsOf(career)

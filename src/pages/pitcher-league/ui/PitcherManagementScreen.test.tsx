@@ -36,6 +36,7 @@ interface 화면옵션 {
   readonly onNextGame?: () => void
   readonly onExit?: () => void
   readonly onOuting?: () => void
+  readonly onOpenShop?: (tab: '장착' | '착용') => void
 }
 
 const 화면 = (options: 화면옵션 = {}) =>
@@ -46,6 +47,7 @@ const 화면 = (options: 화면옵션 = {}) =>
       onSave={options.onSave ?? (() => {})}
       onNextGame={options.onNextGame ?? (() => {})}
       onOuting={options.onOuting}
+      onOpenShop={options.onOpenShop}
       onExit={options.onExit ?? (() => {})}
     />,
   )
@@ -574,5 +576,40 @@ describe('두 갈래 팝업의 키 (0x19398 · StrictMode)', () => {
     키('Enter')
 
     expect(screen.queryByText('보고 싶은 기록을 선택해주세요')).toBeNull()
+  })
+})
+
+describe('[아이템] 110 하위 메뉴 → 111 장비 상점 · [장비착용] 121', () => {
+  it('[아이템] 은 곧장 상점이 아니라 장착·서브·GP 하위 메뉴(110)를 띄운다', () => {
+    화면({ onOpenShop: vi.fn() })
+
+    누르기('아이템')
+
+    expect(칸이름들()).toEqual(['장착', '서브', 'GP'])
+  })
+
+  it('[장착] 은 장비 상점으로, [장비착용] 은 장비착용 창으로 간다', () => {
+    const onOpenShop = vi.fn()
+    화면({ onOpenShop })
+
+    누르기('아이템')
+    누르기('장착')
+    expect(onOpenShop).toHaveBeenLastCalledWith('장착')
+
+    누르기('되돌아가기')
+    누르기('선수정보')
+    누르기('장비착용')
+    expect(onOpenShop).toHaveBeenLastCalledWith('착용')
+  })
+
+  it('투수 서브·GP 아이템은 아직 옮기지 않았다 — 알림만 뜬다', () => {
+    const onOpenShop = vi.fn()
+    화면({ onOpenShop })
+
+    누르기('아이템')
+    누르기('서브')
+
+    expect(onOpenShop).not.toHaveBeenCalled()
+    expect(screen.getByText('아직 옮기지 않은 화면입니다')).toBeTruthy()
   })
 })

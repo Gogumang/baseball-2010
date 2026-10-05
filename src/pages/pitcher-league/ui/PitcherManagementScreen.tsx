@@ -39,8 +39,11 @@ export interface PitcherManagementScreenProps {
   readonly onNextGame: () => void
   /** [외출] 상태 112. 투수편 외출 지도가 아직 없으면 넘기지 않는다 — 그러면 칸이 알림만 띄운다 */
   readonly onOuting?: () => void
-  /** [아이템]·[장비착용] 상태 110·121. 투수편 상점이 없으면 넘기지 않는다 ([아이템/스킬] 122 는 화면이 스킬 창을 띄운다) */
-  readonly onOpenShop?: () => void
+  /**
+   * 111 장비 상점('장착', [아이템] → 110 하위 메뉴 칸 0) · 121 장비착용('착용', [선수정보] 칸 1).
+   * 안 넘기면 그 칸은 알림만 띄운다 ([아이템/스킬] 122 는 화면이 스킬 창을 띄운다)
+   */
+  readonly onOpenShop?: (tab: '장착' | '착용') => void
   /** 105 취소 — 메인 메뉴 장면 0x103 */
   readonly onExit: () => void
 }

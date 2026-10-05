@@ -6,6 +6,9 @@ import { purchaseQuestionOf } from '@/features/shop/model/shopSelection'
 import type { ShopTab } from '@/features/shop/model/shopSelection'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { shopEntriesOf, windowKindNameOf } from '@/pages/shop/lib/shopEntries'
+import type { ShopEntry } from '@/pages/shop/lib/shopEntries'
+import type { ShopWindowKindName } from '@/pages/shop/lib/shopLayout'
+import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import { ShopWindow } from '@/pages/shop/ui/ShopWindow'
 
 interface ShopScreenProps {
@@ -31,6 +34,46 @@ const PART_NAMES = EQUIPMENT_PARTS.map((part) => part.name)
  */
 export function ShopScreen({ initialTab, career, noticeText, onPurchase, onBack }: ShopScreenProps) {
   const tab = TABS.find((candidate) => candidate === initialTab) ?? '장착'
+  return (
+    <ShopScreenView
+      kind={windowKindNameOf(tab)}
+      entriesOf={(part) => shopEntriesOf({ tab, career, part })}
+      questionOf={(itemId) => purchaseQuestionOf(career, itemId)}
+      partNames={tab === '장착' || tab === '착용' ? PART_NAMES : undefined}
+      money={career.money}
+      gamePoint={career.gamePoint}
+      title="나만의리그타자편"
+      noticeText={noticeText}
+      onPurchase={onPurchase}
+      onBack={onBack}
+    />
+  )
+}
+
+export interface ShopScreenViewProps {
+  readonly kind: ShopWindowKindName
+  /** 부위(장비 상점) → 격자 칸. 서브·GP 는 부위를 안 쓴다 */
+  readonly entriesOf: (part: number) => readonly ShopEntry[]
+  /** 살 수 있는 칸의 확인 문구(StrMODE[79]·[81]·[82]) — null 이면 묻지 않고 곧바로 `onPurchase` */
+  readonly questionOf: (itemId: string) => string | null
+  /** 장비 상점·장비착용의 부위 탭 이름 — 없으면 탭을 안 그린다 */
+  readonly partNames?: readonly string[]
+  /** 소지금 (만원) */
+  readonly money: number
+  readonly gamePoint: number
+  readonly title: ScreenFrameTitle
+  readonly noticeText: string
+  readonly onPurchase: (itemId: string) => void
+  readonly onBack: () => void
+}
+
+/**
+ * 창 + 확인·막힘·결과 팝업 묶음 — 타자편·투수편이 같이 쓴다.
+ * 원본도 키 처리 0x13460 · 구매 확정 0x14a74 · 창 0x81dc0 이 한 벌이고 모드로 표만 갈린다 (R12 1a).
+ */
+export function ShopScreenView({
+  kind, entriesOf, questionOf, partNames, money, gamePoint, title, noticeText, onPurchase, onBack,
+}: ShopScreenViewProps) {
   const [part, setPart] = useState(0)
   const [cursor, setCursor] = useState(0)
   const [pending, setPending] = useState<{ readonly itemId: string; readonly question: string } | null>(null)
@@ -38,7 +81,7 @@ export function ShopScreen({ initialTab, career, noticeText, onPurchase, onBack 
   const [blockNotice, setBlockNotice] = useState<string | null>(null)
   const [dismissedNotice, setDismissedNotice] = useState('')
 
-  const entries = shopEntriesOf({ tab, career, part })
+  const entries = entriesOf(part)
   const isNoticeOpen = noticeText !== '' && noticeText !== dismissedNotice
 
   const select = (index: number) => {
@@ -51,7 +94,7 @@ export function ShopScreen({ initialTab, career, noticeText, onPurchase, onBack 
       return
     }
     // 살 수 있는 칸은 StrMODE[79]·[82] 로 한 번 묻는다
-    const question = purchaseQuestionOf(career, entry.id)
+    const question = questionOf(entry.id)
     if (question === null) onPurchase(entry.id)
     else setPending({ itemId: entry.id, question })
   }
@@ -64,18 +107,16 @@ export function ShopScreen({ initialTab, career, noticeText, onPurchase, onBack 
   return (
     <RawScreen>
       <ShopWindow
-        kind={windowKindNameOf(tab)}
+        kind={kind}
         entries={entries}
         cursor={cursor}
         onMoveCursor={setCursor}
         onSelect={select}
-        money={career.money}
+        money={money}
         isKeyEnabled={pending === null && blockNotice === null && !isNoticeOpen}
-        partTabs={tab === '장착' || tab === '착용'
-          ? { names: PART_NAMES, current: part, onChange: changePart }
-          : undefined}
+        partTabs={partNames === undefined ? undefined : { names: partNames, current: part, onChange: changePart }}
       />
-      <ScreenFrame title="나만의리그타자편" gamePoint={career.gamePoint} onBack={onBack} />
+      <ScreenFrame title={title} gamePoint={gamePoint} onBack={onBack} />
       {pending !== null && (
         <MessageBox text={pending.question} buttons={['예', '아니오']}
           onAnswer={(index) => {

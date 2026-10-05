@@ -3,6 +3,7 @@ import { PitcherManagementScreen } from '@/pages/pitcher-league/ui/PitcherManage
 import { PitcherSeasonEndScreen } from '@/pages/pitcher-league/ui/PitcherSeasonEndScreen'
 import { PitcherYearEndScreen } from '@/pages/pitcher-league/ui/PitcherYearEndScreen'
 import { PitcherGameScreen } from '@/pages/pitching/ui/PitcherGameScreen'
+import { PitcherShopScreen } from '@/pages/shop/ui/PitcherShopScreen'
 import { EndingScreen } from '@/pages/ending/ui/EndingScreen'
 import {
   isContinuablePitcherEnding,
@@ -29,13 +30,15 @@ interface PitcherLeagueRouteProps {
  * 45경기를 다 치르면 **시즌종료(136 자리) → 연말(132) → 엔딩(141)** 로 빠진다.
  * 관리 화면 안의 선수정보·트레이닝·구질 훈련·휴식은 `PitcherManagementScreen` 이 스스로 돈다.
  *
- * `onOuting`/`onOpenShop` 은 투수편 외출(112)·상점(110/111) 화면이 생기면 그때 넘긴다 —
+ * `onOuting` 은 투수편 외출(112) 화면이 생기면 그때 넘긴다 —
  * 지금은 그 칸을 누르면 화면이 "아직 옮기지 않은 화면입니다" 를 띄운다.
+ * 상점은 [아이템] → 110 → **111 장비 상점** · [선수정보] → **121 장비착용** 이 `PitcherShopScreen` 으로 간다
+ * (서브·GP 아이템은 아직 — 관리 화면이 알림으로 막는다).
  */
 export function PitcherLeagueRoute({
   session, random, openedHiddenIds = [], gameSettings, onExit,
 }: PitcherLeagueRouteProps) {
-  const { career, scene, gameOptions, actions } = session
+  const { career, scene, gameOptions, shopTab, shopNotice, actions } = session
 
   if (career === null || scene === '등록') {
     return <PitcherCreateFlow openedHiddenIds={openedHiddenIds} onCreate={actions.create} onCancel={onExit} />
@@ -96,12 +99,32 @@ export function PitcherLeagueRoute({
     )
   }
 
+  if (scene === '상점') {
+    // 해금표는 원본에서 전역(app+0xc0)이라 기록연감의 오픈 id 를 얹어 보여 준다 — 구매도 같은 값으로 판정한다
+    const missing = openedHiddenIds.filter((id) => !career.openedHiddenIds.includes(id))
+    const shopCareer = missing.length === 0
+      ? career
+      : { ...career, openedHiddenIds: [...career.openedHiddenIds, ...missing] }
+    return (
+      <PitcherShopScreen
+        key={shopTab}
+        tab={shopTab}
+        career={shopCareer}
+        noticeText={shopNotice}
+        onPurchase={(itemId) => actions.purchase(itemId, openedHiddenIds)}
+        // 111 취소 → 110, 121 취소 → 106 이지만 웹 관리 화면은 다시 열 때 105 부터다 (근사)
+        onBack={() => actions.goto('관리')}
+      />
+    )
+  }
+
   return (
     <PitcherManagementScreen
       career={career}
       random={random}
       onSave={actions.save}
       onNextGame={actions.beginGame}
+      onOpenShop={actions.openShop}
       onExit={onExit}
     />
   )

@@ -8,6 +8,8 @@ import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCare
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import { useGamePointWallet } from '@/entities/wallet/model/useGamePointWallet'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
+import { pitcherEquipmentOf } from '@/widgets/batting-stage/lib/batterLayers'
+import { shopItemId } from '@/features/shop/model/shopSelection'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 
 /** 나만의리그 투수편 한 판 (원본 모드 3, 장면 0x106) — 저장·장면 전환만 본다 */
@@ -457,5 +459,46 @@ describe('G 지갑 다리 (전역 mgr[+0x64])', () => {
     const { result } = 띄우기(옛투수저장(1500))
 
     expect(result.current.career?.gamePoint).toBe(1500)
+  })
+})
+
+describe('투수편 장비 상점 (111 · 121)', () => {
+  it('장비를 사면 소지금·장착 니블이 저장에 들어가고, 투수 그림 등급(0x79790)이 그 니블을 받는다', () => {
+    const store = 메모리저장()
+    const { result } = 띄우기(store)
+    act(() => result.current.actions.create('투수', 신인))
+    act(() => result.current.actions.save({ ...result.current.career!, money: 200_000, popularity: 999 }))
+
+    act(() => result.current.actions.openShop('장착'))
+    expect(result.current.scene).toBe('상점')
+    expect(result.current.shopTab).toBe('장착')
+
+    // 레벨 9 사신의 두건 = 히든 id 21 — 전역(기록연감)에서 열린 것을 얹어 판정한다
+    act(() => result.current.actions.purchase(shopItemId('장착', 0, 9), [21]))
+
+    const career = result.current.career!
+    expect(result.current.shopNotice).toBe('[사신의 두건] 구매 완료')
+    expect(career.money).toBe(50_000)
+    expect(career.equipmentLevels.control).toBe(10)
+    expect(career.openedHiddenIds).toContain(21)
+    expect((store.load() as typeof career).equipmentLevels.control).toBe(10)
+    expect(pitcherEquipmentOf(career.equipmentLevels)).toEqual({ head: 9, hand: -1, body: -1, leg: -1 })
+
+    act(() => result.current.actions.goto('관리'))
+    act(() => result.current.actions.openShop('착용'))
+    expect(result.current.shopTab).toBe('착용')
+    expect(result.current.shopNotice).toBe('')
+  })
+
+  it('전역 해금이 없으면 히든 칸은 막힌다 — 커리어는 그대로', () => {
+    const { result } = 띄우기()
+    act(() => result.current.actions.create('투수', 신인))
+    act(() => result.current.actions.save({ ...result.current.career!, money: 200_000, popularity: 999 }))
+    const before = result.current.career
+
+    act(() => result.current.actions.purchase(shopItemId('장착', 0, 9)))
+
+    expect(result.current.shopNotice).toBe('아직 구매할 수 없는 아이템입니다. 특별한 조건을 통해 오픈됩니다')
+    expect(result.current.career).toBe(before)
   })
 })

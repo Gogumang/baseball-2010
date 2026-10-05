@@ -55,6 +55,19 @@ export const PITCHER_PLAYER_INFO_SLOTS: readonly PitcherMenuEntry[] = [
   { id: '기록실', state: 124 },
 ]
 
+/**
+ * 110 아이템 하위 메뉴 세 칸 → 확인하면 **111 상점**(고른 칸이 창 종류) — 키 0x11478 에 모드 갈림이 없다
+ * (R9 3절 "110 아이템 하위 메뉴"). 칸 이름은 타자편 관리 화면 표 0xd4758 과 같다.
+ *
+ * ⚠️ 투수편은 **장착(장비 상점, 창 종류 3)만** 옮겼다. 서브(1)·GP(2) 는 가격·한계표가 모드로 갈리는데
+ * (R12 1b-나·다) 투수 쪽 데이터가 아직 없어 고르면 "옮기지 않은 화면" 알림을 띄운다.
+ */
+export const PITCHER_ITEM_SLOTS: readonly PitcherMenuEntry[] = [
+  { id: '장착', state: 111 },
+  { id: '서브', state: 111 },
+  { id: 'GP', state: 111 },
+]
+
 /** 107 트레이닝 칸 4 와 106 칸 3 이 함께 쓰는 팝업 0x78 의 두 갈래 (탭 1·2) */
 export const PITCH_WINDOW_CHOICES: readonly [string, string] = ['마구', '구질']
 
