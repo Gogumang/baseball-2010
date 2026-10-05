@@ -14,6 +14,13 @@ import { describeOutcome, isFreePass, isHit } from '@/entities/at-bat/model/atBa
 import { playQuickAtBat } from '@/entities/game/model/quickAtBat'
 import { batterAt, teamBatters, teamPitchers, quickPitcherOf } from '@/entities/team/model/teamRoster'
 import { advanceRunners, runnerCountOf } from '@/entities/game/model/baseState'
+import {
+  recordLineupPlay,
+  rosterLineupOf,
+  rosterSlotAt,
+  tryQuickCpuPinchHit,
+} from '@/entities/game/model/quickLineup'
+import type { QuickLineup } from '@/entities/game/model/quickLineup'
 import type { BaseState } from '@/entities/game/model/baseState'
 import {
   completeGameRecordIdsOf,
@@ -363,6 +370,17 @@ export interface PitcherGameProgress {
    * 되돌리는 곳이 없어 한 번 실린 번호는 경기 내내 직구·변화구에도 남는다 — 원본 그대로 옮긴다.
    */
   readonly ballMagicNumber: number
+  /**
+   * 상대 팀 명단(`team+0xe`)과 타순 칸별 이 경기 기록(`team+0x34 + 타순×0x18`) — **CPU 대타** `0xac228` 이 보고 바꾼다.
+   * 기록은 내가 던진 타석이든 간이 엔진 타석이든 정산 `0xa8024` 가 똑같이 쌓는다.
+   */
+  readonly opponentLineup: QuickLineup
+  /**
+   * `state[0xe]` — 다음 공이 나가기 전까지 CPU 대타를 다시 묻지 않게 막는 칸. `0xac228`(ac33e)이 1 로 세우고
+   * 공마다 투구 처리 `0xa5e14`(a5e7c — 사람 공 0x3dec6 · 간이 엔진 c26ca)와 새 타석 0xd 진입 `0x48d50`(48eb6,
+   * 이전 상태가 0x16 이면 건너뜀)이 내린다 (a114d95).
+   */
+  readonly pinchHitUsed: boolean
   readonly log: readonly PitcherGameLogEntry[]
   readonly nextLogId: number
   /** 경기가 끝난(또는 지금 치르는) 이닝 인덱스 (0-기준) */
@@ -427,9 +445,9 @@ function quickPitcherAt(teamId: number, index: number) {
  *    상대 로스터는 마선수도 장비도 없어 그 둘은 원래 0 이다.
  * 파워·수비·주루는 이 길이 아니라(0xab214·수비·주루가 저마다 부른다) 여기서 손대지 않는다.
  */
-function opponentBatterAbility(teamId: number, orderIndex: number) {
+function opponentBatterAbility(teamId: number, rosterSlot: number) {
   const roster = teamBatters(teamId)
-  const player = roster[orderIndex % roster.length]
+  const player = roster[rosterSlot % roster.length]
   return {
     hit: gameAbilityOf({
       mode: PITCHER_EDITION_MODE,
@@ -496,6 +514,9 @@ export function startPitcherGame(
     burst: createBurstSession(PITCHER_EDITION_MODE),
     lastBurstResolution: null,
     ballMagicNumber: 0,
+    // 경기 시작 명단은 로스터 차례 그대로 — 앞 아홉이 타순, 나머지가 벤치 (team+0x28c)
+    opponentLineup: rosterLineupOf(teamBatters(options.opponentTeamId).length),
+    pinchHitUsed: false,
     log: [],
     nextLogId: 1,
     endedInningIndex: 0,
@@ -652,7 +673,7 @@ export function startPitch(
     random,
   )
 
-  const batter = opponentBatterAbility(options.opponentTeamId, progress.opponentOrderIndex)
+  const batter = opponentBatterAbility(options.opponentTeamId, opponentRosterSlotOf(progress))
   const resolution = pitchAgainstBatter(
     pitch,
     batter,
@@ -695,6 +716,8 @@ export function startPitch(
     // ⚠️ 마구 횟수는 **코스 확정(OK)** 때 줄어든다 — 구질을 고른 순간이 아니다 (0x50e9c)
     magicRemaining,
     ballMagicNumber,
+    // 투구 처리 0xa5e14 가 공마다 state[0xe](CPU 대타 막음)를 내린다 (a5e7c)
+    pinchHitUsed: false,
     pitchCount: progress.pitchCount + 1,
     // ctx+0x161 · ctx+0x16c — 투구 처리 0xa5e14 가 공 하나마다 둘 다 올린다
     atBatPitches: progress.atBatPitches + 1,
@@ -707,7 +730,8 @@ export function startPitch(
   }
 
   const outcome = afterPitch.atBat.outcome
-  if (outcome === null) return afterPitch
+  // 볼·스트라이크·파울 — 판정 A 0xae24c 의 "그 밖 → 0xf" 라 다음 공을 고르기 전에 0xf 진입 0x3d954 를 다시 지난다
+  if (outcome === null) return enterPitchSelection(afterPitch, random)
   if (isBattedBallInPlay(outcome)) {
     // 여기서 멈춘다 — 화면이 이 타구를 실시간으로 돌리고 결과를 `resolveDefensePlay` 에 넘긴다.
     // `atBat` 은 아직 안 비웠으므로 끝난 타석의 결과 코드·볼 카운트가 그대로 남아 있다.
@@ -854,7 +878,7 @@ export function pickoff(
       })),
       progress.options.stats.breaking,
     ),
-    runAbility: opponentBatterAbility(progress.options.opponentTeamId, progress.opponentOrderIndex).run,
+    runAbility: opponentBatterAbility(progress.options.opponentTeamId, opponentRosterSlotOf(progress)).run,
     random,
     offenseIsCpu: true,
   })
@@ -921,7 +945,11 @@ export function pickoff(
     }`,
     true,
   )
-  return changed ? advance(next, random) : next
+  // 반 이닝이 끝났으면(위에서 atBatPrepared 를 내렸다) 다음 사람 타석은 `advance` 가 새로 준비한다 —
+  // 0xf 진입도 그 안에서 한 번 돈다
+  if (!next.atBatPrepared) return advance(next, random)
+  // 같은 타석이 이어지면 견제 판 끝(판정 B 0xae3e8 의 ae592)도 0xf 로 간다 — 0xf 진입 0x3d954 를 지난다
+  return enterPitchSelection(changed ? advance(next, random) : next, random)
 }
 
 /**
@@ -949,7 +977,7 @@ function defensePlayInputOf(
       progress.options.stats.breaking,
     ),
     // 주자는 상대 타자다 — 지금 타순 칸의 주루
-    runAbility: opponentBatterAbility(progress.options.opponentTeamId, progress.opponentOrderIndex).run,
+    runAbility: opponentBatterAbility(progress.options.opponentTeamId, opponentRosterSlotOf(progress)).run,
     random,
     // 나만의리그 투수편 = 전역 모드 3
     gameMode: PITCHER_EDITION_MODE,
@@ -1132,6 +1160,8 @@ function applyDefensivePlay(
     teamWalksAllowed: progress.teamWalksAllowed + (freePass ? 1 : 0),
     teamRunsAllowed: progress.teamRunsAllowed + applied.runsScored,
     perfectInningFlag,
+    // 정산 0xa8024 — 타순 칸 기록(타석 +0x14 · 안타 +0x12 · 적시타 +0x13)이 CPU 대타 0xac228 의 재료다
+    opponentLineup: recordLineupPlay(progress.opponentLineup, slot, outcome, applied.runsScored),
     opponentBatterLogs: {
       ...progress.opponentBatterLogs,
       [slot]: {
@@ -1352,6 +1382,83 @@ function triggerBurstAtPrep(progress: PitcherGameProgress, random: RandomPort): 
   return next === session ? progress : { ...progress, burst: next }
 }
 
+/* ── 0xf 진입 · CPU 대타 ─────────────────────────────────────────────────────── */
+
+/** 한 타석에서 0xf 진입을 다시 지나는 상한 — 대타 한 번 뒤 막음 칸이 서서 두 번째에서 멈춘다 */
+const MAXIMUM_PITCH_SELECTION_ENTRIES = 3
+
+/** 지금 상대 타순 칸에 선 선수의 로스터 칸 — CPU 대타가 들어오면 타순 칸과 갈린다 */
+function opponentRosterSlotOf(progress: PitcherGameProgress): number {
+  return rosterSlotAt(progress.opponentLineup, progress.opponentOrderIndex)
+}
+
+/**
+ * **상태 0xf 진입 `0x3d954`** — 내가 던지는 타석에서 공 하나를 고르기 전마다 돈다 (디스어셈 3d9e4~3da94).
+ * ```
+ * 3d9e4  수비 팀이 CPU 인가 (state[0x31 + state[0xa]] == 1) — 모드 3 의 내 팀은 사람 팀(0x3a20a)이라 거짓
+ * 3da44  돌발 객체가 있고 진행 중(0x8eb94 = obj+0xc ≠ −1)이면 건너뜀
+ * 3da70  r0 = 0xac228(…, 공격 팀, 주자관리, state)       ; CPU 대타 — 0x66864 가드는 투수 교체 갈래에만 있다
+ * 3da74  r0 참 → 22 "Time!"(3da88) · 상태 0x16 예약(3da94)
+ * ```
+ * 0x16 → 0xd(이전 상태 0x16 이라 카운트·타석 초기화·state[0xe] 지우기를 건너뜀, 48e94) → **0xe 진입 0x50674**
+ * (감독 강판 0x504cc 를 다시 판정, 506ea) → 메시지 1 → 0xf 예약 · **돌발 0x8f158 을 다시** → 0xf 진입. 그때는 state[0xe]
+ * 가 서 있어 대타 판정이 굴림 없이 빠지므로 고리는 한 번 더 돌고 끝난다 (타자편 `prepareMyAtBat`·팀 경기
+ * `enterPitchSelection` 과 같은 차례).
+ *
+ * 0xf 로 들어서는 길은 새 타석의 0xe 확인(`advance`), 볼·스트라이크·파울 뒤(판정 A 0xae24c, `startPitch`), 견제 판 끝
+ * (판정 B 0xae3e8 의 ae592, `pickoff`)이다 — 그래서 공마다 카운트를 실은 채로 다시 묻는다
+ * (카운트가 있으면 확률이 `>> (볼 + 스트라이크 + 1)` 로 준다, `judgeCpuPinchHit`).
+ */
+function enterPitchSelection(progress: PitcherGameProgress, random: RandomPort): PitcherGameProgress {
+  let current = progress
+  for (let entry = 0; entry < MAXIMUM_PITCH_SELECTION_ENTRIES; entry += 1) {
+    if (!isPitchTurn(current) || !current.atBatPrepared) return current
+    if (current.burst !== null && current.burst.current !== null) return current
+    const pinched = applyOpponentCpuPinchHit(current, random)
+    if (pinched === current) return current
+    // 0x16 → 0xd(지우기 건너뜀) → 0xe(강판 판정) → 메시지 1(돌발 굴림) → 0xf 진입
+    current = prepareAtBat(pinched, random)
+  }
+  return current
+}
+
+/**
+ * 내가 던지는 타석의 **CPU 대타** `0xac228` — 공격 팀(상대)을 두고 한 번 묻는다 (Q1 4절, `pinchHitAi`).
+ * 들어오면 확정 `0xaebe4` 의 대타 가지가 명단 두 칸과 기록 24바이트를 맞바꾸고 빠진 선수를 지운다 —
+ * 그 타순 칸의 돌발 조건 기록(+0x12 안타 · +0x13 홈런 자리, `opponentBatterLogs`)도 들어온 선수 것(빈 기록)이 된다.
+ * 카운트는 이어받는다 — 0x16 → 0xd 가 카운트 지우기(0xb6764)·타석 초기화(0xa5bcc)를 건너뛴다 (48e94).
+ *
+ * ⚠️ 원본이 보는 마선수 비트(0xb633d)·장비 레벨 니블(+0x19·+0x1a)은 웹 리그 로스터에 없다 — 늘 0 이라 결과가 같다.
+ */
+function applyOpponentCpuPinchHit(progress: PitcherGameProgress, random: RandomPort): PitcherGameProgress {
+  const slot = progress.opponentOrderIndex
+  const pinch = tryQuickCpuPinchHit(
+    progress.opponentLineup,
+    slot,
+    {
+      alreadyUsedThisGame: progress.pinchHitUsed,
+      runnerCount: runnerCountOf(progress.game.bases),
+      strikes: progress.atBat.strikes,
+      balls: progress.atBat.balls,
+    },
+    random,
+  )
+  if (pinch === null) return progress
+  const opponentBatterLogs = { ...progress.opponentBatterLogs }
+  delete opponentBatterLogs[slot]
+  return appendLog(
+    {
+      ...progress,
+      opponentLineup: pinch.lineup,
+      // state[0xe] = 1 (ac33e) — 다음 공(0xa5e14 a5e7c)이 나갈 때까지 다시 묻지 않는다
+      pinchHitUsed: true,
+      opponentBatterLogs,
+    },
+    `${progress.game.inning}회${progress.game.half} 상대 ${(slot % BATTING_ORDER_SIZE) + 1}번 CPU 대타`,
+    true,
+  )
+}
+
 /* ── 강판 ────────────────────────────────────────────────────────────────────── */
 
 /** 스스로 강판 — `#` → StrGAME[104] "그만 던지시겠습니까?" 에 "예" (0x498d4 → 0xc1b48, 상태 0x21) */
@@ -1437,13 +1544,21 @@ function advance(progress: PitcherGameProgress, random: RandomPort): PitcherGame
 
     if (current.onMound) {
       if (current.atBatPrepared) return current
-      // 상태 0x18(1회초 판) → 0xd → 0xe(강판 판정) → 0xf(돌발) 차례 — 판의 굴림이 타석 준비보다 앞이다
-      const prepared = prepareAtBat(withHalfInningBoard(current, random), random)
-      return {
-        ...prepared,
-        lastHumanHalf: { inning: prepared.game.inning, half: prepared.game.half },
-        autoSinceHuman: false,
-      }
+      // 상태 0x18(1회초 판) → 0xd → 0xe(강판 판정) → 0xf(돌발) 차례 — 판의 굴림이 타석 준비보다 앞이다.
+      // 새 타석의 0xd 진입 0x48d50 은 state[0xe](CPU 대타 막음)를 내린다 (48eb6)
+      const prepared = prepareAtBat(
+        withHalfInningBoard({ ...current, pinchHitUsed: false }, random),
+        random,
+      )
+      // 0xf 진입 0x3d954 — 강판(0x23)이면 0xf 에 안 간다
+      return enterPitchSelection(
+        {
+          ...prepared,
+          lastHumanHalf: { inning: prepared.game.inning, half: prepared.game.half },
+          autoSinceHuman: false,
+        },
+        random,
+      )
     }
     // 내가 마운드에 없는 수비 타석도 자동진행(0x21) — 같은 진입이 남은 돌발을 내린다
     current = markAuto(playDefensiveAtBat(withoutPendingBurst(current), random))
@@ -1572,7 +1687,7 @@ function playDefensiveAtBat(
   const { options } = progress
   // 내가 마운드에 없는 수비 타석은 자동진행(0x21) 안의 간이 타석 — 상태 0xf 를 안 지나 돌발을 굴리지 않는다
   const play = playQuickAtBat(
-    batterAt(options.opponentTeamId, progress.opponentOrderIndex),
+    batterAt(options.opponentTeamId, opponentRosterSlotOf(progress)),
     quickPitcherAt(options.ourTeamId, ourOtherPitcherIndex(options)),
     { inning: progress.game.inning },
     random,
@@ -1582,6 +1697,8 @@ function playDefensiveAtBat(
       ...progress,
       atBatPitches: play.pitches,
       halfInningPitches: progress.halfInningPitches + play.pitches,
+      // 간이 엔진도 공마다 0xa5e14 를 부른다 (c26ca) — state[0xe] 가 내려간다
+      pinchHitUsed: false,
     },
     play.outcome,
     false,
@@ -1640,6 +1757,8 @@ function playTeammateAtBat(
       inningRuns: halfChanged ? clearInningRuns(progress.inningRuns, game.inning) : progress.inningRuns,
       // 우리 공격이 끝나면 다음 수비 반 이닝의 투구 수를 0 부터 센다
       halfInningPitches: halfChanged ? 0 : progress.halfInningPitches,
+      // 간이 엔진도 공마다 0xa5e14 를 부른다 (c26ca) — state[0xe] 가 내려간다
+      pinchHitUsed: false,
     },
     `${before.inning}회${before.half} ${(slot % BATTING_ORDER_SIZE) + 1}번 — ${describeOutcome(outcome)}${
       runs > 0 ? ` (${runs}점)` : ''

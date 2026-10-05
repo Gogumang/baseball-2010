@@ -892,3 +892,65 @@ describe('투수 쪽 보정 0x34d6c — 공+0x10 (0x3de10) · 내 투수 보너�
     expect(progress.lastPitch?.magicNumber).toBe(0)
   })
 })
+
+describe('내가 던지는 타석의 CPU 대타 0xac228 — 0xf 진입 0x3d954 (3da44·3da70)', () => {
+  /** 첫 타자 칸이 대타 조건(타석 2 · 안타 0 · 적시타 0)을 채운 경기 — 벤치 셋 */
+  const 대타감 = (): PitcherGameProgress => {
+    const 시작 = startPitcherGame(기본옵션, 씨앗(20100901))
+    const records = [...시작.opponentLineup.records]
+    records[시작.opponentOrderIndex % 9] = { hits: 0, runScoringHits: 0, plateAppearances: 2 }
+    return { ...시작, opponentLineup: { ...시작.opponentLineup, records } }
+  }
+
+  it('볼·스트라이크 뒤 0xf 진입마다 묻는다 — 카운트를 이어받고, 바뀌면 0xe(강판)·돌발을 다시 지난 뒤 막음 칸에서 멈춘다', () => {
+    const 경기 = 대타감()
+    expect(경기.opponentLineup.benchBatters).toBe(3)
+    // 각본 0.7: 지켜본 스트라이크 → 마지막 굴림이 대타 rand(0,1000) = 700 (문턱 100 >> (0+1+1) = 25 에 못 미침)
+    const 평소 = 각본난수(0.7)
+    const 안바뀜 = startPitch(경기, 한가운데직구, 평소)
+    expect(안바뀜.lastResolution).toEqual({ kind: '스트라이크', isSwinging: false })
+    expect(안바뀜.log.some((entry) => entry.text.includes('대타'))).toBe(false)
+    expect(안바뀜.pinchHitUsed).toBe(false)
+
+    // 그 굴림만 0 으로 → 대타가 나온다. rand(0, 벤치 3) = 2 → 명단 칸 11
+    const 대타각본 = 각본난수(0.7, 평소.calls() - 1, 0)
+    const 바뀜 = startPitch(경기, 한가운데직구, 대타각본)
+    const 칸 = 경기.opponentOrderIndex % 9
+    expect(바뀜.log[0].text).toContain('CPU 대타')
+    expect(바뀜.opponentLineup.rosterSlots[칸]).toBe(11)
+    expect(바뀜.opponentLineup.benchBatters).toBe(2)
+    // 들어온 선수는 빈 기록 · 막음 칸이 섰다 · 카운트(1 스트라이크)를 이어받는다
+    expect(바뀜.opponentLineup.records[칸]).toEqual({ hits: 0, runScoringHits: 0, plateAppearances: 0 })
+    expect(바뀜.pinchHitUsed).toBe(true)
+    expect(바뀜.atBat.strikes).toBe(1)
+    expect(isPitchTurn(바뀜)).toBe(true)
+    // 대타 굴림 둘(rand(0,1000)·rand(0,벤치)) 뒤에 강판 판정·돌발 굴림(0xe → 메시지 1)이 한 번 더 돈다 — 두 번째 0xf 는 굴림 없음
+    expect(대타각본.calls()).toBeGreaterThan(평소.calls() + 1)
+
+    // 다음 공이 나가면 0xa5e14 가 막음 칸을 내린다
+    const 다음공 = startPitch(바뀜, 한가운데직구, 각본난수(0.7))
+    expect(다음공.pinchHitUsed).toBe(false)
+  })
+
+  it('돌발이 진행 중이면 대타를 묻지도 않는다 (3da44 → 0x8eb94)', () => {
+    const 경기 = 대타감()
+    const 행 = BURST_TABLES.PITCHER[0]
+    const 돌발중: PitcherGameProgress = {
+      ...경기,
+      burst: 경기.burst === null ? null : { ...경기.burst, current: 행, triggeredCount: 1 },
+    }
+    const 평소 = 각본난수(0.7)
+    startPitch(경기, 한가운데직구, 평소)
+    const 각본 = 각본난수(0.7, 평소.calls() - 1, 0)
+    const 그대로 = startPitch(돌발중, 한가운데직구, 각본)
+    expect(그대로.log.some((entry) => entry.text.includes('대타'))).toBe(false)
+    // 대타 rand(0,1000) 한 번이 빠진다
+    expect(각본.calls()).toBe(평소.calls() - 1)
+  })
+
+  it('명단 기록은 내가 던진 타석도 정산 0xa8024 처럼 쌓인다 — 타석 수 +0x14', () => {
+    const 끝 = 끝까지던지기(startPitcherGame(기본옵션, 씨앗(3)), 3)
+    const 타석합 = 끝.opponentLineup.records.reduce((sum, record) => sum + record.plateAppearances, 0)
+    expect(타석합).toBeGreaterThan(20)
+  })
+})

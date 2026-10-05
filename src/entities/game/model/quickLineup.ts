@@ -92,6 +92,12 @@ export function tryQuickCpuPinchHit(
     readonly alreadyUsedThisGame: boolean
     /** 주자 수 (`0xa9599` = 주자관리 `+0xc`) */
     readonly runnerCount: number
+    /**
+     * state[4]·state[5] 볼카운트 — 간이 엔진은 타석 시작이라 0. 사람 장면 0xf 진입(`0x3d954` 3da70)은 공마다 다시 물어
+     * 그때의 카운트다 (투수편). 안 넘기면 0.
+     */
+    readonly strikes?: number
+    readonly balls?: number
   },
   random: RandomPort,
 ): QuickPinchHit | null {
@@ -107,8 +113,8 @@ export function tryQuickCpuPinchHit(
       ),
       record: lineup.records[slot] ?? EMPTY_BATTER_GAME_RECORD,
       runnerCount: situation.runnerCount,
-      strikes: 0,
-      balls: 0,
+      strikes: situation.strikes ?? 0,
+      balls: situation.balls ?? 0,
     },
     random,
   )
