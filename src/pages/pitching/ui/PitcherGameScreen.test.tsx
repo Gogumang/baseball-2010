@@ -80,7 +80,9 @@ describe('투수편 경기 화면', () => {
   })
 
   it('환경설정 게이지가 꺼져 있으면 코스를 확정하는 순간 던진다 (원본 기본값)', () => {
-    띄우기()
+    // 첫 공이 인플레이면 수비 화면이 덮는다 — 게이지 끈 공의 흩어짐을 t + 3 칸(0x4dce0)으로 고친 뒤
+    // 기본 씨앗의 첫 공이 인플레이가 되어, 첫 공이 볼·스트라이크인 씨앗 1 로 옮겼다
+    띄우기({}, 1)
     fireEvent.click(screen.getByText('FASTBALL'))
     fireEvent.click(screen.getAllByRole('button', { name: /[◎·]/ })[0])
 

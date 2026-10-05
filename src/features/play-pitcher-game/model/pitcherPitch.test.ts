@@ -226,6 +226,50 @@ describe('사람 투구 만들기', () => {
 })
 
 /**
+ * 흩어짐 반지름의 그림 칸 scene+0x17bc (0x4dc78) — 게이지를 안 쓴 공은 0x4dce0 이 t + 3 을 넣고,
+ * 게이지로 정한 공은 커서가 멈춘 칸(누른 칸 g)이다. 반지름 = slt_pitch 프레임 min(0x3b + 칸, 0x43) 폭/2.
+ */
+describe('제구 흩어짐 그림 칸 (0x4dce0)', () => {
+  const 던지기 = (overrides: { typeNumber?: number; grade: number; gaugeCell: number }, seed: number) =>
+    buildHumanPitch(
+      {
+        typeNumber: overrides.typeNumber ?? 1,
+        courseCell: 4,
+        grade: overrides.grade,
+        gaugeCell: overrides.gaugeCell,
+        stats: 능력,
+        repertoire: 레퍼토리,
+        side: 1,
+      },
+      씨앗(seed),
+    )
+  const 도착 = (공: ReturnType<typeof buildHumanPitch>) => 공.worldPath![공.worldPath!.length - 1]
+
+  it('게이지를 안 쓰면(칸 0) 칸은 t + 3 — 같은 t 를 칸 t + 3 으로 누른 공과 같은 자리다', () => {
+    for (let seed = 1; seed <= 30; seed += 1) {
+      expect(도착(던지기({ grade: 3, gaugeCell: 0 }, seed))).toEqual(도착(던지기({ grade: 3, gaugeCell: 6 }, seed)))
+    }
+  })
+
+  it('게이지를 안 쓴 t = 3 공은 반지름 10(프레임 0x41)이라 중심에서 30·(10+2) = 360 안이다', () => {
+    const 중심x = 20585
+    const 중심y = 1202
+    for (let seed = 1; seed <= 200; seed += 1) {
+      const 점 = 도착(던지기({ grade: 3, gaugeCell: 0 }, seed))
+      expect(Math.abs(점.x - 중심x)).toBeLessThanOrEqual(360)
+      expect(Math.abs(점.y - 중심y)).toBeLessThanOrEqual(360)
+    }
+  })
+
+  it('마구는 게이지를 안 쓰는 공(0x3f500)이라 누른 칸과 상관없이 t + 3 = 8 이다', () => {
+    for (let seed = 1; seed <= 10; seed += 1) {
+      const 마구 = { typeNumber: MAGIC_PITCH_TYPE_NUMBER, grade: 5 }
+      expect(도착(던지기({ ...마구, gaugeCell: 1 }, seed))).toEqual(도착(던지기({ ...마구, gaugeCell: 0 }, seed)))
+    }
+  })
+})
+
+/**
  * 투수 미션 조준 흔들림 (0x39c5c) — 세기는 미션 레코드 바이트 13(`conditionCode`)다.
  * 여기서는 **값이 진짜 전달되는지**만 본다. 흔드는 식 자체는 `entities/pitching` 쪽 시험이 맡는다.
  */

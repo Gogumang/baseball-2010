@@ -66,7 +66,8 @@ describe('투수편 화면의 소리 배선', () => {
   })
 
   it('한 개 던지면 투구 순간 소리 12 가 먼저, 이어서 심판 콜이 난다 (0x3f378 → 0x51a94)', () => {
-    const { result } = 띄우기()
+    // 게이지 끈 공의 흩어짐을 t + 3 칸(0x4dce0)으로 고친 뒤 기본 씨앗은 한가운데 공이 다 인플레이라 1 로 옮겼다
+    const { result } = 띄우기(1)
     expect(result.current.canPitch).toBe(true)
     녹음.played.length = 0
 

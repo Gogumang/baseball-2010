@@ -188,7 +188,10 @@ export interface ControlErrorInput {
   /** 제구 등급 0~5 (0xb74bc) */
   readonly tier: number
   readonly isComputer: boolean
-  /** 사용자 투구의 조준 칸 (게이지). CPU 는 등급 + 3 */
+  /**
+   * 사용자 투구의 그림 칸 `scene+0x17bc` — 게이지로 등급을 정했으면 누른 칸, 아니면 등급 + 3 (0x4dce0).
+   * CPU 는 늘 등급 + 3. 사람 쪽 가름은 `features/play-pitcher-game` 의 `buildHumanPitch` 가 한다.
+   */
   readonly aimIndex?: number
   /**
    * **투수 미션 조준 흔들림** — `missions.ts` 의 `conditionCode` 0~3 과 존 중심을 고르는 배치 side.

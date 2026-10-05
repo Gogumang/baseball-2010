@@ -189,7 +189,10 @@ export interface HumanPitchInput {
   readonly courseCell: number
   /** 등급 t (0~5) */
   readonly grade: number
-  /** 게이지에서 누른 칸 — 제구 흩어짐의 조준 칸(slt_pitch 59~67)으로 들어간다 */
+  /**
+   * 게이지에서 누른 칸 0~9 (안 눌렀거나 게이지를 안 쓰면 0). 게이지로 등급을 정한 공이면 이 칸이
+   * 제구 흩어짐 반지름의 그림 칸(scene+0x17bc)이 된다 — `aimCellOf` 참조.
+   */
   readonly gaugeCell: number
   readonly stats: PitcherStats
   readonly repertoire: PitcherRepertoire
@@ -201,6 +204,31 @@ export interface HumanPitchInput {
    * 미션이 아닌 경기(나만의리그·시즌)에서는 늘 없다.
    */
   readonly missionConditionCode?: number
+}
+
+/** 게이지를 안 쓴 공의 그림 칸 = t + 3 (0x4dce0) — CPU 의 `COMPUTER_AIM_OFFSET` 과 같은 줄이다 */
+const NON_GAUGE_AIM_OFFSET = 3
+
+/**
+ * **제구 흩어짐 반지름을 고르는 그림 칸 `scene+0x17bc`** — 투구 순간 0x4dc78 이 읽는 값.
+ *
+ * ```
+ * 4dcd4: bl 0x3f500 (게이지를 쓰는가 — 수비가 사람 · 설정 +0x2d · 구질 ≠ 22)
+ * 4dcde: 쓰면 → 4dcf0 (17bc 는 게이지 커서가 멈춘 칸 그대로)
+ * 4dce0: 안 쓰면 → scene+0x17bc ← scene+0x17c0(t) + 3
+ * 4dd82: 반지름 = slt_pitch 프레임 min(0x3b + 17bc, 0x43) 의 폭/2,  t == 0 이면 프레임 0x3b 의 폭/2 (4ddb2)
+ * ```
+ * 게이지 커서(0x4d708)는 t 가 0 인 동안만 틱마다 +1 이고, OK(0x50e08)가 t 를 정하면 멈춘다 — 그래서 게이지로 등급을
+ * 정한 공은 17bc = 누른 칸 g(1~9)다. 안 누르고 던지면 t = 0 이라 칸과 상관없이 프레임 0x3b 다.
+ *
+ * 부르는 쪽은 게이지를 안 쓰면 `gaugeCell` 을 0 으로 넘긴다(투수편·팀 경기·미션 화면 모두). 그래서
+ * "마구가 아니고 칸이 1~9" 이면 게이지로 정한 공이고, 그 밖(게이지 끔 · 마구 · 안 누름)은 t + 3 이다.
+ * 안 누른 공은 t = 0 이라 어느 칸이든 같은 반지름이므로 이 가름은 원본과 결과가 같다.
+ */
+function aimCellOf(input: Pick<HumanPitchInput, 'typeNumber' | 'gaugeCell' | 'grade'>): number {
+  const pressedGauge =
+    input.typeNumber !== MAGIC_PITCH_TYPE_NUMBER && input.gaugeCell >= 1 && input.gaugeCell <= GAUGE_LAST_CELL
+  return pressedGauge ? input.gaugeCell : input.grade + NON_GAUGE_AIM_OFFSET
 }
 
 /**
@@ -235,7 +263,7 @@ export function buildHumanPitch(input: HumanPitchInput, random: RandomPort): Pit
     {
       tier: input.grade,
       isComputer: false,
-      aimIndex: input.gaugeCell,
+      aimIndex: aimCellOf(input),
       ...(input.missionConditionCode === undefined
         ? {}
         : { missionAim: { conditionCode: input.missionConditionCode, side } }),
