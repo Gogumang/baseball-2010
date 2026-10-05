@@ -1015,7 +1015,8 @@ export function useSeasonSession(
 
       // 승패는 원본 셈 `0xb69c8`·`0x4f072` 로 다시 낸다 — 이긴 칸 = R(1) > R(0) ? 1 : 0 이라
       // **동점이면 선공(칸 0) 쪽이 이긴다**. 요약의 `won`(내 점수 > 상대 점수)은 동점을 패로 본다.
-      // 원본 시즌 경기는 동점으로 끝나지 않으니(S1 6절) 웹 이닝 안전망에 닿았을 때만 갈린다.
+      // 원본 시즌 경기는 동점으로 끝나지 않으니(경기 끝 판정 0xb68fc 가 동점이면 끝을 안 낸다 — E 3d ·
+      // `seasonHumanWonOf` 주석) 웹 이닝 안전망에 닿았을 때만 갈린다.
       // 사람 칸은 이 경기 옵션의 `playerSide` 다 (`state[0x31 + 칸] == 0`)
       const tied = summary.ourScore === summary.opponentScore
       const won = gameOptions === null
