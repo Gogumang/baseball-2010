@@ -125,3 +125,45 @@ describe('사람이 던지는 타석의 CPU 마타자 필살 — 0x34488 → 0x4
     expect(specialSwingRemainingAt(after, '상대')).toBe(0)
   })
 })
+
+describe('사람 투구의 공+0x10 (0x3de10) — CPU 타석 판정의 0x34d6c 투수 쪽', () => {
+  it('마구가 아닌 공은 0 이고 투수 +0x18 을 함께 싣는다', () => {
+    const progress = 시작()
+    const after = startThrowPitch(progress, 한가운데직구, createSeededRandom(1))
+    expect(after.lastPitch?.magicNumber).toBe(0)
+    expect(after.ballMagicNumber).toBe(0)
+  })
+
+  it('마구(22)를 던지면 남은 > 0 일 때 공에 번호가 실리고, 되돌리지 않아 다음 직구에도 남는다', () => {
+    const base = 시작()
+    const 마구투수: TeamGameProgress = {
+      ...base,
+      magicRemaining: 3,
+      ourPitcherEntry: base.ourPitcherEntry.map((pitcher, slot) =>
+        slot === base.ourPitcherIndex ? { ...pitcher, repertoire: { ...pitcher.repertoire, magicId: 2 } } : pitcher,
+      ),
+    }
+    const random = createSeededRandom(9)
+    const 마구 = startThrowPitch(마구투수, { typeNumber: 22, courseCell: 4, gaugeCell: 0 }, random)
+    expect(마구.magicRemaining).toBe(2)
+    expect(마구.lastPitch?.magicNumber).toBe(2)
+    expect(마구.lastPitch?.pitcherMagicNumber).toBe(2)
+    if (!isPitchTurn(마구)) return
+    const 직구 = startThrowPitch(마구, 한가운데직구, random)
+    expect(직구.lastPitch?.magicNumber).toBe(2)
+  })
+
+  it('마지막 한 개(남은 1 → 0)는 코스 확정 0x50e9c 가 먼저 줄여 0x3de10 이 안 싣는다', () => {
+    const base = 시작()
+    const 마구투수: TeamGameProgress = {
+      ...base,
+      magicRemaining: 1,
+      ourPitcherEntry: base.ourPitcherEntry.map((pitcher, slot) =>
+        slot === base.ourPitcherIndex ? { ...pitcher, repertoire: { ...pitcher.repertoire, magicId: 3 } } : pitcher,
+      ),
+    }
+    const 마구 = startThrowPitch(마구투수, { typeNumber: 22, courseCell: 4, gaugeCell: 0 }, createSeededRandom(9))
+    expect(마구.magicRemaining).toBe(0)
+    expect(마구.lastPitch?.magicNumber).toBe(0)
+  })
+})

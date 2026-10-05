@@ -56,7 +56,7 @@ import { specialSwingCountOf } from '@/entities/batting/model/specialSwing'
 import { aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
 import { isMistakePitch } from '@/entities/pitching/model/mistakePitch'
 import type { Pitch } from '@/entities/pitching/model/pitch'
-import { MAGIC_PITCH_TYPE_NUMBER } from '@/entities/pitcher-career/model/magicPitch'
+import { MAGIC_PITCH_TYPE_NUMBER, ballMagicNumberAfterPitch } from '@/entities/pitcher-career/model/magicPitch'
 import {
   consumeStamina,
   FULL_STAMINA,
@@ -606,6 +606,14 @@ export interface TeamGameProgress {
   readonly stamina: number
   readonly magicRemaining: number
   /**
+   * **공 객체 +0x10** — 사람 투수가 던진 공에 실린 마구 번호 (0x3de10, H2 3-4). 되돌리는 코드가 없어
+   * 한 번 마구를 던진 뒤로는 직구·변화구에도 남는다. CPU 타석 판정의 보정 구조체 0x34d6c 투수 쪽이 본다.
+   *
+   * ⚠️ 미해결: 원본 공 객체는 경기에 하나라 CPU 투수가 던진 마구(사람 타석, `widgets/batting-stage` 의
+   *    `MagicPitchGameState`)와 칸을 함께 쓴다. 웹은 두 쪽이 따로 들고 있어 반 이닝을 건너 이어지지 않는다.
+   */
+  readonly ballMagicNumber: number
+  /**
    * **타순 칸별 이 경기 남은 필살 횟수** = s8 팀[+0x29 + 타순] (0xaea30 이 읽고 0xae9e8 이 쓴다). 아홉 칸.
    * −1 은 "아직 안 채움" — 타석 교대 0xaebe4 가 그 타순 선수로 채운다(`specialSwingRemainingAt`).
    * 대타 교체(0xaede0) 때 그 칸을 −1 로 되돌린다. 이닝이 바뀌어도 다시 차지 않는다 (H2 1-2).
@@ -819,6 +827,8 @@ export function startTeamGame(options: TeamGameOptions, random: RandomPort): Tea
     atBatPrepared: false,
     stamina: ourPitcherStaminas[startingSlots.ours] ?? FULL_STAMINA,
     magicRemaining: options.magicCount ?? 0,
+    // 공 객체 new — +0x10 = 0 (0x1239 new 의 0 채움은 원본 미확인 — H2 3-4)
+    ballMagicNumber: 0,
     ourSpecialSwingRemaining: UNFILLED_SPECIAL_SWINGS,
     opponentSpecialSwingRemaining: UNFILLED_SPECIAL_SWINGS,
     pitchCount: 0,
@@ -1926,7 +1936,7 @@ function pitchOnce(
     },
     random,
   )
-  const pitch = buildHumanPitch(
+  const builtPitch = buildHumanPitch(
     {
       typeNumber: input.typeNumber,
       courseCell: input.courseCell,
@@ -1942,6 +1952,18 @@ function pitchOnce(
     },
     random,
   )
+
+  // 코스 확정 0x50e9c 가 남은 마구를 줄이고(아래 magicRemaining) 상태 0x11 진입 0x3de10 이 그 **뒤**에
+  // `구질 == 22 && 남은 > 0` 이면 공+0x10 = 투수+0x18 을 싣는다 — 마지막 한 개(1 → 0)는 안 싣는다 (H2 3-4).
+  // 되돌리는 줄이 없어 마구 뒤의 공에도 남는다. CPU 타석 판정의 0x34d6c 투수 쪽이 이 칸을 본다
+  const magicRemainingAfter = isMagic ? progress.magicRemaining - 1 : progress.magicRemaining
+  const ballMagicNumber = ballMagicNumberAfterPitch(
+    progress.ballMagicNumber,
+    input.typeNumber,
+    repertoire.magicId,
+    magicRemainingAfter,
+  )
+  const pitch: Pitch = { ...builtPitch, magicNumber: ballMagicNumber, pitcherMagicNumber: repertoire.magicId }
 
   // 실투 판정 0x33cbc — 투구 순간 0x4dc78 이 궤적 준비 0x9e669 **뒤**(0x4dea0)에 부른다.
   // 등급 뽑기·제구 흩어짐 굴림 뒤, CPU 타자 결정 0x34334 앞이다. 마구가 아니면 rand(0,100) 한 번.
@@ -2028,7 +2050,8 @@ function pitchOnce(
     ...progress,
     stamina,
     // ⚠️ 마구 횟수는 **코스 확정(OK)** 때 줄어든다 — 구질을 고른 순간이 아니다 (0x50e9c)
-    magicRemaining: isMagic ? progress.magicRemaining - 1 : progress.magicRemaining,
+    magicRemaining: magicRemainingAfter,
+    ballMagicNumber,
     // 0x4e136 — CPU 마타자의 필살 스윙이 나간 틱에 그 타순 칸 −1 (헛스윙도)
     opponentSpecialSwingRemaining:
       thrown.specialSwingRemaining === null
