@@ -19,6 +19,7 @@ import {
   currentPitcherAbility,
   currentPitcherAceIndex,
   pitchSlotsFor,
+  substitutionDetailAbilities,
 } from '@/features/play-team-game/model/teamGameFlow'
 import type {
   TeamEntryBatter,
@@ -61,7 +62,9 @@ import * as styles from '@/pages/team-game/ui/TeamGameScreen.css'
  *     **수비 중이면 투수 교체, 공격 중이면 대타**다 (갈림길 `0x49598`)
  *   - **'3'/'2'** 도루 (공격 중, 메시지 0x583 — I-controls 0절)
  *
- * 원본에 있고 여기 없는 것: 교체 연출(상태 0x16), 자동진행 **중계 화면**(상태 0x21),
+ * 교체 연출(상태 0x16)은 **소리만** 잇는다 — 대타 등판음·"Time!" 22 는 `useTeamGame` 걸음 끝이 낸다(1e1f5f2).
+ * 그 연출 그림(0x4da30)은 없다.
+ * 원본에 있고 여기 없는 것: 교체 연출 0x16 의 그림, 자동진행 **중계 화면**(상태 0x21),
  * 공수 교대 화면(0x18)·경기 끝 결과 판의 승·패·세 투수 세 줄.
  */
 const smallLogoUrlOf = (teamId: number) => `./sprites/team_logo_ini/${String(teamId).padStart(3, '0')}.png`
@@ -389,6 +392,7 @@ export function TeamGameScreen({
             entry={progress.ourPitcherEntry}
             currentIndex={progress.ourPitcherIndex}
             benchIndexes={session.benchPitchers}
+            abilitiesOf={(index) => substitutionDetailAbilities(progress, '투수', index)}
             onSelect={(benchIndex) => {
               actions.changePitcher(benchIndex)
               setChangeWindow(null)
@@ -399,6 +403,7 @@ export function TeamGameScreen({
             entry={progress.ourEntry}
             currentSlot={game.battingOrderIndex}
             benchIndexes={session.benchBatters}
+            abilitiesOf={(index) => substitutionDetailAbilities(progress, '대타', index)}
             onSelect={(benchIndex) => {
               actions.pinchHit(benchIndex)
               setChangeWindow(null)
@@ -567,6 +572,8 @@ interface PitcherChangeWindowProps {
   readonly entry: readonly TeamEntryPitcher[]
   readonly currentIndex: number
   readonly benchIndexes: readonly number[]
+  /** 그 명단 칸의 상세 창 능력치 네 칸 — `0xb6414(rec, 칸, 1)` (`substitutionDetailAbilities`) */
+  readonly abilitiesOf: (index: number) => readonly [number, number, number, number] | null
   readonly onSelect: (benchIndex: number) => void
 }
 
@@ -577,20 +584,23 @@ interface PitcherChangeWindowProps {
  * 칸마다 이름 · 보직 · **방어율** · **탈삼진** 넷을 적는다. OK 가 확정(상태 0x16 연출), '#'·CLR 이 취소다.
  *
  * ⚠️ **근사**: 웹 로스터에는 보직(`+0xb`)도 시즌 기록(방어율·탈삼진)도 없다 —
- * 대신 경기에서 실제로 쓰는 능력치 제구·구속·체력을 적는다. 창 배치도 웹 껍데기 그대로다.
+ * 대신 원본이 '0' 상세 창에만 적는 능력치(`0xb6414(rec, 칸, 1)` — 마선수 레벨 배율 포함,
+ * `substitutionDetailAbilities`)를 목록 줄에 붙여 적는다. 창 배치도 웹 껍데기 그대로다.
  */
 function PitcherChangeWindow({
   entry,
   currentIndex,
   benchIndexes,
+  abilitiesOf,
   onSelect,
 }: PitcherChangeWindowProps) {
   const describe = (index: number) => {
     const player = entry[index]
-    if (player === undefined) return { label: `${index + 1}번`, detail: undefined }
+    const ability = abilitiesOf(index)
+    if (player === undefined || ability === null) return { label: `${index + 1}번`, detail: undefined }
     return {
       label: player.aceIndex >= 0 ? `${player.name} (마투수)` : player.name,
-      detail: `제구 ${player.ability[0]} · 구속 ${player.ability[1]} · 체력 ${player.ability[3]}`,
+      detail: `제구 ${ability[0]} · 구속 ${ability[1]} · 체력 ${ability[3]}`,
     }
   }
   const current = describe(currentIndex)
@@ -619,6 +629,8 @@ interface PinchHitWindowProps {
   readonly entry: readonly TeamEntryBatter[]
   readonly currentSlot: number
   readonly benchIndexes: readonly number[]
+  /** 그 명단 칸의 상세 창 능력치 네 칸 — `0xb6414(rec, 칸, 1)` (`substitutionDetailAbilities`) */
+  readonly abilitiesOf: (index: number) => readonly [number, number, number, number] | null
   readonly onSelect: (benchIndex: number) => void
 }
 
@@ -627,17 +639,19 @@ interface PinchHitWindowProps {
  * 원본은 같은 192×210 창에 제목만 "대타 교체"(img_text 149 "타자" + 299 "교체" — S10 정정)로
  * 바꿔 그리고, 칸마다 이름 · 수비 위치 · **타율** · **홈런** 넷을 적는다.
  *
- * ⚠️ **근사**: 웹 로스터에는 시즌 기록(타율·홈런)이 없다 — 대신 경기에서 실제로 쓰는 능력치
- * 히트·파워·주루를 적는다. 창 배치도 웹 껍데기 그대로다.
+ * ⚠️ **근사**: 웹 로스터에는 시즌 기록(타율·홈런)이 없다 — 대신 원본이 '0' 상세 창에만 적는
+ * 능력치(`0xb6414(rec, 칸, 1)`, `substitutionDetailAbilities`) 히트·파워·주루를 목록 줄에 붙여 적는다.
+ * 창 배치도 웹 껍데기 그대로다.
  * 고른 선수는 **옛 타자의 수비 자리를 받고, 빠진 선수는 벤치에서 지워진다**(재출장 없음, 0xaebe4).
  */
-function PinchHitWindow({ entry, currentSlot, benchIndexes, onSelect }: PinchHitWindowProps) {
+function PinchHitWindow({ entry, currentSlot, benchIndexes, abilitiesOf, onSelect }: PinchHitWindowProps) {
   const describe = (index: number) => {
     const player = entry[index]
-    if (player === undefined) return { label: `${index + 1}번`, detail: undefined }
+    const ability = abilitiesOf(index)
+    if (player === undefined || ability === null) return { label: `${index + 1}번`, detail: undefined }
     return {
       label: player.aceIndex >= 0 ? `${player.name} (마타자)` : player.name,
-      detail: `히트 ${player.ability[0]} · 파워 ${player.ability[1]} · 주루 ${player.ability[3]}`,
+      detail: `히트 ${ability[0]} · 파워 ${ability[1]} · 주루 ${ability[3]}`,
     }
   }
   const current = describe(currentSlot)
