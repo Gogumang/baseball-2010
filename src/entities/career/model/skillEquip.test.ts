@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  applySkillReward, createCareer, equippedPlusSkillCountOf, isSkillEquipped, plusSkillSlotLimitOf,
+  applySkillReward, createCareer, equippedPlusSkillCountOf, isMinusSkill, isSkillEquipped, MINUS_SKILL_IDS, plusSkillSlotLimitOf,
   rebuildEquippedSkillIds, setSkillEquipped,
 } from '@/entities/career/model/playerCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
@@ -153,5 +153,19 @@ describe('효과는 장착분만 낸다 — 0xb62b4 · 0xa4bf8', () => {
     expect(illnessChanceOf(10, [6], [])).toBe(14)
     expect(illnessChanceOf(10, [6], [6])).toBe(0)
     expect(illnessChanceOf(10, [4], [])).toBe(24)
+  })
+})
+
+describe('마이너스 판정 0x5f350 비트1 — 표 0xd7e10 과 같은 묶음', () => {
+  it('0~23 중 2~5 · 17~20 만 마이너스다 (19·20 포함)', () => {
+    const 마이너스 = Array.from({ length: 24 }, (_, s) => s).filter(isMinusSkill)
+    expect(마이너스).toEqual([2, 3, 4, 5, 17, 18, 19, 20])
+    expect(마이너스).toEqual([...MINUS_SKILL_IDS])
+  })
+
+  it('19·20 도 상한을 안 보고 장착되고 장착 수에 안 든다 (0xa4b04 · 0xa4aa4)', () => {
+    const career = 얻기(선수(), 0, 1, 6, 7, 8, 9, 19, 20)
+    expect(career.equippedSkillIds).toEqual([0, 1, 6, 7, 8, 9, 19, 20])
+    expect(equippedPlusSkillCountOf(career)).toBe(6)
   })
 })

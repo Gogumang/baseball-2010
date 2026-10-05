@@ -486,7 +486,15 @@ export const PLUS_SKILL_SLOT_LIMITS: readonly number[] = [6, 8, 10]
 /** 장착 수 세기 0xa4aa4 가 도는 번호 범위 0~23 (`cmp r4,#0x17`) */
 const LAST_COUNTED_SKILL_ID = 23
 
-/** 마이너스 스킬인가 — 0x5f350 비트1 (s ∈ 2~5 · 17~20). 표 0xd7e10 과 같은 묶음이다 */
+/**
+ * 마이너스 스킬인가 — 0x5f350(표, s) 비트1. 디스어셈(확정):
+ *   s ≤ 1 → 1 · s−8 ≤ 8(8~16) → 1 · s−2 ≤ 3(2~5) → **2** · s−17 ≤ 3(17~20) → **2** · 나머지(6·7·21~) → 4
+ *   (여기에 s ≤ 7 이면 0x10, 아니면 0x20 을 OR). 그래서 19·20 도 마이너스다 — 표 0xd7e10 = [2,3,4,5,17,18,19,20] 과 같은 묶음.
+ * 쓰는 곳이 둘로 갈리지만 묶음은 같다:
+ *   0x5f350 비트1 — 장착 수 0xa4aa4 · 장착 동작 0xa4b04(상한 건너뜀) · 최면요법 효과 0xa4970 · 장착 창 해제불가(H-modes 6절)
+ *   표 0xd7e10 — 해제 플래그 0xa43fc/0xa4f30(+0x1d0+k) · 최면요법 가드 0xa4f00(보유 수)
+ * 모드 3(투수편)도 같은 함수들을 탄다(0x5f350 에 모드 갈림이 없다).
+ */
 export function isMinusSkill(skillId: number): boolean {
   return MINUS_SKILL_IDS.includes(skillId)
 }
