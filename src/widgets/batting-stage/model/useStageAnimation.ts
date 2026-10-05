@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { DEFAULT_REPERTOIRE, selectPitch } from '@/entities/pitching/model/selectPitch'
-import { createMagicPitchGameState } from '@/entities/pitching/model/magicPitchGame'
+import { aceOrderOfMagicNumber, createMagicPitchGameState } from '@/entities/pitching/model/magicPitchGame'
+import { aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
 import type { MagicPitchGameState } from '@/entities/pitching/model/magicPitchGame'
 import type { PitcherRepertoireInfo } from '@/entities/pitching/model/pitch'
 import { lastSwingFrameOf } from '@/entities/batting/model/swingTiming'
@@ -71,7 +72,10 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
     const magicStateOf = (repertoire: PitcherRepertoireInfo | undefined) => {
       const info = repertoire ?? DEFAULT_REPERTOIRE
       if (magic === null || magic.magicId !== info.magicId) {
-        magic = { magicId: info.magicId, state: createMagicPitchGameState(info) }
+        // 0xaebe4: 마투수(0xb633d)면 횟수 = 0xd8509[mgr[0x13a + 순번(0xb63a1)]] — 레벨은 상태를 세울 때 한 번 읽는다
+        const order = aceOrderOfMagicNumber(info.magicId)
+        const aceLevel = order < 0 ? 0 : aceLevelOf(latestRef.current.aceLevels, aceLevelSlotOf('투수', order + 1))
+        magic = { magicId: info.magicId, state: createMagicPitchGameState(info, { aceLevel }) }
       }
       return magic.state
     }

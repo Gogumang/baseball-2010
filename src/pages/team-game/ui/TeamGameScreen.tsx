@@ -442,6 +442,8 @@ export function TeamGameScreen({
               }
               // 시즌 홈경기에서만 차 있다 — 차 있으면 배경이 시즌 구장(0x77494)으로 갈린다
               seasonStadium={seasonStadium}
+              // 상대 마투수의 마구 횟수 0xd8509[mgr[0x13a + 순번]] (0xaebe4) — 전역 마선수 레벨 칸
+              aceLevels={options.aceLevels}
               isPaused={burstLines !== null}
               random={random}
               onPitchResolved={(detail) => actions.resolvePitch(detail)}

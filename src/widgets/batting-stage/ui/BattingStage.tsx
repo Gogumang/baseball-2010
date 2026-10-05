@@ -87,6 +87,13 @@ interface BattingStageProps {
    * 안 넘기면 그 셋이 아닌 것으로 본다.
    */
   readonly gameMode?: number
+  /**
+   * **마선수 레벨 열 칸** = 원본 전역 기록 `mgr[0x13a..0x143]` (칸 0~4 마투수 · 5~9 마타자 → 레벨 0~4).
+   * `entities/mission/model/useAceLevels` 의 `levels` 를 그대로 넘긴다. 상대가 마투수면 경기 첫 마구 상태를
+   * 세울 때 `0xd8509[레벨]` = [3,4,5,6,7] 로 마구 횟수를 정한다 (타석 교대 0xaebe4, aeec2~aeeea).
+   * 안 넘기면 모두 Lv1 = 3 회다.
+   */
+  readonly aceLevels?: Readonly<Record<number, number>>
   /** 참이면 새 공을 던지지 않는다. 타석 결과 연출 중에 쓴다. */
   readonly isPaused: boolean
   readonly random: RandomPort

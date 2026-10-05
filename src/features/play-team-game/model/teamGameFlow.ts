@@ -243,6 +243,13 @@ export interface TeamGameOptions {
    * (`31058`). 그래서 이 칸은 상대 팀 마투수의 **입력**이기도 하다 (`rollOpponentAceIndex`).
    */
   readonly acePitcherId?: number
+  /**
+   * **마선수 레벨 열 칸** = 원본 전역 기록 `mgr[0x13a..0x143]` (`entities/mission/model/useAceLevels` 의 `levels`).
+   * 명단의 마선수(사람 팀·AI 팀 모두)가 능력치 0xb6414 첫 단계에서 `0xd88aa[레벨]` 배율을 먹고,
+   * 상대 마투수의 마구 횟수 0xd8509[레벨] 도 이 칸을 본다 (타석 화면이 `BattingStage.aceLevels` 로 받는다).
+   * 안 넘기면 모두 Lv1(0) — 배율 60% · 마구 3 회다.
+   */
+  readonly aceLevels?: Readonly<Record<number, number>>
   /** 이 경기에 쓸 수 있는 마구 횟수. 로스터 투수는 마구가 없어 기본 0 이다 */
   readonly magicCount?: number
   /** 화면 배치 side (투영 원점 표 0xcfb18 의 칸) */

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  aceOrderOfMagicNumber,
   advanceMagicPitchGameState,
   createMagicPitchGameState,
   isAceMagicNumber,
@@ -26,6 +27,18 @@ describe('magicPitchGame — 한 경기 마구 상태 (0xaebe4 · 0x345fc · 0x3
     expect(createMagicPitchGameState(ACE_PITCHER_REPERTOIRES[0]).remaining).toBe(3)
     expect(createMagicPitchGameState(ACE_PITCHER_REPERTOIRES[0], { aceLevel: 4 }).remaining).toBe(7)
     expect(createMagicPitchGameState(ACE_PITCHER_REPERTOIRES[0], { hasSpiritSkill: true }).remaining).toBe(5)
+  })
+
+  it('마투수 순번 = 마구 번호 − 5 (0xb63a1, H2 4-1) — 레벨 칸 mgr[0x13a + 순번]', () => {
+    expect(ACE_PITCHER_REPERTOIRES.map((ace) => aceOrderOfMagicNumber(ace.magicId))).toEqual([0, 1, 2, 3, 4])
+    expect(aceOrderOfMagicNumber(0)).toBe(-1)
+    expect(aceOrderOfMagicNumber(4)).toBe(-1)
+  })
+
+  it('레벨별 마구 횟수는 0xd8509 = [3, 4, 5, 6, 7]', () => {
+    expect([0, 1, 2, 3, 4].map((aceLevel) => createMagicPitchGameState(ACE_PITCHER_REPERTOIRES[2], { aceLevel }).remaining)).toEqual([
+      3, 4, 5, 6, 7,
+    ])
   })
 
   it('첫 마구는 공짜다 — 소모 조건이 `공+0x10 != 0` 인 원본 버그 그대로', () => {

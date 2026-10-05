@@ -23,12 +23,21 @@ export function isAceMagicNumber(magicNumber: number): boolean {
   return magicNumber >= 5 && magicNumber <= 9
 }
 
+/**
+ * 마투수 순번 0~4 (0xb63a1 = 마선수면 `rec[0xa] & 0x1f`) — 마선수 레코드 +0x18 마구 번호 5~9 에서 5 를 뺀 값과
+ * 같다 (H2 4-1 "순번 = 번호 − 5"). 마투수가 아니면 −1.
+ * 레벨 칸 `mgr[0x13a + 순번]` 을 고르는 데 쓴다 (마투수는 열 칸 중 앞 다섯 칸 0~4).
+ */
+export function aceOrderOfMagicNumber(magicNumber: number): number {
+  return isAceMagicNumber(magicNumber) ? magicNumber - 5 : -1
+}
+
 export interface MagicPitchGameOptions {
   /**
-   * 마투수 레벨 0~4 (`s8 전역기록[0x13a + 순번]` — 타석 교대 0xaebe4 가 이 칸으로 0xd8509 를 색인한다, H2 1-2).
-   * 저장은 이제 있다(`entities/mission/model/useAceLevels`, 레벨업 0x5fb24). 안 넘기면 0 = Lv1 이다.
-   * ⚠️ 유일한 부르는 곳 `widgets/batting-stage/model/useStageAnimation` 이 아직 레벨을 안 넘긴다
-   *    (레퍼토리만 보고 마투수 칸 번호를 모른다) — 마투수 마구는 지금 늘 Lv1 횟수 3 이다.
+   * 마투수 레벨 0~4 (`s8 전역기록[0x13a + 순번]` — 타석 교대 0xaebe4 가 이 칸으로 0xd8509 를 색인한다,
+   * aeec2~aeeea: `0xb63a1(P) + mgr + 0x138` 의 +2 바이트를 ldrsb → `ldrsb [0xd8509 + 레벨]`, 표 = [3,4,5,6,7]).
+   * 저장은 `entities/mission/model/useAceLevels`(레벨업 0x5fb24). 안 넘기면 0 = Lv1 이다.
+   * 부르는 곳 `widgets/batting-stage/model/useStageAnimation` 이 `BattingStage` 의 `aceLevels` 로 채운다.
    */
   readonly aceLevel?: number
   /** 투수 스킬 23 혼신 (마구 횟수 +2). CPU 투수 스킬을 아직 읽지 않아 기본 false (근사) */
