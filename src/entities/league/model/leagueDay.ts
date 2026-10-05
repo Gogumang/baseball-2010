@@ -315,9 +315,10 @@ function defenseOf(
  * `matchup` 은 **명단**으로 본 두 팀이다 — `away` 의 선수가 초(칸 0), `home` 의 선수가 말(칸 1)에 공격한다.
  * CPU 끼리 경기 준비는 칸의 팀 번호와 명단이 엇갈리므로 부르는 쪽이 `cpuGameSidesOf` 로 바꿔 넘긴다.
  *
- * `startingPitcherSlot` 을 주면 **양 팀 모두 그 칸**이 선발이다 — 정규 리그와 포스트시즌(0xc2760)은 같은 준비
- * `0xc239c` 의 4인 로테이션(`0xb8c80` → `0xb5ca8`, 포스트시즌은 시리즈 안 경기 수가 g), 국가대항전은 준비
- * `0xc2c4c` 가 `L+0x32 % 4` 로 0↔k 맞바꿈(`0xb6c34` → `0xb8c94`)을 한다. CPU 끼리 경기에 `rand(0,4)` 선발은 없다.
+ * `startingPitcherSlot` 이 선발 칸이다(수 하나면 양 팀 같은 칸) — 정규 리그와 포스트시즌(0xc2760)은 같은 준비
+ * `0xc239c` 의 4인 로테이션(`0xb8c80` → `0xb5ca8`, 포스트시즌은 이어 온 칸 + 시리즈 g — `postseasonStarterSlotOf`),
+ * 국가대항전은 준비 `0xc2c4c` 의 `L+0x32 % 4` 0↔k 맞바꿈(`0xb6c34` → `0xb8c94`)이 같은 레코드에 두 번 걸려 제자리라
+ * 그 레코드의 0번이다(`nationalCupStartingPitcherIndex`). CPU 끼리 경기에 `rand(0,4)` 선발은 없다.
  * 안 주면 `rand(0,4)` 두 번으로 뽑는다 — 지금은 이 길을 쓰는 원본 CPU 경기가 없다(테스트·예비용).
  *
  * **마선수** — `0xc239c` 는 두 팀 객체를 만든 직후 굴림 다섯(`rollCpuGamePrep`)으로 양 팀에 마타자·마투수를 하나씩
