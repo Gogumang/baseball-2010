@@ -436,12 +436,6 @@ export function resolveDefensePlay(
   return finishPlayerOutcome({ ...progress, pendingDefensePlay: null }, pending.outcome, random, result, null)
 }
 
-/** 타석 결과 링 코드 — 사구는 9 (0xa8b9c). `atBatRecordCodeOf` 는 아직 사구를 몰라 8 로 둔다 */
-const HIT_BY_PITCH_RING_CODE = 9
-function ringCodeOf(outcome: AtBatOutcome): number {
-  return outcome.kind === '사구' ? HIT_BY_PITCH_RING_CODE : atBatRecordCodeOf(outcome)
-}
-
 /**
  * **사구 뒤 벤치 클리어링** (`entities/game/model/benchClearing`, R10 6절).
  * 내 타석이라 수비는 늘 CPU 다 → 들어가면 상대 투수 투구 수(`+0x27c`) +10 (0x3ab82).
@@ -571,9 +565,8 @@ function finishPlayerOutcome(
       : resolveBurst(
           progress.burst,
           burstResultBitsOf({
-            // 사구도 B5(출루)·B11 을 켠다 — 0xa882a 는 "볼 4개 || 사구", B11 은 0xa8b7a·0xa8bf4 두 곳.
-            // burstResultBits 가 아직 '사구' 를 모르므로 같은 비트를 내는 볼넷으로 넘긴다
-            outcome: outcome.kind === '사구' ? { kind: '볼넷' } : outcome,
+            // 사구도 B5(출루)·B11 을 켠다 — burstResultBitsOf 가 '사구' 를 받는다 (0xa882a · 0xa8bf4)
+            outcome,
             runsBattedIn,
             outsBefore: progress.game.outs,
             outsAdded: outsInPlay,
@@ -612,7 +605,7 @@ function finishPlayerOutcome(
       homeRunStreak: backToBack.streak,
       recordIds: [...progress.recordIds, ...recordIds],
       popularityPoints: progress.popularityPoints + points,
-      recentAtBatCodes: [...progress.recentAtBatCodes, ringCodeOf(outcome)].slice(-RECENT_AT_BAT_COUNT),
+      recentAtBatCodes: [...progress.recentAtBatCodes, atBatRecordCodeOf(outcome)].slice(-RECENT_AT_BAT_COUNT),
       doublePlays: progress.doublePlays + penalties.doublePlays,
       scoringPositionOuts: progress.scoringPositionOuts + penalties.scoringPositionOuts,
       reputationCounts: addReputationCounts(progress.reputationCounts, {
@@ -723,6 +716,7 @@ function addReputationCounts(
     grandSlams: counts.grandSlams + (outcome.kind === '홈런' && runsBattedIn === GRAND_SLAM_RUNS ? 1 : 0),
     walkOffs: counts.walkOffs + (isWalkOff && isHit ? 1 : 0),
     buntHits: counts.buntHits,
+    // G+0xfc 는 볼넷만이다 — 사구 갈래(0xa8b90)는 코드 13 으로 G+0x100 을 올리고, 평판식은 0xfc 만 읽는다
     walks: counts.walks + (outcome.kind === '볼넷' ? 1 : 0),
     goAheadRuns:
       counts.goAheadRuns + (opponentScore >= ourScoreBefore && opponentScore <= after - 1 ? 1 : 0),

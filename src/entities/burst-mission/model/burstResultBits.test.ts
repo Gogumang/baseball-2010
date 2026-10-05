@@ -114,6 +114,14 @@ describe('타석 결과 → 결과비트', () => {
     expect(hasBit(볼넷비트, B.볼넷)).toBe(true)
   })
 
+  it('사구도 볼넷과 같은 비트다 — B5(0xa882a "볼 4개 || 사구") · B11(사구 갈래 0xa8bf4)', () => {
+    const 사구 = { kind: '사구' } as const
+    expect(burstResultBitsOf({ outcome: 사구, runsBattedIn: 0, outsBefore: 1, outsAdded: 0 })).toBe(B.출루 | B.볼넷)
+    expect(burstResultBitsOf({ outcome: 사구, runsBattedIn: 1, outsBefore: 2, outsAdded: 0 })).toBe(
+      burstResultBitsOf({ outcome: 볼넷, runsBattedIn: 1, outsBefore: 2, outsAdded: 0 }),
+    )
+  })
+
   it('⚠️ 원본 그대로 — 사람 팀 승리로 끝난 플레이는 홈런·볼넷 비트를 덤으로 켠다 (0xa89f0)', () => {
     const bits = burstResultBitsOf({
       outcome: 땅볼아웃,

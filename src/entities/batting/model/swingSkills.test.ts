@@ -55,5 +55,7 @@ describe('스윙 스킬 보정 — 0xab214 (점검 10차)', () => {
     expect(atBatRecordCodeOf({ kind: '아웃', detail: '뜬공아웃' })).toBe(6)
     expect(atBatRecordCodeOf({ kind: '아웃', detail: '땅볼아웃' })).toBe(5)
     expect(atBatRecordCodeOf({ kind: '볼넷' })).toBe(8)
+    // 사구는 9 (0xa8b9c)
+    expect(atBatRecordCodeOf({ kind: '사구' })).toBe(9)
   })
 })

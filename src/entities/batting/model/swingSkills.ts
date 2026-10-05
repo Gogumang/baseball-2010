@@ -38,6 +38,9 @@ export function atBatRecordCodeOf(outcome: AtBatOutcome): number {
       return 7
     case '아웃':
       return outcome.detail === '뜬공아웃' ? 6 : 5
+    case '사구':
+      // 0xa8024 사구 갈래가 링에 9 를 넣는다 (0xa8b9c) — 볼넷 8 과 다르다
+      return 9
     default:
       return 8
   }

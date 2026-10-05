@@ -75,7 +75,6 @@ const MAXIMUM_OUTS_PER_INNING = 3
  * 타석 결과 → 결과비트.
  *
  * **근사한 곳** (원본은 수비 플레이 상태를 직접 보고, 웹에는 아직 없는 값들이다):
- *   - B5 의 "볼 4개 || 사구" 는 웹의 볼넷 결과 하나로 합쳤다 (웹에 데드볼 구분이 없다).
  *   - B9 는 원본이 `state[0x1a] == 0`(주자 플레이로 이어지지 않은 삼진)까지 본다. 웹에는
  *     낫아웃·주자 플레이가 없으므로 삼진이면 늘 켠다.
  *   - B3 는 원본이 "진루 수가 2·3 이 아닌 나머지" 라 1루타 말고도 떨어질 수 있는데,
@@ -96,7 +95,9 @@ export function burstResultBitsOf(input: BurstResultBitsInput): number {
   // B5 — 타자가 출루했고 **이 플레이로 이닝이 끝나지 않았다** (0xa882a: 플레이 전 아웃 + 이번 아웃 ≤ 2).
   // 이 비트가 "안타 목표에서 단타도 성공" 을 만든다 (CORRECTIONS.md 1절, P7 → K 정정).
   const isHit = outcome.kind === '안타' || outcome.kind === '홈런'
-  const reachedBase = isHit || outcome.kind === '볼넷' || (input.batterRunnerSafe ?? false)
+  // 0xa882a 는 "볼 4개 || 사구" 를 본다 — 사구도 출루다
+  const isWalkOrHitByPitch = outcome.kind === '볼넷' || outcome.kind === '사구'
+  const reachedBase = isHit || isWalkOrHitByPitch || (input.batterRunnerSafe ?? false)
   if (reachedBase && input.outsBefore + input.outsAdded <= MAXIMUM_OUTS_PER_INNING - 1) {
     bits |= BURST_RESULT_BIT.출루
   }
@@ -114,7 +115,8 @@ export function burstResultBitsOf(input: BurstResultBitsInput): number {
   if (input.outsAdded >= 1) bits |= BURST_RESULT_BIT.아웃
   if (input.outsAdded >= 2) bits |= BURST_RESULT_BIT.병살
   if (outcome.kind === '삼진') bits |= BURST_RESULT_BIT.삼진
-  if (outcome.kind === '볼넷') bits |= BURST_RESULT_BIT.볼넷
+  // B11 은 볼넷 갈래 0xa8b7a 와 사구 갈래 0xa8bf4 두 곳이 켠다
+  if (isWalkOrHitByPitch) bits |= BURST_RESULT_BIT.볼넷
 
   if (input.humanTeamWalkOff ?? false) bits |= HUMAN_WIN_END_BITS
 
