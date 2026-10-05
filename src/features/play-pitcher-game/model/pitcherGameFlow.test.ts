@@ -1019,7 +1019,7 @@ describe('자동 타석(0x21)의 0xc1ba4 — 양 팀 마운드와 CPU 대타 (0x
     expect(강판.ourMound.usedSlots.filter((slot) => slot === MY_PITCHER_SLOT)).toHaveLength(1)
   })
 
-  it('강제 교체의 새 투수는 마무리 굴림(0xac360)이 가른다 — 참이면 벤치 마지막, 거짓이면 0xabfcc(가득 동률 → 벤치 앞)', () => {
+  it('강제 교체의 새 투수는 0xabfcc 의 중간계투(로스터 칸 4~6, 가득 동률 → 앞 칸 4)다 — 벤치에 마선수가 없어 마무리 굴림 0xac360 을 안 굴린다 (0xb8a8d)', () => {
     const 시작 = startPitcherGame(기본옵션, 씨앗(20100901))
     /** 첫 굴림만 고정, 나머지는 씨앗 */
     const 첫굴림 = (value: number) => {
@@ -1029,7 +1029,9 @@ describe('자동 타석(0x21)의 0xc1ba4 — 양 팀 마운드와 CPU 대타 (0x
     }
     const 첫구원 = (progress: PitcherGameProgress) => progress.ourMound.usedSlots[1] ?? progress.ourMound.pitcherSlot
     // 선발 날 목록 [나, 1, …, 7, 0] — 벤치 [1, …, 7, 0]
-    expect(첫구원(giveUpPitching(시작, 첫굴림(0.99)))).toBe(1)
-    expect(첫구원(giveUpPitching(시작, 첫굴림(0)))).toBe(0)
+    // 굴렸다면 첫 굴림 0 이 벤치 마지막(0)을 올렸을 자리다 — 굴림과 무관하게 4
+    // (0xabfcc 차례 [중간 1, 마무리 2, 선발 0] — 보직은 로스터 칸 표 `rosterPitcherRoleOf`)
+    expect(첫구원(giveUpPitching(시작, 첫굴림(0.99)))).toBe(4)
+    expect(첫구원(giveUpPitching(시작, 첫굴림(0)))).toBe(4)
   })
 })

@@ -36,7 +36,7 @@ export const EMPTY_MOUND_COUNTERS: MoundPitcherCounters = {
 export interface PitcherChangeInput extends MoundPitcherCounters {
   /** 지금 투수의 보직 — 레코드 `+0xb` 하위 2비트 (0xb6704) */
   readonly role: PitcherRole
-  /** 특수 투수인가 (0xb633c) — 마선수 계열 */
+  /** 지금 마운드 투수가 마선수인가 (0xb633c = 레코드 `+0xa` 비트6, ac4f2) */
   readonly isSpecialPitcher?: boolean
   /** 지금 투수의 스태미나 0~10000 (`+0x2c`) */
   readonly stamina: number
@@ -50,22 +50,23 @@ export interface PitcherChangeInput extends MoundPitcherCounters {
   readonly lead: number
   /** **0-기준** 이닝 (state+0x6b). 1-기준 회에서 하나 뺀 값이다 */
   readonly inningIndex: number
-  /** 루에 나가 있는 주자 수 (0xa9888) — 9회 이후 마무리 상황 판정에 쓴다 */
+  /** 루에 나가 있는 주자 수 (ac5aa 0xa9598 = 주자 목록 길이) — 9회 이후 마무리 상황 판정에 쓴다 */
   readonly runnerCount: number
 }
 
 export interface PitcherChangeDecision {
+  /**
+   * 바꾸는가 (`[sp+8]`). 9회 이후 **마무리 상황이면 이것도 참이다** — ac5b4~ac5c2 가 `[sp+4]` 를 세우며
+   * 곧장 ac5c0 의 `[sp+8] = 1` 로 간다 (아래 `judgePitcherChange` 디스어셈).
+   */
   readonly replace: boolean
   /**
-   * "마무리 상황" 표시. 새 투수를 어떻게 고를지를 가른다 (0xac5d8~0xac61c):
-   *   - 마무리 상황이 **아니면** 0xac360 을 굴려, 참이면 벤치 **마지막**에서 고른다
-   *   - 마무리 상황이면 굴리지 않고 곧장 0xabfcc(`chooseReplacementPitcher`) 로 간다
+   * "마무리 상황" 표시 `[sp+4]`. 새 투수를 어떻게 고를지를 가른다 (0xac5d8~0xac61c):
+   *   - 마무리 상황이 **아니고** 벤치에 마선수가 있으면(0xb8a8d) 0xac360 을 굴려, 참이면 벤치 **마지막**에서 고른다
+   *   - 그 밖이면 굴리지 않고 곧장 0xabfcc(`chooseReplacementPitcher`) 로 간다
    *     (이때 0xabfcc 의 다섯째 인자 = 마무리 플래그 → `lateInningFlag`)
    * ⚠️ E-6 4절 3c 가 이 방향을 **거꾸로** 적었던 것을 CORRECTIONS 가 정정했다 ("E: 새 투수는
    * … 방향이 반대", V3-E "새 투수 고르기 방향이 반대").
-   *
-   * ⚠️ 원본 문서(E-6, 유력)가 "A>1 이면 교체 / 9회 이후엔 여기에 더해 마무리 상황을 표시" 로만
-   * 적혀 있어, 마무리 상황 자체가 교체를 부르는지는 알 수 없다 — 여기서는 **표시만** 한다.
    */
   readonly saveSituation: boolean
 }
@@ -76,21 +77,41 @@ const SPECIAL = { inningRuns: 2, runs: 3, staminaPercent: 39 } as const
 const COMMON = { inningRuns: 2, staminaPercent: 19 } as const
 /** 9회 이후 마무리 상황 — `0 < 리드 ≤ 5` 이고 (리드 ≤ 3 또는 리드 ≤ 주자 수 + 2) */
 const SAVE = { maximumLead: 5, comfortableLead: 3, runnerBonus: 2 } as const
-/** 0-기준 이닝 8 = 9회 */
-const SAVE_FROM_INNING_INDEX = 8
+/** 0-기준 이닝 7 을 **넘어야** 마무리 상황을 센다 (ac574 `cmp r6,#7 ; ble`) — 곧 9회부터 */
+const SAVE_AFTER_INNING_INDEX = 7
 
 /**
- * `0xac428` 의 교체 판정. 이닝 구간은 **0-기준**이다 (CORRECTIONS 의 V3 정정 —
- * 1-기준으로 옮기면 1~4회 / 5회 / 7회 / 6회·8회 이상 이다).
+ * `0xac428` 의 교체 판정 (디스어셈 ac428~ac656 — 이 함수는 ac44e~ac5d4 까지). 이닝은 **0-기준**
+ * state+0x6b 다 (CORRECTIONS 의 V3 정정 — 1-기준으로 옮기면 1~4회 / 5회 / 7회 / 6회·8회 이상).
  *
  * ```
- * 벤치 ≤ minimumBench → 안 바꿈 ; state[0xd] → 안 바꿈
- * 특수 투수 : A>2 or B>3 or s≤39
- * 역할 0·1  : A>2 or s≤19 → 교체
- *             inn ≤ 3 : B>4 / inn == 4 : B>4 && s≤49 / inn == 6 : B>2 && s≤29
- *             그 밖(inn 5 · inn ≥ 7) : A>1
- * 역할 2    : A≠0 and 리드 ≤ −2
+ * ac44e  벤치(team+0x33) ≤ [sp+0x58] → 0
+ * ac458  벤치 ≤ 1 이고 [sp+4](모드 3) 이고 벤치 0번이 0xb6389(내 선수) → 0   ← 부르는 쪽(simulateHalfInning)
+ * ac486  state[0xd] → 0
+ * ac48e  P = 0xae83c(team) · s = 0xaebb0(team)(체력%) · 보직 = 0xb6dec(P)
+ *        B = 0xa61b8(rec,1,1) · A = 0xa61b8(rec,0,1) · inn = state[0x6b]
+ *        리드 = 0xb69b0(state, state[0xa]) − 0xb69b0(state, state[9])
+ * ac4f2  0xb633c(P) 마선수 : A>2 · B>3 · s≤39 → ac5c0(교체) , 아니면 → 0 (ac568)
+ * ac50e  보직 < 0 → ac5c4 · 보직 ≥ 2 : 보직 == 2 이고 A ≠ 0 이고 리드 ≤ −2 → ac5c0 , 아니면 ac5c4
+ * ac526  보직 0·1 :
+ *          A>2 · s≤19            → ac53a: 교체=1 → ac574
+ *          inn ≤ 3 : B>4 → ac53a , 아니면 → ac574
+ *          inn == 4 : B>4 && s≤49 → ac5c0 , 아니면 ac5c4
+ *          inn == 6 : B>2 && s≤29 → 교체=1 , → ac5c4
+ *          그 밖(5 · ≥7) : A>1 → 교체=1 , → ac574
+ * ac574  inn ≤ 7 → ac5c4
+ *        d = 리드 ; d ≤ 0 · d > 5 → ac5c4
+ *        d ≤ 3 → 마무리=1
+ *        d ≤ 0xa9598(주자관리)+2 → 마무리=1 → ac5c0(교체=1)
+ *        아니면 마무리 ? ac5c0(교체=1) : ac5c4
+ * ac5c4  [sp+8](강제) → 교체=1 (부르는 쪽 `force`) ; 교체가 0 이면 → 0
  * ```
+ * 곧 **9회 이후 마무리 상황이면 교체도 참**이고(ac5b6·ac5c0), A>2·체력≤19% 로 바꿀 때도 ac574 에서
+ * 마무리 상황을 센다. inn == 4 · inn == 6 갈래와 마선수·보직 2 갈래는 ac574 를 안 지나 마무리 상황이 없다.
+ *
+ * 보직 3(`+0xb & 3 == 3`)은 ac518 에서 ac5c4 로 빠져 판정으로는 안 바꾼다 — 웹 `PitcherRole` 에 3 이 없어 여기 없다.
+ * 주자 수는 0xa9598(주자 목록 길이)이고, 마무리 굴림 0xac360 은 0xa9888(루 0~3 에 선 주자 수)을 센다 —
+ * 웹은 두 값을 가르지 않는다(죽은 주자가 목록에 남는 순간은 간이 엔진에 없다, I 4절).
  */
 export function judgePitcherChange(input: PitcherChangeInput): PitcherChangeDecision {
   const none: PitcherChangeDecision = { replace: false, saveSituation: false }
@@ -109,32 +130,44 @@ export function judgePitcherChange(input: PitcherChangeInput): PitcherChangeDeci
   }
 
   if (input.role === PITCHER_ROLE.relief) {
-    // 역할 2(마무리)는 이닝 실점이 있고 2점 이상 뒤지면 내린다
+    // 역할 2(마무리)는 이닝 실점이 있고 2점 이상 뒤지면 내린다 (ac51c~ac524)
     return { replace: a !== 0 && input.lead <= -2, saveSituation: false }
   }
 
+  const inn = input.inningIndex
+  let replace: boolean
   if (a > COMMON.inningRuns || s <= COMMON.staminaPercent) {
-    return { replace: true, saveSituation: false }
+    replace = true // ac53a → ac574
+  } else if (inn <= 3) {
+    replace = b > 4 // ac534 → ac53a / ac574
+  } else if (inn === 4) {
+    return { replace: b > 4 && s <= 49, saveSituation: false } // ac540 → ac5c0 / ac5c4
+  } else if (inn === 6) {
+    return { replace: b > 2 && s <= 29, saveSituation: false } // ac552 → ac5c4
+  } else {
+    replace = a > 1 // ac56c → ac574
   }
 
-  const inn = input.inningIndex
-  if (inn <= 3) return { replace: b > 4, saveSituation: false }
-  if (inn === 4) return { replace: b > 4 && s <= 49, saveSituation: false }
-  if (inn === 6) return { replace: b > 2 && s <= 29, saveSituation: false }
-
+  // ac574~ac5c2 — 9회 이후 마무리 상황이면 교체도 1
+  const lead = input.lead
   const saveSituation =
-    inn >= SAVE_FROM_INNING_INDEX &&
-    input.lead > 0 &&
-    input.lead <= SAVE.maximumLead &&
-    (input.lead <= SAVE.comfortableLead || input.lead <= input.runnerCount + SAVE.runnerBonus)
-  return { replace: a > 1, saveSituation }
+    inn > SAVE_AFTER_INNING_INDEX &&
+    lead > 0 &&
+    lead <= SAVE.maximumLead &&
+    (lead <= SAVE.comfortableLead || lead <= input.runnerCount + SAVE.runnerBonus)
+  return { replace: replace || saveSituation, saveSituation }
 }
 
 /**
  * 마무리 투입 굴림 `0xac360` — 참이면 새 투수를 **벤치 마지막**에서 고른다.
  * 확률은 `d_level.dat[0x36..0x3b]` = 45·35·50·60·60·30 % (P7 E2 확정).
  *
- * ⚠️ 이 굴림은 **마무리 상황이 아닐 때만** 돈다 (V3-E 정정) — `PitcherChangeDecision.saveSituation` 참고.
+ * ⚠️ 이 굴림은 **마무리 상황이 아니고 벤치에 마선수가 있을 때만** 돈다 (V3-E 정정 · 0xb8a8d) —
+ * `replacementPitcherSlotOf` 참고.
+ *
+ * 디스어셈 ac360~ac408: 0xb6c20(state,1)==1 && 0xb6c20(state,0)==1 → 0 (난수 없음) ·
+ * 칸 k (inn==8 → 1 · inn==7 → 2 · 리드<0 → 3 · 0xa9888(루 위 주자)>1 → 4 · 리드==1 → 5 · 그 밖 0) ·
+ * `d_level[0x36+k] > rand(0,100)` (0xbfa54) 이면 참. 사이의 0x1f1d8 은 `[r0+0xac]` 읽기뿐이다.
  */
 export const CLOSER_ROLL_PERCENTS: readonly number[] = [45, 35, 50, 60, 60, 30]
 
@@ -166,6 +199,21 @@ export function rollsCloser(input: CloserRollInput, random: RandomPort): boolean
   return randomIntegerBelow(random, 0, 100) < (CLOSER_ROLL_PERCENTS[index] ?? 0)
 }
 
+/**
+ * **로스터 투수 칸별 보직** — `XlsPITCHER_DATA` 레코드 `+0xb & 3` (0xb6dec → 0xb6704 가 읽는 칸).
+ * 레코드 0x30 바이트가 표 한 줄 그대로이고, 15팀 × 8줄 120줄이 **모두 팀 안 차례 [0,0,0,0,1,1,1,2]** 다
+ * (`base/extracted/XlsPITCHER_DATA.json` 의 줄마다 바이트 11 을 풀어 확인 — 선발 넷 · 중간 셋 · 마무리 하나).
+ * 웹 로스터 JSON 에는 이 칸이 없어(생성기 몫) 여기 표로 둔다. 생성기가 `+0xb` 를 싣게 되면 그 값으로 바꾼다.
+ *
+ * 선발 교체 0xb5e98(0↔k, k ≤ 3)·4인 로테이션은 선발끼리만 맞바꾸므로 칸의 보직이 그대로다.
+ */
+export const ROSTER_PITCHER_ROLES: readonly PitcherRole[] = [0, 0, 0, 0, 1, 1, 1, 2]
+
+/** 로스터 투수 칸(팀 안 0~7)의 보직. 그 밖의 칸(마투수 8번 · 투수편의 내 투수 등)은 모른다 */
+export function rosterPitcherRoleOf(slot: number): PitcherRole | undefined {
+  return ROSTER_PITCHER_ROLES[slot]
+}
+
 /** 새 투수 후보 한 명 — 벤치 칸과, 고를 때 보는 값들 */
 export interface ReplacementCandidate {
   /** 로스터 칸 */
@@ -174,8 +222,10 @@ export interface ReplacementCandidate {
   readonly stamina?: number
   /** 보직. **웹 로스터에는 이 값이 없다** — 넣어 주면 원본 순서를 그대로 쓴다 */
   readonly role?: PitcherRole
-  /** 특수 투수(마선수)인가 */
+  /** 마선수인가 — 0xb633c = 레코드 `+0xa` **비트6**. 0xabfcc 는 늘 거르고, 0xb8a8d 는 이것을 찾는다 */
   readonly isSpecialPitcher?: boolean
+  /** 내 육성 선수인가 — 0xb6388 = 레코드 `+0xa` **비트7**(부호). 모드 3 에서만 거른다 */
+  readonly isOwnPlayer?: boolean
 }
 
 /** 후보 스태미나가 이 값을 넘으면 마무리로 올릴 만하다 (0xabfcc 의 `> 30` = 0.3%) */
@@ -188,19 +238,25 @@ const CLOSER_MINIMUM_STAMINA = 30
 const MIDDLE_RELIEVER: PitcherRole = PITCHER_ROLE.unknown
 
 /**
- * 새 투수 고르기 `0xabfcc` (P7 E2 확정).
+ * 새 투수 고르기 `0xabfcc(경기, team, inn, 내선수거름, [sp]=마무리플래그)` (디스어셈 abfcc~ac1fe).
  *
  * ```
- * 순서 = (inn > 7 && 늦은이닝플래그) ? [마무리, 중간, 선발] : [중간, 마무리, 선발]
- * 마무리 : 능력 합이 큰 순 → "현재 투수 스태미나 ≤ 0 이거나 후보 스태미나 > 30" 인 첫 후보
- * 중간   : 스태미나가 큰 순 → 첫 후보
- * 선발   : 후보 목록의 **마지막**(벤치 번호가 가장 큰 선발)
+ * abff4  순서 = inn ≤ 7 ? [1,2,0] : 마무리플래그 ? [2,1,0] : [1,2,0]   (보직표 0xd833c = [0,1,2])
+ * ac032  보직마다: 벤치 i 중 0xb6dec == 보직 · !0xb633c(마선수) · !(내선수거름 && 0xb6388) 인 칸 목록
+ *        비면 → 다음 보직
+ * ac0be  2 마무리 : 0xb5b50(능력 합) 큰 순 거품 정렬 → "마운드 투수 +0x2c ≤ 0 이거나 후보 +0x2c > 30" 인 첫 후보
+ *                   (없으면 다음 보직)
+ * ac17a  1 중간   : +0x2c 큰 순 거품 정렬(같으면 앞 칸 그대로) → 첫 후보
+ * ac1da  0 선발   : 목록의 **마지막**
+ * ac1f4  다 비면 −1
  * ```
+ * **마선수는 어느 보직 목록에도 안 든다** — 마선수를 올리는 길은 0xac428 의 "벤치 마지막"(0xac360) 뿐이다.
  *
  * ⚠️ **웹 로스터(`shared/config/original/roster.ts`)에는 보직(`+0xb` 하위 2비트)이 없다.**
  * 후보에 `role` 이 하나도 안 실려 오면 위 순서를 세울 수 없어, 원본의 가장 흔한 갈래인
- * **"중간계투 = 스태미나가 가장 많은 후보"** 만 남긴다 (같으면 벤치 번호가 작은 쪽).
+ * **"중간계투 = 스태미나가 가장 많은 후보"** 만 남긴다 (같으면 벤치 번호가 작은 쪽). **근사다.**
  * 보직을 채우려면 `XlsPITCHER_DATA` 의 레코드 `+0xb` 를 로스터 JSON 에 넣어야 한다.
+ * 마무리 갈래의 "능력 합" 0xb5b50 도 웹 후보에 없어 스태미나 순으로 본다 — **근사다.**
  */
 export function chooseReplacementPitcher(
   candidates: readonly ReplacementCandidate[],
@@ -209,13 +265,14 @@ export function chooseReplacementPitcher(
     readonly lateInningFlag?: boolean
     /** 지금 마운드에 선 투수의 스태미나 (마무리 갈래가 본다) */
     readonly currentStamina: number
-    /** 모드 3 이면 마선수를 건너뛴다 */
-    readonly excludeSpecialPitchers?: boolean
+    /** 0xabfcc 넷째 인자 = 0xac428 의 `[sp+4]`(모드 3) — 참이면 내 육성 선수(0xb6388)를 거른다 */
+    readonly excludeOwnPlayers?: boolean
   },
 ): number {
   const usable = candidates.filter(
     (candidate) =>
-      input.excludeSpecialPitchers !== true || candidate.isSpecialPitcher !== true,
+      candidate.isSpecialPitcher !== true &&
+      !(input.excludeOwnPlayers === true && candidate.isOwnPlayer === true),
   )
   if (usable.length === 0) return -1
   const staminaOf = (candidate: ReplacementCandidate) => candidate.stamina ?? FULL_STAMINA
@@ -235,9 +292,7 @@ export function chooseReplacementPitcher(
       : [MIDDLE_RELIEVER, PITCHER_ROLE.relief, PITCHER_ROLE.starter]
 
   for (const role of order) {
-    const pool = usable.filter(
-      (candidate) => candidate.role === role && candidate.isSpecialPitcher !== true,
-    )
+    const pool = usable.filter((candidate) => candidate.role === role)
     if (pool.length === 0) continue
     if (role === PITCHER_ROLE.relief) {
       // 능력 합이 큰 순 — 웹 후보에 능력 합이 없으면 스태미나 순으로 본다 (근사)
@@ -266,55 +321,72 @@ export interface ReplacementPickInput {
   readonly runnerCount: number
   /** 지금 마운드에 선 투수의 스태미나 */
   readonly currentStamina: number
-  /** 두 팀 다 CPU 조작이면 마무리 굴림 0xac360 을 아예 돌리지 않는다 (0xb6c20) */
+  /** 두 팀 다 CPU 조작이면 마무리 굴림 0xac360 이 난수 없이 거짓이다 (0xb6c20) */
   readonly bothTeamsAreCpu?: boolean
-  /** 모드 3 이면 마선수를 건너뛴다 */
-  readonly excludeSpecialPitchers?: boolean
+  /**
+   * 0xac428 의 `[sp+4]` = (모드 == 3). 참이면 0xabfcc 가 내 육성 선수를 거르고, 고른 투수가 내 선수면
+   * ac626 에서 **ac5d8 로 돌아가 다시 고른다** (0xac360 을 또 굴린다)
+   */
+  readonly excludeOwnPlayers?: boolean
 }
 
+/** ac626 되돌이의 안전망 (원본에는 없다 — 0xac360 이 참일 확률이 1 보다 작아 언젠가 빠진다) */
+const MAXIMUM_REPLACEMENT_PICKS = 1_000
+
 /**
- * 새 투수 고르기 `0xac5d8~0xac61c` — 판정(`judgePitcherChange`)이 "바꾼다" 고 한 뒤의 자리.
+ * 새 투수 고르기 `0xac5d6~0xac640` — 판정(`judgePitcherChange`)이 "바꾼다" 고 한 뒤의 자리.
  *
  * ```
- * 0xb8a8d(team, 0) 이 참이고 **마무리 상황이 아니면**  →  0xac360 굴림
- *     참   → 벤치 **마지막**(벤치 수 − 1)
- *     거짓 → 벤치 ≤ 1 이면 0번, 아니면 0xabfcc
- * 마무리 상황이거나 0xb8a8d 가 거짓이면  →  0xabfcc(…, [sp] = 마무리 플래그)
+ * ac5d8  0xb8a8d(team, 0) 참 **그리고** 마무리 상황 아님 → 0xac360 굴림
+ *            참   → 벤치 **마지막**(벤치 수 − 1)
+ *            거짓 → 벤치 ≤ 1 이면 0번, 아니면 0xabfcc
+ *        그 밖 → 0xabfcc(…, inn, [sp+4], [sp] = 마무리 플래그)
+ * ac622  −1 이면 0 (안 바꿈)
+ * ac626  [sp+4] 이고 고른 투수가 0xb6388(내 선수)면 → ac5d8 로 돌아간다
  * ```
+ * `0xb8a8d(team, 0)` (b8a8c~b8b00) = **벤치(team+0x33 명)에 마선수(0xb633c)가 하나라도 있나**. 곧 0xac360 은
+ * 벤치에 마선수가 있을 때만 굴리고(그때 "벤치 마지막"은 명부 끝에 붙은 마선수 자리다), 마선수가 없는
+ * 팀은 **난수 없이** 늘 0xabfcc 로 간다. 후보의 `isSpecialPitcher` 로 이것을 본다.
  *
  * ⚠️ E-defense-rules 4절 3c 가 이 방향을 **거꾸로**("마무리 상황이면 벤치 마지막") 적었던 것을
  * CORRECTIONS 2절이 정정했다 — "E: 새 투수는 … **방향이 반대**". 여기서는 정정 쪽이다.
- *
- * ⚠️ `0xb8a8d(team, 0)` 이 무엇을 보는지는 해독 문서에 없어 **늘 참으로 본다** — **근사다**.
- * "벤치 ≤ 1 이면 0번" 갈래도 따로 두지 않았다 — 후보가 하나뿐이면 `chooseReplacementPitcher`
- * 가 그 하나를 돌려주므로 결과가 같다(벤치가 비면 `judgePitcherChange` 가 이미 안 바꾼다).
- *
- * ⚠️ `features/play-team-game/model/teamGameFlow.replacementPitcherIndexOf` 가 같은 규칙을
- * 먼저 갖고 있다(팀 경기 전용). 둘은 같은 자리를 옮긴 것이라 **나중에 이쪽 하나로 합쳐야 한다** —
- * 이번 작업에서는 `features` 를 건드리지 않기로 해 그대로 둔다.
  */
 export function replacementPitcherSlotOf(
   bench: readonly ReplacementCandidate[],
   input: ReplacementPickInput,
   random: RandomPort,
 ): number {
-  const picksBenchLast =
-    !input.saveSituation &&
-    rollsCloser(
-      {
-        inningIndex: input.inningIndex,
-        lead: input.lead,
-        runnerCount: input.runnerCount,
-        bothTeamsAreCpu: input.bothTeamsAreCpu,
-      },
-      random,
-    )
-  if (picksBenchLast) return bench.length === 0 ? -1 : bench[bench.length - 1].index
-  return chooseReplacementPitcher(bench, {
-    inningIndex: input.inningIndex,
-    // 0xabfcc 의 다섯째 인자가 마무리 플래그다 (V3-E)
-    lateInningFlag: input.saveSituation,
-    currentStamina: input.currentStamina,
-    excludeSpecialPitchers: input.excludeSpecialPitchers,
-  })
+  const benchHasSpecialPitcher = bench.some((candidate) => candidate.isSpecialPitcher === true)
+  const chooses = () =>
+    chooseReplacementPitcher(bench, {
+      inningIndex: input.inningIndex,
+      // 0xabfcc 의 다섯째 인자가 마무리 플래그다 (V3-E)
+      lateInningFlag: input.saveSituation,
+      currentStamina: input.currentStamina,
+      excludeOwnPlayers: input.excludeOwnPlayers,
+    })
+  for (let attempt = 0; attempt < MAXIMUM_REPLACEMENT_PICKS; attempt += 1) {
+    let picked: number
+    if (benchHasSpecialPitcher && !input.saveSituation) {
+      const closer = rollsCloser(
+        {
+          inningIndex: input.inningIndex,
+          lead: input.lead,
+          runnerCount: input.runnerCount,
+          bothTeamsAreCpu: input.bothTeamsAreCpu,
+        },
+        random,
+      )
+      if (closer) picked = bench[bench.length - 1]?.index ?? -1
+      else if (bench.length <= 1) picked = bench[0]?.index ?? -1
+      else picked = chooses()
+    } else {
+      picked = chooses()
+    }
+    if (picked < 0) return -1
+    const own = bench.find((candidate) => candidate.index === picked)?.isOwnPlayer === true
+    if (input.excludeOwnPlayers === true && own) continue
+    return picked
+  }
+  return -1
 }

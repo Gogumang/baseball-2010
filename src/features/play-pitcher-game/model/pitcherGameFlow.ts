@@ -25,6 +25,7 @@ import {
   startingMoundOf,
 } from '@/entities/game/model/simulateHalfInning'
 import type { HalfInningDefense, HalfInningMound } from '@/entities/game/model/simulateHalfInning'
+import { rosterPitcherRoleOf } from '@/entities/pitching/model/pitcherChange'
 import { advanceRunners, runnerCountOf } from '@/entities/game/model/baseState'
 import {
   recordLineupPlay,
@@ -2004,7 +2005,8 @@ function applyTeammateCpuPinchHit(progress: PitcherGameProgress, random: RandomP
  * 한 팀의 수비 쪽 재료 — 투수 목록 차례·능력·사기. 모드 3 이라 `0xac428` 의 `[sp+4]` 가 서서
  * 내 투수(`MY_PITCHER_SLOT`)를 새 투수로 안 고른다 (`isOwnPlayerAt`).
  *
- * `bothTeamsAreCpu` 는 거짓 — 모드 3 경기 준비 `0x3a20a` 가 내 팀을 사람 팀으로 적어 마무리 굴림 `0xac360` 이 돈다.
+ * `bothTeamsAreCpu` 는 거짓 — 모드 3 경기 준비 `0x3a20a` 가 내 팀을 사람 팀으로 적는다. 다만 마무리 굴림 `0xac360` 은
+ * 벤치에 마선수가 있을 때만(0xb8a8d) 돌아 이 화면 로스터에서는 돌지 않는다.
  * ⚠️ 상대 팀 사기는 이 화면이 들고 있지 않아 100 으로 본다 — **근사다** (타자편 `gameFlow.quickDefenseOf` 와 같다).
  * ⚠️ 벤치 투수 스태미나는 따로 들지 않아 가득으로 본다(`staminaAt` 없음) — **근사다**.
  */
@@ -2034,6 +2036,8 @@ function quickDefenseOf(
     morale: isOurs ? options.teamMorale : 100,
     bothTeamsAreCpu: false,
     isOwnPlayerAt: (slot) => isOurs && slot === MY_PITCHER_SLOT,
+    // 0xb6dec 보직 — 로스터 칸 0~3 선발 · 4~6 중간 · 7 마무리. 내 투수(칸 8)는 표 밖이라 0xabfcc 목록에 안 든다
+    roleAt: (slot) => (isOurs && slot === MY_PITCHER_SLOT ? undefined : rosterPitcherRoleOf(slot)),
   }
 }
 

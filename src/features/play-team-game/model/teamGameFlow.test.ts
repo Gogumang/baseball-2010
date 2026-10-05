@@ -619,16 +619,45 @@ describe('새 투수 고르기 방향 (0xac5d8, V3-E 정정)', () => {
     }
   })
 
-  it('마무리 상황이 **아닐 때** 굴려서 참이면 벤치 마지막을 올린다', () => {
+  it('마무리 상황이 **아니고 벤치에 마투수가 있을 때** 굴려서 참이면 벤치 마지막(마투수)을 올린다 (0xb8a8d)', () => {
+    const 마투수 = { benchIsSpecialPitcherAt: (index: number) => index === 벤치[벤치.length - 1] }
     const 고른칸 = new Set<number>()
     for (let seed = 1; seed <= 40; seed += 1) {
       고른칸.add(
-        replacementPitcherIndexOf(벤치, { ...상황, saveSituation: false }, createSeededRandom(seed)),
+        replacementPitcherIndexOf(벤치, { ...상황, ...마투수, saveSituation: false }, createSeededRandom(seed)),
       )
     }
 
     expect(고른칸.has(벤치[벤치.length - 1]), '굴림이 참인 씨앗에서는 벤치 마지막').toBe(true)
     expect(고른칸.size, '거짓인 씨앗에서는 0xabfcc 가 고른 다른 칸').toBeGreaterThan(1)
+  })
+
+  it('벤치에 마투수가 없으면 굴리지 않고 0xabfcc 로 간다 — 마투수는 0xabfcc 가 고르지 않는다', () => {
+    let 굴린횟수 = 0
+    const 세는난수: RandomPort = {
+      next: () => {
+        굴린횟수 += 1
+        return 0
+      },
+      nextInRange: (from: number) => {
+        굴린횟수 += 1
+        return from
+      },
+      pick: <T,>(candidates: readonly T[]) => {
+        굴린횟수 += 1
+        return candidates[0]
+      },
+    }
+    expect(replacementPitcherIndexOf(벤치, { ...상황, saveSituation: false }, 세는난수)).toBe(벤치[0])
+    expect(굴린횟수).toBe(0)
+    // 마투수가 벤치 앞에 있어도 0xabfcc 는 건너뛴다 (마무리 상황 → 굴림 없음)
+    expect(
+      replacementPitcherIndexOf(
+        벤치,
+        { ...상황, saveSituation: true, benchIsSpecialPitcherAt: (index) => index === 벤치[0] },
+        세는난수,
+      ),
+    ).toBe(벤치[1])
   })
 
   it('마무리 상황이면 난수를 아예 쓰지 않는다 (0xac360 을 건너뛴다)', () => {
@@ -1281,11 +1310,12 @@ describe('한 경기를 끝까지 돌리면 16칸이 실제로 찬다', () => {
     const 끝 = runAutoProgress(startTeamGame({ ...기본옵션, settings: 전부자동 }, random), random)
     const summary = summaryOf(끝)
 
-    expect(summary.ourScore).toBe(6)
+    // 9회초 5-4 마무리 상황에서 우리 CPU 가 마무리(로스터 칸 7)를 올린다 (0xac428 ac574 → 0xabfcc [2,1,0])
+    expect(summary.ourScore).toBe(5)
     expect(summary.opponentScore).toBe(4)
     expect(summary.pitching.outsRecorded).toBe(27)
-    // 피안타 10 · 탈삼진 18(뒤집혀 S[5]) · 내 타자 삼진 8 · 안타 10 · 2루타 4 · 2점 홈런 1
-    expect(summary.gameRecord).toEqual([0, 0, 10, 0, 0, 18, 8, 10, 4, 0, 0, 1, 0, 0, 0, 0])
+    // 피안타 7 · 탈삼진 12(뒤집혀 S[5]) · 내 타자 삼진 11 · 안타 13 · 2루타 5 · 솔로 홈런 1
+    expect(summary.gameRecord).toEqual([0, 0, 7, 0, 0, 12, 11, 13, 5, 0, 1, 0, 0, 0, 0, 0])
 
     const context = {
       opponentRuns: summary.opponentScore,
@@ -1295,8 +1325,8 @@ describe('한 경기를 끝까지 돌리면 16칸이 실제로 찬다', () => {
     }
     // 16칸이 비었을 때는 승리·완투·상대 득점만 남아 +2 였다
     expect(seasonReputationChangeOf(clearSeasonGameRecord(), context)).toBe(2)
-    // 채워진 16칸으로는 상한 +6 까지 올라간다
-    expect(seasonReputationChangeOf(summary.gameRecord, context)).toBe(6)
+    // 채워진 16칸으로는 +5 까지 올라간다 (상한 +6 은 씨앗 42 처럼 크게 이긴 경기)
+    expect(seasonReputationChangeOf(summary.gameRecord, context)).toBe(5)
   })
 })
 

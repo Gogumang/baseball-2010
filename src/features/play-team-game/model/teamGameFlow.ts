@@ -71,11 +71,11 @@ import {
   staminaPercentOf,
 } from '@/entities/pitcher-career/model/pitcherStamina'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
+import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
 import {
-  chooseReplacementPitcher,
   EMPTY_MOUND_COUNTERS,
   judgePitcherChange,
-  rollsCloser,
+  replacementPitcherSlotOf,
 } from '@/entities/pitching/model/pitcherChange'
 import type { MoundPitcherCounters } from '@/entities/pitching/model/pitcherChange'
 import { runnerCountOf } from '@/entities/game/model/baseState'
@@ -2705,11 +2705,16 @@ function judgeAutoPitcherChange(
   const defenseScore = defendingIsOurs ? game.ourScore : game.opponentScore
   const offenseScore = defendingIsOurs ? game.opponentScore : game.ourScore
 
+  const entries = pitcherEntriesOf(
+    progress,
+    defendingIsOurs ? progress.options.ourTeamId : progress.options.opponentTeamId,
+  )
   const decision = judgePitcherChange({
     ...counters,
-    // ⚠️ 웹 로스터에 보직(`+0xb`)이 없다 — 선발로 본다 (역할 0·1 은 같은 갈래라 결과가 같다).
-    //    로스터 JSON 에 `+0xb` 가 들어오면 그 값을 쓰면 된다.
-    role: PITCHER_ROLE.starter,
+    // ac4a0 0xb6ded(마운드 투수) — 명단 칸의 보직(로스터 칸 표), 모르면 선발
+    role: entries[current]?.role ?? PITCHER_ROLE.starter,
+    // ac4f2 0xb633c(마운드 투수) — 마투수면 특수 문턱(A>2 · B>3 · s≤39)
+    isSpecialPitcher: (entries[current]?.aceIndex ?? -1) >= 0,
     stamina,
     benchCount: bench.length,
     // 0xac428 의 일곱째 인자(`[sp+0x58]`)는 0xc1cd8 이 넘기는 `[sp+0x10] = max(r7, 0)` 이다.
@@ -2737,6 +2742,10 @@ function judgeAutoPitcherChange(
       currentStamina: stamina,
       // 0xabfcc 는 벤치 투수 레코드의 +0x2c 를 견준다 — 경기 사이에 이어진 값이 그대로 들어간다
       benchStaminaOf: (index) => benchStaminas[index] ?? FULL_STAMINA,
+      // 0xb8a8d · 0xabfcc 가 보는 마선수(0xb633c) — 명부의 마투수 칸
+      benchIsSpecialPitcherAt: (index) => (entries[index]?.aceIndex ?? -1) >= 0,
+      // 0xabfcc 의 보직 목록 (0xb6dec)
+      benchRoleOf: (index) => entries[index]?.role,
     },
     random,
   )
@@ -2775,53 +2784,41 @@ export interface ReplacementPickInput {
   readonly currentStamina: number
   /** 벤치 투수 칸의 스태미나 `+0x2c` — 안 넘기면 모두 가득으로 본다 */
   readonly benchStaminaOf?: (index: number) => number
+  /** 벤치 투수 칸이 마선수(0xb633c)인가 — 안 넘기면 아무도 아니다 */
+  readonly benchIsSpecialPitcherAt?: (index: number) => boolean
+  /** 벤치 투수 칸의 보직 `+0xb & 3` — 안 넘기면(또는 모르면) 0xabfcc 가 스태미나 최고 근사로 고른다 */
+  readonly benchRoleOf?: (index: number) => PitcherRole | undefined
 }
 
 /**
- * 새 투수 고르기 `0xac5d8~0xac61c`.
+ * 새 투수 고르기 `0xac5d6~0xac640` — `entities/pitching` 의 `replacementPitcherSlotOf` 에 벤치 칸을 넘긴다
+ * (디스어셈 대조는 그쪽 주석).
  *
- * ```
- * 0xb8a8d(team, 0) 이 참이고 **마무리 상황이 아니면**  →  0xac360 굴림
- *     참   → 벤치 **마지막**(벤치 수 − 1)
- *     거짓 → 벤치 ≤ 1 이면 0번, 아니면 0xabfcc
- * 마무리 상황이거나 0xb8a8d 가 거짓이면  →  0xabfcc(…, [sp] = 마무리 플래그)
- * ```
- *
- * ⚠️ E-defense-rules 4절 3c 가 이 방향을 **거꾸로**("마무리 상황이면 벤치 마지막") 적었던 것을
- * CORRECTIONS 가 정정했다 — V3-E "❌ 새 투수 고르기 방향이 반대". 여기서는 정정 쪽이다.
- *
- * ⚠️ `0xb8a8d(team, 0)` 이 무엇을 보는지는 해독 문서에 없어 **늘 참으로 본다** — **근사다**.
- * "벤치 ≤ 1 이면 0번" 갈래도 따로 두지 않았다 — 후보가 하나뿐이면 `chooseReplacementPitcher`
- * 가 그 하나를 돌려주므로 결과가 같다(벤치가 비면 `judgePitcherChange` 가 이미 안 바꾼다).
+ * 벤치에 마투수가 있을 때만(0xb8a8d) 마무리 굴림 0xac360 이 돌고, 참이면 벤치 **마지막**(명부 끝의 마투수 자리)을
+ * 올린다. 마무리 상황이거나 벤치에 마투수가 없으면 난수 없이 0xabfcc 로 가고, 0xabfcc 는 마선수를 고르지 않는다.
+ * 팀 경기는 한 팀을 사람이 잡으므로 "두 팀 다 CPU"(0xb6c20)가 아니고, 모드 3 이 아니라 내 선수 거르기도 없다.
  */
 export function replacementPitcherIndexOf(
   bench: readonly number[],
   input: ReplacementPickInput,
   random: RandomPort,
 ): number {
-  const picksBenchLast =
-    !input.saveSituation &&
-    rollsCloser(
-      {
-        inningIndex: input.inningIndex,
-        lead: input.lead,
-        runnerCount: input.runnerCount,
-        // 팀 경기는 한 팀을 사람이 잡으므로 "두 팀 다 CPU" 가 아니다 (0xb6c20)
-        bothTeamsAreCpu: false,
-      },
-      random,
-    )
-  if (picksBenchLast) return bench.length === 0 ? -1 : bench[bench.length - 1]
-  return chooseReplacementPitcher(
-    bench.map((index) =>
-      input.benchStaminaOf === undefined ? { index } : { index, stamina: input.benchStaminaOf(index) },
-    ),
+  return replacementPitcherSlotOf(
+    bench.map((index) => ({
+      index,
+      ...(input.benchStaminaOf === undefined ? {} : { stamina: input.benchStaminaOf(index) }),
+      ...(input.benchIsSpecialPitcherAt?.(index) === true ? { isSpecialPitcher: true } : {}),
+      ...(input.benchRoleOf === undefined ? {} : { role: input.benchRoleOf(index) }),
+    })),
     {
+      saveSituation: input.saveSituation,
       inningIndex: input.inningIndex,
-      // 0xabfcc 의 다섯째 인자가 마무리 플래그다 (V3-E)
-      lateInningFlag: input.saveSituation,
+      lead: input.lead,
+      runnerCount: input.runnerCount,
       currentStamina: input.currentStamina,
+      bothTeamsAreCpu: false,
     },
+    random,
   )
 }
 

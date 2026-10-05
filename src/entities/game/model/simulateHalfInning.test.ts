@@ -282,12 +282,12 @@ describe('투수편(모드 3)의 0xac428 — [sp+4] 내 투수 건너뛰기 · [
     expect(바뀜.justChanged).toBe(true)
   })
 
-  it('0xac360 이 벤치 마지막(내 투수)을 고르면 ac626 에서 다시 굴린다 — 내 투수는 끝내 안 오른다', () => {
-    // 첫 굴림 0 → 벤치 마지막 = 나 → 다시, 둘째 0 → 또 나 → 다시, 셋째 0.99 → 0xabfcc 가 나를 걸러 1
-    const 굴림 = 차례([0, 0, 0.99])
+  it('벤치에 마선수가 없으면 0xb8a8d 가 거짓이라 0xac360 을 안 굴린다 — 0xabfcc 가 내 투수를 걸러 1 (ac5d8)', () => {
+    // 굴렸다면 0 → 벤치 마지막(나)이 나왔을 자리다. 투수편 로스터에는 마선수(+0xa 비트6)가 없다
+    const 굴림 = 차례([0])
     const 바뀜 = changePitcherIfNeeded(수비, 수비.mound, { ...상황(굴림.random), force: true })
     expect(바뀜.pitcherSlot).toBe(1)
-    expect(굴림.calls()).toBe(3)
+    expect(굴림.calls()).toBe(0)
   })
 
   it('벤치가 나 하나뿐이면 아예 안 바꾼다 (ac458) — 강제여도', () => {

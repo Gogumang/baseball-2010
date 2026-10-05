@@ -14,6 +14,8 @@ import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/
 import { ACE_BATTERS, ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
+import { rosterPitcherRoleOf } from '@/entities/pitching/model/pitcherChange'
+import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
 import { gameAbilitiesOf } from '@/features/play-team-game/model/gameAbilities'
 import { aceLevelOf, aceLevelSlotOf, applyAceLevelRate } from '@/entities/mission/model/aceLevel'
 import type {
@@ -345,6 +347,11 @@ export interface TeamEntryPitcher {
    * (마투수가 8번에 들어오면 옛 8번이 맨 끝으로 가 명단 칸과 갈릴 수 있다).
    */
   readonly orderIndex: number
+  /**
+   * 보직 `+0xb & 3` (0xb6dec) — 로스터 칸 표(`rosterPitcherRoleOf`)에서. 마투수는 마선수 문턱·거르기를 타서
+   * 보직을 안 쓴다(0xac428 ac4f2 · 0xabfcc). 없으면 CPU 투수 교체가 선발로 본다
+   */
+  readonly role?: PitcherRole
 }
 
 /**
@@ -378,6 +385,7 @@ export function rosterEntryPitchersOf(teamId: number): readonly TeamEntryPitcher
     repertoire: rosterRepertoireOf(teamId, slot),
     aceIndex: NO_ACE_BATTER,
     orderIndex: slot,
+    role: rosterPitcherRoleOf(slot),
   }))
 }
 
@@ -448,6 +456,7 @@ export function entryPitchersOfOrder(teamId: number, order: TeamEntryOrder): rea
       repertoire: rosterRepertoireOf(teamId, slot),
       aceIndex: NO_ACE_BATTER,
       orderIndex,
+      role: rosterPitcherRoleOf(slot),
     }
   })
 }
