@@ -4,6 +4,7 @@ import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
 import type { StoryContext } from '@/app/model/useStorySchedule'
 import type { StoryCarry } from '@/entities/story/model/aceMatch'
 import type { GameEvaluation, StreakNotice } from '@/entities/career/model/gameEvaluation'
+import type { PostseasonPopup } from '@/entities/career/model/postseasonFlow'
 
 /** 지금 떠 있는 화면 하나. 화면마다 필요한 값을 같이 들고 다닌다. */
 export type Screen =
@@ -63,6 +64,11 @@ export type Screen =
     }
   | { readonly kind: '성적' }
   | { readonly kind: '시즌종료' }
+  /**
+   * 나만의리그 포스트시즌 대진 (원본 상태 128). 대진은 `career.postseason` 이 들고, 화면은 그 위에 뜬
+   * 알림 팝업(0xb 정규시즌 우승 · 7 우승 팀 발표 · 8 한국시리즈 우승)만 들고 다닌다.
+   */
+  | { readonly kind: '포스트시즌'; readonly popup: PostseasonPopup | null }
   /**
    * 나만의리그 국가대항전 (원본 상태 134 순위 · 135 매치업 — 화면 한 벌이 둘을 같이 돈다).
    *

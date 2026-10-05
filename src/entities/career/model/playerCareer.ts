@@ -4,7 +4,6 @@ import type { League } from '@/entities/league/model/league'
 import { BALANCE } from '@/shared/config/original/balance'
 import type { PostseasonSeries } from '@/entities/league/model/league'
 import { finishRegularSeason } from '@/entities/league/model/seasonEnd'
-import { runCpuPostseason } from '@/entities/league/model/postseasonPlay'
 import { EMPTY_LEAGUE, advancePostseason, opponentOf, recordLeagueResult } from '@/entities/league/model/league'
 import { playLeagueDay } from '@/entities/league/model/leagueDay'
 import {
@@ -182,6 +181,12 @@ export interface PlayerCareer {
   readonly leaguePlayerStats: LeaguePlayerStats
   /** 정규시즌 1위 횟수 — 원본 세이브 레코드 +0x7a (0xb818c 가 45경기째에 늘린다) */
   readonly regularSeasonFirstCount: number
+  /**
+   * 정규시즌 우승 보상(StrMODE[191])을 받았는가 — 원본 세이브 레코드 +0x77.
+   * 포스트시즌 대진 128 진입(0x120a4)이 이 칸이 0 일 때만 보상 팝업을 띄우고, 팝업이 닫힐 때(0x15b4c) 1 로 세운다.
+   * 새 시즌 처리 0x1b7c0 이 0 으로 되돌린다.
+   */
+  readonly regularSeasonRewardTaken: boolean
   /** 진행 중인 포스트시즌. 정규시즌 중에는 null 이다 (0xb80a8 이 45경기째에 연다) */
   readonly postseason: PostseasonSeries | null
   /** 또또상품권 구매 수(상한 200, +0x186) · 1등 횟수 — 칭호 21·22 */
@@ -351,6 +356,7 @@ export function createCareer(name: string, profile: RookieProfile = DEFAULT_ROOK
     league: EMPTY_LEAGUE,
     leaguePlayerStats: EMPTY_LEAGUE_PLAYER_STATS,
     regularSeasonFirstCount: 0,
+    regularSeasonRewardTaken: false,
     postseason: null,
     lotteryPurchases: 0,
     lotteryFirstPrizes: 0,
@@ -692,16 +698,6 @@ export function applySeasonEnd(career: PlayerCareer): PlayerCareer {
 }
 
 /**
- * 포스트시즌을 내 차례까지 진행한다 (0x13da0).
- * 내 팀이 지금 시리즈에 있으면 그대로 두고, 아니면 CPU 끼리 돌려 다음 차례를 만든다.
- */
-export function applyPostseasonProgress(career: PlayerCareer, random: RandomPort): PlayerCareer {
-  if (career.postseason === null) return career
-  const advanced = runCpuPostseason(career.postseason, career.teamId, random)
-  return advanced === career.postseason ? career : { ...career, postseason: advanced }
-}
-
-/**
  * 다음 경기 상대 (0xb765c).
  * 정규시즌은 일정표 0xd89cb 에서 그날 상대를 읽고, 포스트시즌은 지금 시리즈의 맞은편이다.
  * 포스트시즌인데 내 팀이 그 시리즈에 없으면(진출 실패) 상대가 없다 — 그때는 일정표로 돌아간다 (추정).
@@ -770,6 +766,8 @@ export function startNextSeason(career: PlayerCareer): PlayerCareer {
     league: EMPTY_LEAGUE,
     leaguePlayerStats: EMPTY_LEAGUE_PLAYER_STATS,
     postseason: null,
+    // 0x1b7c0 `S[0x77] = 0` — 정규시즌 우승 보상 받음 플래그 해제 (S13)
+    regularSeasonRewardTaken: false,
     wins: 0,
     draws: 0,
     losses: 0,

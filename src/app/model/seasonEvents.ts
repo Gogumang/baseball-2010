@@ -10,7 +10,6 @@ import {
   SALARY_FIRM_EVENT_ID,
   SALARY_POLITE_EVENT_ID,
   salaryResultEventId,
-  yearEndEventId,
 } from '@/entities/career/model/seasonFlow'
 import { salaryNegotiationRankOf } from '@/entities/awards/model/seasonAwards'
 
@@ -20,6 +19,12 @@ export type SeasonStep =
   | { readonly kind: '새시즌' }
   | { readonly kind: '엔딩'; readonly endingIndex: number }
   | { readonly kind: '관리' }
+  /**
+   * 포스트시즌 대진 128 — 원본 시즌 끝 사슬은 136(392) → 130(370) → 131(375) → **128** → 132(연말) 다
+   * (B "시즌 끝 상태 순서" · R9 8절). 웹 타자편엔 130·131 이 아직 없어 목표 결과(393~396) 뒤에 곧장 온다.
+   * 연말 이벤트(380/502/504/501)는 128 이 끝나고(`useCareerSession.closePostseasonPopup`) 튼다.
+   */
+  | { readonly kind: '포스트시즌' }
 
 const GOAL_RESULT_EVENT_IDS = [393, 394, 395, 396]
 const SALARY_RESULT_EVENT_IDS = [384, 385, 386, 387, 388, 389, 390, 391]
@@ -57,7 +62,8 @@ export function nextSeasonStep(career: PlayerCareer, viewed: readonly number[]):
     return { kind: '이벤트', eventId: salaryResultEventId(choice, salaryNegotiationRankOf(career)) }
   }
   if (viewed.some((id) => GOAL_RESULT_EVENT_IDS.includes(id))) {
-    return { kind: '이벤트', eventId: yearEndEventId(career) }
+    // ⚠️ 미해결: 원본은 여기서 130 타이틀(370) → 131 MVP(375) 를 거친다 — 타자편 웹엔 아직 없다
+    return { kind: '포스트시즌' }
   }
   if (saw(GOAL_INTRO_EVENT_ID)) {
     return { kind: '이벤트', eventId: goalResultEventId(achievedGoalCount(career, '연말')) }

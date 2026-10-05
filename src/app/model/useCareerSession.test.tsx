@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { describe, expect, it } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { applyGameEvaluation, isEvaluatedGame, useCareerSession } from '@/app/model/useCareerSession'
-import { startPostseason } from '@/entities/league/model/league'
+import { EMPTY_LEAGUE, LEAGUE_TEAM_COUNT, startPostseason } from '@/entities/league/model/league'
 import { useAtBatRunner } from '@/app/model/useAtBatRunner'
 import type { Screen } from '@/app/model/screen'
 import { createCareer } from '@/entities/career/model/playerCareer'
@@ -603,5 +603,91 @@ describe('타자편 경기 뒤 평가 게이트 (0x4f216 · 0x4f268 → 0xa719c)
     const career = { ...createCareer('평가'), postseason: startPostseason([0, 1, 2, 3, 4, 5, 6, 7]) }
     expect(isEvaluatedGame(career)).toBe(false)
     expect(applyGameEvaluation(career, 평가, false)).toBe(career)
+  })
+})
+
+describe('타자편 포스트시즌 대진 128 — 사람이 친다 (0x120a4 · 0x13da0 · 0x15984)', () => {
+  /** 팀 번호가 작을수록 많이 이긴 정규시즌 — 순위가 0, 1, 2, … */
+  const 순서대로리그 = {
+    ...EMPTY_LEAGUE,
+    wins: Array.from({ length: LEAGUE_TEAM_COUNT }, (_, team) => 40 - team),
+    losses: Array.from({ length: LEAGUE_TEAM_COUNT }, (_, team) => 5 + team),
+  }
+  const 시즌끝선수 = (overrides: Partial<PlayerCareer> = {}): PlayerCareer => ({
+    ...createCareer('포스트'),
+    teamId: 0,
+    gamesPlayed: 45,
+    league: 순서대로리그,
+    postseason: startPostseason([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]),
+    popularity: 1000,
+    reputation: 300,
+    money: 1000,
+    ...overrides,
+  })
+
+  it('목표 결과(393~396) 뒤에 대진 128 로 가고, 정규시즌 1위면 [191] 보상 팝업 0xb 가 뜬다', () => {
+    const rendered = 띄우기(시즌끝선수())
+    이벤트보기(rendered, [396])
+    expect(rendered.result.current.screen).toEqual({ kind: '포스트시즌', popup: { kind: '정규시즌우승' } })
+
+    // 팝업이 떠 있으면 키가 안 먹는다
+    act(() => rendered.result.current.session.actions.pressPostseason())
+    expect(rendered.result.current.session.career?.postseason?.round).toBe('준플레이오프')
+
+    act(() => rendered.result.current.session.actions.closePostseasonPopup())
+    expect(rendered.result.current.screen).toEqual({ kind: '포스트시즌', popup: null })
+    expect(rendered.result.current.session.career).toMatchObject({
+      popularity: 1010,
+      money: 1500,
+      regularSeasonRewardTaken: true,
+    })
+  })
+
+  it('[확인] — CPU 끼리 내 차례(1위는 한국시리즈)까지 돌고 머물렀다가, 다음 [확인]에 내 경기를 연다', () => {
+    const rendered = 띄우기(시즌끝선수({ regularSeasonRewardTaken: true }))
+    이벤트보기(rendered, [396])
+    expect(rendered.result.current.screen).toEqual({ kind: '포스트시즌', popup: null })
+
+    act(() => rendered.result.current.session.actions.pressPostseason())
+    expect(rendered.result.current.screen).toEqual({ kind: '포스트시즌', popup: null })
+    const series = rendered.result.current.session.career?.postseason
+    expect(series?.round).toBe('한국시리즈')
+    expect(series?.teams[0]).toBe(0)
+
+    act(() => rendered.result.current.session.actions.pressPostseason())
+    expect(rendered.result.current.screen).toEqual({ kind: '경기' })
+    expect(rendered.result.current.session.progress?.opponentTeamId).toBe(series?.teams[1])
+  })
+
+  it('포스트시즌 경기 결과 [확인] 은 관리 주기 대신 대진 128 로 돌아간다', () => {
+    const rendered = 띄우기(시즌끝선수({ gamesPlayed: 47, regularSeasonRewardTaken: true }))
+    act(() => rendered.result.current.session.actions.confirmGameResult())
+    expect(rendered.result.current.screen).toEqual({ kind: '포스트시즌', popup: null })
+  })
+
+  it('내 팀 우승 — 팝업 7 [137] → 팝업 8 [190] 보상 → 연말(132) 이벤트', () => {
+    const 끝난대진 = { ...startPostseason([0, 1, 2, 3]), round: '종료' as const, teams: [0, 1] as const, champion: 0 }
+    const rendered = 띄우기(시즌끝선수({ gamesPlayed: 50, postseason: 끝난대진, regularSeasonRewardTaken: true }))
+    act(() => rendered.result.current.session.actions.confirmGameResult())
+    act(() => rendered.result.current.session.actions.pressPostseason())
+    expect(rendered.result.current.screen).toEqual({ kind: '포스트시즌', popup: { kind: '우승발표', champion: 0 } })
+
+    act(() => rendered.result.current.session.actions.closePostseasonPopup())
+    expect(rendered.result.current.screen).toEqual({ kind: '포스트시즌', popup: { kind: '한국시리즈우승' } })
+
+    act(() => rendered.result.current.session.actions.closePostseasonPopup())
+    expect(rendered.result.current.session.career).toMatchObject({ popularity: 1015, reputation: 325, money: 2000 })
+    // 1년차 연말은 연봉협상 380
+    expect(rendered.result.current.screen).toEqual({ kind: '이벤트', eventId: 380, context: '시즌' })
+  })
+
+  it('다른 팀 우승 — 팝업 7 만 닫고 보상 없이 연말로', () => {
+    const 끝난대진 = { ...startPostseason([0, 1, 2, 3]), round: '종료' as const, teams: [1, 2] as const, champion: 1 }
+    const rendered = 띄우기(시즌끝선수({ gamesPlayed: 46, postseason: 끝난대진, regularSeasonRewardTaken: true }))
+    act(() => rendered.result.current.session.actions.confirmGameResult())
+    act(() => rendered.result.current.session.actions.pressPostseason())
+    act(() => rendered.result.current.session.actions.closePostseasonPopup())
+    expect(rendered.result.current.session.career).toMatchObject({ popularity: 1000, reputation: 300, money: 1000 })
+    expect(rendered.result.current.screen).toEqual({ kind: '이벤트', eventId: 380, context: '시즌' })
   })
 })

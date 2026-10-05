@@ -5,9 +5,9 @@ import { createCareer } from '@/entities/career/model/playerCareer'
 const 선수 = (overrides = {}) => ({ ...createCareer('테스트'), ...overrides })
 
 describe('nextSeasonStep — 연말 이벤트 연결', () => {
-  it('392 뒤에는 목표 결과, 결과 뒤에는 연말 이벤트', () => {
+  it('392 뒤에는 목표 결과, 결과 뒤에는 포스트시즌 대진 128 (연말 이벤트는 128 이 끝난 뒤)', () => {
     expect(nextSeasonStep(선수(), [392])).toEqual({ kind: '이벤트', eventId: 396 })
-    expect(nextSeasonStep(선수({ season: 3 }), [396])).toEqual({ kind: '이벤트', eventId: 380 })
+    expect(nextSeasonStep(선수({ season: 3 }), [396])).toEqual({ kind: '포스트시즌' })
   })
 
   it('강경·정중을 고르면 연봉 결과 이벤트로, 결과나 수락 뒤에는 새 시즌', () => {

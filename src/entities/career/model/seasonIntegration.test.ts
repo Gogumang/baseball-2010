@@ -3,7 +3,6 @@ import {
   GAMES_PER_SEASON,
   applyGameResult,
   applyLeagueDay,
-  applyPostseasonProgress,
   applySeasonEnd,
   createCareer,
   nextOpponentOf,
@@ -46,10 +45,8 @@ function 경기하루(career: PlayerCareer, result: '승' | '패', random: Rando
     opponentTeamId: nextOpponentOf(career),
   } as unknown as GameSummary
 
-  return applyPostseasonProgress(
-    applySeasonEnd(applyLeagueDay(applyGameResult(career, summary), summary.ourTeamId, random)),
-    random,
-  )
+  // CPU 끼리의 포스트시즌 경기는 경기 뒤가 아니라 대진 화면 128 의 [확인](0x13da0)에서 돈다
+  return applySeasonEnd(applyLeagueDay(applyGameResult(career, summary), summary.ourTeamId, random))
 }
 
 describe('한 시즌 통째로 — 경기 정산 흐름이 이어지는가', () => {
@@ -87,13 +84,14 @@ describe('한 시즌 통째로 — 경기 정산 흐름이 이어지는가', () 
     expect(내팀경기).toBeLessThanOrEqual(GAMES_PER_SEASON)
   })
 
-  it('45경기째에 포스트시즌이 열리고 내 차례이거나 우승이 정해져 있다', () => {
+  it('45경기째에 포스트시즌 대진(준플레이오프 3위 대 4위)이 열리고, CPU 경기는 아직 안 돌았다', () => {
     const career = 한시즌(777)
 
     expect(career.postseason).not.toBeNull()
     const series = career.postseason!
-    const 내차례 = series.teams[0] === career.teamId || series.teams[1] === career.teamId
-    expect(내차례 || series.round === '종료', `라운드 ${series.round}, 팀 ${series.teams}`).toBe(true)
+    expect(series.round).toBe('준플레이오프')
+    expect(series.wins).toEqual([0, 0])
+    expect(series.teams).toEqual([series.qualifiers[2], series.qualifiers[3]])
   })
 
   it('순위는 승이 많은 팀이 앞이다', () => {

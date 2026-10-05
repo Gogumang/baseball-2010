@@ -11,6 +11,7 @@ import { ScreenOverlay } from '@/shared/ui'
 import { StoryScreen } from '@/pages/story/ui/StoryScreen'
 import { RecordScreen } from '@/pages/record/ui/RecordScreen'
 import { SeasonEndScreen } from '@/pages/season-end/ui/SeasonEndScreen'
+import { PostseasonScreen } from '@/pages/season-end/ui/PostseasonScreen'
 import { NationalCupScreen } from '@/pages/national-cup/ui/NationalCupScreen'
 import { EndingScreen } from '@/pages/ending/ui/EndingScreen'
 import type { HallOfFameResult } from '@/entities/collection/model/collection'
@@ -169,6 +170,16 @@ export function CareerRoutes({
 
     case '시즌종료':
       return <SeasonEndScreen career={career} onStartNextSeason={actions.beginYearEnd} />
+
+    case '포스트시즌':
+      return (
+        <PostseasonScreen
+          series={career.postseason}
+          popup={screen.popup}
+          onConfirm={actions.pressPostseason}
+          onClosePopup={actions.closePostseasonPopup}
+        />
+      )
 
     case '국가대항전':
       return (

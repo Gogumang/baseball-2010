@@ -26,7 +26,6 @@ import type { SoundPort } from '@/shared/api/audio/soundPort'
 import {
   applyGameResult,
   applyLeagueDay,
-  applyPostseasonProgress,
   nextOpponentOf,
   applySeasonEnd,
   createCareer,
@@ -40,8 +39,17 @@ import {
   startNextSeason,
   gainGamePoint,
   countGameForSkills,
+  GAMES_PER_SEASON,
   MAXIMUM_GAME_POINT,
 } from '@/entities/career/model/playerCareer'
+import {
+  applyKoreanSeriesReward,
+  applyRegularSeasonReward,
+  popupAfterChampion,
+  pressPostseasonBracket,
+  regularSeasonPopupOnEnter,
+  REGULAR_SEASON_HIDDEN_ID,
+} from '@/entities/career/model/postseasonFlow'
 import { applyBurstRewards } from '@/entities/career/model/burstReward'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { selectSpecialSwingNumber, setSkillEquipped } from '@/entities/career/model/playerCareer'
@@ -82,6 +90,7 @@ import {
   MID_SEASON_GAME,
   midSeasonEventId,
   midSeasonTitlesOf,
+  yearEndEventId,
 } from '@/entities/career/model/seasonFlow'
 import { forgetRepeatableEvents } from '@/entities/story/model/storyScene'
 import { battingOrderEventId, emptyPlaceEventId, isEmptyPlaceEventId } from '@/entities/career/model/battingOrder'
@@ -393,10 +402,11 @@ export function useCareerSession({
         evaluationJingleIdOf(evaluation.popularityChange),
       ])
       // 같은 날 나머지 네 경기도 원본대로 치러 순위표에 넣는다 (0xc2a48)
-      // 45경기째면 정규시즌을 닫고, 포스트시즌은 내 차례가 올 때까지 CPU 끼리 돌린다 (0x13da0)
-      const settled = applyPostseasonProgress(
-        applySeasonEnd(applyLeagueDay(applyGameResult(currentCareer, summary), summary.ourTeamId, random)),
-        random,
+      // 45경기째면 하루 끝(0xb818c)이 정규시즌을 닫고 대진(0xb80a8)을 연다.
+      // CPU 끼리의 포스트시즌 경기는 **여기서 돌리지 않는다** — 원본은 대진 화면 128 의 [확인](0x13da0)에서 돌린다
+      // (`pressPostseasonBracket`).
+      const settled = applySeasonEnd(
+        applyLeagueDay(applyGameResult(currentCareer, summary), summary.ourTeamId, random),
       )
       const evaluated = applyGameEvaluation(settled, evaluation, isEvaluatedGame(currentCareer))
       // 스킬 조건용 경기 뒤 카운터 — 사기까지 반영된 뒤에 센다 (A-4)
@@ -566,6 +576,20 @@ export function useCareerSession({
     setManagementCheck('고정')
   }
 
+  /**
+   * 포스트시즌 대진 128 로 — 진입 0x120a4 가 정규시즌 우승 팝업(0xb)을 띄울지 정한다.
+   * 원본은 131(MVP) 뒤와, 포스트시즌 경기 뒤(100 → 116 → 114 → 128)에 여기로 온다.
+   */
+  const enterPostseason = (current: PlayerCareer) => {
+    setScreen({ kind: '포스트시즌', popup: regularSeasonPopupOnEnter(current) })
+  }
+
+  /** 128 이 끝났다 (팝업 7 · 8 닫힘 → 132 연말) — 연말 0x10c54 의 이벤트(501/504/502/380)를 튼다 */
+  const finishPostseason = (finished: PlayerCareer) => {
+    setCareer(finished)
+    setScreen({ kind: '이벤트', eventId: yearEndEventId(finished), context: '시즌' })
+  }
+
   const continueSeason = (viewed: PlayerCareer, viewedEventIds: readonly number[]) => {
     // ── 국가대표 이벤트(461~464)는 연말 사슬 밖이다. 상태 133 이 따로 예약한 것이라 먼저 가른다 ──
     if (viewedEventIds.includes(NATIONAL_CUP_EVENT.출전)) {
@@ -582,6 +606,10 @@ export function useCareerSession({
     }
 
     const step = nextSeasonStep(viewed, viewedEventIds)
+    if (step.kind === '포스트시즌') {
+      setCareer(viewed)
+      return enterPostseason(viewed)
+    }
     if (step.kind === '이벤트') {
       setCareer(viewed)
       return setScreen({ kind: '이벤트', eventId: step.eventId, context: '시즌' })
@@ -882,6 +910,9 @@ export function useCareerSession({
 
     confirmGameResult: () => {
       if (career === null) return
+      // 포스트시즌 경기 뒤 — 116 이 [114 → 128] 로 대진 화면에 돌아간다 (R9 8절). 관리 주기·중간평가를 안 탄다.
+      // 45번째 경기도 대진을 열지만(0xb818c) 그 뒤는 136(시즌종료) 사슬이라 경기 수로 가른다.
+      if (career.postseason !== null && career.gamesPlayed > GAMES_PER_SEASON) return enterPostseason(career)
       if (isSeasonFinished(career)) return setScreen({ kind: '시즌종료' })
       // 22경기 뒤 중간평가 (0x11910 → 0x11e84)
       if (career.gamesPlayed === MID_SEASON_GAME) {
@@ -1069,6 +1100,40 @@ export function useCareerSession({
       runner.setIsPaused(false)
       // 경기 시작 인트로 예약음 61 (상태 0xc). 웹에는 인트로 화면이 없어 로딩이 끝나는 자리다 — 근사
       playSoundIds(audio, [GAME_INTRO_SOUND])
+    },
+
+    /**
+     * 대진 화면 128 [확인] — 키 0x13da0. 팝업이 떠 있으면 키가 안 먹는다(0x1d06a 의 0x754f9 검사).
+     * 끝났으면 우승 팀 발표(팝업 7), 내 차례면 경기(142 → 144 → 경기 장면 — 웹은 142 화면 없이 곧장),
+     * 아니면 CPU 끼리 돌려 바뀐 대진을 보여 주고 128 에 머문다.
+     */
+    pressPostseason: () => {
+      if (career === null || career.postseason === null) return
+      if (screen.kind !== '포스트시즌' || screen.popup !== null) return
+      const result = pressPostseasonBracket(career.postseason, career.teamId, random)
+      if (result.kind === '우승발표') {
+        return setScreen({ kind: '포스트시즌', popup: { kind: '우승발표', champion: result.champion } })
+      }
+      if (result.kind === '내경기') return beginGame()
+      setCareer({ ...career, postseason: result.series })
+    },
+
+    /** 대진 화면 128 의 팝업 닫힘 — 틀 0x15984 */
+    closePostseasonPopup: () => {
+      if (career === null || screen.kind !== '포스트시즌' || screen.popup === null) return
+      const popup = screen.popup
+      if (popup.kind === '정규시즌우승') {
+        // 팝업 0xb — 보상을 얹고 128 에 머문다
+        setCareer(applyRegularSeasonReward(career, REGULAR_SEASON_HIDDEN_ID.타자편))
+        return setScreen({ kind: '포스트시즌', popup: null })
+      }
+      if (popup.kind === '우승발표') {
+        const next = popupAfterChampion(career, popup.champion)
+        if (next !== null) return setScreen({ kind: '포스트시즌', popup: next })
+        return finishPostseason(career)
+      }
+      // 팝업 8 — 한국시리즈 우승 보상 뒤 132
+      finishPostseason(applyKoreanSeriesReward(career))
     },
 
     /** 시즌 성적 화면 뒤 — 올해의 목표 결과(392)부터 연말 이벤트를 잇는다 */
