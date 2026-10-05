@@ -371,6 +371,51 @@ describe('공마다 상대 투수 투구 수·스태미나 (0x3dec6 → 0xa5e14(
   })
 })
 
+describe('훈련·휴식 결과 창 — 변화량은 굴린 값 그대로, 필살타법은 창이 없다 (0x17f5c · 0x18bd8 · 0x18dd8)', () => {
+  const 관리띄우기 = (career: PlayerCareer) => {
+    const saveGame = 메모리저장(career)
+    const random = createSeededRandom(20100901)
+    const rendered = renderHook(() => {
+      const [screen, setScreen] = useState<Screen>({ kind: '메인메뉴' })
+      const runner = useAtBatRunner()
+      return { screen, session: useCareerSession({ runner, random, saveGame, screen, setScreen }) }
+    })
+    act(() => rendered.result.current.session.actions.continueSaved())
+    return rendered
+  }
+
+  it('능력치 훈련: 상세 창 변화량 = 훈련 칸 상승 굴림 · 사기 칸 −감소 굴림 (0x18d0e~0x18d38)', () => {
+    const rendered = 관리띄우기({ ...createCareer('훈련'), morale: 50 })
+    try {
+      act(() => rendered.result.current.session.actions.runTrainingMenu('히트'))
+      const detail = rendered.result.current.session.managementDetail
+      expect(detail).not.toBeNull()
+      expect(detail?.changes).toBeDefined()
+      expect(detail?.changes?.ability.power).toBe(0)
+      expect(detail?.changes?.ability.hit).toBeGreaterThan(0)
+      expect(detail?.changes?.morale).toBeLessThan(0)
+      expect(detail?.afterClose).toEqual({ kind: '훈련', isSpecialSwing: false })
+    } finally {
+      act(() => rendered.unmount())
+    }
+  })
+
+  it('휴식: 사기 칸 = 회복 굴림 그대로 (0x18fb4), 능력치 칸은 0', () => {
+    const rendered = 관리띄우기({ ...createCareer('휴식'), morale: 95 })
+    try {
+      act(() => rendered.result.current.session.actions.runCommand('휴식'))
+      const detail = rendered.result.current.session.managementDetail
+      expect(detail?.after.morale).toBe(100)
+      // 100 에서 잘리기 전 값 — 전후 차이(5)보다 크다
+      expect(detail?.changes?.morale).toBeGreaterThanOrEqual(10)
+      expect(detail?.changes?.ability).toEqual({ hit: 0, power: 0, defense: 0, run: 0 })
+    } finally {
+      act(() => rendered.unmount())
+    }
+  })
+
+})
+
 describe('CPU 견제 (0x345fc 종류 4 → 0x34848) — 타자편도 견제 판을 재생하고 같은 타석을 잇는다', () => {
   const 볼: PitchOutcomeDetail = {
     resolution: { kind: '볼' },

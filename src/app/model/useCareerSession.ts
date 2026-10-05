@@ -72,6 +72,7 @@ import type { OutingPlace } from '@/shared/config/outingPlaces'
 import { applyEventRewards } from '@/entities/story/model/eventReward'
 import { rollTrainingInjury } from '@/entities/career/model/condition'
 import type { ManagementDetail } from '@/app/model/managementDetail'
+import { restDetailChangesOf, trainingDetailChangesOf } from '@/pages/management/lib/detailPopup'
 import { evaluateGame, updateStreaks } from '@/entities/career/model/gameEvaluation'
 import { recordSeasonMvp } from '@/entities/awards/model/seasonAwards'
 import type { EventReward } from '@/entities/story/model/eventReward'
@@ -699,6 +700,8 @@ export function useCareerSession({
           before: career,
           after: rest.career,
           messages: [`사기 ${rest.moraleGain} 상승하였습니다`],
+          // 변화량 칸은 굴린 회복값 그대로 — 100 에서 잘리기 전 [sp+0x10] (0x18fb4)
+          changes: restDetailChangesOf(rest.moraleGain),
           afterClose: { kind: '휴식' },
         })
       }
@@ -792,6 +795,8 @@ export function useCareerSession({
         before: career,
         after: trained,
         messages: trainingOutcomeLinesOf(outcome),
+        // 변화량 칸은 굴린 값 그대로 — 훈련 칸 [sp+0x34] · 사기 칸 −[sp+0x38] (0x18d0e~0x18d38)
+        changes: trainingDetailChangesOf(outcome),
         afterClose: { kind: '훈련', isSpecialSwing: outcome.specialSwing !== null },
       })
     },
