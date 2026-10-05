@@ -24,6 +24,7 @@ import {
   isBatterTurn,
   isPitchTurn,
   ourPitcherStats,
+  substitutionDetailAbilities,
   pickoff,
   pinchHit,
   pitchSlotsFor,
@@ -1000,6 +1001,19 @@ describe('마투수 등판 — 0xb88c8 → 0xb521c 의 0x60 가지 (8번 칸)', 
     expect(구속({ 1: 4 }) - 구속()).toBe(850 - 510)
     // 안 넘기면 새 저장 기본값 Lv1 과 같다. 다른 칸(마타자 칸 6)의 레벨은 상관없다
     expect(구속({ 1: 0, 6: 4 })).toBe(구속())
+  })
+
+  it('교체 상세 창 능력치는 0xb6414(rec, 칸, 1) — 레벨 배율만 먹고 0xb570c 팀·시즌 보정은 안 먹는다 (0x5aefc ctx 0)', () => {
+    const { progress } = 시작({ mode: 1, acePitcherId: 1 })
+    // 레오니 구속 850 · Lv1 60% = 510. 경기용 값(ourPitcherStats)과 달리 팀 능력치 보정이 없다
+    expect(substitutionDetailAbilities(progress, '투수', 8)?.[1]).toBe(510)
+    expect(substitutionDetailAbilities({ ...progress, options: { ...progress.options, aceLevels: { 1: 4 } } }, '투수', 8)?.[1]).toBe(850)
+    // 마선수가 아니면 명단 값 그대로
+    expect(substitutionDetailAbilities(progress, '투수', 1)).toEqual(progress.ourPitcherEntry[1]?.ability)
+    expect(substitutionDetailAbilities(progress, '대타', 9)).toEqual(
+      aceLeveledAbility(progress.ourEntry[9]!.ability, '타자', progress.ourEntry[9]!.aceIndex, undefined),
+    )
+    expect(substitutionDetailAbilities(progress, '대타', 99)).toBeNull()
   })
 
   it('마선수 레벨 배율 — 타자는 칸 +5 (0xb6442), 마선수가 아니면 그대로', () => {
