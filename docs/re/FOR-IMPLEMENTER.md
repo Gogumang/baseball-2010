@@ -29,7 +29,7 @@
 | 중 | `src/entities/game/model/simulateHalfInning.ts:92-98` | 땅볼 진루타 난수를 `canAdvance` 일 때만 뽑는다 | 원본은 아웃 ≤1 이면 **주자가 없어도** `rand(0,10000)` 을 먼저 뽑는다(판정 자체는 웹과 같음) → 같은 시드 재현을 원하면 순서를 맞출 것 | E-defense-rules.md E-3 · 3g | 확정 |
 | 중 | `src/entities/batting/model/battedBallOutcome.ts` · `missionClearability` | 장내(그라운드) 홈런이 없어 3루타로 센다 | 원본에는 그라운드 홈런이 **있고 홈런 + 그라운드홈런 둘 다로 센다**. 타구 근사에 만들 길이 없으니 최소한 미션 "그라운드홈런" 판정만이라도 홈런 쪽으로 | E-defense-rules.md E-8 · 1e | 확정 |
 | 중 | `src/entities/batting/model/battedBallOutcome.ts:22,36` | 페어 45~135 (양끝 포함) | 0x36140 은 `−135 < a < −45`(양끝 제외) — **정확히 선 위(±45·±135)는 폴** | P2-fielding-ai.md 7절 | 확정 (페어/파울 문턱 자체는 UNRESOLVED U-01) |
-| 중 | `src/entities/batting/model/swingSkills.ts:27-39` (`atBatRecordCodeOf`) | 삼진 5 · 땅볼 6 · 그 밖 아웃 7 · 나머지 8 | 원본(0xa8024) 5 기타아웃 · 6 뜬공 · 7 삼진 · 8 볼넷 · 9 사구 | P7-leftovers.md A1 | 확정 (9 "사구" 이름만 유력) |
+| 중 | `src/entities/batting/model/swingSkills.ts:27-39` (`atBatRecordCodeOf`) | 삼진 5 · 땅볼 6 · 그 밖 아웃 7 · 나머지 8 | 원본(0xa8024) 5 기타아웃 · 6 뜬공 · 7 삼진 · 8 볼넷 · 9 사구 | P7-leftovers.md A1 | 확정 (9 = 사구도 확정 — P7 A1-1. 메인 180a1d1 이 사구 → 9 를 옮겼다) |
 | 중 | `src/entities/game/model/gameRecords.ts:9` | 기록달성 게이트가 "공격·수비 팀이 사람 팀인가" 만 본다 | 원본은 그 밖에 ① 자동진행 뒤에는 전부 없음 ② 모드 5·6·7(미션·홈런더비) 전부 없음 ③ 번호마다 방향 고정(0~15·32~35·37~39 = 사람 공격, 16~31·36 = 사람 수비; 28~31·37~39 는 게이트 없음) | R8-record-triggers.md 9절 | 확정 |
 | 하 | `src/entities/game/model/gameRecords.ts:62-77` (34·35) | 볼넷·사구를 함께 센다 | 원본은 **결과 8(볼넷)만** 세고 사구(9)는 안 세며 백투백 카운터(ctx+0x162)는 끊는다. 지금은 사구가 없어 차이 없음 | R8-record-triggers.md 9절 | 확정 |
 | 하 | `src/entities/game/model/gameRecords.ts:159` 주석 | 18~23 판정 자리를 0xa7c4c·0xa7d0c 로 적음 | 16·17 은 0xa7c4c, **18~23 은 0xa7998**, 25 는 0xa7d0c | R8-record-triggers.md 7절·9절 | 확정 |
