@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { plateErrorOf, resolvePitch } from '@/features/play-at-bat/model/resolvePitch'
+import { isHitByPitch, plateErrorOf, resolvePitch } from '@/features/play-at-bat/model/resolvePitch'
 import type { BattingContext } from '@/features/play-at-bat/model/resolvePitch'
 import { createPatternDeck } from '@/entities/batting/model/battedBallOutcome'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
@@ -52,6 +52,70 @@ describe('resolvePitch — 스윙하지 않은 경우', () => {
     const deck = createPatternDeck(고정(0))
     expect(resolvePitch(직구(), null, 상황, deck, 고정(0)).detail.resolution).toEqual({ kind: '스트라이크', isSwinging: false })
     expect(resolvePitch(직구({ plate: { x: 1.5, y: 0 } }), null, 상황, deck, 고정(0)).detail.resolution).toEqual({ kind: '볼' })
+  })
+})
+
+/** 도착점 하나짜리 궤적 — 판정 좌표는 궤적 마지막 점의 `projectToPlate` 다 (scene+0x10dc/+0x10e0) */
+const 도착 = (x: number, y: number, stageSide: number) =>
+  직구({ worldPath: [{ x: 19501, y: 1110, z: 24500 }, { x, y, z: 29705 }], stageSide })
+const 안굴림: RandomPort = {
+  next: () => {
+    throw new Error('사구 판정은 난수를 쓰지 않는다')
+  },
+  nextInRange: () => {
+    throw new Error('사구 판정은 난수를 쓰지 않는다')
+  },
+  pick: () => {
+    throw new Error('사구 판정은 난수를 쓰지 않는다')
+  },
+}
+
+describe('isHitByPitch — 0x35a20 (사각형 0xcfd50 = 171, 240, 38, 130)', () => {
+  it('우타(side 0): 판정 x 181 은 상자 [171, 209] 안이라 사구', () => {
+    // (18400, 1202, 29705) → side 0 판정 좌표 (181, 325)
+    expect(isHitByPitch(도착(18400, 1202, 0), 0)).toBe(true)
+  })
+
+  it('좌타(side 1)는 x 를 480 − 171 − 38 = 271 로 뒤집는다 — 같은 상자 [271, 309]', () => {
+    // (21450, 1202, 29705) → side 1 판정 좌표 (289, 325)
+    expect(isHitByPitch(도착(21450, 1202, 1), 1)).toBe(true)
+    // 뒤집지 않은 자리(171~209)는 좌타에게는 사구가 아니다 — side 1 에서 19700 → (186, 325)
+    expect(isHitByPitch(도착(19700, 1202, 1), 1)).toBe(false)
+  })
+
+  it('경계는 포함이다 (blt/bgt) — 좌타 x 271 은 사구, 268 은 아니다', () => {
+    // side 1: 21150 → 271, 21100 → 268
+    expect(isHitByPitch(도착(21150, 1202, 1), 1)).toBe(true)
+    expect(isHitByPitch(도착(21100, 1202, 1), 1)).toBe(false)
+  })
+
+  it('존 한가운데 공은 사구가 아니다', () => {
+    expect(isHitByPitch(도착(20585, 1202, 1), 1)).toBe(false)
+  })
+
+  it('궤적이 없으면 판정 좌표가 없어 사구도 없다', () => {
+    expect(isHitByPitch(직구({ worldPath: null }), 1)).toBe(false)
+  })
+})
+
+describe('resolvePitch — 사구', () => {
+  const 좌타 = { ...상황, situation: { ...상황.situation, batterSide: 1 } }
+
+  it('스윙하지 않았고 상자 안이면 사구 — 볼·스트라이크보다 먼저, 난수 안 씀', () => {
+    const deck = createPatternDeck(고정(0))
+    const { detail, deck: after } = resolvePitch(도착(21450, 1202, 1), null, 좌타, deck, 안굴림)
+
+    expect(detail.resolution).toEqual({ kind: '사구' })
+    expect(detail.hasSwung).toBe(false)
+    expect(detail.resultCode).toBeNull()
+    expect(after).toBe(deck)
+  })
+
+  it('스윙했으면 상자 안이어도 사구가 아니다 (스윙 +0xd · state[0x10])', () => {
+    const deck = createPatternDeck(고정(0))
+    const { detail } = resolvePitch(도착(21450, 1202, 1), { frame: 0, shift: 0, buntKind: 0 }, 좌타, deck, 고정(0))
+
+    expect(detail.resolution.kind).not.toBe('사구')
   })
 })
 

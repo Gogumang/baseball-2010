@@ -821,3 +821,43 @@ describe('내 타석의 상대 투수 — 지금 마운드 투수의 능력치 (
     expect(바뀜.control).toBe(Math.round(teamPitchers(3)[다른칸].ability[0] / 10))
   })
 })
+
+describe('사구 — 사람 타석 결과 4 (0x35a20 → 0x9d57c) 를 경기에 먹인다', () => {
+  function 내타석(bases: BaseState, outs: number): GameProgress {
+    const progress = startGame(createSeededRandom(20100901))
+    return { ...progress, game: { ...progress.game, bases, outs, half: '말' } }
+  }
+
+  it('수비가 돌지 않고 곧장 끝난다 — 타수에 안 들고 볼넷 수에도 안 든다', () => {
+    const 시작 = 내타석(EMPTY_BASES, 0)
+    const 끝 = startPlayerOutcome(시작, { kind: '사구' }, createSeededRandom(3))
+
+    expect(끝.pendingDefensePlay).toBeNull()
+    expect(끝.myStats.atBats).toBe(시작.myStats.atBats)
+    expect(끝.myStats.walks).toBe(시작.myStats.walks)
+    // 평판 볼넷 칸 G+0xfc(코드 12)는 볼넷만 — 사구는 코드 13(G+0x100)이라 따로다
+    expect(끝.reputationCounts.walks).toBe(시작.reputationCounts.walks)
+  })
+
+  it('타석 결과 링에는 9 가 들어간다 (0xa8b9c)', () => {
+    const 끝 = startPlayerOutcome(내타석(EMPTY_BASES, 0), { kind: '사구' }, createSeededRandom(3))
+
+    expect(끝.recentAtBatCodes[끝.recentAtBatCodes.length - 1]).toBe(9)
+  })
+
+  it('만루 사구는 밀어내기 1타점이다', () => {
+    const 만루 = { first: true, second: true, third: true }
+    const 시작 = 내타석(만루, 0)
+    const 끝 = startPlayerOutcome(시작, { kind: '사구' }, createSeededRandom(3))
+
+    expect(끝.myStats.runsBattedIn - 시작.myStats.runsBattedIn).toBe(1)
+  })
+
+  it('사구는 2·3볼넷 기록(34·35)을 안 센다 — 0xa7a7c 를 부르지 않는다', () => {
+    let progress = 내타석(EMPTY_BASES, 0)
+    progress = { ...progress, myStats: { ...progress.myStats, walks: 1 } }
+    const 끝 = startPlayerOutcome(progress, { kind: '사구' }, createSeededRandom(3))
+
+    expect(끝.recordIds.filter((id) => id === 34 || id === 35)).toEqual([])
+  })
+})

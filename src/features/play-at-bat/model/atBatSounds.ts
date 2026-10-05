@@ -152,6 +152,7 @@ export function contactSoundIdOf(input: ContactSoundInput): number | null {
  * |---|---|---|
  * | 볼 (v2) | **16** "Ball!" | 0x51ac2 |
  * | 볼넷 (v3) | **24** "Base on balls!" | 0x51aca |
+ * | 사구 (v4) | **23** "Hit by pitch" | 0x51b08~0x51b1e — 진동 200ms(0x3a45(200, 100)) 뒤 바로 튼다. 웹엔 진동이 없다 |
  * | 스트라이크 (v1 기본) | **18** "Strike!" | 0x51aa2 |
  * | 스트라이크 카운트 2 (v1) | **39** "Strike two!" | `[sp+0xa4]+4 == 2` |
  * | 삼진 (v5) | **21** "Strike out!" | 0x51bf6 |
@@ -165,6 +166,8 @@ export function pitchCallSoundIdOf(resolution: PitchResolution, atBat: AtBatStat
   switch (resolution.kind) {
     case '볼':
       return atBat.outcome?.kind === '볼넷' ? 24 : 16
+    case '사구':
+      return HIT_BY_PITCH_CALL_SOUND
     case '스트라이크':
       if (atBat.outcome?.kind === '삼진') return 21
       return atBat.strikes === 2 ? 39 : 18
@@ -174,6 +177,9 @@ export function pitchCallSoundIdOf(resolution: PitchResolution, atBat: AtBatStat
       return null
   }
 }
+
+/** "Hit by pitch" — 판정 v4 (0x51b14 `movs r1,#0x17`). 볼넷과 달리 뒤에 함성 29 를 잇지 않는다 */
+export const HIT_BY_PITCH_CALL_SOUND = 23
 
 /** 관중 함성 — 볼넷 뒤 (판정 v3 의 뒤꼬리 0x51afa~0x51b02) */
 export const WALK_CHEER_SOUND = 29

@@ -24,6 +24,9 @@ export function describeResolution(detail: PitchOutcomeDetail): string {
   switch (resolution.kind) {
     case '볼':
       return '볼'
+    // 판정 v4 — game_judge 애니 7 "몸에 맞는 공" (stageScenery JUDGE_ANIMATIONS)
+    case '사구':
+      return '몸에 맞는 공'
     case '파울':
       return '파울'
     case '스트라이크':

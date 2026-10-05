@@ -5,6 +5,7 @@ import {
   inPlayCallSoundIdOf,
   pitchCallSoundIdOf,
   PITCH_RELEASE_SOUND,
+  walkCheerSoundIdOf,
 } from '@/features/play-at-bat/model/atBatSounds'
 import type { AtBatState } from '@/entities/at-bat/model/atBatState'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
@@ -90,6 +91,14 @@ describe('심판 콜 (판정 스위치 0x51a94)', () => {
   it('볼은 16, 네 번째 볼은 볼넷 24', () => {
     expect(pitchCallSoundIdOf({ kind: '볼' }, 카운트(1, 0))).toBe(16)
     expect(pitchCallSoundIdOf({ kind: '볼' }, 카운트(4, 0, { kind: '볼넷' }))).toBe(24)
+  })
+
+  it('사구는 23 "Hit by pitch" (판정 v4 0x51b14) — 볼넷 24 와 다르다', () => {
+    expect(pitchCallSoundIdOf({ kind: '사구' }, 카운트(2, 1, { kind: '사구' }))).toBe(23)
+  })
+
+  it('사구 뒤에는 볼넷 함성 29 가 없다 — CPU 공격이어도 (29 예약은 v3 꼬리 0x51b02 뿐)', () => {
+    expect(walkCheerSoundIdOf({ kind: '사구' }, true)).toBeNull()
   })
 
   it('스트라이크는 18, 두 번째는 39, 세 번째(삼진)는 21', () => {

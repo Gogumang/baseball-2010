@@ -6,6 +6,11 @@ export const BALLS_FOR_WALK = 4
 export type PitchResolution =
   | { readonly kind: '스트라이크'; readonly isSwinging: boolean }
   | { readonly kind: '볼' }
+  /**
+   * 몸에 맞는 공 — 투구 판정 0x9d57c 가 state[0x12] 를 **맨 먼저** 보고 4 를 돌려준다(0x9d582).
+   * 볼·스트라이크 카운트를 올리지 않고 그 자리에서 타석이 끝난다.
+   */
+  | { readonly kind: '사구' }
   | { readonly kind: '파울' }
   | { readonly kind: '타구'; readonly outcome: AtBatOutcome }
 
@@ -45,6 +50,8 @@ export function applyPitchResolution(
         ? { ...state, balls, outcome: { kind: '볼넷' } }
         : { ...state, balls }
     }
+    case '사구':
+      return { ...state, outcome: { kind: '사구' } }
     case '파울':
       // 투 스트라이크 이후의 파울은 카운트를 올리지 않는다.
       return state.strikes >= STRIKES_FOR_STRIKEOUT - 1

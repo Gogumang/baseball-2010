@@ -101,6 +101,39 @@ export function plateErrorOf(pitch: Pitch, shift: number): { horizontal: number;
   }
 }
 
+/**
+ * 사구 사각형 — 표 `0xcfd50` = (x 171, y 240, 폭 38, 높이 130). 판정 좌표계(카메라 오프셋 없음, `projectToPlate`)다.
+ * 우타자(side 0) 몸 자리다 — 타자 앵커 x 184(표 0xcfb2c)가 이 안에 든다.
+ */
+export const HIT_BY_PITCH_BOX = { x: 171, y: 240, width: 38, height: 130 } as const
+/** 좌타 뒤집기 기준 폭 — `0x35a7a~0x35a84`: x ← 480 − x − w (월드 폭 480) */
+const HIT_BY_PITCH_MIRROR_WIDTH = 480
+const LEFT_HANDED_BATTER = 1
+
+/**
+ * **몸에 맞는 공 판정 `0x35a20`** — 상태 0x12 진입(공 도착 판정) `0x3dfac` 가 맨 먼저 부르고(0x3dfc4)
+ * 결과를 state[0x12] 에 넣는다(0x3dfc8). 투구 판정 `0x9d57c` 는 이 칸을 **볼·스트라이크보다 먼저** 본다.
+ *
+ * ```
+ * 35a2c: 스윙 객체([scene+0xf9c])+0xd ≠ 0  또는  state[0x10] ≠ 0  → 0     ; 스윙(번트 포함)했으면 사구 없음
+ * 35a40: 상자 = 표 0xcfd50 (x, y, w, h)
+ * 35a6c: 0xb63c0(현재 타자) 참(좌타)이면 x ← 480 − x − w
+ * 35a86: (px, py) = (scene+0x10dc, scene+0x10e0)                            ; 공 도착 판정 좌표
+ * 35aaa: x ≤ px ≤ x+w  그리고  y ≤ py ≤ y+h  → 1                           ; 경계 포함
+ * ```
+ * 판정 좌표는 공 도착점이다 — 웹은 `plateErrorOf` 와 같은 자리(궤적 마지막 점을 `projectToPlate`)를 쓴다.
+ * 난수를 쓰지 않는다.
+ * 궤적이 없는 투구(`worldPath === null`)는 판정 좌표가 없어 사구를 내지 않는다 — 지금 타석 화면의
+ * CPU 투구는 늘 궤적이 있다.
+ */
+export function isHitByPitch(pitch: Pitch, batterSide: number): boolean {
+  const path = pitch.worldPath
+  if (path === null || path.length === 0) return false
+  const point = projectToPlate(path[path.length - 1], pitch.stageSide)
+  const box = HIT_BY_PITCH_BOX
+  const left = batterSide === LEFT_HANDED_BATTER ? HIT_BY_PITCH_MIRROR_WIDTH - box.x - box.width : box.x
+  return point.x >= left && point.x <= left + box.width && point.y >= box.y && point.y <= box.y + box.height
+}
 
 /**
  * 투구 하나를 끝까지 처리한다: 스윙 결과(0xab214) → 방향(0x5141c) → 원본 타구 패턴 → 안타·아웃(대체 근사, 추정).
@@ -114,6 +147,13 @@ export function resolvePitch(
   random: RandomPort,
 ): { readonly detail: PitchOutcomeDetail; readonly deck: PatternDeck } {
   if (swing === null) {
+    // 사구가 볼·스트라이크보다 먼저다 (0x9d57c 첫머리 0x9d582 — state[0x12] 면 곧장 4)
+    if (isHitByPitch(pitch, context.situation.batterSide)) {
+      return {
+        detail: { resolution: { kind: '사구' }, hasSwung: false, isBunt: false, resultCode: null, contactSoundId: null },
+        deck,
+      }
+    }
     const resolution: PitchResolution = isInsideStrikeZone(pitch.plate)
       ? { kind: '스트라이크', isSwinging: false }
       : { kind: '볼' }

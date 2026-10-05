@@ -6,6 +6,8 @@ export function describePitchResolution(resolution: PitchResolution): string {
   switch (resolution.kind) {
     case '볼':
       return '볼'
+    case '사구':
+      return '몸에 맞는 공'
     case '파울':
       return '파울'
     case '스트라이크':
@@ -38,6 +40,8 @@ export function describeBanner(outcomeKind: string): string {
       return '안타!'
     case '볼넷':
       return '볼넷'
+    case '사구':
+      return '몸에 맞는 공'
     case '삼진':
       return '삼진…'
     default:

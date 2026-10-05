@@ -77,6 +77,15 @@ describe('advanceRunners — 볼넷', () => {
   })
 })
 
+describe('advanceRunners — 사구 (0xae24c 가 볼넷과 같은 밀어내기 주루 0x17 로 보낸다)', () => {
+  it('볼넷과 같은 자리로 민다 — 만루면 1점, 3루 혼자는 안 들어온다', () => {
+    for (const bases of [EMPTY_BASES, 주자1루, 주자3루, 만루]) {
+      expect(advanceRunners(bases, { kind: '사구' }, 1)).toEqual(advanceRunners(bases, { kind: '볼넷' }, 1))
+    }
+    expect(advanceRunners(만루, { kind: '사구' }, 0).runsScored).toBe(1)
+  })
+})
+
 describe('advanceRunners — 아웃', () => {
   it('2아웃 미만에서 3루 주자가 있으면 뜬공은 희생플라이가 된다', () => {
     const result = advanceRunners(주자3루, { kind: '아웃', detail: '뜬공아웃' }, 1)

@@ -58,6 +58,8 @@ export function advanceRunners(
     case '안타':
       return advanceForHit(bases, outcome.bases)
     case '볼넷':
+    // 사구도 같은 밀어내기다 — 0xae24c 가 투구 판정 3(볼넷)·4(사구)를 함께 상태 0x17(밀어내기 주루)로 보낸다
+    case '사구':
       return advanceForWalk(bases)
     case '삼진':
       return { bases, runsScored: 0, outsAdded: 1 }
@@ -88,7 +90,7 @@ function advanceForHit(bases: BaseState, hitBases: 1 | 2 | 3): AdvanceResult {
   }
 }
 
-/** 볼넷은 밀려난 주자만 진루한다. 만루에서만 점수가 난다. */
+/** 볼넷·사구는 밀려난 주자만 진루한다. 만루에서만 점수가 난다. */
 function advanceForWalk(bases: BaseState): AdvanceResult {
   if (!bases.first) return { bases: { ...bases, first: true }, runsScored: 0, outsAdded: 0 }
   if (!bases.second) return { bases: { ...bases, second: true }, runsScored: 0, outsAdded: 0 }

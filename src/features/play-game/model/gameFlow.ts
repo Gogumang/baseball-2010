@@ -363,7 +363,7 @@ export interface PlayerOutcomeOptions {
  * 이 칸의 뜻이다 (원본 상태 0x17 이 도는 동안 투구가 안 나가는 것과 같은 자리).
  * 주자 처리·기록·돌발 판정은 화면이 다 돌고 `resolveDefensePlay` 를 부를 때 한 번에 한다.
  *
- * 삼진·볼넷·홈런은 수비가 개입할 것이 없어 여기서 곧장 끝낸다 (0xc11f0 과 같은 규칙).
+ * 삼진·볼넷·사구·홈런은 수비가 개입할 것이 없어 여기서 곧장 끝낸다 (0xc11f0 과 같은 규칙).
  */
 export function startPlayerOutcome(
   progress: GameProgress,
@@ -396,6 +396,12 @@ export function resolveDefensePlay(
   const pending = progress.pendingDefensePlay
   if (pending === null) return progress
   return finishPlayerOutcome({ ...progress, pendingDefensePlay: null }, pending.outcome, random, result, null)
+}
+
+/** 타석 결과 링 코드 — 사구는 9 (0xa8b9c). `atBatRecordCodeOf` 는 아직 사구를 몰라 8 로 둔다 */
+const HIT_BY_PITCH_RING_CODE = 9
+function ringCodeOf(outcome: AtBatOutcome): number {
+  return outcome.kind === '사구' ? HIT_BY_PITCH_RING_CODE : atBatRecordCodeOf(outcome)
 }
 
 /**
@@ -496,7 +502,9 @@ function finishPlayerOutcome(
       : resolveBurst(
           progress.burst,
           burstResultBitsOf({
-            outcome,
+            // 사구도 B5(출루)·B11 을 켠다 — 0xa882a 는 "볼 4개 || 사구", B11 은 0xa8b7a·0xa8bf4 두 곳.
+            // burstResultBits 가 아직 '사구' 를 모르므로 같은 비트를 내는 볼넷으로 넘긴다
+            outcome: outcome.kind === '사구' ? { kind: '볼넷' } : outcome,
             runsBattedIn,
             outsBefore: progress.game.outs,
             outsAdded: outsInPlay,
@@ -536,7 +544,7 @@ function finishPlayerOutcome(
       homeRunStreak: backToBack.streak,
       recordIds: [...progress.recordIds, ...recordIds],
       popularityPoints: progress.popularityPoints + points,
-      recentAtBatCodes: [...progress.recentAtBatCodes, atBatRecordCodeOf(outcome)].slice(-RECENT_AT_BAT_COUNT),
+      recentAtBatCodes: [...progress.recentAtBatCodes, ringCodeOf(outcome)].slice(-RECENT_AT_BAT_COUNT),
       doublePlays: progress.doublePlays + penalties.doublePlays,
       scoringPositionOuts: progress.scoringPositionOuts + penalties.scoringPositionOuts,
       reputationCounts: addReputationCounts(progress.reputationCounts, {

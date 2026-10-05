@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { describeResolution } from '@/widgets/batting-stage/lib/stageText'
 import {
   CLOUD_WRAP_WIDTH,
   PITCHER_OVERLAY_FRAME_OFFSET,
@@ -76,6 +77,12 @@ describe('판정 글자 — game_judge 애니 (0x39504)', () => {
   it('종류 → 애니 번호', () => {
     expect(['스트라이크', '헛스윙', '볼', '파울', '아웃', '볼넷', '삼진', '몸에 맞는 공'].map(judgeAnimationOf)).toEqual([0, 0, 3, 4, 1, 6, 9, 7])
     expect(judgeAnimationOf('홈런!')).toBeNull()
+    // 사구 판정 문구가 애니 7 로 이어진다 (판정 v4)
+    expect(
+      judgeAnimationOf(
+        describeResolution({ resolution: { kind: '사구' }, hasSwung: false, isBunt: false, resultCode: null }),
+      ),
+    ).toBe(7)
   })
 })
 

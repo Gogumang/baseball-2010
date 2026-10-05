@@ -31,6 +31,15 @@ describe('atBatState', () => {
     expect(state.outcome).toEqual({ kind: '볼넷' })
   })
 
+  it('사구는 카운트를 올리지 않고 그 자리에서 타석을 끝낸다 (0x9d57c 가 state[0x12] 를 맨 먼저 본다)', () => {
+    const state = 연속적용(createAtBat(), [볼, 볼, 볼, 스트라이크, { kind: '사구' }])
+
+    expect(state.outcome).toEqual({ kind: '사구' })
+    expect(state.balls).toBe(3)
+    expect(state.strikes).toBe(1)
+    expect(isAtBatFinished(state)).toBe(true)
+  })
+
   it('투 스트라이크 이후의 파울은 카운트를 올리지 않는다', () => {
     const state = 연속적용(createAtBat(), [스트라이크, 스트라이크, 파울, 파울, 파울])
 
