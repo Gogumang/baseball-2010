@@ -178,8 +178,39 @@ describe('트레이닝 하위 메뉴 (상태 107 · 키 0x12d48)', () => {
     // 고정 난수 0 → bfa55(4,7) 의 최솟값 4
     expect(trained.ability.control).toBe(투수().ability.control + 4)
     expect(trained.hasActedThisCycle).toBe(true)
-    // 훈련 연출이 끝나면 커맨드 줄로 돌아간다 (R9 8절 107 줄)
+    // 타자편과 같은 상세 결과 창(0x872a1)이 먼저 뜨고, 닫으면 커맨드 줄로 돌아간다 (R9 8절 107 줄)
+    const 창 = screen.getByRole('dialog', { name: '상세정보' })
+    expect(창.textContent).toContain('제구 4 상승하였습니다')
+    fireEvent.click(창)
     expect(screen.getByText('다음경기')).toBeTruthy()
+  })
+
+  it('상세 결과 창 이름표는 img_text 340~343 · 사기 84 다 (0x87314 `0x7b984` 모드 3 갈래)', () => {
+    화면()
+    누르기('트레이닝')
+    누르기('구속')
+    fireEvent.click(칸('예'))
+
+    const 그림들 = Array.from(screen.getByRole('dialog', { name: '상세정보' }).querySelectorAll('img'))
+      .map((image) => image.getAttribute('src') ?? '')
+    for (const frame of ['340', '341', '342', '343', '084']) {
+      expect(그림들).toContain(`./sprites/img_text/frames/${frame}.png`)
+    }
+  })
+
+  it('창을 닫을 때 부상 판정 0x1b4c4 를 굴린다 — 사기 30 이하면 일반 열 5%, 고정 난수 0 이면 다친다', () => {
+    const onSave = vi.fn()
+    화면({ career: 투수({ morale: 20 }), onSave })
+    누르기('트레이닝')
+    누르기('제구')
+    fireEvent.click(칸('예'))
+    expect(onSave).toHaveBeenCalledOnce()
+
+    fireEvent.keyDown(window, { key: 'Enter' })
+
+    const injured = onSave.mock.calls[1][0] as PitcherCareer
+    expect([injured.isInjured, injured.injuryRemaining]).toEqual([true, 3])
+    expect(screen.getByText('부상을 당했습니다.')).toBeTruthy()
   })
 
   it('능력치가 보직 한계면 StrMODE[192] 로 막는다', () => {
@@ -380,8 +411,8 @@ describe('휴식 (상태 105 칸 2 → 팝업 0x2a → 127)', () => {
 
     누르기('휴식')
     fireEvent.click(칸('예'))
-    // 사기 결과 창을 닫아야 회복 판정이 돈다
-    fireEvent.click(칸('확인'))
+    // 사기 결과 창(상세 창 0x872a1)을 닫아야 회복 판정이 돈다 (콜백 0x1d671)
+    fireEvent.click(screen.getByRole('dialog', { name: '상세정보' }))
 
     // 고정 난수 0 → 질병·부상 둘 다 낫는다
     const recovered = onSave.mock.calls[1][0] as PitcherCareer

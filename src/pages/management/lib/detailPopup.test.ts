@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { createCareer } from '@/entities/career/model/playerCareer'
-import { detailRowsOf, DETAIL_ROW_TOP, restDetailChangesOf, trainingDetailChangesOf } from '@/pages/management/lib/detailPopup'
+import {
+  detailRowsOf, DETAIL_ROW_TOP, gpItemDetailChangesOf, restDetailChangesOf, trainingDetailChangesOf,
+} from '@/pages/management/lib/detailPopup'
 import { runTraining } from '@/entities/career/model/training'
 import { runRest } from '@/entities/career/model/outing'
 import { TRAINING_MENUS } from '@/shared/config/trainingMenus'
@@ -13,11 +15,11 @@ describe('상세정보 결과 창 — 0x872a0 · 0x872d4', () => {
     const after = { ...선수, ability: { ...선수.ability, hit: 106 }, morale: 94 }
 
     expect(detailRowsOf(선수, after)).toEqual([
-      { labelFrame: 336, current: 106, maximum: 800, change: 6 },
-      { labelFrame: 337, current: 100, maximum: 800, change: 0 },
-      { labelFrame: 338, current: 130, maximum: 800, change: 0 },
-      { labelFrame: 339, current: 100, maximum: 800, change: 0 },
-      { labelFrame: 84, current: 94, maximum: 100, change: -6 },
+      { labelFrame: 336, current: 106, maximum: 800, change: 6, bonus: 0 },
+      { labelFrame: 337, current: 100, maximum: 800, change: 0, bonus: 0 },
+      { labelFrame: 338, current: 130, maximum: 800, change: 0, bonus: 0 },
+      { labelFrame: 339, current: 100, maximum: 800, change: 0, bonus: 0 },
+      { labelFrame: 84, current: 94, maximum: 100, change: -6, bonus: 0 },
     ])
   })
 
@@ -54,6 +56,15 @@ describe('상세정보 결과 창 — 0x872a0 · 0x872d4', () => {
       expect(변화(detailRowsOf(before, outcome.career))).toEqual([8, 0, 0, 0, -4])
     })
 
+    it('훈련: 그 보정은 넷째 칸(보너스)으로 따로 넘어간다 — [sp+0xe8+4k] · 사기 [sp+0xf8] (0x18d42)', () => {
+      // 타입 +1 · 병아리 +1 · 표적판 +2 = 4, 사기 감소 보정 = 병아리 −1
+      const before = { ...선수, morale: 50, battingTypeIndex: 0, skillIds: [0], equippedSkillIds: [0], subItemIds: [0] }
+      const outcome = runTraining(before, 메뉴('히트'), 고정(0))
+
+      const rows = detailRowsOf(before, outcome.career, trainingDetailChangesOf(outcome))
+      expect(rows.map((row) => row.bonus)).toEqual([4, 0, 0, 0, -1])
+    })
+
     it('훈련: 사기가 0 에서 잘려도 사기 칸은 굴린 감소값 그대로', () => {
       const before = { ...선수, morale: 3, skillIds: [], equippedSkillIds: [] }
       const outcome = runTraining(before, 메뉴('파워'), 고정(0.999))
@@ -73,6 +84,26 @@ describe('상세정보 결과 창 — 0x872a0 · 0x872d4', () => {
 
       expect(rest.career.morale).toBe(100)
       expect(변화(detailRowsOf(before, rest.career, restDetailChangesOf(rest.moraleGain)))).toEqual([0, 0, 0, 0, 15])
+      // 휴식은 보너스 배열을 0 으로 비워 넘긴다 (0x18ee8)
+      expect(detailRowsOf(before, rest.career, restDetailChangesOf(rest.moraleGain)).every((row) => row.bonus === 0)).toBe(true)
+    })
+  })
+
+  describe('GP 아이템 결과 창 변화량 — 0x14f28~0x14fa4 (두 모드 공용)', () => {
+    const 한계 = [800, 800, 800, 800]
+
+    it('0~3 은 그 칸만, 효과 전 기본값이 한계보다 낮을 때 10', () => {
+      expect(gpItemDetailChangesOf(1, [100, 100, 100, 100], 한계)).toEqual({ ability: [0, 10, 0, 0], morale: 0 })
+      expect(gpItemDetailChangesOf(1, [100, 800, 100, 100], 한계)).toEqual({ ability: [0, 0, 0, 0], morale: 0 })
+    })
+
+    it('4(도시락)는 네 칸 각각 같은 조건 · 6(영지버섯)은 사기 칸 40', () => {
+      expect(gpItemDetailChangesOf(4, [100, 800, 100, 799], 한계)).toEqual({ ability: [10, 0, 10, 10], morale: 0 })
+      expect(gpItemDetailChangesOf(6, [100, 100, 100, 100], 한계)).toEqual({ ability: [0, 0, 0, 0], morale: 40 })
+    })
+
+    it('5·7·8·9 는 창을 띄우지 않는다 (0x14f2c `cmp k,#6`)', () => {
+      expect([5, 7, 8, 9].map((k) => gpItemDetailChangesOf(k, [0, 0, 0, 0], 한계))).toEqual([null, null, null, null])
     })
   })
 })

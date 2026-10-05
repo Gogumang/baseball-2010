@@ -1,6 +1,6 @@
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
-import { hasSkill, isSkillEquipped, MAXIMUM_ABILITY } from '@/entities/career/model/playerCareer'
+import { isSkillEquipped, MAXIMUM_ABILITY } from '@/entities/career/model/playerCareer'
 import { equipmentBonusOf } from '@/entities/career/model/equipment'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -124,20 +124,26 @@ const LUCK_SKILL = 6
 const LUCK_REDUCTION = 20
 const INJURY_ROLL_RANGE = 10_000
 
-export function trainingInjuryChanceOf(career: PlayerCareer, isSpecialSwing: boolean): number {
+/**
+ * 0x1b4c4 가 보는 칸 — 모드 갈림이 없어(상세 창 콜백 0x1d63c 를 두 모드가 같이 건다) 투수편 기록도 같은 칸이다.
+ * 스킬 4·6 도 **비트 번호** 그대로 본다.
+ */
+export type TrainingInjuryCareer = Pick<PlayerCareer, 'morale' | 'isInjured' | 'injuryRemaining' | 'skillIds' | 'equippedSkillIds'>
+
+export function trainingInjuryChanceOf(career: TrainingInjuryCareer, isSpecialSwing: boolean): number {
   const row = INJURY_CHANCE_BY_MORALE.find(([floor]) => career.morale > floor) ?? INJURY_CHANCE_BY_MORALE[4]
   let chance = isSpecialSwing ? row[2] : row[1]
   // 0x1b4c4: 유리몸은 보유(0xa3a74, 0x1b550) · 행운은 장착(0xa4bf8, 0x1b562)
-  if (hasSkill(career, GLASS_BODY_SKILL)) chance += GLASS_BODY_BONUS
+  if (career.skillIds.includes(GLASS_BODY_SKILL)) chance += GLASS_BODY_BONUS
   if (isSkillEquipped(career, LUCK_SKILL)) chance -= LUCK_REDUCTION
   return Math.max(0, chance)
 }
 
-export function rollTrainingInjury(
-  career: PlayerCareer,
+export function rollTrainingInjury<T extends TrainingInjuryCareer>(
+  career: T,
   isSpecialSwing: boolean,
   random: RandomPort,
-): { career: PlayerCareer; notice: string | null } {
+): { career: T; notice: string | null } {
   if (career.isInjured) return { career, notice: null }
   const roll = randomIntegerBelow(random, 0, INJURY_ROLL_RANGE)
   if (roll >= trainingInjuryChanceOf(career, isSpecialSwing) * 100) return { career, notice: null }

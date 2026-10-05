@@ -14,6 +14,7 @@ import { PitcherBasicInfoPanel } from '@/pages/pitcher-league/ui/PitcherBasicInf
 import { PitcherRepertoirePanel } from '@/pages/pitcher-league/ui/PitcherRepertoirePanel'
 import { PitcherRecordPanel } from '@/pages/pitcher-league/ui/PitcherRecordPanel'
 import { PitchTrainingScreen } from '@/pages/pitcher-league/ui/PitchTrainingScreen'
+import { DetailWindow } from '@/pages/management/ui/DetailPopup'
 import * as styles from '@/pages/pitcher-league/ui/PitcherManagementScreen.css'
 
 /**
@@ -121,7 +122,7 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
         />
       )}
 
-      {menu.subWindow === null && menu.choice === null && (
+      {menu.subWindow === null && menu.choice === null && menu.detail === null && (
         <Panel heading={menu.kind === '관리' ? '커맨드' : menu.kind}>
           <MenuList items={menu.items} onSelect={menu.select} />
         </Panel>
@@ -150,6 +151,14 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
             ))}
           </div>
         </Panel>
+      )}
+
+      {/*
+        상세 결과 창(0x872a1) — 타자편 창을 그대로 쓴다 (두 모드 공용, 이름표만 340~343).
+        ⚠️ 원본 좌표는 화면 기준이지만 이 화면은 공용 판(`PixelScreen`) 본문 안에 겹쳐 그려 머리띠만큼 내려간다 (근사).
+      */}
+      {menu.detail !== null && (
+        <DetailWindow rows={menu.detail.rows} messages={menu.detail.messages} onClose={menu.closeDetail} />
       )}
 
       {menu.question !== null && (

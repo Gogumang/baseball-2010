@@ -124,7 +124,7 @@ export interface PitcherTrainingOutcome {
   /**
    * 굴린 값 그대로 — 보너스(타입·스킬)와 자르기 전. 타자편 `TrainingOutcome.rolledGain` 과 같은 칸이다
    * (0x18d14 훈련 칸 [sp+0x34] · 0x18d36 사기 칸 −[sp+0x38], 결과 창 0x872a1 은 두 모드 공용).
-   * 마구는 상승 굴림이 없어 0. ⚠️ 투수편엔 아직 상세 결과 창이 없어 알림만 쓴다.
+   * 마구는 상승 굴림이 없어 0. 창 줄은 `pages/pitcher-league/lib/pitcherDetailPopup.ts` 가 세운다.
    */
   readonly rolledGain: number
   readonly rolledMoraleLoss: number

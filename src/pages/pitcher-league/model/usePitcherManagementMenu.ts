@@ -52,6 +52,9 @@ import {
   recoverAfterPitcherRest,
   runPitcherRest,
 } from '@/pages/pitcher-league/model/pitcherRest'
+import { pitcherRestDetailRowsOf, pitcherTrainingDetailRowsOf } from '@/pages/pitcher-league/lib/pitcherDetailPopup'
+import type { DetailRow } from '@/pages/management/lib/detailPopup'
+import { rollTrainingInjury } from '@/entities/career/model/condition'
 
 /**
  * 투수편 관리 화면의 상태 기계 — 원본 장면 0x106 의 상태 **105(허브) · 106(선수정보) · 107(트레이닝)**
@@ -77,6 +80,16 @@ export interface PitcherMenuChoice {
   readonly text: string
   readonly labels: readonly [string, string]
   readonly onChoose: (index: number) => void
+}
+
+/**
+ * 상세 결과 창(0x872a1) — 능력치 훈련·휴식 뒤에 뜬다. 닫을 때 할 일은 원본 콜백 그대로:
+ * 훈련 0x1d63c → 부상 0x1b4c4 · 휴식 0x1d671 → 회복 0x1b308.
+ */
+export interface PitcherMenuDetail {
+  readonly rows: readonly DetailRow[]
+  readonly messages: readonly string[]
+  readonly afterClose: () => void
 }
 
 export interface UsePitcherManagementMenuInput {
@@ -117,6 +130,10 @@ export interface PitcherManagementMenu {
   readonly equipTitle: (title: string) => void
   readonly items: readonly MenuItem[]
   readonly notice: string
+  /** 상세 결과 창 — 떠 있으면 화면이 `DetailWindow` 를 그린다 */
+  readonly detail: PitcherMenuDetail | null
+  /** 상세 결과 창을 닫는다 — 훈련은 부상(0x1b4c4), 휴식은 회복(0x1b308)을 이때 굴린다 */
+  readonly closeDetail: () => void
   readonly question: PitcherMenuQuestion | null
   readonly choice: PitcherMenuChoice | null
   /** 두 갈래 팝업의 커서 (원본 `장면+0x166`) — 좌우 키가 옮긴다 */
@@ -155,8 +172,8 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
   const [choice, setChoice] = useState<PitcherMenuChoice | null>(null)
   /** 두 갈래 팝업(0x78·0x80)의 커서 — 원본 `장면+0x166`. 창을 열 때마다 0 에서 시작한다 */
   const [choiceIndex, setChoiceIndex] = useState(0)
-  /** 알림 창을 **닫을 때** 할 일 — 휴식 회복 판정 0x1b308 처럼 결과 창 뒤에 붙는 것들 */
-  const [afterNotice, setAfterNotice] = useState<(() => void) | null>(null)
+  /** 상세 결과 창 — 닫을 때 할 일(부상·회복 판정)을 같이 든다 */
+  const [detail, setDetail] = useState<PitcherMenuDetail | null>(null)
 
   /** 두 갈래 팝업을 연다 — 커서는 늘 첫 칸부터다 (원본도 `+0x166` 을 0 으로 두고 연다) */
   const openChoice = useCallback((next: PitcherMenuChoice) => {
@@ -179,8 +196,22 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
       setKind('관리')
       const result = trainingResultOf(PITCHER_ABILITY_NAMES[slot] ?? menu.name, outcome.gains[ability] ?? 0)
       // 타입 보너스 줄 — "[" + 타입 이름(0x1400080 [2+타입]) + "]" + StrMODE[194] (0x187a8~0x187f2)
-      const typeLine = outcome.typeBonus > 0 ? `!N[${PITCHER_TYPE_NAMES[career.typeIndex] ?? ''}] 타입 보너스 +1` : ''
-      setNotice(`${result}${typeLine}`)
+      const typeLine = outcome.typeBonus > 0 ? [`[${PITCHER_TYPE_NAMES[career.typeIndex] ?? ''}] 타입 보너스 +1`] : []
+      const rows = pitcherTrainingDetailRowsOf(outcome)
+      if (rows === null) return setNotice([result, ...typeLine].join('!N'))
+      /*
+       * 칸 0~3 은 타자편과 같은 상세 결과 창(0x872a1)을 띄운다 — 0x17f5c 가 모드 공용이다.
+       * 창을 닫으면 콜백 0x1d63c → **부상 판정 0x1b4c4** (모드 갈림 없음, 마구가 아니라 일반 열).
+       */
+      return setDetail({
+        rows,
+        messages: [result, ...typeLine],
+        afterClose: () => {
+          const injury = rollTrainingInjury(outcome.career, false, random)
+          if (injury.career !== outcome.career) onSave(injury.career)
+          if (injury.notice !== null) setNotice(injury.notice)
+        },
+      })
     },
     [career, onSave, random],
   )
@@ -259,16 +290,19 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
         onYes: () => {
           const rest = runPitcherRest(career, random)
           onSave(rest.career)
-          // StrMODE[24] "사기" + 수치 + [83] (0x18e3c)
-          setNotice(`사기 ${rest.moraleGain} 상승하였습니다`)
-          /*
-           * 결과 창을 **닫을 때** 회복 판정 0x1b308 (질병 60% · 부상 30%, G 2-2).
-           * 타자편 `useCareerSession` 이 `recoverAfterRest` 를 부르는 자리와 같다.
-           */
-          setAfterNotice(() => () => {
-            const recovered = recoverAfterPitcherRest(rest.career, random)
-            onSave(recovered.career)
-            if (recovered.recoveries.length > 0) setNotice(recovered.recoveries.join(' '))
+          // 상세 결과 창(0x18fc2 → 0x872a1) — 글은 StrMODE[24] "사기" + 수치 + [83] (0x18e3c)
+          setDetail({
+            rows: pitcherRestDetailRowsOf(rest.career, rest.moraleGain),
+            messages: [`사기 ${rest.moraleGain} 상승하였습니다`],
+            /*
+             * 결과 창을 **닫을 때** 회복 판정 0x1b308 (콜백 0x1d671, 질병 60% · 부상 30%, G 2-2).
+             * 타자편 `useCareerSession` 이 `recoverAfterRest` 를 부르는 자리와 같다.
+             */
+            afterClose: () => {
+              const recovered = recoverAfterPitcherRest(rest.career, random)
+              onSave(recovered.career)
+              if (recovered.recoveries.length > 0) setNotice(recovered.recoveries.join(' '))
+            },
           })
         },
       })
@@ -478,14 +512,25 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     [career, onSave],
   )
 
-  /** 알림을 닫는다 — 닫을 때 할 일이 걸려 있으면 그것까지 (휴식 회복 판정 0x1b308) */
-  const dismissNotice = useCallback(() => {
-    setNotice('')
-    const next = afterNotice
-    if (next === null) return
-    setAfterNotice(null)
-    next()
-  }, [afterNotice])
+  const closeDetail = useCallback(() => {
+    const shown = detail
+    setDetail(null)
+    shown?.afterClose()
+  }, [detail])
+
+  const dismissNotice = useCallback(() => setNotice(''), [])
+
+  /** 상세 결과 창의 키 — 확인·취소로 닫는다 (타자편 `useManagementMenu` 와 같은 처리, 0x1b4c4 가 보는 닫기 키) */
+  useEffect(() => {
+    if (detail === null) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Enter' && event.key !== 'Escape') return
+      event.preventDefault()
+      closeDetail()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [closeDetail, detail])
 
   const saveTrainedPitch = useCallback(
     (trained: PitcherCareer) => {
@@ -521,6 +566,8 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     equipTitle,
     items,
     notice,
+    detail,
+    closeDetail,
     question,
     choice,
     choiceIndex,
