@@ -1050,9 +1050,8 @@ function resolveBurstFor(
   const resolution = resolveBurst(
     progress.burst,
     burstResultBitsOf({
-      // 사구도 B5(출루)·B11 을 켠다 (0xa882a "볼 4개 || 사구" · 0xa8bf4). burstResultBits 가 아직 '사구' 를
-      // 몰라 같은 비트를 내는 볼넷으로 넘긴다
-      outcome: outcome.kind === '사구' ? { kind: '볼넷' } : outcome,
+      // 사구도 B5(출루)·B11 을 켠다 (0xa882a "볼 4개 || 사구" · 0xa8bf4) — burstResultBitsOf 가 직접 받는다
+      outcome,
       runsBattedIn: runsScored,
       outsBefore,
       outsAdded,

@@ -1799,10 +1799,8 @@ function resolveBurstFor(
   },
 ): TeamGameProgress {
   if (progress.burst === null) return progress
-  // 사구도 B5(출루)·B11 을 켠다 (0xa882a "볼 4개 || 사구" · 0xa8bf4). burstResultBits 가 아직 '사구' 를
-  // 몰라 같은 비트를 내는 볼넷으로 넘긴다
-  const outcome: AtBatOutcome = play.outcome.kind === '사구' ? { kind: '볼넷' } : play.outcome
-  const resolution = resolveBurst(progress.burst, burstResultBitsOf({ ...play, outcome }))
+  // 사구도 B5(출루)·B11 을 켠다 (0xa882a "볼 4개 || 사구" · 0xa8bf4) — burstResultBitsOf 가 '사구' 를 직접 받는다
+  const resolution = resolveBurst(progress.burst, burstResultBitsOf(play))
   return {
     ...progress,
     burst: resolution.session,
