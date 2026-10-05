@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ballFrameIndexAt, ballPixelAt, platePixelOf, RELEASE_PIXEL } from '@/widgets/batting-stage/lib/trajectory'
+import { ballFrameIndexAt, ballKindAt, ballPixelAt, platePixelOf, RELEASE_PIXEL } from '@/widgets/batting-stage/lib/trajectory'
 import { toPixel } from '@/widgets/batting-stage/lib/stageLayout'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 
@@ -78,6 +78,44 @@ describe('마구 공 그림 종류 (경기+0x1080, ball.pzx 종류 3 × 크기 1
 
   it('궤적이 없는 공도 같은 묶음으로 옮겨진다', () => {
     expect(ballFrameIndexAt({ ...커브, ballKind: 2 }, 19)).toBe(9 + 22)
+  })
+})
+
+describe('날아가는 도중 불꽃 공으로 바뀐다 (0x3b55e, 경로 번호 8 부터)', () => {
+  // 궤적 없는 20 틱 공 — 크기 칸은 2→9, 종류 1 이면 +11
+  const 마구 = (pitcherMagicNumber: number, pitcherForm: number): Pitch => ({
+    ...커브,
+    isMagicPitch: true,
+    pitcherMagicNumber,
+    pitcherForm,
+  })
+  const 보통칸 = (frame: number) => ballFrameIndexAt(커브, frame)
+
+  it('마구 1 은 경로 7 까지 보통 공, 8 부터 불꽃 공', () => {
+    expect(ballKindAt(마구(1, 3), 7)).toBe(0)
+    expect(ballKindAt(마구(1, 3), 8)).toBe(1)
+    expect(ballFrameIndexAt(마구(1, 3), 7)).toBe(보통칸(7))
+    expect(ballFrameIndexAt(마구(1, 3), 8)).toBe(보통칸(8) + 11)
+    expect(ballFrameIndexAt(마구(1, 3), 19)).toBe(보통칸(19) + 11)
+  })
+
+  it('마구 4 는 폼 묶음 0(폼 0·1)일 때만 불꽃 공이 된다', () => {
+    expect(ballKindAt(마구(4, 1), 8)).toBe(1)
+    expect(ballKindAt(마구(4, 2), 8)).toBe(0)
+  })
+
+  it('구질이 마구가 아니거나 다른 마구 번호면 던질 때 값 그대로다', () => {
+    expect(ballKindAt({ ...마구(1, 0), isMagicPitch: false }, 8)).toBe(0)
+    expect(ballKindAt(마구(2, 0), 8)).toBe(0)
+    expect(ballKindAt({ ...마구(9, 0), ballKind: 1 }, 3)).toBe(1)
+  })
+
+  it('원본 궤적이 있는 공도 같은 틱에 바뀐다', () => {
+    const path = Array.from({ length: 12 }, (_, index) => ({ x: 20000, y: 1150, z: 24500 + index * 500 }))
+    const 궤적마구: Pitch = { ...원본직구, frameCount: path.length, worldPath: path, isMagicPitch: true, pitcherMagicNumber: 1 }
+    const 궤적보통: Pitch = { ...궤적마구, isMagicPitch: false }
+    expect(ballFrameIndexAt(궤적마구, 7)).toBe(ballFrameIndexAt(궤적보통, 7))
+    expect(ballFrameIndexAt(궤적마구, 8)).toBe(ballFrameIndexAt(궤적보통, 8) + 11)
   })
 })
 

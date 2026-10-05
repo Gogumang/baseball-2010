@@ -35,7 +35,11 @@ export interface Pitch {
    * 아직 안 옮긴 곳(사용자 투구)은 없는 값이라 `?? 0` 으로 읽는다.
    */
   readonly magicNumber?: number
-  /** ball.pzx 공 그림 종류 = 경기+0x1080 (0x46fa8) — 0 보통 · 1 불꽃 · 2 날개 */
+  /**
+   * ball.pzx 공 그림 종류 = 경기+0x1080 — 0 보통 · 1 불꽃 · 2 날개. **던질 때 정해지는 값**(0x46fa8, 마구 8·9)만 담는다.
+   * 0x1080 은 날아가는 도중 0x3b55e 도 1 로 쓴다(마구 1 · 폼 묶음 0 인 마구 4, 경로 번호 8 부터) —
+   * 그건 그릴 때 `magicBallKindAtPath` 로 덮는다 (`widgets/batting-stage/lib/trajectory.ts`).
+   */
   readonly ballKind?: number
   /**
    * 이번 공의 **구질이 마구(22)인가** = 경기+0xfc8 == 0x16.

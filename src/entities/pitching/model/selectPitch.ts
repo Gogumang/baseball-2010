@@ -116,7 +116,8 @@ export function selectPitch(
     worldPath,
     stageSide: situation.side,
     magicNumber: magicState.ballMagicNumber,
-    // 0x46fa8 은 구질 22 일 때만 경기+0x1080 을 쓰고, 새 투구 준비 0x3d954 가 0 으로 지운다
+    // 던질 때 값 — 0x46fa8 은 구질 22 일 때만 경기+0x1080 을 쓰고, 새 투구 준비 0x3d954 가 0 으로 지운다.
+    // 0x3b55e 도 날아가는 도중 1 을 쓰지만(마구 1·4, 경로 번호 8 부터) 그건 그릴 때 magicBallKindAtPath 가 덮는다
     ballKind: isMagic ? magicBallKindOf(repertoire.magicId) : 0,
     // 이펙트 가리개 — 경기+0xfc8 == 0x16 과 투수 레코드 +0x18·폼을 그대로 실어 보낸다
     isMagicPitch: isMagic,

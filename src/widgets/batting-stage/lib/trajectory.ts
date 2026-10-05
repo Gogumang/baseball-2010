@@ -1,3 +1,4 @@
+import { magicBallKindAtPath } from '@/entities/pitcher-career/model/magicPitch'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import { BALL_FRAMES_PER_KIND, ballFrameOf, projectToScreen } from '@/entities/pitching/model/pitchCurve'
 import { bezierPointAt } from '@/shared/lib/bezier/bezier'
@@ -43,20 +44,37 @@ export function platePixelOf(pitch: Pitch): { x: number; y: number } {
 }
 
 /**
- * 공 그림 종류 = 경기+0x1080 (0x46fa8) — ball.pzx 는 종류 3 × 크기 11칸이다
- * (000~010 보통 · 011~022 불꽃 · 023~033 날개). 마투수 마구만 0 이 아닌 값을 쓴다:
- * **발렌타인(마구 8) → 2(날개) · 드래고나(마구 9) → 1(불꽃)**, 그 밖엔 전부 0 이다
- * (근거는 `entities/pitcher-career/model/magicPitch.ts` 의 `MAGIC_BALL_KIND_BY_NUMBER` 주석).
- * 종류를 정하는 것은 `selectPitch` 이고 여기서는 그대로 받아 쓴다.
+ * 공 그림 종류 = 경기+0x1080 — ball.pzx 는 종류 3 × 크기 11칸이다
+ * (000~010 보통 · 011~022 불꽃 · 023~033 날개). 0 이 아닌 값을 쓰는 곳은 둘이다
+ * (근거는 `entities/pitcher-career/model/magicPitch.ts` 의 `MAGIC_BALL_KIND_BY_NUMBER` 주석):
+ *   - 던질 때 `0x46fa8` — **발렌타인(마구 8) → 2(날개) · 드래고나(마구 9) → 1(불꽃)**.
+ *     `selectPitch` 가 정해 `pitch.ballKind` 로 실어 보낸다.
+ *   - 날아가는 도중 `0x3b55e` (타석 공 그리기 0x3b2f4) — 마구 1, 그리고 폼 묶음 0 인 마구 4 는
+ *     공 경로 번호(경기+0x1098) 가 8 인 틱부터 1(불꽃). 공 그리기(0x3b62e·0x3b6ae)가 그 뒤에 다시 읽으므로
+ *     바로 그 틱부터 불꽃 공이다 → `magicBallKindAtPath`.
+ *     이 갈래의 경기+0x1040(effect_fire/effect_shinning) 조건은 적재 0x47cc8 의 실리는 조건과 같아서
+ *     (`magicBallEffect.ts` 의 `magicBallEffectFolderOf`) 마구 번호·폼만으로 갈린다.
+ * 경로 번호는 웹의 `frame` 과 같은 칸이다 (`magicBallEffectFrameAt` 과 같은 기준).
  */
 const DEFAULT_BALL_KIND = 0
 const SMALLEST_BALL = 2
 const LARGEST_BALL = 9
 
+/** 이 틱(공 경로 번호 `frame`)의 공 그림 종류 */
+export function ballKindAt(pitch: Pitch, frame: number): number {
+  return magicBallKindAtPath({
+    isMagicPitch: pitch.isMagicPitch === true,
+    magicNumber: pitch.pitcherMagicNumber ?? 0,
+    pitcherForm: pitch.pitcherForm ?? 0,
+    pathIndex: frame,
+    selectedBallKind: pitch.ballKind ?? DEFAULT_BALL_KIND,
+  })
+}
+
 /** ball.pzx 프레임 번호 */
 export function ballFrameIndexAt(pitch: Pitch, frame: number): number {
   const path = pitch.worldPath
-  const ballKind = pitch.ballKind ?? DEFAULT_BALL_KIND
+  const ballKind = ballKindAt(pitch, frame)
   if (path !== null && path.length > 0) return ballFrameOf(path, clampFrame(frame, path.length), ballKind)
   const ratio = Math.max(0, Math.min(1, frame / Math.max(1, pitch.frameCount - 1)))
   return SMALLEST_BALL + Math.round(ratio * (LARGEST_BALL - SMALLEST_BALL)) + BALL_FRAMES_PER_KIND * ballKind
