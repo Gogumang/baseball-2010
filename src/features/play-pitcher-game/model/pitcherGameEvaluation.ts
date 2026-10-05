@@ -444,6 +444,11 @@ export interface PitcherGameEvaluation {
   /** StrUSER_EVT 번호 */
   readonly managerCommentIndex: number
   readonly completeGame: CompleteGameKind
+  /**
+   * 선수 카운터 +0x1e0/+0x1f0 에 세는 완투 계열 — 0xa690c 선발형 **승리** 갈래(0xa6b02~0xa6c1e)에서만 올린다
+   * (퍼펙트 [0] · 노히트 [1] · 완봉 [2] · 완투 [3]). 구원형이나 진 경기는 '없음'.
+   */
+  readonly countedCompleteGame: CompleteGameKind
 }
 
 export function evaluatePitcherGame(
@@ -458,5 +463,7 @@ export function evaluatePitcherGame(
     moraleChange: moraleChangeOf(context, popularityChange),
     managerCommentIndex: managerCommentIndexOf(context, popularityChange),
     completeGame: completeGameKindOf(record, context),
+    countedCompleteGame:
+      isStarterTypePosition(context.positionCode) && context.won ? completeGameKindOf(record, context) : '없음',
   }
 }

@@ -120,6 +120,36 @@ export const EMPTY_PITCHER_SEASON_STATS: PitcherSeasonStats = {
   losses: 0,
 }
 
+/** 선수 +0x1f0 u16[0..3] — 완투 계열 횟수 (통산, 새 시즌에도 지우지 않는다) */
+export interface CompleteGameCounts {
+  readonly perfect: number
+  readonly noHitter: number
+  readonly shutout: number
+  readonly completeGame: number
+}
+
+export const EMPTY_COMPLETE_GAME_COUNTS: CompleteGameCounts = { perfect: 0, noHitter: 0, shutout: 0, completeGame: 0 }
+
+const COMPLETE_GAME_COUNT_KEY = {
+  퍼펙트: 'perfect',
+  노히트: 'noHitter',
+  완봉: 'shutout',
+  완투: 'completeGame',
+} as const
+
+/** 완투 계열 한 번을 센다 (0xa6b54~0xa6c1a, u16 — 65535 를 넘으면 원본은 0 으로 돈다) */
+export function countCompleteGame(
+  career: PitcherCareer,
+  kind: keyof typeof COMPLETE_GAME_COUNT_KEY | '없음',
+): PitcherCareer {
+  if (kind === '없음') return career
+  const key = COMPLETE_GAME_COUNT_KEY[kind]
+  return {
+    ...career,
+    completeGameCounts: { ...career.completeGameCounts, [key]: (career.completeGameCounts[key] + 1) & 0xffff },
+  }
+}
+
 export interface PitcherCareer {
   readonly name: string
   /** 제구·구속·변화·체력 (레코드 +0xc 부터 s16 네 칸) */
@@ -228,6 +258,12 @@ export interface PitcherCareer {
    */
   readonly lotteryPurchases: number
   readonly lotteryFirstPrizes: number
+  /**
+   * 완투 계열 누적 — 선수 +0x1f0 u16[0..3] (퍼펙트 · 노히트 · 완봉 · 완투). 경기 뒤 인기도 0xa690c 의 선발형 승리
+   * 갈래가 +0x1e0[k] 와 함께 올린다(0xa6b54~0xa6c1a). 읽는 곳: 칭호 60 철완 28호(Σ[0..3] ≥ 20, 0x1ad4e) ·
+   * 칭호 63 퍼펙트 플레이어([0] > 1, 0x1aea0). 짝 칸 +0x1e0 은 읽는 곳을 못 찾아 두지 않는다.
+   */
+  readonly completeGameCounts: CompleteGameCounts
   readonly seasonPopularityGain: number
   readonly popularityAtSeasonStart: number
   readonly hasSeenYearGoalWindow: boolean
@@ -310,6 +346,7 @@ export function createPitcherCareer(
     mvpSeasonBits: 0,
     lotteryPurchases: 0,
     lotteryFirstPrizes: 0,
+    completeGameCounts: EMPTY_COMPLETE_GAME_COUNTS,
     seasonPopularityGain: 0,
     popularityAtSeasonStart: STARTING_POPULARITY,
     hasSeenYearGoalWindow: false,

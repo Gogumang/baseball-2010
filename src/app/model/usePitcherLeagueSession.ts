@@ -5,6 +5,7 @@ import {
   applyPitcherLeagueDay,
   applyPitcherPostseasonProgress,
   applyPitcherSeasonEnd,
+  countCompleteGame,
   createPitcherCareer,
   gainPitcherMorale,
   gainPitcherPopularity,
@@ -143,6 +144,8 @@ function normalizePitcherCareer(raw: unknown): PitcherCareer | null {
     stats: { ...base.stats, ...saved.stats },
     careerStats: { ...base.careerStats, ...saved.careerStats },
     leaguePlayerStats: { ...base.leaguePlayerStats, ...saved.leaguePlayerStats },
+    // 완투 계열 칸(+0x1f0[0..3])은 나중에 생긴 칸이다 — 옛 저장은 0 에서 시작한다
+    completeGameCounts: { ...base.completeGameCounts, ...saved.completeGameCounts },
     /*
      * 장착 칸(선수기록 +0x14)은 나중에 생긴 칸이다 — 바탕의 신인 값([0, 8])을 그대로 두면 보유와 어긋난다.
      * 예전 웹엔 장착 창이 없어 장착은 모두 획득 때의 자동 장착(0xa4bd8 → 0xa4b04, 모드 3 도 같다)뿐이었으므로
@@ -395,12 +398,14 @@ export function usePitcherLeagueSession(
             summary.evaluation.moraleChange,
           )
         : seasoned
+      // 선발형 승리 완투 계열 → +0x1e0/+0x1f0 (0xa690c 안이라 평가가 도는 정규시즌 경기만)
+      const counted = isEvaluated ? countCompleteGame(evaluated, summary.evaluation.countedCompleteGame) : evaluated
       setGameOptions(null)
 
       // 경기 뒤 평가 116 의 끝 — 정규시즌이 닫혔으면 시즌 끝 사슬(136→…→132)로 간다.
       // 45경기를 다 치렀는지는 `isPitcherSeasonFinished`(0xb818c) 가 본다.
-      if (isPitcherSeasonFinished(evaluated)) {
-        commit(evaluated)
+      if (isPitcherSeasonFinished(counted)) {
+        commit(counted)
         return setScene('시즌종료')
       }
       /*
@@ -423,18 +428,18 @@ export function usePitcherLeagueSession(
        * ⚠️ **부상 엔딩 판정보다 앞에 둔다** — 부상 엔딩은 관리 화면 **진입**(105, 0x11910 → 0x11b32)의
        *    첫 줄이라, 홀수 경기 뒤에는 105 에 들르지 않아 원본에서도 굴러가지 않는다.
        */
-      if (!isPitcherManagementCycleOpen(evaluated)) {
-        commit(evaluated)
-        setGameOptions(pitcherGameOptionsOf(evaluated, { gaugeSettingOn, throwModeManual }))
+      if (!isPitcherManagementCycleOpen(counted)) {
+        commit(counted)
+        setGameOptions(pitcherGameOptionsOf(counted, { gaugeSettingOn, throwModeManual }))
         return setScene('경기')
       }
       // 관리 화면 진입 105(0x11910 → 0x11b32)의 첫 줄 — 부상 누적 20경기면 이벤트 500 → 엔딩 141 (B-7)
-      const injury = pitcherInjuryEndingOf(evaluated)
+      const injury = pitcherInjuryEndingOf(counted)
       if (injury !== null) {
-        commit({ ...evaluated, endingIndex: injury })
+        commit({ ...counted, endingIndex: injury })
         return setScene('엔딩')
       }
-      commit(evaluated)
+      commit(counted)
       setScene('관리')
     },
     [career, commit, gameOptions, gaugeSettingOn, random, throwModeManual],

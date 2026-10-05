@@ -105,6 +105,22 @@ describe('투수편 칭호 — 이름은 48~63, 비트는 타자편 32~47 과 �
     expect(evaluateNewPitcherTitles(투수({ ability: 거의, skillIds: [0, 8, 7], equippedSkillIds: [0, 8] }))).not.toContain('초음속 폭격기')
   })
 
+  it('철완 28호(60) — 실효 체력 > 799 이고 완투 계열 합(+0x1f0[0..3]) ≥ 20 (0x1ad4e~0x1ad76)', () => {
+    const 철완 = TITLE_NAMES[60]
+    const 체력 = { control: 100, velocity: 100, breaking: 100, stamina: 800 }
+    const 스물 = { perfect: 1, noHitter: 2, shutout: 7, completeGame: 10 }
+    expect(evaluateNewPitcherTitles(투수({ ability: 체력, completeGameCounts: 스물 }))).toContain(철완)
+    expect(evaluateNewPitcherTitles(투수({ ability: 체력, completeGameCounts: { ...스물, completeGame: 9 } }))).not.toContain(철완)
+    expect(evaluateNewPitcherTitles(투수({ ability: { ...체력, stamina: 799 }, completeGameCounts: 스물 }))).not.toContain(철완)
+  })
+
+  it('퍼펙트 플레이어(63) — 퍼펙트 2회 (+0x1f0[0] > 1, 0x1aea0)', () => {
+    const 퍼펙트 = TITLE_NAMES[63]
+    const 없음 = { perfect: 0, noHitter: 0, shutout: 0, completeGame: 0 }
+    expect(evaluateNewPitcherTitles(투수({ completeGameCounts: { ...없음, perfect: 1 } }))).not.toContain(퍼펙트)
+    expect(evaluateNewPitcherTitles(투수({ completeGameCounts: { ...없음, perfect: 2 } }))).toContain(퍼펙트)
+  })
+
   it('마구 4단계를 다 배우면 마탄의 투수다 (0x1ae04 — +0x201 > 3, 근사다)', () => {
     expect(evaluateNewPitcherTitles(투수({ magicLevel: 3 }))).not.toContain('마탄의 투수')
     expect(evaluateNewPitcherTitles(투수({ magicLevel: 4 }))).toContain('마탄의 투수')

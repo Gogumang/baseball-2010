@@ -75,11 +75,19 @@ export function titleSubjectOfPitcher(career: PitcherCareer): TitleSubject {
 
 type PitcherRule = (career: PitcherCareer) => boolean
 
-/**
- * 투수편 전용 칭호 48~63 (P3 8절). 번호가 빠진 것:
- *   60 철완 28호      — `실효 체력 > 799 && Σ u16 +0x1f0[0..3] ≥ 20`. 웹에 **완투 계열 누적 칸이 없다**.
- *   63 퍼펙트 플레이어 — `u16 +0x1f0[0] > 1` (퍼펙트 2회). 웹에 **퍼펙트 누적 칸이 없다**.
- */
+/** 철완 28호 — 실효 체력 `0xb6415(P, 3, 1) > 0x31f` (0x1ad66~0x1ad72) */
+const IRON_ARM_STAMINA = 0x31f
+/** 철완 28호 — 완투 계열 합 `Σ u16 +0x1f0[0..3] ≥ 0x14` (0x1ad4e~0x1ad76) */
+const IRON_ARM_COMPLETE_GAMES = 0x14
+/** 퍼펙트 플레이어 — `u16 +0x1f0[0] > 1` (0x1aea0~0x1aeac) */
+const PERFECT_PLAYER_MINIMUM = 1
+
+const completeGameTotalOf = (career: PitcherCareer) => {
+  const counts = career.completeGameCounts
+  return counts.perfect + counts.noHitter + counts.shutout + counts.completeGame
+}
+
+/** 투수편 전용 칭호 48~63 (P3 8절) */
 const PITCHER_RULES: Readonly<Record<number, PitcherRule>> = {
   // 48 괴물 투수 — 2년 연속 MVP, 시즌 시작 때 (타자편 32 와 같은 식)
   48: (career) => matchesMonsterTitle(titleSubjectOfPitcher(career)),
@@ -108,7 +116,14 @@ const PITCHER_RULES: Readonly<Record<number, PitcherRule>> = {
     return ability.control > MAXED_ABILITY && ability.velocity > MAXED_ABILITY && ability.breaking > MAXED_ABILITY
   },
   // 62 마탄의 투수 — 마구 4단계 모두 훈련 (0x1ae04, `s8 +0x201 > 3`). **근사다** — 필드 뜻이 유력이다
+  // 60 철완 28호 — 실효 체력 > 799 이고 완투 계열(퍼펙트·노히트·완봉·완투) 합 20 이상.
+  // 체력은 제구·구속·변화(61)와 같은 `0xb6415(P, 3, 1)` — 장비·장착 스킬까지, 부상·질병·사기 감소는 빼고
+  60: (career) =>
+    equippedPitcherAbilityOf(career).stamina > IRON_ARM_STAMINA &&
+    completeGameTotalOf(career) >= IRON_ARM_COMPLETE_GAMES,
   62: (career) => career.magicLevel > ALL_MAGIC_LEVELS,
+  // 63 퍼펙트 플레이어 — 퍼펙트 2회 (+0x1f0[0], 타자편 47 사이클 횟수와 같은 칸·같은 식)
+  63: (career) => career.completeGameCounts.perfect > PERFECT_PLAYER_MINIMUM,
 }
 
 /** 조건을 만족했지만 아직 얻지 않은 투수편 칭호 (원본 번호 순) */

@@ -94,7 +94,7 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     hasEntered: true,
     recordIds: [],
     record: { outsRecorded: 21 },
-    evaluation: { popularityChange: 0, reputationChange: 0, moraleChange: 0 },
+    evaluation: { popularityChange: 0, reputationChange: 0, moraleChange: 0, countedCompleteGame: '없음' },
   } as unknown as Parameters<ReturnType<typeof 띄우기>['result']['current']['actions']['finishGame']>[0]
 
   const 경기치르기 = (result: ReturnType<typeof 띄우기>['result']) => {
@@ -112,11 +112,13 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
   }
 
   it('경기 뒤 평가(0xa719c)는 정규시즌만 — 포스트시즌 경기는 0x4f268 이 건너뛴다, 45번째 경기는 평가된다', () => {
-    const 평가요약 = { ...경기요약, evaluation: { popularityChange: 7, reputationChange: 3, moraleChange: -5 } } as typeof 경기요약
+    const 평가요약 = { ...경기요약, evaluation: { popularityChange: 7, reputationChange: 3, moraleChange: -5, countedCompleteGame: '완봉' } } as typeof 경기요약
     const 정규 = 판짜기({ gamesPlayed: 44, popularity: 100, reputation: 100, morale: 50 })
     act(() => 정규.current.actions.beginGame())
     act(() => 정규.current.actions.finishGame(평가요약))
     expect(정규.current.career).toMatchObject({ popularity: 107, morale: 45 })
+    // 선발형 승리 완봉 → +0x1f0[2] (평가 안이라 정규시즌만)
+    expect(정규.current.career?.completeGameCounts).toEqual({ perfect: 0, noHitter: 0, shutout: 1, completeGame: 0 })
     expect(정규.current.career?.reputation).not.toBe(100)
 
     const 포스트 = 판짜기({
@@ -129,6 +131,7 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     act(() => 포스트.current.actions.beginGame())
     act(() => 포스트.current.actions.finishGame(평가요약))
     expect(포스트.current.career).toMatchObject({ popularity: 100, reputation: 100, morale: 50 })
+    expect(포스트.current.career?.completeGameCounts.shutout).toBe(0)
   })
 
   it('45경기째를 치르면 정규시즌이 닫히고 시즌종료 화면으로 간다 (0xb818c)', () => {
@@ -649,5 +652,18 @@ describe('투수편 외출 (112 지도 · 113 장소 — 타자편과 같은 코
 
     expect(result.current.outingNotice).toBe('인기도가 부족합니다. 필요한 인기도 : 600')
     expect(result.current.career).toBe(before)
+  })
+})
+
+describe('완투 계열 카운터 +0x1f0 — 옛 저장 호환', () => {
+  it('칸이 없던 저장도 0 에서 시작한다', () => {
+    const store = 메모리저장()
+    const 첫판 = 띄우기(store)
+    act(() => 첫판.result.current.actions.create('투수', 신인))
+    const { completeGameCounts: _빠짐, ...옛저장 } = store.load() as Record<string, unknown>
+    store.save(옛저장)
+
+    const 둘째판 = 띄우기(store)
+    expect(둘째판.result.current.career?.completeGameCounts).toEqual({ perfect: 0, noHitter: 0, shutout: 0, completeGame: 0 })
   })
 })

@@ -201,6 +201,12 @@ describe('한꺼번에', () => {
     expect(결과.managerCommentIndex).toBeGreaterThanOrEqual(2)
     expect(결과.moraleChange).toBe(5)
   })
+
+  it('+0x1f0 에 세는 완투 계열은 선발형 승리 갈래만이다 (0xa6b02 — 진 경기·구원형은 없음)', () => {
+    expect(evaluatePitcherGame(완투기록, 선발).countedCompleteGame).toBe('완봉')
+    expect(evaluatePitcherGame(완투기록, { ...선발, won: false }).countedCompleteGame).toBe('없음')
+    expect(evaluatePitcherGame(완투기록, 구원).countedCompleteGame).toBe('없음')
+  })
 })
 
 describe('R+0x128(내 실점)이 평가에 들어간다 — P1 5-1 "늘 0" 정정 (9d039b6)', () => {
