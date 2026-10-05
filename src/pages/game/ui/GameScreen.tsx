@@ -14,6 +14,8 @@ import { HALF_INNING_JINGLE_TICK } from '@/features/play-game/model/halfInningBo
 import { HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
+import { mySpecialSwingRemainingOf } from '@/features/play-game/model/gameFlow'
+import { RUTHLESS_SKILL_ID } from '@/entities/batting/model/specialSwing'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import type { AtBatState } from '@/entities/at-bat/model/atBatState'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
@@ -61,6 +63,11 @@ interface GameScreenProps {
    * 인자는 틱 10 의 갱신이 돌았는가 (진행기 `resolveBenchClearing` 이 그 굴림 8 번을 낸다).
    */
   readonly onBenchClearingDone?: (reachedTargetTick: boolean) => void
+  /**
+   * 필살 스윙이 나간 틱(`0x4e136`)에 줄인 남은 횟수를 받는다 — 진행기(`spendMySpecialSwing`)가 든다.
+   * 안 넘기면 횟수를 줄여도 받아 줄 곳이 없어 경기 내내 처음 횟수로 남는다.
+   */
+  readonly onSpecialSwingUsed?: (remaining: number) => void
 }
 
 /** 나만의리그 타자편 = 원본 전역 모드 4 — 경기 중 메뉴 표 0xcfcfc 의 **행 2**(네 칸)다 */
@@ -84,6 +91,7 @@ export function GameScreen({
   settings,
   onSettingsChange,
   onBenchClearingDone,
+  onSpecialSwingUsed,
 }: GameScreenProps) {
   const [isMenuOpen, setMenuOpen] = useState(false)
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
@@ -241,6 +249,16 @@ export function GameScreen({
           // 필살타법 '0' (0x535a4 → 0x51dee → 0x34c74). 레벨이 아니라 **고른 번호**(+0x18)를 넘긴다 —
           // 0 이면(아직 안 고름) '0' 키가 무시된다
           specialSwingNumber={career.specialSwingNumber}
+          // 한 경기 횟수 s8 team[+0x29 + 타순] — 0xaebe4 가 표 0xd84f0[+0x18] (+ 스킬 23 무자비 1)로 채운다
+          specialSwingRemaining={mySpecialSwingRemainingOf(progress, {
+            swingNumber: career.specialSwingNumber,
+            hasRuthlessSkill: career.equippedSkillIds.includes(RUTHLESS_SKILL_ID),
+          })}
+          onSpecialSwingUsed={onSpecialSwingUsed}
+          // 0xab214 의 내 선수 보너스 — 모드 4 에서 rec = 0x1f8d4(저장, 4) = [저장+0xbc]+0x11c 의 rec[0xa] 비트7(육성)이
+          // 서고(0xb6389, ab3d6), 연차 idx 는 같은 레코드 +0xb3 (ab3f2) — 커리어 연차는 1부터라 1 을 뺀다
+          isBatterOwnPlayer
+          careerYearIndex={career.season - 1}
           onPitchResolved={onPitchResolved}
           onPickoff={onPickoff}
         />

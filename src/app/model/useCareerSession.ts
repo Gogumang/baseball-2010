@@ -3,7 +3,7 @@ import type { Screen } from '@/app/model/screen'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import { isAtBatFinished } from '@/entities/at-bat/model/atBatState'
 import { describeOutcomeBanner } from '@/entities/at-bat/model/resolutionText'
-import { cpuPickoff, resolveBenchClearing, resolveDefensePlay, startGame, startPlayerOutcome, stealBase, summaryOf, throwOpponentPitch } from '@/features/play-game/model/gameFlow'
+import { cpuPickoff, resolveBenchClearing, resolveDefensePlay, spendMySpecialSwing, startGame, startPlayerOutcome, stealBase, summaryOf, throwOpponentPitch } from '@/features/play-game/model/gameFlow'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
@@ -732,6 +732,16 @@ export function useCareerSession({
       if (cup !== null) return finishCupGame(next, cup)
       const currentCareer = careerRef.current
       if (currentCareer !== null) finishGame(next, currentCareer)
+    },
+
+    /** 필살 스윙이 나갔다 (`0x4e136`) — 줄인 남은 횟수를 진행기에 적는다. 난수·소리 없음 */
+    spendSpecialSwing: (remaining: number) => {
+      const current = progressRef.current
+      if (current === null) return
+      const next = spendMySpecialSwing(current, remaining)
+      if (next === current) return
+      progressRef.current = next
+      setProgress(next)
     },
 
     /**

@@ -1,6 +1,7 @@
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { describeOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { atBatRecordCodeOf } from '@/entities/batting/model/swingSkills'
+import { specialSwingCountOf } from '@/entities/batting/model/specialSwing'
 import {
   applyAtBatOutcome,
   applyOpponentInning,
@@ -263,7 +264,22 @@ export interface GameProgress {
    * 모드 4 에서 판이 설 수 있는 것은 이 하나뿐이다 (`withFirstInningBoard` 머리말).
    */
   readonly halfInningBoard: { readonly serial: number; readonly inning: number; readonly half: GameState['half'] } | null
+  /**
+   * **내 타순 칸의 필살타법 남은 횟수** — 팀 객체 `s8 team[+0x29 + 타순]` (H2 1-1·1-2).
+   *
+   * `UNFILLED_SPECIAL_SWING_COUNT`(−1) 는 "아직 안 채움" 이다. 타석 교대·교체 처리 `0xaebe4` 가 타석마다
+   * `0xaea30(팀) < 0` 일 때만(aef34~aef3c) 채운다 — 값은 `specialSwingCountOf`(표 0xd84f0 · 스킬 23 +1,
+   * aefd4~af00a)라 난수도 경기 상황도 안 보고 **선수 레코드만** 본다. 그래서 첫 내 타석 전에 채우든 화면이
+   * 읽는 순간 채우든 값이 같다 — 웹은 읽는 쪽(`mySpecialSwingRemainingOf`)이 채운다.
+   * 다시 −1 로 되돌리는 곳은 교체(대타 0xaede0 등)뿐인데 나는 대타로 안 바뀌므로 경기 내내 한 번만 찬다.
+   * 줄이는 곳은 스윙 틱 `0x4e136` 하나다 (`spendMySpecialSwing`).
+   * ⚠️ −1 로 처음 깔아 두는 자리(팀 초기화)는 찾지 못했다 — 0 으로 깔리면 필살이 아예 안 나가므로 −1 로 본다.
+   */
+  readonly specialSwingRemaining: number
 }
+
+/** `team[+0x29 + 타순]` 의 "아직 안 채움" 값 — `0xaebe4` 가 음수를 보고 채운다 */
+export const UNFILLED_SPECIAL_SWING_COUNT = -1
 
 /**
  * 이 화면이 돌리는 경기는 나만의리그 **타자편** = 원본 게임 모드 4 다 (0x327b8 모드표, H-1).
@@ -354,6 +370,7 @@ export function startGame(
     decisions: EMPTY_DECISION_STATE,
     pendingBenchClearing: null,
     halfInningBoard: null,
+    specialSwingRemaining: UNFILLED_SPECIAL_SWING_COUNT,
   }
   return advanceUntilPlayerTurn(withFirstInningBoard(initial, random), random)
 }
@@ -1297,6 +1314,42 @@ function appendLog(progress: GameProgress, text: string, isMine: boolean): GameP
     log: [entry, ...progress.log].slice(0, MAXIMUM_LOG_LENGTH),
     nextLogId: progress.nextLogId + 1,
   }
+}
+
+/**
+ * 내 타순 칸의 필살 남은 횟수 `0xaea30(팀)` — 아직 안 채웠으면 `0xaebe4` 가 채울 값으로 읽는다.
+ *
+ * ```
+ * aef28  B = 0xae89c(팀) ; B+0x18 == 0 → 0xae9e8(팀, 0)
+ * aef36  0xaea30(팀) ≥ 0 → 그대로
+ * aef3e  마타자(0xb633d) → s8 0xd84fa[레벨] · 아니면 u8 0xd84f0[B+0x18]   ; 내 선수는 마선수가 아니다
+ * aefec  0xb62b4(B, 0x17) 무자비(장착 비트) → +1
+ * ```
+ */
+export function mySpecialSwingRemainingOf(
+  progress: GameProgress,
+  batter: {
+    /** 고른 필살 번호 (선수 +0x18) */
+    readonly swingNumber: number
+    /** 타자 스킬 23 무자비 장착 */
+    readonly hasRuthlessSkill: boolean
+  },
+): number {
+  if (progress.specialSwingRemaining >= 0) return progress.specialSwingRemaining
+  return specialSwingCountOf({
+    swingNumber: batter.swingNumber,
+    isAceBatter: false,
+    hasRuthlessSkill: batter.hasRuthlessSkill,
+  })
+}
+
+/**
+ * 필살 스윙이 나간 틱 `0x4e136` — `0xae9e8(팀, 남은 − 1)`. 줄인 값은 타석 그림(`BattingStage.onSpecialSwingUsed`)이
+ * `remainingAfterSpecialSwing` 으로 이미 계산해 넘긴다. 난수 없음.
+ */
+export function spendMySpecialSwing(progress: GameProgress, remaining: number): GameProgress {
+  if (progress.specialSwingRemaining === remaining) return progress
+  return { ...progress, specialSwingRemaining: remaining }
 }
 
 /**

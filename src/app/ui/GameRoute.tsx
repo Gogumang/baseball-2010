@@ -125,6 +125,8 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
         onPickoff={session.actions.cpuPickoff}
         // 사구 뒤 벤치 클리어링 연출(상태 0x1e)이 끝나면 사구를 먹인다
         onBenchClearingDone={session.actions.finishBenchClearing}
+        // 필살 스윙 틱(0x4e136)의 남은 횟수 −1 — 경기 진행기가 든다
+        onSpecialSwingUsed={session.actions.spendSpecialSwing}
         settings={gameSettings.settings}
         onSettingsChange={gameSettings.setSettings}
       />

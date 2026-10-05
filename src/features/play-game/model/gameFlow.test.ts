@@ -5,6 +5,9 @@ import {
   opponentPitcherAbilityOf,
   resolveDefensePlay,
   startGame,
+  mySpecialSwingRemainingOf,
+  spendMySpecialSwing,
+  UNFILLED_SPECIAL_SWING_COUNT,
   startPlayerOutcome,
   stealBase,
   summaryOf,
@@ -1113,5 +1116,20 @@ describe('1회초 판 (상태 0x18) — 선공·1번 타자일 때만', () => {
     const 씨 = createSeededRandom(77)
     startGame({ ...씨, next: () => { 수 += 1; return 씨.next() } }, 0, 1, undefined, PLAYER_SIDE_FIRST_BAT)
     expect(수).toBe(36)
+  })
+})
+
+describe('내 필살 남은 횟수 s8 team[+0x29 + 타순] (0xaebe4 채움 · 0x4e136 소모)', () => {
+  it('경기 시작은 −1(안 채움)이고, 읽을 때 표 0xd84f0[번호] (+ 무자비 1) 로 채운다', () => {
+    const progress = startGame(createSeededRandom(1))
+    expect(progress.specialSwingRemaining).toBe(UNFILLED_SPECIAL_SWING_COUNT)
+    expect(mySpecialSwingRemainingOf(progress, { swingNumber: 3, hasRuthlessSkill: false })).toBe(4)
+    expect(mySpecialSwingRemainingOf(progress, { swingNumber: 3, hasRuthlessSkill: true })).toBe(5)
+    expect(mySpecialSwingRemainingOf(progress, { swingNumber: 0, hasRuthlessSkill: true })).toBe(0)
+
+    // 한 번 쓰면 그 값이 경기 내내 남는다 — 0 이 되어도 다시 안 찬다 (음수일 때만 채운다)
+    const spent = spendMySpecialSwing(progress, 0)
+    expect(mySpecialSwingRemainingOf(spent, { swingNumber: 3, hasRuthlessSkill: false })).toBe(0)
+    expect(spendMySpecialSwing(spent, 0)).toBe(spent)
   })
 })
