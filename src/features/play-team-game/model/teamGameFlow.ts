@@ -81,6 +81,7 @@ import {
 import type { PitchSlot, PitcherStats } from '@/features/play-pitcher-game/model/pitcherPitch'
 import { TEAM_GAME_MODE } from '@/features/play-team-game/model/gameAbilities'
 import type { FieldingAssignment, SeasonTeamCondition } from '@/features/play-team-game/model/gameAbilities'
+import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
 import { introSkipsFirstBoard, rollHalfInningFielders } from '@/features/play-game/model/halfInningBoard'
 import { EMPTY_DECISION_STATE } from '@/features/play-pitcher-game/model/winLossSave'
 import type { DecisionState } from '@/features/play-pitcher-game/model/winLossSave'
@@ -348,6 +349,12 @@ export interface TeamGameProgress {
   readonly lastHumanHalf: { readonly inning: number; readonly half: GameState['half'] } | null
   /** 그 뒤로 자동(간이 엔진, 상태 0x21) 타석이 지났는가 — 지났으면 0x18 이 판 없이 넘어간다 (4fab6) */
   readonly autoSinceHuman: boolean
+  /**
+   * **벤치 클리어링 연출 중**(상태 0x1e) — 사람 타석의 사구가 20/99 굴림에 걸리면 진입(0x3a5f0)의 굴림 45 번까지
+   * 쓰고 사구 결과를 붙든 채 멈춘다. 화면이 연출을 끝내고 `resolveBenchClearing` 을 부르면 보통 길(0xae24c)로 간다.
+   * `side` 는 사람이 잡은 쪽 — '공격' 우리 타자가 맞음 · '수비' 우리 투수가 맞힘.
+   */
+  readonly pendingBenchClearing: { readonly side: '공격' | '수비'; readonly outcome: AtBatOutcome } | null
   /** 지금 타석의 볼 카운트 (사람이 잡은 타석에서만 찬다) */
   readonly atBat: AtBatState
   /** 상대 타순 커서 0~8 */
@@ -416,12 +423,17 @@ export interface TeamGameProgress {
    */
   readonly gameRecord: readonly number[]
   /**
-   * `state[0xe]` — 이 경기에 CPU 대타를 이미 썼는가. 원본은 **경기에 한 칸**이라 양 팀을 합쳐 한 번뿐이다.
+   * `state[0xe]` — **다음 공이 나가기 전까지** CPU 대타를 다시 묻지 않게 막는 칸 (양 팀 공용 한 칸).
+   * "경기에 한 번" 이 아니다 — 대타 횟수를 막는 것은 벤치 수·타순 칸 기록(`0xac228` 의 다른 조건)뿐이다.
    *
-   * ⚠️ 미해결: 사람 경기 장면의 타석 시작 `0x48d50` 이 이전 상태(`scene+0x28`)가 0x16 이 아니면
-   *    `state[0xe] = 0` 을 쓴다 (48eb0~48eb6, 0xa5bcc 바로 뒤). 그러면 사람 장면에서는 "타석마다 한 번" 이라
-   *    0xf 에 공마다 다시 들어와도 한 번만 묻게 막는 칸으로 보인다. 간이 엔진(0xc262c·0xc0ee8)에는 지우는 곳을
-   *    못 찾았다. 둘이 섞이는 웹 흐름에서 어떻게 셈할지 정하지 못해 아직 "경기에 한 번" 그대로 둔다.
+   * - 세우는 곳: `0xac228` 이 대타를 낼 때 1 (ac33e).
+   * - 지우는 곳(전수 — `strb …,[state+0xe]` 꼴 셋):
+   *   · **공마다** 투구 처리 `0xa5e14` 의 a5e7c (a5e72 의 state[0xd] = 0 바로 뒤) — 사람 장면 공이 손을 떠날 때
+   *     (`0x3de10` 의 3dec6)와 간이 엔진 공마다(`0xc262c` 의 c26ca) 둘 다 부른다.
+   *   · 사람 장면 타석 시작 `0x48d50` 의 48eb6 — 이전 상태(`scene+0x28`)가 0x16 이면 건너뛴다 (48e94).
+   *   · 경기 상태 초기화 `0xb67d0` 의 b6806 (경기를 세울 때).
+   * 그래서 간이 엔진에서는 대타를 낸 뒤 `0xc262c` 가 같은 타석으로 다시 들어올 때(`0xc1ba4` 재호출) 한 번 막고,
+   * 사람 장면에서는 0x16 → 0xd → 0xe → 0xf 로 다시 들어온 `0x3d954` 를 한 번 막는다. 공이 하나 나가면 다시 열린다.
    */
   readonly cpuPinchHitUsed: boolean
   /**
@@ -593,6 +605,7 @@ export function startTeamGame(options: TeamGameOptions, random: RandomPort): Tea
     halfInningBoard: null,
     lastHumanHalf: null,
     autoSinceHuman: false,
+    pendingBenchClearing: null,
     atBat: createAtBat(),
     opponentOrderIndex: 0,
     opponentPitcherIndex: startingSlots.opponent,
@@ -645,6 +658,8 @@ export function isHumanTurn(progress: TeamGameProgress): boolean {
   // 수비 진행 중(원본 상태 0x17)에는 타석·투구 차례가 아니다 — 원본도 공이 멈출 때까지
   // 0xe·0xf 로 돌아가지 않아 다음 투구가 나가지 않는다
   if (progress.pendingDefensePlay !== null) return false
+  // 벤치 클리어링 연출(0x1e) 중에도 다음 공이 안 나간다
+  if (progress.pendingBenchClearing !== null) return false
   const ours = isOurOffense(progress)
   return isHumanControlled(settingsOf(progress), {
     mode: progress.options.mode,
@@ -1140,6 +1155,8 @@ function throwOpponentPitch(progress: TeamGameProgress, pitchTypeNumber: number 
     }),
     opponentPitcherCounters: addRunsToCounters(progress.opponentPitcherCounters, 0, 1, false),
     pitcherJustChanged: false,
+    // 같은 0xa5e14 가 바로 뒤(a5e7c)에서 state[0xe] 도 내린다
+    cpuPinchHitUsed: false,
   }
 }
 
@@ -1168,7 +1185,11 @@ export function applyBatterOutcome(
   random: RandomPort,
   options: BatterOutcomeOptions = {},
 ): TeamGameProgress {
-  const started = startBatterOutcome(progress, outcome, random, options)
+  let started = startBatterOutcome(progress, outcome, random, options)
+  // 끼어들 사람이 없으면 벤치 클리어링도 100틱을 다 본 것으로 친다 — 틱 10 의 굴림 8 번까지 나간다
+  if (started.pendingBenchClearing !== null) {
+    started = resolveBenchClearing(started, { reachedTargetTick: true }, random)
+  }
   const pending = started.pendingDefensePlay
   if (pending === null) return started
   // 미리 다 돌려 버린다 — `runDefensePlay` 는 스테퍼를 끝까지 도는 얇은 껍데기라 난수 차례가 같다.
@@ -1195,7 +1216,12 @@ export function startBatterOutcome(
 ): TeamGameProgress {
   if (progress.game.isFinished) return progress
   // 사구면 상태 0x12 끝(0x4e74c)에서 벤치 클리어링을 굴린다 — 밀어내기 주루·정산보다 앞이다
-  progress = withBatterBenchClearing(progress, outcome, random)
+  const cleared = withBatterBenchClearing(progress, outcome, random)
+  if (cleared !== progress) {
+    // 들어갔다 — 진입 0x3a5f0 의 굴림 45 번 뒤 연출에서 붙든다
+    rollBenchClearingEntry(random)
+    return { ...cleared, pendingBenchClearing: { side: '공격', outcome } }
+  }
   if (!isBattedBallInPlay(outcome)) {
     // 홈런도 공이 날아가는 그림은 나와야 한다 — 진루·득점은 그대로 두고 **보여 줄 틱만** 만든다
     const playback = homeRunPlaybackOf({ outcome, bases: progress.game.bases, pattern: options.pattern })
@@ -1212,11 +1238,33 @@ export function startBatterOutcome(
 }
 
 /**
+ * **벤치 클리어링 연출이 끝났다** — 출구 0xae24c (100틱 뒤 화면 전환이 끝났거나 OK·'5' 로 건너뜀).
+ * `reachedTargetTick` = 틱 10 의 갱신이 돌았는가 — 돌았으면 수비 8명 목표 굴림 8 번이 그때 나갔다
+ * (`features/play-game/model/benchClearingScene`). 그 뒤 사구는 보통 길 그대로다.
+ */
+export function resolveBenchClearing(
+  progress: TeamGameProgress,
+  scene: { readonly reachedTargetTick: boolean },
+  random: RandomPort,
+): TeamGameProgress {
+  const pending = progress.pendingBenchClearing
+  if (pending === null) return progress
+  if (scene.reachedTargetTick) rollBenchClearingTargets(random)
+  const cleared: TeamGameProgress = { ...progress, pendingBenchClearing: null }
+  if (pending.side === '공격') {
+    const playback = homeRunPlaybackOf({ outcome: pending.outcome, bases: cleared.game.bases })
+    return finishBatterOutcome(cleared, pending.outcome, random, null, playback)
+  }
+  // 사구는 인플레이가 아니라 수비 화면 없이 곧장 끝난다
+  return advance(startDefensiveAtBat(cleared, pending.outcome, true, random), random)
+}
+
+/**
  * **사구 뒤 벤치 클리어링** (`entities/game/model/benchClearing`, R10 6절) — 우리 타석이라 수비(상대)는 CPU 다.
  * 들어가면 상대 투수 투구 수(`+0x27c`) +10 (0x3ab82). 시즌 평판 S[1](코드 1, 0x3ab92)도 부르지만 코드 ≤ 5 는
  * 공격측이 CPU 일 때만 적히므로 우리 공격에서는 게이트에서 버려진다 (`withSeasonRecord` 가 그대로 가른다).
  * 홈런더비가 아니라 사구면 늘 한 번 굴린다 — **사구 타석만 난수를 하나 더 쓴다.**
- * ⚠️ 연출 화면(양 팀이 마운드로 몰려나오는 100틱, 배경음 44)과 그 연출이 쓰는 난수는 없다.
+ * 들어가면 부르는 쪽이 연출(상태 0x1e)을 붙든다 — `pendingBenchClearing` · `resolveBenchClearing`.
  * 우리가 던진 공에 CPU 타자가 맞는 쪽(코드 1 이 S[1] 에 남고 우리 투수 스태미나 −1000)은 `withPitcherBenchClearing`.
  */
 function withBatterBenchClearing(
@@ -1515,6 +1563,8 @@ function pitchOnce(
     pitchCount: progress.pitchCount + 1,
     // 투구마다 state[0xd] 가 내려간다 (0xa5e72) — 그 뒤라야 다시 교체를 볼 수 있다
     pitcherJustChanged: false,
+    // 같은 0xa5e14 가 state[0xe](CPU 대타 막음)도 내린다 (a5e7c)
+    cpuPinchHitUsed: false,
     ourPitcherCounters: {
       ...progress.ourPitcherCounters,
       pitches: progress.ourPitcherCounters.pitches + 1,
@@ -1529,6 +1579,12 @@ function pitchOnce(
 
   // 사구면 상태 0x12 끝(0x4e74c)에서 벤치 클리어링을 굴린다 — 밀어내기 주루(0x17)·정산 0xa8024 보다 앞이다
   const cleared = withPitcherBenchClearing(afterPitch, outcome, random)
+  if (cleared !== afterPitch) {
+    // 들어갔다 — 진입 0x3a5f0 의 굴림 45 번 뒤 연출에서 붙든다. 끼어들 사람이 없는 갈래는 끝까지 본 것으로
+    rollBenchClearingEntry(random)
+    const held: TeamGameProgress = { ...cleared, pendingBenchClearing: { side: '수비', outcome } }
+    return defer ? held : resolveBenchClearing(held, { reachedTargetTick: true }, random)
+  }
   const started = startDefensiveAtBat(cleared, outcome, true, random)
   const pending = started.pendingDefensePlay
   // 수비 진행 중 — 화면이 틱을 돌리는 동안 경기를 붙들어 둔다 (원본 상태 0x17)
@@ -1547,7 +1603,7 @@ function pitchOnce(
  * 들어가면 0x3ab7c `0xaeab0(수비 팀, 1000)` — 지금 마운드의 우리 투수 스태미나(+0x2c) −1000, [0, 10000] 로 자른다.
  * 시즌 평판 S[1](코드 1, 0x3ab92)은 코드 ≤ 5 라 공격측(상대)이 CPU 인 지금 남는다 — `withSeasonRecord` 가
  * 시즌 팀 경기(모드 2)일 때만 적는다. 홈런더비가 아니라 사구면 늘 한 번 굴린다 — **사구 타석만 난수를 하나 더 쓴다.**
- * ⚠️ 연출 화면(양 팀이 마운드로 몰려나오는 100틱, 배경음 44)과 그 연출이 쓰는 난수는 없다.
+ * 들어가면 부르는 쪽이 연출(상태 0x1e)을 붙든다 — `pendingBenchClearing` · `resolveBenchClearing`.
  */
 function withPitcherBenchClearing(
   progress: TeamGameProgress,
@@ -1919,6 +1975,9 @@ function applyPickoffPlay(
  * (간이 엔진 중계)로 빠져 0xf 를 지나지 않는다. 그래서 여기서도 **사람이 잡은 타석에서만** 굴린다.
  */
 function prepareAtBat(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
+  // 상태 0xd 진입 0x48d50 — 이전 상태가 교체 연출 0x16 이 아니면 state[0xe] = 0 (48eb0~48eb6).
+  // 이 길로 오는 것은 새 타석뿐이다(교체 연출 뒤 재진입은 이 함수를 안 지난다)
+  progress = progress.cpuPinchHitUsed ? { ...progress, cpuPinchHitUsed: false } : progress
   // 사람 경기 타석 시작 0x3d954 는 **수비가 사람일 때** CPU 대타 0xac228 을 부른다 (0x3da6e).
   // (수비가 CPU 면 그 자리에서 CPU 투수 교체 0xac428 로 간다 — 그쪽은 자동 타석에만 옮겨져 있다.)
   // ⚠️ 돌발미션 판정과의 앞뒤 차례는 **미확인**이다 (0x3d954 를 끝까지 읽지 않았다).
@@ -2214,7 +2273,7 @@ export function availablePinchHitters(progress: TeamGameProgress): readonly numb
  * 공격 쪽이다 (R4 1a): 경기 상태 0xe·0xf 이고 **벤치 타자 수 `팀+0x28c` > 0**.
  *
  * 원본은 한 경기 대타 횟수를 사람에게 제한하지 않는다 — 벤치가 남아 있는 만큼 낼 수 있다
- * (경기당 1번 제한은 CPU 대타 `0xac228` 쪽 `state[0xe]` 뿐이다).
+ * (CPU 대타 `0xac228` 쪽에도 경기당 횟수 제한은 없다 — `state[0xe]` 는 다음 공까지만 막는 칸이다).
  */
 export function canOpenPinchHit(progress: TeamGameProgress): boolean {
   if (progress.game.isFinished) return false
@@ -2344,6 +2403,10 @@ function substituteBatter(
  *   - 사람이 잡은 타석: `0x3d954` 가 **수비가 사람일 때만** 부른다 (`0x3da6e`) — 곧 우리가
  *     던지는 타석에서 상대 타순에만 선다.
  *
+ * 막음 칸 `state[0xe]`(`cpuPinchHitUsed`)은 공마다 내려가므로(`0xa5e14` a5e7c) **한 경기에 여러 번** 나올 수 있다 —
+ * 벤치 수·타순 칸 기록(타석 둘 이상·적시타 없음·안타 하나 이하)이 실제 상한이다.
+ * (`judgeCpuPinchHit` 의 입력 이름 `alreadyUsedThisGame` 은 예전 해석의 이름이다 — 뜻은 이 칸이다.)
+ *
  * ⚠️ 원본이 보는 **장비 레벨 니블**(레코드 `+0x19`·`+0x1a`)은 웹 로스터 표에 없어 늘 0 으로 둔다.
  */
 function applyCpuPinchHit(
@@ -2404,7 +2467,7 @@ function applyCpuPinchHit(
   return appendLog(
     {
       ...changed,
-      // state[0xe] = 1 — 경기에 한 번뿐이다
+      // state[0xe] = 1 (ac33e) — 다음 공(0xa5e14)이 나갈 때까지 다시 묻지 않는다
       cpuPinchHitUsed: true,
       // 타석 시작에서만 부르므로 카운트는 이미 0-0 이다 — 간이 엔진은 0xc0ee8 → 0xb6764 가 먼저 지우고,
       // 사람 장면은 0x16 → 0xd 가 지우기를 건너뛰지만 그 전 0xd 가 이미 지웠다
@@ -2635,14 +2698,41 @@ function withHalfInningBoard(progress: TeamGameProgress, random: RandomPort): Te
   }
 }
 
+/**
+ * 간이 타석 하나 앞의 **교체 판정** — `0xc262c` 가 `0xc1ba4` 를 부르는 모양 그대로다.
+ *
+ * `0xc1ba4` 는 한 번 불릴 때 CPU 대타 `0xac228`(공격 팀, 0xc1c50)과 CPU 투수 교체 `0xac428`(수비 팀, 0xc1ce2)을
+ * **둘 다** 부르고 하나라도 참이면 1 을 돌려준다(0xc1ce6 `orrs`). 그러면 `0xc262c` 는 공을 안 던지고 돌아가고
+ * (c266c `bne c2732`), 다음 부름에서 **같은 타석**으로 다시 `0xc1ba4` 를 지난다. 그때 대타를 낸 쪽은
+ * `state[0xe]`(ac234), 투수를 바꾼 쪽은 `state[0xd]` 가 서 있어 곧장 빠지지만, **안 바뀐 쪽은 처음부터 다시
+ * 판정한다** — 투수만 바뀐 부름 뒤에는 대타 굴림(`rand(0,1000)`)이 한 번 더 돈다. 둘 다 안 바뀌어야 공을 던진다.
+ * 두 칸은 공이 나가야(0xa5e14) 내려가므로 이 고리는 많아야 세 번 돈다.
+ */
+function runQuickSubstitutions(
+  progress: TeamGameProgress,
+  battingIsOurs: boolean,
+  random: RandomPort,
+): TeamGameProgress {
+  let current = progress
+  for (let call = 0; call < MAXIMUM_QUICK_SUBSTITUTION_CALLS; call += 1) {
+    const pinched = applyCpuPinchHit(current, battingIsOurs, random)
+    const changed = judgeAutoPitcherChange(pinched, !battingIsOurs, random)
+    if (changed === current) return current
+    current = changed
+  }
+  return current
+}
+
+/** `runQuickSubstitutions` 이 도는 상한 — 대타 한 번 · 투수 한 번 · 마지막 빈 부름 */
+const MAXIMUM_QUICK_SUBSTITUTION_CALLS = 3
+
 /** 자동으로 넘기는 우리 타석 — 원본도 같은 간이 엔진을 쓴다 (0xc11f0) */
 function playAutoOffenseAtBat(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
-  // 0xc262c 는 타석마다 먼저 0xc1ba4 를 부른다 — 그 안에서 CPU 대타(공격 팀)가 먼저다 (0xc1c50)
-  progress = applyCpuPinchHit(progress, true, random)
+  // 0xc262c 는 타석마다 먼저 0xc1ba4 를 부른다 — CPU 대타(공격 팀, 0xc1c50) 뒤 CPU 투수 교체(0xc1ce2).
+  // 우리가 공격 중이면 **상대 투수**를 본다
+  progress = runQuickSubstitutions(progress, true, random)
   // 이어 c26b6 0xa5bcc 가 대타 홈런 칸 ctx+0x160 을 지운다 — 간이 엔진 타석은 기록 5 를 못 낸다
   if (progress.pinchHitHomeRunHalf !== null) progress = { ...progress, pinchHitHomeRunHalf: null }
-  // 이어서 CPU 투수 교체 (0xc1ce2) — 우리가 공격 중이면 **상대 투수**를 본다
-  progress = judgeAutoPitcherChange(progress, false, random)
   const { options } = progress
   const before = progress.game
   const play = playQuickAtBat(
@@ -2670,8 +2760,9 @@ function playAutoOffenseAtBat(progress: TeamGameProgress, random: RandomPort): T
       decisions: decisionsAfterPlay(progress.decisions, before, game, moundsOf(progress)),
       atBat: createAtBat(),
       atBatPrepared: false,
-      // 투구마다 state[0xd] 가 내려간다 (0xa5e72)
+      // 투구마다 state[0xd]·state[0xe] 가 내려간다 (0xa5e14 의 a5e72·a5e7c, c26ca)
       pitcherJustChanged: false,
+      cpuPinchHitUsed: false,
       opponentStamina: drainQuickPitcher(
         progress.opponentStamina,
         opponentPitcherStaminaAbility(progress),
@@ -2708,10 +2799,8 @@ function playAutoOffenseAtBat(progress: TeamGameProgress, random: RandomPort): T
 
 /** 자동으로 넘기는 상대 타석 */
 function playAutoDefenseAtBat(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
-  // 0xc1ba4 안 차례 그대로 — CPU 대타(공격 = 상대 팀)가 먼저 (0xc1c50)
-  progress = applyCpuPinchHit(progress, false, random)
-  // 우리가 수비 중인 자동 타석 — 0xc1ba4 가 **우리 투수**를 본다 (0xc1ce2)
-  progress = judgeAutoPitcherChange(progress, true, random)
+  // 0xc1ba4 안 차례 그대로 — CPU 대타(공격 = 상대 팀, 0xc1c50) 뒤 **우리 투수** 교체 판정(0xc1ce2)
+  progress = runQuickSubstitutions(progress, false, random)
   const { options } = progress
   const play = playQuickAtBat(
     entryQuickBatterOf(progress, options.opponentTeamId, progress.opponentOrderIndex),
@@ -2722,7 +2811,9 @@ function playAutoDefenseAtBat(progress: TeamGameProgress, random: RandomPort): T
   return startDefensiveAtBat(
     {
       ...progress,
+      // 투구마다 state[0xd]·state[0xe] 가 내려간다 (0xa5e14 의 a5e72·a5e7c, c26ca)
       pitcherJustChanged: false,
+      cpuPinchHitUsed: false,
       stamina: drainQuickPitcher(
         progress.stamina,
         ourPitcherStats(progress).stamina,

@@ -205,6 +205,15 @@ describe('사람 타석의 공마다 상대 투수를 깎는다 — 0x3dec6 의 
     )
   })
 
+  it('같은 0xa5e14 가 CPU 대타 막음 칸 state[0xe] 도 내린다 (a5e7c) — 사람 공도 마찬가지 (0x3dec6)', () => {
+    const 칠때 = { ...시작({ playerSide: PLAYER_SIDE_FIRST_BAT }).progress, cpuPinchHitUsed: true }
+    expect(applyBatterPitch(칠때, 볼(1), createSeededRandom(1)).cpuPinchHitUsed).toBe(false)
+    const 던질때 = { ...시작().progress, cpuPinchHitUsed: true }
+    const 던진뒤 = throwPitch(던질때, { typeNumber: 첫구질(던질때), courseCell: 4, gaugeCell: 0 }, createSeededRandom(1))
+    expect(던진뒤.pitchCount).toBe(1)
+    expect(던진뒤.cpuPinchHitUsed).toBe(false)
+  })
+
   it('구질을 안 실은 공(옛 호출)은 깎지 않는다', () => {
     const { progress } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
     const after = applyBatterPitch(progress, 볼(), createSeededRandom(1))
@@ -955,8 +964,8 @@ describe('일반모드 경기 세우기 0x30f20 — AI 팀 마선수', () => {
 })
 
 describe('CPU 대타 0xac228 — 자동 타석에서', () => {
-  it('경기에 한 번까지만 나오고, 나오면 그 팀 명단이 한 칸 줄어든다', () => {
-    let 나온경기 = 0
+  it('state[0xe] 는 공마다 내려간다 — 한 경기에 여러 번 나올 수 있고, 나올 때마다 그 팀 명단이 한 칸 준다', () => {
+    let 여러번 = 0
     for (let seed = 1; seed <= 24; seed += 1) {
       const progress = startTeamGame(
         { ...기본옵션, mode: 1, season: undefined, settings: 전부자동 },
@@ -965,14 +974,18 @@ describe('CPU 대타 0xac228 — 자동 타석에서', () => {
       expect(progress.game.isFinished).toBe(true)
       // 명단은 우리 12(마타자 없음) · 상대 13(AI 마타자) 로 시작한다
       const 줄어든칸 = 12 - progress.ourEntry.length + (13 - progress.opponentEntry.length)
-      // state[0xe] 는 경기에 한 칸이라 두 번 나올 수 없다
-      expect(줄어든칸).toBe(progress.cpuPinchHitUsed ? 1 : 0)
+      // 대타 한 번마다 벤치 타자 수 team+0x28c 도 하나씩 준다 (aed9c~aedae)
+      expect(3 - progress.ourBenchBatters + (4 - progress.opponentBenchBatters), `씨앗 ${seed * 7919}`).toBe(
+        줄어든칸,
+      )
+      // 마지막 공(0xa5e14 a5e7c)이 칸을 내렸다
+      expect(progress.cpuPinchHitUsed).toBe(false)
       // 간이 엔진(0xc1ba4) 대타는 교체 연출 0x16 을 안 지난다 — 소리 고리에 아무것도 안 남긴다
       expect(progress.scenePinchHit).toBeNull()
-      if (progress.cpuPinchHitUsed) 나온경기 += 1
+      if (줄어든칸 >= 2) 여러번 += 1
     }
-    // 배선이 살아 있다는 확인 — 24경기 중 한 번은 나온다
-    expect(나온경기).toBeGreaterThan(0)
+    // 예전 "경기에 한 번" 이면 나올 수 없는 경기가 실제로 있다
+    expect(여러번).toBeGreaterThan(0)
   })
 
   it('CPU 대타가 들어오면 그 뒤 타석은 들어온 벤치 선수(로스터 9번 이후)의 리그 기록에 쌓인다', () => {
@@ -983,16 +996,22 @@ describe('CPU 대타 0xac228 — 자동 타석에서', () => {
         createSeededRandom(seed * 7919),
       )
       expect(progress.game.isFinished).toBe(true)
-      if (!progress.cpuPinchHitUsed) continue
+      // 시즌(모드 2)은 마타자가 없어 두 팀 다 명단 12 로 시작한다
+      const 우리대타 = 12 - progress.ourEntry.length
+      const 상대대타 = 12 - progress.opponentEntry.length
+      if (우리대타 + 상대대타 === 0) continue
       나온경기 += 1
-      // 시즌(모드 2)은 마타자가 없어 명단 12 → 대타 한 번에 11 이다
-      const 대타팀 =
-        progress.ourEntry.length < 12 ? 기본옵션.ourTeamId : 기본옵션.opponentTeamId
-      const 벤치칸기록 = progress.leaguePlateAppearances.filter(
-        (appearance) => appearance.teamId === 대타팀 && appearance.battingOrderIndex >= 9,
-      )
-      // 예전에는 타순 칸(0~8)으로만 쌓여 벤치 선수 기록이 하나도 없고 빠진 선수에게 붙었다
-      expect(벤치칸기록.length, `씨앗 ${seed * 7919}`).toBeGreaterThan(0)
+      for (const [대타팀, 줄어든칸] of [
+        [기본옵션.ourTeamId, 우리대타],
+        [기본옵션.opponentTeamId, 상대대타],
+      ] as const) {
+        if (줄어든칸 === 0) continue
+        const 벤치칸기록 = progress.leaguePlateAppearances.filter(
+          (appearance) => appearance.teamId === 대타팀 && appearance.battingOrderIndex >= 9,
+        )
+        // 예전에는 타순 칸(0~8)으로만 쌓여 벤치 선수 기록이 하나도 없고 빠진 선수에게 붙었다
+        expect(벤치칸기록.length, `씨앗 ${seed * 7919}`).toBeGreaterThan(0)
+      }
     }
     expect(나온경기).toBeGreaterThan(0)
   })
@@ -1212,11 +1231,11 @@ describe('한 경기를 끝까지 돌리면 16칸이 실제로 찬다', () => {
     const 끝 = runAutoProgress(startTeamGame({ ...기본옵션, settings: 전부자동 }, random), random)
     const summary = summaryOf(끝)
 
-    expect(summary.ourScore).toBe(7)
-    expect(summary.opponentScore).toBe(3)
+    expect(summary.ourScore).toBe(6)
+    expect(summary.opponentScore).toBe(4)
     expect(summary.pitching.outsRecorded).toBe(27)
-    // 피안타 7 · 탈삼진 18(뒤집혀 S[5]) · 내 타자 삼진 9 · 안타 14 · 2루타 5 · 2점 홈런 1
-    expect(summary.gameRecord).toEqual([0, 0, 7, 0, 0, 18, 9, 14, 5, 0, 0, 1, 0, 0, 0, 0])
+    // 피안타 10 · 탈삼진 18(뒤집혀 S[5]) · 내 타자 삼진 8 · 안타 10 · 2루타 4 · 2점 홈런 1
+    expect(summary.gameRecord).toEqual([0, 0, 10, 0, 0, 18, 8, 10, 4, 0, 0, 1, 0, 0, 0, 0])
 
     const context = {
       opponentRuns: summary.opponentScore,

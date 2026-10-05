@@ -122,7 +122,15 @@ export interface HalfInningOffense {
   readonly lineup: QuickLineup
   /** 그 로스터 칸 타자의 간이 타석용 능력 */
   readonly batterOf: (rosterSlot: number) => QuickAtBatBatter
-  /** `state[0xe]` — 이 경기에 CPU 대타를 이미 썼는가 (경기에 한 칸, 양 팀 공용) */
+  /**
+   * `state[0xe]` — CPU 대타를 다시 묻지 않게 막는 칸 (양 팀 공용).
+   *
+   * ⚠️ **원본과 다름(미반영)**: 원본은 "경기에 한 번" 이 아니라 **공마다** 투구 처리 `0xa5e14` 가 이 칸을 내린다
+   *    (a5e7c — 간이 엔진은 `0xc262c` 의 c26ca 가 공마다 부른다). 또 `0xc1ba4` 가 하나라도 바꾸면 같은 타석으로
+   *    다시 불려 안 바뀐 쪽을 다시 판정한다(c266c). 팀 경기(`teamGameFlow.runQuickSubstitutions`)는 원본대로
+   *    고쳤지만, 이 반 이닝 엔진은 `entities/league` 의 CPU 끼리 경기 테스트가 "경기에 많아야 한 번" 을 단언하고
+   *    있어 그쪽과 함께 고쳐야 한다 — 아직 반 이닝 안에서는 안 내린다. 타자편 `gameFlow` 의 같은 칸도 아직 옛 해석이다.
+   */
   readonly pinchHitUsed: boolean
 }
 

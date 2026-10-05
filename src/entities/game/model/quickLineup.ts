@@ -88,7 +88,7 @@ export function tryQuickCpuPinchHit(
   lineup: QuickLineup,
   order: number,
   situation: {
-    /** `state[0xe]` — 이 경기에 CPU 대타를 이미 썼는가 (양 팀 공용 한 칸) */
+    /** `state[0xe]` — 다음 공이 나가기 전까지 막는 칸 (양 팀 공용 한 칸, 공마다 `0xa5e14` a5e7c 가 내린다) */
     readonly alreadyUsedThisGame: boolean
     /** 주자 수 (`0xa9599` = 주자관리 `+0xc`) */
     readonly runnerCount: number
