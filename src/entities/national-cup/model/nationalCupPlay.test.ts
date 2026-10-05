@@ -8,6 +8,8 @@ import {
 import { createNationalCup, endNationalCupDay } from '@/entities/national-cup/model/nationalCup'
 import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createSeededRandom } from '@/shared/api/random/seededRandom'
+import { simulateLeagueGame } from '@/entities/league/model/leagueDay'
 
 function 씨앗난수(seed: number): RandomPort {
   let state = seed
@@ -21,31 +23,52 @@ function 씨앗난수(seed: number): RandomPort {
   }
 }
 
-describe('국가대항전 선발 투수 0xb6c2d', () => {
-  it('양 팀 모두 날짜 % 4 번째 투수다 — 정규 경기처럼 랜덤이 아니다', () => {
+describe('국가대항전 CPU 경기 선발 — 같은 레코드를 같은 k 로 두 번 맞바꿔 제자리 (0xc2c4c c2d18~c2d40 · 0x1f570)', () => {
+  it('양 팀 모두 상대국 슬롯의 0번 — 첫날은 마스터 0번, 그 뒤로는 그날 사람 경기 준비가 한 번 돌린 1번이다', () => {
     const cup = createNationalCup()
     expect(nationalCupStartingPitcherIndex(cup)).toBe(0)
-    expect(nationalCupStartingPitcherIndex({ ...cup, day: 3 })).toBe(3)
-    expect(nationalCupStartingPitcherIndex({ ...cup, day: STARTING_PITCHER_CANDIDATES })).toBe(0)
+    for (const day of [1, 2, 3, STARTING_PITCHER_CANDIDATES]) {
+      expect(nationalCupStartingPitcherIndex({ ...cup, day })).toBe(1)
+    }
   })
 })
 
 describe('CPU 끼리 한 경기 0xc2dac', () => {
   it('같은 씨앗이면 같은 경기가 나오고 승·패가 하나씩 정해진다', () => {
-    const 첫번째 = playCpuNationalCupGame(12, 13, 씨앗난수(2010))
-    const 두번째 = playCpuNationalCupGame(12, 13, 씨앗난수(2010))
+    const 첫번째 = playCpuNationalCupGame(12, 13, 11, createSeededRandom(2010), 1)
+    const 두번째 = playCpuNationalCupGame(12, 13, 11, createSeededRandom(2010), 1)
 
     expect(첫번째).toEqual(두번째)
     expect([첫번째.winner, 첫번째.loser].sort()).toEqual([12, 13])
   })
 
-  it('판정이 정상이다 — 칸 1(a) 이 더 내면 a 승이다 (0xc2a48 의 뒤집힘 버그 없음)', () => {
-    // 같은 씨앗으로 여러 짝을 돌려, 점수가 많은 쪽이 늘 이기는지 본다
+  it('칸 1(a, 말 공격)이 더 내면 a 승, 아니면(동점 포함) b 승이다 (0xc2f12~0xc2f46)', () => {
     for (let seed = 1; seed <= 12; seed += 1) {
-      const 결과 = playCpuNationalCupGame(11, 12, 씨앗난수(seed))
-      const 많은쪽 = 결과.firstSlotRuns > 결과.secondSlotRuns ? 11 : 12
-      expect(결과.winner).toBe(많은쪽)
+      const 결과 = playCpuNationalCupGame(11, 12, 13, createSeededRandom(seed), 0)
+      const 이긴쪽 = 결과.firstSlotRuns > 결과.secondSlotRuns ? 11 : 12
+      expect(결과.winner).toBe(이긴쪽)
     }
+  })
+
+  it('두 나라 모두 그날 사람 경기 상대국의 선수로 선다 — a·b 와 상관없이 명단이 같다 (0x1f570 → base+0x934)', () => {
+    for (let seed = 1; seed <= 6; seed += 1) {
+      const 짝1 = playCpuNationalCupGame(12, 13, 11, createSeededRandom(seed), 1)
+      const 짝2 = playCpuNationalCupGame(13, 12, 11, createSeededRandom(seed), 1)
+      // 같은 경기가 나오고 칸만 바뀐다
+      expect(짝2.firstSlotRuns).toBe(짝1.firstSlotRuns)
+      expect(짝2.secondSlotRuns).toBe(짝1.secondSlotRuns)
+      const 직접 = simulateLeagueGame({ away: 11, home: 11 }, createSeededRandom(seed), 1, undefined, { sharedRoster: true })
+      expect([짝1.firstSlotRuns, 짝1.secondSlotRuns]).toEqual([직접.homeRuns, 직접.awayRuns])
+    }
+  })
+
+  it('하루 넘기기의 CPU 경기는 nationalCupMatchupOf 의 상대를 명단으로 쓴다', () => {
+    const cup = createNationalCup()
+    // 첫날: 사람 10–11, CPU 12–13 → 명단은 11, 선발 0번
+    const 기대 = playCpuNationalCupGame(12, 13, 11, createSeededRandom(77), 0)
+    const 하루뒤 = advanceNationalCupDay(cup, 10, 11, createSeededRandom(77))
+    expect(하루뒤.wins[cup.teams.indexOf(기대.winner)]).toBe(1)
+    expect(하루뒤.losses[cup.teams.indexOf(기대.loser)]).toBe(1)
   })
 })
 
@@ -86,13 +109,13 @@ describe('하루 넘기기 0x4ea0c → 0xb818c', () => {
 })
 
 describe('날짜 칸은 하루 끝마다 는다', () => {
-  it('선발 투수 칸이 날짜를 따라 돈다', () => {
+  it('CPU 경기 선발 칸은 날짜 % 4 를 따르지 않는다 — 상대국 슬롯이 매일 마스터에서 새로 덮인다', () => {
     let cup = createNationalCup()
     const 칸 = [nationalCupStartingPitcherIndex(cup)]
     for (let day = 0; day < 4; day += 1) {
       cup = endNationalCupDay(cup)
       칸.push(nationalCupStartingPitcherIndex(cup))
     }
-    expect(칸).toEqual([0, 1, 2, 3, 0])
+    expect(칸).toEqual([0, 1, 1, 1, 1])
   })
 })

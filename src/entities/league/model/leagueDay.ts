@@ -176,6 +176,13 @@ export interface LeagueGameExtras {
    * 을 먹는다(모드를 가리지 않는 전역 칸). 안 넘기면 모두 Lv1(60%) — 새 저장 기본값이다.
    */
   readonly aceLevels?: Readonly<Record<number, number>>
+  /**
+   * 두 명단이 **같은 팀 레코드 하나**를 쓴다 — 국가대항전 CPU 경기(`0xc2c4c`)는 대회 중 `0x1f570` 이 팀 10 이 아닌 팀을
+   * 모두 상대국 슬롯 `+0x934` 하나로 돌려 두 팀 객체가 같은 선수 레코드를 읽는다. 투수 스태미나 `+0x2c` 가 레코드에
+   * 있으므로 **한 표를 두 팀이 같이 깎는다** — 같은 투수가 양쪽 마운드에 서면 한 값을 나눠 쓴다.
+   * 팀 객체의 명단 차례(`team[i]`)·교체로 쓴 칸은 팀마다 따로다.
+   */
+  readonly sharedRoster?: boolean
 }
 
 /** 마투수 하나 — 간이 타석용 능력과 스태미나 용량의 바탕(체력 칸) */
@@ -402,8 +409,12 @@ export function simulateLeagueGame(
     pitched.set(defenseTeamId, team)
   }
 
+  const sharedRoster = extras?.sharedRoster === true
   const awayStaminas = staminaTableOf(startingStaminas?.away)
-  const homeStaminas = staminaTableOf(startingStaminas?.home)
+  const homeStaminas = sharedRoster ? awayStaminas : staminaTableOf(startingStaminas?.home)
+  /** 같은 레코드를 쓰면 마운드 값이 다른 쪽 반 이닝에 깎였을 수 있다 — 표(레코드)의 값으로 다시 선다 */
+  const resynced = (mound: HalfInningMound, table: readonly number[]): HalfInningMound =>
+    sharedRoster ? { ...mound, stamina: table[mound.pitcherSlot] ?? mound.stamina } : mound
   let awayMound = startingMoundOf(awaySlot, awayStaminas[awaySlot])
   let homeMound = startingMoundOf(homeSlot, homeStaminas[homeSlot])
   /**
@@ -422,6 +433,7 @@ export function simulateLeagueGame(
   let pinchHits = 0
 
   for (let inning = 1; inning <= MAXIMUM_INNINGS; inning += 1) {
+    homeMound = resynced(homeMound, homeStaminas)
     const top = simulateHalfInning(
       awayOrder,
       (order) => batterAt(matchup.away, order % BATTING_ORDER_SIZE),
@@ -447,6 +459,7 @@ export function simulateLeagueGame(
     // 홈이 이미 앞서 있으면 9회말은 치르지 않는다
     if (inning >= REGULAR_INNINGS && homeRuns > awayRuns) break
 
+    awayMound = resynced(awayMound, awayStaminas)
     const bottom = simulateHalfInning(
       homeOrder,
       (order) => batterAt(matchup.home, order % BATTING_ORDER_SIZE),

@@ -568,3 +568,17 @@ describe('0xc239c 의 굴림 다섯과 마선수 (c2464~c24ea)', () => {
     expect(높음).not.toEqual(낮음)
   })
 })
+
+describe('같은 레코드를 쓰는 두 명단 — 국가대항전 CPU 경기 (0x1f570 → base+0x934)', () => {
+  it('스태미나 표가 하나라 두 팀이 같은 투수를 같이 깎는다', () => {
+    let 달라짐 = 0
+    for (let seed = 1; seed <= 10; seed += 1) {
+      const 같이 = simulateLeagueGame({ away: 11, home: 11 }, createSeededRandom(seed), 1, undefined, { sharedRoster: true })
+      const 따로 = simulateLeagueGame({ away: 11, home: 11 }, createSeededRandom(seed), 1)
+      expect(같이.pitcherStaminas.away).toEqual(같이.pitcherStaminas.home)
+      if (JSON.stringify(같이) !== JSON.stringify(따로)) 달라짐 += 1
+    }
+    // 같은 선발이 양쪽 마운드에서 한 값을 깎으므로 교체 시점이 달라진다
+    expect(달라짐).toBeGreaterThan(0)
+  })
+})
