@@ -30,11 +30,16 @@ interface StoryScreenProps {
   readonly onMatch: (command: MatchCommand, carry: StoryCarry) => void
   /** 대결에서 돌아온 결과 이벤트라면 앞 이벤트가 모은 보상·기록 */
   readonly carried?: StoryCarry
+  /**
+   * 이벤트 번호별 `%s` 자리 글 — 원본이 그 이벤트에만 따로 서식을 쓰는 곳 (380 연봉 제시액 0x8bc4c).
+   * undefined 를 돌려주면 기본(이름·팀). 안 넘기면 늘 기본이다.
+   */
+  readonly replacementsFor?: (eventId: number) => readonly string[] | undefined
 }
 
 /** 원작 이벤트. 대사마다 원본이 정한 인물·표정·자리로 초상화를 띄운다. */
 export function StoryScreen({
-  events, event, playerName, teamName, skinIndex, battingTypeIndex, onComplete, onMatch, carried,
+  events, event, playerName, teamName, skinIndex, battingTypeIndex, onComplete, onMatch, carried, replacementsFor,
 }: StoryScreenProps) {
   const { step, portraits, next, jump } = useEventPlayback(events, event, onComplete, onMatch, carried)
   const command = step.command
@@ -45,7 +50,9 @@ export function StoryScreen({
       : command.speaker === PLAYER_SPEAKER
         ? playerName
         : (SPEAKER_NAMES[command.speaker] ?? null)
-  const replacements = command?.op === 'say' && command.format === TEAM_NAME_FORMAT ? [teamName] : [playerName, teamName]
+  const replacements =
+    replacementsFor?.(step.cursor.eventId) ??
+    (command?.op === 'say' && command.format === TEAM_NAME_FORMAT ? [teamName] : [playerName, teamName])
   const dialogue = command?.op === 'say' || command?.op === 'yesno' ? command.text : command?.op === 'system' ? (command.text ?? '') : ''
 
   const menu: MenuItem[] | null =

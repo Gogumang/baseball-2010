@@ -76,3 +76,43 @@ describe('StoryScreen — 관리 화면 위에 겹치는 덮개다', () => {
     expect(screen.getAllByRole('button')[0].textContent).toContain('안녕')
   })
 })
+
+describe('StoryScreen — 이벤트별 %s 글 (replacementsFor)', () => {
+  const 연봉이벤트 = {
+    ...이벤트,
+    id: 380,
+    commands: [{ op: 'say', text: '%s만 상승해서 %s만이다', speaker: 0, format: 0, portraits: [] }],
+  } as unknown as OriginalEvent
+
+  it('넘기면 그 이벤트의 %s 자리에 넣는다 (380 연봉 제시액 0x8bc4c)', () => {
+    render(
+      <StoryScreen
+        events={[연봉이벤트]}
+        event={연봉이벤트}
+        playerName="테스트"
+        teamName="드래곤즈"
+        replacementsFor={(eventId) => (eventId === 380 ? ['5000', '1억'] : undefined)}
+        onComplete={() => {}}
+        onMatch={() => {}}
+      />,
+    )
+
+    expect(screen.getByText(/5000만 상승해서 1억만이다/)).toBeTruthy()
+  })
+
+  it('undefined 면 예전대로 이름·팀이다', () => {
+    render(
+      <StoryScreen
+        events={[연봉이벤트]}
+        event={연봉이벤트}
+        playerName="테스트"
+        teamName="드래곤즈"
+        replacementsFor={() => undefined}
+        onComplete={() => {}}
+        onMatch={() => {}}
+      />,
+    )
+
+    expect(screen.getByText(/테스트만 상승해서 드래곤즈만이다/)).toBeTruthy()
+  })
+})

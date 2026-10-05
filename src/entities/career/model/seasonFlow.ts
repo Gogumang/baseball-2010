@@ -62,7 +62,10 @@ const COMEBACK_PREVIOUS_MAXIMUM = 1
  * 중간평가 칭호 (0x11e84) — 1년차에 다섯 개 모두 → 칭호 1, 2년차 이후 지난 중간평가 ≤ 1 개였다가 다섯 개 → 칭호 9.
  * 이번 값은 lastMidSeasonGoalCount(원본 +0x1cc)에 남긴다 — 호출하는 쪽이 저장한다.
  */
-export function midSeasonTitlesOf(career: PlayerCareer, achieved: number): string[] {
+export function midSeasonTitlesOf(
+  career: Pick<PlayerCareer, 'season' | 'lastMidSeasonGoalCount'>,
+  achieved: number,
+): string[] {
   if (achieved < ALL_GOALS) return []
   if (career.season === 1) return [TITLE_NAMES[FIRST_YEAR_TITLE]]
   return career.lastMidSeasonGoalCount <= COMEBACK_PREVIOUS_MAXIMUM ? [TITLE_NAMES[COMEBACK_TITLE]] : []

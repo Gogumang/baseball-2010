@@ -9,6 +9,11 @@ import {
   pitcherYearEndRewardsOf,
 } from '@/entities/pitcher-career/model/pitcherYearEnd'
 import { salaryOfferOf } from '@/entities/career/model/seasonFlow'
+import { ORIGINAL_EVENTS } from '@/shared/config/original/events'
+
+/** 이벤트 한 편을 그 이벤트의 보상 명령으로 끝낸다 — 세션은 재생기가 지나온 보상을 넘긴다 */
+const 끝내기 = (career: Parameters<typeof finishPitcherYearEndEvent>[0], eventId: number) =>
+  finishPitcherYearEndEvent(career, eventId, pitcherYearEndRewardsOf(eventId, ORIGINAL_EVENTS))
 
 const 투수 = (overrides: Partial<PitcherCareer> = {}): PitcherCareer => ({
   ...createPitcherCareer('테스트'),
@@ -83,33 +88,33 @@ describe('투수편 연말 사슬 (상태 136 → 130 → 131 → 132)', () => {
 
 describe('연말 이벤트 보상 (명령 7, 점프표 0xd4e50)', () => {
   it('보상은 r_event 데이터에서 읽는다', () => {
-    expect(pitcherYearEndRewardsOf(377)).toEqual([
+    expect(pitcherYearEndRewardsOf(377, ORIGINAL_EVENTS)).toEqual([
       { kind: 0, value: 20 },
       { kind: 1, value: 30 },
       { kind: 3, value: 10 },
     ])
-    expect(pitcherYearEndRewardsOf(371)).toEqual([])
+    expect(pitcherYearEndRewardsOf(371, ORIGINAL_EVENTS)).toEqual([])
   })
 
   it('타이틀 372~374 는 소지금 +3/+6/+10 (100만 단위)', () => {
     const 앞 = 투수({ money: 1000 })
-    expect(finishPitcherYearEndEvent(앞, 372).money).toBe(1300)
-    expect(finishPitcherYearEndEvent(앞, 373).money).toBe(1600)
-    expect(finishPitcherYearEndEvent(앞, 374).money).toBe(2000)
+    expect(끝내기(앞, 372).money).toBe(1300)
+    expect(끝내기(앞, 373).money).toBe(1600)
+    expect(끝내기(앞, 374).money).toBe(2000)
   })
 
   it('MVP 377 은 인기도 +20 · 평판 +30 · 소지금 +10', () => {
     const 앞 = 투수({ popularity: 100, reputation: 100, money: 0 })
-    const 뒤 = finishPitcherYearEndEvent(앞, 377)
+    const 뒤 = 끝내기(앞, 377)
     expect([뒤.popularity, 뒤.reputation, 뒤.money]).toEqual([120, 130, 1000])
   })
 
   it('393~396 은 연차 보정이 붙는다 (0x8d508) — 3년차 393: 인기도 30+6 · 평판 44−4 · 소지금 20+2', () => {
     const 앞 = 투수({ season: 3, popularity: 100, reputation: 100, money: 0 })
-    const 뒤 = finishPitcherYearEndEvent(앞, 393)
+    const 뒤 = 끝내기(앞, 393)
     expect([뒤.popularity, 뒤.reputation, 뒤.money]).toEqual([136, 140, 2200])
     // 1년차는 보정이 없다
-    const 신인 = finishPitcherYearEndEvent(투수({ popularity: 100, reputation: 100, money: 0 }), 396)
+    const 신인 = 끝내기(투수({ popularity: 100, reputation: 100, money: 0 }), 396)
     expect([신인.popularity, 신인.reputation]).toEqual([95, 96])
   })
 
@@ -117,12 +122,12 @@ describe('연말 이벤트 보상 (명령 7, 점프표 0xd4e50)', () => {
     const 앞 = 투수({ salary: 50, popularity: 300, popularityAtSeasonStart: 100 })
     // 상승분 = max(1, trunc(200/4)) = 50 → 제시 100
     expect(salaryOfferOf(앞)).toEqual({ raise: 50, salary: 100 })
-    expect(finishPitcherYearEndEvent(앞, 384).salary).toBe(130)
+    expect(끝내기(앞, 384).salary).toBe(130)
     // 수락 383 = +0% 평판 +20
-    const 수락 = finishPitcherYearEndEvent({ ...앞, reputation: 100 }, 383)
+    const 수락 = 끝내기({ ...앞, reputation: 100 }, 383)
     expect([수락.salary, 수락.reputation]).toEqual([100, 120])
     // 강경 실패 387 = −20% 평판 −30
-    const 삭감 = finishPitcherYearEndEvent({ ...앞, reputation: 100 }, 387)
+    const 삭감 = 끝내기({ ...앞, reputation: 100 }, 387)
     expect([삭감.salary, 삭감.reputation]).toEqual([80, 70])
   })
 
