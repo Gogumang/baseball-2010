@@ -105,6 +105,16 @@ interface BattingStageProps {
    * (0x51800 → `features/defense-play` 의 `isUncatchable`).
    */
   readonly onPitchResolved: (detail: PitchOutcomeDetail, pitch: Pitch, isUncatchable?: boolean) => void
+  /**
+   * **CPU 투수의 견제** — 투구 AI 목표점 고르기 `0x345fc` 가 종류 4 를 뽑고 주자가 1·2명이면 `0x34848` 이
+   * 주자 있는 루(1·2·3)를 굴려 메시지 0x10 을 보낸다. 그 투구는 **공이 없다** — 이 콜백만 부르고 다시 대기로 간다.
+   * 주자 루는 `hud.bases` 로 본다.
+   *
+   * ⚠️ **안 넘기면 CPU 견제가 꺼진다**(`selectPitch` 의 옵션 없음) — 종류 4 를 예전처럼 모서리 투구로 던져
+   *    원본과 난수 차례·결과가 어긋난다(미해결). 원본은 홈런더비(모드 7)만 빼고 견제하므로
+   *    나만의리그 타자편(`pages/game`)·미션(`pages/mission-play`)도 진행기에 견제 판이 생기면 넘겨야 한다.
+   */
+  readonly onPickoff?: (base: 1 | 2 | 3) => void
 }
 
 /** 원작 타석 화면. 그리기는 lib, 루프와 조작은 model이 맡는다. */

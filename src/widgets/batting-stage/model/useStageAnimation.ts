@@ -86,14 +86,31 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
           return
         }
         if (elapsed >= WIND_UP_MILLISECONDS) {
-          const { pitcherAbility, random } = latestRef.current
-          pitchRef.current = selectPitch(
+          const { pitcherAbility, random, hud, onPickoff } = latestRef.current
+          const bases = hud?.bases ?? { first: false, second: false, third: false }
+          const choice = selectPitch(
             pitcherAbility,
-            pitchSituationOf(latestRef.current.hud, latestRef.current.batterForm),
+            pitchSituationOf(hud, latestRef.current.batterForm),
             random,
             'hard',
             magicStateOf(pitcherAbility.repertoire),
+            // 견제를 받아 줄 쪽이 있을 때만 켠다 — 주자 루는 HUD 루 그대로 (원본 0xa9878 자리)
+            onPickoff === undefined
+              ? undefined
+              : {
+                  hasRunnerOnBase: (base) =>
+                    base === 1 ? bases.first : base === 2 ? bases.second : base === 3 ? bases.third : false,
+                },
           )
+          if (choice.kind === '견제') {
+            // 0x34848 → 메시지 0x10: 공을 안 던진다(상태 0x11 예약 0x34888 을 안 지난다).
+            // 견제 판(상태 0x17)이 끝나면 원본은 같은 타석 다음 공(0xf)으로 돌아온다 — 여기서는 다시 대기로 둔다
+            pitchRef.current = null
+            phaseStartedAtRef.current = now
+            onPickoff?.(choice.base)
+            return
+          }
+          pitchRef.current = choice.pitch
           // 새 투구가 시작하면 홈런 글자 연출을 끈다 (원본 +0x1960 을 다음 플레이가 지우는 자리)
           homeRunStartedAtRef.current = -1
           phaseRef.current = '투구중'

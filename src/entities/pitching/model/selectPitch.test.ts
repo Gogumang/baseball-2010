@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { flightMillisecondsOf, selectPitch } from '@/entities/pitching/model/selectPitch'
-import type { PitchSituation } from '@/entities/pitching/model/selectPitch'
+import { flightMillisecondsOf, selectPitch as selectChoice } from '@/entities/pitching/model/selectPitch'
+import type { CpuPitchChoice, PitchSituation } from '@/entities/pitching/model/selectPitch'
+import type { Pitch } from '@/entities/pitching/model/pitch'
+import { computerPitchTypeOf, pitchListOf, targetKindOf } from '@/entities/pitching/model/pitchIntelligence'
+import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { PITCH_TYPES } from '@/shared/config/original/pitchTypes'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { isInsideStrikeZone } from '@/shared/lib/geometry/coordinate'
@@ -20,6 +23,14 @@ function 존적중비율(control: number, attempts: number): number {
 }
 
 const FASTBALL = PITCH_TYPES[0]
+
+function 공(choice: CpuPitchChoice): Pitch {
+  if (choice.kind !== '투구') throw new Error(`공이 아니라 견제다 (${choice.base}루)`)
+  return choice.pitch
+}
+
+/** 견제를 끈 기존 호출 — 늘 공이 나온다 */
+const selectPitch = (...args: Parameters<typeof selectChoice>) => 공(selectChoice(...args))
 
 describe('selectPitch — 원본 CPU 투구 (0x344dc → 0x9eeac → 0x345fc → 0xb74bc → 0x4dc78)', () => {
   it('같은 시드는 같은 공을 낸다', () => {
@@ -138,6 +149,85 @@ describe('selectPitch 마구 — CPU 상대 투수 (0x344dc · 0x345fc · 0x3de1
     expect(드래고나.type).toBe('브레스 웨폰')
     // 레코드 16 = 브레스 웨폰, 38틱
     expect(드래고나.frameCount).toBe(38)
+  })
+})
+
+describe('selectPitch CPU 견제 — 0x345fc 종류 4 = 0x34848 (I-controls 4a-2)', () => {
+  /** 1루 주자 한 명 — 주자열 1, 종류 4 가중치 w4 = 3 */
+  const 일루상황: PitchSituation = { strikes: 1, balls: 1, outs: 0, runnerCount: 1, batterSide: 1, side: 1 }
+  const 일루만 = { hasRunnerOnBase: (base: number) => base === 1 }
+
+  /** 견제가 나오는 첫 시드 */
+  function 견제시드(situation: PitchSituation, pickoff: { hasRunnerOnBase: (base: number) => boolean }): number {
+    for (let seed = 1; seed < 5000; seed += 1) {
+      if (selectChoice(투수(60), situation, createSeededRandom(seed), 'hard', undefined, pickoff).kind === '견제') return seed
+    }
+    throw new Error('견제가 안 나온다')
+  }
+
+  it('주자가 있는 투구의 일부(약 3%)는 공 대신 견제다 — 루는 늘 주자가 있는 루', () => {
+    const random = createSeededRandom(2025)
+    let pickoffs = 0
+    const attempts = 4000
+    for (let index = 0; index < attempts; index += 1) {
+      const choice = selectChoice(투수(60), 일루상황, random, 'hard', undefined, 일루만)
+      if (choice.kind === '견제') {
+        pickoffs += 1
+        expect(choice.base).toBe(1)
+      }
+    }
+    expect(pickoffs / attempts).toBeGreaterThan(0.015)
+    expect(pickoffs / attempts).toBeLessThan(0.05)
+  })
+
+  it('난수 차례: 구질 → 목표 종류 → rand(1,4) 를 주자 있는 루까지 반복 — 목표점·제구·곡선은 안 굴린다', () => {
+    const 이삼루 = { hasRunnerOnBase: (base: number) => base === 2 || base === 3 }
+    const 상황2: PitchSituation = { ...일루상황, runnerCount: 2 }
+    const seed = 견제시드(상황2, 이삼루)
+    const actual = createSeededRandom(seed)
+    const choice = selectChoice(투수(60), 상황2, actual, 'hard', undefined, 이삼루)
+
+    const expected = createSeededRandom(seed)
+    computerPitchTypeOf({ list: pitchListOf(0x1143, false), magicCount: 0, ...상황2 }, expected)
+    expect(targetKindOf('hard', 상황2, expected)).toBe(4)
+    let base = 0
+    do {
+      base = randomIntegerBelow(expected, 1, 4)
+    } while (!이삼루.hasRunnerOnBase(base))
+
+    expect(choice).toEqual({ kind: '견제', base })
+    // 그 뒤 굴림이 없다 — 두 난수열이 같은 자리에 서 있다
+    expect(actual.next()).toBe(expected.next())
+  })
+
+  it('견제를 안 켜면(옵션 없음) 같은 시드에서 예전처럼 공을 던진다 — 종류 4 → 1 (알려진 어긋남)', () => {
+    const seed = 견제시드(일루상황, 일루만)
+    expect(selectChoice(투수(60), 일루상황, createSeededRandom(seed)).kind).toBe('투구')
+  })
+
+  it('주자가 없거나 만루면 견제하지 않는다 (0x34684 → 종류 1)', () => {
+    const 만루: PitchSituation = { ...일루상황, runnerCount: 3 }
+    const 모두 = { hasRunnerOnBase: () => true }
+    const random = createSeededRandom(99)
+    for (let index = 0; index < 2000; index += 1) {
+      expect(selectChoice(투수(60), 만루, random, 'hard', undefined, 모두).kind).toBe('투구')
+      expect(selectChoice(투수(60), 상황, random, 'hard', undefined, 모두).kind).toBe('투구')
+    }
+  })
+
+  it('견제면 마구 상태를 안 고친다 — 소모(0x34894)·싣기(0x3de10) 둘 다 0x34888 뒤라 안 지난다', () => {
+    const 마투수 = { control: 67, velocity: 55, repertoire: ACE_PITCHER_REPERTOIRES[0] }
+    const 마구상황: PitchSituation = { strikes: 0, balls: 1, outs: 0, runnerCount: 2, batterSide: 1, side: 1 }
+    const 일이루 = { hasRunnerOnBase: (base: number) => base <= 2 }
+    for (let seed = 1; seed < 5000; seed += 1) {
+      const state = { remaining: 3, ballMagicNumber: 5 }
+      const choice = selectChoice(마투수, 마구상황, createSeededRandom(seed), 'hard', state, 일이루)
+      if (choice.kind === '견제') {
+        expect(state).toEqual({ remaining: 3, ballMagicNumber: 5 })
+        return
+      }
+    }
+    throw new Error('견제가 안 나온다')
   })
 })
 

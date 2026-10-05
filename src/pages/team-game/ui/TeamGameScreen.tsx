@@ -444,6 +444,8 @@ export function TeamGameScreen({
               isPaused={burstLines !== null}
               random={random}
               onPitchResolved={(detail) => actions.resolvePitch(detail)}
+              // CPU 투수 견제 (0x345fc 종류 4 → 0x34848 → 메시지 0x10) — 루가 정해진 뒤는 진행기가 판을 돌린다
+              onPickoff={(base) => actions.cpuPickoff(base)}
             />
             <Hint>
               {(game.battingOrderIndex % 9) + 1}번 {currentBatterEntry(progress)?.name ?? '타자'} ·

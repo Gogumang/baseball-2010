@@ -1483,11 +1483,10 @@ export function pickoff(progress: TeamGameProgress, webKey: string, random: Rand
  * 메시지 0x10** 을 보낸다(I-controls 4a-2). 공은 안 던진다 — 상태 0x11 예약(0x34888)을 안 지난다.
  *
  * 여기는 **그 루가 정해진 뒤**(메시지 0x10 이후)다. 루를 고르는 굴림(`entities/pitching/model/pitchTarget`
- * 의 `isCpuPickoff` · `cpuPickoffBaseOf`)은 CPU 투구를 고르는 자리(`selectPitch` — 지금은
- * `widgets/batting-stage/model/useStageAnimation`)에서 굴려야 차례가 원본과 같다: 구질(0x344dc) →
- * 목표 종류(0x9eeac) → **견제 루(0x34848, 주자 있는 루까지 반복)** 이고, 그 뒤 목표점·제구·곡선 굴림은 없다.
- * ⚠️ 그 자리는 이 작업 구역 밖이라 아직 이 함수를 부르는 곳이 없다 — 타석 화면이 "이번 투구는 견제" 를
- *    알려 주면(`TeamGameSession.actions.cpuPickoff`) 그대로 이어진다.
+ * 의 `isCpuPickoff` · `cpuPickoffBaseOf`)은 CPU 투구를 고르는 자리 `selectPitch`(← `widgets/batting-stage/
+ * model/useStageAnimation`)에서 굴린다: 구질(0x344dc) → 목표 종류(0x9eeac) → **견제 루(0x34848, 주자 있는
+ * 루까지 반복)** 이고, 그 뒤 목표점·제구·곡선 굴림은 없다. 타석 화면이 `onPickoff(루)` 로 알려 주면
+ * `TeamGameScreen` 이 `TeamGameSession.actions.cpuPickoff` 로 여기에 넘긴다.
  *
  * 그 루가 비었으면 원본 루프가 거기서 안 멈추므로 부르는 쪽 잘못이다 — 아무 일도 없다.
  */
