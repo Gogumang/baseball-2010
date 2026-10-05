@@ -84,6 +84,20 @@ describe('능력치 훈련 — 0x17f5c (원본 규칙)', () => {
     expect(적게.gamePoint).toBe(0)
   })
 
+  it('사기(0x186c4)를 먼저 굴리고 상승(0x18704)을 다음에 굴린다', () => {
+    const 차례: number[] = [0, 0.999]
+    const 순서난수: RandomPort = {
+      next: () => 차례.shift()!,
+      nextInRange: (minimum, maximum) => minimum + 차례.shift()! * (maximum - minimum),
+      pick: (candidates) => candidates[0],
+    }
+
+    const outcome = runTraining(선수({ battingTypeIndex: 1 }), 메뉴('히트'), 순서난수)
+
+    // 첫 굴림 0 → 사기 5, 둘째 굴림 0.999 → 상승 6
+    expect([outcome.moraleLoss, outcome.gains.hit]).toEqual([5, 6])
+  })
+
   it('사기가 0 이면 막고, 능력치가 타입 한계치 이상이면 막는다 (StrMODE[193][192], 0x12e40)', () => {
     expect(blockReasonOf(선수({ morale: 0 }), 메뉴('히트'))).toBe('사기부족')
     const 한계 = 선수({ battingTypeIndex: 1, ability: { hit: 800, power: 849, run: 10, defense: 750 } })

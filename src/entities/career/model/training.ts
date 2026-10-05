@@ -151,12 +151,14 @@ export function runTraining(career: PlayerCareer, menu: TrainingMenu, random: Ra
 
 function runAbilityTraining(career: PlayerCareer, menu: TrainingMenu, random: RandomPort): TrainingOutcome {
   const [ability] = menu.abilities
+  // 굴리는 차례: 사기 bfa55(5,8) → [sp+0x38] (0x186c4) 이 **먼저**, 상승 bfa55 → [sp+0x34] (0x18704) 가 다음
+  const rolledMoraleLoss = roll(random, MORALE_LOSS_RANGE)
   const rolled = roll(random, LEG_ABILITIES.has(ability) ? LEG_GAIN_RANGE : GAIN_RANGE)
   const typeBonus = TYPE_BONUS_ABILITY[career.battingTypeIndex] === ability ? TYPE_BONUS : 0
   const skillGain = (isSkillEquipped(career, ROOKIE_SKILL) ? 1 : 0) - (isSkillEquipped(career, WEAK_BODY_SKILL) ? 2 : 0)
   const gains = { [ability]: rolled + typeBonus + skillGain + subItemTrainingBonus(career, ability) }
   const moraleLoss =
-    roll(random, MORALE_LOSS_RANGE) -
+    rolledMoraleLoss -
     (isSkillEquipped(career, ROOKIE_SKILL) ? 1 : 0) +
     (isSkillEquipped(career, WEAK_BODY_SKILL) ? 2 : 0) -
     subItemMoraleRelief(career)
