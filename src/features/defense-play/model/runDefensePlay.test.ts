@@ -5,7 +5,10 @@ import { AUTO_ADVANCE_TICK_MARGIN, beatsThrow } from '@/entities/fielding/model/
 import { BASE_POSITIONS, FIELDER_COUNT } from '@/entities/fielding/model/fieldGeometry'
 import { EMPTY_BASES, type BaseState } from '@/entities/game/model/baseState'
 import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
+import { createFielders } from '@/entities/fielding/model/fieldingState'
+import { throwTicksToFielder } from '@/entities/fielding/model/throwPlan'
 import {
+  cpuSpecialThrowOf,
   defenseAbilitiesOf,
   isBattedBallInPlay,
   runDefensePlay,
@@ -962,5 +965,46 @@ describe('송구 수동/자동 — 환경설정 +0xf4 (0x5269c → 0xae6c8 → 0
     }
 
     expect(굴림수('수동')).toBe(굴림수('자동'))
+  })
+})
+
+describe('CPU 홈 송구 20% 특수 송구 — 0xafa60 → 0xb2c90 → 0xb3444 → 0xa1620', () => {
+  // 2루 주자 단타를 투수가 잡아 CPU 점수식이 홈을 고르는 타구 (웹 근사 궤적 기준)
+  const 홈송구 = (value: number) =>
+    runDefensePlay({
+      outcome: 단타,
+      trajectory: battedBallTrajectory([90, 600, 300, 0]),
+      bases: { first: false, second: true, third: false },
+      outs: 0,
+      runAbility: 500,
+      defenseIsCpu: true,
+      random: 고정난수(value),
+    })
+
+  it('홈을 고르면 rand(0,100) ≤ 19 일 때 특수 송구다', () => {
+    expect(홈송구(0.1).throwBase).toBe(0)
+    expect(홈송구(0.1).log.some((line) => line.includes('0루로 특수 송구'))).toBe(true)
+    expect(홈송구(0.5).log.some((line) => line.includes('특수'))).toBe(false)
+  })
+
+  it('내야수의 홈 송구는 맞혀도 효과가 없다 — 계획 [1] 은 외야수만 선다 (b368a)', () => {
+    const 야수 = createFielders(Array.from({ length: 9 }, () => 500))
+    expect(cpuSpecialThrowOf(야수, 5, 1).special).toBe(false)
+    expect(cpuSpecialThrowOf(야수, 0, 1).special).toBe(false)
+  })
+
+  it('받을 야수가 없으면(+0xf0[홈] = −1) 던지지 않고 들고 뛴다 — 특수가 버려진다 (b2cc4)', () => {
+    const 야수 = createFielders(Array.from({ length: 9 }, () => 500))
+    expect(cpuSpecialThrowOf(야수, 8, -1).special).toBe(false)
+  })
+
+  it('외야수가 17틱 넘게 던지면 송구 속도가 +0xd8 = 130% 가 된다 (a16dc · 0xa0fc4)', () => {
+    const 야수 = createFielders(Array.from({ length: 9 }, () => 500))
+    expect(throwTicksToFielder(야수[8], 야수[1])).toBeGreaterThan(17)
+    const 특수 = cpuSpecialThrowOf(야수, 8, 1)
+    expect(특수.special).toBe(true)
+    if (!특수.special) return
+    expect(특수.thrower.throwSpeed).toBe(Math.trunc((야수[8].throwSpeed * 130) / 100))
+    expect(throwTicksToFielder(특수.thrower, 야수[1])).toBeLessThan(throwTicksToFielder(야수[8], 야수[1]))
   })
 })

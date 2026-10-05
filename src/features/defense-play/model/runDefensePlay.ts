@@ -2,6 +2,7 @@ import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import {
   inPlayCommandOf,
   type ControlSide,
@@ -15,6 +16,7 @@ import {
   SIXTH_SENSE_SKILL_ID,
   HOME_RUN_DERBY_MODE,
   BATTER_CAREER_MODE,
+  LASER_SPEED_PERCENT,
   LASER_WINDOW_FIRST_TICK,
 } from '@/entities/defense-controls/model/laserThrow'
 import {
@@ -28,6 +30,7 @@ import {
   requiredBasesOnFlyCatch,
 } from '@/entities/fielding/model/autoAdvance'
 import {
+  BOUNCE_THROW_DISTANCE,
   MINIMUM_THROW_SPEED,
   NO_THROW_ERROR,
   rollFumble,
@@ -39,6 +42,7 @@ import {
   BASE_DEFAULT_FIELDER,
   basePosition,
   FIELDER_COUNT,
+  horizontalDistance,
   isSamePoint,
   progressPercent,
   runnerSpeedOf,
@@ -84,8 +88,13 @@ import {
   defenseArrivalTicks,
   secondBaseCoverSlot,
 } from '@/entities/fielding/model/throwArrival'
-import { effectiveThrowSpeedOf, readyTicksOf, throwTicksToFielder } from '@/entities/fielding/model/throwPlan'
-import { chooseThrowTargetBase } from '@/entities/fielding/model/throwTargetBase'
+import {
+  effectiveThrowSpeedOf,
+  planThrow,
+  readyTicksOf,
+  throwTicksToFielder,
+} from '@/entities/fielding/model/throwPlan'
+import { chooseThrowTargetBase, isSpecialThrow } from '@/entities/fielding/model/throwTargetBase'
 import { EMPTY_BASES, type AdvanceResult, type BaseState } from '@/entities/game/model/baseState'
 import type { ManualAutoMode } from '@/entities/settings/model/gameSettings'
 import { forecastCatch } from '@/features/defense-play/model/catchForecast'
@@ -238,8 +247,8 @@ export interface DefensePlayInput {
    * ⚠️ **옮기지 못한 한 가지**: `0xafa60` 은 이 갈림 말고 **경기 장면 메시지 처리기
    * `0x509a0` 앞머리(0x509b4~0x509d0)에서도 조건 없이 한 번씩** 불린다 (S8 4-3, 확정).
    * 웹에는 메시지 큐가 없어 그 자리를 옮길 길이 없다 — 여기서는 **매 틱 갈림만** 옮겼다.
-   * `0xafa60` 의 "홈 송구면 rand(0,100) ≤ 19 로 특수 송구" 굴림도 웹에 없다(난수 차례를 건드리게
-   * 되므로 지어 넣지 않는다).
+   * `0xafa60` 의 "홈 송구면 rand(0,100) ≤ 19 로 특수 송구" 굴림은 이 갈림이 도는 쪽(CPU 송구)에서
+   * 홈을 골랐을 때 한 번 굴린다 — `cpuSpecialThrowOf` 주석 참고.
    *
    * 배선: 사람이 수비하는 자리(`pitcherGameFlow` · `teamGameFlow` 수비 타석 · 투수편 미션)가
    * 이 칸을 넘기면 된다. 안 넘기면 원본 기본값(수동)이다.
@@ -1049,25 +1058,47 @@ export function stepDefensePlay(
           isBallHeld: true,
           isThrowerReady: true,
         })
-        // 악송구 굴림 (0xa1828). 레이저(특수)면 기준이 +100 = +1%p 더 위험하다
+        // CPU 홈 송구 20% 특수 송구 (0xafa60) — 점수식이 홈(0)을 골랐을 때**만** 한 번 굴린다
+        // (`afad2: cmp r0,#0 ; bne` 로 홈이 아니면 굴림 자체를 건너뛴다). 효과는 `cpuSpecialThrowOf` 참고.
+        const cpuSpecial =
+          play.manualThrowBase === NONE &&
+          cpuThrowEnabled &&
+          throwBase === 0 &&
+          input.random !== undefined &&
+          isSpecialThrow(throwBase, randomIntegerBelow(input.random, 0, 100))
+        const special = cpuSpecial
+          ? cpuSpecialThrowOf(fielders, chaserSlot, covers[0] ?? NONE)
+          : NO_CPU_SPECIAL_THROW
+        // 원바운드(0xa17fc 갈래)는 악송구 굴림 대신 rand(0,2) 한 번으로 각도 부호(±1)만 정한다
+        if (special.bounce && input.random !== undefined) randomIntegerBelow(input.random, 0, 2)
+        // 악송구 굴림 (0xa1828). 레이저(특수)면 기준이 +100 = +1%p 더 위험하다.
+        // CPU 특수 송구는 0xa1620 의 다섯째 인자(= 계획 [1])로 같은 자리에 들어간다
         const error =
-          input.random === undefined
+          input.random === undefined || special.bounce
             ? NO_THROW_ERROR
-            : rollThrowError(abilities[chaserSlot] ?? DEFAULT_ABILITY, laserThrow, input.random)
+            : rollThrowError(
+                abilities[chaserSlot] ?? DEFAULT_ABILITY,
+                laserThrow || special.special,
+                input.random,
+              )
         errantThrow = error.errant
-        let arrivalTicks = defenseArrivalTicks(contextAt(tick), throwBase)
+        const thrower = special.special ? special.thrower : fielders[chaserSlot]
+        let arrivalTicks = special.special
+          ? specialThrowArrivalTicks(contextAt(tick), throwBase, thrower)
+          : defenseArrivalTicks(contextAt(tick), throwBase)
         if (error.errant) {
           // 속도 보정은 공 속도에 그대로 더해진다(하한 100) → 도착 틱이 그 비율만큼 늘거나 준다.
           // **근사**: 방향 보정(±49)은 공이 루를 벗어난다는 뜻이라 궤적을 다시 만들어야 하는데
           // 그 물리 루프는 해독 금지 구역이다. 여기서는 "그 송구로는 아웃이 안 난다" 로만 본다.
-          const base = effectiveThrowSpeedOf(fielders[chaserSlot])
+          const base = effectiveThrowSpeedOf(thrower)
           const errant = Math.max(MINIMUM_THROW_SPEED, base + error.speedDelta)
           arrivalTicks = Math.max(1, Math.trunc((arrivalTicks * base) / errant))
         }
         throwArrivalTick = tick + arrivalTicks
         throwFromSlot = chaserSlot
         log.push(
-          `${tick}틱 ${throwBase}루로 ${laserThrow ? '레이저 ' : ''}송구 — ${throwArrivalTick}틱 도착` +
+          `${tick}틱 ${throwBase}루로 ${laserThrow ? '레이저 ' : ''}${cpuSpecial ? '특수 ' : ''}송구 — ${throwArrivalTick}틱 도착` +
+            (special.bounce ? ' (원바운드)' : '') +
             (error.errant ? ' (악송구)' : ''),
         )
       }
@@ -1654,4 +1685,78 @@ function ballPointAt(input: BallPointInput): WorldPoint {
     y: Math.trunc((1200 * done * (whole - done)) / (whole * whole)),
     z: from.z + Math.trunc(((to.z - from.z) * done) / whole),
   }
+}
+
+/** CPU 홈 특수 송구가 0xa1620 에 무엇을 넘기는가 (`cpuSpecialThrowOf`) */
+interface CpuSpecialThrow {
+  /** 계획 [1] — 0xa1620 다섯째 인자. 거짓이면 특수 굴림이 아무 효과도 없다 */
+  readonly special: true
+  /** 거리 상한(20400)을 넘어 원바운드로 던진다 — 악송구 굴림을 건너뛴다 */
+  readonly bounce: boolean
+  /** 송구 속도를 +0xd8(130%)로 바꿔 끼운 던지는 야수 */
+  readonly thrower: FielderState
+}
+
+const NO_CPU_SPECIAL_THROW = { special: false, bounce: false } as const
+
+/**
+ * **CPU 홈 송구 20% 특수 송구의 효과** — `0xafa60` 이 굴린 특수 값이 어디까지 내려가는가 (직접 뜬 것).
+ *
+ * ```
+ * afad2: b == 0 이면 r6 = (rand(0,100) ≤ 19)          ; 0xbfa54, 홈이 아니면 굴림 없음
+ * afae6: 플레이.vt58(b, r6)                            ; = 0xb2c90
+ * b2c9e: [sp+0x1c] = 특수
+ * b2cc4: C = +0xf0[b] ; C == −1 → 공 가진 야수가 직접 들고 뛴다(특수 버려짐)
+ * b2de8: 플레이.vt5c(C, [sp+0x1c])                      ; = 0xb2e38
+ * b2e78: 플레이.vt8c(결과, 플레이, 던지는야수, C, 특수)   ; = 0xb3444 송구 계획 → +0x14c..+0x153
+ * b3528: 외야수(칸>5) && 특수 → 중계 안 함
+ * b368a: [1] = 외야수(+0x88 > 5) && 특수 && 송구틱(vtb8) > 0x11
+ * b2f06: +0x1f4(사람 레이저) == 0 이면 던지는야수.vtac(받는야수 +0x2c 목표점, [+0x14d] = [1])  ; = 0xa1620
+ * a165c: 특수 → 야수+0xe8 = 4
+ * a16be: 특수 && 거리 > cfg(17000)×120/100 → 거리 = 상한, 원바운드 표시
+ * a16dc: +0xdc(송구 속도) = 특수 ? +0xd8 : +0xd4      ; 0xa0fc4: +0xd8 = +0xd4 × 130 / 100
+ * a17fc: 원바운드면 +0xc0 = 4, 각도 ±1 (0xbfaa0 = rand(0,2)) → **악송구 굴림 건너뜀**
+ * a1828: 아니면 악송구 굴림 기준 = +0xe4 + 특수×100 + 100 (`rollThrowError`)
+ * ```
+ * 곧 **"레이저급 속도"는 맞다** — 다만 계획 [1] 을 거치므로 **외야수가, 중계 없이, 17틱 넘게 걸리는
+ * 홈 송구**일 때만 효과가 난다. 내야수의 홈 송구는 20% 를 맞혀도 아무 차이가 없다(굴림만 먹는다).
+ *
+ * **근사**: 원본은 0xb2c90 이 실패하면(직접 뛰는 게 빠름·거리 ≤ 600) 다음 틱에 `0xafa60` 이 다시 돌아
+ * 또 굴린다. 웹 진행기는 송구를 잡는 틱에 한 번만 정하므로 굴림도 한 번이다.
+ * 원바운드 거리는 웹 관례대로 수평 거리로 잰다(원본 0xbf9f1 은 던지는 쪽 높이 1000 을 넣는다).
+ */
+export function cpuSpecialThrowOf(
+  fielders: readonly FielderState[],
+  throwerSlot: number,
+  receiverSlot: number,
+): CpuSpecialThrow | typeof NO_CPU_SPECIAL_THROW {
+  if (receiverSlot === NONE) return NO_CPU_SPECIAL_THROW
+  const plan = planThrow({ fielders, fromSlot: throwerSlot, finalSlot: receiverSlot, base: 0, special: true })
+  if (!plan.special) return NO_CPU_SPECIAL_THROW
+  const holder = fielders[throwerSlot]
+  return {
+    special: true,
+    bounce: horizontalDistance(holder.position, fielders[receiverSlot].target) > BOUNCE_THROW_DISTANCE,
+    thrower: { ...holder, throwSpeed: Math.trunc((holder.throwSpeed * LASER_SPEED_PERCENT) / 100) },
+  }
+}
+
+/**
+ * 특수 송구의 도착 틱 — `defenseArrivalTicks`(0xaf284) 의 "커버 있음" 갈래를 **중계 없이,
+ * 속도만 +0xd8 로 바꿔** 그대로 따른다 (특수면 0xb3444 가 중계를 끼우지 않는다).
+ */
+function specialThrowArrivalTicks(context: DefenseContext, base: number, thrower: FielderState): number {
+  const { play, fielders } = context
+  const cover = fielders[play.coverOfBase[wrapBase(base)] ?? NONE]
+  if (cover === undefined) return defenseArrivalTicks(context, base)
+  let ticks = throwTicksToFielder(thrower, cover)
+  let remaining = 0
+  if (!thrower.holdingBall) {
+    remaining = play.catchTick - context.currentTick
+    ticks += readyTicksOf(thrower.slot)
+  } else {
+    ticks += thrower.actionRemainingTicks
+  }
+  ticks = Math.max(ticks, ticksToReach(cover.position, basePosition(base), cover.speed) - remaining)
+  return remaining + ticks
 }
