@@ -1,4 +1,6 @@
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
+import type { SeasonEndState } from '@/entities/career/model/playerCareer'
+import { leagueDayCounterOf } from '@/entities/career/model/leagueGameSetup'
 import { applyPitcherEventRewards } from '@/entities/pitcher-career/model/pitcherEventReward'
 import {
   judgePitcherEnding,
@@ -122,10 +124,12 @@ export function nextPitcherYearEndStep(career: PitcherCareer, viewed: readonly n
     const choice = saw(SALARY_FIRM_EVENT_ID) ? SALARY_FIRM_EVENT_ID : SALARY_POLITE_EVENT_ID
     return { kind: '이벤트', eventId: salaryResultEventId(choice, pitcherSalaryNegotiationRankOf(career)) }
   }
-  // 상태 132 — 502·496 의 선택지는 데이터의 gotoEvent 로 380·503 에 이어진다
+  // 상태 132 — 502·496 의 선택지는 데이터의 gotoEvent 로 380·503 에 이어진다.
+  // 128 이 끝나면(팝업 7·8 닫힘, 틀 0x15984) 늘 132 다 — 이어하기로 128 에 돌아온 때는 앞 사슬의 본 번호가 없다
+  if (saw(PITCHER_POSTSEASON_STEP_ID)) return { kind: '이벤트', eventId: pitcherYearEndEventIdOf(career) }
   if (sawAny(MVP_RESULT_EVENT_IDS)) {
     // 131 → 128 → 132. 128 은 대진(L+0x34)이 있을 때만이다 — 정규시즌이 닫히면 0xb818c 가 늘 연다
-    if (!saw(PITCHER_POSTSEASON_STEP_ID) && career.postseason !== null) return { kind: '포스트시즌' }
+    if (career.postseason !== null) return { kind: '포스트시즌' }
     return { kind: '이벤트', eventId: pitcherYearEndEventIdOf(career) }
   }
   if (saw(MVP_INTRO_EVENT_ID)) {
@@ -149,7 +153,65 @@ export function nextPitcherYearEndStep(career: PitcherCareer, viewed: readonly n
  * 연봉 등급 k(0xa4d78)가 이 비트를 읽는다.
  */
 export function enterPitcherYearEndEvent(career: PitcherCareer, eventId: number): PitcherCareer {
-  return eventId === MVP_INTRO_EVENT_ID ? recordPitcherSeasonMvp(career) : career
+  const state = SEASON_END_STATE_OF_EVENT[eventId]
+  // 상태 진입이 S+0x50 을 쓰고 저장한다 — 이어하기가 이 값으로 돌아온다 (`seasonEndState`)
+  const entered = state === undefined || career.seasonEndState === state ? career : { ...career, seasonEndState: state }
+  return eventId === MVP_INTRO_EVENT_ID ? recordPitcherSeasonMvp(entered) : entered
+}
+
+/**
+ * 이벤트를 진입에서 트는 시즌 끝 상태 — 136 이 392, 130 이 370, 131 이 375, 132(0x10c54)가 501/504/502/380.
+ * 380 은 502 의 선택지(gotoEvent)·'연말' 화면에서도 열리지만 그때도 상태는 132 다. 384~391 · 461~464 는 상태를 바꾸지 않는다
+ * (133 0x1a090 · 134 0x19f30 은 S+0x50 을 안 쓴다 — 타자편 794c8d9).
+ */
+const SEASON_END_STATE_OF_EVENT: Readonly<Partial<Record<number, SeasonEndState>>> = {
+  [GOAL_INTRO_EVENT_ID]: 136,
+  [TITLE_INTRO_EVENT_ID]: 130,
+  [MVP_INTRO_EVENT_ID]: 131,
+  [RELEASE_EVENT_ID]: 132,
+  [FINAL_RETIREMENT_EVENT_ID]: 132,
+  [RETIREMENT_CHOICE_EVENT_ID]: 132,
+  [SALARY_EVENT_ID]: 132,
+}
+
+/** 이어하기(상태 100 진입 0x1c154)가 돌아갈 곳 — 타자편 `app/model/seasonEvents.ResumePoint` 와 같은 꼴 */
+export type PitcherResumePoint =
+  /** S+0x50 == 0xb · 0xd · 0xe · 9 → 136 · 130 · 131 · 132 — 그 상태가 진입에서 트는 이벤트로 */
+  | { readonly kind: '이벤트'; readonly eventId: number }
+  /** 128 대진 — S+0x50 == 0xf, 또는 경기 뒤(2) 116 이 g ≠ 0 이라 128 로 */
+  | { readonly kind: '포스트시즌' }
+  /** 경기 뒤(2) 116 이 포스트시즌 중 g == 0 이라 136 으로 — 웹은 시즌 끝 화면(136 자리) */
+  | { readonly kind: '시즌종료' }
+  /** 그 밖 — 관리 화면 (원본은 S+0xb2 짝수 · S+0x50 ∈ {1,3} 이면 105, 아니면 109) */
+  | { readonly kind: '관리' }
+
+/**
+ * 이어하기 분기 0x1c154 (R9 2b — 장면 0x106 이라 모드 3·4 공용):
+ * ```
+ * 1c24e: S+0x50 == 6|7 → 141 · 0x11 → 새 시즌 · 2 → 116 · 0xb → 136 · 9 → 132 · 0xc|0xd → 130 · 0xe → 131
+ * 그 밖: S+0x12c → 134 · S+0xb4 ≠ 0 → 128
+ * 116 끝 0x12b74: S+0xb4 ≠ 0 이면 S+0xb2(= L+0x32) == 0 → [114 → 136], 아니면 [114 → 128]
+ * ```
+ * 웹 투수편은 경기 뒤 116 을 null 로 두므로(116 진입 0x1278c 가 S+0x50 = 2), 대진이 있는데 사슬 상태가 아니면
+ * 116 의 끝처럼 g 로 가른다. 엔딩 141 · 국가대항전은 웹 투수편이 따로 돌아가지 않는다 (타자편과 같다).
+ */
+export function pitcherResumePointOf(career: PitcherCareer): PitcherResumePoint {
+  if (career.endingIndex !== null) return { kind: '관리' }
+  switch (career.seasonEndState) {
+    case 136:
+      return { kind: '이벤트', eventId: GOAL_INTRO_EVENT_ID }
+    case 130:
+      return { kind: '이벤트', eventId: TITLE_INTRO_EVENT_ID }
+    case 131:
+      return { kind: '이벤트', eventId: MVP_INTRO_EVENT_ID }
+    case 132:
+      return { kind: '이벤트', eventId: pitcherYearEndEventIdOf(career) }
+    default:
+      break
+  }
+  if (career.postseason === null) return { kind: '관리' }
+  if (career.seasonEndState === 128) return { kind: '포스트시즌' }
+  return leagueDayCounterOf(career) === 0 ? { kind: '시즌종료' } : { kind: '포스트시즌' }
 }
 
 /** 이벤트 데이터의 보상 명령 7 (r_event) — 데이터(535KB)는 부르는 쪽이 넘긴다 (첫 화면 묶음에 넣지 않으려고) */

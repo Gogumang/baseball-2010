@@ -10,6 +10,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { equipmentBonusOf } from '@/entities/career/model/equipment'
 import { NO_EQUIPPED_TITLE } from '@/entities/career/model/titles'
 import { isSkillEquipped, setSkillEquipped } from '@/entities/career/model/playerCareer'
+import type { SeasonEndState } from '@/entities/career/model/playerCareer'
 import {
   MAXIMUM_PITCHER_ABILITY,
   PITCHER_ABILITY_ORDER,
@@ -280,6 +281,13 @@ export interface PitcherCareer {
   readonly regularSeasonFirstCount: number
   /** 정규시즌 우승 보상을 받았는가 S+0x77 — 128 팝업 0xb 닫힘이 켜고 새 시즌 0x1b7c0 이 지운다 (`postseasonFlow`) */
   readonly regularSeasonRewardTaken: boolean
+  /**
+   * 시즌 끝 사슬의 어느 상태에 들어와 있는가 — 세이브 레코드 **S+0x50(돌아온 까닭)** 의 시즌 끝 값 (타자편과 같은 칸).
+   * 상태 진입마다 쓰고 곧바로 저장한다: 136 → 0xb (0x10bba) · 130 → 0xd 투수 (0x19848) · 131 → 0xe (0x19782) ·
+   * 128 → 0xf (0x120ce) · 132 → 9 (0x10c60). 경기 뒤 116 진입(0x1278c)이 2, 새 시즌 0x1b768 이 1(0x1b7ba) — 웹은 둘 다 null.
+   * 이어하기(상태 100 진입 0x1c154, 모드 3·4 공용)가 이 값으로 돌아간다 (`pitcherResumePointOf`).
+   */
+  readonly seasonEndState: SeasonEndState | null
   readonly postseason: PostseasonSeries | null
   readonly lastMidSeasonGoalCount: number
   /**
@@ -371,6 +379,7 @@ export function createPitcherCareer(
     leaguePlayerStats: EMPTY_LEAGUE_PLAYER_STATS,
     regularSeasonFirstCount: 0,
     regularSeasonRewardTaken: false,
+    seasonEndState: null,
     postseason: null,
     lastMidSeasonGoalCount: 0,
     midSeasonEvaluatedYears: [],
@@ -716,6 +725,8 @@ export function startNextPitcherSeason(career: PitcherCareer): PitcherCareer {
     leaguePlayerStats: EMPTY_LEAGUE_PLAYER_STATS,
     postseason: null,
     regularSeasonRewardTaken: false,
+    // 0x1b7ba `S[0x50] = 1` — 시즌 끝 사슬을 벗어난다
+    seasonEndState: null,
     wins: 0,
     draws: 0,
     losses: 0,

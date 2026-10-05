@@ -6,6 +6,7 @@ import {
   finishPitcherYearEndEvent,
   nextPitcherYearEndStep,
   PITCHER_POSTSEASON_STEP_ID,
+  pitcherResumePointOf,
   pitcherYearEndEventIdOf,
   pitcherYearEndRewardsOf,
 } from '@/entities/pitcher-career/model/pitcherYearEnd'
@@ -136,7 +137,44 @@ describe('연말 이벤트 보상 (명령 7, 점프표 0xd4e50)', () => {
   it('375 에 들어갈 때만 MVP 비트를 남긴다 (상태 131)', () => {
     const 잘함 = 투수({ season: 2, stats: 좋은성적 })
     expect(enterPitcherYearEndEvent(잘함, 375).mvpSeasonBits).toBe(1 << 1)
-    expect(enterPitcherYearEndEvent(잘함, 370)).toBe(잘함)
+    expect(enterPitcherYearEndEvent(잘함, 370).mvpSeasonBits).toBe(잘함.mvpSeasonBits)
+  })
+
+  it('상태 진입이 S+0x50 을 적는다 — 392 → 136 · 370 → 130 · 375 → 131 · 132 의 501/504/502/380 → 132', () => {
+    const 연말 = 투수({ season: 2 })
+    expect(enterPitcherYearEndEvent(연말, 392).seasonEndState).toBe(136)
+    expect(enterPitcherYearEndEvent(연말, 370).seasonEndState).toBe(130)
+    expect(enterPitcherYearEndEvent(연말, 375).seasonEndState).toBe(131)
+    for (const id of [501, 504, 502, 380]) expect(enterPitcherYearEndEvent(연말, id).seasonEndState).toBe(132)
+    // 결과 이벤트(393·371·376·384…)와 국가대표(461~464)는 상태를 안 바꾼다
+    const 들어감 = { ...연말, seasonEndState: 131 as const }
+    expect(enterPitcherYearEndEvent(들어감, 376)).toBe(들어감)
+    expect(enterPitcherYearEndEvent({ ...연말, seasonEndState: 132 }, 461).seasonEndState).toBe(132)
+  })
+})
+
+describe('이어하기 0x1c154 (모드 3·4 공용) — pitcherResumePointOf', () => {
+  it('136·130·131·132 는 그 상태가 진입에서 트는 이벤트로', () => {
+    expect(pitcherResumePointOf(투수({ seasonEndState: 136 }))).toEqual({ kind: '이벤트', eventId: 392 })
+    expect(pitcherResumePointOf(투수({ seasonEndState: 130 }))).toEqual({ kind: '이벤트', eventId: 370 })
+    expect(pitcherResumePointOf(투수({ seasonEndState: 131 }))).toEqual({ kind: '이벤트', eventId: 375 })
+    expect(pitcherResumePointOf(투수({ season: 2, seasonEndState: 132 }))).toEqual({ kind: '이벤트', eventId: 380 })
+  })
+
+  it('128(0xf)이면 대진으로, 경기 뒤(116)면 g 로 — 0 이면 시즌 끝(136 자리), 아니면 128', () => {
+    const 대진 = startPostseason([0, 1, 2, 3, 4, 5, 6, 7])
+    expect(pitcherResumePointOf(투수({ postseason: 대진, seasonEndState: 128 }))).toEqual({ kind: '포스트시즌' })
+    // 45번째 경기 뒤 — 대진이 막 열려 g = 0
+    expect(pitcherResumePointOf(투수({ gamesPlayed: 45, postseason: 대진 }))).toEqual({ kind: '시즌종료' })
+    // 포스트시즌 경기 뒤 시리즈가 이어지면 g ≠ 0
+    expect(pitcherResumePointOf(투수({ gamesPlayed: 46, postseason: { ...대진, wins: [1, 0] } }))).toEqual({
+      kind: '포스트시즌',
+    })
+  })
+
+  it('정규시즌·엔딩은 관리 화면', () => {
+    expect(pitcherResumePointOf(투수({ gamesPlayed: 12 }))).toEqual({ kind: '관리' })
+    expect(pitcherResumePointOf(투수({ seasonEndState: 132, endingIndex: 2 }))).toEqual({ kind: '관리' })
   })
 })
 
@@ -149,5 +187,7 @@ describe('128 포스트시즌 걸음', () => {
       eventId: 380,
     })
     expect(nextPitcherYearEndStep({ ...대진, postseason: null }, [375, 376])).toEqual({ kind: '이벤트', eventId: 380 })
+    // 이어하기로 128 에 돌아와 끝냈다 — 앞 사슬의 본 번호가 없어도 132 다 (틀 0x15984)
+    expect(nextPitcherYearEndStep(대진, [PITCHER_POSTSEASON_STEP_ID])).toEqual({ kind: '이벤트', eventId: 380 })
   })
 })

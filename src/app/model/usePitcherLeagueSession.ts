@@ -19,7 +19,9 @@ import {
   finishPitcherYearEndEvent,
   nextPitcherYearEndStep,
   PITCHER_POSTSEASON_STEP_ID,
+  pitcherResumePointOf,
 } from '@/entities/pitcher-career/model/pitcherYearEnd'
+import type { PitcherResumePoint } from '@/entities/pitcher-career/model/pitcherYearEnd'
 import {
   applyKoreanSeriesReward,
   applyRegularSeasonReward,
@@ -322,7 +324,25 @@ export function usePitcherLeagueSession(
   const legacyGamePoint = useRef<number | null>(null)
   if (legacyGamePoint.current === null) legacyGamePoint.current = loaded.current?.gamePoint ?? 0
 
-  const [career, setCareer] = useState<PitcherCareer | null>(loaded.current)
+  /**
+   * **이어하기** — 장면 0x106 에 들어오면 상태 100 진입 0x1c154 가 S+0x50 으로 돌아갈 상태를 고른다 (`pitcherResumePointOf`).
+   * 시즌 끝 사슬 안이면 그 상태로 돌아가 진입에서 하는 일을 다시 한다 — 136·130·131·132 는 이벤트를 다시 틀고
+   * (375 는 MVP 비트를 다시 — 같은 값), 128 은 진입 0x120a4 를 다시 밟는다(S+0x77 이 서 있으면 팝업 0xb 를 다시 안 띄운다).
+   * 경기 뒤(116, S+0x50 = 2)에 끊겼으면 116 의 끝처럼 대진이 있을 때 g == 0 → 시즌 끝(136 자리) · 아니면 128.
+   * 타자편 794c8d9 `continueSaved` 와 같은 꼴이다.
+   */
+  const resumed = useRef<{ career: PitcherCareer | null; point: PitcherResumePoint } | null>(null)
+  if (resumed.current === null) {
+    const saved = loaded.current
+    const point: PitcherResumePoint = saved === null ? { kind: '관리' } : pitcherResumePointOf(saved)
+    resumed.current = {
+      career: saved !== null && point.kind === '이벤트' ? enterPitcherYearEndEvent(saved, point.eventId) : saved,
+      point,
+    }
+  }
+  const resumePoint = resumed.current.point
+
+  const [career, setCareer] = useState<PitcherCareer | null>(resumed.current.career)
 
   /**
    * **켠 스킬 통계** (`0xb663c` → `[mgr+0xc8]+0xf8`, 모드 3) — 장착 0xa4b04 가 새로 켤 때마다 비트를 OR 한다.
@@ -340,13 +360,28 @@ export function usePitcherLeagueSession(
     if (before === null || before.name !== career.name || before.ids === career.equippedSkillIds) return
     skillEquipStatEventsOf(PITCHER_LEAGUE_MODE, before.ids, career.equippedSkillIds).forEach(recordStat)
   }, [career, recordStat])
-  const [scene, setScene] = useState<PitcherScene>(career === null ? '등록' : '관리')
+  const [scene, setScene] = useState<PitcherScene>(() =>
+    career === null
+      ? '등록'
+      : resumePoint.kind === '이벤트'
+        ? '이벤트'
+        : resumePoint.kind === '포스트시즌'
+          ? '포스트시즌'
+          : resumePoint.kind === '시즌종료'
+            ? '시즌종료'
+            : '관리',
+  )
   const [gameOptions, setGameOptions] = useState<PitcherGameOptions | null>(null)
-  const [story, setStory] = useState<PitcherStory | null>(null)
+  const [story, setStory] = useState<PitcherStory | null>(() =>
+    resumePoint.kind === '이벤트' ? { eventId: resumePoint.eventId, context: '연말', viewed: [] } : null,
+  )
   const [storyNotice, setStoryNotice] = useState('')
   /** 128 로 넘어가며 접어 둔 연말 사슬의 본 번호 — 128 이 끝나면 여기서 132 로 잇는다 */
   const yearEndViewedRef = useRef<readonly number[]>([])
-  const [postseasonPopup, setPostseasonPopup] = useState<PostseasonPopup | null>(null)
+  const [postseasonPopup, setPostseasonPopup] = useState<PostseasonPopup | null>(() =>
+    // 128 진입 0x120a4 를 다시 밟는다 — 정규시즌 우승 보상을 아직 안 받았고 1위면 팝업 0xb
+    career !== null && resumePoint.kind === '포스트시즌' ? regularSeasonPopupOnEnter(career) : null,
+  )
 
 
   /** 이벤트 재생(114)으로 — 뒤 상태는 `story.context` 가 정한다 */
@@ -654,7 +689,8 @@ export function usePitcherLeagueSession(
        * 관리 주기·부상 엔딩·중간평가를 타지 않는다. 45번째 경기는 경기 전 대진이 없어 아래 시즌종료로 간다.
        */
       if (career.postseason !== null) {
-        commit(counted)
+        // 128 진입 0x120a4 — S+0x50 = 0xf · 저장 (116 진입 0x1278c 의 2 를 곧바로 덮는다)
+        commit({ ...counted, seasonEndState: 128 })
         setPostseasonPopup(regularSeasonPopupOnEnter(counted))
         return setScene('포스트시즌')
       }
@@ -762,7 +798,8 @@ export function usePitcherLeagueSession(
       if (step.kind === '포스트시즌') {
         // 131 뒤 128 진입 0x120a4 — 정규시즌 우승 보상을 아직 안 받았고 1위면 팝업 0xb
         yearEndViewedRef.current = viewed
-        commit(current)
+        // 진입 0x120a4 — S+0x50 = 0xf · 저장 (이어하기는 S+0xb4 갈래로 128 에 돌아온다)
+        commit(current.seasonEndState === 128 ? current : { ...current, seasonEndState: 128 })
         setPostseasonPopup(regularSeasonPopupOnEnter(current))
         return setScene('포스트시즌')
       }

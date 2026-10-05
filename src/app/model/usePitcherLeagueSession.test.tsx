@@ -180,6 +180,66 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     expect(포스트.current.career?.completeGameCounts.shutout).toBe(0)
   })
 
+  /** 저장해 두고 다시 띄운다 — 장면 0x106 에 다시 들어오는 이어하기 (상태 100 진입 0x1c154) */
+  const 이어하기 = (career: Partial<커리어>) => {
+    const store = 메모리저장()
+    const 첫판 = 띄우기(store)
+    act(() => 첫판.result.current.actions.create('투수', 신인))
+    act(() => 첫판.result.current.actions.save({ ...첫판.result.current.career!, ...career }))
+    return 띄우기(store).result
+  }
+
+  it('이어하기 — 시즌 끝 사슬 136·130·131·132 면 그 상태의 이벤트(392·370·375·380)부터 다시 튼다 (S+0x50)', () => {
+    expect(이어하기({ season: 2, gamesPlayed: 45, seasonEndState: 136 }).current.story).toEqual({
+      eventId: 392, context: '연말', viewed: [],
+    })
+    expect(이어하기({ season: 2, gamesPlayed: 45, seasonEndState: 130 }).current.story?.eventId).toBe(370)
+    const 엠브이피 = 이어하기({ season: 2, gamesPlayed: 45, seasonEndState: 131 })
+    expect(엠브이피.current.scene).toBe('이벤트')
+    expect(엠브이피.current.story?.eventId).toBe(375)
+    const 연말 = 이어하기({ season: 2, gamesPlayed: 45, seasonEndState: 132 })
+    expect(연말.current.story?.eventId).toBe(380)
+    // 연봉 수락 → 새 시즌 0x1b768 이 S+0x50 을 벗어난다
+    연말끝까지(연말)
+    expect(연말.current.career?.seasonEndState).toBeNull()
+    expect(연말.current.scene).toBe('관리')
+  })
+
+  it('이어하기 — 128(0xf)이면 대진으로, 끝나면 앞 사슬 없이도 132(380)로 간다', () => {
+    const 대진 = startPostseason([3, 0, 1, 2, 4, 5, 6, 7])
+    const result = 이어하기({
+      season: 2, gamesPlayed: 45, postseason: 대진, regularSeasonRewardTaken: true, seasonEndState: 128,
+    })
+    expect(result.current.scene).toBe('포스트시즌')
+    expect(result.current.postseasonPopup).toBeNull()
+    act(() => result.current.actions.save({ ...result.current.career!, postseason: { ...대진, round: '종료', champion: 5 } }))
+    act(() => result.current.actions.pressPostseason())
+    act(() => result.current.actions.closePostseasonPopup())
+    expect(result.current.story).toMatchObject({ eventId: 380, context: '연말' })
+    expect(result.current.career?.seasonEndState).toBe(132)
+
+  })
+
+  it('이어하기 — 45번째 경기 뒤(사슬 전)는 시즌 끝 화면, 정규시즌은 관리 화면', () => {
+    const 대진 = startPostseason([3, 0, 1, 2, 4, 5, 6, 7])
+    expect(이어하기({ gamesPlayed: 45, postseason: 대진 }).current.scene).toBe('시즌종료')
+    expect(이어하기({ gamesPlayed: 12 }).current.scene).toBe('관리')
+  })
+
+  it('128 에 들어가면 S+0x50 = 0xf 를 적는다 — 131 뒤 진입과 포스트시즌 경기 뒤 진입', () => {
+    const result = 판짜기({
+      season: 2,
+      gamesPlayed: 45,
+      popularity: 300,
+      postseason: startPostseason([3, 0, 1, 2, 4, 5, 6, 7]),
+    })
+    act(() => result.current.actions.beginYearEnd())
+    expect(result.current.career?.seasonEndState).toBe(136)
+    연말끝까지(result)
+    expect(result.current.scene).toBe('포스트시즌')
+    expect(result.current.career?.seasonEndState).toBe(128)
+  })
+
   it('45경기째를 치르면 정규시즌이 닫히고 시즌종료 화면으로 간다 (0xb818c)', () => {
     const result = 판짜기({ gamesPlayed: 44 })
 
