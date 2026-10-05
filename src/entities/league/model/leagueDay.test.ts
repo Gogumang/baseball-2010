@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { cpuGameSidesOf, matchupsOf, playLeagueDay, simulateLeagueGame } from '@/entities/league/model/leagueDay'
+import {
+  ACE_BATTER_ROSTER_SLOT,
+  ACE_PITCHER_SLOT,
+  cpuGameAcesOf,
+  cpuGameSidesOf,
+  matchupsOf,
+  playLeagueDay,
+  rollCpuGamePrep,
+  simulateLeagueGame,
+} from '@/entities/league/model/leagueDay'
 import {
   EMPTY_LEAGUE,
   LEAGUE_SIDE_HOME,
@@ -454,9 +463,108 @@ describe('0xc239c 는 칸의 팀 번호와 명단을 엇갈려 앉힌다 (c2494�
     const wins = Array.from({ length: LEAGUE_TEAM_COUNT }, () => 0)
     for (const matchup of matchupsOf(day)) {
       if (matchup.away === myTeam || matchup.home === myTeam) continue
-      const score = simulateLeagueGame({ away: matchup.home, home: matchup.away }, random, rotationSlotOf(day))
+      const rolls = rollCpuGamePrep(random)
+      // 팀 A = 칸 1(홈 X)의 객체 = 원정 명단(말 공격) · 팀 B = 홈 명단(초 공격)
+      const score = simulateLeagueGame({ away: matchup.home, home: matchup.away }, random, rotationSlotOf(day), undefined, {
+        aces: { away: rolls.teamB, home: rolls.teamA },
+      })
       wins[score.awayRuns > score.homeRuns ? matchup.home : matchup.away] += 1
     }
     expect(played.league.wins).toEqual(wins)
+  })
+})
+
+describe('0xc239c 의 굴림 다섯과 마선수 (c2464~c24ea)', () => {
+  /** 정해 둔 값을 차례로 내놓는 난수 */
+  function 차례난수(values: readonly number[]): RandomPort & { 범위: Array<readonly [number, number]> } {
+    let index = 0
+    const 범위: Array<readonly [number, number]> = []
+    return {
+      범위,
+      next: () => 0,
+      nextInRange: (minimum, maximum) => {
+        범위.push([minimum, maximum])
+        const value = values[index] ?? minimum
+        index += 1
+        return value
+      },
+      pick: (candidates) => candidates[0],
+    }
+  }
+
+  it('구장 rand(0,4) → x·y rand(0,5) → 0x66968(y) → 0x66994(x) 차례다', () => {
+    const random = 차례난수([3, 1, 4, 2, 0])
+    const rolls = rollCpuGamePrep(random)
+    expect(random.범위).toEqual([[0, 4], [0, 5], [0, 5], [0, 5], [0, 5]])
+    expect(rolls.stadium).toBe(3)
+    // 팀 A: 마타자 x = 1 · 마투수 y = 4
+    expect(rolls.teamA).toEqual({ batter: 1, pitcher: 4 })
+    // 팀 B: 마투수 = 0x66968(4) 의 굴림 2 · 마타자 = 0x66994(1) 의 굴림 0
+    expect(rolls.teamB).toEqual({ batter: 0, pitcher: 2 })
+  })
+
+  it('팀 B 의 굴림이 팀 A 번호와 겹치면 하나 내린다 (0이면 4) — 두 팀 마선수는 늘 다르다', () => {
+    const rolls = rollCpuGamePrep(차례난수([0, 0, 3, 3, 0]))
+    expect(rolls.teamA).toEqual({ batter: 0, pitcher: 3 })
+    expect(rolls.teamB).toEqual({ batter: 4, pitcher: 2 })
+  })
+
+  it('팀 A 는 칸 sX 의 객체다 — 홈 X(정규)면 말 공격 명단, 원정 X(포스트시즌)면 초 공격 명단', () => {
+    const rolls = rollCpuGamePrep(차례난수([0, 1, 2, 3, 4]))
+    expect(cpuGameAcesOf(rolls)).toEqual({ away: rolls.teamB, home: rolls.teamA })
+    expect(cpuGameAcesOf(rolls, 1 - LEAGUE_SIDE_HOME)).toEqual({ away: rolls.teamA, home: rolls.teamB })
+  })
+
+  it('playLeagueDay 는 경기마다 준비 굴림 다섯을 먼저 부른다', () => {
+    const 범위: Array<readonly [number, number]> = []
+    const 바탕 = createSeededRandom(9)
+    playLeagueDay(EMPTY_LEAGUE, 0, 0, {
+      next: () => 바탕.next(),
+      nextInRange: (minimum, maximum) => {
+        범위.push([minimum, maximum])
+        return 바탕.nextInRange(minimum, maximum)
+      },
+      pick: (candidates) => 바탕.pick(candidates),
+    })
+    expect(범위.slice(0, 5)).toEqual([[0, 4], [0, 5], [0, 5], [0, 5], [0, 5]])
+  })
+
+  it('마선수가 들어가도 기록표·스태미나 표에는 명단 밖 칸(마타자 12 · 마투수 8)이 안 남는다', () => {
+    for (let seed = 1; seed <= 40; seed += 1) {
+      const score = simulateLeagueGame({ away: 2, home: 5 }, createSeededRandom(seed), 0, undefined, {
+        aces: { away: { batter: 0, pitcher: 1 }, home: { batter: 2, pitcher: 3 } },
+      })
+      expect(score.plateAppearances.every((appearance) => appearance.battingOrderIndex < ACE_BATTER_ROSTER_SLOT)).toBe(true)
+      expect(score.pitcherAppearances.every((line) => line.pitcherSlot < ACE_PITCHER_SLOT)).toBe(true)
+      expect(score.pitcherStaminas.away).toHaveLength(PITCHERS_PER_TEAM)
+      expect(score.pitcherStaminas.home).toHaveLength(PITCHERS_PER_TEAM)
+    }
+  })
+
+  it('마투수는 벤치 맨 끝(8번)이라 벤치가 지쳤을 때 CPU 교체 0xabfcc 가 고른다 — 늘 10000 으로 선다', () => {
+    // 로스터 투수가 모두 지친 표 — 스태미나가 가장 높은 벤치 투수를 고르면 마투수다
+    const 지침 = Array.from({ length: PITCHERS_PER_TEAM }, () => 1500)
+    let 달라짐 = 0
+    for (let seed = 1; seed <= 20; seed += 1) {
+      const 없음 = simulateLeagueGame({ away: 2, home: 5 }, createSeededRandom(seed), 0, { away: 지침, home: 지침 })
+      // 마타자 번호를 표 밖(−1)으로 두면 마투수만 들어간다
+      const 있음 = simulateLeagueGame({ away: 2, home: 5 }, createSeededRandom(seed), 0, { away: 지침, home: 지침 }, {
+        aces: { away: { batter: -1, pitcher: 1 }, home: { batter: -1, pitcher: 3 } },
+      })
+      if (JSON.stringify(없음) !== JSON.stringify(있음)) 달라짐 += 1
+    }
+    expect(달라짐).toBeGreaterThan(0)
+  })
+
+  it('마선수 레벨 배율이 능력치에 붙는다 — 레벨만 다른 같은 씨앗이 다른 경기가 되는 일이 있다', () => {
+    const aces = { away: { batter: 4, pitcher: 4 }, home: { batter: 3, pitcher: 3 } }
+    const 낮음 = Array.from({ length: 30 }, (_unused, seed) =>
+      simulateLeagueGame({ away: 1, home: 6 }, createSeededRandom(seed), 1, undefined, { aces }))
+    const 높음 = Array.from({ length: 30 }, (_unused, seed) =>
+      simulateLeagueGame({ away: 1, home: 6 }, createSeededRandom(seed), 1, undefined, {
+        aces,
+        aceLevels: { 3: 4, 4: 4, 8: 4, 9: 4 },
+      }))
+    expect(높음).not.toEqual(낮음)
   })
 })

@@ -1041,6 +1041,7 @@ export function useSeasonSession(
             record.teamId,
             random,
             rested.cpuPitcherStaminas,
+            aceLevels,
           )
           const advanced = cpu.series
           commit({
@@ -1087,6 +1088,7 @@ export function useSeasonSession(
           summary.leaguePlateAppearances,
         ),
         afterGameStamina.cpuPitcherStaminas,
+        aceLevels,
       )
       const rested = withDayEndRecovery({ ...afterGameStamina, cpuPitcherStaminas: day.pitcherStaminas })
 
@@ -1128,7 +1130,7 @@ export function useSeasonSession(
       activeSound().play(seasonEvaluationJingleIdOf(evaluation.popularityChange))
       setScene(SEASON_SCENE_STATE.관중수입)
     },
-    [commit, gainGamePoint, gameKind, gameOptions, random, recordStat, save],
+    [aceLevels, commit, gainGamePoint, gameKind, gameOptions, random, recordStat, save],
   )
 
   /** 관중수입 창에서 확인 — 정산된 레코드를 받아 경기 뒤 마무리로 간다 (0xf1) */
@@ -1191,7 +1193,7 @@ export function useSeasonSession(
       return enterPreGameSquad({ kind: '포스트시즌', options })
     }
     // 0xc2760 은 CPU 팀 투수 레코드 +0x2c 를 깎기만 한다 — 회복(0xb617c)은 다음 내 경기 끝 0x4ea0c 에서다
-    const cpu = runCpuPostseasonWithStamina(series, myTeam, random, save.cpuPitcherStaminas)
+    const cpu = runCpuPostseasonWithStamina(series, myTeam, random, save.cpuPitcherStaminas, aceLevels)
     const advanced = cpu.series
     commit({
       ...save,
@@ -1202,7 +1204,7 @@ export function useSeasonSession(
         record: { ...save.state.record, postseasonChampion: advanced.champion ?? NO_CHAMPION },
       },
     })
-  }, [commit, enterPreGameSquad, optionsFor, random, save])
+  }, [aceLevels, commit, enterPreGameSquad, optionsFor, random, save])
 
   /**
    * 국가대항전 한 경기 — 원본대로 **사람이 대표팀을 조작한다** (시즌 221).

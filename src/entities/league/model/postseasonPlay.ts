@@ -1,6 +1,11 @@
 import { LEAGUE_SIDE_HOME, advancePostseason } from '@/entities/league/model/league'
 import type { PostseasonSeries } from '@/entities/league/model/league'
-import { cpuGameSidesOf, simulateLeagueGame } from '@/entities/league/model/leagueDay'
+import {
+  cpuGameAcesOf,
+  cpuGameSidesOf,
+  rollCpuGamePrep,
+  simulateLeagueGame,
+} from '@/entities/league/model/leagueDay'
 import { isMyTurn } from '@/entities/league/model/seasonEnd'
 import { rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -58,6 +63,8 @@ export function playCpuSeriesGameWithStamina(
   series: PostseasonSeries,
   random: RandomPort,
   pitcherStaminas: PitcherStaminaTable = {},
+  /** 마선수 레벨 열 칸 — `playLeagueDay` 의 `aceLevels` 와 같다. 안 넘기면 Lv1(60%) */
+  aceLevels?: Readonly<Record<number, number>>,
 ): CpuPostseasonResult {
   if (series.round === '종료') return { series, pitcherStaminas }
   // 9eba·13e8a: 0xc2760(…, X = 0xb7648(L, r, 1) = 아랫 시드, Y = 0xb7648(L, r, 0) = 윗 시드).
@@ -68,10 +75,15 @@ export function playCpuSeriesGameWithStamina(
   const sides = cpuGameSidesOf(x, y, 1 - LEAGUE_SIDE_HOME)
   // 선발 = 이 시리즈 g 번 돈 로스터의 0번 (0xc239c c24fc~c254e, 위 주석) — 굴림이 없다
   const day = series.wins[0] + series.wins[1]
-  const score = simulateLeagueGame(sides, random, rotationSlotOf(day), {
-    away: pitcherStaminas[sides.away],
-    home: pitcherStaminas[sides.home],
-  })
+  // 경기 준비의 굴림 다섯 (c2464~c24ea) — 팀 A = 칸 sX(초)의 객체 = 윗 시드 명단
+  const rolls = rollCpuGamePrep(random)
+  const score = simulateLeagueGame(
+    sides,
+    random,
+    rotationSlotOf(day),
+    { away: pitcherStaminas[sides.away], home: pitcherStaminas[sides.home] },
+    { aces: cpuGameAcesOf(rolls, 1 - LEAGUE_SIDE_HOME), aceLevels },
+  )
   // c28e2~c290a: `score(sX) > score(sY)` 면 X 승, 아니면(동점 포함) Y 승. 칸 sX(초)에서 친 것은 Y 의 선수라
   // **점수를 덜 낸 명단의 팀이 이긴다** — 원본 버그 그대로 (R1 항목 4 는 명단 엇갈림을 못 보고 "정상" 으로 읽었다)
   const winner = score.awayRuns > score.homeRuns ? x : y
@@ -101,11 +113,13 @@ export function runCpuPostseasonWithStamina(
   myTeamId: number,
   random: RandomPort,
   pitcherStaminas: PitcherStaminaTable = {},
+  /** 마선수 레벨 열 칸 — 안 넘기면 Lv1(60%) */
+  aceLevels?: Readonly<Record<number, number>>,
 ): CpuPostseasonResult {
   let current: CpuPostseasonResult = { series, pitcherStaminas }
   for (let game = 0; game < MAXIMUM_GAMES; game += 1) {
     if (current.series.round === '종료' || isMyTurn(current.series, myTeamId)) return current
-    current = playCpuSeriesGameWithStamina(current.series, random, current.pitcherStaminas)
+    current = playCpuSeriesGameWithStamina(current.series, random, current.pitcherStaminas, aceLevels)
   }
   return current
 }

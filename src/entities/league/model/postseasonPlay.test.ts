@@ -6,7 +6,9 @@ import {
   runCpuPostseasonWithStamina,
 } from '@/entities/league/model/postseasonPlay'
 import { advancePostseason, startPostseason } from '@/entities/league/model/league'
-import { simulateLeagueGame } from '@/entities/league/model/leagueDay'
+import type { PostseasonSeries } from '@/entities/league/model/league'
+import { rollCpuGamePrep, simulateLeagueGame } from '@/entities/league/model/leagueDay'
+import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
 function 씨앗난수(seed: number): RandomPort {
@@ -106,7 +108,7 @@ describe('스태미나 +0x2c 를 잇는다 (0xc2760 — 하루 끝 0xb818c 포�
 describe('선발은 0xc239c 의 로테이션이다 — 시리즈 안 경기 수 g 로 돈다 (c24fc~c254e, rand(0,4) 없음)', () => {
   /** 난수를 몇 번 불렀는지 세는 감싸개 */
   function 세는난수(seed: number) {
-    const 바탕 = 씨앗난수(seed)
+    const 바탕 = createSeededRandom(seed)
     const 범위: Array<readonly [number, number]> = []
     const port: RandomPort = {
       next: () => 바탕.next(),
@@ -119,24 +121,39 @@ describe('선발은 0xc239c 의 로테이션이다 — 시리즈 안 경기 수 
     return { port, 범위 }
   }
 
+  /** 원본 차례로 손으로 짠 한 경기 — 준비 굴림 다섯 → 초 공격 윗 시드 명단 → 덜 낸 명단의 팀 승 */
+  function 기대승자(series: PostseasonSeries, seed: number, g: number): number {
+    const random = createSeededRandom(seed)
+    const rolls = rollCpuGamePrep(random)
+    const 기대 = simulateLeagueGame({ away: series.teams[0], home: series.teams[1] }, random, g, undefined, {
+      aces: { away: rolls.teamA, home: rolls.teamB },
+    })
+    return 기대.awayRuns > 기대.homeRuns ? series.teams[1] : series.teams[0]
+  }
+
   it('양 팀 모두 rotationSlotOf(두 팀 승수 합) 칸이 선발이고 같은 난수로 같은 경기가 된다', () => {
     const 시작 = startPostseason(순위)
     // 1승 1패 뒤 셋째 경기 = g 2
     const 둘째뒤 = advancePostseason(advancePostseason(시작, 시작.teams[0]), 시작.teams[1])
     for (const [series, g] of [[시작, 0], [둘째뒤, 2]] as const) {
-      // 초 공격은 윗 시드의 선수 · 점수를 덜 낸 명단의 팀이 이긴다 (0xc239c 칸·명단 엇갈림 + c28f8)
-      const 기대 = simulateLeagueGame({ away: series.teams[0], home: series.teams[1] }, 씨앗난수(31), g)
-      const 승자 = 기대.awayRuns > 기대.homeRuns ? series.teams[1] : series.teams[0]
-      expect(playCpuSeriesGame(series, 씨앗난수(31))).toEqual(advancePostseason(series, 승자))
+      for (const seed of [31, 32, 33]) {
+        expect(playCpuSeriesGame(series, createSeededRandom(seed))).toEqual(
+          advancePostseason(series, 기대승자(series, seed, g)),
+        )
+      }
     }
   })
 
-  it('경기 준비에서 rand(0,4) 를 부르지 않는다 — 선발 굴림이 없다', () => {
+  it('경기 준비 굴림은 구장 rand(0,4) · 마선수 rand(0,5) 넷뿐이다 — 선발 굴림이 없다', () => {
     const 시작 = startPostseason(순위)
     const 세기 = 세는난수(5)
     playCpuSeriesGame(시작, 세기.port)
     const 그대로 = 세는난수(5)
-    simulateLeagueGame({ away: 시작.teams[0], home: 시작.teams[1] }, 그대로.port, 0)
+    const rolls = rollCpuGamePrep(그대로.port)
+    simulateLeagueGame({ away: 시작.teams[0], home: 시작.teams[1] }, 그대로.port, 0, undefined, {
+      aces: { away: rolls.teamA, home: rolls.teamB },
+    })
+    expect(세기.범위.slice(0, 5)).toEqual([[0, 4], [0, 5], [0, 5], [0, 5], [0, 5]])
     expect(세기.범위).toEqual(그대로.범위)
   })
 
@@ -145,8 +162,8 @@ describe('선발은 0xc239c 의 로테이션이다 — 시리즈 안 경기 수 
     let series = 시작
     for (let game = 0; game < 3; game += 1) series = advancePostseason(series, 시작.teams[0])
     expect(series.round).toBe('플레이오프')
-    const 기대 = simulateLeagueGame({ away: series.teams[0], home: series.teams[1] }, 씨앗난수(8), 0)
-    const 승자 = 기대.awayRuns > 기대.homeRuns ? series.teams[1] : series.teams[0]
-    expect(playCpuSeriesGame(series, 씨앗난수(8))).toEqual(advancePostseason(series, 승자))
+    expect(playCpuSeriesGame(series, createSeededRandom(8))).toEqual(
+      advancePostseason(series, 기대승자(series, 8, 0)),
+    )
   })
 })

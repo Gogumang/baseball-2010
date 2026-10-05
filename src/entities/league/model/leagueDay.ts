@@ -13,6 +13,11 @@ import type {
   HalfInningResult,
 } from '@/entities/game/model/simulateHalfInning'
 import { rosterLineupOf } from '@/entities/game/model/quickLineup'
+import type { QuickLineup } from '@/entities/game/model/quickLineup'
+import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
+import { ACE_BATTERS, ACE_PITCHERS, rollOpponentAceIndex } from '@/entities/game/model/aceOpponent'
+import { EMPTY_BATTER_GAME_RECORD } from '@/entities/batting/model/pinchHitAi'
+import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
 import {
   BATTERS_PER_TEAM,
   PITCHERS_PER_TEAM,
@@ -146,6 +151,123 @@ const BATTING_ORDER_SIZE = 9
 const ALL_PITCHER_SLOTS: readonly number[] = Array.from({ length: PITCHERS_PER_TEAM }, (_, slot) => slot)
 
 /**
+ * 명단 밖에서 들어온 **마타자**의 로스터 칸 표시 — 리그 붙박이 표(0~11)에 없는 선수다 (`0x1f84c` 저장 레코드).
+ * 선수 기록표(`leaguePlayerStats`)에는 쌓지 않는다 (아래 `simulateLeagueGame` 주석).
+ */
+export const ACE_BATTER_ROSTER_SLOT = BATTERS_PER_TEAM
+/** **마투수**가 앉는 투수 명단 칸 — `0xb521c` 의 `0x60` 가지가 8번 칸(로스터 여덟 뒤)에 넣는다 */
+export const ACE_PITCHER_SLOT = PITCHERS_PER_TEAM
+
+/** 마타자를 넣는 명단 칸 — `0xb53f0` 의 `0x40` 가지가 9번 = 첫 벤치 칸 */
+const ACE_BATTER_ENTRY_SLOT = 9
+
+/** 한 팀이 받는 마선수 번호 둘 (`ACE_BATTERS` · `ACE_PITCHERS` 칸 0~4) */
+export interface LeagueGameAces {
+  readonly batter: number
+  readonly pitcher: number
+}
+
+/** `simulateLeagueGame` 의 덧붙임 — 경기 준비가 넣는 것 */
+export interface LeagueGameExtras {
+  /** 명단(`matchup` 의 away·home)마다 넣을 마선수 — `0xb8870`(마타자)·`0xb88c8`(마투수) */
+  readonly aces?: { readonly away?: LeagueGameAces; readonly home?: LeagueGameAces }
+  /**
+   * 마선수 레벨 열 칸 `mgr[0x13a..0x143]` — 마선수 능력치 네 칸이 `0xb6414` 첫 단계에서 `v · 0xd88aa[레벨] / 100`
+   * 을 먹는다(모드를 가리지 않는 전역 칸). 안 넘기면 모두 Lv1(60%) — 새 저장 기본값이다.
+   */
+  readonly aceLevels?: Readonly<Record<number, number>>
+}
+
+/** 마투수 하나 — 간이 타석용 능력과 스태미나 용량의 바탕(체력 칸) */
+interface LeagueAcePitcher {
+  readonly quick: QuickAtBatPitcher
+  readonly staminaAbility: number
+}
+
+function acePitcherOf(index: number, levels: Readonly<Record<number, number>> | undefined): LeagueAcePitcher | undefined {
+  const ace = ACE_PITCHERS[index]
+  if (ace === undefined) return undefined
+  // 마투수 레코드 +0xc 부터 u16 넷 = 제구·구속·변화·체력 (acePlayers 의 hit·power·defense·run 칸 차례)
+  const ability = aceAbilityAtLevel(ace.ability, aceLevelOf(levels, aceLevelSlotOf('투수', index + 1)))
+  return {
+    quick: { control: ability.hit, velocity: ability.power, stamina: ability.run, skillIds: [] },
+    staminaAbility: ability.run,
+  }
+}
+
+function aceBatterOf(index: number, levels: Readonly<Record<number, number>> | undefined): QuickAtBatBatter | undefined {
+  const ace = ACE_BATTERS[index]
+  if (ace === undefined) return undefined
+  const ability = aceAbilityAtLevel(ace.ability, aceLevelOf(levels, aceLevelSlotOf('타자', index + 1)))
+  return { hit: ability.hit, power: ability.power, run: ability.run, skillIds: [] }
+}
+
+/**
+ * 마타자를 넣은 명단 — `0xb53f0` 은 9번(첫 벤치)에 넣으며 **옛 9번을 맨 끝으로 옮긴다**(b544a, 밀기가 아니다).
+ * 벤치 타자 수 `team+0x28c` 가 하나 는다(0xb8870 b8898~b88b2) — CPU 대타 `rand(0, 벤치 수)` 의 범위가 3 → 4 다.
+ */
+function withAceBatterLineup(lineup: QuickLineup): QuickLineup {
+  const rosterSlots = [...lineup.rosterSlots]
+  const records = [...lineup.records]
+  const seated = rosterSlots[ACE_BATTER_ENTRY_SLOT]
+  if (seated !== undefined) {
+    rosterSlots.push(seated)
+    records.push(records[ACE_BATTER_ENTRY_SLOT] ?? EMPTY_BATTER_GAME_RECORD)
+  }
+  rosterSlots[ACE_BATTER_ENTRY_SLOT] = ACE_BATTER_ROSTER_SLOT
+  records[ACE_BATTER_ENTRY_SLOT] = EMPTY_BATTER_GAME_RECORD
+  return { rosterSlots, records, benchBatters: lineup.benchBatters + 1 }
+}
+
+/** CPU 끼리 경기 준비 `0xc239c` 의 굴림 다섯 (c2464~c24ea) */
+export interface CpuGamePrepRolls {
+  /**
+   * c2464 `rand(0,4)` → `state+0x30` = **구장 번호**. 일반모드 경기 세우기 `0x30f20` 이 같은 칸에 준비 기록의 구장
+   * `rec+0xc`(310e2~310ec)를, 국가대항전 준비 `0xc2c4c`(c2cf6)·경기 장면 진입(3a032)이 `0xff`(없음)를 쓴다.
+   * 간이 엔진 쪽에서 이 칸을 읽는 곳은 못 찾았다 — 웹은 굴림만 소모하고 값은 쓰지 않는다.
+   */
+  readonly stadium: number
+  /** 칸 sX 의 팀 객체(= Y 의 명단, `cpuGameSidesOf`) — c2470 x → `0xb8870(x)`, c247a y → `0xb88c8(y)` */
+  readonly teamA: LeagueGameAces
+  /** 칸 sY 의 팀 객체(= X 의 명단) — c24d8 `0xb88c8(0x66968(y))` → c24ea `0xb8870(0x66994(x))` */
+  readonly teamB: LeagueGameAces
+}
+
+/**
+ * `0xc239c` 가 두 팀 객체를 만든 직후 부르는 굴림 다섯 — 차례 그대로다 (직접 떴다):
+ * ```
+ * c2464  state+0x30 = rand(0,4)             ; 구장
+ * c2470  x = rand(0,5) ; c247a  y = rand(0,5)
+ * c2494  0xb891c(A) ; 0xb8768(A) ; c24aa 0xb8870(A, x) ; c24b6 0xb88c8(A, y)
+ * c24ce  0xb891c(B) ; 0xb8768(B) ; c24dc v = 0x66968(y) ; 0xb88c8(B, v) ; c24ee w = 0x66994(x) ; 0xb8870(B, w)
+ * ```
+ * `0x66968`·`0x66994` 는 같은 함수로, 안에서 `rand(0,5)` 한 번 — 넘긴 번호와 겹치면 하나 내린다(`rollOpponentAceIndex`).
+ * 그래서 두 팀의 마타자·마투수는 늘 서로 다르다. 팀 세우기 `0xb891c`·`0xb8768`·`0xb8870`·`0xb88c8` 은 굴리지 않는다
+ * (R4 3c 의 일반모드 굴림 넷과 같은 함수들).
+ */
+export function rollCpuGamePrep(random: RandomPort): CpuGamePrepRolls {
+  const stadium = Math.trunc(random.nextInRange(0, 4))
+  const x = Math.trunc(random.nextInRange(0, 5))
+  const y = Math.trunc(random.nextInRange(0, 5))
+  const pitcherB = rollOpponentAceIndex(y, random)
+  const batterB = rollOpponentAceIndex(x, random)
+  return { stadium, teamA: { batter: x, pitcher: y }, teamB: { batter: batterB, pitcher: pitcherB } }
+}
+
+/**
+ * 굴림을 명단 쪽(`cpuGameSidesOf` 의 away·home)으로 — 팀 A 는 **칸 sX 의 객체**다.
+ * `sideOfX` 가 홈(1)이면 A 는 말 공격 명단, 원정(0)이면 초 공격 명단이다.
+ */
+export function cpuGameAcesOf(
+  rolls: CpuGamePrepRolls,
+  sideOfX: number = LEAGUE_SIDE_HOME,
+): NonNullable<LeagueGameExtras['aces']> {
+  return sideOfX === LEAGUE_SIDE_HOME
+    ? { away: rolls.teamB, home: rolls.teamA }
+    : { away: rolls.teamA, home: rolls.teamB }
+}
+
+/**
  * 한 팀의 수비 쪽 재료 (`HalfInningDefense`) — 반 이닝마다 리드와 마운드만 갈아 끼운다.
  *
  * `bothTeamsAreCpu` 는 **참**이다: 하루치 리그 경기는 양 팀 다 CPU 조작이라 마무리 투입 굴림
@@ -157,14 +279,22 @@ function defenseOf(
   mound: HalfInningMound,
   lead: number,
   staminas: readonly number[],
+  acePitcher?: LeagueAcePitcher,
 ): HalfInningDefense {
   const roster = teamPitchers(teamId)
   return {
     mound,
-    pitcherSlots: ALL_PITCHER_SLOTS,
-    pitcherAt: (slot) => quickPitcherOf(roster[slot % roster.length]),
+    // 마투수는 명단 8번 칸 = 벤치 맨 끝에 하나 더 (0xb88c8 → 0xb521c, 벤치 투수 수 team+0x33 +1)
+    pitcherSlots: acePitcher === undefined ? ALL_PITCHER_SLOTS : [...ALL_PITCHER_SLOTS, ACE_PITCHER_SLOT],
+    pitcherAt: (slot) =>
+      slot === ACE_PITCHER_SLOT && acePitcher !== undefined
+        ? acePitcher.quick
+        : quickPitcherOf(roster[slot % roster.length]),
     // 투수 능력치 순서는 제구·구속·변화·**체력** (칸 3)
-    staminaAbilityAt: (slot) => roster[slot % roster.length].ability[3],
+    staminaAbilityAt: (slot) =>
+      slot === ACE_PITCHER_SLOT && acePitcher !== undefined
+        ? acePitcher.staminaAbility
+        : roster[slot % roster.length].ability[3],
     // 벤치 투수는 제 레코드 값으로 올라온다 — 경기 사이에 이어진 값
     staminaAt: (slot) => staminas[slot] ?? FULL_STAMINA,
     lead,
@@ -183,10 +313,18 @@ function defenseOf(
  * `0xc2c4c` 가 `L+0x32 % 4` 로 0↔k 맞바꿈(`0xb6c34` → `0xb8c94`)을 한다. CPU 끼리 경기에 `rand(0,4)` 선발은 없다.
  * 안 주면 `rand(0,4)` 두 번으로 뽑는다 — 지금은 이 길을 쓰는 원본 CPU 경기가 없다(테스트·예비용).
  *
- * ⚠️ 미해결 — `0xc239c` 는 팀을 만든 직후 굴림 다섯을 부른다: c2464 `rand(0,4)` → `state+0x30`(뜻 미확인),
- * c2470·c247a `x, y = rand(0,5)` → 팀A `0xb8870(x)` 마타자·`0xb88c8(y)` 마투수, 팀B `0xb88c8(0x66968(y))`·
- * `0xb8870(0x66994(x))`(둘 다 안에서 rand(0,5) 한 번 더). 이 마선수 넣기와 굴림 다섯은 웹 CPU 끼리 경기
- * (정규·포스트시즌)에 아직 없다. 국가대항전 준비 `0xc2c4c` 에는 이 굴림이 없다(`state+0x30 = 0xff`).
+ * **마선수** — `0xc239c` 는 두 팀 객체를 만든 직후 굴림 다섯(`rollCpuGamePrep`)으로 양 팀에 마타자·마투수를 하나씩
+ * 넣는다(정규·포스트시즌 모두). `extras.aces` 로 받아 마타자는 첫 벤치(9번, 옛 9번은 맨 끝), 마투수는 투수 명단 8번
+ * (벤치 맨 끝)에 앉힌다 — 선발이 아니라 **CPU 대타·CPU 투수 교체로만** 경기에 나온다. 능력치 네 칸은 레벨 배율
+ * `0xd88aa` 을 먹는다(`extras.aceLevels`). 국가대항전 준비 `0xc2c4c` 에는 이 굴림이 없다(`state+0x30 = 0xff`).
+ * ⚠️ 남은 차이:
+ *   - 마투수 스태미나 시작 값 — 원본은 저장의 마투수 레코드(`0x1f824`) +0x2c 를 통째로 복사한다. 그 값을 못 읽어
+ *     10000 으로 선다 (`features/play-team-game` 의 마투수와 같은 근사).
+ *   - CPU 대타 판정 `0xac228` 은 타석의 타자가 마선수(`0xb633c`)면 대타를 안 낸다. 그 검사가 웹 `tryQuickCpuPinchHit`
+ *     (`entities/game/model/quickLineup`)에 `batterIsAce: false` 로 박혀 있어, 대타로 들어선 마타자가 다시 대타로
+ *     바뀔 수 있다 — 그 파일 몫이다.
+ *   - 원본은 마선수를 팀 **저장 레코드**에 넣는다(0xb53f0·0xb521c 가 0xb8680 의 레코드를 늘리고 덮는다) — 첫 경기 뒤로
+ *     팀 레코드에 마선수 칸이 남아 사람 경기의 명단·기록표에도 비친다. 웹은 경기마다 붙박이 표에서 새로 세운다.
  */
 export function simulateLeagueGame(
   matchup: LeagueMatchup,
@@ -197,7 +335,18 @@ export function simulateLeagueGame(
    * 깎인 값에 하루 끝 `0xb617c` +20% 만 더한 값이다 (a583fe0). 안 넘기면 모두 10000.
    */
   startingStaminas?: { readonly away?: readonly number[]; readonly home?: readonly number[] },
+  /** 경기 준비가 넣는 마선수 (`0xc239c` → `rollCpuGamePrep`·`cpuGameAcesOf`). 안 넘기면 없다 */
+  extras?: LeagueGameExtras,
 ): LeagueGameScore {
+  const levels = extras?.aceLevels
+  const awayAces = extras?.aces?.away
+  const homeAces = extras?.aces?.home
+  const awayAceBatter = awayAces === undefined ? undefined : aceBatterOf(awayAces.batter, levels)
+  const homeAceBatter = homeAces === undefined ? undefined : aceBatterOf(homeAces.batter, levels)
+  const awayAcePitcher = awayAces === undefined ? undefined : acePitcherOf(awayAces.pitcher, levels)
+  const homeAcePitcher = homeAces === undefined ? undefined : acePitcherOf(homeAces.pitcher, levels)
+  const batterOfTeam = (teamId: number, ace: QuickAtBatBatter | undefined) => (slot: number) =>
+    slot === ACE_BATTER_ROSTER_SLOT && ace !== undefined ? ace : batterAt(teamId, slot)
   // 선발은 경기를 세울 때 로스터 앞 4명 중 하나로 정해진다 (0x3107a·0x31090, S13 1-4b)
   // 칸 번호를 먼저 정해 두는 것은 **투수 기록을 그 칸에 쌓아야** 하기 때문이다.
   // 난수를 부르는 횟수·순서는 예전과 같다(팀마다 한 번씩).
@@ -215,6 +364,9 @@ export function simulateLeagueGame(
   /** 반 이닝이 내놓은 타석 결과를 공격 팀 것으로 적어 둔다 — 판정에는 손대지 않는다 */
   const collect = (teamId: number, half: HalfInningResult) => {
     for (const appearance of half.plateAppearances) {
+      // ⚠️ 마타자의 타석은 쌓지 않는다 — 원본은 팀 레코드 9번에 복사된 마타자 레코드(0x30 바이트, 기록 칸 +0x20~
+      //    포함)에 쌓지만 다음 경기의 0xb8870 이 그 칸을 저장 레코드로 통째로 덮는다. 웹 기록표에는 그 칸이 없다
+      if (appearance.rosterSlot === ACE_BATTER_ROSTER_SLOT) continue
       // 선수 기록은 **실제로 선 선수의 로스터 칸**에 쌓는다 — CPU 대타가 들어오면 타순 칸과 갈린다
       plateAppearances.push({
         teamId,
@@ -254,8 +406,11 @@ export function simulateLeagueGame(
    * (`0xa5e14` a5e7c — 간이 엔진은 `0xc262c` 의 c26ca) 대타는 한 경기에 여러 번 나올 수 있다 — 반 이닝 엔진이
    * 다음 반 이닝에 넘겨 주는 값은 늘 거짓이다.
    */
-  let awayLineup = rosterLineupOf(BATTERS_PER_TEAM)
-  let homeLineup = rosterLineupOf(BATTERS_PER_TEAM)
+  // 마타자는 첫 벤치 칸(9번)에 앉는다 — 원본에서 마타자가 타석에 서는 길은 CPU 대타뿐이다
+  let awayLineup = awayAceBatter === undefined ? rosterLineupOf(BATTERS_PER_TEAM) : withAceBatterLineup(rosterLineupOf(BATTERS_PER_TEAM))
+  let homeLineup = homeAceBatter === undefined ? rosterLineupOf(BATTERS_PER_TEAM) : withAceBatterLineup(rosterLineupOf(BATTERS_PER_TEAM))
+  const awayBatterOf = batterOfTeam(matchup.away, awayAceBatter)
+  const homeBatterOf = batterOfTeam(matchup.home, homeAceBatter)
   let pinchHitUsed = false
   let steals = 0
   let pinchHits = 0
@@ -269,8 +424,8 @@ export function simulateLeagueGame(
       random,
       undefined,
       undefined,
-      defenseOf(matchup.home, homeMound, homeRuns - awayRuns, homeStaminas),
-      { lineup: awayLineup, batterOf: (slot) => batterAt(matchup.away, slot), pinchHitUsed },
+      defenseOf(matchup.home, homeMound, homeRuns - awayRuns, homeStaminas, homeAcePitcher),
+      { lineup: awayLineup, batterOf: awayBatterOf, pinchHitUsed },
     )
     awayRuns += top.runs
     awayOrder = top.nextBattingOrderIndex % BATTING_ORDER_SIZE
@@ -294,8 +449,8 @@ export function simulateLeagueGame(
       random,
       undefined,
       undefined,
-      defenseOf(matchup.away, awayMound, awayRuns - homeRuns, awayStaminas),
-      { lineup: homeLineup, batterOf: (slot) => batterAt(matchup.home, slot), pinchHitUsed },
+      defenseOf(matchup.away, awayMound, awayRuns - homeRuns, awayStaminas, awayAcePitcher),
+      { lineup: homeLineup, batterOf: homeBatterOf, pinchHitUsed },
     )
     homeRuns += bottom.runs
     homeOrder = bottom.nextBattingOrderIndex % BATTING_ORDER_SIZE
@@ -327,7 +482,10 @@ export function simulateLeagueGame(
    */
   const awayWon = awayRuns >= homeRuns
   const linesOf = (teamId: number, starterSlot: number, decision: '승' | '패') =>
-    [...(pitched.get(teamId) ?? new Map()).entries()].map(([pitcherSlot, line]) => ({
+    [...(pitched.get(teamId) ?? new Map()).entries()]
+      // 마투수 줄은 쌓지 않는다 — 마타자와 같이 팀 레코드 8번 칸이 다음 경기에 저장 레코드로 덮인다
+      .filter(([pitcherSlot]) => pitcherSlot !== ACE_PITCHER_SLOT)
+      .map(([pitcherSlot, line]) => ({
       teamId,
       pitcherSlot,
       ...line,
@@ -345,7 +503,11 @@ export function simulateLeagueGame(
     pitcherAppearances,
     steals,
     pinchHits,
-    pitcherStaminas: { away: awayStaminas, home: homeStaminas },
+    // 마투수 칸(8번)의 스태미나는 잇지 않는다 — 다음 경기의 0xb88c8 이 저장 레코드(+0x2c 포함)로 다시 덮는다
+    pitcherStaminas: {
+      away: awayStaminas.slice(0, PITCHERS_PER_TEAM),
+      home: homeStaminas.slice(0, PITCHERS_PER_TEAM),
+    },
   }
 }
 
@@ -403,6 +565,11 @@ export function playLeagueDay(
   playerStats: LeaguePlayerStats = EMPTY_LEAGUE_PLAYER_STATS,
   /** 팀 번호 → 투수 칸별 시작 스태미나 (`simulateLeagueGame` 의 `startingStaminas`). 안 넘기면 모두 10000 */
   pitcherStaminas: Readonly<Record<number, readonly number[]>> = {},
+  /**
+   * 마선수 레벨 열 칸 `mgr[0x13a..0x143]` — CPU 끼리 경기에 들어가는 마선수의 능력치 배율 `0xd88aa`.
+   * ⚠️ 안 넘기면 모두 Lv1(60%) — 커리어 모드들(투수편·타자편)은 아직 이 값을 안 넘긴다(미해결).
+   */
+  aceLevels?: Readonly<Record<number, number>>,
 ): LeagueDayResult {
   const plateAppearances: LeaguePlateAppearance[] = []
   const pitcherAppearances: LeaguePitcherAppearance[] = []
@@ -412,11 +579,16 @@ export function playLeagueDay(
     // ⚠️ 칸과 명단이 엇갈린다 (0xc239c, 직접 떴다 — `cpuGameSidesOf` 주석): 홈 팀(A목록 X)의 **선수**가 칸 0
     //    (초 공격)에, 원정 팀(Y)의 선수가 칸 1(말 공격)에 선다. 그래서 X 명단을 먼저 공격으로 돌린다.
     const sides = cpuGameSidesOf(matchup.home, matchup.away)
+    // 경기 준비의 굴림 다섯 — 구장 · 양 팀 마타자·마투수 (c2464~c24ea). 팀 A = 칸 1(X = 홈)의 객체 = 원정 명단
+    const rolls = rollCpuGamePrep(random)
     // 하루가 끝날 때마다 팀마다 로테이션이 한 칸 돈다 (0xb5ca8, S5 U-16) — 날짜가 선발을 정한다
-    const score = simulateLeagueGame(sides, random, rotationSlotOf(day), {
-      away: staminas[sides.away],
-      home: staminas[sides.home],
-    })
+    const score = simulateLeagueGame(
+      sides,
+      random,
+      rotationSlotOf(day),
+      { away: staminas[sides.away], home: staminas[sides.home] },
+      { aces: cpuGameAcesOf(rolls), aceLevels },
+    )
     staminas[sides.away] = score.pitcherStaminas.away
     staminas[sides.home] = score.pitcherStaminas.home
     plateAppearances.push(...score.plateAppearances)
