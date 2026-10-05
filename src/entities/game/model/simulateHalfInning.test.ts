@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { drainPitcherForPitch, drainQuickPitcher, simulateHalfInning, startingMoundOf } from '@/entities/game/model/simulateHalfInning'
+import {
+  changePitcherIfNeeded,
+  drainPitcherForPitch,
+  drainQuickPitcher,
+  simulateHalfInning,
+  startingMoundOf,
+} from '@/entities/game/model/simulateHalfInning'
 import type { HalfInningDefense, HalfInningMound } from '@/entities/game/model/simulateHalfInning'
 import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
 import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
@@ -233,5 +239,73 @@ describe('공 하나 소모 drainPitcherForPitch — 0xa5e14 의 0xa5f0e~ → 0x
   it('타자 압도면 c ×2 — 직구 둘과 같다', () => {
     const 압도 = drainPitcherForPitch(수비, startingMoundOf(0), 1, true)
     expect(FULL_STAMINA - 압도).toBeGreaterThan(FULL_STAMINA - drainPitcherForPitch(수비, startingMoundOf(0), 1, false))
+  })
+})
+
+describe('투수편(모드 3)의 0xac428 — [sp+4] 내 투수 건너뛰기 · [sp+8] 강제 (ac428~ac656)', () => {
+  const 내투수 = 8
+  /** 벤치 차례 [1, 2, 나] — 마운드 0 */
+  const 수비: HalfInningDefense = {
+    mound: startingMoundOf(0),
+    pitcherSlots: [0, 1, 2, 내투수],
+    pitcherAt: () => 투수(500),
+    staminaAbilityAt: () => 500,
+    lead: 0,
+    bothTeamsAreCpu: false,
+    isOwnPlayerAt: (slot) => slot === 내투수,
+  }
+  /** 차례대로 내주는 next() 값 — 다 쓰면 마지막 값을 되풀이 */
+  const 차례 = (values: readonly number[]) => {
+    let calls = 0
+    const random: RandomPort = {
+      next: () => values[Math.min(calls++, values.length - 1)],
+      nextInRange: (minimum, maximum) => minimum + (maximum - minimum) / 2,
+      pick: (candidates) => candidates[0],
+    }
+    return { random, calls: () => calls }
+  }
+  const 상황 = (random: RandomPort) => ({
+    inningIndex: 2,
+    lead: 0,
+    runnerCount: 0,
+    inningRunsAllowed: 0,
+    random,
+  })
+
+  it('강제(0xc1b48)면 판정이 거짓이어도 바꾼다 — 기운 넘치는 선발도 내린다', () => {
+    const 굴림 = 차례([0.99])
+    expect(changePitcherIfNeeded(수비, 수비.mound, 상황(굴림.random))).toBe(수비.mound)
+    const 바뀜 = changePitcherIfNeeded(수비, 수비.mound, { ...상황(굴림.random), force: true })
+    // 마무리 굴림 rand(0,100) = 99 → 45% 에 못 미쳐 0xabfcc — 다 가득이라 벤치 앞 번호
+    expect(바뀜.pitcherSlot).toBe(1)
+    expect(바뀜.usedSlots).toEqual([0])
+    expect(바뀜.justChanged).toBe(true)
+  })
+
+  it('0xac360 이 벤치 마지막(내 투수)을 고르면 ac626 에서 다시 굴린다 — 내 투수는 끝내 안 오른다', () => {
+    // 첫 굴림 0 → 벤치 마지막 = 나 → 다시, 둘째 0 → 또 나 → 다시, 셋째 0.99 → 0xabfcc 가 나를 걸러 1
+    const 굴림 = 차례([0, 0, 0.99])
+    const 바뀜 = changePitcherIfNeeded(수비, 수비.mound, { ...상황(굴림.random), force: true })
+    expect(바뀜.pitcherSlot).toBe(1)
+    expect(굴림.calls()).toBe(3)
+  })
+
+  it('벤치가 나 하나뿐이면 아예 안 바꾼다 (ac458) — 강제여도', () => {
+    const 마운드: HalfInningMound = { ...startingMoundOf(2), usedSlots: [0, 1] }
+    const 굴림 = 차례([0])
+    expect(changePitcherIfNeeded(수비, 마운드, { ...상황(굴림.random), force: true })).toBe(마운드)
+    expect(굴림.calls()).toBe(0)
+  })
+
+  it('최소 벤치 [sp+0x58] — 벤치가 그보다 많아야 본다 (ac44e)', () => {
+    const 지친: HalfInningMound = { ...수비.mound, stamina: 0 }
+    const 굴림 = 차례([0.99])
+    expect(changePitcherIfNeeded(수비, 지친, { ...상황(굴림.random), minimumBench: 3 })).toBe(지친)
+    expect(changePitcherIfNeeded(수비, 지친, { ...상황(굴림.random), minimumBench: 2 }).pitcherSlot).toBe(1)
+  })
+
+  it('교체 직후(state[0xd])면 강제도 막힌다 (ac486)', () => {
+    const 막 = { ...수비.mound, justChanged: true }
+    expect(changePitcherIfNeeded(수비, 막, { ...상황(차례([0.99]).random), force: true })).toBe(막)
   })
 })

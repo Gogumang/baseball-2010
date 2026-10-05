@@ -11,6 +11,7 @@ import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import {
   closeManagerHookWindow,
+  MY_PITCHER_SLOT,
   earnedRunAverageOf,
   giveUpPitching,
   isPitchTurn,
@@ -254,7 +255,8 @@ describe('돌발미션', () => {
   it('구원 대기 중 자동 타석에서는 돌발이 안 뜬다 — 뜨면 내 첫 타석 준비에서 뜬 채로 온다', () => {
     const 구원 = { ...기본옵션, role: PITCHER_ROLE.relief }
     let 뜬경기 = 0
-    for (let seed = 1; seed <= 40; seed += 1) {
+    // 자동 타석에 대타·투수 교체 굴림이 끼면서 씨앗마다 8회 상황이 바뀌어 넓게 본다 (돌발이 뜨는 경기가 드물다)
+    for (let seed = 1; seed <= 60; seed += 1) {
       const progress = startPitcherGame(구원, 씨앗(seed))
       expect(progress.onMound, `씨앗 ${seed}`).toBe(true)
       if ((progress.burst?.triggeredCount ?? 0) === 0) continue
@@ -952,5 +954,79 @@ describe('내가 던지는 타석의 CPU 대타 0xac228 — 0xf 진입 0x3d954 (
     const 끝 = 끝까지던지기(startPitcherGame(기본옵션, 씨앗(3)), 3)
     const 타석합 = 끝.opponentLineup.records.reduce((sum, record) => sum + record.plateAppearances, 0)
     expect(타석합).toBeGreaterThan(20)
+  })
+})
+
+describe('자동 타석(0x21)의 0xc1ba4 — 양 팀 마운드와 CPU 대타 (0xac228 → 0xac428)', () => {
+  const 쉬는날 = { ...기본옵션, dayCounter: 3 }
+  const 씨앗들 = Array.from({ length: 30 }, (_unused, index) => index + 1)
+
+  it('선발이 아닌 날은 0↔k 맞바꾼 칸이 우리 선발이고, 경기 내내 양 팀 투수가 지치고 바뀐다 — CPU 는 나를 안 고른다', () => {
+    let 우리교체 = 0
+    let 상대교체 = 0
+    for (const seed of 씨앗들) {
+      const 끝 = startPitcherGame(쉬는날, 씨앗(seed))
+      // 사람 장면이 하나도 없다 — 경기가 시작에서 끝난다
+      expect(끝.game.isFinished).toBe(true)
+      expect(끝.ourMound.pitcherSlot).not.toBe(MY_PITCHER_SLOT)
+      expect(끝.ourMound.usedSlots).not.toContain(MY_PITCHER_SLOT)
+      // 투구 수·소모는 마운드에 쌓인다 (교체되면 0 부터)
+      expect(끝.ourMound.pitches + 끝.ourMound.usedSlots.length).toBeGreaterThan(0)
+      if (끝.ourMound.usedSlots.length > 0) {
+        우리교체 += 1
+        // g = 3 → k = 2 가 선발 (0xa4f60)
+        expect(끝.ourMound.usedSlots[0]).toBe(2)
+      }
+      if (끝.opponentMound.usedSlots.length > 0) 상대교체 += 1
+    }
+    expect(우리교체).toBeGreaterThan(0)
+    expect(상대교체).toBeGreaterThan(0)
+  })
+
+  it('우리 공격 타석에도 CPU 대타가 나온다 — 벤치가 줄고 그 칸 동료 기록이 빈다', () => {
+    let 대타경기 = 0
+    for (const seed of 씨앗들) {
+      const 끝 = startPitcherGame(쉬는날, 씨앗(seed))
+      if (끝.ourLineup.benchBatters < 3) 대타경기 += 1
+      expect(끝.ourLineup.rosterSlots.length).toBe(12 - (3 - 끝.ourLineup.benchBatters))
+    }
+    expect(대타경기).toBeGreaterThan(0)
+  })
+
+  it('구원은 8회에 벤치에서 올라온다 — 그 전 CPU 교체는 나를 고르지 않고, 올라오면 우리 마운드가 내가 된다', () => {
+    for (const seed of 씨앗들) {
+      const 등판 = startPitcherGame({ ...기본옵션, role: PITCHER_ROLE.relief }, 씨앗(seed))
+      if (!등판.onMound) continue
+      expect(등판.game.inning).toBe(8)
+      expect(등판.ourMound.pitcherSlot).toBe(MY_PITCHER_SLOT)
+      expect(등판.ourMound.usedSlots).not.toContain(MY_PITCHER_SLOT)
+      // 오늘 로테이션 선발(g = 2 → 칸 2)이 맨 먼저 내려갔다
+      expect(등판.ourMound.usedSlots[0]).toBe(2)
+    }
+  })
+
+  it('강판(0xc1b48)은 강제 교체로 우리 CPU 투수를 올린다 — 나는 내려간 투수가 되고 다시 안 오른다', () => {
+    const 시작 = startPitcherGame(기본옵션, 씨앗(20100901))
+    expect(시작.ourMound.pitcherSlot).toBe(MY_PITCHER_SLOT)
+    const 강판 = giveUpPitching(시작, 씨앗(5))
+    expect(강판.onMound).toBe(false)
+    expect(강판.game.isFinished).toBe(true)
+    expect(강판.ourMound.pitcherSlot).not.toBe(MY_PITCHER_SLOT)
+    expect(강판.ourMound.usedSlots[0]).toBe(MY_PITCHER_SLOT)
+    expect(강판.ourMound.usedSlots.filter((slot) => slot === MY_PITCHER_SLOT)).toHaveLength(1)
+  })
+
+  it('강제 교체의 새 투수는 마무리 굴림(0xac360)이 가른다 — 참이면 벤치 마지막, 거짓이면 0xabfcc(가득 동률 → 벤치 앞)', () => {
+    const 시작 = startPitcherGame(기본옵션, 씨앗(20100901))
+    /** 첫 굴림만 고정, 나머지는 씨앗 */
+    const 첫굴림 = (value: number) => {
+      const rest = 씨앗(5)
+      let 번 = 0
+      return { ...rest, next: () => (번++ === 0 ? value : rest.next()) }
+    }
+    const 첫구원 = (progress: PitcherGameProgress) => progress.ourMound.usedSlots[1] ?? progress.ourMound.pitcherSlot
+    // 선발 날 목록 [나, 1, …, 7, 0] — 벤치 [1, …, 7, 0]
+    expect(첫구원(giveUpPitching(시작, 첫굴림(0.99)))).toBe(1)
+    expect(첫구원(giveUpPitching(시작, 첫굴림(0)))).toBe(0)
   })
 })

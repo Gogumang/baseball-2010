@@ -11,10 +11,13 @@ import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/
 import { runnerCountOf } from '@/entities/game/model/baseState'
 import { quickEngineSteal, quickStealBaseOf } from '@/entities/game/model/steal'
 import {
+  chooseReplacementPitcher,
   judgePitcherChange,
   replacementPitcherSlotOf,
+  rollsCloser,
 } from '@/entities/pitching/model/pitcherChange'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
+import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
 import {
   FULL_STAMINA,
   consumeStamina,
@@ -217,6 +220,12 @@ export interface HalfInningDefense {
    * 돌려준다 (0xb6c20) — **CPU 끼리의 리그 경기가 바로 이 경우다**.
    */
   readonly bothTeamsAreCpu?: boolean
+  /**
+   * **모드 3(투수편)만** 넘긴다 — `0xac428` 의 다섯째 인자 `[sp+4] = (모드 == 3)`(0xc1cc0·0xc1b64)와
+   * 그 칸이 `0xb6389`(레코드 `+0xa` 비트7, 내 육성 선수)인가. 이것을 넘기면 교체 AI 가 내 투수를 새 투수로
+   * 고르지 않는다 (아래 `changePitcherIfNeeded` 의 ac45e·ac626 갈래).
+   */
+  readonly isOwnPlayerAt?: (pitcherSlot: number) => boolean
 }
 
 /** 원본 실점 카운터 A·B 는 99 에서 자른다 (P7 E1) */
@@ -528,11 +537,26 @@ export function changePitcherIfNeeded(
     readonly runnerCount: number
     readonly inningRunsAllowed: number
     readonly random: RandomPort
+    /**
+     * `0xac428` 의 일곱째 인자 `[sp+0x58]` — 벤치(`team+0x33`)가 이보다 많아야 바꾼다 (ac44e). 안 넘기면 0.
+     * 간이 엔진은 `max(r7, 0)`(0xc1c84) 을 넘기고 r7 은 투수편 구원 갈래에서만 벤치의 내 투수 번호다.
+     */
+    readonly minimumBench?: number
+    /** `[sp+8]` 강제 교체 — 강판·자동진행 켜기 `0xc1b48` 만 1 을 넘긴다 (0xc1b6e). 판정이 거짓이어도 바꾼다 (ac5c4) */
+    readonly force?: boolean
+    /**
+     * 지금 마운드 투수의 보직 (`0xb6ded(현재 투수)`, ac4a0). 웹 로스터에는 보직이 없어 안 넘기면 선발로 본다 —
+     * 투수편 내 투수(강판 `0xc1b48`)처럼 보직을 아는 투수만 넘긴다. 이 갈래(`isOwnPlayerAt`·`force`)에서만 쓴다.
+     */
+    readonly moundRole?: PitcherRole
   },
 ): HalfInningMound {
   const bench = defense.pitcherSlots.filter(
     (slot) => slot !== mound.pitcherSlot && !mound.usedSlots.includes(slot),
   )
+  if (defense.isOwnPlayerAt !== undefined || situation.force === true) {
+    return changePitcherInPitcherEdition(defense, mound, bench, situation)
+  }
   const decision = judgePitcherChange({
     inningRunsAllowed: situation.inningRunsAllowed,
     runsAllowed: mound.runsAllowed,
@@ -567,9 +591,16 @@ export function changePitcherIfNeeded(
   )
   if (next < 0) return mound
 
-  // 교체 0xaec64 는 카운터(+0x27c·+0x280·+0x284)를 한꺼번에 0 으로 민다.
-  // 올라온 투수의 스태미나는 **제 레코드 값**(+0x2c)이다 — 교체 실행 0xaebe4 에 +0x2c 쓰기가 없다.
-  // 부르는 쪽이 `staminaAt` 을 안 넘기면(투수별 스태미나를 안 드는 길) 가득으로 본다 — **근사다.**
+  return moundAfterChange(defense, mound, next)
+}
+
+/**
+ * 교체 0xaec64 는 카운터(+0x27c·+0x280·+0x284)를 한꺼번에 0 으로 민다.
+ * 올라온 투수의 스태미나는 **제 레코드 값**(+0x2c)이다 — 교체 실행 0xaebe4 에 +0x2c 쓰기가 없다.
+ * 부르는 쪽이 `staminaAt` 을 안 넘기면(투수별 스태미나를 안 드는 길) 가득으로 본다 — **근사다.**
+ * `state[0xd]` 는 0xac428 끝(ac652)이 1 로 세운다.
+ */
+function moundAfterChange(defense: HalfInningDefense, mound: HalfInningMound, next: number): HalfInningMound {
   return {
     pitcherSlot: next,
     stamina: defense.staminaAt?.(next) ?? FULL_STAMINA,
@@ -579,6 +610,96 @@ export function changePitcherIfNeeded(
     justChanged: true,
   }
 }
+
+/**
+ * 투수편(모드 3)의 `0xac428` — 내 투수 건너뛰기 `[sp+4]` 와 강제 `[sp+8]` 이 들어간 갈래 (디스어셈 ac428~ac656).
+ * ```
+ * ac44e  벤치 ≤ [sp+0x58] → 0
+ * ac458  벤치 ≤ 1 이고 벤치 0번이 있고 [sp+4] 이고 0xb6389(벤치 0번) → 0     ; 남은 하나가 내 투수면 안 바꾼다
+ * ac486  state[0xd] → 0
+ * ac4ee~ 판정 (judgePitcherChange) · ac5c4 [sp+8] 이면 교체 = 1
+ * ac5d8  0xb8a8d(team, 0) 이고 마무리 상황 아님 → 0xac360 굴림: 참 → 벤치 마지막
+ *                                               거짓 → 벤치 ≤ 1 이면 0번 · 아니면 0xabfcc
+ *        그 밖 → 0xabfcc(…, inn, [sp+4], [sp]=마무리 플래그)                ; 0xabfcc 는 0xb6388 내 선수를 거른다
+ * ac622  −1 이면 0
+ * ac626  [sp+4] 이고 고른 벤치 투수가 0xb6389(내 선수)면 **ac5d8 로 돌아가 다시 고른다** (0xac360 을 또 굴린다)
+ * ac642  0xaf09c(team, 번호, 0) · state[0xd] = 1
+ * ```
+ * `isOwnPlayerAt` 이 없으면(강제만) 내 선수 거르기가 없다.
+ *
+ * ⚠️ `0xb8a8d(team, 0)` 는 `replacementPitcherSlotOf` 와 같이 늘 참으로 본다 — **근사다**.
+ * ⚠️ 판정(`judgePitcherChange`)은 다른 갈래와 같은 함수를 쓴다 — 그 함수가 원본과 다른 두 자리(9회 이후 마무리 상황이면
+ *    원본은 ac5b6·ac5ba 에서 **교체도 1** 로 세운다 · A>2 나 체력 ≤19% 로 바꿀 때도 ac53a → ac574 로 마무리 상황을 센다)는
+ *    `entities/pitching` 을 고칠 때 함께 고쳐야 한다(이 갈래만 따로 고치면 같은 0xac428 이 두 갈래로 갈린다).
+ */
+function changePitcherInPitcherEdition(
+  defense: HalfInningDefense,
+  mound: HalfInningMound,
+  bench: readonly number[],
+  situation: Parameters<typeof changePitcherIfNeeded>[2],
+): HalfInningMound {
+  const isOwn = defense.isOwnPlayerAt ?? (() => false)
+  const skipsOwn = defense.isOwnPlayerAt !== undefined
+  if (bench.length <= (situation.minimumBench ?? 0)) return mound
+  if (bench.length <= 1 && bench[0] !== undefined && skipsOwn && isOwn(bench[0])) return mound
+  if (mound.justChanged) return mound
+  const decision = judgePitcherChange({
+    inningRunsAllowed: situation.inningRunsAllowed,
+    runsAllowed: mound.runsAllowed,
+    pitches: mound.pitches,
+    role: situation.moundRole ?? PITCHER_ROLE.starter,
+    stamina: mound.stamina,
+    benchCount: bench.length,
+    // 위에서 이미 보았다
+    minimumBench: -1,
+    justChanged: false,
+    lead: situation.lead,
+    inningIndex: situation.inningIndex,
+    runnerCount: situation.runnerCount,
+  })
+  if (!decision.replace && situation.force !== true) return mound
+
+  const candidates = bench.map((slot) => ({
+    index: slot,
+    ...(defense.staminaAt === undefined ? {} : { stamina: defense.staminaAt(slot) }),
+    // 0xabfcc 의 "마선수제외 && 0xb6388" 거르기 — 웹 로스터에 마선수(비트6)가 없어 이 칸을 내 선수 표시로 쓴다
+    isSpecialPitcher: skipsOwn && isOwn(slot),
+  }))
+  // ac626 의 되돌이 — 0xac360 이 참일 확률은 1 보다 작아 언젠가 빠진다. 안전망만 둔다 (원본에는 없다)
+  for (let attempt = 0; attempt < MAXIMUM_REPLACEMENT_PICKS; attempt += 1) {
+    const picksBenchLast =
+      !decision.saveSituation &&
+      rollsCloser(
+        {
+          inningIndex: situation.inningIndex,
+          lead: situation.lead,
+          runnerCount: situation.runnerCount,
+          bothTeamsAreCpu: defense.bothTeamsAreCpu,
+        },
+        situation.random,
+      )
+    const benchIndex = picksBenchLast
+      ? bench.length - 1
+      : !decision.saveSituation && bench.length <= 1
+        ? 0
+        : bench.indexOf(
+            chooseReplacementPitcher(candidates, {
+              inningIndex: situation.inningIndex,
+              lateInningFlag: decision.saveSituation,
+              currentStamina: mound.stamina,
+              excludeSpecialPitchers: skipsOwn,
+            }),
+          )
+    const next = bench[benchIndex]
+    if (next === undefined) return mound
+    if (skipsOwn && isOwn(next)) continue
+    return moundAfterChange(defense, mound, next)
+  }
+  return mound
+}
+
+/** `changePitcherInPitcherEdition` 의 되돌이 안전망 (원본에는 없다) */
+const MAXIMUM_REPLACEMENT_PICKS = 1_000
 
 /**
  * 투구 하나마다 깎이는 스태미나 (0xa5e14 → 0xaeb08). 간이 엔진은 구질을 안 골라 늘 직구(소모 9)다.
