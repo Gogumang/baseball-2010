@@ -645,6 +645,8 @@ function defensePlayInputOf(
     // 수비는 상대 팀이다 — 로스터의 수비 자리 코드로 아홉 칸을 채운다
     defenseAbilities: opponentDefenseAbilitiesOf(progress),
     runAbility: runnerRunAbilityOf(progress),
+    // 이 공이 나는 동안 출발한 도루 주자 — 판 시작 리드(0x3d7b8)가 다음 루로 15·14 + rand(0,9) 틱 몰아 돌린다
+    stealingFrom: progress.stealingFrom,
     // 난수를 넘겨야 펌블(0xb41d0)·악송구(0xa1828)·필살수비(0x66b30/0x66be4) 굴림이 돈다
     random,
     // 나만의리그 타자편 = 전역 모드 4 (0x1552d10) — 필살수비 기준이 절반이다

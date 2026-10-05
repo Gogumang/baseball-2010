@@ -235,13 +235,13 @@ describe('수비 진행 — 미션도 수비 시뮬레이션이 돌린다 (P2 7�
     expect(run.bases).toEqual({ first: true, second: false, third: false })
   })
 
-  it('1·3루 땅볼은 병살이 되어 아웃 두 개가 쌓이고 3루 주자는 못 들어온다', () => {
+  it('1·3루 땅볼 — 판 시작 리드(0x3d7b8) 뒤로 아웃 하나, 3루 주자는 못 들어온다', () => {
     const 챔피언 = PITCHER_MISSIONS.find((m) => m.name === '최강의 챔피언')!
     expect(챔피언.start.runners).toEqual({ first: true, second: false, third: true })
 
     const run = applyPitcherOutcome(startPitcherMission(챔피언), { kind: '아웃', detail: '땅볼아웃' })
 
-    expect(run.totalOuts).toBe(2)
+    expect(run.totalOuts).toBe(1)
     expect(run.allowed.runs).toBe(0)
   })
 })

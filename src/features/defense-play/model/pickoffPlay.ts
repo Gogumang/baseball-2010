@@ -1,5 +1,5 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import type { PickoffBase } from '@/entities/defense-controls/model/pickoff'
+import { PICKOFF_PLAY_KIND, type PickoffBase } from '@/entities/defense-controls/model/pickoff'
 import { autoAdvanceDecisions } from '@/entities/fielding/model/autoAdvance'
 import {
   MINIMUM_THROW_SPEED,
@@ -25,6 +25,7 @@ import {
 } from '@/entities/fielding/model/fieldingState'
 import { judgeOut, OUT_KIND, releaseForcesAfterOut } from '@/entities/fielding/model/outJudgement'
 import { startPickoff } from '@/entities/fielding/model/pickoff'
+import { applyRunnerLead, runnerLeadOf } from '@/entities/fielding/model/runnerLead'
 import { defenseArrivalTicks } from '@/entities/fielding/model/throwArrival'
 import { effectiveThrowSpeedOf } from '@/entities/fielding/model/throwPlan'
 import { EMPTY_BASES, type BaseState } from '@/entities/game/model/baseState'
@@ -44,17 +45,20 @@ import { runnerFateOf } from '@/features/defense-play/model/runnerFates'
  * 1. **시작 0xb28be**: 공 쥔 야수 = 투수(P+0x130 = 0) · 쥠(P+0x12c = 1) · state[0x1e] = 1 ·
  *    야수 1~4 를 루 0~3 좌표(0xd86b0 = 0xd78f0)로 보내고 커버 = 루번호+1 · 투수 AI 상태 0xe.
  *    → `entities/fielding/model/pickoff.startPickoff` 가 그대로 만든다.
- * 2. **상태 0x17 진입 0x4677a**: 살아 있는 주자를 모두 `vt0x48(+0x8c)` = 마지막으로 닿은 루로.
- *    주자는 리드 폭이 없어 이미 그 루 위에 비트까지 정확히 서 있으므로 **제자리 명령**이다 (S8 6절).
+ * 2. **상태 0x17 진입 0x46418**: 주자 고리 0x4657e 가 주자마다 `0x3d7b8` — 다음 루로 5 틱(1% 로 10 틱) 몰아
+ *    돌리고 목표를 닿은 루로 되돌린다(9976cb7, `runnerLead`). 이어 0x4677a 가 살아 있는 주자를 모두
+ *    `vt0x48(+0x8c)` = 마지막으로 닿은 루로. ⚠️ S8 6-3 의 "리드 폭이 없다" 는 이 고리를 놓친 것 — 판이 열리면
+ *    주자는 루를 떠나 돌아오는 중이라 **태그될 수 있다**.
  * 3. **AI 상태 0xe 0xb47da**: `플레이.vt0x58(state[0x27])` = 0xb2c90 → 커버가 있고 그 커버의 목표 루가
  *    대상 루면 던진다. 던지기는 야수 vt0xac = 0xa1620 이고 그 안에서 **악송구 굴림 0xa1828** 이 돈다.
- * 4. **아웃 판정 0xb36d0** 이 틱마다 그대로 돈다 — 거르개 0x58d 에 4 가 없다(I 3c). 그런데 루에 붙은
- *    주자는 태그(3)·포스(2) 두 갈래가 모두 요구하는 "아직 움직이는 중" 이 아니라 **절대 안 죽는다.**
+ * 4. **아웃 판정 0xb36d0** 이 틱마다 그대로 돈다 — 거르개 0x58d 에 4 가 없다(I 3c). 루에 닿은 주자는
+ *    "아직 움직이는 중" 이 아니라 안 죽지만, 리드에서 돌아오는 중에 공이 오면 태그(≤499)로 죽는다.
  * 5. **포구 0xb4292**: 받은 야수가 루 b 위(vt0x58, 좌표 완전일치)에 서 있고 `0xa97a0`(b 에 마지막으로
  *    닿은 산 주자)가 제 목표점에 서 있으면(vt0x18) **결과 코드 9 = 세이프** → 0x51c14 → 소리 17.
  *
  * ## 난수 — 이 판이 굴리는 것
- * **악송구 굴림 한 번**(`rand(0,10000)`), 악송구면 두 번 더(속도·방향) — 0xa1828 그대로. 그 밖은 없다.
+ * 판이 열릴 때 주자마다 리드 덧틱 `rand(0,100)` 한 번(0x3d7b8, 목록 차례) → **악송구 굴림 한 번**(`rand(0,10000)`),
+ * 악송구면 두 번 더(속도·방향) — 0xa1828 그대로. 그 밖은 없다.
  *
  * ## 근사·미해결 (지어내지 않은 자리)
  * - ⚠️ **송구 시각**: 원본은 0xb2c90 이 "커버의 목표 루가 대상 루면" 곧바로 던지고 공은 궤적 물리
@@ -146,14 +150,19 @@ export function runPickoffPlay(input: PickoffPlayInput): PickoffPlayResult {
   // 대상 루는 이 함수의 `targetBase`(= state[0x27]) 가 들고 있다.
   let play: PlayView = { ...initialPlayView(start.play.kind), ...start.play, manualThrowBase: NONE }
 
-  // ── 2. 상태 0x17 진입 0x4677a — 주자는 마지막으로 닿은 루(+0x8c)로. 리드가 없어 제자리다 ──
+  // ── 2. 상태 0x17 진입 0x46418 — 주자 고리 0x4657e 의 0x3d7b8: 주자마다 다음 루로 `0xcffac`[루] = 5 틱
+  //    (+5 if rand(0,100) == 0) 몰아 돌린 뒤 목표를 닿은 루(+0x8c)로 되돌린다 → 판이 열리면 제 루로 돌아오는 중.
+  //    그 뒤 0x4677a 가 살아 있는 주자를 모두 vt0x48(+0x8c) — 같은 목표다.
   // 목록은 루 순서(1·2·3) — 원본 0xa9a10 이 3·2·1 순으로 맨 앞에 끼워 넣어 같은 순서가 된다.
   // 번호는 1 부터 센다 — 0 은 타자주자 자리라 그림(`viewStateOf`)이 타자로 그리지 않게 비워 둔다.
+  // 굴림: 주자마다 rand(0,100) 한 번(목록 차례) — 송구의 악송구 굴림(첫 틱)보다 앞이다.
   const runners: PickoffRunner[] = []
   ;([1, 2, 3] as const).forEach((base) => {
     const occupied = base === 1 ? input.bases.first : base === 2 ? input.bases.second : input.bases.third
     if (!occupied) return
-    runners.push({ state: createRunner(runners.length + 1, base, speed, { isBatterRunner: false }), counted: false })
+    const runner = createRunner(runners.length + 1, base, speed, { isBatterRunner: false })
+    const lead = runnerLeadOf(runner, { playKind: PICKOFF_PLAY_KIND, stealing: false, random: input.random })
+    runners.push({ state: applyRunnerLead(runner, lead), counted: false })
   })
 
   let outs = input.outs

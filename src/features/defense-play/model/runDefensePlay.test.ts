@@ -121,16 +121,15 @@ describe('한 플레이 진행기 — 타자주자의 운명은 결과 코드, �
     expect(play(땅볼아웃, EMPTY_BASES, 0).tagOut).toBe(false)
     expect(play(뜬공아웃, EMPTY_BASES, 0).tagOut).toBe(false)
     expect(play(단타, 만루, 0).tagOut).toBe(false)
-    // ⚠️ 만루 땅볼은 **태그가 아니라 포스(루) 아웃**이다 — 3루 주자는 홈에 밀려 있고
-    //    공 쥔 야수가 홈을 밟고 있으니 0xb3890(2a)이 0xb380e(3a)를 덮어쓴다.
-    //    (2a 의 vt10 = 0xa9f60 은 `산 주자 수 > [주자+0x8c]`, 곧 **마지막으로 닿은 루**를 본다)
-    const 만루땅볼 = play(땅볼아웃, 만루, 0)
-    expect(만루땅볼.tagOut).toBe(false)
-    expect(만루땅볼.log.some((줄) => 줄.includes('루 아웃'))).toBe(true)
-    // 태그가 서는 것은 **포스가 아닌** 주자다 — 1·2루가 빈 3루 주자가 홈으로 뛰다 잡힌다
-    const 삼루땅볼 = play(땅볼아웃, 주자3루, 0)
-    expect(삼루땅볼.tagOut).toBe(true)
-    expect(삼루땅볼.log.some((줄) => 줄.includes('태그 아웃'))).toBe(true)
+    // 1루 주자 땅볼 — 공 쥔 야수가 2루를 밟고 있어 **포스(루) 아웃**(0xb3890 2a)이면 서지 않는다
+    // (2a 의 vt10 = 0xa9f60 은 `산 주자 수 > [주자+0x8c]`, 곧 **마지막으로 닿은 루**를 본다)
+    const 포스땅볼 = play(땅볼아웃, 주자1루, 0, [97, 971, 460, 0])
+    expect(포스땅볼.tagOut).toBe(false)
+    expect(포스땅볼.log.some((줄) => 줄.includes('루 아웃'))).toBe(true)
+    // 2루 송구를 받은 야수가 루를 밟기 전에 주자와 닿으면 태그(3a)다
+    const 태그땅볼 = play(땅볼아웃, 주자1루, 0, [86, 1171, 400, 0])
+    expect(태그땅볼.tagOut).toBe(true)
+    expect(태그땅볼.log.some((줄) => 줄.includes('태그 아웃'))).toBe(true)
   })
 
   it('직선타를 잡히면 주자는 원래 루에 그대로 있다 (0xa9620 리터치)', () => {
@@ -198,20 +197,24 @@ describe('희생플라이는 "보장" 이 아니라 자동 진루 규칙(0xaf918
 })
 
 describe('2아웃 득점 보류 — state[0] (0xaa164 · 0xaa34c · 0xaa388)', () => {
-  it('2아웃 뜬공이면 3루 주자가 들어와도 점수가 안 된다', () => {
+  it('2아웃 뜬공 — 친 순간 뛴(0xa9e44) 3루 주자가 포구 전에 홈을 밟으면 공이 땅에 안 닿아 바로 득점(0xaa16e), 포구가 3아웃', () => {
+    // ⚠️ 원본 그대로: 보류는 state[0x1e](공이 땅에 닿은 플레이)일 때만이라 뜬 공이 잡히기 전 득점은 남는다
     const 결과 = play(뜬공아웃, 주자3루, 2, 깊은뜬공)
 
     expect(결과.advance.outsAdded).toBe(1)
-    expect(결과.advance.runsScored).toBe(0)
-    expect(결과.voidedRuns).toBeGreaterThanOrEqual(1)
+    expect(결과.advance.runsScored).toBe(1)
+    expect(결과.voidedRuns).toBe(0)
+    expect(결과.log[0]).toContain('홈 — 보류 0 / 득점 1')
   })
 
   // 주루 700 으로 올린 까닭: 포구 반경(내야 500 · 외야 300)이 되살아나면서 야수가 한두 틱 먼저 잡게 됐고,
   // 그래서 **평범한 주자(500)는 땅볼에서 홈 송구에 잡힌다**. 보류 규칙이 무엇을 막는지 보이려면
   // 0아웃이었을 때 실제로 점수가 나는 주자가 있어야 해서 발이 빠른 주자로 바꿨다.
   it('2아웃 땅볼로 타자주자가 죽으면 그 플레이 득점은 0 이다 (S2 2-5)', () => {
-    const 없을때 = play(땅볼아웃, 주자3루, 0, representativePatternOf(땅볼아웃), 700)
-    const 두아웃 = play(땅볼아웃, 주자3루, 2, representativePatternOf(땅볼아웃), 700)
+    // 0아웃이면 3루 주자는 리드(0x3d7b8) 뒤 제 루로 돌아오다 자동 진루로 홈을 노린다 — 그 득점이 나는 땅볼
+    const 땅볼 = [90, 810, 1592, 0] as const
+    const 없을때 = play(땅볼아웃, 주자3루, 0, [...땅볼], 700)
+    const 두아웃 = play(땅볼아웃, 주자3루, 2, [...땅볼], 700)
 
     expect(두아웃.advance.outsAdded).toBeGreaterThanOrEqual(1)
     expect(두아웃.advance.runsScored).toBe(0)
@@ -517,10 +520,11 @@ describe('수비 아홉 칸 능력치 — 자리 코드 −1 이 칸 번호다 (
 })
 
 describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
+  // 판 시작 리드(0x3d7b8) 뒤로 대표 단타는 협살이 안 선다 — 1루 주자가 3루까지 노리다 2·3루 사이에 갇히는 깊은 타구
   const 협살상황 = (defenseIsCpu: boolean) =>
     runDefensePlay({
-      outcome: 단타,
-      trajectory: battedBallTrajectory(representativePatternOf(단타)),
+      outcome: 뜬공아웃,
+      trajectory: battedBallTrajectory([126, 1054, 1444, 0]),
       bases: 주자1루,
       outs: 0,
       defenseIsCpu,
@@ -543,8 +547,8 @@ describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
     const 시작 = 결과.log.find((line) => line.includes('협살 시작'))
 
     expect(결과.rundowns).toBe(1)
-    // 2루로 간 송구를 받은 유격수(5)와 3루수(4)가 1번 주자를 사이에 둔다
-    expect(시작).toContain('1번 주자')
+    // 3루로 간 송구를 받은 3루수(4)와 2루수(3)가 1번 주자를 2·3루 사이에 둔다
+    expect(시작).toContain('1번 주자 2↔3루')
   })
 
   it('**주자가 안 되돌면 태그가 안 난다** — 원본에도 주자 쪽 협살 AI 가 없다', () => {
@@ -960,9 +964,10 @@ describe('송구 수동/자동 — 환경설정 +0xf4 (0x5269c → 0xae6c8 → 0
 
   it('수동이면 점수식 0xafb24 가 안 돌고 0xb1c90 이 앞선 주자의 루를 고른다', () => {
     // 만루 단타 — 3루 주자가 홈(웹 루 번호 4 = 원본 표 0xd86b0 의 홈 사본)으로 간다
-    expect(만루단타({ throwMode: '수동' }).throwBase).toBe(4)
+    const 단타궤적 = battedBallTrajectory([92, 698, 565, 0])
+    expect(만루단타({ throwMode: '수동', trajectory: 단타궤적 }).throwBase).toBe(4)
     // 자동이면 점수식이 더 가까운 루를 고른다
-    expect(만루단타({ throwMode: '자동' }).throwBase).toBe(2)
+    expect(만루단타({ throwMode: '자동', trajectory: 단타궤적 }).throwBase).toBe(1)
   })
 
   it('수비가 CPU 면 설정이 수동이어도 점수식이 돈다 — 0xae6c8 의 앞 항', () => {
@@ -1007,7 +1012,7 @@ describe('CPU 홈 송구 20% 특수 송구 — 0xafa60 → 0xb2c90 → 0xb3444 �
   const 홈송구 = (value: number) =>
     runDefensePlay({
       outcome: 단타,
-      trajectory: battedBallTrajectory([90, 600, 300, 0]),
+      trajectory: battedBallTrajectory([95, 489, 429, 1]),
       bases: { first: true, second: true, third: true },
       outs: 0,
       runAbility: 500,

@@ -46,7 +46,14 @@ describe('주자 운명 목록 — 정산 0xa8024 가 읽는 +0x95·+0x96', () =
   })
 
   it('2아웃 보류가 3아웃으로 날아가도 그 주자의 +0x95 는 남는다 (0xaa1cc 는 점수판을 안 건드린다)', () => {
-    const 결과 = play(뜬공아웃, 주자3루, 2, 깊은뜬공)
+    // 2아웃 땅볼 — 친 순간 뛴(0xa9e44) 3루 주자가 홈을 밟지만 공이 땅에 닿은 플레이라 보류, 타자주자가 1루에서 죽는다
+    const 결과 = runDefensePlay({
+      outcome: 땅볼아웃,
+      trajectory: battedBallTrajectory([90, 810, 1592, 0]),
+      bases: 주자3루,
+      outs: 2,
+      runAbility: 700,
+    })
     expect(결과.advance.runsScored).toBe(0)
     expect(결과.voidedRuns).toBeGreaterThanOrEqual(1)
     expect(결과.runnerFates).toEqual([fate(0, false, true), fate(3, true, true)])
@@ -67,8 +74,10 @@ describe('주자 운명 목록 — 정산 0xa8024 가 읽는 +0x95·+0x96', () =
     }
   })
 
-  it('견제: 타자주자 없이 찬 루 오름차순, 루에 붙은 주자는 아무 표시도 없다', () => {
-    const 결과 = runPickoffPlay({ targetBase: 1, bases: 주자13루, outs: 0, offenseIsCpu: true })
+  it('견제: 타자주자 없이 찬 루 오름차순, 리드 5틱에서 돌아온 주자는 아무 표시도 없다', () => {
+    // 리드 덧틱 굴림 rand(0,100) 이 0 이 아니게 (0 이면 10틱 리드라 1루 주자가 태그된다)
+    const 난수 = { next: () => 0.9, nextInRange: (a: number, b: number) => a + 0.9 * (b - a), pick: <T,>(c: readonly T[]) => c[0] }
+    const 결과 = runPickoffPlay({ targetBase: 1, bases: 주자13루, outs: 0, offenseIsCpu: true, random: 난수 })
     expect(결과.runnerFates).toEqual([fate(1, false, false), fate(3, false, false)])
   })
 

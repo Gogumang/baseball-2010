@@ -109,17 +109,17 @@ describe('missionAdvance — 미션 주루도 수비 시뮬레이션이 정한�
     })
   })
 
-  it('2아웃이면 득점이 보류된다 — 3루 주자 뜬공에 점수가 없다', () => {
+  it('3루 주자 뜬공 — 1아웃이면 태그업 득점, 2아웃이면 친 순간 뛴(0xa9e44) 주자가 포구 전에 홈을 밟아 바로 득점(0xaa16e, 원본 그대로)', () => {
     const 뜬공 = { kind: '아웃', detail: '뜬공아웃' } as const
     expect(missionAdvance(주자(false, false, true), 1, 뜬공).runsScored).toBe(1)
-    expect(missionAdvance(주자(false, false, true), 2, 뜬공).runsScored).toBe(0)
+    expect(missionAdvance(주자(false, false, true), 2, 뜬공).runsScored).toBe(1)
   })
 
-  it('3루 주자 땅볼은 병살이 되고 점수가 없다 — 희생플라이 보장 근사가 사라졌다', () => {
+  it('3루 주자 땅볼 — 리드(0x3d7b8) 뒤 제 루로 돌아와 그대로 남고 타자만 죽는다, 희생플라이 보장 근사는 없다', () => {
     expect(missionAdvance(주자(false, false, true), 0, { kind: '아웃', detail: '땅볼아웃' })).toEqual({
-      bases: 주자(false, false, false),
+      bases: 주자(false, false, true),
       runsScored: 0,
-      outsAdded: 2,
+      outsAdded: 1,
     })
   })
 

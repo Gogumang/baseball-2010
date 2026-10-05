@@ -289,20 +289,14 @@ describe('사람 타석은 수비 시뮬레이션을 돌린다 — CPU 간이 �
    * 대조가 성립하지 않았다. 득점이 실제로 나는 **깊은 뜬공**(희생플라이)으로 바꿨다.
    */
   it('2아웃에 타자주자가 죽으면 3루 주자 득점이 무효가 된다 (S2 2-5)', () => {
-    const 깊은뜬공: BattedBallPattern = [90, 900, 1500, 0]
-    const 뜬공아웃 = { kind: '아웃', detail: '뜬공아웃' } as const
-    const 무사 = 내타석({ first: false, second: false, third: true }, 0)
+    // 2아웃 땅볼 — 친 순간 뛴(0xa9e44) 3루 주자가 홈을 밟아도 공이 땅에 닿은 플레이라 보류(0xaa1c0),
+    // 타자주자가 1루에서 죽어 3아웃 → 영영 안 푼다(0xaa388)
+    const 땅볼: BattedBallPattern = [90, 810, 1592, 0]
+    const 땅볼아웃 = { kind: '아웃', detail: '땅볼아웃' } as const
     const 이사 = 내타석({ first: false, second: false, third: true }, 2)
-
-    expect(
-      applyPlayerOutcome(무사, 뜬공아웃, createSeededRandom(3), { pattern: 깊은뜬공 })
-        .lastDefensePlay!.advance.runsScored,
-    ).toBe(1)
-    // 2아웃이면 같은 타구인데도 점수가 0 이다
-    expect(
-      applyPlayerOutcome(이사, 뜬공아웃, createSeededRandom(3), { pattern: 깊은뜬공 })
-        .lastDefensePlay!.advance.runsScored,
-    ).toBe(0)
+    const play = applyPlayerOutcome(이사, 땅볼아웃, createSeededRandom(3), { pattern: 땅볼 }).lastDefensePlay!
+    expect(play.advance.runsScored).toBe(0)
+    expect(play.voidedRuns).toBe(1)
   })
 
   it('CPU 간이 엔진은 손대지 않았다 — advanceRunners 의 근사는 그대로다', () => {
@@ -1059,8 +1053,8 @@ describe('CPU 견제 — 모드 4 도 0x345fc 종류 4 → 0x34848 → 메시지
     if (!isPickoffPlayResult(play)) throw new Error('견제 판이 아니다')
     expect(play.throwBase).toBe(3)
     expect(play.ticks.length).toBeGreaterThan(0)
-    // 악송구 굴림 1번(악송구면 +2번)뿐이다
-    expect(counter.draws).toBe(play.errantThrow ? 3 : 1)
+    // 주자마다 리드 rand(0,100) 1번(0x3d7b8, 주자 둘) → 악송구 굴림 1번(악송구면 +2번)
+    expect(counter.draws).toBe(2 + (play.errantThrow ? 3 : 1))
     expect(after.opponentMound.pitches).toBe(판.opponentMound.pitches)
     expect(after.opponentMound.stamina).toBe(판.opponentMound.stamina)
     expect(after.game.battingOrderIndex).toBe(판.game.battingOrderIndex)
@@ -1069,7 +1063,7 @@ describe('CPU 견제 — 모드 4 도 0x345fc 종류 4 → 0x34848 → 메시지
     // 정산 0xa8024 는 종류 4 라 타석 칸(+0x14)이 안 오른다
     expect(after.ourLineup.records).toEqual(판.ourLineup.records)
     if (!play.errantThrow) {
-      // 루에 붙은 주자는 견제로 안 죽는다 (0xb36d0 · 0x4677a) — 결과 9
+      // 리드 5틱(0xcffac)에서 돌아온 주자는 견제로 안 죽는다 (0xb36d0 · 0x4677a) — 결과 9
       expect(play.resultCode).toBe(PICKOFF_RESULT.SAFE)
       expect(after.game).toEqual(판.game)
     }

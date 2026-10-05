@@ -96,6 +96,8 @@ import {
   throwTicksToFielder,
 } from '@/entities/fielding/model/throwPlan'
 import { chooseThrowTargetBase, isSpecialThrow } from '@/entities/fielding/model/throwTargetBase'
+import { applyRunnerLead, runnerLeadOf } from '@/entities/fielding/model/runnerLead'
+import { stealTargetBaseOf } from '@/entities/fielding/model/stealStart'
 import { EMPTY_BASES, type AdvanceResult, type BaseState } from '@/entities/game/model/baseState'
 import type { ManualAutoMode } from '@/entities/settings/model/gameSettings'
 import { forecastCatch } from '@/features/defense-play/model/catchForecast'
@@ -151,6 +153,17 @@ export interface DefensePlayInput {
   readonly defenseAbilities?: readonly number[]
   /** 주자들의 주루 능력치. 기본 500 */
   readonly runAbility?: number
+  /**
+   * 이번 투구에 출발한 도루 주자들의 루 — state[0x14 + 루] (`0xa9bd4`). 판이 열릴 때 `0x3d7b8` 이 이 주자들은
+   * 다음 루를 목표로 `0xcffa8`[루] + rand(0,9)(2 이하 → 3) 틱, 나머지는 `0xcffb0`[루] 틱 몰아 돌린다.
+   * 안 주면 아무도 출발 안 했다.
+   */
+  readonly stealingFrom?: readonly number[]
+  /**
+   * 장면 +0xfdc — 이번 투구의 번트 종류(0 = 없음). 서 있으면 도루 안 한 주자 리드가 +3 틱(`0x3d7b8`).
+   * ⚠️ 부르는 쪽이 아직 안 싣는다(번트 종류가 타구 결과까지 안 넘어온다) — 안 주면 0.
+   */
+  readonly buntKind?: number
   /**
    * **이 타구는 잡히지 않는다** — 필살타법이 성공한 타구 (0x51800, S13 6절 확정).
    *
@@ -480,6 +493,54 @@ function createPlayRunners(bases: BaseState, outcome: AtBatOutcome, speed: numbe
 }
 
 /**
+ * 타구 판(종류 1)의 시작 위치 — `0x46418` 의 주자 고리(0x4657e~0x465aa)가 주자마다 부르는 `0x3d7b8`
+ * (`entities/fielding/model/runnerLead`, 9976cb7 에서 직접 뜬 것).
+ * - 도루 주자: 목표 = 다음 루(0xa9bd4 가 이미 세움) · `0xcffa8`[루](15·14·14) + rand(0,9)(2 이하 → 3) 틱 · 목표 그대로
+ * - 그 밖: 다음 루로 `0xcffb0`[루](6·13·7) 틱(번트 종류가 서 있으면 +3) 간 뒤 목표를 **판 시작 때의 목표**로 되돌린다
+ *   — 포스로 밀리는 주자는 다음 루, 아니면 제 루(돌아오는 중)
+ * - 타자주자는 칸 0 이 0 틱이라 움직이지 않는다
+ *
+ * 리드 앞의 목표는 `0x4653e` 주자관리.vt1c = `0xa9e44`(직접 뜬 것)가 세운다 — 타자주자 다음 주자부터:
+ * ```
+ * a9e8a  도루 표시가 없으면 R.vt88() ; 0xbef1c(R,0) ; +0x98 = +0x94 = 0 ; +0x88 = +0x90 = +0x8c
+ * a9ec2  관리.vt10(i)(0xa9f60 포스: 0..i 산 주자 수 > +0x8c) || 아웃 == 2 || 도루 표시 일 때만:
+ * a9ed6    +0x8c == 1 && 플레이.vt94() && !플레이+0x111 && 아웃 != 2 → 건너뜀
+ * a9eec    앞 주자 +0x7c ≥ +0x8c → +0x7c = +0x8c + 1 ; vt48(+0x8c + 1)        ; 밀린다
+ * a9ef6    아니면 아웃 == 2 && 종류(state[0x26]) == 1 → 같은 목표              ; 2아웃이면 친 순간 뛴다
+ * ```
+ * 웹은 포스 사슬을 `createPlayRunners`(결과 코드 다리)가 세우므로 여기서는 **2아웃 갈래만** 더한다.
+ * ⚠️ 1루 주자 예외(a9ed6, 플레이.vt94 의 뜻 미확인)는 아웃 != 2 일 때만이라 2아웃 갈래와 안 겹친다 — 옮기지 않았다.
+ * ⚠️ 도루 표시 없는 주자의 R.vt88() 은 안 읽었다.
+ * ⚠️ S8 6-3 의 "0x46418 의 주자 움직임은 0x46664 걷기 루프뿐" 은 이 고리를 놓친 것이다.
+ */
+function leadRunnersForBattedBall(runners: readonly MutableRunner[], input: DefensePlayInput): void {
+  const stealing = input.stealingFrom ?? []
+  const twoOuts = input.outs === 2
+  for (const runner of runners) {
+    const base = runner.state.startBase
+    if (runner.state.isBatterRunner || base < 1 || base > 3) continue
+    const isStealing = stealing.includes(base)
+    // 0xa9bd4 → vt48(0xb6228) — 출발한 주자의 목표 루는 한 루 앞.
+    // 0x4653e 주자관리.vt1c(0xa9e44): 2아웃이면 종류 1 에서 모든 주자에게 다음 루(+0x7c = +0x8c + 1 · vt48)
+    // — 포스(0xa9f60)·도루가 아니어도 (a9eb4 r6 = 아웃 == 2 → a9efa 종류 1 갈래)
+    const started =
+      isStealing || (twoOuts && runner.state.targetBase === base)
+        ? { ...runner.state, targetBase: stealTargetBaseOf(base) }
+        : runner.state
+    const lead = runnerLeadOf(started, {
+      playKind: BATTED_BALL_PLAY_KIND,
+      stealing: isStealing,
+      buntKind: input.buntKind,
+      random: input.random,
+    })
+    runner.state = applyRunnerLead(started, lead)
+  }
+}
+
+/** 타구 판의 플레이 종류 (0x3e11a 이후 상태 0x13 → 0x17) */
+const BATTED_BALL_PLAY_KIND = 1
+
+/**
  * 루 커버 배정 — 기본표 0xd85a8 = [포수, 1루수, 2루수, 3루수] 에 2루 규칙(0xb1e24)을 얹는다.
  * 공을 쫓는 야수는 커버를 못 하므로 1루만 투수(0)가 대신 들어가고, 나머지는 커버 없음(−1)이 된다
  * — `defenseArrivalTicks` 의 (A) 갈래가 그때 "직접 들고 뛰기" 를 본다.
@@ -641,6 +702,10 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
       slideUnlocked: specialDefense.slideUnlocked,
     })
   }
+
+  // ── 상태 0x17 진입 0x46418 → 0x3d7b8: 판 시작(vt18) 뒤 주자 목록 차례로 리드 틱을 몰아서 돌린다 ──
+  // 필살수비 굴림(메시지 0x11)보다 뒤다. 도루 주자만 rand(0,9) 한 번 — 종류 1 은 그 뒤 도루 표시를 지운다(state[0x14+b] = 0)
+  leadRunnersForBattedBall(runners, input)
 
   const chaserSlot = forecast.choice.slot
   let catchTick = Math.max(0, Math.min(forecast.choice.catchTick, maximumTicks))
