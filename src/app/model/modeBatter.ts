@@ -28,9 +28,18 @@ export interface ModeBatter {
   readonly ability: BatterAbility
   /** 장착 스킬 id (`career.equippedSkillIds`) — 타석 화면 `batterSkillIds` 로 간다 */
   readonly skillIds: readonly number[]
+  /**
+   * 고른 필살타법 번호 = 선수 레코드 +0x18 (`career.specialSwingNumber`, 1~4 · 0 이면 안 고름).
+   * 미션도 나리 타자편 저장을 올리니 그 선수의 번호다 — '0' 키(0x51dee)가 S+0x10 에 싣는 값.
+   */
+  readonly specialSwingNumber: number
 }
 
 export function modeBatterOf(career: PlayerCareer | null): ModeBatter {
-  if (career === null) return { ability: ROOKIE_BATTER_ABILITY, skillIds: [] }
-  return { ability: equippedAbilityOf(career), skillIds: career.equippedSkillIds }
+  if (career === null) return { ability: ROOKIE_BATTER_ABILITY, skillIds: [], specialSwingNumber: 0 }
+  return {
+    ability: equippedAbilityOf(career),
+    skillIds: career.equippedSkillIds,
+    specialSwingNumber: career.specialSwingNumber,
+  }
 }

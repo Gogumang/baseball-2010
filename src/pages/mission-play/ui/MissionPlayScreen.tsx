@@ -32,7 +32,16 @@ interface MissionPlayScreenProps {
   readonly isPaused: boolean
   readonly bannerText: string
   readonly random: RandomPort
-  readonly onPitchResolved: (detail: PitchOutcomeDetail, pitch: Pitch) => void
+  /** 셋째 인자는 필살타법이 성공한 타구인가 (`BattingStage.onPitchResolved` 그대로) */
+  readonly onPitchResolved: (detail: PitchOutcomeDetail, pitch: Pitch, isUncatchable?: boolean) => void
+  /**
+   * 치는 선수의 **고른 필살 번호** (레코드 +0x18) — '0' 키 0x51dee 가 S+0x10 에 싣는다. 안 넘기면 0 = '0' 키 무시.
+   */
+  readonly specialSwingNumber?: number
+  /** 이 미션 한 판의 남은 필살 횟수 (0xaea30). 안 넘기면 횟수 제한 없이 번호만 본다 (`BattingStage` 기본) */
+  readonly specialSwingRemaining?: number
+  /** 필살 스윙이 나가 남은 횟수가 줄었다 (0x4e136) — 인자는 줄인 뒤 값 */
+  readonly onSpecialSwingUsed?: (remaining: number) => void
   readonly onGiveUp: () => void
   readonly onFinish: () => void
   /**
@@ -76,6 +85,9 @@ export function MissionPlayScreen({
   bannerText,
   random,
   onPitchResolved,
+  specialSwingNumber,
+  specialSwingRemaining,
+  onSpecialSwingUsed,
   aceLevels,
   onPickoff,
   onGiveUp,
@@ -159,7 +171,14 @@ export function MissionPlayScreen({
         <BattingStage
           batterAbility={ability}
           batterSkillIds={batterSkillIds}
+          // 판정 묶음 '미션' = 모드 6(타자 미션) — 공격(사람) +100 (0xab5c0)
           swingMode="미션"
+          // 미션은 나리 타자편 저장의 선수(등록 타자 rec[0xa] 0xa0 — 비트7)가 친다. 내 선수 보너스는 모드 3·4 에서만
+          // 켜지므로(sp40) 판정 값은 안 바뀐다 — 연차도 그 갈래에서만 읽혀 넘기지 않는다
+          isBatterOwnPlayer
+          specialSwingNumber={specialSwingNumber}
+          specialSwingRemaining={specialSwingRemaining}
+          onSpecialSwingUsed={onSpecialSwingUsed}
           gameMode={MISSION_BATTER_MODE}
           pitcherAbility={pitcherAbility}
           isEagleEyeEnabled={false}

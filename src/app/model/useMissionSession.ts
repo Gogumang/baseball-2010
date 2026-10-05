@@ -30,7 +30,8 @@ import {
 import type { PitcherRun } from '@/entities/mission/model/pitcherRun'
 import { attemptSteal } from '@/entities/game/model/steal'
 import { missionOpponentOf, pitcherAbilityOf } from '@/entities/game/model/aceOpponent'
-import { pitchAgainstBatter } from '@/entities/pitching/model/simulateBatter'
+import { pitchAgainstBatterDetailed } from '@/entities/pitching/model/simulateBatter'
+import { RUTHLESS_SKILL_ID, specialSwingCountOf } from '@/entities/batting/model/specialSwing'
 import { rollsIntoBenchClearing } from '@/entities/game/model/benchClearing'
 import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
 import { BATTER_SLOT, gameAbilityOf } from '@/features/play-team-game/model/gameAbilities'
@@ -125,6 +126,48 @@ export function missionOpponentAbility(
   return aceAbilityAtLevel(opponent.ability, level)
 }
 
+/** 필살 남은 칸의 "아직 안 채움" — 타석 교대 0xaebe4 가 음수일 때만 채운다 (H2 1-2) */
+const UNFILLED_SPECIAL_SWING = -1
+/** 마선수 레코드 +0x18 = 순번(0부터) + 5 (H2 4-1) */
+const ACE_SPECIAL_NUMBER_OFFSET = 5
+
+/**
+ * **타자 미션에서 치는 내 타자의 남은 필살 횟수** = 0xaea30. 칸이 −1 이면 0xaebe4 처럼 채운 값이다:
+ * `+0x18 == 0 → 0`, 아니면 u8 0xd84f0[번호] (내 선수는 마선수가 아니다) + 스킬 23 무자비(장착) +1.
+ * 미션은 나리 타자편 저장(0x213c0 6 → 4)을 올리니 그 선수의 번호·장착 스킬이다.
+ */
+export function missionBatterSpecialSwingRemainingOf(
+  stored: number,
+  batter: { readonly specialSwingNumber: number; readonly skillIds: readonly number[] },
+): number {
+  if (stored >= 0) return stored
+  return specialSwingCountOf({
+    swingNumber: batter.specialSwingNumber,
+    isAceBatter: false,
+    hasRuthlessSkill: batter.skillIds.includes(RUTHLESS_SKILL_ID),
+  })
+}
+
+/**
+ * **투수 미션 상대 마타자의 필살** — 0x34468 이 보는 번호·남은 횟수와 0x34d6c 의 순번·레벨.
+ * 마타자 미션이 아니면 null (일반 CPU 타자는 S+0x10 을 쓰지 않는다 — Q1 5절).
+ * 남은 칸이 −1 이면 0xaebe4 처럼 s8 0xd84fa[레벨] 로 채운다 (레벨 = `mgr[0x13f + 순번]`).
+ * ⚠️ 마타자 레코드의 스킬 23 무자비(+1)는 웹 마선수 표에 스킬 비트가 없어 늘 거짓이다.
+ */
+export function missionOpponentSpecialSwingOf(
+  mission: OriginalMission,
+  stored: number,
+  aceLevels?: Readonly<Record<number, number>>,
+): { readonly swingNumber: number; readonly remaining: number; readonly aceOrder: number; readonly aceLevel: number } | null {
+  if (mission.side !== '투수' || missionOpponent(mission) === null) return null
+  const aceOrder = mission.opponentAce - 1
+  const swingNumber = aceOrder + ACE_SPECIAL_NUMBER_OFFSET
+  const aceLevel = aceLevelOf(aceLevels, aceLevelSlotOf('타자', mission.opponentAce))
+  const remaining =
+    stored >= 0 ? stored : specialSwingCountOf({ swingNumber, isAceBatter: true, aceLevel, hasRuthlessSkill: false })
+  return { swingNumber, remaining, aceOrder, aceLevel }
+}
+
 /**
  * 타자 미션 상대 투수 능력치. 마투수면 레벨 배율(0xb6414)을 먼저 곱한 네 칸을 투구 엔진 눈금으로 줄인다
  * — 마타자와 같은 0xb6414 라 투수 칸(제구·구속·변화·체력)도 똑같이 먹는다.
@@ -211,6 +254,14 @@ export function useMissionSession({
   const [pendingBenchClearing, setPendingBenchClearing] = useState<
     { readonly run: PitcherRun; readonly outcome: AtBatOutcome } | null
   >(null)
+  /**
+   * **필살 남은 칸** s8 팀[+0x29 + 타순] — 미션 한 판에 한 번 채우고(0xaebe4) 스윙 틱 0x4e136 이 줄인다. −1 = 안 채움.
+   * 타자 미션은 내 타자 칸, 투수 미션은 상대 타자 칸이다.
+   * ⚠️ 근사: 웹 미션은 상대 타선·타순을 들고 있지 않고 모든 상대 타석을 같은 선수(마타자 미션이면 그 마타자)로
+   *    본다 — 그래서 칸도 하나다. 원본 미션 팀에서 마타자가 몇 번 타순에 서는지는 아직 안 읽었다.
+   */
+  const [batterSpecialSwingStored, setBatterSpecialSwingStored] = useState(UNFILLED_SPECIAL_SWING)
+  const [opponentSpecialSwingStored, setOpponentSpecialSwingStored] = useState(UNFILLED_SPECIAL_SWING)
   /** 결과를 확인하고 돌아갈 때 마지막으로 한 편의 목록을 연다 */
   const [lastSide, setLastSide] = useState<OriginalMission['side']>('타자')
   const [clearCounts, setClearCounts] = useState<MissionClearCounts>(() => missionRecord.load())
@@ -248,7 +299,11 @@ export function useMissionSession({
    * 미션 상대 마운드(시작 스태미나 — 미확인)를 두고 여기서 깎아야 한다.
    */
   const handleMissionPitch = useCallback(
-    (detail: PitchOutcomeDetail) => {
+    (
+      detail: PitchOutcomeDetail,
+      /** 필살타법이 성공한 타구인가 (0x517e6 → 0x51800) — 야수가 쥐지 못한다. `BattingStage` 의 셋째 인자 */
+      isUncatchable = false,
+    ) => {
       const nextAtBat = runner.applyPitch(detail.resolution)
       const hasSwung = detail.hasSwung
       const outcome = isAtBatFinished(nextAtBat) ? nextAtBat.outcome : null
@@ -280,7 +335,7 @@ export function useMissionSession({
         if (hasSwung) setMissionRun((previous) => (previous === null ? previous : recordSwing(previous)))
         setPendingDefensePlay({
           side: '타자',
-          input: missionDefensePlayInputOf(current.bases, current.outs, outcome, random),
+          input: { ...missionDefensePlayInputOf(current.bases, current.outs, outcome, random), isUncatchable },
           outcome,
           isBunt: detail.isBunt,
           runnersOnBase,
@@ -356,6 +411,9 @@ export function useMissionSession({
       },
       random,
     )
+    // 공+0x10(마구 번호, 0x3de10)은 싣지 않는다 — 미션 구질 메뉴에 마구 칸이 없어(`modePitchMenuOf`, 9fe86db)
+    // 구질 22 가 나올 길이 없으니 원본도 0 그대로다. ⚠️ 마구 칸이 열리면 남은 횟수(0xaebe4 · 0xd84ff/0xd8509)와
+    // 코스 확정 소모 0x50e9c → 0x3de10 싣기(`ballMagicNumberAfterPitch`, 되돌리지 않음)를 여기 이어야 한다
     const pitch = buildHumanPitch(
       {
         typeNumber,
@@ -407,8 +465,10 @@ export function useMissionSession({
         isMyTeam: false,
       }),
     }
+    // 마타자 필살 0x34468~0x34488 — 남은 칸(0xaea30)이 0 이 아니면 휘두를 때마다 필살이다 (난수 없음)
+    const specialSwing = missionOpponentSpecialSwingOf(pitcherRun.mission, opponentSpecialSwingStored, aceLevels)
     // 원본 0x34334 가 보는 상황 — state 의 볼카운트·아웃과 주자 유무(0xa9599)
-    const resolution = pitchAgainstBatter(
+    const thrown = pitchAgainstBatterDetailed(
       pitch,
       batterAbility,
       random,
@@ -423,8 +483,18 @@ export function useMissionSession({
         isMistakePitch: isMistake,
         // 0xb633d(타자) — 마타자 미션의 상대는 마선수 레코드(+0xa 비트 6)라 번트 칸을 뽑아도 친다
         isMagicBatter: opponent !== null,
+        ...(specialSwing === null ? {} : { specialSwing }),
+        // 판정 묶음 '투수미션' = 모드 5 — 수비(사람) −10 (0xab5c0, 모드 3·4 밖) 과
+        // 0xab42a 의 비트7 투수 +100. 미션 투수는 나리 투수편 저장 [저장+0x3c] 의 선수(0x1fbd0, 9fe86db) 또는
+        // 명예 투수(+0x880) 라 레코드 rec[0xa] 비트7(등록 투수 0x80 — C 노트 · 0xb6389)이 서 있다.
+        // 연차(+0xb3)는 모드 3·4 갈래(sp40)에서만 읽혀 여기서는 안 쓰인다 — 넘기지 않는다
+        swingMode: '투수미션',
+        isPitcherOwnPlayer: true,
       },
     )
+    const resolution = thrown.resolution
+    // 0x4e136 — 필살 스윙이 나간 틱에 남은 −1 (헛스윙도). 마타자가 아니면 null 이라 칸을 안 건드린다
+    if (thrown.specialSwingRemaining !== null) setOpponentSpecialSwingStored(thrown.specialSwingRemaining)
 
     let nextRun = recordPitch(pitcherRun, grade === MAX_GAUGE_GRADE)
     const nextAtBat = runner.applyPitch(resolution)
@@ -446,15 +516,19 @@ export function useMissionSession({
       // 수비 화면(0x17)이 돈다 — 실점·피안타·이닝 목표는 다 돌고 난 뒤에 센다
       setPendingDefensePlay({
         side: '투수',
-        input: missionDefensePlayInputOf(
-          nextRun.bases,
-          nextRun.outs,
-          outcome,
-          random,
-          MISSION_PITCHER_MODE,
-          // 사람이 수비다 — 환경설정 송구(+0xf4)가 그대로 0xae6c8 의 답이 된다
-          throwModeManual,
-        ),
+        input: {
+          ...missionDefensePlayInputOf(
+            nextRun.bases,
+            nextRun.outs,
+            outcome,
+            random,
+            MISSION_PITCHER_MODE,
+            // 사람이 수비다 — 환경설정 송구(+0xf4)가 그대로 0xae6c8 의 답이 된다
+            throwModeManual,
+          ),
+          // 0x517e6 — 마타자 필살이 성공한 타구는 송구공 비트(0xaf180)가 서서 야수가 쥐지 못한다
+          isUncatchable: thrown.isUncatchable,
+        },
         outcome,
         isBunt: false,
         runnersOnBase: runnerCountOf(nextRun.bases),
@@ -549,6 +623,9 @@ export function useMissionSession({
     /** 수비 화면이 끝났다 — 진루·아웃·실점을 이제 먹인다 */
     finishDefensePlay,
 
+    /** 타자 미션의 필살 스윙이 나갔다 (0x4e136) — `BattingStage` 의 `onSpecialSwingUsed`, 인자는 줄인 뒤 남은 횟수 */
+    specialSwingUsed: (remaining: number) => setBatterSpecialSwingStored(remaining),
+
     /**
      * **벤치 클리어링 연출이 끝났다** — 출구 0xae24c (`BenchClearingScene` 의 `onDone`).
      * 틱 10 의 갱신 0x401d4 에 닿았으면 수비 8명 목표 굴림 8 번이 그때 나갔다 — 화면 대신 여기서 굴린다.
@@ -565,6 +642,9 @@ export function useMissionSession({
 
     begin: (mission: OriginalMission) => {
       setLastSide(mission.side)
+      // 새 경기 — 필살 남은 칸은 0xaebe4 가 다시 채운다
+      setBatterSpecialSwingStored(UNFILLED_SPECIAL_SWING)
+      setOpponentSpecialSwingStored(UNFILLED_SPECIAL_SWING)
       runner.resetAtBat(mission.start)
       runner.setBannerText('')
       runner.setIsPaused(false)
@@ -583,6 +663,8 @@ export function useMissionSession({
 
     /** 이벤트 match — 공략 레코드를 치르고 결과 이벤트로 돌아간다. 미션 클리어 기록에는 남기지 않는다 */
     beginAceMatch: (mission: OriginalMission, pending: Omit<Extract<Screen, { kind: '마선수대결' }>, 'kind' | 'mission'>) => {
+      setBatterSpecialSwingStored(UNFILLED_SPECIAL_SWING)
+      setOpponentSpecialSwingStored(UNFILLED_SPECIAL_SWING)
       runner.resetAtBat(mission.start)
       runner.setBannerText('')
       runner.setIsPaused(false)
@@ -677,5 +759,6 @@ export function useMissionSession({
   return {
     missionRun, pitcherRun, clearedKeys, clearCounts, lastSide, aceLevels, pitcher,
     missionConditionCode, pendingDefensePlay, pendingBenchClearing, pickoffReplay, handleMissionPitch, handleThrow, actions,
+    batterSpecialSwingStored,
   }
 }

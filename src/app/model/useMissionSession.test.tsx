@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
-import { missionOpponentAbility, missionPitcherAbility, useMissionSession } from '@/app/model/useMissionSession'
+import {
+  missionBatterSpecialSwingRemainingOf,
+  missionOpponentAbility,
+  missionOpponentSpecialSwingOf,
+  missionPitcherAbility,
+  useMissionSession,
+} from '@/app/model/useMissionSession'
 import { useAtBatRunner } from '@/app/model/useAtBatRunner'
 import type { Screen } from '@/app/model/screen'
 import { aceMatchMissionOf, EMPTY_STORY_CARRY } from '@/entities/story/model/aceMatch'
@@ -222,9 +228,18 @@ describe('투수 미션 투구 게이지 — 누른 칸 g 를 그대로 받는�
    * 하나 더 붙는다 (0x4dbac → 0xb74bc).
    */
   it('게이지 칸이 달라져도 난수 차례는 같고, 게이지를 끄면 딱 한 번 더 뽑는다', () => {
-    const 칸별 = [1, 5, 7, 8, 9, 0, 12].map((cell) => drawsOfOnePitch(1, cell).drawn)
-    expect(new Set(칸별).size, `칸마다 난수 차례가 다르다: ${칸별.join(',')}`).toBe(1)
-    expect(drawsOfOnePitch(1, 0, false).drawn).toBe(칸별[0] + 1)
+    // 등급이 바뀌면 판정 값이 바뀌어 타구 결과(그 뒤 굴림 수)가 갈릴 수 있다 — 칸 9(t=5)는 비트7 투수 +100 ·
+    // 수비 사람 −10(모드 5, 16897fc)을 실은 뒤 아웃이 난다. 그래서 **같은 결과가 난 칸끼리** 굴림 수를 견준다
+    const 칸별 = [1, 5, 7, 8, 9, 0, 12].map((cell) => drawsOfOnePitch(1, cell))
+    const 결과별 = new Map<string, Set<number>>()
+    for (const { banner, drawn } of 칸별) 결과별.set(banner, (결과별.get(banner) ?? new Set()).add(drawn))
+    for (const [banner, draws] of 결과별) {
+      expect(draws.size, `${banner} 칸마다 난수 차례가 다르다: ${[...draws].join(',')}`).toBe(1)
+    }
+    const 끔 = drawsOfOnePitch(1, 0, false)
+    const 같은결과 = 칸별.find((pitch) => pitch.banner === 끔.banner)
+    expect(같은결과).toBeDefined()
+    expect(끔.drawn).toBe(같은결과!.drawn + 1)
   })
 })
 
@@ -492,5 +507,39 @@ describe('투수 미션 사구 뒤 벤치 클리어링 — 0x4e72c → 0x1e 는 
     expect(watched.counter.drawn() - beforeWatch).toBe(skipDraws + 8)
     // 진입 0x3a5f0 의 45 번은 던지는 순간 이미 나갔다
     expect(watched.drawnByThrow).toBeGreaterThanOrEqual(45 + 1)
+  })
+})
+
+/* ── 필살타법 남은 횟수 (0xaebe4 · 0x4e136) ─────────────────────────────────── */
+
+describe('미션의 필살 남은 칸 — 0xaebe4 가 채우고 0x4e136 이 줄인다', () => {
+  const 미션 = (id: number, side: '투수' | '타자') => {
+    const found = MISSIONS.find((row) => row.id === id && row.side === side)
+    if (found === undefined) throw new Error(`미션 ${id} 없음`)
+    return found
+  }
+
+  it('타자 미션의 내 타자는 u8 0xd84f0[번호] — 무자비(23) 장착이면 +1, 번호 0 이면 0', () => {
+    expect(missionBatterSpecialSwingRemainingOf(-1, { specialSwingNumber: 0, skillIds: [23] })).toBe(0)
+    expect(missionBatterSpecialSwingRemainingOf(-1, { specialSwingNumber: 1, skillIds: [] })).toBe(2)
+    expect(missionBatterSpecialSwingRemainingOf(-1, { specialSwingNumber: 4, skillIds: [23] })).toBe(6)
+    // 한 번 채운(또는 줄인) 값은 그대로 쓴다
+    expect(missionBatterSpecialSwingRemainingOf(1, { specialSwingNumber: 4, skillIds: [23] })).toBe(1)
+  })
+
+  it('투수 미션 상대 마타자는 번호 = 순번 + 5 · 횟수 0xd84fa[mgr[0x13f + 순번]]', () => {
+    // 미션 4 의 상대는 마타자 순번 3 (1부터) → 번호 7 · 칸 5 + 2 = 7
+    expect(missionOpponentSpecialSwingOf(미션(4, '투수'), -1)).toEqual({ swingNumber: 7, remaining: 2, aceOrder: 2, aceLevel: 0 })
+    expect(missionOpponentSpecialSwingOf(미션(4, '투수'), -1, { 7: 4 })).toEqual({
+      swingNumber: 7,
+      remaining: 5,
+      aceOrder: 2,
+      aceLevel: 4,
+    })
+    expect(missionOpponentSpecialSwingOf(미션(4, '투수'), 0)?.remaining).toBe(0)
+  })
+
+  it('일반 타자가 상대인 투수 미션은 필살이 없다 (CPU 일반 타자는 S+0x10 을 안 쓴다)', () => {
+    expect(missionOpponentSpecialSwingOf(미션(1, '투수'), -1)).toBeNull()
   })
 })

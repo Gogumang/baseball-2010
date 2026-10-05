@@ -26,7 +26,11 @@ describe('미션·홈런더비 타자 — 0xb570c 모드 5·6·7 = 0xb6414', () 
     expect(modeBatterOf(스킬선수).skillIds).toEqual([22])
   })
 
+  it('고른 필살타법 번호(+0x18)를 그대로 싣는다 — 미션 타석의 "0" 키가 쓴다', () => {
+    expect(modeBatterOf({ ...선수, specialSwingNumber: 3 }).specialSwingNumber).toBe(3)
+  })
+
   it('선수가 없으면 신인 능력치·스킬 없음', () => {
-    expect(modeBatterOf(null)).toEqual({ ability: ROOKIE_BATTER_ABILITY, skillIds: [] })
+    expect(modeBatterOf(null)).toEqual({ ability: ROOKIE_BATTER_ABILITY, skillIds: [], specialSwingNumber: 0 })
   })
 })

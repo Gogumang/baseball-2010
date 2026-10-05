@@ -1,6 +1,6 @@
 import type { Screen } from '@/app/model/screen'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
-import { missionOpponent, missionPitcherAbility } from '@/app/model/useMissionSession'
+import { missionBatterSpecialSwingRemainingOf, missionOpponent, missionPitcherAbility } from '@/app/model/useMissionSession'
 import type { useMissionSession } from '@/app/model/useMissionSession'
 import { MissionSelectScreen, MissionBriefing } from '@/pages/mission-select/ui/MissionSelectScreen'
 import { MissionPlayScreen } from '@/pages/mission-play/ui/MissionPlayScreen'
@@ -101,7 +101,11 @@ export function MissionRoutes({
         isPaused={runner.isPaused}
         bannerText={runner.bannerText}
         random={random}
-        onPitchResolved={session.handleMissionPitch}
+        onPitchResolved={(detail, _pitch, isUncatchable) => session.handleMissionPitch(detail, isUncatchable)}
+        // 필살타법 — 나리 타자편 저장 선수의 번호(+0x18)와 이 미션 한 판의 남은 횟수 (0xaebe4 가 채운다)
+        specialSwingNumber={batter.specialSwingNumber}
+        specialSwingRemaining={missionBatterSpecialSwingRemainingOf(session.batterSpecialSwingStored, batter)}
+        onSpecialSwingUsed={actions.specialSwingUsed}
         // 상대 마투수 마구 횟수 0xd8509[레벨] (타석 교대 0xaebe4) — 안 넘기면 늘 Lv1 의 3회다
         aceLevels={session.aceLevels}
         // CPU 견제 (0x345fc 종류 4 → 0x34848 → 메시지 0x10) — 미션(모드 6)에서도 돈다
