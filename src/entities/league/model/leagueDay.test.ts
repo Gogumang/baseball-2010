@@ -378,16 +378,21 @@ describe('CPU 끼리 경기도 타순이 아홉 칸으로 이어진다 (team+0x3
 })
 
 describe('CPU 끼리 경기에도 CPU 대타가 나온다 (0xc1ba4 → 0xac228 · Q1 4절)', () => {
-  it('여러 경기를 돌리면 대타가 나오고, 한 경기에 많아야 한 번이다 (state[0xe] 는 경기에 한 칸)', () => {
+  it('여러 경기를 돌리면 대타가 나오고, 한 경기에 여러 번도 나온다 — state[0xe] 는 공마다 내려간다 (0xa5e14 a5e7c)', () => {
     let 대타 = 0
+    let 여러번 = 0
     for (let seed = 1; seed <= 30; seed += 1) {
       const score = simulateLeagueGame({ away: 1, home: 2 }, createSeededRandom(seed), 0)
-      expect(score.pinchHits, `씨앗 ${seed}`).toBeLessThanOrEqual(1)
+      // 상한은 두 팀 벤치 수뿐이다 (붙박이 로스터 12명 − 타순 9 = 셋씩)
+      expect(score.pinchHits, `씨앗 ${seed}`).toBeLessThanOrEqual(6)
       대타 += score.pinchHits
+      if (score.pinchHits > 1) 여러번 += 1
       // 대타로 들어온 벤치 선수(로스터 9~11)의 타석은 그 선수 칸에 쌓인다
       const 벤치타석 = score.plateAppearances.filter((appearance) => appearance.battingOrderIndex >= 9)
       expect(벤치타석.length > 0, `씨앗 ${seed}`).toBe(score.pinchHits > 0)
     }
     expect(대타).toBeGreaterThan(0)
+    // 예전 "경기에 한 번" 이면 나올 수 없는 경기가 실제로 있다
+    expect(여러번).toBeGreaterThan(0)
   })
 })

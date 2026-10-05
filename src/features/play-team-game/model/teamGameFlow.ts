@@ -2780,7 +2780,6 @@ function substituteBatter(
  *
  * 막음 칸 `state[0xe]`(`cpuPinchHitUsed`)은 공마다 내려가므로(`0xa5e14` a5e7c) **한 경기에 여러 번** 나올 수 있다 —
  * 벤치 수·타순 칸 기록(타석 둘 이상·적시타 없음·안타 하나 이하)이 실제 상한이다.
- * (`judgeCpuPinchHit` 의 입력 이름 `alreadyUsedThisGame` 은 예전 해석의 이름이다 — 뜻은 이 칸이다.)
  *
  * ⚠️ 원본이 보는 **장비 레벨 니블**(레코드 `+0x19`·`+0x1a`)은 웹 로스터 표에 없어 늘 0 으로 둔다.
  */
@@ -2801,7 +2800,7 @@ function applyCpuPinchHit(
 
   const benchIndex = judgeCpuPinchHit(
     {
-      alreadyUsedThisGame: progress.cpuPinchHitUsed,
+      blockedUntilNextPitch: progress.cpuPinchHitUsed,
       batterIsAce: batter.aceIndex !== NO_ACE_BATTER,
       // 원본은 명단 칸이 모자라도 team+0x28c 만 보고 rand(0, n) 을 돌린다 — 실제 칸 수로 자른다
       benchBatters: Math.min(bench, Math.max(0, entry.length - BATTING_ORDER_SIZE)),

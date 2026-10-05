@@ -106,13 +106,19 @@ export interface HalfInningResult {
   readonly pitcherChanges?: readonly HalfInningPitcherChange[]
   /** 이닝이 끝났을 때의 공격 팀 명단 (`offense` 를 넘겼을 때만) — 다음 공격에 그대로 넘긴다 */
   readonly lineup?: QuickLineup
-  /** `state[0xe]` — 이 경기에 CPU 대타를 썼는가 (`offense` 를 넘겼을 때만). 양 팀 공용 한 칸이다 */
+  /**
+   * `state[0xe]` — CPU 대타 막음 칸 (`offense` 를 넘겼을 때만). 양 팀 공용 한 칸이고 **공마다 내려간다**
+   * (`0xa5e14` a5e7c) — 반 이닝이 끝나면 늘 거짓이다(마지막 타석도 공을 던졌으므로).
+   */
   readonly pinchHitUsed?: boolean
   /** 이 이닝에 들어온 CPU 대타 */
   readonly pinchHits: readonly HalfInningPinchHit[]
 }
 
 /* ── 공격 쪽: 명단과 CPU 대타 (0xc1ba4 → 0xac228 → 0xaebe4) ───────────────────── */
+
+/** 한 타석 앞에서 `0xc1ba4` 를 다시 부르는 상한 — 대타 한 번 · 투수 한 번 · 마지막 빈 부름 */
+const MAXIMUM_SUBSTITUTION_CALLS = 3
 
 /**
  * 반 이닝을 도는 동안 공격 팀이 쓰는 것 — 이것을 넘기면 **타석마다 CPU 대타**(0xac228)가 돌고
@@ -123,14 +129,9 @@ export interface HalfInningOffense {
   /** 그 로스터 칸 타자의 간이 타석용 능력 */
   readonly batterOf: (rosterSlot: number) => QuickAtBatBatter
   /**
-   * `state[0xe]` — CPU 대타를 다시 묻지 않게 막는 칸 (양 팀 공용).
-   *
-   * ⚠️ **원본과 다름(미반영)**: 원본은 "경기에 한 번" 이 아니라 **공마다** 투구 처리 `0xa5e14` 가 이 칸을 내린다
-   *    (a5e7c — 간이 엔진은 `0xc262c` 의 c26ca 가 공마다 부른다). 또 `0xc1ba4` 가 하나라도 바꾸면 같은 타석으로
-   *    다시 불려 안 바뀐 쪽을 다시 판정한다(c266c). 팀 경기(`teamGameFlow.runQuickSubstitutions`)와 타자편
-   *    `gameFlow`(동료 간이 타석·내 타석의 상대 공)는 원본대로 고쳤지만, 이 반 이닝 엔진은 `entities/league` 의
-   *    CPU 끼리 경기 테스트가 "경기에 많아야 한 번" 을 단언하고 있어 그쪽과 함께 고쳐야 한다 — 아직 반 이닝 안에서는
-   *    안 내리고 다시 부르지도 않는다(타자편 상대 공격 반 이닝도 이 엔진이다).
+   * `state[0xe]` — 다음 공이 나가기 전까지 CPU 대타를 다시 묻지 않게 막는 칸 (양 팀 공용).
+   * "경기에 한 번" 이 아니다 — 세우는 곳 `0xac228`(ac33e), 지우는 곳 `0xa5e14`(a5e7c, 공마다)·`0x48d50`(48eb6,
+   * 사람 장면 타석 시작)·`0xb67d0`(b6806, 경기 시작).
    */
   readonly pinchHitUsed: boolean
 }
@@ -306,45 +307,53 @@ export function simulateHalfInning(
   }
 
   for (let faced = 0; faced < MAXIMUM_BATTERS && outs < OUTS_PER_INNING; faced += 1) {
-    // 0xc1ba4 안 차례 그대로 — **CPU 대타(공격 팀)가 먼저**다 (0xc1c50, 투수 교체 0xc1ce2 보다 앞)
-    if (lineup !== undefined && pinchHitUsed !== undefined) {
-      const pinch = tryQuickCpuPinchHit(
-        lineup,
-        order,
-        { alreadyUsedThisGame: pinchHitUsed, runnerCount: runnerCountOf(bases) },
-        random,
-      )
-      if (pinch !== null) {
-        lineup = pinch.lineup
-        // state[0xe] = 1 — 경기에 한 번뿐이다 (ac338)
-        pinchHitUsed = true
-        pinchHits.push({
-          battingOrderIndex: order,
-          outgoingRosterSlot: pinch.outgoingRosterSlot,
-          incomingRosterSlot: pinch.incomingRosterSlot,
-        })
+    // 0xc1ba4 안 차례 그대로 — **CPU 대타(공격 팀)가 먼저**다 (0xc1c50, 투수 교체 0xc1ce2 보다 앞).
+    // 둘 중 하나라도 바뀌면 0xc1ba4 가 1 을 돌려 0xc262c 가 공 없이 돌아가고(c266c), 다음 부름에서 **같은 타석**으로
+    // 0xc1ba4 를 다시 지난다 — 바뀐 쪽은 state[0xe]·state[0xd] 로 곧장 빠지고 안 바뀐 쪽은 다시 판정(굴림 포함)한다.
+    for (let call = 0; call < MAXIMUM_SUBSTITUTION_CALLS; call += 1) {
+      let substituted = false
+      if (lineup !== undefined && pinchHitUsed !== undefined) {
+        const pinch = tryQuickCpuPinchHit(
+          lineup,
+          order,
+          { alreadyUsedThisGame: pinchHitUsed, runnerCount: runnerCountOf(bases) },
+          random,
+        )
+        if (pinch !== null) {
+          lineup = pinch.lineup
+          // state[0xe] = 1 (ac33e) — 다음 공(0xa5e14 a5e7c)이 나갈 때까지 다시 묻지 않는다
+          pinchHitUsed = true
+          substituted = true
+          pinchHits.push({
+            battingOrderIndex: order,
+            outgoingRosterSlot: pinch.outgoingRosterSlot,
+            incomingRosterSlot: pinch.incomingRosterSlot,
+          })
+        }
       }
-    }
-    // 간이 타석 루프 0xc262c 는 **타석마다 먼저** 0xc1ba4 를 불러 수비 팀 투수 교체를 판정한다
-    if (defense !== undefined && mound !== undefined) {
-      const changed = changePitcherIfNeeded(defense, mound, {
-        inningIndex: inning - 1,
-        lead: defense.lead - runs,
-        runnerCount: runnerCountOf(bases),
-        inningRunsAllowed,
-        random,
-      })
-      if (changed !== mound) {
-        mound = changed
-        // 교체 0xaec64 가 +0x27c·+0x280·+0x284 를 한꺼번에 0 으로 민다
-        inningRunsAllowed = 0
-        pitcherChanges.push({
-          pitcherSlot: changed.pitcherSlot,
-          outs,
+      // 간이 타석 루프 0xc262c 는 **타석마다 먼저** 0xc1ba4 를 불러 수비 팀 투수 교체를 판정한다
+      if (defense !== undefined && mound !== undefined) {
+        const changed = changePitcherIfNeeded(defense, mound, {
+          inningIndex: inning - 1,
+          lead: defense.lead - runs,
           runnerCount: runnerCountOf(bases),
-          runsBefore: runs,
+          inningRunsAllowed,
+          random,
         })
+        if (changed !== mound) {
+          mound = changed
+          substituted = true
+          // 교체 0xaec64 가 +0x27c·+0x280·+0x284 를 한꺼번에 0 으로 민다
+          inningRunsAllowed = 0
+          pitcherChanges.push({
+            pitcherSlot: changed.pitcherSlot,
+            outs,
+            runnerCount: runnerCountOf(bases),
+            runsBefore: runs,
+          })
+        }
       }
+      if (!substituted) break
     }
     // 상태 0xf — 타석 준비. 원본은 여기서 돌발미션 발동을 굴린다 (0x8f158)
     hooks.onAtBatStart?.({
@@ -453,6 +462,8 @@ export function simulateHalfInning(
         justChanged: false,
       }
     }
+    // 같은 0xa5e14 가 state[0xe](CPU 대타 막음)도 내린다 (a5e7c) — 다음 타석은 다시 대타를 묻는다
+    if (pinchHitUsed !== undefined) pinchHitUsed = false
     order += 1
   }
 

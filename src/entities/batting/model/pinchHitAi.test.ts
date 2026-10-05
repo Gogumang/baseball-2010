@@ -26,7 +26,7 @@ function 정해진난수(values: readonly number[]): RandomPort & { readonly rol
 
 /** 모든 막는 조건을 지난 입력 — 주자 없음 = 100‰ */
 const 통과입력: CpuPinchHitInput = {
-  alreadyUsedThisGame: false,
+  blockedUntilNextPitch: false,
   batterIsAce: false,
   benchBatters: 3,
   record: { hits: 0, runScoringHits: 0, plateAppearances: 2 },
@@ -75,7 +75,7 @@ describe('CPU 대타 0xac228', () => {
 
   it('막는 조건은 난수를 하나도 쓰지 않는다', () => {
     const 막힘: readonly Partial<CpuPinchHitInput>[] = [
-      { alreadyUsedThisGame: true },
+      { blockedUntilNextPitch: true },
       { batterIsAce: true },
       { benchBatters: 0 },
       { record: { hits: 0, runScoringHits: 1, plateAppearances: 2 } },

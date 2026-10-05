@@ -96,8 +96,12 @@ export function recordPlateAppearance(
 }
 
 export interface CpuPinchHitInput {
-  /** `state[0xe]` — 이 경기에 CPU 대타를 이미 썼는가 (양 팀 공용 칸이다) */
-  readonly alreadyUsedThisGame: boolean
+  /**
+   * `state[0xe]` — **다음 공이 나가기 전까지** CPU 대타를 다시 묻지 않게 막는 칸 (양 팀 공용 한 칸).
+   * "경기에 한 번" 이 아니다: `0xac228` 이 대타를 낼 때 세우고(ac33e) 투구 처리 `0xa5e14` 가 **공마다**
+   * 내린다(a5e7c) — 그 밖에 사람 장면 타석 시작 `0x48d50`(48eb6)·경기 상태 초기화 `0xb67d0`(b6806).
+   */
+  readonly blockedUntilNextPitch: boolean
   /** 지금 타석에 선 타자가 마선수인가 (`0xb633c` = 레코드 `+0xa` 비트6) */
   readonly batterIsAce: boolean
   /** 벤치 타자 수 `team+0x28c` */
@@ -134,7 +138,7 @@ const PERMILLE = 1000
  * `rand(0, 벤치수)` 한 번. 그래서 대부분의 타석은 굴림을 하나도 쓰지 않는다.
  */
 export function judgeCpuPinchHit(input: CpuPinchHitInput, random: RandomPort): number {
-  if (input.alreadyUsedThisGame) return -1
+  if (input.blockedUntilNextPitch) return -1
   if (input.batterIsAce) return -1
   const bench = input.benchBatters
   if (bench <= 0) return -1

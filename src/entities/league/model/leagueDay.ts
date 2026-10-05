@@ -111,7 +111,8 @@ export interface LeagueGameScore {
    */
   readonly steals: number
   /**
-   * 이 경기에 들어온 CPU 대타 (0xac228) — `state[0xe]` 가 경기에 한 칸이라 **0 이나 1** 이다.
+   * 이 경기에 들어온 CPU 대타 (0xac228) — 막음 칸 `state[0xe]` 는 공마다 내려가므로(`0xa5e14` a5e7c) 한 경기에
+   * **여러 번** 나올 수 있다. 상한은 두 팀 벤치 수(`team+0x28c`, 붙박이 로스터는 셋씩)다.
    * 들어온 선수의 타석은 `plateAppearances` 에 그 선수의 로스터 칸으로 이미 들어 있다.
    */
   readonly pinchHits: number
@@ -209,8 +210,9 @@ export function simulateLeagueGame(
   let homeMound = startingMoundOf(homeSlot)
   /**
    * 양 팀 명단(`team+0xe`) — 간이 엔진 `0xc1ba4` 가 타석마다 먼저 공격 팀을 두고 **CPU 대타**
-   * `0xac228` 을 부른다 (`0xc1c50`, Q1 4절). 대타 한 번은 **경기에 한 번**이다 — `state[0xe]` 가
-   * 두 팀 공용 한 칸이라 어느 쪽이든 먼저 쓰면 끝이다.
+   * `0xac228` 을 부른다 (`0xc1c50`, Q1 4절). 막음 칸 `state[0xe]` 는 두 팀 공용 한 칸이지만 **공마다** 내려가므로
+   * (`0xa5e14` a5e7c — 간이 엔진은 `0xc262c` 의 c26ca) 대타는 한 경기에 여러 번 나올 수 있다 — 반 이닝 엔진이
+   * 다음 반 이닝에 넘겨 주는 값은 늘 거짓이다.
    */
   let awayLineup = rosterLineupOf(BATTERS_PER_TEAM)
   let homeLineup = rosterLineupOf(BATTERS_PER_TEAM)

@@ -98,7 +98,7 @@ export function tryQuickCpuPinchHit(
   const slot = lineupSlotOf(order)
   const benchIndex = judgeCpuPinchHit(
     {
-      alreadyUsedThisGame: situation.alreadyUsedThisGame,
+      blockedUntilNextPitch: situation.alreadyUsedThisGame,
       batterIsAce: false,
       // 원본은 team+0x28c 만 보고 rand(0, n) 을 돌린다 — 명단 칸이 모자랄 일은 없지만 실제 칸 수로 자른다
       benchBatters: Math.min(
