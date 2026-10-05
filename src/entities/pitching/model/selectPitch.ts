@@ -39,6 +39,9 @@ export interface PitchSituation extends CountSituation {
  */
 export const DEFAULT_REPERTOIRE: PitcherRepertoireInfo = { form: 0, pitchMask: ROSTER_PITCHER_REPERTOIRES[0].pitchMask, magicId: 0 }
 
+/** 마구의 제구 등급 — 0x4dbac 가 구질 22 면 굴림 없이 돌려주는 값 (4dbbc) */
+const MAGIC_PITCH_CONTROL_TIER = 5
+
 /** 마구 이름을 못 고를 때 쓰는 글자 — `features/play-pitcher-game` 의 사람 투구와 같은 대체값 */
 const MAGIC_PITCH_NAME = '마구'
 
@@ -97,7 +100,8 @@ export interface CpuPickoffInput {
 
 /**
  * CPU 투구 — 원본 순서 그대로 난수를 뽑는다:
- *   구질(0x344dc) → 목표 종류(0x9eeac) → 목표점(0x345fc) → 제구 등급(0xb74bc) → 제구 오차(0x4dc78) → 곡선
+ *   구질(0x344dc) → 목표 종류(0x9eeac) → 목표점(0x345fc) → 제구 등급(0xb74bc, 마구면 굴림 없이 5 — 0x4dbac)
+ *   → 제구 오차(0x4dc78) → 곡선
  *   → 실투 판정(0x33cbc, 0x4dea0 — 마구가 아니면 rand(0,100) 한 번)
  * 목표 종류가 4(견제)이고 주자가 1·2명이면(`isCpuPickoff`, 0x34684) 목표점을 만들지 않고 0x34848 이
  * **견제 루**를 굴린 뒤 끝난다 — 목표점·제구 등급·제구 오차·곡선 굴림이 **없다** (`{ kind: '견제' }`).
@@ -154,14 +158,16 @@ export function selectPitch(
   }
   const target = pitchTargetOf(kind, situation, random)
   const control = pitcher.control * ORIGINAL_SCALE
-  const controlTier = controlTierOf(control, true, random)
+  const isMagic = typeNumber === MAGIC_PITCH_TYPE_NUMBER
+  // 0x4dbac: 구질(scene+0xfc8) == 22(마구)면 굴림 없이 5 를 돌려준다 (4dbb8 cmp #0x16 → 4dbbc movs r0,#5).
+  // 마구가 아니면 0xb74bc 제구 등급을 굴린다. 그 값이 scene+0x17c0 에 앉아 제구 오차(0xcfd60 행 5)에도 쓰인다
+  const controlTier = isMagic ? MAGIC_PITCH_CONTROL_TIER : controlTierOf(control, true, random)
   const finalTarget = applyControlError(target, { tier: controlTier, isComputer: true }, random)
   const stats = {
     control,
     velocity: pitcher.velocity * ORIGINAL_SCALE,
     breaking: (pitcher.breaking ?? pitcher.velocity) * ORIGINAL_SCALE,
   }
-  const isMagic = typeNumber === MAGIC_PITCH_TYPE_NUMBER
   // 마구는 게이지를 쓰지 않고 등급이 늘 5 다 — 구속 단계 레코드가 없어 번호로 곧장 고른다 (H2 3-5·3-6)
   const speedStage = pitchSpeedStageOf(typeNumber - 1, stats, controlTier)
   const recordIndex = isMagic ? magicPitchRecordIndexOf(repertoire.magicId, repertoire.form) : null

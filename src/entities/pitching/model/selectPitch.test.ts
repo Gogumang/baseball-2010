@@ -3,6 +3,7 @@ import { flightMillisecondsOf, selectPitch as selectChoice } from '@/entities/pi
 import type { CpuPitchChoice, PitchSituation } from '@/entities/pitching/model/selectPitch'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import { computerPitchTypeOf, pitchListOf, targetKindOf } from '@/entities/pitching/model/pitchIntelligence'
+import { applyControlError, pitchTargetOf } from '@/entities/pitching/model/pitchTarget'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { PITCH_TYPES } from '@/shared/config/original/pitchTypes'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
@@ -97,6 +98,25 @@ describe('selectPitch 마구 — CPU 상대 투수 (0x344dc · 0x345fc · 0x3de1
     expect(pitch.type).toBe('싸이킥 스타')
     // 첫 마구는 소모되지 않는다(공+0x10 == 0) — 대신 공에 번호 5 가 실린다
     expect(pitch.magicNumber).toBe(5)
+  })
+
+  it('마구는 제구 등급을 굴리지 않고 5 다 (0x4dbac 4dbb8) — 구질 → 종류 → 목표점 → 제구 오차(등급 5) 뒤 굴림 없음', () => {
+    const state = { remaining: 3, ballMagicNumber: 0 }
+    const actual = createSeededRandom(11)
+    const pitch = selectPitch(마투수(0), 마구상황, actual, 'hard', { ...state })
+    expect(pitch.type).toBe('싸이킥 스타')
+    expect(pitch.controlTier).toBe(5)
+
+    const expected = createSeededRandom(11)
+    const repertoire = ACE_PITCHER_REPERTOIRES[0]
+    expect(
+      computerPitchTypeOf({ list: pitchListOf(repertoire.pitchMask, true), magicCount: 3, ...마구상황 }, expected),
+    ).toBe(22)
+    const kind = targetKindOf('hard', 마구상황, expected)
+    const target = pitchTargetOf(kind, 마구상황, expected)
+    applyControlError(target, { tier: 5, isComputer: true }, expected)
+    // 제구 등급 굴림(0xb74bc)도 실투 굴림(0x33cbc)도 없다 — 두 난수열이 같은 자리에 서 있다
+    expect(actual.next()).toBe(expected.next())
   })
 
   it('남은 횟수가 0 이면 마구가 나오지 않는다 (0x34518 · 0x3456c)', () => {
