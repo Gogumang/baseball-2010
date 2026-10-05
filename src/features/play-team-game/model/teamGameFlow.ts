@@ -193,6 +193,18 @@ export interface TeamGameOptions {
    * 국가대항전 중에는 같은 칸 `L+0x32` 가 **대회 날짜**다 (0xb7bf0 이 0 으로 놓는다).
    */
   readonly dayCounter?: number
+  /**
+   * **상대 팀만** 다른 로테이션 날짜로 돌릴 때 — 모드 2 에서만 본다. 안 넘기면 `dayCounter` 와 같다
+   * (정규·포스트시즌은 원본 `0x6548` 이 두 팀을 같은 `S+0xb2` 로 돌린다).
+   *
+   * 국가대항전은 두 팀이 다르다 (7dd3826 확정): 로테이션 `0xb5ca8` 은 팀 레코드를 **제자리에서** 당기는데,
+   * 상대국 슬롯 `base+0x934` 는 대회 시작 `0x20648`(b7ca4)과 하루 끝 `0xb818c`(b8216)에서 **마스터 팀 표에서
+   * 새로 복사**된 뒤 그날 경기 준비에서 한 번만 돈다 → 첫날(L+0x32 == 0, 670e 가 안 돌림)은 0번, 그 뒤로는
+   * **늘 1번**. 대한민국 슬롯(+0x918)은 대회 초기화에서 한 번 만들고 매일 돌아 `cup.day % 4` 가 맞다.
+   * 그래서 국가대항전을 부르는 쪽은 `dayCounter: cup.day` 와 함께 `opponentDayCounter: cup.day === 0 ? 0 : 1`
+   * 을 넘긴다.
+   */
+  readonly opponentDayCounter?: number
   /** 팀별 능력치 네 칸. 안 넘기면 XlsTEAM_DATA 값 */
   readonly teamAbilities?: readonly (readonly number[])[]
   /** 내 팀 타순 칸별 수비 자리·보직 — 보직 불일치 −20% 입력 (시즌모드 전용) */
@@ -448,8 +460,9 @@ function startingPitcherSlotsOf(
   random: RandomPort,
 ): { readonly opponent: number; readonly ours: number } {
   if (options.mode === TEAM_GAME_MODE.시즌) {
-    const slot = rotationSlotOf(options.dayCounter ?? 0)
-    return { opponent: slot, ours: slot }
+    const day = options.dayCounter ?? 0
+    // 상대 칸만 다른 날짜를 받을 수 있다 — 국가대항전 상대국 슬롯은 매일 새로 복사된다 (`opponentDayCounter`)
+    return { opponent: rotationSlotOf(options.opponentDayCounter ?? day), ours: rotationSlotOf(day) }
   }
   // 원본은 AI 팀 → 사람 팀 차례로 뽑는다 (0x31088 → 0x3109e)
   const opponent = rollStartingPitcherIndex(random)

@@ -500,6 +500,17 @@ describe('시즌모드 선발은 4인 로테이션이다 (0x6548 → 0xb8c80 →
     }
   })
 
+  it('국가대항전 상대국은 매일 새로 복사돼 첫날 0번 · 그 뒤 늘 1번 — 대한민국만 cup.day % 4 (7dd3826)', () => {
+    const 대회 = (day: number) =>
+      시작({ mode: 2, ourTeamId: 10, dayCounter: day, opponentDayCounter: day === 0 ? 0 : 1 }).progress
+    expect([0, 1, 2, 3, 4, 5].map((day) => 대회(day).ourPitcherIndex)).toEqual([0, 1, 2, 3, 0, 1])
+    expect([0, 1, 2, 3, 4, 5].map((day) => 대회(day).opponentPitcherIndex)).toEqual([0, 1, 1, 1, 1, 1])
+  })
+
+  it('opponentDayCounter 를 안 넘기면 상대도 dayCounter 를 따른다 (기존 동작)', () => {
+    expect(시작({ mode: 2, dayCounter: 3 }).progress.opponentPitcherIndex).toBe(3)
+  })
+
   it('날짜를 안 넘기면 시즌 첫 경기(g == 0)와 같아 두 팀 다 로스터 0번이다', () => {
     const { progress } = 시작({ mode: 2 })
 
