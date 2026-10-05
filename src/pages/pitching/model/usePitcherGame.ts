@@ -27,7 +27,8 @@ import { carryDistanceOf } from '@/entities/batting/model/battedBallFlight'
 import { GAME_INTRO_SOUND, gameResultSoundIdOf } from '@/features/play-game/model/gameSounds'
 // 진행 소리(공수 교대 13 · 돌발 42/36/37)는 팀경기와 같은 자리다 — 같은 경기 장면(0x104)이라
 // 규칙도 하나다. 화면 두 곳이 같은 것을 두 번 적지 않게 팀경기 쪽 것을 그대로 빌려 쓴다.
-import { stepSoundIdsOf } from '@/pages/team-game/model/teamGameSounds'
+// CPU 대타 교체 소리(22 "Time!" → 들어온 타자 등판음 14/15/26)도 같은 0xf 진입 0x3d954 · 0x16 연출이라 함께 빌린다
+import { pinchHitSoundIdsOf, stepSoundIdsOf } from '@/pages/team-game/model/teamGameSounds'
 import { activeSound, playSoundIds } from '@/shared/api/audio/soundPort'
 import type {
   PitchInput,
@@ -112,6 +113,11 @@ export function usePitcherGame(
       playSoundIds(audio, [
         ...(soundsOf === undefined ? [] : soundsOf(current, after)),
         ...stepSoundIdsOf(current, after),
+        // 사람 장면 CPU 대타(0x3d954 3da70)가 교체 연출 0x16 을 지났으면 — 22(3da88) 뒤 0xe 에서 들어온 타자 등판음.
+        // 다음 공을 고르기 전(0xf 진입)에 서므로 걸음 끝에 둔다 (팀경기 `useTeamGame` 과 같은 자리).
+        // 투수편 사람 장면은 늘 우리 수비라 CPU 투수 교체(3da3e — 수비가 CPU 일 때)는 없고, 8회 구원 등판·강판 교체는
+        // 0x21(간이 엔진) 쪽이라 0x16 을 안 지나 등판음도 없다
+        ...pinchHitSoundIdsOf(current, after),
       ])
     }
   }, [audio])

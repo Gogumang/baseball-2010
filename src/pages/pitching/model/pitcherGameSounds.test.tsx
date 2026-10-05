@@ -142,4 +142,38 @@ describe('투수편 화면의 소리 배선', () => {
     const 결과 = result.current.summary!.result
     if (결과 !== '무') expect(녹음.played.at(-1)).toBe(결과 === '승' ? 31 : 32)
   })
+  /**
+   * 0xf 진입 0x3d954 의 CPU 대타(3da70)가 걸리면 22 "Time!"(3da88) → 0x16 → 0xe 에서 들어온 타자 등판음
+   * (0x38b64 타자 가지 — 마타자 26 · 2루나 3루 주자 15 · 그 밖 14). 대타가 안 난 걸음에는 22 가 없다.
+   */
+  it('내가 던지는 타석에 CPU 대타가 서면 22 뒤 등판음 14/15 가 난다 — 대타 없는 걸음엔 22 가 없다', () => {
+    let 대타소리 = 0
+    for (let seed = 1; seed <= 10 && 대타소리 === 0; seed += 1) {
+      const { result, unmount } = 띄우기(seed)
+      for (let pitch = 0; pitch < 400; pitch += 1) {
+        const 앞 = result.current.progress.scenePinchHit
+        녹음.played.length = 0
+        if (result.current.progress.pendingDefensePlay !== null) {
+          act(() => result.current.actions.finishDefensePlay())
+        } else if (result.current.canPitch) {
+          act(() => result.current.actions.throwPitch({ typeNumber: 1, courseCell: 4, gaugeCell: 0 }))
+        } else {
+          break
+        }
+        const 뒤 = result.current.progress.scenePinchHit
+        if (뒤 === 앞) {
+          expect(녹음.played).not.toContain(22)
+          continue
+        }
+        const 자리 = 녹음.played.indexOf(22)
+        expect(자리).toBeGreaterThanOrEqual(0)
+        const bases = result.current.progress.game.bases
+        expect(녹음.played[자리 + 1]).toBe(bases.second || bases.third ? 15 : 14)
+        대타소리 += 1
+        break
+      }
+      unmount()
+    }
+    expect(대타소리).toBe(1)
+  })
 })

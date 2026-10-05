@@ -925,6 +925,9 @@ describe('내가 던지는 타석의 CPU 대타 0xac228 — 0xf 진입 0x3d954 (
     expect(바뀜.opponentLineup.records[칸]).toEqual({ hits: 0, runScoringHits: 0, plateAppearances: 0 })
     expect(바뀜.pinchHitUsed).toBe(true)
     expect(바뀜.atBat.strikes).toBe(1)
+    // 사람 장면 대타라 "Time!"·등판음 신호가 선다 (안 바뀐 공은 그대로)
+    expect(안바뀜.scenePinchHit).toBeNull()
+    expect(바뀜.scenePinchHit).toEqual({ serial: 1, by: 'CPU', incomingIsAce: false })
     expect(isPitchTurn(바뀜)).toBe(true)
     // 대타 굴림 둘(rand(0,1000)·rand(0,벤치)) 뒤에 강판 판정·돌발 굴림(0xe → 메시지 1)이 한 번 더 돈다 — 두 번째 0xf 는 굴림 없음
     expect(대타각본.calls()).toBeGreaterThan(평소.calls() + 1)

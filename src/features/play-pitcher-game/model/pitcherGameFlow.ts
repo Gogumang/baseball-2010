@@ -437,6 +437,11 @@ export interface PitcherGameProgress {
   /** 우리·상대 지금 투수의 **이번 이닝 실점 A**(`+0x284`) — 반 이닝 교대 `0xa5b00`·교체 `0xaec64` 가 0 으로 */
   readonly ourInningRunsAllowed: number
   readonly opponentInningRunsAllowed: number
+  /**
+   * 사람 장면(0xf 진입 `0x3d954`)에서 지난 **CPU 대타** 한 번 — 화면이 "Time!" 22 와 들어온 타자 등판음(14/15/26)을
+   * 내는 신호다 (`pages/team-game` 의 `pinchHitSoundIdsOf` 와 같은 모양). 간이 엔진 대타는 연출이 없어 안 바꾼다.
+   */
+  readonly scenePinchHit: { readonly serial: number; readonly by: 'CPU'; readonly incomingIsAce: boolean } | null
   readonly log: readonly PitcherGameLogEntry[]
   readonly nextLogId: number
   /** 경기가 끝난(또는 지금 치르는) 이닝 인덱스 (0-기준) */
@@ -592,6 +597,7 @@ export function startPitcherGame(
     opponentMound: startingMoundOf(opponentPitcherOrderOf(options)[0]),
     ourInningRunsAllowed: 0,
     opponentInningRunsAllowed: 0,
+    scenePinchHit: null,
     log: [],
     nextLogId: 1,
     endedInningIndex: 0,
@@ -1516,8 +1522,8 @@ function applyOpponentCpuPinchHit(
   progress: PitcherGameProgress,
   random: RandomPort,
   /**
-   * 사람 장면 0xf 진입(`0x3d954`)에서 불렀는가 — 내가 던진 타석의 기록으로 적는다.
-   * 간이 엔진 `0xc1ba4`(0xc1c50) 대타는 자동 타석 기록이다.
+   * 사람 장면 0xf 진입(`0x3d954`)에서 불렀는가 — 그러면 "Time!" 22(3da88) → 교체 연출 0x16 → 0xe 등판음을 지난다
+   * (`scenePinchHit`). 간이 엔진 `0xc1ba4`(0xc1c50) 대타는 연출이 없다.
    */
   inScene: boolean,
 ): PitcherGameProgress {
@@ -1543,6 +1549,10 @@ function applyOpponentCpuPinchHit(
       // state[0xe] = 1 (ac33e) — 다음 공(0xa5e14 a5e7c)이 나갈 때까지 다시 묻지 않는다
       pinchHitUsed: true,
       opponentBatterLogs,
+      // 상대 로스터에는 마선수가 없다 — 등판음은 14/15 중 하나다
+      scenePinchHit: inScene
+        ? { serial: (progress.scenePinchHit?.serial ?? 0) + 1, by: 'CPU', incomingIsAce: false }
+        : progress.scenePinchHit,
     },
     `${progress.game.inning}회${progress.game.half} 상대 ${(slot % BATTING_ORDER_SIZE) + 1}번 CPU 대타`,
     inScene,
