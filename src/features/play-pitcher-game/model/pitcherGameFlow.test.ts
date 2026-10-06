@@ -1123,3 +1123,22 @@ describe('경기 시작 — 상태 9 갱신 0x3f584 의 시뮬 초기화 0xc0dac
     expect(ranges[0]).toEqual([0, 2])
   })
 })
+
+describe('상태 0xe 의 OK 대기 — 내가 던지는 타석마다 (0x39e14 → 0x532b0)', () => {
+  it('첫 타석 앞에 대기가 서고, 다음 타자 타석은 새 대기다. 감독 강판(0x23)이면 대기를 안 바꾼다', () => {
+    const random = 씨앗(20100901)
+    let progress = startPitcherGame(기본옵션, random)
+    expect(isPitchTurn(progress)).toBe(true)
+    expect(progress.sceneConfirm?.entries).toBeGreaterThanOrEqual(1)
+    for (let step = 0; step < 400 && !progress.game.isFinished && isPitchTurn(progress); step += 1) {
+      const before = progress
+      progress = throwPitch(progress, { typeNumber: 1, courseCell: 4, gaugeCell: 0 }, random)
+      if (progress.managerHookText !== null) {
+        expect(progress.sceneConfirm).toBe(before.sceneConfirm)
+        break
+      }
+      const 새타석 = progress.opponentOrderIndex !== before.opponentOrderIndex || progress.game.half !== before.game.half
+      if (새타석 && isPitchTurn(progress)) expect(progress.sceneConfirm).not.toBe(before.sceneConfirm)
+    }
+  })
+})

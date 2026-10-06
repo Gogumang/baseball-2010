@@ -9,8 +9,25 @@ import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
 import { ORIGINAL_USER_EVENTS } from '@/shared/config/original/userEvents'
 import { PitcherGameScreen } from '@/pages/pitching/ui/PitcherGameScreen'
 import type { PitcherGameOptions } from '@/features/play-pitcher-game/model/pitcherGameFlow'
+import { SCENE_CONFIRM_LOCK_FRAMES } from '@/features/play-game/model/useSceneConfirm'
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.useRealTimers()
+})
+
+/**
+ * 상태 0xe — 내가 던지는 타석마다 사람 OK 를 기다린다 (0x532b0). 들어선 뒤 세 갱신은 안 받으니(0x49a26) 시계를 흘리고 누른다.
+ * 기다리는 중이면 경기 화면의 왼쪽 소프트키가 '확인' 이다(경기 화면이 서 있을 때 — '메뉴' 키와 함께).
+ */
+const OK통과 = () => {
+  for (let 번 = 0; 번 < 3; 번 += 1) {
+    if (screen.queryByRole('button', { name: '메뉴' }) === null) return
+    if (screen.queryByRole('button', { name: '확인' }) === null) return
+    act(() => void vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_LOCK_FRAMES))
+    fireEvent.keyDown(window, { key: 'Enter' })
+  }
+}
 
 /**
  * 수비 화면에 무엇이 넘어가는지 적어 두려고 **원본을 그대로 감싼다** (그림은 원본이 그린다).
@@ -53,6 +70,7 @@ const 기본옵션: PitcherGameOptions = {
  * 기본 옵션은 후공·선발이라 1회초 판이 선다 (진행기 `withHalfInningBoard`).
  */
 const 띄우기 = (options: Partial<PitcherGameOptions> = {}, seed = 20100901) => {
+  vi.useFakeTimers()
   const rendered = render(
     <PitcherGameScreen
       options={{ ...기본옵션, ...options }}
@@ -64,6 +82,7 @@ const 띄우기 = (options: Partial<PitcherGameOptions> = {}, seed = 20100901) =
   if (screen.queryByRole('button', { name: '메뉴' }) === null && screen.queryByText(/^\d+회[초말]$/) !== null) {
     fireEvent.click(screen.getByRole('button', { name: '확인' }))
   }
+  OK통과()
   return rendered
 }
 
@@ -163,7 +182,11 @@ describe('경기 시작 연출 (인트로 0xc → 1회초 판 0x18)', () => {
     fireEvent.keyDown(window, { key: '*' })
     expect(screen.queryByText('조작방법')).toBeNull()
 
+    vi.useFakeTimers()
     fireEvent.keyDown(window, { key: 'Enter' })
+    // 판 OK → 0xd → 0xe — 이번엔 사람 OK 를 기다린다
+    expect(screen.queryByText('1. 구질 선택')).toBeNull()
+    OK통과()
     expect(screen.getByText('1. 구질 선택')).toBeTruthy()
   })
 
@@ -175,7 +198,9 @@ describe('경기 시작 연출 (인트로 0xc → 1회초 판 0x18)', () => {
         onFinish={vi.fn()}
       />,
     )
+    vi.useFakeTimers()
     fireEvent.keyDown(window, { key: '5' })
+    OK통과()
     expect(screen.getByText('1. 구질 선택')).toBeTruthy()
   })
 })
@@ -215,6 +240,8 @@ describe('내가 던진 인플레이 타구 — 수비 화면이 실시간으로
   /** 인플레이 타구가 떠서 수비 화면이 설 때까지 던진다 */
   function 수비화면까지던지기(최대 = 80) {
     for (let pitch = 0; pitch < 최대; pitch += 1) {
+      // 새 타자면 0xe 에서 OK 부터
+      OK통과()
       if (screen.queryByText('1. 구질 선택') === null) return
       한개던지기()
     }
@@ -251,6 +278,8 @@ describe('내가 던진 인플레이 타구 — 수비 화면이 실시간으로
 
       for (let 갱신 = 0; 갱신 < 400 && screen.queryByText('1. 구질 선택') === null; 갱신 += 1) {
         act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
+        // 다음 타자면 0xe 의 OK
+        if (screen.queryByRole('button', { name: '확인' }) !== null) fireEvent.keyDown(window, { key: 'Enter' })
       }
 
       expect(screen.getByText('1. 구질 선택')).toBeTruthy()

@@ -156,6 +156,8 @@ import { rollHalfInningFielders } from '@/features/play-game/model/halfInningBoa
 import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
 import { pitcherOfRecordNamesOf } from '@/features/play-game/model/gameDecisions'
 import type { PitcherOfRecordNames } from '@/features/play-game/model/gameDecisions'
+import { chainSceneConfirm, enterSceneConfirm } from '@/features/play-game/model/sceneConfirm'
+import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 
 /**
  * 나만의리그 **투수편**(원본 모드 3) 경기 진행기.
@@ -360,6 +362,12 @@ export interface PitcherGameProgress {
   readonly atBat: AtBatState
   /** 이 타석의 준비(0xe·0xf)를 이미 지났는가 */
   readonly atBatPrepared: boolean
+  /**
+   * **상태 0xe 의 OK 대기** — 내가 던지는 타석의 0xe 진입마다 새 객체다 (`features/play-game/model/sceneConfirm`).
+   * 진입에서 감독 강판(0x504cc)이 참이면 0x23 으로 빠져 기다리지 않는다(이 칸을 안 바꾼다). 화면이 OK 를 받을 때까지
+   * 구질 고르기를 안 띄운다. 진행기는 OK 뒤 굴림(돌발 0x8f158 · 0xf 진입 0xac228)을 들어서는 걸음에서 미리 해 둔다.
+   */
+  readonly sceneConfirm?: SceneConfirmWait | null
   readonly lastPitch: Pitch | null
   readonly lastResolution: PitchResolution | null
   /** 이닝별 실점 표 (`0xb6988`) — 감독 강판 3번 사유가 읽는다 */
@@ -1730,7 +1738,12 @@ function resolveBurstFor(
  * 타석 준비 — 상태 0xe 진입의 **감독 강판 판정**과 0xe → 0xf 전이의 **돌발 발동 판정**.
  * 순서도 원본 그대로다: 강판이 먼저고, 강판되면 0x23 으로 빠져 0xf(돌발)에 가지 않는다.
  */
-function prepareAtBat(progress: PitcherGameProgress, random: RandomPort): PitcherGameProgress {
+function prepareAtBat(
+  progress: PitcherGameProgress,
+  random: RandomPort,
+  /** 같은 걸음에서 방금 0xe 의 OK 를 지나왔는가 — 그러면 교체 뒤의 0xe 가 두 번째 대기다 */
+  afterSceneConfirm = false,
+): PitcherGameProgress {
   const { options } = progress
   const bases = progress.game.bases
   const hook = judgeManagerHook(
@@ -1754,7 +1767,9 @@ function prepareAtBat(progress: PitcherGameProgress, random: RandomPort): Pitche
     }
   }
 
-  return { ...triggerBurstAtPrep(progress, random), hookFlags: hook.flags, atBatPrepared: true }
+  // 강판이 아니면 0xe 에 머물러 사람 OK 를 기다린다 (0x532b0) — 그 뒤가 메시지 1 의 돌발 굴림이다
+  const sceneConfirm = afterSceneConfirm ? chainSceneConfirm(progress.sceneConfirm) : enterSceneConfirm()
+  return { ...triggerBurstAtPrep({ ...progress, sceneConfirm }, random), hookFlags: hook.flags, atBatPrepared: true }
 }
 
 /**
@@ -1833,15 +1848,22 @@ function opponentRosterSlotOf(progress: PitcherGameProgress): number {
  * (판정 B 0xae3e8 의 ae592, `pickoff`)이다 — 그래서 공마다 카운트를 실은 채로 다시 묻는다
  * (카운트가 있으면 확률이 `>> (볼 + 스트라이크 + 1)` 로 준다, `judgeCpuPinchHit`).
  */
-function enterPitchSelection(progress: PitcherGameProgress, random: RandomPort): PitcherGameProgress {
+function enterPitchSelection(
+  progress: PitcherGameProgress,
+  random: RandomPort,
+  /** 같은 걸음에서 방금 새 타석의 0xe OK 를 지나왔는가 (`advance`) */
+  afterSceneConfirm = false,
+): PitcherGameProgress {
   let current = progress
+  let chained = afterSceneConfirm
   for (let entry = 0; entry < MAXIMUM_PITCH_SELECTION_ENTRIES; entry += 1) {
     if (!isPitchTurn(current) || !current.atBatPrepared) return current
     if (current.burst !== null && current.burst.current !== null) return current
     const pinched = applyOpponentCpuPinchHit(current, random, true)
     if (pinched === current) return current
-    // 0x16 → 0xd(지우기 건너뜀) → 0xe(강판 판정) → 메시지 1(돌발 굴림) → 0xf 진입
-    current = prepareAtBat(pinched, random)
+    // 0x16 → 0xd(지우기 건너뜀) → 0xe(강판 판정 · OK 대기) → 메시지 1(돌발 굴림) → 0xf 진입
+    current = prepareAtBat(pinched, random, chained)
+    chained = true
   }
   return current
 }
@@ -1999,6 +2021,8 @@ function advance(progress: PitcherGameProgress, random: RandomPort): PitcherGame
           autoSinceHuman: false,
         },
         random,
+        // 강판(0x23)이 아니면 방금 새 타석의 0xe 를 지났다 — CPU 대타가 나면 0xe 를 한 번 더 지난다
+        prepared.managerHookText === null,
       )
     }
     // 내가 마운드에 없는 수비 타석도 자동진행(0x21) — 같은 진입이 남은 돌발을 내린다

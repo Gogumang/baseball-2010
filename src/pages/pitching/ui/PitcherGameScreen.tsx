@@ -20,6 +20,7 @@ import { useInGameMenuState } from '@/features/play-team-game/model/useInGameMen
 import { HelpScreen } from '@/pages/help/ui/HelpScreen'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import { usePitcherGame } from '@/pages/pitching/model/usePitcherGame'
+import { useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
 import { CourseGrid } from '@/pages/pitching/ui/CourseGrid'
 import { PitchGradeGauge } from '@/pages/pitching/ui/PitchGradeGauge'
 import { ManagerHookWindow } from '@/pages/pitching/ui/ManagerHookWindow'
@@ -158,8 +159,30 @@ export function PitcherGameScreen({
    */
   // 견제 판(또는 홈런 비행)을 재생하는 동안은 원본도 상태 0x17 이라 0xf 키를 안 받는다
   const isReplaying = play !== null && play !== shownPlay && play.ticks.length > 0
+  /**
+   * **상태 0xe — 내가 던지는 타석마다 사람 OK 를 기다린다** (`features/play-game/model/sceneConfirm`, 0x39e14 → 0x532b0 —
+   * 0x532b0 은 조작 객체의 공수를 안 본다). 진입에서 감독 강판(0x504cc)이 참이면 0x23 이라 기다리지 않는다.
+   * 인트로·교대 판·수비 화면·벤치 클리어링·경기 중 메뉴·조작방법·설정·강판 물음·돌발 결과 창·감독 대사 창이 덮으면 받지 않는다.
+   * ⚠️ 미이식: 0xe 그리기 0x4d9ec 가 0xd 그리기 위에 얹는 안내 판 0x44944.
+   */
+  const sceneConfirm = useSceneConfirm(
+    progress.sceneConfirm,
+    !isSceneShowing &&
+      progress.pendingDefensePlay === null &&
+      !isReplaying &&
+      !isPopupOpen &&
+      overlay === null &&
+      !asksGiveUp &&
+      // 타석이 끝나며 난 돌발 결과 창(0x1d)은 다음 0xd 보다 먼저다 (+0x1b6c)
+      resolution === null &&
+      progress.managerHookText === null,
+  )
+  const isAwaitingConfirm = sceneConfirm.isAwaiting && canPitch
+  /** 돌발 제안 창(0x1b)은 0xe 의 OK 뒤 메시지 1 이 굴려 예약한다(0x50c42) — OK 전에는 안 띄운다. 결과 창은 0xe 앞이다 */
+  const visibleBurstLines = resolution === null && isAwaitingConfirm ? null : burstLines
   const acceptsPickoff =
     canPitch &&
+    !isAwaitingConfirm &&
     !isReplaying &&
     !isSceneShowing &&
     phase === '구질' &&
@@ -314,9 +337,13 @@ export function PitcherGameScreen({
         title={`${progress.game.inning}회${progress.game.half}`}
         badge={`${staminaPercentOf(progress.stamina)}%`}
         leftKey={
-          canPitch && !isPopupOpen
-            ? { label: '# 강판', onPress: () => setAsksGiveUp(true) }
-            : undefined
+          isAwaitingConfirm && !isPopupOpen
+            ? // 0xe — OK 하나만 받는다 (0x532b0). ⚠️ 원본 '#'(0x4994a)는 0xe 에서도 강판 물음을 열지만, 웹 진행기는 OK 뒤
+              // 굴림(돌발 0x8f158)을 들어서는 걸음에 미리 해 두어 0xe 에서 강판하면 굴림이 하나 더 남는다 — OK 뒤에만 연다
+              { label: '확인', onPress: sceneConfirm.confirm, isDisabled: !sceneConfirm.acceptsConfirm }
+            : canPitch && !isPopupOpen
+              ? { label: '# 강판', onPress: () => setAsksGiveUp(true) }
+              : undefined
         }
         rightKey={{
           label: isMenuOpen ? '닫기' : '메뉴',
@@ -405,7 +432,8 @@ export function PitcherGameScreen({
           </>
         )}
 
-        {!asksGiveUp && !isPopupOpen && canPitch && phase === '구질' && (
+        {/* 0xe — 구질 고르기(0xf)는 OK 뒤다 */}
+        {!asksGiveUp && !isPopupOpen && canPitch && !isAwaitingConfirm && phase === '구질' && (
           <>
             <Panel heading="1. 구질 선택" />
             <MenuList
@@ -458,9 +486,9 @@ export function PitcherGameScreen({
         </ul>
       </PixelScreen>
 
-      {burstLines !== null && (
+      {visibleBurstLines !== null && (
         <BurstMissionWindow
-          lines={burstLines}
+          lines={visibleBurstLines}
           judgement={resolution?.judgement ?? null}
           onClose={
             resolution !== null ? actions.closeBurst : () => setShownProposal(proposal)
