@@ -1917,6 +1917,40 @@ describe('엔트리 편집기(0x55864)가 고친 명단으로 경기를 세운�
     expect(progress.ourPitcherEntry[0]?.name).toBe(startTeamGame(기본옵션, createSeededRandom(1)).ourPitcherEntry[0]?.name)
   })
 
+  it('표 밖 선수(영입 id ≥ 0xb4)는 실어 준 자기 기록으로 그 칸에 선다 — 0xb891c 는 id 로 거르지 않는다', () => {
+    const 명전타자 = { name: '명전타자', ability: [901, 802, 703, 604] as const }
+    const 명전투수 = {
+      name: '명전투수',
+      ability: [880, 870, 860, 850] as const,
+      repertoire: { name: '명전투수', form: 2, magicId: 0, pitchMask: 0b1011 },
+    }
+    const { progress } = 시작({
+      dayCounter: 0,
+      ourEntryOrder: {
+        batters: [
+          { rosterSlot: -1, position: 6, record: 명전타자 },
+          ...Array.from({ length: 11 }, (_u, i) => ({ rosterSlot: i + 1, position: i < 8 ? i + 1 : 0 })),
+        ],
+        pitchers: [명전투수, 1, 2, 3, 4, 5, 6, 7],
+      },
+    })
+    const 타자 = progress.ourEntry[0]
+    expect(타자?.name).toBe('명전타자')
+    expect(타자?.ability).toEqual([901, 802, 703, 604])
+    expect(타자?.position).toBe(6)
+    // 리그 로스터 칸이 아니다 — 표 칸을 차지하지도 않는다
+    expect(타자?.rosterSlot).toBe(-1)
+    expect(progress.ourEntry.slice(1).map((batter) => batter.rosterSlot)).toEqual(Array.from({ length: 11 }, (_u, i) => i + 1))
+
+    const 투수 = progress.ourPitcherEntry[0]
+    expect(투수?.name).toBe('명전투수')
+    expect(투수?.ability).toEqual([880, 870, 860, 850])
+    expect(투수?.repertoire.pitchMask).toBe(0b1011)
+    expect(투수?.tableSlot).toBeUndefined()
+    expect(투수?.orderIndex).toBe(0)
+    expect(progress.ourPitcherEntry.slice(1).map((pitcher) => pitcher.tableSlot)).toEqual([1, 2, 3, 4, 5, 6, 7])
+  })
+
   it('명단을 넘겨도 경기 세우기의 난수 굴림은 그대로다', () => {
     const 없음 = 세는난수(createSeededRandom(7))
     const 있음 = 세는난수(createSeededRandom(7))

@@ -433,23 +433,64 @@ export function rosterEntryPitchersOf(teamId: number): readonly TeamEntryPitcher
  *   g 번 돌기 전 모양이라 원본의 "g 번 돈 배열의 0번" 과 같다 · 일반모드는 0x30f20 의 0↔k).
  */
 export interface TeamEntryOrder {
-  readonly batters: readonly { readonly rosterSlot: number; readonly position: number }[]
-  readonly pitchers: readonly number[]
+  readonly batters: readonly {
+    readonly rosterSlot: number
+    readonly position: number
+    /** 붙박이 표 밖 선수(영입 id ≥ 0xb4)면 그 선수 기록 — 있으면 `rosterSlot` 대신 이것으로 선다 */
+    readonly record?: TeamEntryBatterRecord
+  }[]
+  /** 로스터 칸, 또는 붙박이 표 밖 선수(영입 id ≥ 0xb4)의 기록 */
+  readonly pitchers: readonly (number | TeamEntryPitcherRecord)[]
 }
 
 /**
- * 차례의 로스터 칸 하나하나를 붙박이 표 칸으로 — 표에 없는 칸(영입 선수 `rosterSlot` −1 · 범위 밖)은
- * **아직 안 쓴 표 칸을 작은 번호부터** 채운다.
+ * **붙박이 표 밖 선수의 기록** — 영입해 온 명예·나리 선수(id ≥ 0xb4). 원본은 이 선수를 따로 다루지 않는다:
  *
- * ⚠️ 근사: 영입해 온 나리·명예 선수(id ≥ 0xb4)는 웹 붙박이 표에 이름·능력치가 없어 경기에 세울 수 없다
- * (트레이드·영입 화면과 같은 한계). 지어내지 않으려고 그 팀 표 선수로 자리만 채운다.
+ * ```
+ * b891c  경기용 팀 = team[0xe + i] = i (b895a)        ; 팀 레코드의 선수 배열 그대로 — id 로 거르는 갈래가 없다
+ * b8680  선수 = 같은 팀 레코드(모드별 0x1f891·0x1f8a9 …)의 i 번째 0x30 바이트
+ * b62c0  이름 = 0x20498(관리자, rec[0], 0xb6278(rec)) → 0xaa458: 투수 id ≤ 0x4f · 타자 id ≤ 0x77 만 에디트 이름 표,
+ *        그 밖(곧 id ≥ 0xb4) 은 null → rec + 1 (기록 안의 이름)
+ * b6414  능력치 = 기록 +0xc 네 칸에 장비 니블·장착 비트를 얹은 값 (나리·명예 기록이 같은 꼴)
+ * ```
+ * 영입(0xdf)이 기록 0x30 바이트를 통째로 팀 레코드에 옮기므로(S6 4-2·4-3) 그 선수는 **자기 기록으로, 놓인 칸에서**
+ * 리그 선수와 똑같이 경기에 선다. 웹 붙박이 표에는 그 기록이 없어 부르는 쪽이 이 칸에 실어 준다.
+ * `ability` 는 0xb6414 를 먹인 값(명전 `equippedAbility` 꼴)이다 — 경기 보정(0xb570c)은 리그 선수와 같은 길을 탄다.
+ *
+ * ⚠️ 미해결: 이 선수의 시즌 개인 기록 칸(리그 기록표 `팀 × 12 + 칸`)을 원본이 어디에 쌓는지 안 읽었다 —
+ *    웹은 마선수처럼 로스터 칸 없음(`NO_ROSTER_SLOT` · `tableSlot` 없음)으로 두어 리그 기록표에 쌓지 않는다.
  */
-function tableSlotsOfOrder(slots: readonly number[], tableSize: number): readonly number[] {
-  const isTableSlot = (slot: number) => Number.isInteger(slot) && slot >= 0 && slot < tableSize
+export interface TeamEntryBatterRecord {
+  readonly name: string
+  /** 히트 · 파워 · 수비 · 주루 — 0xb6414(기록, k, 1) */
+  readonly ability: readonly [number, number, number, number]
+}
+
+/** 붙박이 표 밖 투수의 기록 — `TeamEntryBatterRecord` 주석과 같다 */
+export interface TeamEntryPitcherRecord {
+  readonly name: string
+  /** 제구 · 구속 · 변화 · 체력 — 0xb6414(기록, k, 1) */
+  readonly ability: readonly [number, number, number, number]
+  /** 폼 0xb6e24 · 고른 마구 +0x18 · 구질 마스크 +0x1c */
+  readonly repertoire: PitcherRepertoire
+  /** 보직 `+0xb & 3` (0xb6dec) — 없으면 CPU 투수 교체가 선발로 본다 */
+  readonly role?: PitcherRole
+}
+
+/**
+ * 차례의 로스터 칸 하나하나를 붙박이 표 칸으로 — 표에 없는 칸(`rosterSlot` −1 · 범위 밖)은
+ * **아직 안 쓴 표 칸을 작은 번호부터** 채운다. 기록을 실은 칸(`null`)은 표 칸을 안 쓴다.
+ *
+ * ⚠️ 근사: 기록 없이 들어온 표 밖 선수(영입 선수의 기록을 부르는 쪽이 못 실었을 때)는 지어내지 않으려고
+ * 그 팀 표 선수로 자리만 채운다 (트레이드·영입 화면과 같은 한계).
+ */
+function tableSlotsOfOrder(slots: readonly (number | null)[], tableSize: number): readonly (number | null)[] {
+  const isTableSlot = (slot: number | null): slot is number =>
+    slot !== null && Number.isInteger(slot) && slot >= 0 && slot < tableSize
   const used = new Set(slots.filter(isTableSlot))
   let spare = 0
   return slots.map((slot) => {
-    if (isTableSlot(slot)) return slot
+    if (slot === null || isTableSlot(slot)) return slot
     while (spare < tableSize && used.has(spare)) spare += 1
     const filled = spare < tableSize ? spare : 0
     used.add(filled)
@@ -460,14 +501,21 @@ function tableSlotsOfOrder(slots: readonly number[], tableSize: number): readonl
 /** 고친 차례로 세운 타자 명단 — 수비 위치는 차례가 든 값(편집기가 고친 +0x1c)이다 */
 export function entryBattersOfOrder(teamId: number, order: TeamEntryOrder): readonly TeamEntryBatter[] {
   const table = teamBatters(teamId)
-  const slots = tableSlotsOfOrder(order.batters.map((batter) => batter.rosterSlot), table.length)
+  const slots = tableSlotsOfOrder(
+    order.batters.map((batter) => (batter.record === undefined ? batter.rosterSlot : null)),
+    table.length,
+  )
   return order.batters.map((batter, index) => {
+    const position = batter.position & 0xf
+    if (batter.record !== undefined) {
+      return { name: batter.record.name, ability: batter.record.ability, position, aceIndex: NO_ACE_BATTER, rosterSlot: NO_ROSTER_SLOT }
+    }
     const rosterSlot = slots[index] ?? 0
     const player = table[rosterSlot]
     return {
       name: player?.name ?? '',
       ability: player?.ability ?? [0, 0, 0, 0],
-      position: batter.position & 0xf,
+      position,
       aceIndex: NO_ACE_BATTER,
       rosterSlot,
     }
@@ -477,8 +525,22 @@ export function entryBattersOfOrder(teamId: number, order: TeamEntryOrder): read
 /** 고친 차례로 세운 투수 명단 — 0번이 저장 레코드의 0번이다 (선발 칸은 부르는 쪽이 정한다) */
 export function entryPitchersOfOrder(teamId: number, order: TeamEntryOrder): readonly TeamEntryPitcher[] {
   const table = teamPitchers(teamId)
-  const slots = tableSlotsOfOrder(order.pitchers, table.length)
-  return slots.map((slot, orderIndex) => {
+  const slots = tableSlotsOfOrder(
+    order.pitchers.map((pitcher) => (typeof pitcher === 'number' ? pitcher : null)),
+    table.length,
+  )
+  return order.pitchers.map((pitcher, orderIndex): TeamEntryPitcher => {
+    if (typeof pitcher !== 'number') {
+      return {
+        name: pitcher.name,
+        ability: pitcher.ability,
+        repertoire: pitcher.repertoire,
+        aceIndex: NO_ACE_BATTER,
+        orderIndex,
+        ...(pitcher.role === undefined ? {} : { role: pitcher.role }),
+      }
+    }
+    const slot = slots[orderIndex] ?? 0
     const player = table[slot]
     return {
       name: player?.name ?? '',
