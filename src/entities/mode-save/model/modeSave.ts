@@ -18,7 +18,7 @@
  * 읽어서 경기로 세우는 것은 페이지(`pages/general-mode`)의 몫이다.
  */
 export interface ModeSave {
-  /** 전역기록 +0x3c — 마지막으로 시작한 모드 (0 = 아직 없음) */
+  /** 전역기록 +0x3c — 마지막으로 시작한 모드 (새 저장은 1 — 생성자 0x9f26c) */
   readonly lastPlayedMode: number
   /** 전역기록 +0x4d — 일반모드 경기가 중간 저장돼 있다 */
   readonly isGeneralGameInProgress: boolean
@@ -26,9 +26,18 @@ export interface ModeSave {
   readonly generalGame: unknown
 }
 
-/** 옛 세이브에 이 칸이 없을 때 — 새 저장의 +0x3c 기본값은 원본에서 못 읽었다(미해결), 웹은 0 으로 둔다 */
+/**
+ * **새 저장의 +0x3c = 1(일반모드)** — 전역기록 생성자 `0x9f26c` 가 `0x9f334 str r5(=1), [this, #0x3c]` 로 넣는다
+ * (같은 자리에서 +0x40..+0x4b · +0x4c..+0x57 은 memset 0). 앱 시작 0x20138 이 new(0xe44) → 0x9f26c → [mgr+0xac] 에 두고
+ * 0xe44 바이트를 0 으로 민 뒤 `game_o.sav` 를 읽는데(0x202c6 `0x1f0ec`), 파일이 없으면(−1) 0x9f26c 를 **다시** 불러
+ * 기본값을 세우고 곧바로 쓴다(0x202ce~0x202dc `0x1f1b8`). 그 뒤 +0x3c 를 쓰는 곳은 0x327e8 · 0x328de · 0x31360 셋뿐이다.
+ * 그래서 처음 켠 게임의 [최근게임] 은 모드 1 갈래 — +0x4d 가 0 이라 하위 12 [13](앞 상태 0x27 → 커서 1)이 뜬다.
+ */
+export const NEW_SAVE_LAST_PLAYED_MODE = 1
+
+/** 새 저장(파일 없음) — 생성자 0x9f26c 의 값 */
 export const EMPTY_MODE_SAVE: ModeSave = {
-  lastPlayedMode: 0,
+  lastPlayedMode: NEW_SAVE_LAST_PLAYED_MODE,
   isGeneralGameInProgress: false,
   generalGame: null,
 }
@@ -39,8 +48,9 @@ const MODE_LIMIT = 9
 /**
  * 저장소에서 읽은 값을 고른다. 칸이 없으면(옛 세이브) `legacyLastPlayedMode` 를 +0x3c 로 쓴다 —
  * 웹 [최근게임] 이 예전에는 늘 나만의리그 타자편 이어하기였으므로, 부르는 쪽이 타자편 커리어가 있으면 4 를 넘겨 그 길을 잇는다.
+ * 안 넘기면 새 저장의 기본값 1 이다 (`NEW_SAVE_LAST_PLAYED_MODE`).
  */
-export function normalizeModeSave(raw: unknown, legacyLastPlayedMode = 0): ModeSave {
+export function normalizeModeSave(raw: unknown, legacyLastPlayedMode = NEW_SAVE_LAST_PLAYED_MODE): ModeSave {
   if (raw === null || typeof raw !== 'object') return { ...EMPTY_MODE_SAVE, lastPlayedMode: legacyLastPlayedMode }
   const value = raw as Partial<Record<keyof ModeSave, unknown>>
   const mode = value.lastPlayedMode

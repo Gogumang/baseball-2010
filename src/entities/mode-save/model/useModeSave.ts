@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 import {
+  NEW_SAVE_LAST_PLAYED_MODE,
   normalizeModeSave,
   withGeneralGameFinished,
   withGeneralGameResumed,
@@ -28,7 +29,7 @@ export interface ModeSaveSession {
  * 모드 저장 칸 고리 — 고칠 때마다 **곧바로** 저장소에 쓴다. 원본도 0x22754(저장, 1)·0x1f1b9 가 그 자리에서 파일을 쓰므로
  * 반 이닝 저장 직후에 창을 닫아도 그 저장이 남아야 한다 (렌더 뒤 effect 로 미루지 않는다).
  */
-export function useModeSave(store: JsonStorePort, legacyLastPlayedMode = 0): ModeSaveSession {
+export function useModeSave(store: JsonStorePort, legacyLastPlayedMode = NEW_SAVE_LAST_PLAYED_MODE): ModeSaveSession {
   const [save, setSave] = useState<ModeSave>(() => normalizeModeSave(store.load(), legacyLastPlayedMode))
   const saveRef = useRef(save)
 

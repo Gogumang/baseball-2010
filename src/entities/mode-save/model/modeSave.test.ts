@@ -10,11 +10,15 @@ import {
 } from '@/entities/mode-save/model/modeSave'
 
 describe('모드 저장 칸 — 전역기록 +0x3c · +0x4d · 모드 1 블록', () => {
-  it('옛 세이브(칸 없음)는 빈 칸 — +0x3c 는 부르는 쪽이 넘긴 옛 기본값', () => {
+  it('새 저장의 +0x3c 는 1(일반모드) — 전역기록 생성자 0x9f26c 의 0x9f334', () => {
+    expect(EMPTY_MODE_SAVE.lastPlayedMode).toBe(1)
     expect(normalizeModeSave(null)).toEqual(EMPTY_MODE_SAVE)
+    expect(normalizeModeSave({ lastPlayedMode: 12 }).lastPlayedMode).toBe(1)
+  })
+
+  it('옛 세이브(칸 없음)는 +0x3c 를 부르는 쪽이 넘긴 옛 기본값으로', () => {
     expect(normalizeModeSave(undefined, 4).lastPlayedMode).toBe(4)
     expect(normalizeModeSave({ lastPlayedMode: 'x' }, 4).lastPlayedMode).toBe(4)
-    expect(normalizeModeSave({ lastPlayedMode: 12 }).lastPlayedMode).toBe(0)
   })
 
   it('블록 없이 +0x4d 만 서 있는 값은 저장 없음으로 읽는다', () => {

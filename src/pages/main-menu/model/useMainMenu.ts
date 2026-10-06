@@ -10,10 +10,10 @@ export function useMainMenu(
   hasSavedGame: boolean,
   isSheetOpen: boolean,
   onEffect: (effect: Exclude<MainMenuEffect, null>) => void,
-  /** 전역기록 칸 — +0x4d(일반모드 경기 중간 저장) · +0x3c(마지막 모드). 안 넘기면 저장 없음 · 0 */
+  /** 전역기록 칸 — +0x4d(일반모드 경기 중간 저장) · +0x3c(마지막 모드). 안 넘기면 저장 없음 · 1(새 저장 — 생성자 0x9f26c) */
   globalRecord: { readonly isGeneralGameInProgress: boolean; readonly lastPlayedMode: number } = {
     isGeneralGameInProgress: false,
-    lastPlayedMode: 0,
+    lastPlayedMode: 1,
   },
 ): { state: MainMenuState; dispatch: (action: MainMenuAction) => void } {
   const [state, setState] = useState<MainMenuState>(() => initialMainMenu(hasSavedGame))

@@ -32,6 +32,7 @@ import { PitcherLeagueRoute } from '@/app/ui/PitcherLeagueRoute'
 import { GeneralModeScreen, aceOpenPriceOf, generalGameOfSave, useAceOpen } from '@/pages/general-mode'
 import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow'
 import { useModeSave } from '@/entities/mode-save/model/useModeSave'
+import { NEW_SAVE_LAST_PLAYED_MODE } from '@/entities/mode-save/model/modeSave'
 import { useGamePointWallet } from '@/entities/wallet/model/useGamePointWallet'
 import { useAceLevels } from '@/entities/mission/model/useAceLevels'
 import type { SeasonAutobotBatInput } from '@/entities/season-mode/model/seasonRewards'
@@ -78,8 +79,8 @@ const PITCHER_WALLET_MERGE_KEY = 'compus-baseball/pitcher-wallet-merged'
 const EDITED_NAMES_KEY = 'compus-baseball/edited-names'
 /**
  * **모드 저장 칸** — 원본 전역기록 +0x3c(마지막 모드) · +0x4d(일반모드 경기 중간 저장)와 모드 1 저장 블록(`entities/mode-save`).
- * 옛 세이브에는 이 칸이 없다 — 없으면 +0x3c 를 "나리 타자편 커리어가 있으면 4, 없으면 0" 으로 읽어
- * 예전 웹 [최근게임](늘 타자편 이어하기)과 같은 길로 이어 준다.
+ * 옛 세이브에는 이 칸이 없다 — 없으면 +0x3c 를 "나리 타자편 커리어가 있으면 4, 없으면 새 저장 기본값 1(생성자 0x9f26c)" 로
+ * 읽어 예전 웹 [최근게임](늘 타자편 이어하기)과 같은 길로 이어 준다.
  */
 const MODE_SAVE_KEY = 'compus-baseball/mode-save'
 /** 나만의리그 타자편 = 원본 모드 4 */
@@ -121,7 +122,10 @@ export function App() {
   /** 옛 세이브 이사거리 — 지갑 칸이 없던 시절 G는 나만의리그 선수 안에 들어 있었다 */
   const legacyGamePoint = useMemo(() => saveGame.load()?.gamePoint ?? null, [saveGame])
   // 전역기록 +0x3c · +0x4d · 모드 1 저장 블록 — 옛 세이브면 타자편 커리어 유무로 +0x3c 를 정한다
-  const legacyLastPlayedMode = useMemo(() => (saveGame.load() === null ? 0 : NARI_BATTER_MODE), [saveGame])
+  const legacyLastPlayedMode = useMemo(
+    () => (saveGame.load() === null ? NEW_SAVE_LAST_PLAYED_MODE : NARI_BATTER_MODE),
+    [saveGame],
+  )
   const modeSave = useModeSave(modeSaveStore, legacyLastPlayedMode)
   const { setLastPlayedMode } = modeSave
   const gameSettings = useGameSettings(settingsStore)

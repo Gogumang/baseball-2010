@@ -159,7 +159,7 @@ describe('reduceMainMenu — 원본 글자 목록에서 모드를 고르는 메�
       expect(결과.state.generalModeWindow).toEqual({ kind: '진입', initialSelected: 1 })
     })
 
-    it('0(아직 아무 모드도 안 함)이면 아무 일도 없다 — 원본은 상태 0x27 에 남는다(미해결)', () => {
+    it('0 이면 아무 일도 없다 — 원본에선 나올 수 없는 값(새 저장은 1), 웹은 망가진 저장 대비로 목록에 남는다', () => {
       const 결과 = 최근게임(0)
       expect(결과.effect).toBeNull()
       expect(결과.state.generalModeWindow).toBeNull()

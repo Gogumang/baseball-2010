@@ -55,7 +55,7 @@ interface MainMenuScreenProps {
   readonly hasSavedGame: boolean
   /** 전역기록 +0x4d — 일반모드 경기가 중간 저장돼 있다. [13] 처음 커서·[15] 확인·이어하기가 본다. 안 넘기면 없음 */
   readonly isGeneralGameInProgress?: boolean
-  /** 전역기록 +0x3c — 마지막으로 시작한 모드. [최근게임] 이 이 값으로 갈라진다(0x28d54). 안 넘기면 0(없음) */
+  /** 전역기록 +0x3c — 마지막으로 시작한 모드. [최근게임] 이 이 값으로 갈라진다(0x28d54). 안 넘기면 새 저장 기본값 1 */
   readonly lastPlayedMode?: number
   /** 나만의리그 [14] 에서 편을 골랐다 — 원본은 그 편 커리어가 있으면 이어하고 없으면 팀 고르기로 간다(0xf684) */
   readonly onNewGame: (edition: '타자편' | '투수편') => void
@@ -124,7 +124,7 @@ const REEL_STATE = 5
 export function MainMenuScreen({
   hasSavedGame,
   isGeneralGameInProgress = false,
-  lastPlayedMode = 0,
+  lastPlayedMode = 1,
   onNewGame,
   onSelectMode,
   onBack,

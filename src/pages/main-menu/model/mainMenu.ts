@@ -175,8 +175,9 @@ function answerGeneralModeWindow(
  * ```
  * 웹: 시즌 +0x4e 는 웹 시즌 경기에 중간 저장이 없어 늘 0 → 장면 0x105(`시즌모드`). 나리 +0x4f/+0x50 은 웹에 칸이 없어 늘 0 →
  * 장면 0x106(그 편 고르기 뒤와 같은 `나리투수편`/`나리타자편`). 대전(8·9)은 통신이라 웹에 없고 +0x3c 에 들어올 수도 없다.
- * ⚠️ 미해결: m = 0(새 저장의 +0x3c 기본값은 못 읽었다)이면 상태 0x27 에 남는데 0x27 은 갱신 함수가 없어 화면이 멈춘 듯 보일 것 —
- * 웹은 아무 일도 안 하고 목록에 남는다.
+ * 새 저장의 +0x3c 는 전역기록 생성자 0x9f26c 가 넣는 1 이다(0x9f334) — 처음 켠 게임의 [최근게임] 은 모드 1 갈래로 간다.
+ * 원본에서 m = 0 은 나올 수 없다(+0x3c 를 쓰는 곳은 0x327e8 · 0x328de · 0x31360 과 생성자뿐). 웹은 망가진 저장 대비로
+ * 아무 일도 안 하고 목록에 남는다.
  */
 export function recentGameOf(
   state: MainMenuState,
@@ -235,8 +236,8 @@ export function reduceMainMenu(
   hasSavedGame: boolean,
   /** 일반모드 경기가 중간 저장돼 있는가 (전역기록 +0x4d — 경기정보 OK·이어하기가 1, 경기 끝 정산이 0) */
   isGeneralGameInProgress = false,
-  /** 전역기록 +0x3c — 마지막으로 시작한 모드 (0 = 아직 없음). [최근게임] 이 이 값으로 갈라진다 */
-  lastPlayedMode = 0,
+  /** 전역기록 +0x3c — 마지막으로 시작한 모드 (새 저장은 1 — 생성자 0x9f26c). [최근게임] 이 이 값으로 갈라진다 */
+  lastPlayedMode = 1,
 ): MainMenuResult {
   const stay = (next: MainMenuState): MainMenuResult => ({ state: next, effect: null })
 

@@ -80,7 +80,7 @@ const HOME_RUN_DERBY_MODE = 7
 export function EntryRoutes({
   screen, setScreen, session, gameSettings, collection, random, wallet, aceSelect, hallOfFameDeletion, claimCollectionReward,
   onRenamePlayer, onResetEditedNames, onStartGeneralMode,
-  isGeneralGameInProgress = false, lastPlayedMode = 0, onLastPlayedMode, onResumeGeneralGame,
+  isGeneralGameInProgress = false, lastPlayedMode = 1, onLastPlayedMode, onResumeGeneralGame,
 }: EntryRoutesProps) {
   /** 전부 수집 보상 팝업 글 (0x292f8 의 `0xbbef9(글, 1, −1, 1)`) — 메뉴 위에 뜬다 */
   const [collectionRewardText, setCollectionRewardText] = useState<string | null>(null)
