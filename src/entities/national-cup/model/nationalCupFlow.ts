@@ -240,19 +240,13 @@ export interface NationalCupFinish {
  * 대회 마무리 — 결과 팝업을 닫은 뒤 벌어지는 일을 한 덩어리로 모았다
  * (나리 `0x1b92c` 팝업 `0x25`→`0x26` / 시즌 `0x896c` 팝업 1→`0x23`·`0x24`).
  *
- * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- * ⚠️⚠️ **여기가 국가대항전 플래그(`SeasonRecord.nationalCup` = `S+0x12c`)를 내리는 자리다.**
- *
- * 원본 **나만의리그**는 여기서 내린다 (`0x1b9ea`·`0x1bae6` 의 `S+0x12c = 0`, 새 시즌 `0x1b768`).
- * 원본 **시즌모드**에는 내리는 줄이 **하나도 없다** (S6 1절: `0x12c` 쓰기 15곳 전수 확인 — 복붙 누락).
- * 그래서 시즌모드는 대회가 끝난 뒤에도 플래그가 1 로 남아, 다음 시즌의 **정규 경기가 끝날 때마다**
- * 진입 분기(`0x4b50` = `enterSeasonScene`)가 국가대항전 대진표(243)로 새고 시즌이 막힌다.
- *
- * **여기서 지우면 풀린다 (사용자 판단 대기)** — 이 함수가 `clearNationalCup(record)` 를 부르거나,
- * `seasonRecord.ts` 의 `startNextYear` 에 `nationalCup: false` 한 줄을 더하면 된다.
- * `seasonStateMachine.ts` 에 `clearNationalCup()` 가 이미 만들어져 있고 **아무도 부르지 않는 것이
- * 원본 동작**이라, 이 모듈도 부르지 않는다. DECISIONS.md 2026-09-20 "아직 안 정한 것 1건" 참고.
- * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ * 국가대항전 플래그(`SeasonRecord.nationalCup` = `S+0x12c`)는 **여기서 내리지 않는다** — 내리는 자리는 모드마다 따로다:
+ * - **나만의리그**: `0x1b9ea`·`0x1bae6` 의 `S+0x12c = 0`, 새 시즌 `0x1b768`.
+ * - **시즌모드**: 대회 끝 `0x896c` → 보상 `0x8a56`/`0x8b10` → `0x8b88: bl 0x6e0c`(새 해)다. 새 해의 리그 초기화
+ *   `0xa305c → 0xb7b34` 가 L(= SR+0x80)을 0xf8 바이트 memset 하므로 `SR+0x12c`(L+0xac)도 함께 0 이 된다 (588b201).
+ *   S6 1절의 "내리는 줄이 없다(시즌이 막히는 원본 버그)" 는 strb 만 센 전수 스캔이 이 memset 을 놓친 것이다 —
+ *   원본은 막히지 않는다. 웹은 `useSeasonSession.finishCup` 이 `nextYearOf` 로 새 해에 들어가고
+ *   `seasonRecord.startNextYear` 가 플래그를 내린다.
  */
 export function finishNationalCup(mode: NationalCupMode, cup: NationalCup): NationalCupFinish {
   return {

@@ -31,9 +31,9 @@ export interface NationalCupScreenProps {
    * 대회 끝 — 결과 팝업과 보상 팝업을 모두 닫았을 때. `finish.reward` 를 `applySeasonReward` 로 넣고,
    * `finish.openedTeams` 로 히든 팀을 열면 된다.
    *
-   * ⚠️ **국가대항전 플래그(`SeasonRecord.nationalCup`)를 내릴지 말지가 여기서 갈린다.**
-   * 원본 시즌모드는 내리지 않아 다음 시즌이 막힌다 — `finishNationalCup` 의 큰 주석 참고
-   * (사용자 판단 대기라 이 화면은 아무것도 하지 않는다).
+   * 국가대항전 플래그(`SeasonRecord.nationalCup`)는 이 화면이 내리지 않는다 — 시즌모드는 대회 끝이 곧장 새 해
+   * `0x6e0c` 로 가서 리그 초기화 memset 이 함께 지우고(588b201), 나만의리그는 제 세션이 내린다
+   * (`finishNationalCup` 주석 참고).
    */
   readonly onFinish: (finish: NationalCupFinish, cup: NationalCup) => void
 }
