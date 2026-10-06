@@ -133,10 +133,22 @@ describe('자리 고르기와 확정 (0xdf → 0xc554)', () => {
     expect(result.roster.batters[3].kindByte & 0x1f).toBe(3)
   })
 
+  it('자리 고르기에 들어오면 StrMODE[179] 를 띄운다 (0x5980 목적 3) — 팝업이 먼저 키를 먹는다', () => {
+    띄우기()
+
+    fireEvent.click(screen.getByRole('button', { name: '나리투수 나리투수' }))
+
+    expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain('해당 선수가 영입될')
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: '알림' })).toBeNull()
+    expect(screen.getByRole('group', { name: '자리 고르기' })).toBeTruthy()
+  })
+
   it('자리 고르기에서 취소하면 목록으로 되돌아간다 (0xdf 취소 → 0xe2)', () => {
     띄우기()
 
     fireEvent.click(screen.getByRole('button', { name: '나리투수 나리투수' }))
+    fireEvent.keyDown(window, { key: 'Escape' }) // StrMODE[179] 팝업을 닫는다
     fireEvent.keyDown(window, { key: 'Escape' })
 
     expect(screen.getByRole('group', { name: '선수영입' })).toBeTruthy()

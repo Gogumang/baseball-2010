@@ -296,6 +296,44 @@ describe('시즌정보 0xcd → 선수정보(0xdf 목적 2) → 카드 0xd9 ↔ 
   })
 })
 
+describe('아이템 → 장착아이템 = 선수 고르기 0xdf 목적 1 (키 0x4da4 → 0xc3e8)', () => {
+  const 키 = (key: string) => fireEvent.keyDown(window, { key })
+
+  it('리그 선수를 고르면 장비 창 0xdc(종류 3) — 웹엔 없어 "아직 없음", 취소는 아이템 메뉴 0xd0', () => {
+    const store = 메모리저장(세이브(레코드({ seenEvents: [400, 1], yearGoalShown: true })))
+    render(<시즌화면 store={store} 장면={SEASON_SCENE_STATE.아이템} onExit={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole('button', { name: '장착아이템' }))
+    expect(screen.getByTestId('엔트리-줄-0').textContent).toContain('봉은중')
+    키('Enter')
+    expect(알림글()).toContain('창 종류 3')
+    fireEvent.click(screen.getByRole('button', { name: 'OK' }))
+
+    키('Escape')
+    expect(screen.getByRole('button', { name: '장착아이템' })).toBeTruthy()
+  })
+
+  it('나리 선수(+0xa 비트 7)를 고르면 StrMODE[220] 알림 — 0xdf 에 남는다', () => {
+    const 표 = { id: 0, kindByte: 0, fieldPosition: 0, stamina: 10000 }
+    const store = 메모리저장({
+      ...세이브(레코드({ seenEvents: [400, 1], yearGoalShown: true })),
+      roster: {
+        pitchers: [{ id: 0xfe, kindByte: 0x80, fieldPosition: 0, stamina: 10000, record: { name: '나리투수', ability: [1, 2, 3, 4] } },
+          ...[1, 2, 3, 4, 5, 6, 7].map((slot) => ({ ...표, id: slot, kindByte: slot }))],
+        batters: Array.from({ length: 12 }, (_, slot) => ({ ...표, id: slot, kindByte: slot })),
+      },
+    })
+    render(<시즌화면 store={store} 장면={SEASON_SCENE_STATE.아이템} onExit={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole('button', { name: '장착아이템' }))
+    expect(screen.getByTestId('엔트리-줄-0').textContent).toContain('나리투수')
+    키('Enter')
+    expect(알림글()).toContain('나만의리그에서 영입된 선수는')
+    fireEvent.click(screen.getByRole('button', { name: 'OK' }))
+    expect(screen.getByTestId('엔트리-줄-0').textContent).toContain('나리투수')
+  })
+})
+
 describe('선수영입 후보 목록 = 명예의 전당 목록 종류 0 (진입 0xe1dc · 키 0xe340)', () => {
   const 띄우기 = () => {
     const store = 메모리저장(세이브(레코드({ seenEvents: [400, 1, 5, 100], yearGoalShown: true })))

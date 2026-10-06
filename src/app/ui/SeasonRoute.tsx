@@ -47,7 +47,9 @@ import type { HallOfFameNariPlayer } from '@/pages/special/ui/SpecialScreen'
 import type { Collection } from '@/entities/collection/model/collection'
 import type { RecruitCandidate, RecruitListInput } from '@/pages/season'
 import { nariRecruitPlayerOf } from '@/entities/season-mode/model/playerRecruit'
-import { PLAYER_PICK_PURPOSE, playerPickCancelTarget } from '@/entities/season-mode/model/playerPick'
+import {
+  NARI_EQUIP_REFUSAL_TEXT_ID, PLAYER_PICK_PURPOSE, playerPickCancelTarget, refusesEquipment,
+} from '@/entities/season-mode/model/playerPick'
 import type { PlayerPickPurpose } from '@/entities/season-mode/model/playerPick'
 import { seasonPlayerRecordOf } from '@/entities/season-mode/model/seasonPlayerRecord'
 import { ENTRY_TAB } from '@/entities/season-mode/model/entryEditor'
@@ -152,6 +154,8 @@ export function SeasonRoute({
   const [missingWindow, setMissingWindow] = useState<ItemWindowKind | null>(null)
   /** 시즌정보(0xcd)에서 고른, 웹에 아직 없는 화면 — 원본 상태·창 이름 */
   const [missingScreen, setMissingScreen] = useState<string | null>(null)
+  /** 0xdf 목적 1 에서 나리 선수를 고르면 뜨는 StrMODE[220] 알림 (0xbbef9(…, 1, 1, 1) — 상태는 0xdf 그대로) */
+  const [pickNotice, setPickNotice] = useState<string | null>(null)
   /**
    * 공용 선수 고르기 0xdf 의 목적 `this+0x110` 과 목록 탭(ed+0x33f)·커서 — 목적 1·2 만 (3 선수영입은 `PlayerRecruitScreen` 이 든다).
    * 원본 목록 객체 [this+0xa8] 는 장면이 사는 동안 남지만 0xdf 에 들어올 때마다 다시 채워 커서는 0 이고, 탭만
@@ -439,10 +443,19 @@ export function SeasonRoute({
         roster={session.tradeRoster}
         initialTab={pick.tab}
         gamePoint={session.gamePoints}
+        overlay={pickNotice === null ? undefined : (
+          <MessageBox text={pickNotice} buttons={['OK']} onAnswer={() => setPickNotice(null)} />
+        )}
         onPick={(tab, index) => {
-          // 0xc3e8 확인 — 목적 2 → 카드 0xd9
           setPlayerPick({ ...pick, tab, cursor: index })
-          actions.goto(SEASON_SCENE_STATE.선수상세)
+          // 0xc3e8 확인 — 목적 2 → 카드 0xd9
+          if (pick.purpose === PLAYER_PICK_PURPOSE.선수정보) return actions.goto(SEASON_SCENE_STATE.선수상세)
+          // 목적 1 — 0xb5694(팀, ed+0x33f ? 0 : 1, 커서) 가 나리 선수(0xb6388)면 StrMODE[220], 아니면 장비 창 0xdc(종류 3).
+          // ⚠️ 웹엔 장비 창이 아직 없다 — "아직 없음" 알림 뒤 0xdf 에 남는다 (0xdc 의 취소가 어디로 가는지는 미해결)
+          const player = (tab === ENTRY_TAB.투수 ? session.tradeRoster.pitchers : session.tradeRoster.batters)[index]
+          if (player === undefined) return undefined
+          if (refusesEquipment(player)) return setPickNotice(ORIGINAL_MODE_TEXT[NARI_EQUIP_REFUSAL_TEXT_ID] ?? '')
+          return setMissingWindow(ITEM_WINDOW_KIND.장비)
         }}
         onBack={() => {
           setPlayerPick(null)
@@ -557,10 +570,16 @@ export function SeasonRoute({
     return (
       <SeasonItemMenuScreen
         state={state}
-        // 0xdc 는 칸마다 다른 창(0x5f3c)을 연다 — 웹엔 구장 창(종류 4)만 있다. 나머지 셋(장비 창·서브아이템·
-        // GP아이템)은 아직 화면이 없어 지어내지 않고 "아직 없음" 으로 막는다
-        onSelect={(_item, target, windowKind) =>
-          windowKind === ITEM_WINDOW_KIND.구장아이템 ? actions.goto(target) : setMissingWindow(windowKind)}
+        // 0xdc 는 칸마다 다른 창(0x5f3c)을 연다 — 웹엔 구장 창(종류 4)만 있다. 서브아이템·GP아이템은 아직 화면이 없어
+        // 지어내지 않고 "아직 없음" 으로 막는다. 칸 0 장착아이템은 먼저 선수 고르기 0xdf(this+0x110 = 1, 키 0x4da4)다
+        onSelect={(_item, target, windowKind) => {
+          if (target === SEASON_SCENE_STATE.선수고르기) {
+            // 이전 상태가 0xd0 이라 탭은 1(투수) · 커서 0 (0x5980)
+            setPlayerPick({ purpose: PLAYER_PICK_PURPOSE.장착아이템, tab: ENTRY_TAB.투수, cursor: 0 })
+            return actions.goto(target)
+          }
+          return windowKind === ITEM_WINDOW_KIND.구장아이템 ? actions.goto(target) : setMissingWindow(windowKind)
+        }}
         onBack={backToManagement}
       />
     )

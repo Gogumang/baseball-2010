@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
+import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import {
   hasRecruitedCareerPlayer, hasRecruitedHallOfFamePlayer, recruitPlayer, slotOf,
 } from '@/entities/season-mode/model/playerRecruit'
@@ -12,11 +13,14 @@ import { recruitEntriesOf } from '@/widgets/season/lib/recruitList'
 import type { RecruitCandidate, RecruitListInput } from '@/widgets/season/lib/recruitList'
 
 /** StrMODE[181] — 중복 (0xb5054 / 0xb50ac 가 걸릴 때) */
-const ALREADY_RECRUITED = '!C이미 영입된 선수 입니다'
-/** StrMODE[179] — 자리 고르기 안내 (상태 0xdf) */
-const CHOOSE_SLOT = '영입할 자리를 고르세요'
+const ALREADY_RECRUITED = ORIGINAL_MODE_TEXT[181] ?? ''
+/**
+ * StrMODE[179] "해당 선수가 영입될 위치를 선택합니다" — 0xdf 들어옴 0x5980 이 목적 3 일 때만 `0xbbef9(…, 1, 1, 1)` 로 띄운다
+ * (0x5ac2~0x5ae0). 팝업이 떠 있는 동안 목록은 키를 안 받는다(0x6fe0).
+ */
+const CHOOSE_SLOT = ORIGINAL_MODE_TEXT[179] ?? ''
 /** StrMODE[180] — 영입 완료 */
-const RECRUIT_DONE = '선수 영입을 완료하였습니다'
+const RECRUIT_DONE = ORIGINAL_MODE_TEXT[180] ?? ''
 
 export interface PlayerRecruitScreenProps {
   readonly roster: SeasonTeamRoster
@@ -59,6 +63,12 @@ export interface RecruitCandidateActions {
 
 /**
  * 선수영입 (장면 0x105 상태 **0xe2** → 자리 고르기 **0xdf** → 확정 `0xc554`).
+ *
+ * 자리 고르기는 원본에서 **공용 선수 고르기 0xdf 의 목적 3**(`this+0x110 = 3`, `entities/season-mode/model/playerPick.ts`)이다 —
+ * 시즌정보 선수정보(목적 2)·장착아이템(목적 1)과 같은 상태·같은 목록 창을 쓰고, 목적 3 만 다른 점은: 탭이 영입 후보 종류로
+ * 정해지고 '*'(탭 뒤집기)를 목록에 안 넘기며(0x6fe0) · 들어올 때 StrMODE[179] 를 띄우고 · 바닥이 7 이고 · 취소가 0xe2,
+ * 확인이 영입 확정 0xc4ea 다. 웹은 목적 1·2 를 `SeasonPlayerPickScreen`(엔트리 목록 창)으로 그리지만 목적 3 은 아직 이
+ * 화면 안에서 공용 판 목록으로 근사한다 — 후보 종류의 배열만 보이므로 탭 뒤집기가 없는 것은 원본과 같다.
  * `docs/re/S6-season-cleanup.md` 4절 · `docs/re/R13-season-leftovers.md` 9절 확정.
  *
  * **비용도 인기도 조건도 없다.** 중복 검사만 통과하면 시즌 중 아무 때나 영입할 수 있다.
@@ -96,6 +106,12 @@ export function PlayerRecruitScreen({ roster, list, rosterNames, onRecruit, onBa
     value: `#${index}`,
   }))
 
+  /** this+0x110 = 3 · 상태 0xdf — 들어옴 0x5980 이 StrMODE[179] 를 띄운다 */
+  const enterSlotStep = (chosenStep: { readonly candidate: RecruitCandidate; readonly isPitcher: boolean }) => {
+    setStep(chosenStep)
+    setNotice(CHOOSE_SLOT)
+  }
+
   const selectCandidate = (index: number) => {
     const entry = entries[index]
     if (entry === undefined || entry.candidate === null) return
@@ -103,7 +119,7 @@ export function PlayerRecruitScreen({ roster, list, rosterNames, onRecruit, onBa
       setNotice(ALREADY_RECRUITED)
       return
     }
-    setStep({ candidate: entry.candidate, isPitcher: entry.isPitcher })
+    enterSlotStep({ candidate: entry.candidate, isPitcher: entry.isPitcher })
   }
 
   /**
@@ -117,7 +133,7 @@ export function PlayerRecruitScreen({ roster, list, rosterNames, onRecruit, onBa
       ? hasRecruitedCareerPlayer(players)
       : choice.candidate !== null && hasRecruitedHallOfFamePlayer(players, choice.candidate.player.id)
     if (duplicated) return ALREADY_RECRUITED
-    if (choice.candidate !== null) setStep({ candidate: choice.candidate, isPitcher: choice.isPitcher })
+    if (choice.candidate !== null) enterSlotStep({ candidate: choice.candidate, isPitcher: choice.isPitcher })
     return undefined
   }
 
@@ -164,7 +180,7 @@ export function PlayerRecruitScreen({ roster, list, rosterNames, onRecruit, onBa
           onMoveCursor={slotCursor.moveTo}
           onSelect={selectSlot}
           onBack={() => setStep(null)}
-          footer={`${CHOOSE_SLOT}\n고른 자리의 선수는 맨 끝으로 밀린다 (빠지지 않는다)`}
+          footer={'고른 자리의 선수는 맨 끝으로 밀린다 (빠지지 않는다)'}
         />
       )}
 
