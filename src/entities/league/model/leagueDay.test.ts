@@ -15,11 +15,17 @@ import {
   EMPTY_LEAGUE,
   LEAGUE_SIDE_HOME,
   LEAGUE_TEAM_COUNT,
+  UNSHUFFLED_PITCHER_ORDER,
   leagueSideOf,
+  leagueStarterSlotOf,
+  nextSeasonLeague,
   opponentOf,
+  pitcherOrderOf,
+  recordLeagueResult,
+  rotateLeaguePitchers,
 } from '@/entities/league/model/league'
 import { BATTERS_PER_TEAM, PITCHERS_PER_TEAM, startingPitcherOf } from '@/entities/team/model/teamRoster'
-import { rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
+import { advanceRotation, rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
 import {
   EMPTY_LEAGUE_PLAYER_STATS,
   leaguePitcherIdOf,
@@ -474,8 +480,11 @@ describe('0xc239c 는 칸의 팀 번호와 명단을 엇갈려 앉힌다 (c2494�
       if (matchup.away === myTeam || matchup.home === myTeam) continue
       const rolls = rollCpuGamePrep(random)
       // 팀 A = 칸 1(홈 X)의 객체 = 원정 명단(말 공격) · 팀 B = 홈 명단(초 공격)
-      const score = simulateLeagueGame({ away: matchup.home, home: matchup.away }, random, rotationSlotOf(day), undefined, {
+      // 빈 리그에서 g ≠ 0 인 날이면 오늘 준비에서 한 칸 돈 차례다 (c24fc~c254e) — 0번이 선발
+      const 차례 = advanceRotation(UNSHUFFLED_PITCHER_ORDER)
+      const score = simulateLeagueGame({ away: matchup.home, home: matchup.away }, random, 차례[0], undefined, {
         aces: { away: rolls.teamB, home: rolls.teamA },
+        pitcherOrders: { away: 차례, home: 차례 },
       })
       wins[score.awayRuns > score.homeRuns ? matchup.home : matchup.away] += 1
     }
@@ -669,5 +678,34 @@ describe('마투수 스태미나는 저장 레코드 +0x2c(10000)에서 서고 �
     const 하루 = playLeagueDay(EMPTY_LEAGUE, 0, 4, 씨앗난수(5))
     expect(Object.keys(하루.acePitcherStaminas)).toHaveLength(8)
     expect(하루.acePitcherStaminas[4]).toBeUndefined()
+  })
+})
+
+describe('로테이션은 리그가 들고 다니는 레코드 차례다 (0xb5ca8 영구 섞기 — c24fc~c254e)', () => {
+  it('g ≠ 0 인 날마다 두 팀 레코드가 한 칸 돌고, 0번이 선발이다 — 이어 돌리면 g % 4 와 같다', () => {
+    let league = EMPTY_LEAGUE
+    for (let day = 0; day < 6; day += 1) {
+      league = playLeagueDay(league, day, 4, 씨앗난수(day + 1)).league
+      for (let team = 0; team < LEAGUE_TEAM_COUNT; team += 1) expect(leagueStarterSlotOf(league, team)).toBe(rotationSlotOf(day))
+    }
+    // 4번 칸 뒤(중간·마무리)는 안 섞인다
+    expect(pitcherOrderOf(league, 0).slice(4)).toEqual([4, 5, 6, 7])
+  })
+
+  it('사람 경기 두 팀을 여기서 안 돌리면(투수편 내 팀 맞바꿈 길) 그 둘만 제자리다', () => {
+    const 하루 = playLeagueDay(EMPTY_LEAGUE, 1, 4, 씨앗난수(2), undefined, {}, undefined, false)
+    const 상대 = opponentOf(1, 4)
+    expect(leagueStarterSlotOf(하루.league, 4)).toBe(0)
+    expect(leagueStarterSlotOf(하루.league, 상대)).toBe(0)
+    expect(leagueStarterSlotOf(하루.league, [0, 1, 2, 3, 5, 6, 7, 8, 9].find((team) => team !== 상대) ?? 0)).toBe(1)
+  })
+
+  it('섞인 차례는 새 시즌으로 이어진다 — 승패만 비운다', () => {
+    const 섞인 = rotateLeaguePitchers(recordLeagueResult(EMPTY_LEAGUE, 1, 2), [3])
+    const 새시즌 = nextSeasonLeague(섞인.pitcherOrders)
+    expect(새시즌.wins.every((wins) => wins === 0)).toBe(true)
+    expect(leagueStarterSlotOf(새시즌, 3)).toBe(1)
+    // 승패를 기록해도 차례는 그대로 남는다
+    expect(pitcherOrderOf(recordLeagueResult(섞인, 3, 4), 3)).toEqual(pitcherOrderOf(섞인, 3))
   })
 })

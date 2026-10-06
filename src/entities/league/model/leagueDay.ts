@@ -3,7 +3,9 @@ import {
   LEAGUE_TEAM_COUNT,
   leagueSideOf,
   opponentOf,
+  pitcherOrderOf,
   recordLeagueResult,
+  rotateLeaguePitchers,
 } from '@/entities/league/model/league'
 import type { League } from '@/entities/league/model/league'
 import { simulateHalfInning, startingMoundOf } from '@/entities/game/model/simulateHalfInning'
@@ -27,7 +29,7 @@ import {
   startingPitcherOf,
   teamPitchers,
 } from '@/entities/team/model/teamRoster'
-import { rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
+import { cpuGameRotationAdvances, SEASON_MODE } from '@/entities/pitcher-career/model/pitcherRotation'
 import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
 import { rosterPitcherRoleOf } from '@/entities/pitching/model/pitcherChange'
 import {
@@ -205,6 +207,11 @@ export interface LeagueGameExtras {
    * 팀 객체의 명단 차례(`team[i]`)·교체로 쓴 칸은 팀마다 따로다.
    */
   readonly sharedRoster?: boolean
+  /**
+   * 명단마다의 **투수 레코드 차례** (`League.pitcherOrders`) — 칸 p 에 앉은 붙박이 표 칸. 0번이 선발이고 나머지가
+   * 벤치 차례다(교체 0xabfcc 가 `team+0x0c` 를 이 차례로 훑는다 — 같은 조건이면 앞 칸을 고른다). 안 넘기면 `[0..7]`.
+   */
+  readonly pitcherOrders?: { readonly away?: readonly number[]; readonly home?: readonly number[] }
 }
 
 /**
@@ -320,12 +327,14 @@ function defenseOf(
   lead: number,
   staminas: readonly number[],
   acePitcher?: LeagueAcePitcher,
+  /** 투수 레코드 차례 — 벤치를 이 차례로 훑는다 (`LeagueGameExtras.pitcherOrders`) */
+  order: readonly number[] = ALL_PITCHER_SLOTS,
 ): HalfInningDefense {
   const roster = teamPitchers(teamId)
   return {
     mound,
     // 마투수는 명단 8번 칸 = 벤치 맨 끝에 하나 더 (0xb88c8 → 0xb521c, 벤치 투수 수 team+0x33 +1)
-    pitcherSlots: acePitcher === undefined ? ALL_PITCHER_SLOTS : [...ALL_PITCHER_SLOTS, ACE_PITCHER_SLOT],
+    pitcherSlots: acePitcher === undefined ? order : [...order, ACE_PITCHER_SLOT],
     pitcherAt: (slot) =>
       slot === ACE_PITCHER_SLOT && acePitcher !== undefined
         ? acePitcher.quick
@@ -524,6 +533,8 @@ export function simulateLeagueGame(
   }
 
   const sharedRoster = extras?.sharedRoster === true
+  const awayPitcherOrder = extras?.pitcherOrders?.away ?? ALL_PITCHER_SLOTS
+  const homePitcherOrder = sharedRoster ? awayPitcherOrder : extras?.pitcherOrders?.home ?? ALL_PITCHER_SLOTS
   const awayStaminas = staminaTableOf(startingStaminas?.away)
   const homeStaminas = sharedRoster ? awayStaminas : staminaTableOf(startingStaminas?.home)
   // 마투수는 팀 레코드 8번 칸에 레코드째 들어온다 — 그 +0x2c 로 선다 (0xb521c)
@@ -561,7 +572,7 @@ export function simulateLeagueGame(
       random,
       undefined,
       undefined,
-      defenseOf(matchup.home, homeMound, homeRuns - awayRuns, homeStaminas, homeAcePitcher),
+      defenseOf(matchup.home, homeMound, homeRuns - awayRuns, homeStaminas, homeAcePitcher, homePitcherOrder),
       { lineup: awayLineup, batterOf: awayBatterOf, pinchHitUsed, isAceRosterSlot },
     )
     decision = decisionsAfterHalfInning(decision, top, {
@@ -594,7 +605,7 @@ export function simulateLeagueGame(
       random,
       undefined,
       undefined,
-      defenseOf(matchup.away, awayMound, awayRuns - homeRuns, awayStaminas, awayAcePitcher),
+      defenseOf(matchup.away, awayMound, awayRuns - homeRuns, awayStaminas, awayAcePitcher, awayPitcherOrder),
       { lineup: homeLineup, batterOf: homeBatterOf, pinchHitUsed, isAceRosterSlot },
     )
     decision = decisionsAfterHalfInning(decision, bottom, {
@@ -727,25 +738,41 @@ export function playLeagueDay(
    * 안 넘기면 모두 Lv1(60%). 앱은 시즌모드·커리어(타자편·투수편) 모두 `useAceLevels().levels` 를 넘긴다.
    */
   aceLevels?: Readonly<Record<number, number>>,
+  /**
+   * 사람 경기 두 팀의 로테이션을 여기서 돌리는가 (기본 참). 원본은 사람 경기 준비 `0x6548`(670e~673e)이 g ≠ 0 이면
+   * 상대와 내 팀(타자편·시즌) 레코드를 한 칸씩 돌린다 — 그 준비가 아직 리그 차례(`pitcherOrders`)를 돌리지 않으므로
+   * 하루 한 칸이 빠지지 않게 여기서 대신 돌린다. 투수편 내 팀은 원본이 돌리지 않고 0↔k 를 맞바꾼다(0xa4f60) —
+   * 사람 경기 쪽이 차례를 직접 다루게 되면 거짓을 넘긴다.
+   */
+  rotatesHumanGameTeams: boolean = true,
 ): LeagueDayResult {
   const plateAppearances: LeaguePlateAppearance[] = []
   const pitcherAppearances: LeaguePitcherAppearance[] = []
   const staminas: Record<number, readonly number[]> = { ...pitcherStaminas }
   const aceStaminas: Record<number, number> = {}
-  const played = matchupsOf(day).reduce((current, matchup) => {
-    if (matchup.away === myTeamId || matchup.home === myTeamId) return current
+  // 리그 모드(2·3·4)는 g ≠ 0 이면 경기 준비마다 두 팀 레코드가 한 칸 돈다 — 모드 차이는 내 팀 쪽뿐이라 2 로 묻는다
+  const rotates = cpuGameRotationAdvances(SEASON_MODE, day)
+  const humanGame = matchupsOf(day).find((matchup) => matchup.away === myTeamId || matchup.home === myTeamId)
+  const rotated =
+    rotates && rotatesHumanGameTeams && humanGame !== undefined
+      ? rotateLeaguePitchers(league, [humanGame.away, humanGame.home])
+      : league
+  const played = matchupsOf(day).reduce((before, matchup) => {
+    if (matchup.away === myTeamId || matchup.home === myTeamId) return before
     // ⚠️ 칸과 명단이 엇갈린다 (0xc239c, 직접 떴다 — `cpuGameSidesOf` 주석): 홈 팀(A목록 X)의 **선수**가 칸 0
     //    (초 공격)에, 원정 팀(Y)의 선수가 칸 1(말 공격)에 선다. 그래서 X 명단을 먼저 공격으로 돌린다.
     const sides = cpuGameSidesOf(matchup.home, matchup.away)
     // 경기 준비의 굴림 다섯 — 구장 · 양 팀 마타자·마투수 (c2464~c24ea). 팀 A = 칸 1(X = 홈)의 객체 = 원정 명단
     const rolls = rollCpuGamePrep(random)
-    // 하루가 끝날 때마다 팀마다 로테이션이 한 칸 돈다 (0xb5ca8, S5 U-16) — 날짜가 선발을 정한다
+    // 굴림 뒤 c24fc~c254e: g ≠ 0 이면 두 팀 레코드를 0xb5ca8 로 한 칸 돌린다(영구) — 0번 레코드가 오늘의 선발이다
+    const current = rotates ? rotateLeaguePitchers(before, [sides.away, sides.home]) : before
+    const orders = { away: pitcherOrderOf(current, sides.away), home: pitcherOrderOf(current, sides.home) }
     const score = simulateLeagueGame(
       sides,
       random,
-      rotationSlotOf(day),
+      { away: orders.away[0] ?? 0, home: orders.home[0] ?? 0 },
       { away: staminas[sides.away], home: staminas[sides.home] },
-      { aces: cpuGameAcesOf(rolls), aceLevels },
+      { aces: cpuGameAcesOf(rolls), aceLevels, pitcherOrders: orders },
     )
     staminas[sides.away] = score.pitcherStaminas.away
     staminas[sides.home] = score.pitcherStaminas.home
@@ -759,7 +786,7 @@ export function playLeagueDay(
     return score.awayRuns > score.homeRuns
       ? recordLeagueResult(current, matchup.home, matchup.away)
       : recordLeagueResult(current, matchup.away, matchup.home)
-  }, league)
+  }, rotated)
 
   return {
     league: played,

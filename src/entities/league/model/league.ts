@@ -1,3 +1,5 @@
+import { advanceRotation } from '@/entities/pitcher-career/model/pitcherRotation'
+
 /**
  * 리그 순위표·일정·포스트시즌 (binary.mod 0xb7xxx — 누락 탐색 9차, 바이트 확인).
  *   일정   상대 = 표 0xd89cb[(일차 mod 9)×10 + 팀] — 9일 라운드로빈 × 5 = 45경기
@@ -55,6 +57,18 @@ export interface League {
   readonly losingStreak: readonly number[]
   /** headToHead[a][b] = a 가 b 에게 이긴 수 */
   readonly headToHead: readonly (readonly number[])[]
+  /**
+   * 팀 번호 → **투수 레코드 차례** — 칸 p 에 지금 앉은 레코드의 붙박이 표 칸(0~7). 없으면 `[0..7]` 그대로다.
+   *
+   * 원본 로테이션 `0xb5ca8` 은 팀 저장 레코드의 투수 0~3 을 제자리에서 한 칸 당긴다(영구) — 경기용 팀 객체는
+   * `team[i] = i`(0xb891c)라 늘 0번 레코드가 선발이고, 벤치 차례(교체 0xabfcc 가 보는 `team+0x0c` 차례)도 이 차례다.
+   * 섞인 차례는 저장에 남아 **새 시즌으로 이어지고**(새 시즌 처리는 레코드를 되돌리지 않는다), 투수편의 0↔k 맞바꿈
+   * (0xa4f60 → 0xb8c94)·새 시즌 0↔k(0x1b684) 같은 다른 뒤섞임과 겹쳐 쌓인다. 웹 로스터는 붙박이 표라 레코드를 되쓰지
+   * 않고 이 차례만 들고 다닌다 — 투수 기록·스태미나는 붙박이 칸 번호로 센다(레코드를 따라간다).
+   *
+   * 옛 저장에는 이 칸이 없다 — `[0..7]` 로 본다(저장 형식 번호는 올리지 않는다).
+   */
+  readonly pitcherOrders?: Readonly<Record<number, readonly number[]>>
 }
 
 const zeros = () => Array.from({ length: LEAGUE_TEAM_COUNT }, () => 0)
@@ -74,6 +88,8 @@ const replaced = (values: readonly number[], index: number, value: number) =>
 export function recordLeagueResult(league: League, winner: number, loser: number): League {
   const winnerStreak = league.streak[winner] + 1
   return {
+    // 투수 레코드 차례(`pitcherOrders`)처럼 승패와 상관없는 칸은 그대로 둔다
+    ...league,
     wins: replaced(league.wins, winner, league.wins[winner] + 1),
     losses: replaced(league.losses, loser, league.losses[loser] + 1),
     streak: replaced(replaced(league.streak, winner, winnerStreak), loser, 0),
@@ -83,6 +99,38 @@ export function recordLeagueResult(league: League, winner: number, loser: number
       team === winner ? replaced(row, loser, row[loser] + 1) : row,
     ),
   }
+}
+
+/** 투수 레코드 칸 수 (`team+0x0c` 8명) */
+const PITCHER_RECORD_COUNT = 8
+
+/** 한 번도 섞이지 않은 차례 `[0..7]` */
+export const UNSHUFFLED_PITCHER_ORDER: readonly number[] = Array.from({ length: PITCHER_RECORD_COUNT }, (_, slot) => slot)
+
+/** 그 팀의 지금 투수 레코드 차례 (`League.pitcherOrders`) — 없으면 `[0..7]` */
+export function pitcherOrderOf(league: Pick<League, 'pitcherOrders'>, team: number): readonly number[] {
+  return league.pitcherOrders?.[team] ?? UNSHUFFLED_PITCHER_ORDER
+}
+
+/** 그 팀 레코드 0번 = 오늘의 선발 — 붙박이 표 칸 (`0xb891c` 의 `team[0] = 0`) */
+export function leagueStarterSlotOf(league: Pick<League, 'pitcherOrders'>, team: number): number {
+  return pitcherOrderOf(league, team)[0] ?? 0
+}
+
+/** 그 팀들의 레코드를 `0xb5ca8` 로 한 칸씩 돌린다 (투수 0~3 당기기, 영구) */
+export function rotateLeaguePitchers(league: League, teams: readonly number[]): League {
+  if (teams.length === 0) return league
+  const pitcherOrders: Record<number, readonly number[]> = { ...league.pitcherOrders }
+  for (const team of teams) pitcherOrders[team] = advanceRotation(pitcherOrders[team] ?? UNSHUFFLED_PITCHER_ORDER)
+  return { ...league, pitcherOrders }
+}
+
+/**
+ * 새 시즌 리그 — 승패는 비우고 **투수 레코드 차례는 잇는다**. 원본 새 시즌 처리는 팀 저장 레코드를 다시 짓지 않으므로
+ * 지난 시즌(포스트시즌 포함)에 섞인 차례가 그대로 남는다. 포스트시즌을 치렀으면 `pitcherOrdersAfterPostseason` 을 넘긴다.
+ */
+export function nextSeasonLeague(pitcherOrders: League['pitcherOrders']): League {
+  return pitcherOrders === undefined ? EMPTY_LEAGUE : { ...EMPTY_LEAGUE, pitcherOrders }
 }
 
 /**
@@ -142,6 +190,12 @@ export interface PostseasonSeries {
    * 끝날 때 쌓는다 (옛 저장에는 없다 — 0 으로 본다).
    */
   readonly rotations?: Readonly<Record<number, number>>
+  /**
+   * 포스트시즌을 시작할 때(정규시즌이 끝났을 때)의 투수 레코드 차례 — `startPostseason` 에 리그의 `pitcherOrders` 를
+   * 넘기면 담긴다. 있으면 선발은 이 차례를 `rotations + g` 칸 더 돌린 0번이고, 없으면(옛 저장) 정규 44 칸을 돈
+   * `[0..7]` 로 본다.
+   */
+  readonly baseOrders?: Readonly<Record<number, readonly number[]>>
 }
 
 /**
@@ -154,14 +208,44 @@ const REGULAR_SEASON_DAYS = 45
 const POSTSEASON_ROTATION_SIZE = 4
 
 /**
- * 포스트시즌 경기의 **그 팀 선발 칸** — 정규시즌 44 칸 + 앞 시리즈에서 이어 온 칸 + 이 시리즈 g 칸을 돈 레코드의 0번.
- * 웹 로스터는 붙박이 표라 섞는 대신 칸 번호를 셈한다 (`pitcherRotation.rotationSlotOf` 와 같은 근사).
- *
- * ⚠️ 근사가 갈리는 자리: 원본은 섞인 레코드가 저장에 남아 **새 시즌으로도** 이어지고, 투수편 내 팀의 0↔k 맞바꿈
- * (0xa4f60)·엔트리 편집 같은 다른 뒤섞임과 겹친다 — 여기서는 이 시즌 정규 44 칸 + 포스트시즌 칸만 센다.
+ * 포스트시즌 경기의 **그 팀 선발 칸** — 정규시즌이 끝났을 때의 레코드 차례(`baseOrders`) + 앞 시리즈에서 이어 온 칸 +
+ * 이 시리즈 g 칸을 돈 레코드의 0번. 차례가 없으면(옛 저장·`startPostseason` 에 안 넘긴 길) 정규 44 칸을 돈 `[0..7]` 로 본다
+ * — 그때는 지난 시즌에서 이어진 섞임·투수편 맞바꿈(0xa4f60)이 빠진다.
  */
 export function postseasonStarterSlotOf(series: PostseasonSeries, team: number): number {
-  return postseasonRotationTurnsOf(series, team) % POSTSEASON_ROTATION_SIZE
+  return postseasonPitcherOrderOf(series, team)[0] ?? 0
+}
+
+/** 이번 포스트시즌 경기를 준비했을 때 그 팀의 투수 레코드 차례 전체 — 0번이 선발, 나머지가 벤치 차례다 */
+export function postseasonPitcherOrderOf(series: PostseasonSeries, team: number): readonly number[] {
+  const base = series.baseOrders?.[team]
+  if (base === undefined) return rotatedBy(UNSHUFFLED_PITCHER_ORDER, postseasonRotationTurnsOf(series, team))
+  return rotatedBy(base, (series.rotations?.[team] ?? 0) + postseasonGameOf(series))
+}
+
+function rotatedBy(order: readonly number[], turns: number): readonly number[] {
+  let rotated = order
+  for (let turn = 0; turn < turns % POSTSEASON_ROTATION_SIZE; turn += 1) rotated = advanceRotation(rotated)
+  return rotated
+}
+
+/**
+ * 포스트시즌이 다 끝났을 때 팀마다의 투수 레코드 차례 — 정규시즌 끝 차례(`baseOrders`, 없으면 44 칸 돈 `[0..7]`)에
+ * 끝난 시리즈들에서 돈 칸(`rotations`)을 얹는다. 새 시즌으로 이어지는 값이다 (`nextSeasonLeague`).
+ */
+export function pitcherOrdersAfterPostseason(
+  series: PostseasonSeries,
+  regularSeasonOrders?: Readonly<Record<number, readonly number[]>>,
+): Readonly<Record<number, readonly number[]>> {
+  const orders: Record<number, readonly number[]> = {}
+  for (let team = 0; team < LEAGUE_TEAM_COUNT; team += 1) {
+    const base =
+      series.baseOrders?.[team] ??
+      regularSeasonOrders?.[team] ??
+      rotatedBy(UNSHUFFLED_PITCHER_ORDER, REGULAR_SEASON_DAYS - 1)
+    orders[team] = rotatedBy(base, series.rotations?.[team] ?? 0)
+  }
+  return orders
 }
 
 /** 이번 포스트시즌 경기를 준비할 때까지 그 팀 레코드가 돈 로테이션 수 — 정규 44 + 앞 시리즈 이월 + 이 시리즈 g */
@@ -185,9 +269,14 @@ const WINS_NEEDED: Readonly<Record<Exclude<PostseasonRound, '종료'>, number>> 
   한국시리즈: 4,
 }
 
-export function startPostseason(ranking: readonly number[]): PostseasonSeries {
+export function startPostseason(
+  ranking: readonly number[],
+  /** 정규시즌이 끝났을 때 리그의 투수 레코드 차례 (`League.pitcherOrders`). 안 넘기면 44 칸 돈 `[0..7]` 로 본다 */
+  pitcherOrders?: League['pitcherOrders'],
+): PostseasonSeries {
   const qualifiers = ranking.slice(0, POSTSEASON_TEAM_COUNT)
   return {
+    ...(pitcherOrders === undefined ? {} : { baseOrders: pitcherOrders }),
     round: '준플레이오프',
     qualifiers,
     teams: [qualifiers[2], qualifiers[3]],

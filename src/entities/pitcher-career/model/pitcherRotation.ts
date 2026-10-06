@@ -37,19 +37,16 @@ export function advanceRotation<T>(pitchers: readonly T[]): T[] {
 }
 
 /**
- * 날짜 카운터 g 로 셈하는 **오늘의 선발 칸**.
+ * 날짜 카운터 g 로 셈하는 **오늘의 선발 칸** — 한 번도 안 섞인 `[0..7]` 에서 g 칸 돈 레코드의 0번(`g % 4`).
  *
  * 원본은 `0xb5ca8` 로 로스터 레코드를 하루 한 칸씩 **실제로 섞고**(영구) 늘 0번을 선발로 세운다
- * (경기용 팀 객체 `0xb891c` 가 `team[i] = i`). 웹판 로스터는 `shared/config/original/roster.ts`
- * 의 **붙박이 표**라 레코드를 되쓸 수 없다. 그래서 섞는 대신 **칸 번호를 셈해서 들고 다닌다**
- * — **근사다**.
+ * (경기용 팀 객체 `0xb891c` 가 `team[i] = i`). 리그 쪽은 그 섞인 차례를 `League.pitcherOrders` 로 들고
+ * (`leagueStarterSlotOf` · `rotateLeaguePitchers`, 정규시즌 `playLeagueDay` · 포스트시즌 `postseasonPitcherOrderOf`)
+ * 새 시즌으로도 잇는다(`nextSeasonLeague`).
  *
- * 리그는 10팀이 날마다 다섯 경기를 모두 치르므로(일정표 0xd89cb, `league.ts`) 어느 팀이든
- * 하루에 딱 한 칸씩 돈다. 그래서 g 번 돌린 로스터의 0번은 원래 로스터의 `g % 4` 번과 같다.
- * 포스트시즌 CPU 경기도 `0xc239c` 의 `0xb5ca8` 로테이션이다(g = 시리즈 안 경기 수, 앞 시리즈 이월 — `postseasonStarterSlotOf`).
- *
- * 근사가 원본과 갈리는 자리는 하나뿐이다: 원본은 섞인 로스터가 저장에 남아 **투수편 맞바꿈
- * (0xa4f60)·새 시즌 0↔k(0x1b684) 같은 다른 뒤섞임과 겹쳐 쌓이지만**, 웹은 늘 g 하나로만 셈한다.
+ * ⚠️ 이 셈은 **시즌 첫 해 정규시즌**에만 그 차례와 같다: 차례가 지난 시즌·포스트시즌에서 이어지거나 투수편 맞바꿈
+ * (0xa4f60)·새 시즌 0↔k(0x1b684)가 겹치면 갈린다. 사람 경기 진행기(타자편·팀·투수편)와 시즌 화면이 아직 이 셈을
+ * 쓴다 — 리그의 `leagueStarterSlotOf(league, 팀)` 으로 옮겨야 원본과 같다.
  */
 export function rotationSlotOf(dayCounter: number): number {
   return ((Math.trunc(dayCounter) % ROTATION_SIZE) + ROTATION_SIZE) % ROTATION_SIZE

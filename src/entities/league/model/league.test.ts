@@ -10,6 +10,10 @@ import {
   rankingOf,
   recordLeagueResult,
   startPostseason,
+  pitcherOrdersAfterPostseason as 포스트시즌뒤차례,
+  postseasonPitcherOrderOf as 포스트시즌차례,
+  startPostseason as 포스트시즌시작,
+  advancePostseason as 포스트시즌진행,
 } from '@/entities/league/model/league'
 
 describe('리그 일정 — 표 0xd89cb (9일 라운드로빈)', () => {
@@ -150,5 +154,33 @@ describe('postseasonSideOf — 포스트시즌 홈/원정 (0xb7844 의 리그+0x
     expect(series).toMatchObject({ round: '플레이오프', teams: [1, 0] })
     expect(postseasonSideOf(series, 0)).toBe(0)
     expect(postseasonSideOf(series, 1)).toBe(1)
+  })
+})
+
+describe('포스트시즌 선발도 리그 레코드 차례에서 이어 돈다 (0xb5ca8 영구 — 시리즈마다 g 는 0 부터)', () => {
+  const 순위 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+  it('정규시즌 끝 차례를 넘기면 그 0번부터 시리즈 g 칸을 돈다', () => {
+    const 끝차례 = { 2: [3, 0, 1, 2, 4, 5, 6, 7], 3: [0, 1, 2, 3, 4, 5, 6, 7] }
+    const 시작 = 포스트시즌시작(순위, 끝차례)
+    expect(포스트시즌차례(시작, 2)[0]).toBe(3)
+    const 한경기뒤 = 포스트시즌진행(시작, 2)
+    // g = 1 → 한 칸 돈 레코드 0번
+    expect(포스트시즌차례(한경기뒤, 2)[0]).toBe(0)
+    expect(포스트시즌차례(한경기뒤, 3)[0]).toBe(1)
+  })
+
+  it('차례를 안 넘긴 옛 길은 정규 44 칸을 돈 [0..7] 이다 (44 % 4 = 0)', () => {
+    expect(포스트시즌차례(포스트시즌시작(순위), 2)).toEqual([0, 1, 2, 3, 4, 5, 6, 7])
+  })
+
+  it('끝난 시리즈에서 돈 칸까지 얹은 차례가 새 시즌으로 간다', () => {
+    let 시리즈 = 포스트시즌시작(순위, {})
+    // 준PO 3위(2) vs 4위(3) — 2 가 3연승: 세 경기, g = 1·2 에서 두 칸 돈다
+    for (let 경기 = 0; 경기 < 3; 경기 += 1) 시리즈 = 포스트시즌진행(시리즈, 2)
+    const 차례 = 포스트시즌뒤차례(시리즈)
+    expect(차례[2]?.[0]).toBe(2)
+    expect(차례[3]?.[0]).toBe(2)
+    expect(차례[0]?.[0]).toBe(0)
   })
 })

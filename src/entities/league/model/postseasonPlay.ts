@@ -1,4 +1,4 @@
-import { LEAGUE_SIDE_HOME, advancePostseason, postseasonStarterSlotOf } from '@/entities/league/model/league'
+import { LEAGUE_SIDE_HOME, advancePostseason, postseasonPitcherOrderOf } from '@/entities/league/model/league'
 import type { PostseasonSeries } from '@/entities/league/model/league'
 import {
   cpuGameAcesOf,
@@ -74,10 +74,12 @@ export function playCpuSeriesGameWithStamina(
   const sides = cpuGameSidesOf(x, y, 1 - LEAGUE_SIDE_HOME)
   // 선발 = 정규 44 칸 + 앞 시리즈에서 이어 온 칸 + 이 시리즈 g 칸을 돈 레코드의 0번 (0xc239c c24fc~c254e,
   // 위 주석) — 굴림이 없고, 이어 온 칸이 팀마다 달라 선발 칸도 팀마다 다르다
-  const starters = {
-    away: postseasonStarterSlotOf(series, sides.away),
-    home: postseasonStarterSlotOf(series, sides.home),
+  // 벤치 차례(교체 0xabfcc 가 보는 team+0x0c)도 섞인 레코드 차례 그대로다
+  const orders = {
+    away: postseasonPitcherOrderOf(series, sides.away),
+    home: postseasonPitcherOrderOf(series, sides.home),
   }
+  const starters = { away: orders.away[0] ?? 0, home: orders.home[0] ?? 0 }
   // 경기 준비의 굴림 다섯 (c2464~c24ea) — 팀 A = 칸 sX(초)의 객체 = 윗 시드 명단
   const rolls = rollCpuGamePrep(random)
   const score = simulateLeagueGame(
@@ -85,7 +87,7 @@ export function playCpuSeriesGameWithStamina(
     random,
     starters,
     { away: pitcherStaminas[sides.away], home: pitcherStaminas[sides.home] },
-    { aces: cpuGameAcesOf(rolls, 1 - LEAGUE_SIDE_HOME), aceLevels },
+    { aces: cpuGameAcesOf(rolls, 1 - LEAGUE_SIDE_HOME), aceLevels, pitcherOrders: orders },
   )
   // c28e2~c290a: `score(sX) > score(sY)` 면 X 승, 아니면(동점 포함) Y 승. 칸 sX(초)에서 친 것은 Y 의 선수라
   // **점수를 덜 낸 명단의 팀이 이긴다** — 원본 버그 그대로 (R1 항목 4 는 명단 엇갈림을 못 보고 "정상" 으로 읽었다)
