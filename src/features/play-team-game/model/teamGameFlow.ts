@@ -131,6 +131,7 @@ import type {
   TeamGameAbilityContext,
 } from '@/features/play-team-game/model/teamGameRoster'
 import { rollOpponentAceIndex } from '@/entities/game/model/aceOpponent'
+import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
 import {
   backToBackRecordOf,
   completeGameRecordIdsOf,
@@ -1404,7 +1405,15 @@ function entryQuickPitcherOf(
   slot: number,
 ): QuickAtBatPitcher {
   const ability = pitcherAbilitiesAt(progress, teamId, slot)
-  return { control: ability[0], velocity: ability[1], stamina: ability[3], skillIds: [] }
+  const entry = pitcherEntryAt(progress, teamId, slot)
+  return {
+    control: ability[0],
+    velocity: ability[1],
+    stamina: ability[3],
+    skillIds: [],
+    // 손 0xb63c0 — 마투수(+0xa 비트6)는 폼 7·9·10 이 0, 그 밖은 폼 & 1 (0xab214 의 스킬 13·14)
+    ...(entry === undefined ? {} : { hand: pitcherHandOf(entry.repertoire.form, entry.aceIndex >= 0) }),
+  }
 }
 
 /** 지금 타석에 선 우리 타자의 경기용 능력치 */

@@ -2,6 +2,8 @@ import { BATTERS, PITCHERS } from '@/shared/config/original/roster'
 import type { RosterPlayer } from '@/shared/config/original/roster'
 import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { ROSTER_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
+import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
 
 /**
  * 팀별 선수 명단 — 원본 Team 구조체 (+0x0c 투수 8명 · +0x10 타자 12명, 0x1ff98).
@@ -26,13 +28,21 @@ export function quickBatterOf(player: RosterPlayer): QuickAtBatBatter {
   return { hit: player.ability[0], power: player.ability[1], run: player.ability[3], skillIds: [] }
 }
 
-/** 투수 능력치 순서는 제구·구속·변화·체력 */
+/**
+ * 투수 능력치 순서는 제구·구속·변화·체력.
+ *
+ * 손 `0xb63c0(rec)` — 간이 타석 0xab214 가 타자 스킬 13 좌완UP · 14 우완UP 에 쓴다. 로스터 투수는 마선수가 아니라
+ * `폼 & 1` 이고, 폼은 같은 레코드 +0xb 상위 니블(`ROSTER_PITCHER_REPERTOIRES`, `PITCHERS` 와 같은 차례 = 전역 번호)이다.
+ * 붙박이 표 밖의 선수(전역 번호를 못 찾음)는 손을 싣지 않는다 — 0 으로 본다.
+ */
 export function quickPitcherOf(player: RosterPlayer): QuickAtBatPitcher {
+  const repertoire = ROSTER_PITCHER_REPERTOIRES[PITCHERS.indexOf(player)]
   return {
     control: player.ability[0],
     velocity: player.ability[1],
     stamina: player.ability[3],
     skillIds: [],
+    ...(repertoire === undefined ? {} : { hand: pitcherHandOf(repertoire.form, false) }),
   }
 }
 

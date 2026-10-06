@@ -1,3 +1,4 @@
+import { ROSTER_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
 import { describe, expect, it } from 'vitest'
 import {
   BATTERS_PER_TEAM,
@@ -50,7 +51,10 @@ describe('teamRoster — 원본 Team 구조체의 12타자·8투수', () => {
       velocity: pitcher.ability[1],
       stamina: pitcher.ability[3],
       skillIds: [],
+      // 손 0xb63c0 = 폼(+0xb 상위 니블) & 1 — 봉은중 폼 1 → 좌투
+      hand: ROSTER_PITCHER_REPERTOIRES[0].form & 1,
     })
+    expect(startingPitcherOf(0).hand).toBe(1)
   })
 })
 
@@ -76,6 +80,7 @@ describe('선발 투수 무작위 — 0xb8c94(팀, 0, bfa54(0,4)) (S13 1-4b)', (
       velocity: 셋째.ability[1],
       stamina: 셋째.ability[3],
       skillIds: [],
+      hand: ROSTER_PITCHER_REPERTOIRES[2].form & 1,
     })
   })
 
