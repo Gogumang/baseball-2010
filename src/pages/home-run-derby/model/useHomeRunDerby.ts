@@ -200,7 +200,13 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
       }
       setIsPaused(false)
       // 다음 공 준비(상태 0xf) 0x3dbf8 — +0x84 > 0 이면 HUD 콤보 표시를 켠다(+0x1b60 = 1 · +0x19ec = 0).
-      // ⚠️ 보너스 게임을 열 때는 상태 0xd(→ 0xe) 로 가는데 그 뒤 0xf 를 지나는지는 유력(0x48d50 이 0xe 를 예약하는 것까지 봤다)
+      // 단계가 오르거나 보너스 게임을 열 때(0xae3e8 → 상태 0xd)도 **0xf 를 지난다 (확정, U-89)**:
+      //   0xd 갱신 0x39e14 — 틱 > 0 이고 점수판 [+0xf10]+0x6c ≠ 1 이면 0xe (모드 갈림 없음)
+      //   0xe 진입 0x50674 — 강판 0x504cc 는 모드 3 이 아니면 늘 0(0x504de) → 0x23 으로 안 샌다
+      //   0xe 키 0x532b0 — OK(−5·'5') → 메시지 1 → 0x50c18: 인자 0xe 면 상태 0xf (돌발 객체 +0xf28 이 있고 0x8f158 참일 때만 0x1b → 0xf)
+      //   0xf 진입 0x3d954 → 0x3db92~0x3dbf2(모드 7 애니 되돌리기) · 0x3dbf8(+0x84 > 0 → 표시 켜기)
+      // (예전 근거 "0x48d50 의 0x49846" 은 0x49846 이 교체 화면 키 0x495fc 안이라 틀린 주소였다.)
+      // ⚠️ 원본은 0xe 에서 사람 OK 를 기다리지만 웹 더비에는 그 확인 단계가 없어 결과 연출이 끝나면 곧바로 0xf 로 본다.
       if (shouldShowComboAtNextPitch(runRef.current)) {
         setShownCombo(runRef.current.comboDisplay)
         clearComboTimer()

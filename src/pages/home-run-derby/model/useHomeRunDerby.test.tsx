@@ -127,6 +127,24 @@ describe('홈런더비 한 판', () => {
     expect(rendered.result.current.shownCombo).toBeNull()
   })
 
+  it('보너스를 열어도 다음 공 준비(0xd → 0xe → OK → 0xf)를 지나 올린 콤보를 21 갱신 띄운다 (U-89 — 0x39e14 · 0x532b0 · 0x50c18 · 0x3dbf8)', () => {
+    const rendered = 띄우기()
+    for (let index = 0; index < 8; index += 1) 한구(rendered, 헛스윙)
+    한구(rendered, 홈런)
+    act(() => rendered.result.current.onPitchResolved(홈런))
+    expect(rendered.result.current.run.isBonusGame).toBe(true)
+    expect(rendered.result.current.shownCombo).toBeNull()
+    act(() => {
+      vi.advanceTimersByTime(1_500)
+    })
+    expect(rendered.result.current.shownCombo).toBe(1)
+    act(() => {
+      vi.advanceTimersByTime(21 * 62)
+    })
+    expect(rendered.result.current.shownCombo).toBeNull()
+    expect(rendered.result.current.run.comboDisplay).toBe(0)
+  })
+
   it('HUD 콤보는 다음 공 준비(상태 0xf)에서 켜져 21 갱신 뒤 꺼지고 +0x84 를 지운다 (0x3dbf8 · 0x45a12)', () => {
     const rendered = 띄우기()
     한구(rendered, 홈런)
