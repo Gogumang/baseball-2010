@@ -1,4 +1,4 @@
-import { globalStyle, style } from '@vanilla-extract/css'
+import { style } from '@vanilla-extract/css'
 import { theme } from '@/app/styles/theme.css'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 
@@ -44,29 +44,66 @@ export const panel = style({
   boxShadow: `inset 0 0 0 1px ${ORIGINAL_COLORS.text}`,
 })
 
-/** 쪽 제목 — 흰 글 */
-export const bodyTitle = style({
+/** 본문 한 줄 — 원본 줄 나누기(`wrapHelpText`)로 이미 나눈 줄이라 웹 글꼴로 다시 접지 않는다 */
+export const textLine = style({
   position: 'absolute',
   color: ORIGINAL_COLORS.text,
   fontSize: '11px',
-  lineHeight: '13px',
+  lineHeight: '14px',
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
   pointerEvents: 'none',
 })
 
-/** 본문 글 — StrHOWTO 원문 마크업 그대로 */
-export const bodyText = style({
+/** 본문 상자 0xbb28d — 색은 미션 고르기 설명 상자와 같은 근사 */
+export const innerBox = style({
   position: 'absolute',
-  color: ORIGINAL_COLORS.text,
-  fontSize: '11px',
-  // 줄 높이는 12px — 원본 줄간(11+3=14)보다 2px 좁다. 본문 칸 아래 244px 에 장 넘기기 단추가
-  // 있어 12줄짜리 첫 장이 14px(168) · 13px(156) 로는 그 단추를 덮는다. 12px 면 144 라 안 겹친다.
-  // **근사다** — 줄 높이는 도트 또렷함과 무관하니 글자 크기는 11px 그대로 둔다.
-  lineHeight: '12px',
-  overflowY: 'auto',
+  boxSizing: 'border-box',
+  border: `1px solid ${ORIGINAL_COLORS.windowBorder}`,
+  borderRadius: '2px',
+  background: '#213473',
+  pointerEvents: 'none',
 })
 
-// 본문은 `MarkupText` 가 <p> 로 그린다 — 그쪽 줄 높이(원본 14px)가 이겨서 여기서 다시 눌러 준다
-globalStyle(`${bodyText} p`, { lineHeight: '12px' })
+/** 스크롤 막대 바탕 — RGB(32, 48, 158) (0x58c5a) */
+export const scrollTrack = style({
+  position: 'absolute',
+  background: 'rgb(32, 48, 158)',
+  pointerEvents: 'none',
+})
+
+/** 스크롤 손잡이 — 흰색 폭 4 (0x58cc0 · 0x6a979) */
+export const scrollKnob = style({
+  position: 'absolute',
+  background: 'rgb(255, 255, 255)',
+  pointerEvents: 'none',
+})
+
+/** 내용 자르기 창 (0xbae25) — 여닫는 동안 판 높이에 맞춰 줄어든다 */
+export const clip = style({
+  position: 'absolute',
+  overflow: 'hidden',
+})
+
+/** 등급표 (0x54330) — 바탕과 검정 줄 */
+export const ratingTable = style({
+  position: 'absolute',
+  boxSizing: 'border-box',
+  border: '1px solid rgb(0, 0, 0)',
+  pointerEvents: 'none',
+})
+
+export const ratingLine = style({
+  position: 'absolute',
+  background: 'rgb(0, 0, 0)',
+})
+
+export const ratingText = style({
+  position: 'absolute',
+  fontSize: '11px',
+  lineHeight: '11px',
+  whiteSpace: 'nowrap',
+})
 
 /** 쪽 번호 */
 export const pagerText = style({

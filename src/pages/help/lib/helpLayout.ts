@@ -71,32 +71,85 @@ export const RANKING_TITLE_FRAMES = [9, 12, 15, 18, 20] as const
 export const rowLeftOf = (item: RankingMenuItem) => ROW.rightEdge - item.labelWidth
 
 /**
- * 도움말 본문 창 (상태 7, 그리기 `0x2fc8c` → 뷰어 `0x639a5` → `0x58d10`).
- *
- * ⚠️ 판 `0x58371` 의 치수와 뷰어 `0x58d10` 의 쪽 나누기·글 배치는 **아직 미해독**이다.
- * 환경설정·기록연감과 같은 가운데 192 판(x0 = W/2 − 96 = 24, y0 = H/2 − 106 = 54)으로 두고
- * 쪽 제목 줄은 기록연감 자리를 쓴다 — **배치 근사**.
+ * 도움말 본문 판 (상태 7 · 경기 중 [조작방법] — 뷰어 그리기 `0x58fd4`).
+ * 판 0x55e60 은 가운데 (W/2, H/2) · 폭 192 · 다 열린 높이 0xd4 = 212 라 왼쪽 위가 (24, 54) 다 (확정).
+ * 쪽 번호 자리는 `HELP_VIEWER` 표 참고 — 숫자 그림(num.pzx 0x585ac)은 웹 글자로 둔다(근사).
  */
 export const BODY_PANEL = {
   x: SCREEN.width / 2 - 96,
   y: SCREEN.height / 2 - 106,
   width: 192,
   height: 212,
-  /** 쪽 제목 줄 — 노란 네모 slt_frame 이미지 38 (34, 78) + 제목 (42, 76) */
-  bullet: { image: 38, x: 34, y: 78 },
-  titleX: 42,
-  titleY: 76,
-  /** 본문 글 — 판 안쪽 좌우 여백 10px, 제목 줄 아래 */
-  textX: 34,
-  textY: 94,
-  textWidth: 172,
-  /** 쪽 넘기기 화살 slt_frame 이미지 20 · 쪽 번호 (기록연감 PAGER 와 같은 자리) */
+  /** 쪽 번호 — 쪽 (W/2 + 0x34, y0 + 0x16) · 쪽수 (W/2 + 0x42, …). 웹은 "쪽/쪽수" 한 덩이로 쪽 자리에 쓴다 */
   pager: {
-    arrowImage: 20,
-    leftX: SCREEN.width / 2 + 35,
-    rightX: SCREEN.width / 2 + 79,
-    arrowY: 77,
-    numberX: SCREEN.width / 2 + 52,
-    y: 76,
+    numberX: SCREEN.width / 2 + 0x34,
+    y: 54 + 0x16,
   },
 } as const
+
+/**
+ * 뷰어 그리기 `0x58fd4`(→ 0x639a5 · 0x58d10) 의 배치 — x0 = W/2 − 0x60 = 24, y0 = H/2 − 0x6a = 54 (확정).
+ *
+ * | 그림 | 자리 |
+ * |---|---|
+ * | 판 0x55e60 | 가운데 (W/2, H/2), 폭 192, 높이 = 뷰어 +0x90 (여닫기 연출) |
+ * | 장 띠 slt_frame **프레임** `[55..60][장]` (192×19) | (W/2 − 96, y0 − 2) = (24, 52) |
+ * | 장 이름 img_text **프레임** `[8,9,12,15,18,25,26][장]` | 띠 프레임의 상자 r 안 가운데: (24 + r.x + (r.w − w)/2, y0 + r.y + 2) |
+ * | 장 테두리 slt_frame **프레임 61** (72×17) | (24 + r.x, y0 + r.y − 2) — 쪽 보기면 늘, 장 고르기면 깜빡임 |
+ * | 잠김(장 6) 제목 img_text 프레임 26 | (x0 + 0x21 − w/2, H/2 − 0x65) |
+ * | 쪽 화살 slt_frame **이미지 20** | (W/2 + 0x23, y0 + 0x17) · 좌우 뒤집어 (W/2 + 0x50, …) — 장 고르기면 늘, 쪽 보기면 깜빡임 |
+ * | 쪽 번호 0x585ac(num) | 쪽 (W/2 + 0x34, y0 + 0x16) · 쪽수 (W/2 + 0x42, …) · 사이 num 이미지 0x65 (W/2 + 0x36, …) |
+ * | 본문 상자 0xbb28d | (x0 + 5, y0 + 0x24, 0xac, 0xab) |
+ * | 스크롤 막대 0x58c10 | (x0 + 0xb3, y0 + 0x28) — `HELP_SCROLL_BAR` |
+ * | 글 0x58750 | `HELP_TEXT_BOX` |
+ *
+ * 깜빡임: 그릴 때마다 +0x410 을 1 올리고 `% 8 ≤ 3` 이면 켠다(0x58d1e). 판이 여닫히는 동안(+0x90 ≤ 0xd3)은 끈다(0x58efc).
+ * 띠 프레임의 상자 r 은 slt_frame/frames/boxes.json 의 값이다(0x94a64 가 프레임 상자를 읽는다).
+ */
+export const HELP_VIEWER = {
+  x0: 24,
+  y0: 54,
+  panelWidth: 192,
+  centerY: SCREEN.height / 2,
+  /** 장 띠 slt_frame 프레임 55~60 — 장 0~5 */
+  tab: { firstFrame: 55, x: 24, y: 52 },
+  /** 띠 프레임 55~60 의 상자 (x, y, w, h) — boxes.json */
+  tabBoxes: [
+    [2, 2, 72, 17],
+    [25, 2, 72, 17],
+    [48, 2, 72, 17],
+    [71, 2, 72, 17],
+    [94, 2, 72, 17],
+    [118, 2, 72, 17],
+  ],
+  /** 장 이름 img_text 프레임 (표 0xd1ad0) 과 그 폭 (img_text/frames/origins.json) */
+  names: [
+    { frame: 8, width: 43 },
+    { frame: 9, width: 42 },
+    { frame: 12, width: 54 },
+    { frame: 15, width: 42 },
+    { frame: 18, width: 43 },
+    { frame: 25, width: 42 },
+    { frame: 26, width: 41 },
+  ],
+  highlightFrame: 61,
+  lockedTitle: { frame: 26, width: 41, x: 24 + 0x21, y: SCREEN.height / 2 - 0x65 },
+  pageArrow: { image: 20, leftX: SCREEN.width / 2 + 0x23, rightX: SCREEN.width / 2 + 0x50, y: 54 + 0x17 },
+  innerBox: { x: 29, y: 90, width: 0xac, height: 0xab },
+  /** 스크롤 막대 끝 화살 — slt_frame 이미지 78 (7×5): 위 (x, y − 4) · 아래는 뒤집어 (x, y + 159 + 1) */
+  scrollCap: { image: 78 },
+} as const
+
+/**
+ * 판 높이 연출 (+0x90 · 걸음 +0x94 · 끝 +0x98 · 방향 +0x99) — 그리기 끝 0x59300~0x593a8.
+ * ```
+ * 여는 중(+0x99 = 1):  걸음 ×= 4 · 높이 += 걸음 · ≥ 0xd4 면 0xd4 · 끝 = 1      (열 때 높이 0x20 · 걸음 1 — 0x63734)
+ * 닫는 중(+0x99 = 0):  걸음 ×= 4 · 높이 −= 걸음 · ≤ 10 이면 10 · 끝 = 1          (CLR 이 걸음 1 · 끝 0 · 방향 0 — 0x6385c)
+ * ```
+ * 그린 높이는 열 때 32 → 36 → 52 → 116 → 212, 닫을 때 212 → 208 → 192 → 128 이고, 닫기 끝(+0x98)이 선 다음 갱신에
+ * 키 0x637d0 이 1 을 돌려줘 뷰어가 닫힌다(0x63964). 단 `[뷰어+0x125]` 가 서 있으면 CLR 이 연출 없이 곧장 1 을 돌려준다
+ * (0x63850) — 경기 장면 0x3301c 가 1, 메인 메뉴 0x234d4 · 경기 끝 0x332b8 가 0 으로 둔다. 그래서 **경기 중 [조작방법]은 곧장 닫힌다**.
+ */
+export const HELP_PANEL_OPEN_HEIGHTS: readonly number[] = [32, 36, 52, 116]
+export const HELP_PANEL_CLOSE_HEIGHTS: readonly number[] = [212, 208, 192, 128]
+export const HELP_PANEL_FULL_HEIGHT = 0xd4

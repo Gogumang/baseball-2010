@@ -1,8 +1,14 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { HelpScreen } from '@/pages/help/ui/HelpScreen'
-import { BODY_PANEL, RANKING_MENU_ITEMS } from '@/pages/help/lib/helpLayout'
+import {
+  BODY_PANEL,
+  HELP_PANEL_CLOSE_HEIGHTS,
+  HELP_PANEL_FULL_HEIGHT,
+  HELP_PANEL_OPEN_HEIGHTS,
+  RANKING_MENU_ITEMS,
+} from '@/pages/help/lib/helpLayout'
 import { GAME_INQUIRY_CHAPTER } from '@/shared/config/helpSections'
 
 /**
@@ -18,14 +24,22 @@ const 띄우기 = (overrides: Partial<Parameters<typeof HelpScreen>[0]> = {}) =>
 const 칸 = (name: string) => screen.getByRole('button', { name })
 
 describe('도움말 본문 (상태 7)', () => {
-  it('가운데 192×212 판에 장 0 [기본 조작] 첫 쪽부터 보여 준다 (0x63689(뷰어, 0))', () => {
+  it('가운데 192 판에 장 0 [기본 조작] 첫 쪽부터 보여 준다 (0x63689(뷰어, 0)) — 판은 높이 0x20 에서 열리기 시작한다', () => {
     const { container } = 띄우기()
 
-    const 판 = container.querySelector(`div[style*="${BODY_PANEL.width}px"]`) as HTMLElement
+    const 판 = container.querySelector(`div[style*="width: ${BODY_PANEL.width}px"]`) as HTMLElement
     expect(판.style.left).toBe(`${BODY_PANEL.x}px`)
-    expect(판.style.top).toBe(`${BODY_PANEL.y}px`)
+    // 첫 그리기는 +0x90 = 0x20 — 가운데 H/2 에서 위아래로 16
+    expect(판.style.height).toBe(`${HELP_PANEL_OPEN_HEIGHTS[0]}px`)
+    expect(판.style.top).toBe(`${160 - 16}px`)
     expect(screen.getByText('<기본 조작>')).toBeTruthy()
     expect(screen.getByText('1/5')).toBeTruthy()
+  })
+
+  it('판 높이 연출 — 열 때 32 → 36 → 52 → 116 → 212, 닫을 때 212 → 208 → 192 → 128 (0x59300~0x593a8)', () => {
+    expect(HELP_PANEL_OPEN_HEIGHTS).toEqual([32, 36, 52, 116])
+    expect(HELP_PANEL_CLOSE_HEIGHTS).toEqual([212, 208, 192, 128])
+    expect(HELP_PANEL_FULL_HEIGHT).toBe(BODY_PANEL.height)
   })
 
   it('여는 때는 장 고르기 — 좌우가 장을 넘기고 0~5 를 돌며 되감는다 (0x638a0 · 0x638fe)', () => {
@@ -92,6 +106,11 @@ describe('도움말 본문 (상태 7)', () => {
     // 상태 10 은 쪽 보기로 열린다(+0xe5 = 0) — 좌우는 쪽, OK·아래는 잠겨 아무 일 없다, CLR 은 바로 닫기
     fireEvent.keyDown(window, { key: 'ArrowDown' })
     expect(screen.getByText('<게임문의>')).toBeTruthy()
+    // 둘째 쪽은 빈 StrHOWTO[33] — 표 0xd0b18 그대로 한 쪽이고 등급표(0x54330)를 그린다
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(screen.getByText('2/4')).toBeTruthy()
+    expect(screen.getByTestId('등급표')).toBeTruthy()
+    expect(screen.getByText('MO-090814-004')).toBeTruthy()
     fireEvent.keyDown(window, { key: 'ArrowRight' })
     expect(screen.getByText('<주의사항>')).toBeTruthy()
   })
@@ -172,6 +191,55 @@ describe('경기 중 [조작방법] — 멈춘 경기 장면 위에 얹힌다', 
       expect(뒤).toHaveBeenCalled()
     } finally {
       window.removeEventListener('keydown', 뒤)
+    }
+  })
+})
+
+describe('뷰어 그리기 0x58fd4 — 장 고르기/쪽 보기 그림 차이와 줄 넘기기', () => {
+  it('쪽 보기에서 아래 키는 글을 한 줄 내리고 스크롤 손잡이가 걸음만큼 내려간다 (0x61ce4)', () => {
+    띄우기()
+    // 장 5 의 넷째 쪽 [29]~ 은 길다 — 장 5 둘째 쪽 [27] 미션모드로 가서 쪽 보기
+    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+    fireEvent.keyDown(window, { key: 'Enter' })
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    // [28] 스페셜은 11줄보다 길다
+    expect(screen.getByText('<스페셜>')).toBeTruthy()
+    const 손잡이 = () => (screen.getByTestId('스크롤손잡이') as HTMLElement).style.top
+    const 처음 = 손잡이()
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    expect(screen.queryByText('<스페셜>')).toBeNull()
+    expect(손잡이()).not.toBe(처음)
+    fireEvent.keyDown(window, { key: 'ArrowUp' })
+    expect(screen.getByText('<스페셜>')).toBeTruthy()
+  })
+
+  it('장 띠는 slt_frame 프레임 55+장, 장 이름은 img_text 프레임 표 0xd1ad0 이다', () => {
+    const { container } = 띄우기()
+    const srcs = [...container.querySelectorAll('img')].map((img) => img.getAttribute('src'))
+    expect(srcs).toContain('./sprites/slt_frame/frames/055.png')
+    expect(srcs).toContain('./sprites/img_text/frames/008.png')
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    const 다음 = [...container.querySelectorAll('img')].map((img) => img.getAttribute('src'))
+    expect(다음).toContain('./sprites/slt_frame/frames/056.png')
+    expect(다음).toContain('./sprites/img_text/frames/009.png')
+  })
+})
+
+describe('닫기 연출 — [뷰어+0x125] 가 없으면(메인 메뉴) CLR 뒤 판이 4프레임에 걸쳐 줄고 나서 닫힌다 (0x63850 · 0x63964)', () => {
+  it('경기 중(+0x125 = 1)은 곧장, 메인 메뉴는 4프레임 뒤에 닫힌다', () => {
+    vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'performance', 'setTimeout'] })
+    try {
+      const onBack = vi.fn()
+      띄우기({ onBack, gamePoint: 0 })
+      fireEvent.keyDown(window, { key: 'Escape' })
+      expect(onBack).not.toHaveBeenCalled()
+      act(() => {
+        vi.advanceTimersByTime(62 * 6)
+      })
+      expect(onBack).toHaveBeenCalledOnce()
+    } finally {
+      vi.useRealTimers()
     }
   })
 })
