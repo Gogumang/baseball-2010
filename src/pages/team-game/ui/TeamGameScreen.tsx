@@ -32,6 +32,8 @@ import { hasGameIntro } from '@/widgets/game-scene/lib/introSchedule'
 import { HALF_INNING_JINGLE_TICK } from '@/features/play-game/model/halfInningBoard'
 import { HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
 import { useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
+import { settlementBackdropOffsetAt } from '@/pages/team-game/model/settlementBackdrop'
+import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type {
   TeamEntryBatter,
   TeamEntryPitcher,
@@ -333,6 +335,8 @@ export function TeamGameScreen({
       resolution === null,
   )
   const isAwaitingConfirm = sceneConfirm.isAwaiting && (canBat || canPitch)
+  /** 정산 배경 전용 난수 — 경기 난수를 건드리지 않는다 (정산 갈래 주석) */
+  const [backdropRandom] = useState(() => createSeededRandom(0))
   isAwaitingConfirmRef.current = isAwaitingConfirm
   /**
    * 띄울 돌발 창 — 결과 창(0x1d)은 0xe 앞이라 늘 띄우고, 제안 창(0x1b)은 0xe 의 OK 뒤 메시지 1 이 0x8f158 을 굴려
@@ -398,11 +402,39 @@ export function TeamGameScreen({
     )
   }
   if (summary !== null) {
+    // 정산 갱신 0x4b100 의 r7 — 사람 팀(우리)이 이겼나. 비기면 거짓
+    const isHumanWin = summary.result === '승'
     return (
       <PixelScreen
         title="경기 결과"
         leftKey={{ label: '확인', onPress: () => onFinish(summary) }}
       >
+        {/*
+          정산 그리기 0x4a384 — 결과 판보다 먼저 구름 0x78448 과 배경 고르기 0x40ff0(장면, +0x17e2)만 그린다 (선수·공·HUD 없음).
+          +0x17e2 는 이긴 판만 틱마다 3 씩 150 까지 올라 구장이 가라앉는다 (`settlementBackdropOffsetAt`).
+          ⚠️ 판 위 글자·숫자(0x4a404 진 판 · 0x4a448 이긴 판 갈래)는 아직 웹 요약 그대로다.
+        */}
+        <div className={styles.stageArea}>
+          <BattingStage
+            batterAbility={currentBatterAbility(progress)}
+            pitcherAbility={currentPitcherAbility(progress)}
+            swingMode="일반"
+            gameMode={options.mode}
+            isEagleEyeEnabled={false}
+            // 결과 뒤 배경은 HUD·선수를 안 그린다
+            hud={null}
+            acePitcher={null}
+            // 시즌 홈경기·대전이면 배경 고르기 0x40ff0 이 시즌 구장으로 간다 — 타석과 같은 규칙
+            seasonStadium={seasonStadium}
+            isPaused
+            isResultBackdrop
+            resultBackdropOffsetOf={(tick) => settlementBackdropOffsetAt(tick, isHumanWin)}
+            // ⚠️ 웹 타석 화면은 그림을 세울 때 하늘 줄을 rand(0, 6) 으로 고른다(원본은 구장 팀 데이터 +0xb2, 추정 대체) —
+            //    경기가 끝난 뒤 그 굴림이 경기 난수에 새지 않게 이 배경은 따로 든 난수로 세운다
+            random={backdropRandom}
+            onPitchResolved={() => {}}
+          />
+        </div>
         <BigResult>
           {summary.ourScore} : {summary.opponentScore} {summary.result}
         </BigResult>

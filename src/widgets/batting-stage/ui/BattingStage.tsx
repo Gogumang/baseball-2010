@@ -131,6 +131,11 @@ interface BattingStageProps {
    * 같은 캔버스를 그대로 쓰므로 구름·전광판 흐름은 타석에서 이어진다. 안 넘기면 타석 화면이다.
    */
   readonly isResultBackdrop?: boolean
+  /**
+   * 결과 창 뒤 배경의 틱 t(0 = 들어선 틱) +0x17e2 — 안 넘기면 홈런더비 결과 창(0x3c0b8, 틱마다 +5)이다.
+   * 팀경기 정산(0x19) 갱신 0x4b100 은 사람 팀이 이겼을 때만 +3 이라 부르는 쪽이 넘긴다.
+   */
+  readonly resultBackdropOffsetOf?: (tick: number) => number
   readonly random: RandomPort
   /**
    * **고른 필살타법 번호** (선수 레코드 +0x18, 1~4). 레벨(+0x201)이 아니다 — 경기는 이 번호만 본다
