@@ -125,7 +125,8 @@ export function goalsOf(mission: OriginalMission, progress: MissionProgress): Mi
  * `goalCounts` 가 바로 이 칸들(0 인 칸은 빠짐)이라, 목표 글에 없는 이름을 여기서 골라 판정에 더한다. 원본 표에서 걸리는 것은
  * 투수 9 "투혼의 삼진 행진"의 아웃 1 과 타자 14 "폭주!! 사이클링 히트"의 타점 1 · 안타 2(사이클을 채우면 늘 함께 찬다) 뿐이다.
  * 사이클링히트는 네 안타 칸(`CYCLE_HIT_PARTS`)을 글 하나로 묶은 것이라 그 넷은 이미 든 것으로 본다.
- * ⚠️ 화면 목표 막대(`goalsOf`)는 목표 글만 보인다 — 원본 화면이 칸을 어떻게 보이는지는 안 읽었다(미해결).
+ * 화면 목표 띠(`GoalBar`)는 목표 글 +0xe 의 줄만 하나씩 보인다 — 원본 0x36714 도 칸 값·진행 수를 그리지 않아
+ * 글에 없는 칸은 화면에 안 나온다(원본 그대로, `goalTicker` 주석).
  */
 export function unlistedGoalNamesOf(mission: OriginalMission): string[] {
   const covered = mission.goals.includes(CYCLE_HIT_GOAL) ? [...mission.goals, ...CYCLE_HIT_PARTS] : mission.goals

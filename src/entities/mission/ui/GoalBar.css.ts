@@ -1,23 +1,20 @@
 import { style } from '@vanilla-extract/css'
 import { theme } from '@/app/styles/theme.css'
 
+/** 한 줄 높이의 창 — 넘기는 줄은 창 밖으로 잘린다 (0x36714 의 자르기 창) */
 export const bar = style({
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: '5px',
+  position: 'relative',
+  overflow: 'hidden',
+  height: '25px',
   border: `2px solid ${theme.color.line}`,
   background: theme.color.panel,
-  padding: '6px 8px',
   fontSize: '11px',
 })
 
 export const goal = style({
-  border: `1px solid ${theme.color.line}`,
-  padding: '1px 5px',
-  color: theme.color.inkDim,
-})
-
-export const achieved = style({
-  borderColor: theme.color.accentDeep,
-  color: theme.color.accent,
+  position: 'absolute',
+  left: '8px',
+  top: '5px',
+  whiteSpace: 'nowrap',
+  color: theme.color.ink,
 })

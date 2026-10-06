@@ -289,7 +289,7 @@ describe('목표 글에 없는 목표 칸도 판정한다 — 0xaaa6c 는 행+0x
     expect(judgedGoalsOf(투혼, 아웃없음).map((goal) => goal.name)).toEqual(['MAX게이지', '탈삼진', '아웃'])
   })
 
-  it('화면 막대(goalsOf)는 목표 글 그대로다', () => {
+  it('화면 띠(goalsOf 이름 → GoalBar)는 목표 글 그대로다 — 글에 없는 칸은 안 보인다 (0x36714)', () => {
     expect(goalsOf(투혼, createProgress()).map((goal) => goal.name)).toEqual(['MAX게이지', '탈삼진'])
     expect(goalsOf(사이클, createProgress()).map((goal) => goal.name)).toEqual(['사이클링히트'])
   })
