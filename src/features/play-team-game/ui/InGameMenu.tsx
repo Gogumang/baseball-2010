@@ -15,17 +15,12 @@ import type { InGameMenuAction } from '@/features/play-team-game/model/inGameMen
 const autoProgressConfirmOf = (cost: number) =>
   `!C!cFFFFFF자동진행을 하시겠습니까?!N!cFFFF00${cost} G포인트!cFFFFFF가 소모됩니다`
 
-/**
- * StrGAME[2] — 대전모드 6회 제한 알림.
- * ⚠️ **원본 문구 미해독 — 근사**. I-controls 4d 는 뜻("6회까지만")만 적고 원문을 적지 않았다.
- */
-const VERSUS_INNING_LIMIT_NOTICE = '!C!cFFFFFF대전모드는 6회까지만!N자동진행할 수 있습니다'
+/** StrGAME[2] — 대전모드 6회 제한 알림 (`base/extracted/StrGAME.json` [2] 원문 그대로) */
+const VERSUS_INNING_LIMIT_NOTICE = '!C!cFFFFFF대전모드는 6회까지만!N자동진행 가능합니다'
 
-/**
- * StrGAME[5] — G포인트 부족 알림 (`0x3c7d8`).
- * ⚠️ **원본 문구 미해독 — 근사**. 같은 뜻의 StrMODE[65] 첫 줄을 본떴다.
- */
-const NOT_ENOUGH_GAME_POINT = '!C!cFF0000G포인트가 부족합니다'
+/** StrGAME[5] — G포인트 부족 알림 (`0x3c7d8`, `base/extracted/StrGAME.json` [5] 원문 그대로) */
+const NOT_ENOUGH_GAME_POINT =
+  '!C!cFFFFFF자동진행을 할 수 없습니다!N!cFF0000G포인트가 부족합니다!cFFFFFF!N!N[!cFFFF00스페셜!cFFFFFF] [!cFFFF00G포인트충전!cFFFFFF]!N에서 충전할 수 있습니다'
 
 interface InGameMenuProps {
   /** 전역 게임 모드 — 표 0xcfcfc 의 행을 고른다 */

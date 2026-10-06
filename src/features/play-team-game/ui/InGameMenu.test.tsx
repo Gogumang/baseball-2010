@@ -96,3 +96,18 @@ describe('경기 중 메뉴 — 나가기 (동작 3 0x3c504 → 하위 1 0x3c77c
     expect(onQuit).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('경기 중 메뉴 — 자동진행 알림 문구는 StrGAME 원문이다', () => {
+  it('[2] 대전 6회 제한 · [5] G포인트 부족', () => {
+    render(<InGameMenu mode={8} onContinue={vi.fn()} onAutoProgress={vi.fn()} gamePoint={999} canAutoProgress={false} />)
+    fireEvent.click(screen.getByText('자동진행'))
+    expect(screen.getByText(/자동진행 가능합니다/)).toBeTruthy()
+    cleanup()
+
+    render(<InGameMenu mode={1} onContinue={vi.fn()} onAutoProgress={vi.fn()} autoProgressCost={100} gamePoint={0} />)
+    fireEvent.click(screen.getByText('자동진행'))
+    fireEvent.click(screen.getByText('예'))
+    expect(screen.getByText(/자동진행을 할 수 없습니다/)).toBeTruthy()
+    expect(screen.getByText(/에서 충전할 수 있습니다/)).toBeTruthy()
+  })
+})
