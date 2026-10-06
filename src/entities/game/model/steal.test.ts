@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import {
-  attemptSteal,
-  canStealFrom,
   quickEngineSteal,
   quickStealBaseOf,
   stealChanceOf,
@@ -34,23 +32,11 @@ describe('도루 — 원본 표 0xd9064', () => {
     // 인자가 주자 하나뿐이라는 것 자체가 그 증거다
     expect(stealChanceOf.length).toBe(1)
   })
-
-  it('rand(0,10000) 이 확률보다 작으면 성공이다', () => {
-    // 주력 500 → 30% → 3000
-    expect(attemptSteal(주자(500), 고정(0.2999))).toBe('성공')
-    expect(attemptSteal(주자(500), 고정(0.3))).toBe('실패')
-  })
-
-  it('3루 주자는 도루를 걸지 않는다', () => {
-    expect(canStealFrom(1)).toBe(true)
-    expect(canStealFrom(2)).toBe(true)
-    expect(canStealFrom(3)).toBe(false)
-  })
 })
 
 /**
  * CPU 간이 엔진의 도루 (0xc1818, E-defense-rules E-5).
- * ⚠️ **원본 그대로 — 실패가 없다.** 사람 경기의 `attemptSteal` 과 다른 길이다.
+ * ⚠️ **원본 그대로 — 실패가 없다.** 사람 경기 도루(공 도착 뒤 도루 판)와 다른 길이다.
  */
 describe('간이 엔진 도루 — 성공만 있고 실패가 없다 (0xc1818)', () => {
   const 빈루 = { first: false, second: false, third: false }

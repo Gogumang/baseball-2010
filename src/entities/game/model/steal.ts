@@ -18,21 +18,10 @@ const STEAL_SUCCESS_PERCENT: readonly number[] = [1, 5, 10, 15, 20, 30, 40, 50, 
 const RUN_BAND = 100
 const RANDOM_LIMIT = 10_000
 
-export type StealResult = '성공' | '실패'
-
 /** 성공률(만분율). 퍼센트로 보여 줄 때는 100 으로 나눈다 */
 export function stealChanceOf(runner: BatterAbility): number {
   const band = Math.min(STEAL_SUCCESS_PERCENT.length - 1, Math.max(0, Math.trunc(runner.run / RUN_BAND)))
   return STEAL_SUCCESS_PERCENT[band] * 100
-}
-
-export function attemptSteal(runner: BatterAbility, random: RandomPort): StealResult {
-  return randomIntegerBelow(random, 0, RANDOM_LIMIT) < stealChanceOf(runner) ? '성공' : '실패'
-}
-
-/** 3루 주자는 도루를 걸지 않는다 (원본이 홈 도루를 시도하지 않는다) */
-export function canStealFrom(base: 1 | 2 | 3): boolean {
-  return base !== 3
 }
 
 /* ── CPU 간이 엔진의 도루 (0xc1818, E-defense-rules E-5) ─────────────────────── */
@@ -67,8 +56,8 @@ export interface QuickStealResult {
  * ```
  *
  * ⚠️ **원본 그대로 — 실패가 없다.** 굴림에 지면 아무 일도 일어나지 않고 주자도 죽지 않는다.
- * 투수 구속·포수 능력도 이 판정에 들어오지 않는다. 사람 경기의 `attemptSteal`(실패 있음)과
- * 다른 길이라 따로 둔다.
+ * 투수 구속·포수 능력도 이 판정에 들어오지 않는다. 사람 경기 도루는 이 표가 아니라 공 도착 뒤의 도루 판
+ * (`features/defense-play/model/stealPlay` — 포수 송구와 주자 도착이 겨룬다)이다.
  *
  * 성공하면 **모든 주자가 한 루씩** 간다. 가장 앞선 주자가 3루가 아닌 것이 조건이라 득점은 나오지 않는다.
  */

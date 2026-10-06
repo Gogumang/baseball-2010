@@ -535,7 +535,7 @@ export interface PlayerOutcomeOptions {
   /**
    * 이 공의 **번트 종류** 장면 +0xfdc (0 스윙 · 1~3 번트 — `BattingStage.onPitchResolved` 넷째 인자). 타구 판 시작 리드
    * (0x3d7b8)가 도루 안 한 주자에게 +3 틱을 더한다(`DefensePlayInput.buntKind`). 안 넘기면 0.
-   * ⚠️ 부르는 쪽(`useCareerSession`)이 아직 안 싣는다 — 타석 화면은 넷째 인자로 알린다.
+   * `useCareerSession.handlePitchResolved` 가 타석 화면의 넷째 인자를 그대로 싣는다.
    */
   readonly buntKind?: number
 }

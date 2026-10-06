@@ -516,7 +516,7 @@ export function useCareerSession({
   )
 
   const handlePitchResolved = useCallback(
-    (detail: PitchOutcomeDetail, _pitch?: unknown, isUncatchable?: boolean) => {
+    (detail: PitchOutcomeDetail, _pitch?: unknown, isUncatchable?: boolean, buntKind?: number) => {
       // 공이 손을 떠날 때 상대 투수 투구 수·스태미나를 깎는다 (0x3dec6 → 0xa5e14(ctx, 구질)).
       // 타자 스킬 22 압도(0xb62b4(현재 타자, 22) — 장착 비트)면 소모 ×2
       const beforePitch = progressRef.current
@@ -574,6 +574,8 @@ export function useCareerSession({
         buntFoulOut: detail.isBuntFoulOut,
         foulRecordIds: tally.foulRecordIds,
         arrivalPlay: arrival?.play ?? null,
+        // 이 공의 번트 종류(장면 +0xfdc) — 타구 판 시작 리드(0x3d7b8)가 도루 안 한 주자에게 +3 틱을 더한다
+        buntKind: buntKind ?? 0,
       })
       progressRef.current = advanced
       setProgress(advanced)

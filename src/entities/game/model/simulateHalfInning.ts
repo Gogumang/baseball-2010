@@ -445,7 +445,7 @@ export function simulateHalfInning(
        *
        * ⚠️ **주자가 누구인지가 근사다** — 반 이닝 엔진은 루에 선 주자의 신원을 들고 있지 않다.
        * 1루 주자는 직전 타자, 2루 주자는 그 앞 타자로 보고 타순에서 거꾸로 센다
-       * (`features/play-team-game/model/teamGameFlow.stealBase` 도 같은 근사를 쓴다).
+       * (팀 경기 주자 판의 `teamGameFlow.runAbilitiesOnBaseOf` 도 같은 근사를 쓴다).
        * 도루로 2루에 간 주자는 실제로는 직전 타자라 이 셈이 한 칸 어긋나고, 이닝 첫 타석처럼
        * 거꾸로 셀 타자가 모자라면 0번으로 막는다.
        */

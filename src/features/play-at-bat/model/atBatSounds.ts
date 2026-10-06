@@ -302,10 +302,10 @@ const SAFE_CALL = 17
  * 소리가 아니라 다른 호출의 인자다), 도루도 **같은 길**로만 17 을 낸다:
  * 도루 키(0x583)는 주자를 출발만 시키고(0xa9bd4), 투구가 끝나면 0x3dfac 가 state[0x24] 를 보고
  * 플레이 종류 **5**(0x3e0e4~0x3e116)로 상태 0x17(수비 화면)에 들어간다 — 종류 9(0x3e07e)는 폭투·포일이다
- * (S8 5절). 그 안에서 포수 송구가 루에 닿아 야수가 공을 쥔 채 태그에 실패해야 v9 가 선다. 웹 도루
- * (`entities/game/model/steal.attemptSteal`)는 **주력 표 굴림 하나**라 "송구가 도착했는가"
- * 라는 칸 자체가 없다 — 성공할 때마다 17 을 내면 원본이 안 내는 자리에서도 울린다.
- * 그래서 **잇지 않았다** (틱이 있는 도루 수비 시뮬레이션이 들어오면 그때 이을 자리다).
+ * (S8 5절). 그 안에서 포수 송구가 루에 닿아 야수가 공을 쥔 채 태그에 실패해야 v9 가 선다 — 사람 경기 도루는
+ * 그 판(`features/defense-play/model/stealPlay`, 공 도착 `pitchArrivalPlay`)이 판정 콜을 직접 내므로
+ * (`PitchArrivalPlay.callSoundId`) 이 함수는 도루를 따로 다루지 않는다. 간이 엔진 도루(`entities/game/model/steal`
+ * 의 `quickEngineSteal`, 표 0xd9064 굴림 하나)는 소리 없이 지나간다.
  */
 export function inPlayCallSoundIdOf(outcome: AtBatOutcome, play?: DefenseCallContext | null): number | null {
   if (outcome.kind === '홈런') return 11
