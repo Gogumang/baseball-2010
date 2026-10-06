@@ -25,8 +25,8 @@ import { integerSquareRoot } from '@/shared/lib/math/originalTrigonometry'
  * 아니면 10000"(홈이면 각각 +10000000 / +1000000)을 얹고, 첫 루 항에 2배 가중을 준 뒤
  * `2×첫 루 항 + 둘째 루 항 + 500` 과 기본 점수 합을 더해 최댓값을 고른다.
  *
- * 난이도는 `난이도 + 유효 > 2` 한 곳에서만 쓰인다: 높으면 "여유가 가장 큰 루"(안전한 아웃),
- * 낮으면 점수식(= 앞 루 욕심)으로 간다.
+ * 인자 하나(S7 이 "난이도" 라 부른 값 — 실제로는 **지금 아웃 수**, `ThrowTargetInput.outs` 주석)는
+ * `인자 + 유효 > 2` 한 곳에서만 쓰인다: 크면 "여유가 가장 큰 루"(안전한 아웃), 작으면 점수식(= 앞 루 욕심)으로 간다.
  */
 
 /** 확실한 아웃 후보의 기본 점수 */
@@ -83,19 +83,20 @@ export function isForcedRunner(play: PlayView, runners: readonly RunnerState[], 
   return runner.startBase === previous.targetBase
 }
 
-/**
- * 원본 난이도는 **옵션 `+0x2c` 에 2(hard) 로 박혀 있고 뒤로 바꾸는 곳이 없다**
- * (P7 K2 · L 요약 확정 · DECISIONS 2026-09-20 ②). 그래서 환경설정 화면에도 난이도 줄이 없다.
- * 값을 넣지 않으면 이 기본값을 쓴다.
- */
-export const ORIGINAL_DIFFICULTY = 2
-
 export interface ThrowTargetInput extends DefenseContext {
   /**
-   * 제어기 +0x10 전역 설정 +6 바이트. 0~1 이면 점수식, 3 이상이면 늘 "여유 최대" 규칙.
-   * 원본은 늘 `ORIGINAL_DIFFICULTY`(2) 다 — 안 넣으면 그 값을 쓴다.
+   * **지금 아웃 수** (`state[6]`) — 0xafa60 이 `제어기.vt14(인자)` 로 넘기는 값이다 (직접 뜬 것):
+   * ```
+   * afaba: r3 = [제어기+0x10] ; r1 = (s8)[r3+6] ; 제어기.vt14(r1) = 0xafb24
+   * 3ecf6: 제어기+0x10 = [0x1552d0c]          ; 화면 초기화 0x3e340 — 전역 경기 상태(P7: state = 0x1552d0c)
+   * 3e790: 플레이+0x28 = [0x1552d0c]          ; 같은 객체 — 플레이가 state[0x1e]·[0x1f]·[0x87] 을 쓰는 곳
+   * b36fa: [플레이+0x28]+6 += 1               ; 아웃 판정 0xb36d0 의 아웃 꼬리 = 아웃 수
+   * ```
+   * S7·P2 가 이 칸을 "설정 +6 = 난이도" 로 읽어 예전 웹은 옵션 난이도 2 로 못 박았는데, 그 전역은
+   * 설정(0x1f1d8)이 아니라 경기 상태다. 0~1아웃이면 점수식, 2아웃이면 확실한 후보가 있을 때만 "여유 최대".
+   * (그 판에서 이미 잡은 아웃까지 센 값이다 — 아웃 꼬리가 그 자리에서 올린다.)
    */
-  readonly difficulty?: number
+  readonly outs: number
   /** 0xa990c(주자관리) = 살아 있는 주자 수. 0 이고 내야수가 잡았으면 안 던진다 */
   readonly activeRunnerCount: number
 }
@@ -308,7 +309,7 @@ export function describeThrowTarget(input: ThrowTargetInput): ThrowTargetDebug {
       scoreA[base][other] = termA + termC
       scoreB[base][other] = 2 * termB + termD + SCORE_FLOOR
     }
-    if ((input.difficulty ?? ORIGINAL_DIFFICULTY) + effective > 2) sure = true
+    if (input.outs + effective > 2) sure = true
   }
 
   // ── 고르기 (3-4) ──

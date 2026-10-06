@@ -230,7 +230,7 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
       manualThrowBase !== NONE
         ? manualThrowBase
         : cpuThrowEnabled
-          ? chooseThrowTargetBase({ ...contextAt(tick), activeRunnerCount: active })
+          ? chooseThrowTargetBase({ ...contextAt(tick), activeRunnerCount: active, outs })
           : autoThrowTargetBase(contextAt(tick))
     if (base === NONE) return
     // CPU 홈 송구 20% 특수 송구 (0xafa60 `afad2`) — 점수식이 홈을 골랐을 때만 한 번 굴린다

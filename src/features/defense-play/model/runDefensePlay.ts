@@ -1157,7 +1157,7 @@ export function stepDefensePlay(
         play.manualThrowBase !== NONE
           ? play.manualThrowBase
           : cpuThrowEnabled
-            ? chooseThrowTargetBase({ ...contextAt(tick), activeRunnerCount: active })
+            ? chooseThrowTargetBase({ ...contextAt(tick), activeRunnerCount: active, outs })
             : autoThrowTargetBase(contextAt(tick))
       if (throwBase !== NONE) {
         // 레이저 송구 — 반짝임 창 안에 새로 누른 키가 들어왔고 공을 쥐었으면 특수 송구가 나간다 (0x400bc)

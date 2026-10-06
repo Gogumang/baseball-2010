@@ -35,7 +35,7 @@ const 입력 = (
   runners,
   currentTick: 0,
   landingTick: 30,
-  difficulty: 0,
+  outs: 0,
   activeRunnerCount: runners.length,
   ...overrides,
 })
@@ -96,7 +96,7 @@ describe('플레이 vt 0x80 = 0xb1b54 — 포스로 밀려 가는 주자인가',
   })
 })
 
-describe('점수식 0xafb24 — 후보표와 최종 점수 (난이도 0 = 점수식)', () => {
+describe('점수식 0xafb24 — 후보표와 최종 점수 (0아웃 = 점수식)', () => {
   const 상황 = 입력(만루플레이, [타자주자, 삼루주자])
   const 결과 = describeThrowTarget(상황)
 
@@ -116,7 +116,7 @@ describe('점수식 0xafb24 — 후보표와 최종 점수 (난이도 0 = 점수
     expect(BASE_SCORE).toEqual([4000, 1000, 2000, 3000])
   })
 
-  it('불확실한 홈 보너스 1000000 — 난이도 0 의 점수식은 밀리지 않는 3루 주자라도 홈을 고른다', () => {
+  it('불확실한 홈 보너스 1000000 — 0아웃의 점수식은 밀리지 않는 3루 주자라도 홈을 고른다', () => {
     // 홈 = 4000 + 1000000(A) + 2×10000 + 500(B) = 1024500 — 둘째 루 항은 확실(effective)한 첫 루에만 붙는다
     // 1루 = 1000(A) + 2×(100011 + 5001(밖·1루) + 10000(달리는 중)) + 500(B) = 231524
     // 후보가 없는 루도 바닥값 500 은 받는다 (`+500`)
@@ -124,22 +124,22 @@ describe('점수식 0xafb24 — 후보표와 최종 점수 (난이도 0 = 점수
     expect(결과.chosen).toBe(0)
   })
 
-  it('난이도 0~1 에서는 점수식, 2 이상에서는 "여유 최대" 규칙으로 바뀐다', () => {
-    expect(describeThrowTarget({ ...상황, difficulty: 1 }).sure).toBe(false)
-    expect(describeThrowTarget({ ...상황, difficulty: 2 }).sure).toBe(true)
-    expect(describeThrowTarget({ ...상황, difficulty: 3 }).sure).toBe(true)
+  it('아웃 0~1 에서는 점수식, 2 이상(인자 + 유효 > 2)에서는 "여유 최대" 규칙으로 바뀐다', () => {
+    expect(describeThrowTarget({ ...상황, outs: 1 }).sure).toBe(false)
+    expect(describeThrowTarget({ ...상황, outs: 2 }).sure).toBe(true)
+    expect(describeThrowTarget({ ...상황, outs: 3 }).sure).toBe(true)
   })
 
   it('"여유 최대" 규칙은 여유가 가장 큰 루를 고른다', () => {
-    const 어려움 = describeThrowTarget({ ...상황, difficulty: 3 })
+    const 어려움 = describeThrowTarget({ ...상황, outs: 3 })
     const 최대 = 어려움.margins.indexOf(Math.max(...어려움.margins))
     expect(어려움.chosen).toBe(최대)
     expect(어려움.chosen).toBe(1)
   })
 
-  it('난이도가 3 이상이면 확실한 후보가 없어도 늘 "여유 최대" 로 간다', () => {
+  it('인자가 3 이상이면 확실한 후보가 없어도 늘 "여유 최대" 로 간다', () => {
     const 후보없음 = describeThrowTarget(
-      입력({ ballHolderSlot: 3, catchFielderSlot: 3 }, [], { activeRunnerCount: 1, difficulty: 3 }),
+      입력({ ballHolderSlot: 3, catchFielderSlot: 3 }, [], { activeRunnerCount: 1, outs: 3 }),
     )
     expect(후보없음.sure).toBe(true)
   })
@@ -153,7 +153,7 @@ describe('도루 주자 — 떠난 루가 아니라 달려가는 루로 던진�
       입력(
         { ...initialPlayView(5), coverOfBase: [1, 2, 3, 4], ballHolderSlot: 1, catchFielderSlot: 1, everHeld: true, held: true },
         [도루주자],
-        { fielders: 포수보유, landingTick: 0, difficulty: 2 },
+        { fielders: 포수보유, landingTick: 0, outs: 2 },
       ),
     )
     expect(결과.candidates.map((candidate) => candidate.runTick)).toEqual([NONE, NONE, 23, NONE])
