@@ -23,7 +23,7 @@ import {
   startTeamGame,
   startThrowPitch,
   stealableBases,
-  stealBase,
+  startSteal,
   summaryOf,
 } from '@/features/play-team-game/model/teamGameFlow'
 import type {
@@ -80,7 +80,7 @@ export interface TeamGameSession {
   readonly canPinchHit: boolean
   /** 지금 대타로 낼 수 있는 우리 명단 칸 (9번부터가 벤치다) */
   readonly benchBatters: readonly number[]
-  /** 지금 도루를 걸 수 있는 루 ('3' 1루 · '2' 2루) */
+  /** 지금 도루를 출발시킬 수 있는 루 ('3' 1루 · '2' 2루 · '1' 3루) */
   readonly stealableBases: readonly StealBase[]
   /**
    * **지금 실시간으로 돌려야 하는 타구** (원본 경기 상태 0x17). 차 있으면 화면은 타석·투구 대신
@@ -119,7 +119,7 @@ export interface TeamGameSession {
     readonly changePitcher: (benchIndex: number) => void
     /** `#` 대타 화면에서 벤치 타자 칸을 고른다 (0xaf06c → 0xaebe4) */
     readonly pinchHit: (benchIndex: number) => void
-    /** 도루 (메시지 0x583) — 대상 주자가 선 루 */
+    /** 도루 출발 (메시지 0x583 → 0xa9bd4) — 대상 주자가 선 루. 판정은 공이 도착할 때 도루 판이 한다 */
     readonly steal: (base: StealBase) => void
     /** 경기 중 메뉴 '*' 의 자동진행 — **비용 검사는 화면이 먼저 한다** */
     readonly autoProgress: () => void
@@ -205,6 +205,9 @@ export function useTeamGame(options: TeamGameOptions, random: RandomPort): TeamG
             return [
               detail.contactSoundId ?? null,
               pitchCallSoundIdOf(detail.resolution, nextAtBat),
+              // 공 도착 0x3dfac 가 연 도루·폭투 판의 판정 콜(도루 17 · 62/20, 폭투 17) — 원본은 판 안의 그 틱에 낸다.
+              // 웹은 판을 미리 다 돌려 재생하므로 판을 연 자리에서 낸다 (견제와 같은 근사)
+              arrivalCallSoundIdOf(before, after),
               after.pendingDefensePlay !== null || nextAtBat.outcome === null
                 ? null
                 : inPlayCallSoundIdOf(nextAtBat.outcome),
@@ -235,6 +238,8 @@ export function useTeamGame(options: TeamGameOptions, random: RandomPort): TeamG
             return [
               releaseSound,
               pitchCallSoundIdOf(resolution, nextAtBat),
+              // CPU 가 건 도루·폭투 판의 판정 콜 — 판을 연 자리에서 낸다 (견제와 같은 근사)
+              arrivalCallSoundIdOf(before, after),
               // 볼넷 뒤 관중 함성 29 (0x51afa~0x51b02) — 원본은 **공격 팀이 CPU 조작**
               // (`state[0x31 + state[9]] == 1`, 0x51adc~0x51af8) 일 때만 예약한다.
               // 이 자리는 사람이 던지는 타석이라 **타석에 선 쪽이 언제나 상대(CPU) 팀**이다.
@@ -267,9 +272,8 @@ export function useTeamGame(options: TeamGameOptions, random: RandomPort): TeamG
           ],
         ),
       pinchHit: (benchIndex: number) => step((current) => pinchHit(current, benchIndex)),
-      // 도루 실패로 이닝이 끝나면 공수 교대 징글이 난다. 세이프 콜(17)은 잇지 않았다 —
-      // 원본 판정 v9 가 어떤 플레이에서 나는지 미해결이다
-      steal: (base: StealBase) => step((current) => stealBase(current, base, random)),
+      // 도루 출발 — 주자를 출발만 시킨다(난수·소리 없음). 판정은 공이 도착할 때 도루 판(종류 5)이 한다
+      steal: (base: StealBase) => step((current) => startSteal(current, base)),
       autoProgress: () => step((current) => runAutoProgress(current, random)),
       finishBenchClearing: (reachedTargetTick: boolean) =>
         step((current) => resolveBenchClearing(current, { reachedTargetTick }, random)),
@@ -326,6 +330,12 @@ export function useTeamGame(options: TeamGameOptions, random: RandomPort): TeamG
     pendingDefensePlay: progress.pendingDefensePlay,
     actions,
   }
+}
+
+/** 이번 걸음에 공 도착 판(0x3dfac — 종류 9·5)이 새로 열렸으면 그 판정 콜 */
+function arrivalCallSoundIdOf(before: TeamGameProgress, after: TeamGameProgress): number | null {
+  const play = after.lastArrivalPlay
+  return play !== null && play !== before.lastArrivalPlay ? play.callSoundId : null
 }
 
 /** 견제 판이 새로 열렸으면 그 판정 콜 하나 */

@@ -41,7 +41,7 @@ import {
   startTeamGame,
   startThrowPitch,
   stealableBases,
-  stealBase,
+  startSteal,
   summaryOf,
   throwPitch,
 } from '@/features/play-team-game/model/teamGameFlow'
@@ -52,6 +52,7 @@ import {
   seasonReputationChangeOf,
 } from '@/entities/season-mode/model/seasonReputation'
 import type { TeamGameOptions, TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow'
+import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { battingPatternOdds } from '@/shared/config/original/battingPatterns'
 import { ACE_BATTERS } from '@/entities/game/model/aceOpponent'
@@ -214,7 +215,8 @@ describe('사람 장면 0xf 진입 0x3d954 — 공마다 CPU 투수 교체(0xac4
 
   it('타석이 끝난 공(볼넷)은 0xf 로 안 돌아가 묻지 않는다 — 새 타석 준비(0xd → 0xe → 0xf)에서 묻는다', () => {
     const 판 = { ...지친상대(), atBat: createAtBat({ balls: 3, strikes: 0 }) }
-    const 뒤 = applyBatterPitch(판, 볼, createSeededRandom(1))
+    // 씨앗 2 — 공 도착 0x3dfac 의 0.1% 굴림(0x35034)이 하나 늘어 교체 판정 굴림이 한 칸 밀렸다
+    const 뒤 = applyBatterPitch(판, 볼, createSeededRandom(2))
     expect(뒤.game.bases.first).toBe(true)
     // 다음 타자의 타석 준비(prepareAtBat)에서 0x3d954 가 바꿨다 — 새 타석이라 카운트는 0-0
     expect(뒤.opponentPitcherIndex).not.toBe(판.opponentPitcherIndex)
@@ -238,8 +240,10 @@ describe('사람 타석의 공마다 상대 투수를 깎는다 — 0x3dec6 의 
     expect(직구.opponentPitcherCounters.pitches).toBe(progress.opponentPitcherCounters.pitches + 1)
     expect(직구.opponentStamina).toBeLessThan(progress.opponentStamina)
     expect(직구.pitcherJustChanged).toBe(false)
-    // 굴림이 없다 — 같은 씨앗이 그대로 서 있다
-    expect(random.next()).toBe(createSeededRandom(1).next())
+    // 깎는 데는 굴림이 없다 — 이 공에서 나간 굴림은 공 도착 0x3dfac 의 0.1% 굴림(0x35034) 하나뿐이다
+    const 기준 = createSeededRandom(1)
+    기준.next()
+    expect(random.next()).toBe(기준.next())
   })
 
   it('같은 공 수면 결과는 구질 소모를 따른다 — 마구(22)는 직구와 같은 9', () => {
@@ -460,7 +464,7 @@ describe('자동진행 (경기 중 메뉴 동작 4 = 0x3c60c)', () => {
   })
 })
 
-describe('도루 (0x53610 → 메시지 0x583)', () => {
+describe('도루 출발 (0x53610 → 메시지 0x583 → 0xa9bd4) · 공 도착 판 (0x3dfac)', () => {
   /** 1루에 주자를 세운 우리 공격 상황 */
   const 일루주자 = () => {
     const { progress, random } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
@@ -472,14 +476,15 @@ describe('도루 (0x53610 → 메시지 0x583)', () => {
       random,
     }
   }
+  const 볼: PitchOutcomeDetail = { resolution: { kind: '볼' }, hasSwung: false, isBunt: false, resultCode: null }
 
-  it('1루 주자만 있으면 1루 도루를 걸 수 있다 — 3루 주자는 빠진다', () => {
+  it('출발시킬 수 있는 루 — canStartSteal(앞길 검사). 만루면 3루 주자만 홈으로 뛸 수 있다', () => {
     const { progress } = 일루주자()
 
     expect(stealableBases(progress)).toEqual([1])
 
     const 만루 = { ...progress, game: { ...progress.game, bases: { first: true, second: true, third: true } } }
-    expect(stealableBases(만루)).toEqual([])
+    expect(stealableBases(만루)).toEqual([3])
   })
 
   it('우리 수비 차례에는 도루가 없다 (원본도 공격일 때만 0x53610 을 탄다)', () => {
@@ -491,36 +496,60 @@ describe('도루 (0x53610 → 메시지 0x583)', () => {
     })).toEqual([])
   })
 
-  it('성공하면 주자가 2루로 가고, 실패하면 아웃이 하나 는다', () => {
+  it('키는 주자를 출발만 시킨다 — 루·아웃·기록은 그대로, 난수 없음', () => {
     const { progress } = 일루주자()
-    // 성공·실패 둘 다 나오도록 씨앗을 여러 개 돌린다
-    const 결과 = [1, 2, 3, 4, 5, 6, 7, 8].map((seed) =>
-      stealBase(progress, 1, createSeededRandom(seed)),
-    )
-    const 성공 = 결과.filter((next) => next.game.bases.second)
-    const 실패 = 결과.filter((next) => !next.game.bases.second)
+    const started = startSteal(progress, 1)
 
-    expect(성공.length + 실패.length).toBe(8)
-    for (const next of 성공) {
+    expect(started.stealingFrom).toEqual([1])
+    expect(started.game).toBe(progress.game)
+    expect(started.recordIds).toBe(progress.recordIds)
+    // 이미 출발했거나 걸 수 없는 루면 같은 객체
+    expect(startSteal(started, 1)).toBe(started)
+    expect(startSteal(progress, 2)).toBe(progress)
+  })
+
+  it('공이 도착하면 도루 판(종류 5)이 열린다 — 1루 도루는 늘 세이프, 기록 8 · 타석은 이어진다', () => {
+    for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
+      const { progress } = 일루주자()
+      const started = startSteal(progress, 1)
+      const next = applyBatterPitch(started, 볼, createSeededRandom(seed))
+
+      expect(next.stealingFrom).toEqual([])
+      expect(next.lastArrivalPlay?.kind).toBe(5)
+      expect(next.lastDefensePlay).toBe(next.lastArrivalPlay?.result)
+      expect(next.game.bases.second).toBe(true)
       expect(next.game.bases.first).toBe(false)
       expect(next.game.outs).toBe(progress.game.outs)
-      // 기록 8 도루 성공 (0xa8024 @a83c6) — 사람 공격이라 게이트를 지난다
-      expect(next.recordIds).toEqual([...progress.recordIds, 8])
-    }
-    for (const next of 실패) {
-      // 24 도루 저지 후보는 사람 공격이라 게이트(0xa77f0 a785e)에서 버려진다
-      expect(next.recordIds).toEqual(progress.recordIds)
-      expect(next.game.outs).toBe(progress.game.outs + 1)
-      // 타석은 이어진다 — 타순 커서가 넘어가지 않는다
       expect(next.game.battingOrderIndex).toBe(progress.game.battingOrderIndex)
+      // 8 도루 성공 (0xa8024 @a83c6) — 사람 공격이라 게이트를 지난다
+      expect(next.recordIds).toEqual([...progress.recordIds, 8])
+      expect(next.atBat.balls).toBe(progress.atBat.balls + 1)
     }
   })
 
-  it('걸 수 없는 루면 그대로 돌려준다', () => {
-    const { progress, random } = 일루주자()
+  it('출발하지 않은 공은 판이 없다 (0.1% 폭투·포일 굴림만 한 번)', () => {
+    const { progress } = 일루주자()
+    const next = applyBatterPitch(progress, 볼, createSeededRandom(1))
 
-    expect(stealBase(progress, 2, random)).toBe(progress)
-    expect(stealBase(progress, 3, random)).toBe(progress)
+    expect(next.lastArrivalPlay).toBeNull()
+    expect(next.game.bases).toEqual(progress.game.bases)
+  })
+
+  it('CPU 공격은 타자 결정 앞에서 0x520de 를 굴린다 — 1루 주자면 공마다 약 1.1% 로 도루 판이 열린다', () => {
+    let opened = 0
+    let caught = 0
+    for (let seed = 1; seed <= 400; seed += 1) {
+      const { progress } = 시작({}, seed)
+      const 일루 = { ...progress, game: { ...progress.game, bases: { first: true, second: false, third: false } } }
+      const next = throwPitch(일루, { typeNumber: 첫구질(일루), courseCell: 0, gaugeCell: 0 }, createSeededRandom(seed))
+      if (next.lastArrivalPlay?.kind === 5) {
+        opened += 1
+        caught += next.lastArrivalPlay.result.caughtFrom.length
+      }
+    }
+    expect(opened).toBeGreaterThan(0)
+    // 1루 도루는 리드 뒤 송구할 루가 없어 늘 세이프다 (c8649a3)
+    expect(caught).toBe(0)
   })
 })
 
@@ -1476,8 +1505,9 @@ describe('실투 판정 0x33cbc — 사람이 던지는 공', () => {
       kind: '스트라이크',
       isSwinging: false,
     })
-    // 지켜보면 타자 쪽 굴림은 표 하나뿐이다 — 그 바로 앞이 실투 판정이다
-    const 실투자리 = 평소.calls() - 2
+    // 지켜보면 타자 쪽 굴림은 표 하나뿐이고, 그 뒤가 공 도착 0x3dfac 의 0.1% 굴림(0x35034)이다 —
+    // 표 바로 앞이 실투 판정이다 (주자가 없어 CPU 도루 0x520de 는 안 굴린다)
+    const 실투자리 = 평소.calls() - 3
 
     const 실투 = startThrowPitch(progress, input, 각본난수(0.7, 실투자리, 0))
     expect(실투.lastResolution?.kind).toBe('타구')
@@ -1577,7 +1607,7 @@ describe('사구 — 우리 타석 결과 4 와 벤치 클리어링 (상태 0x1e
 
 /**
  * 우리가 던진 공에 CPU 타자가 맞는다 — 0x35a20. 기본 배치 side 1(좌타)에서 바깥 칸 2 를 노린 공이
- * 흩어져 상자 [271, 309] 에 닿는 씨앗을 골랐다 (10: 벤치 클리어링 굴림 20 이상 · 103: 19 이하).
+ * 흩어져 상자 [271, 309] 에 닿는 씨앗을 골랐다 (35: 벤치 클리어링 안 들어감 · 86: 들어감 — 공 도착 0.1% 굴림 뒤).
  */
 describe('사구 — 우리 수비에서 CPU 타자가 맞는다 (0x35a20 · 벤치 클리어링 수비 사람 갈래)', () => {
   function 맞히기(seed: number): { 전: TeamGameProgress; 후: TeamGameProgress } {
@@ -1599,7 +1629,7 @@ describe('사구 — 우리 수비에서 CPU 타자가 맞는다 (0x35a20 · 벤
 
   it('벤치 클리어링에 들어가면 우리 투수 스태미나 −1000 · 시즌 평판 S[1] +1 (공격측 CPU)', () => {
     const 보통 = 맞히기(35).후
-    const 벤치 = 맞히기(1179).후
+    const 벤치 = 맞히기(86).후
     expect(벤치.lastResolution).toEqual({ kind: '사구' })
     expect(보통.stamina - 벤치.stamina).toBe(1000)
     expect(벤치.gameRecord[1] - 보통.gameRecord[1]).toBe(1)
@@ -1614,7 +1644,7 @@ describe('사구 — 우리 수비에서 CPU 타자가 맞는다 (0x35a20 · 벤
   it('시즌이 아니면(모드 ≠ 2) S[1] 이 안 남는다', () => {
     const { progress } = 시작({ mode: 1 })
     const input = { typeNumber: 첫구질(progress), courseCell: 2, gaugeCell: 0 }
-    const 벤치 = startThrowPitch(progress, input, createSeededRandom(1179))
+    const 벤치 = startThrowPitch(progress, input, createSeededRandom(86))
     expect(벤치.lastResolution).toEqual({ kind: '사구' })
     expect(벤치.log.some((entry) => entry.text.includes('벤치 클리어링'))).toBe(true)
     expect(벤치.gameRecord).toEqual(progress.gameRecord)

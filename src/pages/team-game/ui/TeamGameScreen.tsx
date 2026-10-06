@@ -53,6 +53,7 @@ import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import { CourseGrid } from '@/pages/pitching/ui/CourseGrid'
 import { PitchGradeGauge } from '@/pages/pitching/ui/PitchGradeGauge'
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
+import { stealBaseOfKey } from '@/features/defense-play/model/pitchArrivalPlay'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import * as styles from '@/pages/team-game/ui/TeamGameScreen.css'
 
@@ -70,7 +71,7 @@ import * as styles from '@/pages/team-game/ui/TeamGameScreen.css'
  *   - **'\*'** 경기 중 메뉴 (표 0xcfcfc 행 0: 계속·자동진행·조작방법·설정·나가기 — I-controls 4c)
  *   - **'#'** 교체 화면 (상태 0xb, 투구 전·구질 고르기 — I-controls 4b · R4 1a).
  *     **수비 중이면 투수 교체, 공격 중이면 대타**다 (갈림길 `0x49598`)
- *   - **'3'/'2'** 도루 (공격 중, 메시지 0x583 — I-controls 0절)
+ *   - **'3'/'2'/'1'** 도루 출발 (공격 중, 메시지 0x583 → 0xa9bd4 — I-controls 0절). 판정은 공이 도착할 때 도루 판이 한다
  *
  * 교체 연출(상태 0x16)은 **소리만** 잇는다 — 대타 등판음·"Time!" 22 는 `useTeamGame` 걸음 끝이 낸다(1e1f5f2).
  * 그 연출 그림(0x4da30)은 없다.
@@ -167,7 +168,7 @@ export function TeamGameScreen({
   }, [canPitch, progress.atBat.balls, progress.atBat.strikes])
 
   /**
-   * 원본 공용 키 처리 `0x498d4` — '\*' 경기 중 메뉴 · '#' 교체 · 도루 '3'/'2'.
+   * 원본 공용 키 처리 `0x498d4` — '\*' 경기 중 메뉴 · '#' 교체 · 도루 '3'/'2'/'1'.
    * (CLR 은 웹에서 Escape·Backspace 로 받는다 — 원본 키 코드 −16.)
    */
   const isStealable = session.stealableBases
@@ -207,8 +208,8 @@ export function TeamGameScreen({
         event.preventDefault()
         return setChangeWindow(null)
       }
-      // 도루 0x53610 — '3' 1루 주자 · '2' 2루 주자 ('1' 3루 주자는 원본이 홈 도루를 걸지 않는다)
-      const stealBase = event.key === '3' ? 1 : event.key === '2' ? 2 : null
+      // 도루 출발 0x53610 — '3' 1루 주자 · '2' 2루 주자 · '1' 3루 주자(홈으로)
+      const stealBase = stealBaseOfKey(event.key)
       if (stealBase !== null && isStealable.includes(stealBase)) {
         event.preventDefault()
         actions.steal(stealBase)
@@ -549,6 +550,7 @@ export function TeamGameScreen({
               탭·Space·5 스윙 · ←→(4·6) 타자 이동
               {isStealable.includes(1) && ' · 3 도루(1루)'}
               {isStealable.includes(2) && ' · 2 도루(2루)'}
+              {isStealable.includes(3) && ' · 1 도루(3루)'}
             </Hint>
           </div>
         ) : canPitch ? (
