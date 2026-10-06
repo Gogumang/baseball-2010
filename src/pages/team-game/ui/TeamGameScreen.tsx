@@ -533,6 +533,10 @@ export function TeamGameScreen({
               // ⚠️ 미해결: `batterSkillIds` 를 안 넘긴다 — 팀 경기 명단(`TeamEntryBatter`)·로스터 표에 선수 스킬 비트(+0x14)가
               //    없다. 그래서 실투 판정 0x33cbc 의 타자 비트 22 압도(+5)와 0xa5e14 의 압도 ×2 가 늘 거짓이다
               gameMode={options.mode}
+              // 환경설정 전광판(저장 +0x3a) — OFF 면 흐르는 글자를 안 그린다 (0x77726)
+              isScoreboardOn={settings?.isScoreboardOn}
+              // 환경설정 진동(저장 +0x3b) — 맞은 공·사구 진동 (0x3a44)
+              isVibrationOn={settings?.isVibrationOn}
               pitcherAbility={currentPitcherAbility(progress)}
               hud={{
                 inning: game.inning,
