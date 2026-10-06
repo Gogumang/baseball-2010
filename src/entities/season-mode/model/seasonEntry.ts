@@ -36,7 +36,8 @@ import type { EntryBatterRow, EntryLists, EntryPitcherRow } from '@/entities/sea
  *   (`useSeasonSession.seasonLeagueStarterSlotOf` — 지난 시즌·포스트시즌에서 이어진 차례)을 넣는다.
  *
  * ⚠️ 미해결·근사
- * - 상대 팀(this+0x120 = 0)은 보기 전용이라 고칠 일이 없다. 웹은 상대 팀 명단을 붙박이 표에서 만든다.
+ * - 상대 팀(this+0x120 = 0)은 보기 전용이라 고칠 일이 없다. 상대 팀 레코드는 트레이드로 바뀐 CPU 팀이면 시즌 저장의
+ *   `cpuRosters`, 아니면 붙박이 표다(`useSeasonSession.cpuRosterOf` — 팀 경기 `opponentEntryOrder` 도 같은 레코드).
  *   원본은 상대 팀에도 굴린 마선수(`0x66968`·`0x66994`)를 넣는다 — `useSeasonSession` 이 0xdd 진입에서 굴려
  *   경기 옵션 `opponentAces` 로 싣고, CPU 팀 목록에도 같은 값을 `acePitcherId`·`aceBatterId` 로 끼운다.
  * - 국가대항전의 대한민국 레코드(`+0x918`)는 대회 내내 이어진다 — 웹은 시즌 세이브의 `cupRoster` 에 둔다
