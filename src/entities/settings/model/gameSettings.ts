@@ -81,9 +81,12 @@ export interface GameSettings {
    * 526ac: 그 값이 0 이면 건너뛴다                  ; 주루와 달리 예외가 하나도 없다
    * 526ae: 0xaf8e0(제어기 = 장면+0x210)             ; = 제어기.vt0xc = 0xafa60 CPU 송구 결정
    * ```
-   * 곧 **"사람이 수비하면서 설정이 수동이면 CPU 송구 결정(점수식 0xafb24)을 아예 안 돌린다"**.
-   * 그때 목표 루는 플레이 vt0x30 = `0xb1c90` 이 고른다 — 사람이 누른 목표(+0x160)가 먼저고,
-   * 안 눌렀으면 "앞선 주자부터 잡히는 첫 루"(`throwArrival.autoThrowTargetBase`)다.
+   * 곧 **"사람이 수비하면서 설정이 수동이면 CPU 송구 결정(점수식 0xafb24)을 매 틱 돌리지 않는다"**.
+   * 그때 공은 **사람이 누른 목표(+0x160)로만** 나간다 — 플레이 틱 vt4c 의 b4660~b46a8 이 공 가진 야수가 준비되면
+   * 그 루로 보낸다(0xb2c90). 키를 안 누르면 공 쥔 야수는 공을 들고 서 있다: 플레이 vt0x30 = `0xb1c90` 의 자동 고리
+   * (`throwArrival.autoThrowTargetBase`)가 고른 루는 송구가 아니라 2루 커버가 아닌 키스톤 야수의 자리 잡기(0xb203a,
+   * `throwArrival.secondBaseHelperPlacement`)에만 쓰인다. 예외는 아웃이 난 틱의 결과 메시지 0xbba — 수동이어도
+   * `아웃 ≤ 2` 면 0xafa60 을 한 번 부른다(`runDefensePlay` 6c 절, 공 가진 야수가 준비됐을 때만 던진다).
    *
    * 배선: `DefensePlayInput.throwMode`(+ `defenseIsCpu`) 로 넘긴다. 안 넘기면 원본 기본값(수동)이다.
    * 사람이 수비하는 자리 가운데 지금 이 설정을 넘기는 것은 **투수편**뿐이다
