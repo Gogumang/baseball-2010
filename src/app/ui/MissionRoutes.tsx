@@ -34,6 +34,11 @@ interface MissionRoutesProps {
   /** 경기 중 메뉴 "설정" 칸 */
   readonly gameSettings: ReturnType<typeof useGameSettings>
   readonly pitchControl: PitchControl
+  /**
+   * 선수 고르기 창(하위 17) 머리띠의 G포인트 — 전역 기록 `mgr+0x64` (App 의 지갑 `wallet.balance`).
+   * 머리띠 0x54d95 는 제목이 −1 이 아니면 G포인트(0x54a60)를 늘 그린다. 안 넘기면 머리띠를 예전(명예의 전당 띠)대로 둔다.
+   */
+  readonly gamePoint?: number
 }
 
 /** 미션 모드 화면 분기. 진행 중인 미션이 없으면 선택 화면으로 되돌린다. */
@@ -48,6 +53,7 @@ export function MissionRoutes({
   nari,
   pitchControl,
   gameSettings,
+  gamePoint,
 }: MissionRoutesProps) {
   const { missionRun, pitcherRun, actions } = session
   const batter = session.hallOfFameBatter ?? nariBatter
@@ -59,9 +65,20 @@ export function MissionRoutes({
   // 미션 모드로 들어오면 먼저 선수를 고른다 (하위 17 — 진입 0x2613c · 갱신 0x29a54). 결과 0(되돌아가기)은
   // 하위 5 모드 목록 — 웹은 메인 메뉴다. 1·3 → 모드 5(투수 미션), 2·4 → 모드 6(타자 미션) 목록으로 간다.
   // 원본은 육성·명예 선수가 다 없으면 코드 5·6 팝업만 떠서 들어갈 수 없다(신인 대체 없음, Q2 3-1).
+  //
+  // 그리기 0x2dec8 (직접 뜸) 은 셋만 부른다:
+  //   0x58371(skin, [this+0x90], 0)                         ; 바탕
+  //   0x63b15(skin, [this+0x74] 목록, 6, 1, [this+0x2c], −1) ; 명예의 전당 목록 k 6 (시즌 0xe2 0xa10c 와 같은 k)
+  //   0x54d95(skin, 11, 5, 0)                                ; 머리띠 — 제목 11 "미션모드"(game_frame 18) · 바닥 5(되돌아가기만)
+  // 0x54d95 는 제목이 −1 이 아니면 G포인트(0x54a60)도 그린다(0x550de) — 명예의 전당(하위 27, 제목 16) 띠가 아니다.
+  // 머리글 질문 StrMAINMENU[14] "어떤 선수로 플레이 하시겠습니까?" 는 **안 띄운다**: 그 팝업 0x25d78(0x74ef5(…, 0x10))은
+  // 진입 표 0xcf06c 에서 하위 13(나만의리그 편 고르기, 0x329f6) 하나만 부르고, 하위 17 의 진입 0x2613c(0x24924 자원 ·
+  // 0x5eb8c 칸 채우기)·갱신 0x29a54(0x62569 키 → 표 0xcec00)·그리기 0x2dec8 어디에도 0x25d78·0x74ef5·문자열 0x702b5 호출이 없다.
+  // ⚠️ 미해결: 바탕 0x58371 의 내부는 안 읽어 명예의 전당 화면 바탕 그대로 둔다.
   if (screen.kind === '미션선택' && session.player === null) {
     return (
       <HallOfFameScreen
+        {...(gamePoint === undefined ? {} : { frame: { title: '미션모드' as const, gamePoint } })}
         collection={hallOfFame}
         mode={{ kind: '선수고르기', nari, onPick: actions.choosePlayer, onCancel: () => setScreen({ kind: '메인메뉴' }) }}
         onBack={() => setScreen({ kind: '메인메뉴' })}

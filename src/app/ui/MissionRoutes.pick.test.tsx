@@ -14,7 +14,10 @@ import { createSeededRandom } from '@/shared/api/random/seededRandom'
 afterEach(cleanup)
 
 describe('미션 모드 진입 — 하위 17 선수 고르기를 먼저 띄운다 (0x2613c · 0x29a54)', () => {
-  function 띄우기(nari: { 투수: { name: string; equippedAbility: number[] } | null; 타자: { name: string; equippedAbility: number[] } | null }) {
+  function 띄우기(
+    nari: { 투수: { name: string; equippedAbility: number[] } | null; 타자: { name: string; equippedAbility: number[] } | null },
+    gamePoint?: number,
+  ) {
     const setScreenSpy = vi.fn()
     function Harness() {
       const [screen, setScreen] = useState<Screen>({ kind: '미션선택' })
@@ -28,7 +31,7 @@ describe('미션 모드 진입 — 하위 17 선수 고르기를 먼저 띄운�
       return (
         <MissionRoutes screen={screen} setScreen={go} session={session} runner={runner} random={random}
           batter={modeBatterOf(null)} hallOfFame={EMPTY_COLLECTION} nari={nari}
-          pitchControl="게이지" gameSettings={gameSettings} />
+          pitchControl="게이지" gameSettings={gameSettings} {...(gamePoint === undefined ? {} : { gamePoint })} />
       )
     }
     render(<Harness />)
@@ -47,6 +50,17 @@ describe('미션 모드 진입 — 하위 17 선수 고르기를 먼저 띄운�
     const { 슬롯 } = 띄우기({ 투수: null, 타자: null })
     fireEvent.click(슬롯(5))
     expect(view.getByText(/나만의리그 선수를/)).toBeTruthy()
+  })
+
+  it('머리띠는 그리기 0x2dec8 의 0x54d95(skin, 11, 5) — 제목 11 "미션모드"(game_frame 18) + G포인트, 명예의 전당 띠가 아니다', () => {
+    띄우기({ 투수: null, 타자: null }, 1234)
+    const sources = [...document.querySelectorAll('img')].map((image) => image.getAttribute('src') ?? '')
+    expect(sources.some((src) => src.endsWith('game_frame/018.png'))).toBe(true)
+    expect(sources.some((src) => src.endsWith('game_frame/003.png'))).toBe(false)
+    // 머리글 질문 StrMAINMENU[14] 는 하위 13(0x25d78) 몫이다 — 하위 17 은 안 띄운다
+    expect(view.queryByText(/어떤 선수로 플레이/)).toBeNull()
+    // 바닥 5 = 되돌아가기만
+    expect(view.getByRole('button', { name: '되돌아가기' })).toBeTruthy()
   })
 
   it('되돌아가기는 결과 0 — 메인 메뉴로', () => {
