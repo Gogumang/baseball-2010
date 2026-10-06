@@ -455,6 +455,26 @@ describe('사람 조작 — 상태 0x17 키 표 (I-controls 0·2b·2d·3b)', () 
     expect(누르고있다.laserThrow).toBe(false)
     expect(안눌렀다.laserThrow).toBe(false)
   })
+
+  it('레이저 송구는 야수 vtb0 = 0xa222c 로 던진다 — +0xdc = 2000 고정 · 악송구 굴림 없음 (b2f06 · a229c)', () => {
+    const 공통 = {
+      outcome: 단타,
+      trajectory: battedBallTrajectory(representativePatternOf(단타)),
+      bases: 주자1루,
+      outs: 0,
+      // rand 가 늘 0 이면 0xa1828 의 rand(0,10000) = 0 < 기준이라 0xa1620 송구는 늘 악송구다
+      random: 고정난수(0),
+    }
+    const 레이저 = runDefensePlay({ ...공통, controls: 계속누름('수비', '2') })
+    const 보통 = runDefensePlay({ ...공통, controls: { side: '수비', keyAt: () => ({ key: '2', isRepeat: true }) } })
+
+    expect(레이저.laserThrow).toBe(true)
+    expect(레이저.errantThrow).toBe(false)
+    expect(보통.laserThrow).toBe(false)
+    expect(보통.errantThrow).toBe(true)
+    // 같은 틱(펌블 뒤 36틱)에 같은 루로 던져도 레이저(2000)가 먼저 닿는다
+    expect(레이저.throwArrivalTick).toBeLessThan(보통.throwArrivalTick)
+  })
 })
 
 describe('필살타법 성공 타구는 야수가 잡지 못한다 — 공 비트 4 (0x51800 · 0xaf180 · 0xbc3, S13 6절)', () => {

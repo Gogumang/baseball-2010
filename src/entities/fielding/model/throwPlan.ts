@@ -83,8 +83,8 @@ function arcsineDegrees(value: number): number {
  * ```
  * 곧 **70/80 % 는 속도가 아니라 중력 배율**이고, 공은 수평 속도 v·cosθ 로 큰 축을 따라 한 틱씩 간다
  * (공 틱 0xa28c0 의 `x += cos·속도 >> 16` 과 같은 걸음). 송구 0xa1620 도 같은 식으로 쏜다.
- * ⚠️ 원본 그대로: v 는 +0xdc **지난 송구의 속도**다 — 0xa1620 이 송구마다 특수면 +0xd8(130%), 아니면 +0xd4 로
- * 덮어쓴다(a16ec). 웹 야수는 판마다 새로 만들어 늘 +0xd4 다(특수 송구 뒤 남는 130% 는 안 옮겼다).
+ * ⚠️ 원본 그대로: v 는 +0xdc **지난 송구의 속도**다(`FielderState.throwSpeed`) — 0xa1620 이 송구마다 특수면 +0xd8(130%),
+ * 아니면 +0xd4 로 덮어쓰고(a16ec), 판 시작 0xb0fb4 → 0xa0fc4 가 +0xd4 로 되돌린다. `thrownWith` 가 그 덮어쓰기다.
  * (거리 20400 을 넘으면 원바운드가 되는 것은 0xa1620 쪽이다 — `BOUNCE_THROW_DISTANCE`)
  */
 export function throwTicksTo(fielder: FielderState, point: WorldPoint): number {
@@ -108,6 +108,22 @@ export function throwTicksTo(fielder: FielderState, point: WorldPoint): number {
   // 큰 축 성분은 cos/sin 45° 이상이라 0 이 안 된다 — 0 이면 원본은 0 으로 나눈다(지어내지 않고 도달 못 함으로 둔다)
   if (axisSpeed === 0) return NEVER_ARRIVES
   return Math.ceil(axisDistance / axisSpeed)
+}
+
+/** 레이저 송구(플레이+0x1f4) 속도 — 0xb2e38 이 고르는 야수 vtb0 = 0xa222c 가 `+0xdc = 0xfa << 3` 으로 넣는다 (a229c) */
+export const LASER_THROW_SPEED = 2000
+
+/** 특수 송구 속도 +0xd8 = +0xd4 × 130 / 100 (0xa0fc4) */
+export const SPECIAL_THROW_SPEED_PERCENT = 130
+
+/**
+ * 던지는 순간의 +0xdc — 0xa1620 a16dc~a16ec: `+0xdc = 특수 ? +0xd8 : +0xd4`. 던진 뒤에도 그 판 동안 남는다.
+ */
+export function thrownWith(fielder: FielderState, special: boolean): FielderState {
+  const speed = special
+    ? Math.trunc((fielder.baseThrowSpeed * SPECIAL_THROW_SPEED_PERCENT) / 100)
+    : fielder.baseThrowSpeed
+  return speed === fielder.throwSpeed ? fielder : { ...fielder, throwSpeed: speed }
 }
 
 /** 다른 야수에게 던지는 틱 — vt 0xb4 = 0xa1a60 (상대 +0x20 위치를 vt 0xb8 에 넘긴다) */

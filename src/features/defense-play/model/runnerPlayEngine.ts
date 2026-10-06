@@ -38,7 +38,7 @@ import {
 } from '@/entities/fielding/model/heldRuns'
 import { judgeOut, OUT_KIND, releaseForcesAfterOut } from '@/entities/fielding/model/outJudgement'
 import { defenseArrivalTicks } from '@/entities/fielding/model/throwArrival'
-import { effectiveThrowSpeedOf, readyTicksOf, throwTicksTo } from '@/entities/fielding/model/throwPlan'
+import { effectiveThrowSpeedOf, readyTicksOf, thrownWith, throwTicksTo } from '@/entities/fielding/model/throwPlan'
 import { chooseThrowTargetBase, isSpecialThrow } from '@/entities/fielding/model/throwTargetBase'
 import { EMPTY_BASES, type BaseState } from '@/entities/game/model/baseState'
 import type { ManualAutoMode } from '@/entities/settings/model/gameSettings'
@@ -279,11 +279,13 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
       input.random === undefined || bounce
         ? NO_THROW_ERROR
         : rollThrowError(abilities[holderSlot] ?? DEFAULT_ABILITY, special?.special === true, input.random)
-    const thrower = special !== null && special.special ? special.thrower : holder
-    let arrival =
-      special !== null && special.special
-        ? specialThrowArrivalTicks(contextAt(tick), base, thrower)
-        : defenseArrivalTicks(contextAt(tick), base)
+    // a16dc~a16ec: +0xdc = 특수 ? +0xd8 : +0xd4 — 던질 때 덮어쓰고 그 판 동안 남는다
+    const isSpecial = special !== null && special.special
+    fielders = fielders.map((fielder) => (fielder.slot === holderSlot ? thrownWith(fielder, isSpecial) : fielder))
+    const thrower = fielders[holderSlot]
+    let arrival = isSpecial
+      ? specialThrowArrivalTicks(contextAt(tick), base, thrower)
+      : defenseArrivalTicks(contextAt(tick), base)
     if (error.errant) {
       const speed = effectiveThrowSpeedOf(thrower)
       const errant = Math.max(MINIMUM_THROW_SPEED, speed + error.speedDelta)

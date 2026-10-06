@@ -31,7 +31,10 @@ export function rollFumble(defenseAbility: number, ballIsMoving: boolean, random
   return fumbleChanceOf(defenseAbility) > randomIntegerBelow(random, 0, RANDOM_LIMIT)
 }
 
-/** 악송구 기준값 = (10 − 등급) + 특수×100 + 100 (0xa1828). 특수 송구(레이저)는 오히려 1%p 더 위험하다 */
+/**
+ * 악송구 기준값 = (10 − 등급) + 특수×100 + 100 (0xa1828). 특수 = 0xa1620 의 다섯째 인자(송구 계획 [1], CPU 홈 특수 송구)라
+ * 오히려 1%p 더 위험하다. 레이저 송구(플레이+0x1f4)는 0xa1620 이 아니라 야수 vtb0 = 0xa222c 로 던져 이 굴림 자체가 없다.
+ */
 export function throwErrorChanceOf(defenseAbility: number, special = false): number {
   return throwErrorBiasOf(abilityGradeOf(defenseAbility)) + (special ? 100 : 0) + 100
 }

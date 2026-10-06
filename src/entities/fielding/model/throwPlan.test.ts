@@ -10,6 +10,7 @@ import {
   RELAY_DISTANCE,
   THROW_COEFFICIENT_INFIELD,
   THROW_COEFFICIENT_OUTFIELD,
+  thrownWith,
   throwTicksTo,
 } from '@/entities/fielding/model/throwPlan'
 
@@ -28,6 +29,21 @@ describe('설정값 — d_level.dat (S7 5-2)', () => {
     expect(야수들[3].throwSpeed).toBe(972)
     expect(effectiveThrowSpeedOf(야수들[3])).toBe(680)
     expect(effectiveThrowSpeedOf(야수들[8])).toBe(777)
+  })
+})
+
+describe('송구 속도 +0xdc — 지난 송구의 속도 (0xa0fc4 · 0xa1620 a16dc~a16ec)', () => {
+  it('판 시작에는 +0xdc = +0xd4 다 (0xa0fc4)', () => {
+    expect(야수들[8].throwSpeed).toBe(야수들[8].baseThrowSpeed)
+  })
+
+  it('특수 송구는 +0xd8(= +0xd4 × 130%)로 덮어쓰고, 보통 송구가 +0xd4 로 되돌린다', () => {
+    const 특수뒤 = thrownWith(야수들[8], true)
+    expect(특수뒤.throwSpeed).toBe(Math.trunc((972 * 130) / 100))
+    expect(특수뒤.baseThrowSpeed).toBe(972)
+    // 다음 송구 틱 0xa1adc 는 남은 130% 로 잰다 — 더 빠르다
+    expect(throwTicksTo(특수뒤, { x: 0, y: 0, z: 0 })).toBeLessThan(throwTicksTo(야수들[8], { x: 0, y: 0, z: 0 }))
+    expect(thrownWith(특수뒤, false).throwSpeed).toBe(972)
   })
 })
 

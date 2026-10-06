@@ -74,8 +74,14 @@ export interface FielderState {
   readonly actionLockTicks: number
   /** 경기용 수비 능력치 등급 0~7 (0xbbe98) */
   readonly defenseGrade: number
-  /** 송구 공 속도 (0xa0fc4: cfg+0x1a 940 + cfg+0x2a 8 × (등급+1) + 팀 보너스) */
+  /**
+   * **지난 송구의 속도 +0xdc** — 송구 틱 0xa1adc(야수 vtbc)가 읽는 v 다.
+   * 판 시작(플레이 vt20 = 0xb0fb4 → 0xa0fc4)이 +0xd4 로 되돌리고, 던질 때마다 0xa1620(a16dc~a16ec)이
+   * 특수 ? +0xd8(130%) : +0xd4 로 덮어쓴다 — 곧 특수 송구 뒤에는 그 판이 끝날 때까지 130% 로 잰다(원본 그대로).
+   */
   readonly throwSpeed: number
+  /** 송구 공 속도 +0xd4 (0xa0fc4: cfg+0x1a 940 + cfg+0x2a 8 × (등급+1) + 팀 보너스). +0xd8 = 이 값 × 130 / 100 */
+  readonly baseThrowSpeed: number
 }
 
 export interface RunnerState {
@@ -191,6 +197,8 @@ export function createFielders(defenseAbilities: readonly number[], teamBonus = 
   return Array.from({ length: FIELDER_COUNT }, (_unused, slot) => {
     const grade = abilityGradeOf(defenseAbilities[slot] ?? 0)
     const start = FIELDER_START_POSITIONS[slot]
+    // 0xa0fc4(야수, v): +0xdc = +0xd4 = v · +0xd8 = v × 130 / 100
+    const throwSpeed = throwSpeedOf(grade, teamBonus)
     return {
       slot,
       position: start,
@@ -203,7 +211,8 @@ export function createFielders(defenseAbilities: readonly number[], teamBonus = 
       arrivalSlackTicks: 0,
       actionLockTicks: 0,
       defenseGrade: grade,
-      throwSpeed: throwSpeedOf(grade, teamBonus),
+      throwSpeed,
+      baseThrowSpeed: throwSpeed,
     }
   })
 }

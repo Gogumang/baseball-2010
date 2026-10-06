@@ -16,7 +16,6 @@ import {
   SIXTH_SENSE_SKILL_ID,
   HOME_RUN_DERBY_MODE,
   BATTER_CAREER_MODE,
-  LASER_SPEED_PERCENT,
   LASER_WINDOW_FIRST_TICK,
 } from '@/entities/defense-controls/model/laserThrow'
 import {
@@ -37,6 +36,7 @@ import {
   rollFumble,
   rollSpecialDefense,
   rollThrowError,
+  type ThrowErrorResult,
 } from '@/entities/fielding/model/fieldingErrors'
 import type { BattedBallTrajectory } from '@/entities/fielding/model/catchPrediction'
 import {
@@ -89,7 +89,9 @@ import { defenseArrivalTicks, secondBaseCoverSlot } from '@/entities/fielding/mo
 import {
   effectiveThrowSpeedOf,
   planThrow,
+  LASER_THROW_SPEED,
   readyTicksOf,
+  thrownWith,
   throwTicksTo,
   throwTicksToFielder,
 } from '@/entities/fielding/model/throwPlan'
@@ -1075,26 +1077,37 @@ export function stepDefensePlay(
       isThrowerReady: true,
     })
     if (laser) laserThrow = true
-    // CPU 홈 송구 20% 특수 송구 — 효과는 `cpuSpecialThrowOf` 참고
-    const special = cpuSpecial ? cpuSpecialThrowOf(fielders, fromSlot, coverSlot) : NO_CPU_SPECIAL_THROW
-    // 원바운드(0xa17fc 갈래)는 악송구 굴림 대신 rand(0,2) 한 번으로 각도 부호(±1)만 정한다
-    if (special.bounce && input.random !== undefined) randomIntegerBelow(input.random, 0, 2)
-    // 악송구 굴림 (0xa1828). 레이저(특수)면 기준이 +100 = +1%p 더 위험하다.
-    // CPU 특수 송구는 0xa1620 의 다섯째 인자(= 계획 [1])로 같은 자리에 들어간다
-    const error =
-      input.random === undefined || special.bounce
-        ? NO_THROW_ERROR
-        : rollThrowError(abilities[fromSlot] ?? DEFAULT_ABILITY, laser || special.special, input.random)
+    // CPU 홈 송구 20% 특수 송구 — 효과는 `cpuSpecialThrowOf` 참고. 레이저는 0xb2e38 이 다른 함수로 던진다(아래)
+    const special = !laser && cpuSpecial ? cpuSpecialThrowOf(fielders, fromSlot, coverSlot) : NO_CPU_SPECIAL_THROW
+    let error: ThrowErrorResult = NO_THROW_ERROR
+    let arrivalTicks: number
+    if (laser) {
+      // b2f06: 플레이+0x1f4(레이저) 면 0xa1620(vtac) 대신 야수 vtb0 = 0xa222c 로 던진다 (직접 뜬 것):
+      //   a229c `+0xdc = 2000` 고정 속도 · 0xa1adc 와 같은 정수 산술(0xa279d 중력 배율 · 0xbfab0 · cos) · **난수 굴림 없음**
+      //   (0xbfa54 호출이 없다 — 악송구가 안 난다). 특수라 0xb3444 가 중계도 안 끼운다(b3528).
+      fielders = fielders.map((fielder) =>
+        fielder.slot === fromSlot ? { ...fielder, throwSpeed: LASER_THROW_SPEED } : fielder,
+      )
+      arrivalTicks = specialThrowArrivalTicks(contextAt(tick), base, fielders[fromSlot])
+    } else {
+      // 원바운드(0xa17fc 갈래)는 악송구 굴림 대신 rand(0,2) 한 번으로 각도 부호(±1)만 정한다
+      if (special.bounce && input.random !== undefined) randomIntegerBelow(input.random, 0, 2)
+      // 악송구 굴림 (0xa1828). CPU 특수 송구는 0xa1620 의 다섯째 인자(= 계획 [1])로 기준 +100 에 들어간다
+      if (input.random !== undefined && !special.bounce) {
+        error = rollThrowError(abilities[fromSlot] ?? DEFAULT_ABILITY, special.special, input.random)
+      }
+      // a16dc~a16ec: +0xdc = 특수 ? +0xd8 : +0xd4 — 던질 때 덮어쓰고 그 판 동안 남는다(`FielderState.throwSpeed`)
+      fielders = fielders.map((fielder) => (fielder.slot === fromSlot ? thrownWith(fielder, special.special) : fielder))
+      arrivalTicks = special.special
+        ? specialThrowArrivalTicks(contextAt(tick), base, fielders[fromSlot])
+        : defenseArrivalTicks(contextAt(tick), base)
+    }
     if (error.errant) errantThrow = true
-    const thrower = special.special ? special.thrower : fielders[fromSlot]
-    let arrivalTicks = special.special
-      ? specialThrowArrivalTicks(contextAt(tick), base, thrower)
-      : defenseArrivalTicks(contextAt(tick), base)
     if (error.errant) {
       // 속도 보정은 공 속도에 그대로 더해진다(하한 100) → 도착 틱이 그 비율만큼 늘거나 준다.
       // **근사**: 방향 보정(±49)은 공이 루를 벗어난다는 뜻이라 궤적을 다시 만들어야 하는데
       // 그 물리 루프는 해독 금지 구역이다. 여기서는 "그 송구로는 아웃이 안 난다" 로만 본다.
-      const speed = effectiveThrowSpeedOf(thrower)
+      const speed = effectiveThrowSpeedOf(fielders[fromSlot])
       const errant = Math.max(MINIMUM_THROW_SPEED, speed + error.speedDelta)
       arrivalTicks = Math.max(1, Math.trunc((arrivalTicks * speed) / errant))
     }
@@ -2140,7 +2153,7 @@ interface CpuSpecialThrow {
   readonly special: true
   /** 거리 상한(20400)을 넘어 원바운드로 던진다 — 악송구 굴림을 건너뛴다 */
   readonly bounce: boolean
-  /** 송구 속도를 +0xd8(130%)로 바꿔 끼운 던지는 야수 */
+  /** 송구 속도 +0xdc 를 +0xd8(= +0xd4 × 130%)로 바꿔 끼운 던지는 야수 (`thrownWith`) */
   readonly thrower: FielderState
 }
 
@@ -2184,7 +2197,7 @@ export function cpuSpecialThrowOf(
   return {
     special: true,
     bounce: horizontalDistance(holder.position, fielders[receiverSlot].target) > BOUNCE_THROW_DISTANCE,
-    thrower: { ...holder, throwSpeed: Math.trunc((holder.throwSpeed * LASER_SPEED_PERCENT) / 100) },
+    thrower: thrownWith(holder, true),
   }
 }
 
