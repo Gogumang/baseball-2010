@@ -74,7 +74,7 @@ export function MissionRoutes({
         run={missionRun}
         ability={ability}
         batterSkillIds={batter.skillIds}
-        pitcherAbility={missionPitcherAbility(missionRun.mission, session.aceLevels)}
+        pitcherAbility={missionPitcherAbility(missionRun.mission, session.aceLevels, session.opponentStaminaPercent)}
         opponent={missionOpponent(missionRun.mission)}
         atBat={runner.atBat}
         isPaused={runner.isPaused}

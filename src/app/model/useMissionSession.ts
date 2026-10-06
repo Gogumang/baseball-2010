@@ -40,6 +40,9 @@ import {
 } from '@/features/defense-play/model/pitchArrivalPlay'
 import { chargedRunsOfFates } from '@/features/defense-play/model/runnerFates'
 import { missionOpponentOf, pitcherAbilityOf } from '@/entities/game/model/aceOpponent'
+import {
+  FULL_STAMINA, consumeStamina, pitchStaminaCostOf, staminaCapacityOf, staminaPercentOf,
+} from '@/entities/pitcher-career/model/pitcherStamina'
 import { pitchAgainstBatterDetailed } from '@/entities/pitching/model/simulateBatter'
 import { RUTHLESS_SKILL_ID, specialSwingCountOf } from '@/entities/batting/model/specialSwing'
 import { rollsIntoBenchClearing } from '@/entities/game/model/benchClearing'
@@ -111,6 +114,8 @@ interface MissionSessionInput {
    * 0xb6414 능력치·레퍼토리·실투 스킬 (`modePitcherOf`). 안 넘기면 신인 투수다 (원본에 없는 대체).
    */
   readonly pitcher?: ModePitcher
+  /** 타자 미션에서 치는 타자의 장착 스킬 (`modeBatterOf(...).skillIds`) — 압도 22 가 마투수 투구 소모를 ×2 한다 */
+  readonly batterSkillIds?: readonly number[]
 }
 
 /** 미션 상대. 원본 레코드의 마선수 순번이 있으면 그 마선수다 (타자 미션이면 마투수). */
@@ -184,12 +189,49 @@ export function missionOpponentSpecialSwingOf(
 export function missionPitcherAbility(
   mission: OriginalMission,
   aceLevels?: Readonly<Record<number, number>>,
+  /** 마투수의 체력% `0xaebb0` (세션 `opponentStaminaPercent`). 안 넘기면 지치지 않은 것으로 본다 */
+  staminaPercent?: number,
 ): PitcherAbility {
   const opponent = missionOpponent(mission)
   const ability = missionOpponentAbility(mission, aceLevels)
   return opponent === null || ability === null
     ? DEFAULT_PITCHER_ABILITY
-    : pitcherAbilityOf({ ...opponent, ability })
+    : pitcherAbilityOf({ ...opponent, ability }, undefined, staminaPercent)
+}
+
+/** 타자 스킬 22 압도 — 0xa5e14 가 `0xb62b4(현재 타자, 22)` 면 투구 소모 ×2 (0xa5f0e) */
+const INTIMIDATE_SKILL_ID = 22
+/**
+ * 미션 마투수 용량 0x66e44(V, P, 첫 투수)의 사기 — V = `0x1f9a8(app, 모드, 팀)` 이 모드 5·6·7 이면 표 0xcd7e0 의
+ * 0x1fa1e(늘 0)로 가서 V 가 없다 → 사기 100.
+ */
+const MISSION_TEAM_MORALE = 100
+
+/**
+ * **타자 미션 마투수의 투구 하나** — 0xa5e14 (모드 갈래 없음, 0x3dec6). 마투수는 0xaae7c 가 저장된 마투수 레코드
+ * (0x1f824)를 0xb521c 로 팀 칸 8 에 통째(0x30, +0x2c 포함 — 다섯 줄 모두 10000) 베끼고 0xb8c94 로 0번과 맞바꿔 세우므로
+ * 경기마다 10000 에서 선다. 이미 마운드에 그 마투수가 있으면 다시 베끼지 않아 깎인 값이 이어진다 — 미션 객체는
+ * CPU 투수 교체 0xac428 도 건너뛴다. 용량의 체력은 `0xb6415(P, 3, 1)` = 레벨 배율 먹은 넷째 칸(마선수 표에 스킬 비트 없음).
+ * ⚠️ 첫 투수 +200 (0xaeb08 의 `team+0x26 − team+0x33 == 1`) 이 0xb521c 로 끼운 마투수에게 서는지는 못 읽었다 —
+ *    교체가 없으니 선 것으로 둔다(나만의리그 `drainPitcherForPitch` 와 같은 셈). 마선수가 아닌 미션 상대는 붙박이
+ *    투수 값이 없어(`DEFAULT_PITCHER_ABILITY`) 깎지 않는다.
+ */
+export function missionOpponentStaminaAfterPitch(
+  stamina: number,
+  mission: OriginalMission,
+  pitchTypeNumber: number,
+  batterSkillIds: readonly number[],
+  aceLevels?: Readonly<Record<number, number>>,
+): number {
+  const ability = missionOpponent(mission) === null ? null : missionOpponentAbility(mission, aceLevels)
+  if (ability === null) return stamina
+  const cost = pitchStaminaCostOf({
+    pitchTypeNumber,
+    batterIntimidates: batterSkillIds.includes(INTIMIDATE_SKILL_ID),
+    pitcherIsCoward: false,
+    pitcherEndures: false,
+  })
+  return consumeStamina(stamina, cost, staminaCapacityOf(ability.run, MISSION_TEAM_MORALE, true))
 }
 
 /** 클리어 횟수 상한 — 원본은 s8 칸에 99 까지 센다 (0xa51d0) */
@@ -228,6 +270,8 @@ const MISSION_STAGE_SIDE = 1
 /** 미션 투수는 체력 레코드가 없다 — 늘 100% 로 둔다 (추정) */
 const MISSION_STAMINA_PERCENT = 100
 
+const NO_SKILLS: readonly number[] = []
+
 /** 미션 모드 한 판 — 타자편(MissionRun)과 투수편(PitcherRun)을 함께 다룬다. */
 export function useMissionSession({
   runner,
@@ -240,6 +284,7 @@ export function useMissionSession({
   throwModeManual,
   aceLevels,
   pitcher: pitcherInput,
+  batterSkillIds = NO_SKILLS,
 }: MissionSessionInput) {
   const pitcher = useMemo(() => pitcherInput ?? modePitcherOf(null), [pitcherInput])
   const silent = useMemo(() => createSilentSound(), [])
@@ -248,6 +293,8 @@ export function useMissionSession({
   const missionRunRef = useRef(missionRun)
   missionRunRef.current = missionRun
   const [pitcherRun, setPitcherRun] = useState<PitcherRun | null>(null)
+  /** 타자 미션 상대 마투수의 레코드 스태미나 +0x2c — 새 경기마다 10000 (`missionOpponentStaminaAfterPitch`) */
+  const [opponentMoundStamina, setOpponentMoundStamina] = useState(FULL_STAMINA)
   const [pendingDefensePlay, setPendingDefensePlay] = useState<PendingMissionDefense | null>(null)
   const pendingDefensePlayRef = useRef(pendingDefensePlay)
   pendingDefensePlayRef.current = pendingDefensePlay
@@ -333,14 +380,9 @@ export function useMissionSession({
   /**
    * 타자 미션의 공 하나.
    *
-   * **상대 투수 투구 소모 0xa5e14 는 잇지 않는다 (원본은 탄다).** 공이 손을 떠날 때 부르는 0x3dec6 →
-   * 0xa5e14(ctx, 구질) 에는 모드 갈래가 없어(0x3de10~0x3dec8 · 0xa5e14~0xa5f62 확인) 미션(모드 6)에서도
-   * 투구 수 +1 · 스태미나 −c(×2 압도 22) 가 돈다. 그런데 깎인 체력이 쓰이는 두 곳이 웹 미션에 없다:
-   *   - CPU 투수 교체 0xac428 — 미션 객체(scene+0xf28 +0xc ≠ −1)면 건너뛴다 (Q1 4절, 유력)
-   *   - 체력% 0xaebb0 → CPU 제구 등급 0x4dbac · 피로 0xb58e6 — 웹 CPU 투구 `selectPitch` 는 체력%를
-   *     받지 않는다 (나만의리그 경기도 같다 — `throwOpponentPitch` 가 깎은 체력은 교체·간이 타석만 본다)
-   * 받을 곳 없이 칸만 두면 죽은 상태라 `detail.pitchTypeNumber` 는 버린다. `selectPitch` 가 체력%를 받게 되면
-   * 미션 상대 마운드(시작 스태미나 — 미확인)를 두고 여기서 깎아야 한다.
+   * 공이 손을 떠날 때(0x3dec6) 상대 마투수 투구 소모 0xa5e14 가 돈다 — 모드 갈래가 없어(0x3de10~0x3dec8 ·
+   * 0xa5e14~0xa5f62) 미션(모드 6)에서도 깎인다(`missionOpponentStaminaAfterPitch`). 깎인 체력%(0xaebb0)는 다음 공의
+   * CPU 제구 등급·피로(0xb58e6)와 스윙 판정 0xab214 가 본다 (`missionPitcherAbility` 셋째 인자).
    */
   const handleMissionPitch = useCallback(
     (
@@ -351,6 +393,14 @@ export function useMissionSession({
       buntKind = 0,
     ) => {
       const nextAtBat = runner.applyPitch(detail.resolution)
+      const pitchingRun = missionRunRef.current
+      // 견제는 공이 아니라 구질이 오지 않는다 (`PitchOutcomeDetail.pitchTypeNumber`)
+      const pitchTypeNumber = detail.pitchTypeNumber
+      if (pitchingRun !== null && pitchTypeNumber !== undefined) {
+        setOpponentMoundStamina((stamina) =>
+          missionOpponentStaminaAfterPitch(stamina, pitchingRun.mission, pitchTypeNumber, batterSkillIds, aceLevels),
+        )
+      }
       const hasSwung = detail.hasSwung
       const outcome = isAtBatFinished(nextAtBat) ? nextAtBat.outcome : null
       // 인플레이 타구면 수비 화면(상태 0x17)이 먼저 돈다 — 아웃·세이프 콜은 그 뒤다
@@ -445,7 +495,7 @@ export function useMissionSession({
       runner.pauseWithBanner(describeOutcomeBanner(outcome, runnersOnBase))
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [audio, random, runner],
+    [aceLevels, audio, batterSkillIds, random, runner],
   )
 
   /**
@@ -780,6 +830,8 @@ export function useMissionSession({
 
   /** 새 경기 — 필살·마구 남은 칸은 0xaebe4 가 다시 채운다 (팀 new 0xb891c 가 −1), 공 객체도 새것 */
   const resetForNewMatch = (mission: OriginalMission) => {
+    // 새 경기 — 0xaae7c 가 저장된 마투수 레코드(+0x2c = 10000)를 다시 베낀다
+    setOpponentMoundStamina(FULL_STAMINA)
     setBatterSpecialSwingStored(UNFILLED_SPECIAL_SWING)
     setOpponentSpecialSwingStored(UNFILLED_SPECIAL_SWING)
     setPitcherMagicStored(UNFILLED_SPECIAL_SWING)
@@ -832,6 +884,7 @@ export function useMissionSession({
 
     /** 이벤트 match — 공략 레코드를 치르고 결과 이벤트로 돌아간다. 미션 클리어 기록에는 남기지 않는다 */
     beginAceMatch: (mission: OriginalMission, pending: Omit<Extract<Screen, { kind: '마선수대결' }>, 'kind' | 'mission'>) => {
+      setOpponentMoundStamina(FULL_STAMINA)
       setBatterSpecialSwingStored(UNFILLED_SPECIAL_SWING)
       setOpponentSpecialSwingStored(UNFILLED_SPECIAL_SWING)
       runner.resetAtBat(mission.start)
@@ -982,6 +1035,8 @@ export function useMissionSession({
     missionRun, pitcherRun, pitcherAceMatchMission, clearedKeys, clearCounts, lastSide, aceLevels, pitcher,
     missionConditionCode, pendingDefensePlay, pendingBenchClearing, pickoffReplay, handleMissionPitch, handleThrow, actions,
     batterSpecialSwingStored, pitcherMagicRemaining, stealableBases,
+    /** 타자 미션 상대 마투수의 체력% `0xaebb0` = trunc(+0x2c / 100) — `missionPitcherAbility` 셋째 인자 */
+    opponentStaminaPercent: staminaPercentOf(opponentMoundStamina),
   }
 }
 

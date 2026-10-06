@@ -5,6 +5,7 @@ import {
   missionBatterSpecialSwingRemainingOf,
   missionOpponentAbility,
   missionOpponentSpecialSwingOf,
+  missionOpponentStaminaAfterPitch,
   missionPitcherAbility,
   useMissionSession,
 } from '@/app/model/useMissionSession'
@@ -384,6 +385,43 @@ describe('미션 마선수의 레벨 배율 0xd88aa (0xb6414)', () => {
     // 레오니 580·850·580 → 60% = 348·510·348 → /10 반올림
     expect(missionPitcherAbility(레오니미션)).toMatchObject({ control: 35, velocity: 51, breaking: 35 })
     expect(missionPitcherAbility(레오니미션, { 1: 4 })).toMatchObject({ control: 58, velocity: 85, breaking: 58 })
+  })
+
+  it('타자 미션 마투수는 공마다 0xa5e14 로 깎인다 — 새 경기는 10000, 압도 22 면 ×2, 마선수가 아니면 그대로', () => {
+    if (레오니미션 === undefined) throw new Error('레오니 미션이 없다')
+    // 체력 넷째 칸(run)이 용량 0x66e44 의 재료다 — 사기 100(모드 6 은 V 가 없다)이라 > 90 갈래 +1/20 · 첫 투수 +200 · +250
+    const 레오니 = missionOpponentAbility(레오니미션)!
+    const 용량 = 레오니.run + Math.trunc(레오니.run / 20) + 200 + 250
+    const 직구 = missionOpponentStaminaAfterPitch(10_000, 레오니미션, 1, [])
+    expect(직구).toBe(10_000 + Math.trunc(((용량 - 9) * 10_000) / 용량) - 10_000)
+    const 압도 = missionOpponentStaminaAfterPitch(10_000, 레오니미션, 1, [22])
+    expect(압도).toBe(10_000 + Math.trunc(((용량 - 18) * 10_000) / 용량) - 10_000)
+    const 일반 = MISSIONS.find((mission) => mission.side === '타자' && mission.opponentAce === 0)!
+    expect(missionOpponentStaminaAfterPitch(10_000, 일반, 1, [])).toBe(10_000)
+    // 체력% 는 투구 AI 의 피로·지친 등급으로 간다 (pitcherAbilityOf 셋째 인자)
+    expect(missionPitcherAbility(레오니미션, undefined, 40)).not.toEqual(missionPitcherAbility(레오니미션))
+  })
+
+  it('세션은 공마다 마투수 체력%를 내리고 새 경기에서 100 으로 되돌린다', () => {
+    if (레오니미션 === undefined) throw new Error('레오니 미션이 없다')
+    const { rendered } = setUpSession()
+    act(() => rendered.result.current.session.actions.begin(레오니미션))
+    expect(rendered.result.current.session.opponentStaminaPercent).toBe(100)
+    for (let pitch = 0; pitch < 2; pitch += 1) {
+      act(() => {
+        rendered.result.current.session.handleMissionPitch({
+          resolution: { kind: '볼' },
+          hasSwung: false,
+          isBunt: false,
+          resultCode: null,
+          pitchTypeNumber: 1,
+        })
+      })
+    }
+    expect(rendered.result.current.session.opponentStaminaPercent).toBeLessThan(100)
+    act(() => rendered.result.current.session.actions.begin(레오니미션))
+    expect(rendered.result.current.session.opponentStaminaPercent).toBe(100)
+    rendered.unmount()
   })
 
   it('마선수가 아닌 미션은 배율이 없다', () => {

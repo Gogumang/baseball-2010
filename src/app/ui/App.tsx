@@ -149,6 +149,8 @@ export function App() {
     readRegularSeasonOtherModes: readBatterOtherModes,
   })
   const pitcherMissionPitcher = useMemo(() => modePitcherOf(pitcherSession.career), [pitcherSession.career])
+  // 타자 미션(모드 6)은 0x213c0 이 6→4 로 나리 타자편 저장을 올린다 — 마투수 투구 소모(0xa5e14)의 압도 22 가 이 타자를 본다
+  const missionBatterSkillIds = (careerSession.career ?? careerSession.savedCareer)?.equippedSkillIds
   // 미션 보상 G (0x4ef72) — 지갑으로 들어간다. 육성 선수가 없어도 사라지지 않는다
   const mission = useMissionSession({
     runner, random, missionRecord, screen, setScreen, sound,
@@ -159,6 +161,7 @@ export function App() {
     // 투수 미션(모드 5)은 0x213c0 이 5→3 으로 나리 투수편 저장을 올리고 0x1fbd0 이 그 투수(또는 명예 투수)를 준다.
     // 투수편 세션은 시작할 때 저장을 올려 두므로 `career` 가 곧 저장된 투수다 (`modePitcherOf`)
     pitcher: pitcherMissionPitcher,
+    ...(missionBatterSkillIds === undefined ? {} : { batterSkillIds: missionBatterSkillIds }),
   })
   // 투수편이 연 히든(장비 컬렉터 20·24·28·32)도 같은 전역 표 `app+0xc0` 에 모은다 (0x62368)
   // 시즌 결산이 연 전역 해금(0x29)도 같은 전역 표에 모은다
