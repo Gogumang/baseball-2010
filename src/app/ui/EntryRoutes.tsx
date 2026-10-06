@@ -2,7 +2,10 @@ import { useMemo, useState } from 'react'
 import type { Screen } from '@/app/model/screen'
 import { MessageBox, RawScreen } from '@/shared/ui'
 import { HomeRunDerbyScreen } from '@/pages/home-run-derby/ui/HomeRunDerbyScreen'
-import { modeBatterOf } from '@/app/model/modeBatter'
+import { modeBatterOf, modeBatterOfHallOfFame } from '@/app/model/modeBatter'
+import { nariBatterOf } from '@/app/model/useCollection'
+import { hallOfFameBatterAt } from '@/entities/collection/model/collection'
+import type { HallOfFamePlayerPick } from '@/entities/collection/model/collection'
 import { createLocalStorageJsonStore } from '@/shared/api/save/localStorageJsonStore'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
@@ -20,7 +23,7 @@ import type { useCareerSession } from '@/app/model/useCareerSession'
 import type { useGameSettings } from '@/app/model/useGameSettings'
 import type { Collection } from '@/entities/collection/model/collection'
 import type { GamePointWalletSession } from '@/entities/wallet/model/useGamePointWallet'
-import { SpecialScreen } from '@/pages/special/ui/SpecialScreen'
+import { HallOfFameScreen, SpecialScreen } from '@/pages/special/ui/SpecialScreen'
 import { ACE_PHASE, AceSelectScreen } from '@/pages/general-mode'
 import { TitleScreen } from '@/pages/title/ui/TitleScreen'
 import { MainMenuScreen } from '@/pages/main-menu/ui/MainMenuScreen'
@@ -50,7 +53,11 @@ interface EntryRoutesProps {
 
 /** 커리어가 아직 없을 때의 화면 — 타이틀 → 메인 메뉴(도움말) → 선수 등록. */
 export function EntryRoutes({ screen, setScreen, session, gameSettings, collection, random, wallet, aceSelect }: EntryRoutesProps) {
-  const [isMissionBlocked, setMissionBlocked] = useState(false)
+  /**
+   * 홈런더비 선수 고르기 결과 (하위 16 0x29ac8 — 코드 2 나리 타자 · 4 명예 타자, 전역기록 +0xa6).
+   * null 이면 아직 안 골랐다 — 들어올 때마다 0x25e6c → 0x5eb8c 가 +0xa6 을 −1 로 되돌리고 다시 고르게 한다.
+   */
+  const [derbyPick, setDerbyPick] = useState<HallOfFamePlayerPick | null>(null)
   /** 홈런더비 최고 비거리 (저장 +0x5c) — 원본은 게임 전체 저장에 두므로 커리어와 따로 둔다 */
   const derbyStore = useMemo(() => createLocalStorageJsonStore(DERBY_BEST_KEY), [])
   const [derbyBest, setDerbyBest] = useState(() => {
@@ -157,18 +164,48 @@ export function EntryRoutes({ screen, setScreen, session, gameSettings, collecti
 
   if (screen.kind === '홈런더비') {
     const career = session.career ?? session.savedCareer
-    if (career === null) return null
-    const derbyBatter = modeBatterOf(career)
+    const leave = () => {
+      setDerbyPick(null)
+      setScreen({ kind: '메인메뉴' })
+    }
+    // 하위 16 선수 고르기 — 결과 0(되돌아가기)은 하위 5 모드 목록(웹은 메인 메뉴), 2·4 → 모드 7 (0x29ac8).
+    // 육성·명예 타자가 다 없으면 코드 5·6 팝업만 떠서 들어갈 수 없다 (신인 대체 없음, Q2 3-1)
+    if (derbyPick === null) {
+      return (
+        <HallOfFameScreen
+          collection={collection}
+          mode={{
+            kind: '선수고르기', purpose: '홈런더비', nari: { 투수: null, 타자: nariBatterOf(career) },
+            onPick: setDerbyPick, onCancel: leave,
+          }}
+          onBack={leave}
+        />
+      )
+    }
+    // 선수 게터 0x1fc20: 모드 7 · +0x11f == 0 · +0xa6 ≥ 0 → 명전 기록 0x1f640, 그 밖은 나리 타자편 저장(0x213c0(앱,4,0))
+    const famer = derbyPick.hallOfFameIndex === null ? null : hallOfFameBatterAt(collection, derbyPick.hallOfFameIndex)
+    if (famer === null && career === null) return null
+    const derbyBatter = famer === null ? modeBatterOf(career) : modeBatterOfHallOfFame(famer)
+    // 겉모습도 그 기록의 생김새(+0xb: 폼 = 2×타입 + 손 · 피부)와 장비 니블이다 — 옛 명전 기록에 없으면 기본 그림
+    const look = famer === null
+      ? career === null
+        ? null
+        : { form: career.battingTypeIndex * 2 + career.battingSide, skinIndex: career.skinIndex, equipmentLevels: career.equipmentLevels }
+      : {
+          form: famer.look === undefined ? undefined : famer.look.typeIndex * 2 + famer.look.handIndex,
+          skinIndex: famer.look?.skinIndex,
+          equipmentLevels: famer.equipmentLevels,
+        }
     return (
       <HomeRunDerbyScreen
         // 원본은 모드 7 로 들어갈 때 0x213c0(앱,4,0) 으로 나만의리그 타자편 저장을 올린다.
         // 능력치는 0xb6414 까지 — 0xb570c 의 질병·부상·사기 감소는 모드 3·4 갈래라 안 먹는다 (`modeBatterOf`)
         ability={derbyBatter.ability}
         batterSkillIds={derbyBatter.skillIds}
-        // 같은 저장을 올리니 겉모습도 그 선수 것이다 — 폼(몸통·손)·피부·장비
-        batterForm={career.battingTypeIndex * 2 + career.battingSide}
-        batterSkinIndex={career.skinIndex}
-        batterEquipmentLevels={career.equipmentLevels}
+        // 같은 저장(또는 명전 기록)을 올리니 겉모습도 그 선수 것이다 — 폼(몸통·손)·피부·장비
+        {...(look?.form === undefined ? {} : { batterForm: look.form })}
+        {...(look?.skinIndex === undefined ? {} : { batterSkinIndex: look.skinIndex })}
+        {...(look?.equipmentLevels === undefined ? {} : { batterEquipmentLevels: look.equipmentLevels })}
         // 단계 1~4 난입 마투수도 전역 마선수 레벨을 본다 — 0xb6414 는 모드 7 도 가리지 않는다
         aceLevels={aceSelect?.levels}
         random={random}
@@ -185,17 +222,7 @@ export function EntryRoutes({ screen, setScreen, session, gameSettings, collecti
         }}
         settings={gameSettings.settings}
         onSettingsChange={gameSettings.setSettings}
-        onExit={() => setScreen({ kind: '메인메뉴' })}
-      />
-    )
-  }
-
-  if (isMissionBlocked) {
-    return (
-      <MessageBox
-        text="나만의리그 선수를 먼저 등록해야합니다"
-        buttons={['확인']}
-        onAnswer={() => setMissionBlocked(false)}
+        onExit={leave}
       />
     )
   }
@@ -209,19 +236,13 @@ export function EntryRoutes({ screen, setScreen, session, gameSettings, collecti
         // 시즌모드·일반모드는 팀을 맡는 모드라 육성 선수가 없어도 들어간다
         if (mode === '시즌모드') return setScreen({ kind: '시즌모드' })
         if (mode === '일반모드') return setScreen({ kind: '일반모드' })
-        // 홈런더비도 미션과 같은 선수 고르기 창을 쓴다 — 결과 2 = 육성 타자 · 4 = 명예 타자 (H-2 · Q2)
-        if (session.career === null && session.savedCareer === null) {
-          return setMissionBlocked(true)
+        // 미션(하위 17)·홈런더비(하위 16)는 곧바로 선수 고르기 창으로 간다 — 고를 선수가 없을 때 막는 것도 그 창이다
+        // (코드 5 StrCOMMON[38] · 6 [39], Q2 3-1). 메인 메뉴에서 미리 막는 길은 원본에 없다.
+        if (mode === '홈런더비') {
+          setDerbyPick(null)
+          return setScreen({ kind: '홈런더비' })
         }
-        if (mode === '홈런더비') return setScreen({ kind: '홈런더비' })
         if (mode !== '미션') return
-        // 원본은 **육성 선수도 명예의 전당 선수도 없으면 미션에 못 들어간다** (Q2 3-1 확정).
-        // 코드 5 → StrCOMMON[38] 팝업만 띄우고 되돌아간다. 신인 능력치로 대신 넣어 주는 길은 없다.
-        // ⚠️ 명예의 전당 선수(+0x880/+0x940)는 이제 기록연감에 쌓이지만, 미션·홈런더비 선수 고르기 창(0x62568 의
-        //    결과 3·4 → 전역기록 +0xa5/+0xa6)과 명예 선수로 경기를 세우는 길(0x1fbd0/0x1fc20)이 미션 세션에 아직 없어 육성 선수만 본다.
-        if (session.career === null && session.savedCareer === null) {
-          return setMissionBlocked(true)
-        }
         setScreen({ kind: '미션선택' })
       }}
       onBack={() => setScreen({ kind: '타이틀' })}

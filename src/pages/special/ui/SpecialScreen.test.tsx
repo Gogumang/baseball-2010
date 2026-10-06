@@ -353,6 +353,51 @@ describe('미션 선수 고르기 — 메인 메뉴 하위 17 (0x2613c 목록 �
   })
 })
 
+describe('홈런더비 선수 고르기 — 하위 16 (0x25e6c 목록 종류 1 · 5×2 · 칸 5 부터)', () => {
+  const 나리 = { name: '홍길동', equippedAbility: [999, 800, 400, 0] }
+  const 명예타자 = { name: '전설', ability: { hit: 1, power: 2, defense: 3, run: 4 }, endingIndex: 6, season: 13, titleIds: [], slot: 0 }
+  const 열기 = () => {
+    const onPick = vi.fn()
+    render(
+      <HallOfFameScreen
+        collection={{ ...EMPTY_COLLECTION, hallOfFame: [명예타자] }}
+        mode={{ kind: '선수고르기', purpose: '홈런더비', nari: { 투수: 나리, 타자: 나리 }, onPick, onCancel: vi.fn() }}
+        onBack={vi.fn()}
+      />,
+    )
+    return { onPick }
+  }
+
+  it('타자 칸 5~14 열 칸만 격자 첫 두 줄에 그린다 — 처음 커서는 칸 5', () => {
+    열기()
+    expect(screen.queryByRole('button', { name: '1번 슬롯' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '5번 슬롯' })).toBeNull()
+    const first = screen.getByRole('button', { name: '6번 슬롯' })
+    expect(first.getAttribute('aria-current')).toBe('true')
+    expect(first.style.left).toBe(`${hallOfFameCellOf(0).x - HALL_OF_FAME_GRID.backingInset}px`)
+    expect(screen.getByRole('button', { name: '15번 슬롯' }).style.top)
+      .toBe(`${hallOfFameCellOf(9).y - HALL_OF_FAME_GRID.backingInset}px`)
+  })
+
+  it('나리 타자 → 코드 2 · 명예 타자 → 코드 4 (+0xa6 = 명전 번호)', () => {
+    const { onPick } = 열기()
+    fireEvent.click(screen.getByRole('button', { name: '6번 슬롯' }))
+    expect(onPick).toHaveBeenLastCalledWith({ side: '타자', hallOfFameIndex: null })
+    fireEvent.click(screen.getByRole('button', { name: '7번 슬롯' }))
+    expect(onPick).toHaveBeenLastCalledWith({ side: '타자', hallOfFameIndex: 0 })
+  })
+
+  it('방향키는 두 줄 안에서만 움직인다', () => {
+    열기()
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    expect(screen.getByRole('button', { name: '11번 슬롯' }).getAttribute('aria-current')).toBe('true')
+    fireEvent.keyDown(window, { key: 'ArrowUp' })
+    fireEvent.keyDown(window, { key: 'ArrowUp' })
+    expect(screen.getByRole('button', { name: '6번 슬롯' }).getAttribute('aria-current')).toBe('true')
+  })
+})
+
 describe('명예의 전당 능력치 도형 — 축 최대 800 (0x5e864)', () => {
   it('최대길이 = 30 × 800 / 999 = 24, 값 0 이면 가운데', () => {
     const center = { x: 178, y: 104 }

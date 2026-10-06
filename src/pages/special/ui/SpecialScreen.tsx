@@ -264,6 +264,12 @@ export type HallOfFameMode =
    */
   | {
       readonly kind: '선수고르기'
+      /**
+       * 어느 창인가 (기본 미션). **홈런더비** = 하위 16 (진입 0x25e6c · 갱신 0x29ac8): 목록 종류 1 이라 0x5eb8c 가
+       * 투수 칸 0~4 를 안 채우고(상태 0), 격자는 5열 × **2행**(0x25e96), 키 0x62568 의 셋째 인자 5(0x29ae0)로
+       * 칸 번호가 5 부터다 — 타자 칸 5~14 만 고른다. 결과 2·4 만 나온다.
+       */
+      readonly purpose?: '미션' | '홈런더비'
       readonly nari: { readonly 투수: HallOfFameNariPlayer | null; readonly 타자: HallOfFameNariPlayer | null }
       readonly onPick: (pick: HallOfFamePlayerPick) => void
       readonly onCancel: () => void
@@ -314,8 +320,9 @@ export function HallOfFameScreen({ collection, mode, onBack }: {
   const [popup, setPopup] = useState<HallOfFamePopup | null>(null)
 
   const slots = hallOfFameSlotsOf(collection, mode)
+  const view = hallOfFameGridViewOf(mode)
   const current = slots[slot]
-  const cell = hallOfFameCellOf(slot)
+  const cell = hallOfFameCellOf(slot - view.firstSlot)
   const { a, b } = HALL_OF_FAME_DETAIL
 
   /** 등록 목록의 키 확인 (0x62604~0x627d0) — 결과 코드와 지금 모드(3 투수 · 4 타자)로 가른다 */
@@ -398,7 +405,7 @@ export function HallOfFameScreen({ collection, mode, onBack }: {
       const dy = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0
       if (dx !== 0 || dy !== 0) {
         event.preventDefault()
-        return setSlot((previous) => moveHallOfFameSlot(previous, dx, dy))
+        return setSlot((previous) => moveHallOfFameSlot(previous, dx, dy, view))
       }
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault()
@@ -528,7 +535,8 @@ export function HallOfFameScreen({ collection, mode, onBack }: {
 
       {/* 5×3 격자 — 칸마다 둥근 네모 RGB(48,69,205) 를 (x−3, y−3, 칸+3) 에 (0x7a844) */}
       {slots.map((entry, index) => {
-        const box = hallOfFameCellOf(index)
+        if (index < view.firstSlot || index >= view.firstSlot + view.rows * HALL_OF_FAME_GRID.columns) return null
+        const box = hallOfFameCellOf(index - view.firstSlot)
         return (
           <button
             key={index}
@@ -644,6 +652,10 @@ const pitcherChartOf = (ability: PitcherAbility) => [ability.control, ability.ve
 /** 칸 15개의 상태 (0x5eb8c) — `HallOfFameSlotState` 머리말 */
 function hallOfFameSlotsOf(collection: Collection, mode: HallOfFameMode): readonly HallOfFameSlotView[] {
   return Array.from({ length: HALL_OF_FAME_SLOTS }, (_unused, index): HallOfFameSlotView => {
+    // 홈런더비(목록 종류 1)는 투수 칸 0~4 를 채우지 않는다 (0x5ec8e → 0x5ed0e 건너뜀)
+    if (mode.kind === '선수고르기' && mode.purpose === '홈런더비' && index < HALL_OF_FAME_PITCHER_SLOTS) {
+      return { kind: '빈칸', state: 0 }
+    }
     if (index === NARI_PITCHER_SLOT || index === NARI_BATTER_SLOT) {
       if (mode.kind === '보기') return { kind: '빈칸', state: 0 }
       const nari = index === NARI_PITCHER_SLOT ? mode.nari.투수 : mode.nari.타자
@@ -673,7 +685,7 @@ function hallOfFameSlotsOf(collection: Collection, mode: HallOfFameMode): readon
  * 진입 0x2613c 가 목록 `+0x80` 을 0 으로 두고(0x261be) 0x5eb8c 를 부른다 (⚠️ +0x80 이 커서 칸이라는 것은 유력).
  */
 function initialHallOfFameSlotOf(mode: HallOfFameMode): number {
-  if (mode.kind === '선수고르기') return NARI_PITCHER_SLOT
+  if (mode.kind === '선수고르기') return hallOfFameGridViewOf(mode).firstSlot
   return mode.kind === '등록' && mode.edition === '타자' ? NARI_BATTER_SLOT : NARI_PITCHER_SLOT + 1
 }
 
@@ -689,9 +701,27 @@ function hallOfFameIconOf(slot: number, state: HallOfFameSlotState) {
 }
 
 /** 격자 안에서 커서 옮기기 (5열 3행, 가장자리에서 멈춘다) */
-function moveHallOfFameSlot(slot: number, dx: number, dy: number): number {
+function moveHallOfFameSlot(slot: number, dx: number, dy: number, view: HallOfFameGridView = FULL_GRID): number {
   const columns = HALL_OF_FAME_GRID.columns
-  const column = Math.min(columns - 1, Math.max(0, (slot % columns) + dx))
-  const row = Math.min(HALL_OF_FAME_GRID.rows - 1, Math.max(0, Math.trunc(slot / columns) + dy))
-  return row * columns + column
+  const cell = slot - view.firstSlot
+  const column = Math.min(columns - 1, Math.max(0, (cell % columns) + dx))
+  const row = Math.min(view.rows - 1, Math.max(0, Math.trunc(cell / columns) + dy))
+  return view.firstSlot + row * columns + column
+}
+
+/** 보이는 격자 — 첫 칸 번호(키 0x62568 의 셋째 인자)와 행 수(목록 위젯 0x1c 의 행 인자) */
+interface HallOfFameGridView {
+  readonly firstSlot: number
+  readonly rows: number
+}
+
+const FULL_GRID: HallOfFameGridView = { firstSlot: 0, rows: HALL_OF_FAME_GRID.rows }
+
+/**
+ * 홈런더비 선수 고르기는 칸 5 부터 5×2 (0x25e6c 위젯 (5열, 2행) · 0x29ae0 셋째 인자 5).
+ * ⚠️ 그리는 자리: 두 줄을 미션·스페셜 격자의 첫 두 줄 자리(y 179·219)에 둔다 — 하위 16 그리기의 격자 y 는 안 읽었다(근사).
+ */
+function hallOfFameGridViewOf(mode: HallOfFameMode): HallOfFameGridView {
+  if (mode.kind === '선수고르기' && mode.purpose === '홈런더비') return { firstSlot: NARI_BATTER_SLOT, rows: 2 }
+  return FULL_GRID
 }
