@@ -13,6 +13,7 @@ import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
 import { HALF_INNING_JINGLE_TICK } from '@/features/play-game/model/halfInningBoard'
 import { HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
 import { useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
+import { SceneMatchupCards } from '@/widgets/matchup-cards/ui/SceneMatchupCards'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import { mySpecialSwingRemainingOf, stealableBasesOf } from '@/features/play-game/model/gameFlow'
@@ -302,6 +303,17 @@ export function GameScreen({
             flightProbeRef={flightProbeRef}
             onPickoff={onPickoff}
           />
+          {/*
+            0xe 그리기 0x4d9ec — 0xd 두 그림 뒤 타석 장면 위에 투수·타자 소개 판 0x44944. 팀 글자는 0xb6c20: 내 팀 PLAYER · 상대 COM.
+            ⚠️ 웹 경기 상태에 없는 칸(투수 이름·보직·좌우·방어율·탈삼진·체력 막대 / 내 수비·타율·홈런·타점·오늘 타석 기록)은 비운다.
+          */}
+          {sceneConfirm.isAwaiting && sceneConfirm.isInConfirmState && (
+            <SceneMatchupCards
+              batterHand={career.battingSide}
+              pitcher={{ isComputer: true, ...(ace === null ? {} : { name: ace.name }) }}
+              batter={{ isComputer: false, name: career.name, battingOrder: career.battingOrder - 1 }}
+            />
+          )}
         </div>
 
         {isMenuOpen ? (

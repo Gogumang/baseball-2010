@@ -34,6 +34,7 @@ import { HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
 import { useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
 import { settlementBackdropOffsetAt } from '@/pages/team-game/model/settlementBackdrop'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
+import { SceneMatchupCards } from '@/widgets/matchup-cards/ui/SceneMatchupCards'
 import type {
   TeamEntryBatter,
   TeamEntryPitcher,
@@ -338,6 +339,36 @@ export function TeamGameScreen({
   /** 정산 배경 전용 난수 — 경기 난수를 건드리지 않는다 (정산 갈래 주석) */
   const [backdropRandom] = useState(() => createSeededRandom(0))
   isAwaitingConfirmRef.current = isAwaitingConfirm
+  /** 0xd 두 그림을 지나 0xe 에 들어섰으면 소개 판을 그린다 (0x4d9ec → 0x44944) */
+  const isMatchupShown = isAwaitingConfirm && sceneConfirm.isInConfirmState
+  const ourBatting = canBat
+  const matchupBatterEntry = ourBatting
+    ? currentBatterEntry(progress)
+    : progress.opponentEntry[progress.opponentOrderIndex]
+  const matchupPitcherEntry = ourBatting
+    ? progress.opponentPitcherEntry[progress.opponentPitcherIndex]
+    : progress.ourPitcherEntry[progress.ourPitcherIndex]
+  /**
+   * 소개 판 — 팀 글자는 `0xb6c20(st, 측)`(사람 팀 PLAYER · CPU 팀 COM): 우리가 치면 타자가 PLAYER, 던지면 투수가 PLAYER.
+   * ⚠️ 웹 명단에 없는 칸(투수 보직·좌우·방어율·탈삼진·체력 막대 / 타자 좌우·타율·홈런·타점·오늘 타석 기록)은 비운다 —
+   *    판은 모르는 칸을 안 그린다. 타자 손을 몰라 우타(0) 배치로 둔다.
+   */
+  const matchupCards = (
+    <SceneMatchupCards
+      batterHand={0}
+      pitcher={{
+        isComputer: ourBatting,
+        ...(matchupPitcherEntry === undefined ? {} : { name: matchupPitcherEntry.name }),
+      }}
+      batter={{
+        isComputer: !ourBatting,
+        battingOrder: ourBatting ? progress.game.battingOrderIndex % 9 : progress.opponentOrderIndex % 9,
+        ...(matchupBatterEntry === undefined
+          ? {}
+          : { name: matchupBatterEntry.name, position: matchupBatterEntry.position }),
+      }}
+    />
+  )
   /**
    * 띄울 돌발 창 — 결과 창(0x1d)은 0xe 앞이라 늘 띄우고, 제안 창(0x1b)은 0xe 의 OK 뒤 메시지 1 이 0x8f158 을 굴려
    * 예약하므로(0x50c42) OK 를 받은 뒤에만 띄운다
@@ -630,6 +661,7 @@ export function TeamGameScreen({
           // 0xe 에서 화면을 누르면 OK 로 본다 (터치용 웹판 편의 — 캔버스 탭이 스윙인 것과 같은 자리)
           <div className={styles.stageArea} onClick={sceneConfirm.acceptsConfirm ? sceneConfirm.confirm : undefined}>
             <Panel heading="타석" />
+            <div className={styles.matchupFrame}>
             <BattingStage
               batterAbility={currentBatterAbility(progress)}
               // 마타자가 대타로 올라오면 필살 연출 점프표(0xd01e4)가 이 순번을 본다
@@ -691,6 +723,9 @@ export function TeamGameScreen({
               // CPU 투수 견제 (0x345fc 종류 4 → 0x34848 → 메시지 0x10) — 루가 정해진 뒤는 진행기가 판을 돌린다
               onPickoff={(base) => actions.cpuPickoff(base)}
             />
+            {/* 0xe 그리기 0x4d9ec — 타석 장면 위에 투수·타자 소개 판 0x44944 */}
+            {isMatchupShown && matchupCards}
+            </div>
             <Hint>
               {(game.battingOrderIndex % 9) + 1}번 {currentBatterEntry(progress)?.name ?? '타자'} ·
               탭·Space·5 스윙 · ←→(4·6) 타자 이동
@@ -729,7 +764,11 @@ export function TeamGameScreen({
               />
             </div>
 
-            {/* 0xe — 구질 고르기(0xf)는 OK 뒤다. ⚠️ 0xe 의 안내 판 0x44944 그림은 아직 없다 */}
+            {/*
+              0xe — 구질 고르기(0xf)는 OK 뒤다. 그 동안은 투수·타자 소개 판 0x44944 를 띄운다.
+              ⚠️ 원본은 판 아래에 0xd 그리기(타석 장면)가 깔린다 — 웹 투구 화면에는 그 캔버스가 없어 판만 놓는다
+            */}
+            {isMatchupShown && <div className={styles.matchupFrame}>{matchupCards}</div>}
             {phase === '구질' && !isAwaitingConfirm && (
               <>
                 <Panel heading="1. 구질 선택" />

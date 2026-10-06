@@ -67,6 +67,14 @@ export const stageArea = style({
   position: 'relative',
 })
 
+/** 타석 캔버스(240×320) 자리 — 상태 0xe 의 소개 판(`MatchupCards`, 원본 좌표)이 이 위에 겹친다 */
+export const matchupFrame = style({
+  position: 'relative',
+  width: 240,
+  minHeight: 320,
+  margin: '0 auto',
+})
+
 export const log = style({
   margin: '6px 0 0',
   padding: 0,

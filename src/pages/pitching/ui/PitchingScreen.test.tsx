@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
-import { SCENE_CONFIRM_LOCK_FRAMES } from '@/features/play-game/model/useSceneConfirm'
+import { SCENE_CONFIRM_READY_FRAMES, SCENE_PREPARE_FRAMES } from '@/features/play-game/model/useSceneConfirm'
 import { enterSceneConfirm } from '@/features/play-game/model/sceneConfirm'
 import { PitchingScreen } from '@/pages/pitching/ui/PitchingScreen'
 import { PITCH_TYPES } from '@/shared/config/original/pitchTypes'
@@ -125,9 +125,13 @@ describe('투수 미션 상태 0xe — 새 타석마다 사람 OK 를 기다린�
         />,
       )
       expect(screen.queryByText('1. 구질 선택')).toBeNull()
+      // 0xd 두 그림 뒤 0xe — 투수·타자 소개 판(0x44944)이 선다
+      expect(screen.queryByTestId('소개판')).toBeNull()
+      act(() => void vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_PREPARE_FRAMES))
+      expect(screen.getByTestId('소개판')).toBeTruthy()
       fireEvent.keyDown(window, { key: 'Enter' })
       expect(screen.queryByText('1. 구질 선택')).toBeNull()
-      act(() => void vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_LOCK_FRAMES))
+      act(() => void vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_READY_FRAMES))
       fireEvent.click(screen.getByRole('button', { name: '확인' }))
       expect(screen.getByText('1. 구질 선택')).toBeTruthy()
     } finally {

@@ -7,7 +7,7 @@ import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/mod
 import { TeamGameScreen } from '@/pages/team-game/ui/TeamGameScreen'
 import { DEFENSE_BACKGROUND_URL } from '@/pages/defense/lib/defenseView'
 import type { TeamGameOptions } from '@/features/play-team-game/model/teamGameFlow'
-import { SCENE_CONFIRM_LOCK_FRAMES } from '@/features/play-game/model/useSceneConfirm'
+import { SCENE_CONFIRM_READY_FRAMES, SCENE_PREPARE_FRAMES } from '@/features/play-game/model/useSceneConfirm'
 
 /**
  * 경기 시작 인트로(상태 0xc)와 1회초 판(0x18) — 첫 사람 타석 앞에 서면 OK 로 넘긴다.
@@ -27,7 +27,7 @@ const 판닫기 = () => {
 const OK통과 = () => {
   for (let 번 = 0; 번 < 3; 번 += 1) {
     if (screen.queryByRole('button', { name: '확인' }) === null) return
-    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_LOCK_FRAMES))
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_READY_FRAMES))
     fireEvent.keyDown(window, { key: 'Enter' })
   }
 }
@@ -360,7 +360,7 @@ describe('상태 0xe — 새 타석마다 사람 OK 를 기다린다 (0x39e14 �
 
   it("기다리는 동안 '#' 교체는 안 열리고 '*' 메뉴는 열린다 — 메뉴가 떠 있으면 OK 를 안 받는다", () => {
     판까지()
-    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_LOCK_FRAMES))
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_READY_FRAMES))
     fireEvent.keyDown(window, { key: '#' })
     expect(screen.queryByText('투수 교체')).toBeNull()
     fireEvent.keyDown(window, { key: '*' })
@@ -368,9 +368,19 @@ describe('상태 0xe — 새 타석마다 사람 OK 를 기다린다 (0x39e14 �
     fireEvent.keyDown(window, { key: '5' })
     fireEvent.keyDown(window, { key: '*' })
     expect(screen.queryByText('1. 구질 선택')).toBeNull()
-    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_LOCK_FRAMES))
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_READY_FRAMES))
     fireEvent.keyDown(window, { key: 'Enter' })
     expect(screen.getByText('1. 구질 선택')).toBeTruthy()
+  })
+
+  it('0xd 두 그림 뒤 0xe 에 들어서면 투수·타자 소개 판(0x44944)이 서고, OK 뒤에는 걷힌다 (0x4d9ec)', () => {
+    판까지()
+    expect(screen.queryByTestId('소개판')).toBeNull()
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_PREPARE_FRAMES))
+    expect(screen.getByTestId('소개판')).toBeTruthy()
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_READY_FRAMES))
+    fireEvent.keyDown(window, { key: '5' })
+    expect(screen.queryByTestId('소개판')).toBeNull()
   })
 
   it('공격 차례도 같다 — 타석 장면은 서지만 OK 전에는 공이 안 나간다', () => {

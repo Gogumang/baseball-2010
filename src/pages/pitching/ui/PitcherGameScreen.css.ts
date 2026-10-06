@@ -1,4 +1,15 @@
 import { style } from '@vanilla-extract/css'
+
+/**
+ * 타석 캔버스(240×320) 자리 — 상태 0xe 의 소개 판(`MatchupCards`, 원본 좌표)을 놓는다.
+ * 투구 화면에는 0xd 그리기(타석 장면) 캔버스가 없어 판만 이 자리에 선다 (투수 미션 화면도 같이 쓴다).
+ */
+export const matchupFrame = style({
+  position: 'relative',
+  width: 240,
+  height: 320,
+  margin: '0 auto',
+})
 import { theme } from '@/app/styles/theme.css'
 
 export const frame = style({

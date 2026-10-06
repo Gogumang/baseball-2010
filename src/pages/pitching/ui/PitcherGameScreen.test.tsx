@@ -9,7 +9,7 @@ import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
 import { ORIGINAL_USER_EVENTS } from '@/shared/config/original/userEvents'
 import { PitcherGameScreen } from '@/pages/pitching/ui/PitcherGameScreen'
 import type { PitcherGameOptions } from '@/features/play-pitcher-game/model/pitcherGameFlow'
-import { SCENE_CONFIRM_LOCK_FRAMES } from '@/features/play-game/model/useSceneConfirm'
+import { SCENE_CONFIRM_READY_FRAMES } from '@/features/play-game/model/useSceneConfirm'
 
 afterEach(() => {
   cleanup()
@@ -24,7 +24,7 @@ const OK통과 = () => {
   for (let 번 = 0; 번 < 3; 번 += 1) {
     if (screen.queryByRole('button', { name: '메뉴' }) === null) return
     if (screen.queryByRole('button', { name: '확인' }) === null) return
-    act(() => void vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_LOCK_FRAMES))
+    act(() => void vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_READY_FRAMES))
     fireEvent.keyDown(window, { key: 'Enter' })
   }
 }

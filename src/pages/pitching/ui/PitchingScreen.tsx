@@ -9,6 +9,8 @@ import type { AtBatState } from '@/entities/at-bat/model/atBatState'
 import { CourseGrid } from '@/pages/pitching/ui/CourseGrid'
 import { PitchGradeGauge } from '@/pages/pitching/ui/PitchGradeGauge'
 import { useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
+import { SceneMatchupCards } from '@/widgets/matchup-cards/ui/SceneMatchupCards'
+import * as styles from '@/pages/pitching/ui/PitcherGameScreen.css'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
@@ -238,6 +240,16 @@ export function PitchingScreen({
                 }
           }
         />
+      )}
+
+      {/*
+        0xe — 0xd 두 그림 뒤 0x4d9ec 가 투수·타자 소개 판 0x44944 를 그린다(모드 검사 없음). 내가 던지므로 투수 PLAYER · 타자 COM.
+        ⚠️ 원본은 판 아래 0xd 그리기(타석 장면)가 깔리지만 웹 투구 화면엔 그 캔버스가 없다. 웹 미션 상태에 없는 칸은 비운다.
+      */}
+      {!isPopupOpen && isAwaitingConfirm && sceneConfirm.isInConfirmState && (
+        <div className={styles.matchupFrame}>
+          <SceneMatchupCards batterHand={0} pitcher={{ isComputer: false }} batter={{ isComputer: true }} />
+        </div>
       )}
 
       {!isPopupOpen && phase === '구질' && !isAwaitingConfirm && (

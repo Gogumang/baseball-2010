@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
-import { SCENE_CONFIRM_LOCK_FRAMES } from '@/features/play-game/model/useSceneConfirm'
+import { SCENE_CONFIRM_READY_FRAMES, SCENE_PREPARE_FRAMES } from '@/features/play-game/model/useSceneConfirm'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import { createAtBat } from '@/entities/at-bat/model/atBatState'
@@ -197,7 +197,10 @@ describe('상태 0xe — 내 타석마다 사람 OK 를 기다린다 (0x39e14 �
     expect(screen.getByRole('button', { name: '확인' })).toBeTruthy()
     fireEvent.keyDown(window, { key: '5' })
     expect(screen.getByRole('button', { name: '확인' })).toBeTruthy()
-    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_LOCK_FRAMES))
+    // 0xd 두 그림 뒤 0xe — 소개 판(0x44944)
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_PREPARE_FRAMES))
+    expect(screen.getByTestId('소개판')).toBeTruthy()
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_READY_FRAMES))
     fireEvent.keyDown(window, { key: '5' })
     expect(screen.queryByRole('button', { name: '확인' })).toBeNull()
     // 수비 화면을 갔다 와 화면이 다시 서도 같은 대기는 이미 받았다
@@ -210,7 +213,7 @@ describe('상태 0xe — 내 타석마다 사람 OK 를 기다린다 (0x39e14 �
     vi.useFakeTimers()
     띄우기({ bannerText: '삼진', progress: 진행() })
     if (screen.queryByRole('button', { name: '메뉴' }) === null) fireEvent.keyDown(window, { key: 'Enter' })
-    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_LOCK_FRAMES))
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_READY_FRAMES))
     fireEvent.keyDown(window, { key: '5' })
     expect((screen.getByRole('button', { name: '확인' }) as HTMLButtonElement).disabled).toBe(true)
   })

@@ -15,7 +15,7 @@ import { pitchSlotsFor } from '@/features/play-team-game/model/teamGameFlow'
 import { setActiveSound } from '@/shared/api/audio/soundPort'
 import { FULL_PLAY_SETTINGS, MATCH_SETTING_KIND } from '@/features/play-team-game/model/matchSettings'
 import type { SoundPort } from '@/shared/api/audio/soundPort'
-import { SCENE_CONFIRM_LOCK_FRAMES } from '@/features/play-game/model/useSceneConfirm'
+import { SCENE_CONFIRM_READY_FRAMES } from '@/features/play-game/model/useSceneConfirm'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 
 /**
@@ -204,7 +204,7 @@ describe('`#` 투수 교체 화면 — "Time!" 22 (상태 0xb 진입 0x3af06)', 
     )
     판닫기()
     // 상태 0xe 의 OK — 교체 창은 OK 뒤(0xf)에 열린다
-    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_LOCK_FRAMES))
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_READY_FRAMES))
     fireEvent.keyDown(window, { key: 'Enter' })
     녹음.played.length = 0
 

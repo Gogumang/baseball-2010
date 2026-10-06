@@ -21,6 +21,7 @@ import { HelpScreen } from '@/pages/help/ui/HelpScreen'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import { usePitcherGame } from '@/pages/pitching/model/usePitcherGame'
 import { useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
+import { SceneMatchupCards } from '@/widgets/matchup-cards/ui/SceneMatchupCards'
 import { CourseGrid } from '@/pages/pitching/ui/CourseGrid'
 import { PitchGradeGauge } from '@/pages/pitching/ui/PitchGradeGauge'
 import { ManagerHookWindow } from '@/pages/pitching/ui/ManagerHookWindow'
@@ -432,7 +433,20 @@ export function PitcherGameScreen({
           </>
         )}
 
-        {/* 0xe — 구질 고르기(0xf)는 OK 뒤다 */}
+        {/*
+          0xe — 구질 고르기(0xf)는 OK 뒤다. 0xd 두 그림 뒤 0x4d9ec 가 투수·타자 소개 판 0x44944 를 그린다(모드 검사 없음).
+          내가 던지므로 투수 PLAYER · 타자 COM. ⚠️ 원본은 판 아래 0xd 그리기(타석 장면)가 깔리지만 웹 투구 화면엔 그 캔버스가 없다.
+          ⚠️ 웹 경기 상태에 없는 칸(보직·좌우·방어율·탈삼진·체력 막대 / 타자 이름·수비·기록)은 비운다. 타자 손은 우타(0) 배치.
+        */}
+        {!isPopupOpen && isAwaitingConfirm && sceneConfirm.isInConfirmState && (
+          <div className={styles.matchupFrame}>
+            <SceneMatchupCards
+              batterHand={0}
+              pitcher={{ isComputer: false, ...(pitcherName === undefined ? {} : { name: pitcherName }) }}
+              batter={{ isComputer: true, battingOrder: progress.opponentOrderIndex % 9 }}
+            />
+          </div>
+        )}
         {!asksGiveUp && !isPopupOpen && canPitch && !isAwaitingConfirm && phase === '구질' && (
           <>
             <Panel heading="1. 구질 선택" />

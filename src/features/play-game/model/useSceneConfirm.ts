@@ -9,6 +9,16 @@ import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
  */
 export const SCENE_CONFIRM_LOCK_FRAMES = 3
 
+/**
+ * 0xd(타석 준비)에 머무는 갱신 수 — 갱신 0x39e14 는 `틱 > 0 && 점수판 [+0xf10]+0x6c ≠ 1` 이면 0xe 를 예약하고(다음 틱에 옮긴다),
+ * 점수판 +0x6c 는 1 이 되는 일이 없어 늘 두 그림 머문다 (4c09530 확정). 0xd 의 OK 는 사람 조작 0x536bc 의 점프표(0xe~0x1a)
+ * 밖이라 아무 일도 없다.
+ */
+export const SCENE_PREPARE_FRAMES = 2
+
+/** 대기가 보이기 시작해 OK 를 처음 받을 수 있게 되기까지 — 0xd 두 그림 + 0xe 잠금 세 그림 */
+export const SCENE_CONFIRM_READY_FRAMES = SCENE_PREPARE_FRAMES + SCENE_CONFIRM_LOCK_FRAMES
+
 /** 0xe 의 OK — 원본 키 −5(OK)·'5'(0x35) (0x532b0). 웹은 Enter·스페이스도 OK 로 받는다 (타석 화면 스윙 키와 같은 묶음) */
 const CONFIRM_KEYS: ReadonlySet<string> = new Set(['Enter', ' ', '5'])
 
@@ -16,8 +26,13 @@ const CONFIRM_KEYS: ReadonlySet<string> = new Set(['Enter', ' ', '5'])
 const confirmedCounts = new WeakMap<SceneConfirmWait, number>()
 
 export interface SceneConfirm {
-  /** 상태 0xe — 사람 OK 를 기다리는 중 (메뉴가 떠 있어도 참이다) */
+  /** 상태 0xd·0xe — 사람 OK 를 기다리는 중 (메뉴가 떠 있어도 참이다) */
   readonly isAwaiting: boolean
+  /**
+   * 0xd 두 그림을 지나 **0xe 에 들어섰는가** — 0xe 그리기 0x4d9ec 의 투수·타자 소개 판 0x44944(`MatchupCards`)는 이때부터
+   * 그린다(판의 틱은 0xe 에 들어선 그림이 0)
+   */
+  readonly isInConfirmState: boolean
   /** 지금 OK 를 받는 중인가 — 기다리는 중이고 화면이 받을 수 있을 때 (`canAccept`) */
   readonly acceptsConfirm: boolean
   /** OK 한 번 — 받을 수 없으면(잠금 3 갱신·메뉴 등) 아무 일도 없다 */
@@ -29,8 +44,8 @@ export interface SceneConfirm {
  *
  * - `canAccept` 가 거짓이면(경기 중 메뉴·조작방법·설정·교대 판·인트로가 덮고 있으면) 키를 안 받는다 — 일시정지 팝업
  *   0x754f9 가 떠 있으면 경기 키가 안 가고, 0x498d4 의 OK 는 0xe 의 사람 조작 객체에게만 간다.
- * - 받기 시작한 뒤 `SCENE_CONFIRM_LOCK_FRAMES` 갱신 안의 OK 는 무시한다 (0x49a26).
- *   ⚠️ 근사: 원본 틱(+0x2c)은 0xe 에 들어선 때부터 센다. 웹은 화면이 받기 시작한 때(덮개가 걷힌 때)부터 세고,
+ * - 받기 시작하면 0xd 두 그림(`SCENE_PREPARE_FRAMES`) 뒤 0xe 로 보고, 그 뒤 `SCENE_CONFIRM_LOCK_FRAMES` 갱신 안의 OK 는
+ *   무시한다 (0x49a26). ⚠️ 근사: 원본은 0xd 에 들어선 때부터 센다. 웹은 화면이 받기 시작한 때(덮개가 걷힌 때)부터 세고,
  *   메뉴를 열었다 닫으면 처음부터 다시 센다 — 일시정지 팝업 동안 장면 틱이 도는지는 안 봤다.
  * - Enter·스페이스·'5' 를 OK 로 받는다. 화면 누르기는 부르는 쪽이 `confirm` 을 잇는다.
  */
@@ -41,14 +56,23 @@ export function useSceneConfirm(wait: SceneConfirmWait | null | undefined, canAc
   const acceptsConfirm = isAwaiting && canAccept
 
   const isUnlockedRef = useRef(false)
-  // 대기 한 번(객체 · 받은 OK 수)마다 잠금을 새로 건다 — 같은 걸음의 두 번째 0xe 도 틱 0 부터다
+  const [enteredKey, setEnteredKey] = useState<{ readonly wait: SceneConfirmWait; readonly confirmed: number } | null>(null)
+  const isInConfirmState =
+    isAwaiting && enteredKey !== null && enteredKey.wait === wait && enteredKey.confirmed === confirmed
+  // 대기 한 번(객체 · 받은 OK 수)마다 0xd 두 그림 → 0xe → 잠금 세 그림을 새로 센다 — 같은 걸음의 두 번째 0xe 도
+  // 0x16 → 0xd 를 지나 다시 센다
   useEffect(() => {
     isUnlockedRef.current = false
-    if (!acceptsConfirm) return
-    const timer = window.setTimeout(() => {
+    if (!acceptsConfirm || wait == null) return
+    const frame = millisecondsPerFrame()
+    const entered = window.setTimeout(() => setEnteredKey({ wait, confirmed }), SCENE_PREPARE_FRAMES * frame)
+    const unlocked = window.setTimeout(() => {
       isUnlockedRef.current = true
-    }, SCENE_CONFIRM_LOCK_FRAMES * millisecondsPerFrame())
-    return () => window.clearTimeout(timer)
+    }, SCENE_CONFIRM_READY_FRAMES * frame)
+    return () => {
+      window.clearTimeout(entered)
+      window.clearTimeout(unlocked)
+    }
   }, [acceptsConfirm, wait, confirmed])
 
   const stateRef = useRef({ wait, confirmed, acceptsConfirm })
@@ -73,5 +97,5 @@ export function useSceneConfirm(wait: SceneConfirmWait | null | undefined, canAc
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [acceptsConfirm, confirm])
 
-  return { isAwaiting, acceptsConfirm, confirm }
+  return { isAwaiting, isInConfirmState, acceptsConfirm, confirm }
 }

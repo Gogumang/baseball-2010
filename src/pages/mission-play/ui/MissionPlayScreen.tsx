@@ -19,6 +19,7 @@ import type { StealBase } from '@/entities/fielding/model/stealStart'
 import { stealBaseOfKey } from '@/features/defense-play/model/pitchArrivalPlay'
 import type { AcePlayer } from '@/shared/config/original/acePlayers'
 import { useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
+import { SceneMatchupCards } from '@/widgets/matchup-cards/ui/SceneMatchupCards'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 
 interface MissionPlayScreenProps {
@@ -272,6 +273,18 @@ export function MissionPlayScreen({
             onPickoff={onPickoff}
             flightProbeRef={flightProbeRef}
           />
+
+          {/*
+            0xe 그리기 0x4d9ec — 0xd 두 그림 뒤 투수·타자 소개 판 0x44944 (모드 검사 없음). 사람이 치므로 타자 PLAYER · 투수 COM.
+            ⚠️ 웹 미션 상태에 없는 칸(이름·기록·좌우 등)은 비운다 — 마투수 미션이면 투수 이름만 적는다. 타자 손은 우타(0) 배치.
+          */}
+          {isAwaitingConfirm && sceneConfirm.isInConfirmState && (
+            <SceneMatchupCards
+              batterHand={0}
+              pitcher={{ isComputer: true, ...(opponent === null ? {} : { name: opponent.name }) }}
+              batter={{ isComputer: false }}
+            />
+          )}
 
           <div className={styles.overlay}>
             {isOver ? (

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
-import { SCENE_CONFIRM_LOCK_FRAMES, useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
+import { SCENE_CONFIRM_READY_FRAMES, SCENE_PREPARE_FRAMES, useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
 import { chainSceneConfirm, enterSceneConfirm } from '@/features/play-game/model/sceneConfirm'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
@@ -11,7 +11,7 @@ afterEach(() => vi.useRealTimers())
 
 function 잠금풀기() {
   act(() => {
-    vi.advanceTimersByTime(SCENE_CONFIRM_LOCK_FRAMES * millisecondsPerFrame())
+    vi.advanceTimersByTime(SCENE_CONFIRM_READY_FRAMES * millisecondsPerFrame())
   })
 }
 
@@ -91,5 +91,26 @@ describe('상태 0xe 의 OK 대기 (0x532b0 · 0x49a26)', () => {
     expect(again.result.current.isAwaiting).toBe(false)
     const next = renderHook(() => useSceneConfirm(enterSceneConfirm(), true))
     expect(next.result.current.isAwaiting).toBe(true)
+  })
+
+  it('0xd 두 그림 뒤에야 0xe(소개 판)이고, 그 뒤 세 그림까지 OK 를 안 받는다 (0x39e14 · 0x49a26)', () => {
+    const wait = enterSceneConfirm()
+    const { result } = renderHook(() => useSceneConfirm(wait, true))
+    expect(result.current.isInConfirmState).toBe(false)
+    act(() => {
+      vi.advanceTimersByTime(SCENE_PREPARE_FRAMES * millisecondsPerFrame())
+    })
+    expect(result.current.isInConfirmState).toBe(true)
+    act(() => {
+      vi.advanceTimersByTime(2 * millisecondsPerFrame())
+    })
+    act(() => result.current.confirm())
+    expect(result.current.isAwaiting).toBe(true)
+    act(() => {
+      vi.advanceTimersByTime(millisecondsPerFrame())
+    })
+    act(() => result.current.confirm())
+    expect(result.current.isAwaiting).toBe(false)
+    expect(result.current.isInConfirmState).toBe(false)
   })
 })
