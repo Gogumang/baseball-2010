@@ -11,7 +11,7 @@ import { SEASON_PHASE, SEASON_SCENE_STATE } from '@/entities/season-mode/model/s
 import { SEASON_PLAYABLE_EVENTS } from '@/entities/season-mode/model/seasonEventFlow'
 import { PRE_GAME_ACE_PHASE, SQUAD_PURPOSE } from '@/entities/season-mode/model/preGameFlow'
 import { ENTRY_SUB_TAB, ENTRY_TAB } from '@/entities/season-mode/model/entryEditor'
-import { teamPitchers } from '@/entities/team/model/teamRoster'
+import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { GAME_POINT_LIMIT } from '@/entities/season-mode/model/seasonRewards'
 import { clearSeasonGameRecord } from '@/entities/season-mode/model/seasonReputation'
 import { useGamePointWallet } from '@/entities/wallet/model/useGamePointWallet'
@@ -233,6 +233,9 @@ describe('시즌 세션', () => {
     act(() => result.current.actions.playNextGame())
     act(() => result.current.actions.finishGame(요약()))
     act(() => result.current.actions.confirmIncome(result.current.state!.record))
+    // 0xe9 → 0xf1 경기 뒤 마무리(결과판) → 확인 0x49a4
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.경기뒤마무리)
+    act(() => result.current.actions.confirmDayResults())
     expect(result.current.scene).toBe(SEASON_SCENE_STATE.다음경기)
     expect(result.current.state?.record.phase).toBe(SEASON_PHASE.다음경기)
 
@@ -263,9 +266,24 @@ describe('시즌 세션', () => {
     act(() => result.current.actions.playNextGame())
     act(() => result.current.actions.finishGame(요약()))
 
-    // 1경기째 뒤 → 홀수라 관리 메뉴가 안 열리고 다음경기로
+    // 수입 확인 → 0xf1 경기 뒤 마무리 → 확인. 1경기째 뒤 → 홀수라 관리 메뉴가 안 열리고 다음경기로
     act(() => result.current.actions.confirmIncome(result.current.state!.record))
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.경기뒤마무리)
+    act(() => result.current.actions.confirmDayResults())
     expect(result.current.scene).toBe(SEASON_SCENE_STATE.다음경기)
+  })
+
+  it('짝수 경기 뒤 0xf1 확인은 관리 메뉴로 간다 (0x49a4)', () => {
+    const { result } = 띄우기()
+    시작(result, 0)
+    act(() => result.current.actions.playNextGame())
+    act(() => result.current.actions.finishGame(요약()))
+
+    act(() => result.current.actions.confirmIncome({ ...result.current.state!.record, games: 2 }))
+    act(() => result.current.actions.confirmDayResults())
+
+    expect(result.current.scene === SEASON_SCENE_STATE.관리메뉴 || result.current.scene === SEASON_SCENE_STATE.이벤트재생)
+      .toBe(true)
   })
 
   it('정규시즌이 끝나면 **국가대항전 연차라도** 시즌 끝 사슬이 먼저다 (afterKoreanSeries)', () => {
@@ -1604,5 +1622,112 @@ describe('영입한 명전 선수는 그 기록으로 팀 경기 명단에 실�
       ability: [710, 660, 610, 560],
       repertoire: { name: '철완', form: 3, magicId: 2, pitchMask: 0b101 },
     })
+  })
+})
+
+/**
+ * CPU 트레이드 요청 — 0xf1 진입 0x953c 가 굴리고(0x93c8), 관리 메뉴 진입 0xec10 이 알림 [203] 을 띄운다.
+ * 굴림 차례를 정해 두려고 수입 확인 직전에만 난수를 갈아 끼운다.
+ */
+describe('CPU 트레이드 요청 (0x953c → 0xec10 → 0xe5)', () => {
+  /** 처음엔 씨앗 난수, `script` 를 넣으면 그 값들을 먼저 내고 다 쓰면 씨앗 난수로 돌아간다 */
+  function 갈아끼는난수() {
+    const seeded = createSeededRandom(20100901)
+    let queue: number[] = []
+    const random = {
+      next: () => (queue.length > 0 ? queue.shift()! : seeded.next()),
+      nextInRange: (minimum: number, maximum: number) => seeded.nextInRange(minimum, maximum),
+      pick: <T,>(candidates: readonly T[]) => seeded.pick(candidates),
+    }
+    /** [값, 아래, 위) — randomIntegerBelow 가 그 값을 내는 next() */
+    const script = (draws: readonly (readonly [number, number, number])[]) => {
+      queue = draws.map(([value, low, high]) => (value - low + 0.5) / (high - low))
+    }
+    return { random, script }
+  }
+
+  const 상대팀 = 3
+  const 띄우기요청 = () => {
+    const { random, script } = 갈아끼는난수()
+    const hook = renderHook(() => useSeasonSession(메모리저장(), random))
+    return { ...hook, script }
+  }
+  /** 요청이 서는 굴림 — 상대 3팀 타자 0번(값 29 이하 아무나)을 내 타자 0번(값 40)과 */
+  const 요청굴림 = (): readonly (readonly [number, number, number])[] => {
+    const 내칸 = teamBatters(0).findIndex((player) => player.grade >= teamBatters(상대팀)[0].grade)
+    return [[0, 0, 10000], [상대팀, 0, 10], [1, 0, 2], [0, 0, 12], [내칸, 0, 12]]
+  }
+
+  it('0xf1 에 들어가면 굴린다 — 요청이 서면 SR+0x17a +1 · 짝수 경기 뒤 관리 메뉴에서 알림이 뜬다', () => {
+    const { result, script } = 띄우기요청()
+    시작(result, 0)
+    act(() => result.current.actions.playNextGame())
+    act(() => result.current.actions.finishGame(요약()))
+
+    script(요청굴림())
+    act(() => result.current.actions.confirmIncome({ ...result.current.state!.record, games: 2 }))
+
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.경기뒤마무리)
+    expect(result.current.state?.record.tradeRequestCount).toBe(1)
+    expect(result.current.tradeRequest).toMatchObject({ isRequested: true, opponentTeamId: 상대팀, tab: 1 })
+
+    act(() => result.current.actions.confirmDayResults())
+    이벤트넘기기(result)
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.관리메뉴)
+    expect(result.current.isTradeRequestAlertOpen).toBe(true)
+
+    // 예 → 0xe5 (트레이드 영입 선수)
+    act(() => result.current.actions.answerTradeRequest(true))
+    expect(result.current.isTradeRequestAlertOpen).toBe(false)
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.트레이드영입선수)
+
+    // 결과를 닫으면 플래그를 지우고 관리 메뉴로 — 알림은 다시 안 뜬다
+    act(() => result.current.actions.closeTradeResult())
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.관리메뉴)
+    expect(result.current.tradeRequest.isRequested).toBe(false)
+    expect(result.current.isTradeRequestAlertOpen).toBe(false)
+  })
+
+  it('아니오면 요청을 버린다 (0x7490: this+0x148 = 0)', () => {
+    const { result, script } = 띄우기요청()
+    시작(result, 0)
+    act(() => result.current.actions.playNextGame())
+    act(() => result.current.actions.finishGame(요약()))
+    script(요청굴림())
+    act(() => result.current.actions.confirmIncome({ ...result.current.state!.record, games: 2 }))
+    act(() => result.current.actions.confirmDayResults())
+    이벤트넘기기(result)
+
+    act(() => result.current.actions.answerTradeRequest(false))
+
+    expect(result.current.tradeRequest.isRequested).toBe(false)
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.관리메뉴)
+  })
+
+  it('굴림이 1000 이상이면 요청도 횟수도 없다', () => {
+    const { result, script } = 띄우기요청()
+    시작(result, 0)
+    act(() => result.current.actions.playNextGame())
+    act(() => result.current.actions.finishGame(요약()))
+
+    script([[1000, 0, 10000]])
+    act(() => result.current.actions.confirmIncome(result.current.state!.record))
+
+    expect(result.current.tradeRequest.isRequested).toBe(false)
+    expect(result.current.state?.record.tradeRequestCount).toBe(0)
+  })
+
+  it('보통 트레이드(0xe4)로 들어가면 요청 칸을 지운다 (0x4774 memset)', () => {
+    const { result, script } = 띄우기요청()
+    시작(result, 0)
+    act(() => result.current.actions.playNextGame())
+    act(() => result.current.actions.finishGame(요약()))
+    script(요청굴림())
+    act(() => result.current.actions.confirmIncome(result.current.state!.record))
+    expect(result.current.tradeRequest.isRequested).toBe(true)
+
+    act(() => result.current.actions.goto(SEASON_SCENE_STATE.트레이드))
+
+    expect(result.current.tradeRequest.isRequested).toBe(false)
   })
 })

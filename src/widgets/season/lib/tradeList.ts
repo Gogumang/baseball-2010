@@ -4,6 +4,7 @@ import {
   batterPositionPenaltyOf, tradeRefusalOf,
 } from '@/entities/season-mode/model/playerTrade'
 import type { TradeRefusal } from '@/entities/season-mode/model/playerTrade'
+import { TRADE_REQUEST_TAB, myPlayerGradeOf } from '@/entities/season-mode/model/tradeRequest'
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 
 /**
@@ -25,8 +26,8 @@ export interface TradePlayerEntry {
   readonly name: string
   readonly player: SeasonPlayer
   /**
-   * 원본 등급 바이트 `+0x1b` 자리. ⚠️ 웹 선수 표에 이 칸이 없어 **늘 0** 이다
-   * — 성공률의 차이 항 `d` 가 0 이 된다 (`playerTrade.ts` 머리 주석).
+   * 선수 레코드 `+0x1b` (`RosterPlayer.grade`) — 성공률의 차이 항 `d` 와 성공 시 소지금 변화가 읽는다.
+   * 내 명단은 id 로 내 팀 표를 읽는다(`tradeRequest.myPlayerGradeOf` — 표 밖 나리·명전 선수는 0, 어차피 거절된다).
    */
   readonly grade: number
   /** 자리 벌점 (타자는 수비 자리, 투수는 보직 — 웹에 보직이 없어 투수는 0) */
@@ -34,9 +35,6 @@ export interface TradePlayerEntry {
   /** 나리·명예 선수면 트레이드 거절 (StrMODE[165]/[166]) */
   readonly refusal: TradeRefusal | null
 }
-
-/** 웹 선수 표에 등급 칸(`+0x1b`)이 없다 — 양쪽 모두 이 값으로 본다 */
-export const UNKNOWN_GRADE = 0
 
 const fallbackNameOf = (isPitcher: boolean, slot: number) =>
   `${isPitcher ? '투수' : '타자'} ${slot + 1}번`
@@ -51,7 +49,7 @@ export function opponentTradeEntriesOf(teamId: number, isPitcher: boolean): read
     index,
     name: player.name,
     player: { id: index, kindByte: index, fieldPosition: 0, stamina: 0 },
-    grade: UNKNOWN_GRADE,
+    grade: player.grade,
     // 붙박이 표에는 수비 자리 칸이 없어 0 이다 (타자 자리 0 → 벌점 10)
     penalty: isPitcher ? 0 : batterPositionPenaltyOf(0),
     refusal: null,
@@ -72,7 +70,7 @@ export function myTradeEntriesOf(
       index,
       name: table[slot]?.name ?? fallbackNameOf(isPitcher, slot),
       player,
-      grade: UNKNOWN_GRADE,
+      grade: myPlayerGradeOf(teamId, isPitcher ? TRADE_REQUEST_TAB.투수 : TRADE_REQUEST_TAB.타자, player),
       penalty: isPitcher ? 0 : batterPositionPenaltyOf(player.fieldPosition & 0xf),
       refusal: tradeRefusalOf(player),
     }

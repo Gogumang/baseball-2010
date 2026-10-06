@@ -93,6 +93,23 @@ describe('시즌 관리 메뉴 (상태 0xc9)', () => {
   })
 })
 
+describe('관리 메뉴 진입 알림 — CPU 트레이드 요청 StrMODE[203] (팝업 0x27)', () => {
+  it('예·아니오로 답하고, 떠 있는 동안 메뉴 키는 안 먹는다', () => {
+    const onAnswer = vi.fn()
+    const onExit = vi.fn()
+    render(
+      <SeasonManagementScreen state={시즌()} onSelect={vi.fn()} onExit={onExit}
+        alert={{ text: '!C[트윈스] 팀에서!N트레이드 요청이 왔습니다', onAnswer }} />,
+    )
+
+    expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain('트레이드 요청')
+    fireEvent.click(screen.getByRole('button', { name: '아니오' }))
+
+    expect(onAnswer).toHaveBeenCalledWith(false)
+    expect(onExit).not.toHaveBeenCalled()
+  })
+})
+
 describe('구단관리 하위 메뉴 (상태 0xce)', () => {
   it('네 칸이 차례대로 나온다', () => {
     render(<SeasonTeamMenuScreen state={시즌()} onSelect={vi.fn()} onBack={vi.fn()} />)

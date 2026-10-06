@@ -7,8 +7,10 @@ import {
   SeasonOutingScreen, SeasonSummaryScreen, SeasonTeamMenuScreen, SeasonTitleAwardScreen,
   SeasonTrainingScreen, StadiumShopScreen, TradeScreen, CoachHireScreen, SEASON_MVP_LEADER_KINDS,
   seasonAwardRewardOf, seasonMvpResultEventId, seasonTitleResultEventId,
-  SeasonMatchInfoScreen, seasonMatchInfoLines,
+  SeasonMatchInfoScreen, seasonMatchInfoLines, DayResultBoardScreen,
 } from '@/pages/season'
+import { fillModeText } from '@/widgets/season/lib/seasonText'
+import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { AceSelectScreen } from '@/pages/general-mode'
 import { EntryEditorScreen } from '@/widgets/entry-editor'
 import { TEAMS } from '@/shared/config/original/teams'
@@ -208,9 +210,15 @@ export function SeasonRoute({
   }
 
   if (scene === SEASON_SCENE_STATE.관리메뉴) {
+    const request = session.tradeRequest
     return (
       <SeasonManagementScreen
         state={state}
+        // 0xec10 — StrMODE[203] "[%s] 팀에서 트레이드 요청이 왔습니다 확인 하시겠습니까?", %s = 팀 이름([this+0x158])
+        alert={session.isTradeRequestAlertOpen
+          ? { text: fillModeText(ORIGINAL_MODE_TEXT[203] ?? '', TEAMS[request.opponentTeamId]?.name ?? ''),
+            onAnswer: actions.answerTradeRequest }
+          : null}
         onSelect={(item, target) => {
           // 관리 메뉴 칸 5 → 0xd8 다음경기 (점프표 0xcbe40). 경기는 그 화면의 확인에서 시작한다
           if (item === '다음경기') return actions.openNextGame()
@@ -243,14 +251,18 @@ export function SeasonRoute({
 
   // 트레이드 한 바퀴 (0xe4 팀 고르기 → 0xe5 영입 선수 → 0xe6 보상 선수 → 0xe7 확인·진행).
   // 원본도 한 장면 객체가 네 칸을 이어 들고 있어(this+0x154·0x158·0x15c) 화면 하나가 단계를 든다
-  if (scene === SEASON_SCENE_STATE.트레이드) {
+  // CPU 트레이드 요청을 받으면 관리 메뉴에서 곧장 0xe5(영입 선수)로 온다 — 같은 화면이 요청 칸으로 단계를 든다
+  if (scene === SEASON_SCENE_STATE.트레이드 || scene === SEASON_SCENE_STATE.트레이드영입선수) {
     return (
       <TradeScreen
         state={state}
         roster={roster}
         gamePoints={session.gamePoints}
         random={random}
+        request={scene === SEASON_SCENE_STATE.트레이드영입선수 ? session.tradeRequest : null}
         onTrade={actions.finishTrade}
+        onFinish={actions.closeTradeResult}
+        onCancelRequest={actions.cancelTradeRequest}
         onBack={backToTeamMenu}
       />
     )
@@ -537,6 +549,14 @@ export function SeasonRoute({
         // 시즌은 여기서 끝이고 SR+0x1bc 가 섰으니 다시 들어와도 관리 메뉴다. **근사다**
         onFinish={onExit}
       />
+    )
+  }
+
+  // 경기 뒤 마무리 0xf1 — 같은 날 다른 네 경기 결과판 (그림 0xb400, SR+0x1c0). 확인 키 0x49a4
+  if (scene === SEASON_SCENE_STATE.경기뒤마무리) {
+    return (
+      <DayResultBoardScreen board={state.record.dayBoard} onConfirm={actions.confirmDayResults}
+        gamePoint={session.gamePoints} />
     )
   }
 

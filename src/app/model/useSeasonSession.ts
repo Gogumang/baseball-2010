@@ -20,6 +20,8 @@ import {
 import { clearSeasonGameRecord } from '@/entities/season-mode/model/seasonReputation'
 import type { SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
 import type { TradeSettlement } from '@/entities/season-mode/model/playerTrade'
+import { NO_TRADE_REQUEST, rollTradeRequest } from '@/entities/season-mode/model/tradeRequest'
+import type { TradeRequest } from '@/entities/season-mode/model/tradeRequest'
 import {
   EMPTY_LEAGUE, LEAGUE_SIDE_HOME, UNSHUFFLED_PITCHER_ORDER, leagueSideOf, nextSeasonLeague, pitcherOrderOf,
   pitcherOrdersAfterPostseason, rankingOf, rotateLeaguePitchers, startPostseason,
@@ -199,6 +201,16 @@ export interface SeasonSession {
   readonly matchInfoStarterName: string | null
   /** 이벤트 재생 0xd3 — 트는 이벤트와 끝나고 돌아갈 상태(`this+0x24`). 그 장면이 아니면 null */
   readonly eventPlayback: SeasonEventPlayback | null
+  /**
+   * CPU 트레이드 요청 — 장면 객체 this+0x148 (20바이트). 경기 뒤 마무리 0xf1 진입 0x953c 가 굴려 담는다.
+   * 장면 객체 칸이라 **저장되지 않는다**(장면을 만들 때 0, 팀 고르기 0xe4 진입 0x4774 도 지운다).
+   */
+  readonly tradeRequest: TradeRequest
+  /**
+   * 관리 메뉴(0xc9) 진입에서 요청 알림 StrMODE[203] 이 떠 있는가 — 0xe9ac 의 0xec10: 이벤트 폴링이 아무것도 안
+   * 틀었고 상태가 0xc9 이고 this+0x148 ≠ 0 이면 팝업 id 0x27(예·아니오). 답은 0xc9 그림 0x73b8 이 받는다.
+   */
+  readonly isTradeRequestAlertOpen: boolean
   readonly notice: string
   readonly actions: SeasonActions
 }
@@ -254,6 +266,17 @@ export interface SeasonActions {
   /** 0xe0 — 마선수 잠금 팝업을 닫는다 */
   readonly closeEntryAceLocked: () => void
   readonly confirmIncome: (record: SeasonRecord) => void
+  /** 경기 뒤 마무리(0xf1) 결과판의 확인 — 키 0x49a4 (포스트시즌 0xef · 짝수 경기 0xc9 · 홀수 0xd8) */
+  readonly confirmDayResults: () => void
+  /**
+   * 관리 메뉴의 요청 알림 [203] 에 답했다 — 0x73b8 의 팝업 0x27 갈래(7422~749e):
+   * 예(0) → 상태 0xe5(트레이드 영입 선수)로 · 관리·구단관리 메뉴 커서를 칸 1 로 / 아니오(1)·취소(0x14) → this+0x148 = 0
+   */
+  readonly answerTradeRequest: (accept: boolean) => void
+  /** 요청 트레이드 0xe5 의 [216] 에 "예" — 0x712a: this+0x148 = 0 · 구단관리 0xce */
+  readonly cancelTradeRequest: () => void
+  /** 트레이드 결과 알림을 닫았다 — 0xc7ba: this+0x148 = 0 · 관리 메뉴 0xc9 (보통 트레이드도 같다) */
+  readonly closeTradeResult: () => void
   /** 국가대항전 한 경기 — 사람이 대표팀을 조작한다 */
   readonly playCupGame: (myTeam: number, opponent: number) => void
   readonly finishCup: (finish: NationalCupFinish) => void
@@ -550,6 +573,8 @@ export const SEASON_DEFAULT_MATCH_SETTINGS: MatchProgressSettings = {
 }
 /** 시즌모드 = 원본 게임 모드 2 (능력치 보정 마스크 0x306 에 든다) */
 const SEASON_GAME_MODE = 2
+/** 경기 뒤 마무리 0xf1 진입 0x953c 가 트는 배경음 — 관리 화면 4 (`0x6ea6d(소리, 4, −1, 1)`) */
+const SEASON_MANAGEMENT_BGM = 4
 
 /** 같은 경기 화면을 쓰는 세 갈래 — 끝났을 때 정산하는 곳이 다르다 */
 export type SeasonGameKind = '정규' | '포스트시즌' | '국가대항전'
@@ -756,6 +781,10 @@ export function useSeasonSession(
   const [entryEdit, setEntryEdit] = useState<SeasonEntryEdit | null>(null)
   /** 이벤트 재생 0xd3 — 트는 이벤트와 돌아갈 상태 */
   const [eventPlayback, setEventPlayback] = useState<SeasonEventPlayback | null>(null)
+  /** this+0x148 — CPU 트레이드 요청 (장면 객체 칸, 저장 안 함) */
+  const [tradeRequest, setTradeRequest] = useState<TradeRequest>(NO_TRADE_REQUEST)
+  /** 관리 메뉴 진입의 요청 알림 [203] (팝업 0x27) 이 떠 있는가 */
+  const [isTradeRequestAlertOpen, setTradeRequestAlertOpen] = useState(false)
   const playbackSerial = useRef(0)
   /**
    * 전역 저장 +0xbe — 이벤트 100 의 1000 G 를 받았는가 (0x8c714). 모드를 가리지 않는 전역 칸이라 시즌을 새로
@@ -862,6 +891,15 @@ export function useSeasonSession(
       }
       if (poll.kind === '연초목표') return startEvent(YEAR_GOAL_EVENT_ID, scene)
       if (poll.kind === '이벤트') return startEvent(poll.eventId, scene)
+      // 0xec10 — 아무 이벤트도 안 틀었고 0xc9 이고 this+0x148 ≠ 0 이면 요청 알림 [203] (팝업 0x27).
+      // ⚠️ 그 앞 0xebfc 의 엔딩 플래그(0x1552adc) 갈래는 웹에 그 전역 칸이 없어 건너뛴다 — 시즌 중엔 늘 0 이다(유력)
+      if (scene === SEASON_SCENE_STATE.관리메뉴 && tradeRequest.isRequested) setTradeRequestAlertOpen(true)
+      return
+    }
+
+    // 팀 고르기 0xe4 진입 0x4774 — this+0x148 20바이트를 memset 0 (보통 트레이드는 요청 플래그가 늘 0)
+    if (scene === SEASON_SCENE_STATE.트레이드) {
+      setTradeRequest(NO_TRADE_REQUEST)
       return
     }
 
@@ -893,7 +931,7 @@ export function useSeasonSession(
       const rank = Math.max(0, rankingOf(save.league).indexOf(record.teamId))
       return startEvent(regularSeasonRankEventId(rank), step.next)
     }
-  }, [commit, event100Awarded, openedHiddenIds, random, save, scene, startEvent])
+  }, [commit, event100Awarded, openedHiddenIds, random, save, scene, startEvent, tradeRequest.isRequested])
 
   const chooseTeam = useCallback(
     (teamId: number) => {
@@ -1560,13 +1598,43 @@ export function useSeasonSession(
         // 원본 시즌 끝 사슬의 첫 칸 (0xee → 시상 셋 → 정규시즌순위 → 결산)
         return setScene(SEASON_END_CHAIN[0].state)
       }
-      const next = afterGameNext(settled)
-      // 홀수 경기 뒤는 관리 메뉴를 건너뛰고 곧장 0xd8 — 들어옴 0x4cb8 이 phase 를 4 로 둔다
-      if (next === SEASON_SCENE_STATE.다음경기) return nextGameEntered({ ...save, state: { ...save.state, record: settled } }, false)
-      setScene(next)
+      // 0xe9 → (0xd3 평가 이벤트) → **0xf1 경기 뒤 마무리**. 진입 0x953c: CPU 트레이드 요청 0x93c8 을 굴려
+      // this+0x148 에 담고(요청 횟수 SR+0x17a 는 레코드) 배경음 4 를 반복으로 튼다 (0x6ea6d(소리, 4, −1, 1))
+      const rolled = rollTradeRequest(random, settled, save.roster)
+      commit({ ...save, state: { ...save.state, record: rolled.record } })
+      setTradeRequest(rolled.request)
+      activeSound().playBgm(SEASON_MANAGEMENT_BGM)
+      setScene(SEASON_SCENE_STATE.경기뒤마무리)
     },
-    [commit, nextGameEntered, save],
+    [commit, random, save],
   )
+
+  /** 0xf1 키 0x49a4 — 확인이면 포스트시즌 0xef · 경기 수 짝수 0xc9 · 홀수 0xd8 */
+  const confirmDayResults = useCallback(() => {
+    if (save === null) return
+    const next = afterGameNext(save.state.record)
+    // 홀수 경기 뒤는 관리 메뉴를 건너뛰고 곧장 0xd8 — 들어옴 0x4cb8 이 phase 를 4 로 둔다
+    if (next === SEASON_SCENE_STATE.다음경기) return nextGameEntered(save, false)
+    setScene(next)
+  }, [nextGameEntered, save])
+
+  const answerTradeRequest = useCallback((accept: boolean) => {
+    setTradeRequestAlertOpen(false)
+    // ⚠️ 원본은 "예" 에서 관리 메뉴(this+0x70)·구단관리(this+0x78) 커서를 칸 1 로 옮긴다 — 웹 메뉴 화면은
+    //    커서를 화면이 들고 있어 그 자리는 옮기지 않는다(근사)
+    if (accept) return setScene(SEASON_SCENE_STATE.트레이드영입선수)
+    setTradeRequest((request) => ({ ...request, isRequested: false }))
+  }, [])
+
+  const cancelTradeRequest = useCallback(() => {
+    setTradeRequest((request) => ({ ...request, isRequested: false }))
+    setScene(SEASON_SCENE_STATE.구단관리)
+  }, [])
+
+  const closeTradeResult = useCallback(() => {
+    setTradeRequest((request) => ({ ...request, isRequested: false }))
+    setScene(SEASON_SCENE_STATE.관리메뉴)
+  }, [])
 
   /**
    * 결산 화면(0xef)이 포스트시즌을 한 걸음 진행시킨다.
@@ -1963,10 +2031,13 @@ export function useSeasonSession(
     summaryEntry,
     cup: save?.cup ?? null,
     eventPlayback,
+    tradeRequest,
+    isTradeRequestAlertOpen,
     notice,
     actions: {
       chooseTeam, goto, updateRecord, updateRoster, removeHallOfFamer, finishTrade, playNextGame,
-      openNextGame, confirmNextGame, cancelNextGame, confirmIncome,
+      openNextGame, confirmNextGame, cancelNextGame, confirmIncome, confirmDayResults,
+      answerTradeRequest, cancelTradeRequest, closeTradeResult,
       choosePreGameAce: choosePreGameAceAction, cancelPreGameAce: cancelPreGameAceAction,
       startPendingGame, cancelMatchInfo, toggleMatchSettings, applyMatchSettings,
       openEntryEdit, pressEntryKey: pressEntryKeyAction, pointEntryCursor: pointEntryCursorAction,

@@ -6,7 +6,7 @@ import { startNewSeason } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonRecord, SeasonState } from '@/entities/season-mode/model/seasonRecord'
 import { PLAYER_OWN_BIT } from '@/entities/season-mode/model/playerRecruit'
 import type { SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
-import { teamBatters } from '@/entities/team/model/teamRoster'
+import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { TEAMS } from '@/shared/config/original/teams'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
@@ -49,6 +49,8 @@ const 띄우기 = (
 ) => {
   const onTrade = vi.fn()
   const onBack = vi.fn()
+  const onFinish = vi.fn()
+  const onCancelRequest = vi.fn()
   render(
     <TradeScreen
       state={state}
@@ -57,10 +59,12 @@ const 띄우기 = (
       random={고정난수(1)}
       onTrade={onTrade}
       onBack={onBack}
+      onFinish={onFinish}
+      onCancelRequest={onCancelRequest}
       {...나머지}
     />,
   )
-  return { onTrade, onBack }
+  return { onTrade, onBack, onFinish, onCancelRequest }
 }
 
 const 누르기 = (이름: string | RegExp) => fireEvent.click(screen.getByRole('button', { name: 이름 }))
@@ -124,13 +128,50 @@ describe('0xe5 영입 선수 → 0xe6 보상 선수', () => {
 })
 
 describe('0xe7 확인·진행 (J 4-4)', () => {
-  const 확인까지 = (나머지: Partial<Parameters<typeof TradeScreen>[0]> = {}) => {
+  // 두 팀 타자 6번은 +0x1b 가 둘 다 9 라 d = 0 이다 (표 값)
+  const 같은값칸 = 6
+  const 확인까지 = (나머지: Partial<Parameters<typeof TradeScreen>[0]> = {}, 상대칸 = 같은값칸, 내칸 = 같은값칸) => {
     const handles = 띄우기(상태(), 나머지)
     상대팀고르기()
-    누르기(teamBatters(OPPONENT)[0].name)
-    누르기(teamBatters(MY_TEAM)[0].name)
+    누르기(teamBatters(OPPONENT)[상대칸].name)
+    누르기(teamBatters(MY_TEAM)[내칸].name)
     return handles
   }
+
+  it('시험 전제 — 6번끼리는 값이 같고, 0번끼리는 40 · 29 다', () => {
+    expect(teamBatters(MY_TEAM)[같은값칸].grade).toBe(teamBatters(OPPONENT)[같은값칸].grade)
+    expect([teamBatters(MY_TEAM)[0].grade, teamBatters(OPPONENT)[0].grade]).toEqual([40, 29])
+  })
+
+  it('+0x1b 차이가 성공률을 깎는다 — d = 110 이면 40 − 44 − 20 → 바닥 3%', () => {
+    확인까지({}, 0, 0)
+
+    expect(screen.getByRole('button', { name: /기본 진행/ }).textContent).toContain('3%')
+    expect(screen.getByRole('button', { name: /\+50%/ }).textContent).toContain('53%')
+  })
+
+  it('성공하면 소지금에 d 가 더해진다 (0xd180 — 좋은 선수를 내주면 들어온다)', () => {
+    const { onTrade } = 확인까지({ random: 고정난수(2) }, 0, 0)
+
+    누르기(/기본 진행/)
+    누르기('예')
+
+    const settlement = onTrade.mock.calls[0][0]
+    expect(settlement.isSuccess).toBe(true)
+    // 새 시즌 소지금 50 + (40 − 29) × 10
+    expect(settlement.record.money).toBe(160)
+  })
+
+  it('결과 알림을 닫으면 관리 메뉴 쪽으로 나간다 (0xc7ba → 0xc9)', () => {
+    const { onFinish, onBack } = 확인까지({ random: 고정난수(19) })
+
+    누르기(/기본 진행/)
+    누르기('예')
+    누르기('확인')
+
+    expect(onFinish).toHaveBeenCalledTimes(1)
+    expect(onBack).not.toHaveBeenCalled()
+  })
 
   it('비용 세 칸과 그 성공률이 나온다 — 자리 벌점 10+10 이라 기본은 20% 다', () => {
     확인까지()
@@ -151,8 +192,10 @@ describe('0xe7 확인·진행 (J 4-4)', () => {
     const settlement = onTrade.mock.calls[0][0]
     expect(settlement.isSuccess).toBe(true)
     expect(settlement.record.tradeUsed).toBe(1)
-    expect(settlement.roster.batters[0].id).toBe(0)
+    expect(settlement.roster.batters[같은값칸].id).toBe(같은값칸)
     expect(settlement.gamePointCost).toBe(0)
+    // d = 0 이라 소지금은 그대로
+    expect(settlement.record.money).toBe(50)
   })
 
   it('실패해도 커맨드는 쓴 것이고 명단은 그대로다', () => {
@@ -186,5 +229,60 @@ describe('커맨드 가드 (SR+0x56)', () => {
 
     누르기('확인')
     expect(onBack).toHaveBeenCalled()
+  })
+})
+
+describe('CPU 트레이드 요청으로 들어오면 (0xe5 진입 0x5cd0 · 키 0x7104 · 0x727c · 0xc66c)', () => {
+  const 요청 = {
+    isRequested: true, myIndex: 3, opponentIndex: 2, tab: 1, opponentTeamId: OPPONENT,
+  } as const
+
+  it('팀 고르기를 건너뛰고 [204] 알림부터 — 닫으면 상대 칸이 묶인 목록이다', () => {
+    띄우기(상태(), { request: 요청 })
+
+    expect(알림글()).toContain('상대 팀에서 제시한')
+    누르기('확인')
+    expect(screen.getByRole('button', { name: teamBatters(OPPONENT)[2].name })).toBeDefined()
+  })
+
+  it('다른 줄을 눌러도 요청 칸으로 진행하고 [205] → 확인 단계, 성공이 강제된다 (뽑기 100 이어도)', () => {
+    const { onTrade, onFinish } = 띄우기(상태({ tradeUsed: 1 }), { request: 요청, random: 고정난수(100) })
+
+    누르기('확인')
+    누르기(teamBatters(OPPONENT)[0].name)
+    expect(알림글()).toContain('상대 팀에서 원하는')
+    누르기('확인')
+    누르기(teamBatters(MY_TEAM)[0].name)
+    // 0xc756 — 비용 칸은 안 움직여 늘 기본 진행이다
+    누르기(/\+50%/)
+    누르기('예')
+
+    const settlement = onTrade.mock.calls[0][0]
+    expect(settlement.isSuccess).toBe(true)
+    expect(settlement.gamePointCost).toBe(0)
+    expect(settlement.record.tradeUsed).toBe(1)
+    // 요청 칸끼리 맞바꿨다 — 내 3번 자리에 상대 2번
+    expect(settlement.roster.batters[3].id).toBe(2)
+    누르기('확인')
+    expect(onFinish).toHaveBeenCalledTimes(1)
+  })
+
+  it('영입 단계에서 취소하면 [216] — 예면 요청을 버린다', () => {
+    const { onCancelRequest, onBack } = 띄우기(상태(), { request: 요청 })
+    누르기('확인')
+
+    누르기('되돌아가기')
+    expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain('트레이드를 취소')
+    누르기('예')
+
+    expect(onCancelRequest).toHaveBeenCalledTimes(1)
+    expect(onBack).not.toHaveBeenCalled()
+  })
+
+  it('탭 0 이면 투수 명단이다 (0xb5695 탭 0 = 0xb51fc 투수 배열)', () => {
+    띄우기(상태(), { request: { ...요청, tab: 0 } })
+    누르기('확인')
+
+    expect(screen.getByRole('button', { name: teamPitchers(OPPONENT)[2].name })).toBeDefined()
   })
 })

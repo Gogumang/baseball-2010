@@ -1,4 +1,4 @@
-import { RawScreen } from '@/shared/ui'
+import { MessageBox, RawScreen } from '@/shared/ui'
 import type { SeasonState } from '@/entities/season-mode/model/seasonRecord'
 import { SEASON_GAME_COUNT } from '@/entities/season-mode/model/seasonRecord'
 import {
@@ -26,6 +26,11 @@ export interface SeasonManagementScreenProps {
   readonly onSelect: (item: ManagementMenuItem, target: SeasonSceneState) => void
   /** 취소(−16) — 원본은 `0xbc290(앱, 0x103)` 으로 **메인 메뉴 장면**으로 나간다 (P4 1b) */
   readonly onExit: () => void
+  /**
+   * 진입에서 띄운 예·아니오 알림 — CPU 트레이드 요청 StrMODE[203] (팝업 id 0x27, 0xec10).
+   * 떠 있는 동안 메뉴는 키를 안 받는다(원본 `this+0xc0 +0x99 ≠ 0` 이면 키 무시). 답은 0x73b8 이 받는다.
+   */
+  readonly alert?: { readonly text: string; readonly onAnswer: (accept: boolean) => void } | null
 }
 
 /**
@@ -37,7 +42,7 @@ export interface SeasonManagementScreenProps {
  * ⚠️ 관리 메뉴 그리기(0x73b8)의 좌표는 아직 안 풀렸다 — **원본 배치 미해독 — 근사**로
  * 공용 판 (24, 54, 192, 212) 에 한 열 목록을 얹었다 (`seasonWindowLayout.ts` 머리 주석).
  */
-export function SeasonManagementScreen({ state, onSelect, onExit }: SeasonManagementScreenProps) {
+export function SeasonManagementScreen({ state, onSelect, onExit, alert = null }: SeasonManagementScreenProps) {
   const { record } = state
   // 갱신 0x4efc: SR+4 가 서 있으면 트레이닝·외출 칸을 끈다 — 이벤트 4 대사
   // "트레이닝, 외출 중 딱 한 가지 일만" 과 같은 규칙이다 (P4 3절 확정).
@@ -52,7 +57,9 @@ export function SeasonManagementScreen({ state, onSelect, onExit }: SeasonManage
     if (target === null || rows[index].isDisabled === true) return
     onSelect(MANAGEMENT_MENU[index], target)
   }
-  const { cursor, moveTo } = useSeasonCursor({ count: rows.length, onSelect: select, onCancel: onExit })
+  const { cursor, moveTo } = useSeasonCursor({
+    count: rows.length, onSelect: select, onCancel: onExit, isEnabled: alert === null,
+  })
 
   const illness = record.illness === 0 ? '' : `\n질병 : ${ILLNESS_NAMES[record.illness] ?? '질병'}`
 
@@ -74,6 +81,10 @@ export function SeasonManagementScreen({ state, onSelect, onExit }: SeasonManage
         }
       />
       <SeasonStatusBar record={record} teamMorale={state.teamMorale} />
+      {alert !== null && (
+        // 팝업 0x27 답: 0 예 · 1 아니오 · 0x14 취소 — 아니오·취소는 같은 갈래다 (7488~749e)
+        <MessageBox text={alert.text} buttons={['예', '아니오']} onAnswer={(answer) => alert.onAnswer(answer === 0)} />
+      )}
     </RawScreen>
   )
 }
