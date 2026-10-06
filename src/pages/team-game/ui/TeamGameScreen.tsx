@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { BigResult, Hint, MenuList, Panel, PixelScreen, StatGrid } from '@/shared/ui'
 import type { MenuItem, StatEntry } from '@/shared/ui'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -172,6 +172,8 @@ export function TeamGameScreen({
    * (CLR 은 웹에서 Escape·Backspace 로 받는다 — 원본 키 코드 −16.)
    */
   const isStealable = session.stealableBases
+  /** 타석 화면이 채우는 "공이 나는 동안(상태 0x11)인가" — 원본 도루 키 0x53610 은 이때만 받는다 */
+  const flightProbeRef = useRef<(() => boolean) | null>(null)
   const isDefenseInPlay = session.pendingDefensePlay !== null
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -212,7 +214,8 @@ export function TeamGameScreen({
       const stealBase = stealBaseOfKey(event.key)
       if (stealBase !== null && isStealable.includes(stealBase)) {
         event.preventDefault()
-        actions.steal(stealBase)
+        // 공이 나는 동안(상태 0x11)만 — 그 밖의 키는 원본도 먹고 끝난다
+        if (flightProbeRef.current?.() === true) actions.steal(stealBase)
       }
     }
     window.addEventListener('keydown', onKeyDown)
@@ -415,7 +418,9 @@ export function TeamGameScreen({
               : isStealable.length > 0
                 ? {
                     label: `도루 ${isStealable[0]}루`,
-                    onPress: () => actions.steal(isStealable[0]),
+                    onPress: () => {
+                      if (flightProbeRef.current?.() === true) actions.steal(isStealable[0])
+                    },
                   }
                 : undefined
         }
@@ -541,7 +546,10 @@ export function TeamGameScreen({
               cpuMagic={opponentMagicStateOf(progress)}
               isPaused={burstLines !== null}
               random={random}
-              onPitchResolved={(detail, _pitch, isUncatchable) => actions.resolvePitch(detail, isUncatchable)}
+              onPitchResolved={(detail, _pitch, isUncatchable, buntKind) =>
+                actions.resolvePitch(detail, isUncatchable, buntKind)
+              }
+              flightProbeRef={flightProbeRef}
               // CPU 투수 견제 (0x345fc 종류 4 → 0x34848 → 메시지 0x10) — 루가 정해진 뒤는 진행기가 판을 돌린다
               onPickoff={(base) => actions.cpuPickoff(base)}
             />

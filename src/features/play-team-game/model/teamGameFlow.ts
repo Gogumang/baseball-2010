@@ -1714,6 +1714,12 @@ export interface BatterOutcomeOptions {
    * 이 삼진 타석의 진루다. 그 밖(볼넷·사구·삼진 + 도루·폭투)은 이미 주자 판으로 먹였으니 재생 칸만 지킨다.
    */
   readonly arrivalPlay?: PitchArrivalPlay | null
+  /**
+   * 이 공의 **번트 종류** 장면 +0xfdc (0 스윙 · 1~3 번트 — 타석 화면 `onPitchResolved` 넷째 인자). 타구 판 시작 리드
+   * (0x3d7b8)가 도루 안 한 주자에게 +3 틱을 더한다(`DefensePlayInput.buntKind`). 안 넘기면 0.
+   * 번트는 늘 맞히므로(swingResult `contact = 번트 > 0`) 못 맞힌 공의 도루·폭투 판에는 실릴 일이 없다.
+   */
+  readonly buntKind?: number
 }
 
 /**
@@ -1884,6 +1890,8 @@ function batterDefenseInputOf(
     runningMode: progress.options.runningModeManual === true ? '수동' : '자동',
     // 필살타법이 성공한 타구면 야수가 쥐지 않는다 (0x51800)
     isUncatchable: options.isUncatchable,
+    // 장면 +0xfdc — 번트면 도루 안 한 주자의 판 시작 리드가 +3 틱 (0x3d7b8)
+    buntKind: options.buntKind ?? 0,
     // 판정 11(2스트라이크 번트 파울 아웃)이면 아웃 콜이 조건 없이 62 다 — 진행기는 안 본다
     buntFoulOut: options.buntFoulOut,
   }

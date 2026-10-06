@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import { resolvePitch } from '@/features/play-at-bat/model/resolvePitch'
 import type { BattingSwing } from '@/features/play-at-bat/model/resolvePitch'
 import { nextBatterShift } from '@/features/play-at-bat/model/batterShift'
@@ -145,8 +145,16 @@ interface BattingStageProps {
   /**
    * 세 번째 인자는 **필살타법이 성공한 타구인가** — 성공하면 야수가 쥐지 않고 지나친다
    * (0x51800 → `features/defense-play` 의 `isUncatchable`).
+   * 네 번째 인자는 이 공의 **번트 종류** 장면 +0xfdc (0 스윙 · 1~3 번트 키 '8'·'7'·'9') — 타구 판 시작 리드(0x3d7b8)가
+   * 도루 안 한 주자에게 +3 틱을 더한다(`DefensePlayInput.buntKind`). 안 휘둘렀으면 0.
    */
-  readonly onPitchResolved: (detail: PitchOutcomeDetail, pitch: Pitch, isUncatchable?: boolean) => void
+  readonly onPitchResolved: (detail: PitchOutcomeDetail, pitch: Pitch, isUncatchable?: boolean, buntKind?: number) => void
+  /**
+   * **공이 나는 동안(상태 0x11)인가** 를 밖에서 물을 수 있게 이 칸에 묻는 함수를 넣어 준다. 원본 도루 키(0x53610 →
+   * 메시지 0x583)는 상태 0x11 에서만 받는다 — 타석 화면 밖 키 처리(`GameScreen` 등)가 이 함수로 거른다.
+   * 스윙·번트 키와 같은 판정(`isFlying` — 릴리스 뒤 · 스윙 전)이다. 화면이 내려가면 null 로 되돌린다.
+   */
+  readonly flightProbeRef?: { current: (() => boolean) | null }
   /**
    * **CPU 투수의 견제** — 투구 AI 목표점 고르기 `0x345fc` 가 종류 4 를 뽑고 주자가 1·2명이면 `0x34848` 이
    * 주자 있는 루(1·2·3)를 굴려 메시지 0x10 을 보낸다. 그 투구는 **공이 없다** — 이 콜백만 부르고 다시 대기로 간다.
@@ -160,7 +168,7 @@ interface BattingStageProps {
 }
 
 /** 원작 타석 화면. 그리기는 lib, 루프와 조작은 model이 맡는다. */
-export function BattingStage({ canBunt = false, swingMode = '일반', batterForm = 0, batterSkinIndex = 0, batterTeamIndex, batterEquipmentLevels, batterSkillIds = [], recentAtBatCodes = [], specialSwingNumber = 0, aceBatterIndex = -1, specialSwingRemaining, onSpecialSwingUsed, isBatterOwnPlayer = false, careerYearIndex = 0, ...props }: BattingStageProps) {
+export function BattingStage({ canBunt = false, swingMode = '일반', batterForm = 0, batterSkinIndex = 0, batterTeamIndex, batterEquipmentLevels, batterSkillIds = [], recentAtBatCodes = [], specialSwingNumber = 0, aceBatterIndex = -1, specialSwingRemaining, onSpecialSwingUsed, isBatterOwnPlayer = false, careerYearIndex = 0, flightProbeRef, ...props }: BattingStageProps) {
   const refs = useStageRefs({
     ...props,
     canBunt,
@@ -261,6 +269,7 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
         // 큰 타구 감상이 끝나는 자리에 016 을 쏜다 (0x4cb1c → 0x4cd14)
         bigHitAt: watchesBigHit ? contact : null,
         resultText,
+        buntKind: swing?.buntKind ?? 0,
       }
       phaseRef.current = '타격'
       phaseStartedAtRef.current = now
@@ -271,7 +280,7 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
     homeRunStartedAtRef.current = isHomeRun ? now : -1
     phaseRef.current = '결과'
     phaseStartedAtRef.current = now
-    latest.onPitchResolved(result.detail, pitch, isUncatchable)
+    latest.onPitchResolved(result.detail, pitch, isUncatchable, swing?.buntKind ?? 0)
   }, [aceBatterIndex, specialSwingNumber, isBatterOwnPlayer, careerYearIndex])
 
   /** 상태 0x13 을 끝내고 인플레이(0x17)로 넘긴다 — 시간이 다 됐거나 OK/'5' 로 건너뛸 때 */
@@ -293,7 +302,7 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
     homeRunStartedAtRef.current = pending.isHomeRun ? now : -1
     phaseRef.current = '결과'
     phaseStartedAtRef.current = now
-    latestRef.current.onPitchResolved(pending.detail, pending.pitch, pending.isUncatchable)
+    latestRef.current.onPitchResolved(pending.detail, pending.pitch, pending.isUncatchable, pending.buntKind)
   }, [])
 
   const actions = useMemo(() => {
@@ -333,6 +342,18 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
       },
     }
   }, [commitHit, finishPitch, specialSwingNumber, aceBatterIndex, specialSwingRemaining, onSpecialSwingUsed])
+
+  // 공이 나는 동안(상태 0x11)인가 — 도루 키(0x53610)를 받는 화면이 묻는다. 스윙·번트 키의 `isFlying` 과 같은 판정이다
+  useEffect(() => {
+    if (flightProbeRef === undefined) return
+    flightProbeRef.current = () =>
+      phaseRef.current === '투구중' &&
+      pitchRef.current !== null &&
+      ballFrameAt(performance.now(), phaseStartedAtRef.current, millisecondsPerFrame()) >= 0
+    return () => {
+      flightProbeRef.current = null
+    }
+  }, [flightProbeRef, phaseRef, pitchRef, phaseStartedAtRef])
 
   useStageAnimation(refs, finishPitch, commitHit)
   const pointerHandlers = useStageControls(refs, actions)

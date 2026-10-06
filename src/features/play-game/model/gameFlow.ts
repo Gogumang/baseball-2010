@@ -472,6 +472,12 @@ export interface PlayerOutcomeOptions {
    * 재생 칸만 지킨다 — 이 타석 결과가 재생 칸을 비우면 판이 화면에 안 나온다.
    */
   readonly arrivalPlay?: PitchArrivalPlay | null
+  /**
+   * 이 공의 **번트 종류** 장면 +0xfdc (0 스윙 · 1~3 번트 — `BattingStage.onPitchResolved` 넷째 인자). 타구 판 시작 리드
+   * (0x3d7b8)가 도루 안 한 주자에게 +3 틱을 더한다(`DefensePlayInput.buntKind`). 안 넘기면 0.
+   * ⚠️ 부르는 쪽(`useCareerSession`)이 아직 안 싣는다 — 타석 화면은 넷째 인자로 알린다.
+   */
+  readonly buntKind?: number
 }
 
 /**
@@ -658,6 +664,8 @@ function defensePlayInputOf(
     runningMode: progress.runningModeManual ? '수동' : '자동',
     // 필살타법이 성공한 타구면 야수가 쥐지 않는다 (0x51800) — 타석 쪽이 확률 굴림을 하면 넘겨 준다
     isUncatchable: options.isUncatchable,
+    // 장면 +0xfdc — 번트면 도루 안 한 주자의 판 시작 리드가 +3 틱 (0x3d7b8)
+    buntKind: options.buntKind ?? 0,
     // 판정 11(2스트라이크 번트 파울 아웃)이면 아웃 콜이 조건 없이 62 다 — 진행기는 안 본다
     buntFoulOut: options.buntFoulOut,
   }
@@ -1399,8 +1407,8 @@ export function spendMySpecialSwing(progress: GameProgress, remaining: number): 
  * 받아들이는 문턱은 `canStartSteal`(0xa97a0 · 0xa9924 앞길 검사) — 같은 투구에 앞 주자가 이미 출발했으면 겹도루.
  * **난수 없음.**
  *
- * ⚠️ 원본은 상태 0x11(공이 나는 동안)에만 키를 받는다. 웹 타석 화면은 공의 비행 단계를 밖으로 알리지 않아
- *    타석 화면이 떠 있는 동안 받고, 다음에 도착하는 공에 붙인다 — 투구 전(0xf)에 누른 키도 그 공의 도루가 된다.
+ * 원본은 상태 0x11(공이 나는 동안)에만 키를 받는다 — 화면(`GameScreen`)이 타석 화면의 비행 판정
+ * (`BattingStage.flightProbeRef`, 스윙·번트 키와 같은 `isFlying`)으로 거른 뒤에만 부른다.
  */
 export function startSteal(progress: GameProgress, base: StealBase): GameProgress {
   const { game } = progress
@@ -1439,6 +1447,9 @@ export interface PitchArrivalStep {
  *   낫아웃(종류 9 + 삼진 + 타자주자)만은 여기서 안 먹인다 — `startPlayerOutcome` 의 `arrivalPlay` 로 넘기면 그 판의
  *   advance 가 곧 삼진 타석의 진루가 된다.
  * - 기록: 도루 판의 8(도루 성공)은 사람 공격이라 0xa77f0 게이트를 지나고 24(도루 저지)는 버려진다.
+ * - 판정 칸은 판 **앞**에서 먹는다(0x3dfac 의 스위치 0x3e11a — `pitchArrivalPlay` 머리말): 볼넷·사구 + 도루면 종류가
+ *   2(밀어내기)로 덮여 도루 판이 없고, 삼진 + 도루면 판은 아웃 + 1 로 열린다(삼진 아웃은 판 뒤 보통 길이 더해 합이 같다).
+ *   판에서 3아웃이 나는 것은 카운트만 오른 공뿐이라 끊긴 타석의 볼넷·삼진은 없다(`interrupted`).
  *
  * 난수: `rollPassedBall` 1번(매 못 맞힌 공) → 판이 열리면 그 안의 굴림 (`runPitchArrivalPlay`).
  */

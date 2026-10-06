@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { BigResult, Hint, PixelScreen } from '@/shared/ui'
 import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
@@ -41,7 +41,8 @@ interface GameScreenProps {
   readonly bannerText: string
   readonly random: RandomPort
   /** 세 번째 인자는 **필살타법이 성공한 타구인가** (0x51800) */
-  readonly onPitchResolved: (detail: PitchOutcomeDetail, pitch: Pitch, isUncatchable?: boolean) => void
+  /** 넷째 인자는 이 공의 번트 종류(장면 +0xfdc, `BattingStage.onPitchResolved`) — 타구 판 리드(0x3d7b8)가 본다 */
+  readonly onPitchResolved: (detail: PitchOutcomeDetail, pitch: Pitch, isUncatchable?: boolean, buntKind?: number) => void
   /** 경기를 그만두고 메인 메뉴로 (이 경기 기록은 사라진다) */
   readonly onQuit: () => void
   /**
@@ -106,6 +107,12 @@ export function GameScreen({
 
   /** 지금 출발시킬 수 있는 루 — `canStartSteal`(0xa9924 앞길 검사). 이번 공에 이미 출발한 주자는 빠진다 */
   const stealableBases = onSteal === undefined ? [] : stealableBasesOf(progress)
+  /** 타석 화면이 채우는 "공이 나는 동안(상태 0x11)인가" — 원본 도루 키 0x53610 은 이때만 받는다 */
+  const flightProbeRef = useRef<(() => boolean) | null>(null)
+  const stealIfFlying = (base: StealBase) => {
+    if (flightProbeRef.current?.() !== true) return
+    onSteal?.(base)
+  }
 
   const isBenchClearing = progress.pendingBenchClearing !== null
   /** OK 로 1회초 판을 닫았는가 */
@@ -126,7 +133,8 @@ export function GameScreen({
       const base = stealBaseOfKey(event.key)
       if (base !== null && stealableBases.includes(base)) {
         event.preventDefault()
-        onSteal?.(base)
+        // 공이 나는 동안(상태 0x11)만 — 그 밖의 키는 원본도 먹고 끝난다
+        if (flightProbeRef.current?.() === true) onSteal?.(base)
       }
     }
     window.addEventListener('keydown', onKeyDown)
@@ -181,7 +189,7 @@ export function GameScreen({
         stealableBases.length > 0 && !isMenuOpen
           ? {
               label: `도루 ${stealableBases[0]}루`,
-              onPress: () => onSteal?.(stealableBases[0]),
+              onPress: () => stealIfFlying(stealableBases[0]),
             }
           : undefined
       }
@@ -254,6 +262,7 @@ export function GameScreen({
           isBatterOwnPlayer
           careerYearIndex={career.season - 1}
           onPitchResolved={onPitchResolved}
+          flightProbeRef={flightProbeRef}
           onPickoff={onPickoff}
         />
       </div>

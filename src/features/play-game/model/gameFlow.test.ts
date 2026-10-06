@@ -31,6 +31,9 @@ import type { BattedBallPattern } from '@/shared/config/original/battedBallPatte
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { isPickoffPlayResult, PICKOFF_RESULT } from '@/features/defense-play/model/pickoffPlay'
+import { runPitchArrivalPlay } from '@/features/defense-play/model/pitchArrivalPlay'
+import { runStealPlay } from '@/features/defense-play/model/stealPlay'
+import { rollPassedBall } from '@/entities/fielding/model/passedBall'
 
 describe('startGame', () => {
   it('커리어 타순(9번)이면 플레이어는 아홉 번째 타자다', () => {
@@ -788,6 +791,45 @@ describe('기록달성 남은 것 — 타자편 배선 (6·7 백투백 · 8·24 
     expect(rolls).toBe(1)
     arrivePitch(시작, { resolution: { kind: '파울' }, outcomeAfter: null }, 세는)
     expect(rolls).toBe(1)
+  })
+
+  it('볼넷·사구 + 도루면 판이 없다 — 0x3dfac 스위치(0x3e1cc)가 종류를 2(밀어내기)로 덮어쓴다', () => {
+    for (const [resolution, outcomeAfter] of [
+      [{ kind: '볼' }, { kind: '볼넷' }],
+      [{ kind: '사구' }, { kind: '사구' }],
+    ] as const) {
+      const random = createSeededRandom(4)
+      const 시작 = startGame(random)
+      const 출발 = startSteal({ ...시작, game: { ...시작.game, bases: { first: true, second: false, third: false } } }, 1)
+      const { progress: 뒤, play, interrupted } = arrivePitch(출발, { resolution, outcomeAfter }, random)
+      expect(play).toBeNull()
+      expect(interrupted).toBe(false)
+      expect(뒤.stealingFrom).toEqual([])
+      expect(뒤.game.bases).toEqual(출발.game.bases)
+      expect(뒤.recordIds).toEqual(출발.recordIds)
+    }
+  })
+
+  it('삼진 + 도루면 판은 아웃 + 1 로 열린다 — 0x3e15e 가 판 앞에서 state[6]++', () => {
+    const 삼루 = { first: false, second: false, third: true }
+    for (let seed = 1; seed <= 10; seed += 1) {
+      const play = runPitchArrivalPlay(
+        { gameMode: 4, pitchJudgement: 5, stealingFrom: [3], bases: 삼루, outs: 0, defenseIsCpu: true, offenseIsCpu: false },
+        createSeededRandom(seed),
+      )
+      const 직접 = createSeededRandom(seed)
+      if (rollPassedBall(4, 직접) || play === null || play.kind !== 5) continue
+      const 판 = runStealPlay({
+        bases: 삼루,
+        stealingFrom: [3],
+        outs: 1,
+        random: 직접,
+        defenseIsCpu: true,
+        offenseIsCpu: false,
+      })
+      expect(play.result.advance).toEqual(판.advance)
+      expect(play.result.ticks.length).toBe(판.ticks.length)
+    }
   })
 
   it('8 은 G 2 — 도루 하나가 경기 끝 수입을 2 올린다', () => {

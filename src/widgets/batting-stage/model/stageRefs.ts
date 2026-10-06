@@ -47,6 +47,8 @@ export interface PendingHit {
    */
   readonly bigHitAt: { readonly x: number; readonly y: number } | null
   readonly resultText: string
+  /** 이 공의 번트 종류 장면 +0xfdc (0 스윙 · 1~3 번트) — 인플레이로 넘길 때 함께 알린다 */
+  readonly buntKind: number
 }
 
 /** 매 프레임 최신 값을 읽어야 하는 props 묶음. */
@@ -85,7 +87,7 @@ export interface StageLatest {
   /** 최근 타석 기록 코드 — 스킬 16·17 조건 */
   readonly recentAtBatCodes: readonly number[]
   /** 세 번째 인자는 **필살타법이 성공한 타구인가** (0x51800) */
-  readonly onPitchResolved: (detail: PitchOutcomeDetail, pitch: Pitch, isUncatchable?: boolean) => void
+  readonly onPitchResolved: (detail: PitchOutcomeDetail, pitch: Pitch, isUncatchable?: boolean, buntKind?: number) => void
   /**
    * CPU 투수가 공 대신 **견제**를 걸었다 (0x34848 → 메시지 0x10). 없으면 CPU 견제가 꺼진다 —
    * `BattingStage` 의 같은 이름 props 주석 참고.

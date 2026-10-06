@@ -3,12 +3,13 @@ import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
 import { rollCpuSteal, type CpuStealInput } from '@/entities/fielding/model/cpuSteal'
 import {
+  PASSED_BALL_PLAY_KIND,
   passedBallShot,
   passedBallStrikeoutOf,
   rollPassedBall,
   type PassedBallStrikeout,
 } from '@/entities/fielding/model/passedBall'
-import { canStartSteal, pitchPlayKindOf, type StealBase } from '@/entities/fielding/model/stealStart'
+import { canStartSteal, pitchPlayKindOf, STEAL_PLAY_KIND, type StealBase } from '@/entities/fielding/model/stealStart'
 import type { BaseState } from '@/entities/game/model/baseState'
 import { stealPlayRecordIdsOf } from '@/entities/game/model/gameRecords'
 import type { ManualAutoMode } from '@/entities/settings/model/gameSettings'
@@ -37,15 +38,35 @@ import { runStealPlay, stealCallSoundIdOf, type StealPlayResult } from '@/featur
  * 0x3e05a  v = 0x9d57c                 ; 투구 판정 (1 스트라이크 · 2 볼 · 3 볼넷 · 4 사구 · 5 삼진)
  * 0x3e062  r && v ≠ 3·4 → 0x3507c(rand 두 번) · 종류 9 ; v == 5 면 낫아웃 갈래 (passedBallStrikeoutOf)
  * 0x3e0e4  아니고 도루 중 && !(아웃 > 1 && v == 5) → 종류 5
+ * 0x3e11a  switch [scene+0x10ac](v) — 표 0xcffb4 (직접 뜬 것, 판 종류를 정한 **뒤** 같은 진입에서 곧장 돈다)
+ *          1 → 0x3e134 state[4](스트라이크)++ · 2 → 0x3e156 state[5](볼)++
+ *          3 → 0x3e1ae state[5]++ 뒤 4 와 같이 · 4 → 0x3e1b4 0xaf020 · **0xb0cb8(플레이, 2)** ; 종류를 2(밀어내기)로 덮어쓴다
+ *          5 → 0x3e15e 삼진 기록 칸 · **state[6](아웃)++**  · 그 밖(0 = 낫아웃이 지운 칸) → 건너뜀
+ * 0x3e1d4  v ≠ 0 이면 state[0xc] = v · 메시지 0xbba(v) ; 0x3e1f4 0xa5fdc (연속 파울 지우기)
  * ```
  * 맞힌 공(파울·인플레이)은 `0x3dfac` 가 아니라 타격 갈래로 가서 이 굴림이 없다.
  *
+ * ## 판정 칸은 판 **앞**에서 먹는다 — 판 뒤에 `[scene+0x10ac]` 를 읽는 자리는 없다
+ * `0x10ac` 상수를 읽는 곳은 5곳뿐이다(xval): 0x35108 · 0x39504(그림) · 0x3dfac(여기 둘) · 0x46844(수비 화면) ·
+ * 0x51408(판 끝 메시지가 **판정 결과로 덮어쓴다**). 판 끝 판정 B 0xae3e8 은 v 를 안 읽고 state[0xc] 만 본다:
+ * 종류 4·5 → state[0xc] == 5 && 종류 5 면 0xd(새 타석) 아니면 0xf · 종류 9 → state[0xc] == 5 면 0xd 아니면 0xf(정산 0xa8024
+ * 건너뜀) · 아웃 > 2 → 0x18. 그래서:
+ * - **볼넷·사구 + 도루**: 0x3e0e4 가 종류 5 를 세워도 스위치 0x3e1cc 가 종류 2(밀어내기 판)로 덮어쓴다 — 도루 판은 없다
+ *   (`runPitchArrivalPlay` 가 null). 출발한 주자는 밀어내기 판에서 리드(0x3d7b8, 0x4657e 고리는 종류를 안 가른다)를 탄다.
+ * - **삼진 + 도루(1아웃 이하)**: 삼진 아웃이 판 앞에서 붙어 판은 **아웃 + 1** 로 열린다(`playOutsOf`). 판에서 셋째 아웃이 나도
+ *   삼진은 그대로다(이미 센 아웃). 종류 9 에서 삼진이 선(1루 주자 && 아웃 ≤ 1) 판도 같다. 낫아웃은 판정 칸을 0 으로 지워 아웃이 없다.
+ * - **볼·스트라이크 + 판에서 3아웃**: 카운트는 이미 올랐고 판정 B 가 0x18(공수 교대)로 보낸다 — 그 타석은 끊긴다.
+ *
  * ## 판 뒤
- * - 진루·아웃·득점은 `result.advance` (판 안의 자동 진루 0xaf918 까지 다 돈 값).
+ * - 진루·아웃·득점은 `result.advance` (판 안의 자동 진루 0xaf918 까지 다 돈 값, 아웃은 판을 연 아웃 수에 더할 값).
  * - 콜: 도루 판 `stealCallSoundIdOf` · 폭투 판 `passedBallCallSoundIdOf`.
  * - 기록: 도루 판만 정산 0xa8024 @a83c6·@a83de(state[0x26] == 5) → `stealPlayRecordIdsOf` (8 도루 · 24 도루 저지).
  *   0xa77f0 게이트(8 은 사람 공격 · 24 는 사람 수비)는 부르는 쪽이 건다.
- * - `outs` 는 **이 투구 전의 아웃 수** — 0x3dfac 는 판정 칸만 적고 0x17 로 간다(삼진 아웃은 판 뒤에 붙는다).
+ * - `PitchArrivalPlayInput.outs` 는 **이 투구 전의 아웃 수**(종류 고르기 0x3e0ee 가 읽는 값)다. 부르는 쪽은 판의 advance 를
+ *   이 아웃 수 위에 주자 판으로 먼저 먹이고, 타석이 끝났으면(삼진) 그 뒤 보통 길로 삼진 아웃을 더한다 — 판을 연 아웃 수
+ *   (투구 전 + 1)에 판 아웃을 더한 것과 합이 같다. 판 아웃은 셋째 아웃에서 멈추므로 이 순서로 3아웃을 넘지 않는다.
+ * - ⚠️ 미해결: 밀어내기 판(종류 2)은 웹에 판 엔진이 없다 — 볼넷·사구 + 도루면 출발한 주자의 리드 rand(0,9)·밀리지 않는
+ *   도루 주자(예: 2루 단독 + 볼넷)의 진루를 안 옮긴다. 볼넷·사구는 보통 길(고정 밀어내기)로만 간다.
  */
 
 /** 0x9d57c 투구 판정 — E 4b: 1 스트라이크 · 2 볼 · 3 볼넷 · 4 사구 · 5 삼진 */
@@ -109,7 +130,7 @@ export interface PitchArrivalPlayInput {
   readonly stealingFrom: readonly StealBase[]
   /** 투구 때 루 상황 */
   readonly bases: BaseState
-  /** 이 투구 전의 아웃 수 (state[6]) */
+  /** 이 투구 전의 아웃 수 (state[6]) — 판 종류 고르기(0x3e0ee)가 읽는다. 판은 삼진이 서면 + 1 로 연다(`playOutsOf`) */
   readonly outs: number
   readonly defenseAbilities?: readonly number[]
   /** 루별 주자 주루 (0 = 낫아웃 타자주자) */
@@ -158,9 +179,19 @@ export function runPitchArrivalPlay(input: PitchArrivalPlayInput, random: Random
     outs: input.outs,
   })
   if (kind === null) return null
+  // 0x3e1cc — 볼넷·사구면 판정 칸 스위치가 종류를 2(밀어내기)로 덮어쓴다. 도루 판(종류 5)은 열리지 않는다
+  if (kind === STEAL_PLAY_KIND && isFreePassJudgement(input.pitchJudgement)) return null
+  const strikeout =
+    kind === PASSED_BALL_PLAY_KIND
+      ? passedBallStrikeoutOf({
+          pitchJudgement: input.pitchJudgement,
+          firstBaseOccupied: input.bases.first,
+          outs: input.outs,
+        })
+      : 'none'
   const common = {
     bases: input.bases,
-    outs: input.outs,
+    outs: playOutsOf(input.outs, input.pitchJudgement, strikeout),
     defenseAbilities: input.defenseAbilities,
     runAbility: input.runAbility,
     runnerTeamGrade: input.runnerTeamGrade,
@@ -173,13 +204,8 @@ export function runPitchArrivalPlay(input: PitchArrivalPlayInput, random: Random
     defenseTeamIndex: input.defenseTeamIndex,
     offenseTeamIndex: input.offenseTeamIndex,
   }
-  if (kind === 9) {
+  if (kind === PASSED_BALL_PLAY_KIND) {
     const shot = passedBallShot(random)
-    const strikeout = passedBallStrikeoutOf({
-      pitchJudgement: input.pitchJudgement,
-      firstBaseOccupied: input.bases.first,
-      outs: input.outs,
-    })
     const result = runPassedBallPlay({
       ...common,
       shot,
@@ -202,6 +228,20 @@ export function runPitchArrivalPlay(input: PitchArrivalPlayInput, random: Random
     callSoundId: stealCallSoundIdOf(result),
     recordIds: stealRecordIdsOf(result),
   }
+}
+
+/** 0x3e1ae·0x3e1b4 — 볼넷(3)·사구(4)는 판정 칸 스위치가 플레이 종류를 2 로 덮어쓴다 */
+function isFreePassJudgement(pitchJudgement: number): boolean {
+  return pitchJudgement === PITCH_JUDGEMENT.WALK || pitchJudgement === PITCH_JUDGEMENT.HIT_BY_PITCH
+}
+
+/**
+ * 판을 여는 아웃 수 — 0x3e15e 가 삼진(v == 5)이면 판 앞에서 state[6]++ 한다. 도루 판(5)은 1아웃 이하 삼진만 열리고,
+ * 폭투 판(9)은 삼진이 선 판(`'strikeoutStands'`)만 아웃이 붙는다(낫아웃은 0x3e0aa 가 판정 칸을 0 으로 지워 스위치를 건너뛴다).
+ */
+function playOutsOf(outs: number, pitchJudgement: number, strikeout: PassedBallStrikeout | 'none'): number {
+  if (pitchJudgement !== PITCH_JUDGEMENT.STRIKEOUT) return outs
+  return strikeout === 'batterRuns' ? outs : outs + 1
 }
 
 /** 도루 판 정산 — 잡힌 도루 주자가 있으면 24 한 번, 아니면 루를 옮긴 도루 주자마다 8 */
@@ -229,8 +269,9 @@ export function stealRecordIdsOf(result: Pick<StealPlayResult, 'stolenFrom' | 'c
  *   (볼넷·사구·삼진) 그 뒤 보통 길로 타석 결과를 먹인다.
  * - `'batterRuns'`: 낫아웃 — 판의 advance 가 곧 이 타석의 진루다(타자주자 포함). 삼진 기록은 그대로.
  *
- * ⚠️ 판에서 3아웃이 나면 그 타석은 끊긴다(다음 이닝 같은 타자부터) — 견제사로 끊긴 타석과 같은 근사.
- *   원본이 판 뒤 판정 칸 `[scene+0x10ac]`(볼넷·삼진)를 읽는 자리는 안 떴다.
+ * 판에서 3아웃이 나는 것은 볼·스트라이크(카운트만 오른 공)뿐이다 — 판정 B 0xae3e8 이 0x18 로 보내 그 타석은 끊긴다
+ * (다음 이닝 같은 타자부터 — ⚠️ 정산 0xa8024 가 종류 5 에서 타순을 미는지는 안 읽었다). 삼진은 판 앞에서 아웃이 붙고
+ * (위 머리말), 볼넷·사구는 도루 판이 안 열린다.
  */
 export function arrivalApplicationOf(play: PitchArrivalPlay): 'runnerOnly' | 'batterRuns' {
   return play.kind === 9 && play.strikeout === 'batterRuns' ? 'batterRuns' : 'runnerOnly'

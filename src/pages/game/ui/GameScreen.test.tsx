@@ -67,13 +67,13 @@ describe('나만의리그 타자편 경기 중 메뉴 (표 0xcfcfc 행 2)', () =
 })
 
 describe('도루 (0x53610 → 메시지 0x583)', () => {
-  it('1루에 주자가 있으면 도루 키가 뜨고 3 키가 도루를 건다', () => {
+  it('1루에 주자가 있으면 도루 키가 뜬다 — 공이 날기 전(상태 0x11 밖)의 3 키는 먹고 끝난다', () => {
     const onSteal = vi.fn()
     띄우기({ onSteal }, { first: true, second: false, third: false })
 
     expect(screen.getByRole('button', { name: '도루 1루' })).toBeTruthy()
     fireEvent.keyDown(window, { key: '3' })
-    expect(onSteal).toHaveBeenCalledWith(1)
+    expect(onSteal).not.toHaveBeenCalled()
   })
 
   it('2루가 막혀 있으면 1루 주자는 못 뛴다', () => {

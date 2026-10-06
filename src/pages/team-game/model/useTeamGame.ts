@@ -93,7 +93,7 @@ export interface TeamGameSession {
      * 타석 화면이 판정한 공 하나. `isUncatchable` 은 필살타법이 성공한 타구(0x517e6 → 0x51800)인가 —
      * 수비 화면의 야수가 쥐지 못한다.
      */
-    readonly resolvePitch: (detail: PitchOutcomeDetail, isUncatchable?: boolean) => void
+    readonly resolvePitch: (detail: PitchOutcomeDetail, isUncatchable?: boolean, buntKind?: number) => void
     /**
      * 사람 타석의 필살 스윙이 나갔다 (0x4e136) — `BattingStage` 의 `onSpecialSwingUsed` 를 그대로 잇는다.
      * 인자는 줄인 뒤 남은 횟수다.
@@ -188,13 +188,15 @@ export function useTeamGame(options: TeamGameOptions, random: RandomPort): TeamG
   const actions = useMemo(
     () => ({
       // 인플레이 타구가 나오면 **여기서 멈춘다** — 주자 처리는 수비 화면이 끝난 뒤다 (상태 0x17)
-      resolvePitch: (detail: PitchOutcomeDetail, isUncatchable?: boolean) =>
+      resolvePitch: (detail: PitchOutcomeDetail, isUncatchable?: boolean, buntKind?: number) =>
         step(
-          // 판정 11(2스트라이크 번트 파울 아웃)이면 아웃 콜이 조건 없이 62 다 — 플레이 끝까지 간다
+          // 판정 11(2스트라이크 번트 파울 아웃)이면 아웃 콜이 조건 없이 62 다 — 플레이 끝까지 간다.
+          // 번트 종류(장면 +0xfdc)는 타구 판 리드(0x3d7b8)가 도루 안 한 주자에게 +3 틱을 더하는 데 쓴다
           (current) =>
             startBatterPitch(current, detail, random, {
               buntFoulOut: detail.isBuntFoulOut,
               isUncatchable: isUncatchable === true,
+              buntKind: buntKind ?? 0,
             }),
           // 타구음(0x515de~) → 심판 콜(0x51a94) 순서. 통로가 하나라 뒤 소리가 앞 소리를 끊는다.
           // 인플레이 타구면 아웃 콜은 여기서 안 난다 — 수비 화면이 끝난 뒤(`finishDefensePlay`)다

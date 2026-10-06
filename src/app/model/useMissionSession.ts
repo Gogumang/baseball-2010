@@ -347,6 +347,8 @@ export function useMissionSession({
       detail: PitchOutcomeDetail,
       /** 필살타법이 성공한 타구인가 (0x517e6 → 0x51800) — 야수가 쥐지 못한다. `BattingStage` 의 셋째 인자 */
       isUncatchable = false,
+      /** 이 공의 번트 종류 장면 +0xfdc (`BattingStage` 의 넷째 인자) — 타구 판 리드(0x3d7b8)가 본다 */
+      buntKind = 0,
     ) => {
       const nextAtBat = runner.applyPitch(detail.resolution)
       const hasSwung = detail.hasSwung
@@ -420,6 +422,8 @@ export function useMissionSession({
             isUncatchable,
             // 공이 나는 동안 출발한 주자 — 판 시작 리드(0x3d7b8)가 다음 루로 몰아 돌린다
             stealingFrom: stealing,
+            // 장면 +0xfdc — 번트면 도루 안 한 주자의 판 시작 리드가 +3 틱
+            buntKind,
           },
           outcome,
           isBunt: detail.isBunt,

@@ -80,7 +80,9 @@ export function MissionRoutes({
         isPaused={runner.isPaused}
         bannerText={runner.bannerText}
         random={random}
-        onPitchResolved={(detail, _pitch, isUncatchable) => session.handleMissionPitch(detail, isUncatchable)}
+        onPitchResolved={(detail, _pitch, isUncatchable, buntKind) =>
+          session.handleMissionPitch(detail, isUncatchable, buntKind)
+        }
         // 필살타법 — 나리 타자편 저장 선수의 번호(+0x18)와 이 미션 한 판의 남은 횟수 (0xaebe4 가 채운다)
         specialSwingNumber={batter.specialSwingNumber}
         specialSwingRemaining={missionBatterSpecialSwingRemainingOf(session.batterSpecialSwingStored, batter)}

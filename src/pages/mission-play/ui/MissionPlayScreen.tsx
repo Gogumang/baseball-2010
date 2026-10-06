@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { BigResult, Hint, PixelScreen } from '@/shared/ui'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
@@ -33,8 +33,8 @@ interface MissionPlayScreenProps {
   readonly isPaused: boolean
   readonly bannerText: string
   readonly random: RandomPort
-  /** 셋째 인자는 필살타법이 성공한 타구인가 (`BattingStage.onPitchResolved` 그대로) */
-  readonly onPitchResolved: (detail: PitchOutcomeDetail, pitch: Pitch, isUncatchable?: boolean) => void
+  /** 셋째 인자는 필살타법이 성공한 타구인가 · 넷째는 번트 종류 장면 +0xfdc (`BattingStage.onPitchResolved` 그대로) */
+  readonly onPitchResolved: (detail: PitchOutcomeDetail, pitch: Pitch, isUncatchable?: boolean, buntKind?: number) => void
   /**
    * 치는 선수의 **고른 필살 번호** (레코드 +0x18) — '0' 키 0x51dee 가 S+0x10 에 싣는다. 안 넘기면 0 = '0' 키 무시.
    */
@@ -111,14 +111,19 @@ export function MissionPlayScreen({
   const canBunt = run.mission.goals.includes('번트')
   // 도루 출발 — 사람 공격이고 앞길이 열린 주자가 있을 때 (`canStartSteal`). 목표에 도루가 없어도 키는 먹는다
   const canSteal = !isOver && stealableBases.length > 0
-  // 원본 공용 키 처리 0x498d4 — 도루 '3'/'2'/'1'
+  /** 타석 화면이 채우는 "공이 나는 동안(상태 0x11)인가" — 원본 도루 키 0x53610 은 이때만 받는다 */
+  const flightProbeRef = useRef<(() => boolean) | null>(null)
+  const stealIfFlying = (base: StealBase) => {
+    if (flightProbeRef.current?.() === true) onSteal(base)
+  }
+  // 원본 공용 키 처리 0x498d4 — 도루 '3'/'2'/'1' (공이 나는 동안만, 그 밖의 키는 먹고 끝난다)
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat || isMenuOpen || overlay !== null) return
       const base = stealBaseOfKey(event.key)
       if (base !== null && stealableBases.includes(base)) {
         event.preventDefault()
-        onSteal(base)
+        if (flightProbeRef.current?.() === true) onSteal(base)
       }
     }
     window.addEventListener('keydown', onKeyDown)
@@ -154,7 +159,7 @@ export function MissionPlayScreen({
         isOver
           ? { label: '확인', onPress: onFinish }
           : canSteal
-            ? { label: `도루 ${stealableBases[0]}루`, onPress: () => onSteal(stealableBases[0]) }
+            ? { label: `도루 ${stealableBases[0]}루`, onPress: () => stealIfFlying(stealableBases[0]) }
             : undefined
       }
       rightKey={
@@ -226,6 +231,7 @@ export function MissionPlayScreen({
           aceLevels={aceLevels}
           onPitchResolved={onPitchResolved}
           onPickoff={onPickoff}
+          flightProbeRef={flightProbeRef}
         />
 
         <div className={styles.overlay}>
