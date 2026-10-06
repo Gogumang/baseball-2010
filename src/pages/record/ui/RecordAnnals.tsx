@@ -17,7 +17,8 @@ import {
 import { STAT_NAMES } from '@/pages/record/lib/statNames'
 import type { AnnalsDirection } from '@/pages/record/lib/annalsGrid'
 import {
-  ANNALS_GRID_SHAPES, VISIBLE_GRID_ROWS, hasDownMark, isBlinkOn, moveGridCursor, scrollTopAfter,
+  ANNALS_GRID_SHAPES, DIRECTION_CODES, VISIBLE_GRID_ROWS, cursorShakeOf, hasDownMark, isBlinkOn, moveGridCursor,
+  scrollTopAfter,
 } from '@/pages/record/lib/annalsGrid'
 import {
   INITIAL_SECRET_CODE_STATE, UNLOCKED_STAT_PAGE_COUNT, statNameOffsetOf, statPageCellsOf, statTotalTextOf,
@@ -74,6 +75,9 @@ export function RecordAnnals({ collection, onBack }: RecordAnnalsProps) {
   const [gridTop, setGridTop] = useState(0)
   const tick = useUpdateCounter()
   const isBlinking = isBlinkOn(tick)
+  /** 고른 칸 흔들림 — 방향 [this+0xfc] 과 시작 틱 ([this+0xf8] = 지금 틱 − 시작) */
+  const [shake, setShake] = useState<{ readonly directionCode: number; readonly startedAt: number } | null>(null)
+  const cursorShake = !isTabFocused && shake !== null ? cursorShakeOf(shake.directionCode, tick - shake.startedAt) : null
   const [secretCode, setSecretCode] = useState(INITIAL_SECRET_CODE_STATE)
   const frames = useFrameOrigins(SLT_FRAMES)
   const textFrames = useFrameOrigins(IMG_TEXT)
@@ -131,6 +135,8 @@ export function RecordAnnals({ collection, onBack }: RecordAnnalsProps) {
       event.preventDefault()
       const nextCursor = moveGridCursor(ANNALS_GRID_SHAPES[tab], cursor, direction)
       setCursor(nextCursor)
+      // 커서가 옮겨 갔으면(격자 +0x25) 흔들림을 새로 건다 (0x2eaec)
+      if (nextCursor !== cursor) setShake({ directionCode: DIRECTION_CODES[direction], startedAt: tick })
       if (direction === 'up' || direction === 'down') {
         setGridTop(scrollTopAfter(tab, gridTop, nextCursor, direction))
         return
@@ -197,6 +203,7 @@ export function RecordAnnals({ collection, onBack }: RecordAnnalsProps) {
           hasDownMark={hasDownMark(1, gridTop)}
           isCursorShown={!isTabFocused && isBlinking}
           isBlinking={isBlinking}
+          cursorShake={cursorShake}
           onSelect={selectCell}
           items={endingCells}
         />
@@ -212,6 +219,7 @@ export function RecordAnnals({ collection, onBack }: RecordAnnalsProps) {
             hasDownMark={hasDownMark(2, gridTop)}
             isCursorShown={!isTabFocused && isBlinking}
             isBlinking={isBlinking}
+            cursorShake={cursorShake}
             onSelect={selectCell}
             items={ORIGINAL_SKILLS.map((skill) => ({
               name: skill.name,
@@ -309,7 +317,7 @@ interface CellItem {
  * 보이는 i 번째 칸 = 번호 − 윗줄 × 4.
  */
 function CellGrid({
-  frames, items, gainedFrame, cursor, top, hasDownMark: isDownMarkShown, isCursorShown, isBlinking, onSelect,
+  frames, items, gainedFrame, cursor, top, hasDownMark: isDownMarkShown, isCursorShown, isBlinking, cursorShake, onSelect,
 }: {
   readonly frames: ReturnType<typeof useFrameOrigins>
   readonly items: readonly CellItem[]
@@ -319,6 +327,8 @@ function CellGrid({
   readonly hasDownMark: boolean
   readonly isCursorShown: boolean
   readonly isBlinking: boolean
+  /** 고른 칸만 이만큼 옮겨 그린다 — 칸·이름·테두리 모두 (0x2ec52 가 x·y 자체를 바꾼다) */
+  readonly cursorShake: { readonly dx: number; readonly dy: number } | null
   readonly onSelect: (index: number) => void
 }) {
   const visible = CELL_GRID.columns * VISIBLE_GRID_ROWS
@@ -328,7 +338,10 @@ function CellGrid({
     <>
       {items.slice(start, start + visible).map((item, offset) => {
         const index = start + offset
-        const { x, y } = cellPositionOf(offset)
+        const base = cellPositionOf(offset)
+        const shift = index === cursor && cursorShake !== null ? cursorShake : { dx: 0, dy: 0 }
+        const x = base.x + shift.dx
+        const y = base.y + shift.dy
         return (
           <div key={item.name + index}>
             <FrameSprite folder={SLT_FRAMES} frame={item.isGained ? (item.gainedFrame ?? gainedFrame) : CELL_FRAMES.locked}

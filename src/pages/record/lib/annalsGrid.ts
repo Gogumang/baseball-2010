@@ -100,3 +100,16 @@ export const hasDownMark = (tab: number, top: number) => top <= (DOWN_MARK_MAX_T
  * ⚠️ [skin+0x410] 은 다른 화면과 함께 쓰는 셈이라 들어올 때의 위상은 알 수 없다 — 웹은 화면 갱신 수로 센다.
  */
 export const isBlinkOn = (tick: number) => tick % 8 <= 3
+
+/**
+ * 고른 칸 흔들림 (탭 1 0x2ec1a~0x2ec60 · 탭 2 0x2f0e2~0x2f128): 격자 커서가 옮겨 간 틱(격자 +0x25)에
+ * [this+0xf8] = 0 · [this+0xfc] = 방향([skin+0x8c]). 본문에 초점이 있고 [this+0xfc] ≠ −1 이면 고른 칸을
+ * `x += 표 0xce8bc[2·방향 + t]`, `y += 표 0xce88c[3·방향 + t]` 로 그리고 t 를 올린다 — t > 1 이면 [this+0xfc] = −1.
+ * 곧 두 틱: ← (−2, 0)→(+2, 0) · → (+2, 0)→(−2, 0) · ↑ (0, −2)→(0, +2) · ↓ (0, +2)→(0, −2).
+ */
+const SHAKE_X = [-2, 2, 2, -2, 0, 0, 0, 0] as const
+const SHAKE_Y = [0, 0, 0, 0, 0, 0, -2, 2, 0, 2, -2, 0] as const
+export function cursorShakeOf(directionCode: number, tick: number): { readonly dx: number; readonly dy: number } {
+  if (tick < 0 || tick > 1) return { dx: 0, dy: 0 }
+  return { dx: SHAKE_X[2 * directionCode + tick] ?? 0, dy: SHAKE_Y[3 * directionCode + tick] ?? 0 }
+}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  ANNALS_GRID_SHAPES, hasDownMark, isBlinkOn, moveGridCursor, scrollTopAfter,
+  ANNALS_GRID_SHAPES, DIRECTION_CODES, cursorShakeOf, hasDownMark, isBlinkOn, moveGridCursor, scrollTopAfter,
 } from '@/pages/record/lib/annalsGrid'
 
 describe('기록연감 격자 키 처리 (0x2b7a0 · 0x2b640 · 0x6bead)', () => {
@@ -40,5 +40,14 @@ describe('기록연감 격자 키 처리 (0x2b7a0 · 0x2b640 · 0x6bead)', () =>
 
   it('깜박임은 8 틱 중 앞 4 틱 (값 % 8 ≤ 3)', () => {
     expect([0, 3, 4, 7, 8].map(isBlinkOn)).toEqual([true, true, false, false, true])
+  })
+
+  it('고른 칸 흔들림 — 방향마다 두 틱 (표 0xce8bc[2·방향 + t] · 0xce88c[3·방향 + t]), 그 뒤는 멈춘다', () => {
+    const shakeOf = (direction: keyof typeof DIRECTION_CODES) =>
+      [0, 1, 2].map((tick) => cursorShakeOf(DIRECTION_CODES[direction], tick))
+    expect(shakeOf('left')).toEqual([{ dx: -2, dy: 0 }, { dx: 2, dy: 0 }, { dx: 0, dy: 0 }])
+    expect(shakeOf('right')).toEqual([{ dx: 2, dy: 0 }, { dx: -2, dy: 0 }, { dx: 0, dy: 0 }])
+    expect(shakeOf('up')).toEqual([{ dx: 0, dy: -2 }, { dx: 0, dy: 2 }, { dx: 0, dy: 0 }])
+    expect(shakeOf('down')).toEqual([{ dx: 0, dy: 2 }, { dx: 0, dy: -2 }, { dx: 0, dy: 0 }])
   })
 })
