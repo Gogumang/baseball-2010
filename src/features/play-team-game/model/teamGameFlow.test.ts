@@ -2162,3 +2162,41 @@ describe('출루 허용 state[0x88] — 정산 0xa8c5c~0xa8ca6 은 주자 목록
     expect(resolveDefensePlay(progress, 에러출루, random).pitching.allowedBaserunner).toBe(true)
   })
 })
+
+describe('36 필살송구 아웃 — 결과 코드 0xd(그 판의 아웃 판정) · 0x46892 → state[0x8b] → 0xa80f8', () => {
+  /** 사람 수비 타석에서 인플레이 타구가 붙들린 판 */
+  function 수비판(): { progress: TeamGameProgress; random: RandomPort } {
+    for (let seed = 1; seed < 200; seed += 1) {
+      const random = createSeededRandom(seed)
+      let current = startTeamGame(기본옵션, random)
+      for (let pitch = 0; pitch < 60 && isPitchTurn(current); pitch += 1) {
+        current = startThrowPitch(current, { typeNumber: 첫구질(current), courseCell: 4, gaugeCell: 0 }, random)
+        if (current.pendingDefensePlay !== null && current.game.outs === 0) return { progress: current, random }
+        if (current.pendingDefensePlay !== null) break
+      }
+    }
+    throw new Error('붙들린 수비 판을 못 찾았다')
+  }
+
+  it('안타 타석이라도 레이저 판에 아웃이 나면 36 — 타석 결과가 아니라 판의 아웃이다', () => {
+    const { progress, random } = 수비판()
+    const 안타판 = {
+      ...progress,
+      pendingDefensePlay: { ...progress.pendingDefensePlay!, outcome: { kind: '안타', bases: 1 } as const },
+    }
+    const 결과 = runDefensePlay(progress.pendingDefensePlay!.input)
+    const 레이저 = { ...결과, laserThrow: true, advance: { ...결과.advance, outsAdded: 1, runsScored: 0 } }
+    expect(resolveDefensePlay(안타판, 레이저, random).recordIds).toContain(36)
+  })
+
+  it('아웃 타석이라도 판에 아웃이 없으면(에러로 삶) 36 이 없다', () => {
+    const { progress, random } = 수비판()
+    const 결과 = runDefensePlay(progress.pendingDefensePlay!.input)
+    const 아웃없음 = { ...결과, laserThrow: true, advance: { ...결과.advance, outsAdded: 0, runsScored: 0 } }
+    const 아웃타석 = {
+      ...progress,
+      pendingDefensePlay: { ...progress.pendingDefensePlay!, outcome: { kind: '아웃', detail: '땅볼아웃' } as const },
+    }
+    expect(resolveDefensePlay(아웃타석, 아웃없음, random).recordIds).not.toContain(36)
+  })
+})

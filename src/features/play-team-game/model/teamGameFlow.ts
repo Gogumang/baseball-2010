@@ -1102,8 +1102,14 @@ function withHalfInningPitches(tally: TeamRecordTally, game: GameState, pitches:
  *   삼진 아닌 결과로 끝난 타석이면 R[1] = 0 (0xa8fb2~). 플레이 종류 4·5(견제·주자만)는 이 길로 안 온다.
  * - 25 삼구 삼자범퇴 — 아웃 처리 `0xa7d0c`: 반 이닝 투구 수(`ctx+0x16c`) == 3 이고 3아웃.
  * - 26·27 병살·삼중살 — 한 플레이 아웃 2·3 (`0xa8e58`). 주자 달리는 중 삼진(state[0x1a])은 웹에 없어 늘 거짓.
- * - 36 필살송구 아웃 — 레이저 송구가 나간 플레이의 결과가 아웃(0x46892 `+0x10ac == 0xd` → state[0x8b] = 1)이고
- *   이 플레이 아웃이 있으면 (0xa80f8). ⚠️ "결과 코드 0xd" 를 타석 결과 '아웃' 으로 본다 — **근사**.
+ * - 36 필살송구 아웃 — 레이저 연출이 끝난 뒤(+0x1999) 수비 화면 결과 팝업 0x46844 가 **결과 코드 0xd** 를 보이면
+ *   state[0x8b] = 1 (46892~46932), 정산이 이 플레이 아웃 이벤트 > 0 이면 36 (0xa80f8~0xa8116).
+ *   결과 코드 0xd 는 **타석 결과가 아니다** — 플레이 틱 b4540 에서 그 틱의 아웃 판정 vt90(0xb36d0)이 아웃을 내면
+ *   곧바로 vt44(13)·vt54(13) 로 보내는 "아웃이 났다" 코드다(포스·태그·뜬공 포구 모두, `runDefensePlay` 의
+ *   `runOutJudgement` 주석). 그래서 안타 타석이라도 레이저 뒤 주자가 잡히면 서고, 아웃 타석이라도 아웃이 없으면
+ *   안 선다 — 레이저 송구가 난 판(`laserThrow`)에 아웃이 있으면 세운다.
+ *   ⚠️ 미해결: 팝업 차례 — 레이저 연출이 끝나기 **전** 아웃 팝업(+0x1997 = 1)이나 그 뒤 다른 코드 팝업(세이프 9 등)이
+ *   +0x1998·+0x1999 를 지우는 경우는 틱별 결과 코드를 진행기가 내주지 않아 가리지 못한다.
  * 상대 타석은 공격 팀이 사람이 아니라 백투백 카운터 `ctx+0x162` 를 0 으로 (0xa794c · 5-4).
  */
 function withOurDefenseRecords(
@@ -1137,7 +1143,8 @@ function withOurDefenseRecords(
         })
       : []),
     ...laserThrowOutRecordOf({
-      laserThrowFlag: play.laserThrow && play.outcome.kind === '아웃',
+      // 결과 코드 0xd(그 판의 아웃 판정) — 타석 결과 '아웃' 이 아니다
+      laserThrowFlag: play.laserThrow && play.outsAdded > 0,
       outsInPlay: play.outsAdded,
     }).recordIds,
     ...multiOutPlayRecordIdsOf({ outsInPlay: play.outsAdded, strikeoutWhileRunning: false }),
