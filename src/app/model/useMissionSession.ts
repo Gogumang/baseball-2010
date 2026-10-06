@@ -1050,6 +1050,11 @@ export function useMissionSession({
         random,
         // 타자 미션은 사람이 공격이다 (`missionDefensePlayInputOf` 의 offenseIsCpu 와 같다)
         offenseIsCpu: false,
+        // 수비는 CPU 다 — 미션 경기 준비 0xaa57c 가 레코드 +3 의 윗 4비트 칸을 사람(aa658 `0xb6c18(st, 칸, 0)`),
+        // 다른 칸을 CPU(aa666 `… , 1)`)로 세우고, 타자 미션의 사람 칸은 공격이라 수비측 경기[0x31 + 수비측] == 1 이다.
+        // 슬롯 2 의 0xae6c8 첫 항이 서서 받은 야수의 0xafa60 이 매 틱 돈다 (d80918a · 4dec1e1 의 타자편 cpuPickoff 와 같다).
+        // 송구 설정(+0xf4)은 둘째 항이라 안 넘긴다
+        defenseIsCpu: true,
       })
       setMissionRun((previous) => (previous === null ? previous : applyPickoff(previous, result.advance)))
       playSoundIds(audio, [pickoffCallSoundIdOf(result)])

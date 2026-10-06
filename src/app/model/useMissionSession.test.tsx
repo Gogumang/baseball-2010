@@ -445,6 +445,8 @@ describe('타자 미션 CPU 견제 — 0x345fc 종류 4 → 0x34848 → 0x50f28 
       outs: before.outs,
       random: createSeededRandom(7),
       offenseIsCpu: false,
+      // 타자 미션은 수비가 CPU 다 (0xaa57c 가 레코드 +3 윗 4비트의 사람 칸 반대쪽을 경기[0x31 + 칸] = 1 로 세운다)
+      defenseIsCpu: true,
     })
 
     act(() => {
@@ -453,6 +455,8 @@ describe('타자 미션 CPU 견제 — 0x345fc 종류 4 → 0x34848 → 0x50f28 
 
     const after = rendered.result.current.session.missionRun!
     expect(rendered.result.current.session.pickoffReplay?.advance).toEqual(expected.advance)
+    // 받은 야수의 0xafa60 매 틱 갈래가 도는 판 — 틱 수까지 같다
+    expect(rendered.result.current.session.pickoffReplay?.ticks).toHaveLength(expected.ticks.length)
     expect(after.outs).toBe(before.outs + expected.advance.outsAdded)
     expect(after.remainingPlateAppearances).toBe(before.remainingPlateAppearances)
     expect(after.progress).toBe(before.progress)
