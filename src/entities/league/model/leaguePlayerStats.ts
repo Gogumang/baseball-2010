@@ -142,7 +142,7 @@ export function leagueBatterLineOf(stats: LeaguePlayerStats, batterId: number): 
 
 /**
  * 투수 전역 번호 — `teamRoster.teamPitchers` 가 `PITCHERS.slice(팀 × 8, +8)` 로 자르는 칸 그대로다.
- * 선발 칸(0~3)은 `pitcherRotation.rotationSlotOf` 가 날짜로 정한다.
+ * 섞인 레코드 차례(로테이션 0xb5ca8)와 상관없이 붙박이 표 칸으로 센다 — 기록은 레코드를 따라간다 (`League.pitcherOrders`).
  */
 export function leaguePitcherIdOf(teamId: number, pitcherSlot: number): number {
   const slot = ((pitcherSlot % PITCHERS_PER_TEAM) + PITCHERS_PER_TEAM) % PITCHERS_PER_TEAM
