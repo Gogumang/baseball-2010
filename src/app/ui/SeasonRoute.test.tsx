@@ -209,3 +209,17 @@ describe('이벤트 재생 0xd3 배선', () => {
     expect(screen.getByRole('button', { name: '다음경기' })).toBeDefined()
   })
 })
+
+describe('아이템 메뉴 0xd0 배선', () => {
+  it('구장아이템은 아이템 상점(0xdc 창 4)으로 가고, 웹에 없는 창(GP아이템 2)은 "아직 없음" 으로 막는다', () => {
+    const store = 메모리저장(세이브(레코드({ seenEvents: [400, 1], yearGoalShown: true })))
+    render(<시즌화면 store={store} 장면={SEASON_SCENE_STATE.아이템} onExit={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'GP아이템' }))
+    expect(알림글()).toContain('창 종류 2')
+    fireEvent.click(screen.getByRole('button', { name: 'OK' }))
+
+    fireEvent.click(screen.getByRole('button', { name: '구장아이템' }))
+    expect(screen.getAllByRole('button', { name: /관중석/ }).length).toBeGreaterThan(0)
+  })
+})

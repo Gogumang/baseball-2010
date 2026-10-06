@@ -2,21 +2,23 @@ import { SEASON_SCENE_STATE } from '@/entities/season-mode/model/seasonStateMach
 import type { SeasonSceneState } from '@/entities/season-mode/model/seasonStateMachine'
 
 /**
- * 시즌 아이템 하위 메뉴 (장면 0x105 상태 **0xd0**, 갱신 0x4d04 · 키 0x4da4 · 그리기 0x7538).
+ * 시즌 아이템 하위 메뉴 (장면 0x105 상태 **0xd0**, 갱신 0x4d04 · 키 0x4da4 · 그리기 공통 틀 0x9f60).
  *
- * 근거: `docs/re/P4-season-flow.md` 1a 상태표("아이템 하위 메뉴", 키 0x4da4 → **0xdc**) ·
- * 1b(관리 메뉴 칸 4) · **5 절**(공용 선수 고르기 0xdf 의 `this+0x110 == 1` 이 "아이템(0xd0) →
- * 장착아이템" 에서 들어오고 취소하면 0xd0 으로 돌아온다),
- * `docs/re/R13-season-leftovers.md` 표(0xd0 그리기 = 공통 틀 0x9f60),
- * `docs/re/R12-shop-guards.md` 22행·`docs/re/S3-stadium-items.md` 3절(아이템 창 종류 `[win+0x1a4]`).
- *
- * **칸 목록의 근거는 StrHOWTO[18] "[아이템] : 장비, GP아이템"** 이다 — 설명서가 두 가지만 적었다.
- *
- * ⚠️ **0xd0 의 갱신 0x4d04·그리기 0x7538 은 아직 안 풀렸다** — 칸 수·차례를 확정할 수 없어
- * 설명서가 적은 두 칸만 둔다. 시즌 **서브아이템 상점**(창 종류 1, 가격표 `0xcc430` ×10 =
- * 100만 단위, R12 (나)절)도 시즌에 분명히 있지만 **어느 칸으로 들어가는지가 문서에 없다** →
- * 지어내지 않았다. 밝혀지면 이 표에 `{ label: '서브아이템', windowKind: 1, target: 아이템상점 }`
- * 한 줄을 더하면 된다.
+ * 직접 떴다:
+ * ```
+ * 0x4d04 (들어옴) 이전 상태가 0xc9 면 메뉴(this+0x88) 커서를 (0,0) 으로 · 바탕 0x76705(…, 0x23, 0xbe, 0x1e)
+ * 0x4da4 (키)    확인: 칸 = 행 × 열수 + 열
+ *                  칸 0 → this+0x110 = 1 · 0xdf (선수 고르기 → 그 선수의 장비 창)
+ *                  그 밖 → 0xdc (아이템 상점)
+ *                취소(−16) → 0xc9
+ * 0x5f3c (0xdc 들어옴) 같은 메뉴 칸으로 창 종류 [win+0x1a4] 를 고른다:
+ *                  0 → 3 장비 · 1 → 4 구장 (관중석 SR+0x1b8 · 전광판 +0x1b9 · 잔디 +0x1ba 로 구장 그림)
+ *                  2 → 1 서브아이템 · 3 → 2 GP아이템 (이전 상태가 0xe8 이면 GP 창 커서를 셋 아래로)
+ * ```
+ * 그래서 칸은 **넷**이고 차례가 위와 같다. 칸 글은 문자열 표에 없다(그림 글로 보임) —
+ * 이름은 이벤트·설명서 글이 부르는 대로 적었다: s_event_txt[95] "[아이템]의 **장착아이템** 샵",
+ * [85] "[아이템]에서 **구장아이템**을 구매", [71] "**GP아이템** 샵", StrHOWTO[20] "[아이템] → [장착아이템]".
+ * 칸 2 "서브아이템" 은 창 종류 1 의 이름(R12)이다 — ⚠️ 칸 글 자체는 확인하지 못했다.
  */
 
 /** 아이템 창 종류 `[win+0x1a4]` — 1 서브아이템 · 2 GP · 3 장비 · 4 구장 (R12 · S3) */
@@ -32,27 +34,31 @@ export interface SeasonItemMenuEntry {
   readonly description: string
 }
 
-/**
- * 아이템 메뉴 칸.
- *
- * - **장비**: 먼저 선수를 고른다(0xdf, `this+0x110 = 1`) → 그 선수의 장비 상점 0xdc.
- *   ⚠️ 나만의리그에서 영입된 선수는 StrMODE[220] 로 거절한다 (P4 5절) — 선수 고르기 쪽 규칙이라
- *   이 화면에는 없다.
- * - **GP아이템**: 곧장 아이템 상점 0xdc(창 종류 2). 효과표는 P4 6절의 `0xa310c` 8칸이다.
- *
- * 구장 아이템(창 종류 4)은 여기가 아니라 **구단관리 → 구장관리(0xea)** 쪽이다 (S3).
- */
+/** 아이템 메뉴 칸 — 키 0x4da4 · 0xdc 들어옴 0x5f3c 의 칸 차례 그대로 */
 export const SEASON_ITEM_MENU: readonly SeasonItemMenuEntry[] = [
   {
-    label: '장비',
+    label: '장착아이템',
     windowKind: ITEM_WINDOW_KIND.장비,
+    // 칸 0 만 선수를 먼저 고른다 (this+0x110 = 1 → 0xdf, 취소하면 0xd0 으로 — P4 5절)
     target: SEASON_SCENE_STATE.선수고르기,
-    description: '선수를 골라 장비 4부위를 사서 장착한다',
+    description: '일반 선수를 골라 장비를 사서 장착한다',
+  },
+  {
+    label: '구장아이템',
+    windowKind: ITEM_WINDOW_KIND.구장아이템,
+    target: SEASON_SCENE_STATE.아이템상점,
+    description: '관중석·전광판·잔디를 산다 (교체는 구단관리 → 구장관리)',
+  },
+  {
+    label: '서브아이템',
+    windowKind: ITEM_WINDOW_KIND.서브아이템,
+    target: SEASON_SCENE_STATE.아이템상점,
+    description: '트레이닝·외출 서브 아이템 (가격표 0xcc430)',
   },
   {
     label: 'GP아이템',
     windowKind: ITEM_WINDOW_KIND.GP아이템,
     target: SEASON_SCENE_STATE.아이템상점,
-    description: 'G포인트로 사는 아이템 — 추첨·사기·질병·목표점·트레이드·구내매점',
+    description: 'G포인트로 사는 아이템 (효과표 0xa310c)',
   },
 ]

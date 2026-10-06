@@ -37,15 +37,16 @@ export const emptyCell = style({
   pointerEvents: 'none',
 })
 
-/** 순위 딱지 글 — ⚠️ 원본은 numBox 숫자 + img_text 307 "위" 다 (컴포넌트 쪽 주석 참고) */
+/** 순위 딱지 칸 — 자리만 잡는다. 안의 숫자·"위" 는 그림이다 (numBox + img_text 307) */
 export const rankTag = style({
   position: 'absolute',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  color: ORIGINAL_COLORS.text,
-  fontSize: '11px',
-  lineHeight: '11px',
+  pointerEvents: 'none',
+})
+
+/** img_text 307 "위" (9×10) — 딱지 칸 오른쪽 끝, 세로 가운데 (정렬 0x24) */
+export const rankUnit = style({
+  position: 'absolute',
+  imageRendering: 'pixelated',
   pointerEvents: 'none',
 })
 

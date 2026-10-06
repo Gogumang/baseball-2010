@@ -40,7 +40,8 @@ describe('시즌 팀 트레이닝 (상태 0xcf)', () => {
     render(<SeasonTrainingScreen state={시즌()} gamePoints={1000} onTrain={onTrain} onBack={vi.fn()} />)
 
     fireEvent.click(줄('타격'))
-    expect(알림글()).toContain('[타격] 트레이닝')
+    // sprintf(StrMODE[85], StrMODE[45]) — "[타격훈련]을 하시겠습니까?"
+    expect(알림글()).toContain('[타격훈련]을 하시겠습니까?')
 
     fireEvent.click(screen.getByRole('button', { name: '예' }))
     expect(onTrain).toHaveBeenCalledWith('타격', 1)
@@ -51,7 +52,8 @@ describe('시즌 팀 트레이닝 (상태 0xcf)', () => {
     render(<SeasonTrainingScreen state={시즌()} gamePoints={500} onTrain={onTrain} onBack={vi.fn()} />)
 
     fireEvent.click(줄('지옥훈련'))
-    expect(알림글()).toContain('지옥훈련 500G')
+    expect(알림글()).toContain('[지옥훈련]을 하시겠습니까?')
+    expect(알림글()).toContain('500 G포인트가 소모됩니다')
 
     fireEvent.click(screen.getByRole('button', { name: '예' }))
     expect(onTrain).toHaveBeenCalledWith('지옥훈련', 4)
@@ -101,14 +103,15 @@ describe('시즌 팀 트레이닝 (상태 0xcf)', () => {
     expect(onTrain).toHaveBeenCalledWith('타격', 1)
   })
 
-  it('⚠️ 지옥훈련은 일부만 최대면 알린 뒤 그대로 진행한다', () => {
+  it('⚠️ 지옥훈련은 일부만 최대면 그 칸들을 [192] 줄로 앞에 붙인 [141] 확인 팝업 하나로 묻는다 (0x9224~0x9262)', () => {
     const onTrain = vi.fn()
     render(<SeasonTrainingScreen state={시즌([999, 999, 100, 100])} gamePoints={1000} onTrain={onTrain} onBack={vi.fn()} />)
 
     fireEvent.click(줄('지옥훈련'))
-    expect(알림글()).toContain('[투구, 타격] 능력치가 최대')
+    expect(알림글()).toContain('[투구] 능력치가 최대입니다')
+    expect(알림글()).toContain('[타격] 능력치가 최대입니다')
+    expect(알림글()).toContain('[지옥훈련]을 하시겠습니까?')
 
-    fireEvent.click(screen.getByRole('button', { name: '확인' }))
     fireEvent.click(screen.getByRole('button', { name: '예' }))
     expect(onTrain).toHaveBeenCalledWith('지옥훈련', 4)
   })

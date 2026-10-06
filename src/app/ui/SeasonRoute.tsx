@@ -1,4 +1,6 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { ITEM_WINDOW_KIND } from '@/widgets/season/lib/seasonItemMenu'
+import type { ItemWindowKind } from '@/widgets/season/lib/seasonItemMenu'
 import {
   GameIncomeScreen, NextGameScreen, PlayerRecruitScreen,
   SeasonEndingScreen, SeasonGoalsScreen, SeasonItemMenuScreen, SeasonManagementScreen, SeasonMvpScreen,
@@ -68,10 +70,24 @@ interface SeasonRouteProps {
 export function SeasonRoute({ session, random, gameSettings, onExit, aceSelect }: SeasonRouteProps) {
   const { state, scene, league, roster, playerStats, series, cup, gameOptions, notice, actions } = session
 
+  /** 아이템 메뉴에서 고른, 웹에 아직 없는 창 종류 (`[win+0x1a4]`) */
+  const [missingWindow, setMissingWindow] = useState<ItemWindowKind | null>(null)
   const ranks = useMemo(
     () => (state === null ? { myRank: 0, opponentRank: 0 } : seasonRanksOf(league, state.record)),
     [league, state],
   )
+
+  if (missingWindow !== null) {
+    return (
+      <RawScreen>
+        <MessageBox
+          text={`이 화면은 아직 없습니다 (장면 0xdc 창 종류 ${missingWindow})`}
+          buttons={['OK']}
+          onAnswer={() => setMissingWindow(null)}
+        />
+      </RawScreen>
+    )
+  }
 
   if (notice !== '') {
     return (
@@ -306,7 +322,10 @@ export function SeasonRoute({ session, random, gameSettings, onExit, aceSelect }
     return (
       <SeasonItemMenuScreen
         state={state}
-        onSelect={(_item, target) => actions.goto(target)}
+        // 0xdc 는 칸마다 다른 창(0x5f3c)을 연다 — 웹엔 구장 창(종류 4)만 있다. 나머지 셋(장비 창·서브아이템·
+        // GP아이템)은 아직 화면이 없어 지어내지 않고 "아직 없음" 으로 막는다
+        onSelect={(_item, target, windowKind) =>
+          windowKind === ITEM_WINDOW_KIND.구장아이템 ? actions.goto(target) : setMissingWindow(windowKind)}
         onBack={backToManagement}
       />
     )

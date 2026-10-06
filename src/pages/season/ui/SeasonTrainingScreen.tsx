@@ -2,34 +2,83 @@ import { useState } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
 import type { SeasonState } from '@/entities/season-mode/model/seasonRecord'
 import {
-  HELL_TRAINING_GAME_POINT, HELL_TRAINING_INDEX, TEAM_ABILITY_LABELS, TRAINING_SLOTS,
+  HELL_TRAINING_GAME_POINT, HELL_TRAINING_INDEX, TRAINING_GUARD_CEILING, TRAINING_SLOTS,
   checkSeasonTraining,
 } from '@/widgets/season/lib/seasonTraining'
-import type { TrainingRefusal, TrainingSlot } from '@/widgets/season/lib/seasonTraining'
+import type { TrainingSlot } from '@/widgets/season/lib/seasonTraining'
+import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
+import { fillModeText } from '@/widgets/season/lib/seasonText'
 import { SeasonListWindow } from '@/widgets/season/ui/SeasonListWindow'
 import type { SeasonListRow } from '@/widgets/season/ui/SeasonListWindow'
 import { SeasonStatusBar } from '@/widgets/season/ui/SeasonStatusBar'
 import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
 
-/**
- * 가드 거절 글 — 원본 StrMODE id 는 주석에 적었다.
- * ⚠️ **문구는 근사**다: 웹에 StrMODE 표가 없고 문서도 번호와 뜻만 적었다 (J 4-6).
- */
-const REFUSAL_TEXT: Readonly<Record<TrainingRefusal, (names: readonly string[]) => string>> = {
-  사기없음: () => '사기가 0이라 트레이닝을 할 수 없습니다', // StrMODE[193]
-  G부족: () => `G포인트가 부족합니다!N지옥훈련에는 ${HELL_TRAINING_GAME_POINT}G가 필요합니다`, // StrMODE[65]
-  능력치최대: (names) => `[${names.join(', ')}] 능력치가 최대입니다`, // StrMODE[192]
+/** StrMODE 번호 (가드 0x9108 이 0x702b4 로 꺼내는 글 — 직접 떴다) */
+const TEXT = {
+  /** "!C사기가 0일 때는!N훈련을 할 수 없습니다" — 팝업 (1,1) */
+  사기없음: 193,
+  /** "G포인트가 부족합니다. 구매 페이지로 이동하시겠습니까?" — 팝업 (2,2) 예/아니오 */
+  G부족: 65,
+  /** "[%s] 능력치가 최대입니다" — %s = StrMODE[44 + 칸] */
+  능력치최대: 192,
+  /** "[지옥훈련]을 하시겠습니까? … 500 G포인트가 소모됩니다" — 팝업 (2, 0x12) */
+  지옥훈련확인: 141,
+  /** "[%s훈련]을 하시겠습니까?" — %s = StrMODE[44 + 칸], 팝업 (2, 0x11) */
+  훈련확인: 85,
+  /** StrMODE[44..47] 투구·타격·집중·근성 */
+  능력치이름: 44,
+} as const
+
+/** StrMODE[192] 를 칸 이름으로 채운 한 줄 (sprintf(buf, [192], [44 + 칸])) */
+const maxedLineOf = (index: number): string =>
+  fillModeText(ORIGINAL_MODE_TEXT[TEXT.능력치최대] ?? '', ORIGINAL_MODE_TEXT[TEXT.능력치이름 + index] ?? '')
+
+/** 팝업 한 장 — 글과 단추 */
+interface TrainingPopup {
+  readonly text: string
+  /** 예/아니오(2) 인가, 확인 하나(1)인가 */
+  readonly asks: boolean
+  /** 예를 누르면 훈련할 칸. 없으면 예도 닫기만 한다 */
+  readonly trainIndex: number | null
 }
 
 /**
- * 확인 팝업 — 원본은 `0xbbef8(buf, 2, 0x11, 1)`(칸 0~3) · `0xbbef8(buf, 2, 0x12, 1)`(지옥훈련)
- * 로 예/아니오 두 칸짜리를 띄운다 (R13 5절). 지옥훈련 쪽은 앞줄에 **StrMODE[141] "지옥훈련 500G"**
- * 를 채워 넣는 것까지 확정이고, ⚠️ **나머지 문구는 근사**다.
+ * 가드 0x9108 (9128~9310, 직접 떴다) 이 띄우는 팝업:
+ * ```
+ * 팀 사기 == 0                     → [193]                        (1,1)
+ * 칸 4 지옥훈련: G < 500           → [65]                         (2,2) — 예는 G 충전 페이지 0xfa (이식 대상 아님)
+ *               능력치 > 998 인 칸마다 sprintf([192], [44+i]) + "!N" 을 이어 붙인다
+ *               넷 다 최대          → 그 글                         (1,1)
+ *               그 밖              → 그 글 + [141]                 (2,0x12)
+ * 칸 0~3: 그 칸 > 998              → sprintf([192], [44+칸])       (1,1)
+ *         그 밖                    → sprintf([85], [44+칸])        (2,0x11)
+ * ```
  */
-const CONFIRM_TEXT = (slot: TrainingSlot): string =>
-  slot === '지옥훈련'
-    ? `!C지옥훈련 ${HELL_TRAINING_GAME_POINT}G!N진행하시겠습니까?`
-    : `!C[${slot}] 트레이닝을 진행하시겠습니까?`
+function trainingPopupOf(
+  checked: ReturnType<typeof checkSeasonTraining>,
+  index: number,
+  abilities: readonly number[],
+): TrainingPopup {
+  if (!checked.ok && checked.reason === '사기없음') {
+    return { text: ORIGINAL_MODE_TEXT[TEXT.사기없음] ?? '', asks: false, trainIndex: null }
+  }
+  if (index === HELL_TRAINING_INDEX) {
+    if (!checked.ok && checked.reason === 'G부족') {
+      return { text: ORIGINAL_MODE_TEXT[TEXT.G부족] ?? '', asks: true, trainIndex: null }
+    }
+    const maxed = abilities
+      .map((value, slot) => (value > TRAINING_GUARD_CEILING ? `${maxedLineOf(slot)}!N` : ''))
+      .join('')
+    if (!checked.ok) return { text: maxed, asks: false, trainIndex: null }
+    return { text: maxed + (ORIGINAL_MODE_TEXT[TEXT.지옥훈련확인] ?? ''), asks: true, trainIndex: index }
+  }
+  if (!checked.ok) return { text: maxedLineOf(index), asks: false, trainIndex: null }
+  return {
+    text: fillModeText(ORIGINAL_MODE_TEXT[TEXT.훈련확인] ?? '', ORIGINAL_MODE_TEXT[TEXT.능력치이름 + index] ?? ''),
+    asks: true,
+    trainIndex: index,
+  }
+}
 
 export interface SeasonTrainingScreenProps {
   readonly state: SeasonState
@@ -68,8 +117,7 @@ export interface SeasonTrainingScreenProps {
 export function SeasonTrainingScreen({ state, gamePoints, onTrain, onBack }: SeasonTrainingScreenProps) {
   const { record, teamMorale, teamAbilities } = state
   const abilities = teamAbilities[record.teamId] ?? []
-  const [notice, setNotice] = useState<string | null>(null)
-  const [question, setQuestion] = useState<number | null>(null)
+  const [popup, setPopup] = useState<TrainingPopup | null>(null)
 
   const rows: readonly SeasonListRow[] = TRAINING_SLOTS.map((label, index) => ({
     id: label,
@@ -79,24 +127,14 @@ export function SeasonTrainingScreen({ state, gamePoints, onTrain, onBack }: Sea
   }))
 
   const select = (index: number) => {
-    const checked = checkSeasonTraining({ abilities, teamMorale, gamePoints }, index)
-    if (!checked.ok) {
-      setNotice(REFUSAL_TEXT[checked.reason ?? '사기없음'](checked.maxedAbilities ?? []))
-      return
-    }
-    // ⚠️ 지옥훈련은 일부 능력치가 최대여도 그대로 진행한다 (넷 다 최대일 때만 거절) — 원본 그대로.
-    // 최대인 칸을 알려 주기만 하고 확인 팝업으로 넘어간다.
-    if (checked.maxedAbilities !== undefined && checked.maxedAbilities.length > 0) {
-      setNotice(REFUSAL_TEXT.능력치최대(checked.maxedAbilities))
-    }
-    setQuestion(index)
+    setPopup(trainingPopupOf(checkSeasonTraining({ abilities, teamMorale, gamePoints }, index), index, abilities))
   }
 
   const { cursor, moveTo } = useSeasonCursor({
     count: rows.length,
     onSelect: select,
     onCancel: onBack,
-    isEnabled: notice === null && question === null,
+    isEnabled: popup === null,
   })
 
   return (
@@ -108,25 +146,17 @@ export function SeasonTrainingScreen({ state, gamePoints, onTrain, onBack }: Sea
         onMoveCursor={moveTo}
         onSelect={select}
         onBack={onBack}
-        footer={
-          `${TEAM_ABILITY_LABELS.join('·')} 는 팀 전체 능력치에 영향을 준다` +
-          `\n지옥훈련은 네 능력치를 한꺼번에 올린다 (${HELL_TRAINING_GAME_POINT}G)` +
-          `\nG포인트 : ${gamePoints}`
-        }
       />
       <SeasonStatusBar record={record} teamMorale={teamMorale} />
 
-      {notice !== null && (
-        <MessageBox text={notice} buttons={['확인']} onAnswer={() => setNotice(null)} />
-      )}
-      {notice === null && question !== null && (
+      {popup !== null && (
         <MessageBox
-          text={CONFIRM_TEXT(TRAINING_SLOTS[question])}
-          buttons={['예', '아니오']}
+          text={popup.text}
+          buttons={popup.asks ? ['예', '아니오'] : ['확인']}
           onAnswer={(answer) => {
-            const slot = question
-            setQuestion(null)
-            if (answer === 0) onTrain(TRAINING_SLOTS[slot], slot)
+            const trainIndex = popup.trainIndex
+            setPopup(null)
+            if (popup.asks && answer === 0 && trainIndex !== null) onTrain(TRAINING_SLOTS[trainIndex], trainIndex)
           }}
         />
       )}

@@ -13,9 +13,9 @@ export interface SeasonItemMenuScreenProps {
   /**
    * 칸을 골랐다. 그 칸이 여는 **아이템 창 종류**(`[win+0x1a4]`)와 가는 장면 상태를 함께 넘긴다.
    *
-   * - 장비(종류 3) → **선수 고르기 0xdf** (`this+0x110 = 1`) → 그 선수의 상점 0xdc.
+   * - 칸 0 장착아이템(종류 3) → **선수 고르기 0xdf** (`this+0x110 = 1`) → 그 선수의 상점 0xdc.
    *   취소하면 다시 이 화면(0xd0)으로 온다 (P4 5절).
-   * - GP아이템(종류 2) → 곧장 **아이템 상점 0xdc**.
+   * - 칸 1 구장아이템(4) · 2 서브아이템(1) · 3 GP아이템(2) → 곧장 **아이템 상점 0xdc**.
    */
   readonly onSelect: (item: SeasonItemMenuEntry, target: SeasonSceneState, windowKind: ItemWindowKind) => void
   /** 취소(−16) — 관리 메뉴(0xc9)로 되돌아간다 */
@@ -23,16 +23,14 @@ export interface SeasonItemMenuScreenProps {
 }
 
 /**
- * 시즌 아이템 하위 메뉴 (장면 0x105 상태 **0xd0**, 갱신 0x4d04 · 키 **0x4da4** · 그리기 0x7538).
+ * 시즌 아이템 하위 메뉴 (장면 0x105 상태 **0xd0**, 갱신 0x4d04 · 키 **0x4da4** · 그리기 공통 틀 0x9f60).
  *
- * 관리 메뉴 칸 4 에서 들어와 아이템 상점 **0xdc** 로 가는 길목이다 (P4 1a·1b·5 절).
+ * 관리 메뉴 칸 4 에서 들어와 칸 0 은 선수 고르기 0xdf, 나머지는 아이템 상점 **0xdc** 로 간다.
+ * 칸 넷과 차례·창 종류는 `widgets/season/lib/seasonItemMenu.ts` 머리 주석 (0x4da4 · 0x5f3c 직접 떴다).
  *
- * ⚠️ **칸 수·차례는 근사**다 — 0xd0 의 갱신·그리기가 안 풀려서 StrHOWTO[18]
- * "[아이템] : 장비, GP아이템" 두 칸만 뒀다. 서브아이템 상점(창 종류 1)이 어느 칸인지는
- * 문서에 없어 지어내지 않았다 (`widgets/season/lib/seasonItemMenu.ts` 머리 주석).
- *
- * ⚠️ **원본 배치 미해독 — 근사**: 0xd0 의 그리기는 **공통 틀**(0x9f60) 하나뿐이라 줄 좌표가 없다.
- * 다른 시즌 화면들과 같은 공용 판 (24, 54, 192, 212) 목록으로 그린다.
+ * ⚠️ **원본 배치 미해독 — 근사**: 그리기는 **공통 틀**(0x9f60)의 가운데 판이라 줄 좌표가 없다.
+ * 다른 시즌 화면들과 같은 공용 판 (24, 54, 192, 212) 목록으로 그린다. 칸 글은 그림 글로 보여
+ * 이벤트·설명서 글이 부르는 이름을 적었다.
  */
 export function SeasonItemMenuScreen({ state, onSelect, onBack }: SeasonItemMenuScreenProps) {
   const rows: readonly SeasonListRow[] = SEASON_ITEM_MENU.map((entry) => ({
