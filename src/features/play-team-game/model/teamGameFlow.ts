@@ -1660,7 +1660,7 @@ function withFoulRecords(progress: TeamGameProgress, isFoul: boolean): TeamGameP
  * `0xa5e14(ctx, game+0xfc8 = 구질)` 이 수비 팀 투수를 깎는다 (P1 3-1, 4099ec6 과 같은 자리):
  *   투구 수 +1 (`team+0x27c` 묶음) · state[0xd] = 0 (`pitcherJustChanged`) · 스태미나 −c·용량 (0xaeb08)
  *   c = 0x66ef0(구질), 타자 스킬 22 압도 또는 투수 스킬 18 이면 ×2, 투수 스킬 10 이면 −1.
- * 용량 X 는 간이 타석 쪽(`drainQuickPitcher`)과 같은 입력이다 — 상대 팀 사기 100 · 첫 투수 보너스(0x66e44).
+ * 용량 X 는 간이 타석 쪽(`quickPitcherDrainOf`)과 같은 입력이다 — 상대 팀 사기 100 · 첫 투수 보너스(0x66e44).
  *
  * ⚠️ 미해결: 타자 스킬 22 압도 — 팀 경기 명단(`TeamEntryBatter`)에 스킬 비트(+0x14)가 없어 늘 거짓이다.
  *    상대 CPU 투수 스킬 18·10 도 같은 까닭으로 늘 거짓.
@@ -3544,16 +3544,29 @@ export function startSteal(progress: TeamGameProgress, base: StealBase): TeamGam
 /**
  * 간이 타석의 투구 한 개마다 수비 팀 투수의 스태미나가 깎이고 투구 수가 는다 (0xa5e14).
  *
- * **근사**: 간이 엔진은 구질을 고르지 않아 `pitchStaminaCostOf` 의 기본 소모(9)를 쓴다.
+ * 원본 `0xc262c` 의 공 고리는 c26be 0xa5c2d → **c26c8 0xa5e14(소모)** → c26d4 rand(0,100) 경로 굴림 →
+ * 0xc11f0/0xc1818 차례다 — 공 하나가 보는 체력%(0xaebb0)는 **그 공의 소모까지 먹은 값**이다
+ * (`simulateHalfInning` 의 `beforePitch` 와 같다, d9d376c). 그래서 `playQuickAtBat` 의 `beforePitch` 갈고리로
+ * 공마다 한 번 깎고, 그 공의 투수 체력%를 `QuickAtBatPitcher.stamina` 에 실어 돌려준다(0 이면 0xab214 탈진 갈래·
+ * 제구 등급 지친 갈래). 갈고리는 난수를 쓰지 않는다.
+ *
+ * 간이 엔진 소모는 늘 구질 1(`0xa5e14` 의 c26c8 인자) — `pitchStaminaCostOf` 의 기본 소모다.
  * 용량 X 는 그 투수의 체력 능력치(칸 3)와 팀 사기로 구한다 (0x66e44).
  */
-function drainQuickPitcher(
+interface QuickPitcherDrain {
+  /** 공 하나를 던지기 앞 — 깎고 그 공의 투수(체력% 실음)를 돌려준다 */
+  readonly beforePitch: () => QuickAtBatPitcher
+  /** 지금까지 깎은 스태미나 */
+  readonly stamina: () => number
+}
+
+function quickPitcherDrainOf(
+  pitcher: QuickAtBatPitcher,
   stamina: number,
   staminaAbility: number,
   teamMorale: number,
   isFirstPitcher: boolean,
-  pitches: number,
-): number {
+): QuickPitcherDrain {
   const capacity = staminaCapacityOf(staminaAbility, teamMorale, isFirstPitcher)
   const cost = pitchStaminaCostOf({
     pitchTypeNumber: 1,
@@ -3561,9 +3574,14 @@ function drainQuickPitcher(
     pitcherIsCoward: false,
     pitcherEndures: false,
   })
-  let next = stamina
-  for (let pitch = 0; pitch < pitches; pitch += 1) next = consumeStamina(next, cost, capacity)
-  return next
+  let current = stamina
+  return {
+    beforePitch: () => {
+      current = consumeStamina(current, cost, capacity)
+      return { ...pitcher, stamina: staminaPercentOf(current) }
+    },
+    stamina: () => current,
+  }
 }
 
 /* ── 자동 진행 ───────────────────────────────────────────────────────────────── */
@@ -3681,11 +3699,20 @@ function playAutoOffenseAtBat(progress: TeamGameProgress, random: RandomPort): T
   if (progress.pinchHitHomeRunHalf !== null) progress = { ...progress, pinchHitHomeRunHalf: null }
   const { options } = progress
   const before = progress.game
+  const pitcher = entryQuickPitcherOf(progress, options.opponentTeamId, progress.opponentPitcherIndex)
+  const drain = quickPitcherDrainOf(
+    pitcher,
+    progress.opponentStamina,
+    opponentPitcherStaminaAbility(progress),
+    100,
+    progress.opponentUsedPitchers.length === 0,
+  )
   const play = playQuickAtBat(
     entryQuickBatterOf(progress, options.ourTeamId, before.battingOrderIndex),
-    entryQuickPitcherOf(progress, options.opponentTeamId, progress.opponentPitcherIndex),
+    pitcher,
     { inning: before.inning },
     random,
+    { beforePitch: drain.beforePitch },
   )
   const outcome = play.outcome
   // 간이 엔진 타석 — 희생플라이가 없다 (E-2 확정)
@@ -3712,13 +3739,8 @@ function playAutoOffenseAtBat(progress: TeamGameProgress, random: RandomPort): T
       // 투구마다 state[0xd]·state[0xe] 가 내려간다 (0xa5e14 의 a5e72·a5e7c, c26ca)
       pitcherJustChanged: false,
       cpuPinchHitUsed: false,
-      opponentStamina: drainQuickPitcher(
-        progress.opponentStamina,
-        opponentPitcherStaminaAbility(progress),
-        100,
-        progress.opponentUsedPitchers.length === 0,
-        play.pitches,
-      ),
+      // 공마다 이미 깎았다 (위 `beforePitch`)
+      opponentStamina: drain.stamina(),
       opponentPitcherCounters: addRunsToCounters(
         progress.opponentPitcherCounters,
         runsBattedIn,
@@ -3751,11 +3773,20 @@ function playAutoDefenseAtBat(progress: TeamGameProgress, random: RandomPort): T
   // 0xc1ba4 안 차례 그대로 — CPU 대타(공격 = 상대 팀, 0xc1c50) 뒤 **우리 투수** 교체 판정(0xc1ce2)
   progress = runQuickSubstitutions(progress, false, random)
   const { options } = progress
+  const pitcher = entryQuickPitcherOf(progress, options.ourTeamId, progress.ourPitcherIndex)
+  const drain = quickPitcherDrainOf(
+    pitcher,
+    progress.stamina,
+    ourPitcherStats(progress).stamina,
+    ourTeamMoraleOf(progress.options),
+    progress.ourUsedPitchers.length === 0,
+  )
   const play = playQuickAtBat(
     entryQuickBatterOf(progress, options.opponentTeamId, progress.opponentOrderIndex),
-    entryQuickPitcherOf(progress, options.ourTeamId, progress.ourPitcherIndex),
+    pitcher,
     { inning: progress.game.inning },
     random,
+    { beforePitch: drain.beforePitch },
   )
   return startDefensiveAtBat(
     {
@@ -3771,13 +3802,8 @@ function playAutoDefenseAtBat(progress: TeamGameProgress, random: RandomPort): T
       // 투구마다 state[0xd]·state[0xe] 가 내려간다 (0xa5e14 의 a5e72·a5e7c, c26ca)
       pitcherJustChanged: false,
       cpuPinchHitUsed: false,
-      stamina: drainQuickPitcher(
-        progress.stamina,
-        ourPitcherStats(progress).stamina,
-        ourTeamMoraleOf(progress.options),
-        progress.ourUsedPitchers.length === 0,
-        play.pitches,
-      ),
+      // 공마다 이미 깎았다 (위 `beforePitch`)
+      stamina: drain.stamina(),
     },
     play.outcome,
     false,
