@@ -88,6 +88,17 @@ export interface StageScene {
    * 그것이 생기면 `batterLayers.pitcherEquipmentOf(career.equipmentLevels)` 한 줄이면 된다.
    */
   readonly pitcherEquipment?: PitcherEquipment
+  /**
+   * 마운드 투수 레코드의 **폼** `rec[0xb] >> 4` (0xb6e24). 투구 단계 표 0x9e0b8 이 투구 객체 `[게임+0xf98]+0xc` 로 보는 값 —
+   * 타석 교대 0x48d50 이 0x48f34 에서 `0xb6e24(현재 투수 0xae83d)` 를 거기 쓴다. 표는 `폼 >> 1` 로 갈린다. 없으면 0.
+   */
+  readonly pitcherForm?: number
+  /**
+   * 마운드 투수의 **손** 0xb63c0 (0 우투 · 1 좌투). 투수 그림 적재 vt8(0x793b0) 의 다섯째 인자로 그림 객체 +0x3c 에 들어가고
+   * (타석 교대 0x482c8~0x482fc), 그리기 0x79524 가 ≠ 0 이면 효과 0x11(좌우 뒤집기)로 그린다. 투수 x 는 좌투면 +1 이다
+   * (0x38dac~0x38db8 → 0x38e6c 그림 객체 +4). 없으면 0.
+   */
+  readonly pitcherHand?: number
   readonly acePitcher: {
     readonly framesUrl: string
     readonly frameCount: number
@@ -109,7 +120,7 @@ export function renderBattingStage(
     opponentTeamId: scene.hud?.opponentTeamId ?? null,
   })
   const progress = scene.pitch === null || scene.frame < 0 ? -1 : scene.frame / scene.pitch.frameCount
-  drawPitcher(context, scene.acePitcher, progress, scene.pitcherTick, scene.tick, side, scene.pitcherEquipment)
+  drawPitcher(context, scene.acePitcher, progress, scene.pitcherTick, scene.tick, side, scene.pitcherEquipment, scene.pitcherForm ?? 0, scene.pitcherHand ?? 0)
   drawBatter(context, scene.swingFrame, scene.shift, scene.bodyType, side, scene.batterSkinIndex, scene.batterTeamIndex, scene.batterEquipment)
   drawStrikeZone(context, side)
   if (scene.pitch !== null && scene.isEagleEyeEnabled) {
@@ -137,8 +148,14 @@ export function renderBattingStage(
   }
 }
 
-/** 일반 투수 폼 — 원본 투수 명단 첫 선수의 폼(0)으로 둔다 (추정). 홀수 폼이면 좌우 반전이다 */
-const PITCHER_FORM = 0
+/** 좌투(손 1) — 그림을 뒤집고 x 를 1 옮긴다 (0x79524 효과 0x11 · 0x38db8) */
+const LEFT_HANDED_PITCHER = 1
+
+/** 투수 그림의 거울 축 x 와 뒤집기 — 좌투면 앵커 + 1 (0x38db8) 을 축으로 뒤집는다 (0x79524 효과 0x11) */
+export function pitcherMirrorOf(anchorX: number, hand: number): { readonly axisX: number; readonly isMirrored: boolean } {
+  const isMirrored = hand === LEFT_HANDED_PITCHER
+  return { axisX: anchorX + (isMirrored ? 1 : 0), isMirrored }
+}
 
 function drawPitcher(
   context: CanvasRenderingContext2D,
@@ -148,14 +165,23 @@ function drawPitcher(
   tick: number,
   side: number,
   equipment: PitcherEquipment = NO_PITCHER_EQUIPMENT,
+  form = 0,
+  hand = 0,
 ): void {
   // 투수 앵커 (프레임 원점 = 발밑) — 원본 표 0xcfb18 의 side 칸
   const { x: MOUND_CENTER_X, y: MOUND_BOTTOM_Y } = stageLayoutOf(side).pitcherAnchor
   const ratio = progress < 0 ? 0 : Math.min(1, progress)
 
   if (ace === null) {
-    // 투구 단계 표 (0x9e0b8) · 대기 동작 (state 2)
-    const index = pitcherTick === null ? pitcherIdleFrameAt(tick) : pitcherFrameAt(PITCHER_FORM, pitcherTick)
+    // 투구 단계 표 (0x9e0b8, 폼 >> 1 로 갈린다) · 대기 동작 (state 2)
+    const index = pitcherTick === null ? pitcherIdleFrameAt(tick) : pitcherFrameAt(form, pitcherTick)
+    // 좌투면 x + 1 (0x38db8) 자리를 축으로 거울을 놓는다 — 타자 그림과 같은 축 잡기(근사, `drawBatter` 주석)
+    const { axisX, isMirrored } = pitcherMirrorOf(MOUND_CENTER_X, hand)
+    context.save()
+    if (isMirrored) {
+      context.translate(axisX * 2, 0)
+      context.scale(-1, 1)
+    }
     // 원본 0x79524 는 바탕 프레임 f · 머리 · 몸 · **바탕 f+22** · 손 · 다리 여섯 칸을 이 차례로 쌓는다.
     // f+22 에 몸통·던지는 팔·글러브 안 공이 들어 있다 (PITCHER_OVERLAY_FRAME_OFFSET 주석).
     // 장비 칸은 등급 줄(.mpl)로 색만 갈리므로 타자와 같은 `layerPaletteIndexOf` 를 그대로 쓴다 —
@@ -163,8 +189,9 @@ function drawPitcher(
     for (const layer of pitcherLayersOf(index, equipment)) {
       const frame = placedFrame(layer.folder, layer.frame, layerPaletteIndexOf(layer, 0, 0))
       if (frame === null) continue
-      context.drawImage(frame.image, MOUND_CENTER_X + frame.offsetX, MOUND_BOTTOM_Y + frame.offsetY)
+      context.drawImage(frame.image, axisX + frame.offsetX, MOUND_BOTTOM_Y + frame.offsetY)
     }
+    context.restore()
     return
   }
 

@@ -4,6 +4,7 @@ import { aceOrderOfMagicNumber, createMagicPitchGameState } from '@/entities/pit
 import { aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
 import type { MagicPitchGameState } from '@/entities/pitching/model/magicPitchGame'
 import type { PitcherRepertoireInfo } from '@/entities/pitching/model/pitch'
+import { pitcherHandOfPitch } from '@/entities/pitching/model/pitcherHand'
 import { lastSwingFrameOf } from '@/entities/batting/model/swingTiming'
 import type { BattingSwing } from '@/features/play-at-bat/model/resolvePitch'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
@@ -209,7 +210,17 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
       }
       particleTick = nowTick
 
+      // 마운드 투수의 폼·손 — 던진 공이 실은 값(그 투수 레코드)을 먼저, 없으면 레퍼토리(같은 레코드의 폼·+0x18)
+      const repertoire = latestRef.current.pitcherAbility.repertoire
+      const pitcherForm = pitch?.pitcherForm ?? repertoire?.form ?? 0
+      const pitcherHand = pitcherHandOfPitch({
+        pitcherForm,
+        pitcherMagicNumber: pitch?.pitcherMagicNumber ?? repertoire?.magicId ?? 0,
+      })
+
       renderBattingStage(context, {
+        pitcherForm,
+        pitcherHand,
         pitch,
         frame: ballFrame,
         shift: shiftRef.current,
