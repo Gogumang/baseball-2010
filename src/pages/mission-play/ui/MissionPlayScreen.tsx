@@ -108,7 +108,12 @@ export function MissionPlayScreen({
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
   const goals = goalsOf(run.mission, run.progress)
   const isOver = run.status !== '진행중'
-  const canBunt = run.mission.goals.includes('번트')
+  /**
+   * 번트 키 '7'/'8'/'9' — 원본은 미션 목표와 상관없이 받는다. 타격 키 0x535a4 는 모드를 안 보고 0x6a7 을 보내고,
+   * 받는 0x51e48 은 상태 0x11 · S+4(스윙 받을 준비) · 지금 타자(0xae89c)가 마선수(0xb633c, +0xa 비트6)가 아님만 본다.
+   * 미션은 나리 타자편 저장의 선수가 치므로 마선수가 아니다 → 늘 켠다.
+   */
+  const canBunt = true
   // 도루 출발 — 사람 공격이고 앞길이 열린 주자가 있을 때 (`canStartSteal`). 목표에 도루가 없어도 키는 먹는다
   const canSteal = !isOver && stealableBases.length > 0
   /** 타석 화면이 채우는 "공이 나는 동안(상태 0x11)인가" — 원본 도루 키 0x53610 은 이때만 받는다 */

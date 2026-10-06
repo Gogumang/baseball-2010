@@ -78,3 +78,26 @@ describe('미션 타석은 마선수 레벨과 CPU 견제 콜백을 타석 화�
     expect(stageProps.last?.onPickoff).toBe(onPickoff)
   })
 })
+
+describe('미션 타석의 번트는 목표와 상관없이 켜진다 (0x535a4 → 0x6a7 → 0x51e48, 모드·목표 갈림 없음)', () => {
+  it('번트 목표가 없는 타자 미션도 canBunt', () => {
+    const mission = MISSIONS.find((candidate) => candidate.side === '타자' && !candidate.goals.includes('번트'))!
+    render(
+      <MissionPlayScreen
+        run={startMission(mission)}
+        ability={ROOKIE_BATTER_ABILITY}
+        pitcherAbility={DEFAULT_PITCHER_ABILITY}
+        opponent={null}
+        atBat={createAtBat()}
+        isPaused={false}
+        bannerText=""
+        random={createSeededRandom(1)}
+        onPitchResolved={vi.fn()}
+        onGiveUp={vi.fn()}
+        onFinish={vi.fn()}
+        onSteal={vi.fn()}
+      />,
+    )
+    expect(stageProps.last?.canBunt).toBe(true)
+  })
+})
