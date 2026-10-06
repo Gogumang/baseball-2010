@@ -31,6 +31,7 @@ import { ballFrameAt, useStageRefs } from '@/widgets/batting-stage/model/stageRe
 import type { AcePitcherFrames, StageHud } from '@/widgets/batting-stage/model/stageRefs'
 import { useStageAnimation } from '@/widgets/batting-stage/model/useStageAnimation'
 import { useStageControls } from '@/widgets/batting-stage/model/useStageControls'
+import { buntStanceAfterSwingKey } from '@/widgets/batting-stage/lib/buntStance'
 import { canSpecialSwing, remainingAfterSpecialSwing } from '@/entities/batting/model/specialSwing'
 import { pitcherBoostSideOf, swingBoostOf } from '@/entities/batting/model/swingBoost'
 import { aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
@@ -341,6 +342,12 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
         // 상태 0x13 은 OK(−5)·'5' 로 건너뛴다 (0x406e8). 그때 스윙 키는 건너뛰기로만 쓰인다
         if (phaseRef.current === '타격') return commitHit(now)
         if (!isFlying(now)) return
+        // 번트 자세면 스윙이 안 나가고(0xb9374 가 S+8 을 보고 그냥 돌아간다) 판정 F(+0xfd8)만 이 틱으로 바뀐다
+        const bunt = buntRef.current
+        if (bunt !== null) {
+          buntRef.current = buntStanceAfterSwingKey(bunt, frameNow(now))
+          return
+        }
         swingStartedAtRef.current = now
         finishPitch({ frame: frameNow(now), shift: shiftRef.current, buntKind: 0 }, now)
       },
@@ -360,11 +367,18 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
         if (!isFlying(now)) return
         // 0x51e14: 남은 횟수 0xaea30 이 0 이면 무시 — 번호(+0x18)가 0 이면 늘 0 이다
         if (!canSpecialSwing(specialSwingNumber, aceBatterIndex >= 0, specialSwingRemaining)) return
-        swingStartedAtRef.current = now
-        // 0x4e136: 스윙이 나가는 틱에 남은 > 0 이면 −1 (결과와 무관)
+        // 0x4e136: 예약이 풀리는 틱에 S+0x10 ≠ 0 이고 남은 > 0 이면 −1 (결과와 무관 — 번트 자세라 스윙이 안 나가도)
         if (specialSwingRemaining !== undefined && specialSwingRemaining > 0) {
           onSpecialSwingUsed?.(remainingAfterSpecialSwing(specialSwingRemaining))
         }
+        const bunt = buntRef.current
+        if (bunt !== null) {
+          // 번트 자세면 스윙은 안 나가고(0xb9374) 판정 F(+0xfd8)만 이 틱으로 바뀐다.
+          // ⚠️ 미해결: 원본은 S+0x10 = 필살 번호가 남은 채 번트 판정(0x51226)으로 간다 — 그 쓰임은 안 옮겼다
+          buntRef.current = buntStanceAfterSwingKey(bunt, frameNow(now))
+          return
+        }
+        swingStartedAtRef.current = now
         finishPitch({ frame: frameNow(now), shift: shiftRef.current, buntKind: 0, isSpecial: true }, now)
       },
     }

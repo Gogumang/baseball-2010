@@ -18,6 +18,7 @@ import { preloadPtcParts } from '@/widgets/particles/lib/renderParticles'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import { pitchReleaseSoundIdOf } from '@/widgets/batting-stage/lib/pitchReleaseSound'
+import { isBuntJudgeFrame } from '@/widgets/batting-stage/lib/buntStance'
 import type { StageRefs } from '@/widgets/batting-stage/model/stageRefs'
 import { DERBY_ORDINARY_PITCH_TYPE } from '@/entities/home-run-derby/model/derbyRules'
 
@@ -162,8 +163,8 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
           )
         }
         const bunt = buntRef.current
-        // 번트 자세는 공이 플레이트에 닿는 순간(N−1) 판정한다 — 판정 시점은 추정
-        if (bunt !== null && frame >= pitch.frameCount - 1) {
+        // 번트 자세는 공이 N−1 틱에 닿는 그 틱에 깊이 조건 없이 판정한다 (0x4e15c r7 → 0x4e1fe 메시지 0x6aa, 확정)
+        if (bunt !== null && isBuntJudgeFrame(frame, pitch.frameCount)) {
           finishPitch({ frame: bunt.frame, shift: shiftRef.current, buntKind: bunt.kind }, now)
           return
         }
