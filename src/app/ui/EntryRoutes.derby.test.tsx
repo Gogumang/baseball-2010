@@ -28,8 +28,9 @@ afterEach(() => {
 describe('홈런더비 진입 — 하위 16 선수 고르기 (0x25e6c · 0x29ac8)', () => {
   const 나리 = { ...createCareer('나리'), battingTypeIndex: 1, battingSide: 0, skinIndex: 2 }
   const 명전 = { ...createCareer('전설'), endingIndex: 4, battingTypeIndex: 2, battingSide: 1, skinIndex: 1, equippedSkillIds: [22], specialSwingNumber: 3 }
-  const 등록 = registerHallOfFame(EMPTY_COLLECTION, 명전, 99_999)
-  if (등록.kind !== '등록') throw new Error('등록 실패')
+  const 등록결과 = registerHallOfFame(EMPTY_COLLECTION, 명전, 99_999)
+  if (등록결과.kind !== '등록') throw new Error('등록 실패')
+  const 명전기록 = 등록결과.collection
 
   function 띄우기(career: typeof 나리 | null) {
     const setScreen = vi.fn()
@@ -38,7 +39,7 @@ describe('홈런더비 진입 — 하위 16 선수 고르기 (0x25e6c · 0x29ac8
       setScreen,
       session: { career, savedCareer: null, actions: { gainGamePoint: vi.fn() } } as unknown as Props['session'],
       gameSettings: { settings: undefined, setSettings: vi.fn() } as unknown as Props['gameSettings'],
-      collection: 등록.collection,
+      collection: 명전기록,
       random: createSeededRandom(1),
       wallet: { balance: 0 } as unknown as Props['wallet'],
     }
