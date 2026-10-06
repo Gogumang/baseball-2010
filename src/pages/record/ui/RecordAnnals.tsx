@@ -3,14 +3,13 @@ import { Button, FrameSprite, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import type { Collection } from '@/entities/collection/model/collection'
 import { ORIGINAL_SKILLS } from '@/shared/config/original/skills'
-import { ORIGINAL_ENDINGS } from '@/shared/config/original/endings'
 import { TITLE_NAMES } from '@/entities/career/model/titles'
 import { RECORD_NAMES } from '@/entities/game/model/gameRecords'
 import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import {
   ACHIEVEMENT_MARK, RECORD_COUNT, CELL_FRAMES, CELL_GRID, LIST_GRID, LOCKED_MARK, NAME_ROW, PAGER, PAGE_TITLE, PANEL,
   SPECIAL_RECORD_FIRST_CELL, SPECIAL_RECORD_NAMES,
-  PROGRESS_ROW, SCROLL_MARKS, SKILL_DESCRIPTION, TAB_BAR, TAB_COUNT, TAB_CURSOR, TAB_NAMES,
+  ENDING_CELL_NAMES, NARI_ENDING_CELL_COUNT, PROGRESS_ROW, SCROLL_MARKS, endingCellFrameOf, endingProgressOf, SKILL_DESCRIPTION, TAB_BAR, TAB_COUNT, TAB_CURSOR, TAB_NAMES,
   TAB_NAME_FRAMES, TAB_NAME_Y, TAB_PAGE_COUNTS, TOTAL_ROW, cellPositionOf, tabIconWidthOf,
   tabIconXOf, tabNameXOf, tabSlotXOf,
 } from '@/pages/record/lib/recordAnnalsLayout'
@@ -63,6 +62,14 @@ export function RecordAnnals({ collection, onBack }: RecordAnnalsProps) {
   const [secretCode, setSecretCode] = useState(INITIAL_SECRET_CODE_STATE)
   const frames = useFrameOrigins(SLT_FRAMES)
   const textFrames = useFrameOrigins(IMG_TEXT)
+  /** 진행 탭 칸 20 — 0~14 나리 엔딩(전역기록 +0xa8 + i) · 15~19 시즌 엔딩(+0xa0 + j) (0x58b5c) */
+  const endingCells = ENDING_CELL_NAMES.map((name, index) => ({
+    name,
+    isGained: index < NARI_ENDING_CELL_COUNT
+      ? collection.endings.includes(index)
+      : collection.seasonEndings.includes(index - NARI_ENDING_CELL_COUNT),
+    gainedFrame: endingCellFrameOf(index),
+  }))
 
   // 쪽 넘기기 한도 — 통계 탭은 비밀 번호가 열려 있으면 8쪽 (0x2ba32 · 0x2ba8c). 쪽 번호 "/전체" 는 늘 표 값이다
   const pageLimit = tab === 4 && secretCode.isUnlocked ? UNLOCKED_STAT_PAGE_COUNT : TAB_PAGE_COUNTS[tab]
@@ -138,10 +145,7 @@ export function RecordAnnals({ collection, onBack }: RecordAnnalsProps) {
           gainedFrame={CELL_FRAMES.progress}
           cursor={cursor}
           setCursor={setCursor}
-          items={ORIGINAL_ENDINGS.map((_ending, index) => ({
-            name: `엔딩 ${index + 1}`,
-            isGained: collection.endings.includes(index),
-          }))}
+          items={endingCells}
         />
       )}
 
@@ -191,21 +195,28 @@ export function RecordAnnals({ collection, onBack }: RecordAnnalsProps) {
 
       {tab === 4 && <StatRows page={page} stats={collection.stats} />}
 
-      {tab === 1 && (
-        <>
-          <img className={styles.sprite} alt=""
-            src={imageSrc(SLT_FRAME, PAGE_TITLE.bulletImage)}
-            style={{ left: PROGRESS_ROW.bulletX, top: PROGRESS_ROW.y + 4 }} />
-          <FrameSprite folder={IMG_TEXT} frame={PROGRESS_ROW.labelFrame} origins={textFrames}
-            x={PROGRESS_ROW.labelX} y={PROGRESS_ROW.y} />
-          <FrameSprite folder={SLT_FRAMES} frame={PROGRESS_ROW.frame} origins={frames}
-            x={PROGRESS_ROW.frameX} y={PROGRESS_ROW.y - 3} />
-          <div className={styles.progressValue}
-            style={{ left: PROGRESS_ROW.frameX, top: PROGRESS_ROW.y + 1, width: 67 }}>
-            {Math.trunc((collection.endings.length * 100) / ORIGINAL_ENDINGS.length)}%
+      {tab === 1 && PROGRESS_ROW.modeFrames.map((modeFrame, row) => {
+        const y = PROGRESS_ROW.firstY + PROGRESS_ROW.step * row
+        const gained = endingCells
+          .filter((cell, index) => cell.isGained && (row === 0) === (index < NARI_ENDING_CELL_COUNT)).length
+        return (
+          <div key={modeFrame}>
+            <img className={styles.sprite} alt=""
+              src={imageSrc(SLT_FRAME, PROGRESS_ROW.bulletImage)}
+              style={{ left: PROGRESS_ROW.bulletX, top: y + PROGRESS_ROW.bulletDy }} />
+            <FrameSprite folder={IMG_TEXT} frame={modeFrame} origins={textFrames}
+              x={PROGRESS_ROW.modeLabelX} y={y} />
+            <FrameSprite folder={IMG_TEXT} frame={PROGRESS_ROW.labelFrame} origins={textFrames}
+              x={PROGRESS_ROW.modeLabelX + nameWidthOf(textFrames, modeFrame) + PROGRESS_ROW.labelGap} y={y} />
+            <FrameSprite folder={SLT_FRAMES} frame={PROGRESS_ROW.frame} origins={frames}
+              x={PROGRESS_ROW.frameX} y={y + PROGRESS_ROW.frameDy} />
+            <div className={styles.progressValue}
+              style={{ left: PROGRESS_ROW.frameX, top: y, width: PROGRESS_ROW.frameWidth }}>
+              {endingProgressOf(row, gained)}%
+            </div>
           </div>
-        </>
-      )}
+        )
+      })}
 
       {(tab === 2 || tab === 3) && (
         <TotalRow
@@ -232,6 +243,8 @@ export function RecordAnnals({ collection, onBack }: RecordAnnalsProps) {
 interface CellItem {
   readonly name: string
   readonly isGained: boolean
+  /** 얻은 칸 프레임 — 없으면 격자 공통 값 (진행 탭은 칸마다 다르다, `endingCellFrameOf`) */
+  readonly gainedFrame?: number
 }
 
 /** 41×25 칸 격자 4열 (탭 1 진행 · 탭 2 스킬) */
@@ -255,7 +268,7 @@ function CellGrid({
         const { x, y } = cellPositionOf(offset)
         return (
           <div key={item.name + index}>
-            <FrameSprite folder={SLT_FRAMES} frame={item.isGained ? gainedFrame : CELL_FRAMES.locked}
+            <FrameSprite folder={SLT_FRAMES} frame={item.isGained ? (item.gainedFrame ?? gainedFrame) : CELL_FRAMES.locked}
               origins={frames} x={x} y={y} />
             {item.isGained ? (
               <>

@@ -6,8 +6,8 @@ import { EMPTY_COLLECTION } from '@/entities/collection/model/collection'
 import { ORIGINAL_SKILLS } from '@/shared/config/original/skills'
 import { TITLE_NAMES } from '@/entities/career/model/titles'
 import {
-  CELL_GRID, PANEL, TAB_CURSOR, TAB_NAME_Y, TAB_SELECTED_WIDTH, TAB_SLOT_WIDTH,
-  cellPositionOf, tabIconXOf, tabNameXOf, tabSlotXOf,
+  CELL_GRID, ENDING_CELL_NAMES, PANEL, PROGRESS_ROW, TAB_CURSOR, TAB_NAME_Y, TAB_SELECTED_WIDTH, TAB_SLOT_WIDTH,
+  cellPositionOf, endingCellFrameOf, endingProgressOf, tabIconXOf, tabNameXOf, tabSlotXOf,
 } from '@/pages/record/lib/recordAnnalsLayout'
 import { STAT_NAMES } from '@/pages/record/lib/statNames'
 import { applyAnnalsStat } from '@/entities/collection/model/annalsStats'
@@ -215,5 +215,46 @@ describe('탭 0 달성 횟수 — 셀 0~39 "!R!cffff00%d" (0x7a0d0~0x7a0fc)', ()
     const { container } = 띄우기({ collection: EMPTY_COLLECTION })
     fireEvent.keyDown(window, { key: 'ArrowLeft' })
     expect([...container.querySelectorAll('div[data-cell]')]).toHaveLength(0)
+  })
+})
+
+describe('진행 탭 = 엔딩 칸 20 (0x2ead8 · 0x58b5c)', () => {
+  const 진행 = (endings: readonly number[], seasonEndings: readonly number[]) => {
+    const utils = 띄우기({ collection: { ...EMPTY_COLLECTION, endings, seasonEndings } })
+    fireEvent.click(screen.getByRole('button', { name: '진행' }))
+    return utils
+  }
+
+  it('칸 이름은 StrMAINMENU[189 + i] — 0~14 나리 엔딩, 15~19 시즌 엔딩', () => {
+    expect(ENDING_CELL_NAMES).toHaveLength(20)
+    expect(ENDING_CELL_NAMES[0]).toBe('부상')
+    expect(ENDING_CELL_NAMES[14]).toBe('정복자')
+    expect(ENDING_CELL_NAMES[15]).toBe('비인기')
+    expect(ENDING_CELL_NAMES[19]).toBe('최강')
+  })
+
+  it('얻은 칸은 이름 · 프레임은 칸마다 (8·9·14·18·19 → 20 · 0·1·10·15 → 19 · 그 밖 17)', () => {
+    진행([0, 2], [])
+
+    expect(screen.getByRole('button', { name: '부상' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '관중' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '방출' })).toBeNull()
+    expect([8, 9, 14, 18, 19].map(endingCellFrameOf)).toEqual([20, 20, 20, 20, 20])
+    expect([0, 1, 10, 15].map(endingCellFrameOf)).toEqual([19, 19, 19, 19])
+    expect(endingCellFrameOf(2)).toBe(17)
+  })
+
+  it('진행도는 두 줄 — 나리 n·100/15(버림) · 시즌 s·20', () => {
+    진행([0, 1, 2, 3], [0, 2])
+
+    expect(screen.getByText('26%')).toBeTruthy()
+    expect(screen.getByText('40%')).toBeTruthy()
+    expect(endingProgressOf(0, 15)).toBe(100)
+    expect(endingProgressOf(1, 5)).toBe(100)
+  })
+
+  it('진행도 줄 y — 글 209 · 229, 노란 네모 +1, 프레임 14 는 −4', () => {
+    expect(PROGRESS_ROW.firstY).toBe(209)
+    expect(PROGRESS_ROW.firstY + PROGRESS_ROW.step).toBe(229)
   })
 })
