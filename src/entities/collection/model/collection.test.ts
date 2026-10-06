@@ -122,6 +122,39 @@ describe('명예의 전당 — 등록 0x62cea (K 4-2 · Q2 4절)', () => {
     expect(HALL_OF_FAME_MAX_PITCHERS).toBe(4)
   })
 
+  it('기록을 통째로 복사한다(0x1f680 · 0x1f654 memcpy 0x30) — 장비 니블·장착 비트 +0x14·번호 +0x18·구질 마스크 +0x1c', () => {
+    const 타자 = 선수({
+      endingIndex: 4, equipmentLevels: { hit: 3, power: 0, defense: 1, run: 0 }, equippedSkillIds: [5, 22], specialSwingNumber: 2,
+    })
+    const batter = registerHallOfFame(EMPTY_COLLECTION, 타자, 넉넉)
+    if (batter.kind !== '등록') throw new Error('등록 실패')
+    expect(batter.collection.hallOfFame[0]).toMatchObject({
+      equipmentLevels: { hit: 3, power: 0, defense: 1, run: 0 }, equippedSkillIds: [5, 22], specialSwingNumber: 2,
+    })
+
+    const 투수 = {
+      ...createPitcherCareer('철완'), endingIndex: 5, pitchMask: 0b1011, selectedMagicNumber: 3,
+      equippedSkillIds: [16, 22], equipmentLevels: { control: 2, velocity: 0, breaking: 0, stamina: 4 },
+    }
+    const pitcher = registerHallOfFamePitcher(EMPTY_COLLECTION, 투수, 넉넉)
+    if (pitcher.kind !== '등록') throw new Error('등록 실패')
+    expect(pitcher.collection.hallOfFamePitchers[0]).toMatchObject({
+      pitchMask: 0b1011, selectedMagicNumber: 3, equippedSkillIds: [16, 22],
+      equipmentLevels: { control: 2, velocity: 0, breaking: 0, stamina: 4 },
+    })
+    // 저장했다 읽어도 그대로 남는다
+    expect(normalizeCollection(JSON.parse(JSON.stringify(pitcher.collection))).hallOfFamePitchers).toEqual(pitcher.collection.hallOfFamePitchers)
+    expect(normalizeCollection(JSON.parse(JSON.stringify(batter.collection))).hallOfFame).toEqual(batter.collection.hallOfFame)
+  })
+
+  it('기록 칸이 없는 옛 저장도 읽고, 칸 형식이 깨진 선수만 버린다', () => {
+    const famer = { name: '전설', ability: { hit: 1, power: 2, defense: 3, run: 4 }, endingIndex: 6, season: 13, titleIds: [] }
+    const loaded = normalizeCollection({
+      titles: [], skills: [], endings: [], hallOfFame: [famer, { ...famer, equippedSkillIds: 'x' }, { ...famer, specialSwingNumber: '1' }],
+    })
+    expect(loaded.hallOfFame).toEqual([{ ...famer, slot: 0 }])
+  })
+
   it('엔딩을 보지 않은 선수는 등록할 수 없다', () => {
     expect(registerHallOfFame(EMPTY_COLLECTION, 선수(), 넉넉).kind).toBe('엔딩전')
   })

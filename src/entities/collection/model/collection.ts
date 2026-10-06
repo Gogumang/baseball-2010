@@ -34,8 +34,23 @@ export interface HallOfFameLook {
   readonly teamId: number
 }
 
+/**
+ * 등록 `0x1f654`(투수) / `0x1f680`(타자) 은 선수 기록 0x30 바이트를 **통째로** 칸에 복사한다
+ * (`memcpy(전역기록 + 0x880|0x940 + 칸·0x30, 선수, 0x30)` — 그 앞에 +0xa 를 0(투수)/0x20(타자),
+ * +0 을 칸 − 0x4c / 칸 − 0x38 로 바꿔 명예 선수 번호를 단다). 그래서 명전 선수는 미션·홈런더비(0x1fbd0 · 0x1fc20)에서
+ * 나리 선수와 같은 칸을 읽힌다 — 능력치 +0xc · 장착 비트 +0x14 · 고른 마구/필살 번호 +0x18 · 구질 마스크 +0x1c(투수) ·
+ * 장비 니블 · 생김새 +0xb. 웹 기록은 0x30 바이트가 아니라 그중 경기가 읽는 칸만 이름으로 든다.
+ * 이 칸들은 2026-10-06 에 더했다 — 그 전에 등록한 옛 저장에는 없어 `undefined` 다(읽는 쪽이 대체를 정한다).
+ */
+interface HallOfFameRecordFields<Ability> {
+  /** 장비 니블 (0 = 미장착, 1~11 = 레벨+1) — 0xb6414 가 능력치에 얹는다 */
+  readonly equipmentLevels?: Ability
+  /** 장착 스킬 — 기록 +0x14 비트 (`career.equippedSkillIds` 그대로, 경기 스킬 0xb62b4 가 본다) */
+  readonly equippedSkillIds?: readonly number[]
+}
+
 /** 명예의 전당 타자 (+0x940 칸) */
-export interface HallOfFamer {
+export interface HallOfFamer extends HallOfFameRecordFields<BatterAbility> {
   readonly name: string
   readonly ability: BatterAbility
   readonly endingIndex: number
@@ -46,10 +61,12 @@ export interface HallOfFamer {
   /** 장비·장착 스킬을 얹은 능력치 `0xb6415(기록, k, 1)` — 능력치 도형이 쓴다. 옛 저장에는 없다 */
   readonly equippedAbility?: BatterAbility
   readonly look?: HallOfFameLook
+  /** 고른 필살타법 번호 — 기록 +0x18 (`career.specialSwingNumber`, 0 이면 안 고름) */
+  readonly specialSwingNumber?: number
 }
 
 /** 명예의 전당 투수 (+0x880 칸) */
-export interface HallOfFamePitcher {
+export interface HallOfFamePitcher extends HallOfFameRecordFields<PitcherAbility> {
   readonly name: string
   readonly ability: PitcherAbility
   readonly equippedAbility: PitcherAbility
@@ -59,6 +76,10 @@ export interface HallOfFamePitcher {
   /** 칸 번호 0~3 */
   readonly slot: number
   readonly look: HallOfFameLook
+  /** 보유 구질 마스크 — 기록 +0x1c (비트 t−1 = 구질 t, 경기 구질 칸 0xb6d2c 가 본다) */
+  readonly pitchMask?: number
+  /** 고른 마구 번호 — 기록 +0x18 (0 없음 · 1~4) */
+  readonly selectedMagicNumber?: number
 }
 
 export interface Collection {
@@ -183,6 +204,9 @@ export function registerHallOfFame(
     slot: target,
     equippedAbility: equippedAbilityOf(career),
     look: { typeIndex: career.battingTypeIndex, handIndex: career.battingSide, skinIndex: career.skinIndex, teamId: career.teamId },
+    equipmentLevels: career.equipmentLevels,
+    equippedSkillIds: career.equippedSkillIds,
+    specialSwingNumber: career.specialSwingNumber,
   }
   return { kind: '등록', slot: target, collection: { ...collection, hallOfFame: [...collection.hallOfFame, famer] } }
 }
@@ -209,6 +233,10 @@ export function registerHallOfFamePitcher(
     titleIds: career.titleIds,
     slot: target,
     look: { typeIndex: career.typeIndex, handIndex: career.handIndex, skinIndex: career.skinIndex, teamId: career.teamId },
+    equipmentLevels: career.equipmentLevels,
+    equippedSkillIds: career.equippedSkillIds,
+    pitchMask: career.pitchMask,
+    selectedMagicNumber: career.selectedMagicNumber,
   }
   return {
     kind: '등록',
@@ -230,6 +258,13 @@ const hasNumbers = (value: unknown, keys: readonly string[]) =>
 
 const isLook = (value: unknown) => hasNumbers(value, ['typeIndex', 'handIndex', 'skinIndex', 'teamId'])
 
+const isOptionalNumber = (value: unknown) => value === undefined || typeof value === 'number'
+
+/** 기록 칸(장비 니블·장착 비트)은 옛 저장에 없을 수 있다 — 있으면 형식만 본다 */
+const hasRecordFields = (candidate: Record<string, unknown>, abilityKeys: readonly string[]) =>
+  (candidate.equipmentLevels === undefined || hasNumbers(candidate.equipmentLevels, abilityKeys)) &&
+  (candidate.equippedSkillIds === undefined || isNumberArray(candidate.equippedSkillIds))
+
 function isHallOfFamer(value: unknown): value is HallOfFamer {
   if (typeof value !== 'object' || value === null) return false
   const candidate = value as Record<string, unknown>
@@ -241,7 +276,9 @@ function isHallOfFamer(value: unknown): value is HallOfFamer {
     hasNumbers(candidate.ability, ABILITY_KEYS) &&
     (candidate.slot === undefined || typeof candidate.slot === 'number') &&
     (candidate.equippedAbility === undefined || hasNumbers(candidate.equippedAbility, ABILITY_KEYS)) &&
-    (candidate.look === undefined || isLook(candidate.look))
+    (candidate.look === undefined || isLook(candidate.look)) &&
+    hasRecordFields(candidate, ABILITY_KEYS) &&
+    isOptionalNumber(candidate.specialSwingNumber)
   )
 }
 
@@ -256,7 +293,10 @@ function isHallOfFamePitcher(value: unknown): value is HallOfFamePitcher {
     isStringArray(candidate.titleIds) &&
     hasNumbers(candidate.ability, PITCHER_ABILITY_KEYS) &&
     hasNumbers(candidate.equippedAbility, PITCHER_ABILITY_KEYS) &&
-    isLook(candidate.look)
+    isLook(candidate.look) &&
+    hasRecordFields(candidate, PITCHER_ABILITY_KEYS) &&
+    isOptionalNumber(candidate.pitchMask) &&
+    isOptionalNumber(candidate.selectedMagicNumber)
   )
 }
 
