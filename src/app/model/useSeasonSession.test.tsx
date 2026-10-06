@@ -1763,13 +1763,47 @@ describe('영입한 명전 선수는 그 기록으로 팀 경기 명단에 실�
     act(() => result.current.actions.startPendingGame())
 
     const order = result.current.gameOptions?.ourEntryOrder
-    expect(order?.batters[0]).toEqual({ rosterSlot: -1, position: roster.batters[0]!.fieldPosition & 0xf, record: { name: '전설', ability: [500, 600, 300, 200] } })
+    expect(order?.batters[0]).toEqual({ rosterSlot: -1, position: roster.batters[0]!.fieldPosition & 0xf, record: { name: '전설', ability: [500, 600, 300, 200], recordId: 0xc8 } })
     const pitcher = order?.pitchers.find((entry) => typeof entry !== 'number')
     expect(pitcher).toEqual({
       name: '철완',
       ability: [710, 660, 610, 560],
       repertoire: { name: '철완', form: 3, magicId: 2, pitchMask: 0b101 },
+      recordId: 0xb5,
     })
+  })
+
+  it('명전 선수의 사람 경기 기록은 제 레코드(원본 id)로 쌓이고 순위표에 내 팀 줄·기록 이름으로 나온다 (0xa56dc 모드 2)', () => {
+    const rendered = renderHook(() => useSeasonSession(
+      메모리저장(), createSeededRandom(20100901), null, undefined, undefined, undefined, undefined, () => 명전,
+    ))
+    const { result } = rendered
+    시작(result, 0)
+    const { roster } = result.current
+    act(() => result.current.actions.updateRoster({
+      pitchers: roster.pitchers,
+      batters: [{ ...roster.batters[0]!, id: 0xc8, kindByte: 0x20 }, ...roster.batters.slice(1)],
+    }))
+    act(() => result.current.actions.playNextGame())
+    // 진행기가 그 칸으로 쌓아 보낸 타석 (표 밖 · 원본 id 0xc8)
+    const 타석 = [
+      { teamId: 0, battingOrderIndex: -1, recordId: 0xc8, outcome: { kind: '홈런' } as const, runsBattedIn: 2 },
+      { teamId: 0, battingOrderIndex: -1, recordId: 0xc8, outcome: { kind: '아웃', detail: '땅볼아웃' } as const, runsBattedIn: 0 },
+    ]
+    act(() => result.current.actions.finishGame(요약({ leaguePlateAppearances: 타석 })))
+    expect(result.current.playerStats.recordBatters?.[0xc8]).toEqual({ atBats: 2, hits: 1, homeRuns: 1, runsBattedIn: 2 })
+    // 붙박이 표 0팀 0번 줄에는 안 쌓였다
+    expect(result.current.playerStats.batters[0]).toBeUndefined()
+
+    const { state, league, playerStats, series, cpuRosterOf } = result.current
+    const recordOf = result.current.recordSource()!
+    const 줄 = seasonLeagueRecordsOf(
+      { league, myTeamId: 0, roster: result.current.roster, cpuRosterOf, playerStats, recordOf }, false,
+    )
+    expect(줄[0]).toMatchObject({ teamId: 0, name: '전설', homeRuns: 1, atBatsOrOuts: 2 })
+    // 목표 ③ 도 그 줄을 센다 — 0번 칸 타율 500
+    const 입력 = seasonGoalInputOf({ state: state!, league, roster: result.current.roster, playerStats, series, recordOf })
+    expect(입력.teamBattingAverage).toBeGreaterThan(0)
   })
 })
 

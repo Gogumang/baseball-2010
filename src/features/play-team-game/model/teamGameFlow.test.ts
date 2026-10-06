@@ -2315,3 +2315,47 @@ describe('트레이드로 옮겨 온 선수 — 표 팀 + 칸으로 서고 그 �
     expect(progress.ourPitcherEntry[2]).toMatchObject({ name: teamPitchers(6)[5]!.name, tableSlot: 5, tableTeamId: 6 })
   })
 })
+
+describe('영입한 표 밖 선수(명전·나리)는 원본 id 로 제 줄에 쌓는다 (0xa8024 → 0xa56dc 모드 2 갈래 0xa56fa)', () => {
+  const 명전타자 = { name: '명전타자', ability: [901, 802, 703, 604] as const, recordId: 0xc8 }
+  const 명전투수 = {
+    name: '명전투수',
+    ability: [880, 870, 860, 850] as const,
+    repertoire: { name: '명전투수', form: 2, magicId: 0, pitchMask: 0b1011 },
+    recordId: 0xb4,
+  }
+  const 차례 = {
+    batters: [
+      { rosterSlot: -1, position: 6, record: 명전타자 },
+      ...Array.from({ length: 11 }, (_u, i) => ({ rosterSlot: i + 1, position: i < 8 ? i + 1 : 0 })),
+    ],
+    pitchers: [명전투수, 1, 2, 3, 4, 5, 6, 7],
+  }
+
+  it('타석은 recordId 로, 투수 줄은 칸 −1 · recordId 로 실린다', () => {
+    const { progress, random } = 시작({ ourEntryOrder: 차례, dayCounter: 0, playerSide: PLAYER_SIDE_LAST_BAT })
+    expect(progress.ourEntry[0]).toMatchObject({ rosterSlot: -1, recordId: 0xc8 })
+    expect(progress.ourPitcherEntry[0]).toMatchObject({ recordId: 0xb4 })
+    const summary = summaryOf(끝까지(progress, random))
+    const 명전타석 = summary.leaguePlateAppearances.filter((line) => line.recordId === 0xc8)
+    expect(명전타석.length).toBeGreaterThan(0)
+    expect(명전타석.every((line) => line.teamId === 0 && line.battingOrderIndex === -1)).toBe(true)
+    const 명전줄 = summary.leaguePitchers!.lines.filter((line) => line.recordId === 0xb4)
+    expect(명전줄).toHaveLength(1)
+    expect(명전줄[0]).toMatchObject({ teamId: 0, pitcherSlot: -1 })
+    expect(명전줄[0]!.pitches).toBeGreaterThan(0)
+  })
+
+  it('recordId 없이 실린 기록(예전 모양)은 예전처럼 쌓지 않는다', () => {
+    const { progress, random } = 시작({
+      ourEntryOrder: {
+        batters: [{ rosterSlot: -1, position: 6, record: { name: '명전타자', ability: [901, 802, 703, 604] } }, ...차례.batters.slice(1)],
+        pitchers: [{ ...명전투수, recordId: undefined }, 1, 2, 3, 4, 5, 6, 7],
+      },
+      dayCounter: 0,
+    })
+    const summary = summaryOf(끝까지(progress, random))
+    expect(summary.leaguePlateAppearances.some((line) => line.recordId !== undefined)).toBe(false)
+    expect(summary.leaguePitchers!.lines.some((line) => line.recordId !== undefined || line.pitcherSlot < 0)).toBe(false)
+  })
+})

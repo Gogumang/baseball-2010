@@ -255,6 +255,12 @@ export interface TeamEntryBatter {
    * 에 쌓아 성적이 선수를 따라간다 — 웹 리그 기록표도 이 팀 · 칸(`leagueBatterIdOf`)으로 센다.
    */
   readonly tableTeamId?: number
+  /**
+   * 붙박이 표 밖 선수(시즌에 영입한 명전·나리)의 원본 id — 기록을 실어 선 칸(`rosterSlot` 이 `NO_ROSTER_SLOT`)만 든다.
+   * 0xa8024 가 그 선수 레코드 +0x20~ 에 쌓으므로(0xa56dc 모드 2 갈래가 마선수만 거른다) 리그 기록표의 표 밖 줄
+   * (`LeaguePlayerStats.recordBatters`)로 센다. 마선수는 없다
+   */
+  readonly recordId?: number
 }
 
 /** 리그 로스터 선수가 아니다 (마타자 — `0x1f84c` 로 저장에서 꺼낸 레코드) */
@@ -389,6 +395,8 @@ export interface TeamEntryPitcher {
   readonly tableSlot?: number
   /** `tableSlot` 의 붙박이 표 팀 — 트레이드로 옮겨 온 투수만 든다(없으면 경기 팀). `TeamEntryBatter.tableTeamId` 주석 */
   readonly tableTeamId?: number
+  /** 붙박이 표 밖 투수(영입한 명전·나리)의 원본 id — `TeamEntryBatter.recordId` 주석 */
+  readonly recordId?: number
 }
 
 /**
@@ -476,13 +484,16 @@ export interface TeamEntryTablePitcher {
  * 리그 선수와 똑같이 경기에 선다. 웹 붙박이 표에는 그 기록이 없어 부르는 쪽이 이 칸에 실어 준다.
  * `ability` 는 0xb6414 를 먹인 값(명전 `equippedAbility` 꼴)이다 — 경기 보정(0xb570c)은 리그 선수와 같은 길을 탄다.
  *
- * ⚠️ 미해결: 이 선수의 시즌 개인 기록 칸(리그 기록표 `팀 × 12 + 칸`)을 원본이 어디에 쌓는지 안 읽었다 —
- *    웹은 마선수처럼 로스터 칸 없음(`NO_ROSTER_SLOT` · `tableSlot` 없음)으로 두어 리그 기록표에 쌓지 않는다.
+ * 시즌 개인 기록: 0xa8024 는 `0xa56dc(R, 선수, 0)` 이 참이면 그 레코드 +0x20~ 에 쌓고, 모드 2 갈래(0xa56fa)는 마선수
+ * (0xb633d)만 거른다(직접 떴다) — 명전·나리 선수도 쌓인다. 웹은 로스터 칸이 없으니(`NO_ROSTER_SLOT` · `tableSlot` 없음)
+ * 부르는 쪽이 `recordId`(원본 id)를 실어 주면 리그 기록표의 표 밖 줄(`LeaguePlayerStats.recordBatters`·`recordPitchers`)로 센다.
  */
 export interface TeamEntryBatterRecord {
   readonly name: string
   /** 히트 · 파워 · 수비 · 주루 — 0xb6414(기록, k, 1) */
   readonly ability: readonly [number, number, number, number]
+  /** 그 선수의 원본 id(+0) — 있으면 리그 기록표의 표 밖 줄로 쌓는다 (`TeamEntryBatter.recordId`) */
+  readonly recordId?: number
 }
 
 /** 붙박이 표 밖 투수의 기록 — `TeamEntryBatterRecord` 주석과 같다 */
@@ -494,6 +505,8 @@ export interface TeamEntryPitcherRecord {
   readonly repertoire: PitcherRepertoire
   /** 보직 `+0xb & 3` (0xb6dec) — 없으면 CPU 투수 교체가 선발로 본다 */
   readonly role?: PitcherRole
+  /** 그 선수의 원본 id(+0) — 있으면 리그 기록표의 표 밖 줄로 쌓는다 (`TeamEntryBatter.recordId`) */
+  readonly recordId?: number
 }
 
 /**
@@ -532,7 +545,15 @@ export function entryBattersOfOrder(teamId: number, order: TeamEntryOrder): read
   return order.batters.map((batter, index) => {
     const position = batter.position & 0xf
     if (batter.record !== undefined) {
-      return { name: batter.record.name, ability: batter.record.ability, position, aceIndex: NO_ACE_BATTER, rosterSlot: NO_ROSTER_SLOT }
+      const { recordId } = batter.record
+      return {
+        name: batter.record.name,
+        ability: batter.record.ability,
+        position,
+        aceIndex: NO_ACE_BATTER,
+        rosterSlot: NO_ROSTER_SLOT,
+        ...(recordId === undefined ? {} : { recordId }),
+      }
     }
     if (isForeignTable(batter.tableTeamId, teamId)) {
       // 옮겨 온 선수 — 레코드는 옛 팀 Xls 행 사본이라 그 행의 이름·능력치로 서고, 기록도 그 자리로 쌓는다
@@ -589,6 +610,7 @@ export function entryPitchersOfOrder(teamId: number, order: TeamEntryOrder): rea
         aceIndex: NO_ACE_BATTER,
         orderIndex,
         ...(pitcher.role === undefined ? {} : { role: pitcher.role }),
+        ...(pitcher.recordId === undefined ? {} : { recordId: pitcher.recordId }),
       }
     }
     const slot = slots[orderIndex] ?? 0

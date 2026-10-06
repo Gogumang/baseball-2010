@@ -132,3 +132,38 @@ describe('경기 끝 판정 붙이기 — 사람 경기 요약도 같은 길 (0x
     expect(등판들).toHaveLength(0)
   })
 })
+
+describe('표 밖 선수(영입한 명전·나리)의 줄 — 원본 id 열쇠 (recordBatters · recordPitchers)', () => {
+  it('recordId 가 있으면 표 밖 줄에, 없으면 붙박이 표 줄에 쌓는다', () => {
+    const stats = recordLeaguePlateAppearances(EMPTY_LEAGUE_PLAYER_STATS, [
+      { teamId: 0, battingOrderIndex: -1, recordId: 0xfe, outcome: { kind: '홈런' }, runsBattedIn: 1 },
+      { teamId: 0, battingOrderIndex: 2, outcome: { kind: '홈런' }, runsBattedIn: 1 },
+    ])
+    expect(stats.recordBatters).toEqual({ 0xfe: { atBats: 1, hits: 1, homeRuns: 1, runsBattedIn: 1 } })
+    expect(Object.keys(stats.batters)).toEqual(['2'])
+    const pitched = recordLeaguePitcherAppearances(EMPTY_LEAGUE_PLAYER_STATS, [
+      { teamId: 0, pitcherSlot: -1, recordId: 0xb4, outs: 3, runsAllowed: 0, strikeouts: 1, pitches: 12, decision: '승' },
+    ])
+    expect(pitched.recordPitchers?.[0xb4]).toMatchObject({ outs: 3, wins: 1 })
+    expect(pitched.pitchers).toEqual({})
+  })
+
+  it('표 밖 선수가 없으면 칸을 만들지 않는다 — 예전 저장과 같은 모양', () => {
+    const stats = recordLeaguePlateAppearances(EMPTY_LEAGUE_PLAYER_STATS, [
+      { teamId: 1, battingOrderIndex: 0, outcome: { kind: '홈런' }, runsBattedIn: 1 },
+    ])
+    expect(stats).not.toHaveProperty('recordBatters')
+    expect(recordLeaguePitcherAppearances(stats, [])).not.toHaveProperty('recordPitchers')
+  })
+
+  it('판정은 같은 원본 id 의 줄에 붙는다', () => {
+    const appearances = leaguePitcherAppearancesOf(
+      [{ teamId: 0, pitcherSlot: -1, recordId: 0xb4, outs: 27, runsAllowed: 0, strikeouts: 5, pitches: 100 }],
+      { winner: { side: 1, pitcherSlot: -1, recordId: 0xb4 }, loser: null, save: null },
+      () => 0,
+      (_teamId, slot, recordId) => recordId === undefined && slot < 0,
+    )
+    expect(appearances).toHaveLength(1)
+    expect(appearances[0]).toMatchObject({ recordId: 0xb4, decision: '승' })
+  })
+})

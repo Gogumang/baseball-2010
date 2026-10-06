@@ -177,9 +177,18 @@ export function SeasonRoute({
   const backToManagement = () => actions.goto(SEASON_SCENE_STATE.관리메뉴)
   const backToTeamMenu = () => actions.goto(SEASON_SCENE_STATE.구단관리)
   // 목표 판정 0xa37bc 의 다섯 칸 — 시즌정보 화면과 목표 창(SYS sub 1)이 같은 값을 본다
-  const goalInput = seasonGoalInputOf({ state, league, roster, playerStats, series })
-  const leagueRecordSource = {
-    league, myTeamId: state.record.teamId, roster, cpuRosterOf: session.cpuRosterOf, playerStats,
+  // 영입한 명전 선수의 기록(recordSource)도 세션 판정(392)과 같이 넘긴다 — 그 칸의 줄을 같은 열쇠로 센다
+  const goalRecordOf = session.recordSource()
+  const goalInput = seasonGoalInputOf({
+    state, league, roster, playerStats, series, ...(goalRecordOf === undefined ? {} : { recordOf: goalRecordOf }),
+  })
+  // 시상 순위표의 재료 — 시상 화면에서만 만든다(명전 기록을 그때 읽는다)
+  const leagueRecordSourceOf = () => {
+    const recordOf = session.recordSource()
+    return {
+      league, myTeamId: state.record.teamId, roster, cpuRosterOf: session.cpuRosterOf, playerStats,
+      ...(recordOf === undefined ? {} : { recordOf }),
+    }
   }
 
   // 이벤트 재생 0xd3 (갱신 0x5110 · 키 0x90ec · 그리기 0xa09c → 대화창 0x8b5ac).
@@ -503,7 +512,7 @@ export function SeasonRoute({
     const isBatter = scene === SEASON_SCENE_STATE.타자시상
     // ⚠️ 시즌모드는 `isMine` 을 "1위 팀 == 내 팀" 으로 본다 (B 4절 2번) — 여기서 그렇게 채운다.
     // 순위표 0x9d789 는 열 팀 레코드를 훑는다 — 트레이드로 옮겨 간 선수는 지금 팀 줄로, 투수 타이틀은 투수 배열에서
-    const records = seasonLeagueRecordsOf(leagueRecordSource, !isBatter).map((record) => ({
+    const records = seasonLeagueRecordsOf(leagueRecordSourceOf(), !isBatter).map((record) => ({
       ...record,
       isMine: record.teamId === state.record.teamId,
     }))
@@ -526,7 +535,7 @@ export function SeasonRoute({
     const kind = SEASON_MVP_LEADER_KINDS[randomIntegerBelow(random, 0, SEASON_MVP_LEADER_KINDS.length)]
     const leader = kind === undefined
       ? null
-      : leaderOf(seasonLeagueRecordsOf(leagueRecordSource, isPitcherLeaderKind(kind)), kind)
+      : leaderOf(seasonLeagueRecordsOf(leagueRecordSourceOf(), isPitcherLeaderKind(kind)), kind)
     const isMine = leader?.record.teamId === state.record.teamId
     return (
       <SeasonMvpScreen

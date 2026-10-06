@@ -1445,7 +1445,12 @@ function withLeaguePlateAppearance(
   runsBattedIn: number,
 ): readonly LeaguePlateAppearance[] {
   const rosterSlot = entry[slot]?.rosterSlot ?? slot
-  if (rosterSlot === NO_ROSTER_SLOT) return appearances
+  if (rosterSlot === NO_ROSTER_SLOT) {
+    // 기록을 실어 선 표 밖 선수(영입한 명전·나리)는 제 레코드에 쌓인다 — 원본 id 로 넘긴다. 마타자는 넘기지 않는다
+    const recordId = entry[slot]?.recordId
+    if (recordId === undefined || (entry[slot]?.aceIndex ?? NO_ACE_BATTER) >= 0) return appearances
+    return [...appearances, { teamId, battingOrderIndex: NO_ROSTER_SLOT, outcome, runsBattedIn, recordId }]
+  }
   // 트레이드로 옮겨 온 선수는 옛 팀 표 자리(원본 id)로 쌓는다 — 레코드 +0x20~ 가 선수를 따라간다
   const tableTeamId = entry[slot]?.tableTeamId ?? teamId
   return [...appearances, { teamId: tableTeamId, battingOrderIndex: rosterSlot, outcome, runsBattedIn }]
@@ -4196,7 +4201,13 @@ function chargeMoundLine(
 ): readonly GamePitcherLine[] {
   const teamId = ours ? progress.options.ourTeamId : progress.options.opponentTeamId
   const entry = pitcherEntryAt(progress, teamId, ours ? progress.ourPitcherIndex : progress.opponentPitcherIndex)
-  if (entry?.tableSlot === undefined || entry.aceIndex >= 0) return progress.pitcherLines
+  if (entry === undefined || entry.aceIndex >= 0) return progress.pitcherLines
+  // 기록을 실어 선 표 밖 투수(영입한 명전·나리)는 원본 id 로 줄을 가른다 (칸 −1)
+  if (entry.tableSlot === undefined) {
+    return entry.recordId === undefined
+      ? progress.pitcherLines
+      : chargePitcherLine(progress.pitcherLines, teamId, NO_ROSTER_SLOT, delta, entry.recordId)
+  }
   // 줄은 그 투수의 붙박이 표 자리로 — 트레이드로 옮겨 온 투수는 옛 팀이다 (`TeamEntryPitcher.tableTeamId`)
   return chargePitcherLine(progress.pitcherLines, entry.tableTeamId ?? teamId, entry.tableSlot, delta)
 }
@@ -4218,21 +4229,42 @@ function decisionTableTeamOf(progress: TeamGameProgress, record: PitcherOfRecord
   return entry === undefined || entry.aceIndex >= 0 ? undefined : entry.tableTeamId
 }
 
-/** 판정 셋의 표 팀 — 하나도 없으면 칸째 뺀다(트레이드가 없는 경기는 요약 모양이 예전과 같다) */
+/** 판정 받은 투수가 표 밖 투수(영입한 명전·나리)면 그 원본 id */
+function decisionRecordIdOf(progress: TeamGameProgress, record: PitcherOfRecord | null): number | undefined {
+  if (record === null) return undefined
+  const isOurs = record.side === progress.game.playerSide
+  const entry = (isOurs ? progress.ourPitcherEntry : progress.opponentPitcherEntry)[record.number]
+  return entry === undefined || entry.aceIndex >= 0 || entry.tableSlot !== undefined ? undefined : entry.recordId
+}
+
+type DecisionKeys = { readonly winner?: number; readonly loser?: number; readonly save?: number }
+
+/** 판정 셋에서 칸 하나씩 — 하나도 없으면 undefined (요약에 칸째 안 싣는다 — 예전 모양 그대로) */
+function decisionKeysOf(
+  ended: { readonly winner: PitcherOfRecord | null; readonly loser: PitcherOfRecord | null; readonly save: PitcherOfRecord | null },
+  keyOf: (record: PitcherOfRecord | null) => number | undefined,
+): DecisionKeys | undefined {
+  const winner = keyOf(ended.winner)
+  const loser = keyOf(ended.loser)
+  const save = keyOf(ended.save)
+  if (winner === undefined && loser === undefined && save === undefined) return undefined
+  return {
+    ...(winner === undefined ? {} : { winner }),
+    ...(loser === undefined ? {} : { loser }),
+    ...(save === undefined ? {} : { save }),
+  }
+}
+
+/** 판정 셋의 표 팀(트레이드로 옮겨 온 투수)·원본 id(표 밖 투수) — 없는 칸은 싣지 않는다 */
 function decisionTableTeamsOf(
   progress: TeamGameProgress,
   ended: { readonly winner: PitcherOfRecord | null; readonly loser: PitcherOfRecord | null; readonly save: PitcherOfRecord | null },
-): Pick<GameLeaguePitchers, 'decisionTableTeams'> {
-  const winner = decisionTableTeamOf(progress, ended.winner)
-  const loser = decisionTableTeamOf(progress, ended.loser)
-  const save = decisionTableTeamOf(progress, ended.save)
-  if (winner === undefined && loser === undefined && save === undefined) return {}
+): Pick<GameLeaguePitchers, 'decisionTableTeams' | 'decisionRecordIds'> {
+  const tableTeams = decisionKeysOf(ended, (record) => decisionTableTeamOf(progress, record))
+  const recordIds = decisionKeysOf(ended, (record) => decisionRecordIdOf(progress, record))
   return {
-    decisionTableTeams: {
-      ...(winner === undefined ? {} : { winner }),
-      ...(loser === undefined ? {} : { loser }),
-      ...(save === undefined ? {} : { save }),
-    },
+    ...(tableTeams === undefined ? {} : { decisionTableTeams: tableTeams }),
+    ...(recordIds === undefined ? {} : { decisionRecordIds: recordIds }),
   }
 }
 

@@ -102,6 +102,19 @@ export interface LeaguePlayerStats {
    * 저장 형식 번호는 올리지 않는다(올리면 `load` 가 옛 저장을 통째로 버린다).
    */
   readonly pitchers?: Readonly<Record<number, LeaguePitcherLine>>
+  /**
+   * **붙박이 표 밖 선수**(시즌모드에 영입한 명전 0xb4~ · 나리 0xfe)의 이번 시즌 타자 줄 — 원본 id(+0) → 줄.
+   *
+   * 영입 0xc554 가 기록 0x30 바이트를 통째로 팀 레코드에 옮기고, 기록 함수 0xa8024 는 `0xa56dc(R, 선수, 0)` 이 참이면 그
+   * 레코드 +0x20~ 에 쌓는다. 0xa56dc 의 모드 2 갈래(점프표 0xd8204[0] = 0xa56fa, 직접 떴다)는 시즌 객체 0x1f55d 의
+   * +0x12c(국가대항전)·+0xb4(포스트시즌)가 0 이고 플래그 0 이면 선수가 마선수(0xb633d)가 아닐 때 참이다 — 명전·나리 선수는
+   * 마선수 비트(+0xa 비트 6)가 없어 쌓인다. 순위표 0x9d789 도 마선수만 빼고 훑는다.
+   * 그 선수들은 내 팀에만 있고(트레이드에서 거절된다) 명전 id 는 칸마다, 나리는 투수·타자 한 명씩이라 id 로 갈린다.
+   * 옛 저장에는 없다 — 빈 표로 본다.
+   */
+  readonly recordBatters?: Readonly<Record<number, LeagueBatterLine>>
+  /** 붙박이 표 밖 선수의 이번 시즌 투수 줄 — `recordBatters` 주석과 같다 */
+  readonly recordPitchers?: Readonly<Record<number, LeaguePitcherLine>>
 }
 
 /**
@@ -123,6 +136,11 @@ export interface LeaguePlateAppearance {
   readonly battingOrderIndex: number
   readonly outcome: AtBatOutcome
   readonly runsBattedIn: number
+  /**
+   * 붙박이 표 밖 선수(영입한 명전·나리)의 원본 id — 있으면 `battingOrderIndex` 대신 이 열쇠로
+   * `recordBatters` 에 쌓는다 (`LeaguePlayerStats.recordBatters` 주석)
+   */
+  readonly recordId?: number
 }
 
 /**
@@ -147,6 +165,16 @@ export function leagueBatterLineOf(stats: LeaguePlayerStats, batterId: number): 
 export function leaguePitcherIdOf(teamId: number, pitcherSlot: number): number {
   const slot = ((pitcherSlot % PITCHERS_PER_TEAM) + PITCHERS_PER_TEAM) % PITCHERS_PER_TEAM
   return teamId * PITCHERS_PER_TEAM + slot
+}
+
+/** 붙박이 표 밖 선수(영입한 명전·나리)의 이번 시즌 타자 줄 — 원본 id 로 (`recordBatters`) */
+export function leagueRecordBatterLineOf(stats: LeaguePlayerStats, recordId: number): LeagueBatterLine {
+  return stats.recordBatters?.[recordId] ?? EMPTY_LEAGUE_BATTER_LINE
+}
+
+/** 붙박이 표 밖 선수의 이번 시즌 투수 줄 — 원본 id 로 (`recordPitchers`) */
+export function leagueRecordPitcherLineOf(stats: LeaguePlayerStats, recordId: number): LeaguePitcherLine {
+  return stats.recordPitchers?.[recordId] ?? EMPTY_LEAGUE_PITCHER_LINE
 }
 
 /** 그 투수의 이번 시즌 성적. 한 번도 안 던졌으면(또는 옛 저장이면) 0 줄이다 */
@@ -179,7 +207,17 @@ export function recordLeaguePlateAppearances(
   if (plateAppearances.length === 0) return stats
 
   const batters: Record<number, LeagueBatterLine> = { ...stats.batters }
+  let recordBatters: Record<number, LeagueBatterLine> | undefined
   for (const appearance of plateAppearances) {
+    if (appearance.recordId !== undefined) {
+      recordBatters ??= { ...stats.recordBatters }
+      recordBatters[appearance.recordId] = addPlateAppearance(
+        recordBatters[appearance.recordId] ?? EMPTY_LEAGUE_BATTER_LINE,
+        appearance.outcome,
+        appearance.runsBattedIn,
+      )
+      continue
+    }
     const id = leagueBatterIdOf(appearance.teamId, appearance.battingOrderIndex)
     batters[id] = addPlateAppearance(
       batters[id] ?? EMPTY_LEAGUE_BATTER_LINE,
@@ -187,7 +225,8 @@ export function recordLeaguePlateAppearances(
       appearance.runsBattedIn,
     )
   }
-  return { ...stats, batters }
+  // 표 밖 선수가 없으면 칸을 만들지 않는다 — 예전 저장과 같은 모양
+  return recordBatters === undefined ? { ...stats, batters } : { ...stats, batters, recordBatters }
 }
 
 /**
@@ -213,6 +252,8 @@ export interface LeaguePitcherAppearance {
    * 줄이 둘이다 (`leaguePitcherAppearancesOf`).
    */
   readonly decision: LeaguePitcherDecision | null
+  /** 붙박이 표 밖 선수(영입한 명전·나리)의 원본 id — 있으면 `recordPitchers` 에 쌓는다 */
+  readonly recordId?: number
 }
 
 /** 경기 끝 0xa7de8 이 올리는 칸 — 승 +0x2e · 패 +0x2f · 세 +0x24 */
@@ -226,6 +267,8 @@ export interface LeaguePitcherGameLine {
   readonly runsAllowed: number
   readonly strikeouts: number
   readonly pitches: number
+  /** 붙박이 표 밖 선수의 원본 id (`LeaguePitcherAppearance.recordId`) */
+  readonly recordId?: number
 }
 
 /** 경기 끝 판정 하나 — 측(0 = 초 공격 칸 · 1 = 말 공격 칸)과 그 칸 팀의 투수 칸 */
@@ -237,6 +280,8 @@ export interface LeaguePitcherOfRecord {
    * 부르는 쪽이 칸과 함께 표 팀을 넘긴다. 없으면 `teamOfSide(측)` 이다.
    */
   readonly teamId?: number
+  /** 붙박이 표 밖 선수의 원본 id — 줄과 같은 열쇠로 찾는다 (`LeaguePitcherAppearance.recordId`) */
+  readonly recordId?: number
 }
 
 /**
@@ -255,17 +300,20 @@ export function leaguePitcherAppearancesOf(
     readonly save: LeaguePitcherOfRecord | null
   },
   teamOfSide: (side: number) => number,
-  skip: (teamId: number, pitcherSlot: number) => boolean = () => false,
+  skip: (teamId: number, pitcherSlot: number, recordId?: number) => boolean = () => false,
 ): LeaguePitcherAppearance[] {
   const appearances: LeaguePitcherAppearance[] = lines
-    .filter((line) => !skip(line.teamId, line.pitcherSlot))
+    .filter((line) => !skip(line.teamId, line.pitcherSlot, line.recordId))
     .map((line) => ({ ...line, decision: null }))
   const attach = (record: LeaguePitcherOfRecord | null, decision: LeaguePitcherDecision) => {
     if (record === null) return
     const teamId = record.teamId ?? teamOfSide(record.side)
-    if (skip(teamId, record.pitcherSlot)) return
+    if (skip(teamId, record.pitcherSlot, record.recordId)) return
     const index = appearances.findIndex(
-      (appearance) => appearance.teamId === teamId && appearance.pitcherSlot === record.pitcherSlot,
+      (appearance) =>
+        appearance.teamId === teamId
+        && appearance.pitcherSlot === record.pitcherSlot
+        && appearance.recordId === record.recordId,
     )
     const found = index < 0 ? undefined : appearances[index]
     if (found !== undefined && found.decision === null) {
@@ -280,6 +328,7 @@ export function leaguePitcherAppearancesOf(
       strikeouts: 0,
       pitches: 0,
       decision,
+      ...(record.recordId === undefined ? {} : { recordId: record.recordId }),
     })
   }
   attach(decisions.winner, '승')
@@ -318,9 +367,18 @@ export function recordLeaguePitcherAppearances(
   if (appearances.length === 0) return stats
 
   const pitchers: Record<number, LeaguePitcherLine> = { ...stats.pitchers }
+  let recordPitchers: Record<number, LeaguePitcherLine> | undefined
   for (const appearance of appearances) {
+    if (appearance.recordId !== undefined) {
+      recordPitchers ??= { ...stats.recordPitchers }
+      recordPitchers[appearance.recordId] = addPitcherAppearance(
+        recordPitchers[appearance.recordId] ?? EMPTY_LEAGUE_PITCHER_LINE,
+        appearance,
+      )
+      continue
+    }
     const id = leaguePitcherIdOf(appearance.teamId, appearance.pitcherSlot)
     pitchers[id] = addPitcherAppearance(pitchers[id] ?? EMPTY_LEAGUE_PITCHER_LINE, appearance)
   }
-  return { ...stats, pitchers }
+  return recordPitchers === undefined ? { ...stats, pitchers } : { ...stats, pitchers, recordPitchers }
 }

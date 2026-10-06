@@ -109,7 +109,8 @@ import {
 } from '@/entities/season-mode/model/seasonStateMachine'
 import type { SeasonMenuCursors } from '@/entities/season-mode/model/seasonStateMachine'
 import {
-  EMPTY_LEAGUE_PITCHER_LINE, leagueBatterIdOf, leagueBatterLineOf, leaguePitcherIdOf, leaguePitcherLineOf,
+  leagueBatterIdOf, leagueBatterLineOf, leaguePitcherIdOf, leaguePitcherLineOf, leagueRecordBatterLineOf,
+  leagueRecordPitcherLineOf,
 } from '@/entities/league/model/leaguePlayerStats'
 import type { LeagueBatterLine, LeaguePitcherLine } from '@/entities/league/model/leaguePlayerStats'
 import { EMPTY_LEAGUE_RECORD } from '@/entities/awards/model/leaderboard'
@@ -157,6 +158,8 @@ export interface SeasonSession {
    * 화면이 낸 칸(`TradeSwap`)은 이 차례라 `finishTrade` 가 명단 첨자로 되돌린다
    */
   readonly tradeRoster: SeasonTeamRoster
+  /** 영입한 명전 선수의 기록을 찾아 준다(기록연감 명전 칸) — 순위표 이름·경기 명단이 같은 것을 본다. 없으면 undefined */
+  readonly recordSource: () => SeasonEntryRecordSource | undefined
   readonly tradeRosterOf: (teamId: number) => SeasonTeamRoster
   /** 리그 선수별 성적 — 타이틀·MVP 판정의 유일한 재료다 (B-2) */
   readonly playerStats: LeaguePlayerStats
@@ -439,20 +442,26 @@ function recordSeasonHumanGamePitchers(
   pitchers: GameLeaguePitchers | undefined,
 ): LeaguePlayerStats {
   const tableTeams = pitchers?.decisionTableTeams
-  if (pitchers === undefined || tableTeams === undefined) return recordHumanGamePitchers(stats, pitchers, true)
-  const recordOf = (record: PitcherOfRecord | null, teamId: number | undefined) =>
-    record === null
-      ? null
-      : { side: record.side, pitcherSlot: record.number, ...(teamId === undefined ? {} : { teamId }) }
+  const recordIds = pitchers?.decisionRecordIds
+  if (pitchers === undefined || (tableTeams === undefined && recordIds === undefined)) {
+    return recordHumanGamePitchers(stats, pitchers, true)
+  }
+  const recordOf = (record: PitcherOfRecord | null, teamId: number | undefined, recordId: number | undefined) => {
+    if (record === null) return null
+    // 표 밖 투수(영입한 명전·나리)는 줄과 같이 칸 −1 · 원본 id 로 찾는다
+    if (recordId !== undefined) return { side: record.side, pitcherSlot: -1, recordId }
+    return { side: record.side, pitcherSlot: record.number, ...(teamId === undefined ? {} : { teamId }) }
+  }
   const appearances = leaguePitcherAppearancesOf(
     pitchers.lines,
     {
-      winner: recordOf(pitchers.decision.winner, tableTeams.winner),
-      loser: recordOf(pitchers.decision.loser, tableTeams.loser),
-      save: recordOf(pitchers.decision.save, tableTeams.save),
+      winner: recordOf(pitchers.decision.winner, tableTeams?.winner, recordIds?.winner),
+      loser: recordOf(pitchers.decision.loser, tableTeams?.loser, recordIds?.loser),
+      save: recordOf(pitchers.decision.save, tableTeams?.save, recordIds?.save),
     },
     (side) => pitchers.sideTeams[side] ?? pitchers.sideTeams[0],
-    (_teamId, pitcherSlot) => pitcherSlot < 0 || pitcherSlot >= PITCHERS_PER_TEAM,
+    (_teamId, pitcherSlot, recordId) =>
+      recordId === undefined && (pitcherSlot < 0 || pitcherSlot >= PITCHERS_PER_TEAM),
   )
   return recordLeaguePitcherAppearances(stats, appearances)
 }
@@ -2196,6 +2205,7 @@ export function useSeasonSession(
     league: save?.league ?? EMPTY_LEAGUE,
     roster: save?.roster ?? EMPTY_ROSTER,
     cpuRosterOf: (teamId: number) => cpuRosterOf(save, teamId),
+    recordSource: recordSourceNow,
     tradeRoster: save === null ? EMPTY_ROSTER : tradeRecordRosterOf(save, save.state.record.teamId, save.roster),
     tradeRosterOf: (teamId: number) =>
       save === null ? cpuRosterOf(save, teamId) : tradeRecordRosterOf(save, teamId, cpuRosterOf(save, teamId)),
@@ -2256,18 +2266,38 @@ export interface SeasonLeagueRecordSource {
   /** CPU 팀 레코드 (`SeasonSession.cpuRosterOf`) */
   readonly cpuRosterOf: (teamId: number) => SeasonTeamRoster
   readonly playerStats: LeaguePlayerStats
+  /** 영입한 명전 선수의 기록(이름) — 경기 명단과 같은 칸 (`SeasonSession.recordSource`) */
+  readonly recordOf?: SeasonEntryRecordSource
 }
 
-/** 시즌 명단 선수의 이번 시즌 타자 줄 — 리그 선수는 붙박이 표 자리(옮겨 왔으면 옛 팀)로 쌓였다 */
+/**
+ * 시즌 명단 선수의 이번 시즌 타자 줄 — 리그 선수는 붙박이 표 자리(옮겨 왔으면 옛 팀)로, 표 밖 선수(영입한 명전·나리)는
+ * 원본 id 의 표 밖 줄로 쌓였다
+ */
 export function seasonBatterLineOf(stats: LeaguePlayerStats, ownerTeamId: number, player: SeasonPlayer): LeagueBatterLine {
-  if (player.id >= HALL_OF_FAME_FIRST_ID) return EMPTY_LEAGUE_BATTER_LINE
+  if (player.id >= HALL_OF_FAME_FIRST_ID) return leagueRecordBatterLineOf(stats, player.id)
   return leagueBatterLineOf(stats, leagueBatterIdOf(tableTeamOf(player, ownerTeamId), player.id))
 }
 
 /** 시즌 명단 선수의 이번 시즌 투수 줄 — `seasonBatterLineOf` 와 같은 열쇠 */
 export function seasonPitcherLineOf(stats: LeaguePlayerStats, ownerTeamId: number, player: SeasonPlayer): LeaguePitcherLine {
-  if (player.id >= HALL_OF_FAME_FIRST_ID) return EMPTY_LEAGUE_PITCHER_LINE
+  if (player.id >= HALL_OF_FAME_FIRST_ID) return leagueRecordPitcherLineOf(stats, player.id)
   return leaguePitcherLineOf(stats, leaguePitcherIdOf(tableTeamOf(player, ownerTeamId), player.id))
+}
+
+/** 순위표 줄의 이름 — 표 밖 명전 선수는 기록 이름(rec + 1)을 명전 칸에서 찾는다(`recordOf`), 그 밖은 `playerFaceOf` */
+function recordNameOf(
+  source: SeasonLeagueRecordSource,
+  team: number,
+  player: SeasonPlayer,
+  isPitcher: boolean,
+  index: number,
+): string {
+  if (player.id >= HALL_OF_FAME_FIRST_ID && player.record === undefined) {
+    const found = isPitcher ? source.recordOf?.pitcher(player) : source.recordOf?.batter(player)
+    if (found !== undefined) return found.name
+  }
+  return playerFaceOf(team, player, isPitcher, index).name
 }
 
 /**
@@ -2289,7 +2319,7 @@ export function seasonLeagueRecordsOf(source: SeasonLeagueRecordSource, isPitche
         records.push({
           ...EMPTY_LEAGUE_RECORD,
           teamId: team,
-          name: playerFaceOf(team, player, false, index).name,
+          name: recordNameOf(source, team, player, false, index),
           atBatsOrOuts: line.atBats,
           hits: line.hits,
           homeRuns: line.homeRuns,
@@ -2307,7 +2337,7 @@ export function seasonLeagueRecordsOf(source: SeasonLeagueRecordSource, isPitche
       records.push({
         ...EMPTY_LEAGUE_RECORD,
         teamId: team,
-        name: playerFaceOf(team, player, true, index).name,
+        name: recordNameOf(source, team, player, true, index),
         atBatsOrOuts: line.outs,
         hits: line.runsAllowed,
         saves: line.saves,
@@ -2364,19 +2394,24 @@ export function seasonGoalInputOf(source: SeasonGoalSource): SeasonGoalInput {
   const ranking = rankingOf(source.league)
   const regularRank = Math.max(0, ranking.indexOf(team))
   const order = seasonEntryOrderOf(source.roster, source.recordOf)
-  // 기록을 실은 칸(영입한 명전 선수)은 경기가 리그 기록표에 쌓지 않는다 — 빈 줄로 센다 (⚠️ 원본 자리 미해결)
-  const batterLines = entryBattersOfOrder(team, order).map((batter) =>
-    batter.rosterSlot === NO_ROSTER_SLOT
-      ? EMPTY_LEAGUE_BATTER_LINE
-      // 트레이드로 옮겨 온 선수는 옛 팀 표 자리(원본 id)로 쌓였다 — 같은 열쇠로 읽는다
-      : leagueBatterLineOf(source.playerStats, leagueBatterIdOf(batter.tableTeamId ?? team, batter.rosterSlot)))
+  // 기록을 실은 칸(영입한 명전·나리 선수)은 그 레코드에 쌓인 표 밖 줄(원본 id)로 센다 — 기록을 못 찾은 칸은 빈 줄
+  const batterLines = entryBattersOfOrder(team, order).map((batter) => {
+    if (batter.rosterSlot === NO_ROSTER_SLOT) {
+      return batter.recordId === undefined
+        ? EMPTY_LEAGUE_BATTER_LINE
+        : leagueRecordBatterLineOf(source.playerStats, batter.recordId)
+    }
+    // 트레이드로 옮겨 온 선수는 옛 팀 표 자리(원본 id)로 쌓였다 — 같은 열쇠로 읽는다
+    return leagueBatterLineOf(source.playerStats, leagueBatterIdOf(batter.tableTeamId ?? team, batter.rosterSlot))
+  })
   const pitcherLines = order.pitchers.map((slot) => {
     if (typeof slot === 'number') {
       return slot >= 0 ? leaguePitcherLineOf(source.playerStats, leaguePitcherIdOf(team, slot)) : { outs: 0, runsAllowed: 0 }
     }
-    return 'tableSlot' in slot
-      ? leaguePitcherLineOf(source.playerStats, leaguePitcherIdOf(slot.tableTeamId, slot.tableSlot))
-      : { outs: 0, runsAllowed: 0 }
+    if ('tableSlot' in slot) return leaguePitcherLineOf(source.playerStats, leaguePitcherIdOf(slot.tableTeamId, slot.tableSlot))
+    return slot.recordId === undefined
+      ? { outs: 0, runsAllowed: 0 }
+      : leagueRecordPitcherLineOf(source.playerStats, slot.recordId)
   })
   return {
     rank: goalRankOf(team, regularRank, record.inPostseason ? goalBracketOf(source.series) : null),

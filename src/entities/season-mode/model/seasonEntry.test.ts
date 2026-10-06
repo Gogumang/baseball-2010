@@ -72,8 +72,9 @@ describe('영입한 나리 선수(0xfe)는 명단에 든 기록 사본으로 선
 
   it('팀 경기 차례 — recordOf 없이도 사본을 싣는다', () => {
     const order = seasonEntryOrderOf(roster)
-    expect(order.pitchers).toEqual([투수기록, 1])
-    expect(order.batters).toEqual([{ rosterSlot: -1, position: 3, record: 타자기록 }])
+    // 원본 id 를 함께 실어 그 선수의 시즌 기록을 제 줄로 쌓게 한다 (0xa8024 → 레코드 +0x20~)
+    expect(order.pitchers).toEqual([{ ...투수기록, recordId: 0xfe }, 1])
+    expect(order.batters).toEqual([{ rosterSlot: -1, position: 3, record: { ...타자기록, recordId: 0xfe } }])
   })
 
   it('편집기 목록 — 사본의 이름·능력치', () => {

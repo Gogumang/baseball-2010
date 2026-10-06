@@ -19,6 +19,11 @@ export interface GamePitcherLine {
   readonly runsAllowed: number
   readonly strikeouts: number
   readonly pitches: number
+  /**
+   * 붙박이 표 밖 투수(시즌에 영입한 명전·나리)의 원본 id — 있으면 `pitcherSlot` 은 −1 이고 이 열쇠로 줄을 가른다.
+   * 원본은 그 선수의 팀 레코드 +0x20~ 에 쌓는다 (`LeaguePlayerStats.recordPitchers`)
+   */
+  readonly recordId?: number
 }
 
 /** 경기 요약에 싣는 리그 투수 재료 */
@@ -38,6 +43,12 @@ export interface GameLeaguePitchers {
     readonly loser?: number
     readonly save?: number
   }
+  /** 판정 받은 투수가 붙박이 표 밖 투수면 그 원본 id (`GamePitcherLine.recordId`) — 그때 판정의 등번호는 표 밖 칸이다 */
+  readonly decisionRecordIds?: {
+    readonly winner?: number
+    readonly loser?: number
+    readonly save?: number
+  }
 }
 
 /** 줄 하나에 더한다 — 없으면 새로 만든다 (나온 차례대로) */
@@ -46,13 +57,22 @@ export function chargePitcherLine(
   teamId: number,
   pitcherSlot: number,
   delta: Partial<Pick<GamePitcherLine, 'outs' | 'runsAllowed' | 'strikeouts' | 'pitches'>>,
+  /** 붙박이 표 밖 투수의 원본 id (`GamePitcherLine.recordId`) */
+  recordId?: number,
 ): readonly GamePitcherLine[] {
   const outs = delta.outs ?? 0
   const runsAllowed = delta.runsAllowed ?? 0
   const strikeouts = delta.strikeouts ?? 0
   const pitches = delta.pitches ?? 0
-  const index = lines.findIndex((line) => line.teamId === teamId && line.pitcherSlot === pitcherSlot)
-  if (index < 0) return [...lines, { teamId, pitcherSlot, outs, runsAllowed, strikeouts, pitches }]
+  const index = lines.findIndex(
+    (line) => line.teamId === teamId && line.pitcherSlot === pitcherSlot && line.recordId === recordId,
+  )
+  if (index < 0) {
+    return [
+      ...lines,
+      { teamId, pitcherSlot, outs, runsAllowed, strikeouts, pitches, ...(recordId === undefined ? {} : { recordId }) },
+    ]
+  }
   return lines.map((line, at) =>
     at === index
       ? {

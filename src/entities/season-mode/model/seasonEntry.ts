@@ -213,6 +213,8 @@ export interface SeasonEntryBatterRecord {
   readonly name: string
   /** 히트 · 파워 · 수비 · 주루 — 0xb6414(기록, k, 1) */
   readonly ability: readonly [number, number, number, number]
+  /** 원본 id(+0) — 명단 차례에 실을 때 붙인다. 팀 경기가 그 선수의 시즌 기록을 표 밖 줄로 쌓는다 */
+  readonly recordId?: number
 }
 
 export interface SeasonEntryPitcherRecord {
@@ -223,6 +225,8 @@ export interface SeasonEntryPitcherRecord {
   readonly repertoire: { readonly name: string; readonly form: number; readonly magicId: number; readonly pitchMask: number }
   /** 보직 `+0xb & 3` (0xb6dec) — 없으면 받는 쪽(CPU 투수 교체)이 선발로 본다 */
   readonly role?: PitcherRole
+  /** 원본 id(+0) — `SeasonEntryBatterRecord.recordId` 와 같다 */
+  readonly recordId?: number
 }
 
 /** 표 밖 선수의 기록을 찾아 준다 — 없으면 undefined */
@@ -260,15 +264,18 @@ export function seasonEntryOrderOf(roster: SeasonTeamRoster, recordOf?: SeasonEn
           : { rosterSlot: player.id, position, tableTeamId: player.tableTeamId }
       }
       const record = player.record ?? recordOf?.batter(player)
-      return record === undefined ? { rosterSlot: NOT_IN_ROSTER, position } : { rosterSlot: NOT_IN_ROSTER, position, record }
+      // 원본 id 를 함께 실어 그 선수의 시즌 기록을 제 줄(리그 기록표의 표 밖 줄)로 쌓게 한다
+      return record === undefined
+        ? { rosterSlot: NOT_IN_ROSTER, position }
+        : { rosterSlot: NOT_IN_ROSTER, position, record: { name: record.name, ability: record.ability, recordId: player.id } }
     }),
     pitchers: roster.pitchers.map((player) => {
       if (isTablePlayer(player)) {
         return player.tableTeamId === undefined ? player.id : { tableTeamId: player.tableTeamId, tableSlot: player.id }
       }
       const carried = player.record
-      if (carried !== undefined && 'repertoire' in carried) return carried
-      return recordOf?.pitcher(player) ?? NOT_IN_ROSTER
+      const record = carried !== undefined && 'repertoire' in carried ? carried : recordOf?.pitcher(player)
+      return record === undefined ? NOT_IN_ROSTER : { ...record, recordId: player.id }
     }),
   }
 }
