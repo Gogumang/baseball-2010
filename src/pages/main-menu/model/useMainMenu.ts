@@ -10,6 +10,11 @@ export function useMainMenu(
   hasSavedGame: boolean,
   isSheetOpen: boolean,
   onEffect: (effect: Exclude<MainMenuEffect, null>) => void,
+  /** 전역기록 칸 — +0x4d(일반모드 경기 중간 저장) · +0x3c(마지막 모드). 안 넘기면 저장 없음 · 0 */
+  globalRecord: { readonly isGeneralGameInProgress: boolean; readonly lastPlayedMode: number } = {
+    isGeneralGameInProgress: false,
+    lastPlayedMode: 0,
+  },
 ): { state: MainMenuState; dispatch: (action: MainMenuAction) => void } {
   const [state, setState] = useState<MainMenuState>(() => initialMainMenu(hasSavedGame))
 
@@ -21,10 +26,13 @@ export function useMainMenu(
   hasSavedRef.current = hasSavedGame
   const isSheetOpenRef = useRef(isSheetOpen)
   isSheetOpenRef.current = isSheetOpen
+  const globalRecordRef = useRef(globalRecord)
+  globalRecordRef.current = globalRecord
 
   // setState 업데이터 안에서 부모 콜백을 부르면 StrictMode 가 두 번 부른다 — ref 로 읽고 한 번만 반영한다.
   const dispatchRef = useRef((action: MainMenuAction) => {
-    const result = reduceMainMenu(stateRef.current, action, hasSavedRef.current)
+    const { isGeneralGameInProgress, lastPlayedMode } = globalRecordRef.current
+    const result = reduceMainMenu(stateRef.current, action, hasSavedRef.current, isGeneralGameInProgress, lastPlayedMode)
     stateRef.current = result.state
     setState(result.state)
     if (result.effect !== null) onEffectRef.current(result.effect)

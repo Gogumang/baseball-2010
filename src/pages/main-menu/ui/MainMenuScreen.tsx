@@ -24,7 +24,7 @@ import { MenuWheel } from '@/pages/main-menu/ui/MenuWheel'
 import * as styles from '@/pages/main-menu/ui/MainMenuScreen.css'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 
-export type GameMode = '미션' | '홈런더비' | '시즌모드' | '일반모드' | '일반모드빠른실행'
+export type GameMode = '미션' | '홈런더비' | '시즌모드' | '일반모드' | '일반모드빠른실행' | '일반모드경기이어하기'
 
 /**
  * 일반모드 [13] 버튼 — 띄운 쪽이 `0x74ea9(창, 고른 그림, 보통 그림, 0)` 로 하나씩 넣는다 (0x29782~0x297d8).
@@ -53,7 +53,10 @@ const NARI_EDITION_CANCEL = -1
 
 interface MainMenuScreenProps {
   readonly hasSavedGame: boolean
-  readonly onContinue: () => void
+  /** 전역기록 +0x4d — 일반모드 경기가 중간 저장돼 있다. [13] 처음 커서·[15] 확인·이어하기가 본다. 안 넘기면 없음 */
+  readonly isGeneralGameInProgress?: boolean
+  /** 전역기록 +0x3c — 마지막으로 시작한 모드. [최근게임] 이 이 값으로 갈라진다(0x28d54). 안 넘기면 0(없음) */
+  readonly lastPlayedMode?: number
   /** 나만의리그 [14] 에서 편을 골랐다 — 원본은 그 편 커리어가 있으면 이어하고 없으면 팀 고르기로 간다(0xf684) */
   readonly onNewGame: (edition: '타자편' | '투수편') => void
   readonly onSelectMode: (mode: GameMode) => void
@@ -120,7 +123,8 @@ const REEL_STATE = 5
  */
 export function MainMenuScreen({
   hasSavedGame,
-  onContinue,
+  isGeneralGameInProgress = false,
+  lastPlayedMode = 0,
   onNewGame,
   onSelectMode,
   onBack,
@@ -132,21 +136,20 @@ export function MainMenuScreen({
   gamePoint,
 }: MainMenuScreenProps) {
   const { state, dispatch } = useMainMenu(hasSavedGame, false, (effect) => {
-    if (effect === '이어하기') onContinue()
-    else if (effect === '나리타자편') onNewGame('타자편')
+    if (effect === '나리타자편') onNewGame('타자편')
     else if (effect === '나리투수편') onNewGame('투수편')
     else if (effect === '미션') onSelectMode('미션')
     else if (effect === '홈런더비') onSelectMode('홈런더비')
     else if (effect === '시즌모드') onSelectMode('시즌모드')
     else if (effect === '일반모드') onSelectMode('일반모드')
     else if (effect === '일반모드빠른실행') onSelectMode('일반모드빠른실행')
-    // 일반모드 중간 저장(+0x4d)이 웹에 없어 이 갈래는 오지 않는다 — 모델이 늘 "저장 없음" 으로 돈다
-    else if (effect === '일반모드경기이어하기') return
+    // 일반모드 중간 저장 이어하기 — 상태 0x27 → 0x327b8(this, 1) → 0x213c0(앱, 1, 0) → 장면 0x104
+    else if (effect === '일반모드경기이어하기') onSelectMode('일반모드경기이어하기')
     else if (effect === '스페셜') onSpecial()
     else if (effect === '도움말') onHelp()
     else if (effect === '환경설정') onSettings()
     else onBack()
-  })
+  }, { isGeneralGameInProgress, lastPlayedMode })
   const origins = useFrameOrigins(`${MAIN_UI}/frames`)
   const textOrigins = useFrameOrigins(`${IMG_TEXT}/frames`)
 

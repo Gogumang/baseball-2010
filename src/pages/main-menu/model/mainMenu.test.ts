@@ -131,12 +131,39 @@ describe('reduceMainMenu — 원본 글자 목록에서 모드를 고르는 메�
     expect(고르기(나만의리그로이동, '최근게임', false).selectedModeId).toBe('최근게임')
   })
 
-  it('최근게임으로 시작하면 이어하기다', () => {
-    expect(reduceMainMenu(게임시작목록(true), { type: '시작' }, true).effect).toBe('이어하기')
-  })
+  describe('최근게임 — 전역기록 +0x3c(마지막 모드)로 갈라진다 (0x28d54 → 0x327b8)', () => {
+    const 최근게임 = (lastPlayedMode: number, inProgress = false) =>
+      reduceMainMenu(게임시작목록(true), { type: '시작' }, true, inProgress, lastPlayedMode)
 
-  it('저장이 없어도 최근게임에서 시작을 누르면 이어하기다 — 원본은 커서를 막지 않는다', () => {
-    expect(reduceMainMenu(게임시작목록(false), { type: '시작' }, false).effect).toBe('이어하기')
+    it('미션(5·6)은 상태 17 선수 고르기, 홈런더비(7)는 상태 16 선수 고르기', () => {
+      expect(최근게임(5).effect).toBe('미션')
+      expect(최근게임(6).effect).toBe('미션')
+      expect(최근게임(7).effect).toBe('홈런더비')
+    })
+
+    it('시즌(2)은 장면 0x105, 나리 투수편(3)·타자편(4)은 장면 0x106 — 그 편 고르기 뒤와 같은 길', () => {
+      expect(최근게임(2).effect).toBe('시즌모드')
+      expect(최근게임(3).effect).toBe('나리투수편')
+      expect(최근게임(4).effect).toBe('나리타자편')
+    })
+
+    it('일반모드(1)는 +0x4d 면 창 없이 저장을 올려 경기로 (0x327f8)', () => {
+      const 결과 = 최근게임(1, true)
+      expect(결과.effect).toBe('일반모드경기이어하기')
+      expect(결과.state.generalModeWindow).toBeNull()
+    })
+
+    it('일반모드(1)에 저장이 없으면 상태 12 [13] — 앞 상태 0x27 이라 처음 커서는 1(새로하기)', () => {
+      const 결과 = 최근게임(1, false)
+      expect(결과.effect).toBeNull()
+      expect(결과.state.generalModeWindow).toEqual({ kind: '진입', initialSelected: 1 })
+    })
+
+    it('0(아직 아무 모드도 안 함)이면 아무 일도 없다 — 원본은 상태 0x27 에 남는다(미해결)', () => {
+      const 결과 = 최근게임(0)
+      expect(결과.effect).toBeNull()
+      expect(결과.state.generalModeWindow).toBeNull()
+    })
   })
 
   it('미션모드로 시작하면 미션 선택으로 간다', () => {

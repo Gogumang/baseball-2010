@@ -14,7 +14,6 @@ afterEach(cleanup)
 const 띄우기 = (gamePoint?: number) => render(
   <MainMenuScreen
     hasSavedGame={false}
-    onContinue={vi.fn()}
     onNewGame={vi.fn()}
     onSelectMode={vi.fn()}
     onBack={vi.fn()}
@@ -74,9 +73,10 @@ describe('메인 메뉴 머리띠 0x54d95(skin, 0, 1|5)', () => {
 })
 
 describe('일반모드 진입 창 [13] — 하위 12 0x296f0', () => {
-  const 일반모드창 = (onSelectMode = vi.fn()) => {
+  const 일반모드창 = (onSelectMode = vi.fn(), isGeneralGameInProgress = false) => {
     render(
-      <MainMenuScreen hasSavedGame={false} onContinue={vi.fn()} onNewGame={vi.fn()} onSelectMode={onSelectMode}
+      <MainMenuScreen hasSavedGame={false} onNewGame={vi.fn()} onSelectMode={onSelectMode}
+        isGeneralGameInProgress={isGeneralGameInProgress}
         onBack={vi.fn()} onHelp={vi.fn()} onSettings={vi.fn()} onSpecial={vi.fn()} />,
     )
     // 윗단 [게임시작] → 아랫단 최근게임 → ↓ 일반모드 → 시작
@@ -133,12 +133,25 @@ describe('일반모드 진입 창 [13] — 하위 12 0x296f0', () => {
     })
     expect(screen.getByRole('button', { name: '빠른실행' })).toBeTruthy()
   })
+  it('전역기록 +0x4d 가 서 있으면 처음 커서는 이어하기(9)이고 OK 면 저장을 올려 경기로 간다', () => {
+    const onSelectMode = 일반모드창(vi.fn(), true)
+    expect(그림('이어하기')).toContain('popup/frames/009.png')
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(onSelectMode).toHaveBeenCalledWith('일반모드경기이어하기')
+  })
+
+  it('+0x4d 가 서 있으면 새로하기는 [15] 확인을 먼저 띄운다 — 예라야 일반모드로 들어간다', () => {
+    const onSelectMode = 일반모드창(vi.fn(), true)
+    fireEvent.click(screen.getByRole('button', { name: '새로하기' }))
+    expect(onSelectMode).not.toHaveBeenCalled()
+    expect(screen.getByText('G포인트도 사라집니다', { exact: false })).toBeTruthy()
+  })
 })
 
 describe('나만의리그 편 고르기 창 [14] — 하위 13 (진입 0x25d78 · 갱신 0x2464c)', () => {
   const 나리창 = (hasSavedGame: boolean, onNewGame = vi.fn()) => {
     render(
-      <MainMenuScreen hasSavedGame={hasSavedGame} onContinue={vi.fn()} onNewGame={onNewGame} onSelectMode={vi.fn()}
+      <MainMenuScreen hasSavedGame={hasSavedGame} onNewGame={onNewGame} onSelectMode={vi.fn()}
         onBack={vi.fn()} onHelp={vi.fn()} onSettings={vi.fn()} onSpecial={vi.fn()} />,
     )
     // 윗단 [게임시작] → 아랫단 최근게임 → ↓↓ 나만의리그 → 시작
@@ -178,5 +191,33 @@ describe('나만의리그 편 고르기 창 [14] — 하위 13 (진입 0x25d78 �
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(onNewGame).not.toHaveBeenCalled()
     expect(screen.queryByRole('button', { name: '타자편' })).toBeNull()
+  })
+
+})
+
+describe('최근게임 — 전역기록 +0x3c', () => {
+  const 최근게임 = (lastPlayedMode: number, isGeneralGameInProgress = false) => {
+    const onSelectMode = vi.fn()
+    const onNewGame = vi.fn()
+    render(
+      <MainMenuScreen hasSavedGame={false} onNewGame={onNewGame} onSelectMode={onSelectMode}
+        isGeneralGameInProgress={isGeneralGameInProgress} lastPlayedMode={lastPlayedMode}
+        onBack={vi.fn()} onHelp={vi.fn()} onSettings={vi.fn()} onSpecial={vi.fn()} />,
+    )
+    // 윗단 [게임시작] → 아랫단 커서 0(최근게임) → 시작
+    for (const key of ['Enter', 'Enter']) {
+      act(() => {
+        fireEvent.keyDown(window, { key })
+      })
+    }
+    return { onSelectMode, onNewGame }
+  }
+
+  it('마지막 모드가 일반모드이고 +0x4d 면 곧바로 이어하기', () => {
+    expect(최근게임(1, true).onSelectMode).toHaveBeenCalledWith('일반모드경기이어하기')
+  })
+
+  it('마지막 모드가 나리 타자편이면 그 편으로 (장면 0x106)', () => {
+    expect(최근게임(4).onNewGame).toHaveBeenCalledWith('타자편')
   })
 })

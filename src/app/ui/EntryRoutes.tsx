@@ -60,12 +60,27 @@ interface EntryRoutesProps {
    * 앱이 빠른실행 여부를 일반모드 화면에 넘긴다. 안 넘기면 새로하기처럼 들어간다.
    */
   readonly onStartGeneralMode?: (isQuickStart: boolean) => void
+  /** 전역기록 +0x4d — 일반모드 경기 중간 저장 있음 (메인 메뉴 [13]·[15]·[최근게임]) */
+  readonly isGeneralGameInProgress?: boolean
+  /** 전역기록 +0x3c — 마지막 모드 ([최근게임] 0x28d54) */
+  readonly lastPlayedMode?: number
+  /** 모드를 시작했다 — 0x327b8 머리의 +0x3c = 모드 (나리 [14] 3·4 · 시즌 2 · 홈런더비 고르기 7) */
+  readonly onLastPlayedMode?: (mode: number) => void
+  /** 일반모드 이어하기 — 상태 0x27 → 0x327b8(this, 1) → 0x213c0(앱, 1, 0) → 장면 0x104 */
+  readonly onResumeGeneralGame?: () => void
 }
+
+/** 원본 모드 번호 — 0x327b8 이 +0x3c 에 적는 값 */
+const SEASON_MODE = 2
+const NARI_PITCHER_MODE = 3
+const NARI_BATTER_MODE = 4
+const HOME_RUN_DERBY_MODE = 7
 
 /** 커리어가 아직 없을 때의 화면 — 타이틀 → 메인 메뉴(도움말) → 선수 등록. */
 export function EntryRoutes({
   screen, setScreen, session, gameSettings, collection, random, wallet, aceSelect, hallOfFameDeletion, claimCollectionReward,
   onRenamePlayer, onResetEditedNames, onStartGeneralMode,
+  isGeneralGameInProgress = false, lastPlayedMode = 0, onLastPlayedMode, onResumeGeneralGame,
 }: EntryRoutesProps) {
   /** 전부 수집 보상 팝업 글 (0x292f8 의 `0xbbef9(글, 1, −1, 1)`) — 메뉴 위에 뜬다 */
   const [collectionRewardText, setCollectionRewardText] = useState<string | null>(null)
@@ -180,7 +195,12 @@ export function EntryRoutes({
           collection={collection}
           mode={{
             kind: '선수고르기', purpose: '홈런더비', nari: { 투수: null, 타자: nariBatterOf(career) },
-            onPick: setDerbyPick, onCancel: leave,
+            // 하위 16 의 답 2·4 → this+0x13c = 7 → 상태 0x27 → 0x327b8(this, 7) 이 +0x3c = 7
+            onPick: (pick) => {
+              onLastPlayedMode?.(HOME_RUN_DERBY_MODE)
+              setDerbyPick(pick)
+            },
+            onCancel: leave,
           }}
           onBack={leave}
         />
@@ -234,18 +254,27 @@ export function EntryRoutes({
   return (
     <MainMenuScreen
       hasSavedGame={session.savedCareer !== null}
-      onContinue={session.actions.continueSaved}
+      isGeneralGameInProgress={isGeneralGameInProgress}
+      lastPlayedMode={lastPlayedMode}
       // 나만의리그 편 고르기 창 [14](하위 13)은 메인 메뉴 위에 뜬다. 고른 편 → 0x327b8(모드 4|3) → 장면 0x106 셋업 0xf684:
       // 그 편 커리어(전역기록 +0x40 + 모드)가 있으면 이어하기(100), 없으면 팀 고르기(101). 지울지 묻는 창은 없다.
       // 투수편은 PitcherLeagueRoute 가 커리어 유무로 등록/관리를 가른다.
       onNewGame={(edition) => {
+        // [14] 답 → this+0x13c = 4|3 → 상태 0x27 → 0x327b8 이 +0x3c 에 적는다 ([최근게임] 의 3·4 갈래도 같은 길)
+        onLastPlayedMode?.(edition === '투수편' ? NARI_PITCHER_MODE : NARI_BATTER_MODE)
         if (edition === '투수편') return setScreen({ kind: '투수편' })
         if (session.savedCareer !== null) return session.actions.continueSaved()
         setScreen({ kind: '팀선택' })
       }}
       onSelectMode={(mode) => {
         // 시즌모드·일반모드는 팀을 맡는 모드라 육성 선수가 없어도 들어간다
-        if (mode === '시즌모드') return setScreen({ kind: '시즌모드' })
+        if (mode === '시즌모드') {
+          // 하위 14 → this+0x13c = 2 → 상태 0x27 → 0x327b8(this, 2) — +0x3c = 2. 웹 시즌 경기는 중간 저장(+0x4e)이 없어
+          // 늘 장면 0x105(시즌 관리)로 간다
+          onLastPlayedMode?.(SEASON_MODE)
+          return setScreen({ kind: '시즌모드' })
+        }
+        if (mode === '일반모드경기이어하기') return onResumeGeneralGame?.()
         if (mode === '일반모드' || mode === '일반모드빠른실행') {
           const isQuickStart = mode === '일반모드빠른실행'
           return onStartGeneralMode === undefined ? setScreen({ kind: '일반모드' }) : onStartGeneralMode(isQuickStart)

@@ -84,12 +84,12 @@ export type MainMenuAction =
 
 /** 메뉴 밖으로 나가야 하는 결과. null 이면 메뉴 안에서 끝난다. */
 export type MainMenuEffect =
-  | '이어하기' | '미션' | '홈런더비' | '시즌모드' | '일반모드' | '타이틀로'
+  | '미션' | '홈런더비' | '시즌모드' | '일반모드' | '타이틀로'
   /** 나만의리그 [14] 답 0 · 1 — 모드 4 타자편 · 모드 3 투수편 (0x2464c) */
   | '나리타자편' | '나리투수편'
   /** 일반모드 빠른실행 — 하위 22(경기정보)로 곧바로, this+0x14c = 1 (0x299f8 · 0x2992a) */
   | '일반모드빠른실행'
-  /** 일반모드 중간 저장 이어하기 — 상태 0x27 → 0x327b8 이 0x213c0(앱, 1, 0) 으로 올려 경기 장면으로 (웹엔 그 저장이 없다) */
+  /** 일반모드 중간 저장 이어하기 — 상태 0x27 → 0x327b8 이 0x213c0(앱, 1, 0) 으로 올려 경기 장면으로 */
   | '일반모드경기이어하기'
   /** 처음 메뉴에서 갈라지는 화면들 — 원본 하위 상태 6 · 9 · 8 (P6-screens 1-2 · F-ui-layout 4-0) */
   | '스페셜' | '도움말' | '환경설정'
@@ -155,6 +155,47 @@ function answerGeneralModeWindow(
   return { state: close, effect: null }
 }
 
+/**
+ * **[최근게임]** — 게임시작 목록 커서 0 의 OK (0x28cb0 → 표 0xcebb0[0] = 11 → 0x28d54, 2026-10-06 직접 다시 뜸).
+ * ```
+ * 28d5e m = 전역기록(0x1f1d9)+0x3c (마지막 모드) → this+0x13c = m
+ * 28d66 m ∈ {5,6}  → 상태 17 (미션 선수 고르기)
+ * 28d7e m == 7     → 상태 16 (홈런더비 선수 고르기)
+ * 28d86 그 밖       → 상태 0x27 → 진입 0x32988 → 0x327b8(this, m)
+ * ```
+ * 0x327b8(this, m): st[3] = 전역기록 +0x2c · 0x1552d14 = m · **전역기록 +0x3c = m** 뒤 m−1 로 점프표 0xcf048:
+ * ```
+ * 1   327f8 +0x4d ? 0x213c0(앱,1,0) · 장면 0x104 · +0x4d = 1 : this+0xeb = 0 · 상태 12 ([13], 앞 상태 0x27 → 커서 1)
+ * 2   3284e (+0x42 && +0x4e) ? 0x213c0(앱,2,0) · 장면 0x104 : 0x140006c = 0xc9 · 장면 0x105 (시즌 관리)
+ * 3·4 3288e (+0x40+m && +0x4c+m) ? 0x213c0(앱,m,0) · 장면 0x104 : 0x140006c = 0x69 · 장면 0x106 (나리 관리)
+ * 5·6 328e4 장면 0x107 (최근게임은 이 갈래로 안 온다 — 위에서 17 로 갔다)
+ * 7   328c8 0x213c0(앱,4,0) · +0x3c = 7 · this+0x13c = 7 · 장면 0x104 (최근게임은 16 으로 갔다)
+ * 8·9 328f0 +0x4c+m ? 0x213c0(앱,m,0) · 장면 0x104 : 상태 15 (대전 통신)
+ * 그 밖(0) 점프표 밖 — 0x1f1b9 만 하고 돌아온다
+ * ```
+ * 웹: 시즌 +0x4e 는 웹 시즌 경기에 중간 저장이 없어 늘 0 → 장면 0x105(`시즌모드`). 나리 +0x4f/+0x50 은 웹에 칸이 없어 늘 0 →
+ * 장면 0x106(그 편 고르기 뒤와 같은 `나리투수편`/`나리타자편`). 대전(8·9)은 통신이라 웹에 없고 +0x3c 에 들어올 수도 없다.
+ * ⚠️ 미해결: m = 0(새 저장의 +0x3c 기본값은 못 읽었다)이면 상태 0x27 에 남는데 0x27 은 갱신 함수가 없어 화면이 멈춘 듯 보일 것 —
+ * 웹은 아무 일도 안 하고 목록에 남는다.
+ */
+export function recentGameOf(
+  state: MainMenuState,
+  lastPlayedMode: number,
+  isGeneralGameInProgress: boolean,
+): MainMenuResult {
+  if (lastPlayedMode === 5 || lastPlayedMode === 6) return { state, effect: '미션' }
+  if (lastPlayedMode === 7) return { state, effect: '홈런더비' }
+  if (lastPlayedMode === 1) {
+    if (isGeneralGameInProgress) return { state, effect: '일반모드경기이어하기' }
+    const initialSelected = generalModeEntryCursorOf(RESTART_MODE_STATE, isGeneralGameInProgress)
+    return { state: { ...state, generalModeWindow: { kind: '진입', initialSelected } }, effect: null }
+  }
+  if (lastPlayedMode === 2) return { state, effect: '시즌모드' }
+  if (lastPlayedMode === 3) return { state, effect: '나리투수편' }
+  if (lastPlayedMode === 4) return { state, effect: '나리타자편' }
+  return { state, effect: null }
+}
+
 /** 지금 단에서 커서가 있는 칸의 id */
 export function selectedIdOf(state: MainMenuState): string {
   return state.tier === 4 ? state.selectedTopId : state.selectedModeId
@@ -192,11 +233,10 @@ export function reduceMainMenu(
   state: MainMenuState,
   action: MainMenuAction,
   hasSavedGame: boolean,
-  /**
-   * 일반모드 경기가 중간 저장돼 있는가 (전역기록 +0x4d). ⚠️ 웹은 일반모드 반 이닝 자동 저장·이어 붙이기가 없어
-   * 늘 거짓으로 부른다 — 원본도 저장이 없으면 [15] 가 안 뜨고 이어하기가 새로하기와 같다.
-   */
+  /** 일반모드 경기가 중간 저장돼 있는가 (전역기록 +0x4d — 경기정보 OK·이어하기가 1, 경기 끝 정산이 0) */
   isGeneralGameInProgress = false,
+  /** 전역기록 +0x3c — 마지막으로 시작한 모드 (0 = 아직 없음). [최근게임] 이 이 값으로 갈라진다 */
+  lastPlayedMode = 0,
 ): MainMenuResult {
   const stay = (next: MainMenuState): MainMenuResult => ({ state: next, effect: null })
 
@@ -235,7 +275,7 @@ export function reduceMainMenu(
       return stay(select(next.id))
     }
     case '시작':
-      return start(state, hasSavedGame, isGeneralGameInProgress)
+      return start(state, hasSavedGame, isGeneralGameInProgress, lastPlayedMode)
     case '뒤로':
       // 게임시작 목록의 CLR(−16) 은 처음 메뉴로 돌아간다 — 0x28cb0 의 `0xbcb49(this+0x18, 4)` (확정)
       if (state.tier === 5) return stay({ ...state, tier: 4 })
@@ -245,7 +285,12 @@ export function reduceMainMenu(
   }
 }
 
-function start(state: MainMenuState, hasSavedGame: boolean, isGeneralGameInProgress: boolean): MainMenuResult {
+function start(
+  state: MainMenuState,
+  hasSavedGame: boolean,
+  isGeneralGameInProgress: boolean,
+  lastPlayedMode: number,
+): MainMenuResult {
   const entries = entriesOf(state.tier)
   const entry = entries.find((candidate) => candidate.id === selectedIdOf(state))
   if (entry === undefined) return { state, effect: null }
@@ -268,7 +313,7 @@ function start(state: MainMenuState, hasSavedGame: boolean, isGeneralGameInProgr
     return { state, effect: null }
   }
 
-  if (entry.id === '최근게임') return { state, effect: '이어하기' }
+  if (entry.id === '최근게임') return recentGameOf(state, lastPlayedMode, isGeneralGameInProgress)
   if (entry.id === '미션모드') return { state, effect: '미션' }
   if (entry.id === '홈런더비') return { state, effect: '홈런더비' }
   // 시즌모드는 저장이 따로라 나만의리그처럼 지워도 되는지 묻지 않는다 (0x22755 는 다른 칸)

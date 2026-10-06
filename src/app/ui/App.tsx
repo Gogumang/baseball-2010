@@ -29,7 +29,9 @@ import { useSeasonSession } from '@/app/model/useSeasonSession'
 import { SeasonRoute } from '@/app/ui/SeasonRoute'
 import { usePitcherLeagueSession } from '@/app/model/usePitcherLeagueSession'
 import { PitcherLeagueRoute } from '@/app/ui/PitcherLeagueRoute'
-import { GeneralModeScreen, aceOpenPriceOf, useAceOpen } from '@/pages/general-mode'
+import { GeneralModeScreen, aceOpenPriceOf, generalGameOfSave, useAceOpen } from '@/pages/general-mode'
+import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow'
+import { useModeSave } from '@/entities/mode-save/model/useModeSave'
 import { useGamePointWallet } from '@/entities/wallet/model/useGamePointWallet'
 import { useAceLevels } from '@/entities/mission/model/useAceLevels'
 import type { SeasonAutobotBatInput } from '@/entities/season-mode/model/seasonRewards'
@@ -74,6 +76,14 @@ const PITCHER_WALLET_MERGE_KEY = 'compus-baseball/pitcher-wallet-merged'
  * 옛 세이브에는 이 칸이 없다 — 없으면 빈 표(모두 원래 이름)다.
  */
 const EDITED_NAMES_KEY = 'compus-baseball/edited-names'
+/**
+ * **모드 저장 칸** — 원본 전역기록 +0x3c(마지막 모드) · +0x4d(일반모드 경기 중간 저장)와 모드 1 저장 블록(`entities/mode-save`).
+ * 옛 세이브에는 이 칸이 없다 — 없으면 +0x3c 를 "나리 타자편 커리어가 있으면 4, 없으면 0" 으로 읽어
+ * 예전 웹 [최근게임](늘 타자편 이어하기)과 같은 길로 이어 준다.
+ */
+const MODE_SAVE_KEY = 'compus-baseball/mode-save'
+/** 나만의리그 타자편 = 원본 모드 4 */
+const NARI_BATTER_MODE = 4
 
 const ENTRY_SCREENS: readonly Screen['kind'][] = ['타이틀', '메인메뉴', '도움말', '환경설정', '스페셜', '나리편선택', '팀선택', '선수등록', '홈런더비', '일반모드']
 
@@ -87,6 +97,9 @@ const MISSION_SCREENS: readonly Screen['kind'][] = [
 
 /** 일반모드 = 원본 모드 1 (0x22c7d 의 획득 GP 칸 0) */
 const GENERAL_STAT_MODE = 1
+/** 투수 미션 · 타자 미션 = 원본 모드 5 · 6 (0x29a54 → 표 0xcec00) */
+const MISSION_PITCHER_MODE = 5
+const MISSION_BATTER_MODE = 6
 
 /** 화면 분기만 한다. 상태와 규칙은 model의 훅 세 개가 나눠 갖는다. */
 export function App() {
@@ -102,10 +115,15 @@ export function App() {
   const collectionRewardStore = useMemo(() => createLocalStorageJsonStore(COLLECTION_REWARD_KEY), [])
   const pitcherWalletMergeStore = useMemo(() => createLocalStorageJsonStore(PITCHER_WALLET_MERGE_KEY), [])
   const editedNamesStore = useMemo(() => createLocalStorageJsonStore(EDITED_NAMES_KEY), [])
+  const modeSaveStore = useMemo(() => createLocalStorageJsonStore(MODE_SAVE_KEY), [])
   // 에디트 이름표 — 서자마자 공용 이름 함수(0xb62c0)가 이 표를 본다. 경기·기록 화면의 선수 이름이 다 여길 거친다
   const editedNames = useEditedNames(editedNamesStore)
   /** 옛 세이브 이사거리 — 지갑 칸이 없던 시절 G는 나만의리그 선수 안에 들어 있었다 */
   const legacyGamePoint = useMemo(() => saveGame.load()?.gamePoint ?? null, [saveGame])
+  // 전역기록 +0x3c · +0x4d · 모드 1 저장 블록 — 옛 세이브면 타자편 커리어 유무로 +0x3c 를 정한다
+  const legacyLastPlayedMode = useMemo(() => (saveGame.load() === null ? 0 : NARI_BATTER_MODE), [saveGame])
+  const modeSave = useModeSave(modeSaveStore, legacyLastPlayedMode)
+  const { setLastPlayedMode } = modeSave
   const gameSettings = useGameSettings(settingsStore)
   // 소리 통로 하나 — 환경설정 칸(0~4) × 25 가 원본 소리 크기다 (옵션 +0x2e)
   const sound = useSound(gameSettings.settings.soundLevel)
@@ -113,6 +131,8 @@ export function App() {
   const [screen, setScreen] = useState<Screen>({ kind: '타이틀' })
   /** 일반모드 진입 창 [13] 에서 빠른실행을 골랐는가 (원본 메인 메뉴 this+0x14c) */
   const [isGeneralQuickStart, setGeneralQuickStart] = useState(false)
+  /** 일반모드 이어하기로 올린 진행 — 있으면 준비 화면 없이 경기 장면으로 (0x213c0(앱, 1, 0) → 0x104) */
+  const [generalResume, setGeneralResume] = useState<TeamGameProgress | null>(null)
   // 화면에 들어설 때 한 번 나는 소리 — 타이틀의 로고 음성 0 (0x69400)
   useSceneEnterSound(sound, screen.kind, screenEnterSoundOf(screen))
 
@@ -306,11 +326,23 @@ export function App() {
   // 미션 모드는 메인 메뉴에서 들어가 선수 고르기(하위 17)부터 띄운다 — 육성·명예 선수가 다 없으면 원본대로
   // 고르기 창에서 막힌다(StrCOMMON[38]·[39]). 고른 선수의 편이 투수(모드 5)/타자(모드 6) 미션을 정한다.
   if (MISSION_SCREENS.includes(screen.kind)) {
+    // 미션 선수 고르기(하위 17) 0x29a54 의 답 → this+0x13c = 5(투수)|6(타자) → 상태 0x27 → 0x327b8 이 +0x3c 에 적는다.
+    // 마선수 대결(나리 이벤트)은 이 고르기를 안 지나 +0x3c 를 안 건드린다
+    const missionFromMenu = {
+      ...mission,
+      actions: {
+        ...mission.actions,
+        choosePlayer: (pick: Parameters<typeof mission.actions.choosePlayer>[0]) => {
+          setLastPlayedMode(pick.side === '투수' ? MISSION_PITCHER_MODE : MISSION_BATTER_MODE)
+          mission.actions.choosePlayer(pick)
+        },
+      },
+    }
     return (
       <MissionRoutes
         screen={screen}
         setScreen={setScreen}
-        session={mission}
+        session={missionFromMenu}
         runner={runner}
         random={random}
         // 미션(모드 6)은 0x213c0(앱, 4, 0) 으로 나리 타자편 저장을 올린다 — 진행 중 커리어가 없으면
@@ -353,11 +385,23 @@ export function App() {
     )
   }
 
-  // 일반모드는 저장이 없다 — 준비 다섯 화면부터 경기까지 한 화면이 돌고 메인 메뉴로 돌아간다
+  // 일반모드 — 준비 다섯 화면부터 경기까지 한 화면이 돌고 메인 메뉴로 돌아간다. 경기는 경기정보 OK·반 이닝마다
+  // 모드 1 저장 블록에 남고(+0x4d), 경기 중 "나가기"로 나가도 남아 [13]/[최근게임] 의 이어하기로 그 자리에서 다시 선다
   if (screen.kind === '일반모드') {
+    const leaveGeneralMode = () => {
+      setGeneralResume(null)
+      setScreen({ kind: '메인메뉴' })
+    }
     return (
       <GeneralModeScreen
         random={random}
+        {...(generalResume === null ? {} : { resumeGame: generalResume })}
+        // 경기정보 OK 0x3136e — +0x3c = 1 · +0x4d = 1 · 블록 = 새 경기
+        onGameStart={modeSave.startGeneralGame}
+        // 반 이닝 자동 저장 0x4f928 → 0x22754 — 블록만
+        onGameSave={modeSave.saveGeneralGame}
+        // 정산 진입 0x4ea0c → 0x4f3d6 — +0x4d = 0
+        onSettlementEnter={modeSave.finishGeneralGame}
         // 진입 창 [13] 의 빠른실행 (this+0x14c) — 1~6 단계를 건너뛰고 경기정보로
         isQuickStart={isGeneralQuickStart}
         openedHiddenTeamIds={collection.collection.openedHiddenIds}
@@ -387,9 +431,9 @@ export function App() {
           recordStat({ kind: 'G획득', mode: GENERAL_STAT_MODE, amount: earned })
           // 이어서 0x4ec8a `0x22e10` — 이번 경기 기록달성 횟수(0x1fce0, 모드 1)를 통계 [mgr+0xc8]+4+n 누계에 더한다
           recordStat({ kind: '기록달성', recordIds: summary.recordIds ?? [] })
-          setScreen({ kind: '메인메뉴' })
+          leaveGeneralMode()
         }}
-        onExit={() => setScreen({ kind: '메인메뉴' })}
+        onExit={leaveGeneralMode}
       />
     )
   }
@@ -437,6 +481,25 @@ export function App() {
         // 일반모드 진입 창 [13] — 빠른실행이면 경기정보(상태 22)부터 (0x299f8 this+0x14c = 1)
         onStartGeneralMode={(isQuickStart) => {
           setGeneralQuickStart(isQuickStart)
+          setGeneralResume(null)
+          setScreen({ kind: '일반모드' })
+        }}
+        // 전역기록 +0x4d · +0x3c — 메인 메뉴 [13] 처음 커서·[15] 확인·이어하기, [최근게임] 갈래가 본다
+        isGeneralGameInProgress={modeSave.save.isGeneralGameInProgress}
+        lastPlayedMode={modeSave.save.lastPlayedMode}
+        onLastPlayedMode={setLastPlayedMode}
+        // [13]/[최근게임] 이어하기 — 상태 0x27 → 0x327b8(this, 1): +0x3c = 1 → 0x213c0(앱, 1, 0) 로 블록을 올려 장면 0x104 → +0x4d = 1
+        onResumeGeneralGame={() => {
+          const saved = generalGameOfSave(modeSave.save.generalGame)
+          setGeneralQuickStart(false)
+          if (saved === null) {
+            // ⚠️ 웹 전용: 블록을 경기로 못 읽으면(옛 꼴) 저장이 없는 것으로 보고 새로하기(상태 18)로 간다
+            modeSave.finishGeneralGame()
+            setGeneralResume(null)
+          } else {
+            modeSave.resumeGeneralGame()
+            setGeneralResume(saved)
+          }
           setScreen({ kind: '일반모드' })
         }}
         // 메인 메뉴 처음 단(하위 4)의 전부 수집 보상 판정 0x28e98 → 팝업 0x292f8
