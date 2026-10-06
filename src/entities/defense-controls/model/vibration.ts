@@ -10,8 +10,9 @@
  * - 0x5228c ← 메시지 0xbc5 — 맞은 모든 타구, 등급 1/2/3 = 100/200/300ms (`vibrationMillisecondsOf`) → 타석 화면
  * - 0x51b0e — 사구 판정(v4) 직후 200ms (`HIT_BY_PITCH_VIBRATION_MILLISECONDS`) → 타석 화면
  * - 0x8cece·0x8cee6 — 이벤트 명령 5 화면효과 1·2 의 500ms (`EVENT_VIBRATION_MILLISECONDS`) → 이야기 재생기
- * - 0x29684 환경설정에서 진동을 켤 때 100ms · 0x3cc20 경기 중 메뉴 진동 토글 100ms — 웹 화면 쪽 미배선
- * - 0x4d0d6 (0x4ce9c, 상태 18 그리기) 100ms — 조건 칸(state[0xc] == 5 · +0x2c == 0)의 뜻 미해결이라 미배선
+ * - 0x29684 환경설정에서 진동을 켤 때 · 0x3cc20 경기 중 메뉴에서 켤 때 100ms (`VIBRATION_TOGGLE_MILLISECONDS`)
+ *   → 환경설정 화면 (경기 중 메뉴의 "설정" 도 같은 화면을 띄운다)
+ * - 0x4d0d6 (0x4ce9c = 상태 0x12 그리기) 100ms — 삼진 (`STRIKEOUT_VIBRATION_MILLISECONDS`) → 타석 화면
  */
 
 /** d_level.dat D[0x10] = 0 — 타이밍 점수 하한 */
@@ -54,6 +55,25 @@ export function vibrationMillisecondsOf(timingScore: number): number {
 
 /** 사구 판정(v4) 0x51b08~0x51b0e 의 `vibrate(200, 100)` */
 export const HIT_BY_PITCH_VIBRATION_MILLISECONDS = 200
+
+/**
+ * 진동 켜기 미리 흔들기 — 환경설정 0x2966c~0x29684 · 경기 중 메뉴 0x3cc0c~0x3cc26 이 똑같다:
+ * ```
+ * 저장+0x3b ^= 1 ; 켜졌으면 0x3a44(100, 100)     ; 끌 때는 안 울린다 (꺼진 뒤라 0x3a44 도 거른다)
+ * ```
+ */
+export const VIBRATION_TOGGLE_MILLISECONDS = 100
+
+/**
+ * 삼진 진동 — 상태 0x12(맞히지 못한 공 결과) 그리기 0x4ce9c 의 0x4d0b4~0x4d0d6:
+ * ```
+ * 4d0ba  s8 state([0x1552d0c])[0xc] == 5     ; 0x12 진입 0x3dfac 가 판정 v(0x9d57c) ≠ 0 이면 쓰는 칸, 5 = 삼진
+ * 4d0c6  경기+0x2c(상태 틱) == 0              ; 상태에 들어온 첫 그리기 한 번
+ * 4d0d6  0x3a44(100, 100)
+ * ```
+ * 0x9d57c: 스트라이크(스윙했거나 존 안)이고 그 전 스트라이크 st[4] > 1 이면 5 (아니면 1) — 곧 세 번째 스트라이크다.
+ */
+export const STRIKEOUT_VIBRATION_MILLISECONDS = 100
 
 /** 이벤트 명령 5 화면효과 1·2 의 진동 (0x8cece · 0x8cee6) */
 export const EVENT_VIBRATION_MILLISECONDS = 500

@@ -238,8 +238,12 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
       specialSwing: { number: specialSwingNumber, isAceBatter: aceBatterIndex >= 0 },
     }
     const resolved = resolvePitch(pitch, swing, context, deck, latest.random)
-    // 진동 — 맞은 공은 0xbc5 → 0x5228c 의 100/200/300ms, 사구는 0x51b0e 의 200ms. 환경설정 진동(+0x3b)이 켜졌을 때만
-    vibrate(pitchVibrationMillisecondsOf(resolved.detail, swing?.frame ?? null, pitch), latest.isVibrationOn !== false)
+    // 진동 — 맞은 공은 0xbc5 → 0x5228c 의 100/200/300ms, 사구는 0x51b0e 의 200ms, 삼진은 0x4d0d6 의 100ms.
+    // 환경설정 진동(+0x3b)이 켜졌을 때만. HUD 는 이 공 전 볼카운트다
+    vibrate(
+      pitchVibrationMillisecondsOf(resolved.detail, swing?.frame ?? null, pitch, latest.hud?.strikes ?? null),
+      latest.isVibrationOn !== false,
+    )
     // 구질 번호(game+0xfc8)를 실어 보낸다 — 받는 쪽이 0xa5e14 처럼 상대 투수 투구 수·스태미나를 깎는다
     const pitchTypeNumber = pitchTypeNumberRef.current
     const result =

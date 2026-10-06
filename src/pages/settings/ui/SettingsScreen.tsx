@@ -3,6 +3,7 @@ import { FrameSprite, MessageBox, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { PITCH_CONTROLS, SOUND_LEVEL_COUNT, SPEED_LEVEL_COUNT } from '@/entities/settings/model/gameSettings'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
+import { VIBRATION_TOGGLE_MILLISECONDS, vibrate } from '@/entities/defense-controls/model/vibration'
 import { SETTINGS_TEXT } from '@/shared/config/settingsMenu'
 import {
   DETAIL_CHOICES, DETAIL_COLORS, DETAIL_ROWS, DETAIL_ROW_COUNT, DETAIL_TITLE,
@@ -33,7 +34,8 @@ interface SettingsScreenProps {
  *   값 줄 0~2 = 사운드 · 속도 · 진동 (StrMAINMENU[63]~[65])
  *   메뉴 줄 3~5 = 상세 설정 · 모드 초기화 · 게임 데이터 관리 (…[66]~[68])
  *
- * 웹에는 소리·진동이 없어 값만 들고 있지만 **줄은 원본대로 보여 준다.**
+ * 줄은 원본대로 보여 준다. 진동을 켜면 0x29684 처럼 100ms 흔든다(`navigator.vibrate` 가 있을 때만) — 경기 중 메뉴의
+ * "설정" 도 이 화면이라 0x3cc20(같은 일)도 여기서 된다.
  * 게임 데이터 관리(백업·복구)는 원본이 서버를 쓰므로 🌐 안내만 띄운다.
  * 상세 설정에는 웹이 실제로 쓰는 항목(투구 게이지)을 둔다.
  */
@@ -52,19 +54,24 @@ export function SettingsScreen({ settings, hasSavedCareer, onChange, onResetCare
 
   const isBlocked = notice !== null || isConfirmingReset || isDetailOpen
 
-  /** 값 줄에서 좌우 키가 값을 바꾼다 */
-  const changeValue = (step: number) => {
-    if (cursor === 0) {
+  /** 값 줄에서 좌우 키가 값을 바꾼다 — 줄은 지금 커서(누른 줄을 넘기면 그 줄. 클릭은 커서 갱신 전에 부른다) */
+  const changeValue = (step: number, row: number = cursor) => {
+    if (row === 0) {
       return onChange({ ...settings, soundLevel: (settings.soundLevel + step + SOUND_LEVEL_COUNT) % SOUND_LEVEL_COUNT })
     }
-    if (cursor === 1) {
+    if (row === 1) {
       return onChange({ ...settings, speedLevel: (settings.speedLevel + step + SPEED_LEVEL_COUNT) % SPEED_LEVEL_COUNT })
     }
-    if (cursor === 2) onChange({ ...settings, isVibrationOn: !settings.isVibrationOn })
+    if (row === 2) {
+      // 0x2966c: 저장+0x3b ^= 1 → 켜졌으면 0x3a44(100) 미리 흔들기 (경기 중 메뉴 0x3cc0c 도 같다)
+      const isVibrationOn = !settings.isVibrationOn
+      onChange({ ...settings, isVibrationOn })
+      vibrate(VIBRATION_TOGGLE_MILLISECONDS, isVibrationOn)
+    }
   }
 
   const openRow = (index: number) => {
-    if (index < FIRST_MENU_ROW) return changeValue(1)
+    if (index < FIRST_MENU_ROW) return changeValue(1, index)
     if (index === 3) return setDetailOpen(true)
     if (index === 4) return hasSavedCareer ? setIsConfirmingReset(true) : undefined
     setNotice(SETTINGS_TEXT.dataManagementBlocked)

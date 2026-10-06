@@ -119,6 +119,26 @@ describe('환경설정 값 바꾸기', () => {
     expect(onChange).toHaveBeenCalledWith({ ...DEFAULT_SETTINGS, isVibrationOn: false })
   })
 
+  it('진동을 켜면 100ms 흔든다 (0x29684) — 끌 때는 안 울린다', () => {
+    const vibrateSpy = vi.fn()
+    Object.defineProperty(navigator, 'vibrate', { value: vibrateSpy, configurable: true, writable: true })
+    try {
+      const { rerender } = 띄우기({ settings: { ...DEFAULT_SETTINGS, isVibrationOn: false } })
+      fireEvent.click(줄('진동'))
+      expect(vibrateSpy).toHaveBeenCalledWith(100)
+
+      vibrateSpy.mockClear()
+      rerender(
+        <SettingsScreen settings={{ ...DEFAULT_SETTINGS, isVibrationOn: true }} hasSavedCareer
+          onChange={vi.fn()} onResetCareer={vi.fn()} onBack={vi.fn()} />,
+      )
+      fireEvent.click(줄('진동'))
+      expect(vibrateSpy).not.toHaveBeenCalled()
+    } finally {
+      Reflect.deleteProperty(navigator, 'vibrate')
+    }
+  })
+
   it('게임 데이터 관리는 통신이 필요해 안내만 띄운다 (🌐)', () => {
     띄우기()
 
