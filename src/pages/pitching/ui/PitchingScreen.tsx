@@ -8,6 +8,8 @@ import type { PitcherRun } from '@/entities/mission/model/pitcherRun'
 import type { AtBatState } from '@/entities/at-bat/model/atBatState'
 import { CourseGrid } from '@/pages/pitching/ui/CourseGrid'
 import { PitchGradeGauge } from '@/pages/pitching/ui/PitchGradeGauge'
+import { useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
+import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 
 /**
  * 투구 화면. 원작 설명서 <투구 조작>의 세 단계를 그대로 따른다:
@@ -54,6 +56,10 @@ interface PitchingScreenProps {
    * 안 넘기면 견제 키가 없다.
    */
   readonly onPickoffKey?: (key: string) => void
+  /**
+   * **상태 0xe 의 OK 대기** — 세션이 새 타석마다 싣는다 (`useMissionSession.sceneConfirm`). 안 넘기면 기다리지 않는다
+   */
+  readonly sceneConfirm?: SceneConfirmWait | null
 }
 
 export function PitchingScreen({
@@ -68,13 +74,21 @@ export function PitchingScreen({
   onGiveUp,
   onFinish,
   onPickoffKey,
+  sceneConfirm: sceneConfirmWait,
 }: PitchingScreenProps) {
   const [phase, setPhase] = useState<PitchPhase>('구질')
   const [pitchType, setPitchType] = useState<PitchTypeInfo | null>(null)
   const [courseCell, setCourseCell] = useState(4)
+  /**
+   * **상태 0xe — 새 타석마다 사람 OK 를 기다린다** (0x39e14 → 0x532b0 — 공수·모드 갈림 없음). 결과 연출 동안은 받지 않는다.
+   * ⚠️ 미이식: 0xe 그리기 0x4d9ec 가 0xd 그리기 위에 얹는 안내 판 0x44944.
+   */
+  const sceneConfirm = useSceneConfirm(sceneConfirmWait, run.status === '진행중' && bannerText === '')
+  const isAwaitingConfirm = sceneConfirm.isAwaiting && run.status === '진행중'
 
-  // 견제 — 구질 고르기(0xf)에서만. 끝난 미션(결과 화면)은 키를 안 받는다
-  const acceptsPickoff = onPickoffKey !== undefined && phase === '구질' && run.status === '진행중'
+  // 견제 — 구질 고르기(0xf)에서만. 끝난 미션(결과 화면)·0xe(OK 대기)는 키를 안 받는다
+  const acceptsPickoff =
+    onPickoffKey !== undefined && phase === '구질' && run.status === '진행중' && !isAwaitingConfirm
   useEffect(() => {
     if (!acceptsPickoff || onPickoffKey === undefined) return
     const onKeyDown = (event: KeyboardEvent) => {
@@ -123,6 +137,12 @@ export function PitchingScreen({
     <PixelScreen
       title={run.mission.name}
       badge={remainingBadgeOf(run)}
+      leftKey={
+        isAwaitingConfirm
+          ? // 0xe — OK 하나만 받는다 (0x532b0). 구질 고르기(0xf)는 OK 뒤다
+            { label: '확인', onPress: sceneConfirm.confirm, isDisabled: !sceneConfirm.acceptsConfirm }
+          : undefined
+      }
       rightKey={{ label: '포기', onPress: onGiveUp }}
     >
       <GoalBar goals={goals} />
@@ -130,7 +150,7 @@ export function PitchingScreen({
         {atBat.balls}볼 {atBat.strikes}스트라이크 {bannerText !== '' && `· ${bannerText}`}
       </Hint>
 
-      {phase === '구질' && (
+      {phase === '구질' && !isAwaitingConfirm && (
         <>
           <Panel heading="1. 구질 선택" />
           <MenuList

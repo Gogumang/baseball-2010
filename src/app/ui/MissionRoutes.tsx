@@ -145,6 +145,8 @@ export function MissionRoutes({
         onRestart={() => actions.begin(missionRun.mission)}
         settings={gameSettings.settings}
         onSettingsChange={gameSettings.setSettings}
+        // 상태 0xe — 새 타석마다 사람 OK 를 기다린다
+        sceneConfirm={session.sceneConfirm}
       />
     )
   }
@@ -167,6 +169,8 @@ export function MissionRoutes({
         onFinish={actions.finishPitcher}
         // 사람 견제 '3'·'1'·'7' (0x53548 → 0x50f28) — 모드 5 도 막지 않는다 (`actions.pickoff` 주석)
         onPickoffKey={actions.pickoff}
+        // 상태 0xe — 새 타석마다 사람 OK 를 기다린다
+        sceneConfirm={session.sceneConfirm}
       />
     )
   }
@@ -252,6 +256,8 @@ export function PitcherAceMatchRoute({ mission, session, runner, pitchControl, o
       onGiveUp={actions.giveUpPitcher}
       // 마선수 대결도 미션 장면(모드 5)이라 사람 견제 길이 같다
       onPickoffKey={actions.pickoff}
+      // 대결도 미션 장면이라 새 타석마다 0xe 에서 OK 를 기다린다
+      sceneConfirm={session.sceneConfirm}
       onFinish={() => {
         const isWin = actions.finishPitcherAceMatch()
         if (isWin !== null) onFinish(isWin)

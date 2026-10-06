@@ -1127,3 +1127,29 @@ describe('보통 타자 미션 경기 중 나가기 — 0x40140: 0xa5368(…, 0)
     rendered.unmount()
   })
 })
+
+describe('상태 0xe 의 OK 대기 — 미션(모드 5·6)도 새 타석마다 (0x39e14 → 0x532b0)', () => {
+  it('미션을 세우면 대기가 서고, 타석이 끝나면(결과 연출 뒤 새 타석) 새 대기다 — 같은 타석의 다음 공은 그대로다', () => {
+    const { rendered } = setUpSession()
+    const mission = MISSIONS.find((row) => row.side === '타자')
+    if (mission === undefined) throw new Error('타자 미션이 없다')
+    act(() => rendered.result.current.session.actions.begin(mission))
+    const 처음 = rendered.result.current.session.sceneConfirm
+    expect(처음).not.toBeNull()
+    const 스트라이크 = () =>
+      act(() => {
+        rendered.result.current.session.handleMissionPitch({
+          resolution: { kind: '스트라이크', isSwinging: true },
+          hasSwung: true,
+          isBunt: false,
+          resultCode: null,
+        })
+      })
+    스트라이크()
+    expect(rendered.result.current.session.sceneConfirm).toBe(처음)
+    스트라이크()
+    스트라이크()
+    // 삼진 — 0xd → 0xe
+    expect(rendered.result.current.session.sceneConfirm).not.toBe(처음)
+  })
+})

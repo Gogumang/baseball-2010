@@ -91,6 +91,8 @@ import { missionRewardOf } from '@/entities/mission/model/missionReward'
 import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
 import { vibrate } from '@/entities/defense-controls/model/vibration'
 import { strikeoutVibrationMillisecondsOf } from '@/features/play-game/model/strikeoutVibration'
+import { enterSceneConfirm } from '@/features/play-game/model/sceneConfirm'
+import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 
 interface MissionSessionInput {
   readonly runner: AtBatRunner
@@ -373,6 +375,18 @@ export function useMissionSession({
    *    본다 — 그래서 칸도 하나다. 원본 미션 팀에서 마타자가 몇 번 타순에 서는지는 아직 안 읽었다.
    */
   const [batterSpecialSwingStored, setBatterSpecialSwingStored] = useState(UNFILLED_SPECIAL_SWING)
+  /**
+   * **상태 0xe 의 OK 대기** (`features/play-game/model/sceneConfirm`) — 미션(모드 5·6)도 보통 경기 장면 0x104 라 새 타석마다
+   * 0xd → 0xe 를 지나 사람 OK 를 기다린다(0x39e14 · 0x532b0 에 모드 갈림 없음). 미션 시작(0x18 판 뒤)·타석이 끝난 뒤·
+   * 3아웃으로 끊긴 뒤마다 새 객체를 싣는다. 화면(`MissionPlayScreen`·`PitchingScreen`)이 `useSceneConfirm` 으로 받는다.
+   * 제한 시간은 그 동안에도 흐른다 — 모드 5·6 의 0xaada4 는 장면 상태 갱신 뒤(0x52ed0) 상태를 안 가리고 돈다.
+   */
+  const [sceneConfirm, setSceneConfirm] = useState<SceneConfirmWait | null>(null)
+  /** 타석을 새로 세운다 — 0xd → 0xe 라 OK 를 기다린다 */
+  const resetAtBatWithConfirm = (count?: { balls: number; strikes: number }) => {
+    setSceneConfirm(enterSceneConfirm())
+    runner.resetAtBat(count)
+  }
   const [opponentSpecialSwingStored, setOpponentSpecialSwingStored] = useState(UNFILLED_SPECIAL_SWING)
   /**
    * **투수 미션 마구 남은 칸** s8 팀[+0x28] — −1 = 안 채움(팀 new 0xb891c). 0xaebe4 가 미션 투수로 채우고
@@ -507,7 +521,7 @@ export function useMissionSession({
         if (interrupted) {
           // 판에서 3아웃 — 이 타석은 끊긴다 (판정 B 0xae3e8 아웃 > 2 → 0x18). 미션은 시작 상황으로 돌아간다(applyPickoff)
           if (hasSwung) setMissionRun((previous) => (previous === null ? previous : checkSwingsExhausted(recordSwing(previous))))
-          runner.resetAtBat()
+          resetAtBatWithConfirm()
           return
         }
       }
@@ -552,6 +566,8 @@ export function useMissionSession({
         }
         return applyMissionOutcome(swung, outcome, detail.isBunt)
       })
+      // 결과 연출 뒤 새 타석 — 0xd → 0xe
+      setSceneConfirm(enterSceneConfirm())
       runner.pauseWithBanner(describeOutcomeBanner(outcome, runnersOnBase))
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -776,7 +792,7 @@ export function useMissionSession({
       if (play.result.ticks.length > 0) setPickoffReplay(play.result)
       if (interrupted) {
         // 판에서 3아웃 — 이 타석은 끊긴다 (판정 B 0xae3e8 아웃 > 2 → 0x18)
-        runner.resetAtBat()
+        resetAtBatWithConfirm()
         setPitcherRun(checkPitchExhausted(nextRun))
         return
       }
@@ -829,7 +845,7 @@ export function useMissionSession({
           ? // 낫아웃 — 폭투·포일 판의 진루(타자주자 포함)가 이 삼진 타석의 진루다 (0x3e0d0 state[0x1a])
             withPitcherNotOut(nextRun, outcome, play)
           : applyPitcherOutcome(nextRun, outcome, { random })
-      runner.resetAtBat()
+      resetAtBatWithConfirm()
     } else {
       nextRun = checkPitchExhausted(nextRun)
     }
@@ -865,7 +881,7 @@ export function useMissionSession({
         setPitcherRun((previous) =>
           previous === null ? previous : applyPitcherOutcome(previous, pending.outcome, { played }),
         )
-        runner.resetAtBat()
+        resetAtBatWithConfirm()
         runner.setIsPaused(false)
         return
       }
@@ -874,6 +890,8 @@ export function useMissionSession({
           ? previous
           : applyMissionOutcome(previous, pending.outcome, pending.isBunt, random, played),
       )
+      // 결과 연출 뒤 새 타석 — 0xd → 0xe
+      setSceneConfirm(enterSceneConfirm())
       runner.pauseWithBanner(describeOutcomeBanner(pending.outcome, pending.runnersOnBase))
     },
     [audio, random, runner],
@@ -903,7 +921,7 @@ export function useMissionSession({
     setOpponentSpecialSwingStored(UNFILLED_SPECIAL_SWING)
     setPitcherMagicStored(UNFILLED_SPECIAL_SWING)
     setBallMagicNumber(0)
-    runner.resetAtBat(mission.start)
+    resetAtBatWithConfirm(mission.start)
     runner.setBannerText('')
     runner.setIsPaused(false)
     setPendingDefensePlay(null)
@@ -934,7 +952,7 @@ export function useMissionSession({
       setPendingBenchClearing(null)
       if (reachedTargetTick) rollBenchClearingTargets(random)
       setPitcherRun(applyPitcherOutcome(pending.run, pending.outcome, { random }))
-      runner.resetAtBat()
+      resetAtBatWithConfirm()
     },
 
     /**
@@ -965,7 +983,7 @@ export function useMissionSession({
       setOpponentMoundStamina(FULL_STAMINA)
       setBatterSpecialSwingStored(UNFILLED_SPECIAL_SWING)
       setOpponentSpecialSwingStored(UNFILLED_SPECIAL_SWING)
-      runner.resetAtBat(mission.start)
+      resetAtBatWithConfirm(mission.start)
       runner.setBannerText('')
       runner.setIsPaused(false)
       setPendingDefensePlay(null)
@@ -1116,7 +1134,7 @@ export function useMissionSession({
       // 판정 B 0xae3e8 의 견제 가지는 아웃 ≤ 2 든 3아웃이든 정산 0xa8024 를 부른다 (ae5a8)
       setPitcherRun(withPitcherMissionRunnerResult(pitcherRun, result, true))
       // 3아웃 — 이 타석은 끊긴다 (아웃 > 2 → 0x18)
-      if (interrupted) runner.resetAtBat()
+      if (interrupted) resetAtBatWithConfirm()
     },
 
     /** 견제 판 재생이 끝났다 */
@@ -1191,6 +1209,8 @@ export function useMissionSession({
     player, hallOfFameBatter,
     missionConditionCode, pendingDefensePlay, pendingBenchClearing, pickoffReplay, handleMissionPitch, handleThrow, actions,
     batterSpecialSwingStored, pitcherMagicRemaining, stealableBases,
+    /** 상태 0xe 의 OK 대기 — 화면이 `useSceneConfirm` 에 넘긴다 */
+    sceneConfirm,
     /** 타자 미션 상대 마투수의 체력% `0xaebb0` = trunc(+0x2c / 100) — `missionPitcherAbility` 셋째 인자 */
     opponentStaminaPercent: staminaPercentOf(opponentMoundStamina),
   }

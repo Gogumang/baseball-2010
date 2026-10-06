@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { SCENE_CONFIRM_LOCK_FRAMES } from '@/features/play-game/model/useSceneConfirm'
+import { enterSceneConfirm } from '@/features/play-game/model/sceneConfirm'
 import { PitchingScreen } from '@/pages/pitching/ui/PitchingScreen'
 import { PITCH_TYPES } from '@/shared/config/original/pitchTypes'
 import type { PitchTypeInfo } from '@/shared/config/original/pitchTypes'
@@ -101,5 +104,34 @@ describe('투수 미션 사람 견제 키 — 구질 고르기(0xf)에서만 0x5
     expect(screen.getByText(/2\. 코스 선택/)).toBeTruthy()
     fireEvent.keyDown(window, { key: '3' })
     expect(onPickoffKey).not.toHaveBeenCalled()
+  })
+})
+
+describe('투수 미션 상태 0xe — 새 타석마다 사람 OK 를 기다린다 (0x532b0)', () => {
+  it('대기가 있으면 구질 고르기 대신 확인 소프트키가 서고, 세 갱신 뒤 OK 로 구질 고르기가 뜬다', () => {
+    vi.useFakeTimers()
+    try {
+      render(
+        <PitchingScreen
+          run={startPitcherMission(PITCHER_MISSIONS[0]!)}
+          repertoire={[직구]}
+          usesGauge={false}
+          atBat={createAtBat()}
+          bannerText=""
+          onThrow={vi.fn()}
+          onGiveUp={() => {}}
+          onFinish={() => {}}
+          sceneConfirm={enterSceneConfirm()}
+        />,
+      )
+      expect(screen.queryByText('1. 구질 선택')).toBeNull()
+      fireEvent.keyDown(window, { key: 'Enter' })
+      expect(screen.queryByText('1. 구질 선택')).toBeNull()
+      act(() => void vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_LOCK_FRAMES))
+      fireEvent.click(screen.getByRole('button', { name: '확인' }))
+      expect(screen.getByText('1. 구질 선택')).toBeTruthy()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

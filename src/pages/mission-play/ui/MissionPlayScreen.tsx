@@ -18,6 +18,8 @@ import type { MissionRun } from '@/entities/mission/model/missionRun'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
 import { stealBaseOfKey } from '@/features/defense-play/model/pitchArrivalPlay'
 import type { AcePlayer } from '@/shared/config/original/acePlayers'
+import { useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
+import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 
 interface MissionPlayScreenProps {
   readonly run: MissionRun
@@ -71,6 +73,10 @@ interface MissionPlayScreenProps {
   /** 경기 중 메뉴 "설정" 칸이 열 환경설정. 안 넘기면 칸이 잠긴다 */
   readonly settings?: GameSettings
   readonly onSettingsChange?: (settings: GameSettings) => void
+  /**
+   * **상태 0xe 의 OK 대기** — 세션이 새 타석마다 싣는다 (`useMissionSession.sceneConfirm`). 안 넘기면 기다리지 않는다
+   */
+  readonly sceneConfirm?: SceneConfirmWait | null
 }
 
 /**
@@ -104,12 +110,22 @@ export function MissionPlayScreen({
   onRestart,
   settings,
   onSettingsChange,
+  sceneConfirm: sceneConfirmWait,
 }: MissionPlayScreenProps) {
   const menu = useInGameMenuState()
   const isMenuOpen = menu.isOpen
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
   const goals = goalsOf(run.mission, run.progress)
   const isOver = run.status !== '진행중'
+  /**
+   * **상태 0xe — 새 타석마다 사람 OK 를 기다린다** (0x39e14 → 0x532b0, 모드 갈림 없음). 결과 연출·메뉴·조작방법·설정이 덮으면
+   * 받지 않는다. ⚠️ 미이식: 0xe 그리기 0x4d9ec 가 0xd 그리기 위에 얹는 안내 판 0x44944.
+   */
+  const sceneConfirm = useSceneConfirm(
+    sceneConfirmWait,
+    !isOver && !isPaused && bannerText === '' && !isMenuOpen && overlay === null,
+  )
+  const isAwaitingConfirm = sceneConfirm.isAwaiting && !isOver
   /**
    * 번트 키 '7'/'8'/'9' — 원본은 미션 목표와 상관없이 받는다. 타격 키 0x535a4 는 모드를 안 보고 0x6a7 을 보내고,
    * 받는 0x51e48 은 상태 0x11 · S+4(스윙 받을 준비) · 지금 타자(0xae89c)가 마선수(0xb633c, +0xa 비트6)가 아님만 본다.
@@ -169,6 +185,9 @@ export function MissionPlayScreen({
         leftKey={
           isOver
             ? { label: '확인', onPress: onFinish }
+            : isAwaitingConfirm && !isMenuOpen
+              ? // 0xe — OK 하나만 받는다 (0x532b0)
+                { label: '확인', onPress: sceneConfirm.confirm, isDisabled: !sceneConfirm.acceptsConfirm }
             : canSteal
               ? { label: `도루 ${stealableBases[0]}루`, onPress: () => stealIfFlying(stealableBases[0]) }
               : undefined
@@ -205,7 +224,8 @@ export function MissionPlayScreen({
           />
         )}
 
-        <div className={styles.stageArea}>
+        {/* 0xe 에서 화면을 누르면 OK 로 본다 (터치용 웹판 편의 — 캔버스 탭이 스윙인 것과 같은 자리) */}
+        <div className={styles.stageArea} onClick={sceneConfirm.acceptsConfirm ? sceneConfirm.confirm : undefined}>
           <BattingStage
             batterAbility={ability}
             batterSkillIds={batterSkillIds}
@@ -244,7 +264,8 @@ export function MissionPlayScreen({
             }
             canBunt={canBunt}
             // 조작방법 뷰어 동안은 일시정지 팝업이 떠 있어 경기 갱신이 멈춘다 (0x52cc6 0x754f9)
-            isPaused={isPaused || isOver || overlay !== null}
+            // 0xe(OK 대기)에서도 공이 안 나간다
+            isPaused={isPaused || isOver || overlay !== null || isAwaitingConfirm}
             random={random}
             aceLevels={aceLevels}
             onPitchResolved={onPitchResolved}
