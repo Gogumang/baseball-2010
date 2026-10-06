@@ -35,7 +35,7 @@ import {
   teamBatters,
   teamPitchers,
 } from '@/entities/team/model/teamRoster'
-import { staminaPercentOf } from '@/entities/pitcher-career/model/pitcherStamina'
+import { FULL_STAMINA, staminaPercentOf } from '@/entities/pitcher-career/model/pitcherStamina'
 import {
   lineupSlotOf,
   recordLineupPlay,
@@ -45,7 +45,7 @@ import {
 } from '@/entities/game/model/quickLineup'
 import type { QuickLineup } from '@/entities/game/model/quickLineup'
 import { runnerCountOf } from '@/entities/game/model/baseState'
-import { rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
+import { ROTATION_SIZE, rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
 import { opponentOf } from '@/entities/league/model/league'
 import type { GameSummary } from '@/entities/game/model/gameSummary'
 import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
@@ -126,14 +126,28 @@ export interface GameProgress {
   /** 이번 경기에 등판한 마선수. 없으면 평범한 투수다. */
   readonly aceOpponent: AcePlayer | null
   /**
-   * 양 팀 선발 투수의 로스터 칸 — 경기를 세울 때 한 번만 정한다.
+   * 양 팀 선발 투수의 로스터 칸 — 경기를 세울 때 한 번만 정한다 (= `…PitcherOrder[0]`).
    * 이 화면은 나만의리그 **타자편(모드 4)** 이라 원본 경기 준비 `0x1c46c` 가 두 팀 모두
    * `0xb8c80`(→ `0xb5ca8`) 로 4인 로테이션을 한 칸 돌린다 (P1 1-1) — 무작위가 아니다.
-   * 원본은 투수 0번과 이 칸을 **레코드째 섞어** 0번이 선발이 되지만, 웹판 로스터는 붙박이
-   * 표라 바꿀 수 없어 칸 번호를 경기 내내 들고 다닌다 (`rotationSlotOf` 주석 — **근사다**).
+   * 원본은 레코드를 제자리에서 섞어 0번이 선발이 되고, 웹은 그 섞인 차례를 리그가 들고 다닌다
+   * (`League.pitcherOrders` — 부르는 쪽이 `startGame` 마지막 인자로 넘긴다).
    */
   readonly ourStartingPitcherIndex: number
   readonly opponentStartingPitcherIndex: number
+  /**
+   * 양 팀 **투수 레코드 차례** — 칸 p 에 앉은 붙박이 표 칸 (`League.pitcherOrders`). 0번이 선발이고 나머지가 벤치 차례다
+   * (경기용 팀 객체 `0xb891c` 의 `team[i] = i`, 교체 0xabfcc 가 `team+0x0c` 를 이 차례로 훑는다).
+   * 부르는 쪽이 안 넘기면 날짜 g 로 돈 4인 로테이션(`rotationSlotOf`, 첫 시즌 정규시즌에서만 원본과 같다)이다.
+   */
+  readonly ourPitcherOrder: readonly number[]
+  readonly opponentPitcherOrder: readonly number[]
+  /**
+   * 양 팀 투수 칸(붙박이 표 칸 0~7)별 **레코드 스태미나** `+0x2c` — 벤치 투수는 이 값으로 올라오고(0xabfcc 도 견준다),
+   * 내려간 투수는 그 순간 값을 여기 남긴다. 지금 마운드 값은 `…Mound.stamina` 가 든다. 원본 레코드 값은 경기 사이에
+   * 이어진다 — 부르는 쪽이 리그 표를 넘기고 경기 끝 값(`summaryOf` 의 `pitcherStaminas`)을 되적는다. 안 넘기면 모두 10000.
+   */
+  readonly ourPitcherStaminas: readonly number[]
+  readonly opponentPitcherStaminas: readonly number[]
   /**
    * 상대 팀의 지금 타순 칸 (팀 객체 `team+0x32`, 0~8) — **이닝이 바뀌어도 이어진다**.
    *
@@ -317,6 +331,27 @@ const RECENT_AT_BAT_COUNT = 10
  * 리그 상대가 아니다. 상대는 자기 팀을 뺀 기본 팀에서 고른다.
  */
 
+/** 리그 경기의 양 팀 투수 차례·칸별 레코드 스태미나 (`startGame` 마지막 인자) */
+export interface GamePitcherSetup {
+  /** 내 팀 투수 레코드 차례 — 0번이 선발 */
+  readonly ourOrder?: readonly number[]
+  readonly opponentOrder?: readonly number[]
+  /** 붙박이 표 칸(0~7)별 레코드 `+0x2c`. 빠진 칸은 10000 */
+  readonly ourStaminas?: readonly number[]
+  readonly opponentStaminas?: readonly number[]
+}
+
+/** 날짜만큼 돈 4인 로테이션 차례 (0xb5ca8 을 g 번 — 0~3 칸은 `(g + i) % 4`, 4번 뒤는 그대로). 첫 시즌 정규시즌에서만 원본과 같다 */
+function rotatedRosterOrderOf(dayCounter: number): readonly number[] {
+  const first = rotationSlotOf(dayCounter)
+  return ALL_PITCHER_SLOTS.map((slot) => (slot < ROTATION_SIZE ? (first + slot) % ROTATION_SIZE : slot))
+}
+
+/** 칸별 스태미나 표 — 빠진 칸은 10000 */
+function staminaTableOf(given: readonly number[] | undefined): readonly number[] {
+  return ALL_PITCHER_SLOTS.map((slot) => given?.[slot] ?? FULL_STAMINA)
+}
+
 /**
  * 상대는 원본 일정표(0xd89cb)가 정한다 — 무작위로 고르지 않는다.
  * 부르는 쪽이 `nextOpponentOf` 로 구해서 넘긴다. 안 넘기면 일정표 첫날 상대를 쓴다.
@@ -341,7 +376,19 @@ export function startGame(
    *    들고 다닌다. 경기 중에 설정을 바꾸는 길은 `useCareerSession` 이 이 칸을 갈아 끼워 잇는다.
    */
   runningModeManual = false,
+  /**
+   * 양 팀 투수 레코드 차례와 칸별 시작 스태미나 — 리그 경기(타자편 모드 4)는 리그가 들고 다니는 차례
+   * (`leagueStarterSlotOf`·`postseasonPitcherOrderOf`, 경기 준비 0x1c46c 가 g ≠ 0 이면 두 팀을 0xb8c80 → 0xb5ca8 로 한 칸
+   * 돌린 뒤)와 레코드 `+0x2c` 표를 넘긴다. 안 넘기면 날짜 g 의 4인 로테이션 · 10000 이다 (예전 그대로).
+   */
+  pitchers?: GamePitcherSetup,
 ): GameProgress {
+  const ourPitcherOrder = pitchers?.ourOrder ?? rotatedRosterOrderOf(dayCounter)
+  const opponentPitcherOrder = pitchers?.opponentOrder ?? rotatedRosterOrderOf(dayCounter)
+  const ourPitcherStaminas = staminaTableOf(pitchers?.ourStaminas)
+  const opponentPitcherStaminas = staminaTableOf(pitchers?.opponentStaminas)
+  const ourStarter = ourPitcherOrder[0] ?? 0
+  const opponentStarter = opponentPitcherOrder[0] ?? 0
   const initial: GameProgress = {
     game: createGame(battingOrder - 1, playerSide),
     ourTeamId,
@@ -350,14 +397,17 @@ export function startGame(
     aceOpponent: null,
     // 모드 4 는 경기 준비 0x1c46c 에서 **두 팀 모두** 0xb8c80 로 4인 로테이션을 한 칸 돌린다
     // (P1 1-1 의 `else (모드 4): if g != 0: 0xb8c80(내 팀)` + 그 앞줄의 상대 팀). 무작위가 아니다.
-    opponentStartingPitcherIndex: rotationSlotOf(dayCounter),
-    ourStartingPitcherIndex: rotationSlotOf(dayCounter),
+    opponentStartingPitcherIndex: opponentStarter,
+    ourStartingPitcherIndex: ourStarter,
+    ourPitcherOrder,
+    opponentPitcherOrder,
+    ourPitcherStaminas,
+    opponentPitcherStaminas,
     // 경기 시작 0x3a55a 가 0 으로 세운다 — 그 뒤로는 이닝을 넘어 이어진다
     opponentOrderIndex: 0,
-    // 선발이 막 올라온 마운드 — ⚠️ 원본 스태미나는 시즌 내내 이어지는 레코드 값(+0x2c)인데
-    // 웹 로스터는 투수별 스태미나를 저장하지 않아 가득에서 시작한다 (leagueDay 와 같은 근사)
-    ourMound: startingMoundOf(rotationSlotOf(dayCounter)),
-    opponentMound: startingMoundOf(rotationSlotOf(dayCounter)),
+    // 선발이 막 올라온 마운드 — 레코드 +0x2c 그대로 선다 (부르는 쪽이 리그 표를 안 넘기면 10000)
+    ourMound: startingMoundOf(ourStarter, ourPitcherStaminas[ourStarter] ?? FULL_STAMINA),
+    opponentMound: startingMoundOf(opponentStarter, opponentPitcherStaminas[opponentStarter] ?? FULL_STAMINA),
     opponentInningRunsAllowed: 0,
     ourLineup: rosterLineupOf(BATTERS_PER_TEAM),
     opponentLineup: rosterLineupOf(BATTERS_PER_TEAM),
@@ -1053,6 +1103,8 @@ function playOpponentInning(progress: GameProgress, random: RandomPort): GamePro
       progress.ourTeamId,
       progress.ourMound,
       progress.game.ourScore - progress.game.opponentScore,
+      progress.ourPitcherOrder,
+      progress.ourPitcherStaminas,
     ),
     // 상대 타자는 명단에서 고르고, 타석마다 CPU 대타(0xac228)를 먼저 본다
     {
@@ -1077,6 +1129,8 @@ function playOpponentInning(progress: GameProgress, random: RandomPort): GamePro
       game,
       opponentOrderIndex: half.nextBattingOrderIndex % BATTING_ORDER_SIZE,
       ourMound: half.mound ?? progress.ourMound,
+      // 내려간 투수는 그 순간 값을 레코드에 남긴다
+      ourPitcherStaminas: withOutgoingStaminas(progress.ourPitcherStaminas, half.pitcherChanges ?? []),
       decisions,
       // 상대 공격이 끝나면 우리 공격 반 이닝이 시작된다 — 교대 0xa5b00 이 A 를 0 으로 되돌린다
       opponentInningRunsAllowed: 0,
@@ -1204,6 +1258,24 @@ const MAXIMUM_PITCHER_COUNTER = 99
 /** 팀 투수 여덟 칸 (`team+0x0c`) — 벤치는 여기서 마운드와 이미 쓴 투수를 뺀 나머지다 */
 const ALL_PITCHER_SLOTS: readonly number[] = Array.from({ length: PITCHERS_PER_TEAM }, (_unused, slot) => slot)
 
+/** 칸 하나의 레코드 스태미나를 바꾼 표 */
+function withStaminaAt(table: readonly number[], slot: number, stamina: number): readonly number[] {
+  return table.map((value, index) => (index === slot ? stamina : value))
+}
+
+/** 반 이닝 안의 교체마다 내려간 투수 값을 표에 되적는다 */
+function withOutgoingStaminas(
+  table: readonly number[],
+  changes: readonly { readonly outgoingPitcherSlot: number; readonly outgoingStamina: number }[],
+): readonly number[] {
+  return changes.reduce((current, change) => withStaminaAt(current, change.outgoingPitcherSlot, change.outgoingStamina), table)
+}
+
+/** 경기 끝 칸별 레코드 스태미나 — 표에 지금 마운드 값을 얹는다 */
+function finalStaminasOf(table: readonly number[], mound: HalfInningMound): readonly number[] {
+  return withStaminaAt(table, mound.pitcherSlot, mound.stamina)
+}
+
 /**
  * 한 팀의 수비 쪽 재료 (`HalfInningDefense`) — `leagueDay.defenseOf` 와 같은 모양이다.
  *
@@ -1217,11 +1289,20 @@ const ALL_PITCHER_SLOTS: readonly number[] = Array.from({ length: PITCHERS_PER_T
  *
  * ⚠️ 팀 사기(`0x66e44` 의 `V[+2]`)는 이 화면이 들고 있지 않아 100 으로 본다 — **근사다**.
  */
-function quickDefenseOf(teamId: number, mound: HalfInningMound, lead: number): HalfInningDefense {
+function quickDefenseOf(
+  teamId: number,
+  mound: HalfInningMound,
+  lead: number,
+  /** 투수 레코드 차례 — 벤치를 이 차례로 훑는다 (`GameProgress.…PitcherOrder`) */
+  order: readonly number[] = ALL_PITCHER_SLOTS,
+  /** 칸별 레코드 스태미나 — 벤치 투수는 이 값으로 올라온다 */
+  staminas?: readonly number[],
+): HalfInningDefense {
   const roster = teamPitchers(teamId)
   return {
     mound,
-    pitcherSlots: ALL_PITCHER_SLOTS,
+    pitcherSlots: order,
+    ...(staminas === undefined ? {} : { staminaAt: (slot: number) => staminas[slot] ?? FULL_STAMINA }),
     pitcherAt: (slot) => quickPitcherOf(roster[slot % roster.length]),
     // 투수 능력치 순서는 제구·구속·변화·**체력** (칸 3)
     staminaAbilityAt: (slot) => roster[slot % roster.length].ability[3],
@@ -1243,6 +1324,8 @@ function opponentQuickDefenseOf(progress: GameProgress): HalfInningDefense {
     progress.opponentTeamId,
     progress.opponentMound,
     progress.game.opponentScore - progress.game.ourScore,
+    progress.opponentPitcherOrder,
+    progress.opponentPitcherStaminas,
   )
 }
 
@@ -1301,6 +1384,8 @@ function changeOpponentPitcher(progress: GameProgress, random: RandomPort): Game
     {
       ...progress,
       opponentMound: after,
+      // 내려간 투수의 +0x2c 는 레코드에 남는다 — 다음 경기(리그 표)로 이어진다
+      opponentPitcherStaminas: withStaminaAt(progress.opponentPitcherStaminas, before.pitcherSlot, before.stamina),
       opponentInningRunsAllowed: 0,
       // 교체 자리에서 세이브 후보를 잡는다 (0xa60c0 — 수비 측 = 상대)
       decisions: decisionsAfterPitcherChange(progress.decisions, progress.game, {
@@ -1675,6 +1760,11 @@ export function summaryOf(progress: GameProgress): GameSummary {
     opponentTeamId: progress.opponentTeamId,
     leaguePlateAppearances: progress.leaguePlateAppearances,
     pitchersOfRecord: pitchersOfRecordOf(progress),
+    // 양 팀 레코드 +0x2c — 경기에서 깎인 값이 리그 표로 이어진다 (하루 끝 0xb617c 회복은 부르는 쪽)
+    pitcherStaminas: {
+      ours: finalStaminasOf(progress.ourPitcherStaminas, progress.ourMound),
+      opponent: finalStaminasOf(progress.opponentPitcherStaminas, progress.opponentMound),
+    },
   }
 }
 

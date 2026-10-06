@@ -905,6 +905,38 @@ describe('내 타석의 상대 투수 — 지금 마운드 투수의 능력치 (
   })
 })
 
+describe('리그 투수 차례·레코드 스태미나 — startGame 마지막 인자', () => {
+  it('차례 0번이 선발이고, 그 레코드 +0x2c 로 선다', () => {
+    const progress = startGame(createSeededRandom(1), 0, 9, 3, undefined, 7, false, {
+      ourOrder: [2, 0, 1, 3, 4, 5, 6, 7],
+      opponentOrder: [3, 1, 2, 0, 4, 5, 6, 7],
+      opponentStaminas: [10_000, 10_000, 10_000, 6_500, 10_000, 10_000, 10_000, 10_000],
+    })
+    expect(progress.ourStartingPitcherIndex).toBe(2)
+    expect(progress.opponentStartingPitcherIndex).toBe(3)
+    expect(progress.opponentPitcherOrder).toEqual([3, 1, 2, 0, 4, 5, 6, 7])
+    expect(progress.ourPitcherStaminas).toEqual(Array(8).fill(10_000))
+  })
+
+  it('안 넘기면 날짜 g 의 4인 로테이션 — 0~3 칸이 g 칸 돈 차례, 스태미나 10000', () => {
+    const progress = startGame(createSeededRandom(1), 0, 9, 3, undefined, 5)
+    expect(progress.ourPitcherOrder).toEqual([1, 2, 3, 0, 4, 5, 6, 7])
+    expect(progress.ourStartingPitcherIndex).toBe(1)
+  })
+
+  it('경기 끝 요약이 양 팀 칸별 레코드 스태미나를 낸다 — 마운드 값까지 얹는다', () => {
+    const random = createSeededRandom(3)
+    let progress = startGame(random, 0, 9, 3)
+    for (let guard = 0; guard < 300 && !progress.game.isFinished; guard += 1) {
+      progress = applyPlayerOutcome(progress, { kind: '삼진' }, random)
+    }
+    const summary = summaryOf(progress)
+    expect(summary.pitcherStaminas?.ours[progress.ourMound.pitcherSlot]).toBe(progress.ourMound.stamina)
+    expect(summary.pitcherStaminas?.opponent[progress.opponentMound.pitcherSlot]).toBe(progress.opponentMound.stamina)
+    expect(summary.pitcherStaminas?.ours[progress.ourStartingPitcherIndex]).toBeLessThan(10_000)
+  })
+})
+
 describe('사구 — 사람 타석 결과 4 (0x35a20 → 0x9d57c) 를 경기에 먹인다', () => {
   function 내타석(bases: BaseState, outs: number): GameProgress {
     const progress = startGame(createSeededRandom(20100901))

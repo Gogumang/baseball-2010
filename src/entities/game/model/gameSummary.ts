@@ -37,4 +37,12 @@ export interface GameSummary {
     readonly loss: string | null
     readonly save: string | null
   }
+  /**
+   * 경기가 끝났을 때 양 팀 투수 칸(붙박이 표 칸 0~7)별 레코드 스태미나 `+0x2c` — 리그 표로 이어지는 값이다
+   * (하루 끝 `0xb617c` 회복 전). 리그 사람 경기 진행기(타자편)만 채운다 — **선택 칸**.
+   */
+  readonly pitcherStaminas?: {
+    readonly ours: readonly number[]
+    readonly opponent: readonly number[]
+  }
 }
