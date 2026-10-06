@@ -93,6 +93,12 @@ export interface Collection {
   readonly titles: readonly string[]
   readonly skills: readonly number[]
   readonly endings: readonly number[]
+  /**
+   * 본 시즌모드 엔딩 e (0~4) — 전역기록 `+0xa0 + e`. 새 해 0x6e0c 가 10년차 엔딩 판정 0xa3084 ≥ 0 이면 1 을 쓴다(P4 1c).
+   * 읽는 곳은 "엔딩 모두 수집" 판정 0x28e98(0x292a4~0x292b6) — 엔딩 이름은 StrMAINMENU[204~208] "비인기 … 최강".
+   * 옛 저장에는 없어 빈 목록이다.
+   */
+  readonly seasonEndings: readonly number[]
   readonly hallOfFame: readonly HallOfFamer[]
   readonly hallOfFamePitchers: readonly HallOfFamePitcher[]
   /** 열린 히든 id (0x62368 — 원본 전역 저장) */
@@ -102,7 +108,7 @@ export interface Collection {
 }
 
 export const EMPTY_COLLECTION: Collection = {
-  titles: [], skills: [], endings: [], hallOfFame: [], hallOfFamePitchers: [], openedHiddenIds: [], stats: EMPTY_ANNALS_STATS,
+  titles: [], skills: [], endings: [], seasonEndings: [], hallOfFame: [], hallOfFamePitchers: [], openedHiddenIds: [], stats: EMPTY_ANNALS_STATS,
 }
 
 const union = <T>(left: readonly T[], right: readonly T[]): T[] => [...new Set([...left, ...right])]
@@ -133,6 +139,23 @@ export function mergeEndingIntoCollection(collection: Collection, viewer: Ending
   const seen = romance === null ? [viewer.endingIndex] : [viewer.endingIndex, romance]
   if (seen.every((index) => collection.endings.includes(index))) return collection
   return { ...collection, endings: union(collection.endings, seen) }
+}
+
+/** 시즌 엔딩 e 를 켠다 (`저장+0xa0+e = 1`, 0x6e0c). 0~4 밖이거나 이미 있으면 같은 객체 */
+export function mergeSeasonEndingIntoCollection(collection: Collection, endingIndex: number | null): Collection {
+  if (endingIndex === null || !Number.isInteger(endingIndex) || endingIndex < 0 || endingIndex > SEASON_ENDING_LAST) return collection
+  if (collection.seasonEndings.includes(endingIndex)) return collection
+  return { ...collection, seasonEndings: [...collection.seasonEndings, endingIndex] }
+}
+const SEASON_ENDING_LAST = 4
+
+/**
+ * 투수편이 얻은 칭호 — 원본은 칭호를 얻을 때 0xa40e0 이 **지금 편** 쪽 기록연감 비트(투수편 `+0xec`)에 켠다(P3 10-2).
+ * 웹 칭호는 이름이라(공통 0~31 은 두 편 같은 이름 · 투수편 고유는 48~63) 이름 목록에 합치면 같은 뜻이다. 다 있으면 같은 객체.
+ */
+export function mergeTitlesIntoCollection(collection: Collection, titleIds: readonly string[]): Collection {
+  const missing = titleIds.filter((title, index) => !collection.titles.includes(title) && titleIds.indexOf(title) === index)
+  return missing.length === 0 ? collection : { ...collection, titles: [...collection.titles, ...missing] }
 }
 
 /** 미션 올 클리어 → 타자 헬멧 레벨 9 (0xa5184 — 모드 6 이면 id 37) */
@@ -365,6 +388,7 @@ export function normalizeCollection(raw: unknown): Collection {
     titles: candidate.titles,
     skills: candidate.skills,
     endings: candidate.endings,
+    seasonEndings: isNumberArray(candidate.seasonEndings) ? candidate.seasonEndings : [],
     hallOfFame,
     hallOfFamePitchers,
     openedHiddenIds,

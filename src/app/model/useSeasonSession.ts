@@ -110,7 +110,9 @@ import type { GamePointWalletSession } from '@/entities/wallet/model/useGamePoin
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 import { seasonHallOfFameRecordSourceOf } from '@/app/model/seasonHallOfFameRecords'
 import type { SeasonHallOfFame } from '@/app/model/seasonHallOfFameRecords'
-import { normalizeCollectionRewardRecord, withAwardedBit } from '@/entities/collection/model/collectionRewards'
+import {
+  normalizeCollectionRewardRecord, withAwardedBit, withStoredAwardedBits,
+} from '@/entities/collection/model/collectionRewards'
 import type { CollectionRewardRecord } from '@/entities/collection/model/collectionRewards'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { GAME_POINT_USAGE } from '@/entities/collection/model/annalsStats'
@@ -1812,12 +1814,13 @@ export function useSeasonSession(
   const awardLeagueFirst = useCallback(
     (award: LeagueFirstAward) => {
       // 0x6a56~0x6a94: G += 금액(99999 상한) → 비트 k 켜기 0x9f709 → 저장 0x1f1b9 — 팝업을 띄우는 그 자리에서 다 한다.
-      setRewardRecord((record) => withAwardedBit(record, award.bit))
+      // 같은 바이트의 k 3~7 은 메인 메뉴 전부 수집 보상(0x292f8)이 켠다 — 저장된 비트를 합친 뒤 켜야 그 비트를 안 지운다
+      setRewardRecord((record) => withAwardedBit(withStoredAwardedBits(record, rewardStore?.load()), award.bit))
       gainGamePoint(award.gamePoint)
       // 0x6a98~0x6abc: 이어서 0x22dd5(mgr, k = 0·1·2) — 통계 [mgr+0xc8] +0x106+k 달성 표시 → 통계 저장 0x1f1e1
       recordStat?.({ kind: '달성표시', index: award.bit })
     },
-    [gainGamePoint, recordStat],
+    [gainGamePoint, recordStat, rewardStore],
   )
 
   /**

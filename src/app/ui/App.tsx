@@ -33,6 +33,8 @@ import { GeneralModeScreen, aceOpenPriceOf, useAceOpen } from '@/pages/general-m
 import { useGamePointWallet } from '@/entities/wallet/model/useGamePointWallet'
 import { useAceLevels } from '@/entities/mission/model/useAceLevels'
 import type { SeasonAutobotBatInput } from '@/entities/season-mode/model/seasonRewards'
+import { judgeSeasonEnding } from '@/entities/season-mode/model/seasonRewards'
+import { SEASON_PHASE } from '@/entities/season-mode/model/seasonStateMachine'
 import { nariSeasonRecordsOf } from '@/app/model/seasonHallOfFameRecords'
 import type { RegularSeasonOtherModes } from '@/entities/career/model/postseasonFlow'
 
@@ -190,13 +192,22 @@ export function App() {
     () => [...(pitcherOpenedHiddenIds ?? []), ...seasonOpenedHiddenIds],
     [pitcherOpenedHiddenIds, seasonOpenedHiddenIds],
   )
+  // 시즌 엔딩 — 새 해 0x6e0c 가 판정 0xa3084 ≥ 0 으로 phase 6(엔딩)을 세우는 그 자리에서 전역기록 +0xa0+e = 1
+  const seasonRecord = seasonSession.state?.record ?? null
+  const seasonEndingIndex = seasonRecord !== null && seasonRecord.phase === SEASON_PHASE.엔딩
+    ? judgeSeasonEnding(seasonRecord)
+    : null
+  const everyMissionCleared = isEveryMissionCleared(mission.clearedKeys)
   const collection = useCollection(
     collectionStore,
     careerSession.career,
-    isEveryMissionCleared(mission.clearedKeys),
+    everyMissionCleared,
     sharedOpenedHiddenIds,
     // 엔딩 적재 0x87c7c 는 두 편 공용 — 투수편 엔딩·연애 엔딩도 기록연감 칸에 켠다
     pitcherSession.career,
+    // 투수편 칭호도 기록연감 칭호 칸(투수편 비트 +0xec)에 켠다 (0xa40e0)
+    pitcherSession.career?.titleIds,
+    seasonEndingIndex,
   )
   const { recordStat: recordCollectionStat } = collection
   hallOfFameForMissionRef.current = collection.collection
@@ -397,6 +408,8 @@ export function App() {
         screen={screen} setScreen={setScreen} session={careerSession} gameSettings={gameSettings}
         collection={collection.collection} random={random} wallet={wallet} aceSelect={aceSelect}
         hallOfFameDeletion={hallOfFameDeletion}
+        // 메인 메뉴 처음 단(하위 4)의 전부 수집 보상 판정 0x28e98 → 팝업 0x292f8
+        claimCollectionReward={() => collection.claimCollectionReward(collectionRewardStore, everyMissionCleared, wallet)}
       />
     )
   }

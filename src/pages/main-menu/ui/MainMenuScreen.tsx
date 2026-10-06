@@ -1,4 +1,7 @@
+import { useEffect, useRef } from 'react'
+import type { ReactNode } from 'react'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 import { NEW_GAME_CONFIRM } from '@/shared/config/original/mainMenu'
 import { entriesOf, isEntryDimmed, selectedIdOf, TOP_ENTRIES } from '@/pages/main-menu/model/mainMenu'
@@ -33,7 +36,18 @@ interface MainMenuScreenProps {
   readonly onSettings: () => void
   /** 원작 처음 메뉴의 [스페셜] (StrMAINMENU[1]) */
   readonly onSpecial: () => void
+  /**
+   * 처음 메뉴(하위 4)에 들어선 지 **열 번째 갱신** — 갱신 0x29454 가 상태 틱 `[this+0x2c] == 10`(0xbc9c8 이 상태가 같으면
+   * 1 씩 올리고 바뀌면 0 으로 되돌리는 칸)일 때 전부 수집 보상 판정 0x28e98 을 부른다(0x2951e~0x29536).
+   * 아랫단(하위 5)으로 내려가면 틱이 끊기고 돌아오면 다시 센다.
+   */
+  readonly onTopMenuTenthTick?: () => void
+  /** 메뉴 위에 얹는 것 — 전부 수집 보상 팝업 0x292f8 */
+  readonly overlay?: ReactNode
 }
+
+/** 판정을 부르는 상태 틱 (0x29520 `cmp r3,#0xa`) */
+const TOP_MENU_REWARD_TICK = 10
 
 const MAIN_UI = './sprites/main_ui'
 const IMG_TEXT = './sprites/img_text'
@@ -78,6 +92,8 @@ export function MainMenuScreen({
   onHelp,
   onSettings,
   onSpecial,
+  onTopMenuTenthTick,
+  overlay,
 }: MainMenuScreenProps) {
   const { state, dispatch } = useMainMenu(hasSavedGame, false, (effect) => {
     if (effect === '이어하기') onContinue()
@@ -95,6 +111,14 @@ export function MainMenuScreen({
   const textOrigins = useFrameOrigins(`${IMG_TEXT}/frames`)
 
   const isWheel = state.tier === 4
+
+  const tenthTickRef = useRef(onTopMenuTenthTick)
+  tenthTickRef.current = onTopMenuTenthTick
+  useEffect(() => {
+    if (!isWheel) return undefined
+    const timer = window.setTimeout(() => tenthTickRef.current?.(), millisecondsPerFrame() * TOP_MENU_REWARD_TICK)
+    return () => window.clearTimeout(timer)
+  }, [isWheel])
   const entries = entriesOf(state.tier)
   const selectedId = selectedIdOf(state)
   const selected = entries.find((entry) => entry.id === selectedId)
@@ -291,6 +315,8 @@ export function MainMenuScreen({
       <button type="button" data-turn={`${turn.direction}/${turn.counter}/${turn.fromCursor}/${scroll}`} className={styles.backButton} onClick={() => dispatch({ type: '뒤로' })}>
         {state.tier === 5 ? '‹ 처음 메뉴' : '‹ 타이틀'}
       </button>
+
+      {overlay}
     </RawScreen>
   )
 }

@@ -52,12 +52,20 @@ interface EntryRoutesProps {
   }
   /** 스페셜 명예의 전당 "슬롯에서 삭제" — 앱이 기록연감·시즌 명단 정리를 묶어 넘긴다 */
   readonly hallOfFameDeletion?: HallOfFameDeletion
+  /**
+   * 전부 수집 보상 판정·지급(0x28e98 → 0x292f8) — 줄 것이 있으면 지급까지 마치고 팝업 글을, 없으면 null.
+   * 메인 메뉴 처음 단 열 번째 갱신에 부르고, 팝업을 닫으면 곧바로 다시 부른다([this+0x2c] = 9 → 다음 갱신 10).
+   */
+  readonly claimCollectionReward?: () => string | null
 }
 
 /** 커리어가 아직 없을 때의 화면 — 타이틀 → 메인 메뉴(도움말) → 선수 등록. */
 export function EntryRoutes({
-  screen, setScreen, session, gameSettings, collection, random, wallet, aceSelect, hallOfFameDeletion,
+  screen, setScreen, session, gameSettings, collection, random, wallet, aceSelect, hallOfFameDeletion, claimCollectionReward,
 }: EntryRoutesProps) {
+  /** 전부 수집 보상 팝업 글 (0x292f8 의 `0xbbef9(글, 1, −1, 1)`) — 메뉴 위에 뜬다 */
+  const [collectionRewardText, setCollectionRewardText] = useState<string | null>(null)
+  const claimReward = () => setCollectionRewardText(claimCollectionReward?.() ?? null)
   /**
    * 홈런더비 선수 고르기 결과 (하위 16 0x29ac8 — 코드 2 나리 타자 · 4 명예 타자, 전역기록 +0xa6).
    * null 이면 아직 안 골랐다 — 들어올 때마다 0x25e6c → 0x5eb8c 가 +0xa6 을 −1 로 되돌리고 다시 고르게 한다.
@@ -255,6 +263,10 @@ export function EntryRoutes({
       onHelp={() => setScreen({ kind: '도움말' })}
       onSettings={() => setScreen({ kind: '환경설정' })}
       onSpecial={() => setScreen({ kind: '스페셜' })}
+      onTopMenuTenthTick={claimReward}
+      overlay={collectionRewardText !== null && (
+        <MessageBox text={collectionRewardText} buttons={['OK']} onAnswer={claimReward} />
+      )}
     />
   )
 }

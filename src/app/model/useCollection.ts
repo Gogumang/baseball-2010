@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   mergeCareerIntoCollection,
   mergeEndingIntoCollection,
+  mergeSeasonEndingIntoCollection,
+  mergeTitlesIntoCollection,
   normalizeCollection,
   openHiddenForMissions,
   registerHallOfFame,
@@ -17,6 +19,10 @@ import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCaree
 import { equippedPitcherAbilityOf } from '@/entities/pitcher-career/model/pitcherCareer'
 import { equippedAbilityOf } from '@/entities/career/model/condition'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
+import {
+  collectionRewardGamePointOf, collectionRewardStatModeOf, collectionRewardTextOf, judgeCollectionReward,
+  normalizeCollectionRewardRecord, withAwardedBit,
+} from '@/entities/collection/model/collectionRewards'
 
 const NO_IDS: readonly number[] = []
 
@@ -26,6 +32,12 @@ export interface HallOfFameWallet {
   readonly spend: (price: number) => void
 }
 const NO_EVENTS: readonly string[] = []
+const NO_TITLES: readonly string[] = []
+
+/** 전부 수집 보상이 G 를 넣는 전역 지갑 `mgr[+0x64]` — `gain` 이 0~99999 로 자른다(0x293a2~0x293b6 과 같다) */
+export interface CollectionRewardWallet {
+  readonly gain: (amount: number) => void
+}
 
 /**
  * 히든 오픈 id 를 전역 표에 더한다 — 이미 다 있으면 같은 객체를 돌려줘 저장·렌더를 되풀이하지 않는다.
@@ -55,8 +67,23 @@ export function useCollection(
   isEveryMissionCleared: boolean,
   pitcherOpenedHiddenIds: readonly number[] = NO_IDS,
   pitcherEnding: EndingViewer | null = null,
+  pitcherTitleIds: readonly string[] = NO_TITLES,
+  seasonEndingIndex: number | null = null,
 ) {
   const [collection, setCollection] = useState<Collection>(() => normalizeCollection(store.load()))
+  /** 판정이 읽는 지금 값 — 팝업을 닫고 곧바로 다시 판정할 때 렌더를 기다리지 않는다 */
+  const collectionRef = useRef(collection)
+  collectionRef.current = collection
+
+  // 투수편 칭호 — 0xa40e0 이 투수편 기록연감 비트(+0xec)에 켠다
+  useEffect(() => {
+    setCollection((previous) => mergeTitlesIntoCollection(previous, pitcherTitleIds))
+  }, [pitcherTitleIds])
+
+  // 시즌 엔딩 — 새 해 0x6e0c 가 엔딩으로 갈 때 전역기록 +0xa0+e = 1
+  useEffect(() => {
+    setCollection((previous) => mergeSeasonEndingIntoCollection(previous, seasonEndingIndex))
+  }, [seasonEndingIndex])
 
   useEffect(() => {
     if (career === null) return
@@ -110,7 +137,46 @@ export function useCollection(
     setCollection((previous) => ({ ...previous, stats: applyAnnalsStat(previous.stats, event) }))
   }, [])
 
-  return { collection, register, registerPitcher, deleteHallOfFamer, recordStat }
+  /**
+   * **전부 수집 보상** — 메인 메뉴 하위 4 갱신 0x29454 가 그 상태 열 번째 갱신([this+0x2c] == 10)에서 부른다:
+   * ```
+   * k = 0x28e98(this)            ; 판정 — 맞으면 그 자리에서 0x22dd5(mgr, k) 달성 표시 · 통계 저장 0x1f1e1
+   * k ≥ 0: 0x292f8(this, k)      ; 팝업 [180+k]+[188] · 비트 k 0x9f709 · G += 0xcebd4[k]×1000 (0~99999) · 저장 0x1f1b9
+   *                               ;   · 0x22c7d(mgr, 보상, 모드) · 통계 저장
+   *        [this+0x2c] = 9       ; 다음 갱신이 다시 10 이라 또 판정한다 — 받을 것이 여럿이면 하나씩 이어 뜬다
+   * ```
+   * 지급 비트는 시즌 세션과 같이 쓰는 저장 칸(`rewardStore`)에서 바로 읽고 바로 쓴다. 줄 것이 없으면 null, 있으면 팝업 글.
+   */
+  const claimCollectionReward = useCallback(
+    (rewardStore: JsonStorePort, isEveryMissionCleared: boolean, wallet: CollectionRewardWallet): string | null => {
+      const current = collectionRef.current
+      const record = normalizeCollectionRewardRecord(rewardStore.load())
+      const kind = judgeCollectionReward({
+        record,
+        isEveryMissionCleared,
+        stats: current.stats,
+        titles: current.titles,
+        endings: current.endings,
+        seasonEndings: current.seasonEndings,
+      })
+      if (kind < 0) return null
+      const amount = collectionRewardGamePointOf(kind)
+      // 판정 쪽 0x22dd5 → 팝업 쪽 0x22c7d 차례 그대로 쌓는다 (다음 판정은 이 두 칸을 안 본다)
+      setCollection((previous) => ({
+        ...previous,
+        stats: applyAnnalsStat(
+          applyAnnalsStat(previous.stats, { kind: '달성표시', index: kind }),
+          { kind: 'G획득', mode: collectionRewardStatModeOf(kind), amount },
+        ),
+      }))
+      rewardStore.save(withAwardedBit(record, kind))
+      wallet.gain(amount)
+      return collectionRewardTextOf(kind)
+    },
+    [],
+  )
+
+  return { collection, register, registerPitcher, deleteHallOfFamer, recordStat, claimCollectionReward }
 }
 
 /** 등록 목록 칸 0·5 에 그리는 나리 선수 — 이름과 능력치 도형 값 `0xb6415(기록, k, 1)` */
