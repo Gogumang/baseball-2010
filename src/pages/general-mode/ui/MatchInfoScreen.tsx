@@ -20,12 +20,12 @@ const IMG_TEXT_FRAME = './sprites/img_text/frames'
  * 바닥비트 — 그림 0x2e0c4 의 모드 1(일반모드, [메뉴+0x13c] == 1) 갈래 (0x2e128~0x2e15e, 직접 떴다):
  * 기본 0x44(되돌아가기 + "0경기설정"), 빠른실행([메뉴+0x14c])이고 재굴림이 안 돌 때([skin+0xf4] == 0) +0x20 "#재선택".
  * 설정 창([skin+0x2ba])이 떠 있으면 0x20 을 끄고 0x40 을 뒤집는다 → 4.
- * [skin+0xf4] 는 '*' 재굴림이 도는 20틱 동안 서는 칸이다(0x311f8 · 0x31424 가 세우고 0x3128c 가 내림) — 웹 재굴림은
- * 한 번에 끝나 늘 0 이다. "#재선택" 표시지만 재굴림 키는 '*'(0x312e6 `cmp r4, #0x2a`)다. 원본 그대로 둔다.
+ * [skin+0xf4] 는 '*' 재굴림이 도는 20틱 동안 서는 칸이다(0x31424 가 세우고 0x3128c 가 내림) — 그동안은 0x44.
+ * 설정 창은 도는 동안 열릴 수 없다(키를 안 받는다). "#재선택" 표시지만 재굴림 키는 '*'(0x312e6 `cmp r4, #0x2a`)다. 원본 그대로 둔다.
  * (모드 8·9 대전 갈래 0x2e162~ 는 4 / 빠른실행 0x24 — 웹에 대전모드가 없다.)
  */
-const generalMatchInfoFooterOf = (isQuickStart: boolean, isSettingsOpen: boolean): number => {
-  let footer = isQuickStart ? 0x64 : 0x44
+const generalMatchInfoFooterOf = (isQuickStart: boolean, isRespinning: boolean, isSettingsOpen: boolean): number => {
+  let footer = isQuickStart && !isRespinning ? 0x64 : 0x44
   if (isSettingsOpen) footer = (footer & ~0x20) ^ 0x40
   return footer
 }
@@ -38,6 +38,8 @@ export interface MatchInfoScreenProps {
   readonly isQuickStart?: boolean
   /** 경기진행 설정 창이 떠 있는가 (skin+0x2ba) — 바닥이 되돌아가기(4)만 남는다 */
   readonly isSettingsOpen?: boolean
+  /** `*` 재굴림이 도는 중인가 (skin+0xf4) — 그동안 키를 전부 버린다(0x312b6) */
+  readonly isRespinning?: boolean
   /** 머리띠 G포인트 — 들고 있는 곳에서만 넘긴다 (팀 고르기 화면과 같은 규칙) */
   readonly gamePoint?: number
   /** OK/'5' — 경기 시작 (저장을 쓰고 경기 장면 0x104 로) */
@@ -69,7 +71,7 @@ export interface MatchInfoScreenProps {
  *   - '4'/왼 → 유저 팀 · '6'/오른 → CPU 팀(보기 전용) **엔트리 편집**(상태 23, 편집기 0x55864)
  */
 export function MatchInfoScreen({
-  setup, isQuickStart = false, isSettingsOpen = false, gamePoint = 0, onStart, onOpenSettings, onRespin, onCancel, onOpenEntry,
+  setup, isQuickStart = false, isSettingsOpen = false, isRespinning = false, gamePoint = 0, onStart, onOpenSettings, onRespin, onCancel, onOpenEntry,
   userStarterName = null, cpuMatchInfo = null,
 }: MatchInfoScreenProps) {
   const sltOrigins = useFrameOrigins(SLT_FRAME)
@@ -78,6 +80,8 @@ export function MatchInfoScreen({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      // 0x311a8: 빠른실행이고 [메뉴+0x154] ≤ 0x13(재굴림이 도는 중)이면 312ba 에서 끝 — 키를 안 본다
+      if (isRespinning) return
       if (event.key === 'Enter') {
         event.preventDefault()
         return onStart()
@@ -106,7 +110,7 @@ export function MatchInfoScreen({
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [isQuickStart, onStart, onOpenSettings, onRespin, onCancel, onOpenEntry])
+  }, [isQuickStart, isRespinning, onStart, onOpenSettings, onRespin, onCancel, onOpenEntry])
 
   const { anchorA, anchorB, firstBatTag } = MATCH_INFO_LAYOUT
   const isUserFirstBat = setup.playerSide === PLAYER_SIDE_FIRST_BAT
@@ -199,7 +203,7 @@ export function MatchInfoScreen({
       {/* 머리띠(제목 12 "경기정보")·바닥띠 — 원본 공용 목록 k 4 도 이 둘을 얹는다 (P6 1-1 · 2a-6) */}
       {/* 바닥띠의 "되돌아가기" 가 원본 소프트키다 — 따로 두었던 버튼은 없앴다 (스테이지 (0,0) 에 떨어져 있었다) */}
       <ScreenFrame title="경기정보" gamePoint={gamePoint} onBack={onCancel}
-        footer={generalMatchInfoFooterOf(isQuickStart, isSettingsOpen)} />
+        footer={generalMatchInfoFooterOf(isQuickStart, isRespinning, isSettingsOpen)} />
     </RawScreen>
   )
 }

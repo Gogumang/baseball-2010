@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { FULL_PLAY_SETTINGS } from '@/features/play-team-game/model/matchSettings'
 import type { MatchProgressSettings } from '@/features/play-team-game/model/matchSettings'
@@ -14,7 +14,10 @@ import { GENERAL_MODE_STEP } from '@/pages/general-mode/lib/generalModeSetup'
 import type { GeneralModeSetup } from '@/pages/general-mode/lib/generalModeSetup'
 import type { CpuMatchInfo } from '@/pages/general-mode/lib/matchInfoLines'
 import type { GeneralModeFlowState } from '@/pages/general-mode/lib/generalModeFlow'
-import { rollQuickStart } from '@/pages/general-mode/lib/quickStart'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import {
+  QUICK_RESPIN_TICKS, finishQuickRespin, rollQuickRespinTeams, rollQuickStart,
+} from '@/pages/general-mode/lib/quickStart'
 import type { QuickStartOpenState } from '@/pages/general-mode/lib/quickStart'
 import { teamGameOptionsOf } from '@/pages/general-mode/lib/generalModeSetup'
 import {
@@ -71,6 +74,8 @@ export interface GeneralModeSession {
   readonly isPlaying: boolean
   /** 경기진행 설정 창이 떠 있는가 (skin+0x2ba) */
   readonly isSettingsOpen: boolean
+  /** `*` 재굴림이 도는 중인가 (skin+0xf4) — 그동안 경기정보 키를 안 받고(0x312b6) 바닥이 0x44 다 */
+  readonly isRespinning: boolean
   /** 지금 기록으로 만든 경기 옵션 */
   readonly gameOptions: TeamGameOptions
   readonly actions: {
@@ -142,13 +147,47 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
    */
   const [userEntryRoster, setUserEntryRoster] = useState<SeasonTeamRoster | null>(null)
 
+  /**
+   * `*` 재굴림 (0x311a8). 키 '*'(0x31424)는 [skin+0xf4] = 1 · [메뉴+0x154] = 0 만 하고, 굴림은 그 뒤 **매 틱**
+   * 갱신 앞머리(31200~)가 한다: 1~19틱은 팀 둘만(`rollQuickRespinTeams`), 20틱째에 선공·마선수까지 굴리고
+   * [skin+0xf4] = 0 → `0x30f20`(31290). 도는 동안([메뉴+0x154] ≤ 0x13) 키는 전부 버린다(312b6).
+   * `respinTick` = [메뉴+0x154] (도는 중이 아니면 null). `respinBuilt` = 0x30f20 이 마지막으로 세운 두 팀 —
+   * 도는 동안 기록 +0 · +4 는 바뀌지만 선발 줄은 0x30f20 이 만든 팀 객체(0xb51fd)를 읽으므로 옛 팀이 남는다.
+   */
+  const [respinTick, setRespinTick] = useState<number | null>(null)
+  // 열린 것 목록은 부르는 쪽이 그릴 때마다 새 배열일 수 있다 — 틱 타이머가 그 때문에 다시 걸리지 않게 ref 로 읽는다
+  const openStateRef = useRef<QuickStartOpenState>({})
+  openStateRef.current = { openedHiddenTeamIds, openedAcePitcherIds, openedAceBatterIds }
+  const [respinBuilt, setRespinBuilt] = useState<{ readonly userTeamId: number; readonly aiTeamId: number } | null>(null)
+
   const respin = useCallback(() => {
-    setUserEntryRoster(null)
-    // 재굴림이 멈추는 틱(0x311a8 의 31238 `cmp #0x14`)에 기록을 굴리고 곧장 0x30f20 (31290)
-    const setup = rollQuickStart(random, { openedHiddenTeamIds, openedAcePitcherIds, openedAceBatterIds })
-    setRolls(rollsOf(setup, random))
-    setFlow((current) => withSetup(current, setup))
-  }, [random, openedHiddenTeamIds, openedAcePitcherIds, openedAceBatterIds])
+    // 0x3140e: 빠른실행([메뉴+0x14c])이고 [skin+0xf4] == 0 일 때만
+    if (!flow.isQuickStart || flow.step !== GENERAL_MODE_STEP.경기정보 || respinTick !== null) return
+    setRespinBuilt({ userTeamId: flow.setup.userTeamId, aiTeamId: flow.setup.aiTeamId })
+    setRespinTick(0)
+  }, [flow, respinTick])
+
+  useEffect(() => {
+    if (respinTick === null) return undefined
+    const timer = window.setTimeout(() => {
+      const tick = respinTick + 1
+      if (tick < QUICK_RESPIN_TICKS) {
+        const teams = rollQuickRespinTeams(random, openStateRef.current)
+        setFlow((current) => withSetup(current, { ...current.setup, ...teams }))
+        setRespinTick(tick)
+        return
+      }
+      // 20틱째 — 팀 둘 · 선공 · 마투수 · 마타자 → [skin+0xf4] = 0 → 0x30f20. 고친 엔트리도 여기서 사라진다
+      const setup = finishQuickRespin(random, flow.setup, openStateRef.current)
+      setUserEntryRoster(null)
+      setRolls(rollsOf(setup, random))
+      setFlow((current) => withSetup(current, setup))
+      setRespinBuilt(null)
+      setRespinTick(null)
+    }, millisecondsPerFrame())
+    return () => window.clearTimeout(timer)
+  }, [respinTick, flow.setup, random])
+  const isRespinning = respinTick !== null
 
   /** 상태 21 OK — 마타자를 고르면 22 로 들어가며 0x30f20 이 굴린다 */
   const selectAce = useCallback(
@@ -179,9 +218,10 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
    * 고친 명단은 **맞바꾸기 전** 모양으로 들고 있다 — 경기는 그 차례에서 k 번을 선발로 세우므로(`startTeamGame`)
    * 편집기의 투수 0번과 같은 투수다.
    */
+  const builtTeams = respinBuilt ?? flow.setup
   const entrySourceOf = useCallback(
     (isUserTeam: boolean): SeasonEntryInput => {
-      const teamId = isUserTeam ? flow.setup.userTeamId : flow.setup.aiTeamId
+      const teamId = isUserTeam ? builtTeams.userTeamId : builtTeams.aiTeamId
       const roster = (isUserTeam ? userEntryRoster : null) ?? tableRosterOf(teamId)
       const starterSlot = rolls === null
         ? 0
@@ -195,7 +235,7 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
         aceBatterId: isUserTeam ? flow.setup.aceBatterId : (rolls?.opponentAces.batter ?? -1),
       }
     },
-    [flow.setup, rolls, userEntryRoster],
+    [builtTeams.userTeamId, builtTeams.aiTeamId, flow.setup.acePitcherId, flow.setup.aceBatterId, rolls, userEntryRoster],
   )
 
   const openEntry = useCallback(
@@ -249,11 +289,11 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
 
   const isMatchInfo = flow.step === GENERAL_MODE_STEP.경기정보
   const userStarterName = isMatchInfo && (rolls !== null || userEntryRoster !== null)
-    ? seasonStarterNameOf(flow.setup.userTeamId, entrySourceOf(true).roster, 0)
+    ? seasonStarterNameOf(builtTeams.userTeamId, entrySourceOf(true).roster, 0)
     : null
   const cpuMatchInfo: CpuMatchInfo | null = isMatchInfo && rolls !== null
     ? {
-        starterName: seasonStarterNameOf(flow.setup.aiTeamId, entrySourceOf(false).roster, 0) ?? '-',
+        starterName: seasonStarterNameOf(builtTeams.aiTeamId, entrySourceOf(false).roster, 0) ?? '-',
         acePitcherId: rolls.opponentAces.pitcher,
         aceBatterId: rolls.opponentAces.batter,
       }
@@ -269,20 +309,27 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
       selectStadium: (stadiumId: number) => setFlow((current) => chooseStadium(current, stadiumId)),
       selectAce,
       respin,
-      openSettings: () => setSettingsOpen(true),
+      // 도는 동안([메뉴+0x154] ≤ 0x13)은 312b6 에서 끝나 키 처리까지 가지 않는다
+      openSettings: () => {
+        if (!isRespinning) setSettingsOpen(true)
+      },
       closeSettings: () => setSettingsOpen(false),
       applySettings: (next: MatchProgressSettings) => {
         setSettings(next)
         setSettingsOpen(false)
       },
-      start: () => setPlaying(true),
-      back,
-      openEntry,
+      start: () => {
+        if (!isRespinning) setPlaying(true)
+      },
+      back: () => (isRespinning ? true : back()),
+      openEntry: (isUserTeam: boolean) => {
+        if (!isRespinning) openEntry(isUserTeam)
+      },
       pressEntryKey: pressEntryKeyAction,
       pointEntryCursor: pointEntryCursorAction,
       closeEntryAceLocked,
     }),
-    [respin, selectAce, back, openEntry, pressEntryKeyAction, pointEntryCursorAction, closeEntryAceLocked],
+    [respin, isRespinning, selectAce, back, openEntry, pressEntryKeyAction, pointEntryCursorAction, closeEntryAceLocked],
   )
 
   const gameOptions = useMemo(
@@ -300,7 +347,7 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
   )
 
   return {
-    flow, entryEdit, userStarterName, cpuMatchInfo, settings, isPlaying, isSettingsOpen, gameOptions, actions,
+    flow, entryEdit, userStarterName, cpuMatchInfo, settings, isPlaying, isSettingsOpen, isRespinning, gameOptions, actions,
   }
 }
 

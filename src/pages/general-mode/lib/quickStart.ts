@@ -13,7 +13,9 @@
  * 31546: 0x9f604(저장) → [rec+0xd] 마타자
  * ```
  *
- * 경기정보에서 `*` 를 누르면 20틱 동안 이 굴림을 매 틱 되풀이하다 멈춘다(슬롯머신, R4 3b).
+ * 경기정보에서 `*` 를 누르면 20틱 동안 **팀 둘만** 매 틱 다시 뽑다가 20번째 틱에 선공·마선수까지 뽑고 멈춘다
+ * (0x311a8, 아래 `rollQuickRespinTeams` · `finishQuickRespin`). R4 3b 의 "매 틱 다섯을 다 굴린다 · 구장 = 유저 팀" 은
+ * 0x314b0(진입)과 섞인 것이다 — 재굴림은 구장을 안 건드린다.
  */
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -88,5 +90,40 @@ export function rollQuickStart(random: RandomPort, open: QuickStartOpenState = {
   return { userTeamId, aiTeamId, playerSide, stadiumId: userTeamId, aceBatterId, acePitcherId }
 }
 
-/** 경기정보에서 `*` 를 눌렀을 때 도는 틱 수 (메뉴+0x154 가 0 에서 20 까지, R4 3b) */
+/** 경기정보에서 `*` 를 눌렀을 때 도는 틱 수 (메뉴+0x154 가 0 에서 20 까지, 0x31238 `cmp #0x14`) */
 export const QUICK_RESPIN_TICKS = 20
+
+/**
+ * **`*` 재굴림 한 틱** — 0x311a8 의 31200~31230 (직접 떴다). [메뉴+0x14c](빠른실행) && [skin+0xf4](0x31424 가 세움)
+ * 인 동안 매 틱 [메뉴+0x154]++ 하고 `0x9f5a0(저장)` 을 두 번 — 기록 +0(유저 팀) · +4(AI 팀)만 새로 적는다
+ * (31296~312a4 가 나머지 +8 · +0xc 를 옛 값 그대로 되적는다). 그래서 화면은 두 엠블럼만 돈다.
+ */
+export function rollQuickRespinTeams(
+  random: RandomPort,
+  open: QuickStartOpenState = {},
+): { readonly userTeamId: number; readonly aiTeamId: number } {
+  const candidates = quickStartTeamCandidates(open.openedHiddenTeamIds)
+  const userTeamId = candidates[uniform(random, candidates.length)]
+  const aiTeamId = candidates[uniform(random, candidates.length)]
+  return { userTeamId, aiTeamId }
+}
+
+/**
+ * **재굴림 20번째 틱** — 31238 `cmp [메뉴+0x154], #0x14` 가 맞으면 그 틱의 팀 둘 뒤에 `bfa55(0,2)`(선공 +8) ·
+ * `0x9f650`(마투수 +0xe) · `0x9f604`(마타자 +0xd) 을 굴려 적고 [skin+0xf4] = 0(3128c), 이어 `0x30f20`(31290).
+ *
+ * ⚠️ **원본 그대로 — 구장(+0xc)은 안 바꾼다.** 진입 0x314b0 은 구장 = 유저 팀(3152e)이지만 여기는 +0xc 낱말을
+ * 옛 값으로 되적고 +0xd · +0xe 바이트만 고친다(31262 · 31272 → 31280 `ldr [sp+0x2c]`). 재굴림 뒤 구장은
+ * 처음 유저 팀의 구장으로 남는다.
+ */
+export function finishQuickRespin(
+  random: RandomPort,
+  previous: GeneralModeSetup,
+  open: QuickStartOpenState = {},
+): GeneralModeSetup {
+  const { userTeamId, aiTeamId } = rollQuickRespinTeams(random, open)
+  const playerSide = uniform(random, 2) !== 0 ? PLAYER_SIDE_LAST_BAT : PLAYER_SIDE_FIRST_BAT
+  const acePitcherId = rollAce(random, open.openedAcePitcherIds)
+  const aceBatterId = rollAce(random, open.openedAceBatterIds)
+  return { ...previous, userTeamId, aiTeamId, playerSide, aceBatterId, acePitcherId }
+}

@@ -181,6 +181,7 @@ export function GeneralModeScreen(props: GeneralModeScreenProps) {
             setup={flow.setup}
             isQuickStart={flow.isQuickStart}
             isSettingsOpen={session.isSettingsOpen}
+            isRespinning={session.isRespinning}
             userStarterName={session.userStarterName}
             cpuMatchInfo={session.cpuMatchInfo}
             onStart={actions.start}

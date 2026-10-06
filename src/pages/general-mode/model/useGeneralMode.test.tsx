@@ -1,11 +1,14 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { rollTeamSetup, startTeamGame } from '@/features/play-team-game/model/teamGameFlow'
 import { teamPitchers } from '@/entities/team/model/teamRoster'
 import { swapWithStarter } from '@/entities/pitcher-career/model/pitcherRotation'
-import { rollQuickStart } from '@/pages/general-mode/lib/quickStart'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import {
+  QUICK_RESPIN_TICKS, finishQuickRespin, rollQuickRespinTeams, rollQuickStart,
+} from '@/pages/general-mode/lib/quickStart'
 import { useGeneralMode } from '@/pages/general-mode/model/useGeneralMode'
 
 /**
@@ -86,16 +89,61 @@ describe('일반모드 0x30f20 굴림 넷은 상태 22 진입에서 돈다', () 
     expect(result.current.userStarterName).toBe(편집기선발)
   })
 
-  it('재굴림(*)은 기록 굴림 뒤에 0x30f20 을 다시 돈다 (31290)', () => {
-    const { result } = 빠른실행()
-    const 따로 = createSeededRandom(씨앗)
-    const 처음 = rollQuickStart(따로, 열림)
-    rollTeamSetup(처음.acePitcherId, 처음.aceBatterId, 따로)
-    act(() => result.current.actions.respin())
-    const setup = rollQuickStart(따로, 열림)
-    const 굴림 = rollTeamSetup(setup.acePitcherId, setup.aceBatterId, 따로)
-    expect(result.current.flow.setup).toEqual(setup)
-    expect(result.current.gameOptions.opponentAces).toEqual(굴림.opponentAces)
-    expect(result.current.gameOptions.startingPitcherSlots).toEqual(굴림.startingPitcherSlots)
+  it('재굴림(*)은 20틱 동안 팀 둘만 굴리다 20틱째 선공·마선수 뒤에 0x30f20 을 다시 돈다 (0x311a8)', () => {
+    vi.useFakeTimers()
+    try {
+      const { result } = 빠른실행()
+      const 따로 = createSeededRandom(씨앗)
+      const 처음 = rollQuickStart(따로, 열림)
+      const 처음굴림 = rollTeamSetup(처음.acePitcherId, 처음.aceBatterId, 따로)
+      const 처음선발 = result.current.userStarterName
+      act(() => result.current.actions.respin())
+      expect(result.current.isRespinning).toBe(true)
+
+      for (let 틱 = 1; 틱 < QUICK_RESPIN_TICKS; 틱 += 1) {
+        const 팀 = rollQuickRespinTeams(따로, 열림)
+        act(() => { vi.advanceTimersByTime(millisecondsPerFrame()) })
+        // 기록 +0 · +4 만 바뀐다 — 선공·구장·마선수와 0x30f20 이 세운 선발 줄은 그대로
+        expect(result.current.flow.setup).toEqual({ ...처음, ...팀 })
+        expect(result.current.userStarterName).toBe(처음선발)
+        expect(result.current.gameOptions.startingPitcherSlots).toEqual(처음굴림.startingPitcherSlots)
+      }
+      const setup = finishQuickRespin(따로, result.current.flow.setup, 열림)
+      const 굴림 = rollTeamSetup(setup.acePitcherId, setup.aceBatterId, 따로)
+      act(() => { vi.advanceTimersByTime(millisecondsPerFrame()) })
+
+      expect(result.current.isRespinning).toBe(false)
+      expect(result.current.flow.setup).toEqual(setup)
+      // ⚠️ 원본 그대로 — 재굴림은 구장(+0xc)을 안 바꾼다
+      expect(result.current.flow.setup.stadiumId).toBe(처음.stadiumId)
+      expect(result.current.gameOptions.opponentAces).toEqual(굴림.opponentAces)
+      expect(result.current.gameOptions.startingPitcherSlots).toEqual(굴림.startingPitcherSlots)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('재굴림이 도는 동안은 키를 안 받는다 — 시작·설정·엔트리·CLR·다시 * (0x312b6)', () => {
+    vi.useFakeTimers()
+    try {
+      const { result } = 빠른실행()
+      act(() => result.current.actions.respin())
+      act(() => { vi.advanceTimersByTime(millisecondsPerFrame()) })
+      act(() => {
+        result.current.actions.start()
+        result.current.actions.openSettings()
+        result.current.actions.openEntry(true)
+      })
+      expect(result.current.isPlaying).toBe(false)
+      expect(result.current.isSettingsOpen).toBe(false)
+      expect(result.current.entryEdit).toBeNull()
+      let 처리됨 = false
+      act(() => { 처리됨 = result.current.actions.back() })
+      expect(처리됨).toBe(true)
+      for (let 틱 = 2; 틱 <= QUICK_RESPIN_TICKS; 틱 += 1) act(() => { vi.advanceTimersByTime(millisecondsPerFrame()) })
+      expect(result.current.isRespinning).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

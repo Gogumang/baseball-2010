@@ -88,6 +88,19 @@ describe('빠른실행 재선택', () => {
     expect(onRespin).not.toHaveBeenCalled()
   })
 
+  it('재굴림이 도는 동안은 키를 안 받는다 (0x311a8 312b6)', () => {
+    const onRespin = vi.fn()
+    const onStart = vi.fn()
+    const onCancel = vi.fn()
+    띄우기({ isQuickStart: true, isRespinning: true, onRespin, onStart, onCancel })
+
+    for (const key of ['*', 'Enter', 'Escape']) fireEvent.keyDown(window, { key })
+
+    expect(onRespin).not.toHaveBeenCalled()
+    expect(onStart).not.toHaveBeenCalled()
+    expect(onCancel).not.toHaveBeenCalled()
+  })
+
   it("빠른실행이면 '*' 로 결정사항을 다시 굴린다", () => {
     const onRespin = vi.fn()
     띄우기({ isQuickStart: true, onRespin })
@@ -141,6 +154,11 @@ describe('바닥 (0x2e0c4 모드 1 갈래)', () => {
   it('빠른실행이면 0x64 — "#재선택"(프레임 5)이 붙는다', () => {
     const { container } = 띄우기({ isQuickStart: true })
     expect(marks(container)).toEqual([5, 6])
+  })
+
+  it("빠른실행이라도 '*' 재굴림이 도는 동안([skin+0xf4])은 0x44 — \"#재선택\" 이 빠진다", () => {
+    const { container } = 띄우기({ isQuickStart: true, isRespinning: true })
+    expect(marks(container)).toEqual([6])
   })
 
   it('설정 창이 떠 있으면 4 — 되돌아가기만 (0x20 끄고 0x40 뒤집기)', () => {
