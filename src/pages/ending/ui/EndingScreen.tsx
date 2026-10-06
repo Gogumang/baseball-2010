@@ -1,16 +1,19 @@
-import { useState, type ReactNode } from 'react'
-import { FrameSprite, MarkupText, MessageBox, RawScreen } from '@/shared/ui'
+import { useState, type CSSProperties, type ReactNode } from 'react'
+import { MarkupText, MessageBox, RawScreen } from '@/shared/ui'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
+import type { FrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
+import { useRecoloredSprite } from '@/shared/lib/sprite/paletteSwap'
 import { ORIGINAL_ENDINGS } from '@/shared/config/original/endings'
 import type { HallOfFameResult } from '@/entities/collection/model/collection'
+import { romanceEndingIndexOf, romanceEventsSeenOf } from '@/entities/career/model/seasonFlow'
 import {
-  BAND_BACKGROUND, BAND_WINDOW, BATTER_EDITION_MODE, CREDITS, ENDING_IMAGE, ENDING_IMAGE_TICKS,
-  ENDING_TEXT, IRIS, IRIS_STAGES, SCREEN, WALK_IN, creditsTopOf, endingImageXOf,
-  endingWalkInAnimationOf, endingWalkInPaletteOf, irisRadiusOf,
+  BAND_BACKGROUND, BAND_WINDOW, BATTER_EDITION_MODE, CREDITS, ENDING_IMAGE, INJURY_ENDING, IRIS_COVER,
+  LAST_WALK_IN_ENDING, RISING_TEXT, SCREEN, SHORT_ENDING_TEXT_TOP, WALK_IN, creditsTopOf, creditsWalkersOf,
+  endingImageOffsetOf, endingWalkInAnimationOf, endingWalkInPaletteOf, irisCircleOf, irisStartTickOf, risingTextTopOf,
 } from '@/pages/ending/lib/endingLayout'
-import type { EndingWalkInLook } from '@/pages/ending/lib/endingLayout'
+import type { CreditsWalker, EndingWalkInLook } from '@/pages/ending/lib/endingLayout'
 import * as styles from '@/pages/ending/ui/EndingScreen.css'
 
 const ENDING_FRAMES = './sprites/ending/frames'
@@ -21,6 +24,8 @@ const imageSrc = (folder: string, id: number) => `${folder}/${String(id).padStar
 interface EndingScreenProps {
   readonly playerName: string
   readonly endingIndex: number
+  /** 본 이벤트 번호 — 연애 이벤트 300~303 이 연애 엔딩(9 + c)과 제작진 인물을 고른다 (0x87c7c) */
+  readonly seenEventIds?: readonly string[]
   /** 엔딩 보너스(0이면 부상·방출 엔딩) */
   readonly bonusGamePoint: number
   readonly isContinuable: boolean
@@ -29,8 +34,8 @@ interface EndingScreenProps {
   readonly onContinue: () => boolean
   readonly onFinish: () => void
   /**
-   * 걸어 들어오는 선수의 생김새 (레코드 +0xb, 0x63a5c). 안 주면 **타격형 황인 타자**로 본다 —
-   * 애니 2 · 팔레트 2 로, 원본이 그 비트에서 뽑는 값과 같다.
+   * 선수의 생김새 (레코드 +0xb, 0x63a5c) — 걸어 들어오는 그림과 제작진의 선수 애니·팔레트를 고른다.
+   * 안 주면 **타격형 황인 타자**로 본다 — 애니 바탕 0 · 팔레트 2 로, 원본이 그 비트에서 뽑는 값과 같다.
    */
   readonly walkInLook?: EndingWalkInLook
 }
@@ -42,6 +47,8 @@ const DEFAULT_WALK_IN_LOOK: EndingWalkInLook = {
   handIndex: 0,
   skinIndex: 0,
 }
+
+const NO_EVENTS: readonly string[] = []
 
 /** 엔딩 뒤 원문 문구 */
 const TEXT = {
@@ -65,26 +72,23 @@ interface Question {
 }
 
 /**
- * 나만의리그 엔딩 (그리기 0x882b4, 적재 0x87c7c — P6 4b).
+ * 나만의리그 엔딩 (상태 141 — 적재 0x87c7c · 그리기 0x168fc → 0x882b4 / 0x88bb4, `endingLayout.ts` 머리말).
  *
- * 띠 창(mode_ui 프레임 10 박스 0 = (0, 65, 240, 72)) 안에 mode_back 배경을 깔고,
- * ending.pzx 이미지 0 두 조각이 **1px/틱**으로 미끄러져 들어온 뒤(S9 8-1),
- * 검정 판에 뚫린 원이 커지는 **원형 전환**(S9 8-2)으로 화면이 열린다.
- * 글은 StrENDING[결과] 흰 글 가운데고, 끝에 **[21] 제작진**이 아래에서 위로 흐른다.
+ * 엔딩 번호(판정표 0xa3a84): 0 부상 · 1 방출 · 2~9 은퇴 뒤 진로. 10~14 연애는 **본 엔딩 뒤 제작진 앞에** 붙는 글이고
+ * (`romanceEndingIndexOf`), 20 은 은퇴 엔딩 글 앞의 머리말, 21 은 제작진이다.
  *
- * 엔딩 번호(판정표 0xa3a84): 0 부상 · 1 방출 · 2~9 은퇴 뒤 진로 · 10~14 연애 · 20 최고 엔딩.
- * 부상·방출(0·1)은 이어하기를 묻고, 그 밖은 엔딩 보너스를 준 뒤 명예의 전당 등록을 묻는다.
+ * 키 0x1220c: 부상·방출(0·1)은 곧장 StrMODE[221] 이어하기를 묻는다. 그 밖은 단계 1 의 키가 제작진으로 넘기고,
+ * 제작진(단계 > 2)의 키가 엔딩 보너스(StrMODE[214]) → 명예의 전당 등록(StrMODE[215])을 묻는다.
  * "나중에 등록" 은 원본에서 선수를 남겨 두지만, 웹판은 저장이 하나라 등록하지 않으면 사라진다.
  * G포인트가 모자랄 때 원본이 어디로 가는지는 미확인 — StrCOMMON[41] 을 띄우고 끝낸다 (추정).
  *
- * ⚠️ 근사한 곳: 제작진은 **게임이 실제로 끝나는 엔딩에서만** 흐르게 했다(부상·방출은 이어하기를
- * 묻는 자리라 건너뛴다) — 원본이 어느 엔딩에서 제작진을 돌리는지는 못 읽었다.
- * 그림 시작 오프셋은 `endingLayout.ts` 주석 참고. 아이리스 D(140 → 240)와 걸어 들어오는 그림
- * (event_char_0 애니 + mode_ui 프레임 87)은 S12 6·7 절에서 확정됐다.
+ * ⚠️ 근사한 곳: 단계 0(배경음이 들어오는 동안 아무것도 안 그림)과 단계 2(키 뒤 배경음이 빠지는 동안)는 배경음 페이드
+ * 끝(0x1bf54)을 기다리는데, 웹은 그 기다림 없이 바로 넘긴다 — 틀 수 n 도 화면이 뜬 때부터 센다.
  */
 export function EndingScreen(props: EndingScreenProps) {
   const { playerName, endingIndex, bonusGamePoint, isContinuable, onRegister, onContinue, onFinish } = props
   const walkInLook = props.walkInLook ?? DEFAULT_WALK_IN_LOOK
+  const seenEventIds = props.seenEventIds ?? NO_EVENTS
   const [phase, setPhase] = useState<Phase>('엔딩')
   const [message, setMessage] = useState('')
   const inform = (text: string) => {
@@ -111,21 +115,28 @@ export function EndingScreen(props: EndingScreenProps) {
     ? questions[phase]
     : null
 
-  /** 엔딩 글 → (부상·방출이면 이어하기 / 그 밖이면 제작진) → 보너스 → 등록 */
+  /** 엔딩 → (부상·방출이면 이어하기 / 그 밖이면 제작진) → 보너스 → 등록 */
   const onPress = phase === '엔딩'
     ? () => setPhase(isContinuable ? '이어하기질문' : '제작진')
     : phase === '제작진'
       ? () => setPhase(bonusGamePoint > 0 ? '보너스' : '등록질문')
       : undefined
 
+  const romanceEndingIndex = romanceEndingIndexOf(endingIndex, seenEventIds)
+  // 제작진은 은퇴 엔딩(연애 엔딩이 붙는 e 2~9)에만 있고, 그 뒤 보너스·등록 팝업도 제작진 위에 뜬다 (단계 > 2 의 키)
+  const isCredits = romanceEndingIndex !== null && phase !== '엔딩'
+
   return (
-    <EndingStage
-      playerName={playerName}
-      endingIndex={endingIndex}
-      isCredits={phase === '제작진'}
-      walkInLook={walkInLook}
-      onPress={onPress}
-    >
+    <RawScreen>
+      {isCredits
+        ? <EndingCredits romanceEndingIndex={romanceEndingIndex} romanceEvents={romanceEventsSeenOf(seenEventIds)} look={walkInLook} />
+        : endingIndex <= LAST_WALK_IN_ENDING
+          ? <ShortEnding endingIndex={endingIndex} look={walkInLook} />
+          : <RetirementEnding endingIndex={endingIndex} playerName={playerName} />}
+
+      {onPress !== undefined && (
+        <button type="button" className={styles.pressArea} aria-label="확인" onClick={onPress} />
+      )}
       {phase === '보너스' && (
         <MessageBox
           text={TEXT.bonus.replace('%d', String(bonusGamePoint))}
@@ -141,64 +152,34 @@ export function EndingScreen(props: EndingScreenProps) {
           onAnswer={(index) => (index === 0 ? question.onYes() : question.onNo())}
         />
       )}
-    </EndingStage>
+    </RawScreen>
   )
 }
 
-interface EndingStageProps {
-  readonly playerName: string
-  readonly endingIndex: number
-  readonly isCredits: boolean
-  readonly walkInLook: EndingWalkInLook
-  /** 화면을 눌러 다음으로 갈 수 있을 때만 준다 — 없으면 연출이 제자리에 멈춘다 */
-  readonly onPress?: () => void
-  readonly children?: ReactNode
-}
-
-/** 엔딩 연출 한 장 — 띠 창 + 엔딩 그림 + 원형 전환 + 글/제작진 (0x882b4) */
-function EndingStage({ playerName, endingIndex, isCredits, walkInLook, onPress, children }: EndingStageProps) {
-  /** 그림이 다 들어오면 연출이 끝난다 — 그 뒤로는 움직이는 것이 없다 */
-  const settledTick = Math.max(ENDING_IMAGE_TICKS, IRIS.fullTick)
-  const tick = Math.min(useUpdateCounter(), settledTick)
-
-  /**
-   * 원형 전환은 그림 이동량과 **다른 칸**(전환 틱 [this+0x308])이 몬다 — 화면이 열리는 것이 먼저고
-   * 그림은 그 뒤로도 계속 미끄러진다. 웹판도 같은 틱을 그대로 넣어 t ≥ 7 에 원이 화면을 다 덮는다.
-   */
-  /**
-   * 단계에 따라 D 가 다르다 (S12 6절) — 첫 단계 `0x879b6` 은 D = 140 에 중심 보정 (−58, −55),
-   * 뒤 단계 `0x87e2c` 는 D = 240 에 보정 없음이라 화면을 다 덮는다.
-   * ⚠️ 단계가 **언제** 바뀌는지는 아직 못 읽어, 첫 단계가 다 열리는 틱에 뒤 단계로 넘긴다 (근사).
-   */
-  const isFirstStage = tick < IRIS.fullTick
-  const stage = isFirstStage ? IRIS_STAGES.open : IRIS_STAGES.reveal
-  const radius = isFirstStage ? irisRadiusOf(tick, stage.diameter) : stage.diameter
-  const irisX = IRIS.centerX + stage.dx
-  const irisY = IRIS.centerY + stage.dy
-  const bandEdgeY = BAND_WINDOW.y + BAND_WINDOW.height - BAND_WINDOW.edgeHeight
-
+/** 띠 창 (0x883b6~0x88556 · 제작진 0x88bcc~0x88d64) — 가운데 박스 검정 + 박스 **바깥** 위·아래 11px 띠 + 선 */
+function BandWindow({ children }: { readonly children?: ReactNode }) {
+  const { x, y, width, height, edgeHeight } = BAND_WINDOW
+  const bottom = y + height
   return (
-    <RawScreen>
-      {/* 띠 창 (0x882b4 차례 1) — 검정 박스 + 위·아래 11px 띠 + 테두리 선 */}
+    <>
       <svg
         className={styles.overlay}
+        aria-label="띠 창"
         viewBox={`0 0 ${SCREEN.width} ${SCREEN.height}`}
         width={SCREEN.width}
         height={SCREEN.height}
         shapeRendering="crispEdges"
       >
-        {/* 화면 검정(0x6a735) → 박스 (0, 65, 240, 72) 검정 채움 → 위·아래 띠 (차례 그대로) */}
         <rect x={0} y={0} width={SCREEN.width} height={SCREEN.height} fill={BAND_WINDOW.fill} />
-        <rect x={BAND_WINDOW.x} y={BAND_WINDOW.y} width={BAND_WINDOW.width} height={BAND_WINDOW.height} fill={BAND_WINDOW.fill} />
-        <rect x={BAND_WINDOW.x} y={BAND_WINDOW.y} width={BAND_WINDOW.width} height={BAND_WINDOW.edgeHeight} fill={BAND_WINDOW.edgeColor} />
-        <rect x={BAND_WINDOW.x} y={bandEdgeY} width={BAND_WINDOW.width} height={BAND_WINDOW.edgeHeight} fill={BAND_WINDOW.edgeColor} />
-        <rect x={BAND_WINDOW.x} y={BAND_WINDOW.y} width={BAND_WINDOW.width} height={1} fill={BAND_WINDOW.outerLine} />
-        <rect x={BAND_WINDOW.x} y={BAND_WINDOW.y + 1} width={BAND_WINDOW.width} height={1} fill={BAND_WINDOW.innerLine} />
-        <rect x={BAND_WINDOW.x} y={BAND_WINDOW.y + BAND_WINDOW.height - 1} width={BAND_WINDOW.width} height={1} fill={BAND_WINDOW.outerLine} />
-        <rect x={BAND_WINDOW.x} y={BAND_WINDOW.y + BAND_WINDOW.height - 2} width={BAND_WINDOW.width} height={1} fill={BAND_WINDOW.innerLine} />
+        <rect data-part="box" x={x} y={y} width={width} height={height} fill={BAND_WINDOW.fill} />
+        <rect data-part="top" x={x} y={y - edgeHeight} width={width} height={edgeHeight} fill={BAND_WINDOW.edgeColor} />
+        <rect x={x} y={y - edgeHeight} width={width} height={1} fill={BAND_WINDOW.outerLine} />
+        <rect x={x} y={y - edgeHeight + 1} width={width} height={1} fill={BAND_WINDOW.innerLine} />
+        <rect data-part="bottom" x={x} y={bottom} width={width} height={edgeHeight} fill={BAND_WINDOW.edgeColor} />
+        <rect x={x} y={bottom + edgeHeight - 2} width={width} height={1} fill={BAND_WINDOW.innerLine} />
+        <rect x={x} y={bottom + edgeHeight - 1} width={width} height={1} fill={BAND_WINDOW.outerLine} />
       </svg>
-
-      {/* 띠 안 배경 0x7b9ad — mode_back 을 (1, 66) 에 70 높이로 자른다 */}
+      {/* 띠 안 배경 0x7b9ac(this, 1, y' + 1, −14) */}
       <div
         className={styles.bandClip}
         style={{
@@ -210,111 +191,202 @@ function EndingStage({ playerName, endingIndex, isCredits, walkInLook, onPress, 
       >
         <img className={styles.sprite} alt="" src={imageSrc(MODE_BACK_FRAMES, BAND_BACKGROUND.frame)} style={{ left: 0, top: 0 }} />
       </div>
-
-      {/* 엔딩 그림 두 조각 — 1px/틱으로 미끄러져 들어온다 (S9 8-1) */}
-      {[0, 1].map((piece) => (
-        <img
-          key={piece}
-          className={styles.sprite}
-          alt=""
-          src={imageSrc(ENDING_FRAMES, ENDING_IMAGE.image)}
-          style={{ left: endingImageXOf(tick, piece), top: ENDING_IMAGE.y }}
-        />
-      ))}
-
-      {/* 걸어 들어오는 그림 둘 — 3틱에 1px 왼쪽으로 온다 (S12 7절) */}
-      <WalkIn tick={tick} look={walkInLook} />
-
-      {/* 원형 전환 — 검정 판에 원을 뚫어 덮는다 (S9 8-2). evenodd 라 원 안쪽이 구멍이 된다 */}
-      <svg
-        className={styles.overlay}
-        aria-label="원형 전환"
-        viewBox={`0 0 ${SCREEN.width} ${SCREEN.height}`}
-        width={SCREEN.width}
-        height={SCREEN.height}
-      >
-        <path
-          fillRule="evenodd"
-          fill={IRIS.cover}
-          d={`M0,0H${SCREEN.width}V${SCREEN.height}H0Z`
-            + `M${irisX - radius},${irisY}`
-            + `a${radius},${radius} 0 1,0 ${radius * 2},0`
-            + `a${radius},${radius} 0 1,0 ${-radius * 2},0`}
-        />
-      </svg>
-
-      {isCredits
-        ? <EndingCredits />
-        : (
-          <div
-            className={styles.endingText}
-            style={{ left: ENDING_TEXT.x, top: ENDING_TEXT.y, width: ENDING_TEXT.width }}
-          >
-            <MarkupText raw={ORIGINAL_ENDINGS[endingIndex] ?? ''} replacements={[playerName]} />
-          </div>
-        )}
-
-      {onPress !== undefined && (
-        <button type="button" className={styles.pressArea} aria-label="확인" onClick={onPress} />
-      )}
       {children}
-    </RawScreen>
+    </>
+  )
+}
+
+/** 부상·방출 엔딩 (0x883b6 갈래) — 띠 창 + 걸어 들어오는 선수(+ 부상 아이콘) + StrENDING[e] */
+function ShortEnding({ endingIndex, look }: { readonly endingIndex: number; readonly look: EndingWalkInLook }) {
+  const tick = useUpdateCounter()
+  return (
+    <BandWindow>
+      <WalkIn tick={tick} look={look} hasInjuryIcon={endingIndex === INJURY_ENDING} />
+      <div
+        className={styles.endingText}
+        style={{ left: 0, top: SHORT_ENDING_TEXT_TOP, width: SCREEN.width }}
+      >
+        <MarkupText raw={ORIGINAL_ENDINGS[endingIndex] ?? ''} />
+      </div>
+    </BandWindow>
   )
 }
 
 /**
- * 걸어 들어오는 그림 (S12 7절 확정) — `event_char_0.pzx` 애니(육성 선수 캐릭터)와
- * `ui/mode_ui.pzx` 프레임 87(부상 아이콘)이 오른쪽에서 **3틱에 1px** 씩 온다.
- * `n & 7 == 0` 인 틱만 1px 위로 튄다(걸음 흔들림).
- *
- * 애니 번호는 육성 선수 레코드의 외모 비트가 고른다 — 타자 장타형이면 **8+2**, 그 밖 **0+2**
- * (0x63a5c, `endingWalkInAnimationOf`).
- *
- * ⚠️ **팔레트는 번호만 고르고 아직 칠하지 못한다**: `event_char_0.mpl` 팔레트 교체가 웹에 없다
- * (C-1 "그림 팔레트는 아직 바꾸지 않는다"). 번호는 `data-palette` 로 남겨 둔다 —
- * `shared` 에 mpl 팔레트 교체가 생기면 그 번호를 그대로 넘기면 된다.
+ * 은퇴 엔딩 2~9 (0x886ca 갈래) — ending.pzx 그림이 미끄러져 서고, 원형 전환이 e 의 자리로 닫히며,
+ * StrENDING[20] 머리말 + 본 엔딩 글이 아래에서 올라온다.
  */
-function WalkIn({ tick, look }: { readonly tick: number; readonly look: EndingWalkInLook }) {
+function RetirementEnding({ endingIndex, playerName }: { readonly endingIndex: number; readonly playerName: string }) {
+  const tick = useUpdateCounter()
+  const irisTick = tick - irisStartTickOf(endingIndex)
+  const circle = irisTick < 0 ? null : irisCircleOf(irisTick, endingIndex)
+  const prologue = ORIGINAL_ENDINGS[RISING_TEXT.prologueIndex] ?? ''
+  const story = ORIGINAL_ENDINGS[endingIndex] ?? ''
+  const risingText = `!C${prologue}${'!N'.repeat(RISING_TEXT.gapLines)}${story}`
+
+  return (
+    <>
+      <div className={styles.blackScreen} />
+      <img
+        className={styles.sprite}
+        alt=""
+        data-part="ending-image"
+        src={imageSrc(ENDING_FRAMES, ENDING_IMAGE.image)}
+        style={{ left: ENDING_IMAGE.x + endingImageOffsetOf(tick, endingIndex), top: ENDING_IMAGE.y }}
+      />
+      {/* 원형 전환 — 검정 판에 원을 뚫어 덮는다. evenodd 라 원 안쪽이 구멍이 된다 */}
+      {circle !== null && (
+        <svg
+          className={styles.overlay}
+          aria-label="원형 전환"
+          viewBox={`0 0 ${SCREEN.width} ${SCREEN.height}`}
+          width={SCREEN.width}
+          height={SCREEN.height}
+        >
+          <path
+            fillRule="evenodd"
+            fill={IRIS_COVER}
+            d={`M0,0H${SCREEN.width}V${SCREEN.height}H0Z`
+              + `M${circle.x},${circle.y + circle.diameter / 2}`
+              + `a${circle.diameter / 2},${circle.diameter / 2} 0 1,0 ${circle.diameter},0`
+              + `a${circle.diameter / 2},${circle.diameter / 2} 0 1,0 ${-circle.diameter},0`}
+          />
+        </svg>
+      )}
+      <div
+        className={styles.endingText}
+        style={{ left: RISING_TEXT.x, top: risingTextTopOf(tick), width: RISING_TEXT.width }}
+      >
+        <MarkupText raw={risingText} replacements={[playerName]} />
+      </div>
+    </>
+  )
+}
+
+/** 프레임 한 장 — 팔레트를 갈아 끼우고, 뒤집기 깃발이면 원점을 거울로 놓는다 */
+function FramePiece({ folder, frame, origins, x, y, palette = null, isFlipped = false }: {
+  readonly folder: string
+  readonly frame: number
+  readonly origins: FrameOrigins | null
+  readonly x: number
+  readonly y: number
+  readonly palette?: number | null
+  readonly isFlipped?: boolean
+}) {
+  const key = String(frame).padStart(3, '0')
+  const url = useRecoloredSprite(`${folder}/${key}.png`, palette)
+  const origin = origins?.[key]
+  if (origin === undefined) return null
+  const style: CSSProperties = isFlipped
+    ? { left: x - origin.x - origin.width, top: y + origin.y, transform: 'scaleX(-1)' }
+    : { left: x + origin.x, top: y + origin.y }
+  return <img className={styles.sprite} style={style} src={url} alt="" data-frame={frame} />
+}
+
+/**
+ * 걸어 들어오는 그림 (S12 7절 · e 0·1) — `event_char_0.pzx` 애니(육성 선수 캐릭터)와 `ui/mode_ui.pzx`
+ * 프레임 87(부상 아이콘, 부상 엔딩만)이 오른쪽에서 **3틱에 1px** 씩 온다. `n & 7 == 0` 인 틱만 1px 위로 튄다.
+ *
+ * 애니 번호는 육성 선수 레코드의 외모 비트가 고른다 — 타자 장타형이면 **8+2**, 그 밖 **0+2** (0x63a5c).
+ * 팔레트는 `event_char_0.mpl` 의 `endingWalkInPaletteOf` 벌로 갈아 끼운다 (0x63a92).
+ */
+function WalkIn({ tick, look, hasInjuryIcon }: {
+  readonly tick: number
+  readonly look: EndingWalkInLook
+  readonly hasInjuryIcon: boolean
+}) {
   const origins = useFrameOrigins(WALK_IN.characterFolder)
   const animations = useAnimations(WALK_IN.characterFolder)
   const iconOrigins = useFrameOrigins(WALK_IN.iconFolder)
   const entries = animations?.[endingWalkInAnimationOf(look)]
   const step = entries === undefined ? null : animationStepAt(entries, tick)
+  const palette = endingWalkInPaletteOf(look)
 
   return (
-    <div data-palette={endingWalkInPaletteOf(look)} data-animation={endingWalkInAnimationOf(look)}>
+    <div data-palette={palette} data-animation={endingWalkInAnimationOf(look)}>
       {step !== null && (
-        <FrameSprite
+        <FramePiece
           folder={WALK_IN.characterFolder}
           frame={step.frame}
           origins={origins}
+          palette={palette}
           x={WALK_IN.xOf(tick, WALK_IN.characterDx) + step.dx}
           y={WALK_IN.characterYOf(tick) + step.dy}
         />
       )}
-      <FrameSprite
-        folder={WALK_IN.iconFolder}
-        frame={WALK_IN.iconFrame}
-        origins={iconOrigins}
-        x={WALK_IN.xOf(tick, WALK_IN.iconDx)}
-        y={WALK_IN.iconYOf(tick)}
-      />
+      {hasInjuryIcon && (
+        <FramePiece
+          folder={WALK_IN.iconFolder}
+          frame={WALK_IN.iconFrame}
+          origins={iconOrigins}
+          x={WALK_IN.xOf(tick, WALK_IN.iconDx)}
+          y={WALK_IN.iconYOf(tick)}
+        />
+      )}
     </div>
   )
 }
 
-/**
- * 제작진 StrENDING[21] — `(0, H − 카운터, W)` 로 아래에서 위로 흐른다 (P6 4b-6).
- * 틱을 따로 세려고 따로 뗐다 — 이 칸이 뜨는 순간부터 0 에서 시작해야 화면 아래에서 올라온다.
- */
-function EndingCredits() {
-  const tick = useUpdateCounter()
+/** 20틱 구간 — 짝수 구간은 깃발 0x11(뒤집기), 홀수는 0 (0x88dd4~0x88dee) */
+const TURN_TICKS = 20
+
+/** 제작진 인물 하나 — 애니를 돌리며 띠 아래(196)에 선다 (0x88d8c~0x88e8a) */
+function CreditsWalkerSprite({ walker, tick, playerPalette }: {
+  readonly walker: CreditsWalker
+  readonly tick: number
+  readonly playerPalette: number
+}) {
+  const origins = useFrameOrigins(walker.folder)
+  const animations = useAnimations(walker.folder)
+  const entries = animations?.[walker.animation]
+  const step = entries === undefined ? null : animationStepAt(entries, tick)
+  if (step === null) return null
+  const isFlipped = walker.turnsEvery20 ? Math.trunc(tick / TURN_TICKS) % 2 === 0 : walker.isFlipped
   return (
-    <div
-      className={styles.creditsText}
-      style={{ left: CREDITS.x, top: creditsTopOf(tick), width: CREDITS.width }}
-    >
-      <MarkupText raw={ORIGINAL_ENDINGS[CREDITS.index] ?? ''} />
-    </div>
+    <FramePiece
+      folder={walker.folder}
+      frame={step.frame}
+      origins={origins}
+      palette={walker.isPlayer ? playerPalette : null}
+      isFlipped={isFlipped}
+      x={walker.x + step.dx}
+      y={BAND_WINDOW.y + BAND_WINDOW.height + step.dy}
+    />
+  )
+}
+
+/**
+ * 제작진 `0x88bb4` (단계 3) — 띠 창 + 선수와 본 연애 상대들 + `"!C" + StrENDING[9 + c] + "!N"×8 + StrENDING[21]` 이
+ * `(0, H − n/2, W)` 로 올라온다. 띠 아래 20px 밑으로만 보인다 (0xbaf6d 잘라내기).
+ * 인물은 나중 번호부터 그려 선수가 맨 앞이다.
+ */
+function EndingCredits({ romanceEndingIndex, romanceEvents, look }: {
+  readonly romanceEndingIndex: number
+  readonly romanceEvents: readonly number[]
+  readonly look: EndingWalkInLook
+}) {
+  const tick = useUpdateCounter()
+  const walkers = creditsWalkersOf(look, romanceEvents)
+  const credits = `!C${ORIGINAL_ENDINGS[romanceEndingIndex] ?? ''}${'!N'.repeat(CREDITS.gapLines)}${ORIGINAL_ENDINGS[CREDITS.index] ?? ''}`
+  const palette = endingWalkInPaletteOf(look)
+  return (
+    <BandWindow>
+      <div data-part="credits-walkers">
+        {[...walkers].reverse().map((walker, index) => (
+          <CreditsWalkerSprite key={walkers.length - 1 - index} walker={walker} tick={tick} playerPalette={palette} />
+        ))}
+      </div>
+      <div
+        className={styles.creditsClip}
+        style={{ left: 0, top: CREDITS.clipTop, width: SCREEN.width, height: SCREEN.height - CREDITS.clipTop }}
+      >
+        <div
+          className={styles.creditsText}
+          style={{ left: CREDITS.x, top: creditsTopOf(tick) - CREDITS.clipTop, width: CREDITS.width }}
+        >
+          <MarkupText raw={credits} />
+        </div>
+      </div>
+    </BandWindow>
   )
 }

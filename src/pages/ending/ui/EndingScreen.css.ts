@@ -22,11 +22,20 @@ export const bandClip = style({
   overflow: 'hidden',
 })
 
-/** 엔딩 그림 두 조각이 미끄러지는 칸 — 띠 아래로는 넘치지 않게 자른다 (0xbae25 와 같은 틀) */
-export const stageClip = style({
+/** 화면 검정 (0x6a735) */
+export const blackScreen = style({
   position: 'absolute',
   left: 0,
   top: 0,
+  width: '240px',
+  height: '320px',
+  background: '#000000',
+  pointerEvents: 'none',
+})
+
+/** 제작진 글 잘라내기 — 띠 아래 20px 밑으로만 보인다 (0x88e92~0x88ec8) */
+export const creditsClip = style({
+  position: 'absolute',
   overflow: 'hidden',
   pointerEvents: 'none',
 })

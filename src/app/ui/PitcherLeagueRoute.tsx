@@ -175,9 +175,10 @@ export function PitcherLeagueRoute({
       <EndingScreen
         playerName={career.name}
         endingIndex={endingIndex}
+        seenEventIds={career.seenEventIds}
         bonusGamePoint={pitcherEndingBonusOf(endingIndex)}
         isContinuable={isContinuablePitcherEnding(endingIndex)}
-        // 걸어 들어오는 그림은 모드 3 이면 애니 2 로 고정이다 (endingLayout `endingWalkInAnimationOf`)
+        // 선수 애니 바탕은 모드 3 이면 0 으로 고정이다 (endingLayout `endingWalkInAnimationOf`)
         walkInLook={{
           mode: PITCHER_EDITION_MODE,
           typeIndex: career.typeIndex,

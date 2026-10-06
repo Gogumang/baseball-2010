@@ -204,7 +204,9 @@ export function CareerRoutes({
 
     case '엔딩':
       return (
-        <EndingScreen playerName={career.name} endingIndex={screen.endingIndex}
+        <EndingScreen playerName={career.name} endingIndex={screen.endingIndex} seenEventIds={career.seenEventIds}
+          // 선수 생김새 +0xb — 타입(bit5~7)·손(bit4)·피부(bit2~3). 걸어 들어오는 그림·제작진 선수 애니와 팔레트 (0x63a5c)
+          walkInLook={{ mode: 4, typeIndex: career.battingTypeIndex, handIndex: career.battingSide, skinIndex: career.skinIndex }}
           bonusGamePoint={endingBonusOf(screen.endingIndex)} isContinuable={isContinuableEnding(screen.endingIndex)}
           onRegister={() => onRegisterHallOfFame(career)} onContinue={actions.continueAfterEnding}
           onFinish={actions.finishEnding} />

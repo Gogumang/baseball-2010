@@ -1,85 +1,91 @@
+import { sineHundred } from '@/shared/lib/math/originalTrigonometry'
+
 /**
- * 엔딩 화면 배치 (나만의리그 엔딩 그리기 `0x882b4`, 적재 `0x87c7c` — P6 4b).
+ * 나만의리그 엔딩 화면 (장면 0x106 상태 141 — 적재 `0x87c7c`, 그리기 `0x168fc`).
  *
- * 흐름 (P6 4b 확정):
- *   1. 화면 검정(0x6a735) → **mode_ui 프레임 10 박스 0 = (0, 65, 240, 72)** 띠 창
- *      (검정 채움 + 위·아래 11px 띠 #395DCE + 선 #294DAD·#4A7DFF, 안에 mode_back 배경 0x7b9ad)
- *   2. 캐릭터·선수 그림이 오른쪽에서 걸어 들어옴 (유력 — 아래 `WALK_IN` 주석)
- *   3. **엔딩 그림** `ending.pzx` 이미지 0 (146×96, 원점 (−84,−57)) 두 조각이 미끄러져 들어옴
- *   4. **원형 전환(아이리스)** — 검정 판에 투명색 RGB(255,0,255) 원을 뚫어 덮는다
- *   5. 글 StrENDING[결과] 흰 글 가운데, 끝에 **[21] 제작진**이 `(0, H − 카운터, W)` 로 아래→위
+ * 장면 그리기 `0x168fc` 가 단계 `[장면+0xd4]` 로 두 함수를 가른다:
+ * ```
+ * 단계 ≤ 2 → 0x882b4(엔딩판, 단계, n)      ; 단계 0 은 아무것도 안 그린다(0x882c4)
+ * 단계 > 2 → 0x88bb4(엔딩판, 단계, n)      ; 제작진
+ * ```
+ * n = `[장면+0x2c]`(이 상태에 들어와 돈 틀 수). 단계는 배경음 페이드(0xbdae9(…, 1500))가 끝날 때 0→1, 키로 1→2(0x12246),
+ * 다시 페이드가 끝나면 2→3 이고 이때 n 을 0 으로 되돌린다(0x1bf54~0x1bfa0).
  *
- * 움직임 두 식은 S9 8절이 확정했다 (그림 1px/틱 · 아이리스 반지름).
+ * `0x882b4` 는 본 엔딩 e(`[this+0x2e4]`)로 **두 갈래**다 (표 0xd4b28):
+ *   - **e 0·1 (부상·방출)** — 0x883b6: 띠 창 + mode_back + 걸어 들어오는 선수(+ e 0 이면 부상 아이콘) + 글.
+ *     엔딩 그림·원형 전환은 없다(적재가 ending.pzx 를 안 올리고 `[this+0x2ec]` 를 안 켠다).
+ *   - **e 2~9** — 0x886ca: ending.pzx 그림이 미끄러져 서고, 그 뒤 원형 전환이 e 마다 다른 자리로 닫히며,
+ *     글 StrENDING[20] + 본 엔딩이 아래에서 올라온다. 띠 창·걸어 들어오는 선수는 없다.
+ * 제작진 `0x88bb4` 는 e 2~9 에만 온다(부상·방출은 키가 곧장 이어하기 팝업이다, 0x1220c).
  */
 
 export const SCREEN = { width: 240, height: 320 } as const
 
+/** mode_ui 프레임 10 박스 0 = (0, 65, 240, 72) — F-6 외출 연출 창과 같은 틀 */
+const BAND_BOX = { x: 0, y: 65, width: SCREEN.width, height: 72 } as const
+
 /**
- * 띠 창 = mode_ui **프레임 10 박스 0** (0, 65, 240, 72) — F-6 외출 연출 창과 같은 틀 (P6 4b-1).
- * 프레임 10 은 `public/sprites/mode_ui/frames/010.png` 가 없다 — **그림 없이 박스만 있는 배치 프레임**이라
- * 여기서는 박스 값만 쓰고 면·선은 직접 칠한다 (훈련 창 `TrainingScene.css.ts` 와 같은 방식).
+ * 띠 창 — 박스를 **화면 세로 가운데로 옮겨** 쓴다 (0x883ea~0x8840a · 제작진 0x88c02~0x88c16):
+ * `y' = H/2 − (y + h/2) + y = 160 − 101 + 65 = 124`.
+ * 박스 안은 검정(0xb9f75), **위·아래 11px 띠는 박스 바깥**에 칠한다 (0x88420~0x88556):
+ * ```
+ * 위  (0, y'−11, W, 11) #395DCE · 선 y'−11 #294DAD · 선 y'−10 #4A7DFF
+ * 아래 (0, y'+h, W, 11) #395DCE · 선 y'+h+9 #4A7DFF · 선 y'+h+10 #294DAD
+ * ```
  */
 export const BAND_WINDOW = {
-  x: 0,
-  y: 65,
-  width: SCREEN.width,
-  height: 72,
-  /** 박스 안은 먼저 검정으로 채운다 */
+  x: BAND_BOX.x,
+  y: SCREEN.height / 2 - BAND_BOX.height / 2,
+  width: BAND_BOX.width,
+  height: BAND_BOX.height,
   fill: '#000000',
-  /** 위·아래 11px 띠 RGB(57,93,206) */
   edgeHeight: 11,
   edgeColor: '#395DCE',
-  /** 띠 테두리 선 — 바깥 #294DAD, 안쪽 #4A7DFF */
   outerLine: '#294DAD',
   innerLine: '#4A7DFF',
 } as const
 
-/** 띠 창 아래 = 연출 잘라내기 (0, 0, W, 띠 아래) (P6 4b-1) */
+/** 띠 창 아래 = 196 — 걸어 들어오는 선수·제작진 인물의 발 자리 */
 export const BAND_WINDOW_BOTTOM = BAND_WINDOW.y + BAND_WINDOW.height
 
 /**
- * 띠 안 배경 `0x7b9ad` — mode_back 을 (1, 66) 에 70 높이로 자른다 (상태판 `STADIUM_BAND` 과 같은 값).
- *
- * ⚠️ 원본이 엔딩에서 **어느 프레임**(0 낮 · 1 저녁 · 2 밤)을 고르는지는 못 읽었다 — 낮(0)을 쓴다.
+ * 띠 안 배경 `0x7b9ac(this, 박스x + 1, y' + 1, −14)` (0x88572 · 0x88d76) — mode_back 을 (1, 125) 에 70 높이로 자른다.
+ * ⚠️ 원본이 **어느 프레임**(0 낮 · 1 저녁 · 2 밤)을 고르는지는 못 읽었다 — 낮(0)을 쓴다.
  */
-export const BAND_BACKGROUND = { frame: 0, left: 1, top: 66, height: 70 } as const
+export const BAND_BACKGROUND = { frame: 0, left: 1, top: BAND_WINDOW.y + 1, height: BAND_WINDOW.height - 2 } as const
 
 /**
- * 걸어 들어오는 그림 두 개 — **확정** (S12 7절, P6 4b-2 정정).
+ * 걸어 들어오는 그림 두 개 (e 0·1 만) — S12 7절 · 0x885b0~0x88698.
  *
- * - `[this+0x344]` = **`event_char_0.pzx` 애니**(육성 선수 캐릭터). 적재 `0x87cd6` 가
- *   `0x63a05([0x1552cfc], 1, 2)` 로 만들고 반복 재생을 켠다. 애니 번호는 `(0 또는 8) + 2` 로,
- *   육성 선수 레코드가 `p[0xb] >> 4 > 1` 이면 8 을 쓴다(0x63a5c~0x63a92).
- *   팔레트도 `(p[0xb] >> 2) & 3` 으로 고른다 — 아래 `endingWalkInAnimationOf`·`endingWalkInPaletteOf`.
- * - `[this+0x15c]` 는 필드가 아니라 **프레임 배열 바이트 오프셋(0xae × 2)** 이었다 —
- *   `this+0x138`(= `ui/mode_ui.pzx`)의 **프레임 87**(부상 아이콘)이다. 단계 `[this+0x2e4] == 0` 일 때만 그린다.
+ * - `[this+0x344]` = `event_char_0.pzx` 애니 — 적재 `0x87cd6` 이 **e ≤ 1 일 때만** `0x63a05(ui, 1, 2)` 로 만든다.
+ * - mode_ui **프레임 87**(부상 아이콘) — `[this+0x2e4] == 0`(부상 엔딩)일 때만 (0x885fc).
  *
- * 자리 (0x885b0~0x885e6 · 0x8865e~0x88698, `n` = 그리기 2번째 인자 = 틱 카운터):
+ * 자리 (`n` = 틀 수, 박스는 가운데로 옮긴 y' = 124 · 아래 196):
  * ```
- * 애니        x = 240 − n/3 − 20   y = (n & 7) ? 137 : 136
- * 프레임 87   x = 240 − n/3 − 62   y = (n & 7) ? 61  : 60
+ * 애니        x = 240 − n/3 − 20   y = (n & 7) ? 196 : 195
+ * 프레임 87   x = 240 − n/3 − 62   y = (n & 7) ? 120 : 119      ; y' − 4 / y' − 5
  * ```
- * `n/3` 은 `__divsi3` 정수 나눗셈이라 **3틱에 1px** 왼쪽으로 오고,
- * `n & 7 == 0` 인 틱(8틱에 한 번)만 1px 위로 튄다 — 걸음 흔들림이다.
+ * (S12 의 137·61 은 박스를 옮기기 전 값이다.)
  */
 export const WALK_IN = {
-  /** event_char_0.pzx 애니 — 기본 번호 0 + 2 (장타형이면 8 + 2) */
   characterFolder: './sprites/event_char_0/frames',
   characterAnimation: 2,
   characterAnimationWithLook: 10,
   characterDx: -20,
-  /** 부상 아이콘 = ui/mode_ui 프레임 87 (20×19) */
   iconFolder: './sprites/mode_ui/frames',
   iconFrame: 87,
   iconDx: -62,
   /** x = W − n/3 + dx — 3틱에 1px */
   xOf: (tick: number, dx: number) => SCREEN.width - Math.trunc(tick / 3) + dx,
   /** y — 8틱에 한 번 1px 위로 튄다 */
-  characterYOf: (tick: number) => ((tick & 7) !== 0 ? 137 : 136),
-  iconYOf: (tick: number) => ((tick & 7) !== 0 ? 61 : 60),
-  /** 띠 아래 = 137 (mode_ui 프레임 10 박스 0 의 아래 끝) */
-  y: BAND_WINDOW_BOTTOM,
+  characterYOf: (tick: number) => ((tick & 7) !== 0 ? BAND_WINDOW_BOTTOM : BAND_WINDOW_BOTTOM - 1),
+  iconYOf: (tick: number) => ((tick & 7) !== 0 ? BAND_WINDOW.y - 4 : BAND_WINDOW.y - 5),
 } as const
+
+/** 부상 아이콘을 그리는 엔딩 — 0 부상 (0x885fc `cmp [this+0x2e4], #0`) */
+export const INJURY_ENDING = 0
+/** 걸어 들어오는 갈래(0x883b6)를 타는 마지막 엔딩 — 0 부상 · 1 방출 */
+export const LAST_WALK_IN_ENDING = 1
 
 /**
  * 걸어 들어오는 선수의 생김새 — 레코드 `+0xb` 한 바이트에서 뽑는다 (C-4 등록 화면과 같은 칸).
@@ -99,15 +105,18 @@ export interface EndingWalkInLook {
 /** 타자편 모드 번호 — 엔딩 애니 8 가지는 이 모드에서만 탄다 */
 export const BATTER_EDITION_MODE = 4
 
+/** `0x63a04` idx == 1(육성 선수) 의 애니 바탕 — 모드 4 이고 `p[0xb] >> 4 > 1` 이면 8, 아니면 0 (0x63a5c~0x63a92) */
+function playerAnimationBaseOf(look: EndingWalkInLook): number {
+  const typeAndHand = (look.typeIndex << 1) | (look.handIndex & 1)
+  return look.mode === BATTER_EDITION_MODE && typeAndHand > 1 ? 8 : 0
+}
+
 /**
- * 엔딩 애니 번호 = `(모드 4 이고 p[0xb] >> 4 > 1 ? 8 : 0) + 2` (0x63a5c~0x63a92).
- * `p[0xb] >> 4` 는 `타입<<1 | 손` 이라 **타입 ≥ 1**(= 타자 장타형)이면 8 이다.
- * 투수편(모드 3)은 조건에서 빠지므로 늘 2 다.
+ * 엔딩 애니 번호 = 바탕 + 2 (0x87cd6 의 n = 2).
+ * `p[0xb] >> 4` 는 `타입<<1 | 손` 이라 **타입 ≥ 1**(= 타자 장타형)이면 8 이다. 투수편(모드 3)은 늘 2 다.
  */
 export function endingWalkInAnimationOf(look: EndingWalkInLook): number {
-  const typeAndHand = (look.typeIndex << 1) | (look.handIndex & 1)
-  const base = look.mode === BATTER_EDITION_MODE && typeAndHand > 1 ? 8 : 0
-  return base + WALK_IN.characterAnimation
+  return playerAnimationBaseOf(look) + WALK_IN.characterAnimation
 }
 
 /**
@@ -123,11 +132,28 @@ export function endingWalkInPaletteOf(look: EndingWalkInLook): number {
 }
 
 /**
- * 엔딩 그림 — `ending.pzx` 이미지 0 (146×96, 원점 (−84,−57) = `public/sprites/ending/frames/origins.json`).
- * 그리기 `0xcaa1d(그림, x = [this+0x2f4] / [this+0x2f0], y = H/2 − h, 16, 2)` 로 **두 번** (P6 4b-4).
+ * e 0·1 의 글 (0x88974~0x88a94) — StrENDING[e] 를 띠 아래 칸 `(0, y'+h+11, W, H − (y'+h+11))` = (0, 207, 240, 113)
+ * 의 **세로 가운데 줄 y = 207 + 113/2 = 263** 에 `0xba269(글, 0, y, W, −1, 0)` 로 그린다.
+ * ⚠️ 0xba269 의 y 가 글 위끝인지 가운데인지는 안 읽었다 — 다른 호출(올라오는 글)과 같이 위끝으로 둔다.
+ */
+export const SHORT_ENDING_TEXT_TOP = (() => {
+  const top = BAND_WINDOW_BOTTOM + BAND_WINDOW.edgeHeight
+  return top + Math.trunc((SCREEN.height - top) / 2)
+})()
+
+/**
+ * 엔딩 그림 — `ending.pzx` 이미지 0 (146×96). e 2~9 에만 올린다 (적재 0x87cf2~0x87d10).
  *
- * 가로 자리는 `W/2 − [그림+0x20]` 로 가운데 맞춤 (S9 8-1) → `(240 − 146)/2 = 47`.
- * 세로는 `H/2 − h = 160 − 96 = 64`.
+ * 움직임 (0x886ca~0x887bc):
+ * ```
+ * 처음 [this+0x2f0] = W − 2·폭 = −52 · [this+0x2f4] = 0   (0x87dc8~0x87dd4)
+ * 가 단계: [this+0x2f0] 자리에 그리고 +1 (0 에서 멈춤)
+ * 나 단계(표의 칸 > 0 인 e 4~9): [this+0x2f0] 가 0 이 된 뒤 [this+0x2f4] 자리에 그리고 −1, 목표 칸에 닿으면 원형 전환을 켠다
+ * e 2·3: 가 단계가 0 에 닿으면 곧바로 원형 전환을 켠다 ([this+0x2ec] = 1)
+ * ```
+ * 나 단계 목표 = e 4·5·6·9 → −37 · e 7·8 → −52 (표 0xd4b28 의 갈래가 r5 에 넣는 값).
+ *
+ * ⚠️ 그림의 바탕 자리(x 47 · y 64)는 S9 8-1 의 가운데 맞춤 그대로다 — 그리기 0xcaa1d 의 기준점 플래그(0x10, 2) 뜻은 안 읽었다.
  */
 export const ENDING_IMAGE = {
   image: 0,
@@ -135,101 +161,154 @@ export const ENDING_IMAGE = {
   height: 96,
   x: (SCREEN.width - 146) / 2,
   y: SCREEN.height / 2 - 96,
-  /**
-   * S9 8-1 확정: `[this+0x2f4] = min([this+0x2f4] + 1, 0)` → **한 틱에 1px**,
-   * 음수에서 0 까지 올라오고 0 에서 멈춘다.
-   */
-  step: 1,
-  /**
-   * ⚠️ 시작 오프셋은 원본에 적혀 있지 않다 — 그림 반폭(73)만큼 왼쪽에서 시작하는 것으로 잡았다 (**근사**).
-   * `[this+0x2f0] == 0` 인지로 두 조각 중 어느 쪽을 먼저 움직일지 고르므로(0x886ec·0x887b0)
-   * 웹판도 **첫 조각이 0 에 닿은 뒤 두 번째 조각**이 움직인다.
-   */
-  startOffset: -73,
+  /** 가 단계 시작 자리 `W − 2·폭` */
+  startOffset: SCREEN.width - 2 * 146,
 } as const
 
-/** 조각 i(0·1)의 x — 0 번이 다 올라온 뒤에 1 번이 움직인다 (0x886ec) */
-export function endingImageXOf(tick: number, piece: number): number {
-  const ticksLeft = tick - piece * -ENDING_IMAGE.startOffset
-  const offset = Math.min(ENDING_IMAGE.startOffset + Math.max(ticksLeft, 0) * ENDING_IMAGE.step, 0)
-  return ENDING_IMAGE.x + offset
+/** 나 단계 목표 — e 별 (0x88374~0x883b4). 없는 e(2·3)는 나 단계가 없다 */
+const PAN_TARGET: Readonly<Record<number, number>> = { 4: -37, 5: -37, 6: -37, 7: -52, 8: -52, 9: -37 }
+
+/** 그림 자리 (바탕 x 에 더할 값) — 틱 n 에서 */
+export function endingImageOffsetOf(tick: number, endingIndex: number): number {
+  const slide = Math.min(ENDING_IMAGE.startOffset + tick, 0)
+  const panTarget = PAN_TARGET[endingIndex]
+  if (slide < 0 || panTarget === undefined) return slide
+  const panTicks = tick + ENDING_IMAGE.startOffset
+  return Math.max(0 - panTicks, panTarget)
 }
 
-/** 그림 두 조각이 모두 제자리에 서는 틱 */
-export const ENDING_IMAGE_TICKS = -ENDING_IMAGE.startOffset * 2
-
 /**
- * 원형 전환(아이리스) — 오프스크린 `[0x1552ae4]` 를 검정으로 칠하고 투명색 **RGB(255,0,255)** 원을
- * `0x1400708(가운데 (W/2 + dx, H/2 + dy), 지름 …, 0°~360°)` 로 뚫은 뒤 화면에 덮는다 (P6 4b-5).
+ * 원형 전환이 켜지는 틱 — 그린 뒤 옮긴 값이 목표(가 단계 0 · 나 단계 목표)에 닿은 **그 틀**에 `[this+0x2ec]` 를 켜고
+ * 같은 틀에서 원을 t = 0 으로 그린다 (0x88794 · 0x887a0 → 0x887be).
  */
-/**
- * 아이리스 단계값 — **확정** (S12 6절).
- *
- * ```
- * 0x887ce  r0 = 화면 폭 (0x14008b8 = 240)
- * 0x887ea  D = 240 − [this+0x2fc]
- * ```
- * `[this+0x2fc]` 를 넣는 곳은 딱 둘이고, 원 중심 보정 `[+0x300]`/`[+0x304]` 도 같이 들어간다:
- *
- * | 주소 | `[+0x2fc]` | **D** | 중심 보정 (dx, dy) |
- * |---|---|---|---|
- * | `0x879b6` 단계 설정 | 100 | **140** | (**−58**, **−55**) |
- * | `0x87e2c` 뒤 단계 재설정 | 0 | **240** | (0, 0) |
- */
-export const IRIS_STAGES = {
-  /** 엔딩이 열릴 때 — 원이 가운데 140px 까지만 열린다 */
-  open: { diameter: 140, dx: -58, dy: -55 },
-  /** 뒤 단계 — D = 240 이라 화면을 다 덮는다 */
-  reveal: { diameter: 240, dx: 0, dy: 0 },
-} as const
-
-export const IRIS = {
-  centerX: SCREEN.width / 2,
-  centerY: SCREEN.height / 2,
-  /** 덮는 판 색 */
-  cover: '#000000',
-  /** 첫 단계 D (0x879b6) — 반지름 식의 기본값 */
-  diameter: IRIS_STAGES.open.diameter,
-  /** 원 중심 보정 — 가운데 (W/2 + dx, H/2 + dy) (P6 4b 5항) */
-  dx: IRIS_STAGES.open.dx,
-  dy: IRIS_STAGES.open.dy,
-  /** p 가 110 에 걸리는 틱 — 이 뒤로는 r 이 D 에서 멈춘다 */
-  fullTick: 7,
-} as const
-
-/**
- * 아이리스 반지름 (S9 8-2 **확정**, 0x887dc~0x88846):
- * ```
- * k = (t == 0) ? 90 : 110
- * p = min(16·t, 110)
- * r = ( D − D·k/100 ) + D·p/100          // 나눗셈은 모두 __divsi3 정수 나눗셈
- * ```
- * t = 0 → 0.10·D · t = 1 → 0.06·D · t = 2 → 0.22·D · … · t ≥ 7 → D.
- *
- * ⚠️ t = 1 이 t = 0 보다 **작아지는 것**(0.06 < 0.10)은 원본 그대로다 — 고치지 않는다.
- */
-export function irisRadiusOf(tick: number, diameter: number = IRIS.diameter): number {
-  const k = tick === 0 ? 90 : 110
-  const p = Math.min(16 * tick, 110)
-  return diameter - Math.trunc((diameter * k) / 100) + Math.trunc((diameter * p) / 100)
+export function irisStartTickOf(endingIndex: number): number {
+  const panTarget = PAN_TARGET[endingIndex] ?? 0
+  return -ENDING_IMAGE.startOffset - 1 - panTarget
 }
 
-/** 원 그리기에 쓰는 값 `[this+0x2f8] = 화면폭 − r` (S9 8-2) — 참고용 */
-export const irisDrawValueOf = (tick: number, diameter: number = IRIS.diameter) =>
-  SCREEN.width - irisRadiusOf(tick, diameter)
-
 /**
- * 엔딩 글 — StrENDING[결과] 흰 글 가운데 `(0, …, 폭 W)` (P6 4b-6).
+ * 원형 전환 — e 별 닫히는 크기 `s = [this+0x2fc]` 와 자리 `[this+0x300]`·`[this+0x304]` (적재 0x87e4c~0x87f10,
+ * 보정 표 s8 0xd41c7 = [45, −28, −69, −42, −108, 6, −56, −80, 13, −29]).
  *
- * ⚠️ 나만의리그 쪽 y 는 원본에 적혀 있지 않다. 시즌 엔딩 `0x87a1c` 가 쓰는
- * **`(0, H/2 + 55, 폭 W)`** 를 그대로 썼다 — 띠 창(65~137)·엔딩 그림(64~160) 아래라 겹치지 않는다.
+ * | e | s | dx, dy |
+ * |---|---|---|
+ * | 2 | 34 | −69, −42 |
+ * | 3 | 90 | −108, 6 |
+ * | 4·8 | 57 | 13, −29 |
+ * | 5·6·9 | 85 | −56, −80 |
+ * | 7 | 70 | 45, −28 |
+ *
+ * (P6·S12 가 적은 D 140 · (−58, −55) 는 **시즌모드 엔딩** 적재 0x879b6 의 값이다.)
  */
-export const ENDING_TEXT = { x: 0, y: SCREEN.height / 2 + 55, width: SCREEN.width } as const
+export const IRIS_BY_ENDING: Readonly<Record<number, { readonly size: number; readonly dx: number; readonly dy: number }>> = {
+  2: { size: 34, dx: -69, dy: -42 },
+  3: { size: 90, dx: -108, dy: 6 },
+  4: { size: 57, dx: 13, dy: -29 },
+  5: { size: 85, dx: -56, dy: -80 },
+  6: { size: 85, dx: -56, dy: -80 },
+  7: { size: 70, dx: 45, dy: -28 },
+  8: { size: 57, dx: 13, dy: -29 },
+  9: { size: 85, dx: -56, dy: -80 },
+}
+
+/** 덮는 판 색 — 오프스크린을 검정으로 칠하고 RGB(255,0,255) 원을 뚫는다 */
+export const IRIS_COVER = '#000000'
 
 /**
- * 제작진 — StrENDING **[21]** 을 `(0, H − 카운터, W)` 로 **아래에서 위로** 흐른다 (P6 4b-6).
- * 카운터는 그림 이동량과 같은 틱 카운터라 **1px/틱**으로 잡았다 (근사 — 원본 증가폭 미확인).
+ * 원형 전환의 원 (0x887ce~0x8896c) — t = 켜진 뒤 틱 `[this+0x308]`:
+ * ```
+ * D = W − s
+ * r = D − D·sin(t == 0 ? 90 : 110)/100 + D·sin(min(16t, 110))/100     ; sin = 0x6c6a9 (사인표 0xd310c, ×100)
+ * 지름 = W − r · 왼쪽 위 = (W/2 + dx − (D − r)/2, H/2 + dy − (D − r)/2)  ; 0x1400708 fillArc(…, 0, 360)
+ * ```
+ * t = 0 → 지름 240(화면 전체) 에서 줄어 t ≥ 7 이면 지름 s 로 선다(t = 6 에 조금 더 작아졌다 돌아온다 — 원본 그대로).
+ * 가운데는 늘 (W/2 + dx + s/2, H/2 + dy + s/2) 다.
  */
-export const CREDITS = { index: 21, step: 1, x: 0, width: SCREEN.width } as const
+export function irisCircleOf(tick: number, endingIndex: number): { readonly x: number; readonly y: number; readonly diameter: number } | null {
+  const iris = IRIS_BY_ENDING[endingIndex]
+  if (iris === undefined) return null
+  const span = SCREEN.width - iris.size
+  const k = sineHundred(tick === 0 ? 90 : 110)
+  const p = sineHundred(Math.min(tick << 4, 110))
+  const r = Math.trunc((span * p) / 100) + (span - Math.trunc((span * k) / 100))
+  const shift = Math.trunc((span - r) / 2)
+  return {
+    x: SCREEN.width / 2 + iris.dx - shift,
+    y: SCREEN.height / 2 + iris.dy - shift,
+    diameter: SCREEN.width - r,
+  }
+}
 
-export const creditsTopOf = (tick: number) => SCREEN.height - tick * CREDITS.step
+/**
+ * e 2~9 의 글 (0x88a96~0x88b56) — `"!C" + StrENDING[20] + "!N"×4 + sprintf(StrENDING[e], 이름)` 을
+ * `(0, H − n, W)` 에 그린다 → **한 틱에 1px 씩 아래에서 올라온다**. [20] 은 모든 은퇴 엔딩 앞에 붙는 머리말이다.
+ */
+export const RISING_TEXT = { prologueIndex: 20, gapLines: 4, x: 0, width: SCREEN.width } as const
+export const risingTextTopOf = (tick: number) => SCREEN.height - tick
+
+/**
+ * 제작진 `0x88bb4` (단계 3 — 틱은 0 부터 다시 센다):
+ * ```
+ * 띠 창(가운데 124) + mode_back + 연애 인물들 (발 y = 196)
+ * 글 "!C" + StrENDING[연애 엔딩 9 + c] + "!N"×8 + StrENDING[21] 을 (0, H − n/2, W) 에,
+ *    잘라내기 (0, 196 + 20, W, …) 아래로만 보인다
+ * ```
+ */
+export const CREDITS = { index: 21, gapLines: 8, x: 0, width: SCREEN.width, clipTop: BAND_WINDOW_BOTTOM + 20 } as const
+
+export const creditsTopOf = (tick: number) => SCREEN.height - Math.trunc(tick / 2)
+
+/** 제작진 화면에 서는 인물 하나 */
+export interface CreditsWalker {
+  readonly folder: string
+  readonly animation: number
+  readonly x: number
+  /** 그리기 깃발 0x11 — 좌우를 뒤집어 그린다 (⚠️ 0x93c45 의 깃발 비트 0 = 뒤집기로 본 것은 **유력**) */
+  readonly isFlipped: boolean
+  /** 20틱마다 돌아선다 (선수, c == 3) — 짝수 구간이 뒤집힌 쪽 */
+  readonly turnsEvery20: boolean
+  /** 선수면 생김새 팔레트를 쓴다 */
+  readonly isPlayer: boolean
+}
+
+/** 0xd4aec — 선수 애니 = 바탕 + 표[c − 1] */
+const PLAYER_CREDITS_ANIMATION = [6, 5, 4, 7, 1] as const
+/** 0xd4b00 — 연애 상대 애니 = 0xd0ae6[10 + k] + 표[c − 2] */
+const PARTNER_CREDITS_ANIMATION = [5, 3, 0, 1, 0] as const
+/** 0xd0ae6[10..13] — event_char_1.pzx 안 인물 넷(300 메디카 · 301 레오니 · 302 로제 · 303 발렌타인)의 애니 바탕 */
+const PARTNER_ANIMATION_BASE = [0, 7, 15, 23] as const
+const FIRST_ROMANCE_EVENT = 300
+/** 처음 자리 W/2 (0x88010~0x88024) 와 c 별 옮김 (0x8819c~0x88264) */
+const WALKER_SHIFT: Readonly<Record<number, readonly number[]>> = {
+  1: [0],
+  2: [40, -40],
+  3: [0, -80, 80],
+  4: [85, -100, -50, 0],
+  5: [0, -100, -50, 50, 100],
+}
+
+/**
+ * 제작진 인물 (적재 0x87fda~0x88266): 선수 하나 + 본 연애 상대(이벤트 번호 순). c = 1 + 상대 수.
+ * c == 2 면 상대(1번)를 뒤집고, c == 3 이면 1번을 뒤집고 선수가 20틱마다 돌아선다.
+ */
+export function creditsWalkersOf(look: EndingWalkInLook, romanceEvents: readonly number[]): readonly CreditsWalker[] {
+  const count = 1 + romanceEvents.length
+  const shifts = WALKER_SHIFT[count] ?? WALKER_SHIFT[1]
+  const player: CreditsWalker = {
+    folder: WALK_IN.characterFolder,
+    animation: playerAnimationBaseOf(look) + PLAYER_CREDITS_ANIMATION[count - 1],
+    x: SCREEN.width / 2 + shifts[0],
+    isFlipped: false,
+    turnsEvery20: count === 3,
+    isPlayer: true,
+  }
+  const partners = romanceEvents.map((eventId, index): CreditsWalker => ({
+    folder: './sprites/event_char_1/frames',
+    animation: PARTNER_ANIMATION_BASE[eventId - FIRST_ROMANCE_EVENT] + PARTNER_CREDITS_ANIMATION[count - 2],
+    x: SCREEN.width / 2 + (shifts[index + 1] ?? 0),
+    isFlipped: index === 0 && (count === 2 || count === 3),
+    turnsEvery20: false,
+    isPlayer: false,
+  }))
+  return [player, ...partners]
+}
