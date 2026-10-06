@@ -8,6 +8,15 @@ export const sprite = style({
   pointerEvents: 'none',
 })
 
+/** 스킨 바탕(0x58371 · 0x5fd61) — 화면 전체, 자르기 0xbae25(0, 0, W, H) */
+export const skinBackdrop = style({
+  position: 'absolute',
+  left: 0,
+  top: 0,
+  overflow: 'hidden',
+  pointerEvents: 'none',
+})
+
 /**
  * 못 쓰는 칸 — 원본에 있는 칸이라 지우지 않고 흐리게만 그린다.
  * (원본에는 이런 상태가 없다. 통신 기능·아직 안 만든 화면을 구분해 보여 주려고 웹판이 더한 것이다.)

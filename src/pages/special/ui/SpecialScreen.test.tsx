@@ -163,6 +163,14 @@ describe('명예의 전당 격자 5×3', () => {
     )
   }
 
+  it('바탕은 메뉴 바탕 0x58371 — main_title 프레임 13 · 이미지 7 (하위 27 0x2dcd8)', () => {
+    찬칸열기()
+    expect(screen.getByTestId('바탕-메뉴')).toBeTruthy()
+    const srcs = Array.from(document.querySelectorAll('img')).map((img) => img.getAttribute('src'))
+    expect(srcs).toContain('./sprites/main_title/frames/013.png')
+    expect(srcs).toContain('./sprites/main_title/007.png')
+  })
+
   it('슬롯 15칸이고 왼쪽 x 20 에서 40 씩, 줄은 179 에서 40 씩이다', () => {
     열기()
 

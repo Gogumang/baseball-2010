@@ -296,6 +296,14 @@ describe('명예의 전당 등록 목록(상태 145) 머리띠 — 0x15d54 → 0
   it('G 를 안 넘기면 예전 띠(제목 0, G 없음)', () => {
     const { container } = 띄우기({ bonusGamePoint: 0, hallOfFame: 명전('타자') })
     등록목록까지()
-    expect(그림들(container).filter((src) => src.startsWith('./sprites/gpoint/'))).toHaveLength(0)
+    // G 숫자는 gpoint **이미지**다 — 공 무늬 바탕(0x5fd61)의 gpoint **프레임**(애니)은 빼고 센다
+    expect(그림들(container).filter((src) => src.startsWith('./sprites/gpoint/') && !src.includes('/frames/'))).toHaveLength(0)
+  })
+
+  it('바탕은 공 무늬 0x5fd61(skin, 0, 0, W, H) — 하늘색 위 gpoint 애니 13열 × 15줄', () => {
+    const { container } = 띄우기({ bonusGamePoint: 0, hallOfFame: 명전('타자') })
+    등록목록까지()
+    expect(container.querySelector('[data-testid="바탕-공무늬"]')).not.toBeNull()
+    expect(그림들(container).filter((src) => src.startsWith('./sprites/gpoint/frames/'))).toHaveLength(13 * 15)
   })
 })

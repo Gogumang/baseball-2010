@@ -23,6 +23,8 @@ import {
 import type { HallOfFameSlotState } from '@/pages/special/lib/specialLayout'
 import * as styles from '@/pages/special/ui/SpecialScreen.css'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
+import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
+import type { SkinBackdropKind } from '@/pages/special/ui/SkinBackdrops'
 import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLayout'
 
 const MAIN_UI = './sprites/main_ui'
@@ -363,7 +365,7 @@ type HallOfFamePopup =
  *  - "친구에게 선물" 은 통신이 필요해 안내만 띄운다. "슬롯에서 삭제" 는 `deletion`(HallOfFameDeletion) 대로 돈다.
  *    슬롯 현금 구매·G 충전 페이지(🌐)도 열 수 없어 목록으로 돌아온다.
  */
-export function HallOfFameScreen({ collection, mode, onBack, frame }: {
+export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop }: {
   readonly collection: Collection
   readonly mode: HallOfFameMode
   readonly onBack: () => void
@@ -373,6 +375,12 @@ export function HallOfFameScreen({ collection, mode, onBack, frame }: {
    * 세우고 그리기 0xa10c 끝의 `0x7f4ec(hdr)` 가 `0x54d95(skin, 10 "시즌모드", 5)` 로 그린다. 안 주면 예전 그대로.
    */
   readonly frame?: { readonly title: ScreenFrameTitle; readonly gamePoint: number }
+  /**
+   * 바탕 — 안 주면 모드로 정한다: 등록(나리 상태 145 — 0x16928 이 `0x5fd61(skin, 0, 0, W, H)`)은 **공무늬**,
+   * 보기(하위 27 0x2dcd8) · 선수고르기(미션 하위 17 0x2dec8 · 홈런더비 하위 16 0x2df20)는 **메뉴바탕** `0x58371(skin, main_title, 0)`.
+   * 시즌 선수영입 0xe2 는 공통 앞그림 0xb810 이 0xdd · 0xe0 · 0xe1 밖이라 `0x5fd61` — 그 화면은 '공무늬' 를 넘겨야 원본과 같다.
+   */
+  readonly backdrop?: SkinBackdropKind
 }) {
   const [slot, setSlot] = useState(initialHallOfFameSlotOf(mode))
   const [isBubbleOpen, setIsBubbleOpen] = useState(false)
@@ -546,6 +554,15 @@ export function HallOfFameScreen({ collection, mode, onBack, frame }: {
 
   return (
     <RawScreen>
+      <SkinBackdrop kind={backdrop ?? (mode.kind === '등록' ? '공무늬' : '메뉴바탕')} />
+      {/*
+        ⚠️ 미해결(안 그림): 덧그림 0x669c1(목록) 은 바탕이 아니다 — 0x65e80(목록, &[0x1552ae0], [목록+0x298], [목록+0x204]) 이
+        (0, 0, 54, 75) 를 RGB(255,0,255)(투명 키)로 채우고 고른 선수 그림 객체 [목록+0x298] 의 vt+0x10 으로 (27, 62) 에 그린 뒤
+        그 54×75 를 이미지 [0x1552ae0] 로 떠 두고 화면을 검정으로 지운다(바탕은 그 뒤에 그린다). 목록 A 자리(0x655cc)가
+        그 이미지를 0x98975 로 (A.x − ([목록+0x3c] ? 0x32 : 0x3b), A.y − 0x61) 에 찍는다 — 고른 선수의 **몸 그림**이다.
+        부르는 곳: 메인 메뉴 그리기 0x32dd8(하위 17 · 27 앞) · 나리 0x16a34(상태 145) · 시즌 0xe9ac. 웹은 선수 몸 그림 합성을
+        이 화면에 아직 잇지 않았다.
+      */}
       {/* A 자리 — 원 두 개 (A−38 지름 77 · A−31 지름 63) 가 빈 칸·잠긴 칸의 바탕이다 */}
       {HALL_OF_FAME_SLOT_ART.circles.map((circle) => (
         <div
