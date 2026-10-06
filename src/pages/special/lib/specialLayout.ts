@@ -1,3 +1,6 @@
+import { ABILITY_AXIS_ANGLES, abilityVertexOf } from '@/pages/create-player/lib/teamSelectLayout'
+import type { ChartPoint } from '@/pages/create-player/lib/teamSelectLayout'
+
 /**
  * 스페셜 목록 배치 (메인 메뉴 상태 6 — P6 2d).
  *
@@ -259,6 +262,62 @@ export function hallOfFameCellOf(index: number): GridCell {
  * 아니면 방망이 — P6 2a-3 확정).
  */
 export const HALL_OF_FAME_PITCHER_SLOTS = 5
+
+/**
+ * 칸 배치 (칸 채우기 0x5eb8c · 빈 칸 찾기 0x62514 확정):
+ * ```
+ * 0 = 나리 투수 · 1~4 = 명예 투수 0~3 · 5 = 나리 타자 · 6~9 = 명예 타자 0~3 · 10 = 안 씀 · 11~14 = 명예 타자 4~7
+ * ```
+ */
+export const NARI_PITCHER_SLOT = 0
+export const NARI_BATTER_SLOT = 5
+const UNUSED_SLOT = 10
+
+/** 칸 → 명예의 전당 편과 번호. 나리 칸·안 쓰는 칸은 null */
+export function hallOfFameEntryOfSlot(slot: number): { readonly side: '투수' | '타자'; readonly index: number } | null {
+  if (slot >= 1 && slot <= 4) return { side: '투수', index: slot - 1 }
+  if (slot >= 6 && slot <= 14 && slot !== UNUSED_SLOT) return { side: '타자', index: slot <= 9 ? slot - 6 : slot - 7 }
+  return null
+}
+
+/**
+ * 칸 상태 `[목록+0x20c + 칸×8]` (0x5eb8c) — 0 아무것도 아님 · 1 나리 선수 있음 · 2 나리 선수 없음 ·
+ * 3 명예 선수 있음 · 4 열린 빈 칸 · 5 잠긴 칸(열림 깃발 g+0x80+i / g+0x88+i 가 0).
+ * 목록 종류 `[목록+0x1fc]` 가 **2(스페셜 명예의 전당, 상태 27 — 0x26024)** 면 나리 칸 0·5 를 채우지 않아 0 으로 남고,
+ * **3(엔딩 뒤 등록, 나리 상태 145 — 0x1c91e)** 이면 나리 저장이 있는지로 1·2 를 넣는다. 칸 10 은 늘 0 이다.
+ */
+export type HallOfFameSlotState = 0 | 1 | 2 | 3 | 4 | 5
+
+/**
+ * 키 결과 코드 `0x5eae0` — 칸 상태와 편(칸 ≤ 4 면 투수)으로:
+ * 1 → 투수 1 · 타자 2 · 3 → 투수 3 · 타자 4 · 2 → 5 · 4 → 6 · 5 → 7 · 그 밖 0.
+ */
+export function hallOfFameKeyCodeOf(state: HallOfFameSlotState, slot: number): number {
+  const isBatter = slot >= HALL_OF_FAME_PITCHER_SLOTS
+  if (state === 1) return isBatter ? 2 : 1
+  if (state === 3) return isBatter ? 4 : 3
+  if (state === 2) return 5
+  if (state === 4) return 6
+  if (state === 5) return 7
+  return 0
+}
+
+/**
+ * 능력치 도형 (B 자리) — `0x5aefc(skin, anim, B.x, B.y + 8, 종류 = 칸 ≤ 4 ? 3(투수) : 2(타자), 기록, 0, 30, 최대표)` (0x656ce~0x65740).
+ * 종류 2·3 은 축 최대치(서술자 +0)를 넘겨받은 표로 바꾸는데, 그 표는 `0x5e864` 가 s8 0xd1743(투수)·0xd174b(타자)
+ * 의 0 행 × 10 = **800** 네 칸으로 채운다. 값은 `0xb6415(기록, k, 1)` (장비·장착 스킬을 얹은 능력치, 0x5b228~0x5b23c).
+ * 길이는 팀 도형과 같은 0x75ebc: 최대길이 = 반지름 × 800 / 999 = 24, 현재길이 = 최대길이 × 값 / 999.
+ */
+export const HALL_OF_FAME_CHART = { dy: 8, radius: 30, axisMaximum: 800 } as const
+
+const ORIGINAL_AXIS_SCALE = 999
+
+/** 네 값의 꼭짓점 — 축 각도·꼭짓점 식은 팀 도형(`teamSelectLayout`)과 같고 축 최대치만 800 이다 */
+export function hallOfFameChartVerticesOf(center: ChartPoint, values: readonly number[]): readonly ChartPoint[] {
+  const maximum = Math.trunc((HALL_OF_FAME_CHART.radius * HALL_OF_FAME_CHART.axisMaximum) / ORIGINAL_AXIS_SCALE)
+  return ABILITY_AXIS_ANGLES.map((angle, axis) =>
+    abilityVertexOf(center, Math.trunc((maximum * (values[axis] ?? 0)) / ORIGINAL_AXIS_SCALE), angle))
+}
 
 /**
  * 자세히 보기 두 자리 (k = 6·7·8 의 보정, 표 0xd1eac — P6 2a-1 확정).

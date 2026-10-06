@@ -14,7 +14,9 @@ import { SeasonEndScreen } from '@/pages/season-end/ui/SeasonEndScreen'
 import { PostseasonScreen } from '@/pages/season-end/ui/PostseasonScreen'
 import { NationalCupScreen } from '@/pages/national-cup/ui/NationalCupScreen'
 import { EndingScreen } from '@/pages/ending/ui/EndingScreen'
-import type { HallOfFameResult } from '@/entities/collection/model/collection'
+import type { Collection, HallOfFameResult } from '@/entities/collection/model/collection'
+import { nariBatterOf } from '@/app/model/useCollection'
+import type { HallOfFameNariPlayer } from '@/pages/special/ui/SpecialScreen'
 import { endingBonusOf, isContinuableEnding } from '@/entities/career/model/seasonFlow'
 import { TEAMS } from '@/shared/config/original/teams'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
@@ -33,7 +35,13 @@ interface CareerRoutesProps {
   readonly random: RandomPort
   /** 커리어가 있는 화면만 이 컴포넌트로 온다 — App이 먼저 걸러준다. */
   readonly career: PlayerCareer
-  readonly onRegisterHallOfFame: (career: PlayerCareer) => HallOfFameResult['kind']
+  /** 명예의 전당 등록 목록 (나리 상태 145) — 기록연감·나리 투수편 저장·등록 (G·통계는 App 이 지갑으로 치른다) */
+  readonly hallOfFame: {
+    readonly collection: Collection
+    /** 칸 0 나리 투수 — 투수편 저장이 있으면 (0x5eb8c 의 g+0x43 · 0x1fbd0) */
+    readonly nariPitcher: HallOfFameNariPlayer | null
+    readonly register: (career: PlayerCareer, slot: number | null) => HallOfFameResult['kind']
+  }
   readonly onAceMatch: AceMatchStarter
   /** 경기 중 메뉴 "설정" 칸이 열 환경설정 — 안 넘기면 그 칸이 잠긴다 */
   readonly gameSettings: ReturnType<typeof useGameSettings>
@@ -51,7 +59,7 @@ export function CareerRoutes({
   runner,
   random,
   career,
-  onRegisterHallOfFame,
+  hallOfFame,
   onAceMatch,
   gameSettings,
   aceLevels,
@@ -208,7 +216,16 @@ export function CareerRoutes({
           // 선수 생김새 +0xb — 타입(bit5~7)·손(bit4)·피부(bit2~3). 걸어 들어오는 그림·제작진 선수 애니와 팔레트 (0x63a5c)
           walkInLook={{ mode: 4, typeIndex: career.battingTypeIndex, handIndex: career.battingSide, skinIndex: career.skinIndex }}
           bonusGamePoint={endingBonusOf(screen.endingIndex)} isContinuable={isContinuableEnding(screen.endingIndex)}
-          onRegister={() => onRegisterHallOfFame(career)} onContinue={actions.continueAfterEnding}
+          hallOfFame={{
+            collection: hallOfFame.collection,
+            edition: '타자',
+            nari: {
+              투수: hallOfFame.nariPitcher,
+              타자: nariBatterOf(career),
+            },
+            onRegister: (slot) => hallOfFame.register(career, slot),
+          }}
+          onContinue={actions.continueAfterEnding}
           onFinish={actions.finishEnding} />
       )
 

@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { CareerRoutes } from '@/app/ui/CareerRoutes'
+import { EMPTY_COLLECTION } from '@/entities/collection/model/collection'
 import { useCareerSession } from '@/app/model/useCareerSession'
 import { useAtBatRunner } from '@/app/model/useAtBatRunner'
 import { useGameSettings } from '@/app/model/useGameSettings'
@@ -60,7 +61,8 @@ function 띄우기(saved: PlayerCareer) {
     }
     return (
       <CareerRoutes screen={screenState} setScreen={setScreen} session={session} runner={runner} random={random}
-        career={session.career} onRegisterHallOfFame={() => '엔딩전'} onAceMatch={() => {}}
+        career={session.career} hallOfFame={{ collection: EMPTY_COLLECTION, nariPitcher: null, register: () => '엔딩전' }}
+        onAceMatch={() => {}}
         gameSettings={gameSettings} />
     )
   }

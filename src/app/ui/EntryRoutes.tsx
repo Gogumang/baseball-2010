@@ -217,7 +217,8 @@ export function EntryRoutes({ screen, setScreen, session, gameSettings, collecti
         if (mode !== '미션') return
         // 원본은 **육성 선수도 명예의 전당 선수도 없으면 미션에 못 들어간다** (Q2 3-1 확정).
         // 코드 5 → StrCOMMON[38] 팝업만 띄우고 되돌아간다. 신인 능력치로 대신 넣어 주는 길은 없다.
-        // 웹에는 아직 명예의 전당이 없으니 육성 선수만 본다.
+        // ⚠️ 명예의 전당 선수(+0x880/+0x940)는 이제 기록연감에 쌓이지만, 미션·홈런더비 선수 고르기 창(0x62568 의
+        //    결과 3·4 → 전역기록 +0xa5/+0xa6)과 명예 선수로 경기를 세우는 길(0x1fbd0/0x1fc20)이 미션 세션에 아직 없어 육성 선수만 본다.
         if (session.career === null && session.savedCareer === null) {
           return setMissionBlocked(true)
         }

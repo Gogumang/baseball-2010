@@ -1,15 +1,24 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
-import type { Collection } from '@/entities/collection/model/collection'
-import { HALL_OF_FAME_BATTER_SLOTS } from '@/entities/collection/model/collection'
+import type { Collection, HallOfFameResult, HallOfFameSide } from '@/entities/collection/model/collection'
+import {
+  firstEmptyHallOfFameSlot, hallOfFameBatterAt, hallOfFamePitcherAt, isHallOfFameSlotOpen,
+} from '@/entities/collection/model/collection'
+import type { BatterAbility } from '@/entities/batting/model/batter'
+import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbility'
+import { abilityChartFrameOf } from '@/pages/create-player/lib/teamSelectLayout'
+import type { ChartPoint } from '@/pages/create-player/lib/teamSelectLayout'
+import { ORIGINAL_COLORS } from '@/shared/config/design'
 import { RecordAnnals } from '@/pages/record/ui/RecordAnnals'
 import {
-  DESCRIPTION_PANEL, FOOTER, HALL_OF_FAME_BUBBLE, HALL_OF_FAME_DETAIL, HALL_OF_FAME_GRID,
+  DESCRIPTION_PANEL, FOOTER, HALL_OF_FAME_BUBBLE, HALL_OF_FAME_CHART, HALL_OF_FAME_DETAIL, HALL_OF_FAME_GRID,
   HALL_OF_FAME_PITCHER_SLOTS, HALL_OF_FAME_SLOTS, HALL_OF_FAME_SLOT_ART, HALL_OF_FAME_TAGS,
-  HEADBAND, ITEM_COUNT, ROW, SCREEN, SLT_FRAME, SPECIAL_ITEMS, WHEEL,
-  descriptionPanelTopOf, hallOfFameBubblePositionOf, hallOfFameCellOf, rowLeftOf, rowTopOf,
+  HEADBAND, ITEM_COUNT, NARI_BATTER_SLOT, NARI_PITCHER_SLOT, ROW, SCREEN, SLT_FRAME, SPECIAL_ITEMS, WHEEL,
+  descriptionPanelTopOf, hallOfFameBubblePositionOf, hallOfFameCellOf, hallOfFameChartVerticesOf,
+  hallOfFameEntryOfSlot, hallOfFameKeyCodeOf, rowLeftOf, rowTopOf,
 } from '@/pages/special/lib/specialLayout'
+import type { HallOfFameSlotState } from '@/pages/special/lib/specialLayout'
 import * as styles from '@/pages/special/ui/SpecialScreen.css'
 
 const MAIN_UI = './sprites/main_ui'
@@ -93,7 +102,7 @@ export function SpecialScreen({ collection, renderAceSelect, onBack }: SpecialSc
   }
 
   if (view === '명예의 전당') {
-    return <HallOfFameView collection={collection} onBack={() => setView('목록')} />
+    return <HallOfFameScreen collection={collection} mode={{ kind: '보기' }} onBack={() => setView('목록')} />
   }
 
   const selected = SPECIAL_ITEMS[cursor]
@@ -220,36 +229,116 @@ function SpecialBands({ onBack }: { readonly onBack: () => void }) {
   )
 }
 
+/** 등록 목록에서 나리 선수 칸(0·5)에 그릴 선수 — 저장이 없으면 null (칸 상태 2) */
+export interface HallOfFameNariPlayer {
+  readonly name: string
+  /** `0xb6415(기록, k, 1)` — 능력치 도형 값 */
+  readonly equippedAbility: readonly number[]
+}
+
+/** 명예의 전당 목록의 두 쓰임 */
+export type HallOfFameMode =
+  /** 스페셜 명예의 전당 — 하위 상태 27, 목록 종류 2 (0x26024) */
+  | { readonly kind: '보기' }
+  /**
+   * 엔딩 뒤 등록 — 나리 상태 145, 목록 종류 3 (0x1c91e). 키는 0x62568 이 `0x5eae0` 결과 코드와 모드로 가른다.
+   * `onRegister(칸)` 은 칸 번호(없으면 첫 빈 칸)로 등록을 해 보고 결과를 돌려준다. `onDone` 은 등록 뒤 메인 메뉴,
+   * `onLater` 는 "나중에 등록" 예.
+   */
+  | {
+      readonly kind: '등록'
+      readonly edition: HallOfFameSide
+      readonly nari: { readonly 투수: HallOfFameNariPlayer | null; readonly 타자: HallOfFameNariPlayer | null }
+      readonly onRegister: (slot: number | null) => HallOfFameResult['kind']
+      readonly onDone: () => void
+      readonly onLater: () => void
+    }
+
+/** 원본 문구 (StrCOMMON · 0xcc214 · StrMODE[219]) */
+const HALL_OF_FAME_TEXT = {
+  nariFirst: '!C!cFFFFFF나만의리그 선수를!N먼저 등록해야합니다', // StrCOMMON[38]
+  confirm: '!C!cffffff명예의 전당에 선수를!N등록하시겠습니까?!N(!cFFFF0020000 G포인트 소모!cFFFFFF)', // StrCOMMON[50]
+  full: '!C!cffffff명예의 전당에!N빈슬롯이 없습니다', // StrCOMMON[51]
+  done: '!C!cffffff명예의 전당에!N등록이 완료되었습니다', // StrCOMMON[52]
+  shortage: '!C!cFF0000G포인트가 부족합니다.!cFFFFFF 구매!N페이지로 이동하시겠습니까?', // 0xcc214
+  later: '!C나중에 등록 하시겠습니까?!N메인 메뉴로 이동합니다', // StrMODE[219]
+  // StrCOMMON[45] / [54] — 슬롯 현금 구매 (🌐)
+  buyPitcherSlots: '!C!cFFFFFF슬롯을 오픈하여 명예선수를!N추가로 등록할 수 있습니다!N투수 슬롯 2개가 오픈됩니다!N!N!cFFFFFF실제 현금 !cFF0000500원!cFFFFFF의 추가 정보!N이용료 (통화료별도)가 부과!N됩니다. 아이템 구매 중 일부!N시간이 소요 될 수 있으므로!N강제종료 하지 마세요!N!N구매 하시겠습니까?',
+  buyBatterSlots: '!C!cFFFFFF슬롯을 오픈하여 명예선수를!N추가로 등록할 수 있습니다!N타자 슬롯 4개가 오픈됩니다!N!N!cFFFFFF실제 현금 !cFF00001000원!cFFFFFF의 추가 정보!N이용료 (통화료별도)가 부과!N됩니다. 아이템 구매 중 일부!N시간이 소요 될 수 있으므로!N강제종료 하지 마세요!N!N구매 하시겠습니까?',
+} as const
+
+/** 등록 목록에 뜬 팝업 — 0x62568 의 창 종류 [목록+0x314] (0x16 확인 · 0x17 G 부족) 와 알림 */
+type HallOfFamePopup =
+  | { readonly kind: '확인'; readonly slot: number | null }
+  | { readonly kind: 'G부족' }
+  | { readonly kind: '나중에' }
+  | { readonly kind: '완료' }
+  | { readonly kind: '알림'; readonly text: string; readonly buttons: readonly string[] }
+
 /**
- * 명예의 전당 (하위 상태 27 = 공용 목록 페이지 `0x63b15` 의 k = 8 — P6 2a-3 · S9 3~4절).
+ * 명예의 전당 목록 (공용 목록 페이지 `0x63b15` 의 k = 8 — P6 2a-3 · S9 3~4절). 스페셜(상태 27)과 엔딩 뒤 등록(나리 상태 145)이 같이 쓴다.
  *
- * 위쪽 A(58,110) 자리에 고른 슬롯 한 명, B(178,96) 자리에 능력치, 아래쪽에 **5×3 격자 15칸**,
- * 커서 칸 옆에 **말풍선**(친구에게 선물 / 슬롯에서 삭제)이 뜬다.
+ * 위쪽 A(58,110) 자리에 고른 칸의 선수, B(178,96) 자리에 능력치 도형, 아래쪽에 **5×3 격자 15칸**
+ * (`NARI_PITCHER_SLOT` 머리말의 배치). 스페셜에서는 칸을 고르면 **말풍선**(친구에게 선물 / 슬롯에서 삭제)이 뜬다.
  *
  * ⚠️ **웹에 값이 없어 못 그린 것**
- *  - 찬 슬롯의 **캐릭터 그림**([skin+0x290])과 **팀 로고**(캐릭터+0x30): 명예의 전당 기록에
- *    팀·외모가 없다. 원 두 개만 깔고 이름 막대를 얹는다.
- *  - **능력치 도형** `0x5aefd`: S9 가 "능력치 값 → 꼭짓점 길이 식" 을 못 풀어 남긴 자리라
- *    B 딱지만 두고 도형은 안 그린다.
- *  - **슬롯 상태 표** `[skin+0x20c + 슬롯×8]`(2·4 = EMPTY · 5 = LOCK · 그 밖 = EMPTY+자물쇠)을
- *    못 읽어, 웹은 기본 칸(타자 4 · 투수 2 — `collection.ts` 머리말)만 EMPTY 로 열고
- *    나머지는 LOCK 으로 둔다 — **근사**.
- *  - "친구에게 선물" 은 통신이 필요하고, "슬롯에서 삭제" 는 기록을 고치는 길이 이 화면에
- *    안 들어와 있어 둘 다 안내만 띄운다.
+ *  - 찬 칸의 **캐릭터 그림**([skin+0x290])과 **팀 로고**(캐릭터+0x30) — 원 두 개만 깔고 이름 막대를 얹는다.
+ *  - "친구에게 선물" 은 통신이 필요하고, "슬롯에서 삭제"(StrCOMMON[46], 시즌 중 막기 StrMAINMENU[213]·[214])는
+ *    아직 옮기지 않아 안내만 띄운다. 슬롯 현금 구매·G 충전 페이지(🌐)도 열 수 없어 목록으로 돌아온다.
  */
-function HallOfFameView({ collection, onBack }: { readonly collection: Collection; readonly onBack: () => void }) {
-  const [slot, setSlot] = useState(HALL_OF_FAME_PITCHER_SLOTS)
+export function HallOfFameScreen({ collection, mode, onBack }: {
+  readonly collection: Collection
+  readonly mode: HallOfFameMode
+  readonly onBack: () => void
+}) {
+  const [slot, setSlot] = useState(mode.kind === '등록' && mode.edition === '타자' ? NARI_BATTER_SLOT : NARI_PITCHER_SLOT + 1)
   const [isBubbleOpen, setIsBubbleOpen] = useState(false)
   const [bubbleCursor, setBubbleCursor] = useState(0)
   const [notice, setNotice] = useState<string | null>(null)
+  const [popup, setPopup] = useState<HallOfFamePopup | null>(null)
 
-  const slots = hallOfFameSlotsOf(collection)
+  const slots = hallOfFameSlotsOf(collection, mode)
   const current = slots[slot]
   const cell = hallOfFameCellOf(slot)
   const { a, b } = HALL_OF_FAME_DETAIL
 
+  /** 등록 목록의 키 확인 (0x62604~0x627d0) — 결과 코드와 지금 모드(3 투수 · 4 타자)로 가른다 */
+  const pressRegisterSlot = (target: number) => {
+    if (mode.kind !== '등록') return
+    const code = hallOfFameKeyCodeOf(slots[target].state, target)
+    const entry = hallOfFameEntryOfSlot(target)
+    const isMine = (side: HallOfFameSide) => mode.edition === side
+    // 1·2 나리 선수 칸 → 첫 빈 칸이 있으면 [50] 확인, 없으면 [51] (0x62630 · 0x626a0)
+    if ((code === 1 && isMine('투수')) || (code === 2 && isMine('타자'))) {
+      const empty = firstEmptyHallOfFameSlot(collection, mode.edition)
+      return setPopup(empty === null ? { kind: '알림', text: HALL_OF_FAME_TEXT.full, buttons: ['확인'] } : { kind: '확인', slot: null })
+    }
+    // 5 나리 선수 없음 → StrCOMMON[38] (0x62710 — 모드 3 칸 0 · 모드 4 칸 5)
+    if (code === 5 && ((isMine('투수') && target === NARI_PITCHER_SLOT) || (isMine('타자') && target === NARI_BATTER_SLOT))) {
+      return setPopup({ kind: '알림', text: HALL_OF_FAME_TEXT.nariFirst, buttons: ['확인'] })
+    }
+    // 6 열린 빈 칸 — 자기 편 칸이면 그 칸으로 [50] 확인 (0x62728)
+    if (code === 6 && entry !== null && isMine(entry.side)) return setPopup({ kind: '확인', slot: entry.index })
+    // 7 잠긴 칸 — 자기 편이면 슬롯 현금 구매 [45]/[54] (0x62772, 🌐)
+    if (code === 7 && entry !== null && isMine(entry.side)) {
+      const text = entry.side === '투수' ? HALL_OF_FAME_TEXT.buyPitcherSlots : HALL_OF_FAME_TEXT.buyBatterSlots
+      return setPopup({ kind: '알림', text, buttons: ['예', '아니오'] })
+    }
+    // 3·4 명예 선수 칸은 결과 3·4 를 남길 뿐 상태 145 가 그 결과로 하는 일이 없다 (⚠️ 0x1ca4c 가 0·7·팝업만 본다 — 유력)
+    return undefined
+  }
+
+  const pressSlot = (target: number) => {
+    if (mode.kind === '등록') return pressRegisterSlot(target)
+    setBubbleCursor(0)
+    return setIsBubbleOpen(true)
+  }
+
+  /** 되돌아가기 — 등록 목록은 결과 0 → StrMODE[219] (0x1ca4c), 스페셜은 상태 6 */
+  const goBack = () => (mode.kind === '등록' ? setPopup({ kind: '나중에' }) : onBack())
+
   useEffect(() => {
-    if (notice !== null) return undefined
+    if (notice !== null || popup !== null) return undefined
     const onKeyDown = (event: KeyboardEvent) => {
       event.stopImmediatePropagation()
       if (isBubbleOpen) {
@@ -275,19 +364,37 @@ function HallOfFameView({ collection, onBack }: { readonly collection: Collectio
       }
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault()
-        setBubbleCursor(0)
-        return setIsBubbleOpen(true)
+        return pressSlot(slot)
       }
       if (event.key === 'Escape' || event.key === 'Backspace') {
         event.preventDefault()
-        onBack()
+        goBack()
       }
     }
     window.addEventListener('keydown', onKeyDown, true)
     return () => window.removeEventListener('keydown', onKeyDown, true)
   })
 
+  /** 팝업 답 — 확인(0x16)·G 부족(0x17)·나중에(StrMODE[219])·완료(0x30) */
+  const answerPopup = (index: number) => {
+    if (popup === null || mode.kind !== '등록') return setPopup(null)
+    if (popup.kind === '확인') {
+      if (index !== 0) return setPopup(null)
+      const result = mode.onRegister(popup.slot)
+      if (result === 'G부족') return setPopup({ kind: 'G부족' })
+      if (result === '빈칸없음') return setPopup({ kind: '알림', text: HALL_OF_FAME_TEXT.full, buttons: ['확인'] })
+      return setPopup({ kind: '완료' })
+    }
+    if (popup.kind === '나중에') return index === 0 ? mode.onLater() : setPopup(null)
+    if (popup.kind === '완료') return mode.onDone()
+    // G 부족 "예" 는 결과 7 → G 충전 페이지 139(🌐) — 웹은 목록으로 돌아온다
+    return setPopup(null)
+  }
+
+  const popupView = popup === null ? null : popupTextOf(popup)
   const bubble = hallOfFameBubblePositionOf(cell)
+  const chartValues = current.kind === '찬칸' ? current.chartValues : []
+  const chartCenter = { x: b.x, y: b.y + HALL_OF_FAME_CHART.dy }
 
   return (
     <RawScreen>
@@ -308,10 +415,10 @@ function HallOfFameView({ collection, onBack }: { readonly collection: Collectio
         <img
           className={styles.sprite}
           alt=""
-          src={imageSrc(SLT_FRAME, hallOfFameIconOf(slot, current.kind).image)}
+          src={imageSrc(SLT_FRAME, hallOfFameIconOf(slot, current.state).image)}
           style={{
-            left: a.x - Math.floor(hallOfFameIconOf(slot, current.kind).width / 2),
-            top: a.y - Math.floor(hallOfFameIconOf(slot, current.kind).height / 2),
+            left: a.x - Math.floor(hallOfFameIconOf(slot, current.state).width / 2),
+            top: a.y - Math.floor(hallOfFameIconOf(slot, current.state).height / 2),
           }}
         />
       )}
@@ -332,18 +439,18 @@ function HallOfFameView({ collection, onBack }: { readonly collection: Collectio
             width: HALL_OF_FAME_SLOT_ART.nameBar.width,
           }}
         >
-          {current.famer.name}
+          {current.name}
         </div>
       ) : (
         <img
           className={styles.sprite}
-          alt={current.kind === '잠김' ? 'LOCK' : 'EMPTY'}
-          src={imageSrc(SLT_FRAME, hallOfFameBarLabelOf(current.kind).image)}
+          alt={current.state === 5 ? 'LOCK' : 'EMPTY'}
+          src={imageSrc(SLT_FRAME, hallOfFameBarLabelOf(current.state).image)}
           style={{
             left: a.x + HALL_OF_FAME_SLOT_ART.nameBar.dx
-              + Math.floor((HALL_OF_FAME_SLOT_ART.nameBar.width - hallOfFameBarLabelOf(current.kind).width) / 2),
+              + Math.floor((HALL_OF_FAME_SLOT_ART.nameBar.width - hallOfFameBarLabelOf(current.state).width) / 2),
             top: a.y + HALL_OF_FAME_SLOT_ART.nameBar.dy
-              + Math.floor((HALL_OF_FAME_SLOT_ART.nameBar.height - hallOfFameBarLabelOf(current.kind).height) / 2),
+              + Math.floor((HALL_OF_FAME_SLOT_ART.nameBar.height - hallOfFameBarLabelOf(current.state).height) / 2),
           }}
         />
       )}
@@ -379,6 +486,8 @@ function HallOfFameView({ collection, onBack }: { readonly collection: Collectio
         )
       })}
 
+      <HallOfFameAbilityChart center={chartCenter} values={chartValues} />
+
       {/* 5×3 격자 — 칸마다 둥근 네모 RGB(48,69,205) 를 (x−3, y−3, 칸+3) 에 (0x7a844) */}
       {slots.map((entry, index) => {
         const box = hallOfFameCellOf(index)
@@ -391,6 +500,7 @@ function HallOfFameView({ collection, onBack }: { readonly collection: Collectio
             aria-current={index === slot}
             data-slot={index}
             data-kind={entry.kind}
+            data-state={entry.state}
             style={{
               left: box.x - HALL_OF_FAME_GRID.backingInset,
               top: box.y - HALL_OF_FAME_GRID.backingInset,
@@ -400,7 +510,7 @@ function HallOfFameView({ collection, onBack }: { readonly collection: Collectio
               borderRadius: HALL_OF_FAME_GRID.cornerRadius,
             }}
             onMouseEnter={() => setSlot(index)}
-            onClick={() => { setSlot(index); setBubbleCursor(0); setIsBubbleOpen(true) }}
+            onClick={() => { setSlot(index); pressSlot(index) }}
           />
         )
       })}
@@ -439,12 +549,46 @@ function HallOfFameView({ collection, onBack }: { readonly collection: Collectio
         </div>
       )}
 
-      <SpecialBands onBack={onBack} />
+      <SpecialBands onBack={goBack} />
 
       {notice !== null && <MessageBox text={notice} buttons={['확인']} onAnswer={() => setNotice(null)} />}
+      {popupView !== null && <MessageBox text={popupView.text} buttons={popupView.buttons} onAnswer={answerPopup} />}
     </RawScreen>
   )
 }
+
+function popupTextOf(popup: HallOfFamePopup): { readonly text: string; readonly buttons: readonly string[] } {
+  if (popup.kind === '확인') return { text: HALL_OF_FAME_TEXT.confirm, buttons: ['예', '아니오'] }
+  if (popup.kind === 'G부족') return { text: HALL_OF_FAME_TEXT.shortage, buttons: ['예', '아니오'] }
+  if (popup.kind === '나중에') return { text: HALL_OF_FAME_TEXT.later, buttons: ['예', '아니오'] }
+  if (popup.kind === '완료') return { text: HALL_OF_FAME_TEXT.done, buttons: ['확인'] }
+  return { text: popup.text, buttons: popup.buttons }
+}
+
+/**
+ * 능력치 도형 (B 자리, `HALL_OF_FAME_CHART`) — 바탕 테두리(고정 29, #6B92F4)는 팀 도형과 같고, 값 마름모는 축 최대 800 이다.
+ * 빈 칸·잠긴 칸은 기록이 없어 네 값이 0 이라 바탕만 남는다 (0x5b1de~0x5b1f6).
+ * ⚠️ 축 딱지 그림(종류 2 → 4~7 · 종류 3 → 0~3 번)과 빨간 최대 테두리(anim+0x1e0)는 팀 도형과 같은 까닭으로 안 그린다.
+ */
+function HallOfFameAbilityChart({ center, values }: { readonly center: ChartPoint; readonly values: readonly number[] }) {
+  const radius = HALL_OF_FAME_CHART.radius
+  const size = radius * 2
+  const pointsOf = (points: readonly ChartPoint[]) => points.map((point) => `${point.x},${point.y}`).join(' ')
+  return (
+    <svg className={styles.sprite} width={size} height={size} shapeRendering="crispEdges" aria-label="능력치 도형"
+      viewBox={`${center.x - radius} ${center.y - radius} ${size} ${size}`}
+      style={{ left: center.x - radius, top: center.y - radius }}>
+      <polygon points={pointsOf(abilityChartFrameOf(center))} fill="none" stroke={ORIGINAL_COLORS.radarAxis} strokeWidth={1} />
+      {values.length > 0 && (
+        <polygon data-part="values" points={pointsOf(hallOfFameChartVerticesOf(center, values))}
+          fill={ORIGINAL_COLORS.radarFill} fillOpacity={CHART_FILL_ALPHA} stroke={ORIGINAL_COLORS.radarEdge} strokeWidth={1} />
+      )}
+    </svg>
+  )
+}
+
+/** 팀 도형과 같은 채움 불투명도 0xb4 (TeamSelectScreen) */
+const CHART_FILL_ALPHA = 0xb4 / 0xff
 
 /** 말풍선 두 칸은 웹에서 아직 못 하는 일이라 안내만 띄운다 (원본 글은 통신·삭제 실행이다) */
 const HALL_OF_FAME_BUBBLE_NOTICES = [
@@ -452,38 +596,48 @@ const HALL_OF_FAME_BUBBLE_NOTICES = [
   '슬롯에서 삭제는!N아직 만들지 않았습니다',
 ] as const
 
-type HallOfFameSlot =
-  | { readonly kind: '찬칸'; readonly famer: Collection['hallOfFame'][number] }
-  | { readonly kind: '빈칸' }
-  | { readonly kind: '잠김' }
+type HallOfFameSlotView =
+  | { readonly kind: '찬칸'; readonly state: HallOfFameSlotState; readonly name: string; readonly chartValues: readonly number[] }
+  | { readonly kind: '빈칸'; readonly state: HallOfFameSlotState }
 
-/**
- * 슬롯 15칸. **0~4 투수 · 5~14 타자** (0x653ee 확정).
- * ⚠️ 원본 슬롯 상태 표 `[skin+0x20c]` 를 못 읽어, 기본으로 열려 있는 칸(타자 4 · 투수 2)만
- * 빈칸으로 두고 나머지는 잠김으로 둔다 — **근사**.
- */
-const OPEN_PITCHER_SLOTS = 2
+const batterChartOf = (ability: BatterAbility) => [ability.hit, ability.power, ability.defense, ability.run]
+const pitcherChartOf = (ability: PitcherAbility) => [ability.control, ability.velocity, ability.breaking, ability.stamina]
 
-function hallOfFameSlotsOf(collection: Collection): readonly HallOfFameSlot[] {
-  return Array.from({ length: HALL_OF_FAME_SLOTS }, (_unused, index): HallOfFameSlot => {
-    if (index < HALL_OF_FAME_PITCHER_SLOTS) {
-      return index < OPEN_PITCHER_SLOTS ? { kind: '빈칸' } : { kind: '잠김' }
+/** 칸 15개의 상태 (0x5eb8c) — `HallOfFameSlotState` 머리말 */
+function hallOfFameSlotsOf(collection: Collection, mode: HallOfFameMode): readonly HallOfFameSlotView[] {
+  return Array.from({ length: HALL_OF_FAME_SLOTS }, (_unused, index): HallOfFameSlotView => {
+    if (index === NARI_PITCHER_SLOT || index === NARI_BATTER_SLOT) {
+      if (mode.kind !== '등록') return { kind: '빈칸', state: 0 }
+      const nari = index === NARI_PITCHER_SLOT ? mode.nari.투수 : mode.nari.타자
+      return nari === null
+        ? { kind: '빈칸', state: 2 }
+        : { kind: '찬칸', state: 1, name: nari.name, chartValues: nari.equippedAbility }
     }
-    const batterIndex = index - HALL_OF_FAME_PITCHER_SLOTS
-    const famer = collection.hallOfFame[batterIndex]
-    if (famer !== undefined) return { kind: '찬칸', famer }
-    return batterIndex < HALL_OF_FAME_BATTER_SLOTS ? { kind: '빈칸' } : { kind: '잠김' }
+    const entry = hallOfFameEntryOfSlot(index)
+    if (entry === null) return { kind: '빈칸', state: 0 }
+    if (!isHallOfFameSlotOpen(entry.side, entry.index)) return { kind: '빈칸', state: 5 }
+    if (entry.side === '투수') {
+      const famer = hallOfFamePitcherAt(collection, entry.index)
+      return famer === null
+        ? { kind: '빈칸', state: 4 }
+        : { kind: '찬칸', state: 3, name: famer.name, chartValues: pitcherChartOf(famer.equippedAbility) }
+    }
+    const famer = hallOfFameBatterAt(collection, entry.index)
+    // 옛 저장(장비 얹은 값이 없는 선수)은 기본 능력치로 그린다
+    return famer === null
+      ? { kind: '빈칸', state: 4 }
+      : { kind: '찬칸', state: 3, name: famer.name, chartValues: batterChartOf(famer.equippedAbility ?? famer.ability) }
   })
 }
 
-/** 막대 글씨 — 잠긴 칸은 LOCK(114), 그 밖은 EMPTY(113) */
-function hallOfFameBarLabelOf(kind: HallOfFameSlot['kind']) {
-  return kind === '잠김' ? HALL_OF_FAME_SLOT_ART.lock : HALL_OF_FAME_SLOT_ART.empty
+/** 막대 글씨 — 잠긴 칸(5)은 LOCK(114), 그 밖은 EMPTY(113) (0x653ee~0x65432) */
+function hallOfFameBarLabelOf(state: HallOfFameSlotState) {
+  return state === 5 ? HALL_OF_FAME_SLOT_ART.lock : HALL_OF_FAME_SLOT_ART.empty
 }
 
-/** A 가운데 아이콘 — 잠기면 자물쇠 31, 투수 칸(≤ 4)이면 글러브 23, 타자 칸이면 방망이 24 */
-function hallOfFameIconOf(slot: number, kind: HallOfFameSlot['kind']) {
-  if (kind === '잠김') return HALL_OF_FAME_SLOT_ART.padlock
+/** A 가운데 아이콘 — 상태 2·4 면 투수 칸(≤ 4) 글러브 23 · 타자 칸 방망이 24, 그 밖(0·5)은 자물쇠 31 */
+function hallOfFameIconOf(slot: number, state: HallOfFameSlotState) {
+  if (state !== 2 && state !== 4) return HALL_OF_FAME_SLOT_ART.padlock
   return slot < HALL_OF_FAME_PITCHER_SLOTS ? HALL_OF_FAME_SLOT_ART.glove : HALL_OF_FAME_SLOT_ART.bat
 }
 

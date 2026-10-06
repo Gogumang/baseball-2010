@@ -10,7 +10,7 @@ import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { createLocalStorageSaveGame } from '@/shared/api/save/localStorageSaveGame'
 import { createLocalStorageMissionRecord } from '@/shared/api/save/localStorageMissionRecord'
 import { createLocalStorageJsonStore } from '@/shared/api/save/localStorageJsonStore'
-import { useCollection } from '@/app/model/useCollection'
+import { nariBatterOf, nariPitcherOf, useCollection } from '@/app/model/useCollection'
 import { GAME_POINT_USAGE } from '@/entities/collection/model/annalsStats'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 import { isEveryMissionCleared } from '@/entities/mission/model/missionGoal'
@@ -273,6 +273,12 @@ export function App() {
         random={random}
         openedHiddenIds={collection.collection.openedHiddenIds}
         gameSettings={gameSettings}
+        // 명예의 전당 등록 (나리 상태 145, 모드 3) — 칸 5 나리 타자는 타자편 저장이 있으면
+        hallOfFame={{
+          collection: collection.collection,
+          nariBatter: nariBatterOf(careerSession.career ?? careerSession.savedCareer),
+          register: (target, slot) => collection.registerPitcher(target, wallet, slot),
+        }}
         onExit={() => setScreen({ kind: '메인메뉴' })}
         // 마선수 대결 (SYS 8 → 투수 미션 team − 1) — 미션 세션이 투수편 내 투수(`pitcherMissionPitcher`)로 던지고
         // 이겼나를 돌려주면 투수편 세션이 140 → resultEvents[이김 ? 0 : 1] → 105 로 잇는다
@@ -301,7 +307,12 @@ export function App() {
       runner={runner}
       random={random}
       career={careerSession.career}
-      onRegisterHallOfFame={collection.register}
+      // 명예의 전당 등록 (나리 상태 145) — G 20000 은 전역 지갑에서 (0x62dc4)
+      hallOfFame={{
+        collection: collection.collection,
+        nariPitcher: nariPitcherOf(pitcherSession.career),
+        register: (target, slot) => collection.register(target, wallet, slot),
+      }}
       onAceMatch={startAceMatch}
       gameSettings={gameSettings}
       // 마선수 대결의 상대 마투수도 전역 레벨 칸을 본다 (0xb6414 배율 · 0xaebe4 마구 횟수)

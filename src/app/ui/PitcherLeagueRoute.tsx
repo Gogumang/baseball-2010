@@ -18,6 +18,11 @@ import {
 } from '@/entities/pitcher-career/model/pitcherSeasonFlow'
 import { PITCHER_EDITION_MODE } from '@/entities/pitcher-career/model/pitcherRotation'
 import type { ReactNode } from 'react'
+import { EMPTY_COLLECTION } from '@/entities/collection/model/collection'
+import type { Collection, HallOfFameResult } from '@/entities/collection/model/collection'
+import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
+import type { HallOfFameNariPlayer } from '@/pages/special/ui/SpecialScreen'
+import { nariPitcherOf } from '@/app/model/useCollection'
 import type { PitcherAceMatch, PitcherLeagueSession } from '@/app/model/usePitcherLeagueSession'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { useGameSettings } from '@/app/model/useGameSettings'
@@ -29,6 +34,12 @@ interface PitcherLeagueRouteProps {
   /** 경기 중 메뉴 "설정" 칸 */
   readonly gameSettings: ReturnType<typeof useGameSettings>
   readonly onExit: () => void
+  /** 명예의 전당 등록 목록 (나리 상태 145, 모드 3) — 기록연감·칸 5 나리 타자·등록 (G·통계는 App 이 지갑으로 치른다) */
+  readonly hallOfFame?: {
+    readonly collection: Collection
+    readonly nariBatter: HallOfFameNariPlayer | null
+    readonly register: (career: PitcherCareer, slot: number | null) => HallOfFameResult['kind']
+  }
   /**
    * 마선수 대결 화면 — 투수 미션 레코드(team − 1)를 사람이 던지는 미션 장면(모드 5). 끝나면 `onFinish(이겼나)`.
    * 안 넘기면 대결을 열지 않고 예전처럼 지나온 보상만 남기고 105 로 돌아간다 (`abortStoryAtMatch`).
@@ -50,7 +61,7 @@ interface PitcherLeagueRouteProps {
  * 상점은 [아이템] → 110 → **111 상점**(장비·서브·GP) · [선수정보] → **121 장비착용** 이 `PitcherShopScreen` 으로 간다.
  */
 export function PitcherLeagueRoute({
-  session, random, openedHiddenIds = [], gameSettings, onExit, renderAceMatch,
+  session, random, openedHiddenIds = [], gameSettings, onExit, renderAceMatch, hallOfFame,
 }: PitcherLeagueRouteProps) {
   const { career, scene, gameOptions, shopTab, shopNotice, shopGpDetail, actions } = session
 
@@ -185,10 +196,13 @@ export function PitcherLeagueRoute({
           handIndex: career.handIndex,
           skinIndex: career.skinIndex,
         }}
-        // ⚠️ **막힌 곳**: 명예의 전당 145 는 투수 칸이 2개인데(`entities/collection` 머리글),
-        // 웹 기록연감에는 타자 4칸만 있고 등록 함수도 `PlayerCareer` 를 받는다 —
-        // 투수는 아직 등록할 데가 없어 StrCOMMON[51] "빈슬롯이 없습니다" 로 돌려보낸다.
-        onRegister={() => '빈칸없음'}
+        // 명예의 전당 145 — 모드 3 은 투수 칸(+0x880, 기본 2칸)에 0x1f654 로 넣는다
+        hallOfFame={{
+          collection: hallOfFame?.collection ?? EMPTY_COLLECTION,
+          edition: '투수',
+          nari: { 투수: nariPitcherOf(career), 타자: hallOfFame?.nariBatter ?? null },
+          onRegister: (slot) => hallOfFame?.register(career, slot) ?? '빈칸없음',
+        }}
         onContinue={actions.continueAfterEnding}
         onFinish={() => {
           actions.finishEnding()

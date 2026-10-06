@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { EndingScreen } from '@/pages/ending/ui/EndingScreen'
+import { EMPTY_COLLECTION } from '@/entities/collection/model/collection'
 import {
   BAND_BACKGROUND, BAND_WINDOW, BATTER_EDITION_MODE, ENDING_IMAGE, SHORT_ENDING_TEXT_TOP, WALK_IN,
   creditsTopOf, creditsWalkersOf, endingImageOffsetOf, endingWalkInAnimationOf, endingWalkInPaletteOf,
@@ -22,7 +23,12 @@ const 띄우기 = (overrides: Partial<Parameters<typeof EndingScreen>[0]> = {}) 
       endingIndex={9}
       bonusGamePoint={3000}
       isContinuable={false}
-      onRegister={vi.fn(() => '등록' as const)}
+      hallOfFame={{
+        collection: EMPTY_COLLECTION,
+        edition: '타자',
+        nari: { 투수: null, 타자: { name: '홍길동', equippedAbility: [500, 500, 500, 500] } },
+        onRegister: vi.fn(() => '등록' as const),
+      }}
       onContinue={vi.fn(() => true)}
       onFinish={vi.fn()}
       {...overrides}
@@ -180,9 +186,18 @@ describe('엔딩 흐름', () => {
     expect(screen.getByText('-총괄/PM-')).toBeTruthy()
   })
 
-  it('제작진 뒤에 엔딩 보너스 → 명예의 전당 등록을 묻는다', () => {
+  it('제작진 뒤에 엔딩 보너스 → 명예의 전당 등록 목록(상태 145)에서 칸을 골라 등록한다', () => {
     const onRegister = vi.fn(() => '등록' as const)
-    띄우기({ onRegister })
+    const onFinish = vi.fn()
+    띄우기({
+      onFinish,
+      hallOfFame: {
+        collection: EMPTY_COLLECTION,
+        edition: '타자',
+        nari: { 투수: null, 타자: { name: '홍길동', equippedAbility: [500, 500, 500, 500] } },
+        onRegister,
+      },
+    })
 
     fireEvent.click(screen.getByRole('button', { name: '확인' })) // 엔딩 글 → 제작진
     fireEvent.click(screen.getByRole('button', { name: '확인' })) // 제작진 → 보너스
@@ -190,10 +205,28 @@ describe('엔딩 흐름', () => {
     expect(screen.getByText(/3000 G포인트/)).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'OK' }))
+    fireEvent.click(screen.getByRole('button', { name: '예' })) // StrMODE[215] → 등록 목록
+
+    // 칸 5(나리 타자, 코드 2) → 첫 빈 칸으로 [50] 확인
+    fireEvent.click(screen.getByRole('button', { name: '6번 슬롯' }))
+    expect(screen.getByText(/20000 G포인트 소모/)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '예' }))
 
-    expect(onRegister).toHaveBeenCalled()
+    expect(onRegister).toHaveBeenCalledWith(null)
     expect(screen.getByText(/등록이 완료되었습니다/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    expect(onFinish).toHaveBeenCalled()
+  })
+
+  it('등록을 묻는 팝업에 아니오면 곧장 끝낸다 — StrMODE[219] 는 목록의 취소다 (0x1bbc4)', () => {
+    const onFinish = vi.fn()
+    띄우기({ onFinish, bonusGamePoint: 0 })
+
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    fireEvent.click(screen.getByRole('button', { name: '아니오' }))
+
+    expect(onFinish).toHaveBeenCalled()
   })
 
   it('부상·방출 엔딩은 제작진 없이 이어하기를 묻는다', () => {

@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { SpecialScreen } from '@/pages/special/ui/SpecialScreen'
+import { HallOfFameScreen, SpecialScreen } from '@/pages/special/ui/SpecialScreen'
 import { EMPTY_COLLECTION } from '@/entities/collection/model/collection'
 import {
-  HALL_OF_FAME_BUBBLE, HALL_OF_FAME_GRID, HALL_OF_FAME_PITCHER_SLOTS, HALL_OF_FAME_SLOTS,
-  ROW, SPECIAL_ITEMS, hallOfFameBubblePositionOf, hallOfFameCellOf, rowLeftOf, rowTopOf,
+  HALL_OF_FAME_BUBBLE, HALL_OF_FAME_GRID, HALL_OF_FAME_SLOTS,
+  ROW, SPECIAL_ITEMS, hallOfFameBubblePositionOf, hallOfFameCellOf, hallOfFameChartVerticesOf, rowLeftOf, rowTopOf,
 } from '@/pages/special/lib/specialLayout'
 
 /**
@@ -168,19 +168,25 @@ describe('명예의 전당 격자 5×3', () => {
     expect(칸0.style.width).toBe(`${cell.width + 3}px`)
   })
 
-  it('슬롯 0~4 는 투수 칸, 5~14 는 타자 칸이다 — 등록된 선수는 타자 칸부터 찬다', () => {
+  it('칸 배치 0x5eb8c — 0·5·10 은 빈 자물쇠(상태 0), 투수 1~2·타자 6~9 가 열리고 나머지는 LOCK', () => {
     const famer = {
       name: '전설', ability: { hit: 1, power: 2, defense: 3, run: 4 },
-      endingIndex: 6, season: 13, titleIds: [],
+      endingIndex: 6, season: 13, titleIds: [], slot: 1,
     }
     render(<SpecialScreen collection={{ ...EMPTY_COLLECTION, hallOfFame: [famer] }} onBack={vi.fn()} />)
     fireEvent.click(칸('명예의전당'))
 
     const 슬롯 = (index: number) => screen.getByRole('button', { name: `${index + 1}번 슬롯` })
-    expect(슬롯(HALL_OF_FAME_PITCHER_SLOTS).dataset.kind).toBe('찬칸')
-    expect(슬롯(0).dataset.kind).toBe('빈칸')
-    // 첫 커서가 타자 첫 칸이라 이름 막대에 그 선수가 뜬다
+    expect([0, 5, 10].map((index) => 슬롯(index).dataset.state)).toEqual(['0', '0', '0'])
+    expect([1, 2, 3, 4].map((index) => 슬롯(index).dataset.state)).toEqual(['4', '4', '5', '5'])
+    // 명예 타자 1번(칸 7)에 등록된 선수
+    expect(슬롯(7).dataset.kind).toBe('찬칸')
+    expect([6, 8, 9].map((index) => 슬롯(index).dataset.state)).toEqual(['4', '4', '4'])
+    expect([11, 12, 13, 14].map((index) => 슬롯(index).dataset.state)).toEqual(['5', '5', '5', '5'])
+    fireEvent.mouseEnter(슬롯(7))
     expect(screen.getByText('전설')).toBeTruthy()
+    // 찬 칸은 능력치 도형에 값 마름모를 얹는다 (축 최대 800)
+    expect(screen.getByLabelText('능력치 도형').querySelector('polygon[data-part="values"]')).not.toBeNull()
   })
 
   it('칸을 누르면 말풍선이 칸 오른쪽 26px 에 뜨고, 오른쪽 두 열에서는 왼쪽으로 뒤집는다', () => {
@@ -205,5 +211,81 @@ describe('명예의 전당 격자 5×3', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: '친구에게 선물' }))
 
     expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain('통신')
+  })
+})
+
+describe('명예의 전당 등록 목록 — 나리 상태 145 (0x62568 목록 종류 3)', () => {
+  const 나리 = { name: '홍길동', equippedAbility: [999, 800, 400, 0] }
+  const 열기등록 = (overrides: Partial<{ onRegister: () => '등록' | 'G부족' | '빈칸없음' | '엔딩전'; edition: '투수' | '타자' }> = {}) => {
+    const onRegister = vi.fn(overrides.onRegister ?? (() => '등록' as const))
+    const onDone = vi.fn()
+    const onLater = vi.fn()
+    render(
+      <HallOfFameScreen
+        collection={EMPTY_COLLECTION}
+        mode={{ kind: '등록', edition: overrides.edition ?? '타자', nari: { 투수: null, 타자: 나리 }, onRegister, onDone, onLater }}
+        onBack={vi.fn()}
+      />,
+    )
+    const 슬롯 = (index: number) => screen.getByRole('button', { name: `${index + 1}번 슬롯` })
+    return { onRegister, onDone, onLater, 슬롯 }
+  }
+
+  it('나리 칸 0·5 는 저장이 있으면 상태 1, 없으면 2', () => {
+    const { 슬롯 } = 열기등록()
+    expect(슬롯(5).dataset.state).toBe('1')
+    expect(슬롯(0).dataset.state).toBe('2')
+  })
+
+  it('열린 빈 칸을 고르면 그 칸 번호로 [50] 확인 뒤 등록한다 (코드 6 — 칸 8 → 타자 2번)', () => {
+    const { onRegister, onDone, 슬롯 } = 열기등록()
+    fireEvent.click(슬롯(8))
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+    expect(onRegister).toHaveBeenCalledWith(2)
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    expect(onDone).toHaveBeenCalled()
+  })
+
+  it('G 가 모자라면 0xcc214 "구매 페이지로 이동하시겠습니까?" — 어느 답이든 목록으로 돌아온다', () => {
+    const { onDone, 슬롯 } = 열기등록({ onRegister: () => 'G부족' })
+    fireEvent.click(슬롯(5))
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+    expect(screen.getByText(/구매/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '아니오' }))
+    expect(onDone).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('남의 편 칸·잠긴 칸은 자기 편만 받는다 — 투수편이면 칸 0 의 나리 투수 없음은 StrCOMMON[38]', () => {
+    const { 슬롯 } = 열기등록({ edition: '투수' })
+    fireEvent.click(슬롯(8))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    fireEvent.click(슬롯(0))
+    expect(screen.getByText(/먼저 등록해야합니다/)).toBeTruthy()
+  })
+
+  it('잠긴 자기 편 칸은 슬롯 현금 구매 [54] (🌐)', () => {
+    const { 슬롯 } = 열기등록()
+    fireEvent.click(슬롯(12))
+    expect(screen.getByText(/타자 슬롯 4개가 오픈됩니다/)).toBeTruthy()
+  })
+
+  it('되돌아가기는 StrMODE[219] "나중에 등록" — 예면 나간다', () => {
+    const { onLater } = 열기등록()
+    fireEvent.click(screen.getByRole('button', { name: '되돌아가기' }))
+    expect(screen.getByText(/나중에 등록/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+    expect(onLater).toHaveBeenCalled()
+  })
+})
+
+describe('명예의 전당 능력치 도형 — 축 최대 800 (0x5e864)', () => {
+  it('최대길이 = 30 × 800 / 999 = 24, 값 0 이면 가운데', () => {
+    const center = { x: 178, y: 104 }
+    const [왼위, 오른위] = hallOfFameChartVerticesOf(center, [999, 0, 0, 0])
+    expect(오른위).toEqual(center)
+    // 225° 축 길이 24 — x 는 178 + (24 · cos225 ×65535) >> 16
+    expect(왼위.x).toBeLessThan(center.x)
+    expect(Math.round(Math.hypot(왼위.x - center.x, 왼위.y - center.y))).toBe(24)
   })
 })

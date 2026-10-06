@@ -5,14 +5,25 @@ import {
   normalizeCollection,
   openHiddenForMissions,
   registerHallOfFame,
+  registerHallOfFamePitcher,
+  HALL_OF_FAME_COST,
 } from '@/entities/collection/model/collection'
-import type { Collection, EndingViewer } from '@/entities/collection/model/collection'
-import { applyAnnalsStat } from '@/entities/collection/model/annalsStats'
+import type { Collection, EndingViewer, HallOfFameResult } from '@/entities/collection/model/collection'
+import { applyAnnalsStat, GAME_POINT_USAGE } from '@/entities/collection/model/annalsStats'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
+import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
+import { equippedPitcherAbilityOf } from '@/entities/pitcher-career/model/pitcherCareer'
+import { equippedAbilityOf } from '@/entities/career/model/condition'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 
 const NO_IDS: readonly number[] = []
+
+/** 등록 비용을 치르는 전역 G 지갑 `mgr[+0x64]` 의 두 칸 */
+export interface HallOfFameWallet {
+  readonly balance: number
+  readonly spend: (price: number) => void
+}
 const NO_EVENTS: readonly string[] = []
 
 /**
@@ -70,16 +81,45 @@ export function useCollection(
     store.save(collection)
   }, [collection, store])
 
-  const register = (target: PlayerCareer) => {
-    const result = registerHallOfFame(collection, target)
-    if (result.kind === '등록') setCollection(result.collection)
+  /**
+   * 명예의 전당 등록 (0x62cea~0x62e4e) — 칸을 채우고, G 20000 을 지갑에서 빼고, 통계 0x22c29(모드 4 ? 1 : 2, 20000) 을 적는다.
+   * `slot` 은 등록 목록에서 고른 빈 칸(없으면 첫 빈 칸, 0x62514).
+   */
+  const commitRegistration = (result: HallOfFameResult, wallet: HallOfFameWallet, usage: number) => {
+    if (result.kind !== '등록') return result.kind
+    setCollection({ ...result.collection, stats: applyAnnalsStat(result.collection.stats, { kind: 'G사용', usage, amount: HALL_OF_FAME_COST }) })
+    wallet.spend(HALL_OF_FAME_COST)
     return result.kind
   }
+  const register = (target: PlayerCareer, wallet: HallOfFameWallet, slot: number | null = null) =>
+    commitRegistration(registerHallOfFame(collection, target, wallet.balance, slot), wallet, GAME_POINT_USAGE.batterLeague)
+  const registerPitcher = (target: PitcherCareer, wallet: HallOfFameWallet, slot: number | null = null) =>
+    commitRegistration(registerHallOfFamePitcher(collection, target, wallet.balance, slot), wallet, GAME_POINT_USAGE.pitcherLeague)
 
   /** 통계 기록 `[mgr+0xc8]` 에 한 건 쌓는다 (0x22e35 · 0x22c29 · 0xb663c) — 원본도 곧바로 저장(0x1f1e1)한다 */
   const recordStat = useCallback((event: AnnalsStatEvent) => {
     setCollection((previous) => ({ ...previous, stats: applyAnnalsStat(previous.stats, event) }))
   }, [])
 
-  return { collection, register, recordStat }
+  return { collection, register, registerPitcher, recordStat }
+}
+
+/** 등록 목록 칸 0·5 에 그리는 나리 선수 — 이름과 능력치 도형 값 `0xb6415(기록, k, 1)` */
+export interface NariHallOfFamePlayer {
+  readonly name: string
+  readonly equippedAbility: readonly number[]
+}
+
+/** 칸 0 나리 투수 (0x5eb8c — 투수편 저장 g+0x43 · 0x1fbd0). k = 0 제구 · 1 구속 · 2 변화 · 3 체력 */
+export function nariPitcherOf(career: PitcherCareer | null | undefined): NariHallOfFamePlayer | null {
+  if (career === null || career === undefined) return null
+  const ability = equippedPitcherAbilityOf(career)
+  return { name: career.name, equippedAbility: [ability.control, ability.velocity, ability.breaking, ability.stamina] }
+}
+
+/** 칸 5 나리 타자 (0x5eb8c — 타자편 저장 g+0x44 · 0x1fc20). k = 0 히트 · 1 파워 · 2 수비 · 3 주루 */
+export function nariBatterOf(career: PlayerCareer | null | undefined): NariHallOfFamePlayer | null {
+  if (career === null || career === undefined) return null
+  const ability = equippedAbilityOf(career)
+  return { name: career.name, equippedAbility: [ability.hit, ability.power, ability.defense, ability.run] }
 }
