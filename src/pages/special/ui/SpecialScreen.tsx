@@ -316,7 +316,7 @@ export type HallOfFameMode =
  * 예(0x62994): 투수 0x22371 · 타자 0x22339 — 시즌 명단 정리 0x221dc 뒤 칸을 0 으로 · 0x5eb8c 다시 채움 · 저장 0x1f1b9 ·
  *       StrCOMMON[46]
  * ```
- * ⚠️ 확인 창의 처음 커서 `0x749d5(popup, 1)`(둘째 칸 "아니오" 로 보임, 유력)는 공용 MessageBox 에 처음 커서 칸이 없어 안 옮겼다.
+ * [128] 확인 창은 띄운 바로 뒤 `0x749d5(popup, 1)`(0x2ae42)로 처음 커서를 둘째 칸 **"아니오"** 에 둔다.
  */
 export interface HallOfFameDeletion {
   /** 막기 검사 — 그 명전 선수가 시즌 내 팀 명단에 있고(0xb50ac) 시즌모드 경기가 진행 중(전역기록 +0x4e)인가 */
@@ -703,17 +703,24 @@ export function HallOfFameScreen({ collection, mode, onBack, frame }: {
         : <ScreenFrame title={frame.title} gamePoint={frame.gamePoint} onBack={goBack} />}
 
       {notice !== null && <MessageBox text={notice} buttons={['확인']} onAnswer={() => setNotice(null)} />}
-      {popupView !== null && <MessageBox text={popupView.text} buttons={popupView.buttons} onAnswer={answerPopup} />}
+      {popupView !== null && <MessageBox text={popupView.text} buttons={popupView.buttons}
+        {...(popupView.initialSelected === undefined ? {} : { initialSelected: popupView.initialSelected })} onAnswer={answerPopup} />}
     </RawScreen>
   )
 }
 
-function popupTextOf(popup: HallOfFamePopup): { readonly text: string; readonly buttons: readonly string[] } {
+function popupTextOf(popup: HallOfFamePopup): {
+  readonly text: string
+  readonly buttons: readonly string[]
+  /** 처음 커서 — 0x749d5 를 부르는 자리만 준다 (안 주면 첫 칸) */
+  readonly initialSelected?: number
+} {
   if (popup.kind === '확인') return { text: HALL_OF_FAME_TEXT.confirm, buttons: ['예', '아니오'] }
   if (popup.kind === 'G부족') return { text: HALL_OF_FAME_TEXT.shortage, buttons: ['예', '아니오'] }
   if (popup.kind === '나중에') return { text: HALL_OF_FAME_TEXT.later, buttons: ['예', '아니오'] }
   if (popup.kind === '완료') return { text: HALL_OF_FAME_TEXT.done, buttons: ['확인'] }
-  if (popup.kind === '삭제확인') return { text: HALL_OF_FAME_TEXT.deleteConfirm, buttons: ['예', '아니오'] }
+  // 0x2ae3a 0x74ef5(…[128], 종류 2) 바로 뒤 0x2ae42 `0x749d5(popup, 1)` — 처음 커서 "아니오"
+  if (popup.kind === '삭제확인') return { text: HALL_OF_FAME_TEXT.deleteConfirm, buttons: ['예', '아니오'], initialSelected: 1 }
   return { text: popup.text, buttons: popup.buttons }
 }
 

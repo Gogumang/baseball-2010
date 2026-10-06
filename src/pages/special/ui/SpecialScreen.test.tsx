@@ -275,6 +275,20 @@ describe('명예의 전당 격자 5×3', () => {
     expect(onDelete).not.toHaveBeenCalled()
   })
 
+  it('[128] 확인 창의 처음 커서는 [아니오] 다 — 0x2ae42 0x749d5(popup, 1)', () => {
+    const onDelete = vi.fn()
+    찬칸열기({ isBlocked: () => false, onDelete })
+
+    fireEvent.click(screen.getByRole('button', { name: '2번 슬롯' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '슬롯에서 삭제' }))
+    expect(screen.getByRole('button', { name: '아니오' }).querySelector('img')?.getAttribute('src'))
+      .toContain('popup/frames/007.png')
+    fireEvent.keyDown(window, { key: 'Enter' })
+
+    expect(onDelete).not.toHaveBeenCalled()
+    expect(screen.queryByText(/현재 명예선수를/)).toBeNull()
+  })
+
   it('시즌 팀에 있고 시즌모드 경기 진행 중이면 StrMAINMENU[213] 으로 막고 말풍선은 남는다', () => {
     const onDelete = vi.fn()
     찬칸열기({ isBlocked: () => true, onDelete })

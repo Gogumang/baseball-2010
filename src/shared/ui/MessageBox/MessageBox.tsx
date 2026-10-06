@@ -19,6 +19,16 @@ interface MessageBoxProps {
    * 이 글자들을 세로로 그린다 — 칸 수와 순서는 `buttons` 와 같아야 한다.
    */
   readonly listItems?: readonly string[]
+  /**
+   * 처음 고른 칸 (안 주면 0 = 첫 칸 — 지금까지와 같다).
+   *
+   * 원본은 상자를 띄울 때마다 격자 객체를 새로 만들어(0x75070 `new(0x28)` → 0x6bd7c → 0x6bd38 이 +0xc/+0x10 을 0 으로)
+   * 칸 배치 0x6bfe1 이 `vtbl+0x14(0, 0)`(0x6c00d) 로 커서를 (0, 0) 에 두고, 첫 버튼만 고름 표시를 켠다(0x7511a 인자 1).
+   * 곧 **기본은 첫 칸**이다. 몇몇 자리는 띄운 바로 뒤 `0x749d5(창, n)` 을 불러 커서를 n 칸으로 옮긴다 —
+   * 열 수 c 로 (n % c, n / c) 를 격자 +0xc/+0x10 에 넣고 모든 버튼 고름 표시를 끈 뒤 칸 n 만 켠다(0x749d4~0x74a4e).
+   * 예/아니오(종류 2·3)는 버튼 1 "예" · 2 "아니오" 순서(0x750f8~0x75140)라 n = 1 이 **"아니오"** 다.
+   */
+  readonly initialSelected?: number
   /** 누른 버튼 번호 */
   readonly onAnswer: (index: number) => void
 }
@@ -26,7 +36,7 @@ interface MessageBoxProps {
 /**
  * 메시지 상자 (0xbbef8 → 0x74ef4 배치 · 0x746cc 그리기 — layout-re 4차, 판·위치 바이트 확인).
  * 화면을 검정 반투명으로 덮고, 폭 240 띠를 세로 가운데에 둔다. 글은 (45, y+20) 부터 폭 150, 줄 간격 14.
- * 버튼은 `ui/popup.pzx` 프레임 그림이고 첫 버튼이 기본 선택이다 (F-1 확정) — "확인" 이 아니라 **"OK"**,
+ * 버튼은 `ui/popup.pzx` 프레임 그림이고 첫 버튼이 기본 선택이다 (F-1 확정 — 자리별 처음 칸은 `initialSelected`) — "확인" 이 아니라 **"OK"**,
  * 고른 칸은 노란 글자가 아니라 **주황 그림 6·7**(49×23)이다.
  *
  * 열림·닫힘 애니메이션은 F-1 1-4(확정)다 — 아래 `OPEN_*` · `CLOSE_*` 참고.
@@ -76,8 +86,8 @@ function buttonFrameOf(count: number, index: number, isSelected: boolean): numbe
   return (isSelected ? YES_NO_SELECTED_FRAMES : YES_NO_FRAMES)[index]
 }
 
-export function MessageBox({ text, buttons, listItems, onAnswer }: MessageBoxProps) {
-  const [selected, setSelected] = useState(0)
+export function MessageBox({ text, buttons, listItems, initialSelected = 0, onAnswer }: MessageBoxProps) {
+  const [selected, setSelected] = useState(() => Math.min(Math.max(0, initialSelected), Math.max(0, buttons.length - 1)))
 
   // 상자가 열려 있는 동안 키는 상자 것이다. 뒤쪽 메뉴가 같은 Enter 를 같이 받으면
   // 상자를 눌러 닫을 수 없고 (상점 구매 확인), Escape 가 화면을 빠져나가 버린다 (관리 알림).

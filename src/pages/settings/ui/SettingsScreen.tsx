@@ -385,6 +385,12 @@ function DetailSettings({ settings, onChange, onBack }: {
 
 type ModeResetPopup = '나리확인' | '시즌확인' | '에디트확인' | '완료'
 
+/**
+ * 세 확인 창의 처음 커서 — 띄운 바로 뒤 `0x749d5(창, 1)` 로 둘째 칸 **"아니오"** 에 둔다
+ * (나리 [210]/[211] 0x2c930 · 시즌 0xcf870 0x2c7fa · 에디트 0xcf8d4 0x2c81c).
+ */
+const CONFIRM_FIRST_CURSOR = 1
+
 const MODE_RESET_NAMES = [SETTINGS_TEXT.careerReset, SETTINGS_TEXT.seasonReset, SETTINGS_TEXT.editReset] as const
 
 /**
@@ -394,6 +400,7 @@ const MODE_RESET_NAMES = [SETTINGS_TEXT.careerReset, SETTINGS_TEXT.seasonReset, 
  * ```
  * 하위 0 목록    CLR(−16) → 0xbcb49(…, 8) 환경설정 첫 화면 · OK(−5) → 칸별
  *   칸 0 [82] 나만의리그  → 고르기 창 0xcf848 "초기화할 데이터를 선택하세요"(종류 0x10) → 하위 1
+ *                          → 편별 확인 [210]/[211] (종류 2) + 0x749d5(창, 1) (0x2c928 · 0x2c930)
  *   칸 1 [83] 시즌모드    → 확인 0xcf870 (종류 2) + 0x749d5(창, 1) → 하위 3
  *   칸 2 [84] 에디트      → 확인 0xcf8d4 (종류 2) + 0x749d5(창, 1) → 하위 4
  * 하위 3 답 0(예) → 하위 0 · 0x224ed(mgr, 2) · 알림 0xcf900 "초기화 되었습니다" / 답 1·−1 → 하위 0
@@ -408,7 +415,6 @@ const MODE_RESET_NAMES = [SETTINGS_TEXT.careerReset, SETTINGS_TEXT.seasonReset, 
  *    시즌 중 막기 [212] → 확인 [210]/[211] → 0x224ed(4 타자 / 3 투수) 다(R11 3-1). 웹은 투수편 지우기·
  *    시즌 중 막기 배선이 다른 작업 구역(app/model)이라 **예전처럼 타자편 저장이 있을 때만 [210] 확인**으로 둔다.
  *  - 칸 1 시즌모드: 웹에 시즌 저장 지우기(0x224ed(2))가 없어 `onResetSeason` 을 안 받으면 OK 가 아무 일도 안 한다.
- *  - 확인 창의 처음 커서 0x749d5(창, 1)(둘째 칸 "아니오" 로 보임)는 공용 MessageBox 에 처음 커서가 없어 못 옮겼다.
  *  - 머리띠 0x54d95(skin, 0, 5, 0) 는 환경설정 첫 화면처럼 그리지 않는다.
  */
 function ModeResetPage({ hasSavedCareer, onResetCareer, onResetEditedNames, onResetSeason, onBack }: {
@@ -497,15 +503,15 @@ function ModeResetPage({ hasSavedCareer, onResetCareer, onResetEditedNames, onRe
       })}
 
       {popup === '나리확인' && (
-        <MessageBox text={SETTINGS_TEXT.careerResetConfirm} buttons={['예', '아니오']}
+        <MessageBox text={SETTINGS_TEXT.careerResetConfirm} buttons={['예', '아니오']} initialSelected={CONFIRM_FIRST_CURSOR}
           onAnswer={answerConfirm(onResetCareer)} />
       )}
       {popup === '시즌확인' && onResetSeason !== undefined && (
-        <MessageBox text={SETTINGS_TEXT.seasonResetConfirm} buttons={['예', '아니오']}
+        <MessageBox text={SETTINGS_TEXT.seasonResetConfirm} buttons={['예', '아니오']} initialSelected={CONFIRM_FIRST_CURSOR}
           onAnswer={answerConfirm(onResetSeason)} />
       )}
       {popup === '에디트확인' && (
-        <MessageBox text={SETTINGS_TEXT.editResetConfirm} buttons={['예', '아니오']}
+        <MessageBox text={SETTINGS_TEXT.editResetConfirm} buttons={['예', '아니오']} initialSelected={CONFIRM_FIRST_CURSOR}
           onAnswer={answerConfirm(onResetEditedNames)} />
       )}
       {popup === '완료' && (

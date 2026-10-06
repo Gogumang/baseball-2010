@@ -48,6 +48,24 @@ describe('메시지 상자 버튼 — popup.pzx 프레임', () => {
     expect(onAnswer).toHaveBeenCalledWith(0)
   })
 
+  it('처음 칸을 주면 그 칸이 고른 그림으로 시작한다 — 0x749d5(창, 1) 은 [아니오]', () => {
+    const onAnswer = vi.fn()
+    render(<MessageBox text="질문" buttons={['예', '아니오']} initialSelected={1} onAnswer={onAnswer} />)
+
+    expect(그림('예')?.getAttribute('src')).toContain('popup/frames/001.png')
+    expect(그림('아니오')?.getAttribute('src')).toContain('popup/frames/007.png')
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(onAnswer).toHaveBeenCalledWith(1)
+  })
+
+  it('처음 칸을 안 주면 첫 칸이다 — 원본도 상자마다 격자를 새로 만들어 (0, 0) 에 둔다', () => {
+    const onAnswer = vi.fn()
+    render(<MessageBox text="질문" buttons={['예', '아니오']} onAnswer={onAnswer} />)
+
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(onAnswer).toHaveBeenCalledWith(0)
+  })
+
   it('Escape 는 마지막 칸이다 — 예/아니오면 [아니오]', () => {
     const onAnswer = vi.fn()
     render(<MessageBox text="질문" buttons={['예', '아니오']} onAnswer={onAnswer} />)

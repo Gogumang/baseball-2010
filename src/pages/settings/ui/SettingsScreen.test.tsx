@@ -215,6 +215,25 @@ describe('환경설정 → 모드 초기화 (원본 상태 0x21, 세 줄)', () =
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
+  it('세 확인 창은 처음 커서가 [아니오] 다 — 0x749d5(창, 1) (0x2c930 · 0x2c7fa · 0x2c81c)', () => {
+    const onResetCareer = vi.fn()
+    const onResetSeason = vi.fn()
+    const onResetEditedNames = vi.fn()
+    모드초기화열기({ onResetCareer, onResetSeason, onResetEditedNames })
+
+    for (const name of ['나만의리그 초기화', '시즌모드 초기화', '에디트 초기화']) {
+      fireEvent.click(줄(name))
+      expect(screen.getByRole('button', { name: '아니오' }).querySelector('img')?.getAttribute('src'))
+        .toContain('popup/frames/007.png')
+      // 바로 OK 를 누르면 [아니오] — 아무것도 안 지운다
+      fireEvent.keyDown(window, { key: 'Enter' })
+      expect(screen.queryByRole('dialog')).toBeNull()
+    }
+    expect(onResetCareer).not.toHaveBeenCalled()
+    expect(onResetSeason).not.toHaveBeenCalled()
+    expect(onResetEditedNames).not.toHaveBeenCalled()
+  })
+
   it('키: 아래 두 번 → OK 가 에디트 확인을 띄우고, CLR 은 환경설정 첫 화면으로', () => {
     모드초기화열기()
 
