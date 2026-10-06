@@ -18,6 +18,9 @@ export interface SeasonTeamMenuScreenProps {
   readonly onSelect: (item: TeamMenuItem, target: SeasonSceneState) => void
   /** 취소(−16) — 관리 메뉴(0xc9)로 되돌아간다 */
   readonly onBack: () => void
+  /** 메뉴 커서 — 원본 메뉴 객체 this+0x78 은 장면이 사는 동안 남는다(세션이 든다). 안 주면 화면이 0 에서 든다 */
+  readonly cursor?: number
+  readonly onCursorChange?: (index: number) => void
 }
 
 /**
@@ -29,7 +32,9 @@ export interface SeasonTeamMenuScreenProps {
  * 관리 메뉴 화면 위에서 하위 메뉴만 바뀌는 것으로 보이지만 좌표를 확인하지 못했다.
  * 여기서는 관리 메뉴와 같은 공용 판 목록으로 그린다.
  */
-export function SeasonTeamMenuScreen({ state, onSelect, onBack }: SeasonTeamMenuScreenProps) {
+export function SeasonTeamMenuScreen({
+  state, onSelect, onBack, cursor: heldCursor, onCursorChange,
+}: SeasonTeamMenuScreenProps) {
   const rows: readonly SeasonListRow[] = TEAM_MENU.map((label) => ({ id: label, label }))
 
   const select = (index: number) => {
@@ -37,7 +42,11 @@ export function SeasonTeamMenuScreen({ state, onSelect, onBack }: SeasonTeamMenu
     if (target === null) return
     onSelect(TEAM_MENU[index], target)
   }
-  const { cursor, moveTo } = useSeasonCursor({ count: rows.length, onSelect: select, onCancel: onBack })
+  const { cursor, moveTo } = useSeasonCursor({
+    count: rows.length, onSelect: select, onCancel: onBack,
+    ...(heldCursor === undefined ? {} : { cursor: heldCursor }),
+    ...(onCursorChange === undefined ? {} : { onCursorChange }),
+  })
 
   return (
     <RawScreen>

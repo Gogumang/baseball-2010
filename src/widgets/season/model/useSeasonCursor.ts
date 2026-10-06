@@ -16,6 +16,12 @@ export interface SeasonCursorOptions {
   readonly onCancel?: () => void
   /** 팝업이 떠 있으면 화면은 키를 안 받는다 (원본 `this+0xc0 +0x99 ≠ 0` 이면 키 무시) */
   readonly isEnabled?: boolean
+  /**
+   * 커서를 부르는 쪽이 들고 있으면 넘긴다 — 원본 메뉴 객체(관리 메뉴 this+0x70 · 구단관리 this+0x78)는 장면이 사는 동안
+   * 남아 상태를 오가도 커서가 이어진다. 주면 `onCursorChange` 로만 바뀐다.
+   */
+  readonly cursor?: number
+  readonly onCursorChange?: (index: number) => void
 }
 
 export interface SeasonCursor {
@@ -23,24 +29,38 @@ export interface SeasonCursor {
   readonly moveTo: (index: number) => void
 }
 
-export function useSeasonCursor({ count, onSelect, onCancel, isEnabled = true }: SeasonCursorOptions): SeasonCursor {
-  const [cursor, setCursor] = useState(0)
+export function useSeasonCursor({
+  count, onSelect, onCancel, isEnabled = true, cursor: heldCursor, onCursorChange,
+}: SeasonCursorOptions): SeasonCursor {
+  const [ownCursor, setOwnCursor] = useState(0)
+  const cursor = heldCursor ?? ownCursor
 
   // 칸이 줄어들면 커서를 안으로 끌어온다 — 목록이 바뀌는 화면(영입 목록)이 있다
   const safeCursor = count === 0 ? 0 : Math.min(cursor, count - 1)
 
-  const latest = useRef({ count, onSelect, onCancel, cursor: safeCursor })
-  latest.current = { count, onSelect, onCancel, cursor: safeCursor }
+  const setCursor = (index: number) => {
+    if (heldCursor === undefined) setOwnCursor(index)
+    onCursorChange?.(index)
+  }
+  /** 위·아래 한 칸 — 화면이 커서를 들면 이전 값에서 셈하고, 부르는 쪽이 들면 지금 값에서 셈해 넘긴다 */
+  const stepCursor = (step: number, total: number, current: number) => {
+    const next = (previous: number) => (Math.min(previous, total - 1) + step + total) % total
+    if (heldCursor === undefined) return setOwnCursor(next)
+    onCursorChange?.(next(current))
+  }
+
+  const latest = useRef({ count, onSelect, onCancel, cursor: safeCursor, stepCursor })
+  latest.current = { count, onSelect, onCancel, cursor: safeCursor, stepCursor }
 
   useEffect(() => {
     if (!isEnabled) return undefined
     const onKeyDown = (event: KeyboardEvent) => {
-      const { count: total, cursor: current, onSelect: select, onCancel: cancel } = latest.current
+      const { count: total, cursor: current, onSelect: select, onCancel: cancel, stepCursor: move } = latest.current
       if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         if (total === 0) return
         event.preventDefault()
         const step = event.key === 'ArrowDown' ? 1 : -1
-        setCursor((previous) => (Math.min(previous, total - 1) + step + total) % total)
+        move(step, total, current)
         return
       }
       // 확인 — 원본 −5 · '5'

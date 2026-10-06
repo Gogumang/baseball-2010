@@ -31,6 +31,12 @@ export interface SeasonManagementScreenProps {
    * 떠 있는 동안 메뉴는 키를 안 받는다(원본 `this+0xc0 +0x99 ≠ 0` 이면 키 무시). 답은 0x73b8 이 받는다.
    */
   readonly alert?: { readonly text: string; readonly onAnswer: (accept: boolean) => void } | null
+  /**
+   * 메뉴 커서 — 원본 메뉴 객체 this+0x70 은 장면이 사는 동안 남아 커서가 상태를 넘어 이어진다(세션이 든다).
+   * 안 주면 화면이 0 에서 들고 시작한다.
+   */
+  readonly cursor?: number
+  readonly onCursorChange?: (index: number) => void
 }
 
 /**
@@ -42,7 +48,9 @@ export interface SeasonManagementScreenProps {
  * ⚠️ 관리 메뉴 그리기(0x73b8)의 좌표는 아직 안 풀렸다 — **원본 배치 미해독 — 근사**로
  * 공용 판 (24, 54, 192, 212) 에 한 열 목록을 얹었다 (`seasonWindowLayout.ts` 머리 주석).
  */
-export function SeasonManagementScreen({ state, onSelect, onExit, alert = null }: SeasonManagementScreenProps) {
+export function SeasonManagementScreen({
+  state, onSelect, onExit, alert = null, cursor: heldCursor, onCursorChange,
+}: SeasonManagementScreenProps) {
   const { record } = state
   // 갱신 0x4efc: SR+4 가 서 있으면 트레이닝·외출 칸을 끈다 — 이벤트 4 대사
   // "트레이닝, 외출 중 딱 한 가지 일만" 과 같은 규칙이다 (P4 3절 확정).
@@ -59,6 +67,8 @@ export function SeasonManagementScreen({ state, onSelect, onExit, alert = null }
   }
   const { cursor, moveTo } = useSeasonCursor({
     count: rows.length, onSelect: select, onCancel: onExit, isEnabled: alert === null,
+    ...(heldCursor === undefined ? {} : { cursor: heldCursor }),
+    ...(onCursorChange === undefined ? {} : { onCursorChange }),
   })
 
   const illness = record.illness === 0 ? '' : `\n질병 : ${ILLNESS_NAMES[record.illness] ?? '질병'}`

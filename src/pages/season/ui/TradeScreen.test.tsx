@@ -312,6 +312,27 @@ describe('CPU 트레이드 요청으로 들어오면 (0xe5 진입 0x5cd0 · 키 
     expect(onFinish).toHaveBeenCalledTimes(1)
   })
 
+  it('위·아래를 눌러도 커서가 요청 칸에서 안 움직인다 (−3 → 보기 전용 편집기 0x559f8 은 끝 코드만 적는다)', () => {
+    띄우기(상태(), { request: 요청 })
+    누르기('확인')
+    const 커서줄 = () => screen.getAllByRole('button').find((button) => button.getAttribute('aria-current') === 'true')
+
+    expect(커서줄()?.textContent).toContain(teamBatters(OPPONENT)[2].name)
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    fireEvent.keyDown(window, { key: 'ArrowUp' })
+    fireEvent.keyDown(window, { key: 'ArrowUp' })
+    expect(커서줄()?.textContent).toContain(teamBatters(OPPONENT)[2].name)
+  })
+
+  it("요청 중에는 '*' 가 편집기에 안 가 탭이 묶인다 (0x7104 `키 == 0x2a` 거르기)", () => {
+    띄우기(상태(), { request: 요청 })
+    누르기('확인')
+
+    fireEvent.keyDown(window, { key: '*' })
+    expect(screen.getByRole('button', { name: teamBatters(OPPONENT)[2].name })).toBeDefined()
+    expect(screen.queryByRole('group', { name: '트레이드 탭' })).toBeNull()
+  })
+
   it('영입 단계에서 취소하면 [216] — 예면 요청을 버린다', () => {
     const { onCancelRequest, onBack } = 띄우기(상태(), { request: 요청 })
     누르기('확인')

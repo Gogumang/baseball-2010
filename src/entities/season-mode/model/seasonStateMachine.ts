@@ -165,6 +165,54 @@ export function teamMenuTarget(index: number): SeasonSceneState | null {
 }
 
 /**
+ * **관리 메뉴(this+0x70)·구단관리(this+0x78) 메뉴 커서** — 두 메뉴 객체는 장면 초기화 0x3b14 가 만들어 장면이 사는 동안
+ * 남는다. 그래서 상태를 오가도 커서가 이어지고, 들어올 때 지우는 갈래만 0 으로 되돌린다 (직접 떴다).
+ */
+export interface SeasonMenuCursors {
+  /** this+0x70 관리 메뉴 6칸 */
+  readonly management: number
+  /** this+0x78 구단관리 4칸 */
+  readonly teamMenu: number
+}
+
+/** 장면 생성 — 0x6c219 로 만든 메뉴는 커서 (0,0) */
+export const INITIAL_SEASON_MENU_CURSORS: SeasonMenuCursors = { management: 0, teamMenu: 0 }
+
+/**
+ * CPU 트레이드 요청 [203] 에 "예" (0x73b8 7440~7484) — 두 메뉴 커서를 칸 1(관리 메뉴 구단관리 · 구단관리 트레이드)에 둔다:
+ * `[this+0x70|0x78] +0xc = 1 % 열수 · +0x10 = 1 / 열수` (한 열 메뉴라 곧 줄 1).
+ */
+export const TRADE_REQUEST_MENU_CURSOR = 1
+
+/**
+ * 상태에 들어올 때 메뉴 커서를 지우는 갈래 — `previous` 는 이전 상태 this+0x24.
+ * ```
+ * 0x4efc (0xc9 진입)  SR+4 ≠ 0 이고 이전 ∉ {0xd8, 0xce, 0xd0} → 관리 메뉴 커서 (0,0) · 스크롤 0
+ *                     SR+0x1bc ≠ 0                         → 관리 메뉴 커서 (0,0) · 스크롤 0
+ * 0x47d8 (0xce 진입)  이전 == 0xc9                          → 구단관리 커서 (0,0) · 스크롤 0
+ * ```
+ * 곧 관리 메뉴에서 구단관리로 들어가면 늘 맨 위에서 시작하고, 트레이드·영입 같은 하위 화면에서 돌아오면 자리가 남는다.
+ */
+export function menuCursorsOnEnter(
+  cursors: SeasonMenuCursors,
+  entered: SeasonSceneState,
+  previous: SeasonSceneState,
+  record: Pick<SeasonRecord, 'acted' | 'endingSeen'>,
+): SeasonMenuCursors {
+  if (entered === SEASON_SCENE_STATE.관리메뉴) {
+    const keeps = previous === SEASON_SCENE_STATE.다음경기
+      || previous === SEASON_SCENE_STATE.구단관리
+      || previous === SEASON_SCENE_STATE.아이템
+    if ((record.acted && !keeps) || record.endingSeen) return { ...cursors, management: 0 }
+    return cursors
+  }
+  if (entered === SEASON_SCENE_STATE.구단관리 && previous === SEASON_SCENE_STATE.관리메뉴) {
+    return { ...cursors, teamMenu: 0 }
+  }
+  return cursors
+}
+
+/**
  * 관리 메뉴가 열리는가 — 경기 수가 **짝수**일 때만이다 (P4 1b, StrHOWTO[18] "2경기마다").
  * 0·2·4·…·44 뒤에 열리므로 45번째 경기 뒤(홀수)는 관리 없이 바로 다음 화면으로 간다.
  */

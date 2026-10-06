@@ -138,3 +138,24 @@ describe('구단관리 하위 메뉴 (상태 0xce)', () => {
     expect(onBack).toHaveBeenCalled()
   })
 })
+
+describe('메뉴 커서를 부르는 쪽이 든다 (메뉴 객체 this+0x70 · this+0x78 는 장면이 사는 동안 남는다)', () => {
+  const 커서칸 = () => screen.getAllByRole('button').find((button) => button.getAttribute('aria-current') === 'true')
+
+  it('관리 메뉴는 넘긴 커서 칸에서 서고, 옮기면 onCursorChange 로 알린다', () => {
+    const onCursorChange = vi.fn()
+    render(
+      <SeasonManagementScreen state={시즌()} onSelect={vi.fn()} onExit={vi.fn()} cursor={1} onCursorChange={onCursorChange} />,
+    )
+
+    expect(커서칸()?.textContent).toContain('구단관리')
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    expect(onCursorChange).toHaveBeenCalledWith(2)
+  })
+
+  it('구단관리도 같다 — 칸 1 은 트레이드', () => {
+    render(<SeasonTeamMenuScreen state={시즌()} onSelect={vi.fn()} onBack={vi.fn()} cursor={1} onCursorChange={vi.fn()} />)
+
+    expect(커서칸()?.textContent).toContain('트레이드')
+  })
+})

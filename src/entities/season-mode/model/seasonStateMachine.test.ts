@@ -3,6 +3,9 @@ import { opponentOf } from '@/entities/league/model/league'
 import { startNewSeason, startNextYear } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import {
+  INITIAL_SEASON_MENU_CURSORS,
+  TRADE_REQUEST_MENU_CURSOR,
+  menuCursorsOnEnter,
   SEASON_END_CHAIN,
   SEASON_PHASE,
   SEASON_SCENE_STATE,
@@ -150,5 +153,34 @@ describe('시즌 끝 이벤트 사슬', () => {
     expect(afterKoreanSeries(기본({ yearIndex: 0 }))).toBe(SEASON_SCENE_STATE.국가대항전안내)
     expect(afterKoreanSeries(기본({ yearIndex: 1 }))).toBe('새해')
     expect(afterKoreanSeries(기본({ yearIndex: 8 }))).toBe(SEASON_SCENE_STATE.국가대항전안내)
+  })
+})
+
+describe('관리 메뉴·구단관리 커서 진입 갈래 (0x4efc · 0x47d8)', () => {
+  const 커서 = { management: 4, teamMenu: 2 }
+  const 기록 = { acted: false, endingSeen: false }
+
+  it('관리 메뉴: SR+4 가 서 있고 이전이 0xd8·0xce·0xd0 이 아니면 0 으로', () => {
+    expect(menuCursorsOnEnter(커서, SEASON_SCENE_STATE.관리메뉴, SEASON_SCENE_STATE.트레이닝, { ...기록, acted: true }))
+      .toEqual({ management: 0, teamMenu: 2 })
+    expect(menuCursorsOnEnter(커서, SEASON_SCENE_STATE.관리메뉴, SEASON_SCENE_STATE.구단관리, { ...기록, acted: true }))
+      .toBe(커서)
+    expect(menuCursorsOnEnter(커서, SEASON_SCENE_STATE.관리메뉴, SEASON_SCENE_STATE.트레이닝, 기록)).toBe(커서)
+  })
+
+  it('관리 메뉴: SR+0x1bc(엔딩 본 시즌)면 이전 상태와 상관없이 0', () => {
+    expect(menuCursorsOnEnter(커서, SEASON_SCENE_STATE.관리메뉴, SEASON_SCENE_STATE.다음경기, { ...기록, endingSeen: true }))
+      .toEqual({ management: 0, teamMenu: 2 })
+  })
+
+  it('구단관리: 이전이 관리 메뉴일 때만 0', () => {
+    expect(menuCursorsOnEnter(커서, SEASON_SCENE_STATE.구단관리, SEASON_SCENE_STATE.관리메뉴, 기록))
+      .toEqual({ management: 4, teamMenu: 0 })
+    expect(menuCursorsOnEnter(커서, SEASON_SCENE_STATE.구단관리, SEASON_SCENE_STATE.트레이드, 기록)).toBe(커서)
+  })
+
+  it('장면 생성은 둘 다 0 · 요청 "예" 는 칸 1', () => {
+    expect(INITIAL_SEASON_MENU_CURSORS).toEqual({ management: 0, teamMenu: 0 })
+    expect(TRADE_REQUEST_MENU_CURSOR).toBe(1)
   })
 })

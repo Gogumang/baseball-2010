@@ -1704,11 +1704,37 @@ describe('CPU 트레이드 요청 (0x953c → 0xec10 → 0xe5)', () => {
     expect(result.current.isTradeRequestAlertOpen).toBe(false)
     expect(result.current.scene).toBe(SEASON_SCENE_STATE.트레이드영입선수)
 
+    // 7440~7484 — 관리 메뉴·구단관리 커서를 칸 1 로
+    expect(result.current.menuCursors).toEqual({ management: 1, teamMenu: 1 })
+
     // 결과를 닫으면 플래그를 지우고 관리 메뉴로 — 알림은 다시 안 뜬다
     act(() => result.current.actions.closeTradeResult())
     expect(result.current.scene).toBe(SEASON_SCENE_STATE.관리메뉴)
     expect(result.current.tradeRequest.isRequested).toBe(false)
     expect(result.current.isTradeRequestAlertOpen).toBe(false)
+    // SR+4 가 0 이라 0x4efc 가 커서를 안 지운다 — 구단관리 칸에 남는다
+    expect(result.current.menuCursors.management).toBe(1)
+    // 관리 메뉴에서 구단관리로 들어가면 0x47d8 이 구단관리 커서를 지운다
+    act(() => result.current.actions.goto(SEASON_SCENE_STATE.구단관리))
+    expect(result.current.menuCursors.teamMenu).toBe(0)
+  })
+
+  it('요청 중 [216] 예로 구단관리에 가면 커서가 트레이드 칸(1)에 남아 있다 (0x47d8 은 이전이 0xc9 일 때만 지운다)', () => {
+    const { result, script } = 띄우기요청()
+    시작(result, 0)
+    act(() => result.current.actions.playNextGame())
+    act(() => result.current.actions.finishGame(요약()))
+    script(요청굴림())
+    act(() => result.current.actions.confirmIncome({ ...result.current.state!.record, games: 2 }))
+    act(() => result.current.actions.confirmDayResults())
+    이벤트넘기기(result)
+    act(() => result.current.actions.moveMenuCursor('teamMenu', 3))
+
+    act(() => result.current.actions.answerTradeRequest(true))
+    act(() => result.current.actions.cancelTradeRequest())
+
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.구단관리)
+    expect(result.current.menuCursors).toEqual({ management: 1, teamMenu: 1 })
   })
 
   it('아니오면 요청을 버린다 (0x7490: this+0x148 = 0)', () => {

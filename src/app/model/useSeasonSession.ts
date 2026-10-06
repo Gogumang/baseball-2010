@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { SeasonRecord, SeasonState } from '@/entities/season-mode/model/seasonRecord'
 import {
   SEASON_GAME_COUNT, isFinalYear, normalizeSeasonState, startNewSeason,
@@ -101,7 +101,10 @@ import {
   achievedSeasonGoalCount, goalRankOf, seasonGoalResultEventId, teamBattingAverageOf, teamEarnedRunAverageOf,
 } from '@/entities/season-mode/model/seasonGoals'
 import type { GoalPostseasonBracket, SeasonGoalInput } from '@/entities/season-mode/model/seasonGoals'
-import { regularSeasonRankEventId } from '@/entities/season-mode/model/seasonStateMachine'
+import {
+  INITIAL_SEASON_MENU_CURSORS, TRADE_REQUEST_MENU_CURSOR, menuCursorsOnEnter, regularSeasonRankEventId,
+} from '@/entities/season-mode/model/seasonStateMachine'
+import type { SeasonMenuCursors } from '@/entities/season-mode/model/seasonStateMachine'
 import {
   leagueBatterIdOf, leagueBatterLineOf, leaguePitcherIdOf, leaguePitcherLineOf,
 } from '@/entities/league/model/leaguePlayerStats'
@@ -214,6 +217,8 @@ export interface SeasonSession {
    * 틀었고 상태가 0xc9 이고 this+0x148 ≠ 0 이면 팝업 id 0x27(예·아니오). 답은 0xc9 그림 0x73b8 이 받는다.
    */
   readonly isTradeRequestAlertOpen: boolean
+  /** 관리 메뉴(this+0x70)·구단관리(this+0x78) 커서 — 장면이 사는 동안 이어진다 (`menuCursorsOnEnter`) */
+  readonly menuCursors: SeasonMenuCursors
   readonly notice: string
   readonly actions: SeasonActions
 }
@@ -278,6 +283,8 @@ export interface SeasonActions {
   readonly answerTradeRequest: (accept: boolean) => void
   /** 요청 트레이드 0xe5 의 [216] 에 "예" — 0x712a: this+0x148 = 0 · 구단관리 0xce */
   readonly cancelTradeRequest: () => void
+  /** 관리 메뉴·구단관리 커서를 옮겼다 */
+  readonly moveMenuCursor: (menu: keyof SeasonMenuCursors, index: number) => void
   /** 트레이드 결과 알림을 닫았다 — 0xc7ba: this+0x148 = 0 · 관리 메뉴 0xc9 (보통 트레이드도 같다) */
   readonly closeTradeResult: () => void
   /** 국가대항전 한 경기 — 사람이 대표팀을 조작한다 */
@@ -831,6 +838,21 @@ export function useSeasonSession(
   const [tradeRequest, setTradeRequest] = useState<TradeRequest>(NO_TRADE_REQUEST)
   /** 관리 메뉴 진입의 요청 알림 [203] (팝업 0x27) 이 떠 있는가 */
   const [isTradeRequestAlertOpen, setTradeRequestAlertOpen] = useState(false)
+  /** 관리 메뉴·구단관리 메뉴 객체의 커서 — 장면 생성(0x3b14)에서 0, 상태를 오가도 남는다 */
+  const [menuCursors, setMenuCursors] = useState<SeasonMenuCursors>(INITIAL_SEASON_MENU_CURSORS)
+  /** 이전 상태 this+0x24 — 진입 갈래(0x4efc · 0x47d8)가 본다 */
+  const previousScene = useRef(scene)
+  useLayoutEffect(() => {
+    const previous = previousScene.current
+    if (previous === scene) return
+    previousScene.current = scene
+    const record = save?.state.record
+    if (record === undefined) return
+    setMenuCursors((cursors) => menuCursorsOnEnter(cursors, scene, previous, record))
+  }, [save, scene])
+  const moveMenuCursor = useCallback((menu: keyof SeasonMenuCursors, index: number) => {
+    setMenuCursors((cursors) => ({ ...cursors, [menu]: index }))
+  }, [])
   const playbackSerial = useRef(0)
   /**
    * 전역 저장 +0xbe — 이벤트 100 의 1000 G 를 받았는가 (0x8c714). 모드를 가리지 않는 전역 칸이라 시즌을 새로
@@ -1657,9 +1679,11 @@ export function useSeasonSession(
 
   const answerTradeRequest = useCallback((accept: boolean) => {
     setTradeRequestAlertOpen(false)
-    // ⚠️ 원본은 "예" 에서 관리 메뉴(this+0x70)·구단관리(this+0x78) 커서를 칸 1 로 옮긴다 — 웹 메뉴 화면은
-    //    커서를 화면이 들고 있어 그 자리는 옮기지 않는다(근사)
-    if (accept) return setScene(SEASON_SCENE_STATE.트레이드영입선수)
+    if (accept) {
+      // 7440~7484 — 관리 메뉴(this+0x70)·구단관리(this+0x78) 커서를 칸 1 로 (구단관리 · 트레이드)
+      setMenuCursors({ management: TRADE_REQUEST_MENU_CURSOR, teamMenu: TRADE_REQUEST_MENU_CURSOR })
+      return setScene(SEASON_SCENE_STATE.트레이드영입선수)
+    }
     setTradeRequest((request) => ({ ...request, isRequested: false }))
   }, [])
 
@@ -2071,11 +2095,12 @@ export function useSeasonSession(
     eventPlayback,
     tradeRequest,
     isTradeRequestAlertOpen,
+    menuCursors,
     notice,
     actions: {
       chooseTeam, goto, updateRecord, updateRoster, removeHallOfFamer, finishTrade, playNextGame,
       openNextGame, confirmNextGame, cancelNextGame, confirmIncome, confirmDayResults,
-      answerTradeRequest, cancelTradeRequest, closeTradeResult,
+      answerTradeRequest, cancelTradeRequest, closeTradeResult, moveMenuCursor,
       choosePreGameAce: choosePreGameAceAction, cancelPreGameAce: cancelPreGameAceAction,
       startPendingGame, cancelMatchInfo, toggleMatchSettings, applyMatchSettings,
       openEntryEdit, pressEntryKey: pressEntryKeyAction, pointEntryCursor: pointEntryCursorAction,

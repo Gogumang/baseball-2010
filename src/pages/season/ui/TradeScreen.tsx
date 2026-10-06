@@ -132,8 +132,8 @@ export interface TradeScreenProps {
  * ⚠️ **원본 배치 미해독 — 근사**: 0xe5·0xe6 의 엔트리 목록 창(0x5cfec)과 0xe7 의 진행 화면
  * (0xd4e8) 좌표를 확인하지 못해 다른 시즌 화면과 같은 공용 판 목록으로 그린다.
  * 머리띠 제목도 트레이드 그림이 따로 없어 **시즌모드** 제목을 쓴다.
- * ⚠️ 요청 중 위·아래를 바꿔 넣는 키 −3 은 목록(0x55864)에서 왼쪽 키 갈래(0x559f8)로 가는데, 그 갈래가 목록 쪽
- * 무엇을 바꾸는지는 안 풀었다 — 웹은 커서만 묶는다.
+ * 요청 중 위·아래를 바꿔 넣는 키 −3 은 보기 전용 편집기의 왼쪽 갈래(0x559f8)라 끝 코드만 적고 아무도 안 읽는다 —
+ * 곧 커서가 안 움직일 뿐이다(`lockedCursor` 주석).
  */
 export function TradeScreen({
   state, roster, opponentRosterOf = tableRosterOf, gamePoints, random, request = null, onTrade, onFinish, onCancelRequest,
@@ -301,18 +301,26 @@ export function TradeScreen({
   const listSelect = step.kind === '영입' ? chooseAcquired : chooseGiven
   const listCount = step.kind === '확인' ? boostRows.length : listEntries.length
 
+  /**
+   * 요청이면 커서가 묶인다 — 0xe5 는 상대 칸, 0xe6 은 내 칸, 0xe7 은 비용 칸 0.
+   * 0xe5·0xe6 진입(0x5cd0·0x5b28)이 목록 커서를 요청 칸에 두고 ed+0x439 = 1 로 목록 객체가 위·아래를 못 받게 하며,
+   * 키 0x7104·0x727c 는 위·아래·'2'·'8' 을 −3 으로 바꿔 편집기에 넘긴다. −3 은 편집기 왼쪽 갈래 0x559f8 인데
+   * 트레이드 목록은 보기 전용(ed+0x330 = −1, 0x5561c 셋째 인자 0)이고 ed+0x337 = 0 이라 **끝 코드 ed+0x338 = 2 만**
+   * 적는다 — 0x7104·0x727c 는 그 칸을 읽지 않으므로 보이는 일은 없다(커서가 안 움직일 뿐이다).
+   * 0xe7(0xc66c)은 비용 칸 이동 키를 안 받는다(0xc756).
+   */
+  const lockedCursor = forced === null
+    ? null
+    : step.kind === '영입' ? forced.opponentIndex : step.kind === '보상' ? forced.myIndex : 0
+
   const { cursor, moveTo } = useSeasonCursor({
     count: listCount,
     onSelect: (index) => (step.kind === '확인' ? chooseBoost(index) : listSelect(index)),
     onCancel: () => backOneStep(),
     isEnabled: step.kind !== '팀' && !isBusy,
+    ...(lockedCursor === null ? {} : { cursor: lockedCursor, onCursorChange: () => undefined }),
   })
-
-  /** 요청이면 커서가 묶인다 — 0xe5 는 상대 칸, 0xe6 은 내 칸, 0xe7 은 비용 칸 0 */
-  const lockedCursor = forced === null
-    ? null
-    : step.kind === '영입' ? forced.opponentIndex : step.kind === '보상' ? forced.myIndex : 0
-  const shownCursor = lockedCursor ?? cursor
+  const shownCursor = cursor
   const moveCursor = lockedCursor === null ? moveTo : () => undefined
 
   /** '*' (편집기 559b2) — 목록 탭만 뒤집고 커서 0. 트레이드 탭(this+0x154)은 0xe5 OK 에서만 바뀐다 */

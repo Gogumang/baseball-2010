@@ -219,6 +219,9 @@ export function SeasonRoute({
           ? { text: fillModeText(ORIGINAL_MODE_TEXT[203] ?? '', TEAMS[request.opponentTeamId]?.name ?? ''),
             onAnswer: actions.answerTradeRequest }
           : null}
+        // 메뉴 객체 this+0x70 의 커서 — 장면이 사는 동안 이어진다 (요청 "예" 는 칸 1 로 옮긴다)
+        cursor={session.menuCursors.management}
+        onCursorChange={(index) => actions.moveMenuCursor('management', index)}
         onSelect={(item, target) => {
           // 관리 메뉴 칸 5 → 0xd8 다음경기 (점프표 0xcbe40). 경기는 그 화면의 확인에서 시작한다
           if (item === '다음경기') return actions.openNextGame()
@@ -230,7 +233,16 @@ export function SeasonRoute({
   }
 
   if (scene === SEASON_SCENE_STATE.구단관리) {
-    return <SeasonTeamMenuScreen state={state} onSelect={(_item, target) => actions.goto(target)} onBack={backToManagement} />
+    return (
+      <SeasonTeamMenuScreen
+        state={state}
+        // 메뉴 객체 this+0x78 의 커서 — 관리 메뉴에서 들어오면 0 (0x47d8), 하위 화면에서 돌아오면 남는다
+        cursor={session.menuCursors.teamMenu}
+        onCursorChange={(index) => actions.moveMenuCursor('teamMenu', index)}
+        onSelect={(_item, target) => actions.goto(target)}
+        onBack={backToManagement}
+      />
+    )
   }
 
   if (scene === SEASON_SCENE_STATE.구장관리 || scene === SEASON_SCENE_STATE.아이템상점) {
