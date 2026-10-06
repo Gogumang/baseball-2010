@@ -2124,3 +2124,41 @@ describe("사람 '#' 교체 뒤 0x16 → 0xd → 0xe → 0xf 재진입 · 교체
     expect(returnToPitchSelection(공격, createSeededRandom(1))).toBe(공격)
   })
 })
+
+describe('출루 허용 state[0x88] — 정산 0xa8c5c~0xa8ca6 은 주자 목록의 마지막 원소만 본다', () => {
+  /** 사람 수비 타석에서 인플레이 타구가 붙들린 판 (수비 화면 전) */
+  function 수비판(): { progress: TeamGameProgress; random: RandomPort } {
+    for (let seed = 1; seed < 200; seed += 1) {
+      const random = createSeededRandom(seed)
+      let current = startTeamGame(기본옵션, random)
+      for (let pitch = 0; pitch < 60 && isPitchTurn(current); pitch += 1) {
+        current = startThrowPitch(current, { typeNumber: 첫구질(current), courseCell: 4, gaugeCell: 0 }, random)
+        if (current.pendingDefensePlay !== null) {
+          if (current.pitching.allowedBaserunner) break
+          return { progress: current, random }
+        }
+      }
+    }
+    throw new Error('붙들린 수비 판을 못 찾았다')
+  }
+
+  it('야수선택(타자주자 살고 앞 주자 아웃)은 출루로 안 친다 — 목록 [타자주자, 1루] 의 마지막이 처리 끝', () => {
+    const { progress, random } = 수비판()
+    const 결과 = runDefensePlay(progress.pendingDefensePlay!.input)
+    const 야수선택 = {
+      ...결과,
+      runnerFates: [
+        { fromBase: 0, scored: false, retired: false },
+        { fromBase: 1, scored: false, retired: true },
+      ],
+    }
+    expect(resolveDefensePlay(progress, 야수선택, random).pitching.allowedBaserunner).toBe(false)
+  })
+
+  it('에러로 산 타자주자(목록 마지막이 살아 있음)는 출루다', () => {
+    const { progress, random } = 수비판()
+    const 결과 = runDefensePlay(progress.pendingDefensePlay!.input)
+    const 에러출루 = { ...결과, runnerFates: [{ fromBase: 0, scored: false, retired: false }] }
+    expect(resolveDefensePlay(progress, 에러출루, random).pitching.allowedBaserunner).toBe(true)
+  })
+})

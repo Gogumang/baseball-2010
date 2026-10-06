@@ -36,6 +36,7 @@ import {
 import { homeRunPlaybackOf } from '@/features/defense-play/model/homeRunPlayback'
 import { PICKOFF_RESULT, runPickoffPlay } from '@/features/defense-play/model/pickoffPlay'
 import type { PickoffPlayResult } from '@/features/defense-play/model/pickoffPlay'
+import { baserunnerAllowedOfFates, runnerFatesWithoutPlay } from '@/features/defense-play/model/runnerFates'
 import { PICKOFF_PLAY_KIND, pickoffPlayForKey } from '@/entities/defense-controls/model/pickoff'
 import type { PickoffBase } from '@/entities/defense-controls/model/pickoff'
 import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
@@ -387,10 +388,10 @@ export interface TeamPitchingLine {
   readonly walksAllowed: number
   readonly runsAllowed: number
   /**
-   * `state+0x88` 출루 허용.
-   * ⚠️ 원본은 이 칸을 **주자 목록의 마지막 원소만** 보고 세워서 야수선택이 퍼펙트를 안 깬다
-   * (CORRECTIONS 2-1, S5 확정). 웹판에는 야수선택이 없어 차이가 드러나지 않으므로
-   * 안타·볼넷·사구면 세우는 것으로 둔다 (**근사** — 사구는 아웃 없는 플레이라 원본도 늘 선다, 확정).
+   * `state+0x88` 출루 허용 — 정산 `0xa8024` 의 `0xa8c5c~0xa8ca6` 이 **주자 목록의 마지막 원소** `+0x96 == 0` 이고
+   * 수비 팀이 사람이면 1 로 세운다(지우는 곳 없음). `movs r5,#0` 가 루프 안이라 마지막 원소 하나만 본다 —
+   * 야수선택(타자주자 살고 앞 주자 아웃)은 안 깨고, 에러로 산 타자주자는 깬다 (CORRECTIONS 2-1, S5 U-13 1 확정).
+   * 웹은 주자 운명 목록(`runnerFates`, 90c7864)을 `baserunnerAllowedOfFates` 로 읽는다 (`allowedBaserunnerOfPlay`).
    */
   readonly allowedBaserunner: boolean
 }
@@ -2407,6 +2408,35 @@ function defensiveDefenseInputOf(
 }
 
 /**
+ * 이 정산(`0xa8024`)이 `state[0x88]`(출루 허용)을 세우는가 — `0xa8c5c~0xa8ca6`:
+ * ```
+ * a8c2e  r5 = 0 ; r4 = 0
+ * a8c5c  for i < 0xa9598(목록 크기):  r3 = 주자[i]+0x96 ; r5 = 0 ; if r3 == 0: r5 = 1   ; ★ 루프 안에서 지운다
+ * a8c86  0xa57f8(R, 0x17, r5)                                                          ; R+0x130 = r5 (읽는 곳 없음)
+ * a8ca6  if r5 && 수비 팀이 사람: state[0x88] = 1
+ * ```
+ * 목록은 `[타자주자?, 1루?, 2루?, 3루?]` 라 마지막 원소 하나만 본다 (`baserunnerAllowedOfFates`).
+ * - 수비 화면을 돈 판(인플레이 · 낫아웃 판)은 진행기의 `runnerFates`.
+ * - 사람 장면의 삼진·볼넷·사구·홈런은 수비 화면 없이 정산으로 가므로 `runnerFatesWithoutPlay`.
+ *
+ * ⚠️ 미해결: **간이 엔진 타석**(자동으로 넘긴 상대 타석, `mine` 거짓)이 정산 때 주자 목록에 무엇을 두는지는 못 읽었다
+ *    (간이 엔진 홈런 0xc1054 → 0xc10b8 이 목록 전원에 +0x95·+0x96 을 세운다는 것만 안다). 그래서 거기만 예전처럼
+ *    안타·볼넷·사구면 세운다 (근사).
+ */
+function allowedBaserunnerOfPlay(
+  bases: GameState['bases'],
+  outcome: AtBatOutcome,
+  mine: boolean,
+  defensePlay: DefensePlayResult | null,
+): boolean {
+  if (defensePlay !== null) return baserunnerAllowedOfFates(defensePlay.runnerFates)
+  if (mine && outcome.kind !== '안타' && outcome.kind !== '아웃') {
+    return baserunnerAllowedOfFates(runnerFatesWithoutPlay(bases, outcome))
+  }
+  return isHit(outcome) || isFreePass(outcome)
+}
+
+/**
  * 상대 타석 하나를 경기 상태에 먹인다 — 예전 `applyDefensiveAtBat` 의 몸통이다.
  * `playback` 이 null 이면 재생할 것이 없다는 뜻이라 `lastDefensePlay` 는 그대로 둔다
  * (실시간으로 이미 다 보여 준 플레이가 여기로 온다 — 넣으면 같은 장면을 한 번 더 튼다).
@@ -2428,7 +2458,7 @@ function finishDefensiveAtBat(
   )
   const slot = progress.opponentOrderIndex
   const hit = isHit(outcome)
-  // 출루 허용 state[0x88] 와 투수 +0x2a 는 볼넷·사구를 함께 센다 (0xa8caa — 사구 플레이는 아웃이 없어 늘 선다)
+  // 투수 +0x2a 는 볼넷·사구를 함께 센다
   const walk = isFreePass(outcome)
   const inningEnded = before.outs + applied.outsAdded >= OUTS_PER_INNING
 
@@ -2458,7 +2488,8 @@ function finishDefensiveAtBat(
       hitsAllowed: progress.pitching.hitsAllowed + (hit ? 1 : 0),
       walksAllowed: progress.pitching.walksAllowed + (walk ? 1 : 0),
       runsAllowed: progress.pitching.runsAllowed + applied.runsScored,
-      allowedBaserunner: progress.pitching.allowedBaserunner || hit || walk,
+      allowedBaserunner:
+        progress.pitching.allowedBaserunner || allowedBaserunnerOfPlay(before.bases, outcome, mine, defensePlay),
     },
     // 시즌 평판 16칸 — 우리 수비라 **공격측(상대)이 CPU** 인 코드(≤ 5)만 선다
     gameRecord: withSeasonRecord(
@@ -2708,6 +2739,10 @@ function applyPickoffPlay(
   const applied = withRunnerOnlyAdvance(recorded, result.advance, humanSide)
   const { changed, runs } = applied
   let next = applied.progress
+  // 견제 판도 정산 0xa8024 를 지난다(ae5a8) — 사람 수비면 그 판 주자 목록의 마지막 원소로 state[0x88] (a8ca6)
+  if (humanDefends && !next.pitching.allowedBaserunner && baserunnerAllowedOfFates(result.runnerFates)) {
+    next = { ...next, pitching: { ...next.pitching, allowedBaserunner: true } }
+  }
 
   const call = result.resultCode === PICKOFF_RESULT.OUT ? '견제사' : result.errantThrow ? '악송구' : '세이프'
   next = appendLog(
