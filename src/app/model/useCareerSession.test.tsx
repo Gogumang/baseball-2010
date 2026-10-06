@@ -316,6 +316,17 @@ describe('연속 파울 기록 32·33 (0xa7dbc) — 실제 타석에서 경기 �
     for (const pitch of pitches) act(() => rendered.result.current.session.handlePitchResolved(pitch))
   }
 
+  it('142 에서 굴린 마선수 넷이 경기 팀에 실린다 — 0xb88c8 · 0xb8870 (명부 투수 8번 · 명단 9번)', () => {
+    const rendered = 경기띄우기()
+    const aces = rendered.result.current.session.matchAces
+    const progress = rendered.result.current.session.progress
+    expect(aces).not.toBeNull()
+    expect(progress?.aces?.ours).toEqual({ batter: aces?.myBatter, pitcher: aces?.myPitcher })
+    expect(progress?.aces?.opponent).toEqual({ batter: aces?.opponentBatter, pitcher: aces?.opponentPitcher })
+    expect(progress?.opponentPitcherOrder).toHaveLength(9)
+    expect(progress?.ourLineup.rosterSlots).toHaveLength(13)
+  })
+
   it('한 타석 파울 넷이면 32·33 이 경기 기록에 들어가고 G 수입이 된다', () => {
     const rendered = 경기띄우기()
     try {

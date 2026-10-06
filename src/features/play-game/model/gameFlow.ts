@@ -16,7 +16,7 @@ import {
 } from '@/entities/game/model/gameState'
 import type { GameState, PlayerSide } from '@/entities/game/model/gameState'
 import { playQuickAtBat } from '@/entities/game/model/quickAtBat'
-import type { QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
+import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
 import {
   changePitcherIfNeeded,
   drainPitcherForPitch,
@@ -70,6 +70,18 @@ import { EMPTY_BATTER_GAME_LOG, recordBatterAtBat } from '@/entities/game/model/
 import type { BatterGameLog } from '@/entities/game/model/batterGameLog'
 import type { LeaguePlateAppearance } from '@/entities/league/model/leaguePlayerStats'
 import type { AcePlayer } from '@/shared/config/original/acePlayers'
+import { pitcherAbilityOf } from '@/entities/game/model/aceOpponent'
+import {
+  ACE_BATTER_ROSTER_SLOT,
+  ACE_PITCHER_SLOT,
+  gameAceBatterOf,
+  gameAcePitcherOf,
+  NO_GAME_ACES,
+  withAceBatterLineup,
+  withAcePitcherOrder,
+  withAcePitcherStamina,
+} from '@/features/play-game/model/gameAces'
+import type { GameAcePitcher, GameAceSetup } from '@/features/play-game/model/gameAces'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { defenseAbilitiesOf, isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
@@ -130,6 +142,11 @@ export interface GameProgress {
   readonly opponentTeamId: number
   /** 이번 경기에 등판한 마선수. 없으면 평범한 투수다. */
   readonly aceOpponent: AcePlayer | null
+  /**
+   * 142 경기 준비 `0x1c46c` 가 두 팀 명부에 넣은 마선수 (`gameAces.ts`) — 마타자는 명단 9번(첫 벤치), 마투수는
+   * 투수 8번 칸이다. 없으면(국가대항전 · 리그 밖 경기) 아무도 안 실렸다.
+   */
+  readonly aces?: GameAceSetup
   /**
    * 양 팀 선발 투수의 로스터 칸 — 경기를 세울 때 한 번만 정한다 (= `…PitcherOrder[0]`).
    * 이 화면은 나만의리그 **타자편(모드 4)** 이라 원본 경기 준비 `0x1c46c` 가 두 팀 모두
@@ -393,11 +410,22 @@ export function startGame(
    * 돌린 뒤)와 레코드 `+0x2c` 표를 넘긴다. 안 넘기면 날짜 g 의 4인 로테이션 · 10000 이다 (예전 그대로).
    */
   pitchers?: GamePitcherSetup,
+  /**
+   * 142 경기 준비 `0x1c46c`(1c62e~1c660)가 두 팀 명부에 넣은 마선수 — `0xb88c8` 마투수 → 투수 8번 칸,
+   * `0xb8870` 마타자 → 명단 9번(첫 벤치, 옛 9번은 맨 끝). 안 넘기면 아무도 안 싣는다(예전 그대로).
+   */
+  aces?: GameAceSetup,
 ): GameProgress {
-  const ourPitcherOrder = pitchers?.ourOrder ?? rotatedRosterOrderOf(dayCounter)
-  const opponentPitcherOrder = pitchers?.opponentOrder ?? rotatedRosterOrderOf(dayCounter)
-  const ourPitcherStaminas = staminaTableOf(pitchers?.ourStaminas)
-  const opponentPitcherStaminas = staminaTableOf(pitchers?.opponentStaminas)
+  const ourAces = aces?.ours ?? NO_GAME_ACES
+  const opponentAces = aces?.opponent ?? NO_GAME_ACES
+  const ourPitcherOrder = withAcePitcherOrder(pitchers?.ourOrder ?? rotatedRosterOrderOf(dayCounter), ourAces.pitcher)
+  const opponentPitcherOrder = withAcePitcherOrder(
+    pitchers?.opponentOrder ?? rotatedRosterOrderOf(dayCounter),
+    opponentAces.pitcher,
+  )
+  // 마투수는 저장 레코드째(+0x2c = 10000) 8번 칸에 복사된다 (0xb521c)
+  const ourPitcherStaminas = withAcePitcherStamina(staminaTableOf(pitchers?.ourStaminas), ourAces.pitcher)
+  const opponentPitcherStaminas = withAcePitcherStamina(staminaTableOf(pitchers?.opponentStaminas), opponentAces.pitcher)
   const ourStarter = ourPitcherOrder[0] ?? 0
   const opponentStarter = opponentPitcherOrder[0] ?? 0
   const initial: GameProgress = {
@@ -406,6 +434,7 @@ export function startGame(
     opponentTeamId,
     // 정규 경기에 마선수가 무작위로 나오는 코드는 원본에 없다 — 마선수 대결은 이벤트 match 명령으로만 (누락 탐색 8차)
     aceOpponent: null,
+    ...(aces === undefined ? {} : { aces }),
     // 모드 4 는 경기 준비 0x1c46c 에서 **두 팀 모두** 0xb8c80 로 4인 로테이션을 한 칸 돌린다
     // (P1 1-1 의 `else (모드 4): if g != 0: 0xb8c80(내 팀)` + 그 앞줄의 상대 팀). 무작위가 아니다.
     opponentStartingPitcherIndex: opponentStarter,
@@ -421,8 +450,9 @@ export function startGame(
     ourMound: startingMoundOf(ourStarter, ourPitcherStaminas[ourStarter] ?? FULL_STAMINA),
     opponentMound: startingMoundOf(opponentStarter, opponentPitcherStaminas[opponentStarter] ?? FULL_STAMINA),
     opponentInningRunsAllowed: 0,
-    ourLineup: rosterLineupOf(BATTERS_PER_TEAM),
-    opponentLineup: rosterLineupOf(BATTERS_PER_TEAM),
+    // 마타자는 첫 벤치 칸(9번)에 앉는다 — 타석에 서는 길은 CPU 대타(0xac228)뿐이다 (0xb8870)
+    ourLineup: withAceBatterLineup(rosterLineupOf(BATTERS_PER_TEAM), ourAces.batter),
+    opponentLineup: withAceBatterLineup(rosterLineupOf(BATTERS_PER_TEAM), opponentAces.batter),
     pinchHitUsed: false,
     myStats: EMPTY_SEASON_STATS,
     popularityPoints: 0,
@@ -872,13 +902,14 @@ function finishPlayerOutcome(
  */
 function opponentDefenseAbilitiesOf(progress: GameProgress): readonly number[] {
   // 수비 칸 0 은 지금 마운드에 선 투수다 — 교체되면 바뀐다
+  const ace = moundAcePitcherOf(progress, false)
   const pitcher = teamPitchers(progress.opponentTeamId)[progress.opponentMound.pitcherSlot]
   return defenseAbilitiesOf(
     teamBatters(progress.opponentTeamId).map((player) => ({
       position: player.position,
       defense: player.ability[2],
     })),
-    pitcher?.ability[2],
+    ace === undefined ? pitcher?.ability[2] : ace.breaking,
   )
 }
 
@@ -899,6 +930,11 @@ const STAGE_PITCHER_DIVISOR = 10
  */
 export function opponentPitcherAbilityOf(progress: GameProgress): PitcherAbility {
   const slot = progress.opponentMound.pitcherSlot
+  // 142 가 상대 명부 8번 칸에 넣은 마투수가 마운드에 서면 그 레코드가 던진다 — 레벨 배율(0xb6414)·체력%(0xaebb0)
+  const ace = moundAcePitcherOf(progress, false)
+  if (ace !== undefined) {
+    return pitcherAbilityOf(ace.player, progress.aces?.levels ?? {}, staminaPercentOf(progress.opponentMound.stamina))
+  }
   const pitcher = teamPitchers(progress.opponentTeamId)[slot]
   const repertoire = ROSTER_PITCHER_REPERTOIRES[progress.opponentTeamId * PITCHERS_PER_TEAM + slot]
   if (pitcher === undefined) return DEFAULT_PITCHER_ABILITY
@@ -926,7 +962,31 @@ export function opponentPitcherAbilityOf(progress: GameProgress): PitcherAbility
  * 누상 주자가 누구인지 `GameState` 가 들고 있지 않은 것도 `stealBase` 와 같은 한계다.
  */
 function runnerRunAbilityOf(progress: GameProgress): number {
-  return batterAt(progress.ourTeamId, rosterSlotAt(progress.ourLineup, progress.game.battingOrderIndex)).run
+  return teamBatterAt(progress, true, rosterSlotAt(progress.ourLineup, progress.game.battingOrderIndex)).run
+}
+
+/**
+ * 명단 칸의 선수 — 마타자 칸(`ACE_BATTER_ROSTER_SLOT`)이면 142 가 넣은 마타자, 아니면 로스터 붙박이 선수.
+ */
+function teamBatterAt(progress: GameProgress, isOurs: boolean, rosterSlot: number): QuickAtBatBatter {
+  if (rosterSlot === ACE_BATTER_ROSTER_SLOT) {
+    const aces = isOurs ? progress.aces?.ours : progress.aces?.opponent
+    const ace = aces === undefined ? undefined : gameAceBatterOf(aces.batter, progress.aces?.levels)
+    if (ace !== undefined) return ace
+  }
+  return batterAt(isOurs ? progress.ourTeamId : progress.opponentTeamId, rosterSlot)
+}
+
+/** 그 팀 명부 8번 칸의 마투수 (142 가 넣은 것) — 없으면 undefined */
+function teamAcePitcherOf(progress: GameProgress, isOurs: boolean): GameAcePitcher | undefined {
+  const aces = isOurs ? progress.aces?.ours : progress.aces?.opponent
+  return aces === undefined ? undefined : gameAcePitcherOf(aces.pitcher, progress.aces?.levels)
+}
+
+/** 지금 마운드가 마투수(8번 칸)면 그 선수 */
+function moundAcePitcherOf(progress: GameProgress, isOurs: boolean): GameAcePitcher | undefined {
+  const mound = isOurs ? progress.ourMound : progress.opponentMound
+  return mound.pitcherSlot === ACE_PITCHER_SLOT ? teamAcePitcherOf(progress, isOurs) : undefined
 }
 
 /**
@@ -996,7 +1056,8 @@ const BATTING_ORDER_SIZE = 9
  * ⚠️ K 4절 1-6 의 "매 타석 시작 때" 는 **0xf 를 지나는 타석마다** 라는 뜻이다. 예전 웹은 이것을 동료·상대 타석까지로
  * 읽어 세 자리(내 타석·동료 `playTeammateAtBat`·상대 `onAtBatStart`)에서 굴리고 판정했다 — 원본에 없는 굴림이었다.
  *
- * 상대 마선수(b0=10~22)는 웹판 로스터가 아직 들고 있지 않아 그 조건 행은 걸리지 않는다.
+ * 상대 마선수(b0=10~22): 마투수 행(0xae83d)은 142 가 상대 명부 8번에 넣은 마투수가 마운드에 섰을 때 걸린다. 마타자 행(0xae89d)은
+ * 지금 타자를 보는데 내 타석의 타자는 나라 걸리지 않는다.
  */
 function burstContextOf(
   progress: GameProgress,
@@ -1011,6 +1072,8 @@ function burstContextOf(
   },
 ) {
   const ace = progress.aceOpponent
+  // 142 가 상대 명부에 넣은 마투수가 지금 마운드면 그 레코드가 마선수다 (b0 = 마투수 행)
+  const moundAce = moundAcePitcherOf(progress, false)
   return {
     ...situation,
     // 원본 이닝은 0-기준이다 (game+0x6b) — 웹 `inning` 은 1-기준이라 하나 뺀다
@@ -1018,7 +1081,7 @@ function burstContextOf(
     ourScore: progress.game.ourScore,
     opponentScore: progress.game.opponentScore,
     opponentAceBatterId: ace !== null && ace.role === '타자' ? ace.id : null,
-    opponentAcePitcherId: ace !== null && ace.role === '투수' ? ace.id : null,
+    opponentAcePitcherId: ace !== null && ace.role === '투수' ? ace.id : (moundAce?.player.id ?? null),
   }
 }
 
@@ -1176,7 +1239,7 @@ function playOpponentInning(progress: GameProgress, random: RandomPort): GamePro
   // 돌발을 굴리지도(0x8f158) 판정하지도(0x8f414) 않는다 (`burstContextOf` 머리말)
   const half = simulateHalfInning(
     progress.opponentOrderIndex,
-    (order) => batterAt(progress.opponentTeamId, order % BATTING_ORDER_SIZE),
+    (order) => teamBatterAt(progress, false, order % BATTING_ORDER_SIZE),
     startingPitcherOf(progress.ourTeamId, progress.ourStartingPitcherIndex),
     progress.game.inning,
     random,
@@ -1189,11 +1252,12 @@ function playOpponentInning(progress: GameProgress, random: RandomPort): GamePro
       progress.game.ourScore - progress.game.opponentScore,
       progress.ourPitcherOrder,
       progress.ourPitcherStaminas,
+      teamAcePitcherOf(progress, true),
     ),
     // 상대 타자는 명단에서 고르고, 타석마다 CPU 대타(0xac228)를 먼저 본다
     {
       lineup: progress.opponentLineup,
-      batterOf: (rosterSlot) => batterAt(progress.opponentTeamId, rosterSlot),
+      batterOf: (rosterSlot) => teamBatterAt(progress, false, rosterSlot),
       pinchHitUsed: progress.pinchHitUsed,
     },
   )
@@ -1269,7 +1333,7 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort): GameProg
   const mound = progress.opponentMound
   const pitched = perPitchDrainOf(opponentDefense, mound)
   const play = playQuickAtBat(
-    batterAt(progress.ourTeamId, rosterSlotAt(progress.ourLineup, progress.game.battingOrderIndex)),
+    teamBatterAt(progress, true, rosterSlotAt(progress.ourLineup, progress.game.battingOrderIndex)),
     // 간이 엔진이 보는 투수 체력은 체력%(0xaebb0)다 — 마운드의 살아 있는 값을 넘긴다
     { ...opponentDefense.pitcherAt(mound.pitcherSlot), stamina: staminaPercentOf(mound.stamina) },
     { inning: progress.game.inning },
@@ -1410,21 +1474,31 @@ function quickDefenseOf(
   order: readonly number[] = ALL_PITCHER_SLOTS,
   /** 칸별 레코드 스태미나 — 벤치 투수는 이 값으로 올라온다 */
   staminas?: readonly number[],
+  /** 142 가 명부 8번 칸에 넣은 마투수 (`order` 에 8 이 들어 있다) */
+  ace?: GameAcePitcher,
 ): HalfInningDefense {
   const roster = teamPitchers(teamId)
+  const isAce = (slot: number) => ace !== undefined && slot === ACE_PITCHER_SLOT
   return {
     mound,
     pitcherSlots: order,
     ...(staminas === undefined ? {} : { staminaAt: (slot: number) => staminas[slot] ?? FULL_STAMINA }),
-    pitcherAt: (slot) => quickPitcherOf(roster[slot % roster.length]),
+    pitcherAt: (slot) => (isAce(slot) && ace !== undefined ? ace.quick : quickPitcherOf(roster[slot % roster.length])),
     // 투수 능력치 순서는 제구·구속·변화·**체력** (칸 3)
-    staminaAbilityAt: (slot) => roster[slot % roster.length].ability[3],
+    staminaAbilityAt: (slot) =>
+      isAce(slot) && ace !== undefined ? ace.staminaAbility : roster[slot % roster.length].ability[3],
     lead,
     bothTeamsAreCpu: false,
     roleAt: rosterPitcherRoleOf,
     // 마무리 갈래(ac0be)의 정렬 열쇠 0xb5b50 = 0xb570c(팀, k, P, 1, 90, 1) 네 칸 합. 모드 4 는 0xb574a 가지가 내 육성
     // 선수(0xb6388)에만 붙고 팀 능력치(0x306)·코치(모드 2) 정액이 없어 로스터 밑값을 0..999 로 자른 합이다
-    abilitySumAt: (slot) => pitcherAbilitySumOf(roster[slot % roster.length].ability.map(clampAbility)),
+    abilitySumAt: (slot) =>
+      isAce(slot) && ace !== undefined
+        ? pitcherAbilitySumOf([ace.control, ace.velocity, ace.breaking, ace.staminaAbility].map(clampAbility))
+        : pitcherAbilitySumOf(roster[slot % roster.length].ability.map(clampAbility)),
+    // 마선수 0xb633c(+0xa 비트6) — 마투수 8번 칸. 마운드면 특수 문턱(ac4f2), 벤치에 있으면 0xb8a8d 가 참이라
+    // 마무리 굴림 0xac360 을 지나고, 0xabfcc 는 고르지 않는다 (`leagueDay.defenseOf` 와 같다). 보직은 칸 8 이 표 밖이라 없다
+    isSpecialPitcherAt: isAce,
   }
 }
 
@@ -1439,6 +1513,7 @@ function opponentQuickDefenseOf(progress: GameProgress): HalfInningDefense {
     progress.game.opponentScore - progress.game.ourScore,
     progress.opponentPitcherOrder,
     progress.opponentPitcherStaminas,
+    teamAcePitcherOf(progress, false),
   )
 }
 
@@ -1563,7 +1638,9 @@ function opponentHalfDecisionsOf(
  */
 export function pitchersOfRecordOf(progress: GameProgress): PitcherOfRecordNames {
   return pitcherOfRecordNamesOf(progress.decisions, progress.game.playerSide, (isOurTeam, slot) =>
-    teamPitchers(isOurTeam ? progress.ourTeamId : progress.opponentTeamId)[slot]?.name,
+    slot === ACE_PITCHER_SLOT && teamAcePitcherOf(progress, isOurTeam) !== undefined
+      ? teamAcePitcherOf(progress, isOurTeam)?.player.name
+      : teamPitchers(isOurTeam ? progress.ourTeamId : progress.opponentTeamId)[slot]?.name,
   )
 }
 
@@ -1732,7 +1809,7 @@ function withoutSteal(progress: GameProgress): GameProgress {
 function runAbilitiesOnBaseOf(progress: GameProgress): Partial<Record<0 | 1 | 2 | 3, number>> {
   const runOf = (slotsBack: number) => {
     const slot = (progress.game.battingOrderIndex - slotsBack + BATTING_ORDER_SIZE) % BATTING_ORDER_SIZE
-    return batterAt(progress.ourTeamId, rosterSlotAt(progress.ourLineup, slot)).run
+    return teamBatterAt(progress, true, rosterSlotAt(progress.ourLineup, slot)).run
   }
   return { 0: runnerRunAbilityOf(progress), 1: runOf(1), 2: runOf(2), 3: runOf(3) }
 }
@@ -1882,7 +1959,10 @@ export function summaryOf(progress: GameProgress): GameSummary {
     reputationCounts: progress.reputationCounts,
     ourTeamId: progress.ourTeamId,
     opponentTeamId: progress.opponentTeamId,
-    leaguePlateAppearances: progress.leaguePlateAppearances,
+    // 마타자(명단 밖 저장 레코드)는 리그 선수 기록표에 없다 — CPU 끼리 경기(`leagueDay`)와 같이 뺀다
+    leaguePlateAppearances: progress.leaguePlateAppearances.filter(
+      (appearance) => appearance.battingOrderIndex !== ACE_BATTER_ROSTER_SLOT,
+    ),
     pitchersOfRecord: pitchersOfRecordOf(progress),
     // 리그 투수 기록 재료 — 투수 줄(상대 마운드의 투구 수를 얹어)과 경기 끝 판정 0xa7de8
     leaguePitchers: {
@@ -1896,9 +1976,10 @@ export function summaryOf(progress: GameProgress): GameSummary {
           : [progress.opponentTeamId, progress.ourTeamId],
     },
     // 양 팀 레코드 +0x2c — 경기에서 깎인 값이 리그 표로 이어진다 (하루 끝 0xb617c 회복은 부르는 쪽)
+    // 로스터 칸(0~7)만 리그 표로 잇는다 — 8번(마투수)은 다음 142 의 0xb88c8 이 저장 레코드(+0x2c 포함)로 다시 덮는다
     pitcherStaminas: {
-      ours: finalStaminasOf(progress.ourPitcherStaminas, progress.ourMound),
-      opponent: finalStaminasOf(progress.opponentPitcherStaminas, progress.opponentMound),
+      ours: finalStaminasOf(progress.ourPitcherStaminas, progress.ourMound).slice(0, PITCHERS_PER_TEAM),
+      opponent: finalStaminasOf(progress.opponentPitcherStaminas, progress.opponentMound).slice(0, PITCHERS_PER_TEAM),
     },
   }
 }

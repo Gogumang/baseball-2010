@@ -110,7 +110,7 @@ import type { OutingResult } from '@/entities/career/model/outing'
 import { OUTING_PLACES } from '@/shared/config/outingPlaces'
 import type { OutingPlace } from '@/shared/config/outingPlaces'
 import { PITCHER_MANAGEMENT_TEXT } from '@/pages/pitcher-league/lib/pitcherManagementMenu'
-import { nariMatchCancelTargetOf, rollNariMatchAces } from '@/pages/management/lib/nariMatchPrepare'
+import { nariGameAcesOf, nariMatchCancelTargetOf, rollNariMatchAces } from '@/pages/management/lib/nariMatchPrepare'
 import type { NariMatchAces, NariOpenedAces } from '@/pages/management/lib/nariMatchPrepare'
 import { DEFAULT_OPENED_ACE_BATTER_IDS, DEFAULT_OPENED_ACE_PITCHER_IDS } from '@/pages/general-mode/lib/generalModeSetup'
 
@@ -217,7 +217,7 @@ export interface PitcherLeagueSession {
     /** 바뀐 커리어를 그대로 저장한다 (구질 훈련처럼 화면이 계산해 돌려줄 때) */
     readonly save: (career: PitcherCareer) => void
     readonly goto: (scene: PitcherScene) => void
-    readonly beginGame: () => void
+    readonly beginGame: (aces?: NariMatchAces | null) => void
     /** 관리 [다음경기] → 109 순위표 (이전 상태 105) */
     readonly openNextGameStandings: () => void
     /** 109 확인(−5 · '5') → 142 경기 준비 */
@@ -709,11 +709,16 @@ export function usePitcherLeagueSession(
     [commit],
   )
 
-  const beginGame = useCallback(() => {
-    if (career === null) return
-    setGameOptions(leagueGameOptionsOf(career, { gaugeSettingOn, throwModeManual }))
-    setScene('경기')
-  }, [career, gaugeSettingOn, throwModeManual])
+  const beginGame = useCallback(
+    (aces?: NariMatchAces | null) => {
+      if (career === null) return
+      const options = leagueGameOptionsOf(career, { gaugeSettingOn, throwModeManual })
+      // 142 진입 0x1c46c 가 두 팀 명부(저장의 나리 팀 레코드)에 넣은 마선수 — 경기 장면 0x39fdc 가 같은 명부로 팀을 세운다
+      setGameOptions(aces === undefined || aces === null ? options : { ...options, aces: nariGameAcesOf(aces, aceLevels) })
+      setScene('경기')
+    },
+    [aceLevels, career, gaugeSettingOn, throwModeManual],
+  )
 
   /** 109 순위표의 이전 상태가 105(관리)인가 — 취소·바닥 5 가 이것으로 갈린다 (0x105f0 · 0x16928) */
   const [nextGameFromManagement, setNextGameFromManagement] = useState(false)
@@ -1377,10 +1382,10 @@ export function usePitcherLeagueSession(
         setScene('다음경기순위')
       },
       confirmNextGameStandings: openMatchPrepare,
-      // 142 확인 0x13cb6 → 144 → 경기. ⚠️ 미해결: 굴린 마선수를 경기 팀에 싣는 일(0xb88c8 · 0xb8870)은 경기 진행기가 아직 안 받는다
+      // 142 확인 0x13cb6 → 144 → 경기. 굴린 마선수는 진입이 두 팀 명부에 넣었다(0xb88c8 · 0xb8870) — 경기에 그대로 실린다
       confirmMatchPrepare: () => {
         if (scene !== '경기준비') return
-        beginGame()
+        beginGame(matchAces)
       },
       cancelMatchPrepare: () => {
         if (career === null || scene !== '경기준비') return

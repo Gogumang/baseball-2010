@@ -386,6 +386,11 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     expect(result.current.matchAces).toBe(굴림)
     act(() => result.current.actions.confirmMatchPrepare())
     expect(result.current.scene).toBe('경기')
+    // 굴린 넷이 경기 팀에 실린다 — 0xb88c8 · 0xb8870 (명부 투수 8번 · 명단 9번)
+    expect(result.current.gameOptions?.aces).toMatchObject({
+      ours: { batter: 굴림?.myBatter, pitcher: 굴림?.myPitcher },
+      opponent: { batter: 굴림?.opponentBatter, pitcher: 굴림?.opponentPitcher },
+    })
   })
 
   it('관리 [다음경기] → 109 순위표 — 취소는 105 로, 확인은 경기 (0x105f0)', () => {

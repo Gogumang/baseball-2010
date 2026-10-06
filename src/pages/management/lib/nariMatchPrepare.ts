@@ -14,7 +14,8 @@
  * 1c668  장면+0x288 = 1
  * ```
  * 그래서 **장면이 새로 설 때마다(이어하기 · 경기 뒤) 처음 142 에 들어설 때 한 번** 넷을 굴린다. 109 로 물러났다 다시
- * 들어와도 안 굴린다 — 0xb88c8 은 팀 저장 레코드에 마선수를 넣으므로(0xb521d) 다시 세운 팀 객체(0xb891c)에도 남는다(유력).
+ * 들어와도 안 굴린다 — 0xb88c8 은 `0xb8680(팀)` 이 돌려주는 명부(모드 3·4 → 0x1f989 = 저장 블록 [g+0xb8]/[g+0xbc] 의
+ * 나리 팀 레코드)에 `0xb521d` 로 마선수를 넣고, 그것을 빼는 코드가 없어 다시 세운 팀 객체(0xb891c)에도 남는다(확정).
  * 0x9f604·0x9f650 은 열린 수가 0 이어도 `bfa55(0, 0)` 을 부른다(개수 검사 없음, 0x9f630·0x9f67c).
  *
  * 키 0x13c30 (머리띠가 다 내려왔을 때만 — 전역 +0xe4):
@@ -39,6 +40,7 @@ import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { leagueGamePlayerSideOf } from '@/entities/career/model/leagueGameSetup'
 import { teamPitchers } from '@/entities/team/model/teamRoster'
 import { seasonMatchInfoLines } from '@/pages/season/lib/seasonMatchInfo'
+import type { GameAceSetup } from '@/features/play-game/model/gameAces'
 
 /** 마선수 번호가 없을 때 — 표 0xd7638[0] = −1 */
 export const NO_NARI_ACE = -1
@@ -74,6 +76,19 @@ export function rollNariMatchAces(random: RandomPort, opened: NariOpenedAces): N
   const opponentPitcher = rollOpponentAceIndex(myPitcher, random)
   const opponentBatter = rollOpponentAceIndex(myBatter, random)
   return { myBatter, myPitcher, opponentPitcher, opponentBatter }
+}
+
+/**
+ * 굴린 넷을 경기 팀에 싣는 꼴로 — 1c62e `0xb88c8(내 팀, p)` · `0xb8870(내 팀, b)` · 1c64e `0xb88c8(상대, …)` ·
+ * 1c660 `0xb8870(상대, …)`. 마선수는 저장의 나리 팀 레코드(명부)에 들어가 경기 장면이 세우는 팀에 그대로 실린다
+ * (`features/play-game/model/gameAces` 머리말). 레벨 배율은 전역 레벨 칸(`mgr[0x13a..]`)을 본다.
+ */
+export function nariGameAcesOf(aces: NariMatchAces, levels?: Readonly<Record<number, number>>): GameAceSetup {
+  return {
+    ours: { batter: aces.myBatter, pitcher: aces.myPitcher },
+    opponent: { batter: aces.opponentBatter, pitcher: aces.opponentPitcher },
+    ...(levels === undefined ? {} : { levels }),
+  }
 }
 
 /** 142 취소(−16)가 갈 곳 — S+0x12c(국가대항전) → 135 · S+0xb4(포스트시즌) → 128 · 그 밖 109 (0x13c72~0x13cb4) */

@@ -13,7 +13,18 @@ import type { AtBatState, PitchResolution } from '@/entities/at-bat/model/atBatS
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { describeOutcome, isFreePass, isHit } from '@/entities/at-bat/model/atBatOutcome'
 import { playQuickAtBat } from '@/entities/game/model/quickAtBat'
-import type { QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
+import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
+import {
+  ACE_BATTER_ROSTER_SLOT,
+  ACE_PITCHER_SLOT,
+  aceBatterPlayerOf,
+  gameAceBatterOf,
+  gameAcePitcherOf,
+  NO_GAME_ACES,
+  withAceBatterLineup,
+} from '@/features/play-game/model/gameAces'
+import type { GameAcePitcher, GameAceSetup, GameTeamAces } from '@/features/play-game/model/gameAces'
+import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
 import {
   PITCHERS_PER_TEAM,
   batterAt,
@@ -198,6 +209,16 @@ const OPPONENT_PITCHER_NUMBER_BASE = -200
  */
 export const MY_PITCHER_SLOT = PITCHERS_PER_TEAM
 
+/**
+ * **우리 팀 마투수의 웹 칸 번호** — 원본은 `0xb521c` 가 목록 **8번 칸**에 넣고 옛 8번을 맨 끝으로 옮긴다. 웹은 8 을 내 투수
+ * (`MY_PITCHER_SLOT`, 근사)가 쓰고 있어 다른 번호(9)를 붙인다 — 목록 차례로는 원본대로 8번 자리에 앉고 내 투수가 끝으로
+ * 간다(`ourPitcherOrderOf`). 상대 팀 마투수는 `ACE_PITCHER_SLOT`(8) 그대로다.
+ */
+export const OUR_ACE_PITCHER_SLOT = MY_PITCHER_SLOT + 1
+
+/** 투수 목록에서 마투수가 끼는 자리 — `0xb521c` 의 8번 칸 */
+const ACE_PITCHER_LIST_INDEX = 8
+
 function teammatePitcherNumberOf(slot: number): number {
   return slot === MY_PITCHER_SLOT ? MY_PITCHER_NUMBER : TEAMMATE_PITCHER_NUMBER_BASE - slot
 }
@@ -306,6 +327,11 @@ export interface PitcherGameOptions {
    */
   readonly ourPitcherStaminas?: readonly number[]
   readonly opponentPitcherStaminas?: readonly number[]
+  /**
+   * 142 경기 준비 `0x1c46c`(1c62e~1c660)가 두 팀 명부에 넣은 마선수 — 마투수는 투수 목록 8번 칸(옛 8번은 맨 끝),
+   * 마타자는 명단 9번(첫 벤치, 옛 9번은 맨 끝) (`features/play-game/model/gameAces`). 안 넘기면 아무도 안 싣는다.
+   */
+  readonly aces?: GameAceSetup
 }
 
 export interface PitcherGameLogEntry {
@@ -529,7 +555,30 @@ function rotatedPitcherSlots(dayCounter: number): number[] {
  *   주석의 근사) 위에서 `0xa4f60` 의 k 로 0↔k 를 맞바꾼다. 내 선발 날(g 짝수)은 맞바꿈이 되돌아와 내가 0번이다.
  * - 그 밖(구원): 0~3 이 날마다 돌고(0xb8c80) 나는 끝에 그대로 있다.
  */
-function ourPitcherOrderOf(options: PitcherGameOptions): number[] {
+export function ourPitcherOrderOf(options: PitcherGameOptions): number[] {
+  const order = rosterOurPitcherOrderOf(options)
+  // 142 가 명부 8번 칸에 마투수를 넣었으면 옛 8번(웹 목록 끝)은 맨 끝으로 밀린다 (0xb521c b527e~b528e)
+  if (gameAcePitcherOf(teamAcesOf(options, true).pitcher, undefined) === undefined) return order
+  return [...order.slice(0, ACE_PITCHER_LIST_INDEX), OUR_ACE_PITCHER_SLOT, ...order.slice(ACE_PITCHER_LIST_INDEX)]
+}
+
+/** 한 팀에 실린 마선수 번호 */
+function teamAcesOf(options: PitcherGameOptions, isOurs: boolean): GameTeamAces {
+  return (isOurs ? options.aces?.ours : options.aces?.opponent) ?? NO_GAME_ACES
+}
+
+/** 그 팀 명부의 마투수 — 레벨 배율 먹은 값. 없으면 undefined */
+function teamAcePitcherOf(options: PitcherGameOptions, isOurs: boolean): GameAcePitcher | undefined {
+  return gameAcePitcherOf(teamAcesOf(options, isOurs).pitcher, options.aces?.levels)
+}
+
+/** 그 팀 마투수의 웹 칸 번호 */
+function acePitcherSlotOf(isOurs: boolean): number {
+  return isOurs ? OUR_ACE_PITCHER_SLOT : ACE_PITCHER_SLOT
+}
+
+/** 로스터만으로 짠 우리 팀 투수 목록 (마투수 넣기 앞) */
+function rosterOurPitcherOrderOf(options: PitcherGameOptions): number[] {
   const assignment = startAssignmentOf({
     mode: PITCHER_EDITION_MODE,
     dayCounter: options.dayCounter,
@@ -549,8 +598,10 @@ function ourPitcherOrderOf(options: PitcherGameOptions): number[] {
  * 상대 팀 투수 목록 — 하루 한 칸씩 도는 4인 로테이션 (0xb8c80 → 0xb5ca8, S5 U-16). 0번이 오늘 선발이다.
  * 리그가 들고 다니는 차례(`options.opponentPitcherOrder`)가 있으면 그것이다.
  */
-function opponentPitcherOrderOf(options: PitcherGameOptions): readonly number[] {
-  return options.opponentPitcherOrder ?? rotatedPitcherSlots(options.dayCounter)
+export function opponentPitcherOrderOf(options: PitcherGameOptions): readonly number[] {
+  const order = options.opponentPitcherOrder ?? rotatedPitcherSlots(options.dayCounter)
+  // 142 가 상대 명부 8번 칸(로스터 여덟 뒤 = 벤치 맨 끝)에 넣은 마투수 (0xb88c8)
+  return teamAcePitcherOf(options, false) === undefined ? order : [...order, ACE_PITCHER_SLOT]
 }
 
 /** 칸별 레코드 스태미나 표 (붙박이 표 칸 0~7) — 빠진 칸은 10000 */
@@ -592,8 +643,18 @@ function withOutgoingStamina(table: readonly number[], outgoing: HalfInningMound
  *    상대 로스터는 마선수도 장비도 없어 그 둘은 원래 0 이다.
  * 파워·수비·주루는 이 길이 아니라(0xab214·수비·주루가 저마다 부른다) 여기서 손대지 않는다.
  */
-function opponentBatterAbility(teamId: number, rosterSlot: number) {
-  const roster = teamBatters(teamId)
+function opponentBatterAbility(options: PitcherGameOptions, rosterSlot: number) {
+  // 142 가 상대 명단 9번에 넣은 마타자가 CPU 대타로 서면 그 레코드 — 0xb6415 첫 단계가 레벨 배율을 먹인다
+  const ace = rosterSlot === ACE_BATTER_ROSTER_SLOT ? aceBatterAbilityOf(options) : undefined
+  if (ace !== undefined) {
+    return {
+      hit: gameAbilityOf({ mode: PITCHER_EDITION_MODE, base: ace.hit, isPitcher: false, slot: BATTER_SLOT.히트, isMyTeam: false }),
+      power: ace.power,
+      defense: ace.defense,
+      run: ace.run,
+    }
+  }
+  const roster = teamBatters(options.opponentTeamId)
   const player = roster[rosterSlot % roster.length]
   return {
     hit: gameAbilityOf({
@@ -607,6 +668,23 @@ function opponentBatterAbility(teamId: number, rosterSlot: number) {
     defense: player.ability[2],
     run: player.ability[3],
   }
+}
+
+/** 상대 마타자의 레벨 배율 먹은 네 칸 (히트·파워·수비·주루) */
+function aceBatterAbilityOf(options: PitcherGameOptions) {
+  const index = teamAcesOf(options, false).batter
+  const player = aceBatterPlayerOf(index)
+  if (player === undefined) return undefined
+  return aceAbilityAtLevel(player.ability, aceLevelOf(options.aces?.levels, aceLevelSlotOf('타자', index + 1)))
+}
+
+/** 간이 타석의 타자 — 명단 칸이 마타자 칸이면 142 가 넣은 마타자 */
+function quickBatterOfTeam(options: PitcherGameOptions, isOurs: boolean, rosterSlot: number): QuickAtBatBatter {
+  if (rosterSlot === ACE_BATTER_ROSTER_SLOT) {
+    const ace = gameAceBatterOf(teamAcesOf(options, isOurs).batter, options.aces?.levels)
+    if (ace !== undefined) return ace
+  }
+  return batterAt(isOurs ? options.ourTeamId : options.opponentTeamId, rosterSlot)
 }
 
 /* ── 시작 ────────────────────────────────────────────────────────────────────── */
@@ -668,9 +746,13 @@ export function startPitcherGame(
     lastBurstResolution: null,
     ballMagicNumber: 0,
     // 경기 시작 명단은 로스터 차례 그대로 — 앞 아홉이 타순, 나머지가 벤치 (team+0x28c)
-    opponentLineup: rosterLineupOf(teamBatters(options.opponentTeamId).length),
+    // 142 가 넣은 마타자는 첫 벤치 칸(9번)에 앉는다 — 타석에 서는 길은 CPU 대타(0xac228)뿐이다 (0xb8870)
+    opponentLineup: withAceBatterLineup(
+      rosterLineupOf(teamBatters(options.opponentTeamId).length),
+      teamAcesOf(options, false).batter,
+    ),
     pinchHitUsed: false,
-    ourLineup: rosterLineupOf(teamBatters(options.ourTeamId).length),
+    ourLineup: withAceBatterLineup(rosterLineupOf(teamBatters(options.ourTeamId).length), teamAcesOf(options, true).batter),
     // 오늘 0번이 마운드에 선다 — 선발 날이면 나다 (`ourPitcherOrderOf` 가 `startsToday` 와 같은 자리를 낸다)
     ourMound: startingMoundOf(
       ourStarter,
@@ -841,7 +923,7 @@ export function startPitch(
     random,
   )
 
-  const batter = opponentBatterAbility(options.opponentTeamId, opponentRosterSlotOf(progress))
+  const batter = opponentBatterAbility(options, opponentRosterSlotOf(progress))
   // CPU 도루 0x520de — 상태 0x11 의 10번째 틱(0x537dc → 메시지 0x583)이라 실투 판정(0x4dea0) 뒤, CPU 타자 결정
   // (11번째 틱 0x34334) **바로 앞**이다. 후보가 있을 때만 rand(0,1000) 한 번 → 0xa9bd4 출발 (`rollCpuStealStart`)
   const stealingFrom = rollCpuStealStart(
@@ -1042,10 +1124,9 @@ function myDefenseAbilitiesOf(progress: PitcherGameProgress): readonly number[] 
  * 상대 타순을 거꾸로 센다 (타자편 `gameFlow`·팀 경기와 같은 근사). 대타가 들어온 칸은 지금 그 칸의 로스터 선수다.
  */
 function runAbilitiesOnBaseOf(progress: PitcherGameProgress): Partial<Record<0 | 1 | 2 | 3, number>> {
-  const teamId = progress.options.opponentTeamId
   const runOf = (slotsBack: number) => {
     const slot = (((progress.opponentOrderIndex - slotsBack) % BATTING_ORDER_SIZE) + BATTING_ORDER_SIZE) % BATTING_ORDER_SIZE
-    return opponentBatterAbility(teamId, rosterSlotAt(progress.opponentLineup, slot)).run
+    return opponentBatterAbility(progress.options, rosterSlotAt(progress.opponentLineup, slot)).run
   }
   return { 0: runOf(0), 1: runOf(1), 2: runOf(2), 3: runOf(3) }
 }
@@ -1181,7 +1262,7 @@ export function pickoff(
       })),
       progress.options.stats.breaking,
     ),
-    runAbility: opponentBatterAbility(progress.options.opponentTeamId, opponentRosterSlotOf(progress)).run,
+    runAbility: opponentBatterAbility(progress.options, opponentRosterSlotOf(progress)).run,
     random,
     offenseIsCpu: true,
     // 사람이 수비한다 — 0xae6c8 은 환경설정 "송구"(+0xf4) 혼자가 받은 야수의 0xafa60 을 켠다 (타구 진행기와 같은 배선)
@@ -1311,7 +1392,7 @@ function defensePlayInputOf(
       progress.options.stats.breaking,
     ),
     // 주자는 상대 타자다 — 지금 타순 칸의 주루
-    runAbility: opponentBatterAbility(progress.options.opponentTeamId, opponentRosterSlotOf(progress)).run,
+    runAbility: opponentBatterAbility(progress.options, opponentRosterSlotOf(progress)).run,
     random,
     // 나만의리그 투수편 = 전역 모드 3
     gameMode: PITCHER_EDITION_MODE,
@@ -1709,8 +1790,12 @@ function triggerBurstAtPrep(progress: PitcherGameProgress, random: RandomPort): 
       ourScore: progress.game.ourScore,
       opponentScore: progress.game.opponentScore,
       opponentBattingSlot: progress.opponentOrderIndex,
-      // 정규 경기에 마선수가 무작위로 나오는 코드는 원본에 없다 — 이벤트 match 명령으로만 (타자편과 같다)
-      opponentAceBatterId: null,
+      // b0 마타자 행(0xae89d → 0xb633d) — 142 가 상대 명단에 넣은 마타자가 대타로 지금 타석에 섰으면 그 선수.
+      // 마투수 행(0xae83d)은 마운드 투수를 보는데, 내가 던지는 타석의 마운드는 나라 걸리지 않는다
+      opponentAceBatterId:
+        opponentRosterSlotOf(progress) === ACE_BATTER_ROSTER_SLOT
+          ? (aceBatterPlayerOf(teamAcesOf(progress.options, false).batter)?.id ?? null)
+          : null,
       opponentAcePitcherId: null,
       hitsInGame: log.hits,
       homeRunsInGame: log.homeRuns,
@@ -1800,9 +1885,13 @@ function applyOpponentCpuPinchHit(
       // state[0xe] = 1 (ac33e) — 다음 공(0xa5e14 a5e7c)이 나갈 때까지 다시 묻지 않는다
       pinchHitUsed: true,
       opponentBatterLogs,
-      // 상대 로스터에는 마선수가 없다 — 등판음은 14/15 중 하나다
+      // 들어온 타자가 142 가 넣은 마타자면 등판음 0x38b64 의 마선수 가지 (0xb633c)
       scenePinchHit: inScene
-        ? { serial: (progress.scenePinchHit?.serial ?? 0) + 1, by: 'CPU', incomingIsAce: false }
+        ? {
+            serial: (progress.scenePinchHit?.serial ?? 0) + 1,
+            by: 'CPU',
+            incomingIsAce: rosterSlotAt(pinch.lineup, slot) === ACE_BATTER_ROSTER_SLOT,
+          }
         : progress.scenePinchHit,
     },
     `${progress.game.inning}회${progress.game.half} 상대 ${(slot % BATTING_ORDER_SIZE) + 1}번 CPU 대타`,
@@ -2060,7 +2149,7 @@ function playDefensiveAtBat(
   const pitched = perPitchDrainOf(defense, mound)
   // 내가 마운드에 없는 수비 타석은 자동진행(0x21) 안의 간이 타석 — 상태 0xf 를 안 지나 돌발을 굴리지 않는다
   const play = playQuickAtBat(
-    batterAt(options.opponentTeamId, opponentRosterSlotOf(progress)),
+    quickBatterOfTeam(options, false, opponentRosterSlotOf(progress)),
     // 간이 엔진이 보는 투수 체력은 체력%(0xaebb0)다 — 마운드의 살아 있는 값을 넘긴다
     { ...defense.pitcherAt(mound.pitcherSlot), stamina: staminaPercentOf(mound.stamina) },
     { inning: progress.game.inning },
@@ -2123,7 +2212,7 @@ function playTeammateAtBat(
   const pitched = perPitchDrainOf(defense, mound)
   const play = playQuickAtBat(
     // 대타가 들어오면 그 타순 칸에 선 선수가 바뀐다 — 명단(`team+0xe`)에서 고른다
-    batterAt(options.ourTeamId, rosterSlotAt(progress.ourLineup, before.battingOrderIndex)),
+    quickBatterOfTeam(options, true, rosterSlotAt(progress.ourLineup, before.battingOrderIndex)),
     // 간이 엔진이 보는 투수 체력은 체력%(0xaebb0)다 — 마운드의 살아 있는 값을 넘긴다
     { ...defense.pitcherAt(mound.pitcherSlot), stamina: staminaPercentOf(mound.stamina) },
     { inning: before.inning },
@@ -2306,6 +2395,9 @@ function quickDefenseOf(
 ): HalfInningDefense {
   const { options } = progress
   const roster = teamPitchers(isOurs ? options.ourTeamId : options.opponentTeamId)
+  // 142 가 명부 8번 칸에 넣은 마투수 — 웹 칸 번호는 우리 9(`OUR_ACE_PITCHER_SLOT`) · 상대 8
+  const ace = teamAcePitcherOf(options, isOurs)
+  const isAce = (slot: number) => ace !== undefined && slot === acePitcherSlotOf(isOurs)
   const myPitcher = {
     control: options.stats.control,
     velocity: options.stats.velocity,
@@ -2321,10 +2413,18 @@ function quickDefenseOf(
         ? progress.stamina
         : (isOurs ? progress.ourPitcherStaminas : progress.opponentPitcherStaminas)[slot] ?? FULL_STAMINA,
     pitcherAt: (slot) =>
-      isOurs && slot === MY_PITCHER_SLOT ? myPitcher : quickPitcherOf(roster[slot % roster.length]),
+      isOurs && slot === MY_PITCHER_SLOT
+        ? myPitcher
+        : isAce(slot) && ace !== undefined
+          ? ace.quick
+          : quickPitcherOf(roster[slot % roster.length]),
     // 투수 능력치 순서는 제구·구속·변화·**체력** (칸 3)
     staminaAbilityAt: (slot) =>
-      isOurs && slot === MY_PITCHER_SLOT ? options.staminaAbility : roster[slot % roster.length].ability[3],
+      isOurs && slot === MY_PITCHER_SLOT
+        ? options.staminaAbility
+        : isAce(slot) && ace !== undefined
+          ? ace.staminaAbility
+          : roster[slot % roster.length].ability[3],
     lead: isOurs
       ? progress.game.ourScore - progress.game.opponentScore
       : progress.game.opponentScore - progress.game.ourScore,
@@ -2332,7 +2432,10 @@ function quickDefenseOf(
     bothTeamsAreCpu: false,
     isOwnPlayerAt: (slot) => isOurs && slot === MY_PITCHER_SLOT,
     // 0xb6dec 보직 — 로스터 칸 0~3 선발 · 4~6 중간 · 7 마무리. 내 투수(칸 8)는 표 밖이라 0xabfcc 목록에 안 든다
-    roleAt: (slot) => (isOurs && slot === MY_PITCHER_SLOT ? undefined : rosterPitcherRoleOf(slot)),
+    roleAt: (slot) => ((isOurs && slot === MY_PITCHER_SLOT) || isAce(slot) ? undefined : rosterPitcherRoleOf(slot)),
+    // 마선수 0xb633c(+0xa 비트6) — 마운드면 특수 문턱(ac4f2), 벤치에 있으면 0xb8a8d 가 참이라 마무리 굴림 0xac360 을
+    // 지나고, 0xabfcc 는 고르지 않는다 (`leagueDay.defenseOf` 와 같다)
+    isSpecialPitcherAt: isAce,
     // 마무리 갈래(ac0be)의 정렬 열쇠 0xb5b50 = 0xb570c(팀, k, P, 1, 90, 1) 네 칸 합. 모드 3 은 팀 능력치(0x306)·코치
     // 정액이 없고 0xb574a 가지는 내 육성 선수(0xb6388)에만 붙는다 — 로스터 투수는 밑값을 0..999 로 자른 합.
     // 내 투수는 0xabfcc 가 모드 3 에서 거르므로(내선수거름) 그 칸 값은 쓰이지 않는다 — 실효 능력치 네 칸 합을 둔다
@@ -2344,7 +2447,9 @@ function quickDefenseOf(
             options.stats.breaking,
             options.staminaAbility,
           ])
-        : pitcherAbilitySumOf(roster[slot % roster.length].ability.map(clampAbility)),
+        : isAce(slot) && ace !== undefined
+          ? pitcherAbilitySumOf([ace.control, ace.velocity, ace.breaking, ace.staminaAbility].map(clampAbility))
+          : pitcherAbilitySumOf(roster[slot % roster.length].ability.map(clampAbility)),
   }
 }
 
@@ -2581,9 +2686,13 @@ export interface PitcherGameSummary {
 export function pitchersOfRecordOf(progress: PitcherGameProgress, myName: string | null): PitcherOfRecordNames {
   const { options } = progress
   return pitcherOfRecordNamesOf(progress.decision, progress.game.playerSide, (isOurTeam, number) => {
-    if (!isOurTeam) return rosterPitcherName(options.opponentTeamId, OPPONENT_PITCHER_NUMBER_BASE - number)
-    if (number === MY_PITCHER_NUMBER) return myName ?? undefined
-    return rosterPitcherName(options.ourTeamId, TEAMMATE_PITCHER_NUMBER_BASE - number)
+    const slot = isOurTeam ? TEAMMATE_PITCHER_NUMBER_BASE - number : OPPONENT_PITCHER_NUMBER_BASE - number
+    if (isOurTeam && number === MY_PITCHER_NUMBER) return myName ?? undefined
+    if (slot === acePitcherSlotOf(isOurTeam)) {
+      const ace = teamAcePitcherOf(options, isOurTeam)
+      if (ace !== undefined) return ace.player.name
+    }
+    return rosterPitcherName(isOurTeam ? options.ourTeamId : options.opponentTeamId, slot)
   })
 }
 

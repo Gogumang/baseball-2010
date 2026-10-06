@@ -83,7 +83,7 @@ import { hiddenOpenTextOf } from '@/entities/career/model/equipment'
 import type { RookieProfile } from '@/entities/career/model/playerCareer'
 import { useStorySchedule } from '@/app/model/useStorySchedule'
 import { enterSeasonEvent, nextSeasonStep, resumePointOf } from '@/app/model/seasonEvents'
-import { nariMatchCancelTargetOf, rollNariMatchAces } from '@/pages/management/lib/nariMatchPrepare'
+import { nariGameAcesOf, nariMatchCancelTargetOf, rollNariMatchAces } from '@/pages/management/lib/nariMatchPrepare'
 import type { NariMatchAces, NariOpenedAces } from '@/pages/management/lib/nariMatchPrepare'
 import { DEFAULT_OPENED_ACE_BATTER_IDS, DEFAULT_OPENED_ACE_PITCHER_IDS } from '@/pages/general-mode/lib/generalModeSetup'
 import {
@@ -121,6 +121,7 @@ import type { NationalCup, NationalCupMatchup } from '@/entities/national-cup/mo
 import { advanceNationalCupDay } from '@/entities/national-cup/model/nationalCupPlay'
 import { isMyTurn } from '@/entities/league/model/seasonEnd'
 import type { GamePitcherSetup } from '@/features/play-game/model/gameFlow'
+import type { GameAceSetup } from '@/features/play-game/model/gameAces'
 import {
   careerNationalCupRewardItems,
   careerNationalTeamEventId,
@@ -405,10 +406,12 @@ export function useCareerSession({
       playerSide: PlayerSide = PLAYER_SIDE_LAST_BAT,
       /** 리그 경기의 두 팀 투수 레코드 차례·칸별 +0x2c (`leagueGamePitchersOf`). 국가대항전은 안 넘긴다 */
       pitchers?: GamePitcherSetup,
+      /** 142 가 두 팀 명부에 넣은 마선수 (0xb88c8 · 0xb8870). 국가대항전은 안 넘긴다 */
+      aces?: GameAceSetup,
     ) => {
       // 환경설정 "주루" 를 경기에 태운다 — 타자편은 사람이 늘 공격이라 설정이 그대로 먹는다 (0xae690)
       const started = startGame(
-        random, ourTeamId, battingOrder, opponentTeamId, playerSide, dayCounter, runningModeManualRef.current, pitchers,
+        random, ourTeamId, battingOrder, opponentTeamId, playerSide, dayCounter, runningModeManualRef.current, pitchers, aces,
       )
       progressRef.current = started
       setProgress(started)
@@ -422,7 +425,7 @@ export function useCareerSession({
     [random, runner, setScreen],
   )
 
-  const beginGame = useCallback(() => {
+  const beginGame = useCallback((aces: NariMatchAces | null) => {
     const current = careerRef.current
     cupGameRef.current = null
     const opponent = current === null || current === undefined ? undefined : nextOpponentOf(current)
@@ -444,8 +447,10 @@ export function useCareerSession({
       current === null || current === undefined || opponent === undefined
         ? undefined
         : leagueGamePitchersOf(current, opponent),
+      // 142 진입 0x1c46c 가 두 팀 명부(저장의 나리 팀 레코드)에 넣은 마선수 — 경기 장면 0x39fdc 가 같은 명부로 팀을 세운다
+      aces === null ? undefined : nariGameAcesOf(aces, aceLevels),
     )
-  }, [startMatch])
+  }, [aceLevels, startMatch])
 
   /**
    * 109 다음경기 앞 순위표에 들어선다 — 진입 0x10d8c: `S+0x50 = 4`(0x10db0) · 이전 ≠ 142 면 저장(0x1fded · 0x22755).
@@ -1095,12 +1100,12 @@ export function useCareerSession({
 
     /**
      * 142 확인(−5 · '5', 0x13cb6) — 저장 [모드+0x4c] = 1 · 저장 · 밀기 → 144 → 경기 장면 (0x15ce0).
-     * ⚠️ 미해결: 굴린 마선수(`matchAces`)를 경기 팀에 넣는 일(0xb88c8 · 0xb8870 — 마타자 명단 9번 · 마투수 투수 8번)은
-     *    경기 진행기(features/play-game)가 받지 않아 아직 안 싣는다. 저장 [모드+0x4c](해 봤음 표시)도 웹에 칸이 없다.
+     * 굴린 마선수(`matchAces`)는 진입이 이미 두 팀 명부에 넣었다(0xb88c8 · 0xb8870 — 마타자 명단 9번 · 마투수 투수 8번) —
+     * 경기 장면이 같은 명부로 팀을 세우므로 경기에 그대로 실린다. ⚠️ 저장 [모드+0x4c](해 봤음 표시)는 웹에 칸이 없다.
      */
     confirmMatchPrepare: () => {
       if (career === null || screen.kind !== '경기준비') return
-      beginGame()
+      beginGame(matchAces)
     },
 
     /** 142 취소(−16, 0x13c72) — S+0xb4(포스트시즌) → 128 진입 0x120a4 를 다시, 그 밖 → 109 (이전 상태 142 라 취소가 안 먹는다) */
