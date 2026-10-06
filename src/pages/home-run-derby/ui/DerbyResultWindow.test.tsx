@@ -63,11 +63,20 @@ describe('홈런더비 결과 화면 (0x45c18)', () => {
     expect(onExit).toHaveBeenCalledTimes(1)
   })
 
-  it('신기록이면 알려 준다 (원본은 효과음 0x1f 로만 알린다)', () => {
-    띄우기(결과({ isNewRecord: false }))
-    expect(screen.queryByText('NEW RECORD!')).toBeNull()
-    cleanup()
+  it('신기록이어도 글자로는 안 알린다 — 0x45c18 은 st+0x3c 를 안 읽고, 효과음 0x1f 로만 알린다', () => {
     띄우기(결과({ isNewRecord: true }))
-    expect(screen.getByText('NEW RECORD!')).toBeTruthy()
+    expect(screen.queryByText(/NEW RECORD/i)).toBeNull()
+  })
+
+  it('값 숫자는 칸 (W/2 + 15, 줄 y, 42×12) 위에 붙여 오른쪽 맞춤, 자간 1 이다 (0xba51c 정렬 4)', () => {
+    const { container } = render(
+      <DerbyResultWindow result={결과({ pitchCount: 12 })} heldGamePoint={0} onRetry={vi.fn()} onExit={vi.fn()} />,
+    )
+    // 첫 줄 "12" — num 21(4px) · 22(6px), 오른끝 135 + 42 = 177 − (4+1) − (6+1) = 165, 위 = H/2 − 66 = 94
+    const glyphs = [...container.querySelectorAll('img')].filter((node) => /num\/02[0-9]\.png$/.test(node.getAttribute('src') ?? ''))
+    expect(glyphs.slice(0, 2).map((node) => [node.getAttribute('src'), node.style.left, node.style.top])).toEqual([
+      ['./sprites/num/021.png', '165px', '94px'],
+      ['./sprites/num/022.png', '170px', '94px'],
+    ])
   })
 })

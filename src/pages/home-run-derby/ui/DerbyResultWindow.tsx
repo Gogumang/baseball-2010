@@ -7,7 +7,7 @@ import {
   GAME_POINT_FOLDER, GAME_POINT_GLYPH_HEIGHT, POINT_BOX, POINT_GP_FRAME, POINT_GP_X, POINT_LABEL_X,
   POINT_ROWS, POINT_VALUE_BOX, RESULT_TITLE, RESULT_WINDOW, RETRY_BOX, RETRY_BUTTONS,
   RETRY_DEFAULT_ANSWER, RETRY_QUESTION, RETRY_TEXT, STAT_BOX, STAT_BOX_TITLE, STAT_LABEL_X,
-  STAT_ROWS, STAT_UNIT_X, STAT_VALUE_BOX, STAT_VALUE_PLATE,
+  STAT_ROWS, STAT_UNIT_X, STAT_VALUE_BOX, STAT_VALUE_GLYPH_HEIGHT, STAT_VALUE_PLATE,
   gamePointGlyphsOf, statLabelTopOf, statPlateTopOf, statValueTopOf,
 } from '@/pages/home-run-derby/lib/derbyResultLayout'
 import * as styles from '@/pages/home-run-derby/ui/DerbyResultWindow.css'
@@ -37,6 +37,10 @@ interface DerbyResultWindowProps {
  *
  * 창 몸통(0x55e60)·안쪽 칸(0x5eec4)의 **그림 모양**은 선 목록만 확인돼 CSS 로 근사한다 (추정) —
  * 다른 화면(`pages/settings` · `pages/record`)이 쓰는 것과 같은 근사다.
+ *
+ * 신기록 표시는 없다 — 0x45c18 은 신기록 칸 st+0x3c 를 읽지 않는다. 신기록은 진입 0x4f574 의 효과음 0x1f 로만 알린다.
+ * ⚠️ 원본은 창 뒤에 구름 0x78448 · 구장 0x78578(장면 +0x17e2 를 틱마다 5 씩 150 까지 올리며 밀어 넣는다, 갱신 0x3c0b8)을
+ *    그리는데, 웹은 아직 그 배경을 이 화면에 안 깐다(구장 그리기는 `widgets/batting-stage` 캔버스 안에만 있다).
  */
 export function DerbyResultWindow({ result, heldGamePoint, onRetry, onExit }: DerbyResultWindowProps) {
   const [answer, setAnswer] = useState(RETRY_DEFAULT_ANSWER)
@@ -91,7 +95,8 @@ export function DerbyResultWindow({ result, heldGamePoint, onRetry, onExit }: De
             glyphs={numberGlyphsOf(statValues[index])}
             right={STAT_VALUE_BOX.x + STAT_VALUE_BOX.width}
             boxTop={statValueTopOf(index)}
-            boxHeight={STAT_VALUE_BOX.height}
+            // 0xba51c 정렬 4 는 세로 가운데 맞춤이 없다 — 상자 높이를 글자 높이로 주어 위를 칸 y 에 붙인다
+            boxHeight={STAT_VALUE_GLYPH_HEIGHT}
           />
           <FrameSprite folder={IMG_TEXT_FRAMES} frame={row.unit} origins={textOrigins} x={STAT_UNIT_X} y={statValueTopOf(index)} />
         </div>
@@ -140,7 +145,6 @@ export function DerbyResultWindow({ result, heldGamePoint, onRetry, onExit }: De
         </button>
       ))}
 
-      {result.isNewRecord && <div className={styles.newRecord}>NEW RECORD!</div>}
     </RawScreen>
   )
 }

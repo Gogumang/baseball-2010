@@ -49,8 +49,14 @@ export const STAT_ROW_STEP = 16
 /** 값 바탕 game_ui 프레임 40 (58×15) */
 export const STAT_VALUE_PLATE = { frame: 40, x: CENTER_X + 15, firstY: CENTER_Y - 68, width: 58, height: 15 } as const
 
-/** 값 칸 — 42×12, 오른쪽 정렬 */
+/**
+ * 값 칸 — 42×12. 0xba719(칸, 자간 1, 값, 기준 0x14, num 이미지, 정렬 4) → 0xba51c (0x45ee6~0x45fbe):
+ * x = 칸 x + 42 − Σ(글자 폭 + 1), **위 = 칸 y** — 정렬 4 는 가로만 보고 세로 가운데 맞춤(0x20)·아래 맞춤(0x40)이 없다.
+ * 글자 높이가 모두 10 이라 가장 큰 높이에 아래를 맞춰도(0xba628) 그대로 칸 y 다.
+ */
 export const STAT_VALUE_BOX = { x: CENTER_X + 15, firstY: CENTER_Y - 66, width: 42, height: 12 } as const
+/** num 20~29 글자 높이 — 값은 칸 y 에 위를 붙인다 */
+export const STAT_VALUE_GLYPH_HEIGHT = 10
 
 /** 단위 그림 자리 (10×10) */
 export const STAT_UNIT_X = CENTER_X + 59

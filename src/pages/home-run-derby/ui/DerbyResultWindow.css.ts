@@ -53,15 +53,3 @@ export const answerButton = style({
  * 신기록 알림 — 원본은 그림 대신 **효과음 0x1f**(아니면 0x20)로만 알린다(0x4f644~).
  * 웹은 소리가 없어 글로 대신한다 (원본에 없는 웹판 표시).
  */
-export const newRecord = style({
-  position: 'absolute',
-  left: 0,
-  top: '44px',
-  width: '240px',
-  textAlign: 'center',
-  color: ORIGINAL_COLORS.highlightYellow,
-  fontSize: '11px',
-  lineHeight: '13px',
-  textShadow: `1px 1px 0 ${ORIGINAL_COLORS.black}`,
-  pointerEvents: 'none',
-})
