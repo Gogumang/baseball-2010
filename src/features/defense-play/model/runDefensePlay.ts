@@ -1411,40 +1411,19 @@ export function stepDefensePlay(
         })
       }
 
-      // ── 송구 목표 루 ──
-      // 사람이 방향키로 고른 목표(플레이+0x160)가 있으면 그 루다 (플레이 틱 0xb45dc 의 b4660~b46a8).
-      // 안 골랐으면 — **송구 설정 갈림**(`input.throwMode` 주석의 0x5269c·0xae6c8):
-      //   CPU 송구 결정이 도는 쪽(수비 CPU 또는 설정 자동)이면 점수식 0xafb24,
-      //   안 도는 쪽(사람 수비 + 설정 수동)이면 **아무도 던지지 않는다**. 0xb1c90 의 자동 가지는 고른 루를
-      //   2루 커버/중계 야수 자리 잡기에만 쓰고 송구 호출이 없다(c8649a3). 그 밖에 공을 내보내는 자리
-      //   (중계 이어 던지기 b4616 · AI 상태 9·0xe · 협살 0xb3a94)는 모두 앞선 송구·견제·CPU 에서만 선다.
-      //   아웃이 난 뒤에는 한 번 CPU 결정이 돈다 — 아래 6c 절.
-      //
-      // ⚠️ **근사(그대로 둔 것)**: 원본은 쥐기가 넣은 준비 틱(+0xc8)이 다 줄어야(vtC4) 사람 키(b4660)든 CPU(0xafa60)든
-      //    던진다 — 포구 R 틱 뒤다. 이 절은 포구 틱에 고르고 준비 틱을 도착 틱에 더한다(0xaf284 "이미 잡았다" 갈래).
-      //    고른 뒤의 루로 보내기 관문(0xb2c90: 커버 없음 → 들고 뛰기 · 직접 밟기 · 600 이하)은 원본대로 본다.
-      //    CPU 가 −1 을 고르거나 0xb2c90 이 실패하면 +0x128 이 남아 준비가 끝난 틱부터 4c 절이 다시 고른다.
-      const active = runners.filter((runner) => !runner.state.isOut && !runner.state.scored).length
+      // ── 송구는 포구 틱에 고르지 않는다 — 준비 틱(+0xc8)이 다 줄어든 틱(포구 + R)에 그때 상태로 고른다 ──
+      // 쥐기 0xb2710(P, f, 1)은 +0x128 = 1 · +0xc8 = R(내야 3 · 외야 6)을 넣을 뿐 송구 호출이 없다. 공을 내보내는 쪽은
+      // 둘 다 공 가진 야수의 준비(vtC4 = 0xa20ec, +0xc8 ≤ 0)를 먼저 본다 (직접 뜬 것):
+      // ```
+      // b4660~b4684: +0x160 ≠ −1 && +0x12c && 공가진야수.vtC4()  → 사람 목표 (1b 절)
+      // afa6c~afab8: +0x128 && 공가진야수.vtC4() && +0xe0 && AI ∉ {8,9} && +0xc8 ≤ 0 → 점수식 0xafb24 (4c 절)
+      // ```
+      // 야수 틱 0xa1284(0' 절)가 플레이 틱보다 먼저 +0xc8 을 줄이므로 포구 c 틱에 넣은 R 은 c + R 틱 머리에서 0 이 되고,
+      // 그 틱의 1b · 4c 절이 **그때의 주자·야수 자리**로 고른다(07e80dc · 46d8420 이 옮긴 차례 그대로).
       // 땅볼·직선타로 타자주자가 죽는 시각은 1루에 공이 닿는 때다 — 공이 손을 떠나기 전(쥔 채)의 0xaf284 로 잰다
+      // (타자주자의 운명을 결과 코드가 정하는 이 진행기의 규약 — 근사)
       if (input.outcome.kind === '아웃' && !onTheFly) {
         batterOutTick = tick + defenseArrivalTicks(contextAt(tick), 1)
-      }
-      if (play.manualThrowBase !== NONE) {
-        const manual = play.manualThrowBase
-        sendToBase(chaserSlot, manual, '사람', false)
-        // b46a4: 사람 목표는 한 번 보면 지운다 (+0x160 = −1)
-        play = { ...play, manualThrowBase: NONE }
-      } else if (cpuThrowEnabled) {
-        const target = chooseThrowTargetBase({ ...contextAt(tick), activeRunnerCount: active, outs })
-        if (target !== NONE) {
-          // CPU 홈 송구 20% 특수 송구 (0xafa60) — 점수식이 홈(0)을 골랐을 때**만** 한 번 굴린다
-          // (`afad2: cmp r0,#0 ; bne` 로 홈이 아니면 굴림 자체를 건너뛴다). 효과는 `cpuSpecialThrowOf` 참고.
-          const cpuSpecial =
-            target === 0 &&
-            input.random !== undefined &&
-            isSpecialThrow(target, randomIntegerBelow(input.random, 0, 100))
-          if (sendToBase(chaserSlot, target, 'CPU', cpuSpecial)) play = { ...play, wantsThrow: false }
-        }
       }
     }
 
@@ -1454,9 +1433,8 @@ export function stepDefensePlay(
     // b4686:   공가진야수.vt58()(발밑 루) ≠ +0x160 이면 플레이.vt58(+0x160, 0) = 0xb2c90   ; 루로 보내기
     // b46a4:   +0x160 = −1
     // ```
-    // 포구 틱 전에 고른 키는 위 1절이 포구 틱에 던진다(준비 틱은 도착 틱에 더한다 — 근사). 여기는 포구 **뒤에**
-    // 고른 키 — 공 가진 야수(받은 야수 포함)의 준비가 끝난 틱부터 그 루로 보낸다. 발밑 루(좌표 완전일치)가
-    // 그 루면 보내지 않는다. 어느 쪽이든 본 뒤에는 +0x160 = −1 이다.
+    // 포구 전에 고른 키든 뒤에 고른 키든 같다 — 공 가진 야수(받은 야수 포함)의 준비가 끝난 틱(포구 + R)부터 그 루로
+    // 보낸다. 발밑 루(좌표 완전일치)가 그 루면 보내지 않는다. 어느 쪽이든 본 뒤에는 +0x160 = −1 이다.
     if (
       !play.finished &&
       !uncatchable &&
@@ -1845,7 +1823,18 @@ export function stepDefensePlay(
     const batterSettled = batterOutTick < 0 || tick >= batterOutTick
     // 아무도 잡지 않는 타구는 "잡은 적 있음" 이 서지 않으므로 낙구를 끝 조건으로 쓴다
     const ballSettled = uncatchable ? tick >= trajectory.landingTick : play.everHeld
-    if (ballSettled && throwSettled && batterSettled && !stillActive) {
+    // 공 가진 야수가 아직 준비 중(+0xc8 > 0)이고 송구를 고를 쪽(+0x128 의 CPU 결정 · +0x160 사람 목표)이 남아 있으면
+    // 그 준비가 끝나는 틱까지 판을 안 닫는다 — 송구 결정이 포구 + R 틱으로 옮겨 간 뒤에도 예전처럼 "고른 송구가 닿을 때까지"
+    // 판이 이어지게 하는 이 진행기의 끝 조건이다(원본의 판 끝 0x9d5bd 는 안 옮겼다 — 근사)
+    const holderNow = fielders[play.ballHolderSlot]
+    const decisionPending =
+      !uncatchable &&
+      play.held &&
+      holderNow !== undefined &&
+      holderNow.holdingBall &&
+      holderNow.actionRemainingTicks > 0 &&
+      ((play.wantsThrow && cpuThrowEnabled) || play.manualThrowBase !== NONE)
+    if (ballSettled && throwSettled && batterSettled && !stillActive && !decisionPending) {
       play = { ...play, finished: true }
     }
   }
@@ -2204,8 +2193,8 @@ const NO_CPU_SPECIAL_THROW = { special: false, bounce: false } as const
  * 곧 **"레이저급 속도"는 맞다** — 다만 계획 [1] 을 거치므로 **외야수가, 중계 없이, 17틱 넘게 걸리는
  * 홈 송구**일 때만 효과가 난다. 내야수의 홈 송구는 20% 를 맞혀도 아무 차이가 없다(굴림만 먹는다).
  *
- * **근사**: 원본은 0xb2c90 이 실패하면(직접 뛰는 게 빠름·거리 ≤ 600) 다음 틱에 `0xafa60` 이 다시 돌아
- * 또 굴린다. 웹 진행기는 송구를 잡는 틱에 한 번만 정하므로 굴림도 한 번이다.
+ * 원본은 0xb2c90 이 실패하면(직접 뛰는 게 빠름·거리 ≤ 600) 다음 틱에 `0xafa60` 이 다시 돌아 또 굴린다 —
+ * 웹도 준비가 끝난 틱부터 4c 절이 매 틱 다시 고르므로 같다.
  * 원바운드 거리는 웹 관례대로 수평 거리로 잰다(원본 0xbf9f1 은 던지는 쪽 높이 1000 을 넣는다).
  */
 export function cpuSpecialThrowOf(

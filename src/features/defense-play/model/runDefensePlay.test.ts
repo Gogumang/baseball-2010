@@ -69,6 +69,7 @@ function play2(
   bases: BaseState,
   outs: number,
   runningMode: '수동' | '자동',
+  throwMode: '수동' | '자동' = '자동',
 ): DefensePlayResult {
   return runDefensePlay({
     outcome,
@@ -77,7 +78,7 @@ function play2(
     outs,
     runAbility: 500,
     runningMode,
-    throwMode: '자동',
+    throwMode,
   })
 }
 
@@ -571,11 +572,12 @@ describe('수비 아홉 칸 능력치 — 자리 코드 −1 이 칸 번호다 (
 })
 
 describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
-  // 판 시작 리드(0x3d7b8) 뒤로 대표 단타는 협살이 안 선다 — 1루 주자가 3루까지 노리다 2·3루 사이에 갇히는 깊은 타구
+  // 판 시작 리드(0x3d7b8) 뒤로 대표 단타는 협살이 안 선다 — 1루 주자가 3루까지 노리다 2·3루 사이에 갇히는 깊은 타구.
+  // 송구를 준비 틱이 끝난 틱(포구 + R)에 고른 뒤로 [95,1299,785,0] 은 2루로 던져 협살이 안 선다 — 같은 모양의 타구로 바꿨다
   const 협살상황 = (defenseIsCpu: boolean) =>
     runDefensePlay({
       outcome: 단타,
-      trajectory: battedBallTrajectory([95, 1299, 785, 0]),
+      trajectory: battedBallTrajectory([85, 1250, 776, 0]),
       bases: 주자1루,
       outs: 0,
       defenseIsCpu,
@@ -598,7 +600,7 @@ describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
     const 시작 = 결과.log.find((line) => line.includes('협살 시작'))
 
     expect(결과.rundowns).toBe(1)
-    // 3루로 간 송구를 받은 3루수(4)와 2루수(3)가 1번 주자를 2·3루 사이에 둔다
+    // 3루로 간 송구를 받은 3루수(4)와 2루 커버 유격수(5)가 1번 주자를 2·3루 사이에 둔다
     expect(시작).toContain('1번 주자 2↔3루')
   })
 
@@ -966,7 +968,9 @@ describe('포스 사슬 — 결과 코드가 준 최소 루가 앞 주자까지 
   })
 
   it('3루타 + 1루 주자: 1루 주자는 홈까지 밀려 득점한다', () => {
-    const 수동 = play2(삼루타, 주자1루, 0, '수동')
+    // 송구 없이 사슬만 본다 — 송구 자동이면 좌익수가 준비 틱(외야 6)이 끝난 24틱에 3루로 던져, 3루를 돌아 홈으로 가는
+    // 1번 주자를 3루수가 태그한다(포구 틱에 고르던 예전 근사에선 안 던졌다)
+    const 수동 = play2(삼루타, 주자1루, 0, '수동', '수동')
 
     expect(수동.advance.bases).toEqual({ first: false, second: false, third: true })
     expect(수동.advance.runsScored).toBe(1)
@@ -980,7 +984,8 @@ describe('포스 사슬 — 결과 코드가 준 최소 루가 앞 주자까지 
   })
 
   it('3루타 + 만루: 사슬이 홈에서 멈춰 세 명이 다 들어온다', () => {
-    const 수동 = play2(삼루타, 만루, 0, '수동')
+    // 위와 같은 까닭으로 송구 없이 사슬만 본다
+    const 수동 = play2(삼루타, 만루, 0, '수동', '수동')
 
     expect(수동.advance.bases).toEqual({ first: false, second: false, third: true })
     expect(수동.advance.runsScored).toBe(3)
