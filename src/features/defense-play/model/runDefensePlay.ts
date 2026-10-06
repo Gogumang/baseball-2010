@@ -77,7 +77,6 @@ import {
   EMPTY_HELD_RUNS,
   onRunnerReachesHome,
   releaseHeldRuns,
-  runsAfterTwoOutRule,
   type HeldRunState,
 } from '@/entities/fielding/model/heldRuns'
 import {
@@ -2079,19 +2078,22 @@ export function stepDefensePlay(
 /**
  * 다 돈 상태에서 결과를 뽑는다 — 원본 루프가 끝난 뒤의 마무리다.
  *
- * 타석 단위로 마무리할 때의 같은 결과 규칙 (S2 2-5, `runsAfterTwoOutRule`):
- * **땅볼로 타자주자가 아웃이 되어 그 플레이에서 3아웃이 되면 주자 득점은 0** 이다.
- * 틱 단위로는 주자가 타자주자보다 먼저 홈을 밟아 `state[0]` 보류를 안 타는 경우가 있어
- * (0xaa164 는 "타자주자가 살아서 뛰는 중" 이면 바로 올린다) 마지막에 한 번 더 건다.
+ * **득점 = 점수판에 올라간 득점(`held.scoreboardRuns`) 그대로** — 원본은 판 뒤에 득점을 지우지 않는다 (직접 뜸):
+ * - 바로 득점(0xaa1b0 메시지 0x13 → 0x51fb8 → 0xa5c34)은 그 자리에서 팀+0x27c+8(총점)·+4 를 +1 하고 이벤트 0xf 를 넣는다.
+ * *   팀+0x27c 칸을 줄이는 코드는 없다(`movs #0x9f; lsls #2` 쓰임 44곳 — 0xa5c34·0xa5e14 의 +1 말고는 다른 객체·초기화).
+ * - 3아웃이 막는 것은 `state[0]` 보류분뿐이다 — 해제 꼬리 0xaa388 `state[6] > 2 → return`, 다음 판 0xb67d0 이 지운다.
+ * - 판 끝 판정 0xae3e8: 아웃 > 2 면 ae554 → 0x18 로 정산 0xa8024(ae5b2)를 부를 뿐 점수판은 안 건드린다.
+ * 곧 아웃 ≤ 1 때 · 공이 안 닿았을 때 · 타자주자가 살아 뛰던 때 바로 올린 득점은 뒤에 타자주자가 죽어 3아웃이 돼도 남는다
+ * (⚠️ 원본 그대로 — 야구 규칙과 다를 수 있다).
+ *
+ * 예전 웹은 S2 2-5 의 "타석 단위 엔진에 옮길 때의 같은 결과 규칙"(3아웃 · 땅볼 · 타자주자 아웃이면 득점 0)을 여기에 한 번 더
+ * 걸었다. 그 규칙은 보류 개념이 없던 타석 단위 엔진을 위한 근사였고, 이 진행기는 보류·해제를 틱 단위로 원본대로 돌리므로 뺐다.
+ * `voidedRuns` 는 3아웃으로 끝내 안 풀린 보류분(`state[0]`)이다.
  */
 export function defensePlayResultOf(state: DefensePlayState): DefensePlayResult {
   const held = state.held
   const runners = state.runners
-  const runsScored = runsAfterTwoOutRule(held.scoreboardRuns, {
-    outsAfter: state.outs,
-    ballOnGround: !state.onTheFly,
-    batterRunnerOut: runners[0].state.isOut,
-  })
+  const runsScored = held.scoreboardRuns
 
   return {
     advance: {
@@ -2107,7 +2109,7 @@ export function defensePlayResultOf(state: DefensePlayState): DefensePlayResult 
     tagOut: state.tagOut,
     throwBase: state.firstThrowBase,
     throwArrivalTick: state.firstThrowArrivalTick,
-    voidedRuns: held.heldRuns + (held.scoreboardRuns - runsScored),
+    voidedRuns: held.heldRuns,
     fumbled: state.fumbled,
     errantThrow: state.errantThrow,
     specialDefense: state.specialDefense,

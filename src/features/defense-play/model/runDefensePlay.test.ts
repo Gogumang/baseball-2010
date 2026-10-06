@@ -225,19 +225,25 @@ describe('2아웃 득점 보류 — state[0] (0xaa164 · 0xaa34c · 0xaa388)', (
     expect(결과.log[0]).toContain('홈 — 보류 0 / 득점 1')
   })
 
-  // 주루 700 으로 올린 까닭: 포구 반경(내야 500 · 외야 300)이 되살아나면서 야수가 한두 틱 먼저 잡게 됐고,
-  // 그래서 **평범한 주자(500)는 땅볼에서 홈 송구에 잡힌다**. 보류 규칙이 무엇을 막는지 보이려면
-  // 0아웃이었을 때 실제로 점수가 나는 주자가 있어야 해서 발이 빠른 주자로 바꿨다.
-  it('2아웃 땅볼로 타자주자가 죽으면 그 플레이 득점은 0 이다 (S2 2-5)', () => {
-    // 0아웃이면 3루 주자는 리드(0x3d7b8) 뒤 제 루로 돌아오다 자동 진루로 홈을 노린다 — 그 득점이 나는 땅볼
-    const 땅볼 = [90, 810, 1592, 0] as const
-    const 없을때 = play(땅볼아웃, 주자3루, 0, [...땅볼], 700)
-    const 두아웃 = play(땅볼아웃, 주자3루, 2, [...땅볼], 700)
+  it('2아웃 땅볼 — 타자주자가 죽은 틱에 홈을 밟은 주자는 보류(0xaa1c0)되고 3아웃이라 영영 안 풀린다(0xaa388)', () => {
+    const 결과 = play(땅볼아웃, 주자3루, 2, [74, 722, 362, 0])
 
-    expect(두아웃.advance.outsAdded).toBeGreaterThanOrEqual(1)
-    expect(두아웃.advance.runsScored).toBe(0)
-    // 0아웃이었다면 같은 타구에 점수가 났다 — 보류 규칙이 걸렸다는 뜻
-    expect(없을때.advance.runsScored).toBe(1)
+    expect(결과.advance.outsAdded).toBe(1)
+    expect(결과.advance.runsScored).toBe(0)
+    expect(결과.voidedRuns).toBe(1)
+    expect(결과.log).toContain('16틱 1번 주자 홈 — 보류 1 / 득점 0')
+  })
+
+  it('2아웃 땅볼 — 타자주자가 살아 뛰던 때 바로 올린 득점(0xaa1b0)은 뒤에 타자주자가 죽어 3아웃이 돼도 남는다', () => {
+    // ⚠️ 원본 그대로: 바로 득점은 0xa5c34 가 점수판에 곧장 +1 하고, 팀+0x27c 칸을 되돌리는 코드는 없다.
+    // 예전 웹은 S2 2-5 의 타석 단위 근사(3아웃 · 땅볼 · 타자주자 아웃 → 0)를 걸어 이 득점을 지웠다
+    const 결과 = play(땅볼아웃, 주자3루, 2, [266, 94, 785, 0])
+
+    expect(결과.advance.outsAdded).toBe(1)
+    expect(결과.runnerFates[0].retired).toBe(true)
+    expect(결과.advance.runsScored).toBe(1)
+    expect(결과.voidedRuns).toBe(0)
+    expect(결과.log).toContain('16틱 1번 주자 홈 — 보류 0 / 득점 1')
   })
 
   it('2아웃이라도 안타로 타자주자가 살면 점수는 그대로 난다', () => {

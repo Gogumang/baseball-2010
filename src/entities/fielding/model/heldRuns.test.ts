@@ -6,7 +6,6 @@ import {
   onRunnerReachesHome,
   releaseHeldRuns,
   resetHeldRuns,
-  runsAfterTwoOutRule,
   shouldHoldRun,
 } from '@/entities/fielding/model/heldRuns'
 
@@ -95,14 +94,5 @@ describe('보류 해제 — 0xaa34c', () => {
         someRunnerStillActive: false,
       }),
     ).toBe(EMPTY_HELD_RUNS)
-  })
-})
-
-describe('타석 단위 엔진에 옮길 때의 같은 결과 규칙 (S2 2-5)', () => {
-  it('땅볼로 타자주자가 아웃되며 3아웃이 되면 그 타석 득점은 0 이다', () => {
-    expect(runsAfterTwoOutRule(2, { outsAfter: 3, ballOnGround: true, batterRunnerOut: true })).toBe(0)
-    expect(runsAfterTwoOutRule(2, { outsAfter: 3, ballOnGround: false, batterRunnerOut: true })).toBe(2)
-    expect(runsAfterTwoOutRule(2, { outsAfter: 2, ballOnGround: true, batterRunnerOut: true })).toBe(2)
-    expect(runsAfterTwoOutRule(2, { outsAfter: 3, ballOnGround: true, batterRunnerOut: false })).toBe(2)
   })
 })

@@ -79,15 +79,3 @@ function stillWaiting(input: HeldRunReleaseInput): boolean {
 export function resetHeldRuns(state: HeldRunState): HeldRunState {
   return { heldRuns: 0, scoreboardRuns: state.scoreboardRuns }
 }
-
-/**
- * 타석 단위로 돌리는 지금의 웹 엔진에 옮길 때의 같은 결과 규칙 (S2 2-5):
- * **땅볼로 타자주자가 아웃이 되어 그 플레이에서 3아웃이 되면 주자 득점은 0** 이다.
- */
-export function runsAfterTwoOutRule(
-  runsScored: number,
-  input: { readonly outsAfter: number; readonly ballOnGround: boolean; readonly batterRunnerOut: boolean },
-): number {
-  if (input.outsAfter > 2 && input.ballOnGround && input.batterRunnerOut) return 0
-  return runsScored
-}

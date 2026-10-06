@@ -46,13 +46,13 @@ describe('주자 운명 목록 — 정산 0xa8024 가 읽는 +0x95·+0x96', () =
   })
 
   it('2아웃 보류가 3아웃으로 날아가도 그 주자의 +0x95 는 남는다 (0xaa1cc 는 점수판을 안 건드린다)', () => {
-    // 2아웃 땅볼 — 친 순간 뛴(0xa9e44) 3루 주자가 홈을 밟지만 공이 땅에 닿은 플레이라 보류, 타자주자가 1루에서 죽는다
+    // 2아웃 땅볼 — 타자주자가 1루에서 죽는 틱에 3루 주자가 홈을 밟아 보류(0xaa1c0), 3아웃이라 안 풀린다(0xaa388)
     const 결과 = runDefensePlay({
       outcome: 땅볼아웃,
-      trajectory: battedBallTrajectory([90, 810, 1592, 0]),
+      trajectory: battedBallTrajectory([74, 722, 362, 0]),
       bases: 주자3루,
       outs: 2,
-      runAbility: 700,
+      runAbility: 500,
     })
     expect(결과.advance.runsScored).toBe(0)
     expect(결과.voidedRuns).toBeGreaterThanOrEqual(1)

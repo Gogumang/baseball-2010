@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { applyOutcome, applyPickoff, giveUp, missionAdvance, startMission, tick } from '@/entities/mission/model/missionRun'
 import { MISSIONS } from '@/shared/config/original/missions'
+import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
+import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 
 const 첫걸음 = MISSIONS.find((m) => m.name === '명품 타자의 첫 걸음')!
 const 사이클링 = MISSIONS.find((m) => m.name.includes('사이클링'))!
@@ -226,5 +228,20 @@ describe('타점은 3아웃으로 끝난 판의 득점도 든다 (0xae3e8 ae554 
     expect(next.bases).toEqual(찬스.start.runners)
     // 2루타 목표가 남아 아직이다
     expect(next.status).toBe('진행중')
+  })
+
+  it('2아웃 3루 주자 땅볼 — 타자주자가 살아 뛰던 때 바로 올린 득점은 타자주자가 죽어 3아웃이어도 타점이다 (원본 그대로)', () => {
+    const run = startMission(찬스)
+    const 땅볼아웃 = { kind: '아웃', detail: '땅볼아웃' } as const
+    const played = runDefensePlay({
+      outcome: 땅볼아웃,
+      trajectory: battedBallTrajectory([266, 94, 785, 0]),
+      bases: run.bases,
+      outs: run.outs,
+      runAbility: 500,
+    })
+    expect(played.runnerFates[0].retired).toBe(true)
+    const next = applyOutcome(run, 땅볼아웃, false, undefined, played)
+    expect(next.progress.counts['타점']).toBe(1)
   })
 })
