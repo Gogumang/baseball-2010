@@ -1144,6 +1144,21 @@ export function useMissionSession({
       if (missionRun !== null) setMissionRun(giveUpMission(missionRun))
     },
 
+    /**
+     * **경기 중 메뉴 "나가기"** (보통 타자 미션, 모드 6) — 경기 상태 0x22 갱신 `0x40140` 은 밀기가 끝나면 모드 5·6 에서
+     * `0xa5368(미션, 0)`(실패 — 횟수·보상·해금을 안 건드리고 [obj+0xbc] = 0 만) 뒤 0x140006c = 4 · 장면 0x103(메인 메뉴 처음 단).
+     * 결과 화면(상태 0x19)도 미션 목록(장면 0x107)도 지나지 않는다. 클리어 기록은 그대로다.
+     * 다시 들어오면 [최근게임] 5·6 → 하위 17(선수 고르기) — 미션 모드를 떠나면 고른 선수가 내려간다(`isInMissionMode`).
+     */
+    quitBatterMission: () => {
+      setPendingDefensePlay(null)
+      setPickoffReplay(null)
+      setPendingBenchClearing(null)
+      setMissionRun(null)
+      runner.setIsPaused(true)
+      setScreen({ kind: '메인메뉴' })
+    },
+
     giveUpPitcher: () => {
       setPendingDefensePlay(null)
       setPendingBenchClearing(null)

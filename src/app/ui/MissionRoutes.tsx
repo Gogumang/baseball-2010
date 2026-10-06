@@ -136,7 +136,10 @@ export function MissionRoutes({
         // 도루 출발 (0x53610 → 0x583 → 0xa9bd4) — 판정은 공이 도착할 때 도루 판(종류 5)이 한다
         stealableBases={session.stealableBases}
         onSteal={actions.steal}
-        onGiveUp={actions.giveUpBatter}
+        // 경기 중 "나가기" — 보통 미션은 0x40140 이 0xa5368(…, 0) 뒤 곧장 메인 메뉴(결과 화면 없음).
+        // ⚠️ 미해결: 마선수 대결(+0x11f/+0x176)도 0x40140 은 플래그를 안 보고 메인 메뉴로 나가는 것으로 보이나, 다시 들어올 때
+        //    105 진입이 결과 이벤트를 어떻게 잇는지 못 읽어 예전(실패 결과 → 진 이벤트) 그대로 둔다
+        onGiveUp={screen.kind === '마선수대결' ? actions.giveUpBatter : actions.quitBatterMission}
         onFinish={screen.kind === '마선수대결' ? actions.finishAceMatch : actions.finishBatter}
         // 경기 중 메뉴 "다시하기" (StrGAME[7]) — 같은 미션을 처음부터 다시 세운다
         onRestart={() => actions.begin(missionRun.mission)}

@@ -1104,3 +1104,26 @@ describe("투수 미션 낫아웃의 '아웃' 칸 — 판정 0xaaa6c 는 정산 
     expect(run.status).toBe('성공')
   })
 })
+
+describe('보통 타자 미션 경기 중 나가기 — 0x40140: 0xa5368(…, 0) 뒤 곧장 메인 메뉴(0x103 하위 4)', () => {
+  it('결과 화면·미션 목록을 안 거치고 클리어 기록도 안 쓴다', () => {
+    const missionRecord: MissionRecordPort = { load: () => ({}), save: vi.fn() }
+    let screen: Screen = { kind: '미션선택' }
+    const setScreen = vi.fn((next: Screen) => {
+      screen = next
+    })
+    const rendered = renderHook(() => {
+      const runner = useAtBatRunner()
+      return useMissionSession({ runner, random: createSeededRandom(1), missionRecord, screen, setScreen })
+    })
+    const mission = MISSIONS.find((row) => row.side === '타자')!
+    act(() => rendered.result.current.actions.begin(mission))
+    expect(screen.kind).toBe('미션진행')
+
+    act(() => rendered.result.current.actions.quitBatterMission())
+    expect(screen).toEqual({ kind: '메인메뉴' })
+    expect(rendered.result.current.missionRun).toBeNull()
+    expect(missionRecord.save).not.toHaveBeenCalled()
+    rendered.unmount()
+  })
+})
