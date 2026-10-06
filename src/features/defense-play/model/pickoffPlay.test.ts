@@ -76,10 +76,10 @@ describe('견제 한 판 — 종류 4 (0xb28be · 0xb47da · 0xb4292)', () => {
     expect(result.errantThrow).toBe(false)
   })
 
-  it('악송구면 속도·방향 두 번을 더 굴리고, 받는 야수가 없어 결과 코드가 안 선다 (근사)', () => {
+  it('악송구면 수평·수직 속도 · 방향 크기 · 부호 넷을 더 굴리고(0xa1868~0xa1924), 받는 야수가 없어 결과 코드가 안 선다 (근사)', () => {
     const random = 세는난수(0)
     const result = runPickoffPlay({ targetBase: 1, bases: 일루, outs: 0, random })
-    expect(random.count()).toBe(4)
+    expect(random.count()).toBe(6)
     expect(result.errantThrow).toBe(true)
     expect(result.resultCode).toBeNull()
     expect(result.advance).toEqual({ bases: 일루, runsScored: 0, outsAdded: 0 })

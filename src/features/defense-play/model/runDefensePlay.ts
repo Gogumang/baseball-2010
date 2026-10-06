@@ -31,7 +31,6 @@ import {
 } from '@/entities/fielding/model/autoAdvance'
 import {
   BOUNCE_THROW_DISTANCE,
-  MINIMUM_THROW_SPEED,
   NO_THROW_ERROR,
   rollFumble,
   rollSpecialDefense,
@@ -87,8 +86,8 @@ import {
 } from '@/entities/fielding/model/outJudgement'
 import { defenseArrivalTicks, secondBaseCoverSlot } from '@/entities/fielding/model/throwArrival'
 import {
-  effectiveThrowSpeedOf,
   planThrow,
+  errantThrowFlight,
   LASER_THROW_SPEED,
   readyTicksOf,
   thrownWith,
@@ -1103,13 +1102,11 @@ export function stepDefensePlay(
         : defenseArrivalTicks(contextAt(tick), base)
     }
     if (error.errant) errantThrow = true
-    if (error.errant) {
-      // 속도 보정은 공 속도에 그대로 더해진다(하한 100) → 도착 틱이 그 비율만큼 늘거나 준다.
-      // **근사**: 방향 보정(±49)은 공이 루를 벗어난다는 뜻이라 궤적을 다시 만들어야 하는데
-      // 그 물리 루프는 해독 금지 구역이다. 여기서는 "그 송구로는 아웃이 안 난다" 로만 본다.
-      const speed = effectiveThrowSpeedOf(fielders[fromSlot])
-      const errant = Math.max(MINIMUM_THROW_SPEED, speed + error.speedDelta)
-      arrivalTicks = Math.max(1, Math.trunc((arrivalTicks * speed) / errant))
+    if (error.errant && input.random !== undefined) {
+      // 악송구 갈래(a1868~a1908) — 수평 속도·방향을 흔들고 굴림 둘을 더 먹는다(`errantThrowFlight`).
+      // 공은 송구 계획 [3](중계면 중계맨, b2ea8)의 목표점(+0x2c)으로 쏜다. 도착 틱 = 남은 동작 틱(+0xc8) + 흔들린 공이
+      // 그 큰 축 거리를 가는 틱. **근사**: 그 뒤 공 경로는 해독 금지 구역이라 "그 송구는 아무도 못 받는다" 로 본다.
+      arrivalTicks = errantArrivalTicks(fielders, fromSlot, coverSlot, base, special.special, error, input.random)
     }
     throwBase = base
     throwArrivalTick = tick + Math.max(1, arrivalTicks)
@@ -2199,6 +2196,25 @@ export function cpuSpecialThrowOf(
     bounce: horizontalDistance(holder.position, fielders[receiverSlot].target) > BOUNCE_THROW_DISTANCE,
     thrower: thrownWith(holder, true),
   }
+}
+
+/**
+ * 악송구 도착 틱 — 던지는 야수의 남은 동작 틱(+0xc8) + `errantThrowFlight`(0xa1620 악송구 갈래)의 틱.
+ * 공을 쏘는 점은 송구 계획 0xb3444 의 [3](받는 야수 — 중계면 중계맨)의 목표점이다 (b2ea8 → b2f52 vtac).
+ */
+export function errantArrivalTicks(
+  fielders: readonly FielderState[],
+  fromSlot: number,
+  coverSlot: number,
+  base: number,
+  special: boolean,
+  error: ThrowErrorResult,
+  random: RandomPort,
+): number {
+  const thrower = fielders[fromSlot]
+  const plan = planThrow({ fielders, fromSlot, finalSlot: coverSlot, base, special })
+  const target = fielders[plan.toSlot]?.target ?? basePosition(base)
+  return Math.max(1, thrower.actionRemainingTicks + errantThrowFlight(thrower, target, error, random).ticks)
 }
 
 /**

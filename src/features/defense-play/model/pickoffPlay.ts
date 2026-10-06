@@ -2,7 +2,6 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { PICKOFF_PLAY_KIND, type PickoffBase } from '@/entities/defense-controls/model/pickoff'
 import { autoAdvanceDecisions } from '@/entities/fielding/model/autoAdvance'
 import {
-  MINIMUM_THROW_SPEED,
   NO_THROW_ERROR,
   rollThrowError,
 } from '@/entities/fielding/model/fieldingErrors'
@@ -27,11 +26,10 @@ import { judgeOut, OUT_KIND, releaseForcesAfterOut } from '@/entities/fielding/m
 import { startPickoff } from '@/entities/fielding/model/pickoff'
 import { applyRunnerLead, runnerLeadOf } from '@/entities/fielding/model/runnerLead'
 import { defenseArrivalTicks } from '@/entities/fielding/model/throwArrival'
-import { effectiveThrowSpeedOf } from '@/entities/fielding/model/throwPlan'
 import { EMPTY_BASES, type BaseState } from '@/entities/game/model/baseState'
 import type { ManualAutoMode } from '@/entities/settings/model/gameSettings'
 import { viewStateOf, type ActionMemory, type DefensePlayView } from '@/features/defense-play/model/defensePlayView'
-import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
+import { errantArrivalTicks, type DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { runnerFateOf } from '@/features/defense-play/model/runnerFates'
 
 /**
@@ -212,17 +210,15 @@ export function runPickoffPlay(input: PickoffPlayInput): PickoffPlayResult {
     // ── 3. AI 상태 0xe — 0xb2c90 이 대상 루 커버에게 던진다 (첫 틱) ──
     if (tick === 0) {
       const coverSlot = play.coverOfBase[targetBase] ?? NONE
-      const pitcher = fielders[PITCHER_SLOT]
       const error =
         input.random === undefined
           ? NO_THROW_ERROR
           : rollThrowError(abilities[PITCHER_SLOT] ?? DEFAULT_ABILITY, false, input.random)
       errantThrow = error.errant
       let arrival = defenseArrivalTicks(contextAt(tick), targetBase)
-      if (error.errant) {
-        const base = effectiveThrowSpeedOf(pitcher)
-        const errant = Math.max(MINIMUM_THROW_SPEED, base + error.speedDelta)
-        arrival = Math.max(1, Math.trunc((arrival * base) / errant))
+      if (error.errant && input.random !== undefined) {
+        // 악송구 갈래(a1868~a1908) — 흔들린 수평 속도·방향으로 도착 틱, 굴림 둘 더 (`errantArrivalTicks`)
+        arrival = errantArrivalTicks(fielders, PITCHER_SLOT, coverSlot, targetBase, false, error, input.random)
       }
       throwArrivalTick = tick + Math.max(1, arrival)
       receiverSlot = errantThrow ? NONE : coverSlot

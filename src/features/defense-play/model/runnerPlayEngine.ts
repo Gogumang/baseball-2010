@@ -8,7 +8,6 @@ import {
 } from '@/entities/fielding/model/autoAdvance'
 import type { BattedBallTrajectory } from '@/entities/fielding/model/catchPrediction'
 import {
-  MINIMUM_THROW_SPEED,
   NO_THROW_ERROR,
   rollFumble,
   rollThrowError,
@@ -38,13 +37,17 @@ import {
 } from '@/entities/fielding/model/heldRuns'
 import { judgeOut, OUT_KIND, releaseForcesAfterOut } from '@/entities/fielding/model/outJudgement'
 import { defenseArrivalTicks } from '@/entities/fielding/model/throwArrival'
-import { effectiveThrowSpeedOf, readyTicksOf, thrownWith, throwTicksTo } from '@/entities/fielding/model/throwPlan'
+import { readyTicksOf, thrownWith, throwTicksTo } from '@/entities/fielding/model/throwPlan'
 import { chooseThrowTargetBase, isSpecialThrow } from '@/entities/fielding/model/throwTargetBase'
 import { EMPTY_BASES, type BaseState } from '@/entities/game/model/baseState'
 import type { ManualAutoMode } from '@/entities/settings/model/gameSettings'
 import { viewStateOf, type ActionMemory, type DefensePlayView } from '@/features/defense-play/model/defensePlayView'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
-import { cpuSpecialThrowOf, specialThrowArrivalTicks } from '@/features/defense-play/model/runDefensePlay'
+import {
+  cpuSpecialThrowOf,
+  errantArrivalTicks,
+  specialThrowArrivalTicks,
+} from '@/features/defense-play/model/runDefensePlay'
 import { runnerFateOf } from '@/features/defense-play/model/runnerFates'
 
 /**
@@ -286,10 +289,9 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
     let arrival = isSpecial
       ? specialThrowArrivalTicks(contextAt(tick), base, thrower)
       : defenseArrivalTicks(contextAt(tick), base)
-    if (error.errant) {
-      const speed = effectiveThrowSpeedOf(thrower)
-      const errant = Math.max(MINIMUM_THROW_SPEED, speed + error.speedDelta)
-      arrival = Math.max(1, Math.trunc((arrival * speed) / errant))
+    if (error.errant && input.random !== undefined) {
+      // 악송구 갈래(a1868~a1908) — 흔들린 수평 속도·방향으로 도착 틱, 굴림 둘 더 (`errantArrivalTicks`)
+      arrival = errantArrivalTicks(fielders, holderSlot, coverSlot, base, isSpecial, error, input.random)
     }
     if (error.errant) errantThrow = true
     throwState.flight = {

@@ -68,7 +68,7 @@ describe('도루 한 판 — 종류 5 (0xb2950 · 0xb1c90 · 0xb36d0 · 0xb4292)
     expect(result.advance).toEqual({ bases: EMPTY_BASES, runsScored: 0, outsAdded: 1 })
   })
 
-  it('난수는 판이 열릴 때 도루 주자 리드 rand(0,9) 한 번, 송구 때 악송구 굴림(0xa1828) 한 번 — 악송구면 두 번 더', () => {
+  it('난수는 판이 열릴 때 도루 주자 리드 rand(0,9) 한 번, 송구 때 악송구 굴림(0xa1828) 한 번 — 악송구면 넷 더(수평·수직 속도 · 방향 크기 · 부호)', () => {
     const quiet = 세는난수(0.5)
     const plain = runStealPlay({ bases: 일루, stealingFrom: [1], outs: 0, runAbility: 0, random: quiet, manualThrowBase: 2 })
     expect(quiet.count()).toBe(2)
@@ -77,7 +77,7 @@ describe('도루 한 판 — 종류 5 (0xb2950 · 0xb1c90 · 0xb36d0 · 0xb4292)
 
     const wild = 세는난수(0)
     const errant = runStealPlay({ bases: 일루, stealingFrom: [1], outs: 0, runAbility: 0, random: wild, manualThrowBase: 2 })
-    expect(wild.count()).toBe(4)
+    expect(wild.count()).toBe(6)
     expect(errant.errantThrow).toBe(true)
     expect(errant.resultCode).toBeNull()
     expect(stealCallSoundIdOf(errant)).toBeNull()

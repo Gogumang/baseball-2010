@@ -62,19 +62,19 @@ describe('악송구 — 0xa1828', () => {
     expect(throwErrorChanceOf(999, true)).toBe(203)
   })
 
-  it('굴림이 기준보다 작을 때만 속도·방향이 흔들린다', () => {
+  it('굴림이 기준보다 작을 때만 수평·수직 속도가 흔들린다', () => {
     expect(rollThrowError(100, false, 고정(0.011)).errant).toBe(false)
     const 악송구 = rollThrowError(100, false, 차례([0.0109, 0, 0]))
     expect(악송구.errant).toBe(true)
     expect(악송구.speedDelta).toBe(-50)
-    expect(악송구.angleDelta).toBe(-49)
+    expect(악송구.verticalDelta).toBe(-49)
   })
 
-  it('특수 송구는 위쪽 보정이 막혀 늘 느려지고 왼쪽으로 샌다 (원본 그대로)', () => {
+  it('특수 송구는 위쪽 보정이 막혀 수평·수직 속도가 늘 준다 (원본 그대로)', () => {
     const 악송구 = rollThrowError(100, true, 차례([0, 0.99, 0.99]))
     expect(악송구.errant).toBe(true)
     expect(악송구.speedDelta).toBeLessThan(0)
-    expect(악송구.angleDelta).toBeLessThan(0)
+    expect(악송구.verticalDelta).toBeLessThan(0)
   })
 
   it('송구 거리 상한 20400 = 17000 × 120 / 100', () => {

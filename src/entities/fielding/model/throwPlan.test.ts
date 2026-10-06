@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { createFielders } from '@/entities/fielding/model/fieldingState'
 import {
   chooseRelaySlot,
-  effectiveThrowSpeedOf,
   INFIELD_READY_TICKS,
   OUTFIELD_READY_TICKS,
   planThrow,
@@ -10,9 +9,12 @@ import {
   RELAY_DISTANCE,
   THROW_COEFFICIENT_INFIELD,
   THROW_COEFFICIENT_OUTFIELD,
+  errantThrowFlight,
   thrownWith,
   throwTicksTo,
 } from '@/entities/fielding/model/throwPlan'
+import type { RandomPort } from '@/shared/api/random/randomPort'
+import { basePosition } from '@/entities/fielding/model/fieldGeometry'
 
 /** 수비 500(등급 3) 아홉 명 — 송구 공 속도 940 + 8×4 = 972 */
 const 야수들 = createFielders(Array.from({ length: 9 }, () => 500))
@@ -25,10 +27,8 @@ describe('설정값 — d_level.dat (S7 5-2)', () => {
     expect([0, 5, 6, 8].map(readyTicksOf)).toEqual([3, 3, 6, 6])
   })
 
-  it('송구 유효 속도 = 공 속도 × 계수 ÷ 100 (내야 680 · 외야 777)', () => {
+  it('송구 공 속도 +0xd4 = 940 + 8 × (등급 + 1) — 등급 3 이면 972', () => {
     expect(야수들[3].throwSpeed).toBe(972)
-    expect(effectiveThrowSpeedOf(야수들[3])).toBe(680)
-    expect(effectiveThrowSpeedOf(야수들[8])).toBe(777)
   })
 })
 
@@ -44,6 +44,40 @@ describe('송구 속도 +0xdc — 지난 송구의 속도 (0xa0fc4 · 0xa1620 a1
     // 다음 송구 틱 0xa1adc 는 남은 130% 로 잰다 — 더 빠르다
     expect(throwTicksTo(특수뒤, { x: 0, y: 0, z: 0 })).toBeLessThan(throwTicksTo(야수들[8], { x: 0, y: 0, z: 0 }))
     expect(thrownWith(특수뒤, false).throwSpeed).toBe(972)
+  })
+})
+
+describe('악송구 갈래 0xa1620 (a1868~a1908)', () => {
+  const 차례 = (values: number[]): RandomPort & { readonly used: () => number } => {
+    let i = 0
+    return {
+      next: () => values[i++] ?? 0,
+      nextInRange: () => 0,
+      pick: (c) => c[0],
+      used: () => i,
+    }
+  }
+
+  it('굴림 둘(방향 크기 rand(0, 22 − h/150) · 부호 rand(0,2))을 더 먹고, 흔들린 수평 속도로 도착 틱을 잰다', () => {
+    const 이루수 = 야수들[3]
+    const 일루 = basePosition(1)
+    const 보통 = throwTicksTo(이루수, 일루)
+    const 난수 = 차례([0, 0])
+    // 수평 속도 −50: 느려져 더 늦게 닿는다. 방향 크기 0 이라 방향은 그대로
+    const 느림 = errantThrowFlight(이루수, 일루, { speedDelta: -50, verticalDelta: 0 }, 난수)
+    expect(난수.used()).toBe(2)
+    expect(느림.ticks).toBeGreaterThanOrEqual(보통)
+    const 빠름 = errantThrowFlight(이루수, 일루, { speedDelta: 50, verticalDelta: 0 }, 차례([0, 0]))
+    expect(빠름.ticks).toBeLessThanOrEqual(보통)
+    expect(빠름.horizontalSpeed).toBeGreaterThan(느림.horizontalSpeed)
+  })
+
+  it('방향 흔들림은 표 0xd7aec = [1, −1] 의 부호 × 크기 — 둘째 굴림 0 이면 +, 1 이면 −', () => {
+    const 이루수 = 야수들[3]
+    const 일루 = basePosition(1)
+    const 기준 = errantThrowFlight(이루수, 일루, { speedDelta: 0, verticalDelta: 0 }, 차례([0, 0])).direction
+    expect(errantThrowFlight(이루수, 일루, { speedDelta: 0, verticalDelta: 0 }, 차례([0.5, 0])).direction).toBeGreaterThan(기준)
+    expect(errantThrowFlight(이루수, 일루, { speedDelta: 0, verticalDelta: 0 }, 차례([0.5, 0.9])).direction).toBeLessThan(기준)
   })
 })
 

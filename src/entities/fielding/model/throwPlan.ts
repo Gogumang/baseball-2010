@@ -8,6 +8,11 @@ import {
 import { AI_STATE, NONE, type FielderState } from '@/entities/fielding/model/fieldingState'
 import { SINE_HUNDRED_TABLE } from '@/shared/config/original/trigonometryTables'
 import { atan2Degrees, cosineSixteen, sineSixteen } from '@/shared/lib/math/originalTrigonometry'
+import type { RandomPort } from '@/shared/api/random/randomPort'
+import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
+
+/** 악송구 수평 속도 하한 (a186e: ≤ 99 → 100) */
+const MINIMUM_THROW_SPEED = 100
 
 /**
  * 송구 계획 0xb3444 (플레이 vt 0x8c) 와 송구 도착 틱 (야수 vt 0xbc = 0xa1adc).
@@ -42,16 +47,6 @@ const RELAY_SLOTS = [2, 3, 4, 5] as const
 /** 중계맨을 못 고르면 유격수(5, AI 상태 0xa 일 때) 아니면 2루수(3) */
 const RELAY_FALLBACK_SHORTSTOP = 5
 const RELAY_FALLBACK_SECOND = 3
-
-/**
- * 송구 공 속도 × (내야 70 / 외야 80) ÷ 100 — **악송구 도착 틱 근사에만 쓴다**.
- * ⚠️ 원본의 70/80 % 는 속도가 아니라 공 **중력**에 곱하는 배율이다(0xa1adc · 0xa16f4, `throwTicksTo`).
- * 악송구 속도 보정(0xa1828 의 rand(−50,51))도 +0xdc 에 더해진다 — 이 값으로 비율을 잡는 것은 근사다.
- */
-export function effectiveThrowSpeedOf(fielder: FielderState): number {
-  const coefficient = isOutfieldSlot(fielder.slot) ? THROW_COEFFICIENT_OUTFIELD : THROW_COEFFICIENT_INFIELD
-  return Math.trunc((fielder.throwSpeed * coefficient) / 100)
-}
 
 /** 0xbfab0 — sin×100 표(0xd8de0) 이진 탐색. lo 0 · hi 90 에서 가운데가 두 번 같으면 멈춘다. 음수는 −asin(−x) */
 function arcsineDegrees(value: number): number {
@@ -88,26 +83,101 @@ function arcsineDegrees(value: number): number {
  * (거리 20400 을 넘으면 원바운드가 되는 것은 0xa1620 쪽이다 — `BOUNCE_THROW_DISTANCE`)
  */
 export function throwTicksTo(fielder: FielderState, point: WorldPoint): number {
+  return throwFlightOf(fielder, point).ticks
+}
+
+/** 0xa1adc · 0xa1620 이 함께 쓰는 중간값 — 중력 g' · 수평 속도 h · 방향 φ · 큰 축 */
+interface ThrowFlight {
+  readonly ticks: number
+  readonly gravity: number
+  readonly horizontalSpeed: number
+  readonly direction: number
+  readonly alongX: boolean
+  readonly axisDistance: number
+}
+
+function throwFlightOf(fielder: FielderState, point: WorldPoint): ThrowFlight {
   const from = fielder.position
-  const distance = horizontalDistance(from, point)
-  if (distance === 0) return 0
-  const speed = fielder.throwSpeed
-  if (speed <= 0) return UNREACHABLE_TICKS
   const coefficient = isOutfieldSlot(fielder.slot) ? THROW_COEFFICIENT_OUTFIELD : THROW_COEFFICIENT_INFIELD
   const gravity = Math.trunc((coefficient * BALL_GRAVITY) / 100)
+  const dx = point.x - from.x
+  const dz = point.z - from.z
+  const alongX = Math.abs(dx) > Math.abs(dz)
+  const axisDistance = alongX ? Math.abs(dx) : Math.abs(dz)
+  const direction = atan2Degrees(dx, dz)
+  const base = { gravity, direction, alongX, axisDistance }
+  const distance = horizontalDistance(from, point)
+  if (distance === 0) return { ...base, ticks: 0, horizontalSpeed: 0 }
+  const speed = fielder.throwSpeed
+  if (speed <= 0) return { ...base, ticks: UNREACHABLE_TICKS, horizontalSpeed: 0 }
   const sineOfDouble = Math.trunc((distance * gravity * 100) / (speed * speed))
   const elevation = arcsineDegrees(sineOfDouble) >> 1
   const horizontalSpeed = (speed * cosineSixteen(elevation)) >> 16
-  if (horizontalSpeed === 0) return NEVER_ARRIVES
-  const dx = point.x - from.x
-  const dz = point.z - from.z
-  const direction = atan2Degrees(dx, dz)
-  const alongX = Math.abs(dx) > Math.abs(dz)
-  const axisDistance = alongX ? Math.abs(dx) : Math.abs(dz)
+  if (horizontalSpeed === 0) return { ...base, ticks: NEVER_ARRIVES, horizontalSpeed }
+  return { ...base, horizontalSpeed, ticks: axisTicks(axisDistance, horizontalSpeed, direction, alongX) }
+}
+
+/** a1b8a~a1bd8 · a17b0~a17e0 — 큰 축 거리 ÷ 그 축 속도 성분, 올림(0x6c5d8) */
+function axisTicks(axisDistance: number, horizontalSpeed: number, direction: number, alongX: boolean): number {
   const axisSpeed = Math.abs((horizontalSpeed * (alongX ? cosineSixteen(direction) : sineSixteen(direction))) >> 16)
   // 큰 축 성분은 cos/sin 45° 이상이라 0 이 안 된다 — 0 이면 원본은 0 으로 나눈다(지어내지 않고 도달 못 함으로 둔다)
   if (axisSpeed === 0) return NEVER_ARRIVES
   return Math.ceil(axisDistance / axisSpeed)
+}
+
+/** a1908: 악송구 방향 흔들림의 부호 표 0xd7aec = [1, −1] */
+const ERRANT_DIRECTION_SIGNS = [1, -1] as const
+
+/** 악송구 공의 날아가기 (0xa1620 의 악송구 갈래가 정한 값) */
+export interface ErrantThrowFlight {
+  /** 큰 축 거리를 흔들린 수평 속도·방향으로 가는 틱 — 이 진행기의 "도착" 틱 */
+  readonly ticks: number
+  /** 흔들린 수평 속도 h' */
+  readonly horizontalSpeed: number
+  /** 흔들린 방향 φ' (도) */
+  readonly direction: number
+}
+
+/**
+ * **악송구 갈래** — 0xa1620 이 `rand(0,10000) < 기준`(0xa1828, `rollThrowError`) 뒤에 공을 흔든다 (직접 뜬 것).
+ * `rollThrowError` 가 앞 굴림 셋(기준 · 수평 속도 · 수직 속도)을 했고, 여기서 나머지 둘을 굴린다.
+ * ```
+ * a173c  h = v·cos16(θ) >> 16 ; t = ⌈큰 축 거리 / |h·cos|sin(φ) >> 16|⌉        ; 0xa1adc 와 같은 산술
+ * a17e4  w = g'·t >> 1                                                            ; 수직 속도(공+0x44 = g')
+ * a1868  h += rand(−50, 특수?0:51) ; h ≤ 99 → 100
+ * a1876  w += rand(−49, 특수?0:50) ; 0 ≤ w ≤ 99 → 100 · −99 ≤ w < 0 → −100
+ * a18a4  w > 1000 → w·3/4 · w > 800 → w·4/5 · w > 500 → w·5/6
+ *        아니면 h > 1200 → h·6/7 · h > 900 → h·8/9
+ * a1908  m = rand(0, 22 − h/150) ; φ += [1, −1][rand(0,2)] · m ; +0xc0 = 4 → a19d2 h · w · φ 로 쏜다
+ * ```
+ * ⚠️ 그 뒤 공 경로(궤적 물리 0xb401c, 해독 금지 구역)와 누가 줍는지는 안 옮겼다 — 이 진행기는 악송구를 "아무도 못 받는다" 로
+ * 보고, 공이 원래 목표의 큰 축 거리를 h'·φ' 로 다 가는 틱을 도착 틱으로 쓴다(근사).
+ */
+export function errantThrowFlight(
+  fielder: FielderState,
+  point: WorldPoint,
+  error: { readonly speedDelta: number; readonly verticalDelta: number },
+  random: RandomPort,
+): ErrantThrowFlight {
+  const flight = throwFlightOf(fielder, point)
+  let horizontal = flight.horizontalSpeed + error.speedDelta
+  if (horizontal <= 99) horizontal = MINIMUM_THROW_SPEED
+  let vertical = ((flight.gravity * flight.ticks) >> 1) + error.verticalDelta
+  if (vertical >= 0 && vertical <= 99) vertical = 100
+  else if (vertical < 0 && vertical > -100) vertical = -100
+  if (vertical > 1000) vertical = Math.trunc((vertical * 3) / 4)
+  else if (vertical > 800) vertical = Math.trunc((vertical * 4) / 5)
+  else if (vertical > 500) vertical = Math.trunc((vertical * 5) / 6)
+  else if (horizontal > 1200) horizontal = Math.trunc((horizontal * 6) / 7)
+  else if (horizontal > 900) horizontal = Math.trunc((horizontal * 8) / 9)
+  const magnitude = randomIntegerBelow(random, 0, 22 - Math.trunc(horizontal / 150))
+  const sign = ERRANT_DIRECTION_SIGNS[randomIntegerBelow(random, 0, 2)] ?? 1
+  const direction = flight.direction + sign * magnitude
+  return {
+    horizontalSpeed: horizontal,
+    direction,
+    ticks: flight.axisDistance === 0 ? 0 : axisTicks(flight.axisDistance, horizontal, direction, flight.alongX),
+  }
 }
 
 /** 레이저 송구(플레이+0x1f4) 속도 — 0xb2e38 이 고르는 야수 vtb0 = 0xa222c 가 `+0xdc = 0xfa << 3` 으로 넣는다 (a229c) */

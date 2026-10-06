@@ -41,20 +41,21 @@ export function throwErrorChanceOf(defenseAbility: number, special = false): num
 
 export interface ThrowErrorResult {
   readonly errant: boolean
-  /** 송구 속도 보정 (하한 100 은 부르는 쪽에서 적용한다) */
+  /** 수평 속도 보정 rand(−50, 특수?0:51) (a1868 — 하한 100 은 `errantThrowFlight` 가 건다) */
   readonly speedDelta: number
-  /** 송구 방향 보정(도) */
-  readonly angleDelta: number
+  /** 수직 속도 보정 rand(−49, 특수?0:50) (a1876 — 예전 이름 "방향 보정" 은 틀렸다, r7 = 수직 속도) */
+  readonly verticalDelta: number
 }
 
-export const NO_THROW_ERROR: ThrowErrorResult = { errant: false, speedDelta: 0, angleDelta: 0 }
+export const NO_THROW_ERROR: ThrowErrorResult = { errant: false, speedDelta: 0, verticalDelta: 0 }
 
 /**
- * 악송구 굴림 (0xa1828~0xa1896).
+ * 악송구 굴림의 앞 셋 (0xa1828~0xa1888).
  * ```
  * r = rand(0,10000) ; 기준 = (10 − 등급) + 특수×100 + 100
- * r < 기준 → 속도 += rand(−50, 특수?0:51) (하한 100), 방향 += rand(−49, 특수?0:50)
+ * r < 기준 → 수평 속도 += rand(−50, 특수?0:51) · 수직 속도 += rand(−49, 특수?0:50)
  * ```
+ * 악송구면 0xa1620 은 이어서 방향 흔들림 rand(0, 22 − h/150) · 부호 rand(0,2) 를 굴린다 — `errantThrowFlight`.
  * 확률은 ≈1.03~1.10% 다.
  */
 export function rollThrowError(
@@ -67,12 +68,9 @@ export function rollThrowError(
   return {
     errant: true,
     speedDelta: randomIntegerBelow(random, -50, special ? 0 : 51),
-    angleDelta: randomIntegerBelow(random, -49, special ? 0 : 50),
+    verticalDelta: randomIntegerBelow(random, -49, special ? 0 : 50),
   }
 }
-
-/** 송구 속도에 적용되는 하한 (0xa1828) */
-export const MINIMUM_THROW_SPEED = 100
 
 /** 송구 거리 상한 = 17000 × 120 / 100. 넘으면 원바운드가 된다 (0xa1620, I-controls 2b) */
 export const BOUNCE_THROW_DISTANCE = 20_400
