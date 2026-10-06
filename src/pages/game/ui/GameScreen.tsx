@@ -12,6 +12,7 @@ import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
 import { HALF_INNING_JINGLE_TICK } from '@/features/play-game/model/halfInningBoard'
 import { HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
+import { useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import { mySpecialSwingRemainingOf, stealableBasesOf } from '@/features/play-game/model/gameFlow'
@@ -121,6 +122,22 @@ export function GameScreen({
   const [isBoardClosed, setBoardClosed] = useState(false)
   const board = progress.halfInningBoard ?? null
   const isHalfInningBoardOpen = !isBoardClosed && board !== null && isAtFirstPitchOf(progress, atBat)
+  /**
+   * **상태 0xe — 내 타석마다 사람 OK 를 기다린다** (`features/play-game/model/sceneConfirm`, 0x39e14 → 0x532b0).
+   * 타석 결과 연출·돌발 창·1회초 판·벤치 클리어링·경기 중 메뉴·조작방법·설정이 덮고 있으면 받지 않는다.
+   * 받은 OK 는 진행기가 실은 대기 객체에 남아, 수비 화면을 갔다 와 이 화면이 다시 서도 다시 묻지 않는다.
+   * ⚠️ 돌발 제안 창(0x1b)은 원본에서 OK 뒤에 서지만, 그 창을 띄우는 `app/ui/GameRoute` 가 이 대기를 몰라 지금은 OK 앞에 선다.
+   * ⚠️ 미이식: 0xe 그리기 0x4d9ec 가 0xd 그리기 위에 얹는 안내 판 0x44944.
+   */
+  const sceneConfirm = useSceneConfirm(
+    progress.sceneConfirm,
+    !isPaused &&
+      bannerText === '' &&
+      !isMenuOpen &&
+      overlay === null &&
+      !isBenchClearing &&
+      !isHalfInningBoardOpen,
+  )
   /** 원본 공용 키 처리 0x498d4 — '*' 메뉴 · 도루 '3'/'2'/'1' */
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -194,7 +211,10 @@ export function GameScreen({
             : `G ${earnedGamePoint}`
         }
         leftKey={
-          stealableBases.length > 0 && !isMenuOpen
+          sceneConfirm.isAwaiting && !isMenuOpen
+            ? // 0xe — OK 하나만 받는다 (0x532b0)
+              { label: '확인', onPress: sceneConfirm.confirm, isDisabled: !sceneConfirm.acceptsConfirm }
+            : stealableBases.length > 0 && !isMenuOpen
             ? {
                 label: `도루 ${stealableBases[0]}루`,
                 onPress: () => stealIfFlying(stealableBases[0]),
@@ -206,7 +226,8 @@ export function GameScreen({
           onPress: menu.toggle,
         }}
       >
-        <div className={styles.stageArea}>
+        {/* 0xe 에서 화면을 누르면 OK 로 본다 (터치용 웹판 편의 — 캔버스 탭이 스윙인 것과 같은 자리) */}
+        <div className={styles.stageArea} onClick={sceneConfirm.acceptsConfirm ? sceneConfirm.confirm : undefined}>
           {ace !== null && (
             <div className={styles.aceAlert}>
               <img src={ace.iconUrl} alt={ace.name} width={33} height={33} />
@@ -261,7 +282,8 @@ export function GameScreen({
                 : { framesUrl: ace.framesUrl, frameCount: ace.frameCount, stillUrl: ace.stillUrl }
             }
             // 조작방법 뷰어 동안도 일시정지 팝업이 떠 있어 경기 갱신이 멈춘다 (0x52cc6 0x754f9)
-            isPaused={isPaused || isMenuOpen || overlay !== null}
+            // 0xe(OK 대기)에서도 공이 안 나간다 — 타석 장면(0xd 그리기)만 선다
+            isPaused={isPaused || isMenuOpen || overlay !== null || sceneConfirm.isAwaiting}
             random={random}
             // 필살타법 '0' (0x535a4 → 0x51dee → 0x34c74). 레벨이 아니라 **고른 번호**(+0x18)를 넘긴다 —
             // 0 이면(아직 안 고름) '0' 키가 무시된다

@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { SCENE_CONFIRM_LOCK_FRAMES } from '@/features/play-game/model/useSceneConfirm'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import { createAtBat } from '@/entities/at-bat/model/atBatState'
@@ -18,6 +20,12 @@ const 진행 = (bases = { first: false, second: false, third: false }): GameProg
   return { ...base, game: { ...base.game, bases } }
 }
 
+/** 0xe 의 OK 를 이미 받은 자리 (0xf) */
+const 받은진행 = (bases = { first: false, second: false, third: false }): GameProgress => ({
+  ...진행(bases),
+  sceneConfirm: null,
+})
+
 const 띄우기 = (
   props: Partial<Parameters<typeof GameScreen>[0]> = {},
   bases?: { first: boolean; second: boolean; third: boolean },
@@ -25,7 +33,7 @@ const 띄우기 = (
   render(
     <GameScreen
       career={createCareer('테스트')}
-      progress={진행(bases)}
+      progress={받은진행(bases)}
       atBat={createAtBat()}
       pitcherAbility={DEFAULT_PITCHER_ABILITY}
       isPaused={false}
@@ -160,5 +168,50 @@ describe('1회초 판 (상태 0x18) — 선공·1번 타자', () => {
   it('첫 공이 나간 뒤(수비 재생으로 화면이 다시 올라와도) 판이 다시 서지 않는다', () => {
     띄우기({ progress: 선공1번(), atBat: { ...createAtBat(), strikes: 1 } })
     expect(screen.getByRole('button', { name: '메뉴' })).toBeTruthy()
+  })
+})
+
+describe('상태 0xe — 내 타석마다 사람 OK 를 기다린다 (0x39e14 → 0x532b0)', () => {
+  afterEach(() => vi.useRealTimers())
+
+  it('진행기가 실은 대기가 있으면 확인 소프트키가 서고, 세 갱신 뒤 OK 하나로 걷힌다 — 다시 서도 다시 묻지 않는다', () => {
+    vi.useFakeTimers()
+    const progress = 진행()
+    expect(progress.sceneConfirm).toBeTruthy()
+    const 그리기 = () => (
+      <GameScreen
+        career={createCareer('테스트')}
+        progress={progress}
+        atBat={createAtBat()}
+        pitcherAbility={DEFAULT_PITCHER_ABILITY}
+        isPaused={false}
+        bannerText=""
+        random={createSeededRandom(1)}
+        onPitchResolved={vi.fn()}
+        onQuit={vi.fn()}
+      />
+    )
+    const { unmount } = render(그리기())
+    // 1회초 판(0x18)이 서 있으면 먼저 닫는다
+    if (screen.queryByRole('button', { name: '메뉴' }) === null) fireEvent.keyDown(window, { key: 'Enter' })
+    expect(screen.getByRole('button', { name: '확인' })).toBeTruthy()
+    fireEvent.keyDown(window, { key: '5' })
+    expect(screen.getByRole('button', { name: '확인' })).toBeTruthy()
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_LOCK_FRAMES))
+    fireEvent.keyDown(window, { key: '5' })
+    expect(screen.queryByRole('button', { name: '확인' })).toBeNull()
+    // 수비 화면을 갔다 와 화면이 다시 서도 같은 대기는 이미 받았다
+    unmount()
+    render(그리기())
+    expect(screen.queryByRole('button', { name: '확인' })).toBeNull()
+  })
+
+  it('타석 결과 연출(배너) 동안은 OK 를 안 받는다', () => {
+    vi.useFakeTimers()
+    띄우기({ bannerText: '삼진', progress: 진행() })
+    if (screen.queryByRole('button', { name: '메뉴' }) === null) fireEvent.keyDown(window, { key: 'Enter' })
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_LOCK_FRAMES))
+    fireEvent.keyDown(window, { key: '5' })
+    expect((screen.getByRole('button', { name: '확인' }) as HTMLButtonElement).disabled).toBe(true)
   })
 })

@@ -28,7 +28,8 @@ const 띄우기 = (onSteal: (base: 1 | 2 | 3) => void) => {
   return render(
     <GameScreen
       career={createCareer('테스트')}
-      progress={{ ...base, game: { ...base.game, bases: { first: true, second: false, third: false } } }}
+      // 0xe 의 OK 는 이미 받은 자리 — 공이 나는 동안(0x11)만 본다
+      progress={{ ...base, sceneConfirm: null, game: { ...base.game, bases: { first: true, second: false, third: false } } }}
       atBat={createAtBat()}
       pitcherAbility={DEFAULT_PITCHER_ABILITY}
       isPaused={false}

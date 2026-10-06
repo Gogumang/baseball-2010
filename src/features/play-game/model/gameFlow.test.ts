@@ -1334,3 +1334,16 @@ describe('자동진행이 내 차례에서 멈출 때 0xc22b4 — 모드 4 의 9
     }
   })
 })
+
+describe('상태 0xe 의 OK 대기 — 내 타석 준비(0xd → 0xe)마다 새 대기 (0x39e14 → 0x532b0)', () => {
+  it('경기 시작의 내 첫 타석과, 내 타석이 끝나 돌아온 다음 내 타석은 각각 새 대기다', () => {
+    const progress = startGame(createSeededRandom(20100901))
+    expect(isPlayerTurn(progress.game)).toBe(true)
+    expect(progress.sceneConfirm?.entries).toBeGreaterThanOrEqual(1)
+    const after = applyPlayerOutcome(progress, { kind: '삼진' }, createSeededRandom(3))
+    if (!after.game.isFinished) {
+      expect(after.sceneConfirm).not.toBe(progress.sceneConfirm)
+      expect(after.sceneConfirm?.entries).toBeGreaterThanOrEqual(1)
+    }
+  })
+})

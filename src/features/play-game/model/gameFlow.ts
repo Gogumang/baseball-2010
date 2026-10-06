@@ -119,6 +119,8 @@ import { rollHalfInningFielders } from '@/features/play-game/model/halfInningBoa
 import { pitcherAbilitySumOf, rosterPitcherRoleOf } from '@/entities/pitching/model/pitcherChange'
 import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
+import { chainSceneConfirm, enterSceneConfirm } from '@/features/play-game/model/sceneConfirm'
+import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 import {
   arrivalApplicationOf,
   arrivesUnhit,
@@ -214,6 +216,12 @@ export interface GameProgress {
    * 세우는 곳은 `0xac228`(ac33e) 하나다.
    */
   readonly pinchHitUsed: boolean
+  /**
+   * **상태 0xe 의 OK 대기** — 내 타석 준비(0xd → 0xe)마다 새 객체다 (`sceneConfirm`). 화면(`GameScreen`)이 OK 를 받을 때까지
+   * 공을 안 던진다. 0xe 확인 뒤 0xf 진입이 CPU 투수 교체를 내면 0x16 → 0xd → 0xe 로 한 번 더 기다린다(대기 2).
+   * 진행기는 OK 뒤 굴림(돌발 0x8f158 · 0xac428)을 들어서는 걸음에서 미리 다 해 둔다 — 대기 동안 다른 굴림이 없어 차례는 같다.
+   */
+  readonly sceneConfirm?: SceneConfirmWait | null
   readonly myStats: SeasonStats
   /** 사용자 타석 인기도 점수 합 */
   readonly popularityPoints: number
@@ -1204,14 +1212,16 @@ export function withAutoStopLateInningSetup(progress: GameProgress, random: Rand
  * 0xf 진입을 다시 지난다 (팀 경기 `readyAtBat`·`enterPitchSelection` 과 같은 차례).
  */
 function prepareMyAtBat(progress: GameProgress, random: RandomPort): GameProgress {
-  let current = triggerBurstForMyAtBat(progress, random)
+  // 0xd → 0xe (0x39e14) — 사람 OK 를 기다린다 (0x532b0)
+  let current = triggerBurstForMyAtBat({ ...progress, sceneConfirm: enterSceneConfirm() }, random)
   // 0xf 진입은 교체가 날 때마다 다시 온다 — 바뀐 쪽 막음 칸(state[0xd])이 서 있어 두 번째 판정에서 멈춘다
   for (let entry = 0; entry < MAXIMUM_SUBSTITUTION_CALLS; entry += 1) {
     if (current.game.isFinished) return current
     if (current.burst !== null && current.burst.current !== null) return current
     const changed = changeOpponentPitcher(current, random)
     if (changed === current) return current
-    current = triggerBurstForMyAtBat(changed, random)
+    // 22 → 0x16 → 0xd → 0xe — OK 를 한 번 더 기다린다
+    current = triggerBurstForMyAtBat({ ...changed, sceneConfirm: chainSceneConfirm(changed.sceneConfirm) }, random)
   }
   return current
 }
