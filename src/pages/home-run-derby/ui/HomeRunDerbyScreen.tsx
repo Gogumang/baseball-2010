@@ -7,6 +7,7 @@ import { HelpScreen } from '@/pages/help/ui/HelpScreen'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
+import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { DerbyResult } from '@/entities/home-run-derby/model/derbyRun'
 import { derbyBallCountOf, derbyBallNumberOf } from '@/entities/home-run-derby/model/derbyRun'
@@ -196,6 +197,8 @@ export function HomeRunDerbyScreen({
             isEventZoneShown={session.isEventZoneShown}
             tick={tick}
             shownCombo={session.shownCombo}
+            // 0x4585c 가 0xb63c1(지금 타자)로 콤보 표시 쪽을 가른다 — 타석 그림과 같은 폼(안 넘기면 0 = 우타)
+            batterSide={batterSideOfForm(batterForm ?? 0)}
           />
 
           <div className={styles.overlay}>

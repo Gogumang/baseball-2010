@@ -74,4 +74,17 @@ describe('홈런더비 HUD (0x45a54)', () => {
     띄우기(createDerbyRun(), 0, { isEventZoneShown: true })
     expect(screen.getByAltText('이벤트 존')).toBeTruthy()
   })
+
+  it('콤보 표시는 trainning.pzx "Combo" 가 미끄러져 온 뒤 셋째 갱신부터 숫자를 붙인다 (0x4585c — combo.pzx 는 안 그린다)', () => {
+    const run = createDerbyRun()
+    const hud = (tick: number) => (
+      <DerbyHud run={run} bestDistance={0} aceName={null} isEventZoneShown={false} tick={tick} shownCombo={2} batterSide={1} />
+    )
+    const { rerender } = render(hud(10))
+    expect(screen.getByAltText('Combo').getAttribute('src')).toBe('./sprites/trainning/frames/003.png')
+    expect(screen.queryAllByTestId('콤보숫자')).toHaveLength(0)
+    rerender(hud(13))
+    expect(screen.getByAltText('Combo').getAttribute('src')).toBe('./sprites/trainning/frames/006.png')
+    expect(screen.getAllByTestId('콤보숫자').map((node) => node.getAttribute('src'))).toEqual(['./sprites/num/072.png'])
+  })
 })

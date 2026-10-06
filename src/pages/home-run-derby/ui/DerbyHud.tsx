@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { SpriteNumber } from '@/shared/ui'
 import { numberGlyphsOf } from '@/shared/lib/pixelNumber/pixelNumber'
 import { DERBY_PITCH_COUNT } from '@/entities/home-run-derby/model/derbyRules'
@@ -5,8 +6,8 @@ import { derbyBallCountOf, derbyBallNumberOf } from '@/entities/home-run-derby/m
 import type { DerbyRun } from '@/entities/home-run-derby/model/derbyRun'
 import { isEventZoneVisibleAt } from '@/entities/home-run-derby/model/eventZone'
 import {
-  ACE_NAME_ROW, BALL_ICON, BALL_ROW, COMBO_LABEL, COMBO_ROW, DISTANCE_ROWS, EVENT_ZONE_SPOT,
-  ballIconLeftOf, distanceRowTopOf,
+  ACE_NAME_ROW, BALL_ICON, BALL_ROW, COMBO_DISPLAY, DISTANCE_ROWS, EVENT_ZONE_SPOT,
+  ballIconLeftOf, comboDisplayPlacementOf, distanceRowTopOf,
 } from '@/pages/home-run-derby/lib/derbyHudLayout'
 import * as styles from '@/pages/home-run-derby/ui/DerbyHud.css'
 
@@ -25,23 +26,34 @@ interface DerbyHudProps {
    * 원본 `0x4585c` 는 +0x1b60 이 켜졌을 때만 그리고, 숫자는 늘 +0x84 를 읽는다. 지금 콤보(+0x39)는 안 본다.
    */
   readonly shownCombo?: number | null
+  /** 치는 타자의 손 (0xb63c0 — 0 우타 · 1 좌타). 콤보 표시를 왼쪽(좌타)·오른쪽(우타) 어디에 그릴지 가른다 */
+  readonly batterSide?: number
 }
 
-const comboFrameSrc = `${COMBO_LABEL.folder}/${String(COMBO_LABEL.frame).padStart(3, '0')}.png`
+const spriteSrcOf = (folder: string, frame: number) => `${folder}/${String(frame).padStart(3, '0')}.png`
 
 /**
  * 홈런더비 HUD (0x45a54) — 일반 점수판 대신 **공 아이콘 10칸**과 비거리를 보여 준다.
  * 공 번호는 `(보너스 중 ? 최대 콤보 : 10) − 남은 기회 + 1` 이고(확정),
  * 지금 누적 비거리가 최고 기록을 넘으면 강조한다(확정).
  *
- * 좌표는 원본에서 못 읽어 `derbyHudLayout` 에 내가 정한 값으로 적어 두었다.
+ * 좌표는 콤보 표시(0x4585c)만 원본 값이고, 나머지는 원본에서 못 읽어 `derbyHudLayout` 에 내가 정한 값으로 적어 두었다.
  */
-export function DerbyHud({ run, bestDistance, aceName, isEventZoneShown, tick, shownCombo = null }: DerbyHudProps) {
+export function DerbyHud({
+  run, bestDistance, aceName, isEventZoneShown, tick, shownCombo = null, batterSide = 0,
+}: DerbyHudProps) {
   const ballNumber = derbyBallNumberOf(run)
   const ballCount = derbyBallCountOf(run)
   const isOverBest = run.totalDistance > bestDistance
   const totalGlyphs = numberGlyphsOf(run.totalDistance)
   const bestGlyphs = numberGlyphsOf(bestDistance)
+
+  // 콤보 표시를 켠 갱신 — 상태 0xf 가 +0x19ec = 0 · 두 애니를 첫 칸으로 돌린다(0x3db92~0x3dc14)
+  const [comboShownAt, setComboShownAt] = useState<{ value: number | null; tick: number }>({ value: shownCombo, tick })
+  if (comboShownAt.value !== shownCombo) setComboShownAt({ value: shownCombo, tick })
+  const comboPlacement = shownCombo !== null && shownCombo > 0
+    ? comboDisplayPlacementOf(shownCombo, batterSide, tick - comboShownAt.tick)
+    : null
 
   return (
     <div className={styles.hud}>
@@ -93,22 +105,25 @@ export function DerbyHud({ run, bestDistance, aceName, isEventZoneShown, tick, s
         boxHeight={DISTANCE_ROWS.glyphHeight}
       />
 
-      {/* 콤보 — ui/combo.pzx 의 "Combo" 글자 (원본 좌표 미확인).
-          ⚠️ 원본 0x4585c 는 combo.pzx 애니(장면 +0x19e8)를 끝 칸까지 돌린 뒤 숫자 +0x84 를 그린다 — 웹은 처음부터 글자·숫자를 같이 둔다 */}
-      {shownCombo !== null && shownCombo > 0 && (
+      {/* 콤보 표시 (0x4585c) — trainning.pzx "Combo" 글자가 미끄러져 오고, 끝 칸에 닿으면 큰 숫자(num 70~)가 붙는다 */}
+      {comboPlacement !== null && (
         <>
           <img
             className={styles.sprite}
-            style={{ left: COMBO_ROW.x, top: COMBO_ROW.y }}
-            src={comboFrameSrc}
+            style={{ left: comboPlacement.left, top: comboPlacement.top }}
+            src={spriteSrcOf(COMBO_DISPLAY.folder, comboPlacement.frame)}
             alt="Combo"
           />
-          <SpriteNumber
-            glyphs={numberGlyphsOf(shownCombo)}
-            right={COMBO_ROW.x + COMBO_LABEL.width + 18}
-            boxTop={COMBO_ROW.y}
-            boxHeight={COMBO_LABEL.height}
-          />
+          {comboPlacement.digits.map((digit, index) => (
+            <img
+              key={index}
+              className={styles.sprite}
+              style={{ left: digit.left, top: digit.top }}
+              src={spriteSrcOf('./sprites/num', digit.frame)}
+              alt=""
+              data-testid="콤보숫자"
+            />
+          ))}
         </>
       )}
 
