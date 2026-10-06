@@ -63,7 +63,9 @@ const 칸이름들 = () => screen.getAllByRole('option').map(칸이름)
 /** 커맨드·하위 메뉴 칸 (`role="option"`) 과 보통 버튼을 함께 찾는다 */
 function 누르기(name: string) {
   const candidates = [...screen.queryAllByRole('option'), ...screen.queryAllByRole('button')]
+  // 바닥띠 되돌아가기(ScreenFrame)는 그림 단추라 이름표로 찾는다
   const found = candidates.find((element) => 칸이름(element).startsWith(name))
+    ?? candidates.find((element) => element.getAttribute('aria-label') === name)
   if (found === undefined) throw new Error(`칸을 찾지 못했습니다: ${name}`)
   fireEvent.click(found)
 }
@@ -99,7 +101,8 @@ describe('커맨드 여섯 칸 (상태 105 · 점프표 0xcc540)', () => {
     누르기('되돌아가기')
     expect(onExit).not.toHaveBeenCalled()
 
-    누르기('나가기')
+    // 105 바닥도 되돌아가기(바닥 5) — 취소(−16)는 메인 메뉴로
+    누르기('되돌아가기')
     expect(onExit).toHaveBeenCalledOnce()
   })
 
@@ -644,5 +647,24 @@ describe('[아이템] 110 하위 메뉴 → 111 장비 상점 · [장비착용] 
 
     누르기('GP')
     expect(onOpenShop).toHaveBeenLastCalledWith('GP')
+  })
+})
+
+describe('머리띠·바닥 (0x16928 · 0x166cc)', () => {
+  const 바닥표시 = (container: HTMLElement) =>
+    [...container.querySelectorAll('img[data-footer-mark]')].map((node) => Number((node as HTMLElement).dataset.footerMark))
+
+  it('105 는 바닥 5 — 되돌아가기만', () => {
+    const { container } = 화면()
+    expect(바닥표시(container)).toEqual([])
+    expect(screen.getByRole('button', { name: '되돌아가기' })).toBeTruthy()
+  })
+
+  it('기본정보(119)는 바닥 0x87 — "#닉네임"(프레임 8)·"0상세정보"(프레임 1)·되돌아가기 (0x166f2)', () => {
+    const { container } = 화면()
+    누르기('선수정보')
+    누르기('기본정보')
+    expect(바닥표시(container)).toEqual([8, 1])
+    expect(screen.getByRole('button', { name: '되돌아가기' })).toBeTruthy()
   })
 })

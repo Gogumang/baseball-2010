@@ -1,4 +1,5 @@
 import { style } from '@vanilla-extract/css'
+import { theme } from '@/app/styles/theme.css'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 
 /**
@@ -6,6 +7,28 @@ import { ORIGINAL_COLORS } from '@/shared/config/design'
  * 원본 상태판(0x7d34c)·커맨드 줄(0x7e418)은 32×32 아이콘 계단형이지만, 투수편 웹 화면들은
  * 공용 판(`PixelScreen`) 관례를 쓰므로 여기서도 줄만 세운다.
  */
+
+/**
+ * 머리띠(정착 y −8~26)와 바닥띠(정착 y 300~320) 사이 판 — 본문 근사 줄들을 여기 세운다.
+ * 판 바탕은 전에 쓰던 공용 판(`PixelScreen`)과 같은 색이고, 넘치면 판 안에서만 스크롤한다.
+ */
+export const frameBody = style({
+  position: 'absolute',
+  left: 0,
+  top: 0,
+  width: 240,
+  height: 320,
+  boxSizing: 'border-box',
+  padding: '28px 10px 22px',
+  background: theme.color.field,
+  overflowY: 'auto',
+  overflowX: 'hidden',
+  scrollbarWidth: 'none',
+  selectors: { '&::-webkit-scrollbar': { display: 'none' } },
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '10px',
+})
 
 /** 두 칸짜리 정보 줄 (이름 — 값) */
 export const infoRow = style({

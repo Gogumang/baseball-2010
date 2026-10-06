@@ -1,4 +1,5 @@
-import { MenuList, MessageBox, Panel, PixelScreen } from '@/shared/ui'
+import { MenuList, MessageBox, Panel, RawScreen } from '@/shared/ui'
+import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { createCareer } from '@/entities/career/model/playerCareer'
@@ -24,9 +25,13 @@ import * as styles from '@/pages/pitcher-league/ui/PitcherManagementScreen.css'
  * 투수편만 다른 곳은 **트레이닝 칸 0~3 이 제구·구속·변화·체력**이라는 것과,
  * 칸 4(그리고 선수정보 칸 3)가 **팝업 0x78** 로 마구·구질 두 갈래를 먼저 묻는다는 것이다.
  *
- * 머리띠 제목은 `TITLE_IMAGES.나만의리그투수편`(그림 9 + 11) 자리다 —
- * ⚠️ 이 화면은 투수편의 다른 화면들처럼 공용 판(`PixelScreen`) 관례를 쓰므로 제목을 글자로 적는다
- * (**원본 배치 미해독 — 근사**).
+ * **머리띠·바닥띠** (직접 떴다): 장면 0x106 의 공통 틀 0x16928 이 판(0x7f53c)에 제목·바닥을 맡기고 각 그림이 끝에
+ * 0x7f4ec 로 0x54d95 를 부른다 — 105·106·107·108·110·122·123 그림(0x19f0c · 0x19f00 · 0x19eb8 · 0x19e44 · 0x19eac ·
+ * 0x19ee0 · 0x19e24)은 모두 0x19da4 를 거쳐 끝에 0x7f4ed. 틀의 "그 밖" 갈래(0x169ea~0x16a08)가
+ * 제목 `[장면+0xcc] == 4 ? 8 : 9` · 바닥 5 다 — 투수편([장면+0xcc] = 3)은 **제목 9**(`나만의리그투수편`, 그림 9 + 11)·바닥 5.
+ * 기본정보(119) 그림 0x166cc 는 판을 안 거치고 직접 0x54d95(같은 제목, **바닥 0x87**: "#닉네임"·"0상세정보"·되돌아가기,
+ * 0x166f2)를 부르고, 칭호 목록(129) 0x198fc 도 0x166cc 를 먼저 그린다. 표시는 "#" 지만 칭호 키는 '*'(0x1056c) — 원본 그대로.
+ * ⚠️ 본문(상태판·하위 창)은 여전히 **원본 배치 미해독 — 근사**: 머리띠와 바닥띠 사이 판에 줄로 세운다.
  */
 
 export interface PitcherManagementScreenProps {
@@ -47,6 +52,9 @@ export interface PitcherManagementScreenProps {
   /** 105 취소 — 메인 메뉴 장면 0x103 */
   readonly onExit: () => void
 }
+
+/** 기본정보 카드 그림 0x166cc 의 바닥비트 (0x166f2 `movs r2, #0x87`) */
+const BASIC_INFO_FOOTER = 0x87
 
 /**
  * 칭호 목록 창은 **타자편 위젯을 그대로 쓴다** — 원본도 창 하나를 두 편이 같이 쓰고,
@@ -74,38 +82,74 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
     )
   }
 
-  const isHub = menu.kind === '관리' && menu.subWindow === null
+  const isBasicInfo = menu.subWindow === '기본정보'
   return (
-    <PixelScreen
-      title="나만의리그 투수편"
-      badge={`${career.gamePoint} G`}
-      /* 105 취소는 메인 메뉴로, 그 아래 화면의 취소는 한 단계 위로 (−16) */
-      leftKey={{ label: isHub ? '나가기' : '되돌아가기', onPress: menu.back }}
-    >
-      {/* 하위 메뉴(106·107)가 열려도 화면은 그대로고 아래 줄만 바뀐다 (0x7e84c) */}
-      {menu.subWindow === null && <PitcherStatusBoard career={career} />}
-      {menu.subWindow === '기본정보' && <PitcherBasicInfoPanel career={career} />}
+    <RawScreen>
+      {/* 하위 메뉴(106·107)가 열려도 화면은 그대로고 아래 줄만 바뀐다 (0x7e84c). 본문은 근사 — 머리띠·바닥띠 사이 판 */}
+      <div className={styles.frameBody}>
+        {menu.subWindow === null && <PitcherStatusBoard career={career} />}
+        {isBasicInfo && <PitcherBasicInfoPanel career={career} />}
+        {menu.subWindow === '구질목록' && (
+          <PitcherRepertoirePanel
+            career={career}
+            tab={menu.pitchWindowTab}
+            onChangeTab={menu.changePitchTab}
+            onSelectMagic={menu.selectMagicCell}
+            onSelectPitch={menu.selectPitchCell}
+          />
+        )}
+        {menu.subWindow === '기록실' && <PitcherRecordPanel career={career} tab={menu.recordWindowTab} />}
+
+        {menu.subWindow === null && menu.choice === null && menu.detail === null && (
+          <Panel heading={menu.kind === '관리' ? '커맨드' : menu.kind}>
+            <MenuList items={menu.items} onSelect={menu.select} />
+          </Panel>
+        )}
+
+        {/*
+          팝업 0x78 — StrMODE[59] "원하는 항목을 선택해주세요".
+          원본은 좌우 키로 `+0x166` 을 토글하고 확인으로 고르는 작은 창이다
+          (그리기 0x190f8 · 키 0x19398) — 키는 `usePitcherManagementMenu` 가 본다.
+          ⚠️ **원본 배치 미해독 — 근사**: 여기서는 두 칸 버튼을 가로로 놓고 고른 칸을 눌러 그린다.
+        */}
+        {menu.choice !== null && (
+          <Panel heading={menu.choice.text}>
+            <div className={styles.tabRow}>
+              {menu.choice.labels.map((label, index) => (
+                <button
+                  key={label}
+                  type="button"
+                  aria-pressed={index === menu.choiceIndex}
+                  className={`${styles.tab} ${index === menu.choiceIndex ? styles.tabSelected : ''}`}
+                  onPointerEnter={() => menu.moveChoice(index)}
+                  onClick={() => menu.chooseOption(index)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </Panel>
+        )}
+      </div>
+
+      {/*
+        머리띠 제목 9 · 바닥 — 기본정보(119)·칭호(129)는 0x87, 그 밖은 0x16928 의 5. 되돌아가기 = 취소(−16):
+        105 는 메인 메뉴로, 그 아래 화면은 한 단계 위로.
+      */}
+      <ScreenFrame title="나만의리그투수편" gamePoint={career.gamePoint} onBack={menu.back}
+        footer={isBasicInfo ? BASIC_INFO_FOOTER : undefined} />
+
       {/*
         칭호 목록 창 — 원본 하위 상태 **129** (P3 10-1). 기본정보(119) 위에 겹쳐 뜨고
         '*' 키로 여닫는다 (`usePitcherManagementMenu` 의 키 처리 주석 참고).
       */}
-      {menu.subWindow === '기본정보' && menu.isTitleWindowOpen && (
+      {isBasicInfo && menu.isTitleWindowOpen && (
         <TitleListWindow
           career={titleViewOf(career)}
           onEquip={menu.equipTitle}
           onClose={menu.closeTitleWindow}
         />
       )}
-      {menu.subWindow === '구질목록' && (
-        <PitcherRepertoirePanel
-          career={career}
-          tab={menu.pitchWindowTab}
-          onChangeTab={menu.changePitchTab}
-          onSelectMagic={menu.selectMagicCell}
-          onSelectPitch={menu.selectPitchCell}
-        />
-      )}
-      {menu.subWindow === '기록실' && <PitcherRecordPanel career={career} tab={menu.recordWindowTab} />}
       {/* 스킬 창 — 하위 상태 122. 타자편 위젯을 그대로 쓴다 (키 0x13140 · 대화 0x147b0 에 모드 갈림이 없다) */}
       {menu.subWindow === '아이템/스킬' && (
         <SkillWindow
@@ -118,41 +162,7 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
         />
       )}
 
-      {menu.subWindow === null && menu.choice === null && menu.detail === null && (
-        <Panel heading={menu.kind === '관리' ? '커맨드' : menu.kind}>
-          <MenuList items={menu.items} onSelect={menu.select} />
-        </Panel>
-      )}
-
-      {/*
-        팝업 0x78 — StrMODE[59] "원하는 항목을 선택해주세요".
-        원본은 좌우 키로 `+0x166` 을 토글하고 확인으로 고르는 작은 창이다
-        (그리기 0x190f8 · 키 0x19398) — 키는 `usePitcherManagementMenu` 가 본다.
-        ⚠️ **원본 배치 미해독 — 근사**: 여기서는 두 칸 버튼을 가로로 놓고 고른 칸을 눌러 그린다.
-      */}
-      {menu.choice !== null && (
-        <Panel heading={menu.choice.text}>
-          <div className={styles.tabRow}>
-            {menu.choice.labels.map((label, index) => (
-              <button
-                key={label}
-                type="button"
-                aria-pressed={index === menu.choiceIndex}
-                className={`${styles.tab} ${index === menu.choiceIndex ? styles.tabSelected : ''}`}
-                onPointerEnter={() => menu.moveChoice(index)}
-                onClick={() => menu.chooseOption(index)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </Panel>
-      )}
-
-      {/*
-        상세 결과 창(0x872a1) — 타자편 창을 그대로 쓴다 (두 모드 공용, 이름표만 340~343).
-        ⚠️ 원본 좌표는 화면 기준이지만 이 화면은 공용 판(`PixelScreen`) 본문 안에 겹쳐 그려 머리띠만큼 내려간다 (근사).
-      */}
+      {/* 상세 결과 창(0x872a1) — 타자편 창을 그대로 쓴다 (두 모드 공용, 이름표만 340~343). 화면 기준 원본 좌표 */}
       {menu.detail !== null && (
         <DetailWindow rows={menu.detail.rows} messages={menu.detail.messages} onClose={menu.closeDetail} />
       )}
@@ -167,6 +177,6 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
       {menu.question === null && menu.notice !== '' && (
         <MessageBox text={`!C${menu.notice}`} buttons={['확인']} onAnswer={menu.dismissNotice} />
       )}
-    </PixelScreen>
+    </RawScreen>
   )
 }
