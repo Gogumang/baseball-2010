@@ -1,11 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { startNewSeason } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonPlayer, SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
 import { HALL_OF_FAME_FIRST_ID, PLAYER_OWN_BIT } from '@/entities/season-mode/model/playerRecruit'
 import {
   TRADE_BOOST_RATE, applyTrade, batterPositionPenaltyOf, canUseTradeCommand, markTradeUsed,
-  pitcherRolePenaltyOf, rollTradeSuccess, tradeBoostCostOf, tradeRefusalOf, tradeSuccessRate,
+  pitcherRolePenaltyOf, rollTradeSuccess, tradeBoostCostOf, tradeMoneyChangeOf, tradeRefusalOf, tradeSuccessRate,
+  withTradeMoney,
 } from '@/entities/season-mode/model/playerTrade'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
@@ -83,8 +84,28 @@ describe('성공 판정 — bfa55(1,101) < r', () => {
     expect(rollTradeSuccess(고정난수(40), 40)).toBe(false)
   })
 
-  it('강제 성공 플래그(this+0x148, CPU 요청 수락)는 굴리지 않는다', () => {
+  it('강제 성공 플래그(this+0x148, CPU 요청 수락)면 뽑기가 커도 성공이다', () => {
     expect(rollTradeSuccess(고정난수(100), 3, true)).toBe(true)
+  })
+
+  it('강제 성공이어도 뽑기 하나는 먼저 나간다 (d160 → d16c → d170)', () => {
+    const next = vi.fn(() => 0.5)
+    rollTradeSuccess({ next, nextInRange: vi.fn(), pick: vi.fn() }, 3, true)
+    expect(next).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('성공한 트레이드의 소지금 — SR+2 += d (0xd180~0xd1a0)', () => {
+  it('d = (내 − 상대) × 10, 음수면 ×2', () => {
+    expect(tradeMoneyChangeOf(40, 10)).toBe(300)
+    expect(tradeMoneyChangeOf(10, 40)).toBe(-600)
+    expect(tradeMoneyChangeOf(7, 7)).toBe(0)
+  })
+
+  it('0..9999 로 자른다', () => {
+    expect(withTradeMoney(레코드({ money: 100 }), 0, 60).money).toBe(0)
+    expect(withTradeMoney(레코드({ money: 9990 }), 60, 0).money).toBe(9999)
+    expect(withTradeMoney(레코드({ money: 50 }), 30, 20).money).toBe(150)
   })
 })
 

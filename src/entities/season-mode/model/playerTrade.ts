@@ -11,9 +11,9 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
  * → **0xe7**(확인·진행). `docs/re/P4-season-flow.md` 1a·1b 표 · `docs/re/R13-season-leftovers.md`
  * 그리기 표, 성공률·비용은 `docs/re/J-modes-rules.md` 4-4 **확정**(0xcf24)이다.
  *
+ * 선수 바이트 `+0x1b` 는 이제 선수 표에 있다(`RosterPlayer.grade`) — 성공률의 차이 항 `d` 와 성공 시 소지금 변화가 읽는다.
+ *
  * ⚠️ **웹에 없어서 못 옮긴 것** (지어내지 않았다):
- *   - **선수 등급 바이트 `+0x1b`** — 성공률의 차이 항 `d` 가 읽는 칸인데 웹 선수 표
- *     (`shared/config/original/data/roster.json`)에 없다. 부르는 쪽이 0 을 넘기면 `d = 0` 이다.
  *   - **투수 보직 `0xb6705`** — 웹 로스터에 보직 칸이 없다(`teamGameRoster.ts` 머리 주석과 같은 한계).
  *     그래서 투수 쪽 자리 벌점은 늘 0 이 된다.
  *   - **성공 뒤 두 팀 명단을 실제로 맞바꾸는 루틴** — J 4-4 는 성공률 함수만 풀었다.
@@ -102,10 +102,35 @@ export function tradeSuccessRate(input: TradeRateInput): number {
 /**
  * 성공 판정 — `bfa55(1, 101) < r` 또는 **강제 성공 플래그**(this+0x148, CPU 요청 수락).
  * 뽑기가 1..100 이라 실제 확률은 `(r − 1)%` 다 ⚠️ (원본 그대로).
+ *
+ * 강제 성공이어도 **뽑기는 먼저 한다** (직접 떴다 — d160 `bfa55(1,101)` → d16c `< r` 이면 성공,
+ * 아니면 d170 에서 this+0x148 을 본다). 난수 하나가 늘 나간다.
  */
 export function rollTradeSuccess(random: RandomPort, rate: number, isForced = false): boolean {
-  if (isForced) return true
-  return randomIntegerBelow(random, 1, 101) < rate
+  const drawn = randomIntegerBelow(random, 1, 101)
+  return drawn < rate || isForced
+}
+
+/**
+ * 성공한 트레이드의 소지금 변화 — 직접 떴다 (0xcfa0~0xcfba 에서 만든 d 를 0xd180~0xd1a0 이 SR+2 에 더한다).
+ * ```
+ * d = (내.+0x1b − 상대.+0x1b) × 10 ; d < 0 이면 d ×= 2
+ * 성공: SR+2 = clamp(SR+2 + d, 0, 9999)        ; 실패는 손대지 않는다
+ * ```
+ * 성공률 깎기에 쓰는 바로 그 d 다 — 좋은 선수를 내주면 돈이 들어오고, 데려오면 두 배로 나간다(100만 단위).
+ */
+export function tradeMoneyChangeOf(myGrade: number, opponentGrade: number): number {
+  const difference = (myGrade - opponentGrade) * TRADE_GRADE_SCALE
+  return difference < 0 ? difference * 2 : difference
+}
+
+/** 소지금 상한 (SR+2, 0xd18c `0x270f`) */
+const TRADE_MONEY_LIMIT = 9999
+
+/** 성공한 트레이드 뒤 레코드 — SR+2 += d (0..9999) */
+export function withTradeMoney(record: SeasonRecord, myGrade: number, opponentGrade: number): SeasonRecord {
+  const money = record.money + tradeMoneyChangeOf(myGrade, opponentGrade)
+  return { ...record, money: Math.min(Math.max(money, 0), TRADE_MONEY_LIMIT) }
 }
 
 /** 거절 사유 — StrMODE[165] 나만의리그 선수 · [166] 명예의 전당 선수 */
