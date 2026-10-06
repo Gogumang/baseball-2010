@@ -40,6 +40,9 @@ export const GAME_START_MENU: readonly MainMenuEntry[] = [
   { id: '미션모드', labelFrame: 12, isAvailable: true, description: '상황에 따라 주어진 목표를!N달성하는 모드입니다' }, // [12]
 ]
 
+/** [14] 나만의리그 편 고르기 창 질문 (하위 상태 13 진입 0x25d78, 종류 0x10 — 타자편·투수편 두 칸) */
+export const NARI_EDITION_PROMPT = '!C어떤 선수로!N플레이 하시겠습니까?'
+
 /**
  * [13] 일반모드 진입 창 질문 (하위 상태 12 0x296f0, 종류 0x10 — 이어하기·새로하기·빠른실행 세 칸).
  */

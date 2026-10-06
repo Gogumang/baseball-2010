@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
-import { GENERAL_MODE_PROMPT, NEW_GAME_CONFIRM } from '@/shared/config/original/mainMenu'
+import { GENERAL_MODE_PROMPT, NARI_EDITION_PROMPT, NEW_GAME_CONFIRM } from '@/shared/config/original/mainMenu'
 import { MessageBox } from '@/shared/ui/MessageBox/MessageBox'
 import { entriesOf, isEntryDimmed, selectedIdOf, TOP_ENTRIES } from '@/pages/main-menu/model/mainMenu'
 import { useMainMenu } from '@/pages/main-menu/model/useMainMenu'
@@ -41,10 +41,21 @@ const GENERAL_MODE_CANCEL = -1
 /** [15] 의 처음 커서 — 0x749d5(창, 1) = [아니오] (0x298f2 · 0x2998c) */
 const NEW_GAME_CONFIRM_CURSOR = 1
 
+/**
+ * 나만의리그 [14] 버튼 (진입 0x25d78): 0 타자편 고른 13 / 보통 11 (이미지 표 +0x34/+0x2c) · 1 투수편 14 / 12 (+0x38/+0x30).
+ * 격자 2열×1행(종류 0x10 인자 2, 1) · 간격 0x74805(창, 0x3c, 0) · CLR → −1. 처음 커서는 0(0x749d5 를 안 부른다).
+ */
+const NARI_EDITION_BUTTONS = ['타자편', '투수편'] as const
+const NARI_EDITION_BUTTON_FRAMES = [{ normal: 11, selected: 13 }, { normal: 12, selected: 14 }] as const
+const NARI_EDITION_GRID = { columns: 2, gapX: 0x3c, gapY: 0 } as const
+/** CLR(−16) → −1 (0x25dc2~0x25df2 가 창 키 표에 넣는다) → 상태 5 */
+const NARI_EDITION_CANCEL = -1
+
 interface MainMenuScreenProps {
   readonly hasSavedGame: boolean
   readonly onContinue: () => void
-  readonly onNewGame: () => void
+  /** 나만의리그 [14] 에서 편을 골랐다 — 원본은 그 편 커리어가 있으면 이어하고 없으면 팀 고르기로 간다(0xf684) */
+  readonly onNewGame: (edition: '타자편' | '투수편') => void
   readonly onSelectMode: (mode: GameMode) => void
   readonly onBack: () => void
   /** 원작 처음 메뉴의 [도움말] (StrMAINMENU[2]) */
@@ -122,7 +133,8 @@ export function MainMenuScreen({
 }: MainMenuScreenProps) {
   const { state, dispatch } = useMainMenu(hasSavedGame, false, (effect) => {
     if (effect === '이어하기') onContinue()
-    else if (effect === '새로하기') onNewGame()
+    else if (effect === '나리타자편') onNewGame('타자편')
+    else if (effect === '나리투수편') onNewGame('투수편')
     else if (effect === '미션') onSelectMode('미션')
     else if (effect === '홈런더비') onSelectMode('홈런더비')
     else if (effect === '시즌모드') onSelectMode('시즌모드')
@@ -164,8 +176,7 @@ export function MainMenuScreen({
   // 아랫단 바탕 띠 — 자라는 동안은 릴 줄을 안 그린다 (0x254d8 이 줄 묶음을 통째로 건너뛴다)
   const band = useMenuBand(!isWheel)
 
-  const panelText = state.lockedNotice
-    ?? (state.isConfirmingNewGame ? NEW_GAME_CONFIRM : (selected?.description ?? ''))
+  const panelText = state.lockedNotice ?? selected?.description ?? ''
 
   const sizeOf = (frames: ReturnType<typeof useFrameOrigins>, frame: number) =>
     frames?.[pad(frame)] ?? null
@@ -337,15 +348,16 @@ export function MainMenuScreen({
         </div>
       )}
 
-      {state.isConfirmingNewGame && (
-        <div className={styles.confirmKeys}>
-          <button type="button" onClick={() => dispatch({ type: '확인', isAccepted: true })}>
-            예
-          </button>
-          <button type="button" onClick={() => dispatch({ type: '확인', isAccepted: false })}>
-            아니오
-          </button>
-        </div>
+      {/* 나만의리그 편 고르기 창 [14] — 하위 13 */}
+      {state.isPickingNariEdition && (
+        <MessageBox
+          text={NARI_EDITION_PROMPT}
+          buttons={NARI_EDITION_BUTTONS}
+          buttonFrames={NARI_EDITION_BUTTON_FRAMES}
+          grid={NARI_EDITION_GRID}
+          cancelAnswer={NARI_EDITION_CANCEL}
+          onAnswer={(answer) => dispatch({ type: '창답', answer })}
+        />
       )}
 
       {/* 일반모드 진입 창 — 하위 12 그리기도 게임시작 목록 위에 상자를 얹는다 */}

@@ -134,3 +134,49 @@ describe('일반모드 진입 창 [13] — 하위 12 0x296f0', () => {
     expect(screen.getByRole('button', { name: '빠른실행' })).toBeTruthy()
   })
 })
+
+describe('나만의리그 편 고르기 창 [14] — 하위 13 (진입 0x25d78 · 갱신 0x2464c)', () => {
+  const 나리창 = (hasSavedGame: boolean, onNewGame = vi.fn()) => {
+    render(
+      <MainMenuScreen hasSavedGame={hasSavedGame} onContinue={vi.fn()} onNewGame={onNewGame} onSelectMode={vi.fn()}
+        onBack={vi.fn()} onHelp={vi.fn()} onSettings={vi.fn()} onSpecial={vi.fn()} />,
+    )
+    // 윗단 [게임시작] → 아랫단 최근게임 → ↓↓ 나만의리그 → 시작
+    for (const key of ['Enter', 'ArrowDown', 'ArrowDown', 'Enter']) {
+      act(() => {
+        fireEvent.keyDown(window, { key })
+      })
+    }
+    return onNewGame
+  }
+  const 그림 = (name: string) => screen.getByRole('button', { name }).querySelector('img')?.getAttribute('src') ?? ''
+
+  it('저장이 있어도 [15] 확인 없이 [14] 가 뜬다 — 타자편(고른 13)·투수편(보통 12), 처음 커서는 타자편', () => {
+    나리창(true)
+
+    expect(screen.queryByText('새로하시겠습니까?', { exact: false })).toBeNull()
+    expect(screen.getByText('플레이 하시겠습니까?', { exact: false })).toBeTruthy()
+    expect(그림('타자편')).toContain('popup/frames/013.png')
+    expect(그림('투수편')).toContain('popup/frames/012.png')
+  })
+
+  it('Enter 는 타자편, → 뒤 Enter 는 투수편', () => {
+    const 타자 = 나리창(false)
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(타자).toHaveBeenCalledWith('타자편')
+
+    cleanup()
+    const 투수 = 나리창(false)
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(그림('투수편')).toContain('popup/frames/014.png')
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(투수).toHaveBeenCalledWith('투수편')
+  })
+
+  it('CLR 은 창만 닫는다', () => {
+    const onNewGame = 나리창(true)
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(onNewGame).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: '타자편' })).toBeNull()
+  })
+})

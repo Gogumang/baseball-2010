@@ -121,7 +121,7 @@ describe('reduceMainMenu — 원본 글자 목록에서 모드를 고르는 메�
 
     const 시작 = reduceMainMenu(고름, { type: '시작' }, true)
     expect(시작.effect).toBe('시즌모드')
-    expect(시작.state.isConfirmingNewGame).toBe(false)
+    expect(시작.state.isPickingNariEdition).toBe(false)
   })
 
   it('저장이 없어도 최근게임은 잠기지 않는다 — 원본은 커서로 막지 않는다', () => {
@@ -144,20 +144,27 @@ describe('reduceMainMenu — 원본 글자 목록에서 모드를 고르는 메�
     expect(reduceMainMenu(고름, { type: '시작' }, false).effect).toBe('미션')
   })
 
-  it('저장이 없으면 나만의리그는 바로 새로하기다', () => {
-    const 고름 = 고르기(게임시작목록(false), '나만의리그', false)
-    expect(reduceMainMenu(고름, { type: '시작' }, false).effect).toBe('새로하기')
+  it('나만의리그는 저장이 있어도 지울지 묻지 않고 편 고르기 창 [14](하위 13)를 띄운다 — [15] 는 일반모드 것이다', () => {
+    for (const hasSavedGame of [false, true]) {
+      const 고름 = 고르기(게임시작목록(hasSavedGame), '나만의리그', hasSavedGame)
+      const 창 = reduceMainMenu(고름, { type: '시작' }, hasSavedGame)
+      expect(창.effect).toBeNull()
+      expect(창.state.isPickingNariEdition).toBe(true)
+    }
   })
 
-  it('저장이 있는데 나만의리그로 시작하면 지울지 먼저 묻는다', () => {
+  it('[14] 답 0 은 타자편(모드 4) · 1 은 투수편(모드 3) · CLR(−1) 은 게임시작 목록 (0x2464c)', () => {
     const 고름 = 고르기(게임시작목록(true), '나만의리그', true)
-    const 물음 = reduceMainMenu(고름, { type: '시작' }, true)
-    expect(물음.state.isConfirmingNewGame).toBe(true)
-    expect(물음.effect).toBeNull()
+    const 창 = reduceMainMenu(고름, { type: '시작' }, true).state
+    const 답 = (answer: number) => reduceMainMenu(창, { type: '창답', answer }, true)
 
-    expect(reduceMainMenu(물음.state, { type: '확인', isAccepted: true }, true).effect).toBe('새로하기')
-    expect(reduceMainMenu(물음.state, { type: '확인', isAccepted: false }, true).state.isConfirmingNewGame).toBe(false)
-    expect(reduceMainMenu(물음.state, { type: '뒤로' }, true).state.isConfirmingNewGame).toBe(false)
+    expect(답(0).effect).toBe('나리타자편')
+    expect(답(1).effect).toBe('나리투수편')
+    expect(답(-1).effect).toBeNull()
+    expect(답(-1).state.isPickingNariEdition).toBe(false)
+    expect(답(-1).state.tier).toBe(5)
+    // 창이 떠 있으면 목록 키는 안 먹는다
+    expect(reduceMainMenu(창, { type: '뒤로' }, true).state).toBe(창)
   })
 })
 

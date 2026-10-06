@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { Screen } from '@/app/model/screen'
-import { MessageBox, RawScreen } from '@/shared/ui'
+import { MessageBox } from '@/shared/ui'
 import { HomeRunDerbyScreen } from '@/pages/home-run-derby/ui/HomeRunDerbyScreen'
 import { modeBatterOf, modeBatterOfHallOfFame } from '@/app/model/modeBatter'
 import { nariBatterOf } from '@/app/model/useCollection'
@@ -12,13 +12,6 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 /** 홈런더비 최고 비거리 저장 칸 */
 const DERBY_BEST_KEY = 'compus-baseball/derby-best'
 
-/** StrMAINMENU[14] 원문 그대로 (`base/extracted/StrMAINMENU.json`) */
-const MY_LEAGUE_EDITION_PROMPT = '!C어떤 선수로!N플레이 하시겠습니까?'
-/** 선수 목록 결과 코드 1 육성 투수 · 2 육성 타자 → 원본 모드 3 · 4 (H-modes 1절) */
-const MY_LEAGUE_EDITIONS = [
-  { label: '육성 투수', code: 1 },
-  { label: '육성 타자', code: 2 },
-] as const
 import type { useCareerSession } from '@/app/model/useCareerSession'
 import type { useGameSettings } from '@/app/model/useGameSettings'
 import type { Collection } from '@/entities/collection/model/collection'
@@ -148,33 +141,6 @@ export function EntryRoutes({
     )
   }
 
-  /**
-   * 나만의리그 편 고르기 — 원본 메인 메뉴 **하위 13(0x2464c)** 이다 (H-modes 1절).
-   *
-   * 예/아니오 팝업이 아니라 **선수 목록 창**(`0x62568` / 항목 채우기 `0x5eae0`)이고,
-   * 질문 머리는 **StrMAINMENU[14] `!C어떤 선수로!N플레이 하시겠습니까?`** 다.
-   * 결과 코드는 **1 육성 투수 · 2 육성 타자 · 3 명예 투수 · 4 명예 타자** 이고
-   * (Q2-mission-rewards 1절 확정), 나만의리그는 그중 **육성 쪽만** 받아 모드 3·4 로 간다.
-   *
-   * ⚠️ **근사다**: 명예 선수 칸(3·4)은 미션·홈런더비가 쓰는 자리라 여기서는 안 보인다.
-   *    원본이 나리에서도 그 두 칸을 그리는지는 `0x5eae0` 속을 안 읽어 확인하지 못했다.
-   *
-   * 예전에는 `MessageBox` 를 썼는데, 그 상자의 버튼은 글자가 아니라 `popup.pzx` **그림**
-   * (프레임 1 "예" · 2 "아니오")이라 `buttons` 로 넘긴 이름이 화면에 안 나오고 늘 예/아니오가 떴다.
-   */
-  if (screen.kind === '나리편선택') {
-    return (
-      <RawScreen>
-        <MessageBox
-          text={MY_LEAGUE_EDITION_PROMPT}
-          buttons={MY_LEAGUE_EDITIONS.map((edition) => edition.label)}
-          listItems={MY_LEAGUE_EDITIONS.map((edition) => edition.label)}
-          onAnswer={(index) => setScreen(index === 0 ? { kind: '투수편' } : { kind: '팀선택' })}
-        />
-      </RawScreen>
-    )
-  }
-
   // 원본 흐름은 0x65 팀 고르기 → 0x66 등록 → 0x67 확인이다 (C-6)
   if (screen.kind === '팀선택') {
     return (
@@ -269,7 +235,14 @@ export function EntryRoutes({
     <MainMenuScreen
       hasSavedGame={session.savedCareer !== null}
       onContinue={session.actions.continueSaved}
-      onNewGame={() => setScreen({ kind: '나리편선택' })}
+      // 나만의리그 편 고르기 창 [14](하위 13)은 메인 메뉴 위에 뜬다. 고른 편 → 0x327b8(모드 4|3) → 장면 0x106 셋업 0xf684:
+      // 그 편 커리어(전역기록 +0x40 + 모드)가 있으면 이어하기(100), 없으면 팀 고르기(101). 지울지 묻는 창은 없다.
+      // 투수편은 PitcherLeagueRoute 가 커리어 유무로 등록/관리를 가른다.
+      onNewGame={(edition) => {
+        if (edition === '투수편') return setScreen({ kind: '투수편' })
+        if (session.savedCareer !== null) return session.actions.continueSaved()
+        setScreen({ kind: '팀선택' })
+      }}
       onSelectMode={(mode) => {
         // 시즌모드·일반모드는 팀을 맡는 모드라 육성 선수가 없어도 들어간다
         if (mode === '시즌모드') return setScreen({ kind: '시즌모드' })

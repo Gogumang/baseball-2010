@@ -26,7 +26,16 @@ export interface MainMenuState {
   readonly tier: MainMenuTier
   readonly selectedTopId: string
   readonly selectedModeId: string
-  readonly isConfirmingNewGame: boolean
+  /**
+   * 나만의리그 편 고르기 창 [14] — 하위 상태 13. 게임시작 목록 [나만의리그] 가 곧바로 하위 13 으로 간다
+   * (0x28cb0 표 0xcebb0[2] = 13 → 0x28d9a). **저장을 지울지 묻는 창은 없다** — [15] 는 0x296f0(일반모드) 안에만 있다.
+   *
+   * 진입 0x25d78: [14] "어떤 선수로 플레이 하시겠습니까?" 종류 0x10, 격자 2열×1행, 간격 0x74805(창, 0x3c, 0),
+   * 버튼 0 타자편(popup 고른 13 / 보통 11) · 1 투수편(14 / 12), CLR → −1. 0x749d5 를 안 불러 처음 커서는 0(타자편).
+   * 갱신 0x2464c: 답 0 → this+0x13c = 4(타자편) · 1 → 3(투수편) → 상태 0x27 → 0x327b8(모드) → 장면 0x106,
+   * −1 → 상태 5. 장면 셋업 0xf684 가 전역기록 +0x40 + 모드(그 편 커리어 있음)면 이어하기(100), 없으면 팀 고르기(101).
+   */
+  readonly isPickingNariEdition: boolean
   /** 못 들어가는 칸을 골랐을 때 뜨는 안내 (원본 팝업 0x74ef5 종류 1 자리). null 이면 안 뜬다. */
   readonly lockedNotice: string | null
   /** 일반모드 진입 창 — 하위 상태 12(0x296f0)의 [13]·[15]. null 이면 안 떠 있다. */
@@ -70,13 +79,14 @@ export type MainMenuAction =
   | { readonly type: '커서'; readonly step: 1 | -1 }
   | { readonly type: '시작' }
   | { readonly type: '뒤로' }
-  | { readonly type: '확인'; readonly isAccepted: boolean }
-  /** 일반모드 진입 창의 답 — 버튼 칸 번호, CLR 은 −1 */
+  /** 진입 창(일반모드 [13]·[15] · 나만의리그 [14])의 답 — 버튼 칸 번호, CLR 은 −1 */
   | { readonly type: '창답'; readonly answer: number }
 
 /** 메뉴 밖으로 나가야 하는 결과. null 이면 메뉴 안에서 끝난다. */
 export type MainMenuEffect =
-  | '이어하기' | '새로하기' | '미션' | '홈런더비' | '시즌모드' | '일반모드' | '타이틀로'
+  | '이어하기' | '미션' | '홈런더비' | '시즌모드' | '일반모드' | '타이틀로'
+  /** 나만의리그 [14] 답 0 · 1 — 모드 4 타자편 · 모드 3 투수편 (0x2464c) */
+  | '나리타자편' | '나리투수편'
   /** 일반모드 빠른실행 — 하위 22(경기정보)로 곧바로, this+0x14c = 1 (0x299f8 · 0x2992a) */
   | '일반모드빠른실행'
   /** 일반모드 중간 저장 이어하기 — 상태 0x27 → 0x327b8 이 0x213c0(앱, 1, 0) 으로 올려 경기 장면으로 (웹엔 그 저장이 없다) */
@@ -102,7 +112,7 @@ export function initialMainMenu(_hasSavedGame: boolean): MainMenuState {
     tier: 4,
     selectedTopId: TOP_ENTRIES[0].id,
     selectedModeId: MODE_ENTRIES[0].id,
-    isConfirmingNewGame: false,
+    isPickingNariEdition: false,
     lockedNotice: null,
     generalModeWindow: null,
   }
@@ -199,10 +209,13 @@ export function reduceMainMenu(
   // 안내 팝업이 떠 있으면 아무 키나 받아 닫기만 한다 (원본 확인 팝업 0x74189 자리)
   if (state.lockedNotice !== null) return stay({ ...state, lockedNotice: null })
 
-  if (state.isConfirmingNewGame) {
-    if (action.type === '확인' && action.isAccepted) return { state, effect: '새로하기' }
-    if (action.type === '확인' || action.type === '뒤로') return stay({ ...state, isConfirmingNewGame: false })
-    return stay(state)
+  if (state.isPickingNariEdition) {
+    if (action.type !== '창답') return stay(state)
+    const close = { ...state, isPickingNariEdition: false }
+    if (action.answer === 0) return { state: close, effect: '나리타자편' }
+    if (action.answer === 1) return { state: close, effect: '나리투수편' }
+    // −1(CLR) → 상태 5 게임시작 목록
+    return stay(close)
   }
 
   const entries = entriesOf(state.tier)
@@ -265,11 +278,7 @@ function start(state: MainMenuState, hasSavedGame: boolean, isGeneralGameInProgr
     const initialSelected = generalModeEntryCursorOf(5, isGeneralGameInProgress)
     return { state: { ...state, generalModeWindow: { kind: '진입', initialSelected } }, effect: null }
   }
-  if (entry.id === '나만의리그') {
-    // StrMAINMENU[15] — 저장이 있으면 지워도 되는지 먼저 묻는다.
-    return hasSavedGame
-      ? { state: { ...state, isConfirmingNewGame: true }, effect: null }
-      : { state, effect: '새로하기' }
-  }
+  // 나만의리그 → 하위 13 편 고르기 창 [14] (0x28d9a) — 저장 유무와 상관없이 지울지 묻지 않는다
+  if (entry.id === '나만의리그') return { state: { ...state, isPickingNariEdition: true }, effect: null }
   return { state, effect: null }
 }

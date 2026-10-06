@@ -39,13 +39,12 @@ export function useMainMenu(
       const dispatch = dispatchRef.current
       if (event.key === 'Enter') {
         event.preventDefault()
-        dispatch(stateRef.current.isConfirmingNewGame ? { type: '확인', isAccepted: true } : { type: '시작' })
+        dispatch({ type: '시작' })
       } else if (event.key === 'Escape' || event.key === 'Backspace') {
         event.preventDefault()
         dispatch({ type: '뒤로' })
       } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
         // 원본 목록은 ↑↓ 로 고른다 (셀렉트박스였을 때는 시트가 가져가던 키다)
-        if (stateRef.current.isConfirmingNewGame) return
         event.preventDefault()
         dispatch({ type: '커서', step: event.key === 'ArrowDown' ? 1 : -1 })
       }
