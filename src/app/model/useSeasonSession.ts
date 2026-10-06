@@ -281,7 +281,7 @@ export interface SeasonActions {
   readonly removeCareerPlayer: (isPitcher: boolean) => void
   /**
    * 시즌모드 초기화 — 모드 저장 지우기 `0x224ec(mgr, 2)`: game_s.sav 를 지우고 전역기록 +0x42(시즌 커리어 있음) ·
-   * +0x4e(경기 중간 저장)를 0 으로. 다음 시즌모드 진입은 팀 고르기다.
+   * +0x4e(경기 중간 저장)를 0 으로. 다음 시즌모드 진입은 팀 고르기다. 경기진행 설정·창 본 표시(전역 칸)는 남는다.
    */
   readonly resetSeason: () => void
   /** 트레이드 한 번이 끝났다 (0xe7) — 커맨드 표시·명단·G 를 **한 번에** 적어 넣는다 */
@@ -405,6 +405,7 @@ interface SeasonSave {
   /**
    * 경기진행 설정 시즌 칸 (전역 저장 +0x12c+m 계열, m = 1). 원본은 **전역 저장**이라 시즌을 새로 해도 남는다 —
    * 웹엔 그 전역 저장 객체가 없어 시즌 저장에 두되, 새 시즌(`chooseTeam`)이 앞 저장의 값을 그대로 넘겨받는다.
+   * 모드 초기화 0x224ec(2) 는 이 칸을 안 지운다 — `resetSeason` 이 시즌 없는 덩어리에 남겨 둔다(`SeasonGlobalCarry`).
    * ⚠️ 시즌 저장 칸을 통째로 지우면(브라우저 저장 삭제) 함께 사라진다 — 그 점만 근사다.
    * 한 번도 고치지 않았으면 원본 저장의 0 초기값(`SEASON_DEFAULT_MATCH_SETTINGS` — 찬스 · 공격 득점권)이다.
    */
@@ -444,6 +445,25 @@ interface SeasonSave {
    * (웹 명단 첨자 돌림 수 — `withOwnRecordRotation`). 진행 꼴이 바뀌어 못 읽으면 저장 없음으로 본다.
    */
   readonly gameSave?: SeasonGameSaveBlock | null
+}
+
+/**
+ * **시즌이 없어도 남는 전역 칸** — 경기진행 설정(+0x12c+1 계열)과 창 본 표시(+0x11e). 원본은 전역기록이라 모드 초기화
+ * 0x224ec(2)(시즌 파일 지움)가 안 건드린다. 웹은 시즌 저장에 두므로 시즌을 지울 때 이 두 칸만 남긴 덩어리를 쓴다
+ * (`normalizeSeasonSave` 는 `state` 가 없으면 시즌 없음으로 본다).
+ */
+type SeasonGlobalCarry = Pick<SeasonSave, 'matchSettings' | 'matchSettingsSeen'>
+
+/** 저장(또는 시즌 없는 덩어리)에서 전역 칸만 고른다 */
+function seasonGlobalCarryOf(raw: unknown): SeasonGlobalCarry {
+  if (raw === null || typeof raw !== 'object') return {}
+  const value = raw as Partial<SeasonSave>
+  return {
+    ...(value.matchSettings === undefined || value.matchSettings === null || typeof value.matchSettings !== 'object'
+      ? {}
+      : { matchSettings: value.matchSettings }),
+    ...(typeof value.matchSettingsSeen === 'boolean' ? { matchSettingsSeen: value.matchSettingsSeen } : {}),
+  }
 }
 
 /** 시즌 저장의 경기 블록 (`SeasonSave.gameSave`) */
@@ -861,7 +881,8 @@ const HOSPITAL_PLACE = SEASON_OUTING_PLACES.indexOf('병원')
  */
 function normalizeSeasonSave(saved: Partial<SeasonSave> | null): SeasonSave | null {
   if (saved === null || saved === undefined || typeof saved !== 'object') return null
-  // 시즌 초기화(`resetSeason` — game_s.sav 지움)가 남긴 빈 덩어리 — 저장소에 clear 가 없어 {} 를 덮어쓴다
+  // 시즌 초기화(`resetSeason` — game_s.sav 지움)가 남긴 덩어리 — 저장소에 clear 가 없어 전역 칸 둘만 남긴 덩어리
+  // (`SeasonGlobalCarry`)를 덮어쓴다. 시즌은 없다
   if (saved.state === undefined) return null
   const state = normalizeSeasonState(saved.state)
   const roster = saved.roster === undefined
@@ -1003,6 +1024,9 @@ export function useSeasonSession(
   )
   const loaded = useRef<SeasonSave | null>(null)
   if (loaded.current === null) loaded.current = withSceneConstructed(normalizeSeasonSave(store.load() as Partial<SeasonSave> | null))
+  /** 시즌이 없을 때의 전역 칸 (`SeasonGlobalCarry`) — 시즌이 있으면 그 저장이 주인이다 */
+  const carriedGlobals = useRef<SeasonGlobalCarry | null>(null)
+  if (carriedGlobals.current === null) carriedGlobals.current = seasonGlobalCarryOf(store.load())
 
   const [save, setSave] = useState<SeasonSave | null>(loaded.current)
   const [scene, setScene] = useState<SeasonSceneState>(() =>
@@ -1244,9 +1268,9 @@ export function useSeasonSession(
         ranking: [],
         cup: null,
         cpuPitcherStaminas: fullCpuPitcherStaminas(teamId),
-        // 경기진행 설정(+0x12c+1)과 창을 본 표시(+0x11e)는 전역 저장 칸이라 새 시즌이 넘겨받는다
-        ...(save?.matchSettings === undefined ? {} : { matchSettings: save.matchSettings }),
-        ...(save?.matchSettingsSeen === undefined ? {} : { matchSettingsSeen: save.matchSettingsSeen }),
+        // 경기진행 설정(+0x12c+1)과 창을 본 표시(+0x11e)는 전역 저장 칸이라 새 시즌이 넘겨받는다 — 시즌 초기화 뒤면
+        // 남겨 둔 덩어리에서
+        ...seasonGlobalCarryOf(save ?? carriedGlobals.current),
       }
       commit(next)
       // 0xcc → 0xcb: 새 시즌 초기화에서 왔으니 새 선수 플래그가 선다 — 관리 메뉴 첫 폴링이 400 을 튼다
@@ -1293,14 +1317,18 @@ export function useSeasonSession(
 
   /**
    * 0x224ec(mgr, 2) — 시즌 파일 지움(+0x42 = 0) · +0x4e = 0. 웹 시즌 저장 한 칸이 곧 그 파일이고 +0x4e 도 그 안에 있다.
-   * ⚠️ 같은 함수가 지우는 전역기록 +0x48 · +0x49 · +0x54/+0x55(대전) · +0xf8~+0x117 · +0x138 · +8 은 웹에 짝지은 칸이 없어
-   * 안 지운다(미해결). 경기진행 설정(+0x12c+1)·창 본 표시(+0x11e)는 이 함수가 안 건드리는 전역 칸인데 웹은 시즌 저장에
-   * 두었으므로 함께 사라진다(근사).
+   * 같은 함수의 나머지 칸(전역기록 G)은 웹에 짝이 없어 지울 것이 없다 — `entities/settings/model/modeReset.ts` 머리 주석:
+   * +0x48/+0x49 · +0x54/+0x55 · +0xf8~+0x117 · +0x138 은 대전모드 8·9 칸(🌐), +8 은 시즌 파일 도장(0x22754 가 쓰고 0x213c0 이
+   * 견준다). 경기진행 설정(+0x12c+1)·창 본 표시(+0x11e)는 이 함수가 안 건드리는 전역 칸이라 **남긴다** — 시즌 없는 덩어리에
+   * 그 두 칸만 쓴다(`SeasonGlobalCarry`).
    */
   const resetSeason = useCallback(() => {
+    const current = latestSave.current
+    const carry = seasonGlobalCarryOf(current ?? carriedGlobals.current)
+    carriedGlobals.current = carry
     latestSave.current = null
     setSave(null)
-    store.save({})
+    store.save(carry)
     setGameOptions(null)
     setResumeGame(null)
     setPendingGame(null)
@@ -2459,7 +2487,7 @@ export function useSeasonSession(
     preGameAces,
     pendingGame,
     isMatchSettingsOpen,
-    matchSettings: save?.matchSettings ?? SEASON_DEFAULT_MATCH_SETTINGS,
+    matchSettings: (save ?? carriedGlobals.current)?.matchSettings ?? SEASON_DEFAULT_MATCH_SETTINGS,
     entryEdit,
     matchInfoStarterName,
     matchInfoOpponentStarterName,

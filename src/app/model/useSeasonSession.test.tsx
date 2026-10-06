@@ -2125,6 +2125,35 @@ describe('모드 초기화 — 0x224ec(mgr, 2) 시즌 · 0x223a8 나리 선수 �
     expect(renderHook(() => useSeasonSession(store, createSeededRandom(1))).result.current.state).toBeNull()
   })
 
+  it('경기진행 설정·창 본 표시는 0x224ec(2) 가 안 지우는 전역 칸이라 시즌 초기화 뒤에도 남는다 (+0x12c+1 · +0x11e)', () => {
+    const store = 메모리저장()
+    const { result } = 띄우기(store)
+    시작(result, 0)
+    act(() => result.current.actions.openNextGame())
+    act(() => result.current.actions.confirmNextGame())
+    act(() => result.current.actions.choosePreGameAce(1))
+    act(() => result.current.actions.choosePreGameAce(8))
+    // 처음 0xdd — 창이 저절로 열리고 +0x11e = 1
+    expect(result.current.isMatchSettingsOpen).toBe(true)
+    const 설정 = { ...SEASON_DEFAULT_MATCH_SETTINGS, kind: 1, value: 2 }
+    act(() => result.current.actions.applyMatchSettings(설정))
+
+    act(() => result.current.actions.resetSeason())
+    expect(result.current.state).toBeNull()
+    expect(result.current.matchSettings).toEqual(설정)
+
+    // 새로 고친 뒤 새 시즌을 시작해도 그대로 — 0xdd 에 와도 창이 저절로 안 열린다
+    const 다시 = renderHook(() => useSeasonSession(store, createSeededRandom(20100901)))
+    expect(다시.result.current.state).toBeNull()
+    시작(다시.result, 2)
+    expect(다시.result.current.matchSettings).toEqual(설정)
+    act(() => 다시.result.current.actions.openNextGame())
+    act(() => 다시.result.current.actions.confirmNextGame())
+    act(() => 다시.result.current.actions.choosePreGameAce(1))
+    act(() => 다시.result.current.actions.choosePreGameAce(8))
+    expect(다시.result.current.isMatchSettingsOpen).toBe(false)
+  })
+
   it('나리 초기화는 내 시즌 팀에서 그 편 첫 나리 선수를 빼고 저장한다', () => {
     const store = 메모리저장()
     const { result } = 띄우기(store)
