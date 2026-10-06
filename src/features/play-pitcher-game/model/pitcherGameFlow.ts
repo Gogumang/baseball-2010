@@ -12,6 +12,7 @@ import type { AtBatState, PitchResolution } from '@/entities/at-bat/model/atBatS
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { describeOutcome, isFreePass, isHit } from '@/entities/at-bat/model/atBatOutcome'
 import { playQuickAtBat } from '@/entities/game/model/quickAtBat'
+import type { QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
 import {
   PITCHERS_PER_TEAM,
   batterAt,
@@ -1987,6 +1988,7 @@ function playDefensiveAtBat(
   progress = runQuickSubstitutions(progress, false, random)
   const mound = progress.ourMound
   const defense = ourQuickDefenseOf(progress)
+  const pitched = perPitchDrainOf(defense, mound)
   // 내가 마운드에 없는 수비 타석은 자동진행(0x21) 안의 간이 타석 — 상태 0xf 를 안 지나 돌발을 굴리지 않는다
   const play = playQuickAtBat(
     batterAt(options.opponentTeamId, opponentRosterSlotOf(progress)),
@@ -1994,6 +1996,7 @@ function playDefensiveAtBat(
     { ...defense.pitcherAt(mound.pitcherSlot), stamina: staminaPercentOf(mound.stamina) },
     { inning: progress.game.inning },
     random,
+    { beforePitch: pitched.beforePitch },
   )
   const before = progress.game
   const played = applyDefensivePlay(
@@ -2018,7 +2021,8 @@ function playDefensiveAtBat(
     ...played,
     ourMound: {
       ...played.ourMound,
-      stamina: drainQuickPitcher(defense, mound, play.pitches),
+      // 공마다 이미 깎았다 (위 `beforePitch`, 0xc262c 의 c26c8)
+      stamina: pitched.stamina(),
       runsAllowed: Math.min(MAXIMUM_PITCHER_COUNTER, mound.runsAllowed + runs),
       pitches: mound.pitches + play.pitches,
     },
@@ -2041,6 +2045,7 @@ function playTeammateAtBat(
   const before = progress.game
   const mound = progress.opponentMound
   const defense = opponentQuickDefenseOf(progress)
+  const pitched = perPitchDrainOf(defense, mound)
   const play = playQuickAtBat(
     // 대타가 들어오면 그 타순 칸에 선 선수가 바뀐다 — 명단(`team+0xe`)에서 고른다
     batterAt(options.ourTeamId, rosterSlotAt(progress.ourLineup, before.battingOrderIndex)),
@@ -2048,6 +2053,7 @@ function playTeammateAtBat(
     { ...defense.pitcherAt(mound.pitcherSlot), stamina: staminaPercentOf(mound.stamina) },
     { inning: before.inning },
     random,
+    { beforePitch: pitched.beforePitch },
   )
   const outcome = play.outcome
   // 동료 타석은 원본도 간이 엔진(0xc262c)이다 — 희생플라이가 없다 (E-2 확정)
@@ -2091,7 +2097,8 @@ function playTeammateAtBat(
       ...withMoundsPitched(progress),
       opponentMound: {
         ...mound,
-        stamina: drainQuickPitcher(defense, mound, play.pitches),
+        // 공마다 이미 깎았다 (위 `beforePitch`, 0xc262c 의 c26c8)
+        stamina: pitched.stamina(),
         runsAllowed: Math.min(MAXIMUM_PITCHER_COUNTER, mound.runsAllowed + runs),
         pitches: mound.pitches + play.pitches,
         justChanged: false,
@@ -2112,6 +2119,25 @@ function playTeammateAtBat(
 
 /** 원본 실점 카운터 A·B 는 99 에서 자른다 (P7 E1) */
 const MAXIMUM_PITCHER_COUNTER = 99
+
+/**
+ * 간이 타석의 공 하나를 던지기 앞 — `0xc262c` 의 공 고리는 c26be 0xa5c2d → **c26c8 0xa5e14(소모)** → c26d4 경로 굴림
+ * 차례라, 공 하나가 보는 체력%(0xaebb0)는 그 공의 소모까지 먹은 값이다 (반 이닝 엔진 `beforePitch` 와 같다, d9d376c).
+ * 갈고리는 난수를 쓰지 않는다.
+ */
+function perPitchDrainOf(
+  defense: HalfInningDefense,
+  mound: HalfInningMound,
+): { readonly beforePitch: () => QuickAtBatPitcher; readonly stamina: () => number } {
+  let stamina = mound.stamina
+  return {
+    beforePitch: () => {
+      stamina = drainQuickPitcher(defense, { ...mound, stamina }, 1)
+      return { ...defense.pitcherAt(mound.pitcherSlot), stamina: staminaPercentOf(stamina) }
+    },
+    stamina: () => stamina,
+  }
+}
 
 /** 한 타석 앞에서 `0xc1ba4` 를 다시 부르는 상한 — 대타 한 번 · 투수 한 번 · 마지막 빈 부름 */
 const MAXIMUM_QUICK_SUBSTITUTION_CALLS = 3

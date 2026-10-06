@@ -14,6 +14,7 @@ import {
 } from '@/entities/game/model/gameState'
 import type { GameState, PlayerSide } from '@/entities/game/model/gameState'
 import { playQuickAtBat } from '@/entities/game/model/quickAtBat'
+import type { QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
 import {
   changePitcherIfNeeded,
   drainPitcherForPitch,
@@ -1181,12 +1182,14 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort): GameProg
   // 동료 타석은 자동진행(0x21) 안의 간이 타석이라 상태 0xf 를 안 지난다 — 돌발 굴림(0x8f158)·판정(0x8f414) 없음
   const opponentDefense = opponentQuickDefenseOf(progress)
   const mound = progress.opponentMound
+  const pitched = perPitchDrainOf(opponentDefense, mound)
   const play = playQuickAtBat(
     batterAt(progress.ourTeamId, rosterSlotAt(progress.ourLineup, progress.game.battingOrderIndex)),
     // 간이 엔진이 보는 투수 체력은 체력%(0xaebb0)다 — 마운드의 살아 있는 값을 넘긴다
     { ...opponentDefense.pitcherAt(mound.pitcherSlot), stamina: staminaPercentOf(mound.stamina) },
     { inning: progress.game.inning },
     random,
+    { beforePitch: pitched.beforePitch },
   )
   const outcome = play.outcome
   // 동료 타석은 원본도 간이 엔진(0xc262c)이 돌린다 — **간이 엔진에는 희생플라이가 없다** (E-2 확정).
@@ -1220,7 +1223,8 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort): GameProg
       ourLineup: recordLineupPlay(progress.ourLineup, slot, outcome, runsBattedIn),
       opponentMound: {
         ...mound,
-        stamina: drainQuickPitcher(opponentDefense, mound, play.pitches),
+        // 공마다 이미 깎았다 (위 `beforePitch`, 0xc262c 의 c26c8)
+        stamina: pitched.stamina(),
         runsAllowed: Math.min(MAXIMUM_PITCHER_COUNTER, mound.runsAllowed + runsBattedIn),
         pitches: mound.pitches + play.pitches,
         // 투구마다 state[0xd] 가 내려간다 (0xa5e72)
@@ -1257,6 +1261,25 @@ const MAXIMUM_PITCHER_COUNTER = 99
 
 /** 팀 투수 여덟 칸 (`team+0x0c`) — 벤치는 여기서 마운드와 이미 쓴 투수를 뺀 나머지다 */
 const ALL_PITCHER_SLOTS: readonly number[] = Array.from({ length: PITCHERS_PER_TEAM }, (_unused, slot) => slot)
+
+/**
+ * 간이 타석의 공 하나를 던지기 앞 — `0xc262c` 의 공 고리는 c26be 0xa5c2d → **c26c8 0xa5e14(소모)** → c26d4 경로 굴림
+ * 차례라, 공 하나가 보는 체력%(0xaebb0)는 그 공의 소모까지 먹은 값이다 (반 이닝 엔진 `beforePitch` 와 같다, d9d376c).
+ * 갈고리는 난수를 쓰지 않는다.
+ */
+function perPitchDrainOf(
+  defense: HalfInningDefense,
+  mound: HalfInningMound,
+): { readonly beforePitch: () => QuickAtBatPitcher; readonly stamina: () => number } {
+  let stamina = mound.stamina
+  return {
+    beforePitch: () => {
+      stamina = drainQuickPitcher(defense, { ...mound, stamina }, 1)
+      return { ...defense.pitcherAt(mound.pitcherSlot), stamina: staminaPercentOf(stamina) }
+    },
+    stamina: () => stamina,
+  }
+}
 
 /** 칸 하나의 레코드 스태미나를 바꾼 표 */
 function withStaminaAt(table: readonly number[], slot: number, stamina: number): readonly number[] {
