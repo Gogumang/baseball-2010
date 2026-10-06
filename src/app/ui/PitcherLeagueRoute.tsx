@@ -127,6 +127,8 @@ export function PitcherLeagueRoute({
           {story.context === '지도' && outingMap}
           <ScreenOverlay>
           <StoryScreen
+            // 명령 5 의 500ms 진동(0x3a44)은 환경설정 진동(옵션 +0x3b)이 켜졌을 때만
+            isVibrationOn={gameSettings.settings.isVibrationOn}
             key={`${story.context}:${event.id}`}
             events={session.storyEvents}
             event={event}

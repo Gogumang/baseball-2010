@@ -160,6 +160,8 @@ export function SeasonRoute({ session, random, gameSettings, onExit, aceSelect, 
         <RawScreen>
           <ScreenOverlay>
             <StoryScreen
+              // 명령 5 의 500ms 진동(0x3a44)은 환경설정 진동(옵션 +0x3b)이 켜졌을 때만
+              isVibrationOn={gameSettings.settings.isVibrationOn}
               key={playback.serial}
               events={SEASON_PLAYABLE_EVENTS}
               event={event}

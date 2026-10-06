@@ -181,6 +181,8 @@ export function CareerRoutes({
           {/* 대사창은 화면 **위에 얹히는 덮개**다 — 안 감싸면 창 전체로 퍼져 구석에 그려진다 */}
           <ScreenOverlay>
           <StoryScreen
+            // 명령 5 의 500ms 진동(0x3a44)은 환경설정 진동(옵션 +0x3b)이 켜졌을 때만
+            isVibrationOn={gameSettings.settings.isVibrationOn}
             key={event.id}
             events={session.storyEvents}
             event={event}
