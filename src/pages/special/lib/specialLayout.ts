@@ -69,7 +69,8 @@ export const SPECIAL_ITEMS: readonly SpecialItem[] = [
   {
     id: '에디트', labelFrame: 20, labelWidth: 73, labelHeight: 27, state: 29,
     description: '선수의 이름을 자유롭게!N변경할 수 있습니다', // [21]
-    availability: '아직', blockedText: '에디트(이름 변경)는!N아직 만들지 않았습니다',
+    // 상태 29 (진입 0x24804 · 갱신 0x2b2e0 · 그리기 0x2e1e0) — 화면은 앱이 `renderEdit` 으로 꽂는다 (pages 끼리 import 금지)
+    availability: '됨',
   },
   {
     id: '기록연감', labelFrame: 21, labelWidth: 97, labelHeight: 27, state: 30,

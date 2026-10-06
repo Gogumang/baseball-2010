@@ -37,6 +37,7 @@ import { judgeSeasonEnding } from '@/entities/season-mode/model/seasonRewards'
 import { SEASON_PHASE } from '@/entities/season-mode/model/seasonStateMachine'
 import { nariSeasonRecordsOf } from '@/app/model/seasonHallOfFameRecords'
 import type { RegularSeasonOtherModes } from '@/entities/career/model/postseasonFlow'
+import { useEditedNames } from '@/entities/player-name/model/useEditedNames'
 
 const SETTINGS_KEY = 'compus-baseball/settings'
 const COLLECTION_KEY = 'compus-baseball/collection'
@@ -68,6 +69,11 @@ const COLLECTION_REWARD_KEY = 'compus-baseball/collection-rewards'
  * (근거는 `usePitcherLeagueSession` 의 **투수 G 이사** 머리글).
  */
 const PITCHER_WALLET_MERGE_KEY = 'compus-baseball/pitcher-wallet-merged'
+/**
+ * **에디트 이름표** — 원본 앱 데이터 save[+0xac]+0x178 (투수 80 · 타자 120 칸, R11 1c). 모드와 상관없는 한 벌이다.
+ * 옛 세이브에는 이 칸이 없다 — 없으면 빈 표(모두 원래 이름)다.
+ */
+const EDITED_NAMES_KEY = 'compus-baseball/edited-names'
 
 const ENTRY_SCREENS: readonly Screen['kind'][] = ['타이틀', '메인메뉴', '도움말', '환경설정', '스페셜', '나리편선택', '팀선택', '선수등록', '홈런더비', '일반모드']
 
@@ -95,6 +101,9 @@ export function App() {
   const walletStore = useMemo(() => createLocalStorageJsonStore(WALLET_KEY), [])
   const collectionRewardStore = useMemo(() => createLocalStorageJsonStore(COLLECTION_REWARD_KEY), [])
   const pitcherWalletMergeStore = useMemo(() => createLocalStorageJsonStore(PITCHER_WALLET_MERGE_KEY), [])
+  const editedNamesStore = useMemo(() => createLocalStorageJsonStore(EDITED_NAMES_KEY), [])
+  // 에디트 이름표 — 서자마자 공용 이름 함수(0xb62c0)가 이 표를 본다. 경기·기록 화면의 선수 이름이 다 여길 거친다
+  const editedNames = useEditedNames(editedNamesStore)
   /** 옛 세이브 이사거리 — 지갑 칸이 없던 시절 G는 나만의리그 선수 안에 들어 있었다 */
   const legacyGamePoint = useMemo(() => saveGame.load()?.gamePoint ?? null, [saveGame])
   const gameSettings = useGameSettings(settingsStore)
@@ -412,6 +421,7 @@ export function App() {
         screen={screen} setScreen={setScreen} session={careerSession} gameSettings={gameSettings}
         collection={collection.collection} random={random} wallet={wallet} aceSelect={aceSelect}
         hallOfFameDeletion={hallOfFameDeletion}
+        onRenamePlayer={editedNames.rename}
         // 메인 메뉴 처음 단(하위 4)의 전부 수집 보상 판정 0x28e98 → 팝업 0x292f8
         claimCollectionReward={() => collection.claimCollectionReward(collectionRewardStore, everyMissionCleared, wallet)}
       />

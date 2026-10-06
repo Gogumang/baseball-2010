@@ -76,12 +76,17 @@ describe('스페셜 칸 고르기', () => {
     expect(screen.getByText(/통신이 필요합니다/)).toBeTruthy()
   })
 
-  it('아직 안 만든 칸도 안내를 띄운다 — 에디트', () => {
-    띄우기()
+  it('에디트 칸은 앱이 꽂은 상태 29 화면으로 가고, 그 화면의 CLR 은 목록으로 온다 (0x2b432)', () => {
+    const renderEdit = vi.fn((onBack: () => void) => (
+      <button type="button" onClick={onBack}>에디트-화면</button>
+    ))
+    띄우기({ renderEdit })
 
     fireEvent.click(칸('에디트'))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '에디트-화면' }))
 
-    expect(screen.getByText(/아직 만들지 않았습니다/)).toBeTruthy()
+    expect(칸('에디트')).toBeTruthy()
   })
 
   it('마선수선택 칸은 앱이 꽂은 상태 28 화면으로 가고, 그 화면의 되돌아가기는 목록으로 온다', () => {

@@ -31,6 +31,7 @@ import { MainMenuScreen } from '@/pages/main-menu/ui/MainMenuScreen'
 import { CreatePlayerScreen } from '@/pages/create-player/ui/CreatePlayerScreen'
 import { TeamSelectScreen } from '@/pages/create-player/ui/TeamSelectScreen'
 import { HelpScreen } from '@/pages/help/ui/HelpScreen'
+import { SpecialEditScreen } from '@/pages/special-edit/ui/SpecialEditScreen'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 
 interface EntryRoutesProps {
@@ -57,11 +58,14 @@ interface EntryRoutesProps {
    * 메인 메뉴 처음 단 열 번째 갱신에 부르고, 팝업을 닫으면 곧바로 다시 부른다([this+0x2c] = 9 → 다음 갱신 10).
    */
   readonly claimCollectionReward?: () => string | null
+  /** 스페셜 에디트(상태 29)의 이름 저장 0xaa4ad + 파일 저장 0x1f1b9 — 앱의 에디트 이름표 고리. 안 넘기면 에디트 칸이 안 열린다 */
+  readonly onRenamePlayer?: (id: number, isPitcher: boolean, name: string) => void
 }
 
 /** 커리어가 아직 없을 때의 화면 — 타이틀 → 메인 메뉴(도움말) → 선수 등록. */
 export function EntryRoutes({
   screen, setScreen, session, gameSettings, collection, random, wallet, aceSelect, hallOfFameDeletion, claimCollectionReward,
+  onRenamePlayer,
 }: EntryRoutesProps) {
   /** 전부 수집 보상 팝업 글 (0x292f8 의 `0xbbef9(글, 1, −1, 1)`) — 메뉴 위에 뜬다 */
   const [collectionRewardText, setCollectionRewardText] = useState<string | null>(null)
@@ -110,6 +114,12 @@ export function EntryRoutes({
               onSelect={() => undefined}
               onCancel={onBack}
             />
+          ),
+        })}
+        // 상태 29 = 에디트 — 팀 고르기(목록 k 9) → 기본 명단 보기 → 이름 입력, CLR 이 상태 6 으로 (0x2b2e0)
+        {...(onRenamePlayer === undefined ? {} : {
+          renderEdit: (onBack: () => void) => (
+            <SpecialEditScreen gamePoint={wallet.balance} onRename={onRenamePlayer} onBack={onBack} />
           ),
         })}
         onBack={() => setScreen({ kind: '메인메뉴' })}

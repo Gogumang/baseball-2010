@@ -1,6 +1,8 @@
 import { useEffect } from 'react'
+import type { ReactNode } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
+import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import {
   ACE_ENTRY_LOCKED_TEXT, ENTRY_SUB_TAB, ENTRY_TAB, NO_ENTRY_PICK, fieldPositionLabelOf,
 } from '@/entities/season-mode/model/entryEditor'
@@ -24,6 +26,13 @@ export interface EntryEditorScreenProps<B extends EntryBatterRow & EntryFace, P 
   /** 마선수 잠금 팝업(StrTEXT 0xd200c)이 떠 있는가 */
   readonly isAceLocked: boolean
   readonly gamePoint?: number
+  /**
+   * 머리띠 제목 — 안 주면 탭대로 "투수엔트리"/"타자엔트리"(0x54d95(skin, 탭 1 ? 7 : 6, …)).
+   * 스페셜 에디트(상태 29 그리기 0x2e1e0)는 탭과 상관없이 제목 1 "팀선택" 이다.
+   */
+  readonly title?: ScreenFrameTitle
+  /** 화면 맨 위에 얹는 창 — 스페셜 에디트의 이름 입력 창(하위 2)이 엔트리 창 위에 뜬다 */
+  readonly overlay?: ReactNode
   readonly onKey: (key: EntryKey) => void
   /** 웹 전용 — 줄을 눌러 커서를 옮긴다 */
   readonly onMoveCursor: (index: number) => void
@@ -52,7 +61,7 @@ const PITCHER_ABILITY_LABELS = ['제구', '구속', '변화', '체력'] as const
  *    줄에는 이름·수비 위치 글자만 적는다. 화면 밀기(0xbdae9, 1000) 연출도 없다.
  */
 export function EntryEditorScreen<B extends EntryBatterRow & EntryFace, P extends EntryPitcherRow & EntryFace>({
-  editor, lists, teamName, isAceLocked, gamePoint = 0, onKey, onMoveCursor, onCloseAceLocked,
+  editor, lists, teamName, isAceLocked, gamePoint = 0, title, overlay, onKey, onMoveCursor, onCloseAceLocked,
 }: EntryEditorScreenProps<B, P>) {
   useEffect(() => {
     if (isAceLocked) return undefined
@@ -151,12 +160,13 @@ export function EntryEditorScreen<B extends EntryBatterRow & EntryFace, P extend
 
       {/* 바닥 — 투수 탭 0xf "#타자"+"0상세정보"+되돌아가기 · 타자 탭 0x17 "#투수"+… (일반 0x2e0a2 · 시즌 0xb090).
           표시는 "#" 지만 탭을 바꾸는 키는 편집기 0x55864 의 '*'(0x2a, 0x558c4)다 — '#'(0x23)는 아무 일도 안 한다. 원본 그대로 둔다. */}
-      <ScreenFrame title={isPitcherTab ? '투수엔트리' : '타자엔트리'} gamePoint={gamePoint}
+      <ScreenFrame title={title ?? (isPitcherTab ? '투수엔트리' : '타자엔트리')} gamePoint={gamePoint}
         onBack={() => onKey('취소')} footer={isPitcherTab ? ENTRY_FOOTER.투수 : ENTRY_FOOTER.타자} />
 
       {isAceLocked && (
         <MessageBox text={ACE_ENTRY_LOCKED_TEXT} buttons={['OK']} onAnswer={onCloseAceLocked} />
       )}
+      {overlay}
     </RawScreen>
   )
 }
