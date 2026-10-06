@@ -1,4 +1,5 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { liveRunnerCountOf, passPlayGate, someRunnerStillActive } from '@/entities/fielding/model/playGate'
 import { PICKOFF_PLAY_KIND, type PickoffBase } from '@/entities/defense-controls/model/pickoff'
 import { autoAdvanceDecisions } from '@/entities/fielding/model/autoAdvance'
 import {
@@ -202,6 +203,8 @@ export function runPickoffPlay(input: PickoffPlayInput): PickoffPlayResult {
   let catchTick = -1
   /** 악송구로 공이 빠졌다 — 더는 아무도 쥐지 않는다 (근사) */
   let ballLost = false
+  /** 플레이 +0x120 — 판 진행 관문 0xb0d28 의 판 끝 세기 */
+  let endCounter = 0
   /** 이번 틱에 0xb36d0 이 아웃을 냈나 — 결과 코드 13 → 결과 메시지 0xbba */
   let outJudgedThisTick = false
   /** +0x15c · +0x158 — 0xb2e38 이 미룬 송구(AI 9)의 받을 야수 · 목표 루 */
@@ -450,7 +453,9 @@ export function runPickoffPlay(input: PickoffPlayInput): PickoffPlayResult {
     }
 
     // ── 자동 추가 진루 0xaf918 — 경기 장면 슬롯 2 가 매 틱 부른다 (종류 4 는 거르개 2·3·8 밖이다) ──
-    if (!play.finished && autoBaserunningEnabled && resultCode === null) {
+    // 결과 코드(9·13)가 선 뒤에도 돈다 — 슬롯 2 의 52660 은 판 진행 관문 0xb0d28 이 열려 있으면 매 틱 부르고, 결과 코드를
+    // 안 본다(예전 "결과가 선 뒤 주자가 더 뛰는지 모름" 근사는 +0x111 을 끝 표시로 읽은 탓 — +0x111 은 홈런 코드 8 이다)
+    if (!play.finished && autoBaserunningEnabled) {
       const decisions = autoAdvanceDecisions({ ...contextAt(tick), force: true })
       for (const decision of decisions) {
         const runner = runners.find((candidate) => candidate.state.index === decision.runnerIndex)
@@ -536,27 +541,24 @@ export function runPickoffPlay(input: PickoffPlayInput): PickoffPlayResult {
       cpuThrowDecision(tick)
     }
 
-    // ── 끝났나 — 결과 코드가 섰거나 송구가 끝났고, 날아가는 공도 뛰는 주자도 없다 ──
-    // CPU 송구 결정이 도는 판(`0xae6c8`)은 공 가진 야수가 준비 중이고 +0x128 이 서 있으면 그 틱까지 판을 안 닫는다 —
-    // 준비가 끝난 틱의 0xafa60 이 고를 수 있게(타구 진행기 8절과 같은 끝 조건 — 원본 판 끝 0x9d5bd 는 안 옮김, 근사)
-    const stillActive = runners.some(
-      (runner) => !runner.state.isOut && !runner.state.scored && !isAtTarget(runner.state),
-    )
-    const holderNow = fielders[play.ballHolderSlot]
-    const decisionPending =
-      cpuThrowEnabled &&
-      play.wantsThrow &&
-      play.held &&
-      holderNow !== undefined &&
-      holderNow.holdingBall &&
-      holderNow.actionRemainingTicks > 0
-    const receivePending = deferredThrowReceiver !== NONE && fielders.some((fielder) => fielder.aiState === AI_STATE.RECEIVE)
-    if ((resultCode !== null || caught) && flight === null && !stillActive && !decisionPending && !receivePending) {
-      play = { ...play, finished: true }
-    }
-    // 3아웃이면 판이 끝난다 — 판 진행 관문 0xb0d28 의 b0dbe `state[6] > 2 → 0`(타구 진행기 8절 끝과 같은 근거): 다음 틱 머리의
-    // 슬롯 2 가 플레이 틱·자동 진루·CPU 송구 0xafa60 을 하나도 안 돈다
-    if (outs > 2) play = { ...play, finished: true }
+    // ── 판 진행 관문 0xb0d28 (`playGate.passPlayGate`) — 원본은 다음 틱 슬롯 2 머리에서 돈다. 웹은 그 틱 끝에서 본다 ──
+    // 3아웃 · 처리 안 끝난 주자(0xaa05c, +0x94 까지) · 공을 쥔 채 51틱(+0x120). state[0xb] 는 이 판의 결과 코드(9 · 13)다.
+    // ⚠️ 근사: 악송구는 아무도 못 받는 것으로 옮겼다 — 공이 루에 닿은 뒤로는 "쥔 것" 으로 센다(원본은 누가 줍는다).
+    const gate = passPlayGate({
+      foulFlag: false,
+      lastEventCode: resultCode ?? 0,
+      outs,
+      someRunnerActive: someRunnerStillActive(runnerStates(), isAtTarget),
+      homeRunDerby: false,
+      homeRunFlag: false,
+      poleHomeRunFlag: false,
+      liveRunnerCount: liveRunnerCountOf(runnerStates()),
+      ballHeld: play.held || ballLost,
+      groundRuleFlag: false,
+      endCounter,
+    })
+    endCounter = gate.endCounter
+    if (!gate.open) play = { ...play, finished: true }
   }
 
   return {

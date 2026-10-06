@@ -4,6 +4,7 @@ import { autoSlideRunnerIndexes, SLIDING_SPEED_BONUS, type SlidingRunner } from 
 import {
   autoAdvanceDecisions,
   clearsRequirement,
+  requiredBasePinOf,
   requiredBasesOnBounce,
 } from '@/entities/fielding/model/autoAdvance'
 import type { BattedBallTrajectory } from '@/entities/fielding/model/catchPrediction'
@@ -38,6 +39,7 @@ import {
   type HeldRunState,
 } from '@/entities/fielding/model/heldRuns'
 import { judgeOut, OUT_KIND, releaseForcesAfterOut } from '@/entities/fielding/model/outJudgement'
+import { liveRunnerCountOf, passPlayGate, someRunnerStillActive } from '@/entities/fielding/model/playGate'
 import { defenseArrivalTicks } from '@/entities/fielding/model/throwArrival'
 import { planThrow, readyTicksOf, thrownWith, throwTicksTo } from '@/entities/fielding/model/throwPlan'
 import { chooseThrowTargetBase, isSpecialThrow } from '@/entities/fielding/model/throwTargetBase'
@@ -70,15 +72,15 @@ import { runnerFateOf } from '@/features/defense-play/model/runnerFates'
  *    0xb2c90 이 성공하면 +0x128 = 0. 받은 야수도 준비 틱이 지나면 이어 던진다.
  *    사람 수비·수동 송구에서 키가 없으면 **던지지 않는다** — 0xb1c90 의 자동 가지에는 송구 호출이 없다.
  * 5. 그림 · 6. 움직이기 · 7. 아웃 판정 0xb36d0 → 아웃이 났으면 결과 메시지 0xbba 의 CPU 송구 결정 한 번
- *    (0x51d40~0x51db4, 사람 수비에서도) · 8. 2아웃 보류 득점 풀기 0xaa34c · 9. 끝났나
+ *    (0x51d40~0x51db4, 사람 수비에서도) · 8. 2아웃 보류 득점 풀기 0xaa34c · 9. 판 진행 관문 0xb0d28
  *
  * ## 근사 (지어내지 않은 자리 — 견제 진행기와 같다)
  * - ⚠️ 송구 도착 틱은 `defenseArrivalTicks`(0xaf284) 근사다 — 원본은 궤적 물리(0xb401c, 해독 금지 구역).
  *   커버가 루를 밟기 전에 공이 닿으면 커버가 루를 밟는 틱까지 포구를 미룬다 (`pickoffPlay` 와 같다).
  * - ⚠️ 움직이기·아웃 판정(5~7)은 원본에서 야수·주자 틱(0절 자리) 안이다 — 웹은 슬롯 2 뒤로 두었다(타구 진행기와 같다).
  * - ⚠️ 악송구 뒤 공 경로·주자 반응은 미해결 — "그 송구는 아무도 못 받는다" 로 둔다(타구 진행기와 같다).
- * - ⚠️ 자동 추가 진루는 결과 코드가 서기 전까지만 묻는다 (`pickoffPlay` 와 같다 — 끝 표시 +0x111 을
- *   세우는 자리를 안 읽어서, 결과가 선 뒤 주자가 더 뛰는지 알 수 없다).
+ * - 자동 추가 진루는 결과 코드가 선 뒤에도 판이 닫힐 때까지 매 틱 묻는다 — +0x111 은 "끝" 이 아니라 홈런 코드 8 이다
+ *   (`playGate`). 판은 0xb0d28 대로 주자가 다 서고 공을 쥔 채 51틱 뒤에 닫힌다.
  * - 사람 주루 키(0x582·0x584)·슬라이딩 키(0x585)·레이저(0x400bc)는 받지 않는다 — 미리 끝까지 돌려 재생만 한다.
  */
 
@@ -188,6 +190,8 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
   let outJudgedThisTick = false
   /** 악송구로 공이 빠졌다 — 더는 아무도 쥐지 않는다 (근사) */
   let ballLost = false
+  /** 플레이 +0x120 — 판 진행 관문 0xb0d28 의 판 끝 세기 */
+  let endCounter = 0
   /** +0x15c · +0x158 — 0xb2e38 이 미룬 송구(AI 9)의 받을 야수 · 목표 루 */
   let deferredThrowReceiver = NONE
   let deferredThrowBase = NONE
@@ -463,7 +467,8 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
     }
 
     // ── 4. 자동 추가 진루 0xaf918 · 자동 슬라이딩 0xb030c ──
-    if (!play.finished && autoBaserunningEnabled && resultCode === null) {
+    // 결과 코드(9·13)가 선 뒤에도 돈다 — 슬롯 2 의 52660 은 판 진행 관문 0xb0d28 이 열려 있으면 매 틱 부르고 결과 코드를 안 본다
+    if (!play.finished && autoBaserunningEnabled) {
       const decisions = autoAdvanceDecisions({ ...contextAt(tick), force: true })
       for (const decision of decisions) {
         const runner = runners.find((candidate) => candidate.state.index === decision.runnerIndex)
@@ -528,6 +533,11 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
     })
     for (const runner of runners) {
       if (runner.state.isOut || runner.state.scored) continue
+      // 주자 틱 a028c — 요구 루를 밟아 풀리기 전에는 그 너머로 못 간다 (`requiredBasePinOf`)
+      const pinned = requiredBasePinOf(runner.state)
+      if (pinned !== runner.state.targetBase) {
+        runner.state = { ...runner.state, legStart: runner.state.position, targetBase: pinned, settled: false }
+      }
       runner.state = {
         ...runner.state,
         position: stepToward(runner.state.position, basePosition(runner.state.targetBase), runner.state.speed),
@@ -568,10 +578,8 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
       cpuThrowDecision(tick)
     }
 
-    // ── 8. 보류 득점 풀기 (0xaa34c) ──
-    const stillActive = runners.some(
-      (runner) => !runner.state.isOut && !runner.state.scored && !isAtTarget(runner.state),
-    )
+    // ── 8. 보류 득점 풀기 (0xaa34c) — aa364 의 "진행 중인 주자" 도 0xaa05c(+0x94 항까지) ──
+    const stillActive = someRunnerStillActive(runnerStates(), isAtTarget)
     held = releaseHeldRuns(held, {
       outs,
       ballOnGround,
@@ -579,16 +587,25 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
       someRunnerStillActive: stillActive,
     })
 
-    // ── 9. 끝났나 — 공이 정리됐고(쥐었거나 빠졌고, 날아가는 송구가 없다) 뛰는 주자가 없다 ──
-    const holderSettled =
-      !play.held || isSamePoint(fielders[play.ballHolderSlot].position, fielders[play.ballHolderSlot].target)
-    const ballSettled = caught && throwState.flight === null && (ballLost || play.held) && holderSettled
-    if ((resultCode !== null || ballSettled) && throwState.flight === null && !stillActive) {
-      play = { ...play, finished: true }
-    }
-    // 3아웃이면 판이 끝난다 — 판 진행 관문 0xb0d28 의 b0dbe `state[6] > 2 → 0`(타구 진행기 8절 끝과 같은 근거): 다음 틱 머리의
-    // 슬롯 2 가 플레이 틱·자동 진루·CPU 송구 0xafa60 을 하나도 안 돈다
-    if (outs > 2) play = { ...play, finished: true }
+    // ── 9. 판 진행 관문 0xb0d28 (`playGate.passPlayGate`) — 원본은 다음 틱 슬롯 2 머리에서 돈다. 웹은 그 틱 끝에서 본다 ──
+    // 3아웃 · 처리 안 끝난 주자 · 아무도 안 쥠(종류 9 의 줍기 전 · 송구 중) → 이어 감, 공을 쥔 채 51틱(+0x120) → 닫음.
+    // state[0xb] 는 이 판의 결과 코드(9 · 13)다. 낙구·담장 결과 코드(b44f6)는 이 판에 타구가 없어 안 선다.
+    // ⚠️ 근사: 악송구는 아무도 못 받는 것으로 옮겼다 — 공이 루에 닿은 뒤로는 "쥔 것" 으로 센다(원본은 누가 줍는다).
+    const gate = passPlayGate({
+      foulFlag: false,
+      lastEventCode: resultCode ?? 0,
+      outs,
+      someRunnerActive: stillActive,
+      homeRunDerby: false,
+      homeRunFlag: false,
+      poleHomeRunFlag: false,
+      liveRunnerCount: liveRunnerCountOf(runnerStates()),
+      ballHeld: play.held || ballLost,
+      groundRuleFlag: false,
+      endCounter,
+    })
+    endCounter = gate.endCounter
+    if (!gate.open) play = { ...play, finished: true }
   }
 
   const voidedRuns = outs > 2 ? held.heldRuns : 0

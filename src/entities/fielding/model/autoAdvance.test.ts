@@ -5,6 +5,7 @@ import {
   AUTO_ADVANCE_TICK_MARGIN,
   beatsThrow,
   clearsRequirement,
+  requiredBasePinOf,
   requiredBasesOnBounce,
   requiredBasesOnFlyCatch,
   TAG_DISTANCE,
@@ -231,5 +232,20 @@ describe('포스와 태그업 — 요구 루 세우기', () => {
 
   it('태그 거리는 499 다 (0xb36d0)', () => {
     expect(TAG_DISTANCE).toBe(499)
+  })
+})
+
+describe('주자 틱 a028c — 요구 루(+0x88)를 밟기 전에는 그 너머로 못 간다 (requiredBasePinOf)', () => {
+  it('요구 루가 없으면 목표 그대로', () => {
+    expect(requiredBasePinOf(createRunner(1, 2, 300, { targetBase: 3 }))).toBe(3)
+  })
+  it('리터치(요구 루 = 투구 루 2)인데 자동 진루가 3루로 보냈으면 2루로 되돌린다 — max(+0x88, min(+0x80, +0x8c))', () => {
+    expect(requiredBasePinOf(createRunner(1, 2, 300, { targetBase: 3, requiredBase: 2 }))).toBe(2)
+  })
+  it('포스(요구 루 = 다음 루)로 달리는 중이면 그대로', () => {
+    expect(requiredBasePinOf(createRunner(1, 1, 300, { targetBase: 2, requiredBase: 2 }))).toBe(2)
+  })
+  it('이미 요구 루 너머에 닿은 주자는 닿은 루에 선다 (+0x8c > +0x88)', () => {
+    expect(requiredBasePinOf(createRunner(1, 3, 300, { startBase: 3, targetBase: 4, requiredBase: 2 }))).toBe(3)
   })
 })

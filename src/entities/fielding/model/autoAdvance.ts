@@ -221,6 +221,20 @@ export function requiredBasesOnFlyCatch(runners: readonly RunnerState[]): readon
 }
 
 /**
+ * **주자 틱 0xa01cc 의 요구 루 갈래** a026e~a02b8 (직접 뜬 것) — 이번 틱에 달려갈 루.
+ * ```
+ * a026e  +0x94 && +0x88 == −1 → +0x94 = 0
+ * a028c  +0x94 면 r1 = min(+0x80 마지막으로 받은 목표, +0x8c 마지막으로 닿은 루) ; vt48(+0x88 > r1 ? +0x88 : r1)
+ * ```
+ * 요구 루(+0x88)를 밟아 풀리기(0xa040c · 0xaa0a8) 전에는 그 너머로 못 간다 — 자동 진루가 다음 루로 보내도 되돌려 세운다.
+ * 웹은 +0x94 를 `requiredBase ≠ −1` 로, +0x80 을 `targetBase` 로 읽는다. 요구 루가 없으면 목표 그대로다.
+ */
+export function requiredBasePinOf(runner: RunnerState): number {
+  if (runner.requiredBase === NONE) return runner.targetBase
+  return Math.max(runner.requiredBase, Math.min(runner.targetBase, runner.startBase))
+}
+
+/**
  * 요구 루가 풀리는 조건 (0xaa0a8): 판정끝(+0x94) 인 주자가 요구 루를 밟으면 `+0x94 = 0, +0x88 = −1`.
  * 리터치 전에 떠난 주자가 먼저 뛰는 것 자체는 막지 않는다 — 막는 것은 자동 주루의 "잡힐 뜬공" 가지뿐이다.
  *

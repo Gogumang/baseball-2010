@@ -26,6 +26,7 @@ import {
 } from '@/entities/defense-controls/model/sliding'
 import {
   autoAdvanceDecisions,
+  requiredBasePinOf,
   requiredBasesOnBounce,
   requiredBasesOnFlyCatch,
 } from '@/entities/fielding/model/autoAdvance'
@@ -1944,28 +1945,12 @@ export function stepDefensePlay(
     )
     for (const runner of runners) {
       if (runner.state.isOut || runner.state.scored) continue
-      // 주자 틱 0xa01cc 의 요구 루 갈래 a026e~a02b8 (직접 뜬 것):
-      // ```
-      // a026e  +0x94 && +0x88 == −1 → +0x94 = 0
-      // a028c  +0x94 면 r1 = min(+0x80 마지막으로 받은 목표, +0x8c 마지막으로 닿은 루) ;
-      //        vt48(+0x88 > r1 ? +0x88 : r1)                ; 요구 루를 밟기 전에는 그 너머로 못 간다
-      // ```
-      // 웹은 +0x94 를 `requiredBase ≠ −1` 로, +0x80 을 `targetBase` 로 읽는다. 자동 진루(4절)가 리터치 주자를 다음 루로
-      // 보내도 요구 루에 닿아 풀리기(0xa040c) 전에는 되돌려 세운다 — 판 진행 관문 0xb0d28 의 0xaa05c 가 +0x94 를 보므로
+      // 주자 틱 0xa01cc 의 요구 루 갈래 a028c (`requiredBasePinOf`) — 자동 진루(4절)가 리터치 주자를 다음 루로 보내도
+      // 요구 루에 닿아 풀리기(0xa040c) 전에는 되돌려 세운다. 판 진행 관문 0xb0d28 의 0xaa05c 가 +0x94 를 보므로
       // 이것이 없으면 요구 루를 못 푼 주자가 판을 끝없이 잡아 둔다.
-      if (runner.state.requiredBase !== NONE) {
-        const pinned = Math.max(
-          runner.state.requiredBase,
-          Math.min(runner.state.targetBase, runner.state.startBase),
-        )
-        if (pinned !== runner.state.targetBase) {
-          runner.state = {
-            ...runner.state,
-            legStart: runner.state.position,
-            targetBase: pinned,
-            settled: false,
-          }
-        }
+      const pinned = requiredBasePinOf(runner.state)
+      if (pinned !== runner.state.targetBase) {
+        runner.state = { ...runner.state, legStart: runner.state.position, targetBase: pinned, settled: false }
       }
       const target = basePosition(runner.state.targetBase)
       runner.state = {
