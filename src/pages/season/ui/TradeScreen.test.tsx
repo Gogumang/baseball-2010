@@ -70,8 +70,13 @@ const 띄우기 = (
 const 누르기 = (이름: string | RegExp) => fireEvent.click(screen.getByRole('button', { name: 이름 }))
 const 알림글 = () => screen.getByRole('dialog', { name: '알림' }).textContent ?? ''
 
-/** 0xe4 → 0xe5 : 상대 팀을 고른다 */
+/** 0xe4 → 0xe5 : 상대 팀을 고른다 — 0x4774 가 탭을 0(투수)으로 지워 투수 목록으로 열린다 */
 const 상대팀고르기 = () => 누르기(TEAMS[OPPONENT].name)
+/** 0xe4 → 0xe5 → '*' : 타자 목록으로 뒤집는다 */
+const 타자로 = () => {
+  상대팀고르기()
+  누르기('타자')
+}
 
 describe('0xe4 팀 고르기', () => {
   it('팀 격자가 먼저 뜬다 (선수 등록 화면을 빌려 쓴다)', () => {
@@ -90,19 +95,50 @@ describe('0xe4 팀 고르기', () => {
 })
 
 describe('0xe5 영입 선수 → 0xe6 보상 선수', () => {
-  it('고른 팀의 타자 명단이 나온다 (StrMODE[163])', () => {
+  it('고른 팀의 **투수** 명단이 먼저 나온다 — 0xe4 진입이 탭(this+0x154)을 0 으로 지운다 (StrMODE[163])', () => {
     띄우기(상태())
 
     상대팀고르기()
 
     expect(document.body.textContent).toContain('영입할 선수를 선택합니다')
+    expect(screen.getByRole('button', { name: teamPitchers(OPPONENT)[0].name })).toBeDefined()
+    expect(screen.getByRole('button', { name: '투수' }).getAttribute('aria-current')).toBe('true')
+  })
+
+  it('탭 단추 첫째가 투수(탭 0) · 둘째가 타자(탭 1)다 — 타자를 누르면 타자 명단', () => {
+    띄우기(상태())
+    상대팀고르기()
+
+    const 단추들 = screen.getByRole('group', { name: '트레이드 탭' }).querySelectorAll('button')
+    expect([...단추들].map((단추) => 단추.textContent)).toEqual(['투수', '타자'])
+    누르기('타자')
     expect(screen.getByRole('button', { name: teamBatters(OPPONENT)[0].name })).toBeDefined()
+  })
+
+  it("'*' 키도 목록 탭을 뒤집는다 (편집기 559b2)", () => {
+    띄우기(상태())
+    상대팀고르기()
+
+    fireEvent.keyDown(window, { key: '*' })
+    expect(screen.getByRole('button', { name: teamBatters(OPPONENT)[0].name })).toBeDefined()
+  })
+
+  it('⚠️ 0xe6 에서 목록을 뒤집어도 트레이드 탭은 0xe5 에서 정한 그대로다 (원본 그대로 — 0x727c 는 this+0x154 를 본다)', () => {
+    const { onTrade } = 띄우기(상태(), { random: 고정난수(1) })
+    상대팀고르기() // 투수 탭
+    누르기(teamPitchers(OPPONENT)[1].name)
+    누르기('타자') // 0xe6 목록만 타자로
+    누르기(teamBatters(MY_TEAM)[2].name) // 보이는 것은 타자 2번이지만 투수 탭 2번 칸이 된다
+    누르기(/기본 진행/)
+    누르기('예')
+
+    expect(onTrade.mock.calls[0][0].swap).toEqual({ opponentTeamId: OPPONENT, tab: 0, myIndex: 2, opponentIndex: 1 })
   })
 
   it('영입할 선수를 고르면 내 팀 명단(StrMODE[164])으로 넘어간다', () => {
     띄우기(상태())
 
-    상대팀고르기()
+    타자로()
     누르기(teamBatters(OPPONENT)[0].name)
 
     expect(document.body.textContent).toContain('보상할 우리')
@@ -118,7 +154,7 @@ describe('0xe5 영입 선수 → 0xe6 보상 선수', () => {
     })
     띄우기(상태(), { roster: 나리가낀명단 })
 
-    상대팀고르기()
+    타자로()
     누르기(teamBatters(OPPONENT)[0].name)
     // 기록 사본이 없는 표 밖 선수는 `타자 N번` 으로 적힌다
     누르기('타자 1번')
@@ -132,7 +168,7 @@ describe('0xe7 확인·진행 (J 4-4)', () => {
   const 같은값칸 = 6
   const 확인까지 = (나머지: Partial<Parameters<typeof TradeScreen>[0]> = {}, 상대칸 = 같은값칸, 내칸 = 같은값칸) => {
     const handles = 띄우기(상태(), 나머지)
-    상대팀고르기()
+    타자로()
     누르기(teamBatters(OPPONENT)[상대칸].name)
     누르기(teamBatters(MY_TEAM)[내칸].name)
     return handles
@@ -305,7 +341,7 @@ describe('상대 팀 레코드 (시즌 저장의 CPU 명단)', () => {
         : { id: slot, kindByte: slot, fieldPosition: 0, stamina: 0 })),
     }
     띄우기(상태(), { opponentRosterOf: () => 상대 })
-    상대팀고르기()
+    타자로()
 
     expect(screen.getByRole('button', { name: teamBatters(MY_TEAM)[1].name })).toBeDefined()
     expect(screen.queryByRole('button', { name: teamBatters(OPPONENT)[4].name })).toBeNull()
@@ -316,7 +352,7 @@ describe('상대 팀 레코드 (시즌 저장의 CPU 명단)', () => {
       batters: 명단().batters.map((player, slot) => (slot === 2 ? { ...player, id: 7, tableTeamId: OPPONENT } : player)),
     })
     띄우기(상태(), { roster: 내명단 })
-    상대팀고르기()
+    타자로()
     누르기(teamBatters(OPPONENT)[0].name)
 
     expect(screen.getAllByRole('button', { name: teamBatters(OPPONENT)[7].name }).length).toBeGreaterThan(0)

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
 import type { SeasonState } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
@@ -48,10 +48,27 @@ const REQUEST_CANCEL_QUESTION = ORIGINAL_MODE_TEXT[216]
 const ALREADY_USED = '!C이번 트레이드 커맨드는!N이미 사용했습니다'
 
 /**
- * 탭 — 원본 `[this+0x154]` 는 `0xb5695(팀, 탭, i)` 에 그대로 들어가 **0 이면 투수(0xb51fc) · 그 밖 타자(0xb53d0)** 다.
+ * 탭 — 원본 `[this+0x154]` 는 `0xb5695(팀, 탭, i)` 에 그대로 들어가 **0 이면 투수(0xb51fc) · 1 이면 타자(0xb53d0)** 다.
  * (직접 떴다. J 4-4 의 "0 타자" 는 반대다 — CPU 요청 0x93c8 의 뽑기 범위 8·12 와 팀 배열 수 [+0xc]·[+0x10] 도 그렇다)
+ *
+ * 탭은 **두 칸**이다 (직접 떴다):
+ * ```
+ * 0x4774 (0xe4 진입)  memset(this+0x148, 0, 0x14)         ; 트레이드 탭 this+0x154 = 0 (투수)
+ * 0x5cd0 (0xe5 진입)  0x5561c(ed, 상대 팀, 0, 0, this+0x154 == 0 ? 1 : 0) ; 목록(편집기) 탭 ed+0x33f — 1 투수 · 0 타자
+ * 0x5b28 (0xe6 진입)  0x5561c(ed, 내 팀,  0, 1, this+0x154 == 0 ? 1 : 0)
+ * 0x55864 '*'(559b2)  ed+0x33f 뒤집기 · 커서 0              ; 목록만 바뀐다
+ * 0x7104 (0xe5 OK)    this+0x154 = ed+0x33f == 0 ? 1 : 0 ; this+0x150 = 커서   ; 트레이드 탭은 여기서만 정해진다
+ * 0x727c (0xe6 OK)    this+0x14c = 커서 ; 0xb5695(내 팀, this+0x154, 커서) 로 나리·명전 검사
+ * ```
+ * ⚠️ 원본 그대로: 0xe6 에서 '*' 로 목록을 뒤집어도 트레이드 탭은 0xe5 에서 정한 그대로라, 보이는 목록과 다른 배열의
+ * 같은 칸이 보상 선수가 된다. 칸이 그 배열 밖이면(타자 8~11 칸을 투수 탭으로) 원본은 0xb5695 가 0 을 돌려준 선수를
+ * 읽는다 — 웹은 지어내지 않고 아무 일도 안 한다.
+ * 웹은 '*' 키와 함께 탭 단추 두 개(투수 · 타자, 원본 편집기 탭 그림의 자리 — 좌표 미해독)로 같은 뒤집기를 준다.
  */
-type TradeTab = '타자' | '투수'
+const TAB_LABELS: readonly { readonly tab: number; readonly label: string }[] = [
+  { tab: TRADE_REQUEST_TAB.투수, label: '투수' },
+  { tab: TRADE_REQUEST_TAB.타자, label: '타자' },
+]
 
 type TradeStep =
   | { readonly kind: '팀' }
@@ -126,8 +143,10 @@ export function TradeScreen({
   const forced = request !== null && request.isRequested ? request : null
   const [step, setStep] = useState<TradeStep>(() =>
     forced === null ? { kind: '팀' } : { kind: '영입', teamId: forced.opponentTeamId })
-  const [tab, setTab] = useState<TradeTab>(() =>
-    forced !== null && forced.tab === TRADE_REQUEST_TAB.투수 ? '투수' : '타자')
+  // this+0x154 — 0xe4 진입이 0 으로 지운다(투수). 요청이면 요청 칸의 탭
+  const [tradeTab, setTradeTab] = useState<number>(() => forced?.tab ?? TRADE_REQUEST_TAB.투수)
+  // ed+0x33f — 목록이 보여 주는 탭. 0xe5·0xe6 진입마다 this+0x154 로 다시 선다
+  const [listTab, setListTab] = useState<number>(() => forced?.tab ?? TRADE_REQUEST_TAB.투수)
   const [boost, setBoost] = useState(0)
   const [question, setQuestion] = useState<TradeQuestion | null>(null)
   // 커맨드 가드 (SR+0x56) — 한 번 쓰면 협회허가증(GP 아이템 칸 5)으로만 되살아난다.
@@ -140,11 +159,20 @@ export function TradeScreen({
   const [isDone, setDone] = useState<'결과' | '가드' | null>(() =>
     forced === null && !canUseTradeCommand(record) ? '가드' : null)
 
-  const isPitcher = tab === '투수'
+  const isPitcher = tradeTab === TRADE_REQUEST_TAB.투수
+  const isListPitcher = listTab === TRADE_REQUEST_TAB.투수
   const isBusy = question !== null || notice !== null
 
-  const opponentEntries = step.kind === '팀' ? [] : opponentTradeEntriesOf(step.teamId, opponentRosterOf(step.teamId), isPitcher)
+  const opponentRoster = step.kind === '팀' ? null : opponentRosterOf(step.teamId)
+  /** 트레이드 탭(this+0x154)의 두 명단 — 고른 칸이 가리키는 선수 */
+  const opponentEntries = step.kind === '팀' || opponentRoster === null
+    ? []
+    : opponentTradeEntriesOf(step.teamId, opponentRoster, isPitcher)
   const myEntries = step.kind === '팀' ? [] : myTradeEntriesOf(record.teamId, roster, isPitcher)
+  /** 목록이 보여 주는 탭(ed+0x33f)의 명단 */
+  const shownEntries = step.kind === '영입' && opponentRoster !== null
+    ? opponentTradeEntriesOf(step.teamId, opponentRoster, isListPitcher)
+    : step.kind === '보상' ? myTradeEntriesOf(record.teamId, roster, isListPitcher) : []
 
   const acquiredEntry = step.kind === '보상' || step.kind === '확인'
     ? opponentEntries[step.acquired] ?? null
@@ -174,6 +202,8 @@ export function TradeScreen({
   /** 요청이면 단계에 들어갈 때마다 진입 알림 [204]/[205] 를 다시 띄운다 (0x5cd0·0x5b28 은 진입 함수다) */
   const enterStep = (next: TradeStep) => {
     setStep(next)
+    // 0x5cd0 · 0x5b28 — 편집기를 this+0x154 탭으로 다시 세운다
+    if (next.kind === '영입' || next.kind === '보상') setListTab(tradeTab)
     if (forced === null) return
     if (next.kind === '영입') setNotice(REQUEST_ACQUIRED)
     if (next.kind === '보상') setNotice(REQUEST_GIVEN)
@@ -182,6 +212,9 @@ export function TradeScreen({
   const chooseTeam = (teamId: number) => {
     // 원본 목록에는 내 팀이 없다 — 격자에서 뺄 수 없어 고르면 아무 일도 안 한다 (근사)
     if (teamId === record.teamId) return
+    // 0xe4 진입 0x4774 가 20바이트를 지워 트레이드 탭은 0(투수)이다 — 0xe5 진입이 그 탭으로 목록을 연다
+    setTradeTab(TRADE_REQUEST_TAB.투수)
+    setListTab(TRADE_REQUEST_TAB.투수)
     setStep({ kind: '영입', teamId })
   }
 
@@ -189,9 +222,14 @@ export function TradeScreen({
     if (step.kind !== '영입') return
     // 요청이면 커서가 상대 칸에 묶여 있다
     const chosen = forced === null ? index : forced.opponentIndex
-    const entry = opponentEntries[chosen]
+    // 0x7104 — 트레이드 탭은 여기서 목록 탭으로 정해진다
+    const nextTab = forced === null ? listTab : tradeTab
+    const entry = shownEntries[chosen]
     if (entry === undefined) return
-    enterStep({ kind: '보상', teamId: step.teamId, acquired: chosen })
+    setTradeTab(nextTab)
+    setStep({ kind: '보상', teamId: step.teamId, acquired: chosen })
+    setListTab(nextTab)
+    if (forced !== null) setNotice(REQUEST_GIVEN)
   }
 
   const chooseGiven = (index: number) => {
@@ -200,6 +238,7 @@ export function TradeScreen({
       // 0x736e — 요청이면 나리·명전 검사 없이 곧장 0xe7 (요청 굴림이 이미 걸렀다)
       return enterStep({ kind: '확인', teamId: step.teamId, acquired: step.acquired, given: forced.myIndex })
     }
+    // 0x727c — 보이는 목록이 아니라 트레이드 탭(this+0x154) 배열의 같은 칸이다 (위 머리 주석)
     const entry = myEntries[index]
     if (entry === undefined) return
     // 영입해 온 나리·명예 선수는 트레이드 대상이 아니다 (StrMODE[165]/[166])
@@ -234,7 +273,7 @@ export function TradeScreen({
       ...(isSuccess ? {
         swap: {
           opponentTeamId: step.teamId,
-          tab: isPitcher ? TRADE_REQUEST_TAB.투수 : TRADE_REQUEST_TAB.타자,
+          tab: tradeTab,
           myIndex: step.given,
           opponentIndex: step.acquired,
         },
@@ -258,7 +297,7 @@ export function TradeScreen({
     if (isDone === '가드') onBack()
   }
 
-  const listEntries = step.kind === '영입' ? opponentEntries : myEntries
+  const listEntries = shownEntries
   const listSelect = step.kind === '영입' ? chooseAcquired : chooseGiven
   const listCount = step.kind === '확인' ? boostRows.length : listEntries.length
 
@@ -275,6 +314,24 @@ export function TradeScreen({
     : step.kind === '영입' ? forced.opponentIndex : step.kind === '보상' ? forced.myIndex : 0
   const shownCursor = lockedCursor ?? cursor
   const moveCursor = lockedCursor === null ? moveTo : () => undefined
+
+  /** '*' (편집기 559b2) — 목록 탭만 뒤집고 커서 0. 트레이드 탭(this+0x154)은 0xe5 OK 에서만 바뀐다 */
+  function flipListTab() {
+    setListTab((current) => (current === TRADE_REQUEST_TAB.투수 ? TRADE_REQUEST_TAB.타자 : TRADE_REQUEST_TAB.투수))
+    moveTo(0)
+  }
+
+  const canFlip = forced === null && (step.kind === '영입' || step.kind === '보상') && !isBusy
+  useEffect(() => {
+    if (!canFlip) return undefined
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== '*') return
+      event.preventDefault()
+      flipListTab()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  })
 
   function backOneStep() {
     if (step.kind === '확인') return enterStep({ kind: '보상', teamId: step.teamId, acquired: step.acquired })
@@ -305,24 +362,21 @@ export function TradeScreen({
   return (
     <RawScreen>
       {step.kind !== '확인' && forced === null && (
-        // 타자·투수 탭 (원본 `[this+0x154]`). ⚠️ 원본이 어떤 키로 탭을 바꾸는지는 안 풀렸다 — 근사.
-        // 요청이면 탭이 요청 값으로 정해져 있어 단추를 안 둔다
+        // 목록 탭(ed+0x33f) — 단추는 '*' 뒤집기와 같다. 요청이면 '*' 가 편집기에 안 가(0x7104 `키 == 0x2a` 거르기)
+        // 탭이 요청 값으로 묶여 단추를 안 둔다. ⚠️ 단추 자리는 원본 편집기 탭 그림 좌표를 못 풀어 근사다
         <div role="group" aria-label="트레이드 탭">
-          {(['타자', '투수'] as const).map((name, index) => (
+          {TAB_LABELS.map(({ tab, label }, index) => (
             <button
-              key={name}
+              key={label}
               type="button"
-              className={`${styles.row}${name === tab ? ` ${styles.rowSelected}` : ''}`}
-              aria-current={name === tab}
+              className={`${styles.row}${tab === listTab ? ` ${styles.rowSelected}` : ''}`}
+              aria-current={tab === listTab}
               style={{ left: 28 + index * 60, top: 36, width: 56, height: 16 }}
               onClick={() => {
-                setTab(name)
-                moveTo(0)
-                // 탭을 바꾸면 고른 선수가 다른 명단 칸을 가리키게 된다 — 영입 고르기부터 다시
-                if (step.kind === '보상') setStep({ kind: '영입', teamId: step.teamId })
+                if (tab !== listTab) flipListTab()
               }}
             >
-              <span className={styles.rowLabel}>{name}</span>
+              <span className={styles.rowLabel}>{label}</span>
             </button>
           ))}
         </div>
