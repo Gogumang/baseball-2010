@@ -94,13 +94,15 @@ describe('투구 하나의 주자 판 — 0x3dfac 의 0x35034 → 0x9d57c → �
     expect(random.count()).toBe(0)
   })
 
-  it('도루 중이면 종류 5 — 세이프면 8 후보, 콜 17', () => {
+  it('도루 중이면 종류 5 — 아무도 안 던지면(키 없는 사람 수비 · 잡을 루가 없는 CPU) 콜 없이 8 후보', () => {
+    // 1루 도루는 늘 세이프라 CPU 점수식도 루를 안 고르고, 키 없는 사람 수동 송구는 아예 안 던진다
+    // → 결과 코드(9 세이프 · 13 아웃)가 안 서서 판정 콜도 없다
     const play = runPitchArrivalPlay(
       { gameMode: 4, pitchJudgement: PITCH_JUDGEMENT.BALL, stealingFrom: [1], bases: 일루, outs: 0, runAbility: 500 },
       세는난수(0.5),
     )
     expect(play?.kind).toBe(5)
-    expect(play?.callSoundId).toBe(17)
+    expect(play?.callSoundId).toBeNull()
     expect(play?.recordIds).toEqual([8])
     expect(play !== null && arrivalApplicationOf(play)).toBe('runnerOnly')
   })

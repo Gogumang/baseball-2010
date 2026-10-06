@@ -121,13 +121,23 @@ describe('한 플레이 진행기 — 타자주자의 운명은 결과 코드, �
     expect(play(땅볼아웃, EMPTY_BASES, 0).tagOut).toBe(false)
     expect(play(뜬공아웃, EMPTY_BASES, 0).tagOut).toBe(false)
     expect(play(단타, 만루, 0).tagOut).toBe(false)
-    // 1루 주자 땅볼 — 공 쥔 야수가 2루를 밟고 있어 **포스(루) 아웃**(0xb3890 2a)이면 서지 않는다
+    // 1루 주자 땅볼에 사람이 '2'(2루 송구)를 누른다 — 키가 없으면 사람 수동 송구는 아무도 안 던진다
+    const 이루송구 = (pattern: BattedBallPattern) =>
+      runDefensePlay({
+        outcome: 땅볼아웃,
+        trajectory: battedBallTrajectory(pattern),
+        bases: 주자1루,
+        outs: 0,
+        runAbility: 500,
+        controls: 계속누름('수비', '2'),
+      })
+    // 공 쥔 야수가 2루를 밟고 있어 **포스(루) 아웃**(0xb3890 2a)이면 서지 않는다
     // (2a 의 vt10 = 0xa9f60 은 `산 주자 수 > [주자+0x8c]`, 곧 **마지막으로 닿은 루**를 본다)
-    const 포스땅볼 = play(땅볼아웃, 주자1루, 0, [97, 971, 460, 0])
+    const 포스땅볼 = 이루송구([97, 971, 460, 0])
     expect(포스땅볼.tagOut).toBe(false)
     expect(포스땅볼.log.some((줄) => 줄.includes('루 아웃'))).toBe(true)
     // 2루 송구를 받은 야수가 루를 밟기 전에 주자와 닿으면 태그(3a)다
-    const 태그땅볼 = play(땅볼아웃, 주자1루, 0, [86, 1171, 400, 0])
+    const 태그땅볼 = 이루송구([86, 1171, 400, 0])
     expect(태그땅볼.tagOut).toBe(true)
     expect(태그땅볼.log.some((줄) => 줄.includes('태그 아웃'))).toBe(true)
   })
@@ -348,6 +358,8 @@ describe('확률 굴림은 난수를 줘야 돈다 — 펌블 · 악송구 · �
       trajectory: battedBallTrajectory(representativePatternOf(땅볼아웃)),
       bases: 주자1루,
       outs: 0,
+      // 키 없는 사람 수동 송구는 안 던지므로 사람이 '8'(홈 송구)을 누른 판으로 본다 — 사람 송구는 특수 굴림이 없다
+      controls: 계속누름('수비', '8'),
       random: 차례난수([0.9, 0.9, 0.9, 0.9, 0, 0.9]),
     })
 
@@ -755,7 +767,8 @@ describe('레이저 송구 반짝임이 화면까지 내려간다 (경기+0x19ad
       return count
     }
 
-    expect(뽑은수({ defenseIsCpu: true })).toBe(뽑은수({ defenseIsCpu: false }))
+    // 사람 쪽은 송구 자동 — 키 없는 수동 송구는 안 던져서 악송구 굴림이 빠지기 때문이다
+    expect(뽑은수({ defenseIsCpu: true })).toBe(뽑은수({ defenseIsCpu: false, throwMode: '자동' }))
   })
 
   it('굴림이 통과하면 **공 쥔 야수 칸**이 실린다 (플레이+0x130)', () => {
@@ -962,13 +975,58 @@ describe('송구 수동/자동 — 환경설정 +0xf4 (0x5269c → 0xae6c8 → 0
     expect(송구줄(만루단타())).toBe(송구줄(만루단타({ throwMode: '수동' })))
   })
 
-  it('수동이면 점수식 0xafb24 가 안 돌고 0xb1c90 이 앞선 주자의 루를 고른다', () => {
-    // 만루 단타 — 앞선 주자부터 훑는다. 송구 시간은 공 가진 야수.vtC0 + 공 가진 야수.vtB8(루 좌표)
-    // (b1fce~b2020): 홈(4)·3루로 가는 주자는 못 잡고, 1루에서 2루로 가는 주자를 잡을 수 있다
+  it('수동이면 키를 안 누른 사람 수비는 던지지 않는다 — 0xb1c90 자동 가지에는 송구 호출이 없다', () => {
+    // 공을 내보내는 호출(플레이.vt58 0xb2c90 · vt5c 0xb2e38)은 0xafa60(CPU 결정) · b4660(+0x160 사람 목표) ·
+    // 앞선 송구가 세운 중계/AI 상태 9 · 견제 · CPU 협살뿐이다. 0x509a0 앞머리는 빈 함수 0xae5f8 을 부른다.
     const 단타궤적 = battedBallTrajectory([92, 698, 565, 0])
-    expect(만루단타({ throwMode: '수동', trajectory: 단타궤적 }).throwBase).toBe(2)
-    // 자동이면 점수식이 더 가까운 루를 고른다
+    const 수동 = 만루단타({ throwMode: '수동', trajectory: 단타궤적 })
+    expect(수동.throwBase).toBe(-1)
+    expect(송구줄(수동)).toBe('(송구 없음)')
+    // 자동이면 점수식이 루를 고른다
     expect(만루단타({ throwMode: '자동', trajectory: 단타궤적 }).throwBase).toBe(1)
+  })
+
+  it('포구 뒤에 누른 키는 준비 틱이 지난 뒤 그 틱에 던진다 — 플레이 틱 b4660~b46a8', () => {
+    const 단타궤적 = battedBallTrajectory([92, 698, 565, 0])
+    const 키없음 = 만루단타({ throwMode: '수동', trajectory: 단타궤적 })
+    const 누른틱 = 키없음.catchTick + 8
+    const 늦게 = 만루단타({
+      throwMode: '수동',
+      trajectory: 단타궤적,
+      controls: { side: '수비', keyAt: (tick) => (tick === 누른틱 ? { key: '6', isRepeat: false } : null) },
+    })
+
+    expect(늦게.throwBase).toBe(1)
+    expect(늦게.log.some((line) => line.startsWith(`${누른틱}틱 1루로 송구`))).toBe(true)
+  })
+
+  it('사람 수동에서도 아웃이 난 틱 끝에는 CPU 송구 결정이 한 번 돈다 — 결과 메시지 0xbba → 0x51d40 → 0xafa60', () => {
+    // 포수가 잡은 공을 들고 있는데 2루 주자가 옆을 지나다 태그(0xb36d0 결과 3)된다 → 결과 코드 13 →
+    // 0x51d40 이 수비 조작이 사람이어도 `아웃 ≤ 2` 면 0xafa60 을 부른다 → 점수식이 2루를 고른다
+    const 결과 = runDefensePlay({
+      outcome: 이루타,
+      trajectory: battedBallTrajectory([133, 500, 300, 1]),
+      bases: { first: true, second: true, third: false },
+      outs: 1,
+      runAbility: 500,
+      throwMode: '수동',
+    })
+    const 태그 = 결과.log.find((line) => line.includes('태그 아웃'))
+    expect(태그).toBeDefined()
+    const 아웃틱 = 태그!.split('틱')[0]
+    expect(결과.log.some((line) => line.startsWith(`${아웃틱}틱 2루로 송구`) && line.includes('CPU 결정'))).toBe(true)
+    expect(결과.throwBase).toBe(2)
+    // 2아웃째(이 판의 첫 아웃 + 1)라 `아웃 ≤ 2` — 3아웃이었다면 돌지 않는다
+    const 셋째 = runDefensePlay({
+      outcome: 이루타,
+      trajectory: battedBallTrajectory([133, 500, 300, 1]),
+      bases: { first: true, second: true, third: false },
+      outs: 2,
+      runAbility: 500,
+      throwMode: '수동',
+    })
+    expect(셋째.log.some((line) => line.includes('태그 아웃'))).toBe(true)
+    expect(셋째.log.some((line) => line.includes('CPU 결정'))).toBe(false)
   })
 
   it('수비가 CPU 면 설정이 수동이어도 점수식이 돈다 — 0xae6c8 의 앞 항', () => {
@@ -984,7 +1042,7 @@ describe('송구 수동/자동 — 환경설정 +0xf4 (0x5269c → 0xae6c8 → 0
     expect(눌렀다.log.some((line) => line.includes('사람이 1루로 송구 지시'))).toBe(true)
   })
 
-  it('난수 굴림 차례는 수동/자동에 한 톨도 안 흔들린다', () => {
+  it('키 없는 수동은 송구가 없어 악송구 굴림(0xa1828)이 빠진다', () => {
     const 굴림수 = (mode: '수동' | '자동') => {
       let calls = 0
       let seed = 20100901
@@ -1002,7 +1060,7 @@ describe('송구 수동/자동 — 환경설정 +0xf4 (0x5269c → 0xae6c8 → 0
       return calls
     }
 
-    expect(굴림수('수동')).toBe(굴림수('자동'))
+    expect(굴림수('수동')).toBeLessThan(굴림수('자동'))
   })
 })
 

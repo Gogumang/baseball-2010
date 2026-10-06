@@ -37,7 +37,7 @@ import {
   type HeldRunState,
 } from '@/entities/fielding/model/heldRuns'
 import { judgeOut, OUT_KIND, releaseForcesAfterOut } from '@/entities/fielding/model/outJudgement'
-import { autoThrowTargetBase, defenseArrivalTicks } from '@/entities/fielding/model/throwArrival'
+import { defenseArrivalTicks } from '@/entities/fielding/model/throwArrival'
 import { effectiveThrowSpeedOf, readyTicksOf, throwTicksTo } from '@/entities/fielding/model/throwPlan'
 import { chooseThrowTargetBase, isSpecialThrow } from '@/entities/fielding/model/throwTargetBase'
 import { EMPTY_BASES, type BaseState } from '@/entities/game/model/baseState'
@@ -57,11 +57,13 @@ import { runnerFateOf } from '@/features/defense-play/model/runnerFates'
  * ## 한 틱의 차례 (원본 경기 장면 슬롯 2 = 0x524c0 · 플레이 틱 — 견제 진행기와 같은 근사 순서)
  * 1. (종류 9) 쫓는 야수가 포구 틱에 공을 쥔다 — 펌블 굴림 0xb41d0 → 공 쥐기 0xb2710(P, f, 1)
  *    · 낙구 틱에 포스 요구 루 0xa95e8 (P2 2b: 0xb4510~0xb453c)
- * 2. 공 쥔 야수의 송구 판단 — `0xb1c90`(사람 목표 +0x160 → 수동 가지 / −1 → 자동 가지) 또는 CPU 송구 결정
- *    `0xafa60 → 0xafb24` (`0xae6c8` 갈림, `runDefensePlay` 의 `throwMode` 주석) → 루로 보내기 `0xb2c90`
+ * 2. 공 쥔 야수의 송구 판단 — 사람 목표 +0x160(플레이 틱 0xb45dc 의 b4660~b46a8, 쓰고 나면 −1) 또는 CPU 송구
+ *    결정 `0xafa60 → 0xafb24` (`0xae6c8` 갈림, `runDefensePlay` 의 `throwMode` 주석) → 루로 보내기 `0xb2c90`.
+ *    사람 수비·수동 송구에서 키가 없으면 **던지지 않는다** — 0xb1c90 의 자동 가지에는 송구 호출이 없다.
  * 3. 송구 도착 = 받는 야수가 루 위에서 쥔다(0xb2710) → 아웃 판정 0xb36d0 → 결과 9(0xb4292)
  * 4. 자동 추가 진루 0xaf918 (`0xae690` 갈림) · 자동 슬라이딩 0xb030c
- * 5. 그림 · 6. 움직이기 · 7. 아웃 판정 0xb36d0 · 8. 2아웃 보류 득점 풀기 0xaa34c · 9. 끝났나
+ * 5. 그림 · 6. 움직이기 · 7. 아웃 판정 0xb36d0 → 아웃이 났으면 결과 메시지 0xbba 의 CPU 송구 결정 한 번
+ *    (0x51d40~0x51db4, 사람 수비에서도) · 8. 2아웃 보류 득점 풀기 0xaa34c · 9. 끝났나
  *
  * ## 근사 (지어내지 않은 자리 — 견제 진행기와 같다)
  * - ⚠️ 송구 도착 틱은 `defenseArrivalTicks`(0xaf284) 근사다 — 원본은 궤적 물리(0xb401c, 해독 금지 구역).
@@ -113,7 +115,10 @@ export interface RunnerPlayEngineInput {
   readonly random?: RandomPort
   readonly defenseIsCpu?: boolean
   readonly throwMode?: ManualAutoMode
-  /** 사람이 고른 송구 목표 루 (+0x160). 판 내내 같은 키로 본다 */
+  /**
+   * 사람이 고른 송구 목표 루 (+0x160). 판이 열릴 때 이미 골라 둔 키로 본다 —
+   * 원본은 그 키로 한 번 던지면 `+0x160 = −1` 로 지운다(b46a8). 그래서 **첫 송구에만** 쓴다.
+   */
   readonly manualThrowBase?: number
   readonly offenseIsCpu?: boolean
   readonly runningMode?: ManualAutoMode
@@ -172,6 +177,12 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
   const throwState: { flight: ThrowInFlight | null } = { flight: null }
   /** 송구 판단을 이미 한 야수 — 새로 공을 쥔 야수만 다시 본다 (근사, 머리말) */
   let decidedHolder = NONE
+  /** 사람 목표 +0x160 이 아직 안 쓰였나 — 쓰면 −1 (b46a8) */
+  let manualPending = manualThrowBase !== NONE
+  /** 공 쥔 야수가 준비되는 틱 — 쥐기 0xb2710(P, f, 1)이 +0xc8 에 넣은 준비 틱이 다 지나는 때 */
+  let holderReadyTick = 0
+  /** 이번 틱에 0xb36d0 이 아웃을 냈나 — 결과 코드 13 → 메시지 0xbba */
+  let outJudgedThisTick = false
   /** 악송구로 공이 빠졌다 — 더는 아무도 쥐지 않는다 (근사) */
   let ballLost = false
 
@@ -195,6 +206,7 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
     victim.state = { ...victim.state, isOut: true, settled: true }
     outs += 1
     outsAdded += 1
+    outJudgedThisTick = true
     // state[0x87] — 마지막 판정이 태그였나 (0xb36d0 꼬리)
     tagOut = judged.kind === OUT_KIND.TAG
     resultCode = RUNNER_PLAY_RESULT.OUT
@@ -216,27 +228,32 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
     )
     play = { ...play, ballHolderSlot: slot, held: true, everHeld: true }
     ballOnGround = true
+    holderReadyTick = tick + (extra.actionRemainingTicks ?? fielders[slot]?.actionRemainingTicks ?? 0)
     runOutJudgement(tick)
   }
 
-  /** 송구 판단 — 0xb1c90(수동/자동 가지) 또는 0xafa60→0xafb24, 그리고 루로 보내기 0xb2c90 */
-  const decideThrow = (tick: number): void => {
+  /**
+   * 송구 판단 — 사람 목표 +0x160(b4660, 한 번 쓰면 −1) 또는 0xafa60→0xafb24, 그리고 루로 보내기 0xb2c90.
+   * `forceCpu` 는 결과 메시지 0xbba 가 부르는 0xafa60 한 번(사람 수동 송구에서도 돈다).
+   * 사람 수비·수동 송구에서 키가 없으면 아무것도 안 한다 — 0xb1c90 자동 가지에는 송구 호출이 없다(c8649a3).
+   */
+  const decideThrow = (tick: number, forceCpu = false): void => {
     const holderSlot = play.ballHolderSlot
     const holder = fielders[holderSlot]
     if (holder === undefined) return
     decidedHolder = holderSlot
     const active = runners.filter((runner) => !runner.state.isOut && !runner.state.scored).length
-    const base =
-      manualThrowBase !== NONE
-        ? manualThrowBase
-        : cpuThrowEnabled
-          ? chooseThrowTargetBase({ ...contextAt(tick), activeRunnerCount: active, outs })
-          : autoThrowTargetBase(contextAt(tick))
+    const byHuman = !forceCpu && manualPending
+    if (byHuman) manualPending = false
+    const base = byHuman
+      ? manualThrowBase
+      : forceCpu || cpuThrowEnabled
+        ? chooseThrowTargetBase({ ...contextAt(tick), activeRunnerCount: active, outs })
+        : NONE
     if (base === NONE) return
     // CPU 홈 송구 20% 특수 송구 (0xafa60 `afad2`) — 점수식이 홈을 골랐을 때만 한 번 굴린다
     const cpuSpecial =
-      manualThrowBase === NONE &&
-      cpuThrowEnabled &&
+      !byHuman &&
       base === 0 &&
       input.random !== undefined &&
       isSpecialThrow(base, randomIntegerBelow(input.random, 0, 100))
@@ -312,6 +329,7 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
   }
 
   for (let tick = 0; tick <= maximumTicks && !play.finished; tick += 1) {
+    outJudgedThisTick = false
     // ── 1. (종류 9) 포구 ──
     if (chase !== undefined && !caught && tick === catchTick) {
       const ballIsMoving = tick < chase.trajectory.length - 1
@@ -465,6 +483,24 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
 
     // ── 7. 틱 갱신 뒤 아웃 판정 (0xb43da) ──
     runOutJudgement(tick)
+
+    // ── 7b. 아웃이 난 틱 끝 — 결과 메시지 0xbba(13) → 0x51d40~0x51db4 → 0xafa60 한 번 ──
+    // 수비 조작이 사람이든 CPU 든 `아웃 ≤ 2` 면 플레이+0x128 = 1 로 세우고 CPU 송구 결정을 부른다
+    // (`runDefensePlay` 의 6c 절에 근거). 공 쥔 야수가 준비(vtC4)돼 있어야 던진다.
+    // CPU 송구(수비 CPU · 설정 자동)는 새로 쥔 야수를 다음 틱 2절이 어차피 같은 점수식으로 본다 —
+    // 그 판단을 이미 한 야수일 때만 여기서 한 번 더 본다(근사: 원본은 +0x128 이 선 동안 매 틱 다시 본다).
+    if (
+      outJudgedThisTick &&
+      outs <= 2 &&
+      !play.finished &&
+      !ballLost &&
+      throwState.flight === null &&
+      play.held &&
+      tick >= holderReadyTick &&
+      (!cpuThrowEnabled || decidedHolder === play.ballHolderSlot)
+    ) {
+      decideThrow(tick, true)
+    }
 
     // ── 8. 보류 득점 풀기 (0xaa34c) ──
     const stillActive = runners.some(

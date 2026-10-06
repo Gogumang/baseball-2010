@@ -25,8 +25,8 @@ const 일루 = { ...EMPTY_BASES, first: true }
 const 일삼루 = { ...EMPTY_BASES, first: true, third: true }
 
 describe('도루 한 판 — 종류 5 (0xb2950 · 0xb1c90 · 0xb36d0 · 0xb4292)', () => {
-  it('판이 열릴 때 도루 주자는 이미 15+3 틱 달려 나가 있다(0x46418 → 0x3d7b8) — 자동 규칙이 2루로 던져도 세이프 9 · 콜 17', () => {
-    const result = runStealPlay({ bases: 일루, stealingFrom: [1], outs: 0, runAbility: 500 })
+  it('판이 열릴 때 도루 주자는 이미 15+3 틱 달려 나가 있다(0x46418 → 0x3d7b8) — 사람이 2루로 던져도 세이프 9 · 콜 17', () => {
+    const result = runStealPlay({ bases: 일루, stealingFrom: [1], outs: 0, runAbility: 500, manualThrowBase: 2 })
     // 속도 335 로 1루(25946, 24175)에서 2루 쪽으로 18 틱 — 그림 0틱은 움직이기 전이다
     expect(result.ticks[0].runners[0]).toMatchObject({ x: 21338, z: 20298, base: 2 })
     expect(result.throwBase).toBe(2)
@@ -70,13 +70,13 @@ describe('도루 한 판 — 종류 5 (0xb2950 · 0xb1c90 · 0xb36d0 · 0xb4292)
 
   it('난수는 판이 열릴 때 도루 주자 리드 rand(0,9) 한 번, 송구 때 악송구 굴림(0xa1828) 한 번 — 악송구면 두 번 더', () => {
     const quiet = 세는난수(0.5)
-    const plain = runStealPlay({ bases: 일루, stealingFrom: [1], outs: 0, runAbility: 0, random: quiet })
+    const plain = runStealPlay({ bases: 일루, stealingFrom: [1], outs: 0, runAbility: 0, random: quiet, manualThrowBase: 2 })
     expect(quiet.count()).toBe(2)
     expect(plain.throwBase).toBe(2)
     expect(plain.errantThrow).toBe(false)
 
     const wild = 세는난수(0)
-    const errant = runStealPlay({ bases: 일루, stealingFrom: [1], outs: 0, runAbility: 0, random: wild })
+    const errant = runStealPlay({ bases: 일루, stealingFrom: [1], outs: 0, runAbility: 0, random: wild, manualThrowBase: 2 })
     expect(wild.count()).toBe(4)
     expect(errant.errantThrow).toBe(true)
     expect(errant.resultCode).toBeNull()
@@ -84,11 +84,14 @@ describe('도루 한 판 — 종류 5 (0xb2950 · 0xb1c90 · 0xb36d0 · 0xb4292)
     expect(errant.advance.bases).toEqual({ ...EMPTY_BASES, second: true })
   })
 
-  it('리드 덧틱이 크면(rand 8 → 23 틱) 잡을 루가 없어도 자동 규칙은 마지막으로 본 주자의 루로 던진다(b2036) — 세이프', () => {
-    const result = runStealPlay({ bases: 일루, stealingFrom: [1], outs: 0, runAbility: 500, random: 세는난수(0.95) })
-    expect(result.throwBase).toBe(2)
-    expect(result.resultCode).toBe(RUNNER_PLAY_RESULT.SAFE)
+  it('사람 수비·수동 송구에서 키가 없으면 포수는 공을 들고 있다 — 0xb1c90 자동 가지에는 송구 호출이 없다', () => {
+    const counted = 세는난수(0.95)
+    const result = runStealPlay({ bases: 일루, stealingFrom: [1], outs: 0, runAbility: 500, random: counted })
+    expect(result.throwBase).toBe(-1)
+    expect(result.resultCode).toBeNull()
     expect(result.stolenFrom).toEqual([1])
+    // 굴림은 리드 rand(0,9) 한 번뿐 — 악송구 굴림이 없다
+    expect(counted.count()).toBe(1)
   })
 
   it('재생 칸에 든 결과가 도루 판인지 가를 수 있다 — 견제 결과는 아니다', () => {

@@ -60,8 +60,8 @@ describe('폭투·포일 한 판 — 종류 9 (0x3507c · 0xb284a)', () => {
     expect(passedBallCallSoundIdOf(result)).toBeNull()
   })
 
-  it('낫아웃이면 타자주자가 맨 앞(0번)에 서고 1루 포스(결과 2)로 잡힌다 — 콜 20', () => {
-    const result = runPassedBallPlay({ shot: 가운데, bases: EMPTY_BASES, outs: 0, batterRuns: true })
+  it('낫아웃이면 타자주자가 맨 앞(0번)에 서고 사람이 1루로 던지면 포스(결과 2)로 잡힌다 — 콜 20', () => {
+    const result = runPassedBallPlay({ shot: 가운데, bases: EMPTY_BASES, outs: 0, batterRuns: true, manualThrowBase: 1 })
     expect(result.ticks[0].runners.map((runner) => runner.index)).toEqual([0])
     expect(result.throwBase).toBe(1)
     expect(result.resultCode).toBe(RUNNER_PLAY_RESULT.OUT)
@@ -80,8 +80,14 @@ describe('폭투·포일 한 판 — 종류 9 (0x3507c · 0xb284a)', () => {
     runPassedBallPlay({ shot: 가운데, bases: EMPTY_BASES, outs: 0, random: quiet })
     expect(quiet.count()).toBe(1)
     const throwing = 세는난수(0.9)
-    runPassedBallPlay({ shot: 가운데, bases: EMPTY_BASES, outs: 0, batterRuns: true, random: throwing })
+    runPassedBallPlay({ shot: 가운데, bases: EMPTY_BASES, outs: 0, batterRuns: true, random: throwing, manualThrowBase: 1 })
     expect(throwing.count()).toBe(2)
+    // 키 없는 사람 수동 송구는 던지지 않는다 — 낫아웃 타자주자는 1루에 산다
+    const holding = 세는난수(0.9)
+    const kept = runPassedBallPlay({ shot: 가운데, bases: EMPTY_BASES, outs: 0, batterRuns: true, random: holding })
+    expect(holding.count()).toBe(1)
+    expect(kept.throwBase).toBe(-1)
+    expect(kept.advance.bases.first).toBe(true)
   })
 
   it('커버 — 포수가 쫓으면 홈은 투수가 맡되 홈으로 올 주자가 없으면 비운다 (0xb1d48 · 0xb1b88)', () => {

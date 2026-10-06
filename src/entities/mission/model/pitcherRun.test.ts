@@ -226,13 +226,16 @@ describe('이닝 단위 미션 — 노히트노런 · 퍼펙트게임', () => {
 describe('수비 진행 — 미션도 수비 시뮬레이션이 돌린다 (P2 7절 · U-02)', () => {
   const 사우팅 = PITCHER_MISSIONS.find((m) => m.name.includes('영혼의 사우팅'))!
 
-  it('2루 주자가 있으면 단타에 1실점이다 — 고정 진루표 근사(0실점)가 아니다', () => {
+  it('2루 주자가 있는 단타 — 수비 진행기가 정한다: 키 없는 사람 수비는 안 던져 2루 주자는 3루에 선다', () => {
     expect(사우팅.start.runners).toEqual({ first: false, second: true, third: false })
 
     const run = applyPitcherOutcome(startPitcherMission(사우팅), { kind: '안타', bases: 1 })
 
-    expect(run.allowed.runs).toBe(1)
-    expect(run.bases).toEqual({ first: true, second: false, third: false })
+    // 투수편은 사람 수비 · 송구 설정 기본 수동 — 원본은 키가 없으면 아무도 던지지 않는다(0xb1c90 자동 가지에
+    // 송구 호출이 없다). 공 쥔 외야수가 공을 들고 있으니 자동 진루 0xaf918 의 수비 틱 예측(0xaf284)이
+    // 외야수 → 홈으로 잡혀 2루 주자는 3루에서 멈춘다.
+    expect(run.allowed.runs).toBe(0)
+    expect(run.bases).toEqual({ first: true, second: false, third: true })
   })
 
   it('1·3루 땅볼 — 판 시작 리드(0x3d7b8) 뒤로 아웃 하나, 3루 주자는 못 들어온다', () => {
