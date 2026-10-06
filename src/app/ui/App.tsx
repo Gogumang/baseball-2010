@@ -147,6 +147,11 @@ export function App() {
   const seasonSession = useSeasonSession(
     seasonStore, random, wallet, aceLevels.levels, recordStat, readAutobotBatInput, collectionRewardStore, readHallOfFame,
   )
+  // 142 경기 준비 0x1c46c 가 내 마타자·마투수를 열린 것 중에서 굴린다 (0x9f604 · 0x9f650, 825865d)
+  const nariOpenedAces = useMemo(
+    () => ({ pitcherIds: aceOpen.openedAcePitcherIds, batterIds: aceOpen.openedAceBatterIds }),
+    [aceOpen.openedAcePitcherIds, aceOpen.openedAceBatterIds],
+  )
   // 투수편 G도 같은 지갑 한 칸이다 — 옛 투수 저장에 남은 G는 표식 칸을 보고 딱 한 번 옮겨 온다
   const pitcherSession = usePitcherLeagueSession(
     pitcherStore,
@@ -160,6 +165,7 @@ export function App() {
     // 같은 날 CPU 끼리 경기·포스트시즌 CPU 경기의 마선수 배율(0xd88aa)도 전역 레벨 칸을 본다
     aceLevels.levels,
     readPitcherOtherModes,
+    nariOpenedAces,
   )
   // 화면이 바뀌면 그 화면의 배경음으로 갈아탄다 (`screenBgm.ts` 의 표). 투수편은 안쪽 장면(128 이어하기 4)을 본다
   const pitcherBgm = usePitcherLeagueBgm(screen.kind === '투수편', pitcherSession.scene)
@@ -172,6 +178,7 @@ export function App() {
     // 같은 날 CPU 끼리 경기·포스트시즌 CPU 경기의 마선수 배율(0xd88aa)도 전역 레벨 칸을 본다
     aceLevels: aceLevels.levels,
     readRegularSeasonOtherModes: readBatterOtherModes,
+    openedAces: nariOpenedAces,
   })
   const pitcherMissionPitcher = useMemo(() => modePitcherOf(pitcherSession.career), [pitcherSession.career])
   // 타자 미션(모드 6)은 0x213c0 이 6→4 로 나리 타자편 저장을 올린다 — 마투수 투구 소모(0xa5e14)의 압도 22 가 이 타자를 본다
