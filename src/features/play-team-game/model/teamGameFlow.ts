@@ -358,6 +358,14 @@ export interface TeamGameOptions {
   readonly ourPitcherStaminas?: readonly number[]
   /** 상대 팀 투수 시작 스태미나 — 표 칸 차례. 뜻은 `ourPitcherStaminas` 와 같다 */
   readonly opponentPitcherStaminas?: readonly number[]
+  /**
+   * **상대 팀 투수 레코드 차례** (시즌 모드 2 만 본다) — 리그가 들고 다니는 차례(`League.pitcherOrders` ·
+   * `postseasonPitcherOrderOf`)를 경기 준비 `0x6548`(670e~673e)이 g ≠ 0 이면 0xb8c80 → 0xb5ca8 로 한 칸 돌린 뒤의 것.
+   * 칸 p 에 앉은 붙박이 표 칸이고 0번이 선발 · 나머지가 벤치 차례다 (`0xb891c` 의 `team[i] = i`).
+   * 있으면 상대 투수 명단을 이 차례로 세우고 선발은 명단 0번이다. 없으면 `rotationSlotOf(…DayCounter)` 셈(첫 시즌
+   * 정규시즌에서만 원본과 같다) · 명단은 표 차례 그대로다.
+   */
+  readonly opponentPitcherOrder?: readonly number[]
   /** 화면 배치 side (투영 원점 표 0xcfb18 의 칸) */
   readonly stageSide?: number
 }
@@ -715,6 +723,8 @@ function startingPitcherSlotsOf(
 ): { readonly opponent: number; readonly ours: number } {
   if (options.mode === TEAM_GAME_MODE.시즌) {
     const day = options.dayCounter ?? 0
+    // 리그 차례를 받았으면 상대 명단이 그 차례라 선발은 명단 0번이다 (`opponentPitcherEntryOf`)
+    if (options.opponentPitcherOrder !== undefined) return { opponent: 0, ours: rotationSlotOf(day) }
     // 상대 칸만 다른 날짜를 받을 수 있다 — 국가대항전 상대국 슬롯은 매일 새로 복사된다 (`opponentDayCounter`)
     return { opponent: rotationSlotOf(options.opponentDayCounter ?? day), ours: rotationSlotOf(day) }
   }
@@ -785,6 +795,20 @@ function opponentAceIndexesOf(
   return rollOpponentAces(options.acePitcherId ?? NO_ACE_BATTER, options.aceBatterId ?? NO_ACE_BATTER, random)
 }
 
+/**
+ * 상대 팀 투수 명단 — 시즌에 리그 차례(`opponentPitcherOrder`)를 받았으면 그 차례로 표 칸을 늘어세운다(칸마다 제 표 칸
+ * `orderIndex` · 보직을 그대로 든다 — 로테이션 0xb5ca8 은 레코드째 옮긴다). 그 밖은 표 차례 그대로.
+ */
+function opponentPitcherEntryOf(options: TeamGameOptions): readonly TeamEntryPitcher[] {
+  const table = rosterEntryPitchersOf(options.opponentTeamId)
+  const order = options.mode === TEAM_GAME_MODE.시즌 ? options.opponentPitcherOrder : undefined
+  if (order === undefined) return table
+  return order.flatMap((slot) => {
+    const pitcher = table[slot]
+    return pitcher === undefined ? [] : [pitcher]
+  })
+}
+
 /** 시작 스태미나 배열을 명단 칸으로 — 명단 차례(`orderIndex`)로 찾고, 없는 칸·마투수는 10000 */
 function pitcherStaminasOf(
   entry: readonly TeamEntryPitcher[],
@@ -817,10 +841,7 @@ export function startTeamGame(options: TeamGameOptions, random: RandomPort): Tea
       : entryPitchersOfOrder(options.ourTeamId, ourOrder),
     options.acePitcherId ?? NO_ACE_BATTER,
   )
-  const opponentPitcherEntry = withAcePitcher(
-    rosterEntryPitchersOf(options.opponentTeamId),
-    opponentAces.pitcher,
-  )
+  const opponentPitcherEntry = withAcePitcher(opponentPitcherEntryOf(options), opponentAces.pitcher)
   const ourPitcherStaminas = pitcherStaminasOf(ourPitcherEntry, options.ourPitcherStaminas)
   const opponentPitcherStaminas = pitcherStaminasOf(opponentPitcherEntry, options.opponentPitcherStaminas)
   const initial: TeamGameProgress = {

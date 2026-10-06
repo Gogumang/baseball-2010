@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { teamPitchers } from '@/entities/team/model/teamRoster'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { createAtBat } from '@/entities/at-bat/model/atBatState'
 import { EMPTY_BATTER_GAME_LOG, recordBatterAtBat } from '@/entities/game/model/batterGameLog'
@@ -637,6 +638,27 @@ describe('시즌모드 선발은 4인 로테이션이다 (0x6548 → 0xb8c80 →
       대전.ourPitcherIndex !== 대전2.ourPitcherIndex ||
         대전.opponentPitcherIndex !== 대전2.opponentPitcherIndex,
     ).toBe(true)
+  })
+})
+
+describe('시즌 상대 투수 레코드 차례 — opponentPitcherOrder', () => {
+  it('리그 차례로 상대 명단을 세우고 명단 0번이 선발이다 — 칸마다 제 표 칸·보직을 든다', () => {
+    const { progress } = 시작({
+      playerSide: PLAYER_SIDE_FIRST_BAT,
+      dayCounter: 9,
+      opponentPitcherOrder: [2, 3, 0, 1, 4, 5, 6, 7],
+      opponentPitcherStaminas: [10_000, 10_000, 6_000, 10_000, 10_000, 10_000, 10_000, 10_000],
+    })
+    expect(progress.opponentPitcherIndex).toBe(0)
+    expect(progress.opponentPitcherEntry.map((pitcher) => pitcher.orderIndex)).toEqual([2, 3, 0, 1, 4, 5, 6, 7])
+    expect(progress.opponentPitcherEntry[0]?.name).toBe(teamPitchers(1)[2]?.name)
+    // 표 칸 2 의 레코드 +0x2c 로 선다
+    expect(progress.opponentStamina).toBe(6_000)
+  })
+
+  it('안 넘기면 예전 셈 — g % 4 칸이 선발', () => {
+    const { progress } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT, dayCounter: 9 })
+    expect(progress.opponentPitcherIndex).toBe(1)
   })
 })
 
