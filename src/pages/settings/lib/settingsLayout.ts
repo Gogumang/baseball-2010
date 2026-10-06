@@ -179,7 +179,7 @@ export const DETAIL_COLORS = { selected: '#FFFFFF', unselected: '#7B93D4' } as c
  *            + 흰 둥근 테두리 0x6aa65 (막대 자리, 둥글기 1)                                  ; 0x5a4de
  * ```
  * 아래 OK 단추는 종류 0x21 갈래에 없다 (0x5a4f6 → 0x5a6f8 끝).
- * ⚠️ 흰 테두리는 `0xca911(틱, 8) ≤ 3` 일 때만 그려(깜빡임) 지지만 첫 화면(종류 8)처럼 웹은 늘 그린다.
+ * 흰 테두리는 첫 화면처럼 깜빡인다 (`isSelectedOutlineShown`, 0x5a4ae).
  */
 export const MODE_RESET_TITLE = { frame: 291, x: X1 - 29 + 31, y: PANEL.y + 5 } as const
 export const MODE_RESET_ROW_COUNT = 3
@@ -192,3 +192,15 @@ export const MODE_RESET_ROW = {
   bar: { x: PANEL.x + 0x32, dy: 0x25, width: 114, height: 18 },
   name: { x: PANEL.x + 0x32, dy: 0x28, width: 114 },
 } as const
+
+/**
+ * 고른 줄 흰 테두리의 **깜빡임** — 공용 페이지 0x593c8 머리(0x593ce~0x593ee)가 그릴 때마다 skin+0x410 을 +1 한 뒤
+ * `0xca911(카운터, 8) ≤ 3` 이면 [sp+0x9c] = 1 로 두고, 테두리 0x6aa65 는 그 값이 켜졌을 때만 그린다 —
+ * 첫 화면(종류 8) 0x598c4 · 상세 설정(0x20) 0x5a1aa · 모드 초기화(0x21) 0x5a4ae. 8 갱신 중 4 갱신 보인다.
+ * (판이 펼쳐지는 동안 0x59548 이 0 으로 끄는 것은 웹에 판 펼침이 없어 옮길 자리가 없다.)
+ * ⚠️ 카운터의 시작 위상은 미확인이다 — skin+0x410 은 화면을 건너 이어지는 값인데, 웹은 화면마다 갱신 수를 0 부터 센다.
+ */
+export const isSelectedOutlineShown = (updates: number) => (updates + 1) % 8 <= 3
+
+/** 머리띠 `0x54d95(skin, 0, 5, 0)` — 제목 0 "2010프로야구" · 바닥 5(되돌아가기). 상태 8·0x20·0x21 그리기 0x2dc90 · 0x2dc48 · 0x2dc00 */
+export const SETTINGS_FRAME = { title: '2010프로야구', footer: 5 } as const

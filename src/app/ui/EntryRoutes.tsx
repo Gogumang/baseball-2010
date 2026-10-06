@@ -137,6 +137,7 @@ export function EntryRoutes({
         onChange={gameSettings.setSettings}
         onResetCareer={session.actions.resetCareer}
         {...(onResetEditedNames === undefined ? {} : { onResetEditedNames })}
+        mainMenu={{ gamePoint: wallet.balance }}
         onBack={() => setScreen({ kind: '메인메뉴' })}
       />
     )

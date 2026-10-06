@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { FrameSprite, MessageBox, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
+import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
+import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { PITCH_CONTROLS, SOUND_LEVEL_COUNT, SPEED_LEVEL_COUNT } from '@/entities/settings/model/gameSettings'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
 import { VIBRATION_TOGGLE_MILLISECONDS, vibrate } from '@/entities/defense-controls/model/vibration'
@@ -8,8 +10,8 @@ import { SETTINGS_TEXT } from '@/shared/config/settingsMenu'
 import {
   DETAIL_CHOICES, DETAIL_COLORS, DETAIL_ROWS, DETAIL_ROW_COUNT, DETAIL_TITLE,
   FIRST_MENU_ROW, MENU_ROW, MODE_RESET_ROW, MODE_RESET_ROW_COUNT, MODE_RESET_TITLE, OK_BUTTON, PANEL, ROW_COUNT, ROW_ICONS,
-  SOUND_BARS, SPEED_MARKS, TITLE, VALUE_ROW, VIBRATION,
-  bottomAlignOffset, iconCenterOffsetOf, modeResetRowTopOf, rowTopOf,
+  SETTINGS_FRAME, SOUND_BARS, SPEED_MARKS, TITLE, VALUE_ROW, VIBRATION,
+  bottomAlignOffset, iconCenterOffsetOf, isSelectedOutlineShown, modeResetRowTopOf, rowTopOf,
 } from '@/pages/settings/lib/settingsLayout'
 import * as styles from '@/pages/settings/ui/SettingsScreen.css'
 
@@ -35,7 +37,30 @@ interface SettingsScreenProps {
    * 칸은 보이되 OK 가 아무 일도 하지 않는다 (⚠️ 미배선).
    */
   readonly onResetSeason?: () => void
+  /**
+   * 메인 메뉴 장면(0x103)의 환경설정일 때만 준다 — 상태 8·0x20·0x21 그리기(0x2dc90 · 0x2dc48 · 0x2dc00)가
+   * 판 뒤에 머리띠 `0x54d95(skin, 0, 5, 0)`(제목 "2010프로야구" + G포인트 · 바닥 되돌아가기)를 그린다.
+   * 경기 중 메뉴 그리기 0x3cdd0 은 0x593c8 종류 8 만 그리고 머리띠가 없어 안 준다.
+   */
+  readonly mainMenu?: { readonly gamePoint: number }
   readonly onBack: () => void
+}
+
+/**
+ * 머리띠 — 들어올 때마다 미끄러져 내려온다: 상태 8 진입 0x259fc(앞 상태가 0x20~0x22 가 아닐 때) ·
+ * 0x20 진입 0x2421c · 0x21 진입 0x242a4 가 skin+0x84 = 1 을 세운다. 하위 페이지에서 **돌아온** 첫 화면은
+ * 0x259fc 가 커서만 (0, 3/4/5) 로 두고 0x84 를 안 세워(0x25a28~0x25a4e) 다 내려온 그대로다.
+ */
+function SettingsFrame({ mainMenu, onBack, slides = true }: {
+  readonly mainMenu: { readonly gamePoint: number } | undefined
+  readonly onBack: () => void
+  readonly slides?: boolean
+}) {
+  if (mainMenu === undefined) return null
+  return (
+    <ScreenFrame title={SETTINGS_FRAME.title} gamePoint={mainMenu.gamePoint} footer={SETTINGS_FRAME.footer}
+      onBack={onBack} slides={slides} />
+  )
 }
 
 /**
@@ -51,9 +76,12 @@ interface SettingsScreenProps {
  * 상세 설정에는 웹이 실제로 쓰는 항목(투구 게이지)을 둔다.
  */
 export function SettingsScreen({
-  settings, hasSavedCareer, onChange, onResetCareer, onResetEditedNames, onResetSeason, onBack,
+  settings, hasSavedCareer, onChange, onResetCareer, onResetEditedNames, onResetSeason, mainMenu, onBack,
 }: SettingsScreenProps) {
   const [cursor, setCursor] = useState(0)
+  /** 하위 페이지(상세 설정·모드 초기화)에서 돌아왔는가 — 돌아온 첫 화면은 머리띠가 다시 미끄러지지 않는다 */
+  const [hasReturned, setHasReturned] = useState(false)
+  const isOutlineShown = isSelectedOutlineShown(useUpdateCounter())
   const [notice, setNotice] = useState<string | null>(null)
   const [isDetailOpen, setDetailOpen] = useState(false)
   const [isModeResetOpen, setModeResetOpen] = useState(false)
@@ -119,7 +147,10 @@ export function SettingsScreen({
 
   // 상세 설정은 팝업이 아니라 **딴 페이지**다 (원본 장면 상태 0x20 · 페이지 32)
   if (isDetailOpen) {
-    return <DetailSettings settings={settings} onChange={onChange} onBack={() => setDetailOpen(false)} />
+    return (
+      <DetailSettings settings={settings} onChange={onChange} mainMenu={mainMenu}
+        onBack={() => { setHasReturned(true); setDetailOpen(false) }} />
+    )
   }
   // 모드 초기화도 딴 페이지다 (장면 상태 0x21 · 페이지 33, 갱신 0x2c6d8 · 그리기 0x2dc00)
   if (isModeResetOpen && onResetEditedNames !== undefined) {
@@ -129,7 +160,8 @@ export function SettingsScreen({
         onResetCareer={onResetCareer}
         onResetEditedNames={onResetEditedNames}
         {...(onResetSeason === undefined ? {} : { onResetSeason })}
-        onBack={() => setModeResetOpen(false)}
+        mainMenu={mainMenu}
+        onBack={() => { setHasReturned(true); setModeResetOpen(false) }}
       />
     )
   }
@@ -222,7 +254,7 @@ export function SettingsScreen({
               </div>
             )}
 
-            {index === cursor && (
+            {index === cursor && isOutlineShown && (
               <div className={styles.selectedOutline}
                 style={{ left: bar.x, top: top + bar.dy, width: bar.width, height: bar.height }} />
             )}
@@ -240,6 +272,8 @@ export function SettingsScreen({
         onClick={onBack}>
         <img className={styles.sprite} alt="" src={imageSrc(POPUP, OK_BUTTON.frame)} style={{ left: 0, top: 0 }} />
       </button>
+
+      <SettingsFrame mainMenu={mainMenu} onBack={onBack} slides={!hasReturned} />
 
       {notice !== null && <MessageBox text={notice} buttons={['확인']} onAnswer={() => setNotice(null)} />}
     </RawScreen>
@@ -281,12 +315,14 @@ function toggleDetail(settings: GameSettings, row: number): GameSettings {
  * (`settingsLayout.ts` 의 `DETAIL_*` 주석).
  * 웹판에 배선이 없는 값(송구·전광판)도 **원본에 줄이 있으므로 그대로 보여 주고 저장한다.**
  */
-function DetailSettings({ settings, onChange, onBack }: {
+function DetailSettings({ settings, onChange, mainMenu, onBack }: {
   readonly settings: GameSettings
   readonly onChange: (settings: GameSettings) => void
+  readonly mainMenu: { readonly gamePoint: number } | undefined
   readonly onBack: () => void
 }) {
   const [cursor, setCursor] = useState(0)
+  const isOutlineShown = isSelectedOutlineShown(useUpdateCounter())
   const frames = useFrameOrigins(`${SLT_FRAME}/frames`)
   const titleFrames = useFrameOrigins(IMG_TEXT)
   const values = detailValuesOf(settings)
@@ -355,7 +391,7 @@ function DetailSettings({ settings, onChange, onBack }: {
               </div>
             ))}
 
-            {index === cursor && (
+            {index === cursor && isOutlineShown && (
               <div className={styles.selectedOutline}
                 style={{
                   left: VALUE_ROW.bar.x, top: top + VALUE_ROW.bar.dy,
@@ -379,6 +415,7 @@ function DetailSettings({ settings, onChange, onBack }: {
         onClick={onBack}>
         <img className={styles.sprite} alt="" src={imageSrc(POPUP, OK_BUTTON.frame)} style={{ left: 0, top: 0 }} />
       </button>
+      <SettingsFrame mainMenu={mainMenu} onBack={onBack} />
     </RawScreen>
   )
 }
@@ -415,16 +452,17 @@ const MODE_RESET_NAMES = [SETTINGS_TEXT.careerReset, SETTINGS_TEXT.seasonReset, 
  *    시즌 중 막기 [212] → 확인 [210]/[211] → 0x224ed(4 타자 / 3 투수) 다(R11 3-1). 웹은 투수편 지우기·
  *    시즌 중 막기 배선이 다른 작업 구역(app/model)이라 **예전처럼 타자편 저장이 있을 때만 [210] 확인**으로 둔다.
  *  - 칸 1 시즌모드: 웹에 시즌 저장 지우기(0x224ed(2))가 없어 `onResetSeason` 을 안 받으면 OK 가 아무 일도 안 한다.
- *  - 머리띠 0x54d95(skin, 0, 5, 0) 는 환경설정 첫 화면처럼 그리지 않는다.
  */
-function ModeResetPage({ hasSavedCareer, onResetCareer, onResetEditedNames, onResetSeason, onBack }: {
+function ModeResetPage({ hasSavedCareer, onResetCareer, onResetEditedNames, onResetSeason, mainMenu, onBack }: {
   readonly hasSavedCareer: boolean
   readonly onResetCareer: () => void
   readonly onResetEditedNames: () => void
   readonly onResetSeason?: () => void
+  readonly mainMenu: { readonly gamePoint: number } | undefined
   readonly onBack: () => void
 }) {
   const [cursor, setCursor] = useState(0)
+  const isOutlineShown = isSelectedOutlineShown(useUpdateCounter())
   const [popup, setPopup] = useState<ModeResetPopup | null>(null)
   const frames = useFrameOrigins(`${SLT_FRAME}/frames`)
   const titleFrames = useFrameOrigins(IMG_TEXT)
@@ -490,7 +528,7 @@ function ModeResetPage({ hasSavedCareer, onResetCareer, onResetEditedNames, onRe
               }}>
               {name}
             </div>
-            {isSelected && (
+            {isSelected && isOutlineShown && (
               <div className={styles.selectedOutline}
                 style={{ left: bar.x, top: top + bar.dy, width: bar.width, height: bar.height }} />
             )}
@@ -501,6 +539,8 @@ function ModeResetPage({ hasSavedCareer, onResetCareer, onResetEditedNames, onRe
           </div>
         )
       })}
+
+      <SettingsFrame mainMenu={mainMenu} onBack={onBack} />
 
       {popup === '나리확인' && (
         <MessageBox text={SETTINGS_TEXT.careerResetConfirm} buttons={['예', '아니오']} initialSelected={CONFIRM_FIRST_CURSOR}

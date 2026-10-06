@@ -5,7 +5,7 @@ import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import { DEFAULT_SETTINGS, SPEED_LEVEL_COUNT } from '@/entities/settings/model/gameSettings'
 import {
   MENU_ROW, MODE_RESET_ROW, MODE_RESET_TITLE, PANEL, SOUND_BARS, SPEED_MARKS, VALUE_ROW,
-  bottomAlignOffset, modeResetRowTopOf, rowTopOf,
+  bottomAlignOffset, isSelectedOutlineShown, modeResetRowTopOf, rowTopOf,
 } from '@/pages/settings/lib/settingsLayout'
 
 /**
@@ -23,6 +23,7 @@ const 띄우기 = (overrides: Partial<Parameters<typeof SettingsScreen>[0]> = {}
       onChange={vi.fn()}
       onResetCareer={vi.fn()}
       onResetEditedNames={vi.fn()}
+      mainMenu={{ gamePoint: 1234 }}
       onBack={vi.fn()}
       {...overrides}
     />,
@@ -316,5 +317,40 @@ describe('환경설정 → 상세 설정 (원본 페이지 32, 네 줄)', () => 
     fireEvent.click(줄('전광판'))
 
     expect(onChange).toHaveBeenCalledWith({ ...DEFAULT_SETTINGS, isScoreboardOn: false })
+  })
+})
+
+/**
+ * 머리띠 `0x54d95(skin, 0, 5, 0)` — 메인 메뉴 상태 8·0x20·0x21 그리기(0x2dc90 · 0x2dc48 · 0x2dc00)가 모두 그린다.
+ * 경기 중 메뉴 그리기 0x3cdd0 은 종류 8 판만 그린다.
+ */
+describe('환경설정 머리띠와 흰 테두리 깜빡임', () => {
+  const 되돌아가기 = () => screen.queryByRole('button', { name: '되돌아가기' })
+
+  it('메인 메뉴 환경설정은 세 페이지 모두 머리띠(제목 0 · 바닥 5 되돌아가기)를 그린다', () => {
+    const onBack = vi.fn()
+    띄우기({ onBack })
+    expect(되돌아가기()).toBeTruthy()
+
+    fireEvent.click(줄('모드 초기화'))
+    expect(줄('에디트 초기화')).toBeTruthy()
+    expect(되돌아가기()).toBeTruthy()
+    // 모드 초기화의 되돌아가기는 첫 화면으로 (CLR 0xbcb49(…, 8))
+    fireEvent.click(되돌아가기() as HTMLElement)
+    expect(줄('사운드')).toBeTruthy()
+    expect(onBack).not.toHaveBeenCalled()
+
+    fireEvent.click(줄('상세 설정'))
+    expect(되돌아가기()).toBeTruthy()
+  })
+
+  it('경기 중 메뉴 "설정"(mainMenu 없음)은 머리띠가 없다', () => {
+    띄우기({ mainMenu: undefined })
+    expect(되돌아가기()).toBeNull()
+  })
+
+  it('흰 테두리는 그릴 때마다 +1 한 카운터 % 8 ≤ 3 일 때만 — 8 갱신 중 4 갱신', () => {
+    const shown = Array.from({ length: 8 }, (_unused, updates) => isSelectedOutlineShown(updates))
+    expect(shown).toEqual([true, true, true, false, false, false, false, true])
   })
 })
