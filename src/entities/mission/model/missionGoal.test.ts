@@ -14,6 +14,8 @@ import {
   pitcherGoalNamesFor,
   recordPitcherOutcome,
   withOutCalls,
+  judgedGoalsOf,
+  unlistedGoalNamesOf,
 } from '@/entities/mission/model/missionGoal'
 import { MISSIONS } from '@/shared/config/original/missions'
 
@@ -268,5 +270,27 @@ describe("'번트' 는 번트 안타만 — R+0xf4 는 정산 안타 갈래의 a
     expect(goalNamesFor({ kind: '아웃', detail: '땅볼아웃' }, 0, true)).not.toContain('번트')
     const progress = recordOutcome(createProgress(), { kind: '아웃', detail: '땅볼아웃' }, 0, true, 1)
     expect(isCleared(번트달인, progress)).toBe(false)
+  })
+})
+
+describe('목표 글에 없는 목표 칸도 판정한다 — 0xaaa6c 는 행+0xa0.. 칸만 본다', () => {
+  const 투혼 = PITCHER_MISSIONS.find((m) => m.id === 9)!
+  const 사이클 = BATTER_MISSIONS.find((m) => m.id === 14)!
+
+  it('전수: 글에 없는 칸은 투수 9 의 아웃, 타자 14 의 타점·안타뿐이다', () => {
+    const unlisted = MISSIONS.flatMap((m) => unlistedGoalNamesOf(m).map((name) => `${m.side}${m.id}:${name}`))
+    expect(unlisted.sort()).toEqual(['타자14:안타', '타자14:타점', '투수9:아웃'].sort())
+  })
+
+  it("투수 9 는 탈삼진 4 · MAX게이지 10 을 채워도 '아웃' 1 이 없으면 아직이다", () => {
+    const 아웃없음 = { counts: { 탈삼진: 4, MAX게이지: 10, 아웃: 0 }, plateAppearances: 4, brokenConditions: [] }
+    expect(isCleared(투혼, 아웃없음)).toBe(false)
+    expect(isCleared(투혼, { ...아웃없음, counts: { ...아웃없음.counts, 아웃: 1 } })).toBe(true)
+    expect(judgedGoalsOf(투혼, 아웃없음).map((goal) => goal.name)).toEqual(['MAX게이지', '탈삼진', '아웃'])
+  })
+
+  it('화면 막대(goalsOf)는 목표 글 그대로다', () => {
+    expect(goalsOf(투혼, createProgress()).map((goal) => goal.name)).toEqual(['MAX게이지', '탈삼진'])
+    expect(goalsOf(사이클, createProgress()).map((goal) => goal.name)).toEqual(['사이클링히트'])
   })
 })

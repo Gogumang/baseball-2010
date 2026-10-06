@@ -112,8 +112,40 @@ export function goalsOf(mission: OriginalMission, progress: MissionProgress): Mi
   })
 }
 
+/**
+ * **목표 글에 이름이 없는 목표 칸** — 판정은 이것도 본다 (직접 재역어셈).
+ *
+ * 판 끝 판정 0xaaa6c 는 레코드의 목표 글(+0xe, 32바이트 `goals`)을 읽지 않는다. 행+0xa0.. 의 목표 칸을 **모두**
+ * `0xaa928(미션, 칸, 한도)`(한도 > 0 이고 칸 < 한도면 상태 1 = 아직)로 차례로 견줄 뿐이라, 0 이 아닌 칸은 글에 없어도 목표다:
+ * - 타자(모드 6, aaade~aab56): 안타 합 R+0xb4..0xc0 ↔ +0xa6 · 단타 R+0xb4 ↔ +0xa1 아래 · 2루타 R+0xb8 ↔ +0xa0 위 ·
+ *   3루타 R+0xbc ↔ +0xa0 아래 · 홈런 R+0xc0 ↔ +0xa3 아래 · 만루홈런 R+0xc8 ↔ +0xa2 위 · 그라운드홈런 R+0xcc ↔ +0xa2 아래 ·
+ *   번트 R+0xf4 ↔ +0xa4 위 · 타점 R+0x104 ↔ +0xa5 · 도루 R+0x10c ↔ +0xa4 아래.
+ * - 투수(모드 5, aac76~aacd6): 탈삼진 R+0x134 ↔ +0xa0 위 · 삼진콤보 R+0x14c ↔ +0xa0 아래 · MAX게이지 R+0x158 ↔ +0xa1 위 ·
+ *   아웃 R+0x13c ↔ +0xa4.
+ * `goalCounts` 가 바로 이 칸들(0 인 칸은 빠짐)이라, 목표 글에 없는 이름을 여기서 골라 판정에 더한다. 원본 표에서 걸리는 것은
+ * 투수 9 "투혼의 삼진 행진"의 아웃 1 과 타자 14 "폭주!! 사이클링 히트"의 타점 1 · 안타 2(사이클을 채우면 늘 함께 찬다) 뿐이다.
+ * 사이클링히트는 네 안타 칸(`CYCLE_HIT_PARTS`)을 글 하나로 묶은 것이라 그 넷은 이미 든 것으로 본다.
+ * ⚠️ 화면 목표 막대(`goalsOf`)는 목표 글만 보인다 — 원본 화면이 칸을 어떻게 보이는지는 안 읽었다(미해결).
+ */
+export function unlistedGoalNamesOf(mission: OriginalMission): string[] {
+  const covered = mission.goals.includes(CYCLE_HIT_GOAL) ? [...mission.goals, ...CYCLE_HIT_PARTS] : mission.goals
+  return Object.entries(mission.goalCounts)
+    .filter(([name, count]) => count > 0 && !covered.includes(name))
+    .map(([name]) => name)
+}
+
+/** 판정이 보는 목표 전부 — 목표 글의 목표(`goalsOf`)에 글에 없는 목표 칸(`unlistedGoalNamesOf`)을 더한 것 */
+export function judgedGoalsOf(mission: OriginalMission, progress: MissionProgress): MissionGoal[] {
+  const unlisted = unlistedGoalNamesOf(mission).map((name) => ({
+    name,
+    required: mission.goalCounts[name] ?? 0,
+    achieved: progress.counts[name] ?? 0,
+  }))
+  return [...goalsOf(mission, progress), ...unlisted]
+}
+
 export function isCleared(mission: OriginalMission, progress: MissionProgress): boolean {
-  return goalsOf(mission, progress).every((goal) => goal.achieved >= goal.required)
+  return judgedGoalsOf(mission, progress).every((goal) => goal.achieved >= goal.required)
 }
 
 const FULL_BASES = 3
