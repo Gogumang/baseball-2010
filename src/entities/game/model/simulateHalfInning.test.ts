@@ -244,6 +244,29 @@ describe('공 하나 소모 drainPitcherForPitch — 0xa5e14 의 0xa5f0e~ → 0x
   })
 })
 
+describe('간이 엔진은 공마다 깎는다 — 0xc262c 가 공을 던지기 앞에 0xa5e14 (c26c8)', () => {
+  const 수비 = (stamina: number): HalfInningDefense => ({
+    mound: { ...startingMoundOf(0, stamina), usedSlots: [] },
+    pitcherSlots: [0],
+    pitcherAt: () => 투수(500),
+    staminaAbilityAt: () => 500,
+    lead: 0,
+  })
+
+  it('반 이닝이 끝난 스태미나는 던진 공 수만큼 한 공씩 깎은 값이다', () => {
+    const result = simulateHalfInning(0, () => 타자(500), 투수(500), 1, 씨앗난수(3), undefined, undefined, 수비(FULL_STAMINA))
+    expect(result.mound?.stamina).toBe(drainQuickPitcher(수비(FULL_STAMINA), startingMoundOf(0), result.pitches))
+  })
+
+  it('바닥난 투수도 공마다 0 ↔ 100 을 오간다 — 0xaeb08 의 되살아남(원본 버그)이 공 단위로 돈다', () => {
+    // 한 공(소모 9)이면 0 이 되는 스태미나에서 시작한다
+    const 한공 = FULL_STAMINA - drainQuickPitcher(수비(FULL_STAMINA), startingMoundOf(0), 1)
+    const result = simulateHalfInning(0, () => 타자(500), 투수(500), 1, 씨앗난수(11), undefined, undefined, 수비(한공))
+    expect(result.mound?.stamina).toBe(drainQuickPitcher(수비(한공), startingMoundOf(0, 한공), result.pitches))
+    expect([0, 100]).toContain(result.mound?.stamina)
+  })
+})
+
 describe('투수편(모드 3)의 0xac428 — [sp+4] 내 투수 건너뛰기 · [sp+8] 강제 (ac428~ac656)', () => {
   const 내투수 = 8
   /** 벤치 차례 [1, 2, 나] — 마운드 0 */

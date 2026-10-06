@@ -276,6 +276,12 @@ export interface QuickAtBatHooks {
    * 안 넘기면 아무 일도 하지 않으므로 난수 순서도 그대로다.
    */
   readonly onPitchJudged?: (judgement: PitchJudgement) => void
+  /**
+   * 공 하나를 던지기 **바로 앞** — 0xc262c 는 공마다 스태미나 소모 `0xa5e14`(c26c8)를 먼저 부르고 나서 경로 굴림
+   * `rand(0,100)`(c26d4)과 투구(0xc11f0 / 0xc1818)로 간다. 돌려준 투수가 이 공의 투수다(소모가 반영된 체력%).
+   * 안 넘기면 받은 `startingPitcher` 를 그대로 쓴다. 난수를 쓰지 않는다.
+   */
+  readonly beforePitch?: () => QuickAtBatPitcher
 }
 
 /**
@@ -285,7 +291,7 @@ export interface QuickAtBatHooks {
  */
 export function playQuickAtBat(
   batter: QuickAtBatBatter,
-  pitcher: QuickAtBatPitcher,
+  startingPitcher: QuickAtBatPitcher,
   situation: QuickAtBatSituation,
   random: RandomPort,
   hooks: QuickAtBatHooks = {},
@@ -294,6 +300,7 @@ export function playQuickAtBat(
   let balls = 0
   for (let pitch = 1; pitch <= MAXIMUM_PITCHES; pitch += 1) {
     const done = (outcome: AtBatOutcome): QuickAtBatPlay => ({ outcome, pitches: pitch, balls, strikes })
+    const pitcher = hooks.beforePitch?.() ?? startingPitcher
     const isSwing =
       randomIntegerBelow(random, 0, 100) <= SWING_PATH_LIMIT || situation.inning === FORCED_SWING_INNING
     if (!isSwing) {

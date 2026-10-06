@@ -421,8 +421,19 @@ export function simulateHalfInning(
       defense !== undefined && mound !== undefined
         ? { ...defense.pitcherAt(mound.pitcherSlot), stamina: staminaPercentOf(mound.stamina) }
         : pitcher
+    /** 이 타석 동안 공마다 깎이는 스태미나 — 0xc262c 는 공을 던지기 **앞에** 0xa5e14 로 깎는다(c26c8) */
+    let pitchStamina = mound?.stamina
     const rosterSlot = lineup !== undefined ? rosterSlotAt(lineup, order) : undefined
     const play = playQuickAtBat(batterOn(order), facing, { inning }, random, {
+      ...(defense === undefined || mound === undefined
+        ? {}
+        : {
+            beforePitch: () => {
+              const current = mound as HalfInningMound
+              pitchStamina = drainQuickPitcher(defense, { ...current, stamina: pitchStamina ?? current.stamina }, 1)
+              return { ...facing, stamina: staminaPercentOf(pitchStamina) }
+            },
+          }),
       /**
        * 투구 판정 경로 뒤에만 도루를 굴린다 (0xc1818, E-5). **실패가 없어** 주자를 잃지 않는다.
        *
@@ -507,7 +518,8 @@ export function simulateHalfInning(
       inningRunsAllowed = Math.min(MAXIMUM_COUNTER, inningRunsAllowed + scored)
       mound = {
         ...mound,
-        stamina: drainQuickPitcher(defense, mound, play.pitches),
+        // 공마다 이미 깎았다 (위 `beforePitch`)
+        stamina: pitchStamina ?? mound.stamina,
         runsAllowed: Math.min(MAXIMUM_COUNTER, mound.runsAllowed + scored),
         pitches: mound.pitches + play.pitches,
         // 투구마다 state[0xd] 가 내려간다 (0xa5e72) — 타석을 하나 치렀으면 반드시 내려가 있다
@@ -673,9 +685,9 @@ function moundAfterChange(defense: HalfInningDefense, mound: HalfInningMound, ne
  * 용량 X = 사기보정(체력 실효 능력치) + (첫 투수 ? 200 : 0) + 250 (0x66e44) — 구원으로 올라온
  * 투수는 +200 이 없어 같은 체력이면 더 빨리 지친다.
  *
- * ⚠️ **근사**: 원본은 투구마다 깎지만 여기서는 타석이 끝난 뒤 그 타석의 투구 수만큼 한꺼번에
- * 깎는다 (`features/play-team-game` 의 `drainQuickPitcher` 와 같은 근사). 깎이는 총량은 같고,
- * 한 타석 **안에서** 보는 체력%만 한 타석 늦는다.
+ * 반 이닝 엔진은 `pitchCount = 1` 로 **공마다** 부른다 — 0xc262c 가 공을 던지기 앞에 0xa5e14 를 부르므로(c26c8)
+ * 그 공이 보는 체력%는 자기 소모까지 먹은 값이다. 여러 개를 한꺼번에 깎는 것은 `features/play-team-game` 처럼
+ * 타석이 끝난 뒤 몰아 깎는 쪽(근사)이 쓰는 길이다.
  */
 export function drainQuickPitcher(
   defense: HalfInningDefense,
