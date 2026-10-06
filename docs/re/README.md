@@ -27,7 +27,7 @@
 | 문서 | 내용 |
 |---|---|
 | [E-defense-rules.md](E-defense-rules.md) | 간이 경기 엔진, 연장·콜드게임, 순위 정렬, 병살·삼중살, 도루 |
-| [R1-league-day-winner.md](R1-league-day-winner.md) | **CPU 끼리 경기의 승패가 뒤집혀 있다**(원본 버그, 확정) |
+| [R1-league-day-winner.md](R1-league-day-winner.md) | ~~**CPU 끼리 경기의 승패가 뒤집혀 있다**(원본 버그, 확정)~~ *(정정 2026-10-06, 0470ded: 칸·명단 엇갈림 — 정규는 더 낸 팀 승, 포스트시즌만 덜 낸 팀 승)* |
 | [P2-fielding-ai.md](P2-fielding-ai.md) | 타구 뒤 수비 AI — 포구 예측·추적·송구·자동 주루·태그/포스 |
 | [Q1-cpu-offense-ai.md](Q1-cpu-offense-ai.md) | CPU 타자의 스윙·번트 판단, CPU 도루·대타 |
 | [S8-fielding-ai-3.md](S8-fielding-ai-3.md) | 협살, 송구 타이밍 게이트, 견제 송구, 0.1% 폭투 사건, 리드 없음 |
