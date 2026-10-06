@@ -316,6 +316,12 @@ export interface PitcherCareer {
   readonly postseason: PostseasonSeries | null
   readonly lastMidSeasonGoalCount: number
   /**
+   * 평판 0 으로 끝난 경기 뒤 평가가 **연속**으로 이어진 수 (+0x184, u8) — 타자편 `PlayerCareer.reputationZeroGames` 와 같은
+   * 칸·같은 셈이다. 경기 뒤 평가 116(장면 0x106, 모드 3·4 공용)의 `0xa4d08(S)`(0x12c32)가 평판 0 이면 +1, 아니면 0.
+   * 칭호 30 "가짜 인간" 이 `s8 +0x184 > 4` 로 본다. 옛 저장에는 없다(0).
+   */
+  readonly reputationZeroGames: number
+  /**
    * 중간평가(상태 117)를 본 해 — 연차idx 목록. 원본은 기록 `+0x180` 의 비트 `13 + 연차idx`(모드 3 · 타자편은 `+0`)이고
    * 보상 실행기 0x8c460 끝(0x8cbaa~0x8cbdc)이 이벤트 452~454 를 마칠 때 켠다. 105 진입(0x11bda~0x11c0c)이
    * `경기 수 == 22 && 0xa4280(기록, 타자편?, 연차idx) == 0` 일 때만 117 로 보낸다.
@@ -407,6 +413,7 @@ export function createPitcherCareer(
     seasonEndState: null,
     postseason: null,
     lastMidSeasonGoalCount: 0,
+    reputationZeroGames: 0,
     midSeasonEvaluatedYears: [],
     wins: 0,
     draws: 0,

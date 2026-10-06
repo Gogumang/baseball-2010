@@ -55,7 +55,9 @@ import { applyBurstRewards } from '@/entities/career/model/burstReward'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { selectSpecialSwingNumber, setSkillEquipped } from '@/entities/career/model/playerCareer'
 import { expandSkillSlots } from '@/entities/career/model/skillEquip'
-import { awardTitles, equipTitle, evaluateNewTitles } from '@/entities/career/model/titles'
+import {
+  awardTitles, equipTitle, evaluateNewTitles, nationalCupStandingsTitleOf,
+} from '@/entities/career/model/titles'
 import { blockReasonOf, runTraining, specialSwingCostOf } from '@/entities/career/model/training'
 import { trainingBlockTextOf, trainingOutcomeLinesOf } from '@/entities/career/model/trainingText'
 import {
@@ -658,8 +660,11 @@ export function useCareerSession({
   const continueSeason = (viewed: PlayerCareer, viewedEventIds: readonly number[]) => {
     // ── 국가대표 이벤트(461~464)는 연말 사슬 밖이다. 상태 133 이 따로 예약한 것이라 먼저 가른다 ──
     if (viewedEventIds.includes(NATIONAL_CUP_EVENT.출전)) {
-      // 463 출전 — 상태 133 이 `0xb7bf1(L)` 로 대회를 세우고 순위 화면 134 를 줄에 넣는다
-      setCareer(awardTitles(viewed, evaluateNewTitles(viewed)))
+      // 463 출전 — 상태 133 이 `0xb7bf1(L)` 로 대회를 세우고 순위 화면 134 를 줄에 넣는다.
+      // 134 의 틀 0x1b92c 머리가 들어온 첫 틀(장면+0x2c == 1)에 비트 8 이 없으면 칭호 8 "국가 대표" 를 준다 — 그 뒤다
+      const evaluated = awardTitles(viewed, evaluateNewTitles(viewed))
+      const nationalTitle = nationalCupStandingsTitleOf(evaluated.titleIds)
+      setCareer(nationalTitle === null ? evaluated : awardTitles(evaluated, [nationalTitle]))
       return setScreen({ kind: '국가대항전', cup: createNationalCup() })
     }
     if (viewedEventIds.includes(NATIONAL_CUP_EVENT.거절) || viewedEventIds.includes(NATIONAL_CUP_EVENT.탈락)) {

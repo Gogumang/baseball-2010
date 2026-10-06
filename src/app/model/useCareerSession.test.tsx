@@ -7,6 +7,7 @@ import { advancePostseason, EMPTY_LEAGUE, LEAGUE_TEAM_COUNT, startPostseason } f
 import { useAtBatRunner } from '@/app/model/useAtBatRunner'
 import type { Screen } from '@/app/model/screen'
 import { createCareer } from '@/entities/career/model/playerCareer'
+import { TITLE_NAMES } from '@/entities/career/model/titles'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { SALARY_ACCEPT_EVENT_ID } from '@/entities/career/model/seasonFlow'
@@ -117,6 +118,9 @@ describe('연말 국가대표 선발 판정 (상태 133 = 0x1a090)', () => {
     이벤트보기(출전, [461, 463])
 
     expect(출전.result.current.screen).toEqual({ kind: '국가대항전', cup: createNationalCup() })
+    // 순위 화면 134 의 첫 틀(0x1b92c)이 칭호 8 "국가 대표" 를 주고 곧바로 장착한다
+    expect(출전.result.current.session.career?.titleIds).toContain(TITLE_NAMES[8])
+    expect(출전.result.current.session.career?.equippedTitle).toBe(8)
 
     const 거절 = 띄우기(목표달성선수())
     연봉사슬끝내기(거절)
@@ -124,6 +128,7 @@ describe('연말 국가대표 선발 판정 (상태 133 = 0x1a090)', () => {
 
     expect(거절.result.current.screen).toEqual({ kind: '관리' })
     expect(거절.result.current.session.career?.season).toBe(2)
+    expect(거절.result.current.session.career?.titleIds).not.toContain(TITLE_NAMES[8])
   })
 })
 

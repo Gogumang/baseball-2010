@@ -89,7 +89,10 @@ import {
 } from '@/pages/pitcher-league/model/pitcherGameOptions'
 import type { PitcherGameOptions, PitcherGameSummary } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
-import { MAXIMUM_GAME_POINT, rebuildEquippedSkillIds } from '@/entities/career/model/playerCareer'
+import {
+  MAXIMUM_GAME_POINT, countReputationZeroGame, rebuildEquippedSkillIds,
+} from '@/entities/career/model/playerCareer'
+import { nationalCupStandingsTitleOf } from '@/entities/career/model/titles'
 import { isInfiniteGamePointOn } from '@/shared/lib/dev/devOptions'
 import type { GamePointWalletSession } from '@/entities/wallet/model/useGamePointWallet'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
@@ -725,7 +728,13 @@ export function usePitcherLeagueSession(
           )
         : seasoned
       // 선발형 승리 완투 계열 → +0x1e0/+0x1f0 (0xa690c 안이라 평가가 도는 정규시즌 경기만)
-      const counted = isEvaluated ? countCompleteGame(evaluated, summary.evaluation.countedCompleteGame) : evaluated
+      const completed = isEvaluated ? countCompleteGame(evaluated, summary.evaluation.countedCompleteGame) : evaluated
+      // 경기 뒤 평가 116 의 `0xa4d08(S)`(0x12c32) — 평판 0 이면 +0x184 +1, 아니면 0. 116 은 장면 0x106 의 모드 3·4 공용
+      // 상태이고 포스트시즌 경기 뒤에도 돈다(평가 0xa719c 만 건너뛴다) — 타자편 `countGameForSkills` 와 같은 자리다
+      const counted = {
+        ...completed,
+        reputationZeroGames: countReputationZeroGame(completed.reputationZeroGames, completed.reputation),
+      }
       setGameOptions(null)
 
       /*
@@ -839,8 +848,11 @@ export function usePitcherLeagueSession(
   const continueYearEnd = useCallback(
     (current: PitcherCareer, viewed: readonly number[]) => {
       if (viewed.includes(NATIONAL_CUP_EVENT.출전)) {
+        // 대회는 옮기지 않았지만 순위 화면 134 에 들어오는 첫 틀(0x1b92c 머리 — 장면 0x106 은 모드 3·4 공용)이 주는
+        // 칭호 8 "국가 대표" 는 그 화면에 들어오기만 하면 받는 것이라 여기서 준다
+        const nationalTitle = nationalCupStandingsTitleOf(current.titleIds)
         setStoryNotice(PITCHER_MANAGEMENT_TEXT.notPorted)
-        return startNewSeason(current)
+        return startNewSeason(nationalTitle === null ? current : awardPitcherTitles(current, [nationalTitle]))
       }
       // 464 거절은 S+0x12c = 0 으로 곧 새 시즌 (P5) · 462 탈락은 근사 (위 머리글)
       if (viewed.includes(NATIONAL_CUP_EVENT.거절) || viewed.includes(NATIONAL_CUP_EVENT.탈락)) {

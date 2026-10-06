@@ -70,9 +70,8 @@ export function titleSubjectOfPitcher(career: PitcherCareer): TitleSubject {
     seenEventIds: career.seenEventIds,
     // 칭호 판정 0x1a1c0 은 **보유** 비트(0xa3a74 — 0x1a380·0x1a768)를 본다. 장착이 아니다
     hasLegendSkill: hasPitcherSkill(career, LEGEND_SKILL),
-    // ⚠️ +0x184(평판 0 연속, 0xa4d08)는 두 편이 같은 경기 뒤 평가 116 에서 세지만 웹 투수 커리어엔 아직 그 칸이 없다 —
-    //    칭호 30 은 투수편에서 아직 안 나온다 (투수 세션의 경기 뒤 카운터가 생기면 그 칸을 넘길 것)
-    reputationZeroGames: 0,
+    // +0x184(평판 0 연속, 0xa4d08) — 두 편이 같은 경기 뒤 평가 116 에서 센다 (세션 finishGame)
+    reputationZeroGames: career.reputationZeroGames,
   }
 }
 

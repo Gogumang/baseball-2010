@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { usePitcherLeagueSession } from '@/app/model/usePitcherLeagueSession'
 import { startPostseason } from '@/entities/league/model/league'
-import { NO_EQUIPPED_TITLE } from '@/entities/career/model/titles'
+import { NO_EQUIPPED_TITLE, TITLE_NAMES } from '@/entities/career/model/titles'
 import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import { useGamePointWallet } from '@/entities/wallet/model/useGamePointWallet'
@@ -178,6 +178,18 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     act(() => 포스트.current.actions.finishGame(평가요약))
     expect(포스트.current.career).toMatchObject({ popularity: 100, reputation: 100, morale: 50 })
     expect(포스트.current.career?.completeGameCounts.shutout).toBe(0)
+  })
+
+  it('경기 뒤 평가 116 의 0xa4d08 — 평판 0 으로 끝난 경기마다 +0x184 +1, 아니면 0 (칭호 30 이 본다)', () => {
+    const 영 = 판짜기({ reputation: 0, reputationZeroGames: 4 })
+    act(() => 영.current.actions.beginGame())
+    act(() => 영.current.actions.finishGame(경기요약))
+    expect(영.current.career?.reputationZeroGames).toBe(5)
+
+    const 있음 = 판짜기({ reputation: 50, reputationZeroGames: 4 })
+    act(() => 있음.current.actions.beginGame())
+    act(() => 있음.current.actions.finishGame(경기요약))
+    expect(있음.current.career?.reputationZeroGames).toBe(0)
   })
 
   /** 저장해 두고 다시 띄운다 — 장면 0x106 에 다시 들어오는 이어하기 (상태 100 진입 0x1c154) */
@@ -397,6 +409,9 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     expect(출전.current.scene).toBe('관리')
     expect(출전.current.career?.season).toBe(2)
     expect(출전.current.storyNotice).not.toBe('')
+    // 순위 화면 134 에 들어오는 것만으로 받는 칭호 8 "국가 대표" (0x1b92c) — 거절은 못 받는다
+    expect(출전.current.career?.titleIds).toContain(TITLE_NAMES[8])
+    expect(거절.current.career?.titleIds).not.toContain(TITLE_NAMES[8])
   })
 
   it('7년차 인기도 499 이하면 연말 사슬 끝이 방출(501) → 엔딩(1)이다', () => {
