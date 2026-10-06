@@ -75,11 +75,17 @@ export function screenBgmOf(screen: Screen): number | null {
  * 128 대진은 타자편과 같은 진입 0x120a4 다: 이어하기로 들어왔으면(이전 상태 1) 4, 아니면 114 의 40 이 이어진다.
  * 109 순위표는 타자편과 같은 진입 0x10d8c(모드 갈림 없음)다: 이전 ≠ 105 면 `0x6ea6d(소리, 4, −1, 1)`, 105 에서 오면
  * 105 진입 0x11910 이 튼 4 가 이어진다 — 어느 길이든 4 다.
+ * 105 관리 화면도 타자편과 같은 틀 0x1aec4(모드 갈림 없음)다: 첫 틀(+0x2c == 2)에 이전 상태가 {100, 116, 132, 125, 126,
+ * 114, 134, 1, 112} 면 `0x6ea6d(소리, 4, −1, 1)`(1aef4~1af02) — 관리 화면 배경음 4. 111 상점·112 외출은 105 에서 들어가
+ * 배경음을 안 건드려 그 4 가 이어진다(타자편 `SCREEN_BGM` 의 아이템·외출 4 와 같다).
  * 그 밖 장면은 예전 근사 그대로 준비 화면 배경음(3)이다 (머리 주석 ⚠️).
  */
 export function pitcherLeagueBgmOf(scene: PitcherScene, postseasonFromReentry: boolean): number | null {
   if (scene === '포스트시즌') return postseasonFromReentry ? POSTSEASON_REENTRY_BGM : SCREEN_BGM.이벤트
   if (scene === '다음경기순위') return SCREEN_BGM.다음경기순위
+  if (scene === '관리') return SCREEN_BGM.관리
+  if (scene === '상점') return SCREEN_BGM.아이템
+  if (scene === '외출') return SCREEN_BGM.외출
   // 142 진입 0x1c46c 는 배경음을 안 건드린다 — 109(4) · 128(40 / 이어하기 4)의 것이 이어진다
   if (scene === '경기준비') return null
   return SCREEN_BGM.투수편
