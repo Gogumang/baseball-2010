@@ -511,11 +511,13 @@ export function SeasonRoute({
         // 그리기 0xa10c: 공용 목록 0x63b15(…, 6, 1, [this+0x2c], −1) — 미션 선수 고르기(하위 17, 0x2dec8)와 같은 k 6 —
         // 뒤에 머리띠 0x7f4ec. 머리띠는 공통 앞그림 0xb810 이 0xe2 에서 기본 갈래 0x7f53c(hdr, 10, 5, 0) 로 세운 "시즌모드"
         // (+ G포인트 · 되돌아가기)라 미션(제목 11)·스페셜과 다르다.
-        // ⚠️ 미해결: 0xb810 의 배경 0x5fd61(미션 하위 17 은 0x58371)과 상태 0xe2 덧그림 0x669c0 → 0x65e80(목록 +0x298 객체를
-        //    54×75 버퍼에 그린다 — 캐릭터 그림으로 보임)은 내부를 안 읽어 명예의 전당 화면 그대로 둔다.
+        // 바탕은 공통 앞그림 0xb810 의 공 무늬 0x5fd61 이다(미션 하위 17 은 메뉴 바탕 0x58371) — backdrop="공무늬".
+        // ⚠️ 미해결: 상태 0xe2 덧그림 0x669c0 → 0x65e80(목록 +0x298 객체를 54×75 버퍼에 그린다 — 캐릭터 그림으로 보임)은
+        //    내부를 안 읽어 명예의 전당 화면 그대로 둔다.
         renderCandidates={({ choose, back }) => (
           <HallOfFameScreen
             frame={{ title: '시즌모드', gamePoint: session.gamePoints }}
+            backdrop="공무늬"
             collection={hallOfFame ?? EMPTY_COLLECTION}
             mode={{
               kind: '선수고르기',
