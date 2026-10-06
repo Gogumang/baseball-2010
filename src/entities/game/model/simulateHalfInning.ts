@@ -241,10 +241,16 @@ export interface HalfInningDefense {
    *
    * ⚠️ **안 넘기면 보직을 모른다** — 마운드는 선발, 새 투수는 "스태미나 최고"(`chooseReplacementPitcher` 근사)로
    * 고른다. 이때는 9회 이후 마무리 상황(교체도 참)에서 마무리 대신 선발형으로 본 투수가 올라와 **다음 타석에
-   * 또 바뀐다**(마무리는 보직 2 갈래로 버티지만 보직을 모르면 그 갈래를 못 탄다). 리그(`entities/league`)·
-   * 타자편(`features/play-game`)은 아직 안 넘긴다.
+   * 또 바뀐다**(마무리는 보직 2 갈래로 버티지만 보직을 모르면 그 갈래를 못 탄다). 지금은 리그(`entities/league`)·
+   * 타자편(`features/play-game`)·투수편(`features/play-pitcher-game`) 모두 `rosterPitcherRoleOf` 를 넘긴다.
    */
   readonly roleAt?: (pitcherSlot: number) => PitcherRole | undefined
+  /**
+   * 그 칸 투수의 능력 합 `0xb5b50(팀, P)` = 경기용 능력치 네 칸(체력 인자 90)의 합 (`pitcherAbilitySumOf`).
+   * 새 투수 고르기 0xabfcc 의 마무리 갈래(ac0be)가 이 값 큰 순으로 줄 세운다. 안 넘기면 그 갈래는
+   * 스태미나 순 근사로 고른다.
+   */
+  readonly abilitySumAt?: (pitcherSlot: number) => number
   /**
    * 그 칸이 마선수(0xb633c = 레코드 `+0xa` 비트6)인가. 마운드면 특수 문턱(ac4f2), 벤치에 하나라도 있으면
    * 0xb8a8d 가 참이라 마무리 굴림 0xac360 을 지난다. 0xabfcc 는 마선수를 고르지 않는다. 안 넘기면 아무도 아니다.
@@ -643,6 +649,8 @@ export function changePitcherIfNeeded(
       ...(defense.staminaAt === undefined ? {} : { stamina: defense.staminaAt(slot) }),
       // 0xabfcc 의 `[sp+4] && 0xb6388` 거르기 · ac626 되돌이가 보는 내 육성 선수
       ...(skipsOwn ? { isOwnPlayer: isOwn(slot) } : {}),
+      // 0xb5b50 능력 합 — 마무리 갈래(ac0be)의 정렬 열쇠
+      ...(defense.abilitySumAt === undefined ? {} : { abilitySum: defense.abilitySumAt(slot) }),
       // 마선수(0xb633c) — 타자편·투수편 로스터에는 마선수가 없고, 리그의 마투수 8번 칸은 `isSpecialPitcherAt` 을
       // 넘겨야 선다. 마선수가 벤치에 없으면 0xb8a8d(team, 0) 이 거짓이라 마무리 굴림 0xac360 은 **돌지 않는다**.
     })),

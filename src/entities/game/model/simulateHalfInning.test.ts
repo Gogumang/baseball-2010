@@ -366,3 +366,29 @@ describe('CPU 대타 0xac228 은 마선수 타자를 바꾸지 않는다 (0xb633
     expect(보통대타).toBeGreaterThan(0)
   })
 })
+
+describe('새 투수 고르기의 마무리 갈래 — 능력 합 0xb5b50 (ac0be)', () => {
+  const 고정난수: RandomPort = { next: () => 0.5, nextInRange: (minimum) => minimum, pick: (items) => items[0] }
+  /** 마운드 0(선발) · 벤치 6·7 둘 다 마무리 — 중간계투가 없어 평소에도 마무리 갈래로 간다 */
+  const 수비 = (abilitySumAt?: (slot: number) => number): HalfInningDefense => ({
+    mound: startingMoundOf(0),
+    pitcherSlots: [0, 6, 7],
+    pitcherAt: () => 투수(500),
+    staminaAbilityAt: () => 500,
+    staminaAt: (slot) => (slot === 6 ? FULL_STAMINA : 5000),
+    lead: 0,
+    bothTeamsAreCpu: true,
+    roleAt: (slot) => (slot === 0 ? 0 : 2),
+    ...(abilitySumAt === undefined ? {} : { abilitySumAt }),
+  })
+  const 상황 = { inningIndex: 2, lead: 0, runnerCount: 0, inningRunsAllowed: 0, random: 고정난수, force: true }
+
+  it('능력 합을 넘기면 합이 큰 7 이 올라온다 — 스태미나가 더 많은 6 이 아니다', () => {
+    const 바뀜 = changePitcherIfNeeded(수비((slot) => (slot === 7 ? 2400 : 2000)), 수비().mound, 상황)
+    expect(바뀜.pitcherSlot).toBe(7)
+  })
+
+  it('안 넘기면 예전 근사(스태미나 순)로 6', () => {
+    expect(changePitcherIfNeeded(수비(), 수비().mound, 상황).pitcherSlot).toBe(6)
+  })
+})
