@@ -5,13 +5,13 @@ import {
   applyRunScored,
   NO_SIDE,
   REGULATION_LAST_INNING_INDEX,
-} from '@/features/play-pitcher-game/model/winLossSave'
-import type { DecisionState, PitcherOfRecord } from '@/features/play-pitcher-game/model/winLossSave'
+} from '@/entities/game/model/winLossSave'
+import type { DecisionState, PitcherOfRecord } from '@/entities/game/model/winLossSave'
 
 /**
  * **승·패·세 투수 칸**(state+0x44/0x50/0x5c)을 사람 경기(타자편·팀 경기)에 잇는 얇은 껍데기.
  *
- * 판정식은 투수편이 이미 옮겨 둔 `features/play-pitcher-game/model/winLossSave` 그대로다 (S1 확정):
+ * 판정식은 `entities/game/model/winLossSave` 그대로다 (S1 확정):
  * - 득점 처리 `0xa5c34` 는 **한 점마다** 불린다 — 한 플레이에 여러 점이 나도 한 점씩 차례로 넣는다.
  * - 세이브 후보는 투수가 **올라오는 순간** `0xa60c0` 한 번 (사람 경기 0x52284 · 간이 엔진 0xc26a2).
  *

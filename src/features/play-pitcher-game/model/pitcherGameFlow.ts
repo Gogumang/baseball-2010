@@ -119,8 +119,8 @@ import {
   applyRunScored,
   decisionCodeForMine,
   gameEndDecisionOf,
-} from '@/features/play-pitcher-game/model/winLossSave'
-import type { DecisionState, GameEndDecision } from '@/features/play-pitcher-game/model/winLossSave'
+} from '@/entities/game/model/winLossSave'
+import type { DecisionState, GameEndDecision } from '@/entities/game/model/winLossSave'
 import {
   buildHumanPitch,
   drainStamina,

@@ -100,8 +100,8 @@ import { TEAM_GAME_MODE } from '@/features/play-team-game/model/gameAbilities'
 import type { FieldingAssignment, SeasonTeamCondition } from '@/features/play-team-game/model/gameAbilities'
 import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
 import { introSkipsFirstBoard, rollHalfInningFielders } from '@/features/play-game/model/halfInningBoard'
-import { EMPTY_DECISION_STATE } from '@/features/play-pitcher-game/model/winLossSave'
-import type { DecisionState } from '@/features/play-pitcher-game/model/winLossSave'
+import { EMPTY_DECISION_STATE } from '@/entities/game/model/winLossSave'
+import type { DecisionState } from '@/entities/game/model/winLossSave'
 import {
   decisionsAfterPitcherChange,
   decisionsAfterPlay,

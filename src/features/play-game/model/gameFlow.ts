@@ -89,8 +89,8 @@ import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/pla
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
 import { ROSTER_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
-import { EMPTY_DECISION_STATE } from '@/features/play-pitcher-game/model/winLossSave'
-import type { DecisionState } from '@/features/play-pitcher-game/model/winLossSave'
+import { EMPTY_DECISION_STATE } from '@/entities/game/model/winLossSave'
+import type { DecisionState } from '@/entities/game/model/winLossSave'
 import {
   decisionsAfterPitcherChange,
   decisionsAfterPlay,

@@ -11,7 +11,7 @@
  *
  * 사람 경기(0x51408 의 0x52096 · 0x52284)와 간이 엔진(득점 0xc0fb4·0xc1054 → 0xa5c34, 교체 0xc262c 의
  * 0xc26a2 → 0xa60c0)이 **같은 함수**를 부르므로 판정도 한 벌이다 — 그래서 `entities/game` 에 둔다.
- * (`features/play-pitcher-game/model/winLossSave` 는 옮겨 오기 전 자리다 — 같은 내용.)
+ * (`features/play-pitcher-game/model/winLossSave` 는 옛 import 를 위한 다시 내보내기다.)
  */
 
 /** 측 2 = 없음 (0xb6814) */

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createGame } from '@/entities/game/model/gameState'
 import type { GameState } from '@/entities/game/model/gameState'
-import { EMPTY_DECISION_STATE, NO_SIDE } from '@/features/play-pitcher-game/model/winLossSave'
+import { EMPTY_DECISION_STATE, NO_SIDE } from '@/entities/game/model/winLossSave'
 import {
   decisionsAfterPitcherChange,
   decisionsAfterPlay,

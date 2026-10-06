@@ -2,7 +2,7 @@ import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
 import { isStarterTypePosition } from '@/entities/pitcher-career/model/pitcherRole'
 import { NO_ENTRY_USER_EVENT_INDEX } from '@/entities/pitcher-career/model/pitcherRotation'
-import { PITCHER_DECISION_CODE } from '@/features/play-pitcher-game/model/winLossSave'
+import { PITCHER_DECISION_CODE } from '@/entities/game/model/winLossSave'
 
 /**
  * 투수편 **경기 뒤 평가** (binary.mod 인기도 0xa690c · 평판 0xa6218 · 사기 0xa73c4 ·
