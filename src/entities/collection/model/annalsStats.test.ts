@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   addGamePointEarned, addGamePointUsage, applyAnnalsStat, gamePointEarnedOf, skillEquipStatEventsOf, countItemPurchase, EMPTY_ANNALS_STATS, GAME_POINT_USAGE_LIMIT,
-  gamePointUsageOf, itemPurchaseCountOf, markSkillEquipped, normalizeAnnalsStats,
+  gamePointUsageOf, itemPurchaseCountOf, markSkillEquipped, normalizeAnnalsStats, markAchievement, achievementMarkOf,
 } from '@/entities/collection/model/annalsStats'
 
 /** 기록연감 통계 기록 `[mgr+0xc8]` — 0x22e35 · 0x22c29 · 0xb663c (디스어셈 확정) */
@@ -100,5 +100,25 @@ describe('저장에서 읽기', () => {
     expect(stats.batterEquippedSkillBits).toBe(0)
     expect(stats.gamePointEarned).toEqual(EMPTY_ANNALS_STATS.gamePointEarned)
     expect(normalizeAnnalsStats(undefined)).toEqual(EMPTY_ANNALS_STATS)
+  })
+})
+
+describe('달성 표시 0x22dd4 · 0x22db4 (+0x106 + k)', () => {
+  it('k 0~7 만 1 로 세운다 — 밖이면 그대로(부호 없는 bhi), 읽기는 0', () => {
+    const marked = markAchievement(EMPTY_ANNALS_STATS, 2)
+    expect(marked.achievementMarks).toEqual([0, 0, 1, 0, 0, 0, 0, 0])
+    expect(achievementMarkOf(marked, 2)).toBe(1)
+    expect(markAchievement(marked, 2)).toBe(marked)
+    expect(markAchievement(EMPTY_ANNALS_STATS, 8)).toBe(EMPTY_ANNALS_STATS)
+    expect(markAchievement(EMPTY_ANNALS_STATS, -1)).toBe(EMPTY_ANNALS_STATS)
+    expect(achievementMarkOf(marked, 8)).toBe(0)
+    expect(applyAnnalsStat(EMPTY_ANNALS_STATS, { kind: '달성표시', index: 1 }).achievementMarks[1]).toBe(1)
+  })
+
+  it('옛 저장(칸 없음)·깨진 칸은 0 여덟으로 읽는다', () => {
+    const saved = JSON.parse(JSON.stringify(markAchievement(EMPTY_ANNALS_STATS, 5))) as Record<string, unknown>
+    expect(normalizeAnnalsStats(saved).achievementMarks[5]).toBe(1)
+    expect(normalizeAnnalsStats({ ...saved, achievementMarks: undefined }).achievementMarks).toEqual(EMPTY_ANNALS_STATS.achievementMarks)
+    expect(normalizeAnnalsStats({ ...saved, achievementMarks: [1, 2] }).achievementMarks).toEqual(EMPTY_ANNALS_STATS.achievementMarks)
   })
 })

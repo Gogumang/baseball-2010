@@ -10,6 +10,11 @@
  * | `+0xa8 + 2(10m + i)` (m 0~2, i 0~9) | u16 | `0x22e35(mgr, 모드, i)` — 1 더함(16비트 넘침은 0 으로) | `0x22eb5(mgr, 모드, i)` → 셀 16~46 |
  * | `+0xf4` / `+0xf8` | u32 비트 | 스킬 켜기 `0xb663c` — 모드 4 → +0xf4, 모드 3 → +0xf8 에 `1 << 스킬` OR. `0xb663c` 는 장착 `0xa4b04` 만 부르고, 그건 스킬 창(0x147b0)과 **획득 0xa4bd8**(0x10fb4 · 이벤트 0x8c460, 얻자마자 켠다)이 부른다 | 전부 수집 보상 k=5 "스킬 모두 수집"(`0x28f8a`) 하나뿐 |
  *
+ * | `+0x106 + k` (k 0~7) | u8 | `0x22dd4(mgr, k)` — k ≤ 7 이면 1 (0x22dd6 `cmp r1,#7; bhi`) | `0x22db4(mgr, k)` (k > 7 이면 0) → 기록연감 탭 0 셀 40~47 의 달성 표시 |
+ *
+ * `0x22dd4` 를 부르는 곳: 시즌 리그 1위 G 지급 0x6a9e·0x6aa6(결산 0x6900) · 0x88da·0x88e0(0x85ec) — k = 보상 비트 0·1·2,
+ * 전역기록 +0x145 비트를 켜고 저장한 바로 뒤 — 와 전부 수집 보상 0x28e98(0x28f10 · 0x28f5e · 0x29066 · 0x2925c · 0x292c2, 웹 아직 없음).
+ *
  * 모드 → 칸 m: `0x22e35`/`0x22eb5` 둘 다 **4(나리 타자편) → 0 · 3(나리 투수편) → 1 · 2(시즌) → 2**, 그 밖은 무시(0x22e40~0x22e4e).
  * 사용처 k (`0x22c29` 호출지 전수 → 이름 StrMAINMENU[175 + k]):
  *   0 마선수(오픈 0xa41a·0x2a20c·0x2b1ca, 레벨업 0x5fc1a) · 1/2 나리 타자편/투수편(모드 4 면 1 아니면 2 — GP 아이템 0x1501e,
@@ -74,7 +79,12 @@ export interface AnnalsStats {
   /** `+0xf4` (타자편) · `+0xf8` (투수편) — 한 번이라도 켠 스킬 비트 */
   readonly batterEquippedSkillBits: number
   readonly pitcherEquippedSkillBits: number
+  /** `+0x106 + k` u8 [8] — 달성 표시 (0x22dd4). 옛 저장에는 없어 0 으로 */
+  readonly achievementMarks: readonly number[]
 }
+
+/** `+0x106` 여덟 칸 (`cmp r1,#7`) */
+export const ACHIEVEMENT_MARK_KINDS = 8
 
 export const EMPTY_ANNALS_STATS: AnnalsStats = {
   itemPurchaseCounts: Array.from({ length: 3 * ITEM_SLOTS_PER_MODE }, () => 0),
@@ -82,6 +92,7 @@ export const EMPTY_ANNALS_STATS: AnnalsStats = {
   gamePointEarned: Array.from({ length: GAME_POINT_EARNED_KINDS }, () => 0),
   batterEquippedSkillBits: 0,
   pitcherEquippedSkillBits: 0,
+  achievementMarks: Array.from({ length: ACHIEVEMENT_MARK_KINDS }, () => 0),
 }
 
 const isMode = (mode: number): mode is StatMode => mode === 2 || mode === 3 || mode === 4
@@ -147,6 +158,19 @@ export function markSkillEquipped(stats: AnnalsStats, mode: number, skillId: num
   return stats
 }
 
+/** `0x22dd4(mgr, k)` — `[+0x106 + k] = 1`. k 가 0~7 밖이면(부호 없는 `bhi`) 아무것도 안 한다. 이미 서 있으면 같은 객체 */
+export function markAchievement(stats: AnnalsStats, kind: number): AnnalsStats {
+  if (!Number.isInteger(kind) || kind < 0 || kind >= ACHIEVEMENT_MARK_KINDS) return stats
+  if (stats.achievementMarks[kind] === 1) return stats
+  return { ...stats, achievementMarks: stats.achievementMarks.map((mark, at) => (at === kind ? 1 : mark)) }
+}
+
+/** `0x22db4(mgr, k)` — k > 7 이면 0, 아니면 그 바이트 */
+export function achievementMarkOf(stats: AnnalsStats, kind: number): number {
+  if (kind < 0 || kind >= ACHIEVEMENT_MARK_KINDS) return 0
+  return stats.achievementMarks[kind] ?? 0
+}
+
 /** 기록연감에 쌓는 통계 한 건 — 세션이 원본 호출 자리에서 낸다 */
 export type AnnalsStatEvent =
   /** `0x22e35` + `0x22c29` — 나리 상점 GP 아이템 구매 확정 (0x14ffe · 0x1501e) */
@@ -157,6 +181,8 @@ export type AnnalsStatEvent =
   | { readonly kind: '스킬장착'; readonly mode: number; readonly skillId: number }
   /** `0x22c7d` — G 를 얻은 자리 */
   | { readonly kind: 'G획득'; readonly mode: number; readonly amount: number }
+  /** `0x22dd4` — 달성 표시 k (리그 1위 1·5·10회 = 0·1·2, 전부 수집 = 3~7) */
+  | { readonly kind: '달성표시'; readonly index: number }
 
 /**
  * 장착 목록이 바뀐 사이에 **새로 켜진** 스킬마다 `스킬장착` 한 건 — `0xb663c` 는 이미 켜진 스킬엔 들어오지 않으니
@@ -179,6 +205,7 @@ export function applyAnnalsStat(stats: AnnalsStats, event: AnnalsStatEvent): Ann
   }
   if (event.kind === 'G사용') return addGamePointUsage(stats, event.usage, event.amount)
   if (event.kind === 'G획득') return addGamePointEarned(stats, event.amount, event.mode)
+  if (event.kind === '달성표시') return markAchievement(stats, event.index)
   return markSkillEquipped(stats, event.mode, event.skillId)
 }
 
@@ -202,5 +229,9 @@ export function normalizeAnnalsStats(raw: unknown): AnnalsStats {
       : EMPTY_ANNALS_STATS.gamePointEarned,
     batterEquippedSkillBits: isBits(candidate.batterEquippedSkillBits) ? candidate.batterEquippedSkillBits : 0,
     pitcherEquippedSkillBits: isBits(candidate.pitcherEquippedSkillBits) ? candidate.pitcherEquippedSkillBits : 0,
+    achievementMarks: isCountArray(candidate.achievementMarks, ACHIEVEMENT_MARK_KINDS)
+      && candidate.achievementMarks.every((mark) => mark <= 0xff)
+      ? candidate.achievementMarks
+      : EMPTY_ANNALS_STATS.achievementMarks,
   }
 }

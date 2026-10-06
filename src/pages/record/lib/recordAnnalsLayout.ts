@@ -158,3 +158,26 @@ export const SKILL_DESCRIPTION = {
 
 /** 기록·통계 탭의 목록 격자 — `0x79ed5(…, 120, 90, 표, 줄높이 18, 1열, 8줄)` */
 export const LIST_GRID = { x: PANEL.x + 8, firstY: PANEL.y + 36, step: 18, rows: 8, width: 176 } as const
+
+/**
+ * **탭 0 기록의 칸 이름** — 격자 종류 1 칸 그리기 0x7a916 이 칸 번호 n(= 쪽 × 8 + 줄)의 이름을 글 표 `[격자+0x90]` 의
+ * `n + 8` 번(0x7a964~0x7a970)으로 찍는다 = StrGAME[8 + n]. 0~39 는 경기 기록(`RECORD_NAMES`), 40~47 은 아래 여덟
+ * (StrGAME[48~55] — 끝 공백도 원본 글 그대로)이다.
+ */
+export const SPECIAL_RECORD_NAMES = [
+  '시즌모드 리그 1위 1회', '시즌모드 리그 1위 5회', '시즌모드 리그 1위 10회', '미션모드 모두 성공',
+  '기록달성 모두 성공 ', '스킬 모두 수집 ', '닉네임 모두 수집 ', '엔딩 모두 수집 ',
+] as const
+/** 달성 표시 칸이 시작하는 칸 번호 — 0x7a08c 의 `n > 0x27` 갈래 (`0x22db4(mgr, n − 0x28)`) */
+export const SPECIAL_RECORD_FIRST_CELL = 0x28
+
+/**
+ * **달성 표시** — 0x7a08c(격자, x, y + 2, 칸너비, n) 의 종류 0·1 갈래(0x7a102~0x7a156, 직접 떴다):
+ * ```
+ * 0x22db4(mgr, n − 0x28) == 0 → 아무것도 안 그림
+ * w = 0xba815([격자+0x94], 0x47, 0) 의 너비          ; slt_frame 이미지 71 (28×18)
+ * 0xba759([격자+0x94], 0x47, 0, x + 칸너비 − w − 1, (y + 2) − 3, …)
+ * ```
+ * 곧 칸 오른쪽 끝에서 1px 안쪽에 오른쪽을 맞추고, 칸 위쪽보다 1px 위에 그린다.
+ */
+export const ACHIEVEMENT_MARK = { image: 71, width: 28, dx: -1, dy: -1 } as const

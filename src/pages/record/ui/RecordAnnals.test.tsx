@@ -171,3 +171,29 @@ describe('기록연감 칸 격자', () => {
     expect(screen.getByText(`1/${TITLE_NAMES.length}`)).toBeTruthy()
   })
 })
+
+describe('탭 0 스페셜기록 쪽 — 셀 40~47 이름 StrGAME[48~55] · 달성 표시 0x22db4 (0x7a102~0x7a156)', () => {
+  it('쪽 6(ArrowLeft 로 마지막 쪽)에 여덟 이름이 서고, 표시 k 가 선 칸에만 slt_frame 71 을 칸 오른쪽 끝에 그린다', () => {
+    const stats = applyAnnalsStat(applyAnnalsStat(EMPTY_COLLECTION.stats, { kind: '달성표시', index: 0 }), { kind: '달성표시', index: 2 })
+    const { container } = 띄우기({ collection: { ...EMPTY_COLLECTION, stats } })
+
+    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+    expect(screen.getByText('6/6')).toBeTruthy()
+    expect(screen.getByText('시즌모드 리그 1위 1회')).toBeTruthy()
+    expect(screen.getByText('엔딩 모두 수집')).toBeTruthy()
+
+    const marks = [...container.querySelectorAll('img[alt="달성"]')] as HTMLElement[]
+    expect(marks.map((mark) => mark.dataset.cell)).toEqual(['40', '42'])
+    // x = 32 + 176 − 28 − 1 = 179, y = 90 + 18·줄 − 1
+    expect(marks[0]?.style.left).toBe('179px')
+    expect(marks[0]?.style.top).toBe('89px')
+    expect(marks[1]?.style.top).toBe('125px')
+  })
+
+  it('다른 쪽에는 표시가 없다', () => {
+    const stats = applyAnnalsStat(EMPTY_COLLECTION.stats, { kind: '달성표시', index: 0 })
+    const { container } = 띄우기({ collection: { ...EMPTY_COLLECTION, stats } })
+
+    expect(container.querySelectorAll('img[alt="달성"]')).toHaveLength(0)
+  })
+})

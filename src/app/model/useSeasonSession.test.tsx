@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 import { SEASON_DEFAULT_MATCH_SETTINGS, seasonGoalInputOf, useSeasonSession } from '@/app/model/useSeasonSession'
@@ -879,6 +879,16 @@ describe('전역 G 지갑 (mgr[+0x64])', () => {
     first.unmount()
     // 시즌 저장이 따로 비어 있어도(새 시즌) 전역 칸은 그대로다
     expect(다시띄우기().result.current.leagueFirstAwardedBits).toBe(0b11)
+  })
+
+  it('지급 뒤 0x22dd5(mgr, k) — 기록연감 통계 달성 표시 k 를 한 건 낸다 (0x6a98~0x6ab2)', () => {
+    const recordStat = vi.fn()
+    const { result } = renderHook(() =>
+      useSeasonSession(메모리저장(), createSeededRandom(20100901), null, undefined, recordStat))
+
+    act(() => result.current.actions.awardLeagueFirst({ threshold: 10, bit: 2, gamePoint: 30000 }))
+
+    expect(recordStat).toHaveBeenCalledWith({ kind: '달성표시', index: 2 })
   })
 
   it('옛 저장(지급 비트 칸 없음)은 0 에서 시작한다', () => {

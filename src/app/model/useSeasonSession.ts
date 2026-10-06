@@ -1810,11 +1810,12 @@ export function useSeasonSession(
   const awardLeagueFirst = useCallback(
     (award: LeagueFirstAward) => {
       // 0x6a56~0x6a94: G += 금액(99999 상한) → 비트 k 켜기 0x9f709 → 저장 0x1f1b9 — 팝업을 띄우는 그 자리에서 다 한다.
-      // ⚠️ 뒤따르는 0x22dd5(mgr, k) — 통계 객체 [mgr+0xc8] +0x106+k 달성 표시 — 는 웹 기록연감 통계에 칸이 없어 안 옮겼다
       setRewardRecord((record) => withAwardedBit(record, award.bit))
       gainGamePoint(award.gamePoint)
+      // 0x6a98~0x6abc: 이어서 0x22dd5(mgr, k = 0·1·2) — 통계 [mgr+0xc8] +0x106+k 달성 표시 → 통계 저장 0x1f1e1
+      recordStat?.({ kind: '달성표시', index: award.bit })
     },
-    [gainGamePoint],
+    [gainGamePoint, recordStat],
   )
 
   /**

@@ -8,7 +8,8 @@ import { TITLE_NAMES } from '@/entities/career/model/titles'
 import { RECORD_NAMES } from '@/entities/game/model/gameRecords'
 import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import {
-  CELL_FRAMES, CELL_GRID, LIST_GRID, LOCKED_MARK, NAME_ROW, PAGER, PAGE_TITLE, PANEL,
+  ACHIEVEMENT_MARK, CELL_FRAMES, CELL_GRID, LIST_GRID, LOCKED_MARK, NAME_ROW, PAGER, PAGE_TITLE, PANEL,
+  SPECIAL_RECORD_FIRST_CELL, SPECIAL_RECORD_NAMES,
   PROGRESS_ROW, SCROLL_MARKS, SKILL_DESCRIPTION, TAB_BAR, TAB_COUNT, TAB_CURSOR, TAB_NAMES,
   TAB_NAME_FRAMES, TAB_NAME_Y, TAB_PAGE_COUNTS, TOTAL_ROW, cellPositionOf, tabIconWidthOf,
   tabIconXOf, tabNameXOf, tabSlotXOf,
@@ -19,6 +20,7 @@ import {
   statValueTextOf, typeSecretDigit,
 } from '@/pages/record/lib/statCells'
 import type { AnnalsStats } from '@/entities/collection/model/annalsStats'
+import { achievementMarkOf } from '@/entities/collection/model/annalsStats'
 import * as styles from '@/pages/record/ui/RecordAnnals.css'
 
 const SLT_FRAME = './sprites/slt_frame'
@@ -46,7 +48,8 @@ interface RecordAnnalsProps {
  * 박스 0 `(2/31/60/89/118, 2, 72, 17)` 을 읽어 확정했다(S12 1절). 간격은 29 다.
  * 원본은 **고른 탭의 이름 하나만** img_text 로 그리고, 안 고른 탭은 막대 그림 안의 아이콘이다.
  *
- * ⚠️ 탭 0 기록은 원본이 **달성 횟수**를 보여 주는데 웹은 그 누계를 아직 저장하지 않는다 — 이름만 보인다.
+ * ⚠️ 탭 0 기록 셀 0~39 는 원본이 **달성 횟수**(`[mgr+0xc8]+4+n`, 0x22df0)를 보여 주는데 웹은 그 누계를 아직 저장하지 않는다 —
+ *    이름만 보인다. 셀 40~47(스페셜기록 쪽)은 달성 표시 `+0x106+k` 가 서 있으면 slt_frame 71 을 그린다(`AchievementMarks`).
  * 탭 4 통계는 칸 번호(쪽 × 8 + 줄)마다 이름·값이 정해진 `lib/statCells.ts` 대로 그린다. 값은 웹이 쌓는
  * GP 아이템 구매 수·사용처별 소모 GP 만 있고, 플레이 시간·우승 횟수·획득 GP 는 비운다.
  * 아이템·GP 쪽(2~7)은 숫자 키로 **"1212123"** 을 쳐야 열린다 (`typeSecretDigit`, 0x2b7a0).
@@ -182,7 +185,8 @@ export function RecordAnnals({ collection, onBack }: RecordAnnalsProps) {
         />
       )}
 
-      {tab === 0 && <ListRows page={page} names={RECORD_NAMES} />}
+      {tab === 0 && <ListRows page={page} names={RECORD_TAB_NAMES} />}
+      {tab === 0 && <AchievementMarks page={page} stats={collection.stats} />}
 
       {tab === 4 && <StatRows page={page} stats={collection.stats} />}
 
@@ -330,6 +334,29 @@ function ListRows({ page, names }: { readonly page: number; readonly names: read
           {name}
         </div>
       ))}
+    </>
+  )
+}
+
+/** 탭 0 의 칸 이름 48개 — StrGAME[8 + n] (경기 기록 40 + 달성 8) */
+const RECORD_TAB_NAMES: readonly string[] = [...RECORD_NAMES, ...SPECIAL_RECORD_NAMES]
+
+/** 탭 0 셀 40~47 의 달성 표시 — slt_frame 이미지 71 을 칸 오른쪽 끝에 (0x7a102~0x7a156) */
+function AchievementMarks({ page, stats }: { readonly page: number; readonly stats: AnnalsStats }) {
+  return (
+    <>
+      {Array.from({ length: LIST_GRID.rows }, (_, row) => {
+        const cell = page * LIST_GRID.rows + row
+        if (cell < SPECIAL_RECORD_FIRST_CELL || achievementMarkOf(stats, cell - SPECIAL_RECORD_FIRST_CELL) === 0) return null
+        return (
+          <img key={cell} className={styles.sprite} alt="달성" data-cell={cell}
+            src={imageSrc(SLT_FRAME, ACHIEVEMENT_MARK.image)}
+            style={{
+              left: LIST_GRID.x + LIST_GRID.width - ACHIEVEMENT_MARK.width + ACHIEVEMENT_MARK.dx,
+              top: LIST_GRID.firstY + LIST_GRID.step * row + ACHIEVEMENT_MARK.dy,
+            }} />
+        )
+      })}
     </>
   )
 }
