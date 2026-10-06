@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { FrameSprite, MessageBox, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
@@ -10,10 +11,14 @@ import { SETTINGS_TEXT } from '@/shared/config/settingsMenu'
 import {
   DETAIL_CHOICES, DETAIL_COLORS, DETAIL_ROWS, DETAIL_ROW_COUNT, DETAIL_TITLE,
   FIRST_MENU_ROW, IN_GAME_PANEL, IN_GAME_ROW_COUNT, MENU_ROW, MODE_RESET_ROW, MODE_RESET_ROW_COUNT, MODE_RESET_TITLE,
-  OK_BUTTON, OK_SELECTED_FRAME, OK_SELECTED_OVERFLOW, PANEL, ROW_COUNT, ROW_ICONS,
+  OK_BUTTON, OK_SELECTED_FRAME, OK_SELECTED_OVERFLOW, PANEL, ROW_ICONS,
   SETTINGS_FRAME, SOUND_BARS, SPEED_MARKS, TITLE, VALUE_ROW, VIBRATION,
-  bottomAlignOffset, iconCenterOffsetOf, isSelectedOutlineShown, modeResetRowTopOf, rowTopOf,
+  MAIN_MENU_CURSOR_COUNT, SCREEN,
+  bottomAlignOffset, closingFold, iconCenterOffsetOf, isSelectedOutlineShown, modeResetRowTopOf, nextPanelFold,
+  openingFold, panelClipOf, rowTopOf,
 } from '@/pages/settings/lib/settingsLayout'
+import type { PanelFold } from '@/pages/settings/lib/settingsLayout'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import * as styles from '@/pages/settings/ui/SettingsScreen.css'
 
 const SLT_FRAME = './sprites/slt_frame'
@@ -102,10 +107,51 @@ export function SettingsScreen({
     SETTINGS_TEXT.detail, SETTINGS_TEXT.modeReset, SETTINGS_TEXT.dataManagement,
   ]
   const names = isInGame ? allNames.slice(0, IN_GAME_ROW_COUNT) : allNames
-  /** 커서 칸 수 — 경기 중은 격자 1×4(0x3c3ac) 라 줄 셋 + OK. 메인 메뉴는 웹이 줄 여섯만 센다 */
-  const cursorCount = isInGame ? IN_GAME_ROW_COUNT + 1 : ROW_COUNT
-  /** 경기 중 OK 칸 — 고르면 popup 프레임 18, OK·좌우 모두 0x3cccc 로 경기 중 메뉴로 돌아간다 */
-  const isOkSelected = isInGame && cursor === IN_GAME_ROW_COUNT
+  /**
+   * 커서 칸 수 — 줄 다음 칸이 OK 단추다. 경기 중은 격자 1×4(0x3c3ac) 라 줄 셋 + OK,
+   * 메인 메뉴는 격자 1×7(0x259fc) 이라 줄 여섯 + OK.
+   */
+  const cursorCount = isInGame ? IN_GAME_ROW_COUNT + 1 : MAIN_MENU_CURSOR_COUNT
+  /** OK 칸 번호 (격자 마지막 칸) */
+  const okCell = names.length
+  /** OK 칸이 고른 칸이면 popup 프레임 18 (0x59de2~0x59e4e) */
+  const isOkSelected = cursor === okCell
+
+  /**
+   * 판 펼침·접힘 (`nextPanelFold`) — 처음 들어오면 0x20 부터 펼친다. 하위 페이지에서 돌아온 첫 화면은 그 페이지가
+   * 이미 다 편 판 그대로다(0x259fc 가 앞 상태 0x20~0x22 면 플래그를 안 건드린다) — 이 화면은 하위 페이지 동안에도
+   * 그대로 서 있어 다 편 상태를 들고 있다.
+   */
+  const [fold, setFold] = useState<PanelFold>(openingFold)
+  const foldRef = useRef(fold)
+  foldRef.current = fold
+  const onBackRef = useRef(onBack)
+  onBackRef.current = onBack
+  const isFolding = !fold.isDone
+  useEffect(() => {
+    if (!isFolding) return undefined
+    const timer = window.setInterval(() => {
+      const next = nextPanelFold(foldRef.current, panel.height)
+      // 접힘이 끝나면 갱신 끝 0x29688 이 상태 4 로 — 10 높이 판은 그려지지 않는다
+      if (!next.isOpening && next.isDone) {
+        window.clearInterval(timer)
+        foldRef.current = next
+        return onBackRef.current()
+      }
+      foldRef.current = next
+      setFold(next)
+    }, millisecondsPerFrame())
+    return () => window.clearInterval(timer)
+  }, [isFolding, panel.height])
+
+  /**
+   * 첫 화면을 나간다 — 메인 메뉴는 OK 칸·CLR 모두 0x295e2(저장 0x1f1b9 → 접힘 → 상태 4).
+   * 경기 중은 0x3cccc 가 목록을 닫는다(접힘 여부는 안 읽었다 — 곧바로 돌아간다).
+   */
+  const leave = () => {
+    if (isInGame) return onBack()
+    setFold(closingFold(foldRef.current))
+  }
 
   const isBlocked = notice !== null || isDetailOpen || isModeResetOpen
 
@@ -126,7 +172,7 @@ export function SettingsScreen({
   }
 
   const openRow = (index: number) => {
-    if (isInGame && index === IN_GAME_ROW_COUNT) return onBack()
+    if (index === okCell) return leave()
     if (index < FIRST_MENU_ROW) return changeValue(1, index)
     if (index === 3) return setDetailOpen(true)
     // 칸 4 → 상태 0x21 (0x295d0 `0xbcb49(…, 0x21)`) — 조건 없이 들어간다
@@ -147,8 +193,9 @@ export function SettingsScreen({
         event.preventDefault()
         return changeValue(horizontal)
       }
-      // 경기 중 OK 칸의 좌우도 0x3cba4 → 칸 3 갈래 0x3cccc (돌아가기)
-      if (horizontal !== 0 && isOkSelected) {
+      // 경기 중 OK 칸의 좌우도 0x3cba4 → 칸 3 갈래 0x3cccc (돌아가기). 메인 메뉴 OK 칸의 좌우는 아무 일도 없다
+      // (0x29604/0x2960a 는 칸 0~2 만 본다)
+      if (horizontal !== 0 && isOkSelected && isInGame) {
         event.preventDefault()
         return onBack()
       }
@@ -158,7 +205,7 @@ export function SettingsScreen({
       }
       if (event.key === 'Escape' || event.key === 'Backspace') {
         event.preventDefault()
-        onBack()
+        leave()
       }
     }
     window.addEventListener('keydown', onKeyDown)
@@ -186,12 +233,20 @@ export function SettingsScreen({
     )
   }
 
+  /** 이번에 그리는 판 높이 — 판은 화면 가운데를 기준으로 위아래로 펴진다 (0x55e60 정렬 0x22) */
+  const drawnHeight = Math.min(fold.height, panel.height)
+  const isUnfolded = drawnHeight >= panel.height
+  const clip = panelClipOf(drawnHeight, panel.height)
+
   return (
     <RawScreen>
       <div
         className={styles.panel}
-        style={{ left: panel.x, top: panel.y, width: panel.width, height: panel.height }}
+        style={{
+          left: panel.x, top: SCREEN.height / 2 - Math.trunc(drawnHeight / 2), width: panel.width, height: drawnHeight,
+        }}
       />
+      <PanelClip x={panel.x} y={clip.y} width={panel.width} height={clip.height}>
       <FrameSprite folder={IMG_TEXT} frame={TITLE.frame} origins={titleFrames} x={TITLE.x} y={TITLE.y + panelDy} />
 
       {names.map((name, index) => {
@@ -274,7 +329,8 @@ export function SettingsScreen({
               </div>
             )}
 
-            {index === cursor && isOutlineShown && (
+            {/* 펴는 동안은 테두리를 끈다 (0x59548) */}
+            {index === cursor && isOutlineShown && isUnfolded && (
               <div className={styles.selectedOutline}
                 style={{ left: bar.x, top: top + bar.dy, width: bar.width, height: bar.height }} />
             )}
@@ -289,17 +345,38 @@ export function SettingsScreen({
 
       <button type="button" className={styles.row} aria-label="확인"
         style={{ left: (PANEL.width - OK_BUTTON.width) / 2 + PANEL.x, top: OK_BUTTON.y + panelDy, width: OK_BUTTON.width, height: OK_BUTTON.height }}
-        onMouseEnter={isInGame ? () => setCursor(IN_GAME_ROW_COUNT) : undefined}
-        onClick={onBack}>
+        onMouseEnter={() => setCursor(okCell)}
+        onClick={() => { setCursor(okCell); leave() }}>
         <img className={styles.sprite} alt=""
           src={imageSrc(POPUP, isOkSelected ? OK_SELECTED_FRAME : OK_BUTTON.frame)}
           style={isOkSelected ? { left: -OK_SELECTED_OVERFLOW, top: -OK_SELECTED_OVERFLOW } : { left: 0, top: 0 }} />
       </button>
+      </PanelClip>
 
-      <SettingsFrame mainMenu={mainMenu} onBack={onBack} slides={!hasReturned} />
+      {/* 머리띠 되돌아가기 = CLR (0x295e2) */}
+      <SettingsFrame mainMenu={mainMenu} onBack={leave} slides={!hasReturned} />
 
       {notice !== null && <MessageBox text={notice} buttons={['확인']} onAnswer={() => setNotice(null)} />}
     </RawScreen>
+  )
+}
+
+/**
+ * 잘라내기 0xbae25 사각형 — 안의 그림은 화면 좌표 그대로 두고 바깥만 가린다.
+ */
+function PanelClip({ x, y, width, height, children }: {
+  readonly x: number
+  readonly y: number
+  readonly width: number
+  readonly height: number
+  readonly children: ReactNode
+}) {
+  return (
+    <div style={{ position: 'absolute', left: x, top: y, width, height: Math.max(0, height), overflow: 'hidden' }}>
+      <div style={{ position: 'absolute', left: -x, top: -y, width: SCREEN.width, height: SCREEN.height }}>
+        {children}
+      </div>
+    </div>
   )
 }
 

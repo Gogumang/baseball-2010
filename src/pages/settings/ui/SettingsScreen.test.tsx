@@ -1,12 +1,14 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import { DEFAULT_SETTINGS, SPEED_LEVEL_COUNT } from '@/entities/settings/model/gameSettings'
 import {
   IN_GAME_PANEL, MENU_ROW, MODE_RESET_ROW, MODE_RESET_TITLE, OK_BUTTON, PANEL, SOUND_BARS, SPEED_MARKS, VALUE_ROW,
-  bottomAlignOffset, isSelectedOutlineShown, modeResetRowTopOf, rowTopOf,
+  bottomAlignOffset, closingFold, isSelectedOutlineShown, modeResetRowTopOf, nextPanelFold, openingFold, panelClipOf,
+  rowTopOf,
 } from '@/pages/settings/lib/settingsLayout'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 
 /**
  * 환경설정 창 (공용 페이지 0x593c8 종류 8 — P6 5절).
@@ -55,8 +57,13 @@ describe('환경설정 창 배치', () => {
     expect(줄('모드 초기화').style.width).toBe(`${MENU_ROW.bar.width}px`)
   })
 
-  it('판은 가운데 192×212 다 (24, 54)', () => {
+  it('판은 가운데 192×212 다 (24, 54) — 다 펴진 뒤', () => {
+    vi.useFakeTimers()
     const { container } = 띄우기()
+    act(() => {
+      vi.advanceTimersByTime(millisecondsPerFrame() * 4)
+    })
+    vi.useRealTimers()
     const panel = container.querySelector(`div[style*="${PANEL.width}px"]`) as HTMLElement
 
     expect(panel.style.left).toBe(`${PANEL.x}px`)
@@ -402,5 +409,128 @@ describe('환경설정 머리띠와 흰 테두리 깜빡임', () => {
   it('흰 테두리는 그릴 때마다 +1 한 카운터 % 8 ≤ 3 일 때만 — 8 갱신 중 4 갱신', () => {
     const shown = Array.from({ length: 8 }, (_unused, updates) => isSelectedOutlineShown(updates))
     expect(shown).toEqual([true, true, true, false, false, false, false, true])
+  })
+})
+
+/**
+ * 첫 화면 격자 1×7 (진입 0x259fc `vtbl+0x10(1, 7, 1, 0x20, 0)`) — 일곱째 칸이 OK 단추.
+ * OK(−5)·CLR(−16) 은 0x295e2: 저장 → 판 접힘 → 갱신 끝 0x29688 이 상태 4.
+ * 판 펼침·접힘은 0x593c8 끝 0x5a6fe — 걸음 ×4.
+ */
+describe('환경설정 첫 화면 — OK 칸과 판 펼침·접힘', () => {
+  const 판높이 = (container: HTMLElement) =>
+    (container.querySelector(`div[style*="${PANEL.width}px"]`) as HTMLElement).style.height
+  const 한틱 = () => act(() => {
+    vi.advanceTimersByTime(millisecondsPerFrame())
+  })
+  const OK그림 = () => 줄('확인').querySelector('img')?.getAttribute('src') ?? ''
+
+  it('펼침은 0x20 에서 걸음 ×4 — 그려지는 높이 32 · 36 · 52 · 116 · 212 (경기 중은 130 에서 멈춘다)', () => {
+    const heights: number[] = []
+    let fold = openingFold()
+    for (let draw = 0; draw < 6; draw += 1) {
+      heights.push(fold.height)
+      fold = nextPanelFold(fold, PANEL.height)
+    }
+    expect(heights).toEqual([32, 36, 52, 116, 212, 212])
+
+    let small = openingFold()
+    for (let draw = 0; draw < 4; draw += 1) small = nextPanelFold(small, IN_GAME_PANEL.height)
+    expect(small).toMatchObject({ height: 130, isDone: true })
+  })
+
+  it('접힘은 걸음 ×4 로 줄여 10 에서 끝 — 212 · 208 · 192 · 128 을 그린다', () => {
+    const heights: number[] = []
+    let fold = closingFold(nextPanelFold({ ...openingFold(), height: 212, isDone: true }, PANEL.height))
+    while (!fold.isDone) {
+      heights.push(fold.height)
+      fold = nextPanelFold(fold, PANEL.height)
+    }
+    expect(heights).toEqual([212, 208, 192, 128])
+    expect(fold.height).toBe(10)
+  })
+
+  it('펴는 동안은 잘라내기가 판 안쪽 5px, 다 펴지면 바깥 5px 다 (0xbae25)', () => {
+    expect(panelClipOf(52, 212)).toEqual({ y: 160 - 26 + 5, height: 42 })
+    expect(panelClipOf(212, 212)).toEqual({ y: 54 - 5, height: 222 })
+  })
+
+  it('화면도 판을 펴며 들어온다 — 펴는 동안은 흰 테두리가 없다', () => {
+    vi.useFakeTimers()
+    const { container } = 띄우기()
+    expect(판높이(container)).toBe('32px')
+    expect(container.querySelector('div[class*="selectedOutline"]')).toBeNull()
+    한틱()
+    expect(판높이(container)).toBe('36px')
+    한틱()
+    한틱()
+    한틱()
+    expect(판높이(container)).toBe(`${PANEL.height}px`)
+    vi.useRealTimers()
+  })
+
+  it('↑ 한 번이면 감겨 일곱째 OK 칸 — 고르면 popup 프레임 18, ↓ 는 사운드로 돌아온다', () => {
+    띄우기()
+    expect(OK그림()).toContain('popup/frames/000.png')
+
+    fireEvent.keyDown(window, { key: 'ArrowUp' })
+    expect(OK그림()).toContain('popup/frames/018.png')
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    expect(OK그림()).toContain('popup/frames/000.png')
+  })
+
+  it('OK 칸의 좌우는 아무 일도 없다 (0x29604/0x2960a 는 칸 0~2 만)', () => {
+    const onBack = vi.fn()
+    const onChange = vi.fn()
+    띄우기({ onBack, onChange })
+    fireEvent.keyDown(window, { key: 'ArrowUp' })
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+
+    expect(onBack).not.toHaveBeenCalled()
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('OK 칸에서 OK 는 판을 접은 뒤 나간다 — 접히는 네 장 동안은 아직 안 나간다', () => {
+    vi.useFakeTimers()
+    const onBack = vi.fn()
+    const { container } = 띄우기({ onBack })
+    for (let tick = 0; tick < 4; tick += 1) 한틱()
+
+    fireEvent.keyDown(window, { key: 'ArrowUp' })
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(onBack).not.toHaveBeenCalled()
+    expect(판높이(container)).toBe('212px')
+    한틱()
+    expect(판높이(container)).toBe('208px')
+    한틱()
+    한틱()
+    expect(판높이(container)).toBe('128px')
+    expect(onBack).not.toHaveBeenCalled()
+    한틱()
+    expect(onBack).toHaveBeenCalledTimes(1)
+    vi.useRealTimers()
+  })
+
+  it('CLR 도 같은 0x295e2 — 접고 나서 나간다', () => {
+    vi.useFakeTimers()
+    const onBack = vi.fn()
+    띄우기({ onBack })
+    for (let tick = 0; tick < 4; tick += 1) 한틱()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(onBack).not.toHaveBeenCalled()
+    for (let tick = 0; tick < 4; tick += 1) 한틱()
+    expect(onBack).toHaveBeenCalledTimes(1)
+    vi.useRealTimers()
+  })
+
+  it('하위 페이지에서 돌아온 첫 화면은 다시 펴지 않는다 (0x259fc 앞 상태 0x20~0x22)', () => {
+    vi.useFakeTimers()
+    const { container } = 띄우기()
+    for (let tick = 0; tick < 4; tick += 1) 한틱()
+    fireEvent.click(줄('상세 설정'))
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(판높이(container)).toBe(`${PANEL.height}px`)
+    vi.useRealTimers()
   })
 })
