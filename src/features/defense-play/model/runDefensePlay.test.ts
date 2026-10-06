@@ -871,6 +871,36 @@ describe('주루 수동/자동 — 설정 +0xbd 와 0xae690 (직접 뜬 것)', (
   })
 })
 
+describe('1루 주자 예외 — 0xa9e44 a9ed6: 2아웃 전 잡힐 뜬공이면 1루 주자는 포스 목표를 안 받는다', () => {
+  // 판 첫 틱의 목표 루(그림의 base) — 리드(0x3d7b8) 뒤 목표를 판 시작 때의 목표로 되돌리므로 이 값이 0xa9e44 의 답이다
+  const 첫목표 = (outcome: AtBatOutcome, bases: BaseState, outs: number, stealingFrom: (1 | 2 | 3)[] = []) =>
+    runDefensePlay({
+      outcome,
+      trajectory: battedBallTrajectory(representativePatternOf(outcome)),
+      bases,
+      outs,
+      runAbility: 500,
+      stealingFrom,
+    }).ticks[0].runners.map((runner) => runner.base)
+
+  it('0·1아웃 뜬공: 1루 주자도 그 앞 주자도 제 루가 목표다 — 사슬이 1루에서 끊긴다', () => {
+    expect(첫목표(뜬공아웃, 주자1루, 0)).toEqual([1, 1])
+    expect(첫목표(직선타아웃, 만루, 1)).toEqual([1, 1, 2, 3])
+  })
+
+  it('땅볼은 예외가 아니다 — 1루부터 밀린다', () => {
+    expect(첫목표(땅볼아웃, 만루, 0)).toEqual([1, 2, 3, 0])
+  })
+
+  it('2아웃이면 예외가 없고 모든 주자가 친 순간 다음 루로 간다 (a9ef6)', () => {
+    expect(첫목표(뜬공아웃, 만루, 2)).toEqual([1, 2, 3, 0])
+  })
+
+  it('도루 표시가 선 1루 주자는 +0x7c 가 이미 2 라 2루 주자는 밀린다 (a9eec 가 앞 주자 +0x7c 를 본다)', () => {
+    expect(첫목표(뜬공아웃, { first: true, second: true, third: false }, 0, [1])).toEqual([1, 2, 3])
+  })
+})
+
 describe('포스 사슬 — 결과 코드가 준 최소 루가 앞 주자까지 민다 (`createPlayRunners`)', () => {
   // 한 줄 규칙: **최소 진루 루 = min(홈, max(출발 루, 타자주자 최소 루 + 목록 번호))**.
   //

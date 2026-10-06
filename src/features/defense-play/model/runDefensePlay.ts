@@ -472,16 +472,23 @@ export interface MutableRunner {
  * 포스로 밀리는(최소 루가 출발 루보다 큰) 주자만 첫 틱부터 뛴다.
  * 나머지는 루에 붙어 있다가 자동 진루(0xaf918)가 보내 준다 — 그쪽은 **주루 수동이면 안 돈다**.
  */
-function createPlayRunners(bases: BaseState, outcome: AtBatOutcome, speed: number): MutableRunner[] {
+function createPlayRunners(
+  bases: BaseState,
+  outcome: AtBatOutcome,
+  speed: number,
+  firstBaseException: FirstBaseException | null = null,
+): MutableRunner[] {
   const batterMinimum = batterMinimumBaseOf(outcome)
   // 0 = 타자주자. 그 뒤는 **뒤 주자 → 앞선 주자** 순서다 (자동 진루가 목록 끝부터 = 앞선 주자부터 본다)
   const fromBases = [0]
   if (bases.first) fromBases.push(1)
   if (bases.second) fromBases.push(2)
   if (bases.third) fromBases.push(3)
+  const pushed = firstBaseException === null ? null : pushedRunnersWithFirstBaseException(fromBases, firstBaseException)
   return fromBases.map((fromBase, index) => {
     // 홈보다 더 갈 곳은 없다 — 사슬이 만루 + 3루타처럼 넘치면 전부 홈에서 멈춘다
-    const minimumBase = Math.min(HOME_BASE, Math.max(fromBase, batterMinimum + index))
+    const chained = Math.min(HOME_BASE, Math.max(fromBase, batterMinimum + index))
+    const minimumBase = pushed === null || index === 0 ? chained : pushed[index] ? fromBase + 1 : fromBase
     const targetBase = minimumBase > fromBase ? fromBase + 1 : fromBase
     return {
       state: createRunner(index, fromBase, speed, { targetBase, isBatterRunner: index === 0 }),
@@ -489,6 +496,43 @@ function createPlayRunners(bases: BaseState, outcome: AtBatOutcome, speed: numbe
       counted: false,
     }
   })
+}
+
+/** `0xa9e44` 의 1루 주자 예외가 걸리는 판 — 2아웃 전 · 잡힐 뜬공(플레이.vt94) · 끝나지 않은 판 */
+interface FirstBaseException {
+  /** 0xa9bd4 가 출발 표시를 세운 주자의 루 — 그 주자의 +0x7c 는 이미 다음 루다 */
+  readonly stealingFrom: readonly number[]
+}
+
+/**
+ * **1루 주자 예외** — 주자관리.vt1c = `0xa9e44`(a9ed6~a9eea, 직접 뜬 것)를 타자주자 다음 주자부터 그대로 돈다.
+ * ```
+ * a9ec2  관리.vt10(i) = 0xa9f60(목록 0..i 산 주자 수 > +0x8c) || 아웃 == 2 || 도루 표시  가 아니면 건너뜀
+ * a9ed6  +0x8c == 1 && 플레이.vt94() && !플레이+0x111 && 아웃 != 2  → 건너뜀            ; ★ 1루 주자 예외
+ * a9eec  앞 주자(목록 i−1).+0x7c ≥ +0x8c  → +0x7c = +0x8c + 1 ; vt48(+0x8c + 1)          ; 밀린다
+ * a9ef6  아니면 아웃 == 2 && 종류 == 1 → 같은 목표 / 아니면 건너뜀
+ * ```
+ * 플레이.vt94 = `0xb1b2c` 는 "가장 이른 포구 틱 +0x11c ≤ 공 낙구 틱" = 잡힐 뜬공이다(인자는 0x46516~0x4653e).
+ * 곧 2아웃 전 잡힐 뜬공이면 1루 주자가 밀리지 않고, 그 앞 주자도 "앞 주자 +0x7c ≥ 내 루" 가 안 서서
+ * 사슬이 끊긴다. 도루 표시가 선 1루 주자는 +0x7c 가 이미 2(0xa9bd4 → vt48)라 2루 주자는 그대로 밀린다.
+ * 앞 주자의 +0x7c: 타자주자 = 1, 건너뛴 주자 = 제 루(vt88 0xa0820 이 +0x7c = +0x8c), 도루 주자 = 다음 루.
+ * 이 갈래는 2아웃이 아닐 때만이라 웹의 결과 코드 다리(최소 루 M = 1, 뜬공 아웃)와 겹치는 곳은 이 함수뿐이다.
+ */
+function pushedRunnersWithFirstBaseException(fromBases: readonly number[], exception: FirstBaseException): boolean[] {
+  const pushed = fromBases.map(() => false)
+  let previousTarget = 1 // 타자주자 +0x7c
+  for (let index = 1; index < fromBases.length; index += 1) {
+    const base = fromBases[index]
+    const stealing = exception.stealingFrom.includes(base)
+    const forced = index + 1 > base // 0xa9f60: 목록 0..i 산 주자 수 > +0x8c
+    let target = stealing ? base + 1 : base
+    if ((forced || stealing) && base !== 1 && previousTarget >= base) {
+      pushed[index] = true
+      target = base + 1
+    }
+    previousTarget = target
+  }
+  return pushed
 }
 
 /**
@@ -508,10 +552,10 @@ function createPlayRunners(bases: BaseState, outcome: AtBatOutcome, speed: numbe
  * a9ef6    아니면 아웃 == 2 && 종류(state[0x26]) == 1 → 같은 목표              ; 2아웃이면 친 순간 뛴다
  * ```
  * 웹은 포스 사슬을 `createPlayRunners`(결과 코드 다리)가 세우므로 여기서는 **2아웃 갈래만** 더한다.
- * ⚠️ 1루 주자 예외(a9ed6)는 아웃 != 2 일 때만이라 2아웃 갈래와 안 겹친다 — 옮기지 않았다.
- *    인자 둘은 0x46516~0x4653e 가 넘긴다: 플레이.vt94 = `0xb1b2c`(+0x11c 가장 이른 포구 틱 ≤ 공+0xaa0 낙구 틱
- *    — "뜬공이 잡힐 예정", autoAdvance 의 af98e 와 같은 함수) · 플레이+0x111(끝남). 곧 2아웃 전 잡힐 뜬공이면
- *    1루 주자는 포스 목표를 안 받고 리드 뒤 1루로 돌아온다(웹 포스 사슬 createPlayRunners 와 대조는 아직).
+ * 1루 주자 예외(a9ed6)는 아웃 != 2 일 때만이라 2아웃 갈래와 안 겹친다 — `createPlayRunners` 가 받는다
+ *    (`pushedRunnersWithFirstBaseException`). 인자 둘은 0x46516~0x4653e 가 넘긴다: 플레이.vt94 = `0xb1b2c`
+ *    (+0x11c 가장 이른 포구 틱 ≤ 공+0xaa0 낙구 틱 — "뜬공이 잡힐 예정", autoAdvance 의 af98e 와 같은 함수) ·
+ *    플레이+0x111(끝남, 판 시작이라 0). 웹은 잡힐 뜬공을 결과 코드(뜬공·직선타 아웃 = `onTheFly`)로 본다.
  * - 도루 표시 없는 주자의 R.vt88(+0x8c) = `0xa0820`: 루 좌표 0xd77d8[b] 에 세우고(0xbef58) +0x7c·+0x80·+0x88·+0x8c·+0x90 = b,
  *   +0x94 = 0, vt10(동작 0). 리드는 루 좌표에서 출발하므로(applyRunnerLead) 웹과 같다.
  * ⚠️ S8 6-3 의 "0x46418 의 주자 움직임은 0x46664 걷기 루프뿐" 은 이 고리를 놓친 것이다.
@@ -675,10 +719,16 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
   const maximumTicks = input.maximumTicks ?? DEFAULT_MAXIMUM_TICKS
 
   let fielders = createFielders(abilities)
-  const runners = createPlayRunners(input.bases, input.outcome, speed)
   const uncatchable = input.isUncatchable === true
   // 잡히지 않는 타구는 뜬 채로 잡힐 일도 없다 — 떨어진 뒤 굴러가는 공처럼 본다
   const onTheFly = !uncatchable && catchesOnTheFly(input.outcome)
+  // 0xa9e44 의 1루 주자 예외 (a9ed6) — 2아웃 전 잡힐 뜬공이면 1루 주자는 포스 목표를 안 받는다
+  const runners = createPlayRunners(
+    input.bases,
+    input.outcome,
+    speed,
+    onTheFly && input.outs !== 2 ? { stealingFrom: input.stealingFrom ?? [] } : null,
+  )
 
   // ── 포구 예보 ──
   // 뜬 채로 잡히는 타구는 낙구 전까지만, 굴러간 타구는 낙구 **다음** 틱부터 본다.
