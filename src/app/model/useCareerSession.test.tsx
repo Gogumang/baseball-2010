@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { useState } from 'react'
 import { describe, expect, it } from 'vitest'
-import { act, renderHook } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { applyGameEvaluation, isEvaluatedGame, useCareerSession } from '@/app/model/useCareerSession'
 import { advancePostseason, EMPTY_LEAGUE, LEAGUE_TEAM_COUNT, startPostseason } from '@/entities/league/model/league'
 import { useAtBatRunner } from '@/app/model/useAtBatRunner'
@@ -853,5 +853,26 @@ describe('타자편 포스트시즌 대진 128 — 사람이 친다 (0x120a4 · 
     act(() => rendered.result.current.session.actions.closePostseasonPopup())
     expect(rendered.result.current.session.career).toMatchObject({ popularity: 1000, reputation: 300, money: 1000 })
     expect(rendered.result.current.screen).toEqual({ kind: '이벤트', eventId: 380, context: '시즌' })
+  })
+})
+
+describe('칭호는 관리 화면에서 하나씩 — 판정 0x1a1c0 (0x1afac) · 팝업 0x1274c · 확인 0x1b1e4', () => {
+  it('들어온 관리 화면에서 처음 맞는 하나만 띄우고, 확인하면 주고 곧바로 장착한 뒤 다음 것을 띄운다', async () => {
+    const rendered = 띄우기({ ...createCareer('칭호'), season: 2, gamesPlayed: 10, popularity: 4500, seenEventIds: ['451'], titleIds: [TITLE_NAMES[0]] })
+    const 세션 = () => rendered.result.current.session
+    // 관리 화면 진입 이벤트 검사(trigger 0)는 이벤트 본문이 도착한 뒤에 돈다 — 그 뒤 두 번째 틀이 판정이다
+    await waitFor(() => expect(세션().storyEvents).not.toBeNull(), { timeout: 5000 })
+    // 경기 결과·훈련 같은 곳에서는 주지 않는다 — 관리 화면 갱신에서만
+    expect(세션().career?.titleIds).toEqual([TITLE_NAMES[0]])
+    expect(rendered.result.current.screen).toEqual({ kind: '관리' })
+    // 6 슈퍼 스타(인기도 2000) 가 7 월드클래스(4000) 보다 먼저다
+    expect(세션().pendingTitle).toBe(TITLE_NAMES[6])
+    act(() => 세션().actions.confirmTitle())
+    expect(세션().career?.titleIds).toEqual([TITLE_NAMES[0], TITLE_NAMES[6]])
+    expect(세션().career?.equippedTitle).toBe(6)
+    expect(세션().pendingTitle).toBe(TITLE_NAMES[7])
+    act(() => 세션().actions.confirmTitle())
+    expect(세션().career?.equippedTitle).toBe(7)
+    expect(세션().pendingTitle).toBeNull()
   })
 })

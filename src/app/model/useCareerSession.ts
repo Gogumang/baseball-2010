@@ -57,7 +57,7 @@ import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { selectSpecialSwingNumber, setSkillEquipped } from '@/entities/career/model/playerCareer'
 import { expandSkillSlots } from '@/entities/career/model/skillEquip'
 import {
-  awardTitles, equipTitle, evaluateNewTitles, nationalCupStandingsTitleOf,
+  awardTitles, equipTitle, nationalCupStandingsTitleOf, nextTitleOf,
 } from '@/entities/career/model/titles'
 import { blockReasonOf, runTraining, specialSwingCostOf } from '@/entities/career/model/training'
 import { trainingBlockTextOf, trainingOutcomeLinesOf } from '@/entities/career/model/trainingText'
@@ -456,17 +456,17 @@ export function useCareerSession({
       const streakReputation = streak.notices.reduce((total, notice) => total + notice.reputationChange, 0)
       // 부상은 경기 뒤가 아니라 훈련 결과 창을 닫을 때 굴린다 (0x1b4c4)
       const rolled = gainReputation(streak.career, streakReputation)
-      const newTitles = evaluateNewTitles(rolled)
-      // 경기 뒤 평가 116 진입 0x1278c 가 S+0x50 = 2 · 저장 — 시즌 끝 사슬 상태를 벗어난다 (이어하기는 116 의 끝처럼 가른다)
-      const awarded = awardTitles(rolled, newTitles)
-      setCareer(awarded.seasonEndState === null ? awarded : { ...awarded, seasonEndState: null })
+      // 경기 뒤 평가 116 진입 0x1278c 가 S+0x50 = 2 · 저장 — 시즌 끝 사슬 상태를 벗어난다 (이어하기는 116 의 끝처럼 가른다).
+      // 칭호는 여기서 주지 않는다 — 판정 0x1a1c0 은 관리 화면 갱신 0x1aec4 에서만 돈다 (`pendingTitle`)
+      setCareer(rolled.seasonEndState === null ? rolled : { ...rolled, seasonEndState: null })
       // 경기 끝 0x4ea0c: 기록 달성 G 합을 저장 G 에 더한 뒤 0x4ec82 `0x22c7d(액수, 모드 4)` 로 획득 GP 통계에 적는다
       recordStat({ kind: 'G획득', mode: BATTER_LEAGUE_MODE, amount: gamePointRewardOf(summary) })
       setScreen({
         kind: '경기결과',
         summary,
         gamePointReward: gamePointRewardOf(summary),
-        newTitles,
+        // 원본 116 은 0x1a1c0 칭호를 띄우지 않는다 — 얻은 칭호는 관리 화면에서 하나씩 팝업으로 받는다
+        newTitles: [],
         evaluation,
         streakNotices: streak.notices,
       })
@@ -616,6 +616,15 @@ export function useCareerSession({
    * 이벤트 뒤 이어서 볼 때는 굴리지 않는다 — 반복 이벤트가 연달아 나오지 않게.
    */
   const [managementCheck, setManagementCheck] = useState<'무작위포함' | '고정' | null>(null)
+  /**
+   * **칭호 팝업 하나** — 관리 장면 this+0x270 (줄 칭호 번호, −1 = 없음). 판정 0x1a1c0 은 관리 장면 갱신 0x1aec4 끝
+   * (0x1af90~0x1afc2)에서 `this+0x274 == 1`(관리 화면 105 에 들어와 두 번째 갱신 — 진입 0x11c64 가 0 으로 둔다)이고
+   * +0x270 < 0 일 때만 돌고, 번호 차례로 **처음 맞는 하나만** 남겨 팝업 0x1274c 를 띄운다. 확인 0x1b1e4 가 비트를 켜고
+   * 곧바로 장착(+0x1c4)·저장한 뒤 +0x270 = −1 · +0x274 = 1 로 다음 틀에 다시 판정한다 — 그래서 여러 개가 하나씩 이어진다.
+   * 원본은 105 에 머무는 동안 커리어가 바뀌지 않는다(훈련·휴식·상점·외출은 다른 상태로 갔다 105 로 다시 들어온다).
+   * 웹은 훈련 결과 따위를 관리 화면 위 알림으로 보이므로 "105 에 있고 진입 이벤트 검사가 끝났으면" 늘 판정한 값으로 둔다.
+   */
+  const pendingTitle = screen.kind === '관리' && managementCheck === null && career !== null ? nextTitleOf(career) : null
   // 저장을 불러오면 반복 이벤트를 다시 볼 수 있게 한다 (0xacf60) — 이벤트 본문이 도착한 뒤에
   const [shouldForgetRepeatable, setShouldForgetRepeatable] = useState(false)
   useEffect(() => {
@@ -639,7 +648,7 @@ export function useCareerSession({
    */
   const startNewSeason = (finished: PlayerCareer) => {
     const next = startNextSeason(finished)
-    setCareer(awardTitles(next, evaluateNewTitles(next)))
+    setCareer(next)
     setScreen({ kind: '관리' })
     setManagementCheck('고정')
   }
@@ -669,9 +678,8 @@ export function useCareerSession({
     if (viewedEventIds.includes(NATIONAL_CUP_EVENT.출전)) {
       // 463 출전 — 상태 133 이 `0xb7bf1(L)` 로 대회를 세우고 순위 화면 134 를 줄에 넣는다.
       // 134 의 틀 0x1b92c 머리가 들어온 첫 틀(장면+0x2c == 1)에 비트 8 이 없으면 칭호 8 "국가 대표" 를 준다 — 그 뒤다
-      const evaluated = awardTitles(viewed, evaluateNewTitles(viewed))
-      const nationalTitle = nationalCupStandingsTitleOf(evaluated.titleIds)
-      setCareer(nationalTitle === null ? evaluated : awardTitles(evaluated, [nationalTitle]))
+      const nationalTitle = nationalCupStandingsTitleOf(viewed.titleIds)
+      setCareer(nationalTitle === null ? viewed : awardTitles(viewed, [nationalTitle]))
       return setScreen({ kind: '국가대항전', cup: createNationalCup() })
     }
     if (viewedEventIds.includes(NATIONAL_CUP_EVENT.거절) || viewedEventIds.includes(NATIONAL_CUP_EVENT.탈락)) {
@@ -709,7 +717,7 @@ export function useCareerSession({
       }
       return startNewSeason(viewed)
     }
-    setCareer(awardTitles(viewed, evaluateNewTitles(viewed)))
+    setCareer(viewed)
     setScreen({ kind: '관리' })
     setManagementCheck('무작위포함')
   }
@@ -1035,7 +1043,7 @@ export function useCareerSession({
       if (career === null || menu === undefined) return
 
       const outcome = runTraining(career, menu, random)
-      const trained = awardTitles(outcome.career, evaluateNewTitles(outcome.career))
+      const trained = outcome.career
       setCareer(trained)
       const changes = trainingDetailChangesOf(outcome)
       // 필살타법 — 상세 창 대신 알림 창 하나(관리 화면 알림 상자, [확인] → 관리 화면).
@@ -1073,6 +1081,12 @@ export function useCareerSession({
     /** 관리 화면 알림 상자 [확인] — 알림은 여기서만 지운다 (화면이 기억하면 같은 문구가 다시 안 뜬다) */
     dismissManagementNotice: () => setManagementNotice(''),
 
+    /** 칭호 팝업 확인 0x1b1e4 — 비트·곧바로 장착(+0x1c4)·저장, 다음 틀에 다시 판정 */
+    confirmTitle: () => {
+      if (career === null || pendingTitle === null) return
+      setCareer(awardTitles(career, [pendingTitle]))
+    },
+
     isRestBlocked: () => career === null || restBlockReasonOf(career) !== null,
 
     showTrainingBlocked: (menuId: string) => {
@@ -1103,7 +1117,7 @@ export function useCareerSession({
       const outcome = performOuting(career, outingFunction, random)
       setOutingNotice('')
       setOutingResult({ effectText: outcome.effectText, recoveryText: outcome.recoveryText })
-      setCareer(awardTitles(outcome.career, evaluateNewTitles(outcome.career)))
+      setCareer(outcome.career)
     },
 
     /**
@@ -1123,7 +1137,7 @@ export function useCareerSession({
       const selection = selectShopItem(career, itemId, random)
       setShopNotice(selection.notice)
       setShopGpDetail(selection.detail ?? null)
-      setCareer(awardTitles(selection.career, evaluateNewTitles(selection.career)))
+      setCareer(selection.career)
       // GP 칸 구매가 확정됐으면(G 를 뺐으면) 0x14ffe `0x22e35(모드 4, 칸)` → 0x1501e `0x22c29(1, 가격)`
       const [tab, first] = itemId.split(':')
       if (tab === 'GP' && selection.career !== career) {
@@ -1146,7 +1160,7 @@ export function useCareerSession({
     settlePlaceForAceMatch: () => {
       if (career === null) return
       const visited = spendCycleAction({ ...career, outingsThisSeason: career.outingsThisSeason + 1 })
-      setCareer(awardTitles(visited, evaluateNewTitles(visited)))
+      setCareer(visited)
     },
 
     /** [!] 장소에서 [들어가기] — 그 장소(trigger 2~6)의 이벤트를 본다 */
@@ -1181,11 +1195,11 @@ export function useCareerSession({
         }
         // 장소 이벤트도 외출이다 — 행동을 쓰고 외출 횟수(칭호 "1년간 외출")에 센다
         const visited = spendCycleAction({ ...viewed, outingsThisSeason: viewed.outingsThisSeason + 1 })
-        setCareer(awardTitles(visited, evaluateNewTitles(visited)))
+        setCareer(visited)
         return setScreen({ kind: '관리' })
       }
       if (screen.context === '시즌') return continueSeason(viewed, viewedEventIds)
-      setCareer(awardTitles(viewed, evaluateNewTitles(viewed)))
+      setCareer(viewed)
       if (screen.context === '외출진입') return setScreen({ kind: '외출' })
       setScreen({ kind: '관리' })
       setManagementCheck('고정')
@@ -1320,6 +1334,7 @@ export function useCareerSession({
     outingResult,
     managementNotice,
     managementDetail,
+    pendingTitle,
     loadingTip,
     storyEvents: story.events,
     eventPlaceIds: story.eventPlaceIds,

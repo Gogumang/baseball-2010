@@ -7,7 +7,7 @@ import { GameResultScreen } from '@/pages/game-result/ui/GameResultScreen'
 import { ManagementScreen } from '@/pages/management/ui/ManagementScreen'
 import { ShopScreen } from '@/pages/shop/ui/ShopScreen'
 import { OutingMapScreen } from '@/pages/outing-map/ui/OutingMapScreen'
-import { ScreenOverlay } from '@/shared/ui'
+import { MessageBox, ScreenOverlay } from '@/shared/ui'
 import { StoryScreen } from '@/pages/story/ui/StoryScreen'
 import { RecordScreen } from '@/pages/record/ui/RecordScreen'
 import { SeasonEndScreen } from '@/pages/season-end/ui/SeasonEndScreen'
@@ -19,6 +19,7 @@ import { nariBatterOf } from '@/app/model/useCollection'
 import type { HallOfFameNariPlayer } from '@/pages/special/ui/SpecialScreen'
 import { endingBonusOf, isContinuableEnding } from '@/entities/career/model/seasonFlow'
 import { TEAMS } from '@/shared/config/original/teams'
+import { conditionTextOf } from '@/entities/career/model/titles'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { MatchCommand } from '@/pages/story/model/useEventPlayback'
@@ -87,6 +88,26 @@ export function CareerRoutes({
       onExpandSkillSlots={actions.expandSkillSlots}
       onExit={() => setScreen({ kind: '메인메뉴' })}
     />
+  )
+
+  /**
+   * 칭호 팝업 0x1274c (종류 0x78) — 관리 화면 위에 하나씩. 그림 0x1afe8 은 이름 StrNICKNAME[i] 와 조건 문구 [i+64] 를 그린다.
+   * ⚠️ 그 팝업 틀의 배치(0x1afe8 의 좌표·그림)는 옮기지 않아 알림 상자로 보인다 — 근사. 다른 알림·상세 창이 닫힌 뒤에 띄운다.
+   */
+  const titlePopup = session.pendingTitle !== null && session.managementNotice === '' && session.managementDetail === null
+    ? (
+      <MessageBox
+        text={`!C${session.pendingTitle}!N${conditionTextOf(session.pendingTitle) ?? ''}`}
+        buttons={['확인']}
+        onAnswer={actions.confirmTitle}
+      />
+    )
+    : null
+  const managementWithTitle = (
+    <>
+      {management}
+      {titlePopup}
+    </>
   )
 
   switch (screen.kind) {
@@ -230,6 +251,6 @@ export function CareerRoutes({
       )
 
     default:
-      return management
+      return screen.kind === '관리' ? managementWithTitle : management
   }
 }

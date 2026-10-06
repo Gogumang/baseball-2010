@@ -45,6 +45,11 @@ describe('evaluateNewTitles — 원문 조건', () => {
     expect(evaluateNewTitles(선수())).toEqual(['이름 없는 신인'])
   })
 
+  it('"이름 없는 신인" 은 1년차 첫 경기 전에만 — 연차idx == 0 && 경기 수 == 0 (0x1a1e6~0x1a1fc)', () => {
+    expect(evaluateNewTitles({ ...선수(), gamesPlayed: 1 })).not.toContain('이름 없는 신인')
+    expect(evaluateNewTitles({ ...선수(), season: 2 })).not.toContain('이름 없는 신인')
+  })
+
   it('통산 500안타면 안타제조기, 100홈런이면 떠오르는 홈런 타자', () => {
     const titles = evaluateNewTitles(선수({}, { hits: 500, homeRuns: 100 }))
 

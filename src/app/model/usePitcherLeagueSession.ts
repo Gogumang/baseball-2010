@@ -80,7 +80,7 @@ import {
 } from '@/entities/pitcher-career/model/pitcherSeasonFlow'
 import {
   awardPitcherTitles,
-  evaluateNewPitcherTitles,
+  nextPitcherTitleOf,
 } from '@/entities/pitcher-career/model/pitcherTitles'
 import type { PitcherRookieProfile } from '@/entities/pitcher-career/model/pitcherRegistration'
 import {
@@ -191,7 +191,11 @@ export interface PitcherLeagueSession {
   readonly aceMatch: PitcherAceMatch | null
   /** 이벤트 재생 뒤 띄울 알림 — 히든 오픈(보상 7) 팝업 글 · 옮기지 않은 갈래. 없으면 '' */
   readonly storyNotice: string
+  /** 관리 화면에 띄울 칭호 팝업 하나 (0x1a1c0 → 0x1274c). 없으면 null */
+  readonly pendingTitle: string | null
   readonly actions: {
+    /** 칭호 팝업 확인 0x1b1e4 — 비트·곧바로 장착·저장 */
+    readonly confirmTitle: () => void
     readonly create: (name: string, profile: PitcherRookieProfile) => void
     /** 바뀐 커리어를 그대로 저장한다 (구질 훈련처럼 화면이 계산해 돌려줄 때) */
     readonly save: (career: PitcherCareer) => void
@@ -519,23 +523,15 @@ export function usePitcherLeagueSession(
     if (carried !== 0) wallet.gain(carried)
   }, [mergeStore, wallet])
 
-  /**
-   * 칭호 판정 — 원본은 **관리 화면(105)에 들어올 때마다** 0x1a1c0 이 번호 순서로 검사한다 (P3 4절).
-   * 맞는 것을 주면서 곧바로 장착까지 한다 (0x1b214 `선수+0x1c4 = i`).
-   *
-   * ⚠️ 원본은 **처음 맞는 하나만** 팝업으로 주고 확인하면 다음 프레임에 다시 판정하는데,
-   * 웹은 타자편(`useCareerSession`)과 마찬가지로 팝업 없이 **한꺼번에** 붙인다 (P3 9절 "부여 방식 차이").
-   * 번호 오름차순으로 이어 주므로 마지막에 남는 장착값은 원본과 같다.
-   */
-  useEffect(() => {
-    if (career === null || scene !== '관리') return
-    if (evaluateNewPitcherTitles(career).length === 0) return
+
+  /** 칭호 팝업 확인 0x1b1e4 */
+  const confirmTitle = useCallback(() => {
     // 직전 값을 받아 붙인다 — 지갑 다리가 맞춰 둔 G를 옛 값으로 되돌리지 않는다 (`commitWith` 머리글)
     commitWith((current) => {
-      const earned = evaluateNewPitcherTitles(current)
-      return earned.length === 0 ? current : awardPitcherTitles(current, earned)
+      const title = nextPitcherTitleOf(current)
+      return title === null ? current : awardPitcherTitles(current, [title])
     })
-  }, [career, commitWith, scene])
+  }, [commitWith])
 
   /**
    * 자동 발동 한 번 — 0x8be80 → 0xadc70 (커서에서 이어 훑기). 끝까지 없으면 커서가 0 으로 되감기고 그 호출은 "없음" 이라
@@ -1274,6 +1270,17 @@ export function usePitcherLeagueSession(
     setScene('등록')
   }, [])
 
+  /**
+   * **칭호 팝업 하나** — 원본은 관리 화면(105) 갱신 0x1aec4 끝에서 판정 0x1a1c0 이 번호 순서로 **처음 맞는 하나만**
+   * this+0x270 에 남겨 팝업 0x1274c 를 띄우고, 확인 0x1b1e4 가 비트·곧바로 장착(+0x1c4)·저장 뒤 다음 틀에 다시 판정한다
+   * (P3 4절 — 장면 0x106 은 모드 3·4 공용). 105 에 있고 이벤트·알림이 없으면 판정한 값으로 둔다(타자편 `pendingTitle` 과 같다).
+   * ⚠️ 근사: 웹 투수 관리 화면은 훈련 결과 창을 화면 안에서 띄워(원본은 125 → 105) 그 창과 칭호 팝업이 함께 설 수 있다.
+   */
+  const pendingTitle = career !== null && scene === '관리' && story === null && fileEvents !== null
+    && storyNotice === '' && outingRecoveryNotice === ''
+    ? nextPitcherTitleOf(career)
+    : null
+
   return {
     career: shown,
     scene,
@@ -1289,9 +1296,11 @@ export function usePitcherLeagueSession(
     eventPlaceIds,
     storyReplacementsFor,
     storyNotice,
+    pendingTitle,
     aceMatch,
     postseasonPopup,
     actions: {
+      confirmTitle,
       create,
       save: saveFromScreen,
       goto,

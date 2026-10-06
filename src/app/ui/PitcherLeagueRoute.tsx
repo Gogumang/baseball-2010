@@ -11,6 +11,7 @@ import { awardWindowTextOf } from '@/pages/story/lib/awardWindows'
 import { PostseasonScreen } from '@/pages/season-end/ui/PostseasonScreen'
 import { MessageBox, ScreenOverlay } from '@/shared/ui'
 import { TEAMS } from '@/shared/config/original/teams'
+import { conditionTextOf } from '@/entities/career/model/titles'
 import {
   isContinuablePitcherEnding,
   judgePitcherSeasonAwards,
@@ -245,6 +246,14 @@ export function PitcherLeagueRoute({
       {/* 이벤트 뒤 알림 — 히든 오픈(보상 7, 0x62368) · 옮기지 않은 갈래(투수편 국가대항전) */}
       {session.storyNotice !== '' && session.outingRecoveryNotice === '' && (
         <MessageBox text={session.storyNotice} buttons={['확인']} onAnswer={actions.dismissStoryNotice} />
+      )}
+      {/* 칭호 팝업 0x1274c — 이름 [i+16] · 조건 [i+80] (투수편 i > 31, 0x1afe8). ⚠️ 팝업 틀 배치는 옮기지 않아 알림 상자다 */}
+      {session.pendingTitle !== null && (
+        <MessageBox
+          text={`!C${session.pendingTitle}!N${conditionTextOf(session.pendingTitle) ?? ''}`}
+          buttons={['확인']}
+          onAnswer={actions.confirmTitle}
+        />
       )}
     </>
   )

@@ -150,7 +150,8 @@ const signedByteOf = (value: number) => ((value & 0xff) << 24) >> 24
  *   1·9          — 중간평가 화면(0x11e84) → `seasonFlow.midSeasonTitlesOf`.
  */
 const COMMON_RULES: Readonly<Record<number, SubjectRule>> = {
-  0: () => true, // 지금부터 시작이다!
+  // 0 이름 없는 신인 — 연차idx(+0xb3) == 0 && 경기 수(+0xb2) == 0 (0x1a1e6~0x1a1fc) — 1년차 첫 경기 전 관리 화면에서만
+  0: (s) => s.season === 1 && isSeasonStart(s), // 지금부터 시작이다!
   // 2 최고의 루키 — 연차idx 1(2년차 시작) 이고 **1년차 MVP** (0x1a204)
   2: (s) => s.season === 2 && isSeasonStart(s) && hasMvpInSeason(s.mvpSeasonBits, 1),
   // 원본은 연차 인덱스 == 8, 즉 **9년차에만** 본다 (P3 9절). `>=` 면 10년차 이후에도 줘 버린다
@@ -349,7 +350,8 @@ export function evaluateNewTitles(career: PlayerCareer): readonly string[] {
 
 /**
  * 원본이 실제로 주는 **하나** (0x1a1c0 은 처음 맞는 하나만 this+0x270 에 쓴다).
- * 확인하면 다음 프레임에 다시 판정해서 이어서 준다 — 웹은 아직 한꺼번에 준다.
+ * 확인(0x1b1e4)하면 다음 프레임에 다시 판정해서 이어서 준다 — 세션이 관리 화면에서 이 하나를 팝업으로 띄운다
+ * (`useCareerSession.pendingTitle`).
  */
 export function nextTitleOf(career: PlayerCareer): string | null {
   return evaluateNewTitles(career)[0] ?? null
@@ -357,8 +359,8 @@ export function nextTitleOf(career: PlayerCareer): string | null {
 
 /**
  * 칭호를 준다. 원본은 팝업 확인 때 비트를 켜고 **곧바로 장착**한다 (0x1b214 `선수+0x1c4 = i`).
- * 웹은 여러 개를 한꺼번에 붙이는데, 원본도 번호 오름차순으로 하나씩 이어 주므로
- * 마지막에 남는 장착값은 **번호가 가장 큰 것**으로 같다.
+ * 세션은 관리 화면 팝업에서 하나씩 넘긴다. 여러 개를 한꺼번에 넘기면(중간평가 1·9 처럼 판정 함수 밖에서 번호만 넣는 곳)
+ * 번호가 가장 큰 것이 장착으로 남는다 — 원본도 번호 오름차순으로 하나씩 이어 주므로 같다.
  */
 export function awardTitles(career: PlayerCareer, titles: readonly string[]): PlayerCareer {
   if (titles.length === 0) return career

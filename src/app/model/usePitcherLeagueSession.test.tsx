@@ -1183,3 +1183,28 @@ describe('기록연감 통계 고리 — 투수편 모드 3 (0x22e35 · 0x22c29 
     expect(events).toEqual([{ kind: 'GP아이템구매', mode: 3, index: 3, price: BATTER_GP_ITEMS[3].price }])
   })
 })
+
+describe('투수편 칭호도 관리 화면에서 하나씩 — 0x1a1c0 · 0x1274c · 0x1b1e4 (장면 0x106 공용)', () => {
+  it('처음 맞는 하나를 띄우고 확인하면 주고 장착한 뒤 다음 것을 띄운다', async () => {
+    const { result } = 띄우기()
+    act(() => result.current.actions.create('투수', 신인))
+    await waitFor(() => expect(result.current.storyEvents).not.toBeNull(), { timeout: 5000 })
+    첫이벤트넘기기(result)
+    for (let guard = 0; guard < 10 && result.current.scene === '이벤트'; guard += 1) 이벤트끝내기(result)
+    expect(result.current.scene).toBe('관리')
+    // 1년차 첫 경기 전 — 0 "이름 없는 신인" 이 먼저다
+    expect(result.current.pendingTitle).toBe(TITLE_NAMES[0])
+    act(() => result.current.actions.save({ ...result.current.career!, popularity: 4500 }))
+    for (let guard = 0; guard < 10 && result.current.scene === '이벤트'; guard += 1) 이벤트끝내기(result)
+    expect(result.current.pendingTitle).toBe(TITLE_NAMES[0])
+    act(() => result.current.actions.confirmTitle())
+    expect(result.current.career?.titleIds).toEqual([TITLE_NAMES[0]])
+    expect(result.current.career?.equippedTitle).toBe(0)
+    expect(result.current.pendingTitle).toBe(TITLE_NAMES[6])
+    act(() => result.current.actions.confirmTitle())
+    expect(result.current.pendingTitle).toBe(TITLE_NAMES[7])
+    act(() => result.current.actions.confirmTitle())
+    expect(result.current.career?.equippedTitle).toBe(7)
+    expect(result.current.pendingTitle).toBeNull()
+  })
+})
