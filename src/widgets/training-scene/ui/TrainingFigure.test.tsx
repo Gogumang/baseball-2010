@@ -35,3 +35,21 @@ describe('훈련 팝업 선수 그림 팔레트', () => {
     expect(칠하기.mock.calls.some(([url]) => url.includes('shadow'))).toBe(false)
   })
 })
+
+describe('훈련 팝업 선수 몸통·좌우 (0x10810 → 0x78ab0 · 0x78cfc)', () => {
+  it('폼 >> 1 이 0 이면 balancer, 그 밖이면 sluger 몸통이다 — 예전엔 늘 balancer', () => {
+    render(<TrainingFigure pose={0} x={0} y={0} form={3} />)
+    expect(칠하기.mock.calls.some(([url]) => url.startsWith('./sprites/batter_sluger/frames/'))).toBe(true)
+    expect(칠하기.mock.calls.some(([url]) => url.startsWith('./sprites/batter_balancer/frames/'))).toBe(false)
+  })
+
+  it('우타(손 0)면 그림 x 를 축으로 뒤집고, 좌타는 그대로다', () => {
+    const 우타 = render(<TrainingFigure pose={0} x={120} y={0} form={0} />)
+    const 상자 = 우타.container.firstElementChild as HTMLElement
+    expect(상자.style.transform).toBe('scaleX(-1)')
+    expect(상자.style.left).toBe('120px')
+    cleanup()
+    const 좌타 = render(<TrainingFigure pose={0} x={120} y={0} form={1} />)
+    expect((좌타.container.firstElementChild as HTMLElement).style.transform).toBe('')
+  })
+})

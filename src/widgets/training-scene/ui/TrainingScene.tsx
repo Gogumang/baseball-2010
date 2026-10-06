@@ -31,6 +31,8 @@ interface TrainingSceneProps {
    * 안 넘기면 타격형으로 본다.
    */
   readonly battingTypeIndex?: number
+  /** 타석 손 (0 우타 · 1 좌타) — 폼 = 2 × 타입 + 손 으로 선수 그림을 뒤집는다 (0x10810 → 0x78cfc). 안 넘기면 좌타 */
+  readonly battingSide?: number
   /**
    * **장착 장비 니블** = `career.equipmentLevels` (0 미장착 · 1~11 = 레벨+1).
    * 원본 훈련 팝업 캐릭터도 관리 화면 그림 객체 그대로라 0x10810 의 니블 루프(0x10866)가
@@ -45,7 +47,7 @@ interface TrainingSceneProps {
 }
 
 /** 원작 훈련 팝업. presentation 이 바뀔 때마다 처음부터 튼다. */
-export function TrainingScene({ presentation, caption, battingTypeIndex = 0, equipmentLevels, skinIndex, teamIndex, onFinished }: TrainingSceneProps) {
+export function TrainingScene({ presentation, caption, battingTypeIndex = 0, battingSide = 1, equipmentLevels, skinIndex, teamIndex, onFinished }: TrainingSceneProps) {
   const folder = animationFolderOf(presentation?.file ?? 'raise_traning_ani')
   const origins = useFrameOrigins(folder)
   const animations = useAnimations(folder)
@@ -110,6 +112,8 @@ export function TrainingScene({ presentation, caption, battingTypeIndex = 0, equ
             equipment={equipmentLevels === undefined ? NO_EQUIPMENT : batterEquipmentOf(equipmentLevels)}
             skinIndex={skinIndex}
             teamIndex={teamIndex}
+            // 폼 rec[0xb] >> 4 = 2 × 타입 + 손 (0x1081a) — 몸통 종류·뒤집기
+            form={battingTypeIndex * 2 + battingSide}
             x={ANCHOR.x + figure.offsetX}
             y={ANCHOR.y - figure.liftY}
           />

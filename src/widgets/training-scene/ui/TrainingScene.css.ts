@@ -55,3 +55,12 @@ export const caption = style({
   fontSize: '11px',
   fontWeight: 700,
 })
+
+/** 훈련 선수 그림의 거울 축 — 그림 x 에 놓은 폭 0 상자. 우타면 이 상자를 scaleX(-1) 로 뒤집는다 (0x78cfc 효과 0x11) */
+export const figureAxis = style({
+  position: 'absolute',
+  top: 0,
+  width: 0,
+  height: 0,
+  transformOrigin: '0 0',
+})

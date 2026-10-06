@@ -1,6 +1,7 @@
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useRecoloredSprite } from '@/shared/lib/sprite/paletteSwap'
-import { batterLayersOf, layerPaletteIndexOf, NO_EQUIPMENT } from '@/widgets/batting-stage/lib/batterLayers'
+import { batterLayersOf, bodyTypeOf, layerPaletteIndexOf, NO_EQUIPMENT } from '@/widgets/batting-stage/lib/batterLayers'
+import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
 import type { BatterEquipment, BatterLayer } from '@/widgets/batting-stage/lib/batterLayers'
 import * as styles from '@/widgets/training-scene/ui/TrainingScene.css'
 
@@ -16,7 +17,11 @@ import * as styles from '@/widgets/training-scene/ui/TrainingScene.css'
  *   (`batterLayersOf` 넷째 인자 false).
  *   (적재 0x78ab0 은 그림자·잔상 파일을 아예 안 읽는다 — 몸통·헬멧·배트만 읽는다.)
  * - 잔상(batter_ghost)은 0x78eca 가 자세 8·9 에서 끼우지만 이 팝업에서 슬롯이 차는지
- *   확정하지 못해 예전처럼 뺀다. 뒤집지 않는다.
+ *   확정하지 못해 예전처럼 뺀다.
+ * - **몸통 종류·좌우** — 0x10810 이 적재 vt8 에 `r2 = rec[0xb] >> 4`(폼, 0x1081a)와
+ *   `[sp] = 0xb63c0(rec)`(손, 0x10820)을 넘긴다. 적재 0x78ab0 이 몸통을 `폼 >> 1` 로 고르고(0 balancer · 그 밖 sluger,
+ *   `bodyTypeOf`), 손은 그림 +0x3c 에 들어가 그리기 0x78cfc 가 **우타(+0x3c == 0)면 효과 0x11 로 뒤집는다**(R6 4절).
+ *   거울 축은 그림 x 로 둔다 — 타석 그림(`drawBatter`)과 같은 근사다.
  * - 겹침 순서는 표 0xd3a54[자세] 로 바뀐다 (`batterLayersOf` 의 `ORDER_RULES`).
  *
  * **장착 아이템**(item_bat_*)은 0x10810 의 니블 루프(0x10866 — 부위 0~3, `rec[0x19]`·`rec[0x1a]`
@@ -27,11 +32,10 @@ import * as styles from '@/widgets/training-scene/ui/TrainingScene.css'
  *   78be8: 몸통 팔레트 = 피부 × 15 + 팀 · 78c14: 헬멧 팔레트 = 팀
  * 장비 손·다리는 등급 줄이 먼저다 (`layerPaletteIndexOf`).
  *
- * **아직 반영 안 한 것**: 타입별 sluger 몸통.
  */
 
-/** 몸통은 아직 타격형(balancer)만 그린다 — 위 주석의 "아직 반영 안 한 것" */
-const BODY_TYPE = 0
+/** 우타 — 그림이 좌타 자세로 그려져 있어 뒤집는다 (0x78d0c) */
+const RIGHT_HANDED = 0
 
 /** 이 팝업에서 빼는 겹 — 잔상(미확정). 그림자는 `batterLayersOf(…, false)` 가 뺀다 */
 const OMITTED = ['/batter_ghost/']
@@ -45,20 +49,25 @@ interface TrainingFigureProps {
   /** 피부 번호(`rec[0xb]` bit2-3) · 내 팀 — 몸통(피부 × 15 + 팀)·헬멧(팀) 팔레트. 안 넘기면 구운 색 그대로 */
   readonly skinIndex?: number
   readonly teamIndex?: number
+  /** 폼 `rec[0xb] >> 4` = 2 × 타입 + 손 — 몸통 종류(폼 >> 1)와 뒤집기(손 0 = 우타)를 고른다. 안 넘기면 좌타 타격형(폼 1) */
+  readonly form?: number
 }
 
-export function TrainingFigure({ pose, x, y, equipment = NO_EQUIPMENT, skinIndex, teamIndex }: TrainingFigureProps) {
-  const layers = batterLayersOf(pose, BODY_TYPE, equipment, false)
+export function TrainingFigure({ pose, x, y, equipment = NO_EQUIPMENT, skinIndex, teamIndex, form = 1 }: TrainingFigureProps) {
+  const layers = batterLayersOf(pose, bodyTypeOf(form), equipment, false)
     .filter((layer) => !OMITTED.some((folder) => layer.folder.includes(folder)))
+  const isMirrored = batterSideOfForm(form) === RIGHT_HANDED
+  // 겹들을 그림 x 에 놓은 폭 0 상자 안에 두고 그 상자를 뒤집는다 — 축 = 그림 x
   return (
-    <>
+    <div className={styles.figureAxis} style={{ left: x, transform: isMirrored ? 'scaleX(-1)' : undefined }}
+      data-mirrored={isMirrored ? 'true' : undefined}>
       {layers.map((layer, index) => (
-        <FigureLayer key={`${layer.folder}#${index}`} layer={layer} x={x} y={y}
+        <FigureLayer key={`${layer.folder}#${index}`} layer={layer} x={0} y={y}
           paletteIndex={skinIndex === undefined || teamIndex === undefined
             ? layer.gradePaletteRow ?? null
             : layerPaletteIndexOf(layer, skinIndex, teamIndex)} />
       ))}
-    </>
+    </div>
   )
 }
 

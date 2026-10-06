@@ -89,6 +89,8 @@ export function ManagementScreen(props: ManagementScreenProps) {
             caption={`${menu.playingMenuId}훈련`}
             // 장타형은 동작표가 따로다 (0xd4a18·0xd4a6c — F-6). 0 만 타격형이고 그 밖은 장타형이다
             battingTypeIndex={career.battingTypeIndex}
+            // 손(우타면 뒤집기)도 같은 0x10810 이 그림 객체에 넣는다 (0xb63c0 → +0x3c)
+            battingSide={career.battingSide}
             // 훈련 팝업 캐릭터도 0x10810 이 세운 그림 객체 그대로라 장착 장비를 입고 나온다
             equipmentLevels={career.equipmentLevels}
             // 몸통 = 피부 × 15 + 팀 · 헬멧 = 팀 (기본정보 카드와 같은 0x10810 → 0x78be8·0x78c14)
