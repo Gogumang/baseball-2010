@@ -2024,6 +2024,16 @@ export function stepDefensePlay(
     if (ballSettled && throwSettled && batterSettled && !stillActive && !decisionPending) {
       play = { ...play, finished: true }
     }
+    // 3아웃이면 판이 끝난다 — 원본 판 진행 관문 `0xb0d28`(플레이, 직접 뜬 것)이 슬롯 2(0x524c0) 머리 52502 에서 매 틱 먼저 돈다:
+    // ```
+    // b0d2c  +0x110(파울 표시 — 0xb2bc4 의 코드 7 이 세우고 아웃 꼬리 b3702 가 지움) == 0 이면 b0db4:
+    // b0db4    state[0xb](마지막 사건 코드) == 11 → 0 ; state[6](아웃) > 2 → 0          ; ★ 끝
+    // b0dc6    0xaa05c(주자관리: 처리 안 끝난 주자가 목표점에 없거나 +0x94) → +0x120 = 0 ; 1 …
+    // 52510  0 이면 → 529f0 — 플레이 틱 vt48 · vt4c · 자동 진루 0xaf918 · 자동 슬라이딩 · CPU 송구 0xafa60 을 하나도 안 돈다
+    // ```
+    // 곧 셋째 아웃이 적힌 틱(아웃 꼬리 b36fa 가 state[6] 을 올림)의 나머지는 돌고(같은 틱 뒤쪽의 자동 진루·0xafa60 —
+    // 0xbba 의 0x51d40 만 `아웃 ≤ 2` 를 따로 본다), **다음 틱 머리에서 판이 닫힌다**. 웹은 그 틱 끝에서 닫는다
+    if (outs > 2) play = { ...play, finished: true }
   }
 
   // ── 한 틱치를 상태에 되돌려 넣는다 ──

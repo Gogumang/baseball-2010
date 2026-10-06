@@ -27,6 +27,7 @@ import type {
   DefensePlayResult,
 } from '@/features/defense-play/model/runDefensePlay'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { BATTED_BALL_PATTERNS, type BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 
 const 땅볼아웃: AtBatOutcome = { kind: '아웃', detail: '땅볼아웃' }
@@ -1383,8 +1384,24 @@ describe('송구 0xb2e38 — 중계 b4616 · AI 9 미루기 · 던진 야수 AI 
   })
 
   it('결과 코드 9 — 공 든 야수가 루에 막 닿았는데 주자가 서 있으면 0xbba 로 0xafa60 을 한 번 부른다 (b43ec~b444a)', () => {
-    // 3루수(4)가 잡은 땅볼 — b1d48 이 3루를 투수(0)에게 넘기고, 투수가 3루 송구를 받은 틱에 3루에 닿는데
-    // 2루 주자(1번)가 이미 3루에 서 있다
+    // 2루타 + 도루로 출발한 1루 주자(0아웃) — 3루수가 쫓아 b1d48 이 3루를 투수(0)에게 넘기고, 투수가 3루에 닿는 틱에
+    // 1번 주자가 이미 3루에 서 있다
+    const 결과 = runDefensePlay({
+      outcome: 이루타,
+      trajectory: battedBallTrajectory([107, 633, 986, 0]),
+      bases: 주자1루,
+      outs: 0,
+      runAbility: 500,
+      stealingFrom: [1],
+      random: createSeededRandom(15839),
+      defenseIsCpu: true,
+    })
+
+    expect(결과.log).toContain('27틱 결과 코드 9 — 0번 야수가 3루에 닿았지만 1번 주자가 서 있다')
+  })
+
+  it('3아웃이면 그 틱 끝에서 판이 닫힌다 — 판 진행 관문 0xb0d28 의 state[6] > 2 (b0dbe)', () => {
+    // 예전 결과 코드 9 장면: 2아웃 땅볼 — 타자주자가 셋째 아웃이 된 뒤에도 판이 돌아 27틱에 코드 9 · 0xafa60 이 돌았다
     const 결과 = runDefensePlay({
       outcome: 땅볼아웃,
       trajectory: battedBallTrajectory([129, 802, 500, 0]),
@@ -1394,7 +1411,13 @@ describe('송구 0xb2e38 — 중계 b4616 · AI 9 미루기 · 던진 야수 AI 
       defenseIsCpu: true,
     })
 
-    expect(결과.log).toContain('27틱 결과 코드 9 — 0번 야수가 3루에 닿았지만 1번 주자가 서 있다')
+    expect(결과.log).toContain('26틱 타자주자 아웃')
+    // 셋째 아웃이 적힌 틱의 나머지(4c 의 0xafa60)는 돈다 — 원본도 같은 틱 슬롯 2 뒤쪽은 돈다
+    expect(결과.log).toContain('26틱 3루로 송구 — 27틱 도착 (CPU 결정) (4번 야수)')
+    // 다음 틱부터는 아무것도 안 돈다 — 27틱 결과 코드 9 가 없다
+    expect(결과.log.some((line) => line.startsWith('27틱'))).toBe(false)
+    expect(결과.ticks).toHaveLength(27)
+    expect(결과.advance.outsAdded).toBe(1)
   })
 })
 

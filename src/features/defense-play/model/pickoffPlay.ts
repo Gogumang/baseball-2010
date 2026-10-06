@@ -554,6 +554,9 @@ export function runPickoffPlay(input: PickoffPlayInput): PickoffPlayResult {
     if ((resultCode !== null || caught) && flight === null && !stillActive && !decisionPending && !receivePending) {
       play = { ...play, finished: true }
     }
+    // 3아웃이면 판이 끝난다 — 판 진행 관문 0xb0d28 의 b0dbe `state[6] > 2 → 0`(타구 진행기 8절 끝과 같은 근거): 다음 틱 머리의
+    // 슬롯 2 가 플레이 틱·자동 진루·CPU 송구 0xafa60 을 하나도 안 돈다
+    if (outs > 2) play = { ...play, finished: true }
   }
 
   return {
