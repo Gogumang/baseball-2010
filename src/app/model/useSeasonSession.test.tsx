@@ -558,6 +558,38 @@ describe('트레이드로 옮겨 간 선수의 리그 성적은 선수를 따라
   })
 })
 
+describe('트레이드 칸은 로테이션으로 섞인 레코드 차례다 (0xb5ca8 → 0x1f9a9 배열 차례)', () => {
+  it('두 경기(g = 1 에서 한 칸) 뒤 투수 목록 0번은 레코드 0번이고, 맞바꾸기는 그 선수를 옮긴다', () => {
+    const { result } = 띄우기()
+    시작(result, 0)
+    for (let game = 0; game < 2; game += 1) {
+      act(() => result.current.actions.playNextGame())
+      const 옵션 = result.current.gameOptions!
+      act(() => result.current.actions.finishGame(요약({ opponentTeamId: 옵션.opponentTeamId })))
+      act(() => result.current.actions.confirmIncome(result.current.state!.record))
+    }
+    const 차례 = result.current.league.pitcherOrders![0]!
+    expect(차례.slice(0, 4)).toEqual([1, 2, 3, 0])
+    // 내 명단은 로테이션 전 자리 차례 — 트레이드 목록은 레코드 차례
+    expect(result.current.tradeRoster.pitchers[0]).toBe(result.current.roster.pitchers[1])
+    expect(result.current.tradeRoster.batters).toBe(result.current.roster.batters)
+    const 상대 = 5
+    const 상대차례 = result.current.league.pitcherOrders![상대]!
+    expect(result.current.tradeRosterOf(상대).pitchers[0]).toEqual(result.current.cpuRosterOf(상대).pitchers[상대차례[0]!])
+
+    const 데려올 = result.current.tradeRosterOf(상대).pitchers[0]!
+    const 내줄 = result.current.tradeRoster.pitchers[0]!
+    act(() => result.current.actions.finishTrade({
+      record: result.current.state!.record, gamePointCost: 0, isSuccess: true,
+      swap: { opponentTeamId: 상대, tab: 0, myIndex: 0, opponentIndex: 0 },
+    }))
+    // 명단 첨자 1(레코드 0번)에 데려온 선수, 상대 레코드 0번 칸(명단 첨자 차례[0])에 내준 선수
+    expect(result.current.roster.pitchers[1]).toMatchObject({ id: 데려올.id, tableTeamId: 상대 })
+    expect(result.current.cpuRosterOf(상대).pitchers[상대차례[0]!]).toMatchObject({ id: 내줄.id, tableTeamId: 0 })
+    expect(result.current.tradeRoster.pitchers[0]).toMatchObject({ id: 데려올.id, tableTeamId: 상대 })
+  })
+})
+
 describe('구장 히든 해금 (app+0xe0)', () => {
   it('컬렉터 해금 id 를 쌓아 둔다 — 같은 id 를 두 번 열어도 한 번만 남는다', () => {
     const { result } = 띄우기()

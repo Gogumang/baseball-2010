@@ -19,7 +19,7 @@ import {
 } from '@/entities/season-mode/model/seasonEvaluation'
 import { clearSeasonGameRecord } from '@/entities/season-mode/model/seasonReputation'
 import type { SeasonPlayer, SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
-import { swapTradedPlayers } from '@/entities/season-mode/model/playerTrade'
+import { TRADE_TAB, swapTradedPlayers } from '@/entities/season-mode/model/playerTrade'
 import type { TradeSettlement, TradeSwap } from '@/entities/season-mode/model/playerTrade'
 import { NO_TRADE_REQUEST, rollTradeRequest } from '@/entities/season-mode/model/tradeRequest'
 import type { TradeRequest } from '@/entities/season-mode/model/tradeRequest'
@@ -152,6 +152,12 @@ export interface SeasonSession {
   readonly roster: SeasonTeamRoster
   /** CPU 팀 레코드의 명단 — 트레이드로 바뀐 팀은 시즌 저장의 것, 나머지는 붙박이 표 (`SeasonSave.cpuRosters`) */
   readonly cpuRosterOf: (teamId: number) => SeasonTeamRoster
+  /**
+   * 트레이드 화면이 보는 **레코드 차례** 명단 — 투수가 로테이션(0xb5ca8)으로 섞인 차례다(`tradeRecordRosterOf`).
+   * 화면이 낸 칸(`TradeSwap`)은 이 차례라 `finishTrade` 가 명단 첨자로 되돌린다
+   */
+  readonly tradeRoster: SeasonTeamRoster
+  readonly tradeRosterOf: (teamId: number) => SeasonTeamRoster
   /** 리그 선수별 성적 — 타이틀·MVP 판정의 유일한 재료다 (B-2) */
   readonly playerStats: LeaguePlayerStats
   /** 포스트시즌 시리즈 (준PO → PO → 한국시리즈). 정규시즌 중에는 null */
@@ -469,6 +475,45 @@ function cpuLeagueRecordOf(save: SeasonSave, teamId: number): LeagueTeamRecord |
       ? { tableTeamId: tableTeamOf(player, teamId), tableSlot: player.id }
       : { tableTeamId: teamId, tableSlot: index }
   return { batters: roster.batters.map(seatOf), pitchers: roster.pitchers.map(seatOf) }
+}
+
+/**
+ * **트레이드가 보는 레코드 차례** — 원본 트레이드(0xe5·0xe6 목록 · 요청 0x93c8 · 맞바꾸기 0xd1cc)는 `0x1f9a9(저장, 모드, 팀)` 의
+ * 팀 레코드 배열을 칸 차례대로 본다. 투수 배열은 경기 준비마다 로테이션 `0xb5ca8`(0~3 한 칸 당김, 영구)로 섞여 있는데
+ * 웹 명단(내 팀 `roster` · CPU `cpuRosters`)은 로테이션 전 자리 차례이고 섞인 차례는 리그가 든다(`League.pitcherOrders` —
+ * 칸 p 에 앉은 명단 첨자). 트레이드는 관리 메뉴(정규시즌 경기 사이)에서만 열리고 그때 레코드는 지난 경기 준비까지 돈
+ * 모양이라 리그 차례 그대로다(다음 경기 준비의 한 칸은 아직 안 돌았다). 그래서 목록·요청 칸은 이 차례로 보이고,
+ * 맞바꿀 때 명단 첨자로 되돌린다(`recordPitcherIndexOf`). 차례가 명단 길이와 안 맞는 꼬리(영입으로 늘어난 칸)는 그대로다.
+ */
+function recordPitcherOrderOf(save: SeasonSave, teamId: number, pitcherCount: number): readonly number[] {
+  const order = pitcherOrderOf(save.league, teamId)
+  const valid = order.length <= pitcherCount
+    && order.every((index) => Number.isInteger(index) && index >= 0 && index < order.length)
+    && new Set(order).size === order.length
+  const head = valid ? order : []
+  return [...head, ...Array.from({ length: pitcherCount - head.length }, (_unused, k) => head.length + k)]
+}
+
+/** 레코드 차례로 늘어세운 팀 명단 — 타자는 그대로(로테이션은 투수만 섞는다) */
+function tradeRecordRosterOf(save: SeasonSave, teamId: number, roster: SeasonTeamRoster): SeasonTeamRoster {
+  const order = recordPitcherOrderOf(save, teamId, roster.pitchers.length)
+  return { ...roster, pitchers: order.flatMap((index) => roster.pitchers[index] ?? []) }
+}
+
+/** 레코드 칸 p → 명단 첨자 */
+function recordPitcherIndexOf(save: SeasonSave, teamId: number, roster: SeasonTeamRoster, recordIndex: number): number {
+  return recordPitcherOrderOf(save, teamId, roster.pitchers.length)[recordIndex] ?? recordIndex
+}
+
+/** 트레이드 화면·요청이 낸 레코드 칸을 명단 첨자로 — 투수 탭만 (타자 배열은 섞이지 않는다) */
+function rosterTradeSwapOf(save: SeasonSave, swap: TradeSwap): TradeSwap {
+  if (swap.tab !== TRADE_TAB.투수) return swap
+  const myTeamId = save.state.record.teamId
+  return {
+    ...swap,
+    myIndex: recordPitcherIndexOf(save, myTeamId, save.roster, swap.myIndex),
+    opponentIndex: recordPitcherIndexOf(save, swap.opponentTeamId, cpuRosterOf(save, swap.opponentTeamId), swap.opponentIndex),
+  }
 }
 
 /**
@@ -1110,8 +1155,9 @@ export function useSeasonSession(
   const finishTrade = useCallback(
     (settlement: TradeSettlement) => {
       if (save === null) return
-      // 성공이면 두 팀 레코드의 한 칸씩을 맞바꾼다 (0xd1cc~0xd3ae — 스태미나 +0x2c 도 레코드를 따라간다)
-      const swapped = settlement.swap === undefined ? save : withTradeSwap(save, settlement.swap)
+      // 성공이면 두 팀 레코드의 한 칸씩을 맞바꾼다 (0xd1cc~0xd3ae — 스태미나 +0x2c 도 레코드를 따라간다).
+      // 화면·요청 칸은 레코드 차례라 명단 첨자로 되돌려 건다
+      const swapped = settlement.swap === undefined ? save : withTradeSwap(save, rosterTradeSwapOf(save, settlement.swap))
       commit({
         ...swapped,
         state: { ...save.state, record: settlement.record },
@@ -1730,7 +1776,13 @@ export function useSeasonSession(
       }
       // 0xe9 → (0xd3 평가 이벤트) → **0xf1 경기 뒤 마무리**. 진입 0x953c: CPU 트레이드 요청 0x93c8 을 굴려
       // this+0x148 에 담고(요청 횟수 SR+0x17a 는 레코드) 배경음 4 를 반복으로 튼다 (0x6ea6d(소리, 4, −1, 1))
-      const rolled = rollTradeRequest(random, settled, save.roster, (team) => cpuRosterOf(save, team))
+      // 0x93c8 은 두 팀 레코드 배열을 칸으로 뽑는다 — 로테이션으로 섞인 레코드 차례로 넘긴다
+      const rolled = rollTradeRequest(
+        random,
+        settled,
+        tradeRecordRosterOf(save, settled.teamId, save.roster),
+        (team) => tradeRecordRosterOf(save, team, cpuRosterOf(save, team)),
+      )
       commit({ ...save, state: { ...save.state, record: rolled.record } })
       setTradeRequest(rolled.request)
       activeSound().playBgm(SEASON_MANAGEMENT_BGM)
@@ -2144,6 +2196,9 @@ export function useSeasonSession(
     league: save?.league ?? EMPTY_LEAGUE,
     roster: save?.roster ?? EMPTY_ROSTER,
     cpuRosterOf: (teamId: number) => cpuRosterOf(save, teamId),
+    tradeRoster: save === null ? EMPTY_ROSTER : tradeRecordRosterOf(save, save.state.record.teamId, save.roster),
+    tradeRosterOf: (teamId: number) =>
+      save === null ? cpuRosterOf(save, teamId) : tradeRecordRosterOf(save, teamId, cpuRosterOf(save, teamId)),
     playerStats: save?.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS,
     series: save?.series ?? null,
     ranking: save?.ranking ?? [],

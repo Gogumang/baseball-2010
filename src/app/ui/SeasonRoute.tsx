@@ -271,9 +271,10 @@ export function SeasonRoute({
     return (
       <TradeScreen
         state={state}
-        roster={roster}
-        // 상대 팀 레코드 — 지난 트레이드로 바뀐 CPU 팀은 시즌 저장의 명단 (0x1f9a9)
-        opponentRosterOf={session.cpuRosterOf}
+        // 두 팀 레코드를 칸 차례로 — 투수는 로테이션(0xb5ca8)으로 섞인 레코드 차례다. 지난 트레이드로 바뀐 CPU 팀은
+        // 시즌 저장의 명단 (0x1f9a9). 화면이 낸 칸은 세션(finishTrade)이 명단 첨자로 되돌린다
+        roster={session.tradeRoster}
+        opponentRosterOf={session.tradeRosterOf}
         gamePoints={session.gamePoints}
         random={random}
         request={scene === SEASON_SCENE_STATE.트레이드영입선수 ? session.tradeRequest : null}
