@@ -90,6 +90,11 @@ interface BattingStageProps {
    */
   readonly gameMode?: number
   /**
+   * **환경설정 "전광판"** = 저장 +0x3a (`GameSettings.isScoreboardOn`). 꺼져 있으면 전광판 흐르는 글자를
+   * 그리지 않는다 — 0x77494 의 0x77726 이 `0x1f1d9() + 0x3a ≠ 0` 을 본다 (R2 6절). 안 넘기면 켠 것으로 본다.
+   */
+  readonly isScoreboardOn?: boolean
+  /**
    * **마선수 레벨 열 칸** = 원본 전역 기록 `mgr[0x13a..0x143]` (칸 0~4 마투수 · 5~9 마타자 → 레벨 0~4).
    * `entities/mission/model/useAceLevels` 의 `levels` 를 그대로 넘긴다. 상대가 마투수면 경기 첫 마구 상태를
    * 세울 때 `0xd8509[레벨]` = [3,4,5,6,7] 로 마구 횟수를 정한다 (타석 교대 0xaebe4, aeec2~aeeea).

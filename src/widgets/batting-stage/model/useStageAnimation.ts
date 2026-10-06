@@ -237,6 +237,8 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
           seasonStadium: latestRef.current.seasonStadium,
           // 하늘 조명 0x78490 은 모드 5·6·7(미션·홈런더비)에서 안 그린다
           gameMode: latestRef.current.gameMode,
+          // 환경설정 전광판(+0x3a) OFF 면 흐르는 글자를 안 그린다 (0x77726)
+          isScoreboardOn: latestRef.current.isScoreboardOn,
         },
       })
 

@@ -82,8 +82,8 @@ export interface SceneryState {
   /** 타자 손 (0 우타 · 1 좌타). 우타면 펜스 묶음이 좌우로 뒤집힌다. 없으면 좌타 배치다 */
   readonly side?: number
   /**
-   * 환경설정 전광판(+0x3a) — OFF 면 전광판을 그리지 않는다 (0x77726, R2-game-effects.md 6절).
-   * 생략하면(웹판이 아직 안 이어 준 자리) 켠 것으로 본다 — 이 필드는 아직 부르는 쪽이 배선하지 않았다.
+   * 환경설정 전광판(+0x3a) — OFF 면 전광판 흐르는 글자를 그리지 않는다 (0x77726, R2-game-effects.md 6절).
+   * `BattingStage` 의 `isScoreboardOn` 이 그대로 내려온다. 생략하면 켠 것으로 본다.
    */
   readonly isScoreboardOn?: boolean
   /**

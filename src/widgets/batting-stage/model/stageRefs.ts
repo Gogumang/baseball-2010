@@ -73,6 +73,8 @@ export interface StageLatest {
   readonly seasonStadium?: SeasonStadium
   /** 게임 모드(전역 `0x1552d10`) — 하늘 조명 0x78490 이 모드 5·6·7 에서 안 그린다 */
   readonly gameMode?: number
+  /** 환경설정 전광판(저장 +0x3a) — 거짓이면 전광판 흐르는 글자를 안 그린다 (0x77726). 없으면 켬 */
+  readonly isScoreboardOn?: boolean
   /**
    * 마선수 레벨 열 칸 (`mgr[0x13a..0x143]`, 칸 → 0~4) — 마투수 마구 횟수 0xd8509[레벨] (0xaebe4).
    * 없으면 모두 Lv1(0) 이다.

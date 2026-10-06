@@ -159,6 +159,8 @@ export function HomeRunDerbyScreen({
           aceLevels={aceLevels}
           swingMode="홈런더비"
           gameMode={DERBY_MODE}
+          // 환경설정 전광판(저장 +0x3a) — OFF 면 흐르는 글자를 안 그린다 (0x77726)
+          isScoreboardOn={settings?.isScoreboardOn}
           isEagleEyeEnabled={false}
           // 홈런더비는 일반 점수판을 안 그린다 (0x4c4bc 가 0x373d0 대신 0x45a54 로 간다)
           hud={null}
