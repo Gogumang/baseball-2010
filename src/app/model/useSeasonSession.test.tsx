@@ -17,7 +17,12 @@ import { clearSeasonGameRecord } from '@/entities/season-mode/model/seasonReputa
 import { useGamePointWallet } from '@/entities/wallet/model/useGamePointWallet'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { TeamGameSummary } from '@/features/play-team-game/model/teamGameFlow'
-import { rollOpponentAces } from '@/features/play-team-game/model/teamGameFlow'
+import {
+  applyBatterOutcome, isBatterTurn, rollOpponentAces, startTeamGame, summaryOf,
+} from '@/features/play-team-game/model/teamGameFlow'
+import { BURST_TABLES } from '@/entities/burst-mission/model/burstMissionRow'
+import { BURST_GOAL } from '@/entities/burst-mission/model/burstMissionJudge'
+import { PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 
 /** 시즌 모드 한 판을 잇는 훅 (원본 장면 0x105) — 저장·장면 전환만 본다 */
@@ -395,6 +400,45 @@ describe('시즌 돌발미션 보상 (0x8e34c 모드 2)', () => {
     expect(후.record.money).toBe(전.record.money + 7)
     // 사기는 0 으로 잘린 뒤 경기 평가(패 −10)가 붙어도 0 아래로 안 간다
     expect(후.teamMorale).toBe(0)
+  })
+
+  it('흐름: 시즌 경기 옵션으로 띄운 팀 경기에서 돌발이 성공하면 그 요약을 받은 세션 레코드에 보상이 먹는다', () => {
+    /** 다음경기까지 간 세션 둘 — 같은 씨앗이라 같은 판이다 */
+    const 판 = () => {
+      const { result } = 띄우기()
+      시작(result, 0)
+      act(() => result.current.actions.updateRecord({
+        ...result.current.state!.record, money: 100, reputation: 100, popularity: 100,
+      }))
+      act(() => result.current.actions.playNextGame())
+      return result
+    }
+    const 받는판 = 판()
+    const 빈판 = 판()
+
+    // 세션이 준 옵션 그대로(첫 타석이 사람 타석이 되게 선공만 고정) 팀 경기를 세우고, 돌발 하나를 띄워 판정한다
+    const random = createSeededRandom(20100901)
+    const 시작판 = startTeamGame({ ...받는판.current.gameOptions!, playerSide: PLAYER_SIDE_FIRST_BAT }, random)
+    expect(isBatterTurn(시작판)).toBe(true)
+    // 시즌 타자형 행 중 목표가 안타(0)인 첫 행 — 2루타는 성공이다
+    const row = BURST_TABLES.SEASON.slice(0, 31).find((candidate) => candidate.goal === BURST_GOAL.안타)!
+    const 뜬판 = { ...시작판, burst: { ...시작판.burst!, current: row, triggeredCount: 1, judgement: null } }
+    const 뒤 = applyBatterOutcome(뜬판, { kind: '안타', bases: 2 }, random)
+    const 경기요약 = summaryOf(뒤)
+    const deltas = 경기요약.burstRewardDeltas ?? []
+    expect(deltas.length).toBeGreaterThan(0)
+
+    act(() => 받는판.current.actions.finishGame(경기요약))
+    act(() => 빈판.current.actions.finishGame({ ...경기요약, burstRewardDeltas: [] }))
+
+    // 두 판의 차이가 곧 돌발 변화량이다 (평가·수입 등 나머지는 같다)
+    const 합 = (name: string) => deltas.filter((delta) => delta.name === name).reduce((sum, delta) => sum + delta.amount, 0)
+    const 받음 = 받는판.current.state!
+    const 없음 = 빈판.current.state!
+    expect(받음.record.money - 없음.record.money).toBe(합('소지금'))
+    expect(받음.record.reputation - 없음.record.reputation).toBe(합('평판'))
+    expect(받음.record.popularity - 없음.record.popularity).toBe(합('인기도'))
+    expect(받음).not.toEqual(없음)
   })
 })
 

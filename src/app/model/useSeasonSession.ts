@@ -75,7 +75,6 @@ import {
   opensSeasonAutobotBat,
 } from '@/entities/season-mode/model/seasonRewards'
 import type { SeasonAutobotBatInput } from '@/entities/season-mode/model/seasonRewards'
-import type { BurstRewardDelta } from '@/entities/burst-mission/model/burstMissionReward'
 import type { LeagueFirstAward, SeasonSummaryEntry } from '@/entities/season-mode/model/seasonRewards'
 import type { SeasonAwardReward } from '@/widgets/season/lib/seasonAwardEvents'
 import { activeSound } from '@/shared/api/audio/soundPort'
@@ -274,12 +273,6 @@ export interface SeasonActions {
   readonly clearNotice: () => void
   readonly quit: () => void
 }
-
-/**
- * 팀 경기 요약이 돌발 변화량을 싣게 되면 받을 칸 — `TeamGameSummary` 에는 아직 없다(features 소관, 보고함).
- * 경기 중 `resolveBurst` 의 `deltas` 를 판정 차례대로 모은 목록이면 된다.
- */
-type SeasonBurstSummary = TeamGameSummary & { readonly burstRewardDeltas?: readonly BurstRewardDelta[] }
 
 /** 저장 칸 하나에 시즌 상태·리그 전적·로스터를 함께 담는다 (원본 저장 0x22755 에 해당) */
 interface SeasonSave {
@@ -1325,9 +1318,8 @@ export function useSeasonSession(
       if (save === null) return
       const savedBefore = save
       // 돌발미션 보상·페널티 (0x8e34c 모드 2) — 원본은 판정이 난 경기 중에 SR·팀 사기에 바로 더하므로 평가보다 앞이다.
-      // ⚠️ 팀 경기 요약(`TeamGameSummary`, features 소관)이 아직 돌발 변화량을 싣지 않는다 — 실으면(`burstRewardDeltas`)
-      //    여기서 그대로 먹는다. 그 전에는 빈 목록이라 아무 일도 없다.
-      const burstDeltas = (summary as SeasonBurstSummary).burstRewardDeltas ?? []
+      // 요약이 경기 중 `resolveBurst` 의 deltas 를 판정 차례대로 싣고 온다(`burstRewardDeltas`)
+      const burstDeltas = summary.burstRewardDeltas ?? []
       const afterBurst = applySeasonBurstRewards(savedBefore.state, burstDeltas)
       const current: SeasonSave = afterBurst === savedBefore.state ? savedBefore : { ...savedBefore, state: afterBurst }
       const { record } = current.state
