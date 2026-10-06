@@ -59,3 +59,26 @@ describe('시즌 엔트리 명단', () => {
     expect(seasonEntryOrderOf(written).batters[0]).toEqual({ rosterSlot: 10, position: teamBatters(0)[0]?.position })
   })
 })
+
+describe('영입한 나리 선수(0xfe)는 명단에 든 기록 사본으로 선다', () => {
+  const 투수기록 = {
+    name: '나리투', ability: [1, 2, 3, 4] as const, repertoire: { name: '나리투', form: 1, magicId: 2, pitchMask: 3 }, role: 2 as const,
+  }
+  const 타자기록 = { name: '나리타', ability: [5, 6, 7, 8] as const }
+  const roster = {
+    pitchers: [{ id: 0xfe, kindByte: 0x80, fieldPosition: 0, stamina: 10000, record: 투수기록 }, { id: 1, kindByte: 1, fieldPosition: 0, stamina: 0 }],
+    batters: [{ id: 0xfe, kindByte: 0xa0, fieldPosition: 3, stamina: 0, record: 타자기록 }],
+  }
+
+  it('팀 경기 차례 — recordOf 없이도 사본을 싣는다', () => {
+    const order = seasonEntryOrderOf(roster)
+    expect(order.pitchers).toEqual([투수기록, 1])
+    expect(order.batters).toEqual([{ rosterSlot: -1, position: 3, record: 타자기록 }])
+  })
+
+  it('편집기 목록 — 사본의 이름·능력치', () => {
+    const lists = seasonEntryListsOf({ teamId: 0, roster, dayCounter: 0, acePitcherId: -1, aceBatterId: -1 })
+    expect(lists.batters[0]).toMatchObject({ name: '나리타', ability: [5, 6, 7, 8] })
+    expect(lists.pitchers[0]).toMatchObject({ name: '나리투', ability: [1, 2, 3, 4] })
+  })
+})

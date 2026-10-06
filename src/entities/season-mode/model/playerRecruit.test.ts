@@ -10,6 +10,7 @@ import {
   isHallOfFameDeleteBlocked,
   isHallOfFameRecord,
   isPitcherRecord,
+  nariRecruitPlayerOf,
   playerKindOf,
   recruitPlayer,
   recruitSourceOf,
@@ -215,5 +216,27 @@ describe('명전 칸 삭제의 시즌 명단 정리 — 0x221dc · 0xb6348', () 
     expect(isHallOfFameDeleteBlocked(roster, 0xb4, true, false)).toBe(false)
     expect(isHallOfFameDeleteBlocked(roster, 0xb5, true, true)).toBe(false)
     expect(isHallOfFameDeleteBlocked(null, 0xb4, true, true)).toBe(false)
+  })
+})
+
+describe('나리 선수 기록 0x22168 · 0x220ec → 시즌 선수 (0x1762e · 0x10ff8)', () => {
+  const 투수기록 = { name: '나리', ability: [1, 2, 3, 4] as const, repertoire: { name: '나리', form: 0, magicId: 0, pitchMask: 1 } }
+  const 타자기록 = { name: '나리', ability: [5, 6, 7, 8] as const }
+
+  it('id 0xfe · +0xa 투수 0x80 / 타자 0xa0 — 0xb6278 이 투수·타자로 가르고 0xb5054 에 걸린다', () => {
+    const pitcher = nariRecruitPlayerOf(투수기록, true)
+    const batter = nariRecruitPlayerOf(타자기록, false)
+    expect(pitcher).toMatchObject({ id: 0xfe, kindByte: 0x80, record: 투수기록 })
+    expect(batter).toMatchObject({ id: 0xfe, kindByte: 0xa0, record: 타자기록 })
+    expect(isPitcherRecord(pitcher.id, pitcher.kindByte)).toBe(true)
+    expect(isPitcherRecord(batter.id, batter.kindByte)).toBe(false)
+    expect(isHallOfFameRecord(pitcher)).toBe(false)
+
+    const roster = recruitPlayer(로스터(), pitcher, true, 2).roster
+    expect(roster.pitchers[2]).toMatchObject({ id: 0xfe, kindByte: 0x82, stamina: RECRUIT_PITCHER_STAMINA, record: 투수기록 })
+    expect(hasRecruitedCareerPlayer(roster.pitchers)).toBe(true)
+    const batters = recruitPlayer(로스터(), batter, false, 4).roster.batters
+    expect(batters[4]).toMatchObject({ id: 0xfe, kindByte: 0xa4, fieldPosition: 4, record: 타자기록 })
+    expect(hasRecruitedCareerPlayer(batters)).toBe(true)
   })
 })

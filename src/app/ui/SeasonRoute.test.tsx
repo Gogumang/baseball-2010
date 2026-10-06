@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { useEffect } from 'react'
+import type { ComponentProps } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { SeasonRoute } from '@/app/ui/SeasonRoute'
@@ -51,9 +52,11 @@ interface 화면Props {
   readonly 장면?: SeasonSceneState
   readonly onExit: () => void
   readonly hallOfFame?: Collection
+  readonly nari?: NonNullable<ComponentProps<typeof SeasonRoute>['nari']>
+  readonly nariRecords?: NonNullable<ComponentProps<typeof SeasonRoute>['nariRecords']>
 }
 
-function 시즌화면({ store, 장면, onExit, hallOfFame }: 화면Props) {
+function 시즌화면({ store, 장면, onExit, hallOfFame, nari, nariRecords }: 화면Props) {
   const session = useSeasonSession(store, createSeededRandom(20100901))
   const gameSettings = useGameSettings(설정저장)
   const { goto } = session.actions
@@ -67,6 +70,8 @@ function 시즌화면({ store, 장면, onExit, hallOfFame }: 화면Props) {
       gameSettings={gameSettings}
       onExit={onExit}
       {...(hallOfFame === undefined ? {} : { hallOfFame })}
+      {...(nari === undefined ? {} : { nari })}
+      {...(nariRecords === undefined ? {} : { nariRecords })}
     />
   )
 }
@@ -279,5 +284,48 @@ describe('선수영입 후보 목록 = 명예의 전당 목록 종류 0 (진입 
 
     const saved = store.load() as { roster: { pitchers: { id: number }[] } }
     expect(saved.roster.pitchers[0]?.id).toBe(0xb5)
+  })
+})
+
+describe('선수영입 나리 칸 0·5 — 0x22168 · 0x220ec 의 내 선수 기록을 id 0xfe 로 통째 옮긴다', () => {
+  const 나리투수 = {
+    name: '나리투수', ability: [10, 20, 30, 40] as const,
+    repertoire: { name: '나리투수', form: 0, magicId: 2, pitchMask: 0b101 }, role: 2 as const,
+  }
+  const 나리타자 = { name: '나리타자', ability: [1, 2, 3, 4] as const }
+  const 띄우기 = () => {
+    const store = 메모리저장(세이브(레코드({ seenEvents: [400, 1, 5, 100], yearGoalShown: true })))
+    render(
+      <시즌화면
+        store={store}
+        장면={SEASON_SCENE_STATE.선수영입}
+        onExit={vi.fn()}
+        hallOfFame={EMPTY_COLLECTION}
+        nari={{ 투수: { name: '나리투수', equippedAbility: [10, 20, 30, 40] }, 타자: { name: '나리타자', equippedAbility: [1, 2, 3, 4] } }}
+        nariRecords={{ 투수: 나리투수, 타자: 나리타자 }}
+      />,
+    )
+    return store
+  }
+  const 슬롯 = (index: number) => screen.getByRole('button', { name: `${index + 1}번 슬롯` })
+  const 자리0 = () => screen.getAllByRole('button').find((button) => /#0/.test(button.textContent ?? ''))
+
+  it('나리 투수를 고르면 자리 고르기(0xdf)로 가고 id 0xfe · +0xa 0x80(칸 번호 갈아끼움) · 기록 사본으로 끼워 넣는다', () => {
+    const store = 띄우기()
+
+    fireEvent.click(슬롯(0))
+    fireEvent.click(자리0()!)
+
+    const saved = store.load() as { roster: { pitchers: { id: number; kindByte: number; stamina: number; record?: unknown }[] } }
+    expect(saved.roster.pitchers[0]).toMatchObject({ id: 0xfe, kindByte: 0x80, stamina: 10000, record: 나리투수 })
+  })
+
+  it('나리 타자는 +0xa 0xa0 · 기록 사본으로 끼워 넣는다', () => {
+    const store = 띄우기()
+
+    fireEvent.click(슬롯(5))
+    fireEvent.click(자리0()!)
+    const saved = store.load() as { roster: { batters: { id: number; kindByte: number; record?: unknown }[] } }
+    expect(saved.roster.batters[0]).toMatchObject({ id: 0xfe, kindByte: 0xa0, record: 나리타자 })
   })
 })

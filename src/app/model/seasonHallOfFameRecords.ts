@@ -3,9 +3,14 @@ import {
   HALL_OF_FAME_PITCHER_FIRST_RECORD_ID, hallOfFameBatterAt, hallOfFamePitcherAt,
 } from '@/entities/collection/model/collection'
 import type { Collection } from '@/entities/collection/model/collection'
-import { equippedPitcherAbilityOf } from '@/entities/pitcher-career/model/pitcherCareer'
+import { equippedPitcherAbilityOf, pitcherFormOfCareer } from '@/entities/pitcher-career/model/pitcherCareer'
+import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
+import { equippedAbilityOf } from '@/entities/career/model/condition'
+import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { pitcherFormOf } from '@/entities/pitcher-career/model/pitcherRegistration'
-import type { SeasonEntryRecordSource } from '@/entities/season-mode/model/seasonEntry'
+import type {
+  SeasonEntryBatterRecord, SeasonEntryPitcherRecord, SeasonEntryRecordSource,
+} from '@/entities/season-mode/model/seasonEntry'
 import { modeBatterOfHallOfFame } from '@/app/model/modeBatter'
 
 /** 명전 칸 사본 — 시즌 영입 후보·경기 명단이 읽는 두 목록 */
@@ -62,5 +67,43 @@ export function seasonHallOfFameRecordSourceOf(hallOfFame: SeasonHallOfFame): Se
         ...(famer.role === undefined ? {} : { role: famer.role }),
       }
     },
+  }
+}
+
+/**
+ * **나리 투수 기록** — 영입 후보 칸 0 의 원본 `0x22168(저장)` = 나만의리그 투수편 저장(칸 3)의 내 투수 기록.
+ * 웹은 미션(`modePitcherOf`)과 같이 투수편 커리어(저장된 것)를 그 기록으로 본다. 영입 0xc554 가 이 0x30 바이트를 통째로
+ * 팀 레코드에 옮기므로 경기 기록 행은 명전 투수와 같은 칸이다 — 이름 rec + 1 · 0xb6414 · 구질 마스크 +0x1c ·
+ * 폼 0xb6e24 · 고른 마구 +0x18 · 보직 +0xb & 3. 영입 순간의 값을 시즌 명단에 사본으로 남긴다(`SeasonPlayer.record`).
+ */
+export function seasonNariPitcherRecordOf(career: PitcherCareer): SeasonEntryPitcherRecord {
+  const ability = equippedPitcherAbilityOf(career)
+  return {
+    name: career.name,
+    ability: [ability.control, ability.velocity, ability.breaking, ability.stamina],
+    repertoire: {
+      name: career.name,
+      form: pitcherFormOfCareer(career),
+      magicId: career.selectedMagicNumber,
+      pitchMask: career.pitchMask,
+    },
+    role: career.role,
+  }
+}
+
+/** **나리 타자 기록** — 칸 5 의 원본 `0x220ec(저장)` = 타자편 저장(칸 4)의 내 타자. 이름 rec + 1 · 0xb6414 (`modeBatterOf` 와 같다) */
+export function seasonNariBatterRecordOf(career: PlayerCareer): SeasonEntryBatterRecord {
+  const ability = equippedAbilityOf(career)
+  return { name: career.name, ability: [ability.hit, ability.power, ability.defense, ability.run] }
+}
+
+/** 영입 목록 나리 칸 0·5 의 기록 — 저장이 없으면 null (칸 상태 2) */
+export function nariSeasonRecordsOf(
+  pitcherCareer: PitcherCareer | null | undefined,
+  batterCareer: PlayerCareer | null | undefined,
+): { readonly 투수: SeasonEntryPitcherRecord | null; readonly 타자: SeasonEntryBatterRecord | null } {
+  return {
+    투수: pitcherCareer === null || pitcherCareer === undefined ? null : seasonNariPitcherRecordOf(pitcherCareer),
+    타자: batterCareer === null || batterCareer === undefined ? null : seasonNariBatterRecordOf(batterCareer),
   }
 }

@@ -88,6 +88,8 @@ function playerFaceOf(
   const table = isPitcher ? teamPitchers(teamId) : teamBatters(teamId)
   const found = player.id < HALL_OF_FAME_FIRST_ID ? table[player.id] : undefined
   if (found !== undefined) return { name: found.name, ability: found.ability }
+  // 영입 때 옮긴 기록 사본(나리 선수)은 그 이름(rec + 1)·능력치로
+  if (player.record !== undefined) return { name: player.record.name, ability: player.record.ability }
   return { name: `${isPitcher ? '투수' : '타자'} ${index + 1}번`, ability: [] }
 }
 
@@ -203,8 +205,8 @@ export function seasonStarterNameOf(teamId: number, roster: SeasonTeamRoster, da
  *
  * 영입 선수(id ≥ 0xb4 · 0xfe)는 붙박이 표에 없다. 원본 경기용 팀 0xb891c 는 팀 레코드의 0x30 바이트를 id 로 거르지 않고
  * 그대로 쓰고(0xb8680), 이름은 0xaa458 표 밖이라 rec + 1, 능력치는 그 기록의 0xb6414 다 (7da5044) — 그래서
- * `recordOf` 가 그 선수의 기록(명전 칸 사본)을 주면 그 칸에 **기록**을 싣는다. 못 주면 `rosterSlot` −1 (받는 쪽이 안 쓴
- * 표 칸으로 채운다 — 근사).
+ * 선수가 영입 때 옮긴 기록 사본(`SeasonPlayer.record` — 나리 선수)을 들고 있으면 그것을, 아니면 `recordOf` 가 주는
+ * 기록(명전 칸)을 그 칸에 싣는다. 둘 다 없으면 `rosterSlot` −1 (받는 쪽이 안 쓴 표 칸으로 채운다 — 근사).
  */
 export interface SeasonEntryBatterRecord {
   readonly name: string
@@ -240,11 +242,13 @@ export function seasonEntryOrderOf(roster: SeasonTeamRoster, recordOf?: SeasonEn
     batters: roster.batters.map((player) => {
       const position = player.fieldPosition & 0xf
       if (isTablePlayer(player)) return { rosterSlot: player.id, position }
-      const record = recordOf?.batter(player)
+      const record = player.record ?? recordOf?.batter(player)
       return record === undefined ? { rosterSlot: NOT_IN_ROSTER, position } : { rosterSlot: NOT_IN_ROSTER, position, record }
     }),
     pitchers: roster.pitchers.map((player) => {
       if (isTablePlayer(player)) return player.id
+      const carried = player.record
+      if (carried !== undefined && 'repertoire' in carried) return carried
       return recordOf?.pitcher(player) ?? NOT_IN_ROSTER
     }),
   }

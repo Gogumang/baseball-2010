@@ -33,6 +33,7 @@ import { GeneralModeScreen, aceOpenPriceOf, useAceOpen } from '@/pages/general-m
 import { useGamePointWallet } from '@/entities/wallet/model/useGamePointWallet'
 import { useAceLevels } from '@/entities/mission/model/useAceLevels'
 import type { SeasonAutobotBatInput } from '@/entities/season-mode/model/seasonRewards'
+import { nariSeasonRecordsOf } from '@/app/model/seasonHallOfFameRecords'
 import type { RegularSeasonOtherModes } from '@/entities/career/model/postseasonFlow'
 
 const SETTINGS_KEY = 'compus-baseball/settings'
@@ -315,6 +316,8 @@ export function App() {
           투수: nariPitcherOf(pitcherSession.career),
           타자: nariBatterOf(careerSession.career ?? careerSession.savedCareer),
         }}
+        // 나리 칸을 고르면 영입할 기록 (0x22168 · 0x220ec — 같은 두 저장의 내 선수)
+        nariRecords={nariSeasonRecordsOf(pitcherSession.career, careerSession.career ?? careerSession.savedCareer)}
       />
     )
   }

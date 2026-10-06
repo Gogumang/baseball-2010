@@ -43,6 +43,8 @@ import { HallOfFameScreen } from '@/pages/special/ui/SpecialScreen'
 import type { HallOfFameNariPlayer } from '@/pages/special/ui/SpecialScreen'
 import type { Collection } from '@/entities/collection/model/collection'
 import type { RecruitCandidate, RecruitListInput } from '@/pages/season'
+import { nariRecruitPlayerOf } from '@/entities/season-mode/model/playerRecruit'
+import type { SeasonEntryBatterRecord, SeasonEntryPitcherRecord } from '@/entities/season-mode/model/seasonEntry'
 
 interface SeasonRouteProps {
   readonly session: SeasonSession
@@ -73,6 +75,22 @@ interface SeasonRouteProps {
    * 안 넘기면 둘 다 없음(상태 2)으로 그린다.
    */
   readonly nari?: { readonly 투수: HallOfFameNariPlayer | null; readonly 타자: HallOfFameNariPlayer | null }
+  /**
+   * 나리 칸 0·5 를 고르면 영입할 기록 — `0x22168` · `0x220ec` 가 주는 나리 저장의 내 선수 기록(이름·0xb6414·레퍼토리·보직).
+   * 앱이 `seasonNariPitcherRecordOf` · `seasonNariBatterRecordOf` 로 만든다. 없으면 그 칸은 영입 후보가 없다.
+   */
+  readonly nariRecords?: {
+    readonly 투수: SeasonEntryPitcherRecord | null
+    readonly 타자: SeasonEntryBatterRecord | null
+  }
+}
+
+/** 나리 칸 후보 — id 0xfe · +0xa 0x80/0xa0 · 기록 사본 (`nariRecruitPlayerOf`) */
+function nariRecruitOf(
+  record: SeasonEntryBatterRecord | SeasonEntryPitcherRecord | null | undefined,
+  isPitcher: boolean,
+): RecruitCandidate | null {
+  return record === null || record === undefined ? null : { name: record.name, player: nariRecruitPlayerOf(record, isPitcher) }
 }
 
 /** 명예의 전당 등록 `0x1f654`(투수: `+0xa = 0` · `+0 = i + 0xb4`) · `0x1f680`(타자: `+0xa = 0x20` · `+0 = i + 0xc8`) */
@@ -86,7 +104,7 @@ const HALL_OF_FAME_BATTER_KIND = 0x20
  * 전역 기록에 복사하므로 그 둘은 칸 번호로 정해진다 — 중복 검사 `0xb50ac` 가 이 번호를 견준다.
  * ⚠️ 나머지 칸(+0x1c 수비 위치·+0x2c 스태미나)은 기록연감에 남아 있지 않다 — 0 으로 둔다. 영입이 투수 스태미나를
  * 10000 으로, 타자 수비 위치를 밀려난 선수의 자리로 덮으므로(S6 4-2·4-3) 영입 결과에는 닿지 않는다.
- * ⚠️ 미해결: id ≥ 0xb4 선수의 경기 출전(능력치·이름을 기록에서 읽기)은 아직 없다 — 명단 편집·경기에서 빠진다.
+ * 경기 출전은 시즌 세션이 명전 칸을 기록으로 싣는다(05ac4dd `seasonHallOfFameRecordSourceOf`).
  */
 function hallOfFameRecruitsOf(hallOfFame: SeasonRouteProps['hallOfFame']): Pick<RecruitListInput, 'hallOfFamePitchers' | 'hallOfFameBatters'> {
   if (hallOfFame === undefined) return { hallOfFamePitchers: [], hallOfFameBatters: [] }
@@ -117,7 +135,9 @@ function hallOfFameRecruitsOf(hallOfFame: SeasonRouteProps['hallOfFame']): Pick<
  * **아직 화면이 없는 장면**(연초 목표 0xd4 등)은
  * 알림을 띄우고 관리 메뉴로 되돌린다 — 조용히 아무것도 안 하는 것보다 낫다.
  */
-export function SeasonRoute({ session, random, gameSettings, onExit, aceSelect, hallOfFame, nari }: SeasonRouteProps) {
+export function SeasonRoute({
+  session, random, gameSettings, onExit, aceSelect, hallOfFame, nari, nariRecords,
+}: SeasonRouteProps) {
   const { state, scene, league, roster, playerStats, series, cup, gameOptions, notice, actions } = session
 
   /** 아이템 메뉴에서 고른, 웹에 아직 없는 창 종류 (`[win+0x1a4]`) */
@@ -333,12 +353,14 @@ export function SeasonRoute({ session, random, gameSettings, onExit, aceSelect, 
 
   if (scene === SEASON_SCENE_STATE.선수영입 || scene === SEASON_SCENE_STATE.선수고르기) {
     const recruits = hallOfFameRecruitsOf(hallOfFame)
+    const careerPitcher = nariRecruitOf(nariRecords?.투수, true)
+    const careerBatter = nariRecruitOf(nariRecords?.타자, false)
     return (
       <PlayerRecruitScreen
         roster={roster}
         // 영입 후보는 나만의리그 선수·명예의 전당에서 온다. 명예의 전당은 기록연감 칸(c3e66c1)에서 싣는다.
-        // ⚠️ 나리 두 칸(0x22168·0x220ec — 투수편·타자편 저장)은 시즌 선수로 옮기는 칸을 아직 안 읽어 기록이 없다
-        list={{ careerPitcher: null, careerBatter: null, ...recruits }}
+        // 나리 두 칸(0x22168·0x220ec — 투수편·타자편 저장의 내 선수)은 그 기록을 id 0xfe 선수로 통째 옮긴다
+        list={{ careerPitcher: careerPitcher, careerBatter: careerBatter, ...recruits }}
         // 진입 0xe1dc: 목록 객체 [this+0xa8] 를 종류 0(+0x1fc = 0 · +0x80 = 0)으로 0x5eb8c 에 채우고 키 0xe340 이
         // 0x62569(목록, 키, 0) — 미션 선수 고르기(하위 17)와 같은 명예의 전당 목록이다. 빈 칸 StrCOMMON[38]/[39] ·
         // 잠긴 칸 [45]/[54](🌐) 는 목록이 띄운다.
@@ -351,7 +373,9 @@ export function SeasonRoute({ session, random, gameSettings, onExit, aceSelect, 
               nari: nari ?? { 투수: null, 타자: null },
               onPick: (pick) => {
                 const isPitcher = pick.side === '투수'
-                if (pick.hallOfFameIndex === null) return choose({ source: '나리', isPitcher, candidate: null })
+                if (pick.hallOfFameIndex === null) {
+                  return choose({ source: '나리', isPitcher, candidate: isPitcher ? careerPitcher : careerBatter })
+                }
                 const list = isPitcher ? recruits.hallOfFamePitchers : recruits.hallOfFameBatters
                 return choose({ source: '명예', isPitcher, candidate: list[pick.hallOfFameIndex] ?? null })
               },

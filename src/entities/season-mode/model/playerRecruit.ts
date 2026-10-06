@@ -1,3 +1,5 @@
+import type { SeasonEntryBatterRecord, SeasonEntryPitcherRecord } from '@/entities/season-mode/model/seasonEntry'
+
 /**
  * 시즌 선수영입 (상태 0xe2 → 0xdf → 0xc554) — `docs/re/S6-season-cleanup.md` 4 절 **확정**,
  * 고르는 규칙은 `docs/re/R13-season-leftovers.md` 9 절, 가드는 `docs/re/P4-season-flow.md` 5 절.
@@ -61,6 +63,13 @@ export function isPitcherRecord(id: number, kindByte: number): boolean {
 
 /** 시즌 로스터에 들어가는 선수 한 명 (원본 0x30 바이트 레코드 중 이 규칙이 쓰는 칸만) */
 export interface SeasonPlayer {
+  /**
+   * 영입 때 옮긴 **기록 사본**(이름 rec + 1 · 0xb6414 능력치 · 투수 레퍼토리·보직) — 붙박이 표 밖 선수만.
+   * 영입 0xc554 는 원본 기록 0x30 바이트를 통째로 팀 레코드에 복사하므로(S6 4-2) 그 뒤 원본(나리 저장)이 바뀌어도
+   * 시즌 선수는 영입 순간의 기록으로 선다. 나리 선수(id 0xfe)가 이 칸을 든다. 명전 선수는 지금의 명전 칸을 읽는다
+   * (`seasonHallOfFameRecordSourceOf` — 칸이 바뀌는 길은 삭제뿐이라 결과가 같다).
+   */
+  readonly record?: SeasonEntryBatterRecord | SeasonEntryPitcherRecord
   /** +0 */
   readonly id: number
   /** +0xa — 상위 3비트(종류·육성)와 하위 5비트(칸 번호)가 한 바이트에 같이 있다 */
@@ -90,6 +99,34 @@ export function slotOf(player: SeasonPlayer): number {
  */
 export function withSlot(player: SeasonPlayer, slot: number): SeasonPlayer {
   return { ...player, kindByte: (player.kindByte & 0xe0) | (slot & PLAYER_SLOT_MASK) }
+}
+
+/**
+ * **나리 선수 기록** — 영입 후보 칸 0(투수) · 5(타자)의 원본 `0x22168(저장)` · `0x220ec(저장)` (직접 떴다):
+ * ```
+ * 0x213c0(저장, 3|4, 1)                         ; 나만의리그 투수편(3)·타자편(4) 저장을 올린다
+ * L = [저장 + 0xb8|0xbc] ; 팀 = (s8)L[0x11d]       ; 그 저장의 내 팀
+ * T = L + 4 + 팀·0x1c
+ * for i in 0..수: P = 0xb51fc|0xb53d0(T, i) ; (s8)P[0xa] < 0 → return P   ; 첫 육성 선수(bit7)
+ * return 0
+ * ```
+ * 그 기록은 나리 선수 생성 0x17360 이 `+0xa = 0x80`(투수) / `0xa0`(타자, 0x1762e~0x17634 · 타자편은 0x1764a 가 0xa7)으로,
+ * 나리 경기 쪽 사본도 `+0 = 0xfe`(0x10ff8 · 0x110e2)로 단 내 선수다 — id `0xfe` 는 `0xb6278` 이 명전 구간에서 빼는 값이다.
+ * 하위 5비트(나리 팀 칸)는 영입 `0xb6604` 가 덮어쓰므로 상위 비트만 의미가 있다.
+ * 영입 0xc554 는 이 기록을 명전 칸과 똑같이 통째로 옮긴다(복사 전 고치는 칸은 +0xa 하위 5비트 · 투수 +0x2c 뿐).
+ */
+export const NARI_PITCHER_KIND_BYTE = PLAYER_OWN_BIT
+export const NARI_BATTER_KIND_BYTE = PLAYER_OWN_BIT | PLAYER_KIND.일반타자
+
+/** 나리 선수 기록 → 시즌 명단 선수 (id 0xfe · +0xa 0x80/0xa0 · 기록 사본) */
+export function nariRecruitPlayerOf(record: SeasonEntryBatterRecord | SeasonEntryPitcherRecord, isPitcher: boolean): SeasonPlayer {
+  return {
+    id: OWN_PLAYER_ID,
+    kindByte: isPitcher ? NARI_PITCHER_KIND_BYTE : NARI_BATTER_KIND_BYTE,
+    fieldPosition: 0,
+    stamina: 0,
+    record,
+  }
 }
 
 /** 영입된 투수의 스태미나는 10000 으로 채워진다 (`선수+0x2c = 0x2710`) */

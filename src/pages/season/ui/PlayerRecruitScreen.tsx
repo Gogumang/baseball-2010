@@ -46,7 +46,7 @@ export interface PlayerRecruitScreenProps {
 export interface RecruitChoice {
   readonly source: '나리' | '명예'
   readonly isPitcher: boolean
-  /** 영입할 기록 — 나리 기록(0x22168 · 0x220ec)은 웹에 아직 없어 null 이다 */
+  /** 영입할 기록 — 나리 칸은 나리 저장의 내 선수(0x22168 · 0x220ec), 명예 칸은 명전 칸. 저장·칸이 없으면 null */
   readonly candidate: RecruitCandidate | null
 }
 
@@ -108,9 +108,8 @@ export function PlayerRecruitScreen({ roster, list, rosterNames, onRecruit, onBa
 
   /**
    * 키 0xe340 (직접 떴다) — 결과 1/2 → `0xb5054(내 팀, 0/1)`, 3/4 → `0xb50ac(내 팀, 0/1, [목록+0x130])` 가 참이면
-   * StrMODE[181] 을 0xbbef9(…, 1, 1, 1) 로, 아니면 `this+0x110 = 3` · 상태 0xdf(자리 고르기).
-   * ⚠️ 나리 기록(0x22168 · 0x220ec)을 시즌 선수로 옮기는 칸(나리 레코드의 +0 · +0xa)은 아직 안 읽어 나리 후보는 중복 검사까지만
-   * 하고 자리 고르기로 가지 않는다.
+   * StrMODE[181] 을 0xbbef9(…, 1, 1, 1) 로, 아니면 `this+0x110 = 3` · 상태 0xdf(자리 고르기) — 나리·명예 모두 같다
+   * (0xe3f8 · 0xe466 → 0xe472). 나리 기록은 id 0xfe · +0xa 0x80/0xa0 이라 0xb5054(+0xa 부호 비트)에 걸린다.
    */
   const chooseCandidate = (choice: RecruitChoice): string | undefined => {
     const players = choice.isPitcher ? roster.pitchers : roster.batters
