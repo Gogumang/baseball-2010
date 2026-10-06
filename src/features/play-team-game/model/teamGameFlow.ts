@@ -415,12 +415,9 @@ export interface TeamRecordTally {
   readonly moundOuts: number
   /** `state[0x8c]` — 이 경기에서 사람이 투구 코스를 한 번이라도 확정했는가 (유일한 1 쓰기 0x50e9c) */
   readonly pitchCourseConfirmed: boolean
-  /**
-   * `[ctx+0x24]` 첫 바이트 — 자동진행(유료 0x50794·0x52c50 → 0xc1b48 이 1)이 걸렸는가. 0xa77f0 첫 게이트(a77f2)가
-   * 이것이 서 있으면 아무것도 안 준다. 0 으로 되돌리는 곳은 시뮬 초기화 0xc0dac(경기 시작) 뿐이다 —
-   * ⚠️ "자동진행 뒤로는 기록 없음" 은 R8 1절의 **유력** 해석이다(중단 질문 0x1e 가 되돌리는지는 0xc0ea8 에서 못 봤다).
-   */
-  readonly autoProgressed: boolean
+  // 0xa77f0 첫 게이트(a77f2)가 보는 `[ctx+0x24]` 첫 바이트는 팀 경기에서 늘 0 이라 칸을 두지 않는다 — 1 을 쓰는 곳은
+  // 0xc1b48 하나이고 부르는 곳(0x52c62 "그만 던지시겠습니까?" 0x1b · 0x507f8 감독 강판 0x23)이 모두 투수편 강판 길이다.
+  // 30G 자동진행 0x3c8da 는 시뮬 초기화 0xc0dac 로 오히려 0 을 쓰고 표시는 engine+0xa0 에 둔다 (R15 10-2·10-3 확정).
 }
 
 const EMPTY_RECORD_TALLY: TeamRecordTally = {
@@ -432,7 +429,6 @@ const EMPTY_RECORD_TALLY: TeamRecordTally = {
   moundStrikeoutCombo: 0,
   moundOuts: 0,
   pitchCourseConfirmed: false,
-  autoProgressed: false,
 }
 
 /**
@@ -595,8 +591,8 @@ export interface TeamGameProgress {
    *
    * 원본은 팀 경기에서도 쌓고 준다: 0xa77f0 은 모드 5·6·7 만 막고(a780a) 경기 끝 0x4ea0c 는 모드 5·6 만 다른 갈래로
    * 보낸 뒤(4eb64) 나머지 모드는 `scene+0x17f4 = Σ 횟수 × 0xcfbf8[k]`(4ebe0~4ec36)를 저장 G(+0x64)에 더한다(4ec5a,
-   * 99999 상한). 방향 게이트(공격 0~15·32~39 / 수비 16~31·36)는 `passesRecordTeamGate`, 자동진행 뒤 막힘은
-   * `recordTally.autoProgressed`.
+   * 99999 상한). 방향 게이트(공격 0~15·32~39 / 수비 16~31·36)는 `passesRecordTeamGate`. 30G 자동진행은 기록을
+   * 막지 않는다 — 간이 엔진 쪽 지급 지점(0xc15a4·0xc1818)이 살아 있다 (R15 10-3).
    */
   readonly recordIds: readonly number[]
   /** 기록달성 판정이 보는 원본 칸들 (경기 객체 ctx · 경기 상태 state · 우리 투수 경기 기록 R) */
@@ -1028,7 +1024,7 @@ function entryBattersOf(progress: TeamGameProgress, teamId: number): readonly Te
 
 /**
  * 지급 게이트 `0xa77f0` 을 지나 기록을 쌓는다 (R8 1절).
- * a77f2 자동진행 뒤면 다 버리고, 번호마다 방향(a7818·a785e·a78bc)을 본다 — 팀 경기에서 사람 팀은 우리 팀 하나라
+ * a77f2 게이트(`[ctx+0x24]`, 투수편 강판 뒤)는 팀 경기에서 늘 열려 있고, 번호마다 방향(a7818·a785e·a78bc)을 본다 — 팀 경기에서 사람 팀은 우리 팀 하나라
  * 우리 공격이면 공격 팀이, 우리 수비면 수비 팀이 사람이다. 모드 5·6·7 갈래(a780a)는 팀 경기에 없다.
  */
 function withGameRecords(
@@ -1036,7 +1032,7 @@ function withGameRecords(
   recordIds: readonly number[],
   humanOffense: boolean,
 ): TeamGameProgress {
-  if (recordIds.length === 0 || progress.recordTally.autoProgressed) return progress
+  if (recordIds.length === 0) return progress
   const passed = recordIds.filter((id) =>
     passesRecordTeamGate(id, { offenseIsHuman: humanOffense, defenseIsHuman: !humanOffense }),
   )
@@ -1182,7 +1178,7 @@ function withOurDefenseRecords(
  */
 function gameEndRecordIdsFor(progress: TeamGameProgress): readonly number[] {
   // 0x4ea0c 는 경기가 끝나야 부른다 — 도중의 요약에는 안 붙인다
-  if (progress.recordTally.autoProgressed || !progress.game.isFinished) return []
+  if (!progress.game.isFinished) return []
   const game = progress.game
   const won =
     game.ourScore > game.opponentScore || (game.ourScore === game.opponentScore && ourHalfOf(game) === '초')
@@ -3687,21 +3683,36 @@ export function canAutoProgress(progress: TeamGameProgress): boolean {
  * 자동진행을 한 번 굴린다 — 사람 차례를 건너뛰고 간이 엔진이 타석을 이어 돌린다
  * (`0x3c8da` 가 간이 시뮬레이터 `this+0x1780` 으로 넘기고, 갱신 `0x48480` 이 `0xc262c` 를 반복한다).
  *
- * ⚠️ **중계 화면(경기 상태 0x21)은 옮기지 않았다** — 속도 칸 3단계·주자 그림·"공격팀(PLAYER/COM)" 띠·
- * CLR 중단 질문(StrGAME[6])은 R10 7절에 있지만 연출이라 건너뛰었다. 여기서는 결과만 계산한다.
+ * **들어가기** (경기 중 메뉴 0x3c158 의 자동진행 가지 0x3c8da~0x3c95a, R15 10-3):
+ * ```
+ * 3c93c  0xc0dac(sim, …)      ; 시뮬 초기화 — c0df6 rand(0, 2) → sim+4 · sim[0] = 0 · sim+0x94 = 0 …
+ * 3c942  sim+0xa0 = 1         ; 자동진행 표시
+ * 3c94a  0xc0ea8(sim, 0)      ; sim+0x9f(중단) = 0
+ * 3c956  0xbcb48(…, 0x21)     ; → 진입 0x3abf0: 남은 돌발 0x8f628 (굴림 없음)
+ * ```
+ * **끝나는 조건** — 갱신 0x48480 이 틱마다 `r = 0xc2198(sim, 1)` 을 보고 참이면 `0xc262c`(간이 타석 하나):
+ * ```
+ * c21d6  0xb68fc(state) 경기 끝 → sim[0] = 0, 거짓
+ * c2274  r = 0xc1e04(sim) || sim[1] || sim+0x94 > 0          ; 30G 길은 sim[1]·+0x94 가 0
+ * 0xc1e04 모드 1·2 (c1f20): sim+0x9f → 거짓 · sim+0xa0 → 참
+ *         모드 8·9 (c1f04): 이닝(0-기준 state+0x6b) > 5 → 거짓 · sim+0x9f → 거짓 · sim+0xa0 → 참
+ * ```
+ * 곧 일반·시즌은 **경기 끝까지**, 대전은 **0-기준 이닝이 6(7회)에 들면** 멈춘다 — 둘 다 원본 그대로다 (확정).
+ * 간이 엔진 타석의 기록달성은 그대로 쌓인다(`[ctx+0x24]` 를 안 세운다 — R15 10-3).
  *
- * ⚠️ **끝나는 지점은 근사**다. 원본은 `0xc2198(sim,1)` 이 거짓이 될 때까지 도는데 그 조건을 못 읽었다
- * (I-controls 4d 는 "7회 직접 플레이 전환 지점으로 보임 — 유력" 이라고만 적는다).
- * 여기서는 **경기 끝까지** 돌리되, 대전모드는 "6회까지만" 이라는 StrGAME[2] 에 맞춰 **6회를 마치면 멈춘다**.
+ * ⚠️ **중계 화면(경기 상태 0x21)은 옮기지 않았다** — 속도 칸 v = 전역 +0xbc(0..2, 틱 간격 8·4·1)·주자 그림·
+ *    "공격팀(PLAYER/COM)" 띠·CLR 중단 질문(StrGAME[6], 예 → sim+0xa0 = 0 · 0xc0ea8(sim, 1) → 다음 0xc2198 이 거짓)은
+ *    R10 7절에 있다. 웹은 결과를 한 번에 계산해 사람이 도중에 멈출 틈이 없다.
+ * ⚠️ 미해결: 대전에서 경기 끝 전에 멈출 때 원본은 `0xc0ee8(sim)`·`0xc22b4(sim)` 을 부른다 — 0xc22b4 안에 rand
+ *    (0xbfa54) 호출이 있어 그 뒤 굴림 차례가 다를 수 있다. 안 읽었다.
  */
 export function runAutoProgress(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
   // 수비 진행 중에는 손대지 않는다 — 붙들어 둔 타구를 버리고 다음 타석으로 넘어가면 안 된다
   if (progress.pendingDefensePlay !== null) return progress
-  // 자동진행 전환 0xc1b48 이 [ctx+0x24] 첫 바이트를 1 로 — 이 뒤로 0xa77f0 은 기록을 안 준다 (a77f2, 유력)
-  let current: TeamGameProgress = withoutPendingBurst({
-    ...progress,
-    recordTally: { ...progress.recordTally, autoProgressed: true },
-  })
+  // 3c93c 시뮬 초기화 0xc0dac 의 c0df6 rand(0, 2) → sim+4 — 그 값의 쓰임은 안 읽었다 (굴림 차례만 맞춘다)
+  random.nextInRange(0, 2)
+  // 상태 0x21 진입 0x3abf0 — 사람 장면에서 뜬 채 남은 돌발을 판정 없이 내린다 (0x8f628)
+  let current: TeamGameProgress = withoutPendingBurst(progress)
   for (let step = 0; step < MAXIMUM_AUTO_STEPS; step += 1) {
     if (current.game.isFinished) return current
     if (isVersusMode(current.options.mode) && current.game.inning - 1 > AUTO_PROGRESS_LAST_INNING_INDEX) {

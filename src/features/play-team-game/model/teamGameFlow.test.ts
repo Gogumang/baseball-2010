@@ -1838,12 +1838,23 @@ describe('기록달성 — 팀 경기도 0xa77f0 으로 쌓고 경기 끝 0x4ea0
     expect(summaryOf(끝({ moundOuts: 20, pitchCourseConfirmed: true }, 0)).recordIds).toEqual([37])
   })
 
-  it('자동진행(0xc1b48 → [ctx+0x24] = 1) 뒤로는 아무 기록도 없다 (a77f2, 유력)', () => {
-    const { progress, random } = 우리공격()
-    const 끝 = runAutoProgress(progress, random)
-    expect(끝.recordTally.autoProgressed).toBe(true)
-    expect(summaryOf(끝).recordIds).toEqual(progress.recordIds)
-    expect(summaryOf(끝).gamePoints).toBe(0)
+  it('30G 자동진행은 기록을 막지 않는다 — [ctx+0x24] 를 세우는 0xc1b48 은 투수편 강판 길뿐이다 (R15 10-3)', () => {
+    let 쌓인경기 = 0
+    for (let seed = 1; seed <= 8; seed += 1) {
+      const random = createSeededRandom(seed * 104729)
+      const progress = startTeamGame({ ...기본옵션, playerSide: PLAYER_SIDE_FIRST_BAT }, random)
+      const 끝 = runAutoProgress(progress, random)
+      expect(끝.game.isFinished).toBe(true)
+      if (summaryOf(끝).recordIds!.length > progress.recordIds.length) 쌓인경기 += 1
+    }
+    expect(쌓인경기).toBeGreaterThan(0)
+  })
+
+  it('들어갈 때 시뮬 초기화 0xc0dac 가 rand(0, 2) 를 한 번 굴린다 (c0df6) — 그 뒤가 간이 타석이다', () => {
+    const { progress } = 우리공격()
+    const random = 세는난수(createSeededRandom(5))
+    runAutoProgress(progress, random)
+    expect(random.rolls[0]).toBe(2)
   })
 
   it('경기진행 설정으로 넘긴 타석(간이 엔진)은 자동진행이 아니라 기록이 쌓인다 — 게이트를 지난 번호뿐이다', () => {
