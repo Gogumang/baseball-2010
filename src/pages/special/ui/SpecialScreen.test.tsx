@@ -279,6 +279,80 @@ describe('명예의 전당 등록 목록 — 나리 상태 145 (0x62568 목록 �
   })
 })
 
+describe('미션 선수 고르기 — 메인 메뉴 하위 17 (0x2613c 목록 종류 0 · 키 0x627d4)', () => {
+  const 나리 = { name: '홍길동', equippedAbility: [999, 800, 400, 0] }
+  const 명예투수 = {
+    name: '철완', ability: { control: 1, velocity: 2, breaking: 3, stamina: 4 },
+    equippedAbility: { control: 1, velocity: 2, breaking: 3, stamina: 4 }, endingIndex: 5, season: 10, titleIds: [], slot: 1,
+    look: { typeIndex: 0, handIndex: 0, skinIndex: 0, teamId: 1 },
+  }
+  const 명예타자 = { name: '전설', ability: { hit: 1, power: 2, defense: 3, run: 4 }, endingIndex: 6, season: 13, titleIds: [], slot: 2 }
+  const 열기 = (nari: { 투수: typeof 나리 | null; 타자: typeof 나리 | null } = { 투수: null, 타자: 나리 }) => {
+    const onPick = vi.fn()
+    const onCancel = vi.fn()
+    render(
+      <HallOfFameScreen
+        collection={{ ...EMPTY_COLLECTION, hallOfFame: [명예타자], hallOfFamePitchers: [명예투수] }}
+        mode={{ kind: '선수고르기', nari, onPick, onCancel }}
+        onBack={vi.fn()}
+      />,
+    )
+    const 슬롯 = (index: number) => screen.getByRole('button', { name: `${index + 1}번 슬롯` })
+    return { onPick, onCancel, 슬롯 }
+  }
+
+  it('종류 0 은 나리 칸과 명전 칸을 다 채운다 (0x5eb8c) — 처음 커서는 칸 0', () => {
+    const { 슬롯 } = 열기()
+    expect(슬롯(0).dataset.state).toBe('2')
+    expect(슬롯(5).dataset.state).toBe('1')
+    expect(슬롯(2).dataset.state).toBe('3')
+    expect(슬롯(8).dataset.state).toBe('3')
+    expect(슬롯(1).dataset.state).toBe('4')
+    expect(슬롯(3).dataset.state).toBe('5')
+    expect(슬롯(10).dataset.state).toBe('0')
+    expect(슬롯(0).getAttribute('aria-current')).toBe('true')
+  })
+
+  it('코드 1·2 는 나리 선수(+0xa5/+0xa6 = −1), 3·4 는 명전 번호 (0x5eae0)', () => {
+    const { onPick, 슬롯 } = 열기({ 투수: 나리, 타자: 나리 })
+    fireEvent.click(슬롯(0))
+    expect(onPick).toHaveBeenLastCalledWith({ side: '투수', hallOfFameIndex: null })
+    fireEvent.click(슬롯(5))
+    expect(onPick).toHaveBeenLastCalledWith({ side: '타자', hallOfFameIndex: null })
+    fireEvent.click(슬롯(2))
+    expect(onPick).toHaveBeenLastCalledWith({ side: '투수', hallOfFameIndex: 1 })
+    fireEvent.click(슬롯(8))
+    expect(onPick).toHaveBeenLastCalledWith({ side: '타자', hallOfFameIndex: 2 })
+  })
+
+  it('나리 선수 없음 5 → StrCOMMON[38] · 빈 명전 칸 6 → [39] · 잠긴 칸 7 → [45]/[54] — 고르지 못한다', () => {
+    const { onPick, 슬롯 } = 열기()
+    fireEvent.click(슬롯(0))
+    expect(screen.getByText(/나만의리그 선수를/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    fireEvent.click(슬롯(1))
+    expect(screen.getByText(/명예의전당 선수를/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    fireEvent.click(슬롯(3))
+    expect(screen.getByText(/투수 슬롯 2개가 오픈됩니다/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '아니오' }))
+    fireEvent.click(슬롯(12))
+    expect(screen.getByText(/타자 슬롯 4개가 오픈됩니다/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+    fireEvent.click(슬롯(10))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(onPick).not.toHaveBeenCalled()
+  })
+
+  it('말풍선은 뜨지 않고, 되돌아가기는 결과 0 (0x6286e)', () => {
+    const { onCancel, 슬롯 } = 열기()
+    fireEvent.click(슬롯(2))
+    expect(screen.queryByRole('menu')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '되돌아가기' }))
+    expect(onCancel).toHaveBeenCalled()
+  })
+})
+
 describe('명예의 전당 능력치 도형 — 축 최대 800 (0x5e864)', () => {
   it('최대길이 = 30 × 800 / 999 = 24, 값 0 이면 가운데', () => {
     const center = { x: 178, y: 104 }

@@ -165,6 +165,18 @@ export function isHallOfFameSlotOpen(side: HallOfFameSide, slot: number): boolea
   return slot >= 0 && slot < (side === '투수' ? HALL_OF_FAME_OPEN_PITCHERS : HALL_OF_FAME_OPEN_BATTERS)
 }
 
+/**
+ * 미션·홈런더비 **선수 고르기** 결과 (메인 메뉴 하위 17 미션 0x29a54 · 16 홈런더비 0x29ac8, 목록 0x62568 → 0x5eae0).
+ * 칸 코드 1 나리 투수 · 2 나리 타자 · 3 명예 투수 · 4 명예 타자 를 편과 명전 번호로 든다 —
+ * 0x5eae0 이 **전역기록 +0xa5(투수)/+0xa6(타자)** 에 쓰는 s8 그대로다: 나리 선수면 −1(`null`), 명예 선수면 명전 번호 0~.
+ * 경기 선수 게터 0x1fbd0 · 0x1fc20 이 모드 5·6·7 에서 이 값이 0 이상이면 명전 기록(0x1f62c · 0x1f640)을 준다.
+ */
+export interface HallOfFamePlayerPick {
+  readonly side: HallOfFameSide
+  /** 명전 번호 (투수 0~3 · 타자 0~7) — 나리 선수면 null (+0xa5/+0xa6 = −1) */
+  readonly hallOfFameIndex: number | null
+}
+
 export type HallOfFameResult =
   | { readonly kind: '등록'; readonly collection: Collection; readonly slot: number }
   | { readonly kind: '빈칸없음' }

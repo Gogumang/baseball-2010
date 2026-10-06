@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
-import type { Collection, HallOfFameResult, HallOfFameSide } from '@/entities/collection/model/collection'
+import type {
+  Collection, HallOfFamePlayerPick, HallOfFameResult, HallOfFameSide,
+} from '@/entities/collection/model/collection'
 import {
   firstEmptyHallOfFameSlot, hallOfFameBatterAt, hallOfFamePitcherAt, isHallOfFameSlotOpen,
 } from '@/entities/collection/model/collection'
@@ -253,6 +255,19 @@ export type HallOfFameMode =
       readonly onDone: () => void
       readonly onLater: () => void
     }
+  /**
+   * **미션 선수 고르기** — 메인 메뉴 하위 17 (진입 0x2613c · 갱신 0x29a54), 목록 종류 0 (`[목록+0x1fc] = 0`, 0x261c2).
+   * 0x5eb8c 가 종류 0 이면 나리 칸 0·5(1 있음 / 2 없음)와 명전 칸을 다 채운다. 키는 0x62568 의 종류 ≠ 3 갈래 0x627d4 —
+   * 칸 코드 `0x5eae0` 을 표 0xd1da0 로: 1~4 → 결과 [목록+0x12c] = 코드 (0x627ec~0x627f8, `onPick`),
+   * 5 → StrCOMMON[38] · 6 → StrCOMMON[39] · 7 → 칸 ≤ 4 ? [45] : [54] 현금 구매(🌐). 되돌아가기는 결과 0 (`onCancel`).
+   * 편은 0x5ea1a 가 커서 칸으로 정한다(`[목록+0x288] = 칸 > 4`) — 칸 ≤ 4 가 투수다.
+   */
+  | {
+      readonly kind: '선수고르기'
+      readonly nari: { readonly 투수: HallOfFameNariPlayer | null; readonly 타자: HallOfFameNariPlayer | null }
+      readonly onPick: (pick: HallOfFamePlayerPick) => void
+      readonly onCancel: () => void
+    }
 
 /** 원본 문구 (StrCOMMON · 0xcc214 · StrMODE[219]) */
 const HALL_OF_FAME_TEXT = {
@@ -262,6 +277,7 @@ const HALL_OF_FAME_TEXT = {
   done: '!C!cffffff명예의 전당에!N등록이 완료되었습니다', // StrCOMMON[52]
   shortage: '!C!cFF0000G포인트가 부족합니다.!cFFFFFF 구매!N페이지로 이동하시겠습니까?', // 0xcc214
   later: '!C나중에 등록 하시겠습니까?!N메인 메뉴로 이동합니다', // StrMODE[219]
+  hallOfFameFirst: '!C!cFFFFFF명예의전당 선수를!N먼저 등록해야합니다', // StrCOMMON[39]
   // StrCOMMON[45] / [54] — 슬롯 현금 구매 (🌐)
   buyPitcherSlots: '!C!cFFFFFF슬롯을 오픈하여 명예선수를!N추가로 등록할 수 있습니다!N투수 슬롯 2개가 오픈됩니다!N!N!cFFFFFF실제 현금 !cFF0000500원!cFFFFFF의 추가 정보!N이용료 (통화료별도)가 부과!N됩니다. 아이템 구매 중 일부!N시간이 소요 될 수 있으므로!N강제종료 하지 마세요!N!N구매 하시겠습니까?',
   buyBatterSlots: '!C!cFFFFFF슬롯을 오픈하여 명예선수를!N추가로 등록할 수 있습니다!N타자 슬롯 4개가 오픈됩니다!N!N!cFFFFFF실제 현금 !cFF00001000원!cFFFFFF의 추가 정보!N이용료 (통화료별도)가 부과!N됩니다. 아이템 구매 중 일부!N시간이 소요 될 수 있으므로!N강제종료 하지 마세요!N!N구매 하시겠습니까?',
@@ -291,7 +307,7 @@ export function HallOfFameScreen({ collection, mode, onBack }: {
   readonly mode: HallOfFameMode
   readonly onBack: () => void
 }) {
-  const [slot, setSlot] = useState(mode.kind === '등록' && mode.edition === '타자' ? NARI_BATTER_SLOT : NARI_PITCHER_SLOT + 1)
+  const [slot, setSlot] = useState(initialHallOfFameSlotOf(mode))
   const [isBubbleOpen, setIsBubbleOpen] = useState(false)
   const [bubbleCursor, setBubbleCursor] = useState(0)
   const [notice, setNotice] = useState<string | null>(null)
@@ -328,14 +344,36 @@ export function HallOfFameScreen({ collection, mode, onBack }: {
     return undefined
   }
 
+  /** 선수 고르기의 키 확인 (0x627d4~0x6286c) — 칸 코드 표 0xd1da0 */
+  const pressPickSlot = (target: number) => {
+    if (mode.kind !== '선수고르기') return undefined
+    const code = hallOfFameKeyCodeOf(slots[target].state, target)
+    const entry = hallOfFameEntryOfSlot(target)
+    if (code === 1 || code === 2) return mode.onPick({ side: code === 1 ? '투수' : '타자', hallOfFameIndex: null })
+    if ((code === 3 || code === 4) && entry !== null) return mode.onPick({ side: entry.side, hallOfFameIndex: entry.index })
+    if (code === 5) return setPopup({ kind: '알림', text: HALL_OF_FAME_TEXT.nariFirst, buttons: ['확인'] })
+    if (code === 6) return setPopup({ kind: '알림', text: HALL_OF_FAME_TEXT.hallOfFameFirst, buttons: ['확인'] })
+    // 7 잠긴 칸 — 0x6282c: 칸 ≤ 4 면 [45] 투수 슬롯, 아니면 [54] 타자 슬롯 (팝업 종류 4 → 현금 구매 🌐, 웹은 목록으로)
+    if (code === 7) {
+      const text = target < HALL_OF_FAME_PITCHER_SLOTS ? HALL_OF_FAME_TEXT.buyPitcherSlots : HALL_OF_FAME_TEXT.buyBatterSlots
+      return setPopup({ kind: '알림', text, buttons: ['예', '아니오'] })
+    }
+    return undefined
+  }
+
   const pressSlot = (target: number) => {
     if (mode.kind === '등록') return pressRegisterSlot(target)
+    if (mode.kind === '선수고르기') return pressPickSlot(target)
     setBubbleCursor(0)
     return setIsBubbleOpen(true)
   }
 
-  /** 되돌아가기 — 등록 목록은 결과 0 → StrMODE[219] (0x1ca4c), 스페셜은 상태 6 */
-  const goBack = () => (mode.kind === '등록' ? setPopup({ kind: '나중에' }) : onBack())
+  /** 되돌아가기 — 등록 목록은 결과 0 → StrMODE[219] (0x1ca4c), 선수 고르기는 결과 0 (0x6286e), 스페셜은 상태 6 */
+  const goBack = () => {
+    if (mode.kind === '등록') return setPopup({ kind: '나중에' })
+    if (mode.kind === '선수고르기') return mode.onCancel()
+    return onBack()
+  }
 
   useEffect(() => {
     if (notice !== null || popup !== null) return undefined
@@ -607,7 +645,7 @@ const pitcherChartOf = (ability: PitcherAbility) => [ability.control, ability.ve
 function hallOfFameSlotsOf(collection: Collection, mode: HallOfFameMode): readonly HallOfFameSlotView[] {
   return Array.from({ length: HALL_OF_FAME_SLOTS }, (_unused, index): HallOfFameSlotView => {
     if (index === NARI_PITCHER_SLOT || index === NARI_BATTER_SLOT) {
-      if (mode.kind !== '등록') return { kind: '빈칸', state: 0 }
+      if (mode.kind === '보기') return { kind: '빈칸', state: 0 }
       const nari = index === NARI_PITCHER_SLOT ? mode.nari.투수 : mode.nari.타자
       return nari === null
         ? { kind: '빈칸', state: 2 }
@@ -628,6 +666,15 @@ function hallOfFameSlotsOf(collection: Collection, mode: HallOfFameMode): readon
       ? { kind: '빈칸', state: 4 }
       : { kind: '찬칸', state: 3, name: famer.name, chartValues: batterChartOf(famer.equippedAbility ?? famer.ability) }
   })
+}
+
+/**
+ * 처음 커서 칸. 등록 목록은 자기 편 나리 칸 쪽(기존), 선수 고르기는 칸 0 —
+ * 진입 0x2613c 가 목록 `+0x80` 을 0 으로 두고(0x261be) 0x5eb8c 를 부른다 (⚠️ +0x80 이 커서 칸이라는 것은 유력).
+ */
+function initialHallOfFameSlotOf(mode: HallOfFameMode): number {
+  if (mode.kind === '선수고르기') return NARI_PITCHER_SLOT
+  return mode.kind === '등록' && mode.edition === '타자' ? NARI_BATTER_SLOT : NARI_PITCHER_SLOT + 1
 }
 
 /** 막대 글씨 — 잠긴 칸(5)은 LOCK(114), 그 밖은 EMPTY(113) (0x653ee~0x65432) */
