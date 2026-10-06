@@ -213,3 +213,18 @@ describe('applyPickoff — CPU 견제 한 판 (메시지 0x10 → 종류 4 → 0
     expect(next.bases).toEqual(번트의달인.start.runners)
   })
 })
+
+describe('타점은 3아웃으로 끝난 판의 득점도 든다 (0xae3e8 ae554 → 정산 0xa8024 a8994 += 이벤트 0xf 수)', () => {
+  const 찬스 = MISSIONS.find((m) => m.name === '찬스를 노려라')!
+
+  it('2아웃 3루 주자 뜬공 — 포구 전에 홈을 밟은 바로 득점이 타점 1 이고, 루·아웃은 시작 상황으로 돌아간다', () => {
+    const run = startMission(찬스)
+    expect(run.outs).toBe(2)
+    const next = applyOutcome(run, { kind: '아웃', detail: '뜬공아웃' })
+    expect(next.progress.counts['타점']).toBe(1)
+    expect(next.outs).toBe(찬스.start.outs)
+    expect(next.bases).toEqual(찬스.start.runners)
+    // 2루타 목표가 남아 아직이다
+    expect(next.status).toBe('진행중')
+  })
+})

@@ -180,6 +180,15 @@ export const MISSION_BATTER_MODE = 6
 /**
  * 공격 결과로 주자·아웃을 옮긴다. 3아웃이 되면 미션 시작 상황으로 되돌린다 —
  * 미션은 한 이닝을 넘기지 않는 것으로 본다 (추정).
+ *
+ * **득점은 3아웃이어도 그대로 낸다** — 미션 '타점'(R+0x104)의 원본 길 (직접 재역어셈):
+ * - 판 끝 판정 B 0xae3e8 은 아웃 > 2 여도(ae554 → 0x18) 정산 0xa8024 를 부른다(ae5b2), 판정 0xaaa6c 는 그 뒤(ae5c4).
+ * - 정산은 이 판의 사건 목록에서 이벤트 0xf 를 센다(a8098~a80a0 → `[sp+0x28]`). 0xf 는 득점 처리 0xa5c34 가 점수판
+ *   1점마다 넣는다(a5c70~a5c7c) — 바로 득점(메시지 0x13)이든 보류가 풀린 득점이든. 3아웃으로 영영 안 풀린 보류 득점만 빠진다.
+ * - a8946: `state[0x11]`(공을 맞혔다 — 판정 0x51108 의 5131c 가 장면 +0xfd2 를 싣는다) · 볼 4개(`state[5] > 3`) ·
+ *   사구(`state[0x12]`) 중 하나면 a8994 `0xa57f8(R, 0xe, [sp+0x28])` — 타점 += 그 판 득점. 아니면(a895a → a89c8) 안 든다.
+ * 그래서 2아웃 뜬공에 친 순간 뛴 3루 주자가 포구 전에 홈을 밟은 득점(0xaa16e 바로 득점)도 그 판이 3아웃으로 끝나도
+ * 타점이다(원본 그대로). 예전엔 3아웃이면 0 으로 버렸다. 맞히지 않은 판(견제·도루·폭투·포일, 낫아웃)은 이 함수를 안 지난다.
  */
 export function advanceSituation(
   run: Pick<MissionRun, 'mission' | 'bases' | 'outs'>,
@@ -191,7 +200,7 @@ export function advanceSituation(
   const advance = missionAdvance(run.bases, run.outs, outcome, { random, played })
   const outs = run.outs + advance.outsAdded
   if (outs >= OUTS_PER_INNING) {
-    return { bases: run.mission.start.runners, outs: run.mission.start.outs, runsScored: 0 }
+    return { bases: run.mission.start.runners, outs: run.mission.start.outs, runsScored: advance.runsScored }
   }
   return { bases: advance.bases, outs, runsScored: advance.runsScored }
 }
