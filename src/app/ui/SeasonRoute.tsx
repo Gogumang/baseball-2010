@@ -8,6 +8,7 @@ import {
   SeasonTrainingScreen, StadiumShopScreen, TradeScreen, CoachHireScreen, SEASON_MVP_LEADER_KINDS,
   seasonAwardRewardOf, seasonMvpResultEventId, seasonTitleResultEventId,
   SeasonMatchInfoScreen, seasonMatchInfoLines, DayResultBoardScreen,
+  SeasonPlayerPickScreen, SeasonPlayerCardScreen, seasonCardAbilitiesOf, seasonPlayerDetailViewOf,
 } from '@/pages/season'
 import { fillModeText } from '@/widgets/season/lib/seasonText'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
@@ -46,6 +47,11 @@ import type { HallOfFameNariPlayer } from '@/pages/special/ui/SpecialScreen'
 import type { Collection } from '@/entities/collection/model/collection'
 import type { RecruitCandidate, RecruitListInput } from '@/pages/season'
 import { nariRecruitPlayerOf } from '@/entities/season-mode/model/playerRecruit'
+import { PLAYER_PICK_PURPOSE, playerPickCancelTarget } from '@/entities/season-mode/model/playerPick'
+import type { PlayerPickPurpose } from '@/entities/season-mode/model/playerPick'
+import { seasonPlayerRecordOf } from '@/entities/season-mode/model/seasonPlayerRecord'
+import { ENTRY_TAB } from '@/entities/season-mode/model/entryEditor'
+import type { EntryTab } from '@/entities/season-mode/model/entryEditor'
 import type { SeasonEntryBatterRecord, SeasonEntryPitcherRecord } from '@/entities/season-mode/model/seasonEntry'
 
 interface SeasonRouteProps {
@@ -146,6 +152,16 @@ export function SeasonRoute({
   const [missingWindow, setMissingWindow] = useState<ItemWindowKind | null>(null)
   /** 시즌정보(0xcd)에서 고른, 웹에 아직 없는 화면 — 원본 상태·창 이름 */
   const [missingScreen, setMissingScreen] = useState<string | null>(null)
+  /**
+   * 공용 선수 고르기 0xdf 의 목적 `this+0x110` 과 목록 탭(ed+0x33f)·커서 — 목적 1·2 만 (3 선수영입은 `PlayerRecruitScreen` 이 든다).
+   * 원본 목록 객체 [this+0xa8] 는 장면이 사는 동안 남지만 0xdf 에 들어올 때마다 다시 채워 커서는 0 이고, 탭만
+   * 0xd9·0xdc 에서 돌아올 때 창+0x24c(타자)를 따른다 (0x5980).
+   */
+  const [playerPick, setPlayerPick] = useState<{
+    readonly purpose: PlayerPickPurpose
+    readonly tab: EntryTab
+    readonly cursor: number
+  } | null>(null)
   /**
    * 메인 메뉴에서 들어오는 길 = 0x327b8(this, 2) 의 모드 2 갈래 — `+0x42 && +0x4e` 면 장면 0x105 를 세우지 않고 곧장 경기
    * 장면 0x104 다(메인 메뉴 시즌모드 0x24698 · [최근게임] 모드 2 가 같은 길). 첫 그림 전에 갈라 관리 화면이 한 번도 서지 않게
@@ -414,6 +430,58 @@ export function SeasonRoute({
     )
   }
 
+  // 공용 선수 고르기 0xdf — 목적 1(장착아이템)·2(선수정보). 목록은 내 팀 레코드 차례(투수는 로테이션으로 섞인 차례)
+  if (scene === SEASON_SCENE_STATE.선수고르기 && playerPick !== null && playerPick.purpose !== PLAYER_PICK_PURPOSE.선수영입) {
+    const pick = playerPick
+    return (
+      <SeasonPlayerPickScreen
+        teamId={state.record.teamId}
+        roster={session.tradeRoster}
+        initialTab={pick.tab}
+        gamePoint={session.gamePoints}
+        onPick={(tab, index) => {
+          // 0xc3e8 확인 — 목적 2 → 카드 0xd9
+          setPlayerPick({ ...pick, tab, cursor: index })
+          actions.goto(SEASON_SCENE_STATE.선수상세)
+        }}
+        onBack={() => {
+          setPlayerPick(null)
+          actions.goto(playerPickCancelTarget(pick.purpose))
+        }}
+      />
+    )
+  }
+
+  // 선수 카드 0xd9 ↔ 능력치 상세 창 0xda — 0xdf 목적 2 에서 고른 선수 (0x5404: 0xb5694(팀, 탭 == 0 ? 1 : 0, 커서))
+  if ((scene === SEASON_SCENE_STATE.선수상세 || scene === SEASON_SCENE_STATE.능력치상세) && playerPick !== null) {
+    const pick = playerPick
+    const isPitcher = pick.tab === ENTRY_TAB.투수
+    const players = isPitcher ? session.tradeRoster.pitchers : session.tradeRoster.batters
+    const player = players[pick.cursor]
+    if (player !== undefined) {
+      const recordOf = session.recordSource()
+      const view = seasonPlayerRecordOf(state.record.teamId, player, isPitcher, pick.cursor, recordOf)
+      const context = { record: state.record, teamMorale: state.teamMorale }
+      return (
+        <SeasonPlayerCardScreen
+          teamId={state.record.teamId}
+          view={view}
+          abilities={seasonCardAbilitiesOf(view, context)}
+          detail={seasonPlayerDetailViewOf(view, context)}
+          isDetailOpen={scene === SEASON_SCENE_STATE.능력치상세}
+          gamePoint={session.gamePoints}
+          onOpenDetail={() => actions.goto(SEASON_SCENE_STATE.능력치상세)}
+          onCloseDetail={() => actions.goto(SEASON_SCENE_STATE.선수상세)}
+          onBack={() => {
+            // 0x48a0 취소 → 0xdf. 0x5980 이 목록을 다시 채워 커서 0 · 탭은 창+0x24c(이 선수가 타자였는가)대로
+            setPlayerPick({ ...pick, cursor: 0 })
+            actions.goto(SEASON_SCENE_STATE.선수고르기)
+          }}
+        />
+      )
+    }
+  }
+
   if (scene === SEASON_SCENE_STATE.선수영입 || scene === SEASON_SCENE_STATE.선수고르기) {
     const recruits = hallOfFameRecruitsOf(hallOfFame)
     const careerPitcher = nariRecruitOf(nariRecords?.투수, true)
@@ -510,7 +578,9 @@ export function SeasonRoute({
           const { action } = entry
           if (action.kind === '상태') return setMissingScreen(`시즌정보 ${entry.label} — 상태 0x${action.target.toString(16)}`)
           if (action.kind === '기록순위창') return setMissingScreen('시즌정보 기록순위 — 창 0x80 → 상태 0xdb')
-          return setMissingScreen('시즌정보 선수정보 — 선수 고르기 0xdf 목적 2')
+          // 칸 2 — this+0x110 = 2 · 0xdf. 이전 상태가 0xcd 라 탭은 1(투수)
+          setPlayerPick({ purpose: PLAYER_PICK_PURPOSE.선수정보, tab: ENTRY_TAB.투수, cursor: 0 })
+          actions.goto(SEASON_SCENE_STATE.선수고르기)
         }}
         onBack={backToManagement}
       />

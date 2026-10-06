@@ -233,6 +233,69 @@ describe('아이템 메뉴 0xd0 배선', () => {
   })
 })
 
+describe('시즌정보 0xcd → 선수정보(0xdf 목적 2) → 카드 0xd9 ↔ 상세 0xda 배선', () => {
+  const 띄우기 = (덮어쓰기: Partial<SeasonRecord> = {}) => {
+    const store = 메모리저장(세이브(레코드({ seenEvents: [400, 1], yearGoalShown: true, ...덮어쓰기 })))
+    render(<시즌화면 store={store} 장면={SEASON_SCENE_STATE.시즌정보} onExit={vi.fn()} />)
+  }
+  const 키 = (key: string) => fireEvent.keyDown(window, { key })
+
+  it('구단정보·아이템·기록순위는 웹에 화면이 없어 "아직 없음" 으로 막고 0xcd 에 남는다', () => {
+    띄우기()
+    fireEvent.click(screen.getByRole('button', { name: '구단정보' }))
+    expect(알림글()).toContain('상태 0xd5')
+    fireEvent.click(screen.getByRole('button', { name: 'OK' }))
+    fireEvent.click(screen.getByRole('button', { name: '기록순위' }))
+    expect(알림글()).toContain('0xdb')
+    fireEvent.click(screen.getByRole('button', { name: 'OK' }))
+    expect(screen.getByRole('button', { name: '선수정보' })).toBeTruthy()
+  })
+
+  it('선수정보 → 투수 탭 목록(내 팀) → 확인 → 카드 → "0" 상세 창 → 취소로 카드 → 취소로 목록 → 취소로 시즌정보', () => {
+    띄우기()
+    fireEvent.click(screen.getByRole('button', { name: '선수정보' }))
+
+    // 0x5980 — 이전 상태 0xcd 라 탭 1(투수), 보기 전용
+    expect(screen.getByTestId('엔트리-줄-0').textContent).toContain('봉은중')
+    키('Enter')
+    expect(screen.getByTestId('선수상세-이름').textContent).toBe('봉은중')
+
+    키('0')
+    const 창 = screen.getByRole('dialog', { name: '상세정보' })
+    expect(창).toBeTruthy()
+    키('Escape')
+    expect(screen.queryByRole('dialog', { name: '상세정보' })).toBeNull()
+    expect(screen.getByTestId('선수상세-이름').textContent).toBe('봉은중')
+
+    키('Escape')
+    expect(screen.getByTestId('엔트리-줄-0').textContent).toContain('봉은중')
+    키('Escape')
+    expect(screen.getByRole('button', { name: '선수정보' })).toBeTruthy()
+  })
+
+  it('타자 카드에서 돌아오면 목록은 타자 탭이다 (0x5980: 이전 0xd9 ∧ 창+0x24c)', () => {
+    띄우기()
+    fireEvent.click(screen.getByRole('button', { name: '선수정보' }))
+    키('*')
+    키('ArrowDown')
+    키('Enter')
+    expect(screen.getByTestId('선수상세-이름').textContent).toBe('이태형')
+    키('Escape')
+    expect(screen.getByTestId('엔트리-줄-0').textContent).toContain('박택용')
+    expect(screen.getByTestId('엔트리-줄-0').getAttribute('aria-current')).toBe('true')
+  })
+
+  it('상세 창 글 — 팀 사기 줄과 코치 줄 (0x897e8)', () => {
+    띄우기({ coach: 2 })
+    fireEvent.click(screen.getByRole('button', { name: '선수정보' }))
+    키('Enter')
+    키('0')
+    const 창글 = screen.getByRole('dialog', { name: '상세정보' }).textContent ?? ''
+    expect(창글).toContain('코치')
+    expect(창글).toContain('팀 투수 제구 +10')
+  })
+})
+
 describe('선수영입 후보 목록 = 명예의 전당 목록 종류 0 (진입 0xe1dc · 키 0xe340)', () => {
   const 띄우기 = () => {
     const store = 메모리저장(세이브(레코드({ seenEvents: [400, 1, 5, 100], yearGoalShown: true })))

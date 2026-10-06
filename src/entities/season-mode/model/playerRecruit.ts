@@ -79,6 +79,15 @@ export interface SeasonPlayer {
   /** +0x2c — 투수 스태미나 */
   readonly stamina: number
   /**
+   * **+0x19 · +0x1a 장비 니블 네 칸** (부위 k = 바이트 +0x19 + k/2, k 짝수 = 윗니블 · 0 없음 · n = 레벨 + 1).
+   * 팀 레코드는 Xls 행 0x30 바이트를 그대로 복사해 시작하므로(S6 3-1) 처음 값은 붙박이 표의 `equipment` 다 — 리그 열 팀은
+   * 모두 0. 원본에서 이 칸을 바꾸는 곳은 아이템 → 장착아이템(0xd0 칸 0 → 선수 고르기 0xdf 목적 1 → 장비 창 0xdc,
+   * 키 0x957c 적용 0x7d90 — P4 5절)뿐이고 트레이드·영입은 레코드를 통째로 옮긴다.
+   * **없으면 붙박이 표 값**이다(`seasonPlayerEquipmentOf`) — 옛 저장과 지금까지 만든 명단은 모두 그렇다.
+   * ⚠️ 웹에는 장비 창 0xdc 가 아직 없어 이 칸을 쓰는 곳이 없다.
+   */
+  readonly equipment?: readonly number[]
+  /**
    * **이 선수의 붙박이 표 팀** — 원본 id(+0)는 Xls 행 번호 그대로라(투수 `팀 × 8 + 칸` · 타자 `팀 × 12 + 칸`,
    * `base/extracted/XlsPITCHER_DATA.json` 줄마다 바이트 0 이 줄 번호다) 팀이 id 안에 들어 있다. 웹 `id` 는 그 팀 안
    * 칸만 들어서, 트레이드(0xd1cc~0xd3ae)로 **다른 팀 레코드에 옮겨진** 선수는 그 팀을 여기 따로 든다.

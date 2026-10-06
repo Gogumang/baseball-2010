@@ -23,6 +23,17 @@ export interface RosterPlayer {
    * 성공률을 깎고 성공하면 소지금(SR+2)에 더한다. 칸의 뜻(등급·몸값)은 미확정이다.
    */
   readonly grade: number
+  /**
+   * 레코드 +0xb (u8) — 윗 3비트 타자 타입(0x5e864 한계 행) · 아랫 2비트 보직(0xb6704: 투수 한계 행 · 타자 내야/외야).
+   */
+  readonly profile: number
+  /** 레코드 +0x14 (u32) — 장착 스킬 비트. 0xb62b4(p, n) = (값 >> n) & 1 */
+  readonly skillBits: number
+  /**
+   * 레코드 +0x19 · +0x1a 장비 니블 네 칸 (부위 0·1 = +0x19 윗·아랫, 2·3 = +0x1a 윗·아랫). 0 = 없음, n = 레벨 + 1.
+   * 시즌 팀 레코드는 이 행을 그대로 복사해 시작한다 — 리그 열 팀은 모두 0, 외인구단(팀 14)만 차 있다.
+   */
+  readonly equipment: readonly [number, number, number, number]
 }
 
 // JSON 은 네 칸 튜플을 나타내지 못해 한 번 더 단언한다

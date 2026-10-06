@@ -43,6 +43,16 @@ POSITION_MASK = 0xF
 # 런타임 팀 레코드의 선수는 Xls 행 0x30 바이트를 그대로 복사한 것이다 (S6 3-1) — 행 바이트 27 이 곧 +0x1b.
 GRADE_OFFSET = 0x1B
 
+# 선수 레코드의 나머지 칸 — 시즌 선수 상세(0xd9 카드 · 0xda 글 0x897e8)가 읽는다 (직접 떴다).
+#   +0xb  (u8)  윗 3비트 = 타자 타입(0x5e864 의 0xd174b 행) · 아랫 2비트 = 보직(0xb6704: 투수 한계 행 · 타자 내야/외야)
+#               · 0xd9 들어옴 0x5404 는 비트 4~7 과 비트 2~3 을 그림 적재 vt[8] 에 따로 넘긴다 (그림 쪽 뜻 미확정)
+#   +0x14 (u32) 장착 스킬 비트 — 0xb62b4(p, n) = (+0x14 >> n) & 1
+#   +0x19 · +0x1a  장비 니블 네 칸 — 부위 k 는 바이트 +0x19 + k/2, k 짝수 = 윗니블 (0xb6494 · 0x897e8 · 0x5590~0x55c6)
+# 런타임 팀 레코드는 이 행 0x30 바이트를 그대로 복사한 것이라(S6 3-1) 행 바이트가 곧 시즌 선수의 처음 값이다.
+PROFILE_OFFSET = 0x0B
+SKILL_BITS_OFFSET = 0x14
+EQUIPMENT_OFFSET = 0x19
+
 # StrCOMMON 안의 구간. 인덱스를 직접 확인해 정리한 것이다.
 COMMON_TEAM_RANGE = (0, 15)
 COMMON_ACE_PITCHER_RANGE = (15, 20)
@@ -126,6 +136,24 @@ def position_of(row_hex: str) -> int:
 def grade_of(row_hex: str) -> int:
     """선수 레코드 +0x1b 바이트 (트레이드가 견주는 칸 — 0x93c8 · 0xcf24)."""
     return bytes.fromhex(row_hex)[GRADE_OFFSET]
+
+
+def profile_of(row_hex: str) -> int:
+    """선수 레코드 +0xb 바이트 (타입·보직·그림)."""
+    return bytes.fromhex(row_hex)[PROFILE_OFFSET]
+
+
+def skill_bits_of(row_hex: str) -> int:
+    """선수 레코드 +0x14 u32 — 장착 스킬 비트 (0xb62b4)."""
+    row = bytes.fromhex(row_hex)
+    return int.from_bytes(row[SKILL_BITS_OFFSET:SKILL_BITS_OFFSET + 4], 'little')
+
+
+def equipment_nibbles_of(row_hex: str) -> list[int]:
+    """선수 레코드 +0x19 · +0x1a 의 장비 니블 네 칸 (부위 0·1 = +0x19 윗·아랫, 2·3 = +0x1a 윗·아랫)."""
+    row = bytes.fromhex(row_hex)
+    first, second = row[EQUIPMENT_OFFSET], row[EQUIPMENT_OFFSET + 1]
+    return [first >> 4, first & 0xF, second >> 4, second & 0xF]
 
 
 def quote(text: str) -> str:
@@ -370,7 +398,11 @@ def generate_roster() -> None:
         for index, (name, row) in enumerate(zip(data['names'], data['rows'])):
             if not name.strip():
                 continue
-            player = {'id': index, 'name': name, 'ability': abilities_of(row), 'grade': grade_of(row)}
+            player = {
+                'id': index, 'name': name, 'ability': abilities_of(row), 'grade': grade_of(row),
+                'profile': profile_of(row), 'skillBits': skill_bits_of(row),
+                'equipment': equipment_nibbles_of(row),
+            }
             # 수비 위치는 타자 표에만 있다. 투수 표의 같은 칸(+0x1c)은 다른 뜻이라 넣지 않는다.
             if label == 'batters':
                 player['position'] = position_of(row)
@@ -400,6 +432,17 @@ def generate_roster() -> None:
         '   * 성공률을 깎고 성공하면 소지금(SR+2)에 더한다. 칸의 뜻(등급·몸값)은 미확정이다.\n'
         '   */\n'
         '  readonly grade: number\n'
+        '  /**\n'
+        '   * 레코드 +0xb (u8) — 윗 3비트 타자 타입(0x5e864 한계 행) · 아랫 2비트 보직(0xb6704: 투수 한계 행 · 타자 내야/외야).\n'
+        '   */\n'
+        '  readonly profile: number\n'
+        '  /** 레코드 +0x14 (u32) — 장착 스킬 비트. 0xb62b4(p, n) = (값 >> n) & 1 */\n'
+        '  readonly skillBits: number\n'
+        '  /**\n'
+        '   * 레코드 +0x19 · +0x1a 장비 니블 네 칸 (부위 0·1 = +0x19 윗·아랫, 2·3 = +0x1a 윗·아랫). 0 = 없음, n = 레벨 + 1.\n'
+        '   * 시즌 팀 레코드는 이 행을 그대로 복사해 시작한다 — 리그 열 팀은 모두 0, 외인구단(팀 14)만 차 있다.\n'
+        '   */\n'
+        '  readonly equipment: readonly [number, number, number, number]\n'
         '}\n'
         '\n'
         '// JSON 은 네 칸 튜플을 나타내지 못해 한 번 더 단언한다\n'

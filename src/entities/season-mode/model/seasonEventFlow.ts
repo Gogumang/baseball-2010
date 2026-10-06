@@ -538,7 +538,7 @@ export function cureIllnessByItem(record: SeasonRecord): SeasonRecord {
 export const ILLNESS_ABILITY_PENALTY_PERCENT = 30
 
 /** 경기 능력치 보정이 보는 질병 칸 — SR+6 (`0xb5824`) */
-export function illnessPenaltyFieldOf(record: SeasonRecord): number {
+export function illnessPenaltyFieldOf(record: Pick<SeasonRecord, 'illnessSlack'>): number {
   return record.illnessSlack
 }
 

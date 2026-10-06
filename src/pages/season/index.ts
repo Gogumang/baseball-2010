@@ -35,6 +35,16 @@ export type { SeasonInfoScreenProps } from '@/pages/season/ui/SeasonInfoScreen'
 export { SEASON_INFO_MENU } from '@/widgets/season/lib/seasonInfoMenu'
 export type { SeasonInfoAction, SeasonInfoMenuEntry } from '@/widgets/season/lib/seasonInfoMenu'
 
+/** 공용 선수 고르기 0xdf (목적 1·2) → 선수 카드 0xd9 ↔ 능력치 상세 창 0xda (글 0x897e8) */
+export { SeasonPlayerPickScreen } from '@/pages/season/ui/SeasonPlayerPickScreen'
+export type { SeasonPlayerPickScreenProps } from '@/pages/season/ui/SeasonPlayerPickScreen'
+export { SeasonPlayerCardScreen } from '@/pages/season/ui/SeasonPlayerCardScreen'
+export type { SeasonPlayerCardScreenProps } from '@/pages/season/ui/SeasonPlayerCardScreen'
+export {
+  seasonCardAbilitiesOf, seasonDetailEffectiveOf, seasonPlayerDetailViewOf,
+} from '@/pages/season/lib/seasonPlayerDetail'
+export type { SeasonCardAbility, SeasonPlayerDetailContext } from '@/pages/season/lib/seasonPlayerDetail'
+
 /** 경기 뒤 마무리 0xf1 — 같은 날 다른 네 경기 결과판 (그림 0xb400) */
 export { DayResultBoardScreen } from '@/pages/season/ui/DayResultBoardScreen'
 export type { DayResultBoardScreenProps } from '@/pages/season/ui/DayResultBoardScreen'
