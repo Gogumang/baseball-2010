@@ -22,24 +22,25 @@ const frameImage = (folder: string, frame: number) => `${folder}/${String(frame)
 
 interface NationalCupStandingsProps {
   readonly cup: NationalCup
-  /** 확인(−5/0x35) — 다음 경기 또는 결과 화면으로 */
+  /** 확인(−5/0x35) — 경기 준비로 (142 · 0xdd) */
   readonly onConfirm: () => void
   /**
-   * 확인 칸을 받는가. 결과 팝업이 떠 있는 동안에는 원본도 키를 팝업이 가져가므로 끈다
-   * (그때도 순위표 자체는 팝업 뒤에 그대로 남는다).
+   * 확인 칸을 받는가 (기본 참).
    */
   readonly isConfirmable?: boolean
 }
 
 /**
- * 국가대항전 순위 화면 (나만의리그 상태 134 `0x19f30` · 시즌모드 상태 243 `0xe684`).
+ * 국가대항전 둘째 화면 = 순위표 (나만의리그 상태 135 그림 `0x168dc → 0x168a4` · 시즌모드 0xf4 그림 `0xae5c → 0xae24`).
+ * 대진판(134 · 0xf3, `NationalCupBracket`)에서 확인하면 온다. 키: 확인 → 142 / 0xdd (나리 0x10680 · 시즌 0x4a18),
+ * 시즌만 취소 → 0xf3.
  *
  * 그리기는 **팀 순위표 `0x7f070` 그대로**다. 그 함수는 `L+0xac`(국가대항전 진행 플래그)가 서 있으면
  * `7f1d2` 에서 **4줄** 만 그린다 — 정규 10줄 대신 참가 4국이다 (P5·P6 확정).
  * 줄 차례는 `0xb7f0c` 순위(승 내림차순 → 패 오름차순 → 한·일·쿠·미)이고,
  * 팀 이름표는 `img_text 65 + 팀번호` 라 10~13 이 75~78 이다.
  *
- * 들어올 때 `0x19f30`/`0xe684` 가 하는 **히든 팀 열기**와 **대한민국 투수 스태미나 회복**은 화면이 아니라
+ * 134 진입 `0x19f30`(시즌 0xf3 진입 `0xe684`)이 하는 **히든 팀 열기**와 **대한민국 투수 스태미나 회복**은 화면이 아니라
  * 대회 처리 쪽 일이라 여기 없다 — `nationalCupFlow.hiddenTeamsToOpen` 과
  * `nationalCup.NATIONAL_CUP_FULL_STAMINA` 참고.
  */

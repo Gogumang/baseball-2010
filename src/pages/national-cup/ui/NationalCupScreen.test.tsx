@@ -8,8 +8,8 @@ import type { NationalCupMode } from '@/entities/national-cup/model/nationalCupF
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
 /**
- * 국가대항전 한 바퀴 — 순위 → 매치업 → (경기) → … → 결과 팝업 → 보상 팝업.
- * 원본 상태로는 `134 → 135 → 142 → … → 134 키` (나리) / `243 → 244 → 221 → … → 243 키` (시즌)다.
+ * 국가대항전 한 바퀴 — 대진판(0x85af4) → 순위표(0x7f070) → (경기) → … → 결과 팝업 → 보상 팝업.
+ * 원본 상태로는 `134 → 135 → 142 → … → 134 키` (나리) / `0xf3 → 0xf4 → 0xdd → … → 0xf3 키` (시즌)다.
  */
 
 afterEach(cleanup)
@@ -44,15 +44,17 @@ const 띄우기 = (
 const 확인 = () => fireEvent.click(screen.getByRole('button', { name: '확인' }))
 
 describe('경기가 남았을 때', () => {
-  it('순위 화면에서 확인하면 매치업이 뜨고, 거기서 경기로 넘어간다', () => {
+  it('대진판(134 · 0xf3)에서 확인하면 순위표(135 · 0xf4)가 뜨고, 거기서 확인하면 경기로 넘어간다', () => {
     const onStartGame = vi.fn()
     띄우기(createNationalCup(), { onStartGame })
 
-    expect(screen.getByRole('group', { name: '국가대항전 순위' })).toBeTruthy()
-    확인()
     expect(screen.getByRole('group', { name: '국가대항전 대진' })).toBeTruthy()
+    expect(screen.queryByRole('group', { name: '국가대항전 순위' })).toBeNull()
+    확인()
+    expect(screen.getByRole('group', { name: '국가대항전 순위' })).toBeTruthy()
+    expect(screen.queryByRole('group', { name: '국가대항전 대진' })).toBeNull()
 
-    fireEvent.click(screen.getByRole('button', { name: '경기 시작' }))
+    확인()
     expect(onStartGame).toHaveBeenCalledTimes(1)
     expect(onStartGame.mock.calls[0][0]).toEqual({ myTeam: 10, opponent: 11 })
   })
@@ -145,18 +147,18 @@ describe('머리띠·바닥 (0x7f4ec ← 시즌 틀 0xb810 · 나리 틀 0x16928
   const 되돌아가기그림 = (container: HTMLElement) =>
     [...container.querySelectorAll('img')].some((node) => node.getAttribute('src')?.endsWith('game_frame/021.png'))
 
-  it('시즌 0xf3(순위)은 제목 10 · 바닥 1 — 되돌아가기가 없다', () => {
+  it('시즌 0xf3(대진판)은 제목 10 · 바닥 1 — 되돌아가기가 없다', () => {
     const { container } = 띄우기(createNationalCup(), { mode: '시즌모드' })
     expect(되돌아가기그림(container)).toBe(false)
   })
 
-  it('시즌 0xf4(매치업)는 바닥 5 — 되돌아가기(−16)는 0xf3 으로 (0x4a18)', () => {
+  it('시즌 0xf4(순위표)는 바닥 5 — 되돌아가기(−16)는 0xf3 대진판으로 (0x4a18)', () => {
     띄우기(createNationalCup(), { mode: '시즌모드' })
     확인()
     const 단추 = 되돌아가기단추()
     expect(단추).toBeTruthy()
     fireEvent.click(단추 as HTMLElement)
-    expect(screen.getByRole('group', { name: '국가대항전 순위' })).toBeTruthy()
+    expect(screen.getByRole('group', { name: '국가대항전 대진' })).toBeTruthy()
   })
 
   it('나리 134·135 는 바닥 5 지만 취소 길이 없다 — 표시만 그리고 눌리지 않는다 (0x19fdc · 0x10680)', () => {

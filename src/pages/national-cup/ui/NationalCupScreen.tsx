@@ -13,7 +13,7 @@ import {
   nationalCupRewardText,
 } from '@/entities/national-cup/model/nationalCupFlow'
 import type { NationalCupFinish, NationalCupMode } from '@/entities/national-cup/model/nationalCupFlow'
-import { NationalCupMatchup } from '@/pages/national-cup/ui/NationalCupMatchup'
+import { NationalCupBracket } from '@/pages/national-cup/ui/NationalCupBracket'
 import { NationalCupStandings } from '@/pages/national-cup/ui/NationalCupStandings'
 
 export interface NationalCupScreenProps {
@@ -41,24 +41,31 @@ export interface NationalCupScreenProps {
   readonly onFinish: (finish: NationalCupFinish, cup: NationalCup) => void
 }
 
-type Step = '순위' | '매치업' | '결과' | '보상'
+type Step = '대진' | '순위' | '결과' | '보상'
 
 /**
- * 국가대항전 화면 한 벌 — 순위 → 매치업 → (경기) → … → 결과 → 보상.
+ * 국가대항전 화면 한 벌 — 대진 → 순위 → (경기) → … → 결과 → 보상.
  *
  * 원본 한 바퀴 (나만의리그, P5 5절):
  * ```
- * 133 → 114(이벤트 461) → 134[순위] → 키 → 135[매치업] → 키 → 142[경기 준비] → 사람 경기
+ * 133 → 114(이벤트 461) → 134[대진판 0x85af4] → 키 → 135[순위표 0x7f070] → 키 → 142[경기 준비] → 사람 경기
  *     → 결과 장면 0x4ea0c (같은 라운드 CPU 경기 0xc2dac · 하루 끝 0xb818c)
  *     → 101 재진입(0x1c154, S+0x12c 면) → 134 …  (4번)
  *     → 대회 끝이면 134 키에서 결과 팝업 0x25 → 0x1b92c → 우승이면 보상 팝업 0x26 → 새 시즌
  * ```
- * 시즌모드는 `242 → 211 → 243[순위] → 244[매치업] → 221 → 0x4b50 → 243 …` 로 상태 번호만 다르다.
+ * 시즌모드는 `0xf2 → 0xd3 → 0xf3[대진판] → 0xf4[순위표] → 0xdd → … → 0xf3 …` 로 상태 번호만 다르다.
+ *
+ * **그림** (직접 떴다): 134 · 0xf3 그림(0x19fc8 · 0xe6e4)은 둘 다 `0x85af4` 하나만 부른다 — 단계(`S+0x12d`)별
+ * mode_ui 프레임 66/67/68 대진판(`NationalCupBracket`). 135 · 0xf4 그림(0x168dc → 0x168a4 · 0xae5c → 0xae24)은
+ * `0x7f070(ui, L)` 순위표 4줄 + 0x7f4ec(`NationalCupStandings`). 예전 웹은 이 둘을 거꾸로("순위 → 매치업") 두고
+ * 매치업 자리에 원본에 없는 "VS" 판(근사)을 그렸다 — 원본 차례·그림대로 바로잡았다.
+ * 대회가 끝나 결과 팝업이 뜨는 동안에도 뒤 그림은 134 · 0xf3 의 대진판이다(단계 0 → 프레임 68 우승국,
+ * 결승 동전 던지기면 단계 1 그대로 프레임 67).
  *
  * ⚠️ 이벤트 461~464(선발·거절)와 경기 자체는 이 화면 밖이다 — 앱이 잇는다.
  *
  * **머리띠·바닥** (직접 떴다): 두 그림 모두 끝에서 0x7f4ec(판)로 판에 맡긴 제목·바닥을 0x54d95 에 넘긴다 —
- * 순위(134 0x19fc8 / 0xf3 0xe6e4 → 0x85af4, 끝 0x85e36) · 매치업(135 0x168dc → 0x168a4 / 0xf4 0xae5c → 0xae24, 끝 0x7f4ed).
+ * 대진(134 0x19fc8 / 0xf3 0xe6e4 → 0x85af4, 끝 0x85e36) · 순위(135 0x168dc → 0x168a4 / 0xf4 0xae5c → 0xae24, 끝 0x7f4ed).
  * - 시즌 틀 0xb810: 0xf3 → 제목 10 · **바닥 1**(0xb88e~0xb8a6), 0xf4 는 "그 밖" → 10 · **5**.
  * - 나리 틀 0x16928: 0x86 · 0x87 둘 다 "그 밖"(0x169ea~0x16a08) → 제목 [장면+0xcc] == 4 ? 8 : 9 · **5**.
  *   나리 135 키 0x10680 은 확인만 본다 — 취소 길이 없어 되돌아가기 표시는 그려도 눌리지 않는다.
@@ -67,19 +74,19 @@ type Step = '순위' | '매치업' | '결과' | '보상'
 export function NationalCupScreen({
   mode, cup, yearIndex, gamePoint = 0, random, onStartGame, onFinish,
 }: NationalCupScreenProps) {
-  const [step, setStep] = useState<Step>('순위')
+  const [step, setStep] = useState<Step>('대진')
   /** 동전 던지기(`0xb858c`)가 우승국을 바꿀 수 있어 확인 뒤 대회를 따로 들고 있는다 */
   const [resolved, setResolved] = useState<NationalCup>(cup)
 
   const edition = nationalCupEditionOf(yearIndex)
-  const current = step === '순위' || step === '매치업' ? cup : resolved
+  const current = step === '대진' || step === '순위' ? cup : resolved
   const matchup = nationalCupMatchupOf(cup)
   const finish = finishNationalCup(mode, resolved)
   const championName = TEAMS[resolved.champion]?.name ?? ''
 
-  const confirmStandings = () => {
+  const confirmBracket = () => {
     const next = confirmNationalCupStandings(cup, random)
-    if (next.kind === '다음경기') return setStep('매치업')
+    if (next.kind === '다음경기') return setStep('순위')
     setResolved(next.cup)
     setStep('결과')
   }
@@ -92,23 +99,18 @@ export function NationalCupScreen({
 
   return (
     <RawScreen>
-      {step === '매치업' && matchup !== null ? (
-        <NationalCupMatchup
-          cup={cup}
-          matchup={matchup}
-          edition={edition}
-          onStart={() => onStartGame(matchup, cup)}
-          // 시즌 0x4a18 만 −16 → 0xf3. 나리 0x10680 은 확인만 본다
-          {...(mode === '시즌모드' ? { onBack: () => setStep('순위') } : {})}
-        />
+      {step === '순위' && matchup !== null ? (
+        // 135 키 0x10680 · 0xf4 키 0x4a18: 확인 → 142 경기 준비 / 0xdd 경기정보
+        <NationalCupStandings cup={cup} onConfirm={() => onStartGame(matchup, cup)} />
       ) : (
-        <NationalCupStandings cup={current} onConfirm={confirmStandings} isConfirmable={step === '순위'} />
+        <NationalCupBracket cup={current} onConfirm={confirmBracket} isConfirmable={step === '대진'} />
       )}
 
       {/* 시즌 0xf3 은 제목 10 · 바닥 1, 0xf4 는 10 · 5. 나리 134·135 는 타자편 제목(8) · 5 — 되돌아가기는 표시만 */}
       {mode === '시즌모드'
         ? <ScreenFrame title="시즌모드" gamePoint={gamePoint}
-            onBack={step === '매치업' ? () => setStep('순위') : null} />
+            // 0xf4 키 0x4a18 만 −16 → 0xf3. 나리 0x10680 은 확인만 본다
+            onBack={step === '순위' ? () => setStep('대진') : null} />
         : <ScreenFrame title="나만의리그타자편" gamePoint={gamePoint} onBack={null} footer={5} />}
 
       {step === '결과' && (
