@@ -456,6 +456,42 @@ export function seasonEvaluationJingleIdOf(popularityChange: number): number {
 }
 
 /**
+ * 새 해 `0x6e0c` — 결산을 닫은 뒤(국가대항전이 없는 해)와 **국가대항전 결과 팝업을 닫은 뒤**(`0x896c` →
+ * `0x8a56`/`0x8b10` 보상 → `0x8b88: bl 0x6e0c`) 두 자리가 같은 함수를 부른다.
+ *
+ * ```
+ * e = 0xa3084(SR)                 ; 연차 idx 가 9(isFinalYear)가 아니면 −1
+ * e ≥ 0: 저장+0xa0+e = 1, phase = 6, 저장, 이벤트 500 → 0xd3 → 0xf5(엔딩)
+ * e < 0: phase = 1 · 0xa305c(리그 초기화) · 연차 +1 · 사기 100 · CPU 9팀 +30 → 0xc9
+ * ```
+ * 리그 초기화 `0xa305c → 0xb7b34` 가 **L = SR+0x80 을 0xf8 바이트 memset** 하므로 국가대항전 플래그
+ * `SR+0x12c`(= L+0xac)도 여기서 0 이 된다 — `startNextYear` 주석 참고.
+ */
+function nextYearOf(save: SeasonSave): { readonly save: SeasonSave; readonly scene: SeasonSceneState } {
+  const { record } = save.state
+  // 0x6e0c 머리 — 마지막 해(연차 idx 9)면 새 해 대신 **엔딩**이다.
+  // `judgeSeasonEnding` 이 0~4 를 돌려주는 해가 곧 `isFinalYear` 인 해라 둘은 같은 조건이다.
+  if (isFinalYear(record) && judgeSeasonEnding(record) !== null) {
+    return {
+      save: { ...save, state: { ...save.state, record: { ...record, phase: SEASON_PHASE.엔딩 } } },
+      scene: SEASON_SCENE_STATE.엔딩,
+    }
+  }
+  // 새 해로 넘어가며 리그 전적·선수 성적을 비운다 (정규시즌 표는 해마다 새로 센다)
+  return {
+    save: {
+      ...save,
+      state: startNextYear(save.state),
+      league: EMPTY_LEAGUE,
+      playerStats: EMPTY_LEAGUE_PLAYER_STATS,
+      series: null,
+      ranking: [],
+    },
+    scene: SEASON_SCENE_STATE.관리메뉴,
+  }
+}
+
+/**
  * @param wallet 전역 G 지갑(`useGamePointWallet`). 넘기면 **지갑이 G 의 주인**이고
  *   시즌은 자기 주머니를 안 쓴다. 안 넘기면 예전처럼 세션 주머니로 논다(테스트용) —
  *   그 자리는 새로 고치면 사라진다.
@@ -1263,25 +1299,27 @@ export function useSeasonSession(
     [enterMatchInfo, optionsFor, save],
   )
 
-  /** 대회 끝 — 보상을 넣고 히든 팀을 연 뒤 관리 메뉴로 돌아간다 */
+  /**
+   * 대회 끝 — 결과 팝업을 닫으면(`0x896c`) 보상을 넣고(`0x8a56`/`0x8b10`) **곧장 새 해 `0x6e0c`** 다
+   * (`0x8b88: bl 0x6e0c`, S6 1-2). 새 해의 리그 초기화가 국가대항전 플래그 `SR+0x12c` 를 함께 지운다.
+   */
   const finishCup = useCallback(
     (finish: NationalCupFinish) => {
       if (save === null) return
       const record = applySeasonReward(save.state.record, finish.reward)
-      commit({
+      const next = nextYearOf({
         ...save,
-        // ⚠️ **사용자 판단 대기**: 원본은 여기서도 `nationalCup` 을 내리지 않는다.
-        //    그대로 두면 다음 정규 경기마다 다시 대회 화면으로 샌다 (S6 1절).
         state: { ...save.state, record: { ...record, nationalCupChampion: finish.champion } },
         cup: null,
         cupRoster: null,
       })
+      commit(next.save)
       setNotice(
         finish.openedTeams.length === 0
           ? '국가대항전이 끝났습니다.'
           : `국가대항전이 끝났습니다.!N히든 팀이 열렸습니다: ${finish.openedTeams.join(', ')}`,
       )
-      setScene(SEASON_SCENE_STATE.관리메뉴)
+      setScene(next.scene)
     },
     [commit, save],
   )
@@ -1421,13 +1459,8 @@ export function useSeasonSession(
   )
 
   /**
-   * 결산을 닫았다 (`0x87b4`) — 연차 idx 가 **짝수**면 국가대항전, 홀수면 곧장 새 해다.
-   * 새 해 `0x6e0c` 는 머리에서 먼저 **10년차 엔딩 판정 `0xa3084`** 를 본다 (P4 1c):
-   * ```
-   * e = 0xa3084(SR)                 ; 연차 idx 가 9(isFinalYear)가 아니면 −1
-   * e ≥ 0: 저장+0xa0+e = 1, phase = 6, 저장, 이벤트 500 → 0xd3 → 0xf5(엔딩)
-   * e < 0: 연차 +1 · 리그 초기화 · CPU 9팀 +30 → 0xc9
-   * ```
+   * 결산을 닫았다 (`0x87b4`) — 연차 idx 가 **짝수**면 국가대항전, 홀수면 곧장 새 해 `0x6e0c`(`nextYearOf`)다.
+   * 새 해는 머리에서 먼저 **10년차 엔딩 판정 `0xa3084`** 를 본다 (P4 1c).
    * 예전에는 이 머리 분기가 통째로 빠져 있어 **10년차 엔딩에 영영 닿지 못했다**.
    *
    * ⚠️ 안 옮긴 것 — `저장+0xa0+e = 1`(본 엔딩 종류 표시)는 **전역 저장** 칸이라 웹에 자리가 없다.
@@ -1447,22 +1480,9 @@ export function useSeasonSession(
       })
       return setScene(SEASON_SCENE_STATE.국가대항전)
     }
-    // 0x6e0c 머리 — 마지막 해(연차 idx 9)면 새 해 대신 **엔딩**이다.
-    // `judgeSeasonEnding` 이 0~4 를 돌려주는 해가 곧 `isFinalYear` 인 해라 둘은 같은 조건이다.
-    if (isFinalYear(record) && judgeSeasonEnding(record) !== null) {
-      commit({ ...save, state: { ...save.state, record: { ...record, phase: SEASON_PHASE.엔딩 } } })
-      return setScene(SEASON_SCENE_STATE.엔딩)
-    }
-    // 새 해로 넘어가며 리그 전적·선수 성적을 비운다 (정규시즌 표는 해마다 새로 센다)
-    commit({
-      ...save,
-      state: startNextYear(save.state),
-      league: EMPTY_LEAGUE,
-      playerStats: EMPTY_LEAGUE_PLAYER_STATS,
-      series: null,
-      ranking: [],
-    })
-    setScene(SEASON_SCENE_STATE.관리메뉴)
+    const next = nextYearOf(save)
+    commit(next.save)
+    setScene(next.scene)
   }, [commit, save])
 
   /**

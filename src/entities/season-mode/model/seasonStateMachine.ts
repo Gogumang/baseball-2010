@@ -100,25 +100,11 @@ export interface SceneEntryInput {
  * 포스트시즌: SR+0xb2 != 0 → 0xef ; phase 0xc → 0xeb | 0xd → 0xec | 0xe → 0xed | 그 밖 → 0xef
  * ```
  *
- * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- * ⚠️ **사용자 판단 대기 — 국가대항전 플래그(`record.nationalCup` = `S+0x12c`)**
- *
- * 원본 시즌모드에는 이 플래그를 **0 으로 되돌리는 코드가 하나도 없다**
- * (S6 1절 확정: `0x12c` 를 만드는 코드 모양이 하나뿐이라 쓰기 15곳을 전수 확인했다.
- *  내리는 줄은 나리 쪽 `0x1b92c`·`0x1b768` 에만 있다 — 복붙 누락형 원본 버그).
- *
- * 그래서 아래 `nationalCup` 가지를 원본대로 두면, 대회가 한 번 열린 뒤부터는
- * **정규 경기가 끝날 때마다 여기서 국가대항전 대진표(0xf3)로 새고 시즌 진행이 막힌다.**
- * 목록 화면의 뒤로가기(`0x83cc` 의 −16 키)도 같은 플래그를 보고 215 대신 244 로 간다.
- *
- * **여기 한 줄을 넣으면 풀린다** — 대회가 끝나는 자리, 즉
- * `seasonRecord.ts` 의 `startNextYear`(원본 `0x6e0c`) 에
- * `nationalCup: false` 한 줄을 더하면 된다. (나리 `0x1b92c` 가 하는 일과 같다.)
- * `clearNationalCup()` 를 그 한 줄로 쓰라고 아래에 만들어 두었다 — **지금은 아무도 부르지 않는다.**
- *
- * DECISIONS.md 2026-09-20 항목에 "사용자 판단 대기" 로 올라가 있어 임의로 고치지 않았다.
- * 다만 웹판엔 국가대항전 자체가 아직 없으므로 지금 당장 막히는 것은 없다.
- * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ * 국가대항전 플래그(`record.nationalCup` = `SR+0x12c`)는 대회 시작(상태 242 `0xe600`)에 서고
+ * 대회 끝 `0x896c` → 새 해 `0x6e0c` 의 리그 초기화 memset(`0xa305c` → `0xb7b34`)에서 내려간다
+ * (`seasonRecord.startNextYear` 주석). 그래서 이 가지는 **대회가 진행 중일 때 저장에서 이어 들어온 경우**에만 탄다.
+ * ⚠️ S6 1절·DECISIONS 2026-09-20 의 "내리는 코드가 없다(시즌이 막히는 원본 버그)" 는 그 memset 을 놓친 결론이다.
+ * 덧붙여 경기 끝 `0x4ea0c` 도 이 플래그가 서 있으면 phase 2 를 쓰지 않는다(4f1ba~4f1ca: L+0x34·L+0xac 둘 다 0 일 때만).
  *
  * (참고: S6 1-4 는 같은 함수를 줄여 적으면서 `phase 6·7 → 0xee` 로 옮겼지만,
  *  phase 6 을 세우는 자리가 엔딩 경로(`0x6e0c`)라 **P4 1a 의 `→ 0xf5`(엔딩)** 를 따랐다.)
@@ -133,7 +119,6 @@ export function enterSeasonScene(record: SeasonRecord, input: SceneEntryInput): 
   if (phase === SEASON_PHASE.포스트시즌시작) return SEASON_SCENE_STATE.포스트시즌시작
   if (phase === SEASON_PHASE.정규시즌순위) return SEASON_SCENE_STATE.정규시즌순위
 
-  // ⚠️ 원본 버그 그대로 — 위 큰 주석 참고. 이 플래그는 시즌모드에서 내려가지 않는다.
   if (record.nationalCup) return SEASON_SCENE_STATE.국가대항전
 
   if (!record.inPostseason) {
@@ -148,15 +133,6 @@ export function enterSeasonScene(record: SeasonRecord, input: SceneEntryInput): 
   if (phase === SEASON_PHASE.투수시상) return SEASON_SCENE_STATE.투수시상
   if (phase === SEASON_PHASE.최우수선수) return SEASON_SCENE_STATE.최우수선수
   return SEASON_SCENE_STATE.시즌결산
-}
-
-/**
- * ⚠️ **사용자 판단 대기**: 원본에 없는 한 줄이다.
- * 대회가 끝나는 자리(`startNextYear`)에서 이것을 부르면 위 버그가 풀린다.
- * **지금은 어디서도 부르지 않는다** — 원본과 같은 상태로 두었다.
- */
-export function clearNationalCup(record: SeasonRecord): SeasonRecord {
-  return { ...record, nationalCup: false }
 }
 
 /** 관리 메뉴 6칸 (점프표 `0xcbe40`, StrHOWTO[18]) */

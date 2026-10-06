@@ -97,7 +97,7 @@ export interface SeasonRecord {
   /**
    * SR+0x12c = L+0xac — **국가대항전 진행 중** 플래그.
    * ⚠️ P1 이 "포스트시즌 플래그" 로 적은 것은 틀렸다 (P5 확정).
-   * 이 칸을 0 으로 되돌리는 코드가 시즌모드에 **하나도 없다** — `seasonStateMachine.ts` 참고.
+   * 대회 시작(상태 242 `0xe600`)에 1, 새 해 `0x6e0c` 의 리그 초기화 memset 에서 0 이 된다 (`startNextYear` 참고).
    */
   readonly nationalCup: boolean
   /** SR+0x144 — 국가대항전 우승국 (10 = 대한민국) */
@@ -252,8 +252,17 @@ export function startNewSeason(teamId: number, name: string): SeasonState {
  * ```
  * 인기도·평판·소지금은 해를 넘겨 그대로 간다 (초기화 코드가 없다).
  *
- * ⚠️ 국가대항전 플래그(`nationalCup`)를 **내리지 않는다** — 원본 0x6e0c 전 구간에
- * `+0x12c` 를 만지는 줄이 없다(S6 1-2 전수 확인). `seasonStateMachine.ts` 의 경고 참고.
+ * 국가대항전 플래그(`nationalCup` = SR+0x12c)는 **여기서 내려간다.** 리그 초기화 `0xa305c` 가 부르는
+ * `0xb7b34(L)` 가 L(= SR+0x80)을 통째로 지운다 (b7b34~b7b6a, 직접 떴다):
+ * ```
+ * memcpy(tmp, L, 0xf8)      ; 0x1400408
+ * memset(L, 0, 0xf8)        ; 0x1400428 — SR+0x80 ~ SR+0x177, 곧 SR+0x12c(= L+0xac) 포함
+ * L+0x33 = tmp+0x33         ; 연차(SR+0xb3)만 되살린다
+ * L+0x37 = 0xf              ; 우승팀 미정
+ * ```
+ * ⚠️ S6 1절·DECISIONS 2026-09-20 은 "`+0x12c` 를 0 으로 쓰는 strb 가 없다" 는 전수 스캔으로 **리셋이 없다(원본 버그)**
+ * 고 보았지만, 그 스캔은 memset 을 세지 않았다. 원본은 대회 끝(`0x896c` → `0x8b88: bl 0x6e0c`)에서 이 함수를 지나며
+ * 플래그를 지우므로 **시즌이 막히지 않는다.** 그래서 웹도 여기서 내린다 — 지어낸 줄이 아니라 원본 memset 이다.
  */
 export function startNextYear(state: SeasonState): SeasonState {
   const { record } = state
@@ -266,6 +275,8 @@ export function startNextYear(state: SeasonState): SeasonState {
       inPostseason: false,
       postseasonRound: -1,
       postseasonChampion: 0xf,
+      // L+0xac — 위 memset 이 지운다
+      nationalCup: false,
       acted: false,
       popularityAtSeasonStart: record.popularity,
     },

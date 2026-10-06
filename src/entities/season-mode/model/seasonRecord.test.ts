@@ -82,10 +82,10 @@ describe('새 해 0x6e0c', () => {
     expect(뒤.record.popularityAtSeasonStart).toBe(700)
   })
 
-  it('⚠️ 국가대항전 플래그를 내리지 않는다 (원본 그대로 — 사용자 판단 대기)', () => {
+  it('국가대항전 플래그를 내린다 — 리그 초기화 0xb7b34 의 memset(SR+0x80, 0, 0xf8) 이 SR+0x12c 를 덮는다', () => {
     const 앞 = startNewSeason(0, 'T')
     const 뒤 = startNextYear({ ...앞, record: { ...앞.record, nationalCup: true } })
-    expect(뒤.record.nationalCup).toBe(true)
+    expect(뒤.record.nationalCup).toBe(false)
   })
 })
 

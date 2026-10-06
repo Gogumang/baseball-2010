@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { opponentOf } from '@/entities/league/model/league'
-import { startNewSeason } from '@/entities/season-mode/model/seasonRecord'
+import { startNewSeason, startNextYear } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import {
   SEASON_END_CHAIN,
@@ -8,7 +8,6 @@ import {
   SEASON_SCENE_STATE,
   afterGameNext,
   afterKoreanSeries,
-  clearNationalCup,
   enterSeasonScene,
   isRegularSeasonOver,
   managementMenuTarget,
@@ -61,16 +60,18 @@ describe('진입 분기 0xcb (0x4b50)', () => {
   })
 })
 
-describe('⚠️ 국가대항전 플래그가 안 내려가는 원본 버그', () => {
-  it('플래그가 서 있으면 정규시즌 경기 뒤마다 대진표로 샌다 — 시즌 진행이 막힌다', () => {
+describe('국가대항전 플래그 SR+0x12c (0x4bc2)', () => {
+  it('대회 중에 이어 들어오면 phase 다음에 대진표로 간다', () => {
     const record = 기본({ nationalCup: true, phase: 3, games: 4 })
-    // 원래대로면 관리 메뉴가 열릴 자리인데 대진표로 빠진다
     expect(enterSeasonScene(record, 저장있음)).toBe(SEASON_SCENE_STATE.국가대항전)
-    expect(enterSeasonScene({ ...record, games: 5 }, 저장있음)).toBe(SEASON_SCENE_STATE.국가대항전)
+    // phase 2(경기끝) 는 플래그보다 먼저 본다
+    expect(enterSeasonScene({ ...record, phase: SEASON_PHASE.경기끝 }, 저장있음)).toBe(SEASON_SCENE_STATE.관중수입)
   })
 
-  it('한 줄(clearNationalCup)을 넣으면 풀린다 — 지금은 아무도 부르지 않는다', () => {
-    const record = clearNationalCup(기본({ nationalCup: true, phase: 3, games: 4 }))
+  it('새 해 0x6e0c 의 리그 초기화 memset 이 플래그를 지워 정규 흐름으로 돌아온다', () => {
+    const state = { ...startNewSeason(0, '테스트'), record: 기본({ nationalCup: true, phase: 3, games: 0 }) }
+    const record = startNextYear(state).record
+    expect(record.nationalCup).toBe(false)
     expect(enterSeasonScene(record, 저장있음)).toBe(SEASON_SCENE_STATE.관리메뉴)
   })
 })

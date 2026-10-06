@@ -502,6 +502,33 @@ describe('시즌 끝 사슬', () => {
     expect(result.current.scene).toBe(SEASON_SCENE_STATE.국가대항전)
     expect(result.current.cup).not.toBeNull()
   })
+
+  it('대회가 끝나면 곧장 새 해 0x6e0c — 리그 초기화 memset 이 국가대항전 플래그를 지운다 (0x8b88 → 0xa305c → 0xb7b34)', () => {
+    const { result } = 띄우기()
+    act(() => result.current.actions.chooseTeam(0))
+    act(() => result.current.actions.confirmIncome({
+      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
+    }))
+    act(() => result.current.actions.updateRecord({ ...result.current.state!.record, yearIndex: 2 }))
+    act(() => result.current.actions.finishSeason())
+    expect(result.current.state?.record.nationalCup).toBe(true)
+
+    act(() => result.current.actions.finishCup({
+      champion: 11,
+      isKoreaChampion: false,
+      koreaInFinal: false,
+      reward: { popularity: 0, reputation: 0, money: 0, gamePoint: 0, messageId: 0 },
+      openedTeams: [],
+    }))
+
+    const record = result.current.state!.record
+    expect(record.nationalCup).toBe(false)
+    expect(record.yearIndex).toBe(3)
+    expect(record.inPostseason).toBe(false)
+    expect(record.games).toBe(0)
+    expect(result.current.cup).toBeNull()
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.관리메뉴)
+  })
 })
 
 describe('포스트시즌', () => {
