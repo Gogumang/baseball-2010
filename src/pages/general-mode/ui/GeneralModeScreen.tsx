@@ -180,6 +180,7 @@ export function GeneralModeScreen(props: GeneralModeScreenProps) {
           <MatchInfoScreen
             setup={flow.setup}
             isQuickStart={flow.isQuickStart}
+            isSettingsOpen={session.isSettingsOpen}
             userStarterName={session.userStarterName}
             cpuMatchInfo={session.cpuMatchInfo}
             onStart={actions.start}

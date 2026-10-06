@@ -126,3 +126,26 @@ describe('머리띠·바닥띠 (ScreenFrame)', () => {
     expect(onOpenSettings).toHaveBeenCalled()
   })
 })
+
+describe('바닥 (0x2e0c4 모드 1 갈래)', () => {
+  const marks = (container: HTMLElement) =>
+    [...container.querySelectorAll('img[data-footer-mark]')].map((node) => Number((node as HTMLElement).dataset.footerMark))
+  // "0경기설정"(프레임 6)은 18틱 중 앞 9틱만 그린다 — 첫 그림(갱신 0)은 켜져 있다
+
+  it('보통은 0x44 — "0경기설정" + 되돌아가기', () => {
+    const { container } = 띄우기()
+    expect(marks(container)).toEqual([6])
+    expect(screen.getByRole('button', { name: '되돌아가기' })).toBeTruthy()
+  })
+
+  it('빠른실행이면 0x64 — "#재선택"(프레임 5)이 붙는다', () => {
+    const { container } = 띄우기({ isQuickStart: true })
+    expect(marks(container)).toEqual([5, 6])
+  })
+
+  it('설정 창이 떠 있으면 4 — 되돌아가기만 (0x20 끄고 0x40 뒤집기)', () => {
+    const { container } = 띄우기({ isQuickStart: true, isSettingsOpen: true })
+    expect(marks(container)).toEqual([])
+    expect(screen.getByRole('button', { name: '되돌아가기' })).toBeTruthy()
+  })
+})
