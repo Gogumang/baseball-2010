@@ -9,6 +9,8 @@ import { isEventZoneHit } from '@/entities/home-run-derby/model/eventZone'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import { LOSE_SOUND, WIN_SOUND } from '@/features/play-game/model/gameSounds'
 import { activeSound, playSoundIds } from '@/shared/api/audio/soundPort'
+import type { RandomPort } from '@/shared/api/random/randomPort'
+import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
 
 /** 공 하나의 결과를 보여 주는 시간 — 타석 화면들이 쓰는 값과 같다 (원본에 없는 웹판 연출) */
 const BANNER_MILLISECONDS = 1_500
@@ -23,6 +25,25 @@ export interface HomeRunDerbyOptions {
    * 0xd88aa(0xb6414) 로 이 칸을 본다 — `derbyPitcherOf` 머리말.
    */
   readonly aceLevels?: Readonly<Record<number, number>>
+  /**
+   * 경기 장면 시작 굴림을 낼 난수 (`rollDerbySceneStart`). 안 넘기면 굴리지 않는다 (예전 시험용).
+   */
+  readonly random?: RandomPort
+}
+
+/**
+ * **홈런더비 경기 시작 굴림 둘** — 상태 9 갱신 0x3f584 의 공통 꼬리 차례 그대로:
+ * ```
+ * 3f856  0x39fdc(scene, 7)  → 모드 7 갈래 3a43e:
+ *          3a44e  r7 = (s8) 0x1f8d5(저장, 4)+1          ; 내 타자편 팀
+ *          3a454  v = rand(0, 9) → sp+0x18 ; v == r7 이면 9   ; 상대 팀 — 0xb6bd5(ctx, 1, v) · 팀 객체 0xb891c
+ * 3fa0e  0xc0dac 시뮬 초기화 → c0df6 rand(0, 2)          ; `rollSimulatorInit` (dcfcef7)
+ * ```
+ * ⚠️ 뽑은 상대 팀(수비 팀)은 웹 더비가 그리지 않아 버린다 — 굴림 차례만 맞춘다.
+ */
+export function rollDerbySceneStart(random: RandomPort): void {
+  random.nextInRange(0, 9)
+  rollSimulatorInit(random)
 }
 
 export interface HomeRunDerbySession {
@@ -49,7 +70,7 @@ export interface HomeRunDerbySession {
  * 비거리는 원본이 타구 궤적의 착지점에서 잰다(0xa600c) — 타석(`resolvePitch`)이 실제로 뽑은 패턴
  * (`detail.pattern`)을 `derbyBattedBallOf` 가 `battedBallFlight` 궤적으로 만든다 (그 파일 머리말 참고).
  */
-export function useHomeRunDerby({ bestDistance, onFinish, aceLevels }: HomeRunDerbyOptions): HomeRunDerbySession {
+export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: HomeRunDerbyOptions): HomeRunDerbySession {
   const [run, setRun] = useState<DerbyRun>(createDerbyRun)
   const [banner, setBanner] = useState('')
   const [isPaused, setIsPaused] = useState(false)
@@ -63,6 +84,16 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels }: HomeRunDe
   bestRef.current = bestDistance
   const onFinishRef = useRef(onFinish)
   onFinishRef.current = onFinish
+  const randomRef = useRef(random)
+  randomRef.current = random
+
+  // 장면에 들어선 첫 그림 뒤 한 번 — 첫 공(상태 0xd → 투구)보다 앞이다. StrictMode 의 효과 두 번 돌기에도 한 번만
+  const isSceneStartRolledRef = useRef(false)
+  useEffect(() => {
+    if (isSceneStartRolledRef.current || randomRef.current === undefined) return
+    isSceneStartRolledRef.current = true
+    rollDerbySceneStart(randomRef.current)
+  }, [])
 
   const timerRef = useRef<number | null>(null)
   const clearTimer = () => {
@@ -131,6 +162,8 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels }: HomeRunDe
 
   const restart = useCallback(() => {
     clearTimer()
+    // 다시하기도 경기 장면을 새로 세운다 — 같은 시작 굴림 둘 (⚠️ 다시하기가 상태 7 → 9 를 다시 타는지는 유력)
+    if (randomRef.current !== undefined) rollDerbySceneStart(randomRef.current)
     const fresh = createDerbyRun()
     runRef.current = fresh
     setRun(fresh)

@@ -120,3 +120,33 @@ describe('홈런더비 한 판', () => {
     expect(rendered.result.current.pitcher.pitchType).toBe(1)
   })
 })
+
+describe('경기 시작 굴림 — 0x39fdc 모드 7 갈래 3a454 rand(0, 9) 뒤 0xc0dac 의 rand(0, 2) (0x3f584 공통 꼬리)', () => {
+  function 기록난수() {
+    const calls: [number, number][] = []
+    const random = {
+      next: () => 0,
+      nextInRange: (min: number, max: number) => {
+        calls.push([min, max])
+        return min
+      },
+      pick: <T,>(items: readonly T[]) => items[0],
+    }
+    return { random, calls }
+  }
+
+  it('들어서면 한 번 — 다시 그려도 더 굴리지 않는다', () => {
+    const { random, calls } = 기록난수()
+    const rendered = renderHook(() => useHomeRunDerby({ bestDistance: 0, random }))
+    expect(calls).toEqual([[0, 9], [0, 2]])
+    rendered.rerender()
+    expect(calls).toEqual([[0, 9], [0, 2]])
+  })
+
+  it('다시하기도 새 장면이라 같은 둘을 또 굴린다', () => {
+    const { random, calls } = 기록난수()
+    const rendered = renderHook(() => useHomeRunDerby({ bestDistance: 0, random }))
+    act(() => rendered.result.current.restart())
+    expect(calls).toEqual([[0, 9], [0, 2], [0, 9], [0, 2]])
+  })
+})
