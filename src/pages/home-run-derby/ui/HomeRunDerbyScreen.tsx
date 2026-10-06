@@ -102,7 +102,7 @@ export function HomeRunDerbyScreen({
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
   /**
    * 결과 창의 "예"(재도전)는 메인 메뉴 하위 39 를 거쳐 모드 7 장면을 **새로 세운다** — 타석 캔버스도 새로 띄운다
-   * (하늘 행 굴림이 새 장면마다 한 번이다). 경기 중 메뉴의 다시하기는 예전처럼 같은 캔버스를 쓴다.
+   * (하늘 행 굴림이 새 장면마다 한 번이다). 경기 중 메뉴의 다시하기도 같은 길(0x3c98e → 0x27)이라 캔버스를 새로 띄운다.
    */
   const [stageSerial, setStageSerial] = useState(0)
   const isResultShown = session.result !== null
@@ -168,6 +168,8 @@ export function HomeRunDerbyScreen({
             onQuit={onExit}
             onRestart={() => {
               menu.close()
+              // 다시하기도 결과 창 [예]와 같이 경기 장면 0x104 를 새로 세운다(0x3c9d8 → 0x27) — 타석 캔버스도 새로 띄운다
+              setStageSerial((serial) => serial + 1)
               session.restart()
             }}
             onOpenHelp={() => {
@@ -227,7 +229,7 @@ export function HomeRunDerbyScreen({
               heldGamePoint={gamePoint}
               onRetry={() => {
                 setStageSerial((serial) => serial + 1)
-                session.restart()
+                session.retryFromResult()
               }}
               onExit={onExit}
             />

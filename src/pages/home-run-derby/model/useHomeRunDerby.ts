@@ -99,7 +99,10 @@ export interface HomeRunDerbySession {
   /** 판이 끝났으면 결과, 아니면 null */
   readonly result: DerbyResult | null
   readonly onPitchResolved: (detail: PitchOutcomeDetail) => void
+  /** 경기 중 메뉴 [다시하기] 예 — 새 경기 장면 (0x3c98e 모드 7 갈래, `restart` 머리말) */
   readonly restart: () => void
+  /** 결과 창 [예] — 단계 > 0 이면 rand(1, 4) 를 하나 더 굴린 뒤 `restart` 와 같다 (0x40a08) */
+  readonly retryFromResult: () => void
 }
 
 /**
@@ -327,14 +330,21 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
     }, BANNER_MILLISECONDS)
   }, [])
 
+  /**
+   * **다시하기 = 경기 장면을 새로 세운다 (확정)**. 경기 중 메뉴 [다시하기](0x3c706 → StrGAME[7] 질문 → 하위 3) 의 예
+   * 처리 0x3c98e: `0x20094(앱, 5)` · 장면+0x17f9 = 1 → 모드 7 이면(0x3c9d2) 전역 0x140006c = 0x27 · `0xbc291(…, 0x103)`
+   * (0x3c9d8~0x3c9e8) — 결과 창 [예](0x40a98) 와 같은 길이다. 메인 메뉴 하위 0x27 → 0x32988 → 0x327b8(this, 7) →
+   * 경기 장면 0x104 를 새로 만들고, 그 초기화 0x3301c 가 `0xbcb49(장면+0x18, 7)`(0x330fe)로 **상태 7 → 9 → 8 → 0xd** 를
+   * 처음부터 탄다 — 시작 굴림 rand(0, 9) · rand(0, 2) 도 다시 돈다(U-79 확정). 0x20094 모드 5 갈래(0x1ff98)에는 굴림이 없다.
+   */
   const restart = useCallback(() => {
     clearTimer()
     // 경기 시작 상태 9 의 0x39868 이 +0x84 · 표시(+0x1b60) · +0x19ec 를 지운다
     clearComboTimer()
     setShownCombo(null)
-    // 경기 시작과 같이 적재 8 → 0xd → 0xe 로 와서 OK 를 기다린다 (⚠️ 아래 7 → 9 를 다시 타는지와 함께 유력)
+    // 경기 시작과 같이 적재 8 → 0xd → 0xe 로 와서 OK 를 기다린다
     enterScenePrepare()
-    // 다시하기도 경기 장면을 새로 세운다 — 같은 시작 굴림 둘 (⚠️ 다시하기가 상태 7 → 9 를 다시 타는지는 유력)
+    // 새 경기 장면의 상태 9 — 같은 시작 굴림 둘
     if (randomRef.current !== undefined) rollDerbySceneStart(randomRef.current)
     const fresh = createDerbyRun()
     runRef.current = fresh
@@ -344,6 +354,16 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
     setIsEventZoneShown(false)
     setResult(null)
   }, [])
+
+  /**
+   * 결과 창 [예] 0x40a08 (0x40a54~0x40a98): +0x17f9(예) 이고 단계 state+0x38 > 0 이면
+   * `r = rand(1, 4)` → `0xb89dc([장면+0x224], r)` 기록 0x30 바이트를 지금 투수 `0xae83c([장면+0x224])` 에 복사한 뒤 0x27.
+   * ⚠️ 복사는 웹에 상대 팀 기록이 없어 굴림 차례만 맞춘다 (뜻은 미해결 — 마투수로 덮인 상대 투수 칸을 팀의 r 번째 투수로 되돌리는 것으로 보인다).
+   */
+  const retryFromResult = useCallback(() => {
+    if (runRef.current.stage > 0 && randomRef.current !== undefined) randomRef.current.nextInRange(1, 4)
+    restart()
+  }, [restart])
 
   return {
     run,
@@ -357,5 +377,6 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
     result,
     onPitchResolved,
     restart,
+    retryFromResult,
   }
 }

@@ -301,4 +301,23 @@ describe('경기 시작 굴림 — 0x39fdc 모드 7 갈래 3a454 rand(0, 9) 뒤 
     act(() => rendered.result.current.restart())
     expect(calls).toEqual([[0, 9], [0, 2], [0, 9], [0, 2]])
   })
+
+  it('결과 창 [예]는 단계 0 이면 다시하기와 같다 (0x40a5e 단계 ≤ 0 → 0x40a98)', () => {
+    const { random, calls } = 기록난수()
+    const rendered = renderHook(() => useHomeRunDerby({ bestDistance: 0, random }))
+    act(() => rendered.result.current.retryFromResult())
+    expect(calls).toEqual([[0, 9], [0, 2], [0, 9], [0, 2]])
+  })
+
+  it('결과 창 [예]는 단계 > 0 이면 rand(1, 4) 를 먼저 하나 굴린다 (0x40a7e)', () => {
+    const { random, calls } = 기록난수()
+    const rendered = renderHook(() => useHomeRunDerby({ bestDistance: 0, random }))
+    OK(rendered)
+    const 큰홈런: PitchOutcomeDetail = { ...홈런, pattern: [45, 2000, 1500, 0] }
+    for (let index = 0; index < 9 && rendered.result.current.run.stage === 0; index += 1) 한구(rendered, 큰홈런)
+    expect(rendered.result.current.run.stage).toBe(1)
+    calls.length = 0
+    act(() => rendered.result.current.retryFromResult())
+    expect(calls).toEqual([[1, 4], [0, 9], [0, 2]])
+  })
 })
