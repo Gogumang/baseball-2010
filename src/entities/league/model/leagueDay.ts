@@ -32,9 +32,18 @@ import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
 import { rosterPitcherRoleOf } from '@/entities/pitching/model/pitcherChange'
 import {
   EMPTY_LEAGUE_PLAYER_STATS,
+  leaguePitcherAppearancesOf,
   recordLeaguePitcherAppearances,
   recordLeaguePlateAppearances,
 } from '@/entities/league/model/leaguePlayerStats'
+import {
+  EMPTY_DECISION_STATE,
+  REGULATION_LAST_INNING_INDEX,
+  applyPitcherChange,
+  applyRunScored,
+  gameEndDecisionOf,
+} from '@/entities/game/model/winLossSave'
+import type { DecisionState, PitcherOfRecord } from '@/entities/game/model/winLossSave'
 import type {
   LeaguePitcherAppearance,
   LeaguePlateAppearance,
@@ -129,6 +138,10 @@ export interface LeagueGameScore {
    */
   readonly pitcherStaminas: { readonly away: readonly number[]; readonly home: readonly number[] }
 }
+
+/** state 칸 — 초 공격 0 · 말 공격 1 */
+const AWAY_SIDE = 0
+const HOME_SIDE = 1
 
 /** 투수 칸별 스태미나 — 모자란 칸은 가득 */
 function staminaTableOf(given: readonly number[] | undefined): number[] {
@@ -317,6 +330,78 @@ function defenseOf(
 }
 
 /**
+ * 반 이닝 하나 동안의 승·패·세 판정 (S1 확정) — 간이 엔진은 **한 점마다** 득점 처리 `0xa5c34` 를 부르고
+ * (0xc0fb4·0xc1054 가 점수 `0xb6a9d` +1 바로 뒤), 투수가 바뀐 다음 타석 첫머리에 세이브 후보 `0xa60c0` 을 부른다
+ * (0xc262c 의 0xc26a2). 반 이닝 엔진은 판정에 손대지 않으므로 그 결과(타석마다 들어온 점수와 그때 마운드,
+ * 교체 때의 아웃·주자·점수)를 차례대로 다시 밟는다 — 교체는 그 앞까지 들어온 점수(`runsBefore`) 자리에 끼운다.
+ *
+ * 측(side)은 state 칸이다 — 초 공격 칸 0, 말 공격 칸 1. 등번호 자리에는 투수 칸을 넣는다(경기 끝에서
+ * 세이브 투수 = 승리 투수 비교에만 쓰이고, 세이브는 어차피 원본 버그로 안 붙는다).
+ */
+export function decisionsAfterHalfInning(
+  state: DecisionState,
+  half: HalfInningResult,
+  situation: {
+    /** 0-기준 이닝 `state+0x6b` */
+    readonly inningIndex: number
+    /** 공격 칸 `state[9]` (초 0 · 말 1) */
+    readonly offenseSide: number
+    /** 이 반 이닝이 시작될 때 칸별 점수 [칸 0, 칸 1] */
+    readonly scoresBefore: readonly [number, number]
+    /** 공격 팀 마운드(지금은 덕아웃)에 서 있는 투수 칸 — 이 반 이닝 동안 바뀌지 않는다 */
+    readonly offenseMoundSlot: number
+    /** 수비 팀이 이 반 이닝을 시작할 때의 마운드 칸 */
+    readonly defenseMoundSlot: number
+  },
+): DecisionState {
+  const { inningIndex, offenseSide } = situation
+  const defenseSide = 1 - offenseSide
+  const scores: [number, number] = [situation.scoresBefore[0], situation.scoresBefore[1]]
+  const scoreOf = (side: number) => scores[side] ?? 0
+  let defenseMound = situation.defenseMoundSlot
+  const moundPitcherOf = (side: number) => (side === offenseSide ? situation.offenseMoundSlot : defenseMound)
+  let decision = state
+  let runs = 0
+  const changes = [...(half.pitcherChanges ?? [])]
+  const applyChangesUpTo = (runsSoFar: number) => {
+    while (changes.length > 0 && (changes[0]?.runsBefore ?? 0) <= runsSoFar) {
+      const change = changes.shift()
+      if (change === undefined) break
+      defenseMound = change.pitcherSlot
+      decision = applyPitcherChange(decision, {
+        lastInningIndex: REGULATION_LAST_INNING_INDEX,
+        inningIndex,
+        outs: change.outs,
+        defenseSide,
+        offenseSide,
+        scoreOf,
+        moundPitcherOf,
+        runnerCount: change.runnerCount,
+      })
+    }
+  }
+  for (const appearance of half.plateAppearances) {
+    if (appearance.runsBattedIn <= 0) continue
+    applyChangesUpTo(runs)
+    if (appearance.pitcherSlot !== undefined) defenseMound = appearance.pitcherSlot
+    for (let run = 0; run < appearance.runsBattedIn; run += 1) {
+      scores[offenseSide] = (scores[offenseSide] ?? 0) + 1
+      runs += 1
+      decision = applyRunScored(decision, {
+        inningIndex,
+        lastInningIndex: REGULATION_LAST_INNING_INDEX,
+        offenseSide,
+        defenseSide,
+        scoreOf,
+        moundPitcherOf,
+      })
+    }
+  }
+  applyChangesUpTo(Number.POSITIVE_INFINITY)
+  return decision
+}
+
+/**
  * 한 경기를 9이닝(동점이면 연장)까지 돌린다.
  *
  * `matchup` 은 **명단**으로 본 두 팀이다 — `away` 의 선수가 초(칸 0), `home` 의 선수가 말(칸 1)에 공격한다.
@@ -441,6 +526,8 @@ export function simulateLeagueGame(
   let pinchHitUsed = false
   let steals = 0
   let pinchHits = 0
+  /** 승·패·세 칸 `state+0x44..+0x64` — 경기 상태 초기화 0xb6814 가 셋 다 2(없음)로 둔다 */
+  let decision: DecisionState = EMPTY_DECISION_STATE
 
   for (let inning = 1; inning <= MAXIMUM_INNINGS; inning += 1) {
     homeMound = resynced(homeMound, homeStaminas)
@@ -455,6 +542,13 @@ export function simulateLeagueGame(
       defenseOf(matchup.home, homeMound, homeRuns - awayRuns, homeStaminas, homeAcePitcher),
       { lineup: awayLineup, batterOf: awayBatterOf, pinchHitUsed, isAceRosterSlot },
     )
+    decision = decisionsAfterHalfInning(decision, top, {
+      inningIndex: inning - 1,
+      offenseSide: AWAY_SIDE,
+      scoresBefore: [awayRuns, homeRuns],
+      offenseMoundSlot: awayMound.pitcherSlot,
+      defenseMoundSlot: homeMound.pitcherSlot,
+    })
     awayRuns += top.runs
     awayOrder = top.nextBattingOrderIndex % BATTING_ORDER_SIZE
     chargeStaminas(homeStaminas, top, top.mound)
@@ -481,6 +575,13 @@ export function simulateLeagueGame(
       defenseOf(matchup.away, awayMound, awayRuns - homeRuns, awayStaminas, awayAcePitcher),
       { lineup: homeLineup, batterOf: homeBatterOf, pinchHitUsed, isAceRosterSlot },
     )
+    decision = decisionsAfterHalfInning(decision, bottom, {
+      inningIndex: inning - 1,
+      offenseSide: HOME_SIDE,
+      scoresBefore: [awayRuns, homeRuns],
+      offenseMoundSlot: homeMound.pitcherSlot,
+      defenseMoundSlot: awayMound.pitcherSlot,
+    })
     homeRuns += bottom.runs
     homeOrder = bottom.nextBattingOrderIndex % BATTING_ORDER_SIZE
     chargeStaminas(awayStaminas, bottom, bottom.mound)
@@ -496,34 +597,29 @@ export function simulateLeagueGame(
   }
 
   /**
-   * 승패 투수 — **근사다**. 원본 규칙(0xa7de8 이 읽는 `state+0x44/0x48`·`+0x50/0x54` 를 누가
-   * 채우는가)은 해독 문서가 "미해결" 로 남겨 두었다 (P1 6절 마지막 줄). 여기서는 **이긴 팀
-   * 선발에게 승, 진 팀 선발에게 패**로 두고, 구원으로 올라온 투수는 `null` 이다.
-   *
-   * ⚠️ **세이브(+0x24)는 여전히 늘 0 이다 — 그게 원본이다.** 세이브 종류 코드 `state+0x64` 를
-   * 0 으로 되돌리는 코드가 없어 경기 끝 검사(0xa7eaa)에 늘 걸린다: **원본에서도 세이브가 한 번도
-   * 기록되지 않는다** (CORRECTIONS 2-1, S1 유력). 구원 교체가 생겼다고 세이브를 지어내지 않는다.
-   *
-   * 판정은 **실제 점수**로 한다. 아래 `playLeagueDay` 가 옮겨 온 원본 버그(0xc2a48 이 순위표에
-   * 진 팀을 승으로 적는 것)는 **순위표 기록 쪽 실수**이고, 원본에서도 승패 투수는 경기 안에서
-   * 정해진 진짜 결과를 본다 — 그래서 여기서는 뒤집지 않는다.
-   * 동점(웹 안전망인 30이닝까지 안 갈린 경우)은 순위표와 같이 원정 쪽을 승으로 본다.
+   * 승·패·세 투수 — 경기 끝 0xa7de8 이 읽는 칸 그대로다 (S1 확정, 위 `decisionsAfterHalfInning`).
+   * 원본 빈틈도 그대로 옮긴다:
+   *   - 승리 투수는 **6회(이닝 index ≥ 5) 이후의 득점 때만** 정해진다 — 5회까지만 점수가 나고 그 뒤로 한 점도
+   *     안 나면 **승리 투수가 없다**(패전 투수는 이닝 조건이 없어 남는다). 선발 5이닝 요건 같은 진짜 규칙은 없다.
+   *   - 세이브는 **한 번도 기록되지 않는다** — 후보는 교체 0xa60c0 이 잡지만 세이브 코드 `state+0x64` 를 0 으로
+   *     되돌리는 곳이 없어 0xa7eaa 에 늘 걸린다 (S1 4-1, CORRECTIONS 2-1).
+   *   - 동점(웹 안전망 30이닝까지 안 갈린 경우)은 승·패 모두 없다.
+   * 판정은 경기 안의 **실제 점수**로 한다 — 순위표 쪽의 칸·명단 엇갈림(`playLeagueDay`)과는 따로다.
    */
-  const awayWon = awayRuns >= homeRuns
-  const linesOf = (teamId: number, starterSlot: number, decision: '승' | '패') =>
-    [...(pitched.get(teamId) ?? new Map()).entries()]
-      // 마투수 줄은 쌓지 않는다 — 마타자와 같이 팀 레코드 8번 칸이 다음 경기에 저장 레코드로 덮인다
-      .filter(([pitcherSlot]) => pitcherSlot !== ACE_PITCHER_SLOT)
-      .map(([pitcherSlot, line]) => ({
-      teamId,
-      pitcherSlot,
-      ...line,
-      decision: pitcherSlot === starterSlot ? decision : null,
-    }))
-  const pitcherAppearances: readonly LeaguePitcherAppearance[] = [
-    ...linesOf(matchup.away, awaySlot, awayWon ? '승' : '패'),
-    ...linesOf(matchup.home, homeSlot, awayWon ? '패' : '승'),
-  ]
+  const ended = gameEndDecisionOf(decision)
+  const recordOf = (record: PitcherOfRecord | null) =>
+    record === null ? null : { side: record.side, pitcherSlot: record.number }
+  const lines = [...pitched.entries()].flatMap(([teamId, team]) =>
+    [...team.entries()].map(([pitcherSlot, line]) => ({ teamId, pitcherSlot, ...line })),
+  )
+  const pitcherAppearances: readonly LeaguePitcherAppearance[] = leaguePitcherAppearancesOf(
+    lines,
+    { winner: recordOf(ended.winner), loser: recordOf(ended.loser), save: recordOf(ended.save) },
+    // 칸 s 에서 **던진** 팀 — 초(칸 0) 수비는 home, 말(칸 1) 수비는 away. 판정 측은 그 칸의 팀이다
+    (side) => (side === AWAY_SIDE ? matchup.away : matchup.home),
+    // 마투수 줄·판정은 쌓지 않는다 — 마타자와 같이 팀 레코드 8번 칸이 다음 경기에 저장 레코드로 덮인다
+    (_teamId, pitcherSlot) => pitcherSlot === ACE_PITCHER_SLOT,
+  )
 
   return {
     awayRuns,

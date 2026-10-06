@@ -4,6 +4,7 @@ import {
   ACE_PITCHER_SLOT,
   cpuGameAcesOf,
   cpuGameSidesOf,
+  decisionsAfterHalfInning,
   matchupsOf,
   playLeagueDay,
   rollCpuGamePrep,
@@ -24,6 +25,8 @@ import {
   leaguePitcherLineOf,
 } from '@/entities/league/model/leaguePlayerStats'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import type { HalfInningResult } from '@/entities/game/model/simulateHalfInning'
+import { EMPTY_DECISION_STATE, NO_SIDE } from '@/entities/game/model/winLossSave'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 
 function 씨앗난수(seed: number): RandomPort {
@@ -219,27 +222,32 @@ describe('CPU 끼리 경기도 날짜가 선발을 정한다 (0xb5ca8 · S5 U-16
 })
 
 describe('CPU 끼리 경기가 선발 투수 기록도 쌓는다 (0xa8024 · 경기 끝 0xa7de8, P1 6절)', () => {
-  it('양 팀 선발 줄이 나오고, 승과 패는 그 두 줄에만 붙는다', () => {
-    const 경기 = simulateLeagueGame({ away: 2, home: 3 }, 씨앗난수(77), 1)
-    // 선발 칸(1)은 양 팀 한 줄씩. 구원은 벤치에서 오므로 이 칸이 될 수 없다
-    const 선발줄 = 경기.pitcherAppearances.filter((줄) => 줄.pitcherSlot === 1)
-
-    expect(선발줄).toHaveLength(2)
-    expect(경기.pitcherAppearances.filter((줄) => 줄.decision === '승')).toHaveLength(1)
-    expect(경기.pitcherAppearances.filter((줄) => 줄.decision === '패')).toHaveLength(1)
-    // 교체로 올라온 투수는 승패가 없다 (세이브도 원본이 안 준다 — CORRECTIONS 2-1)
-    expect(경기.pitcherAppearances.every((줄) => 줄.decision === null || 줄.pitcherSlot === 1)).toBe(true)
+  it('승·패는 한 경기에 많아야 하나씩이고, 승은 이긴 팀 · 패는 진 팀 투수에게 간다 (0xa5c34 → 0xa7de8)', () => {
+    for (let seed = 1; seed <= 40; seed += 1) {
+      const 경기 = simulateLeagueGame({ away: 2, home: 3 }, 씨앗난수(seed), 1)
+      const 승 = 경기.pitcherAppearances.filter((줄) => 줄.decision === '승')
+      const 패 = 경기.pitcherAppearances.filter((줄) => 줄.decision === '패')
+      const 이긴팀 = 경기.awayRuns > 경기.homeRuns ? 2 : 3
+      expect(승.length).toBeLessThanOrEqual(1)
+      // 패전 투수는 이닝 조건이 없어 점수가 갈린 경기면 늘 있다
+      expect(패).toHaveLength(1)
+      expect(승.every((줄) => 줄.teamId === 이긴팀)).toBe(true)
+      expect(패.every((줄) => 줄.teamId !== 이긴팀)).toBe(true)
+    }
   })
 
-  it('승은 **점수가 많은 쪽** 선발에게 간다 — 순위표의 원본 버그(0xc2a48)와 따로 논다', () => {
-    const 경기 = simulateLeagueGame({ away: 2, home: 3 }, 씨앗난수(77), 1)
-    const 선발 = (teamId: number) =>
-      경기.pitcherAppearances.find((줄) => 줄.teamId === teamId && 줄.pitcherSlot === 1)
-
-    const 이긴쪽 = 경기.awayRuns >= 경기.homeRuns ? 선발(2) : 선발(3)
-    const 진쪽 = 경기.awayRuns >= 경기.homeRuns ? 선발(3) : 선발(2)
-    expect(이긴쪽?.decision).toBe('승')
-    expect(진쪽?.decision).toBe('패')
+  it('승리 투수는 선발이 아니어도 된다 — 6회 이후 득점 순간 마운드에 선 투수다 (선발 5이닝 요건이 원본에 없다)', () => {
+    let 구원승 = 0
+    let 승없음 = 0
+    for (let seed = 1; seed <= 200; seed += 1) {
+      const 경기 = simulateLeagueGame({ away: 2, home: 3 }, 씨앗난수(seed), 1)
+      const 승 = 경기.pitcherAppearances.find((줄) => 줄.decision === '승')
+      if (승 === undefined) 승없음 += 1
+      else if (승.pitcherSlot !== 1) 구원승 += 1
+    }
+    expect(구원승).toBeGreaterThan(0)
+    // 5회까지만 점수가 나고 6회 이후 한 점도 없으면 승리 투수가 빈다 (원본 빈틈, S1 6절)
+    expect(승없음).toBeGreaterThan(0)
   })
 
   /**
@@ -272,28 +280,16 @@ describe('CPU 끼리 경기가 선발 투수 기록도 쌓는다 (0xa8024 · 경
     expect(줄들.every((줄) => 줄.saves === 0)).toBe(true)
   })
 
-  it('하루치 네 경기가 승 4 · 패 4 로 쌓인다 (내 팀 경기는 빠진다)', () => {
+  it('하루치 네 경기 — 패는 경기마다 하나(4), 승은 그 이하다 (내 팀 경기는 빠진다)', () => {
     const { playerStats } = playLeagueDay(EMPTY_LEAGUE, 0, 4, 씨앗난수(5))
     const 줄들 = Object.values(playerStats.pitchers ?? {})
     const 합 = (고르기: (줄: (typeof 줄들)[number]) => number) =>
       줄들.reduce((sum, 줄) => sum + 고르기(줄), 0)
 
-    expect(합((줄) => 줄.wins)).toBe(4)
+    expect(합((줄) => 줄.wins)).toBeLessThanOrEqual(4)
     expect(합((줄) => 줄.losses)).toBe(4)
-    // 네 경기 여덟 선발에 구원이 더 붙는다 (교체가 생기기 전에는 딱 여덟 줄이었다)
+    // 네 경기 여덟 선발에 구원이 더 붙는다
     expect(줄들.length).toBeGreaterThanOrEqual(8)
-  })
-
-  it('그날 쓰는 선발 칸은 로테이션이 정한다 — 승패가 붙는 줄이 그 칸이다', () => {
-    const { playerStats } = playLeagueDay(EMPTY_LEAGUE, 3, 4, 씨앗난수(9))
-    const 줄들 = Object.entries(playerStats.pitchers ?? {})
-    const 선발칸 = 줄들
-      .filter(([, 줄]) => 줄.wins + 줄.losses > 0)
-      .map(([id]) => Number(id) % PITCHERS_PER_TEAM)
-
-    // 네 경기 × 양 팀 = 여덟 선발, 전부 그날의 로테이션 칸이다
-    expect(선발칸).toHaveLength(8)
-    expect(new Set(선발칸)).toEqual(new Set([rotationSlotOf(3)]))
   })
 
   it('이어서 돌리면 투수 줄도 앞서 쌓은 표 위에 더해진다', () => {
@@ -321,8 +317,11 @@ describe('CPU 끼리 경기가 선발 투수 기록도 쌓는다 (0xa8024 · 경
     const 합 = (고르기: (줄: (typeof 줄들)[number]) => number) =>
       줄들.reduce((sum, 줄) => sum + 고르기(줄), 0)
 
-    expect(합((줄) => 줄.wins)).toBe(225)
-    expect(합((줄) => 줄.losses)).toBe(225)
+    // 패는 경기마다 하나다(마투수 8번 칸이 진 경우만 빠진다). 승은 6회 이후 득점이 없는 경기에서 빈다 (S1 6절)
+    expect(합((줄) => 줄.losses)).toBeGreaterThanOrEqual(220)
+    expect(합((줄) => 줄.losses)).toBeLessThanOrEqual(225)
+    expect(합((줄) => 줄.wins)).toBeLessThan(합((줄) => 줄.losses))
+    expect(합((줄) => 줄.wins)).toBeGreaterThan(150)
     // 한 경기에 양 팀 합쳐 18이닝(54아웃)이 기준이다. 홈이 앞서면 9회말을 안 치르고(−3),
     // 동점이면 연장을 가므로 딱 떨어지지는 않는다
     expect(합((줄) => 줄.outs)).toBeGreaterThanOrEqual(225 * 51)
@@ -601,5 +600,56 @@ describe('CPU 끼리 경기의 수비 객체는 보직과 마선수를 넘긴다
     }
     // 보직을 안 넘기면 모두 선발로 보여 마무리 상황마다 교체가 서 두 팀 합 평균 6 을 넘었다
     expect(줄수 / 경기).toBeLessThan(5)
+  })
+})
+
+describe('반 이닝 승·패 판정은 한 점마다 0xa5c34 를 밟는다 (S1 2·3절)', () => {
+  const 반이닝 = (
+    plays: readonly { runs: number; pitcherSlot: number }[],
+    changes: HalfInningResult['pitcherChanges'] = [],
+  ): HalfInningResult =>
+    ({
+      runs: plays.reduce((sum, play) => sum + play.runs, 0),
+      plateAppearances: plays.map((play, index) => ({
+        battingOrderIndex: index,
+        outcome: { kind: '안타', bases: 1 },
+        runsBattedIn: play.runs,
+        pitcherSlot: play.pitcherSlot,
+      })),
+      pitcherChanges: changes,
+    }) as unknown as HalfInningResult
+
+  it('뒤지던 팀이 2점타로 뒤집으면 — 첫 점에 동점(둘 다 지움), 둘째 점에 새로 잡는다', () => {
+    // 6회초(index 5) 0:1 로 뒤지던 원정(칸 0)이 2점. 홈 마운드는 5번, 원정 덕아웃 투수는 1번
+    const 판정 = decisionsAfterHalfInning(
+      { ...EMPTY_DECISION_STATE, loser: { side: 0, number: 1 }, winner: { side: 1, number: 0 } },
+      반이닝([{ runs: 2, pitcherSlot: 5 }]),
+      { inningIndex: 5, offenseSide: 0, scoresBefore: [0, 1], offenseMoundSlot: 1, defenseMoundSlot: 5 },
+    )
+    expect(판정.winner).toEqual({ side: 0, number: 1 })
+    expect(판정.loser).toEqual({ side: 1, number: 5 })
+  })
+
+  it('5회까지의 득점은 승리 투수를 안 건드린다 — 패전만 잡힌다', () => {
+    const 판정 = decisionsAfterHalfInning(
+      EMPTY_DECISION_STATE,
+      반이닝([{ runs: 3, pitcherSlot: 0 }]),
+      { inningIndex: 4, offenseSide: 0, scoresBefore: [0, 0], offenseMoundSlot: 0, defenseMoundSlot: 0 },
+    )
+    expect(판정.winner.side).toBe(NO_SIDE)
+    expect(판정.loser).toEqual({ side: 1, number: 0 })
+  })
+
+  it('교체(0xa60c0)는 그 앞까지 들어온 점수 자리에 끼고, 세이브 후보와 코드를 남긴다', () => {
+    // 9회말(index 8) 홈 공격, 원정이 3:0 으로 앞선 채 0아웃에 원정 마무리 7번이 오른다
+    const 판정 = decisionsAfterHalfInning(
+      EMPTY_DECISION_STATE,
+      반이닝([], [
+        { pitcherSlot: 7, outs: 0, runnerCount: 0, runsBefore: 0, outgoingPitcherSlot: 0, outgoingStamina: 0 },
+      ]),
+      { inningIndex: 8, offenseSide: 1, scoresBefore: [3, 0], offenseMoundSlot: 0, defenseMoundSlot: 0 },
+    )
+    expect(판정.save).toEqual({ side: 0, number: 7 })
+    expect(판정.saveCode).toBe(3)
   })
 })

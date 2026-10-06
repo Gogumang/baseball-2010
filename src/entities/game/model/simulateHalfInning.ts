@@ -61,6 +61,11 @@ export interface HalfInningPlateAppearance {
    * 로스터 칸이 갈린다 — 선수 기록은 이 칸에 쌓아야 한다.
    */
   readonly rosterSlot?: number
+  /**
+   * 이 타석 동안 마운드에 선 수비 투수 칸 (`defense` 를 넘겼을 때만). 득점 처리 `0xa5c34` 는 한 점마다
+   * **그 순간 마운드 투수**를 승·패 투수로 적는다 (S1 2·3절) — 부르는 쪽이 그 판정을 돌릴 재료다.
+   */
+  readonly pitcherSlot?: number
 }
 
 /** 이 이닝에 들어온 CPU 대타 한 번 (0xac228) */
@@ -474,11 +479,13 @@ export function simulateHalfInning(
     const scored = outs >= OUTS_PER_INNING && advanced.outsAdded > 0 ? 0 : advanced.runsScored
     runs += scored
     // 판정은 그대로 두고 **결과만 내보낸다** — 원본이 0xa8024 로 흘려보내는 자리다
-    plateAppearances.push(
-      rosterSlot === undefined
-        ? { battingOrderIndex: order, outcome, runsBattedIn: scored }
-        : { battingOrderIndex: order, outcome, runsBattedIn: scored, rosterSlot },
-    )
+    plateAppearances.push({
+      battingOrderIndex: order,
+      outcome,
+      runsBattedIn: scored,
+      ...(rosterSlot === undefined ? {} : { rosterSlot }),
+      ...(mound === undefined ? {} : { pitcherSlot: mound.pitcherSlot }),
+    })
     // 타순 칸 기록(안타·적시타·타석) — 다음 CPU 대타 판정이 본다 (0xa8024)
     if (lineup !== undefined) lineup = recordLineupPlay(lineup, order, outcome, scored)
     // 타석이 끝나는 자리 — 원본은 여기서 돌발 결과비트로 판정한다 (0x8f414)
