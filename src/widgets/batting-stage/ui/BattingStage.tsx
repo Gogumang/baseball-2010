@@ -193,7 +193,9 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
       pitcher: latest.pitcherAbility,
       mode: latest.swingMode,
       batterSkillIds: latest.batterSkillIds,
-      situation: situationOf(latest.hud, latest.recentAtBatCodes, latest.batterForm),
+      // 0xab214 는 투수 레코드로 손 0xb63c0 을 바로 읽는다(스킬 13 좌완UP · 14 우완UP) — 던진 공이 그 투수의 폼·+0x18 을 든다.
+      // ⚠️ 다섯째 인자(타자 레코드 칸 0xb6394, 투수 스킬 31)는 이 화면이 타자 레코드를 몰라 0 — 미해결
+      situation: situationOf(latest.hud, latest.recentAtBatCodes, latest.batterForm, pitch),
       // 내 선수 보너스·계수는 비트7(육성·명전)만 본다 — 마선수(비트6) 등판은 해당하지 않는다 (0xb6389).
       // 마구 번호(+0x18) 1~4 를 가진 투수는 비트7 이다 (일반 레코드 +0x18 은 모두 0 — H2 4-2)
       isBatterOwnPlayer,
