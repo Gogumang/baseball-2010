@@ -38,6 +38,7 @@ import type {
 import { ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
 import type {
   TeamGameOptions,
+  TeamGameProgress,
   TeamGameSummary,
 } from '@/features/play-team-game/model/teamGameFlow'
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
@@ -113,6 +114,20 @@ interface TeamGameScreenProps {
    * 값을 만드는 것은 부르는 쪽(`SeasonRoute`)이다.
    */
   readonly seasonStadium?: SeasonStadium
+  /**
+   * **이어하기** — 저장된 진행에서 다시 세운다 (`useTeamGame` 넷째 인자). 인트로(0xc)는 새 경기처럼 다시 선다 —
+   * 원본도 장면 0x104 를 처음부터 들어가 상태 8 → 0xc 를 지난다.
+   */
+  readonly resumeFrom?: TeamGameProgress
+  /**
+   * **이어하기 저장을 썼다** — 진행의 `halfInningSave` 가 바뀔 때마다(경기를 세운 첫 진행 포함) 부른다.
+   * 원본 0x4f928 → 0x22754(저장, 1) 자리다. 받는 쪽이 저장소에 담는다. 안 넘기면 아무 데도 안 남는다(시즌·대전).
+   */
+  readonly onHalfInningSave?: (save: TeamGameProgress) => void
+  /**
+   * **정산(0x19)에 들어섰다** — 경기 끝 결과 판의 OK. 원본 0x4ea0c 가 이 자리에서 전역기록 +0x4c+모드 를 0 으로 지운다(0x4f3d6).
+   */
+  readonly onSettlementEnter?: () => void
 }
 
 export function TeamGameScreen({
@@ -125,9 +140,19 @@ export function TeamGameScreen({
   settings,
   onSettingsChange,
   seasonStadium,
+  resumeFrom,
+  onHalfInningSave,
+  onSettlementEnter,
 }: TeamGameScreenProps) {
-  const session = useTeamGame(options, random, settings?.isVibrationOn)
+  const session = useTeamGame(options, random, settings?.isVibrationOn, resumeFrom)
   const { progress, canBat, canPitch, summary, actions } = session
+  // 이어하기 저장 0x4f928 — 진행기가 새 저장 진행을 담을 때마다 한 번씩 넘긴다
+  const halfInningSave = progress.halfInningSave ?? null
+  const onHalfInningSaveRef = useRef(onHalfInningSave)
+  onHalfInningSaveRef.current = onHalfInningSave
+  useEffect(() => {
+    if (halfInningSave !== null) onHalfInningSaveRef.current?.(halfInningSave)
+  }, [halfInningSave])
   /** 지금 마운드에 선 상대 투수가 마투수면 그 선수 (0xb88c8 로 8번 칸에 앉은 그것) */
   const opposingAcePitcher = ACE_PITCHERS[currentPitcherAceIndex(progress)] ?? null
 
@@ -330,8 +355,9 @@ export function TeamGameScreen({
         names={[names.win, names.loss, names.save]}
         onConfirm={() => {
           setEndBoardClosed(true)
-          // 정산 0x19 진입 — 승리 31 · 패배 32 징글 (0x4ea0c)
+          // 정산 0x19 진입 — 승리 31 · 패배 32 징글 (0x4ea0c). 같은 진입이 +0x4c+모드 를 지운다(0x4f3d6)
           actions.enterSettlement()
+          onSettlementEnter?.()
         }}
       />
     )

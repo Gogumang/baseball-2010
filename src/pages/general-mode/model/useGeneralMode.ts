@@ -143,7 +143,8 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
    * 유저 팀 레코드(저장 칸 `0x1f875(저장, 쪽)`)를 엔트리 편집이 고친 것. 원본은 상태 22 들어옴 `0x314b0` 이
    * 이전 상태가 23 이 아닐 때마다 `0x30f20` 으로 경기를 새로 세우므로(314c8 `cmp [메뉴+0x28], #0x17`)
    * 21 로 물러났다 오거나 재굴림하면 고친 것이 사라진다 — 웹도 그때 비운다.
-   * 나갈 때 `0x2a370` 이 두 팀을 저장 칸 0x32·0x33(이어하기 칸과 같은 자리, R10)에 적지만 웹에는 이어하기가 없다.
+   * 나갈 때 `0x2a370` 이 두 팀을 저장 칸 0x32·0x33(이어하기 칸과 같은 자리, R10)에 적는다 — 웹은 경기정보 OK 가 넘기는
+   * 첫 진행(`GeneralModeScreen.onGameStart`)에 고친 명단이 이미 들어 있어 따로 적지 않는다.
    */
   const [userEntryRoster, setUserEntryRoster] = useState<SeasonTeamRoster | null>(null)
 

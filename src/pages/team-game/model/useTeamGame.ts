@@ -18,6 +18,7 @@ import {
   returnToPitchSelection,
   resolveBenchClearing,
   resolveDefensePlay,
+  resumeTeamGame,
   runAutoProgress,
   spendOurSpecialSwing,
   startBatterOutcome,
@@ -158,8 +159,15 @@ export function useTeamGame(
   random: RandomPort,
   /** 환경설정 진동(저장 +0x3b) — 거짓이면 0x3a44 가 안 울린다. 없으면 켬 (`BattingStage` 와 같다) */
   isVibrationOn?: boolean,
+  /**
+   * **이어하기** — 저장된 진행(`halfInningSave`)이 있으면 새로 세우지 않고 그 자리에서 다시 세운다
+   * (0x213c0(앱, 1, 0) → 장면 0x104, `resumeTeamGame`). 없으면 새 경기다.
+   */
+  resumeFrom?: TeamGameProgress,
 ): TeamGameSession {
-  const [progress, setProgress] = useState<TeamGameProgress>(() => startTeamGame(options, random))
+  const [progress, setProgress] = useState<TeamGameProgress>(() =>
+    resumeFrom === undefined ? startTeamGame(options, random) : resumeTeamGame(resumeFrom, random),
+  )
 
   /**
    * 최신 진행 상태. 소리는 **업데이터 밖에서** 골라야 한다 — 업데이터 안에서 소리를 내면

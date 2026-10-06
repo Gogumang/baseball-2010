@@ -5,6 +5,8 @@ import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { TEAMS } from '@/shared/config/original/teams'
 import { ACE_PLAYERS } from '@/shared/config/original/acePlayers'
 import { GeneralModeScreen } from '@/pages/general-mode/ui/GeneralModeScreen'
+import { generalGameOfSave } from '@/pages/general-mode/lib/generalModeResume'
+import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow'
 
 /**
  * 일반모드 한 판 (하위 상태 18 → 19 → 20 → 21 → 22 → 경기 장면 0x104).
@@ -106,6 +108,54 @@ describe('경기 시작', () => {
 
     // 팀 경기 장면은 경기 시작 인트로(상태 0xc, 모드 1)부터 선다
     expect(screen.getByText(/VS/)).toBeTruthy()
+  })
+
+  it('경기정보 OK 가 첫 저장(0x3136e)을 넘긴다 — 1회초 아웃 0 의 일반모드 진행', () => {
+    const onGameStart = vi.fn()
+    const onGameSave = vi.fn()
+    띄우기({ isQuickStart: true, onGameStart, onGameSave })
+
+    fireEvent.click(screen.getByRole('button', { name: '경기 시작' }))
+
+    expect(onGameStart).toHaveBeenCalledTimes(1)
+    expect(onGameSave).not.toHaveBeenCalled()
+    const save = onGameStart.mock.calls[0]?.[0] as TeamGameProgress
+    expect(save.options.mode).toBe(1)
+    expect(save.game.inning).toBe(1)
+    expect(save.game.half).toBe('초')
+    expect(save.game.outs).toBe(0)
+    // 저장 블록으로 다시 읽을 수 있는 꼴이다
+    expect(generalGameOfSave(JSON.parse(JSON.stringify(save)))).not.toBeNull()
+  })
+})
+
+describe('이어하기 (0x213c0(앱, 1, 0) → 장면 0x104)', () => {
+  /** 경기정보 OK 가 넘긴 첫 저장 하나를 얻는다 */
+  const 첫저장 = (): TeamGameProgress => {
+    const onGameStart = vi.fn()
+    띄우기({ isQuickStart: true, onGameStart })
+    fireEvent.click(screen.getByRole('button', { name: '경기 시작' }))
+    const save = onGameStart.mock.calls[0]?.[0] as TeamGameProgress
+    cleanup()
+    return JSON.parse(JSON.stringify(save)) as TeamGameProgress
+  }
+
+  it('저장 진행이 있으면 준비 화면 없이 경기 장면(인트로부터)으로 바로 선다 — 이어서 쓰는 저장은 반 이닝 저장 몫이다', () => {
+    const save = 첫저장()
+    const onGameStart = vi.fn()
+    const onGameSave = vi.fn()
+    띄우기({ resumeGame: save, onGameStart, onGameSave })
+
+    expect(screen.getByText(/VS/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '경기 시작' })).toBeNull()
+    expect(onGameStart).not.toHaveBeenCalled()
+    expect(onGameSave).toHaveBeenCalled()
+  })
+
+  it('블록이 일반모드 진행이 아니면 이어하기로 못 읽는다', () => {
+    expect(generalGameOfSave(null)).toBeNull()
+    expect(generalGameOfSave({ options: { mode: 2 } })).toBeNull()
+    expect(generalGameOfSave({ options: { mode: 1 }, game: { inning: 1, half: '초' } })).toBeNull()
   })
 })
 

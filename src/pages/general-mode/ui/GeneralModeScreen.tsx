@@ -1,6 +1,7 @@
+import { useRef, useState } from 'react'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { MatchProgressSettings } from '@/features/play-team-game/model/matchSettings'
-import type { TeamGameSummary } from '@/features/play-team-game/model/teamGameFlow'
+import type { TeamGameProgress, TeamGameSummary } from '@/features/play-team-game/model/teamGameFlow'
 import { TeamSelectScreen } from '@/pages/create-player/ui/TeamSelectScreen'
 import { TeamGameScreen } from '@/pages/team-game/ui/TeamGameScreen'
 import { GENERAL_MODE_STEP } from '@/pages/general-mode/lib/generalModeSetup'
@@ -50,6 +51,19 @@ export interface GeneralModeScreenProps {
   /** 경기가 끝나고 확인을 눌렀을 때 */
   readonly onFinish: (summary: TeamGameSummary) => void
   /**
+   * **이어하기로 들어왔다** — 모드 1 저장 블록에서 읽은 진행. 있으면 준비 화면(18~22) 없이 곧바로 경기 장면으로 간다
+   * (메인 메뉴 [13]/[최근게임] → 상태 0x27 → 0x327b8 → 0x213c0(앱, 1, 0) → 장면 0x104).
+   */
+  readonly resumeGame?: TeamGameProgress
+  /**
+   * **경기정보 OK** (0x3136e) — 새 경기의 첫 저장. 받는 쪽이 +0x3c = 1 · +0x4d = 1 · 블록 = 이 진행을 쓴다.
+   */
+  readonly onGameStart?: (save: TeamGameProgress) => void
+  /** **반 이닝 자동 저장** (0x4f928 → 0x22754) — 블록만 고쳐 쓴다. 이어하기 경기도 같다 */
+  readonly onGameSave?: (save: TeamGameProgress) => void
+  /** **정산 진입** (0x4ea0c → 0x4f3d6) — 받는 쪽이 +0x4d 를 지운다 */
+  readonly onSettlementEnter?: () => void
+  /**
    * 준비 첫 화면에서 CLR, 또는 경기 중 메뉴에서 나가기.
    * 원본은 메인 메뉴 하위 상태 5(모드 목록)로 돌아간다.
    */
@@ -73,11 +87,51 @@ export interface GeneralModeScreenProps {
  *    길이 없다. 문구를 만드는 함수는 `lib/hiddenTeam.ts` 의 `hiddenTeamHintMessage` 에 있다.
  */
 export function GeneralModeScreen(props: GeneralModeScreenProps) {
+  if (props.resumeGame !== undefined) return <GeneralModeResume {...props} resumeGame={props.resumeGame} />
+  return <GeneralModePrepare {...props} />
+}
+
+/**
+ * **이어하기 경기** — 저장 블록의 진행에서 장면 0x104 를 다시 세운다. 환경설정(투구 게이지·주루·송구)과 마선수 레벨은
+ * 원본이 경기 중에 전역 칸에서 그때그때 읽으므로 지금 값으로 바꿔 끼운다. 경기진행 설정은 웹에 전역 칸이 없어
+ * 그 경기를 세울 때의 값을 그대로 쓴다(⚠️ 원본은 전역기록 +0x12c 쪽 값을 다시 읽는다).
+ */
+function GeneralModeResume(props: GeneralModeScreenProps & { readonly resumeGame: TeamGameProgress }) {
+  const {
+    random, resumeGame, aceLevels, gaugeSettingOn, runningModeManual, throwModeManual,
+    onFinish, onExit, onGameSave, onSettlementEnter,
+  } = props
+  const [resumeFrom] = useState<TeamGameProgress>(() => ({
+    ...resumeGame,
+    options: {
+      ...resumeGame.options,
+      ...(gaugeSettingOn === undefined ? {} : { gaugeSettingOn }),
+      ...(runningModeManual === undefined ? {} : { runningModeManual }),
+      ...(throwModeManual === undefined ? {} : { throwModeManual }),
+      ...(aceLevels === undefined ? {} : { aceLevels }),
+    },
+  }))
+  return (
+    <TeamGameScreen
+      options={resumeFrom.options}
+      resumeFrom={resumeFrom}
+      random={random}
+      onFinish={onFinish}
+      onQuit={onExit}
+      {...(onGameSave === undefined ? {} : { onHalfInningSave: onGameSave })}
+      {...(onSettlementEnter === undefined ? {} : { onSettlementEnter })}
+    />
+  )
+}
+
+function GeneralModePrepare(props: GeneralModeScreenProps) {
   const {
     random, isQuickStart = false, openedHiddenTeamIds, openedAcePitcherIds, openedAceBatterIds,
     aceLevels, onLevelUpAce, gamePoint, onOpenAce, stadiums, initialSettings, gaugeSettingOn, runningModeManual,
-    throwModeManual, onFinish, onExit,
+    throwModeManual, onFinish, onExit, onGameStart, onGameSave, onSettlementEnter,
   } = props
+  /** 이 경기의 첫 저장인가 — 경기정보 OK 몫(0x3136e)이고 그 뒤는 반 이닝 저장(0x4f928)이다 */
+  const isFirstSaveRef = useRef(true)
 
   const session = useGeneralMode({
     random,
@@ -104,6 +158,15 @@ export function GeneralModeScreen(props: GeneralModeScreenProps) {
         random={random}
         onFinish={onFinish}
         onQuit={onExit}
+        onHalfInningSave={(save) => {
+          if (isFirstSaveRef.current) {
+            isFirstSaveRef.current = false
+            onGameStart?.(save)
+            return
+          }
+          onGameSave?.(save)
+        }}
+        {...(onSettlementEnter === undefined ? {} : { onSettlementEnter })}
       />
     )
   }

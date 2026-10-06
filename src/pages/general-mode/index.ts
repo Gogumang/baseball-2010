@@ -24,6 +24,9 @@
 export { GeneralModeScreen } from '@/pages/general-mode/ui/GeneralModeScreen'
 export type { GeneralModeScreenProps } from '@/pages/general-mode/ui/GeneralModeScreen'
 
+/** 이어하기 — 모드 1 저장 블록(전역 저장소의 unknown 값)을 경기 진행으로 가려 낸다 */
+export { generalGameOfSave } from '@/pages/general-mode/lib/generalModeResume'
+
 export { FirstBatStadiumScreen } from '@/pages/general-mode/ui/FirstBatStadiumScreen'
 export type { FirstBatStadiumScreenProps, StadiumEntry } from '@/pages/general-mode/ui/FirstBatStadiumScreen'
 
