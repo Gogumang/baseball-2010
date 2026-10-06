@@ -713,6 +713,101 @@ export interface TeamGameProgress {
   readonly burstRewardDeltas: readonly BurstRewardDelta[]
   readonly log: readonly TeamGameLogEntry[]
   readonly nextLogId: number
+  /**
+   * **마지막 이어하기 저장 시점의 진행** (원본 반 이닝 자동 저장 `0x4f928` 이 파일에 쓴 그 순간) — 없으면 아직 안 썼다.
+   * 이 진행 자신의 `halfInningSave` 는 늘 null 이다(사슬이 생기지 않게). 부르는 쪽(일반모드 앱)이 받아 저장소에 담고,
+   * 이어하기는 `resumeTeamGame` 으로 다시 세운다. 쓰는 자리·담기는 것은 `TEAM_GAME_RESUME_SAVE` 주석.
+   */
+  readonly halfInningSave?: TeamGameProgress | null
+}
+
+/**
+ * **이어하기 자동 저장** — 원본 경기 상태 0x18 갱신 `0x4f928` 의 틱 0 (R10 5절, 2026-10-06 직접 다시 뜸).
+ *
+ * ## 쓰는 자리
+ * ```
+ * 4f938 0xb68fd(st) 경기 끝이면 → 저장 없이 결과 판 가지
+ * 4f962 틱 [경기+0x2c] == 0 일 때만:
+ * 4f978 0xaebe4(팀0, 0) · 0xaebe4(팀1, 0)      ; 예약 교체 확정(team+0x293 → +0x32 다음 타자 등) — **저장보다 앞**
+ * 4f990 모드 [+0x1104] ∈ {1,2,8,9} (비트 0x306) 이고 이전 상태 [경기+0x28] ≠ 9 이면:
+ * 4f9b2   0x1fdec(저장)  — 대기열 비우기
+ *         모드 1: 0x1fdb0(저장, 0x32, 팀[+0x228], 0) · (저장, 0x32, 팀[+0x22c], 1) · (저장, 0x33, st, 0)
+ *         (2 → 0xb·0xc·0xd · 8 → 0x29·0x2a · 9 → 0x3d·0x3e)
+ * 4fa9e   0x4e8b0(경기)  — 모드별 플레이 시간 누계(0x22efc), 기록 아님
+ * 4faaa   0x22754(저장, 1) — 대기열을 저장 블록에 복사(팀 0x290 바이트 × 2 → 블록+4 · +0x294, st 0xa4 바이트 → 블록+0x524)
+ *                            하고 **모드 블록 전체**를 직렬화(0x226dc → 0x2264c)해 파일에 쓴다
+ * 4fac2 그 뒤에야 0xc2198 (자동진행 갈림) · 판이 서면 0x3fac4 (굴림 36)
+ * ```
+ * 0x18 은 3아웃 뒤(진입 0x3ac90 이 초/말을 뒤집고 주자·반 이닝 투구 수를 지운 **뒤**)뿐 아니라 인트로 0xc 끝(1회초 판)·
+ * 자동진행 0x21 이 사람에게 넘길 때(반 이닝 중간이어도 48544)도 지난다 — 그때마다 쓴다. 경기 끝이면 안 쓴다.
+ * 이전 상태 9(적재)에서 곧장 0x18 로 오는 길은 모드 1 에 없다(1~4 는 인트로 0xc 를 지난다).
+ *
+ * ## 담기는 것 — 모드 1 파일 (0x2264c)
+ * 시간 4바이트(app+0xd8) · 두 팀 객체 0x290 바이트씩(타순·명단·투수 차례·벤치 수·타순 칸 기록 24바이트·필살/마구 남은 횟수·
+ * 투구 수 +0x27c·실점 A/B — 객체 0x29c 중 **+0x290~ 교체 예약 바이트만 빠진다**) · 경기 상태 st 0xa4 바이트(이닝·초말·아웃·
+ * 점수·승패세 칸·출루 허용 등) · 두 팀 레코드(0x20854 — 선수 레코드, 투수 스태미나 +0x2c) · 기록달성 횟수 40칸(블록+0x600).
+ * **난수 씨앗은 없다** — 전역 rand(0xbfa54)의 상태는 bss 0x15606d4 라 어느 저장 블록에도 안 든다.
+ * 경기 장면 객체(+0x1780 시뮬 · 돌발 · 공 객체 +0x10 마구 · 기록 ctx 의 연속 홈런/파울/타석 투구 수 · 화면 G 누계 evt+0x180)는
+ * 장면 쪽이라 안 남는다.
+ *
+ * ## 다시 세우기 — 이어하기 0x213c0(앱, 1, 0) → 장면 0x104
+ * 0x213c0 이 모드 1 파일을 블록에 올리고 → 상태 7 → 9(0x3f584): 3f60a `0x1fdb0` 로 같은 칸 셋을 걸고 3f834 `0x21c54(저장, 0)` 이
+ * 블록 → 팀 둘·st 로 되복사 → 3f856 0x39fdc(모드 1 갈래 3a076 은 구장·관중 그림만, 팀을 새로 안 세운다) → 3fa0e 시뮬 초기화
+ * rand(0, 2) · 0xa5bb0 · 0xa5b00(기록 ctx·반 이닝 투구 수) → 8 → 인트로 0xc → 0x18(판, 아웃 0 이라 뒤집지 않음) 또는 0xd.
+ * 새 경기도 같은 길이다 — 경기정보 OK(0x3136e)가 0x30f20 이 세운 팀·st 를 블록에 두고 파일을 쓴 뒤 장면 0x104 로 간다.
+ */
+export const TEAM_GAME_RESUME_SAVE = { modes: [1, 2, 8, 9] } as const
+
+/** 저장 진행 — 제 안의 저장 칸은 비운다 */
+function savePointOf(progress: TeamGameProgress): TeamGameProgress {
+  return { ...progress, halfInningSave: null }
+}
+
+/**
+ * **이어하기** — 저장된 진행(`halfInningSave`)에서 경기를 다시 세운다 (0x213c0(앱, 1, 0) → 장면 0x104 의 상태 9 · 8 · 0xc).
+ *
+ * 저장 블록에 드는 것(팀 둘·st·팀 레코드·기록달성 횟수)은 그대로 두고, 장면·기록 ctx·공·돌발 쪽은 새 장면처럼 비운다.
+ * 그 뒤 새 경기와 같은 꼬리 — 시뮬 초기화 rand(0, 2) 한 번(3fa0e) → 인트로 끝의 판(굴림 36) 또는 곧장 첫 타석.
+ * 저장된 진행은 아웃 0 · 볼카운트 0 인 자리라(0x18 진입이 지웠다) 판은 그 반 이닝으로 선다.
+ */
+export function resumeTeamGame(saved: TeamGameProgress, random: RandomPort): TeamGameProgress {
+  const { game } = saved
+  const restored: TeamGameProgress = {
+    ...saved,
+    // 장면 쪽 — 상태 0x18 판·자동진행 표시(+0x1784)·벤치 클리어링·수비 재생·교체 연출·공 도착 판
+    halfInningBoard: null,
+    lastHumanHalf: null,
+    autoSinceHuman: false,
+    pendingBenchClearing: null,
+    atBat: createAtBat(),
+    atBatPrepared: false,
+    lastPitch: null,
+    lastResolution: null,
+    lastDefensePlay: null,
+    lastArrivalPlay: null,
+    pendingDefensePlay: null,
+    scenePinchHit: null,
+    scenePitcherChange: null,
+    // 공 객체 +0x10 — 장면이 새로 만든다 (startTeamGame 과 같은 0)
+    ballMagicNumber: 0,
+    // 기록 ctx(0xa5bb0 · 0xa5b00) — 연속 홈런 +0x162 · 연속 파울 +0x15f · 타석 투구 수 +0x161 · 반 이닝 투구 수 +0x16c · 대타 칸 +0x160.
+    // 우리 투수 경기 기록 R(team+0x244)·코스 확정 st[0x8c] 는 저장 블록이라 남는다
+    recordTally: {
+      ...saved.recordTally,
+      homeRunStreak: 0,
+      foulStreak: 0,
+      atBatPitches: 0,
+      halfInningPitches: { inning: game.inning, half: game.half, pitches: 0 },
+    },
+    pinchHitHomeRunHalf: null,
+    // 돌발 객체(경기 장면 +0xf28)도 장면이 새로 만든다 — 팀 경기에서는 시즌만 있다
+    burst: createBurstSession(saved.options.mode),
+    lastBurstResolution: null,
+    halfInningSave: null,
+  }
+  // 상태 9 의 공통 꼬리 0x3fa0e — 새 경기와 같은 rand(0, 2) 한 번
+  rollSimulatorInit(random)
+  return advance({ ...restored, halfInningSave: savePointOf(restored) }, random)
 }
 
 /* ── 시작 ────────────────────────────────────────────────────────────────────── */
@@ -933,7 +1028,8 @@ export function startTeamGame(options: TeamGameOptions, random: RandomPort): Tea
   }
   // 상태 9 갱신 0x3f584 의 공통 꼬리 0x3fa0e — 시뮬 초기화 0xc0dac 의 rand(0, 2) 한 번 (모든 모드 — 마선수·선발 굴림 0x30f20 뒤, 1회초 판 0x18 보다 앞)
   rollSimulatorInit(random)
-  return advance(initial, random)
+  // 경기정보 OK(0x3136e)가 0x30f20 이 세운 두 팀·st 를 저장 블록에 두고 파일을 쓴다 — 이어하기의 첫 자리다
+  return advance({ ...initial, halfInningSave: savePointOf(initial) }, random)
 }
 
 /** 기본 측 — 일반모드는 빠른실행이 반반으로 뽑지만(0x3123c) 화면이 없으면 후공으로 둔다 */
@@ -3824,7 +3920,10 @@ function advance(progress: TeamGameProgress, random: RandomPort): TeamGameProgre
       if (current.atBatPrepared) return current
       // 상태 0x18(공수 교대·1회초 판) → 0xd → 0xe → 0xf(타석 준비) 차례 — 판의 굴림이 타석 준비보다 앞이다.
       // 반 이닝이 뒤집혔으면 0x18 진입 0x3ac90 이 남은 돌발을 먼저 내린다 (0xe 메시지 1 의 굴림 0x8f158 보다 앞)
-      const prepared = prepareAtBat(withHalfInningBoard(withoutBurstOnHalfFlip(current), random), random)
+      const entered = withoutBurstOnHalfFlip(current)
+      // 상태 0x18 을 지나면 틱 0 의 0x4f928 이 판·굴림(0x3fac4)·타석 준비보다 **먼저** 이어하기 저장을 쓴다
+      const saved = passesHalfInningState(entered) ? { ...entered, halfInningSave: savePointOf(entered) } : entered
+      const prepared = prepareAtBat(withHalfInningBoard(saved, random), random)
       return {
         ...prepared,
         lastHumanHalf: { inning: prepared.game.inning, half: prepared.game.half },
@@ -3865,6 +3964,21 @@ function playAutoAtBat(progress: TeamGameProgress, random: RandomPort): TeamGame
     ? playAutoOffenseAtBat(progress, random)
     : playAutoDefenseAtBat(progress, random)
   return played.autoSinceHuman ? played : { ...played, autoSinceHuman: true }
+}
+
+/**
+ * 사람 타석 앞에서 경기 장면이 **상태 0x18 을 지나는가** — 지나면 틱 0 에 이어하기 저장(`TEAM_GAME_RESUME_SAVE`)을 쓴다.
+ *
+ * - 앞 장면이 자동진행 중계(0x21)였다 — 0x21 갱신은 사람에게 넘길 때 늘 0x18 로 간다(48544, 반 이닝 중간이어도).
+ * - 반 이닝이 뒤집혔다 — 3아웃 → 0x18.
+ * - 경기 첫 타석 — 인트로 0xc 끝이 0x18 로 보낸다. 모드 1·이닝/전체 설정이면 곧장 0xd 라 안 지난다 (0x39e3c).
+ * 판이 서는지(`withHalfInningBoard`)와 달리 자동진행 뒤에도 0x18 은 지난다(판만 안 선다, 4fb08).
+ */
+function passesHalfInningState(progress: TeamGameProgress): boolean {
+  if (progress.autoSinceHuman) return true
+  const last = progress.lastHumanHalf
+  if (last === null) return !introSkipsFirstBoard(progress.options.mode, settingsOf(progress))
+  return last.inning !== progress.game.inning || last.half !== progress.game.half
 }
 
 /**
