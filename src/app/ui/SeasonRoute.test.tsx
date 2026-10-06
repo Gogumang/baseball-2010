@@ -73,6 +73,8 @@ describe('엔딩 0xf5 배선', () => {
   it('phase 6 으로 들어오면 **엔딩 화면**이 뜬다 — 예전에는 "화면이 없습니다" 로 샜다', () => {
     const store = 메모리저장(세이브(레코드({
       phase: SEASON_PHASE.엔딩, yearIndex: 9, popularity: 900,
+      // 10년을 다 치른 시즌이라 대상 4 자동 이벤트(400·1·5·100)는 이미 봤다 — 안 그러면 관리 메뉴 폴링이 400 을 튼다
+      seenEvents: [400, 1, 5, 100],
     })))
 
     render(<시즌화면 store={store} onExit={vi.fn()} />)
@@ -86,6 +88,8 @@ describe('엔딩 0xf5 배선', () => {
     const onExit = vi.fn()
     const store = 메모리저장(세이브(레코드({
       phase: SEASON_PHASE.엔딩, yearIndex: 9, popularity: 900,
+      // 10년을 다 치른 시즌이라 대상 4 자동 이벤트(400·1·5·100)는 이미 봤다 — 안 그러면 관리 메뉴 폴링이 400 을 튼다
+      seenEvents: [400, 1, 5, 100],
     })))
     render(<시즌화면 store={store} onExit={onExit} />)
 
@@ -100,6 +104,8 @@ describe('엔딩 0xf5 배선', () => {
   it('엔딩을 그리면 SR+0x1bc 가 서서 다음에 들어올 때는 관리 메뉴다 (0x8bd8 → 0xcb)', () => {
     const store = 메모리저장(세이브(레코드({
       phase: SEASON_PHASE.엔딩, yearIndex: 9, popularity: 900,
+      // 10년을 다 치른 시즌이라 대상 4 자동 이벤트(400·1·5·100)는 이미 봤다 — 안 그러면 관리 메뉴 폴링이 400 을 튼다
+      seenEvents: [400, 1, 5, 100],
     })))
     render(<시즌화면 store={store} onExit={vi.fn()} />)
     cleanup()
@@ -186,5 +192,20 @@ describe('구단관리 트레이드·코치채용 배선 (0xe4 · 0xd7)', () => 
     expect(saved.state.record.coach).toBe(0)
     // 계약금 1억(= 100) 이 빠졌다
     expect(saved.state.record.money).toBe(9899)
+  })
+})
+
+describe('이벤트 재생 0xd3 배선', () => {
+  it('해마다 첫 관리 메뉴에서 연초 목표 — 감독 대사 다음 올해의 목표 창, 닫으면 관리 메뉴', () => {
+    const store = 메모리저장(세이브(레코드({ seenEvents: [400, 1] })))
+    render(<시즌화면 store={store} onExit={vi.fn()} />)
+
+    expect(document.body.textContent).toContain('올해의 목표다!!')
+    fireEvent.click(screen.getByText(/올해의 목표다!!/))
+    // SYS(sub 1) 창 — 제목 StrUSER_EVT[0] 아래에 1년차 다섯 목표
+    expect(document.body.textContent).toContain('순위 5위 이내')
+    fireEvent.click(screen.getByText(/순위 5위 이내/))
+
+    expect(screen.getByRole('button', { name: '다음경기' })).toBeDefined()
   })
 })

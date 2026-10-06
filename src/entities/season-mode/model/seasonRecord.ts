@@ -27,6 +27,12 @@ export interface SeasonRecord {
   readonly illness: number
   /** SR+6 — 입원 실패 여유 칸. 0 이면 다음 입원은 반드시 낫는다 */
   readonly illnessSlack: number
+  /**
+   * SR+8 ~ SR+0x47 — **본 이벤트** 비트 512칸(u64 × 8, 이벤트 id 64개씩). 읽기 `0xb6e80` · 켜기 `0xb6ec0`.
+   * 웹은 켜진 id 목록으로 든다. 반복 이벤트(490)의 비트는 장면 0x105 를 만들 때마다(`0x3b14` → `0x8ce94` →
+   * `0xacf60`) 지워진다 — 경기 뒤에도 장면이 새로 만들어지므로 경기마다 다시 뜰 수 있다.
+   */
+  readonly seenEvents: readonly number[]
   /** SR+7 — 직전 경기의 사기 변화 (0xa7442) */
   readonly lastMoraleChange: number
   /** SR+0x48 (s16) — 인기도 0~9999 */
@@ -104,6 +110,11 @@ export interface SeasonRecord {
   readonly nationalCupChampion: number
   /** SR+0x1a0..0x1af — 이번 경기의 평판 기록 16칸 (u8). `seasonReputation.ts` 가 다룬다 */
   readonly gameRecord: readonly number[]
+  /**
+   * SR+0x187 — **올해의 목표 창을 봤는가**. 관리 메뉴에 들어올 때(0x4efc 끝 0x4ffc) SR+0x1bc 와 이 칸이 둘 다 0 이면
+   * 연초 목표 0xd4 로 간다. 목표 창이 닫히면 `0x7fe90` 이 1 로 켜고 저장한다. 새 시즌 0x5758 · 새 해 0x6e0c 가 0 으로 되돌린다.
+   */
+  readonly yearGoalShown: boolean
   /** SR+0x1b0 / +0x1b4 — 직전 경기 관중 수 */
   readonly lastAttendance: number
   /** SR+0x188 + 7×종류 + 칸 — 구장 아이템 보유 플래그 21칸. `stadiumItems.ts` 참고 */
@@ -203,6 +214,8 @@ export function startNewSeason(teamId: number, name: string): SeasonState {
       acted: false,
       illness: 0,
       illnessSlack: 0,
+      // 0x204e0(저장, 2, 1) 의 모드 2 자료 초기화 — 본 이벤트 비트도 비어 있다 (유력)
+      seenEvents: [],
       lastMoraleChange: 0,
       popularity: 0,
       lastPopularityChange: 0,
@@ -231,6 +244,8 @@ export function startNewSeason(teamId: number, name: string): SeasonState {
       nationalCup: false,
       nationalCupChampion: 0xf,
       gameRecord: zeros(GAME_RECORD_SIZE),
+      // SR+0x187 = 0 (0x57c4)
+      yearGoalShown: false,
       lastAttendance: 0,
       stadiumOwned: falses(STADIUM_OWNED_SIZE),
       stadiumEquipped: zeros(STADIUM_EQUIPPED_SIZE),
@@ -247,7 +262,7 @@ export function startNewSeason(teamId: number, name: string): SeasonState {
  *
  * ```
  * phase = 1 ; 0xa305c(SR) (리그 초기화 + SR+0x78 = 인기도) ; 0x204e0(저장, 2, 0)
- * 연차 SR+0xb3 += 1 ; 팀 사기 = 100 ; SR+0x187 = 0
+ * 연차 SR+0xb3 += 1 ; 팀 사기 = 100 ; SR+0x187 = 0 (올해의 목표 창 다시)
  * CPU 9팀 전부: 팀 능력치 4칸 각각 += 30, 999 상한   ← 해마다 CPU 가 강해진다
  * ```
  * 인기도·평판·소지금은 해를 넘겨 그대로 간다 (초기화 코드가 없다).
@@ -277,6 +292,8 @@ export function startNextYear(state: SeasonState): SeasonState {
       postseasonChampion: 0xf,
       // L+0xac — 위 memset 이 지운다
       nationalCup: false,
+      // SR+0x187 = 0 (6eaa~6eb2) — 새 해 첫 관리 메뉴에서 올해의 목표가 다시 뜬다
+      yearGoalShown: false,
       acted: false,
       popularityAtSeasonStart: record.popularity,
     },
@@ -323,6 +340,7 @@ export function normalizeSeasonRecord(saved: Partial<SeasonRecord> | null | unde
     gameRecord: padNumbers(saved.gameRecord, GAME_RECORD_SIZE),
     stadiumOwned: padFlags(saved.stadiumOwned, STADIUM_OWNED_SIZE),
     stadiumEquipped: padNumbers(saved.stadiumEquipped, STADIUM_EQUIPPED_SIZE),
+    seenEvents: Array.isArray(saved.seenEvents) ? saved.seenEvents : [],
   }
 }
 

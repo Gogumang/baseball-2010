@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { SeasonRecord, SeasonState } from '@/entities/season-mode/model/seasonRecord'
 import {
   SEASON_GAME_COUNT, isFinalYear, normalizeSeasonState, startNewSeason,
@@ -70,9 +70,18 @@ import {
   TRAINING_MORALE_LOSS_RANGE, TRAINING_SUB_ITEM_GAIN,
 } from '@/widgets/season/lib/seasonTraining'
 import { SEASON_OUTING_EFFECTS, SEASON_OUTING_PLACES } from '@/widgets/season/lib/seasonOuting'
-import { cureIllnessAtHospital } from '@/entities/season-mode/model/seasonEventFlow'
-import { goalRankOf, teamBattingAverageOf, teamEarnedRunAverageOf } from '@/entities/season-mode/model/seasonGoals'
+import {
+  NATIONAL_CUP_INTRO_EVENT_ID, OPENING_EVENT_ID, SEASON_FINAL_EVENT_ID, SEASON_GOAL_INTRO_EVENT_ID, START_SEASON_EVENT_CURSOR,
+  YEAR_GOAL_EVENT_ID, applySeasonEventRewards, clearRepeatableSeen, cureIllnessAtHospital, cursorAfterCalling,
+  illnessPenaltyFieldOf, markEventSeen, opensSeasonGoalWindow, pollSeasonEvents, seasonEventFollowUpOf,
+  tickAfterAnyGame,
+} from '@/entities/season-mode/model/seasonEventFlow'
+import type { SeasonEventCursor, SeasonEventReward } from '@/entities/season-mode/model/seasonEventFlow'
+import {
+  achievedSeasonGoalCount, goalRankOf, seasonGoalResultEventId, teamBattingAverageOf, teamEarnedRunAverageOf,
+} from '@/entities/season-mode/model/seasonGoals'
 import type { GoalPostseasonBracket, SeasonGoalInput } from '@/entities/season-mode/model/seasonGoals'
+import { regularSeasonRankEventId } from '@/entities/season-mode/model/seasonStateMachine'
 import {
   leagueBatterIdOf, leagueBatterLineOf, leaguePitcherIdOf, leaguePitcherLineOf,
 } from '@/entities/league/model/leaguePlayerStats'
@@ -153,8 +162,21 @@ export interface SeasonSession {
    * 팀 경기도 같은 명단 차례로 선다 (옵션 `ourEntryOrder`).
    */
   readonly matchInfoStarterName: string | null
+  /** 이벤트 재생 0xd3 — 트는 이벤트와 끝나고 돌아갈 상태(`this+0x24`). 그 장면이 아니면 null */
+  readonly eventPlayback: SeasonEventPlayback | null
   readonly notice: string
   readonly actions: SeasonActions
+}
+
+/**
+ * 이벤트 재생 0xd3 한 판 (갱신 0x5110 · 키 0x90ec · 그리기 0xa09c).
+ * `eventId` 는 s_event 번호, 또는 연초 목표 내장 이벤트(`YEAR_GOAL_EVENT_ID`).
+ * `serial` 은 같은 이벤트를 잇달아 틀어도 화면을 새로 세우려는 웹 전용 번호다.
+ */
+export interface SeasonEventPlayback {
+  readonly eventId: number
+  readonly returnScene: SeasonSceneState
+  readonly serial: number
 }
 
 export interface SeasonActions {
@@ -218,6 +240,11 @@ export interface SeasonActions {
   readonly markEndingSeen: () => void
   /** 결산을 닫았다 — 국가대항전 연차면 대회, 아니면 새 해 (afterKoreanSeries) */
   readonly finishSeason: () => void
+  /**
+   * 이벤트 재생 0xd3 이 끝났다 — 지나온 보상(명령 7)과 본 이벤트를 받아 적용하고, 392 면 목표 결과 393~396 을
+   * 이어 틀고, 아니면 돌아갈 상태로 간다.
+   */
+  readonly finishSeasonEvent: (rewards: readonly SeasonEventReward[], viewedEventIds: readonly number[]) => void
   readonly clearNotice: () => void
   readonly quit: () => void
 }
@@ -462,6 +489,16 @@ export function seasonEvaluationJingleIdOf(popularityChange: number): number {
 }
 
 /**
+ * 장면 0x105 를 만들 때(`0x3b14` 4016 `0x8ce94` → `0xacf60`) — 반복 이벤트의 본 비트를 지운다.
+ * 메모리에서만 지우고 저장은 다음 저장 때 같이 된다.
+ */
+function withSceneConstructed(save: SeasonSave | null): SeasonSave | null {
+  if (save === null) return null
+  const record = clearRepeatableSeen(save.state.record)
+  return record === save.state.record ? save : { ...save, state: { ...save.state, record } }
+}
+
+/**
  * 새 해 `0x6e0c` — 결산을 닫은 뒤(국가대항전이 없는 해)와 **국가대항전 결과 팝업을 닫은 뒤**(`0x896c` →
  * `0x8a56`/`0x8b10` 보상 → `0x8b88: bl 0x6e0c`) 두 자리가 같은 함수를 부른다.
  *
@@ -515,7 +552,7 @@ export function useSeasonSession(
   recordStat?: (event: AnnalsStatEvent) => void,
 ): SeasonSession {
   const loaded = useRef<SeasonSave | null>(null)
-  if (loaded.current === null) loaded.current = normalizeSeasonSave(store.load() as Partial<SeasonSave> | null)
+  if (loaded.current === null) loaded.current = withSceneConstructed(normalizeSeasonSave(store.load() as Partial<SeasonSave> | null))
 
   const [save, setSave] = useState<SeasonSave | null>(loaded.current)
   const [scene, setScene] = useState<SeasonSceneState>(() =>
@@ -552,6 +589,24 @@ export function useSeasonSession(
   const [openedStadiumIds, setOpenedStadiumIds] = useState<readonly number[]>([])
   /** 엔트리 편집 0xe0 — 편집 객체와 목록 */
   const [entryEdit, setEntryEdit] = useState<SeasonEntryEdit | null>(null)
+  /** 이벤트 재생 0xd3 — 트는 이벤트와 돌아갈 상태 */
+  const [eventPlayback, setEventPlayback] = useState<SeasonEventPlayback | null>(null)
+  const playbackSerial = useRef(0)
+  /**
+   * 전역 저장 +0xbe — 이벤트 100 의 1000 G 를 받았는가 (0x8c714). 모드를 가리지 않는 전역 칸이라 시즌을 새로
+   * 해도 남는다. ⚠️ 웹엔 그 전역 저장 객체가 없어 `leagueFirstAwardedBits`(+0x145)와 같은 자리(세션 상태)에 둔다 — 근사.
+   */
+  const [event100Awarded, setEvent100Awarded] = useState(false)
+  /**
+   * 이벤트 관리자 읽기 객체의 커서(+0x28 · +0x2c) — 관리자는 장면 0x105 를 만들 때(0x3b14) 새로 생긴다.
+   * 웹은 훅이 서는 때와 경기를 마치고 돌아오는 때(`finishGame`)를 그 자리로 본다.
+   */
+  const eventCursor = useRef<SeasonEventCursor>(START_SEASON_EVENT_CURSOR)
+  /**
+   * 새 선수 플래그 this+0xf9 — 장면을 만들 때 0(0x401e), 진입 분기 0xcb 가 **새 시즌 초기화 0xcc 에서 왔을 때만** 1
+   * (4c5a~4c78). 웹은 팀을 고른 직후(`chooseTeam`)가 그 자리다. 관리 메뉴 첫 폴링이 400 을 틀고 지운다.
+   */
+  const newPlayerFlag = useRef(false)
 
   /**
    * 지금 들고 있는 G — **화면도 판정도 이 값 하나만 본다.**
@@ -597,6 +652,66 @@ export function useSeasonSession(
     [store],
   )
 
+  /**
+   * 번호로 이벤트를 틀고 0xd3 으로 — `0x8bdc8` 은 커서 +0x2c 를 그 레코드 다음으로 옮긴다(0xae170).
+   * 연초 목표 내장 이벤트(0x8a680)는 커서를 건드리지 않는다.
+   */
+  const startEvent = useCallback((eventId: number, returnScene: SeasonSceneState) => {
+    if (eventId !== YEAR_GOAL_EVENT_ID) eventCursor.current = cursorAfterCalling(eventCursor.current, eventId)
+    playbackSerial.current += 1
+    setEventPlayback({ eventId, returnScene, serial: playbackSerial.current })
+    setScene(SEASON_SCENE_STATE.이벤트재생)
+  }, [])
+
+  /**
+   * 상태에 **막 들어온 틀** (0xe9ac 의 e9c2: 상태가 바뀐 틀에만 ① 상태별 진입 함수 ② 이벤트 폴링이 돈다).
+   * 같은 상태로 다시 가라고 해도(관리 메뉴 → 관리 메뉴) 바뀐 것이 아니라 돌지 않는다.
+   */
+  const enteredScene = useRef<SeasonSceneState | null>(null)
+  useEffect(() => {
+    if (enteredScene.current === scene) return
+    enteredScene.current = scene
+    if (save === null) return
+    const { record } = save.state
+
+    if (scene === SEASON_SCENE_STATE.관리메뉴 || scene === SEASON_SCENE_STATE.외출지도) {
+      // 0xc9 진입 0x4efc: SR+0x1bc == 0 이면 phase = 3 · 저장 (4f78~4f9c)
+      const entered = scene === SEASON_SCENE_STATE.관리메뉴 && !record.endingSeen && record.phase !== SEASON_PHASE.기본
+        ? { ...record, phase: SEASON_PHASE.기본 }
+        : record
+      const polled = pollSeasonEvents(eventCursor.current, {
+        scene,
+        record: entered,
+        teamMorale: save.state.teamMorale,
+        event100Awarded,
+        newPlayerFlag: newPlayerFlag.current,
+      }, random)
+      eventCursor.current = polled.cursor
+      if (polled.record !== record) commit({ ...save, state: { ...save.state, record: polled.record } })
+      const { poll } = polled
+      if (poll.kind === '오프닝') {
+        newPlayerFlag.current = false
+        return startEvent(OPENING_EVENT_ID, scene)
+      }
+      if (poll.kind === '연초목표') return startEvent(YEAR_GOAL_EVENT_ID, scene)
+      if (poll.kind === '이벤트') return startEvent(poll.eventId, scene)
+      return
+    }
+
+    // 시즌 끝 사슬 — 진입 함수마다 phase 를 세우고 저장한다 (0x6d6c 0xb · 0xe854 0xc · 0xe900 0xd · 0xe7ac 0xe · 0x6c90 0x10)
+    const step = SEASON_END_CHAIN.find((candidate) => candidate.state === scene)
+    if (step === undefined) return
+    const staged = { ...save, state: { ...save.state, record: { ...record, phase: step.phase } } }
+    commit(staged)
+    // 0xee — 392 를 틀고 [다음 0xeb] (6d9c~6db0)
+    if (scene === SEASON_SCENE_STATE.포스트시즌시작) return startEvent(SEASON_GOAL_INTRO_EVENT_ID, step.next)
+    // 0xf0 — 정규시즌 순위 0xb7aa0(L, 팀, 1) 로 401 · 402 · 403 (6cb2~6cee)
+    if (scene === SEASON_SCENE_STATE.정규시즌순위) {
+      const rank = Math.max(0, rankingOf(save.league).indexOf(record.teamId))
+      return startEvent(regularSeasonRankEventId(rank), step.next)
+    }
+  }, [commit, event100Awarded, random, save, scene, startEvent])
+
   const chooseTeam = useCallback(
     (teamId: number) => {
       const next: SeasonSave = {
@@ -611,6 +726,8 @@ export function useSeasonSession(
         cpuPitcherStaminas: fullCpuPitcherStaminas(teamId),
       }
       commit(next)
+      // 0xcc → 0xcb: 새 시즌 초기화에서 왔으니 새 선수 플래그가 선다 — 관리 메뉴 첫 폴링이 400 을 튼다
+      newPlayerFlag.current = true
       setScene(SEASON_SCENE_STATE.관리메뉴)
     },
     [commit],
@@ -691,7 +808,8 @@ export function useSeasonSession(
         // 경기진행 설정 시즌 칸 — 0xdd 의 '0' 창이 고친 값. 한 번도 안 고쳤으면 웹판 기본(모든 이닝 직접)
         settings: save.matchSettings ?? FULL_PLAY_SETTINGS,
         // 코치는 SR+0x185 다 — 채용 화면(0xd7)이 채운 칸을 그대로 넘긴다 (−1 = 없음)
-        season: { illness: record.illness, morale: save.state.teamMorale, coach: record.coach },
+        // 질병 −30% 는 질병 종류 SR+5 가 아니라 **SR+6 > 0** 을 본다 (0xb5824 `ldrsb [SR,#6]`) — `illnessPenaltyFieldOf`
+        season: { illness: illnessPenaltyFieldOf(record), morale: save.state.teamMorale, coach: record.coach },
         // 리그 날짜 카운터 g = SR+0xb2(치른 경기 수) — 양 팀 선발이 네 경기마다 한 바퀴 돈다.
         // 안 넘기면 0 고정이라 늘 로스터 0번이 선발이었다 (0xb5ca8 로테이션이 안 돈다)
         dayCounter: record.games,
@@ -1053,7 +1171,13 @@ export function useSeasonSession(
 
       // 경기 중 `0xa755c` 가 올린 평판 16칸 — 원본은 경기 장면이 SR+0x1a0 을 직접 올리므로
       // **갈래와 상관없이** 레코드에 남는다 (S4 2b·6절). 웹은 요약이 싣고 와서 여기서 꽂는다.
-      const played: SeasonRecord = { ...record, gameRecord: summary.gameRecord }
+      //
+      // 경기 끝 꼬리 4f374~4f3b2 — 갈래와 상관없이 SR+0x54(목표점 보기)·SR+0x7c(질병 쿨다운)를 하나씩 줄인다.
+      // 그 뒤 장면 0x105 를 **새로 만든다**(0x3b14): 반복 이벤트(490)의 본 비트를 지우고(0x8ce94) 이벤트 관리자
+      // (커서)와 새 선수 플래그(this+0xf9)도 새로 선다.
+      const played: SeasonRecord = clearRepeatableSeen(tickAfterAnyGame({ ...record, gameRecord: summary.gameRecord }))
+      eventCursor.current = START_SEASON_EVENT_CURSOR
+      newPlayerFlag.current = false
 
       // 승패는 원본 셈 `0xb69c8`·`0x4f072` 로 다시 낸다 — 이긴 칸 = R(1) > R(0) ? 1 : 0 이라
       // **동점이면 선공(칸 0) 쪽이 이긴다**. 요약의 `won`(내 점수 > 상대 점수)은 동점을 패로 본다.
@@ -1162,7 +1286,6 @@ export function useSeasonSession(
             games: evaluated.record.games + 1,
             // 경기를 치르면 이번 주기의 트레이닝·외출 표시를 지운다 (0x4f158)
             acted: false,
-            aimVisionGames: Math.max(0, evaluated.record.aimVisionGames - 1),
             phase: SEASON_PHASE.경기끝,
           },
         },
@@ -1325,9 +1448,11 @@ export function useSeasonSession(
           ? '국가대항전이 끝났습니다.'
           : `국가대항전이 끝났습니다.!N히든 팀이 열렸습니다: ${finish.openedTeams.join(', ')}`,
       )
+      // 대회 연차(짝수 idx)는 마지막 해(9)가 아니라 엔딩 갈래에 닿지 않지만, 같은 0x6e0c 라 같게 둔다
+      if (next.scene === SEASON_SCENE_STATE.엔딩) return startEvent(SEASON_FINAL_EVENT_ID, next.scene)
       setScene(next.scene)
     },
-    [commit, save],
+    [commit, save, startEvent],
   )
 
   /**
@@ -1484,12 +1609,66 @@ export function useSeasonSession(
         // b7c72 0x205c0 — 대표팀 슬롯 +0x918 을 마스터 팀 10 으로 새로 채운다
         cupRoster: tableRosterOf(KOREA_TEAM_ID),
       })
-      return setScene(SEASON_SCENE_STATE.국가대항전)
+      // 0xf2 진입 0xe5f8: SR+0x12c = 1 · 461 을 틀고 · 대회 초기화 · 저장 · [다음 0xf3] (e600~e64c)
+      return startEvent(NATIONAL_CUP_INTRO_EVENT_ID, SEASON_SCENE_STATE.국가대항전)
     }
     const next = nextYearOf(save)
     commit(next.save)
+    // 엔딩 갈래는 500 을 틀고 [다음 0xf5] (6e54~6e76)
+    if (next.scene === SEASON_SCENE_STATE.엔딩) return startEvent(SEASON_FINAL_EVENT_ID, next.scene)
     setScene(next.scene)
-  }, [commit, save])
+  }, [commit, save, startEvent])
+
+  /**
+   * 이벤트 재생 0xd3 이 끝났다 (실행기 0x8cf64 의 끝 → 이전 상태 `this+0x24`).
+   *
+   * - **본 비트**: 실행기가 마지막 명령에 닿으면 그 이벤트를 본 것으로 켜고 저장한다(8cf92~8cfc2). 선택지로 건너간
+   *   이벤트도 각각 켜진다. 연초 목표 내장 이벤트는 켜지 않는다(mgr+0xa ≠ 0).
+   * - **목표 창**(SYS sub 1)이 닫히면 `0x7fe90` 이 SR+0x187 = 1 · 저장 (8d928~8d942).
+   * - **보상**(명령 7)은 모드 2 갈래로 (`applySeasonEventRewards`) — 393~396 은 연차 보정이 붙는다.
+   * - **이어지는 이벤트**: 392 는 끝에서 `0xa37bc` 로 달성 수를 세어 393~396 을 번호로 튼다(8d0d2~8d12c).
+   * - 선택지로 다른 이벤트를 번호로 불렀으면 커서 +0x2c 가 마지막으로 부른 레코드 다음을 가리킨다.
+   *
+   * ⚠️ 안 옮긴 것: 보상 알림 글(0x8beb8 — "인기도 +n" 같은 팝업), 이벤트 배경음 40(0x5110 — 웹 배경음은 장면 단위다).
+   */
+  const finishSeasonEvent = useCallback(
+    (rewards: readonly SeasonEventReward[], viewedEventIds: readonly number[]) => {
+      const playback = eventPlayback
+      if (save === null || playback === null) return
+      const fileEvents = viewedEventIds.filter((id) => id !== YEAR_GOAL_EVENT_ID)
+      let record = fileEvents.reduce(markEventSeen, save.state.record)
+      if ([playback.eventId, ...viewedEventIds].some(opensSeasonGoalWindow)) record = { ...record, yearGoalShown: true }
+      const applied = applySeasonEventRewards({ ...save.state, record }, rewards, playback.eventId, random)
+      const next: SeasonSave = { ...save, state: applied.state }
+      commit(next)
+      if (rewards.some((reward) => reward.kind === 10)) {
+        gainGamePoint(applied.gamePoint)
+        // 0x8c6e4 `0x22c7d(v, 모드)` — 획득 GP 통계
+        recordStat?.({ kind: 'G획득', mode: SEASON_STAT_MODE, amount: applied.gamePoint })
+      }
+      if (applied.event100Awarded) setEvent100Awarded(true)
+      // 선택지가 번호로 부른 마지막 이벤트 다음부터 이어 훑는다 (0xae170)
+      const lastCalled = viewedEventIds[viewedEventIds.length - 1]
+      if (lastCalled !== undefined && lastCalled !== playback.eventId) {
+        eventCursor.current = cursorAfterCalling(eventCursor.current, lastCalled)
+      }
+      const followUp = seasonEventFollowUpOf(playback.eventId, () =>
+        seasonGoalResultEventId(achievedSeasonGoalCount(
+          applied.state.record.yearIndex,
+          seasonGoalInputOf({
+            state: applied.state,
+            league: next.league,
+            roster: next.roster,
+            playerStats: next.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS,
+            series: next.series ?? null,
+          }),
+        )))
+      if (followUp !== null) return startEvent(followUp, playback.returnScene)
+      setEventPlayback(null)
+      setScene(playback.returnScene)
+    },
+    [commit, eventPlayback, gainGamePoint, random, recordStat, save, startEvent],
+  )
 
   /**
    * 구장 히든 아이템 해금 (`0x81d0` → `0x9f6cc(app, 종류, k, 1)`).
@@ -1539,6 +1718,7 @@ export function useSeasonSession(
     gamePoints,
     openedStadiumIds,
     cup: save?.cup ?? null,
+    eventPlayback,
     notice,
     actions: {
       chooseTeam, goto, updateRecord, updateRoster, finishTrade, playNextGame,
@@ -1549,7 +1729,7 @@ export function useSeasonSession(
       closeEntryAceLocked,
       playCupGame, finishCup, finishGame, continuePostseason,
       runTraining, runOuting, nextSeasonEndStep, awardLeagueFirst, spendGamePoint, finishSeason,
-      openStadiumItems, markEndingSeen, clearNotice, quit,
+      openStadiumItems, markEndingSeen, finishSeasonEvent, clearNotice, quit,
     },
   }
 }

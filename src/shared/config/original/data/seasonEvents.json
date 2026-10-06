@@ -1,0 +1,2984 @@
+[
+ {
+  "id": 400,
+  "audience": 4,
+  "repeatable": false,
+  "trigger": 0,
+  "requiresEvent": 0,
+  "dateFrom": [
+   0,
+   0
+  ],
+  "dateTo": [
+   0,
+   0
+  ],
+  "conditions": [],
+  "commands": [
+   {
+    "op": "say",
+    "text": "모두 주목! 우리 %s 구단은 매년 막강한 전력으로 우승후보로 손꼽히지만",
+    "speaker": 2,
+    "format": 9,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 30,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 37,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 23,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 16,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "항상 뒷심 부족으로 중하위권에서 머무르고 있다.",
+    "speaker": 2,
+    "format": 9,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 30,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 39,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 25,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 22,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "하지만 지금부터는 다르다. 우리는 그 어떤 팀보다 많은 훈련을 소화했다.",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 30,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 37,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 23,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "흘린 땀과 노력은 결코 자신을 배신하지 않는다. 올해 목표는 우승이다!!",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 30,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 37,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 23,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 19,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "라고 말하고 싶지만, 차근 차근 한걸음씩 나아가는 것도 중요하다.",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 30,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 37,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 23,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 16,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "먼저 포스트 시즌 진출을 목표로 선수들 모두 힘내보자! 나를 따르라!!",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 30,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 37,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 23,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 19,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "오오오오!!!!!",
+    "speaker": 23,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 33,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 38,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 24,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 19,
+      "side": "right"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": 392,
+  "audience": 0,
+  "repeatable": false,
+  "trigger": 0,
+  "requiresEvent": 0,
+  "dateFrom": [
+   0,
+   0
+  ],
+  "dateTo": [
+   0,
+   0
+  ],
+  "conditions": [],
+  "commands": [
+   {
+    "op": "say",
+    "text": "정규시즌이 종료되었구나. 올해의 목표를 얼마나 달성했는지 볼까?",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 16,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "system",
+    "sub": 1,
+    "arg": 8
+   }
+  ]
+ },
+ {
+  "id": 393,
+  "audience": 0,
+  "repeatable": false,
+  "trigger": 0,
+  "requiresEvent": 0,
+  "dateFrom": [
+   0,
+   0
+  ],
+  "dateTo": [
+   0,
+   0
+  ],
+  "conditions": [],
+  "commands": [
+   {
+    "op": "say",
+    "text": "5개 목표를 모두 달성했다.",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "고생 끝에 즐거움이 오는구나. 선수단 모두가 자랑스럽다!",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "sound",
+    "id": 36
+   },
+   {
+    "op": "reward",
+    "items": [
+     {
+      "kind": 0,
+      "value": 25
+     },
+     {
+      "kind": 1,
+      "value": 30
+     },
+     {
+      "kind": 3,
+      "value": 35
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": 394,
+  "audience": 0,
+  "repeatable": false,
+  "trigger": 0,
+  "requiresEvent": 0,
+  "dateFrom": [
+   0,
+   0
+  ],
+  "dateTo": [
+   0,
+   0
+  ],
+  "conditions": [],
+  "commands": [
+   {
+    "op": "say",
+    "text": "4개 목표를 달성했다.",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "1개를 달성하지 못했지만 수고 많았다. 모두를 칭찬해줘야겠군.",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "sound",
+    "id": 35
+   },
+   {
+    "op": "reward",
+    "items": [
+     {
+      "kind": 0,
+      "value": 20
+     },
+     {
+      "kind": 3,
+      "value": 20
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": 395,
+  "audience": 0,
+  "repeatable": false,
+  "trigger": 0,
+  "requiresEvent": 0,
+  "dateFrom": [
+   0,
+   0
+  ],
+  "dateTo": [
+   0,
+   0
+  ],
+  "conditions": [],
+  "commands": [
+   {
+    "op": "say",
+    "text": "3개 목표를 달성했구나.",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 16,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "평범한 수준이다. 좀 더 좋은 결과를 낼 수 있도록 노력하자. ",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 16,
+      "side": "right"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": 396,
+  "audience": 0,
+  "repeatable": false,
+  "trigger": 0,
+  "requiresEvent": 0,
+  "dateFrom": [
+   0,
+   0
+  ],
+  "dateTo": [
+   0,
+   0
+  ],
+  "conditions": [],
+  "commands": [
+   {
+    "op": "say",
+    "text": "반도 달성하지 못했다.",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 20,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "이거 참... 이런 식으로 하다간 감독에서 잘리겠는데...",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 22,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "sound",
+    "id": 51
+   },
+   {
+    "op": "reward",
+    "items": [
+     {
+      "kind": 0,
+      "value": -10
+     },
+     {
+      "kind": 1,
+      "value": -5
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": 370,
+  "audience": 0,
+  "repeatable": false,
+  "trigger": 0,
+  "requiresEvent": 0,
+  "dateFrom": [
+   0,
+   0
+  ],
+  "dateTo": [
+   0,
+   0
+  ],
+  "conditions": [],
+  "commands": [
+   {
+    "op": "say",
+    "text": "정규리그도 끝났겠다.",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 30,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 37,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 23,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 16,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "어떤 타자가 잘했는지 확인해볼까?",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 30,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 37,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 23,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 16,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "system",
+    "sub": 3,
+    "arg": 8
+   }
+  ]
+ },
+ {
+  "id": 371,
+  "audience": 0,
+  "repeatable": false,
+  "trigger": 0,
+  "requiresEvent": 0,
+  "dateFrom": [
+   0,
+   0
+  ],
+  "dateTo": [
+   0,
+   0
+  ],
+  "conditions": [],
+  "commands": [
+   {
+    "op": "say",
+    "text": "이번엔 어떤 투수가 잘했는지 확인해볼까?",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 30,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 37,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 23,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 16,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "system",
+    "sub": 3,
+    "arg": 8
+   }
+  ]
+ },
+ {
+  "id": 372,
+  "audience": 0,
+  "repeatable": false,
+  "trigger": 0,
+  "requiresEvent": 0,
+  "dateFrom": [
+   0,
+   0
+  ],
+  "dateTo": [
+   0,
+   0
+  ],
+  "conditions": [],
+  "commands": [
+   {
+    "op": "say",
+    "text": "우리 팀 타자는 한명도 수상하지 못했구나... 어이 타자들 좀 더 분발해봐.",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 33,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 39,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 25,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 22,
+      "side": "right"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": 373,
+  "audience": 0,
+  "repeatable": false,
+  "trigger": 0,
+  "requiresEvent": 0,
+  "dateFrom": [
+   0,
+   0
+  ],
+  "dateTo": [
+   0,
+   0
+  ],
+  "conditions": [],
+  "commands": [
+   {
+    "op": "say",
+    "text": "우리 팀에 우수 타자 수상자가 있구나! 아주 잘했어! 수고 많았다!",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 30,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 38,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 24,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "sound",
+    "id": 35
+   },
+   {
+    "op": "reward",
+    "items": [
+     {
+      "kind": 1,
+      "value": 10
+     },
+     {
+      "kind": 3,
+      "value": 5
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": 374,
+  "audience": 0,
+  "repeatable": false,
+  "trigger": 0,
+  "requiresEvent": 0,
+  "dateFrom": [
+   0,
+   0
+  ],
+  "dateTo": [
+   0,
+   0
+  ],
+  "conditions": [],
+  "commands": [
+   {
+    "op": "say",
+    "text": "우리 팀 투수는 한명도 수상하지 못했구나... 모두 좀 더 분발해야되지 않겠어?",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 33,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 39,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 25,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 22,
+      "side": "right"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": 375,
+  "audience": 0,
+  "repeatable": false,
+  "trigger": 0,
+  "requiresEvent": 0,
+  "dateFrom": [
+   0,
+   0
+  ],
+  "dateTo": [
+   0,
+   0
+  ],
+  "conditions": [],
+  "commands": [
+   {
+    "op": "say",
+    "text": "우리 팀에 우수 투수 수상자가 있구나! 아주 잘했어! 수고 많았다!",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 30,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 38,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 24,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 16,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "sound",
+    "id": 35
+   },
+   {
+    "op": "reward",
+    "items": [
+     {
+      "kind": 1,
+      "value": 10
+     },
+     {
+      "kind": 3,
+      "value": 5
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": 376,
+  "audience": 0,
+  "repeatable": false,
+  "trigger": 0,
+  "requiresEvent": 0,
+  "dateFrom": [
+   0,
+   0
+  ],
+  "dateTo": [
+   0,
+   0
+  ],
+  "conditions": [],
+  "commands": [
+   {
+    "op": "say",
+    "text": "이제 별 중의 별 MVP 선발만 남았어... 이거 내가 다 떨리는 걸...",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 30,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 41,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 28,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 20,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "system",
+    "sub": 4,
+    "arg": 8
+   }
+  ]
+ },
+ {
+  "id": 378,
+  "audience": 0,
+  "repeatable": false,
+  "trigger": 0,
+  "requiresEvent": 0,
+  "dateFrom": [
+   0,
+   0
+  ],
+  "dateTo": [
+   0,
+   0
+  ],
+  "conditions": [],
+  "commands": [
+   {
+    "op": "say",
+    "text": "우리 팀에서 MVP는...역시 선정되지 못했군. 내년엔 좋은 결과를 기대해보자.",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 33,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 39,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 25,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 22,
+      "side": "right"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": 379,
+  "audience": 0,
+  "repeatable": false,
+  "trigger": 0,
+  "requiresEvent": 0,
+  "dateFrom": [
+   0,
+   0
+  ],
+  "dateTo": [
+   0,
+   0
+  ],
+  "conditions": [],
+  "commands": [
+   {
+    "op": "say",
+    "text": "우리 팀에서 MVP가 선정되었다!! 으하하 이게 다 감독이 잘 지도한 덕분...",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 30,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 41,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 24,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 20,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "아니... 너희가 잘 해준거거지... 선수들 모두 고생많았다.",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 30,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 38,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 28,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "어쨌든 경축이다! 풍악을 울려라!",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 30,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 38,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 28,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "sound",
+    "id": 36
+   },
+   {
+    "op": "reward",
+    "items": [
+     {
+      "kind": 0,
+      "value": 10
+     },
+     {
+      "kind": 1,
+      "value": 20
+     },
+     {
+      "kind": 3,
+      "value": 10
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": 401,
+  "audience": 0,
+  "repeatable": false,
+  "trigger": 0,
+  "requiresEvent": 0,
+  "dateFrom": [
+   0,
+   0
+  ],
+  "dateTo": [
+   0,
+   0
+  ],
+  "conditions": [],
+  "commands": [
+   {
+    "op": "say",
+    "text": "정규시즌 우승!!!! 한국시리즈 직행이다!",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 30,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 39,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 25,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "이 자리에 서기까지 힘내준 선수단 모두에게 이 영광을 돌린다.",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 30,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 39,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 25,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "하지만! 아직 우리의 여정은 끝나지 않았다. 이 기세를 몰아 한국시리즈에서도 우승한다!",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 30,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 37,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 23,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 19,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "모두 영광스러운 챔피언의 자리에 오를 준비됐나!!!",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 30,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 37,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 23,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 19,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "네!!!",
+    "speaker": 23,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 33,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 38,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 24,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 19,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "sound",
+    "id": 35
+   },
+   {
+    "op": "reward",
+    "items": [
+     {
+      "kind": 0,
+      "value": 15
+     },
+     {
+      "kind": 1,
+      "value": 20
+     },
+     {
+      "kind": 3,
+      "value": 30
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": 402,
+  "audience": 0,
+  "repeatable": false,
+  "trigger": 0,
+  "requiresEvent": 0,
+  "dateFrom": [
+   0,
+   0
+  ],
+  "dateTo": [
+   0,
+   0
+  ],
+  "conditions": [],
+  "commands": [
+   {
+    "op": "say",
+    "text": "정규시즌 4위 이내에 안착! 플레이오프 진출이다!",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 30,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 37,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 23,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 16,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "아쉽게 1위로 직행하진 못했지만, 어찌됐건 나가는건 나가는거다!",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 30,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 37,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 23,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "정규시즌에서의 아쉬움은 플레이오프에서 설욕해라! 모두 우승을 목표로 나가자!",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 30,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 37,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 23,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "모두 우승을 목표로 달려갈 준비 됐나?!",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 30,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 37,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 23,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 19,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "네!!!",
+    "speaker": 23,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 33,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 38,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 24,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 19,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "sound",
+    "id": 35
+   },
+   {
+    "op": "reward",
+    "items": [
+     {
+      "kind": 0,
+      "value": 10
+     },
+     {
+      "kind": 1,
+      "value": 10
+     },
+     {
+      "kind": 3,
+      "value": 10
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": 403,
+  "audience": 0,
+  "repeatable": false,
+  "trigger": 0,
+  "requiresEvent": 0,
+  "dateFrom": [
+   0,
+   0
+  ],
+  "dateTo": [
+   0,
+   0
+  ],
+  "conditions": [],
+  "commands": [
+   {
+    "op": "say",
+    "text": "......",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 30,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 39,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 23,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 16,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "....플레이 오프에 진출하지 못했다.",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 33,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 39,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 25,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 22,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "열심히 플레이 해준 너희들이 무슨 잘못이 있겠냐? 다 이 감독이 부족한 탓이다.",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 33,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 39,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 25,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 22,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "아닙니다! 선수들이 잘못한거에요! 저희를 혼내주세요! 감독님께선 훌륭하셨습니다!",
+    "speaker": 23,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 30,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 41,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 25,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 22,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "그래...너희들이 그렇게까지 말해준다면야...",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 30,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 39,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 25,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 22,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "내일부터 지옥훈련이다!!! 다 죽었다고 복창해라! 내년에는 기필코 우승한다!! 알겠나!!!",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 30,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 39,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 25,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 19,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "...네!...네?!",
+    "speaker": 23,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 33,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 41,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 25,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 19,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "sound",
+    "id": 51
+   },
+   {
+    "op": "reward",
+    "items": [
+     {
+      "kind": 0,
+      "value": -5
+     },
+     {
+      "kind": 1,
+      "value": -20
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": 461,
+  "audience": 0,
+  "repeatable": false,
+  "trigger": 0,
+  "requiresEvent": 0,
+  "dateFrom": [
+   0,
+   0
+  ],
+  "dateTo": [
+   0,
+   0
+  ],
+  "conditions": [],
+  "commands": [
+   {
+    "op": "say",
+    "text": "2년에 한번 치러지는 !cFFFF00국가대항전!cFFFFFF이 개막한다!",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 30,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 37,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 23,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 19,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "어때? 모두 국가의 명예를 걸고 싸울 준비 됐나?",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 30,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 37,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 23,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "네!!!",
+    "speaker": 23,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 33,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 38,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 24,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": 490,
+  "audience": 4,
+  "repeatable": true,
+  "trigger": 0,
+  "requiresEvent": 0,
+  "dateFrom": [
+   1,
+   1
+  ],
+  "dateTo": [
+   13,
+   45
+  ],
+  "conditions": [
+   {
+    "type": 22,
+    "value": 0
+   }
+  ],
+  "commands": [
+   {
+    "op": "say",
+    "text": "이런! 선수 사이에서 질병이 유행하고 있잖아!!",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 20,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "빨리 !cFF6600병원!cFFFFFF에 보내야겠다!",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 22,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "sound",
+    "id": 33
+   },
+   {
+    "op": "reward",
+    "items": [
+     {
+      "kind": 11,
+      "value": 0
+     }
+    ]
+   },
+   {
+    "op": "system",
+    "sub": 0,
+    "arg": 49,
+    "text": "!C질병으로 선수 능력치!N가 !cFF000030% 감소!cFFFFFF하였습니다!N병원의 입원, GP아이템!N!cFFFF00종합건강진단!cFFFFFF으로 회복!N시킬 수 있습니다"
+   }
+  ]
+ },
+ {
+  "id": 1,
+  "audience": 4,
+  "repeatable": false,
+  "trigger": 0,
+  "requiresEvent": 0,
+  "dateFrom": [
+   1,
+   1
+  ],
+  "dateTo": [
+   1,
+   1
+  ],
+  "conditions": [],
+  "commands": [
+   {
+    "op": "say",
+    "text": "시즌모드를 시작한 것을 환영한다!",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "모드 진행에 앞서 감독의 친절한 설명을 들어볼텐가?",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "choice",
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 16,
+      "side": "right"
+     }
+    ],
+    "choices": [
+     {
+      "text": "듣지 않는다.",
+      "gotoEvent": 2
+     },
+     {
+      "text": "기본 진행 방법을 듣는다.",
+      "gotoEvent": 3
+     },
+     {
+      "text": "관리 커맨드에 대하여 듣는다.",
+      "gotoEvent": 4
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": 2,
+  "audience": 0,
+  "repeatable": false,
+  "trigger": 0,
+  "requiresEvent": 1,
+  "dateFrom": [
+   0,
+   0
+  ],
+  "dateTo": [
+   0,
+   0
+  ],
+  "conditions": [],
+  "commands": [
+   {
+    "op": "say",
+    "text": "그..그래? 이것 참 많이 준비했는데 씁쓸하구먼...",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 22,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "그럼 구단의 정보를 확인한 후에 트레이닝부터 시작해보도록!",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 16,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "궁금한 것이 생기면 [!cFFFF00도움말!cFFFFFF]을 참고해.",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "sound",
+    "id": 52
+   },
+   {
+    "op": "system",
+    "sub": 0,
+    "arg": 58,
+    "text": "!C하단 첫 번째에 위치한!N[!c00CC00시즌정보!cFFFFFF] 커맨드를 통해!N팀 능력치, 아이템, 선수정보!N기록을 확인할 수 있습니다"
+   },
+   {
+    "op": "sound",
+    "id": 52
+   },
+   {
+    "op": "system",
+    "sub": 0,
+    "arg": 59,
+    "text": "!C하단 세 번째에 위치한!N[!c00CC00트레이닝!cFFFFFF] 커맨드를 통해!N팀 능력치를 상승시킵니다!N!N모든 선수 능력치에 일정!N비율의 보너스를 추가시킵니다"
+   }
+  ]
+ },
+ {
+  "id": 3,
+  "audience": 0,
+  "repeatable": false,
+  "trigger": 0,
+  "requiresEvent": 1,
+  "dateFrom": [
+   0,
+   0
+  ],
+  "dateTo": [
+   0,
+   0
+  ],
+  "conditions": [],
+  "commands": [
+   {
+    "op": "say",
+    "text": "기본적인 진행 방법은 나만의 리그와 비슷하다.",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 16,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "1년 정규시즌 45경기에서 4위 이내에 들고, 포스트시즌에 진출하여 우승하는 것이 목표지!",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "단, 자네가 팀의 모든 선수와 구단의 상태를 관리한다는 것이 다른 점이야.",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "경기 내용에 따라 !cFFFF00인기도와 평판!cFFFFFF을 평가를 받고 다음 경기 관중 수가 달라지지. ",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 16,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "관중이 많을수록 돈을 많이 벌 수 있는 건 당연하겠지? 한마디로 멋진 경기를 해야된다는 거야.",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 16,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "소지금이 많아야 !cFFFF00구장도 업그레이드!cFFFFFF하고, 애들 !cFFFF00장착 아이템!cFFFFFF도 사줄 수 있으니까 열심히 해줘... ",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 22,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "더 듣고 싶은 것은 없나?",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 16,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "choice",
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 16,
+      "side": "right"
+     }
+    ],
+    "choices": [
+     {
+      "text": "듣지 않는다.",
+      "gotoEvent": 2
+     },
+     {
+      "text": "관리 커맨드에 대하여 듣는다.",
+      "gotoEvent": 4
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": 4,
+  "audience": 0,
+  "repeatable": false,
+  "trigger": 0,
+  "requiresEvent": 1,
+  "dateFrom": [
+   0,
+   0
+  ],
+  "dateTo": [
+   0,
+   0
+  ],
+  "conditions": [],
+  "commands": [
+   {
+    "op": "say",
+    "text": "2경기마다 !cFFFF00관리커맨드!cFFFFFF를 사용할 수 있어. 여기서 트레이닝을 하거나 외출을 할 수 있지.",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 16,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "단! 트레이닝이나 외출을 하면 !cFFFFFF사기!cFFFFFF가 떨어져.",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 22,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "사기가 너무 낮아지면 선수의 능력치가 감소하거나 부상을 당할 확률이 올라가니까 주의하라고!",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 22,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "사기를 회복하려면 번화가로 외출해서 !cFFFF00회식!cFFFFFF을 하거나,",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 16,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "!cFFFF00GP아이템!cFFFFFF 샵에서 !cFFFF00영지버섯!cFFFFFF을 사먹으면 되지. ",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 16,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "한번에 트레이닝, 외출 중 딱 !cFFFF00한 가지 일!cFFFFFF만 할 수 있으니 전략적으로 생각해.  ",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "더 듣고 싶은 것은 없나?",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "choice",
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ],
+    "choices": [
+     {
+      "text": "듣지 않는다.",
+      "gotoEvent": 2
+     },
+     {
+      "text": "기본 진행 방법을 듣는다.",
+      "gotoEvent": 3
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": 5,
+  "audience": 4,
+  "repeatable": false,
+  "trigger": 0,
+  "requiresEvent": 0,
+  "dateFrom": [
+   1,
+   3
+  ],
+  "dateTo": [
+   1,
+   3
+  ],
+  "conditions": [],
+  "commands": [
+   {
+    "op": "say",
+    "text": "어때 시즌 모드는 할만한가? 경기설정은 해봤고?",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "언제나 경기정보에서 [!cFFFF000 경기설정!cFFFFFF]를 눌러 설정할 수 있지.",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "우리 %s 구단에서 야심차게 준비한 시스템이니 잘 써먹어보라고!",
+    "speaker": 2,
+    "format": 9,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "그건 그렇고 감독의 친절한 설명을 더 들어볼텐가?",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "choice",
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 16,
+      "side": "right"
+     }
+    ],
+    "choices": [
+     {
+      "text": "듣지 않는다.",
+      "gotoEvent": 6
+     },
+     {
+      "text": "구단 관리에 대하여 듣는다.",
+      "gotoEvent": 7
+     },
+     {
+      "text": "선수 장비에 관하여 듣는다.",
+      "gotoEvent": 8
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": 6,
+  "audience": 0,
+  "repeatable": false,
+  "trigger": 0,
+  "requiresEvent": 5,
+  "dateFrom": [
+   0,
+   0
+  ],
+  "dateTo": [
+   0,
+   0
+  ],
+  "conditions": [],
+  "commands": [
+   {
+    "op": "say",
+    "text": "그..그래? 이것 참 많이 준비했는데 씁쓸하구먼...",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 22,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "저번에도 그리 매몰차게 거절했으면서... 자넨 차가운 도시남자군?",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 22,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "나를 조금 더 소중하게 대해줬으면 좋겠어... 이래봬도 유리같이 섬세한 남자라고...",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 22,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "sound",
+    "id": 52
+   },
+   {
+    "op": "system",
+    "sub": 0,
+    "arg": 81,
+    "text": "!C하단 두 번째에 위치한!N[!c00CC00구단관리!cFFFFFF] 커맨드를 통해!N구단관리, 트레이드, 선수영입!N코치채용을 할 수 있습니다"
+   },
+   {
+    "op": "sound",
+    "id": 52
+   },
+   {
+    "op": "system",
+    "sub": 0,
+    "arg": 82,
+    "text": "!C하단 다섯 번째에 위치한!N[!c00CC00아이템!cFFFFFF] 커맨드를 통해!N장착 아이템, 구장 아이템!N서브 아이템, GP 아이템을!N구매할 수 있습니다"
+   }
+  ]
+ },
+ {
+  "id": 7,
+  "audience": 0,
+  "repeatable": false,
+  "trigger": 0,
+  "requiresEvent": 5,
+  "dateFrom": [
+   0,
+   0
+  ],
+  "dateTo": [
+   0,
+   0
+  ],
+  "conditions": [],
+  "commands": [
+   {
+    "op": "say",
+    "text": "구단관리 커맨드는 시즌 모드의 핵심이라고 할 수 있지!",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "[!cFFFF00구장관리!cFFFFFF]는 말그대로 우리 팀의 구단을 관리하고 업그레이드 하는 거야.",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 16,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "[!cFFFF00아이템!cFFFFFF]에서 구장아이템을 구매하여 변경할 수 있지!",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 16,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "[!cFFFF00트레이드!cFFFFFF]는 우리 팀의 선수와 다른 팀의 선수를 맞바꾸는거야.",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 16,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "다른 팀의 슈퍼스타를 모두 데리고 와서 엔트리를 꾸밀 수 있다니 꿈같지 않나?.",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "!cFFFF00G포인트!cFFFFFF를 써서 트레이드 성공률을 더 증가시킬 수도 있으니 참고하도록!",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "[!cFFFF00선수영입!cFFFFFF]은 나만의 리그에서 육성중인 선수나 명예의 전당에 등록된 선수를 영입하는거지.",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 16,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "시즌 중간에도 언제든지 그들을 불러올 수 있으니까 아주 쓸모있다고!",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "마지막으로 [!cFFFF00코치채용!cFFFFFF]은 마선수들을 코치로 채용하는 거야.",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 16,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "그들의 노하우 전수로 모든 선수들에게 능력치 보너스가 붙지. 단 계약금이 필요해!",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 16,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "더 듣고 싶은 것은 없나?",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "choice",
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 16,
+      "side": "right"
+     }
+    ],
+    "choices": [
+     {
+      "text": "듣지 않는다.",
+      "gotoEvent": 6
+     },
+     {
+      "text": "선수 장비에 관하여 듣는다.",
+      "gotoEvent": 8
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": 8,
+  "audience": 0,
+  "repeatable": false,
+  "trigger": 0,
+  "requiresEvent": 5,
+  "dateFrom": [
+   0,
+   0
+  ],
+  "dateTo": [
+   0,
+   0
+  ],
+  "conditions": [],
+  "commands": [
+   {
+    "op": "say",
+    "text": "눈썰미가 있구만! 그래 모든 선수들에게 장착 아이템을 사줄 수 있지!",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "팀의 모든 선수가 반짝반짝한 히든 아이템으로 무장하고 있는 모습이 보고 싶지 않나?!",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "[!cFFFF00아이템!cFFFFFF]의 장착아이템 샵에서 구매할 수 있다네.",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "그런데 우리 애들한테 아이템 사주려면 돈이 필요하잖아.",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 16,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "하지만 우리 구단엔 돈이 없잖아. ",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 22,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "우린 안될꺼야 아마...",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 22,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "이게 아니라! 그러니까 돈을 많이 벌어야 해! 경기에서 승리! 무조건 승리! 멋지게 승리다! 알겠지!",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 19,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "더 듣고 싶은 것은 없나?",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 19,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "choice",
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ],
+    "choices": [
+     {
+      "text": "듣지 않는다.",
+      "gotoEvent": 6
+     },
+     {
+      "text": "구단 관리에 대하여 듣는다.",
+      "gotoEvent": 7
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": 100,
+  "audience": 4,
+  "repeatable": false,
+  "trigger": 0,
+  "requiresEvent": 0,
+  "dateFrom": [
+   1,
+   21
+  ],
+  "dateTo": [
+   1,
+   21
+  ],
+  "conditions": [],
+  "commands": [
+   {
+    "op": "say",
+    "text": "시즌모드를 20경기동안 진행하느라 니들이 고생이 많았다.",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 16,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "혹시 시즌모드 가보라고 하도 뭐라해서 여기까지 온거라면,",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 22,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "새로운 모습을 빨리 보여주고 싶은 마음에 그런거니까 너그럽게 이해하길 바란다.",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 16,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "자... 약속대로 G포인트를 지급하지.",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "sound",
+    "id": 35
+   },
+   {
+    "op": "reward",
+    "items": [
+     {
+      "kind": 10,
+      "value": 1000
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "마지막으로 우승하면 G포인트를 획득하는 기회도 있으니 더 많이 즐겨보도록!",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "sound",
+    "id": 52
+   },
+   {
+    "op": "system",
+    "sub": 0,
+    "arg": 105,
+    "text": "!C시즌모드 우승 횟수에 따라!N!cFFFF00G포인트!cFFFFFF를 획득가능합니다!N!N[!cFFFF00스페셜!cFFFFFF] - [!cFFFF00기록연감!cFFFFFF]의!N기록 탭에서 자세한 조건!N을 확인할 수 있습니다"
+   }
+  ]
+ },
+ {
+  "id": 500,
+  "audience": 0,
+  "repeatable": false,
+  "trigger": 0,
+  "requiresEvent": 0,
+  "dateFrom": [
+   0,
+   0
+  ],
+  "dateTo": [
+   0,
+   0
+  ],
+  "conditions": [],
+  "commands": [
+   {
+    "op": "sound",
+    "id": 2
+   },
+   {
+    "op": "say",
+    "text": "오랫동안 이 감독을 믿고 따라준 선수들 모두에게 감사한다.",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 30,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 37,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 23,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 16,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "이것으로 시즌모드 10년은 모두 종료되었다! 하지만 이것으로 끝이 아니다!",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 46,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 39,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 25,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "이제부터 우리가 나아갈 곳은 바로 !cFFFF00대전모드!cFFFFFF다!!",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 46,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 39,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 25,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 17,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "더 큰 세계를 향해 도전해보자! 알겠나!!",
+    "speaker": 2,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 44,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 41,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 28,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 19,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "say",
+    "text": "오오오오!!!",
+    "speaker": 23,
+    "format": 0,
+    "portraits": [
+     {
+      "file": "event_char_0",
+      "animation": 45,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 38,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 24,
+      "side": "left"
+     },
+     {
+      "file": "event_char_0",
+      "animation": 19,
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "op": "reward",
+    "items": [
+     {
+      "kind": 21,
+      "value": 0
+     }
+    ]
+   }
+  ]
+ }
+]

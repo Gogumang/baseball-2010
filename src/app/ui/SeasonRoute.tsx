@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import {
-  GameIncomeScreen, NextGameScreen, PlayerRecruitScreen, PostseasonStartScreen, RegularSeasonRankScreen,
+  GameIncomeScreen, NextGameScreen, PlayerRecruitScreen,
   SeasonEndingScreen, SeasonGoalsScreen, SeasonItemMenuScreen, SeasonManagementScreen, SeasonMvpScreen,
   SeasonOutingScreen, SeasonSummaryScreen, SeasonTeamMenuScreen, SeasonTitleAwardScreen,
   SeasonTrainingScreen, StadiumShopScreen, TradeScreen, CoachHireScreen, SEASON_MVP_LEADER_KINDS,
@@ -19,7 +19,10 @@ import { judgeTitles, leagueRecordsOf } from '@/entities/awards/model/seasonAwar
 import { leaderOf } from '@/entities/awards/model/leaderboard'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { TeamSelectScreen } from '@/pages/create-player/ui/TeamSelectScreen'
-import { MessageBox, RawScreen } from '@/shared/ui'
+import { MessageBox, RawScreen, ScreenOverlay } from '@/shared/ui'
+import { StoryScreen } from '@/pages/story/ui/StoryScreen'
+import { SEASON_GOAL_WINDOW_SUB, SEASON_PLAYABLE_EVENTS } from '@/entities/season-mode/model/seasonEventFlow'
+import { seasonGoalWindowText } from '@/pages/season/lib/seasonGoalLines'
 import { SEASON_SCENE_STATE } from '@/entities/season-mode/model/seasonStateMachine'
 import { applySeasonReward, judgeSeasonEnding } from '@/entities/season-mode/model/seasonRewards'
 import type { PostseasonSeries } from '@/entities/league/model/league'
@@ -85,6 +88,36 @@ export function SeasonRoute({ session, random, gameSettings, onExit, aceSelect }
 
   const backToManagement = () => actions.goto(SEASON_SCENE_STATE.관리메뉴)
   const backToTeamMenu = () => actions.goto(SEASON_SCENE_STATE.구단관리)
+  // 목표 판정 0xa37bc 의 다섯 칸 — 시즌정보 화면과 목표 창(SYS sub 1)이 같은 값을 본다
+  const goalInput = seasonGoalInputOf({ state, league, roster, playerStats, series })
+
+  // 이벤트 재생 0xd3 (갱신 0x5110 · 키 0x90ec · 그리기 0xa09c → 대화창 0x8b5ac).
+  // ⚠️ 근사: 원본은 대화창 아래에 공통 틀(0x9f60, 이전 상태가 외출 지도면 지도)을 그린다 — 웹은 대화창만 얹는다.
+  if (scene === SEASON_SCENE_STATE.이벤트재생 && session.eventPlayback !== null) {
+    const playback = session.eventPlayback
+    const event = SEASON_PLAYABLE_EVENTS.find((candidate) => candidate.id === playback.eventId)
+    if (event !== undefined) {
+      return (
+        <RawScreen>
+          <ScreenOverlay>
+            <StoryScreen
+              key={playback.serial}
+              events={SEASON_PLAYABLE_EVENTS}
+              event={event}
+              // 화자 1(플레이어)은 s_event 에 없다. fmt 9 의 %s 는 구단 이름(SR+0x17c)이다
+              playerName={state.record.name}
+              teamName={state.record.name}
+              onComplete={actions.finishSeasonEvent}
+              // s_event 에는 경기(match) 명령이 없다
+              onMatch={() => undefined}
+              systemWindowTextOf={(command) =>
+                command.sub === SEASON_GOAL_WINDOW_SUB ? seasonGoalWindowText(state.record.yearIndex, goalInput) : null}
+            />
+          </ScreenOverlay>
+        </RawScreen>
+      )
+    }
+  }
 
   if (scene === SEASON_SCENE_STATE.관리메뉴) {
     return (
@@ -283,8 +316,8 @@ export function SeasonRoute({ session, random, gameSettings, onExit, aceSelect }
     return (
       <SeasonGoalsScreen
         yearIndex={state.record.yearIndex}
-        // 목표 판정 0xa37bc 의 다섯 칸 — 팀 타율 0xa3700 · 팀 방어율 0xa3764 는 리그 선수 기록표에서 센다
-        input={seasonGoalInputOf({ state, league, roster, playerStats, series })}
+        // 팀 타율 0xa3700 · 팀 방어율 0xa3764 는 리그 선수 기록표에서 센다 (`seasonGoalInputOf`)
+        input={goalInput}
         onBack={backToManagement}
       />
     )
@@ -305,8 +338,10 @@ export function SeasonRoute({ session, random, gameSettings, onExit, aceSelect }
   }
 
   // ── 시즌 끝 사슬 (0xee → 0xeb → 0xec → 0xed → 0xf0 → 0xef) ──────────────────
-  if (scene === SEASON_SCENE_STATE.포스트시즌시작) {
-    return <PostseasonStartScreen series={series} onNext={actions.nextSeasonEndStep} />
+  // 0xee 포스트시즌 시작 · 0xf0 정규시즌 순위 — 그리기는 공통 틀(0xa008 · 0x9ff0 → 0x9f60)뿐이고 진입 함수가
+  // phase 를 세우고 이벤트(392 · 401~403)를 튼다. 세션이 들어온 틀에 곧장 0xd3 으로 넘긴다
+  if (scene === SEASON_SCENE_STATE.포스트시즌시작 || scene === SEASON_SCENE_STATE.정규시즌순위) {
+    return <RawScreen>{null}</RawScreen>
   }
 
   if (scene === SEASON_SCENE_STATE.타자시상 || scene === SEASON_SCENE_STATE.투수시상) {
@@ -343,12 +378,6 @@ export function SeasonRoute({ session, random, gameSettings, onExit, aceSelect }
         // MVP 보상 — 379(내 팀)면 인기도 +10 · 평판 +20 · 소지금 +10
         onNext={() => actions.nextSeasonEndStep(seasonAwardRewardOf(seasonMvpResultEventId(isMine)))}
       />
-    )
-  }
-
-  if (scene === SEASON_SCENE_STATE.정규시즌순위) {
-    return (
-      <RegularSeasonRankScreen league={league} teamId={state.record.teamId} onNext={actions.nextSeasonEndStep} />
     )
   }
 

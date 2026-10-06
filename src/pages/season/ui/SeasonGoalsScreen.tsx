@@ -1,13 +1,12 @@
 import { RawScreen } from '@/shared/ui'
 import {
   SEASON_GOAL_REWARDS, achievedSeasonGoalCount, seasonGoalResultEventId, seasonGoalYearBonusOf,
-  seasonGoalsOf, winRatePercentOf,
 } from '@/entities/season-mode/model/seasonGoals'
 import type { SeasonGoalInput } from '@/entities/season-mode/model/seasonGoals'
 import { SeasonListWindow } from '@/widgets/season/ui/SeasonListWindow'
 import type { SeasonListRow } from '@/widgets/season/ui/SeasonListWindow'
 import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
-import { battingAverageTextOf, earnedRunAverageTextOf } from '@/widgets/season/lib/seasonText'
+import { SEASON_GOAL_MARK, seasonGoalLinesOf } from '@/pages/season/lib/seasonGoalLines'
 
 export interface SeasonGoalsScreenProps {
   /** 0-기준 연차 (SR+0xb3). 표 `0xd7cf6` 는 `[연차idx × 5 + i]` 로 읽는다 */
@@ -16,9 +15,6 @@ export interface SeasonGoalsScreenProps {
   readonly input: SeasonGoalInput
   readonly onBack: () => void
 }
-
-/** 달성 표시 (**근사** — 원본 표시 기호는 확인하지 못했다) */
-const MARK = { done: '○', yet: '×' } as const
 
 /**
  * 올해의 목표 — 표 `0xd7cf6`, 판정 `0xa37bc` (P4 2b 확정).
@@ -31,36 +27,10 @@ const MARK = { done: '○', yet: '×' } as const
  *    팀 타율(×1000)·팀 방어율(×100)의 표기도 근사다 (`seasonText.ts`).
  */
 export function SeasonGoalsScreen({ yearIndex, input, onBack }: SeasonGoalsScreenProps) {
-  const [rank, winRate, battingAverage, earnedRunAverage, popularityGain] = seasonGoalsOf(yearIndex)
-  const currentWinRate = winRatePercentOf(input.wins, input.losses)
-
-  const goals: readonly (readonly [string, string, string, boolean])[] = [
-    ['순위', `${rank + 1}위 이내`, `${input.rank + 1}위`, input.rank <= rank],
-    ['승률', `${winRate}% 이상`, `${currentWinRate}%`, currentWinRate >= winRate],
-    [
-      '팀 타율',
-      `${battingAverageTextOf(battingAverage)} 이상`,
-      battingAverageTextOf(input.teamBattingAverage),
-      input.teamBattingAverage >= battingAverage,
-    ],
-    [
-      '팀 방어율',
-      `${earnedRunAverageTextOf(earnedRunAverage)} 이하`,
-      earnedRunAverageTextOf(input.teamEarnedRunAverage),
-      input.teamEarnedRunAverage <= earnedRunAverage,
-    ],
-    [
-      '인기도 상승',
-      `${popularityGain} 이상`,
-      `${input.popularityGain}`,
-      input.popularityGain >= popularityGain,
-    ],
-  ]
-
-  const rows: readonly SeasonListRow[] = goals.map(([name, goal, current, achieved]) => ({
-    id: name,
-    label: `${achieved ? MARK.done : MARK.yet} ${name} ${goal}`,
-    value: current,
+  const rows: readonly SeasonListRow[] = seasonGoalLinesOf(yearIndex, input).map((line) => ({
+    id: line.name,
+    label: `${line.achieved ? SEASON_GOAL_MARK.done : SEASON_GOAL_MARK.yet} ${line.name} ${line.goal}`,
+    value: line.current,
   }))
 
   const achieved = achievedSeasonGoalCount(yearIndex, input)
