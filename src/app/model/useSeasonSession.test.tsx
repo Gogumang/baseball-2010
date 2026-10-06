@@ -866,6 +866,28 @@ describe('전역 G 지갑 (mgr[+0x64])', () => {
     expect(result.current.session.leagueFirstAwardedBits).toBe(1)
   })
 
+  it('리그 1위 G 를 받은 비트는 전역기록 +0x145 저장소에 남는다 — 새로 고쳐도 다시 안 준다 (0x9f709 · 저장 0x1f1b9)', () => {
+    const rewardStore = 메모리저장()
+    const 다시띄우기 = () =>
+      renderHook(() => useSeasonSession(메모리저장(), createSeededRandom(20100901), null, undefined, undefined, undefined, rewardStore))
+    const first = 다시띄우기()
+
+    act(() => first.result.current.actions.awardLeagueFirst({ threshold: 1, bit: 0, gamePoint: 3000 }))
+    act(() => first.result.current.actions.awardLeagueFirst({ threshold: 5, bit: 1, gamePoint: 10000 }))
+
+    expect(rewardStore.load()).toEqual({ awardedBits: 0b11 })
+    first.unmount()
+    // 시즌 저장이 따로 비어 있어도(새 시즌) 전역 칸은 그대로다
+    expect(다시띄우기().result.current.leagueFirstAwardedBits).toBe(0b11)
+  })
+
+  it('옛 저장(지급 비트 칸 없음)은 0 에서 시작한다', () => {
+    const { result } = renderHook(() =>
+      useSeasonSession(메모리저장(), createSeededRandom(20100901), null, undefined, undefined, undefined, 메모리저장()))
+
+    expect(result.current.leagueFirstAwardedBits).toBe(0)
+  })
+
   it('지옥훈련은 지갑에서 500G 를 뺀다 (0xa2fca)', () => {
     const { result } = 지갑띄우기(2000)
     act(() => result.current.session.actions.chooseTeam(0))

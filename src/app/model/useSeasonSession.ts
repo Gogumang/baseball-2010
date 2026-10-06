@@ -106,6 +106,8 @@ import { MORALE_LIMIT, POPULARITY_LIMIT, REPUTATION_LIMIT, MONEY_LIMIT, clampTo 
 import { isInfiniteGamePointOn } from '@/shared/lib/dev/devOptions'
 import type { GamePointWalletSession } from '@/entities/wallet/model/useGamePointWallet'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
+import { normalizeCollectionRewardRecord, withAwardedBit } from '@/entities/collection/model/collectionRewards'
+import type { CollectionRewardRecord } from '@/entities/collection/model/collectionRewards'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { GAME_POINT_USAGE } from '@/entities/collection/model/annalsStats'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
@@ -140,7 +142,7 @@ export interface SeasonSession {
   readonly gameOptions: TeamGameOptions | null
   /** 그 경기가 정규·포스트시즌·국가대항전 중 무엇인가 */
   readonly gameKind: SeasonGameKind
-  /** 전역 저장 +0x145 — 리그 1위 G 를 이미 받은 문턱 비트 */
+  /** 전역 저장 +0x145 — 리그 1위 G 를 이미 받은 문턱 비트 (`game_o.sav` 칸 — 웹은 `rewardStore` 에 저장) */
   readonly leagueFirstAwardedBits: number
   /**
    * 전역 기록 +0x64 — G포인트. **모드마다 다른 칸은 없다**(시즌 GP아이템 0x7c8c·0x801a 도
@@ -150,9 +152,9 @@ export interface SeasonSession {
   /**
    * 열린 구장 히든 아이템 id (관중석 13·14·15 · 전광판 16·17·18).
    * 원본 자리는 **전역 저장** `app[0xe0 + 종류×4 + (칸−4)]` 다 (S3 7절) — 시즌 레코드가 아니라
-   * 앱 저장에 있어 시즌을 새로 시작해도 남는다. 웹에는 그 전역 저장 객체가 없어
-   * `leagueFirstAwardedBits`(+0x145) 와 **같은 자리**(세션 상태)에 둔다.
-   * ⚠️ 그래서 웹에서는 새로 고치면 사라진다 — G(+0x64)는 지갑으로 옮겨 이 한계를 벗어났다.
+   * 앱 저장에 있어 시즌을 새로 시작해도 남는다. 웹에는 그 전역 저장 객체가 없어 세션 상태에 둔다.
+   * ⚠️ 그래서 웹에서는 새로 고치면 사라진다 — G(+0x64)는 지갑으로, 리그 1위 G 비트(+0x145)는 `rewardStore` 로
+   * 옮겨 이 한계를 벗어났다.
    */
   readonly openedStadiumIds: readonly number[]
   /**
@@ -666,6 +668,11 @@ export function useSeasonSession(
    * 안 넘기면(그 저장을 못 읽으면) 0x29 검사를 건너뛴다 (나리 쪽 `applyRegularSeasonReward` 와 같은 자세).
    */
   autobotBatInput?: () => SeasonAutobotBatInput | undefined,
+  /**
+   * 전역기록 `+0x145` 지급 비트를 담는 저장소 (`game_o.sav` 의 그 바이트 — `collectionRewards.ts`). 넘기면 리그 1위 G 를
+   * 받은 문턱이 새로 고쳐도 남는다. 안 넘기면 세션 상태로만 든다(테스트용 — 예전 동작).
+   */
+  rewardStore?: JsonStorePort,
 ): SeasonSession {
   const loaded = useRef<SeasonSave | null>(null)
   if (loaded.current === null) loaded.current = withSceneConstructed(normalizeSeasonSave(store.load() as Partial<SeasonSave> | null))
@@ -686,8 +693,14 @@ export function useSeasonSession(
   const [ownRotationShift, setOwnRotationShift] = useState(0)
   /** 지금 치르는 경기가 무엇인가 — 끝났을 때 어디로 정산할지 갈린다 */
   const [gameKind, setGameKind] = useState<SeasonGameKind>('정규')
-  /** 전역 저장 +0x145 — 리그 1위 G 를 이미 받은 문턱 비트 (시즌을 새로 해도 남는다) */
-  const [leagueFirstAwardedBits, setLeagueFirstAwardedBits] = useState(0)
+  /** 전역 저장 +0x145 — 리그 1위 G 를 이미 받은 문턱 비트 (시즌을 새로 해도 남는다, `rewardStore` 에 둔다) */
+  const [rewardRecord, setRewardRecord] = useState<CollectionRewardRecord>(
+    () => normalizeCollectionRewardRecord(rewardStore?.load()),
+  )
+  const leagueFirstAwardedBits = rewardRecord.awardedBits
+  useEffect(() => {
+    rewardStore?.save(rewardRecord)
+  }, [rewardRecord, rewardStore])
   /**
    * 지갑을 안 넘겼을 때만 쓰는 **세션 주머니** — 옛 동작 그대로다 (테스트용).
    * 지갑을 넘기면 이 칸은 놀고 `wallet.balance` 가 유일한 값이다.
@@ -703,9 +716,9 @@ export function useSeasonSession(
   const [preGameAces, setPreGameAces] = useState<PreGameAces>(PRE_GAME_ACES_START)
   const [pendingGame, setPendingGame] = useState<PendingSeasonGame | null>(null)
   const [isMatchSettingsOpen, setIsMatchSettingsOpen] = useState(false)
-  /** 전역 저장 app+0xe0 — 열린 구장 히든 아이템 id (S3 7절). 위 칸과 같은 자리에 둔다 */
+  /** 전역 저장 app+0xe0 — 열린 구장 히든 아이템 id (S3 7절). 웹은 세션 상태에 둔다(근사) */
   const [openedStadiumIds, setOpenedStadiumIds] = useState<readonly number[]>([])
-  /** 전역 해금표 app+0xc0 중 시즌모드가 연 칸 (0x29) — 위 칸과 같은 자리 */
+  /** 전역 해금표 app+0xc0 중 시즌모드가 연 칸 (0x29) — 세션 상태, 앱이 기록연감 해금 목록에 합친다 */
   const [openedHiddenIds, setOpenedHiddenIds] = useState<readonly number[]>([])
   /** 지금 결산 진입(0x6900) — 0x29 가 새로 열려 진입의 리그 1위 G 검사를 건너뛰었는가 (0x69ce → 0x6ac8) */
   const [summaryEntry, setSummaryEntry] = useState<SeasonSummaryEntry | null>(null)
@@ -719,7 +732,7 @@ export function useSeasonSession(
   const playbackSerial = useRef(0)
   /**
    * 전역 저장 +0xbe — 이벤트 100 의 1000 G 를 받았는가 (0x8c714). 모드를 가리지 않는 전역 칸이라 시즌을 새로
-   * 해도 남는다. ⚠️ 웹엔 그 전역 저장 객체가 없어 `leagueFirstAwardedBits`(+0x145)와 같은 자리(세션 상태)에 둔다 — 근사.
+   * 해도 남는다. ⚠️ 웹엔 그 전역 저장 객체가 없어 세션 상태에 둔다(새로 고치면 사라진다) — 근사.
    */
   const [event100Awarded, setEvent100Awarded] = useState(false)
   /**
@@ -1764,7 +1777,9 @@ export function useSeasonSession(
    */
   const awardLeagueFirst = useCallback(
     (award: LeagueFirstAward) => {
-      setLeagueFirstAwardedBits((bits) => bits | (1 << award.bit))
+      // 0x6a56~0x6a94: G += 금액(99999 상한) → 비트 k 켜기 0x9f709 → 저장 0x1f1b9 — 팝업을 띄우는 그 자리에서 다 한다.
+      // ⚠️ 뒤따르는 0x22dd5(mgr, k) — 통계 객체 [mgr+0xc8] +0x106+k 달성 표시 — 는 웹 기록연감 통계에 칸이 없어 안 옮겼다
+      setRewardRecord((record) => withAwardedBit(record, award.bit))
       gainGamePoint(award.gamePoint)
     },
     [gainGamePoint],

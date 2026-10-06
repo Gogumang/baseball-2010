@@ -55,6 +55,8 @@ const ACE_LEVEL_KEY = 'compus-baseball/ace-level'
  * 옛 세이브에는 이 칸이 없다 — 없으면 `career.gamePoint` 를 그대로 옮겨 온다(이사).
  */
 const WALLET_KEY = 'compus-baseball/wallet'
+/** 전역기록 +0x145 — 전부 수집 보상 지급 비트 (`game_o.sav` 의 그 바이트, `collectionRewards.ts`). 리그 1위 G 가 쓴다 */
+const COLLECTION_REWARD_KEY = 'compus-baseball/collection-rewards'
 /**
  * 투수편 G를 지갑으로 옮겼는지 적어 두는 칸 — 옛 투수 저장은 G를 선수 안에 들고 있었다.
  * 이사를 마치면 선수 칸이 지갑의 그림자가 되어 저장만 봐서는 옮겼는지 알 수 없어 표식을 따로 둔다
@@ -86,6 +88,7 @@ export function App() {
   const aceOpenStore = useMemo(() => createLocalStorageJsonStore(ACE_OPEN_KEY), [])
   const aceLevelStore = useMemo(() => createLocalStorageJsonStore(ACE_LEVEL_KEY), [])
   const walletStore = useMemo(() => createLocalStorageJsonStore(WALLET_KEY), [])
+  const collectionRewardStore = useMemo(() => createLocalStorageJsonStore(COLLECTION_REWARD_KEY), [])
   const pitcherWalletMergeStore = useMemo(() => createLocalStorageJsonStore(PITCHER_WALLET_MERGE_KEY), [])
   /** 옛 세이브 이사거리 — 지갑 칸이 없던 시절 G는 나만의리그 선수 안에 들어 있었다 */
   const legacyGamePoint = useMemo(() => saveGame.load()?.gamePoint ?? null, [saveGame])
@@ -125,7 +128,9 @@ export function App() {
   const otherModesRef = useRef<{ batter?: RegularSeasonOtherModes; pitcher?: RegularSeasonOtherModes }>({})
   const readBatterOtherModes = useCallback(() => otherModesRef.current.batter, [])
   const readPitcherOtherModes = useCallback(() => otherModesRef.current.pitcher, [])
-  const seasonSession = useSeasonSession(seasonStore, random, wallet, aceLevels.levels, recordStat, readAutobotBatInput)
+  const seasonSession = useSeasonSession(
+    seasonStore, random, wallet, aceLevels.levels, recordStat, readAutobotBatInput, collectionRewardStore,
+  )
   // 투수편 G도 같은 지갑 한 칸이다 — 옛 투수 저장에 남은 G는 표식 칸을 보고 딱 한 번 옮겨 온다
   const pitcherSession = usePitcherLeagueSession(
     pitcherStore,
