@@ -2210,8 +2210,9 @@ function pitchOnce(
     typeNumber: input.typeNumber,
     staminaAbility: stats.stamina,
     teamMorale: ourTeamMoraleOf(options),
-    // 경기 중 교체를 아직 안 옮겨서 선발이 곧 "첫 투수" 다
-    isFirstPitcher: true,
+    // 0xaeb08 `team+0x26 − team+0x33 == 1` — 마운드를 밟은 투수가 지금 투수 하나뿐일 때만 첫 투수 보너스(0x66e44 +200).
+    // 교체로 올라온 구원 투수는 받지 않는다 (P1 3-2, 상대 쪽 `throwOpponentPitch` 와 같은 식)
+    isFirstPitcher: progress.ourUsedPitchers.length === 0,
     // 상대 타자의 스킬 22(0xb62b4)를 웹 로스터가 들고 있지 않아 늘 거짓이다
     batterIntimidates: false,
     pitcherIsCoward: false,

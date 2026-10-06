@@ -411,6 +411,16 @@ describe('경기 중 투수 교체 (0xc1ba4 → 0xac428)', () => {
     expect(바꾼뒤.pitcherJustChanged).toBe(true)
   })
 
+  it('구원 투수는 첫 투수 보너스(0x66e44 +200)를 못 받아 한 공에 더 깎인다 (0xaeb08, P1 3-2)', () => {
+    const { progress } = 시작()
+    const 구원 = changePitcher(progress, availablePitchers(progress)[0])
+    const 투구 = { typeNumber: 첫구질(구원), courseCell: 4, gaugeCell: 0 }
+    const 구원뒤 = throwPitch({ ...구원, pitcherJustChanged: false }, 투구, createSeededRandom(3))
+    // 같은 투수·같은 공인데 "아직 교체가 없다" 로 꾸미면 용량이 커져 덜 깎인다
+    const 첫투수뒤 = throwPitch({ ...구원, pitcherJustChanged: false, ourUsedPitchers: [] }, 투구, createSeededRandom(3))
+    expect(구원.stamina - 구원뒤.stamina).toBeGreaterThan(구원.stamina - 첫투수뒤.stamina)
+  })
+
   it('벤치에 없는 칸으로는 바뀌지 않는다', () => {
     const { progress } = 시작()
 
