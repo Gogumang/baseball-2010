@@ -1,7 +1,5 @@
 import type { SeasonPlayer, SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
-import {
-  batterPositionPenaltyOf, tradeRefusalOf,
-} from '@/entities/season-mode/model/playerTrade'
+import { tradePenaltyOf, tradeRefusalOf } from '@/entities/season-mode/model/playerTrade'
 import type { TradeRefusal } from '@/entities/season-mode/model/playerTrade'
 import { TRADE_REQUEST_TAB, playerGradeOf } from '@/entities/season-mode/model/tradeRequest'
 import { playerFaceOf } from '@/entities/season-mode/model/seasonEntry'
@@ -28,7 +26,7 @@ export interface TradePlayerEntry {
    * 표 밖 나리·명전 선수는 0(어차피 거절된다, `tradeRequest.playerGradeOf`).
    */
   readonly grade: number
-  /** 자리 벌점 (타자는 수비 자리, 투수는 보직 — 웹에 보직이 없어 투수는 0) */
+  /** 자리 벌점 — 마스터 명단 칸 번호 `0xb6561` 를 탭별로 본 값 (`playerTrade.tradePenaltyOf`) */
   readonly penalty: number
   /** 나리·명예 선수면 트레이드 거절 (StrMODE[165]/[166]) */
   readonly refusal: TradeRefusal | null
@@ -47,7 +45,7 @@ export function tradeEntriesOf(
     name: playerFaceOf(teamId, player, isPitcher, index).name,
     player,
     grade: playerGradeOf(teamId, tab, player),
-    penalty: isPitcher ? 0 : batterPositionPenaltyOf(player.fieldPosition & 0xf),
+    penalty: tradePenaltyOf(player, teamId, tab),
     refusal: tradeRefusalOf(player),
   }))
 }

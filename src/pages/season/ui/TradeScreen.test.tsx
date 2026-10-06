@@ -173,16 +173,24 @@ describe('0xe7 확인·진행 (J 4-4)', () => {
     expect(onBack).not.toHaveBeenCalled()
   })
 
-  it('비용 세 칸과 그 성공률이 나온다 — 자리 벌점 10 + 0(상대 레코드 +0x1c = 3) 이라 기본은 30% 다', () => {
+  it('비용 세 칸과 그 성공률이 나온다 — 두 타자 다 마스터 칸 6 이라 벌점 0, 기본은 40% 다 (0xb6561)', () => {
     확인까지()
 
-    expect(screen.getByRole('button', { name: /기본 진행/ }).textContent).toContain('30%')
-    expect(screen.getByRole('button', { name: /\+50%/ }).textContent).toContain('80%')
-    expect(screen.getByRole('button', { name: /\+20%/ }).textContent).toContain('50%')
+    expect(screen.getByRole('button', { name: /기본 진행/ }).textContent).toContain('40%')
+    expect(screen.getByRole('button', { name: /\+50%/ }).textContent).toContain('90%')
+    expect(screen.getByRole('button', { name: /\+20%/ }).textContent).toContain('60%')
+  })
+
+  it('타자 탭 마스터 칸 3 은 벌점 10 · 0 은 6 이다 — 3번끼리면 d 를 빼고 40 − 20 (표 값으로 견준다)', () => {
+    확인까지({}, 3, 3)
+    const d = (teamBatters(MY_TEAM)[3].grade - teamBatters(OPPONENT)[3].grade) * 10
+    const 깎임 = Math.trunc((Math.abs(d < 0 ? d * 2 : d) * 100) / 250)
+
+    expect(screen.getByRole('button', { name: /기본 진행/ }).textContent).toContain(`${Math.max(40 - 깎임 - 20, 3)}%`)
   })
 
   it('성공하면 맞바꿀 두 칸(탭·내 칸·상대 칸·상대 팀)을 넘기고 커맨드가 닫힌다', () => {
-    // 기본 진행 30% → 뽑기 29 면 성공 (29 < 30)
+    // 기본 진행 40% → 뽑기 29 면 성공 (29 < 40)
     const { onTrade } = 확인까지({ random: 고정난수(29) })
 
     누르기(/기본 진행/)
@@ -199,7 +207,7 @@ describe('0xe7 확인·진행 (J 4-4)', () => {
   })
 
   it('실패해도 커맨드는 쓴 것이고 명단은 그대로다', () => {
-    const { onTrade } = 확인까지({ random: 고정난수(31) })
+    const { onTrade } = 확인까지({ random: 고정난수(41) })
 
     누르기(/기본 진행/)
     누르기('예')

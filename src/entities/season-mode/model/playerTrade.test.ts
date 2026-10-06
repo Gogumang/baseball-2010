@@ -4,8 +4,8 @@ import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonPlayer, SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
 import { HALL_OF_FAME_FIRST_ID, PLAYER_OWN_BIT } from '@/entities/season-mode/model/playerRecruit'
 import {
-  TRADE_BOOST_RATE, batterPositionPenaltyOf, swapTradedPlayers, canUseTradeCommand, markTradeUsed,
-  pitcherRolePenaltyOf, rollTradeSuccess, tradeBoostCostOf, tradeMoneyChangeOf, tradeRefusalOf, tradeSuccessRate,
+  TRADE_BOOST_RATE, masterRosterSlotOf, swapTradedPlayers, tradePenaltyOf, tradeSlotPenaltyOf, canUseTradeCommand, markTradeUsed,
+  rollTradeSuccess, tradeBoostCostOf, tradeMoneyChangeOf, tradeRefusalOf, tradeSuccessRate,
   withTradeMoney,
 } from '@/entities/season-mode/model/playerTrade'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -33,13 +33,33 @@ const 고정난수 = (value: number): RandomPort => ({
 const 성공률 = (덮어쓰기: Partial<Parameters<typeof tradeSuccessRate>[0]> = {}) =>
   tradeSuccessRate({ myGrade: 0, opponentGrade: 0, myPenalty: 0, opponentPenalty: 0, boost: 0, ...덮어쓰기 })
 
-describe('자리 벌점 (0xb6561)', () => {
-  it('타자는 자리 0 → 10 · 7 → 8 · 1·4 → 6 · 그 밖 0', () => {
-    expect([0, 1, 2, 3, 4, 5, 6, 7, 8].map(batterPositionPenaltyOf)).toEqual([10, 6, 0, 0, 6, 0, 0, 8, 0])
+describe('자리 벌점 — 0xb6561 마스터 칸 번호를 탭별로 (0xcf24 cfe0~d0b8)', () => {
+  it('탭 0(투수): 0 → 10 · 7 → 8 · 1·4 → 6 · 그 밖(−1 포함) 0', () => {
+    expect([-1, 0, 1, 2, 3, 4, 5, 6, 7, 8].map((v) => tradeSlotPenaltyOf(0, v))).toEqual([0, 10, 6, 0, 0, 6, 0, 0, 8, 0])
   })
 
-  it('투수는 보직 3 → 10 · 2·4 → 8 · 0 → 6 · 그 밖 0', () => {
-    expect([0, 1, 2, 3, 4, 5].map(pitcherRolePenaltyOf)).toEqual([6, 0, 8, 10, 8, 0])
+  it('탭 1(타자): 3 → 10 · 2·4 → 8 · 0 → 6 · 그 밖 0', () => {
+    expect([-1, 0, 1, 2, 3, 4, 5].map((v) => tradeSlotPenaltyOf(1, v))).toEqual([0, 6, 0, 8, 10, 8, 0])
+  })
+
+  it('⚠️ 투수는 마스터 팀을 id & 7 로 골라 팀 번호 == 팀 안 칸일 때만 찾는다 (원본 그대로)', () => {
+    // 3팀 3번 투수 = id 27 → 27 & 7 = 3 = 27 / 8 → 찾는다, 값은 자기 +0xa 하위 5비트
+    expect(masterRosterSlotOf(선수({ id: 3, kindByte: 3 }), 3, 0)).toBe(3)
+    // 3팀 2번 투수 = id 26 → 마스터 팀 2 (id 16~23) 에 없다
+    expect(masterRosterSlotOf(선수({ id: 2, kindByte: 2 }), 3, 0)).toBe(-1)
+    // 트레이드로 온 선수는 옛 팀(표 팀)으로 id 를 만든다 — 5팀 5번 → id 45, 45 & 7 = 5 = 45 / 8
+    expect(masterRosterSlotOf(선수({ id: 5, kindByte: 1, tableTeamId: 5 }), 0, 0)).toBe(1)
+  })
+
+  it('⚠️ 타자는 id / 12 팀을 0~7 칸까지만 훑는다 — 8~11 칸 출신은 못 찾는다', () => {
+    expect(masterRosterSlotOf(선수({ id: 7, kindByte: 9 }), 4, 1)).toBe(9)
+    expect(masterRosterSlotOf(선수({ id: 8, kindByte: 8 }), 4, 1)).toBe(-1)
+  })
+
+  it('표 밖 선수(나리·명전 id)는 −1 → 벌점 0', () => {
+    expect(tradePenaltyOf(선수({ id: 0xfe, kindByte: 0 }), 0, 0)).toBe(0)
+    expect(tradePenaltyOf(선수({ id: 0, kindByte: 0 }), 0, 0)).toBe(10)
+    expect(tradePenaltyOf(선수({ id: 0, kindByte: 0 }), 0, 1)).toBe(6)
   })
 })
 

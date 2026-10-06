@@ -1,5 +1,5 @@
 import {
-  HALL_OF_FAME_FIRST_ID, OWN_PLAYER_ID, PLAYER_OWN_BIT, withSlot, withTableTeam,
+  HALL_OF_FAME_FIRST_ID, OWN_PLAYER_ID, PLAYER_OWN_BIT, PLAYER_SLOT_MASK, tableTeamOf, withSlot, withTableTeam,
 } from '@/entities/season-mode/model/playerRecruit'
 import type { SeasonPlayer, SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
@@ -15,6 +15,9 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
  *
  * 성공 뒤 두 명단 맞바꾸기(0xd1cc~0xd3ae)도 직접 떴다 — `swapTradedPlayers` 머리 주석.
  */
+
+/** 트레이드 탭 — `0xb5695(팀, 탭, i)`: 0 이면 투수 배열(0xb51fc) · 1 이면 타자 배열(0xb53d0) */
+export const TRADE_TAB = { 투수: 0, 타자: 1 } as const
 
 /** 트레이드 비용 칸 (StrMODE[168]·[169]·[170]) */
 export const TRADE_BOOST_COUNT = 3
@@ -39,26 +42,76 @@ export const TRADE_GRADE_SCALE = 10
 /** `|d| × 100 / 250` — 정수 나눗셈이다 */
 export const TRADE_GRADE_DIVISOR = 250
 
+/** 0xb6561 이 못 찾았을 때 (b65e2 `−1`) */
+export const MASTER_SLOT_NOT_FOUND = -1
+
 /**
- * 타자 탭 자리 벌점 — `0xb6561(p)` 로 본 수비 자리.
- * 자리 0 → 10 · 자리 7 → 8 · 자리 1·4 → 6 · 그 밖 0.
+ * **`0xb6561(p)` — 마스터 명단에서 본 칸 번호** (직접 떴다). 트레이드 자리 벌점이 두 탭 모두 이 값을 본다
+ * (0xcf24 cfe0~d0b8 — 투수 탭도 보직 0xb6705 가 아니라 이 함수다).
+ * ```
+ * b6564  0xb6278(p) (투수 레코드인가):
+ *   b6574  M = 0x1f8c1(저장, p.id & 7)                 ; ⚠️ 팀이 아니라 id 의 아래 세 비트로 마스터 팀을 고른다
+ *   b6582  i = 0..7: 0xb51fc(M, i).id == p.id → return p.+0xa & 0x1f
+ * 그 밖 (타자):
+ *   b65b0  M = 0x1f8c1(저장, (u8)p.id / 12)            ; 0xca849 = 부호 없는 나눗셈
+ *   b65ca  i = 0..7: 0xb53d0(M, i).id == p.id → return p.+0xa & 0x1f   ; ⚠️ 타자도 8칸(0~7)까지만 훑는다
+ * b65e2  return −1
+ * ```
+ * 0x1f8c1(저장, k) = `[저장+0xac] + 0xac0 + k·0x1c` 는 **마스터 팀**이다 — 0x1ff98 이 Xls 를 팀마다 투수 8줄(0x180)·
+ * 타자 12줄(0x240)씩 끊어 15팀을 채운다. 곧 마스터 팀 k 의 투수는 id `8k..8k+7`, 타자는 `12k..12k+11` 이다.
+ * 그래서 원본 그대로:
+ * - **투수는 id/8 == id&7 일 때만**(팀 번호 == 팀 안 칸) 찾는다 — 나머지 투수는 늘 −1(벌점 0)이다.
+ * - **타자는 팀 안 칸(id % 12)이 0~7 일 때만** 찾는다 — 8~11 칸 출신은 늘 −1 이다.
+ * - 찾으면 돌려주는 값은 마스터 칸이 아니라 **p 자신의 +0xa 하위 5비트**(지금 레코드 칸 번호)다.
+ *
+ * 웹: 원본 id 는 `붙박이 표 팀 × 8|12 + 웹 id`(`SeasonPlayer.tableTeamId`), +0xa 는 `kindByte`. 투수냐는 0xb6278 대신
+ * **탭**으로 가른다 — 웹 명단의 kindByte 는 종류 비트(타자 0x20)를 안 들고, 리그 선수는 투수 표 = 투수 레코드라 같다.
+ * 영입한 나리·명전 선수(id ≥ 0xb4)는 −1 로 본다(투수는 원본도 못 찾는다 · 타자는 원본이 마스터 15팀 밖을 읽는다 —
+ * 그 선수는 트레이드에서 거절되므로 닿지 않는다).
  */
-export function batterPositionPenaltyOf(position: number): number {
-  if (position === 0) return 10
-  if (position === 7) return 8
-  if (position === 1 || position === 4) return 6
+export function masterRosterSlotOf(player: SeasonPlayer, ownerTeamId: number, tab: number): number {
+  if (player.id >= HALL_OF_FAME_FIRST_ID) return MASTER_SLOT_NOT_FOUND
+  const team = tableTeamOf(player, ownerTeamId)
+  const slotBits = player.kindByte & PLAYER_SLOT_MASK
+  if (tab === TRADE_TAB.투수) {
+    const id = team * MASTER_PITCHERS_PER_TEAM + player.id
+    const masterTeam = id & 7
+    return Math.trunc(id / MASTER_PITCHERS_PER_TEAM) === masterTeam ? slotBits : MASTER_SLOT_NOT_FOUND
+  }
+  const id = (team * MASTER_BATTERS_PER_TEAM + player.id) & 0xff
+  return id % MASTER_BATTERS_PER_TEAM <= MASTER_SCAN_LAST ? slotBits : MASTER_SLOT_NOT_FOUND
+}
+
+/** 마스터 팀의 투수 8 · 타자 12 줄 (0x1ff98 의 0x180 · 0x240 바이트) · 0xb6561 이 훑는 마지막 칸 7 */
+const MASTER_PITCHERS_PER_TEAM = 8
+const MASTER_BATTERS_PER_TEAM = 12
+const MASTER_SCAN_LAST = 7
+
+/**
+ * 자리 벌점 — 0xcf24 cfe0~d0b8 (직접 떴다). `v = 0xb6561(p)` 를 탭([this+0x154])에 따라 본다.
+ * ```
+ * 탭 0 (투수): v 0 → 10 · 7 → 8 · 1·4 → 6 · 그 밖(−1 포함) 0
+ * 탭 그 밖 (타자): v 3 → 10 · 2·4 → 8 · 0 → 6 · 그 밖 0
+ * ```
+ * ⚠️ J 4-4 는 "타자 탭: 자리 0·7·1·4 / 투수 탭: 보직 3·2·4·0" 으로 적었다 — 탭 0 을 타자로 읽은 데다 둘 다 수비 자리·보직이
+ * 아니라 위 마스터 칸 번호다. 내 선수(this+0x14c)와 상대 선수(this+0x150)에 같은 식을 건다.
+ */
+export function tradeSlotPenaltyOf(tab: number, masterSlot: number): number {
+  if (tab === TRADE_TAB.투수) {
+    if (masterSlot === 0) return 10
+    if (masterSlot === 7) return 8
+    if (masterSlot === 1 || masterSlot === 4) return 6
+    return 0
+  }
+  if (masterSlot === 3) return 10
+  if (masterSlot === 2 || masterSlot === 4) return 8
+  if (masterSlot === 0) return 6
   return 0
 }
 
-/**
- * 투수 탭 보직 벌점 — 보직 3 → 10 · 2·4 → 8 · 0 → 6 · 그 밖 0.
- * ⚠️ 웹 로스터에 보직 칸이 없어 지금은 아무도 이 값을 못 채운다(위 머리 주석).
- */
-export function pitcherRolePenaltyOf(role: number): number {
-  if (role === 3) return 10
-  if (role === 2 || role === 4) return 8
-  if (role === 0) return 6
-  return 0
+/** 한 선수의 자리 벌점 — `tradeSlotPenaltyOf(탭, 0xb6561(p))` */
+export function tradePenaltyOf(player: SeasonPlayer, ownerTeamId: number, tab: number): number {
+  return tradeSlotPenaltyOf(tab, masterRosterSlotOf(player, ownerTeamId, tab))
 }
 
 export interface TradeRateInput {
@@ -183,9 +236,6 @@ export interface TradeSettlement {
   /** 성공이면 맞바꿀 두 칸 — 세션이 시즌 저장의 두 팀 레코드에 `swapTradedPlayers` 를 건다. 실패면 없다 */
   readonly swap?: TradeSwap
 }
-
-/** 트레이드 탭 — `0xb5695(팀, 탭, i)`: 0 이면 투수 배열(0xb51fc) · 1 이면 타자 배열(0xb53d0) */
-export const TRADE_TAB = { 투수: 0, 타자: 1 } as const
 
 export interface TradedRosters {
   readonly mine: SeasonTeamRoster
