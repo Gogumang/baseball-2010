@@ -33,6 +33,13 @@ describe('홈런더비 화면', () => {
     expect(screen.getByText('1 / 10구')).toBeTruthy()
   })
 
+  it('첫 공 앞 상태 0xe 에서 소개 판(0x44944)을 띄운다 — 투수 판 COM · 타자 판 PLAYER', () => {
+    띄우기()
+    expect(screen.getByTestId('소개판')).toBeTruthy()
+    expect(screen.getByTestId('투수팀').getAttribute('src')).toBe('./sprites/img_text/frames/158.png')
+    expect(screen.getByTestId('타자팀').getAttribute('src')).toBe('./sprites/img_text/frames/157.png')
+  })
+
   it('HUD 판(trainning 프레임 2)과 최고 기록 칸을 함께 보여 준다', () => {
     띄우기()
     expect(screen.getByAltText('홈런더비 판')).toBeTruthy()

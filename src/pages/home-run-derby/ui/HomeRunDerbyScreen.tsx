@@ -15,6 +15,8 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { useHomeRunDerby } from '@/pages/home-run-derby/model/useHomeRunDerby'
 import { DerbyHud } from '@/pages/home-run-derby/ui/DerbyHud'
 import { DerbyResultWindow } from '@/pages/home-run-derby/ui/DerbyResultWindow'
+import { MatchupCards } from '@/widgets/matchup-cards/ui/MatchupCards'
+import type { MatchupBatterCard } from '@/widgets/matchup-cards/ui/MatchupCards'
 import * as styles from '@/pages/home-run-derby/ui/HomeRunDerbyScreen.css'
 
 interface HomeRunDerbyScreenProps {
@@ -53,6 +55,12 @@ interface HomeRunDerbyScreenProps {
   /** 경기 중 메뉴 "설정" 칸이 열 환경설정. 안 넘기면 칸이 잠긴다 */
   readonly settings?: GameSettings
   readonly onSettingsChange?: (settings: GameSettings) => void
+  /**
+   * 상태 0xe 소개 판(0x44944)의 타자 판 칸 — 모드 타자 기록(0x1fc20)의 이름(0xb62c0) · 수비(+0x1c & 0xf) ·
+   * 타율(0xb8e3c) · 홈런(+0x28) · 타점(+0x2a) · 타순(팀 +0x32 = 0xb6394(기록) = +0xa & 0x1f) · 오늘 타석 기록.
+   * ⚠️ 아직 부르는 쪽(app)이 안 넘긴다 — 안 넘긴 칸은 비워 둔다.
+   */
+  readonly matchupBatter?: Omit<MatchupBatterCard, 'isComputer'>
 }
 
 /** 홈런더비 = 원본 전역 모드 7 — 경기 중 메뉴 표 0xcfcfc 의 **행 1**(자동진행 자리에 다시하기) */
@@ -85,6 +93,7 @@ export function HomeRunDerbyScreen({
   onExit,
   settings,
   onSettingsChange,
+  matchupBatter,
 }: HomeRunDerbyScreenProps) {
   const session = useHomeRunDerby({ bestDistance, onFinish, aceLevels, random })
   const tick = useUpdateCounter()
@@ -233,6 +242,14 @@ export function HomeRunDerbyScreen({
                 // 0x4585c 가 0xb63c1(지금 타자)로 콤보 표시 쪽을 가른다 — 타석 그림과 같은 폼(안 넘기면 0 = 우타)
                 batterSide={batterSideOfForm(batterForm ?? 0)}
               />
+              {/* 0xe 그리기 0x4d9ec 는 타석 화면(0x4c4bc — HUD 0x45a54 포함) 다음에 0x44944 를 그린다 → HUD 위 */}
+              {session.isAwaitingConfirm && (
+                <DerbyMatchupCards
+                  batterHand={batterSideOfForm(batterForm ?? 0)}
+                  pitcherName={ace?.name}
+                  batter={matchupBatter}
+                />
+              )}
 
               <div className={styles.overlay}>
                 {session.banner === '' ? (
@@ -258,5 +275,34 @@ export function HomeRunDerbyScreen({
         />
       )}
     </>
+  )
+}
+
+/**
+ * 상태 0xe 의 소개 판 (0x4d9ec → 0x44944) — 0xe 에 들어설 때마다 새로 띄워 틱 0 부터 센다.
+ * 홈런더비에서 원본이 채우는 값 중 웹이 아는 것만 넣는다:
+ * - 팀 글자: 0x39fdc 모드 7 갈래가 `0xb6c19(st, 0, 0)` · `0xb6c19(st, 1, 1)`(3a4a6~3a4bc) — 내 타자편 팀 0 은 PLAYER,
+ *   상대 팀 1 은 COM 이다. 타자 판(st[9])이 모드 타자가 든 팀 0, 투수 판(st[0xa])이 팀 1 이다.
+ * - 손: 타자 판 좌타/우타 · 판 자리 모두 0xb63c0(모드 타자) — `DerbyHud` 와 같은 폼 값.
+ * - 투수 이름: 단계 ≥ 1 마투수는 0x48d50 이 마투수 기록 0x30 바이트를 통째로 복사하므로 그 기록의 이름이다
+ *   (⚠️ 유력 — 0xb62c0 이 마선수 기록에서 `ACE_PLAYERS` 이름을 내는지는 0x20498 을 안 봤다).
+ * ⚠️ 비운 칸: 단계 0 투수(상대 팀 투수 — 웹은 상대 팀을 버린다)의 이름, 투수 보직·좌우·방어율·탈삼진·체력 막대
+ *   (기록 +0xb · +0x20/+0x22/+0x26, 0x66e44 · 0xb8680 — 웹에 마투수·상대 투수 기록이 없다).
+ */
+function DerbyMatchupCards({
+  batterHand, pitcherName, batter,
+}: {
+  readonly batterHand: number
+  readonly pitcherName: string | undefined
+  readonly batter: Omit<MatchupBatterCard, 'isComputer'> | undefined
+}) {
+  const tick = useUpdateCounter()
+  return (
+    <MatchupCards
+      tick={tick}
+      batterHand={batterHand}
+      pitcher={{ isComputer: true, ...(pitcherName === undefined ? {} : { name: pitcherName }) }}
+      batter={{ ...batter, isComputer: false }}
+    />
   )
 }

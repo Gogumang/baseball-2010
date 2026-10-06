@@ -283,7 +283,7 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
       //   0xf 진입 0x3d954 → 0x3db92~0x3dbf2(모드 7 애니 되돌리기) · 0x3dbf8(+0x84 > 0 → 표시 켜기)
       // (예전 근거 "0x48d50 의 0x49846" 은 0x49846 이 교체 화면 키 0x495fc 안이라 틀린 주소였다.)
       // ⚠️ 0xd 가 머무는 틱 수(점수판 +0x6c 를 기다림)는 웹이 따로 세지 않는다 — 결과 연출(웹판 1.5초) 뒤 곧바로 0xe 로 본다.
-      // ⚠️ 미이식: 0xe 그리기 0x4d9ec 는 0xd 그리기에 0x44944(옆에서 밀려 들어오는 판 — sin 으로 0x5a/0x6e 를 밀어 넣는다)를 더 그린다.
+      // 0xe 그리기 0x4d9ec 는 0xd 그리기에 0x44944(투수·타자 소개 판)를 더 그린다 — 화면이 `isAwaitingConfirm` 동안 띄운다.
       if (nextSceneState === 0xd) {
         enterConfirmWait()
         return
