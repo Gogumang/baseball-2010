@@ -345,9 +345,26 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     const 홀수 = 판짜기({ gamesPlayed: 10 })
     경기치르기(홀수)
     expect(홀수.current.career?.gamesPlayed).toBe(11)
-    // 109 순위표 화면이 웹에 없어 타자편과 같이 곧바로 다음 경기다
+    // 홀수 경기 뒤는 109 순위표 — 이전 상태가 100 이라 취소가 안 먹고, 확인하면 경기다
+    expect(홀수.current.scene).toBe('다음경기순위')
+    expect(홀수.current.nextGameFromManagement).toBe(false)
+    act(() => 홀수.current.actions.cancelNextGameStandings())
+    expect(홀수.current.scene).toBe('다음경기순위')
+    act(() => 홀수.current.actions.confirmNextGameStandings())
     expect(홀수.current.scene).toBe('경기')
     expect(홀수.current.gameOptions?.dayCounter).toBe(11)
+  })
+
+  it('관리 [다음경기] → 109 순위표 — 취소는 105 로, 확인은 경기 (0x105f0)', () => {
+    const result = 판짜기({ gamesPlayed: 4 })
+    act(() => result.current.actions.openNextGameStandings())
+    expect(result.current.scene).toBe('다음경기순위')
+    expect(result.current.nextGameFromManagement).toBe(true)
+    act(() => result.current.actions.cancelNextGameStandings())
+    expect(result.current.scene).toBe('관리')
+    act(() => result.current.actions.openNextGameStandings())
+    act(() => result.current.actions.confirmNextGameStandings())
+    expect(result.current.scene).toBe('경기')
   })
 
   it('1~6년차 연말은 392 부터 사슬을 돌고 380 수락(383) 뒤 새 시즌이다 — 짝수 연차라 국가대표 판정은 없다', () => {

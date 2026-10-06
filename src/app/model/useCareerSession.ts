@@ -912,7 +912,8 @@ export function useCareerSession({
     runCommand: (command: ManagementCommand) => {
       if (career === null) return
       // 알림은 [확인] 을 눌러야 지워진다 — "다음경기 때까지 남긴다" 는 원본 근거가 없어 없앴다
-      if (command === '다음경기') return beginGame()
+      // [다음경기](105 칸 5) → 109 순위표 (R9). 확인하면 142 → 경기 (웹은 142 없이 곧바로 경기)
+      if (command === '다음경기') return setScreen({ kind: '다음경기순위', fromManagement: true })
       if (command === '휴식') {
         // 원작 [휴식] 커맨드 — 사기를 회복한다. 관리 주기마다 한 가지만 할 수 있다.
         const blockReason = restBlockReasonOf(career)
@@ -1027,7 +1028,20 @@ export function useCareerSession({
         setScreen({ kind: '관리' })
         return setManagementCheck('무작위포함')
       }
+      // 관리 주기가 아니면 100 이 109 순위표로 보낸다 (0x1c346 그 밖 갈래 — 이전 상태 100 이라 취소가 안 먹는다)
+      setScreen({ kind: '다음경기순위', fromManagement: false })
+    },
+
+    /** 109 순위표 확인(−5 · '5', 0x105f0) → 142 경기 준비 — 웹은 142 가 없어 곧바로 경기 */
+    confirmNextGameStandings: () => {
+      if (career === null) return
       beginGame()
+    },
+
+    /** 109 순위표 취소(−16, 0x1060e) — 이전 상태가 105 일 때만 105 로. 그 밖에는 아무 일도 없다 */
+    cancelNextGameStandings: () => {
+      if (screen.kind !== '다음경기순위' || !screen.fromManagement) return
+      setScreen({ kind: '관리' })
     },
 
     /**

@@ -5,6 +5,7 @@ import { GameRoute } from '@/app/ui/GameRoute'
 import type { useGameSettings } from '@/app/model/useGameSettings'
 import { GameResultScreen } from '@/pages/game-result/ui/GameResultScreen'
 import { ManagementScreen } from '@/pages/management/ui/ManagementScreen'
+import { NextGameStandingsScreen } from '@/pages/management/ui/NextGameStandingsScreen'
 import { ShopScreen } from '@/pages/shop/ui/ShopScreen'
 import { OutingMapScreen } from '@/pages/outing-map/ui/OutingMapScreen'
 import { MessageBox, ScreenOverlay } from '@/shared/ui'
@@ -207,6 +208,13 @@ export function CareerRoutes({
 
     case '성적':
       return <RecordScreen career={career} onBack={backToManagement} />
+
+    case '다음경기순위':
+      return (
+        <NextGameStandingsScreen league={career.league} edition="타자편" gamePoint={career.gamePoint}
+          isFromManagement={screen.fromManagement}
+          onConfirm={actions.confirmNextGameStandings} onCancel={actions.cancelNextGameStandings} />
+      )
 
     case '시즌종료':
       return <SeasonEndScreen career={career} onStartNextSeason={actions.beginYearEnd} />

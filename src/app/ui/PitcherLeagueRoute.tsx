@@ -1,5 +1,6 @@
 import { PitcherCreateFlow } from '@/pages/pitcher-league/ui/PitcherCreateFlow'
 import { PitcherManagementScreen } from '@/pages/pitcher-league/ui/PitcherManagementScreen'
+import { NextGameStandingsScreen } from '@/pages/management/ui/NextGameStandingsScreen'
 import { PitcherSeasonEndScreen } from '@/pages/pitcher-league/ui/PitcherSeasonEndScreen'
 import { PitcherYearEndScreen } from '@/pages/pitcher-league/ui/PitcherYearEndScreen'
 import { PitcherGameScreen } from '@/pages/pitching/ui/PitcherGameScreen'
@@ -91,12 +92,21 @@ export function PitcherLeagueRoute({
       career={career}
       random={random}
       onSave={actions.save}
-      onNextGame={actions.beginGame}
+      // [다음경기] → 109 순위표 → 확인 → 경기
+      onNextGame={actions.openNextGameStandings}
       onOuting={actions.openOuting}
       onOpenShop={actions.openShop}
       onExit={onExit}
     />
   )
+
+  if (scene === '다음경기순위') {
+    return (
+      <NextGameStandingsScreen league={career.league} edition="투수편" gamePoint={career.gamePoint}
+        isFromManagement={session.nextGameFromManagement}
+        onConfirm={actions.confirmNextGameStandings} onCancel={actions.cancelNextGameStandings} />
+    )
+  }
 
   const outingMap = (
     <OutingMapScreen

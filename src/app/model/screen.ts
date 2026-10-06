@@ -44,6 +44,11 @@ export type Screen =
       readonly streakNotices: readonly StreakNotice[]
     }
   | { readonly kind: '관리' }
+  /**
+   * 나만의리그 다음경기 앞 순위표 (원본 상태 109). 관리 [다음경기]에서 오거나(이전 105), 경기 뒤 관리 주기가 아니면
+   * 곧바로 온다(이전 100). `fromManagement` 가 이전 상태 105 — 취소·바닥 5 가 이것으로 갈린다 (0x105f0 · 0x16928).
+   */
+  | { readonly kind: '다음경기순위'; readonly fromManagement: boolean }
   /** 상점 — 관리 화면 [아이템] 하위 메뉴의 탭 (장착·서브·GP) */
   | { readonly kind: '아이템'; readonly tab: string }
   | { readonly kind: '외출' }

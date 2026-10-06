@@ -88,6 +88,8 @@ const 경기시작 = () => {
   떼어낼것.push(() => act(() => rendered.unmount()))
   act(() => rendered.result.current.session.actions.continueSaved())
   act(() => rendered.result.current.session.actions.runCommand('다음경기'))
+  // 109 순위표 확인 → 경기
+  act(() => rendered.result.current.session.actions.confirmNextGameStandings())
   return { rendered, played: 녹음.played }
 }
 

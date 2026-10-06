@@ -126,6 +126,8 @@ import { PITCHER_MANAGEMENT_TEXT } from '@/pages/pitcher-league/lib/pitcherManag
  */
 export type PitcherScene =
   | '등록' | '관리' | '경기' | '시즌종료' | '연말' | '엔딩' | '상점' | '외출' | '이벤트' | '마선수대결' | '포스트시즌'
+  /** 다음경기 앞 순위표 (상태 109) — 타자편과 같은 진입 0x10d8c · 키 0x105f0 · 그림 0x168a4 */
+  | '다음경기순위'
 
 /**
  * 이벤트 재생(상태 114)을 **어디서** 틀었나 — 끝난 뒤 갈 곳(장면+0x24 "뒤 상태")이 이것으로 갈린다.
@@ -163,6 +165,8 @@ type MatchCommand = Extract<EventCommand, { op: 'match' }>
 export interface PitcherLeagueSession {
   readonly career: PitcherCareer | null
   readonly scene: PitcherScene
+  /** 109 순위표의 이전 상태가 105(관리)인가 — 바닥 5(되돌아가기) / 1 */
+  readonly nextGameFromManagement: boolean
   /** 지금 경기를 세울 옵션. 경기 장면이 아니면 null */
   readonly gameOptions: PitcherGameOptions | null
   /** 상점 장면의 창 — '장착' 111 장비 상점 · '착용' 121 장비착용 */
@@ -201,6 +205,12 @@ export interface PitcherLeagueSession {
     readonly save: (career: PitcherCareer) => void
     readonly goto: (scene: PitcherScene) => void
     readonly beginGame: () => void
+    /** 관리 [다음경기] → 109 순위표 (이전 상태 105) */
+    readonly openNextGameStandings: () => void
+    /** 109 확인(−5 · '5') → 142 경기 준비 — 웹은 142 가 없어 곧바로 경기 */
+    readonly confirmNextGameStandings: () => void
+    /** 109 취소(−16) — 이전 상태가 105 일 때만 105 로 (0x1060e) */
+    readonly cancelNextGameStandings: () => void
     readonly finishGame: (summary: PitcherGameSummary) => void
     /** 시즌 끝 화면 [다음] → 연말 사슬 136 → 130 → 131 → 132 (→ 133) 을 이벤트 392 부터 튼다 */
     readonly beginYearEnd: () => void
@@ -680,6 +690,9 @@ export function usePitcherLeagueSession(
     setScene('경기')
   }, [career, gaugeSettingOn, throwModeManual])
 
+  /** 109 순위표의 이전 상태가 105(관리)인가 — 취소·바닥 5 가 이것으로 갈린다 (0x105f0 · 0x16928) */
+  const [nextGameFromManagement, setNextGameFromManagement] = useState(false)
+
   /**
    * 경기 뒤 정산 — 성적·스태미나·전적을 넣고, 같은 날 나머지 네 경기를 돌린 뒤
    * 정규시즌·포스트시즌을 넘긴다 (타자편 `finishGame` 과 같은 차례다).
@@ -778,16 +791,17 @@ export function usePitcherLeagueSession(
        * ```
        * 이 함수에는 **모드 갈림이 없다** — 장면 0x106 은 모드 3(투수편)·4(타자편)가 함께 쓰므로
        * 투수편도 타자편과 **똑같이 2경기 주기**다 (재진입 분기 0x1c38e~0x1c3b8 도 같은 판정).
-       * 웹에는 109 순위표 화면이 없어 타자편(`useCareerSession.confirmGameResult`)과 같이 곧바로
-       * 다음 경기로 간다 (원본 109 → 142 → 144 → 경기 장면).
+       * 홀수 경기 뒤는 109 순위표로 간다 — 타자편(`useCareerSession.confirmGameResult`)과 같다
+       * (원본 109 → 142 → 144 → 경기 장면. 웹은 142·144 없이 109 확인이 곧바로 경기).
        *
        * ⚠️ **부상 엔딩 판정보다 앞에 둔다** — 부상 엔딩은 관리 화면 **진입**(105, 0x11910 → 0x11b32)의
        *    첫 줄이라, 홀수 경기 뒤에는 105 에 들르지 않아 원본에서도 굴러가지 않는다.
        */
       if (!isPitcherManagementCycleOpen(counted)) {
         commit(counted)
-        setGameOptions(leagueGameOptionsOf(counted, { gaugeSettingOn, throwModeManual }))
-        return setScene('경기')
+        // 100 → 109 순위표 (이전 상태 100 이라 취소가 안 먹는다). 확인하면 142 → 경기 (`confirmNextGameStandings`)
+        setNextGameFromManagement(false)
+        return setScene('다음경기순위')
       }
       // 관리 화면 진입 105(0x11910 → 0x11b32)의 첫 줄 — 부상 누적 20경기면 이벤트 500 → 엔딩 141 (B-7)
       const injury = pitcherInjuryEndingOf(counted)
@@ -1286,6 +1300,7 @@ export function usePitcherLeagueSession(
   return {
     career: shown,
     scene,
+    nextGameFromManagement,
     gameOptions,
     shopTab,
     shopNotice,
@@ -1307,6 +1322,15 @@ export function usePitcherLeagueSession(
       save: saveFromScreen,
       goto,
       beginGame,
+      openNextGameStandings: () => {
+        setNextGameFromManagement(true)
+        setScene('다음경기순위')
+      },
+      confirmNextGameStandings: beginGame,
+      cancelNextGameStandings: () => {
+        if (scene !== '다음경기순위' || !nextGameFromManagement) return
+        setScene('관리')
+      },
       finishGame,
       beginYearEnd,
       continueCareer,

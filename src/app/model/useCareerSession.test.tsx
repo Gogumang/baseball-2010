@@ -303,6 +303,8 @@ describe('연속 파울 기록 32·33 (0xa7dbc) — 실제 타석에서 경기 �
     })
     act(() => rendered.result.current.session.actions.continueSaved())
     act(() => rendered.result.current.session.actions.runCommand('다음경기'))
+    // 109 순위표 확인 → 경기
+    act(() => rendered.result.current.session.actions.confirmNextGameStandings())
     act(() => rendered.result.current.session.actions.finishLoading())
     return rendered
   }
@@ -365,6 +367,8 @@ describe('공마다 상대 투수 투구 수·스태미나 (0x3dec6 → 0xa5e14(
     try {
       act(() => rendered.result.current.session.actions.continueSaved())
       act(() => rendered.result.current.session.actions.runCommand('다음경기'))
+      // 109 순위표 확인 → 경기
+      act(() => rendered.result.current.session.actions.confirmNextGameStandings())
       act(() => rendered.result.current.session.actions.finishLoading())
       const before = rendered.result.current.session.progress!.opponentMound
       act(() => rendered.result.current.session.handlePitchResolved(볼(1)))
@@ -462,6 +466,8 @@ describe('CPU 견제 (0x345fc 종류 4 → 0x34848) — 타자편도 견제 판�
     try {
       act(() => rendered.result.current.session.actions.continueSaved())
       act(() => rendered.result.current.session.actions.runCommand('다음경기'))
+      // 109 순위표 확인 → 경기
+      act(() => rendered.result.current.session.actions.confirmNextGameStandings())
       act(() => rendered.result.current.session.actions.finishLoading())
       // 볼넷으로 나가며 주자가 있는 내 타석이 올 때까지 돌린다
       for (let atBat = 0; atBat < 9; atBat += 1) {
@@ -702,14 +708,37 @@ describe('타자편 포스트시즌 대진 128 — 사람이 친다 (0x120a4 · 
     expect(rendered.result.current.session.progress?.opponentTeamId).toBe(series?.teams[1])
   })
 
+  it('[다음경기] → 109 순위표 (이전 105) — 취소는 105 로, 확인은 경기 (0x105f0)', () => {
+    const rendered = 띄우기(createCareer('순위'))
+    act(() => rendered.result.current.session.actions.runCommand('다음경기'))
+    expect(rendered.result.current.screen).toEqual({ kind: '다음경기순위', fromManagement: true })
+    act(() => rendered.result.current.session.actions.cancelNextGameStandings())
+    expect(rendered.result.current.screen).toEqual({ kind: '관리' })
+    act(() => rendered.result.current.session.actions.runCommand('다음경기'))
+    act(() => rendered.result.current.session.actions.confirmNextGameStandings())
+    expect(rendered.result.current.screen).toEqual({ kind: '경기' })
+  })
+
+  it('관리 주기가 아닌 경기 뒤는 100 → 109 — 이전 상태가 100 이라 취소가 안 먹는다 (0x1c346 · 0x1060e)', () => {
+    const rendered = 띄우기({ ...createCareer('홀수'), gamesPlayed: 3 })
+    act(() => rendered.result.current.session.actions.confirmGameResult())
+    expect(rendered.result.current.screen).toEqual({ kind: '다음경기순위', fromManagement: false })
+    act(() => rendered.result.current.session.actions.cancelNextGameStandings())
+    expect(rendered.result.current.screen).toEqual({ kind: '다음경기순위', fromManagement: false })
+  })
+
   it('정규시즌 홈/원정도 0xb7844 — 일정표 짝 중 번호가 큰 팀은 첫 9일 원정이라 선공이다', () => {
     // 0일째 1 대 0 — 1 이 원정(선공), 0 은 홈(후공)
     const 원정 = 띄우기({ ...createCareer('원정'), teamId: 1 })
     act(() => 원정.result.current.session.actions.runCommand('다음경기'))
+    // 109 순위표 확인 → 경기
+    act(() => 원정.result.current.session.actions.confirmNextGameStandings())
     expect(원정.result.current.session.progress?.game.playerSide).toBe(PLAYER_SIDE_FIRST_BAT)
 
     const 홈 = 띄우기({ ...createCareer('홈'), teamId: 0 })
     act(() => 홈.result.current.session.actions.runCommand('다음경기'))
+    // 109 순위표 확인 → 경기
+    act(() => 홈.result.current.session.actions.confirmNextGameStandings())
     expect(홈.result.current.session.progress?.game.playerSide).toBe(PLAYER_SIDE_LAST_BAT)
   })
 
