@@ -210,6 +210,7 @@
   스크롤 값은 OFF 여도 계속 줄어든다(그리기만 막힘).
 - 웹판 `src/widgets/batting-stage/lib/renderScenery.ts:86-98`: 박스 2(`SCOREBOARD_BOX = 2`, 31줄) 로 잘라 첫 프레임을 x 이동 없이 세운다.
   원본과 다른 점: (1) 박스는 종류 3 일 때만 2, 그 밖엔 0 (2) x 이동 +0x8c 를 틱당 −1 로 흘려야 한다(시작값 상자 w+2, 되감기 문턱 −153) (3) 환경설정 전광판 OFF 면 안 그린다.
+  *(보강 2026-10-06, 메인 97c70bc · 61e4b27)* (3) 은 이식됨: `renderScenery` 는 이미 `isScoreboardOn === false` 면 안 그렸지만 부르는 쪽(useStageAnimation)이 칸을 안 채워 늘 그렸다 — BattingStage·StageLatest 에 isScoreboardOn 을 두고 홈런더비·나만의리그 타자편·타자 미션·시즌 팀 경기(TeamGameScreen) 화면이 환경설정 값을 넘긴다(안 넘기면 켬).
 
 ## 8. 효과음 장면 잔여 (L 노트 1-F·1-G 에서 이어서)
 | 번호 | 장면 | 근거 | 판정 |
