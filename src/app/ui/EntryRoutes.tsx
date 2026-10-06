@@ -62,12 +62,17 @@ interface EntryRoutesProps {
   readonly onRenamePlayer?: (id: number, isPitcher: boolean, name: string) => void
   /** 환경설정 → 모드 초기화 → 에디트 초기화 0x204c1 (이름표 memset) — 앱의 에디트 이름표 고리 */
   readonly onResetEditedNames?: () => void
+  /**
+   * 일반모드 진입 창 [13](하위 12 0x296f0)에서 새로하기(상태 18) · 빠른실행(this+0x14c = 1 → 상태 22)을 골랐다.
+   * 앱이 빠른실행 여부를 일반모드 화면에 넘긴다. 안 넘기면 새로하기처럼 들어간다.
+   */
+  readonly onStartGeneralMode?: (isQuickStart: boolean) => void
 }
 
 /** 커리어가 아직 없을 때의 화면 — 타이틀 → 메인 메뉴(도움말) → 선수 등록. */
 export function EntryRoutes({
   screen, setScreen, session, gameSettings, collection, random, wallet, aceSelect, hallOfFameDeletion, claimCollectionReward,
-  onRenamePlayer, onResetEditedNames,
+  onRenamePlayer, onResetEditedNames, onStartGeneralMode,
 }: EntryRoutesProps) {
   /** 전부 수집 보상 팝업 글 (0x292f8 의 `0xbbef9(글, 1, −1, 1)`) — 메뉴 위에 뜬다 */
   const [collectionRewardText, setCollectionRewardText] = useState<string | null>(null)
@@ -268,7 +273,10 @@ export function EntryRoutes({
       onSelectMode={(mode) => {
         // 시즌모드·일반모드는 팀을 맡는 모드라 육성 선수가 없어도 들어간다
         if (mode === '시즌모드') return setScreen({ kind: '시즌모드' })
-        if (mode === '일반모드') return setScreen({ kind: '일반모드' })
+        if (mode === '일반모드' || mode === '일반모드빠른실행') {
+          const isQuickStart = mode === '일반모드빠른실행'
+          return onStartGeneralMode === undefined ? setScreen({ kind: '일반모드' }) : onStartGeneralMode(isQuickStart)
+        }
         // 미션(하위 17)·홈런더비(하위 16)는 곧바로 선수 고르기 창으로 간다 — 고를 선수가 없을 때 막는 것도 그 창이다
         // (코드 5 StrCOMMON[38] · 6 [39], Q2 3-1). 메인 메뉴에서 미리 막는 길은 원본에 없다.
         if (mode === '홈런더비') {

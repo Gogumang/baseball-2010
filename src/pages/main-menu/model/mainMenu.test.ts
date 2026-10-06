@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { SEASON_FIRST_NOTICE } from '@/shared/config/original/mainMenu'
 import {
-  MODE_ENTRIES, TOP_ENTRIES, initialMainMenu, isEntryEnabled, reduceMainMenu, selectedIdOf,
+  MODE_ENTRIES, RESTART_MODE_STATE, TOP_ENTRIES, generalModeEntryCursorOf, initialMainMenu, isEntryEnabled,
+  reduceMainMenu, selectedIdOf,
 } from '@/pages/main-menu/model/mainMenu'
 import type { MainMenuState } from '@/pages/main-menu/model/mainMenu'
 
@@ -197,13 +198,68 @@ describe('원본 목록 — ↑↓ 로 고른다', () => {
   })
 })
 
-describe('일반모드 (모드 1)', () => {
-  it('메뉴에서 고를 수 있다 — 저장이 없어 지워도 되는지 묻지 않는다', () => {
+describe('일반모드 (모드 1) — 하위 12 진입 창 [13]·[15] (0x296f0)', () => {
+  const 일반모드시작 = (inProgress: boolean) => {
     const 고름 = 고르기(게임시작목록(true), '일반모드', true)
     expect(고름.selectedModeId).toBe('일반모드')
+    return reduceMainMenu(고름, { type: '시작' }, true, inProgress)
+  }
+  const 답 = (state: MainMenuState, answer: number, inProgress: boolean) =>
+    reduceMainMenu(state, { type: '창답', answer }, true, inProgress)
 
-    const 시작 = reduceMainMenu(고름, { type: '시작' }, true)
-    expect(시작.effect).toBe('일반모드')
-    expect(시작.state.isConfirmingNewGame).toBe(false)
+  it('고르면 곧바로 들어가지 않고 [13] 창이 뜬다 — 저장(+0x4d)이 없으면 처음 커서는 1(새로하기)', () => {
+    const 시작 = 일반모드시작(false)
+    expect(시작.effect).toBeNull()
+    expect(시작.state.generalModeWindow).toEqual({ kind: '진입', initialSelected: 1 })
+  })
+
+  it('중간 저장이 있으면 처음 커서는 0(이어하기), 앞 상태가 0x27 이면 저장과 상관없이 1 (0x297f0~0x29816)', () => {
+    expect(일반모드시작(true).state.generalModeWindow).toEqual({ kind: '진입', initialSelected: 0 })
+    expect(generalModeEntryCursorOf(RESTART_MODE_STATE, true)).toBe(1)
+    expect(generalModeEntryCursorOf(RESTART_MODE_STATE, false)).toBe(1)
+    expect(generalModeEntryCursorOf(5, true)).toBe(0)
+  })
+
+  it('저장이 없으면 이어하기·새로하기는 둘 다 상태 18(유저 팀), 빠른실행은 상태 22 — [15] 는 안 뜬다', () => {
+    const 창 = 일반모드시작(false).state
+    for (const answer of [0, 1]) {
+      const 결과 = 답(창, answer, false)
+      expect(결과.effect).toBe('일반모드')
+      expect(결과.state.generalModeWindow).toBeNull()
+    }
+    expect(답(창, 2, false).effect).toBe('일반모드빠른실행')
+  })
+
+  it('CLR(−1) 은 창을 닫고 게임시작 목록(상태 5)에 남는다', () => {
+    const 닫음 = 답(일반모드시작(false).state, -1, false)
+    expect(닫음.effect).toBeNull()
+    expect(닫음.state.generalModeWindow).toBeNull()
+    expect(닫음.state.tier).toBe(5)
+  })
+
+  it('창이 떠 있으면 다른 키는 받지 않는다', () => {
+    const 창 = 일반모드시작(false).state
+    expect(reduceMainMenu(창, { type: '뒤로' }, true).state).toBe(창)
+    expect(reduceMainMenu(창, { type: '시작' }, true).state).toBe(창)
+  })
+
+  it('저장이 있으면 이어하기는 상태 0x27(저장을 올려 경기), 새로하기·빠른실행은 [15] 확인을 먼저 띄운다', () => {
+    const 창 = 일반모드시작(true).state
+    expect(답(창, 0, true).effect).toBe('일반모드경기이어하기')
+
+    const 새로 = 답(창, 1, true)
+    expect(새로.effect).toBeNull()
+    expect(새로.state.generalModeWindow).toEqual({ kind: '새로하기확인', next: '일반모드' })
+    expect(답(새로.state, 0, true).effect).toBe('일반모드')
+    for (const answer of [1, -1]) {
+      const 아니오 = 답(새로.state, answer, true)
+      expect(아니오.effect).toBeNull()
+      expect(아니오.state.generalModeWindow).toBeNull()
+    }
+
+    const 빠른 = 답(창, 2, true)
+    expect(빠른.state.generalModeWindow).toEqual({ kind: '새로하기확인', next: '일반모드빠른실행' })
+    expect(답(빠른.state, 0, true).effect).toBe('일반모드빠른실행')
+    expect(답(빠른.state, 1, true).effect).toBeNull()
   })
 })

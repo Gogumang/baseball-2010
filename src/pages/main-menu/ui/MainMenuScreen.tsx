@@ -3,7 +3,8 @@ import type { ReactNode } from 'react'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
-import { NEW_GAME_CONFIRM } from '@/shared/config/original/mainMenu'
+import { GENERAL_MODE_PROMPT, NEW_GAME_CONFIRM } from '@/shared/config/original/mainMenu'
+import { MessageBox } from '@/shared/ui/MessageBox/MessageBox'
 import { entriesOf, isEntryDimmed, selectedIdOf, TOP_ENTRIES } from '@/pages/main-menu/model/mainMenu'
 import { useMainMenu } from '@/pages/main-menu/model/useMainMenu'
 import { useMenuTurn } from '@/pages/main-menu/model/useMenuTurn'
@@ -23,7 +24,22 @@ import { MenuWheel } from '@/pages/main-menu/ui/MenuWheel'
 import * as styles from '@/pages/main-menu/ui/MainMenuScreen.css'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 
-export type GameMode = '미션' | '홈런더비' | '시즌모드' | '일반모드'
+export type GameMode = '미션' | '홈런더비' | '시즌모드' | '일반모드' | '일반모드빠른실행'
+
+/**
+ * 일반모드 [13] 버튼 — 띄운 쪽이 `0x74ea9(창, 고른 그림, 보통 그림, 0)` 로 하나씩 넣는다 (0x29782~0x297d8).
+ * 고른 그림 = popup 이미지 표 +0x24/+0x20/+0x28 → 프레임 9·8·10 (67×23), 보통 = +0x10/+0xc/+0x14 → 4·3·5 (59×15).
+ */
+const GENERAL_MODE_BUTTONS = ['이어하기', '새로하기', '빠른실행'] as const
+const GENERAL_MODE_BUTTON_FRAMES = [
+  { normal: 4, selected: 9 }, { normal: 3, selected: 8 }, { normal: 5, selected: 10 },
+] as const
+/** 격자 1열×3행(종류 0x10 인자 1, 3 — 0x297a0 · 0x753f4) · 간격 0x74805(창, 0, 5) */
+const GENERAL_MODE_GRID = { columns: 1, gapX: 0, gapY: 5 } as const
+/** CLR(−16) → 답 −1 (0x29760~0x2977c 가 창 키 표에 넣는다) → 상태 5 */
+const GENERAL_MODE_CANCEL = -1
+/** [15] 의 처음 커서 — 0x749d5(창, 1) = [아니오] (0x298f2 · 0x2998c) */
+const NEW_GAME_CONFIRM_CURSOR = 1
 
 interface MainMenuScreenProps {
   readonly hasSavedGame: boolean
@@ -111,6 +127,9 @@ export function MainMenuScreen({
     else if (effect === '홈런더비') onSelectMode('홈런더비')
     else if (effect === '시즌모드') onSelectMode('시즌모드')
     else if (effect === '일반모드') onSelectMode('일반모드')
+    else if (effect === '일반모드빠른실행') onSelectMode('일반모드빠른실행')
+    // 일반모드 중간 저장(+0x4d)이 웹에 없어 이 갈래는 오지 않는다 — 모델이 늘 "저장 없음" 으로 돈다
+    else if (effect === '일반모드경기이어하기') return
     else if (effect === '스페셜') onSpecial()
     else if (effect === '도움말') onHelp()
     else if (effect === '환경설정') onSettings()
@@ -327,6 +346,28 @@ export function MainMenuScreen({
             아니오
           </button>
         </div>
+      )}
+
+      {/* 일반모드 진입 창 — 하위 12 그리기도 게임시작 목록 위에 상자를 얹는다 */}
+      {state.generalModeWindow?.kind === '진입' && (
+        <MessageBox
+          text={GENERAL_MODE_PROMPT}
+          buttons={GENERAL_MODE_BUTTONS}
+          buttonFrames={GENERAL_MODE_BUTTON_FRAMES}
+          grid={GENERAL_MODE_GRID}
+          cancelAnswer={GENERAL_MODE_CANCEL}
+          initialSelected={state.generalModeWindow.initialSelected}
+          onAnswer={(answer) => dispatch({ type: '창답', answer })}
+        />
+      )}
+      {state.generalModeWindow?.kind === '새로하기확인' && (
+        // 종류 0x82 = 예/아니오 (0x82 & 0x1f = 2). CLR 은 1(아니오) 로 넣는다 (0x298e0~0x298ea) — 상자 기본값과 같다
+        <MessageBox
+          text={NEW_GAME_CONFIRM}
+          buttons={['예', '아니오']}
+          initialSelected={NEW_GAME_CONFIRM_CURSOR}
+          onAnswer={(answer) => dispatch({ type: '창답', answer })}
+        />
       )}
 
       {/* 취소 — 아랫단이면 윗단으로, 윗단이면 타이틀로 (원본은 CLR 키다, 버튼은 웹 임시).

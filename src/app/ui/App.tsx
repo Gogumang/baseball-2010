@@ -111,6 +111,8 @@ export function App() {
   const sound = useSound(gameSettings.settings.soundLevel)
   const random = useMemo(() => createSeededRandom(Date.now() & 0x7fffffff), [])
   const [screen, setScreen] = useState<Screen>({ kind: '타이틀' })
+  /** 일반모드 진입 창 [13] 에서 빠른실행을 골랐는가 (원본 메인 메뉴 this+0x14c) */
+  const [isGeneralQuickStart, setGeneralQuickStart] = useState(false)
   // 화면에 들어설 때 한 번 나는 소리 — 타이틀의 로고 음성 0 (0x69400)
   useSceneEnterSound(sound, screen.kind, screenEnterSoundOf(screen))
 
@@ -356,6 +358,8 @@ export function App() {
     return (
       <GeneralModeScreen
         random={random}
+        // 진입 창 [13] 의 빠른실행 (this+0x14c) — 1~6 단계를 건너뛰고 경기정보로
+        isQuickStart={isGeneralQuickStart}
         openedHiddenTeamIds={collection.collection.openedHiddenIds}
         // 마선수 오픈 플래그(mgr[0x30+idx]) — 이제 저장에서 읽는다. 새 저장이면 기본 개방분
         // (싸이커·메디카) 둘만 켜져 있다 (K-bursts-special.md K-3 3-3)
@@ -430,6 +434,11 @@ export function App() {
         hallOfFameDeletion={hallOfFameDeletion}
         onRenamePlayer={editedNames.rename}
         onResetEditedNames={editedNames.clear}
+        // 일반모드 진입 창 [13] — 빠른실행이면 경기정보(상태 22)부터 (0x299f8 this+0x14c = 1)
+        onStartGeneralMode={(isQuickStart) => {
+          setGeneralQuickStart(isQuickStart)
+          setScreen({ kind: '일반모드' })
+        }}
         // 메인 메뉴 처음 단(하위 4)의 전부 수집 보상 판정 0x28e98 → 팝업 0x292f8
         claimCollectionReward={() => collection.claimCollectionReward(collectionRewardStore, everyMissionCleared, wallet)}
       />

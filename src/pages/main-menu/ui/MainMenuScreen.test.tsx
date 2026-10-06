@@ -72,3 +72,65 @@ describe('메인 메뉴 머리띠 0x54d95(skin, 0, 1|5)', () => {
     expect(container.querySelector('svg')).toBe(band)
   })
 })
+
+describe('일반모드 진입 창 [13] — 하위 12 0x296f0', () => {
+  const 일반모드창 = (onSelectMode = vi.fn()) => {
+    render(
+      <MainMenuScreen hasSavedGame={false} onContinue={vi.fn()} onNewGame={vi.fn()} onSelectMode={onSelectMode}
+        onBack={vi.fn()} onHelp={vi.fn()} onSettings={vi.fn()} onSpecial={vi.fn()} />,
+    )
+    // 윗단 [게임시작] → 아랫단 최근게임 → ↓ 일반모드 → 시작
+    for (const key of ['Enter', 'ArrowDown', 'Enter']) {
+      act(() => {
+        fireEvent.keyDown(window, { key })
+      })
+    }
+    return onSelectMode
+  }
+  const 그림 = (name: string) => screen.getByRole('button', { name }).querySelector('img')?.getAttribute('src') ?? ''
+
+  it('세 칸은 popup 그림 — 이어하기 4 · 새로하기 3 · 빠른실행 5, 처음 커서는 새로하기(고른 그림 8)', () => {
+    일반모드창()
+
+    expect(screen.getByText('진행하시겠습니까?', { exact: false })).toBeTruthy()
+    expect(그림('이어하기')).toContain('popup/frames/004.png')
+    expect(그림('새로하기')).toContain('popup/frames/008.png')
+    expect(그림('빠른실행')).toContain('popup/frames/005.png')
+  })
+
+  it('한 열 격자라 ↑ 가 이어하기(9)로, ↓ 두 번이면 감겨 이어하기로 온다', () => {
+    일반모드창()
+
+    fireEvent.keyDown(window, { key: 'ArrowUp' })
+    expect(그림('이어하기')).toContain('popup/frames/009.png')
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    expect(그림('빠른실행')).toContain('popup/frames/010.png')
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    expect(그림('이어하기')).toContain('popup/frames/009.png')
+  })
+
+  it('새로하기는 일반모드, 빠른실행은 빠른실행으로 들어간다', () => {
+    const onSelectMode = 일반모드창()
+    fireEvent.click(screen.getByRole('button', { name: '빠른실행' }))
+    expect(onSelectMode).toHaveBeenCalledWith('일반모드빠른실행')
+
+    cleanup()
+    const 새로 = 일반모드창()
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(새로).toHaveBeenCalledWith('일반모드')
+  })
+
+  it('CLR 은 −1 — 창만 닫고 게임시작 목록에 남는다', () => {
+    const onSelectMode = 일반모드창()
+    fireEvent.keyDown(window, { key: 'Escape' })
+
+    expect(onSelectMode).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: '빠른실행' })).toBeNull()
+    // 아랫단(바닥 5) 그대로 — 다시 시작하면 창이 또 뜬다
+    act(() => {
+      fireEvent.keyDown(window, { key: 'Enter' })
+    })
+    expect(screen.getByRole('button', { name: '빠른실행' })).toBeTruthy()
+  })
+})

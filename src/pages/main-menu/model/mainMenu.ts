@@ -29,7 +29,37 @@ export interface MainMenuState {
   readonly isConfirmingNewGame: boolean
   /** 못 들어가는 칸을 골랐을 때 뜨는 안내 (원본 팝업 0x74ef5 종류 1 자리). null 이면 안 뜬다. */
   readonly lockedNotice: string | null
+  /** 일반모드 진입 창 — 하위 상태 12(0x296f0)의 [13]·[15]. null 이면 안 떠 있다. */
+  readonly generalModeWindow: GeneralModeWindow | null
 }
+
+/**
+ * **일반모드 진입 창** — 게임시작 목록에서 [일반모드] 를 고르면 곧바로 하위 상태 12(0x296f0)로 간다
+ * (갱신 0x28cb0 → 표 0xcebb0[1] = 12 → 0x28d8a `this+0xeb = 0 ; 0xbcb49(this+0x18, 12)`).
+ * [최근게임] 의 모드 1 시작 0x327b8 은 전역기록 +0x4d 가 서 있으면 창 없이 저장을 올려 경기로 가고(0x327f8~0x3282c),
+ * 아니면 같은 하위 12 로 온다(0x3282e~0x3283c).
+ *
+ * 하위 12 의 하위 단계 [this+0x18] (0x296f0 직접 읽음):
+ * ```
+ * 단계 0  창 [13] "일반 모드를 진행하시겠습니까?" 종류 0x10, 격자 1열×3행, 간격 0x74805(창, 0, 5)
+ *         버튼(0x74ea9, 고른/보통 popup 프레임) 0 이어하기 9/4 · 1 새로하기 8/3 · 2 빠른실행 10/5, CLR → −1
+ *         처음 커서 0x749d5: 앞 상태 [this+0x28] == 0x27 이면 1, 아니면 전역기록 +0x4d ? 0 : 1 (0x297f0~0x29816)
+ * 단계 1  답 [ctx+0x21c]:
+ *           0 이어하기  +0x4c+모드(= +0x4d) ? 상태 0x27(→ 0x327b8 이 저장을 올려 경기) : 0x24924 → 상태 18(유저 팀)
+ *           1 새로하기  +0x4d ? 창 [15] 종류 0x82 + 0x749d5(창, 1) → 단계 2 : 0x24924 → 상태 18
+ *           2 빠른실행  +0x4d ? 창 [15] 종류 0x82 + 0x749d5(창, 1) → 단계 3 : this+0x14c = 1 · 0x24924 → 상태 22(경기정보)
+ *          −1          상태 5(게임시작 목록)
+ * 단계 2  [15] 답 0 → 상태 18 · 1/−1 → 상태 5          ([15] 의 CLR 은 1, 0x298e0~0x298ea)
+ * 단계 3  [15] 답 0 → this+0x14c = 1 · 상태 22 · 1/−1 → 상태 5
+ * ```
+ * 전역기록 +0x4c + 모드 = "그 모드 경기가 중간 저장돼 있음": 경기정보 OK(0x3136e)·경기 장면 진입(0x3a342 …)이 1, 경기 끝 0x4f3d8 이 0.
+ * 일반모드(모드 1)는 +0x4d 이고, 저장 칸은 반 이닝마다 자동 저장(0x4f928 → 0x1fdec, 두 팀 칸 0x32·0x33 + 경기 상태)이다.
+ */
+export type GeneralModeWindow =
+  /** [13] 이어하기·새로하기·빠른실행 — `initialSelected` 는 0x749d5 의 처음 칸 */
+  | { readonly kind: '진입'; readonly initialSelected: number }
+  /** [15] 새로하기 확인 — 예면 `next` 로 간다 (처음 커서 1 = 아니오) */
+  | { readonly kind: '새로하기확인'; readonly next: '일반모드' | '일반모드빠른실행' }
 
 export type MainMenuAction =
   | { readonly type: '모드선택'; readonly id: string }
@@ -41,10 +71,16 @@ export type MainMenuAction =
   | { readonly type: '시작' }
   | { readonly type: '뒤로' }
   | { readonly type: '확인'; readonly isAccepted: boolean }
+  /** 일반모드 진입 창의 답 — 버튼 칸 번호, CLR 은 −1 */
+  | { readonly type: '창답'; readonly answer: number }
 
 /** 메뉴 밖으로 나가야 하는 결과. null 이면 메뉴 안에서 끝난다. */
 export type MainMenuEffect =
   | '이어하기' | '새로하기' | '미션' | '홈런더비' | '시즌모드' | '일반모드' | '타이틀로'
+  /** 일반모드 빠른실행 — 하위 22(경기정보)로 곧바로, this+0x14c = 1 (0x299f8 · 0x2992a) */
+  | '일반모드빠른실행'
+  /** 일반모드 중간 저장 이어하기 — 상태 0x27 → 0x327b8 이 0x213c0(앱, 1, 0) 으로 올려 경기 장면으로 (웹엔 그 저장이 없다) */
+  | '일반모드경기이어하기'
   /** 처음 메뉴에서 갈라지는 화면들 — 원본 하위 상태 6 · 9 · 8 (P6-screens 1-2 · F-ui-layout 4-0) */
   | '스페셜' | '도움말' | '환경설정'
   | null
@@ -68,7 +104,45 @@ export function initialMainMenu(_hasSavedGame: boolean): MainMenuState {
     selectedModeId: MODE_ENTRIES[0].id,
     isConfirmingNewGame: false,
     lockedNotice: null,
+    generalModeWindow: null,
   }
+}
+
+/** 원본 상태 0x27(39) — 경기 끝·최근게임이 거쳐 가는 "같은 모드 다시 시작"(진입 0x32988 → 0x327b8) */
+export const RESTART_MODE_STATE = 0x27
+
+/**
+ * [13] 의 처음 커서 (0x297f0~0x29816) — 앞 상태가 0x27 이면 1(새로하기), 아니면 중간 저장(+0x4d)이 있으면 0(이어하기), 없으면 1.
+ */
+export function generalModeEntryCursorOf(previousState: number, isGameInProgress: boolean): number {
+  if (previousState === RESTART_MODE_STATE) return 1
+  return isGameInProgress ? 0 : 1
+}
+
+/** 하위 12 의 답 처리 (단계 1~3) — `isGameInProgress` 는 전역기록 +0x4c + 모드 1 = +0x4d */
+function answerGeneralModeWindow(
+  state: MainMenuState,
+  window: GeneralModeWindow,
+  answer: number,
+  isGameInProgress: boolean,
+): MainMenuResult {
+  const close = { ...state, generalModeWindow: null }
+  if (window.kind === '새로하기확인') {
+    return answer === 0 ? { state: close, effect: window.next } : { state: close, effect: null }
+  }
+  if (answer === 0) return { state: close, effect: isGameInProgress ? '일반모드경기이어하기' : '일반모드' }
+  if (answer === 1) {
+    return isGameInProgress
+      ? { state: { ...state, generalModeWindow: { kind: '새로하기확인', next: '일반모드' } }, effect: null }
+      : { state: close, effect: '일반모드' }
+  }
+  if (answer === 2) {
+    return isGameInProgress
+      ? { state: { ...state, generalModeWindow: { kind: '새로하기확인', next: '일반모드빠른실행' } }, effect: null }
+      : { state: close, effect: '일반모드빠른실행' }
+  }
+  // −1(CLR) → 상태 5 게임시작 목록
+  return { state: close, effect: null }
 }
 
 /** 지금 단에서 커서가 있는 칸의 id */
@@ -108,8 +182,19 @@ export function reduceMainMenu(
   state: MainMenuState,
   action: MainMenuAction,
   hasSavedGame: boolean,
+  /**
+   * 일반모드 경기가 중간 저장돼 있는가 (전역기록 +0x4d). ⚠️ 웹은 일반모드 반 이닝 자동 저장·이어 붙이기가 없어
+   * 늘 거짓으로 부른다 — 원본도 저장이 없으면 [15] 가 안 뜨고 이어하기가 새로하기와 같다.
+   */
+  isGeneralGameInProgress = false,
 ): MainMenuResult {
   const stay = (next: MainMenuState): MainMenuResult => ({ state: next, effect: null })
+
+  // 창이 떠 있으면 키는 창 것이다 — 답만 받는다
+  if (state.generalModeWindow !== null) {
+    if (action.type !== '창답') return stay(state)
+    return answerGeneralModeWindow(state, state.generalModeWindow, action.answer, isGeneralGameInProgress)
+  }
 
   // 안내 팝업이 떠 있으면 아무 키나 받아 닫기만 한다 (원본 확인 팝업 0x74189 자리)
   if (state.lockedNotice !== null) return stay({ ...state, lockedNotice: null })
@@ -137,7 +222,7 @@ export function reduceMainMenu(
       return stay(select(next.id))
     }
     case '시작':
-      return start(state, hasSavedGame)
+      return start(state, hasSavedGame, isGeneralGameInProgress)
     case '뒤로':
       // 게임시작 목록의 CLR(−16) 은 처음 메뉴로 돌아간다 — 0x28cb0 의 `0xbcb49(this+0x18, 4)` (확정)
       if (state.tier === 5) return stay({ ...state, tier: 4 })
@@ -147,7 +232,7 @@ export function reduceMainMenu(
   }
 }
 
-function start(state: MainMenuState, hasSavedGame: boolean): MainMenuResult {
+function start(state: MainMenuState, hasSavedGame: boolean, isGeneralGameInProgress: boolean): MainMenuResult {
   const entries = entriesOf(state.tier)
   const entry = entries.find((candidate) => candidate.id === selectedIdOf(state))
   if (entry === undefined) return { state, effect: null }
@@ -175,8 +260,11 @@ function start(state: MainMenuState, hasSavedGame: boolean): MainMenuResult {
   if (entry.id === '홈런더비') return { state, effect: '홈런더비' }
   // 시즌모드는 저장이 따로라 나만의리그처럼 지워도 되는지 묻지 않는다 (0x22755 는 다른 칸)
   if (entry.id === '시즌모드') return { state, effect: '시즌모드' }
-  // 일반모드는 저장이 아예 없다 — 한 판 치고 끝이다 (H-modes 모드 1)
-  if (entry.id === '일반모드') return { state, effect: '일반모드' }
+  // 일반모드 → 하위 12 진입 창 [13] (0x28d8a). 게임시작 목록에서 왔으니 앞 상태는 5다
+  if (entry.id === '일반모드') {
+    const initialSelected = generalModeEntryCursorOf(5, isGeneralGameInProgress)
+    return { state: { ...state, generalModeWindow: { kind: '진입', initialSelected } }, effect: null }
+  }
   if (entry.id === '나만의리그') {
     // StrMAINMENU[15] — 저장이 있으면 지워도 되는지 먼저 묻는다.
     return hasSavedGame

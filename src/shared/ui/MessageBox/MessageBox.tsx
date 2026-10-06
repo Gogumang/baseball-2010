@@ -29,6 +29,22 @@ interface MessageBoxProps {
    * 예/아니오(종류 2·3)는 버튼 1 "예" · 2 "아니오" 순서(0x750f8~0x75140)라 n = 1 이 **"아니오"** 다.
    */
   readonly initialSelected?: number
+  /**
+   * 버튼 그림을 자리가 직접 고른다 — 종류 0x10 창처럼 띄운 쪽이 `0x74ea9(창, 고른 그림, 보통 그림, 0)` 로 버튼을 하나씩 넣는 자리.
+   * 값은 `ui/popup.pzx` 프레임 번호다 (예: 일반모드 [13] 이어하기 4/9 · 새로하기 3/8 · 빠른실행 5/10).
+   * 안 주면 알림 0 · 예/아니오 1·2(고르면 6·7)다.
+   */
+  readonly buttonFrames?: readonly { readonly normal: number; readonly selected: number }[]
+  /**
+   * 버튼 격자 — 창 +0x218 격자의 열 수와 칸 사이 간격([+0x264] 가로 · [+0x268] 세로, 0x74805 가 바꾼다).
+   * 안 주면 한 줄(열 수 = 버튼 수)에 기본 간격 40/10 (0x750a8~0x750be)이다.
+   */
+  readonly grid?: { readonly columns: number; readonly gapX: number; readonly gapY: number }
+  /**
+   * 취소 키(CLR)가 주는 답. 원본은 띄운 쪽이 창의 키 표([+0x234]/[+0x240], 0x75670~0x756b6)에 −16 → 값을 넣는다 —
+   * 예: 일반모드 [13] 은 −1(0x29760~0x2977c). 안 주면 지금까지처럼 마지막 칸이다.
+   */
+  readonly cancelAnswer?: number
   /** 누른 버튼 번호 */
   readonly onAnswer: (index: number) => void
 }
@@ -80,13 +96,53 @@ const YES_NO_SELECTED_FRAMES = [6, 7]
 /** 선택 그림 원점 (−4,−4) */
 const SELECTED_OVERFLOW = 4
 
+/**
+ * 보통 그림의 크기 (`popup/frames/origins.json`) — 격자 칸 크기는 버튼 그림의 가장 큰 폭·높이다(0x74824).
+ * 고른 그림(6~10 · 13·14)은 사방 4px 큰 같은 꼴이고 원점이 (−4,−4) 다.
+ */
+const NORMAL_FRAME_SIZES: Readonly<Record<number, { readonly width: number; readonly height: number }>> = {
+  0: { width: 41, height: 15 }, 1: { width: 41, height: 15 }, 2: { width: 41, height: 15 },
+  3: { width: 59, height: 15 }, 4: { width: 59, height: 15 }, 5: { width: 59, height: 15 },
+  11: { width: 35, height: 53 }, 12: { width: 35, height: 53 },
+}
+
 /** 버튼 칸 → 그림 프레임. 버튼이 하나면 알림이라 "OK" 한 장뿐이고 고른 그림이 따로 없다 */
 function buttonFrameOf(count: number, index: number, isSelected: boolean): number | undefined {
   if (count <= 1) return NOTICE_FRAME
   return (isSelected ? YES_NO_SELECTED_FRAMES : YES_NO_FRAMES)[index]
 }
 
-export function MessageBox({ text, buttons, listItems, initialSelected = 0, onAnswer }: MessageBoxProps) {
+/**
+ * 격자 커서 옮기기 — 격자 객체 키 0x6be70(−3 ←/−4 →/−1 ↑/−2 ↓) → 옮기기 vtbl+0xc 0x6bead.
+ * 상자 격자는 모두 플래그 0x330(0x750f4 · 0x75414)이라 가로·세로 둘 다 **감기고**(0x10·0x20), 감기면 다른 축으로
+ * 한 칸 **넘어간다**(0x100·0x200 — 다른 축 칸이 둘 이상이고 한 단계 깊이까지, 0x6bef2~0x6bf1c · 0x6bf70~).
+ * 곧 한 줄 상자(예/아니오)는 ↑↓ 도 칸을 바꾸고, 한 열 상자(일반모드 [13])는 ←→ 도 칸을 바꾼다.
+ */
+function moveGridCursor(index: number, columns: number, count: number, dx: number, dy: number): number {
+  const rows = Math.max(1, Math.ceil(count / columns))
+  let x = index % columns
+  let y = Math.floor(index / columns)
+  const move = (stepX: number, stepY: number, depth: number) => {
+    if (stepX !== 0) {
+      const isWrapped = x + stepX < 0 || x + stepX >= columns
+      x = (((x + stepX) % columns) + columns) % columns
+      if (isWrapped && rows > 1 && depth <= 1) move(0, Math.sign(stepX), depth + 1)
+    }
+    if (stepY !== 0) {
+      const isWrapped = y + stepY < 0 || y + stepY >= rows
+      y = (((y + stepY) % rows) + rows) % rows
+      if (isWrapped && columns > 1 && depth <= 1) move(Math.sign(stepY), 0, depth + 1)
+    }
+  }
+  move(dx, dy, 1)
+  return Math.min(y * columns + x, count - 1)
+}
+
+export function MessageBox({
+  text, buttons, listItems, initialSelected = 0, buttonFrames, grid, cancelAnswer, onAnswer,
+}: MessageBoxProps) {
+  /** 격자 열 수 — 안 주면 버튼이 한 줄이다 */
+  const columns = Math.max(1, grid?.columns ?? buttons.length)
   const firstSelected = Math.min(Math.max(0, initialSelected), Math.max(0, buttons.length - 1))
   const [selected, setSelected] = useState(firstSelected)
 
@@ -163,24 +219,25 @@ export function MessageBox({ text, buttons, listItems, initialSelected = 0, onAn
     const onKeyDown = (event: KeyboardEvent) => {
       // 잡는 단계에서 멈춰 뒤쪽 화면의 window 리스너(메뉴 목록·커맨드 줄·타석)까지 막는다
       event.stopImmediatePropagation()
-      const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
-      if (step !== 0) {
+      const dx = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
+      const dy = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0
+      if (dx !== 0 || dy !== 0) {
         event.preventDefault()
-        return setSelected((previous) => (previous + step + buttons.length) % buttons.length)
+        return setSelected((previous) => moveGridCursor(previous, columns, buttons.length, dx, dy))
       }
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault()
         return answer(selectedRef.current)
       }
-      // 취소는 마지막 버튼 — 두 개면 [아니오], 하나면 [확인]
+      // 취소는 띄운 쪽이 정한 값, 안 정했으면 마지막 버튼 — 두 개면 [아니오], 하나면 [확인]
       if (event.key === 'Escape' || event.key === 'Backspace') {
         event.preventDefault()
-        answer(buttons.length - 1)
+        answer(cancelAnswer ?? buttons.length - 1)
       }
     }
     window.addEventListener('keydown', onKeyDown, true)
     return () => window.removeEventListener('keydown', onKeyDown, true)
-  }, [answer, buttons.length])
+  }, [answer, buttons.length, columns, cancelAnswer])
 
   // 펼치는 동안에는 높이만, 닫는 동안에는 폭만 원본 값으로 눌러 그린다.
   // 세로 가운데는 CSS(top 50% + translateY(−50%))가 이미 맞춰 준다.
@@ -193,20 +250,45 @@ export function MessageBox({ text, buttons, listItems, initialSelected = 0, onAn
   // 펼치는 동안은 글·버튼을 안 그린다 (0x7479c). 닫는 동안에는 원본도 그대로 그린다.
   const contentStyle = animation?.kind === '열림' ? { visibility: 'hidden' as const } : undefined
 
+  // 격자 칸 크기 = 버튼 그림의 가장 큰 폭·높이(0x74824 의 0x7484e~0x74888) — 그림을 고른 자리만 다르다
+  const cellSize = buttonFrames === undefined || listItems !== undefined
+    ? null
+    : buttonFrames.reduce(
+      (size, pictures) => ({
+        width: Math.max(size.width, NORMAL_FRAME_SIZES[pictures.normal]?.width ?? 0),
+        height: Math.max(size.height, NORMAL_FRAME_SIZES[pictures.normal]?.height ?? 0),
+      }),
+      { width: 0, height: 0 },
+    )
+  // 격자를 준 자리만 칸을 열·줄로 놓는다 — 간격은 [+0x264] 가로 · [+0x268] 세로, 가운데 맞춤(0x74824)
+  const gridStyle = grid === undefined ? undefined : {
+    display: 'grid',
+    gridTemplateColumns: `repeat(${columns}, auto)`,
+    columnGap: `${grid.gapX}px`,
+    rowGap: `${grid.gapY}px`,
+    justifyContent: 'center',
+  }
+
   return (
     <div className={styles.dim} role="dialog" aria-label="알림">
       <div className={styles.box} ref={boxRef} style={boxStyle}>
         <div className={styles.text} style={contentStyle}>
           <MarkupText raw={text} />
         </div>
-        <div className={styles.buttons} style={contentStyle}>
+        <div className={styles.buttons} style={{ ...gridStyle, ...contentStyle }}>
           {buttons.map((label, index) => {
             const isSelected = index === selected
+            const pictures = buttonFrames?.[index]
             // 글자 목록이면 그림을 쓰지 않는다 — 예/아니오 그림으로는 다른 것을 고를 수 없다
-            const frame = listItems === undefined ? buttonFrameOf(buttons.length, index, isSelected) : undefined
+            const frame = listItems !== undefined
+              ? undefined
+              : pictures !== undefined
+                ? (isSelected ? pictures.selected : pictures.normal)
+                : buttonFrameOf(buttons.length, index, isSelected)
             const shown = listItems?.[index] ?? label
             return (
               <button key={label} type="button" className={styles.button} aria-label={label}
+                style={cellSize === null ? undefined : { width: cellSize.width, height: cellSize.height }}
                 onMouseEnter={() => setSelected(index)} onFocus={() => setSelected(index)}
                 onClick={() => answer(index)}>
                 {frame === undefined ? (isSelected ? `▶ ${shown}` : shown) : (
@@ -214,7 +296,7 @@ export function MessageBox({ text, buttons, listItems, initialSelected = 0, onAn
                     className={styles.buttonImage}
                     src={`${POPUP}/${String(frame).padStart(3, '0')}.png`}
                     alt=""
-                    // 선택 그림(49×23)은 원점이 (−4,−4) 라 같은 자리에서 사방 4px 넘쳐 그려진다
+                    // 선택 그림(49×23 · 67×23 · 43×57)은 원점이 (−4,−4) 라 같은 자리에서 사방 4px 넘쳐 그려진다
                     style={isSelected && buttons.length > 1 ? { left: -SELECTED_OVERFLOW, top: -SELECTED_OVERFLOW } : undefined}
                   />
                 )}

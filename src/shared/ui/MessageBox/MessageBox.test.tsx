@@ -136,6 +136,34 @@ describe('메시지 상자 애니메이션', () => {
     expect(onAnswer).toHaveBeenCalledWith(1)
   })
 
+  it('한 줄 상자는 ↑↓ 도 칸을 바꾼다 — 격자 플래그 0x330 이 감기면 다른 축으로 넘긴다 (0x6bead)', () => {
+    render(<MessageBox text="질문" buttons={['예', '아니오']} onAnswer={vi.fn()} />)
+
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    expect(그림('아니오')?.getAttribute('src')).toContain('popup/frames/007.png')
+    fireEvent.keyDown(window, { key: 'ArrowUp' })
+    expect(그림('예')?.getAttribute('src')).toContain('popup/frames/006.png')
+  })
+
+  it('그림·격자·취소 값을 자리가 줄 수 있다 — 종류 0x10 창 (0x74ea9 · 0x74805 · 창 키 표)', () => {
+    const onAnswer = vi.fn()
+    render(
+      <MessageBox text="질문" buttons={['가', '나', '다']}
+        buttonFrames={[{ normal: 4, selected: 9 }, { normal: 3, selected: 8 }, { normal: 5, selected: 10 }]}
+        grid={{ columns: 1, gapX: 0, gapY: 5 }} cancelAnswer={-1} initialSelected={1} onAnswer={onAnswer} />,
+    )
+
+    expect(그림('가')?.getAttribute('src')).toContain('popup/frames/004.png')
+    expect(그림('나')?.getAttribute('src')).toContain('popup/frames/008.png')
+    // 칸 크기는 보통 그림의 가장 큰 폭·높이 59×15
+    expect(screen.getByRole('button', { name: '가' }).style.width).toBe('59px')
+    // 한 열이라 → 도 다음 칸
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(그림('다')?.getAttribute('src')).toContain('popup/frames/010.png')
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(onAnswer).toHaveBeenCalledWith(-1)
+  })
+
   it('한 상자에는 한 번만 답한다 — 두 번 눌러도 한 번이다', () => {
     const onAnswer = vi.fn()
     render(<MessageBox text="알림" buttons={['확인']} onAnswer={onAnswer} />)

@@ -40,8 +40,17 @@ export const GAME_START_MENU: readonly MainMenuEntry[] = [
   { id: '미션모드', labelFrame: 12, isAvailable: true, description: '상황에 따라 주어진 목표를!N달성하는 모드입니다' }, // [12]
 ]
 
-/** [15] 나만의리그를 새로 시작할 때 기존 저장이 있으면 묻는다. */
-export const NEW_GAME_CONFIRM = '!C새로하시겠습니까?!N기존 데이터는 사라집니다.'
+/**
+ * [13] 일반모드 진입 창 질문 (하위 상태 12 0x296f0, 종류 0x10 — 이어하기·새로하기·빠른실행 세 칸).
+ */
+export const GENERAL_MODE_PROMPT = '!C일반 모드를!N진행하시겠습니까?'
+
+/**
+ * [15] 일반모드 새로하기 확인 (0x296f0 단계 1 → 종류 0x82). 원본에서 [15] 를 쓰는 곳은 0x296f0 둘뿐이다
+ * (0x2989e · 0x2993c `0x702b5(표, 0xf)`) — 나만의리그 진입은 이 창을 띄우지 않는다. 원문 그대로 (`StrMAINMENU.json`).
+ */
+export const NEW_GAME_CONFIRM =
+  '!C새로하시겠습니까?!N기존 데이터는 사라집니다.!N(!cFFFF00진행 중인 시합에서 획득한!NG포인트도 사라집니다!cFFFFFF)'
 
 /**
  * [115] 대전모드를 고를 때 시즌 커리어(전역기록 +0x42)가 없으면 뜨는 확인 팝업 문구.
