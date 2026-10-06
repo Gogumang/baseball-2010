@@ -53,8 +53,10 @@ export interface NationalCupGameResult {
  * ```
  * 칸 1 은 말 공격이다 — 명단이 같으니 **나중에 공격한 쪽이 더 내면 a 승**, 동점이면 `b` 승.
  *
- * ⚠️ 미해결: 같은 날 사람 경기가 상대국 레코드의 투수 스태미나를 이미 깎아 두지만(레코드가 같다) 웹은 사람 경기 상대의
- * 끝 스태미나를 들고 있지 않아 10000 으로 선다.
+ * **스태미나도 그 레코드 하나다** (4d09e39): 같은 날 사람 경기가 상대국 레코드(`base+0x934`)의 투수 스태미나 `+0x2c` 를
+ * 이미 깎아 두었으므로, CPU 경기는 **사람 경기가 끝났을 때의 상대 투수 칸별 값**에서 선다(`startingStaminas`).
+ * 그 레코드는 다음 날 하루 끝 `0xb818c`(b8216)의 `0x20648` 이 마스터에서 새로 복사하므로 CPU 경기의 끝 값은 이어지지 않는다.
+ * 안 넘기면 모두 10000 이다(사람 경기 쪽이 아직 끝 값을 넘기지 않는 길).
  */
 export function playCpuNationalCupGame(
   a: number,
@@ -64,10 +66,17 @@ export function playCpuNationalCupGame(
   random: RandomPort,
   /** 양 팀 공통 선발 칸 — `nationalCupStartingPitcherIndex(cup)` */
   startingPitcherSlot: number,
+  /** 그날 사람 경기가 끝났을 때 상대국 레코드의 투수 칸별 스태미나 `+0x2c` (두 팀이 같이 쓴다). 안 넘기면 10000 */
+  startingStaminas?: readonly number[],
 ): NationalCupGameResult {
-  const score = simulateLeagueGame({ away: rosterTeam, home: rosterTeam }, random, startingPitcherSlot, undefined, {
-    sharedRoster: true,
-  })
+  const score = simulateLeagueGame(
+    { away: rosterTeam, home: rosterTeam },
+    random,
+    startingPitcherSlot,
+    // 레코드가 하나라 한 표만 넘기면 된다 — `sharedRoster` 면 away 표를 두 팀이 같이 쓴다
+    startingStaminas === undefined ? undefined : { away: startingStaminas },
+    { sharedRoster: true },
+  )
   // 칸 1(a, 말) 이 더 많이 냈을 때만 a 승 — 동점이면 b 승이다 (원본 그대로)
   const winner = score.homeRuns > score.awayRuns ? a : b
   const loser = winner === a ? b : a
@@ -89,6 +98,11 @@ export function advanceNationalCupDay(
   humanWinner: number,
   humanLoser: number,
   random: RandomPort,
+  /**
+   * 그날 사람 경기가 끝났을 때 **상대국 투수 칸별 스태미나** `+0x2c` — 상대국 슬롯 레코드(`base+0x934`)에 남은 값.
+   * 같은 날 CPU 경기의 두 나라가 이 레코드를 그대로 쓴다. 안 넘기면 10000 에서 선다.
+   */
+  opponentPitcherStaminas?: readonly number[],
 ): NationalCup {
   const afterHuman = recordNationalCupResult(cup, humanWinner, humanLoser)
 
@@ -105,6 +119,7 @@ export function advanceNationalCupDay(
             rosterTeam,
             random,
             nationalCupStartingPitcherIndex(afterHuman),
+            opponentPitcherStaminas,
           )
           return recordNationalCupResult(afterHuman, result.winner, result.loser)
         })()

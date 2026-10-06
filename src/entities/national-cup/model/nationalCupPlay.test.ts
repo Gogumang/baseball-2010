@@ -62,6 +62,27 @@ describe('CPU 끼리 한 경기 0xc2dac', () => {
     }
   })
 
+  it('사람 경기가 깎아 둔 상대국 레코드 스태미나에서 선다 — 레코드 하나를 같이 쓴다 (base+0x934, 4d09e39)', () => {
+    const 지친표 = [0, 0, 0, 0, 0, 0, 0, 0]
+    let 달라짐 = 0
+    for (let seed = 1; seed <= 12; seed += 1) {
+      const 지침 = playCpuNationalCupGame(12, 13, 11, createSeededRandom(seed), 1, 지친표)
+      const 직접 = simulateLeagueGame({ away: 11, home: 11 }, createSeededRandom(seed), 1, { away: 지친표 }, { sharedRoster: true })
+      expect([지침.firstSlotRuns, 지침.secondSlotRuns]).toEqual([직접.homeRuns, 직접.awayRuns])
+      const 가득 = playCpuNationalCupGame(12, 13, 11, createSeededRandom(seed), 1)
+      if (가득.firstSlotRuns !== 지침.firstSlotRuns || 가득.secondSlotRuns !== 지침.secondSlotRuns) 달라짐 += 1
+    }
+    // 탈진(0)한 투수진은 결과를 바꾼다 — 값이 실제로 쓰인다
+    expect(달라짐).toBeGreaterThan(0)
+  })
+
+  it('하루 넘기기도 상대국 끝 스태미나를 CPU 경기에 넘긴다', () => {
+    const 표 = [0, 0, 0, 0, 0, 0, 0, 0]
+    const 기대 = playCpuNationalCupGame(12, 13, 11, createSeededRandom(77), 0, 표)
+    const 하루뒤 = advanceNationalCupDay(createNationalCup(), 10, 11, createSeededRandom(77), 표)
+    expect(하루뒤.wins[createNationalCup().teams.indexOf(기대.winner)]).toBe(1)
+  })
+
   it('하루 넘기기의 CPU 경기는 nationalCupMatchupOf 의 상대를 명단으로 쓴다', () => {
     const cup = createNationalCup()
     // 첫날: 사람 10–11, CPU 12–13 → 명단은 11, 선발 0번
