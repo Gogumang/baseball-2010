@@ -64,10 +64,25 @@ describe('콤보 — 직전 공과 이번 공이 모두 홈런일 때만 오른�
     expect(run.maxCombo).toBe(1)
   })
 
-  it('⚠️ 원본 그대로 — 마지막(10번째) 공은 홈런이어도 콤보가 안 붙는다', () => {
-    // 아홉 번째까지 홈런을 치고 열 번째도 홈런: 콤보는 8 까지만 오른다
+  it('마지막(10번째) 공 홈런도 최대 콤보·보너스 G 를 올리고, 그 뒤 콤보만 지운다 (ae444 → ae470)', () => {
     const run = 여러번(createDerbyRun(), Array.from({ length: 10 }, () => 홈런(90)))
-    expect(run.maxCombo).toBe(8)
+    expect(run.maxCombo).toBe(9)
+    expect(run.bonusGamePoint).toBe(((9 * 10) / 2) * 5)
+    expect(run.combo).toBe(0)
+    // 최대 콤보 9 만큼 보너스 게임이 열린다
+    expect(run.isBonusGame).toBe(true)
+    expect(run.remainingPitches).toBe(9)
+  })
+
+  it('보너스 게임을 열면 "직전 공 홈런"(+0x3a)을 지운다 — 보너스 첫 공 홈런은 콤보가 안 된다 (ae502)', () => {
+    const 열구 = [홈런(90), 홈런(90), 홈런(90), ...Array.from({ length: 6 }, () => 헛스윙), 홈런(90)]
+    const 보너스 = 여러번(createDerbyRun(), 열구)
+    expect(보너스.isBonusGame).toBe(true)
+    expect(보너스.wasPreviousHomeRun).toBe(false)
+
+    const 첫공 = applyDerbyPitch(보너스, 홈런(90))
+    expect(첫공.combo).toBe(0)
+    expect(첫공.bonusGamePoint).toBe(15)
   })
 })
 
@@ -92,6 +107,11 @@ describe('기회와 던진 공 수', () => {
   it('⚠️ 원본 그대로 — 던진 공 수(+0x68)는 마지막 공을 안 세어 9 에서 멈춘다', () => {
     const run = 여러번(createDerbyRun(), Array.from({ length: 10 }, () => 헛스윙))
     expect(run.pitchesThrown).toBe(9)
+  })
+
+  it('보너스 게임을 열 때는 던진 공을 센다 (ae51c)', () => {
+    const 열구 = [홈런(90), 홈런(90), 홈런(90), ...Array.from({ length: 7 }, () => 헛스윙)]
+    expect(여러번(createDerbyRun(), 열구).pitchesThrown).toBe(10)
   })
 
   it('끝난 뒤에는 더 이상 바뀌지 않는다', () => {
@@ -190,8 +210,8 @@ describe('결과 정산 (0x4f574)', () => {
 
   it('획득 G 는 (누적/100) × 배율[단계] + 보너스 G 다', () => {
     const run = 여러번(createDerbyRun(), Array.from({ length: 10 }, () => 홈런(100)))
-    // 누적 1000, 단계 1(누적 800 에서 올라감), 콤보 보너스 = 1+2+…+8 배 5
-    const 콤보보너스 = ((8 * 9) / 2) * 5
+    // 누적 1000, 단계 1(누적 800 에서 올라감), 콤보 보너스 = 1+2+…+9 배 5 (마지막 공도 콤보를 올린다)
+    const 콤보보너스 = ((9 * 10) / 2) * 5
     expect(run.stage).toBe(1)
     expect(run.bonusGamePoint).toBe(콤보보너스)
     expect(derbyResultOf(run, 0).gainedGamePoint).toBe(10 * 2 + 콤보보너스)

@@ -24,6 +24,15 @@ const 헛스윙: PitchOutcomeDetail = {
   resultCode: null,
 }
 
+/** 희생번트 타구 — 번트 판정(0x51226) 성공 코드 6 묶음 (`outcomeOfPattern` 의 case 6) */
+const 번트: PitchOutcomeDetail = {
+  resolution: { kind: '타구', outcome: { kind: '아웃', detail: '땅볼아웃' } },
+  hasSwung: true,
+  isBunt: true,
+  resultCode: 7,
+  pattern: [90, 300, 0, 0],
+}
+
 /** 공 하나를 치고 결과 연출이 끝날 때까지 시간을 흘린다 */
 function 한구(rendered: { result: { current: ReturnType<typeof useHomeRunDerby> } }, detail: PitchOutcomeDetail) {
   act(() => rendered.result.current.onPitchResolved(detail))
@@ -53,6 +62,22 @@ describe('홈런더비 한 판', () => {
     expect(rendered.result.current.run.totalDistance).toBe(0)
     한구(rendered, 홈런)
     expect(rendered.result.current.run.totalDistance).toBeGreaterThan(0)
+  })
+
+  it('번트 타구는 따로 다루지 않는다 — 0x17 끝 0xae3e8 의 "홈런 아닌 공" 하나: 기회 −1 · 비거리 그대로 · 콤보 끊김', () => {
+    const rendered = 띄우기()
+    한구(rendered, 홈런)
+    한구(rendered, 홈런)
+    expect(rendered.result.current.run.combo).toBe(1)
+    const 누적 = rendered.result.current.run.totalDistance
+
+    한구(rendered, 번트)
+
+    const run = rendered.result.current.run
+    expect(run.remainingPitches).toBe(7)
+    expect(run.totalDistance).toBe(누적)
+    expect(run.combo).toBe(0)
+    expect(run.wasPreviousHomeRun).toBe(false)
   })
 
   it('결과 연출 동안은 멈췄다가 다시 풀린다', () => {

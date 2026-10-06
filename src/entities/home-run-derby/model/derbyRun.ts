@@ -70,33 +70,44 @@ export function createDerbyRun(): DerbyRun {
 }
 
 /**
- * 공 하나의 결과 처리 — 0xae24c(아웃·헛스윙 쪽)·0xae3e8(타구 쪽). 둘 다 `구조체+1 == 7` 일 때만
- * 이 길로 간다. 차례는 원본 그대로다:
+ * 공 하나의 결과 처리 — 둘 다 `구조체+1 == 7` 일 때만 이 길로 간다:
+ * - **0xae3e8** — 배트에 맞은 공(번트·파울 포함)이 인플레이(상태 0x17) 끝 `0x524c0 → 0x52a52` 에서 부른다.
+ * - **0xae24c** — 맞지 않은 공(상태 0x12 갱신 `0x4e6d4 → 0x4e78c`)과 벤치 클리어링(상태 30 `0x401d4` · 0x1e 키 `0x40628`) 뒤.
  *
- * 0. (타구 처리 0xa600c) 홈런이면 누적 비거리에 더한다
- * 1. 직전 공과 이번 공이 모두 홈런이면 콤보++ · 최대 콤보 갱신 · **보너스 G += 콤보 × 5**,
- *    아니거나 기회가 다했으면 콤보 0. 그다음 "직전 공 = 이번 공"
- * 2. 남은 기회가 1 보다 많으면 기회−−, 던진 공++, 그리고 누적 ≥ 단계표[단계] 면 단계++
- * 3. 기회가 다했고 최대 콤보 > 0 이고 아직 보너스 전이면 보너스 게임 시작 (기회 = 최대 콤보)
- * 4. 그 밖이면 끝(상태 0x1a)
- * 5. 이번 공이 이벤트 존에 들었으면 보너스 G += 200
+ * 두 함수의 모드 7 갈래는 같은 일을 한다(0xae24c 는 이번 공이 홈런일 수 없어 콤보를 올리지 않고 이벤트 존을 안 본다):
+ * ```
+ * ae42e  r6 = 남은 기회(+0x33) − 1 > 0
+ * ae430  직전 공 홈런(+0x3a) 이면:
+ * ae43a    이번 공 홈런(+0x3b) 이면  콤보(+0x39)++ · 최대 콤보(+0x3d) = max(·, 콤보) · 보너스 G(+0x40) += 콤보 × 5 · +0x84 = 콤보
+ * ae470    !r6 || !이번 공 홈런 이면  콤보 = 0
+ * ae49a  +0x3a = +0x3b ; +0x3b = 0
+ * ae4b6  r6 이면  기회−− · 던진 공(+0x68)++ · 누적(+0x34) ≥ 표 0xd84dc[단계] 면 단계++ → 0xd / 아니면 0xf
+ * ae4ee  아니고 최대 콤보 > 0 && 보너스 전(+0x3e == 0) 이면  +0x3a = 0 · 보너스 = 1 · 기회 = 최대 콤보 · 던진 공++ · 콤보 = 0 → 0xd
+ * ae53a  그 밖이면 끝 → 0x1a
+ * ae53c  이번 공 이벤트 존(+0x3f) 이면  보너스 G += 200 · +0x3f = 0     (0xae3e8 만)
+ * ```
+ * 번트를 따로 보는 갈래는 없다 — 번트 판정 0x51226(0x51108 안)·타구 시작 0x51408 · 이 두 함수 어디에도 모드·번트 갈림이 없어
+ * 번트 타구도 0x17 끝에서 0xae3e8 로 와서 "홈런 아닌 공" 하나로 셈한다.
  *
- * ⚠️ **원본 버그 그대로** ①: 콤보는 `남은 기회 > 1` 일 때만 올라간다 — 곧 **마지막 공은
- * 홈런을 쳐도 콤보가 붙지 않고 0 으로 지워진다**. 최대 콤보(= 보너스 게임 수)도 그만큼 손해다.
- * ⚠️ **원본 버그 그대로** ②: 던진 공 수(+0x68)도 같은 `> 1` 안에서만 올라가 10 구를 다 치면
- * 9 에서 멈춘다. 결과 화면이 "총 기회" 를 이 칸이 아니라 `10 + 보너스` 로 따로 세는 이유다(R14 1-3).
+ * ⚠️ **정정**: 앞서 "마지막 공은 홈런을 쳐도 콤보가 안 붙는다" 고 옮겼으나 틀렸다 — 콤보++ · 최대 콤보 · 보너스 G 는
+ * `r6` 을 보기 **전에** 하고(ae444~ae46e), 마지막 공이면 그 뒤에 콤보만 0 으로 지운다(ae470). 그래서 마지막 공 홈런도
+ * 최대 콤보(= 보너스 게임 수)와 보너스 G 를 올린다. 보너스 게임을 열 때는 "직전 공 홈런"(+0x3a)을 0 으로 지우고 던진 공도 센다.
+ * ⚠️ **원본 버그 그대로**: 던진 공 수(+0x68)는 기회가 남았을 때와 보너스를 열 때만 올라 마지막 공은 안 센다.
+ *    결과 화면이 "총 기회" 를 이 칸이 아니라 `10 + 보너스` 로 따로 세는 이유다(R14 1-3).
  */
 export function applyDerbyPitch(run: DerbyRun, outcome: DerbyPitchOutcome): DerbyRun {
   if (run.isFinished) return run
 
   // 0. 비거리는 타구가 날아가는 동안 이미 더해진다 (0xa600c) — 홈런일 때만 0 보다 크다
   const totalDistance = run.totalDistance + outcome.distance
+  const hasMoreChances = run.remainingPitches > 1
 
-  // 1. 콤보
-  const isComboLinked = run.wasPreviousHomeRun && outcome.isHomeRun && run.remainingPitches > 1
-  const combo = isComboLinked ? run.combo + 1 : 0
-  const maxCombo = isComboLinked ? Math.max(run.maxCombo, combo) : run.maxCombo
-  let bonusGamePoint = run.bonusGamePoint + (isComboLinked ? combo * COMBO_BONUS_UNIT : 0)
+  // 1. 콤보 — 직전·이번 모두 홈런이면 올리고(ae444), 마지막 공이거나 이번이 홈런이 아니면 지운다(ae470)
+  const isComboLinked = run.wasPreviousHomeRun && outcome.isHomeRun
+  const raisedCombo = isComboLinked ? run.combo + 1 : run.combo
+  const maxCombo = isComboLinked ? Math.max(run.maxCombo, raisedCombo) : run.maxCombo
+  let bonusGamePoint = run.bonusGamePoint + (isComboLinked ? raisedCombo * COMBO_BONUS_UNIT : 0)
+  const combo = run.wasPreviousHomeRun && !(hasMoreChances && outcome.isHomeRun) ? 0 : raisedCombo
 
   // 5. 이벤트 존은 같은 처리 끝에서 더한다 (0xae548)
   if (outcome.isEventZoneHit) bonusGamePoint += EVENT_ZONE_BONUS
@@ -105,35 +116,37 @@ export function applyDerbyPitch(run: DerbyRun, outcome: DerbyPitchOutcome): Derb
     totalDistance,
     lastDistance: outcome.distance,
     maxCombo,
-    wasPreviousHomeRun: outcome.isHomeRun,
     bonusGamePoint,
   }
 
   // 2. 아직 기회가 남았다 — 다음 공
-  if (run.remainingPitches > 1) {
+  if (hasMoreChances) {
     return {
       ...run,
       ...common,
       combo,
+      wasPreviousHomeRun: outcome.isHomeRun,
       remainingPitches: run.remainingPitches - 1,
       pitchesThrown: run.pitchesThrown + 1,
       stage: nextAceStageOf(run.stage, totalDistance),
     }
   }
 
-  // 3. 보너스 게임 — 최대 콤보 수만큼, 한 번만
+  // 3. 보너스 게임 — 최대 콤보 수만큼, 한 번만. "직전 공 홈런" 은 지운다(ae502), 던진 공은 센다(ae51c)
   if (maxCombo > 0 && !run.isBonusGame) {
     return {
       ...run,
       ...common,
       combo: 0,
+      wasPreviousHomeRun: false,
       isBonusGame: true,
       remainingPitches: maxCombo,
+      pitchesThrown: run.pitchesThrown + 1,
     }
   }
 
   // 4. 끝
-  return { ...run, ...common, combo, isFinished: true }
+  return { ...run, ...common, combo, wasPreviousHomeRun: outcome.isHomeRun, isFinished: true }
 }
 
 /**
