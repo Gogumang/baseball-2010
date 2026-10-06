@@ -536,7 +536,7 @@ describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
   const 협살상황 = (defenseIsCpu: boolean) =>
     runDefensePlay({
       outcome: 뜬공아웃,
-      trajectory: battedBallTrajectory([126, 1054, 1444, 0]),
+      trajectory: battedBallTrajectory([120, 1052, 1443, 0]),
       bases: 주자1루,
       outs: 0,
       defenseIsCpu,

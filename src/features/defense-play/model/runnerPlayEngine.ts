@@ -179,14 +179,17 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
   let decidedHolder = NONE
   /** 사람 목표 +0x160 이 아직 안 쓰였나 — 쓰면 −1 (b46a8) */
   let manualPending = manualThrowBase !== NONE
-  /** 공 쥔 야수가 준비되는 틱 — 쥐기 0xb2710(P, f, 1)이 +0xc8 에 넣은 준비 틱이 다 지나는 때 */
-  let holderReadyTick = 0
   /** 이번 틱에 0xb36d0 이 아웃을 냈나 — 결과 코드 13 → 메시지 0xbba */
   let outJudgedThisTick = false
   /** 악송구로 공이 빠졌다 — 더는 아무도 쥐지 않는다 (근사) */
   let ballLost = false
 
   const runnerStates = () => runners.map((runner) => runner.state)
+  /** 공 쥔 야수 vtC4 = 0xa20ec — +0xc8(준비 틱)이 다 줄었나. 쥐기 0xb2710(P, f, 1)이 넣고 야수 틱 0xa1284 가 줄인다 */
+  const isHolderReady = (): boolean => {
+    const holder = fielders[play.ballHolderSlot]
+    return play.held && holder !== undefined && holder.holdingBall && holder.actionRemainingTicks <= 0
+  }
   const batterRunnerOf = () => (runners[0]?.state.isBatterRunner === true ? runners[0].state : undefined)
   const contextAt = (tick: number): DefenseContext => ({
     play,
@@ -228,7 +231,6 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
     )
     play = { ...play, ballHolderSlot: slot, held: true, everHeld: true }
     ballOnGround = true
-    holderReadyTick = tick + (extra.actionRemainingTicks ?? fielders[slot]?.actionRemainingTicks ?? 0)
     runOutJudgement(tick)
   }
 
@@ -330,6 +332,12 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
 
   for (let tick = 0; tick <= maximumTicks && !play.finished; tick += 1) {
     outJudgedThisTick = false
+    // ── 0. 야수 틱 0xa1284 — 공용 갱신 0x3f060 이 슬롯 2(0x524c0)보다 먼저 돈다. 쥔 동안 +0xc8 −= 1 (타구 진행기 0' 절) ──
+    fielders = fielders.map((fielder) =>
+      fielder.holdingBall && fielder.actionRemainingTicks > 0
+        ? { ...fielder, actionRemainingTicks: fielder.actionRemainingTicks - 1 }
+        : fielder,
+    )
     // ── 1. (종류 9) 포구 ──
     if (chase !== undefined && !caught && tick === catchTick) {
       const ballIsMoving = tick < chase.trajectory.length - 1
@@ -380,7 +388,8 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
       } else if (isSamePoint(fielders[inFlight.receiver].position, basePosition(inFlight.base))) {
         throwState.flight = null
         play = { ...play, wantsThrow: false }
-        grab(tick, inFlight.receiver)
+        // 송구 받기도 포구 틱 갈래(b42c8)의 0xb2710(P, f, **1**)이다 — 받은 야수도 준비 틱(내야 3 · 외야 6)을 +0xc8 에 넣는다
+        grab(tick, inFlight.receiver, { actionRemainingTicks: readyTicksOf(inFlight.receiver) })
         // 0xb4292 — 받은 야수가 선 루에 마지막으로 닿은 산 주자가 제 목표점에 있으면 결과 9
         const onBase = runners.find(
           (runner) => !runner.state.isOut && wrapBase(runner.state.startBase) === wrapBase(inFlight.base),
@@ -496,7 +505,7 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
       !ballLost &&
       throwState.flight === null &&
       play.held &&
-      tick >= holderReadyTick &&
+      isHolderReady() &&
       (!cpuThrowEnabled || decidedHolder === play.ballHolderSlot)
     ) {
       decideThrow(tick, true)

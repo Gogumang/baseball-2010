@@ -1019,15 +1019,19 @@ export function stepDefensePlay(
   /**
    * **공 가진 야수가 던질 준비가 됐나** — 0xafa60 · b4674 가 보는 `야수.vtC4()` = 0xa20ec
    * (`+0xb0 == 0 && +0xb4 ≤ 0 && +0xc8 ≤ 0`) 와 0xafa60 의 `AI 상태 ∉ {8, 9}`.
-   * 쥐기 0xb2710(P, f, 1)이 +0xc8 에 준비 틱(내야 3 · 외야 6)을 넣으므로 **포구 틱부터 그만큼 지나야** 참이다.
-   * **근사**: +0xc8 을 틱마다 1 씩 줄이는 자리(야수 갱신)는 안 떴다 — "포구 뒤 준비 틱만큼 지났다" 로 본다.
-   * 상태 8(협살)은 CPU 수비에만 선다.
+   * 쥐기 0xb2710(P, f, 1)이 +0xc8 에 준비 틱(내야 3 · 외야 6)을 넣고, 이 틱 머리(0절)의 야수 틱이 쥔 동안 하나씩 줄인다.
+   * 상태 8(협살)은 CPU 수비에만 선다. +0xb0 · +0xb4(동작 잠금)는 이 진행기에 없다(펌블은 15틱 뒤 다시 줍기로 옮겼다).
    */
-  const isHolderReady = (): boolean =>
-    play.held &&
-    tick - catchTick >= readyTicksOf(chaserSlot) &&
-    rundown.runnerIndex === NONE &&
-    (fielders[chaserSlot]?.holdingBall ?? false)
+  const isHolderReady = (): boolean => {
+    const holder = fielders[play.ballHolderSlot]
+    return (
+      play.held &&
+      holder !== undefined &&
+      holder.holdingBall &&
+      holder.actionRemainingTicks <= 0 &&
+      rundown.runnerIndex === NONE
+    )
+  }
 
   /**
    * **공 가진 야수가 루 `base` 로 던진다** — 루로 보내기 0xb2c90 → 0xb2e38 → 던지기 0xa1620.
@@ -1101,6 +1105,21 @@ export function stepDefensePlay(
   {
     outJudgedThisTick = false
     const ballOnGround = play.everHeld || tick >= trajectory.landingTick
+
+    // ── 0'. 야수 틱 0xa1284 의 준비 틱 줄이기 (직접 뜬 것) ──
+    // ```
+    // 52c50: 장면 갱신 — 52e16 공용 갱신 0x3f060 → (상태 0x17 이면) 52e94 0x524c0(슬롯 2: 플레이 틱 · 자동 진루 · CPU 송구)
+    // 3f0d2: 0x3f060 은 플레이가 돌고 상태 0x17 이면 장면+0x1e4 객체 목록.vt8 = 원소마다 vt0xc — 야수 9명(3e660, new(0xf4)
+    //        + 0xa0e08)·주자가 이 목록에 들어 있다(0xc0104)
+    // a1312: 야수 vt0xc = 0xa1284: (+0xb4 동작 잠금이 0 일 때) +0xc8 > 0 && +0xe0(공 쥠) 이면 +0xc8 −= 1 (0 아래로 안 감)
+    // ```
+    // 곧 **야수 틱이 플레이 틱보다 먼저** 돈다 — 포구 틱에 쥐기(0xb2710)가 넣은 준비 틱 R 은 다음 틱부터 줄어
+    // 포구 R 틱 뒤에 0 이 된다. 쥔 동안만 줄고, +0xc8 을 넣는 곳은 쥐기(vt88, b27aa·b27be)뿐이다.
+    fielders = fielders.map((fielder) =>
+      fielder.holdingBall && fielder.actionRemainingTicks > 0
+        ? { ...fielder, actionRemainingTicks: fielder.actionRemainingTicks - 1 }
+        : fielder,
+    )
 
     // ── 0. 사람 조작 (상태 0x17 갈래 0x53420 — I-controls 0·2b·3b절) ──
     // 예전에는 `input.controls?.keyAt(tick)` 로 미리 물어봤다. 이제는 **이번 틱에 눌린 키**를 받는다
