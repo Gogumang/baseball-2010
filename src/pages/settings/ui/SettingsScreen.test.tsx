@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import { DEFAULT_SETTINGS, SPEED_LEVEL_COUNT } from '@/entities/settings/model/gameSettings'
 import {
-  MENU_ROW, MODE_RESET_ROW, MODE_RESET_TITLE, PANEL, SOUND_BARS, SPEED_MARKS, VALUE_ROW,
+  IN_GAME_PANEL, MENU_ROW, MODE_RESET_ROW, MODE_RESET_TITLE, OK_BUTTON, PANEL, SOUND_BARS, SPEED_MARKS, VALUE_ROW,
   bottomAlignOffset, isSelectedOutlineShown, modeResetRowTopOf, rowTopOf,
 } from '@/pages/settings/lib/settingsLayout'
 
@@ -152,13 +152,63 @@ describe('환경설정 값 바꾸기', () => {
     expect(screen.getByRole('dialog')).toBeTruthy()
   })
 
-  it('경기 중 메뉴 "설정"(에디트 초기화를 안 넘김)에서는 모드 초기화가 잠겨 있다 — 웹판 판단', () => {
+  it('메인 메뉴에서 에디트 초기화를 안 넘기면 모드 초기화 줄은 있되 들어가지 않는다', () => {
     띄우기({ onResetEditedNames: undefined })
 
     fireEvent.click(줄('모드 초기화'))
 
     expect(줄('모드 초기화')).toBeTruthy()
     expect(screen.queryByRole('button', { name: '에디트 초기화' })).toBeNull()
+  })
+})
+
+/**
+ * 경기 중 메뉴 "설정" — 경기 장면 초기화 0x3301c 가 skin+0x125 = 1 을 세워 0x593c8 종류 8 이 **작은 판**(높이 130,
+ * 0x5940c) 에 **세 줄**(0x595e4) 만 그린다. 격자 1×4(0x3c3ac) — 넷째 칸이 OK 단추(고르면 popup 18, 0x59df0),
+ * OK·좌우 모두 0x3cccc 로 경기 중 메뉴로 돌아간다. 모드 초기화(에디트 초기화 포함)는 줄 자체가 없다.
+ */
+describe('경기 중 메뉴 "설정" — 작은 판 세 줄 (skin+0x125)', () => {
+  const 경기중 = (overrides: Partial<Parameters<typeof SettingsScreen>[0]> = {}) =>
+    띄우기({ mainMenu: undefined, onResetEditedNames: undefined, ...overrides })
+
+  it('사운드·속도·진동 세 줄만 있다 — 상세 설정·모드 초기화·게임 데이터 관리 줄이 없다', () => {
+    경기중()
+
+    for (const name of ['사운드', '속도', '진동']) expect(줄(name)).toBeTruthy()
+    for (const name of ['상세 설정', '모드 초기화', '게임 데이터 관리']) {
+      expect(screen.queryByRole('button', { name })).toBeNull()
+    }
+  })
+
+  it('판은 (24, 95, 192, 130) — y0 = 160 − 65, 줄·OK 가 41 내려간다', () => {
+    경기중()
+
+    expect(IN_GAME_PANEL).toEqual({ x: 24, y: 95, width: 192, height: 130 })
+    expect(줄('사운드').style.top).toBe(`${rowTopOf(0) + 41 + VALUE_ROW.bar.dy}px`)
+    expect(줄('확인').style.top).toBe(`${OK_BUTTON.y + 41}px`)
+  })
+
+  it('넷째 커서 칸이 OK — 고르면 popup 프레임 18, OK 를 누르면 경기 중 메뉴로', () => {
+    const onBack = vi.fn()
+    경기중({ onBack })
+
+    for (let k = 0; k < 3; k += 1) fireEvent.keyDown(window, { key: 'ArrowDown' })
+    expect(줄('확인').querySelector('img')?.getAttribute('src')).toContain('popup/frames/018.png')
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(onBack).toHaveBeenCalledTimes(1)
+
+    // 한 칸 더 내려가면 첫 줄로 돈다 (칸 넷)
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    expect(줄('확인').querySelector('img')?.getAttribute('src')).toContain('popup/frames/000.png')
+  })
+
+  it('OK 칸의 좌우도 돌아가기다 (0x3cba4 → 칸 3 → 0x3cccc)', () => {
+    const onBack = vi.fn()
+    경기중({ onBack })
+
+    fireEvent.keyDown(window, { key: 'ArrowUp' })
+    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+    expect(onBack).toHaveBeenCalledTimes(1)
   })
 })
 

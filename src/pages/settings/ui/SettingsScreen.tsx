@@ -9,7 +9,8 @@ import { VIBRATION_TOGGLE_MILLISECONDS, vibrate } from '@/entities/defense-contr
 import { SETTINGS_TEXT } from '@/shared/config/settingsMenu'
 import {
   DETAIL_CHOICES, DETAIL_COLORS, DETAIL_ROWS, DETAIL_ROW_COUNT, DETAIL_TITLE,
-  FIRST_MENU_ROW, MENU_ROW, MODE_RESET_ROW, MODE_RESET_ROW_COUNT, MODE_RESET_TITLE, OK_BUTTON, PANEL, ROW_COUNT, ROW_ICONS,
+  FIRST_MENU_ROW, IN_GAME_PANEL, IN_GAME_ROW_COUNT, MENU_ROW, MODE_RESET_ROW, MODE_RESET_ROW_COUNT, MODE_RESET_TITLE,
+  OK_BUTTON, OK_SELECTED_FRAME, OK_SELECTED_OVERFLOW, PANEL, ROW_COUNT, ROW_ICONS,
   SETTINGS_FRAME, SOUND_BARS, SPEED_MARKS, TITLE, VALUE_ROW, VIBRATION,
   bottomAlignOffset, iconCenterOffsetOf, isSelectedOutlineShown, modeResetRowTopOf, rowTopOf,
 } from '@/pages/settings/lib/settingsLayout'
@@ -28,8 +29,8 @@ interface SettingsScreenProps {
   readonly onResetCareer: () => void
   /**
    * 에디트 초기화 `0x204c1` = 이름표 memset (모드 초기화 칸 2).
-   * 메인 메뉴 환경설정(상태 8)만 넘긴다 — 경기 중 메뉴 "설정" 은 모드 초기화를 잠가 둔 웹판 판단이라
-   * 안 넘기면 칸 4 가 예전처럼 아무 일도 하지 않는다.
+   * 메인 메뉴 환경설정(상태 8)만 넘긴다 — 경기 중 메뉴 "설정" 은 작은 판이라 모드 초기화 줄이 아예 없다
+   * (`IN_GAME_PANEL`). 메인 메뉴에서 안 넘기면 칸 4 가 아무 일도 하지 않는다.
    */
   readonly onResetEditedNames?: () => void
   /**
@@ -41,6 +42,8 @@ interface SettingsScreenProps {
    * 메인 메뉴 장면(0x103)의 환경설정일 때만 준다 — 상태 8·0x20·0x21 그리기(0x2dc90 · 0x2dc48 · 0x2dc00)가
    * 판 뒤에 머리띠 `0x54d95(skin, 0, 5, 0)`(제목 "2010프로야구" + G포인트 · 바닥 되돌아가기)를 그린다.
    * 경기 중 메뉴 그리기 0x3cdd0 은 0x593c8 종류 8 만 그리고 머리띠가 없어 안 준다.
+   * **안 주면 경기 장면 안 "설정"** 이다 — 경기 장면이 세운 skin+0x125 로 작은 판(130)·세 줄·OK 칸이 된다
+   * (`IN_GAME_PANEL`, 0x3301c · 0x5940c · 0x595d0).
    */
   readonly mainMenu?: { readonly gamePoint: number }
   readonly onBack: () => void
@@ -71,7 +74,8 @@ function SettingsFrame({ mainMenu, onBack, slides = true }: {
  *   메뉴 줄 3~5 = 상세 설정 · 모드 초기화 · 게임 데이터 관리 (…[66]~[68])
  *
  * 줄은 원본대로 보여 준다. 진동을 켜면 0x29684 처럼 100ms 흔든다(`navigator.vibrate` 가 있을 때만) — 경기 중 메뉴의
- * "설정" 도 이 화면이라 0x3cc20(같은 일)도 여기서 된다.
+ * "설정" 도 이 화면이라 0x3cc20(같은 일)도 여기서 된다. 다만 경기 중은 **작은 판(130)에 값 줄 셋 + OK 칸**뿐이다
+ * (`mainMenu` 없음 = skin+0x125, `IN_GAME_PANEL`) — 상세 설정·모드 초기화(에디트 초기화 포함)는 경기 중에 열 길이 없다.
  * 게임 데이터 관리(백업·복구)는 원본이 서버를 쓰므로 🌐 안내만 띄운다.
  * 상세 설정에는 웹이 실제로 쓰는 항목(투구 게이지)을 둔다.
  */
@@ -88,10 +92,20 @@ export function SettingsScreen({
   const frames = useFrameOrigins(`${SLT_FRAME}/frames`)
   const titleFrames = useFrameOrigins(IMG_TEXT)
 
-  const names = [
+  /** 경기 장면 안 "설정"(skin+0x125 = 1) — 작은 판, 값 줄 셋만, OK 단추가 넷째 커서 칸 */
+  const isInGame = mainMenu === undefined
+  const panel = isInGame ? IN_GAME_PANEL : PANEL
+  /** 판·제목·줄·OK 가 y0 를 따라 내려가는 만큼 */
+  const panelDy = panel.y - PANEL.y
+  const allNames = [
     SETTINGS_TEXT.sound, SETTINGS_TEXT.speed, SETTINGS_TEXT.vibration,
     SETTINGS_TEXT.detail, SETTINGS_TEXT.modeReset, SETTINGS_TEXT.dataManagement,
   ]
+  const names = isInGame ? allNames.slice(0, IN_GAME_ROW_COUNT) : allNames
+  /** 커서 칸 수 — 경기 중은 격자 1×4(0x3c3ac) 라 줄 셋 + OK. 메인 메뉴는 웹이 줄 여섯만 센다 */
+  const cursorCount = isInGame ? IN_GAME_ROW_COUNT + 1 : ROW_COUNT
+  /** 경기 중 OK 칸 — 고르면 popup 프레임 18, OK·좌우 모두 0x3cccc 로 경기 중 메뉴로 돌아간다 */
+  const isOkSelected = isInGame && cursor === IN_GAME_ROW_COUNT
 
   const isBlocked = notice !== null || isDetailOpen || isModeResetOpen
 
@@ -112,6 +126,7 @@ export function SettingsScreen({
   }
 
   const openRow = (index: number) => {
+    if (isInGame && index === IN_GAME_ROW_COUNT) return onBack()
     if (index < FIRST_MENU_ROW) return changeValue(1, index)
     if (index === 3) return setDetailOpen(true)
     // 칸 4 → 상태 0x21 (0x295d0 `0xbcb49(…, 0x21)`) — 조건 없이 들어간다
@@ -125,12 +140,17 @@ export function SettingsScreen({
       const vertical = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0
       if (vertical !== 0) {
         event.preventDefault()
-        return setCursor((previous) => (previous + vertical + ROW_COUNT) % ROW_COUNT)
+        return setCursor((previous) => (previous + vertical + cursorCount) % cursorCount)
       }
       const horizontal = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
       if (horizontal !== 0 && cursor < FIRST_MENU_ROW) {
         event.preventDefault()
         return changeValue(horizontal)
+      }
+      // 경기 중 OK 칸의 좌우도 0x3cba4 → 칸 3 갈래 0x3cccc (돌아가기)
+      if (horizontal !== 0 && isOkSelected) {
+        event.preventDefault()
+        return onBack()
       }
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault()
@@ -170,12 +190,12 @@ export function SettingsScreen({
     <RawScreen>
       <div
         className={styles.panel}
-        style={{ left: PANEL.x, top: PANEL.y, width: PANEL.width, height: PANEL.height }}
+        style={{ left: panel.x, top: panel.y, width: panel.width, height: panel.height }}
       />
-      <FrameSprite folder={IMG_TEXT} frame={TITLE.frame} origins={titleFrames} x={TITLE.x} y={TITLE.y} />
+      <FrameSprite folder={IMG_TEXT} frame={TITLE.frame} origins={titleFrames} x={TITLE.x} y={TITLE.y + panelDy} />
 
       {names.map((name, index) => {
-        const top = rowTopOf(index)
+        const top = rowTopOf(index) + panelDy
         const isValueRow = index < FIRST_MENU_ROW
         const bar = isValueRow ? VALUE_ROW.bar : MENU_ROW.bar
         const bullet = isValueRow ? VALUE_ROW : MENU_ROW
@@ -268,9 +288,12 @@ export function SettingsScreen({
       })}
 
       <button type="button" className={styles.row} aria-label="확인"
-        style={{ left: (PANEL.width - OK_BUTTON.width) / 2 + PANEL.x, top: OK_BUTTON.y, width: OK_BUTTON.width, height: OK_BUTTON.height }}
+        style={{ left: (PANEL.width - OK_BUTTON.width) / 2 + PANEL.x, top: OK_BUTTON.y + panelDy, width: OK_BUTTON.width, height: OK_BUTTON.height }}
+        onMouseEnter={isInGame ? () => setCursor(IN_GAME_ROW_COUNT) : undefined}
         onClick={onBack}>
-        <img className={styles.sprite} alt="" src={imageSrc(POPUP, OK_BUTTON.frame)} style={{ left: 0, top: 0 }} />
+        <img className={styles.sprite} alt=""
+          src={imageSrc(POPUP, isOkSelected ? OK_SELECTED_FRAME : OK_BUTTON.frame)}
+          style={isOkSelected ? { left: -OK_SELECTED_OVERFLOW, top: -OK_SELECTED_OVERFLOW } : { left: 0, top: 0 }} />
       </button>
 
       <SettingsFrame mainMenu={mainMenu} onBack={onBack} slides={!hasReturned} />

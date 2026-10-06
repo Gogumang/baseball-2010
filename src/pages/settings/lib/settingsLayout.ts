@@ -128,6 +128,25 @@ export const VIBRATION = {
 export const OK_BUTTON = { frame: 0, width: 41, height: 15, y: 251 } as const
 
 /**
+ * **경기 중 메뉴 "설정"**(0x3c326 → 하위 5, 그리기 0x3cdd0 이 0x593c8 종류 8)은 **작은 판**이다.
+ *
+ * 경기 장면 초기화 0x3301c 가 skin+0x125 = 1 을 세우고(0x33038, 경기 장면을 나가는 0x332b8 · 메인 메뉴 0x234d4 는 0),
+ * 0x593c8 이 그 플래그면 판 높이 [sp+0x88] = **0x82(130)**(0x5940c~0x59422) · 그리는 줄 수 [sp+0x78] = **3**
+ * (0x595d0~0x595e4) — 사운드·속도·진동만 있고 **상세 설정·모드 초기화·게임 데이터 관리 줄이 아예 없다**.
+ * y0 = H/2 − 130/2 = 95 라 판·제목·줄·OK 가 모두 (95 − 54) = 41 아래로 내려간다(x 는 그대로).
+ * 커서 격자는 1열 4행(0x3c3ac `vtbl+0x10(1, 4, 1, 0x20, 0)`) — 셋째 다음 칸이 OK 단추다.
+ */
+export const IN_GAME_PANEL = { x: PANEL.x, y: SCREEN.height / 2 - 130 / 2, width: PANEL.width, height: 130 } as const
+export const IN_GAME_ROW_COUNT = 3
+
+/**
+ * OK 단추도 커서 칸이다 — 격자 마지막 칸(열수 × 행수 − 1)이 고른 칸이면 popup 프레임 **0x12(18)**(주황 "OK", 49×23,
+ * 원점 −4,−4), 아니면 프레임 0 (0x59de2~0x59e4e). 메인 메뉴 첫 화면 격자는 1×7(진입 0x259fc `vtbl+0x10(1, 7, …)`).
+ */
+export const OK_SELECTED_FRAME = 18
+export const OK_SELECTED_OVERFLOW = 4
+
+/**
  * 상세 설정 (메인 메뉴 상태 0x20 · 페이지 32 — 그리기 0x59e82~0x5a226 의 **4줄 루프** `cmp r6,#4`,
  * 갱신 0x288ac 는 칸 0~3 을 누를 때 값을 `eor #1` 로 뒤집는다 — P7 K2 확정).
  *
