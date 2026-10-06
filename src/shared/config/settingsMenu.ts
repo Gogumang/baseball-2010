@@ -17,6 +17,14 @@ export const SETTINGS_TEXT = {
   modeReset: '모드 초기화', // [67]
   modeResetDescription: '게임 모드를 초기화!N시킬 수 있습니다', // [36]
   careerReset: '나만의리그 초기화', // [82]
+  seasonReset: '시즌모드 초기화', // [83]
+  editReset: '에디트 초기화', // [84]
+  /** 시즌모드 초기화 확인 — 0xcf870 (상태 0x21 하위 0 칸 1, 0x2c7ec) */
+  seasonResetConfirm: '!C!cffffff시즌 모드 초기화를!N하시겠습니까?!N(!cff0000G포인트 아이템도!N함께 삭제됩니다!cffffff)',
+  /** 에디트 초기화 확인 — 0xcf8d4 (상태 0x21 하위 0 칸 2, 0x2c80e) */
+  editResetConfirm: '!C!cffffff선수 이름을 초기화!N하시겠습니까?',
+  /** 초기화 뒤 알림 — 0xcf900 (0x2c9d0 · 0x2ca28) */
+  resetDone: '!C초기화 되었습니다',
   careerResetConfirm:
     '!C!cFFFFFF나만의 리그 타자편!N초기화를 하시겠습니까?!N(!cFF0000G포인트 아이템도!N함께 삭제됩니다!cFFFFFF)', // [210]
 } as const

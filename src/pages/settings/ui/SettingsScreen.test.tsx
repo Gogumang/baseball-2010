@@ -3,7 +3,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import { DEFAULT_SETTINGS, SPEED_LEVEL_COUNT } from '@/entities/settings/model/gameSettings'
-import { MENU_ROW, PANEL, SOUND_BARS, SPEED_MARKS, VALUE_ROW, bottomAlignOffset, rowTopOf } from '@/pages/settings/lib/settingsLayout'
+import {
+  MENU_ROW, MODE_RESET_ROW, MODE_RESET_TITLE, PANEL, SOUND_BARS, SPEED_MARKS, VALUE_ROW,
+  bottomAlignOffset, modeResetRowTopOf, rowTopOf,
+} from '@/pages/settings/lib/settingsLayout'
 
 /**
  * 환경설정 창 (공용 페이지 0x593c8 종류 8 — P6 5절).
@@ -19,6 +22,7 @@ const 띄우기 = (overrides: Partial<Parameters<typeof SettingsScreen>[0]> = {}
       hasSavedCareer
       onChange={vi.fn()}
       onResetCareer={vi.fn()}
+      onResetEditedNames={vi.fn()}
       onBack={vi.fn()}
       {...overrides}
     />,
@@ -147,12 +151,106 @@ describe('환경설정 값 바꾸기', () => {
     expect(screen.getByRole('dialog')).toBeTruthy()
   })
 
-  it('저장이 없으면 모드 초기화가 확인 창을 띄우지 않는다', () => {
-    띄우기({ hasSavedCareer: false })
+  it('경기 중 메뉴 "설정"(에디트 초기화를 안 넘김)에서는 모드 초기화가 잠겨 있다 — 웹판 판단', () => {
+    띄우기({ onResetEditedNames: undefined })
 
     fireEvent.click(줄('모드 초기화'))
 
+    expect(줄('모드 초기화')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '에디트 초기화' })).toBeNull()
+  })
+})
+
+/**
+ * 모드 초기화 — 원본 장면 상태 0x21 (갱신 0x2c6d8 · 그리기 0x5a316, 직접 읽음).
+ * 칸 0 [82] 나만의리그 · 1 [83] 시즌모드 · 2 [84] 에디트. 에디트는 확인 0xcf8d4 → 0x204c1 → 0xcf900.
+ */
+describe('환경설정 → 모드 초기화 (원본 상태 0x21, 세 줄)', () => {
+  const 모드초기화열기 = (overrides: Partial<Parameters<typeof SettingsScreen>[0]> = {}) => {
+    띄우기(overrides)
+    fireEvent.click(줄('모드 초기화'))
+  }
+
+  it('나리 저장이 없어도 들어간다 — 칸 4 는 조건 없이 0xbcb49(…, 0x21)', () => {
+    모드초기화열기({ hasSavedCareer: false })
+
+    for (const name of ['나만의리그 초기화', '시즌모드 초기화', '에디트 초기화']) expect(줄(name)).toBeTruthy()
+  })
+
+  it('줄은 Y = 54 + 30i 의 114px 막대(프레임 36) 이고 제목은 img_text 291 이다', () => {
+    모드초기화열기()
+
+    expect(줄('나만의리그 초기화').style.top).toBe(`${modeResetRowTopOf(0) + MODE_RESET_ROW.bar.dy}px`)
+    expect(줄('에디트 초기화').style.top).toBe(`${PANEL.y + 60 + 0x25}px`)
+    expect(줄('에디트 초기화').style.left).toBe(`${PANEL.x + 0x32}px`)
+    expect(줄('에디트 초기화').style.width).toBe('114px')
+    expect(MODE_RESET_TITLE).toEqual({ frame: 291, x: 36, y: 59 })
+  })
+
+  it('에디트 초기화: 확인 0xcf8d4 에 예 → 이름표를 비우고 0xcf900 "초기화 되었습니다"', () => {
+    const onResetEditedNames = vi.fn()
+    모드초기화열기({ onResetEditedNames })
+
+    fireEvent.click(줄('에디트 초기화'))
+    expect(screen.getByRole('dialog').textContent).toContain('선수 이름을 초기화')
+    expect(onResetEditedNames).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+    expect(onResetEditedNames).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('dialog').textContent).toContain('초기화 되었습니다')
+
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
     expect(screen.queryByRole('dialog')).toBeNull()
+    expect(줄('에디트 초기화')).toBeTruthy()
+  })
+
+  it('에디트 초기화: 아니오면 아무것도 안 지우고 목록으로', () => {
+    const onResetEditedNames = vi.fn()
+    모드초기화열기({ onResetEditedNames })
+
+    fireEvent.click(줄('에디트 초기화'))
+    fireEvent.click(screen.getByRole('button', { name: '아니오' }))
+
+    expect(onResetEditedNames).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('키: 아래 두 번 → OK 가 에디트 확인을 띄우고, CLR 은 환경설정 첫 화면으로', () => {
+    모드초기화열기()
+
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(screen.getByRole('dialog').textContent).toContain('선수 이름을 초기화')
+    fireEvent.click(screen.getByRole('button', { name: '아니오' }))
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(줄('사운드')).toBeTruthy()
+  })
+
+  it('나만의리그: 저장이 있을 때만 [210] 확인 → 예면 지우고 0xcf900', () => {
+    const onResetCareer = vi.fn()
+    모드초기화열기({ onResetCareer })
+
+    fireEvent.click(줄('나만의리그 초기화'))
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+
+    expect(onResetCareer).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('dialog').textContent).toContain('초기화 되었습니다')
+  })
+
+  it('시즌모드: 시즌 지우기를 안 넘기면(웹 미배선) 확인 창이 안 뜨고, 넘기면 0xcf870 확인', () => {
+    모드초기화열기()
+    fireEvent.click(줄('시즌모드 초기화'))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    cleanup()
+
+    const onResetSeason = vi.fn()
+    모드초기화열기({ onResetSeason })
+    fireEvent.click(줄('시즌모드 초기화'))
+    expect(screen.getByRole('dialog').textContent).toContain('시즌 모드 초기화를')
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+    expect(onResetSeason).toHaveBeenCalledTimes(1)
   })
 })
 

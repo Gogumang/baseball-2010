@@ -7,9 +7,9 @@ import { VIBRATION_TOGGLE_MILLISECONDS, vibrate } from '@/entities/defense-contr
 import { SETTINGS_TEXT } from '@/shared/config/settingsMenu'
 import {
   DETAIL_CHOICES, DETAIL_COLORS, DETAIL_ROWS, DETAIL_ROW_COUNT, DETAIL_TITLE,
-  FIRST_MENU_ROW, MENU_ROW, OK_BUTTON, PANEL, ROW_COUNT, ROW_ICONS,
+  FIRST_MENU_ROW, MENU_ROW, MODE_RESET_ROW, MODE_RESET_ROW_COUNT, MODE_RESET_TITLE, OK_BUTTON, PANEL, ROW_COUNT, ROW_ICONS,
   SOUND_BARS, SPEED_MARKS, TITLE, VALUE_ROW, VIBRATION,
-  bottomAlignOffset, iconCenterOffsetOf, rowTopOf,
+  bottomAlignOffset, iconCenterOffsetOf, modeResetRowTopOf, rowTopOf,
 } from '@/pages/settings/lib/settingsLayout'
 import * as styles from '@/pages/settings/ui/SettingsScreen.css'
 
@@ -24,6 +24,17 @@ interface SettingsScreenProps {
   readonly hasSavedCareer: boolean
   readonly onChange: (settings: GameSettings) => void
   readonly onResetCareer: () => void
+  /**
+   * 에디트 초기화 `0x204c1` = 이름표 memset (모드 초기화 칸 2).
+   * 메인 메뉴 환경설정(상태 8)만 넘긴다 — 경기 중 메뉴 "설정" 은 모드 초기화를 잠가 둔 웹판 판단이라
+   * 안 넘기면 칸 4 가 예전처럼 아무 일도 하지 않는다.
+   */
+  readonly onResetEditedNames?: () => void
+  /**
+   * 시즌모드 초기화 `0x224ed(mgr, 2)` (모드 초기화 칸 1). 웹 시즌 저장 지우기가 아직 없어 안 넘기면
+   * 칸은 보이되 OK 가 아무 일도 하지 않는다 (⚠️ 미배선).
+   */
+  readonly onResetSeason?: () => void
   readonly onBack: () => void
 }
 
@@ -39,11 +50,13 @@ interface SettingsScreenProps {
  * 게임 데이터 관리(백업·복구)는 원본이 서버를 쓰므로 🌐 안내만 띄운다.
  * 상세 설정에는 웹이 실제로 쓰는 항목(투구 게이지)을 둔다.
  */
-export function SettingsScreen({ settings, hasSavedCareer, onChange, onResetCareer, onBack }: SettingsScreenProps) {
+export function SettingsScreen({
+  settings, hasSavedCareer, onChange, onResetCareer, onResetEditedNames, onResetSeason, onBack,
+}: SettingsScreenProps) {
   const [cursor, setCursor] = useState(0)
   const [notice, setNotice] = useState<string | null>(null)
-  const [isConfirmingReset, setIsConfirmingReset] = useState(false)
   const [isDetailOpen, setDetailOpen] = useState(false)
+  const [isModeResetOpen, setModeResetOpen] = useState(false)
   const frames = useFrameOrigins(`${SLT_FRAME}/frames`)
   const titleFrames = useFrameOrigins(IMG_TEXT)
 
@@ -52,7 +65,7 @@ export function SettingsScreen({ settings, hasSavedCareer, onChange, onResetCare
     SETTINGS_TEXT.detail, SETTINGS_TEXT.modeReset, SETTINGS_TEXT.dataManagement,
   ]
 
-  const isBlocked = notice !== null || isConfirmingReset || isDetailOpen
+  const isBlocked = notice !== null || isDetailOpen || isModeResetOpen
 
   /** 값 줄에서 좌우 키가 값을 바꾼다 — 줄은 지금 커서(누른 줄을 넘기면 그 줄. 클릭은 커서 갱신 전에 부른다) */
   const changeValue = (step: number, row: number = cursor) => {
@@ -73,7 +86,8 @@ export function SettingsScreen({ settings, hasSavedCareer, onChange, onResetCare
   const openRow = (index: number) => {
     if (index < FIRST_MENU_ROW) return changeValue(1, index)
     if (index === 3) return setDetailOpen(true)
-    if (index === 4) return hasSavedCareer ? setIsConfirmingReset(true) : undefined
+    // 칸 4 → 상태 0x21 (0x295d0 `0xbcb49(…, 0x21)`) — 조건 없이 들어간다
+    if (index === 4) return onResetEditedNames === undefined ? undefined : setModeResetOpen(true)
     setNotice(SETTINGS_TEXT.dataManagementBlocked)
   }
 
@@ -106,6 +120,18 @@ export function SettingsScreen({ settings, hasSavedCareer, onChange, onResetCare
   // 상세 설정은 팝업이 아니라 **딴 페이지**다 (원본 장면 상태 0x20 · 페이지 32)
   if (isDetailOpen) {
     return <DetailSettings settings={settings} onChange={onChange} onBack={() => setDetailOpen(false)} />
+  }
+  // 모드 초기화도 딴 페이지다 (장면 상태 0x21 · 페이지 33, 갱신 0x2c6d8 · 그리기 0x2dc00)
+  if (isModeResetOpen && onResetEditedNames !== undefined) {
+    return (
+      <ModeResetPage
+        hasSavedCareer={hasSavedCareer}
+        onResetCareer={onResetCareer}
+        onResetEditedNames={onResetEditedNames}
+        {...(onResetSeason === undefined ? {} : { onResetSeason })}
+        onBack={() => setModeResetOpen(false)}
+      />
+    )
   }
 
   return (
@@ -216,16 +242,6 @@ export function SettingsScreen({ settings, hasSavedCareer, onChange, onResetCare
       </button>
 
       {notice !== null && <MessageBox text={notice} buttons={['확인']} onAnswer={() => setNotice(null)} />}
-      {isConfirmingReset && (
-        <MessageBox
-          text={SETTINGS_TEXT.careerResetConfirm}
-          buttons={['예', '아니오']}
-          onAnswer={(index) => {
-            if (index === 0) onResetCareer()
-            setIsConfirmingReset(false)
-          }}
-        />
-      )}
     </RawScreen>
   )
 }
@@ -363,6 +379,138 @@ function DetailSettings({ settings, onChange, onBack }: {
         onClick={onBack}>
         <img className={styles.sprite} alt="" src={imageSrc(POPUP, OK_BUTTON.frame)} style={{ left: 0, top: 0 }} />
       </button>
+    </RawScreen>
+  )
+}
+
+type ModeResetPopup = '나리확인' | '시즌확인' | '에디트확인' | '완료'
+
+const MODE_RESET_NAMES = [SETTINGS_TEXT.careerReset, SETTINGS_TEXT.seasonReset, SETTINGS_TEXT.editReset] as const
+
+/**
+ * 환경설정 → **모드 초기화** (메인 메뉴 상태 0x21 — 갱신 0x2c6d8 · 그리기 0x2dc00 → 0x593c8 종류 0x21 · 0x5a316 직접 읽음).
+ *
+ * 하위 상태 [this+0x18] (점프표 0xcece0):
+ * ```
+ * 하위 0 목록    CLR(−16) → 0xbcb49(…, 8) 환경설정 첫 화면 · OK(−5) → 칸별
+ *   칸 0 [82] 나만의리그  → 고르기 창 0xcf848 "초기화할 데이터를 선택하세요"(종류 0x10) → 하위 1
+ *   칸 1 [83] 시즌모드    → 확인 0xcf870 (종류 2) + 0x749d5(창, 1) → 하위 3
+ *   칸 2 [84] 에디트      → 확인 0xcf8d4 (종류 2) + 0x749d5(창, 1) → 하위 4
+ * 하위 3 답 0(예) → 하위 0 · 0x224ed(mgr, 2) · 알림 0xcf900 "초기화 되었습니다" / 답 1·−1 → 하위 0
+ * 하위 4 답 0(예) → 하위 0 · 0x204c1(mgr) = memset(이름표, 0, 0x708) · 알림 0xcf900 / 답 1·−1 → 하위 0
+ * ```
+ * 파일 저장은 이 상태에 없다 — 환경설정 첫 화면을 CLR·OK 로 나갈 때 0x295e2 가 0x1f1b9 로 저장한다.
+ * 웹 이름표 고리(`useEditedNames.clear`)는 비우는 즉시 저장한다(웹 환경설정 값들도 바꾸는 즉시 저장한다) —
+ * 창을 닫아 버리는 경우만 다르다.
+ *
+ * ⚠️ 근사·미해결:
+ *  - 칸 0 나만의리그: 원본은 고르기 창(타자편/투수편 두 칸, 0x74ea9 로 채움)을 먼저 띄우고, 편별로
+ *    시즌 중 막기 [212] → 확인 [210]/[211] → 0x224ed(4 타자 / 3 투수) 다(R11 3-1). 웹은 투수편 지우기·
+ *    시즌 중 막기 배선이 다른 작업 구역(app/model)이라 **예전처럼 타자편 저장이 있을 때만 [210] 확인**으로 둔다.
+ *  - 칸 1 시즌모드: 웹에 시즌 저장 지우기(0x224ed(2))가 없어 `onResetSeason` 을 안 받으면 OK 가 아무 일도 안 한다.
+ *  - 확인 창의 처음 커서 0x749d5(창, 1)(둘째 칸 "아니오" 로 보임)는 공용 MessageBox 에 처음 커서가 없어 못 옮겼다.
+ *  - 머리띠 0x54d95(skin, 0, 5, 0) 는 환경설정 첫 화면처럼 그리지 않는다.
+ */
+function ModeResetPage({ hasSavedCareer, onResetCareer, onResetEditedNames, onResetSeason, onBack }: {
+  readonly hasSavedCareer: boolean
+  readonly onResetCareer: () => void
+  readonly onResetEditedNames: () => void
+  readonly onResetSeason?: () => void
+  readonly onBack: () => void
+}) {
+  const [cursor, setCursor] = useState(0)
+  const [popup, setPopup] = useState<ModeResetPopup | null>(null)
+  const frames = useFrameOrigins(`${SLT_FRAME}/frames`)
+  const titleFrames = useFrameOrigins(IMG_TEXT)
+
+  const openRow = (index: number) => {
+    if (index === 0) return hasSavedCareer ? setPopup('나리확인') : undefined
+    if (index === 1) return onResetSeason === undefined ? undefined : setPopup('시즌확인')
+    setPopup('에디트확인')
+  }
+
+  /** 확인 창 답 — 예(0)면 지우고 0xcf900 알림, 아니오는 하위 0 으로 */
+  const answerConfirm = (reset: () => void) => (answer: number) => {
+    if (answer !== 0) return setPopup(null)
+    reset()
+    setPopup('완료')
+  }
+
+  useEffect(() => {
+    if (popup !== null) return undefined
+    const onKeyDown = (event: KeyboardEvent) => {
+      const vertical = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0
+      if (vertical !== 0) {
+        event.preventDefault()
+        return setCursor((previous) => (previous + vertical + MODE_RESET_ROW_COUNT) % MODE_RESET_ROW_COUNT)
+      }
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault()
+        return openRow(cursor)
+      }
+      if (event.key === 'Escape' || event.key === 'Backspace') {
+        event.preventDefault()
+        onBack()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  })
+
+  const { bar, bullet, name: nameBox } = MODE_RESET_ROW
+  return (
+    <RawScreen>
+      <div
+        className={styles.panel}
+        style={{ left: PANEL.x, top: PANEL.y, width: PANEL.width, height: PANEL.height }}
+      />
+      <FrameSprite folder={IMG_TEXT} frame={MODE_RESET_TITLE.frame} origins={titleFrames}
+        x={MODE_RESET_TITLE.x} y={MODE_RESET_TITLE.y} />
+
+      {MODE_RESET_NAMES.map((name, index) => {
+        const top = modeResetRowTopOf(index)
+        const isSelected = index === cursor
+        return (
+          <div key={name}>
+            <img className={styles.sprite} alt=""
+              src={imageSrc(SLT_FRAME, isSelected ? MODE_RESET_ROW.selectedBulletImage : MODE_RESET_ROW.bulletImage)}
+              style={{ left: bullet.x, top: top + bullet.dy }} />
+            <FrameSprite folder={`${SLT_FRAME}/frames`} frame={MODE_RESET_ROW.barFrame}
+              origins={frames} x={bar.x} y={top + bar.dy} />
+            <div className={styles.menuName}
+              style={{
+                left: nameBox.x, top: top + nameBox.dy, width: nameBox.width,
+                color: isSelected ? DETAIL_COLORS.selected : DETAIL_COLORS.unselected,
+              }}>
+              {name}
+            </div>
+            {isSelected && (
+              <div className={styles.selectedOutline}
+                style={{ left: bar.x, top: top + bar.dy, width: bar.width, height: bar.height }} />
+            )}
+            <button type="button" className={styles.row} aria-label={name}
+              style={{ left: bar.x, top: top + bar.dy, width: bar.width, height: bar.height }}
+              onMouseEnter={() => setCursor(index)}
+              onClick={() => { setCursor(index); openRow(index) }} />
+          </div>
+        )
+      })}
+
+      {popup === '나리확인' && (
+        <MessageBox text={SETTINGS_TEXT.careerResetConfirm} buttons={['예', '아니오']}
+          onAnswer={answerConfirm(onResetCareer)} />
+      )}
+      {popup === '시즌확인' && onResetSeason !== undefined && (
+        <MessageBox text={SETTINGS_TEXT.seasonResetConfirm} buttons={['예', '아니오']}
+          onAnswer={answerConfirm(onResetSeason)} />
+      )}
+      {popup === '에디트확인' && (
+        <MessageBox text={SETTINGS_TEXT.editResetConfirm} buttons={['예', '아니오']}
+          onAnswer={answerConfirm(onResetEditedNames)} />
+      )}
+      {popup === '완료' && (
+        <MessageBox text={SETTINGS_TEXT.resetDone} buttons={['확인']} onAnswer={() => setPopup(null)} />
+      )}
     </RawScreen>
   )
 }

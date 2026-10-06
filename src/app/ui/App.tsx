@@ -422,6 +422,7 @@ export function App() {
         collection={collection.collection} random={random} wallet={wallet} aceSelect={aceSelect}
         hallOfFameDeletion={hallOfFameDeletion}
         onRenamePlayer={editedNames.rename}
+        onResetEditedNames={editedNames.clear}
         // 메인 메뉴 처음 단(하위 4)의 전부 수집 보상 판정 0x28e98 → 팝업 0x292f8
         claimCollectionReward={() => collection.claimCollectionReward(collectionRewardStore, everyMissionCleared, wallet)}
       />

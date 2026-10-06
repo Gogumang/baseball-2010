@@ -164,3 +164,31 @@ export const DETAIL_CHOICES = [VIBRATION.off, VIBRATION.on] as const
 
 /** 값 글 색 — 고른 칸은 흰색, 아닌 칸은 메뉴 줄과 같은 #7B93D4 */
 export const DETAIL_COLORS = { selected: '#FFFFFF', unselected: '#7B93D4' } as const
+
+/**
+ * 환경설정 → **모드 초기화** (메인 메뉴 상태 0x21 · 공용 페이지 0x593c8 종류 0x21 — 그리기 0x5a316 직접 읽음).
+ *
+ * ```
+ * 제목 img_text 프레임 0x123 = 291 "모드 초기화"(58×10) 를 (x1 − w/2 + 31 = 36, y0 + 5)   ; 0x5a316~0x5a370
+ * 줄 i = 0..2, Y_i = y0 + 30·i (첫 화면과 달리 −5 가 없고 간격 0x1e)                      ; 0x5a3ce · 0x5a4e8
+ *   글머리 slt_frame 이미지 39 (x0 + 0x18, Y + 0x2c)                                       ; 0x5a3f6
+ *   막대 slt_frame 프레임 36(114×18) (x0 + 0x32, Y + 0x25)                                  ; 0x5a42c
+ *   이름 StrMAINMENU[0x52 + i] 가운데, 폭 = 프레임 36 폭 (x0 + 0x32, Y + 0x28)             ; 0x5a440 · 0x5a47a
+ *     고른 줄 "!C!cffffff%s"(0xcf2e0) 흰색 · 아닌 줄 "!C!c7B93D4%s"(0xcf2f0)
+ *   고른 줄: 노란 네모 이미지 38 을 글머리 자리에 (x0 + 0x18, Y + 0x2c)                    ; 0x5a4a4
+ *            + 흰 둥근 테두리 0x6aa65 (막대 자리, 둥글기 1)                                  ; 0x5a4de
+ * ```
+ * 아래 OK 단추는 종류 0x21 갈래에 없다 (0x5a4f6 → 0x5a6f8 끝).
+ * ⚠️ 흰 테두리는 `0xca911(틱, 8) ≤ 3` 일 때만 그려(깜빡임) 지지만 첫 화면(종류 8)처럼 웹은 늘 그린다.
+ */
+export const MODE_RESET_TITLE = { frame: 291, x: X1 - 29 + 31, y: PANEL.y + 5 } as const
+export const MODE_RESET_ROW_COUNT = 3
+export const modeResetRowTopOf = (index: number) => PANEL.y + 30 * index
+export const MODE_RESET_ROW = {
+  bulletImage: 39,
+  selectedBulletImage: 38,
+  bullet: { x: PANEL.x + 0x18, dy: 0x2c },
+  barFrame: 36,
+  bar: { x: PANEL.x + 0x32, dy: 0x25, width: 114, height: 18 },
+  name: { x: PANEL.x + 0x32, dy: 0x28, width: 114 },
+} as const

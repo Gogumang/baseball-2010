@@ -60,12 +60,14 @@ interface EntryRoutesProps {
   readonly claimCollectionReward?: () => string | null
   /** 스페셜 에디트(상태 29)의 이름 저장 0xaa4ad + 파일 저장 0x1f1b9 — 앱의 에디트 이름표 고리. 안 넘기면 에디트 칸이 안 열린다 */
   readonly onRenamePlayer?: (id: number, isPitcher: boolean, name: string) => void
+  /** 환경설정 → 모드 초기화 → 에디트 초기화 0x204c1 (이름표 memset) — 앱의 에디트 이름표 고리 */
+  readonly onResetEditedNames?: () => void
 }
 
 /** 커리어가 아직 없을 때의 화면 — 타이틀 → 메인 메뉴(도움말) → 선수 등록. */
 export function EntryRoutes({
   screen, setScreen, session, gameSettings, collection, random, wallet, aceSelect, hallOfFameDeletion, claimCollectionReward,
-  onRenamePlayer,
+  onRenamePlayer, onResetEditedNames,
 }: EntryRoutesProps) {
   /** 전부 수집 보상 팝업 글 (0x292f8 의 `0xbbef9(글, 1, −1, 1)`) — 메뉴 위에 뜬다 */
   const [collectionRewardText, setCollectionRewardText] = useState<string | null>(null)
@@ -134,6 +136,7 @@ export function EntryRoutes({
         hasSavedCareer={session.savedCareer !== null}
         onChange={gameSettings.setSettings}
         onResetCareer={session.actions.resetCareer}
+        {...(onResetEditedNames === undefined ? {} : { onResetEditedNames })}
         onBack={() => setScreen({ kind: '메인메뉴' })}
       />
     )
