@@ -461,6 +461,8 @@ export function useCareerSession({
       setCareer(rolled.seasonEndState === null ? rolled : { ...rolled, seasonEndState: null })
       // 경기 끝 0x4ea0c: 기록 달성 G 합을 저장 G 에 더한 뒤 0x4ec82 `0x22c7d(액수, 모드 4)` 로 획득 GP 통계에 적는다
       recordStat({ kind: 'G획득', mode: BATTER_LEAGUE_MODE, amount: gamePointRewardOf(summary) })
+      // 이어서 0x4ec8a `0x22e10` 이 이번 경기 기록 배열 40칸을 연감 달성 횟수 [+4+n] 에 더한다 (e48e922)
+      recordStat({ kind: '기록달성', recordIds: summary.recordIds ?? [] })
       setScreen({
         kind: '경기결과',
         summary,
