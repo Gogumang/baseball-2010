@@ -36,7 +36,11 @@ export interface GameSettings {
    * 소리 크기 0~4 (옵션 +0x2e, 기본 2 → ×25 = 50). soundLevel × 25 → SoundPort.setVolume 로 이미 배선됐다.
    */
   readonly soundLevel: number
-  /** 진동 (옵션 +0x3b, 기본 켬). 웹에는 아직 진동 배선이 없어 값만 들고 있다 */
+  /**
+   * 진동 (옵션 +0x3b, 기본 켬). 원본 `0x3a44 vibrate(ms)` 처럼 켬일 때만 `navigator.vibrate` 로 울린다
+   * (`entities/defense-controls/model/vibration`) — 타석 무대의 맞은 공·사구·삼진, 이벤트 명령 5 의 500ms,
+   * 환경설정에서 켤 때 100ms 가 이 값을 본다.
+   */
   readonly isVibrationOn: boolean
   /**
    * 주루 수동/자동 (옵션 +0xbd, 기본 자동). **양쪽 다 옮겼다.**
