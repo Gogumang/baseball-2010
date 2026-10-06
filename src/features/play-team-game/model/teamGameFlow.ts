@@ -16,7 +16,7 @@ import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
 import type { PitcherRepertoire } from '@/shared/config/original/pitcherRepertoires'
 import type { BatterAbility } from '@/entities/batting/model/batter'
-import { rollStartingPitcherIndex } from '@/entities/team/model/teamRoster'
+import { PITCHERS_PER_TEAM, rollStartingPitcherIndex } from '@/entities/team/model/teamRoster'
 import { rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
 import { applyOpponentAtBat, applyOpponentRunnerPlay } from '@/features/play-pitcher-game/model/pitcherGameState'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
@@ -101,8 +101,10 @@ import { TEAM_GAME_MODE } from '@/features/play-team-game/model/gameAbilities'
 import type { FieldingAssignment, SeasonTeamCondition } from '@/features/play-team-game/model/gameAbilities'
 import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
 import { introSkipsFirstBoard, rollHalfInningFielders } from '@/features/play-game/model/halfInningBoard'
-import { EMPTY_DECISION_STATE } from '@/entities/game/model/winLossSave'
-import type { DecisionState } from '@/entities/game/model/winLossSave'
+import { EMPTY_DECISION_STATE, gameEndDecisionOf } from '@/entities/game/model/winLossSave'
+import type { DecisionState, PitcherOfRecord } from '@/entities/game/model/winLossSave'
+import { chargePitcherLine, outsAddedBetween } from '@/entities/game/model/gamePitcherLines'
+import type { GameLeaguePitchers, GamePitcherLine } from '@/entities/game/model/gamePitcherLines'
 import {
   decisionsAfterPitcherChange,
   decisionsAfterPlay,
@@ -514,6 +516,11 @@ export interface TeamGameProgress {
   readonly ourPitcherCounters: MoundPitcherCounters
   readonly opponentPitcherCounters: MoundPitcherCounters
   /**
+   * 이 경기를 던진 양 팀 투수 줄 (`entities/game/model/gamePitcherLines`, 붙박이 표 칸 — 마투수는 뺀다) — 사람·간이 타석·
+   * 주자 판의 정산 0xa8024 마다 아웃·실점·삼진을 그 순간 마운드 투수에게, 투구 0xa5e14 마다 투구 수를 쌓는다.
+   */
+  readonly pitcherLines: readonly GamePitcherLine[]
+  /**
    * 우리 팀 **명단** — 원본 `team+0xe` 의 "칸 → 선수" 목록이다.
    * 칸 0~8 이 타순, 9 부터가 벤치다. 대타(`pinchHit`)가 두 칸을 맞바꾸고 빠진 선수를 지운다.
    */
@@ -886,6 +893,7 @@ export function startTeamGame(options: TeamGameOptions, random: RandomPort): Tea
     opponentPitcherStaminas,
     ourPitcherCounters: EMPTY_MOUND_COUNTERS,
     opponentPitcherCounters: EMPTY_MOUND_COUNTERS,
+    pitcherLines: [],
     pitcherJustChanged: false,
     atBatPrepared: false,
     stamina: ourPitcherStaminas[startingSlots.ours] ?? FULL_STAMINA,
@@ -1737,6 +1745,7 @@ function throwOpponentPitch(progress: TeamGameProgress, pitchTypeNumber: number 
       pitcherEndures: false,
     }),
     opponentPitcherCounters: addRunsToCounters(progress.opponentPitcherCounters, 0, 1, false),
+    pitcherLines: chargeMoundLine(progress, false, { pitches: 1 }),
     pitcherJustChanged: false,
     // 같은 0xa5e14 가 바로 뒤(a5e7c)에서 state[0xe] 도 내린다
     cpuPinchHitUsed: false,
@@ -1973,6 +1982,12 @@ function finishBatterOutcome(
     game,
     // 득점 처리 0xa5c34 — 한 점씩 승·패·세 칸을 고친다
     decisions: decisionsAfterPlay(progress.decisions, before, game, moundsOf(progress)),
+    // 정산 0xa8024 — 상대 마운드 투수 레코드에 아웃(결과 코드 5·0xd)·실점·탈삼진
+    pitcherLines: chargeMoundLine(progress, false, {
+      outs: outsAddedBetween(before, game),
+      runsAllowed: runsBattedIn,
+      strikeouts: outcome.kind === '삼진' ? 1 : 0,
+    }),
     gameRecord: withSeasonRecord(progress, '공격', offense.codes),
     ourHitBases: withHitBases(progress.ourHitBases, slot, offense.hitBases),
     lastDefensePlay: playback,
@@ -2238,6 +2253,7 @@ function pitchOnce(
       ...progress.ourPitcherCounters,
       pitches: progress.ourPitcherCounters.pitches + 1,
     },
+    pitcherLines: chargeMoundLine(progress, true, { pitches: 1 }),
     lastPitch: pitch,
     lastResolution: resolution,
     atBat: applyPitchResolution(progress.atBat, resolution),
@@ -2419,6 +2435,12 @@ function finishDefensiveAtBat(
     ...progress,
     game: applied.game,
     decisions: decisionsAfterPlay(progress.decisions, before, applied.game, moundsOf(progress)),
+    // 정산 0xa8024 — 우리 마운드 투수 레코드에 아웃·실점·탈삼진
+    pitcherLines: chargeMoundLine(progress, true, {
+      outs: applied.outsAdded,
+      runsAllowed: applied.runsScored,
+      strikeouts: outcome.kind === '삼진' ? 1 : 0,
+    }),
     opponentOrderIndex: applied.opponentOrderIndex,
     lastDefensePlay: playback ?? progress.lastDefensePlay,
     atBat: createAtBat(),
@@ -2628,6 +2650,11 @@ function withRunnerOnlyAdvance(
     ...progress,
     game,
     decisions: decisionsAfterPlay(progress.decisions, before, game, moundsOf(progress)),
+    // 주자 판(견제·도루)도 정산 0xa8024 를 지난다 — 아웃·실점을 지금 수비 마운드 투수에게
+    pitcherLines: chargeMoundLine(progress, humanDefends, {
+      outs: advanceResult.outsAdded,
+      runsAllowed: runs,
+    }),
     // 득점 처리 0xa5c34 는 1점마다 수비 팀 A·B 를 올린다 (P7 E1)
     ...(humanDefends
       ? {
@@ -3796,6 +3823,12 @@ function playAutoOffenseAtBat(progress: TeamGameProgress, random: RandomPort): T
       cpuPinchHitUsed: false,
       // 공마다 이미 깎았다 (위 `beforePitch`)
       opponentStamina: drain.stamina(),
+      pitcherLines: chargeMoundLine(progress, false, {
+        outs: outsAddedBetween(before, game),
+        runsAllowed: runsBattedIn,
+        strikeouts: outcome.kind === '삼진' ? 1 : 0,
+        pitches: play.pitches,
+      }),
       opponentPitcherCounters: addRunsToCounters(
         progress.opponentPitcherCounters,
         runsBattedIn,
@@ -3859,6 +3892,7 @@ function playAutoDefenseAtBat(progress: TeamGameProgress, random: RandomPort): T
       cpuPinchHitUsed: false,
       // 공마다 이미 깎았다 (위 `beforePitch`)
       stamina: drain.stamina(),
+      pitcherLines: chargeMoundLine(progress, true, { pitches: play.pitches }),
     },
     play.outcome,
     false,
@@ -3890,6 +3924,27 @@ function addRunsToCounters(
     inningRunsAllowed: halfChanged ? 0 : Math.min(99, counters.inningRunsAllowed + runs),
     pitches: counters.pitches + pitches,
   }
+}
+
+/** 지금 마운드 투수 줄에 더한다 — 붙박이 표 칸이 없는 투수(마투수)는 리그 기록표에 칸이 없어 건너뛴다 */
+function chargeMoundLine(
+  progress: TeamGameProgress,
+  ours: boolean,
+  delta: Parameters<typeof chargePitcherLine>[3],
+): readonly GamePitcherLine[] {
+  const teamId = ours ? progress.options.ourTeamId : progress.options.opponentTeamId
+  const entry = pitcherEntryAt(progress, teamId, ours ? progress.ourPitcherIndex : progress.opponentPitcherIndex)
+  if (entry?.tableSlot === undefined || entry.aceIndex >= 0) return progress.pitcherLines
+  return chargePitcherLine(progress.pitcherLines, teamId, entry.tableSlot, delta)
+}
+
+/** 판정 칸(측 · 명단 칸)을 붙박이 표 칸으로 — 표 칸이 없는 투수(마투수)는 표 밖 칸(8)으로 둬 기록표가 건너뛴다 */
+function decisionTableSlotOf(progress: TeamGameProgress, record: PitcherOfRecord | null): PitcherOfRecord | null {
+  if (record === null) return null
+  const isOurs = record.side === progress.game.playerSide
+  const entry = (isOurs ? progress.ourPitcherEntry : progress.opponentPitcherEntry)[record.number]
+  const tableSlot = entry === undefined || entry.aceIndex >= 0 ? undefined : entry.tableSlot
+  return { side: record.side, number: tableSlot ?? PITCHERS_PER_TEAM }
 }
 
 /** 측별 지금 마운드 투수 칸 — 승·패·세 칸이 "그 순간 마운드에 선 투수" 로 적는다 */
@@ -3944,6 +3999,12 @@ export interface TeamGameSummary {
    * (`summaryOf` 는 늘 채운다. 선택 칸인 것은 이 칸을 아직 안 읽는 앱 쪽 시험용 요약들이 그대로 맞게 하려는 것뿐이다.)
    */
   readonly recordIds?: readonly number[]
+  /**
+   * 리그 투수 기록 재료 — 양 팀 투수 줄(붙박이 표 칸, 마투수 뺌)과 경기 끝 판정 0xa7de8 (판정 칸도 표 칸으로 되돌린 것).
+   * 부르는 쪽이 `leaguePitcherAppearancesOf` → `recordLeaguePitcherAppearances` 로 쌓는다 — 정산의 투수 칸 쓰기는
+   * `0xa56dc` 가 참일 때만이라 시즌(모드 2 갈래 0xa56fa)도 국가대항전·포스트시즌 경기는 쌓지 않는다.
+   */
+  readonly leaguePitchers?: GameLeaguePitchers
   /** 위 기록의 G — `recordGamePointsOf` (0xcfbf8 표). 저장 G 에 더하는 것은 부르는 쪽(앱 세션)의 몫이다 */
   readonly gamePoints?: number
   /**
@@ -3974,6 +4035,7 @@ function orderedPitcherStaminasOf(
 }
 
 export function summaryOf(progress: TeamGameProgress): TeamGameSummary {
+  const ended = gameEndDecisionOf(progress.decisions)
   const recordIds = [...progress.recordIds, ...gameEndRecordIdsFor(progress)]
   const game = progress.game
   const flags: CompleteGameFlags = {
@@ -4011,5 +4073,17 @@ export function summaryOf(progress: TeamGameProgress): TeamGameSummary {
       progress.opponentPitcherIndex,
       progress.opponentStamina,
     ),
+    leaguePitchers: {
+      lines: progress.pitcherLines,
+      decision: {
+        winner: decisionTableSlotOf(progress, ended.winner),
+        loser: decisionTableSlotOf(progress, ended.loser),
+        save: decisionTableSlotOf(progress, ended.save),
+      },
+      sideTeams:
+        game.playerSide === 0
+          ? [progress.options.ourTeamId, progress.options.opponentTeamId]
+          : [progress.options.opponentTeamId, progress.options.ourTeamId],
+    },
   }
 }

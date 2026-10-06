@@ -49,6 +49,8 @@ import { runnerCountOf } from '@/entities/game/model/baseState'
 import { ROTATION_SIZE, rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
 import { opponentOf } from '@/entities/league/model/league'
 import type { GameSummary } from '@/entities/game/model/gameSummary'
+import { chargeHalfInningLines, chargePitcherLine, outsAddedBetween } from '@/entities/game/model/gamePitcherLines'
+import type { GamePitcherLine } from '@/entities/game/model/gamePitcherLines'
 import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
 import type { SeasonStats } from '@/entities/career/model/seasonStats'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -90,7 +92,7 @@ import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/pla
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
 import { ROSTER_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
-import { EMPTY_DECISION_STATE } from '@/entities/game/model/winLossSave'
+import { EMPTY_DECISION_STATE, gameEndDecisionOf } from '@/entities/game/model/winLossSave'
 import type { DecisionState } from '@/entities/game/model/winLossSave'
 import {
   decisionsAfterPitcherChange,
@@ -149,6 +151,12 @@ export interface GameProgress {
    */
   readonly ourPitcherStaminas: readonly number[]
   readonly opponentPitcherStaminas: readonly number[]
+  /**
+   * 이 경기를 던진 투수 줄 (`entities/game/model/gamePitcherLines`) — 우리 팀은 반 이닝 엔진 줄 그대로, 상대 팀은
+   * 내 타석·동료 타석·주자 판마다 아웃·실점·삼진을 그 순간 마운드 투수에게 쌓는다. 투구 수는 교체·경기 끝에
+   * 그 마운드의 `pitches` 를 얹는다. 경기 끝 `summaryOf` 가 리그 기록 재료로 낸다.
+   */
+  readonly pitcherLines: readonly GamePitcherLine[]
   /**
    * 상대 팀의 지금 타순 칸 (팀 객체 `team+0x32`, 0~8) — **이닝이 바뀌어도 이어진다**.
    *
@@ -404,6 +412,7 @@ export function startGame(
     opponentPitcherOrder,
     ourPitcherStaminas,
     opponentPitcherStaminas,
+    pitcherLines: [],
     // 경기 시작 0x3a55a 가 0 으로 세운다 — 그 뒤로는 이닝을 넘어 이어진다
     opponentOrderIndex: 0,
     // 선발이 막 올라온 마운드 — 레코드 +0x2c 그대로 선다 (부르는 쪽이 리그 표를 안 넘기면 10000)
@@ -810,6 +819,12 @@ function finishPlayerOutcome(
       ),
       // 내 타석도 같은 정산 0xa8024 가 타순 칸 기록(안타·적시타·타석)을 세운다
       ourLineup: recordLineupPlay(progress.ourLineup, progress.game.battingOrderIndex, outcome, runsBattedIn),
+      // 같은 정산이 상대 마운드 투수 레코드에 아웃(결과 코드 5·0xd)·실점·탈삼진을 쌓는다 (0xa8cca · 0xa8ee4 · 0xa8d1c)
+      pitcherLines: chargePitcherLine(progress.pitcherLines, progress.opponentTeamId, progress.opponentMound.pitcherSlot, {
+        outs: outsAddedBetween(progress.game, nextGame),
+        runsAllowed: runsBattedIn,
+        strikeouts: outcome.kind === '삼진' ? 1 : 0,
+      }),
       lastDefensePlay: playback,
       burst: resolution === null ? progress.burst : resolution.session,
       // 아직 안 보여 준 판정을 지우지 않는다 — 지우는 것은 창을 닫을 때뿐이다.
@@ -1130,6 +1145,8 @@ function playOpponentInning(progress: GameProgress, random: RandomPort): GamePro
       game,
       opponentOrderIndex: half.nextBattingOrderIndex % BATTING_ORDER_SIZE,
       ourMound: half.mound ?? progress.ourMound,
+      // 우리 투수 줄 — 반 이닝 엔진이 던진 투수마다 낸 줄 (투구 수 포함)
+      pitcherLines: chargeHalfInningLines(progress.pitcherLines, progress.ourTeamId, half.pitcherLines),
       // 내려간 투수는 그 순간 값을 레코드에 남긴다
       ourPitcherStaminas: withOutgoingStaminas(progress.ourPitcherStaminas, half.pitcherChanges ?? []),
       decisions,
@@ -1221,6 +1238,11 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort): GameProg
       decisions: decisionsAfterPlay(progress.decisions, progress.game, game, moundsOf(progress)),
       teammateLogs: { ...progress.teammateLogs, [slot]: recorded.log },
       ourLineup: recordLineupPlay(progress.ourLineup, slot, outcome, runsBattedIn),
+      pitcherLines: chargePitcherLine(progress.pitcherLines, progress.opponentTeamId, mound.pitcherSlot, {
+        outs: outsAddedBetween(progress.game, game),
+        runsAllowed: runsBattedIn,
+        strikeouts: outcome.kind === '삼진' ? 1 : 0,
+      }),
       opponentMound: {
         ...mound,
         // 공마다 이미 깎았다 (위 `beforePitch`, 0xc262c 의 c26c8)
@@ -1409,6 +1431,10 @@ function changeOpponentPitcher(progress: GameProgress, random: RandomPort): Game
       opponentMound: after,
       // 내려간 투수의 +0x2c 는 레코드에 남는다 — 다음 경기(리그 표)로 이어진다
       opponentPitcherStaminas: withStaminaAt(progress.opponentPitcherStaminas, before.pitcherSlot, before.stamina),
+      // 그 투수의 투구 수(+0x27c)를 줄에 얹는다 — 교체 0xaec64 가 0 으로 돌린다
+      pitcherLines: chargePitcherLine(progress.pitcherLines, progress.opponentTeamId, before.pitcherSlot, {
+        pitches: before.pitches,
+      }),
       opponentInningRunsAllowed: 0,
       // 교체 자리에서 세이브 후보를 잡는다 (0xa60c0 — 수비 측 = 상대)
       decisions: decisionsAfterPitcherChange(progress.decisions, progress.game, {
@@ -1668,6 +1694,11 @@ function withRunnerOnlyPlay(progress: GameProgress, result: DefensePlayResult): 
     ...next,
     game,
     decisions: decisionsAfterPlay(next.decisions, before, game, moundsOf(next)),
+    // 주자 판(견제·도루)도 정산 0xa8024 를 지난다 — 아웃·실점을 지금 상대 마운드 투수에게
+    pitcherLines: chargePitcherLine(next.pitcherLines, next.opponentTeamId, next.opponentMound.pitcherSlot, {
+      outs: outsAddedBetween(before, game),
+      runsAllowed: runs,
+    }),
     opponentMound: {
       ...next.opponentMound,
       runsAllowed: Math.min(MAXIMUM_PITCHER_COUNTER, next.opponentMound.runsAllowed + runs),
@@ -1783,6 +1814,17 @@ export function summaryOf(progress: GameProgress): GameSummary {
     opponentTeamId: progress.opponentTeamId,
     leaguePlateAppearances: progress.leaguePlateAppearances,
     pitchersOfRecord: pitchersOfRecordOf(progress),
+    // 리그 투수 기록 재료 — 투수 줄(상대 마운드의 투구 수를 얹어)과 경기 끝 판정 0xa7de8
+    leaguePitchers: {
+      lines: chargePitcherLine(progress.pitcherLines, progress.opponentTeamId, progress.opponentMound.pitcherSlot, {
+        pitches: progress.opponentMound.pitches,
+      }),
+      decision: gameEndDecisionOf(progress.decisions),
+      sideTeams:
+        progress.game.playerSide === 0
+          ? [progress.ourTeamId, progress.opponentTeamId]
+          : [progress.opponentTeamId, progress.ourTeamId],
+    },
     // 양 팀 레코드 +0x2c — 경기에서 깎인 값이 리그 표로 이어진다 (하루 끝 0xb617c 회복은 부르는 쪽)
     pitcherStaminas: {
       ours: finalStaminasOf(progress.ourPitcherStaminas, progress.ourMound),

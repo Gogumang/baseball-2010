@@ -1,3 +1,4 @@
+import type { GameLeaguePitchers } from '@/entities/game/model/gamePitcherLines'
 import type { SeasonStats } from '@/entities/career/model/seasonStats'
 import type { GameResult } from '@/entities/game/model/gameState'
 import type { ReputationCounts } from '@/entities/career/model/gameEvaluation'
@@ -41,6 +42,11 @@ export interface GameSummary {
    * 경기가 끝났을 때 양 팀 투수 칸(붙박이 표 칸 0~7)별 레코드 스태미나 `+0x2c` — 리그 표로 이어지는 값이다
    * (하루 끝 `0xb617c` 회복 전). 리그 사람 경기 진행기(타자편)만 채운다 — **선택 칸**.
    */
+  /**
+   * 리그 투수 기록 재료 — 이 경기를 던진 투수 줄과 경기 끝 판정 0xa7de8 (`entities/game/model/gamePitcherLines`).
+   * 사람 경기도 CPU 끼리 경기와 같은 0xa8024·0xa7de8 을 지난다. 리그 사람 경기 진행기만 채운다 — **선택 칸**.
+   */
+  readonly leaguePitchers?: GameLeaguePitchers
   readonly pitcherStaminas?: {
     readonly ours: readonly number[]
     readonly opponent: readonly number[]

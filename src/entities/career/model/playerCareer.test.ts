@@ -344,3 +344,37 @@ describe('리그 투수 레코드 — 차례와 스태미나 (0x1c46c · 4f2e8 �
     expect(결과.leaguePitcherStaminas?.[1]?.[0]).toBe(7_000)
   })
 })
+
+describe('사람 경기 투수 줄 — 정산 0xa8024 · 경기 끝 0xa7de8 (정규시즌만, 0xa56dc)', () => {
+  const 경기 = {
+    result: '승',
+    stats: EMPTY_SEASON_STATS,
+    recordIds: [],
+    ourTeamId: 0,
+    opponentTeamId: 3,
+    leaguePitchers: {
+      lines: [
+        { teamId: 0, pitcherSlot: 1, outs: 27, runsAllowed: 2, strikeouts: 7, pitches: 120 },
+        { teamId: 3, pitcherSlot: 2, outs: 24, runsAllowed: 5, strikeouts: 3, pitches: 130 },
+      ],
+      decision: { winner: { side: 1, number: 1 }, loser: { side: 0, number: 2 }, save: null },
+      sideTeams: [3, 0],
+    },
+  } as unknown as GameSummary
+
+  it('정규시즌이면 두 팀 투수 줄과 승·패가 리그 기록표에 쌓인다', () => {
+    const 표 = applyGameResult(createCareer('선수'), 경기).leaguePlayerStats.pitchers ?? {}
+    const 우리 = Object.values(표).find((line) => line.outs === 27)
+    const 상대 = Object.values(표).find((line) => line.outs === 24)
+    expect(우리).toMatchObject({ runsAllowed: 2, strikeouts: 7, pitches: 120, wins: 1, losses: 0 })
+    expect(상대).toMatchObject({ runsAllowed: 5, wins: 0, losses: 1 })
+  })
+
+  it('포스트시즌 경기는 쌓지 않는다 — 0xa56dc 의 모드 3·4 갈래가 +0xb4 를 보고 거짓', () => {
+    const career = {
+      ...createCareer('선수'),
+      postseason: { round: '플레이오프', qualifiers: [0, 1, 2, 3], teams: [1, 0], wins: [0, 0], winsNeeded: 3, champion: null },
+    } as unknown as Parameters<typeof applyGameResult>[0]
+    expect(applyGameResult(career, 경기).leaguePlayerStats.pitchers).toBeUndefined()
+  })
+})

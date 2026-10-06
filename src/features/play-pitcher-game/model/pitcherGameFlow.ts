@@ -121,7 +121,9 @@ import {
   decisionCodeForMine,
   gameEndDecisionOf,
 } from '@/entities/game/model/winLossSave'
-import type { DecisionState, GameEndDecision } from '@/entities/game/model/winLossSave'
+import type { DecisionState, GameEndDecision, PitcherOfRecord } from '@/entities/game/model/winLossSave'
+import { chargePitcherLine, outsAddedBetween } from '@/entities/game/model/gamePitcherLines'
+import type { GameLeaguePitchers, GamePitcherLine } from '@/entities/game/model/gamePitcherLines'
 import {
   buildHumanPitch,
   drainStamina,
@@ -475,6 +477,11 @@ export interface PitcherGameProgress {
    */
   readonly ourPitcherStaminas: readonly number[]
   readonly opponentPitcherStaminas: readonly number[]
+  /**
+   * 이 경기를 던진 **CPU 투수** 줄 (`entities/game/model/gamePitcherLines`) — 내 투수(육성 선수)는 빼고 동료·상대 투수만.
+   * 간이 타석마다 아웃·실점·삼진을 그 순간 마운드 투수에게 쌓고, 투구 수는 교체·경기 끝에 그 마운드의 `pitches` 를 얹는다.
+   */
+  readonly pitcherLines: readonly GamePitcherLine[]
   /** 우리·상대 지금 투수의 **이번 이닝 실점 A**(`+0x284`) — 반 이닝 교대 `0xa5b00`·교체 `0xaec64` 가 0 으로 */
   readonly ourInningRunsAllowed: number
   readonly opponentInningRunsAllowed: number
@@ -548,6 +555,17 @@ function opponentPitcherOrderOf(options: PitcherGameOptions): readonly number[] 
 /** 칸별 레코드 스태미나 표 (붙박이 표 칸 0~7) — 빠진 칸은 10000 */
 function staminaTableOf(given: readonly number[] | undefined): readonly number[] {
   return Array.from({ length: PITCHERS_PER_TEAM }, (_unused, slot) => given?.[slot] ?? FULL_STAMINA)
+}
+
+/** CPU 투수 줄 하나에 더한다 — 내 자리(표 밖, `MY_PITCHER_SLOT`)는 커리어가 따로 세므로 건너뛴다 */
+function chargeCpuPitcherLine(
+  lines: readonly GamePitcherLine[],
+  teamId: number,
+  pitcherSlot: number,
+  delta: Parameters<typeof chargePitcherLine>[3],
+): readonly GamePitcherLine[] {
+  if (pitcherSlot < 0 || pitcherSlot >= PITCHERS_PER_TEAM) return lines
+  return chargePitcherLine(lines, teamId, pitcherSlot, delta)
 }
 
 /** 내려간 투수의 +0x2c 를 표에 남긴다 — 내 자리(표 밖)는 `stamina` 가 들므로 건너뛴다 */
@@ -660,6 +678,7 @@ export function startPitcherGame(
     opponentMound: startingMoundOf(opponentStarter, opponentStaminas[opponentStarter] ?? FULL_STAMINA),
     ourPitcherStaminas: ourStaminas,
     opponentPitcherStaminas: opponentStaminas,
+    pitcherLines: [],
     ourInningRunsAllowed: 0,
     opponentInningRunsAllowed: 0,
     scenePinchHit: null,
@@ -1995,6 +2014,9 @@ function enterAsRelief(progress: PitcherGameProgress): PitcherGameProgress {
         justChanged: false,
       },
       ourPitcherStaminas: withOutgoingStamina(progress.ourPitcherStaminas, progress.ourMound),
+      pitcherLines: chargeCpuPitcherLine(progress.pitcherLines, progress.options.ourTeamId, progress.ourMound.pitcherSlot, {
+        pitches: progress.ourMound.pitches,
+      }),
       ourInningRunsAllowed: 0,
       // R+0x150 (코드 0x1f) — 포스트시즌이면 0xa56dc 가 거짓이라 안 적는다
       ...(countsMyPitcherRecord(progress)
@@ -2060,6 +2082,12 @@ function playDefensiveAtBat(
   const halfChanged = played.game.half !== before.half || played.game.inning !== before.inning
   return {
     ...played,
+    // 정산 0xa8024 — 우리 마운드 CPU 투수 레코드에 아웃·실점·탈삼진 (내 투수는 커리어가 따로 센다)
+    pitcherLines: chargeCpuPitcherLine(played.pitcherLines, options.ourTeamId, mound.pitcherSlot, {
+      outs: outsAddedBetween(before, played.game),
+      runsAllowed: runs,
+      strikeouts: play.outcome.kind === '삼진' ? 1 : 0,
+    }),
     ourMound: {
       ...played.ourMound,
       // 공마다 이미 깎았다 (위 `beforePitch`, 0xc262c 의 c26c8)
@@ -2126,6 +2154,12 @@ function playTeammateAtBat(
       teammateLogs: { ...progress.teammateLogs, [slot]: recorded.log },
       // 정산 0xa8024 — 타순 칸 기록(타석·안타·적시타)이 다음 CPU 대타 판정의 재료다
       ourLineup: recordLineupPlay(progress.ourLineup, slot, outcome, runs),
+      // 같은 정산이 상대 마운드 투수 레코드에 아웃·실점·탈삼진을 쌓는다
+      pitcherLines: chargeCpuPitcherLine(progress.pitcherLines, options.opponentTeamId, mound.pitcherSlot, {
+        outs: outsAddedBetween(before, game),
+        runsAllowed: runs,
+        strikeouts: outcome.kind === '삼진' ? 1 : 0,
+      }),
       recordIds: recordsAllowed(progress)
         ? [...progress.recordIds, ...recorded.recordIds]
         : progress.recordIds,
@@ -2407,7 +2441,14 @@ function withPitcherChanged(
         : opponentPitcherNumberOf(isOurs ? progress.opponentMound.pitcherSlot : mound.pitcherSlot),
     runnerCount: runnerCountOf(game.bases),
   })
-  // 내려간 투수의 +0x2c 는 레코드에 남는다 — 다음 경기(리그 표)로 이어진다
+  // 내려간 투수의 +0x2c 는 레코드에 남는다 — 다음 경기(리그 표)로 이어진다. 그 투수의 투구 수(+0x27c)는 줄에 얹는다
+  const outgoing = isOurs ? progress.ourMound : progress.opponentMound
+  const pitcherLines = chargeCpuPitcherLine(
+    progress.pitcherLines,
+    isOurs ? progress.options.ourTeamId : progress.options.opponentTeamId,
+    outgoing.pitcherSlot,
+    { pitches: outgoing.pitches },
+  )
   return isOurs
     ? {
         ...progress,
@@ -2415,6 +2456,7 @@ function withPitcherChanged(
         ourMound: mound,
         ourInningRunsAllowed: 0,
         ourPitcherStaminas: withOutgoingStamina(progress.ourPitcherStaminas, progress.ourMound),
+        pitcherLines,
       }
     : {
         ...progress,
@@ -2422,6 +2464,7 @@ function withPitcherChanged(
         opponentMound: mound,
         opponentInningRunsAllowed: 0,
         opponentPitcherStaminas: withOutgoingStamina(progress.opponentPitcherStaminas, progress.opponentMound),
+        pitcherLines,
       }
 }
 
@@ -2515,6 +2558,11 @@ export interface PitcherGameSummary {
    * 마운드 값까지 얹었다. 내 값은 `stamina` 다.
    */
   readonly pitcherStaminas: { readonly ours: readonly number[]; readonly opponent: readonly number[] }
+  /**
+   * 리그 투수 기록 재료 — CPU 투수 줄(내 투수 빼고, 마운드 투구 수를 얹어)과 경기 끝 판정 0xa7de8 · 측 → 팀.
+   * 판정이 내 투수(`MY_PITCHER_NUMBER`)를 가리키면 부르는 쪽이 건너뛴다(내 기록은 `seasonDelta`).
+   */
+  readonly leaguePitchers: GameLeaguePitchers
 }
 
 /**
@@ -2601,7 +2649,36 @@ export function summaryOf(progress: PitcherGameProgress): PitcherGameSummary {
       ours: withOutgoingStamina(progress.ourPitcherStaminas, progress.ourMound),
       opponent: withOutgoingStamina(progress.opponentPitcherStaminas, progress.opponentMound),
     },
+    leaguePitchers: {
+      lines: chargeCpuPitcherLine(
+        chargeCpuPitcherLine(progress.pitcherLines, options.ourTeamId, progress.ourMound.pitcherSlot, {
+          pitches: progress.ourMound.pitches,
+        }),
+        options.opponentTeamId,
+        progress.opponentMound.pitcherSlot,
+        { pitches: progress.opponentMound.pitches },
+      ),
+      decision: {
+        // 판정의 등번호 자리는 표지(`teammatePitcherNumberOf`·`opponentPitcherNumberOf`)라 붙박이 표 칸으로 되돌린다.
+        // 내 투수 표지는 표 밖 칸(`MY_PITCHER_SLOT`)이 된다
+        winner: recordSlotOf(decision.winner, progress.game.playerSide),
+        loser: recordSlotOf(decision.loser, progress.game.playerSide),
+        save: recordSlotOf(decision.save, progress.game.playerSide),
+      },
+      sideTeams:
+        progress.game.playerSide === 0
+          ? [options.ourTeamId, options.opponentTeamId]
+          : [options.opponentTeamId, options.ourTeamId],
+    },
   }
+}
+
+/** 판정 칸의 표지를 붙박이 표 칸으로 — 내 측이면 동료 표지(나는 `MY_PITCHER_SLOT`), 아니면 상대 표지 */
+function recordSlotOf(record: PitcherOfRecord | null, ourSide: number): PitcherOfRecord | null {
+  if (record === null) return null
+  if (record.side !== ourSide) return { side: record.side, number: OPPONENT_PITCHER_NUMBER_BASE - record.number }
+  if (record.number === MY_PITCHER_NUMBER) return { side: record.side, number: MY_PITCHER_SLOT }
+  return { side: record.side, number: TEAMMATE_PITCHER_NUMBER_BASE - record.number }
 }
 
 /**

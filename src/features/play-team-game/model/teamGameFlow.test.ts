@@ -641,6 +641,21 @@ describe('시즌모드 선발은 4인 로테이션이다 (0x6548 → 0xb8c80 →
   })
 })
 
+describe('리그 투수 줄 — 사람 경기도 정산 0xa8024 · 경기 끝 0xa7de8 을 지난다', () => {
+  it('양 팀 줄의 실점 합은 점수와 같고, 우리 줄 아웃 합은 우리 수비 아웃이다 (시즌 · 전부 자동 · 마투수 없음)', () => {
+    for (const seed of [1, 7, 42]) {
+      const progress = startTeamGame({ ...기본옵션, settings: 전부자동 }, createSeededRandom(seed))
+      const 재료 = summaryOf(progress).leaguePitchers!
+      const 합 = (teamId: number, key: 'outs' | 'runsAllowed' | 'pitches') =>
+        재료.lines.filter((line) => line.teamId === teamId).reduce((total, line) => total + line[key], 0)
+      expect(합(0, 'runsAllowed'), `씨앗 ${seed}`).toBe(progress.game.opponentScore)
+      expect(합(1, 'runsAllowed'), `씨앗 ${seed}`).toBe(progress.game.ourScore)
+      expect(합(0, 'outs'), `씨앗 ${seed}`).toBe(progress.pitching.outsRecorded)
+      expect(합(1, 'pitches')).toBeGreaterThan(0)
+    }
+  })
+})
+
 describe('시즌 상대 투수 레코드 차례 — opponentPitcherOrder', () => {
   it('리그 차례로 상대 명단을 세우고 명단 0번이 선발이다 — 칸마다 제 표 칸·보직을 든다', () => {
     const { progress } = 시작({

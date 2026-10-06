@@ -937,6 +937,27 @@ describe('리그 투수 차례·레코드 스태미나 — startGame 마지막 �
   })
 })
 
+describe('리그 투수 줄 — 사람 경기도 0xa8024 · 0xa7de8 을 지난다', () => {
+  it('양 팀 줄의 실점 합은 상대 점수 · 우리 점수와 같고, 우리 줄 아웃 합은 우리 수비 아웃이다', () => {
+    for (const seed of [1, 2, 3, 4]) {
+      const random = createSeededRandom(seed)
+      let progress = startGame(random, 0, 9, 3)
+      for (let guard = 0; guard < 400 && !progress.game.isFinished; guard += 1) {
+        progress = applyPlayerOutcome(progress, { kind: seed % 2 === 0 ? '홈런' : '삼진' }, random)
+      }
+      const 재료 = summaryOf(progress).leaguePitchers!
+      const 합 = (teamId: number, key: 'outs' | 'runsAllowed' | 'strikeouts' | 'pitches') =>
+        재료.lines.filter((line) => line.teamId === teamId).reduce((total, line) => total + line[key], 0)
+      expect(합(0, 'runsAllowed'), `씨앗 ${seed}`).toBe(progress.game.opponentScore)
+      expect(합(3, 'runsAllowed'), `씨앗 ${seed}`).toBe(progress.game.ourScore)
+      expect(합(0, 'outs'), `씨앗 ${seed}`).toBe(progress.pitching.outsRecorded)
+      expect(합(3, 'pitches')).toBeGreaterThan(0)
+      // 판정 측 → 팀: 사람 측(후공 1)이 우리 팀
+      expect(재료.sideTeams).toEqual([3, 0])
+    }
+  })
+})
+
 describe('사구 — 사람 타석 결과 4 (0x35a20 → 0x9d57c) 를 경기에 먹인다', () => {
   function 내타석(bases: BaseState, outs: number): GameProgress {
     const progress = startGame(createSeededRandom(20100901))

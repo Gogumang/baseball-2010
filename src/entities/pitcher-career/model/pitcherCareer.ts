@@ -13,10 +13,12 @@ import type { League, PostseasonSeries } from '@/entities/league/model/league'
 import { finishRegularSeason } from '@/entities/league/model/seasonEnd'
 import { runCpuPostseasonWithStamina } from '@/entities/league/model/postseasonPlay'
 import type { PitcherStaminaTable } from '@/entities/league/model/postseasonPlay'
+import type { GameLeaguePitchers } from '@/entities/game/model/gamePitcherLines'
 import { leagueDayCounterOf } from '@/entities/career/model/leagueGameSetup'
 import {
   humanGamePitcherOrderOf,
   humanGamePitcherStaminasOf,
+  recordHumanGamePitchers,
   recoveredLeagueStaminas,
   staminaTableAfterHumanGame,
 } from '@/entities/pitcher-career/model/leaguePitcherRecords'
@@ -747,6 +749,19 @@ export function pitcherLeagueGameSetupOf(
  * 사람 경기 끝 두 팀 투수 레코드 +0x2c 를 리그 표에 되적는다 — `before` 는 경기 **전** 커리어(g 를 본다), `after` 는
  * `applyPitcherGameResult` 를 지난 커리어다.
  */
+/**
+ * 사람 경기의 CPU 투수 줄(내 투수 빼고)과 경기 끝 판정을 리그 기록표에 쌓는다 — 정규시즌 경기만 (`recordHumanGamePitchers`).
+ * `before` 는 경기 **전** 커리어다(포스트시즌인지 본다).
+ */
+export function withPitcherGameLeagueRecords(
+  before: PitcherCareer,
+  after: PitcherCareer,
+  pitchers: GameLeaguePitchers | undefined,
+): PitcherCareer {
+  const leaguePlayerStats = recordHumanGamePitchers(after.leaguePlayerStats, pitchers, before.postseason === null)
+  return leaguePlayerStats === after.leaguePlayerStats ? after : { ...after, leaguePlayerStats }
+}
+
 export function withPitcherGameStaminas(
   before: PitcherCareer,
   after: PitcherCareer,

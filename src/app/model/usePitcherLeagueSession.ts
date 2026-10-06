@@ -15,6 +15,7 @@ import {
   spendPitcherCycleAction,
   pitcherLeagueGameSetupOf,
   startNextPitcherSeason,
+  withPitcherGameLeagueRecords,
   withPitcherGameStaminas,
 } from '@/entities/pitcher-career/model/pitcherCareer'
 import { isMyTurn } from '@/entities/league/model/seasonEnd'
@@ -688,12 +689,17 @@ export function usePitcherLeagueSession(
         gamePointReward: recordGamePointsOf(summary.recordIds),
       })
       // 두 팀 투수 레코드 +0x2c 는 경기 끝 값이 리그 표에 남는다 (준비 0x1c46c 가 g == 0 이면 열 팀 10000 으로 채운 뒤)
-      const recorded = withPitcherGameStaminas(
+      // 동료·상대 CPU 투수 줄과 경기 끝 판정은 리그 기록표에 (정산 0xa8024 · 0xa7de8 — 정규시즌만, 내 투수 빼고)
+      const recorded = withPitcherGameLeagueRecords(
         career,
-        applyPitcherGameResult(career, outcome),
-        gameOptions.ourTeamId,
-        gameOptions.opponentTeamId,
-        summary.pitcherStaminas,
+        withPitcherGameStaminas(
+          career,
+          applyPitcherGameResult(career, outcome),
+          gameOptions.ourTeamId,
+          gameOptions.opponentTeamId,
+          summary.pitcherStaminas,
+        ),
+        summary.leaguePitchers,
       )
       // 경기 끝 0x4ea0c: 기록 달성 G 를 저장 G 에 더한 뒤 0x4ec82 `0x22c7d(액수, 모드 3)` 로 획득 GP 통계에 적는다
       recordStat({ kind: 'G획득', mode: PITCHER_LEAGUE_MODE, amount: outcome.gamePointReward })

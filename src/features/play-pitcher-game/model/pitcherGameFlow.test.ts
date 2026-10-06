@@ -88,6 +88,20 @@ describe('리그 투수 차례·레코드 스태미나', () => {
     // 선발 2번은 7000 에서 섰으니 더 깎였다
     expect(요약.pitcherStaminas.opponent[2]).toBeLessThan(7_000)
   })
+
+  it('리그 투수 줄 — 내 투수는 빼고 양 팀 CPU 투수 실점 합이 점수와 같다 (구원 날, 전부 간이)', () => {
+    const 끝 = startPitcherGame({ ...기본옵션, dayCounter: 3, role: PITCHER_ROLE.starter }, 씨앗(11))
+    const 재료 = summaryOf(끝).leaguePitchers
+    const 실점 = (teamId: number) =>
+      재료.lines.filter((line) => line.teamId === teamId).reduce((total, line) => total + line.runsAllowed, 0)
+    expect(실점(기본옵션.ourTeamId)).toBe(끝.game.opponentScore)
+    expect(실점(기본옵션.opponentTeamId)).toBe(끝.game.ourScore)
+    expect(재료.lines.every((line) => line.pitcherSlot >= 0 && line.pitcherSlot < 8)).toBe(true)
+    // 판정 칸은 붙박이 표 칸으로 되돌려 둔다
+    for (const record of [재료.decision.winner, 재료.decision.loser]) {
+      if (record !== null) expect(record.number).toBeGreaterThanOrEqual(0)
+    }
+  })
 })
 
 describe('등판', () => {

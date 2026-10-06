@@ -7,6 +7,14 @@ import type { League, PostseasonSeries } from '@/entities/league/model/league'
 import type { PitcherStaminaTable } from '@/entities/league/model/postseasonPlay'
 import { cpuGameRotationAdvances } from '@/entities/pitcher-career/model/pitcherRotation'
 import { recoverStaminaAfterGameDay } from '@/entities/pitcher-career/model/pitcherStamina'
+import {
+  leaguePitcherAppearancesOf,
+  recordLeaguePitcherAppearances,
+} from '@/entities/league/model/leaguePlayerStats'
+import type { LeaguePlayerStats } from '@/entities/league/model/leaguePlayerStats'
+import type { GameLeaguePitchers } from '@/entities/game/model/gamePitcherLines'
+import type { PitcherOfRecord } from '@/entities/game/model/winLossSave'
+import { PITCHERS_PER_TEAM } from '@/entities/team/model/teamRoster'
 
 /**
  * **나만의리그(타자편 모드 4 · 투수편 모드 3) 리그 팀 투수 레코드** — 차례와 스태미나 `+0x2c`.
@@ -91,4 +99,33 @@ export function recoveredLeagueStaminas(table: PitcherStaminaTable, mode: number
     )
   }
   return recovered
+}
+
+/**
+ * 사람 경기 투수 줄을 리그 선수 기록표에 쌓는다 — 정산 0xa8024 · 경기 끝 0xa7de8 이 CPU 끼리 경기와 같은 칸을 올린다.
+ *
+ * 투수 칸 쓰기(아웃 0xa8cca · 탈삼진 0xa8d1c · 실점 0xa8ef4)는 `[sp+0x38] = 0xa56dc(R, 0xae83c(수비 팀), 0)` 이 참일 때만
+ * 돈다(a8044~a804e). 0xa56dc 의 모드 3·4 갈래(점프표 0xd8204 → 0xa571c)는 시즌 객체 0x1fa2d 의 +0x12c(국가대항전)·
+ * +0xb4(포스트시즌)가 서 있으면 거짓 — 그래서 **정규시즌 경기만** 쌓는다(`isRegularSeason`). 마선수(0xb633d)도 거짓이지만
+ * 나만의리그 사람 경기 로스터에는 마선수가 없다. 내 육성 선수(표 밖 칸)는 커리어가 따로 센다 — 건너뛴다.
+ */
+export function recordHumanGamePitchers(
+  stats: LeaguePlayerStats,
+  pitchers: GameLeaguePitchers | undefined,
+  isRegularSeason: boolean,
+): LeaguePlayerStats {
+  if (pitchers === undefined || !isRegularSeason) return stats
+  const recordOf = (record: PitcherOfRecord | null) =>
+    record === null ? null : { side: record.side, pitcherSlot: record.number }
+  const appearances = leaguePitcherAppearancesOf(
+    pitchers.lines,
+    {
+      winner: recordOf(pitchers.decision.winner),
+      loser: recordOf(pitchers.decision.loser),
+      save: recordOf(pitchers.decision.save),
+    },
+    (side) => pitchers.sideTeams[side] ?? pitchers.sideTeams[0],
+    (_teamId, pitcherSlot) => pitcherSlot < 0 || pitcherSlot >= PITCHERS_PER_TEAM,
+  )
+  return recordLeaguePitcherAppearances(stats, appearances)
 }

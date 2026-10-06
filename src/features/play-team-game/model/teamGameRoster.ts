@@ -376,6 +376,11 @@ export interface TeamEntryPitcher {
    * 보직을 안 쓴다(0xac428 ac4f2 · 0xabfcc). 없으면 CPU 투수 교체가 선발로 본다
    */
   readonly role?: PitcherRole
+  /**
+   * 붙박이 표 칸(0~7) — 리그 선수 기록표의 투수 번호(`leaguePitcherIdOf(팀, 칸)`)가 이 칸을 쓴다. 명단 차례(`orderIndex`)는
+   * 엔트리 편집으로 표 칸과 갈릴 수 있다. 마투수(명단 밖 저장 레코드)는 없다.
+   */
+  readonly tableSlot?: number
 }
 
 /**
@@ -410,6 +415,7 @@ export function rosterEntryPitchersOf(teamId: number): readonly TeamEntryPitcher
     aceIndex: NO_ACE_BATTER,
     orderIndex: slot,
     role: rosterPitcherRoleOf(slot),
+    tableSlot: slot,
   }))
 }
 
@@ -481,6 +487,7 @@ export function entryPitchersOfOrder(teamId: number, order: TeamEntryOrder): rea
       aceIndex: NO_ACE_BATTER,
       orderIndex,
       role: rosterPitcherRoleOf(slot),
+      tableSlot: slot,
     }
   })
 }

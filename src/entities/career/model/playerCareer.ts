@@ -20,6 +20,7 @@ import { leagueDayCounterOf } from '@/entities/career/model/leagueGameSetup'
 import {
   humanGamePitcherOrderOf,
   humanGamePitcherStaminasOf,
+  recordHumanGamePitchers,
   recoveredLeagueStaminas,
   staminaTableAfterHumanGame,
 } from '@/entities/pitcher-career/model/leaguePitcherRecords'
@@ -693,9 +694,11 @@ export function applyGameResult(career: PlayerCareer, summary: GameSummary): Pla
     // CPU 끼리 경기와 한 표에 쌓인다 (B-2). 내 선수만 빠져 있는데, 내 성적은 `stats` 가 이미
     // 세고 있어 두 번 세지 않으려는 것이다 (순위표를 만들 때 `myLeagueRecordOf` 로 끼워 넣는다).
     // 미션·홈런더비처럼 리그 밖 경기는 이 칸을 주지 않으므로 그때는 표가 그대로다.
-    leaguePlayerStats: recordLeaguePlateAppearances(
-      career.leaguePlayerStats,
-      summary.leaguePlateAppearances ?? [],
+    // 투수 줄도 같은 정산 0xa8024 · 경기 끝 0xa7de8 이 쌓는다 — 정규시즌 경기만 (0xa56dc 의 포스트시즌 거짓)
+    leaguePlayerStats: recordHumanGamePitchers(
+      recordLeaguePlateAppearances(career.leaguePlayerStats, summary.leaguePlateAppearances ?? []),
+      summary.leaguePitchers,
+      career.postseason === null,
     ),
     // 두 팀 투수 레코드 +0x2c 는 경기 끝 값이 남는다 — 준비 0x1c46c 가 g == 0 이면 열 팀을 10000 으로 채운 뒤다
     ...(summary.pitcherStaminas === undefined
