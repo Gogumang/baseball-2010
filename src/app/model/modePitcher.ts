@@ -31,8 +31,10 @@ import type { PitcherRepertoire, PitcherStats } from '@/features/play-pitcher-ga
  *
  * 그래서 부르는 쪽은 **투수편 커리어(저장된 것 포함)** 를 넘긴다 — `usePitcherLeagueSession` 은 시작할 때
  * 저장을 올려 두므로 `pitcherSession.career` 가 곧 저장된 투수다.
- * ⚠️ 미해결: 웹 명예의 전당에는 **투수 칸이 없고**(K-4 · `HALL_OF_FAME_BATTER_SLOTS`) 미션 선수 고르기 창
- *    (StrMAINMENU[14], 0x62568)도 없어 명예 투수 갈래(+0xa5 ≥ 0)는 아직 탈 수 없다.
+ * ⚠️ 미해결: 명예의 전당 투수 칸(+0x880, c3e66c1)은 생겼지만 미션 선수 고르기 창(StrMAINMENU[14], 0x62568 — 결과 3 →
+ *    전역기록 +0xa5)이 없어 명예 투수 갈래(+0xa5 ≥ 0)는 아직 탈 수 없다. 또 웹 명전 기록(`HallOfFamePitcher`)은 0x30 바이트
+ *    사본이 아니라 능력치·생김새만 들어 구질 마스크(+0x1c)·마구 번호(+0x18)·장착 비트(+0x14)가 없다 — 그 갈래를 열려면
+ *    등록 때 그 칸들도 남겨야 한다.
  *
  * 능력치 — **0xb6414 = `equippedPitcherAbilityOf`** (장비·장착 스킬 5·7·22). 경기용 0xb570c 는 모드 5 에서
  * 질병·부상·사기 감소 갈래(모드 3·4 의 0xb574a)도 시즌 갈래(2)도 안 타고 곧장 피로 0xb58e6 으로 가며,
