@@ -307,6 +307,8 @@ export function App() {
         }}
         pitchControl={gameSettings.settings.pitchControl}
         gameSettings={gameSettings}
+        // 하위 17 머리띠 0x54d95(skin, 11, 5) 는 제목이 −1 이 아니라 G포인트도 그린다 (29261d0)
+        gamePoint={wallet.balance}
       />
     )
   }
