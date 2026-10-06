@@ -649,9 +649,12 @@ describe('실투 판정 0x33cbc — 투구 순간에 굴린다', () => {
  */
 describe('사구 — 내가 맞힌 타석 (0x35a20 → 0xa8024 · 벤치 클리어링)', () => {
   const 바깥직구 = { typeNumber: 1, courseCell: 2, gaugeCell: 0 }
-  /** 사구지만 벤치 클리어링 굴림이 20 이상인 씨앗 · 굴림이 19 이하인 씨앗 */
+  /**
+   * 사구지만 벤치 클리어링 굴림이 20 이상인 씨앗 · 굴림이 19 이하인 씨앗.
+   * 벤치 클리어링 굴림 앞에 공 도착 0x3dfac 의 0.1% 굴림(0x35034)이 하나 끼어 1179 → 86 으로 바꿨다
+   */
   const 사구씨앗 = 35
-  const 벤치씨앗 = 1179
+  const 벤치씨앗 = 86
 
   it('밀어내기 1루 · R+0x148 사구 칸 · 출루 허용(state[0x88]) · 삼자범퇴 칸이 깨진다 — R+0x144 볼넷은 그대로', () => {
     const progress = startPitcherGame(기본옵션, 씨앗(1))
@@ -1033,5 +1036,38 @@ describe('자동 타석(0x21)의 0xc1ba4 — 양 팀 마운드와 CPU 대타 (0x
     // (0xabfcc 차례 [중간 1, 마무리 2, 선발 0] — 보직은 로스터 칸 표 `rosterPitcherRoleOf`)
     expect(첫구원(giveUpPitching(시작, 첫굴림(0.99)))).toBe(4)
     expect(첫구원(giveUpPitching(시작, 첫굴림(0)))).toBe(4)
+  })
+})
+
+describe('CPU 도루 0x520de · 공 도착 판 0x3dfac — 투수편은 늘 CPU 공격', () => {
+  const 가운데직구 = { typeNumber: 1, courseCell: 4, gaugeCell: 0 }
+
+  it('1루 주자가 있으면 타자 결정 앞에서 굴린다 — 못 맞힌 공이면 도루 판(종류 5)이 열리고, 1루 도루는 늘 세이프', () => {
+    let opened = 0
+    for (let seed = 1; seed <= 400; seed += 1) {
+      const progress = startPitcherGame(기본옵션, 씨앗(1))
+      const 일루 = { ...progress, game: { ...progress.game, bases: { first: true, second: false, third: false } } }
+      const 끝 = startPitch(일루, 가운데직구, 씨앗(seed))
+      const play = 끝.lastArrivalPlay
+      if (play?.kind !== 5) continue
+      opened += 1
+      expect(play.result.caughtFrom).toEqual([])
+      expect(끝.lastDefensePlay).toBe(play.result)
+      expect(끝.stealingFrom).toEqual([])
+      // 8(도루)은 공격 계열이라 사람 수비 게이트(0xa77f0)에서 버려진다
+      expect(끝.recordIds).toEqual(일루.recordIds)
+      // 타석은 이어진다 — 타순이 안 돈다
+      if (끝.atBat.outcome === null && 끝.game.half === 일루.game.half) {
+        expect(끝.opponentOrderIndex).toBe(일루.opponentOrderIndex)
+        expect(끝.game.bases.second).toBe(true)
+      }
+    }
+    expect(opened).toBeGreaterThan(0)
+  })
+
+  it('주자가 없으면 CPU 도루 굴림이 없다 — 못 맞힌 공은 0.1% 굴림(0x35034) 하나만 더 쓴다', () => {
+    const progress = startPitcherGame(기본옵션, 씨앗(1))
+    const 끝 = startPitch(progress, 가운데직구, 씨앗(3))
+    expect(끝.lastArrivalPlay).toBeNull()
   })
 })

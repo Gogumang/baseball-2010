@@ -151,6 +151,11 @@ export function usePitcherGame(
             return [
               releaseSound,
               pitchCallSoundIdOf(resolution, nextAtBat),
+              // 공 도착 0x3dfac 가 연 도루·폭투 판의 판정 콜(도루 17 · 62/20, 폭투 17) — 원본은 판 안의 그 틱에 낸다.
+              // 웹은 판을 미리 다 돌려 재생하므로 판을 연 자리에서 낸다 (견제와 같은 근사)
+              after.lastArrivalPlay !== null && after.lastArrivalPlay !== before.lastArrivalPlay
+                ? after.lastArrivalPlay.callSoundId
+                : null,
               // 볼넷 뒤 관중 함성 29 (0x51afa~0x51b02) — 원본은 **공격 팀이 CPU 조작**
               // (`state[0x31 + state[9]] == 1`) 일 때만 예약한다. 투수편은 사람이 늘 수비라
               // 타석에 서는 쪽이 언제나 CPU 다 → 조건이 늘 참이다.

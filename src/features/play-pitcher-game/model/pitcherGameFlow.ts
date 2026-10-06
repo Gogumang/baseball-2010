@@ -38,6 +38,7 @@ import type { BaseState } from '@/entities/game/model/baseState'
 import {
   completeGameRecordIdsOf,
   gameEndRecordIdsOf,
+  passesRecordTeamGate,
   strikeoutRecordIdsOf,
   threePitchInningRecordIdsOf,
 } from '@/entities/game/model/gameRecords'
@@ -54,6 +55,15 @@ import { representativePatternOf } from '@/features/defense-play/model/represent
 import { pitchAgainstBatter } from '@/entities/pitching/model/simulateBatter'
 import { BATTER_SLOT, gameAbilityOf } from '@/features/play-team-game/model/gameAbilities'
 import { isMistakePitch } from '@/entities/pitching/model/mistakePitch'
+import type { StealBase } from '@/entities/fielding/model/stealStart'
+import {
+  arrivalApplicationOf,
+  arrivesUnhit,
+  pitchJudgementOf,
+  rollCpuStealStart,
+  runPitchArrivalPlay,
+  type PitchArrivalPlay,
+} from '@/features/defense-play/model/pitchArrivalPlay'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
@@ -367,6 +377,17 @@ export interface PitcherGameProgress {
    */
   readonly lastDefensePlay: DefensePlayResult | null
   /**
+   * **이번 투구에 출발한 주자들의 루** — state[0x14 + 루]. 투수편은 늘 CPU 공격이라 투구마다 CPU 타자 결정(0x34334)
+   * 바로 앞에서 `0x520de` 를 굴려 넣는다(`rollCpuStealStart`). 공이 도착하면(0x3dfac) 도루 판(종류 5)을 열거나
+   * 지워지고, 인플레이 타구면 타구 판의 리드(0x3d7b8)가 이 칸을 본다.
+   */
+  readonly stealingFrom: readonly StealBase[]
+  /**
+   * **마지막으로 열린 공 도착 판** (0x3dfac — 종류 9 폭투·포일 · 종류 5 도루). 판정 콜을 고르는 데만 쓴다 —
+   * 걸음 앞뒤가 다른 객체면 이번 걸음에 새로 열린 판이다. 재생은 `lastDefensePlay` 가 맡는다.
+   */
+  readonly lastArrivalPlay: PitchArrivalPlay | null
+  /**
    * **지금 화면이 실시간으로 돌리고 있는 타구.** 차 있으면 이 경기는 "수비 진행 중" 이고,
    * 타석 결과(안타/아웃 코드)만 정해졌을 뿐 **진루·아웃·실점은 아직 하나도 안 먹였다**.
    *
@@ -580,6 +601,8 @@ export function startPitcherGame(
     moundStrikeouts: 0,
     moundStrikeoutCombo: 0,
     lastDefensePlay: null,
+    stealingFrom: [],
+    lastArrivalPlay: null,
     pendingDefensePlay: null,
     pendingBenchClearing: null,
     halfInningBoard: null,
@@ -756,6 +779,16 @@ export function startPitch(
   )
 
   const batter = opponentBatterAbility(options.opponentTeamId, opponentRosterSlotOf(progress))
+  // CPU 도루 0x520de — 상태 0x11 의 10번째 틱(0x537dc → 메시지 0x583)이라 실투 판정(0x4dea0) 뒤, CPU 타자 결정
+  // (11번째 틱 0x34334) **바로 앞**이다. 후보가 있을 때만 rand(0,1000) 한 번 → 0xa9bd4 출발 (`rollCpuStealStart`)
+  const stealingFrom = rollCpuStealStart(
+    {
+      bases: progress.game.bases,
+      offenseIsCpu: true,
+      runAbilityOf: (base) => runAbilitiesOnBaseOf(progress)[base] ?? 0,
+    },
+    random,
+  )
   const resolution = pitchAgainstBatter(
     pitch,
     batter,
@@ -811,24 +844,147 @@ export function startPitch(
     lastPitch: pitch,
     lastResolution: resolution,
     atBat: applyPitchResolution(progress.atBat, resolution),
+    stealingFrom,
   }
 
-  const outcome = afterPitch.atBat.outcome
+  // 공 도착 0x3dfac — 못 맞힌 공이면 0.1% 폭투·포일(종류 9)이나 CPU 가 건 도루(종류 5) 판을 연다
+  const arrival = arrivePitcherPitch(afterPitch, { resolution, outcomeAfter: afterPitch.atBat.outcome }, random)
+  // 판에서 반 이닝·경기가 끝났다 — 이 타석은 끊긴다 (판정 B 0xae3e8: 아웃 > 2 → 0x18)
+  if (arrival.interrupted) return advance(arrival.progress, random)
+  const arrived = arrival.progress
+  const outcome = arrived.atBat.outcome
   // 볼·스트라이크·파울 — 판정 A 0xae24c 의 "그 밖 → 0xf" 라 다음 공을 고르기 전에 0xf 진입 0x3d954 를 다시 지난다
-  if (outcome === null) return enterPitchSelection(afterPitch, random)
+  if (outcome === null) return enterPitchSelection(arrived, random)
   if (isBattedBallInPlay(outcome)) {
     // 여기서 멈춘다 — 화면이 이 타구를 실시간으로 돌리고 결과를 `resolveDefensePlay` 에 넘긴다.
     // `atBat` 은 아직 안 비웠으므로 끝난 타석의 결과 코드·볼 카운트가 그대로 남아 있다.
-    return { ...afterPitch, pendingDefensePlay: defensePlayInputOf(afterPitch, outcome, random) }
+    // 출발 칸은 타구 판 입력(리드 0x3d7b8)이 읽고 나면 비운다
+    return { ...withoutSteal(arrived), pendingDefensePlay: defensePlayInputOf(arrived, outcome, random) }
+  }
+  // 낫아웃 — 폭투·포일 판의 진루(타자주자 포함)를 이 삼진 타석의 진루로 먹인다 (0x3e0d0 state[0x1a]).
+  // 삼진 기록(0xa7c4c)은 그대로 남는다 — `applyDefensivePlay` 의 보통 삼진 길을 판의 결과로 지난다
+  const play = arrival.play
+  if (play !== null && arrivalApplicationOf(play) === 'batterRuns') {
+    return advance(applyDefensivePlay(arrived, outcome, true, arrived.atBat.balls, play.result, play.result), random)
   }
   // 사구면 상태 0x12 끝(0x4e74c)에서 벤치 클리어링을 굴린다 — 밀어내기 주루(0x17)·정산 0xa8024 보다 앞이다
-  const settled = withPitcherBenchClearing(afterPitch, outcome, random)
-  if (settled !== afterPitch) {
+  const settled = withPitcherBenchClearing(arrived, outcome, random)
+  if (settled !== arrived) {
     // 들어갔다 — 진입 0x3a5f0 이 공격 9명을 흩뿌리며 45 번 굴리고, 연출이 끝날 때까지 붙든다
     rollBenchClearingEntry(random)
     return { ...settled, pendingBenchClearing: { outcome } }
   }
   return finishNonPlayOutcome(settled, outcome, random)
+}
+
+/** 공 도착 한 걸음의 결과 */
+interface PitcherPitchArrival {
+  readonly progress: PitcherGameProgress
+  /** 열린 주자 판 (종류 9 폭투·포일 · 종류 5 도루). 없으면 null */
+  readonly play: PitchArrivalPlay | null
+  /** 판에서 반 이닝·경기가 끝나 이 타석이 끊겼다 — 타석 결과를 먹이지 말고 `advance` 로 다음 타석을 세운다 */
+  readonly interrupted: boolean
+}
+
+/**
+ * **공 도착** — 상태 0x12 진입 `0x3dfac` (`features/defense-play/model/pitchArrivalPlay`). 타자편 `gameFlow.arrivePitch`
+ * · 팀 경기 `arriveTeamPitch` 와 같은 길이다. 투수편은 늘 내가 수비다.
+ *
+ * - 맞힌 공(파울·타구)은 0x3dfac 를 안 지난다. 파울이면 출발이 풀리고, 타구면 출발 칸을 타구 판 입력이 읽는다.
+ * - 못 맞힌 공: `rollPassedBall` 1번 → 종류 9 / 종류 5 / 없음. 판이 열리면 그 advance 를 견제와 같은 주자 판
+ *   (`withMyRunnerPlay`, 타순 그대로)으로 먹이고 재생 칸에 넣는다. 낫아웃(종류 9 + 삼진 + 타자주자)은 여기서 안 먹이고
+ *   `startPitch` 가 `applyDefensivePlay(…, result, result)` 로 삼진 타석의 진루로 먹인다.
+ * - 정산: 도루(5)는 늘, 폭투·포일(9)은 삼진이 그대로 선 판만 0xa8024 를 지난다(`withMyRunnerPlay` 의 `settles`).
+ * - 기록: 도루 판의 24(도루 저지)만 0xa77f0 게이트를 지난다(사람 수비) — 8(도루)은 버려진다.
+ * - 판은 **송구 키 없이 미리 다 돌린다**(견제 `pickoff` 와 같은 근사).
+ *   ⚠️ 원본은 상태 0x17 동안 사람이 송구 키(0x533c8)를 누를 수 있다 — 키 송구 루(+0x160)는 안 받는다(미해결).
+ *
+ * ⚠️ 근사: 루에 선 주자 = 상대 타순 1·2·3칸 앞 타자(`runAbilitiesOnBaseOf`).
+ * ⚠️ 미해결: 삼진 + 도루(종류 5)면 원본 판정 B 는 정산 0xa8024 를 **종류 5 로 한 번** 부른다 — R+0x138(타자 수)이
+ *   안 오르는 갈래다(0xa8d98). 웹은 주자 판 뒤 보통 삼진 길(`applyDefensivePlay`)로 타자 수를 센다.
+ * ⚠️ 미해결: CPU 타자의 번트 종류(scene+0xfdc)는 `simulateBatter` 가 밖으로 안 내 판에 못 싣는다.
+ *
+ * 난수: `rollPassedBall` 1번(매 못 맞힌 공) → 판이 열리면 그 안의 굴림 (`runPitchArrivalPlay`).
+ */
+function arrivePitcherPitch(
+  progress: PitcherGameProgress,
+  pitch: { readonly resolution: PitchResolution; readonly outcomeAfter: AtBatOutcome | null },
+  random: RandomPort,
+): PitcherPitchArrival {
+  if (!arrivesUnhit(pitch.resolution)) {
+    const next = pitch.resolution.kind === '타구' ? progress : withoutSteal(progress)
+    return { progress: next, play: null, interrupted: false }
+  }
+  const before = progress.game
+  const play = runPitchArrivalPlay(
+    {
+      gameMode: PITCHER_EDITION_MODE,
+      pitchJudgement: pitchJudgementOf(pitch.resolution, pitch.outcomeAfter),
+      stealingFrom: progress.stealingFrom,
+      bases: before.bases,
+      outs: before.outs,
+      // 수비 아홉 칸은 우리 팀, 칸 0 은 나 — 타구 진행기(`defensePlayInputOf`)와 같은 원본 버그(칸 0 은 변화)까지 그대로
+      defenseAbilities: myDefenseAbilitiesOf(progress),
+      runAbilities: runAbilitiesOnBaseOf(progress),
+      defenseIsCpu: false,
+      // 공격이 CPU 라 늘 자동 진루, 송구만 환경설정이 먹는다 (0xae6c8 의 첫 항이 거짓) — 원본 기본값은 수동
+      offenseIsCpu: true,
+      throwMode: progress.options.throwModeManual === false ? '자동' : '수동',
+    },
+    random,
+  )
+  const cleared = withoutSteal(progress)
+  if (play === null) return { progress: cleared, play: null, interrupted: false }
+  const opened: PitcherGameProgress = { ...cleared, lastArrivalPlay: play }
+  if (arrivalApplicationOf(play) === 'batterRuns') return { progress: opened, play, interrupted: false }
+
+  const settles = play.kind === 5 || play.strikeout === 'strikeoutStands'
+  let next = withMyRunnerPlay(opened, play.result, settles).progress
+  // 0xa77f0 — 24(도루 저지)는 수비 계열이라 사람 수비에서 지난다. 8(도루)은 공격 계열이라 버려진다
+  const recordIds = play.recordIds.filter((id) => passesRecordTeamGate(id, { offenseIsHuman: false, defenseIsHuman: true }))
+  if (recordIds.length > 0 && recordsAllowed(next)) next = { ...next, recordIds: [...next.recordIds, ...recordIds] }
+  next = appendLog(next, `${before.inning}회${before.half} ${describeArrivalPlay(play)}`, true)
+  const interrupted =
+    next.game.isFinished || next.game.inning !== before.inning || next.game.half !== before.half
+  return { progress: next, play, interrupted }
+}
+
+function describeArrivalPlay(play: PitchArrivalPlay): string {
+  const runs = play.result.advance.runsScored
+  const tail = runs > 0 ? ` (${runs}실점)` : ''
+  if (play.kind === 9) return `폭투·포일${tail}`
+  if (play.result.caughtFrom.length > 0) return `상대 도루 실패 — 아웃${tail}`
+  if (play.result.stolenFrom.length > 0) return `상대 도루 성공${tail}`
+  return `상대 도루${tail}`
+}
+
+function withoutSteal(progress: PitcherGameProgress): PitcherGameProgress {
+  return progress.stealingFrom.length === 0 ? progress : { ...progress, stealingFrom: [] }
+}
+
+/** 수비 아홉 칸 — 우리 팀, 칸 0 은 나(⚠️ 원본 그대로 능력치 칸 2 를 읽어 투수 레코드에서는 **변화**) */
+function myDefenseAbilitiesOf(progress: PitcherGameProgress): readonly number[] {
+  return defenseAbilitiesOf(
+    teamBatters(progress.options.ourTeamId).map((player) => ({
+      position: player.position,
+      defense: player.ability[2],
+    })),
+    progress.options.stats.breaking,
+  )
+}
+
+/**
+ * 루별 주자 주루 — 0 은 지금 타자(낫아웃 타자주자).
+ * ⚠️ **근사**: 웹 `GameState` 는 루에 선 주자가 누구인지 모른다 — 1루 = 직전 타자 · 2루 = 그 앞 · 3루 = 그 앞으로
+ * 상대 타순을 거꾸로 센다 (타자편 `gameFlow`·팀 경기와 같은 근사). 대타가 들어온 칸은 지금 그 칸의 로스터 선수다.
+ */
+function runAbilitiesOnBaseOf(progress: PitcherGameProgress): Partial<Record<0 | 1 | 2 | 3, number>> {
+  const teamId = progress.options.opponentTeamId
+  const runOf = (slotsBack: number) => {
+    const slot = (((progress.opponentOrderIndex - slotsBack) % BATTING_ORDER_SIZE) + BATTING_ORDER_SIZE) % BATTING_ORDER_SIZE
+    return opponentBatterAbility(teamId, rosterSlotAt(progress.opponentLineup, slot)).run
+  }
+  return { 0: runOf(0), 1: runOf(1), 2: runOf(2), 3: runOf(3) }
 }
 
 /** 인플레이가 아닌 타석 끝(삼진·볼넷·사구·홈런) — 0xae24c 의 보통 길 뒤 0x17(밀어내기)·정산 0xa8024 */
@@ -933,10 +1089,10 @@ export function resolveDefensePlay(
  * 수비 화면은 `runPickoffPlay` 가 미리 끝까지 돌린 틱을 `lastDefensePlay` 로 재생한다 — 견제 중에는 사람이
  * 바꿀 것이 없어서다(`pickoffPlay` 머리 주석). 난수는 그 안의 **악송구 굴림(0xa1828) 1번 · 악송구면 +2번**뿐이다.
  *
- * ⚠️ 견제사·홈인은 이 모드에서 사실상 안 난다 — 사람 경기의 CPU 도루(0x520de)는 투구 모션 10프레임에만
- *    걸리고 견제는 상태 0xf 에서만 들어와 겹치지 않으며(Q1 3b), 웹 투수편에는 CPU 도루 자체가 아직 없다.
- *    그래도 진행기가 아웃·진루를 내면 경기 상태(루·아웃·점수·반 이닝 교대)에는 먹인다. 그때 0xa8024 의
- *    나머지 기록 칸(투수 아웃 수·돌발 판정 등)이 견제 판에서 어떻게 도는지는 **미해결**이라 손대지 않는다.
+ * - 사람 경기의 CPU 도루(0x520de)는 공이 나는 동안(상태 0x11)에만 걸리고 견제는 상태 0xf 에서만 들어와 겹치지
+ *   않는다(Q1 3b). 견제사·진루는 판 시작 리드(0x3d7b8, 3370bf0)로 루를 떠난 주자에게서 난다.
+ * - 진루·아웃·실점은 `withMyRunnerPlay`(도루·폭투 판과 같은 먹이기)로 먹인다. 0xa8024 의 나머지 기록 칸
+ *   (투수 아웃 수·돌발 판정 등)이 견제 판에서 어떻게 도는지는 **미해결**이라 손대지 않는다.
  */
 export function pickoff(
   progress: PitcherGameProgress,
@@ -967,60 +1123,19 @@ export function pickoff(
     offenseIsCpu: true,
   })
 
-  const advanceResult = result.advance
-  const changed =
-    advanceResult.outsAdded > 0 ||
-    advanceResult.runsScored > 0 ||
-    advanceResult.bases.first !== bases.first ||
-    advanceResult.bases.second !== bases.second ||
-    advanceResult.bases.third !== bases.third
-  const before = progress.game
-  let next: PitcherGameProgress = {
+  // 0xa8d98 — 종류 4 는 R+0x138 을 안 올린다 (그대로 돌려받는다)
+  const faced: PitcherGameProgress = {
     ...progress,
-    lastDefensePlay: result,
-    // 0xa8d98 — 종류 4 는 R+0x138 을 안 올린다 (그대로 돌려받는다)
     pitcherRecord: countsMyPitcherRecord(progress)
       ? recordBatterFaced(progress.pitcherRecord, PICKOFF_PLAY_KIND)
       : progress.pitcherRecord,
   }
-  if (changed) {
-    const applied = applyOpponentRunnerPlay(before, progress.opponentOrderIndex, advanceResult)
-    let decision = progress.decision
-    for (let run = 1; run <= applied.runsScored; run += 1) {
-      decision = applyRunScoredFor(progress, decision, run, true)
-    }
-    const halfChanged = applied.game.half !== before.half || applied.game.inning !== before.inning
-    // 포스트시즌이면 0xa56dc 가 거짓이라 R+0x128 · +0x22 를 안 센다 (`countsMyPitcherRecord`)
-    const pickoffCharged = countsMyPitcherRecord(progress)
-      ? chargedRunsOfFates(result.runnerFates, before.outs + advanceResult.outsAdded)
-      : 0
-    next = {
-      ...next,
-      game: applied.game,
-      decision,
-      inningRuns: addInningRuns(progress.inningRuns, before.inning, applied.runsScored),
-      // 견제는 내가 마운드에 있을 때만이라 들어온 주자는 모두 내가 내보낸 주자다 (R+0x128 · +0x22).
-      // 견제도 정산 0xa8024 를 지난다(I 4a-3) — 주자 운명으로 센다 (`chargedRunsOfFates`)
-      runsAllowedByMe: progress.runsAllowedByMe + pickoffCharged,
-      record: {
-        ...progress.record,
-        runsAllowedField: progress.record.runsAllowedField + pickoffCharged,
-      },
-      teamRunsAllowed: progress.teamRunsAllowed + applied.runsScored,
-    }
-    if (halfChanged) {
-      next = {
-        ...next,
-        inningRuns: clearInningRuns(next.inningRuns, applied.game.inning),
-        perfectInningFlag: true,
-        halfInningPitches: 0,
-        atBat: createAtBat(),
-        atBatPitches: 0,
-        atBatPrepared: false,
-        endedInningIndex: applied.game.inning - 1,
-      }
-    }
-  }
+  // 견제도 정산 0xa8024 를 지난다(I 4a-3) — 들어온 주자는 주자 운명으로 센다
+  const applied = withMyRunnerPlay(faced, result, true)
+  const { changed } = applied
+  const advanceResult = result.advance
+  const before = progress.game
+  let next = applied.progress
   const call = result.resultCode === PICKOFF_RESULT.OUT ? '견제사' : result.errantThrow ? '악송구' : '세이프'
   next = appendLog(
     next,
@@ -1037,6 +1152,73 @@ export function pickoff(
 }
 
 /**
+ * **주자만 움직인 판**(견제 종류 4 · 도루 종류 5 · 폭투·포일 종류 9)을 경기 상태에 먹인다 — 내가 던지는 타석이라
+ * 수비는 나다. 타순 커서는 그대로(`applyOpponentRunnerPlay`), 재생 칸(`lastDefensePlay`)에 판을 넣는다.
+ *
+ * - 득점마다 0xa5c34 가 승·패·세이브 칸을 고친다(`applyRunScoredFor`) · 이닝 실점 · 팀 실점.
+ * - `settles` — 판 끝 판정 B 0xae3e8 이 정산 0xa8024 를 부르는가. 부르면 들어온 주자를 주자 운명으로 내 투수
+ *   R+0x128 · +0x22 에 센다(`chargedRunsOfFates`). 견제(4)·도루(5)는 0xd·0xf 어느 쪽이든 0xae5a8 에서 부르고,
+ *   폭투·포일(9)은 `state[0xc] == 5`(삼진) 일 때만 0xd 로 가며 부른다 — 아니면 ae5a2 → ae5b6 으로 **건너뛴다**.
+ * - 반 이닝이 넘어갔으면 이닝 칸·삼자범퇴 표시·반 이닝 투구 수·볼카운트·타석 준비를 내린다 — 다음 타석은 `advance` 가 세운다.
+ *
+ * ⚠️ 미해결: 정산 0xa8024 의 나머지 기록 칸(투수 아웃 수 R+0x13c·돌발 판정 등)이 주자 판에서 어떻게 도는지는 손대지 않았다.
+ */
+function withMyRunnerPlay(
+  progress: PitcherGameProgress,
+  result: DefensePlayResult,
+  settles: boolean,
+): { readonly progress: PitcherGameProgress; readonly changed: boolean } {
+  const before = progress.game
+  const bases = before.bases
+  const advanceResult = result.advance
+  const changed =
+    advanceResult.outsAdded > 0 ||
+    advanceResult.runsScored > 0 ||
+    advanceResult.bases.first !== bases.first ||
+    advanceResult.bases.second !== bases.second ||
+    advanceResult.bases.third !== bases.third
+  let next: PitcherGameProgress = { ...progress, lastDefensePlay: result }
+  if (!changed) return { progress: next, changed }
+  const applied = applyOpponentRunnerPlay(before, progress.opponentOrderIndex, advanceResult)
+  let decision = progress.decision
+  for (let run = 1; run <= applied.runsScored; run += 1) {
+    decision = applyRunScoredFor(progress, decision, run, true)
+  }
+  const halfChanged = applied.game.half !== before.half || applied.game.inning !== before.inning
+  // 포스트시즌이면 0xa56dc 가 거짓이라 R+0x128 · +0x22 를 안 센다 (`countsMyPitcherRecord`).
+  // 내가 마운드에 있을 때만이라 들어온 주자는 모두 내가 내보낸 주자다 (R+0x128 · +0x22)
+  const charged =
+    settles && countsMyPitcherRecord(progress)
+      ? chargedRunsOfFates(result.runnerFates, before.outs + advanceResult.outsAdded)
+      : 0
+  next = {
+    ...next,
+    game: applied.game,
+    decision,
+    inningRuns: addInningRuns(progress.inningRuns, before.inning, applied.runsScored),
+    runsAllowedByMe: progress.runsAllowedByMe + charged,
+    record: {
+      ...progress.record,
+      runsAllowedField: progress.record.runsAllowedField + charged,
+    },
+    teamRunsAllowed: progress.teamRunsAllowed + applied.runsScored,
+  }
+  if (halfChanged) {
+    next = {
+      ...next,
+      inningRuns: clearInningRuns(next.inningRuns, applied.game.inning),
+      perfectInningFlag: true,
+      halfInningPitches: 0,
+      atBat: createAtBat(),
+      atBatPitches: 0,
+      atBatPrepared: false,
+      endedInningIndex: applied.game.inning - 1,
+    }
+  }
+  return { progress: next, changed }
+}
+
+/**
  * 내가 던진 인플레이 타구를 진행기에 넘길 꼴로 만든다 — 능력치·난수·모드·수비 주체까지 다 여기서 채운다.
  * 이 객체를 만드는 데는 난수를 **한 번도 쓰지 않는다** (굴림은 전부 진행기 안에서 돈다).
  */
@@ -1050,6 +1232,8 @@ function defensePlayInputOf(
     trajectory: battedBallTrajectory(representativePatternOf(outcome)),
     bases: progress.game.bases,
     outs: progress.game.outs,
+    // CPU 가 공이 나는 동안 건 도루 — 판 시작 리드(0x3d7b8)가 다음 루로 몰아 돌린다
+    stealingFrom: progress.stealingFrom,
     // 내가 던진 타석이니 수비 아홉 칸은 **우리 팀**이고, 칸 0(투수)은 나다.
     // ⚠️ 원본 그대로: 칸 0 도 능력치 칸 2 를 읽어 투수 레코드에서는 **변화**가 들어간다
     // (0xb570c(팀, 2, 선수, 90, 1) — `defenseAbilitiesOf` 주석).
