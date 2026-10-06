@@ -114,6 +114,28 @@ describe('메시지 상자 애니메이션', () => {
     expect(onAnswer).toHaveBeenCalledTimes(2)
   })
 
+  it('글이 바뀐 새 상자는 커서가 처음 칸으로 돌아간다 — 원본은 상자마다 격자를 새로 만든다 (0x75070 · 0x6c00d)', () => {
+    const onAnswer = vi.fn()
+    const { rerender } = render(<MessageBox text="첫 질문" buttons={['예', '아니오']} onAnswer={onAnswer} />)
+
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(그림('아니오')?.getAttribute('src')).toContain('popup/frames/007.png')
+    rerender(<MessageBox text="둘째 질문" buttons={['예', '아니오']} onAnswer={onAnswer} />)
+
+    expect(그림('예')?.getAttribute('src')).toContain('popup/frames/006.png')
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(onAnswer).toHaveBeenCalledWith(0)
+  })
+
+  it('새 상자의 처음 칸은 그 상자의 `initialSelected` 다 — 0x749d5(창, n) 자리', () => {
+    const onAnswer = vi.fn()
+    const { rerender } = render(<MessageBox text="첫 질문" buttons={['예', '아니오']} onAnswer={onAnswer} />)
+
+    rerender(<MessageBox text="둘째 질문" buttons={['예', '아니오']} initialSelected={1} onAnswer={onAnswer} />)
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(onAnswer).toHaveBeenCalledWith(1)
+  })
+
   it('한 상자에는 한 번만 답한다 — 두 번 눌러도 한 번이다', () => {
     const onAnswer = vi.fn()
     render(<MessageBox text="알림" buttons={['확인']} onAnswer={onAnswer} />)

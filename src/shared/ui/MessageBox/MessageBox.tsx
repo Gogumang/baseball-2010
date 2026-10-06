@@ -87,7 +87,8 @@ function buttonFrameOf(count: number, index: number, isSelected: boolean): numbe
 }
 
 export function MessageBox({ text, buttons, listItems, initialSelected = 0, onAnswer }: MessageBoxProps) {
-  const [selected, setSelected] = useState(() => Math.min(Math.max(0, initialSelected), Math.max(0, buttons.length - 1)))
+  const firstSelected = Math.min(Math.max(0, initialSelected), Math.max(0, buttons.length - 1))
+  const [selected, setSelected] = useState(firstSelected)
 
   // 상자가 열려 있는 동안 키는 상자 것이다. 뒤쪽 메뉴가 같은 Enter 를 같이 받으면
   // 상자를 눌러 닫을 수 없고 (상점 구매 확인), Escape 가 화면을 빠져나가 버린다 (관리 알림).
@@ -112,13 +113,19 @@ export function MessageBox({ text, buttons, listItems, initialSelected = 0, onAn
 
   // 같은 자리에서 글만 바뀌면 **새 상자**다 (보상 안내가 잇달아 뜨는 화면들). 답 잠금을 푼다 —
   // 안 그러면 두 번째 상자의 [OK] 가 먹히지 않는다. (첫 글은 위 useLayoutEffect 가 이미 맡았다)
+  // 커서도 새 상자의 처음 칸으로 돌린다 — 원본은 상자를 띄울 때마다 격자를 새로 만들어(0x75070 `new(0x28)`)
+  // 0x6bd38 이 +0xc/+0x10 을 0 으로, 칸 배치 0x6bfe1 이 `vtbl+0x14(0, 0)`(0x6c00d) 로 (0, 0) 에 둔다.
+  // 그 자리가 띄운 뒤 `0x749d5(창, n)` 을 부르면 n 칸 — 곧 `initialSelected` 다. 앞 상자의 커서는 남지 않는다.
   const shownTextRef = useRef(text)
   useEffect(() => {
     if (shownTextRef.current === text) return
     shownTextRef.current = text
     isAnsweredRef.current = false
     isFinishedRef.current = false
+    setSelected(firstSelected)
     setAnimation(fullHeightRef.current > OPEN_START_HEIGHT ? { kind: '열림', height: OPEN_START_HEIGHT } : null)
+    // 새 상자는 글이 바뀔 때만 생긴다 — 같은 글에서 처음 칸 값만 바뀌어도 커서를 옮기지 않는다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [text])
 
   const answer = useCallback((index: number) => {
