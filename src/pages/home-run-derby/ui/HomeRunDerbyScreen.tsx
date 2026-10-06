@@ -159,6 +159,8 @@ export function HomeRunDerbyScreen({
           aceLevels={aceLevels}
           swingMode="홈런더비"
           gameMode={DERBY_MODE}
+          // 0x344ea 모드 7 갈래 — 단계 0 은 구질 1, 마투수가 나온 뒤로는 22(마구)만, 굴림 없음
+          derbyPitchType={pitcher.pitchType}
           // 환경설정 전광판(저장 +0x3a) — OFF 면 흐르는 글자를 안 그린다 (0x77726)
           isScoreboardOn={settings?.isScoreboardOn}
           // 환경설정 진동(저장 +0x3b) — 맞은 공·사구 진동 (0x3a44)

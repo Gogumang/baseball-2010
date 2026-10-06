@@ -73,6 +73,8 @@ export interface StageLatest {
   readonly seasonStadium?: SeasonStadium
   /** 게임 모드(전역 `0x1552d10`) — 하늘 조명 0x78490 이 모드 5·6·7 에서 안 그린다 */
   readonly gameMode?: number
+  /** 홈런더비(모드 7) 구질 — `BattingStage` 의 같은 이름 props 주석 참고 */
+  readonly derbyPitchType?: number
   /** 환경설정 전광판(저장 +0x3a) — 거짓이면 전광판 흐르는 글자를 안 그린다 (0x77726). 없으면 켬 */
   readonly isScoreboardOn?: boolean
   /** 환경설정 진동(저장 +0x3b) — 거짓이면 0x3a44 가 안 울린다. 없으면 켬 */

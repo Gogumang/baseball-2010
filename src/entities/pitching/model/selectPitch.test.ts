@@ -10,6 +10,7 @@ import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { isInsideStrikeZone } from '@/shared/lib/geometry/coordinate'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { ACE_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
+import { createMagicPitchGameState } from '@/entities/pitching/model/magicPitchGame'
 
 const 상황: PitchSituation = { strikes: 0, balls: 0, outs: 0, runnerCount: 0, batterSide: 1, side: 1 }
 const 투수 = (control: number, pitchMask = 0x1143) => ({ control, velocity: 60, repertoire: { form: 0, pitchMask, magicId: 0 } })
@@ -342,7 +343,7 @@ describe('홈런더비 목표점 (0x345fc 의 0x3460e 모드 7 갈래)', () => {
     const 보통 = 세는난수()
     selectChoice(투수(60, 0x1), 상황, 보통)
     const 더비 = 세는난수()
-    const 공더비 = 공(selectChoice(투수(60, 0x1), 상황, 더비, 'hard', undefined, undefined, false, true))
+    const 공더비 = 공(selectChoice(투수(60, 0x1), 상황, 더비, 'hard', undefined, undefined, false, 1))
     expect(더비.count).toBeLessThan(보통.count)
     expect(공더비.pitcherForm).toBe(0)
   })
@@ -351,8 +352,70 @@ describe('홈런더비 목표점 (0x345fc 의 0x3460e 모드 7 갈래)', () => {
     const 주자상황 = { ...상황, runnerCount: 1 }
     for (let seed = 0; seed < 50; seed += 1) {
       const choice = selectChoice(투수(60), 주자상황, createSeededRandom(seed), 'hard', undefined,
-        { hasRunnerOnBase: (base) => base === 1 }, false, true)
+        { hasRunnerOnBase: (base) => base === 1 }, false, 1)
       expect(choice.kind).toBe('투구')
     }
+  })
+})
+
+describe('홈런더비 구질 (0x344dc 의 0x344ea 모드 7 갈래)', () => {
+  /** 뽑은 횟수를 센다 */
+  const 세는난수 = (seed: number) => {
+    const inner = createSeededRandom(seed)
+    let count = 0
+    return {
+      get count() { return count },
+      next: () => { count += 1; return inner.next() },
+      nextInRange: inner.nextInRange,
+      pick: inner.pick,
+    }
+  }
+  const 마투수 = { control: 67, velocity: 55, repertoire: ACE_PITCHER_REPERTOIRES[1] }
+
+  it('단계 0 (구질 1) — 구질을 굴리지 않고 늘 직구, 목록에 다른 구질이 있어도', () => {
+    for (let seed = 0; seed < 40; seed += 1) {
+      const choice = selectChoice(투수(60), 상황, createSeededRandom(seed), 'hard', undefined, undefined, false, 1)
+      if (choice.kind !== '투구') throw new Error('견제')
+      expect(choice.pitchTypeNumber).toBe(1)
+      expect(choice.pitch.type).toBe('FASTBALL')
+    }
+  })
+
+  it('구질 굴림 rand(0,6) 이 빠진다 — 구질 목록이 달라도 같은 시드면 굴림 수·공이 같다', () => {
+    const 보통상황 = { ...상황, strikes: 1, balls: 1 }
+    const 한구질 = 세는난수(3)
+    const 공한구질 = 공(selectChoice(투수(60, 0x1), 보통상황, 한구질, 'hard', undefined, undefined, false, 1))
+    const 여러구질 = 세는난수(3)
+    const 공여러구질 = 공(selectChoice(투수(60, 0x1143), 보통상황, 여러구질, 'hard', undefined, undefined, false, 1))
+    expect(여러구질.count).toBe(한구질.count)
+    expect(공여러구질.plate).toEqual(공한구질.plate)
+    // 일반 갈래(1-1 은 마구 때가 아니라 rand(0,6) 을 굴린다)보다 적다
+    const 보통 = 세는난수(3)
+    selectChoice(투수(60, 0x1143), 보통상황, 보통)
+    expect(보통.count).toBeGreaterThan(여러구질.count)
+  })
+
+  it('단계 ≥ 1 (구질 22) — 볼카운트와 무관하게 늘 마구, 제구 등급 5 · 실투 굴림 없음', () => {
+    const magic = createMagicPitchGameState(마투수.repertoire)
+    const 보통상황 = { ...상황, strikes: 1, balls: 1 }
+    const random = 세는난수(9)
+    const choice = selectChoice(마투수, 보통상황, random, 'hard', magic, undefined, false, 22)
+    if (choice.kind !== '투구') throw new Error('견제')
+    expect(choice.pitchTypeNumber).toBe(22)
+    expect(choice.pitch.isMagicPitch).toBe(true)
+    expect(choice.pitch.controlTier).toBe(5)
+    expect(choice.isMistakePitch).toBe(false)
+  })
+
+  it('마구 횟수가 줄지 않는다 (0x345fc 가 소모 0x34894 앞에서 끝난다) — 공+0x10 은 늘 투수 +0x18', () => {
+    const magic = createMagicPitchGameState(마투수.repertoire)
+    const start = magic.remaining
+    const random = createSeededRandom(11)
+    for (let index = 0; index < start + 5; index += 1) {
+      const choice = selectChoice(마투수, 상황, random, 'hard', magic, undefined, false, 22)
+      if (choice.kind !== '투구') throw new Error('견제')
+      expect(choice.pitch.magicNumber).toBe(마투수.repertoire.magicId)
+    }
+    expect(magic.remaining).toBe(start)
   })
 })

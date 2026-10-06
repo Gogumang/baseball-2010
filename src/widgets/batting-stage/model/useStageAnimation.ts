@@ -19,10 +19,11 @@ import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import { pitchReleaseSoundIdOf } from '@/widgets/batting-stage/lib/pitchReleaseSound'
 import type { StageRefs } from '@/widgets/batting-stage/model/stageRefs'
+import { DERBY_ORDINARY_PITCH_TYPE } from '@/entities/home-run-derby/model/derbyRules'
 
-/** 다음 투구까지의 준비 시간 */
 /** 홈런더비 = 원본 전역 모드 7 */
 const HOME_RUN_DERBY_GAME_MODE = 7
+/** 다음 투구까지의 준비 시간 */
 const WIND_UP_MILLISECONDS = 850
 /** 결과 문구를 보여주는 시간 */
 const RESULT_DISPLAY_MILLISECONDS = 1150
@@ -121,8 +122,11 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
                 },
             // 실투 판정 0x33cbc 의 타자 비트 22 압도 — 0xb62b4 는 **장착** 비트라 장착 스킬 번호로 본다
             latestRef.current.batterSkillIds.includes(INTIMIDATE_SKILL_ID),
-            // 홈런더비(모드 7)는 0x345fc 가 종류·목표점을 굴리지 않고 존 한가운데를 노린다 (0x3460e)
-            latestRef.current.gameMode === HOME_RUN_DERBY_GAME_MODE,
+            // 홈런더비(모드 7)는 0x344ea 가 구질을 굴리지 않고(마투수가 나왔으면 22, 아니면 1),
+            // 0x345fc 가 종류·목표점을 굴리지 않고 존 한가운데를 노리며(0x3460e) 마구 소모(0x34894)도 건너뛴다
+            latestRef.current.gameMode === HOME_RUN_DERBY_GAME_MODE
+              ? latestRef.current.derbyPitchType ?? DERBY_ORDINARY_PITCH_TYPE
+              : undefined,
           )
           if (choice.kind === '견제') {
             // 0x34848 → 메시지 0x10: 공을 안 던진다(상태 0x11 예약 0x34888 을 안 지난다).

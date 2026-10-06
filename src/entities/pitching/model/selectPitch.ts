@@ -138,7 +138,7 @@ export function selectPitch(
    *    목표점·제구·곡선 난수를 굴리고 원본이 던지지 않는 공을 던진다. 지금 타석 화면을 쓰는 팀 경기·
    *    나만의리그 타자편(`GameRoute`)·미션(`MissionRoutes`)은 모두 `onPickoff` 로 이것을 켠다.
    *    안 켜는 곳은 홈런더비뿐인데, 원본 모드 7 은 0x3460e 에서 종류를 굴리지 않고 존 한가운데(표 0xcfbcc)를
-   *    목표로 끝나므로 견제와 상관없다 — 그 갈래는 `isHomeRunDerby` 가 따른다.
+   *    목표로 끝나므로 견제와 상관없다 — 그 갈래는 `derbyPitchType` 이 따른다.
    */
   cpuPickoff?: CpuPickoffInput,
   /**
@@ -147,15 +147,21 @@ export function selectPitch(
    */
   batterIntimidates = false,
   /**
-   * **홈런더비(원본 모드 7)** 인가 — 0x345fc 가 0x3460e 에서 목표 종류(0x9eeac)·목표점 굴림 없이 존 한가운데를
-   * 목표로 끝난다 (`derbyPitchTargetOf`). 견제도 없다. 안 넘기면 거짓.
+   * **홈런더비(원본 모드 7)** 면 그 판의 구질 번호 (`derbyPitcherOf(…).pitchType`), 아니면 undefined.
+   * 넘기면 원본 모드 7 갈래를 그대로 탄다:
+   * - 0x344ea: 구질 = `state+0x38`(등장한 마투수 수) > 0 ? 22 : 1 — **굴림 없이** 이 값 (0x344fc~0x34504 → 끝)
+   * - 0x3460e: 목표 종류(0x9eeac)·목표점 굴림 없이 존 한가운데(`derbyPitchTargetOf`). 견제도 없다
+   * - 0x34644 → 0x348d6: 마구 소모 0x34894 를 안 지난다 (`advanceMagicPitchGameState` 의 `isHomeRunDerby`)
    */
-  isHomeRunDerby = false,
+  derbyPitchType?: number,
 ): CpuPitchChoice {
   const repertoire = pitcher.repertoire ?? DEFAULT_REPERTOIRE
   const magicState = magic ?? { remaining: 0, ballMagicNumber: 0 }
+  const isHomeRunDerby = derbyPitchType !== undefined
   const list = pitchListOf(repertoire.pitchMask, repertoire.magicId !== 0)
-  const typeNumber = computerPitchTypeOf({ list, magicCount: magicState.remaining, ...situation }, random)
+  const typeNumber = isHomeRunDerby
+    ? derbyPitchType
+    : computerPitchTypeOf({ list, magicCount: magicState.remaining, ...situation }, random)
   let target: WorldPoint
   if (isHomeRunDerby) {
     // 0x3460e: 모드 7 이면 종류·목표점을 굴리지 않고 존 한가운데 (0x34612~0x34644)
@@ -211,7 +217,7 @@ export function selectPitch(
     random,
   )
 
-  advanceMagicPitchGameState(magicState, typeNumber, repertoire.magicId)
+  advanceMagicPitchGameState(magicState, typeNumber, repertoire.magicId, isHomeRunDerby)
 
   const pitch: Pitch = {
     type: isMagic ? magicPitchNameOf(repertoire.magicId, repertoire.form) ?? MAGIC_PITCH_NAME : type.name,

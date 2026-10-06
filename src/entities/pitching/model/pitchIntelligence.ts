@@ -36,7 +36,7 @@ export interface PitchChoiceSituation {
   readonly balls: number
 }
 
-/** 홈런더비(모드 7) 분기는 웹에 홈런더비가 없어 뺐다 */
+/** 홈런더비(모드 7) 분기(0x344ea, 굴림 없이 22 또는 1)는 `selectPitch` 의 `derbyPitchType` 이 따른다 */
 export function computerPitchTypeOf(situation: PitchChoiceSituation, random: RandomPort): number {
   const { list, magicCount, runnerCount, strikes, balls } = situation
   const hasMagic = list[MAGIC_SLOT] === MAGIC_PITCH

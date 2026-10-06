@@ -92,6 +92,11 @@ interface BattingStageProps {
    */
   readonly gameMode?: number
   /**
+   * **홈런더비(모드 7) 상대 투수의 구질** — 0x344ea: `state+0x38`(등장한 마투수 수) > 0 ? 22(마구) : 1, 굴림 없음.
+   * `derbyPitcherOf(단계).pitchType` 을 넘긴다. `gameMode` 가 7 일 때만 읽고, 안 넘기면 마투수가 아직 안 나온 것(1)으로 본다.
+   */
+  readonly derbyPitchType?: number
+  /**
    * **환경설정 "전광판"** = 저장 +0x3a (`GameSettings.isScoreboardOn`). 꺼져 있으면 전광판 흐르는 글자를
    * 그리지 않는다 — 0x77494 의 0x77726 이 `0x1f1d9() + 0x3a ≠ 0` 을 본다 (R2 6절). 안 넘기면 켠 것으로 본다.
    */

@@ -54,10 +54,10 @@ export interface DerbyPitcher {
  * 상대 투수 능력치를 0xb570c → 0xb6414 로 읽으니 홈런더비(모드 7)의 마투수도 같은 배율을 탄다.
  * 안 넘기면 배율 없이 날 값이다.
  *
- * ⚠️ **어긋남(미해결)**: 단계 ≥ 1 에서 원본은 **구질 22(마구)만**, 단계 0 은 **구질 1 만** 던진다(`pitchType`, 0x344dc).
- * `selectPitch` 는 이제 레코드 +0x18(`repertoire.magicId`)이 있으면 마구를 목록에 넣고 남은 횟수(`magicPitchGame`)도
- * 세지만, 구질은 여전히 일반 규칙(`computerPitchTypeOf`)으로 굴린다 — 이 `pitchType` 을 타석 화면이 아직 쓰지 않는다.
- * 0x344dc 의 모드 7 갈래(굴림이 있는지)를 떠 보고 옮겨야 한다.
+ * 구질(`pitchType`)은 0x344dc 의 모드 7 갈래(0x344ea~0x34504)가 **굴림 없이** 정한다 —
+ * `state([0x1552d0c])+0x38`(등장한 마투수 수) > 0 ? 22 : 1. 타석 화면(`BattingStage` 의 `derbyPitchType`)이 이 값을
+ * `selectPitch` 에 넘긴다. 마구면 제구 등급 5(0x4dbac)·실투 굴림 없음·마구 공 그림·공+0x10 이 일반 갈래와 같은 길로 간다.
+ * 남은 마구 횟수는 줄지 않는다 — 0x345fc 가 모드 7 에서 소모 0x34894 앞에 끝난다(`magicPitchGame`).
  */
 export function derbyPitcherOf(stage: number, aceLevels?: Readonly<Record<number, number>>): DerbyPitcher {
   // 구질은 단계만 보고 갈린다 — `0x344dc` 가 `단계 > 0 ? 0x16 : 1` 이다

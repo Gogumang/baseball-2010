@@ -49,6 +49,12 @@ describe('magicPitchGame — 한 경기 마구 상태 (0xaebe4 · 0x345fc · 0x3
     expect(state).toEqual({ remaining: 2, ballMagicNumber: 5 })
   })
 
+  it('홈런더비(모드 7)는 소모가 없다 — 0x345fc 가 0x34644 에서 0x348d6 으로 끝나 0x34894 를 안 지난다', () => {
+    const state = { remaining: 3, ballMagicNumber: 0 }
+    for (let index = 0; index < 10; index += 1) advanceMagicPitchGameState(state, MAGIC_PITCH_TYPE_NUMBER, 6, true)
+    expect(state).toEqual({ remaining: 3, ballMagicNumber: 6 })
+  })
+
   it('마구가 아닌 공에도 공+0x10 이 남는다 — 되돌리는 코드가 원본에 없다 (H2 3-4)', () => {
     const state = { remaining: 3, ballMagicNumber: 0 }
     advanceMagicPitchGameState(state, MAGIC_PITCH_TYPE_NUMBER, 5)

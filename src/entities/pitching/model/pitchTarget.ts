@@ -55,7 +55,7 @@ const OUTSIDE_Y = [330, 380]
  * 넘긴 화면 — 팀 경기 · 나만의리그 타자편 · 미션). 안 넘기면 `pitchTargetOf` 가 종류 4 를 모서리 투구로
  * 떨어뜨려 **원본이 굴리지 않는 목표점 난수를 굴리고 원본이 던지지 않는 공을 던진다**. 안 넘기는 화면은
  * 홈런더비뿐이고, 원본 모드 7 은 0x3460e 에서 종류를 굴리지 않으므로 견제 문제가 아니다 —
- * `selectPitch(…, isHomeRunDerby = true)` 가 종류·목표점 굴림을 건너뛰고 `derbyPitchTargetOf` 로 존 한가운데를 노린다.
+ * `selectPitch(…, derbyPitchType)` 가 종류·목표점 굴림을 건너뛰고 `derbyPitchTargetOf` 로 존 한가운데를 노린다.
  */
 const PICKOFF_KIND = 4
 const FULL_BASES = 3
