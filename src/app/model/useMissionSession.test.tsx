@@ -8,7 +8,10 @@ import {
   missionOpponentStaminaAfterPitch,
   missionPitcherAbility,
   useMissionSession,
+  withPitcherNotOut,
 } from '@/app/model/useMissionSession'
+import { startPitcherMission } from '@/entities/mission/model/pitcherRun'
+import type { PitchArrivalPlay } from '@/features/defense-play/model/pitchArrivalPlay'
 import { useAtBatRunner } from '@/app/model/useAtBatRunner'
 import type { Screen } from '@/app/model/screen'
 import { aceMatchMissionOf, EMPTY_STORY_CARRY } from '@/entities/story/model/aceMatch'
@@ -1068,5 +1071,36 @@ describe('투수편 마선수 대결 — 투수 미션 team − 1 을 던지고 
     expect(result).toBeNull()
     expect(rendered.result.current.pitcherRun).not.toBeNull()
     rendered.unmount()
+  })
+})
+
+/* ── 낫아웃 — 삼진 +1(a7cc4) · 판의 아웃 콜 · 정산 보정 −1(a8cfc) ──────────────────────────────── */
+
+describe("투수 미션 낫아웃의 '아웃' 칸 — 판정 0xaaa6c 는 정산 보정 뒤 값을 본다", () => {
+  // 투수 16 "메디카" — 목표 '아웃' 1 · 타석 제한 1
+  const 메디카 = MISSIONS.find((row) => row.side === '투수' && row.id === 16)!
+  const 낫아웃판 = (outsAdded: number, batterSafe: boolean) =>
+    ({
+      kind: 9,
+      strikeout: 'batterRuns',
+      result: {
+        advance: { bases: { first: batterSafe, second: false, third: false }, runsScored: 0, outsAdded },
+        runnerFates: [{ fromBase: 0, scored: false, retired: !batterSafe }],
+      },
+    }) as unknown as PitchArrivalPlay
+
+  it("타자주자가 살면 '아웃' 은 0 — 삼진 +1 이 보정 −1 로 빠져 목표를 못 채우고 타석 제한으로 실패다", () => {
+    const run = withPitcherNotOut(startPitcherMission(메디카), { kind: '삼진' }, 낫아웃판(0, true))
+    expect(run.progress.counts['탈삼진']).toBe(1)
+    expect(run.progress.counts['아웃']).toBe(0)
+    expect(run.bases.first).toBe(true)
+    expect(run.status).toBe('실패')
+  })
+
+  it("타자주자가 1루에서 잡히면 아웃 콜 하나로 '아웃' 1 — 성공", () => {
+    const run = withPitcherNotOut(startPitcherMission(메디카), { kind: '삼진' }, 낫아웃판(1, false))
+    expect(run.progress.counts['아웃']).toBe(1)
+    expect(run.totalOuts).toBe(1)
+    expect(run.status).toBe('성공')
   })
 })

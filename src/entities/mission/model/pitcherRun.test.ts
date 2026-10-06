@@ -373,3 +373,57 @@ describe('실점 한도 +0xa1 ↔ R+0x128 — 정산 0xa8f56 이 득점 주자�
     expect(run.status).toBe('실패')
   })
 })
+
+describe("'아웃'(R+0x13c)은 아웃 콜마다 1 — 삼진 0xa7c4c · 아웃 콜 0xa7d0c(a7d52)", () => {
+  // 투수 5번 "흔들리지 않는 마음" — 목표 '아웃' 3, 2루 주자, 0아웃
+  const 흔들리지않는 = PITCHER_MISSIONS.find((m) => m.id === 5)!
+  const 일이루 = (outs: number): PitcherRun => ({
+    ...startPitcherMission(흔들리지않는),
+    bases: { first: true, second: true, third: false },
+    outs,
+  })
+
+  it('병살 플레이는 아웃 2 — 결과 하나당 1 이 아니다', () => {
+    const 병살 = playedWith(
+      { bases: { first: false, second: false, third: true }, runsScored: 0, outsAdded: 2 },
+      [fate(0, false, true), fate(1, false, true), fate(2, false, false)],
+    )
+    const run = applyPitcherOutcome(일이루(0), { kind: '아웃', detail: '땅볼아웃' }, { played: 병살 })
+    expect(run.progress.counts['아웃']).toBe(2)
+    expect(run.totalOuts).toBe(2)
+    expect(run.status).toBe('진행중')
+  })
+
+  it('삼중살이면 3 — 목표 3 을 한 판에 채워 성공이다', () => {
+    const 삼중살 = playedWith(
+      { bases: { first: false, second: false, third: false }, runsScored: 0, outsAdded: 3 },
+      [fate(0, false, true), fate(1, false, true), fate(2, false, true)],
+    )
+    const run = applyPitcherOutcome(일이루(0), { kind: '아웃', detail: '땅볼아웃' }, { played: 삼중살 })
+    expect(run.progress.counts['아웃']).toBe(3)
+    expect(run.status).toBe('성공')
+  })
+
+  it('안타 판에서 주자가 잡혀도 아웃 콜이 나 1 이 든다', () => {
+    const 주자아웃 = playedWith(
+      { bases: { first: true, second: true, third: false }, runsScored: 0, outsAdded: 1 },
+      [fate(0, false, false), fate(1, false, false), fate(2, false, true)],
+    )
+    const run = applyPitcherOutcome(일이루(0), { kind: '안타', bases: 1 }, { played: 주자아웃 })
+    expect(run.progress.counts['아웃']).toBe(1)
+  })
+
+  it('판은 셋째 아웃에서 끝난다 — 2아웃 병살은 1 만 든다', () => {
+    const 병살 = playedWith(
+      { bases: { first: false, second: false, third: false }, runsScored: 0, outsAdded: 2 },
+      [fate(0, false, true), fate(1, false, true), fate(2, false, false)],
+    )
+    const run = applyPitcherOutcome(일이루(2), { kind: '아웃', detail: '땅볼아웃' }, { played: 병살 })
+    expect(run.progress.counts['아웃']).toBe(1)
+  })
+
+  it('삼진은 1 (0xa7c4c a7cc4)', () => {
+    const run = applyPitcherOutcome(일이루(0), { kind: '삼진' })
+    expect(run.progress.counts['아웃']).toBe(1)
+  })
+})

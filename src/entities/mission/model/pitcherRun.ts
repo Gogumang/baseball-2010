@@ -184,6 +184,8 @@ export function applyPitcherOutcome(
     outcome,
     run.perfectGauges,
     brokenConditionsOf(run.mission, allowed),
+    // 아웃 콜 수 — 병살 2 · 삼중살 3 · 안타 판의 주자 아웃 1 (R+0x13c, `recordPitcherOutcome` 머리글). 셋째 아웃에서 판이 끝난다
+    defense.outsAtSettlement - run.outs,
   )
   const remainingPlate =
     run.remainingPlateAppearances === null ? null : run.remainingPlateAppearances - 1
@@ -222,6 +224,14 @@ export function applyPitcherOutcome(
  * 이제 `missionPlay` 의 `runnerFates`(진행기 결과 · 진행기 없는 결과는 `runnerFatesWithoutPlay`)를
  * `baserunnerAllowedOfFates` 로 그대로 읽는다 — 앞 주자가 잡히고 뒤 주자가 그 루 이상까지 간 플레이도 원본대로 0 이다.
  */
+
+/**
+ * 진행 중인 판을 판 끝 판정 0xaaa6c 의 순서(실패 한도 → 목표 → 남은 기회)로 다시 잰다 — 정산이 칸을 고친 뒤
+ * (낫아웃 보정 a8cfc 등) 판정이 도는 갈래를 위해 내보낸다. 이미 끝난 판은 그대로다.
+ */
+export function judgePitcherRun(run: PitcherRun): PitcherRun {
+  return run.status === '진행중' ? { ...run, status: judgeStatus(run) } : run
+}
 
 /** 이닝으로 목표를 재는 미션(노히트노런·퍼펙트게임)은 (9 − 시작 이닝 + 1) × 3 아웃을 잡으면 성공이다. */
 function judgeStatus(run: PitcherRun): MissionStatus {

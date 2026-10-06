@@ -13,6 +13,7 @@ import {
   PITCHER_MISSIONS,
   pitcherGoalNamesFor,
   recordPitcherOutcome,
+  withOutCalls,
 } from '@/entities/mission/model/missionGoal'
 import { MISSIONS } from '@/shared/config/original/missions'
 
@@ -239,5 +240,21 @@ describe('isEveryMissionCleared — 미션 올 클리어', () => {
     const all = [...BATTER_MISSIONS, ...PITCHER_MISSIONS].map(missionKeyOf)
     expect(isEveryMissionCleared(all)).toBe(true)
     expect(isEveryMissionCleared(all.slice(1))).toBe(false)
+  })
+})
+
+describe('recordPitcherOutcome — 아웃은 아웃 콜 수만큼 (R+0x13c)', () => {
+  it('outsRecorded 를 주면 그 수만큼 아웃·이닝 목표 칸이 오른다', () => {
+    const progress = recordPitcherOutcome(createProgress(), { kind: '아웃', detail: '땅볼아웃' }, 0, [], 2)
+    expect(progress.counts['아웃']).toBe(2)
+    expect(progress.counts['노히트노런']).toBe(2)
+    expect(progress.counts['퍼펙트게임']).toBe(2)
+  })
+
+  it('withOutCalls 는 낫아웃 보정처럼 뺄 수도 있다', () => {
+    const struck = recordPitcherOutcome(createProgress(), { kind: '삼진' }, 0)
+    const corrected = withOutCalls(struck, -1)
+    expect(corrected.counts['아웃']).toBe(0)
+    expect(corrected.counts['탈삼진']).toBe(1)
   })
 })
