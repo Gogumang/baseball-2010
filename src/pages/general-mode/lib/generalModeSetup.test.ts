@@ -36,7 +36,7 @@ describe('teamGameOptionsOf — 마선수 레벨 (전역 mgr[0x13a..0x143])', ()
       const options = teamGameOptionsOf(준비, aceLevels === undefined ? {} : { aceLevels })
       const progress = startTeamGame(options, createSeededRandom(20100901))
       // 마투수는 투수 명단 8번 칸 (0xb88c8) — `#` 교체로 올린다
-      return ourPitcherStats(changePitcher(progress, 8)).velocity
+      return ourPitcherStats(changePitcher(progress, 8, createSeededRandom(0))).velocity
     }
     expect(구속({ 1: 4 }) - 구속()).toBe(850 - 510)
   })

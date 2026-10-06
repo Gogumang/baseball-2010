@@ -158,6 +158,15 @@ export function TeamGameScreen({
     if (changeWindow === null) return
     audio.play(PITCHER_CHANGE_SOUND)
   }, [audio, changeWindow])
+  /**
+   * 교체 창 닫기 — 원본 `0x495fc` 의 '#'·CLR 가지는 예약을 지우고 경기 상태 **0xe** 로 간다. 0xe 의 메시지 1 이
+   * 돌발 굴림 0x8f158 과 0xf 진입 0x3d954 를 다시 돌리므로 진행기에도 알린다 (`cancelSubstitution`).
+   */
+  const closeChangeWindow = useCallback(() => {
+    if (changeWindow === null) return
+    setChangeWindow(null)
+    actions.cancelSubstitution()
+  }, [actions, changeWindow])
   /** 제안 대사를 이미 보여 준 돌발 행 번호 */
   const [shownProposal, setShownProposal] = useState<number | null>(null)
 
@@ -185,7 +194,7 @@ export function TeamGameScreen({
       if (isDefenseInPlay) return
       if (event.key === '*') {
         event.preventDefault()
-        setChangeWindow(null)
+        closeChangeWindow()
         return setMenuOpen((open) => !open)
       }
       if (isMenuOpen || overlay !== null) {
@@ -200,15 +209,24 @@ export function TeamGameScreen({
         event.preventDefault()
         // 0x495fc 의 '#' 는 교체 화면을 닫는다(취소). 그 밖에서는 0x49598 의 갈림길 그대로 —
         // 공격이 사람이면 대타(0xaf06c), 아니면 투수 교체(0xaf09c)다
-        if (changeWindow !== null) return setChangeWindow(null)
+        if (changeWindow !== null) return closeChangeWindow()
         if (session.canChangePitcher) return setChangeWindow('투수')
         if (session.canPinchHit) return setChangeWindow('대타')
         return
       }
       if (event.key === 'Escape' || event.key === 'Backspace') {
-        if (changeWindow === null) return
-        event.preventDefault()
-        return setChangeWindow(null)
+        if (changeWindow !== null) {
+          event.preventDefault()
+          return closeChangeWindow()
+        }
+        // 코스 고르기(상태 0x10)의 CLR(−16)은 구질 고르기(0xf)로 되돌린다 (0x50ee0~0x50ee6) — 0xf 진입 0x3d954 가 다시 돈다
+        if (canPitch && phase === '코스') {
+          event.preventDefault()
+          setPhase('구질')
+          setSlot(null)
+          actions.returnToPitchSelection()
+        }
+        return
       }
       // 도루 출발 0x53610 — '3' 1루 주자 · '2' 2루 주자 · '1' 3루 주자(홈으로)
       const stealBase = stealBaseOfKey(event.key)
@@ -222,12 +240,15 @@ export function TeamGameScreen({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [
     actions,
+    canPitch,
     changeWindow,
+    closeChangeWindow,
     isDefenseInPlay,
     isSceneCovering,
     isMenuOpen,
     isStealable,
     overlay,
+    phase,
     session.canChangePitcher,
     session.canPinchHit,
   ])
@@ -410,7 +431,7 @@ export function TeamGameScreen({
         badge={canPitch ? `${staminaPercent}%` : `${game.ourScore} : ${game.opponentScore}`}
         leftKey={
           changeWindow !== null
-            ? { label: '취소', onPress: () => setChangeWindow(null) }
+            ? { label: '취소', onPress: closeChangeWindow }
             : session.canChangePitcher
               ? { label: '# 교체', onPress: () => setChangeWindow('투수') }
               : session.canPinchHit
@@ -427,7 +448,7 @@ export function TeamGameScreen({
         rightKey={{
           label: isMenuOpen ? '닫기' : '메뉴',
           onPress: () => {
-            setChangeWindow(null)
+            closeChangeWindow()
             setMenuOpen((open) => !open)
           },
         }}

@@ -14,6 +14,8 @@ import {
   isPitchTurn,
   pickoff,
   pinchHit,
+  cancelSubstitution,
+  returnToPitchSelection,
   resolveBenchClearing,
   resolveDefensePlay,
   runAutoProgress,
@@ -119,6 +121,10 @@ export interface TeamGameSession {
     readonly changePitcher: (benchIndex: number) => void
     /** `#` 대타 화면에서 벤치 타자 칸을 고른다 (0xaf06c → 0xaebe4) */
     readonly pinchHit: (benchIndex: number) => void
+    /** `#` 교체 화면을 '#'·CLR 로 닫는다 — 상태 0xe 로 (0x495fc) */
+    readonly cancelSubstitution: () => void
+    /** 투구 코스 단계에서 CLR — 구질 고르기(상태 0xf)로 되돌린다 (0x50ee6) */
+    readonly returnToPitchSelection: () => void
     /** 도루 출발 (메시지 0x583 → 0xa9bd4) — 대상 주자가 선 루. 판정은 공이 도착할 때 도루 판이 한다 */
     readonly steal: (base: StealBase) => void
     /** 경기 중 메뉴 '*' 의 자동진행 — **비용 검사는 화면이 먼저 한다** */
@@ -263,7 +269,7 @@ export function useTeamGame(options: TeamGameOptions, random: RandomPort): TeamG
       specialSwingUsed: (remaining: number) => step((current) => spendOurSpecialSwing(current, remaining)),
       changePitcher: (benchIndex: number) =>
         step(
-          (current) => changePitcher(current, benchIndex),
+          (current) => changePitcher(current, benchIndex, random),
           // 교체 연출(상태 0x16)을 지나 상태 0xe 로 오면 등판음이 예약된다 (0x38b64 → 0x38c34).
           // 올라온 투수가 마투수면 26, 2·3루에 주자가 있으면 15, 그 밖은 14 다
           (_before, after) => [
@@ -273,7 +279,11 @@ export function useTeamGame(options: TeamGameOptions, random: RandomPort): TeamG
             }),
           ],
         ),
-      pinchHit: (benchIndex: number) => step((current) => pinchHit(current, benchIndex)),
+      pinchHit: (benchIndex: number) => step((current) => pinchHit(current, benchIndex, random)),
+      // 교체 창 취소('#'·CLR → 상태 0xe) — 메시지 1 의 돌발 굴림과 0xf 진입 0x3d954 가 다시 돈다
+      cancelSubstitution: () => step((current) => cancelSubstitution(current, random)),
+      // 코스 고르기(0x10)의 CLR → 0xf (0x50ee6) — 0xf 진입 0x3d954 가 다시 돈다
+      returnToPitchSelection: () => step((current) => returnToPitchSelection(current, random)),
       // 도루 출발 — 주자를 출발만 시킨다(난수·소리 없음). 판정은 공이 도착할 때 도루 판(종류 5)이 한다
       steal: (base: StealBase) => step((current) => startSteal(current, base)),
       autoProgress: () => step((current) => runAutoProgress(current, random)),

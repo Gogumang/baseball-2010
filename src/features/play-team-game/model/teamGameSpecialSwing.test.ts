@@ -46,16 +46,16 @@ describe('필살 남은 횟수 — 타순 칸 s8 팀[+0x29 + 타순], 0xaebe4 �
 
   it('마타자는 0xd84fa[레벨] = 2,2,3,4,5 — 레벨은 전역 mgr[0x13f + 순번] (aceLevels 칸 5 + 순번)', () => {
     const progress = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT, aceBatterId: 1 })
-    const 대타 = pinchHit(progress, 9)
+    const 대타 = pinchHit(progress, 9, createSeededRandom(0))
     expect(specialSwingRemainingAt(대타, '우리')).toBe(2)
-    const 레벨4 = pinchHit({ ...progress, options: { ...progress.options, aceLevels: { 6: 4 } } }, 9)
+    const 레벨4 = pinchHit({ ...progress, options: { ...progress.options, aceLevels: { 6: 4 } } }, 9, createSeededRandom(0))
     expect(specialSwingRemainingAt(레벨4, '우리')).toBe(5)
-    const 레벨2 = pinchHit({ ...progress, options: { ...progress.options, aceLevels: { 6: 2 } } }, 9)
+    const 레벨2 = pinchHit({ ...progress, options: { ...progress.options, aceLevels: { 6: 2 } } }, 9, createSeededRandom(0))
     expect(specialSwingRemainingAt(레벨2, '우리')).toBe(3)
   })
 
   it('필살 스윙(0x4e136)이 줄인 값을 그 타순 칸에 든다 — 이닝이 바뀌어도 다시 차지 않는다', () => {
-    const progress = pinchHit(시작({ playerSide: PLAYER_SIDE_FIRST_BAT, aceBatterId: 0 }), 9)
+    const progress = pinchHit(시작({ playerSide: PLAYER_SIDE_FIRST_BAT, aceBatterId: 0 }), 9, createSeededRandom(0))
     const 씀 = spendOurSpecialSwing(progress, 1)
     expect(specialSwingRemainingAt(씀, '우리')).toBe(1)
     expect(씀.ourSpecialSwingRemaining[progress.game.battingOrderIndex]).toBe(1)
@@ -64,7 +64,7 @@ describe('필살 남은 횟수 — 타순 칸 s8 팀[+0x29 + 타순], 0xaebe4 �
   it('대타(0xaede0)는 그 칸을 −1 로 되돌려 새 선수가 자기 횟수를 받는다', () => {
     const progress = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT, aceBatterId: 0 })
     const 앞칸 = { ...progress, ourSpecialSwingRemaining: progress.ourSpecialSwingRemaining.map(() => 0) }
-    const 대타 = pinchHit(앞칸, 9)
+    const 대타 = pinchHit(앞칸, 9, createSeededRandom(0))
     expect(대타.ourSpecialSwingRemaining[progress.game.battingOrderIndex]).toBe(-1)
     expect(specialSwingRemainingAt(대타, '우리')).toBe(2)
   })

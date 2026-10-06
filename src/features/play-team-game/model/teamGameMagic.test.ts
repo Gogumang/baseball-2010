@@ -34,16 +34,16 @@ describe('우리 팀 마구 횟수 팀+0x28 — 0xaebe4 가 마운드에 오른 
   it('마투수가 교체로 오르면 0xd8509[레벨] = 3,4,5,6,7 (레벨 = mgr[0x13a + 순번])', () => {
     const progress = 시작({ acePitcherId: 2 })
     expect(availablePitchers(progress)).toContain(PITCHER_ENTRY_ACE_SLOT)
-    expect(changePitcher(progress, PITCHER_ENTRY_ACE_SLOT).magicRemaining).toBe(3)
+    expect(changePitcher(progress, PITCHER_ENTRY_ACE_SLOT, createSeededRandom(0)).magicRemaining).toBe(3)
     const 레벨4 = 시작({ acePitcherId: 2, aceLevels: { 2: 4 } })
-    expect(changePitcher(레벨4, PITCHER_ENTRY_ACE_SLOT).magicRemaining).toBe(7)
+    expect(changePitcher(레벨4, PITCHER_ENTRY_ACE_SLOT, createSeededRandom(0)).magicRemaining).toBe(7)
     // 다른 마투수 칸의 레벨은 안 본다
     const 남의칸 = 시작({ acePitcherId: 2, aceLevels: { 1: 4, 7: 4 } })
-    expect(changePitcher(남의칸, PITCHER_ENTRY_ACE_SLOT).magicRemaining).toBe(3)
+    expect(changePitcher(남의칸, PITCHER_ENTRY_ACE_SLOT, createSeededRandom(0)).magicRemaining).toBe(3)
   })
 
   it('마투수가 마구를 던지면 줄고, 일반 투수로 바꾸면 0 — 남은 횟수는 버려지고 내려간 투수는 다시 못 오른다', () => {
-    const progress = changePitcher(시작({ acePitcherId: 0, aceLevels: { 0: 1 } }), PITCHER_ENTRY_ACE_SLOT)
+    const progress = changePitcher(시작({ acePitcherId: 0, aceLevels: { 0: 1 } }), PITCHER_ENTRY_ACE_SLOT, createSeededRandom(0))
     expect(progress.magicRemaining).toBe(4)
     expect(isPitchTurn(progress)).toBe(true)
     const 던짐 = startThrowPitch(progress, 마구, createSeededRandom(3))
@@ -53,7 +53,7 @@ describe('우리 팀 마구 횟수 팀+0x28 — 0xaebe4 가 마운드에 오른 
     if (!isPitchTurn(던짐)) return
     const 벤치 = availablePitchers(던짐)
     expect(벤치).not.toContain(PITCHER_ENTRY_ACE_SLOT)
-    const 교체 = changePitcher(던짐, 벤치[0]!)
+    const 교체 = changePitcher(던짐, 벤치[0]!, createSeededRandom(0))
     expect(교체.magicRemaining).toBe(0)
     expect(availablePitchers(교체)).not.toContain(PITCHER_ENTRY_ACE_SLOT)
   })

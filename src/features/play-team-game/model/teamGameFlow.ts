@@ -2842,8 +2842,8 @@ function runAbilitiesOnBaseOf(
  * **새 타석** — 상태 0xd 진입 `0x48d50` 부터 0xe → 0xf 까지.
  *
  * 0xd 는 이전 상태가 교체 연출 0x16 이 아니면 `state[0xe] = 0` 을 쓴다 (48eb0~48eb6). 이 함수로 오는 것은 늘
- * 새 타석이다 — 교체 연출 뒤 다시 들어오는 길(0x16 → 0xd 건너뜀)은 `enterPitchSelection` 이 `readyAtBat` 으로
- * 곧장 간다.
+ * 새 타석이다 — 교체 연출 뒤 다시 들어오는 길(0x16 → 0xd 건너뜀)은 `enterPitchSelection`(CPU 교체)·`changePitcher`·
+ * `pinchHit`(사람 `#` 교체)이 `readyAtBat` 으로 곧장 간다. 교체 창 취소(→ 0xe, `cancelSubstitution`)도 같다.
  */
 function prepareAtBat(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
   return readyAtBat(
@@ -2945,8 +2945,9 @@ export function burstGameRecordOf(
 /**
  * **상태 0xf 진입 `0x3d954`** — 사람 장면에서 공 하나를 고르기 전마다 돈다.
  *
- * 0xf 에 들어서는 길은 셋이다: 새 타석의 0xe 확인(`readyAtBat`), 인플레이 없이 끝난 공의 다음 공(판정 A
- * `0xae24c` 의 "그 밖 → 0xf" — 볼·스트라이크·파울), 견제 판 끝(판정 B `0xae3e8` 의 ae592). 그때마다:
+ * 0xf 에 들어서는 길은 넷이다: 0xe 확인(`readyAtBat` — 새 타석, 교체 연출 0x16 뒤, 교체 창 취소 뒤), 인플레이 없이
+ * 끝난 공의 다음 공(판정 A `0xae24c` 의 "그 밖 → 0xf" — 볼·스트라이크·파울), 견제 판 끝(판정 B `0xae3e8` 의 ae592),
+ * 코스 고르기(0x10)의 CLR(0x50ee6, `returnToPitchSelection`). 그때마다:
  *
  * ```
  * 3d9e4  r2 = (state[0x31 + state[0xa]] == 1)            ; 수비 팀이 CPU 인가
@@ -3281,15 +3282,43 @@ function withValueAt(values: readonly number[], index: number, value: number): r
 /**
  * 사람이 `#` 메뉴로 투수를 바꾼다 (R4 1b — 원본도 **사람 손으로만** 우리 투수를 바꾼다).
  * `benchIndex` 는 아직 안 쓴 우리 팀 투수 칸이어야 한다.
+ *
+ * 교체 화면(상태 0xb) 키 `0x495fc` 의 OK(0x496f0~0x4970c)는 상태 **0x16**(교체 연출)로 가고, 0x16 → 0xd(이전 상태
+ * 0x16 이라 카운트·타석 초기화·state[0xe] 지우기를 건너뜀, 48e94) → 0xe(모드 1·2·8·9 는 0x504cc 강판이 늘 거짓)
+ * → 메시지 1(0xf 예약 · 돌발 0x8f158) → 0xf 진입 `0x3d954` 로 다시 들어온다 — `readyAtBat` 을 다시 지난다.
+ * 사람 수비라 0x3d954 는 CPU 대타 `0xac228`(3da70)를 묻는다.
  */
-export function changePitcher(progress: TeamGameProgress, benchIndex: number): TeamGameProgress {
+export function changePitcher(progress: TeamGameProgress, benchIndex: number, random: RandomPort): TeamGameProgress {
   if (progress.game.isFinished) return progress
   if (!availablePitchers(progress).includes(benchIndex)) return progress
-  return appendLog(
+  const changed = appendLog(
     applyPitcherChange(progress, true, benchIndex),
     `${progress.game.inning}회${progress.game.half} 투수 교체 — ${progress.ourPitcherIndex + 1}번 → ${benchIndex + 1}번`,
     true,
   )
+  return readyAtBat(changed, random)
+}
+
+/**
+ * **교체 화면 취소** — `0x495fc` 의 '#'·CLR 가지: 두 팀 예약을 지우고(`0xae989` = team+0x290·+0x291 = 0) 경기 상태
+ * **0xe** 로 간다 (R4 1a). 0xe 의 메시지 1 이 다시 0xf 를 예약하고 돌발 `0x8f158` 을 굴린 뒤 0xf 진입 `0x3d954` 를
+ * 지나므로(`readyAtBat`), 바꾼 것이 없어도 그 둘이 한 번 더 돈다. 화면이 교체 창을 닫을 때 부른다.
+ * 교체 창은 0xe·0xf 에서만 열리므로(0x498d4) 사람 차례이고 타석 준비를 지난 때만 먹는다.
+ */
+export function cancelSubstitution(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
+  if (progress.game.isFinished || !isHumanTurn(progress) || !progress.atBatPrepared) return progress
+  return readyAtBat(progress, random)
+}
+
+/**
+ * **코스 고르기 취소** — 상태 0x10(코스 고르기)의 CLR(−16) 가지가 경기 상태를 **0xf** 로 되돌린다
+ * (`0x50ee0~0x50ee6` `0xbcb49(…, 0xf)`, OK(−5) 가지는 0x50ed6 의 0x11). 0xf 진입 `0x3d954` 가 다시 돌아
+ * 사람 수비면 CPU 대타 `0xac228` 를 한 번 더 묻는다 (돌발 굴림은 0xe 메시지 1 몫이라 없다).
+ * 화면이 코스 단계에서 구질 단계로 돌아갈 때 부른다.
+ */
+export function returnToPitchSelection(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
+  if (!isPitchTurn(progress) || !progress.atBatPrepared) return progress
+  return enterPitchSelection(progress, random)
 }
 
 /** 지금 바꿔 넣을 수 있는 우리 팀 투수 칸 — 화면의 투수 교체 목록이 쓴다 */
@@ -3364,10 +3393,10 @@ export function canOpenPinchHit(progress: TeamGameProgress): boolean {
  * `0xa5bf0(ctx, 0)`(3d57e)으로 세우고(공격 팀이 사람일 때만), 다음 0xd 가 안 지운다 → 이 타석의 홈런은 기록 5
  * (`pinchHitHomeRunHalf` · `finishBatterOutcome`).
  *
- * ⚠️ 원본은 0xd → 0xe → 0xf 를 다시 지나며 `0x3d954`(돌발 판정 0x8f158 등)를 다시 돈다 — 웹은 `atBatPrepared` 를
- *    내려 두는 것까지만 한다 (기존 그대로).
+ * 그 뒤 0xd → 0xe → 메시지 1(돌발 0x8f158) → 0xf 진입 `0x3d954` 를 다시 지난다 (`readyAtBat`, `changePitcher` 와 같은
+ * 길) — 사람 공격이라 0x3d954 는 상대 CPU 투수 교체 `0xac428`(3da3e)를 묻는다.
  */
-export function pinchHit(progress: TeamGameProgress, benchIndex: number): TeamGameProgress {
+export function pinchHit(progress: TeamGameProgress, benchIndex: number, random: RandomPort): TeamGameProgress {
   if (progress.game.isFinished) return progress
   if (!availablePinchHitters(progress).includes(benchIndex)) return progress
   const swapped = substituteBatter(
@@ -3380,7 +3409,7 @@ export function pinchHit(progress: TeamGameProgress, benchIndex: number): TeamGa
   )
   if (swapped === null) return progress
 
-  return appendLog(
+  const changed = appendLog(
     {
       ...progress,
       ourEntry: swapped.entry,
@@ -3397,7 +3426,6 @@ export function pinchHit(progress: TeamGameProgress, benchIndex: number): TeamGa
       ),
       // 상태 0x16 → 0xd: 이전 상태가 0x16 이라 0xb6764·0xa5bcc 를 건너뛴다 — 카운트를 그대로 둔다
       atBat: progress.atBat,
-      atBatPrepared: false,
       // 0x3d458 → 0xa5bf0(ctx, 0): 사람 공격이라 ctx+0x160 = 1
       pinchHitHomeRunHalf: { inning: progress.game.inning, half: progress.game.half },
       scenePinchHit: {
@@ -3409,6 +3437,7 @@ export function pinchHit(progress: TeamGameProgress, benchIndex: number): TeamGa
     `${progress.game.inning}회${progress.game.half} 대타 — ${swapped.outgoing.name} → ${swapped.incoming.name}`,
     true,
   )
+  return readyAtBat(changed, random)
 }
 
 /** 지금 타석이 사람 팀이 대타를 낸 그 타석인가 (`ctx+0x160`) — 반 이닝이 바뀌었으면 이미 지워진 칸이다 */
