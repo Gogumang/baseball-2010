@@ -8,6 +8,7 @@ import { useGameSettings } from '@/app/model/useGameSettings'
 import { startNewSeason } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import { SEASON_SCENE_STATE } from '@/entities/season-mode/model/seasonStateMachine'
+import { attendanceOf } from '@/entities/season-mode/model/seasonAttendance'
 import { LEAGUE_SIDE_HOME, leagueSideOf } from '@/entities/league/model/league'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
@@ -20,7 +21,11 @@ import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
  * 이고, 그 값이 그대로 `playerSide` 다 — 그래서 **원정이면 안 넘겨야** 원본과 같다.
  *
  * 값 자체(`0x353ac~0x353e6`)는 `entities/season-mode` 의 `seasonStadiumOf` 가 본다.
+ *
+ * 관중 단계(만원 판정 SR+0x65 + 1)는 **이 경기의 것**이다 — 경기 장면 셋업(0x39fdc 모드 2 갈래 0x3a3e4)이 정규시즌이면
+ * 관중·수입 0xa34b8 을 돌려 그 칸을 새로 쓴 뒤 타석 준비 0x353c2 가 읽는다. 9경기까지는 순위를 안 본다(+100).
  */
+const 이경기관중단계 = (record: SeasonRecord) => attendanceOf(record, { myRank: 0, opponentRank: 0 }).crowdLevel + 1
 
 /** 타석 화면은 캔버스라 여기서는 띄우지 않는다 — 넘어온 prop 만 받아 적는다 */
 const 받은Prop = vi.hoisted(() => ({ 값: undefined as unknown }))
@@ -89,8 +94,10 @@ describe('시즌 구장 배선 — 홈경기에만 장착 장비가 간다 (0x40
     // 팀 0 은 0일차에 홈이다 (0xb7844)
     expect(leagueSideOf(0, 0)).toBe(LEAGUE_SIDE_HOME)
 
-    expect(경기를연다(레코드({ games: 0, stadiumEquipped: [3, 5, 2], crowdLevel: 2 })))
-      .toEqual({ stand: 3, crowd: 3, board: 5, grassPalette: 0 })
+    const record = 레코드({ games: 0, stadiumEquipped: [3, 5, 2], crowdLevel: 2 })
+    // 저장에 남은 앞 경기 판정(2)이 아니라 셋업이 새로 낸 값이다
+    expect(이경기관중단계(record)).toBe(2)
+    expect(경기를연다(record)).toEqual({ stand: 3, crowd: 2, board: 5, grassPalette: 0 })
   })
 
   it('⚠️ 원정경기면 안 넘긴다 — 일반 구장(0x77974)으로 그려져야 원본과 같다', () => {
@@ -100,14 +107,15 @@ describe('시즌 구장 배선 — 홈경기에만 장착 장비가 간다 (0x40
     expect(경기를연다(레코드({ games: 9, stadiumEquipped: [3, 5, 2], crowdLevel: 2 }))).toBeUndefined()
   })
 
-  it('아무것도 안 샀으면 0번 칸이 가고, 관중은 만원 판정 0 + 1 = 1 단계다', () => {
-    expect(경기를연다(레코드({ games: 0 }))).toEqual({ stand: 0, crowd: 1, board: 0, grassPalette: 2 })
+  it('아무것도 안 샀으면 0번 칸이 가고, 관중은 이 경기 만원 판정 + 1 단계다', () => {
+    const record = 레코드({ games: 0 })
+    expect(경기를연다(record)).toEqual({ stand: 0, crowd: 이경기관중단계(record), board: 0, grassPalette: 2 })
   })
 
   it('잔디도 같이 간다 — 칸 3(특급천연잔디)만 줄이 없어 기본 팔레트다 (0x786c8)', () => {
-    expect(경기를연다(레코드({ games: 0, stadiumEquipped: [0, 0, 3] })))
-      .toEqual({ stand: 0, crowd: 1, board: 0, grassPalette: null })
-    expect(경기를연다(레코드({ games: 0, stadiumEquipped: [0, 0, 1] })))
-      .toEqual({ stand: 0, crowd: 1, board: 0, grassPalette: 1 })
+    const 특급 = 레코드({ games: 0, stadiumEquipped: [0, 0, 3] })
+    expect(경기를연다(특급)).toEqual({ stand: 0, crowd: 이경기관중단계(특급), board: 0, grassPalette: null })
+    const 천연 = 레코드({ games: 0, stadiumEquipped: [0, 0, 1] })
+    expect(경기를연다(천연)).toEqual({ stand: 0, crowd: 이경기관중단계(천연), board: 0, grassPalette: 1 })
   })
 })

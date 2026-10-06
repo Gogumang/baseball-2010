@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useState } from 'react'
+import { useLayoutEffect, useState } from 'react'
 import { ITEM_WINDOW_KIND } from '@/widgets/season/lib/seasonItemMenu'
 import type { ItemWindowKind } from '@/widgets/season/lib/seasonItemMenu'
 import {
@@ -34,7 +34,7 @@ import { NationalCupScreen } from '@/pages/national-cup/ui/NationalCupScreen'
 import { TeamGameScreen } from '@/pages/team-game/ui/TeamGameScreen'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { useGameSettings } from '@/app/model/useGameSettings'
-import { isPitcherLeaderKind, seasonGoalInputOf, seasonLeagueRecordsOf, seasonRanksOf } from '@/app/model/useSeasonSession'
+import { isPitcherLeaderKind, seasonGoalInputOf, seasonLeagueRecordsOf } from '@/app/model/useSeasonSession'
 import type { SeasonSession } from '@/app/model/useSeasonSession'
 import { seasonStadiumOf } from '@/entities/season-mode/model/stadiumItems'
 import { PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
@@ -144,10 +144,6 @@ export function SeasonRoute({
 
   /** 아이템 메뉴에서 고른, 웹에 아직 없는 창 종류 (`[win+0x1a4]`) */
   const [missingWindow, setMissingWindow] = useState<ItemWindowKind | null>(null)
-  const ranks = useMemo(
-    () => (state === null ? { myRank: 0, opponentRank: 0 } : seasonRanksOf(league, state.record)),
-    [league, state],
-  )
   /**
    * 메인 메뉴에서 들어오는 길 = 0x327b8(this, 2) 의 모드 2 갈래 — `+0x42 && +0x4e` 면 장면 0x105 를 세우지 않고 곧장 경기
    * 장면 0x104 다(메인 메뉴 시즌모드 0x24698 · [최근게임] 모드 2 가 같은 길). 첫 그림 전에 갈라 관리 화면이 한 번도 서지 않게
@@ -608,7 +604,6 @@ export function SeasonRoute({
       <GameIncomeScreen
         record={state.record}
         teamMorale={state.teamMorale}
-        input={ranks}
         onConfirm={(settlement) => actions.confirmIncome(settlement.record)}
       />
     )

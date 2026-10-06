@@ -7,6 +7,7 @@ import {
   MY_RANK_BONUS,
   OPPONENT_RANK_BONUS,
   STORE_INCOME_BONUS,
+  applyGameIncome,
   attendanceOf,
   lastGameBonusOf,
   settleGameIncome,
@@ -93,32 +94,49 @@ describe('관중 수 0xa34b8', () => {
   })
 })
 
-describe('수입 정산 — 관중 1명당 7500원 (100만 단위)', () => {
-  it('소지금에 더하고 직전 관중·수입을 남긴다', () => {
-    const 결과 = settleGameIncome(기본({ reputation: 300, games: 10, money: 100 }), {
+describe('수입 — 관중 1명당 7500원 (100만 단위), 경기 장면 셋업 0xa34b8 이 소지금에 더한다', () => {
+  it('소지금에 더하고 직전 관중·수입·만원 판정을 남긴다 — 구내매점 칸은 안 건드린다', () => {
+    const 결과 = applyGameIncome(기본({ reputation: 300, games: 10, money: 100, storeGames: 3 }), {
       myRank: 0,
       opponentRank: 4,
     })
-    expect(결과.income).toBe(13)
-    expect(결과.record.money).toBe(113)
-    expect(결과.record.lastAttendance).toBe(18_160)
-    expect(결과.record.lastIncome).toBe(13)
+    // 구내매점이 남아 있어 +2 (0xa3644)
+    expect(결과.money).toBe(115)
+    expect(결과.lastAttendance).toBe(18_160)
+    expect(결과.lastIncome).toBe(13 + STORE_INCOME_BONUS)
+    expect(결과.storeGames).toBe(3)
   })
 
-  it('구내매점이 남아 있으면 +2 이고 경기마다 한 칸 준다', () => {
-    const record = 기본({ reputation: 300, games: 10, storeGames: 2 })
-    const 첫판 = settleGameIncome(record, { myRank: 0, opponentRank: 4 })
+  it('⚠️ 두 번 부르면 두 번 더한다 — 이어하기마다 장면 셋업이 다시 부르는 원본 버그의 바탕', () => {
+    const input = { myRank: 0, opponentRank: 4 }
+    const 한번 = applyGameIncome(기본({ reputation: 300, games: 10, money: 100 }), input)
+    expect(applyGameIncome(한번, input).money).toBe(126)
+  })
+})
+
+describe('경기 뒤 0xe9 (0xdea0) — 계산 없이 보여 주고 구내매점만 줄인다', () => {
+  it('셋업이 남긴 +0x1b4 관중 · +0x66 수입을 그대로 보여 준다 — 소지금은 안 바뀐다', () => {
+    const record = applyGameIncome(기본({ reputation: 300, games: 10, money: 100 }), { myRank: 0, opponentRank: 4 })
+    const 결과 = settleGameIncome(record)
+    expect(결과.attendance).toBe(18_160)
+    expect(결과.income).toBe(13)
+    expect(결과.record.money).toBe(113)
+  })
+
+  it('구내매점이 남아 있으면 셋업이 +2 를 붙이고, 0xe9 가 경기마다 한 칸 준다', () => {
+    const input = { myRank: 0, opponentRank: 4 }
+    const 첫판 = settleGameIncome(applyGameIncome(기본({ reputation: 300, games: 10, storeGames: 2 }), input))
     expect(첫판.income).toBe(13 + STORE_INCOME_BONUS)
     expect(첫판.record.storeGames).toBe(1)
     expect(첫판.storeExpired).toBe(false)
 
-    const 둘째판 = settleGameIncome(첫판.record, { myRank: 0, opponentRank: 4 })
+    const 둘째판 = settleGameIncome(applyGameIncome(첫판.record, input))
     // 이 경기까지는 매점이 살아 있고(+2), 끝나면서 0 이 되어 만료 안내가 붙는다
     expect(둘째판.income).toBe(13 + STORE_INCOME_BONUS)
     expect(둘째판.record.storeGames).toBe(0)
     expect(둘째판.storeExpired).toBe(true)
 
-    const 셋째판 = settleGameIncome(둘째판.record, { myRank: 0, opponentRank: 4 })
+    const 셋째판 = settleGameIncome(applyGameIncome(둘째판.record, input))
     expect(셋째판.income).toBe(13)
     expect(셋째판.storeExpired).toBe(false)
   })

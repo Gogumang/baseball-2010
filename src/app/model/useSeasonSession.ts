@@ -18,6 +18,7 @@ import {
   seasonHumanWonOf,
 } from '@/entities/season-mode/model/seasonEvaluation'
 import { clearSeasonGameRecord } from '@/entities/season-mode/model/seasonReputation'
+import { applyGameIncome } from '@/entities/season-mode/model/seasonAttendance'
 import type { SeasonPlayer, SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
 import { TRADE_TAB, swapTradedPlayers } from '@/entities/season-mode/model/playerTrade'
 import type { TradeSettlement, TradeSwap } from '@/entities/season-mode/model/playerTrade'
@@ -1381,14 +1382,15 @@ export function useSeasonSession(
    * 근거: `docs/re/S4-season-reputation.md` 2a·7절, `docs/re/R13-season-leftovers.md` 4절.
    */
   const clearGameRecord = useCallback(
-    (current: SeasonSave) => {
-      commit({
+    (current: SeasonSave, opponentTeamId: number) => {
+      // 0xdd OK 의 0xa3424 뒤 곧장 경기 장면 셋업 — 정규시즌이면 관중·수입 0xa34b8 이 돈다 (`withSceneSetupIncome`)
+      commit(withSceneSetupIncome({
         ...current,
         state: {
           ...current.state,
           record: { ...current.state.record, gameRecord: clearSeasonGameRecord() },
         },
-      })
+      }, opponentTeamId))
     },
     [commit],
   )
@@ -1405,7 +1407,7 @@ export function useSeasonSession(
       leagueSideOf(save.state.record.games, save.state.record.teamId),
     )
     if (options === null) return
-    clearGameRecord(save)
+    clearGameRecord(save, options.opponentTeamId)
     setGameKind('정규')
     setResumeGame(null)
     const prepared = withOwnRecordRotation({ ...options, ...staminaOptionsOf(save, options.opponentTeamId) })
@@ -1544,7 +1546,7 @@ export function useSeasonSession(
     // 국가대항전은 대표팀 슬롯(+0x918) 명단이다
     const isCup = pendingGame.kind === '국가대항전'
     const roster = isCup ? save.cupRoster ?? tableRosterOf(pendingGame.options.ourTeamId) : save.roster
-    clearGameRecord(save)
+    clearGameRecord(save, pendingGame.options.opponentTeamId)
     setIsMatchSettingsOpen(false)
     setGameKind(pendingGame.kind)
     // 새 경기 — +0x4e = 1 과 첫 블록(0x84a0 · 0x1fdb0 칸 0xc · 0xd)은 경기 화면이 세운 첫 진행으로 `saveGameProgress` 가 쓴다
@@ -2362,8 +2364,8 @@ export function useSeasonSession(
    * 0x327b8 모드 2 갈래 — `+0x42(시즌 저장 있음) && +0x4e` 면 곧장 경기. 원본은 장면 0x105 를 세우지 않고 0x104 로 가서
    * 0x3f584 모드 2 갈래가 칸 0xc · 0xd 를 팀·st 로 되복사하고 0x39fdc 모드 2 갈래(0x3a3c0)가 관중·수입 0xa34b8 을 다시 돌린 뒤
    * +0x4e = 1 · 저장, 시뮬 초기화 rand(0, 2) → 인트로 → 판(`resumeTeamGame`).
-   * ⚠️ 원본은 이어 세울 때마다 0xa34b8(관중 수·경기 수입을 소지금에 더함)이 한 번 더 돈다 — 웹은 수입을 경기 뒤 0xe9 에서
-   *    한 번만 셈해(`GameIncomeScreen`) 이 겹침이 없다(미해결, 수입 시점 근사와 함께 고칠 것).
+   * ⚠️ 원본 그대로 이어 세울 때마다 0xa34b8(관중 수·경기 수입을 소지금에 더함)이 한 번 더 돈다 — 수입이 겹친다
+   *    (`withSceneSetupIncome`, 정규시즌만).
    * 마선수 레벨은 원본이 경기 중 전역 칸에서 그때그때 읽으므로 지금 값으로 바꿔 끼운다.
    */
   const resumeSavedGame = useCallback((): boolean => {
@@ -2378,6 +2380,10 @@ export function useSeasonSession(
     }
     const options: TeamGameOptions = { ...saved.options, ...(aceLevels === undefined ? {} : { aceLevels }) }
     const restored: TeamGameProgress = { ...saved, options }
+    // 장면 0x104 셋업 0x39fdc 모드 2 갈래 — 정규시즌이면 관중·수입 0xa34b8 이 **다시** 돈다(원본 버그: 이어할 때마다
+    // 수입이 소지금에 겹친다). 곧이어 +0x4e = 1 · 파일 쓰기(0x3a426 · 0x22755)
+    const withIncome = withSceneSetupIncome(current, saved.options.opponentTeamId)
+    if (withIncome !== current) commit(withIncome)
     setGameKind(block.kind)
     setOwnRotationShift(block.ownRotationShift)
     setPendingGame(null)
@@ -2458,11 +2464,32 @@ export function useSeasonSession(
   }
 }
 
-/** 내 팀·상대 팀의 지금 순위 (0부터) — 관중 수 계산의 입력 (0xb7aa1) */
-export function seasonRanksOf(league: League, record: SeasonRecord) {
+/**
+ * 내 팀·상대 팀의 지금 순위 (0부터) — 관중 수 계산의 입력 (0xb7aa1(L, 팀, 0)). 상대는 경기 객체에 선 팀이고
+ * (0xa34b8 이 0xb6bdc(st, 0/1) 중 SR[1] 이 아닌 쪽을 고른다) 넘기지 않으면 일정표의 오늘 상대다.
+ */
+export function seasonRanksOf(league: League, record: SeasonRecord, opponentTeamId = seasonOpponentOf(record)) {
   const ranking = rankingOf(league)
   const rankOf = (team: number) => Math.max(0, ranking.indexOf(team))
-  return { myRank: rankOf(record.teamId), opponentRank: rankOf(seasonOpponentOf(record)) }
+  return { myRank: rankOf(record.teamId), opponentRank: rankOf(opponentTeamId) }
+}
+
+/**
+ * **경기 장면 셋업의 관중·수입** — 0x3f584 → 0x39fdc(장면, 2) 의 모드 2 갈래(0x3a3c0)가 국가대항전(L+0xac = SR+0x12c)도
+ * 포스트시즌(L+0x34 = SR+0xb4)도 아니면 `0xa34b8(SR)` 을 부른다(0x3a3e4). 새 경기·이어하기 둘 다 장면을 세우므로
+ * **이어할 때마다 한 번 더 돌아 수입이 겹친다**(원본 버그 그대로). 난수 없음. 순위는 경기 **앞** 리그로 본다.
+ * 해당이 없으면 받은 저장을 그대로 돌려준다.
+ */
+function withSceneSetupIncome(current: SeasonSave, opponentTeamId: number): SeasonSave {
+  const { record } = current.state
+  if (record.nationalCup || record.inPostseason) return current
+  return {
+    ...current,
+    state: {
+      ...current.state,
+      record: applyGameIncome(record, seasonRanksOf(current.league, record, opponentTeamId)),
+    },
+  }
 }
 
 /** 시즌 순위표(0x9d789)가 훑는 재료 — 리그 투수 레코드 차례와 열 팀 레코드, 선수 기록표 */

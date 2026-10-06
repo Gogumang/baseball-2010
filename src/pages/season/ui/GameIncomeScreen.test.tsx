@@ -4,10 +4,12 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { GameIncomeScreen } from '@/pages/season/ui/GameIncomeScreen'
 import { startNewSeason } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
-import type { IncomeSettlement } from '@/entities/season-mode/model/seasonAttendance'
+import type { AttendanceInput, IncomeSettlement } from '@/entities/season-mode/model/seasonAttendance'
+import { applyGameIncome } from '@/entities/season-mode/model/seasonAttendance'
 
 /**
- * 경기 뒤 관중·수입 창 (상태 0xe9 = `0xdea0`) — 계산은 `0xa34b8`, 표시는 J 4-7.
+ * 경기 뒤 관중·수입 창 (상태 0xe9 = `0xdea0`) — 계산은 경기 장면 셋업의 `0xa34b8`(`applyGameIncome`)이 끝냈고
+ * 이 창은 +0x1b4 관중 · +0x66 수입 · 소지금을 보여 준 뒤 구내매점 칸만 줄인다. 표시는 J 4-7.
  * 문서의 예("평판 300 · 10경기 이후 · 1위 vs 5위 → 18160명 · 수입 13")를 그대로 못박는다.
  */
 
@@ -18,9 +20,10 @@ const 레코드 = (덮어쓰기: Partial<SeasonRecord> = {}): SeasonRecord => ({
   ...덮어쓰기,
 })
 
-const 띄우기 = (record: SeasonRecord, input = { myRank: 0, opponentRank: 4 }) => {
+/** 경기 장면 셋업(0xa34b8)을 거친 레코드로 창을 띄운다 */
+const 띄우기 = (record: SeasonRecord, input: AttendanceInput = { myRank: 0, opponentRank: 4 }) => {
   const onConfirm = vi.fn()
-  render(<GameIncomeScreen record={record} teamMorale={100} input={input} onConfirm={onConfirm} />)
+  render(<GameIncomeScreen record={applyGameIncome(record, input)} teamMorale={100} onConfirm={onConfirm} />)
   return onConfirm
 }
 
@@ -34,7 +37,7 @@ describe('경기 수입 정산', () => {
     expect(창글()).toContain('1300만')
   })
 
-  it('수입이 소지금에 더해진다 (5000만 + 1300만)', () => {
+  it('셋업이 더한 소지금(5000만 + 1300만)을 보여 주고 확인해도 다시 더하지 않는다', () => {
     const onConfirm = 띄우기(레코드({ reputation: 300, games: 10 }))
 
     fireEvent.click(screen.getByRole('button', { name: '확인' }))

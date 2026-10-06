@@ -2028,6 +2028,53 @@ describe('시즌 경기 중간 저장 — 전역기록 +0x4e 와 모드 2 블록
   })
 })
 
+describe('관중·수입 0xa34b8 — 경기 장면 셋업(0x39fdc 모드 2 갈래 0x3a3e4)이 돌린다', () => {
+  const 경기정보까지 = (store: JsonStorePort) => {
+    const rendered = renderHook(() => useSeasonSession(store, createSeededRandom(20100901)))
+    시작(rendered.result, 0)
+    act(() => rendered.result.current.actions.openNextGame())
+    act(() => rendered.result.current.actions.confirmNextGame())
+    act(() => rendered.result.current.actions.choosePreGameAce(1))
+    act(() => rendered.result.current.actions.choosePreGameAce(8))
+    return rendered
+  }
+
+  it('경기를 세울 때 소지금에 더하고 관중·수입을 남긴다 — 경기 뒤 0xe9 는 더하지 않는다', () => {
+    const { result } = 경기정보까지(메모리저장())
+    const 앞 = result.current.state!.record
+    expect(앞.lastIncome).toBe(0)
+
+    act(() => result.current.actions.startPendingGame())
+
+    const 셋업 = result.current.state!.record
+    expect(셋업.lastIncome).toBeGreaterThan(0)
+    expect(셋업.lastAttendance).toBeGreaterThan(0)
+    expect(셋업.money).toBe(앞.money + 셋업.lastIncome)
+
+    act(() => result.current.actions.finishGame(요약({ opponentTeamId: result.current.gameOptions!.opponentTeamId })))
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.관중수입)
+    expect(result.current.state!.record.money).toBe(셋업.money)
+  })
+
+  it('⚠️ 이어할 때마다 한 번 더 더한다 — 원본 버그 그대로 (0x327b8 → 0x104 셋업이 다시 0xa34b8)', () => {
+    const store = 메모리저장()
+    const { result } = 경기정보까지(store)
+    act(() => result.current.actions.startPendingGame())
+    const 진행 = startTeamGame(result.current.gameOptions!, createSeededRandom(7))
+    act(() => result.current.actions.saveGameProgress(진행))
+    act(() => result.current.actions.leaveGame())
+    const 나갈때 = result.current.state!.record
+
+    const 다시 = renderHook(() => useSeasonSession(store, createSeededRandom(1)))
+    act(() => {
+      다시.result.current.actions.resumeSavedGame()
+    })
+    const 이어서 = 다시.result.current.state!.record
+    expect(이어서.money).toBe(나갈때.money + 이어서.lastIncome)
+    expect((store.load() as { state: { record: { money: number } } }).state.record.money).toBe(이어서.money)
+  })
+})
+
 describe('모드 초기화 — 0x224ec(mgr, 2) 시즌 · 0x223a8 나리 선수 빼기', () => {
   it('시즌 초기화는 시즌 저장(+0x42)과 +0x4e 를 지우고 다음 진입은 팀 고르기다', () => {
     const store = 메모리저장()

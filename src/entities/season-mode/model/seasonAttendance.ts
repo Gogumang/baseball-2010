@@ -3,11 +3,25 @@ import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import { boardBonusOf, standCapacityOf } from '@/entities/season-mode/model/stadiumItems'
 
 /**
- * 경기 관중 수와 수입 — 원본 `0xa34b8`(계산, 경기 장면 0x39fdc 가 부른다) ·
- * `0xa3644`(구내매점 가산) · `0xdea0`(상태 0xe9 표시).
+ * 경기 관중 수와 수입 — 원본 `0xa34b8`(계산·소지금 가산) · `0xa3644`(구내매점 가산) · `0xdea0`(상태 0xe9 표시).
  *
  * 근거: `docs/re/J-modes-rules.md` 4-7 절 + `docs/re/S3-stadium-items.md` 8 절(표 확정).
  * S3 이 "J 4-7 의 식이 그대로 맞다" 로 확인했다.
+ *
+ * ## 언제 도는가 (직접 뜸 — 0x3f584 · 0x39fdc · 0x3a3c0 · 0xa34b8 · 0xdea0)
+ * `0xa34b8` 을 부르는 곳은 **하나**다 — 경기 장면(0x104) 셋업 0x3f584 끝(0x3f856)이 부르는 0x39fdc(장면, 모드) 의
+ * 모드 2 갈래(점프표 0xcfef8[2] = 0x3a3c0). 거기서 `L = [장면+0xf0c]`(= SR+0x80 리그)의 `L+0xac`(국가대항전 SR+0x12c)와
+ * `L+0x34`(포스트시즌 SR+0xb4)가 **둘 다 0 일 때만** `0xa34b8(SR)` 을 부르고(0x3a3e4), 곧이어 전역기록 +0x4e = 1 ·
+ * 0x22755(저장, 1) 파일 쓰기 · 0x1f1b9 를 한다. 곧
+ * - **정규시즌 경기 장면을 세울 때마다 한 번** — 새 경기(0xdd OK → 0x104)도, 이어하기(0x327b8 → 0x213c0 → 0x104)도.
+ *   이어할 때마다 또 돌아 **소지금에 수입이 겹쳐 더해진다**(원본 버그 — 반 이닝 저장 칸 0xb 가 SR 를 통째로 써
+ *   앞서 더한 수입이 이미 파일에 있다). 포스트시즌·국가대항전 경기는 안 돈다.
+ * - **난수를 안 쓴다** (`0xb6748` 은 늘 1).
+ * - 입력은 경기 **앞** 값이다 — 평판 +0x62 · 직전 경기 평가 +0x4a · 경기 수 +0xb2 · 리그 순위(0xb7aa1(L, 팀, 0)).
+ *   상대는 경기 객체의 두 칸(0xb6bdc(st, 0/1)) 중 SR[1] 이 아닌 쪽이다.
+ * - 쓰는 칸: 수입 +0x66 · 소지금 +2 · 관중 +0x1b0/+0x1b4 · 만원 판정 +0x65.
+ * 경기 뒤 0xe9(0xdea0)는 **계산하지 않는다** — +0x1b4 관중 · +0x66 수입 · 소지금을 보여 주고, 0x8a6fc 가 구내매점
+ * +0x55 를 하나 줄인다. "(+200)" 은 그 줄이기 전에 +0x55 > 0 을 본다(0xe044).
  */
 
 /**
@@ -107,34 +121,41 @@ export function attendanceOf(record: SeasonRecord, input: AttendanceInput): Atte
 
 export interface IncomeSettlement {
   readonly record: SeasonRecord
+  /** 0xdea0 이 보여 주는 관중 (+0x1b4) */
   readonly attendance: number
+  /** 0xdea0 이 보여 주는 수입 (+0x66) */
   readonly income: number
   /** 이 경기로 구내매점 기간이 끝났는가 — 끝나면 StrUSER_EVT[113] 팝업이 붙는다 */
   readonly storeExpired: boolean
 }
 
 /**
- * 경기 뒤 관중·수입 정산 (상태 0xe9 = 0xdea0).
- * 수입을 소지금에 더하고(0~9999), 관중 수를 SR+0x1b0/+0x1b4 에 남긴다.
- *
- * 같은 화면이 부르는 `0x8a6fc` 안에서 **구내매점 카운터 SR+0x55 가 1 줄고**,
- * 0 이 되는 그 경기의 평가 이벤트 끝에 만료 안내가 붙는다 (R13 10절 확정).
- * 줄이는 것은 시즌모드(모드 2)일 때뿐이다.
+ * **경기 장면 셋업의 관중·수입 (0xa34b8)** — 수입을 소지금에 더하고(0~9999) 수입 +0x66 · 관중 +0x1b0/+0x1b4 ·
+ * 만원 판정 +0x65 를 쓴다. 정규시즌 경기 장면을 세울 때마다(이어하기 포함) 부른다 — 위 머리 주석.
+ * 구내매점 +0x55 는 여기서 줄지 않는다(줄이는 것은 0xe9 의 0x8a6fc — `settleGameIncome`).
  */
-export function settleGameIncome(record: SeasonRecord, input: AttendanceInput): IncomeSettlement {
+export function applyGameIncome(record: SeasonRecord, input: AttendanceInput): SeasonRecord {
   const { attendance, income, crowdLevel } = attendanceOf(record, input)
+  return {
+    ...record,
+    money: clampTo(record.money + income, MONEY_LIMIT),
+    lastIncome: income,
+    lastAttendance: attendance,
+    crowdLevel,
+  }
+}
+
+/**
+ * 경기 뒤 관중·수입 창 (상태 0xe9 = 0xdea0). **계산은 이미 경기 장면 셋업(0xa34b8, `applyGameIncome`)이 끝냈다** —
+ * 여기서는 +0x1b4 관중 · +0x66 수입을 보여 주고, 같은 화면이 부르는 `0x8a6fc` 안에서 **구내매점 카운터 SR+0x55 가
+ * 1 줄고**, 0 이 되는 그 경기의 평가 이벤트 끝에 만료 안내가 붙는다 (R13 10절 확정). 줄이는 것은 시즌모드(모드 2)일 때뿐이다.
+ */
+export function settleGameIncome(record: SeasonRecord): IncomeSettlement {
   const storeGames = record.storeGames > 0 ? record.storeGames - 1 : record.storeGames
   return {
-    record: {
-      ...record,
-      money: clampTo(record.money + income, MONEY_LIMIT),
-      lastIncome: income,
-      lastAttendance: attendance,
-      crowdLevel,
-      storeGames,
-    },
-    attendance,
-    income,
+    record: { ...record, storeGames },
+    attendance: record.lastAttendance,
+    income: record.lastIncome,
     storeExpired: record.storeGames > 0 && storeGames === 0,
   }
 }
