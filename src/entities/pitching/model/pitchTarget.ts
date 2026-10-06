@@ -54,7 +54,8 @@ const OUTSIDE_Y = [330, 380]
  * 견제는 `selectPitch` 에 여섯째 인자 `cpuPickoff` 를 넘길 때만 켜진다(= `BattingStage` 에 `onPickoff` 를
  * 넘긴 화면 — 팀 경기 · 나만의리그 타자편 · 미션). 안 넘기면 `pitchTargetOf` 가 종류 4 를 모서리 투구로
  * 떨어뜨려 **원본이 굴리지 않는 목표점 난수를 굴리고 원본이 던지지 않는 공을 던진다**. 안 넘기는 화면은
- * 홈런더비뿐이고, 원본 모드 7 은 0x3460e 에서 종류를 굴리지 않으므로 견제 문제가 아니다.
+ * 홈런더비뿐이고, 원본 모드 7 은 0x3460e 에서 종류를 굴리지 않으므로 견제 문제가 아니다 —
+ * `selectPitch(…, isHomeRunDerby = true)` 가 종류·목표점 굴림을 건너뛰고 `derbyPitchTargetOf` 로 존 한가운데를 노린다.
  */
 const PICKOFF_KIND = 4
 const FULL_BASES = 3
@@ -92,6 +93,21 @@ export function cpuPickoffBaseOf(
     if (hasRunnerOnBase(base)) return base as 1 | 2 | 3
   }
   throw new Error('cpuPickoffBaseOf: 주자가 있는 루가 없다 — isCpuPickoff 로 먼저 걸러야 한다')
+}
+
+/**
+ * **홈런더비(모드 7) 목표점** — 0x345fc 첫머리 (직접 뜬 것, 확정):
+ * ```
+ * 3460e: [장면+0x1104] == 7 이 아니면 → 34646 (종류 0x9eeac · 목표점 굴림)
+ * 34612: 목표 x [+0x10b8] = 표 0xcfbcc[side·12 + 0] · 목표 y [+0x10bc] = 표 0xcfbcc[side·12 + 4]
+ * 3463e: 0xbcb49(장면+0x18, 0x11)  ; 상태 0x11(던지기) 예약 — 일반 갈래 0x34888 과 같은 일
+ * 34644: → 0x348d6 끝
+ * ```
+ * 곧 홈런더비는 목표 종류도 목표점도 **굴리지 않고** 존 한가운데를 노린다 (제구 오차 0x4dc78 는 뒤에서 그대로 돈다).
+ */
+export function derbyPitchTargetOf(side: number): WorldPoint {
+  const center = ZONE_CENTERS[side] ?? ZONE_CENTERS[0]
+  return { x: center.x, y: center.y, z: PLATE_DEPTH }
 }
 
 export function pitchTargetOf(kind: number, situation: TargetSituation, random: RandomPort): WorldPoint {

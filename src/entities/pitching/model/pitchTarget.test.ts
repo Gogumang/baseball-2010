@@ -3,10 +3,11 @@ import {
   applyControlError,
   applyMissionAimShake,
   cpuPickoffBaseOf,
+  derbyPitchTargetOf,
   isCpuPickoff,
   pitchTargetOf,
 } from '@/entities/pitching/model/pitchTarget'
-import { ZONE_CENTERS } from '@/entities/pitching/model/pitchCurve'
+import { PLATE_DEPTH, ZONE_CENTERS } from '@/entities/pitching/model/pitchCurve'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
 /** next() 가 차례로 values 를 돌려준다 — randomIntegerBelow(a, b) = a + floor(v × (b − a)) */
@@ -160,5 +161,12 @@ describe('제구 오차에 미션 흔들림 꿰기', () => {
     )
 
     expect(moved).toEqual({ x: C.x - 40 + 119, y: C.y, z: C.z })
+  })
+})
+
+describe('derbyPitchTargetOf — 홈런더비는 존 한가운데 (0x34612~0x34644)', () => {
+  it('표 0xcfbcc 의 side 칸 그대로', () => {
+    expect(derbyPitchTargetOf(1)).toEqual({ x: ZONE_CENTERS[1].x, y: ZONE_CENTERS[1].y, z: PLATE_DEPTH })
+    expect(derbyPitchTargetOf(0)).toEqual({ x: ZONE_CENTERS[0].x, y: ZONE_CENTERS[0].y, z: PLATE_DEPTH })
   })
 })

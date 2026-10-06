@@ -10,7 +10,7 @@ import { pitchSpeedStageOf } from '@/entities/pitching/model/pitchSpeedStage'
 import { computerPitchTypeOf, pitchListOf } from '@/entities/pitching/model/pitchIntelligence'
 import type { CountSituation } from '@/entities/pitching/model/pitchIntelligence'
 import { targetKindOf } from '@/entities/pitching/model/pitchIntelligence'
-import { applyControlError, cpuPickoffBaseOf, isCpuPickoff, pitchTargetOf } from '@/entities/pitching/model/pitchTarget'
+import { applyControlError, cpuPickoffBaseOf, derbyPitchTargetOf, isCpuPickoff, pitchTargetOf } from '@/entities/pitching/model/pitchTarget'
 import { pitchPathOf, ZONE_CENTERS } from '@/entities/pitching/model/pitchCurve'
 import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
 import {
@@ -138,7 +138,7 @@ export function selectPitch(
    *    목표점·제구·곡선 난수를 굴리고 원본이 던지지 않는 공을 던진다. 지금 타석 화면을 쓰는 팀 경기·
    *    나만의리그 타자편(`GameRoute`)·미션(`MissionRoutes`)은 모두 `onPickoff` 로 이것을 켠다.
    *    안 켜는 곳은 홈런더비뿐인데, 원본 모드 7 은 0x3460e 에서 종류를 굴리지 않고 존 한가운데(표 0xcfbcc)를
-   *    목표로 끝나므로 견제와 상관없다 — 그 갈래를 이 함수가 따르는지는 홈런더비 쪽 몫이다.
+   *    목표로 끝나므로 견제와 상관없다 — 그 갈래는 `isHomeRunDerby` 가 따른다.
    */
   cpuPickoff?: CpuPickoffInput,
   /**
@@ -146,17 +146,28 @@ export function selectPitch(
    * 안 넘기면 거짓.
    */
   batterIntimidates = false,
+  /**
+   * **홈런더비(원본 모드 7)** 인가 — 0x345fc 가 0x3460e 에서 목표 종류(0x9eeac)·목표점 굴림 없이 존 한가운데를
+   * 목표로 끝난다 (`derbyPitchTargetOf`). 견제도 없다. 안 넘기면 거짓.
+   */
+  isHomeRunDerby = false,
 ): CpuPitchChoice {
   const repertoire = pitcher.repertoire ?? DEFAULT_REPERTOIRE
   const magicState = magic ?? { remaining: 0, ballMagicNumber: 0 }
   const list = pitchListOf(repertoire.pitchMask, repertoire.magicId !== 0)
   const typeNumber = computerPitchTypeOf({ list, magicCount: magicState.remaining, ...situation }, random)
-  const kind = targetKindOf(difficulty, situation, random)
-  if (cpuPickoff !== undefined && isCpuPickoff(kind, situation)) {
-    // 0x34848: 루 = rand(1,4) 를 주자 있는 루까지 반복 → 메시지 0x10 → 0x348d6(에필로그). 그 뒤 굴림은 없다
-    return { kind: '견제', base: cpuPickoffBaseOf(cpuPickoff.hasRunnerOnBase, random) }
+  let target: WorldPoint
+  if (isHomeRunDerby) {
+    // 0x3460e: 모드 7 이면 종류·목표점을 굴리지 않고 존 한가운데 (0x34612~0x34644)
+    target = derbyPitchTargetOf(situation.side)
+  } else {
+    const kind = targetKindOf(difficulty, situation, random)
+    if (cpuPickoff !== undefined && isCpuPickoff(kind, situation)) {
+      // 0x34848: 루 = rand(1,4) 를 주자 있는 루까지 반복 → 메시지 0x10 → 0x348d6(에필로그). 그 뒤 굴림은 없다
+      return { kind: '견제', base: cpuPickoffBaseOf(cpuPickoff.hasRunnerOnBase, random) }
+    }
+    target = pitchTargetOf(kind, situation, random)
   }
-  const target = pitchTargetOf(kind, situation, random)
   // 경기용 능력치 0xb570c(…, 체력% 0xaebb0) — 피로 0xb58e6 를 먹인 제구·구속·변화 (`pitcherGameStats`)
   const gameStats = cpuPitchStatsOf(pitcher)
   const stats = { control: gameStats.control, velocity: gameStats.velocity, breaking: gameStats.breaking }

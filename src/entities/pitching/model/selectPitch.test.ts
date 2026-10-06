@@ -325,3 +325,34 @@ describe('selectPitch 실투 판정 0x33cbc — 사람이 칠 때도 CPU 공마�
     expect(압도경계 - 경계).toBe(5)
   })
 })
+
+describe('홈런더비 목표점 (0x345fc 의 0x3460e 모드 7 갈래)', () => {
+  it('목표 종류·목표점을 굴리지 않는다 — 같은 난수에서 두 굴림(종류 rand(0,10000)·목표점)이 빠진다', () => {
+    /** 뽑은 횟수를 센다 */
+    const 세는난수 = () => {
+      const inner = createSeededRandom(7)
+      let count = 0
+      return {
+        get count() { return count },
+        next: () => { count += 1; return inner.next() },
+        nextInRange: inner.nextInRange,
+        pick: inner.pick,
+      }
+    }
+    const 보통 = 세는난수()
+    selectChoice(투수(60, 0x1), 상황, 보통)
+    const 더비 = 세는난수()
+    const 공더비 = 공(selectChoice(투수(60, 0x1), 상황, 더비, 'hard', undefined, undefined, false, true))
+    expect(더비.count).toBeLessThan(보통.count)
+    expect(공더비.pitcherForm).toBe(0)
+  })
+
+  it('주자가 있어도 견제하지 않는다', () => {
+    const 주자상황 = { ...상황, runnerCount: 1 }
+    for (let seed = 0; seed < 50; seed += 1) {
+      const choice = selectChoice(투수(60), 주자상황, createSeededRandom(seed), 'hard', undefined,
+        { hasRunnerOnBase: (base) => base === 1 }, false, true)
+      expect(choice.kind).toBe('투구')
+    }
+  })
+})
