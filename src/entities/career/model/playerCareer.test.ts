@@ -1,5 +1,7 @@
+import { pitcherOrdersAfterPostseason } from '@/entities/league/model/league'
+import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { describe, expect, it } from 'vitest'
-import { applyGameResult, applySeasonEnd, countGameForSkills, countReputationZeroGame, createCareer, nextOpponentOf, GAMES_PER_SEASON, gamePointRewardOf, nameByteLengthOf, rookieAbilityOf, startNextSeason } from '@/entities/career/model/playerCareer'
+import { applyGameResult, applySeasonEnd, countGameForSkills, countReputationZeroGame, createCareer, nextOpponentOf, GAMES_PER_SEASON, gamePointRewardOf, nameByteLengthOf, rookieAbilityOf, startNextSeason, leagueGamePitchersOf, applyLeagueDay } from '@/entities/career/model/playerCareer'
 import { EMPTY_LEAGUE, opponentOf, recordLeagueResult } from '@/entities/league/model/league'
 import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
 import type { GameSummary } from '@/entities/game/model/gameSummary'
@@ -93,8 +95,30 @@ describe('새 시즌 전환 — 0x1b768', () => {
 
     const next = startNextSeason(지난시즌)
 
-    expect(next.league).toEqual(EMPTY_LEAGUE)
+    // 승패는 비우고 투수 레코드 차례는 잇는다 — 새 시즌 처리는 팀 저장 레코드를 다시 짓지 않는다 (nextSeasonLeague)
+    const { pitcherOrders, ...rest } = next.league
+    expect({ ...rest }).toEqual(EMPTY_LEAGUE)
+    expect(pitcherOrders).toEqual(pitcherOrdersAfterPostseason(지난시즌.postseason!))
     expect(next.postseason).toBeNull()
+  })
+
+  it('섞인 투수 레코드 차례는 포스트시즌에 돈 칸까지 얹어 새 시즌으로 넘어간다', () => {
+    const 지난시즌 = {
+      ...createCareer('선수'),
+      league: { ...EMPTY_LEAGUE, pitcherOrders: { 3: [1, 2, 3, 0, 4, 5, 6, 7] } },
+      postseason: {
+        round: '종료',
+        qualifiers: [3, 1, 2, 0],
+        teams: [3, 1],
+        wins: [4, 0],
+        winsNeeded: 4,
+        champion: 3,
+        rotations: { 3: 3 },
+        baseOrders: { 3: [1, 2, 3, 0, 4, 5, 6, 7] },
+      },
+    } as unknown as Parameters<typeof startNextSeason>[0]
+    // 3 칸 더 돈다 — [1,2,3,0] → [0,1,2,3]
+    expect(startNextSeason(지난시즌).league.pitcherOrders?.[3]).toEqual([0, 1, 2, 3, 4, 5, 6, 7])
   })
 
   it('리그 선수 시즌 성적도 0 으로 되돌린다 (0x204e0 — 순위표 재료가 해를 넘기지 않는다)', () => {
@@ -282,5 +306,41 @@ describe('평판 0 연속 카운터 +0x184 — 0xa4d08 (경기 뒤 평가 116, 0
   it('바이트 칸이라 255 다음은 0 이다', () => {
     expect(countReputationZeroGame(255, 0)).toBe(0)
     expect(countReputationZeroGame(254, 0)).toBe(255)
+  })
+})
+
+describe('리그 투수 레코드 — 차례와 스태미나 (0x1c46c · 4f2e8 · 4f268)', () => {
+  it('사람 경기 준비는 g ≠ 0 이면 두 팀 차례를 한 칸 돌린 것을, g == 0 이면 열 팀 10000 을 본다', () => {
+    const career = {
+      ...createCareer('선수'),
+      teamId: 0,
+      gamesPlayed: 6,
+      leaguePitcherStaminas: { 3: [2_500, 10_000, 10_000, 10_000, 10_000, 10_000, 10_000, 10_000] },
+    }
+    const 차려 = leagueGamePitchersOf(career, 3)
+    expect(차려.ourOrder).toEqual([1, 2, 3, 0, 4, 5, 6, 7])
+    expect(차려.opponentOrder).toEqual([1, 2, 3, 0, 4, 5, 6, 7])
+    expect(차려.opponentStaminas?.[0]).toBe(2_500)
+    expect(leagueGamePitchersOf({ ...career, gamesPlayed: 0 }, 3).opponentStaminas).toBeUndefined()
+  })
+
+  it('하루 끝은 CPU 경기가 깎은 표에 열 팀 +20% 를 건다', () => {
+    const career = { ...createCareer('선수'), teamId: 0, gamesPlayed: 2 }
+    const 결과 = applyLeagueDay(career, 0, createSeededRandom(1))
+    const 표 = 결과.leaguePitcherStaminas ?? {}
+    expect(Object.keys(표).length).toBe(8)
+    expect(표[0]).toBeUndefined()
+  })
+
+  it('포스트시즌 경기 끝은 CPU 리그 경기를 건너뛴다 (4f268) — 순위표가 그대로고 회복만 돈다', () => {
+    const career = {
+      ...createCareer('선수'),
+      gamesPlayed: 47,
+      leaguePitcherStaminas: { 1: [5_000, 10_000, 10_000, 10_000, 10_000, 10_000, 10_000, 10_000] },
+      postseason: { round: '플레이오프', qualifiers: [0, 1, 2, 3], teams: [1, 0], wins: [1, 0], winsNeeded: 3, champion: null },
+    } as unknown as Parameters<typeof applyLeagueDay>[0]
+    const 결과 = applyLeagueDay(career, 0, createSeededRandom(1))
+    expect(결과.league).toBe(career.league)
+    expect(결과.leaguePitcherStaminas?.[1]?.[0]).toBe(7_000)
   })
 })

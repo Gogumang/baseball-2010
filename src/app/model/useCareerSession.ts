@@ -27,6 +27,8 @@ import type { SoundPort } from '@/shared/api/audio/soundPort'
 import {
   applyGameResult,
   applyLeagueDay,
+  applyPostseasonCpuGames,
+  leagueGamePitchersOf,
   nextOpponentOf,
   applySeasonEnd,
   createCareer,
@@ -46,7 +48,6 @@ import {
   applyKoreanSeriesReward,
   applyRegularSeasonReward,
   popupAfterChampion,
-  pressPostseasonBracket,
   regularSeasonPopupOnEnter,
   REGULAR_SEASON_HIDDEN_ID,
 } from '@/entities/career/model/postseasonFlow'
@@ -112,6 +113,8 @@ import type { SaveGamePort } from '@/shared/api/save/saveGamePort'
 import { createNationalCup } from '@/entities/national-cup/model/nationalCup'
 import type { NationalCup, NationalCupMatchup } from '@/entities/national-cup/model/nationalCup'
 import { advanceNationalCupDay } from '@/entities/national-cup/model/nationalCupPlay'
+import { isMyTurn } from '@/entities/league/model/seasonEnd'
+import type { GamePitcherSetup } from '@/features/play-game/model/gameFlow'
 import {
   careerNationalCupRewardItems,
   careerNationalTeamEventId,
@@ -369,10 +372,12 @@ export function useCareerSession({
       dayCounter = 0,
       /** 내 팀이 앉는 측 (`0xb7844` → `경기[0x28+side]`). 안 주면 후공 — 국가대항전 자리 (그 갈래는 아직 안 옮겼다) */
       playerSide: PlayerSide = PLAYER_SIDE_LAST_BAT,
+      /** 리그 경기의 두 팀 투수 레코드 차례·칸별 +0x2c (`leagueGamePitchersOf`). 국가대항전은 안 넘긴다 */
+      pitchers?: GamePitcherSetup,
     ) => {
       // 환경설정 "주루" 를 경기에 태운다 — 타자편은 사람이 늘 공격이라 설정이 그대로 먹는다 (0xae690)
       const started = startGame(
-        random, ourTeamId, battingOrder, opponentTeamId, playerSide, dayCounter, runningModeManualRef.current,
+        random, ourTeamId, battingOrder, opponentTeamId, playerSide, dayCounter, runningModeManualRef.current, pitchers,
       )
       progressRef.current = started
       setProgress(started)
@@ -389,11 +394,12 @@ export function useCareerSession({
   const beginGame = useCallback(() => {
     const current = careerRef.current
     cupGameRef.current = null
+    const opponent = current === null || current === undefined ? undefined : nextOpponentOf(current)
     startMatch(
       current?.teamId ?? 0,
       current?.battingOrder,
       // 상대는 일정표(정규시즌)나 지금 시리즈(포스트시즌)가 정한다 — 무작위가 아니다
-      current === null || current === undefined ? undefined : nextOpponentOf(current),
+      opponent,
       // 날짜 카운터 g = S+0xb2(= L+0x32) — 경기 준비 0x1c46c 가 0x1c576 에서 읽고 0이 아니면 두 팀 로테이션을 돌린다.
       // 정규시즌은 오늘까지 치른 경기 수, 포스트시즌은 **시리즈 안 경기 수**다 (`leagueDayCounterOf` — b811c · b777a · b819a).
       // 커리어 `gamesPlayed` 는 내 경기만 세므로 포스트시즌 g 로 쓰지 않는다.
@@ -402,6 +408,11 @@ export function useCareerSession({
       // 가리지 않고 `0xb7844(L, 내 팀)` 로 정한다: 정규시즌은 일정표 0xd89cb · 9일 주기 뒤집기(`leagueSideOf`),
       // 포스트시즌은 대진 윗 시드(칸 0)가 홈·후공, 아랫 시드가 원정·선공 (`leagueGamePlayerSideOf`).
       current === null || current === undefined ? PLAYER_SIDE_LAST_BAT : leagueGamePlayerSideOf(current),
+      // 0x1c46c 가 세운 두 팀 투수 — 리그가 들고 다니는 레코드 차례(g ≠ 0 이면 한 칸 돈 것 · 포스트시즌은 시리즈 이월)와
+      // 레코드 +0x2c (g == 0 이면 1c8a8 이 열 팀 10000)
+      current === null || current === undefined || opponent === undefined
+        ? undefined
+        : leagueGamePitchersOf(current, opponent),
     )
   }, [startMatch])
 
@@ -473,7 +484,12 @@ export function useCareerSession({
       const winner = won ? summary.ourTeamId : summary.opponentTeamId
       const loser = won ? summary.opponentTeamId : summary.ourTeamId
       cupGameRef.current = null
-      setScreen({ kind: '국가대항전', cup: advanceNationalCupDay(cup, winner, loser, random) })
+      // 같은 날 CPU 경기 두 나라는 상대국 슬롯 레코드(base+0x934) 하나를 쓴다 — 사람 경기가 깎아 둔 그 레코드의
+      // 투수 +0x2c 에서 선다 (701a7a9). 사람 경기 끝 상대 투수 칸별 값을 넘긴다
+      setScreen({
+        kind: '국가대항전',
+        cup: advanceNationalCupDay(cup, winner, loser, random, summary.pitcherStaminas?.opponent),
+      })
     },
     [random, setScreen],
   )
@@ -1186,12 +1202,14 @@ export function useCareerSession({
     pressPostseason: () => {
       if (career === null || career.postseason === null) return
       if (screen.kind !== '포스트시즌' || screen.popup !== null) return
-      const result = pressPostseasonBracket(career.postseason, career.teamId, random, aceLevels)
-      if (result.kind === '우승발표') {
-        return setScreen({ ...screen, popup: { kind: '우승발표', champion: result.champion } })
+      // 0x13da0 의 세 갈래 (`pressPostseasonBracket` 과 같은 차례) — CPU 끼리 경기(0xc2760)는 리그 표의 +0x2c 로 서고
+      // 깎인 값을 남긴다(회복 없음). 그래서 CPU 갈래는 표를 잇는 `applyPostseasonCpuGames` 로 돌린다
+      const series = career.postseason
+      if (series.round === '종료') {
+        return setScreen({ ...screen, popup: { kind: '우승발표', champion: series.champion ?? -1 } })
       }
-      if (result.kind === '내경기') return beginGame()
-      setCareer({ ...career, postseason: result.series })
+      if (isMyTurn(series, career.teamId)) return beginGame()
+      setCareer(applyPostseasonCpuGames(career, random, aceLevels))
     },
 
     /** 대진 화면 128 의 팝업 닫힘 — 틀 0x15984 */

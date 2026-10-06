@@ -1,8 +1,10 @@
+import { opponentOf, rotateLeaguePitchers } from '@/entities/league/model/league'
 import { describe, expect, it } from 'vitest'
 import {
   GAMES_PER_SEASON,
   applyPitcherGameResult,
   applyPitcherLeagueDay,
+  pitcherLeagueGameSetupOf,
   createPitcherCareer,
   effectivePitcherAbilityOf,
   equippedPitcherAbilityOf,
@@ -240,9 +242,50 @@ describe('같은 날 CPU 끼리 경기는 전역 마선수 레벨을 본다 (0xc
     const career = 투수({ gamesPlayed: 3 })
     for (let seed = 1; seed <= 10; seed += 1) {
       const 결과 = applyPitcherLeagueDay(career, createSeededRandom(seed), 레벨)
-      const 기대 = playLeagueDay(career.league, 2, career.teamId, createSeededRandom(seed), career.leaguePlayerStats, {}, 레벨)
+      // 투수편은 사람 경기 상대만 0x1c46c 가 돌린다 (내 팀은 0xa4f60 맞바꿈) — 그 뒤 playLeagueDay 는 사람 경기 팀을 안 돌린다
+      const 상대 = opponentOf(2, career.teamId)
+      const 기대 = playLeagueDay(
+        rotateLeaguePitchers(career.league, [상대]),
+        2,
+        career.teamId,
+        createSeededRandom(seed),
+        career.leaguePlayerStats,
+        {},
+        레벨,
+        false,
+      )
       expect(결과.league).toEqual(기대.league)
       expect(결과.leaguePlayerStats).toEqual(기대.playerStats)
     }
+  })
+})
+
+describe('리그 투수 레코드 — 차례와 스태미나 (0x1c46c · 4f304 · 0xc2760)', () => {
+  it('사람 경기 준비는 g ≠ 0 이면 상대 차례를 한 칸 돌린 것을, g == 0 이면 열 팀 10000 을 본다', () => {
+    const career = 투수({ gamesPlayed: 5, leaguePitcherStaminas: { 1: [3_000, 10_000, 10_000, 10_000, 10_000, 10_000, 10_000, 10_000] } })
+    const 차려 = pitcherLeagueGameSetupOf(career, 1)
+    expect(차려.opponentPitcherOrder).toEqual([1, 2, 3, 0, 4, 5, 6, 7])
+    expect(차려.opponentPitcherStaminas?.[0]).toBe(3_000)
+    const 첫날 = pitcherLeagueGameSetupOf({ ...career, gamesPlayed: 0 }, 1)
+    expect(첫날.opponentPitcherOrder).toEqual([0, 1, 2, 3, 4, 5, 6, 7])
+    expect(첫날.opponentPitcherStaminas).toBeUndefined()
+  })
+
+  it('하루 끝 4f304 는 열 팀 투수를 +20% 채운다 — CPU 경기가 깎은 값에서', () => {
+    const career = 투수({ gamesPlayed: 3 })
+    const 결과 = applyPitcherLeagueDay(career, createSeededRandom(1))
+    const 표 = 결과.leaguePitcherStaminas ?? {}
+    // CPU 경기를 치른 팀은 표에 있고 모든 값이 10000 이하다
+    expect(Object.keys(표).length).toBeGreaterThan(0)
+    for (const staminas of Object.values(표)) for (const stamina of staminas) expect(stamina).toBeLessThanOrEqual(10_000)
+  })
+
+  it('포스트시즌 경기 끝은 CPU 리그 경기를 건너뛴다 (4f268) — 순위표가 그대로다', () => {
+    const career = 투수({
+      gamesPlayed: 47,
+      postseason: { round: '플레이오프', qualifiers: [0, 1, 2, 3], teams: [1, 0], wins: [1, 0], winsNeeded: 3, champion: null },
+    } as never)
+    const 결과 = applyPitcherLeagueDay(career, createSeededRandom(1))
+    expect(결과.league).toBe(career.league)
   })
 })

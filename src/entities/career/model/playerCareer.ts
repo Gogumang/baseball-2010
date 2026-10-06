@@ -4,8 +4,26 @@ import type { League } from '@/entities/league/model/league'
 import { BALANCE } from '@/shared/config/original/balance'
 import type { PostseasonSeries } from '@/entities/league/model/league'
 import { finishRegularSeason } from '@/entities/league/model/seasonEnd'
-import { EMPTY_LEAGUE, advancePostseason, opponentOf, recordLeagueResult } from '@/entities/league/model/league'
+import {
+  EMPTY_LEAGUE,
+  advancePostseason,
+  nextSeasonLeague,
+  opponentOf,
+  pitcherOrdersAfterPostseason,
+  recordLeagueResult,
+  startPostseason,
+} from '@/entities/league/model/league'
 import { playLeagueDay } from '@/entities/league/model/leagueDay'
+import { runCpuPostseasonWithStamina } from '@/entities/league/model/postseasonPlay'
+import type { PitcherStaminaTable } from '@/entities/league/model/postseasonPlay'
+import { leagueDayCounterOf } from '@/entities/career/model/leagueGameSetup'
+import {
+  humanGamePitcherOrderOf,
+  humanGamePitcherStaminasOf,
+  recoveredLeagueStaminas,
+  staminaTableAfterHumanGame,
+} from '@/entities/pitcher-career/model/leaguePitcherRecords'
+import { BATTER_EDITION_MODE } from '@/entities/pitcher-career/model/pitcherRotation'
 import {
   EMPTY_LEAGUE_PLAYER_STATS,
   recordLeaguePlateAppearances,
@@ -188,6 +206,12 @@ export interface PlayerCareer {
    * 새 시즌에 0 으로 돌아간다 (0x204e0 — `startNextSeason`).
    */
   readonly leaguePlayerStats: LeaguePlayerStats
+  /**
+   * 리그 열 팀 투수의 레코드 스태미나 `+0x2c` — 팀 번호 → 붙박이 표 칸(0~7)별 값. 없는 팀·칸은 10000.
+   * 원본은 팀 저장 레코드에 있어 경기 사이에 이어진다: 경기 준비 0x1c46c 가 g == 0 이면 열 팀 10000, 사람·CPU 경기가
+   * 깎고, 하루 끝 4f2e8 이 열 팀 +20% (`entities/pitcher-career/model/leaguePitcherRecords`). 옛 저장에는 없다(전원 10000).
+   */
+  readonly leaguePitcherStaminas?: PitcherStaminaTable
   /** 정규시즌 1위 횟수 — 원본 세이브 레코드 +0x7a (0xb818c 가 45경기째에 늘린다) */
   readonly regularSeasonFirstCount: number
   /**
@@ -673,6 +697,15 @@ export function applyGameResult(career: PlayerCareer, summary: GameSummary): Pla
       career.leaguePlayerStats,
       summary.leaguePlateAppearances ?? [],
     ),
+    // 두 팀 투수 레코드 +0x2c 는 경기 끝 값이 남는다 — 준비 0x1c46c 가 g == 0 이면 열 팀을 10000 으로 채운 뒤다
+    ...(summary.pitcherStaminas === undefined
+      ? {}
+      : {
+          leaguePitcherStaminas: staminaTableAfterHumanGame(career, leagueDayCounterOf(career), [
+            { teamId: summary.ourTeamId, staminas: summary.pitcherStaminas.ours },
+            { teamId: summary.opponentTeamId, staminas: summary.pitcherStaminas.opponent },
+          ]),
+        }),
     // 무승부는 원본도 승·패 어디에도 넣지 않는다.
     // **포스트시즌 중에는 정규시즌 전적을 건드리지 않는다** — 0xb76dc 가 포스트시즌 플래그로 갈라져
     // 시리즈 승수만 깎는다. 그래서 45경기 뒤에 치른 경기가 순위표에 더 쌓이지 않는다.
@@ -710,10 +743,73 @@ export function applyLeagueDay(
   /** 전역 마선수 레벨 열 칸 `mgr[0x13a..0x143]` — CPU 끼리 경기의 마선수 배율(0xd88aa). 안 넘기면 Lv1(60%) */
   aceLevels?: Readonly<Record<number, number>>,
 ): PlayerCareer {
+  // 포스트시즌 경기 끝은 4f268 이 CPU 리그 경기(0xc2a48)를 건너뛰고 곧장 하루 끝으로 간다 — 회복만 돈다
+  if (career.postseason !== null) {
+    return { ...career, leaguePitcherStaminas: recoveredLeagueStaminas(career.leaguePitcherStaminas ?? {}, BATTER_EDITION_MODE) }
+  }
   const day = Math.max(0, career.gamesPlayed - 1)
-  // 원본 0xc2a48 은 승패만이 아니라 **선수별 타석 기록(0xa8024)도** 남긴다 — 둘 다 받아 넣는다
-  const played = playLeagueDay(career.league, day, myTeamId, random, career.leaguePlayerStats, {}, aceLevels)
-  return { ...career, league: played.league, leaguePlayerStats: played.playerStats }
+  // 원본 0xc2a48 은 승패만이 아니라 **선수별 타석 기록(0xa8024)도** 남긴다 — 둘 다 받아 넣는다.
+  // CPU 경기 투수는 리그 표의 +0x2c 로 서고(경기 사이에 이어진 값), 사람 경기 두 팀 차례는 여기서 한 칸 돈다
+  const played = playLeagueDay(
+    career.league,
+    day,
+    myTeamId,
+    random,
+    career.leaguePlayerStats,
+    career.leaguePitcherStaminas ?? {},
+    aceLevels,
+  )
+  return {
+    ...career,
+    league: played.league,
+    leaguePlayerStats: played.playerStats,
+    // 하루 끝 4f2e8 — 열 팀 0xb617c (+20%)
+    leaguePitcherStaminas: recoveredLeagueStaminas(played.pitcherStaminas, BATTER_EDITION_MODE),
+  }
+}
+
+/**
+ * 사람 경기 준비 `0x1c46c` 가 세운 두 팀 투수 — 레코드 차례(0번 선발 · 벤치 차례)와 칸별 `+0x2c`.
+ * `startGame` 마지막 인자(`GamePitcherSetup`)로 넘긴다. g 는 `leagueDayCounterOf`.
+ */
+export function leagueGamePitchersOf(
+  career: PlayerCareer,
+  opponentTeamId: number,
+): {
+  readonly ourOrder: readonly number[]
+  readonly opponentOrder: readonly number[]
+  readonly ourStaminas?: readonly number[]
+  readonly opponentStaminas?: readonly number[]
+} {
+  const day = leagueDayCounterOf(career)
+  const ourStaminas = humanGamePitcherStaminasOf(career, day, career.teamId)
+  const opponentStaminas = humanGamePitcherStaminasOf(career, day, opponentTeamId)
+  return {
+    ourOrder: humanGamePitcherOrderOf(career, BATTER_EDITION_MODE, day, career.teamId),
+    opponentOrder: humanGamePitcherOrderOf(career, BATTER_EDITION_MODE, day, opponentTeamId),
+    ...(ourStaminas === undefined ? {} : { ourStaminas }),
+    ...(opponentStaminas === undefined ? {} : { opponentStaminas }),
+  }
+}
+
+/**
+ * 대진 128 [확인]의 CPU 끼리 포스트시즌(0x13da0 → 0xc2760) — 리그 표의 +0x2c 로 서고 깎인 값을 남긴다(회복 없음).
+ * 내 차례이거나 끝난 대진이면 그대로다.
+ */
+export function applyPostseasonCpuGames(
+  career: PlayerCareer,
+  random: RandomPort,
+  aceLevels?: Readonly<Record<number, number>>,
+): PlayerCareer {
+  if (career.postseason === null) return career
+  const result = runCpuPostseasonWithStamina(
+    career.postseason,
+    career.teamId,
+    random,
+    career.leaguePitcherStaminas ?? {},
+    aceLevels,
+  )
+  return { ...career, postseason: result.series, leaguePitcherStaminas: result.pitcherStaminas }
 }
 
 /**
@@ -727,7 +823,8 @@ export function applySeasonEnd(career: PlayerCareer): PlayerCareer {
   return {
     ...career,
     regularSeasonFirstCount: career.regularSeasonFirstCount + (result.isRegularSeasonFirst ? 1 : 0),
-    postseason: result.postseason,
+    // 대진 0xb80a8 — 정규시즌 끝 투수 레코드 차례를 그대로 들고 간다 (포스트시즌 선발·벤치 차례의 바탕)
+    postseason: startPostseason(result.ranking, career.league.pitcherOrders),
   }
 }
 
@@ -797,7 +894,13 @@ export function startNextSeason(career: PlayerCareer): PlayerCareer {
     // 이 **리그 전 선수의 시즌 성적**을 0 으로 되돌린다(팀 레코드·능력치·사기는 그대로 둔다).
     // 웹판은 로스터가 붙박이 표라 성적만 따로 `leaguePlayerStats` 에 담는다 — 그 표가 0x204e0 이
     // 지우는 칸에 해당하므로 여기서 함께 비운다.
-    league: EMPTY_LEAGUE,
+    // 승패는 비우되 **투수 레코드 차례는 잇는다** — 새 시즌 처리는 팀 저장 레코드를 다시 짓지 않아 지난 시즌·포스트시즌에
+    // 섞인 차례가 그대로 남는다 (`nextSeasonLeague`). 레코드 +0x2c 는 첫 경기 준비(g == 0)가 열 팀 10000 으로 채운다
+    league: nextSeasonLeague(
+      career.postseason === null
+        ? career.league.pitcherOrders
+        : pitcherOrdersAfterPostseason(career.postseason, career.league.pitcherOrders),
+    ),
     leaguePlayerStats: EMPTY_LEAGUE_PLAYER_STATS,
     postseason: null,
     // 0x1b7c0 `S[0x77] = 0` — 정규시즌 우승 보상 받음 플래그 해제 (S13)

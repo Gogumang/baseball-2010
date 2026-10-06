@@ -1,8 +1,25 @@
 import { BALANCE } from '@/shared/config/original/balance'
-import { EMPTY_LEAGUE, advancePostseason, opponentOf, recordLeagueResult } from '@/entities/league/model/league'
+import {
+  EMPTY_LEAGUE,
+  advancePostseason,
+  nextSeasonLeague,
+  opponentOf,
+  pitcherOrdersAfterPostseason,
+  recordLeagueResult,
+  rotateLeaguePitchers,
+  startPostseason,
+} from '@/entities/league/model/league'
 import type { League, PostseasonSeries } from '@/entities/league/model/league'
 import { finishRegularSeason } from '@/entities/league/model/seasonEnd'
-import { runCpuPostseason } from '@/entities/league/model/postseasonPlay'
+import { runCpuPostseasonWithStamina } from '@/entities/league/model/postseasonPlay'
+import type { PitcherStaminaTable } from '@/entities/league/model/postseasonPlay'
+import { leagueDayCounterOf } from '@/entities/career/model/leagueGameSetup'
+import {
+  humanGamePitcherOrderOf,
+  humanGamePitcherStaminasOf,
+  recoveredLeagueStaminas,
+  staminaTableAfterHumanGame,
+} from '@/entities/pitcher-career/model/leaguePitcherRecords'
 import { playLeagueDay } from '@/entities/league/model/leagueDay'
 import { EMPTY_LEAGUE_PLAYER_STATS } from '@/entities/league/model/leaguePlayerStats'
 import type { LeaguePlayerStats } from '@/entities/league/model/leaguePlayerStats'
@@ -20,7 +37,7 @@ import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbil
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
 import { FULL_STAMINA, recoverStaminaAfterGameDay } from '@/entities/pitcher-career/model/pitcherStamina'
-import { PITCHER_EDITION_MODE } from '@/entities/pitcher-career/model/pitcherRotation'
+import { PITCHER_EDITION_MODE, cpuGameRotationAdvances } from '@/entities/pitcher-career/model/pitcherRotation'
 import {
   DEFAULT_PITCHER_ROOKIE_PROFILE,
   pitcherFormOf,
@@ -278,6 +295,12 @@ export interface PitcherCareer {
   readonly endingIndex: number | null
   readonly league: League
   readonly leaguePlayerStats: LeaguePlayerStats
+  /**
+   * 리그 열 팀 투수의 레코드 스태미나 `+0x2c` — 팀 번호 → 붙박이 표 칸(0~7)별 값. 없는 팀·칸은 10000. 내 투수 값은
+   * `stamina` 가 든다. 경기 준비 0x1c46c 가 g == 0 이면 열 팀 10000, 경기가 깎고, 하루 끝 4f304 가 열 팀 +20%
+   * (`entities/pitcher-career/model/leaguePitcherRecords`). 옛 저장에는 없다(전원 10000).
+   */
+  readonly leaguePitcherStaminas?: PitcherStaminaTable
   readonly regularSeasonFirstCount: number
   /** 정규시즌 우승 보상을 받았는가 S+0x77 — 128 팝업 0xb 닫힘이 켜고 새 시즌 0x1b7c0 이 지운다 (`postseasonFlow`) */
   readonly regularSeasonRewardTaken: boolean
@@ -657,16 +680,89 @@ export function applyPitcherGameResult(career: PitcherCareer, outcome: PitcherGa
   }
 }
 
-/** 같은 날 나머지 네 경기 (0xc2a48) — 타자편과 같은 코드를 부른다 */
+/**
+ * 같은 날 나머지 네 경기 (0xc2a48) — 타자편과 같은 코드를 부른다.
+ *
+ * 사람 경기 준비 0x1c46c 는 g ≠ 0 이면 **상대 팀** 레코드를 0xb8c80 으로 한 칸 돌리고 내 팀은 돌리지 않는다(0xa4f60
+ * 맞바꿈 — `pitcherGameFlow.ourPitcherOrderOf`). 그래서 `playLeagueDay` 에는 사람 경기 두 팀을 돌리지 말라고 하고
+ * (`rotatesHumanGameTeams` 거짓) 상대만 여기서 돌린다 — 사람 경기가 본 차례(`pitcherLeagueGameSetupOf`)와 같은 칸이다.
+ * 포스트시즌 경기 끝은 4f268 이 CPU 리그 경기를 건너뛰므로 하루 끝 회복만 돈다.
+ */
 export function applyPitcherLeagueDay(
   career: PitcherCareer,
   random: RandomPort,
   /** 전역 마선수 레벨 열 칸 `mgr[0x13a..0x143]` — CPU 끼리 경기의 마선수 배율(0xd88aa). 안 넘기면 Lv1(60%) */
   aceLevels?: Readonly<Record<number, number>>,
 ): PitcherCareer {
+  if (career.postseason !== null) {
+    return { ...career, leaguePitcherStaminas: recoveredLeagueStaminas(career.leaguePitcherStaminas ?? {}, PITCHER_EDITION_MODE) }
+  }
   const day = Math.max(0, career.gamesPlayed - 1)
-  const played = playLeagueDay(career.league, day, career.teamId, random, career.leaguePlayerStats, {}, aceLevels)
-  return { ...career, league: played.league, leaguePlayerStats: played.playerStats }
+  const opponent = opponentOf(day, career.teamId)
+  const league = cpuGameRotationAdvances(PITCHER_EDITION_MODE, day)
+    ? rotateLeaguePitchers(career.league, [opponent])
+    : career.league
+  const played = playLeagueDay(
+    league,
+    day,
+    career.teamId,
+    random,
+    career.leaguePlayerStats,
+    career.leaguePitcherStaminas ?? {},
+    aceLevels,
+    false,
+  )
+  return {
+    ...career,
+    league: played.league,
+    leaguePlayerStats: played.playerStats,
+    // 하루 끝 4f304 — 열 팀 0xb617c (내 육성 선수가 아니면 +20%). 내 투수 회복은 `applyPitcherGameResult` 가 한다
+    leaguePitcherStaminas: recoveredLeagueStaminas(played.pitcherStaminas, PITCHER_EDITION_MODE),
+  }
+}
+
+/**
+ * 사람 경기 준비 `0x1c46c` 가 세운 투수 — 상대 팀 레코드 차례(0번 선발 · 벤치 차례)와 양 팀 칸별 `+0x2c`.
+ * `PitcherGameOptions` 에 그대로 얹는다. 내 팀 차례는 진행기가 0xa4f60 맞바꿈으로 세운다.
+ */
+export function pitcherLeagueGameSetupOf(
+  career: PitcherCareer,
+  opponentTeamId: number,
+): {
+  readonly opponentPitcherOrder: readonly number[]
+  readonly ourPitcherStaminas?: readonly number[]
+  readonly opponentPitcherStaminas?: readonly number[]
+} {
+  const day = leagueDayCounterOf(career)
+  const ourPitcherStaminas = humanGamePitcherStaminasOf(career, day, career.teamId)
+  const opponentPitcherStaminas = humanGamePitcherStaminasOf(career, day, opponentTeamId)
+  return {
+    opponentPitcherOrder: humanGamePitcherOrderOf(career, PITCHER_EDITION_MODE, day, opponentTeamId),
+    ...(ourPitcherStaminas === undefined ? {} : { ourPitcherStaminas }),
+    ...(opponentPitcherStaminas === undefined ? {} : { opponentPitcherStaminas }),
+  }
+}
+
+/**
+ * 사람 경기 끝 두 팀 투수 레코드 +0x2c 를 리그 표에 되적는다 — `before` 는 경기 **전** 커리어(g 를 본다), `after` 는
+ * `applyPitcherGameResult` 를 지난 커리어다.
+ */
+export function withPitcherGameStaminas(
+  before: PitcherCareer,
+  after: PitcherCareer,
+  ourTeamId: number,
+  opponentTeamId: number,
+  /** 경기 끝 표 (`PitcherGameSummary.pitcherStaminas`). 없으면(진행기를 안 거친 요약) 표를 그대로 둔다 */
+  staminas: { readonly ours: readonly number[]; readonly opponent: readonly number[] } | undefined,
+): PitcherCareer {
+  if (staminas === undefined) return after
+  return {
+    ...after,
+    leaguePitcherStaminas: staminaTableAfterHumanGame(before, leagueDayCounterOf(before), [
+      { teamId: ourTeamId, staminas: staminas.ours },
+      { teamId: opponentTeamId, staminas: staminas.opponent },
+    ]),
+  }
 }
 
 /** 45경기가 끝나면 정규시즌을 닫는다 (0xb818c) */
@@ -676,7 +772,8 @@ export function applyPitcherSeasonEnd(career: PitcherCareer): PitcherCareer {
   return {
     ...career,
     regularSeasonFirstCount: career.regularSeasonFirstCount + (result.isRegularSeasonFirst ? 1 : 0),
-    postseason: result.postseason,
+    // 대진 0xb80a8 — 정규시즌 끝 투수 레코드 차례를 그대로 들고 간다 (포스트시즌 선발·벤치 차례의 바탕)
+    postseason: startPostseason(result.ranking, career.league.pitcherOrders),
   }
 }
 
@@ -688,8 +785,17 @@ export function applyPitcherPostseasonProgress(
   aceLevels?: Readonly<Record<number, number>>,
 ): PitcherCareer {
   if (career.postseason === null) return career
-  const advanced = runCpuPostseason(career.postseason, career.teamId, random, aceLevels)
-  return advanced === career.postseason ? career : { ...career, postseason: advanced }
+  // CPU 끼리 경기(0xc2760)는 리그 표의 +0x2c 로 서고 깎인 값을 남긴다 — 회복은 없다
+  const result = runCpuPostseasonWithStamina(
+    career.postseason,
+    career.teamId,
+    random,
+    career.leaguePitcherStaminas ?? {},
+    aceLevels,
+  )
+  return result.series === career.postseason
+    ? career
+    : { ...career, postseason: result.series, leaguePitcherStaminas: result.pitcherStaminas }
 }
 
 /** 다음 경기 상대 (0xb765c) — 타자편 `nextOpponentOf` 와 같은 규칙이다 */
@@ -731,7 +837,13 @@ export function startNextPitcherSeason(career: PitcherCareer): PitcherCareer {
     money: Math.min(MAXIMUM_MONEY, career.money + career.salary * ORIGINAL_MONEY_UNIT),
     stamina: FULL_STAMINA,
     stats: EMPTY_PITCHER_SEASON_STATS,
-    league: EMPTY_LEAGUE,
+    // 승패는 비우되 **투수 레코드 차례는 잇는다** (`nextSeasonLeague` — 새 시즌 처리는 팀 저장 레코드를 다시 짓지 않는다).
+    // 레코드 +0x2c 는 첫 경기 준비(g == 0)가 열 팀 10000 으로 채운다
+    league: nextSeasonLeague(
+      career.postseason === null
+        ? career.league.pitcherOrders
+        : pitcherOrdersAfterPostseason(career.postseason, career.league.pitcherOrders),
+    ),
     leaguePlayerStats: EMPTY_LEAGUE_PLAYER_STATS,
     postseason: null,
     regularSeasonRewardTaken: false,

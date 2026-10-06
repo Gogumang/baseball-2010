@@ -3,6 +3,7 @@ import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCaree
 import {
   applyPitcherGameResult,
   applyPitcherLeagueDay,
+  applyPitcherPostseasonProgress,
   applyPitcherSeasonEnd,
   countCompleteGame,
   createPitcherCareer,
@@ -12,8 +13,11 @@ import {
   isPitcherManagementCycleOpen,
   isPitcherSeasonFinished,
   spendPitcherCycleAction,
+  pitcherLeagueGameSetupOf,
   startNextPitcherSeason,
+  withPitcherGameStaminas,
 } from '@/entities/pitcher-career/model/pitcherCareer'
+import { isMyTurn } from '@/entities/league/model/seasonEnd'
 import {
   enterPitcherYearEndEvent,
   finishPitcherYearEndEvent,
@@ -27,7 +31,6 @@ import {
   applyKoreanSeriesReward,
   applyRegularSeasonReward,
   popupAfterChampion,
-  pressPostseasonBracket,
   regularSeasonPopupOnEnter,
   REGULAR_SEASON_HIDDEN_ID,
 } from '@/entities/career/model/postseasonFlow'
@@ -271,6 +274,15 @@ function normalizePitcherCareer(raw: unknown): PitcherCareer | null {
 }
 
 const NO_STAT = () => {}
+
+/**
+ * 리그 경기 옵션 — 화면 쪽 옵션(`pitcherGameOptionsOf`)에 경기 준비 0x1c46c 가 세운 리그 투수를 얹는다:
+ * 상대 팀 레코드 차례(g ≠ 0 이면 한 칸 돈 것 · 포스트시즌은 시리즈 이월)와 양 팀 칸별 +0x2c (`pitcherLeagueGameSetupOf`).
+ */
+function leagueGameOptionsOf(career: PitcherCareer, settings: Parameters<typeof pitcherGameOptionsOf>[1]): PitcherGameOptions {
+  const options = pitcherGameOptionsOf(career, settings)
+  return { ...options, ...pitcherLeagueGameSetupOf(career, options.opponentTeamId) }
+}
 
 /** 보상 종류 7 — 히든 오픈 |v| */
 const HIDDEN_OPEN_REWARD_KIND = 7
@@ -659,7 +671,7 @@ export function usePitcherLeagueSession(
 
   const beginGame = useCallback(() => {
     if (career === null) return
-    setGameOptions(pitcherGameOptionsOf(career, { gaugeSettingOn, throwModeManual }))
+    setGameOptions(leagueGameOptionsOf(career, { gaugeSettingOn, throwModeManual }))
     setScene('경기')
   }, [career, gaugeSettingOn, throwModeManual])
 
@@ -675,7 +687,14 @@ export function usePitcherLeagueSession(
         entered: summary.hasEntered,
         gamePointReward: recordGamePointsOf(summary.recordIds),
       })
-      const recorded = applyPitcherGameResult(career, outcome)
+      // 두 팀 투수 레코드 +0x2c 는 경기 끝 값이 리그 표에 남는다 (준비 0x1c46c 가 g == 0 이면 열 팀 10000 으로 채운 뒤)
+      const recorded = withPitcherGameStaminas(
+        career,
+        applyPitcherGameResult(career, outcome),
+        gameOptions.ourTeamId,
+        gameOptions.opponentTeamId,
+        summary.pitcherStaminas,
+      )
       // 경기 끝 0x4ea0c: 기록 달성 G 를 저장 G 에 더한 뒤 0x4ec82 `0x22c7d(액수, 모드 3)` 로 획득 GP 통계에 적는다
       recordStat({ kind: 'G획득', mode: PITCHER_LEAGUE_MODE, amount: outcome.gamePointReward })
       const day = applyPitcherLeagueDay(recorded, random, aceLevels)
@@ -749,7 +768,7 @@ export function usePitcherLeagueSession(
        */
       if (!isPitcherManagementCycleOpen(counted)) {
         commit(counted)
-        setGameOptions(pitcherGameOptionsOf(counted, { gaugeSettingOn, throwModeManual }))
+        setGameOptions(leagueGameOptionsOf(counted, { gaugeSettingOn, throwModeManual }))
         return setScene('경기')
       }
       // 관리 화면 진입 105(0x11910 → 0x11b32)의 첫 줄 — 부상 누적 20경기면 이벤트 500 → 엔딩 141 (B-7)
@@ -1201,10 +1220,12 @@ export function usePitcherLeagueSession(
    */
   const pressPostseason = useCallback(() => {
     if (career === null || career.postseason === null || scene !== '포스트시즌' || postseasonPopup !== null) return
-    const result = pressPostseasonBracket(career.postseason, career.teamId, random, aceLevels)
-    if (result.kind === '우승발표') return setPostseasonPopup({ kind: '우승발표', champion: result.champion })
-    if (result.kind === '내경기') return beginGame()
-    commit({ ...career, postseason: result.series })
+    // 0x13da0 의 세 갈래 (`pressPostseasonBracket` 과 같은 차례) — CPU 끼리 경기(0xc2760)는 리그 표의 +0x2c 로 서고
+    // 깎인 값을 남긴다(회복 없음). 그래서 CPU 갈래는 표를 잇는 `applyPitcherPostseasonProgress` 로 돌린다
+    const series = career.postseason
+    if (series.round === '종료') return setPostseasonPopup({ kind: '우승발표', champion: series.champion ?? -1 })
+    if (isMyTurn(series, career.teamId)) return beginGame()
+    commit(applyPitcherPostseasonProgress(career, random, aceLevels))
   }, [aceLevels, beginGame, career, commit, postseasonPopup, random, scene])
 
   /** 128 팝업 닫힘 — 틀 0x15984. 0xb 는 보상 뒤 128 에 머물고(해금 0x32 — 투수편), 7 → (내 팀 우승이면 8) → 132 */
