@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { isHitByPitch, plateErrorOf, resolvePitch } from '@/features/play-at-bat/model/resolvePitch'
 import type { BattingContext } from '@/features/play-at-bat/model/resolvePitch'
-import { createPatternDeck } from '@/entities/batting/model/battedBallOutcome'
+import { createPatternDeck, lastDrawnPattern } from '@/entities/batting/model/battedBallOutcome'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -145,6 +145,23 @@ describe('resolvePitch — 스윙한 경우', () => {
       deck = result.deck
       expect(['파울', '타구']).toContain(result.detail.resolution.kind)
     }
+  })
+
+  it('맞은 공은 덱에서 실제로 뽑은 패턴을 detail.pattern 으로 싣는다 (0x51408 의 그 한 장)', () => {
+    const random = createSeededRandom(7)
+    let deck = createPatternDeck(random)
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      const result = resolvePitch(직구(), { frame: 16, shift: 0, buntKind: 0 }, 상황, deck, random)
+      deck = result.deck
+      expect(result.detail.resultCode).not.toBeNull()
+      expect(result.detail.pattern).toBe(lastDrawnPattern(result.deck, result.detail.resultCode!))
+    }
+  })
+
+  it('헛스윙·볼에는 패턴이 없다', () => {
+    const deck = createPatternDeck(고정(0))
+    expect(resolvePitch(직구(), { frame: 0, shift: 0, buntKind: 0 }, 상황, deck, 고정(0)).detail.pattern).toBeUndefined()
+    expect(resolvePitch(직구(), null, 상황, deck, 고정(0)).detail.pattern).toBeUndefined()
   })
 
   it('성공한 번트만 isBunt', () => {

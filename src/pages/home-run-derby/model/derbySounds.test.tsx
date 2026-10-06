@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { useHomeRunDerby } from '@/pages/home-run-derby/model/useHomeRunDerby'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
-import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { LOSE_SOUND, WIN_SOUND } from '@/features/play-game/model/gameSounds'
 import { setActiveSound } from '@/shared/api/audio/soundPort'
 import type { SoundPort } from '@/shared/api/audio/soundPort'
@@ -33,6 +32,8 @@ const 홈런: PitchOutcomeDetail = {
   hasSwung: true,
   isBunt: false,
   resultCode: 홈런코드,
+  // 타석이 실제로 뽑은 패턴 한 장 (원본 표 24 번 묶음)
+  pattern: [75, 1451, 1004, 0],
   contactSoundId: 5,
 }
 
@@ -56,8 +57,7 @@ afterEach(() => {
 })
 
 function 띄우기(bestDistance = 0) {
-  const random = createSeededRandom(5)
-  return renderHook(() => useHomeRunDerby({ random, bestDistance }))
+  return renderHook(() => useHomeRunDerby({ bestDistance }))
 }
 
 function 한구(rendered: { result: { current: ReturnType<typeof useHomeRunDerby> } }, detail: PitchOutcomeDetail) {

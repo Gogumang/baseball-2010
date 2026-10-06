@@ -8,6 +8,7 @@ import { drawPattern, outcomeOfPattern } from '@/entities/batting/model/battedBa
 import { contactSoundIdOf } from '@/features/play-at-bat/model/atBatSounds'
 import { rollSpecialSwing } from '@/entities/batting/model/specialSwing'
 import type { PatternDeck } from '@/entities/batting/model/battedBallOutcome'
+import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 import { isInsideStrikeZone } from '@/shared/lib/geometry/coordinate'
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { Pitch, PitcherAbility } from '@/entities/pitching/model/pitch'
@@ -72,6 +73,11 @@ export interface PitchOutcomeDetail {
   readonly isBuntFoulOut?: boolean
   /** 방향까지 붙인 원본 결과 코드. 스윙하지 않았으면 null */
   readonly resultCode: number | null
+  /**
+   * 이 타구가 덱에서 **실제로 뽑은 원본 패턴** [각, 세기, 높이, 플래그] (0x51408 이 각·속도·높이를 꺼내는 그 한 장).
+   * 맞은 공(파울 포함)에만 있다. 홈런더비는 이 패턴으로 비거리(0xa600c)와 이벤트 존 플래그(0xb07c8 = flags & 2)를 본다.
+   */
+  readonly pattern?: BattedBallPattern
   /**
    * **타구 순간에 울릴 소리 번호** (`atBatSounds.contactSoundIdOf`). 울릴 것이 없으면 null.
    *
@@ -258,7 +264,7 @@ export function resolvePitch(
   })
   const detail: PitchOutcomeDetail =
     batted.kind === '파울'
-      ? { resolution: { kind: '파울' }, hasSwung: true, isBunt: false, resultCode: code, contactSoundId }
+      ? { resolution: { kind: '파울' }, hasSwung: true, isBunt: false, resultCode: code, pattern: drawn.pattern, contactSoundId }
       : {
           resolution: { kind: '타구', outcome: batted.outcome },
           hasSwung: true,
@@ -266,6 +272,7 @@ export function resolvePitch(
           // 판정 11(2스트라이크 번트 파울 아웃)은 아웃 콜이 조건 없이 62 다
           isBuntFoulOut: batted.isBuntFoulOut === true,
           resultCode: code,
+          pattern: drawn.pattern,
           contactSoundId,
         }
   return { detail, deck: drawn.deck, isUncatchable }

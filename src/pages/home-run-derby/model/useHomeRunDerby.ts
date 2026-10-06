@@ -8,14 +8,12 @@ import type { DerbyResult, DerbyRun } from '@/entities/home-run-derby/model/derb
 import { isEventZoneHit } from '@/entities/home-run-derby/model/eventZone'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import { LOSE_SOUND, WIN_SOUND } from '@/features/play-game/model/gameSounds'
-import type { RandomPort } from '@/shared/api/random/randomPort'
 import { activeSound, playSoundIds } from '@/shared/api/audio/soundPort'
 
 /** 공 하나의 결과를 보여 주는 시간 — 타석 화면들이 쓰는 값과 같다 (원본에 없는 웹판 연출) */
 const BANNER_MILLISECONDS = 1_500
 
 export interface HomeRunDerbyOptions {
-  readonly random: RandomPort
   /** 저장된 최고 비거리 (저장 +0x5c, u16) */
   readonly bestDistance: number
   /** 10구(+보너스)가 다 끝났을 때 한 번 불린다 — 최고 기록·G 를 저장할 곳에 알린다 */
@@ -48,11 +46,10 @@ export interface HomeRunDerbySession {
  * 원본은 공 하나가 끝날 때마다 0xae24c(아웃·헛스윙)·0xae3e8(타구)로 들어가 기회를 하나 쓴다 —
  * 볼·스트라이크를 세지 않으므로 **던진 공은 무엇이든 기회 한 번**이다. 그래서 볼카운트가 없다.
  *
- * 비거리는 원본이 타구 궤적의 착지점에서 재는데(0xa600c), 이식판 `resolvePitch` 는 자기가 뽑은
- * 패턴을 내보내지 않는다 — `derbyBattedBallOf` 가 같은 결과 코드의 원본 패턴을 한 장 골라
- * `battedBallFlight` 로 궤적을 만든다 (근사, 그 파일 머리말 참고).
+ * 비거리는 원본이 타구 궤적의 착지점에서 잰다(0xa600c) — 타석(`resolvePitch`)이 실제로 뽑은 패턴
+ * (`detail.pattern`)을 `derbyBattedBallOf` 가 `battedBallFlight` 궤적으로 만든다 (그 파일 머리말 참고).
  */
-export function useHomeRunDerby({ random, bestDistance, onFinish, aceLevels }: HomeRunDerbyOptions): HomeRunDerbySession {
+export function useHomeRunDerby({ bestDistance, onFinish, aceLevels }: HomeRunDerbyOptions): HomeRunDerbySession {
   const [run, setRun] = useState<DerbyRun>(createDerbyRun)
   const [banner, setBanner] = useState('')
   const [isPaused, setIsPaused] = useState(false)
@@ -62,8 +59,6 @@ export function useHomeRunDerby({ random, bestDistance, onFinish, aceLevels }: H
   // 캔버스 루프에서 불리는 콜백이라 최신 값은 전부 ref 로 읽는다 (StrictMode 가 업데이터를 두 번 돌린다)
   const runRef = useRef(run)
   runRef.current = run
-  const randomRef = useRef(random)
-  randomRef.current = random
   const bestRef = useRef(bestDistance)
   bestRef.current = bestDistance
   const onFinishRef = useRef(onFinish)
@@ -96,7 +91,7 @@ export function useHomeRunDerby({ random, bestDistance, onFinish, aceLevels }: H
     playSoundIds(audioRef.current, [detail.contactSoundId])
 
     const isHomeRun = detail.resolution.kind === '타구' && detail.resolution.outcome.kind === '홈런'
-    const batted = detail.resultCode === null ? null : derbyBattedBallOf(detail.resultCode, isHomeRun, randomRef.current)
+    const batted = detail.pattern === undefined ? null : derbyBattedBallOf(detail.pattern, isHomeRun)
     // 이벤트 존은 "공이 날아가는 중" 조건이라 배트에 맞은 공에서만 본다 (0x36dfc)
     const zoneHit = batted !== null && isEventZoneHit({ apexHeight: batted.apexHeight })
 

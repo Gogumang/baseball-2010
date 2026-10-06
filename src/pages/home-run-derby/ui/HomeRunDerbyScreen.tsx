@@ -82,7 +82,7 @@ export function HomeRunDerbyScreen({
   settings,
   onSettingsChange,
 }: HomeRunDerbyScreenProps) {
-  const session = useHomeRunDerby({ random, bestDistance, onFinish, aceLevels })
+  const session = useHomeRunDerby({ bestDistance, onFinish, aceLevels })
   const tick = useUpdateCounter()
   const [isMenuOpen, setMenuOpen] = useState(false)
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)

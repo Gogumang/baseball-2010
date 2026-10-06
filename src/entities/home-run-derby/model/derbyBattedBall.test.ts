@@ -2,37 +2,29 @@ import { describe, expect, it } from 'vitest'
 import { derbyBattedBallOf } from '@/entities/home-run-derby/model/derbyBattedBall'
 import { DERBY_DISTANCE_LIMIT } from '@/entities/home-run-derby/model/derbyRules'
 import { isEventZoneHit, isEventZoneVisibleAt } from '@/entities/home-run-derby/model/eventZone'
-import { createSeededRandom } from '@/shared/api/random/seededRandom'
-import { outcomeOfPattern } from '@/entities/batting/model/battedBallOutcome'
+import { BATTED_BALL_PATTERNS } from '@/shared/config/original/battedBallPatterns'
 
-/** 홈런 결과 코드 — `outcomeOfPattern` 의 마지막 갈래(21·24 묶음)에서 세기 1100 이상이 홈런이다 */
+/** 홈런성 결과 코드 */
 const 홈런코드 = 24
+/** 그 묶음의 빠른 타구 한 장 */
+const 빠른홈런 = [75, 1451, 1004, 0] as const
 
 describe('타구 한 장 만들기', () => {
-  it('홈런이면 원본 표에서 홈런으로 판정되는 패턴을 고른다', () => {
-    const random = createSeededRandom(7)
-    for (let index = 0; index < 20; index += 1) {
-      const batted = derbyBattedBallOf(홈런코드, true, random)!
-      const judged = outcomeOfPattern(홈런코드, batted.pattern, random)
-      expect(judged.kind === '타구' && judged.outcome.kind).toBe('홈런')
+  it('타석이 뽑은 패턴을 그대로 쓴다 — 다시 뽑지 않는다', () => {
+    for (const pattern of BATTED_BALL_PATTERNS[홈런코드]!) {
+      expect(derbyBattedBallOf(pattern, true).pattern).toBe(pattern)
     }
   })
 
   it('홈런이면 비거리가 붙고, 아니면 0 이다', () => {
-    const random = createSeededRandom(11)
-    expect(derbyBattedBallOf(홈런코드, true, random)!.distance).toBeGreaterThan(0)
-    expect(derbyBattedBallOf(0, false, random)!.distance).toBe(0)
+    expect(derbyBattedBallOf(빠른홈런, true).distance).toBeGreaterThan(0)
+    expect(derbyBattedBallOf(빠른홈런, false).distance).toBe(0)
   })
 
   it('비거리는 상한 160 을 넘지 않는다', () => {
-    const random = createSeededRandom(3)
-    for (let index = 0; index < 50; index += 1) {
-      expect(derbyBattedBallOf(홈런코드, true, random)!.distance).toBeLessThanOrEqual(DERBY_DISTANCE_LIMIT)
+    for (const pattern of BATTED_BALL_PATTERNS[홈런코드]!) {
+      expect(derbyBattedBallOf(pattern, true).distance).toBeLessThanOrEqual(DERBY_DISTANCE_LIMIT)
     }
-  })
-
-  it('패턴이 없는 결과 코드는 null 이다 (21~23 은 원본 표에 없다)', () => {
-    expect(derbyBattedBallOf(21, true, createSeededRandom(1))).toBeNull()
   })
 })
 
