@@ -71,6 +71,25 @@ function 끝까지던지기(progress: PitcherGameProgress, seed = 1): PitcherGam
   throw new Error('경기가 끝나지 않았습니다')
 }
 
+describe('리그 투수 차례·레코드 스태미나', () => {
+  it('상대 차례 0번이 선발이고 그 레코드 +0x2c 로 선다 — 경기 끝 표에 마운드 값이 얹힌다', () => {
+    const 끝 = startPitcherGame(
+      {
+        ...기본옵션,
+        dayCounter: 3,
+        opponentPitcherOrder: [2, 3, 0, 1, 4, 5, 6, 7],
+        opponentPitcherStaminas: [10_000, 10_000, 7_000, 10_000, 10_000, 10_000, 10_000, 10_000],
+      },
+      씨앗(7),
+    )
+    expect(끝.game.isFinished).toBe(true)
+    const 요약 = summaryOf(끝)
+    expect(요약.pitcherStaminas.opponent[끝.opponentMound.pitcherSlot]).toBe(끝.opponentMound.stamina)
+    // 선발 2번은 7000 에서 섰으니 더 깎였다
+    expect(요약.pitcherStaminas.opponent[2]).toBeLessThan(7_000)
+  })
+})
+
 describe('등판', () => {
   it('선발은 날짜 카운터가 짝수인 날에만 등판한다 (2경기마다)', () => {
     expect(startsToday({ ...기본옵션, dayCounter: 2 })).toBe(true)
