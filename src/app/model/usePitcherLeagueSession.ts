@@ -217,6 +217,8 @@ export interface PitcherLeagueSession {
     /** 바뀐 커리어를 그대로 저장한다 (구질 훈련처럼 화면이 계산해 돌려줄 때) */
     readonly save: (career: PitcherCareer) => void
     readonly goto: (scene: PitcherScene) => void
+    /** 경기 중 메뉴 "나가기"(상태 0x22 → 0x40140 → 장면 0x103) — 부르는 쪽이 메인 메뉴로 간다. 저장·+0x4f 는 그대로 */
+    readonly quitGame: () => void
     readonly beginGame: (aces?: NariMatchAces | null) => void
     /** [14] 투수편·[최근게임](모드 3) 의 "곧장 경기" — 0x327b8 모드 3 갈래(+0x43 && +0x4f) → 0x213c0(앱, 3, 0) → 장면 0x104 */
     readonly resumeInterruptedGame: (match: NariGameMatch | null) => void
@@ -1006,6 +1008,28 @@ export function usePitcherLeagueSession(
   const goto = useCallback((next: PitcherScene) => setScene(next), [])
 
   /**
+   * **경기 중 메뉴 "나가기"** — 경기 상태 0x22 갱신 `0x40140` 은 모드를 가리지 않고 0x140006c = 4 · 장면 0x103(메인 메뉴 처음 단)으로
+   * 나간다. 저장(0x22754)도 전역기록 +0x4f 도 안 건드린다 — 142 확인 0x13cca 가 세운 +0x4f 가 남아 [14]·[최근게임] 의
+   * 0x327b8 모드 3 갈래가 곧장 경기(`resumeInterruptedGame`)로 다시 세운다.
+   * 장면 0x106 은 나갈 때 헐리고 다음에 새로 서므로, 웹은 세션 장면을 새로 선 장면의 이어하기(상태 100 진입 0x1c154 —
+   * `pitcherResumePointOf`)로 되돌려 둔다. ⚠️ 웹 전용 갈래: +0x4f 손잡이가 없어 곧장 경기가 안 될 때만 이 장면이 보인다.
+   */
+  const quitGame = useCallback(() => {
+    setGameOptions(null)
+    setNextGameFromManagement(false)
+    matchPreparedRef.current = false
+    if (career === null) return setScene('등록')
+    const point = pitcherResumePointOf(career)
+    if (point.kind === '이벤트') {
+      setCareer(enterPitcherYearEndEvent(career, point.eventId))
+      setStory({ eventId: point.eventId, context: '연말', viewed: [] })
+      return setScene('이벤트')
+    }
+    if (point.kind === '포스트시즌') setPostseasonPopup(regularSeasonPopupOnEnter(career))
+    setScene(point.kind)
+  }, [career])
+
+  /**
    * 내보이는 커리어의 G 는 **지갑 값**이다 (원본 `mgr[+0x64]` 한 칸). 관리 화면 뱃지·구질 훈련
    * 가격 판정·지옥훈련 가드가 다 이 `career.gamePoint` 를 읽으므로, 여기서 한 번 갈아 끼우면
    * **보여 주는 값과 판정이 같은 값**을 본다.
@@ -1392,6 +1416,7 @@ export function usePitcherLeagueSession(
       create,
       save: saveFromScreen,
       goto,
+      quitGame,
       beginGame,
       // 곧장 경기 — 0x213c0(앱, 3, 0) 이 올린 투수편 저장으로 장면 0x104 의 셋업 0x39fdc 모드 3 갈래가 경기를 새로 세운다
       // (반 이닝 저장이 없어 처음부터 · 142 를 안 거쳐 굴림 없음 · 명부의 마선수 그대로). 경기 뒤 나리 장면이 새로 선다

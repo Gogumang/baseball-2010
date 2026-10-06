@@ -1322,4 +1322,25 @@ describe('전역기록 +0x4f(모드 3 경기 중간 저장) — 142 확인 · �
     })
     expect(calls).toEqual(['지움'])
   })
+
+  it('경기 중 나가기(0x22 → 0x40140)는 +0x4f 를 안 건드리고, 세션은 새로 선 장면의 이어하기 자리(109)로 돌아가 둔다', () => {
+    const { calls, rendered, store } = 손잡이띄우기()
+    const { result } = rendered
+    act(() => result.current.actions.create('투수', 신인))
+    act(() => result.current.actions.save({ ...result.current.career!, gamesPlayed: 4 }))
+    act(() => result.current.actions.openNextGameStandings())
+    act(() => result.current.actions.confirmNextGameStandings())
+    act(() => result.current.actions.confirmMatchPrepare())
+    expect(result.current.scene).toBe('경기')
+    const saved = store.load()
+    act(() => result.current.actions.quitGame())
+    // 지움(clear)이 없다 — +0x4f 는 142 가 세운 그대로
+    expect(calls.filter((call) => call === '지움')).toHaveLength(1)
+    expect(result.current.gameOptions).toBeNull()
+    // S+0x50 = 4(109) — 이어하기 0x1c154 는 109 로 간다
+    expect(result.current.scene).toBe('다음경기순위')
+    expect(result.current.nextGameFromManagement).toBe(false)
+    // 저장 쓰기도 없다
+    expect(store.load()).toEqual(saved)
+  })
 })

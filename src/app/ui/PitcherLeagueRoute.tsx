@@ -82,7 +82,12 @@ export function PitcherLeagueRoute({
         pitcherName={career.name}
         random={random}
         onFinish={actions.finishGame}
-        onQuit={() => actions.goto('관리')}
+        // 경기 중 "나가기" — 상태 0x22 갱신 0x40140 은 모드를 가리지 않고 0x140006c = 4 · 장면 0x103(메인 메뉴 처음 단).
+        // 관리(105)로 가지 않는다. 저장·+0x4f 는 그대로라 [14]·[최근게임] 이 곧장 경기로 다시 세운다
+        onQuit={() => {
+          actions.quitGame()
+          onExit()
+        }}
         settings={gameSettings.settings}
         onSettingsChange={gameSettings.setSettings}
       />
