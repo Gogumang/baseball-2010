@@ -65,6 +65,9 @@ export interface ManagementScreenProps {
   readonly onExit: () => void
 }
 
+/** 기본정보 카드 그림 0x166cc 의 바닥비트 (0x166f2 `movs r2, #0x87`) */
+const BASIC_INFO_FOOTER = 0x87
+
 /**
  * 관리 메뉴 — 원본 좌표 그대로 (0x167cc: 상태판 0x7d34c → 커맨드 줄 0x7e418 → 훈련 팝업 0x7f814 → 머리띠·바닥띠 0x54d94).
  * [선수정보]·[트레이닝]·[아이템] 은 화면을 바꾸지 않고 하단 줄이 하위 메뉴로 바뀐다 (0x7e84c).
@@ -108,7 +111,10 @@ export function ManagementScreen(props: ManagementScreenProps) {
         커맨드 줄보다 먼저 그리면 정보 칸 넷째 줄("필살"·"타순")이 아이콘에 덮여 사라진다.
       */}
       {menu.isShowingBasicInfo && <BasicInfoCard career={career} />}
-      <ScreenFrame title="나만의리그타자편" gamePoint={career.gamePoint} onBack={menu.back} />
+      {/* 기본정보(119)·칭호(129 — 0x198fc 가 0x166cc 를 먼저 그린다)는 바닥 0x87 "#닉네임"·"0상세정보"·되돌아가기 (0x166f2).
+          표시는 "#" 지만 칭호 키는 '*'(0x1056c) — 원본 그대로. '0' 상세(120)는 웹에 아직 없다. 그 밖 상태는 0x16928 의 5 */}
+      <ScreenFrame title="나만의리그타자편" gamePoint={career.gamePoint} onBack={menu.back}
+        footer={menu.isShowingBasicInfo ? BASIC_INFO_FOOTER : undefined} />
       {menu.overlay === '기록실' && <StandingsWindow league={career.league} onClose={menu.closeOverlay} />}
       {/* 칭호 목록(상태 129) — 기본정보 카드 위에 뜨고, 취소하면 그 카드(119)로 돌아간다 */}
       {menu.overlay === '칭호' && props.onEquipTitle !== undefined && (

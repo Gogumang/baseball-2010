@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Button, FrameSprite, RawScreen, SpriteNumber } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import {
@@ -16,6 +17,11 @@ interface PostseasonBracketProps {
   readonly onShowStats?: () => void
   readonly onNext?: () => void
   readonly nextLabel?: string
+  /**
+   * 머리띠·바닥띠 — 0x853ac 는 끝(0x8585c)에서 `0x7f4ec(판)` 으로 판에 맡겨 둔 제목·바닥비트(+0xc · +0x14,
+   * 장면 공통 틀이 0x7f53c 로 넣는다)를 0x54d95 로 그린다. 제목이 −1 이면 안 그린다. 대진 위·웹 단추 아래에 둔다.
+   */
+  readonly frame?: ReactNode
 }
 
 /**
@@ -30,7 +36,7 @@ interface PostseasonBracketProps {
  *  - "프레임 54 박스 0 을 단계 7 로 어둡게"(0x7f4ed) 는 P6 도 '유력' 이라 빼 뒀다.
  *  - 우승/탈락 문구(0x85e6c)는 공용 팝업 몫이라 여기서는 안 띄운다 (4a-3).
  */
-export function PostseasonBracket({ series, onShowStats, onNext, nextLabel = '다음' }: PostseasonBracketProps) {
+export function PostseasonBracket({ series, onShowStats, onNext, nextLabel = '다음', frame }: PostseasonBracketProps) {
   const origins = useFrameOrigins(BACKDROP.folder)
   const view = bracketViewOf(series)
   const wonLegs = new Set(view.wonLegs)
@@ -87,6 +93,8 @@ export function PostseasonBracket({ series, onShowStats, onNext, nextLabel = '�
           </div>
         )
       })}
+
+      {frame}
 
       {onNext !== undefined && (
         <Button variant="corner" className={styles.nextButton} onClick={onNext}>

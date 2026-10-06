@@ -164,6 +164,8 @@ export function PitcherLeagueRoute({
     return (
       <PostseasonScreen
         series={career.postseason}
+        edition="투수편"
+        gamePoint={career.gamePoint}
         popup={session.postseasonPopup}
         onConfirm={actions.pressPostseason}
         onClosePopup={actions.closePostseasonPopup}

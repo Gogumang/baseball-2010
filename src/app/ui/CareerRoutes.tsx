@@ -215,6 +215,8 @@ export function CareerRoutes({
       return (
         <PostseasonScreen
           series={career.postseason}
+          edition="타자편"
+          gamePoint={career.gamePoint}
           popup={screen.popup}
           onConfirm={actions.pressPostseason}
           onClosePopup={actions.closePostseasonPopup}

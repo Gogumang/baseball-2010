@@ -19,15 +19,25 @@ describe('나만의리그 포스트시즌 대진 화면 (상태 128)', () => {
   it('팝업이 없을 때만 [다음] 이 키(확인)다', () => {
     const onConfirm = vi.fn()
     const { rerender } = render(
-      <PostseasonScreen series={startPostseason([0, 1, 2, 3])} popup={null} onConfirm={onConfirm} onClosePopup={() => {}} />,
+      <PostseasonScreen edition="타자편" gamePoint={0} series={startPostseason([0, 1, 2, 3])} popup={null} onConfirm={onConfirm} onClosePopup={() => {}} />,
     )
     fireEvent.click(screen.getByText('다음'))
     expect(onConfirm).toHaveBeenCalledTimes(1)
 
     rerender(
-      <PostseasonScreen series={startPostseason([0, 1, 2, 3])} popup={{ kind: '정규시즌우승' }}
+      <PostseasonScreen edition="타자편" gamePoint={0} series={startPostseason([0, 1, 2, 3])} popup={{ kind: '정규시즌우승' }}
         onConfirm={onConfirm} onClosePopup={() => {}} />,
     )
     expect(screen.queryByText('다음')).toBeNull()
+  })
+
+  it('머리띠는 편 제목, 바닥은 1 — 되돌아가기가 없다 (0x16928 상태 0x80 → 0x853ac 끝 0x7f4ec)', () => {
+    const { container } = render(
+      <PostseasonScreen edition="투수편" gamePoint={0} series={startPostseason([0, 1, 2, 3])} popup={null}
+        onConfirm={() => {}} onClosePopup={() => {}} />,
+    )
+    expect(container.querySelectorAll('img[data-footer-mark]')).toHaveLength(0)
+    expect(screen.queryByRole('button', { name: '되돌아가기' })).toBeNull()
+    expect(container.querySelector('img[src*="game_frame/011"]')).not.toBeNull()
   })
 })

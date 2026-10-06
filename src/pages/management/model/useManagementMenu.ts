@@ -61,6 +61,8 @@ export function useManagementMenu(props: ManagementScreenProps) {
   const back = () => {
     if (playback.playingMenuId !== null) return
     if (overlay !== null) return setOverlay(null)
+    // 기본정보(119) 의 취소 → 106(선수정보 하위 메뉴) — 0x1056c (R9 「119·129·120」)
+    if (isShowingBasicInfo) return setIsShowingBasicInfo(false)
     if (kind === 'main') return props.onExit()
     const index = COMMAND_SLOTS.findIndex((slot) => slot.id === kind)
     open('main', null)

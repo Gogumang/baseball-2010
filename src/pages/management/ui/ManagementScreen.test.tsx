@@ -266,3 +266,30 @@ describe('칭호(닉네임) 목록 — 기본정보 카드에서 여는 하위 �
     expect(칭호창()).toBeNull()
   })
 })
+
+describe('기본정보 카드 바닥 (0x166cc)', () => {
+  const marks = (container: HTMLElement) =>
+    [...container.querySelectorAll('img[data-footer-mark]')].map((node) => Number((node as HTMLElement).dataset.footerMark))
+
+  it('카드가 떠 있으면 0x87 — "#닉네임"(8) · "0상세정보"(1) · 되돌아가기, 아니면 되돌아가기만(5)', () => {
+    const { container } = render(<ManagementScreen {...propsWith({})} />)
+    expect(marks(container)).toEqual([])
+
+    fireEvent.click(screen.getByRole('button', { name: '선수정보' }))
+    fireEvent.click(screen.getByRole('button', { name: '기본정보' }))
+
+    expect(marks(container)).toEqual([8, 1])
+    expect(screen.getByRole('button', { name: '되돌아가기' })).toBeTruthy()
+  })
+
+  it('카드에서 취소하면 선수정보 하위 메뉴(106)로 — 카드만 닫힌다 (0x1056c)', () => {
+    const { container } = render(<ManagementScreen {...propsWith({})} />)
+    fireEvent.click(screen.getByRole('button', { name: '선수정보' }))
+    fireEvent.click(screen.getByRole('button', { name: '기본정보' }))
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+
+    expect(container.querySelector('[data-testid="basic-info-card"]')).toBeNull()
+    expect(screen.getByRole('button', { name: '기본정보' })).toBeTruthy()
+  })
+})
