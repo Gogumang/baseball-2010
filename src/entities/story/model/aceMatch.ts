@@ -11,7 +11,7 @@ import type { EventReward } from '@/entities/story/model/eventReward'
  * `[sp+0x14] = u8 rec[4] − 1` 을 그대로 전역 기록에 적는다 —
  * `g[0xf7]`(타자편) / `g[0x175]`(투수편) = **미션 레코드 번호 = `team − 1`**(0부터).
  * 편은 이벤트 쪽이 정한다 (`evt[0x20] == 4` 타자편 · `== 3` 투수편).
- * 웹은 나만의리그 **타자편**만 있으므로 기본값을 '타자' 로 둔다.
+ * 기본값은 '타자'(타자편 App `startAceMatch`)이고, 투수편은 '투수' 를 넘긴다(`usePitcherLeagueSession.beginAceMatch`).
  *
  * 이벤트 데이터가 쓰는 team 은 16~20 뿐이라(events.json 전수) 레코드 15~19 =
  * 단계 0 "OO 공략" 다섯 개에 그대로 떨어진다.
