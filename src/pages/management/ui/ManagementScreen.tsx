@@ -11,7 +11,8 @@ import { useManagementMenu } from '@/pages/management/model/useManagementMenu'
 import { ManagementBoard } from '@/pages/management/ui/ManagementBoard'
 import { CommandBar } from '@/pages/management/ui/CommandBar'
 import { BasicInfoCard } from '@/pages/management/ui/BasicInfoCard'
-import { DetailPopup } from '@/pages/management/ui/DetailPopup'
+import { DetailPopup, DetailWindow } from '@/pages/management/ui/DetailPopup'
+import { batterAbilityDetailViewOf } from '@/pages/management/lib/abilityDetail'
 import { StandingsWindow } from '@/widgets/standings/ui/StandingsWindow'
 // 리그 전적을 경기 결과에 잇는 일은 팀 리드 담당이라, 그때까지는 빈 리그(전부 0승 0패)를 보여 준다
 import { SpecialSwingWindow } from '@/widgets/special-swing/ui/SpecialSwingWindow'
@@ -111,10 +112,16 @@ export function ManagementScreen(props: ManagementScreenProps) {
         커맨드 줄보다 먼저 그리면 정보 칸 넷째 줄("필살"·"타순")이 아이콘에 덮여 사라진다.
       */}
       {menu.isShowingBasicInfo && <BasicInfoCard career={career} />}
+      {/* 능력치 상세(120) — 그림 0x1b2e4 = 기본정보 카드 → 창 0x8a0a4 → 머리띠(0x7f4ed). 표·글은 0x88fe8 */}
+      {menu.abilityDetailOffset !== null && (() => {
+        const view = batterAbilityDetailViewOf(career)
+        return <DetailWindow rows={view.rows} messages={view.messages} scrollOffset={menu.abilityDetailOffset}
+          onClose={menu.closeAbilityDetail} />
+      })()}
       {/* 기본정보(119)·칭호(129 — 0x198fc 가 0x166cc 를 먼저 그린다)는 바닥 0x87 "#닉네임"·"0상세정보"·되돌아가기 (0x166f2).
-          표시는 "#" 지만 칭호 키는 '*'(0x1056c) — 원본 그대로. '0' 상세(120)는 웹에 아직 없다. 그 밖 상태는 0x16928 의 5 */}
+          표시는 "#" 지만 칭호 키는 '*'(0x1056c) — 원본 그대로. 120 은 0x16928 "그 밖"이라 5, 그 밖 상태도 5 */}
       <ScreenFrame title="나만의리그타자편" gamePoint={career.gamePoint} onBack={menu.back}
-        footer={menu.isShowingBasicInfo ? BASIC_INFO_FOOTER : undefined} />
+        footer={menu.isShowingBasicInfo && menu.abilityDetailOffset === null ? BASIC_INFO_FOOTER : undefined} />
       {menu.overlay === '기록실' && <StandingsWindow league={career.league} onClose={menu.closeOverlay} />}
       {/* 칭호 목록(상태 129) — 기본정보 카드 위에 뜨고, 취소하면 그 카드(119)로 돌아간다 */}
       {menu.overlay === '칭호' && props.onEquipTitle !== undefined && (

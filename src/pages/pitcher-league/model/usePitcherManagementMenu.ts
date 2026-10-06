@@ -32,6 +32,8 @@ import {
 } from '@/entities/pitcher-career/model/pitchSelection'
 import { magicPitchNameOf } from '@/entities/pitcher-career/model/magicPitch'
 import { equipPitcherTitle } from '@/entities/pitcher-career/model/pitcherTitles'
+import { abilityDetailScrollKeyOf, scrollAbilityDetail } from '@/pages/management/lib/abilityDetail'
+import { pitcherAbilityDetailViewOf } from '@/pages/pitcher-league/lib/pitcherDetailPopup'
 import { pitchTypeNameOf } from '@/entities/pitcher-career/model/pitchTraining'
 import {
   PITCHER_COMMAND_SLOTS,
@@ -126,6 +128,9 @@ export interface PitcherManagementMenu {
   /** 기본정보(119) 위에 띄운 칭호 목록 창 — 원본 하위 상태 **129** (P3 10-1) */
   readonly isTitleWindowOpen: boolean
   readonly closeTitleWindow: () => void
+  /** 능력치 상세 창(120)의 글 첫 줄 (창 +0x380) — 창이 없으면 null */
+  readonly abilityDetailOffset: number | null
+  readonly closeAbilityDetail: () => void
   /** 129 확인 — 선수 +0x1c4 에 고른 번호를 넣고 저장한다 (0x11f78) */
   readonly equipTitle: (title: string) => void
   readonly items: readonly MenuItem[]
@@ -164,6 +169,11 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
   const [subWindow, setSubWindow] = useState<PitcherMenuWindow>(null)
   /** 119 위에 뜨는 칭호 목록 창(129). 창을 여닫는 키는 `'*'` 다 — 아래 키 처리 주석 참고 */
   const [isTitleWindowOpen, setIsTitleWindowOpen] = useState(false)
+  /**
+   * 능력치 상세 창(120) 글 상자 첫 줄 — 창 +0x380 (진입 0x1b624 가 0). null 이면 창이 없다.
+   * 119 에서 '0' 으로 열고 취소·'0' 이면 119 로 (키 0x1b654 — 타자편 `useManagementMenu` 와 같은 처리).
+   */
+  const [abilityDetailOffset, setAbilityDetailOffset] = useState<number | null>(null)
   const [pitchWindowTab, setPitchWindowTab] = useState<number>(PITCH_WINDOW_TABS.마구)
   /** 기록실 창의 갈래 (장면 +0x164 — 팝업 0x80 이 정한다) */
   const [recordWindowTab, setRecordWindowTab] = useState<number>(RECORD_WINDOW_TABS.엔트리)
@@ -386,12 +396,14 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
 
   const back = useCallback(() => {
     setNotice('')
+    // 120 취소 → 119 (0x1b654)
+    if (abilityDetailOffset !== null) return setAbilityDetailOffset(null)
     // 129 취소도 **119** 로 돌아간다 (0x11f9a) — 기본정보 카드는 그대로 남는다
     if (isTitleWindowOpen) return setIsTitleWindowOpen(false)
     if (subWindow !== null) return closeWindow()
     if (kind !== '관리') return setKind('관리')
     return onExit()
-  }, [closeWindow, isTitleWindowOpen, kind, onExit, subWindow])
+  }, [abilityDetailOffset, closeWindow, isTitleWindowOpen, kind, onExit, subWindow])
 
   /*
    * 기본정보(119) 에서 칭호 목록(129) 을 여는 키.
@@ -403,15 +415,26 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
    */
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key !== '*') return
       // 팝업이 떠 있으면 그쪽이 먼저 키를 가져간다 (원본도 창 위 팝업이 키를 잡는다)
       if (question !== null || choice !== null || notice !== '') return
+      // 120 키 0x1b654 — 취소·'0' → 119, 그 밖은 0x8a044 글 스크롤(↑·'2' / ↓·'8')
+      if (abilityDetailOffset !== null) {
+        if (event.key === 'Escape' || event.key === 'Backspace' || event.key === '0') return setAbilityDetailOffset(null)
+        const direction = abilityDetailScrollKeyOf(event.key)
+        if (direction === null) return
+        event.preventDefault()
+        const lineCount = pitcherAbilityDetailViewOf(career).messages.length
+        return setAbilityDetailOffset(scrollAbilityDetail(abilityDetailOffset, lineCount, direction))
+      }
+      // 119 키 0x1056c — '0'(0x30) → 120 (진입 0x1b624: 글을 새로 만들고 스크롤 0)
+      if (event.key === '0' && subWindow === '기본정보' && !isTitleWindowOpen) return setAbilityDetailOffset(0)
+      if (event.key !== '*') return
       if (isTitleWindowOpen) return setIsTitleWindowOpen(false)
       if (subWindow === '기본정보') setIsTitleWindowOpen(true)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [choice, isTitleWindowOpen, notice, question, subWindow])
+  }, [abilityDetailOffset, career, choice, isTitleWindowOpen, notice, question, subWindow])
 
   /** 129 확인 — `선수+0x1c4 = sel` 뒤 곧바로 저장한다 (0x11f78 의 확인 갈래) */
   const equipTitle = useCallback(
@@ -563,6 +586,8 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     selectPitchCell,
     isTitleWindowOpen,
     closeTitleWindow: () => setIsTitleWindowOpen(false),
+    abilityDetailOffset,
+    closeAbilityDetail: () => setAbilityDetailOffset(null),
     equipTitle,
     items,
     notice,

@@ -4,6 +4,9 @@ import { useTrainingPlayback } from '@/widgets/training-scene/model/useTrainingP
 import { COMMAND_MENUS, COMMAND_SLOTS } from '@/pages/management/lib/managementLayout'
 import type { ManagementCommand, MenuSlot, SubMenuKind } from '@/pages/management/lib/managementLayout'
 import type { ManagementScreenProps } from '@/pages/management/ui/ManagementScreen'
+import {
+  abilityDetailScrollKeyOf, batterAbilityDetailViewOf, scrollAbilityDetail,
+} from '@/pages/management/lib/abilityDetail'
 
 /** 커서를 옮긴 뒤 두 번 갱신하는 동안 +1, −1 로 튄다 (카운터 +0x98) */
 const BOUNCE_BY_UPDATE = [1, -1]
@@ -31,6 +34,11 @@ export function useManagementMenu(props: ManagementScreenProps) {
   const [openedAt, setOpenedAt] = useState(0)
   /** 선수정보 하위 메뉴에서 연 카드 — 상태판 자리에 그린다 (0x15e20) */
   const [isShowingBasicInfo, setIsShowingBasicInfo] = useState(false)
+  /**
+   * 능력치 상세 창(상태 120) 글 상자 첫 줄 — 창 +0x380 (진입 0x1b624 가 0 으로). null 이면 창이 없다.
+   * 119 에서 '0' 으로 열고, 취소·'0' 이면 119 로 (키 0x1b654).
+   */
+  const [abilityDetailOffset, setAbilityDetailOffset] = useState<number | null>(null)
   /** 선수정보 하위 메뉴에서 관리 화면 위에 띄우는 창 — 기록실 0x7f070 · 필살타법 0x803d4 */
   const [overlay, setOverlay] = useState<ManagementOverlay | null>(null)
   /** 예/아니오 질문 (StrMODE[85] 훈련 · [90] 휴식) */
@@ -47,6 +55,7 @@ export function useManagementMenu(props: ManagementScreenProps) {
 
   const open = (next: MenuKind, nextParent: MenuSlot | null) => {
     setIsShowingBasicInfo(false)
+    setAbilityDetailOffset(null)
     setOverlay(null)
     setKind(next)
     setParent(nextParent)
@@ -60,6 +69,8 @@ export function useManagementMenu(props: ManagementScreenProps) {
   }
   const back = () => {
     if (playback.playingMenuId !== null) return
+    // 120 의 취소 → 119 (0x1b654)
+    if (abilityDetailOffset !== null) return setAbilityDetailOffset(null)
     if (overlay !== null) return setOverlay(null)
     // 기본정보(119) 의 취소 → 106(선수정보 하위 메뉴) — 0x1056c (R9 「119·129·120」)
     if (isShowingBasicInfo) return setIsShowingBasicInfo(false)
@@ -113,7 +124,18 @@ export function useManagementMenu(props: ManagementScreenProps) {
         if (event.key === 'Enter' || event.key === 'Escape') props.onCloseDetail()
         return
       }
+      // 120 키 0x1b654 — 취소·'0' → 119, 그 밖은 0x8a044 글 스크롤(↑·'2' / ↓·'8', 나머지 키는 아무 일도 없다)
+      if (abilityDetailOffset !== null) {
+        if (event.key === 'Escape' || event.key === 'Backspace' || event.key === '0') return setAbilityDetailOffset(null)
+        const direction = abilityDetailScrollKeyOf(event.key)
+        if (direction === null) return
+        event.preventDefault()
+        const lineCount = batterAbilityDetailViewOf(props.career).messages.length
+        return setAbilityDetailOffset(scrollAbilityDetail(abilityDetailOffset, lineCount, direction))
+      }
       if (event.key === 'Escape' || event.key === 'Backspace') return back()
+      // 119 키 0x1056c — '0'(0x30) → 120 능력치 상세 (진입 0x1b624: 글을 새로 만들고 스크롤 0)
+      if (event.key === '0' && isShowingBasicInfo && overlay === null) return setAbilityDetailOffset(0)
       /*
        * 기본정보 카드(상태 119) 에서 칭호 목록(상태 129) 을 여는 키.
        *
@@ -140,6 +162,8 @@ export function useManagementMenu(props: ManagementScreenProps) {
   return {
     kind,
     isShowingBasicInfo,
+    abilityDetailOffset,
+    closeAbilityDetail: () => setAbilityDetailOffset(null),
     overlay,
     closeOverlay: () => setOverlay(null),
     /** 필살타법 창(상태 0x6c)의 StrMODE[66] "예" — 원본은 상태 0x7d → 0x17f5c(연출 뒤 0xa3bac) */

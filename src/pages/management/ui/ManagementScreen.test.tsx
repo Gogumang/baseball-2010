@@ -293,3 +293,53 @@ describe('기본정보 카드 바닥 (0x166cc)', () => {
     expect(screen.getByRole('button', { name: '기본정보' })).toBeTruthy()
   })
 })
+
+describe('능력치 상세 창 — 기본정보(119)에서 \'0\' → 120 (키 0x1056c · 0x1b654)', () => {
+  const 기본정보열기 = () => {
+    fireEvent.click(screen.getByRole('button', { name: '선수정보' }))
+    fireEvent.click(screen.getByRole('button', { name: '기본정보' }))
+  }
+  const 상세창 = () => screen.queryByRole('dialog', { name: '상세정보' })
+  const 바닥표시 = (container: HTMLElement) =>
+    [...container.querySelectorAll('img[data-footer-mark]')].map((node) => Number((node as HTMLElement).dataset.footerMark))
+
+  it("'0' 으로 열고 '0'·취소로 119 로 돌아간다 — 120 바닥은 5", () => {
+    const { container } = render(<ManagementScreen {...propsWith({})} />)
+    기본정보열기()
+    expect(바닥표시(container)).toEqual([8, 1])
+
+    fireEvent.keyDown(window, { key: '0' })
+    expect(상세창()).not.toBeNull()
+    expect(바닥표시(container)).toEqual([])
+    // 120 에서 '*' 는 칭호 목록을 열지 않는다 (0x1b654 의 그 밖 키 = 스크롤)
+    fireEvent.keyDown(window, { key: '*' })
+    expect(screen.queryByRole('dialog', { name: '칭호' })).toBeNull()
+
+    fireEvent.keyDown(window, { key: '0' })
+    expect(상세창()).toBeNull()
+    expect(container.querySelector('[data-testid="basic-info-card"]')).not.toBeNull()
+
+    fireEvent.keyDown(window, { key: '0' })
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(상세창()).toBeNull()
+    expect(container.querySelector('[data-testid="basic-info-card"]')).not.toBeNull()
+  })
+
+  it('글 줄이 넷을 넘으면 ↓ 로 민다', () => {
+    const career = {
+      ...createCareer('테스터'),
+      morale: 5,
+      isSick: true,
+      isInjured: true,
+      equipmentLevels: { hit: 1, power: 1, defense: 0, run: 0 },
+    }
+    render(<ManagementScreen {...propsWith({ career })} />)
+    기본정보열기()
+    fireEvent.keyDown(window, { key: '0' })
+    expect(screen.getByText('나이스 헬멧')).toBeTruthy()
+
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    expect(screen.queryByText('나이스 헬멧')).toBeNull()
+    expect(screen.getByText('사기')).toBeTruthy()
+  })
+})

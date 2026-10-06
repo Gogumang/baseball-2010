@@ -668,3 +668,21 @@ describe('머리띠·바닥 (0x16928 · 0x166cc)', () => {
     expect(screen.getByRole('button', { name: '되돌아가기' })).toBeTruthy()
   })
 })
+
+describe('능력치 상세 창(120) — 기본정보에서 \'0\' (키 0x1056c · 0x1b654)', () => {
+  it("'0' 으로 열면 투수 이름표 표와 글이 뜨고 바닥은 5, 되돌아가기는 119 로", () => {
+    const { container } = 화면({ career: 투수({ morale: 20 }) })
+    누르기('선수정보')
+    누르기('기본정보')
+    fireEvent.keyDown(window, { key: '0' })
+
+    expect(screen.getByRole('dialog', { name: '상세정보' })).toBeTruthy()
+    expect(container.querySelector('img[src$="img_text/frames/340.png"]')).not.toBeNull()
+    expect(screen.getByText('사기')).toBeTruthy()
+    expect(container.querySelectorAll('img[data-footer-mark]').length).toBe(0)
+
+    누르기('되돌아가기')
+    expect(screen.queryByRole('dialog', { name: '상세정보' })).toBeNull()
+    expect(container.querySelectorAll('img[data-footer-mark]').length).toBe(2)
+  })
+})

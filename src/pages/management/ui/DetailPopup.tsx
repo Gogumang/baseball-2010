@@ -1,6 +1,7 @@
 import { FrameSprite, SpriteNumber } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
+import { parseGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import { glyphsWidthOf, numberGlyphsOf } from '@/pages/management/lib/managementLayout'
 import {
   CHANGE_ARROW_FRAMES, DETAIL_CHANGE_X, DETAIL_CURRENT_DX, DETAIL_HEADER, DETAIL_LABEL_BOX, DETAIL_MAXIMUM_DX,
@@ -49,13 +50,18 @@ interface DetailWindowProps {
   readonly rows: readonly DetailRow[]
   readonly messages: readonly string[]
   readonly onClose: () => void
+  /**
+   * 글 상자 첫 줄 — 창 +0x380. 0x8a0a4 는 이 줄부터 끝까지 16px 간격으로 그리고 상자 밖은 잘린다(0x8a148~0x8a180).
+   * 능력치 상세(120)만 0x8a044 로 민다. 안 주면 0.
+   */
+  readonly scrollOffset?: number
 }
 
 /**
  * 상세정보 창 — 표와 메시지 줄. 누르면 닫힌다. 창 모양(0x55e60)은 선 목록만 확인돼 CSS 로 근사한다 (추정)
  * 두 모드 공용 창(0x872d4)이라 줄(이름표 포함)만 받는다 — 투수편은 이름표 340~343 으로 세운 줄을 넘긴다.
  */
-export function DetailWindow({ rows, messages, onClose }: DetailWindowProps) {
+export function DetailWindow({ rows, messages, onClose, scrollOffset = 0 }: DetailWindowProps) {
   const origins = useFrameOrigins(MODE_UI)
   const textOrigins = useFrameOrigins(IMG_TEXT)
   const sway = Math.floor(useUpdateCounter() / ARROW_SWAY_UPDATES) % 2
@@ -106,8 +112,13 @@ export function DetailWindow({ rows, messages, onClose }: DetailWindowProps) {
         )
       })}
       <div className={styles.messages} style={{ left: DETAIL_MESSAGE_BOX.x, top: DETAIL_MESSAGE_BOX.y, width: DETAIL_MESSAGE_BOX.width, height: DETAIL_MESSAGE_BOX.height }}>
-        {messages.map((message, index) => (
-          <div key={index} style={{ height: DETAIL_MESSAGE_LINE_HEIGHT }}>{message}</div>
+        {/* 글은 0xba269 가 색 마크업(!c)을 읽으며 그린다 — 능력치 상세(120)의 "[!cFFFF00이름!cFFFFFF]" */}
+        {messages.slice(scrollOffset).map((message, index) => (
+          <div key={scrollOffset + index} style={{ height: DETAIL_MESSAGE_LINE_HEIGHT }}>
+            {parseGameMarkup(message).flatMap((line) => line.segments).map((segment, segmentIndex) => (
+              <span key={segmentIndex} style={segment.color === null ? undefined : { color: segment.color }}>{segment.text}</span>
+            ))}
+          </div>
         ))}
       </div>
     </div>

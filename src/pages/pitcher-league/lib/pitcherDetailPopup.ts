@@ -1,11 +1,14 @@
 import { BALANCE } from '@/shared/config/original/balance'
-import { equippedPitcherAbilityOf, pitcherAbilityLimitsOf } from '@/entities/pitcher-career/model/pitcherCareer'
+import {
+  effectivePitcherAbilityOf, equippedPitcherAbilityOf, isPitcherSkillEquipped, pitcherAbilityLimitsOf,
+} from '@/entities/pitcher-career/model/pitcherCareer'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { PITCHER_ABILITY_ORDER } from '@/entities/pitcher-career/model/pitcherAbility'
 import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbility'
 import type { PitcherTrainingOutcome } from '@/entities/pitcher-career/model/pitcherManagement'
 import { detailRowsFromSlots, PITCHER_DETAIL_LABEL_FRAMES } from '@/pages/management/lib/detailPopup'
-import type { DetailRow, DetailSlots } from '@/pages/management/lib/detailPopup'
+import type { DetailRow, DetailSlots, DetailView } from '@/pages/management/lib/detailPopup'
+import { abilityDetailViewOf } from '@/pages/management/lib/abilityDetail'
 
 /**
  * 투수편 상세 결과 창 줄 — 창 0x872a1 · 그리기 0x872d4 는 두 모드 공용이다 (타자편 `detailPopup.ts`).
@@ -17,6 +20,9 @@ import type { DetailRow, DetailSlots } from '@/pages/management/lib/detailPopup'
  */
 
 const MAXIMUM_MORALE = BALANCE.limits.morale
+/** 0xb62b5(기록, 5) 무력감 · (기록, 7) 전설 — 장착 비트 */
+const POWERLESS_SKILL = 5
+const LEGEND_SKILL = 7
 
 const abilitySlotsOf = (ability: PitcherAbility): readonly number[] => PITCHER_ABILITY_ORDER.map((key) => ability[key])
 
@@ -54,4 +60,31 @@ export function pitcherTrainingDetailRowsOf(outcome: PitcherTrainingOutcome): De
 /** 휴식 결과 창 — 0x18ede~0x18fc2: 능력치 칸 0, 사기 칸은 회복 굴림 그대로(100 자르기 전), 보너스 0 */
 export function pitcherRestDetailRowsOf(after: PitcherCareer, moraleGain: number): DetailRow[] {
   return rowsOf(after, { ability: [0, 0, 0, 0], morale: moraleGain })
+}
+
+/**
+ * 투수편 능력치 상세 창(120) — 0x88fe8 의 모드 3 갈래: 장비 이름 StrITEM 44 칸부터 · 능력치 이름 StrMODE[40..43] ·
+ * 이름표 340~343. 최대값은 0x5e865 모드 3 갈래(보직 0xb6705) = `pitcherAbilityLimitsOf`.
+ * 실효값은 피로 없는 0xb570c = `effectivePitcherAbilityOf`.
+ * ⚠️ 미해결: 0xb570c 의 코치 갈래(0xb5a28~0xb5a72 — 투수 · 스킬 14 장착 · 칸 ≠ 3 · 경기 객체 [+0x6b] > 4 ·
+ * 0xb6a4d(경기) == 팀이면 +v/10)는 관리 화면에서 **지난 경기 객체**를 읽는다. 웹에는 그 값이 없어 넣지 않았다.
+ */
+export function pitcherAbilityDetailViewOf(career: PitcherCareer): DetailView {
+  const limits = pitcherAbilityLimitsOf(career)
+  const effective = effectivePitcherAbilityOf(career)
+  return abilityDetailViewOf(
+    {
+      isBatter: false,
+      base: abilitySlotsOf(career.ability),
+      limits: abilitySlotsOf(limits),
+      effective: abilitySlotsOf(effective),
+      morale: career.morale,
+      equipmentNibbles: abilitySlotsOf(career.equipmentLevels),
+      isPowerlessEquipped: isPitcherSkillEquipped(career, POWERLESS_SKILL),
+      isLegendEquipped: isPitcherSkillEquipped(career, LEGEND_SKILL),
+      isSick: career.isSick,
+      isInjured: career.isInjured,
+    },
+    PITCHER_DETAIL_LABEL_FRAMES,
+  )
 }

@@ -14,6 +14,7 @@ import { PitcherRepertoirePanel } from '@/pages/pitcher-league/ui/PitcherReperto
 import { PitcherRecordPanel } from '@/pages/pitcher-league/ui/PitcherRecordPanel'
 import { PitchTrainingScreen } from '@/pages/pitcher-league/ui/PitchTrainingScreen'
 import { DetailWindow } from '@/pages/management/ui/DetailPopup'
+import { pitcherAbilityDetailViewOf } from '@/pages/pitcher-league/lib/pitcherDetailPopup'
 import * as styles from '@/pages/pitcher-league/ui/PitcherManagementScreen.css'
 
 /**
@@ -132,12 +133,19 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
         )}
       </div>
 
+      {/* 능력치 상세(120) — 그림 0x1b2e4 = 기본정보 카드 → 창 0x8a0a4 → 머리띠(0x7f4ed). 표·글은 0x88fe8 */}
+      {isBasicInfo && menu.abilityDetailOffset !== null && (() => {
+        const view = pitcherAbilityDetailViewOf(career)
+        return <DetailWindow rows={view.rows} messages={view.messages} scrollOffset={menu.abilityDetailOffset}
+          onClose={menu.closeAbilityDetail} />
+      })()}
+
       {/*
-        머리띠 제목 9 · 바닥 — 기본정보(119)·칭호(129)는 0x87, 그 밖은 0x16928 의 5. 되돌아가기 = 취소(−16):
+        머리띠 제목 9 · 바닥 — 기본정보(119)·칭호(129)는 0x87, 120 과 그 밖은 0x16928 의 5. 되돌아가기 = 취소(−16):
         105 는 메인 메뉴로, 그 아래 화면은 한 단계 위로.
       */}
       <ScreenFrame title="나만의리그투수편" gamePoint={career.gamePoint} onBack={menu.back}
-        footer={isBasicInfo ? BASIC_INFO_FOOTER : undefined} />
+        footer={isBasicInfo && menu.abilityDetailOffset === null ? BASIC_INFO_FOOTER : undefined} />
 
       {/*
         칭호 목록 창 — 원본 하위 상태 **129** (P3 10-1). 기본정보(119) 위에 겹쳐 뜨고
