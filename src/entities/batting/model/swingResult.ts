@@ -34,13 +34,26 @@ import type { SwingBoost } from '@/entities/batting/model/swingBoost'
  * 0xb6c20(state, 팀) = s8 state[0x31 + 팀] (0 이면 사람 — J 노트), state[9] 공격 · state[0xa] 수비.
  * 존 시작값 배율(sp34) 뒤, contact 식 앞이라 contact 에도 들어간다. 0xab5fe 의 셋째 호출은 결과를 버린다.
  *
- * ⚠️ 미해결: 홈런더비(모드 7, sp44)는 contact 식이 다른 갈래(0xab69a~)로 가는데 웹은 아직 그 갈래가 없다.
+ * **홈런더비 갈래** (모드 7, sp44 = 1 — 0xab2c2). contact·B·C 를 **보정 없는 능력치**로 따로 센다 (확정):
+ * ```
+ * ab60e: if sp44: → ab69a                         ; 번트 contact(×12/10, ab610)도 건너뛴다
+ * ab69a: contact = (eff(히트) + 1200) · (타이밍·sp34/10000) / 10      ; K 계수·hit 쪽 보정 없음
+ * ab6d4: B += D[0x46]·10 + ((D[0x48]·eff(히트)·D[0x5a] + D[0x4c]·eff(파워)·D[0x5b])/100)/(D[0x5a]+D[0x5b])
+ *        → ab820 (B 의 +500 ab812 를 건너뛴다)
+ * ab854: C += D[0x4a]·10 + D[0x48]·eff(파워)/100   → ab90a (C 의 +500 ab8fc 를 건너뛴다)
+ * abf18: 15/18 경계에서 18 이 나오면 rand(0,2) == 1 → 24, 아니면 18
+ * ```
+ * eff 는 hit 쪽·power 쪽과 같은 인자(0xb570d …, 1, 0x5a, 1)로 부른 타자 능력치 = `batter.hit`·`batter.power` 다 —
+ * 보정 구조체 out[0]·out[2], 내 선수 보너스, 투수 능력, 팀 조작 보정이 모두 빠진다. 계수는 **마선수식(D[0x46..0x4e])** 이고
+ * C 의 곱은 D[0x4c](extraCoefficient)가 아니라 **D[0x48](hitCoefficient)** 다 (ab876 `ldr r3,[sp,#0x7c]` — 원본 그대로).
+ * 타이밍 배율·탈진 2000·스킬·out[0xa]/[0xb]·상한은 다른 모드와 같은 길을 탄다.
  */
 /**
  * 판정이 보는 원본 모드(0x1552d10) 묶음 —
- * '나만의리그' = 모드 3·4 (투수편·타자편) · '미션' = 모드 6 (**타자** 미션) · '투수미션' = 모드 5 · '일반' = 그 밖.
+ * '나만의리그' = 모드 3·4 (투수편·타자편) · '미션' = 모드 6 (**타자** 미션) · '투수미션' = 모드 5 ·
+ * '홈런더비' = 모드 7 (sp44) · '일반' = 그 밖.
  */
-export type SwingMode = '일반' | '나만의리그' | '미션' | '투수미션'
+export type SwingMode = '일반' | '나만의리그' | '미션' | '투수미션' | '홈런더비'
 
 export interface SwingResultInput {
   /** 공 도착점 − 기준점 + 타자 좌우 이동 (원본 픽셀, ±40 으로 자름) */
@@ -188,6 +201,24 @@ export function swingFactorsOf(input: SwingResultInput): SwingFactors {
     trunc((multiplier * (input.pitcher.control + boost.pitcherControl + pitcherBonus)) / 100) +
     teamAdjust
   const scaledContact = trunc((baseContact * (300 - multiplier)) / 200)
+  const exhausted = input.isPitcherExhausted ? EXHAUSTED_BONUS : 0
+  const timingScale = (input.timing - TIMING_PIVOT) * 2 + 100
+  const { hitWeight, extraWeight } = BALANCE.swing
+
+  if (input.mode === '홈런더비') {
+    // 0xab69a~0xab744 · 0xab854~0xab888 — 머리말 "홈런더비 갈래"
+    const ace = BALANCE.swing.aceFormula
+    const { hit, power } = input.batter
+    const derbyContact = trunc(((hit + 1200) * trunc((scaledContact * input.timing) / 10_000)) / 10)
+    const derbySolidWeight =
+      ace.hitBase * 10 +
+      trunc(trunc((ace.hitCoefficient * hit * hitWeight + ace.extraCoefficient * power * extraWeight) / 100) /
+        (hitWeight + extraWeight))
+    const derbySolid = trunc(((baseSolid + derbySolidWeight) * timingScale) / 100) + exhausted
+    const derbyHomeRunWeight = ace.extraBase * 10 + trunc((ace.hitCoefficient * power) / 100)
+    const derbyHomeRun = trunc(((baseHomeRun + exhausted + derbyHomeRunWeight) * timingScale) / 100)
+    return finishFactors(derbyContact, derbySolid, derbyHomeRun, input, boost)
+  }
 
   const contact = input.buntKind > 0
     ? trunc((scaledContact * 12) / 10)
@@ -198,19 +229,26 @@ export function swingFactorsOf(input: SwingResultInput): SwingFactors {
       )
 
   const formula = isAceFormula ? BALANCE.swing.aceFormula : BALANCE.swing.normalFormula
-  const { hitWeight, extraWeight } = BALANCE.swing
   const solidWeight =
     trunc(
       trunc((hitEdge * formula.hitCoefficient * hitWeight + powerEdge * formula.extraCoefficient * extraWeight) / 100) /
         (hitWeight + extraWeight),
     ) + formula.hitBase * 10
-  const timingScale = (input.timing - TIMING_PIVOT) * 2 + 100
   // 원본은 B 를 먼저 배율까지 끝내고 나서 탈진 보너스를 더하고, C 는 그 보너스를 먼저 받은 뒤 배율을 먹는다
-  const exhausted = input.isPitcherExhausted ? EXHAUSTED_BONUS : 0
   const solid = trunc(((baseSolid + solidWeight + SWING_STRENGTH_BONUS) * timingScale) / 100) + exhausted
   const homeRunWeight = formula.extraBase * 10 + trunc((powerEdge * formula.extraCoefficient) / 100)
   const homeRun = trunc(((baseHomeRun + exhausted + homeRunWeight + SWING_STRENGTH_BONUS) * timingScale) / 100)
+  return finishFactors(contact, solid, homeRun, input, boost)
+}
 
+/** 스킬(0xab91c~) → 보정 구조체 % (0xabd92~0xabe02) — 모든 모드가 같은 길로 모인다 */
+function finishFactors(
+  contact: number,
+  solid: number,
+  homeRun: number,
+  input: SwingResultInput,
+  boost: SwingBoost,
+): SwingFactors {
   const skilled = applySwingSkills({ solid, homeRun }, input.batterSkillIds, input.pitcherSkillIds, input.situation)
   // 0xabd92~0xabe02 — 스킬 보정 뒤, 상한(0xabeba) 앞. 마구 % 도 부호가 양수라 타자 쪽을 올린다 (원본 그대로)
   const boostedSolid = skilled.solid + trunc((skilled.solid * boost.solidPercent) / 100)
@@ -218,7 +256,7 @@ export function swingFactorsOf(input: SwingResultInput): SwingFactors {
   return { contact, solid: boostedSolid, homeRun: boostedHomeRun }
 }
 
-/** 원본 난수 순서: 번트용 rand(0,100) → contact → B → C → 15/18 경계 */
+/** 원본 난수 순서: 번트용 rand(0,100) → contact → B → C → 15/18 경계 (→ 홈런더비만 18 에서 rand(0,2)) */
 export function swingResultOf(input: SwingResultInput, random: RandomPort): SwingResult {
   const factors = swingFactorsOf(input)
   const buntRoll = randomIntegerBelow(random, 0, 100)
@@ -239,8 +277,10 @@ export function swingResultOf(input: SwingResultInput, random: RandomPort): Swin
   if (randomIntegerBelow(random, 0, 10_000) < solid) {
     if (randomIntegerBelow(random, 0, 10_000) < homeRun) return { kind: '타구', code: 24, isSolid: true }
     const lineDriveLimit = trunc((homeRun * 120) / trunc((10_000 - homeRun) / 100))
-    const code = randomIntegerBelow(random, 0, 10_000) >= lineDriveLimit ? 15 : 18
-    return { kind: '타구', code, isSolid: true }
+    if (randomIntegerBelow(random, 0, 10_000) >= lineDriveLimit) return { kind: '타구', code: 15, isSolid: true }
+    // 홈런더비는 18 자리에서 한 번 더 굴린다 — rand(0,2) == 1 이면 24 (0xabf18~0xabf2a)
+    if (input.mode === '홈런더비' && randomIntegerBelow(random, 0, 2) === 1) return { kind: '타구', code: 24, isSolid: true }
+    return { kind: '타구', code: 18, isSolid: true }
   }
   const roll = randomIntegerBelow(random, 0, 10_000) - BALANCE.swing.foulPercent * 100
   if (roll < 0) return { kind: '타구', code: 9, isSolid: true }

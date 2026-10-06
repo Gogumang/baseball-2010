@@ -64,8 +64,8 @@ type MenuOverlay = '조작방법' | '설정'
  * 타석 연출은 다른 모드와 똑같이 `widgets/batting-stage` 를 쓰되 **일반 점수판 대신
  * 홈런더비 HUD(0x45a54)** 를 겹친다 — 원본도 `0x4c4bc` 에서 그렇게 갈린다.
  *
- * 판정 모드는 `'일반'` 이다: `0xab214` 의 "내 선수" 보너스는 원본 모드 3·4(나만의리그)에서만
- * 켜지고 홈런더비는 모드 7 이라 그 갈래에 안 들어간다.
+ * 판정 모드는 `'홈런더비'` 다: `0xab214` 는 모드 7(sp44)이면 contact·B·C 를 보정 없는 능력치로 세는
+ * 다른 갈래(0xab69a)로 가고, 18 자리에서 24 를 한 번 더 굴린다 (`entities/batting/model/swingResult` 머리말).
  */
 export function HomeRunDerbyScreen({
   ability,
@@ -157,7 +157,7 @@ export function HomeRunDerbyScreen({
           batterSkillIds={batterSkillIds}
           pitcherAbility={pitcher.ability}
           aceLevels={aceLevels}
-          swingMode="일반"
+          swingMode="홈런더비"
           gameMode={DERBY_MODE}
           isEagleEyeEnabled={false}
           // 홈런더비는 일반 점수판을 안 그린다 (0x4c4bc 가 0x373d0 대신 0x45a54 로 간다)

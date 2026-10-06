@@ -219,3 +219,50 @@ describe('내 선수 비트7 · 팀 조작 보정 (0xab3d4 · 0xab5c0)', () => {
     )
   })
 })
+
+describe('홈런더비 갈래 (모드 7 sp44 — 0xab69a · 0xab854 · 0xabf18)', () => {
+  it('contact·B·C 를 보정 없는 능력치와 마선수식 계수로 센다 — +500 없음, C 는 D[0x48] 곱', () => {
+    // contact = (300+1200)·trunc(10000·100/10000)/10 = 15000
+    // B = trunc((500 + 2500 + trunc(trunc((400·300·3 + 430·300·1)/100)/4)) · 146/100) = trunc(4222·1.46) = 6164
+    // C = trunc((350 + 700 + trunc(400·300/100)) · 146/100) = trunc(2250·1.46) = 3285
+    expect(swingFactorsOf(기본입력({ mode: '홈런더비' }))).toEqual({ contact: 15000, solid: 6164, homeRun: 3285 })
+  })
+
+  it('투수 능력·제구 배율·팀 조작·보정 구조체 out[0]/out[2] 는 contact·B·C 에 닿지 않는다', () => {
+    const 기본 = swingFactorsOf(기본입력({ mode: '홈런더비' }))
+    expect(
+      swingFactorsOf(
+        기본입력({
+          mode: '홈런더비',
+          pitcher: { control: 900, velocity: 900 },
+          isDefenseHuman: true,
+          boost: { ...NO_SWING_BOOST, batterHit: 200, batterPower: 200 },
+        }),
+      ),
+    ).toEqual(기본)
+  })
+
+  it('탈진 보너스 2000 은 B 에는 배율 뒤, C 에는 배율 앞에 그대로 붙는다', () => {
+    const 지침 = swingFactorsOf(기본입력({ mode: '홈런더비', isPitcherExhausted: true }))
+    expect(지침.solid).toBe(6164 + 2000)
+    expect(지침.homeRun).toBe(Math.trunc(((350 + 2000 + 1900) * 146) / 100))
+  })
+
+  it('18 자리에서 rand(0,2) 를 한 번 더 굴려 1 이면 24, 0 이면 18', () => {
+    // 경계 trunc(3285·120 / trunc(6715/100)) = 5883 → 0.5(5000) 는 18 자리
+    const 굴림 = (last: number) => 순서난수([0, 0, 0, 0.5, 0.5, last])
+    const 홈런 = 굴림(0.5)
+    expect(swingResultOf(기본입력({ mode: '홈런더비' }), 홈런)).toEqual({ kind: '타구', code: 24, isSolid: true })
+    expect(홈런.draws).toHaveLength(6)
+    expect(swingResultOf(기본입력({ mode: '홈런더비' }), 굴림(0.4))).toEqual({ kind: '타구', code: 18, isSolid: true })
+  })
+
+  it('15 자리와 다른 모드의 18 은 더 굴리지 않는다', () => {
+    const 더비15 = 순서난수([0, 0, 0, 0.5, 0.9])
+    expect(swingResultOf(기본입력({ mode: '홈런더비' }), 더비15)).toEqual({ kind: '타구', code: 15, isSolid: true })
+    expect(더비15.draws).toHaveLength(5)
+    const 일반18 = 순서난수([0, 0, 0, 0.5, 0.2955])
+    expect(swingResultOf(기본입력(), 일반18)).toEqual({ kind: '타구', code: 18, isSolid: true })
+    expect(일반18.draws).toHaveLength(5)
+  })
+})
