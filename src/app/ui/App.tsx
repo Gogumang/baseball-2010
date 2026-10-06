@@ -497,6 +497,7 @@ export function App() {
         screen={screen} setScreen={setScreen} session={careerSession} gameSettings={gameSettings}
         collection={collection.collection} random={random} wallet={wallet} aceSelect={aceSelect}
         hallOfFameDeletion={hallOfFameDeletion}
+        recordStat={recordStat}
         onRenamePlayer={editedNames.rename}
         onResetEditedNames={editedNames.clear}
         // 모드 초기화 나리 칸 — 0x224ec(mgr, 4 타자 / 3 투수): 그 편 저장(game_br/pr.sav)·+0x40+m·+0x4c+m 지움 → 0x223a8 이

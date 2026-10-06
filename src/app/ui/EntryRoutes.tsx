@@ -28,6 +28,7 @@ import { HelpScreen } from '@/pages/help/ui/HelpScreen'
 import { SpecialEditScreen } from '@/pages/special-edit/ui/SpecialEditScreen'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import type { CareerResetEdition } from '@/entities/settings/model/modeReset'
+import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 
 interface EntryRoutesProps {
   readonly screen: Screen
@@ -46,6 +47,8 @@ interface EntryRoutesProps {
     readonly onOpenAce: (cell: number) => void
     readonly onLevelUp: (cell: number, cost: number) => void
   }
+  /** 기록연감 사건 — 홈런더비 결과의 획득 G 통계(0x22c7d)를 남긴다. 안 넘기면 안 남긴다 */
+  readonly recordStat?: (event: AnnalsStatEvent) => void
   /** 스페셜 명예의 전당 "슬롯에서 삭제" — 앱이 기록연감·시즌 명단 정리를 묶어 넘긴다 */
   readonly hallOfFameDeletion?: HallOfFameDeletion
   /**
@@ -96,7 +99,7 @@ export function EntryRoutes({
   screen, setScreen, session, gameSettings, collection, random, wallet, aceSelect, hallOfFameDeletion, claimCollectionReward,
   onRenamePlayer, onResetEditedNames, onResetCareerEdition, careerResetBlockOf, onResetSeason, onStartGeneralMode,
   isGeneralGameInProgress = false, lastPlayedMode = 1, onLastPlayedMode, onResumeGeneralGame,
-  nariGameReady, onResumeNariGame,
+  nariGameReady, onResumeNariGame, recordStat,
 }: EntryRoutesProps) {
   /** 전부 수집 보상 팝업 글 (0x292f8 의 `0xbbef9(글, 1, −1, 1)`) — 메뉴 위에 뜬다 */
   const [collectionRewardText, setCollectionRewardText] = useState<string | null>(null)
@@ -261,6 +264,8 @@ export function EntryRoutes({
           }
           // 결과 보상도 전역 +0x64 에 쌓는다 (0x4f6cc, 상한 99999) — 지갑으로 들어간다
           session.actions.gainGamePoint(result.gainedGamePoint)
+          // 이어 0x4f70a `0x22c7d(앱, scene+0x17f4 = 번 G, scene+0x1104 = 7)` — 기록연감 모드별 획득 G (칸 6)
+          recordStat?.({ kind: 'G획득', mode: HOME_RUN_DERBY_MODE, amount: result.gainedGamePoint })
         }}
         settings={gameSettings.settings}
         onSettingsChange={gameSettings.setSettings}

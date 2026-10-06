@@ -32,9 +32,10 @@ describe('홈런더비 진입 — 하위 16 선수 고르기 (0x25e6c · 0x29ac8
   if (등록결과.kind !== '등록') throw new Error('등록 실패')
   const 명전기록 = 등록결과.collection
 
-  function 띄우기(career: typeof 나리 | null) {
+  function 띄우기(career: typeof 나리 | null, recordStat = vi.fn()) {
     const setScreen = vi.fn()
     const props = {
+      recordStat,
       screen: { kind: '홈런더비' } as Screen,
       setScreen,
       session: { career, savedCareer: null, actions: { gainGamePoint: vi.fn() } } as unknown as Props['session'],
@@ -75,6 +76,15 @@ describe('홈런더비 진입 — 하위 16 선수 고르기 (0x25e6c · 0x29ac8
     expect(srcs).toContain('./sprites/game_frame/013.png')
     expect(srcs).not.toContain('./sprites/game_frame/003.png')
     expect(srcs).toContain('./sprites/gpoint/011.png')
+  })
+
+  it('결과 정산은 지갑에 더한 뒤 기록연감 모드 7 획득 G 를 남긴다 (0x4f700 → 0x4f70a 0x22c7d(앱, 번 G, 7))', () => {
+    const recordStat = vi.fn()
+    띄우기(나리, recordStat)
+    fireEvent.click(view.getByRole('button', { name: '6번 슬롯' }))
+    const onFinish = 받은것.at(-1)?.onFinish as (result: { bestDistance: number; gainedGamePoint: number }) => void
+    onFinish({ bestDistance: 0, gainedGamePoint: 123 })
+    expect(recordStat).toHaveBeenCalledWith({ kind: 'G획득', mode: 7, amount: 123 })
   })
 
   it('되돌아가기는 메인 메뉴 (결과 0)', () => {
