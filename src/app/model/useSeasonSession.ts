@@ -59,7 +59,8 @@ import { KOREA_TEAM_ID, createNationalCup, nationalCupSideOf } from '@/entities/
 import { advanceNationalCupDay } from '@/entities/national-cup/model/nationalCupPlay'
 import { isSeasonNationalCupYear } from '@/entities/national-cup/model/nationalCupFlow'
 import type { NationalCupFinish } from '@/entities/national-cup/model/nationalCupFlow'
-import { applySeasonReward, GAME_POINT_LIMIT, judgeSeasonEnding } from '@/entities/season-mode/model/seasonRewards'
+import { applySeasonBurstRewards, applySeasonReward, GAME_POINT_LIMIT, judgeSeasonEnding } from '@/entities/season-mode/model/seasonRewards'
+import type { BurstRewardDelta } from '@/entities/burst-mission/model/burstMissionReward'
 import type { LeagueFirstAward } from '@/entities/season-mode/model/seasonRewards'
 import type { SeasonAwardReward } from '@/widgets/season/lib/seasonAwardEvents'
 import { activeSound } from '@/shared/api/audio/soundPort'
@@ -248,6 +249,12 @@ export interface SeasonActions {
   readonly clearNotice: () => void
   readonly quit: () => void
 }
+
+/**
+ * 팀 경기 요약이 돌발 변화량을 싣게 되면 받을 칸 — `TeamGameSummary` 에는 아직 없다(features 소관, 보고함).
+ * 경기 중 `resolveBurst` 의 `deltas` 를 판정 차례대로 모은 목록이면 된다.
+ */
+type SeasonBurstSummary = TeamGameSummary & { readonly burstRewardDeltas?: readonly BurstRewardDelta[] }
 
 /** 저장 칸 하나에 시즌 상태·리그 전적·로스터를 함께 담는다 (원본 저장 0x22755 에 해당) */
 interface SeasonSave {
@@ -1159,7 +1166,14 @@ export function useSeasonSession(
   const finishGame = useCallback(
     (summary: TeamGameSummary) => {
       if (save === null) return
-      const { record } = save.state
+      const savedBefore = save
+      // 돌발미션 보상·페널티 (0x8e34c 모드 2) — 원본은 판정이 난 경기 중에 SR·팀 사기에 바로 더하므로 평가보다 앞이다.
+      // ⚠️ 팀 경기 요약(`TeamGameSummary`, features 소관)이 아직 돌발 변화량을 싣지 않는다 — 실으면(`burstRewardDeltas`)
+      //    여기서 그대로 먹는다. 그 전에는 빈 목록이라 아무 일도 없다.
+      const burstDeltas = (summary as SeasonBurstSummary).burstRewardDeltas ?? []
+      const afterBurst = applySeasonBurstRewards(savedBefore.state, burstDeltas)
+      const current: SeasonSave = afterBurst === savedBefore.state ? savedBefore : { ...savedBefore, state: afterBurst }
+      const { record } = current.state
       const opponent = summary.opponentTeamId
 
       // 경기 끝 0x4ea0c 는 모드가 5·6(미션)이 아니면 **갈래(정규·포스트시즌·국가대항전)를 가르기 전에**
@@ -1195,13 +1209,13 @@ export function useSeasonSession(
       const stage = { nationalCup: gameKind === '국가대항전', postseason: gameKind === '포스트시즌' }
       if (!seasonGameIsEvaluated(stage)) {
         if (stage.postseason) {
-          const series = save.series ?? null
+          const series = current.series ?? null
           if (series === null) return
           const winner = won ? record.teamId : opponent
           // 4f268 → 4f29a 0xb818c(포스트시즌 갈래는 스태미나를 안 건드린다) → 4f2bc 열 팀 +20%.
           // 그 뒤 결산 0xef 키 0x9dc8 이 CPU 끼리 경기 0xc2760 을 돌린다 — 회복이 **끝난** 표로 서고 깎인 값이
           // 그대로 남는다(0xc2760 의 하루 끝 0xb818c 포스트시즌 갈래는 회복이 없고, 0xb617c 는 0x4ea0c 에서만 불린다)
-          const rested = withDayEndRecovery(withGameEndStamina(save, summary))
+          const rested = withDayEndRecovery(withGameEndStamina(current, summary))
           const cpu = runCpuPostseasonWithStamina(
             advancePostseason(series, winner),
             record.teamId,
@@ -1215,14 +1229,14 @@ export function useSeasonSession(
             cpuPitcherStaminas: cpu.pitcherStaminas,
             series: advanced,
             state: {
-              ...save.state,
+              ...current.state,
               record: { ...played, postseasonChampion: advanced.champion ?? NO_CHAMPION },
             },
           })
           setGameOptions(null)
           return setScene(SEASON_SCENE_STATE.시즌결산)
         }
-        const cup = save.cup ?? null
+        const cup = current.cup ?? null
         if (cup === null) return
         // 내 쪽은 시즌 팀(SR[1], 0~9)이 아니라 **경기에 들어간 대한민국(10)** 이다 — 0x6548 국가대항전
         // 가지(65e2 `cmp r5,#0xa`)가 경기[0x28+side] 에 10 을 꽂았고, 결과 장면 0x4ea0c 는 그 경기 팀으로
@@ -1231,26 +1245,26 @@ export function useSeasonSession(
         const winner = won ? summary.ourTeamId : opponent
         const loser = won ? opponent : summary.ourTeamId
         commit({
-          ...save,
+          ...current,
           cup: advanceNationalCupDay(cup, winner, loser, random),
-          state: { ...save.state, record: played },
+          state: { ...current.state, record: played },
         })
         setGameOptions(null)
         return setScene(SEASON_SCENE_STATE.국가대항전)
       }
 
       const afterMyGame = won
-        ? recordLeagueResult(save.league, record.teamId, opponent)
-        : recordLeagueResult(save.league, opponent, record.teamId)
+        ? recordLeagueResult(current.league, record.teamId, opponent)
+        : recordLeagueResult(current.league, opponent, record.teamId)
       // 내 경기의 끝 스태미나를 되적고 → 같은 날 CPU 경기 0xc2a48 이 그 표로 치러 깎고 → 하루 끝 4f2bc 열 팀 +20%
-      const afterGameStamina = withGameEndStamina(save, summary)
+      const afterGameStamina = withGameEndStamina(current, summary)
       const day = playLeagueDay(
         afterMyGame,
         record.games,
         record.teamId,
         random,
         recordLeaguePlateAppearances(
-          save.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS,
+          current.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS,
           summary.leaguePlateAppearances,
         ),
         afterGameStamina.cpuPitcherStaminas,
@@ -1271,7 +1285,7 @@ export function useSeasonSession(
         opponentTeamId: opponent,
       })
       const evaluated = applySeasonGameEvaluation(
-        { ...save.state, record: played },
+        { ...current.state, record: played },
         evaluation,
       )
 

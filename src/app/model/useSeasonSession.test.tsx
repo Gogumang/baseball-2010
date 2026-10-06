@@ -373,6 +373,30 @@ describe('시즌 이벤트 재생 0xd3', () => {
   })
 })
 
+describe('시즌 돌발미션 보상 (0x8e34c 모드 2)', () => {
+  it('요약이 싣고 온 돌발 변화량을 평가 앞에 SR·팀 사기에 더한다 — 사기는 팀 레코드 +2', () => {
+    const { result } = 띄우기()
+    시작(result, 0)
+    act(() => result.current.actions.updateRecord({ ...result.current.state!.record, money: 100, reputation: 50 }))
+    act(() => result.current.actions.playNextGame())
+    const 전 = result.current.state!
+    const 돌발 = {
+      ...요약({ result: '패', won: false, ourScore: 3, opponentScore: 5 }),
+      burstRewardDeltas: [
+        { name: '소지금', amount: 7 },
+        { name: '평판', amount: -3 },
+        { name: '사기', amount: -200 },
+      ],
+    } as TeamGameSummary
+    act(() => result.current.actions.finishGame(돌발))
+
+    const 후 = result.current.state!
+    expect(후.record.money).toBe(전.record.money + 7)
+    // 사기는 0 으로 잘린 뒤 경기 평가(패 −10)가 붙어도 0 아래로 안 간다
+    expect(후.teamMorale).toBe(0)
+  })
+})
+
 describe('시즌 목표 ③④ 의 재료 (seasonGoalInputOf)', () => {
   it('팀 타율은 리그 선수 기록표의 내 팀 타자 0~8번에서 센다 (0xa3700)', () => {
     const { result } = 띄우기()

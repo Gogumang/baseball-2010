@@ -1,10 +1,12 @@
 import {
   MONEY_LIMIT,
+  MORALE_LIMIT,
   POPULARITY_LIMIT,
   REPUTATION_LIMIT,
   clampTo,
 } from '@/entities/season-mode/model/seasonRecord'
-import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
+import type { SeasonRecord, SeasonState } from '@/entities/season-mode/model/seasonRecord'
+import type { BurstRewardDelta } from '@/entities/burst-mission/model/burstMissionReward'
 
 /**
  * 시즌 결산 보상 — 한국시리즈(`0x85ec`) · 국가대항전(`0x896c`) · 리그 1위 G포인트(`0x6900`).
@@ -68,6 +70,35 @@ export function applySeasonReward(record: SeasonRecord, reward: SeasonReward): S
     reputation: clampTo(record.reputation + reward.reputation, REPUTATION_LIMIT),
     money: clampTo(record.money + reward.money, MONEY_LIMIT),
   }
+}
+
+/**
+ * 시즌 돌발미션 보상·페널티 — `0x8e34c` 의 모드 2 갈래 (직접 떴다).
+ *
+ * ```
+ * r6 = 0x1f55c(저장) = SR                       ; 8e376~8e37c (모드 2)
+ * 종류 1 사기  : 0x1f9a8(저장, 2, SR[1]) = 0x1f570(저장, 팀) → 팀 레코드 +2 += v (0..100)   ; 8e3c8~8e404
+ * 종류 2 인기도: SR+0x48 += v (0..9999)        ; 8e428~8e44a
+ * 종류 3 평판  : SR+0x62 += v (0..999)         ; 8e44e~8e46c
+ * 종류 4 소지금: SR+2 += v (0..9999, 100만 단위) ; 8e470~8e48a
+ * ```
+ * 성공은 두 칸을 더하고 실패는 한 칸을 뺀다 — 부호는 `burstRewardDeltasOf` 가 이미 먹였다.
+ * 원본은 판정이 난 **그 자리(경기 중)** 에서 더하므로 경기 끝 평가(0x4ea0c)보다 앞이다.
+ */
+export function applySeasonBurstRewards(state: SeasonState, deltas: readonly BurstRewardDelta[]): SeasonState {
+  return deltas.reduce<SeasonState>((current, delta) => {
+    const { record } = current
+    switch (delta.name) {
+      case '사기':
+        return { ...current, teamMorale: clampTo(current.teamMorale + delta.amount, MORALE_LIMIT) }
+      case '인기도':
+        return { ...current, record: { ...record, popularity: clampTo(record.popularity + delta.amount, POPULARITY_LIMIT) } }
+      case '평판':
+        return { ...current, record: { ...record, reputation: clampTo(record.reputation + delta.amount, REPUTATION_LIMIT) } }
+      case '소지금':
+        return { ...current, record: { ...record, money: clampTo(record.money + delta.amount, MONEY_LIMIT) } }
+    }
+  }, state)
 }
 
 /**
