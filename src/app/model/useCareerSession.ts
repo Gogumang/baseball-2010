@@ -1105,6 +1105,20 @@ export function useCareerSession({
     /** GP 결과 창 닫기 — 콜백 0x1d649 는 팝업만 닫는다 (굴림 없음) */
     closeShopGpDetail: () => setShopGpDetail(null),
 
+    /**
+     * **마선수 대결로 나가는 장소 이벤트의 끝 처리** — 이벤트 관리자 0x8cf64 의 match(SYS 8, 0x8d734~0x8d904)는 미션
+     * 장면으로 가는 전환(0xbdae9)을 걸고 0x8a380 으로 관리자를 비운 뒤 **1(끝남)** 을 돌려준다 — 보통 이벤트 끝(0x8d506 →
+     * 0x8d8ee)과 같은 꼬리다. 그래서 같은 틀의 114 끝 처리 0x1c014 가 그 자리에서 돌아, 뒤 상태가 113(장소)이고
+     * +0x167 == 0 이면 S+4 = 1(행동함) · S+0x6a(외출 수)++ · 105 · 저장(0x1fded · 0x22755)을 한다.
+     * 결과 이벤트(140 → `[다음 114, 뒤 105]`)의 끝에서는 장소 끝 처리를 다시 하지 않는다 (`대결결과`).
+     * match 는 빈 장소 이벤트(440~444, +0x167 = 1)에 없다.
+     */
+    settlePlaceForAceMatch: () => {
+      if (career === null) return
+      const visited = spendCycleAction({ ...career, outingsThisSeason: career.outingsThisSeason + 1 })
+      setCareer(awardTitles(visited, evaluateNewTitles(visited)))
+    },
+
     /** [!] 장소에서 [들어가기] — 그 장소(trigger 2~6)의 이벤트를 본다 */
     enterPlace: (place: OutingPlace) => {
       if (career === null || career.hasActedThisCycle) return

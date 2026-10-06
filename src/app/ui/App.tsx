@@ -177,14 +177,19 @@ export function App() {
     },
   }
 
-  /** 이벤트 match → 공략 레코드 대결. 레코드가 없는 team 은 없지만, 만나면 패배 결과로 넘긴다 (추정) */
+  /**
+   * 이벤트 match → 공략 레코드 대결. 레코드가 없는 team 은 없지만, 만나면 패배 결과로 넘긴다 (추정).
+   * 장소 이벤트였다면 match 가 돌려준 "끝남" 으로 0x1c014 의 장소 끝 처리(행동 · 외출 수)가 **나가는 자리에서** 돈다.
+   * 결과 이벤트는 어디서 나갔든 140 `[다음 114, 뒤 105]` — 맥락 `대결결과`.
+   */
   const startAceMatch: AceMatchStarter = (command, carried, context) => {
+    if (context === '장소') careerSession.actions.settlePlaceForAceMatch()
     const target = aceMatchMissionOf(command.team)
     if (target === null) {
-      setScreen({ kind: '이벤트', eventId: matchResultEventOf(command.resultEvents, false), context, carried })
+      setScreen({ kind: '이벤트', eventId: matchResultEventOf(command.resultEvents, false), context: '대결결과', carried })
       return
     }
-    mission.actions.beginAceMatch(target, { resultEvents: command.resultEvents, context, carried })
+    mission.actions.beginAceMatch(target, { resultEvents: command.resultEvents, context: '대결결과', carried })
   }
 
   // 미션 모드는 메인 메뉴에서 바로 들어간다. 육성 선수가 없으면 신인 능력치로 한다

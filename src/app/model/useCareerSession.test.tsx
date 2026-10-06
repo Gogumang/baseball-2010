@@ -506,6 +506,24 @@ describe('외출 장소 기능 가드 (113 키 0x16cf0) — 막히면 원문 알
   })
 })
 
+describe('마선수 대결로 나가는 장소 이벤트 — match 의 "끝남" 으로 0x1c014 장소 끝 처리가 나가는 자리에서 돈다 (0x8d904)', () => {
+  it('나갈 때 행동을 쓰고 외출 수 +1, 140 결과 이벤트(대결결과) 끝에서는 다시 안 쓰고 105', () => {
+    const rendered = 띄우기({ ...createCareer('대결'), morale: 50 })
+    act(() => rendered.result.current.setScreen({ kind: '이벤트', eventId: 113, context: '장소' }))
+    const before = rendered.result.current.session.career!
+
+    act(() => rendered.result.current.session.actions.settlePlaceForAceMatch())
+    expect(rendered.result.current.session.career?.hasActedThisCycle).toBe(true)
+    expect(rendered.result.current.session.career?.outingsThisSeason).toBe(before.outingsThisSeason + 1)
+
+    act(() => rendered.result.current.setScreen({ kind: '이벤트', eventId: 114, context: '대결결과' }))
+    act(() => rendered.result.current.session.actions.completeScene([], [113, 114]))
+    expect(rendered.result.current.screen).toEqual({ kind: '관리' })
+    expect(rendered.result.current.session.career?.outingsThisSeason).toBe(before.outingsThisSeason + 1)
+    expect(rendered.result.current.session.career?.seenEventIds).toEqual(expect.arrayContaining(['113', '114']))
+  })
+})
+
 describe('외출 126 — 효과 팝업 → 105 (0x15234 · 0x1575c)', () => {
   it('장소 기능을 고르면 효과 팝업이 뜨고, [확인] 이면 관리 화면으로 가며 입원 회복 글은 관리 알림이 된다', () => {
     const rendered = 띄우기({ ...createCareer('외출'), morale: 50, money: 1000, isInjured: true, injuryRemaining: 1 })

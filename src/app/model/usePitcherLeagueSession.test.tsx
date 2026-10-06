@@ -655,7 +655,7 @@ describe('자동 발동 (0x1cf9c → 0x8be80 → 0xadc70) · 연초 115', () => 
 })
 
 describe('마선수 대결 (match → 투수 미션 team−1 → 140 결과 이벤트)', () => {
-  it('대결로 나갔다가 이기면 resultEvents[0] 을 앞 이벤트가 모은 것과 함께 틀고, 끝나면 105 — 행동은 안 쓴다', async () => {
+  it('대결로 나갔다가 이기면 resultEvents[0] 을 앞 이벤트가 모은 것과 함께 틀고, 끝나면 105 — 장소 끝 처리는 나갈 때 한 번', async () => {
     const { result } = 띄우기()
     act(() => result.current.actions.create('투수', 신인))
     await 이벤트불러오기(result)
@@ -668,6 +668,9 @@ describe('마선수 대결 (match → 투수 미션 team−1 → 140 결과 이�
     act(() => result.current.actions.beginAceMatch({ op: 'match', team: 16, resultEvents: [114, 115] }, 앞보상))
     expect(result.current.scene).toBe('마선수대결')
     expect(result.current.aceMatch?.mission).toMatchObject({ side: '투수', id: 16 })
+    // match(SYS 8)가 관리자에 끝남(1)을 돌려 0x1c014 의 장소 끝 처리가 이 자리에서 돈다 (0x8d904)
+    expect(result.current.career?.hasActedThisCycle).toBe(true)
+    expect(result.current.career?.outingsThisSeason).toBe(1)
 
     act(() => result.current.actions.finishAceMatch(true))
     expect(result.current.story).toEqual({ eventId: 114, context: '대결결과', viewed: [], carried: 앞보상 })
@@ -677,8 +680,9 @@ describe('마선수 대결 (match → 투수 미션 team−1 → 140 결과 이�
     expect(result.current.scene).toBe('관리')
     expect(result.current.career?.popularity).toBe(인기도 + 5)
     expect(result.current.career?.seenEventIds).toEqual(expect.arrayContaining(['113', '114']))
-    expect(result.current.career?.hasActedThisCycle).toBe(false)
-    expect(result.current.career?.outingsThisSeason).toBe(0)
+    // 140 결과 이벤트의 뒤 상태는 105 라 장소 끝 처리를 다시 하지 않는다
+    expect(result.current.career?.hasActedThisCycle).toBe(true)
+    expect(result.current.career?.outingsThisSeason).toBe(1)
   })
 
   it('지면 resultEvents[1]', async () => {

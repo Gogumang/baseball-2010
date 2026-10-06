@@ -147,7 +147,8 @@ export function CareerRoutes({
       // 외출·장소 이벤트의 뒷 화면은 아직 확인하지 못해 예전처럼 덮개만 띄운다.
       return (
         <>
-          {screen.context === '관리' && management}
+          {/* 140 결과 이벤트도 뒤 상태가 105 다 (0x10e40) */}
+          {(screen.context === '관리' || screen.context === '대결결과') && management}
           {/* 대사창은 화면 **위에 얹히는 덮개**다 — 안 감싸면 창 전체로 퍼져 구석에 그려진다 */}
           <ScreenOverlay>
           <StoryScreen

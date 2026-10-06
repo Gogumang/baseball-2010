@@ -5,8 +5,11 @@ import type { OriginalEvent } from '@/shared/config/original/eventTypes'
 import { OUTING_PLACES } from '@/shared/config/outingPlaces'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
-/** 이벤트 화면을 어디서 열었는가 — 끝난 뒤 돌아갈 곳과 행동 소모가 달라진다 */
-export type StoryContext = '관리' | '외출진입' | '장소' | '시즌'
+/**
+ * 이벤트 화면을 어디서 열었는가 — 끝난 뒤 돌아갈 곳과 행동 소모가 달라진다.
+ * `대결결과` 는 마선수 대결에서 돌아와 트는 결과 이벤트(상태 140 0x10df8 `[다음 114, 뒤 105]`)다.
+ */
+export type StoryContext = '관리' | '외출진입' | '장소' | '시즌' | '대결결과'
 
 /**
  * 원작 이벤트 일정. 본문(events.ts, 535KB)은 첫 화면에 필요 없어 커리어가 생긴 뒤 따로 불러온다

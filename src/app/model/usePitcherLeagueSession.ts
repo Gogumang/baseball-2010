@@ -293,6 +293,19 @@ function hiddenOpenNoticeOf(rewards: readonly EventReward[]): string {
 
 /** 496 "정말로 은퇴하려는 거냐?" — 502 "은퇴한다" 의 gotoEvent (선택지 380 / 503) */
 const RETIREMENT_CONFIRM_EVENT_ID = 496
+
+/**
+ * **match 로 나가는 장소 이벤트의 끝 처리** — 이벤트 관리자 0x8cf64 의 match(SYS 8, 0x8d734~0x8d904)는 미션 장면 전환
+ * (0xbdae9)을 걸고 0x8a380 으로 관리자를 비운 뒤 **1(끝남)** 을 돌려준다(보통 이벤트 끝 0x8d506 → 0x8d8ee 와 같은 꼬리).
+ * 그래서 같은 틀의 114 끝 처리 0x1c014 가 그 자리에서 돌아, 뒤 상태가 113 이고 +0x167 == 0 이면 S+4 = 1(행동함) ·
+ * S+0x6a(외출 수)++ · 105 · 저장을 한다. match 는 빈 장소 이벤트(440~444)에 없다. 장소가 아니면 그대로.
+ */
+function settlePlaceForAceMatch(current: PitcherCareer, context: PitcherStoryContext): PitcherCareer {
+  return context === '장소'
+    ? spendPitcherCycleAction({ ...current, outingsThisSeason: current.outingsThisSeason + 1 })
+    : current
+}
+
 /** 연봉 칸 한 단위(100만원)를 금액 서식(만원 단위)으로 — 0x8bc4c 의 ×100 */
 const MONEY_TEXT_SCALE = 100
 
@@ -1092,7 +1105,7 @@ export function usePitcherLeagueSession(
         commit(viewed)
         return setScene('외출')
       }
-      // 140 → 뒤 105. 대결로 나간 장소 이벤트는 0x1c014 의 장소 끝 처리(행동·외출 수)를 지나지 않는다 (아래 `beginAceMatch`)
+      // 140 → 뒤 105. 장소 끝 처리(행동·외출 수)는 대결로 **나갈 때** 이미 했다 (아래 `settlePlaceForAceMatch`)
       if (story.context === '대결결과') {
         commit(viewed)
         return setScene('관리')
@@ -1114,13 +1127,13 @@ export function usePitcherLeagueSession(
   /**
    * 경기 명령(r_event `match`) — 투수편 장소 이벤트 113·123·127·150·153·192·196·207·211·217·221·225·229 (대상 3).
    *
-   * **대결 화면이 없을 때의 근사** (`abortStoryAtMatch`): 그때까지 지나온 보상·본 이벤트만 남기고 알림과 함께 105
-   * (행동·외출 수는 쓰지 않는다). 결과 이벤트는 열리지 않는다.
+   * **대결 화면이 없을 때의 근사** (`abortStoryAtMatch`): 그때까지 지나온 보상·본 이벤트만 남기고 알림과 함께 105.
+   * 장소 끝 처리(행동·외출 수)는 match 가 끝남을 돌려주는 자리라 그대로 한다. 결과 이벤트는 열리지 않는다.
    */
   const abortStoryAtMatch = useCallback(
     (carry: StoryCarry) => {
       if (career === null || story === null) return
-      const rewarded = applyPitcherEventRewards(career, carry.rewards, random, story.eventId)
+      const rewarded = applyPitcherEventRewards(settlePlaceForAceMatch(career, story.context), carry.rewards, random, story.eventId)
       commit(finishPitcherEvent(rewarded, carry.viewedEventIds))
       setStory(null)
       setStoryNotice(PITCHER_MANAGEMENT_TEXT.notPorted)
@@ -1133,7 +1146,8 @@ export function usePitcherLeagueSession(
    * **마선수 대결** — SYS 8(0x8d734 → 0x8d764)이 `g[0x175] = team − 1`(투수편 미션 레코드 번호)를 적고 미션 장면으로 나간다.
    * 그때까지 지나온 보상·본 이벤트는 재생기가 들고(`carry`) 결과 이벤트로 넘긴다 — 타자편과 같은 꼴.
    * 이벤트 데이터의 team 은 16~20 뿐이라 투수 미션 16~20 "메디카·킹타이거·로제·크라이져·어거지죠" (목표 아웃) 에 떨어진다.
-   * 장소 이벤트가 114 에서 끝나지 않고 장면을 떠나므로 0x1c014 의 장소 끝 처리(행동 · 외출 수)는 돌지 않는다 (유력).
+   * match 가 관리자에 "끝남"(1)을 돌려주므로 장소 이벤트였다면 0x1c014 의 장소 끝 처리(행동 · 외출 수)가 **나가는 자리에서**
+   * 돈다 (`settlePlaceForAceMatch`). 결과 이벤트(140)의 끝에서는 다시 하지 않는다.
    */
   const [aceMatch, setAceMatch] = useState<PitcherAceMatch | null>(null)
   const beginAceMatch = useCallback(
@@ -1141,11 +1155,12 @@ export function usePitcherLeagueSession(
       if (career === null || story === null) return
       const mission = aceMatchMissionOf(command.team, '투수')
       if (mission === null) return abortStoryAtMatch(carry)
+      if (story.context === '장소') commit(settlePlaceForAceMatch(career, story.context))
       setStory(null)
       setAceMatch({ mission, resultEvents: command.resultEvents, carried: carry })
       setScene('마선수대결')
     },
-    [abortStoryAtMatch, career, story],
+    [abortStoryAtMatch, career, commit, story],
   )
 
   /**
