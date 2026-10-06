@@ -335,9 +335,6 @@ function defenseOf(
  * ⚠️ 남은 차이:
  *   - 마투수 스태미나 시작 값 — 원본은 저장의 마투수 레코드(`0x1f824`) +0x2c 를 통째로 복사한다. 그 값을 못 읽어
  *     10000 으로 선다 (`features/play-team-game` 의 마투수와 같은 근사).
- *   - CPU 대타 판정 `0xac228` 은 타석의 타자가 마선수(`0xb633c`)면 대타를 안 낸다. 그 검사가 웹 `tryQuickCpuPinchHit`
- *     (`entities/game/model/quickLineup`)에 `batterIsAce: false` 로 박혀 있어, 대타로 들어선 마타자가 다시 대타로
- *     바뀔 수 있다 — 그 파일 몫이다.
  *   - 원본은 마선수를 팀 **저장 레코드**에 넣는다(0xb53f0·0xb521c 가 0xb8680 의 레코드를 늘리고 덮는다) — 첫 경기 뒤로
  *     팀 레코드에 마선수 칸이 남아 사람 경기의 명단·기록표에도 비친다. 웹은 경기마다 붙박이 표에서 새로 세운다.
  */
@@ -366,6 +363,9 @@ export function simulateLeagueGame(
   const homeAcePitcher = homeAces === undefined ? undefined : acePitcherOf(homeAces.pitcher, levels)
   const batterOfTeam = (teamId: number, ace: QuickAtBatBatter | undefined) => (slot: number) =>
     slot === ACE_BATTER_ROSTER_SLOT && ace !== undefined ? ace : batterAt(teamId, slot)
+  // CPU 대타 0xac228 은 타석 타자가 마선수(0xb633c)면 안 낸다 — 대타로 들어선 마타자는 다시 안 바뀐다.
+  // 마타자 칸(12)은 마선수를 넣은 명단에만 있다
+  const isAceRosterSlot = (slot: number) => slot === ACE_BATTER_ROSTER_SLOT
   // 선발은 경기를 세울 때 로스터 앞 4명 중 하나로 정해진다 (0x3107a·0x31090, S13 1-4b)
   // 칸 번호를 먼저 정해 두는 것은 **투수 기록을 그 칸에 쌓아야** 하기 때문이다.
   // 난수를 부르는 횟수·순서는 예전과 같다(팀마다 한 번씩).
@@ -451,7 +451,7 @@ export function simulateLeagueGame(
       undefined,
       undefined,
       defenseOf(matchup.home, homeMound, homeRuns - awayRuns, homeStaminas, homeAcePitcher),
-      { lineup: awayLineup, batterOf: awayBatterOf, pinchHitUsed },
+      { lineup: awayLineup, batterOf: awayBatterOf, pinchHitUsed, isAceRosterSlot },
     )
     awayRuns += top.runs
     awayOrder = top.nextBattingOrderIndex % BATTING_ORDER_SIZE
@@ -477,7 +477,7 @@ export function simulateLeagueGame(
       undefined,
       undefined,
       defenseOf(matchup.away, awayMound, awayRuns - homeRuns, awayStaminas, awayAcePitcher),
-      { lineup: homeLineup, batterOf: homeBatterOf, pinchHitUsed },
+      { lineup: homeLineup, batterOf: homeBatterOf, pinchHitUsed, isAceRosterSlot },
     )
     homeRuns += bottom.runs
     homeOrder = bottom.nextBattingOrderIndex % BATTING_ORDER_SIZE

@@ -73,4 +73,16 @@ describe('간이 엔진 명단과 CPU 대타 (0xac228 → 0xaf06c → 0xaebe4 �
     expect(tryQuickCpuPinchHit(두타석범타(), 0, { alreadyUsedThisGame: true, runnerCount: 3 }, 둘째)).toBeNull()
     expect(둘째.calls()).toBe(0)
   })
+
+  it('타석 타자가 마선수(0xb633c)면 굴림 없이 안 바꾼다 — ac232 가 벤치 수보다 먼저 본다', () => {
+    const random = 정해진난수([0, 1])
+    const pinch = tryQuickCpuPinchHit(
+      두타석범타(),
+      0,
+      { alreadyUsedThisGame: false, runnerCount: 3, batterIsAce: true },
+      random,
+    )
+    expect(pinch).toBeNull()
+    expect(random.calls()).toBe(0)
+  })
 })

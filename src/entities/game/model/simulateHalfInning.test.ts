@@ -10,6 +10,8 @@ import type { HalfInningDefense, HalfInningMound } from '@/entities/game/model/s
 import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
 import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { recordLineupPlay, rosterLineupOf } from '@/entities/game/model/quickLineup'
+import { createSeededRandom } from '@/shared/api/random/seededRandom'
 
 const 타자 = (hit: number): QuickAtBatBatter => ({ hit, power: hit, run: hit, skillIds: [] })
 const 투수 = (control: number): QuickAtBatPitcher => ({
@@ -307,5 +309,37 @@ describe('투수편(모드 3)의 0xac428 — [sp+4] 내 투수 건너뛰기 · [
   it('교체 직후(state[0xd])면 강제도 막힌다 (ac486)', () => {
     const 막 = { ...수비.mound, justChanged: true }
     expect(changePitcherIfNeeded(수비, 막, { ...상황(차례([0.99]).random), force: true })).toBe(막)
+  })
+})
+
+describe('CPU 대타 0xac228 은 마선수 타자를 바꾸지 않는다 (0xb633c)', () => {
+  /** 아홉 타순이 모두 두 타석 범타 — 대타 막는 조건을 다 지난 명단 */
+  const 범타명단 = () => {
+    let lineup = rosterLineupOf(12)
+    for (let order = 0; order < 9; order += 1) {
+      lineup = recordLineupPlay(lineup, order, { kind: '삼진' }, 0)
+      lineup = recordLineupPlay(lineup, order, { kind: '삼진' }, 0)
+    }
+    return lineup
+  }
+
+  it('모든 칸이 마선수면 대타가 하나도 안 나고, 아니면 나는 씨앗이 있다', () => {
+    let 보통대타 = 0
+    for (let seed = 1; seed <= 40; seed += 1) {
+      const 보통 = simulateHalfInning(0, () => 타자(300), 투수(500), 5, createSeededRandom(seed), undefined, {}, undefined, {
+        lineup: 범타명단(),
+        batterOf: () => 타자(300),
+        pinchHitUsed: false,
+      })
+      보통대타 += 보통.pinchHits.length
+      const 마선수 = simulateHalfInning(0, () => 타자(300), 투수(500), 5, createSeededRandom(seed), undefined, {}, undefined, {
+        lineup: 범타명단(),
+        batterOf: () => 타자(300),
+        pinchHitUsed: false,
+        isAceRosterSlot: () => true,
+      })
+      expect(마선수.pinchHits).toEqual([])
+    }
+    expect(보통대타).toBeGreaterThan(0)
   })
 })

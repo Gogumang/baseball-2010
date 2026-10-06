@@ -135,6 +135,11 @@ export interface HalfInningOffense {
    * 사람 장면 타석 시작)·`0xb67d0`(b6806, 경기 시작).
    */
   readonly pinchHitUsed: boolean
+  /**
+   * 그 로스터 칸 타자가 **마선수**인가 (`0xb633c`) — CPU 대타 `0xac228` 은 마선수 타자를 바꾸지 않는다.
+   * 안 넘기면 아무도 마선수가 아니다 (CPU 끼리 경기의 마타자 칸만 참 — `simulateLeagueGame`).
+   */
+  readonly isAceRosterSlot?: (rosterSlot: number) => boolean
 }
 
 /* ── 수비 쪽: 마운드와 투수 교체 (0xc1ba4 → 0xac428 · 0xabfcc · 0xaf09c) ─────── */
@@ -350,7 +355,11 @@ export function simulateHalfInning(
         const pinch = tryQuickCpuPinchHit(
           lineup,
           order,
-          { alreadyUsedThisGame: pinchHitUsed, runnerCount: runnerCountOf(bases) },
+          {
+            alreadyUsedThisGame: pinchHitUsed,
+            runnerCount: runnerCountOf(bases),
+            batterIsAce: offense?.isAceRosterSlot?.(rosterSlotAt(lineup, order)) ?? false,
+          },
           random,
         )
         if (pinch !== null) {

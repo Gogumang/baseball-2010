@@ -81,8 +81,10 @@ export interface QuickPinchHit {
  * 간이 엔진 `0xc1ba4` 는 공격 팀이 누구든 **가림막 없이** 부른다 (`0xc1c50`) — 수비 팀 투수 교체
  * `0xac428` 보다 먼저다. 타석 시작(0-0)이라 볼카운트 항은 0 이다.
  *
- * ⚠️ 원본이 보는 **마선수 비트**(`0xb633d`)와 **장비 레벨 니블**(`+0x19`·`+0x1a`)은 웹 로스터 표에
- * 없다 — 리그 로스터 선수는 둘 다 늘 0 이라 결과가 같다.
+ * 원본은 타석 타자가 **마선수**(`0xb633c` = 레코드 `+0xa` 비트6)면 대타를 안 낸다(ac232 · ac260~ac26e 두 번) —
+ * 부르는 쪽이 `situation.batterIsAce` 로 넘긴다. 안 넘기면 거짓: 리그 로스터 선수는 늘 0 이고, 마선수가 명단에
+ * 들어오는 곳은 CPU 끼리 경기 준비 0xc239c 의 마타자(`simulateLeagueGame` → `HalfInningOffense.isAceRosterSlot`)뿐이다.
+ * ⚠️ **장비 레벨 니블**(`+0x19`·`+0x1a`)은 웹 로스터 표에 없다 — 리그 로스터 선수는 늘 0 이라 결과가 같다.
  */
 export function tryQuickCpuPinchHit(
   lineup: QuickLineup,
@@ -98,6 +100,8 @@ export function tryQuickCpuPinchHit(
      */
     readonly strikes?: number
     readonly balls?: number
+    /** 지금 그 타순에 선 타자가 마선수인가 (`0xb633c`) — 참이면 굴림 없이 대타를 안 낸다. 안 넘기면 거짓 */
+    readonly batterIsAce?: boolean
   },
   random: RandomPort,
 ): QuickPinchHit | null {
@@ -105,7 +109,7 @@ export function tryQuickCpuPinchHit(
   const benchIndex = judgeCpuPinchHit(
     {
       blockedUntilNextPitch: situation.alreadyUsedThisGame,
-      batterIsAce: false,
+      batterIsAce: situation.batterIsAce ?? false,
       // 원본은 team+0x28c 만 보고 rand(0, n) 을 돌린다 — 명단 칸이 모자랄 일은 없지만 실제 칸 수로 자른다
       benchBatters: Math.min(
         lineup.benchBatters,
