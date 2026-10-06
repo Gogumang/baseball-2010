@@ -27,7 +27,8 @@ const FASTBALL_ONLY_MASK = 1
  * ⚠️ 웹 시즌 명단은 선수 기록 0x30 바이트를 들지 않아(번호·종류·수비 위치·스태미나만) 영입 때 옮긴 사본 대신 지금의 명전
  *    칸을 읽는다. 영입 뒤 명전 칸이 바뀌는 길은 삭제뿐이고 삭제는 시즌 명단에서도 그 선수를 뺀다(0x221dc)라 결과가 같다.
  *    단 영입 선수의 시즌 장비 구매(0xdc → 0x2328c 가 명전 기록에도 반영)는 웹에 없다.
- * ⚠️ 투수 보직 `+0xb & 3`(0xb6dec)은 웹 명전 기록에 칸이 없어 싣지 않는다 — 받는 쪽은 선발로 본다.
+ *   투수 보직 = +0xb & 3 (0xb6dec) — 등록 0x1f654 가 +0xb 를 안 건드려 투수편 선수의 보직이 남는다.
+ *     옛 명전 기록(칸이 생기기 전 등록)은 없어 싣지 않는다 — 받는 쪽은 선발로 본다.
  */
 export function seasonHallOfFameRecordSourceOf(hallOfFame: SeasonHallOfFame): SeasonEntryRecordSource {
   return {
@@ -58,6 +59,7 @@ export function seasonHallOfFameRecordSourceOf(hallOfFame: SeasonHallOfFame): Se
           magicId: famer.selectedMagicNumber ?? 0,
           pitchMask: famer.pitchMask ?? FASTBALL_ONLY_MASK,
         },
+        ...(famer.role === undefined ? {} : { role: famer.role }),
       }
     },
   }

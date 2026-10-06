@@ -3,6 +3,7 @@ import { ROTATION_SIZE, rotationSlotOf } from '@/entities/pitcher-career/model/p
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { HALL_OF_FAME_FIRST_ID } from '@/entities/season-mode/model/playerRecruit'
 import type { SeasonPlayer, SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
+import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
 import type { EntryBatterRow, EntryLists, EntryPitcherRow } from '@/entities/season-mode/model/entryEditor'
 
 /**
@@ -217,6 +218,8 @@ export interface SeasonEntryPitcherRecord {
   readonly ability: readonly [number, number, number, number]
   /** 이름 · 폼 0xb6e24 · 고른 마구 +0x18(`magicId` — 경기가 마구 번호로 쓴다) · 구질 마스크 +0x1c */
   readonly repertoire: { readonly name: string; readonly form: number; readonly magicId: number; readonly pitchMask: number }
+  /** 보직 `+0xb & 3` (0xb6dec) — 없으면 받는 쪽(CPU 투수 교체)이 선발로 본다 */
+  readonly role?: PitcherRole
 }
 
 /** 표 밖 선수의 기록을 찾아 준다 — 없으면 undefined */

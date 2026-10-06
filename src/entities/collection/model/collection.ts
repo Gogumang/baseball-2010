@@ -4,6 +4,7 @@ import { equippedAbilityOf } from '@/entities/career/model/condition'
 import { equippedPitcherAbilityOf } from '@/entities/pitcher-career/model/pitcherCareer'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbility'
+import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
 import { romanceEndingIndexOf } from '@/entities/career/model/seasonFlow'
 import { EMPTY_ANNALS_STATS, normalizeAnnalsStats } from '@/entities/collection/model/annalsStats'
 import type { AnnalsStats } from '@/entities/collection/model/annalsStats'
@@ -80,6 +81,12 @@ export interface HallOfFamePitcher extends HallOfFameRecordFields<PitcherAbility
   readonly pitchMask?: number
   /** 고른 마구 번호 — 기록 +0x18 (0 없음 · 1~4) */
   readonly selectedMagicNumber?: number
+  /**
+   * 보직 — 기록 `+0xb & 3` (0xb6dec → 0xb6705). 등록 0x1f654 는 `+0xa`(= 0)·`+0`(칸 − 0x4c)만 덮어쓰고 `+0xb` 는
+   * 손대지 않은 채 0x30 바이트를 복사하므로(0x1f656~0x1f674) 투수편 선수의 보직이 그대로 남는다. 시즌 경기가 이 칸을
+   * CPU 투수 교체(0xabfcc · 0xac428)·등판 판정(0xa4f60) 등에서 읽는다. 옛 저장에는 없다(받는 쪽이 선발로 본다).
+   */
+  readonly role?: PitcherRole
 }
 
 export interface Collection {
@@ -249,6 +256,7 @@ export function registerHallOfFamePitcher(
     equippedSkillIds: career.equippedSkillIds,
     pitchMask: career.pitchMask,
     selectedMagicNumber: career.selectedMagicNumber,
+    role: career.role,
   }
   return {
     kind: '등록',
@@ -333,7 +341,8 @@ function isHallOfFamePitcher(value: unknown): value is HallOfFamePitcher {
     isLook(candidate.look) &&
     hasRecordFields(candidate, PITCHER_ABILITY_KEYS) &&
     isOptionalNumber(candidate.pitchMask) &&
-    isOptionalNumber(candidate.selectedMagicNumber)
+    isOptionalNumber(candidate.selectedMagicNumber) &&
+    (candidate.role === undefined || candidate.role === 0 || candidate.role === 1 || candidate.role === 2)
   )
 }
 

@@ -149,6 +149,20 @@ describe('명예의 전당 — 등록 0x62cea (K 4-2 · Q2 4절)', () => {
     expect(normalizeCollection(JSON.parse(JSON.stringify(batter.collection))).hallOfFame).toEqual(batter.collection.hallOfFame)
   })
 
+  it('투수 보직 +0xb & 3 은 등록 0x1f654 가 안 건드려 그대로 남는다 — 옛 저장은 칸 없음, 틀린 값은 버린다', () => {
+    const 구원 = { ...createPitcherCareer('불펜'), endingIndex: 5, role: 2 as const }
+    const result = registerHallOfFamePitcher(EMPTY_COLLECTION, 구원, 넉넉)
+    if (result.kind !== '등록') throw new Error('등록 실패')
+    expect(result.collection.hallOfFamePitchers[0]?.role).toBe(2)
+    const saved = JSON.parse(JSON.stringify(result.collection)) as { hallOfFamePitchers: Record<string, unknown>[] }
+    expect(normalizeCollection(saved).hallOfFamePitchers[0]?.role).toBe(2)
+
+    const 옛 = { ...saved.hallOfFamePitchers[0] }
+    delete 옛.role
+    expect(normalizeCollection({ ...saved, hallOfFamePitchers: [옛] }).hallOfFamePitchers[0]?.role).toBeUndefined()
+    expect(normalizeCollection({ ...saved, hallOfFamePitchers: [{ ...옛, role: 3 }] }).hallOfFamePitchers).toEqual([])
+  })
+
   it('기록 칸이 없는 옛 저장도 읽고, 칸 형식이 깨진 선수만 버린다', () => {
     const famer = { name: '전설', ability: { hit: 1, power: 2, defense: 3, run: 4 }, endingIndex: 6, season: 13, titleIds: [] }
     const loaded = normalizeCollection({
