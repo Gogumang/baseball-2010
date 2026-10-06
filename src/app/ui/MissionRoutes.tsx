@@ -145,6 +145,8 @@ export function MissionRoutes({
         onThrow={session.handleThrow}
         onGiveUp={actions.giveUpPitcher}
         onFinish={actions.finishPitcher}
+        // 사람 견제 '3'·'1'·'7' (0x53548 → 0x50f28) — 모드 5 도 막지 않는다 (`actions.pickoff` 주석)
+        onPickoffKey={actions.pickoff}
       />
     )
   }
@@ -228,6 +230,8 @@ export function PitcherAceMatchRoute({ mission, session, runner, pitchControl, o
       // ⚠️ 근사: 원본 경기 중 메뉴 나가기 0x40140 은 모드 5·6 이면 0xa5368(obj,0) 뒤 메인 메뉴(장면 0x103)로 간다 —
       //    +0x176 이 서 있을 때 어디로 가는지는 안 읽었다. 웹은 보통 미션처럼 '실패' 로 두어 패배 결과로 잇는다.
       onGiveUp={actions.giveUpPitcher}
+      // 마선수 대결도 미션 장면(모드 5)이라 사람 견제 길이 같다
+      onPickoffKey={actions.pickoff}
       onFinish={() => {
         const isWin = actions.finishPitcherAceMatch()
         if (isWin !== null) onFinish(isWin)

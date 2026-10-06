@@ -62,3 +62,44 @@ describe('투수 미션 투구 화면의 마구 칸 (0x50db8)', () => {
     expect(screen.getByText(/2\. 코스 선택/)).toBeTruthy()
   })
 })
+
+describe('투수 미션 사람 견제 키 — 구질 고르기(0xf)에서만 0x53548 로 넘긴다', () => {
+  function 견제띄우기() {
+    const onPickoffKey = vi.fn()
+    render(
+      <PitchingScreen
+        run={startPitcherMission(PITCHER_MISSIONS[0]!)}
+        repertoire={[직구]}
+        usesGauge={false}
+        atBat={createAtBat()}
+        bannerText=""
+        onThrow={() => {}}
+        onGiveUp={() => {}}
+        onFinish={() => {}}
+        onPickoffKey={onPickoffKey}
+      />,
+    )
+    return onPickoffKey
+  }
+
+  it('구질 단계의 키를 그대로 넘긴다 — 루 가르기·주자 확인은 부르는 쪽이 한다', () => {
+    const onPickoffKey = 견제띄우기()
+    fireEvent.keyDown(window, { key: '3' })
+    fireEvent.keyDown(window, { key: '7' })
+    expect(onPickoffKey.mock.calls).toEqual([['3'], ['7']])
+  })
+
+  it('누르고 있는 반복 키는 한 번만이다', () => {
+    const onPickoffKey = 견제띄우기()
+    fireEvent.keyDown(window, { key: '1', repeat: true })
+    expect(onPickoffKey).not.toHaveBeenCalled()
+  })
+
+  it('코스 고르기(상태 0x10)로 넘어가면 받지 않는다', () => {
+    const onPickoffKey = 견제띄우기()
+    fireEvent.click(screen.getByText(직구.name))
+    expect(screen.getByText(/2\. 코스 선택/)).toBeTruthy()
+    fireEvent.keyDown(window, { key: '3' })
+    expect(onPickoffKey).not.toHaveBeenCalled()
+  })
+})

@@ -24,6 +24,7 @@ import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCare
 import { modePitcherOfHallOfFame } from '@/app/model/modePitcher'
 import { EMPTY_COLLECTION, registerHallOfFame, registerHallOfFamePitcher } from '@/entities/collection/model/collection'
 import { createCareer } from '@/entities/career/model/playerCareer'
+import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
 
 /**
  * 이벤트 112 의 match 명령이 여는 마선수 대결 — 이기면 114, 지면 115 로 돌아가야 한다.
@@ -476,6 +477,116 @@ describe('타자 미션 CPU 견제 — 0x345fc 종류 4 → 0x34848 → 0x50f28 
     act(() => {
       rendered.result.current.session.actions.cpuPickoff(1)
     })
+
+    expect(rendered.result.current.session.missionRun).toBe(before)
+    expect(rendered.result.current.session.pickoffReplay).toBeNull()
+    rendered.unmount()
+  })
+})
+
+/* ── 투수 미션 사람 견제 (0x53580 → 0x53548 → 메시지 0x10 → 0x50f28, 모드 5 갈림 없음) ───────────── */
+
+/** 투수 미션 하나를 세운다 — 씨앗 난수 하나를 시작(0x3fa0e rand(0, 2))부터 그대로 쓴다 */
+function setUpPitcherMission(missionId: number, seed: number, throwModeManual?: boolean) {
+  const missionRecord: MissionRecordPort = { load: () => ({}), save: vi.fn() }
+  const random = createSeededRandom(seed)
+  let screen: Screen = { kind: '미션선택' }
+  const setScreen = vi.fn((next: Screen) => {
+    screen = next
+  })
+  const rendered = renderHook(() => {
+    const runner = useAtBatRunner()
+    return {
+      runner,
+      session: useMissionSession({ runner, random, missionRecord, screen, setScreen, throwModeManual }),
+    }
+  })
+  const mission = MISSIONS.find((row) => row.side === '투수' && row.id === missionId)
+  if (mission === undefined) throw new Error(`투수 미션 ${missionId} 이 없다`)
+  act(() => rendered.result.current.session.actions.begin(mission))
+  return rendered
+}
+
+/** 같은 씨앗으로 시작 굴림 하나를 먹인 난수 — 세션이 견제 판에 넘기는 난수와 같은 자리 */
+function seededAfterStart(seed: number): RandomPort {
+  const random = createSeededRandom(seed)
+  rollSimulatorInit(random)
+  return random
+}
+
+describe('투수 미션 사람 견제 — 구질 고르기 0xf 의 0x53548 은 모드 5 를 안 막는다', () => {
+  // 미션 12 "최강의 챔피언" — 1사 1·3루, 2볼
+  it("'3' 은 1루 견제 판을 사람 수비·송구 설정으로 돌려 먹이고 재생할 판을 남긴다 — 투구 수·볼카운트는 그대로", () => {
+    const rendered = setUpPitcherMission(12, 11)
+    const before = rendered.result.current.session.pitcherRun!
+    const ballsBefore = rendered.result.current.runner.atBat.balls
+    const expected = runPickoffPlay({
+      targetBase: 1,
+      bases: before.bases,
+      outs: before.outs,
+      random: seededAfterStart(11),
+      offenseIsCpu: true,
+      defenseIsCpu: false,
+      throwMode: '수동',
+    })
+
+    // 판이 실제로 돌았다 (1루 주자가 있다)
+    expect(expected.ticks.length).toBeGreaterThan(0)
+
+    act(() => rendered.result.current.session.actions.pickoff('3'))
+
+    const after = rendered.result.current.session.pitcherRun!
+    expect(rendered.result.current.session.pickoffReplay?.advance).toEqual(expected.advance)
+    expect(rendered.result.current.session.pickoffReplay?.ticks).toHaveLength(expected.ticks.length)
+    expect(after.outs).toBe(before.outs + expected.advance.outsAdded)
+    expect(after.totalOuts).toBe(before.totalOuts + expected.advance.outsAdded)
+    // 견제는 투구가 아니다 — 남은 투구 수·볼카운트·목표를 안 건드린다
+    expect(after.remainingPitches).toBe(before.remainingPitches)
+    expect(after.progress).toBe(before.progress)
+    expect(rendered.result.current.runner.atBat.balls).toBe(ballsBefore)
+
+    act(() => rendered.result.current.session.actions.finishPickoffReplay())
+    expect(rendered.result.current.session.pickoffReplay).toBeNull()
+    rendered.unmount()
+  })
+
+  it('환경설정 송구 자동(+0xf4)을 그대로 넘긴다 — 0xae6c8 의 답이 된다', () => {
+    const rendered = setUpPitcherMission(12, 5, false)
+    const before = rendered.result.current.session.pitcherRun!
+    const expected = runPickoffPlay({
+      targetBase: 3,
+      bases: before.bases,
+      outs: before.outs,
+      random: seededAfterStart(5),
+      offenseIsCpu: true,
+      defenseIsCpu: false,
+      throwMode: '자동',
+    })
+
+    act(() => rendered.result.current.session.actions.pickoff('7'))
+
+    expect(rendered.result.current.session.pickoffReplay?.advance).toEqual(expected.advance)
+    expect(rendered.result.current.session.pickoffReplay?.ticks).toHaveLength(expected.ticks.length)
+    rendered.unmount()
+  })
+
+  it("빈 루('1' 2루)·견제 키가 아닌 키는 아무 일도 없다 (0x50f28 의 0xa9878 · 0x53548 의 세 키)", () => {
+    const rendered = setUpPitcherMission(12, 11)
+    const before = rendered.result.current.session.pitcherRun
+
+    act(() => rendered.result.current.session.actions.pickoff('1'))
+    act(() => rendered.result.current.session.actions.pickoff('5'))
+
+    expect(rendered.result.current.session.pitcherRun).toBe(before)
+    expect(rendered.result.current.session.pickoffReplay).toBeNull()
+    rendered.unmount()
+  })
+
+  it('타자 미션에서는 투수 미션 견제가 없다 — 던지는 쪽이 아니다', () => {
+    const rendered = setUpBatterMission(1)
+    const before = rendered.result.current.session.missionRun
+
+    act(() => rendered.result.current.session.actions.pickoff('7'))
 
     expect(rendered.result.current.session.missionRun).toBe(before)
     expect(rendered.result.current.session.pickoffReplay).toBeNull()

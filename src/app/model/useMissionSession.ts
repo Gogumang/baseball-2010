@@ -66,6 +66,7 @@ import { ROOKIE_BATTER_ABILITY } from '@/entities/batting/model/batter'
 import { isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayInput, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { pickoffCallSoundIdOf, runPickoffPlay } from '@/features/defense-play/model/pickoffPlay'
+import { pickoffPlayForKey } from '@/entities/defense-controls/model/pickoff'
 import type { PickoffBase } from '@/entities/defense-controls/model/pickoff'
 import { carryDistanceOf } from '@/entities/batting/model/battedBallFlight'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
@@ -1061,6 +1062,58 @@ export function useMissionSession({
       if (result.ticks.length > 0) setPickoffReplay(result)
     },
 
+    /**
+     * **투수 미션 사람 견제** — 구질 고르기(상태 0xf)에서 키 '3' 1루 · '1' 2루 · '7' 3루 (`PitchingScreen.onPickoffKey`).
+     *
+     * 원본은 모드 5 를 막지 않는다 (직접 재역어셈):
+     * - 미션 경기 준비 0xaa57c 가 사람 칸을 경기[0x31 + 칸] = 0 으로 세우고(aa658), 조작 객체 생성 0x3f584 가 그 값으로
+     *   0x34af8(장면, 칸, 0xb6c20 값)을 불러 0 이면 사람 조작 객체(new 0x30 · 0x53218 → vtable 0xd0a14)를 만든다
+     *   (3f974~3f998). 수비측 객체는 [+0xc] = 1 (3f9c4) — 투수 미션의 사람 칸이 수비다.
+     * - 키는 경기 장면 키 처리 0x498d4 의 끝(499fa~49a52)이 두 조작 객체 중 `[+0x10] == 0`(사람)에게
+     *   슬롯 2 0x53290(상태, 키, r3 = 0 → [+0x1c] = 0) · 슬롯 3 0x536bc 로 넘긴다. 상태 0xe 의 틱 ≤ 2 말고는 거르지 않는다.
+     * - 0x536bc 는 [+0x1c] == 0 이면 점프표 0xd0a24 로 상태 0xf → 0x53580: 수비([+0xc] ≠ 0)면 구질 0x534d8 **뒤에 이어서**
+     *   견제 0x53548 을 부른다 — 구질 키가 먹는 자리면 견제 키도 늘 먹는다. 모드를 읽는 줄이 없다.
+     * - 메시지 0x10 → 0x509a0(앞머리의 [장면+0x214] vt0xc 는 빈 함수 0xae5f8) → 0x50a4c → 0x50f28: 루 > 0 ·
+     *   0xa9878 주자 있음 → 종류 4 · state[0x27] = 루 · 상태 0x17. 모드·미션 객체(+0x1788)를 안 본다.
+     * - 모드 5·6 에서만 도는 0xaada4(장면 갱신 52ed6)는 제한 시간만 보고 키를 먹지 않는다.
+     * 투수편 마선수 대결도 같은 미션 장면(모드 5)이라 같은 길이다.
+     *
+     * 판은 투수편 `pickoff`(4dec1e1)와 같은 입력이다: 사람 수비 · 환경설정 "송구"(+0xf4)가 0xae6c8 의 답, 공격은 CPU.
+     * 끝은 판정 B 0xae3e8 — 아웃 ≤ 2 면 같은 타석 0xf(ae592), 정산 0xa8024 는 늘(ae5a8) → 실점은 주자 운명으로 센다.
+     * 3아웃이면 0x18 — 타석이 끊긴다. 견제는 투구가 아니라 투구 수·볼카운트·마구 칸을 안 건드린다.
+     * ⚠️ 근사: 수비 아홉 칸·주자 주루는 미션 타구와 같은 진행기 기본값이다(레코드에 팀·타순이 없다).
+     * ⚠️ 미해결: 미션 판정 0xaaa6c 가 견제사 아웃을 '아웃' 목표에 세는지 — 도루 판과 같이 이닝 아웃(`totalOuts`)만 센다.
+     * 판정 콜(세이프 17 · 견제사 62/20)은 판을 연 자리에서 낸다 (CPU 견제와 같은 근사).
+     */
+    pickoff: (webKey: string) => {
+      if (pitcherRun === null || pitcherRun.status !== '진행중') return
+      // 수비 화면·벤치 클리어링·앞 판 재생 중에는 상태 0xf 가 아니다
+      if (pendingDefensePlay !== null || pendingBenchClearing !== null || pickoffReplay !== null) return
+      const { bases } = pitcherRun
+      const play = pickoffPlayForKey(webKey, (base) =>
+        base === 1 ? bases.first : base === 2 ? bases.second : bases.third,
+      )
+      if (play === null) return
+      const result = runPickoffPlay({
+        targetBase: play.targetBase,
+        bases,
+        outs: pitcherRun.outs,
+        random,
+        // 투수 미션은 공격이 CPU 다 — 자동 진루 제어기 0xaf918 이 돈다 (0xae690 첫 항)
+        offenseIsCpu: true,
+        // 사람이 수비한다 — 0xae6c8 은 환경설정 "송구"(+0xf4) 혼자가 받은 야수의 0xafa60 을 켠다
+        defenseIsCpu: false,
+        throwMode: throwModeManual === false ? '자동' : '수동',
+      })
+      const interrupted = pitcherRun.outs + result.advance.outsAdded >= MISSION_OUTS_PER_INNING
+      playSoundIds(audio, [pickoffCallSoundIdOf(result)])
+      if (result.ticks.length > 0) setPickoffReplay(result)
+      // 판정 B 0xae3e8 의 견제 가지는 아웃 ≤ 2 든 3아웃이든 정산 0xa8024 를 부른다 (ae5a8)
+      setPitcherRun(withPitcherMissionRunnerResult(pitcherRun, result, true))
+      // 3아웃 — 이 타석은 끊긴다 (아웃 > 2 → 0x18)
+      if (interrupted) runner.resetAtBat()
+    },
+
     /** 견제 판 재생이 끝났다 */
     finishPickoffReplay: () => setPickoffReplay(null),
 
@@ -1168,12 +1221,19 @@ function withBatterNotOut(run: MissionRun, outcome: AtBatOutcome, isBunt: boolea
  * ⚠️ 미해결: R+0x130(출루 허용)을 정산이 주자 판에서도 덮어쓰는지는 안 읽었다 — 손대지 않는다.
  */
 function withPitcherMissionRunnerPlay(run: PitcherRun, play: PitchArrivalPlay): PitcherRun {
+  return withPitcherMissionRunnerResult(run, play.result, play.kind === 5 || play.strikeout === 'strikeoutStands')
+}
+
+/**
+ * 주자만 움직인 판 하나(견제 종류 4 · 도루 5 · 폭투·포일 9)의 결과를 투수 미션에 먹인다.
+ * `settles` — 판 끝 판정 B 0xae3e8 이 정산 0xa8024 를 부르는가 (견제·도루는 늘, 폭투·포일은 삼진이 선 판만).
+ */
+function withPitcherMissionRunnerResult(run: PitcherRun, result: DefensePlayResult, settles: boolean): PitcherRun {
   if (run.status !== '진행중') return run
-  const advance = play.result.advance
+  const advance = result.advance
   const outs = run.outs + advance.outsAdded
   const isInningOver = outs >= MISSION_OUTS_PER_INNING
-  const settles = play.kind === 5 || play.strikeout === 'strikeoutStands'
-  const charged = settles ? chargedRunsOfFates(play.result.runnerFates, Math.min(MISSION_OUTS_PER_INNING, outs)) : 0
+  const charged = settles ? chargedRunsOfFates(result.runnerFates, Math.min(MISSION_OUTS_PER_INNING, outs)) : 0
   return judgedAfterRunnerPlay({
     ...run,
     bases: isInningOver ? EMPTY_BASES : advance.bases,

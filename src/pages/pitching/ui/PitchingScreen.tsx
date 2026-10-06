@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { BigResult, Hint, MenuList, Panel, PixelScreen } from '@/shared/ui'
 import type { MenuItem } from '@/shared/ui'
 import { goalsOf } from '@/entities/mission/model/missionGoal'
@@ -47,6 +47,13 @@ interface PitchingScreenProps {
   ) => void
   readonly onGiveUp: () => void
   readonly onFinish: () => void
+  /**
+   * **사람 견제 키** — 구질 고르기(상태 0xf)에서 누른 키를 그대로 넘긴다. '3' 1루 · '1' 2루 · '7' 3루 (0x53548 → 메시지 0x10).
+   * 원본 0x53580 은 수비면 구질 0x534d8 뒤에 견제 0x53548 을 늘 이어 부른다 — 모드 5(투수 미션)도 막지 않는다.
+   * 코스·게이지 단계는 원본도 다른 상태(0x10·0x11)라 받지 않는다. 그 루에 주자가 없으면 부르는 쪽이 키를 먹고 끝낸다.
+   * 안 넘기면 견제 키가 없다.
+   */
+  readonly onPickoffKey?: (key: string) => void
 }
 
 export function PitchingScreen({
@@ -60,10 +67,23 @@ export function PitchingScreen({
   onThrow,
   onGiveUp,
   onFinish,
+  onPickoffKey,
 }: PitchingScreenProps) {
   const [phase, setPhase] = useState<PitchPhase>('구질')
   const [pitchType, setPitchType] = useState<PitchTypeInfo | null>(null)
   const [courseCell, setCourseCell] = useState(4)
+
+  // 견제 — 구질 고르기(0xf)에서만. 끝난 미션(결과 화면)은 키를 안 받는다
+  const acceptsPickoff = onPickoffKey !== undefined && phase === '구질' && run.status === '진행중'
+  useEffect(() => {
+    if (!acceptsPickoff || onPickoffKey === undefined) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat) return
+      onPickoffKey(event.key)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [acceptsPickoff, onPickoffKey])
 
   const goals = goalsOf(run.mission, run.progress)
 
