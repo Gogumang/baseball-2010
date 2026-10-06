@@ -1289,10 +1289,10 @@ describe('마투수 등판 — 0xb88c8 → 0xb521c 의 0x60 가지 (8번 칸)', 
       startTeamGame({ ...기본옵션, ...options }, random)
       return count
     }
-    // 마투수·마타자·AI 선발·사람 선발 넉 장 (0x31058·0x3106c·0x3107a·0x31090)
-    expect(굴림수({ mode: 1 })).toBe(4)
-    expect(굴림수({ mode: 1, acePitcherId: 0 })).toBe(4)
-    expect(굴림수({ mode: 1, acePitcherId: 0, aceBatterId: 0 })).toBe(4)
+    // 마투수·마타자·AI 선발·사람 선발 넉 장 (0x31058·0x3106c·0x3107a·0x31090) + 상태 9 의 시뮬 초기화 rand(0, 2) (0x3fa0e → 0xc0dac)
+    expect(굴림수({ mode: 1 })).toBe(5)
+    expect(굴림수({ mode: 1, acePitcherId: 0 })).toBe(5)
+    expect(굴림수({ mode: 1, acePitcherId: 0, aceBatterId: 0 })).toBe(5)
   })
 })
 
@@ -1419,12 +1419,11 @@ describe('한 경기를 끝까지 돌리면 16칸이 실제로 찬다', () => {
     const 끝 = runAutoProgress(startTeamGame({ ...기본옵션, settings: 전부자동 }, random), random)
     const summary = summaryOf(끝)
 
-    // CPU 대타 막음이 '+0x13 홈런 수' 로 바뀌어(0xac228 ac282) 굴림 차례가 달라졌다 — 7-0 완봉
-    expect(summary.ourScore).toBe(7)
-    expect(summary.opponentScore).toBe(0)
+    // 경기 시작 rand(0, 2)(상태 9 0x3fa0e → 0xc0dac)와 자동진행 rand(0, 2)가 앞에 서는 차례 — 1-6 완투패
+    expect(summary.ourScore).toBe(1)
+    expect(summary.opponentScore).toBe(6)
     expect(summary.pitching.outsRecorded).toBe(27)
-    // 피안타 7 · 탈삼진 12(뒤집혀 S[5]) · 내 타자 삼진 11 · 안타 13 · 2루타 5
-    expect(summary.gameRecord).toEqual([0, 0, 7, 0, 0, 12, 11, 13, 5, 0, 0, 0, 0, 0, 0, 0])
+    expect(summary.gameRecord).toEqual([0, 0, 13, 0, 0, 13, 13, 6, 3, 1, 0, 0, 0, 0, 0, 0])
 
     const context = {
       opponentRuns: summary.opponentScore,
@@ -1432,10 +1431,10 @@ describe('한 경기를 끝까지 돌리면 16칸이 실제로 찬다', () => {
       won: summary.won,
       completeGame: summary.reputationCompleteGame,
     }
-    // 16칸이 비었을 때는 승리·완봉·상대 득점만 남아 +3 이다
-    expect(seasonReputationChangeOf(clearSeasonGameRecord(), context)).toBe(3)
-    // 채워진 16칸으로는 상한 +6 까지 올라간다
-    expect(seasonReputationChangeOf(summary.gameRecord, context)).toBe(6)
+    // 16칸이 비었을 때는 패배·완투·상대 득점만 남아 −2 다
+    expect(seasonReputationChangeOf(clearSeasonGameRecord(), context)).toBe(-2)
+    // 채워진 16칸이 그만큼을 메워 0 이 된다
+    expect(seasonReputationChangeOf(summary.gameRecord, context)).toBe(0)
   })
 })
 
@@ -1942,7 +1941,7 @@ describe('미리 굴린 0x30f20 넷 — 일반모드 상태 22 진입(0x314b0)�
     expect(앞당김.log).toEqual(그대로.log)
   })
 
-  it('넘기면 startTeamGame 은 하나도 굴리지 않는다', () => {
+  it('넘기면 startTeamGame 은 상태 9 의 시뮬 초기화 rand(0, 2) 하나만 굴린다 (0x3fa0e → 0xc0dac c0df6)', () => {
     const random = 세는난수(createSeededRandom(3))
     startTeamGame(
       {
@@ -1951,7 +1950,7 @@ describe('미리 굴린 0x30f20 넷 — 일반모드 상태 22 진입(0x314b0)�
       },
       random,
     )
-    expect(random.rolls).toEqual([])
+    expect(random.rolls).toEqual([2])
   })
 })
 

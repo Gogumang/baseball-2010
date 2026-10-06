@@ -291,6 +291,8 @@ describe('돌발미션', () => {
     // 자동 타석에 대타·투수 교체 굴림이 끼면서 씨앗마다 8회 상황이 바뀌어 넓게 본다 (돌발이 뜨는 경기가 드물다)
     for (let seed = 1; seed <= 60; seed += 1) {
       const progress = startPitcherGame(구원, 씨앗(seed))
+      // 8회 전에 콜드로 끝난 경기(씨앗 12 — 7회말 11-1)는 구원 등판이 없다
+      if (progress.game.isFinished) continue
       expect(progress.onMound, `씨앗 ${seed}`).toBe(true)
       if ((progress.burst?.triggeredCount ?? 0) === 0) continue
       뜬경기 += 1
@@ -1102,5 +1104,22 @@ describe('CPU 도루 0x520de · 공 도착 판 0x3dfac — 투수편은 늘 CPU 
     const progress = startPitcherGame(기본옵션, 씨앗(1))
     const 끝 = startPitch(progress, 가운데직구, 씨앗(3))
     expect(끝.lastArrivalPlay).toBeNull()
+  })
+})
+
+describe('경기 시작 — 상태 9 갱신 0x3f584 의 시뮬 초기화 0xc0dac (0x3fa0e)', () => {
+  it('startPitcherGame 의 첫 굴림은 rand(0, 2) 다 — 판·간이 타석보다 앞', () => {
+    const inner = createSeededRandom(7)
+    const ranges: (readonly [number, number])[] = []
+    const random: RandomPort = {
+      next: () => inner.next(),
+      nextInRange: (minimum, maximum) => {
+        ranges.push([minimum, maximum])
+        return inner.nextInRange(minimum, maximum)
+      },
+      pick: (candidates) => inner.pick(candidates),
+    }
+    startPitcherGame(기본옵션, random)
+    expect(ranges[0]).toEqual([0, 2])
   })
 })

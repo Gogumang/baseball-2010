@@ -701,7 +701,8 @@ describe('기록달성 남은 것 — 타자편 배선 (6·7 백투백 · 8·24 
 
   it('카운터 없이 친 홈런에는 6·7 이 안 붙는다', () => {
     const random = createSeededRandom(5)
-    const 시작 = startGame(random)
+    // 내 첫 타석 앞 동료 타석이 홈런으로 끝날 수 있어 카운터를 0 으로 못박는다
+    const 시작 = { ...startGame(random), homeRunStreak: 0 }
     const n = 시작.recordIds.length
     const 뒤 = applyPlayerOutcome(시작, { kind: '홈런' }, random)
 
@@ -1255,5 +1256,22 @@ describe('내 필살 남은 횟수 s8 team[+0x29 + 타순] (0xaebe4 채움 · 0x
     const spent = spendMySpecialSwing(progress, 0)
     expect(mySpecialSwingRemainingOf(spent, { swingNumber: 3, hasRuthlessSkill: false })).toBe(0)
     expect(spendMySpecialSwing(spent, 0)).toBe(spent)
+  })
+})
+
+describe('경기 시작 — 상태 9 갱신 0x3f584 의 시뮬 초기화 0xc0dac (0x3fa0e)', () => {
+  it('startGame 의 첫 굴림은 rand(0, 2) 다 — 1회초 판·동료 타석보다 앞', () => {
+    const inner = createSeededRandom(7)
+    const ranges: (readonly [number, number])[] = []
+    const random: RandomPort = {
+      next: () => inner.next(),
+      nextInRange: (minimum, maximum) => {
+        ranges.push([minimum, maximum])
+        return inner.nextInRange(minimum, maximum)
+      },
+      pick: (candidates) => inner.pick(candidates),
+    }
+    startGame(random)
+    expect(ranges[0]).toEqual([0, 2])
   })
 })

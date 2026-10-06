@@ -1,4 +1,5 @@
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
+import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
 import { describeOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { atBatRecordCodeOf } from '@/entities/batting/model/swingSkills'
 import { specialSwingCountOf } from '@/entities/batting/model/specialSwing'
@@ -448,6 +449,8 @@ export function startGame(
     specialSwingRemaining: UNFILLED_SPECIAL_SWING_COUNT,
     stealingFrom: [],
   }
+  // 상태 9 갱신 0x3f584 의 공통 꼬리 0x3fa0e — 시뮬 초기화 0xc0dac 의 rand(0, 2) 한 번 (모든 모드, 1회초 판 0x18 보다 앞)
+  rollSimulatorInit(random)
   return advanceUntilPlayerTurn(withFirstInningBoard(initial, random), random)
 }
 

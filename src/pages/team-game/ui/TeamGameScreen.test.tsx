@@ -67,7 +67,7 @@ describe('팀 경기 화면 — 수비(투구) 차례', () => {
   })
 
   it('게이지 설정이 꺼져 있으면 코스를 확정하는 순간 던진다 (원본 기본값)', () => {
-    띄우기({}, 2)
+    띄우기({}, 3) // 첫 공이 타구가 안 되는 씨앗 (경기 시작 rand(0, 2) 가 차례를 한 칸 민다)
     fireEvent.click(screen.getByText('FASTBALL'))
     fireEvent.click(screen.getAllByRole('button', { name: /[◎·]/ })[0])
 

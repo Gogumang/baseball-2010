@@ -1,4 +1,5 @@
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
+import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
 import { describeOutcome, isFreePass, isHit } from '@/entities/at-bat/model/atBatOutcome'
 import { applyPitchResolution, createAtBat } from '@/entities/at-bat/model/atBatState'
 import type { AtBatState, PitchResolution } from '@/entities/at-bat/model/atBatState'
@@ -917,6 +918,8 @@ export function startTeamGame(options: TeamGameOptions, random: RandomPort): Tea
     log: [],
     nextLogId: 1,
   }
+  // 상태 9 갱신 0x3f584 의 공통 꼬리 0x3fa0e — 시뮬 초기화 0xc0dac 의 rand(0, 2) 한 번 (모든 모드 — 마선수·선발 굴림 0x30f20 뒤, 1회초 판 0x18 보다 앞)
+  rollSimulatorInit(random)
   return advance(initial, random)
 }
 
@@ -3696,7 +3699,7 @@ export function runAutoProgress(progress: TeamGameProgress, random: RandomPort):
   // 수비 진행 중에는 손대지 않는다 — 붙들어 둔 타구를 버리고 다음 타석으로 넘어가면 안 된다
   if (progress.pendingDefensePlay !== null) return progress
   // 3c93c 시뮬 초기화 0xc0dac 의 c0df6 rand(0, 2) → sim+4 — 그 값의 쓰임은 안 읽었다 (굴림 차례만 맞춘다)
-  random.nextInRange(0, 2)
+  rollSimulatorInit(random)
   // 상태 0x21 진입 0x3abf0 — 사람 장면에서 뜬 채 남은 돌발을 판정 없이 내린다 (0x8f628)
   let current: TeamGameProgress = withoutPendingBurst(progress)
   for (let step = 0; step < MAXIMUM_AUTO_STEPS; step += 1) {

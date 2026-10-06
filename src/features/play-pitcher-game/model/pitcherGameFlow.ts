@@ -1,3 +1,4 @@
+import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
 import {
   applyAtBatOutcome,
   createGame,
@@ -686,6 +687,8 @@ export function startPitcherGame(
     nextLogId: 1,
     endedInningIndex: 0,
   }
+  // 상태 9 갱신 0x3f584 의 공통 꼬리 0x3fa0e — 시뮬 초기화 0xc0dac 의 rand(0, 2) 한 번 (모든 모드, 1회초 판 0x18 보다 앞)
+  rollSimulatorInit(random)
   return advance(initial, random)
 }
 
