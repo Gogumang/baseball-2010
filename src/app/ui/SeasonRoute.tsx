@@ -3,7 +3,7 @@ import { ITEM_WINDOW_KIND } from '@/widgets/season/lib/seasonItemMenu'
 import type { ItemWindowKind } from '@/widgets/season/lib/seasonItemMenu'
 import {
   GameIncomeScreen, NextGameScreen, PlayerRecruitScreen,
-  SeasonEndingScreen, SeasonGoalsScreen, SeasonItemMenuScreen, SeasonManagementScreen, SeasonMvpScreen,
+  SeasonEndingScreen, SeasonInfoScreen, SeasonItemMenuScreen, SeasonManagementScreen, SeasonMvpScreen,
   SeasonOutingScreen, SeasonSummaryScreen, SeasonTeamMenuScreen, SeasonTitleAwardScreen,
   SeasonTrainingScreen, StadiumShopScreen, TradeScreen, CoachHireScreen, SEASON_MVP_LEADER_KINDS,
   seasonAwardRewardOf, seasonMvpResultEventId, seasonTitleResultEventId,
@@ -144,6 +144,8 @@ export function SeasonRoute({
 
   /** 아이템 메뉴에서 고른, 웹에 아직 없는 창 종류 (`[win+0x1a4]`) */
   const [missingWindow, setMissingWindow] = useState<ItemWindowKind | null>(null)
+  /** 시즌정보(0xcd)에서 고른, 웹에 아직 없는 화면 — 원본 상태·창 이름 */
+  const [missingScreen, setMissingScreen] = useState<string | null>(null)
   /**
    * 메인 메뉴에서 들어오는 길 = 0x327b8(this, 2) 의 모드 2 갈래 — `+0x42 && +0x4e` 면 장면 0x105 를 세우지 않고 곧장 경기
    * 장면 0x104 다(메인 메뉴 시즌모드 0x24698 · [최근게임] 모드 2 가 같은 길). 첫 그림 전에 갈라 관리 화면이 한 번도 서지 않게
@@ -165,6 +167,18 @@ export function SeasonRoute({
           text={`이 화면은 아직 없습니다 (장면 0xdc 창 종류 ${missingWindow})`}
           buttons={['OK']}
           onAnswer={() => setMissingWindow(null)}
+        />
+      </RawScreen>
+    )
+  }
+
+  if (missingScreen !== null) {
+    return (
+      <RawScreen>
+        <MessageBox
+          text={`이 화면은 아직 없습니다 (${missingScreen})`}
+          buttons={['OK']}
+          onAnswer={() => setMissingScreen(null)}
         />
       </RawScreen>
     )
@@ -484,12 +498,20 @@ export function SeasonRoute({
     )
   }
 
+  // 시즌정보 0xcd — 네 칸 하위 메뉴 (키 0x9008). 구단정보 0xd5 · 아이템 0xd6 · 기록순위 창(0x80 → 0xdb)은 웹에 아직 없다
   if (scene === SEASON_SCENE_STATE.시즌정보) {
     return (
-      <SeasonGoalsScreen
-        yearIndex={state.record.yearIndex}
-        // 팀 타율 0xa3700 · 팀 방어율 0xa3764 는 리그 선수 기록표에서 센다 (`seasonGoalInputOf`)
-        input={goalInput}
+      <SeasonInfoScreen
+        state={state}
+        // 메뉴 객체 this+0x74 의 커서 — 관리 메뉴에서 들어오면 0 (0x4d58), 하위 화면에서 돌아오면 남는다
+        cursor={session.menuCursors.seasonInfo}
+        onCursorChange={(index) => actions.moveMenuCursor('seasonInfo', index)}
+        onSelect={(entry) => {
+          const { action } = entry
+          if (action.kind === '상태') return setMissingScreen(`시즌정보 ${entry.label} — 상태 0x${action.target.toString(16)}`)
+          if (action.kind === '기록순위창') return setMissingScreen('시즌정보 기록순위 — 창 0x80 → 상태 0xdb')
+          return setMissingScreen('시즌정보 선수정보 — 선수 고르기 0xdf 목적 2')
+        }}
         onBack={backToManagement}
       />
     )

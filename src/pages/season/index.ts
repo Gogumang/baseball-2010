@@ -29,8 +29,11 @@ export type { TradeScreenProps } from '@/pages/season/ui/TradeScreen'
 export { CoachHireScreen } from '@/pages/season/ui/CoachHireScreen'
 export type { CoachHireScreenProps } from '@/pages/season/ui/CoachHireScreen'
 
-export { SeasonGoalsScreen } from '@/pages/season/ui/SeasonGoalsScreen'
-export type { SeasonGoalsScreenProps } from '@/pages/season/ui/SeasonGoalsScreen'
+/** 시즌정보 0xcd — 네 칸 하위 메뉴 (키 0x9008) */
+export { SeasonInfoScreen } from '@/pages/season/ui/SeasonInfoScreen'
+export type { SeasonInfoScreenProps } from '@/pages/season/ui/SeasonInfoScreen'
+export { SEASON_INFO_MENU } from '@/widgets/season/lib/seasonInfoMenu'
+export type { SeasonInfoAction, SeasonInfoMenuEntry } from '@/widgets/season/lib/seasonInfoMenu'
 
 /** 경기 뒤 마무리 0xf1 — 같은 날 다른 네 경기 결과판 (그림 0xb400) */
 export { DayResultBoardScreen } from '@/pages/season/ui/DayResultBoardScreen'

@@ -17,7 +17,18 @@ export const SEASON_SCENE_STATE = {
   팀결정확인: 0xc8,
   새시즌초기화: 0xcc,
   관리메뉴: 0xc9,
+  /** 시즌정보 하위 메뉴 4칸 (들어옴 0x4d58 · 키 0x9008 · 그리기 공통 틀 0x9fd8 → 0x9f60) — `seasonInfoMenu.ts` */
   시즌정보: 0xcd,
+  /** 시즌정보 칸 0 구단정보 (갱신 0x53f8 → 0x5324 · 키 0x4884 · 그리기 0xae68) — 키는 취소(−16) → 0xcd 하나뿐 */
+  구단정보: 0xd5,
+  /** 시즌정보 칸 1 아이템 (갱신 0x5ee4 · 키 0x5f10 · 그리기 0xb1b4 = 상태판 + 커맨드 줄 + 아이템 창 0x8453c) */
+  보유아이템: 0xd6,
+  /** 시즌정보 칸 3 기록순위 창(팝업 0x80, 그리기 0xf334 · 키 0xf5d4)에서 확인 → 기록 목록 (갱신 0x56fc · 키 0x74c4 → 0xcd) */
+  기록순위: 0xdb,
+  /** 선수 기본정보 카드 (갱신 0x5404 · 키 0x48a0 · 그리기 0xae98) — 선수 고르기 0xdf 목적 2 에서 확인 */
+  선수상세: 0xd9,
+  /** 능력치 상세 창 (갱신 0x52f4 → 글 0x897e8 · 키 0x9398 · 그리기 0xaf8c = 0xae98 + 창 0x8a0a4) — 카드에서 '0' */
+  능력치상세: 0xda,
   구단관리: 0xce,
   트레이닝: 0xcf,
   아이템: 0xd0,
@@ -173,10 +184,12 @@ export interface SeasonMenuCursors {
   readonly management: number
   /** this+0x78 구단관리 4칸 */
   readonly teamMenu: number
+  /** this+0x74 시즌정보 4칸 (0x3b14 가 `0x6c219(메뉴, 4, 1, 1)` 로 만든다) */
+  readonly seasonInfo: number
 }
 
 /** 장면 생성 — 0x6c219 로 만든 메뉴는 커서 (0,0) */
-export const INITIAL_SEASON_MENU_CURSORS: SeasonMenuCursors = { management: 0, teamMenu: 0 }
+export const INITIAL_SEASON_MENU_CURSORS: SeasonMenuCursors = { management: 0, teamMenu: 0, seasonInfo: 0 }
 
 /**
  * CPU 트레이드 요청 [203] 에 "예" (0x73b8 7440~7484) — 두 메뉴 커서를 칸 1(관리 메뉴 구단관리 · 구단관리 트레이드)에 둔다:
@@ -190,6 +203,7 @@ export const TRADE_REQUEST_MENU_CURSOR = 1
  * 0x4efc (0xc9 진입)  SR+4 ≠ 0 이고 이전 ∉ {0xd8, 0xce, 0xd0} → 관리 메뉴 커서 (0,0) · 스크롤 0
  *                     SR+0x1bc ≠ 0                         → 관리 메뉴 커서 (0,0) · 스크롤 0
  * 0x47d8 (0xce 진입)  이전 == 0xc9                          → 구단관리 커서 (0,0) · 스크롤 0
+ * 0x4d58 (0xcd 진입)  이전 == 0xc9                          → 시즌정보 커서 (0,0) · 스크롤 0 (메뉴 vt+0x14(0,0) · +0x2c/+0x30 = 0)
  * ```
  * 곧 관리 메뉴에서 구단관리로 들어가면 늘 맨 위에서 시작하고, 트레이드·영입 같은 하위 화면에서 돌아오면 자리가 남는다.
  */
@@ -208,6 +222,9 @@ export function menuCursorsOnEnter(
   }
   if (entered === SEASON_SCENE_STATE.구단관리 && previous === SEASON_SCENE_STATE.관리메뉴) {
     return { ...cursors, teamMenu: 0 }
+  }
+  if (entered === SEASON_SCENE_STATE.시즌정보 && previous === SEASON_SCENE_STATE.관리메뉴) {
+    return { ...cursors, seasonInfo: 0 }
   }
   return cursors
 }

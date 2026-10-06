@@ -16,8 +16,8 @@ export const SEASON_GOAL_MARK = { done: '○', yet: '×' } as const
 
 /**
  * 올해의 목표 다섯 줄 — 표 `0xd7cf6` 와 판정 `0xa37bc` 의 다섯 비교를 그대로 줄로 편다.
- * ⚠️ 줄 글(이름·"이상"·"이하")과 타율·방어율 표기는 **근사**다 — 목표를 그리는 함수(0x86fdc 창·시즌정보 0xcd)의
- * 글을 아직 풀지 못했다.
+ * ⚠️ 줄 글(이름·"이상"·"이하")과 타율·방어율 표기는 **근사**다 — 목표를 그리는 함수(0x86fdc 창)의 글을 아직 풀지 못했다.
+ * (시즌정보 0xcd 는 목표 화면이 아니라 네 칸 하위 메뉴다 — `widgets/season/lib/seasonInfoMenu.ts`.)
  */
 export function seasonGoalLinesOf(yearIndex: number, input: SeasonGoalInput): readonly SeasonGoalLine[] {
   const [rank, winRate, battingAverage, earnedRunAverage, popularityGain] = seasonGoalsOf(yearIndex)

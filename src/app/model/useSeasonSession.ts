@@ -2026,7 +2026,7 @@ export function useSeasonSession(
     setTradeRequestAlertOpen(false)
     if (accept) {
       // 7440~7484 — 관리 메뉴(this+0x70)·구단관리(this+0x78) 커서를 칸 1 로 (구단관리 · 트레이드)
-      setMenuCursors({ management: TRADE_REQUEST_MENU_CURSOR, teamMenu: TRADE_REQUEST_MENU_CURSOR })
+      setMenuCursors((cursors) => ({ ...cursors, management: TRADE_REQUEST_MENU_CURSOR, teamMenu: TRADE_REQUEST_MENU_CURSOR }))
       return setScene(SEASON_SCENE_STATE.트레이드영입선수)
     }
     setTradeRequest((request) => ({ ...request, isRequested: false }))
