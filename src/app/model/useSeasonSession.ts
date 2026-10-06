@@ -1327,7 +1327,7 @@ export function useSeasonSession(
 
       // 경기 끝 0x4ea0c 는 모드가 5·6(미션)이 아니면 **갈래(정규·포스트시즌·국가대항전)를 가르기 전에**
       // 기록 달성 G 합 [scene+0x17f4] 를 저장 G(+0x64)에 더하고(4ec5a, 99999 상한) 0x4ec82 `0x22c7d(합, 모드 2)` 로
-      // 획득 GP 통계에 적는다. 합은 요약이 싣고 온다(fc7f196 — 자동진행 뒤 기록은 이미 막혀 있다)
+      // 획득 GP 통계에 적는다. 합은 요약이 싣고 온다(fc7f196 — 30G 자동진행 뒤 타석도 기록을 쌓는다, R15 10-3)
       const earned = summary.gamePoints ?? 0
       if (earned !== 0) gainGamePoint(earned)
       recordStat?.({ kind: 'G획득', mode: SEASON_STAT_MODE, amount: earned })
