@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import type { Screen } from '@/app/model/screen'
+import type { PitcherScene } from '@/app/model/usePitcherLeagueSession'
 
 /**
  * 화면 → 배경음 번호 (`shared/config/original/sounds` 의 `scene` 칸 그대로).
@@ -64,6 +66,36 @@ export function screenBgmOf(screen: Screen): number | null {
   if (screen.kind === '포스트시즌') return screen.fromReentry === true ? POSTSEASON_REENTRY_BGM : SCREEN_BGM.이벤트
   const table: Partial<Record<string, number>> = SCREEN_BGM
   return table[screen.kind] ?? null
+}
+
+/**
+ * 투수편(장면 0x106 모드 3) 배경음 — 최상위 `Screen` 은 '투수편' 한 칸이라 안쪽 장면을 따로 본다.
+ * 128 대진은 타자편과 같은 진입 0x120a4 다: 이어하기로 들어왔으면(이전 상태 1) 4, 아니면 114 의 40 이 이어진다.
+ * 그 밖 장면은 예전 근사 그대로 준비 화면 배경음(3)이다 (머리 주석 ⚠️).
+ */
+export function pitcherLeagueBgmOf(scene: PitcherScene, postseasonFromReentry: boolean): number {
+  if (scene === '포스트시즌') return postseasonFromReentry ? POSTSEASON_REENTRY_BGM : SCREEN_BGM.이벤트
+  return SCREEN_BGM.투수편
+}
+
+/**
+ * 투수편 화면의 배경음 — **장면 0x106 에 들어선 순간** 대진(128)이었으면 이어하기 진입이다.
+ * 원본은 장면을 떠났다 돌아오면 늘 상태 100(0x1c154) → 1(자원 적재) → S+0x50 의 상태로 가므로, 웹에서 '투수편' 화면에
+ * 들어설 때(앱을 켜고 처음 들어설 때 포함 — 세션이 그때 저장의 S+0x50 으로 128 을 고른다) 128 이면 이전 상태가 1 이다.
+ * 128 을 떠나면(경기 142 · 132 연말) 그 표시는 지워진다 — 다시 128 에 오면 경기 뒤 116 → 114 길이다.
+ */
+export function usePitcherLeagueBgm(isActive: boolean, scene: PitcherScene): number | null {
+  const [wasActive, setWasActive] = useState(false)
+  const [fromReentry, setFromReentry] = useState(false)
+  // 그리는 중에 앞 값과 견줘 고친다 (React 의 "이전 렌더 값으로 상태 고치기" — 효과 한 틀 늦지 않게)
+  if (isActive !== wasActive) {
+    setWasActive(isActive)
+    setFromReentry(isActive && scene === '포스트시즌')
+  } else if (fromReentry && scene !== '포스트시즌') {
+    setFromReentry(false)
+  }
+  // 위에서 상태를 고쳤으면 React 가 이 그리기를 버리고 곧바로 다시 그린다 — 돌려주는 값은 고친 상태로 다시 구한다
+  return isActive ? pitcherLeagueBgmOf(scene, fromReentry) : null
 }
 
 /**

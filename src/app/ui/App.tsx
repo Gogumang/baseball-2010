@@ -20,7 +20,7 @@ import { modePitcherOf } from '@/app/model/modePitcher'
 import type { AceMatchStarter } from '@/app/ui/CareerRoutes'
 import { useGameSettings } from '@/app/model/useGameSettings'
 import { useSceneBgm, useSceneEnterSound, useSound } from '@/app/model/useSound'
-import { screenBgmOf, screenEnterSoundOf } from '@/app/model/screenBgm'
+import { screenBgmOf, screenEnterSoundOf, usePitcherLeagueBgm } from '@/app/model/screenBgm'
 import { useSeasonSession } from '@/app/model/useSeasonSession'
 import { SeasonRoute } from '@/app/ui/SeasonRoute'
 import { usePitcherLeagueSession } from '@/app/model/usePitcherLeagueSession'
@@ -90,8 +90,6 @@ export function App() {
   const sound = useSound(gameSettings.settings.soundLevel)
   const random = useMemo(() => createSeededRandom(Date.now() & 0x7fffffff), [])
   const [screen, setScreen] = useState<Screen>({ kind: '타이틀' })
-  // 화면이 바뀌면 그 화면의 배경음으로 갈아탄다 (`screenBgm.ts` 의 표)
-  useSceneBgm(sound, screenBgmOf(screen))
   // 화면에 들어설 때 한 번 나는 소리 — 타이틀의 로고 음성 0 (0x69400)
   useSceneEnterSound(sound, screen.kind, screenEnterSoundOf(screen))
 
@@ -122,6 +120,9 @@ export function App() {
     // 같은 날 CPU 끼리 경기·포스트시즌 CPU 경기의 마선수 배율(0xd88aa)도 전역 레벨 칸을 본다
     aceLevels.levels,
   )
+  // 화면이 바뀌면 그 화면의 배경음으로 갈아탄다 (`screenBgm.ts` 의 표). 투수편은 안쪽 장면(128 이어하기 4)을 본다
+  const pitcherBgm = usePitcherLeagueBgm(screen.kind === '투수편', pitcherSession.scene)
+  useSceneBgm(sound, screen.kind === '투수편' ? pitcherBgm : screenBgmOf(screen))
   const careerSession = useCareerSession({
     runner, random, saveGame, screen, setScreen, sound, wallet,
     // 환경설정 "주루" (설정 +0xbd) — 나리 타자편은 사람이 늘 공격이라 그대로 먹는다 (0xae690)

@@ -1,5 +1,8 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
-import { screenBgmOf } from '@/app/model/screenBgm'
+import { renderHook } from '@testing-library/react'
+import { pitcherLeagueBgmOf, screenBgmOf, usePitcherLeagueBgm } from '@/app/model/screenBgm'
+import type { PitcherScene } from '@/app/model/usePitcherLeagueSession'
 
 describe('포스트시즌 대진 128 배경음 — 진입 0x120a4 (이전 상태 1 일 때만 4)', () => {
   it('이어하기(100 → 1 → 128)면 배경음 4', () => {
@@ -11,5 +14,31 @@ describe('포스트시즌 대진 128 배경음 — 진입 0x120a4 (이전 상태
   it('131 뒤·경기 뒤는 114 이벤트 재생을 지나와 그 배경음 40 이 이어진다', () => {
     expect(screenBgmOf({ kind: '포스트시즌', popup: null })).toBe(40)
     expect(screenBgmOf({ kind: '포스트시즌', popup: null, fromReentry: false })).toBe(40)
+  })
+})
+
+describe('투수편 배경음 — 안쪽 장면을 본다 (128 진입 0x120a4 는 타자편과 같다)', () => {
+  it('장면 0x106 에 들어선 순간 128 이면 이어하기 — 4, 128 을 떠났다 다시 오면 114 의 40', () => {
+    const { result, rerender } = renderHook(
+      ({ isActive, scene }: { isActive: boolean; scene: PitcherScene }) => usePitcherLeagueBgm(isActive, scene),
+      { initialProps: { isActive: false, scene: '포스트시즌' as PitcherScene } },
+    )
+    expect(result.current).toBeNull()
+    rerender({ isActive: true, scene: '포스트시즌' })
+    expect(result.current).toBe(4)
+    rerender({ isActive: true, scene: '경기' })
+    expect(result.current).toBe(3)
+    rerender({ isActive: true, scene: '포스트시즌' })
+    expect(result.current).toBe(40)
+    // 메인 메뉴로 나갔다가 다시 들어오면 다시 이어하기 진입이다
+    rerender({ isActive: false, scene: '포스트시즌' })
+    rerender({ isActive: true, scene: '포스트시즌' })
+    expect(result.current).toBe(4)
+  })
+
+  it('128 이 아닌 장면으로 들어오면 예전 근사 3', () => {
+    expect(pitcherLeagueBgmOf('관리', false)).toBe(3)
+    expect(pitcherLeagueBgmOf('포스트시즌', true)).toBe(4)
+    expect(pitcherLeagueBgmOf('포스트시즌', false)).toBe(40)
   })
 })
