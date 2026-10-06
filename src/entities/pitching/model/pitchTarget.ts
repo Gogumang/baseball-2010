@@ -51,9 +51,10 @@ const OUTSIDE_Y = [330, 380]
  * 건드리지 않는다. `BattingStage` 의 `onPickoff` 가 그 루를 받아 공 없이 대기로 돌아가고,
  * 팀 경기(`TeamGameScreen` → `actions.cpuPickoff`)가 견제 판(플레이 종류 4)을 돌린다.
  *
- * ⚠️ 단, 견제는 `selectPitch` 에 여섯째 인자 `cpuPickoff` 를 넘길 때만 켜진다(= `BattingStage` 에
- * `onPickoff` 를 넘긴 화면만 — 지금은 팀 경기뿐). 안 넘기면 `pitchTargetOf` 가 예전처럼 종류 4 를
- * 모서리 투구로 떨어뜨려 **원본이 굴리지 않는 목표점 난수를 굴리고 원본이 던지지 않는 공을 던진다** (미해결).
+ * 견제는 `selectPitch` 에 여섯째 인자 `cpuPickoff` 를 넘길 때만 켜진다(= `BattingStage` 에 `onPickoff` 를
+ * 넘긴 화면 — 팀 경기 · 나만의리그 타자편 · 미션). 안 넘기면 `pitchTargetOf` 가 종류 4 를 모서리 투구로
+ * 떨어뜨려 **원본이 굴리지 않는 목표점 난수를 굴리고 원본이 던지지 않는 공을 던진다**. 안 넘기는 화면은
+ * 홈런더비뿐이고, 원본 모드 7 은 0x3460e 에서 종류를 굴리지 않으므로 견제 문제가 아니다.
  */
 const PICKOFF_KIND = 4
 const FULL_BASES = 3

@@ -139,11 +139,18 @@ export function recoverStaminaAfterGameDay(stamina: number, input: StaminaRecove
 }
 
 /**
- * 체력%가 능력치에 주는 감소 (0xb58e6~0xb592a).
+ * 체력%가 능력치에 주는 감소 (0xb58e6~0xb592a, 디스어셈 대조 — 확정).
  *   55% 이상 감소 없음 · 35~54 −10% · 20~34 −30% · 1~19 −50% · 0 이하 −90%
- *
- * 원본은 구간마다 자른 값을 빼는 꼴인데 **나눗셈 상수까지는 문서에 없다**(P1 3-3 은 % 만 적었다).
- * 여기서는 `값 − trunc(값·%/100)` 으로 둔다 — **자리 올림이 원본과 한 끗 다를 수 있다**(유력).
+ * ```
+ * b58e8  인자 > 90 또는 > 54 → 그대로
+ * b58f0  인자 > 34 : v += 0xca7b5(v, −10)            ; 0 쪽 버림 나눗셈
+ * b58fe  인자 > 19 : v += 0xca7b5((v − 16v)·2, 100)   ; −30v/100
+ * b590c  인자 > 0  : v −= (v + 부호) >> 1             ; v − trunc(v/2)
+ * b591a  그 밖     : v += 0xca7b5(−90·v, 100)
+ * ```
+ * 네 갈래 모두 `값 − trunc(값·%/100)` 과 같은 값이다(0 쪽 버림이라 부호와 상관없이 같다).
+ * 부르는 쪽 `0xb570c` 에서는 이 감소가 팀 능력치·코치 정액보다 **먼저** 먹고 0..999 자르기는 맨 끝이다
+ * (`entities/pitching/model/pitcherGameStats`).
  */
 export function abilityAfterFatigue(value: number, staminaPercent: number): number {
   const reduction =

@@ -33,8 +33,7 @@ export const ACE_BATTERS: readonly AcePlayer[] = ACE_PLAYERS.filter(
  * 단계 0 은 마투수가 없다(`0x48d9a` 가 `s <= 0` 이면 건너뛴다).
  *
  * → 단계 1~4 = **레오니 · 붕붕머신 · 발렌타인 · 드래고나** 이고, **싸이커(0번)는 안 나온다.**
- * (홈런더비 화면 자체는 아직 없다 — `shared/config/original/mainMenu.ts` 의 `isAvailable: false`.
- *  만들 때 이 표를 그대로 쓰면 된다.)
+ * 홈런더비 난입 마투수(`entities/home-run-derby/model/derbyPitcher`)가 이 표를 쓴다.
  */
 export const DERBY_ACE_PITCHER_INDEXES: readonly number[] = [1, 2, 3, 4]
 
