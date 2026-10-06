@@ -142,3 +142,31 @@ describe('자리 고르기와 확정 (0xdf → 0xc554)', () => {
     expect(screen.getByRole('group', { name: '선수영입' })).toBeTruthy()
   })
 })
+
+describe('원본 후보 목록을 꽂으면 (0xe1dc 목록 종류 0 → 키 0xe340)', () => {
+  it('중복이면 StrMODE[181] 글을 목록에 돌려주고, 아니면 자리 고르기로 간다', () => {
+    const answers: (string | undefined)[] = []
+    const 명예 = { name: '명예투수A', player: 선수(0xb4, PLAYER_KIND.일반투수) }
+    const roster = { ...로스터(), pitchers: [...로스터().pitchers, 선수(0xb4, PLAYER_KIND.일반투수 | 3)] }
+    render(
+      <PlayerRecruitScreen
+        roster={roster}
+        list={후보()}
+        onRecruit={vi.fn()}
+        onBack={vi.fn()}
+        renderCandidates={({ choose }) => (
+          <>
+            <button type="button" onClick={() => answers.push(choose({ source: '명예', isPitcher: true, candidate: 명예 }))}>중복</button>
+            <button type="button" onClick={() => answers.push(choose({ source: '명예', isPitcher: false, candidate: { name: '명예타자A', player: 선수(0xc8, PLAYER_KIND.일반타자) } }))}>새선수</button>
+          </>
+        )}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '중복' }))
+    expect(answers[0]).toContain('이미 영입된 선수 입니다')
+    fireEvent.click(screen.getByRole('button', { name: '새선수' }))
+    expect(answers[1]).toBeUndefined()
+    expect(screen.getByText('자리 고르기')).toBeTruthy()
+  })
+})

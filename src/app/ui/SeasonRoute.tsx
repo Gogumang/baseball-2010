@@ -36,9 +36,12 @@ import { seasonGoalInputOf, seasonRanksOf } from '@/app/model/useSeasonSession'
 import type { SeasonSession } from '@/app/model/useSeasonSession'
 import { seasonStadiumOf } from '@/entities/season-mode/model/stadiumItems'
 import { PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
-import { HALL_OF_FAME_MAX_BATTERS, HALL_OF_FAME_MAX_PITCHERS } from '@/entities/collection/model/collection'
+import {
+  EMPTY_COLLECTION, HALL_OF_FAME_MAX_BATTERS, HALL_OF_FAME_MAX_PITCHERS, hallOfFameRecordIdOf,
+} from '@/entities/collection/model/collection'
+import { HallOfFameScreen } from '@/pages/special/ui/SpecialScreen'
+import type { HallOfFameNariPlayer } from '@/pages/special/ui/SpecialScreen'
 import type { Collection } from '@/entities/collection/model/collection'
-import { HALL_OF_FAME_FIRST_ID } from '@/entities/season-mode/model/playerRecruit'
 import type { RecruitCandidate, RecruitListInput } from '@/pages/season'
 
 interface SeasonRouteProps {
@@ -64,11 +67,15 @@ interface SeasonRouteProps {
    * 기록연감의 명예의 전당 — 선수영입(0xe2 → 0xdf) 후보 칸 1~4(투수 +0x880)·6~(타자 +0x940). 안 넘기면 빈 칸이다.
    * 앱의 `collection.collection` 을 그대로 넘기면 된다.
    */
-  readonly hallOfFame?: Pick<Collection, 'hallOfFame' | 'hallOfFamePitchers'>
+  readonly hallOfFame?: Collection
+  /**
+   * 영입 목록 나리 칸 0·5 (0x5eb8c 목록 종류 0 — 나리 투수편·타자편 저장이 있으면 상태 1, 없으면 2).
+   * 안 넘기면 둘 다 없음(상태 2)으로 그린다.
+   */
+  readonly nari?: { readonly 투수: HallOfFameNariPlayer | null; readonly 타자: HallOfFameNariPlayer | null }
 }
 
 /** 명예의 전당 등록 `0x1f654`(투수: `+0xa = 0` · `+0 = i + 0xb4`) · `0x1f680`(타자: `+0xa = 0x20` · `+0 = i + 0xc8`) */
-const HALL_OF_FAME_BATTER_FIRST_ID = 0xc8
 const HALL_OF_FAME_PITCHER_KIND = 0x00
 const HALL_OF_FAME_BATTER_KIND = 0x20
 
@@ -87,7 +94,7 @@ function hallOfFameRecruitsOf(hallOfFame: SeasonRouteProps['hallOfFame']): Pick<
     const famer = hallOfFame.hallOfFamePitchers.find((candidate) => candidate.slot === slot)
     return famer === undefined ? null : {
       name: famer.name,
-      player: { id: HALL_OF_FAME_FIRST_ID + slot, kindByte: HALL_OF_FAME_PITCHER_KIND, fieldPosition: 0, stamina: 0 },
+      player: { id: hallOfFameRecordIdOf('투수', slot), kindByte: HALL_OF_FAME_PITCHER_KIND, fieldPosition: 0, stamina: 0 },
     }
   })
   const batters = Array.from({ length: HALL_OF_FAME_MAX_BATTERS }, (_, slot): RecruitCandidate | null => {
@@ -95,7 +102,7 @@ function hallOfFameRecruitsOf(hallOfFame: SeasonRouteProps['hallOfFame']): Pick<
     const famer = hallOfFame.hallOfFame.find((candidate, index) => (candidate.slot ?? index) === slot)
     return famer === undefined ? null : {
       name: famer.name,
-      player: { id: HALL_OF_FAME_BATTER_FIRST_ID + slot, kindByte: HALL_OF_FAME_BATTER_KIND, fieldPosition: 0, stamina: 0 },
+      player: { id: hallOfFameRecordIdOf('타자', slot), kindByte: HALL_OF_FAME_BATTER_KIND, fieldPosition: 0, stamina: 0 },
     }
   })
   return { hallOfFamePitchers: pitchers, hallOfFameBatters: batters }
@@ -110,7 +117,7 @@ function hallOfFameRecruitsOf(hallOfFame: SeasonRouteProps['hallOfFame']): Pick<
  * **아직 화면이 없는 장면**(연초 목표 0xd4 등)은
  * 알림을 띄우고 관리 메뉴로 되돌린다 — 조용히 아무것도 안 하는 것보다 낫다.
  */
-export function SeasonRoute({ session, random, gameSettings, onExit, aceSelect, hallOfFame }: SeasonRouteProps) {
+export function SeasonRoute({ session, random, gameSettings, onExit, aceSelect, hallOfFame, nari }: SeasonRouteProps) {
   const { state, scene, league, roster, playerStats, series, cup, gameOptions, notice, actions } = session
 
   /** 아이템 메뉴에서 고른, 웹에 아직 없는 창 종류 (`[win+0x1a4]`) */
@@ -325,12 +332,34 @@ export function SeasonRoute({ session, random, gameSettings, onExit, aceSelect, 
   }
 
   if (scene === SEASON_SCENE_STATE.선수영입 || scene === SEASON_SCENE_STATE.선수고르기) {
+    const recruits = hallOfFameRecruitsOf(hallOfFame)
     return (
       <PlayerRecruitScreen
         roster={roster}
         // 영입 후보는 나만의리그 선수·명예의 전당에서 온다. 명예의 전당은 기록연감 칸(c3e66c1)에서 싣는다.
-        // ⚠️ 나리 두 칸(0x22168·0x220ec — 투수편·타자편 저장)은 아직 넘기지 않아 빈 칸이다
-        list={{ careerPitcher: null, careerBatter: null, ...hallOfFameRecruitsOf(hallOfFame) }}
+        // ⚠️ 나리 두 칸(0x22168·0x220ec — 투수편·타자편 저장)은 시즌 선수로 옮기는 칸을 아직 안 읽어 기록이 없다
+        list={{ careerPitcher: null, careerBatter: null, ...recruits }}
+        // 진입 0xe1dc: 목록 객체 [this+0xa8] 를 종류 0(+0x1fc = 0 · +0x80 = 0)으로 0x5eb8c 에 채우고 키 0xe340 이
+        // 0x62569(목록, 키, 0) — 미션 선수 고르기(하위 17)와 같은 명예의 전당 목록이다. 빈 칸 StrCOMMON[38]/[39] ·
+        // 잠긴 칸 [45]/[54](🌐) 는 목록이 띄운다.
+        // ⚠️ 0xe2 의 그리기(배경·머리띠)는 안 읽었다 — 스페셜·미션과 같은 명예의 전당 화면으로 그린다(근사)
+        renderCandidates={({ choose, back }) => (
+          <HallOfFameScreen
+            collection={hallOfFame ?? EMPTY_COLLECTION}
+            mode={{
+              kind: '선수고르기',
+              nari: nari ?? { 투수: null, 타자: null },
+              onPick: (pick) => {
+                const isPitcher = pick.side === '투수'
+                if (pick.hallOfFameIndex === null) return choose({ source: '나리', isPitcher, candidate: null })
+                const list = isPitcher ? recruits.hallOfFamePitchers : recruits.hallOfFameBatters
+                return choose({ source: '명예', isPitcher, candidate: list[pick.hallOfFameIndex] ?? null })
+              },
+              onCancel: back,
+            }}
+            onBack={back}
+          />
+        )}
         onRecruit={(result) => {
           // 원본은 밀려난 선수를 빼지 않고 **끼워넣는다** — 그 규칙은 recruitPlayer 안에 있다
           actions.updateRoster(result.roster)

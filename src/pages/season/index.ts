@@ -17,7 +17,9 @@ export { StadiumShopScreen } from '@/pages/season/ui/StadiumShopScreen'
 export type { StadiumShopScreenProps } from '@/pages/season/ui/StadiumShopScreen'
 
 export { PlayerRecruitScreen } from '@/pages/season/ui/PlayerRecruitScreen'
-export type { PlayerRecruitScreenProps } from '@/pages/season/ui/PlayerRecruitScreen'
+export type {
+  PlayerRecruitScreenProps, RecruitCandidateActions, RecruitChoice,
+} from '@/pages/season/ui/PlayerRecruitScreen'
 
 /** 트레이드 네 칸 0xe4 → 0xe5 → 0xe6 → 0xe7 (J 4-4) */
 export { TradeScreen } from '@/pages/season/ui/TradeScreen'

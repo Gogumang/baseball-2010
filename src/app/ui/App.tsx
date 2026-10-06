@@ -310,6 +310,11 @@ export function App() {
         aceSelect={aceSelect}
         // 선수영입 후보의 명예의 전당 칸 (0x1f62c · 0x1f640)
         hallOfFame={collection.collection}
+        // 영입 목록(종류 0) 나리 칸 0·5 — 나리 투수편·타자편 저장 (미션 선수 고르기와 같은 값)
+        nari={{
+          투수: nariPitcherOf(pitcherSession.career),
+          타자: nariBatterOf(careerSession.career ?? careerSession.savedCareer),
+        }}
       />
     )
   }

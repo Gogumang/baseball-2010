@@ -276,7 +276,10 @@ export type HallOfFameMode =
        */
       readonly purpose?: '미션' | '홈런더비'
       readonly nari: { readonly 투수: HallOfFameNariPlayer | null; readonly 타자: HallOfFameNariPlayer | null }
-      readonly onPick: (pick: HallOfFamePlayerPick) => void
+      /**
+       * 결과 1~4. 글을 돌려주면 목록 위에 알림으로 띄우고 목록에 남는다 — 시즌 선수영입(0xe340)의 중복 StrMODE[181] 자리다.
+       */
+      readonly onPick: (pick: HallOfFamePlayerPick) => string | undefined | void
       readonly onCancel: () => void
     }
 
@@ -384,8 +387,12 @@ export function HallOfFameScreen({ collection, mode, onBack }: {
     if (mode.kind !== '선수고르기') return undefined
     const code = hallOfFameKeyCodeOf(slots[target].state, target)
     const entry = hallOfFameEntryOfSlot(target)
-    if (code === 1 || code === 2) return mode.onPick({ side: code === 1 ? '투수' : '타자', hallOfFameIndex: null })
-    if ((code === 3 || code === 4) && entry !== null) return mode.onPick({ side: entry.side, hallOfFameIndex: entry.index })
+    const pick = (chosen: HallOfFamePlayerPick) => {
+      const refusal = mode.onPick(chosen)
+      return typeof refusal === 'string' ? setPopup({ kind: '알림', text: refusal, buttons: ['확인'] }) : undefined
+    }
+    if (code === 1 || code === 2) return pick({ side: code === 1 ? '투수' : '타자', hallOfFameIndex: null })
+    if ((code === 3 || code === 4) && entry !== null) return pick({ side: entry.side, hallOfFameIndex: entry.index })
     if (code === 5) return setPopup({ kind: '알림', text: HALL_OF_FAME_TEXT.nariFirst, buttons: ['확인'] })
     if (code === 6) return setPopup({ kind: '알림', text: HALL_OF_FAME_TEXT.hallOfFameFirst, buttons: ['확인'] })
     // 7 잠긴 칸 — 0x6282c: 칸 ≤ 4 면 [45] 투수 슬롯, 아니면 [54] 타자 슬롯 (팝업 종류 4 → 현금 구매 🌐, 웹은 목록으로)

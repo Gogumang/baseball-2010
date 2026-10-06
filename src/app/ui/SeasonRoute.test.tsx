@@ -13,6 +13,7 @@ import { stadiumOwnedIndexOf } from '@/entities/season-mode/model/stadiumItems'
 import { TEAMS } from '@/shared/config/original/teams'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
+import { EMPTY_COLLECTION } from '@/entities/collection/model/collection'
 import type { Collection, HallOfFamePitcher, HallOfFamer } from '@/entities/collection/model/collection'
 
 /**
@@ -49,7 +50,7 @@ interface 화면Props {
   /** 들어오자마자 옮겨 갈 장면 (원본 상태 번호) */
   readonly 장면?: SeasonSceneState
   readonly onExit: () => void
-  readonly hallOfFame?: Pick<Collection, 'hallOfFame' | 'hallOfFamePitchers'>
+  readonly hallOfFame?: Collection
 }
 
 function 시즌화면({ store, 장면, onExit, hallOfFame }: 화면Props) {
@@ -227,25 +228,56 @@ describe('아이템 메뉴 0xd0 배선', () => {
   })
 })
 
-describe('선수영입 후보의 명예의 전당 칸 (0x1f62c · 0x1f640 — c3e66c1)', () => {
-  it('기록연감의 명예 투수·타자가 그 칸 번호 자리(1~4 · 6~)에 후보로 뜬다', () => {
+describe('선수영입 후보 목록 = 명예의 전당 목록 종류 0 (진입 0xe1dc · 키 0xe340)', () => {
+  const 띄우기 = () => {
     const store = 메모리저장(세이브(레코드({ seenEvents: [400, 1, 5, 100], yearGoalShown: true })))
-    const 투수 = { name: '김전당', slot: 1 } as unknown as HallOfFamePitcher
-    const 타자 = { name: '이전당' } as unknown as HallOfFamer
+    const 투수 = {
+      name: '김전당', ability: { control: 1, velocity: 2, breaking: 3, stamina: 4 },
+      equippedAbility: { control: 1, velocity: 2, breaking: 3, stamina: 4 }, endingIndex: 5, season: 10, titleIds: [], slot: 1,
+      look: { typeIndex: 0, handIndex: 0, skinIndex: 0, teamId: 1 },
+    } satisfies HallOfFamePitcher
+    const 타자 = { name: '이전당', ability: { hit: 1, power: 2, defense: 3, run: 4 }, endingIndex: 6, season: 13, titleIds: [] } satisfies HallOfFamer
     render(
       <시즌화면
         store={store}
         장면={SEASON_SCENE_STATE.선수영입}
         onExit={vi.fn()}
-        hallOfFame={{ hallOfFamePitchers: [투수], hallOfFame: [타자] }}
+        hallOfFame={{ ...EMPTY_COLLECTION, hallOfFamePitchers: [투수], hallOfFame: [타자] }}
       />,
     )
+    return store
+  }
+  const 슬롯 = (index: number) => screen.getByRole('button', { name: `${index + 1}번 슬롯` })
 
-    const 줄 = screen.getAllByRole('button')
-      .map((button) => button.textContent ?? '')
-      .filter((text) => /(나리|명예)(투수|타자)$/.test(text))
-    // 칸 0 나리 투수 · 1~4 명예 투수(투수 칸 1 → 셋째 줄) · 5 나리 타자 · 6~ 명예 타자(옛 저장 = 목록 순서 0)
-    expect(줄[2]).toContain('김전당')
-    expect(줄[6]).toContain('이전당')
+  it('명예 투수·타자가 0x5eb8c 칸 배치(투수 1~4 · 타자 6~9)에 찬 칸으로 뜨고, 나리 칸은 없음(상태 2)', () => {
+    띄우기()
+
+    // 투수 칸 1 → 격자 2, 타자 칸 0(옛 저장 = 목록 순서) → 격자 6
+    expect(슬롯(2).dataset.kind).toBe('찬칸')
+    expect(슬롯(6).dataset.kind).toBe('찬칸')
+    expect(슬롯(0).dataset.state).toBe('2')
+    expect(슬롯(1).dataset.state).toBe('4')
+  })
+
+  it('열린 빈 칸은 StrCOMMON[39], 나리 없음은 [38] — 목록이 띄우고 자리 고르기로 가지 않는다', () => {
+    띄우기()
+
+    fireEvent.click(슬롯(1))
+    expect(screen.getByText(/명예의전당 선수를/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    fireEvent.click(슬롯(0))
+    expect(screen.getByText(/나만의리그 선수를/)).toBeTruthy()
+  })
+
+  it('명예 선수를 고르면 자리 고르기(0xdf)로 가고, 고른 자리에 기록 번호 칸 + 0xb4 로 끼워 넣는다', () => {
+    const store = 띄우기()
+
+    fireEvent.click(슬롯(2))
+    const 자리 = screen.getAllByRole('button').find((button) => /#0/.test(button.textContent ?? ''))
+    expect(자리).toBeTruthy()
+    fireEvent.click(자리!)
+
+    const saved = store.load() as { roster: { pitchers: { id: number }[] } }
+    expect(saved.roster.pitchers[0]?.id).toBe(0xb5)
   })
 })

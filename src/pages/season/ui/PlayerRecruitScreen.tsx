@@ -1,15 +1,18 @@
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
-import { recruitPlayer, slotOf } from '@/entities/season-mode/model/playerRecruit'
+import {
+  hasRecruitedCareerPlayer, hasRecruitedHallOfFamePlayer, recruitPlayer, slotOf,
+} from '@/entities/season-mode/model/playerRecruit'
 import type { RecruitResult, SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
 import { SeasonListWindow } from '@/widgets/season/ui/SeasonListWindow'
 import type { SeasonListRow } from '@/widgets/season/ui/SeasonListWindow'
 import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
 import { recruitEntriesOf } from '@/widgets/season/lib/recruitList'
-import type { RecruitListInput } from '@/widgets/season/lib/recruitList'
+import type { RecruitCandidate, RecruitListInput } from '@/widgets/season/lib/recruitList'
 
 /** StrMODE[181] — 중복 (0xb5054 / 0xb50ac 가 걸릴 때) */
-const ALREADY_RECRUITED = '이미 영입된 선수 입니다'
+const ALREADY_RECRUITED = '!C이미 영입된 선수 입니다'
 /** StrMODE[179] — 자리 고르기 안내 (상태 0xdf) */
 const CHOOSE_SLOT = '영입할 자리를 고르세요'
 /** StrMODE[180] — 영입 완료 */
@@ -31,6 +34,27 @@ export interface PlayerRecruitScreenProps {
   readonly onRecruit: (result: RecruitResult, asPitcher: boolean) => void
   /** 취소(−16) — 구단관리(0xce)로 되돌아간다 */
   readonly onBack: () => void
+  /**
+   * 원본 후보 목록 — 진입 0xe1dc 가 목록 객체 `[this+0xa8]` 를 **종류 0**(`+0x1fc = 0` · `+0x80 = 0`)으로 0x5eb8c 에
+   * 채운다. 미션 선수 고르기(하위 17, 0x2613c)와 같은 명예의 전당 목록이라 앱이 그 화면을 꽂는다. 주면 `list` 대신 이것을
+   * 1단계로 그린다 (`RecruitChoice` 를 `choose` 로 넘기면 중복 검사를 하고 자리 고르기로 간다).
+   */
+  readonly renderCandidates?: (actions: RecruitCandidateActions) => ReactNode
+}
+
+/** 목록이 고른 후보 — 키 0xe340 의 결과 코드 1~4 (`[목록+0x12c]`) 와 명전 칸 (`[목록+0x130]`) */
+export interface RecruitChoice {
+  readonly source: '나리' | '명예'
+  readonly isPitcher: boolean
+  /** 영입할 기록 — 나리 기록(0x22168 · 0x220ec)은 웹에 아직 없어 null 이다 */
+  readonly candidate: RecruitCandidate | null
+}
+
+export interface RecruitCandidateActions {
+  /** 고른 후보 — 중복이면 StrMODE[181] 글을 돌려준다(목록이 그 자리에서 띄운다), 아니면 자리 고르기로 간다 */
+  readonly choose: (choice: RecruitChoice) => string | undefined
+  /** 결과 0 → 상태 0xce */
+  readonly back: () => void
 }
 
 /**
@@ -46,8 +70,8 @@ export interface PlayerRecruitScreenProps {
  *
  * ⚠️ **원본 배치 미해독 — 근사**: 0xe340(그리기)의 좌표를 못 찾아 공용 판 목록으로 그린다.
  */
-export function PlayerRecruitScreen({ roster, list, rosterNames, onRecruit, onBack }: PlayerRecruitScreenProps) {
-  const [step, setStep] = useState<{ readonly cursor: number } | null>(null)
+export function PlayerRecruitScreen({ roster, list, rosterNames, onRecruit, onBack, renderCandidates }: PlayerRecruitScreenProps) {
+  const [step, setStep] = useState<{ readonly candidate: RecruitCandidate; readonly isPitcher: boolean } | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
   const entries = recruitEntriesOf(list, roster)
@@ -61,7 +85,7 @@ export function PlayerRecruitScreen({ roster, list, rosterNames, onRecruit, onBa
   }))
 
   /** 2단계 — 바꿀 자리 (0xdf, this+0x110 = 3) */
-  const chosen = step === null ? null : entries[step.cursor]
+  const chosen = step
   const slotPlayers = chosen === null ? [] : chosen.isPitcher ? roster.pitchers : roster.batters
   const slotNames = chosen === null
     ? []
@@ -79,11 +103,27 @@ export function PlayerRecruitScreen({ roster, list, rosterNames, onRecruit, onBa
       setNotice(ALREADY_RECRUITED)
       return
     }
-    setStep({ cursor: index })
+    setStep({ candidate: entry.candidate, isPitcher: entry.isPitcher })
+  }
+
+  /**
+   * 키 0xe340 (직접 떴다) — 결과 1/2 → `0xb5054(내 팀, 0/1)`, 3/4 → `0xb50ac(내 팀, 0/1, [목록+0x130])` 가 참이면
+   * StrMODE[181] 을 0xbbef9(…, 1, 1, 1) 로, 아니면 `this+0x110 = 3` · 상태 0xdf(자리 고르기).
+   * ⚠️ 나리 기록(0x22168 · 0x220ec)을 시즌 선수로 옮기는 칸(나리 레코드의 +0 · +0xa)은 아직 안 읽어 나리 후보는 중복 검사까지만
+   * 하고 자리 고르기로 가지 않는다.
+   */
+  const chooseCandidate = (choice: RecruitChoice): string | undefined => {
+    const players = choice.isPitcher ? roster.pitchers : roster.batters
+    const duplicated = choice.source === '나리'
+      ? hasRecruitedCareerPlayer(players)
+      : choice.candidate !== null && hasRecruitedHallOfFamePlayer(players, choice.candidate.player.id)
+    if (duplicated) return ALREADY_RECRUITED
+    if (choice.candidate !== null) setStep({ candidate: choice.candidate, isPitcher: choice.isPitcher })
+    return undefined
   }
 
   const selectSlot = (index: number) => {
-    if (chosen === null || chosen.candidate === null) return
+    if (chosen === null) return
     const result = recruitPlayer(roster, chosen.candidate.player, chosen.isPitcher, index)
     setStep(null)
     setNotice(RECRUIT_DONE)
@@ -94,7 +134,7 @@ export function PlayerRecruitScreen({ roster, list, rosterNames, onRecruit, onBa
     count: listRows.length,
     onSelect: selectCandidate,
     onCancel: onBack,
-    isEnabled: step === null && notice === null,
+    isEnabled: step === null && notice === null && renderCandidates === undefined,
   })
   const slotCursor = useSeasonCursor({
     count: slotRows.length,
@@ -105,7 +145,9 @@ export function PlayerRecruitScreen({ roster, list, rosterNames, onRecruit, onBa
 
   return (
     <RawScreen>
-      {step === null ? (
+      {step === null && renderCandidates !== undefined ? (
+        renderCandidates({ choose: chooseCandidate, back: onBack })
+      ) : step === null ? (
         <SeasonListWindow
           title="선수영입"
           rows={listRows}
