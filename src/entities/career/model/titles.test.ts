@@ -8,6 +8,7 @@ import {
   equipTitleNoticeOf,
   evaluateNewTitles,
   isAllTitlesCollected,
+  nationalCupStandingsTitleOf,
   nextTitleOf,
   NO_EQUIPPED_TITLE,
   PITCHER_TITLE_OFFSET,
@@ -287,6 +288,21 @@ describe('새로 옮긴 판정 (P3 5·6·7절)', () => {
     const titles = evaluateNewTitles(선수({ popularity: 4000, reputation: 999 }))
 
     expect(titles.map(titleNumberOf)).toEqual([...titles.map(titleNumberOf)].sort((a, b) => a - b))
+  })
+
+  it('평판 0 으로 끝난 경기 뒤 평가가 5번 이어지면 "가짜 인간" (0x1a670 — s8 +0x184 > 4)', () => {
+    expect(evaluateNewTitles(선수({ reputationZeroGames: 4 }))).not.toContain('가짜 인간')
+    expect(evaluateNewTitles(선수({ reputationZeroGames: 5 }))).toContain('가짜 인간')
+    // +0x184 는 u8 로 세고 ldrsb 로 읽는다 — 128 이상이면 음수라 못 받는다 (원본 그대로)
+    expect(evaluateNewTitles(선수({ reputationZeroGames: 127 }))).toContain('가짜 인간')
+    expect(evaluateNewTitles(선수({ reputationZeroGames: 128 }))).not.toContain('가짜 인간')
+  })
+
+  it('국가대항전 순위 화면(134) 틀 0x1b92c 가 "국가 대표" 를 준다 — 비트만 본다', () => {
+    expect(nationalCupStandingsTitleOf([])).toBe('국가 대표')
+    expect(nationalCupStandingsTitleOf(['국가 대표'])).toBeNull()
+    // 판정 함수 0x1a1c0 안에는 8 이 없다
+    expect(evaluateNewTitles(선수({ popularity: 4000, reputation: 999 }))).not.toContain('국가 대표')
   })
 
   it('nextTitleOf 는 원본처럼 하나만 준다', () => {

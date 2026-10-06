@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyGameResult, applySeasonEnd, createCareer, nextOpponentOf, GAMES_PER_SEASON, gamePointRewardOf, nameByteLengthOf, rookieAbilityOf, startNextSeason } from '@/entities/career/model/playerCareer'
+import { applyGameResult, applySeasonEnd, countGameForSkills, countReputationZeroGame, createCareer, nextOpponentOf, GAMES_PER_SEASON, gamePointRewardOf, nameByteLengthOf, rookieAbilityOf, startNextSeason } from '@/entities/career/model/playerCareer'
 import { EMPTY_LEAGUE, opponentOf, recordLeagueResult } from '@/entities/league/model/league'
 import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
 import type { GameSummary } from '@/entities/game/model/gameSummary'
@@ -269,5 +269,18 @@ describe('타자에게 체력은 없다 (StrHOWTO 능력치 설명)', () => {
 
   it('타자 능력치는 히트·파워·수비·주루 넷뿐이다', () => {
     expect(Object.keys(createCareer('선수').ability).sort()).toEqual(['defense', 'hit', 'power', 'run'])
+  })
+})
+
+describe('평판 0 연속 카운터 +0x184 — 0xa4d08 (경기 뒤 평가 116, 0x12c32)', () => {
+  it('평판이 0 이면 한 칸 올리고, 아니면 0 으로 되돌린다', () => {
+    const counted = countGameForSkills({ ...createCareer('전설'), reputation: 0, reputationZeroGames: 3 }, 0)
+    expect(counted.reputationZeroGames).toBe(4)
+    expect(countGameForSkills({ ...createCareer('전설'), reputation: 1, reputationZeroGames: 3 }, 0).reputationZeroGames).toBe(0)
+  })
+
+  it('바이트 칸이라 255 다음은 0 이다', () => {
+    expect(countReputationZeroGame(255, 0)).toBe(0)
+    expect(countReputationZeroGame(254, 0)).toBe(255)
   })
 })

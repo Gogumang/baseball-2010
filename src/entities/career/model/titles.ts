@@ -128,6 +128,8 @@ export interface TitleSubject {
   readonly seenEventIds: readonly string[]
   /** 전설 스킬(비트 7) 보유 */
   readonly hasLegendSkill: boolean
+  /** 평판 0 으로 끝난 경기 뒤 평가 연속 수 (+0x184, u8) — 칭호 30 이 `s8` 로 읽는다 */
+  readonly reputationZeroGames: number
 }
 
 type SubjectRule = (subject: TitleSubject) => boolean
@@ -139,12 +141,13 @@ const hasSeenEvent = (subject: TitleSubject, eventId: number) => subject.seenEve
 const romanceCountOf = (subject: TitleSubject) =>
   Object.values(ROMANCE_EVENT_IDS).filter((eventId) => hasSeenEvent(subject, eventId)).length
 
+/** `s8` 로 읽기 — +0x184 는 u8 로 세지만 칭호 30 은 `ldrsb` 로 읽어 128 이상이면 음수가 된다 (0x1a680) */
+const signedByteOf = (value: number) => ((value & 0xff) << 24) >> 24
+
 /**
- * 공통 칭호 0~31 (P3 5·6절). 번호가 빠진 것은 웹에 그 칸이 없어서다:
- *   8  국가 대표  — 원본은 관리 장면 `this+0x2c == 1`(국가대표 선발 상태, **유력**) 에서 번호만 넣는다.
- *                  웹에는 국가대표 선발(이벤트 461~464)이 아직 없다.
- *   30 가짜 인간  — `s8 +0x184 > 4`(평판 0 상태 유지 카운터, **유력**). 웹에 그 카운터가 없다.
- * 1·9 는 판정 함수 밖 중간평가 화면(0x11e84)이 준다 — `seasonFlow.midSeasonTitlesOf`.
+ * 공통 칭호 0~31 (P3 5·6절). 이 판정 함수(0x1a1c0) 밖에서 주는 것:
+ *   8  국가 대표  — 국가대항전 순위 화면(상태 134)의 틀 `0x1b92c` 가 준다 → `nationalCupStandingsTitleOf`.
+ *   1·9          — 중간평가 화면(0x11e84) → `seasonFlow.midSeasonTitlesOf`.
  */
 const COMMON_RULES: Readonly<Record<number, SubjectRule>> = {
   0: () => true, // 지금부터 시작이다!
@@ -184,6 +187,8 @@ const COMMON_RULES: Readonly<Record<number, SubjectRule>> = {
   27: (s) => s.reputation >= 999, // 평판 999
   28: (s) => s.reputation >= 700, // 평판 700
   29: (s) => s.reputation <= 0, // 평판 0
+  // 30 가짜 인간 — `s8 +0x184 > 4` (0x1a670). +0x184 = 평판 0 으로 끝난 경기 뒤 평가 연속 수 (0xa4d08)
+  30: (s) => signedByteOf(s.reputationZeroGames) > 4,
   31: (s) => s.money >= MONEY_SIX_BILLION, // 소지금 60억
 }
 
@@ -225,7 +230,25 @@ export function titleSubjectOfBatter(career: PlayerCareer): TitleSubject {
     lotteryPurchases: career.lotteryPurchases,
     seenEventIds: career.seenEventIds,
     hasLegendSkill: hasSkill(career, LEGEND_SKILL),
+    reputationZeroGames: career.reputationZeroGames,
   }
+}
+
+/** 칭호 8 "국가 대표" (StrNICKNAME[72] "국가대표 첫 선발") */
+const NATIONAL_TEAM_TITLE = 8
+
+/**
+ * 국가대항전 순위 화면(나리 상태 134)의 틀 `0x1b92c` 머리 (0x1b92e~0x1b958):
+ * ```
+ * if 장면+0x2c(이 상태에 들어와 돈 틀 수) == 1 && !0xa4089(선수, 8):  장면+0x270 = 8 ; 0x1274c(칭호 팝업)
+ * ```
+ * 장면+0x2c 는 상태가 바뀔 때 0xbc9c8 이 0 으로 두는 **틀 수**라(R9 61행) 순위 화면에 **들어올 때마다 한 번** 본다.
+ * 비트 검사만 있으니 처음 들어온 날 한 번 주는 셈이다 — 타자편·투수편이 같은 장면(0x106)·같은 비트다.
+ * 순위 화면에 들어올 때 부르면 줄 칭호 이름을, 이미 가졌으면 null 을 돌려준다.
+ */
+export function nationalCupStandingsTitleOf(owned: readonly string[]): string | null {
+  const title = TITLE_NAMES[NATIONAL_TEAM_TITLE]
+  return owned.includes(title) ? null : title
 }
 
 /** 실효 능력치 999 — 원본은 `0xb6415(기록, k, 1) > 998` 이다 (P3 7절, 0x1ad9a~0x1adfc) */

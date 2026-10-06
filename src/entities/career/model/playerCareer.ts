@@ -87,6 +87,12 @@ export interface PlayerCareer {
   readonly moneyGrubberGames: number
   /** 무력감(스킬 5) 보유 중 "경기 뒤 사기 ≥ 90" 이 **연속**으로 이어진 경기 수 (+0x1c7) */
   readonly highMoraleStreak: number
+  /**
+   * 평판 0 으로 끝난 경기 뒤 평가가 **연속**으로 이어진 수 (+0x184, u8). 경기 뒤 평가 116 의 `0xa4d08(S)` 가
+   * `s16 S+0x62(평판) == 0` 이면 +1(바이트라 255 다음은 0), 아니면 0 으로 되돌린다 (0x12c32 — `+0x1c2` 바로 뒤).
+   * 칭호 30 "가짜 인간" 이 `s8 +0x184 > 4` 로 본다 (0x1a670). 새 시즌에도 안 지운다 (쓰는 곳은 0xa4d08 하나).
+   */
+  readonly reputationZeroGames: number
   /** 몹쓸몸(스킬 3)을 가진 채로 한 훈련 수 (+0x75) — 6회가 되면 해제 조건을 넘는다 */
   readonly badBodyTrainings: number
   /** 유리몸(스킬 4)을 가진 채로 한 훈련 수 (+0x76) — 8회가 되면 해제 조건을 넘는다 */
@@ -331,6 +337,7 @@ export function createCareer(name: string, profile: RookieProfile = DEFAULT_ROOK
     moneyGrubberPopularityGain: 0,
     moneyGrubberGames: 0,
     highMoraleStreak: 0,
+    reputationZeroGames: 0,
     badBodyTrainings: 0,
     fragileTrainings: 0,
     popularity: STARTING_POPULARITY,
@@ -439,7 +446,17 @@ export function countGameForSkills(
     moneyGrubberPopularityGain: hasMoneyGrubber ? career.moneyGrubberPopularityGain + popularityChange : 0,
     moneyGrubberGames: hasMoneyGrubber ? career.moneyGrubberGames + 1 : 0,
     highMoraleStreak: hasHelpless && career.morale >= HIGH_MORALE ? career.highMoraleStreak + 1 : 0,
+    reputationZeroGames: countReputationZeroGame(career.reputationZeroGames, career.reputation),
   }
+}
+
+/**
+ * `0xa4d08(S)` — 평판(+0x62)이 0 이면 +0x184 를 한 칸 올리고(u8, 255 → 0), 아니면 0 (0xa4d08~0xa4d24).
+ * ⚠️ 원본은 연속 기록 0x8a6fc(@0x12b6e) 뒤에 부른다. 웹은 연속 기록이 주는 평판을 이 카운터 **뒤에** 더하므로
+ *    그 평판이 0 을 벗어나게 하는 경기에선 한 칸 어긋날 수 있다 — 0x8a6fc 가 평판을 그 자리에서 바꾸는지 아직 안 읽었다.
+ */
+export function countReputationZeroGame(count: number, reputation: number): number {
+  return reputation === 0 ? (count + 1) & 0xff : 0
 }
 
 /** 이번 시즌 칸별 훈련 수 = 통산 − 새 시즌 사본 (A-4) */
