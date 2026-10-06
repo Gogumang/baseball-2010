@@ -92,8 +92,8 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels }: HomeRunDe
 
     const isHomeRun = detail.resolution.kind === '타구' && detail.resolution.outcome.kind === '홈런'
     const batted = detail.pattern === undefined ? null : derbyBattedBallOf(detail.pattern, isHomeRun)
-    // 이벤트 존은 "공이 날아가는 중" 조건이라 배트에 맞은 공에서만 본다 (0x36dfc)
-    const zoneHit = batted !== null && isEventZoneHit({ apexHeight: batted.apexHeight })
+    // 이벤트 존은 "공이 날아가는 중" 조건이라 배트에 맞은 공에서만 본다 (0x36dfc) — 패턴 플래그 & 2 (+0x127)
+    const zoneHit = isEventZoneHit({ pattern: detail.pattern ?? null })
 
     const next = applyDerbyPitch(current, {
       isHomeRun,

@@ -100,6 +100,19 @@ describe('홈런더비 한 판', () => {
     expect(rendered.result.current.result).toBeNull()
   })
 
+  it('이벤트 존은 친 공의 패턴 플래그 & 2 로만 정해진다 (플레이 +0x127, 0xb07c8)', () => {
+    const rendered = 띄우기()
+    act(() => rendered.result.current.onPitchResolved({ ...홈런, pattern: [118, 961, 1367, 2] }))
+    expect(rendered.result.current.isEventZoneShown).toBe(true)
+    expect(rendered.result.current.run.bonusGamePoint).toBe(200)
+    act(() => {
+      vi.advanceTimersByTime(2_000)
+    })
+    // 플래그 0 패턴(같은 홈런)은 존이 없다
+    act(() => rendered.result.current.onPitchResolved(홈런))
+    expect(rendered.result.current.isEventZoneShown).toBe(false)
+  })
+
   it('단계가 오르면 마투수가 등판한다', () => {
     const rendered = 띄우기()
     expect(rendered.result.current.pitcher.ace).toBeNull()

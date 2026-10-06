@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { derbyBattedBallOf } from '@/entities/home-run-derby/model/derbyBattedBall'
 import { DERBY_DISTANCE_LIMIT } from '@/entities/home-run-derby/model/derbyRules'
-import { isEventZoneHit, isEventZoneVisibleAt } from '@/entities/home-run-derby/model/eventZone'
+import { isBigFlyPattern, isEventZoneHit, isEventZoneVisibleAt } from '@/entities/home-run-derby/model/eventZone'
 import { BATTED_BALL_PATTERNS } from '@/shared/config/original/battedBallPatterns'
 
 /** 홈런성 결과 코드 */
@@ -28,18 +28,24 @@ describe('타구 한 장 만들기', () => {
   })
 })
 
-describe('이벤트 존 (유력 — 원본 조건 한 고리가 미확인)', () => {
-  it('높이 뜬 타구만 존을 얻는다', () => {
-    expect(isEventZoneHit({ apexHeight: 6_000 })).toBe(true)
-    expect(isEventZoneHit({ apexHeight: 4_000 })).toBe(false)
+describe('이벤트 존 — 플레이 +0x127 = 패턴 플래그 & 2 (0xb07c8)', () => {
+  it('플래그 비트1 이 선 패턴만 존을 얻는다 — 높이와 상관없다', () => {
+    expect(isEventZoneHit({ pattern: [118, 961, 1367, 2] })).toBe(true)
+    expect(isEventZoneHit({ pattern: [90, 815, 1592, 0] })).toBe(false)
+    expect(isEventZoneHit({ pattern: [10, 900, 600, 3] })).toBe(true)
   })
 
-  it('필드 플래그(+0x127)가 서 있지 않으면 안 뜬다', () => {
-    expect(isEventZoneHit({ apexHeight: 6_000, hasFieldFlag: false })).toBe(false)
+  it('맞은 공이 아니면 안 뜬다', () => {
+    expect(isEventZoneHit({ pattern: null })).toBe(false)
   })
 
   it('한 공에 한 번만 놓인다', () => {
-    expect(isEventZoneHit({ apexHeight: 6_000, isZonePlaced: true })).toBe(false)
+    expect(isEventZoneHit({ pattern: [118, 961, 1367, 2], isZonePlaced: true })).toBe(false)
+  })
+
+  it('비트1 이 선 패턴은 원본 표에서 결과 18~20 에 몰려 있다 (P7 H1)', () => {
+    const 센다 = (code: number) => (BATTED_BALL_PATTERNS[code] ?? []).filter(isBigFlyPattern).length
+    expect([센다(18), 센다(19), 센다(20)]).toEqual([35, 15, 15])
   })
 
   it('8프레임 주기로 깜빡인다', () => {

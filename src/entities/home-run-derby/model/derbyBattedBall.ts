@@ -19,19 +19,8 @@ export interface DerbyBattedBall {
   readonly pattern: BattedBallPattern
   readonly trajectory: BattedBallTrajectory
   readonly landing: WorldPoint
-  /** 궤적의 최고 높이 — 이벤트 존 판정에 쓴다 */
-  readonly apexHeight: number
   /** 홈런일 때만 0 보다 크다 (0xa600c) */
   readonly distance: number
-}
-
-function apexHeightOf(trajectory: BattedBallTrajectory): number {
-  let apex = 0
-  for (let tick = 0; tick < trajectory.length; tick += 1) {
-    const point = trajectory.pointAt(tick)
-    if (point.y > apex) apex = point.y
-  }
-  return apex
 }
 
 /** 이번 타구(타석이 뽑은 패턴)로 궤적·비거리를 만든다 */
@@ -42,7 +31,6 @@ export function derbyBattedBallOf(pattern: BattedBallPattern, isHomeRun: boolean
     pattern,
     trajectory,
     landing,
-    apexHeight: apexHeightOf(trajectory),
     // 비거리는 홈런일 때만 센다 (0xa600c: 결과 코드 +0x26 이 8 일 때만)
     distance: isHomeRun ? derbyDistanceOf(landing) : 0,
   }
