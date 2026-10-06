@@ -248,3 +248,34 @@ export const ACHIEVEMENT_MARK = { image: 71, width: 28, dx: -1, dy: -1 } as cons
  * 0 도 그대로 찍는다.
  */
 export const RECORD_COUNT = { dx: 3, dy: 3, widthInset: 10 } as const
+
+/**
+ * **탭 0 설명 막대** (0x2e9b0~0x2ea86, 직접 떴다):
+ * ```
+ * 0xba759(slt_frame, 3, 프레임, x0 + 8, y0 + 0xbd)                 ; 막대 — 초점과 상관없이 늘
+ * [skin+0xf6] ≠ 0(탭 막대 초점) → 여기서 꼬리 0x2fb94 로 (글 없음)
+ * 글 = "!cffffff" + StrGAME[쪽 × 8 + 격자 커서 + 0x38]
+ * 판이 덜 열렸으면(높이 ≤ 211) 판 안쪽으로 자르고 자르기 깃발 0
+ * 0x5a8c8(skin, 글, x0 + 10, y0 + 0xc1, 폭 0xaa, 높이 0x10, 1, 자르기 깃발, 1)
+ * ```
+ * 0x5a8c8 = 흐르는 글: 깃발이 서면 (x + 2, y, 폭 − 4, 높이) 로 자르고, 글 폭 tw 를 재
+ * `x' = x + 폭 − [skin+0x284] % (tw + 폭)` 에 왼쪽 맞춤으로 그린 뒤 [skin+0x284] += 3 (오른쪽에서 들어와 왼쪽으로 3px 씩).
+ */
+export const DESCRIPTION_BAR = { frame: 3, x: PANEL.x + 8, y: PANEL.y + 0xbd } as const
+export const DESCRIPTION_TICKER = {
+  x: PANEL.x + 10,
+  y: PANEL.y + 0xc1,
+  width: 0xaa,
+  height: 0x10,
+  /** 자르기 칸은 좌우 2px 안쪽 */
+  clipInset: 2,
+  /** 그릴 때마다 [skin+0x284] 가 오르는 값 */
+  step: 3,
+} as const
+
+/** 흐르는 글의 왼쪽 x — 카운터 c · 글 폭 tw (0x5a91e~0x5a93a) */
+export function tickerTextXOf(counter: number, textWidth: number): number {
+  const { x, width } = DESCRIPTION_TICKER
+  const period = textWidth + width
+  return period > 0 ? x + width - (counter % period) : x + width
+}

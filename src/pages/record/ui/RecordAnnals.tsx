@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { FrameSprite, RawScreen } from '@/shared/ui'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
@@ -7,9 +7,10 @@ import type { Collection } from '@/entities/collection/model/collection'
 import { ORIGINAL_SKILLS } from '@/shared/config/original/skills'
 import { TITLE_NAMES } from '@/entities/career/model/titles'
 import { RECORD_NAMES } from '@/entities/game/model/gameRecords'
-import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
+import { parseGameMarkup, stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
+import { RECORD_DESCRIPTIONS } from '@/pages/record/lib/recordDescriptions'
 import {
-  ACHIEVEMENT_MARK, RECORD_COUNT, CELL_FRAMES, CELL_GRID, LIST_GRID, LOCKED_MARK, NAME_ROW, PAGER, PAGE_TITLE, PANEL,
+  ACHIEVEMENT_MARK, DESCRIPTION_BAR, DESCRIPTION_TICKER, RECORD_COUNT, tickerTextXOf, CELL_FRAMES, CELL_GRID, LIST_GRID, LOCKED_MARK, NAME_ROW, PAGER, PAGE_TITLE, PANEL,
   SPECIAL_RECORD_FIRST_CELL, SPECIAL_RECORD_NAMES,
   ENDING_CELL_NAMES, NARI_ENDING_CELL_COUNT, PROGRESS_ROW, SCROLL_MARKS, endingCellFrameOf, endingProgressOf, SKILL_DESCRIPTION, TAB_BAR, TAB_COUNT, TAB_CURSOR, TAB_NAMES,
   TAB_NAME_FRAMES, TAB_NAME_Y, TAB_PAGE_COUNTS, TOTAL_ROW, cellPositionOf, tabIconWidthOf,
@@ -163,7 +164,9 @@ export function RecordAnnals({ collection, onBack, gamePoint = 0 }: RecordAnnals
         setGridTop(scrollTopAfter(tab, gridTop, nextCursor, direction))
         return
       }
-      // ← → 는 쪽 넘기기 (0x2ba10 · 0x2ba5a) — 쪽이 없는 탭(진행·스킬)은 보이는 것이 없다
+      // ← → 는 쪽 넘기기 (0x2ba10 · 0x2ba5a) — 쪽이 없는 탭(진행·스킬)은 보이는 것이 없다.
+      // 끝에 [skin+0x80] = 0 (0x2babe) — 탭 0·4 그림이 0 일 때만 목록 객체 [mgr+0xe0] 를 새 쪽으로 다시 짓고(0x79ed5 ·
+      // 0x7a005, 0x2e8e0~0x2e996) 1 올리는 "다시 지어라" 깃발이다. 웹은 그릴 때마다 쪽에서 줄을 새로 뽑으므로 따로 둘 것이 없다
       const step = direction === 'right' ? 1 : -1
       if (pageLimit > 0) setPage((previous) => (previous + step + pageLimit) % pageLimit)
     }
@@ -287,6 +290,12 @@ export function RecordAnnals({ collection, onBack, gamePoint = 0 }: RecordAnnals
       {tab === 0 && <ListRows page={page} names={RECORD_TAB_NAMES} />}
       {tab === 0 && <RecordCounts page={page} stats={collection.stats} />}
       {tab === 0 && <AchievementMarks page={page} stats={collection.stats} />}
+      {tab === 0 && (
+        <FrameSprite folder={SLT_FRAMES} frame={DESCRIPTION_BAR.frame} origins={frames} x={DESCRIPTION_BAR.x} y={DESCRIPTION_BAR.y} />
+      )}
+      {tab === 0 && !isTabFocused && (
+        <DescriptionTicker text={RECORD_DESCRIPTIONS[page * LIST_GRID.rows + cursor] ?? ''} tick={tick} />
+      )}
 
       {tab === 4 && <StatRows page={page} stats={collection.stats} />}
 
@@ -413,6 +422,34 @@ function CellGrid({
           x={SCROLL_MARKS.x} y={isBlinking ? SCROLL_MARKS.down.yOn : SCROLL_MARKS.down.yOff} />
       )}
     </>
+  )
+}
+
+/**
+ * 탭 0 설명 — 흐르는 글 0x5a8c8. 카운터 [skin+0x284] 는 이 글을 그릴 때마다 3 오른다.
+ * ⚠️ [skin+0x284] 는 메인 메뉴 객체 칸이라 들어올 때의 값(지우는 곳)을 못 찾았다 — 웹은 이 글이 처음 그려질 때 0 에서 센다.
+ */
+function DescriptionTicker({ text, tick }: { readonly text: string; readonly tick: number }) {
+  const counter = useRef({ value: 0, lastTick: tick })
+  if (counter.current.lastTick !== tick) {
+    counter.current.value += DESCRIPTION_TICKER.step * Math.max(0, tick - counter.current.lastTick)
+    counter.current.lastTick = tick
+  }
+  const textRef = useRef<HTMLSpanElement>(null)
+  const [textWidth, setTextWidth] = useState(0)
+  useLayoutEffect(() => setTextWidth(textRef.current?.offsetWidth ?? 0), [text])
+  const segments = parseGameMarkup(`!cffffff${text}`).flatMap((line) => line.segments)
+  const { x, y, width, height, clipInset } = DESCRIPTION_TICKER
+  return (
+    <div className={styles.tickerClip} data-testid="기록-설명"
+      style={{ left: x + clipInset, top: y, width: width - clipInset * 2, height }}>
+      <span ref={textRef} className={styles.tickerText}
+        style={{ left: tickerTextXOf(counter.current.value, textWidth) - (x + clipInset) }}>
+        {segments.map((segment, index) => (
+          <span key={index} style={segment.color === null ? undefined : { color: segment.color }}>{segment.text}</span>
+        ))}
+      </span>
+    </div>
   )
 }
 

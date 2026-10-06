@@ -3,6 +3,8 @@ import {
   ANNALS_GRID_SHAPES, DIRECTION_CODES, PANEL_ANIMATION_DRAWS, PANEL_OPEN_START_HEIGHT, closingPanelHeightOf, cursorShakeOf,
   hasDownMark, isBlinkOn, moveGridCursor, openingPanelHeightOf, panelTopOf, scrollTopAfter,
 } from '@/pages/record/lib/annalsGrid'
+import { DESCRIPTION_BAR, DESCRIPTION_TICKER, tickerTextXOf } from '@/pages/record/lib/recordAnnalsLayout'
+import { RECORD_DESCRIPTIONS } from '@/pages/record/lib/recordDescriptions'
 
 describe('기록연감 격자 키 처리 (0x2b7a0 · 0x2b640 · 0x6bead)', () => {
   it('탭별 격자 — 0 · 3 · 4 는 1열 8줄(세로 감기), 1 은 4×5 · 2 는 4×10(가로 감기)', () => {
@@ -66,5 +68,22 @@ describe('판 열고 닫기 (0x2407c · 0x2fb94)', () => {
   it('판은 가운데 160 에서 높이 반만큼 위 — 212 면 54', () => {
     expect(panelTopOf(212)).toBe(54)
     expect(panelTopOf(PANEL_OPEN_START_HEIGHT)).toBe(144)
+  })
+})
+
+describe('탭 0 설명 막대 (0x2e9b0 · 0x5a8c8)', () => {
+  it('막대 프레임 3 은 (32, 243), 글은 (34, 247) 폭 170 에서 오른쪽부터 3px 씩 흘러 들어온다', () => {
+    expect([DESCRIPTION_BAR.x, DESCRIPTION_BAR.y]).toEqual([32, 243])
+    expect([DESCRIPTION_TICKER.x, DESCRIPTION_TICKER.y, DESCRIPTION_TICKER.width]).toEqual([34, 247, 170])
+    expect(tickerTextXOf(0, 100)).toBe(204)
+    expect(tickerTextXOf(3, 100)).toBe(201)
+    // 한 바퀴 = 글 폭 + 170
+    expect(tickerTextXOf(270, 100)).toBe(204)
+  })
+
+  it('설명은 StrGAME[0x38 + 칸] — 칸 0 "3루타" 설명 · 칸 47 은 보상 G 글', () => {
+    expect(RECORD_DESCRIPTIONS).toHaveLength(48)
+    expect(RECORD_DESCRIPTIONS[0]).toBe('타자가 자신의 안타로 3루까지 진출')
+    expect(RECORD_DESCRIPTIONS[47]).toContain('90000 G포인트')
   })
 })

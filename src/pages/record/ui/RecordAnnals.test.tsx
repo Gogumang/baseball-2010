@@ -11,6 +11,7 @@ import {
   cellPositionOf, endingCellFrameOf, endingProgressOf, tabIconXOf, tabNameXOf, tabSlotXOf,
 } from '@/pages/record/lib/recordAnnalsLayout'
 import { STAT_NAMES } from '@/pages/record/lib/statNames'
+import { RECORD_DESCRIPTIONS } from '@/pages/record/lib/recordDescriptions'
 import { applyAnnalsStat } from '@/entities/collection/model/annalsStats'
 
 /**
@@ -383,5 +384,20 @@ describe('진행 탭 = 엔딩 칸 20 (0x2ead8 · 0x58b5c)', () => {
   it('진행도 줄 y — 글 209 · 229, 노란 네모 +1, 프레임 14 는 −4', () => {
     expect(PROGRESS_ROW.firstY).toBe(209)
     expect(PROGRESS_ROW.firstY + PROGRESS_ROW.step).toBe(229)
+  })
+})
+
+describe('탭 0 설명 막대 (0x2e9b0~0x2ea86)', () => {
+  it('막대는 늘, 글은 본문에 초점이 있을 때만 — 쪽 × 8 + 줄 커서의 StrGAME[0x38 + n]', () => {
+    띄우기()
+    expect(screen.queryByTestId('기록-설명')).toBeNull()
+
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(screen.getByTestId('기록-설명').textContent).toBe('타자가 자신의 안타로 3루까지 진출')
+
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    // 쪽 1 · 줄 1 → 칸 9 = StrGAME[65]
+    expect(screen.getByTestId('기록-설명').textContent).toBe(RECORD_DESCRIPTIONS[9])
   })
 })

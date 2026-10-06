@@ -135,3 +135,19 @@ export const content = style({
   position: 'absolute',
   inset: 0,
 })
+
+/** 탭 0 흐르는 설명 글의 자르기 칸 (x + 2, y, 폭 − 4, 높이) */
+export const tickerClip = style({
+  position: 'absolute',
+  overflow: 'hidden',
+  pointerEvents: 'none',
+})
+
+export const tickerText = style({
+  position: 'absolute',
+  top: 0,
+  color: ORIGINAL_COLORS.text,
+  fontSize: '11px',
+  lineHeight: '11px',
+  whiteSpace: 'nowrap',
+})
