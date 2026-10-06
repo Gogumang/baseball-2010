@@ -27,7 +27,7 @@ import { NationalCupScreen } from '@/pages/national-cup/ui/NationalCupScreen'
 import { TeamGameScreen } from '@/pages/team-game/ui/TeamGameScreen'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { useGameSettings } from '@/app/model/useGameSettings'
-import { seasonRanksOf } from '@/app/model/useSeasonSession'
+import { seasonGoalInputOf, seasonRanksOf } from '@/app/model/useSeasonSession'
 import type { SeasonSession } from '@/app/model/useSeasonSession'
 import { seasonStadiumOf } from '@/entities/season-mode/model/stadiumItems'
 import { PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
@@ -280,20 +280,11 @@ export function SeasonRoute({ session, random, gameSettings, onExit, aceSelect }
   }
 
   if (scene === SEASON_SCENE_STATE.시즌정보) {
-    const wins = league.wins[state.record.teamId] ?? 0
-    const losses = league.losses[state.record.teamId] ?? 0
     return (
       <SeasonGoalsScreen
         yearIndex={state.record.yearIndex}
-        input={{
-          rank: ranks.myRank,
-          wins,
-          losses,
-          // 팀 타율·방어율은 웹이 아직 팀 단위로 세지 않는다 — 0 으로 두면 목표 ③④ 는 늘 미달이다
-          teamBattingAverage: 0,
-          teamEarnedRunAverage: 0,
-          popularityGain: state.record.popularity - state.record.popularityAtSeasonStart,
-        }}
+        // 목표 판정 0xa37bc 의 다섯 칸 — 팀 타율 0xa3700 · 팀 방어율 0xa3764 는 리그 선수 기록표에서 센다
+        input={seasonGoalInputOf({ state, league, roster, playerStats, series })}
         onBack={backToManagement}
       />
     )

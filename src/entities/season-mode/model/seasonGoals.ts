@@ -98,3 +98,93 @@ export function seasonGoalYearBonusOf(eventId: number, yearIndex: number): Seaso
   if (eventId === 396) return { popularity: -10 * yearIndex, reputation: -2 * yearIndex, money: 0 }
   return { popularity: 0, reputation: 0, money: 0 }
 }
+
+/* ── 목표 ①③④ 의 재료 — 0xa37bc 가 부르는 셈 (직접 떴다) ───────────────────────── */
+
+/** 타자 한 명의 시즌 줄 중 타율 셈이 읽는 두 칸 — 선수 레코드 +0x20 타수 · +0x22 안타 */
+export interface GoalBatterLine {
+  readonly atBats: number
+  readonly hits: number
+}
+
+/** 투수 한 명의 시즌 줄 중 방어율 셈이 읽는 두 칸 — +0x20 잡은 아웃 · +0x22 실점 */
+export interface GoalPitcherLine {
+  readonly outs: number
+  readonly runsAllowed: number
+}
+
+/** `0xb8e3c` 타율 ×1000 — 타수 ≤ 0 이면 0, `안타×1000 / 타수`(버림), 1000 상한 */
+export function battingAverageOf(line: GoalBatterLine): number {
+  if (line.atBats <= 0) return 0
+  return Math.min(Math.trunc((line.hits * 1000) / line.atBats), 1000)
+}
+
+/**
+ * `0xb6ce8` 방어율 ×100 — 아웃 > 0 이면 `실점 × 2700 / 아웃`(버림), 9999 상한.
+ * 아웃이 0 이면 실점이 있으면 9999, 없으면 0 (한 번도 안 던진 투수는 0 이라 평균을 **낮춘다** — 원본 그대로).
+ */
+export function earnedRunAverageOf(line: GoalPitcherLine): number {
+  if (line.outs > 0) return Math.min(Math.trunc((line.runsAllowed * 2700) / line.outs), 9999)
+  return line.runsAllowed > 0 ? 9999 : 0
+}
+
+/** 목표 ③ 이 평균 내는 타자 수 — `0xa3700(SR, 1)` 은 둘째 인자가 0 이 아니면 9 (a3718~a3720) */
+export const GOAL_BATTER_COUNT = 9
+
+/**
+ * 목표 ③ `0xa3700(SR, 1)` — 내 팀 레코드(`0x1f570(저장, SR[1])`)의 타자 **0~8번** 타율(`0xb8e3c`) 합 ÷ 9 (버림).
+ * 차례는 저장된 팀 레코드의 선수 배열(엔트리 편집이 고친 차례) 그대로다. 부르는 쪽이 그 차례로 줄을 넘긴다.
+ */
+export function teamBattingAverageOf(lines: readonly GoalBatterLine[]): number {
+  let sum = 0
+  for (let index = 0; index < GOAL_BATTER_COUNT; index += 1) {
+    sum += battingAverageOf(lines[index] ?? { atBats: 0, hits: 0 })
+  }
+  return Math.trunc(sum / GOAL_BATTER_COUNT)
+}
+
+/**
+ * 목표 ④ `0xa3764(SR)` — 내 팀 레코드의 투수 **전원**(수 = 팀 +0xc) 방어율(`0xb6ce8`) 합 ÷ 투수 수 (버림).
+ * 투수가 없으면 원본은 0 으로 나눈다(0xca7b4) — 시즌 팀은 늘 투수가 있어 닿지 않는다. 웹은 0 으로 둔다.
+ */
+export function teamEarnedRunAverageOf(lines: readonly GoalPitcherLine[]): number {
+  if (lines.length === 0) return 0
+  const sum = lines.reduce((total, line) => total + earnedRunAverageOf(line), 0)
+  return Math.trunc(sum / lines.length)
+}
+
+/** 포스트시즌 대진 칸 — `L+0x38 + 2i` 의 두 팀 (i 0 한국시리즈 · 1 플레이오프 · 2 준플레이오프) */
+export interface GoalPostseasonBracket {
+  /** 우승팀 L+0x37 (없으면 null) */
+  readonly champion: number | null
+  readonly pairs: readonly (readonly (number | null)[])[]
+}
+
+/**
+ * 목표 ① 의 순위 `0xb7aa0(L, 팀, 0)` (b7aa0~b7afa):
+ * ```
+ * (L+0x34 ≠ 0 || L+0x36 ≠ 0) && 셋째 인자 == 0:
+ *     L+0x37 == 팀 → 0
+ *     i = 0..2: L[0x38+2i+1] == 팀 || L[0x38+2i] == 팀 → i + 1
+ *     → 10
+ * 그 밖: 정규시즌 순위표(0부터)
+ * ```
+ * 그래서 **포스트시즌이 시작된 뒤 판정하는 392 에서는** 대진에 든 팀이 1~3, 못 든 팀이 10 이 된다
+ * (정규시즌 1위 → 1 · 2위 → 2 · 3·4위 → 3). 원본 그대로다.
+ */
+export function goalRankOf(
+  team: number,
+  regularSeasonRank: number,
+  bracket: GoalPostseasonBracket | null,
+): number {
+  if (bracket === null) return regularSeasonRank
+  if (bracket.champion === team) return 0
+  for (let index = 0; index < bracket.pairs.length; index += 1) {
+    const pair = bracket.pairs[index] ?? []
+    if (pair[1] === team || pair[0] === team) return index + 1
+  }
+  return POSTSEASON_OUTSIDE_RANK
+}
+
+/** 대진에 없는 팀의 `0xb7aa0` 값 */
+export const POSTSEASON_OUTSIDE_RANK = 10

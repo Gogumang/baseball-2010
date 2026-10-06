@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
+  POSTSEASON_OUTSIDE_RANK,
   SEASON_GOAL_REWARDS,
   SEASON_YEAR_GOALS,
   achievedSeasonGoalCount,
+  battingAverageOf,
+  earnedRunAverageOf,
+  goalRankOf,
+  teamBattingAverageOf,
+  teamEarnedRunAverageOf,
   seasonGoalResultEventId,
   seasonGoalYearBonusOf,
   seasonGoalsOf,
@@ -71,5 +77,45 @@ describe('목표 결과 이벤트 0x8d0e0', () => {
     expect(seasonGoalYearBonusOf(394, 4)).toEqual({ popularity: 20, reputation: 0, money: 20 })
     expect(seasonGoalYearBonusOf(396, 4)).toEqual({ popularity: -40, reputation: -8, money: 0 })
     expect(seasonGoalYearBonusOf(395, 9)).toEqual({ popularity: 0, reputation: 0, money: 0 })
+  })
+})
+
+describe('목표 ③ 팀 타율 0xa3700(SR, 1) · ④ 팀 방어율 0xa3764', () => {
+  it('타율 0xb8e3c — 안타×1000/타수 버림, 1000 상한, 타수 0 이면 0', () => {
+    expect(battingAverageOf({ atBats: 3, hits: 1 })).toBe(333)
+    expect(battingAverageOf({ atBats: 0, hits: 0 })).toBe(0)
+    expect(battingAverageOf({ atBats: 2, hits: 5 })).toBe(1000)
+  })
+
+  it('팀 타율은 타자 0~8번 아홉 명의 타율 합 ÷ 9 — 아홉 명이 안 되면 빈 칸은 0 이다', () => {
+    const 줄 = Array.from({ length: 12 }, (_unused, index) => ({ atBats: 10, hits: index }))
+    // 0,100,…,800 의 합 3600 ÷ 9 = 400 (벤치 9~11 은 안 센다)
+    expect(teamBattingAverageOf(줄)).toBe(400)
+    expect(teamBattingAverageOf([{ atBats: 4, hits: 3 }])).toBe(Math.trunc(750 / 9))
+  })
+
+  it('방어율 0xb6ce8 — 실점×2700/아웃, 9999 상한, 아웃 0 이면 실점 있으면 9999 · 없으면 0', () => {
+    expect(earnedRunAverageOf({ outs: 27, runsAllowed: 3 })).toBe(300)
+    expect(earnedRunAverageOf({ outs: 0, runsAllowed: 1 })).toBe(9999)
+    expect(earnedRunAverageOf({ outs: 0, runsAllowed: 0 })).toBe(0)
+  })
+
+  it('팀 방어율은 투수 전원의 평균 — 안 던진 투수의 0 이 평균을 낮춘다 (원본 그대로)', () => {
+    expect(teamEarnedRunAverageOf([{ outs: 27, runsAllowed: 3 }, { outs: 0, runsAllowed: 0 }])).toBe(150)
+  })
+})
+
+describe('목표 ① 순위 0xb7aa0(L, 팀, 0)', () => {
+  it('포스트시즌이 아니면 정규시즌 순위 그대로', () => {
+    expect(goalRankOf(3, 5, null)).toBe(5)
+  })
+
+  it('포스트시즌 중이면 대진 칸 순위 — 1위 1 · 2위 2 · 3·4위 3 · 대진 밖 10', () => {
+    const 대진 = { champion: null, pairs: [[1, null], [2, null], [3, 4]] }
+    expect(goalRankOf(1, 0, 대진)).toBe(1)
+    expect(goalRankOf(2, 1, 대진)).toBe(2)
+    expect(goalRankOf(4, 3, 대진)).toBe(3)
+    expect(goalRankOf(7, 6, 대진)).toBe(POSTSEASON_OUTSIDE_RANK)
+    expect(goalRankOf(4, 3, { ...대진, champion: 4 })).toBe(0)
   })
 })

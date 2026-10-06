@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
-import { useSeasonSession } from '@/app/model/useSeasonSession'
+import { seasonGoalInputOf, useSeasonSession } from '@/app/model/useSeasonSession'
 import { postseasonGameOf, postseasonRotationTurnsOf } from '@/entities/league/model/league'
 import { SEASON_GAME_COUNT } from '@/entities/season-mode/model/seasonRecord'
 import { SEASON_PHASE, SEASON_SCENE_STATE } from '@/entities/season-mode/model/seasonStateMachine'
@@ -288,6 +288,25 @@ describe('시즌 관리 커맨드', () => {
     const 후 = result.current.state!
     expect(후.teamMorale).toBeGreaterThan(전.teamMorale)
     expect(후.record.money).toBe(전.record.money - 4)
+  })
+})
+
+describe('시즌 목표 ③④ 의 재료 (seasonGoalInputOf)', () => {
+  it('팀 타율은 리그 선수 기록표의 내 팀 타자 0~8번에서 센다 (0xa3700)', () => {
+    const { result } = 띄우기()
+    act(() => result.current.actions.chooseTeam(0))
+    act(() => result.current.actions.playNextGame())
+    // 타자 0~8번이 각자 두 타수 한 안타 → 타율 500 씩
+    const 타석 = Array.from({ length: 9 }, (_unused, slot) => [
+      { teamId: 0, battingOrderIndex: slot, outcome: { kind: '안타', bases: 1 } as const, runsBattedIn: 0 },
+      { teamId: 0, battingOrderIndex: slot, outcome: { kind: '아웃', detail: '땅볼아웃' } as const, runsBattedIn: 0 },
+    ]).flat()
+    act(() => result.current.actions.finishGame(요약({ leaguePlateAppearances: 타석 })))
+
+    const { state, league, roster, playerStats, series } = result.current
+    const 입력 = seasonGoalInputOf({ state: state!, league, roster, playerStats, series })
+    expect(입력.teamBattingAverage).toBe(500)
+    expect(입력.wins).toBe(1)
   })
 })
 

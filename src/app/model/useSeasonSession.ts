@@ -71,6 +71,12 @@ import {
 } from '@/widgets/season/lib/seasonTraining'
 import { SEASON_OUTING_EFFECTS, SEASON_OUTING_PLACES } from '@/widgets/season/lib/seasonOuting'
 import { cureIllnessAtHospital } from '@/entities/season-mode/model/seasonEventFlow'
+import { goalRankOf, teamBattingAverageOf, teamEarnedRunAverageOf } from '@/entities/season-mode/model/seasonGoals'
+import type { GoalPostseasonBracket, SeasonGoalInput } from '@/entities/season-mode/model/seasonGoals'
+import {
+  leagueBatterIdOf, leagueBatterLineOf, leaguePitcherIdOf, leaguePitcherLineOf,
+} from '@/entities/league/model/leaguePlayerStats'
+import { entryBattersOfOrder } from '@/features/play-team-game/model/teamGameRoster'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { MORALE_LIMIT, POPULARITY_LIMIT, REPUTATION_LIMIT, MONEY_LIMIT, clampTo } from '@/entities/season-mode/model/seasonRecord'
 import { isInfiniteGamePointOn } from '@/shared/lib/dev/devOptions'
@@ -1553,4 +1559,74 @@ export function seasonRanksOf(league: League, record: SeasonRecord) {
   const ranking = rankingOf(league)
   const rankOf = (team: number) => Math.max(0, ranking.indexOf(team))
   return { myRank: rankOf(record.teamId), opponentRank: rankOf(seasonOpponentOf(record)) }
+}
+
+/** 목표 판정의 재료가 사는 곳 — 세션 저장의 여러 칸 */
+export interface SeasonGoalSource {
+  readonly state: SeasonState
+  readonly league: League
+  readonly roster: SeasonTeamRoster
+  readonly playerStats: LeaguePlayerStats
+  readonly series: PostseasonSeries | null
+}
+
+/**
+ * 시즌 목표 판정 `0xa37bc` 의 입력 다섯 칸 (P4 2b · 직접 떴다):
+ * ```
+ * ① 0xb7aa0(L, 팀, 0)      — 포스트시즌 중이면 대진 칸 순위(`goalRankOf`), 아니면 정규시즌 순위
+ * ② 0xb7908 / (0xb7908 + 0xb7968) × 100
+ * ③ 0xa3700(SR, 1)         — 팀 레코드 타자 0~8번 타율 평균
+ * ④ 0xa3764(SR)            — 팀 레코드 투수 전원 방어율 평균
+ * ⑤ 인기도 − SR+0x78
+ * ```
+ * ③④ 의 선수 줄은 리그 선수 기록표(`playerStats`)에서 **경기가 쌓을 때와 같은 열쇠**로 찾는다 —
+ * 타자는 저장 명단 차례를 `entryBattersOfOrder` 로 붙박이 표 칸에 맞춘 `팀 × 12 + 칸`, 투수는 `팀 × 8 + 칸`.
+ *
+ * ⚠️ 한계 (지어내지 않고 남긴다):
+ * - 웹 팀 경기 요약(`TeamGameSummary`)이 **사람 경기의 투수 등판 줄**을 싣지 않아 내 팀 투수 줄은 늘 0 이다 —
+ *   원본은 사람 경기도 0xa8024·0xa7de8 로 쌓는다. 그래서 지금은 ④ 가 0(달성)으로 나온다.
+ * - 영입 선수(id ≥ 0xb4)는 웹 붙박이 표에 없어 경기가 남은 표 칸으로 세우고(`tableSlotsOfOrder`) 그 칸으로 쌓는다 — 여기도 같은 칸을 읽는다.
+ * - 대진 칸의 플레이오프 아랫 시드(준PO 승자)는 한국시리즈가 시작된 뒤에는 시리즈 객체에 남지 않아 모른다 —
+ *   목표 판정(392)은 포스트시즌 첫날에 돌아 닿지 않는다.
+ */
+export function seasonGoalInputOf(source: SeasonGoalSource): SeasonGoalInput {
+  const { record } = source.state
+  const team = record.teamId
+  const ranking = rankingOf(source.league)
+  const regularRank = Math.max(0, ranking.indexOf(team))
+  const order = seasonEntryOrderOf(source.roster)
+  const batterLines = entryBattersOfOrder(team, order).map((batter) =>
+    leagueBatterLineOf(source.playerStats, leagueBatterIdOf(team, batter.rosterSlot)))
+  const pitcherLines = order.pitchers.map((slot) =>
+    slot >= 0 ? leaguePitcherLineOf(source.playerStats, leaguePitcherIdOf(team, slot)) : { outs: 0, runsAllowed: 0 })
+  return {
+    rank: goalRankOf(team, regularRank, record.inPostseason ? goalBracketOf(source.series) : null),
+    wins: source.league.wins[team] ?? 0,
+    losses: source.league.losses[team] ?? 0,
+    teamBattingAverage: teamBattingAverageOf(batterLines),
+    teamEarnedRunAverage: teamEarnedRunAverageOf(pitcherLines),
+    popularityGain: record.popularity - record.popularityAtSeasonStart,
+  }
+}
+
+/**
+ * 웹 시리즈 객체 → 원본 대진 칸 `L+0x38 + 2i` (0xb80a8: 1위·미정 · 2위·미정 · 3위·4위, 이긴 팀은 다음 라운드 칸 1).
+ * 시리즈가 없으면 대진 칸이 빈 것과 같다.
+ */
+function goalBracketOf(series: PostseasonSeries | null): GoalPostseasonBracket {
+  if (series === null) return { champion: null, pairs: [] }
+  const [first, second, third, fourth] = series.qualifiers
+  const inKoreanSeries = series.round === '한국시리즈' || series.round === '종료'
+  const playoffLower = series.round === '플레이오프'
+    ? series.teams[1]
+    // 한국시리즈 아랫 시드(플레이오프 승자)가 2위가 아니면 그 팀이 곧 준PO 승자다. 2위면 모른다 — 위 주석
+    : inKoreanSeries && series.teams[1] !== second ? series.teams[1] : null
+  return {
+    champion: series.champion,
+    pairs: [
+      [first ?? null, inKoreanSeries ? series.teams[1] : null],
+      [second ?? null, playoffLower],
+      [third ?? null, fourth ?? null],
+    ],
+  }
 }
