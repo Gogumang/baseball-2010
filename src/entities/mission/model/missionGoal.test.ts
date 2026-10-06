@@ -258,3 +258,15 @@ describe('recordPitcherOutcome — 아웃은 아웃 콜 수만큼 (R+0x13c)', ()
     expect(corrected.counts['탈삼진']).toBe(1)
   })
 })
+
+describe("'번트' 는 번트 안타만 — R+0xf4 는 정산 안타 갈래의 a8506 하나에서만 오른다", () => {
+  it('번트 안타는 번트 목표에 든다', () => {
+    expect(goalNamesFor({ kind: '안타', bases: 1 }, 0, true)).toContain('번트')
+  })
+
+  it('아웃으로 끝난 번트(희생번트 포함)는 안 든다', () => {
+    expect(goalNamesFor({ kind: '아웃', detail: '땅볼아웃' }, 0, true)).not.toContain('번트')
+    const progress = recordOutcome(createProgress(), { kind: '아웃', detail: '땅볼아웃' }, 0, true, 1)
+    expect(isCleared(번트달인, progress)).toBe(false)
+  })
+})

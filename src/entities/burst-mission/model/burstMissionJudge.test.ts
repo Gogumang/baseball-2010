@@ -170,7 +170,8 @@ describe('미션 모드 목표 이름과 어긋나지 않는다', () => {
   })
 
   it('번트·아웃도 이름이 같다', () => {
-    expect(goalNamesFor(땅볼아웃, 0, true)).toContain(BURST_GOAL_NAMES[BURST_GOAL.번트])
+    // 미션 모드의 '번트' 는 번트 안타만 센다 (정산 a8506 이 안타 갈래 안) — 이름 비교는 번트 안타로 한다
+    expect(goalNamesFor(단타, 0, true)).toContain(BURST_GOAL_NAMES[BURST_GOAL.번트])
     expect(pitcherGoalNamesFor(땅볼아웃, '')).toContain(BURST_GOAL_NAMES[BURST_GOAL.아웃])
   })
 

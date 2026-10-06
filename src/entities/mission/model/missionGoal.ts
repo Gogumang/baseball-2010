@@ -127,8 +127,11 @@ export function goalNamesFor(
 ): string[] {
   const names: string[] = []
 
-  // 번트는 인플레이 타구가 되면 성공으로 본다.
-  if (isBunt && (outcome.kind === '안타' || outcome.kind === '아웃')) names.push('번트')
+  // 번트는 **번트 안타만** 센다 (직접 재역어셈). 판정 0xaaa6c 모드 6 갈래는 '번트' 를 0xaa928(R+0xf4, 행+0xa4 위)
+  // (aab36)로 재고, R+0xf4(사건 코드 0xa, 핸들러 0xa58da `+= 1`)를 올리는 곳은 정산 0xa8024 의 a8506 하나뿐이다 —
+  // 안타 갈래(a8490 `[sp+0x14]` = 안타 표시가 서야 들어간다) 안에서 게임+0x13(번트 타구 표시)이 켜졌을 때.
+  // 희생번트처럼 아웃으로 끝난 번트는 안 든다 (번트 시도 수는 스윙 0xa5fac 의 코드 0xb → R+0xf8 로 따로 간다).
+  if (isBunt && outcome.kind === '안타') names.push('번트')
 
   if (outcome.kind === '안타') {
     names.push('안타')
