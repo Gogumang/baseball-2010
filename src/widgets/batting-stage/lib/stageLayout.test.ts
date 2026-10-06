@@ -88,4 +88,16 @@ describe('타자 좌우 — side 0 우타 · 1 좌타 (0xb63c0)', () => {
     expect(pitchSituationOf(null, 2).side).toBe(BATTER_SIDE.우타)
     expect(pitchSituationOf(null, 1).side).toBe(BATTER_SIDE.좌타)
   })
+
+  it('투수 좌우는 공에 실린 투수 손(0xb63c0) — 공이 없으면 우투 0 (타자 스킬 13·14, 0xab9f0·0xaba1e)', () => {
+    expect(situationOf(null, [], 0).pitcherSide).toBe(0)
+    expect(situationOf(null, [], 0, { pitcherForm: 1, pitcherMagicNumber: 0 }).pitcherSide).toBe(1)
+    // 마투수 붕붕머신(폼 8, +0x18 = 7)은 좌투 1
+    expect(situationOf(null, [], 0, { pitcherForm: 8, pitcherMagicNumber: 7 }).pitcherSide).toBe(1)
+  })
+
+  it('투수 스킬 31 이 보는 칸은 타자 레코드 칸 0xb6394 — 안 넘기면 0', () => {
+    expect(situationOf(null, [], 0).batterOrderIndex).toBe(0)
+    expect(situationOf(null, [], 0, undefined, 3).batterOrderIndex).toBe(3)
+  })
 })

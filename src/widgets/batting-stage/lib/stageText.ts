@@ -3,6 +3,8 @@ import type { SwingSituation } from '@/entities/batting/model/swingSkills'
 import type { HudState } from '@/widgets/batting-stage/lib/renderHud'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import type { PitchSituation } from '@/entities/pitching/model/selectPitch'
+import type { Pitch } from '@/entities/pitching/model/pitch'
+import { pitcherHandOfPitch } from '@/entities/pitching/model/pitcherHand'
 import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
 import { batterFrameAt } from '@/widgets/batting-stage/lib/batterLayers'
 
@@ -56,12 +58,21 @@ export function isHomeRunResolution(detail: PitchOutcomeDetail): boolean {
 /**
  * 스킬 조건에 쓰는 타석 상황. HUD 가 없으면 기본 상황이다.
  * 타자 side 는 **폼의 낮은 비트 = 손**(0xb63c0, 0 우타 · 1 좌타)이다 — 화면 배치와 같은 값을 쓴다.
- * 투수 좌우는 원본 선수 레코드에서 아직 읽지 않아 0 — 추정.
+ *
+ * 투수 좌우는 타석 판정 0xab214 가 **던진 투수 레코드**로 `0xb63c0` 을 바로 부른 값이다
+ * (0xab9f0 좌완UP 13 · 0xaba1e 우완UP 14) — 공에 실린 폼·+0x18 로 `pitcherHandOfPitch` 가 낸다.
+ * 공을 안 넘기면 0(우투)으로 본다 — 13 은 늘 꺼지고 14 는 늘 켜지는 옛 동작이다.
+ *
+ * `batterRecordSlot` 은 투수 스킬 31(0xabcd8)이 보는 `0xb6394(타자)` = 타자 레코드 `+0xa & 0x1f` 다 —
+ * 타순이 아니라 **레코드의 팀 안 칸 번호**(일반 타자 0~11, 마타자 순번, 0xb53f0 이 자리를 옮길 때 0xb6604 로
+ * 다시 쓴다 — S6 3-4)이고 2·3·4 면 C −10%. 안 넘기면 0 (31 은 늘 꺼짐).
  */
 export function situationOf(
   hud: HudState | null,
   recentAtBatCodes: readonly number[] = [],
   batterForm = 0,
+  pitch?: Pick<Pitch, 'pitcherForm' | 'pitcherMagicNumber'>,
+  batterRecordSlot = 0,
 ): SwingSituation {
   const bases = hud?.bases ?? { first: false, second: false, third: false }
   return {
@@ -69,11 +80,11 @@ export function situationOf(
     isLosing: hud === null ? false : hud.ourScore < hud.opponentScore,
     runnerCount: Number(bases.first) + Number(bases.second) + Number(bases.third),
     hasSecondBaseRunner: bases.second,
-    pitcherSide: 0,
+    pitcherSide: pitch === undefined ? 0 : pitcherHandOfPitch(pitch),
     batterSide: batterSideOfForm(batterForm),
     balls: hud?.balls ?? 0,
     strikes: hud?.strikes ?? 0,
-    batterOrderIndex: 0,
+    batterOrderIndex: batterRecordSlot,
     recentAtBatCodes,
   }
 }

@@ -11,6 +11,7 @@ import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
+import { pitcherHandOfPitch } from '@/entities/pitching/model/pitcherHand'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { Coordinate } from '@/shared/lib/geometry/coordinate'
 import {
@@ -397,7 +398,10 @@ export function pitchAgainstBatterDetailed(
       isPitcherExhausted: false,
       batterSkillIds: [],
       pitcherSkillIds: [],
-      situation: NEUTRAL_SITUATION,
+      // 0xab214 는 투수·타자 레코드로 손(0xb63c0)·칸(0xb6394)을 바로 읽는다. 투수 손은 공에 실린 폼·+0x18 로,
+      // 타자 손은 화면 배치(`stageSide` = 0x3b084 의 0xb63c1(타자))로 둔다. 타자 레코드 칸(스킬 31)은 몰라 0 이다.
+      // ⚠️ 지금은 두 스킬 목록이 비어 있어(CPU 타자·사람 투수 스킬 비트 미이식) 이 상황이 결과를 바꾸지 않는다
+      situation: { ...NEUTRAL_SITUATION, pitcherSide: pitcherHandOfPitch(pitch), batterSide: pitch.stageSide },
     },
     random,
   )
