@@ -19,7 +19,8 @@ import {
 } from '@/entities/season-mode/model/seasonEvaluation'
 import { clearSeasonGameRecord } from '@/entities/season-mode/model/seasonReputation'
 import type { SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
-import type { TradeSettlement } from '@/entities/season-mode/model/playerTrade'
+import { swapTradedPlayers } from '@/entities/season-mode/model/playerTrade'
+import type { TradeSettlement, TradeSwap } from '@/entities/season-mode/model/playerTrade'
 import { NO_TRADE_REQUEST, rollTradeRequest } from '@/entities/season-mode/model/tradeRequest'
 import type { TradeRequest } from '@/entities/season-mode/model/tradeRequest'
 import {
@@ -67,7 +68,7 @@ import {
   unrotatedPitchersOf,
 } from '@/entities/season-mode/model/seasonEntry'
 import type { SeasonEntryInput, SeasonEntryLists, SeasonEntryRecordSource } from '@/entities/season-mode/model/seasonEntry'
-import { HALL_OF_FAME_FIRST_ID, removeHallOfFamerFromRoster } from '@/entities/season-mode/model/playerRecruit'
+import { HALL_OF_FAME_FIRST_ID, removeHallOfFamerFromRoster, tableTeamOf } from '@/entities/season-mode/model/playerRecruit'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
 import { KOREA_TEAM_ID, createNationalCup, nationalCupSideOf } from '@/entities/national-cup/model/nationalCup'
@@ -140,6 +141,8 @@ export interface SeasonSession {
   readonly scene: SeasonSceneState
   readonly league: League
   readonly roster: SeasonTeamRoster
+  /** CPU 팀 레코드의 명단 — 트레이드로 바뀐 팀은 시즌 저장의 것, 나머지는 붙박이 표 (`SeasonSave.cpuRosters`) */
+  readonly cpuRosterOf: (teamId: number) => SeasonTeamRoster
   /** 리그 선수별 성적 — 타이틀·MVP 판정의 유일한 재료다 (B-2) */
   readonly playerStats: LeaguePlayerStats
   /** 포스트시즌 시리즈 (준PO → PO → 한국시리즈). 정규시즌 중에는 null */
@@ -346,6 +349,12 @@ interface SeasonSave {
    * 시즌 내내 이어진다 (a583fe0 · `seasonStamina` 주석). 이 칸이 없는 옛 저장은 모두 10000 으로 채운다.
    */
   readonly cpuPitcherStaminas?: Readonly<Record<number, readonly number[]>>
+  /**
+   * **CPU 팀 레코드의 선수 배열** — 원본 시즌 저장의 팀 레코드(`0x1f570(저장, 팀)`)마다 든 투수·타자 0x30 바이트들.
+   * 트레이드 성공(0xd1cc~0xd3ae)이 내 팀과 상대 팀 레코드의 한 칸씩을 맞바꾸므로 **바뀐 팀만** 여기 둔다 —
+   * 없는 팀은 붙박이 표 명단(`tableRosterOf`)과 같다(옛 저장도 그렇다). 스태미나(+0x2c)는 `cpuPitcherStaminas` 가 주인이다.
+   */
+  readonly cpuRosters?: Readonly<Record<number, SeasonTeamRoster>>
 }
 
 /** 엔트리 편집 0xe0 한 판 — 편집 객체 `[this+0xa8]` 와 그 목록 */
@@ -387,10 +396,10 @@ function rosterOf(teamId: number): SeasonTeamRoster {
  */
 function withTablePositions(roster: SeasonTeamRoster, teamId: number): SeasonTeamRoster {
   if (roster.batters.some((player) => (player.fieldPosition & 0xf) !== 0)) return roster
-  const table = teamBatters(teamId)
   return {
     ...roster,
     batters: roster.batters.map((player) => {
+      const table = teamBatters(tableTeamOf(player, teamId))
       const position = player.id < HALL_OF_FAME_FIRST_ID ? table[player.id]?.position ?? 0 : 0
       return { ...player, fieldPosition: (player.fieldPosition & ~0xf) | position }
     }),
@@ -398,6 +407,43 @@ function withTablePositions(roster: SeasonTeamRoster, teamId: number): SeasonTea
 }
 
 const EMPTY_ROSTER: SeasonTeamRoster = { pitchers: [], batters: [] }
+
+/** CPU 팀 레코드 — 트레이드로 바뀌었으면 저장의 것, 아니면 붙박이 표 명단 */
+function cpuRosterOf(save: SeasonSave | null, teamId: number): SeasonTeamRoster {
+  return save?.cpuRosters?.[teamId] ?? tableRosterOf(teamId)
+}
+
+/**
+ * 성공한 트레이드를 시즌 저장의 두 팀 레코드에 건다 — `swapTradedPlayers`(0xd1cc~0xd3ae).
+ * 투수 스태미나(+0x2c)도 레코드째 옮겨 가므로, 상대 팀 칸은 `cpuPitcherStaminas`(표 칸 차례)에서 꺼내 실어 보내고
+ * 받은 내 투수의 값을 그 칸에 되적는다.
+ */
+function withTradeSwap(save: SeasonSave, swap: TradeSwap): SeasonSave {
+  const myTeamId = save.state.record.teamId
+  const opponent = swap.opponentTeamId
+  const staminas = save.cpuPitcherStaminas?.[opponent] ?? teamPitchers(opponent).map(() => FULL_STAMINA)
+  const theirs = cpuRosterOf(save, opponent)
+  const swapped = swapTradedPlayers(
+    myTeamId,
+    {
+      mine: save.roster,
+      theirs: {
+        ...theirs,
+        pitchers: theirs.pitchers.map((player, index) => ({ ...player, stamina: staminas[index] ?? FULL_STAMINA })),
+      },
+    },
+    swap,
+  )
+  return {
+    ...save,
+    roster: swapped.mine,
+    cpuRosters: { ...save.cpuRosters, [opponent]: swapped.theirs },
+    cpuPitcherStaminas: {
+      ...save.cpuPitcherStaminas,
+      [opponent]: swapped.theirs.pitchers.map((player) => player.stamina),
+    },
+  }
+}
 
 /*
  * ## 시즌 투수 스태미나 `+0x2c` — 경기 사이에 이어지는 값 (직접 떴다)
@@ -991,21 +1037,11 @@ export function useSeasonSession(
   const finishTrade = useCallback(
     (settlement: TradeSettlement) => {
       if (save === null) return
-      // 데려온 투수(applyTrade 가 바꾼 한 칸)는 그 팀 표의 스태미나를 들고 온다 — 표 명단 값(0)이 아니다
-      const fromTable = settlement.acquiredTeamId === undefined
-        ? undefined
-        : save.cpuPitcherStaminas?.[settlement.acquiredTeamId]
-      const roster: SeasonTeamRoster = {
-        ...settlement.roster,
-        pitchers: settlement.roster.pitchers.map((player, index) =>
-          player === save.roster.pitchers[index]
-            ? player
-            : { ...player, stamina: fromTable?.[player.id] ?? FULL_STAMINA }),
-      }
+      // 성공이면 두 팀 레코드의 한 칸씩을 맞바꾼다 (0xd1cc~0xd3ae — 스태미나 +0x2c 도 레코드를 따라간다)
+      const swapped = settlement.swap === undefined ? save : withTradeSwap(save, settlement.swap)
       commit({
-        ...save,
+        ...swapped,
         state: { ...save.state, record: settlement.record },
-        roster,
       })
       spendGamePoint(settlement.gamePointCost)
     },
@@ -1313,7 +1349,8 @@ export function useSeasonSession(
         ? userEntrySourceOf(save, pendingGame)
         : {
           teamId: options.opponentTeamId,
-          roster: tableRosterOf(options.opponentTeamId),
+          // CPU 팀 레코드 — 트레이드로 바뀌었으면 저장의 것
+          roster: cpuRosterOf(save, options.opponentTeamId),
           dayCounter: options.opponentDayCounter ?? options.dayCounter ?? 0,
           acePitcherId: options.opponentAces?.pitcher ?? -1,
           aceBatterId: options.opponentAces?.batter ?? -1,
@@ -1600,7 +1637,7 @@ export function useSeasonSession(
       }
       // 0xe9 → (0xd3 평가 이벤트) → **0xf1 경기 뒤 마무리**. 진입 0x953c: CPU 트레이드 요청 0x93c8 을 굴려
       // this+0x148 에 담고(요청 횟수 SR+0x17a 는 레코드) 배경음 4 를 반복으로 튼다 (0x6ea6d(소리, 4, −1, 1))
-      const rolled = rollTradeRequest(random, settled, save.roster)
+      const rolled = rollTradeRequest(random, settled, save.roster, (team) => cpuRosterOf(save, team))
       commit({ ...save, state: { ...save.state, record: rolled.record } })
       setTradeRequest(rolled.request)
       activeSound().playBgm(SEASON_MANAGEMENT_BGM)
@@ -2010,6 +2047,7 @@ export function useSeasonSession(
     scene,
     league: save?.league ?? EMPTY_LEAGUE,
     roster: save?.roster ?? EMPTY_ROSTER,
+    cpuRosterOf: (teamId: number) => cpuRosterOf(save, teamId),
     playerStats: save?.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS,
     series: save?.series ?? null,
     ranking: save?.ranking ?? [],

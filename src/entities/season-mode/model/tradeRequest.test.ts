@@ -3,7 +3,7 @@ import { startNewSeason } from '@/entities/season-mode/model/seasonRecord'
 import { tableRosterOf } from '@/entities/season-mode/model/seasonEntry'
 import { PLAYER_OWN_BIT } from '@/entities/season-mode/model/playerRecruit'
 import {
-  TRADE_REQUEST_TAB, myPlayerGradeOf, opponentPlayerGradeOf, rollTradeRequest,
+  TRADE_REQUEST_TAB, playerGradeOf, rollTradeRequest,
 } from '@/entities/season-mode/model/tradeRequest'
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -50,7 +50,7 @@ describe('요청 굴림 bfa55(0, 10000) < 1000', () => {
 describe('요청이 서면', () => {
   // 타자 탭(1)에서 상대 칸 0 의 값 이상인 내 타자를 찾는다
   const 상대팀 = 3
-  const 상대값 = opponentPlayerGradeOf(상대팀, TRADE_REQUEST_TAB.타자, 0)
+  const 상대값 = teamBatters(상대팀)[0]!.grade
   const 큰칸 = teamBatters(MY_TEAM).findIndex((player) => player.grade >= 상대값)
   const 작은칸 = teamBatters(MY_TEAM).findIndex((player) => player.grade < 상대값)
 
@@ -139,9 +139,36 @@ describe('못 찾으면 요청이 사라진다 — 타자 13번 · 투수 9번 (
 })
 
 describe('+0x1b 읽기', () => {
-  it('내 명단은 id 로 내 팀 표를 읽고, 표 밖(나리·명전 id)은 0 이다', () => {
+  it('명단은 id 로 그 선수의 표 팀을 읽고, 표 밖(나리·명전 id)은 0 이다', () => {
     const roster = 명단()
-    expect(myPlayerGradeOf(MY_TEAM, TRADE_REQUEST_TAB.투수, roster.pitchers[2])).toBe(teamPitchers(MY_TEAM)[2].grade)
-    expect(myPlayerGradeOf(MY_TEAM, TRADE_REQUEST_TAB.타자, { ...roster.batters[0], id: 0xfe })).toBe(0)
+    expect(playerGradeOf(MY_TEAM, TRADE_REQUEST_TAB.투수, roster.pitchers[2])).toBe(teamPitchers(MY_TEAM)[2].grade)
+    expect(playerGradeOf(MY_TEAM, TRADE_REQUEST_TAB.타자, { ...roster.batters[0], id: 0xfe })).toBe(0)
+  })
+
+  it('트레이드로 옮겨 온 선수는 옛 팀 표의 값이다 (레코드째 옮겨 +0x1b 가 따라간다)', () => {
+    const 옮겨옴 = { id: 3, kindByte: 3, fieldPosition: 0, stamina: 0, tableTeamId: 7 }
+    expect(playerGradeOf(MY_TEAM, TRADE_REQUEST_TAB.타자, 옮겨옴)).toBe(teamBatters(7)[3]!.grade)
+  })
+})
+
+describe('상대 팀 레코드', () => {
+  it('저장의 CPU 명단을 읽는다 — 거기 간 내 옛 선수의 +0x1b 로 견준다', () => {
+    const 상대팀 = 3
+    // 상대 0번 타자 자리에 0팀 표에서 가장 값이 큰 선수가 가 있다
+    const 큰선수칸 = teamBatters(MY_TEAM).reduce((best, player, index, all) =>
+      (player.grade > all[best]!.grade ? index : best), 0)
+    const 상대명단 = tableRosterOf(상대팀)
+    const 바뀐상대 = {
+      ...상대명단,
+      batters: 상대명단.batters.map((player, index) =>
+        (index === 0 ? { ...player, id: 큰선수칸, tableTeamId: MY_TEAM } : player)),
+    }
+    const 내값들 = teamBatters(MY_TEAM).map((player) => player.grade)
+    const 넘는칸 = 내값들.findIndex((grade) => grade >= 내값들[큰선수칸]!)
+    const random = 차례난수([[0, 0, 10000], [상대팀, 0, 10], [TRADE_REQUEST_TAB.타자, 0, 2], [0, 0, 12], [넘는칸, 0, 12]])
+
+    const { request } = rollTradeRequest(random, 레코드(), 명단(), (team) => (team === 상대팀 ? 바뀐상대 : tableRosterOf(team)))
+
+    expect(request).toMatchObject({ isRequested: true, myIndex: 넘는칸, opponentIndex: 0 })
   })
 })

@@ -78,6 +78,28 @@ export interface SeasonPlayer {
   readonly fieldPosition: number
   /** +0x2c — 투수 스태미나 */
   readonly stamina: number
+  /**
+   * **이 선수의 붙박이 표 팀** — 원본 id(+0)는 Xls 행 번호 그대로라(투수 `팀 × 8 + 칸` · 타자 `팀 × 12 + 칸`,
+   * `base/extracted/XlsPITCHER_DATA.json` 줄마다 바이트 0 이 줄 번호다) 팀이 id 안에 들어 있다. 웹 `id` 는 그 팀 안
+   * 칸만 들어서, 트레이드(0xd1cc~0xd3ae)로 **다른 팀 레코드에 옮겨진** 선수는 그 팀을 여기 따로 든다.
+   * 없으면 명단 주인 팀이다 — 옛 저장·표에서 만든 명단은 모두 그렇다. 주인 팀과 같아지면 지운다(`withTableTeam`).
+   */
+  readonly tableTeamId?: number
+}
+
+/** 이 선수의 이름·능력치·+0x1b·기록 번호를 읽을 붙박이 표 팀 — `tableTeamId`, 없으면 명단 주인 팀 */
+export function tableTeamOf(player: SeasonPlayer, ownerTeamId: number): number {
+  return player.tableTeamId ?? ownerTeamId
+}
+
+/**
+ * 선수를 `ownerTeamId` 의 명단으로 옮길 때 붙박이 표 팀을 적는다 — 원본은 레코드를 통째로 옮겨 id 가 따라가므로
+ * 표 팀이 바뀌지 않는다. 표 팀이 새 주인과 같으면 칸을 지워 "주인 팀 선수" 와 같은 모양으로 둔다.
+ */
+export function withTableTeam(player: SeasonPlayer, fromOwnerTeamId: number, toOwnerTeamId: number): SeasonPlayer {
+  const team = tableTeamOf(player, fromOwnerTeamId)
+  const { tableTeamId: _dropped, ...rest } = player
+  return team === toOwnerTeamId ? rest : { ...rest, tableTeamId: team }
 }
 
 export interface SeasonTeamRoster {

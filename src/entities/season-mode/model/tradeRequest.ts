@@ -1,6 +1,7 @@
-import { HALL_OF_FAME_FIRST_ID } from '@/entities/season-mode/model/playerRecruit'
+import { HALL_OF_FAME_FIRST_ID, tableTeamOf } from '@/entities/season-mode/model/playerRecruit'
 import type { SeasonPlayer, SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
-import { tradeRefusalOf } from '@/entities/season-mode/model/playerTrade'
+import { TRADE_TAB, tradeRefusalOf } from '@/entities/season-mode/model/playerTrade'
+import { tableRosterOf } from '@/entities/season-mode/model/seasonEntry'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import { LEAGUE_TEAM_COUNT } from '@/entities/league/model/league'
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
@@ -34,11 +35,11 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
  * - 요청은 관리 메뉴(0xc9)에 들어갈 때 알림 StrMODE[203] 으로 뜬다(0xec10, `useSeasonSession`).
  *   홀수 경기 뒤(0xf1 → 0xd8)는 관리 메뉴를 안 지나 그대로 묻히고, 다음 0xf1 이 새로 굴려 덮는다.
  *
- * ⚠️ 웹 근사
- * - 상대 팀 선수는 붙박이 표(`teamPitchers`·`teamBatters`)에서 읽는다 — 원본은 저장된 팀 레코드라 지난 트레이드로 바뀐
- *   명단을 읽지만, 웹은 CPU 팀 명단을 저장하지 않는다(`widgets/season/lib/tradeList.ts` 와 같은 한계). 표에는 나리·명전
- *   선수가 없어 A 는 한 번에 끝난다.
- * - 나리·명전 판정은 `tradeRefusalOf`(영입 화면과 같은 규칙, 근사)로 본다.
+ * 상대 팀 레코드는 시즌 저장의 CPU 팀 명단(지난 트레이드로 바뀐 팀만 저장에 있고 나머지는 붙박이 표 —
+ * `useSeasonSession` 의 `cpuRosters`)을 부르는 쪽이 넘긴다. 표에는 나리·명전 선수가 없어 A 는 한 번에 끝나지만, 트레이드로
+ * 옮겨 간 선수도 리그 선수라 마찬가지다.
+ *
+ * ⚠️ 나리·명전 판정은 `tradeRefusalOf`(영입 화면과 같은 규칙, 근사)로 본다.
  */
 export interface TradeRequest {
   /** +0 — 요청이 섰는가 (트레이드 진행 0xcf24 의 강제 성공 플래그로도 쓰인다) */
@@ -62,8 +63,8 @@ export const NO_TRADE_REQUEST: TradeRequest = {
 export const TRADE_REQUEST_ROLL_RANGE = 10000
 export const TRADE_REQUEST_THRESHOLD = 1000
 
-/** 탭 0 = 투수 (0xb51fc) · 1 = 타자 (0xb53d0) */
-export const TRADE_REQUEST_TAB = { 투수: 0, 타자: 1 } as const
+/** 탭 0 = 투수 (0xb51fc) · 1 = 타자 (0xb53d0) — `playerTrade.TRADE_TAB` 와 같은 값 */
+export const TRADE_REQUEST_TAB = TRADE_TAB
 /** 탭별 뽑기 범위 — `탭 == 0 ? 8 : 12` (9446·9488) */
 export const TRADE_REQUEST_PITCHER_RANGE = 8
 export const TRADE_REQUEST_BATTER_RANGE = 12
@@ -71,29 +72,22 @@ export const TRADE_REQUEST_BATTER_RANGE = 12
 const rangeOf = (tab: number) =>
   tab === TRADE_REQUEST_TAB.투수 ? TRADE_REQUEST_PITCHER_RANGE : TRADE_REQUEST_BATTER_RANGE
 
-/** 붙박이 표 선수의 +0x1b — 팀 표에서 칸으로 읽는다 */
-function tableGradeOf(teamId: number, tab: number, index: number): number | undefined {
-  const table = tab === TRADE_REQUEST_TAB.투수 ? teamPitchers(teamId) : teamBatters(teamId)
-  return table[index]?.grade
-}
-
 /**
- * 내 명단 선수의 +0x1b. 리그 선수(id < 0xb4)는 내 팀 붙박이 표의 id 번째 레코드 값이다(시즌 명단의 id 는 그 표의 칸 —
- * `seasonEntry.tableRosterOf`). 영입한 나리·명전 선수는 표에 없어 0 으로 보지만, 그 선수는 아래 나리·명전 검사에서
- * 어차피 떨어지므로 결과에 닿지 않는다.
+ * 시즌 명단 선수의 레코드 +0x1b. 원본은 그 선수 레코드 바이트를 바로 읽는다 — 리그 선수(id < 0xb4)의 레코드는 Xls 행
+ * 사본이라, 웹은 그 선수의 **붙박이 표 팀**(`tableTeamOf` — 트레이드로 옮겨 온 선수는 옛 팀) 표의 id 번째 값을 읽는다.
+ * 영입한 나리·명전 선수는 표에 없어 0 으로 보지만, 그 선수는 나리·명전 검사에서 어차피 떨어지므로 결과에 닿지 않는다.
  */
-export function myPlayerGradeOf(teamId: number, tab: number, player: SeasonPlayer): number {
+export function playerGradeOf(ownerTeamId: number, tab: number, player: SeasonPlayer): number {
   if (player.id >= HALL_OF_FAME_FIRST_ID) return 0
-  return tableGradeOf(teamId, tab, player.id) ?? 0
+  const team = tableTeamOf(player, ownerTeamId)
+  const table = tab === TRADE_REQUEST_TAB.투수 ? teamPitchers(team) : teamBatters(team)
+  return table[player.id]?.grade ?? 0
 }
 
-/** 상대 팀(붙박이 표) 선수의 +0x1b */
-export function opponentPlayerGradeOf(teamId: number, tab: number, index: number): number {
-  return tableGradeOf(teamId, tab, index) ?? 0
+/** 탭의 명단 배열 — `0xb5695(팀, 탭, i)` */
+export function tradeTabPlayersOf(roster: SeasonTeamRoster, tab: number): readonly SeasonPlayer[] {
+  return tab === TRADE_REQUEST_TAB.투수 ? roster.pitchers : roster.batters
 }
-
-/** 상대 팀 표 칸을 시즌 선수 모양으로 — `tradeList.opponentTradeEntriesOf` 와 같은 규칙(칸 = id = kindByte) */
-const tableSeasonPlayer = (index: number): SeasonPlayer => ({ id: index, kindByte: index, fieldPosition: 0, stamina: 0 })
 
 export interface TradeRequestRoll {
   readonly request: TradeRequest
@@ -101,8 +95,16 @@ export interface TradeRequestRoll {
   readonly record: SeasonRecord
 }
 
-/** 0x93c8 한 번 — 위 머리 주석의 굴림 차례 그대로 */
-export function rollTradeRequest(random: RandomPort, record: SeasonRecord, roster: SeasonTeamRoster): TradeRequestRoll {
+/**
+ * 0x93c8 한 번 — 위 머리 주석의 굴림 차례 그대로.
+ * `opponentRosterOf` 는 상대 팀 레코드(`0x1f570(저장, 팀)`) — 안 주면 붙박이 표 명단이다.
+ */
+export function rollTradeRequest(
+  random: RandomPort,
+  record: SeasonRecord,
+  roster: SeasonTeamRoster,
+  opponentRosterOf: (teamId: number) => SeasonTeamRoster = tableRosterOf,
+): TradeRequestRoll {
   if (randomIntegerBelow(random, 0, TRADE_REQUEST_ROLL_RANGE) >= TRADE_REQUEST_THRESHOLD) {
     return { request: NO_TRADE_REQUEST, record }
   }
@@ -111,16 +113,20 @@ export function rollTradeRequest(random: RandomPort, record: SeasonRecord, roste
   let opponentTeamId = randomIntegerBelow(random, 0, LEAGUE_TEAM_COUNT)
   while (opponentTeamId === record.teamId) opponentTeamId = randomIntegerBelow(random, 0, LEAGUE_TEAM_COUNT)
 
-  // A — 상대 선수가 나리·명전이면 탭부터 다시 (붙박이 표에는 없어 한 번에 끝난다)
+  // A — 상대 선수가 나리·명전이면 탭부터 다시 (리그 열 팀 레코드에는 없어 한 번에 끝난다)
+  const opponentRoster = opponentRosterOf(opponentTeamId)
   let tab: number
   let opponentIndex: number
+  let opponent: SeasonPlayer | undefined
   do {
     tab = randomIntegerBelow(random, 0, 2)
     opponentIndex = randomIntegerBelow(random, 0, rangeOf(tab))
-  } while (tradeRefusalOf(tableSeasonPlayer(opponentIndex)) !== null)
+    opponent = tradeTabPlayersOf(opponentRoster, tab)[opponentIndex]
+  } while (opponent !== undefined && tradeRefusalOf(opponent) !== null)
 
-  const opponentGrade = opponentPlayerGradeOf(opponentTeamId, tab, opponentIndex)
-  const mine = tab === TRADE_REQUEST_TAB.투수 ? roster.pitchers : roster.batters
+  // 웹 CPU 명단은 늘 8·12 명이라 비는 칸은 없다 (원본은 0xb5695 가 0 을 돌려 그 +0x1b 를 읽는다)
+  const opponentGrade = opponent === undefined ? 0 : playerGradeOf(opponentTeamId, tab, opponent)
+  const mine = tradeTabPlayersOf(roster, tab)
   const limit = rangeOf(tab)
   // B — 뽑고 나서 n 을 본다: 0..limit 로 limit + 1 번
   for (let tries = 0; ; tries += 1) {
@@ -128,7 +134,7 @@ export function rollTradeRequest(random: RandomPort, record: SeasonRecord, roste
     const player = mine[myIndex]
     // 웹 명단은 늘 8·12 명 이상이라 비는 칸은 없다 (원본은 0xb5695 가 0 을 돌려 그 +0x1b 를 읽는다)
     const fits = player !== undefined
-      && myPlayerGradeOf(record.teamId, tab, player) >= opponentGrade
+      && playerGradeOf(record.teamId, tab, player) >= opponentGrade
       && tradeRefusalOf(player) === null
     if (fits) {
       return { request: { isRequested: true, myIndex, opponentIndex, tab, opponentTeamId }, record: counted }

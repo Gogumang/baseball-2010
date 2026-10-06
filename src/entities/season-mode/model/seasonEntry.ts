@@ -1,7 +1,9 @@
 import { ACE_BATTERS, ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
 import { ROTATION_SIZE, rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
-import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
-import { HALL_OF_FAME_FIRST_ID } from '@/entities/season-mode/model/playerRecruit'
+import { PITCHERS_PER_TEAM, teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
+import { HALL_OF_FAME_FIRST_ID, tableTeamOf } from '@/entities/season-mode/model/playerRecruit'
+import { ROSTER_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
+import { rosterPitcherRoleOf } from '@/entities/pitching/model/pitcherChange'
 import type { SeasonPlayer, SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
 import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
 import type { EntryBatterRow, EntryLists, EntryPitcherRow } from '@/entities/season-mode/model/entryEditor'
@@ -76,16 +78,17 @@ export function tableRosterOf(teamId: number): SeasonTeamRoster {
 }
 
 /**
- * 시즌 명단 선수의 이름·능력치 — 리그 선수(id < 0xb4)는 그 팀 붙박이 표의 id 번째에서 빌려 온다.
- * 영입해 온 나리·명예 선수는 표에 없어 `투수 N번` 으로 적는다 (트레이드·영입 화면과 같은 한계).
+ * 시즌 명단 선수의 이름·능력치 — 리그 선수(id < 0xb4)는 그 선수의 붙박이 표 팀(`tableTeamOf` — 트레이드로 옮겨 온
+ * 선수는 옛 팀) 표의 id 번째에서 빌려 온다. 영입해 온 나리·명예 선수는 기록 사본, 그것도 없으면 `투수 N번` 이다.
  */
-function playerFaceOf(
+export function playerFaceOf(
   teamId: number,
   player: SeasonPlayer,
   isPitcher: boolean,
   index: number,
 ): { readonly name: string; readonly ability: readonly number[] } {
-  const table = isPitcher ? teamPitchers(teamId) : teamBatters(teamId)
+  const team = tableTeamOf(player, teamId)
+  const table = isPitcher ? teamPitchers(team) : teamBatters(team)
   const found = player.id < HALL_OF_FAME_FIRST_ID ? table[player.id] : undefined
   if (found !== undefined) return { name: found.name, ability: found.ability }
   // 영입 때 옮긴 기록 사본(나리 선수)은 그 이름(rec + 1)·능력치로
@@ -241,15 +244,42 @@ export function seasonEntryOrderOf(roster: SeasonTeamRoster, recordOf?: SeasonEn
   return {
     batters: roster.batters.map((player) => {
       const position = player.fieldPosition & 0xf
+      const traded = tradedBatterRecordOf(player)
+      if (traded !== undefined) return { rosterSlot: NOT_IN_ROSTER, position, record: traded }
       if (isTablePlayer(player)) return { rosterSlot: player.id, position }
       const record = player.record ?? recordOf?.batter(player)
       return record === undefined ? { rosterSlot: NOT_IN_ROSTER, position } : { rosterSlot: NOT_IN_ROSTER, position, record }
     }),
     pitchers: roster.pitchers.map((player) => {
+      const traded = tradedPitcherRecordOf(player)
+      if (traded !== undefined) return traded
       if (isTablePlayer(player)) return player.id
       const carried = player.record
       if (carried !== undefined && 'repertoire' in carried) return carried
       return recordOf?.pitcher(player) ?? NOT_IN_ROSTER
     }),
   }
+}
+
+/*
+ * **트레이드로 옮겨 온 리그 선수**(`tableTeamId` 가 선 선수) — 원본 경기용 팀 0xb891c 는 팀 레코드의 0x30 바이트를 그대로
+ * 쓰므로(0xb8680) 그 선수는 옛 팀 Xls 행 사본(이름 0xaa458 표의 제 id · 능력치 0xb6414 · 구질 · 보직 +0xb)으로 선다.
+ * 팀 경기의 명단 칸(`rosterSlot`)은 **경기 팀 표의 칸**이라 그 선수를 가리킬 수 없어, 영입 선수처럼 기록을 실어 넘긴다.
+ * ⚠️ 그래서 그 선수의 사람 경기 성적은 리그 기록표에 안 쌓인다(원본은 레코드 +0x20~ 에 쌓아 선수를 따라간다) — 팀 경기가
+ *    "표 팀 + 칸" 을 따로 받게 되면 `leagueBatterIdOf(옛 팀, id)` 로 쌓을 수 있다. 미해결로 남긴다.
+ */
+function tradedBatterRecordOf(player: SeasonPlayer): SeasonEntryBatterRecord | undefined {
+  if (player.tableTeamId === undefined || player.id >= HALL_OF_FAME_FIRST_ID) return undefined
+  const row = teamBatters(player.tableTeamId)[player.id]
+  return row === undefined ? undefined : { name: row.name, ability: row.ability }
+}
+
+function tradedPitcherRecordOf(player: SeasonPlayer): SeasonEntryPitcherRecord | undefined {
+  if (player.tableTeamId === undefined || player.id >= HALL_OF_FAME_FIRST_ID) return undefined
+  const row = teamPitchers(player.tableTeamId)[player.id]
+  // 구질 표는 `PITCHERS` 와 같은 차례(전역 행 = 팀 × 8 + 칸) · 보직 +0xb & 3 은 팀 안 차례로 같다(`ROSTER_PITCHER_ROLES`)
+  const repertoire = ROSTER_PITCHER_REPERTOIRES[player.tableTeamId * PITCHERS_PER_TEAM + player.id]
+  if (row === undefined || repertoire === undefined) return undefined
+  const role = rosterPitcherRoleOf(player.id)
+  return { name: row.name, ability: row.ability, repertoire, ...(role === undefined ? {} : { role }) }
 }

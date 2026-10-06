@@ -4,7 +4,7 @@ import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonPlayer, SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
 import { HALL_OF_FAME_FIRST_ID, PLAYER_OWN_BIT } from '@/entities/season-mode/model/playerRecruit'
 import {
-  TRADE_BOOST_RATE, applyTrade, batterPositionPenaltyOf, canUseTradeCommand, markTradeUsed,
+  TRADE_BOOST_RATE, batterPositionPenaltyOf, swapTradedPlayers, canUseTradeCommand, markTradeUsed,
   pitcherRolePenaltyOf, rollTradeSuccess, tradeBoostCostOf, tradeMoneyChangeOf, tradeRefusalOf, tradeSuccessRate,
   withTradeMoney,
 } from '@/entities/season-mode/model/playerTrade'
@@ -136,23 +136,47 @@ describe('커맨드 횟수 (SR+0x56)', () => {
   })
 })
 
-describe('명단 반영 (근사 — 교환 루틴은 미해독)', () => {
-  const roster: SeasonTeamRoster = {
-    pitchers: [선수({ id: 0, kindByte: 0 }), 선수({ id: 1, kindByte: 1 })],
-    batters: [선수({ id: 0, kindByte: 0, fieldPosition: 2 })],
+describe('성공 뒤 두 명단 맞바꾸기 (0xd1cc~0xd3ae)', () => {
+  const 내팀 = 0
+  const 상대팀 = 4
+  const mine: SeasonTeamRoster = {
+    pitchers: [선수({ id: 0, kindByte: 0, stamina: 9000 }), 선수({ id: 1, kindByte: 1, stamina: 4000 })],
+    batters: [선수({ id: 0, kindByte: 0, fieldPosition: 2 }), 선수({ id: 1, kindByte: 1, fieldPosition: 0 })],
+  }
+  const theirs: SeasonTeamRoster = {
+    pitchers: [선수({ id: 0, kindByte: 0, stamina: 100 }), 선수({ id: 1, kindByte: 1 }), 선수({ id: 2, kindByte: 2, stamina: 700 })],
+    batters: [선수({ id: 0, kindByte: 0, fieldPosition: 5 }), 선수({ id: 1, kindByte: 1, fieldPosition: 9 })],
   }
 
-  it('고른 자리만 상대 선수로 바뀌고 칸 번호·수비 자리는 그대로다', () => {
-    const 결과 = applyTrade(roster, true, 1, 선수({ id: 7, kindByte: 7, stamina: 500 }))
+  it('투수(탭 0)는 레코드째 맞바꾼다 — 칸 번호·스태미나가 선수를 따라가고 표 팀이 적힌다 (0xb5625)', () => {
+    const 결과 = swapTradedPlayers(내팀, { mine, theirs }, { opponentTeamId: 상대팀, tab: 0, myIndex: 1, opponentIndex: 2 })
 
-    expect(결과.pitchers).toHaveLength(2)
-    expect(결과.pitchers[1].id).toBe(7)
-    expect(결과.pitchers[1].kindByte).toBe(1) // 내주는 선수의 칸 번호를 물려받는다
-    expect(결과.pitchers[0].id).toBe(0)
-    expect(결과.batters).toBe(roster.batters)
+    expect(결과.mine.pitchers[1]).toEqual({ id: 2, kindByte: 2, fieldPosition: 0, stamina: 700, tableTeamId: 상대팀 })
+    expect(결과.theirs.pitchers[2]).toEqual({ id: 1, kindByte: 1, fieldPosition: 0, stamina: 4000, tableTeamId: 내팀 })
+    expect(결과.mine.pitchers[0]).toBe(mine.pitchers[0])
+    expect(결과.mine.batters).toBe(mine.batters)
+    expect(결과.theirs.batters).toBe(theirs.batters)
   })
 
-  it('없는 자리면 명단을 그대로 둔다', () => {
-    expect(applyTrade(roster, false, 5, 선수({ id: 9 }))).toBe(roster)
+  it('타자(탭 1)는 수비 위치를 자리에 남기고 칸 번호를 새 칸으로 쓴다 (0xb5649 → 0xb8e85 · 0xb6605)', () => {
+    const 결과 = swapTradedPlayers(내팀, { mine, theirs }, { opponentTeamId: 상대팀, tab: 1, myIndex: 0, opponentIndex: 1 })
+
+    expect(결과.mine.batters[0]).toEqual({ id: 1, kindByte: 0, fieldPosition: 2, stamina: 0, tableTeamId: 상대팀 })
+    expect(결과.theirs.batters[1]).toEqual({ id: 0, kindByte: 1, fieldPosition: 9, stamina: 0, tableTeamId: 내팀 })
+    expect(결과.mine.pitchers).toBe(mine.pitchers)
+  })
+
+  it('제 팀으로 돌아온 선수는 표 팀 칸을 지운다', () => {
+    const 한번 = swapTradedPlayers(내팀, { mine, theirs }, { opponentTeamId: 상대팀, tab: 0, myIndex: 0, opponentIndex: 0 })
+    const 두번 = swapTradedPlayers(내팀, 한번, { opponentTeamId: 상대팀, tab: 0, myIndex: 0, opponentIndex: 0 })
+
+    expect(두번.mine.pitchers[0]).toEqual(mine.pitchers[0])
+    expect(두번.theirs.pitchers[0]).toEqual(theirs.pitchers[0])
+  })
+
+  it('탭이 0·1 이 아니거나 칸이 없으면 그대로다', () => {
+    const rosters = { mine, theirs }
+    expect(swapTradedPlayers(내팀, rosters, { opponentTeamId: 상대팀, tab: 2, myIndex: 0, opponentIndex: 0 })).toBe(rosters)
+    expect(swapTradedPlayers(내팀, rosters, { opponentTeamId: 상대팀, tab: 1, myIndex: 5, opponentIndex: 0 })).toBe(rosters)
   })
 })

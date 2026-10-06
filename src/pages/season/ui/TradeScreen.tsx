@@ -3,9 +3,10 @@ import { MessageBox, RawScreen } from '@/shared/ui'
 import type { SeasonState } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
 import {
-  TRADE_BOOST_COUNT, applyTrade, canUseTradeCommand, markTradeUsed, rollTradeSuccess,
+  TRADE_BOOST_COUNT, canUseTradeCommand, markTradeUsed, rollTradeSuccess,
   tradeBoostCostOf, tradeSuccessRate, withTradeMoney,
 } from '@/entities/season-mode/model/playerTrade'
+import { tableRosterOf } from '@/entities/season-mode/model/seasonEntry'
 import type { TradeSettlement } from '@/entities/season-mode/model/playerTrade'
 import { TRADE_REQUEST_TAB } from '@/entities/season-mode/model/tradeRequest'
 import type { TradeRequest } from '@/entities/season-mode/model/tradeRequest'
@@ -65,6 +66,10 @@ export interface TradeScreenProps {
   readonly state: SeasonState
   /** 내 팀 명단 (시즌 세이브) */
   readonly roster: SeasonTeamRoster
+  /**
+   * 상대 팀 레코드(`0x1f9a9(저장, 모드, 팀)`) — 시즌 저장의 CPU 팀 명단. 안 주면 붙박이 표 명단이다(`tableRosterOf`).
+   */
+  readonly opponentRosterOf?: (teamId: number) => SeasonTeamRoster
   /** 전역 저장 +0x64 — 성공률 올리기 비용이 여기서 나간다 */
   readonly gamePoints: number
   readonly random: RandomPort
@@ -114,7 +119,8 @@ export interface TradeScreenProps {
  * 무엇을 바꾸는지는 안 풀었다 — 웹은 커서만 묶는다.
  */
 export function TradeScreen({
-  state, roster, gamePoints, random, request = null, onTrade, onFinish, onCancelRequest, onBack,
+  state, roster, opponentRosterOf = tableRosterOf, gamePoints, random, request = null, onTrade, onFinish, onCancelRequest,
+  onBack,
 }: TradeScreenProps) {
   const { record } = state
   const forced = request !== null && request.isRequested ? request : null
@@ -137,7 +143,7 @@ export function TradeScreen({
   const isPitcher = tab === '투수'
   const isBusy = question !== null || notice !== null
 
-  const opponentEntries = step.kind === '팀' ? [] : opponentTradeEntriesOf(step.teamId, isPitcher)
+  const opponentEntries = step.kind === '팀' ? [] : opponentTradeEntriesOf(step.teamId, opponentRosterOf(step.teamId), isPitcher)
   const myEntries = step.kind === '팀' ? [] : myTradeEntriesOf(record.teamId, roster, isPitcher)
 
   const acquiredEntry = step.kind === '보상' || step.kind === '확인'
@@ -210,7 +216,10 @@ export function TradeScreen({
     setQuestion('진행')
   }
 
-  /** 0xe7 진행 — G 를 내고 굴린다. 성공이면 고른 자리가 상대 선수로 바뀌고 소지금에 d 가 더해진다 */
+  /**
+   * 0xe7 진행 — G 를 내고 굴린다. 성공이면 소지금에 d 가 더해지고 두 팀 레코드의 고른 칸이 맞바뀐다
+   * (0xd1cc~0xd3ae — 세션이 `swapTradedPlayers` 로 시즌 저장의 두 명단에 건다)
+   */
   const runTrade = () => {
     setQuestion(null)
     if (step.kind !== '확인' || acquiredEntry === null || givenEntry === null) return
@@ -219,11 +228,17 @@ export function TradeScreen({
     const settled = isSuccess ? withTradeMoney(record, givenEntry.grade, acquiredEntry.grade) : record
     onTrade({
       record: markTradeUsed(settled),
-      roster: isSuccess ? applyTrade(roster, isPitcher, step.given, acquiredEntry.player) : roster,
       // 비용은 성공·실패와 상관없이 나간다 (0xcf24 는 굴리기 전에 깎는다)
       gamePointCost: tradeBoostCostOf(boost),
       isSuccess,
-      acquiredTeamId: step.teamId,
+      ...(isSuccess ? {
+        swap: {
+          opponentTeamId: step.teamId,
+          tab: isPitcher ? TRADE_REQUEST_TAB.투수 : TRADE_REQUEST_TAB.타자,
+          myIndex: step.given,
+          opponentIndex: step.acquired,
+        },
+      } : {}),
     })
     setNotice(isSuccess ? TRADE_SUCCESS : TRADE_FAILURE)
     setDone('결과')

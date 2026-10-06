@@ -1400,7 +1400,7 @@ describe('투수 스태미나 +0x2c — 첫날 6850 0xb6190 · 하루 끝 4f2bc 
     expect(options.opponentPitcherStaminas).toEqual(teamPitchers(options.opponentTeamId).map(() => 10_000))
   })
 
-  it('트레이드로 데려온 투수는 그 팀 표의 스태미나를 들고 온다', () => {
+  it('트레이드로 데려온 투수는 그 팀 레코드의 스태미나를 들고 오고, 내준 투수의 값이 그 칸에 남는다 (0xb5625 레코드째)', () => {
     const store = 메모리저장()
     const rendered = 띄우기(store)
     const { result } = rendered
@@ -1412,18 +1412,41 @@ describe('투수 스태미나 +0x2c — 첫날 6850 0xb6190 · 하루 끝 4f2bc 
     })))
     const 표 = (store.load() as 저장모양).cpuPitcherStaminas![options.opponentTeamId]!
     const roster = result.current.roster
-    const 데려옴 = { id: 2, kindByte: roster.pitchers[1]!.kindByte, fieldPosition: 0, stamina: 0 }
+    const 내준값 = roster.pitchers[1]!.stamina
 
     act(() => result.current.actions.finishTrade({
       record: result.current.state!.record,
-      roster: { ...roster, pitchers: roster.pitchers.map((p, i) => (i === 1 ? 데려옴 : p)) },
       gamePointCost: 0,
       isSuccess: true,
-      acquiredTeamId: options.opponentTeamId,
+      swap: { opponentTeamId: options.opponentTeamId, tab: 0, myIndex: 1, opponentIndex: 2 },
     }))
 
     expect(result.current.roster.pitchers[1]?.stamina).toBe(표[2])
+    expect(result.current.roster.pitchers[1]).toMatchObject({ id: 2, tableTeamId: options.opponentTeamId })
     expect(result.current.roster.pitchers[0]).toBe(roster.pitchers[0])
+    const 저장 = store.load() as 저장모양
+    expect(저장.cpuPitcherStaminas![options.opponentTeamId]![2]).toBe(내준값)
+    expect(result.current.cpuRosterOf(options.opponentTeamId).pitchers[2]).toMatchObject({ id: 1, tableTeamId: 0 })
+  })
+
+  it('트레이드한 타자는 옛 팀 표의 선수로 경기에 선다 — 내 팀 표의 같은 칸 선수가 아니다', () => {
+    const store = 메모리저장()
+    const rendered = 띄우기(store)
+    const { result } = rendered
+    시작(result, 0)
+    act(() => result.current.actions.finishTrade({
+      record: result.current.state!.record,
+      gamePointCost: 0,
+      isSuccess: true,
+      swap: { opponentTeamId: 3, tab: 1, myIndex: 0, opponentIndex: 5 },
+    }))
+    expect(result.current.roster.batters[0]).toMatchObject({ id: 5, tableTeamId: 3 })
+    // 상대 팀 레코드에는 내 0번 타자가 간다 — 그 팀 표 선수가 아니라 0팀 표의 0번
+    expect(result.current.cpuRosterOf(3).batters[5]).toMatchObject({ id: 0, tableTeamId: 0, kindByte: 5 })
+    const options = 경기까지(rendered)
+    const 첫타자 = options.ourEntryOrder!.batters[0]!
+    expect(첫타자.record?.name).toBe(teamBatters(3)[5]!.name)
+    expect(첫타자.record?.name).not.toBe(teamBatters(0)[5]!.name)
   })
 })
 

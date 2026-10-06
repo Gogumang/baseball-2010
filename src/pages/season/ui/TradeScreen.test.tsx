@@ -120,8 +120,8 @@ describe('0xe5 영입 선수 → 0xe6 보상 선수', () => {
 
     상대팀고르기()
     누르기(teamBatters(OPPONENT)[0].name)
-    // ⚠️ 나리 선수도 칸 번호(+0xa 하위 5비트)로 이름을 빌려 와 같은 줄 이름이 나온다 (근사)
-    누르기(teamBatters(MY_TEAM)[0].name)
+    // 기록 사본이 없는 표 밖 선수는 `타자 N번` 으로 적힌다
+    누르기('타자 1번')
 
     expect(알림글()).toContain('나만의 리그 선수는')
   })
@@ -173,17 +173,17 @@ describe('0xe7 확인·진행 (J 4-4)', () => {
     expect(onBack).not.toHaveBeenCalled()
   })
 
-  it('비용 세 칸과 그 성공률이 나온다 — 자리 벌점 10+10 이라 기본은 20% 다', () => {
+  it('비용 세 칸과 그 성공률이 나온다 — 자리 벌점 10 + 0(상대 레코드 +0x1c = 3) 이라 기본은 30% 다', () => {
     확인까지()
 
-    expect(screen.getByRole('button', { name: /기본 진행/ }).textContent).toContain('20%')
-    expect(screen.getByRole('button', { name: /\+50%/ }).textContent).toContain('70%')
-    expect(screen.getByRole('button', { name: /\+20%/ }).textContent).toContain('40%')
+    expect(screen.getByRole('button', { name: /기본 진행/ }).textContent).toContain('30%')
+    expect(screen.getByRole('button', { name: /\+50%/ }).textContent).toContain('80%')
+    expect(screen.getByRole('button', { name: /\+20%/ }).textContent).toContain('50%')
   })
 
-  it('성공하면 그 자리가 상대 선수로 바뀌고 커맨드가 닫힌다', () => {
-    // 기본 진행 20% → 뽑기 19 면 성공 (19 < 20)
-    const { onTrade } = 확인까지({ random: 고정난수(19) })
+  it('성공하면 맞바꿀 두 칸(탭·내 칸·상대 칸·상대 팀)을 넘기고 커맨드가 닫힌다', () => {
+    // 기본 진행 30% → 뽑기 29 면 성공 (29 < 30)
+    const { onTrade } = 확인까지({ random: 고정난수(29) })
 
     누르기(/기본 진행/)
     누르기('예')
@@ -192,14 +192,14 @@ describe('0xe7 확인·진행 (J 4-4)', () => {
     const settlement = onTrade.mock.calls[0][0]
     expect(settlement.isSuccess).toBe(true)
     expect(settlement.record.tradeUsed).toBe(1)
-    expect(settlement.roster.batters[같은값칸].id).toBe(같은값칸)
+    expect(settlement.swap).toEqual({ opponentTeamId: OPPONENT, tab: 1, myIndex: 같은값칸, opponentIndex: 같은값칸 })
     expect(settlement.gamePointCost).toBe(0)
     // d = 0 이라 소지금은 그대로
     expect(settlement.record.money).toBe(50)
   })
 
   it('실패해도 커맨드는 쓴 것이고 명단은 그대로다', () => {
-    const { onTrade } = 확인까지({ random: 고정난수(20) })
+    const { onTrade } = 확인까지({ random: 고정난수(31) })
 
     누르기(/기본 진행/)
     누르기('예')
@@ -208,6 +208,7 @@ describe('0xe7 확인·진행 (J 4-4)', () => {
     const settlement = onTrade.mock.calls[0][0]
     expect(settlement.isSuccess).toBe(false)
     expect(settlement.record.tradeUsed).toBe(1)
+    expect(settlement.swap).toBeUndefined()
   })
 
   it('+50% 칸은 2000G 를 쓴다 (성공·실패와 상관없이 나간다)', () => {
@@ -261,8 +262,8 @@ describe('CPU 트레이드 요청으로 들어오면 (0xe5 진입 0x5cd0 · 키 
     expect(settlement.isSuccess).toBe(true)
     expect(settlement.gamePointCost).toBe(0)
     expect(settlement.record.tradeUsed).toBe(1)
-    // 요청 칸끼리 맞바꿨다 — 내 3번 자리에 상대 2번
-    expect(settlement.roster.batters[3].id).toBe(2)
+    // 요청 칸끼리 맞바꾼다 — 내 3번 자리와 상대 2번
+    expect(settlement.swap).toEqual({ opponentTeamId: OPPONENT, tab: 1, myIndex: 3, opponentIndex: 2 })
     누르기('확인')
     expect(onFinish).toHaveBeenCalledTimes(1)
   })
@@ -284,5 +285,33 @@ describe('CPU 트레이드 요청으로 들어오면 (0xe5 진입 0x5cd0 · 키 
     누르기('확인')
 
     expect(screen.getByRole('button', { name: teamPitchers(OPPONENT)[2].name })).toBeDefined()
+  })
+})
+
+describe('상대 팀 레코드 (시즌 저장의 CPU 명단)', () => {
+  it('지난 트레이드로 간 내 옛 선수가 상대 목록에 제 이름(옛 팀 표)으로 나온다', () => {
+    const 상대 = {
+      pitchers: teamPitchers(OPPONENT).map((_p, slot) => ({ id: slot, kindByte: slot, fieldPosition: 0, stamina: 0 })),
+      batters: teamBatters(OPPONENT).map((_p, slot) => (slot === 4
+        ? { id: 1, kindByte: slot, fieldPosition: 0, stamina: 0, tableTeamId: MY_TEAM }
+        : { id: slot, kindByte: slot, fieldPosition: 0, stamina: 0 })),
+    }
+    띄우기(상태(), { opponentRosterOf: () => 상대 })
+    상대팀고르기()
+
+    expect(screen.getByRole('button', { name: teamBatters(MY_TEAM)[1].name })).toBeDefined()
+    expect(screen.queryByRole('button', { name: teamBatters(OPPONENT)[4].name })).toBeNull()
+  })
+
+  it('데려온 선수는 내 목록에서 옛 팀 표 이름으로 나온다 — 내 팀 표의 같은 칸 이름이 아니다', () => {
+    const 내명단 = 명단({
+      batters: 명단().batters.map((player, slot) => (slot === 2 ? { ...player, id: 7, tableTeamId: OPPONENT } : player)),
+    })
+    띄우기(상태(), { roster: 내명단 })
+    상대팀고르기()
+    누르기(teamBatters(OPPONENT)[0].name)
+
+    expect(screen.getAllByRole('button', { name: teamBatters(OPPONENT)[7].name }).length).toBeGreaterThan(0)
+    expect(screen.queryByRole('button', { name: teamBatters(MY_TEAM)[2].name })).toBeNull()
   })
 })
