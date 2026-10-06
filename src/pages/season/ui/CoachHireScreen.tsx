@@ -41,8 +41,8 @@ export interface CoachHireScreenProps {
  * 가 J 4-3 그대로 들고 있다. **코치는 한 명뿐이고 바꾸면 계약금을 새로 낸다(환불 없음).**
  *
  * ⚠️ **원본 배치 미해독 — 근사**: 0xaa24(선수단 화면)의 좌표·엔트리 목록 창 모양을 확인하지
- * 못해 다른 시즌 화면들과 같은 공용 판 목록으로 그린다. 머리띠 제목도 코치·선수단 그림이
- * 따로 없어(`TITLE_IMAGES` 17칸) **시즌모드** 제목을 쓴다.
+ * 못해 다른 시즌 화면들과 같은 공용 판 목록으로 그린다. 머리띠는 0xaa24 끝이 코치채용([this+0x11c] == 2)이면
+ * `0x54d95(skin, 4 "마선수선택", 5)` 로 그린다(0xad94~0xada0 — 직접 떴다. 마선수 고르기는 같은 제목 + 바닥 0x205).
  */
 export function CoachHireScreen({ state, gamePoints = 0, onHire, onBack }: CoachHireScreenProps) {
   const { record } = state
@@ -130,7 +130,8 @@ export function CoachHireScreen({ state, gamePoints = 0, onHire, onBack }: Coach
       )}
 
       {/* 머리띠·바닥띠 — 같은 계열 화면이 다 달고 있다 (P6 1-1). 되돌아가기는 바닥띠 쪽 하나만 둔다 */}
-      <ScreenFrame title="시즌모드" gamePoint={gamePoints} onBack={onBack} />
+      {/* 0xaa24 끝: [this+0x11c] == 2(코치채용)면 0x54d95(skin, 4 "마선수선택", 5) — 시즌모드 제목이 아니다 (0xad94~0xada0) */}
+      <ScreenFrame title="마선수선택" gamePoint={gamePoints} onBack={onBack} />
     </RawScreen>
   )
 }

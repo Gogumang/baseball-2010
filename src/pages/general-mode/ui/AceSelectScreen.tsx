@@ -293,7 +293,8 @@ export function AceSelectScreen({
 
       {/* 머리띠(제목 8 "마선수선택")·바닥띠 — 원본 공용 목록 k 2 도 이 둘을 얹는다 (P6 1-1 · 2a-5) */}
       {/* 바닥띠의 "되돌아가기" 가 원본 소프트키다 — 따로 두었던 버튼은 없앴다 (스테이지 (0,0) 에 떨어져 있었다) */}
-      <ScreenFrame title="마선수선택" gamePoint={gamePoint} onBack={onCancel} />
+      {/* 바닥 0x205 = 가운데 "0레벨업" + 되돌아가기 — 일반모드 0x2df78 · 0x2dfe0, 시즌 0xaa24(선수단 [+0x11c] ≠ 2) 모두 */}
+      <ScreenFrame title="마선수선택" gamePoint={gamePoint} onBack={onCancel} footer={0x205} />
 
       {/*
         **오픈 힌트 팝업** (0xa68e~0xa6dc) — 칸 4·9(드래고나·킹타이거)는 StrCOMMON[42] 알림 하나,

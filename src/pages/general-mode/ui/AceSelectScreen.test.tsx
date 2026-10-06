@@ -350,3 +350,12 @@ describe('레벨업 — 상태 21 의 0 키 · 상태 28 의 OK (0x29efc · 0x2b
     expect(container.textContent).toContain('마선수 오픈 힌트')
   })
 })
+
+describe('머리띠·바닥띠 — 0x54d95(skin, 4 "마선수선택", 0x205) (0x2dfb4~0x2dfbe)', () => {
+  it('바닥 0x205 = 가운데 "0레벨업"(game_frame 프레임 9) + 되돌아가기', () => {
+    const { container } = 띄우기()
+
+    expect([...container.querySelectorAll('img[data-footer-mark]')].map((node) => (node as HTMLElement).dataset.footerMark)).toEqual(['9'])
+    expect(screen.getByRole('button', { name: '되돌아가기' })).toBeTruthy()
+  })
+})

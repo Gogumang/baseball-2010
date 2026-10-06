@@ -166,7 +166,8 @@ export function SeasonMatchInfoScreen({
 
       {/* 머리띠(제목 12 "경기정보")·바닥띠 — 원본 공용 목록 k 4 도 이 둘을 얹는다 (P6 1-1 · 2a-6) */}
       {/* 바닥띠의 "되돌아가기" 가 원본 소프트키다 — 따로 두었던 버튼은 없앴다 (스테이지 (0,0) 에 떨어져 있었다) */}
-      <ScreenFrame title="경기정보" gamePoint={gamePoint} onBack={onCancel} />
+      {/* 바닥 = [skin+0x2ba](설정 창) ? 4 : 0x44 (0xb3cc~0xb3da) — 이 화면이 떠 있는 동안 설정 창은 닫혀 있어 0x44 = "0경기설정"(깜박임) + 되돌아가기 */}
+      <ScreenFrame title="경기정보" gamePoint={gamePoint} onBack={onCancel} footer={0x44} />
     </RawScreen>
   )
 }
