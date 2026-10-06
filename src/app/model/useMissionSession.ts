@@ -9,11 +9,9 @@ import { runnerCountOf } from '@/entities/game/model/baseState'
 import {
   applyOutcome as applyMissionOutcome,
   applyPickoff,
-  applySteal,
-  canSteal,
   checkSwingsExhausted,
-  failSteal,
   giveUp as giveUpMission,
+  MISSION_BATTER_MODE,
   missionDefensePlayInputOf,
   recordSwing,
   startMission,
@@ -28,7 +26,19 @@ import {
   startPitcherMission,
 } from '@/entities/mission/model/pitcherRun'
 import type { PitcherRun } from '@/entities/mission/model/pitcherRun'
-import { attemptSteal } from '@/entities/game/model/steal'
+import { EMPTY_BASES } from '@/entities/game/model/baseState'
+import { inningGoalOf, isCleared, recordSteal } from '@/entities/mission/model/missionGoal'
+import type { StealBase } from '@/entities/fielding/model/stealStart'
+import {
+  arrivalApplicationOf,
+  arrivesUnhit,
+  pitchJudgementOf,
+  rollCpuStealStart,
+  runPitchArrivalPlay,
+  startHumanSteal,
+  type PitchArrivalPlay,
+} from '@/features/defense-play/model/pitchArrivalPlay'
+import { chargedRunsOfFates } from '@/features/defense-play/model/runnerFates'
 import { missionOpponentOf, pitcherAbilityOf } from '@/entities/game/model/aceOpponent'
 import { pitchAgainstBatterDetailed } from '@/entities/pitching/model/simulateBatter'
 import { RUTHLESS_SKILL_ID, specialSwingCountOf } from '@/entities/batting/model/specialSwing'
@@ -47,7 +57,6 @@ import { ROOKIE_BATTER_ABILITY } from '@/entities/batting/model/batter'
 import { isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayInput, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { pickoffCallSoundIdOf, runPickoffPlay } from '@/features/defense-play/model/pickoffPlay'
-import type { PickoffPlayResult } from '@/features/defense-play/model/pickoffPlay'
 import type { PickoffBase } from '@/entities/defense-controls/model/pickoff'
 import { carryDistanceOf } from '@/entities/batting/model/battedBallFlight'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
@@ -242,8 +251,24 @@ export function useMissionSession({
   const [pendingDefensePlay, setPendingDefensePlay] = useState<PendingMissionDefense | null>(null)
   const pendingDefensePlayRef = useRef(pendingDefensePlay)
   pendingDefensePlayRef.current = pendingDefensePlay
-  /** 다 돌려 놓은 CPU 견제 한 판 — 화면이 재생을 마치면 비운다 (`actions.finishPickoffReplay`) */
-  const [pickoffReplay, setPickoffReplay] = useState<PickoffPlayResult | null>(null)
+  /**
+   * 다 돌려 놓은 주자 판 하나 — CPU 견제(종류 4) · 공 도착 판(0x3dfac 종류 5 도루 · 9 폭투·포일).
+   * 화면이 재생을 마치면 비운다 (`actions.finishPickoffReplay`)
+   */
+  const [pickoffReplay, setPickoffReplay] = useState<DefensePlayResult | null>(null)
+  /**
+   * **타자 미션: 이번 투구에 출발한 주자들의 루** — state[0x14 + 루]. 공이 나는 동안 키 '3'·'2'·'1' 로 쌓이고
+   * (`actions.steal`, 난수 없음) 공이 도착하면(0x3dfac) 도루 판을 열거나 지워진다. 키와 같은 틱에 공이 도착할 수 있어
+   * 진행 칸은 ref 로 든다(화면 표시는 state).
+   */
+  const [stealingFrom, setStealingFrom] = useState<readonly StealBase[]>([])
+  const stealingFromRef = useRef(stealingFrom)
+  const takeStealingFrom = () => {
+    const taken = stealingFromRef.current
+    stealingFromRef.current = []
+    if (taken.length > 0) setStealingFrom([])
+    return taken
+  }
   /**
    * **벤치 클리어링 연출(상태 0x1e)이 붙들고 있는 사구** — 투수 미션 전용.
    * 원본 미션(모드 5)도 보통 경기 장면 0x104 라 상태 0x12 갱신 0x4e6d4 의 끝 0x4e72c~0x4e776 을 그대로 탄다:
@@ -328,13 +353,52 @@ export function useMissionSession({
       const outcome = isAtBatFinished(nextAtBat) ? nextAtBat.outcome : null
       // 인플레이 타구면 수비 화면(상태 0x17)이 먼저 돈다 — 아웃·세이프 콜은 그 뒤다
       const runsDefense = outcome !== null && isBattedBallInPlay(outcome)
-      // 타구음 → 심판 콜 순서 (경기 장면과 같은 0x51408 이다).
+      const current = missionRunRef.current
+      const runnersOnBase = current === null ? 0 : runnerCountOf(current.bases)
+
+      // 공 도착 0x3dfac — 못 맞힌 공이면 0.1% 폭투·포일(종류 9)이나 출발한 도루(종류 5) 판을 연다.
+      // 미션(모드 6)도 보통 경기 장면 0x104 라 같은 길이다 (0x3dfac 는 모드 7 만 0.1% 굴림을 건너뛴다)
+      const stealing = takeStealingFrom()
+      const play =
+        current !== null && current.status === '진행중' && arrivesUnhit(detail.resolution)
+          ? runPitchArrivalPlay(
+              {
+                gameMode: MISSION_BATTER_MODE,
+                pitchJudgement: pitchJudgementOf(detail.resolution, outcome),
+                stealingFrom: stealing,
+                bases: current.bases,
+                outs: current.outs,
+                // 타자 미션은 수비가 CPU · 공격이 사람 — 아홉 칸·주루는 미션 타구(`missionDefensePlayInputOf`)와 같은
+                // 진행기 기본값(500)이다(레코드에 팀·타순이 없다, 근사). 주루 설정은 안 넘긴다(기본 자동 — 견제와 같다)
+                defenseIsCpu: true,
+                offenseIsCpu: false,
+              },
+              random,
+            )
+          : null
+
+      // 타구음 → 심판 콜 순서 (경기 장면과 같은 0x51408 이다). 공 도착 판이 열렸으면 그 판정 콜(도루 17 · 62/20,
+      // 폭투 17)이 심판 콜 뒤다 — 원본은 판 안의 그 틱에 내지만 웹은 판을 미리 다 돌려 재생하므로 연 자리에서 낸다.
       // 삼진·볼넷·홈런은 수비가 개입할 것이 없어 아웃 콜도 여기서 같이 난다 (0xae24c 갈래)
       playSoundIds(audio, [
         detail.contactSoundId,
         pitchCallSoundIdOf(detail.resolution, nextAtBat),
+        play?.callSoundId ?? null,
         outcome === null || runsDefense ? null : inPlayCallSoundIdOf(outcome),
       ])
+
+      if (current !== null && play !== null && arrivalApplicationOf(play) === 'runnerOnly') {
+        // 판의 진루·아웃·득점을 먼저 먹이고 재생한다 — 타석은 이어진다(볼카운트 그대로)
+        const interrupted = current.outs + play.result.advance.outsAdded >= MISSION_OUTS_PER_INNING
+        setMissionRun((previous) => (previous === null ? previous : withMissionRunnerPlay(previous, play)))
+        if (play.result.ticks.length > 0) setPickoffReplay(play.result)
+        if (interrupted) {
+          // 판에서 3아웃 — 이 타석은 끊긴다 (판정 B 0xae3e8 아웃 > 2 → 0x18). 미션은 시작 상황으로 돌아간다(applyPickoff)
+          if (hasSwung) setMissionRun((previous) => (previous === null ? previous : checkSwingsExhausted(recordSwing(previous))))
+          runner.resetAtBat()
+          return
+        }
+      }
 
       if (outcome === null) {
         if (hasSwung) {
@@ -345,16 +409,18 @@ export function useMissionSession({
         return
       }
 
-      const current = missionRunRef.current
-      const runnersOnBase = current === null ? 0 : runnerCountOf(current.bases)
-
       if (runsDefense && current !== null) {
         // 스윙 수만 먼저 줄이고 **루·아웃·목표는 한 톨도 건드리지 않는다** — 수비 화면이
         // 다 돈 뒤 `finishDefensePlay` 가 한 번에 먹인다 (원본도 0x17 이 도는 동안 0xf 로 안 간다)
         if (hasSwung) setMissionRun((previous) => (previous === null ? previous : recordSwing(previous)))
         setPendingDefensePlay({
           side: '타자',
-          input: { ...missionDefensePlayInputOf(current.bases, current.outs, outcome, random), isUncatchable },
+          input: {
+            ...missionDefensePlayInputOf(current.bases, current.outs, outcome, random),
+            isUncatchable,
+            // 공이 나는 동안 출발한 주자 — 판 시작 리드(0x3d7b8)가 다음 루로 몰아 돌린다
+            stealingFrom: stealing,
+          },
           outcome,
           isBunt: detail.isBunt,
           runnersOnBase,
@@ -366,10 +432,15 @@ export function useMissionSession({
       setMissionRun((previous) => {
         if (previous === null) return previous
         const swung = hasSwung ? recordSwing(previous) : previous
+        // 낫아웃 — 폭투·포일 판의 진루(타자주자 포함)가 이 삼진 타석의 진루다 (0x3e0d0 state[0x1a])
+        if (play !== null && arrivalApplicationOf(play) === 'batterRuns') {
+          return withBatterNotOut(swung, outcome, detail.isBunt, play)
+        }
         return applyMissionOutcome(swung, outcome, detail.isBunt)
       })
       runner.pauseWithBanner(describeOutcomeBanner(outcome, runnersOnBase))
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [audio, random, runner],
   )
 
@@ -505,6 +576,14 @@ export function useMissionSession({
     }
     // 마타자 필살 0x34468~0x34488 — 남은 칸(0xaea30)이 0 이 아니면 휘두를 때마다 필살이다 (난수 없음)
     const specialSwing = missionOpponentSpecialSwingOf(pitcherRun.mission, opponentSpecialSwingStored, aceLevels)
+    // CPU 도루 0x520de — 상태 0x11 의 10번째 틱(0x537dc → 메시지 0x583)이라 실투 판정(0x4dea0) 뒤, CPU 타자 결정
+    // (11번째 틱 0x34334) **바로 앞**이다. 후보가 있을 때만 rand(0,1000) 한 번 → 0xa9bd4 출발 (`rollCpuStealStart`).
+    // ⚠️ 근사: 미션 레코드에 상대 타선이 없어 주자 주루는 진행기 기본값(500)이다 — 0x520de 의 표 칸은 주자 속도
+    //    300~383 이면 늘 1 이라(`cpuSteal` 머리말) 주루와 무관하게 같은 확률이다
+    const stealingFrom = rollCpuStealStart(
+      { bases: pitcherRun.bases, offenseIsCpu: true, runAbilityOf: () => MISSION_DEFAULT_RUN_ABILITY },
+      random,
+    )
     // 원본 0x34334 가 보는 상황 — state 의 볼카운트·아웃과 주자 유무(0xa9599)
     const thrown = pitchAgainstBatterDetailed(
       pitch,
@@ -539,6 +618,23 @@ export function useMissionSession({
     runner.setBannerText(describePitchResolution(resolution))
     const outcome = isAtBatFinished(nextAtBat) ? nextAtBat.outcome : null
     const runsDefense = outcome !== null && isBattedBallInPlay(outcome)
+    // 공 도착 0x3dfac — 못 맞힌 공이면 0.1% 폭투·포일(종류 9)이나 CPU 가 건 도루(종류 5) 판을 연다.
+    // 사람 수비라 송구는 환경설정이 먹는다 — 판은 키 없는 사람 수비로 미리 다 돌려 재생한다 (견제와 같은 근사)
+    const play = arrivesUnhit(resolution)
+      ? runPitchArrivalPlay(
+          {
+            gameMode: MISSION_PITCHER_MODE,
+            pitchJudgement: pitchJudgementOf(resolution, outcome),
+            stealingFrom,
+            bases: pitcherRun.bases,
+            outs: pitcherRun.outs,
+            defenseIsCpu: false,
+            offenseIsCpu: true,
+            throwMode: throwModeManual === false ? '자동' : '수동',
+          },
+          random,
+        )
+      : null
     // 투구 순간 소리 (0x3f378 — 투수 단계가 공을 놓는 칸에 닿을 때). 이어서 심판 콜.
     // ⚠️ **근사**: 웹은 던지는 순간에 결과가 다 나오므로 투구음과 심판 콜이 붙어 버린다.
     //    통로가 하나라 뒤 소리가 앞 소리를 끊는다 (원본은 공이 날아가는 동안이 사이에 있다).
@@ -547,8 +643,23 @@ export function useMissionSession({
       // 공+0x10 갈래(3f488)는 안 탄다 → 투수 +0x18 을 0 으로 넘긴다 (b008959)
       pitchReleaseSoundIdOf({ typeNumber, pitcherMagicNumber: 0, ballMagicNumber: nextBallMagicNumber }),
       pitchCallSoundIdOf(resolution, nextAtBat),
+      // 공 도착 판의 판정 콜 — 판을 연 자리에서 낸다 (견제와 같은 근사)
+      play?.callSoundId ?? null,
       outcome === null || runsDefense ? null : inPlayCallSoundIdOf(outcome),
     ])
+
+    if (play !== null && arrivalApplicationOf(play) === 'runnerOnly') {
+      // 판의 진루·아웃·실점을 먼저 먹이고 재생한다 — 타석은 이어진다(볼카운트 그대로)
+      const interrupted = nextRun.outs + play.result.advance.outsAdded >= MISSION_OUTS_PER_INNING
+      nextRun = withPitcherMissionRunnerPlay(nextRun, play)
+      if (play.result.ticks.length > 0) setPickoffReplay(play.result)
+      if (interrupted) {
+        // 판에서 3아웃 — 이 타석은 끊긴다 (판정 B 0xae3e8 아웃 > 2 → 0x18)
+        runner.resetAtBat()
+        setPitcherRun(checkPitchExhausted(nextRun))
+        return
+      }
+    }
 
     if (runsDefense && outcome !== null) {
       // 수비 화면(0x17)이 돈다 — 실점·피안타·이닝 목표는 다 돌고 난 뒤에 센다
@@ -566,6 +677,8 @@ export function useMissionSession({
           ),
           // 0x517e6 — 마타자 필살이 성공한 타구는 송구공 비트(0xaf180)가 서서 야수가 쥐지 못한다
           isUncatchable: thrown.isUncatchable,
+          // CPU 가 공이 나는 동안 건 도루 — 판 시작 리드(0x3d7b8)가 다음 루로 몰아 돌린다
+          stealingFrom,
         },
         outcome,
         isBunt: false,
@@ -590,7 +703,11 @@ export function useMissionSession({
         setPitcherRun(nextRun)
         return
       }
-      nextRun = applyPitcherOutcome(nextRun, outcome, { random })
+      nextRun =
+        play !== null && arrivalApplicationOf(play) === 'batterRuns'
+          ? // 낫아웃 — 폭투·포일 판의 진루(타자주자 포함)가 이 삼진 타석의 진루다 (0x3e0d0 state[0x1a])
+            withPitcherNotOut(nextRun, outcome, play)
+          : applyPitcherOutcome(nextRun, outcome, { random })
       runner.resetAtBat()
     } else {
       nextRun = checkPitchExhausted(nextRun)
@@ -669,6 +786,8 @@ export function useMissionSession({
     setPendingDefensePlay(null)
     setPickoffReplay(null)
     setPendingBenchClearing(null)
+    stealingFromRef.current = []
+    setStealingFrom([])
   }
 
   const actions = {
@@ -717,6 +836,8 @@ export function useMissionSession({
       setPendingDefensePlay(null)
       setPickoffReplay(null)
       setPendingBenchClearing(null)
+      stealingFromRef.current = []
+      setStealingFrom([])
       setMissionRun(startMission(mission))
       setScreen({ kind: '마선수대결', mission, ...pending })
     },
@@ -804,12 +925,19 @@ export function useMissionSession({
     /** 견제 판 재생이 끝났다 */
     finishPickoffReplay: () => setPickoffReplay(null),
 
-    /** 원작 미션 '기동력은 나의 힘' — 번트와 도루를 1개씩 */
-    steal: (ability: BatterAbility) => {
-      if (missionRun === null || !canSteal(missionRun)) return
-      const result = attemptSteal(ability, random)
-      runner.setBannerText(result === '성공' ? '도루 성공!' : '도루 실패')
-      setMissionRun(result === '성공' ? applySteal(missionRun) : failSteal(missionRun))
+    /**
+     * **도루 출발** — 타자 미션의 사람 키 '3' 1루 · '2' 2루 · '1' 3루 주자(`0x53610` → 메시지 0x583 → `0xa9bd4`).
+     * 주자를 출발만 시킨다(난수·소리 없음). 성공·실패는 공이 도착할 때 도루 판(종류 5)이 정한다(`handleMissionPitch`).
+     * 사람 경기 도루는 간이 엔진 표 0xd9064 가 아니다(c18a833).
+     */
+    steal: (base: StealBase) => {
+      const current = missionRunRef.current
+      if (current === null || current.status !== '진행중') return
+      if (pendingDefensePlayRef.current !== null) return
+      const next = startHumanSteal(current.bases, stealingFromRef.current, base)
+      if (next === stealingFromRef.current) return
+      stealingFromRef.current = next
+      setStealingFrom(next)
     },
 
     giveUpBatter: () => {
@@ -840,9 +968,112 @@ export function useMissionSession({
     },
   }
 
+  /** 타자 미션에서 지금 출발시킬 수 있는 루 — `canStartSteal`(0xa9924 앞길 검사). 이번 공에 이미 출발한 주자는 빠진다 */
+  const stealableBases: readonly StealBase[] =
+    missionRun === null || missionRun.status !== '진행중' || pendingDefensePlay !== null
+      ? []
+      : ([1, 2, 3] as const).filter((base) => startHumanSteal(missionRun.bases, stealingFrom, base) !== stealingFrom)
+
   return {
     missionRun, pitcherRun, pitcherAceMatchMission, clearedKeys, clearCounts, lastSide, aceLevels, pitcher,
     missionConditionCode, pendingDefensePlay, pendingBenchClearing, pickoffReplay, handleMissionPitch, handleThrow, actions,
-    batterSpecialSwingStored, pitcherMagicRemaining,
+    batterSpecialSwingStored, pitcherMagicRemaining, stealableBases,
   }
+}
+
+/** 미션은 한 이닝 안에서 논다 — 3아웃이면 시작 상황으로 돌아간다 (`missionRun` 의 추정과 같다) */
+const MISSION_OUTS_PER_INNING = 3
+/** 진행기 기본 주루(등급 3 = 500) — 미션 레코드에 팀·타순이 없어 미션 타구도 이 값을 쓴다 (`missionDefensePlayInputOf`) */
+const MISSION_DEFAULT_RUN_ABILITY = 500
+/** 도루 판 정산 0xa8024 @a83c6 의 기록 8(도루) — 루를 옮긴 도루 주자마다 하나 (`stealRecordIdsOf`) */
+const STEAL_RECORD_ID = 8
+
+/**
+ * **타자 미션의 주자 판**(공 도착 0x3dfac 의 종류 5 도루 · 9 폭투·포일)을 먹인다 — 진루·아웃은 견제 판과 같은
+ * `applyPickoff`(3아웃이면 시작 상황), 미션 도루 목표는 도루 판의 기록 8 하나마다 +1 이다.
+ * ⚠️ 근사: 원본 미션 판정 0xaaa6c 가 도루 목표를 어느 칸에서 세는지는 안 읽었다 — 정산 0xa8024 의 도루 기록(8:
+ *    잡힌 주자가 없을 때 루를 옮긴 도루 주자마다)과 같다고 본다. 판정은 판 끝(0xae5c4, 모드 5·6)에서 돈다.
+ * ⚠️ 악송구·폭투로 들어온 득점은 타점이 아니라 목표·화면 점수에 안 든다 — 견제와 같은 근사(`applyPickoff` 주석).
+ */
+function withMissionRunnerPlay(run: MissionRun, play: PitchArrivalPlay): MissionRun {
+  if (run.status !== '진행중') return run
+  const moved = applyPickoff(run, play.result.advance)
+  const steals = play.recordIds.filter((id) => id === STEAL_RECORD_ID).length
+  if (steals === 0) return moved
+  let progress = moved.progress
+  for (let index = 0; index < steals; index += 1) progress = recordSteal(progress)
+  return { ...moved, progress, status: isCleared(run.mission, progress) ? '성공' : moved.status }
+}
+
+/**
+ * **타자 미션 낫아웃** — 삼진 타석의 목표·타석 수·스윙은 보통 삼진 길(`applyOutcome`) 그대로, 루·아웃만 폭투·포일
+ * 판의 진루(타자주자 포함, 아웃 없음)로 바꾼다. 삼진 기록(0xa7c4c)은 원본도 그대로 남는다.
+ */
+function withBatterNotOut(run: MissionRun, outcome: AtBatOutcome, isBunt: boolean, play: PitchArrivalPlay): MissionRun {
+  if (run.status !== '진행중') return run
+  const struck = applyMissionOutcome(run, outcome, isBunt)
+  const moved = applyPickoff(run, play.result.advance)
+  return { ...struck, bases: moved.bases, outs: moved.outs }
+}
+
+/**
+ * **투수 미션의 주자 판**(종류 5 도루 · 9 폭투·포일)을 먹인다 — 3아웃이면 다음 이닝(빈 루 · 0아웃, `advanceDefense` 와 같다).
+ * 잡은 아웃은 이닝 목표(`totalOuts`)에 든다.
+ * - 실점 R+0x128: 판 끝 판정 B 0xae3e8 이 정산 0xa8024 를 부를 때만 주자 운명으로 센다 — 도루(5)는 늘, 폭투·포일(9)은
+ *   삼진이 그대로 선 판만(ae596 → ae5a6). 아니면 정산을 건너뛰어(ae5a2 → ae5b6) 실점 칸에 안 든다.
+ * - 판정 0xaaa6c 는 판 끝(0xae5c4, 모드 5·6)에서 돈다 — 웹 판정(`pitcherRun.judgeStatus`)은 미션 엔티티 안에 있어
+ *   여기서는 그 두 갈래(실점 한도 → 실패 · 이닝 목표 → 성공)만 같은 순서로 본다.
+ * ⚠️ 미해결: R+0x130(출루 허용)을 정산이 주자 판에서도 덮어쓰는지는 안 읽었다 — 손대지 않는다.
+ */
+function withPitcherMissionRunnerPlay(run: PitcherRun, play: PitchArrivalPlay): PitcherRun {
+  if (run.status !== '진행중') return run
+  const advance = play.result.advance
+  const outs = run.outs + advance.outsAdded
+  const isInningOver = outs >= MISSION_OUTS_PER_INNING
+  const settles = play.kind === 5 || play.strikeout === 'strikeoutStands'
+  const charged = settles ? chargedRunsOfFates(play.result.runnerFates, Math.min(MISSION_OUTS_PER_INNING, outs)) : 0
+  return judgedAfterRunnerPlay({
+    ...run,
+    bases: isInningOver ? EMPTY_BASES : advance.bases,
+    outs: isInningOver ? 0 : outs,
+    totalOuts: run.totalOuts + advance.outsAdded,
+    allowed: { ...run.allowed, runs: run.allowed.runs + charged },
+  })
+}
+
+/**
+ * **투수 미션 낫아웃** — 삼진 타석은 보통 길(`applyPitcherOutcome`: 삼진 목표·타석 수·판정)로 세고, 루·아웃·이닝 아웃·
+ * 실점만 폭투·포일 판의 결과(타자주자 포함)로 바꾼다. 판정 B 가 state[0xc] == 5 라 정산 0xa8024 를 부른다(ae5a6).
+ * ⚠️ 근사: 보통 길이 삼진을 아웃 하나로 센 채 판정한 상태(노히트노런·퍼펙트 아웃 칸 포함)는 그대로 둔다 — 정산 0xa8ce8 이
+ *    state[0x1a] 로 R+0x13c 를 하나 빼는 갈래(P7 E3)는 미션 칸에 옮기지 않았다.
+ */
+function withPitcherNotOut(run: PitcherRun, outcome: AtBatOutcome, play: PitchArrivalPlay): PitcherRun {
+  if (run.status !== '진행중') return run
+  const struck = applyPitcherOutcome(run, outcome)
+  const advance = play.result.advance
+  const outs = run.outs + advance.outsAdded
+  const isInningOver = outs >= MISSION_OUTS_PER_INNING
+  const charged = chargedRunsOfFates(play.result.runnerFates, Math.min(MISSION_OUTS_PER_INNING, outs))
+  const moved: PitcherRun = {
+    ...struck,
+    bases: isInningOver ? EMPTY_BASES : advance.bases,
+    outs: isInningOver ? 0 : outs,
+    totalOuts: run.totalOuts + advance.outsAdded,
+    allowed: { ...struck.allowed, runs: run.allowed.runs + charged },
+  }
+  return struck.status === '진행중' ? judgedAfterRunnerPlay(moved) : moved
+}
+
+/** 판 끝 미션 판정 0xaaa6c 중 주자 판이 바꿀 수 있는 두 갈래 — 실점 한도(+0xa1 ↔ R+0x128) → 실패 · 이닝 목표 → 성공 */
+function judgedAfterRunnerPlay(run: PitcherRun): PitcherRun {
+  const limit = run.mission.failLimits.runs
+  if (limit > 0 && run.allowed.runs >= limit) {
+    const broken = run.progress.brokenConditions.includes('무실점')
+      ? run.progress.brokenConditions
+      : [...run.progress.brokenConditions, '무실점']
+    return { ...run, progress: { ...run.progress, brokenConditions: broken }, status: '실패' }
+  }
+  const inningGoal = inningGoalOf(run.mission)
+  if (inningGoal !== null && run.totalOuts >= inningGoal * MISSION_OUTS_PER_INNING) return { ...run, status: '성공' }
+  return run
 }

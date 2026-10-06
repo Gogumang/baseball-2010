@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { BigResult, Hint, PixelScreen } from '@/shared/ui'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
@@ -14,7 +14,8 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { goalsOf } from '@/entities/mission/model/missionGoal'
 import { GoalBar } from '@/entities/mission/ui/GoalBar'
 import type { MissionRun } from '@/entities/mission/model/missionRun'
-import { canSteal as canStealNow } from '@/entities/mission/model/missionRun'
+import type { StealBase } from '@/entities/fielding/model/stealStart'
+import { stealBaseOfKey } from '@/features/defense-play/model/pitchArrivalPlay'
 import type { AcePlayer } from '@/shared/config/original/acePlayers'
 
 interface MissionPlayScreenProps {
@@ -54,8 +55,13 @@ interface MissionPlayScreenProps {
    * (0x50f28 · 0x345fc 의 갈림은 홈런더비 하나). 안 넘기면 견제가 꺼진다.
    */
   readonly onPickoff?: (base: 1 | 2 | 3) => void
-  /** 도루 목표가 있는 미션에서만 쓴다 */
-  readonly onSteal: () => void
+  /**
+   * **도루 출발** (원본 키 '3' 1루 · '2' 2루 · '1' 3루 주자 → `0x53610` → 0x583 → `0xa9bd4`). 인자는 대상 주자가 선 루다.
+   * 판정은 공이 도착할 때 도루 판(종류 5)이 한다.
+   */
+  readonly onSteal: (base: StealBase) => void
+  /** 지금 출발시킬 수 있는 루 (`canStartSteal`). 안 넘기면 도루 입구가 없다 */
+  readonly stealableBases?: readonly StealBase[]
   /**
    * 경기 중 메뉴 **"다시하기"** (표 0xcfcfc 행 1 · StrGAME[7], `0x3c706`).
    * 미션·홈런더비 행만 자동진행 자리에 이 칸이 온다. 안 넘기면 칸이 잠긴다.
@@ -93,6 +99,7 @@ export function MissionPlayScreen({
   onGiveUp,
   onFinish,
   onSteal,
+  stealableBases = [],
   onRestart,
   settings,
   onSettingsChange,
@@ -102,8 +109,21 @@ export function MissionPlayScreen({
   const goals = goalsOf(run.mission, run.progress)
   const isOver = run.status !== '진행중'
   const canBunt = run.mission.goals.includes('번트')
-  // 도루 목표가 있고 1루 주자가 있을 때만 (StrHOWTO[2])
-  const canSteal = run.mission.goals.includes('도루') && canStealNow(run)
+  // 도루 출발 — 사람 공격이고 앞길이 열린 주자가 있을 때 (`canStartSteal`). 목표에 도루가 없어도 키는 먹는다
+  const canSteal = !isOver && stealableBases.length > 0
+  // 원본 공용 키 처리 0x498d4 — 도루 '3'/'2'/'1'
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat || isMenuOpen || overlay !== null) return
+      const base = stealBaseOfKey(event.key)
+      if (base !== null && stealableBases.includes(base)) {
+        event.preventDefault()
+        onSteal(base)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [isMenuOpen, onSteal, overlay, stealableBases])
 
   const badgeParts: string[] = []
   if (run.remainingSeconds !== null) badgeParts.push(`${Math.ceil(run.remainingSeconds)}초`)
@@ -134,7 +154,7 @@ export function MissionPlayScreen({
         isOver
           ? { label: '확인', onPress: onFinish }
           : canSteal
-            ? { label: '도루', onPress: onSteal }
+            ? { label: `도루 ${stealableBases[0]}루`, onPress: () => onSteal(stealableBases[0]) }
             : undefined
       }
       rightKey={
@@ -215,7 +235,9 @@ export function MissionPlayScreen({
             <Hint>
               {atBat.balls}볼 {atBat.strikes}스트라이크
               {canBunt && ' · 8·7·9(Shift)·길게 눌러 번트'}
-              {canSteal && ' · 아래 [도루]'}
+              {stealableBases.includes(1) && ' · 3 도루(1루)'}
+              {stealableBases.includes(2) && ' · 2 도루(2루)'}
+              {stealableBases.includes(3) && ' · 1 도루(3루)'}
             </Hint>
           ) : (
             <BigResult>{bannerText}</BigResult>

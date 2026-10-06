@@ -317,6 +317,56 @@ describe('미션 인플레이 타구는 수비 화면을 거친다 — 0x13 → 
   })
 })
 
+describe('타자 미션 도루 — 키는 출발만(0xa9bd4), 공이 도착하면 도루 판(0x3dfac 종류 5)', () => {
+  it("'기동력은 나의 힘'(1루 주자) — 출발한 뒤 볼이 도착하면 1루 도루는 세이프, 도루 목표가 오른다 · 재생할 판을 남긴다", () => {
+    const rendered = setUpBatterMission(5)
+    expect(rendered.result.current.session.stealableBases).toEqual([1])
+
+    act(() => {
+      rendered.result.current.session.actions.steal(1)
+    })
+    // 출발만 했다 — 루·목표는 그대로, 같은 주자는 다시 못 건다
+    expect(rendered.result.current.session.missionRun?.bases.first).toBe(true)
+    expect(rendered.result.current.session.stealableBases).toEqual([])
+
+    act(() => {
+      rendered.result.current.session.handleMissionPitch({
+        resolution: { kind: '볼' },
+        hasSwung: false,
+        isBunt: false,
+        resultCode: null,
+      })
+    })
+
+    const after = rendered.result.current.session.missionRun!
+    expect(after.bases).toEqual({ first: false, second: true, third: false })
+    expect(after.outs).toBe(0)
+    expect(after.progress.counts['도루']).toBe(1)
+    expect(rendered.result.current.session.pickoffReplay).not.toBeNull()
+    // 타석은 이어진다 — 볼 하나
+    expect(rendered.result.current.runner.atBat.balls).toBe(3)
+    rendered.unmount()
+  })
+
+  it('출발하지 않은 공은 판이 없다 — 루 그대로', () => {
+    const rendered = setUpBatterMission(5)
+    const before = rendered.result.current.session.missionRun!
+
+    act(() => {
+      rendered.result.current.session.handleMissionPitch({
+        resolution: { kind: '스트라이크', isSwinging: false },
+        hasSwung: false,
+        isBunt: false,
+        resultCode: null,
+      })
+    })
+
+    expect(rendered.result.current.session.missionRun?.bases).toEqual(before.bases)
+    expect(rendered.result.current.session.pickoffReplay).toBeNull()
+    rendered.unmount()
+  })
+})
+
 describe('미션 마선수의 레벨 배율 0xd88aa (0xb6414)', () => {
   const 로제미션 = MISSIONS.find((mission) => mission.side === '투수' && mission.opponentAce === 3)
   const 레오니미션 = MISSIONS.find((mission) => mission.side === '타자' && mission.opponentAce === 2)

@@ -89,7 +89,9 @@ export function MissionRoutes({
         aceLevels={session.aceLevels}
         // CPU 견제 (0x345fc 종류 4 → 0x34848 → 메시지 0x10) — 미션(모드 6)에서도 돈다
         onPickoff={actions.cpuPickoff}
-        onSteal={() => actions.steal(ability)}
+        // 도루 출발 (0x53610 → 0x583 → 0xa9bd4) — 판정은 공이 도착할 때 도루 판(종류 5)이 한다
+        stealableBases={session.stealableBases}
+        onSteal={actions.steal}
         onGiveUp={actions.giveUpBatter}
         onFinish={screen.kind === '마선수대결' ? actions.finishAceMatch : actions.finishBatter}
         // 경기 중 메뉴 "다시하기" (StrGAME[7]) — 같은 미션을 처음부터 다시 세운다
