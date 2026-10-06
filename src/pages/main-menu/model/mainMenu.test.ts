@@ -147,6 +147,15 @@ describe('reduceMainMenu — 원본 글자 목록에서 모드를 고르는 메�
       expect(최근게임(4).effect).toBe('나리타자편')
     })
 
+    it('나리 3·4 는 (+0x40+m && +0x4c+m) 이면 곧장 경기 — 그 편만 본다 (3289c~328b4)', () => {
+      const 나리최근게임 = (lastPlayedMode: number, ready: { 투수편: boolean; 타자편: boolean }) =>
+        reduceMainMenu(게임시작목록(true), { type: '시작' }, true, false, lastPlayedMode, ready)
+      expect(나리최근게임(3, { 투수편: true, 타자편: false }).effect).toBe('나리투수편경기')
+      expect(나리최근게임(4, { 투수편: true, 타자편: false }).effect).toBe('나리타자편')
+      expect(나리최근게임(4, { 투수편: false, 타자편: true }).effect).toBe('나리타자편경기')
+      expect(나리최근게임(3, { 투수편: false, 타자편: true }).effect).toBe('나리투수편')
+    })
+
     it('일반모드(1)는 +0x4d 면 창 없이 저장을 올려 경기로 (0x327f8)', () => {
       const 결과 = 최근게임(1, true)
       expect(결과.effect).toBe('일반모드경기이어하기')
@@ -192,6 +201,17 @@ describe('reduceMainMenu — 원본 글자 목록에서 모드를 고르는 메�
     expect(답(-1).state.tier).toBe(5)
     // 창이 떠 있으면 목록 키는 안 먹는다
     expect(reduceMainMenu(창, { type: '뒤로' }, true).state).toBe(창)
+  })
+
+  it('[14] 답도 0x327b8 모드 3·4 갈래를 지난다 — 그 편 경기 중간 저장이 있으면 곧장 경기 (0x328b4)', () => {
+    const 고름 = 고르기(게임시작목록(true), '나만의리그', true)
+    const 창 = reduceMainMenu(고름, { type: '시작' }, true).state
+    const 답 = (answer: number, ready: { 투수편: boolean; 타자편: boolean }) =>
+      reduceMainMenu(창, { type: '창답', answer }, true, false, 4, ready)
+    expect(답(0, { 투수편: false, 타자편: true }).effect).toBe('나리타자편경기')
+    expect(답(1, { 투수편: true, 타자편: false }).effect).toBe('나리투수편경기')
+    expect(답(1, { 투수편: false, 타자편: true }).effect).toBe('나리투수편')
+    expect(답(0, { 투수편: true, 타자편: true }).state.isPickingNariEdition).toBe(false)
   })
 })
 

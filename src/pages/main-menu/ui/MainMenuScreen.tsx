@@ -6,6 +6,7 @@ import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 import { GENERAL_MODE_PROMPT, NARI_EDITION_PROMPT, NEW_GAME_CONFIRM } from '@/shared/config/original/mainMenu'
 import { MessageBox } from '@/shared/ui/MessageBox/MessageBox'
 import { entriesOf, isEntryDimmed, selectedIdOf, TOP_ENTRIES } from '@/pages/main-menu/model/mainMenu'
+import type { NariGameReady } from '@/pages/main-menu/model/mainMenu'
 import { useMainMenu } from '@/pages/main-menu/model/useMainMenu'
 import { useMenuTurn } from '@/pages/main-menu/model/useMenuTurn'
 import {
@@ -59,6 +60,13 @@ interface MainMenuScreenProps {
   readonly lastPlayedMode?: number
   /** 나만의리그 [14] 에서 편을 골랐다 — 원본은 그 편 커리어가 있으면 이어하고 없으면 팀 고르기로 간다(0xf684) */
   readonly onNewGame: (edition: '타자편' | '투수편') => void
+  /**
+   * 나리 두 편의 `전역기록 +0x40+m && +0x4c+m` — [14]·[최근게임] 의 0x327b8 모드 3·4 갈래가 곧장 경기로 갈지 본다.
+   * 안 넘기면 둘 다 거짓(늘 장면 0x106)
+   */
+  readonly nariGameReady?: NariGameReady
+  /** 그 갈래의 곧장 경기 — 0x213c0(앱, m, 0) → 장면 0x104. 안 넘기면 `onNewGame` 으로 간다 */
+  readonly onResumeNariGame?: (edition: '타자편' | '투수편') => void
   readonly onSelectMode: (mode: GameMode) => void
   readonly onBack: () => void
   /** 원작 처음 메뉴의 [도움말] (StrMAINMENU[2]) */
@@ -126,6 +134,8 @@ export function MainMenuScreen({
   isGeneralGameInProgress = false,
   lastPlayedMode = 1,
   onNewGame,
+  nariGameReady,
+  onResumeNariGame,
   onSelectMode,
   onBack,
   onHelp,
@@ -138,6 +148,8 @@ export function MainMenuScreen({
   const { state, dispatch } = useMainMenu(hasSavedGame, false, (effect) => {
     if (effect === '나리타자편') onNewGame('타자편')
     else if (effect === '나리투수편') onNewGame('투수편')
+    else if (effect === '나리타자편경기') (onResumeNariGame ?? onNewGame)('타자편')
+    else if (effect === '나리투수편경기') (onResumeNariGame ?? onNewGame)('투수편')
     else if (effect === '미션') onSelectMode('미션')
     else if (effect === '홈런더비') onSelectMode('홈런더비')
     else if (effect === '시즌모드') onSelectMode('시즌모드')
@@ -149,7 +161,7 @@ export function MainMenuScreen({
     else if (effect === '도움말') onHelp()
     else if (effect === '환경설정') onSettings()
     else onBack()
-  }, { isGeneralGameInProgress, lastPlayedMode })
+  }, { isGeneralGameInProgress, lastPlayedMode, ...(nariGameReady === undefined ? {} : { nariGameReady }) })
   const origins = useFrameOrigins(`${MAIN_UI}/frames`)
   const textOrigins = useFrameOrigins(`${IMG_TEXT}/frames`)
 

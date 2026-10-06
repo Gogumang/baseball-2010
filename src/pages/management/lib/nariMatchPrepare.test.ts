@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import {
-  NO_NARI_ACE, batterMatchInfoOf, nariMatchCancelTargetOf, rollNariMatchAces, rollNariMatchStadium,
+  NO_NARI_ACE, batterMatchInfoOf, nariGameMatchOfSave, nariMatchCancelTargetOf, rollNariMatchAces, rollNariMatchStadium,
 } from '@/pages/management/lib/nariMatchPrepare'
 import { createCareer } from '@/entities/career/model/playerCareer'
 
@@ -85,5 +85,20 @@ describe('142 구장 0x78664 — 홈 팀 > 9 일 때만 rand(0, 10)', () => {
     expect(calls).toBe(0)
     expect(rollNariMatchStadium(random, 10)).toBe(5)
     expect(calls).toBe(1)
+  })
+})
+
+describe('nariGameMatchOfSave — 142 확인이 모드 저장 칸에 남긴 명부 그림자 (웹 전용)', () => {
+  it('마선수 넷과 국가대항전 여부를 그대로 읽는다', () => {
+    const aces = { myBatter: 0, myPitcher: -1, opponentPitcher: 3, opponentBatter: 4 }
+    expect(nariGameMatchOfSave({ aces, isNationalCup: false })).toEqual({ aces, isNationalCup: false })
+    expect(nariGameMatchOfSave({ aces: null, isNationalCup: true })).toEqual({ aces: null, isNationalCup: true })
+  })
+
+  it('꼴이 안 맞으면 마선수 없이 — 칸 자체가 없으면 null', () => {
+    expect(nariGameMatchOfSave(null)).toBeNull()
+    expect(nariGameMatchOfSave('x')).toBeNull()
+    expect(nariGameMatchOfSave({ aces: { myBatter: 9, myPitcher: 0, opponentPitcher: 0, opponentBatter: 0 } }))
+      .toEqual({ aces: null, isNationalCup: false })
   })
 })

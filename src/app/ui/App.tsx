@@ -33,6 +33,8 @@ import { GeneralModeScreen, aceOpenPriceOf, generalGameOfSave, useAceOpen } from
 import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow'
 import { useModeSave } from '@/entities/mode-save/model/useModeSave'
 import { NEW_SAVE_LAST_PLAYED_MODE } from '@/entities/mode-save/model/modeSave'
+import { nariGameMatchOfSave } from '@/pages/management/lib/nariMatchPrepare'
+import type { NariGameSavePort } from '@/pages/management/lib/nariMatchPrepare'
 import { useGamePointWallet } from '@/entities/wallet/model/useGamePointWallet'
 import { useAceLevels } from '@/entities/mission/model/useAceLevels'
 import type { SeasonAutobotBatInput } from '@/entities/season-mode/model/seasonRewards'
@@ -83,8 +85,9 @@ const EDITED_NAMES_KEY = 'compus-baseball/edited-names'
  * 읽어 예전 웹 [최근게임](늘 타자편 이어하기)과 같은 길로 이어 준다.
  */
 const MODE_SAVE_KEY = 'compus-baseball/mode-save'
-/** 나만의리그 타자편 = 원본 모드 4 */
+/** 나만의리그 타자편 = 원본 모드 4 · 투수편 = 모드 3 (전역기록 +0x4c + 모드 = +0x50 · +0x4f) */
 const NARI_BATTER_MODE = 4
+const NARI_PITCHER_MODE = 3
 
 const ENTRY_SCREENS: readonly Screen['kind'][] = ['타이틀', '메인메뉴', '도움말', '환경설정', '스페셜', '나리편선택', '팀선택', '선수등록', '홈런더비', '일반모드']
 
@@ -127,7 +130,16 @@ export function App() {
     [saveGame],
   )
   const modeSave = useModeSave(modeSaveStore, legacyLastPlayedMode)
-  const { setLastPlayedMode } = modeSave
+  const { setLastPlayedMode, startNariGame, clearNariGame } = modeSave
+  // 전역기록 +0x4f · +0x50 손잡이 — 나리 두 편 세션이 142 확인·등록·정산·지우기에서 쓴다
+  const pitcherNariGameSave = useMemo<NariGameSavePort>(() => ({
+    start: (match) => startNariGame(NARI_PITCHER_MODE, match),
+    clear: () => clearNariGame(NARI_PITCHER_MODE),
+  }), [startNariGame, clearNariGame])
+  const batterNariGameSave = useMemo<NariGameSavePort>(() => ({
+    start: (match) => startNariGame(NARI_BATTER_MODE, match),
+    clear: () => clearNariGame(NARI_BATTER_MODE),
+  }), [startNariGame, clearNariGame])
   const gameSettings = useGameSettings(settingsStore)
   // 소리 통로 하나 — 환경설정 칸(0~4) × 25 가 원본 소리 크기다 (옵션 +0x2e)
   const sound = useSound(gameSettings.settings.soundLevel)
@@ -192,6 +204,7 @@ export function App() {
     aceLevels.levels,
     readPitcherOtherModes,
     nariOpenedAces,
+    pitcherNariGameSave,
   )
   // 화면이 바뀌면 그 화면의 배경음으로 갈아탄다 (`screenBgm.ts` 의 표). 투수편은 안쪽 장면(128 이어하기 4)을 본다
   const pitcherBgm = usePitcherLeagueBgm(screen.kind === '투수편', pitcherSession.scene)
@@ -205,6 +218,7 @@ export function App() {
     aceLevels: aceLevels.levels,
     readRegularSeasonOtherModes: readBatterOtherModes,
     openedAces: nariOpenedAces,
+    nariGameSave: batterNariGameSave,
   })
   const pitcherMissionPitcher = useMemo(() => modePitcherOf(pitcherSession.career), [pitcherSession.career])
   // 타자 미션(모드 6)은 0x213c0 이 6→4 로 나리 타자편 저장을 올린다 — 마투수 투구 소모(0xa5e14)의 압도 22 가 이 타자를 본다
@@ -505,6 +519,21 @@ export function App() {
             setGeneralResume(saved)
           }
           setScreen({ kind: '일반모드' })
+        }}
+        // [14]·[최근게임] 의 0x327b8 모드 3·4 갈래 — 그 편 커리어(+0x40+m) && 경기 중간 저장(+0x4c+m)이면 곧장 경기
+        nariGameReady={{
+          투수편: pitcherSession.career !== null && modeSave.save.nariGames[NARI_PITCHER_MODE].isInProgress,
+          타자편: careerSession.savedCareer !== null && modeSave.save.nariGames[NARI_BATTER_MODE].isInProgress,
+        }}
+        // 0x213c0(앱, m, 0) 으로 그 편 저장을 올려 장면 0x104 — 경기 셋업 0x39fdc 모드 3·4 갈래가 그 저장으로 경기를 새로 세운다
+        onResumeNariGame={(edition) => {
+          if (edition === '투수편') {
+            pitcherSession.actions.resumeInterruptedGame(
+              nariGameMatchOfSave(modeSave.save.nariGames[NARI_PITCHER_MODE].match),
+            )
+            return setScreen({ kind: '투수편' })
+          }
+          careerSession.actions.resumeInterruptedGame(nariGameMatchOfSave(modeSave.save.nariGames[NARI_BATTER_MODE].match))
         }}
         // 메인 메뉴 처음 단(하위 4)의 전부 수집 보상 판정 0x28e98 → 팝업 0x292f8
         claimCollectionReward={() => collection.claimCollectionReward(collectionRewardStore, everyMissionCleared, wallet)}

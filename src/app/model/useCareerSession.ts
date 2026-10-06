@@ -86,7 +86,7 @@ import { enterSeasonEvent, nextSeasonStep, resumePointOf } from '@/app/model/sea
 import {
   nariGameAcesOf, nariMatchCancelTargetOf, rollNariMatchAces, rollNariMatchStadium,
 } from '@/pages/management/lib/nariMatchPrepare'
-import type { NariMatchAces, NariOpenedAces } from '@/pages/management/lib/nariMatchPrepare'
+import type { NariGameMatch, NariGameSavePort, NariMatchAces, NariOpenedAces } from '@/pages/management/lib/nariMatchPrepare'
 import { DEFAULT_OPENED_ACE_BATTER_IDS, DEFAULT_OPENED_ACE_PITCHER_IDS } from '@/pages/general-mode/lib/generalModeSetup'
 import {
   achievedGoalCount,
@@ -211,6 +211,11 @@ interface CareerSessionInput {
    * 내 팀 마선수를 굴린다(0x9f604 · 0x9f650). 안 넘기면 기본 개방 둘(마투수 0 · 마타자 0)이다.
    */
   readonly openedAces?: NariOpenedAces
+  /**
+   * 전역기록 +0x50(모드 4 "타자편 경기 중간 저장됨") 칸 — 142 확인이 세우고 등록·정산·지우기가 내린다(`entities/mode-save`).
+   * 안 넘기면 아무 데도 안 쓴다.
+   */
+  readonly nariGameSave?: NariGameSavePort
 }
 
 const NO_STAT = () => {}
@@ -260,6 +265,7 @@ export function useCareerSession({
   aceLevels,
   readRegularSeasonOtherModes,
   openedAces = DEFAULT_NARI_OPENED_ACES,
+  nariGameSave,
 }: CareerSessionInput) {
   // 통로를 안 받으면 조용한 포트로 — 아래 자리들이 `sound` 가 있는지 매번 보지 않게 한다
   const silent = useMemo(() => createSilentSound(), [])
@@ -305,6 +311,9 @@ export function useCareerSession({
    * 0 으로 둔다 → 장면이 새로 서는 이어하기(`continueSaved`)와 경기 뒤(`finishGame`)에 내린다.
    */
   const matchPreparedRef = useRef(false)
+  /** 전역기록 +0x50 손잡이 — 콜백 신원이 흔들리지 않게 ref 로 읽는다 */
+  const nariGameSaveRef = useRef(nariGameSave)
+  nariGameSaveRef.current = nariGameSave
 
   // 캔버스 루프에서 최신 값을 읽어야 한다 — useAtBatRunner의 atBatRef와 같은 이유다.
   const progressRef = useRef(progress)
@@ -427,8 +436,9 @@ export function useCareerSession({
     [random, runner, setScreen],
   )
 
-  const beginGame = useCallback((aces: NariMatchAces | null) => {
-    const current = careerRef.current
+  const beginGame = useCallback((aces: NariMatchAces | null, from?: PlayerCareer) => {
+    // `from` — 메인 메뉴의 "곧장 경기"(0x327b8 모드 4 갈래)는 저장을 올린 그 자리에서 세운다(아직 그려지기 전이라 ref 가 옛 값)
+    const current = from ?? careerRef.current
     cupGameRef.current = null
     const opponent = current === null || current === undefined ? undefined : nextOpponentOf(current)
     startMatch(
@@ -486,6 +496,8 @@ export function useCareerSession({
     (finished: GameProgress, currentCareer: PlayerCareer) => {
       // 경기 장면 0x104 를 지나 나리 장면이 새로 선다 — 장면+0x288 이 0 (다음 142 에서 다시 굴린다)
       matchPreparedRef.current = false
+      // 정산 진입 0x4ea0c 의 0x4f3d6 — 전역기록 +0x4c + 모드(+0x50) = 0
+      nariGameSaveRef.current?.clear()
       const summary = summaryOf(finished)
       // 경기 후 평가 — 인기도 → 평판 → 사기 (0xa719c), 이어서 연속 기록 (0x8a6fc)
       const evaluation = evaluateGame(currentCareer, summary)
@@ -553,6 +565,8 @@ export function useCareerSession({
       const winner = won ? summary.ourTeamId : summary.opponentTeamId
       const loser = won ? summary.opponentTeamId : summary.ourTeamId
       cupGameRef.current = null
+      // 대회 경기도 정산 진입 0x4ea0c 를 지난다 — 0x4f3d6 은 모드를 가리지 않고 +0x4c + 모드 = 0
+      nariGameSaveRef.current?.clear()
       // 같은 날 CPU 경기 두 나라는 상대국 슬롯 레코드(base+0x934) 하나를 쓴다 — 사람 경기가 깎아 둔 그 레코드의
       // 투수 +0x2c 에서 선다 (701a7a9). 사람 경기 끝 상대 투수 칸별 값을 넘긴다
       setScreen({
@@ -933,14 +947,17 @@ export function useCareerSession({
       setCareer((current) => (current === null ? current : gainGamePoint(current, amount)))
     },
     startNewCareer: (name: string, profile: RookieProfile) => {
+      // 104 등록 확정 0x10fb4 — 전역기록 +0x40 + 모드 = 1 · +0x4c + 모드 = 0 (0x112b2 · 0x112c0)
+      nariGameSaveRef.current?.clear()
       saveGame.clear()
       setCareer(createCareer(name, profile))
       setScreen({ kind: '관리' })
       setManagementCheck('고정')
     },
 
-    /** 환경설정 [나만의리그 초기화] — 저장을 지운다 */
+    /** 환경설정 [나만의리그 초기화] — 저장을 지운다. 모드 저장 지우기 0x224ec(저장, 4) 가 +0x44 · +0x50 = 0 (0x225fa · 0x22602) */
     resetCareer: () => {
+      nariGameSaveRef.current?.clear()
       saveGame.clear()
       setSavedCareer(null)
       setCareer(null)
@@ -976,6 +993,26 @@ export function useCareerSession({
       if (point.kind === '다음경기순위') return setScreen({ kind: '다음경기순위', fromManagement: false })
       setScreen({ kind: '관리' })
       setManagementCheck('고정')
+    },
+
+    /**
+     * **곧장 경기** — [14] 타자편·[최근게임](모드 4)의 0x327b8 모드 3·4 갈래(3288e~328b4): 전역기록 `+0x44 && +0x50` 이면
+     * `0x213c0(앱, 4, 0)` 으로 타자편 저장을 올려 장면 0x104 → 셋업 0x39fdc 모드 3·4 갈래가 그 저장으로 경기를 새로 세운다
+     * (나리 경기는 반 이닝 저장이 없어 그만둔 경기를 처음부터 — 같은 일정·142 가 명부에 넣은 마선수 그대로). 장면 0x106 을
+     * 거치지 않아 142 진입(마선수 굴림)도 없다. 경기가 끝나면 나리 장면이 새로 서고 상태 100 0x1c154 로 이어진다.
+     * ⚠️ 웹 전용: 국가대항전 경기는 웹이 대회를 저장하지 않아 다시 세울 수 없다 — 이어하기(`continueSaved`)로 간다.
+     */
+    resumeInterruptedGame: (match: NariGameMatch | null): void => {
+      if (savedCareer === null) return
+      if (match?.isNationalCup === true) {
+        actions.continueSaved()
+        return
+      }
+      // 경기 뒤 나리 장면이 새로 선다 — 장면+0x288 = 0
+      matchPreparedRef.current = false
+      setMatchAces(match?.aces ?? null)
+      setCareer(savedCareer)
+      beginGame(match?.aces ?? null, savedCareer)
     },
 
     runCommand: (command: ManagementCommand) => {
@@ -1119,6 +1156,8 @@ export function useCareerSession({
      */
     confirmMatchPrepare: () => {
       if (career === null || screen.kind !== '경기준비') return
+      // 0x13cca — 전역기록 +0x4c + 모드(+0x50) = 1 · 저장. 명부(마선수)·S+0x12c 는 나리 저장이 들고 간다 — 웹은 그림자로 남긴다
+      nariGameSaveRef.current?.start({ aces: screen.cup === undefined ? matchAces : null, isNationalCup: screen.cup !== undefined })
       if (screen.cup !== undefined) {
         // 국가대항전 — 1c5fe 가 마선수를 안 넣었다. 경기가 끝나면 이 대회로 하루를 넘긴다 (`finishCupGame`)
         cupGameRef.current = screen.cup.cup
@@ -1438,8 +1477,12 @@ export function useCareerSession({
       return true
     },
 
-    /** 엔딩을 본 뒤 — 선수를 지우고 메인 메뉴로 (등록한 선수는 수집 기록에 남는다) */
+    /**
+     * 엔딩을 본 뒤 — 선수를 지우고 메인 메뉴로 (등록한 선수는 수집 기록에 남는다). 명예의 전당 등록은 0x62dbe 에서
+     * 모드 저장 지우기 0x224ec(저장, 4) 를 부른다 — +0x50 = 0. 등록 없이 끝나도 마지막 경기 정산이 이미 0 으로 두었다.
+     */
     finishEnding: () => {
+      nariGameSaveRef.current?.clear()
       saveGame.clear()
       setSavedCareer(null)
       setCareer(null)

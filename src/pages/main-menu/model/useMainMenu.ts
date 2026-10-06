@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { initialMainMenu, reduceMainMenu } from '@/pages/main-menu/model/mainMenu'
-import type { MainMenuAction, MainMenuEffect, MainMenuState } from '@/pages/main-menu/model/mainMenu'
+import type { MainMenuAction, MainMenuEffect, MainMenuState, NariGameReady } from '@/pages/main-menu/model/mainMenu'
 
 /**
  * 메뉴 상태와 화면 단위 키 입력 — 원본대로 ↑↓ 로 고르고 Enter 로 시작, Esc 로 뒤로 간다.
@@ -10,8 +10,15 @@ export function useMainMenu(
   hasSavedGame: boolean,
   isSheetOpen: boolean,
   onEffect: (effect: Exclude<MainMenuEffect, null>) => void,
-  /** 전역기록 칸 — +0x4d(일반모드 경기 중간 저장) · +0x3c(마지막 모드). 안 넘기면 저장 없음 · 1(새 저장 — 생성자 0x9f26c) */
-  globalRecord: { readonly isGeneralGameInProgress: boolean; readonly lastPlayedMode: number } = {
+  /**
+   * 전역기록 칸 — +0x4d(일반모드 경기 중간 저장) · +0x3c(마지막 모드) · 나리 두 편 `+0x40+m && +0x4c+m`.
+   * 안 넘기면 저장 없음 · 1(새 저장 — 생성자 0x9f26c) · 나리 곧장 경기 없음
+   */
+  globalRecord: {
+    readonly isGeneralGameInProgress: boolean
+    readonly lastPlayedMode: number
+    readonly nariGameReady?: NariGameReady
+  } = {
     isGeneralGameInProgress: false,
     lastPlayedMode: 1,
   },
@@ -31,8 +38,10 @@ export function useMainMenu(
 
   // setState 업데이터 안에서 부모 콜백을 부르면 StrictMode 가 두 번 부른다 — ref 로 읽고 한 번만 반영한다.
   const dispatchRef = useRef((action: MainMenuAction) => {
-    const { isGeneralGameInProgress, lastPlayedMode } = globalRecordRef.current
-    const result = reduceMainMenu(stateRef.current, action, hasSavedRef.current, isGeneralGameInProgress, lastPlayedMode)
+    const { isGeneralGameInProgress, lastPlayedMode, nariGameReady } = globalRecordRef.current
+    const result = reduceMainMenu(
+      stateRef.current, action, hasSavedRef.current, isGeneralGameInProgress, lastPlayedMode, nariGameReady,
+    )
     stateRef.current = result.state
     setState(result.state)
     if (result.effect !== null) onEffectRef.current(result.effect)

@@ -34,6 +34,7 @@ export interface MainMenuState {
    * 버튼 0 타자편(popup 고른 13 / 보통 11) · 1 투수편(14 / 12), CLR → −1. 0x749d5 를 안 불러 처음 커서는 0(타자편).
    * 갱신 0x2464c: 답 0 → this+0x13c = 4(타자편) · 1 → 3(투수편) → 상태 0x27 → 0x327b8(모드) → 장면 0x106,
    * −1 → 상태 5. 장면 셋업 0xf684 가 전역기록 +0x40 + 모드(그 편 커리어 있음)면 이어하기(100), 없으면 팀 고르기(101).
+   * 단 0x327b8 의 모드 3·4 갈래는 `+0x40+m && +0x4c+m`(그 편 경기 중간 저장)이면 장면 0x106 대신 곧장 경기다(`nariEditionEffectOf`).
    */
   readonly isPickingNariEdition: boolean
   /** 못 들어가는 칸을 골랐을 때 뜨는 안내 (원본 팝업 0x74ef5 종류 1 자리). null 이면 안 뜬다. */
@@ -85,8 +86,10 @@ export type MainMenuAction =
 /** 메뉴 밖으로 나가야 하는 결과. null 이면 메뉴 안에서 끝난다. */
 export type MainMenuEffect =
   | '미션' | '홈런더비' | '시즌모드' | '일반모드' | '타이틀로'
-  /** 나만의리그 [14] 답 0 · 1 — 모드 4 타자편 · 모드 3 투수편 (0x2464c) */
+  /** 나만의리그 [14] 답 0 · 1 — 모드 4 타자편 · 모드 3 투수편 (0x2464c) → 0x327b8 모드 3·4 갈래의 장면 0x106 */
   | '나리타자편' | '나리투수편'
+  /** 같은 갈래의 "곧장 경기" — `+0x40+m && +0x4c+m` 이면 0x213c0(앱, m, 0) 으로 그 편 저장을 올려 장면 0x104 (0x328b4) */
+  | '나리타자편경기' | '나리투수편경기'
   /** 일반모드 빠른실행 — 하위 22(경기정보)로 곧바로, this+0x14c = 1 (0x299f8 · 0x2992a) */
   | '일반모드빠른실행'
   /** 일반모드 중간 저장 이어하기 — 상태 0x27 → 0x327b8 이 0x213c0(앱, 1, 0) 으로 올려 경기 장면으로 */
@@ -156,6 +159,26 @@ function answerGeneralModeWindow(
 }
 
 /**
+ * 0x327b8 모드 3·4 갈래가 보는 두 칸 — 편마다 `전역기록 +0x40 + m`(그 편 커리어 있음) && `+0x4c + m`(그 편 경기 중간 저장됨,
+ * 투수편 +0x4f · 타자편 +0x50). 둘 다 서 있으면 참이다. 부르는 쪽이 계산해 넘긴다.
+ */
+export interface NariGameReady {
+  readonly 투수편: boolean
+  readonly 타자편: boolean
+}
+
+const NO_NARI_GAME_READY: NariGameReady = { 투수편: false, 타자편: false }
+
+/**
+ * 0x327b8(this, 3|4) — `(+0x40+m && +0x4c+m)` ? 0x213c0(앱, m, 0) · 장면 0x104(곧장 경기) : 0x140006c = 0x69 · 장면 0x106.
+ * [14] 편 고르기(0x2464c → 상태 0x27)와 [최근게임](0x28d54 → 상태 0x27)이 같은 이 갈래를 지난다.
+ */
+function nariEditionEffectOf(edition: '타자편' | '투수편', ready: NariGameReady): Exclude<MainMenuEffect, null> {
+  if (edition === '타자편') return ready.타자편 ? '나리타자편경기' : '나리타자편'
+  return ready.투수편 ? '나리투수편경기' : '나리투수편'
+}
+
+/**
  * **[최근게임]** — 게임시작 목록 커서 0 의 OK (0x28cb0 → 표 0xcebb0[0] = 11 → 0x28d54, 2026-10-06 직접 다시 뜸).
  * ```
  * 28d5e m = 전역기록(0x1f1d9)+0x3c (마지막 모드) → this+0x13c = m
@@ -173,8 +196,8 @@ function answerGeneralModeWindow(
  * 8·9 328f0 +0x4c+m ? 0x213c0(앱,m,0) · 장면 0x104 : 상태 15 (대전 통신)
  * 그 밖(0) 점프표 밖 — 0x1f1b9 만 하고 돌아온다
  * ```
- * 웹: 시즌 +0x4e 는 웹 시즌 경기에 중간 저장이 없어 늘 0 → 장면 0x105(`시즌모드`). 나리 +0x4f/+0x50 은 웹에 칸이 없어 늘 0 →
- * 장면 0x106(그 편 고르기 뒤와 같은 `나리투수편`/`나리타자편`). 대전(8·9)은 통신이라 웹에 없고 +0x3c 에 들어올 수도 없다.
+ * 웹: 시즌 +0x4e 는 웹 시즌 경기에 중간 저장이 없어 늘 0 → 장면 0x105(`시즌모드`). 나리 3·4 는 [14] 와 같은 갈래
+ * (`nariEditionEffectOf` — +0x4f/+0x50 은 `entities/mode-save`). 대전(8·9)은 통신이라 웹에 없고 +0x3c 에 들어올 수도 없다.
  * 새 저장의 +0x3c 는 전역기록 생성자 0x9f26c 가 넣는 1 이다(0x9f334) — 처음 켠 게임의 [최근게임] 은 모드 1 갈래로 간다.
  * 원본에서 m = 0 은 나올 수 없다(+0x3c 를 쓰는 곳은 0x327e8 · 0x328de · 0x31360 과 생성자뿐). 웹은 망가진 저장 대비로
  * 아무 일도 안 하고 목록에 남는다.
@@ -183,6 +206,7 @@ export function recentGameOf(
   state: MainMenuState,
   lastPlayedMode: number,
   isGeneralGameInProgress: boolean,
+  nariGameReady: NariGameReady = NO_NARI_GAME_READY,
 ): MainMenuResult {
   if (lastPlayedMode === 5 || lastPlayedMode === 6) return { state, effect: '미션' }
   if (lastPlayedMode === 7) return { state, effect: '홈런더비' }
@@ -192,8 +216,8 @@ export function recentGameOf(
     return { state: { ...state, generalModeWindow: { kind: '진입', initialSelected } }, effect: null }
   }
   if (lastPlayedMode === 2) return { state, effect: '시즌모드' }
-  if (lastPlayedMode === 3) return { state, effect: '나리투수편' }
-  if (lastPlayedMode === 4) return { state, effect: '나리타자편' }
+  if (lastPlayedMode === 3) return { state, effect: nariEditionEffectOf('투수편', nariGameReady) }
+  if (lastPlayedMode === 4) return { state, effect: nariEditionEffectOf('타자편', nariGameReady) }
   return { state, effect: null }
 }
 
@@ -238,6 +262,8 @@ export function reduceMainMenu(
   isGeneralGameInProgress = false,
   /** 전역기록 +0x3c — 마지막으로 시작한 모드 (새 저장은 1 — 생성자 0x9f26c). [최근게임] 이 이 값으로 갈라진다 */
   lastPlayedMode = 1,
+  /** 나리 두 편의 `+0x40+m && +0x4c+m` — [14]·[최근게임] 의 모드 3·4 갈래가 곧장 경기로 갈지 본다 */
+  nariGameReady: NariGameReady = NO_NARI_GAME_READY,
 ): MainMenuResult {
   const stay = (next: MainMenuState): MainMenuResult => ({ state: next, effect: null })
 
@@ -253,8 +279,8 @@ export function reduceMainMenu(
   if (state.isPickingNariEdition) {
     if (action.type !== '창답') return stay(state)
     const close = { ...state, isPickingNariEdition: false }
-    if (action.answer === 0) return { state: close, effect: '나리타자편' }
-    if (action.answer === 1) return { state: close, effect: '나리투수편' }
+    if (action.answer === 0) return { state: close, effect: nariEditionEffectOf('타자편', nariGameReady) }
+    if (action.answer === 1) return { state: close, effect: nariEditionEffectOf('투수편', nariGameReady) }
     // −1(CLR) → 상태 5 게임시작 목록
     return stay(close)
   }
@@ -276,7 +302,7 @@ export function reduceMainMenu(
       return stay(select(next.id))
     }
     case '시작':
-      return start(state, hasSavedGame, isGeneralGameInProgress, lastPlayedMode)
+      return start(state, hasSavedGame, isGeneralGameInProgress, lastPlayedMode, nariGameReady)
     case '뒤로':
       // 게임시작 목록의 CLR(−16) 은 처음 메뉴로 돌아간다 — 0x28cb0 의 `0xbcb49(this+0x18, 4)` (확정)
       if (state.tier === 5) return stay({ ...state, tier: 4 })
@@ -291,6 +317,7 @@ function start(
   hasSavedGame: boolean,
   isGeneralGameInProgress: boolean,
   lastPlayedMode: number,
+  nariGameReady: NariGameReady,
 ): MainMenuResult {
   const entries = entriesOf(state.tier)
   const entry = entries.find((candidate) => candidate.id === selectedIdOf(state))
@@ -314,7 +341,7 @@ function start(
     return { state, effect: null }
   }
 
-  if (entry.id === '최근게임') return recentGameOf(state, lastPlayedMode, isGeneralGameInProgress)
+  if (entry.id === '최근게임') return recentGameOf(state, lastPlayedMode, isGeneralGameInProgress, nariGameReady)
   if (entry.id === '미션모드') return { state, effect: '미션' }
   if (entry.id === '홈런더비') return { state, effect: '홈런더비' }
   // 시즌모드는 저장이 따로라 나만의리그처럼 지워도 되는지 묻지 않는다 (0x22755 는 다른 칸)

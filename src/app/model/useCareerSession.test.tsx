@@ -23,6 +23,7 @@ import { summaryOf } from '@/features/play-game/model/gameFlow'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 import { BATTER_GP_ITEMS } from '@/entities/career/model/gpItems'
+import type { NariGameMatch, NariGameSavePort } from '@/pages/management/lib/nariMatchPrepare'
 
 /**
  * 나만의리그 연말 국가대표 사슬 — 연봉 사슬이 끝나면 상태 133(선발 판정)이 끼고,
@@ -982,5 +983,69 @@ describe('칭호는 관리 화면에서 하나씩 — 판정 0x1a1c0 (0x1afac) �
     act(() => 세션().actions.confirmTitle())
     expect(세션().career?.equippedTitle).toBe(7)
     expect(세션().pendingTitle).toBeNull()
+  })
+})
+
+describe('전역기록 +0x50(모드 4 경기 중간 저장) — 142 확인이 세우고, [14]·[최근게임] 이 곧장 경기로 연다 (0x327b8 3288e~328b4)', () => {
+  const 손잡이 = () => {
+    const calls: (NariGameMatch | '지움')[] = []
+    const port: NariGameSavePort = { start: (match) => calls.push(match), clear: () => calls.push('지움') }
+    return { calls, port }
+  }
+  const 띄우기2 = (saved: PlayerCareer | null, port: NariGameSavePort) => {
+    const saveGame = 메모리저장(saved)
+    const random = createSeededRandom(20100901)
+    return renderHook(() => {
+      const [screen, setScreen] = useState<Screen>({ kind: '메인메뉴' })
+      const runner = useAtBatRunner()
+      return { screen, session: useCareerSession({ runner, random, saveGame, screen, setScreen, nariGameSave: port }) }
+    })
+  }
+
+  it('142 확인 0x13cca — 굴린 마선수와 함께 +0x50 = 1, 국가대항전은 마선수 없이 S+0x12c 표시', () => {
+    const { calls, port } = 손잡이()
+    const rendered = 띄우기2({ ...createCareer('중간'), gamesPlayed: 4 }, port)
+    act(() => rendered.result.current.session.actions.continueSaved())
+    act(() => rendered.result.current.session.actions.runCommand('다음경기'))
+    act(() => rendered.result.current.session.actions.confirmNextGameStandings())
+    const aces = rendered.result.current.session.matchAces
+    act(() => rendered.result.current.session.actions.confirmMatchPrepare())
+    expect(calls).toEqual([{ aces, isNationalCup: false }])
+
+    const 대회 = 손잡이()
+    const cupRendered = 띄우기2(목표달성선수(), 대회.port)
+    act(() => cupRendered.result.current.session.actions.continueSaved())
+    act(() => cupRendered.result.current.session.actions.startCupGame({ myTeam: 10, opponent: 11 }, createNationalCup()))
+    act(() => cupRendered.result.current.session.actions.confirmMatchPrepare())
+    expect(대회.calls).toEqual([{ aces: null, isNationalCup: true }])
+  })
+
+  it('곧장 경기 — 저장된 선수로 142 없이 경기를 처음부터 세우고, 남겨 둔 마선수를 싣는다(굴림 없음)', () => {
+    const { calls, port } = 손잡이()
+    const aces = { myBatter: 0, myPitcher: 0, opponentPitcher: 2, opponentBatter: 3 }
+    const rendered = 띄우기2({ ...createCareer('곧장'), gamesPlayed: 4, seasonEndState: 109 }, port)
+    act(() => rendered.result.current.session.actions.resumeInterruptedGame({ aces, isNationalCup: false }))
+    expect(rendered.result.current.screen).toEqual({ kind: '경기' })
+    expect(rendered.result.current.session.career?.name).toBe('곧장')
+    expect(rendered.result.current.session.matchAces).toEqual(aces)
+    expect(rendered.result.current.session.progress?.aces?.ours).toEqual({ batter: 0, pitcher: 0 })
+    expect(rendered.result.current.session.progress?.aces?.opponent).toEqual({ batter: 3, pitcher: 2 })
+    // 0x327b8 의 모드 3·4 갈래는 +0x4c + 모드를 다시 쓰지 않는다 (경기 장면 셋업 0x3a342 가 같은 1)
+    expect(calls).toEqual([])
+  })
+
+  it('곧장 경기 — 국가대항전이었다면 웹은 대회를 다시 세울 수 없어 이어하기로 간다 (웹 전용)', () => {
+    const { port } = 손잡이()
+    const rendered = 띄우기2({ ...createCareer('대회'), gamesPlayed: 4 }, port)
+    act(() => rendered.result.current.session.actions.resumeInterruptedGame({ aces: null, isNationalCup: true }))
+    expect(rendered.result.current.screen).toEqual({ kind: '관리' })
+    expect(rendered.result.current.session.progress).toBeNull()
+  })
+
+  it('모드 초기화(나만의리그 초기화) → 모드 저장 지우기 0x224ec(저장, 4) 는 +0x50 = 0', () => {
+    const { calls, port } = 손잡이()
+    const rendered = 띄우기2(null, port)
+    act(() => rendered.result.current.session.actions.resetCareer())
+    expect(calls).toEqual(['지움'])
   })
 })

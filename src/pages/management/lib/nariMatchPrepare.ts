@@ -102,6 +102,53 @@ export function nariMatchCancelTargetOf(state: { readonly isNationalCup: boolean
   return state.isPostseason ? '포스트시즌' : '다음경기순위'
 }
 
+/**
+ * **142 확인 때 두 팀 명부에 든 것** — ⚠️ 웹 전용 그림자.
+ *
+ * 원본은 이것을 나리 저장이 들고 있다: 마선수는 0xb88c8 · 0xb8870 이 넣은 나리 팀 레코드, 국가대항전은 S+0x12c. 142 확인이
+ * 전역기록 +0x4c + 모드 = 1 과 함께 저장하므로, [최근게임]·[14] 의 "곧장 경기"(0x327b8 모드 3·4 갈래 → `0x213c0(앱, m, 0)` →
+ * 장면 0x104 → 셋업 0x39fdc 모드 3·4 갈래)가 그 저장으로 같은 경기를 처음부터 다시 세운다. 웹은 그 레코드와 대회를 저장하지
+ * 않아 모드 저장 칸(`entities/mode-save` 의 `nariGames[m].match`)에 이것을 남긴다.
+ */
+export interface NariGameMatch {
+  /** 142 진입이 굴려 넣은 마선수 — 국가대항전은 넣지 않는다(1c5fe) */
+  readonly aces: NariMatchAces | null
+  /** S+0x12c — 국가대항전 경기 */
+  readonly isNationalCup: boolean
+}
+
+/** 전역기록 +0x4c + 모드 칸을 쓰고 지우는 손잡이 — 앱이 모드 저장 칸(`useModeSave`)으로 잇는다 */
+export interface NariGameSavePort {
+  /** 142 확인 0x13cca(경기 장면 셋업 0x3a342 도 같은 1) — +0x4c + 모드 = 1 */
+  readonly start: (match: NariGameMatch) => void
+  /** +0x4c + 모드 = 0 — 104 등록 확정 0x112c0 · 경기 끝 정산 진입 0x4f3d6 · 모드 저장 지우기 0x224ec */
+  readonly clear: () => void
+}
+
+const isAceIndex = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isInteger(value) && value >= NO_NARI_ACE && value < ACE_SLOTS
+
+/** 모드 저장 칸에서 읽은 값을 가려 낸다 — 꼴이 안 맞으면 null(마선수 없이 국가대항전 아님으로 본다) */
+export function nariGameMatchOfSave(raw: unknown): NariGameMatch | null {
+  if (raw === null || typeof raw !== 'object') return null
+  const value = raw as Partial<Record<keyof NariGameMatch, unknown>>
+  const aces = value.aces as Partial<Record<keyof NariMatchAces, unknown>> | null | undefined
+  const validAces = aces !== null && aces !== undefined && typeof aces === 'object'
+    && isAceIndex(aces.myBatter) && isAceIndex(aces.myPitcher)
+    && isAceIndex(aces.opponentPitcher) && isAceIndex(aces.opponentBatter)
+    ? (aces as NariMatchAces)
+    : null
+  return {
+    aces: validAces === null ? null : {
+      myBatter: validAces.myBatter,
+      myPitcher: validAces.myPitcher,
+      opponentPitcher: validAces.opponentPitcher,
+      opponentBatter: validAces.opponentBatter,
+    },
+    isNationalCup: value.isNationalCup === true,
+  }
+}
+
 /** 구장 번호가 그대로인 팀의 끝 — 기본 열 팀 0~9 (0x78664 의 `cmp r1, #9`) */
 const LAST_HOME_STADIUM_TEAM = 9
 /** 히든 팀 홈이면 고르는 구장 수 — `bfa55(0, 10)` */

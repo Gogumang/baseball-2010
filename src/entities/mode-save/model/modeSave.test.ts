@@ -7,6 +7,8 @@ import {
   withGeneralGameSaved,
   withGeneralGameStarted,
   withLastPlayedMode,
+  withNariGameCleared,
+  withNariGameStarted,
 } from '@/entities/mode-save/model/modeSave'
 
 describe('모드 저장 칸 — 전역기록 +0x3c · +0x4d · 모드 1 블록', () => {
@@ -30,7 +32,7 @@ describe('모드 저장 칸 — 전역기록 +0x3c · +0x4d · 모드 1 블록',
 
   it('경기정보 OK 0x3136e — +0x3c = 1 · +0x4d = 1 · 블록, 반 이닝 저장은 블록만, 정산 진입은 +0x4d = 0', () => {
     const 시작 = withGeneralGameStarted(withLastPlayedMode(EMPTY_MODE_SAVE, 4), { 회: 1 })
-    expect(시작).toEqual({ lastPlayedMode: 1, isGeneralGameInProgress: true, generalGame: { 회: 1 } })
+    expect(시작).toEqual({ ...EMPTY_MODE_SAVE, lastPlayedMode: 1, isGeneralGameInProgress: true, generalGame: { 회: 1 } })
     const 반이닝 = withGeneralGameSaved(시작, { 회: 3 })
     expect(반이닝.generalGame).toEqual({ 회: 3 })
     expect(반이닝.isGeneralGameInProgress).toBe(true)
@@ -42,5 +44,36 @@ describe('모드 저장 칸 — 전역기록 +0x3c · +0x4d · 모드 1 블록',
     expect(끝.isGeneralGameInProgress).toBe(false)
     expect(끝.generalGame).toBeNull()
     expect(끝.lastPlayedMode).toBe(1)
+  })
+
+  describe('나리 +0x4f(모드 3) · +0x50(모드 4)', () => {
+    it('옛 세이브(칸 없음)는 두 편 다 경기 저장 없음', () => {
+      const 옛것 = normalizeModeSave({ lastPlayedMode: 4, isGeneralGameInProgress: false, generalGame: null })
+      expect(옛것.nariGames[3]).toEqual({ isInProgress: false, match: null })
+      expect(옛것.nariGames[4]).toEqual({ isInProgress: false, match: null })
+    })
+
+    it('142 확인 0x13cca 가 그 편만 1 — 명부 그림자와 함께, 다른 칸은 그대로', () => {
+      const 타자 = withNariGameStarted(EMPTY_MODE_SAVE, 4, { aces: null, isNationalCup: false })
+      expect(타자.nariGames[4]).toEqual({ isInProgress: true, match: { aces: null, isNationalCup: false } })
+      expect(타자.nariGames[3].isInProgress).toBe(false)
+      expect(타자.lastPlayedMode).toBe(EMPTY_MODE_SAVE.lastPlayedMode)
+      // 저장소를 거쳐도 그대로 읽힌다
+      expect(normalizeModeSave(JSON.parse(JSON.stringify(타자)))).toEqual(타자)
+    })
+
+    it('등록 0x112c0 · 정산 0x4f3d6 · 지우기 0x224ec 는 그 편만 0', () => {
+      const 둘다 = withNariGameStarted(withNariGameStarted(EMPTY_MODE_SAVE, 3, {}), 4, {})
+      const 투수끝 = withNariGameCleared(둘다, 3)
+      expect(투수끝.nariGames[3]).toEqual({ isInProgress: false, match: null })
+      expect(투수끝.nariGames[4].isInProgress).toBe(true)
+      // 이미 0 이면 같은 값
+      expect(withNariGameCleared(투수끝, 3)).toBe(투수끝)
+    })
+
+    it('일반모드 정산(+0x4d = 0)은 나리 칸을 안 건드린다', () => {
+      const 나리 = withNariGameStarted(EMPTY_MODE_SAVE, 3, {})
+      expect(withGeneralGameFinished(나리).nariGames[3].isInProgress).toBe(true)
+    })
   })
 })

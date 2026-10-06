@@ -21,6 +21,7 @@ import type { HallOfFameDeletion } from '@/pages/special/ui/SpecialScreen'
 import { ACE_PHASE, AceSelectScreen } from '@/pages/general-mode'
 import { TitleScreen } from '@/pages/title/ui/TitleScreen'
 import { MainMenuScreen } from '@/pages/main-menu/ui/MainMenuScreen'
+import type { NariGameReady } from '@/pages/main-menu/model/mainMenu'
 import { CreatePlayerScreen } from '@/pages/create-player/ui/CreatePlayerScreen'
 import { TeamSelectScreen } from '@/pages/create-player/ui/TeamSelectScreen'
 import { HelpScreen } from '@/pages/help/ui/HelpScreen'
@@ -68,6 +69,10 @@ interface EntryRoutesProps {
   readonly onLastPlayedMode?: (mode: number) => void
   /** 일반모드 이어하기 — 상태 0x27 → 0x327b8(this, 1) → 0x213c0(앱, 1, 0) → 장면 0x104 */
   readonly onResumeGeneralGame?: () => void
+  /** 나리 두 편의 `전역기록 +0x40+m && +0x4c+m` (+0x4f · +0x50) — [14]·[최근게임] 의 모드 3·4 갈래 */
+  readonly nariGameReady?: NariGameReady
+  /** 그 갈래의 곧장 경기 — 0x213c0(앱, m, 0) 으로 그 편 저장을 올려 장면 0x104 */
+  readonly onResumeNariGame?: (edition: '타자편' | '투수편') => void
 }
 
 /** 원본 모드 번호 — 0x327b8 이 +0x3c 에 적는 값 */
@@ -81,6 +86,7 @@ export function EntryRoutes({
   screen, setScreen, session, gameSettings, collection, random, wallet, aceSelect, hallOfFameDeletion, claimCollectionReward,
   onRenamePlayer, onResetEditedNames, onStartGeneralMode,
   isGeneralGameInProgress = false, lastPlayedMode = 1, onLastPlayedMode, onResumeGeneralGame,
+  nariGameReady, onResumeNariGame,
 }: EntryRoutesProps) {
   /** 전부 수집 보상 팝업 글 (0x292f8 의 `0xbbef9(글, 1, −1, 1)`) — 메뉴 위에 뜬다 */
   const [collectionRewardText, setCollectionRewardText] = useState<string | null>(null)
@@ -256,6 +262,14 @@ export function EntryRoutes({
       hasSavedGame={session.savedCareer !== null}
       isGeneralGameInProgress={isGeneralGameInProgress}
       lastPlayedMode={lastPlayedMode}
+      {...(nariGameReady === undefined ? {} : { nariGameReady })}
+      // 0x327b8 모드 3·4 갈래의 곧장 경기(0x328b4) — 머리 327e8 이 먼저 +0x3c = m 을 적는다
+      {...(onResumeNariGame === undefined ? {} : {
+        onResumeNariGame: (edition: '타자편' | '투수편') => {
+          onLastPlayedMode?.(edition === '투수편' ? NARI_PITCHER_MODE : NARI_BATTER_MODE)
+          onResumeNariGame(edition)
+        },
+      })}
       // 나만의리그 편 고르기 창 [14](하위 13)은 메인 메뉴 위에 뜬다. 고른 편 → 0x327b8(모드 4|3) → 장면 0x106 셋업 0xf684:
       // 그 편 커리어(전역기록 +0x40 + 모드)가 있으면 이어하기(100), 없으면 팀 고르기(101). 지울지 묻는 창은 없다.
       // 투수편은 PitcherLeagueRoute 가 커리어 유무로 등록/관리를 가른다.

@@ -18,6 +18,7 @@ import { ORIGINAL_EVENTS } from '@/shared/config/original/events'
 import { rewardsIn } from '@/entities/story/model/eventReward'
 import type { EventReward } from '@/entities/story/model/eventReward'
 import { OUTING_PLACES } from '@/shared/config/outingPlaces'
+import type { NariGameMatch, NariGameSavePort } from '@/pages/management/lib/nariMatchPrepare'
 
 /** 나만의리그 투수편 한 판 (원본 모드 3, 장면 0x106) — 저장·장면 전환만 본다 */
 
@@ -1266,5 +1267,59 @@ describe('투수편 칭호도 관리 화면에서 하나씩 — 0x1a1c0 · 0x127
     act(() => result.current.actions.confirmTitle())
     expect(result.current.career?.equippedTitle).toBe(7)
     expect(result.current.pendingTitle).toBeNull()
+  })
+})
+
+describe('전역기록 +0x4f(모드 3 경기 중간 저장) — 142 확인 · 등록 · 정산 · 곧장 경기 (0x13cca · 0x112c0 · 0x4f3d6 · 0x327b8)', () => {
+  const 경기요약 = {
+    result: '승',
+    seasonDelta: { outs: 21, runsAllowed: 1, strikeouts: 5, pitches: 90, wins: 1, losses: 0, saves: 0 },
+    stamina: 3000,
+    pitchCount: 90,
+    hasEntered: true,
+    recordIds: [],
+    record: { outsRecorded: 21 },
+    evaluation: { popularityChange: 0, reputationChange: 0, moraleChange: 0, countedCompleteGame: '없음' },
+  } as unknown as Parameters<ReturnType<typeof 띄우기>['result']['current']['actions']['finishGame']>[0]
+
+  const 손잡이띄우기 = () => {
+    const calls: (NariGameMatch | '지움')[] = []
+    const port: NariGameSavePort = { start: (match) => calls.push(match), clear: () => calls.push('지움') }
+    const store = 메모리저장()
+    const rendered = renderHook(() => usePitcherLeagueSession(
+      store, createSeededRandom(20100901), false, null, null, true, undefined, undefined, undefined, undefined, port,
+    ))
+    return { calls, rendered, store, port }
+  }
+
+  it('등록 0x112c0 이 0, 142 확인이 굴린 마선수와 함께 1, 경기 끝 정산이 0', () => {
+    const { calls, rendered } = 손잡이띄우기()
+    const { result } = rendered
+    act(() => result.current.actions.create('투수', 신인))
+    expect(calls).toEqual(['지움'])
+    act(() => result.current.actions.save({ ...result.current.career!, gamesPlayed: 4 }))
+    act(() => result.current.actions.openNextGameStandings())
+    act(() => result.current.actions.confirmNextGameStandings())
+    const aces = result.current.matchAces
+    act(() => result.current.actions.confirmMatchPrepare())
+    expect(calls).toEqual(['지움', { aces, isNationalCup: false }])
+    act(() => result.current.actions.finishGame(경기요약))
+    expect(calls).toEqual(['지움', { aces, isNationalCup: false }, '지움'])
+  })
+
+  it('곧장 경기 — 142 를 거치지 않고(굴림 없음) 남겨 둔 마선수로 경기를 처음부터 세운다', () => {
+    const { calls, rendered } = 손잡이띄우기()
+    const { result } = rendered
+    act(() => result.current.actions.create('투수', 신인))
+    act(() => result.current.actions.save({ ...result.current.career!, gamesPlayed: 4, seasonEndState: 109 }))
+    const aces = { myBatter: 0, myPitcher: 0, opponentPitcher: 4, opponentBatter: 1 }
+    act(() => result.current.actions.resumeInterruptedGame({ aces, isNationalCup: false }))
+    expect(result.current.scene).toBe('경기')
+    expect(result.current.matchAces).toEqual(aces)
+    expect(result.current.gameOptions?.aces).toMatchObject({
+      ours: { batter: 0, pitcher: 0 },
+      opponent: { batter: 1, pitcher: 4 },
+    })
+    expect(calls).toEqual(['지움'])
   })
 })

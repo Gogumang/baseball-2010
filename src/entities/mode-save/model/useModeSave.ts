@@ -8,8 +8,10 @@ import {
   withGeneralGameSaved,
   withGeneralGameStarted,
   withLastPlayedMode,
+  withNariGameCleared,
+  withNariGameStarted,
 } from '@/entities/mode-save/model/modeSave'
-import type { ModeSave } from '@/entities/mode-save/model/modeSave'
+import type { ModeSave, NariLeagueMode } from '@/entities/mode-save/model/modeSave'
 
 export interface ModeSaveSession {
   readonly save: ModeSave
@@ -23,6 +25,10 @@ export interface ModeSaveSession {
   readonly resumeGeneralGame: () => void
   /** 경기 끝 정산 진입 0x4ea0c — +0x4d = 0 */
   readonly finishGeneralGame: () => void
+  /** 나리 142 확인 0x13cca — +0x4c + 모드 = 1 (`match` = 그때 명부에 든 것, 웹 그림자) */
+  readonly startNariGame: (mode: NariLeagueMode, match: object | null) => void
+  /** 나리 +0x4c + 모드 = 0 — 104 등록 확정 0x112c0 · 정산 진입 0x4f3d6 · 모드 저장 지우기 0x224ec */
+  readonly clearNariGame: (mode: NariLeagueMode) => void
 }
 
 /**
@@ -50,9 +56,16 @@ export function useModeSave(store: JsonStorePort, legacyLastPlayedMode = NEW_SAV
   const saveGeneralGame = useCallback((game: object) => update((current) => withGeneralGameSaved(current, game)), [update])
   const resumeGeneralGame = useCallback(() => update(withGeneralGameResumed), [update])
   const finishGeneralGame = useCallback(() => update(withGeneralGameFinished), [update])
+  const startNariGame = useCallback(
+    (mode: NariLeagueMode, match: object | null) => update((current) => withNariGameStarted(current, mode, match)),
+    [update],
+  )
+  const clearNariGame = useCallback((mode: NariLeagueMode) => update((current) => withNariGameCleared(current, mode)), [update])
 
   return useMemo(
-    () => ({ save, setLastPlayedMode, startGeneralGame, saveGeneralGame, resumeGeneralGame, finishGeneralGame }),
-    [save, setLastPlayedMode, startGeneralGame, saveGeneralGame, resumeGeneralGame, finishGeneralGame],
+    () => ({
+      save, setLastPlayedMode, startGeneralGame, saveGeneralGame, resumeGeneralGame, finishGeneralGame, startNariGame, clearNariGame,
+    }),
+    [save, setLastPlayedMode, startGeneralGame, saveGeneralGame, resumeGeneralGame, finishGeneralGame, startNariGame, clearNariGame],
   )
 }
