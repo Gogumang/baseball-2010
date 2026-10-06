@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { BigResult, Hint, PixelScreen } from '@/shared/ui'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
@@ -58,6 +58,8 @@ interface HomeRunDerbyScreenProps {
 /** 홈런더비 = 원본 전역 모드 7 — 경기 중 메뉴 표 0xcfcfc 의 **행 1**(자동진행 자리에 다시하기) */
 const DERBY_MODE = 7
 type MenuOverlay = '조작방법' | '설정'
+/** 상태 0xe 의 OK — 원본 키 −5(OK)·'5'(0x35) (0x532b0). 웹은 Enter·스페이스를 OK 로 받는다 (스윙 키와 같은 묶음) */
+const CONFIRM_KEYS: ReadonlySet<string> = new Set(['Enter', ' ', '5'])
 
 /**
  * 홈런더비 (게임 모드 7) — `docs/re/H-modes.md` H-2 절의 규칙 전체를 옮긴 화면이다.
@@ -89,6 +91,20 @@ export function HomeRunDerbyScreen({
   const menu = useInGameMenuState()
   const isMenuOpen = menu.isOpen
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
+
+  // 상태 0xe — 사람 OK 를 기다린다 (0x532b0). 경기 중 메뉴·조작방법·설정이 떠 있으면 경기 키가 안 간다(일시정지 팝업 0x754f9)
+  const acceptsConfirm = session.isAwaitingConfirm && session.result === null && !isMenuOpen && overlay === null
+  const { confirm } = session
+  useEffect(() => {
+    if (!acceptsConfirm) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat || !CONFIRM_KEYS.has(event.key)) return
+      event.preventDefault()
+      confirm()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [acceptsConfirm, confirm])
 
   // 경기 중 메뉴의 "설정"(0x3c326). "조작방법"(0x3c212)은 아래에서 경기 장면 위에 얹는다
   if (overlay === '설정' && settings !== undefined && onSettingsChange !== undefined) {
@@ -157,7 +173,8 @@ export function HomeRunDerbyScreen({
             }
           />
         )}
-        <div className={styles.stageArea}>
+        {/* 0xe 에서 화면을 누르면 OK 로 본다 (터치용 웹판 편의 — 캔버스 탭이 스윙인 것과 같은 자리) */}
+        <div className={styles.stageArea} onClick={acceptsConfirm ? confirm : undefined}>
           <BattingStage
             batterAbility={ability}
             batterForm={batterForm}

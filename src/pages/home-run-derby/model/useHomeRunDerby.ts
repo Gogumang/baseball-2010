@@ -8,6 +8,7 @@ import {
   applyDerbyPitch,
   createDerbyRun,
   derbyResultOf,
+  derbySceneStateAfter,
   endComboDisplay,
   shouldShowComboAtNextPitch,
 } from '@/entities/home-run-derby/model/derbyRun'
@@ -22,6 +23,13 @@ import { millisecondsPerFrame } from '@/shared/config/frameRate'
 
 /** 공 하나의 결과를 보여 주는 시간 — 타석 화면들이 쓰는 값과 같다 (원본에 없는 웹판 연출) */
 const BANNER_MILLISECONDS = 1_500
+
+/**
+ * 상태 0xe 에 들어선 뒤 OK 를 안 받는 갱신 수 — 키 처리 0x498d4 끝(0x49a26~0x49a30)이
+ * `[장면+0x1c] == 0xe && [장면+0x2c](이 상태의 틱) ≤ 2` 이면 사람 조작 객체에 키를 넘기지 않는다.
+ * 진입 틱을 0 으로 세어 틱 0·1·2 셋을 거른다 (⚠️ 틱 0 이 진입 틱인지는 유력 — 0xbca05 의 +0x2c 올리는 자리를 안 봤다).
+ */
+export const CONFIRM_LOCK_FRAMES = 3
 
 export interface HomeRunDerbyOptions {
   /** 저장된 최고 비거리 (저장 +0x5c, u16) */
@@ -59,8 +67,19 @@ export interface HomeRunDerbySession {
   readonly pitcher: DerbyPitcher
   /** 공 하나가 끝난 뒤 띄우는 문구. 비어 있으면 안내 줄을 보여 준다 */
   readonly banner: string
-  /** 결과를 보여 주는 동안은 새 공을 안 던진다 */
+  /** 결과를 보여 주는 동안·상태 0xe 에서 OK 를 기다리는 동안은 새 공을 안 던진다 */
   readonly isPaused: boolean
+  /**
+   * **상태 0xe — 사람 OK 를 기다리는 중**. 경기 첫 공 앞(적재 8 → 0xd, 0x3fa50)·단계가 올라 새 마투수가 설 때·보너스 게임을
+   * 열 때(0xae3e8/0xae24c → 0xd) 0xd 를 지나 0xe 로 온다. 0xe 는 시간 제한·자동 진행이 없다 — 갱신 0x39bd4 는 모드 7 이면
+   * 아무것도 안 하고(0x39bde `cmp r3,#7`), CPU 조작 객체 0x53874 는 0xf·0x10·0x11 만 본다.
+   */
+  readonly isAwaitingConfirm: boolean
+  /**
+   * 0xe 의 OK — 사람 조작 객체 키 0x532b0: 키 == −5(OK) 또는 '5'(0x35) 이면 메시지 1(인자 = 지금 상태 0xe) →
+   * 0x50c18 이 상태 0xf 를 예약한다. 다른 키는 아무 일도 안 한다. 0xe 에 들어선 뒤 `CONFIRM_LOCK_FRAMES` 갱신 안에는 무시한다.
+   */
+  readonly confirm: () => void
   /** 이번 공이 이벤트 존을 얻었나 — 존 그림을 띄우는 동안만 참이다 */
   readonly isEventZoneShown: boolean
   /**
@@ -92,6 +111,8 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
   const [run, setRun] = useState<DerbyRun>(createDerbyRun)
   const [banner, setBanner] = useState('')
   const [isPaused, setIsPaused] = useState(false)
+  // 경기 시작: 적재 상태 8 끝이 모드 7 이면 미리 넣어 둔 0xd 로 간다(0x3fa4c~0x3fa50 · R10 0x48b20) → 0x39e14 → 0xe
+  const [isAwaitingConfirm, setIsAwaitingConfirm] = useState(true)
   const [isEventZoneShown, setIsEventZoneShown] = useState(false)
   const [shownCombo, setShownCombo] = useState<number | null>(null)
   const [result, setResult] = useState<DerbyResult | null>(null)
@@ -125,9 +146,39 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
     if (comboTimerRef.current !== null) window.clearTimeout(comboTimerRef.current)
     comboTimerRef.current = null
   }
+  /** 상태 0xe 의 키 잠금(틱 ≤ 2)이 풀렸나 */
+  const isConfirmUnlockedRef = useRef(false)
+  const confirmLockTimerRef = useRef<number | null>(null)
+  const clearConfirmLockTimer = () => {
+    if (confirmLockTimerRef.current !== null) window.clearTimeout(confirmLockTimerRef.current)
+    confirmLockTimerRef.current = null
+  }
+  /** 0xe 의 키 잠금 시계 — 들어선 뒤 `CONFIRM_LOCK_FRAMES` 갱신이 지나야 OK 를 받는다 */
+  const armConfirmLock = () => {
+    clearConfirmLockTimer()
+    isConfirmUnlockedRef.current = false
+    confirmLockTimerRef.current = window.setTimeout(() => {
+      confirmLockTimerRef.current = null
+      isConfirmUnlockedRef.current = true
+    }, CONFIRM_LOCK_FRAMES * millisecondsPerFrame())
+  }
+  /** 상태 0xd → 0xe 로 들어선다 — OK 를 기다린다 */
+  const enterConfirmWait = () => {
+    isAwaitingConfirmRef.current = true
+    setIsAwaitingConfirm(true)
+    armConfirmLock()
+  }
+  const isAwaitingConfirmRef = useRef(isAwaitingConfirm)
+
+  // 첫 공 앞의 0xe — 잠금 시계만 건다 (StrictMode 의 효과 두 번 돌기에도 같은 결과다)
+  useEffect(() => {
+    if (isAwaitingConfirmRef.current) armConfirmLock()
+  }, [])
+
   useEffect(() => () => {
     clearTimer()
     clearComboTimer()
+    clearConfirmLockTimer()
   }, [])
 
   const audio = activeSound()
@@ -142,6 +193,27 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
     setRun(ended)
     setShownCombo(null)
   }
+
+  /**
+   * 다음 공 준비(상태 0xf) 진입 0x3d954 — 0x3dbf8: +0x84 > 0 이면 HUD 콤보 표시를 켠다(+0x1b60 = 1 · +0x19ec = 0).
+   * 0x3db92~0x3dbf2(모드 7 애니 되돌리기)는 `DerbyHud` 가 표시를 켤 때 첫 칸부터 그리는 것으로 갈음한다.
+   */
+  const enterNextPitch = () => {
+    if (shouldShowComboAtNextPitch(runRef.current)) {
+      setShownCombo(runRef.current.comboDisplay)
+      clearComboTimer()
+      comboTimerRef.current = window.setTimeout(endShownCombo, COMBO_DISPLAY_FRAMES * millisecondsPerFrame())
+    }
+  }
+
+  const confirm = useCallback(() => {
+    if (!isAwaitingConfirmRef.current || !isConfirmUnlockedRef.current) return
+    // 메시지 1 → 0x50c18: 인자 0xe 면 0xf 예약. 돌발 객체 +0xf28 은 홈런더비에 없어(돌발미션은 모드 1·2·4 — `gameFlow`) 0x1b 로 안 샌다
+    isAwaitingConfirmRef.current = false
+    clearConfirmLockTimer()
+    setIsAwaitingConfirm(false)
+    enterNextPitch()
+  }, [])
 
   const onPitchResolved = useCallback((detail: PitchOutcomeDetail) => {
     // 원본은 공 하나가 상태 0xf 에서 21 갱신 안에 끝날 수 없어 표시는 늘 그 전에 꺼진다 — 웹 타이머가 늦으면 여기서 먼저 끈다
@@ -170,6 +242,8 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
       distance: batted?.distance ?? 0,
       isEventZoneHit: zoneHit,
     })
+    // 0xae3e8/0xae24c 가 돌려주는 다음 상태 — 0xd(→ 0xe OK 대기) · 0xf · 0x1a
+    const nextSceneState = derbySceneStateAfter(current, next)
     runRef.current = next
     setRun(next)
     setIsEventZoneShown(zoneHit)
@@ -199,19 +273,21 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
         return
       }
       setIsPaused(false)
-      // 다음 공 준비(상태 0xf) 0x3dbf8 — +0x84 > 0 이면 HUD 콤보 표시를 켠다(+0x1b60 = 1 · +0x19ec = 0).
-      // 단계가 오르거나 보너스 게임을 열 때(0xae3e8 → 상태 0xd)도 **0xf 를 지난다 (확정, U-89)**:
+      // 단계가 오르거나 보너스 게임을 열 때(0xae3e8 → 상태 0xd)는 0xe 에서 **사람 OK 를 기다린 뒤** 0xf 를 지난다 (확정, U-89):
       //   0xd 갱신 0x39e14 — 틱 > 0 이고 점수판 [+0xf10]+0x6c ≠ 1 이면 0xe (모드 갈림 없음)
       //   0xe 진입 0x50674 — 강판 0x504cc 는 모드 3 이 아니면 늘 0(0x504de) → 0x23 으로 안 샌다
+      //   0xe 갱신 0x39bd4 — 모드 7 이면 아무것도 안 한다 (시간 제한·자동 진행 없음)
       //   0xe 키 0x532b0 — OK(−5·'5') → 메시지 1 → 0x50c18: 인자 0xe 면 상태 0xf (돌발 객체 +0xf28 이 있고 0x8f158 참일 때만 0x1b → 0xf)
       //   0xf 진입 0x3d954 → 0x3db92~0x3dbf2(모드 7 애니 되돌리기) · 0x3dbf8(+0x84 > 0 → 표시 켜기)
       // (예전 근거 "0x48d50 의 0x49846" 은 0x49846 이 교체 화면 키 0x495fc 안이라 틀린 주소였다.)
-      // ⚠️ 원본은 0xe 에서 사람 OK 를 기다리지만 웹 더비에는 그 확인 단계가 없어 결과 연출이 끝나면 곧바로 0xf 로 본다.
-      if (shouldShowComboAtNextPitch(runRef.current)) {
-        setShownCombo(runRef.current.comboDisplay)
-        clearComboTimer()
-        comboTimerRef.current = window.setTimeout(endShownCombo, COMBO_DISPLAY_FRAMES * millisecondsPerFrame())
+      // ⚠️ 0xd 가 머무는 틱 수(점수판 +0x6c 를 기다림)는 웹이 따로 세지 않는다 — 결과 연출(웹판 1.5초) 뒤 곧바로 0xe 로 본다.
+      // ⚠️ 미이식: 0xe 그리기 0x4d9ec 는 0xd 그리기에 0x44944(옆에서 밀려 들어오는 판 — sin 으로 0x5a/0x6e 를 밀어 넣는다)를 더 그린다.
+      if (nextSceneState === 0xd) {
+        enterConfirmWait()
+        return
       }
+      // 보통 공(0xf)은 곧바로 다음 공 준비다
+      enterNextPitch()
     }, BANNER_MILLISECONDS)
   }, [])
 
@@ -220,6 +296,8 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
     // 경기 시작 상태 9 의 0x39868 이 +0x84 · 표시(+0x1b60) · +0x19ec 를 지운다
     clearComboTimer()
     setShownCombo(null)
+    // 경기 시작과 같이 적재 8 → 0xd → 0xe 로 와서 OK 를 기다린다 (⚠️ 아래 7 → 9 를 다시 타는지와 함께 유력)
+    enterConfirmWait()
     // 다시하기도 경기 장면을 새로 세운다 — 같은 시작 굴림 둘 (⚠️ 다시하기가 상태 7 → 9 를 다시 타는지는 유력)
     if (randomRef.current !== undefined) rollDerbySceneStart(randomRef.current)
     const fresh = createDerbyRun()
@@ -235,7 +313,9 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
     run,
     pitcher: derbyPitcherOf(run.stage, aceLevels),
     banner,
-    isPaused,
+    isPaused: isPaused || isAwaitingConfirm,
+    isAwaitingConfirm,
+    confirm,
     isEventZoneShown,
     shownCombo,
     result,

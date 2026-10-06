@@ -163,6 +163,22 @@ export function applyDerbyPitch(run: DerbyRun, outcome: DerbyPitchOutcome): Derb
 }
 
 /**
+ * 공 하나를 처리한 뒤 원본이 예약하는 **다음 장면 상태** — 0xae3e8 · 0xae24c 의 모드 7 갈래가 돌려주는 값 (직접 떴다):
+ * ```
+ * 0xae3e8  ae4e4 `movs r6,#0xd`(단계++) · ae4ea `movs r6,#0xf` · ae510 `movs r6,#0xd`(보너스 열기) · ae53a `movs r6,#0x1a` → ae5ca 반환
+ * 0xae24c  ae2e2 단계++ → ae330 `movs r4,#0xd` · ae372 `movs r4,#0xf` · 보너스 → ae330 0xd · ae334 `movs r4,#0x1a`
+ * ```
+ * - **0xf** 다음 공 준비 — 곧바로 다음 공이다.
+ * - **0xd** 타석 준비 → 0xe — 단계가 올라 새 마투수가 서거나 보너스 게임을 열 때. 0xe 는 사람 OK 를 기다린다 (`0x532b0`).
+ * - **0x1a** 결과 창.
+ */
+export function derbySceneStateAfter(before: DerbyRun, after: DerbyRun): 0xd | 0xf | 0x1a {
+  if (after.isFinished) return 0x1a
+  if (after.stage > before.stage || (after.isBonusGame && !before.isBonusGame)) return 0xd
+  return 0xf
+}
+
+/**
  * HUD 콤보 표시가 도는 갱신 수 — `0x4585c` 끝(0x45a00~0x45a18)이 장면 +0x19ec 를 그릴 때마다 1 올리고
  * `> 20` 이 되면 표시(+0x1b60)와 +0x84 를 지운다. 상태 0xf 진입(0x3dc04)에서 +0x19ec = 0 이므로 **21 번** 그린다.
  */

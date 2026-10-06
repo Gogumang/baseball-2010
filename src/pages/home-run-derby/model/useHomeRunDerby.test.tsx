@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
-import { useHomeRunDerby } from '@/pages/home-run-derby/model/useHomeRunDerby'
+import { CONFIRM_LOCK_FRAMES, useHomeRunDerby } from '@/pages/home-run-derby/model/useHomeRunDerby'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import type { DerbyResult } from '@/entities/home-run-derby/model/derbyRun'
 
@@ -41,8 +41,19 @@ function 한구(rendered: { result: { current: ReturnType<typeof useHomeRunDerby
   })
 }
 
+/** 상태 0xe 의 키 잠금(틱 ≤ 2)이 풀리도록 갱신 세 번(62ms × 3)을 흘리고 OK 를 누른다 */
+function OK(rendered: { result: { current: ReturnType<typeof useHomeRunDerby> } }) {
+  act(() => {
+    vi.advanceTimersByTime(CONFIRM_LOCK_FRAMES * 62)
+  })
+  act(() => rendered.result.current.confirm())
+}
+
+/** 띄우고 첫 공 앞의 0xe 에서 OK 를 누른다 */
 function 띄우기(bestDistance = 0, onFinish?: (result: DerbyResult) => void) {
-  return renderHook(() => useHomeRunDerby({ bestDistance, onFinish }))
+  const rendered = renderHook(() => useHomeRunDerby({ bestDistance, onFinish }))
+  OK(rendered)
+  return rendered
 }
 
 beforeEach(() => vi.useFakeTimers())
@@ -137,6 +148,12 @@ describe('홈런더비 한 판', () => {
     act(() => {
       vi.advanceTimersByTime(1_500)
     })
+    // 0xd → 0xe: OK 를 기다리는 동안은 아직 0xf 가 아니다
+    expect(rendered.result.current.isAwaitingConfirm).toBe(true)
+    expect(rendered.result.current.isPaused).toBe(true)
+    expect(rendered.result.current.shownCombo).toBeNull()
+    OK(rendered)
+    expect(rendered.result.current.isAwaitingConfirm).toBe(false)
     expect(rendered.result.current.shownCombo).toBe(1)
     act(() => {
       vi.advanceTimersByTime(21 * 62)
@@ -163,6 +180,50 @@ describe('홈런더비 한 판', () => {
     expect(rendered.result.current.run.combo).toBe(1)
   })
 
+  it('첫 공 앞은 상태 0xe — OK 를 누를 때까지 멈춰 있고, 들어선 뒤 세 갱신 안의 OK 는 먹지 않는다 (0x3fa50 · 0x49a26 · 0x532b0)', () => {
+    const rendered = renderHook(() => useHomeRunDerby({ bestDistance: 0 }))
+    expect(rendered.result.current.isAwaitingConfirm).toBe(true)
+    expect(rendered.result.current.isPaused).toBe(true)
+    // 틱 ≤ 2 — 무시
+    act(() => rendered.result.current.confirm())
+    expect(rendered.result.current.isAwaitingConfirm).toBe(true)
+    // 시간 제한·자동 진행이 없다 (0x39bd4 는 모드 7 이면 아무것도 안 한다)
+    act(() => {
+      vi.advanceTimersByTime(60_000)
+    })
+    expect(rendered.result.current.isAwaitingConfirm).toBe(true)
+    act(() => rendered.result.current.confirm())
+    expect(rendered.result.current.isAwaitingConfirm).toBe(false)
+    expect(rendered.result.current.isPaused).toBe(false)
+  })
+
+  it('보통 공 뒤는 0xf 라 OK 를 기다리지 않는다 (0xae3e8 ae4ea)', () => {
+    const rendered = 띄우기()
+    한구(rendered, 헛스윙)
+    expect(rendered.result.current.isAwaitingConfirm).toBe(false)
+    expect(rendered.result.current.isPaused).toBe(false)
+  })
+
+  it('단계가 오르면 0xd → 0xe 에서 OK 를 기다린 뒤에야 다음 공(0xf)이다 (0xae3e8 ae4e4)', () => {
+    const rendered = 띄우기()
+    // 비거리 109 짜리 시험용 패턴 — 여덟 개면 누적 872 ≥ 800 → 단계 1
+    const 큰홈런: PitchOutcomeDetail = { ...홈런, pattern: [45, 2000, 1500, 0] }
+    let 단계 = 0
+    for (let index = 0; index < 9 && 단계 === 0; index += 1) {
+      한구(rendered, 큰홈런)
+      단계 = rendered.result.current.run.stage
+      if (단계 === 0) expect(rendered.result.current.isAwaitingConfirm).toBe(false)
+    }
+    expect(단계).toBe(1)
+    expect(rendered.result.current.isAwaitingConfirm).toBe(true)
+    expect(rendered.result.current.isPaused).toBe(true)
+    // 콤보 표시(0xf 의 0x3dbf8)는 OK 뒤에 켜진다
+    expect(rendered.result.current.shownCombo).toBeNull()
+    act(() => rendered.result.current.confirm())
+    expect(rendered.result.current.isAwaitingConfirm).toBe(false)
+    expect(rendered.result.current.shownCombo).toBe(rendered.result.current.run.comboDisplay)
+  })
+
   it('다시하기는 판을 처음으로 되돌린다', () => {
     const rendered = 띄우기()
     한구(rendered, 홈런)
@@ -171,6 +232,8 @@ describe('홈런더비 한 판', () => {
     expect(rendered.result.current.run.remainingPitches).toBe(10)
     expect(rendered.result.current.run.totalDistance).toBe(0)
     expect(rendered.result.current.result).toBeNull()
+    // 새 장면도 첫 공 앞 0xe 에서 OK 를 기다린다
+    expect(rendered.result.current.isAwaitingConfirm).toBe(true)
   })
 
   it('이벤트 존은 친 공의 패턴 플래그 & 2 로만 정해진다 (플레이 +0x127, 0xb07c8)', () => {

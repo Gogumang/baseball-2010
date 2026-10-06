@@ -5,6 +5,7 @@ import {
   derbyBallCountOf,
   derbyBallNumberOf,
   derbyResultOf,
+  derbySceneStateAfter,
   endComboDisplay,
   shouldShowComboAtNextPitch,
 } from '@/entities/home-run-derby/model/derbyRun'
@@ -253,5 +254,32 @@ describe('결과 정산 (0x4f574)', () => {
     expect(run.stage).toBe(1)
     expect(run.bonusGamePoint).toBe(콤보보너스)
     expect(derbyResultOf(run, 0).gainedGamePoint).toBe(10 * 2 + 콤보보너스)
+  })
+})
+
+describe('공 하나 뒤 다음 장면 상태 — 0xae3e8 · 0xae24c 모드 7 갈래의 반환값', () => {
+  it('보통은 다음 공 준비 0xf (ae4ea · ae372)', () => {
+    const before = createDerbyRun()
+    expect(derbySceneStateAfter(before, applyDerbyPitch(before, 헛스윙))).toBe(0xf)
+  })
+
+  it('단계가 오르면 0xd → 0xe(OK 대기) (ae4e4 · ae330)', () => {
+    const before = 여러번(createDerbyRun(), [홈런(100), 홈런(100), 홈런(100), 홈런(100), 홈런(100), 홈런(100), 홈런(100)])
+    const after = applyDerbyPitch(before, 홈런(100))
+    expect(after.stage).toBe(1)
+    expect(derbySceneStateAfter(before, after)).toBe(0xd)
+  })
+
+  it('보너스 게임을 열면 0xd (ae510)', () => {
+    const before = 여러번(createDerbyRun(), [홈런(10), 홈런(10), ...Array(7).fill(헛스윙)])
+    const after = applyDerbyPitch(before, 헛스윙)
+    expect(after.isBonusGame).toBe(true)
+    expect(derbySceneStateAfter(before, after)).toBe(0xd)
+  })
+
+  it('끝나면 결과 창 0x1a (ae53a · ae334)', () => {
+    const before = 여러번(createDerbyRun(), Array(9).fill(헛스윙))
+    const after = applyDerbyPitch(before, 헛스윙)
+    expect(derbySceneStateAfter(before, after)).toBe(0x1a)
   })
 })
