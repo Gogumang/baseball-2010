@@ -963,9 +963,10 @@ describe('송구 수동/자동 — 환경설정 +0xf4 (0x5269c → 0xae6c8 → 0
   })
 
   it('수동이면 점수식 0xafb24 가 안 돌고 0xb1c90 이 앞선 주자의 루를 고른다', () => {
-    // 만루 단타 — 3루 주자가 홈(웹 루 번호 4 = 원본 표 0xd86b0 의 홈 사본)으로 간다
+    // 만루 단타 — 앞선 주자부터 훑는다. 송구 시간은 공 가진 야수.vtC0 + 공 가진 야수.vtB8(루 좌표)
+    // (b1fce~b2020): 홈(4)·3루로 가는 주자는 못 잡고, 1루에서 2루로 가는 주자를 잡을 수 있다
     const 단타궤적 = battedBallTrajectory([92, 698, 565, 0])
-    expect(만루단타({ throwMode: '수동', trajectory: 단타궤적 }).throwBase).toBe(4)
+    expect(만루단타({ throwMode: '수동', trajectory: 단타궤적 }).throwBase).toBe(2)
     // 자동이면 점수식이 더 가까운 루를 고른다
     expect(만루단타({ throwMode: '자동', trajectory: 단타궤적 }).throwBase).toBe(1)
   })

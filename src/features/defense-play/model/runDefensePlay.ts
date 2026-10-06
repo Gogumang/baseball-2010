@@ -258,6 +258,9 @@ export interface DefensePlayInput {
    *
    * 곧 **수동 송구 = 점수식 `0xafb24`(CPU 전용)가 아예 안 도는 것**이고, 사람이 키를 안 누르면
    * `0xb1c90` 의 훨씬 단순한 "잡을 수 있는 앞선 루" 규칙이 대신 고른다.
+   * ⚠️ (2026-10-06 재확인) `0xb1c90` 안에는 송구 호출이 없다 — 고른 루는 0xb203a 뒤 2루 커버/중계 야수의
+   * 자리 잡기에만 쓰이고, +0x160 송구는 플레이 틱 0xb45dc 의 b4660~b46a8 이 던진다. 키 없는 사람 수비가
+   * 실제로 무엇으로 던지는지(메시지마다 도는 0xafa60 인지)는 미해결 — `throwArrival.autoThrowTargetBase` 주석.
    *
    * ⚠️ **옮기지 못한 한 가지**: `0xafa60` 은 이 갈림 말고 **경기 장면 메시지 처리기
    * `0x509a0` 앞머리(0x509b4~0x509d0)에서도 조건 없이 한 번씩** 불린다 (S8 4-3, 확정).
@@ -509,8 +512,12 @@ function createPlayRunners(bases: BaseState, outcome: AtBatOutcome, speed: numbe
  * a9ef6    아니면 아웃 == 2 && 종류(state[0x26]) == 1 → 같은 목표              ; 2아웃이면 친 순간 뛴다
  * ```
  * 웹은 포스 사슬을 `createPlayRunners`(결과 코드 다리)가 세우므로 여기서는 **2아웃 갈래만** 더한다.
- * ⚠️ 1루 주자 예외(a9ed6, 플레이.vt94 의 뜻 미확인)는 아웃 != 2 일 때만이라 2아웃 갈래와 안 겹친다 — 옮기지 않았다.
- * ⚠️ 도루 표시 없는 주자의 R.vt88() 은 안 읽었다.
+ * ⚠️ 1루 주자 예외(a9ed6)는 아웃 != 2 일 때만이라 2아웃 갈래와 안 겹친다 — 옮기지 않았다.
+ *    인자 둘은 0x46516~0x4653e 가 넘긴다: 플레이.vt94 = `0xb1b2c`(+0x11c 가장 이른 포구 틱 ≤ 공+0xaa0 낙구 틱
+ *    — "뜬공이 잡힐 예정", autoAdvance 의 af98e 와 같은 함수) · 플레이+0x111(끝남). 곧 2아웃 전 잡힐 뜬공이면
+ *    1루 주자는 포스 목표를 안 받고 리드 뒤 1루로 돌아온다(웹 포스 사슬 createPlayRunners 와 대조는 아직).
+ * - 도루 표시 없는 주자의 R.vt88(+0x8c) = `0xa0820`: 루 좌표 0xd77d8[b] 에 세우고(0xbef58) +0x7c·+0x80·+0x88·+0x8c·+0x90 = b,
+ *   +0x94 = 0, vt10(동작 0). 리드는 루 좌표에서 출발하므로(applyRunnerLead) 웹과 같다.
  * ⚠️ S8 6-3 의 "0x46418 의 주자 움직임은 0x46664 걷기 루프뿐" 은 이 고리를 놓친 것이다.
  */
 function leadRunnersForBattedBall(runners: readonly MutableRunner[], input: DefensePlayInput): void {

@@ -121,6 +121,28 @@ describe('사람 쪽 자동 송구 목표 0xb1c90 — 앞선 주자부터', () =
     expect(autoThrowTargetBase(문)).toBe(2)
   })
 
+  it('고리에는 커버 검사가 없다 — 커버 없는 3루도 잡을 수 있으면 고른다 (b1f7a~b2038)', () => {
+    const 이루주자 = createRunner(2, 2, runnerSpeedOf(0), { targetBase: 3 })
+    const 일루주자 = createRunner(1, 1, runnerSpeedOf(0), { targetBase: 2 })
+    const 문 = 문맥(
+      { ballHolderSlot: 3, catchFielderSlot: 3, coverOfBase: [NONE, NONE, 5, NONE] },
+      { runners: [일루주자, 이루주자] },
+    )
+    expect(autoThrowTargetBase(문)).toBe(3)
+  })
+
+  it('송구 시간은 공 가진 야수가 루까지 던지는 틱이다 — 커버 야수 자리가 아니다 (b200c 공가진야수.vtB8)', () => {
+    // 중견수(8)가 쥐었다. 3루 앞까지 온 주자는 3루수(4) 자리에서 재면 잡히지만 중견수 송구로는 늦다
+    const 삼루앞 = { x: 16_000, y: 0, z: 22_500 }
+    const 이루주자 = createRunner(2, 2, runnerSpeedOf(500), { targetBase: 3, position: 삼루앞 })
+    const 일루주자 = createRunner(1, 1, runnerSpeedOf(0), { targetBase: 2 })
+    const 문 = 문맥(
+      { ballHolderSlot: 8, catchFielderSlot: 8, coverOfBase: [1, 2, 3, 4] },
+      { runners: [일루주자, 이루주자] },
+    )
+    expect(autoThrowTargetBase(문)).toBe(2)
+  })
+
   it('아무도 못 잡으면 목표가 없다 (−1)', () => {
     const 문 = 문맥({ ballHolderSlot: 3, catchFielderSlot: 3 }, { runners: [] })
     expect(autoThrowTargetBase(문)).toBe(NONE)

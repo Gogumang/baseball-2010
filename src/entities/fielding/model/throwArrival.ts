@@ -94,9 +94,27 @@ export function shouldReleaseThrow(receiver: FielderState, holder: FielderState,
  * b2036: 아무도 못 잡으면 sp+0x44 에 **마지막으로 본 산 주자의 vt68** 이 남은 채 0xb203a(커버 배치)로 간다
  * ```
  * 도착 검사보다 루 적기(b1fa2)가 먼저라, 루에 붙어 선 주자는 "잡을 대상" 에선 빠져도 그 루가 남을 수 있다.
- * ⚠️ 원본과 아직 다른 곳 (이번에 안 고침 — 0xb203a 뒤 갈래를 다 안 떴다):
- * - 송구 시간의 둘째 항: 원본은 `0xb0c90(P)`(= P+0x130 공 가진 야수)의 vtB8 인데 여기는 커버 야수의 것을 쓴다
- * - 원본 고리에는 커버(+0xf0) 검사가 없다(여기는 커버 없는 루를 건너뛴다)
+ *
+ * 송구 시간 두 항은 **둘 다 공 가진 야수의 것**이다 (직접 뜬 것):
+ * ```
+ * b1fce: r0 = 0xb0c90(P) ; r5 = r0.vtC0()                ; 공 가진 야수(P+0x130)의 남은 틱
+ * b1fe0: r6 = 0xb0c90(P)                                  ; 다시 공 가진 야수
+ * b1ff2: 루 = R.vt68() ; 점 = 0xd86b0[루]
+ * b200c: r0 = r6.vtB8(점) ; r5 += r0                      ; 공 가진 야수 → 루 좌표 송구 틱
+ * b2022: 주자 틱(0xbefec) ≥ r5 → 그 루
+ * ```
+ * 고리(b1f7a~b2038) 안에는 커버(P+0xf0) 를 읽는 명령이 없다 — 커버가 없는 루도 고른다.
+ * (예전 웹은 둘째 항을 커버 야수 자리에서 루까지로 쟀고 커버 없는 루를 건너뛰었다.)
+ *
+ * ⚠️ **이 고리가 고른 루로 공이 나가는 자리를 원본에서 못 찾았다.** `0xb1c90` 의 고른 루(sp+0x44)는
+ * 0xb203a 뒤에서 **2루 커버/중계 야수(sp+0x58, 2루수 3 · 유격수 5)의 자리 잡기**에만 쓰인다:
+ * 공 가진 야수의 목표점 ~ 그 루 거리(b20ca)가 cfg+0x42(17000) 이상이고 외야수(6~8)가 아직 안 쥐었으면
+ * 둘의 가운데(b2144~b21b0) 근처, 아니면 표 0xd8764 자리로 보내고 AI 상태 0xa(b2358 · b238c, 0xb8dbc)를 준다.
+ * 이 함수 안에 송구(플레이.vt58 = 0xb2c90 · vt5c = 0xb2e38) 호출은 없다. 사람이 고른 루(+0x160)를 실제로
+ * 던지는 곳은 플레이 틱 vt4c(0xb45dc) 안 `b4660~b46a8`(+0x160 ≠ −1 && 공 가진 야수.vtC4() → 플레이.vt58(+0x160, 0)
+ * → +0x160 = −1)이고, 그 밖의 송구는 CPU 송구 결정 0xafa60(→ 0xafae6 플레이.vt58) — 사람 수동 설정에서도
+ * 메시지 처리기 0x509a0 머리에서는 메시지마다 돈다(S8 4-3). 웹은 아직 "키 없는 사람 수비 = 이 루로 던진다"
+ * 로 두었다(진행기 쪽 근사, 미해결).
  */
 export function autoThrowTargetBase(context: DefenseContext): number {
   const { play, fielders, runners } = context
@@ -110,10 +128,10 @@ export function autoThrowTargetBase(context: DefenseContext): number {
     // b1fa2: 도착 검사(b1fa8)보다 **먼저** 적는다 — 건너뛴 주자의 루도 남는다
     base = runner.targetBase
     if (isRunnerStopped(runner)) continue
-    const coverSlot = play.coverOfBase[((base % 4) + 4) % 4] ?? NONE
-    if (coverSlot === NONE) continue
-    const runnerTicks = ticksToReach(runner.position, basePosition(base), runner.speed)
-    const throwTicks = fielderArrivalTicks(holder) + throwTicksTo(fielders[coverSlot], basePosition(base))
+    const point = basePosition(base)
+    const runnerTicks = ticksToReach(runner.position, point, runner.speed)
+    // b1fce~b2020: 공 가진 야수.vtC0() + 공 가진 야수.vtB8(루 좌표) — 커버 검사 없음
+    const throwTicks = fielderArrivalTicks(holder) + throwTicksTo(holder, point)
     if (runnerTicks >= throwTicks) return base
   }
   // b2036 → b203a: 아무도 못 잡으면 마지막으로 본 산 주자의 루가 남은 채 커버 배치로 간다
