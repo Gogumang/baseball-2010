@@ -153,6 +153,21 @@ describe('시즌 세션', () => {
     expect(result.current.state?.record.acted).toBe(false)
   })
 
+  it('정규시즌 경기 끝에 오늘 리그 점수표를 SR+0x1c0 에 담는다 — 내 경기 줄만 −1 (0xc2a48 c2be0)', () => {
+    const { result } = 띄우기()
+    시작(result, 0)
+    act(() => result.current.actions.playNextGame())
+
+    act(() => result.current.actions.finishGame(요약()))
+
+    const board = result.current.state?.record.dayBoard
+    if (board === undefined) throw new Error('레코드가 없다')
+    const 내줄 = board.teamsA.findIndex((team, slot) => team === 0 || board.teamsB[slot] === 0)
+    expect(내줄).toBeGreaterThanOrEqual(0)
+    expect([board.scoresA[내줄], board.scoresB[내줄]]).toEqual([-1, -1])
+    expect(board.scoresA.filter((score) => score >= 0)).toHaveLength(4)
+  })
+
   it('요약이 싣고 온 평판 16칸이 평가에 먹는다 (0xa3440 → 0xa6f1c)', () => {
     const { result } = 띄우기()
     시작(result, 0)

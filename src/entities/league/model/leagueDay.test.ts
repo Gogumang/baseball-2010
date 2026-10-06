@@ -7,6 +7,7 @@ import {
   cpuGameSidesOf,
   cpuPitcherGameAbilityOf,
   decisionsAfterHalfInning,
+  LEAGUE_DAY_NO_SCORE,
   matchupsOf,
   playLeagueDay,
   rollCpuGamePrep,
@@ -163,6 +164,43 @@ describe('playLeagueDay — 내 팀 경기만 빼고 전적에 넣는다', () =>
     const { league } = playLeagueDay(EMPTY_LEAGUE, 1, 내팀, 씨앗난수(77))
 
     expect(league.wins[상대] + league.losses[상대]).toBe(0)
+  })
+})
+
+/**
+ * 하루 대진·점수표 — 0xc2a48 경기 객체 +8 (A[5]·B[5]·scoreA[5]·scoreB[5], s32) 그대로.
+ * A = side 1(홈) · 내 경기 줄은 점수 두 칸이 −1 · scoreA > scoreB 면 A 승.
+ */
+describe('playLeagueDay — 하루 점수표 (0xc2a48 +8, 시즌 SR+0x1c0 원본)', () => {
+  it('다섯 줄이 matchupsOf 차례이고 A 는 홈 · B 는 원정이다', () => {
+    const day = 4
+    const { board } = playLeagueDay(EMPTY_LEAGUE, day, 2, 씨앗난수(9))
+
+    expect(board.teamsA).toEqual(matchupsOf(day).map((matchup) => matchup.home))
+    expect(board.teamsB).toEqual(matchupsOf(day).map((matchup) => matchup.away))
+    board.teamsA.forEach((team) => expect(leagueSideOf(day, team)).toBe(LEAGUE_SIDE_HOME))
+  })
+
+  it('내 경기 줄만 점수가 −1 로 남고, 나머지는 이긴 쪽이 더 많이 냈다', () => {
+    const 내팀 = 7
+    const { board, league } = playLeagueDay(EMPTY_LEAGUE, 0, 내팀, 씨앗난수(5))
+
+    board.teamsA.forEach((teamA, slot) => {
+      const teamB = board.teamsB[slot]
+      const scoreA = board.scoresA[slot]
+      const scoreB = board.scoresB[slot]
+      if (teamA === 내팀 || teamB === 내팀) {
+        expect([scoreA, scoreB]).toEqual([LEAGUE_DAY_NO_SCORE, LEAGUE_DAY_NO_SCORE])
+        return
+      }
+      expect(scoreA).toBeGreaterThanOrEqual(0)
+      expect(scoreB).toBeGreaterThanOrEqual(0)
+      // c2ba6: scoreA > scoreB → A 승, 그 밖(동점 포함) B 승
+      const winner = scoreA > scoreB ? teamA : teamB
+      const loser = winner === teamA ? teamB : teamA
+      expect(league.wins[winner]).toBe(1)
+      expect(league.losses[loser]).toBe(1)
+    })
   })
 })
 

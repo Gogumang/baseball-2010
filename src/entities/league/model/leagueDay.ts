@@ -774,8 +774,43 @@ export function cpuGameSidesOf(x: number, y: number, sideOfX: number = LEAGUE_SI
   return sideOfX === LEAGUE_SIDE_HOME ? { away: x, home: y } : { away: y, home: x }
 }
 
+/** 하루 대진 수 — 열 팀이 다섯 경기를 치른다 */
+export const LEAGUE_DAY_GAME_COUNT = 5
+/** 점수 칸 초기값 — 경기 객체 +8 을 0x50 바이트 −1 로 채운다(c2a6a). 내 경기 줄은 이 값으로 남는다 */
+export const LEAGUE_DAY_NO_SCORE = -1
+
+/**
+ * 하루 대진·점수표 — 0xc2a48 의 경기 객체 **+8 ~ +0x57 (s32 × 20)** 그대로다 (직접 떴다).
+ * ```
+ * c2a66  memset(+8, −1, 0x50)
+ * c2a7a  팀 t = 0..9, 칸 k = 0..4: t 가 A[k]·B[k] 에 없고 A[k] == −1 이면
+ *          0xb7844(L, t) == 1 → A[k] = t, B[k] = 상대 0xb765c(L, t)
+ *          그 밖           → B[k] = t, A[k] = 상대
+ * c2aee  칸 k = 0..4: A[k]·B[k] 가 내 팀이면 건너뛴다 — 점수 두 칸이 −1 로 남는다
+ *          scoreA[k] = 0xb69b0(경기, side(B[k]))   ; c2b8a — 칸 sY(= 0)에서 친 것 = A 명단의 득점
+ *          scoreB[k] = 0xb69b0(경기, side(A[k]))   ; c2b9a — 칸 sX(= 1)에서 친 것 = B 명단의 득점
+ *          scoreA > scoreB → A 승 · 그 밖 B 승     ; c2ba6
+ * c2be0  모드 2 이고 L+0xac(국가대항전)·L+0x34(포스트시즌)가 둘 다 0 이면 memcpy(SR+0x1c0, +8, 0x50)
+ * ```
+ * A = side 1 = `LeagueMatchup.home`, B = `away` 다 (`matchupsOf` 와 같은 채움 순서).
+ * 점수는 **명단 기준**이라 `simulateLeagueGame` 의 칸 점수와 엇갈린다(`cpuGameSidesOf`) — scoreA 가 칸 0(`awayRuns`)이다.
+ * 경기 뒤 마무리 판(0xf1 그림 0xb400)이 이 표를 그린다.
+ */
+export interface LeagueDayBoard {
+  /** +8 [5] — side 1(홈) 팀 */
+  readonly teamsA: readonly number[]
+  /** +0x1c [5] — side 0(원정) 팀 */
+  readonly teamsB: readonly number[]
+  /** +0x30 [5] — A 명단의 득점. 내 경기 줄은 −1 */
+  readonly scoresA: readonly number[]
+  /** +0x44 [5] — B 명단의 득점. 내 경기 줄은 −1 */
+  readonly scoresB: readonly number[]
+}
+
 /** 하루치 경기가 남긴 것 — 순위표와 **선수 기록표** 두 벌이다 */
 export interface LeagueDayResult {
+  /** 0xc2a48 의 하루 대진·점수표 (`LeagueDayBoard`) — 시즌모드가 SR+0x1c0 에 옮겨 담는다 */
+  readonly board: LeagueDayBoard
   readonly league: League
   readonly playerStats: LeaguePlayerStats
   /**
@@ -824,6 +859,9 @@ export function playLeagueDay(
 ): LeagueDayResult {
   const plateAppearances: LeaguePlateAppearance[] = []
   const pitcherAppearances: LeaguePitcherAppearance[] = []
+  const matchups = matchupsOf(day)
+  const scoresA = matchups.map(() => LEAGUE_DAY_NO_SCORE)
+  const scoresB = matchups.map(() => LEAGUE_DAY_NO_SCORE)
   const staminas: Record<number, readonly number[]> = { ...pitcherStaminas }
   const aceStaminas: Record<number, number> = {}
   // 리그 모드(2·3·4)는 g ≠ 0 이면 경기 준비마다 두 팀 레코드가 한 칸 돈다 — 모드 차이는 내 팀 쪽뿐이라 2 로 묻는다
@@ -833,7 +871,7 @@ export function playLeagueDay(
     rotates && rotatesHumanGameTeams && humanGame !== undefined
       ? rotateLeaguePitchers(league, [humanGame.away, humanGame.home])
       : league
-  const played = matchupsOf(day).reduce((before, matchup) => {
+  const played = matchups.reduce((before, matchup, slot) => {
     if (matchup.away === myTeamId || matchup.home === myTeamId) return before
     // ⚠️ 칸과 명단이 엇갈린다 (0xc239c, 직접 떴다 — `cpuGameSidesOf` 주석): 홈 팀(A목록 X)의 **선수**가 칸 0
     //    (초 공격)에, 원정 팀(Y)의 선수가 칸 1(말 공격)에 선다. 그래서 X 명단을 먼저 공격으로 돌린다.
@@ -856,6 +894,9 @@ export function playLeagueDay(
     if (score.acePitcherStaminas.home !== undefined) aceStaminas[sides.home] = score.acePitcherStaminas.home
     plateAppearances.push(...score.plateAppearances)
     pitcherAppearances.push(...score.pitcherAppearances)
+    // 점수표 c2b8a·c2b9a — A(홈) 명단이 친 칸 0 점수가 scoreA 다 (`LeagueDayBoard` 주석)
+    scoresA[slot] = score.awayRuns
+    scoresB[slot] = score.homeRuns
     // 기록 c2b80~c2bca (R1 항목 3): `score(칸 0) > score(칸 1)` 이면 A(X = 홈)에 승, 아니면 B(Y = 원정)에 승 —
     // 동점이면 원정 승. R1 은 이것을 "진 팀에 승" 으로 읽었지만 칸 0 에서 친 것은 **X 의 선수**라
     // (위 엇갈림) **점수를 더 낸 명단의 팀이 이긴다**. 상대전적도 같은 쪽으로 쌓인다.
@@ -865,6 +906,12 @@ export function playLeagueDay(
   }, rotated)
 
   return {
+    board: {
+      teamsA: matchups.map((matchup) => matchup.home),
+      teamsB: matchups.map((matchup) => matchup.away),
+      scoresA,
+      scoresB,
+    },
     league: played,
     playerStats: recordLeaguePitcherAppearances(
       recordLeaguePlateAppearances(playerStats, plateAppearances),

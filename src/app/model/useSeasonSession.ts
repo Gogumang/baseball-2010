@@ -1513,6 +1513,9 @@ export function useSeasonSession(
             // 경기를 치르면 이번 주기의 트레이닝·외출 표시를 지운다 (0x4f158)
             acted: false,
             phase: SEASON_PHASE.경기끝,
+            // SR+0x1c0 — 0xc2a48 끝(c2be0)이 모드 2 · 국가대항전·포스트시즌 아님일 때만 오늘 점수표를 복사한다.
+            // 이 갈래가 곧 그 조건이다(포스트시즌·국가대항전은 위에서 먼저 돌아갔다)
+            dayBoard: day.board,
           },
         },
       })

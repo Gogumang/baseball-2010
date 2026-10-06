@@ -11,6 +11,7 @@ import {
   initialTeamAbilities,
   isFinalYear,
   normalizeSeasonRecord,
+  DAY_BOARD_SIZE,
   normalizeSeasonState,
   seasonDayOf,
   startNewSeason,
@@ -166,6 +167,22 @@ describe('옛 세이브 메우기 — normalizeSeasonRecord', () => {
     expect(메운것.coach).toBe(-1)
     // 저장된 코치는 그대로 둔다
     expect(normalizeSeasonRecord({ coach: 7 }).coach).toBe(7)
+  })
+})
+
+describe('SR+0x1c0 점수표 · SR+0x17a 요청 횟수 — 옛 세이브', () => {
+  it('칸이 없던 세이브는 다섯 줄 빈 표 · 요청 0 으로 채운다', () => {
+    const 메운것 = normalizeSeasonRecord({ teamId: 3, games: 12 })
+    expect(메운것.dayBoard.teamsA).toHaveLength(DAY_BOARD_SIZE)
+    expect(메운것.dayBoard.scoresB).toEqual([0, 0, 0, 0, 0])
+    expect(메운것.tradeRequestCount).toBe(0)
+  })
+
+  it('저장된 표·횟수는 그대로 둔다 (−1 내 경기 줄 포함)', () => {
+    const dayBoard = { teamsA: [1, 3, 5, 7, 9], teamsB: [0, 2, 4, 6, 8], scoresA: [3, -1, 0, 2, 7], scoresB: [1, -1, 4, 2, 0] }
+    const 메운것 = normalizeSeasonRecord({ dayBoard, tradeRequestCount: 4 })
+    expect(메운것.dayBoard).toEqual(dayBoard)
+    expect(메운것.tradeRequestCount).toBe(4)
   })
 })
 

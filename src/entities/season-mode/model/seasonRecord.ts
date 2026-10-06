@@ -117,6 +117,18 @@ export interface SeasonRecord {
   readonly yearGoalShown: boolean
   /** SR+0x1b0 / +0x1b4 — 직전 경기 관중 수 */
   readonly lastAttendance: number
+  /**
+   * SR+0x1c0 ~ +0x20f — **같은 날 리그 다섯 경기의 대진·점수** (s32 × 20 = A[5] · B[5] · scoreA[5] · scoreB[5]).
+   * 경기 끝 CPU 경기 `0xc2a48` 이 끝에서(c2be0~c2c14) **모드 2 이고 국가대항전(L+0xac)·포스트시즌(L+0x34)이
+   * 아닐 때만** 자기 표(경기 객체 +8, 0x50 바이트)를 통째로 복사한다 — 뜻은 `entities/league` 의 `LeagueDayBoard`.
+   * 내 경기 줄은 점수가 −1 이다. 경기 뒤 마무리 판(0xf1 그림 0xb400)이 읽는다.
+   */
+  readonly dayBoard: SeasonDayBoard
+  /**
+   * SR+0x17a (s16) — **CPU 트레이드 요청이 온 횟수**. 경기 뒤 마무리 0xf1 진입 `0x953c` → `0x93c8` 이 10% 를 맞히면
+   * 상대·선수를 고르기 **전에** +1 한다(940e) — 맞는 내 선수를 못 찾아 요청이 사라져도 센다. 자르기 없음.
+   */
+  readonly tradeRequestCount: number
   /** SR+0x188 + 7×종류 + 칸 — 구장 아이템 보유 플래그 21칸. `stadiumItems.ts` 참고 */
   readonly stadiumOwned: readonly boolean[]
   /** SR+0x1b8 / +0x1b9 / +0x1ba — 지금 장착한 관중석 · 전광판 · 잔디 칸 */
@@ -127,6 +139,34 @@ export interface SeasonRecord {
    * phase 를 보기 전에 무조건 관리 메뉴로 보내고, 연초 목표 상태(0xd4)도 막는다.
    */
   readonly endingSeen: boolean
+}
+
+/**
+ * SR+0x1c0 하루 점수표 — `LeagueDayBoard`(entities/league) 와 같은 모양이다.
+ * 시즌 레코드가 리그 모듈의 타입에 묶이지 않게 여기서 따로 적는다(값은 그대로 옮겨 담는다).
+ */
+export interface SeasonDayBoard {
+  readonly teamsA: readonly number[]
+  readonly teamsB: readonly number[]
+  readonly scoresA: readonly number[]
+  readonly scoresB: readonly number[]
+}
+
+/** SR+0x1c0 한 줄 수 — 하루 다섯 경기 */
+export const DAY_BOARD_SIZE = 5
+
+/**
+ * 아직 한 번도 복사되지 않은 점수표. 레코드가 처음 만들어질 때의 값은 문서에 없어 **0 으로 둔다(유력 —
+ * 저장 초기화가 레코드를 0 으로 채운다고 본다)**. 이 판은 정규시즌 경기 직후(0xf1)에만 그려지고 그 경기 끝이
+ * 먼저 복사하므로 화면에는 닿지 않는다.
+ */
+export function emptySeasonDayBoard(): SeasonDayBoard {
+  return {
+    teamsA: zeros(DAY_BOARD_SIZE),
+    teamsB: zeros(DAY_BOARD_SIZE),
+    scoresA: zeros(DAY_BOARD_SIZE),
+    scoresB: zeros(DAY_BOARD_SIZE),
+  }
 }
 
 /** 한 해 정규시즌 경기 수 (StrHOWTO[10] "1년에 총 45경기") */
@@ -247,6 +287,8 @@ export function startNewSeason(teamId: number, name: string): SeasonState {
       // SR+0x187 = 0 (0x57c4)
       yearGoalShown: false,
       lastAttendance: 0,
+      dayBoard: emptySeasonDayBoard(),
+      tradeRequestCount: 0,
       stadiumOwned: falses(STADIUM_OWNED_SIZE),
       stadiumEquipped: zeros(STADIUM_EQUIPPED_SIZE),
       // SR+0x1bc — 새 시즌은 `0x204e0` 초기화 값(0)으로 남는다
@@ -341,6 +383,18 @@ export function normalizeSeasonRecord(saved: Partial<SeasonRecord> | null | unde
     stadiumOwned: padFlags(saved.stadiumOwned, STADIUM_OWNED_SIZE),
     stadiumEquipped: padNumbers(saved.stadiumEquipped, STADIUM_EQUIPPED_SIZE),
     seenEvents: Array.isArray(saved.seenEvents) ? saved.seenEvents : [],
+    dayBoard: normalizeDayBoard(saved.dayBoard),
+  }
+}
+
+/** 옛 세이브(점수표 칸이 없던 때)는 빈 표로, 짧은 줄은 뒤를 0 으로 채운다 */
+function normalizeDayBoard(saved: Partial<SeasonDayBoard> | undefined): SeasonDayBoard {
+  if (saved === undefined || saved === null) return emptySeasonDayBoard()
+  return {
+    teamsA: padNumbers(saved.teamsA, DAY_BOARD_SIZE),
+    teamsB: padNumbers(saved.teamsB, DAY_BOARD_SIZE),
+    scoresA: padNumbers(saved.scoresA, DAY_BOARD_SIZE),
+    scoresB: padNumbers(saved.scoresB, DAY_BOARD_SIZE),
   }
 }
 
