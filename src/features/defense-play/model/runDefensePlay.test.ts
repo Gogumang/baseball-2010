@@ -1397,3 +1397,30 @@ describe('송구 0xb2e38 — 중계 b4616 · AI 9 미루기 · 던진 야수 AI 
     expect(결과.log).toContain('27틱 결과 코드 9 — 0번 야수가 3루에 닿았지만 1번 주자가 서 있다')
   })
 })
+
+describe('뜬공 결과인데 낙구 전에 아무도 못 닿는 타구 — 자르지 않은 예보(0xb12d0 · 0xb3b38 우선순위 6~8)', () => {
+  /** 코드 1 패턴 — 10틱 남짓에 3루수 앞에 떨어져 구른다 */
+  const 일찍떨어지는공: BattedBallPattern = [138, 478, 589, 0]
+
+  it('바운드 뒤에 줍는 야수를 골라 판이 끝까지 가지 않는다 (예전엔 포구 틱 240)', () => {
+    const trajectory = battedBallTrajectory(일찍떨어지는공)
+    const result = play(뜬공아웃, 주자1루, 0, 일찍떨어지는공)
+    expect(result.catchTick).toBeGreaterThan(trajectory.landingTick)
+    expect(result.catchTick).toBeLessThan(40)
+    expect(result.catchFielderSlot).toBe(4)
+    // 뜬 채로 잡히지 않았다 — 원본에서 "잡힐 뜬공" 은 예보(vt94 = +0x11c ≤ 낙구 틱)가 정한다
+    expect(result.caughtOnTheFly).toBe(false)
+    // 타자주자는 결과 코드대로 아웃 · 1루 주자는 바운드 포스로 2루
+    expect(result.advance.outsAdded).toBe(1)
+    expect(result.advance.bases).toEqual({ first: false, second: true, third: false })
+    expect(result.ticks.length).toBeLessThan(60)
+  })
+
+  it('낙구 전에 잡히는 뜬공은 그대로 뜬공이다', () => {
+    const pattern: BattedBallPattern = [129, 802, 500, 0]
+    const result = play(뜬공아웃, 주자1루, 0, pattern)
+    expect(result.caughtOnTheFly).toBe(true)
+    expect(result.catchTick).toBeLessThanOrEqual(battedBallTrajectory(pattern).landingTick)
+    expect(result.advance.bases).toEqual(주자1루)
+  })
+})

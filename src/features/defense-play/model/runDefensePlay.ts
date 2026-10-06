@@ -734,22 +734,29 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
   let fielders = createFielders(abilities)
   const uncatchable = input.isUncatchable === true
   // 잡히지 않는 타구는 뜬 채로 잡힐 일도 없다 — 떨어진 뒤 굴러가는 공처럼 본다
-  const onTheFly = !uncatchable && catchesOnTheFly(input.outcome)
-  // 0xa9e44 의 1루 주자 예외 (a9ed6) — 2아웃 전 잡힐 뜬공이면 1루 주자는 포스 목표를 안 받는다
-  const runners = createPlayRunners(
-    input.bases,
-    input.outcome,
-    speed,
-    onTheFly && input.outs !== 2 ? { stealingFrom: input.stealingFrom ?? [] } : null,
-  )
+  const wantsFlyCatch = !uncatchable && catchesOnTheFly(input.outcome)
 
   // ── 포구 예보 ──
   // 뜬 채로 잡히는 타구는 낙구 전까지만, 굴러간 타구는 낙구 **다음** 틱부터 본다.
   // (낙구 틱에 걸리면 `chooseChaser` 우선순위 1~5 = "낙구 전 포구" 가 되어 잡힌 공이 된다)
-  const window = onTheFly
-    ? { from: 0, to: trajectory.landingTick }
-    : { from: trajectory.landingTick + 1, to: Number.POSITIVE_INFINITY }
+  //
+  // **결과 코드가 뜬공·직선타 아웃인데 낙구 전에 아무도 못 닿는 타구** — 원본 예보 0xb12d0 은 틱 구간을 자르지 않고
+  // 궤적 끝까지(t = 1 → 공+0x6c − 1) 한 표를 만들고, 0xb3b38 은 낙구 전 포구(우선순위 1~5)가 없으면 6~8 갈래로
+  // **바운드 뒤에 줍는 야수**를 고른다(P2 1a · 2a). 웹의 구간 자르기는 결과 코드 다리라, 그 구간이 비면 표가 비어
+  // 포구 틱이 100000(→ 판 끝 240)이 되고 야수가 끝내 공을 못 쥐었다(표본 2279판 — 모두 뜬공아웃 결과 + 낙구가 이른 패턴).
+  // 그때는 원본처럼 자르지 않은 예보로 바운드 뒤 포구를 고른다. 원본에서 "잡힐 뜬공" 은 예보가 정한다 —
+  // 플레이.vt94 = 0xb1b2c(+0x11c 가장 이른 포구 틱 ≤ 낙구 틱)가 0xa9e44(a9ed6)·0xaf918(af98e)에 넘기는 그 값 —
+  // 그래서 이 판은 바운드 판(포스 요구 루 0xa95e8 · 1루 주자 예외 없음 · 타자주자는 1루 송구로)이 된다.
+  // ⚠️ 타석 결과(아웃)는 그대로 — 타자주자가 아웃인 것은 결과 코드 다리의 규약이고, 뜬공 아웃 대신 땅볼처럼 1루에서 죽는다.
+  const flyWindow = { from: 0, to: trajectory.landingTick }
+  const bounceWindow = { from: trajectory.landingTick + 1, to: Number.POSITIVE_INFINITY }
+  const wholeWindow = { from: 0, to: Number.POSITIVE_INFINITY }
+  let window = wantsFlyCatch ? flyWindow : bounceWindow
   let forecast = forecastCatch(trajectory, fielders, window)
+  if (wantsFlyCatch && forecast.earliestCatchTick === NO_FORECAST_CATCH) {
+    window = wholeWindow
+    forecast = forecastCatch(trajectory, fielders, window)
+  }
 
   // ── 필살수비 굴림 (메시지 0x11 = 타구가 떠난 순간, I-controls 2c) ──
   // A(점프, +0x1f5) 를 먼저 굴리고 실패했을 때만 B(슬라이딩, +0x1f6). 창을 여는 것뿐이라
@@ -770,6 +777,16 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
       slideUnlocked: specialDefense.slideUnlocked,
     })
   }
+  // 뜬 채로 잡히는가 — 고른 포구가 낙구 전(0xb3b38 우선순위 1~5)일 때만. 자르지 않은 예보에서 점프·슬라이딩 창이
+  // 열려 낙구 전 포구가 생기면 그것도 뜬공이다
+  const onTheFly = wantsFlyCatch && forecast.choice.catchTick <= trajectory.landingTick
+  // 0xa9e44 의 1루 주자 예외 (a9ed6) — 2아웃 전 잡힐 뜬공이면 1루 주자는 포스 목표를 안 받는다
+  const runners = createPlayRunners(
+    input.bases,
+    input.outcome,
+    speed,
+    onTheFly && input.outs !== 2 ? { stealingFrom: input.stealingFrom ?? [] } : null,
+  )
 
   // ── 상태 0x17 진입 0x46418 → 0x3d7b8: 판 시작(vt18) 뒤 주자 목록 차례로 리드 틱을 몰아서 돌린다 ──
   // 필살수비 굴림(메시지 0x11)보다 뒤다. 도루 주자만 rand(0,9) 한 번 — 종류 1 은 그 뒤 도루 표시를 지운다(state[0x14+b] = 0)
@@ -2107,6 +2124,8 @@ export function runDefensePlay(input: DefensePlayInput): DefensePlayResult {
   return defensePlayResultOf(state)
 }
 
+/** 예보 표가 비었을 때의 가장 이른 포구 틱 (플레이 +0x11c 초기값 0xffff — `forecastCatch`) */
+const NO_FORECAST_CATCH = 0xffff
 /** 펌블 뒤 동작 잠금 틱 — 야수+0xb4 = 15 (놓침 동작 0xd, R3 2-1) */
 const FUMBLE_LOCK_TICKS = 15
 /** 0xb2c90: 받는 야수까지 이 거리 이하면 던지지 않는다 */
