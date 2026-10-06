@@ -44,6 +44,11 @@ export interface SeasonSummaryScreenProps {
   readonly postseasonRank: number
   /** 저장(전역) **+0x145** — 리그 1위 G 를 이미 받은 문턱 비트 (시즌을 새로 시작해도 유지된다) */
   readonly leagueFirstAwardedBits: number
+  /**
+   * 이번 결산 진입(0x6900)에서 세 모드 해금 0x29 "오토봇 배트" 가 새로 열려 **리그 1위 G 검사를 건너뛴다** —
+   * 0x69ce 가 0x62369 의 결과로 곧장 함수 끝(0x6ac8)으로 간다 (원본 버그 그대로). 참이면 G 사슬 없이 끝낸다.
+   */
+  readonly skipsLeagueFirstAward?: boolean
   /** 한국시리즈 보상 적용 (`0x85ec` — 팝업 7 이 닫힐 때 인기도·평판·소지금을 더한다) */
   readonly onApplyKoreanSeriesReward: (reward: SeasonReward) => void
   /** 리그 1위 G 지급 (`0x87e8` — 한 번에 하나, 팝업이 닫히면 다음 문턱을 다시 본다) */
@@ -88,7 +93,7 @@ const NO_CHAMPION = 0xf
  */
 export function SeasonSummaryScreen(props: SeasonSummaryScreenProps) {
   const {
-    record, series, postseasonRank, leagueFirstAwardedBits,
+    record, series, postseasonRank, leagueFirstAwardedBits, skipsLeagueFirstAward = false,
     onApplyKoreanSeriesReward, onLeagueFirstAward, onContinuePostseason, onFinish,
   } = props
 
@@ -103,7 +108,9 @@ export function SeasonSummaryScreen(props: SeasonSummaryScreenProps) {
 
   /** 리그 1위 G 는 한 번에 하나다 — 줄 것이 없으면 결산이 끝난다 (`0x87e8`) */
   const goToLeagueFirst = (bits: number) => {
-    const award = nextLeagueFirstAward(record, bits)
+    // ⚠️ 웹은 결산 진입(0x6900)과 팝업 닫힘(0x87e8)의 두 G 검사를 이 한 자리에 모았다 — 0x29 가 열린 진입이면 건너뛴다.
+    //    원본에서 그 뒤 팝업 닫힘(0x87e8)이 같은 진입 안에서 G 를 다시 볼 수 있는지는 확인하지 못했다(미해결)
+    const award = skipsLeagueFirstAward ? null : nextLeagueFirstAward(record, bits)
     if (award === null) {
       onFinish()
       return

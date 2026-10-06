@@ -20,13 +20,18 @@ import {
 import { clearSeasonGameRecord } from '@/entities/season-mode/model/seasonReputation'
 import type { SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
 import type { TradeSettlement } from '@/entities/season-mode/model/playerTrade'
-import { EMPTY_LEAGUE, LEAGUE_SIDE_HOME, leagueSideOf, rankingOf } from '@/entities/league/model/league'
+import {
+  EMPTY_LEAGUE, LEAGUE_SIDE_HOME, leagueSideOf, leagueStarterSlotOf, nextSeasonLeague, pitcherOrdersAfterPostseason,
+  rankingOf, rotateLeaguePitchers, startPostseason,
+} from '@/entities/league/model/league'
 import type { League } from '@/entities/league/model/league'
 import { recordLeagueResult } from '@/entities/league/model/league'
 import { playLeagueDay } from '@/entities/league/model/leagueDay'
+import type { LeagueAbilityContext } from '@/entities/league/model/leagueDay'
 import { finishRegularSeason } from '@/entities/league/model/seasonEnd'
 import { runCpuPostseasonWithStamina } from '@/entities/league/model/postseasonPlay'
-import { advancePostseason, postseasonRotationTurnsOf, postseasonSideOf } from '@/entities/league/model/league'
+import { advancePostseason, postseasonSideOf, postseasonStarterSlotOf } from '@/entities/league/model/league'
+import { SEASON_MODE, cpuGameRotationAdvances } from '@/entities/pitcher-career/model/pitcherRotation'
 import { isMyTurn } from '@/entities/league/model/seasonEnd'
 import type { PostseasonSeries } from '@/entities/league/model/league'
 import { EMPTY_LEAGUE_PLAYER_STATS, recordLeaguePlateAppearances } from '@/entities/league/model/leaguePlayerStats'
@@ -59,7 +64,11 @@ import { KOREA_TEAM_ID, createNationalCup, nationalCupSideOf } from '@/entities/
 import { advanceNationalCupDay } from '@/entities/national-cup/model/nationalCupPlay'
 import { isSeasonNationalCupYear } from '@/entities/national-cup/model/nationalCupFlow'
 import type { NationalCupFinish } from '@/entities/national-cup/model/nationalCupFlow'
-import { applySeasonBurstRewards, applySeasonReward, GAME_POINT_LIMIT, judgeSeasonEnding } from '@/entities/season-mode/model/seasonRewards'
+import {
+  SEASON_AUTOBOT_BAT_HIDDEN_ID, applySeasonBurstRewards, applySeasonReward, GAME_POINT_LIMIT, judgeSeasonEnding,
+  opensSeasonAutobotBat,
+} from '@/entities/season-mode/model/seasonRewards'
+import type { SeasonAutobotBatInput } from '@/entities/season-mode/model/seasonRewards'
 import type { BurstRewardDelta } from '@/entities/burst-mission/model/burstMissionReward'
 import type { LeagueFirstAward } from '@/entities/season-mode/model/seasonRewards'
 import type { SeasonAwardReward } from '@/widgets/season/lib/seasonAwardEvents'
@@ -141,6 +150,16 @@ export interface SeasonSession {
    * ⚠️ 그래서 웹에서는 새로 고치면 사라진다 — G(+0x64)는 지갑으로 옮겨 이 한계를 벗어났다.
    */
   readonly openedStadiumIds: readonly number[]
+  /**
+   * 시즌모드가 연 **전역 해금표 `app+0xc0`** 칸 — 지금은 결산 0x6900 의 0x29 "오토봇 배트" 하나다. 앱이 기록연감
+   * 해금 목록에 합친다. 자리는 위 칸과 같은 세션 상태다(근사).
+   */
+  readonly openedHiddenIds: readonly number[]
+  /**
+   * 이번 결산 진입(0x6900)에서 0x29 를 새로 열어 **리그 1위 G 검사를 건너뛰었는가** — 원본 버그 그대로
+   * (`opensSeasonAutobotBat` 주석). 결산 화면이 G 사슬을 타지 않고 곧장 끝낸다.
+   */
+  readonly skipsLeagueFirstAward: boolean
   /** 진행 중인 국가대항전. 없으면 null (원본 L+0xa8~ 칸) */
   readonly cup: NationalCup | null
   /** 선수단 화면 0xd7 의 용도 `this+0x11c` — 1 경기 전 마선수 고르기 · 2 코치채용 */
@@ -391,6 +410,26 @@ function withSeasonFirstDayStamina(save: SeasonSave): SeasonSave {
  * 경기 끝 스태미나를 되적는다 — 내 팀은 명단 차례(요약 `ourPitcherStaminas`), 상대는 표 칸 차례.
  * 요약에 없는 칸은 그대로 둔다.
  */
+/**
+ * 시즌 CPU 경기의 경기용 능력치 갈래 (`0xb570c` 모드 2) — 팀 능력치 정액 `0xb592c`(시즌 기록의 10팀 네 칸)와
+ * 코치 `0xb5a74`(SR+0x185, 팀 검사 없음). 리그 CPU 경기 교체의 마무리 후보 정렬(능력 합 `0xb5b50`)이 쓴다 (27f02c7).
+ */
+function seasonAbilityContextOf(state: SeasonState): LeagueAbilityContext {
+  return { mode: SEASON_MODE, teamAbilities: state.teamAbilities, coach: state.record.coach }
+}
+
+/**
+ * 정규시즌 사람 경기 그 팀의 **오늘 선발 칸** — 리그가 들고 다니는 투수 레코드 차례(`League.pitcherOrders`)의 0번.
+ *
+ * 원본 경기 준비 `0x6548`(670e~673e)은 g ≠ 0 이면 두 팀 레코드를 `0xb5ca8` 로 한 칸 돌린 뒤 0번을 세운다. 웹은 그
+ * 한 칸을 경기가 끝난 뒤 `playLeagueDay`(`rotatesHumanGameTeams`)가 리그 차례에 넣으므로, 경기 전에는 여기서 미리
+ * 한 칸 돌려 본다. 차례는 지난 시즌·포스트시즌에서 이어진다(`nextSeasonLeague`) — 첫 해 정규시즌에서만 `g % 4` 와 같다.
+ */
+export function seasonLeagueStarterSlotOf(league: League, team: number, day: number): number {
+  const prepared = cpuGameRotationAdvances(SEASON_MODE, day) ? rotateLeaguePitchers(league, [team]) : league
+  return leagueStarterSlotOf(prepared, team)
+}
+
 function withGameEndStamina(save: SeasonSave, summary: TeamGameSummary): SeasonSave {
   const ours = summary.ourPitcherStaminas
   const theirs = summary.opponentPitcherStaminas
@@ -544,12 +583,18 @@ function nextYearOf(save: SeasonSave): { readonly save: SeasonSave; readonly sce
       scene: SEASON_SCENE_STATE.엔딩,
     }
   }
-  // 새 해로 넘어가며 리그 전적·선수 성적을 비운다 (정규시즌 표는 해마다 새로 센다)
+  // 새 해로 넘어가며 리그 전적·선수 성적을 비운다 (정규시즌 표는 해마다 새로 센다).
+  // 투수 레코드 차례는 잇는다 — 리그 초기화 0xb7b34 는 L(SR+0x80)만 지우고 팀 저장 레코드(0x1f570)는 다시 짓지
+  // 않으므로 0xb5ca8 로 섞인 차례(정규시즌 + 포스트시즌 시리즈에서 돈 칸)가 새 해로 남는다 (3eb7301)
+  const series = save.series ?? null
+  const pitcherOrders = series === null
+    ? save.league.pitcherOrders
+    : pitcherOrdersAfterPostseason(series, save.league.pitcherOrders)
   return {
     save: {
       ...save,
       state: startNextYear(save.state),
-      league: EMPTY_LEAGUE,
+      league: nextSeasonLeague(pitcherOrders),
       playerStats: EMPTY_LEAGUE_PLAYER_STATS,
       series: null,
       ranking: [],
@@ -574,6 +619,11 @@ export function useSeasonSession(
   aceLevels?: Readonly<Record<number, number>>,
   /** 기록연감 통계 `[mgr+0xc8]` 에 한 건 쌓는다 (G 사용처 0x22c29 — 시즌은 k 3). 안 넘기면 안 쌓는다 */
   recordStat?: (event: AnnalsStatEvent) => void,
+  /**
+   * 결산 0x6900 의 0x29 검사가 읽는 다른 두 모드 저장 +0x7a 와 전역 해금표 — 결산에 들어갈 때 부른다.
+   * 안 넘기면(그 저장을 못 읽으면) 0x29 검사를 건너뛴다 (나리 쪽 `applyRegularSeasonReward` 와 같은 자세).
+   */
+  autobotBatInput?: () => SeasonAutobotBatInput | undefined,
 ): SeasonSession {
   const loaded = useRef<SeasonSave | null>(null)
   if (loaded.current === null) loaded.current = withSceneConstructed(normalizeSeasonSave(store.load() as Partial<SeasonSave> | null))
@@ -611,6 +661,12 @@ export function useSeasonSession(
   const [isMatchSettingsOpen, setIsMatchSettingsOpen] = useState(false)
   /** 전역 저장 app+0xe0 — 열린 구장 히든 아이템 id (S3 7절). 위 칸과 같은 자리에 둔다 */
   const [openedStadiumIds, setOpenedStadiumIds] = useState<readonly number[]>([])
+  /** 전역 해금표 app+0xc0 중 시즌모드가 연 칸 (0x29) — 위 칸과 같은 자리 */
+  const [openedHiddenIds, setOpenedHiddenIds] = useState<readonly number[]>([])
+  /** 이번 결산 진입에서 0x29 가 새로 열려 리그 1위 G 검사를 건너뛰었는가 (0x69ce → 0x6ac8) */
+  const [skipsLeagueFirstAward, setSkipsLeagueFirstAward] = useState(false)
+  const autobotBatInputRef = useRef(autobotBatInput)
+  autobotBatInputRef.current = autobotBatInput
   /** 엔트리 편집 0xe0 — 편집 객체와 목록 */
   const [entryEdit, setEntryEdit] = useState<SeasonEntryEdit | null>(null)
   /** 이벤트 재생 0xd3 — 트는 이벤트와 돌아갈 상태 */
@@ -722,6 +778,19 @@ export function useSeasonSession(
       return
     }
 
+    // 결산 0xef 진입 0x6900 — 들어갈 때마다 머리에서 세 모드 해금 0x29 를 본다. 새로 열리면 그 진입의 리그 1위 G
+    // 검사를 건너뛴다(0x69ce → 0x6ac8, 원본 버그 그대로). ⚠️ 해금 알림 창(0x62368 이 띄우는 글)은 웹에 아직 없다
+    if (scene === SEASON_SCENE_STATE.시즌결산) {
+      const input = autobotBatInputRef.current?.()
+      const opens = input !== undefined && opensSeasonAutobotBat(record, {
+        ...input,
+        globalOpenedHiddenIds: [...input.globalOpenedHiddenIds, ...openedHiddenIds],
+      })
+      if (opens) setOpenedHiddenIds((opened) => [...opened, SEASON_AUTOBOT_BAT_HIDDEN_ID])
+      setSkipsLeagueFirstAward(opens)
+      return
+    }
+
     // 시즌 끝 사슬 — 진입 함수마다 phase 를 세우고 저장한다 (0x6d6c 0xb · 0xe854 0xc · 0xe900 0xd · 0xe7ac 0xe · 0x6c90 0x10)
     const step = SEASON_END_CHAIN.find((candidate) => candidate.state === scene)
     if (step === undefined) return
@@ -734,7 +803,7 @@ export function useSeasonSession(
       const rank = Math.max(0, rankingOf(save.league).indexOf(record.teamId))
       return startEvent(regularSeasonRankEventId(rank), step.next)
     }
-  }, [commit, event100Awarded, random, save, scene, startEvent])
+  }, [commit, event100Awarded, openedHiddenIds, random, save, scene, startEvent])
 
   const chooseTeam = useCallback(
     (teamId: number) => {
@@ -837,9 +906,14 @@ export function useSeasonSession(
         // 코치는 SR+0x185 다 — 채용 화면(0xd7)이 채운 칸을 그대로 넘긴다 (−1 = 없음)
         // 질병 −30% 는 질병 종류 SR+5 가 아니라 **SR+6 > 0** 을 본다 (0xb5824 `ldrsb [SR,#6]`) — `illnessPenaltyFieldOf`
         season: { illness: illnessPenaltyFieldOf(record), morale: save.state.teamMorale, coach: record.coach },
-        // 리그 날짜 카운터 g = SR+0xb2(치른 경기 수) — 양 팀 선발이 네 경기마다 한 바퀴 돈다.
-        // 안 넘기면 0 고정이라 늘 로스터 0번이 선발이었다 (0xb5ca8 로테이션이 안 돈다)
-        dayCounter: record.games,
+        // 선발 = 리그 투수 레코드 차례의 0번 (`seasonLeagueStarterSlotOf` — g = SR+0xb2 ≠ 0 이면 0x6548 이 한 칸 돌린 뒤).
+        // 팀 경기 진행기·엔트리 편집은 모드 2 선발을 `rotationSlotOf(dayCounter)` 로 셈하고(features 소관) 편집기에
+        // "그만큼 돈 모양" 을 보인다. 리그 차례는 0xb5ca8 만 움직여 늘 투수 0~3 을 k 칸 돌린 모양이라 선발 칸 k 를
+        // 날짜 칸에 넣으면 선발도 편집기 모양도 같다 — 포스트시즌(`postseasonStarterSlotOf`)과 같은 방식이다.
+        // ⚠️ 미해결: 사람 경기의 벤치 차례(교체 0xabfcc 가 훑는 team+0x0c)는 아직 `[0..7]` 이다 — 진행기가 차례를 받을
+        //    칸이 없다(features 소관)
+        dayCounter: seasonLeagueStarterSlotOf(save.league, record.teamId, record.games),
+        opponentDayCounter: seasonLeagueStarterSlotOf(save.league, opponent, record.games),
         teamAbilities: save.state.teamAbilities,
         // 마선수 레벨 — 0xb6414 가 모드를 가리지 않고 전역 mgr[0x13a + i] 를 읽는다 (b9f896b·e2ee55a)
         aceLevels,
@@ -1242,6 +1316,7 @@ export function useSeasonSession(
             random,
             rested.cpuPitcherStaminas,
             aceLevels,
+            seasonAbilityContextOf(current.state),
           )
           const advanced = cpu.series
           commit({
@@ -1264,9 +1339,11 @@ export function useSeasonSession(
         // 결승을 이겨도 우승국(L+0xc4)이 15 로 남았다. 커리어 `finishCupGame` 과 같이 요약의 팀 번호를 쓴다
         const winner = won ? summary.ourTeamId : opponent
         const loser = won ? opponent : summary.ourTeamId
+        // 같은 날 CPU 경기 두 나라는 사람 경기가 깎아 둔 상대국 슬롯 레코드(base+0x934)의 투수 +0x2c 에서 선다 (701a7a9) —
+        // 요약의 상대 투수 끝 스태미나(표 칸 차례)가 그 값이다
         commit({
           ...current,
-          cup: advanceNationalCupDay(cup, winner, loser, random),
+          cup: advanceNationalCupDay(cup, winner, loser, random, summary.opponentPitcherStaminas),
           state: { ...current.state, record: played },
         })
         setGameOptions(null)
@@ -1289,6 +1366,9 @@ export function useSeasonSession(
         ),
         afterGameStamina.cpuPitcherStaminas,
         aceLevels,
+        // 사람 경기 두 팀의 로테이션 한 칸(0x6548 670e~673e)은 여기서 리그 차례에 넣는다 — 선발은 `optionsFor` 가 미리 셈했다
+        true,
+        seasonAbilityContextOf(current.state),
       )
       const rested = withDayEndRecovery({ ...afterGameStamina, cpuPitcherStaminas: day.pitcherStaminas })
 
@@ -1349,7 +1429,8 @@ export function useSeasonSession(
         const end = finishRegularSeason(save.league, settled.teamId)
         commit({
           ...save,
-          series: end.postseason,
+          // 포스트시즌 선발·벤치 차례는 정규시즌이 끝났을 때의 리그 투수 레코드 차례에서 이어 돈다 (3eb7301)
+          series: startPostseason(end.ranking, save.league.pitcherOrders),
           ranking: end.ranking,
           state: {
             ...save.state,
@@ -1388,17 +1469,20 @@ export function useSeasonSession(
       if (options === null) return
       // 날짜 카운터는 시즌 경기 수가 아니라 **이 시리즈의 g**(L+0x32 — 0xb80a8 b811c 0 · 0xb7724 b777a −1 ·
       // 0xb818c b819a +1)이고, 경기 준비 0x6548 의 로테이션(670e~673e)이 g ≠ 0 이면 양 팀 레코드를 한 칸 돌린다.
-      // 레코드는 영구로 섞이므로 정규 44칸과 앞 시리즈에서 돈 칸이 팀마다 얹힌다 (`postseasonRotationTurnsOf`)
+      // 레코드는 영구로 섞이므로 정규시즌 끝 차례(`baseOrders`)에 앞 시리즈 이월 칸과 g 가 팀마다 얹힌다 — 그 0번을
+      // 날짜 칸에 넣는다(`optionsFor` 주석과 같은 방식)
       const postseasonOptions = {
         ...options,
-        dayCounter: postseasonRotationTurnsOf(series, myTeam),
-        opponentDayCounter: postseasonRotationTurnsOf(series, opponent),
+        dayCounter: postseasonStarterSlotOf(series, myTeam),
+        opponentDayCounter: postseasonStarterSlotOf(series, opponent),
       }
       // 0xef 키: 내 팀이 X/Y 면 this+0x11c = 1 → 0xd7 (P4 4b) — 정규시즌과 같은 경기 전 흐름이다
       return enterPreGameSquad({ kind: '포스트시즌', options: postseasonOptions })
     }
     // 0xc2760 은 CPU 팀 투수 레코드 +0x2c 를 깎기만 한다 — 회복(0xb617c)은 다음 내 경기 끝 0x4ea0c 에서다
-    const cpu = runCpuPostseasonWithStamina(series, myTeam, random, save.cpuPitcherStaminas, aceLevels)
+    const cpu = runCpuPostseasonWithStamina(
+      series, myTeam, random, save.cpuPitcherStaminas, aceLevels, seasonAbilityContextOf(save.state),
+    )
     const advanced = cpu.series
     commit({
       ...save,
@@ -1751,6 +1835,8 @@ export function useSeasonSession(
     // 지갑이 주인이다 (`?무한G` 도 지갑 안에서 갈린다) — 위 `gamePoints` 주석 참고
     gamePoints,
     openedStadiumIds,
+    openedHiddenIds,
+    skipsLeagueFirstAward,
     cup: save?.cup ?? null,
     eventPlayback,
     notice,

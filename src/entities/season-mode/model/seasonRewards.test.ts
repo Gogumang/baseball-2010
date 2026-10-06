@@ -12,6 +12,7 @@ import {
   koreanSeriesRewardOf,
   nationalCupRewardOf,
   nextLeagueFirstAward,
+  opensSeasonAutobotBat,
 } from '@/entities/season-mode/model/seasonRewards'
 
 const 기본 = (덮어쓰기: Partial<SeasonRecord> = {}): SeasonRecord => ({
@@ -125,5 +126,26 @@ describe('10년차 엔딩 0xa3084', () => {
 
   it('엔딩 보너스 G 는 0·3000·6000·9000·12000 이다', () => {
     expect(ENDING_BONUS_GAME_POINTS).toEqual([0, 3, 6, 9, 12])
+  })
+})
+
+describe('결산 0x6900 의 세 모드 해금 0x29 (0x6944~0x69d2)', () => {
+  const 시즌 = (regularSeasonFirsts: number): SeasonRecord => ({ ...startNewSeason(0, '테스트구단').record, regularSeasonFirsts })
+  const 입력 = { pitcherEditionFirsts: 1, batterEditionFirsts: 1, globalOpenedHiddenIds: [] as number[] }
+
+  it('투수편·타자편·시즌 +0x7a 가 모두 s8 > 0 이면 연다', () => {
+    expect(opensSeasonAutobotBat(시즌(1), 입력)).toBe(true)
+    expect(opensSeasonAutobotBat(시즌(0), 입력)).toBe(false)
+    expect(opensSeasonAutobotBat(시즌(1), { ...입력, pitcherEditionFirsts: 0 })).toBe(false)
+    expect(opensSeasonAutobotBat(시즌(1), { ...입력, batterEditionFirsts: 0 })).toBe(false)
+  })
+
+  it('세 칸 모두 부호 있는 바이트로 읽는다 (ldrsb) — 128 이상은 음수라 열지 않는다', () => {
+    expect(opensSeasonAutobotBat(시즌(128), 입력)).toBe(false)
+    expect(opensSeasonAutobotBat(시즌(1), { ...입력, batterEditionFirsts: 200 })).toBe(false)
+  })
+
+  it('전역 표에 이미 열려 있으면(0x9f69d ≠ 0) 건너뛴다', () => {
+    expect(opensSeasonAutobotBat(시즌(1), { ...입력, globalOpenedHiddenIds: [0x29] })).toBe(false)
   })
 })

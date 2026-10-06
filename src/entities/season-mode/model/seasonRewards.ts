@@ -146,6 +146,43 @@ export function nextLeagueFirstAward(record: SeasonRecord, awardedBits: number):
   return null
 }
 
+/** 해금 0x29 = 히든 칸 (1, 1, 2) = StrITEM[20] "오토봇 배트" (R13 §11 · `postseasonFlow.AUTOBOT_BAT_HIDDEN_ID` 와 같은 값) */
+export const SEASON_AUTOBOT_BAT_HIDDEN_ID = 0x29
+
+/** `0x6900` 머리가 적재해 읽는 다른 두 모드 저장과 전역 해금표 */
+export interface SeasonAutobotBatInput {
+  /** 나리 **투수편** 저장(모드 3, `0x213c0(g,3,1)` → `0x1f8d4(g,3)`)의 +0x7a 정규시즌 1위 횟수 — 저장이 없으면 0 */
+  readonly pitcherEditionFirsts: number
+  /** 나리 **타자편** 저장(모드 4)의 +0x7a — 저장이 없으면 0 */
+  readonly batterEditionFirsts: number
+  /** 전역 해금표 `app+0xc0` 에 이미 열린 id (`0x9f69d(g, 1, 1, 2)` 가 보는 칸) */
+  readonly globalOpenedHiddenIds: readonly number[]
+}
+
+const signedByteOf = (value: number) => ((value & 0xff) << 24) >> 24
+
+/**
+ * 시즌 결산 0xef 에 **들어갈 때마다**(`0x6900`) 리그 1위 G 검사 앞에 도는 세 모드 해금 0x29 (0x6944~0x69d2, 직접 떴다):
+ * ```
+ * 0x9f69d(전역, 1, 1, 2) ≠ 0 → 0x69d4 (G 검사로)
+ * 0x213c1(g,3,1) ; [sp+4] = (s8)[0x1f8d5(g,3) + 0x7a] ; 0x1f24d(g,3)   ; 투수편
+ * 0x213c1(g,4,1) ; r4    = (s8)[0x1f8d5(g,4) + 0x7a] ; 0x1f24d(g,4)   ; 타자편
+ * r2 = (s8)[SR + 0x7a]                                                 ; 지금 시즌
+ * r4 > 0 && [sp+4] > 0 && r2 > 0 → r0 = 0x62369(ui, 0x29, 0) ; r0 ≠ 0 → 0x6ac8 (함수 끝)
+ * ```
+ * `0x62368` 은 셋째 인자 0 이면 이미 열린 칸에 0 을 돌려주고, **새로 열었을 때만** 0 이 아닌 값을 준다 — 그래서 0x29 가
+ * 새로 열린 그 결산 진입은 **리그 1위 G 검사(0x69d4~)를 통째로 건너뛴다** (원본 버그 그대로, `equipment.ts` 주석).
+ * 참이면 이번 진입에서 0x29 를 연다.
+ */
+export function opensSeasonAutobotBat(record: SeasonRecord, input: SeasonAutobotBatInput): boolean {
+  if (input.globalOpenedHiddenIds.includes(SEASON_AUTOBOT_BAT_HIDDEN_ID)) return false
+  return (
+    signedByteOf(input.batterEditionFirsts) > 0
+    && signedByteOf(input.pitcherEditionFirsts) > 0
+    && signedByteOf(record.regularSeasonFirsts) > 0
+  )
+}
+
 /** 10년차 엔딩 보너스 표 `0xcbc2e` (s8) × 1000 G — StrMODE[214] (J 4-8) */
 export const ENDING_BONUS_GAME_POINTS: readonly number[] = [0, 3, 6, 9, 12]
 

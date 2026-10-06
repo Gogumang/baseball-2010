@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 import { SEASON_DEFAULT_MATCH_SETTINGS, seasonGoalInputOf, useSeasonSession } from '@/app/model/useSeasonSession'
-import { postseasonGameOf, postseasonRotationTurnsOf } from '@/entities/league/model/league'
+import {
+  EMPTY_LEAGUE, pitcherOrdersAfterPostseason, postseasonGameOf, postseasonRotationTurnsOf, postseasonStarterSlotOf,
+} from '@/entities/league/model/league'
 import { SEASON_GAME_COUNT } from '@/entities/season-mode/model/seasonRecord'
 import { SEASON_PHASE, SEASON_SCENE_STATE } from '@/entities/season-mode/model/seasonStateMachine'
 import { SEASON_PLAYABLE_EVENTS } from '@/entities/season-mode/model/seasonEventFlow'
@@ -731,7 +733,7 @@ describe('포스트시즌', () => {
     }
   })
 
-  it('포스트시즌 사람 경기의 날짜 카운터는 시리즈 g 다 — 정규 44칸 + 앞 시리즈 이월이 팀마다 얹힌다 (0x6548 670e)', () => {
+  it('포스트시즌 사람 경기의 선발은 정규시즌 끝 차례 + 앞 시리즈 이월 + 시리즈 g 칸을 돈 레코드 0번이다 (0x6548 670e)', () => {
     const { result } = 시즌끝()
     const 내팀 = result.current.state!.record.teamId
     for (let i = 0; i < 4 && result.current.pendingGame === null; i += 1) {
@@ -742,9 +744,12 @@ describe('포스트시즌', () => {
     const series = result.current.series!
     const 상대 = series.teams[0] === 내팀 ? series.teams[1] : series.teams[0]
     const options = result.current.pendingGame.options
-    // 시즌 경기 수(45)가 아니다 — 0xb80a8 이 L+0x32 를 0 으로 놓는다
-    expect(options.dayCounter).toBe(postseasonRotationTurnsOf(series, 내팀))
-    expect(options.opponentDayCounter).toBe(postseasonRotationTurnsOf(series, 상대))
+    // 시즌 경기 수(45)가 아니다 — 0xb80a8 이 L+0x32 를 0 으로 놓는다. 대진은 리그 차례를 받아 섰다
+    expect(series.baseOrders).toEqual(result.current.league.pitcherOrders)
+    expect(options.dayCounter).toBe(postseasonStarterSlotOf(series, 내팀))
+    expect(options.opponentDayCounter).toBe(postseasonStarterSlotOf(series, 상대))
+    // 첫 해는 차례가 [0..7] 에서 44 칸 돈 것이라 예전 칸 셈과 같다
+    expect(options.dayCounter).toBe(postseasonRotationTurnsOf(series, 내팀) % 4)
     expect(postseasonGameOf(series)).toBe(series.wins[0] + series.wins[1])
   })
 
@@ -1302,5 +1307,100 @@ describe('팀 경기 기록 달성 G (경기 끝 0x4ea0c 4ec5a → 0x4ec82)', ()
 
     expect(result.current.gamePoints).toBe(before + 25)
     expect(events).toEqual([{ kind: 'G획득', mode: 2, amount: 25 }])
+  })
+})
+
+describe('리그 투수 레코드 차례를 시즌 세션이 잇는다 (0xb5ca8 영구 섞기 — 3eb7301)', () => {
+  /** 저장의 리그에 차례를 꽂고 다시 띄운다 — 저장 정규화가 그 칸을 지우지 않아야 한다 */
+  const 차례꽂고다시 = (pitcherOrders: Readonly<Record<number, readonly number[]>>) => {
+    const store = 메모리저장()
+    const 첫판 = 띄우기(store)
+    시작(첫판.result, 0)
+    const saved = store.load() as { league: object }
+    store.save({ ...saved, league: { ...saved.league, pitcherOrders } })
+    return 띄우기(store)
+  }
+
+  it('저장 정규화가 리그의 pitcherOrders 를 그대로 둔다', () => {
+    const 차례 = { 0: [2, 3, 0, 1, 4, 5, 6, 7] }
+    const { result } = 차례꽂고다시(차례)
+    expect(result.current.league.pitcherOrders).toEqual(차례)
+  })
+
+  it('정규시즌 사람 경기 선발은 리그 차례의 0번 — g ≠ 0 이면 0x6548 이 한 칸 돌린 뒤다', () => {
+    const 섞임 = [2, 3, 0, 1, 4, 5, 6, 7]
+    const 상대섞임 = [1, 2, 3, 0, 4, 5, 6, 7]
+    const 차례: Record<number, readonly number[]> = {}
+    for (let team = 1; team < 10; team += 1) 차례[team] = 상대섞임
+    차례[0] = 섞임
+    const { result } = 차례꽂고다시(차례)
+
+    act(() => result.current.actions.playNextGame())
+    // 첫날(g = 0)은 안 돈다 — 지난 시즌에서 이어 온 차례의 0번
+    expect(result.current.gameOptions?.dayCounter).toBe(2)
+    expect(result.current.gameOptions?.opponentDayCounter).toBe(1)
+
+    act(() => result.current.actions.goto(SEASON_SCENE_STATE.관리메뉴))
+    act(() => result.current.actions.updateRecord({ ...result.current.state!.record, games: 1 }))
+    act(() => result.current.actions.playNextGame())
+    // g = 1 이면 한 칸 돈 레코드의 0번 — 날짜 g % 4 셈(1)이 아니다
+    expect(result.current.gameOptions?.dayCounter).toBe(3)
+    expect(result.current.gameOptions?.opponentDayCounter).toBe(2)
+  })
+
+  it('새 해 리그는 승패를 비우고 포스트시즌까지 돈 차례를 잇는다 (nextSeasonLeague)', () => {
+    const { result } = 띄우기()
+    시작(result, 0)
+    act(() => result.current.actions.confirmIncome({
+      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
+    }))
+    const 리그 = result.current.league
+    const series = result.current.series!
+    expect(series.baseOrders).toEqual(리그.pitcherOrders)
+
+    act(() => result.current.actions.finishSeason())
+
+    expect(result.current.state?.record.yearIndex).toBe(2)
+    expect(result.current.league.wins).toEqual(EMPTY_LEAGUE.wins)
+    expect(result.current.league.pitcherOrders).toEqual(pitcherOrdersAfterPostseason(series, 리그.pitcherOrders))
+  })
+})
+
+describe('결산 0x6900 의 세 모드 해금 0x29 "오토봇 배트"', () => {
+  const 띄우기0x29 = (input: () => { pitcherEditionFirsts: number; batterEditionFirsts: number; globalOpenedHiddenIds: readonly number[] }) =>
+    renderHook(() => useSeasonSession(메모리저장(), createSeededRandom(20100901), null, undefined, undefined, input))
+
+  const 결산들어가기 = (result: 세션결과, firsts: number) => {
+    act(() => result.current.actions.updateRecord({ ...result.current.state!.record, regularSeasonFirsts: firsts }))
+    act(() => result.current.actions.goto(SEASON_SCENE_STATE.시즌결산))
+  }
+
+  it('세 모드 +0x7a 가 모두 > 0 이고 아직 안 열렸으면 연다 — 그 진입은 리그 1위 G 검사를 건너뛴다', () => {
+    const { result } = 띄우기0x29(() => ({ pitcherEditionFirsts: 1, batterEditionFirsts: 2, globalOpenedHiddenIds: [] }))
+    시작(result, 0)
+    결산들어가기(result, 1)
+
+    expect(result.current.openedHiddenIds).toEqual([0x29])
+    expect(result.current.skipsLeagueFirstAward).toBe(true)
+
+    // 다시 들어가면 이미 열려 있어(0x9f69d) 검사를 건너뛰고 G 검사로 간다
+    act(() => result.current.actions.goto(SEASON_SCENE_STATE.관리메뉴))
+    act(() => result.current.actions.goto(SEASON_SCENE_STATE.시즌결산))
+    expect(result.current.openedHiddenIds).toEqual([0x29])
+    expect(result.current.skipsLeagueFirstAward).toBe(false)
+  })
+
+  it('한 모드라도 1위가 없거나 전역 표에 이미 열려 있으면 열지 않는다', () => {
+    const 하나없음 = 띄우기0x29(() => ({ pitcherEditionFirsts: 0, batterEditionFirsts: 2, globalOpenedHiddenIds: [] }))
+    시작(하나없음.result, 0)
+    결산들어가기(하나없음.result, 1)
+    expect(하나없음.result.current.openedHiddenIds).toEqual([])
+    expect(하나없음.result.current.skipsLeagueFirstAward).toBe(false)
+
+    const 열림 = 띄우기0x29(() => ({ pitcherEditionFirsts: 1, batterEditionFirsts: 1, globalOpenedHiddenIds: [0x29] }))
+    시작(열림.result, 0)
+    결산들어가기(열림.result, 1)
+    expect(열림.result.current.openedHiddenIds).toEqual([])
+    expect(열림.result.current.skipsLeagueFirstAward).toBe(false)
   })
 })

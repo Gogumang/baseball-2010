@@ -28,6 +28,7 @@ import { PitcherLeagueRoute } from '@/app/ui/PitcherLeagueRoute'
 import { GeneralModeScreen, aceOpenPriceOf, useAceOpen } from '@/pages/general-mode'
 import { useGamePointWallet } from '@/entities/wallet/model/useGamePointWallet'
 import { useAceLevels } from '@/entities/mission/model/useAceLevels'
+import type { SeasonAutobotBatInput } from '@/entities/season-mode/model/seasonRewards'
 
 const SETTINGS_KEY = 'compus-baseball/settings'
 const COLLECTION_KEY = 'compus-baseball/collection'
@@ -106,7 +107,13 @@ export function App() {
    */
   const recordStatRef = useRef<(event: AnnalsStatEvent) => void>(() => {})
   const recordStat = useCallback((event: AnnalsStatEvent) => recordStatRef.current(event), [])
-  const seasonSession = useSeasonSession(seasonStore, random, wallet, aceLevels.levels, recordStat)
+  /**
+   * 시즌 결산 0x6900 의 0x29 "오토봇 배트" 검사가 읽는 것 — 나리 투수편·타자편 저장의 +0x7a 와 전역 해금표 `app+0xc0`.
+   * 기록연감·투수편 세션은 시즌 세션보다 늦게 서므로 아래에서 채우고 시즌 세션은 결산에 들어갈 때 읽는다.
+   */
+  const autobotBatInputRef = useRef<SeasonAutobotBatInput | undefined>(undefined)
+  const readAutobotBatInput = useCallback(() => autobotBatInputRef.current, [])
+  const seasonSession = useSeasonSession(seasonStore, random, wallet, aceLevels.levels, recordStat, readAutobotBatInput)
   // 투수편 G도 같은 지갑 한 칸이다 — 옛 투수 저장에 남은 G는 표식 칸을 보고 딱 한 번 옮겨 온다
   const pitcherSession = usePitcherLeagueSession(
     pitcherStore,
@@ -144,15 +151,27 @@ export function App() {
     pitcher: pitcherMissionPitcher,
   })
   // 투수편이 연 히든(장비 컬렉터 20·24·28·32)도 같은 전역 표 `app+0xc0` 에 모은다 (0x62368)
+  // 시즌 결산이 연 전역 해금(0x29)도 같은 전역 표에 모은다
+  const pitcherOpenedHiddenIds = pitcherSession.career?.openedHiddenIds
+  const seasonOpenedHiddenIds = seasonSession.openedHiddenIds
+  const sharedOpenedHiddenIds = useMemo(
+    () => [...(pitcherOpenedHiddenIds ?? []), ...seasonOpenedHiddenIds],
+    [pitcherOpenedHiddenIds, seasonOpenedHiddenIds],
+  )
   const collection = useCollection(
     collectionStore,
     careerSession.career,
     isEveryMissionCleared(mission.clearedKeys),
-    pitcherSession.career?.openedHiddenIds,
+    sharedOpenedHiddenIds,
     // 엔딩 적재 0x87c7c 는 두 편 공용 — 투수편 엔딩·연애 엔딩도 기록연감 칸에 켠다
     pitcherSession.career,
   )
   const { recordStat: recordCollectionStat } = collection
+  autobotBatInputRef.current = {
+    pitcherEditionFirsts: pitcherSession.career?.regularSeasonFirstCount ?? 0,
+    batterEditionFirsts: (careerSession.career ?? careerSession.savedCareer)?.regularSeasonFirstCount ?? 0,
+    globalOpenedHiddenIds: collection.collection.openedHiddenIds,
+  }
   useEffect(() => {
     recordStatRef.current = recordCollectionStat
   }, [recordCollectionStat])
@@ -224,6 +243,8 @@ export function App() {
         gameSettings={gameSettings}
         onExit={() => setScreen({ kind: '메인메뉴' })}
         aceSelect={aceSelect}
+        // 선수영입 후보의 명예의 전당 칸 (0x1f62c · 0x1f640)
+        hallOfFame={collection.collection}
       />
     )
   }

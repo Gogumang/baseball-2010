@@ -13,6 +13,7 @@ import { stadiumOwnedIndexOf } from '@/entities/season-mode/model/stadiumItems'
 import { TEAMS } from '@/shared/config/original/teams'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
+import type { Collection, HallOfFamePitcher, HallOfFamer } from '@/entities/collection/model/collection'
 
 /**
  * 시즌 모드 라우팅(0x105) 배선 — **화면이 있는데 라우팅에 없어 못 뜨던 것**들을 못박는다.
@@ -48,9 +49,10 @@ interface 화면Props {
   /** 들어오자마자 옮겨 갈 장면 (원본 상태 번호) */
   readonly 장면?: SeasonSceneState
   readonly onExit: () => void
+  readonly hallOfFame?: Pick<Collection, 'hallOfFame' | 'hallOfFamePitchers'>
 }
 
-function 시즌화면({ store, 장면, onExit }: 화면Props) {
+function 시즌화면({ store, 장면, onExit, hallOfFame }: 화면Props) {
   const session = useSeasonSession(store, createSeededRandom(20100901))
   const gameSettings = useGameSettings(설정저장)
   const { goto } = session.actions
@@ -63,6 +65,7 @@ function 시즌화면({ store, 장면, onExit }: 화면Props) {
       random={createSeededRandom(20100901)}
       gameSettings={gameSettings}
       onExit={onExit}
+      {...(hallOfFame === undefined ? {} : { hallOfFame })}
     />
   )
 }
@@ -221,5 +224,28 @@ describe('아이템 메뉴 0xd0 배선', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '구장아이템' }))
     expect(screen.getAllByRole('button', { name: /관중석/ }).length).toBeGreaterThan(0)
+  })
+})
+
+describe('선수영입 후보의 명예의 전당 칸 (0x1f62c · 0x1f640 — c3e66c1)', () => {
+  it('기록연감의 명예 투수·타자가 그 칸 번호 자리(1~4 · 6~)에 후보로 뜬다', () => {
+    const store = 메모리저장(세이브(레코드({ seenEvents: [400, 1, 5, 100], yearGoalShown: true })))
+    const 투수 = { name: '김전당', slot: 1 } as unknown as HallOfFamePitcher
+    const 타자 = { name: '이전당' } as unknown as HallOfFamer
+    render(
+      <시즌화면
+        store={store}
+        장면={SEASON_SCENE_STATE.선수영입}
+        onExit={vi.fn()}
+        hallOfFame={{ hallOfFamePitchers: [투수], hallOfFame: [타자] }}
+      />,
+    )
+
+    const 줄 = screen.getAllByRole('button')
+      .map((button) => button.textContent ?? '')
+      .filter((text) => /(나리|명예)(투수|타자)$/.test(text))
+    // 칸 0 나리 투수 · 1~4 명예 투수(투수 칸 1 → 셋째 줄) · 5 나리 타자 · 6~ 명예 타자(옛 저장 = 목록 순서 0)
+    expect(줄[2]).toContain('김전당')
+    expect(줄[6]).toContain('이전당')
   })
 })

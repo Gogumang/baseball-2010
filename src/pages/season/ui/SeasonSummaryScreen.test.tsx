@@ -192,6 +192,31 @@ describe('리그 1위 누적 G (StrMODE[223])', () => {
   })
 })
 
+describe('0x29 가 새로 열린 결산 진입 (0x69ce → 0x6ac8)', () => {
+  it('리그 1위 G 검사를 건너뛰고 곧장 끝낸다 — 원본 버그 그대로', () => {
+    const onAward = vi.fn()
+    const onFinish = vi.fn()
+    render(
+      <SeasonSummaryScreen
+        record={기록({ regularSeasonFirsts: 1 })}
+        series={우승시리즈()}
+        postseasonRank={2}
+        leagueFirstAwardedBits={0}
+        skipsLeagueFirstAward
+        onApplyKoreanSeriesReward={vi.fn()}
+        onLeagueFirstAward={onAward}
+        onFinish={onFinish}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '결과' }))
+    확인()
+
+    expect(onAward).not.toHaveBeenCalled()
+    expect(onFinish).toHaveBeenCalled()
+  })
+})
+
 describe('아직 안 끝난 포스트시즌', () => {
   it('대진표만 그리고 "경기" 로 다음 시리즈 경기로 간다', () => {
     const onContinue = vi.fn()

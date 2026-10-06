@@ -71,7 +71,11 @@ export interface SeasonMatchInfoInput {
   readonly myTeamId: number
   /** rec+4 */
   readonly opponentTeamId: number
-  /** 로테이션 칸을 고르는 날짜 카운터 — 경기 옵션의 `dayCounter` 와 같은 값 */
+  /**
+   * 로테이션 칸을 고르는 값 — 경기 옵션의 `dayCounter` 와 같은 값. 시즌 세션은 정규시즌·포스트시즌에서 날짜 g 가 아니라
+   * **리그 투수 레코드 차례로 센 선발 칸**(`seasonLeagueStarterSlotOf` · `postseasonStarterSlotOf`, 0~3)을 넣는다 —
+   * 차례가 투수 0~3 을 k 칸 돌린 모양이라 `rotationSlotOf(k) = k` 가 곧 그 차례의 0번이다
+   */
   readonly dayCounter: number
   /** 상대 칸만 다른 날짜 — 국가대항전 상대국은 첫날 0 · 그 뒤 1 (경기 옵션 `opponentDayCounter`). 없으면 `dayCounter` */
   readonly opponentDayCounter?: number
@@ -115,6 +119,7 @@ function winLossTextOf(input: SeasonMatchInfoInput, team: number): string {
   return format(input.league.wins[team] ?? 0, input.league.losses[team] ?? 0)
 }
 
+/** 그 팀 붙박이 표에서 `rotationSlotOf(값)` 칸 투수 — 값은 위 `dayCounter` 주석대로 리그 차례의 선발 칸이다 */
 function starterNameOf(team: number, dayCounter: number): string {
   return teamPitchers(team)[rotationSlotOf(dayCounter)]?.name ?? EMPTY_VALUE
 }
