@@ -47,8 +47,9 @@ export function advanceRotation<T>(pitchers: readonly T[]): T[] {
  * ⚠️ 이 셈은 **시즌 첫 해 정규시즌**에만 그 차례와 같다: 차례가 지난 시즌·포스트시즌에서 이어지거나 투수편 맞바꿈
  * (0xa4f60)·새 시즌 0↔k(0x1b684)가 겹치면 갈린다. 나만의리그 두 편의 사람 경기는 리그 차례를 받는다
  * (`leaguePitcherRecords.humanGamePitcherOrderOf` → `startGame` · `PitcherGameOptions.opponentPitcherOrder`) — 이 셈은
- * 그 차례를 안 넘긴 길의 기본값이다. 시즌모드(팀 경기 `TeamGameOptions.opponentPitcherOrder` · 시즌 화면)는 아직 이 셈을
- * 쓴다 — 시즌 세션이 리그 차례를 넘겨야 원본과 같다. 투수편 내 팀은 진행기가 0xa4f60 맞바꿈으로 따로 세운다.
+ * 그 차례를 안 넘긴 길의 기본값이다. 시즌모드도 상대 팀은 리그 차례(`TeamGameOptions.opponentPitcherOrder`)를 넘기고,
+ * 내 팀은 시즌 세션이 명단을 그 차례만큼 돌려 넘긴다(`useSeasonSession.withOwnRecordRotation`). 투수편 내 팀은 진행기가
+ * 0xa4f60 맞바꿈으로 따로 세운다.
  */
 export function rotationSlotOf(dayCounter: number): number {
   return ((Math.trunc(dayCounter) % ROTATION_SIZE) + ROTATION_SIZE) % ROTATION_SIZE

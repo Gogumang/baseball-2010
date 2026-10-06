@@ -21,8 +21,8 @@ import { clearSeasonGameRecord } from '@/entities/season-mode/model/seasonReputa
 import type { SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
 import type { TradeSettlement } from '@/entities/season-mode/model/playerTrade'
 import {
-  EMPTY_LEAGUE, LEAGUE_SIDE_HOME, leagueSideOf, leagueStarterSlotOf, nextSeasonLeague, pitcherOrdersAfterPostseason,
-  rankingOf, rotateLeaguePitchers, startPostseason,
+  EMPTY_LEAGUE, LEAGUE_SIDE_HOME, UNSHUFFLED_PITCHER_ORDER, leagueSideOf, nextSeasonLeague, pitcherOrderOf,
+  pitcherOrdersAfterPostseason, rankingOf, rotateLeaguePitchers, startPostseason,
 } from '@/entities/league/model/league'
 import type { League } from '@/entities/league/model/league'
 import { recordLeagueResult } from '@/entities/league/model/league'
@@ -30,8 +30,13 @@ import { playLeagueDay } from '@/entities/league/model/leagueDay'
 import type { LeagueAbilityContext } from '@/entities/league/model/leagueDay'
 import { finishRegularSeason } from '@/entities/league/model/seasonEnd'
 import { runCpuPostseasonWithStamina } from '@/entities/league/model/postseasonPlay'
-import { advancePostseason, postseasonSideOf, postseasonStarterSlotOf } from '@/entities/league/model/league'
-import { SEASON_MODE, cpuGameRotationAdvances } from '@/entities/pitcher-career/model/pitcherRotation'
+import {
+  advancePostseason, postseasonPitcherOrderOf, postseasonSideOf, postseasonStarterSlotOf,
+} from '@/entities/league/model/league'
+import {
+  SEASON_MODE, advanceRotation, cpuGameRotationAdvances, rotationSlotOf,
+} from '@/entities/pitcher-career/model/pitcherRotation'
+import { recordHumanGamePitchers } from '@/entities/pitcher-career/model/leaguePitcherRecords'
 import { isMyTurn } from '@/entities/league/model/seasonEnd'
 import type { PostseasonSeries } from '@/entities/league/model/league'
 import { EMPTY_LEAGUE_PLAYER_STATS, recordLeaguePlateAppearances } from '@/entities/league/model/leaguePlayerStats'
@@ -54,7 +59,8 @@ import {
 } from '@/entities/season-mode/model/entryEditor'
 import type { EntryEditorState, EntryKey } from '@/entities/season-mode/model/entryEditor'
 import {
-  seasonEntryListsOf, seasonEntryOrderOf, seasonRosterOfEntry, seasonStarterNameOf, tableRosterOf,
+  rotatedPitchersOf, seasonEntryListsOf, seasonEntryOrderOf, seasonRosterOfEntry, seasonStarterNameOf, tableRosterOf,
+  unrotatedPitchersOf,
 } from '@/entities/season-mode/model/seasonEntry'
 import type { SeasonEntryInput, SeasonEntryLists } from '@/entities/season-mode/model/seasonEntry'
 import { HALL_OF_FAME_FIRST_ID } from '@/entities/season-mode/model/playerRecruit'
@@ -426,12 +432,55 @@ function seasonAbilityContextOf(state: SeasonState): LeagueAbilityContext {
  * 한 칸 돌려 본다. 차례는 지난 시즌·포스트시즌에서 이어진다(`nextSeasonLeague`) — 첫 해 정규시즌에서만 `g % 4` 와 같다.
  */
 export function seasonLeagueStarterSlotOf(league: League, team: number, day: number): number {
-  const prepared = cpuGameRotationAdvances(SEASON_MODE, day) ? rotateLeaguePitchers(league, [team]) : league
-  return leagueStarterSlotOf(prepared, team)
+  return seasonLeaguePitcherOrderOf(league, team, day)[0] ?? 0
 }
 
-function withGameEndStamina(save: SeasonSave, summary: TeamGameSummary): SeasonSave {
-  const ours = summary.ourPitcherStaminas
+/**
+ * 정규시즌 사람 경기를 준비했을 때 그 팀의 **투수 레코드 차례 전체** — 0번이 선발, 나머지가 교체 `0xabfcc` 의 벤치 차례.
+ * `seasonLeagueStarterSlotOf` 와 같이 g ≠ 0 이면 `0x6548`(670e~673e)의 한 칸을 미리 돌려 본다.
+ */
+export function seasonLeaguePitcherOrderOf(league: League, team: number, day: number): readonly number[] {
+  const prepared = cpuGameRotationAdvances(SEASON_MODE, day) ? rotateLeaguePitchers(league, [team]) : league
+  return pitcherOrderOf(prepared, team)
+}
+
+/**
+ * 국가대항전 상대국 슬롯(+0x934)의 투수 레코드 차례 — 하루마다 마스터에서 새로 덮이고(0xb818c b8216 → 0x20648) 그날
+ * 경기 준비 `0x6548` 이 g ≠ 0 이면 한 칸 돌린다 → 첫날 `[0..7]`, 그 뒤로는 늘 `[1,2,3,0,4..7]` (7dd3826).
+ */
+export function nationalCupOpponentPitcherOrderOf(cupDay: number): readonly number[] {
+  return cupDay === 0 ? UNSHUFFLED_PITCHER_ORDER : advanceRotation(UNSHUFFLED_PITCHER_ORDER)
+}
+
+/**
+ * 내 팀 명단을 **원본 저장 레코드 모양**으로 — 웹 시즌 명단(`roster`·`cupRoster`)은 로테이션을 돌기 전 모양이고 돈 칸 수
+ * k(경기 옵션 `dayCounter` 의 `rotationSlotOf`)를 따로 셈한다(`seasonEntry` 머리 주석). 원본 `0x6548` 은 저장 레코드를
+ * `0xb5ca8` 로 제자리에서 돌린 뒤 경기용 팀 객체 `0xb891c`(`team[i] = i`)를 세우므로 0번 레코드가 선발이고 **나머지가 그
+ * 차례대로 교체 `0xabfcc` 의 벤치 차례**다. 진행기는 넘긴 명단 차례를 벤치 차례로 쓰므로, 명단 투수 0~3 을 k 칸 돌려
+ * 넘기고(시작 스태미나도 같이) 선발 칸은 0(`dayCounter: 0`)으로 둔다. 끝 스태미나는 `withGameEndStamina` 가 되돌린다.
+ */
+function withOwnRecordRotation(options: TeamGameOptions): { readonly options: TeamGameOptions; readonly shift: number } {
+  const shift = rotationSlotOf(options.dayCounter ?? 0)
+  const order = options.ourEntryOrder
+  const staminas = options.ourPitcherStaminas
+  return {
+    shift,
+    options: {
+      ...options,
+      dayCounter: 0,
+      // 상대 칸은 리그 차례(`opponentPitcherOrder`)로 서지만, 안 넘긴 길이 날짜 칸을 따라 바뀌지 않게 남겨 둔다
+      opponentDayCounter: options.opponentDayCounter ?? options.dayCounter ?? 0,
+      ...(order === undefined ? {} : { ourEntryOrder: { ...order, pitchers: rotatedPitchersOf(order.pitchers, shift) } }),
+      ...(staminas === undefined ? {} : { ourPitcherStaminas: rotatedPitchersOf(staminas, shift) }),
+    },
+  }
+}
+
+function withGameEndStamina(save: SeasonSave, summary: TeamGameSummary, ownRotationShift: number): SeasonSave {
+  // 진행기에는 0x6548 이 돌린 레코드 차례로 넘겼다(`withOwnRecordRotation`) — 웹 명단 차례로 되돌린다
+  const ours = summary.ourPitcherStaminas === undefined
+    ? undefined
+    : unrotatedPitchersOf(summary.ourPitcherStaminas, ownRotationShift)
   const theirs = summary.opponentPitcherStaminas
   return {
     ...save,
@@ -640,6 +689,8 @@ export function useSeasonSession(
   )
   const [notice, setNotice] = useState('')
   const [gameOptions, setGameOptions] = useState<TeamGameOptions | null>(null)
+  /** 지금 경기에 넘긴 내 팀 명단을 0x6548 로테이션 몇 칸 돌렸는가 (`withOwnRecordRotation`) — 끝 스태미나를 되돌린다 */
+  const [ownRotationShift, setOwnRotationShift] = useState(0)
   /** 지금 치르는 경기가 무엇인가 — 끝났을 때 어디로 정산할지 갈린다 */
   const [gameKind, setGameKind] = useState<SeasonGameKind>('정규')
   /** 전역 저장 +0x145 — 리그 1위 G 를 이미 받은 문턱 비트 (시즌을 새로 해도 남는다) */
@@ -907,13 +958,14 @@ export function useSeasonSession(
         // 질병 −30% 는 질병 종류 SR+5 가 아니라 **SR+6 > 0** 을 본다 (0xb5824 `ldrsb [SR,#6]`) — `illnessPenaltyFieldOf`
         season: { illness: illnessPenaltyFieldOf(record), morale: save.state.teamMorale, coach: record.coach },
         // 선발 = 리그 투수 레코드 차례의 0번 (`seasonLeagueStarterSlotOf` — g = SR+0xb2 ≠ 0 이면 0x6548 이 한 칸 돌린 뒤).
-        // 팀 경기 진행기·엔트리 편집은 모드 2 선발을 `rotationSlotOf(dayCounter)` 로 셈하고(features 소관) 편집기에
-        // "그만큼 돈 모양" 을 보인다. 리그 차례는 0xb5ca8 만 움직여 늘 투수 0~3 을 k 칸 돌린 모양이라 선발 칸 k 를
-        // 날짜 칸에 넣으면 선발도 편집기 모양도 같다 — 포스트시즌(`postseasonStarterSlotOf`)과 같은 방식이다.
-        // ⚠️ 미해결: 사람 경기의 벤치 차례(교체 0xabfcc 가 훑는 team+0x0c)는 아직 `[0..7]` 이다 — 진행기가 차례를 받을
-        //    칸이 없다(features 소관)
+        // 엔트리 편집·경기정보는 내 팀 명단을 `rotationSlotOf(dayCounter)` 칸 돈 모양으로 보인다. 리그 차례는 0xb5ca8 만
+        // 움직여 늘 투수 0~3 을 k 칸 돌린 모양이라 선발 칸 k 를 날짜 칸에 넣으면 그 모양이 원본 레코드와 같다 —
+        // 포스트시즌(`postseasonStarterSlotOf`)과 같은 방식이다. 상대 팀은 레코드 차례 전체(`opponentPitcherOrder` — 0번 선발 · 나머지 벤치 차례)를 넘긴다. 날짜 칸
+        // (`opponentDayCounter`)은 경기정보·CPU 엔트리 화면이 보는 같은 차례의 0번이다. 내 팀 벤치 차례는 경기를
+        // 세울 때 `withOwnRecordRotation` 이 명단을 돌려 맞춘다
         dayCounter: seasonLeagueStarterSlotOf(save.league, record.teamId, record.games),
         opponentDayCounter: seasonLeagueStarterSlotOf(save.league, opponent, record.games),
+        opponentPitcherOrder: seasonLeaguePitcherOrderOf(save.league, opponent, record.games),
         teamAbilities: save.state.teamAbilities,
         // 마선수 레벨 — 0xb6414 가 모드를 가리지 않고 전역 mgr[0x13a + i] 를 읽는다 (b9f896b·e2ee55a)
         aceLevels,
@@ -962,7 +1014,9 @@ export function useSeasonSession(
     if (options === null) return
     clearGameRecord(save)
     setGameKind('정규')
-    setGameOptions({ ...options, ...staminaOptionsOf(save, options.opponentTeamId) })
+    const prepared = withOwnRecordRotation({ ...options, ...staminaOptionsOf(save, options.opponentTeamId) })
+    setOwnRotationShift(prepared.shift)
+    setGameOptions(prepared.options)
     setScene(SEASON_SCENE_STATE.경기직전)
   }, [clearGameRecord, optionsFor, save])
 
@@ -1099,7 +1153,8 @@ export function useSeasonSession(
     clearGameRecord(save)
     setIsMatchSettingsOpen(false)
     setGameKind(pendingGame.kind)
-    setGameOptions({
+    // 0x6548 이 돌린 저장 레코드 차례로 명단을 세운다 — 0번 선발 · 나머지 벤치 차례 (`withOwnRecordRotation`)
+    const prepared = withOwnRecordRotation({
       ...pendingGame.options,
       settings: save.matchSettings ?? SEASON_DEFAULT_MATCH_SETTINGS,
       ourEntryOrder: seasonEntryOrderOf(roster),
@@ -1107,6 +1162,8 @@ export function useSeasonSession(
       ...(isCup ? {} : staminaOptionsOf(save, pendingGame.options.opponentTeamId)),
       ...withAces,
     })
+    setOwnRotationShift(prepared.shift)
+    setGameOptions(prepared.options)
     setPendingGame(null)
     setScene(SEASON_SCENE_STATE.경기직전)
   }, [clearGameRecord, pendingGame, preGameAces, save])
@@ -1309,7 +1366,7 @@ export function useSeasonSession(
           // 4f268 → 4f29a 0xb818c(포스트시즌 갈래는 스태미나를 안 건드린다) → 4f2bc 열 팀 +20%.
           // 그 뒤 결산 0xef 키 0x9dc8 이 CPU 끼리 경기 0xc2760 을 돌린다 — 회복이 **끝난** 표로 서고 깎인 값이
           // 그대로 남는다(0xc2760 의 하루 끝 0xb818c 포스트시즌 갈래는 회복이 없고, 0xb617c 는 0x4ea0c 에서만 불린다)
-          const rested = withDayEndRecovery(withGameEndStamina(current, summary))
+          const rested = withDayEndRecovery(withGameEndStamina(current, summary, ownRotationShift))
           const cpu = runCpuPostseasonWithStamina(
             advancePostseason(series, winner),
             record.teamId,
@@ -1354,15 +1411,21 @@ export function useSeasonSession(
         ? recordLeagueResult(current.league, record.teamId, opponent)
         : recordLeagueResult(current.league, opponent, record.teamId)
       // 내 경기의 끝 스태미나를 되적고 → 같은 날 CPU 경기 0xc2a48 이 그 표로 치러 깎고 → 하루 끝 4f2bc 열 팀 +20%
-      const afterGameStamina = withGameEndStamina(current, summary)
+      const afterGameStamina = withGameEndStamina(current, summary, ownRotationShift)
       const day = playLeagueDay(
         afterMyGame,
         record.games,
         record.teamId,
         random,
-        recordLeaguePlateAppearances(
-          current.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS,
-          summary.leaguePlateAppearances,
+        // 투수 줄도 같은 정산 0xa8024 · 경기 끝 0xa7de8 이 쌓는다 — 0xa56dc 모드 2 갈래(0xa56fa)는 포스트시즌·국가대항전이면
+        // 거짓이라 정규시즌 경기만이다(이 갈래가 곧 정규시즌이다). 요약 `leaguePitchers` 는 양 팀 표 칸으로 싣고 온다
+        recordHumanGamePitchers(
+          recordLeaguePlateAppearances(
+            current.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS,
+            summary.leaguePlateAppearances,
+          ),
+          summary.leaguePitchers,
+          true,
         ),
         afterGameStamina.cpuPitcherStaminas,
         aceLevels,
@@ -1409,7 +1472,7 @@ export function useSeasonSession(
       activeSound().play(seasonEvaluationJingleIdOf(evaluation.popularityChange))
       setScene(SEASON_SCENE_STATE.관중수입)
     },
-    [aceLevels, commit, gainGamePoint, gameKind, gameOptions, random, recordStat, save],
+    [aceLevels, commit, gainGamePoint, gameKind, gameOptions, ownRotationShift, random, recordStat, save],
   )
 
   /** 관중수입 창에서 확인 — 정산된 레코드를 받아 경기 뒤 마무리로 간다 (0xf1) */
@@ -1475,6 +1538,7 @@ export function useSeasonSession(
         ...options,
         dayCounter: postseasonStarterSlotOf(series, myTeam),
         opponentDayCounter: postseasonStarterSlotOf(series, opponent),
+        opponentPitcherOrder: postseasonPitcherOrderOf(series, opponent),
       }
       // 0xef 키: 내 팀이 X/Y 면 this+0x11c = 1 → 0xd7 (P4 4b) — 정규시즌과 같은 경기 전 흐름이다
       return enterPreGameSquad({ kind: '포스트시즌', options: postseasonOptions })
@@ -1540,6 +1604,7 @@ export function useSeasonSession(
           ourTeamId: myTeam,
           dayCounter: cup.day,
           opponentDayCounter: cup.day === 0 ? 0 : 1,
+          opponentPitcherOrder: nationalCupOpponentPitcherOrderOf(cup.day),
         },
       }, null)
     },

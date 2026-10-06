@@ -25,6 +25,11 @@ describe('시즌 경기정보 값 줄 (0x5dcc0 모드 2)', () => {
     expect(마타자).toMatchObject({ user: '-', cpu: '-' })
   })
 
+  it('상대 선발은 경기 옵션과 같은 리그 레코드 차례의 0번 칸이다 (opponentPitcherOrder)', () => {
+    const [, , 선발] = seasonMatchInfoLines({ ...기본, opponentDayCounter: 0, opponentPitcherOrder: [5, 0, 1, 2, 3, 4, 6, 7] })
+    expect(선발.cpu).toBe(teamPitchers(1)[5]?.name)
+  })
+
   it('상대 마선수 칸은 0xdd 진입에서 굴린 값이다 (0x6548 66f8·670a → 0xb56b5·0xb56e1)', () => {
     const [, , , 마투수, 마타자] = seasonMatchInfoLines({
       ...기본, acePitcherId: 0, aceBatterId: 1, opponentAces: { pitcher: 2, batter: 3 },

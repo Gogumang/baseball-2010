@@ -617,9 +617,13 @@ describe('시즌 끝 사슬', () => {
     // 내 팀은 대한민국(10)이지만 [시즌+1] 은 시즌 팀(3) 그대로 — 질병·보직·사기 보정이 아무 팀에도 안 붙는다
     expect(result.current.gameOptions?.ourTeamId).toBe(10)
     expect(result.current.gameOptions?.seasonTeamId).toBe(3)
-    expect(result.current.gameOptions?.dayCounter).toBe(result.current.cup!.day)
+    // 대한민국 레코드는 대회 날짜만큼 돈 차례로 넘어간다(첫날은 안 돈다) — 진행기 선발 칸은 늘 명단 0번
+    expect(result.current.cup!.day).toBe(0)
+    expect(result.current.gameOptions?.dayCounter).toBe(0)
+    expect(result.current.gameOptions?.ourEntryOrder?.pitchers.slice(0, 4)).toEqual([0, 1, 2, 3])
     // 상대국 슬롯은 매일 마스터에서 새로 복사돼 그날 한 번만 돈다 — 첫날 0번, 그 뒤 늘 1번 (7dd3826)
     expect(result.current.gameOptions?.opponentDayCounter).toBe(0)
+    expect(result.current.gameOptions?.opponentPitcherOrder).toEqual([0, 1, 2, 3, 4, 5, 6, 7])
 
     act(() => result.current.actions.finishGame(요약({ ourTeamId: 10, opponentTeamId: 11 })))
     const day = result.current.cup!.day
@@ -627,9 +631,11 @@ describe('시즌 끝 사슬', () => {
     const games = result.current.state!.record.games
     act(() => result.current.actions.playCupGame(10, 12))
     act(() => result.current.actions.startPendingGame())
-    // 시즌 경기 수(SR+0xb2 의 시즌 값)가 아니라 대회 하루 넘기기가 올린 L+0x32 다
-    expect(result.current.gameOptions?.dayCounter).toBe(day)
+    // 시즌 경기 수(SR+0xb2 의 시즌 값)가 아니라 대회 하루 넘기기가 올린 L+0x32 만큼 돈 레코드다
+    expect(result.current.gameOptions?.dayCounter).toBe(0)
+    expect(result.current.gameOptions?.ourEntryOrder?.pitchers.slice(0, 4)).toEqual([1, 2, 3, 0])
     expect(result.current.gameOptions?.opponentDayCounter).toBe(1)
+    expect(result.current.gameOptions?.opponentPitcherOrder).toEqual([1, 2, 3, 0, 4, 5, 6, 7])
     expect(games).not.toBe(day)
   })
 
@@ -1070,8 +1076,9 @@ describe('엔트리 편집 0xe0 (0x63dc · 0x7044 · 편집기 0x55864)', () => 
     act(() => result.current.actions.playCupGame(10, 12))
     expect(result.current.matchInfoStarterName).not.toBeNull()
     act(() => result.current.actions.startPendingGame())
-    // 둘째 날도 같은 슬롯 — 로테이션은 날짜로 셈하고 명단 차례는 이어진다
-    expect(result.current.gameOptions?.ourEntryOrder?.pitchers.slice(0, 3)).toEqual([2, 1, 0])
+    // 둘째 날도 같은 슬롯 — 고친 레코드 [2,1,0,3] 을 0x6548 이 한 칸 돌린 차례로 선다(0번 선발 · 나머지 벤치)
+    expect(result.current.gameOptions?.ourEntryOrder?.pitchers.slice(0, 4)).toEqual([1, 0, 3, 2])
+    expect(result.current.gameOptions?.dayCounter).toBe(0)
   })
 
   it("'6' 은 CPU 팀 엔트리 — 보기 전용이라 OK 가 안 먹고, 왼쪽 끝(2)으로 돌아온다", () => {
@@ -1149,8 +1156,39 @@ describe('투수 스태미나 +0x2c — 첫날 6850 0xb6190 · 하루 끝 4f2bc 
     // 둘째 날(SR+0xb2 = 1)은 첫날 고리를 안 탄다 — 이어진 값으로 선다
     act(() => result.current.actions.confirmIncome(result.current.state!.record))
     const 다음 = 경기까지(rendered)
-    expect(다음.ourPitcherStaminas?.[0]).toBe(5000)
+    // g = 1 이면 내 레코드가 한 칸 돌아(0x6548) 명단 0번 투수가 3번 칸에 앉는다 — 스태미나도 같이 돈다
+    expect(다음.ourEntryOrder?.pitchers.slice(0, 4)).toEqual([1, 2, 3, 0])
+    expect(다음.ourPitcherStaminas?.[3]).toBe(5000)
     expect(다음.opponentPitcherStaminas).toEqual((store.load() as 저장모양).cpuPitcherStaminas?.[다음.opponentTeamId])
+
+    // 끝 스태미나는 돈 차례로 돌아오고 저장(웹 명단 차례)으로 되돌려 적힌다
+    const 돈끝 = Array.from({ length: 투수수 }, (_v, i) => (i === 0 ? 2000 : 10_000))
+    act(() => result.current.actions.finishGame(요약({
+      opponentTeamId: 다음.opponentTeamId, ourPitcherStaminas: 돈끝, opponentPitcherStaminas: 상대끝,
+    })))
+    // 진행기 0번 = 명단 1번 → 2000 + 20% 회복 = 4000
+    expect(result.current.roster.pitchers[1]?.stamina).toBe(4000)
+  })
+
+  it('정규 경기 요약의 두 팀 투수 줄·승패가 시즌 리그 기록표에 쌓인다 (0xa8024 · 0xa7de8 — 0xa56dc 정규시즌만)', () => {
+    const rendered = 띄우기()
+    const { result } = rendered
+    시작(result, 0)
+    const options = 경기까지(rendered)
+    act(() => result.current.actions.finishGame(요약({
+      opponentTeamId: options.opponentTeamId,
+      leaguePitchers: {
+        lines: [
+          { teamId: 0, pitcherSlot: 1, outs: 27, runsAllowed: 3, strikeouts: 13, pitches: 137 },
+          { teamId: options.opponentTeamId, pitcherSlot: 2, outs: 24, runsAllowed: 5, strikeouts: 11, pitches: 141 },
+        ],
+        decision: { winner: { side: 1, number: 1 }, loser: { side: 0, number: 2 }, save: null },
+        sideTeams: [options.opponentTeamId, 0],
+      },
+    })))
+    const 표 = Object.values(result.current.playerStats.pitchers ?? {})
+    expect(표.find((line) => line.pitches === 137 && line.strikeouts === 13)).toMatchObject({ outs: 27, wins: 1 })
+    expect(표.find((line) => line.pitches === 141 && line.strikeouts === 11)).toMatchObject({ outs: 24, losses: 1 })
   })
 
   it('시즌 첫날(경기 수 0)에 0xdd 에 들어오면 깎인 값도 10000 으로 채운다 (6850) — 그 뒤 날은 안 채운다', () => {
@@ -1336,16 +1374,19 @@ describe('리그 투수 레코드 차례를 시즌 세션이 잇는다 (0xb5ca8 
     const { result } = 차례꽂고다시(차례)
 
     act(() => result.current.actions.playNextGame())
-    // 첫날(g = 0)은 안 돈다 — 지난 시즌에서 이어 온 차례의 0번
-    expect(result.current.gameOptions?.dayCounter).toBe(2)
+    // 첫날(g = 0)은 안 돈다 — 지난 시즌에서 이어 온 차례의 0번. 내 명단은 그 차례로 돌려 넘기고 선발 칸은 0번이다
+    expect(result.current.gameOptions?.dayCounter).toBe(0)
+    expect(result.current.gameOptions?.ourEntryOrder?.pitchers.slice(0, 4)).toEqual([2, 3, 0, 1])
     expect(result.current.gameOptions?.opponentDayCounter).toBe(1)
+    expect(result.current.gameOptions?.opponentPitcherOrder).toEqual(상대섞임)
 
     act(() => result.current.actions.goto(SEASON_SCENE_STATE.관리메뉴))
     act(() => result.current.actions.updateRecord({ ...result.current.state!.record, games: 1 }))
     act(() => result.current.actions.playNextGame())
     // g = 1 이면 한 칸 돈 레코드의 0번 — 날짜 g % 4 셈(1)이 아니다
-    expect(result.current.gameOptions?.dayCounter).toBe(3)
+    expect(result.current.gameOptions?.ourEntryOrder?.pitchers.slice(0, 4)).toEqual([3, 0, 1, 2])
     expect(result.current.gameOptions?.opponentDayCounter).toBe(2)
+    expect(result.current.gameOptions?.opponentPitcherOrder).toEqual([2, 3, 0, 1, 4, 5, 6, 7])
   })
 
   it('새 해 리그는 승패를 비우고 포스트시즌까지 돈 차례를 잇는다 (nextSeasonLeague)', () => {

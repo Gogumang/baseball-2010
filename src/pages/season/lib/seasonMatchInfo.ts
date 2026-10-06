@@ -79,6 +79,11 @@ export interface SeasonMatchInfoInput {
   readonly dayCounter: number
   /** 상대 칸만 다른 날짜 — 국가대항전 상대국은 첫날 0 · 그 뒤 1 (경기 옵션 `opponentDayCounter`). 없으면 `dayCounter` */
   readonly opponentDayCounter?: number
+  /**
+   * 상대 팀 투수 레코드 차례 — 경기 옵션 `opponentPitcherOrder` 와 같은 값(0x6548 이 돌린 뒤, 칸 p 에 앉은 붙박이 표 칸).
+   * 있으면 상대 "선발" 줄은 그 0번 칸 투수다 (`0x5e0e8` 은 레코드 0번을 읽는다). 없으면 날짜 칸으로 셈한다
+   */
+  readonly opponentPitcherOrder?: readonly number[]
   /** 내 팀에 넣은 마투수 0..4 (없으면 −1) */
   readonly acePitcherId: number
   /** 내 팀에 넣은 마타자 0..4 (없으면 −1) */
@@ -139,7 +144,9 @@ export function seasonMatchInfoLines(input: SeasonMatchInfoInput): readonly Matc
     [winLossTextOf(input, myTeamId), winLossTextOf(input, opponentTeamId)],
     [
       input.myStarterName ?? starterNameOf(myTeamId, input.dayCounter),
-      starterNameOf(opponentTeamId, input.opponentDayCounter ?? input.dayCounter),
+      input.opponentPitcherOrder === undefined
+        ? starterNameOf(opponentTeamId, input.opponentDayCounter ?? input.dayCounter)
+        : teamPitchers(opponentTeamId)[input.opponentPitcherOrder[0] ?? 0]?.name ?? EMPTY_VALUE,
     ],
     [acePitcherNameOf(input.acePitcherId), acePitcherNameOf(input.opponentAces?.pitcher ?? -1)],
     [aceBatterNameOf(input.aceBatterId), aceBatterNameOf(input.opponentAces?.batter ?? -1)],
