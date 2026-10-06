@@ -93,6 +93,9 @@ export function missionOpponentOf(opponentRole: AcePlayer['role'], order: number
  * 마선수의 투수 능력치.
  * 원본 표는 타자와 같은 4칸을 쓰는데, 투수는 그 값이 제구·구속·변화·체력을 뜻한다 (0xb570c, 누락 탐색 5차).
  * 타자 필드 이름으로 읽었으므로 hit = 제구, power = 구속이다.
+ *
+ * 0~100 칸(`control` 등)은 ÷10 반올림한 옛 경계(537 → 54)이고, 투구 AI 는 그 대신 `gameAbility` 의
+ * 원본 눈금 값을 쓴다 (`entities/pitching/model/pitcherGameStats`).
  */
 const PITCHER_ENGINE_DIVISOR = 10
 
@@ -105,9 +108,17 @@ const PITCHER_ENGINE_DIVISOR = 10
  * 나만의리그 마선수 대결(`app/ui/GameRoute`)·홈런더비 난입 마투수(`entities/home-run-derby/model/derbyPitcher`)는
  * 앱의 전역 레벨 칸을 넘긴다 — 원본도 거기서 배율을 먹는다.
  */
-export function pitcherAbilityOf(ace: AcePlayer, aceLevels?: Readonly<Record<number, number>>): PitcherAbility {
-  // 투구 엔진은 아직 0~100 눈금이라 경계에서 줄인다 — 원본 투구식 이식 때 없앤다
-  // 폼·보유 구질은 같은 표(XlsACE_PIT_DATA)의 +0xb · +0x1c 에서 온다 — 마구(+0x18)는 아직 쓰지 않는다
+export function pitcherAbilityOf(
+  ace: AcePlayer,
+  aceLevels?: Readonly<Record<number, number>>,
+  /**
+   * 마투수의 체력% `0xaebb0(팀)` (= trunc(+0x2c / 100), 홈런더비 100). 넘기면 투구 AI 가 피로(0xb58e6)와
+   * 지친 제구 등급(0xb74bc)을 먹인다. 안 넘기면 지치지 않은 것으로 본다.
+   */
+  staminaPercent?: number,
+): PitcherAbility {
+  // 투구 엔진의 0~100 칸은 옛 경계라 ÷10 으로 줄여 두고, 원본 눈금은 `gameAbility` 로 따로 싣는다
+  // 폼·보유 구질·마구 번호는 같은 표(XlsACE_PIT_DATA)의 +0xb · +0x1c · +0x18 에서 온다
   const repertoire = ACE_PITCHER_REPERTOIRES.find((candidate) => candidate.name === ace.name)
   const order = ACE_PITCHERS.findIndex((candidate) => candidate.id === ace.id)
   const ability =
@@ -118,6 +129,11 @@ export function pitcherAbilityOf(ace: AcePlayer, aceLevels?: Readonly<Record<num
     control: Math.round(ability.hit / PITCHER_ENGINE_DIVISOR),
     velocity: Math.round(ability.power / PITCHER_ENGINE_DIVISOR),
     breaking: Math.round(ability.defense / PITCHER_ENGINE_DIVISOR),
+    // 0xb570c 의 피로 앞 값 = 0xb6414 실효값(레벨 배율). 마선수는 나리(모드 4)·미션(5·6)·홈런더비(7)에서만 이 길로
+    // 오고, 그 모드들은 팀 능력치(마스크 0x306)·코치(모드 2)가 없어 피로 뒤 정액이 없다.
+    // ⚠️ 마선수 레코드의 장비 니블(+0x19~)·스킬 비트(+0x14) 보정(0xb6494~)은 웹 표에 없어 안 먹인다 (미해결)
+    gameAbility: { beforeFatigue: { control: ability.hit, velocity: ability.power, breaking: ability.defense } },
+    ...(staminaPercent === undefined ? {} : { staminaPercent }),
     ...(repertoire === undefined ? {} : { repertoire: { form: repertoire.form, pitchMask: repertoire.pitchMask, magicId: repertoire.magicId } }),
   }
 }

@@ -5,6 +5,7 @@ import type { PitchPatternDifficulty } from '@/shared/config/original/pitchPatte
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { controlTierOf } from '@/entities/pitching/model/controlTier'
+import { cpuPitchStatsOf } from '@/entities/pitching/model/pitcherGameStats'
 import { pitchSpeedStageOf } from '@/entities/pitching/model/pitchSpeedStage'
 import { computerPitchTypeOf, pitchListOf } from '@/entities/pitching/model/pitchIntelligence'
 import type { CountSituation } from '@/entities/pitching/model/pitchIntelligence'
@@ -21,9 +22,6 @@ import {
 import { advanceMagicPitchGameState } from '@/entities/pitching/model/magicPitchGame'
 import { isMistakePitch } from '@/entities/pitching/model/mistakePitch'
 import type { MagicPitchGameState } from '@/entities/pitching/model/magicPitchGame'
-
-/** 투구 엔진 능력치(0~100)를 원본 눈금(0~999)으로 — 투수편 이식 전 임시 경계 */
-const ORIGINAL_SCALE = 10
 
 export interface PitchSituation extends CountSituation {
   readonly batterSide: number
@@ -157,17 +155,17 @@ export function selectPitch(
     return { kind: '견제', base: cpuPickoffBaseOf(cpuPickoff.hasRunnerOnBase, random) }
   }
   const target = pitchTargetOf(kind, situation, random)
-  const control = pitcher.control * ORIGINAL_SCALE
+  // 경기용 능력치 0xb570c(…, 체력% 0xaebb0) — 피로 0xb58e6 를 먹인 제구·구속·변화 (`pitcherGameStats`)
+  const gameStats = cpuPitchStatsOf(pitcher)
+  const stats = { control: gameStats.control, velocity: gameStats.velocity, breaking: gameStats.breaking }
   const isMagic = typeNumber === MAGIC_PITCH_TYPE_NUMBER
   // 0x4dbac: 구질(scene+0xfc8) == 22(마구)면 굴림 없이 5 를 돌려준다 (4dbb8 cmp #0x16 → 4dbbc movs r0,#5).
-  // 마구가 아니면 0xb74bc 제구 등급을 굴린다. 그 값이 scene+0x17c0 에 앉아 제구 오차(0xcfd60 행 5)에도 쓰인다
-  const controlTier = isMagic ? MAGIC_PITCH_CONTROL_TIER : controlTierOf(control, true, random)
+  // 마구가 아니면 0xb74bc(전역, 피로 먹인 제구, 체력%) 제구 등급을 굴린다 — 체력% 0 이면 지친 갈래.
+  // 그 값이 scene+0x17c0 에 앉아 제구 오차(0xcfd60 행 5)에도 쓰인다
+  const controlTier = isMagic
+    ? MAGIC_PITCH_CONTROL_TIER
+    : controlTierOf(stats.control, gameStats.isNotExhausted, random)
   const finalTarget = applyControlError(target, { tier: controlTier, isComputer: true }, random)
-  const stats = {
-    control,
-    velocity: pitcher.velocity * ORIGINAL_SCALE,
-    breaking: (pitcher.breaking ?? pitcher.velocity) * ORIGINAL_SCALE,
-  }
   // 마구는 게이지를 쓰지 않고 등급이 늘 5 다 — 구속 단계 레코드가 없어 번호로 곧장 고른다 (H2 3-5·3-6)
   const speedStage = pitchSpeedStageOf(typeNumber - 1, stats, controlTier)
   const recordIndex = isMagic ? magicPitchRecordIndexOf(repertoire.magicId, repertoire.form) : null
@@ -183,12 +181,12 @@ export function selectPitch(
   // 실투 판정 0x33cbc — 0x4dc78 이 궤적 준비 0x9e669(4de86) **뒤** 4dea0 에서 부른다. 사람이 칠 때도
   // CPU 투수의 공마다 돈다. 마구가 아니면 rand(0,100) 한 번 (마구면 굴림 없음).
   //  t = scene+0x17c0 = 0x4dbac 가 돌려준 제구 등급 0xb74bc 값 (4dcbe) = `controlTier`
-  //  c = 0xb570d(ctx, 1, 투수, 1, 90, 1) — 경기용 칸 1 **구속**. CPU 투수의 경기용 값은 아래 `stats.velocity` 다
+  //  c = 0xb570d(ctx, 1, 투수, 1, 90, 1) — 경기용 칸 1 **구속**, 체력 인자 90 이라 피로가 없다 (`mistakeVelocity`)
   const isMistake = isMistakePitch(
     {
       isMagicPitch: isMagic,
       grade: controlTier,
-      effectiveVelocity: stats.velocity,
+      effectiveVelocity: gameStats.mistakeVelocity,
       runnerCount: situation.runnerCount,
       hasSecondBaseRunner: situation.hasSecondBaseRunner === true,
       batterIntimidates,

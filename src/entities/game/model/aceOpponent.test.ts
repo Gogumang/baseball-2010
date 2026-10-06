@@ -25,9 +25,19 @@ describe('pitcherAbilityOf', () => {
       control: 67,
       velocity: 55,
       breaking: 82,
+      // 투구 AI 는 반올림 없는 원본 눈금(0xb570c 의 피로 앞 값)을 쓴다
+      gameAbility: { beforeFatigue: { control: 670, velocity: 550, breaking: 820 } },
       // 싸이커 레코드: 폼 6 · 마구 5 · 구질 마스크 0x410b (1·2·4·9·15)
       repertoire: { form: 6, pitchMask: 0x410b, magicId: 5 },
     })
+  })
+
+  it('원본 눈금 재료는 반올림하지 않고, 체력%는 넘길 때만 싣는다', () => {
+    const leony = ACE_PITCHERS[1]
+    // 레오니 제구 580 → Lv1 60% = 348 (0~100 칸은 35 → ×10 하면 350 이 되던 값)
+    expect(pitcherAbilityOf(leony, {}).gameAbility?.beforeFatigue.control).toBe(348)
+    expect(pitcherAbilityOf(leony).staminaPercent).toBeUndefined()
+    expect(pitcherAbilityOf(leony, undefined, 40).staminaPercent).toBe(40)
   })
 
   it('레벨을 넘기면 0xb6414 배율 0xd88aa[mgr[0x13a + 순번]] 을 먼저 곱한다 — 순번 = ACE_PITCHERS 차례', () => {

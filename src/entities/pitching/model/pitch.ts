@@ -1,5 +1,6 @@
 import type { Coordinate } from '@/shared/lib/geometry/coordinate'
 import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
+import type { PitcherGameAbilityParts } from '@/entities/pitching/model/pitcherGameStats'
 
 /**
  * 구질 이름. 원작 21종의 이름을 그대로 쓴다 (FASTBALL·SLIDER·CURVE…).
@@ -73,6 +74,17 @@ export interface PitcherAbility {
   readonly breaking?: number
   /** 없으면 기본 투수 레퍼토리 */
   readonly repertoire?: PitcherRepertoireInfo
+  /**
+   * 원본 눈금 경기용 능력치 재료 — `0xb570c` 를 피로(0xb58e6) 앞뒤로 쪼갠 값 (`pitcherGameStats`).
+   * 있으면 CPU 투구(`selectPitch`)가 0~100 칸 대신 이것으로 제구 등급·구속 단계를 낸다.
+   * 없으면 옛 경계(0~100 칸 × 10)다.
+   */
+  readonly gameAbility?: PitcherGameAbilityParts
+  /**
+   * 투수 체력% — `0xaebb0(팀)` = trunc(레코드 +0x2c / 100), 홈런더비(모드 7)는 100.
+   * 피로 감소(0xb58e6)와 제구 등급의 지친 갈래(0xb74bc, 0 일 때)가 본다. 없으면 지치지 않은 것으로 본다.
+   */
+  readonly staminaPercent?: number
 }
 
 export const DEFAULT_PITCHER_ABILITY: PitcherAbility = {
