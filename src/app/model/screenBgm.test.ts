@@ -26,6 +26,11 @@ describe('투수편 배경음 — 안쪽 장면을 본다 (128 진입 0x120a4 �
     expect(result.current).toBeNull()
     rerender({ isActive: true, scene: '포스트시즌' })
     expect(result.current).toBe(4)
+    // 142 를 들렀다 취소로 돌아와도 128 진입은 이전 142 라 배경음을 안 바꾼다 — 이어하기 4 그대로
+    rerender({ isActive: true, scene: '경기준비' })
+    expect(result.current).toBeNull()
+    rerender({ isActive: true, scene: '포스트시즌' })
+    expect(result.current).toBe(4)
     rerender({ isActive: true, scene: '경기' })
     expect(result.current).toBe(3)
     rerender({ isActive: true, scene: '포스트시즌' })
@@ -42,5 +47,7 @@ describe('투수편 배경음 — 안쪽 장면을 본다 (128 진입 0x120a4 �
     expect(pitcherLeagueBgmOf('포스트시즌', false)).toBe(40)
     // 109 진입 0x10d8c — 타자편과 같은 4 (이전 ≠ 105 면 0x6ea6d(…, 4, −1, 1), 105 에서 오면 105 의 4 그대로)
     expect(pitcherLeagueBgmOf('다음경기순위', false)).toBe(4)
+    // 142 진입 0x1c46c 는 배경음을 안 건드린다
+    expect(pitcherLeagueBgmOf('경기준비', false)).toBeNull()
   })
 })

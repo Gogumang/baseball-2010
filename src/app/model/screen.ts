@@ -49,6 +49,12 @@ export type Screen =
    * 곧바로 온다(이전 100). `fromManagement` 가 이전 상태 105 — 취소·바닥 5 가 이것으로 갈린다 (0x105f0 · 0x16928).
    */
   | { readonly kind: '다음경기순위'; readonly fromManagement: boolean }
+  /**
+   * 나만의리그 경기 준비(매치업, 원본 상태 142) — 109 확인 · 128 [확인](내 차례)에서 온다 (진입 0x1c46c · 키 0x13c30 ·
+   * 그림 0x15d98). 확인 → 144 → 경기, 취소 → 128(포스트시즌) / 109. `postseasonFromReentry` 는 128 에서 왔을 때 그 128 의
+   * 배경음 표시를 들고 간다 — 취소로 128 에 돌아가면 진입 0x120a4 가 이전 142 라 배경음을 안 바꾼다.
+   */
+  | { readonly kind: '경기준비'; readonly postseasonFromReentry?: boolean }
   /** 상점 — 관리 화면 [아이템] 하위 메뉴의 탭 (장착·서브·GP) */
   | { readonly kind: '아이템'; readonly tab: string }
   | { readonly kind: '외출' }

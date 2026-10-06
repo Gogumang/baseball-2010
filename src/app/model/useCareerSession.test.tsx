@@ -305,6 +305,7 @@ describe('연속 파울 기록 32·33 (0xa7dbc) — 실제 타석에서 경기 �
     act(() => rendered.result.current.session.actions.runCommand('다음경기'))
     // 109 순위표 확인 → 경기
     act(() => rendered.result.current.session.actions.confirmNextGameStandings())
+    act(() => rendered.result.current.session.actions.confirmMatchPrepare())
     act(() => rendered.result.current.session.actions.finishLoading())
     return rendered
   }
@@ -369,6 +370,7 @@ describe('공마다 상대 투수 투구 수·스태미나 (0x3dec6 → 0xa5e14(
       act(() => rendered.result.current.session.actions.runCommand('다음경기'))
       // 109 순위표 확인 → 경기
       act(() => rendered.result.current.session.actions.confirmNextGameStandings())
+      act(() => rendered.result.current.session.actions.confirmMatchPrepare())
       act(() => rendered.result.current.session.actions.finishLoading())
       const before = rendered.result.current.session.progress!.opponentMound
       act(() => rendered.result.current.session.handlePitchResolved(볼(1)))
@@ -468,6 +470,7 @@ describe('CPU 견제 (0x345fc 종류 4 → 0x34848) — 타자편도 견제 판�
       act(() => rendered.result.current.session.actions.runCommand('다음경기'))
       // 109 순위표 확인 → 경기
       act(() => rendered.result.current.session.actions.confirmNextGameStandings())
+      act(() => rendered.result.current.session.actions.confirmMatchPrepare())
       act(() => rendered.result.current.session.actions.finishLoading())
       // 볼넷으로 나가며 주자가 있는 내 타석이 올 때까지 돌린다
       for (let atBat = 0; atBat < 9; atBat += 1) {
@@ -704,6 +707,9 @@ describe('타자편 포스트시즌 대진 128 — 사람이 친다 (0x120a4 · 
     expect(series?.teams[0]).toBe(0)
 
     act(() => rendered.result.current.session.actions.pressPostseason())
+    // 내 차례 → 142 경기 준비 (128 의 배경음 표시를 들고 간다)
+    expect(rendered.result.current.screen).toEqual({ kind: '경기준비', postseasonFromReentry: false })
+    act(() => rendered.result.current.session.actions.confirmMatchPrepare())
     expect(rendered.result.current.screen).toEqual({ kind: '경기' })
     expect(rendered.result.current.session.progress?.opponentTeamId).toBe(series?.teams[1])
   })
@@ -716,7 +722,38 @@ describe('타자편 포스트시즌 대진 128 — 사람이 친다 (0x120a4 · 
     expect(rendered.result.current.screen).toEqual({ kind: '관리' })
     act(() => rendered.result.current.session.actions.runCommand('다음경기'))
     act(() => rendered.result.current.session.actions.confirmNextGameStandings())
+    expect(rendered.result.current.screen).toEqual({ kind: '경기준비' })
+    act(() => rendered.result.current.session.actions.confirmMatchPrepare())
     expect(rendered.result.current.screen).toEqual({ kind: '경기' })
+  })
+
+  it('142 경기 준비 0x1c46c — 장면마다 한 번 마선수 넷을 굴리고, 취소는 109(이전 142 라 취소 안 먹음) · 다시 와도 안 굴린다', () => {
+    const rendered = 띄우기({ ...createCareer('준비'), gamesPlayed: 4 })
+    act(() => rendered.result.current.session.actions.runCommand('다음경기'))
+    act(() => rendered.result.current.session.actions.confirmNextGameStandings())
+    expect(rendered.result.current.screen).toEqual({ kind: '경기준비' })
+    const 굴림 = rendered.result.current.session.matchAces
+    // 기본 개방은 마투수 0 · 마타자 0 뿐 — 내 쪽은 늘 0, 상대는 0 과 겹치지 않는다
+    expect(굴림).toMatchObject({ myBatter: 0, myPitcher: 0 })
+    expect(굴림?.opponentPitcher).not.toBe(0)
+    act(() => rendered.result.current.session.actions.cancelMatchPrepare())
+    expect(rendered.result.current.screen).toEqual({ kind: '다음경기순위', fromManagement: false })
+    expect(rendered.result.current.session.career?.seasonEndState).toBe(109)
+    act(() => rendered.result.current.session.actions.cancelNextGameStandings())
+    expect(rendered.result.current.screen).toEqual({ kind: '다음경기순위', fromManagement: false })
+    act(() => rendered.result.current.session.actions.confirmNextGameStandings())
+    expect(rendered.result.current.session.matchAces).toBe(굴림)
+  })
+
+  it('128 내 차례 → 142, 취소하면 128 진입을 다시 밟는다 (S+0xb4 갈래, 0x13ca0)', () => {
+    const rendered = 띄우기(시즌끝선수({ regularSeasonRewardTaken: true }))
+    이벤트보기(rendered, [376])
+    act(() => rendered.result.current.session.actions.pressPostseason())
+    act(() => rendered.result.current.session.actions.pressPostseason())
+    expect(rendered.result.current.screen).toEqual({ kind: '경기준비', postseasonFromReentry: false })
+    act(() => rendered.result.current.session.actions.cancelMatchPrepare())
+    expect(rendered.result.current.screen).toEqual({ kind: '포스트시즌', popup: null, fromReentry: false })
+    expect(rendered.result.current.session.career?.seasonEndState).toBe(128)
   })
 
   it('109 진입 0x10d8c 가 S+0x50 = 4 를 저장 — 이어하기는 109 로(이전 상태 1 · 취소 안 먹음), 105 로 물러나면 3 (0x11990)', () => {
@@ -746,12 +783,14 @@ describe('타자편 포스트시즌 대진 128 — 사람이 친다 (0x120a4 · 
     act(() => 원정.result.current.session.actions.runCommand('다음경기'))
     // 109 순위표 확인 → 경기
     act(() => 원정.result.current.session.actions.confirmNextGameStandings())
+    act(() => 원정.result.current.session.actions.confirmMatchPrepare())
     expect(원정.result.current.session.progress?.game.playerSide).toBe(PLAYER_SIDE_FIRST_BAT)
 
     const 홈 = 띄우기({ ...createCareer('홈'), teamId: 0 })
     act(() => 홈.result.current.session.actions.runCommand('다음경기'))
     // 109 순위표 확인 → 경기
     act(() => 홈.result.current.session.actions.confirmNextGameStandings())
+    act(() => 홈.result.current.session.actions.confirmMatchPrepare())
     expect(홈.result.current.session.progress?.game.playerSide).toBe(PLAYER_SIDE_LAST_BAT)
   })
 
@@ -761,12 +800,14 @@ describe('타자편 포스트시즌 대진 128 — 사람이 친다 (0x120a4 · 
     const 아랫시드 = 띄우기(시즌끝선수({ teamId: 3, gamesPlayed: 46, postseason: 진행중, regularSeasonRewardTaken: true }))
     act(() => 아랫시드.result.current.session.actions.confirmGameResult())
     act(() => 아랫시드.result.current.session.actions.pressPostseason())
+    act(() => 아랫시드.result.current.session.actions.confirmMatchPrepare())
     expect(아랫시드.result.current.screen).toEqual({ kind: '경기' })
     expect(아랫시드.result.current.session.progress?.game.playerSide).toBe(PLAYER_SIDE_FIRST_BAT)
 
     const 윗시드 = 띄우기(시즌끝선수({ teamId: 2, gamesPlayed: 46, postseason: 진행중, regularSeasonRewardTaken: true }))
     act(() => 윗시드.result.current.session.actions.confirmGameResult())
     act(() => 윗시드.result.current.session.actions.pressPostseason())
+    act(() => 윗시드.result.current.session.actions.confirmMatchPrepare())
     expect(윗시드.result.current.session.progress?.game.playerSide).toBe(PLAYER_SIDE_LAST_BAT)
   })
 
@@ -776,6 +817,7 @@ describe('타자편 포스트시즌 대진 128 — 사람이 친다 (0x120a4 · 
     const rendered = 띄우기(시즌끝선수({ teamId: 2, gamesPlayed: 47, postseason: 대진, regularSeasonRewardTaken: true }))
     act(() => rendered.result.current.session.actions.confirmGameResult())
     act(() => rendered.result.current.session.actions.pressPostseason())
+    act(() => rendered.result.current.session.actions.confirmMatchPrepare())
     expect(rendered.result.current.session.progress?.ourStartingPitcherIndex).toBe(2)
     expect(rendered.result.current.session.progress?.opponentStartingPitcherIndex).toBe(2)
   })

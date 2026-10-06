@@ -90,6 +90,8 @@ const 경기시작 = () => {
   act(() => rendered.result.current.session.actions.runCommand('다음경기'))
   // 109 순위표 확인 → 경기
   act(() => rendered.result.current.session.actions.confirmNextGameStandings())
+  // 142 경기 준비 확인 → 144 → 경기
+  act(() => rendered.result.current.session.actions.confirmMatchPrepare())
   return { rendered, played: 녹음.played }
 }
 

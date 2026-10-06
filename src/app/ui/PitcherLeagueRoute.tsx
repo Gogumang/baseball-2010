@@ -1,6 +1,8 @@
 import { PitcherCreateFlow } from '@/pages/pitcher-league/ui/PitcherCreateFlow'
 import { PitcherManagementScreen } from '@/pages/pitcher-league/ui/PitcherManagementScreen'
 import { NextGameStandingsScreen } from '@/pages/management/ui/NextGameStandingsScreen'
+import { NariMatchInfoScreen } from '@/pages/management/ui/NariMatchInfoScreen'
+import { pitcherMatchInfoOf } from '@/pages/pitcher-league/lib/pitcherMatchInfo'
 import { PitcherSeasonEndScreen } from '@/pages/pitcher-league/ui/PitcherSeasonEndScreen'
 import { PitcherYearEndScreen } from '@/pages/pitcher-league/ui/PitcherYearEndScreen'
 import { PitcherGameScreen } from '@/pages/pitching/ui/PitcherGameScreen'
@@ -105,6 +107,16 @@ export function PitcherLeagueRoute({
       <NextGameStandingsScreen league={career.league} edition="투수편" gamePoint={career.gamePoint}
         isFromManagement={session.nextGameFromManagement}
         onConfirm={actions.confirmNextGameStandings} onCancel={actions.cancelNextGameStandings} />
+    )
+  }
+
+  if (scene === '경기준비') {
+    // 142 경기 준비 — 진입 0x1c46c · 키 0x13c30 · 그림 0x15d98 (타자편과 같은 상태)
+    const match = pitcherMatchInfoOf(career, session.matchAces)
+    return (
+      <NariMatchInfoScreen lines={match.lines} myTeamId={match.myTeamId} opponentTeamId={match.opponentTeamId}
+        playerSide={match.playerSide} edition="투수편" gamePoint={career.gamePoint}
+        onStart={actions.confirmMatchPrepare} onCancel={actions.cancelMatchPrepare} />
     )
   }
 

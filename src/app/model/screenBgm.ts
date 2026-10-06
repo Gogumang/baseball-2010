@@ -77,9 +77,11 @@ export function screenBgmOf(screen: Screen): number | null {
  * 105 진입 0x11910 이 튼 4 가 이어진다 — 어느 길이든 4 다.
  * 그 밖 장면은 예전 근사 그대로 준비 화면 배경음(3)이다 (머리 주석 ⚠️).
  */
-export function pitcherLeagueBgmOf(scene: PitcherScene, postseasonFromReentry: boolean): number {
+export function pitcherLeagueBgmOf(scene: PitcherScene, postseasonFromReentry: boolean): number | null {
   if (scene === '포스트시즌') return postseasonFromReentry ? POSTSEASON_REENTRY_BGM : SCREEN_BGM.이벤트
   if (scene === '다음경기순위') return SCREEN_BGM.다음경기순위
+  // 142 진입 0x1c46c 는 배경음을 안 건드린다 — 109(4) · 128(40 / 이어하기 4)의 것이 이어진다
+  if (scene === '경기준비') return null
   return SCREEN_BGM.투수편
 }
 
@@ -87,7 +89,8 @@ export function pitcherLeagueBgmOf(scene: PitcherScene, postseasonFromReentry: b
  * 투수편 화면의 배경음 — **장면 0x106 에 들어선 순간** 대진(128)이었으면 이어하기 진입이다.
  * 원본은 장면을 떠났다 돌아오면 늘 상태 100(0x1c154) → 1(자원 적재) → S+0x50 의 상태로 가므로, 웹에서 '투수편' 화면에
  * 들어설 때(앱을 켜고 처음 들어설 때 포함 — 세션이 그때 저장의 S+0x50 으로 128 을 고른다) 128 이면 이전 상태가 1 이다.
- * 128 을 떠나면(경기 142 · 132 연말) 그 표시는 지워진다 — 다시 128 에 오면 경기 뒤 116 → 114 길이다.
+ * 128 을 떠나면(경기 · 132 연말) 그 표시는 지워진다 — 다시 128 에 오면 경기 뒤 116 → 114 길이다. 142 경기 준비는
+ * 배경음을 안 바꾸고(null) 취소하면 128 로 돌아오므로 그동안은 표시를 둔다.
  */
 export function usePitcherLeagueBgm(isActive: boolean, scene: PitcherScene): number | null {
   const [wasActive, setWasActive] = useState(false)
@@ -96,7 +99,8 @@ export function usePitcherLeagueBgm(isActive: boolean, scene: PitcherScene): num
   if (isActive !== wasActive) {
     setWasActive(isActive)
     setFromReentry(isActive && scene === '포스트시즌')
-  } else if (fromReentry && scene !== '포스트시즌') {
+  } else if (fromReentry && scene !== '포스트시즌' && scene !== '경기준비') {
+    // 142 를 지나 128 로 물러나도(취소) 128 진입은 이전 142 라 배경음을 안 바꾼다 — 그동안은 표시를 둔다
     setFromReentry(false)
   }
   // 위에서 상태를 고쳤으면 React 가 이 그리기를 버리고 곧바로 다시 그린다 — 돌려주는 값은 고친 상태로 다시 구한다

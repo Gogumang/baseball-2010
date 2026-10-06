@@ -110,6 +110,15 @@ import type { OutingResult } from '@/entities/career/model/outing'
 import { OUTING_PLACES } from '@/shared/config/outingPlaces'
 import type { OutingPlace } from '@/shared/config/outingPlaces'
 import { PITCHER_MANAGEMENT_TEXT } from '@/pages/pitcher-league/lib/pitcherManagementMenu'
+import { nariMatchCancelTargetOf, rollNariMatchAces } from '@/pages/management/lib/nariMatchPrepare'
+import type { NariMatchAces, NariOpenedAces } from '@/pages/management/lib/nariMatchPrepare'
+import { DEFAULT_OPENED_ACE_BATTER_IDS, DEFAULT_OPENED_ACE_PITCHER_IDS } from '@/pages/general-mode/lib/generalModeSetup'
+
+/** 처음부터 열린 마선수 — 저장 +0x30 · +0x35 (`normalizeAceOpenSave` 가 늘 켠다) */
+const DEFAULT_NARI_OPENED_ACES: NariOpenedAces = {
+  pitcherIds: DEFAULT_OPENED_ACE_PITCHER_IDS,
+  batterIds: DEFAULT_OPENED_ACE_BATTER_IDS,
+}
 
 /**
  * 나만의리그 **투수편**(원본 게임 모드 3, 장면 0x106) 한 판.
@@ -128,6 +137,8 @@ export type PitcherScene =
   | '등록' | '관리' | '경기' | '시즌종료' | '연말' | '엔딩' | '상점' | '외출' | '이벤트' | '마선수대결' | '포스트시즌'
   /** 다음경기 앞 순위표 (상태 109) — 타자편과 같은 진입 0x10d8c · 키 0x105f0 · 그림 0x168a4 */
   | '다음경기순위'
+  /** 경기 준비(매치업, 상태 142) — 타자편과 같은 진입 0x1c46c · 키 0x13c30 · 그림 0x15d98 */
+  | '경기준비'
 
 /**
  * 이벤트 재생(상태 114)을 **어디서** 틀었나 — 끝난 뒤 갈 곳(장면+0x24 "뒤 상태")이 이것으로 갈린다.
@@ -167,6 +178,8 @@ export interface PitcherLeagueSession {
   readonly scene: PitcherScene
   /** 109 순위표의 이전 상태가 105(관리)인가 — 바닥 5(되돌아가기) / 1 */
   readonly nextGameFromManagement: boolean
+  /** 142 진입 0x1c46c 가 이 장면에서 굴린 마선수 — 경기정보 마투수·마타자 줄 */
+  readonly matchAces: NariMatchAces | null
   /** 지금 경기를 세울 옵션. 경기 장면이 아니면 null */
   readonly gameOptions: PitcherGameOptions | null
   /** 상점 장면의 창 — '장착' 111 장비 상점 · '착용' 121 장비착용 */
@@ -207,8 +220,12 @@ export interface PitcherLeagueSession {
     readonly beginGame: () => void
     /** 관리 [다음경기] → 109 순위표 (이전 상태 105) */
     readonly openNextGameStandings: () => void
-    /** 109 확인(−5 · '5') → 142 경기 준비 — 웹은 142 가 없어 곧바로 경기 */
+    /** 109 확인(−5 · '5') → 142 경기 준비 */
     readonly confirmNextGameStandings: () => void
+    /** 142 확인(−5 · '5') → 144 → 경기 */
+    readonly confirmMatchPrepare: () => void
+    /** 142 취소(−16) — 포스트시즌이면 128, 아니면 109 (0x13c72) */
+    readonly cancelMatchPrepare: () => void
     /** 109 취소(−16) — 이전 상태가 105 일 때만 105 로 (0x1060e) */
     readonly cancelNextGameStandings: () => void
     readonly finishGame: (summary: PitcherGameSummary) => void
@@ -371,6 +388,11 @@ export function usePitcherLeagueSession(
    * +0x7a · 시즌모드 시즌 기록 +0x7a · 전역 해금표 `app+0xc0`. 팝업을 닫을 때 읽는다. 안 넘기면 검사를 건너뛴다.
    */
   readRegularSeasonOtherModes?: () => RegularSeasonOtherModes | undefined,
+  /**
+   * 열린 마선수 로컬 번호 (전역 저장 +0x30.. · +0x35.., `useAceOpen`) — 142 진입 0x1c46c 의 내 팀 마선수 굴림(0x9f604 · 0x9f650)이
+   * 본다. 안 넘기면 기본 개방 둘(마투수 0 · 마타자 0).
+   */
+  openedAces: NariOpenedAces = DEFAULT_NARI_OPENED_ACES,
 ): PitcherLeagueSession {
   const loaded = useRef<PitcherCareer | null>(null)
   if (loaded.current === null) loaded.current = normalizePitcherCareer(store.load())
@@ -696,6 +718,23 @@ export function usePitcherLeagueSession(
   /** 109 순위표의 이전 상태가 105(관리)인가 — 취소·바닥 5 가 이것으로 갈린다 (0x105f0 · 0x16928) */
   const [nextGameFromManagement, setNextGameFromManagement] = useState(false)
 
+  /** 142 진입 0x1c46c 가 이 장면에서 굴린 마선수 */
+  const [matchAces, setMatchAces] = useState<NariMatchAces | null>(null)
+  /**
+   * 장면+0x288 — 142 의 마선수 넣기를 장면마다 한 번만 (1c566~1c572 · 1c668). 장면 셋업 0xfb7c 가 0 으로 둔다 →
+   * 이 세션이 서는 때(이어하기)와 경기 뒤(`finishGame`)에 내린다.
+   */
+  const matchPreparedRef = useRef(false)
+
+  /** 142 경기 준비에 들어선다 — 이 장면에서 처음이면 마선수 넷을 굴린다(난수 4). 웹 투수편엔 국가대항전이 없다 */
+  const openMatchPrepare = useCallback(() => {
+    if (!matchPreparedRef.current) {
+      matchPreparedRef.current = true
+      setMatchAces(rollNariMatchAces(random, openedAces))
+    }
+    setScene('경기준비')
+  }, [openedAces, random])
+
   /**
    * 경기 뒤 정산 — 성적·스태미나·전적을 넣고, 같은 날 나머지 네 경기를 돌린 뒤
    * 정규시즌·포스트시즌을 넘긴다 (타자편 `finishGame` 과 같은 차례다).
@@ -703,6 +742,8 @@ export function usePitcherLeagueSession(
   const finishGame = useCallback(
     (summary: PitcherGameSummary) => {
       if (career === null || gameOptions === null) return
+      // 경기 장면 0x104 를 지나 나리 장면이 새로 선다 — 장면+0x288 = 0
+      matchPreparedRef.current = false
       // 기록 달성 G 는 요약이 들고 온다 (0xa77f0 → 0x4ea0c). 강판당한 경기는 원본이 전면 차단해 0 이다
       const outcome = pitcherGameOutcomeOf(summary, gameOptions, {
         entered: summary.hasEntered,
@@ -1253,7 +1294,7 @@ export function usePitcherLeagueSession(
 
   /**
    * 대진 128 [다음] — 키 0x13da0 (팝업이 떠 있으면 키가 안 먹는다, 0x1d06a 의 0x754f9).
-   * 끝났으면 [137] 우승 팀 발표(팝업 7) · 지금 라운드에 내 팀이 있으면 경기(142 → 144 → 경기 장면 — 웹은 곧장)
+   * 끝났으면 [137] 우승 팀 발표(팝업 7) · 지금 라운드에 내 팀이 있으면 142 경기 준비(→ 144 → 경기 장면)
    * · 아니면 CPU 끼리 내 차례/끝까지 돌리고 128 에 머문다.
    * 투수편 경기는 `isPostseason` 이라 0xa4f60 이 −2(그대로)를 돌려 **로스터 0번 = 내 투수가 늘 선발**이다 (P1 1-2) —
    * 정규시즌처럼 짝수 날만이 아니다.
@@ -1264,9 +1305,10 @@ export function usePitcherLeagueSession(
     // 깎인 값을 남긴다(회복 없음). 그래서 CPU 갈래는 표를 잇는 `applyPitcherPostseasonProgress` 로 돌린다
     const series = career.postseason
     if (series.round === '종료') return setPostseasonPopup({ kind: '우승발표', champion: series.champion ?? -1 })
-    if (isMyTurn(series, career.teamId)) return beginGame()
+    // 내 차례 → 142 경기 준비 (0x13da0)
+    if (isMyTurn(series, career.teamId)) return openMatchPrepare()
     commit(applyPitcherPostseasonProgress(career, random, aceLevels))
-  }, [aceLevels, beginGame, career, commit, postseasonPopup, random, scene])
+  }, [aceLevels, career, commit, openMatchPrepare, postseasonPopup, random, scene])
 
   /** 128 팝업 닫힘 — 틀 0x15984. 0xb 는 보상 뒤 128 에 머물고(해금 0x32 — 투수편), 7 → (내 팀 우승이면 8) → 132 */
   const closePostseasonPopup = useCallback(() => {
@@ -1306,6 +1348,7 @@ export function usePitcherLeagueSession(
     career: shown,
     scene,
     nextGameFromManagement,
+    matchAces,
     gameOptions,
     shopTab,
     shopNotice,
@@ -1333,7 +1376,26 @@ export function usePitcherLeagueSession(
         setNextGameFromManagement(true)
         setScene('다음경기순위')
       },
-      confirmNextGameStandings: beginGame,
+      confirmNextGameStandings: openMatchPrepare,
+      // 142 확인 0x13cb6 → 144 → 경기. ⚠️ 미해결: 굴린 마선수를 경기 팀에 싣는 일(0xb88c8 · 0xb8870)은 경기 진행기가 아직 안 받는다
+      confirmMatchPrepare: () => {
+        if (scene !== '경기준비') return
+        beginGame()
+      },
+      cancelMatchPrepare: () => {
+        if (career === null || scene !== '경기준비') return
+        const target = nariMatchCancelTargetOf({ isNationalCup: false, isPostseason: career.postseason !== null })
+        if (target === '포스트시즌') {
+          // 128 진입 0x120a4 를 다시 — S+0x50 = 0xf · 저장, 정규시즌 우승 보상을 아직 안 받았으면 팝업 0xb
+          commitWith((current) => (current.seasonEndState === 128 ? current : { ...current, seasonEndState: 128 }))
+          setPostseasonPopup(regularSeasonPopupOnEnter(career))
+          return setScene('포스트시즌')
+        }
+        // 109 진입 0x10d8c — 이전 상태 142 라 취소가 안 먹고 저장도 건너뛴다(S+0x50 은 이미 4)
+        commitWith((current) => (current.seasonEndState === 109 ? current : { ...current, seasonEndState: 109 }))
+        setNextGameFromManagement(false)
+        setScene('다음경기순위')
+      },
       cancelNextGameStandings: () => {
         if (scene !== '다음경기순위' || !nextGameFromManagement) return
         // 105 진입 0x11910 이 S+0x50 = 3 · 저장(0x11990) — 웹 null

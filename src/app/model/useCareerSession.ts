@@ -83,6 +83,9 @@ import { hiddenOpenTextOf } from '@/entities/career/model/equipment'
 import type { RookieProfile } from '@/entities/career/model/playerCareer'
 import { useStorySchedule } from '@/app/model/useStorySchedule'
 import { enterSeasonEvent, nextSeasonStep, resumePointOf } from '@/app/model/seasonEvents'
+import { nariMatchCancelTargetOf, rollNariMatchAces } from '@/pages/management/lib/nariMatchPrepare'
+import type { NariMatchAces, NariOpenedAces } from '@/pages/management/lib/nariMatchPrepare'
+import { DEFAULT_OPENED_ACE_BATTER_IDS, DEFAULT_OPENED_ACE_PITCHER_IDS } from '@/pages/general-mode/lib/generalModeSetup'
 import {
   achievedGoalCount,
   applyEndingBonus,
@@ -200,9 +203,20 @@ interface CareerSessionInput {
    * +0x7a · 시즌모드 시즌 기록 +0x7a · 전역 해금표 `app+0xc0`. 팝업을 닫을 때 읽는다. 안 넘기면 검사를 건너뛴다.
    */
   readonly readRegularSeasonOtherModes?: () => RegularSeasonOtherModes | undefined
+  /**
+   * 열린 마선수 로컬 번호 (전역 저장 +0x30.. 마투수 · +0x35.. 마타자, `useAceOpen`). 142 진입 0x1c46c 가 여기서
+   * 내 팀 마선수를 굴린다(0x9f604 · 0x9f650). 안 넘기면 기본 개방 둘(마투수 0 · 마타자 0)이다.
+   */
+  readonly openedAces?: NariOpenedAces
 }
 
 const NO_STAT = () => {}
+
+/** 처음부터 열린 마선수 — 저장 +0x30 · +0x35 (`normalizeAceOpenSave` 가 늘 켠다) */
+const DEFAULT_NARI_OPENED_ACES: NariOpenedAces = {
+  pitcherIds: DEFAULT_OPENED_ACE_PITCHER_IDS,
+  batterIds: DEFAULT_OPENED_ACE_BATTER_IDS,
+}
 
 /**
  * **경기 뒤 평가 0xa719c 는 정규시즌 경기만 탄다** (모드 4 도 투수편과 같은 갈래, 6921426).
@@ -242,6 +256,7 @@ export function useCareerSession({
   recordStat = NO_STAT,
   aceLevels,
   readRegularSeasonOtherModes,
+  openedAces = DEFAULT_NARI_OPENED_ACES,
 }: CareerSessionInput) {
   // 통로를 안 받으면 조용한 포트로 — 아래 자리들이 `sound` 가 있는지 매번 보지 않게 한다
   const silent = useMemo(() => createSilentSound(), [])
@@ -280,6 +295,13 @@ export function useCareerSession({
   const [managementDetail, setManagementDetail] = useState<ManagementDetail | null>(null)
   /** 경기 전 원작 로딩 화면에 띄울 팁. null 이면 로딩 중이 아니다. */
   const [loadingTip, setLoadingTip] = useState<string | null>(null)
+  /** 142 진입 0x1c46c 가 이 장면에서 굴린 마선수 — 경기정보 마투수·마타자 줄이 읽는다 */
+  const [matchAces, setMatchAces] = useState<NariMatchAces | null>(null)
+  /**
+   * 장면+0x288 — 142 진입의 마선수 넣기를 **장면마다 한 번**만 하게 막는 칸 (1c566~1c572 · 1c668). 장면 셋업 0xfb7c 가
+   * 0 으로 둔다 → 장면이 새로 서는 이어하기(`continueSaved`)와 경기 뒤(`finishGame`)에 내린다.
+   */
+  const matchPreparedRef = useRef(false)
 
   // 캔버스 루프에서 최신 값을 읽어야 한다 — useAtBatRunner의 atBatRef와 같은 이유다.
   const progressRef = useRef(progress)
@@ -437,9 +459,26 @@ export function useCareerSession({
     [setScreen],
   )
 
+  /**
+   * 142 경기 준비에 들어선다 — 진입 0x1c46c. 이 장면에서 처음이면(장면+0x288 == 0) 국가대항전이 아닐 때 마선수 넷을
+   * 굴린다(`rollNariMatchAces`, 난수 4). 로테이션·투수 +0x2c 는 웹이 경기를 세울 때(`beginGame`) 같은 값으로 구한다.
+   */
+  const enterMatchPrepare = useCallback(
+    (postseasonFromReentry?: boolean) => {
+      if (!matchPreparedRef.current) {
+        matchPreparedRef.current = true
+        setMatchAces(rollNariMatchAces(random, openedAces))
+      }
+      setScreen(postseasonFromReentry === undefined ? { kind: '경기준비' } : { kind: '경기준비', postseasonFromReentry })
+    },
+    [openedAces, random, setScreen],
+  )
+
   /** 경기가 끝났을 때 보상·칭호를 정산하고 결과 화면으로 넘어간다. */
   const finishGame = useCallback(
     (finished: GameProgress, currentCareer: PlayerCareer) => {
+      // 경기 장면 0x104 를 지나 나리 장면이 새로 선다 — 장면+0x288 이 0 (다음 142 에서 다시 굴린다)
+      matchPreparedRef.current = false
       const summary = summaryOf(finished)
       // 경기 후 평가 — 인기도 → 평판 → 사기 (0xa719c), 이어서 연속 기록 (0x8a6fc)
       const evaluation = evaluateGame(currentCareer, summary)
@@ -908,6 +947,8 @@ export function useCareerSession({
      */
     continueSaved: () => {
       if (savedCareer === null) return
+      // 장면 0x106 이 새로 선다 — 장면+0x288 = 0 (0xfb7c)
+      matchPreparedRef.current = false
       setShouldForgetRepeatable(true)
       const point = resumePointOf(savedCareer)
       if (point.kind === '이벤트') {
@@ -1046,10 +1087,28 @@ export function useCareerSession({
       enterNextGameStandings(false)
     },
 
-    /** 109 순위표 확인(−5 · '5', 0x105f0) → 142 경기 준비 — 웹은 142 가 없어 곧바로 경기 */
+    /** 109 순위표 확인(−5 · '5', 0x105f0) → 142 경기 준비 */
     confirmNextGameStandings: () => {
       if (career === null) return
+      enterMatchPrepare()
+    },
+
+    /**
+     * 142 확인(−5 · '5', 0x13cb6) — 저장 [모드+0x4c] = 1 · 저장 · 밀기 → 144 → 경기 장면 (0x15ce0).
+     * ⚠️ 미해결: 굴린 마선수(`matchAces`)를 경기 팀에 넣는 일(0xb88c8 · 0xb8870 — 마타자 명단 9번 · 마투수 투수 8번)은
+     *    경기 진행기(features/play-game)가 받지 않아 아직 안 싣는다. 저장 [모드+0x4c](해 봤음 표시)도 웹에 칸이 없다.
+     */
+    confirmMatchPrepare: () => {
+      if (career === null || screen.kind !== '경기준비') return
       beginGame()
+    },
+
+    /** 142 취소(−16, 0x13c72) — S+0xb4(포스트시즌) → 128 진입 0x120a4 를 다시, 그 밖 → 109 (이전 상태 142 라 취소가 안 먹는다) */
+    cancelMatchPrepare: () => {
+      if (career === null || screen.kind !== '경기준비') return
+      const target = nariMatchCancelTargetOf({ isNationalCup: false, isPostseason: career.postseason !== null })
+      if (target === '포스트시즌') return enterPostseason(career, screen.postseasonFromReentry === true)
+      enterNextGameStandings(false)
     },
 
     /** 109 순위표 취소(−16, 0x1060e) — 이전 상태가 105 일 때만 105 로. 그 밖에는 아무 일도 없다 */
@@ -1256,7 +1315,7 @@ export function useCareerSession({
 
     /**
      * 대진 화면 128 [확인] — 키 0x13da0. 팝업이 떠 있으면 키가 안 먹는다(0x1d06a 의 0x754f9 검사).
-     * 끝났으면 우승 팀 발표(팝업 7), 내 차례면 경기(142 → 144 → 경기 장면 — 웹은 142 화면 없이 곧장),
+     * 끝났으면 우승 팀 발표(팝업 7), 내 차례면 142 경기 준비(→ 144 → 경기 장면),
      * 아니면 CPU 끼리 돌려 바뀐 대진을 보여 주고 128 에 머문다.
      */
     pressPostseason: () => {
@@ -1268,7 +1327,8 @@ export function useCareerSession({
       if (series.round === '종료') {
         return setScreen({ ...screen, popup: { kind: '우승발표', champion: series.champion ?? -1 } })
       }
-      if (isMyTurn(series, career.teamId)) return beginGame()
+      // 내 차례 → 142 경기 준비 (0x13da0)
+      if (isMyTurn(series, career.teamId)) return enterMatchPrepare(screen.fromReentry === true)
       setCareer(applyPostseasonCpuGames(career, random, aceLevels))
     },
 
@@ -1368,6 +1428,7 @@ export function useCareerSession({
     managementDetail,
     pendingTitle,
     loadingTip,
+    matchAces,
     storyEvents: story.events,
     eventPlaceIds: story.eventPlaceIds,
     handlePitchResolved,

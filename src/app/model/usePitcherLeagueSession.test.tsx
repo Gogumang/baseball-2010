@@ -329,6 +329,11 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
         expect(result.current.scene).toBe('포스트시즌')
         continue
       }
+      if (result.current.scene === '경기준비') {
+        // 128 내 차례 → 142 경기 준비 → 확인
+        act(() => result.current.actions.confirmMatchPrepare())
+        continue
+      }
       if (result.current.postseasonPopup !== null) act(() => result.current.actions.closePostseasonPopup())
       else act(() => result.current.actions.pressPostseason())
     }
@@ -361,8 +366,26 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     act(() => 홀수.current.actions.cancelNextGameStandings())
     expect(홀수.current.scene).toBe('다음경기순위')
     act(() => 홀수.current.actions.confirmNextGameStandings())
+    expect(홀수.current.scene).toBe('경기준비')
+    act(() => 홀수.current.actions.confirmMatchPrepare())
     expect(홀수.current.scene).toBe('경기')
     expect(홀수.current.gameOptions?.dayCounter).toBe(11)
+  })
+
+  it('142 경기 준비 — 마선수 넷은 장면마다 한 번, 취소는 109 (이전 142 라 취소가 안 먹는다)', () => {
+    const result = 판짜기({ gamesPlayed: 4 })
+    act(() => result.current.actions.openNextGameStandings())
+    act(() => result.current.actions.confirmNextGameStandings())
+    expect(result.current.scene).toBe('경기준비')
+    const 굴림 = result.current.matchAces
+    expect(굴림).toMatchObject({ myBatter: 0, myPitcher: 0 })
+    act(() => result.current.actions.cancelMatchPrepare())
+    expect(result.current.scene).toBe('다음경기순위')
+    expect(result.current.nextGameFromManagement).toBe(false)
+    act(() => result.current.actions.confirmNextGameStandings())
+    expect(result.current.matchAces).toBe(굴림)
+    act(() => result.current.actions.confirmMatchPrepare())
+    expect(result.current.scene).toBe('경기')
   })
 
   it('관리 [다음경기] → 109 순위표 — 취소는 105 로, 확인은 경기 (0x105f0)', () => {
@@ -378,6 +401,7 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     expect(result.current.career?.seasonEndState).toBeNull()
     act(() => result.current.actions.openNextGameStandings())
     act(() => result.current.actions.confirmNextGameStandings())
+    act(() => result.current.actions.confirmMatchPrepare())
     expect(result.current.scene).toBe('경기')
   })
 
