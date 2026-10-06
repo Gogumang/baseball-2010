@@ -1419,12 +1419,12 @@ describe('한 경기를 끝까지 돌리면 16칸이 실제로 찬다', () => {
     const 끝 = runAutoProgress(startTeamGame({ ...기본옵션, settings: 전부자동 }, random), random)
     const summary = summaryOf(끝)
 
-    // 9회초 5-4 마무리 상황에서 우리 CPU 가 마무리(로스터 칸 7)를 올린다 (0xac428 ac574 → 0xabfcc [2,1,0])
-    expect(summary.ourScore).toBe(5)
-    expect(summary.opponentScore).toBe(4)
+    // CPU 대타 막음이 '+0x13 홈런 수' 로 바뀌어(0xac228 ac282) 굴림 차례가 달라졌다 — 7-0 완봉
+    expect(summary.ourScore).toBe(7)
+    expect(summary.opponentScore).toBe(0)
     expect(summary.pitching.outsRecorded).toBe(27)
-    // 피안타 7 · 탈삼진 12(뒤집혀 S[5]) · 내 타자 삼진 11 · 안타 13 · 2루타 5 · 솔로 홈런 1
-    expect(summary.gameRecord).toEqual([0, 0, 7, 0, 0, 12, 11, 13, 5, 0, 1, 0, 0, 0, 0, 0])
+    // 피안타 7 · 탈삼진 12(뒤집혀 S[5]) · 내 타자 삼진 11 · 안타 13 · 2루타 5
+    expect(summary.gameRecord).toEqual([0, 0, 7, 0, 0, 12, 11, 13, 5, 0, 0, 0, 0, 0, 0, 0])
 
     const context = {
       opponentRuns: summary.opponentScore,
@@ -1432,10 +1432,10 @@ describe('한 경기를 끝까지 돌리면 16칸이 실제로 찬다', () => {
       won: summary.won,
       completeGame: summary.reputationCompleteGame,
     }
-    // 16칸이 비었을 때는 승리·완투·상대 득점만 남아 +2 였다
-    expect(seasonReputationChangeOf(clearSeasonGameRecord(), context)).toBe(2)
-    // 채워진 16칸으로는 +5 까지 올라간다 (상한 +6 은 씨앗 42 처럼 크게 이긴 경기)
-    expect(seasonReputationChangeOf(summary.gameRecord, context)).toBe(5)
+    // 16칸이 비었을 때는 승리·완봉·상대 득점만 남아 +3 이다
+    expect(seasonReputationChangeOf(clearSeasonGameRecord(), context)).toBe(3)
+    // 채워진 16칸으로는 상한 +6 까지 올라간다
+    expect(seasonReputationChangeOf(summary.gameRecord, context)).toBe(6)
   })
 })
 
@@ -2031,10 +2031,7 @@ describe('돌발 경기 기록 검사 0x8ec9c — 공격 팀 지금 타순 칸 +
     const { progress } = 시작()
     const slot = progress.game.battingOrderIndex
     const ourEntryRecords = progress.ourEntryRecords.map((record, index) =>
-      index === slot ? { ...record, hits: 2 } : { ...record, hits: 5 },
-    )
-    const ourBatterLogs = progress.ourBatterLogs.map((log, index) =>
-      index === slot ? { ...log, stats: { ...log.stats, homeRuns: 1 } } : log,
+      index === slot ? { ...record, hits: 2, homeRuns: 1 } : { ...record, hits: 5, homeRuns: 3 },
     )
     const 상대투수 = progress.opponentPitcherEntry[progress.opponentPitcherIndex]
     const pitcherLines =
@@ -2050,23 +2047,23 @@ describe('돌발 경기 기록 검사 0x8ec9c — 공격 팀 지금 타순 칸 +
               pitches: 20,
             },
           ]
-    const 기록 = burstGameRecordOf({ ...progress, ourEntryRecords, ourBatterLogs, ourHits: 9, pitcherLines }, true)
+    const 기록 = burstGameRecordOf({ ...progress, ourEntryRecords, ourHits: 9, pitcherLines }, true)
     expect(기록.hitsInGame).toBe(2)
     expect(기록.homeRunsInGame).toBe(1)
     expect(기록.strikeoutsInGame).toBe(상대투수?.tableSlot === undefined ? 0 : 4)
   })
 
-  it('사람 수비면 상대 타순 칸 안타와 우리 지금 투수의 탈삼진(R[0])을 본다', () => {
+  it('사람 수비면 상대 타순 칸 안타·홈런(+0x12·+0x13)과 우리 지금 투수의 탈삼진(R[0])을 본다', () => {
     const { progress } = 시작()
     const slot = progress.opponentOrderIndex
     const opponentEntryRecords = progress.opponentEntryRecords.map((record, index) =>
-      index === slot ? { ...record, hits: 1 } : record,
+      index === slot ? { ...record, hits: 1, homeRuns: 1 } : record,
     )
     const 기록 = burstGameRecordOf(
       { ...progress, opponentEntryRecords, recordTally: { ...progress.recordTally, moundStrikeouts: 6 } },
       false,
     )
-    expect(기록).toEqual({ hitsInGame: 1, homeRunsInGame: 0, strikeoutsInGame: 6 })
+    expect(기록).toEqual({ hitsInGame: 1, homeRunsInGame: 1, strikeoutsInGame: 6 })
   })
 })
 
@@ -2109,7 +2106,7 @@ describe("사람 '#' 교체 뒤 0x16 → 0xd → 0xe → 0xf 재진입 · 교체
     const 판 = {
       ...progress,
       opponentEntryRecords: progress.opponentEntryRecords.map((record, index) =>
-        index === slot ? { hits: 0, runScoringHits: 0, plateAppearances: 2 } : record,
+        index === slot ? { hits: 0, homeRuns: 0, plateAppearances: 2 } : record,
       ),
     }
     const random = 세는난수(createSeededRandom(1))
@@ -2123,7 +2120,7 @@ describe("사람 '#' 교체 뒤 0x16 → 0xd → 0xe → 0xf 재진입 · 교체
     const 판 = {
       ...progress,
       opponentEntryRecords: progress.opponentEntryRecords.map((record, index) =>
-        index === slot ? { hits: 0, runScoringHits: 0, plateAppearances: 2 } : record,
+        index === slot ? { hits: 0, homeRuns: 0, plateAppearances: 2 } : record,
       ),
     }
     expect(isPitchTurn(판)).toBe(true)

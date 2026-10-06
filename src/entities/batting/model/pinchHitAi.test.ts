@@ -29,7 +29,7 @@ const 통과입력: CpuPinchHitInput = {
   blockedUntilNextPitch: false,
   batterIsAce: false,
   benchBatters: 3,
-  record: { hits: 0, runScoringHits: 0, plateAppearances: 2 },
+  record: { hits: 0, homeRuns: 0, plateAppearances: 2 },
   runnerCount: 0,
   strikes: 0,
   balls: 0,
@@ -61,7 +61,7 @@ describe('CPU 대타 0xac228', () => {
   })
 
   it('안타가 하나면 확률이 반이다 (ac2fe)', () => {
-    const 기록 = { hits: 1, runScoringHits: 0, plateAppearances: 2 }
+    const 기록 = { hits: 1, homeRuns: 0, plateAppearances: 2 }
     expect(judgeCpuPinchHit({ ...통과입력, record: 기록 }, 정해진난수([49, 0]))).toBe(0)
     expect(judgeCpuPinchHit({ ...통과입력, record: 기록 }, 정해진난수([50, 0]))).toBe(-1)
   })
@@ -78,9 +78,9 @@ describe('CPU 대타 0xac228', () => {
       { blockedUntilNextPitch: true },
       { batterIsAce: true },
       { benchBatters: 0 },
-      { record: { hits: 0, runScoringHits: 1, plateAppearances: 2 } },
-      { record: { hits: 2, runScoringHits: 0, plateAppearances: 2 } },
-      { record: { hits: 0, runScoringHits: 0, plateAppearances: 1 } },
+      { record: { hits: 0, homeRuns: 1, plateAppearances: 2 } },
+      { record: { hits: 2, homeRuns: 0, plateAppearances: 2 } },
+      { record: { hits: 0, homeRuns: 0, plateAppearances: 1 } },
       { batterHasEquipment: true },
     ]
     for (const 덮개 of 막힘) {
@@ -95,31 +95,33 @@ describe('타순 칸 기록 0xa8024', () => {
   it('타석 수는 안타든 아웃이든 오른다 (a8ac6 공통 꼬리)', () => {
     const 아웃 = recordPlateAppearance(EMPTY_BATTER_GAME_RECORD, {
       isHit: false,
-      runsBattedIn: 0,
+      isHomeRun: false,
     })
-    expect(아웃).toEqual({ hits: 0, runScoringHits: 0, plateAppearances: 1 })
-    const 안타 = recordPlateAppearance(아웃, { isHit: true, runsBattedIn: 0 })
-    expect(안타).toEqual({ hits: 1, runScoringHits: 0, plateAppearances: 2 })
-    const 적시타 = recordPlateAppearance(안타, { isHit: true, runsBattedIn: 2 })
-    expect(적시타).toEqual({ hits: 2, runScoringHits: 1, plateAppearances: 3 })
+    expect(아웃).toEqual({ hits: 0, homeRuns: 0, plateAppearances: 1 })
+    const 안타 = recordPlateAppearance(아웃, { isHit: true, isHomeRun: false })
+    expect(안타).toEqual({ hits: 1, homeRuns: 0, plateAppearances: 2 })
+    const 홈런 = recordPlateAppearance(안타, { isHit: true, isHomeRun: true })
+    expect(홈런).toEqual({ hits: 2, homeRuns: 1, plateAppearances: 3 })
   })
 
-  it('점수가 나도 안타가 아니면 적시타가 아니다 (a8728 은 안타 가지 안이다)', () => {
-    expect(
-      recordPlateAppearance(EMPTY_BATTER_GAME_RECORD, { isHit: false, runsBattedIn: 1 })
-        .runScoringHits,
-    ).toBe(0)
+  it('+0x13 은 홈런 수다 — 점수 낸 안타(적시타)는 세지 않는다 (a874c 의 sp+0x24 = 홈런 이벤트 8)', () => {
+    const 적시타 = recordPlateAppearance(EMPTY_BATTER_GAME_RECORD, { isHit: true, isHomeRun: false })
+    expect(적시타.homeRuns).toBe(0)
+    // 적시타가 있어도 대타를 막지 않는다 — 홈런이 막는다 (ac282)
+    expect(judgeCpuPinchHit({ ...통과입력, record: { ...적시타, plateAppearances: 2 } }, 정해진난수([0, 0]))).toBe(0)
+    const 홈런 = recordPlateAppearance(EMPTY_BATTER_GAME_RECORD, { isHit: true, isHomeRun: true })
+    expect(judgeCpuPinchHit({ ...통과입력, record: { ...홈런, plateAppearances: 2 } }, 정해진난수([0, 0]))).toBe(-1)
   })
 
   it('견제(4)·주자만(5)으로 끝난 판은 타석 수를 안 올린다 — 0xa8024 의 state[0x26] 게이트', () => {
-    const 한타석 = recordPlateAppearance(EMPTY_BATTER_GAME_RECORD, { isHit: false, runsBattedIn: 0 })
+    const 한타석 = recordPlateAppearance(EMPTY_BATTER_GAME_RECORD, { isHit: false, isHomeRun: false })
     for (const playKind of [4, 5]) {
       expect(
-        recordPlateAppearance(한타석, { isHit: false, runsBattedIn: 0, playKind }),
+        recordPlateAppearance(한타석, { isHit: false, isHomeRun: false, playKind }),
         `종류 ${playKind}`,
       ).toEqual(한타석)
     }
     // 종류를 안 주면 타구(1)다 — 지금까지와 똑같이 센다
-    expect(recordPlateAppearance(한타석, { isHit: false, runsBattedIn: 0, playKind: 1 }).plateAppearances).toBe(2)
+    expect(recordPlateAppearance(한타석, { isHit: false, isHomeRun: false, playKind: 1 }).plateAppearances).toBe(2)
   })
 })

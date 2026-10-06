@@ -20,7 +20,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
  *   n = team[+0x28c]; if n <= 0: return 0            ; ac252~ac25e  벤치 타자 수
  *   if 마선수(0xae89c(team)): return 0               ; ac260~ac26e  ← 같은 검사를 한 번 더 한다(원본 그대로)
  *   e = team + 0x34 + team[+0x32](타순)×0x18
- *   if e[0x13] != 0: return 0                        ; ac282  적시타가 있으면 안 바꾼다
+ *   if e[0x13] != 0: return 0                        ; ac282  이 경기 홈런을 쳤으면 안 바꾼다
  *   if e[0x12] >  1: return 0                        ; ac288  안타 2개 이상이면 안 바꾼다
  *   if e[0x14] <  2: return 0                        ; ac28e  타석 2번은 서야 바꾼다
  *   if 타자[+0x19]·[+0x1a] 의 네 니블 중 하나라도 != 0: return 0   ; ac294~ac2d0  장비 단 선수 제외
@@ -46,10 +46,15 @@ export interface BatterGameRecord {
   /** `+0x12` — 이 경기 **안타 수** (`0xa8726`, 안타 가지에서 +1) */
   readonly hits: number
   /**
-   * `+0x13` — 그 안타가 **점수를 냈으면** +1 (`0xa874c`). 안타 가지 안에서 그 플레이의
-   * 이벤트 8(득점) 개수 `sp+0x24` 가 0 보다 클 때만 올라간다 = **적시타 수**.
+   * `+0x13` — 이 경기 **홈런 수** (`0xa874c`). 안타 가지 안에서 `[sp+0x24] > 0` 일 때 +1 이고,
+   * `sp+0x24` 는 그 플레이의 **홈런 이벤트 8** 개수(`a80a4~a80b0` — 이벤트 8 은 sp+0x24·sp+0x2c 둘 다, 이벤트 6 은 sp+0x2c 만 올린다)와
+   * 장내 홈런 `state[0x25]`(`a84cc~a84e8`, E-defense 1e)가 센다. `sp+0x24 > 0` 이면 곧바로 안타 종류 4(홈런)로
+   * 가고(`a8192~a81a2`), a874c 바로 뒤가 한 타자 홈런 기록 `0xa7b00` 이다.
+   *
+   * (예전에는 이 칸을 "점수 낸 안타 = 적시타 수" 로 읽었다 — sp+0x24 를 득점 수로 잘못 본 것이라 고쳤다.
+   * 웹 타구 근사에는 장내 홈런이 없어 결과 '홈런' 하나만 센다.)
    */
-  readonly runScoringHits: number
+  readonly homeRuns: number
   /**
    * `+0x14` — 이 경기 **타석 수** (`0xa8b02`).
    *
@@ -66,7 +71,7 @@ export interface BatterGameRecord {
 
 export const EMPTY_BATTER_GAME_RECORD: BatterGameRecord = {
   hits: 0,
-  runScoringHits: 0,
+  homeRuns: 0,
   plateAppearances: 0,
 }
 
@@ -81,16 +86,17 @@ const RUNNER_ONLY_PLAY_KINDS: readonly number[] = [4, 5]
  * 플레이 하나를 기록에 얹는다 (`0xa8024` 의 세 칸만).
  *
  * `playKind` 는 원본 `state[0x26]` — 안 주면 1(타구)이다. 견제(4)·주자만(5)으로 끝난 판은
- * **타석 수(+0x14)를 안 올린다.** 안타·적시타 칸은 안타 가지(0xa86e0) 안이라 그런 판에서는 애초에 안 선다.
+ * **타석 수(+0x14)를 안 올린다.** 안타·홈런 칸은 안타 가지(0xa86e0) 안이라 그런 판에서는 애초에 안 선다.
+ * `isHomeRun` 은 안타 가지 안의 홈런이다 — 홈런이 아니면 `isHit` 이어도 +0x13 은 그대로다.
  */
 export function recordPlateAppearance(
   record: BatterGameRecord,
-  play: { readonly isHit: boolean; readonly runsBattedIn: number; readonly playKind?: number },
+  play: { readonly isHit: boolean; readonly isHomeRun: boolean; readonly playKind?: number },
 ): BatterGameRecord {
   const countsAsPlateAppearance = !RUNNER_ONLY_PLAY_KINDS.includes(play.playKind ?? 1)
   return {
     hits: record.hits + (play.isHit ? 1 : 0),
-    runScoringHits: record.runScoringHits + (play.isHit && play.runsBattedIn > 0 ? 1 : 0),
+    homeRuns: record.homeRuns + (play.isHit && play.isHomeRun ? 1 : 0),
     plateAppearances: record.plateAppearances + (countsAsPlateAppearance ? 1 : 0),
   }
 }
@@ -144,7 +150,7 @@ export function judgeCpuPinchHit(input: CpuPinchHitInput, random: RandomPort): n
   if (bench <= 0) return -1
   // ac260~ac26e 가 같은 마선수 검사를 한 번 더 한다 — 결과는 같아 여기서는 위 한 줄로 갈음한다
   const record = input.record
-  if (record.runScoringHits !== 0) return -1
+  if (record.homeRuns !== 0) return -1
   if (record.hits > 1) return -1
   if (record.plateAppearances < 2) return -1
   if (input.batterHasEquipment === true) return -1

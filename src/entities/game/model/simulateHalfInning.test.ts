@@ -340,8 +340,8 @@ describe('CPU 대타 0xac228 은 마선수 타자를 바꾸지 않는다 (0xb633
   const 범타명단 = () => {
     let lineup = rosterLineupOf(12)
     for (let order = 0; order < 9; order += 1) {
-      lineup = recordLineupPlay(lineup, order, { kind: '삼진' }, 0)
-      lineup = recordLineupPlay(lineup, order, { kind: '삼진' }, 0)
+      lineup = recordLineupPlay(lineup, order, { kind: '삼진' })
+      lineup = recordLineupPlay(lineup, order, { kind: '삼진' })
     }
     return lineup
   }

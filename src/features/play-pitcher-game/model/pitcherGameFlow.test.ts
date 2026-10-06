@@ -932,11 +932,11 @@ describe('투수 쪽 보정 0x34d6c — 공+0x10 (0x3de10) · 내 투수 보너�
 })
 
 describe('내가 던지는 타석의 CPU 대타 0xac228 — 0xf 진입 0x3d954 (3da44·3da70)', () => {
-  /** 첫 타자 칸이 대타 조건(타석 2 · 안타 0 · 적시타 0)을 채운 경기 — 벤치 셋 */
+  /** 첫 타자 칸이 대타 조건(타석 2 · 안타 0 · 홈런 0)을 채운 경기 — 벤치 셋 */
   const 대타감 = (): PitcherGameProgress => {
     const 시작 = startPitcherGame(기본옵션, 씨앗(20100901))
     const records = [...시작.opponentLineup.records]
-    records[시작.opponentOrderIndex % 9] = { hits: 0, runScoringHits: 0, plateAppearances: 2 }
+    records[시작.opponentOrderIndex % 9] = { hits: 0, homeRuns: 0, plateAppearances: 2 }
     return { ...시작, opponentLineup: { ...시작.opponentLineup, records } }
   }
 
@@ -958,7 +958,7 @@ describe('내가 던지는 타석의 CPU 대타 0xac228 — 0xf 진입 0x3d954 (
     expect(바뀜.opponentLineup.rosterSlots[칸]).toBe(11)
     expect(바뀜.opponentLineup.benchBatters).toBe(2)
     // 들어온 선수는 빈 기록 · 막음 칸이 섰다 · 카운트(1 스트라이크)를 이어받는다
-    expect(바뀜.opponentLineup.records[칸]).toEqual({ hits: 0, runScoringHits: 0, plateAppearances: 0 })
+    expect(바뀜.opponentLineup.records[칸]).toEqual({ hits: 0, homeRuns: 0, plateAppearances: 0 })
     expect(바뀜.pinchHitUsed).toBe(true)
     expect(바뀜.atBat.strikes).toBe(1)
     // 사람 장면 대타라 "Time!"·등판음 신호가 선다 (안 바뀐 공은 그대로)

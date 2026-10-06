@@ -26,8 +26,8 @@ function 정해진난수(values: readonly number[]): RandomPort & { readonly cal
 /** 타순 0번이 두 타석 범타로 물러난 명단 — 0xac228 의 막는 조건을 다 지난다 */
 const 두타석범타 = () => {
   let lineup = rosterLineupOf(12)
-  lineup = recordLineupPlay(lineup, 0, { kind: '아웃', detail: '땅볼아웃' }, 0)
-  lineup = recordLineupPlay(lineup, 9, { kind: '삼진' }, 0)
+  lineup = recordLineupPlay(lineup, 0, { kind: '아웃', detail: '땅볼아웃' })
+  lineup = recordLineupPlay(lineup, 9, { kind: '삼진' })
   return lineup
 }
 
@@ -64,7 +64,7 @@ describe('간이 엔진 명단과 CPU 대타 (0xac228 → 0xaf06c → 0xaebe4 �
   })
 
   it('막는 조건에 걸리면 굴림을 하나도 안 쓴다 — 타석 1번 · 이 경기 이미 씀', () => {
-    const 한타석 = recordLineupPlay(rosterLineupOf(12), 0, { kind: '삼진' }, 0)
+    const 한타석 = recordLineupPlay(rosterLineupOf(12), 0, { kind: '삼진' })
     const 첫째 = 정해진난수([0, 0])
     expect(tryQuickCpuPinchHit(한타석, 0, { alreadyUsedThisGame: false, runnerCount: 3 }, 첫째)).toBeNull()
     expect(첫째.calls()).toBe(0)

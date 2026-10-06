@@ -1488,8 +1488,8 @@ function applyDefensivePlay(
     teamWalksAllowed: progress.teamWalksAllowed + (freePass ? 1 : 0),
     teamRunsAllowed: progress.teamRunsAllowed + applied.runsScored,
     perfectInningFlag,
-    // 정산 0xa8024 — 타순 칸 기록(타석 +0x14 · 안타 +0x12 · 적시타 +0x13)이 CPU 대타 0xac228 의 재료다
-    opponentLineup: recordLineupPlay(progress.opponentLineup, slot, outcome, applied.runsScored),
+    // 정산 0xa8024 — 타순 칸 기록(타석 +0x14 · 안타 +0x12 · 홈런 +0x13)이 CPU 대타 0xac228 의 재료다
+    opponentLineup: recordLineupPlay(progress.opponentLineup, slot, outcome),
     opponentBatterLogs: {
       ...progress.opponentBatterLogs,
       [slot]: {
@@ -2152,8 +2152,8 @@ function playTeammateAtBat(
       decision,
       endedInningIndex: game.inning - 1,
       teammateLogs: { ...progress.teammateLogs, [slot]: recorded.log },
-      // 정산 0xa8024 — 타순 칸 기록(타석·안타·적시타)이 다음 CPU 대타 판정의 재료다
-      ourLineup: recordLineupPlay(progress.ourLineup, slot, outcome, runs),
+      // 정산 0xa8024 — 타순 칸 기록(타석·안타·홈런)이 다음 CPU 대타 판정의 재료다
+      ourLineup: recordLineupPlay(progress.ourLineup, slot, outcome),
       // 같은 정산이 상대 마운드 투수 레코드에 아웃·실점·탈삼진을 쌓는다
       pitcherLines: chargeCpuPitcherLine(progress.pitcherLines, options.opponentTeamId, mound.pitcherSlot, {
         outs: outsAddedBetween(before, game),

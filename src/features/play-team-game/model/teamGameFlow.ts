@@ -527,7 +527,7 @@ export interface TeamGameProgress {
   /** 벤치에 남은 상대 타자 수 (`team+0x28c`) */
   readonly opponentBenchBatters: number
   /**
-   * 타순 칸별 이 경기 기록 (`team + 0x34 + 타순×0x18` 의 안타·적시타·타석) — `0xac228` 이 본다.
+   * 타순 칸별 이 경기 기록 (`team + 0x34 + 타순×0x18` 의 안타·홈런·타석) — `0xac228` 이 본다.
    * 명단과 길이·차례가 같다: 대타가 두 칸을 맞바꾸고 빠진 칸을 지우면 기록도 같이 움직인다
    * (원본 `0xaebe4` 도 24바이트 기록을 함께 옮긴다).
    */
@@ -1296,18 +1296,17 @@ function withHitBases(
  *
  * `outcome` 이 null 이면 **타석 결과 없이 끝난 판**(견제 = 플레이 종류 4)이다 — 원본도 견제 판 끝
  * `0xae3e8` 이 `0xa8024` 를 부르지만(`0xae57e~0xae5b2`) `state[0x26] = 4` 라 타석 칸(+0x14)이 안 오르고,
- * 안타·적시타 칸은 안타 가지(`0xa86e0`) 안이라 애초에 안 선다. 게이트는 `recordPlateAppearance` 의 `playKind` 다.
+ * 안타·홈런 칸은 안타 가지(`0xa86e0`) 안이라 애초에 안 선다. 게이트는 `recordPlateAppearance` 의 `playKind` 다.
  */
 function withPlateAppearance(
   records: readonly BatterGameRecord[],
   slot: number,
   outcome: AtBatOutcome | null,
-  runsBattedIn: number,
 ): readonly BatterGameRecord[] {
   const next = [...records]
   next[slot] = recordPlateAppearance(next[slot] ?? EMPTY_BATTER_GAME_RECORD, {
     isHit: outcome !== null && isHit(outcome),
-    runsBattedIn,
+    isHomeRun: outcome !== null && outcome.kind === '홈런',
     ...(outcome === null ? { playKind: PICKOFF_PLAY_KIND } : {}),
   })
   return next
@@ -2005,7 +2004,7 @@ function finishBatterOutcome(
       game.inning !== before.inning || game.half !== before.half,
     ),
     ourHits: progress.ourHits + (isHit(outcome) ? 1 : 0),
-    ourEntryRecords: withPlateAppearance(progress.ourEntryRecords, slot, outcome, runsBattedIn),
+    ourEntryRecords: withPlateAppearance(progress.ourEntryRecords, slot, outcome),
     leaguePlateAppearances: withLeaguePlateAppearance(
       progress.leaguePlateAppearances,
       progress.options.ourTeamId,
@@ -2498,12 +2497,7 @@ function finishDefensiveAtBat(
       '수비',
       defenseRecordCodesOf(outcome, applied.outsAdded),
     ),
-    opponentEntryRecords: withPlateAppearance(
-      progress.opponentEntryRecords,
-      slot,
-      outcome,
-      applied.runsScored,
-    ),
+    opponentEntryRecords: withPlateAppearance(progress.opponentEntryRecords, slot, outcome),
     leaguePlateAppearances: withLeaguePlateAppearance(
       progress.leaguePlateAppearances,
       progress.options.opponentTeamId,
@@ -2730,12 +2724,12 @@ function applyPickoffPlay(
     ? {
         ...progress,
         lastDefensePlay: result,
-        opponentEntryRecords: withPlateAppearance(progress.opponentEntryRecords, progress.opponentOrderIndex, null, 0),
+        opponentEntryRecords: withPlateAppearance(progress.opponentEntryRecords, progress.opponentOrderIndex, null),
       }
     : {
         ...progress,
         lastDefensePlay: result,
-        ourEntryRecords: withPlateAppearance(progress.ourEntryRecords, before.battingOrderIndex, null, 0),
+        ourEntryRecords: withPlateAppearance(progress.ourEntryRecords, before.battingOrderIndex, null),
       }
   const applied = withRunnerOnlyAdvance(recorded, result.advance, humanSide)
   const { changed, runs } = applied
@@ -2943,12 +2937,10 @@ function readyAtBat(progress: TeamGameProgress, random: RandomPort): TeamGamePro
  * 홈런(state[0x25])이 세는 **홈런 수**다(a80a8 · E-defense 1e, 바로 뒤가 한 타자 홈런 0xa7b00·대타 홈런 5).
  * `0xb8cec` 는 `team + 0x244 + 4·team[0]` — 지금 마운드 투수의 경기 기록이고 R[0] 이 탈삼진이다(`recordTally` 주석).
  *
- * 웹 칸: 안타 = 타순 칸 기록 `+0x12`(`*EntryRecords[칸].hits`), 우리 홈런 = 타순 칸 결과 목록(`ourBatterLogs`),
+ * 웹 칸: 안타·홈런 = 타순 칸 기록 `+0x12`·`+0x13`(`*EntryRecords[칸].hits`·`.homeRuns` — 양 팀 같은 칸),
  * 우리 투수 탈삼진 = `recordTally.moundStrikeouts`(교체 때 0), 상대 투수 탈삼진 = 그 투수의 경기 줄(`pitcherLines`).
  *
- * ⚠️ 미해결 둘 — **상대 타순 칸의 홈런**(+0x13)과 **상대 마투수의 탈삼진**은 웹이 들고 있지 않아 0 이다.
- *    `BatterGameRecord.runScoringHits` 가 같은 +0x13 바이트를 "적시타 수" 로 세는데, 위 a874c 로 보면 홈런 수라
- *    그 칸을 빌려 쓰지 않았다(`entities/batting/model/pinchHitAi`). 마투수는 리그 붙박이 표 칸이 없어 경기 줄이 없다.
+ * ⚠️ 미해결 하나 — **상대 마투수의 탈삼진**은 웹이 들고 있지 않아 0 이다(마투수는 리그 붙박이 표 칸이 없어 경기 줄이 없다).
  *    시즌 표(XlsSEASON_BURST 56행)에는 b6 ≠ 0 인 행이 하나도 없어 지금 경기 결과는 같다 (b6 은 타자·투수편 표만 쓴다).
  */
 export function burstGameRecordOf(
@@ -2967,13 +2959,13 @@ export function burstGameRecordOf(
           )
     return {
       hitsInGame: progress.ourEntryRecords[slot]?.hits ?? 0,
-      homeRunsInGame: progress.ourBatterLogs[slot]?.stats.homeRuns ?? 0,
+      homeRunsInGame: progress.ourEntryRecords[slot]?.homeRuns ?? 0,
       strikeoutsInGame: line?.strikeouts ?? 0,
     }
   }
   return {
     hitsInGame: progress.opponentEntryRecords[progress.opponentOrderIndex]?.hits ?? 0,
-    homeRunsInGame: 0,
+    homeRunsInGame: progress.opponentEntryRecords[progress.opponentOrderIndex]?.homeRuns ?? 0,
     strikeoutsInGame: progress.recordTally.moundStrikeouts,
   }
 }
@@ -3549,7 +3541,7 @@ function substituteBatter(
  *     (`enterPitchSelection` — 카운트가 있으면 확률이 `>> (볼+스트라이크+1)` 로 준다).
  *
  * 막음 칸 `state[0xe]`(`cpuPinchHitUsed`)은 공마다 내려가므로(`0xa5e14` a5e7c) **한 경기에 여러 번** 나올 수 있다 —
- * 벤치 수·타순 칸 기록(타석 둘 이상·적시타 없음·안타 하나 이하)이 실제 상한이다.
+ * 벤치 수·타순 칸 기록(타석 둘 이상·홈런 없음·안타 하나 이하)이 실제 상한이다.
  *
  * ⚠️ 원본이 보는 **장비 레벨 니블**(레코드 `+0x19`·`+0x1a`)은 웹 로스터 표에 없어 늘 0 으로 둔다.
  */
@@ -3962,7 +3954,7 @@ function playAutoOffenseAtBat(progress: TeamGameProgress, random: RandomPort): T
         game.inning !== before.inning || game.half !== before.half,
       ),
       ourHits: progress.ourHits + (isHit(outcome) ? 1 : 0),
-      ourEntryRecords: withPlateAppearance(progress.ourEntryRecords, slot, outcome, runsBattedIn),
+      ourEntryRecords: withPlateAppearance(progress.ourEntryRecords, slot, outcome),
       // 자동으로 넘긴 타석도 원본은 같은 0xa8024 를 지난다 — 평판 16칸도 똑같이 오른다
       gameRecord: withSeasonRecord(progress, '공격', autoOffense.codes),
       ourHitBases: withHitBases(progress.ourHitBases, slot, autoOffense.hitBases),

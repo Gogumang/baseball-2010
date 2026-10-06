@@ -817,8 +817,8 @@ function finishPlayerOutcome(
         MAXIMUM_PITCHER_COUNTER,
         progress.opponentInningRunsAllowed + runsBattedIn,
       ),
-      // 내 타석도 같은 정산 0xa8024 가 타순 칸 기록(안타·적시타·타석)을 세운다
-      ourLineup: recordLineupPlay(progress.ourLineup, progress.game.battingOrderIndex, outcome, runsBattedIn),
+      // 내 타석도 같은 정산 0xa8024 가 타순 칸 기록(안타·홈런·타석)을 세운다
+      ourLineup: recordLineupPlay(progress.ourLineup, progress.game.battingOrderIndex, outcome),
       // 같은 정산이 상대 마운드 투수 레코드에 아웃(결과 코드 5·0xd)·실점·탈삼진을 쌓는다 (0xa8cca · 0xa8ee4 · 0xa8d1c)
       pitcherLines: chargePitcherLine(progress.pitcherLines, progress.opponentTeamId, progress.opponentMound.pitcherSlot, {
         outs: outsAddedBetween(progress.game, nextGame),
@@ -1237,7 +1237,7 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort): GameProg
       // 간이 엔진 득점(0xc0fb4·0xc1054)도 같은 0xa5c34 를 부른다
       decisions: decisionsAfterPlay(progress.decisions, progress.game, game, moundsOf(progress)),
       teammateLogs: { ...progress.teammateLogs, [slot]: recorded.log },
-      ourLineup: recordLineupPlay(progress.ourLineup, slot, outcome, runsBattedIn),
+      ourLineup: recordLineupPlay(progress.ourLineup, slot, outcome),
       pitcherLines: chargePitcherLine(progress.pitcherLines, progress.opponentTeamId, mound.pitcherSlot, {
         outs: outsAddedBetween(progress.game, game),
         runsAllowed: runsBattedIn,
@@ -1754,12 +1754,12 @@ export function cpuPickoff(progress: GameProgress, base: PickoffBase, random: Ra
     runningMode: progress.runningModeManual ? '수동' : '자동',
   })
 
-  // 정산 0xa8024 — 종류 4 라 타석 칸(+0x14)이 안 오르고 안타·적시타 가지도 안 선다 (pinchHitAi 게이트)
+  // 정산 0xa8024 — 종류 4 라 타석 칸(+0x14)이 안 오르고 안타·홈런 가지도 안 선다 (pinchHitAi 게이트)
   const slot = lineupSlotOf(before.battingOrderIndex)
   const records = [...progress.ourLineup.records]
   records[slot] = recordPlateAppearance(records[slot] ?? EMPTY_BATTER_GAME_RECORD, {
     isHit: false,
-    runsBattedIn: 0,
+    isHomeRun: false,
     playKind: PICKOFF_PLAY_KIND,
   })
   // 득점 처리 0xa5c34 는 1점마다 수비 팀 실점 A·B 와 승·패·세 칸을 고친다 (내 타석 정산과 같은 칸)

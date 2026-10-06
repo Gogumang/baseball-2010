@@ -13,7 +13,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
  *
  * 원본 팀 객체 `team+0xe` 목록 — 앞 아홉 칸이 타순, 그 뒤가 벤치다 (E 3b). 타순 칸마다
  * 이 경기 기록 24바이트(`team + 0x34 + 타순×0x18`)가 붙어 있고, CPU 대타 `0xac228` 이 그중
- * 안타(+0x12)·적시타(+0x13)·타석(+0x14)을 본다. 벤치 타자 수는 `team+0x28c` 다.
+ * 안타(+0x12)·홈런(+0x13)·타석(+0x14)을 본다. 벤치 타자 수는 `team+0x28c` 다.
  *
  * 대타가 들어오면 확정 `0xaebe4` 의 대타 가지(`aecac~aedec`)가 명단 두 칸과 그 기록을 맞바꾸고
  * 빠진 선수를 명단에서 지운다 — 재출장은 없다 (`features/play-team-game` 의 `substituteBatter` 와
@@ -52,18 +52,16 @@ export function rosterSlotAt(lineup: QuickLineup, order: number): number {
   return lineup.rosterSlots[slot] ?? slot
 }
 
-/** 타석 하나를 그 타순 칸 기록에 얹는다 (`0xa8024` 의 세 칸 — 견제가 없는 간이 타석은 늘 타구 플레이다) */
-export function recordLineupPlay(
-  lineup: QuickLineup,
-  order: number,
-  outcome: AtBatOutcome,
-  runsBattedIn: number,
-): QuickLineup {
+/**
+ * 타석 하나를 그 타순 칸 기록에 얹는다 (`0xa8024` 의 세 칸 — 견제가 없는 간이 타석은 늘 타구 플레이다).
+ * `+0x13` 은 홈런 수다 (`pinchHitAi.BatterGameRecord.homeRuns`).
+ */
+export function recordLineupPlay(lineup: QuickLineup, order: number, outcome: AtBatOutcome): QuickLineup {
   const slot = lineupSlotOf(order)
   const records = [...lineup.records]
   records[slot] = recordPlateAppearance(records[slot] ?? EMPTY_BATTER_GAME_RECORD, {
     isHit: isHit(outcome),
-    runsBattedIn,
+    isHomeRun: outcome.kind === '홈런',
   })
   return { ...lineup, records }
 }
