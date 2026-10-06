@@ -188,18 +188,31 @@ describe('대회 끝 정산 (0x1b92c)', () => {
 })
 
 describe('대회 경기 한 바퀴 (135 → 142 → 사람 경기 → 101 → 134)', () => {
-  it('매치업에서 경기를 시작하면 대한민국으로 경기 화면에 들어간다', () => {
+  it('135 확인은 142 경기 준비로 — [확인] 이면 대한민국으로 경기 화면에 들어가고 마선수는 안 싣는다(1c5fe)', () => {
     const rendered = 띄우기(목표달성선수())
     연봉사슬끝내기(rendered)
     이벤트보기(rendered, [461, 463])
+    const cup = createNationalCup()
 
-    act(() =>
-      rendered.result.current.session.actions.startCupGame({ myTeam: 10, opponent: 11 }, createNationalCup()),
-    )
+    act(() => rendered.result.current.session.actions.startCupGame({ myTeam: 10, opponent: 11 }, cup))
+    expect(rendered.result.current.screen).toEqual({ kind: '경기준비', cup: { matchup: { myTeam: 10, opponent: 11 }, cup } })
 
+    act(() => rendered.result.current.session.actions.confirmMatchPrepare())
     expect(rendered.result.current.screen).toEqual({ kind: '경기' })
     expect(rendered.result.current.session.progress?.ourTeamId).toBe(10)
     expect(rendered.result.current.session.progress?.opponentTeamId).toBe(11)
+    expect(rendered.result.current.session.progress?.aces).toBeUndefined()
+  })
+
+  it('142 취소(−16)는 S+0x12c 갈래 — 135 순위표로 돌아간다 (0x13c72)', () => {
+    const rendered = 띄우기(목표달성선수())
+    연봉사슬끝내기(rendered)
+    이벤트보기(rendered, [461, 463])
+    const cup = createNationalCup()
+
+    act(() => rendered.result.current.session.actions.startCupGame({ myTeam: 10, opponent: 11 }, cup))
+    act(() => rendered.result.current.session.actions.cancelMatchPrepare())
+    expect(rendered.result.current.screen).toEqual({ kind: '국가대항전', cup, atStandings: true })
   })
 })
 

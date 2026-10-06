@@ -35,6 +35,7 @@ import { rollOpponentAceIndex } from '@/entities/game/model/aceOpponent'
 import type { League, PostseasonSeries } from '@/entities/league/model/league'
 import { EMPTY_VALUE } from '@/pages/general-mode/lib/matchInfoLines'
 import type { MatchInfoLine } from '@/pages/general-mode/lib/matchInfoLines'
+import { PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import type { PlayerSide } from '@/entities/game/model/gameState'
 import { leagueGamePitchersOf, nextOpponentOf } from '@/entities/career/model/playerCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
@@ -42,6 +43,7 @@ import { leagueGamePlayerSideOf } from '@/entities/career/model/leagueGameSetup'
 import { teamPitchers } from '@/entities/team/model/teamRoster'
 import { seasonMatchInfoLines } from '@/pages/season/lib/seasonMatchInfo'
 import type { GameAceSetup } from '@/features/play-game/model/gameAces'
+import type { NationalCup, NationalCupMatchup } from '@/entities/national-cup/model/nationalCup'
 
 /** 마선수 번호가 없을 때 — 표 0xd7638[0] = −1 */
 export const NO_NARI_ACE = -1
@@ -100,6 +102,23 @@ export function nariMatchCancelTargetOf(state: { readonly isNationalCup: boolean
   return state.isPostseason ? '포스트시즌' : '다음경기순위'
 }
 
+/** 구장 번호가 그대로인 팀의 끝 — 기본 열 팀 0~9 (0x78664 의 `cmp r1, #9`) */
+const LAST_HOME_STADIUM_TEAM = 9
+/** 히든 팀 홈이면 고르는 구장 수 — `bfa55(0, 10)` */
+const STADIUM_COUNT = 10
+
+/**
+ * 142 진입의 구장 `0x78664(무대, 홈 팀)` (1c7c6, 이전 상태가 143 이 아니면 — 장면+0x288 과 상관없이 들어올 때마다):
+ * ```
+ * 78664  홈 팀 ≤ 9 → 무대+0x70 = 홈 팀  /  그 밖 → 무대+0x70 = bfa55(0, 10)
+ * ```
+ * 나리 정규·포스트시즌 팀은 0~9 라 굴리지 않고, 국가대항전(10~13)만 한 번 굴린다. 웹은 구장 그림이 없어 값은 버린다.
+ */
+export function rollNariMatchStadium(random: RandomPort, homeTeamId: number): number {
+  if (homeTeamId <= LAST_HOME_STADIUM_TEAM) return homeTeamId
+  return Math.trunc(random.nextInRange(0, STADIUM_COUNT))
+}
+
 export interface NariMatchInfoInput {
   readonly league: League
   /** S+0xb4 — 있으면 순위 칸 "--" · 승패 칸은 이번 시리즈 */
@@ -112,6 +131,8 @@ export interface NariMatchInfoInput {
   readonly opponentPitcherOrder: readonly number[]
   /** 이번 장면에서 굴린 마선수 — 국가대항전이면 null("-") */
   readonly aces: NariMatchAces | null
+  /** 진행 중인 국가대항전 (S+0x12c) — 있으면 순위·승패를 대회 표에서 읽는다(0x5dcc0 → 0xb834c) */
+  readonly cup?: NationalCup | null
 }
 
 /**
@@ -123,7 +144,7 @@ export function nariMatchInfoLines(input: NariMatchInfoInput): readonly MatchInf
   return seasonMatchInfoLines({
     league: input.league,
     series: input.postseason,
-    cup: null,
+    cup: input.cup ?? null,
     inPostseason: input.postseason !== null,
     myTeamId: input.myTeamId,
     opponentTeamId: input.opponentTeamId,
@@ -165,5 +186,30 @@ export function batterMatchInfoOf(career: PlayerCareer, aces: NariMatchAces | nu
     myTeamId: career.teamId,
     opponentTeamId,
     playerSide: leagueGamePlayerSideOf(career),
+  }
+}
+
+/**
+ * 국가대항전 142 — 135 확인(0x10680)에서 온다. 내 팀은 `0xb7614(L, n, 0)` 의 대한민국(10), 상대는 그 라운드 대진.
+ * 순위·승패는 대회 표, 마선수 칸은 "-"(1c5fe 가 안 넣는다).
+ *
+ * ⚠️ 근사(예전 그대로): 웹 국가대항전 경기는 두 팀 로테이션(0x1c46c 의 0xb8c80)과 측(0xb7844)을 아직 안 옮겨 날짜 0 차례 ·
+ *    후공으로 친다(`useCareerSession.startCupGame` 주석). 선발 줄도 그 경기와 같은 값(두 팀 레코드 0번)을 적는다.
+ */
+export function cupMatchInfoOf(career: PlayerCareer, matchup: NationalCupMatchup, cup: NationalCup): NariMatchScreenData {
+  return {
+    lines: nariMatchInfoLines({
+      league: career.league,
+      postseason: null,
+      myTeamId: matchup.myTeam,
+      opponentTeamId: matchup.opponent,
+      myStarterName: teamPitchers(matchup.myTeam)[0]?.name ?? EMPTY_VALUE,
+      opponentPitcherOrder: teamPitchers(matchup.opponent).map((_pitcher, slot) => slot),
+      aces: null,
+      cup,
+    }),
+    myTeamId: matchup.myTeam,
+    opponentTeamId: matchup.opponent,
+    playerSide: PLAYER_SIDE_LAST_BAT,
   }
 }

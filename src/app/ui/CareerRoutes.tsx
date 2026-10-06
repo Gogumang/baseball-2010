@@ -7,7 +7,7 @@ import { GameResultScreen } from '@/pages/game-result/ui/GameResultScreen'
 import { ManagementScreen } from '@/pages/management/ui/ManagementScreen'
 import { NextGameStandingsScreen } from '@/pages/management/ui/NextGameStandingsScreen'
 import { NariMatchInfoScreen } from '@/pages/management/ui/NariMatchInfoScreen'
-import { batterMatchInfoOf } from '@/pages/management/lib/nariMatchPrepare'
+import { batterMatchInfoOf, cupMatchInfoOf } from '@/pages/management/lib/nariMatchPrepare'
 import { ShopScreen } from '@/pages/shop/ui/ShopScreen'
 import { OutingMapScreen } from '@/pages/outing-map/ui/OutingMapScreen'
 import { MessageBox, ScreenOverlay } from '@/shared/ui'
@@ -220,7 +220,10 @@ export function CareerRoutes({
 
     case '경기준비': {
       // 142 경기 준비 — 진입 0x1c46c · 키 0x13c30 · 그림 0x15d98
-      const match = batterMatchInfoOf(career, session.matchAces)
+      // 국가대항전(135 에서 옴)이면 대회 표 · 마선수 "-" (1c5fe)
+      const match = screen.cup === undefined
+        ? batterMatchInfoOf(career, session.matchAces)
+        : cupMatchInfoOf(career, screen.cup.matchup, screen.cup.cup)
       return (
         <NariMatchInfoScreen lines={match.lines} myTeamId={match.myTeamId} opponentTeamId={match.opponentTeamId}
           playerSide={match.playerSide} edition="타자편" gamePoint={career.gamePoint}
@@ -255,6 +258,8 @@ export function CareerRoutes({
           random={random}
           onStartGame={actions.startCupGame}
           onFinish={actions.finishCup}
+          // 142 취소로 돌아오면 135(순위표)부터
+          initialStep={screen.atStandings === true ? '순위' : '대진'}
         />
       )
 

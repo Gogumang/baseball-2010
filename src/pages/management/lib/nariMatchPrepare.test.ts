@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import {
-  NO_NARI_ACE, batterMatchInfoOf, nariMatchCancelTargetOf, rollNariMatchAces,
+  NO_NARI_ACE, batterMatchInfoOf, nariMatchCancelTargetOf, rollNariMatchAces, rollNariMatchStadium,
 } from '@/pages/management/lib/nariMatchPrepare'
 import { createCareer } from '@/entities/career/model/playerCareer'
 
@@ -67,5 +67,23 @@ describe('142 경기정보 다섯 줄 (0x5dcc0 모드 2~4 갈래)', () => {
     expect(있음.lines[3].user).not.toBe('-')
     expect(있음.lines[4].cpu).not.toBe('-')
     expect(있음.myTeamId).toBe(career.teamId)
+  })
+})
+
+describe('142 구장 0x78664 — 홈 팀 > 9 일 때만 rand(0, 10)', () => {
+  it('기본 열 팀은 굴리지 않고 그 팀 번호, 대회 팀(10~13)은 한 번 굴린다', () => {
+    let calls = 0
+    const random: RandomPort = {
+      next: () => 0.5,
+      nextInRange: (min, max) => {
+        calls += 1
+        return min + (max - min) * 0.5
+      },
+      pick: (list) => list[0],
+    }
+    expect(rollNariMatchStadium(random, 9)).toBe(9)
+    expect(calls).toBe(0)
+    expect(rollNariMatchStadium(random, 10)).toBe(5)
+    expect(calls).toBe(1)
   })
 })

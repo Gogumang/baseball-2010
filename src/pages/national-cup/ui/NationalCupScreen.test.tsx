@@ -171,3 +171,16 @@ describe('머리띠·바닥 (0x7f4ec ← 시즌 틀 0xb810 · 나리 틀 0x16928
     expect(screen.queryByRole('button', { name: '돌아가기' })).toBeNull()
   })
 })
+
+describe('나리 142 취소로 돌아왔을 때 (0x13c72 의 S+0x12c 갈래 → 135)', () => {
+  it('initialStep 순위면 135 순위표부터 그리고, 확인하면 다시 142 로 넘긴다', () => {
+    const onStartGame = vi.fn()
+    render(
+      <NationalCupScreen mode="나만의리그" cup={createNationalCup()} yearIndex={2} random={고정난수(0)}
+        onStartGame={onStartGame} onFinish={vi.fn()} initialStep="순위" />,
+    )
+    expect(screen.getByRole('group', { name: '국가대항전 순위' })).toBeTruthy()
+    확인()
+    expect(onStartGame).toHaveBeenCalledTimes(1)
+  })
+})

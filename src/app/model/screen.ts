@@ -1,6 +1,6 @@
 import type { OriginalMission } from '@/shared/config/original/missions'
 import type { GameSummary } from '@/entities/game/model/gameSummary'
-import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
+import type { NationalCup, NationalCupMatchup } from '@/entities/national-cup/model/nationalCup'
 import type { StoryContext } from '@/app/model/useStorySchedule'
 import type { StoryCarry } from '@/entities/story/model/aceMatch'
 import type { GameEvaluation, StreakNotice } from '@/entities/career/model/gameEvaluation'
@@ -54,7 +54,15 @@ export type Screen =
    * 그림 0x15d98). 확인 → 144 → 경기, 취소 → 128(포스트시즌) / 109. `postseasonFromReentry` 는 128 에서 왔을 때 그 128 의
    * 배경음 표시를 들고 간다 — 취소로 128 에 돌아가면 진입 0x120a4 가 이전 142 라 배경음을 안 바꾼다.
    */
-  | { readonly kind: '경기준비'; readonly postseasonFromReentry?: boolean }
+  | {
+      readonly kind: '경기준비'
+      readonly postseasonFromReentry?: boolean
+      /**
+       * 국가대항전(S+0x12c) 경기 준비 — 135 확인(0x10680)에서 온다. 진입 0x1c46c 가 마선수를 안 굴리고(1c5fe) 구장만
+       * 굴린다(0x78664, 홈 팀 > 9). 취소(−16)는 135 로 돌아간다(0x13c72 의 S+0x12c 갈래).
+       */
+      readonly cup?: { readonly matchup: NationalCupMatchup; readonly cup: NationalCup }
+    }
   /** 상점 — 관리 화면 [아이템] 하위 메뉴의 탭 (장착·서브·GP) */
   | { readonly kind: '아이템'; readonly tab: string }
   | { readonly kind: '외출' }
@@ -95,7 +103,12 @@ export type Screen =
    * 웹 저장 모양(`PlayerCareer`)엔 자리가 없어 **화면이 들고 다닌다** — 대회 도중에 끄면 대회가 없어진다.
    * (`entities/career` 는 이 작업의 담당 폴더 밖이라 칸을 더하지 않았다.)
    */
-  | { readonly kind: '국가대항전'; readonly cup: NationalCup }
+  | {
+      readonly kind: '국가대항전'
+      readonly cup: NationalCup
+      /** 142 취소로 돌아왔다 — 135(순위표·다음 경기로)부터 그린다. 135 는 진입 함수가 없다(R9 표) */
+      readonly atStandings?: boolean
+    }
   | { readonly kind: '엔딩'; readonly endingIndex: number }
   | { readonly kind: '미션선택' }
   | { readonly kind: '홈런더비' }

@@ -39,6 +39,8 @@ export interface NationalCupScreenProps {
    * (`finishNationalCup` 주석 참고).
    */
   readonly onFinish: (finish: NationalCupFinish, cup: NationalCup) => void
+  /** 처음 그릴 단계 — 나리 142 취소(0x13c72 의 S+0x12c 갈래)는 135(순위)로 돌아온다. 안 주면 134(대진) */
+  readonly initialStep?: '대진' | '순위'
 }
 
 type Step = '대진' | '순위' | '결과' | '보상'
@@ -72,9 +74,9 @@ type Step = '대진' | '순위' | '결과' | '보상'
  *   시즌 0xf4 키 0x4a18 은 −16 → 0xf3 이 있다. 134 · 0xf3 키(0x19fdc · 0xe6f8)도 확인만 본다.
  */
 export function NationalCupScreen({
-  mode, cup, yearIndex, gamePoint = 0, random, onStartGame, onFinish,
+  mode, cup, yearIndex, gamePoint = 0, random, onStartGame, onFinish, initialStep = '대진',
 }: NationalCupScreenProps) {
-  const [step, setStep] = useState<Step>('대진')
+  const [step, setStep] = useState<Step>(initialStep)
   /** 동전 던지기(`0xb858c`)가 우승국을 바꿀 수 있어 확인 뒤 대회를 따로 들고 있는다 */
   const [resolved, setResolved] = useState<NationalCup>(cup)
 

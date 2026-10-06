@@ -83,7 +83,9 @@ import { hiddenOpenTextOf } from '@/entities/career/model/equipment'
 import type { RookieProfile } from '@/entities/career/model/playerCareer'
 import { useStorySchedule } from '@/app/model/useStorySchedule'
 import { enterSeasonEvent, nextSeasonStep, resumePointOf } from '@/app/model/seasonEvents'
-import { nariGameAcesOf, nariMatchCancelTargetOf, rollNariMatchAces } from '@/pages/management/lib/nariMatchPrepare'
+import {
+  nariGameAcesOf, nariMatchCancelTargetOf, rollNariMatchAces, rollNariMatchStadium,
+} from '@/pages/management/lib/nariMatchPrepare'
 import type { NariMatchAces, NariOpenedAces } from '@/pages/management/lib/nariMatchPrepare'
 import { DEFAULT_OPENED_ACE_BATTER_IDS, DEFAULT_OPENED_ACE_PITCHER_IDS } from '@/pages/general-mode/lib/generalModeSetup'
 import {
@@ -1110,13 +1112,22 @@ export function useCareerSession({
      */
     confirmMatchPrepare: () => {
       if (career === null || screen.kind !== '경기준비') return
+      if (screen.cup !== undefined) {
+        // 국가대항전 — 1c5fe 가 마선수를 안 넣었다. 경기가 끝나면 이 대회로 하루를 넘긴다 (`finishCupGame`)
+        cupGameRef.current = screen.cup.cup
+        return startMatch(screen.cup.matchup.myTeam, career.battingOrder, screen.cup.matchup.opponent)
+      }
       beginGame(matchAces)
     },
 
     /** 142 취소(−16, 0x13c72) — S+0xb4(포스트시즌) → 128 진입 0x120a4 를 다시, 그 밖 → 109 (이전 상태 142 라 취소가 안 먹는다) */
     cancelMatchPrepare: () => {
       if (career === null || screen.kind !== '경기준비') return
-      const target = nariMatchCancelTargetOf({ isNationalCup: false, isPostseason: career.postseason !== null })
+      const target = nariMatchCancelTargetOf({ isNationalCup: screen.cup !== undefined, isPostseason: career.postseason !== null })
+      // S+0x12c → 135 (0x13c72). 135 는 진입 함수가 없어 순위표가 그대로 다시 선다
+      if (target === '국가대항전' && screen.cup !== undefined) {
+        return setScreen({ kind: '국가대항전', cup: screen.cup.cup, atStandings: true })
+      }
       if (target === '포스트시즌') return enterPostseason(career, screen.postseasonFromReentry === true)
       enterNextGameStandings(false)
     },
@@ -1369,8 +1380,10 @@ export function useCareerSession({
     },
 
     /**
-     * 매치업 화면(135) [확인] → 경기 준비 142 → 사람 경기.
-     * `0x1c46c` 가 내 팀을 `0xb7614(L,n,0)`(= 대한민국)로 바꿔 끼우므로 팀 10 으로 친다.
+     * 매치업 화면(135) [확인](0x10680) → **경기 준비 142** → [확인] → 사람 경기.
+     * `0x1c46c` 가 내 팀을 `0xb7614(L,n,0)`(= 대한민국)로 바꿔 끼우므로 팀 10 으로 친다. S+0x12c 라 마선수 넣기(1c5fe)를
+     * 건너뛰고 장면+0x288 만 세운다. 이전 상태가 143 이 아니면 구장 `0x78664(무대, 홈 팀)` — 대회 팀은 10~13 이라
+     * **rand(0, 10) 한 번**(취소로 135 에 갔다 다시 와도 또 굴린다).
      *
      * ⚠️ **웹판 임시**: 원본은 여기서 **내 선수가 낀 대표팀 명단**(P5 2절, `0xb53f1`/`0xb521d`)으로
      * 치르는데, 웹은 팀 로스터가 붙박이 표(`entities/team`)라 내 선수를 끼워 넣을 자리가 없다 —
@@ -1378,8 +1391,10 @@ export function useCareerSession({
      */
     startCupGame: (matchup: NationalCupMatchup, cup: NationalCup) => {
       if (career === null) return
-      cupGameRef.current = cup
-      startMatch(matchup.myTeam, career.battingOrder, matchup.opponent)
+      matchPreparedRef.current = true
+      // 홈 팀 — 웹 대회 경기는 후공(내 팀이 홈)으로 친다. 대회 팀은 모두 > 9 라 어느 쪽이든 한 번 굴린다
+      rollNariMatchStadium(random, matchup.myTeam)
+      setScreen({ kind: '경기준비', cup: { matchup, cup } })
     },
 
     /**
