@@ -488,6 +488,12 @@ describe('타자 미션 CPU 견제 — 0x345fc 종류 4 → 0x34848 → 0x50f28 
 
 /** 투수 미션 하나를 세운다 — 씨앗 난수 하나를 시작(0x3fa0e rand(0, 2))부터 그대로 쓴다 */
 function setUpPitcherMission(missionId: number, seed: number, throwModeManual?: boolean) {
+  const mission = MISSIONS.find((row) => row.side === '투수' && row.id === missionId)
+  if (mission === undefined) throw new Error(`투수 미션 ${missionId} 이 없다`)
+  return setUpPitcherMissionOf(mission, seed, throwModeManual)
+}
+
+function setUpPitcherMissionOf(mission: (typeof MISSIONS)[number], seed: number, throwModeManual?: boolean) {
   const missionRecord: MissionRecordPort = { load: () => ({}), save: vi.fn() }
   const random = createSeededRandom(seed)
   let screen: Screen = { kind: '미션선택' }
@@ -501,8 +507,6 @@ function setUpPitcherMission(missionId: number, seed: number, throwModeManual?: 
       session: useMissionSession({ runner, random, missionRecord, screen, setScreen, throwModeManual }),
     }
   })
-  const mission = MISSIONS.find((row) => row.side === '투수' && row.id === missionId)
-  if (mission === undefined) throw new Error(`투수 미션 ${missionId} 이 없다`)
   act(() => rendered.result.current.session.actions.begin(mission))
   return rendered
 }
@@ -590,6 +594,61 @@ describe('투수 미션 사람 견제 — 구질 고르기 0xf 의 0x53548 은 �
 
     expect(rendered.result.current.session.missionRun).toBe(before)
     expect(rendered.result.current.session.pickoffReplay).toBeNull()
+    rendered.unmount()
+  })
+})
+
+/* ── 견제사도 '아웃' 목표에 든다 (아웃 콜 결과 13 → 0xa7d0c → R+0x13c · 판정 0xaaa6c aacd6) ──────── */
+
+describe("투수 미션 견제사는 '아웃' 목표(R+0x13c)에 든다 — 0x51b36 → 0xa7d0c(a7d52) · 판 끝 판정 0xaaa6c(ae5c4)", () => {
+  // 미션 12 "최강의 챔피언" 1사 1·3루 — 씨앗 1 의 1루 견제는 견제사다 (같은 씨앗의 기대 판으로 확인)
+  const mission12 = MISSIONS.find((row) => row.side === '투수' && row.id === 12)!
+  const expectedOf = (seed: number) =>
+    runPickoffPlay({
+      targetBase: 1,
+      bases: mission12.start.runners,
+      outs: mission12.start.outs,
+      random: seededAfterStart(seed),
+      offenseIsCpu: true,
+      defenseIsCpu: false,
+      throwMode: '수동',
+    })
+
+  it("견제사 하나 = '아웃' 칸 +1 · 이닝 아웃 +1 — 목표가 탈삼진뿐이면 진행 중 그대로", () => {
+    expect(expectedOf(1).advance.outsAdded).toBe(1)
+    const rendered = setUpPitcherMission(12, 1)
+    const before = rendered.result.current.session.pitcherRun!
+
+    act(() => rendered.result.current.session.actions.pickoff('3'))
+
+    const after = rendered.result.current.session.pitcherRun!
+    expect(after.progress.counts['아웃']).toBe((before.progress.counts['아웃'] ?? 0) + 1)
+    expect(after.totalOuts).toBe(before.totalOuts + 1)
+    // 타석이 끝난 게 아니다 — 타석 수·삼진콤보는 그대로
+    expect(after.progress.plateAppearances).toBe(before.progress.plateAppearances)
+    expect(after.progress.counts['삼진콤보']).toBe(before.progress.counts['삼진콤보'])
+    expect(after.status).toBe('진행중')
+    rendered.unmount()
+  })
+
+  it("'아웃' 목표가 견제사로 차면 판 끝 판정에서 바로 성공 — 0xaa928 이 상태 1 로 안 남는다", () => {
+    const 아웃한개 = { ...mission12, goals: ['아웃'], goalCounts: { '아웃': 1 } }
+    const rendered = setUpPitcherMissionOf(아웃한개, 1)
+
+    act(() => rendered.result.current.session.actions.pickoff('3'))
+
+    expect(rendered.result.current.session.pitcherRun!.status).toBe('성공')
+    rendered.unmount()
+  })
+
+  it('세이프면 칸이 그대로다', () => {
+    expect(expectedOf(11).advance.outsAdded).toBe(0)
+    const rendered = setUpPitcherMission(12, 11)
+    const before = rendered.result.current.session.pitcherRun!
+
+    act(() => rendered.result.current.session.actions.pickoff('3'))
+
+    expect(rendered.result.current.session.pitcherRun!.progress).toBe(before.progress)
     rendered.unmount()
   })
 })

@@ -1082,7 +1082,8 @@ export function useMissionSession({
      * 끝은 판정 B 0xae3e8 — 아웃 ≤ 2 면 같은 타석 0xf(ae592), 정산 0xa8024 는 늘(ae5a8) → 실점은 주자 운명으로 센다.
      * 3아웃이면 0x18 — 타석이 끊긴다. 견제는 투구가 아니라 투구 수·볼카운트·마구 칸을 안 건드린다.
      * ⚠️ 근사: 수비 아홉 칸·주자 주루는 미션 타구와 같은 진행기 기본값이다(레코드에 팀·타순이 없다).
-     * ⚠️ 미해결: 미션 판정 0xaaa6c 가 견제사 아웃을 '아웃' 목표에 세는지 — 도루 판과 같이 이닝 아웃(`totalOuts`)만 센다.
+     * 견제사는 아웃 콜(결과 13 → 0xa7d0c)이 R+0x13c 를 올려 '아웃' 목표에도 든다 — 판 끝 판정 0xaaa6c(ae5c4)가 바로 본다
+     * (`withRunnerPlayOuts`).
      * 판정 콜(세이프 17 · 견제사 62/20)은 판을 연 자리에서 낸다 (CPU 견제와 같은 근사).
      */
     pickoff: (webKey: string) => {
@@ -1216,8 +1217,9 @@ function withBatterNotOut(run: MissionRun, outcome: AtBatOutcome, isBunt: boolea
  * 잡은 아웃은 이닝 목표(`totalOuts`)에 든다.
  * - 실점 R+0x128: 판 끝 판정 B 0xae3e8 이 정산 0xa8024 를 부를 때만 주자 운명으로 센다 — 도루(5)는 늘, 폭투·포일(9)은
  *   삼진이 그대로 선 판만(ae596 → ae5a6). 아니면 정산을 건너뛰어(ae5a2 → ae5b6) 실점 칸에 안 든다.
- * - 판정 0xaaa6c 는 판 끝(0xae5c4, 모드 5·6)에서 돈다 — 웹 판정(`pitcherRun.judgeStatus`)은 미션 엔티티 안에 있어
- *   여기서는 그 두 갈래(실점 한도 → 실패 · 이닝 목표 → 성공)만 같은 순서로 본다.
+ * - 판정 0xaaa6c 는 판 끝(0xae5c4, 모드 5·6)에서 돈다 — 정산을 건너뛴 폭투·포일 판(ae5a2 → ae5b6)도 판정은 돈다.
+ *   웹 판정(`pitcherRun.judgeStatus`)은 미션 엔티티 안에 있어 여기서는 `judgedAfterRunnerPlay` 가 같은 순서로 본다.
+ * - 주자 판에서 잡은 아웃(견제사·도루사·진루 중 아웃)은 '아웃' 목표에도 든다 — `withRunnerPlayOuts` 머리글.
  * ⚠️ 미해결: R+0x130(출루 허용)을 정산이 주자 판에서도 덮어쓰는지는 안 읽었다 — 손대지 않는다.
  */
 function withPitcherMissionRunnerPlay(run: PitcherRun, play: PitchArrivalPlay): PitcherRun {
@@ -1236,12 +1238,41 @@ function withPitcherMissionRunnerResult(run: PitcherRun, result: DefensePlayResu
   const charged = settles ? chargedRunsOfFates(result.runnerFates, Math.min(MISSION_OUTS_PER_INNING, outs)) : 0
   return judgedAfterRunnerPlay({
     ...run,
+    progress: withRunnerPlayOuts(run.progress, advance.outsAdded),
     bases: isInningOver ? EMPTY_BASES : advance.bases,
     outs: isInningOver ? 0 : outs,
     totalOuts: run.totalOuts + advance.outsAdded,
     allowed: { ...run.allowed, runs: run.allowed.runs + charged },
   })
 }
+
+/**
+ * **주자 판의 아웃도 '아웃' 목표에 든다** (직접 재역어셈).
+ *
+ * 투수 미션 판정 0xaaa6c 의 모드 5 갈래(0xaab9c~)는 '아웃' 목표를 `0xaa928(미션, R+0x13c, 행+0xa4)`(aacd6)로 잰다 —
+ * `0xaa928` 은 한도 > 0 이고 칸 < 한도면 상태 1(아직)로 두는 성공 비교라, 다른 목표가 다 찼으면 칸이 한도에 닿는 판에서
+ * 상태 0 → 0x76c(성공)이다. R+0x13c 는 사건 코드 0x1a(0xa57f8 → 표 0xd8218)의 "잡은 아웃 수" 칸이고, 올리는 곳은
+ * 삼진 0xa7c4c(a7cc4) · **아웃 콜 0xa7d0c**(a7d52 `0xa57f8(R, 0x1a, 1)`, 코드 0x14~0x1f 라 지금 투수가 R 의 선수일 때 —
+ * 미션 투수라 늘 선다) · 정산의 낫아웃 보정 −1(a8cfc) 셋이다.
+ * 아웃 콜 0xa7d0c 는 플레이 판정 메시지 0x51408 의 결과 갈래(점프표 0xd0488)가 부른다: 결과 11(0x51b20, 콜 62) ·
+ * 결과 13(0x51b36 → 0x51bea, 콜 62/20). **견제사·도루사가 내는 62/20 이 바로 결과 13 갈래**(`pickoffCallSoundIdOf`)라
+ * 그 아웃도 R+0x13c 에 1 씩 든다. 판에는 주자 목록뿐이고 정산(0xa8ce8)은 state[0x1a](낫아웃)일 때만 빼므로 그대로 남는다.
+ * R 은 같은 객체다 — 미션 준비 0xaa57c 의 여섯째 인자(미션+0x14, aa5a0)가 0x3f8b6 의 [장면+0x230], 0x51b24 가 넘기는 것도 [장면+0x230].
+ * 판정은 견제 판 끝 판정 B 0xae3e8 의 ae5c4 에서 정산 뒤에 돈다 → 견제사로 '아웃' 목표를 채우면 그 자리에서 성공이다.
+ *
+ * 노히트노런·퍼펙트게임 칸(웹의 "잡은 아웃" 표시 칸, `recordPitcherOutcome`)도 같은 아웃 수로 올린다 — 판정은 이닝 목표
+ * (`totalOuts`)가 하고, 주자 판은 안타·볼넷을 허용하지 않으니 0 으로 되돌릴 일이 없다.
+ * 타석 수·삼진콤보는 타석이 끝난 게 아니라 안 건드린다.
+ */
+function withRunnerPlayOuts(progress: PitcherRun['progress'], outsAdded: number): PitcherRun['progress'] {
+  if (outsAdded <= 0) return progress
+  const counts = { ...progress.counts }
+  for (const name of RUNNER_PLAY_OUT_GOALS) counts[name] = (counts[name] ?? 0) + outsAdded
+  return { ...progress, counts }
+}
+
+/** 주자 판의 아웃이 드는 목표 칸 — '아웃'(R+0x13c) 과, 같은 아웃 수를 쌓는 이닝 목표 표시 칸 */
+const RUNNER_PLAY_OUT_GOALS: readonly string[] = ['아웃', '노히트노런', '퍼펙트게임']
 
 /**
  * **투수 미션 낫아웃** — 삼진 타석은 보통 길(`applyPitcherOutcome`: 삼진 목표·타석 수·판정)로 세고, 루·아웃·이닝 아웃·
@@ -1266,7 +1297,10 @@ function withPitcherNotOut(run: PitcherRun, outcome: AtBatOutcome, play: PitchAr
   return struck.status === '진행중' ? judgedAfterRunnerPlay(moved) : moved
 }
 
-/** 판 끝 미션 판정 0xaaa6c 중 주자 판이 바꿀 수 있는 두 갈래 — 실점 한도(+0xa1 ↔ R+0x128) → 실패 · 이닝 목표 → 성공 */
+/**
+ * 판 끝 미션 판정 0xaaa6c 중 주자 판이 바꿀 수 있는 갈래 — 실점 한도(+0xa1 ↔ R+0x128) → 실패 · 이닝 목표 → 성공 ·
+ * 목표 칸(주자 판의 아웃이 '아웃' R+0x13c 에 든다, `withRunnerPlayOuts`)이 다 차면 → 성공.
+ */
 function judgedAfterRunnerPlay(run: PitcherRun): PitcherRun {
   const limit = run.mission.failLimits.runs
   if (limit > 0 && run.allowed.runs >= limit) {
@@ -1276,6 +1310,8 @@ function judgedAfterRunnerPlay(run: PitcherRun): PitcherRun {
     return { ...run, progress: { ...run.progress, brokenConditions: broken }, status: '실패' }
   }
   const inningGoal = inningGoalOf(run.mission)
-  if (inningGoal !== null && run.totalOuts >= inningGoal * MISSION_OUTS_PER_INNING) return { ...run, status: '성공' }
-  return run
+  if (inningGoal !== null) {
+    return run.totalOuts >= inningGoal * MISSION_OUTS_PER_INNING ? { ...run, status: '성공' } : run
+  }
+  return isCleared(run.mission, run.progress) ? { ...run, status: '성공' } : run
 }
