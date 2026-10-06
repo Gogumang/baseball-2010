@@ -189,9 +189,18 @@ export function SettingsScreen({
   const openRow = (index: number) => {
     if (index === okCell) return leave()
     if (index < FIRST_MENU_ROW) return changeValue(1, index)
-    if (index === 3) return setDetailOpen(true)
+    // 하위 페이지 진입 0x2421c(0x20) · 0x242a4(0x21) 도 판을 높이 0x20 · 걸음 1 · 끝 0 · 펼침 1 로 다시 세운다
+    // (skin+0x90 · +0x94 · +0x98 · +0x99, 0x24262~0x24274 · 0x242ea~0x242fc) — 공용 페이지 0x593c8 이 그대로 편다
+    if (index === 3) {
+      setFold(openingFold())
+      return setDetailOpen(true)
+    }
     // 칸 4 → 상태 0x21 (0x295d0 `0xbcb49(…, 0x21)`) — 조건 없이 들어간다
-    if (index === 4) return onResetEditedNames === undefined ? undefined : setModeResetOpen(true)
+    if (index === 4) {
+      if (onResetEditedNames === undefined) return undefined
+      setFold(openingFold())
+      return setModeResetOpen(true)
+    }
     setNotice(SETTINGS_TEXT.dataManagementBlocked)
   }
 
@@ -230,7 +239,7 @@ export function SettingsScreen({
   // 상세 설정은 팝업이 아니라 **딴 페이지**다 (원본 장면 상태 0x20 · 페이지 32)
   if (isDetailOpen) {
     return (
-      <DetailSettings settings={settings} onChange={onChange} mainMenu={mainMenu}
+      <DetailSettings settings={settings} onChange={onChange} mainMenu={mainMenu} panelHeight={Math.min(fold.height, PANEL.height)}
         onBack={() => { setHasReturned(true); setDetailOpen(false) }} />
     )
   }
@@ -243,6 +252,7 @@ export function SettingsScreen({
         onResetEditedNames={onResetEditedNames}
         {...(onResetSeason === undefined ? {} : { onResetSeason })}
         mainMenu={mainMenu}
+        panelHeight={Math.min(fold.height, PANEL.height)}
         onBack={() => { setHasReturned(true); setModeResetOpen(false) }}
       />
     )
@@ -376,6 +386,14 @@ export function SettingsScreen({
   )
 }
 
+/** 판 (24, H/2 − h/2, 192, h) — 화면 가운데를 기준으로 위아래로 펴진다 (0x55e60 정렬 0x22). 하위 페이지 0x20 · 0x21 용 */
+function UnfoldingPanel({ height }: { readonly height: number }) {
+  return (
+    <div className={styles.panel}
+      style={{ left: PANEL.x, top: SCREEN.height / 2 - Math.trunc(height / 2), width: PANEL.width, height }} />
+  )
+}
+
 /**
  * 잘라내기 0xbae25 사각형 — 안의 그림은 화면 좌표 그대로 두고 바깥만 가린다.
  */
@@ -430,10 +448,12 @@ function toggleDetail(settings: GameSettings, row: number): GameSettings {
  * (`settingsLayout.ts` 의 `DETAIL_*` 주석).
  * 웹판에 배선이 없는 값(송구·전광판)도 **원본에 줄이 있으므로 그대로 보여 주고 저장한다.**
  */
-function DetailSettings({ settings, onChange, mainMenu, onBack }: {
+function DetailSettings({ settings, onChange, mainMenu, panelHeight, onBack }: {
   readonly settings: GameSettings
   readonly onChange: (settings: GameSettings) => void
   readonly mainMenu: { readonly gamePoint: number } | undefined
+  /** 이번에 그리는 판 높이 — 첫 화면이 들고 있는 펼침(`nextPanelFold`) */
+  readonly panelHeight: number
   readonly onBack: () => void
 }) {
   const [cursor, setCursor] = useState(0)
@@ -449,7 +469,8 @@ function DetailSettings({ settings, onChange, mainMenu, onBack }: {
         event.preventDefault()
         return setCursor((previous) => (previous + vertical + DETAIL_ROW_COUNT) % DETAIL_ROW_COUNT)
       }
-      // OK 로 뒤집는 것은 원본 확정, 좌우도 같이 뒤집는 것은 첫 화면 값 줄을 따른 **추정**이다
+      // 갱신 0x288ac 가 OK(−5) · 좌우(−3 · −4) · '4'(0x34) · '6'(0x36) 을 모두 같은 갈래 0x28920(칸 값 ^= 1)으로 보낸다 — 확정.
+      // CLR(−16)은 판·키 상태와 상관없이 곧바로 상태 8 (0xbcb49(…, 8)) — 펴는 도중에도 키를 받는다
       const isToggle = event.key === 'Enter' || event.key === ' '
         || event.key === 'ArrowLeft' || event.key === 'ArrowRight'
       if (isToggle) {
@@ -465,12 +486,12 @@ function DetailSettings({ settings, onChange, mainMenu, onBack }: {
     return () => window.removeEventListener('keydown', onKeyDown)
   })
 
+  const isUnfolded = panelHeight >= PANEL.height
+  const clip = panelClipOf(panelHeight, PANEL.height)
   return (
     <RawScreen>
-      <div
-        className={styles.panel}
-        style={{ left: PANEL.x, top: PANEL.y, width: PANEL.width, height: PANEL.height }}
-      />
+      <UnfoldingPanel height={panelHeight} />
+      <PanelClip x={PANEL.x} y={clip.y} width={PANEL.width} height={clip.height}>
       <FrameSprite folder={IMG_TEXT} frame={DETAIL_TITLE.frame} origins={titleFrames}
         x={DETAIL_TITLE.x} y={DETAIL_TITLE.y} />
 
@@ -506,7 +527,7 @@ function DetailSettings({ settings, onChange, mainMenu, onBack }: {
               </div>
             ))}
 
-            {index === cursor && isOutlineShown && (
+            {index === cursor && isOutlineShown && isUnfolded && (
               <div className={styles.selectedOutline}
                 style={{
                   left: VALUE_ROW.bar.x, top: top + VALUE_ROW.bar.dy,
@@ -530,6 +551,7 @@ function DetailSettings({ settings, onChange, mainMenu, onBack }: {
         onClick={onBack}>
         <img className={styles.sprite} alt="" src={imageSrc(POPUP, OK_BUTTON.frame)} style={{ left: 0, top: 0 }} />
       </button>
+      </PanelClip>
       <SettingsFrame mainMenu={mainMenu} onBack={onBack} />
     </RawScreen>
   )
@@ -582,12 +604,16 @@ const MODE_RESET_NAMES = [SETTINGS_TEXT.careerReset, SETTINGS_TEXT.seasonReset, 
  *
  * ⚠️ 칸 1 시즌모드: `onResetSeason` 을 안 받으면 OK 가 아무 일도 안 한다.
  */
-function ModeResetPage({ onResetCareer, careerResetBlockOf, onResetEditedNames, onResetSeason, mainMenu, onBack }: {
+function ModeResetPage({
+  onResetCareer, careerResetBlockOf, onResetEditedNames, onResetSeason, mainMenu, panelHeight, onBack,
+}: {
   readonly onResetCareer: (edition: CareerResetEdition) => void
   readonly careerResetBlockOf?: (edition: CareerResetEdition) => string | null
   readonly onResetEditedNames: () => void
   readonly onResetSeason?: () => void
   readonly mainMenu: { readonly gamePoint: number } | undefined
+  /** 이번에 그리는 판 높이 — 첫 화면이 들고 있는 펼침(`nextPanelFold`) */
+  readonly panelHeight: number
   readonly onBack: () => void
 }) {
   const [cursor, setCursor] = useState(0)
@@ -639,12 +665,12 @@ function ModeResetPage({ onResetCareer, careerResetBlockOf, onResetEditedNames, 
   })
 
   const { bar, bullet, name: nameBox } = MODE_RESET_ROW
+  const isUnfolded = panelHeight >= PANEL.height
+  const clip = panelClipOf(panelHeight, PANEL.height)
   return (
     <RawScreen>
-      <div
-        className={styles.panel}
-        style={{ left: PANEL.x, top: PANEL.y, width: PANEL.width, height: PANEL.height }}
-      />
+      <UnfoldingPanel height={panelHeight} />
+      <PanelClip x={PANEL.x} y={clip.y} width={PANEL.width} height={clip.height}>
       <FrameSprite folder={IMG_TEXT} frame={MODE_RESET_TITLE.frame} origins={titleFrames}
         x={MODE_RESET_TITLE.x} y={MODE_RESET_TITLE.y} />
 
@@ -665,7 +691,7 @@ function ModeResetPage({ onResetCareer, careerResetBlockOf, onResetEditedNames, 
               }}>
               {name}
             </div>
-            {isSelected && isOutlineShown && (
+            {isSelected && isOutlineShown && isUnfolded && (
               <div className={styles.selectedOutline}
                 style={{ left: bar.x, top: top + bar.dy, width: bar.width, height: bar.height }} />
             )}
@@ -676,6 +702,7 @@ function ModeResetPage({ onResetCareer, careerResetBlockOf, onResetEditedNames, 
           </div>
         )
       })}
+      </PanelClip>
 
       <SettingsFrame mainMenu={mainMenu} onBack={onBack} />
 

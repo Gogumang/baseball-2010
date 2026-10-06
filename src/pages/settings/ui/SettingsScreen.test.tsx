@@ -582,8 +582,43 @@ describe('환경설정 첫 화면 — OK 칸과 판 펼침·접힘', () => {
     const { container } = 띄우기()
     for (let tick = 0; tick < 4; tick += 1) 한틱()
     fireEvent.click(줄('상세 설정'))
+    for (let tick = 0; tick < 4; tick += 1) 한틱()
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(판높이(container)).toBe(`${PANEL.height}px`)
+    vi.useRealTimers()
+  })
+
+  /**
+   * 하위 페이지 진입 0x2421c(0x20) · 0x242a4(0x21) 도 skin+0x90 = 0x20 · +0x94 = 1 · +0x98 = 0 · +0x99 = 1 —
+   * 공용 페이지 0x593c8 종류 0x20(끝 0x5a314) · 0x21(끝 0x5a4f6 → 0x5a6f8)도 같은 꼬리 0x5a6fe 로 편다.
+   */
+  it.each(['상세 설정', '모드 초기화'])('%s 페이지도 판을 32 에서 펴며 들어오고, 펴는 동안은 흰 테두리가 없다', (row) => {
+    vi.useFakeTimers()
+    const { container } = 띄우기()
+    for (let tick = 0; tick < 4; tick += 1) 한틱()
+    fireEvent.click(줄(row))
+    expect(판높이(container)).toBe('32px')
+    expect(container.querySelector('div[class*="selectedOutline"]')).toBeNull()
+    한틱()
+    expect(판높이(container)).toBe('36px')
+    한틱()
+    한틱()
+    expect(판높이(container)).toBe('116px')
+    한틱()
+    expect(판높이(container)).toBe(`${PANEL.height}px`)
+    vi.useRealTimers()
+  })
+
+  it('펴는 도중 돌아가면 첫 화면이 그 판을 이어서 편다 — 처음(32)부터 다시 펴지 않는다', () => {
+    vi.useFakeTimers()
+    const { container } = 띄우기()
+    for (let tick = 0; tick < 4; tick += 1) 한틱()
+    fireEvent.click(줄('상세 설정'))
+    한틱()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(판높이(container)).toBe('36px')
+    한틱()
+    expect(판높이(container)).toBe('52px')
     vi.useRealTimers()
   })
 })
