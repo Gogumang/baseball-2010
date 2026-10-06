@@ -125,7 +125,7 @@ export function TeamGameScreen({
   onSettingsChange,
   seasonStadium,
 }: TeamGameScreenProps) {
-  const session = useTeamGame(options, random)
+  const session = useTeamGame(options, random, settings?.isVibrationOn)
   const { progress, canBat, canPitch, summary, actions } = session
   /** 지금 마운드에 선 상대 투수가 마투수면 그 선수 (0xb88c8 로 8번 칸에 앉은 그것) */
   const opposingAcePitcher = ACE_PITCHERS[currentPitcherAceIndex(progress)] ?? null

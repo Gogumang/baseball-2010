@@ -58,6 +58,8 @@ import {
   stepSoundIdsOf,
 } from '@/pages/team-game/model/teamGameSounds'
 import { activeSound, playSoundIds } from '@/shared/api/audio/soundPort'
+import { vibrate } from '@/entities/defense-controls/model/vibration'
+import { strikeoutVibrationMillisecondsOf } from '@/features/play-game/model/strikeoutVibration'
 
 /**
  * 팀 경기 한 판을 들고 있는 상태 고리 (일반·시즌·대전 공용).
@@ -151,7 +153,12 @@ export interface TeamGameSession {
   }
 }
 
-export function useTeamGame(options: TeamGameOptions, random: RandomPort): TeamGameSession {
+export function useTeamGame(
+  options: TeamGameOptions,
+  random: RandomPort,
+  /** 환경설정 진동(저장 +0x3b) — 거짓이면 0x3a44 가 안 울린다. 없으면 켬 (`BattingStage` 와 같다) */
+  isVibrationOn?: boolean,
+): TeamGameSession {
   const [progress, setProgress] = useState<TeamGameProgress>(() => startTeamGame(options, random))
 
   /**
@@ -160,6 +167,8 @@ export function useTeamGame(options: TeamGameOptions, random: RandomPort): TeamG
    */
   const progressRef = useRef(progress)
   const audio = activeSound()
+  const isVibrationOnRef = useRef(isVibrationOn)
+  isVibrationOnRef.current = isVibrationOn
 
   /** 진행 한 걸음을 먹이고, 그 사이에 원본이 내는 소리를 울린다 */
   const step = useMemo(() => {
@@ -243,6 +252,9 @@ export function useTeamGame(options: TeamGameOptions, random: RandomPort): TeamG
             })
             const resolution = after.lastResolution
             if (resolution === null) return [releaseSound]
+            // 삼진 진동 100ms — 사람이 던진 공도 상태 0x12 그리기 0x4ce9c 를 지난다 (0x4d0d6, `strikeoutVibration`).
+            // 우리 공격 반쪽의 삼진은 `BattingStage` 가 울린다
+            vibrate(strikeoutVibrationMillisecondsOf(resolution, before.atBat.strikes), isVibrationOnRef.current !== false)
             const nextAtBat = applyPitchResolution(before.atBat, resolution)
             return [
               releaseSound,

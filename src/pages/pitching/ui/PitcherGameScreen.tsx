@@ -86,7 +86,7 @@ export function PitcherGameScreen({
   onSettingsChange,
   pitcherName,
 }: PitcherGameScreenProps) {
-  const session = usePitcherGame(options, random)
+  const session = usePitcherGame(options, random, settings?.isVibrationOn)
   const { progress, canPitch, summary, actions } = session
   const audio = activeSound()
   /** 경기 시작 인트로(상태 0xc)가 끝났는가 — 모드 3 은 인트로가 선다 (`hasGameIntro`) */

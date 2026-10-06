@@ -30,6 +30,8 @@ import { GAME_INTRO_SOUND, gameResultSoundIdOf } from '@/features/play-game/mode
 // CPU 대타 교체 소리(22 "Time!" → 들어온 타자 등판음 14/15/26)도 같은 0xf 진입 0x3d954 · 0x16 연출이라 함께 빌린다
 import { pinchHitSoundIdsOf, stepSoundIdsOf } from '@/pages/team-game/model/teamGameSounds'
 import { activeSound, playSoundIds } from '@/shared/api/audio/soundPort'
+import { vibrate } from '@/entities/defense-controls/model/vibration'
+import { strikeoutVibrationMillisecondsOf } from '@/features/play-game/model/strikeoutVibration'
 import type {
   PitchInput,
   PitcherGameOptions,
@@ -84,6 +86,8 @@ export interface PitcherGameSession {
 export function usePitcherGame(
   options: PitcherGameOptions,
   random: RandomPort,
+  /** 환경설정 진동(저장 +0x3b) — 거짓이면 0x3a44 가 안 울린다. 없으면 켬 (`BattingStage` 와 같다) */
+  isVibrationOn?: boolean,
 ): PitcherGameSession {
   const [progress, setProgress] = useState<PitcherGameProgress>(() =>
     startPitcherGame(options, random),
@@ -95,6 +99,8 @@ export function usePitcherGame(
    */
   const progressRef = useRef(progress)
   const audio = activeSound()
+  const isVibrationOnRef = useRef(isVibrationOn)
+  isVibrationOnRef.current = isVibrationOn
 
   /** 진행 한 걸음을 먹이고, 그 사이에 원본이 내는 소리를 울린다 (팀경기 고리와 같은 모양) */
   const step = useMemo(() => {
@@ -145,6 +151,8 @@ export function usePitcherGame(
             })
             const resolution = after.lastResolution
             if (resolution === null) return [releaseSound]
+            // 삼진 진동 100ms — 사람이 던진 공도 상태 0x12 그리기 0x4ce9c 를 지난다 (0x4d0d6, `strikeoutVibration`)
+            vibrate(strikeoutVibrationMillisecondsOf(resolution, before.atBat.strikes), isVibrationOnRef.current !== false)
             // 진행기가 타석이 끝나면 볼카운트를 새 타석으로 되돌리므로, 심판 콜이 보는
             // "이 공을 먹인 뒤" 의 카운트는 여기서 따로 만든다
             const nextAtBat = applyPitchResolution(before.atBat, resolution)
