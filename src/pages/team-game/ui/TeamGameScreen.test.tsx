@@ -57,6 +57,15 @@ describe('팀 경기 화면 — 수비(투구) 차례', () => {
     expect(screen.getByText(/2\. 코스 선택/)).toBeTruthy()
   })
 
+  it('코스 고르기에서 CLR 이면 구질 고르기로 돌아간다 (상태 0x10 → 0xf, 0x50ee6)', () => {
+    띄우기()
+    fireEvent.click(screen.getByText('FASTBALL'))
+    fireEvent.keyDown(window, { key: 'Escape' })
+
+    expect(screen.getByText('1. 구질 선택')).toBeTruthy()
+    expect(screen.queryByText(/2\. 코스 선택/)).toBeNull()
+  })
+
   it('게이지 설정이 꺼져 있으면 코스를 확정하는 순간 던진다 (원본 기본값)', () => {
     띄우기({}, 2)
     fireEvent.click(screen.getByText('FASTBALL'))
@@ -116,7 +125,8 @@ describe('팀 경기 화면 — 공격(타석) 차례', () => {
     띄우기({ playerSide: PLAYER_SIDE_FIRST_BAT })
     fireEvent.keyDown(window, { key: '#' })
 
-    expect(screen.getByText('대타 교체')).toBeTruthy()
+    // 제목 글자는 img_text 149 "타자" + 299 "교체" (S10 4절 — 규칙은 대타지만 화면 글자는 "타자 교체")
+    expect(screen.getByText('타자 교체')).toBeTruthy()
     // 수비 쪽 제목은 안 뜬다
     expect(screen.queryByText('투수 교체')).toBeNull()
   })
@@ -126,7 +136,7 @@ describe('팀 경기 화면 — 공격(타석) 차례', () => {
     fireEvent.keyDown(window, { key: '#' })
     fireEvent.click(screen.getByText('메디카 (마타자)'))
 
-    expect(screen.queryByText('대타 교체')).toBeNull()
+    expect(screen.queryByText('타자 교체')).toBeNull()
     expect(screen.getByText(/1번 메디카/)).toBeTruthy()
   })
 })

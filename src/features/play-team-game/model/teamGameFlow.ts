@@ -175,33 +175,27 @@ import { TEAMS } from '@/shared/config/original/teams'
  * 사람이 잡은 타석의 인플레이 타구만 수비 시뮬레이션(`features/defense-play`)을 거친다 —
  * 원본도 CPU 끼리의 타석에만 간이 엔진을 쓴다 (`play-game/gameFlow` 의 같은 주석).
  *
+ * 들어와 있는 것: 엔트리 편집기(0x55864)가 고친 명단(`ourEntryOrder`) · 사람·CPU 대타(`pinchHit`·0xac228, Q1 4절) ·
+ * 경기 중 투수 교체(자동 타석은 CPU 교체 AI 0xac428 이 양 팀을, 사람 장면은 0xf 진입 0x3d954 가 CPU 쪽을, 우리 투수는
+ * `#` 메뉴만 — `changePitcher`, R4 1a·1b·1c) · 30G 자동진행(`runAutoProgress` — 끝나는 조건 0xc2198 확정).
+ *
  * ⚠️ **아직 안 옮긴 것** (원본에는 있다):
- *   - 엔트리 편집(0x55864) — 타순 첫 순서는 로스터 순서 그대로다
- *   (**대타**는 사람·CPU 양쪽 다 들어왔다 — `pinchHit` 과 CPU 대타 0xac228, Q1 4절)
- *   (경기 중 **투수 교체**는 들어왔다: 자동으로 넘긴 타석에서 CPU 교체 AI(0xac428)가 양 팀 투수를
- *    바꾸고, 사람이 잡은 타석은 원본대로 `#` 메뉴가 바꾼다 — `changePitcher`·`canOpenPitcherChange`.
- *    공격 중 `#` 는 **대타**다 — `pinchHit`·`canOpenPinchHit`, R4 1a·1c)
- *   - 자동진행 **중계 화면**(경기 상태 0x21, R10 7절) — 비용·가드·자동 소화만 있다(`runAutoProgress`)
+ *   - 자동진행 **중계 화면**(경기 상태 0x21, R10 7절) — 속도 칸 +0xbc · CLR 중단 질문. 웹은 결과를 한 번에 낸다
  *   - 감독 강판은 **투수편(모드 3) 전용**이라(P1 2절) 팀 경기에는 원본에도 없다
  *
  * ## 부르는 쪽에게 (시즌 세션 · 포스트시즌 · 국가대항전)
- * 지금 `app/model/useSeasonSession.playNextGame` 이 리그 시뮬레이터로 자동 진행하는 자리를
- * 이 진행기가 대신한다. 이어 붙이는 순서는 이렇다:
+ * 시즌은 `app/ui/SeasonRoute` 가 `pages/team-game/ui/TeamGameScreen`(또는 `pages/team-game/model/useTeamGame`)을
+ * 띄우고 `onFinish(summary)` 를 `useSeasonSession` 의 `finishGame` 이 받는다. 요약에서 읽을 칸:
  * ```
- * 1. 화면을 띄운다:  pages/team-game/ui/TeamGameScreen  (또는 pages/team-game/model/useTeamGame)
- *      options = { mode: 2, ourTeamId, opponentTeamId, playerSide,
- *                  settings, season: { illness, morale, coach }, teamAbilities, lineup }
- * 2. onFinish(summary) 에서 지금 playNextGame 이 하던 일을 그대로 한다:
- *      recordLeagueResult(league, 이긴 팀, 진 팀)            ← summary.won
- *      playLeagueDay(...)                                   ← 같은 날 나머지 네 경기
- *      recordLeaguePlateAppearances(playerStats, summary.leaguePlateAppearances)
- *      evaluateSeasonGame(record, { myRuns: summary.ourScore, opponentRuns: summary.opponentScore,
- *                                   won: summary.won, opponentTeamId: summary.opponentTeamId,
- *                                   popularityCompleteGame: summary.popularityCompleteGame,
- *                                   reputationCompleteGame: summary.reputationCompleteGame })
- * 3. 돌발 보상은 경기 중에 난다 (0x8e34c 모드 2 — 종류 1 사기 · 2 인기도 · 3 평판 · 4 소지금). 판정 차례대로 모은
- *    `summary.burstRewardDeltas` 를 평가 **앞에서** 시즌 레코드에 얹는다. 결과 창은 `closeBurstWindow` 로 닫는다.
+ *   summary.won · ourScore · opponentScore            → 리그 전적 · 시즌 평가 evaluateSeasonGame
+ *   summary.popularityCompleteGame · reputationCompleteGame · gameRecord(평판 16칸, 평가 앞에 꽂는다)
+ *   summary.leaguePlateAppearances · leaguePitchers   → 리그 타자·투수 기록표
+ *   summary.recordIds · gamePoints                    → 기록달성 G (경기 끝 0x4ea0c)
+ *   summary.ourPitcherStaminas · opponentPitcherStaminas → 다음 경기로 잇는 투수 +0x2c
+ *   summary.burstRewardDeltas                         → 돌발 보상 (0x8e34c 모드 2 — 종류 1 사기 · 2 인기도 · 3 평판 ·
+ *                                                       4 소지금). 원본은 경기 중에 더하므로 평가 **앞에** 얹는다
  * ```
+ * 돌발 결과 창은 `closeBurstWindow` 로 닫는다.
  * 포스트시즌·국가대항전도 같은 화면을 쓴다 — `mode` 는 그대로 2 이고 상대 팀만 바뀐다.
  */
 

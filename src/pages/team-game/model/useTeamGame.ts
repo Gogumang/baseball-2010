@@ -112,7 +112,8 @@ export interface TeamGameSession {
     readonly pickoff: (key: string) => void
     /**
      * CPU 투수가 견제를 걸었다 (0x34848 이 고른 루로 메시지 0x10). 사람이 칠 차례에만 먹는다.
-     * ⚠️ 부르는 곳이 아직 없다 — CPU 투구를 고르는 타석 화면(`widgets/batting-stage`)이 알려 줘야 한다.
+     * 타석 화면(`widgets/batting-stage`)이 CPU 투구를 고르며 견제를 뽑으면 `onPickoff` 로 알려 주고
+     * `TeamGameScreen` 이 여기로 넘긴다.
      */
     readonly cpuPickoff: (base: PickoffBase) => void
     /** 돌발 창 닫기 */
