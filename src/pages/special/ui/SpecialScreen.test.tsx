@@ -477,3 +477,28 @@ describe('명예의 전당 능력치 도형 — 축 최대 800 (0x5e864)', () =>
     expect(Math.round(Math.hypot(왼위.x - center.x, 왼위.y - center.y))).toBe(24)
   })
 })
+
+describe('머리띠 0x54d95 — 제목이 있으면 G포인트도 그린다 (0x550d8~0x550de)', () => {
+  const 그림들 = (container: HTMLElement) => [...container.querySelectorAll('img')].map((img) => img.getAttribute('src') ?? '')
+
+  it('스페셜 목록(하위 6)은 제목 0 "2010프로야구"(game_frame 3) + G — G 를 넘기면 숫자 그림이 선다', () => {
+    const { container } = 띄우기({ gamePoint: 1234 })
+    const srcs = 그림들(container)
+    expect(srcs).toContain('./sprites/game_frame/003.png')
+    expect(srcs.filter((src) => src.startsWith('./sprites/gpoint/'))).toHaveLength(5)
+  })
+
+  it('스페셜 명예의 전당(하위 27, 0x2dcd8)은 제목 16 "명예의전당"(game_frame 29) + G', () => {
+    const { container } = 띄우기({ gamePoint: 7 })
+    fireEvent.click(칸('명예의전당'))
+    const srcs = 그림들(container)
+    expect(srcs).toContain('./sprites/game_frame/029.png')
+    expect(srcs).not.toContain('./sprites/game_frame/003.png')
+    expect(srcs).toContain('./sprites/gpoint/007.png')
+  })
+
+  it('G 를 안 넘기면 예전 띠(제목 0, G 없음)', () => {
+    const { container } = 띄우기()
+    expect(그림들(container).filter((src) => src.startsWith('./sprites/gpoint/'))).toHaveLength(0)
+  })
+})

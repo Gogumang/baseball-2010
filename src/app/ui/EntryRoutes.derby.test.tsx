@@ -69,6 +69,14 @@ describe('홈런더비 진입 — 하위 16 선수 고르기 (0x25e6c · 0x29ac8
     expect(받은것.at(-1)).toMatchObject({ batterSkillIds: [22] })
   })
 
+  it('머리띠는 제목 14 "홈런더비"(game_frame 13) + G포인트 — 하위 16 그리기 0x2df20 의 0x54d95(skin, 14, 5)', () => {
+    띄우기(나리)
+    const srcs = [...document.querySelectorAll('img')].map((img) => img.getAttribute('src') ?? '')
+    expect(srcs).toContain('./sprites/game_frame/013.png')
+    expect(srcs).not.toContain('./sprites/game_frame/003.png')
+    expect(srcs).toContain('./sprites/gpoint/011.png')
+  })
+
   it('되돌아가기는 메인 메뉴 (결과 0)', () => {
     const { setScreen } = 띄우기(나리)
     fireEvent.click(view.getByRole('button', { name: '되돌아가기' }))

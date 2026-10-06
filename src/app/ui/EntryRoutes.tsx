@@ -92,6 +92,8 @@ export function EntryRoutes({
       <SpecialScreen
         collection={collection}
         {...(hallOfFameDeletion === undefined ? {} : { hallOfFameDeletion })}
+        // 머리띠 0x54d95 는 제목이 있으면 전역 G(mgr+0x64)를 같이 그린다 — 스페셜 목록(제목 0)·명예의 전당(제목 16)
+        gamePoint={wallet.balance}
         // 상태 28 = 공용 목록 k 11 + 레벨업 창 0x5f395 — OK·`0` 이 오픈/레벨업, CLR 이 상태 6 으로 (0x2af20)
         {...(aceSelect === undefined ? {} : {
           renderAceSelect: (onBack: () => void) => (
@@ -187,6 +189,8 @@ export function EntryRoutes({
     if (derbyPick === null) {
       return (
         <HallOfFameScreen
+          // 하위 16 그리기 0x2df20: 배경 0x58371 · 목록 k 7 · 머리띠 0x54d95(skin, 14 "홈런더비", 5) — G포인트도 그린다
+          frame={{ title: '홈런더비', gamePoint: wallet.balance }}
           collection={collection}
           mode={{
             kind: '선수고르기', purpose: '홈런더비', nari: { 투수: null, 타자: nariBatterOf(career) },

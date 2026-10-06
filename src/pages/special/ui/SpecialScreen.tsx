@@ -46,6 +46,12 @@ interface SpecialScreenProps {
   readonly renderAceSelect?: (onBack: () => void) => ReactNode
   /** 명예의 전당 말풍선 "슬롯에서 삭제" (0x2ac00 · 0x62994). 안 넘기면 안내만 띄운다 */
   readonly hallOfFameDeletion?: HallOfFameDeletion
+  /**
+   * 전역 G(`mgr+0x64`) — 머리띠 0x54d95 는 제목이 −1 이 아니면 오른쪽 위에 G포인트(0x54a60)를 그린다(0x550d8~0x550de).
+   * 스페셜 목록(하위 6, 0x2860c → `0x54d95(skin, 0, 5)`)과 명예의 전당(하위 27, 0x2dcd8 → `0x54d95(skin, 16, 5)`)이 다 그렇다.
+   * 넘기면 두 화면 머리띠를 G 까지 그리고, 안 넘기면 예전처럼 제목 0 띠만(G 없음) 그린다.
+   */
+  readonly gamePoint?: number
   readonly onBack: () => void
 }
 
@@ -65,7 +71,7 @@ interface SpecialScreenProps {
  * ⚠️ 근사한 곳: 줄 y(원본은 굴러가는 목록이라 여덟 줄을 한 번에 세우려고 간격을 벌렸다 — `ROW` 주석),
  * 바퀴는 호와 공만(칸 여섯은 메인 메뉴 몫), 배경은 원본이 무엇을 까는지 아직 못 읽어 검정 그대로다.
  */
-export function SpecialScreen({ collection, renderAceSelect, hallOfFameDeletion, onBack }: SpecialScreenProps) {
+export function SpecialScreen({ collection, renderAceSelect, hallOfFameDeletion, gamePoint, onBack }: SpecialScreenProps) {
   const [view, setView] = useState<SpecialView>('목록')
   const [cursor, setCursor] = useState(0)
   const [notice, setNotice] = useState<string | null>(null)
@@ -111,7 +117,11 @@ export function SpecialScreen({ collection, renderAceSelect, hallOfFameDeletion,
     const mode: HallOfFameMode = hallOfFameDeletion === undefined
       ? { kind: '보기' }
       : { kind: '보기', deletion: hallOfFameDeletion }
-    return <HallOfFameScreen collection={collection} mode={mode} onBack={() => setView('목록')} />
+    // 하위 27 그리기 0x2dcd8: 배경 0x58371 · 목록 k 8 · 머리띠 0x54d95(skin, 16 "명예의전당", 5)
+    return (
+      <HallOfFameScreen collection={collection} mode={mode} onBack={() => setView('목록')}
+        {...(gamePoint === undefined ? {} : { frame: { title: '명예의전당', gamePoint } })} />
+    )
   }
 
   const selected = SPECIAL_ITEMS[cursor]
@@ -192,7 +202,9 @@ export function SpecialScreen({ collection, renderAceSelect, hallOfFameDeletion,
         />
       ))}
 
-      <SpecialBands onBack={onBack} />
+      {gamePoint === undefined
+        ? <SpecialBands onBack={onBack} />
+        : <ScreenFrame title="2010프로야구" gamePoint={gamePoint} onBack={onBack} />}
 
       {notice !== null && <MessageBox text={notice} buttons={['확인']} onAnswer={() => setNotice(null)} />}
     </RawScreen>
