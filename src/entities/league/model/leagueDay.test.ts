@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   ACE_BATTER_ROSTER_SLOT,
+  ACE_PITCHER_RECORD_STAMINA,
   ACE_PITCHER_SLOT,
   cpuGameAcesOf,
   cpuGameSidesOf,
@@ -651,5 +652,22 @@ describe('반 이닝 승·패 판정은 한 점마다 0xa5c34 를 밟는다 (S1 
     )
     expect(판정.save).toEqual({ side: 0, number: 7 })
     expect(판정.saveCode).toBe(3)
+  })
+})
+
+describe('마투수 스태미나는 저장 레코드 +0x2c(10000)에서 서고 끝 값은 팀 레코드 8번 칸에 남는다 (0xb521c)', () => {
+  it('마투수를 넣은 명단만 끝 값을 내놓고, 다음 CPU 경기로는 잇지 않는다', () => {
+    const 경기 = simulateLeagueGame({ away: 2, home: 3 }, 씨앗난수(31), 0, undefined, {
+      aces: { home: { batter: 0, pitcher: 1 } },
+    })
+    expect(경기.acePitcherStaminas.away).toBeUndefined()
+    expect(경기.acePitcherStaminas.home).toBeLessThanOrEqual(ACE_PITCHER_RECORD_STAMINA)
+    expect(경기.pitcherStaminas.home).toHaveLength(PITCHERS_PER_TEAM)
+  })
+
+  it('하루치 CPU 경기는 팀마다 8번 칸 값을 남긴다 (내 팀 경기는 빠진다)', () => {
+    const 하루 = playLeagueDay(EMPTY_LEAGUE, 0, 4, 씨앗난수(5))
+    expect(Object.keys(하루.acePitcherStaminas)).toHaveLength(8)
+    expect(하루.acePitcherStaminas[4]).toBeUndefined()
   })
 })

@@ -137,6 +137,14 @@ export interface LeagueGameScore {
    * 투구마다)를 뺀 것. 원본은 레코드에 남아 다음 경기로 이어진다 (a583fe0). 저장과 하루 끝 회복은 부르는 쪽 몫이다.
    */
   readonly pitcherStaminas: { readonly away: readonly number[]; readonly home: readonly number[] }
+  /**
+   * 경기가 끝났을 때 **마투수(팀 레코드 8번 칸)** 의 스태미나 `+0x2c` — 마투수를 넣은 명단만 있다.
+   * 원본은 `0xb88c8 → 0xb521c` 가 마투수 레코드를 팀 **저장 레코드** 8번 칸에 0x30 바이트 통째로 복사해 두므로
+   * (b5296~b529c memcpy) 경기에서 깎인 값이 그 칸에 남는다. 다음 CPU 경기의 `0xb88c8` 은 다시 저장의 마투수 레코드
+   * (`0x1f824`, 늘 10000)로 덮으므로 CPU 경기끼리는 이어지지 않는다 — 남은 값은 그 팀의 **사람 경기**(레코드 8번 칸을
+   * 그대로 읽는다)가 볼 값이다.
+   */
+  readonly acePitcherStaminas: { readonly away?: number; readonly home?: number }
 }
 
 /** state 칸 — 초 공격 0 · 말 공격 1 */
@@ -199,10 +207,20 @@ export interface LeagueGameExtras {
   readonly sharedRoster?: boolean
 }
 
-/** 마투수 하나 — 간이 타석용 능력과 스태미나 용량의 바탕(체력 칸) */
+/**
+ * 마투수 레코드의 스태미나 `+0x2c` — 원본은 `0xb521c` 가 저장의 마투수 레코드(`0x1f824` = 앱 데이터 +0xac → +0xc64
+ * + 번호×0x30)를 **+0x2c 까지 통째로** 팀 레코드 8번 칸에 복사한다. 그 레코드는 `0x20094` 의 6번 갈래가
+ * `data/XlsACE_PIT_DATA.zt1` 의 0x30 바이트 행을 그대로 부어 만들고, 다섯 행 모두 +0x2c = `10 27` = **10000** 이다.
+ * `0x1f824` 를 부르는 넷(0x48d50 · 0x5aefc · 0xaae7c · 0xb88c8)은 모두 복사해 가는 쪽이라 이 칸을 고치는 곳이 없다.
+ */
+export const ACE_PITCHER_RECORD_STAMINA = 10_000
+
+/** 마투수 하나 — 간이 타석용 능력과 스태미나 용량의 바탕(체력 칸), 레코드 스태미나 */
 interface LeagueAcePitcher {
   readonly quick: QuickAtBatPitcher
   readonly staminaAbility: number
+  /** 레코드 +0x2c — 마운드에 오를 때 이 값으로 선다 */
+  readonly stamina: number
 }
 
 function acePitcherOf(index: number, levels: Readonly<Record<number, number>> | undefined): LeagueAcePitcher | undefined {
@@ -213,6 +231,7 @@ function acePitcherOf(index: number, levels: Readonly<Record<number, number>> | 
   return {
     quick: { control: ability.hit, velocity: ability.power, stamina: ability.run, skillIds: [] },
     staminaAbility: ability.run,
+    stamina: ACE_PITCHER_RECORD_STAMINA,
   }
 }
 
@@ -419,9 +438,9 @@ export function decisionsAfterHalfInning(
  * 마투수는 58066a1 뒤 CPU 투수 교체의 벤치 고르기 `0xabfcc` 가 마선수를 고르지 않아(ac084) CPU 끼리 경기 마운드에는
  * 거의 안 나온다 — 벤치에 있는 것만으로 0xb8a8d 가 참이 되어 마무리 굴림·벤치 수에 비친다. 능력치 네 칸은 레벨 배율
  * `0xd88aa` 을 먹는다(`extras.aceLevels`). 국가대항전 준비 `0xc2c4c` 에는 이 굴림이 없다(`state+0x30 = 0xff`).
+ * 마투수 스태미나는 저장의 마투수 레코드(`0x1f824`) +0x2c 를 통째로 복사한 값(늘 10000, `ACE_PITCHER_RECORD_STAMINA`)
+ * 에서 시작하고, 끝 값은 팀 레코드 8번 칸에 남는다(`acePitcherStaminas`).
  * ⚠️ 남은 차이:
- *   - 마투수 스태미나 시작 값 — 원본은 저장의 마투수 레코드(`0x1f824`) +0x2c 를 통째로 복사한다. 그 값을 못 읽어
- *     10000 으로 선다 (`features/play-team-game` 의 마투수와 같은 근사).
  *   - 원본은 마선수를 팀 **저장 레코드**에 넣는다(0xb53f0·0xb521c 가 0xb8680 의 레코드를 늘리고 덮는다) — 첫 경기 뒤로
  *     팀 레코드에 마선수 칸이 남아 사람 경기의 명단·기록표에도 비친다. 웹은 경기마다 붙박이 표에서 새로 세운다.
  */
@@ -507,6 +526,9 @@ export function simulateLeagueGame(
   const sharedRoster = extras?.sharedRoster === true
   const awayStaminas = staminaTableOf(startingStaminas?.away)
   const homeStaminas = sharedRoster ? awayStaminas : staminaTableOf(startingStaminas?.home)
+  // 마투수는 팀 레코드 8번 칸에 레코드째 들어온다 — 그 +0x2c 로 선다 (0xb521c)
+  if (awayAcePitcher !== undefined) awayStaminas[ACE_PITCHER_SLOT] = awayAcePitcher.stamina
+  if (homeAcePitcher !== undefined) homeStaminas[ACE_PITCHER_SLOT] = homeAcePitcher.stamina
   /** 같은 레코드를 쓰면 마운드 값이 다른 쪽 반 이닝에 깎였을 수 있다 — 표(레코드)의 값으로 다시 선다 */
   const resynced = (mound: HalfInningMound, table: readonly number[]): HalfInningMound =>
     sharedRoster ? { ...mound, stamina: table[mound.pitcherSlot] ?? mound.stamina } : mound
@@ -628,10 +650,15 @@ export function simulateLeagueGame(
     pitcherAppearances,
     steals,
     pinchHits,
-    // 마투수 칸(8번)의 스태미나는 잇지 않는다 — 다음 경기의 0xb88c8 이 저장 레코드(+0x2c 포함)로 다시 덮는다
+    // 로스터 칸(0~7)만 다음 CPU 경기로 잇는다 — 8번(마투수)은 다음 경기의 0xb88c8 이 저장 레코드(+0x2c 포함)로 다시 덮는다
     pitcherStaminas: {
       away: awayStaminas.slice(0, PITCHERS_PER_TEAM),
       home: homeStaminas.slice(0, PITCHERS_PER_TEAM),
+    },
+    // 그래도 팀 레코드 8번 칸에는 깎인 값이 남는다 (0xb521c 가 저장 레코드에 넣은 칸)
+    acePitcherStaminas: {
+      ...(awayAcePitcher === undefined ? {} : { away: awayStaminas[ACE_PITCHER_SLOT] ?? awayAcePitcher.stamina }),
+      ...(homeAcePitcher === undefined ? {} : { home: homeStaminas[ACE_PITCHER_SLOT] ?? homeAcePitcher.stamina }),
     },
   }
 }
@@ -671,6 +698,11 @@ export interface LeagueDayResult {
    * 표에 없던 팀은 10000 에서 시작). 하루 끝 회복(`0xb617c` +20%)은 아직 안 건 값이다.
    */
   readonly pitcherStaminas: Readonly<Record<number, readonly number[]>>
+  /**
+   * 팀 번호 → 오늘 CPU 경기가 끝났을 때 팀 레코드 8번 칸(마투수)의 스태미나 (`LeagueGameScore.acePitcherStaminas`).
+   * 그 팀의 다음 **사람 경기**가 8번 칸을 그대로 읽을 때 쓸 값이다 — 다음 CPU 경기는 10000 으로 다시 덮는다.
+   */
+  readonly acePitcherStaminas: Readonly<Record<number, number>>
 }
 
 /**
@@ -699,6 +731,7 @@ export function playLeagueDay(
   const plateAppearances: LeaguePlateAppearance[] = []
   const pitcherAppearances: LeaguePitcherAppearance[] = []
   const staminas: Record<number, readonly number[]> = { ...pitcherStaminas }
+  const aceStaminas: Record<number, number> = {}
   const played = matchupsOf(day).reduce((current, matchup) => {
     if (matchup.away === myTeamId || matchup.home === myTeamId) return current
     // ⚠️ 칸과 명단이 엇갈린다 (0xc239c, 직접 떴다 — `cpuGameSidesOf` 주석): 홈 팀(A목록 X)의 **선수**가 칸 0
@@ -716,6 +749,8 @@ export function playLeagueDay(
     )
     staminas[sides.away] = score.pitcherStaminas.away
     staminas[sides.home] = score.pitcherStaminas.home
+    if (score.acePitcherStaminas.away !== undefined) aceStaminas[sides.away] = score.acePitcherStaminas.away
+    if (score.acePitcherStaminas.home !== undefined) aceStaminas[sides.home] = score.acePitcherStaminas.home
     plateAppearances.push(...score.plateAppearances)
     pitcherAppearances.push(...score.pitcherAppearances)
     // 기록 c2b80~c2bca (R1 항목 3): `score(칸 0) > score(칸 1)` 이면 A(X = 홈)에 승, 아니면 B(Y = 원정)에 승 —
@@ -733,5 +768,6 @@ export function playLeagueDay(
       pitcherAppearances,
     ),
     pitcherStaminas: staminas,
+    acePitcherStaminas: aceStaminas,
   }
 }
