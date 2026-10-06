@@ -102,6 +102,15 @@ export const hasDownMark = (tab: number, top: number) => top <= (DOWN_MARK_MAX_T
 export const isBlinkOn = (tick: number) => tick % 8 <= 3
 
 /**
+ * 탭 0·4 목록 격자 [skin+0xe0] 의 줄 커서 깜박임 — 0x7a571 이 그릴 때마다 격자 +0x18 의 `% 8 ≤ 4` 를 보고
+ * (0x7a62c~0x7a64a) 다 그린 뒤 +0x18 을 1 올린다(0x7b490). +0x18 은 격자를 다시 지을 때(0x7a005, [skin+0x80] = 0 인 그림 —
+ * 탭 새로 시작 0x2b640 · 쪽 넘기기 0x2babe · 본문 CLR 0x2b964) 0 이 된다. 곧 지은 뒤 다섯 그림 켜짐 · 세 그림 꺼짐.
+ * 커서를 보일지(+6)도 지을 때 `[skin+0xf6] == 0`(본문 초점)으로 정해진다(0x2e93c~0x2e948 · 0x2f9b2~0x2f9c4).
+ * 흔들림(+0x6c · +0x70, 0x7a7f6~0x7a842)은 아래 `cursorShakeOf` 와 같은 표 0xd4080 · 0xd4050 이다.
+ */
+export const isListCursorBlinkOn = (drawsSinceBuilt: number) => drawsSinceBuilt % 8 <= 4
+
+/**
  * 고른 칸 흔들림 (탭 1 0x2ec1a~0x2ec60 · 탭 2 0x2f0e2~0x2f128): 격자 커서가 옮겨 간 틱(격자 +0x25)에
  * [this+0xf8] = 0 · [this+0xfc] = 방향([skin+0x8c]). 본문에 초점이 있고 [this+0xfc] ≠ −1 이면 고른 칸을
  * `x += 표 0xce8bc[2·방향 + t]`, `y += 표 0xce88c[3·방향 + t]` 로 그리고 t 를 올린다 — t > 1 이면 [this+0xfc] = −1.

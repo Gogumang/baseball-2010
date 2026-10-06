@@ -212,8 +212,34 @@ export const SKILL_DESCRIPTION = {
   text: { x: 37, y: 196, width: 168 },
 } as const
 
-/** 기록·통계 탭의 목록 격자 — `0x79ed5(…, 120, 90, 표, 줄높이 18, 1열, 8줄)` */
+/**
+ * 기록·통계 탭의 목록 격자 — 탭 0 `0x79ed5(격자, 종류, 120, y0 + 0x24 = 90, 칸너비 [174], 줄높이 18, 1열, 8줄)` (0x2e8e6~0x2e92e) ·
+ * 탭 4 는 같은 꼴에 종류 2 · **y0 + 0x23 = 89** (0x2f96a~0x2f9ae). 칸 x = 120 − 174/2 = 33, 칸 y = 첫 y + 18 × 줄.
+ * `x` 는 칸 바탕 프레임을 놓는 x(= 칸 x − 1)다.
+ */
 export const LIST_GRID = { x: PANEL.x + 8, firstY: PANEL.y + 36, step: 18, rows: 8, width: 176 } as const
+/** 탭 4 통계 격자의 첫 칸 y — 0x2f9a6 `adds r3, #0x23` (탭 0 은 #0x24) */
+export const STAT_LIST_FIRST_Y = PANEL.y + 0x23
+/** 탭별 목록 격자 첫 칸 y (탭 0 · 4 만) */
+export const listFirstYOf = (tab: number) => (tab === 4 ? STAT_LIST_FIRST_Y : LIST_GRID.firstY)
+
+/**
+ * 칸 바탕 — 0x7a571 의 종류별 칸 그리기(점프표 0xd40c0)가 칸마다 slt_frame **프레임**(0xba759 종류 1)을 (칸 x − 1, 칸 y − 1) 에:
+ * 종류 0 → 10 · 종류 1 → 11 (0x7a928~0x7a954) · 종류 2 → 13 (0x7a9cc~0x7a9fe). 모두 174×18.
+ * 탭 0 의 종류는 `쪽 [skin+0xfc] == 5 ? 1 : 0` (0x2e900~0x2e90a) — 스페셜기록 쪽(6쪽째)만 11 이다. 탭 4 는 늘 종류 2.
+ */
+export function listRowFrameOf(tab: number, page: number): number {
+  if (tab === 4) return 13
+  return page === 5 ? 11 : 10
+}
+export const LIST_ROW_FRAME_DY = -1
+
+/**
+ * **줄 커서** — 0x7a571 꼬리(0x7b3a0~0x7b406, 직접 떴다). 열림 애니가 끝났고(+9) 커서를 보이고(+6) 깜박임이 켜졌으면
+ * 종류 0·1·2 는 점프표 0xd4118 → 0x7b3de: slt_frame 프레임 `셋째 인자 == 3 ? 0x36 : 0x19` 를 (고른 칸 x − 1, 고른 칸 y − 2) 에.
+ * 기록연감은 셋째 인자 0 (0x2e9a6 · 0x2fa34) 이라 **프레임 25** (174×20 노란 테두리). 고른 칸 x·y 는 흔들림이 더해진 값이다.
+ */
+export const LIST_CURSOR = { frame: 0x19, dy: -2 } as const
 
 /**
  * **탭 0 기록의 칸 이름** — 격자 종류 1 칸 그리기 0x7a916 이 칸 번호 n(= 쪽 × 8 + 줄)의 이름을 글 표 `[격자+0x90]` 의

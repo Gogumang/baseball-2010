@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
   ANNALS_GRID_SHAPES, DIRECTION_CODES, PANEL_ANIMATION_DRAWS, PANEL_OPEN_START_HEIGHT, closingPanelHeightOf, cursorShakeOf,
-  hasDownMark, isBlinkOn, moveGridCursor, nicknameScrollDirectionOf, openingPanelHeightOf, panelTopOf, scrollNicknames,
+  hasDownMark, isBlinkOn, isListCursorBlinkOn, moveGridCursor, nicknameScrollDirectionOf, openingPanelHeightOf, panelTopOf, scrollNicknames,
   scrollTopAfter, startNicknameScroll,
 } from '@/pages/record/lib/annalsGrid'
-import { DESCRIPTION_BAR, DESCRIPTION_TICKER, tickerTextXOf } from '@/pages/record/lib/recordAnnalsLayout'
+import {
+  DESCRIPTION_BAR, DESCRIPTION_TICKER, LIST_CURSOR, LIST_GRID, LIST_ROW_FRAME_DY, listFirstYOf, listRowFrameOf, tickerTextXOf,
+} from '@/pages/record/lib/recordAnnalsLayout'
 import { RECORD_DESCRIPTIONS } from '@/pages/record/lib/recordDescriptions'
 
 describe('기록연감 격자 키 처리 (0x2b7a0 · 0x2b640 · 0x6bead)', () => {
@@ -105,5 +107,25 @@ describe('탭 3 닉네임 스크롤 (0x61c54 · 0x61ce4)', () => {
 
   it('날 키 — ↑·2 위, ↓·8 아래', () => {
     expect(['ArrowUp', '2', 'ArrowDown', '8', '4'].map(nicknameScrollDirectionOf)).toEqual(['up', 'up', 'down', 'down', null])
+  })
+})
+
+describe('탭 0·4 목록 격자 그림 (0x7a571 — 0x7a916 · 0x7a9cc · 0x7b3de)', () => {
+  it('칸 바탕 — 탭 0 은 프레임 10, 스페셜기록 쪽(5)만 11 · 탭 4 는 13, 칸 y − 1 에', () => {
+    expect([0, 1, 4, 5].map((page) => listRowFrameOf(0, page))).toEqual([10, 10, 10, 11])
+    expect([0, 1].map((page) => listRowFrameOf(4, page))).toEqual([13, 13])
+    expect(LIST_ROW_FRAME_DY).toBe(-1)
+  })
+
+  it('첫 칸 y — 탭 0 은 y0 + 0x24 = 90, 탭 4 는 y0 + 0x23 = 89', () => {
+    expect(listFirstYOf(0)).toBe(90)
+    expect(listFirstYOf(4)).toBe(89)
+    expect(LIST_GRID.x).toBe(120 - 87 - 1)
+  })
+
+  it('줄 커서 — 프레임 25 를 (칸 x − 1, 칸 y − 2), 지은 뒤 다섯 그림 켜짐 · 세 그림 꺼짐', () => {
+    expect(LIST_CURSOR).toEqual({ frame: 25, dy: -2 })
+    expect(Array.from({ length: 10 }, (_, draw) => isListCursorBlinkOn(draw)))
+      .toEqual([true, true, true, true, true, false, false, false, true, true])
   })
 })

@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
-import { RecordAnnals } from '@/pages/record/ui/RecordAnnals'
+import { RecordAnnals, resetSkinTickerCounter } from '@/pages/record/ui/RecordAnnals'
 import { EMPTY_COLLECTION } from '@/entities/collection/model/collection'
 import { ORIGINAL_SKILLS } from '@/shared/config/original/skills'
 import { TITLE_NAMES } from '@/entities/career/model/titles'
@@ -399,6 +399,23 @@ describe('탭 0 설명 막대 (0x2e9b0~0x2ea86)', () => {
     fireEvent.keyDown(window, { key: 'ArrowRight' })
     // 쪽 1 · 줄 1 → 칸 9 = StrGAME[65]
     expect(screen.getByTestId('기록-설명').textContent).toBe(RECORD_DESCRIPTIONS[9])
+  })
+
+  it('흐르는 글 카운터 [skin+0x284] 는 그린 뒤 3 오르고, 글이 사라졌다 다시 떠도 이어진다', () => {
+    resetSkinTickerCounter()
+    띄우기()
+    // jsdom 은 글 폭 0 — 한 바퀴 170, 글 왼쪽 = 자르기 칸 기준 170 − 카운터 − 2
+    const 글왼쪽 = () => parseInt((screen.getByTestId('기록-설명').firstElementChild as HTMLElement).style.left, 10)
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(글왼쪽()).toBe(168)
+    틱(2)
+    expect(글왼쪽()).toBe(162)
+    // 본문 CLR → 탭 막대(글 없음) → OK 로 다시 본문: 세 번 그렸으니 9 에서 잇는다
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.queryByTestId('기록-설명')).toBeNull()
+    틱(3)
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(글왼쪽()).toBe(159)
   })
 })
 

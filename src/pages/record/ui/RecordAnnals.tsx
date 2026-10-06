@@ -10,7 +10,7 @@ import { RECORD_NAMES } from '@/entities/game/model/gameRecords'
 import { parseGameMarkup, stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import { RECORD_DESCRIPTIONS } from '@/pages/record/lib/recordDescriptions'
 import {
-  ACHIEVEMENT_MARK, DESCRIPTION_BAR, NICKNAME_SCROLLBAR, NICKNAME_TAB_LABEL, DESCRIPTION_TICKER, RECORD_COUNT, tickerTextXOf, CELL_FRAMES, CELL_GRID, LIST_GRID, LOCKED_MARK, NAME_ROW, PAGER, PAGE_TITLE, PANEL,
+  ACHIEVEMENT_MARK, DESCRIPTION_BAR, LIST_CURSOR, LIST_ROW_FRAME_DY, listFirstYOf, listRowFrameOf, NICKNAME_SCROLLBAR, NICKNAME_TAB_LABEL, DESCRIPTION_TICKER, RECORD_COUNT, tickerTextXOf, CELL_FRAMES, CELL_GRID, LIST_GRID, LOCKED_MARK, NAME_ROW, PAGER, PAGE_TITLE, PANEL,
   SPECIAL_RECORD_FIRST_CELL, SPECIAL_RECORD_NAMES,
   ENDING_CELL_NAMES, NARI_ENDING_CELL_COUNT, PROGRESS_ROW, SCROLL_MARKS, endingCellFrameOf, endingProgressOf, SKILL_DESCRIPTION, TAB_BAR, TAB_COUNT, TAB_CURSOR, TAB_NAMES,
   TAB_NAME_FRAMES, TAB_NAME_Y, TAB_PAGE_COUNTS, TOTAL_ROW, cellPositionOf, tabIconWidthOf,
@@ -21,7 +21,7 @@ import type { AnnalsDirection } from '@/pages/record/lib/annalsGrid'
 import {
   ANNALS_GRID_SHAPES, DIRECTION_CODES, PANEL_ANIMATION_DRAWS, PANEL_FULL_HEIGHT, VISIBLE_GRID_ROWS,
   NICKNAME_PAGE_FIRST_NAMES, NICKNAME_PAGE_TITLE_FRAMES, NICKNAME_PAGE_TOTALS, NICKNAME_SCROLL_TRACK,
-  NICKNAME_VISIBLE_ROWS, closingPanelHeightOf, cursorShakeOf, hasDownMark, isBlinkOn, moveGridCursor,
+  NICKNAME_VISIBLE_ROWS, closingPanelHeightOf, cursorShakeOf, hasDownMark, isBlinkOn, isListCursorBlinkOn, moveGridCursor,
   nicknameScrollDirectionOf, openingPanelHeightOf, panelTopOf, scrollNicknames, scrollTopAfter, startNicknameScroll,
 } from '@/pages/record/lib/annalsGrid'
 import type { NicknameScroll } from '@/pages/record/lib/annalsGrid'
@@ -100,6 +100,8 @@ export function RecordAnnals({ collection, onBack, gamePoint = 0 }: RecordAnnals
   /** 고른 칸 흔들림 — 방향 [this+0xfc] 과 시작 틱 ([this+0xf8] = 지금 틱 − 시작) */
   const [shake, setShake] = useState<{ readonly directionCode: number; readonly startedAt: number } | null>(null)
   const cursorShake = !isTabFocused && shake !== null ? cursorShakeOf(shake.directionCode, tick - shake.startedAt) : null
+  /** 탭 0·4 목록 격자를 마지막으로 다시 지은 틱 — 깜박임 카운터 +0x18 = 지금 틱 − 이 값 (0x7a005) */
+  const [listBuiltAt, setListBuiltAt] = useState(0)
   const [secretCode, setSecretCode] = useState(INITIAL_SECRET_CODE_STATE)
   const frames = useFrameOrigins(SLT_FRAMES)
   const textFrames = useFrameOrigins(IMG_TEXT)
@@ -123,11 +125,17 @@ export function RecordAnnals({ collection, onBack, gamePoint = 0 }: RecordAnnals
     setPage(0)
     setCursor(0)
     setGridTop(0)
+    setListBuiltAt(tick)
     if (next === 3) setNicknameScroll(startNicknameScroll(NICKNAME_PAGE_TOTALS[0]))
   }
   const changeTab = (next: number) => restartTab((next + TAB_COUNT) % TAB_COUNT)
   /** CLR — 본문이면 탭 막대로(0x2b95c), 탭 막대면 판을 닫기 시작한다(0x2b946) */
-  const pressClear = () => (isTabFocused ? setClosingAt(tick) : setIsTabFocused(true))
+  const pressClear = () => {
+    if (isTabFocused) return setClosingAt(tick)
+    setIsTabFocused(true)
+    // 0x2b95c~0x2b964 — [skin+0x80] = 0 이라 다음 그림이 목록 격자를 커서 없이(+6 = 0) 다시 짓는다
+    setListBuiltAt(tick)
+  }
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -179,6 +187,7 @@ export function RecordAnnals({ collection, onBack, gamePoint = 0 }: RecordAnnals
       if (pageLimit === 0) return
       const nextPage = (page + step + pageLimit) % pageLimit
       setPage(nextPage)
+      setListBuiltAt(tick)
       // 탭 3 이면 새 쪽의 개수로 스크롤을 다시 세운다 (0x2bac6: 쪽 0 ? 0x20 : 0x10)
       if (tab === 3) setNicknameScroll(startNicknameScroll(nextPage === 0 ? 0x20 : 0x10))
     }
@@ -300,6 +309,7 @@ export function RecordAnnals({ collection, onBack, gamePoint = 0 }: RecordAnnals
         />
       )}
 
+      {(tab === 0 || tab === 4) && <ListRowFrames frames={frames} tab={tab} page={page} />}
       {tab === 0 && <ListRows page={page} names={RECORD_TAB_NAMES} />}
       {tab === 0 && <RecordCounts page={page} stats={collection.stats} />}
       {tab === 0 && <AchievementMarks page={page} stats={collection.stats} />}
@@ -311,6 +321,12 @@ export function RecordAnnals({ collection, onBack, gamePoint = 0 }: RecordAnnals
       )}
 
       {tab === 4 && <StatRows page={page} stats={collection.stats} />}
+      {/* 줄 커서 — 칸을 다 그린 뒤 0x7a571 꼬리가 고른 칸 위에 (본문 초점 + 깜박임 켜짐) */}
+      {(tab === 0 || tab === 4) && !isTabFocused && isListCursorBlinkOn(tick - listBuiltAt) && (
+        <FrameSprite folder={SLT_FRAMES} frame={LIST_CURSOR.frame} origins={frames}
+          x={LIST_GRID.x + (cursorShake?.dx ?? 0)}
+          y={listFirstYOf(tab) + LIST_GRID.step * cursor + LIST_CURSOR.dy + (cursorShake?.dy ?? 0)} />
+      )}
 
       {tab === 1 && PROGRESS_ROW.modeFrames.map((modeFrame, row) => {
         const y = PROGRESS_ROW.firstY + PROGRESS_ROW.step * row
@@ -440,15 +456,30 @@ function CellGrid({
 }
 
 /**
- * 탭 0 설명 — 흐르는 글 0x5a8c8. 카운터 [skin+0x284] 는 이 글을 그릴 때마다 3 오른다.
- * ⚠️ [skin+0x284] 는 메인 메뉴 객체 칸이라 들어올 때의 값(지우는 곳)을 못 찾았다 — 웹은 이 글이 처음 그려질 때 0 에서 센다.
+ * 흐르는 글 카운터 [skin+0x284] — 메인 메뉴 객체(앱에 하나, 0x2ed8 → 0x53b24 → 0x5390c 가 만든다)의 칸이라
+ * 기록연감을 나갔다 들어와도, 탭·초점·고른 줄이 바뀌어도 이어진다. 0 으로 지우는 곳은 둘뿐이다(직접 떴다):
+ * 객체를 만들 때 0x5390c(0x53a00~0x53a08) · 메인 메뉴 상태 15(대전, 0x31918) 의 0x31c60~0x31c6a.
+ * 같은 칸을 0x5a8c8 을 부르는 다른 화면(0x2785c · 0x4a384 · 0x5b798 선수 정보 창 · 0x7c450)도 올리지만
+ * 웹은 아직 그 화면들의 흐르는 글을 이 칸에 잇지 않았다 — 기록연감 설명만 센다.
+ */
+const skinTickerCounter = { value: 0 }
+/** 앱을 새로 띄운 것과 같다 (0x5390c) — 테스트용 */
+export const resetSkinTickerCounter = () => {
+  skinTickerCounter.value = 0
+}
+
+/**
+ * 탭 0 설명 — 흐르는 글 0x5a8c8. [skin+0x284] 로 x 를 정해 그린 **뒤** 3 올린다(0x5a958~0x5a962) —
+ * 그래서 올리기는 그림이 화면에 나간 뒤(effect)에 한다.
  */
 function DescriptionTicker({ text, tick }: { readonly text: string; readonly tick: number }) {
-  const counter = useRef({ value: 0, lastTick: tick })
-  if (counter.current.lastTick !== tick) {
-    counter.current.value += DESCRIPTION_TICKER.step * Math.max(0, tick - counter.current.lastTick)
-    counter.current.lastTick = tick
-  }
+  const lastDrawnTick = useRef(tick - 1)
+  useEffect(() => {
+    skinTickerCounter.value += DESCRIPTION_TICKER.step * Math.max(0, tick - lastDrawnTick.current)
+    lastDrawnTick.current = tick
+  }, [tick])
+  // 건너뛴 갱신(그림을 못 낸 틱)도 원본에선 한 번씩 그렸다 — 그만큼 앞당겨 센 값으로 그린다
+  const counter = skinTickerCounter.value + DESCRIPTION_TICKER.step * Math.max(0, tick - lastDrawnTick.current - 1)
   const textRef = useRef<HTMLSpanElement>(null)
   const [textWidth, setTextWidth] = useState(0)
   useLayoutEffect(() => setTextWidth(textRef.current?.offsetWidth ?? 0), [text])
@@ -458,7 +489,7 @@ function DescriptionTicker({ text, tick }: { readonly text: string; readonly tic
     <div className={styles.tickerClip} data-testid="기록-설명"
       style={{ left: x + clipInset, top: y, width: width - clipInset * 2, height }}>
       <span ref={textRef} className={styles.tickerText}
-        style={{ left: tickerTextXOf(counter.current.value, textWidth) - (x + clipInset) }}>
+        style={{ left: tickerTextXOf(counter, textWidth) - (x + clipInset) }}>
         {segments.map((segment, index) => (
           <span key={index} style={segment.color === null ? undefined : { color: segment.color }}>{segment.text}</span>
         ))}
@@ -545,6 +576,20 @@ function NameRows({
   )
 }
 
+/** 탭 0·4 칸 바탕 — slt_frame 프레임 10 · 11(탭 0 쪽 5) · 13(탭 4) 을 (칸 x − 1, 칸 y − 1) 에 (0x7a916 · 0x7a9cc) */
+function ListRowFrames({
+  frames, tab, page,
+}: { readonly frames: ReturnType<typeof useFrameOrigins>; readonly tab: number; readonly page: number }) {
+  return (
+    <>
+      {Array.from({ length: LIST_GRID.rows }, (_, row) => (
+        <FrameSprite key={row} folder={SLT_FRAMES} frame={listRowFrameOf(tab, page)} origins={frames}
+          x={LIST_GRID.x} y={listFirstYOf(tab) + LIST_GRID.step * row + LIST_ROW_FRAME_DY} />
+      ))}
+    </>
+  )
+}
+
 /** 기록·통계 탭의 1열 8줄 목록 */
 function ListRows({ page, names }: { readonly page: number; readonly names: readonly string[] }) {
   const start = page * LIST_GRID.rows
@@ -611,7 +656,7 @@ function StatRows({ page, stats }: { readonly page: number; readonly stats: Anna
     <>
       {statPageCellsOf(page).map((cell, row) => {
         if (cell === null) return null
-        const top = LIST_GRID.firstY + LIST_GRID.step * row
+        const top = listFirstYOf(4) + LIST_GRID.step * row
         const value = cell.valueOf(stats)
         return (
           <div key={cell.nameIndex}>
