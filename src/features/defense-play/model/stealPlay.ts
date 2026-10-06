@@ -185,8 +185,8 @@ export function runStealPlay(input: StealPlayInput): StealPlayResult {
   const result = runRunnerPlay({
     kind: STEAL_PLAY_KIND,
     fielders,
-    // b29d4: 0xb2710(P, 1, 0) — 엔진이 첫 틱 앞에서 쥐게 하려고 쥠 칸을 세워 둔다
-    play: { ...play, held: true, everHeld: true },
+    // b29d4: 0xb2710(P, 1, 0) — 엔진이 첫 틱 앞에서 쥐게 하려고 쥠 칸을 세워 둔다. 쥐기는 +0x128 = 1 도 세운다(b2720)
+    play: { ...play, held: true, everHeld: true, wantsThrow: true },
     runners,
     abilities,
     outs: input.outs,

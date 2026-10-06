@@ -54,21 +54,23 @@ import { runnerFateOf } from '@/features/defense-play/model/runnerFates'
  * "목록 0번 = 결과 코드가 운명을 정한 타자주자" 를 전제로 짜여 있다. 이 판에는 결과 코드가 없고,
  * 모든 주자의 운명을 원본 판정(0xb36d0 · 0xb4292)이 정한다.
  *
- * ## 한 틱의 차례 (원본 경기 장면 슬롯 2 = 0x524c0 · 플레이 틱 — 견제 진행기와 같은 근사 순서)
+ * ## 한 틱의 차례 (원본 장면 갱신 0x52c50 = 공용 갱신 0x3f060(야수·주자 틱) → 슬롯 2 0x524c0)
+ * 0. 야수 틱 0xa1284 — 공 쥔 야수의 준비 틱 +0xc8 −= 1
  * 1. (종류 9) 쫓는 야수가 포구 틱에 공을 쥔다 — 펌블 굴림 0xb41d0 → 공 쥐기 0xb2710(P, f, 1)
  *    · 낙구 틱에 포스 요구 루 0xa95e8 (P2 2b: 0xb4510~0xb453c)
- * 2. 공 쥔 야수의 송구 판단 — 사람 목표 +0x160(플레이 틱 0xb45dc 의 b4660~b46a8, 쓰고 나면 −1) 또는 CPU 송구
- *    결정 `0xafa60 → 0xafb24` (`0xae6c8` 갈림, `runDefensePlay` 의 `throwMode` 주석) → 루로 보내기 `0xb2c90`.
+ * 3. 송구 도착 = 받는 야수가 루 위에서 쥔다(0xb2710(P, f, 1) — +0x128 = 1, 준비 틱) → 아웃 판정 0xb36d0 → 결과 9(0xb4292)
+ * 3b. 사람 목표 +0x160 — 플레이 틱 vt4c 의 b4660~b46a8: 쥠 && 준비면 루로 보내기 `0xb2c90`, 그리고 −1
+ * 4. 자동 추가 진루 0xaf918 (`0xae690` 갈림, 진루시키면 +0x128 = 1) · 자동 슬라이딩 0xb030c
+ * 4c. CPU 송구 결정 `0xafa60 → 0xafb24` — `0xae6c8`(수비 CPU || 송구 자동)일 때 매 틱, +0x128 && 준비일 때만 고르고
+ *    0xb2c90 이 성공하면 +0x128 = 0. 받은 야수도 준비 틱이 지나면 이어 던진다.
  *    사람 수비·수동 송구에서 키가 없으면 **던지지 않는다** — 0xb1c90 의 자동 가지에는 송구 호출이 없다.
- * 3. 송구 도착 = 받는 야수가 루 위에서 쥔다(0xb2710) → 아웃 판정 0xb36d0 → 결과 9(0xb4292)
- * 4. 자동 추가 진루 0xaf918 (`0xae690` 갈림) · 자동 슬라이딩 0xb030c
  * 5. 그림 · 6. 움직이기 · 7. 아웃 판정 0xb36d0 → 아웃이 났으면 결과 메시지 0xbba 의 CPU 송구 결정 한 번
  *    (0x51d40~0x51db4, 사람 수비에서도) · 8. 2아웃 보류 득점 풀기 0xaa34c · 9. 끝났나
  *
  * ## 근사 (지어내지 않은 자리 — 견제 진행기와 같다)
  * - ⚠️ 송구 도착 틱은 `defenseArrivalTicks`(0xaf284) 근사다 — 원본은 궤적 물리(0xb401c, 해독 금지 구역).
  *   커버가 루를 밟기 전에 공이 닿으면 커버가 루를 밟는 틱까지 포구를 미룬다 (`pickoffPlay` 와 같다).
- * - ⚠️ 송구 판단은 **새로 공을 쥔 야수마다 한 번** 한다. 원본 0xb1c90 은 매 틱 돈다 — 웹 타구 진행기와 같은 근사.
+ * - ⚠️ 움직이기·아웃 판정(5~7)은 원본에서 야수·주자 틱(0절 자리) 안이다 — 웹은 슬롯 2 뒤로 두었다(타구 진행기와 같다).
  * - ⚠️ 악송구 뒤 공 경로·주자 반응은 미해결 — "그 송구는 아무도 못 받는다" 로 둔다(타구 진행기와 같다).
  * - ⚠️ 자동 추가 진루는 결과 코드가 서기 전까지만 묻는다 (`pickoffPlay` 와 같다 — 끝 표시 +0x111 을
  *   세우는 자리를 안 읽어서, 결과가 선 뒤 주자가 더 뛰는지 알 수 없다).
@@ -175,9 +177,7 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
   let firstThrowBase = NONE
   let firstThrowArrival = -1
   const throwState: { flight: ThrowInFlight | null } = { flight: null }
-  /** 송구 판단을 이미 한 야수 — 새로 공을 쥔 야수만 다시 본다 (근사, 머리말) */
-  let decidedHolder = NONE
-  /** 사람 목표 +0x160 이 아직 안 쓰였나 — 쓰면 −1 (b46a8) */
+  /** 사람 목표 +0x160 이 아직 안 쓰였나 — 공 가진 야수가 준비되면 한 번 보고 −1 (b46a4) */
   let manualPending = manualThrowBase !== NONE
   /** 이번 틱에 0xb36d0 이 아웃을 냈나 — 결과 코드 13 → 메시지 0xbba */
   let outJudgedThisTick = false
@@ -229,38 +229,21 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
           ? { ...fielder, holdingBall: false }
           : fielder,
     )
-    play = { ...play, ballHolderSlot: slot, held: true, everHeld: true }
+    // 0xb2710: +0x128 = 1 · +0x130 = f · +0x12c = 1 · +0x112 = 1 · state[0x1e] = 1
+    play = { ...play, ballHolderSlot: slot, held: true, everHeld: true, wantsThrow: true }
     ballOnGround = true
     runOutJudgement(tick)
   }
 
   /**
-   * 송구 판단 — 사람 목표 +0x160(b4660, 한 번 쓰면 −1) 또는 0xafa60→0xafb24, 그리고 루로 보내기 0xb2c90.
-   * `forceCpu` 는 결과 메시지 0xbba 가 부르는 0xafa60 한 번(사람 수동 송구에서도 돈다).
-   * 사람 수비·수동 송구에서 키가 없으면 아무것도 안 한다 — 0xb1c90 자동 가지에는 송구 호출이 없다(c8649a3).
+   * 루로 보내기 0xb2c90(P, 루, 특수) — 성공(1)이면 참 (`runDefensePlay` 의 `sendToBase` 와 같은 갈래).
+   * 커버 없음 → 공 가진 야수가 들고 뛴다(0) · 커버 목표 루 ≠ 루(0) · 직접 밟는 게 빠름(1) · 600 이하 · 자기 자신(0) ·
+   * 그 밖에는 송구 0xb2e38 → 0xa1620(악송구 굴림 0xa1828)(1).
    */
-  const decideThrow = (tick: number, forceCpu = false): void => {
+  const sendToBase = (tick: number, base: number, byHuman: boolean, cpuSpecial: boolean): boolean => {
     const holderSlot = play.ballHolderSlot
     const holder = fielders[holderSlot]
-    if (holder === undefined) return
-    decidedHolder = holderSlot
-    const active = runners.filter((runner) => !runner.state.isOut && !runner.state.scored).length
-    const byHuman = !forceCpu && manualPending
-    if (byHuman) manualPending = false
-    const base = byHuman
-      ? manualThrowBase
-      : forceCpu || cpuThrowEnabled
-        ? chooseThrowTargetBase({ ...contextAt(tick), activeRunnerCount: active, outs })
-        : NONE
-    if (base === NONE) return
-    // CPU 홈 송구 20% 특수 송구 (0xafa60 `afad2`) — 점수식이 홈을 골랐을 때만 한 번 굴린다
-    const cpuSpecial =
-      !byHuman &&
-      base === 0 &&
-      input.random !== undefined &&
-      isSpecialThrow(base, randomIntegerBelow(input.random, 0, 100))
-
-    // ── 0xb2c90(P, 루, 특수) ──
+    if (holder === undefined) return false
     const coverSlot = play.coverOfBase[wrapBase(base)] ?? NONE
     const basePoint = basePosition(base)
     if (coverSlot === NONE) {
@@ -269,10 +252,10 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
         fielder.slot === holderSlot ? { ...fielder, target: basePoint, targetBase: base } : fielder,
       )
       log.push(`${tick}틱 ${holderSlot}번 야수가 ${base}루로 공을 들고 뛴다 (커버 없음)`)
-      return
+      return false
     }
     const cover = fielders[coverSlot]
-    if (cover.targetBase !== base) return
+    if (cover.targetBase !== base) return false
     const runTicks = ticksToReach(holder.position, basePoint, holder.speed)
     const throwTicks = throwTicksTo(holder, cover.target)
     const receiveTicks = fielderArrivalTicks(cover)
@@ -282,10 +265,10 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
         fielder.slot === holderSlot ? { ...fielder, target: basePoint, targetBase: base } : fielder,
       )
       log.push(`${tick}틱 ${holderSlot}번 야수가 ${base}루를 직접 밟으러 간다`)
-      return
+      return true
     }
     if (coverSlot === holderSlot || horizontalDistance(holder.position, cover.position) <= MINIMUM_THROW_DISTANCE) {
-      return
+      return false
     }
 
     // ── 송구 0xb2e38 → 0xa1620 (악송구 굴림 0xa1828) ──
@@ -318,16 +301,32 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
       firstThrowBase = base
       firstThrowArrival = throwState.flight.arrivalTick
     }
-    // 던지면 손을 떠난다 — 준비 틱(+0xc8)도 썼다
+    // 던지면 손을 떠난다(b2f80 · b3070) — 준비 틱(+0xc8)도 썼다. vt24(b307c)가 받을 야수(+0x170)·받는 틱(+0x174)을 다시 세운다
     fielders = fielders.map((fielder) =>
       fielder.slot === holderSlot ? { ...fielder, holdingBall: false, actionRemainingTicks: 0 } : fielder,
     )
-    play = { ...play, held: false, wantsThrow: true }
+    play = { ...play, held: false, catchFielderSlot: coverSlot, catchTick: throwState.flight.arrivalTick }
     log.push(
       `${tick}틱 ${holderSlot}번 야수가 ${base}루로 송구 — ${throwState.flight.arrivalTick}틱 도착` +
         (cpuSpecial ? ' (특수)' : '') +
-        (error.errant ? ' (악송구)' : ''),
+        (error.errant ? ' (악송구)' : '') +
+        (byHuman ? '' : ' (CPU 결정)'),
     )
+    return true
+  }
+
+  /**
+   * CPU 송구 결정 0xafa60 — +0x128 이 서 있고 공 가진 야수가 준비(vtC4)됐을 때만 점수식 0xafb24 로 고른다.
+   * 홈이면 20% 특수 굴림(`afad2`, 0xb2c90 이 실패해도 먹는다), 0xb2c90 이 성공하면 +0x128 = 0.
+   */
+  const cpuThrowDecision = (tick: number): void => {
+    if (!play.wantsThrow || !isHolderReady() || ballLost || throwState.flight !== null) return
+    const active = runners.filter((runner) => !runner.state.isOut && !runner.state.scored).length
+    const base = chooseThrowTargetBase({ ...contextAt(tick), activeRunnerCount: active, outs })
+    if (base === NONE) return
+    const cpuSpecial =
+      base === 0 && input.random !== undefined && isSpecialThrow(base, randomIntegerBelow(input.random, 0, 100))
+    if (sendToBase(tick, base, false, cpuSpecial)) play = { ...play, wantsThrow: false }
   }
 
   for (let tick = 0; tick <= maximumTicks && !play.finished; tick += 1) {
@@ -371,12 +370,6 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
       })
     }
 
-    // ── 2. 송구 판단 ──
-    const newHolder = play.held && play.ballHolderSlot !== decidedHolder
-    if (!play.finished && !ballLost && throwState.flight === null && newHolder) {
-      decideThrow(tick)
-    }
-
     // ── 3. 송구 도착 ──
     const inFlight: ThrowInFlight | null = throwState.flight
     if (inFlight !== null && tick >= inFlight.arrivalTick) {
@@ -401,6 +394,15 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
       }
     }
 
+    // ── 3b. 사람 목표 +0x160 — 플레이 틱 vt4c 의 b4660~b46a8: 쥠 && 준비(vtC4) 이면 발밑 루가 아닐 때 vt58, 그리고 −1 ──
+    if (!play.finished && !ballLost && manualPending && isHolderReady()) {
+      manualPending = false
+      play = { ...play, manualThrowBase: NONE }
+      if (!isSamePoint(fielders[play.ballHolderSlot].position, basePosition(manualThrowBase))) {
+        sendToBase(tick, manualThrowBase, true, false)
+      }
+    }
+
     // ── 4. 자동 추가 진루 0xaf918 · 자동 슬라이딩 0xb030c ──
     if (!play.finished && autoBaserunningEnabled && resultCode === null) {
       const decisions = autoAdvanceDecisions({ ...contextAt(tick), force: true })
@@ -411,6 +413,8 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
         // 타구 진행기와 같은 근사 — 목표 루에 닿아 있을 때만 묻는다
         if (!isAtTarget(runner.state)) continue
         startLeg(runner, decision.toBase)
+        // afa0e: 한 루 더 보내면 플레이+0x128 = 1
+        play = { ...play, wantsThrow: true }
         log.push(`${tick}틱 ${runner.state.index}번 주자 자동 진루 → ${decision.toBase}루`)
       }
     }
@@ -429,6 +433,9 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
         log.push(`${tick}틱 ${runner.state.index}번 주자 자동 슬라이딩`)
       }
     }
+
+    // ── 4c. CPU 송구 결정 0xafa60 (슬롯 2 의 526ae, 매 틱 — `0xae6c8` = 수비 CPU || 송구 설정 자동) ──
+    if (!play.finished && cpuThrowEnabled) cpuThrowDecision(tick)
 
     // ── 5. 그림 ──
     ticks.push(
@@ -495,20 +502,11 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
 
     // ── 7b. 아웃이 난 틱 끝 — 결과 메시지 0xbba(13) → 0x51d40~0x51db4 → 0xafa60 한 번 ──
     // 수비 조작이 사람이든 CPU 든 `아웃 ≤ 2` 면 플레이+0x128 = 1 로 세우고 CPU 송구 결정을 부른다
-    // (`runDefensePlay` 의 6c 절에 근거). 공 쥔 야수가 준비(vtC4)돼 있어야 던진다.
-    // CPU 송구(수비 CPU · 설정 자동)는 새로 쥔 야수를 다음 틱 2절이 어차피 같은 점수식으로 본다 —
-    // 그 판단을 이미 한 야수일 때만 여기서 한 번 더 본다(근사: 원본은 +0x128 이 선 동안 매 틱 다시 본다).
-    if (
-      outJudgedThisTick &&
-      outs <= 2 &&
-      !play.finished &&
-      !ballLost &&
-      throwState.flight === null &&
-      play.held &&
-      isHolderReady() &&
-      (!cpuThrowEnabled || decidedHolder === play.ballHolderSlot)
-    ) {
-      decideThrow(tick, true)
+    // (`runDefensePlay` 의 6c 절에 근거). 공 쥔 야수가 준비(vtC4)돼 있어야 던진다 — 송구를 받는 틱의 아웃은
+    // 쥐기가 준비 틱을 막 넣어 못 던진다.
+    if (outJudgedThisTick && outs <= 2 && !play.finished) {
+      play = { ...play, wantsThrow: true }
+      cpuThrowDecision(tick)
     }
 
     // ── 8. 보류 득점 풀기 (0xaa34c) ──
