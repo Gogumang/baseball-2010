@@ -16,6 +16,7 @@ interface 받은칸 {
   readonly onSpecialSwingUsed?: (remaining: number) => void
   readonly isBatterOwnPlayer?: boolean
   readonly careerYearIndex?: number
+  readonly canBunt?: boolean
 }
 const 받은props: 받은칸[] = []
 vi.mock('@/widgets/batting-stage/ui/BattingStage', () => ({
@@ -97,5 +98,24 @@ describe('나만의리그 타자편 → 타석 그림 필살·내 선수 보너�
   it('내 선수(비트7)이고 연차 idx = 시즌 − 1 (rec[0xb3], 0xab3f2)', () => {
     const career = { ...createCareer('테스트'), season: 3 }
     expect(그리기(career).받은).toMatchObject({ isBatterOwnPlayer: true, careerYearIndex: 2 })
+  })
+})
+
+describe('나만의리그 타자편 번트 — 0x535a4 → 0x6a7 → 0x51e48 은 모드를 안 본다', () => {
+  it('canBunt 를 켜서 넘긴다 (내 선수라 마선수 거름 0xb633c 에 안 걸린다)', () => {
+    render(
+      <GameScreen
+        career={createCareer('테스트')}
+        progress={startGame(createSeededRandom(20100901))}
+        atBat={createAtBat()}
+        pitcherAbility={DEFAULT_PITCHER_ABILITY}
+        isPaused={false}
+        bannerText=""
+        random={createSeededRandom(1)}
+        onPitchResolved={vi.fn()}
+        onQuit={vi.fn()}
+      />,
+    )
+    expect(받은props.at(-1)?.canBunt).toBe(true)
   })
 })

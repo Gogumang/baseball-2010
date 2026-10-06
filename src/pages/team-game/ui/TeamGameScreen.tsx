@@ -525,6 +525,8 @@ export function TeamGameScreen({
               batterAbility={currentBatterAbility(progress)}
               // 마타자가 대타로 올라오면 필살 연출 점프표(0xd01e4)가 이 순번을 본다
               aceBatterIndex={currentBatterEntry(progress)?.aceIndex ?? -1}
+              // 번트 '7'/'8'/'9' — 0x535a4 → 0x6a7 → 0x51e48 은 모드를 안 본다. 마타자(0xb633c)면 위젯이 거른다
+              canBunt
               // 팀 경기(모드 1·2·8·9)는 판정 묶음 '일반' — "내 선수" 보너스(모드 3·4)도 타자 미션 +100(모드 6)도 없다 (0xab214)
               swingMode="일반"
               // 타순 칸별 이 경기 남은 필살 횟수 s8 팀[+0x29 + 타순] (0xaea30) — 진행기가 든다. 0xaebe4 처럼 칸이 비면
@@ -582,6 +584,7 @@ export function TeamGameScreen({
             <Hint>
               {(game.battingOrderIndex % 9) + 1}번 {currentBatterEntry(progress)?.name ?? '타자'} ·
               탭·Space·5 스윙 · ←→(4·6) 타자 이동
+              {(currentBatterEntry(progress)?.aceIndex ?? -1) < 0 && ' · 8·7·9(Shift)·길게 눌러 번트'}
               {isStealable.includes(1) && ' · 3 도루(1루)'}
               {isStealable.includes(2) && ' · 2 도루(2루)'}
               {isStealable.includes(3) && ' · 1 도루(3루)'}

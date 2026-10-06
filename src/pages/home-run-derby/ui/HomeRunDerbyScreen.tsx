@@ -158,6 +158,8 @@ export function HomeRunDerbyScreen({
           pitcherAbility={pitcher.ability}
           aceLevels={aceLevels}
           swingMode="홈런더비"
+          // 번트 '7'/'8'/'9' — 0x535a4 → 0x6a7 → 0x51e48 은 모드 7 도 막지 않는다(모드 갈림 없음). 내 선수가 쳐서 마선수가 아니다
+          canBunt
           gameMode={DERBY_MODE}
           // 0x344ea 모드 7 갈래 — 단계 0 은 구질 1, 마투수가 나온 뒤로는 22(마구)만, 굴림 없음
           derbyPitchType={pitcher.pitchType}

@@ -31,7 +31,7 @@ import { ballFrameAt, useStageRefs } from '@/widgets/batting-stage/model/stageRe
 import type { AcePitcherFrames, StageHud } from '@/widgets/batting-stage/model/stageRefs'
 import { useStageAnimation } from '@/widgets/batting-stage/model/useStageAnimation'
 import { useStageControls } from '@/widgets/batting-stage/model/useStageControls'
-import { buntStanceAfterSwingKey } from '@/widgets/batting-stage/lib/buntStance'
+import { buntStanceAfterBuntKey, buntStanceAfterSwingKey } from '@/widgets/batting-stage/lib/buntStance'
 import { canSpecialSwing, remainingAfterSpecialSwing } from '@/entities/batting/model/specialSwing'
 import { pitcherBoostSideOf, swingBoostOf } from '@/entities/batting/model/swingBoost'
 import { aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
@@ -351,9 +351,13 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
         swingStartedAtRef.current = now
         finishPitch({ frame: frameNow(now), shift: shiftRef.current, buntKind: 0 }, now)
       },
+      /**
+       * 번트 키 '7'/'8'/'9' (0x535a4 → 메시지 0x6a7 → 0x51e48). 상태 0x11 · S+4 가 아니면 무시하고, 지금 타자가
+       * 마선수(0xb633c)면 예약하지 않는다(`buntStanceAfterBuntKey`). 모드 갈림은 없다 — 화면은 `canBunt` 로 키를 연다.
+       */
       toggleBunt: (kind: number, now: number) => {
         if (!isFlying(now)) return
-        buntRef.current = buntRef.current === null ? { kind, frame: frameNow(now) } : null
+        buntRef.current = buntStanceAfterBuntKey(buntRef.current, kind, frameNow(now), aceBatterIndex >= 0)
       },
       moveBatter: (direction: -1 | 1) => {
         shiftRef.current = nextBatterShift(shiftRef.current, direction)

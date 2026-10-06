@@ -38,3 +38,18 @@ describe('홈런더비 타석은 치는 선수의 장착 스킬을 타석 화면
     expect(stageProps.last?.batterSkillIds).toEqual(압도)
   })
 })
+
+describe('홈런더비 번트 — 0x535a4 → 0x6a7 → 0x51e48 은 모드 7 도 막지 않는다', () => {
+  it('canBunt 를 켜서 넘긴다', () => {
+    render(
+      <HomeRunDerbyScreen
+        ability={ROOKIE_BATTER_ABILITY}
+        random={createSeededRandom(1)}
+        bestDistance={0}
+        gamePoint={0}
+        onExit={vi.fn()}
+      />,
+    )
+    expect(stageProps.last?.canBunt).toBe(true)
+  })
+})

@@ -211,6 +211,8 @@ export function GameScreen({
 
         <BattingStage
           batterAbility={effectiveAbilityOf(career)}
+          // 번트 '7'/'8'/'9' — 0x535a4 → 0x6a7 → 0x51e48 은 모드를 안 본다. 타자편은 내 선수가 쳐서 마선수(0xb633c)가 아니다
+          canBunt
           swingMode="나만의리그"
           gameMode={BATTER_CAREER_MODE}
           // 환경설정 전광판(저장 +0x3a) — OFF 면 흐르는 글자를 안 그린다 (0x77726)
@@ -292,7 +294,7 @@ export function GameScreen({
         />
       ) : bannerText === '' ? (
         <Hint>
-          탭·Space·5 스윙 · 좌우 끝 탭·←→(4·6) 타자 이동
+          탭·Space·5 스윙 · 좌우 끝 탭·←→(4·6) 타자 이동 · 8·7·9(Shift)·길게 눌러 번트
           {stealableBases.includes(1) && ' · 3 도루(1루)'}
           {stealableBases.includes(2) && ' · 2 도루(2루)'}
           {stealableBases.includes(3) && ' · 1 도루(3루)'}
