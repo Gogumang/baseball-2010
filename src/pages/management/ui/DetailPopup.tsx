@@ -6,9 +6,10 @@ import { glyphsWidthOf, numberGlyphsOf } from '@/pages/management/lib/management
 import {
   CHANGE_ARROW_FRAMES, DETAIL_CHANGE_X, DETAIL_CURRENT_DX, DETAIL_HEADER, DETAIL_LABEL_BOX, DETAIL_MAXIMUM_DX,
   DETAIL_MESSAGE_BOX, DETAIL_MESSAGE_LINE_HEIGHT, DETAIL_ROW_TOP, DETAIL_SLASH_FRAME, DETAIL_TABLE_FRAME,
-  DETAIL_TITLE_FRAME, DETAIL_VALUE_BOX, DETAIL_WINDOW, DETAIL_Y_OFFSET, detailRowsOf,
+  DETAIL_SCROLL_BAR_COLORS, DETAIL_TITLE_FRAME, DETAIL_VALUE_BOX, DETAIL_WINDOW, DETAIL_Y_OFFSET, detailRowsOf,
+  detailScrollBarOf,
 } from '@/pages/management/lib/detailPopup'
-import type { DetailResult, DetailRow } from '@/pages/management/lib/detailPopup'
+import type { DetailResult, DetailRow, ScrollBarRect } from '@/pages/management/lib/detailPopup'
 import * as styles from '@/pages/management/ui/DetailPopup.css'
 
 const IMG_TEXT = './sprites/img_text/frames'
@@ -121,6 +122,19 @@ export function DetailWindow({ rows, messages, onClose, scrollOffset = 0 }: Deta
           </div>
         ))}
       </div>
+      {/* 오른쪽 스크롤 막대 (0x8a182~0x8a2a4) — 줄 수 ≤ 3 이면 가득, 아니면 4줄 몫 손잡이 */}
+      <svg className={styles.layer} style={{ left: 0, top: 0 }} viewBox="0 0 240 320" width={240} height={320}
+        shapeRendering="crispEdges" data-testid="상세스크롤막대">
+        {scrollBarRects(detailScrollBarOf(messages.length, scrollOffset)).map(([name, rect, fill]) => (
+          <rect key={name} data-part={name} x={rect.x} y={rect.y} width={rect.width} height={Math.max(rect.height, 0)} fill={fill} />
+        ))}
+      </svg>
     </div>
   )
 }
+
+const scrollBarRects = (bar: ReturnType<typeof detailScrollBarOf>): readonly (readonly [string, ScrollBarRect, string])[] => [
+  ['track', bar.track, DETAIL_SCROLL_BAR_COLORS.track],
+  ['thumb', bar.thumb, DETAIL_SCROLL_BAR_COLORS.thumb],
+  ['thumbInner', bar.thumbInner, DETAIL_SCROLL_BAR_COLORS.thumbInner],
+]

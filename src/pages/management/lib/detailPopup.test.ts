@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import {
-  detailRowsOf, DETAIL_ROW_TOP, gpItemDetailChangesOf, restDetailChangesOf, trainingDetailChangesOf,
+  detailRowsOf, detailScrollBarOf, DETAIL_ROW_TOP, gpItemDetailChangesOf, restDetailChangesOf, trainingDetailChangesOf,
 } from '@/pages/management/lib/detailPopup'
 import { runTraining } from '@/entities/career/model/training'
 import { runRest } from '@/entities/career/model/outing'
@@ -105,5 +105,24 @@ describe('상세정보 결과 창 — 0x872a0 · 0x872d4', () => {
     it('5·7·8·9 는 창을 띄우지 않는다 (0x14f2c `cmp k,#6`)', () => {
       expect([5, 7, 8, 9].map((k) => gpItemDetailChangesOf(k, [0, 0, 0, 0], 한계))).toEqual([null, null, null, null])
     })
+  })
+})
+
+describe('글 상자 스크롤 막대 (0x8a182~0x8a2a4)', () => {
+  it('바탕은 상자 오른쪽 7px 줄 — (199, 176, 7, 70)', () => {
+    expect(detailScrollBarOf(0, 0).track).toEqual({ x: 199, y: 176, width: 7, height: 70 })
+  })
+
+  it('줄 수 ≤ 3 이면 손잡이가 막대 가득이다', () => {
+    const bar = detailScrollBarOf(3, 0)
+    expect(bar.thumb).toEqual({ x: 200, y: 176, width: 5, height: 70 })
+    expect(bar.thumbInner).toEqual({ x: 201, y: 177, width: 3, height: 68 })
+  })
+
+  it('줄 수 > 3 이면 길이 = 올림(4·70/n), 자리 = 버림(s·70/n)', () => {
+    // n = 6: L = (280 + 5) / 6 = 47 · s = 2 → p = 140 / 6 = 23
+    const bar = detailScrollBarOf(6, 2)
+    expect(bar.thumb).toEqual({ x: 200, y: 176 + 23, width: 5, height: 46 })
+    expect(bar.thumbInner).toEqual({ x: 201, y: 176 + 24, width: 3, height: 44 })
   })
 })
