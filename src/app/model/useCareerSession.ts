@@ -51,6 +51,7 @@ import {
   regularSeasonPopupOnEnter,
   REGULAR_SEASON_HIDDEN_ID,
 } from '@/entities/career/model/postseasonFlow'
+import type { RegularSeasonOtherModes } from '@/entities/career/model/postseasonFlow'
 import { applyBurstRewards } from '@/entities/career/model/burstReward'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { selectSpecialSwingNumber, setSkillEquipped } from '@/entities/career/model/playerCareer'
@@ -194,6 +195,11 @@ interface CareerSessionInput {
    * CPU 경기(0xc2760)의 마선수 능력치 배율(0xd88aa)이 이 칸을 본다. 안 넘기면 Lv1(60%) — 테스트는 그대로 두면 된다.
    */
   readonly aceLevels?: Readonly<Record<number, number>>
+  /**
+   * 정규시즌 우승 팝업 0xb 닫힘(0x15b84~0x15c52)의 0x29 "오토봇 배트" 검사가 적재해 읽는 다른 두 저장 — 나리 투수편 저장
+   * +0x7a · 시즌모드 시즌 기록 +0x7a · 전역 해금표 `app+0xc0`. 팝업을 닫을 때 읽는다. 안 넘기면 검사를 건너뛴다.
+   */
+  readonly readRegularSeasonOtherModes?: () => RegularSeasonOtherModes | undefined
 }
 
 const NO_STAT = () => {}
@@ -235,6 +241,7 @@ export function useCareerSession({
   runningModeManual = false,
   recordStat = NO_STAT,
   aceLevels,
+  readRegularSeasonOtherModes,
 }: CareerSessionInput) {
   // 통로를 안 받으면 조용한 포트로 — 아래 자리들이 `sound` 가 있는지 매번 보지 않게 한다
   const silent = useMemo(() => createSilentSound(), [])
@@ -1225,7 +1232,7 @@ export function useCareerSession({
       const popup = screen.popup
       if (popup.kind === '정규시즌우승') {
         // 팝업 0xb — 보상을 얹고 128 에 머문다
-        setCareer(applyRegularSeasonReward(career, REGULAR_SEASON_HIDDEN_ID.타자편))
+        setCareer(applyRegularSeasonReward(career, REGULAR_SEASON_HIDDEN_ID.타자편, readRegularSeasonOtherModes?.()))
         return setScreen({ ...screen, popup: null })
       }
       if (popup.kind === '우승발표') {

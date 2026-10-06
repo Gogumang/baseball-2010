@@ -35,7 +35,7 @@ import {
   regularSeasonPopupOnEnter,
   REGULAR_SEASON_HIDDEN_ID,
 } from '@/entities/career/model/postseasonFlow'
-import type { PostseasonPopup } from '@/entities/career/model/postseasonFlow'
+import type { PostseasonPopup, RegularSeasonOtherModes } from '@/entities/career/model/postseasonFlow'
 import { applyPitcherEventRewards, finishPitcherEvent } from '@/entities/pitcher-career/model/pitcherEventReward'
 import {
   PITCHER_YEAR_START_EVENT,
@@ -352,6 +352,11 @@ export function usePitcherLeagueSession(
    * CPU 경기(0xc2760)의 마선수 능력치 배율(0xd88aa)이 이 칸을 본다. 안 넘기면 Lv1(60%).
    */
   aceLevels?: Readonly<Record<number, number>>,
+  /**
+   * 정규시즌 우승 팝업 0xb 닫힘(0x15b84~0x15c52)의 0x29 "오토봇 배트" 검사가 적재해 읽는 다른 두 저장 — 나리 타자편 저장
+   * +0x7a · 시즌모드 시즌 기록 +0x7a · 전역 해금표 `app+0xc0`. 팝업을 닫을 때 읽는다. 안 넘기면 검사를 건너뛴다.
+   */
+  readRegularSeasonOtherModes?: () => RegularSeasonOtherModes | undefined,
 ): PitcherLeagueSession {
   const loaded = useRef<PitcherCareer | null>(null)
   if (loaded.current === null) loaded.current = normalizePitcherCareer(store.load())
@@ -1250,7 +1255,7 @@ export function usePitcherLeagueSession(
   const closePostseasonPopup = useCallback(() => {
     if (career === null || scene !== '포스트시즌' || postseasonPopup === null) return
     if (postseasonPopup.kind === '정규시즌우승') {
-      commit(applyRegularSeasonReward(career, REGULAR_SEASON_HIDDEN_ID.투수편))
+      commit(applyRegularSeasonReward(career, REGULAR_SEASON_HIDDEN_ID.투수편, readRegularSeasonOtherModes?.()))
       return setPostseasonPopup(null)
     }
     if (postseasonPopup.kind === '우승발표') {
@@ -1259,7 +1264,7 @@ export function usePitcherLeagueSession(
       return finishPostseason(career)
     }
     finishPostseason(applyKoreanSeriesReward(career))
-  }, [career, commit, finishPostseason, postseasonPopup, scene])
+  }, [career, commit, finishPostseason, postseasonPopup, readRegularSeasonOtherModes, scene])
 
   const reset = useCallback(() => {
     setCareer(null)

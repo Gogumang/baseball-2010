@@ -29,6 +29,7 @@ import { GeneralModeScreen, aceOpenPriceOf, useAceOpen } from '@/pages/general-m
 import { useGamePointWallet } from '@/entities/wallet/model/useGamePointWallet'
 import { useAceLevels } from '@/entities/mission/model/useAceLevels'
 import type { SeasonAutobotBatInput } from '@/entities/season-mode/model/seasonRewards'
+import type { RegularSeasonOtherModes } from '@/entities/career/model/postseasonFlow'
 
 const SETTINGS_KEY = 'compus-baseball/settings'
 const COLLECTION_KEY = 'compus-baseball/collection'
@@ -113,6 +114,13 @@ export function App() {
    */
   const autobotBatInputRef = useRef<SeasonAutobotBatInput | undefined>(undefined)
   const readAutobotBatInput = useCallback(() => autobotBatInputRef.current, [])
+  /**
+   * 나리 두 편 정규시즌 우승 팝업 0xb 닫힘(0x15b84~0x15c52)의 같은 0x29 검사 — 다른 편 저장 +0x7a · 시즌 기록 +0x7a ·
+   * 전역 해금표. 세션들이 다 선 뒤 아래에서 채우고 팝업을 닫을 때 읽는다.
+   */
+  const otherModesRef = useRef<{ batter?: RegularSeasonOtherModes; pitcher?: RegularSeasonOtherModes }>({})
+  const readBatterOtherModes = useCallback(() => otherModesRef.current.batter, [])
+  const readPitcherOtherModes = useCallback(() => otherModesRef.current.pitcher, [])
   const seasonSession = useSeasonSession(seasonStore, random, wallet, aceLevels.levels, recordStat, readAutobotBatInput)
   // 투수편 G도 같은 지갑 한 칸이다 — 옛 투수 저장에 남은 G는 표식 칸을 보고 딱 한 번 옮겨 온다
   const pitcherSession = usePitcherLeagueSession(
@@ -126,6 +134,7 @@ export function App() {
     recordStat,
     // 같은 날 CPU 끼리 경기·포스트시즌 CPU 경기의 마선수 배율(0xd88aa)도 전역 레벨 칸을 본다
     aceLevels.levels,
+    readPitcherOtherModes,
   )
   // 화면이 바뀌면 그 화면의 배경음으로 갈아탄다 (`screenBgm.ts` 의 표). 투수편은 안쪽 장면(128 이어하기 4)을 본다
   const pitcherBgm = usePitcherLeagueBgm(screen.kind === '투수편', pitcherSession.scene)
@@ -137,6 +146,7 @@ export function App() {
     recordStat,
     // 같은 날 CPU 끼리 경기·포스트시즌 CPU 경기의 마선수 배율(0xd88aa)도 전역 레벨 칸을 본다
     aceLevels: aceLevels.levels,
+    readRegularSeasonOtherModes: readBatterOtherModes,
   })
   const pitcherMissionPitcher = useMemo(() => modePitcherOf(pitcherSession.career), [pitcherSession.career])
   // 미션 보상 G (0x4ef72) — 지갑으로 들어간다. 육성 선수가 없어도 사라지지 않는다
@@ -167,10 +177,25 @@ export function App() {
     pitcherSession.career,
   )
   const { recordStat: recordCollectionStat } = collection
+  const pitcherEditionFirsts = pitcherSession.career?.regularSeasonFirstCount ?? 0
+  const batterEditionFirsts = (careerSession.career ?? careerSession.savedCareer)?.regularSeasonFirstCount ?? 0
+  const seasonModeFirstCount = seasonSession.state?.record.regularSeasonFirsts ?? 0
   autobotBatInputRef.current = {
-    pitcherEditionFirsts: pitcherSession.career?.regularSeasonFirstCount ?? 0,
-    batterEditionFirsts: (careerSession.career ?? careerSession.savedCareer)?.regularSeasonFirstCount ?? 0,
+    pitcherEditionFirsts,
+    batterEditionFirsts,
     globalOpenedHiddenIds: collection.collection.openedHiddenIds,
+  }
+  otherModesRef.current = {
+    batter: {
+      otherLeagueFirstCount: pitcherEditionFirsts,
+      seasonModeFirstCount,
+      globalOpenedHiddenIds: collection.collection.openedHiddenIds,
+    },
+    pitcher: {
+      otherLeagueFirstCount: batterEditionFirsts,
+      seasonModeFirstCount,
+      globalOpenedHiddenIds: collection.collection.openedHiddenIds,
+    },
   }
   useEffect(() => {
     recordStatRef.current = recordCollectionStat

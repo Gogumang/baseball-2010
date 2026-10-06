@@ -3,7 +3,7 @@ import { StrictMode } from 'react'
 import { describe, expect, it } from 'vitest'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { usePitcherLeagueSession } from '@/app/model/usePitcherLeagueSession'
-import { startPostseason } from '@/entities/league/model/league'
+import { EMPTY_LEAGUE, startPostseason } from '@/entities/league/model/league'
 import { NO_EQUIPPED_TITLE, TITLE_NAMES } from '@/entities/career/model/titles'
 import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
@@ -230,6 +230,31 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     expect(result.current.story).toMatchObject({ eventId: 380, context: '연말' })
     expect(result.current.career?.seasonEndState).toBe(132)
 
+  })
+
+  it('정규시즌 우승 팝업 0xb 닫힘 — 다른 편·시즌 저장 +0x7a 가 모두 0 보다 크면 0x29 오토봇 배트를 연다 (0x15b84)', () => {
+    const 펼치기 = (other: number) => {
+      const store = 메모리저장()
+      const 첫판 = 띄우기(store)
+      act(() => 첫판.result.current.actions.create('투수', 신인))
+      const 내팀 = 첫판.result.current.career!.teamId
+      const wins = EMPTY_LEAGUE.wins.map((_w, team) => (team === 내팀 ? 40 : 10))
+      act(() => 첫판.result.current.actions.save({
+        ...첫판.result.current.career!,
+        season: 2, gamesPlayed: 45, regularSeasonFirstCount: 1, regularSeasonRewardTaken: false, seasonEndState: 128,
+        league: { ...EMPTY_LEAGUE, wins },
+        postseason: startPostseason([내팀, ...Array.from({ length: 9 }, (_v, i) => (i >= 내팀 ? i + 1 : i))]),
+      }))
+      const 다시 = renderHook(() => usePitcherLeagueSession(
+        store, createSeededRandom(20100901), false, null, null, true, undefined, undefined,
+        () => ({ otherLeagueFirstCount: other, seasonModeFirstCount: 1, globalOpenedHiddenIds: [] }),
+      ))
+      expect(다시.result.current.postseasonPopup).toEqual({ kind: '정규시즌우승' })
+      act(() => 다시.result.current.actions.closePostseasonPopup())
+      return 다시.result.current.career!.openedHiddenIds
+    }
+    expect(펼치기(1)).toContain(0x29)
+    expect(펼치기(0)).not.toContain(0x29)
   })
 
   it('이어하기 — 45번째 경기 뒤(사슬 전)는 시즌 끝 화면, 정규시즌은 관리 화면', () => {
