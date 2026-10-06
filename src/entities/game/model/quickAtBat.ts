@@ -68,6 +68,13 @@ export interface QuickAtBatBatter {
   /** 주력 — 내야안타와 한 루 더 가는 판정에 쓴다 (player_stat kind 3) */
   readonly run: number
   readonly skillIds: readonly number[]
+  /** 손 `0xb63c0(타자)` — 0 우타 · 1 좌타. 투수 스킬 28·29 가 본다. 안 넘기면 0 */
+  readonly hand?: number
+  /**
+   * 레코드 칸 `0xb6394(타자)` = `+0xa & 0x1f` — 타순이 아니라 팀 안 레코드 칸(일반 타자 0~11, 마타자 순번).
+   * 투수 스킬 31(0xabcd8)이 2·3·4 를 본다. 안 넘기면 0
+   */
+  readonly recordSlot?: number
 }
 
 export interface QuickAtBatPitcher {
@@ -78,6 +85,8 @@ export interface QuickAtBatPitcher {
   readonly skillIds: readonly number[]
   /** 마선수면 스트라이크존 기준이 10 낮아진다 (0xc1818) */
   readonly isAce?: boolean
+  /** 손 `0xb63c0(투수)` — 0 우투 · 1 좌투 (`pitcherHandOf`). 타자 스킬 13·14 가 본다. 안 넘기면 0 */
+  readonly hand?: number
 }
 
 export interface QuickAtBatSituation {
@@ -220,11 +229,12 @@ function verdictOf(
         isLosing: false,
         runnerCount: 0,
         hasSecondBaseRunner: false,
-        pitcherSide: 0,
-        batterSide: 0,
+        // 0xab214 는 두 레코드로 손 0xb63c0(0xab9f0·0xaba1e·0xabc50)·칸 0xb6394(0xabcd8)를 바로 읽는다
+        pitcherSide: pitcher.hand ?? 0,
+        batterSide: batter.hand ?? 0,
         balls: 0,
         strikes: 0,
-        batterOrderIndex: 0,
+        batterOrderIndex: batter.recordSlot ?? 0,
         recentAtBatCodes: [],
       },
     },
