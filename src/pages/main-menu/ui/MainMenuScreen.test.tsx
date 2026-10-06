@@ -58,4 +58,17 @@ describe('메인 메뉴 머리띠 0x54d95(skin, 0, 1|5)', () => {
     const { container } = 띄우기()
     expect(그림들(container)).not.toContain('./sprites/game_frame/003.png')
   })
+
+  it('윗단 ↔ 아랫단을 오가도 머리띠를 다시 내리지 않는다 — 하위 4·5 들어옴(0x24a40 · 0x25b88)은 [skin+0x84]·[+0x86] 을 안 건드린다', () => {
+    const { container } = 띄우기(50)
+    const band = container.querySelector('svg')
+
+    act(() => {
+      fireEvent.keyDown(window, { key: 'Enter' })
+    })
+    expect(container.querySelector('svg')).toBe(band)
+
+    fireEvent.click(screen.getByRole('button', { name: '되돌아가기' }))
+    expect(container.querySelector('svg')).toBe(band)
+  })
 })

@@ -302,7 +302,10 @@ export function MainMenuScreen({
         <DescriptionPanel raw={panelText} />
       </div>
 
-      {/* 머리띠·바닥띠는 두 단 다 마지막에 그린다 — 윗단 바닥 1(뒤로 표시 없음) · 아랫단 바닥 5(뒤로 표시) */}
+      {/* 머리띠·바닥띠는 두 단 다 마지막에 그린다 — 윗단 바닥 1(뒤로 표시 없음) · 아랫단 바닥 5(뒤로 표시).
+          미끄러짐은 [skin+0x84] 가 서 있을 때만 [skin+0x86] 을 두 배씩 키운다(0x54df0~0x54e1e) — 그 둘을 세우는 곳은
+          다른 하위 상태의 들어옴(3 0x258fc · 0x23f5c · 0x24804 …)뿐이고 하위 4 들어옴 0x24a40 · 5 들어옴 0x25b88 은 안 건드린다.
+          곧 두 단을 오가도 머리띠는 다시 내려오지 않는다 — 같은 ScreenFrame 을 그대로 두어 미끄러짐을 이어 간다 */}
       {gamePoint !== undefined && (
         <ScreenFrame title="2010프로야구" gamePoint={gamePoint}
           onBack={isWheel ? null : () => dispatch({ type: '뒤로' })} />
