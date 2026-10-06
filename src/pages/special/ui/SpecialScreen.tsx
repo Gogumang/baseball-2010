@@ -22,6 +22,8 @@ import {
 } from '@/pages/special/lib/specialLayout'
 import type { HallOfFameSlotState } from '@/pages/special/lib/specialLayout'
 import * as styles from '@/pages/special/ui/SpecialScreen.css'
+import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
+import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLayout'
 
 const MAIN_UI = './sprites/main_ui'
 const MAIN_UI_FRAMES = `${MAIN_UI}/frames`
@@ -339,10 +341,16 @@ type HallOfFamePopup =
  *  - "친구에게 선물" 은 통신이 필요해 안내만 띄운다. "슬롯에서 삭제" 는 `deletion`(HallOfFameDeletion) 대로 돈다.
  *    슬롯 현금 구매·G 충전 페이지(🌐)도 열 수 없어 목록으로 돌아온다.
  */
-export function HallOfFameScreen({ collection, mode, onBack }: {
+export function HallOfFameScreen({ collection, mode, onBack, frame }: {
   readonly collection: Collection
   readonly mode: HallOfFameMode
   readonly onBack: () => void
+  /**
+   * 머리띠를 다른 제목으로 그릴 때 — 머리띠 `0x54d95(skin, 제목, 5)` 는 제목이 −1 이 아니면 G포인트(0x54a60)도 그린다.
+   * 시즌 선수영입 0xe2 는 공통 앞그림 0xb810 이 머리띠 객체를 `0x7f53c(hdr, 10, 5, 0)`(0xb8c8~0xb8d6, 0xe2 는 기본 갈래)로
+   * 세우고 그리기 0xa10c 끝의 `0x7f4ec(hdr)` 가 `0x54d95(skin, 10 "시즌모드", 5)` 로 그린다. 안 주면 예전 그대로.
+   */
+  readonly frame?: { readonly title: ScreenFrameTitle; readonly gamePoint: number }
 }) {
   const [slot, setSlot] = useState(initialHallOfFameSlotOf(mode))
   const [isBubbleOpen, setIsBubbleOpen] = useState(false)
@@ -668,7 +676,9 @@ export function HallOfFameScreen({ collection, mode, onBack }: {
         </div>
       )}
 
-      <SpecialBands onBack={goBack} />
+      {frame === undefined
+        ? <SpecialBands onBack={goBack} />
+        : <ScreenFrame title={frame.title} gamePoint={frame.gamePoint} onBack={goBack} />}
 
       {notice !== null && <MessageBox text={notice} buttons={['확인']} onAnswer={() => setNotice(null)} />}
       {popupView !== null && <MessageBox text={popupView.text} buttons={popupView.buttons} onAnswer={answerPopup} />}

@@ -320,6 +320,13 @@ describe('선수영입 나리 칸 0·5 — 0x22168 · 0x220ec 의 내 선수 기
     expect(saved.roster.pitchers[0]).toMatchObject({ id: 0xfe, kindByte: 0x80, stamina: 10000, record: 나리투수 })
   })
 
+  it('0xe2 머리띠는 0xb810 이 세운 제목 10 "시즌모드"(game_frame 22) — 명예의 전당 제목 0 이 아니다', () => {
+    띄우기()
+    const sources = [...document.querySelectorAll('img')].map((image) => image.getAttribute('src') ?? '')
+    expect(sources.some((src) => src.endsWith('game_frame/022.png'))).toBe(true)
+    expect(sources.some((src) => src.endsWith('game_frame/003.png'))).toBe(false)
+  })
+
   it('나리 타자는 +0xa 0xa0 · 기록 사본으로 끼워 넣는다', () => {
     const store = 띄우기()
 
