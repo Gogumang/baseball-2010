@@ -31,6 +31,7 @@ import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 import { hasGameIntro } from '@/widgets/game-scene/lib/introSchedule'
 import { HALF_INNING_JINGLE_TICK } from '@/features/play-game/model/halfInningBoard'
 import { HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
+import { useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
 import type {
   TeamEntryBatter,
   TeamEntryPitcher,
@@ -212,6 +213,8 @@ export function TeamGameScreen({
   /** 타석 화면이 채우는 "공이 나는 동안(상태 0x11)인가" — 원본 도루 키 0x53610 은 이때만 받는다 */
   const flightProbeRef = useRef<(() => boolean) | null>(null)
   const isDefenseInPlay = session.pendingDefensePlay !== null
+  /** 상태 0xe 에서 OK 를 기다리는 중인가 — 아래 `useSceneConfirm` 이 매 그리기마다 채운다 */
+  const isAwaitingConfirmRef = useRef(false)
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat) return
@@ -242,6 +245,9 @@ export function TeamGameScreen({
         // 0x495fc 의 '#' 는 교체 화면을 닫는다(취소). 그 밖에서는 0x49598 의 갈림길 그대로 —
         // 공격이 사람이면 대타(0xaf06c), 아니면 투수 교체(0xaf09c)다
         if (changeWindow !== null) return closeChangeWindow()
+        // ⚠️ 원본 '#' 가지(0x4994a)는 0xe 에서도 열린다. 웹 진행기는 0xe 의 OK 뒤 굴림(돌발 0x8f158 · 0xf 진입 0x3d954)을
+        // 들어서는 걸음에서 미리 해 두어, 0xe 에서 교체를 열면 그 굴림이 한 번 더 돈다 — 그래서 OK 를 받은 뒤(0xf)에만 연다
+        if (isAwaitingConfirmRef.current) return
         if (session.canChangePitcher) return setChangeWindow('투수')
         if (session.canPinchHit) return setChangeWindow('대타')
         return
@@ -306,8 +312,36 @@ export function TeamGameScreen({
    * ('3' 은 공격 중이면 도루 키지만 도루는 사람이 칠 차례에만 열려 서로 겹치지 않는다 — `stealableBases`.)
    */
   const isReplaying = play !== null && play !== shownPlay && play.ticks.length > 0
+  /**
+   * **상태 0xe — 사람 OK 를 기다린다** (`features/play-game/model/sceneConfirm`). 새 타석·반 이닝 시작·교체 연출 뒤·교체 창
+   * 취소 뒤마다 진행기가 대기를 싣는다. 공격이든 수비든 같다 — 0x532b0 은 조작 객체의 공수(+0xc)를 안 본다.
+   * 인트로·교대 판·수비 화면·벤치 클리어링·경기 중 메뉴·조작방법·설정·교체 창이 덮고 있으면 받지 않는다.
+   * ⚠️ 미이식: 0xe 그리기 0x4d9ec 가 0xd 그리기 위에 얹는 안내 판 0x44944 (홈런더비 쪽에서 옮기는 중인 공용 판이 생기면 쓴다).
+   */
+  const sceneConfirm = useSceneConfirm(
+    progress.sceneConfirm,
+    isIntroDone &&
+      summary === null &&
+      !isHalfInningBoardOpen &&
+      progress.pendingBenchClearing === null &&
+      !isDefenseInPlay &&
+      !isReplaying &&
+      !isMenuOpen &&
+      overlay === null &&
+      changeWindow === null &&
+      // 타석이 끝나며 난 돌발 결과 창(0x1d)은 다음 0xd 보다 먼저다 (+0x1b6c) — 닫은 뒤에야 0xe 다
+      resolution === null,
+  )
+  const isAwaitingConfirm = sceneConfirm.isAwaiting && (canBat || canPitch)
+  isAwaitingConfirmRef.current = isAwaitingConfirm
+  /**
+   * 띄울 돌발 창 — 결과 창(0x1d)은 0xe 앞이라 늘 띄우고, 제안 창(0x1b)은 0xe 의 OK 뒤 메시지 1 이 0x8f158 을 굴려
+   * 예약하므로(0x50c42) OK 를 받은 뒤에만 띄운다
+   */
+  const visibleBurstLines = resolution === null && isAwaitingConfirm ? null : burstLines
   const acceptsPickoff =
     canPitch &&
+    !isAwaitingConfirm &&
     !isReplaying &&
     !isSceneCovering &&
     !isDefenseInPlay &&
@@ -468,6 +502,9 @@ export function TeamGameScreen({
         leftKey={
           changeWindow !== null
             ? { label: '취소', onPress: closeChangeWindow }
+            : isAwaitingConfirm
+              ? // 0xe — OK 하나만 받는다 (0x532b0). 교체는 OK 뒤에 연다 (위 '#' 주석)
+                { label: '확인', onPress: sceneConfirm.confirm, isDisabled: !sceneConfirm.acceptsConfirm }
             : session.canChangePitcher
               ? { label: '# 교체', onPress: () => setChangeWindow('투수') }
               : session.canPinchHit
@@ -558,7 +595,8 @@ export function TeamGameScreen({
             }}
           />
         ) : canBat ? (
-          <div className={styles.stageArea}>
+          // 0xe 에서 화면을 누르면 OK 로 본다 (터치용 웹판 편의 — 캔버스 탭이 스윙인 것과 같은 자리)
+          <div className={styles.stageArea} onClick={sceneConfirm.acceptsConfirm ? sceneConfirm.confirm : undefined}>
             <Panel heading="타석" />
             <BattingStage
               batterAbility={currentBatterAbility(progress)}
@@ -611,7 +649,8 @@ export function TeamGameScreen({
               aceLevels={options.aceLevels}
               // 상대 팀+0x28 과 공+0x10 은 진행기가 든다 — 공 객체는 경기에 하나라 사람 투구와 칸을 함께 쓴다
               cpuMagic={opponentMagicStateOf(progress)}
-              isPaused={burstLines !== null}
+              // 0xe 에서는 공이 안 나간다 — 타석 장면(0xd 그리기)만 선다
+              isPaused={visibleBurstLines !== null || isAwaitingConfirm}
               random={random}
               onPitchResolved={(detail, _pitch, isUncatchable, buntKind) =>
                 actions.resolvePitch(detail, isUncatchable, buntKind)
@@ -658,7 +697,8 @@ export function TeamGameScreen({
               />
             </div>
 
-            {phase === '구질' && (
+            {/* 0xe — 구질 고르기(0xf)는 OK 뒤다. ⚠️ 0xe 의 안내 판 0x44944 그림은 아직 없다 */}
+            {phase === '구질' && !isAwaitingConfirm && (
               <>
                 <Panel heading="1. 구질 선택" />
                 {(game.bases.first || game.bases.second || game.bases.third) && (
@@ -718,9 +758,9 @@ export function TeamGameScreen({
         </ul>
       </PixelScreen>
 
-      {burstLines !== null && (
+      {visibleBurstLines !== null && (
         <BurstMissionWindow
-          lines={burstLines}
+          lines={visibleBurstLines}
           judgement={resolution?.judgement ?? null}
           onClose={
             resolution !== null

@@ -161,6 +161,8 @@ import {
 import type { BatterGameRecord } from '@/entities/batting/model/pinchHitAi'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { chainSceneConfirm, enterSceneConfirm } from '@/features/play-game/model/sceneConfirm'
+import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 import { TEAMS } from '@/shared/config/original/teams'
 
 /**
@@ -634,6 +636,12 @@ export interface TeamGameProgress {
   readonly pitcherJustChanged: boolean
   /** 이 타석의 준비(상태 0xe·0xf)를 이미 지났는가 */
   readonly atBatPrepared: boolean
+  /**
+   * **상태 0xe 의 OK 대기** — 0xe 에 들어설 때마다 새 객체다 (`features/play-game/model/sceneConfirm`). 화면이
+   * `useSceneConfirm` 으로 OK 를 받을 때까지 타석·투구를 내지 않는다. 0xe 를 아직 안 지났으면 null.
+   * 진행기는 OK 뒤의 굴림(돌발 0x8f158 · 0xf 진입 0x3d954)을 들어서는 걸음에서 미리 다 해 둔다 — 대기 동안 다른 굴림이 없어 차례는 같다.
+   */
+  readonly sceneConfirm: SceneConfirmWait | null
   /** 우리 투수 스태미나 0~10000 (레코드 +0x2c) */
   readonly stamina: number
   /**
@@ -781,6 +789,7 @@ export function resumeTeamGame(saved: TeamGameProgress, random: RandomPort): Tea
     pendingBenchClearing: null,
     atBat: createAtBat(),
     atBatPrepared: false,
+    sceneConfirm: null,
     lastPitch: null,
     lastResolution: null,
     lastDefensePlay: null,
@@ -999,6 +1008,7 @@ export function startTeamGame(options: TeamGameOptions, random: RandomPort): Tea
     pitcherLines: [],
     pitcherJustChanged: false,
     atBatPrepared: false,
+    sceneConfirm: null,
     stamina: ourPitcherStaminas[startingSlots.ours] ?? FULL_STAMINA,
     // 팀 new 0xb891c 가 팀+0x28 을 −1 로 두고(b89b4~b89ba) 첫 타석 준비(상태 0xd 0x48d50 → 0xaebe4)가 선발로 채운다
     magicRemaining: magicCountOfPitcher(ourPitcherEntry[startingSlots.ours] ?? ourPitcherEntry[0], options.aceLevels),
@@ -3003,6 +3013,8 @@ function prepareAtBat(progress: TeamGameProgress, random: RandomPort): TeamGameP
   return readyAtBat(
     {
       ...progress,
+      // 0xd → 0xe (0x39e14) — 사람 OK 를 기다린다 (0x532b0)
+      sceneConfirm: enterSceneConfirm(),
       cpuPinchHitUsed: false,
       // 같은 0x48d50 의 타석 초기화 0xa5bcc — 연속 파울 ctx+0x15f · 타석 투구 수 ctx+0x161 = 0
       recordTally: { ...progress.recordTally, foulStreak: 0, atBatPitches: 0 },
@@ -3027,7 +3039,7 @@ function prepareAtBat(progress: TeamGameProgress, random: RandomPort): TeamGameP
  */
 function readyAtBat(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
   const session = progress.burst
-  if (session === null) return enterPitchSelection({ ...progress, atBatPrepared: true }, random)
+  if (session === null) return enterPitchSelection({ ...progress, atBatPrepared: true }, random, true)
   const ours = isOurOffense(progress)
   const next = tryTriggerBurst(
     session,
@@ -3047,7 +3059,7 @@ function readyAtBat(progress: TeamGameProgress, random: RandomPort): TeamGamePro
     },
     random,
   )
-  return enterPitchSelection({ ...progress, burst: next, atBatPrepared: true }, random)
+  return enterPitchSelection({ ...progress, burst: next, atBatPrepared: true }, random, true)
 }
 
 /**
@@ -3118,7 +3130,12 @@ export function burstGameRecordOf(
  * 0xac428 의 인자는 간이 엔진(0xc1ba4 의 0xc1ce2)과 같다 — 팀 경기 모드(1·2·8·9)에서 `[sp+4]`(모드 3)·`[sp+0xc]`
  * (최소 벤치)가 둘 다 0 이다 — 그래서 `judgeAutoPitcherChange` 를 그대로 쓴다.
  */
-function enterPitchSelection(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
+function enterPitchSelection(
+  progress: TeamGameProgress,
+  random: RandomPort,
+  /** 같은 걸음에서 방금 0xe 의 OK 를 지나왔는가 (`readyAtBat`) — 그러면 교체 뒤의 0xe 가 두 번째 대기다 */
+  afterSceneConfirm = false,
+): TeamGameProgress {
   if (progress.game.isFinished || !isHumanTurn(progress)) return progress
   // 3d9fc · 3da44 — 돌발 진행 중(0x8eb94 = obj+0xc ≠ −1)이면 두 판정 모두 건너뛴다
   if (progress.burst !== null && progress.burst.current !== null) return progress
@@ -3126,8 +3143,9 @@ function enterPitchSelection(progress: TeamGameProgress, random: RandomPort): Te
     ? judgeAutoPitcherChange(progress, false, random, true)
     : applyCpuPinchHit(progress, false, random, true)
   if (changed === progress) return progress
-  // 22 → 0x16 → 0xd(지우기 건너뜀) → 0xe → 0xf
-  return readyAtBat(changed, random)
+  // 22 → 0x16 → 0xd(지우기 건너뜀) → 0xe(OK 를 다시 기다린다) → 0xf
+  const sceneConfirm = afterSceneConfirm ? chainSceneConfirm(progress.sceneConfirm) : enterSceneConfirm()
+  return readyAtBat({ ...changed, sceneConfirm }, random)
 }
 
 /** 타석이 끝나는 자리에서 돌발을 판정한다 (0x8f414) */
@@ -3451,7 +3469,8 @@ export function changePitcher(progress: TeamGameProgress, benchIndex: number, ra
     `${progress.game.inning}회${progress.game.half} 투수 교체 — ${progress.ourPitcherIndex + 1}번 → ${benchIndex + 1}번`,
     true,
   )
-  return readyAtBat(changed, random)
+  // 0x16 → 0xd → 0xe — 사람 OK 를 다시 기다린다
+  return readyAtBat({ ...changed, sceneConfirm: enterSceneConfirm() }, random)
 }
 
 /**
@@ -3462,7 +3481,8 @@ export function changePitcher(progress: TeamGameProgress, benchIndex: number, ra
  */
 export function cancelSubstitution(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
   if (progress.game.isFinished || !isHumanTurn(progress) || !progress.atBatPrepared) return progress
-  return readyAtBat(progress, random)
+  // '#'·CLR → 곧장 0xe — 사람 OK 를 다시 기다린다
+  return readyAtBat({ ...progress, sceneConfirm: enterSceneConfirm() }, random)
 }
 
 /**
@@ -3592,7 +3612,8 @@ export function pinchHit(progress: TeamGameProgress, benchIndex: number, random:
     `${progress.game.inning}회${progress.game.half} 대타 — ${swapped.outgoing.name} → ${swapped.incoming.name}`,
     true,
   )
-  return readyAtBat(changed, random)
+  // 0x16 → 0xd → 0xe — 사람 OK 를 다시 기다린다
+  return readyAtBat({ ...changed, sceneConfirm: enterSceneConfirm() }, random)
 }
 
 /** 지금 타석이 사람 팀이 대타를 낸 그 타석인가 (`ctx+0x160`) — 반 이닝이 바뀌었으면 이미 지워진 칸이다 */

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, renderHook, screen } from '@testing-library/react'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
@@ -15,6 +15,8 @@ import { pitchSlotsFor } from '@/features/play-team-game/model/teamGameFlow'
 import { setActiveSound } from '@/shared/api/audio/soundPort'
 import { FULL_PLAY_SETTINGS, MATCH_SETTING_KIND } from '@/features/play-team-game/model/matchSettings'
 import type { SoundPort } from '@/shared/api/audio/soundPort'
+import { SCENE_CONFIRM_LOCK_FRAMES } from '@/features/play-game/model/useSceneConfirm'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 
 /**
  * 경기 시작 인트로(상태 0xc)와 1회초 판(0x18) — 첫 사람 타석 앞에 서면 OK 로 넘긴다.
@@ -191,6 +193,7 @@ describe('팀 경기 화면의 소리 배선', () => {
 
 describe('`#` 투수 교체 화면 — "Time!" 22 (상태 0xb 진입 0x3af06)', () => {
   it('교체 화면을 열면 22 가 난다', () => {
+    vi.useFakeTimers()
     const { unmount } = render(
       <TeamGameScreen
         options={기본옵션}
@@ -200,6 +203,9 @@ describe('`#` 투수 교체 화면 — "Time!" 22 (상태 0xb 진입 0x3af06)', 
       />,
     )
     판닫기()
+    // 상태 0xe 의 OK — 교체 창은 OK 뒤(0xf)에 열린다
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_LOCK_FRAMES))
+    fireEvent.keyDown(window, { key: 'Enter' })
     녹음.played.length = 0
 
     fireEvent.click(screen.getByRole('button', { name: '# 교체' }))
@@ -207,6 +213,7 @@ describe('`#` 투수 교체 화면 — "Time!" 22 (상태 0xb 진입 0x3af06)', 
     expect(screen.getByText('투수 교체')).toBeTruthy()
     expect(녹음.played).toContain(PITCHER_CHANGE_SOUND)
     unmount()
+    vi.useRealTimers()
   })
 
   it('경기 중 메뉴(*)에서는 22 가 안 난다 — 0x3c158 은 22 를 안 튼다', () => {

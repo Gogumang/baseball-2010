@@ -7,6 +7,7 @@ import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/mod
 import { TeamGameScreen } from '@/pages/team-game/ui/TeamGameScreen'
 import { DEFENSE_BACKGROUND_URL } from '@/pages/defense/lib/defenseView'
 import type { TeamGameOptions } from '@/features/play-team-game/model/teamGameFlow'
+import { SCENE_CONFIRM_LOCK_FRAMES } from '@/features/play-game/model/useSceneConfirm'
 
 /**
  * 경기 시작 인트로(상태 0xc)와 1회초 판(0x18) — 첫 사람 타석 앞에 서면 OK 로 넘긴다.
@@ -19,7 +20,22 @@ const 판닫기 = () => {
   }
 }
 
-afterEach(cleanup)
+/**
+ * 상태 0xe — 새 타석마다 사람 OK 를 기다린다 (0x532b0). 들어선 뒤 세 갱신은 OK 를 안 받으니(0x49a26) 시계를 흘리고 누른다.
+ * 기다리는 중이면 왼쪽 소프트키가 '확인' 이다.
+ */
+const OK통과 = () => {
+  for (let 번 = 0; 번 < 3; 번 += 1) {
+    if (screen.queryByRole('button', { name: '확인' }) === null) return
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_LOCK_FRAMES))
+    fireEvent.keyDown(window, { key: 'Enter' })
+  }
+}
+
+afterEach(() => {
+  cleanup()
+  vi.useRealTimers()
+})
 
 const 기본옵션: TeamGameOptions = {
   mode: 2,
@@ -30,6 +46,7 @@ const 기본옵션: TeamGameOptions = {
 }
 
 const 띄우기 = (options: Partial<TeamGameOptions> = {}, seed = 20100901) => {
+  vi.useFakeTimers()
   const rendered = render(
     <TeamGameScreen
       options={{ ...기본옵션, ...options }}
@@ -39,6 +56,7 @@ const 띄우기 = (options: Partial<TeamGameOptions> = {}, seed = 20100901) => {
     />,
   )
   판닫기()
+  OK통과()
   return rendered
 }
 
@@ -98,6 +116,8 @@ describe('팀 경기 화면 — 인플레이 타구는 수비 화면으로 (상�
 
     // 타구가 날 때까지 같은 구질·코스로 던진다 (씨앗 20100901 은 여덟 번째 투구에서 난다)
     for (let pitch = 0; pitch < 200; pitch += 1) {
+      // 새 타자면 0xe 에서 OK 부터
+      OK통과()
       if (screen.queryByText('1. 구질 선택') === null) break
       fireEvent.click(screen.getByText('FASTBALL'))
       fireEvent.click(screen.getAllByRole('button', { name: /[◎·]/ })[0])
@@ -308,5 +328,56 @@ describe('경기 시작 인트로 (상태 0xc)', () => {
       />,
     )
     expect(screen.queryByText(/VS/)).toBeNull()
+  })
+})
+
+describe('상태 0xe — 새 타석마다 사람 OK 를 기다린다 (0x39e14 → 0x532b0)', () => {
+  const 판까지 = (options: Partial<TeamGameOptions> = {}) => {
+    vi.useFakeTimers()
+    render(
+      <TeamGameScreen
+        options={{ ...기본옵션, ...options }}
+        random={createSeededRandom(20100901)}
+        onFinish={vi.fn()}
+        onQuit={vi.fn()}
+      />,
+    )
+    판닫기()
+  }
+
+  it('수비 차례: OK 전에는 구질 고르기가 없고, 들어선 뒤 세 갱신 안의 OK 는 안 먹는다 (0x49a26)', () => {
+    판까지()
+    expect(screen.queryByText('1. 구질 선택')).toBeNull()
+    expect(screen.getByRole('button', { name: '확인' })).toBeTruthy()
+    fireEvent.keyDown(window, { key: '5' })
+    expect(screen.queryByText('1. 구질 선택')).toBeNull()
+    // 시간 제한·자동 진행이 없다 (0x39bd4)
+    act(() => vi.advanceTimersByTime(60_000))
+    expect(screen.queryByText('1. 구질 선택')).toBeNull()
+    fireEvent.keyDown(window, { key: '5' })
+    expect(screen.getByText('1. 구질 선택')).toBeTruthy()
+  })
+
+  it("기다리는 동안 '#' 교체는 안 열리고 '*' 메뉴는 열린다 — 메뉴가 떠 있으면 OK 를 안 받는다", () => {
+    판까지()
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_LOCK_FRAMES))
+    fireEvent.keyDown(window, { key: '#' })
+    expect(screen.queryByText('투수 교체')).toBeNull()
+    fireEvent.keyDown(window, { key: '*' })
+    expect(screen.getByText('경기 중 메뉴')).toBeTruthy()
+    fireEvent.keyDown(window, { key: '5' })
+    fireEvent.keyDown(window, { key: '*' })
+    expect(screen.queryByText('1. 구질 선택')).toBeNull()
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_LOCK_FRAMES))
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(screen.getByText('1. 구질 선택')).toBeTruthy()
+  })
+
+  it('공격 차례도 같다 — 타석 장면은 서지만 OK 전에는 공이 안 나간다', () => {
+    판까지({ playerSide: PLAYER_SIDE_FIRST_BAT })
+    expect(screen.getByText('타석')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '확인' })).toBeTruthy()
+    OK통과()
+    expect(screen.queryByRole('button', { name: '확인' })).toBeNull()
   })
 })

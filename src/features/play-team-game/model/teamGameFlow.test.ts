@@ -2359,3 +2359,61 @@ describe('영입한 표 밖 선수(명전·나리)는 원본 id 로 제 줄에 �
     expect(summary.leaguePitchers!.lines.some((line) => line.recordId !== undefined || line.pitcherSlot < 0)).toBe(false)
   })
 })
+
+describe('상태 0xe 의 OK 대기 (0x39e14 → 0x532b0) — 진행기가 0xe 에 들어설 때마다 새 대기를 싣는다', () => {
+  it('첫 사람 타석 앞(0x18 → 0xd → 0xe)에 대기가 서 있다 — 공격이든 수비든', () => {
+    expect(시작().progress.sceneConfirm).not.toBeNull()
+    expect(시작({ playerSide: PLAYER_SIDE_FIRST_BAT }).progress.sceneConfirm).not.toBeNull()
+  })
+
+  it('타석이 끝나 다음 타자(0xd)면 새 대기, 같은 타석 다음 공(0xf)이면 그대로다', () => {
+    const { progress, random } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
+    const 처음 = progress.sceneConfirm
+    const 다음타자 = applyBatterOutcome(progress, { kind: '아웃', detail: '뜬공아웃' }, random)
+    expect(isBatterTurn(다음타자)).toBe(true)
+    expect(다음타자.sceneConfirm).not.toBe(처음)
+    expect(다음타자.sceneConfirm?.entries).toBeGreaterThanOrEqual(1)
+
+    const 수비 = 시작()
+    const 한공 = throwPitch(수비.progress, { typeNumber: 첫구질(수비.progress), courseCell: 4, gaugeCell: 0 }, 수비.random)
+    if (한공.atBat.balls + 한공.atBat.strikes > 0 && 한공.scenePinchHit === 수비.progress.scenePinchHit) {
+      expect(한공.sceneConfirm).toBe(수비.progress.sceneConfirm)
+    }
+  })
+
+  it('# 교체 확정·교체 창 취소 뒤는 0x16(또는 곧장) → 0xe 라 새 대기다 (0x495fc)', () => {
+    const { progress } = 시작()
+    const 바꾼뒤 = changePitcher(progress, availablePitchers(progress)[0]!, createSeededRandom(0))
+    expect(바꾼뒤.sceneConfirm).not.toBe(progress.sceneConfirm)
+    const 취소 = cancelSubstitution(progress, createSeededRandom(0))
+    expect(취소.sceneConfirm).not.toBe(progress.sceneConfirm)
+  })
+
+  it('새 타석의 OK 뒤 0xf 진입이 CPU 교체를 내면 0x16 → 0xd → 0xe 로 한 번 더 기다린다 (같은 걸음 대기 2)', () => {
+    let 겹침 = 0
+    let 홑 = 0
+    for (let seed = 0; seed < 6; seed += 1) {
+      const random = createSeededRandom(seed)
+      let current = startTeamGame({ ...기본옵션, mode: 1 }, random)
+      for (let step = 0; step < 3_000 && !current.game.isFinished; step += 1) {
+        const before = current
+        current = isPitchTurn(current)
+          ? throwPitch(current, { typeNumber: 첫구질(current), courseCell: 4, gaugeCell: 0 }, random)
+          : applyBatterOutcome(current, { kind: '아웃', detail: '뜬공아웃' }, random)
+        const 교체 =
+          current.scenePinchHit?.serial !== before.scenePinchHit?.serial ||
+          current.scenePitcherChange?.serial !== before.scenePitcherChange?.serial
+        if (!교체 || current.sceneConfirm === before.sceneConfirm) continue
+        // 새 타석(카운트 0-0)에서 난 교체면 새 타석의 0xe 와 교체 뒤 0xe 둘
+        if (current.atBat.balls === 0 && current.atBat.strikes === 0) {
+          겹침 += 1
+          expect(current.sceneConfirm?.entries).toBe(2)
+        } else {
+          홑 += 1
+          expect(current.sceneConfirm?.entries).toBe(1)
+        }
+      }
+    }
+    expect(겹침).toBeGreaterThan(0)
+  })
+})
