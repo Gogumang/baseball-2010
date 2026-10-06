@@ -192,6 +192,8 @@ export function TeamGameScreen({
       // 수비 진행 중(상태 0x17)에는 이 키들이 원본에서도 안 먹는다 — '*' 는 경기 상태 0xd~0x15,
       // '#' 는 0xe·0xf 일 때만 열리고(0x498d4), 그 사이 키는 주루·송구가 가져간다
       if (isDefenseInPlay) return
+      // 조작방법 뷰어(경기 중 메뉴 하위 4)의 키는 0x3ca36 이 뷰어 0x637d0 에만 준다 — '*' 도 아무 일 안 한다
+      if (overlay === '조작방법') return
       if (event.key === '*') {
         event.preventDefault()
         // 교체 창(상태 0xb)에서는 '*' 가 안 먹는다 — 0x498d4 의 '*' 가지(4991c)는 상태 0xd~0x15 만 받고,
@@ -404,7 +406,15 @@ export function TeamGameScreen({
 
   // 경기 중 메뉴의 "조작방법"(0x3c212)·"설정"(0x3c326) — 원본도 경기 장면 위에 같은 화면을 얹는다
   if (overlay === '조작방법') {
-    return <HelpScreen onBack={() => setOverlay(null)} />
+    return (
+      <HelpScreen
+        onBack={() => {
+          // 뷰어를 닫으면(0x3ca36: 0x637d0 ≠ 0) 하위 0 으로 돌아가 일시정지 팝업 0x741a0 을 다시 띄운다 — 경기 중 메뉴로 돌아간다
+          setOverlay(null)
+          setMenuOpen(true)
+        }}
+      />
+    )
   }
   if (overlay === '설정' && settings !== undefined && onSettingsChange !== undefined) {
     return (

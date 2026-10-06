@@ -47,6 +47,25 @@ describe('나만의리그 타자편 경기 중 메뉴 (표 0xcfcfc 행 2)', () =
     expect(screen.queryByText('자동진행')).toBeNull()
   })
 
+  it('[조작방법]은 띠 없이 뷰어만 띄우고, CLR 로 닫으면 경기 중 메뉴로 돌아간다 (0x3ce54 · 0x3ca36)', () => {
+    const { container } = 띄우기()
+    fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
+    fireEvent.click(screen.getByText('조작방법'))
+
+    expect(screen.getByText('<기본 조작>')).toBeTruthy()
+    const 띠그림 = [...container.querySelectorAll('img')].filter((img) => img.getAttribute('src')?.includes('game_frame'))
+    expect(띠그림).toHaveLength(0)
+
+    // '*' 는 뷰어(하위 4)에서 아무 일도 안 한다
+    fireEvent.keyDown(window, { key: '*' })
+    expect(screen.getByText('<기본 조작>')).toBeTruthy()
+
+    // 여는 때는 장 고르기라 CLR 한 번에 닫힌다 → 메뉴가 다시 뜬다
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.queryByText('<기본 조작>')).toBeNull()
+    expect(screen.getByText('조작방법')).toBeTruthy()
+  })
+
   it('나가기를 고르면 StrGAME[0] 확인 문구가 뜨고, 예가 경기를 끝낸다', () => {
     const onQuit = vi.fn()
     띄우기({ onQuit })

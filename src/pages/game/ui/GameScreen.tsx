@@ -125,6 +125,8 @@ export function GameScreen({
       if (event.repeat) return
       // 벤치 클리어링(0x1e)·1회초 판(0x18) 중에는 공용 키가 안 열린다 (0x498d4 의 상태 범위 밖)
       if (isBenchClearing || isHalfInningBoardOpen) return
+      // 조작방법 뷰어(경기 중 메뉴 하위 4)의 키는 0x3ca36 이 뷰어 0x637d0 에만 준다 — '*' 도 아무 일 안 한다
+      if (overlay === '조작방법') return
       if (event.key === '*') {
         event.preventDefault()
         return setMenuOpen((open) => !open)
@@ -164,7 +166,17 @@ export function GameScreen({
   }
 
   // 경기 중 메뉴의 "조작방법"(0x3c212)·"설정"(0x3c326)
-  if (overlay === '조작방법') return <HelpScreen onBack={() => setOverlay(null)} />
+  if (overlay === '조작방법') {
+    return (
+      <HelpScreen
+        onBack={() => {
+          // 뷰어를 닫으면(0x3ca36: 0x637d0 ≠ 0) 하위 0 으로 돌아가 일시정지 팝업 0x741a0 을 다시 띄운다 — 경기 중 메뉴로 돌아간다
+          setOverlay(null)
+          setMenuOpen(true)
+        }}
+      />
+    )
+  }
   if (overlay === '설정' && settings !== undefined && onSettingsChange !== undefined) {
     return (
       <SettingsScreen

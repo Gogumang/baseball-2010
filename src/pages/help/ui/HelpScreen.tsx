@@ -1,78 +1,97 @@
 import { useEffect, useState } from 'react'
 import { MarkupText, RawScreen } from '@/shared/ui'
-import {
-  GAME_VERSION, HELP_LAST_BROWSABLE_CHAPTER, HELP_SECTIONS,
-} from '@/shared/config/helpSections'
-import { BODY_PANEL, FOOTER, HEADBAND, SCREEN } from '@/pages/help/lib/helpLayout'
+import { GAME_VERSION, HELP_SECTIONS } from '@/shared/config/helpSections'
+import { BODY_PANEL } from '@/pages/help/lib/helpLayout'
+import { openHelpViewer, stepHelpViewer } from '@/pages/help/lib/helpViewer'
+import type { HelpViewerKey, HelpViewerState } from '@/pages/help/lib/helpViewer'
 import * as styles from '@/pages/help/ui/HelpScreen.css'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 
-const GAME_FRAME = './sprites/game_frame'
 const SLT_FRAME = './sprites/slt_frame'
 
 const imageSrc = (folder: string, id: number) => `${folder}/${String(id).padStart(3, '0')}.png`
 
 interface HelpScreenProps {
   readonly onBack: () => void
-  /** 여는 장 — 메인 메뉴 [도움말](상태 7)은 **0**, [게임문의](상태 10)는 **6** (0x2668c) */
+  /** 여는 장 — 메인 메뉴 [도움말](상태 7)·경기 중 [조작방법]은 **0**, [게임문의](상태 10)는 **6** (0x2668c · 0x3c260) */
   readonly chapter?: number
   /** 상태 10 은 `[뷰어+0x45c] = 1` 로 장 이동을 잠근다 (0x2668c) */
   readonly isChapterLocked?: boolean
   /**
    * 전역 G(`mgr+0x64`) — 메인 메뉴 도움말(상태 7) 그리기 0x2fc8c 끝의 머리띠 `0x54d95(skin, 0, 5)` 는 제목 0 이라
-   * G포인트(0x54a60)도 그린다(0x550dc). 넘기면 머리띠를 G 까지 그리고, 안 넘기면 예전 띠(G 없음) 그대로다.
-   * ⚠️ 경기 중 [조작방법](일시정지 그리기 0x3cdd0 의 갈래 4)은 뷰어 0x639a5 만 부르고 머리띠·바닥띠 0x54d95 를
-   *    아예 안 부른다 — 웹은 그쪽에도 예전 띠(되돌아가기 포함)를 그린다(미해결: 부르는 쪽이 여러 구역이라 안 고쳤다).
+   * G포인트(0x54a60)도 그린다(0x550dc). 넘기면 머리띠를 G 까지 그린다.
+   *
+   * **안 넘기면 머리띠·바닥띠가 없다** — 경기 중 [조작방법]이다: 일시정지 그리기 0x3cdd0 의 갈래 4(0x3ce54)는
+   * 뷰어 `0x639a5(skin)` 하나만 부르고 바탕 0x58371 도 머리띠 0x54d95 도 안 부른다.
+   * 그때는 닫을 길이 CLR 키뿐이라 웹판만 판 안에 [닫기] 칸을 둔다.
    */
   readonly gamePoint?: number
 }
 
+/** 웹 키 → 원본 키 (위 −1 · 아래 −2 · 왼 −3 · 오른 −4 · OK −5 · CLR −16). '2'·'4'·'5'·'6'·'8' 은 0x637d0 이 안 본다 */
+const viewerKeyOf = (key: string): HelpViewerKey | null => {
+  switch (key) {
+    case 'ArrowUp': return '위'
+    case 'ArrowDown': return '아래'
+    case 'ArrowLeft': return '왼'
+    case 'ArrowRight': return '오른'
+    case 'Enter':
+    case ' ': return 'OK'
+    case 'Escape':
+    case 'Backspace': return 'CLR'
+    default: return null
+  }
+}
+
 /**
- * 도움말 = 메인 메뉴 **상태 7** 의 StrHOWTO 뷰어 (그리기 0x2fc8c → 0x639a5 → 0x58d10 — S12 2절).
+ * StrHOWTO 뷰어 — 메인 메뉴 **상태 7** [도움말]·상태 10 [게임문의]·경기 중 메뉴 [조작방법](하위 4) 이 함께 쓴다
+ * (열기 `0x63688` · 키 `0x637d0` · 그리기 `0x639a5` → `0x58d10` — S12 2절).
  *
  * ⚠️ **정정**: 앞서 옮긴 "상태 9 목록 + 상태 37 본문" 은 도움말이 아니라 **랭킹**이었다
  * (설명 글이 `StrMAINMENU[24 + 커서]` = "…의 순위를 확인합니다"). 랭킹 쪽 값은
  * `helpLayout.ts` 의 `RANKING_MENU_ITEMS`·`RANKING_TITLE_FRAMES` 에 남겨 두었다.
  *
  * 장은 원본 표 `0xd0b18 = [5,5,7,6,3,6,4]` 그대로 **일곱**이라(`helpSections.ts`)
- * 기본 조작·미션모드·환경설정까지 모두 이 화면에서 볼 수 있다. 메인 메뉴에서 돌아다닐 수 있는 장은
+ * 기본 조작·미션모드·환경설정까지 모두 이 화면에서 볼 수 있다. 돌아다닐 수 있는 장은
  * **0~5** 고(0x638be·0x63914), 장 6 게임문의는 상태 10 에서 잠긴 채 열린다.
  *
+ * 키는 원본 0x637d0 그대로 두 단계다(`helpViewer.ts`): **장 고르기**(여는 때)에서 좌우 = 장 · OK/아래 = 쪽 보기 · CLR = 닫기,
+ * **쪽 보기**에서 좌우 = 쪽 · CLR = 장 고르기로.
+ *
  * ⚠️ 근사한 곳: 판(0x58371)과 뷰어(0x58d10)의 안쪽 배치·쪽 나누기는 아직 미해독이라
- * 가운데 192 판에 기록연감 쪽 제목 줄을 썼고, 키도 웹판 나름이다
- * (원본은 좌우 키로 장을 넘긴다 — 0x637d0. 여기서는 좌우 = 쪽, 위아래 = 장).
+ * 가운데 192 판에 기록연감 쪽 제목 줄을 썼다. 장 고르기와 쪽 보기가 그림에서 어떻게 다른지(0x58d10)도 안 읽어
+ * 두 단계를 같은 그림으로 그린다. 쪽 넘기기·장 넘기기 단추는 웹판 편의다.
  */
 export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gamePoint }: HelpScreenProps) {
-  const [section, setSection] = useState(chapter)
-  const [page, setPage] = useState(0)
+  const [viewer, setViewer] = useState<HelpViewerState>(() => openHelpViewer(chapter, isChapterLocked))
+  const section = viewer.chapter
+  const page = viewer.page
 
   const pages = HELP_SECTIONS[section]?.pages ?? []
   const pageCount = Math.max(pages.length, 1)
-  const movePage = (step: number) => setPage((previous) => (previous + step + pageCount) % pageCount)
-  /** 장 넘기기 — 0~5 를 돌고 끝에서 되감는다 (0x638be `movs r4, #5` · 0x63914 `cmp r0, #4; bgt`) */
-  const moveSection = (step: number) => {
-    if (isChapterLocked) return
-    const count = HELP_LAST_BROWSABLE_CHAPTER + 1
-    setSection((previous) => (previous + step + count) % count)
-    setPage(0)
+  /** 장마다 보이는 쪽수 (빈 StrHOWTO 항목은 뺀다 — `helpSections.ts`) */
+  const pageCountOf = (chapterIndex: number) => Math.max(HELP_SECTIONS[chapterIndex]?.pages.length ?? 0, 1)
+  /** 웹판 단추 — 단계와 상관없이 쪽 보기·장 고르기의 좌우와 같은 값을 낸다(단계는 그대로 둔다) */
+  const moveBy = (isChapter: boolean, step: number) => {
+    if (isChapter && isChapterLocked) return
+    setViewer((previous) => {
+      const next = stepHelpViewer(
+        { ...previous, isChoosingChapter: isChapter }, step > 0 ? '오른' : '왼', false, pageCountOf(previous.chapter),
+      )
+      return next === '닫기' ? previous : { ...next, isChoosingChapter: previous.isChoosingChapter }
+    })
   }
+  const movePage = (step: number) => moveBy(false, step)
+  const moveSection = (step: number) => moveBy(true, step)
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' || event.key === 'Backspace') {
-        event.preventDefault()
-        return onBack()
-      }
-      const pageStep = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
-      if (pageStep !== 0) {
-        event.preventDefault()
-        return movePage(pageStep)
-      }
-      const sectionStep = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0
-      if (sectionStep !== 0) {
-        event.preventDefault()
-        moveSection(sectionStep)
-      }
+      const key = viewerKeyOf(event.key)
+      if (key === null) return
+      event.preventDefault()
+      const next = stepHelpViewer(viewer, key, isChapterLocked, pageCountOf(viewer.chapter))
+      if (next === '닫기') return onBack()
+      setViewer(next)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
@@ -154,48 +173,20 @@ export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gameP
         </>
       )}
 
-      {gamePoint === undefined
-        ? <HelpBands onBack={onBack} />
-        : <ScreenFrame title="2010프로야구" gamePoint={gamePoint} onBack={onBack} />}
+      {gamePoint === undefined ? (
+        // 경기 중 [조작방법] — 원본은 띠가 없고 CLR 로만 닫는다. 이 칸은 웹판 편의(터치)다
+        <button
+          type="button"
+          className={styles.sectionButton}
+          aria-label="닫기"
+          style={{ left: BODY_PANEL.x + BODY_PANEL.width / 2 - 12, top: BODY_PANEL.y + BODY_PANEL.height - 22 }}
+          onClick={onBack}
+        >
+          닫기
+        </button>
+      ) : (
+        <ScreenFrame title="2010프로야구" gamePoint={gamePoint} onBack={onBack} />
+      )}
     </RawScreen>
-  )
-}
-
-/** 머리띠·바닥띠 0x54d95(메뉴, 0, 5) — 제목 "2010프로야구" + 바닥 되돌아가기 (P6 1-1) */
-function HelpBands({ onBack }: { readonly onBack: () => void }) {
-  return (
-    <>
-      <svg
-        className={styles.sprite}
-        style={{ left: 0, top: 0 }}
-        viewBox={`0 0 ${SCREEN.width} ${SCREEN.height}`}
-        width={SCREEN.width}
-        height={SCREEN.height}
-        shapeRendering="crispEdges"
-      >
-        <rect x={0} y={HEADBAND.band.y} width={SCREEN.width} height={HEADBAND.band.height} fill={HEADBAND.band.color} />
-        <rect x={0} y={HEADBAND.line.y} width={SCREEN.width} height={HEADBAND.line.height} fill={HEADBAND.line.color} />
-        <rect x={0} y={FOOTER.band.y} width={SCREEN.width} height={FOOTER.band.height} fill={FOOTER.band.color} />
-        <rect x={0} y={FOOTER.line.y} width={SCREEN.width} height={1} fill={FOOTER.line.color} />
-      </svg>
-      {HEADBAND.tileXs.map((x) => (
-        <img key={x} className={styles.sprite} alt="" src={imageSrc(GAME_FRAME, HEADBAND.tileImage)} style={{ left: x, top: HEADBAND.tileY }} />
-      ))}
-      <img className={styles.sprite} alt="" src={imageSrc(GAME_FRAME, HEADBAND.cornerImage)} style={{ left: HEADBAND.cornerX, top: HEADBAND.tileY }} />
-      <img className={styles.sprite} alt="" src={imageSrc(GAME_FRAME, HEADBAND.title.image)} style={{ left: HEADBAND.title.x, top: HEADBAND.title.y }} />
-      {FOOTER.tileXs.map((x) => (
-        <img key={x} className={styles.sprite} alt="" src={imageSrc(GAME_FRAME, FOOTER.tileImage)} style={{ left: x, top: FOOTER.tileY }} />
-      ))}
-      <img className={styles.sprite} alt="" src={imageSrc(GAME_FRAME, FOOTER.cornerImage)} style={{ left: FOOTER.cornerX, top: FOOTER.tileY }} />
-      <button
-        type="button"
-        className={styles.backButton}
-        aria-label="되돌아가기"
-        style={{ left: FOOTER.backIcon.x, top: FOOTER.backIcon.y }}
-        onClick={onBack}
-      >
-        <img src={imageSrc(GAME_FRAME, FOOTER.backIcon.image)} alt="" />
-      </button>
-    </>
   )
 }

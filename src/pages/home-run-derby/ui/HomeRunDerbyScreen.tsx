@@ -88,7 +88,17 @@ export function HomeRunDerbyScreen({
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
 
   // 경기 중 메뉴의 "조작방법"(0x3c212)·"설정"(0x3c326)
-  if (overlay === '조작방법') return <HelpScreen onBack={() => setOverlay(null)} />
+  if (overlay === '조작방법') {
+    return (
+      <HelpScreen
+        onBack={() => {
+          // 뷰어를 닫으면(0x3ca36: 0x637d0 ≠ 0) 하위 0 으로 돌아가 일시정지 팝업 0x741a0 을 다시 띄운다 — 경기 중 메뉴로 돌아간다
+          setOverlay(null)
+          setMenuOpen(true)
+        }}
+      />
+    )
+  }
   if (overlay === '설정' && settings !== undefined && onSettingsChange !== undefined) {
     return (
       <SettingsScreen
