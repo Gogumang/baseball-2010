@@ -217,6 +217,16 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     expect(연말.current.scene).toBe('관리')
   })
 
+  it('이어하기 — 109 진입이 S+0x50 = 4 를 저장했으면 109 로 (이전 상태 1 이라 취소가 안 먹는다)', () => {
+    const 순위 = 이어하기({ gamesPlayed: 4, seasonEndState: 109 })
+    expect(순위.current.scene).toBe('다음경기순위')
+    expect(순위.current.nextGameFromManagement).toBe(false)
+    act(() => 순위.current.actions.cancelNextGameStandings())
+    expect(순위.current.scene).toBe('다음경기순위')
+    // g 홀수(경기 뒤 116 → 109 갈래)도 109
+    expect(이어하기({ gamesPlayed: 5 }).current.scene).toBe('다음경기순위')
+  })
+
   it('이어하기 — 128(0xf)이면 대진으로, 끝나면 앞 사슬 없이도 132(380)로 간다', () => {
     const 대진 = startPostseason([3, 0, 1, 2, 4, 5, 6, 7])
     const result = 이어하기({
@@ -360,8 +370,12 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     act(() => result.current.actions.openNextGameStandings())
     expect(result.current.scene).toBe('다음경기순위')
     expect(result.current.nextGameFromManagement).toBe(true)
+    // 109 진입 0x10d8c 의 S+0x50 = 4
+    expect(result.current.career?.seasonEndState).toBe(109)
     act(() => result.current.actions.cancelNextGameStandings())
     expect(result.current.scene).toBe('관리')
+    // 105 진입 0x11990 의 S+0x50 = 3 (웹 null)
+    expect(result.current.career?.seasonEndState).toBeNull()
     act(() => result.current.actions.openNextGameStandings())
     act(() => result.current.actions.confirmNextGameStandings())
     expect(result.current.scene).toBe('경기')

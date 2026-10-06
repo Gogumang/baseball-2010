@@ -719,6 +719,19 @@ describe('타자편 포스트시즌 대진 128 — 사람이 친다 (0x120a4 · 
     expect(rendered.result.current.screen).toEqual({ kind: '경기' })
   })
 
+  it('109 진입 0x10d8c 가 S+0x50 = 4 를 저장 — 이어하기는 109 로(이전 상태 1 · 취소 안 먹음), 105 로 물러나면 3 (0x11990)', () => {
+    const rendered = 띄우기({ ...createCareer('이어'), gamesPlayed: 4 })
+    act(() => rendered.result.current.session.actions.runCommand('다음경기'))
+    expect(rendered.result.current.session.career?.seasonEndState).toBe(109)
+    const 다시 = 띄우기(rendered.result.current.session.career!)
+    expect(다시.result.current.screen).toEqual({ kind: '다음경기순위', fromManagement: false })
+    act(() => 다시.result.current.session.actions.cancelNextGameStandings())
+    expect(다시.result.current.screen).toEqual({ kind: '다음경기순위', fromManagement: false })
+    act(() => rendered.result.current.session.actions.cancelNextGameStandings())
+    expect(rendered.result.current.session.career?.seasonEndState).toBeNull()
+    expect(띄우기(rendered.result.current.session.career!).result.current.screen).toEqual({ kind: '관리' })
+  })
+
   it('관리 주기가 아닌 경기 뒤는 100 → 109 — 이전 상태가 100 이라 취소가 안 먹는다 (0x1c346 · 0x1060e)', () => {
     const rendered = 띄우기({ ...createCareer('홀수'), gamesPlayed: 3 })
     act(() => rendered.result.current.session.actions.confirmGameResult())

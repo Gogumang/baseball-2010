@@ -172,9 +172,14 @@ describe('이어하기 0x1c154 (모드 3·4 공용) — pitcherResumePointOf', (
     })
   })
 
-  it('정규시즌·엔딩은 관리 화면', () => {
+  it('정규시즌 g 짝수·엔딩은 관리 화면', () => {
     expect(pitcherResumePointOf(투수({ gamesPlayed: 12 }))).toEqual({ kind: '관리' })
     expect(pitcherResumePointOf(투수({ seasonEndState: 132, endingIndex: 2 }))).toEqual({ kind: '관리' })
+  })
+
+  it('정규시즌 맨 끝 갈래 — S+0x50 == 4(109)면 109, null 이면 g 홀수일 때 109 (1c38e~1c3b6)', () => {
+    expect(pitcherResumePointOf(투수({ gamesPlayed: 12, seasonEndState: 109 }))).toEqual({ kind: '다음경기순위' })
+    expect(pitcherResumePointOf(투수({ gamesPlayed: 13 }))).toEqual({ kind: '다음경기순위' })
   })
 })
 

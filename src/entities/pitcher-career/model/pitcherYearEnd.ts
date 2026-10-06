@@ -182,8 +182,10 @@ export type PitcherResumePoint =
   | { readonly kind: '포스트시즌' }
   /** 경기 뒤(2) 116 이 포스트시즌 중 g == 0 이라 136 으로 — 웹은 시즌 끝 화면(136 자리) */
   | { readonly kind: '시즌종료' }
-  /** 그 밖 — 관리 화면 (원본은 S+0xb2 짝수 · S+0x50 ∈ {1,3} 이면 105, 아니면 109) */
+  /** 그 밖 갈래의 S+0xb2 짝수 · S+0x50 ∈ {1,3} → 105 관리 화면 (엔딩 141 도 웹은 아직 여기다) */
   | { readonly kind: '관리' }
+  /** 그 밖 갈래의 나머지 → 109 다음경기 앞 순위표 (S+0x50 == 4 이거나 g 홀수). 이전 상태가 1 이라 취소가 안 먹는다 */
+  | { readonly kind: '다음경기순위' }
 
 /**
  * 이어하기 분기 0x1c154 (R9 2b — 장면 0x106 이라 모드 3·4 공용):
@@ -194,6 +196,8 @@ export type PitcherResumePoint =
  * ```
  * 웹 투수편은 경기 뒤 116 을 null 로 두므로(116 진입 0x1278c 가 S+0x50 = 2), 대진이 있는데 사슬 상태가 아니면
  * 116 의 끝처럼 g 로 가른다. 엔딩 141 · 국가대항전은 웹 투수편이 따로 돌아가지 않는다 (타자편과 같다).
+ * 대진이 없으면 맨 끝 갈래(1c38e~1c3b6): S+0x50 == 4(109 진입 0x10db0)면 109, null(1 · 2 · 3)이면 g 짝수 105 · 홀수 109 —
+ * 2 는 116 의 끝(0x12b98)이 같은 g 짝홀로 가른다 (타자편 `resumePointOf` 머리 주석에 S+0x50 쓰는 곳 표).
  */
 export function pitcherResumePointOf(career: PitcherCareer): PitcherResumePoint {
   if (career.endingIndex !== null) return { kind: '관리' }
@@ -209,7 +213,10 @@ export function pitcherResumePointOf(career: PitcherCareer): PitcherResumePoint 
     default:
       break
   }
-  if (career.postseason === null) return { kind: '관리' }
+  if (career.postseason === null) {
+    if (career.seasonEndState === 109) return { kind: '다음경기순위' }
+    return leagueDayCounterOf(career) % 2 === 0 ? { kind: '관리' } : { kind: '다음경기순위' }
+  }
   if (career.seasonEndState === 128) return { kind: '포스트시즌' }
   return leagueDayCounterOf(career) === 0 ? { kind: '시즌종료' } : { kind: '포스트시즌' }
 }

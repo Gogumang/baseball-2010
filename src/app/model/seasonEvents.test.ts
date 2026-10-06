@@ -86,4 +86,15 @@ describe('이어하기 분기 0x1c154 — S+0x50(seasonEndState)', () => {
     expect(resumePointOf(선수())).toEqual({ kind: '관리' })
     expect(resumePointOf(선수({ seasonEndState: 132, endingIndex: 1 }))).toEqual({ kind: '관리' })
   })
+
+  it('정규시즌 맨 끝 갈래 1c38e — S+0x50 == 4(109)면 g 와 상관없이 109', () => {
+    expect(resumePointOf(선수({ gamesPlayed: 4, seasonEndState: 109 }))).toEqual({ kind: '다음경기순위' })
+    expect(resumePointOf(선수({ gamesPlayed: 5, seasonEndState: 109 }))).toEqual({ kind: '다음경기순위' })
+  })
+
+  it('정규시즌 null(S+0x50 1 · 2 · 3)은 g 짝수면 105, 홀수면 109 — 2 는 116 의 끝(0x12b98)이 같은 짝홀로 가른다', () => {
+    expect(resumePointOf(선수({ gamesPlayed: 0 }))).toEqual({ kind: '관리' })
+    expect(resumePointOf(선수({ gamesPlayed: 6 }))).toEqual({ kind: '관리' })
+    expect(resumePointOf(선수({ gamesPlayed: 7 }))).toEqual({ kind: '다음경기순위' })
+  })
 })

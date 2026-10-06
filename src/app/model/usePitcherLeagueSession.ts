@@ -423,7 +423,10 @@ export function usePitcherLeagueSession(
           ? '포스트시즌'
           : resumePoint.kind === '시즌종료'
             ? '시즌종료'
-            : '관리',
+            // 109 — 이전 상태가 1(자원 적재)이라 `nextGameFromManagement` 는 거짓 그대로다
+            : resumePoint.kind === '다음경기순위'
+              ? '다음경기순위'
+              : '관리',
   )
   const [gameOptions, setGameOptions] = useState<PitcherGameOptions | null>(null)
   const [story, setStory] = useState<PitcherStory | null>(() =>
@@ -750,6 +753,8 @@ export function usePitcherLeagueSession(
       const counted = {
         ...completed,
         reputationZeroGames: countReputationZeroGame(completed.reputationZeroGames, completed.reputation),
+        // 116 진입 0x1278c 의 S+0x50 = 2 — 경기 전 109 의 4 를 덮는다 (웹 null). 사슬 상태 값은 아래 갈래가 다시 쓴다
+        seasonEndState: completed.seasonEndState === 109 ? null : completed.seasonEndState,
       }
       setGameOptions(null)
 
@@ -798,8 +803,8 @@ export function usePitcherLeagueSession(
        *    첫 줄이라, 홀수 경기 뒤에는 105 에 들르지 않아 원본에서도 굴러가지 않는다.
        */
       if (!isPitcherManagementCycleOpen(counted)) {
-        commit(counted)
-        // 100 → 109 순위표 (이전 상태 100 이라 취소가 안 먹는다). 확인하면 142 → 경기 (`confirmNextGameStandings`)
+        // 116 → [114 → 109] 순위표 (이전 상태가 105 가 아니라 취소가 안 먹는다). 109 진입 0x10d8c 가 S+0x50 = 4 · 저장
+        commit({ ...counted, seasonEndState: 109 })
         setNextGameFromManagement(false)
         return setScene('다음경기순위')
       }
@@ -1323,12 +1328,16 @@ export function usePitcherLeagueSession(
       goto,
       beginGame,
       openNextGameStandings: () => {
+        // 109 진입 0x10d8c — S+0x50 = 4 · 저장 (이어하기가 109 로 돌아온다)
+        commitWith((current) => (current.seasonEndState === 109 ? current : { ...current, seasonEndState: 109 }))
         setNextGameFromManagement(true)
         setScene('다음경기순위')
       },
       confirmNextGameStandings: beginGame,
       cancelNextGameStandings: () => {
         if (scene !== '다음경기순위' || !nextGameFromManagement) return
+        // 105 진입 0x11910 이 S+0x50 = 3 · 저장(0x11990) — 웹 null
+        commitWith((current) => (current.seasonEndState !== 109 ? current : { ...current, seasonEndState: null }))
         setScene('관리')
       },
       finishGame,

@@ -53,8 +53,11 @@ export const GAMES_PER_MANAGEMENT_CYCLE = BALANCE.season.gamesPerManagementCycle
 /** 한 시즌 경기 수. 원작 설명서 StrHOWTO[10]: "1년에 총 45경기의 정규리그를 진행하며" */
 export const GAMES_PER_SEASON = BALANCE.season.gamesPerSeason
 
-/** 시즌 끝 사슬의 상태 번호 — `PlayerCareer.seasonEndState` (S+0x50 값 0xb·0xc·0xe·0xf·9 에 맞선다) */
-export type SeasonEndState = 136 | 130 | 131 | 128 | 132
+/**
+ * S+0x50(돌아온 까닭)을 쓰는 상태 번호 — `PlayerCareer.seasonEndState`. 시즌 끝 사슬(S+0x50 값 0xb·0xc·0xe·0xf·9)과
+ * 다음경기 앞 순위표 109(진입 0x10d8c 의 `S+0x50 = 4`, 0x10db0)다. 그 밖 값(1 · 2 · 3)은 웹이 null 로 든다.
+ */
+export type SeasonEndState = 136 | 130 | 131 | 128 | 132 | 109
 
 /** 경기를 치르면 회복하는 체력 */
 
@@ -224,8 +227,10 @@ export interface PlayerCareer {
   /**
    * 시즌 끝 사슬의 어느 상태에 들어와 있는가 — 원본 세이브 레코드 **S+0x50(돌아온 까닭)** 의 시즌 끝 값.
    * 상태 진입마다 값을 쓰고 곧바로 저장한다: 136 → 0xb (0x10bba) · 130 → 0xc 타자 (0x19848) · 131 → 0xe (0x19782) ·
-   * 128 → 0xf (0x120ce) · 132 → 9 (0x10c60). 새 시즌 처리 0x1b768 이 1 로 되돌린다(0x1b7ba) — 웹은 null.
-   * 이어하기(상태 100 진입 0x1c154)는 이 값으로 136·130·131·132 에 돌아가고, 0xf 는 S+0xb4(포스트시즌 중) 갈래로 128 이다.
+   * 128 → 0xf (0x120ce) · 132 → 9 (0x10c60) · 109 → 4 (0x10db0). 새 시즌 처리 0x1b768 이 1 로(0x1b7ba), 116 진입이
+   * 2 로(0x1279a), 105 진입이 3 으로(0x11990) 되돌린다 — 웹은 셋 다 null.
+   * 이어하기(상태 100 진입 0x1c154)는 이 값으로 136·130·131·132 에 돌아가고, 0xf 는 S+0xb4(포스트시즌 중) 갈래로 128,
+   * 4 는 맨 끝 갈래(S+0x50 ∉ {1,3})로 109 다.
    */
   readonly seasonEndState: SeasonEndState | null
   /** 진행 중인 포스트시즌. 정규시즌 중에는 null 이다 (0xb80a8 이 45경기째에 연다) */

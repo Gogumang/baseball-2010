@@ -425,6 +425,18 @@ export function useCareerSession({
     )
   }, [startMatch])
 
+  /**
+   * 109 다음경기 앞 순위표에 들어선다 — 진입 0x10d8c: `S+0x50 = 4`(0x10db0) · 이전 ≠ 142 면 저장(0x1fded · 0x22755).
+   * 이전이 142 여도 값은 이미 4 라 웹은 늘 같은 값을 쓴다. 이어하기가 이 값으로 109 에 돌아온다(`resumePointOf`).
+   */
+  const enterNextGameStandings = useCallback(
+    (fromManagement: boolean) => {
+      setCareer((current) => (current === null || current.seasonEndState === 109 ? current : { ...current, seasonEndState: 109 }))
+      setScreen({ kind: '다음경기순위', fromManagement })
+    },
+    [setScreen],
+  )
+
   /** 경기가 끝났을 때 보상·칭호를 정산하고 결과 화면으로 넘어간다. */
   const finishGame = useCallback(
     (finished: GameProgress, currentCareer: PlayerCareer) => {
@@ -905,6 +917,8 @@ export function useCareerSession({
       if (point.kind === '포스트시즌') return enterPostseason(savedCareer, true)
       setCareer(savedCareer)
       if (point.kind === '시즌종료') return setScreen({ kind: '시즌종료' })
+      // 109 — 100 → 1(자원 적재) → 109 라 이전 상태가 1: 취소가 안 먹고 바닥 1, 배경음 4 (0x10d8c · 0x105f0)
+      if (point.kind === '다음경기순위') return setScreen({ kind: '다음경기순위', fromManagement: false })
       setScreen({ kind: '관리' })
       setManagementCheck('고정')
     },
@@ -913,7 +927,7 @@ export function useCareerSession({
       if (career === null) return
       // 알림은 [확인] 을 눌러야 지워진다 — "다음경기 때까지 남긴다" 는 원본 근거가 없어 없앴다
       // [다음경기](105 칸 5) → 109 순위표 (R9). 확인하면 142 → 경기 (웹은 142 없이 곧바로 경기)
-      if (command === '다음경기') return setScreen({ kind: '다음경기순위', fromManagement: true })
+      if (command === '다음경기') return enterNextGameStandings(true)
       if (command === '휴식') {
         // 원작 [휴식] 커맨드 — 사기를 회복한다. 관리 주기마다 한 가지만 할 수 있다.
         const blockReason = restBlockReasonOf(career)
@@ -1028,8 +1042,8 @@ export function useCareerSession({
         setScreen({ kind: '관리' })
         return setManagementCheck('무작위포함')
       }
-      // 관리 주기가 아니면 100 이 109 순위표로 보낸다 (0x1c346 그 밖 갈래 — 이전 상태 100 이라 취소가 안 먹는다)
-      setScreen({ kind: '다음경기순위', fromManagement: false })
+      // 관리 주기가 아니면 116 의 끝(0x12bb0)이 [114 → 109] 로 보낸다 — 이전 상태가 105 가 아니라 취소가 안 먹는다
+      enterNextGameStandings(false)
     },
 
     /** 109 순위표 확인(−5 · '5', 0x105f0) → 142 경기 준비 — 웹은 142 가 없어 곧바로 경기 */
@@ -1041,6 +1055,8 @@ export function useCareerSession({
     /** 109 순위표 취소(−16, 0x1060e) — 이전 상태가 105 일 때만 105 로. 그 밖에는 아무 일도 없다 */
     cancelNextGameStandings: () => {
       if (screen.kind !== '다음경기순위' || !screen.fromManagement) return
+      // 105 진입 0x11910 이 S+0x50 = 3 · 저장(0x11990) — 109 의 4 를 덮는다 (웹 null)
+      setCareer((current) => (current === null || current.seasonEndState !== 109 ? current : { ...current, seasonEndState: null }))
       setScreen({ kind: '관리' })
     },
 
