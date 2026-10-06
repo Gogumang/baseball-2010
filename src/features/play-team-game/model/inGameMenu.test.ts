@@ -42,4 +42,8 @@ describe('경기 중 메뉴 표 0xcfcfc (I-controls 4c)', () => {
       expect(quitConfirmTextOf(mode)).toBe(QUIT_CONFIRM_PLAIN)
     }
   })
+
+  it('StrGAME[1] 은 원문 "진행 중인 게임을 그만하고 메인메뉴로 나가시겠습니까?" 다', () => {
+    expect(QUIT_CONFIRM_PLAIN).toBe('!C!cFFFFFF진행 중인 게임을 그만하고!N메인메뉴로 나가시겠습니까?')
+  })
 })

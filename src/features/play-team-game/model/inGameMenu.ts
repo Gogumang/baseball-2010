@@ -44,13 +44,18 @@ export function inGameMenuOf(mode: number): readonly InGameMenuAction[] {
 export const QUIT_CONFIRM_WITH_LOSS =
   '!C!cFFFFFF현재 이닝의 기록과 획득한!N!cFF0000G포인트가 사라집니다!cFFFFFF!N메인메뉴로 나가시겠습니까?'
 
-/**
- * StrGAME[1] — 그 밖(미션·홈런더비)의 나가기 확인 문구.
- * ⚠️ **원본 문구 미해독 — 근사**. I-controls 4c 는 "모드 1~4·8·9 는 StrGAME[0], 그 밖은 StrGAME[1]" 만 적는다.
- */
-export const QUIT_CONFIRM_PLAIN = '!C!cFFFFFF메인메뉴로 나가시겠습니까?'
+/** StrGAME[1] — 그 밖(미션 5·6 · 홈런더비 7)의 나가기 확인 문구 (`base/extracted/StrGAME.json` [1] 원문 그대로) */
+export const QUIT_CONFIRM_PLAIN = '!C!cFFFFFF진행 중인 게임을 그만하고!N메인메뉴로 나가시겠습니까?'
 
-/** 나가기 확인 문구 (`0x3c504`) */
+/**
+ * 나가기 확인 문구 (`0x3c504`).
+ * 모드 1~4·8·9(0x3c50e~0x3c51a)는 `0x702b5(StrGAME, 0)`, 그 밖(0x3c596)은 `0x702b5(StrGAME, 1)` 을
+ * `0x74ef5(창, 글, 종류 2, 0, 0)` 예/아니오 창으로 띄운다. 뒤에 `0x749d5` 가 없어 **처음 커서는 [예]**(R4 3a-1 — 첫 버튼).
+ * 답은 하위 1 `0x3c77c` 가 본다: [예](+0x21c == 0) → `0x20094(앱, 5)`(XlsTEAM/PITCHER/BATTER 표 다시 적재 — 저장은 안 건드림)
+ * → 경기 상태 0x22 + 밀기(5, 1500). 아니면 일시정지 팝업을 다시 띄운다(메뉴 커서 그대로).
+ * 0x22 갱신 `0x40140` 은 밀기가 끝나면 전역 모드 = 장면+0x1104 · 모드 5·6 이면 `0xa5368(미션, 0)` · 0x140006c = 4 ·
+ * 장면 0x103 — **모든 모드가 메인 메뉴 처음 단(하위 4)으로 간다**. 저장 쓰기(0x22754)도 +0x3c 쓰기도 없다.
+ */
 export function quitConfirmTextOf(mode: number): string {
   const withLoss = (mode >= 1 && mode <= 4) || mode === 8 || mode === 9
   return withLoss ? QUIT_CONFIRM_WITH_LOSS : QUIT_CONFIRM_PLAIN

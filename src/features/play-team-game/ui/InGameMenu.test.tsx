@@ -68,3 +68,31 @@ describe('경기 중 메뉴 커서 — 메뉴 객체(+0xf30)를 0 으로 되돌�
     expect(고른칸()?.textContent).toContain('다시하기')
   })
 })
+
+describe('경기 중 메뉴 — 나가기 (동작 3 0x3c504 → 하위 1 0x3c77c → 상태 0x22)', () => {
+  const 고른칸 = () => screen.getAllByRole('option').find((option) => option.getAttribute('aria-selected') === 'true')
+
+  it('모드 1~4·8·9 는 StrGAME[0], 미션·홈런더비는 StrGAME[1] 로 묻고 처음 커서는 [예]다 (0x749d5 없음)', () => {
+    render(<InGameMenu mode={3} onContinue={vi.fn()} onQuit={vi.fn()} />)
+    fireEvent.click(screen.getByText('나가기'))
+    expect(screen.getByText(/G포인트가 사라집니다/)).toBeTruthy()
+    expect(고른칸()?.textContent).toContain('예')
+    cleanup()
+
+    render(<InGameMenu mode={6} onContinue={vi.fn()} onQuit={vi.fn()} />)
+    fireEvent.click(screen.getByText('나가기'))
+    expect(screen.getByText(/진행 중인 게임을 그만하고/)).toBeTruthy()
+    expect(고른칸()?.textContent).toContain('예')
+  })
+
+  it('[예] 면 나간다 · [아니오] 면 메뉴로 돌아온다', () => {
+    const onQuit = vi.fn()
+    render(<InGameMenu mode={7} onContinue={vi.fn()} onQuit={onQuit} />)
+    fireEvent.click(screen.getByText('나가기'))
+    fireEvent.click(screen.getByText('아니오'))
+    expect(onQuit).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByText('나가기'))
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(onQuit).toHaveBeenCalledTimes(1)
+  })
+})
