@@ -112,9 +112,61 @@ describe('견제사 뒤 결과 메시지 0xbba → 0xafa60 한 번 (0x51d40~0x51
           random: createSeededRandom(seed),
         })
         if (result.resultCode === PICKOFF_RESULT.OUT) 견제사 += 1
-        expect(result.log.some((line) => line.includes('0xbba'))).toBe(false)
+        // 이어 던진 송구(0xb2c90 → 0xb2e38)는 "N번 야수가 b루로 송구" 로 남는다 — 견제 송구는 "b루 견제 송구"
+        expect(result.log.some((line) => line.includes('루로 송구'))).toBe(false)
       }
     }
     expect(견제사).toBeGreaterThan(0)
+  })
+})
+
+describe('견제를 받은 야수의 CPU 송구 결정 — 슬롯 2 의 0xafa60 (매 틱, `0xae6c8` = 수비 CPU || 송구 자동)', () => {
+  it('수비가 CPU 면 받은 야수의 준비 틱(내야 3)이 끝나는 틱까지 판이 열려 그 틱에 점수식이 고른다', () => {
+    const 사람 = runPickoffPlay({ targetBase: 1, bases: { first: true, second: false, third: false }, outs: 0 })
+    const CPU = runPickoffPlay({
+      targetBase: 1,
+      bases: { first: true, second: false, third: false },
+      outs: 0,
+      defenseIsCpu: true,
+    })
+
+    // 6틱에 1루수가 받아 +0xc8 = 3 → 9틱에 준비. 사람 수비·수동 송구는 그 갈래가 안 돌아 8틱 견제사로 끝난다
+    expect(사람.throwArrivalTick).toBe(6)
+    expect(사람.ticks).toHaveLength(9)
+    expect(CPU.ticks).toHaveLength(10)
+    expect(CPU.advance).toEqual(사람.advance)
+    // 송구 설정이 자동이면 사람 수비도 같다
+    expect(
+      runPickoffPlay({ targetBase: 1, bases: { first: true, second: false, third: false }, outs: 0, throwMode: '자동' })
+        .ticks,
+    ).toHaveLength(10)
+  })
+
+  it('표본 — CPU 갈래가 돌아도 견제 판의 결과·굴림은 그대로다 (점수식이 던질 루를 못 찾는다)', () => {
+    const 굴림 = (defenseIsCpu: boolean) => {
+      let calls = 0
+      const results: (number | null)[] = []
+      for (let seed = 0; seed < 300; seed += 1) {
+        const inner = createSeededRandom(seed)
+        const random = {
+          next: () => {
+            calls += 1
+            return inner.next()
+          },
+          nextInRange: (a: number, b: number) => {
+            calls += 1
+            return inner.nextInRange(a, b)
+          },
+          pick: <T,>(c: readonly T[]) => {
+            calls += 1
+            return inner.pick(c)
+          },
+        }
+        const result = runPickoffPlay({ targetBase: ((seed % 3) + 1) as 1 | 2 | 3, bases: 만루, outs: seed % 3, random, defenseIsCpu })
+        results.push(result.resultCode)
+      }
+      return { calls, results }
+    }
+    expect(굴림(true)).toEqual(굴림(false))
   })
 })
