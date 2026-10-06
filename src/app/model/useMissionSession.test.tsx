@@ -583,6 +583,51 @@ describe('미션 선수 고르기 — 명예 선수를 고르면 0x1fbd0 · 0x1f
   })
 })
 
+/* ── 경기 시작 rand(0, 2) — 상태 9 갱신 0x3f584 의 공통 꼬리 0x3fa0e → 0xc0dac ─────────── */
+
+describe('미션 경기 시작은 시뮬 초기화 0xc0dac 의 rand(0, 2) 한 번부터다 (모드 5·6 도 공통 꼬리를 탄다)', () => {
+  function 기록난수() {
+    const inner = createSeededRandom(3)
+    const calls: [number, number][] = []
+    const port: RandomPort = {
+      ...inner,
+      nextInRange: (min: number, max: number) => {
+        calls.push([min, max])
+        return inner.nextInRange(min, max)
+      },
+    }
+    return { port, calls }
+  }
+
+  it.each([['타자', MISSIONS.find((m) => m.side === '타자')!], ['투수', MISSIONS.find((m) => m.side === '투수')!]] as const)(
+    '%s 미션 begin — 굴림 하나 rand(0, 2)', (_side, mission) => {
+      const { port, calls } = 기록난수()
+      const rendered = renderHook(() =>
+        useMissionSession({
+          runner: useAtBatRunner(), random: port, missionRecord: { load: () => ({}), save: vi.fn() },
+          screen: { kind: '미션선택' }, setScreen: vi.fn(),
+        }))
+      act(() => rendered.result.current.actions.begin(mission))
+      expect(calls).toEqual([[0, 2]])
+    })
+
+  it('마선수 대결(beginAceMatch · beginPitcherAceMatch)도 한 번', () => {
+    const { port, calls } = 기록난수()
+    const rendered = renderHook(() =>
+      useMissionSession({
+        runner: useAtBatRunner(), random: port, missionRecord: { load: () => ({}), save: vi.fn() },
+        screen: { kind: '투수편' }, setScreen: vi.fn(),
+      }))
+    const batter = aceMatchMissionOf(SIKER_TEAM, '타자')
+    const pitcher = aceMatchMissionOf(16, '투수')
+    if (batter === null || pitcher === null) throw new Error('대결 미션이 없다')
+    act(() => rendered.result.current.actions.beginAceMatch(batter, { resultEvents: [1, 2], context: '대결결과', carried: EMPTY_STORY_CARRY }))
+    expect(calls).toEqual([[0, 2]])
+    act(() => rendered.result.current.actions.beginPitcherAceMatch(pitcher))
+    expect(calls).toEqual([[0, 2], [0, 2]])
+  })
+})
+
 /* ── 투수 미션 사구 뒤 벤치 클리어링 연출 (상태 0x1e) ───────────────────────────── */
 
 /** 씨앗 난수를 감싸 뽑은 수를 센다 */
@@ -819,7 +864,7 @@ describe('투수편 마선수 대결 — 투수 미션 team − 1 을 던지고 
   })
 
   it('실패하면 졌다', () => {
-    const { status, isWin } = playPitcherAceMatch(5)
+    const { status, isWin } = playPitcherAceMatch(2)
 
     expect(status).toBe('실패')
     expect(isWin).toBe(false)
