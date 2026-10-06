@@ -104,8 +104,9 @@ export function hiddenOpenIdOf(part: number, level: number): number {
  * (3000/10000/20000)이 통째로 건너뛰어진다.** 이미 열려 있던 해에는 보상이 정상이다.
  * (Q2 192행은 이 조건을 뒤집어 적어 두었다 — "이미 열렸으면 건너뛴다" 가 아니라 "새로 열리면" 이다.)
  *
- * 웹판에는 시즌모드도, 나리 투수편도, 시즌 우승 G 보상 단계 자체도 없어 **옮길 코드가 없다** —
- * 조건과 버그만 적어 둔다. 그 셋이 생기면 이 순서(해금 검사 → 열렸으면 보상 건너뜀)를 그대로 옮길 것.
+ * 나리 쪽 짝(정규시즌 우승 팝업 0xb 닫힘 0x15b84~0x15c52)은 같은 세 칸을 보되 **끝내지 않고** 자기 모드 해금으로
+ * 이어간다 — `postseasonFlow.applyRegularSeasonReward` 의 `otherModes`. 시즌모드 쪽(0x6900 — 해금 검사 → 새로 열렸으면
+ * 보상 건너뜀)은 `entities/season-mode` 의 리그 1위 G 지급(`nextLeagueFirstAward`) 앞에 놓일 자리다.
  */
 
 const isCollector = (career: PlayerCareer, part: number) =>

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   applyKoreanSeriesReward,
   applyRegularSeasonReward,
+  AUTOBOT_BAT_HIDDEN_ID,
   popupAfterChampion,
   pressPostseasonBracket,
   regularSeasonPopupOnEnter,
@@ -102,6 +103,28 @@ describe('128 틀 0x15984 — 팝업 닫힘', () => {
     const 다섯번 = { ...createCareer('일위'), regularSeasonFirstCount: 5 }
     expect(applyRegularSeasonReward(네번, REGULAR_SEASON_HIDDEN_ID.타자편).openedHiddenIds).toEqual([])
     expect(applyRegularSeasonReward(다섯번, REGULAR_SEASON_HIDDEN_ID.타자편).openedHiddenIds).toEqual([0x22])
+  })
+
+  it('세 모드(나리 두 편·시즌) 정규시즌 1위가 모두 있으면 0x29 오토봇 배트를 연다 (0x15b84~0x15c52)', () => {
+    const 타자 = { ...createCareer('일위'), regularSeasonFirstCount: 1 }
+    const 모두 = { otherLeagueFirstCount: 1, seasonModeFirstCount: 2, globalOpenedHiddenIds: [] }
+    expect(applyRegularSeasonReward(타자, REGULAR_SEASON_HIDDEN_ID.타자편, 모두).openedHiddenIds).toEqual([AUTOBOT_BAT_HIDDEN_ID])
+    // 한 곳이라도 0 이면 안 연다
+    expect(applyRegularSeasonReward(타자, REGULAR_SEASON_HIDDEN_ID.타자편, { ...모두, seasonModeFirstCount: 0 }).openedHiddenIds).toEqual([])
+    expect(applyRegularSeasonReward(타자, REGULAR_SEASON_HIDDEN_ID.타자편, { ...모두, otherLeagueFirstCount: 0 }).openedHiddenIds).toEqual([])
+    // 전역 표에 이미 열렸으면(0x9f69d) 건너뛴다
+    expect(
+      applyRegularSeasonReward(타자, REGULAR_SEASON_HIDDEN_ID.타자편, { ...모두, globalOpenedHiddenIds: [AUTOBOT_BAT_HIDDEN_ID] }).openedHiddenIds,
+    ).toEqual([])
+    // 다른 저장을 못 읽으면 검사 자체를 건너뛴다
+    expect(applyRegularSeasonReward(타자, REGULAR_SEASON_HIDDEN_ID.타자편).openedHiddenIds).toEqual([])
+  })
+
+  it('0x29 가 열려도 끝내지 않고 0x15c54 의 자기 모드 해금으로 이어간다 — 0x29 가 먼저다', () => {
+    const 투수 = { ...createCareer('일위'), regularSeasonFirstCount: 5 }
+    const 모두 = { otherLeagueFirstCount: 3, seasonModeFirstCount: 1, globalOpenedHiddenIds: [] }
+    expect(applyRegularSeasonReward(투수, REGULAR_SEASON_HIDDEN_ID.투수편, 모두).openedHiddenIds)
+      .toEqual([AUTOBOT_BAT_HIDDEN_ID, REGULAR_SEASON_HIDDEN_ID.투수편])
   })
 
   it('새 시즌 0x1b7c0 이 보상 플래그를 지운다', () => {

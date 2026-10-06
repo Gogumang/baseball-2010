@@ -125,21 +125,62 @@ export function popupAfterChampion(career: PostseasonCareerFields, champion: num
  * 팝업 0xb 닫힘 (0x15aee~0x15c8a) — 정규시즌 우승 보상.
  * 소지금은 0x15b30 이 S+2 를 **바로** 쓴다(9999 칸 자름) — 인기도 S+0x48 도 증가 함수(0xa690c)를 안 거친다.
  *
- * ⚠️ 미해결: 0x15b84~0x15c52 의 **세 모드 해금 0x29** — `0x9f69d(app, 1, 1, 2)` 가 0 이면 저장 모드 3·4·2 를
- *    차례로 적재(0x213c1)해 셋 다 `+0x7a > 0` 일 때 `0x62369(g, 0x29, 0)` 을 부른다. 다른 모드의 저장을
- *    여기서 읽을 수 없어 옮기지 않았다. 그 뒤 0x15c54 의 자기 모드 해금(`REGULAR_SEASON_HIDDEN_ID`)만 옮긴다.
+ * 그 뒤 **세 모드 해금 0x29 "오토봇 배트"** (0x15b84~0x15c52, R13 §11 · S13 4-3):
+ * ```
+ * 0x9f69d(전역, 1, 1, 2) ≠ 0(이미 열림) → 건너뜀
+ * 모드 4 : [sp] = S+0x7a(지금 타자)          ; 0x213c1(g,3,1) r6 = 투수편 저장 +0x7a ; 0x1f24d(g,3)
+ * 모드 3 : 0x213c1(g,4,1) [sp] = 타자편 저장 +0x7a ; 0x1f24d(g,4) ; r6 = S+0x7a(지금 투수)
+ * 0x213c1(g,2,1) r5 = 시즌 기록(0x1f55d) +0x7a ; 0x1f24d(g,2)
+ * [sp] > 0 && r6 > 0 && r5 > 0 → 0x62369(ui, 0x29, 0)
+ * ```
+ * 셋 다 `s8` 로 읽는다. 시즌모드 결산 0x6900 의 같은 검사와 달리 **여기는 열린 뒤에도 끝내지 않고** 0x15c54 의
+ * 자기 모드 해금(`REGULAR_SEASON_HIDDEN_ID`)으로 이어간다. 다른 두 저장의 값은 `otherModes` 로 받는다 —
+ * 안 넘기면(부르는 쪽이 아직 그 저장을 못 읽으면) 0x29 검사를 건너뛴다.
  * ⚠️ 해금 알림(0x62369 가 띄우는 글)은 웹에서 이 자리에 따로 띄우지 않는다 — id 만 남긴다.
  */
-export function applyRegularSeasonReward<T extends PostseasonCareerFields>(career: T, hiddenId: number): T {
+export function applyRegularSeasonReward<T extends PostseasonCareerFields>(
+  career: T,
+  hiddenId: number,
+  otherModes?: RegularSeasonOtherModes,
+): T {
   const rewarded: T = {
     ...career,
     popularity: clamp(career.popularity + REGULAR_SEASON_REWARD.popularity, 0, MAXIMUM_POPULARITY),
     money: clamp(career.money + REGULAR_SEASON_REWARD.moneyUnits * ORIGINAL_MONEY_UNIT, 0, MAXIMUM_MONEY),
     regularSeasonRewardTaken: true,
   }
-  if (career.regularSeasonFirstCount <= REGULAR_SEASON_HIDDEN_COUNT_ABOVE) return rewarded
-  if (career.openedHiddenIds.includes(hiddenId)) return rewarded
-  return { ...rewarded, openedHiddenIds: [...career.openedHiddenIds, hiddenId] }
+  const withAutobot = otherModes !== undefined && opensAutobotBat(career, otherModes)
+    ? { ...rewarded, openedHiddenIds: [...rewarded.openedHiddenIds, AUTOBOT_BAT_HIDDEN_ID] }
+    : rewarded
+  if (signedByteOf(career.regularSeasonFirstCount) <= REGULAR_SEASON_HIDDEN_COUNT_ABOVE) return withAutobot
+  if (withAutobot.openedHiddenIds.includes(hiddenId)) return withAutobot
+  return { ...withAutobot, openedHiddenIds: [...withAutobot.openedHiddenIds, hiddenId] }
+}
+
+/** 해금 0x29 = 히든 칸 (1, 1, 2) = StrITEM[20] "오토봇 배트" (R13 §11 표) */
+export const AUTOBOT_BAT_HIDDEN_ID = 0x29
+
+/** 0x15b84~0x15c52 가 적재해 읽는 **다른 두 모드** 저장의 정규시즌 1위 횟수(+0x7a) — 저장이 없으면 0 */
+export interface RegularSeasonOtherModes {
+  /** 나리 다른 편(타자편이면 투수편 저장 3, 투수편이면 타자편 저장 4)의 +0x7a */
+  readonly otherLeagueFirstCount: number
+  /** 시즌모드 저장 2 의 시즌 기록 +0x7a (`SeasonRecord.regularSeasonFirsts`) */
+  readonly seasonModeFirstCount: number
+  /** 전역 해금표 `app+0xc0` 에 이미 열린 id (0x9f69d 가 보는 곳) */
+  readonly globalOpenedHiddenIds: readonly number[]
+}
+
+const signedByteOf = (value: number) => ((value & 0xff) << 24) >> 24
+
+/** 0x15b84~0x15c50 — 이미 열렸으면 거짓, 아니면 세 모드 +0x7a 가 모두 0 보다 큰가 */
+export function opensAutobotBat(career: PostseasonCareerFields, otherModes: RegularSeasonOtherModes): boolean {
+  if (otherModes.globalOpenedHiddenIds.includes(AUTOBOT_BAT_HIDDEN_ID)) return false
+  if (career.openedHiddenIds.includes(AUTOBOT_BAT_HIDDEN_ID)) return false
+  return (
+    signedByteOf(career.regularSeasonFirstCount) > 0
+    && signedByteOf(otherModes.otherLeagueFirstCount) > 0
+    && signedByteOf(otherModes.seasonModeFirstCount) > 0
+  )
 }
 
 /** 팝업 8 닫힘 (0x15a3a~0x15aa4) — 한국시리즈 우승 보상 */
