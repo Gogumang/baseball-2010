@@ -231,6 +231,7 @@ export function CareerRoutes({
           // 제 n 회 = (연차 idx >> 1) + 1 (`0x85e6c`). 대회는 **끝난 해**의 연말에 치르고
           // 새 시즌은 대회가 끝난 뒤에야 오르므로(`0x1b768`), 연차 idx 는 지금 시즌 − 1 이다
           yearIndex={career.season - 1}
+          gamePoint={career.gamePoint}
           random={random}
           onStartGame={actions.startCupGame}
           onFinish={actions.finishCup}

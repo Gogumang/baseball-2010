@@ -452,6 +452,7 @@ export function SeasonRoute({
         mode="시즌모드"
         cup={cup}
         yearIndex={state.record.yearIndex}
+        gamePoint={session.gamePoints}
         random={random}
         // ⚠️ 웹판 임시 — 원본은 여기서 사람이 대표팀을 조작해 경기를 친다 (시즌 221)
         onStartGame={(matchup) => actions.playCupGame(matchup.myTeam, matchup.opponent)}

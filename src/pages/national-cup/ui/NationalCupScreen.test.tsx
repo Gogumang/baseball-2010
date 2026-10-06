@@ -139,3 +139,33 @@ describe('⚠️ 대한민국이 결승에 못 갔을 때 (원본 그대로)', (
     expect(onFinish.mock.calls[0][0]).toMatchObject({ champion: 13, koreaInFinal: false })
   })
 })
+
+describe('머리띠·바닥 (0x7f4ec ← 시즌 틀 0xb810 · 나리 틀 0x16928)', () => {
+  const 되돌아가기단추 = () => screen.queryByRole('button', { name: '되돌아가기' })
+  const 되돌아가기그림 = (container: HTMLElement) =>
+    [...container.querySelectorAll('img')].some((node) => node.getAttribute('src')?.endsWith('game_frame/021.png'))
+
+  it('시즌 0xf3(순위)은 제목 10 · 바닥 1 — 되돌아가기가 없다', () => {
+    const { container } = 띄우기(createNationalCup(), { mode: '시즌모드' })
+    expect(되돌아가기그림(container)).toBe(false)
+  })
+
+  it('시즌 0xf4(매치업)는 바닥 5 — 되돌아가기(−16)는 0xf3 으로 (0x4a18)', () => {
+    띄우기(createNationalCup(), { mode: '시즌모드' })
+    확인()
+    const 단추 = 되돌아가기단추()
+    expect(단추).toBeTruthy()
+    fireEvent.click(단추 as HTMLElement)
+    expect(screen.getByRole('group', { name: '국가대항전 순위' })).toBeTruthy()
+  })
+
+  it('나리 134·135 는 바닥 5 지만 취소 길이 없다 — 표시만 그리고 눌리지 않는다 (0x19fdc · 0x10680)', () => {
+    const { container } = 띄우기(createNationalCup(), { mode: '나만의리그' })
+    expect(되돌아가기그림(container)).toBe(true)
+    expect(되돌아가기단추()).toBeNull()
+    확인()
+    expect(되돌아가기그림(container)).toBe(true)
+    expect(되돌아가기단추()).toBeNull()
+    expect(screen.queryByRole('button', { name: '돌아가기' })).toBeNull()
+  })
+})

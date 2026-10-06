@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
+import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { TEAMS } from '@/shared/config/original/teams'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { nationalCupMatchupOf } from '@/entities/national-cup/model/nationalCup'
@@ -21,6 +22,8 @@ export interface NationalCupScreenProps {
   readonly cup: NationalCup
   /** 연차 idx — 제 n 회 계산에 쓴다 (`SeasonRecord.yearIndex` = `S+0xb3`) */
   readonly yearIndex: number
+  /** 머리띠 G포인트 */
+  readonly gamePoint?: number
   readonly random: RandomPort
   /**
    * 경기 시작 — 나리 상태 142 / 시즌 221 로 넘어가는 자리다.
@@ -53,8 +56,17 @@ type Step = '순위' | '매치업' | '결과' | '보상'
  * 시즌모드는 `242 → 211 → 243[순위] → 244[매치업] → 221 → 0x4b50 → 243 …` 로 상태 번호만 다르다.
  *
  * ⚠️ 이벤트 461~464(선발·거절)와 경기 자체는 이 화면 밖이다 — 앱이 잇는다.
+ *
+ * **머리띠·바닥** (직접 떴다): 두 그림 모두 끝에서 0x7f4ec(판)로 판에 맡긴 제목·바닥을 0x54d95 에 넘긴다 —
+ * 순위(134 0x19fc8 / 0xf3 0xe6e4 → 0x85af4, 끝 0x85e36) · 매치업(135 0x168dc → 0x168a4 / 0xf4 0xae5c → 0xae24, 끝 0x7f4ed).
+ * - 시즌 틀 0xb810: 0xf3 → 제목 10 · **바닥 1**(0xb88e~0xb8a6), 0xf4 는 "그 밖" → 10 · **5**.
+ * - 나리 틀 0x16928: 0x86 · 0x87 둘 다 "그 밖"(0x169ea~0x16a08) → 제목 [장면+0xcc] == 4 ? 8 : 9 · **5**.
+ *   나리 135 키 0x10680 은 확인만 본다 — 취소 길이 없어 되돌아가기 표시는 그려도 눌리지 않는다.
+ *   시즌 0xf4 키 0x4a18 은 −16 → 0xf3 이 있다. 134 · 0xf3 키(0x19fdc · 0xe6f8)도 확인만 본다.
  */
-export function NationalCupScreen({ mode, cup, yearIndex, random, onStartGame, onFinish }: NationalCupScreenProps) {
+export function NationalCupScreen({
+  mode, cup, yearIndex, gamePoint = 0, random, onStartGame, onFinish,
+}: NationalCupScreenProps) {
   const [step, setStep] = useState<Step>('순위')
   /** 동전 던지기(`0xb858c`)가 우승국을 바꿀 수 있어 확인 뒤 대회를 따로 들고 있는다 */
   const [resolved, setResolved] = useState<NationalCup>(cup)
@@ -86,11 +98,18 @@ export function NationalCupScreen({ mode, cup, yearIndex, random, onStartGame, o
           matchup={matchup}
           edition={edition}
           onStart={() => onStartGame(matchup, cup)}
-          onBack={() => setStep('순위')}
+          // 시즌 0x4a18 만 −16 → 0xf3. 나리 0x10680 은 확인만 본다
+          {...(mode === '시즌모드' ? { onBack: () => setStep('순위') } : {})}
         />
       ) : (
         <NationalCupStandings cup={current} onConfirm={confirmStandings} isConfirmable={step === '순위'} />
       )}
+
+      {/* 시즌 0xf3 은 제목 10 · 바닥 1, 0xf4 는 10 · 5. 나리 134·135 는 타자편 제목(8) · 5 — 되돌아가기는 표시만 */}
+      {mode === '시즌모드'
+        ? <ScreenFrame title="시즌모드" gamePoint={gamePoint}
+            onBack={step === '매치업' ? () => setStep('순위') : null} />
+        : <ScreenFrame title="나만의리그타자편" gamePoint={gamePoint} onBack={null} footer={5} />}
 
       {step === '결과' && (
         <MessageBox
