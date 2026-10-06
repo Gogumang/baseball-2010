@@ -455,7 +455,7 @@ export function SeasonRoute({ session, random, gameSettings, onExit, aceSelect, 
         // 웹 entities/league 에 이 함수가 없어 시리즈 결과에서 바로 읽는다
         postseasonRank={postseasonRankOf(series, state.record.teamId)}
         leagueFirstAwardedBits={session.leagueFirstAwardedBits}
-        skipsLeagueFirstAward={session.skipsLeagueFirstAward}
+        entry={session.summaryEntry}
         onApplyKoreanSeriesReward={(reward) => actions.updateRecord(applySeasonReward(state.record, reward))}
         onLeagueFirstAward={actions.awardLeagueFirst}
         onContinuePostseason={actions.continuePostseason}

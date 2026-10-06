@@ -10,7 +10,8 @@ import { TEAMS } from '@/shared/config/original/teams'
 
 /**
  * 시즌 결산 (0xef, 갱신 0x6900 · 그리기 0xb7b8 = 대진표 0x853ac) — P4 4b 확정.
- * 우승 팝업 StrMODE[137] → 보상 [197]/[198] → 리그 1위 G [223] 차례를 못박는다.
+ * 진입(0x6900)마다 리그 1위 G [223] 하나(또는 0x29 해금 알림 → 0x87e8 의 G 하나), "결과" 키로 우승 팝업 StrMODE[137]
+ * → 보상 [197]/[198] → 끝(0x87b4) 차례를 못박는다.
  */
 
 afterEach(cleanup)
@@ -42,6 +43,7 @@ describe('한국시리즈 우승 보상', () => {
         series={우승시리즈()}
         postseasonRank={0}
         leagueFirstAwardedBits={0}
+        entry={null}
         onApplyKoreanSeriesReward={onApply}
         onLeagueFirstAward={vi.fn()}
         onFinish={onFinish}
@@ -74,6 +76,7 @@ describe('한국시리즈 우승 보상', () => {
         series={우승시리즈()}
         postseasonRank={1}
         leagueFirstAwardedBits={0}
+        entry={null}
         onApplyKoreanSeriesReward={onApply}
         onLeagueFirstAward={vi.fn()}
         onFinish={vi.fn()}
@@ -98,6 +101,7 @@ describe('한국시리즈 우승 보상', () => {
         series={우승시리즈()}
         postseasonRank={2}
         leagueFirstAwardedBits={0}
+        entry={null}
         onApplyKoreanSeriesReward={onApply}
         onLeagueFirstAward={vi.fn()}
         onFinish={onFinish}
@@ -112,8 +116,10 @@ describe('한국시리즈 우승 보상', () => {
   })
 })
 
-describe('리그 1위 누적 G (StrMODE[223])', () => {
-  it('1위 1회면 3000 G 를 한 번 준다 (Q2 5-1 — 문턱·금액이 뒤바뀌어 있었다)', () => {
+describe('리그 1위 누적 G (StrMODE[223]) — 결산 진입(0x6900)마다 하나', () => {
+  const 진입 = (serial: number, opensAutobotBat = false) => ({ serial, opensAutobotBat })
+
+  it('1위 1회면 진입하자마자 3000 G 팝업이 뜨고 그 자리에서 준다 (Q2 5-1 · 0x6a5e 팝업 → 0x6a64~ 지급)', () => {
     const onAward = vi.fn()
     const onFinish = vi.fn()
     render(
@@ -122,62 +128,117 @@ describe('리그 1위 누적 G (StrMODE[223])', () => {
         series={우승시리즈()}
         postseasonRank={2}
         leagueFirstAwardedBits={0}
+        entry={진입(1)}
         onApplyKoreanSeriesReward={vi.fn()}
         onLeagueFirstAward={onAward}
         onFinish={onFinish}
       />,
     )
-
-    fireEvent.click(screen.getByRole('button', { name: '결과' }))
-    확인() // [137] 우승 팝업 → 순위 2 라 보상 없이 리그 1위 검사로
 
     const 글 = screen.getByRole('dialog', { name: '알림' }).textContent ?? ''
     expect(글).toContain('1위 1회')
     expect(글).toContain('3000 G포인트')
-
-    확인()
     expect(onAward).toHaveBeenCalledWith({ threshold: 1, gamePoint: 3000, bit: 0 })
+
+    // 팝업이 떠 있는 동안 "결과" 키는 먹지 않는다
+    fireEvent.click(screen.getByRole('button', { name: '결과' }))
+    expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain('3000 G포인트')
+
+    확인() // 꼬리표 1 — 닫혀도 아무 가지에도 안 걸려 대진표로
+    expect(screen.queryByRole('dialog', { name: '알림' })).toBeNull()
+    expect(onFinish).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: '결과' }))
+    확인() // [137] → 순위 2 라 보상 없이 곧장 0x87b4
+    expect(onAward).toHaveBeenCalledTimes(1)
     expect(onFinish).toHaveBeenCalled()
   })
 
-  it('1위 10회인데 아무 비트도 안 켜졌으면 1회분 → 5회분 → 10회분 을 하나씩 잇달아 준다', () => {
+  it('1위 10회인데 아무 비트도 안 켜졌으면 진입마다 하나씩 준다 — 한 진입에서 잇달아 주지 않는다', () => {
     const onAward = vi.fn()
-    const onFinish = vi.fn()
-    render(
+    const 그리기 = (bits: number, serial: number) => (
       <SeasonSummaryScreen
         record={기록({ regularSeasonFirsts: 10 })}
-        series={우승시리즈()}
+        series={startPostseason([0, 1, 2, 3])}
         postseasonRank={2}
-        leagueFirstAwardedBits={0}
+        leagueFirstAwardedBits={bits}
+        entry={진입(serial)}
         onApplyKoreanSeriesReward={vi.fn()}
         onLeagueFirstAward={onAward}
-        onFinish={onFinish}
-      />,
+        onFinish={vi.fn()}
+      />
     )
-
-    fireEvent.click(screen.getByRole('button', { name: '결과' }))
+    const { rerender, unmount } = render(그리기(0, 1))
+    expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain('3000 G포인트')
     확인()
-    확인() // 1회분
+    expect(screen.queryByRole('dialog', { name: '알림' })).toBeNull()
+    expect(onAward).toHaveBeenCalledTimes(1)
+
+    // 같은 진입에서 값이 바뀌어도 다시 보지 않는다
+    rerender(그리기(0b1, 1))
+    expect(onAward).toHaveBeenCalledTimes(1)
+    unmount()
+
+    // 포스트시즌 경기를 치르고 다시 들어오면(새 진입) 다음 칸
+    render(그리기(0b1, 2))
     expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain('10000 G포인트')
-    확인() // 5회분
+    확인()
+    cleanup()
+    render(그리기(0b11, 3))
     expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain('20000 G포인트')
-    확인() // 10회분
 
     expect(onAward).toHaveBeenNthCalledWith(1, { threshold: 1, gamePoint: 3000, bit: 0 })
     expect(onAward).toHaveBeenNthCalledWith(2, { threshold: 5, gamePoint: 10000, bit: 1 })
     expect(onAward).toHaveBeenNthCalledWith(3, { threshold: 10, gamePoint: 20000, bit: 2 })
-    expect(onFinish).toHaveBeenCalled()
   })
 
   it('이미 받은 비트는 다시 주지 않는다 (저장 전역 +0x145)', () => {
     const onAward = vi.fn()
-    const onFinish = vi.fn()
     render(
       <SeasonSummaryScreen
         record={기록({ regularSeasonFirsts: 1 })}
         series={우승시리즈()}
         postseasonRank={2}
         leagueFirstAwardedBits={0b1}
+        entry={진입(1)}
+        onApplyKoreanSeriesReward={vi.fn()}
+        onLeagueFirstAward={onAward}
+        onFinish={vi.fn()}
+      />,
+    )
+
+    expect(screen.queryByRole('dialog', { name: '알림' })).toBeNull()
+    expect(onAward).not.toHaveBeenCalled()
+  })
+
+  it('진입 효과가 아직 안 돌았으면(entry null) 아무것도 띄우지 않는다', () => {
+    const onAward = vi.fn()
+    render(
+      <SeasonSummaryScreen
+        record={기록({ regularSeasonFirsts: 1 })}
+        series={우승시리즈()}
+        postseasonRank={2}
+        leagueFirstAwardedBits={0}
+        entry={null}
+        onApplyKoreanSeriesReward={vi.fn()}
+        onLeagueFirstAward={onAward}
+        onFinish={vi.fn()}
+      />,
+    )
+    expect(screen.queryByRole('dialog', { name: '알림' })).toBeNull()
+    expect(onAward).not.toHaveBeenCalled()
+  })
+
+  it('한국시리즈 보상 팝업(꼬리표 9·10)이 닫히면 G 검사 없이 곧장 0x87b4 로 끝난다', () => {
+    const onAward = vi.fn()
+    const onFinish = vi.fn()
+    render(
+      <SeasonSummaryScreen
+        record={기록({ regularSeasonFirsts: 1 })}
+        series={우승시리즈()}
+        postseasonRank={0}
+        leagueFirstAwardedBits={0}
+        entry={null}
         onApplyKoreanSeriesReward={vi.fn()}
         onLeagueFirstAward={onAward}
         onFinish={onFinish}
@@ -185,8 +246,8 @@ describe('리그 1위 누적 G (StrMODE[223])', () => {
     )
 
     fireEvent.click(screen.getByRole('button', { name: '결과' }))
-    확인()
-
+    확인() // [137]
+    확인() // [197]
     expect(onAward).not.toHaveBeenCalled()
     expect(onFinish).toHaveBeenCalled()
   })
@@ -202,7 +263,7 @@ describe('0x29 가 새로 열린 결산 진입 (0x69ce → 0x6ac8 · 닫힘 0x87
         series={우승시리즈()}
         postseasonRank={2}
         leagueFirstAwardedBits={0}
-        skipsLeagueFirstAward
+        entry={{ serial: 1, opensAutobotBat: true }}
         onApplyKoreanSeriesReward={vi.fn()}
         onLeagueFirstAward={onAward}
         onFinish={onFinish}
@@ -212,10 +273,12 @@ describe('0x29 가 새로 열린 결산 진입 (0x69ce → 0x6ac8 · 닫힘 0x87
   }
 
   it('해금 알림 창이 먼저 뜨고, 닫으면 리그 1위 G 를 한 번 본다 — 문턱 미달이면 아무것도 없다', () => {
-    const { onAward, onFinish } = 띄우기(1)
+    const { onAward, onFinish } = 띄우기(0)
     expect(document.body.textContent).toContain('오토봇 배트')
+    expect(onAward).not.toHaveBeenCalled()
     확인()
     expect(onAward).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog', { name: '알림' })).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: '결과' }))
     확인()
@@ -223,15 +286,15 @@ describe('0x29 가 새로 열린 결산 진입 (0x69ce → 0x6ac8 · 닫힘 0x87
     expect(onFinish).toHaveBeenCalled()
   })
 
-  it('문턱을 넘었으면 알림을 닫을 때 하나만 주고(꼬리표 1 이라 이어지지 않는다) 뒤 사슬은 건너뛴다', () => {
+  it('문턱을 넘었으면 알림을 닫을 때 하나만 준다(꼬리표 1 이라 이어지지 않는다)', () => {
     const { onAward, onFinish } = 띄우기(20)
+    expect(onAward).not.toHaveBeenCalled() // 진입의 G 검사는 건너뛴다
     확인() // 해금 알림
     expect(document.body.textContent).toContain('G포인트')
-    확인() // G 팝업
     expect(onAward).toHaveBeenCalledTimes(1)
-    // 문턱 표의 첫 칸 하나만
     expect(onAward.mock.calls[0]?.[0]).toMatchObject({ bit: 0 })
-    expect(screen.queryByRole('button', { name: 'OK' })).toBeNull()
+    확인() // G 팝업
+    expect(screen.queryByRole('dialog', { name: '알림' })).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: '결과' }))
     확인()
@@ -249,6 +312,7 @@ describe('아직 안 끝난 포스트시즌', () => {
         series={startPostseason([0, 1, 2, 3])}
         postseasonRank={0}
         leagueFirstAwardedBits={0}
+        entry={null}
         onApplyKoreanSeriesReward={vi.fn()}
         onLeagueFirstAward={vi.fn()}
         onContinuePostseason={onContinue}

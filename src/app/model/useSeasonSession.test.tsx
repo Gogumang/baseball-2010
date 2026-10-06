@@ -1422,13 +1422,18 @@ describe('결산 0x6900 의 세 모드 해금 0x29 "오토봇 배트"', () => {
     결산들어가기(result, 1)
 
     expect(result.current.openedHiddenIds).toEqual([0x29])
-    expect(result.current.skipsLeagueFirstAward).toBe(true)
+    const 첫진입 = result.current.summaryEntry
+    expect(첫진입).toMatchObject({ opensAutobotBat: true })
 
-    // 다시 들어가면 이미 열려 있어(0x9f69d) 검사를 건너뛰고 G 검사로 간다
+    // 결산을 떠나면 진입 값을 비운다 — 다시 들어올 때 지난 진입을 새 진입으로 읽지 않게
     act(() => result.current.actions.goto(SEASON_SCENE_STATE.관리메뉴))
+    expect(result.current.summaryEntry).toBeNull()
+
+    // 다시 들어가면 이미 열려 있어(0x9f69d) 검사를 건너뛰고 G 검사로 간다 — 새 진입 번호
     act(() => result.current.actions.goto(SEASON_SCENE_STATE.시즌결산))
     expect(result.current.openedHiddenIds).toEqual([0x29])
-    expect(result.current.skipsLeagueFirstAward).toBe(false)
+    expect(result.current.summaryEntry).toMatchObject({ opensAutobotBat: false })
+    expect(result.current.summaryEntry?.serial).not.toBe(첫진입?.serial)
   })
 
   it('한 모드라도 1위가 없거나 전역 표에 이미 열려 있으면 열지 않는다', () => {
@@ -1436,12 +1441,12 @@ describe('결산 0x6900 의 세 모드 해금 0x29 "오토봇 배트"', () => {
     시작(하나없음.result, 0)
     결산들어가기(하나없음.result, 1)
     expect(하나없음.result.current.openedHiddenIds).toEqual([])
-    expect(하나없음.result.current.skipsLeagueFirstAward).toBe(false)
+    expect(하나없음.result.current.summaryEntry).toMatchObject({ opensAutobotBat: false })
 
     const 열림 = 띄우기0x29(() => ({ pitcherEditionFirsts: 1, batterEditionFirsts: 1, globalOpenedHiddenIds: [0x29] }))
     시작(열림.result, 0)
     결산들어가기(열림.result, 1)
     expect(열림.result.current.openedHiddenIds).toEqual([])
-    expect(열림.result.current.skipsLeagueFirstAward).toBe(false)
+    expect(열림.result.current.summaryEntry).toMatchObject({ opensAutobotBat: false })
   })
 })

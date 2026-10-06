@@ -7,7 +7,9 @@ import {
   SEASON_AUTOBOT_BAT_HIDDEN_ID, koreanSeriesRewardOf, nextLeagueFirstAward,
 } from '@/entities/season-mode/model/seasonRewards'
 import { hiddenOpenTextOf } from '@/entities/career/model/equipment'
-import type { LeagueFirstAward, SeasonReward } from '@/entities/season-mode/model/seasonRewards'
+import type {
+  LeagueFirstAward, SeasonReward, SeasonSummaryEntry,
+} from '@/entities/season-mode/model/seasonRewards'
 import { MILLION_TO_TEN_THOUSAND } from '@/widgets/season/lib/seasonWindowLayout'
 import { PostseasonBracketWindow } from '@/widgets/season/ui/PostseasonBracketWindow'
 import * as styles from '@/widgets/season/ui/SeasonEndWindow.css'
@@ -48,15 +50,17 @@ export interface SeasonSummaryScreenProps {
   /** 저장(전역) **+0x145** — 리그 1위 G 를 이미 받은 문턱 비트 (시즌을 새로 시작해도 유지된다) */
   readonly leagueFirstAwardedBits: number
   /**
-   * 이번 결산 진입(0x6900)에서 세 모드 해금 0x29 "오토봇 배트" 가 새로 열렸다 — 0x62369 가 해금 알림 창(0x62368 →
-   * 0x74ef5, 꼬리표 g+0x248 = 0)을 띄우고 0x69ce 가 곧장 함수 끝(0x6ac8)으로 가 **진입의 리그 1위 G 검사를 건너뛴다**.
-   * 그 창을 OK 로 닫으면 0xef 갱신 0x85ec 의 0x87e8(`[g+9] ≠ 0 && 꼬리표 == 0 && 결과 ∈ {0, 0x14}`)이 같은 G 검사를
-   * **한 번** 돌린다 — 준 G 팝업은 0xbbef8 이 꼬리표 1 을 세워 다시 0x87e8 을 부르지 않는다. 참이면 이 진입의 뒤 G 사슬은 없다.
+   * 지금 결산 진입(`0x6900`). `serial` 이 바뀔 때마다 진입 몫을 **한 번** 띄운다 — 0x29 "오토봇 배트" 가 새로 열렸으면
+   * 해금 알림 창(0x62368 → 0x74ef5, 꼬리표 0)과 그 창이 닫힐 때 `0x87e8` 의 G 검사 하나, 아니면 진입의 G 검사 하나.
+   * null 이면 진입 효과가 아직 안 돌았다 — 아무것도 띄우지 않고 기다린다.
    */
-  readonly skipsLeagueFirstAward?: boolean
+  readonly entry: SeasonSummaryEntry | null
   /** 한국시리즈 보상 적용 (`0x85ec` — 팝업 7 이 닫힐 때 인기도·평판·소지금을 더한다) */
   readonly onApplyKoreanSeriesReward: (reward: SeasonReward) => void
-  /** 리그 1위 G 지급 (`0x87e8` — 한 번에 하나, 팝업이 닫히면 다음 문턱을 다시 본다) */
+  /**
+   * 리그 1위 G 지급 — 원본은 StrMODE[223] 팝업을 띄우는 **그 자리에서** G·비트·저장을 한다(0x6a5e 팝업 뒤 0x6a64~,
+   * 0x8892 뒤 0x8896~). 그래서 팝업이 뜰 때 부른다.
+   */
   readonly onLeagueFirstAward: (award: LeagueFirstAward) => void
   /**
    * 포스트시즌이 아직 안 끝났다 — 원본은 라운드 `SR+0xb5` 의 대진에 내 팀이 있으면
@@ -71,23 +75,28 @@ export interface SeasonSummaryScreenProps {
   readonly onFinish: () => void
 }
 
-type Phase = '대진표' | '해금알림' | '해금뒤리그1위' | '우승문구' | '한국시리즈보상' | '리그1위'
+type Phase = '대진표' | '해금알림' | '리그1위' | '우승문구' | '한국시리즈보상'
 
 /** SR+0xb7 = 0xf 는 "우승팀 미정" 이다 (P4 1a) */
 const NO_CHAMPION = 0xf
 
 /**
- * 시즌 결산 (장면 0x105 상태 **0xef**, 갱신 `0x6900` · 키 `0x9dc8` · 그리기 `0xb7b8` — P4 1a·4b 확정).
+ * 시즌 결산 (장면 0x105 상태 **0xef**, 진입 `0x6900` · 키 `0x9dc8` · 갱신 `0x85ec` · 그리기 `0xb7b8` — P4 1a·4b,
+ * 팝업 꼬리표 흐름은 0x6900 · 0x85ec · 0x9dc8 을 직접 떴다).
  *
- * `phase = 0xf` 를 세우고 **포스트시즌 대진표 0x853ac** 를 그린다 (R13 1절: 0xef 의 그리기가
- * 바로 대진표다). 시리즈가 끝났으면 우승 팝업 → 보상 → 리그 1위 G 순서로 이어진다:
+ * `phase = 0xf` 를 세우고 **포스트시즌 대진표 0x853ac** 를 그린다 (R13 1절: 0xef 의 그리기가 바로 대진표다).
  *
- * 1. **StrMODE[137]** "한국시리즈 우승! [우승팀]" 팝업(id 7)
- * 2. 팝업이 닫히면 `0x85ec` 가 내 팀 포스트시즌 순위로 보상을 준다 —
- *    0 우승 **[197]** 인기도 +25 · 평판 +30 · 소지금 +40(4000만) / 1 준우승 **[198]** +15 · +15 · +15(1500만)
- * 3. 이어 `0x87e8` 이 **리그 1위 누적 G [223]** 를 한 번에 하나씩 준다
- *    (문턱 3·10·20회 → 1000·5000·10000 G, 비트가 **전역 저장**이라 다시 못 받는다)
- * 4. 끝나면 연차 idx 짝수 → 국가대항전, 홀수 → 새 해 (`afterKoreanSeries`)
+ * **진입마다 하나** (`0x6900`, 포스트시즌 경기를 치르고 돌아와도 다시 들어온다):
+ * - 0x29 "오토봇 배트" 가 새로 열리면 해금 알림 창(꼬리표 0) → 닫히면 `0x87e8` 이 **리그 1위 G [223]** 하나
+ * - 아니면 진입이 곧장 **리그 1위 G [223]** 하나 (1·5·10회 → 3000·10000·20000 G, 비트가 **전역 저장**이라 다시 못 받는다)
+ * - G 팝업은 꼬리표 1 이라 닫혀도 아무 가지에도 안 걸린다 — 다음 문턱은 **다음 진입**에서 준다
+ *
+ * **시리즈가 끝났으면 "결과" 키** (`0x9dc8`):
+ * 1. **StrMODE[137]** "한국시리즈 우승! [우승팀]" 팝업(꼬리표 7)
+ * 2. 닫히면 `0x85ec` 가 내 팀 포스트시즌 순위로 보상 — 0 우승 **[197]**(꼬리표 9) 인기도 +25 · 평판 +30 ·
+ *    소지금 +40(4000만) / 1 준우승 **[198]**(꼬리표 10) +15 · +15 · +15(1500만) / 그 밖은 곧장 4
+ * 3. 보상 팝업이 닫힐 때 더하고(0x86dc~ · 0x8752~) 곧장 4 — **여기에는 G 검사가 없다**
+ * 4. `0x87b4`: 연차 idx 짝수 → 국가대항전, 홀수 → 새 해 (`onFinish`)
  *
  * ⚠️ **준우승 문구의 소지금 표시는 1500만인데 실제로 더하는 값도 15(=1500만) 다** — 표시와 코드가
  * 어긋나는 것은 국가대항전 준우승 쪽(StrMODE[200])이고, 그 버그는 `seasonRewards.ts` 가 이미
@@ -98,40 +107,43 @@ const NO_CHAMPION = 0xf
  */
 export function SeasonSummaryScreen(props: SeasonSummaryScreenProps) {
   const {
-    record, series, postseasonRank, leagueFirstAwardedBits, skipsLeagueFirstAward = false,
+    record, series, postseasonRank, leagueFirstAwardedBits, entry,
     onApplyKoreanSeriesReward, onLeagueFirstAward, onContinuePostseason, onFinish,
   } = props
 
   const [phase, setPhase] = useState<Phase>('대진표')
-  const [awardedBits, setAwardedBits] = useState(leagueFirstAwardedBits)
   const [pendingAward, setPendingAward] = useState<LeagueFirstAward | null>(null)
-  // 0x29 해금 알림은 그 진입에 한 번 — 세션이 진입 효과(0x6900)에서 이 값을 세우므로 화면이 선 뒤에 올 수 있다
-  const autobotNoticeShown = useRef(false)
+
+  /** 리그 1위 G 검사 한 번 (0x69d4~0x6ac0 = 0x8802~0x88fc) — 줄 것이 있으면 팝업을 띄우며 그 자리에서 준다 */
+  const checkLeagueFirst = () => {
+    const award = nextLeagueFirstAward(record, leagueFirstAwardedBits)
+    if (award === null) {
+      setPhase('대진표')
+      return
+    }
+    onLeagueFirstAward(award)
+    setPendingAward(award)
+    setPhase('리그1위')
+  }
+
+  // 진입 몫은 그 진입에 한 번 — 세션이 진입 효과(0x6900)에서 `entry` 를 세우므로 화면이 선 뒤에 온다
+  const handledEntry = useRef<number | null>(null)
   useEffect(() => {
-    if (!skipsLeagueFirstAward || autobotNoticeShown.current) return
-    autobotNoticeShown.current = true
-    setPhase('해금알림')
-  }, [skipsLeagueFirstAward])
+    if (entry === null || handledEntry.current === entry.serial) return
+    handledEntry.current = entry.serial
+    if (entry.opensAutobotBat) setPhase('해금알림')
+    else checkLeagueFirst()
+    // 진입(serial)마다 한 번만 — 다른 값이 바뀌어도 다시 돌지 않는다
+  }, [entry])
 
   const isFinished = series !== null && series.round === '종료'
   const championId = series?.champion ?? (record.postseasonChampion === NO_CHAMPION ? null : record.postseasonChampion)
   const championName = championId === null ? '' : TEAMS[championId]?.name ?? ''
   const reward = koreanSeriesRewardOf(postseasonRank)
 
-  /** 리그 1위 G 는 한 번에 하나다 — 줄 것이 없으면 결산이 끝난다 (`0x87e8`) */
-  const goToLeagueFirst = (bits: number) => {
-    // ⚠️ 웹은 결산 진입(0x6900)과 팝업 닫힘(0x87e8)의 G 검사를 이 한 자리에 모았다 — 0x29 가 열린 진입이면 그 검사는
-    //    해금 알림 창을 닫을 때(0x87e8) 이미 한 번 돌았으므로 여기서는 건너뛴다
-    const award = skipsLeagueFirstAward ? null : nextLeagueFirstAward(record, bits)
-    if (award === null) {
-      onFinish()
-      return
-    }
-    setPendingAward(award)
-    setPhase('리그1위')
-  }
-
   const onPressNext = () => {
+    // 팝업이 떠 있는 동안 키는 팝업이 받는다
+    if (phase !== '대진표') return
     if (!isFinished) {
       onContinuePostseason?.()
       return
@@ -157,23 +169,17 @@ export function SeasonSummaryScreen(props: SeasonSummaryScreenProps) {
         <MessageBox
           text={hiddenOpenTextOf(SEASON_AUTOBOT_BAT_HIDDEN_ID) ?? ''}
           buttons={['OK']}
-          onAnswer={() => {
-            // 0x87e8 — 리그 1위 G 검사를 한 번 (문턱 3·10·20 중 아직 안 받은 첫 칸 하나)
-            const award = nextLeagueFirstAward(record, awardedBits)
-            setPendingAward(award)
-            setPhase(award === null ? '대진표' : '해금뒤리그1위')
-          }}
+          // 꼬리표 0 이 닫히면 0x87e8 — 리그 1위 G 검사를 한 번 (1·5·10 중 아직 안 받은 첫 칸 하나)
+          onAnswer={checkLeagueFirst}
         />
       )}
 
-      {phase === '해금뒤리그1위' && pendingAward !== null && (
+      {phase === '리그1위' && pendingAward !== null && (
         <MessageBox
           text={formatted(TEXT.leagueFirst, [pendingAward.threshold, pendingAward.gamePoint])}
           buttons={['OK']}
           onAnswer={() => {
-            // G 팝업(0xbbef8, 꼬리표 1)을 닫아도 0x87e8 은 다시 안 돈다 — 대진표로 돌아간다
-            onLeagueFirstAward(pendingAward)
-            setAwardedBits(awardedBits | (1 << pendingAward.bit))
+            // G 팝업(0xbbef9(…, 1, 1, 1), 꼬리표 1)은 닫혀도 0x85ec 의 어느 가지에도 안 걸린다 — 대진표로 돌아간다
             setPendingAward(null)
             setPhase('대진표')
           }}
@@ -185,9 +191,9 @@ export function SeasonSummaryScreen(props: SeasonSummaryScreenProps) {
           text={formatted(TEXT.champion, [championName])}
           buttons={['OK']}
           onAnswer={() => {
-            // 팝업 7 이 닫힐 때 보상이 붙는다 (0x85ec). 3위 아래는 문구도 보상도 없다
+            // 팝업 7 이 닫힐 때 보상이 붙는다 (0x85ec). 3위 아래는 문구도 보상도 없이 곧장 0x87b4
             if (reward.messageId === 0) {
-              goToLeagueFirst(awardedBits)
+              onFinish()
               return
             }
             onApplyKoreanSeriesReward(reward)
@@ -205,20 +211,8 @@ export function SeasonSummaryScreen(props: SeasonSummaryScreenProps) {
             reward.money * MILLION_TO_TEN_THOUSAND,
           ])}
           buttons={['OK']}
-          onAnswer={() => goToLeagueFirst(awardedBits)}
-        />
-      )}
-
-      {phase === '리그1위' && pendingAward !== null && (
-        <MessageBox
-          text={formatted(TEXT.leagueFirst, [pendingAward.threshold, pendingAward.gamePoint])}
-          buttons={['OK']}
-          onAnswer={() => {
-            onLeagueFirstAward(pendingAward)
-            const next = awardedBits | (1 << pendingAward.bit)
-            setAwardedBits(next)
-            goToLeagueFirst(next)
-          }}
+          // 꼬리표 9·10 이 닫히면 0x87b4 — 리그 1위 G 검사 없이 결산을 닫는다
+          onAnswer={onFinish}
         />
       )}
     </RawScreen>

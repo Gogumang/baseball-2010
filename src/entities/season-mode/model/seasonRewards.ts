@@ -125,13 +125,16 @@ export interface LeagueFirstAward {
 }
 
 /**
- * 리그 1위 G 지급 검사 (`0x6900` 갱신 + `0x87e8` 팝업 닫힘).
+ * 리그 1위 G 지급 검사 — 결산 0xef 진입 `0x6900`(0x69d4~0x6ac0) 과 0xef 갱신 `0x85ec` 의 `0x87e8`(0x8802~0x88fc) 이
+ * 같은 고리를 돈다 (직접 떴다).
  * ```
  * k = SR+0x7a (정규시즌 1위 횟수)
- * for i in 0..2: k ≥ 문턱[i] 이고 저장+0x145 의 비트 i 가 0 이면 → 지급하고 이번 호출은 끝
+ * for i in 0..2: k ≥ 문턱[i] 이고 저장+0x145 의 비트 i 가 0 이면
+ *     → StrMODE[223] 팝업 0xbbef9(buf, 1, 1, 1) · G += · 비트 i · 저장 · 0x22dd5 — 이번 호출은 끝
  * ```
- * 한 번에 하나만 준다 — 팝업이 닫히면 다음 문턱을 다시 본다. 비트가 **전역 저장**에 있어
- * 시즌을 새로 시작해도 다시 받지 못한다(의도로 보임).
+ * **한 번 부를 때 하나**다. 그 팝업의 꼬리표가 1 이라 닫혀도 0x85ec 의 어느 가지(꼬리표 7·9·10·0)에도 걸리지 않아
+ * 다음 문턱을 다시 보지 않는다 — 다음 칸은 다음 결산 진입에서 준다(`SeasonSummaryEntry`). 비트가 **전역 저장**에
+ * 있어 시즌을 새로 시작해도 다시 받지 못한다(의도로 보임).
  */
 export function nextLeagueFirstAward(record: SeasonRecord, awardedBits: number): LeagueFirstAward | null {
   for (let i = 0; i < LEAGUE_FIRST_THRESHOLDS.length; i += 1) {
@@ -157,6 +160,17 @@ export interface SeasonAutobotBatInput {
   readonly batterEditionFirsts: number
   /** 전역 해금표 `app+0xc0` 에 이미 열린 id (`0x9f69d(g, 1, 1, 2)` 가 보는 칸) */
   readonly globalOpenedHiddenIds: readonly number[]
+}
+
+/**
+ * 결산 0xef 진입 한 번 (`0x6900`) — 진입마다 `serial` 이 바뀐다. 진입이 하는 일은 하나다 (0x6900 · 0x85ec 직접 떴다):
+ * - `opensAutobotBat` 참: 0x29 해금 알림 창(꼬리표 0)을 띄우고 G 검사는 건너뛴다(0x69ce → 0x6ac8). 창을 닫으면
+ *   `0x87e8`(`[g+9] ≠ 0 && 꼬리표 [g+0x248] == 0 && 결과 [g+0x21c] ∈ {0, 0x14}`)이 G 검사를 한 번 돈다.
+ * - 거짓: 진입이 곧장 G 검사를 한 번 돈다(0x69d4~0x6ac0).
+ */
+export interface SeasonSummaryEntry {
+  readonly serial: number
+  readonly opensAutobotBat: boolean
 }
 
 const signedByteOf = (value: number) => ((value & 0xff) << 24) >> 24

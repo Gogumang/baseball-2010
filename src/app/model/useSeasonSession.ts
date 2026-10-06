@@ -76,7 +76,7 @@ import {
 } from '@/entities/season-mode/model/seasonRewards'
 import type { SeasonAutobotBatInput } from '@/entities/season-mode/model/seasonRewards'
 import type { BurstRewardDelta } from '@/entities/burst-mission/model/burstMissionReward'
-import type { LeagueFirstAward } from '@/entities/season-mode/model/seasonRewards'
+import type { LeagueFirstAward, SeasonSummaryEntry } from '@/entities/season-mode/model/seasonRewards'
 import type { SeasonAwardReward } from '@/widgets/season/lib/seasonAwardEvents'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import {
@@ -162,10 +162,10 @@ export interface SeasonSession {
    */
   readonly openedHiddenIds: readonly number[]
   /**
-   * 이번 결산 진입(0x6900)에서 0x29 를 새로 열어 **진입의 리그 1위 G 검사를 건너뛰었는가** (`opensSeasonAutobotBat`
-   * 주석). 결산 화면이 해금 알림 창을 띄우고, 닫힐 때(0x87e8) G 검사를 한 번 돌린 뒤 뒤 G 사슬은 타지 않는다.
+   * 지금 결산 0xef 진입(`0x6900`) — 결산이 아니거나 진입 효과가 아직 안 돌았으면 null. 결산 화면은 `serial` 이 바뀔 때
+   * 한 번 진입 몫(0x29 해금 알림 창 또는 리그 1위 G 하나)을 띄운다 (`SeasonSummaryEntry`).
    */
-  readonly skipsLeagueFirstAward: boolean
+  readonly summaryEntry: SeasonSummaryEntry | null
   /** 진행 중인 국가대항전. 없으면 null (원본 L+0xa8~ 칸) */
   readonly cup: NationalCup | null
   /** 선수단 화면 0xd7 의 용도 `this+0x11c` — 1 경기 전 마선수 고르기 · 2 코치채용 */
@@ -714,8 +714,9 @@ export function useSeasonSession(
   const [openedStadiumIds, setOpenedStadiumIds] = useState<readonly number[]>([])
   /** 전역 해금표 app+0xc0 중 시즌모드가 연 칸 (0x29) — 위 칸과 같은 자리 */
   const [openedHiddenIds, setOpenedHiddenIds] = useState<readonly number[]>([])
-  /** 이번 결산 진입에서 0x29 가 새로 열려 리그 1위 G 검사를 건너뛰었는가 (0x69ce → 0x6ac8) */
-  const [skipsLeagueFirstAward, setSkipsLeagueFirstAward] = useState(false)
+  /** 지금 결산 진입(0x6900) — 0x29 가 새로 열려 진입의 리그 1위 G 검사를 건너뛰었는가 (0x69ce → 0x6ac8) */
+  const [summaryEntry, setSummaryEntry] = useState<SeasonSummaryEntry | null>(null)
+  const summaryEntrySerial = useRef(0)
   const autobotBatInputRef = useRef(autobotBatInput)
   autobotBatInputRef.current = autobotBatInput
   /** 엔트리 편집 0xe0 — 편집 객체와 목록 */
@@ -802,6 +803,8 @@ export function useSeasonSession(
   useEffect(() => {
     if (enteredScene.current === scene) return
     enteredScene.current = scene
+    // 결산을 떠나면 그 진입은 끝났다 — 다시 들어올 때 지난 진입 값을 새 진입으로 읽지 않게 비운다
+    if (scene !== SEASON_SCENE_STATE.시즌결산) setSummaryEntry(null)
     if (save === null) return
     const { record } = save.state
 
@@ -830,8 +833,9 @@ export function useSeasonSession(
     }
 
     // 결산 0xef 진입 0x6900 — 들어갈 때마다 머리에서 세 모드 해금 0x29 를 본다. 새로 열리면 해금 알림 창(0x62368 →
-    // 0x74ef5)을 띄우고 그 진입의 리그 1위 G 검사를 건너뛴다(0x69ce → 0x6ac8). 창을 닫으면 0x87e8 이 G 검사를 한 번
-    // 돌린다 — 결산 화면(`SeasonSummaryScreen`)이 이 값으로 그 창과 검사를 맡는다
+    // 0x74ef5, 꼬리표 0)을 띄우고 그 진입의 리그 1위 G 검사를 건너뛴다(0x69ce → 0x6ac8). 창을 닫으면 0x87e8 이 G 검사를
+    // 한 번 돌린다. 안 열리면 진입이 곧장 G 검사를 한 번(0x69d4~0x6ac0) — 결산 화면(`SeasonSummaryScreen`)이 이 값으로
+    // 그 창과 검사를 맡는다
     if (scene === SEASON_SCENE_STATE.시즌결산) {
       const input = autobotBatInputRef.current?.()
       const opens = input !== undefined && opensSeasonAutobotBat(record, {
@@ -839,7 +843,8 @@ export function useSeasonSession(
         globalOpenedHiddenIds: [...input.globalOpenedHiddenIds, ...openedHiddenIds],
       })
       if (opens) setOpenedHiddenIds((opened) => [...opened, SEASON_AUTOBOT_BAT_HIDDEN_ID])
-      setSkipsLeagueFirstAward(opens)
+      summaryEntrySerial.current += 1
+      setSummaryEntry({ serial: summaryEntrySerial.current, opensAutobotBat: opens })
       return
     }
 
@@ -1902,7 +1907,7 @@ export function useSeasonSession(
     gamePoints,
     openedStadiumIds,
     openedHiddenIds,
-    skipsLeagueFirstAward,
+    summaryEntry,
     cup: save?.cup ?? null,
     eventPlayback,
     notice,
