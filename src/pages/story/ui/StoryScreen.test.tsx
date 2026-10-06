@@ -166,3 +166,27 @@ describe('StoryScreen — system 3·4 발표 창 (0x8cf64 → 0x8b3bc · 0x8b23c
     expect(끝).toHaveLength(1)
   })
 })
+
+describe('StoryScreen — 명령 5 화면효과', () => {
+  it('검은 화면에서 밝아짐(6)은 덮개를 단계 16(완전 검정)부터 띄운다', () => {
+    const 효과이벤트 = {
+      ...이벤트,
+      commands: [{ op: 'effect', id: 6 }, { op: 'say', text: '안녕', speaker: 0, format: 0, portraits: [] }],
+    } as unknown as OriginalEvent
+
+    render(
+      <StoryScreen
+        events={[효과이벤트]}
+        event={효과이벤트}
+        playerName="테스트"
+        teamName="드래곤즈"
+        onComplete={() => {}}
+        onMatch={() => {}}
+      />,
+    )
+
+    const 덮개 = screen.getByTestId('screen-effect-cover')
+    expect(덮개.style.opacity).toBe('1')
+    expect(덮개.style.background).toContain('0, 0, 0')
+  })
+})

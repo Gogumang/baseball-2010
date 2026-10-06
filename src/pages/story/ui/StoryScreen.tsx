@@ -7,6 +7,8 @@ import type { EventReward } from '@/entities/story/model/eventReward'
 import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import { EventPortraits } from '@/widgets/event-portraits/ui/EventPortraits'
 import { useEventPlayback } from '@/pages/story/model/useEventPlayback'
+import { useScreenEffect } from '@/pages/story/model/useScreenEffect'
+import { FULL_LEVEL } from '@/entities/story/model/screenEffect'
 import type { MatchCommand, SystemCommand } from '@/pages/story/model/useEventPlayback'
 import type { StoryCarry } from '@/entities/story/model/aceMatch'
 import * as styles from '@/pages/story/ui/StoryScreen.css'
@@ -40,14 +42,21 @@ interface StoryScreenProps {
    * 나만의리그 두 편이 시상 판정으로 채운다 (`pages/story/lib/awardWindows`).
    */
   readonly systemWindowTextOf?: (command: SystemCommand) => string | null
+  /**
+   * 환경설정 진동(저장 +0x3b) — 명령 5 화면효과 1·2 의 500ms 진동(0x3a44)이 이 칸을 본다.
+   * 안 넘기면 켠 것으로 본다(원본 기본값 켬).
+   */
+  readonly isVibrationOn?: boolean
 }
 
 /** 원작 이벤트. 대사마다 원본이 정한 인물·표정·자리로 초상화를 띄운다. */
 export function StoryScreen({
   events, event, playerName, teamName, skinIndex, battingTypeIndex, onComplete, onMatch, carried, replacementsFor,
-  systemWindowTextOf,
+  systemWindowTextOf, isVibrationOn = true,
 }: StoryScreenProps) {
   const { step, portraits, next, jump } = useEventPlayback(events, event, onComplete, onMatch, carried, systemWindowTextOf)
+  // 명령 5 화면효과 — 흔들기 오프셋·덮개 (효과기 0xbd844)
+  const effect = useScreenEffect(step, isVibrationOn)
   const command = step.command
 
   const speakerName =
@@ -73,7 +82,11 @@ export function StoryScreen({
   const isDialogue = command?.op === 'say' || command?.op === 'system'
 
   return (
-    <div className={styles.overlay}>
+    <div className={styles.overlay}
+      // 흔들기(종류 9)는 원본이 화면 전체 그리기 원점을 옮긴다(0xba888) — 웹은 이 이야기 판만 옮긴다 (근사)
+      style={effect === null || (effect.offset.x === 0 && effect.offset.y === 0)
+        ? undefined
+        : { transform: `translate(${effect.offset.x}px, ${effect.offset.y}px)` }}>
       <EventPortraits portraits={portraits} height={styles.PORTRAIT_HEIGHT}
         skinIndex={skinIndex} battingTypeIndex={battingTypeIndex} />
       {speakerName !== null && <span className={styles.nameTag}>{speakerName}</span>}
@@ -89,6 +102,15 @@ export function StoryScreen({
         <MenuList items={menu} cursorStyle="선택지" onSelect={(id) => jump(Number(id))} />
       ) : (
         <Hint>대사창을 누르거나 Enter</Hint>
+      )}
+
+      {effect?.overlay != null && (
+        // 화면 전체 덮개 — 진하기 = 단계 / 16 (추정, `screenEffect` 머리말)
+        <div className={styles.effectCover} data-testid="screen-effect-cover"
+          style={{
+            background: effect.overlay.color === '흰색' ? '#FFFFFF' : '#000000',
+            opacity: effect.overlay.level / FULL_LEVEL,
+          }} />
       )}
     </div>
   )

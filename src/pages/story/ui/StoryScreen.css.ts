@@ -36,3 +36,11 @@ export const overlay = style({
   padding: '0 8px 24px',
   zIndex: 30,
 })
+
+/** 명령 5 화면효과 덮개 — 240×320 칸 전체를 덮고 누르기는 막지 않는다 (효과기 0xbd844 의 (0, 0, 폭, 높이) 칠하기) */
+export const effectCover = style({
+  position: 'absolute',
+  inset: 0,
+  pointerEvents: 'none',
+  zIndex: 1,
+})
