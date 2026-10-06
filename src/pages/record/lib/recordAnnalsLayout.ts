@@ -103,10 +103,14 @@ export const CELL_FRAMES = { progress: 17, skill: 20, locked: 18, cursor: 21 } a
 /** 못 얻은 칸의 "?" 두 개 — 이미지 111 을 (x+10, y+7) · (x+20, y+7) */
 export const LOCKED_MARK = { image: 111, dx: [10, 20], dy: 7 } as const
 
-/** 위·아래 스크롤 표시 — 프레임 24 ▲ (42×11) · 23 ▼ */
+/**
+ * 위·아래 스크롤 표시 — 프레임 24 ▲ (42×11) · 23 ▼ (0x2eb2c~0x2ebc8 · 0x2eff4~0x2f090).
+ * x 는 둘 다 프레임 24 폭으로 가운데 (W/2 − 21). y 는 깜박임(`isBlinkOn`)에 따라 1px 까딱인다 —
+ * 켜지면 ▲ y0 + 20 · ▼ y0 + 116, 꺼지면 ▲ y0 + 21 · ▼ y0 + 115.
+ */
 export const SCROLL_MARKS = {
-  up: { frame: 24, y: PANEL.y + 20 },
-  down: { frame: 23, y: PANEL.y + 116 },
+  up: { frame: 24, yOn: PANEL.y + 20, yOff: PANEL.y + 21 },
+  down: { frame: 23, yOn: PANEL.y + 116, yOff: PANEL.y + 115 },
   x: SCREEN_WIDTH / 2 - 21,
 } as const
 

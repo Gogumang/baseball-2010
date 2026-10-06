@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Button, FrameSprite, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
+import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import type { Collection } from '@/entities/collection/model/collection'
 import { ORIGINAL_SKILLS } from '@/shared/config/original/skills'
 import { TITLE_NAMES } from '@/entities/career/model/titles'
@@ -14,6 +15,10 @@ import {
   tabIconXOf, tabNameXOf, tabSlotXOf,
 } from '@/pages/record/lib/recordAnnalsLayout'
 import { STAT_NAMES } from '@/pages/record/lib/statNames'
+import type { AnnalsDirection } from '@/pages/record/lib/annalsGrid'
+import {
+  ANNALS_GRID_SHAPES, VISIBLE_GRID_ROWS, hasDownMark, isBlinkOn, moveGridCursor, scrollTopAfter,
+} from '@/pages/record/lib/annalsGrid'
 import {
   INITIAL_SECRET_CODE_STATE, UNLOCKED_STAT_PAGE_COUNT, statNameOffsetOf, statPageCellsOf, statTotalTextOf,
   statValueTextOf, typeSecretDigit,
@@ -54,11 +59,21 @@ interface RecordAnnalsProps {
  * 아이템·GP 쪽(2~7)은 숫자 키로 **"1212123"** 을 쳐야 열린다 (`typeSecretDigit`, 0x2b7a0).
  *   ⚠️ 원본은 센 수·열림 표시를 메인 메뉴 객체에 두어(만들 때 0x234d4 만 지운다) 들어올 때(0x2407c) 버퍼만 비우지만,
  *   웹은 이 화면을 열 때마다 처음부터 센다 (근사).
+ *
+ * 키 처리는 원본 갱신 0x2b7a0 그대로다(`lib/annalsGrid.ts`): 들어오면 **탭 막대에 초점**이 있어 ←→ 가 탭을 바꾸고,
+ * OK·↓ 로 본문에 들어가 ←→ 는 쪽(진행·스킬은 같은 줄 안 커서 감기), ↑↓ 는 커서 — 진행·스킬은 보이는 3줄 창이
+ * 커서를 따라 한 줄씩 움직인다. 취소는 본문 → 탭 막대 → 닫기. 탭 아이콘·칸 누르기는 웹 덧붙임이다.
  */
 export function RecordAnnals({ collection, onBack }: RecordAnnalsProps) {
   const [tab, setTab] = useState(0)
   const [page, setPage] = useState(0)
   const [cursor, setCursor] = useState(0)
+  /** [skin+0xf6] — 들어올 때 1 (0x2407c) */
+  const [isTabFocused, setIsTabFocused] = useState(true)
+  /** 보이는 줄 창 윗줄 [skin+0x1f4] (아랫줄 [skin+0x1f8] = 윗줄 + 3) */
+  const [gridTop, setGridTop] = useState(0)
+  const tick = useUpdateCounter()
+  const isBlinking = isBlinkOn(tick)
   const [secretCode, setSecretCode] = useState(INITIAL_SECRET_CODE_STATE)
   const frames = useFrameOrigins(SLT_FRAMES)
   const textFrames = useFrameOrigins(IMG_TEXT)
@@ -74,33 +89,65 @@ export function RecordAnnals({ collection, onBack }: RecordAnnalsProps) {
   // 쪽 넘기기 한도 — 통계 탭은 비밀 번호가 열려 있으면 8쪽 (0x2ba32 · 0x2ba8c). 쪽 번호 "/전체" 는 늘 표 값이다
   const pageLimit = tab === 4 && secretCode.isUnlocked ? UNLOCKED_STAT_PAGE_COUNT : TAB_PAGE_COUNTS[tab]
   const pageCount = TAB_PAGE_COUNTS[tab]
-  const changeTab = (next: number) => {
-    setTab((next + TAB_COUNT) % TAB_COUNT)
+  /** 0x2b640 — 탭 새로 시작: 쪽 0 · 커서 (0, 0) · 창 0~3 */
+  const restartTab = (next: number) => {
+    setTab(next)
     setPage(0)
     setCursor(0)
+    setGridTop(0)
   }
+  const changeTab = (next: number) => restartTab((next + TAB_COUNT) % TAB_COUNT)
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Tab') {
+      const { key } = event
+      // 숫자 키는 아직 안 열렸으면 비밀 번호 버퍼에 쌓인다 (0x2b7b4~0x2b838, 탭·초점과 상관없다)
+      if (/^[0-9]$/.test(key)) setSecretCode((previous) => typeSecretDigit(previous, key))
+      if (key === 'Escape' || key === 'Backspace') {
         event.preventDefault()
-        return changeTab(tab + (event.shiftKey ? -1 : 1))
+        // CLR: 본문이면 탭 막대로(0x2b95c), 탭 막대면 닫는다(0x2b946)
+        return isTabFocused ? onBack() : setIsTabFocused(true)
       }
-      if (event.key === 'Escape' || event.key === 'Backspace') {
-        event.preventDefault()
-        return onBack()
+      if (isTabFocused) {
+        // 날 키 그대로 (격자 키 처리를 안 거친다): ← '4' · → '6' 은 탭, OK · '5' · ↓ 는 본문으로. '2' · '8' · ↑ 은 아무것도 안 한다
+        if (key === 'ArrowLeft' || key === '4') {
+          event.preventDefault()
+          return changeTab(tab - 1)
+        }
+        if (key === 'ArrowRight' || key === '6') {
+          event.preventDefault()
+          return changeTab(tab + 1)
+        }
+        if (key === 'Enter' || key === ' ' || key === '5' || key === 'ArrowDown') {
+          event.preventDefault()
+          restartTab(tab)
+          return setIsTabFocused(false)
+        }
+        return
       }
-      // 숫자 키는 아직 안 열렸으면 비밀 번호 버퍼에 쌓인다 (0x2b7b4~0x2b838, 탭과 상관없다)
-      if (/^[0-9]$/.test(event.key)) setSecretCode((previous) => typeSecretDigit(previous, event.key))
-      const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
-      if (step !== 0 && pageLimit > 0) {
-        event.preventDefault()
-        setPage((previous) => (previous + step + pageLimit) % pageLimit)
+      // 본문: 격자가 숫자 2·4·6·8 을 방향으로 바꾼다 (표 0xd2e7c)
+      const direction = annalsDirectionOf(key)
+      if (direction === null) return
+      event.preventDefault()
+      const nextCursor = moveGridCursor(ANNALS_GRID_SHAPES[tab], cursor, direction)
+      setCursor(nextCursor)
+      if (direction === 'up' || direction === 'down') {
+        setGridTop(scrollTopAfter(tab, gridTop, nextCursor, direction))
+        return
       }
+      // ← → 는 쪽 넘기기 (0x2ba10 · 0x2ba5a) — 쪽이 없는 탭(진행·스킬)은 보이는 것이 없다
+      const step = direction === 'right' ? 1 : -1
+      if (pageLimit > 0) setPage((previous) => (previous + step + pageLimit) % pageLimit)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   })
+
+  /** 웹 덧붙임 — 보이는 칸을 누르면 본문에 들어가 그 칸을 고른다 (창은 그대로) */
+  const selectCell = (index: number) => {
+    setIsTabFocused(false)
+    setCursor(index)
+  }
 
   return (
     <RawScreen>
@@ -110,9 +157,11 @@ export function RecordAnnals({ collection, onBack }: RecordAnnalsProps) {
       {/* 탭 막대 — 고른 탭만 넓은 칸이라 탭마다 프레임이 다르다 */}
       <FrameSprite folder={SLT_FRAMES} frame={TAB_BAR.firstFrame + tab} origins={frames}
         x={TAB_BAR.x} y={TAB_BAR.y} />
-      {/* 커서 프레임 9 — 고른 탭 박스 (24 + 박스x, 54) */}
-      <FrameSprite folder={SLT_FRAMES} frame={TAB_CURSOR.frame} origins={frames}
-        x={tabSlotXOf(tab)} y={TAB_CURSOR.y} />
+      {/* 커서 프레임 9 — 고른 탭 박스 (24 + 박스x, 54). 탭 막대에 초점이 있으면 깜박인다 (0x2e5be) */}
+      {(!isTabFocused || isBlinking) && (
+        <FrameSprite folder={SLT_FRAMES} frame={TAB_CURSOR.frame} origins={frames}
+          x={tabSlotXOf(tab)} y={TAB_CURSOR.y} />
+      )}
       {/* 이름은 고른 탭 하나만 — 박스 안 가운데 맞춤 (0x2e568) */}
       <FrameSprite folder={IMG_TEXT} frame={TAB_NAME_FRAMES[tab]} origins={textFrames}
         x={tabNameXOf(tab, nameWidthOf(textFrames, TAB_NAME_FRAMES[tab]))} y={TAB_NAME_Y} />
@@ -144,7 +193,11 @@ export function RecordAnnals({ collection, onBack }: RecordAnnalsProps) {
           frames={frames}
           gainedFrame={CELL_FRAMES.progress}
           cursor={cursor}
-          setCursor={setCursor}
+          top={gridTop}
+          hasDownMark={hasDownMark(1, gridTop)}
+          isCursorShown={!isTabFocused && isBlinking}
+          isBlinking={isBlinking}
+          onSelect={selectCell}
           items={endingCells}
         />
       )}
@@ -155,7 +208,11 @@ export function RecordAnnals({ collection, onBack }: RecordAnnalsProps) {
             frames={frames}
             gainedFrame={CELL_FRAMES.skill}
             cursor={cursor}
-            setCursor={setCursor}
+            top={gridTop}
+            hasDownMark={hasDownMark(2, gridTop)}
+            isCursorShown={!isTabFocused && isBlinking}
+            isBlinking={isBlinking}
+            onSelect={selectCell}
             items={ORIGINAL_SKILLS.map((skill) => ({
               name: skill.name,
               isGained: collection.skills.includes(skill.id),
@@ -247,19 +304,25 @@ interface CellItem {
   readonly gainedFrame?: number
 }
 
-/** 41×25 칸 격자 4열 (탭 1 진행 · 탭 2 스킬) */
+/**
+ * 41×25 칸 격자 4열 (탭 1 진행 · 탭 2 스킬). 칸 번호 `윗줄 × 4` ~ `(윗줄 + 3) × 4 − 1` 을 그린다(0x2ebcc~0x2ebe0) —
+ * 보이는 i 번째 칸 = 번호 − 윗줄 × 4.
+ */
 function CellGrid({
-  frames, items, gainedFrame, cursor, setCursor,
+  frames, items, gainedFrame, cursor, top, hasDownMark: isDownMarkShown, isCursorShown, isBlinking, onSelect,
 }: {
   readonly frames: ReturnType<typeof useFrameOrigins>
   readonly items: readonly CellItem[]
   readonly gainedFrame: number
   readonly cursor: number
-  readonly setCursor: (index: number) => void
+  readonly top: number
+  readonly hasDownMark: boolean
+  readonly isCursorShown: boolean
+  readonly isBlinking: boolean
+  readonly onSelect: (index: number) => void
 }) {
-  const visible = CELL_GRID.columns * CELL_GRID.visibleRows
-  const firstRow = Math.max(0, Math.floor(cursor / CELL_GRID.columns) - (CELL_GRID.visibleRows - 1))
-  const start = firstRow * CELL_GRID.columns
+  const visible = CELL_GRID.columns * VISIBLE_GRID_ROWS
+  const start = top * CELL_GRID.columns
 
   return (
     <>
@@ -286,25 +349,34 @@ function CellGrid({
                   style={{ left: x + dx, top: y + LOCKED_MARK.dy }} />
               ))
             )}
-            {index === cursor && (
+            {index === cursor && isCursorShown && (
               <FrameSprite folder={SLT_FRAMES} frame={CELL_FRAMES.cursor} origins={frames} x={x - 1} y={y - 1} />
             )}
             <button type="button" className={styles.cell} aria-label={item.isGained ? item.name : '???'}
               style={{ left: x, top: y, width: CELL_GRID.width, height: CELL_GRID.height }}
-              onClick={() => setCursor(index)} />
+              onClick={() => onSelect(index)} />
           </div>
         )
       })}
-      {start > 0 && (
+      {top > 0 && (
         <FrameSprite folder={SLT_FRAMES} frame={SCROLL_MARKS.up.frame} origins={frames}
-          x={SCROLL_MARKS.x} y={SCROLL_MARKS.up.y} />
+          x={SCROLL_MARKS.x} y={isBlinking ? SCROLL_MARKS.up.yOn : SCROLL_MARKS.up.yOff} />
       )}
-      {start + visible < items.length && (
+      {isDownMarkShown && (
         <FrameSprite folder={SLT_FRAMES} frame={SCROLL_MARKS.down.frame} origins={frames}
-          x={SCROLL_MARKS.x} y={SCROLL_MARKS.down.y} />
+          x={SCROLL_MARKS.x} y={isBlinking ? SCROLL_MARKS.down.yOn : SCROLL_MARKS.down.yOff} />
       )}
     </>
   )
+}
+
+/** 본문 키 → 방향. 격자 꼴 1 은 숫자 2·4·6·8 을 ↑ ← → ↓ 로 바꾼다 (0x6c096, 표 0xd2e7c) */
+function annalsDirectionOf(key: string): AnnalsDirection | null {
+  if (key === 'ArrowUp' || key === '2') return 'up'
+  if (key === 'ArrowDown' || key === '8') return 'down'
+  if (key === 'ArrowLeft' || key === '4') return 'left'
+  if (key === 'ArrowRight' || key === '6') return 'right'
+  return null
 }
 
 /** 164×18 이름 줄 8개 (탭 3 닉네임) */

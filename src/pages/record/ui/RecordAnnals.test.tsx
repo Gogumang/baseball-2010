@@ -65,12 +65,36 @@ describe('기록연감 뼈대', () => {
     expect(screen.queryByText(/\/\d/)).toBeNull()
   })
 
-  it('좌우 키로 쪽을 넘긴다', () => {
+  it('들어오면 탭 막대에 초점 — 좌우 키는 탭을 바꾼다 (0x2407c [skin+0xf6] = 1 · 0x2ba10 · 0x2ba5a)', () => {
     띄우기()
 
     fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(screen.getByRole('button', { name: '진행' }).style.width).toBe(`${TAB_SELECTED_WIDTH}px`)
+
+    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+    expect(screen.getByRole('button', { name: '통계' }).style.width).toBe(`${TAB_SELECTED_WIDTH}px`)
+  })
+
+  it('OK·↓ 로 본문에 들어가면 좌우 키로 쪽을 넘긴다', () => {
+    띄우기()
+
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
 
     expect(screen.getByText('2/6')).toBeTruthy()
+  })
+
+  it('취소는 본문 → 탭 막대 → 닫기 (0x2b93a)', () => {
+    const onBack = vi.fn()
+    띄우기({ onBack })
+
+    fireEvent.keyDown(window, { key: 'Enter' })
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(onBack).not.toHaveBeenCalled()
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(onBack).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -117,6 +141,7 @@ describe('기록연감 칸 격자', () => {
   it('통계 탭은 비밀 번호 없이 2쪽만 돈다 — 쪽 1 은 [136]~[140] 다섯 줄', () => {
     띄우기()
     fireEvent.click(screen.getByRole('button', { name: '통계' }))
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
 
     fireEvent.keyDown(window, { key: 'ArrowRight' })
     expect(screen.getByText('2/2')).toBeTruthy()
@@ -132,6 +157,7 @@ describe('기록연감 칸 격자', () => {
     띄우기({ collection: { ...EMPTY_COLLECTION, stats } })
     fireEvent.click(screen.getByRole('button', { name: '통계' }))
     for (const key of '1212123') fireEvent.keyDown(window, { key })
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
 
     fireEvent.keyDown(window, { key: 'ArrowRight' })
     fireEvent.keyDown(window, { key: 'ArrowRight' })
@@ -144,7 +170,9 @@ describe('기록연감 칸 격자', () => {
   it('비밀 번호가 틀리면 열리지 않는다 — 다시 쳐도 센 수가 7 에 멈춰 있다', () => {
     띄우기()
     fireEvent.click(screen.getByRole('button', { name: '통계' }))
-    for (const key of '12121241212123') fireEvent.keyDown(window, { key })
+    // 탭 막대에서 치므로 '4'·'6' 은 탭을 바꾼다 — 그 둘이 없는 틀린 번호
+    for (const key of '12121221212123') fireEvent.keyDown(window, { key })
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
 
     fireEvent.keyDown(window, { key: 'ArrowLeft' })
     expect(screen.getByText('2/2')).toBeTruthy()
@@ -155,6 +183,7 @@ describe('기록연감 칸 격자', () => {
     띄우기({ collection: { ...EMPTY_COLLECTION, stats } })
     fireEvent.click(screen.getByRole('button', { name: '통계' }))
     for (const key of '1212123') fireEvent.keyDown(window, { key })
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
 
     fireEvent.keyDown(window, { key: 'ArrowLeft' })
 
@@ -172,11 +201,60 @@ describe('기록연감 칸 격자', () => {
   })
 })
 
+describe('진행·스킬 격자 — 보이는 3줄 창이 커서를 따라간다 (0x2b968 · 0x2b9aa · 0x2ebcc)', () => {
+  const 본문 = (tabName: string, collection = EMPTY_COLLECTION) => {
+    const utils = 띄우기({ collection })
+    fireEvent.click(screen.getByRole('button', { name: tabName }))
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    return utils
+  }
+  const 내리기 = (times: number) => {
+    for (let i = 0; i < times; i += 1) fireEvent.keyDown(window, { key: 'ArrowDown' })
+  }
+
+  it('진행 탭 — 커서가 넷째 줄로 가면 창이 한 줄 내려가 칸 12~15 가 보이고, 끝 줄에서 시즌 엔딩 칸 16~19 가 보인다', () => {
+    본문('진행', { ...EMPTY_COLLECTION, endings: [0, 13], seasonEndings: [4] })
+    expect(screen.getByRole('button', { name: '부상' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '승리자' })).toBeNull()
+
+    내리기(2)
+    expect(screen.queryByRole('button', { name: '승리자' })).toBeNull()
+    내리기(1)
+    expect(screen.getByRole('button', { name: '승리자' }).style.top).toBe(`${cellPositionOf(8 + 1).y}px`)
+    expect(screen.queryByRole('button', { name: '부상' })).toBeNull()
+
+    내리기(5) // 줄 4 에서 멈춘다 (세로는 감지 않는다)
+    expect(screen.getByRole('button', { name: '최강' }).style.top).toBe(`${cellPositionOf(8 + 3).y}px`)
+
+    // 올리면 커서가 창 윗줄보다 위로 갈 때만 창이 따라 올라간다
+    for (let i = 0; i < 2; i += 1) fireEvent.keyDown(window, { key: 'ArrowUp' })
+    expect(screen.getByRole('button', { name: '최강' })).toBeTruthy()
+    fireEvent.keyDown(window, { key: 'ArrowUp' })
+    expect(screen.queryByRole('button', { name: '최강' })).toBeNull()
+  })
+
+  it('스킬 탭 — 숫자 8 도 ↓ 다. 끝 줄(칸 36~39)까지 내려간다', () => {
+    본문('스킬', { ...EMPTY_COLLECTION, skills: [39] })
+    for (let i = 0; i < 9; i += 1) fireEvent.keyDown(window, { key: '8' })
+
+    expect(screen.getByRole('button', { name: ORIGINAL_SKILLS[39].name }).style.left).toBe(`${cellPositionOf(3).x}px`)
+  })
+
+  it('← 는 같은 줄 끝으로 감긴다 — 고른 칸이 바뀌어 설명이 따라간다', () => {
+    본문('스킬', { ...EMPTY_COLLECTION, skills: [3] })
+    expect(screen.queryByText(/효과 :/)).toBeNull()
+
+    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+    expect(screen.getByText(/효과 :/)).toBeTruthy()
+  })
+})
+
 describe('탭 0 스페셜기록 쪽 — 셀 40~47 이름 StrGAME[48~55] · 달성 표시 0x22db4 (0x7a102~0x7a156)', () => {
   it('쪽 6(ArrowLeft 로 마지막 쪽)에 여덟 이름이 서고, 표시 k 가 선 칸에만 slt_frame 71 을 칸 오른쪽 끝에 그린다', () => {
     const stats = applyAnnalsStat(applyAnnalsStat(EMPTY_COLLECTION.stats, { kind: '달성표시', index: 0 }), { kind: '달성표시', index: 2 })
     const { container } = 띄우기({ collection: { ...EMPTY_COLLECTION, stats } })
 
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
     fireEvent.keyDown(window, { key: 'ArrowLeft' })
     expect(screen.getByText('6/6')).toBeTruthy()
     expect(screen.getByText('시즌모드 리그 1위 1회')).toBeTruthy()
@@ -213,6 +291,7 @@ describe('탭 0 달성 횟수 — 셀 0~39 "!R!cffff00%d" (0x7a0d0~0x7a0fc)', ()
 
   it('마지막 쪽(셀 40~47)에는 횟수가 없다', () => {
     const { container } = 띄우기({ collection: EMPTY_COLLECTION })
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
     fireEvent.keyDown(window, { key: 'ArrowLeft' })
     expect([...container.querySelectorAll('div[data-cell]')]).toHaveLength(0)
   })
