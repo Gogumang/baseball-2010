@@ -41,6 +41,7 @@ import type {
   TeamGameSummary,
 } from '@/features/play-team-game/model/teamGameFlow'
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
+import { useInGameMenuState } from '@/features/play-team-game/model/useInGameMenuState'
 import { useTeamGame } from '@/pages/team-game/model/useTeamGame'
 import { PITCHER_CHANGE_SOUND } from '@/pages/team-game/model/teamGameSounds'
 import { activeSound } from '@/shared/api/audio/soundPort'
@@ -133,7 +134,8 @@ export function TeamGameScreen({
   const [phase, setPhase] = useState<PitchPhase>('구질')
   const [slot, setSlot] = useState<PitchSlot | null>(null)
   const [courseCell, setCourseCell] = useState(4)
-  const [isMenuOpen, setMenuOpen] = useState(false)
+  const menu = useInGameMenuState()
+  const isMenuOpen = menu.isOpen
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
   /** 경기 끝 결과 판(0x18)에서 OK 를 눌러 정산(0x19)으로 넘어갔는가 */
   const [isEndBoardClosed, setEndBoardClosed] = useState(false)
@@ -199,13 +201,13 @@ export function TeamGameScreen({
         // 교체 창(상태 0xb)에서는 '*' 가 안 먹는다 — 0x498d4 의 '*' 가지(4991c)는 상태 0xd~0x15 만 받고,
         // 0xb 의 키 함수 0x495fc 는 '2'·'8'·'#'·'0'·'5' 만 본다. 창을 닫지도 메뉴를 열지도 않는다
         if (changeWindow !== null && !isMenuOpen) return
-        return setMenuOpen((open) => !open)
+        return menu.toggle()
       }
       if (isMenuOpen || overlay !== null) {
         // 교체 화면과 메뉴에서 CLR 은 닫기다 (0x495fc 의 '#'·CLR 가지)
         if (event.key === 'Escape' || event.key === 'Backspace') {
           event.preventDefault()
-          setMenuOpen(false)
+          menu.close()
         }
         return
       }
@@ -251,6 +253,8 @@ export function TeamGameScreen({
     isSceneCovering,
     isMenuOpen,
     isStealable,
+    menu.close,
+    menu.toggle,
     overlay,
     phase,
     session.canChangePitcher,
@@ -404,18 +408,7 @@ export function TeamGameScreen({
     )
   }
 
-  // 경기 중 메뉴의 "조작방법"(0x3c212)·"설정"(0x3c326) — 원본도 경기 장면 위에 같은 화면을 얹는다
-  if (overlay === '조작방법') {
-    return (
-      <HelpScreen
-        onBack={() => {
-          // 뷰어를 닫으면(0x3ca36: 0x637d0 ≠ 0) 하위 0 으로 돌아가 일시정지 팝업 0x741a0 을 다시 띄운다 — 경기 중 메뉴로 돌아간다
-          setOverlay(null)
-          setMenuOpen(true)
-        }}
-      />
-    )
-  }
+  // 경기 중 메뉴의 "설정"(0x3c326). "조작방법"(0x3c212)은 아래에서 경기 장면 위에 얹는다
   if (overlay === '설정' && settings !== undefined && onSettingsChange !== undefined) {
     return (
       <SettingsScreen
@@ -424,7 +417,11 @@ export function TeamGameScreen({
         hasSavedCareer={false}
         onChange={onSettingsChange}
         onResetCareer={() => {}}
-        onBack={() => setOverlay(null)}
+        onBack={() => {
+          // [설정]에서 CLR(0x3cb0e)도 하위 0 · 팝업 0x741a0 을 다시 띄운다 — 경기 중 메뉴로, 커서는 그대로
+          setOverlay(null)
+          menu.reopen()
+        }}
       />
     )
   }
@@ -461,7 +458,7 @@ export function TeamGameScreen({
           label: isMenuOpen ? '닫기' : '메뉴',
           // 소프트키1 도 0x498d4 가 '*' 로 읽는다(498e8) — 교체 창(0xb)에서는 안 먹는다
           isDisabled: changeWindow !== null && !isMenuOpen,
-          onPress: () => setMenuOpen((open) => !open),
+          onPress: menu.toggle,
         }}
       >
         <div className={styles.hud}>
@@ -479,17 +476,19 @@ export function TeamGameScreen({
         {isMenuOpen ? (
           <InGameMenu
             mode={options.mode}
-            onContinue={() => setMenuOpen(false)}
+            cursor={menu.cursor}
+            onCursorChange={menu.setCursor}
+            onContinue={menu.close}
             onQuit={onQuit}
             onOpenHelp={() => {
-              setMenuOpen(false)
+              menu.close()
               setOverlay('조작방법')
             }}
             onOpenSettings={
               settings === undefined || onSettingsChange === undefined
                 ? undefined
                 : () => {
-                    setMenuOpen(false)
+                    menu.close()
                     setOverlay('설정')
                   }
             }
@@ -502,10 +501,13 @@ export function TeamGameScreen({
                 : (cost) => {
                     onSpendGamePoint(cost)
                     actions.autoProgress()
-                    setMenuOpen(false)
+                    menu.close()
                   }
             }
           />
+        ) : overlay === '조작방법' ? (
+          // 뷰어 동안은 메뉴를 띄웠을 때처럼 타석을 내려 둔다 — 다시 올리면 타석이 새로 서며 굴림이 샌다
+          null
         ) : isChangingPitcher ? (
           <PitcherChangeWindow
             entry={progress.ourPitcherEntry}
@@ -698,6 +700,17 @@ export function TeamGameScreen({
               ? actions.closeBurst
               : () => setShownProposal(proposal?.index ?? null)
           }
+        />
+      )}
+
+      {overlay === '조작방법' && (
+        <HelpScreen
+          onBack={() => {
+            // 뷰어를 닫으면(0x3ca36: 0x637d0 ≠ 0) 하위 0 으로 돌아가 일시정지 팝업 0x741a0 을 다시 띄운다 — 경기 중 메뉴로,
+            // 메뉴 객체는 안 건드려 커서가 그대로다
+            setOverlay(null)
+            menu.reopen()
+          }}
         />
       )}
     </div>

@@ -51,6 +51,12 @@ interface InGameMenuProps {
   readonly gamePoint?: number
   /** 칸 "다시하기" (StrGAME[7], `0x3c706`) — 미션·홈런더비 행에만 있다 */
   readonly onRestart?: () => void
+  /**
+   * 처음 띄울 커서 칸 (메뉴 객체 +0xf30 의 커서). [조작방법]·[설정]에서 돌아오면 원본은 커서를 그대로 둔다
+   * (`useInGameMenuState` 머리말) — 부르는 쪽이 `onCursorChange` 로 받아 둔 값을 다시 넘긴다. 기본 0.
+   */
+  readonly cursor?: number
+  readonly onCursorChange?: (cursor: number) => void
 }
 
 /**
@@ -72,8 +78,12 @@ export function InGameMenu({
   canAutoProgress = true,
   gamePoint,
   onRestart,
+  cursor: initialCursor = 0,
+  onCursorChange,
 }: InGameMenuProps) {
   const [confirming, setConfirming] = useState<InGameMenuAction | null>(null)
+  /** 질문 창에서 돌아와도 같은 메뉴 객체라 커서가 남는다 */
+  const [cursor, setCursor] = useState(initialCursor)
   const [notice, setNotice] = useState<string | null>(null)
 
   /** 앱이 손잡이를 안 넘긴 칸은 잠근다 — 원본에는 없는 웹판 가드다 */
@@ -100,7 +110,7 @@ export function InGameMenu({
         <DialogueBox>
           <MarkupText raw={notice} />
         </DialogueBox>
-        <MenuList items={[{ id: '확인', label: '확인' }]} onSelect={() => setNotice(null)} />
+        <MenuList key="알림" items={[{ id: '확인', label: '확인' }]} onSelect={() => setNotice(null)} />
       </>
     )
   }
@@ -118,6 +128,7 @@ export function InGameMenu({
           <MarkupText raw={text} />
         </DialogueBox>
         <MenuList
+          key="질문"
           items={[
             { id: '예', label: '예' },
             { id: '아니오', label: '아니오' },
@@ -148,8 +159,15 @@ export function InGameMenu({
   return (
     <>
       <Panel heading="경기 중 메뉴" />
+      {/* 질문 창 목록과 다른 객체다 — 같은 자리라도 새로 세워 커서를 섞지 않는다 */}
       <MenuList
+        key="메뉴"
         items={items}
+        initialIndex={cursor}
+        onCursorChange={(index) => {
+          setCursor(index)
+          onCursorChange?.(index)
+        }}
         onSelect={(id) => {
           const action = id as InGameMenuAction
           if (action === '계속') return onContinue()

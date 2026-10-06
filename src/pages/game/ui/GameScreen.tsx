@@ -3,6 +3,7 @@ import { BigResult, Hint, PixelScreen } from '@/shared/ui'
 import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
+import { useInGameMenuState } from '@/features/play-team-game/model/useInGameMenuState'
 import { HelpScreen } from '@/pages/help/ui/HelpScreen'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import { effectiveAbilityOf } from '@/entities/career/model/condition'
@@ -95,7 +96,8 @@ export function GameScreen({
   onBenchClearingDone,
   onSpecialSwingUsed,
 }: GameScreenProps) {
-  const [isMenuOpen, setMenuOpen] = useState(false)
+  const menu = useInGameMenuState()
+  const isMenuOpen = menu.isOpen
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
   const isEagleEyeEnabled = career.eagleEyeGamesRemaining > 0
   const ace = progress.aceOpponent
@@ -129,7 +131,7 @@ export function GameScreen({
       if (overlay === '조작방법') return
       if (event.key === '*') {
         event.preventDefault()
-        return setMenuOpen((open) => !open)
+        return menu.toggle()
       }
       if (isMenuOpen || overlay !== null) return
       const base = stealBaseOfKey(event.key)
@@ -141,7 +143,7 @@ export function GameScreen({
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [isBenchClearing, isHalfInningBoardOpen, isMenuOpen, onSteal, overlay, stealableBases])
+  }, [isBenchClearing, isHalfInningBoardOpen, isMenuOpen, menu.toggle, onSteal, overlay, stealableBases])
 
   // 사구 뒤 벤치 클리어링 (상태 0x1e) — 타석이 붙들린 채 연출이 돈다. 공용 키 '*'·도루도 0x1e 에서는 안 열린다
   if (progress.pendingBenchClearing !== null && onBenchClearingDone !== undefined) {
@@ -165,18 +167,7 @@ export function GameScreen({
     )
   }
 
-  // 경기 중 메뉴의 "조작방법"(0x3c212)·"설정"(0x3c326)
-  if (overlay === '조작방법') {
-    return (
-      <HelpScreen
-        onBack={() => {
-          // 뷰어를 닫으면(0x3ca36: 0x637d0 ≠ 0) 하위 0 으로 돌아가 일시정지 팝업 0x741a0 을 다시 띄운다 — 경기 중 메뉴로 돌아간다
-          setOverlay(null)
-          setMenuOpen(true)
-        }}
-      />
-    )
-  }
+  // 경기 중 메뉴의 "설정"(0x3c326). "조작방법"(0x3c212)은 아래에서 경기 장면 위에 얹는다
   if (overlay === '설정' && settings !== undefined && onSettingsChange !== undefined) {
     return (
       <SettingsScreen
@@ -184,137 +175,156 @@ export function GameScreen({
         hasSavedCareer={false}
         onChange={onSettingsChange}
         onResetCareer={() => {}}
-        onBack={() => setOverlay(null)}
+        onBack={() => {
+          // [설정]에서 CLR(0x3cb0e)도 하위 0 · 팝업 0x741a0 을 다시 띄운다 — 경기 중 메뉴로, 커서는 그대로
+          setOverlay(null)
+          menu.reopen()
+        }}
       />
     )
   }
 
   return (
-    <PixelScreen
-      title={`${career.name} · ${career.battingOrder}번타자`}
-      badge={
-        isEagleEyeEnabled
-          ? `G ${earnedGamePoint} · 이글아이 ${career.eagleEyeGamesRemaining}`
-          : `G ${earnedGamePoint}`
-      }
-      leftKey={
-        stealableBases.length > 0 && !isMenuOpen
-          ? {
-              label: `도루 ${stealableBases[0]}루`,
-              onPress: () => stealIfFlying(stealableBases[0]),
-            }
-          : undefined
-      }
-      rightKey={{
-        label: isMenuOpen ? '닫기' : '메뉴',
-        onPress: () => setMenuOpen((open) => !open),
-      }}
-    >
-      <div className={styles.stageArea}>
-        {ace !== null && (
-          <div className={styles.aceAlert}>
-            <img src={ace.iconUrl} alt={ace.name} width={33} height={33} />
-            <div>
-              <strong>{ace.name}</strong> 등판!
-              <span className={detail}>필살기 · {ace.burst}</span>
+    <>
+      <PixelScreen
+        title={`${career.name} · ${career.battingOrder}번타자`}
+        badge={
+          isEagleEyeEnabled
+            ? `G ${earnedGamePoint} · 이글아이 ${career.eagleEyeGamesRemaining}`
+            : `G ${earnedGamePoint}`
+        }
+        leftKey={
+          stealableBases.length > 0 && !isMenuOpen
+            ? {
+                label: `도루 ${stealableBases[0]}루`,
+                onPress: () => stealIfFlying(stealableBases[0]),
+              }
+            : undefined
+        }
+        rightKey={{
+          label: isMenuOpen ? '닫기' : '메뉴',
+          onPress: menu.toggle,
+        }}
+      >
+        <div className={styles.stageArea}>
+          {ace !== null && (
+            <div className={styles.aceAlert}>
+              <img src={ace.iconUrl} alt={ace.name} width={33} height={33} />
+              <div>
+                <strong>{ace.name}</strong> 등판!
+                <span className={detail}>필살기 · {ace.burst}</span>
+              </div>
             </div>
-          </div>
+          )}
+
+          <BattingStage
+            batterAbility={effectiveAbilityOf(career)}
+            // 번트 '7'/'8'/'9' — 0x535a4 → 0x6a7 → 0x51e48 은 모드를 안 본다. 타자편은 내 선수가 쳐서 마선수(0xb633c)가 아니다
+            canBunt
+            swingMode="나만의리그"
+            gameMode={BATTER_CAREER_MODE}
+            // 환경설정 전광판(저장 +0x3a) — OFF 면 흐르는 글자를 안 그린다 (0x77726)
+            isScoreboardOn={settings?.isScoreboardOn}
+            // 환경설정 진동(저장 +0x3b) — 맞은 공·사구 진동 (0x3a44)
+            isVibrationOn={settings?.isVibrationOn}
+            // 타자 폼 = 원본 rec[0xb] 윗니블 `2 × 타입 + 손` (C 5절 0x16f9a) — 장타형이면 sluger 몸통이 나온다
+            batterForm={career.battingTypeIndex * 2 + career.battingSide}
+            // 고른 피부(0 황인 · 1 백인 · 2 흑인)와 장비를 타석 그림에 입힌다 —
+            // 안 넘기면 구운 벌(피부 0)과 맨몸으로 나간다
+            batterSkinIndex={career.skinIndex}
+            batterEquipmentLevels={career.equipmentLevels}
+            // 스윙 결과 0xab214 는 0xb62b4 = 장착 비트(+0x14)만 본다 — 보유 전부가 아니다
+            batterSkillIds={career.equippedSkillIds}
+            recentAtBatCodes={progress.recentAtBatCodes}
+            pitcherAbility={pitcherAbility}
+            // 마선수 대결의 상대 마투수 마구 횟수 = 0xd8509[mgr[0x13a + 순번]] (0xaebe4)
+            aceLevels={aceLevels}
+            hud={{
+              inning: progress.game.inning,
+              half: progress.game.half,
+              ourScore: progress.game.ourScore,
+              opponentScore: progress.game.opponentScore,
+              balls: atBat.balls,
+              strikes: atBat.strikes,
+              outs: progress.game.outs,
+              bases: progress.game.bases,
+              // HUD 팀 아이콘은 작은 로고 ui/team_logo_ini (0x373d0)
+              ourLogoUrl: smallLogoUrlOf(career.teamId),
+              opponentLogoUrl: smallLogoUrlOf(progress.opponentTeamId),
+              ourTeamId: career.teamId,
+              opponentTeamId: progress.opponentTeamId,
+            }}
+            isEagleEyeEnabled={isEagleEyeEnabled}
+            acePitcher={
+              ace === null
+                ? null
+                : { framesUrl: ace.framesUrl, frameCount: ace.frameCount, stillUrl: ace.stillUrl }
+            }
+            // 조작방법 뷰어 동안도 일시정지 팝업이 떠 있어 경기 갱신이 멈춘다 (0x52cc6 0x754f9)
+            isPaused={isPaused || isMenuOpen || overlay !== null}
+            random={random}
+            // 필살타법 '0' (0x535a4 → 0x51dee → 0x34c74). 레벨이 아니라 **고른 번호**(+0x18)를 넘긴다 —
+            // 0 이면(아직 안 고름) '0' 키가 무시된다
+            specialSwingNumber={career.specialSwingNumber}
+            // 한 경기 횟수 s8 team[+0x29 + 타순] — 0xaebe4 가 표 0xd84f0[+0x18] (+ 스킬 23 무자비 1)로 채운다
+            specialSwingRemaining={mySpecialSwingRemainingOf(progress, {
+              swingNumber: career.specialSwingNumber,
+              hasRuthlessSkill: career.equippedSkillIds.includes(RUTHLESS_SKILL_ID),
+            })}
+            onSpecialSwingUsed={onSpecialSwingUsed}
+            // 0xab214 의 내 선수 보너스 — 모드 4 에서 rec = 0x1f8d4(저장, 4) = [저장+0xbc]+0x11c 의 rec[0xa] 비트7(육성)이
+            // 서고(0xb6389, ab3d6), 연차 idx 는 같은 레코드 +0xb3 (ab3f2) — 커리어 연차는 1부터라 1 을 뺀다
+            isBatterOwnPlayer
+            careerYearIndex={career.season - 1}
+            onPitchResolved={onPitchResolved}
+            flightProbeRef={flightProbeRef}
+            onPickoff={onPickoff}
+          />
+        </div>
+
+        {isMenuOpen ? (
+          <InGameMenu
+            // 나만의리그 타자편은 표 0xcfcfc 의 행 2 — 자동진행·다시하기가 없는 네 칸이다
+            mode={BATTER_CAREER_MODE}
+            cursor={menu.cursor}
+            onCursorChange={menu.setCursor}
+            onContinue={menu.close}
+            onQuit={onQuit}
+            onOpenHelp={() => {
+              menu.close()
+              setOverlay('조작방법')
+            }}
+            onOpenSettings={
+              settings === undefined || onSettingsChange === undefined
+                ? undefined
+                : () => {
+                    menu.close()
+                    setOverlay('설정')
+                  }
+            }
+          />
+        ) : bannerText === '' ? (
+          <Hint>
+            탭·Space·5 스윙 · 좌우 끝 탭·←→(4·6) 타자 이동 · 8·7·9(Shift)·길게 눌러 번트
+            {stealableBases.includes(1) && ' · 3 도루(1루)'}
+            {stealableBases.includes(2) && ' · 2 도루(2루)'}
+            {stealableBases.includes(3) && ' · 1 도루(3루)'}
+          </Hint>
+        ) : (
+          <BigResult>{bannerText}</BigResult>
         )}
-
-        <BattingStage
-          batterAbility={effectiveAbilityOf(career)}
-          // 번트 '7'/'8'/'9' — 0x535a4 → 0x6a7 → 0x51e48 은 모드를 안 본다. 타자편은 내 선수가 쳐서 마선수(0xb633c)가 아니다
-          canBunt
-          swingMode="나만의리그"
-          gameMode={BATTER_CAREER_MODE}
-          // 환경설정 전광판(저장 +0x3a) — OFF 면 흐르는 글자를 안 그린다 (0x77726)
-          isScoreboardOn={settings?.isScoreboardOn}
-          // 환경설정 진동(저장 +0x3b) — 맞은 공·사구 진동 (0x3a44)
-          isVibrationOn={settings?.isVibrationOn}
-          // 타자 폼 = 원본 rec[0xb] 윗니블 `2 × 타입 + 손` (C 5절 0x16f9a) — 장타형이면 sluger 몸통이 나온다
-          batterForm={career.battingTypeIndex * 2 + career.battingSide}
-          // 고른 피부(0 황인 · 1 백인 · 2 흑인)와 장비를 타석 그림에 입힌다 —
-          // 안 넘기면 구운 벌(피부 0)과 맨몸으로 나간다
-          batterSkinIndex={career.skinIndex}
-          batterEquipmentLevels={career.equipmentLevels}
-          // 스윙 결과 0xab214 는 0xb62b4 = 장착 비트(+0x14)만 본다 — 보유 전부가 아니다
-          batterSkillIds={career.equippedSkillIds}
-          recentAtBatCodes={progress.recentAtBatCodes}
-          pitcherAbility={pitcherAbility}
-          // 마선수 대결의 상대 마투수 마구 횟수 = 0xd8509[mgr[0x13a + 순번]] (0xaebe4)
-          aceLevels={aceLevels}
-          hud={{
-            inning: progress.game.inning,
-            half: progress.game.half,
-            ourScore: progress.game.ourScore,
-            opponentScore: progress.game.opponentScore,
-            balls: atBat.balls,
-            strikes: atBat.strikes,
-            outs: progress.game.outs,
-            bases: progress.game.bases,
-            // HUD 팀 아이콘은 작은 로고 ui/team_logo_ini (0x373d0)
-            ourLogoUrl: smallLogoUrlOf(career.teamId),
-            opponentLogoUrl: smallLogoUrlOf(progress.opponentTeamId),
-            ourTeamId: career.teamId,
-            opponentTeamId: progress.opponentTeamId,
+      </PixelScreen>
+      {overlay === '조작방법' && (
+        <HelpScreen
+          onBack={() => {
+            // 뷰어를 닫으면(0x3ca36: 0x637d0 ≠ 0) 하위 0 으로 돌아가 일시정지 팝업 0x741a0 을 다시 띄운다 — 경기 중 메뉴로,
+            // 메뉴 객체는 안 건드려 커서가 그대로다
+            setOverlay(null)
+            menu.reopen()
           }}
-          isEagleEyeEnabled={isEagleEyeEnabled}
-          acePitcher={
-            ace === null
-              ? null
-              : { framesUrl: ace.framesUrl, frameCount: ace.frameCount, stillUrl: ace.stillUrl }
-          }
-          isPaused={isPaused || isMenuOpen}
-          random={random}
-          // 필살타법 '0' (0x535a4 → 0x51dee → 0x34c74). 레벨이 아니라 **고른 번호**(+0x18)를 넘긴다 —
-          // 0 이면(아직 안 고름) '0' 키가 무시된다
-          specialSwingNumber={career.specialSwingNumber}
-          // 한 경기 횟수 s8 team[+0x29 + 타순] — 0xaebe4 가 표 0xd84f0[+0x18] (+ 스킬 23 무자비 1)로 채운다
-          specialSwingRemaining={mySpecialSwingRemainingOf(progress, {
-            swingNumber: career.specialSwingNumber,
-            hasRuthlessSkill: career.equippedSkillIds.includes(RUTHLESS_SKILL_ID),
-          })}
-          onSpecialSwingUsed={onSpecialSwingUsed}
-          // 0xab214 의 내 선수 보너스 — 모드 4 에서 rec = 0x1f8d4(저장, 4) = [저장+0xbc]+0x11c 의 rec[0xa] 비트7(육성)이
-          // 서고(0xb6389, ab3d6), 연차 idx 는 같은 레코드 +0xb3 (ab3f2) — 커리어 연차는 1부터라 1 을 뺀다
-          isBatterOwnPlayer
-          careerYearIndex={career.season - 1}
-          onPitchResolved={onPitchResolved}
-          flightProbeRef={flightProbeRef}
-          onPickoff={onPickoff}
         />
-      </div>
-
-      {isMenuOpen ? (
-        <InGameMenu
-          // 나만의리그 타자편은 표 0xcfcfc 의 행 2 — 자동진행·다시하기가 없는 네 칸이다
-          mode={BATTER_CAREER_MODE}
-          onContinue={() => setMenuOpen(false)}
-          onQuit={onQuit}
-          onOpenHelp={() => {
-            setMenuOpen(false)
-            setOverlay('조작방법')
-          }}
-          onOpenSettings={
-            settings === undefined || onSettingsChange === undefined
-              ? undefined
-              : () => {
-                  setMenuOpen(false)
-                  setOverlay('설정')
-                }
-          }
-        />
-      ) : bannerText === '' ? (
-        <Hint>
-          탭·Space·5 스윙 · 좌우 끝 탭·←→(4·6) 타자 이동 · 8·7·9(Shift)·길게 눌러 번트
-          {stealableBases.includes(1) && ' · 3 도루(1루)'}
-          {stealableBases.includes(2) && ' · 2 도루(2루)'}
-          {stealableBases.includes(3) && ' · 1 도루(3루)'}
-        </Hint>
-      ) : (
-        <BigResult>{bannerText}</BigResult>
       )}
-    </PixelScreen>
+    </>
   )
 }
 

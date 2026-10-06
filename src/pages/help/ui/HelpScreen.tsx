@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { MarkupText, RawScreen } from '@/shared/ui'
+import { MarkupText, RawScreen, ScreenOverlay } from '@/shared/ui'
 import { GAME_VERSION, HELP_SECTIONS } from '@/shared/config/helpSections'
 import { BODY_PANEL } from '@/pages/help/lib/helpLayout'
 import { openHelpViewer, stepHelpViewer } from '@/pages/help/lib/helpViewer'
@@ -84,8 +84,14 @@ export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gameP
   const movePage = (step: number) => moveBy(false, step)
   const moveSection = (step: number) => moveBy(true, step)
 
+  /** 경기 중 [조작방법] — 경기 장면 위에 얹힌다 (gamePoint 를 안 넘긴 쪽) */
+  const isOverGame = gamePoint === undefined
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      // 경기 중 메뉴 하위 4 의 키는 0x3ca36 이 뷰어 0x637d0 에만 준다 — 뒤에 깔린 경기 화면(스윙·이동·'*')은 아무 키도 못 받는다.
+      // 창의 잡기 단계에서 먼저 받아 뒤쪽 듣개로 안 넘긴다
+      if (isOverGame) event.stopPropagation()
       const key = viewerKeyOf(event.key)
       if (key === null) return
       event.preventDefault()
@@ -93,12 +99,12 @@ export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gameP
       if (next === '닫기') return onBack()
       setViewer(next)
     }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    window.addEventListener('keydown', onKeyDown, isOverGame)
+    return () => window.removeEventListener('keydown', onKeyDown, isOverGame)
   })
 
-  return (
-    <RawScreen>
+  const body = (
+    <>
       <div
         className={styles.panel}
         style={{ left: BODY_PANEL.x, top: BODY_PANEL.y, width: BODY_PANEL.width, height: BODY_PANEL.height }}
@@ -187,6 +193,31 @@ export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gameP
       ) : (
         <ScreenFrame title="2010프로야구" gamePoint={gamePoint} onBack={onBack} />
       )}
-    </RawScreen>
+    </>
+  )
+
+  if (!isOverGame) return <RawScreen>{body}</RawScreen>
+
+  /*
+   * 경기 중 [조작방법] — 원본은 경기 장면을 그대로 둔 채 그 위에 뷰어만 그린다:
+   * 0x3c212 가 일시정지 팝업을 닫고 같은 팝업(0x741a0 → 그리기 0x3cdd0 갈래 4 = 뷰어 0x639a5)을 다시 띄우면
+   * 0x75440 → 0x741a0 이 +0x250 = 1 · +0x24d = 1 을 세운다. 경기 프레임 0x52c50 은 0x52efe 에서
+   * `[+0x24f](경기 장면 0x3301c 가 1) && 팝업 && [+0x250] == 0` 일 때만 장면을 건너뛰므로 **다시 띄운 첫 프레임에 장면을 한 번 그리고**,
+   * 팝업 그리기 0x746cc 가 그 위를 0x74704~0x7474a 로 **검정 단계 5** 로 한 번 덮은 뒤 +0x250 · +0x24d 를 지운다.
+   * 그 뒤로는 장면도 덮개도 다시 안 그려 **멈춘 장면 + 어둡게** 가 뷰어 뒤에 남는다(경기 갱신도 0x754f9 가 막는다).
+   * 단계 5 의 불투명도는 칠하기 함수 [0x15605d0] 본문을 못 읽어 단계/16 으로 둔다(경기 결과 판의 단계 8 과 같은 근사).
+   */
+  return (
+    <ScreenOverlay>
+      <div className={styles.overGameDim} style={{ opacity: POPUP_DIM_STAGE / DIM_STAGE_MAX }} />
+      <div className={styles.overGameCenter}>
+        <div className={styles.overGameStage}>{body}</div>
+      </div>
+    </ScreenOverlay>
   )
 }
+
+/** 팝업 덮개 단계 — 0x7473c `movs r3, #5` (F-ui-layout 1절) */
+const POPUP_DIM_STAGE = 5
+/** 단계의 끝 — 단계/16 근사 (CORRECTIONS: 반투명 L/16) */
+const DIM_STAGE_MAX = 16

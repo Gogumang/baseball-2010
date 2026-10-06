@@ -147,3 +147,31 @@ describe('머리띠 0x54d95(skin, 0, 5) — 도움말(상태 7) 그리기 0x2fc8
     expect(onBack).toHaveBeenCalledOnce()
   })
 })
+
+describe('경기 중 [조작방법] — 멈춘 경기 장면 위에 얹힌다', () => {
+  it('뷰어가 키를 다 먹는다 — 뒤 경기 화면의 듣개로 안 넘어간다 (하위 4 키는 0x637d0 에만)', () => {
+    const 뒤 = vi.fn()
+    window.addEventListener('keydown', 뒤)
+    try {
+      render(<HelpScreen onBack={vi.fn()} />)
+      fireEvent.keyDown(window, { key: 'ArrowRight' })
+      fireEvent.keyDown(window, { key: '5' })
+      expect(뒤).not.toHaveBeenCalled()
+      expect(screen.getByText('<일반모드에 대하여>')).toBeTruthy()
+    } finally {
+      window.removeEventListener('keydown', 뒤)
+    }
+  })
+
+  it('메인 메뉴 도움말(상태 7)은 예전처럼 키를 막지 않는다', () => {
+    const 뒤 = vi.fn()
+    window.addEventListener('keydown', 뒤)
+    try {
+      render(<HelpScreen onBack={vi.fn()} gamePoint={0} />)
+      fireEvent.keyDown(window, { key: 'ArrowRight' })
+      expect(뒤).toHaveBeenCalled()
+    } finally {
+      window.removeEventListener('keydown', 뒤)
+    }
+  })
+})

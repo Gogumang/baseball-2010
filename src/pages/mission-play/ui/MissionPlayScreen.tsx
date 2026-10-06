@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { BigResult, Hint, PixelScreen } from '@/shared/ui'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
+import { useInGameMenuState } from '@/features/play-team-game/model/useInGameMenuState'
 import { HelpScreen } from '@/pages/help/ui/HelpScreen'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import * as styles from '@/pages/mission-play/ui/MissionPlayScreen.css'
@@ -104,7 +105,8 @@ export function MissionPlayScreen({
   settings,
   onSettingsChange,
 }: MissionPlayScreenProps) {
-  const [isMenuOpen, setMenuOpen] = useState(false)
+  const menu = useInGameMenuState()
+  const isMenuOpen = menu.isOpen
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
   const goals = goalsOf(run.mission, run.progress)
   const isOver = run.status !== '진행중'
@@ -142,18 +144,7 @@ export function MissionPlayScreen({
   }
   if (run.remainingSwings !== null) badgeParts.push(`${Math.max(0, run.remainingSwings)}스윙`)
 
-  // 경기 중 메뉴의 "조작방법"(0x3c212)·"설정"(0x3c326)
-  if (overlay === '조작방법') {
-    return (
-      <HelpScreen
-        onBack={() => {
-          // 뷰어를 닫으면(0x3ca36: 0x637d0 ≠ 0) 하위 0 으로 돌아가 일시정지 팝업 0x741a0 을 다시 띄운다 — 경기 중 메뉴로 돌아간다
-          setOverlay(null)
-          setMenuOpen(true)
-        }}
-      />
-    )
-  }
+  // 경기 중 메뉴의 "설정"(0x3c326). "조작방법"(0x3c212)은 아래에서 경기 장면 위에 얹는다
   if (overlay === '설정' && settings !== undefined && onSettingsChange !== undefined) {
     return (
       <SettingsScreen
@@ -161,114 +152,133 @@ export function MissionPlayScreen({
         hasSavedCareer={false}
         onChange={onSettingsChange}
         onResetCareer={() => {}}
-        onBack={() => setOverlay(null)}
+        onBack={() => {
+          // [설정]에서 CLR(0x3cb0e)도 하위 0 · 팝업 0x741a0 을 다시 띄운다 — 경기 중 메뉴로, 커서는 그대로
+          setOverlay(null)
+          menu.reopen()
+        }}
       />
     )
   }
 
   return (
-    <PixelScreen
-      title={run.mission.name}
-      badge={badgeParts.join(' · ') || undefined}
-      leftKey={
-        isOver
-          ? { label: '확인', onPress: onFinish }
-          : canSteal
-            ? { label: `도루 ${stealableBases[0]}루`, onPress: () => stealIfFlying(stealableBases[0]) }
-            : undefined
-      }
-      rightKey={
-        isOver
-          ? undefined
-          : { label: isMenuOpen ? '닫기' : '메뉴', onPress: () => setMenuOpen((open) => !open) }
-      }
-    >
-      <GoalBar goals={goals} />
+    <>
+      <PixelScreen
+        title={run.mission.name}
+        badge={badgeParts.join(' · ') || undefined}
+        leftKey={
+          isOver
+            ? { label: '확인', onPress: onFinish }
+            : canSteal
+              ? { label: `도루 ${stealableBases[0]}루`, onPress: () => stealIfFlying(stealableBases[0]) }
+              : undefined
+        }
+        rightKey={
+          isOver
+            ? undefined
+            : { label: isMenuOpen ? '닫기' : '메뉴', onPress: menu.toggle }
+        }
+      >
+        <GoalBar goals={goals} />
 
-      {isMenuOpen && (
-        <InGameMenu
-          // 미션 행은 자동진행 자리에 **다시하기**가 온다 (표 0xcfcfc 행 1)
-          mode={MISSION_BATTER_MODE}
-          onContinue={() => setMenuOpen(false)}
-          onQuit={onGiveUp}
-          onRestart={onRestart}
-          onOpenHelp={() => {
-            setMenuOpen(false)
-            setOverlay('조작방법')
+        {isMenuOpen && (
+          <InGameMenu
+            // 미션 행은 자동진행 자리에 **다시하기**가 온다 (표 0xcfcfc 행 1)
+            mode={MISSION_BATTER_MODE}
+            cursor={menu.cursor}
+            onCursorChange={menu.setCursor}
+            onContinue={menu.close}
+            onQuit={onGiveUp}
+            onRestart={onRestart}
+            onOpenHelp={() => {
+              menu.close()
+              setOverlay('조작방법')
+            }}
+            onOpenSettings={
+              settings === undefined || onSettingsChange === undefined
+                ? undefined
+                : () => {
+                    menu.close()
+                    setOverlay('설정')
+                  }
+            }
+          />
+        )}
+
+        <div className={styles.stageArea}>
+          <BattingStage
+            batterAbility={ability}
+            batterSkillIds={batterSkillIds}
+            // 판정 묶음 '미션' = 모드 6(타자 미션) — 공격(사람) +100 (0xab5c0)
+            swingMode="미션"
+            // 미션은 나리 타자편 저장의 선수(등록 타자 rec[0xa] 0xa0 — 비트7)가 친다. 내 선수 보너스는 모드 3·4 에서만
+            // 켜지므로(sp40) 판정 값은 안 바뀐다 — 연차도 그 갈래에서만 읽혀 넘기지 않는다
+            isBatterOwnPlayer
+            specialSwingNumber={specialSwingNumber}
+            specialSwingRemaining={specialSwingRemaining}
+            onSpecialSwingUsed={onSpecialSwingUsed}
+            gameMode={MISSION_BATTER_MODE}
+            // 환경설정 전광판(저장 +0x3a) — OFF 면 흐르는 글자를 안 그린다 (0x77726)
+            isScoreboardOn={settings?.isScoreboardOn}
+            // 환경설정 진동(저장 +0x3b) — 맞은 공·사구 진동 (0x3a44)
+            isVibrationOn={settings?.isVibrationOn}
+            pitcherAbility={pitcherAbility}
+            isEagleEyeEnabled={false}
+            // 시작 상황을 원본 HUD 에 보인다. 미션 팀 로고는 레코드에 없어 기본 두 팀을 쓴다 (추정)
+            hud={{
+              inning: run.mission.start.inning,
+              half: '말',
+              ourScore: run.mission.start.ourScore + (run.progress.counts['타점'] ?? 0),
+              opponentScore: run.mission.start.opponentScore,
+              balls: atBat.balls,
+              strikes: atBat.strikes,
+              outs: run.outs,
+              bases: run.bases,
+              ourLogoUrl: './sprites/team_logo_ini/000.png',
+              opponentLogoUrl: './sprites/team_logo_ini/001.png',
+            }}
+            acePitcher={
+              opponent === null
+                ? null
+                : { framesUrl: opponent.framesUrl, frameCount: opponent.frameCount, stillUrl: opponent.stillUrl }
+            }
+            canBunt={canBunt}
+            // 조작방법 뷰어 동안은 일시정지 팝업이 떠 있어 경기 갱신이 멈춘다 (0x52cc6 0x754f9)
+            isPaused={isPaused || isOver || overlay !== null}
+            random={random}
+            aceLevels={aceLevels}
+            onPitchResolved={onPitchResolved}
+            onPickoff={onPickoff}
+            flightProbeRef={flightProbeRef}
+          />
+
+          <div className={styles.overlay}>
+            {isOver ? (
+              <BigResult>{run.status === '성공' ? '미션 성공!' : '미션 실패'}</BigResult>
+            ) : bannerText === '' ? (
+              <Hint>
+                {atBat.balls}볼 {atBat.strikes}스트라이크
+                {canBunt && ' · 8·7·9(Shift)·길게 눌러 번트'}
+                {stealableBases.includes(1) && ' · 3 도루(1루)'}
+                {stealableBases.includes(2) && ' · 2 도루(2루)'}
+                {stealableBases.includes(3) && ' · 1 도루(3루)'}
+              </Hint>
+            ) : (
+              <BigResult>{bannerText}</BigResult>
+            )}
+          </div>
+        </div>
+      </PixelScreen>
+      {overlay === '조작방법' && (
+        <HelpScreen
+          onBack={() => {
+            // 뷰어를 닫으면(0x3ca36: 0x637d0 ≠ 0) 하위 0 으로 돌아가 일시정지 팝업 0x741a0 을 다시 띄운다 — 경기 중 메뉴로,
+            // 메뉴 객체는 안 건드려 커서가 그대로다
+            setOverlay(null)
+            menu.reopen()
           }}
-          onOpenSettings={
-            settings === undefined || onSettingsChange === undefined
-              ? undefined
-              : () => {
-                  setMenuOpen(false)
-                  setOverlay('설정')
-                }
-          }
         />
       )}
-
-      <div className={styles.stageArea}>
-        <BattingStage
-          batterAbility={ability}
-          batterSkillIds={batterSkillIds}
-          // 판정 묶음 '미션' = 모드 6(타자 미션) — 공격(사람) +100 (0xab5c0)
-          swingMode="미션"
-          // 미션은 나리 타자편 저장의 선수(등록 타자 rec[0xa] 0xa0 — 비트7)가 친다. 내 선수 보너스는 모드 3·4 에서만
-          // 켜지므로(sp40) 판정 값은 안 바뀐다 — 연차도 그 갈래에서만 읽혀 넘기지 않는다
-          isBatterOwnPlayer
-          specialSwingNumber={specialSwingNumber}
-          specialSwingRemaining={specialSwingRemaining}
-          onSpecialSwingUsed={onSpecialSwingUsed}
-          gameMode={MISSION_BATTER_MODE}
-          // 환경설정 전광판(저장 +0x3a) — OFF 면 흐르는 글자를 안 그린다 (0x77726)
-          isScoreboardOn={settings?.isScoreboardOn}
-          // 환경설정 진동(저장 +0x3b) — 맞은 공·사구 진동 (0x3a44)
-          isVibrationOn={settings?.isVibrationOn}
-          pitcherAbility={pitcherAbility}
-          isEagleEyeEnabled={false}
-          // 시작 상황을 원본 HUD 에 보인다. 미션 팀 로고는 레코드에 없어 기본 두 팀을 쓴다 (추정)
-          hud={{
-            inning: run.mission.start.inning,
-            half: '말',
-            ourScore: run.mission.start.ourScore + (run.progress.counts['타점'] ?? 0),
-            opponentScore: run.mission.start.opponentScore,
-            balls: atBat.balls,
-            strikes: atBat.strikes,
-            outs: run.outs,
-            bases: run.bases,
-            ourLogoUrl: './sprites/team_logo_ini/000.png',
-            opponentLogoUrl: './sprites/team_logo_ini/001.png',
-          }}
-          acePitcher={
-            opponent === null
-              ? null
-              : { framesUrl: opponent.framesUrl, frameCount: opponent.frameCount, stillUrl: opponent.stillUrl }
-          }
-          canBunt={canBunt}
-          isPaused={isPaused || isOver}
-          random={random}
-          aceLevels={aceLevels}
-          onPitchResolved={onPitchResolved}
-          onPickoff={onPickoff}
-          flightProbeRef={flightProbeRef}
-        />
-
-        <div className={styles.overlay}>
-          {isOver ? (
-            <BigResult>{run.status === '성공' ? '미션 성공!' : '미션 실패'}</BigResult>
-          ) : bannerText === '' ? (
-            <Hint>
-              {atBat.balls}볼 {atBat.strikes}스트라이크
-              {canBunt && ' · 8·7·9(Shift)·길게 눌러 번트'}
-              {stealableBases.includes(1) && ' · 3 도루(1루)'}
-              {stealableBases.includes(2) && ' · 2 도루(2루)'}
-              {stealableBases.includes(3) && ' · 1 도루(3루)'}
-            </Hint>
-          ) : (
-            <BigResult>{bannerText}</BigResult>
-          )}
-        </div>
-      </div>
-    </PixelScreen>
+    </>
   )
 }

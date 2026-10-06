@@ -24,6 +24,13 @@ interface MenuListProps {
    *                고른 줄 글자만 노랑 RGB(255,255,0) 으로 칠한다 (R14 3-4 표 dlg+0xe4).
    */
   readonly cursorStyle?: '목록' | '선택지'
+  /**
+   * 처음 그릴 때의 커서 칸 (기본 0). 메뉴 객체를 버리지 않고 다시 띄우는 원본 화면용이다 —
+   * 예: 경기 중 메뉴는 [조작방법]·[설정]에서 돌아올 때 커서를 그대로 둔다(0x3ca36 · 0x3cb0e).
+   */
+  readonly initialIndex?: number
+  /** 커서가 옮겨질 때마다 불린다 — 부르는 쪽이 커서를 들고 있다가 `initialIndex` 로 되돌려 줄 때 쓴다 */
+  readonly onCursorChange?: (index: number) => void
 }
 
 /**
@@ -31,8 +38,16 @@ interface MenuListProps {
  * 키보드(↑↓ + Enter)와 터치(탭)를 같은 동작으로 다룬다 — 데스크탑과 모바일에서
  * 조작 방식만 다를 뿐 화면은 동일하다.
  */
-export function MenuList({ items, onSelect, cursorStyle = '목록' }: MenuListProps) {
-  const [selectedIndex, setSelectedIndex] = useState(0)
+export function MenuList({
+  items,
+  onSelect,
+  cursorStyle = '목록',
+  initialIndex = 0,
+  onCursorChange,
+}: MenuListProps) {
+  const [selectedIndex, setSelectedIndex] = useState(() =>
+    initialIndex >= 0 && initialIndex < items.length ? initialIndex : 0,
+  )
   const itemsRef = useRef(items)
   itemsRef.current = items
 
@@ -50,9 +65,19 @@ export function MenuList({ items, onSelect, cursorStyle = '목록' }: MenuListPr
    *    그려지기만 해도 0 으로 튄다**. 그래서 **칸 이름을 이어 붙인 값**으로 견준다.
    */
   const itemsKey = items.map((item) => item.id).join('\u0000')
+  /** 처음 그릴 때는 `initialIndex` 를 지킨다 — 구성이 **바뀔 때만** 0 으로 */
+  const firstItemsKeyRef = useRef(itemsKey)
   useEffect(() => {
+    if (itemsKey === firstItemsKeyRef.current) return
+    firstItemsKeyRef.current = itemsKey
     setSelectedIndex(0)
   }, [itemsKey])
+
+  const onCursorChangeRef = useRef(onCursorChange)
+  onCursorChangeRef.current = onCursorChange
+  useEffect(() => {
+    onCursorChangeRef.current?.(selectedIndex)
+  }, [selectedIndex])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

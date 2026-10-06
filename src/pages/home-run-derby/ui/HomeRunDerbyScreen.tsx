@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { BigResult, Hint, PixelScreen } from '@/shared/ui'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
+import { useInGameMenuState } from '@/features/play-team-game/model/useInGameMenuState'
 import { HelpScreen } from '@/pages/help/ui/HelpScreen'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
@@ -84,21 +85,11 @@ export function HomeRunDerbyScreen({
 }: HomeRunDerbyScreenProps) {
   const session = useHomeRunDerby({ bestDistance, onFinish, aceLevels, random })
   const tick = useUpdateCounter()
-  const [isMenuOpen, setMenuOpen] = useState(false)
+  const menu = useInGameMenuState()
+  const isMenuOpen = menu.isOpen
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
 
-  // 경기 중 메뉴의 "조작방법"(0x3c212)·"설정"(0x3c326)
-  if (overlay === '조작방법') {
-    return (
-      <HelpScreen
-        onBack={() => {
-          // 뷰어를 닫으면(0x3ca36: 0x637d0 ≠ 0) 하위 0 으로 돌아가 일시정지 팝업 0x741a0 을 다시 띄운다 — 경기 중 메뉴로 돌아간다
-          setOverlay(null)
-          setMenuOpen(true)
-        }}
-      />
-    )
-  }
+  // 경기 중 메뉴의 "설정"(0x3c326). "조작방법"(0x3c212)은 아래에서 경기 장면 위에 얹는다
   if (overlay === '설정' && settings !== undefined && onSettingsChange !== undefined) {
     return (
       <SettingsScreen
@@ -106,7 +97,11 @@ export function HomeRunDerbyScreen({
         hasSavedCareer={false}
         onChange={onSettingsChange}
         onResetCareer={() => {}}
-        onBack={() => setOverlay(null)}
+        onBack={() => {
+          // [설정]에서 CLR(0x3cb0e)도 하위 0 · 팝업 0x741a0 을 다시 띄운다 — 경기 중 메뉴로, 커서는 그대로
+          setOverlay(null)
+          menu.reopen()
+        }}
       />
     )
   }
@@ -126,89 +121,104 @@ export function HomeRunDerbyScreen({
   const ace = pitcher.ace
 
   return (
-    <PixelScreen
-      title="홈런더비"
-      badge={`${derbyBallNumberOf(run)} / ${derbyBallCountOf(run)}구${run.isBonusGame ? ' · 보너스' : ''}`}
-      rightKey={{
-        label: isMenuOpen ? '닫기' : '메뉴',
-        onPress: () => setMenuOpen((open) => !open),
-      }}
-    >
-      {isMenuOpen && (
-        <InGameMenu
-          // 홈런더비 행은 자동진행 자리에 **다시하기**가 온다 (표 0xcfcfc 행 1)
-          mode={DERBY_MODE}
-          onContinue={() => setMenuOpen(false)}
-          onQuit={onExit}
-          onRestart={() => {
-            setMenuOpen(false)
-            session.restart()
+    <>
+      <PixelScreen
+        title="홈런더비"
+        badge={`${derbyBallNumberOf(run)} / ${derbyBallCountOf(run)}구${run.isBonusGame ? ' · 보너스' : ''}`}
+        rightKey={{
+          label: isMenuOpen ? '닫기' : '메뉴',
+          onPress: menu.toggle,
+        }}
+      >
+        {isMenuOpen && (
+          <InGameMenu
+            // 홈런더비 행은 자동진행 자리에 **다시하기**가 온다 (표 0xcfcfc 행 1)
+            mode={DERBY_MODE}
+            cursor={menu.cursor}
+            onCursorChange={menu.setCursor}
+            onContinue={menu.close}
+            onQuit={onExit}
+            onRestart={() => {
+              menu.close()
+              session.restart()
+            }}
+            onOpenHelp={() => {
+              menu.close()
+              setOverlay('조작방법')
+            }}
+            onOpenSettings={
+              settings === undefined || onSettingsChange === undefined
+                ? undefined
+                : () => {
+                    menu.close()
+                    setOverlay('설정')
+                  }
+            }
+          />
+        )}
+        <div className={styles.stageArea}>
+          <BattingStage
+            batterAbility={ability}
+            batterForm={batterForm}
+            batterSkinIndex={batterSkinIndex}
+            batterEquipmentLevels={batterEquipmentLevels}
+            batterSkillIds={batterSkillIds}
+            pitcherAbility={pitcher.ability}
+            aceLevels={aceLevels}
+            swingMode="홈런더비"
+            // 번트 '7'/'8'/'9' — 0x535a4 → 0x6a7 → 0x51e48 은 모드 7 도 막지 않는다(모드 갈림 없음). 내 선수가 쳐서 마선수가 아니다
+            canBunt
+            gameMode={DERBY_MODE}
+            // 0x344ea 모드 7 갈래 — 단계 0 은 구질 1, 마투수가 나온 뒤로는 22(마구)만, 굴림 없음
+            derbyPitchType={pitcher.pitchType}
+            // 환경설정 전광판(저장 +0x3a) — OFF 면 흐르는 글자를 안 그린다 (0x77726)
+            isScoreboardOn={settings?.isScoreboardOn}
+            // 환경설정 진동(저장 +0x3b) — 맞은 공·사구 진동 (0x3a44)
+            isVibrationOn={settings?.isVibrationOn}
+            isEagleEyeEnabled={false}
+            // 홈런더비는 일반 점수판을 안 그린다 (0x4c4bc 가 0x373d0 대신 0x45a54 로 간다)
+            hud={null}
+            acePitcher={
+              ace === null
+                ? null
+                : { framesUrl: ace.framesUrl, frameCount: ace.frameCount, stillUrl: ace.stillUrl }
+            }
+            // 조작방법 뷰어 동안은 일시정지 팝업이 떠 있어 경기 갱신이 멈춘다 (0x52cc6 0x754f9)
+            isPaused={session.isPaused || overlay !== null}
+            random={random}
+            onPitchResolved={(detail) => session.onPitchResolved(detail)}
+          />
+
+          <DerbyHud
+            run={run}
+            bestDistance={bestDistance}
+            aceName={ace?.name ?? null}
+            isEventZoneShown={session.isEventZoneShown}
+            tick={tick}
+            shownCombo={session.shownCombo}
+          />
+
+          <div className={styles.overlay}>
+            {session.banner === '' ? (
+              <Hint>
+                {run.isBonusGame ? '보너스 게임' : '10구 안에 멀리 쳐라'} · 누적 {run.totalDistance}M
+              </Hint>
+            ) : (
+              <BigResult>{session.banner}</BigResult>
+            )}
+          </div>
+        </div>
+      </PixelScreen>
+      {overlay === '조작방법' && (
+        <HelpScreen
+          onBack={() => {
+            // 뷰어를 닫으면(0x3ca36: 0x637d0 ≠ 0) 하위 0 으로 돌아가 일시정지 팝업 0x741a0 을 다시 띄운다 — 경기 중 메뉴로,
+            // 메뉴 객체는 안 건드려 커서가 그대로다
+            setOverlay(null)
+            menu.reopen()
           }}
-          onOpenHelp={() => {
-            setMenuOpen(false)
-            setOverlay('조작방법')
-          }}
-          onOpenSettings={
-            settings === undefined || onSettingsChange === undefined
-              ? undefined
-              : () => {
-                  setMenuOpen(false)
-                  setOverlay('설정')
-                }
-          }
         />
       )}
-      <div className={styles.stageArea}>
-        <BattingStage
-          batterAbility={ability}
-          batterForm={batterForm}
-          batterSkinIndex={batterSkinIndex}
-          batterEquipmentLevels={batterEquipmentLevels}
-          batterSkillIds={batterSkillIds}
-          pitcherAbility={pitcher.ability}
-          aceLevels={aceLevels}
-          swingMode="홈런더비"
-          // 번트 '7'/'8'/'9' — 0x535a4 → 0x6a7 → 0x51e48 은 모드 7 도 막지 않는다(모드 갈림 없음). 내 선수가 쳐서 마선수가 아니다
-          canBunt
-          gameMode={DERBY_MODE}
-          // 0x344ea 모드 7 갈래 — 단계 0 은 구질 1, 마투수가 나온 뒤로는 22(마구)만, 굴림 없음
-          derbyPitchType={pitcher.pitchType}
-          // 환경설정 전광판(저장 +0x3a) — OFF 면 흐르는 글자를 안 그린다 (0x77726)
-          isScoreboardOn={settings?.isScoreboardOn}
-          // 환경설정 진동(저장 +0x3b) — 맞은 공·사구 진동 (0x3a44)
-          isVibrationOn={settings?.isVibrationOn}
-          isEagleEyeEnabled={false}
-          // 홈런더비는 일반 점수판을 안 그린다 (0x4c4bc 가 0x373d0 대신 0x45a54 로 간다)
-          hud={null}
-          acePitcher={
-            ace === null
-              ? null
-              : { framesUrl: ace.framesUrl, frameCount: ace.frameCount, stillUrl: ace.stillUrl }
-          }
-          isPaused={session.isPaused}
-          random={random}
-          onPitchResolved={(detail) => session.onPitchResolved(detail)}
-        />
-
-        <DerbyHud
-          run={run}
-          bestDistance={bestDistance}
-          aceName={ace?.name ?? null}
-          isEventZoneShown={session.isEventZoneShown}
-          tick={tick}
-          shownCombo={session.shownCombo}
-        />
-
-        <div className={styles.overlay}>
-          {session.banner === '' ? (
-            <Hint>
-              {run.isBonusGame ? '보너스 게임' : '10구 안에 멀리 쳐라'} · 누적 {run.totalDistance}M
-            </Hint>
-          ) : (
-            <BigResult>{session.banner}</BigResult>
-          )}
-        </div>
-      </div>
-    </PixelScreen>
+    </>
   )
 }

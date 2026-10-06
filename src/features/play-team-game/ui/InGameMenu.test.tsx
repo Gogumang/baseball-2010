@@ -43,3 +43,28 @@ describe('경기 중 메뉴 — 다시하기 (표 0xcfcfc 행 1, 0x3c706)', () =
     expect(screen.getByText('계속').closest('button')?.disabled).toBe(false)
   })
 })
+
+describe('경기 중 메뉴 커서 — 메뉴 객체(+0xf30)를 0 으로 되돌리는 곳은 \'*\' 로 여는 0x3c02c 뿐이다', () => {
+  const 고른칸 = () => screen.getAllByRole('option').find((option) => option.getAttribute('aria-selected') === 'true')
+
+  it('넘겨받은 커서 칸에서 시작한다 — [조작방법]·[설정]에서 돌아올 때 (0x3ca36 · 0x3cb0e)', () => {
+    render(<InGameMenu mode={3} cursor={2} onContinue={vi.fn()} />)
+    expect(고른칸()?.textContent).toContain('설정')
+  })
+
+  it('커서가 옮겨지면 알려 준다', () => {
+    const onCursorChange = vi.fn()
+    render(<InGameMenu mode={3} onContinue={vi.fn()} onCursorChange={onCursorChange} />)
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    expect(onCursorChange).toHaveBeenLastCalledWith(1)
+  })
+
+  it('질문 창에서 아니오로 돌아와도 커서가 남는다', () => {
+    render(<InGameMenu mode={6} onContinue={vi.fn()} onRestart={vi.fn()} />)
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(screen.getByText(/다시 플레이하시겠습니까/)).toBeTruthy()
+    fireEvent.click(screen.getByText('아니오'))
+    expect(고른칸()?.textContent).toContain('다시하기')
+  })
+})

@@ -1,4 +1,5 @@
 import { globalStyle, style } from '@vanilla-extract/css'
+import { theme } from '@/app/styles/theme.css'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 
 /** 원작 좌표에 그대로 놓는 그림 한 장 */
@@ -74,4 +75,28 @@ export const pagerText = style({
   fontSize: '11px',
   lineHeight: '13px',
   pointerEvents: 'none',
+})
+
+/** 경기 중 [조작방법] — 멈춘 경기 장면을 검정으로 한 번 덮는다 (불투명도는 부르는 쪽이 단계/16 으로 준다) */
+export const overGameDim = style({
+  position: 'absolute',
+  inset: 0,
+  background: ORIGINAL_COLORS.black,
+})
+
+/** 경기 중 [조작방법] — 240×320 원작 판을 기둥 가운데 둔다 (RawScreen 과 같은 배치, 바탕은 비운다) */
+export const overGameCenter = style({
+  position: 'absolute',
+  inset: 0,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+})
+
+export const overGameStage = style({
+  position: 'relative',
+  flex: 'none',
+  width: theme.size.screenWidth,
+  height: theme.size.screenHeight,
+  overflow: 'hidden',
 })

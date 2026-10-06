@@ -16,6 +16,7 @@ import type {
 } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
+import { useInGameMenuState } from '@/features/play-team-game/model/useInGameMenuState'
 import { HelpScreen } from '@/pages/help/ui/HelpScreen'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import { usePitcherGame } from '@/pages/pitching/model/usePitcherGame'
@@ -102,8 +103,11 @@ export function PitcherGameScreen({
   const isSceneShowing = !isIntroDone || isHalfInningBoardOpen || isBenchClearing || summary !== null
 
   const [phase, setPhase] = useState<PitchPhase>('구질')
-  const [isMenuOpen, setMenuOpen] = useState(false)
+  const menu = useInGameMenuState()
+  const isMenuOpen = menu.isOpen
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
+  /** 일시정지 팝업이 떠 있는가 — 경기 중 메뉴, 또는 그 하위 4 [조작방법] 뷰어 (둘 다 0x741a0 팝업이라 경기 키·갱신이 멈춘다) */
+  const isPopupOpen = isMenuOpen || overlay === '조작방법'
   /** 이미 다 보여 준 수비 플레이 — 같은 플레이를 두 번 재생하지 않는다 */
   const [shownPlay, setShownPlay] = useState<DefensePlayResult | null>(null)
   const play = progress.lastDefensePlay
@@ -132,11 +136,11 @@ export function PitcherGameScreen({
       // 조작방법 뷰어(경기 중 메뉴 하위 4)의 키는 0x3ca36 이 뷰어 0x637d0 에만 준다 — '*' 도 아무 일 안 한다
       if (overlay === '조작방법') return
       event.preventDefault()
-      setMenuOpen((open) => !open)
+      menu.toggle()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [isSceneShowing, overlay])
+  }, [isSceneShowing, menu.toggle, overlay])
 
   const burst = progress.burst
   const resolution = progress.lastBurstResolution
@@ -248,18 +252,7 @@ export function PitcherGameScreen({
     )
   }
 
-  // 경기 중 메뉴의 "조작방법"(0x3c212)·"설정"(0x3c326)
-  if (overlay === '조작방법') {
-    return (
-      <HelpScreen
-        onBack={() => {
-          // 뷰어를 닫으면(0x3ca36: 0x637d0 ≠ 0) 하위 0 으로 돌아가 일시정지 팝업 0x741a0 을 다시 띄운다 — 경기 중 메뉴로 돌아간다
-          setOverlay(null)
-          setMenuOpen(true)
-        }}
-      />
-    )
-  }
+  // 경기 중 메뉴의 "설정"(0x3c326). "조작방법"(0x3c212)은 아래에서 경기 장면 위에 얹는다
   if (overlay === '설정' && settings !== undefined && onSettingsChange !== undefined) {
     return (
       <SettingsScreen
@@ -267,7 +260,11 @@ export function PitcherGameScreen({
         hasSavedCareer={false}
         onChange={onSettingsChange}
         onResetCareer={() => {}}
-        onBack={() => setOverlay(null)}
+        onBack={() => {
+          // [설정]에서 CLR(0x3cb0e)도 하위 0 · 팝업 0x741a0 을 다시 띄운다 — 경기 중 메뉴로, 커서는 그대로
+          setOverlay(null)
+          menu.reopen()
+        }}
       />
     )
   }
@@ -317,13 +314,13 @@ export function PitcherGameScreen({
         title={`${progress.game.inning}회${progress.game.half}`}
         badge={`${staminaPercentOf(progress.stamina)}%`}
         leftKey={
-          canPitch && !isMenuOpen
+          canPitch && !isPopupOpen
             ? { label: '# 강판', onPress: () => setAsksGiveUp(true) }
             : undefined
         }
         rightKey={{
           label: isMenuOpen ? '닫기' : '메뉴',
-          onPress: () => setMenuOpen((open) => !open),
+          onPress: menu.toggle,
         }}
       >
         <div className={styles.hud}>
@@ -372,24 +369,26 @@ export function PitcherGameScreen({
           <InGameMenu
             // 나만의리그 투수편은 표 0xcfcfc 의 행 2 — 자동진행·다시하기가 없는 네 칸이다
             mode={PITCHER_CAREER_MODE}
-            onContinue={() => setMenuOpen(false)}
+            cursor={menu.cursor}
+            onCursorChange={menu.setCursor}
+            onContinue={menu.close}
             onQuit={onQuit}
             onOpenHelp={() => {
-              setMenuOpen(false)
+              menu.close()
               setOverlay('조작방법')
             }}
             onOpenSettings={
               settings === undefined || onSettingsChange === undefined
                 ? undefined
                 : () => {
-                    setMenuOpen(false)
+                    menu.close()
                     setOverlay('설정')
                   }
             }
           />
         )}
 
-        {!isMenuOpen && asksGiveUp && (
+        {!isPopupOpen && asksGiveUp && (
           <>
             {/* StrGAME[104] "그만 던지시겠습니까?" — 모드 3 은 교체 화면 대신 이 물음만 뜬다 */}
             <Panel heading="그만 던지시겠습니까?" />
@@ -406,7 +405,7 @@ export function PitcherGameScreen({
           </>
         )}
 
-        {!asksGiveUp && !isMenuOpen && canPitch && phase === '구질' && (
+        {!asksGiveUp && !isPopupOpen && canPitch && phase === '구질' && (
           <>
             <Panel heading="1. 구질 선택" />
             <MenuList
@@ -421,7 +420,7 @@ export function PitcherGameScreen({
           </>
         )}
 
-        {!asksGiveUp && !isMenuOpen && canPitch && phase === '코스' && (
+        {!asksGiveUp && !isPopupOpen && canPitch && phase === '코스' && (
           <>
             <Panel heading={<>2. 코스 선택 — {slot?.name}</>} />
             <CourseGrid
@@ -443,7 +442,7 @@ export function PitcherGameScreen({
           </>
         )}
 
-        {!asksGiveUp && !isMenuOpen && canPitch && phase === '게이지' && (
+        {!asksGiveUp && !isPopupOpen && canPitch && phase === '게이지' && (
           <>
             <Panel heading="3. 투구 결정" />
             <PitchGradeGauge onPress={throwWith} />
@@ -473,6 +472,17 @@ export function PitcherGameScreen({
         <ManagerHookWindow
           userEventIndex={progress.managerHookText}
           onConfirm={actions.confirmManagerHook}
+        />
+      )}
+
+      {overlay === '조작방법' && (
+        <HelpScreen
+          onBack={() => {
+            // 뷰어를 닫으면(0x3ca36: 0x637d0 ≠ 0) 하위 0 으로 돌아가 일시정지 팝업 0x741a0 을 다시 띄운다 — 경기 중 메뉴로,
+            // 메뉴 객체는 안 건드려 커서가 그대로다
+            setOverlay(null)
+            menu.reopen()
+          }}
         />
       )}
     </div>
