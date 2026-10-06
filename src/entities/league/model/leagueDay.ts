@@ -31,7 +31,8 @@ import {
 } from '@/entities/team/model/teamRoster'
 import { cpuGameRotationAdvances, SEASON_MODE } from '@/entities/pitcher-career/model/pitcherRotation'
 import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
-import { rosterPitcherRoleOf } from '@/entities/pitching/model/pitcherChange'
+import { pitcherAbilitySumOf, rosterPitcherRoleOf } from '@/entities/pitching/model/pitcherChange'
+import { TEAMS } from '@/shared/config/original/teams'
 import {
   EMPTY_LEAGUE_PLAYER_STATS,
   leaguePitcherAppearancesOf,
@@ -212,6 +213,60 @@ export interface LeagueGameExtras {
    * 벤치 차례다(교체 0xabfcc 가 `team+0x0c` 를 이 차례로 훑는다 — 같은 조건이면 앞 칸을 고른다). 안 넘기면 `[0..7]`.
    */
   readonly pitcherOrders?: { readonly away?: readonly number[]; readonly home?: readonly number[] }
+  /** 경기용 능력치(0xb570c)의 모드 갈래 — 교체 0xabfcc 마무리 갈래의 능력 합 0xb5b50 에 쓴다. 안 넘기면 모드 2 밖 */
+  readonly abilityContext?: LeagueAbilityContext
+}
+
+/**
+ * CPU 투수의 경기용 능력치(`0xb570c`)가 모드에 따라 먹는 것 — CPU 끼리 경기에는 내 팀이 없으므로 모드 2 의 내 팀 갈래
+ * (질병·보직·사기, 0xb581a 가 감쌈)는 오지 않는다. 남는 것은 팀 능력치 0xb592c(모드 1·2·8·9)와 코치 0xb5a74(모드 2)다.
+ */
+export interface LeagueAbilityContext {
+  /** 원본 게임 모드 `0x1552d10` — 시즌 2 · 투수편 3 · 타자편 4 */
+  readonly mode: number
+  /** 팀 번호 → 팀 능력치 네 칸 [투구, 타격, 집중, 근성] (시즌 기록). 안 넘기면 XlsTEAM_DATA 그대로 */
+  readonly teamAbilities?: readonly (readonly number[])[]
+  /** 시즌 코치 `SR+0x185` (−1 없음, 0~9). 원본 코치 분기에 팀 검사가 없어 상대 팀에도 붙는다 (J 4-2 유력) */
+  readonly coach?: number
+}
+
+/** 팀 능력치를 먹이는 모드 비트 0x306 = {1, 2, 8, 9} (0xb593a) */
+const TEAM_ABILITY_MODE_MASK = 0x306
+/** 코치 표 `0xd884c` — 투수 칸에 붙는 것은 0~4 번 (0xb5a74 점프표) */
+const COACH_BONUS: readonly number[] = [8, 9, 10, 6, 4, 8, 5, 10, 6, 7]
+/** 코치 번호 → 붙는 투수 칸 (제구 0 · 구속 1 · 변화 2 · 체력 3) */
+const COACH_PITCHER_SLOTS: Readonly<Record<number, readonly number[]>> = {
+  0: [2],
+  1: [1],
+  2: [0],
+  3: [0, 2],
+  4: [0, 1, 2, 3],
+}
+/** 투수 칸 → 팀 능력치 칸 — 구속·변화 → 투구(0), 제구 → 집중(2), 체력 → 근성(3) (0xb592c) */
+const TEAM_ABILITY_SLOT_OF_PITCHER = [2, 0, 0, 3] as const
+const XLS_TEAM_ABILITY_OFFSET = 2
+
+/**
+ * CPU 투수 한 칸의 경기용 능력치 — `0xb570c(팀, k, P, 1, 90, 1)` 차례: 0xb6414 실효값(붙박이 로스터는 밑값) → 피로 0xb58e6
+ * (체력 인자 90 이면 없음) → 팀 능력치 정액 0xb592c → 코치 0xb5a74 → 0..999 자르기 0xb5b06.
+ * 팀 정액·코치 식은 `features/play-team-game/model/gameAbilities`(J-4 확정)와 같다 — entities 가 features 를 못 불러 옮겨 적었다.
+ */
+export function cpuPitcherGameAbilityOf(
+  base: number,
+  slot: number,
+  teamId: number,
+  context: LeagueAbilityContext | undefined,
+): number {
+  let value = base
+  const mode = context?.mode ?? -1
+  if (mode >= 0 && mode <= 9 && ((1 << mode) & TEAM_ABILITY_MODE_MASK) !== 0) {
+    const abilities = context?.teamAbilities?.[teamId] ?? TEAMS[teamId]?.values.slice(XLS_TEAM_ABILITY_OFFSET)
+    const teamAbility = abilities?.[TEAM_ABILITY_SLOT_OF_PITCHER[slot] ?? 0] ?? 0
+    if (teamAbility !== 0) value += Math.trunc((17 * teamAbility - 5100) / 100)
+  }
+  const coach = context?.coach ?? -1
+  if (mode === 2 && coach >= 0 && (COACH_PITCHER_SLOTS[coach]?.includes(slot) ?? false)) value += COACH_BONUS[coach] ?? 0
+  return Math.min(999, Math.max(0, value))
 }
 
 /**
@@ -226,6 +281,8 @@ export const ACE_PITCHER_RECORD_STAMINA = 10_000
 interface LeagueAcePitcher {
   readonly quick: QuickAtBatPitcher
   readonly staminaAbility: number
+  /** 변화 칸 (능력 합 0xb5b50 용) */
+  readonly breaking: number
   /** 레코드 +0x2c — 마운드에 오를 때 이 값으로 선다 */
   readonly stamina: number
 }
@@ -238,6 +295,7 @@ function acePitcherOf(index: number, levels: Readonly<Record<number, number>> | 
   return {
     quick: { control: ability.hit, velocity: ability.power, stamina: ability.run, skillIds: [] },
     staminaAbility: ability.run,
+    breaking: ability.defense,
     stamina: ACE_PITCHER_RECORD_STAMINA,
   }
 }
@@ -329,6 +387,7 @@ function defenseOf(
   acePitcher?: LeagueAcePitcher,
   /** 투수 레코드 차례 — 벤치를 이 차례로 훑는다 (`LeagueGameExtras.pitcherOrders`) */
   order: readonly number[] = ALL_PITCHER_SLOTS,
+  abilityContext?: LeagueAbilityContext,
 ): HalfInningDefense {
   const roster = teamPitchers(teamId)
   return {
@@ -354,6 +413,21 @@ function defenseOf(
     // 마선수 0xb633c(+0xa 비트6) — 마투수 8번 칸. 마운드면 특수 문턱(ac4f2), 벤치에 있으면 0xb8a8d 가 참이라
     // 마무리 굴림 0xac360 을 지나고(CPU 끼리라 0xb6c20 이 늘 거짓), 0xabfcc 는 고르지 않는다(ac084)
     isSpecialPitcherAt: (slot) => slot === ACE_PITCHER_SLOT && acePitcher !== undefined,
+    // 마무리 갈래(ac0be)의 정렬 열쇠 0xb5b50 = 경기용 능력치(체력 인자 90) 네 칸 합. 마투수는 0xabfcc 가 거르므로
+    // 그 칸 값은 쓰이지 않는다 — 레벨 배율 먹은 네 칸을 그대로 둔다
+    abilitySumAt: (slot) =>
+      slot === ACE_PITCHER_SLOT && acePitcher !== undefined
+        ? pitcherAbilitySumOf([
+            acePitcher.quick.control,
+            acePitcher.quick.velocity,
+            acePitcher.breaking,
+            acePitcher.staminaAbility,
+          ])
+        : pitcherAbilitySumOf(
+            (roster[slot % roster.length]?.ability ?? [0, 0, 0, 0]).map((base, k) =>
+              cpuPitcherGameAbilityOf(base, k, teamId, abilityContext),
+            ),
+          ),
   }
 }
 
@@ -572,7 +646,7 @@ export function simulateLeagueGame(
       random,
       undefined,
       undefined,
-      defenseOf(matchup.home, homeMound, homeRuns - awayRuns, homeStaminas, homeAcePitcher, homePitcherOrder),
+      defenseOf(matchup.home, homeMound, homeRuns - awayRuns, homeStaminas, homeAcePitcher, homePitcherOrder, extras?.abilityContext),
       { lineup: awayLineup, batterOf: awayBatterOf, pinchHitUsed, isAceRosterSlot },
     )
     decision = decisionsAfterHalfInning(decision, top, {
@@ -605,7 +679,7 @@ export function simulateLeagueGame(
       random,
       undefined,
       undefined,
-      defenseOf(matchup.away, awayMound, awayRuns - homeRuns, awayStaminas, awayAcePitcher, awayPitcherOrder),
+      defenseOf(matchup.away, awayMound, awayRuns - homeRuns, awayStaminas, awayAcePitcher, awayPitcherOrder, extras?.abilityContext),
       { lineup: homeLineup, batterOf: homeBatterOf, pinchHitUsed, isAceRosterSlot },
     )
     decision = decisionsAfterHalfInning(decision, bottom, {
@@ -745,6 +819,8 @@ export function playLeagueDay(
    * 사람 경기 쪽이 차례를 직접 다루게 되면 거짓을 넘긴다.
    */
   rotatesHumanGameTeams: boolean = true,
+  /** 경기용 능력치의 모드 갈래 (`LeagueAbilityContext`) — 시즌모드는 `{ mode: 2, teamAbilities, coach }`. 안 넘기면 모드 2 밖 */
+  abilityContext?: LeagueAbilityContext,
 ): LeagueDayResult {
   const plateAppearances: LeaguePlateAppearance[] = []
   const pitcherAppearances: LeaguePitcherAppearance[] = []
@@ -772,7 +848,7 @@ export function playLeagueDay(
       random,
       { away: orders.away[0] ?? 0, home: orders.home[0] ?? 0 },
       { away: staminas[sides.away], home: staminas[sides.home] },
-      { aces: cpuGameAcesOf(rolls), aceLevels, pitcherOrders: orders },
+      { aces: cpuGameAcesOf(rolls), aceLevels, pitcherOrders: orders, abilityContext },
     )
     staminas[sides.away] = score.pitcherStaminas.away
     staminas[sides.home] = score.pitcherStaminas.home

@@ -5,6 +5,7 @@ import {
   ACE_PITCHER_SLOT,
   cpuGameAcesOf,
   cpuGameSidesOf,
+  cpuPitcherGameAbilityOf,
   decisionsAfterHalfInning,
   matchupsOf,
   playLeagueDay,
@@ -707,5 +708,19 @@ describe('로테이션은 리그가 들고 다니는 레코드 차례다 (0xb5ca
     expect(leagueStarterSlotOf(새시즌, 3)).toBe(1)
     // 승패를 기록해도 차례는 그대로 남는다
     expect(pitcherOrderOf(recordLeagueResult(섞인, 3, 4), 3)).toEqual(pitcherOrderOf(섞인, 3))
+  })
+})
+
+describe('CPU 투수 경기용 능력치 0xb570c — 마무리 갈래 능력 합 0xb5b50 의 재료', () => {
+  it('모드 3·4 는 밑값 그대로(0..999 자르기만), 모드 2 는 팀 능력치 정액 + 코치', () => {
+    expect(cpuPitcherGameAbilityOf(500, 0, 0, { mode: 3 })).toBe(500)
+    expect(cpuPitcherGameAbilityOf(500, 0, 0, undefined)).toBe(500)
+    // 제구(칸 0) ← 팀 집중(칸 2) 600: trunc((17·600 − 5100)/100) = 51
+    const 팀 = [[0, 0, 600, 0]]
+    expect(cpuPitcherGameAbilityOf(500, 0, 0, { mode: 2, teamAbilities: 팀 })).toBe(551)
+    // 코치 2(투수 제구 +10) — 팀 검사 없이 붙는다
+    expect(cpuPitcherGameAbilityOf(500, 0, 0, { mode: 2, teamAbilities: 팀, coach: 2 })).toBe(561)
+    expect(cpuPitcherGameAbilityOf(500, 1, 0, { mode: 2, teamAbilities: 팀, coach: 2 })).toBe(500)
+    expect(cpuPitcherGameAbilityOf(990, 0, 0, { mode: 2, teamAbilities: 팀, coach: 2 })).toBe(999)
   })
 })

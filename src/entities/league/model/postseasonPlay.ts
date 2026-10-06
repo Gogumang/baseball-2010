@@ -6,6 +6,7 @@ import {
   rollCpuGamePrep,
   simulateLeagueGame,
 } from '@/entities/league/model/leagueDay'
+import type { LeagueAbilityContext } from '@/entities/league/model/leagueDay'
 import { isMyTurn } from '@/entities/league/model/seasonEnd'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
@@ -64,6 +65,8 @@ export function playCpuSeriesGameWithStamina(
   pitcherStaminas: PitcherStaminaTable = {},
   /** 마선수 레벨 열 칸 — `playLeagueDay` 의 `aceLevels` 와 같다. 안 넘기면 Lv1(60%) */
   aceLevels?: Readonly<Record<number, number>>,
+  /** 경기용 능력치의 모드 갈래 — `playLeagueDay` 의 `abilityContext` 와 같다 (마무리 갈래의 능력 합 0xb5b50) */
+  abilityContext?: LeagueAbilityContext,
 ): CpuPostseasonResult {
   if (series.round === '종료') return { series, pitcherStaminas }
   // 9eba·13e8a: 0xc2760(…, X = 0xb7648(L, r, 1) = 아랫 시드, Y = 0xb7648(L, r, 0) = 윗 시드).
@@ -87,7 +90,7 @@ export function playCpuSeriesGameWithStamina(
     random,
     starters,
     { away: pitcherStaminas[sides.away], home: pitcherStaminas[sides.home] },
-    { aces: cpuGameAcesOf(rolls, 1 - LEAGUE_SIDE_HOME), aceLevels, pitcherOrders: orders },
+    { aces: cpuGameAcesOf(rolls, 1 - LEAGUE_SIDE_HOME), aceLevels, pitcherOrders: orders, abilityContext },
   )
   // c28e2~c290a: `score(sX) > score(sY)` 면 X 승, 아니면(동점 포함) Y 승. 칸 sX(초)에서 친 것은 Y 의 선수라
   // **점수를 덜 낸 명단의 팀이 이긴다** — 원본 버그 그대로 (R1 항목 4 는 명단 엇갈림을 못 보고 "정상" 으로 읽었다)
@@ -120,11 +123,13 @@ export function runCpuPostseasonWithStamina(
   pitcherStaminas: PitcherStaminaTable = {},
   /** 마선수 레벨 열 칸 — 안 넘기면 Lv1(60%) */
   aceLevels?: Readonly<Record<number, number>>,
+  /** 경기용 능력치의 모드 갈래 — `playLeagueDay` 의 `abilityContext` 와 같다 (마무리 갈래의 능력 합 0xb5b50) */
+  abilityContext?: LeagueAbilityContext,
 ): CpuPostseasonResult {
   let current: CpuPostseasonResult = { series, pitcherStaminas }
   for (let game = 0; game < MAXIMUM_GAMES; game += 1) {
     if (current.series.round === '종료' || isMyTurn(current.series, myTeamId)) return current
-    current = playCpuSeriesGameWithStamina(current.series, random, current.pitcherStaminas, aceLevels)
+    current = playCpuSeriesGameWithStamina(current.series, random, current.pitcherStaminas, aceLevels, abilityContext)
   }
   return current
 }
@@ -139,6 +144,7 @@ export function runCpuPostseason(
   random: RandomPort,
   /** 마선수 레벨 열 칸 — 안 넘기면 Lv1(60%) */
   aceLevels?: Readonly<Record<number, number>>,
+  abilityContext?: LeagueAbilityContext,
 ): PostseasonSeries {
-  return runCpuPostseasonWithStamina(series, myTeamId, random, {}, aceLevels).series
+  return runCpuPostseasonWithStamina(series, myTeamId, random, {}, aceLevels, abilityContext).series
 }
