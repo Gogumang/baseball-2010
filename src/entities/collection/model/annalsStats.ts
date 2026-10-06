@@ -5,12 +5,20 @@
  *
  * | 칸 | 꼴 | 쓰는 곳 | 읽는 곳 |
  * |---|---|---|---|
+ * | `+4 + n` (n 0~39) | u8 | `0x22df0(mgr, 더할 값 u8, n)` — n ≤ 0x27 이면 `strb` 로 더한다(**256 이면 0 으로 넘친다**, 원본 그대로). 부르는 곳은 `0x22e10(mgr)` 하나 — 이번 경기 기록달성 횟수 배열 `0x1fce0(mgr)`(모드별 저장 칸) 40칸을 그대로 더한다 | 기록연감 탭 0 셀 0~39 `"!R!cffff00%d"`(0x7a0d0~0x7a0fc) · 전부 수집 k=4 "기록달성 모두 성공"(0x28f3a~0x28f56, 40칸 모두 ≠ 0) |
  * | `+0x6c + 4k` (k 0~7) | u32 | `0x22c29(mgr, k, 액수)` — 더하고 0~99999999 로 자름 | `0x2322d(mgr, k)` → 기록연감 통계 셀 56~63, 합계 `0x58801(…, 5)` |
  * | `+0x8c + 4j` (j 0~6) | u32 | `0x22c7d(mgr, 액수, 모드)` — 점프표 `0xcda88` 로 모드 → 칸 j, 더하고 0~99999999 로 자름 | `0x2325d(mgr, j)` → 셀 48~54 |
  * | `+0xa8 + 2(10m + i)` (m 0~2, i 0~9) | u16 | `0x22e35(mgr, 모드, i)` — 1 더함(16비트 넘침은 0 으로) | `0x22eb5(mgr, 모드, i)` → 셀 16~46 |
  * | `+0xf4` / `+0xf8` | u32 비트 | 스킬 켜기 `0xb663c` — 모드 4 → +0xf4, 모드 3 → +0xf8 에 `1 << 스킬` OR. `0xb663c` 는 장착 `0xa4b04` 만 부르고, 그건 스킬 창(0x147b0)과 **획득 0xa4bd8**(0x10fb4 · 이벤트 0x8c460, 얻자마자 켠다)이 부른다 | 전부 수집 보상 k=5 "스킬 모두 수집"(`0x28f8a`) 하나뿐 |
  *
  * | `+0x106 + k` (k 0~7) | u8 | `0x22dd4(mgr, k)` — k ≤ 7 이면 1 (0x22dd6 `cmp r1,#7; bhi`) | `0x22db4(mgr, k)` (k > 7 이면 0) → 기록연감 탭 0 셀 40~47 의 달성 표시 |
+ *
+ * `0x22e10` 을 부르는 곳(전수): 경기 끝 `0x4ea0c` 의 0x4ec8a — 기록 달성 G 합을 G 에 더하고 `0x22c7d`(0x4ec82) 바로 뒤,
+ * 이어서 `0x1fd45`(그 배열 비우기) · 통계 저장 `0x1f1e1`. 이 갈래는 미션 5·6 이 안 탄다. 그리고 홈런더비 결과 `0x4f574` 의
+ * 0x4f710 — ⚠️ 모드 7 이면 `0x1fce0` 이 **0(널)** 을 돌려줘(점프표 0xcd804 의 5·6·7 칸 → 0x1fd34) 주소 0..39 의 바이트를 더한다.
+ * 기기 메모리 값이라 옮길 수 없어 웹은 홈런더비에서 아무것도 안 더한다(미해결). 경기 쪽 배열은 모드 1 저장+0x600 ·
+ * 2 +0x8f0 · 3·4 +0xb9c · 8·9 +0x600(0x1fce0 직접 떴다)이고, 경기 중 `0xa77f0` 이 기록을 더할 때 같이 센다 —
+ * 웹 요약의 `recordIds`(같은 기록이 난 횟수만큼 들어 있다)가 그 배열이다.
  *
  * `0x22dd4` 를 부르는 곳: 시즌 리그 1위 G 지급 0x6a9e·0x6aa6(결산 0x6900) · 0x88da·0x88e0(0x85ec) — k = 보상 비트 0·1·2,
  * 전역기록 +0x145 비트를 켜고 저장한 바로 뒤 — 와 전부 수집 보상 0x28e98(0x28f10 · 0x28f5e · 0x29066 · 0x2925c · 0x292c2, 웹 아직 없음).
@@ -70,6 +78,8 @@ const EARNED_MODE_SLOTS: Readonly<Record<number, number>> = { 1: 0, 4: 1, 3: 2, 
 export const GAME_POINT_EARNED_KINDS = 7
 
 export interface AnnalsStats {
+  /** `+4 + n` u8 [40] — 기록달성 번호 n 의 누계 (0x22df0). 옛 저장에는 없어 0 으로 */
+  readonly recordCounts: readonly number[]
   /** `+0xa8` u16 [3][10] — 칸 m·10 + i */
   readonly itemPurchaseCounts: readonly number[]
   /** `+0x6c` u32 [8] */
@@ -83,10 +93,15 @@ export interface AnnalsStats {
   readonly achievementMarks: readonly number[]
 }
 
+/** `+4` 마흔 칸 (`cmp r2,#0x27`) — 기록달성 40종 (StrGAME[8~47]) */
+export const RECORD_COUNT_KINDS = 40
+const U8 = 0x100
+
 /** `+0x106` 여덟 칸 (`cmp r1,#7`) */
 export const ACHIEVEMENT_MARK_KINDS = 8
 
 export const EMPTY_ANNALS_STATS: AnnalsStats = {
+  recordCounts: Array.from({ length: RECORD_COUNT_KINDS }, () => 0),
   itemPurchaseCounts: Array.from({ length: 3 * ITEM_SLOTS_PER_MODE }, () => 0),
   gamePointUsage: Array.from({ length: GAME_POINT_USAGE_KINDS }, () => 0),
   gamePointEarned: Array.from({ length: GAME_POINT_EARNED_KINDS }, () => 0),
@@ -158,6 +173,26 @@ export function markSkillEquipped(stats: AnnalsStats, mode: number, skillId: num
   return stats
 }
 
+/**
+ * `0x22e10(mgr)` — 이번 경기 기록달성 횟수 배열을 `0x22df0(mgr, 횟수, n)` 으로 n = 0..39 차례로 더한다.
+ * 칸은 u8 이라 `(누계 + 횟수) & 0xff` 다(0x22e06 `adds` · `strb` — 256 번째에 0 으로 돌아간다, 원본 그대로).
+ * `recordIds` 는 경기 중 난 기록 번호를 난 횟수만큼 담은 목록이다(웹 경기 요약). 0~39 밖 번호는 버린다(`cmp r2,#0x27`).
+ * 더할 것이 없으면 같은 객체.
+ */
+export function addRecordCounts(stats: AnnalsStats, recordIds: readonly number[]): AnnalsStats {
+  const perGame = Array.from({ length: RECORD_COUNT_KINDS }, () => 0)
+  for (const id of recordIds) {
+    if (Number.isInteger(id) && id >= 0 && id < RECORD_COUNT_KINDS) perGame[id] = (perGame[id] + 1) % U8
+  }
+  if (perGame.every((count) => count === 0)) return stats
+  return { ...stats, recordCounts: stats.recordCounts.map((total, at) => (total + perGame[at]) % U8) }
+}
+
+/** `[+4 + n]` (0x7a0d4 `ldrb`) — 없는 칸은 0 */
+export function recordCountOf(stats: AnnalsStats, recordId: number): number {
+  return stats.recordCounts[recordId] ?? 0
+}
+
 /** `0x22dd4(mgr, k)` — `[+0x106 + k] = 1`. k 가 0~7 밖이면(부호 없는 `bhi`) 아무것도 안 한다. 이미 서 있으면 같은 객체 */
 export function markAchievement(stats: AnnalsStats, kind: number): AnnalsStats {
   if (!Number.isInteger(kind) || kind < 0 || kind >= ACHIEVEMENT_MARK_KINDS) return stats
@@ -181,6 +216,8 @@ export type AnnalsStatEvent =
   | { readonly kind: '스킬장착'; readonly mode: number; readonly skillId: number }
   /** `0x22c7d` — G 를 얻은 자리 */
   | { readonly kind: 'G획득'; readonly mode: number; readonly amount: number }
+  /** `0x22e10` — 경기 끝(0x4ec8a) 이번 경기 기록달성 횟수를 누계에 더한다. 번호를 난 횟수만큼 */
+  | { readonly kind: '기록달성'; readonly recordIds: readonly number[] }
   /** `0x22dd4` — 달성 표시 k (리그 1위 1·5·10회 = 0·1·2, 전부 수집 = 3~7) */
   | { readonly kind: '달성표시'; readonly index: number }
 
@@ -206,6 +243,7 @@ export function applyAnnalsStat(stats: AnnalsStats, event: AnnalsStatEvent): Ann
   if (event.kind === 'G사용') return addGamePointUsage(stats, event.usage, event.amount)
   if (event.kind === 'G획득') return addGamePointEarned(stats, event.amount, event.mode)
   if (event.kind === '달성표시') return markAchievement(stats, event.index)
+  if (event.kind === '기록달성') return addRecordCounts(stats, event.recordIds)
   return markSkillEquipped(stats, event.mode, event.skillId)
 }
 
@@ -218,6 +256,10 @@ export function normalizeAnnalsStats(raw: unknown): AnnalsStats {
   if (typeof raw !== 'object' || raw === null) return EMPTY_ANNALS_STATS
   const candidate = raw as Record<string, unknown>
   return {
+    recordCounts: isCountArray(candidate.recordCounts, RECORD_COUNT_KINDS)
+      && candidate.recordCounts.every((count) => count < U8)
+      ? candidate.recordCounts
+      : EMPTY_ANNALS_STATS.recordCounts,
     itemPurchaseCounts: isCountArray(candidate.itemPurchaseCounts, 3 * ITEM_SLOTS_PER_MODE)
       ? candidate.itemPurchaseCounts
       : EMPTY_ANNALS_STATS.itemPurchaseCounts,

@@ -352,6 +352,8 @@ export function App() {
           const earned = summary.gamePoints ?? 0
           if (earned !== 0) wallet.gain(earned)
           recordStat({ kind: 'G획득', mode: GENERAL_STAT_MODE, amount: earned })
+          // 이어서 0x4ec8a `0x22e10` — 이번 경기 기록달성 횟수(0x1fce0, 모드 1)를 통계 [mgr+0xc8]+4+n 누계에 더한다
+          recordStat({ kind: '기록달성', recordIds: summary.recordIds ?? [] })
           setScreen({ kind: '메인메뉴' })
         }}
         onExit={() => setScreen({ kind: '메인메뉴' })}

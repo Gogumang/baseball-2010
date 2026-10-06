@@ -1420,7 +1420,8 @@ describe('팀 경기 기록 달성 G (경기 끝 0x4ea0c 4ec5a → 0x4ec82)', ()
     act(() => result.current.actions.finishGame(요약({ recordIds: [1], gamePoints: 25 })))
 
     expect(result.current.gamePoints).toBe(before + 25)
-    expect(events).toEqual([{ kind: 'G획득', mode: 2, amount: 25 }])
+    // 이어서 0x4ec8a 0x22e10 — 이번 경기 기록달성 횟수를 누계(+4+n)에 더한다
+    expect(events).toEqual([{ kind: 'G획득', mode: 2, amount: 25 }, { kind: '기록달성', recordIds: [1] }])
   })
 })
 

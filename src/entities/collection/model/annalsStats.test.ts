@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   addGamePointEarned, addGamePointUsage, applyAnnalsStat, gamePointEarnedOf, skillEquipStatEventsOf, countItemPurchase, EMPTY_ANNALS_STATS, GAME_POINT_USAGE_LIMIT,
   gamePointUsageOf, itemPurchaseCountOf, markSkillEquipped, normalizeAnnalsStats, markAchievement, achievementMarkOf,
+  addRecordCounts, recordCountOf, RECORD_COUNT_KINDS,
 } from '@/entities/collection/model/annalsStats'
 
 /** 기록연감 통계 기록 `[mgr+0xc8]` — 0x22e35 · 0x22c29 · 0xb663c (디스어셈 확정) */
@@ -120,5 +121,32 @@ describe('달성 표시 0x22dd4 · 0x22db4 (+0x106 + k)', () => {
     expect(normalizeAnnalsStats(saved).achievementMarks[5]).toBe(1)
     expect(normalizeAnnalsStats({ ...saved, achievementMarks: undefined }).achievementMarks).toEqual(EMPTY_ANNALS_STATS.achievementMarks)
     expect(normalizeAnnalsStats({ ...saved, achievementMarks: [1, 2] }).achievementMarks).toEqual(EMPTY_ANNALS_STATS.achievementMarks)
+  })
+})
+
+describe('기록달성 누계 0x22e10 → 0x22df0 (+4 + n, u8)', () => {
+  it('이번 경기 번호 목록을 난 횟수만큼 더한다 — 0~39 밖은 버리고(cmp r2,#0x27), 더할 게 없으면 같은 객체', () => {
+    const once = addRecordCounts(EMPTY_ANNALS_STATS, [1, 1, 39, 40, -1])
+    expect(recordCountOf(once, 1)).toBe(2)
+    expect(recordCountOf(once, 39)).toBe(1)
+    expect(once.recordCounts).toHaveLength(RECORD_COUNT_KINDS)
+    expect(recordCountOf(addRecordCounts(once, [1]), 1)).toBe(3)
+    expect(addRecordCounts(once, [])).toBe(once)
+    expect(addRecordCounts(once, [40])).toBe(once)
+    expect(recordCountOf(applyAnnalsStat(EMPTY_ANNALS_STATS, { kind: '기록달성', recordIds: [7] }), 7)).toBe(1)
+  })
+
+  it('칸은 u8 — 255 다음은 0 이다 (0x22e06 adds · strb, 원본 그대로)', () => {
+    const full = addRecordCounts(EMPTY_ANNALS_STATS, Array.from({ length: 255 }, () => 3))
+    expect(recordCountOf(full, 3)).toBe(255)
+    expect(recordCountOf(addRecordCounts(full, [3]), 3)).toBe(0)
+  })
+
+  it('옛 저장(칸 없음)·깨진 칸은 0 마흔으로 읽는다', () => {
+    const saved = JSON.parse(JSON.stringify(addRecordCounts(EMPTY_ANNALS_STATS, [5]))) as Record<string, unknown>
+    expect(normalizeAnnalsStats(saved).recordCounts[5]).toBe(1)
+    expect(normalizeAnnalsStats({ ...saved, recordCounts: undefined }).recordCounts).toEqual(EMPTY_ANNALS_STATS.recordCounts)
+    expect(normalizeAnnalsStats({ ...saved, recordCounts: Array.from({ length: 40 }, () => 256) }).recordCounts)
+      .toEqual(EMPTY_ANNALS_STATS.recordCounts)
   })
 })

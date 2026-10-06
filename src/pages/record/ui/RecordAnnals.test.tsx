@@ -197,3 +197,23 @@ describe('탭 0 스페셜기록 쪽 — 셀 40~47 이름 StrGAME[48~55] · 달�
     expect(container.querySelectorAll('img[alt="달성"]')).toHaveLength(0)
   })
 })
+
+describe('탭 0 달성 횟수 — 셀 0~39 "!R!cffff00%d" (0x7a0d0~0x7a0fc)', () => {
+  it('쪽 0 의 여덟 칸에 누계를 찍는다 — 0 도 찍고, 자리는 (x + 3, 줄 위 + 3, 폭 − 10) 오른쪽 맞춤', () => {
+    const stats = applyAnnalsStat(EMPTY_COLLECTION.stats, { kind: '기록달성', recordIds: [1, 1, 7] })
+    const { container } = 띄우기({ collection: { ...EMPTY_COLLECTION, stats } })
+
+    const counts = [...container.querySelectorAll('[data-cell]')].filter((node) => node.tagName === 'DIV') as HTMLElement[]
+    expect(counts.map((node) => node.dataset.cell)).toEqual(['0', '1', '2', '3', '4', '5', '6', '7'])
+    expect(counts.map((node) => node.textContent)).toEqual(['0', '2', '0', '0', '0', '0', '0', '1'])
+    expect(counts[1]?.style.left).toBe('35px')
+    expect(counts[1]?.style.top).toBe('111px')
+    expect(counts[1]?.style.width).toBe('166px')
+  })
+
+  it('마지막 쪽(셀 40~47)에는 횟수가 없다', () => {
+    const { container } = 띄우기({ collection: EMPTY_COLLECTION })
+    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+    expect([...container.querySelectorAll('div[data-cell]')]).toHaveLength(0)
+  })
+})

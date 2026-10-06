@@ -1376,6 +1376,8 @@ export function useSeasonSession(
       const earned = summary.gamePoints ?? 0
       if (earned !== 0) gainGamePoint(earned)
       recordStat?.({ kind: 'G획득', mode: SEASON_STAT_MODE, amount: earned })
+      // 이어서 0x4ec8a `0x22e10` — 이번 경기 기록달성 횟수(0x1fce0, 모드 2 저장+0x8f0)를 통계 +4+n 누계에 더한다
+      recordStat?.({ kind: '기록달성', recordIds: summary.recordIds ?? [] })
 
       // 경기 중 `0xa755c` 가 올린 평판 16칸 — 원본은 경기 장면이 SR+0x1a0 을 직접 올리므로
       // **갈래와 상관없이** 레코드에 남는다 (S4 2b·6절). 웹은 요약이 싣고 와서 여기서 꽂는다.

@@ -181,3 +181,14 @@ export const SPECIAL_RECORD_FIRST_CELL = 0x28
  * 곧 칸 오른쪽 끝에서 1px 안쪽에 오른쪽을 맞추고, 칸 위쪽보다 1px 위에 그린다.
  */
 export const ACHIEVEMENT_MARK = { image: 71, width: 28, dx: -1, dy: -1 } as const
+
+/**
+ * **달성 횟수** — 같은 0x7a08c 의 `n ≤ 0x27` 갈래(0x7a0d0~0x7a0fc, 직접 떴다):
+ * ```
+ * sprintf(buf, "!R!cffff00%d", (u8)[[mgr+0xc8] + 4 + n])      ; 0xd4140
+ * 0xba269(buf, x + 3, (y + 2) + 1, 칸너비 − 10, −1, 0)            ; 노랑 오른쪽 맞춤
+ * ```
+ * 달성 표시와 같은 기준(줄 위 = (y + 2) − 2)이라 글은 줄 위에서 3px 아래, 칸 왼쪽 3px 안에서 폭 − 10 칸 오른쪽에 붙는다.
+ * 0 도 그대로 찍는다.
+ */
+export const RECORD_COUNT = { dx: 3, dy: 3, widthInset: 10 } as const
