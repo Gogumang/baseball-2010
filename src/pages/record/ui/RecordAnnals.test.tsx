@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { RecordAnnals } from '@/pages/record/ui/RecordAnnals'
 import { EMPTY_COLLECTION } from '@/entities/collection/model/collection'
 import { ORIGINAL_SKILLS } from '@/shared/config/original/skills'
@@ -17,10 +18,24 @@ import { applyAnnalsStat } from '@/entities/collection/model/annalsStats'
  * 진행·스킬은 41×25 칸 격자, 닉네임은 164×18 줄이다.
  */
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.useRealTimers()
+})
 
-const 띄우기 = (overrides: Partial<Parameters<typeof RecordAnnals>[0]> = {}) =>
-  render(<RecordAnnals collection={EMPTY_COLLECTION} onBack={vi.fn()} {...overrides} />)
+/** 갱신 n 번 — 기록연감은 판이 다 열린 뒤(그림 4번)에야 키를 받는다 (0x2b87c) */
+const 틱 = (count: number) => act(() => void vi.advanceTimersByTime(millisecondsPerFrame() * count))
+/** 가짜 requestAnimationFrame 은 16ms 마다 돈다 — 띄운 직후 한 번 밀어 두면 틱 경계가 rAF 뒤로 온다 */
+const 시계맞추기 = () => act(() => void vi.advanceTimersByTime(16))
+
+/** 띄우고 판이 다 열릴 때까지 기다린다 */
+const 띄우기 = (overrides: Partial<Parameters<typeof RecordAnnals>[0]> = {}) => {
+  vi.useFakeTimers()
+  const result = render(<RecordAnnals collection={EMPTY_COLLECTION} onBack={vi.fn()} {...overrides} />)
+  시계맞추기()
+  틱(4)
+  return result
+}
 
 describe('기록연감 뼈대', () => {
   it('판은 가운데 192×212 다', () => {
@@ -94,6 +109,39 @@ describe('기록연감 뼈대', () => {
     expect(onBack).not.toHaveBeenCalled()
 
     fireEvent.keyDown(window, { key: 'Escape' })
+    // 판이 212 → 208 → 192 → 128 → 10 으로 닫힌 다음 갱신에 나간다 (0x2fb94 · 0x2bb0a)
+    틱(3)
+    expect(onBack).not.toHaveBeenCalled()
+    틱(1)
+    expect(onBack).toHaveBeenCalledTimes(1)
+  })
+
+  it('판이 다 열리기 전에는 키를 안 받는다 — 32 → 36 → 52 → 116 → 212 (0x2407c · 0x2fb94 · 0x2b87c)', () => {
+    vi.useFakeTimers()
+    const { container } = render(<RecordAnnals collection={EMPTY_COLLECTION} onBack={vi.fn()} />)
+    시계맞추기()
+    const panel = () => container.querySelector(`div[style*="${PANEL.width}px"]`) as HTMLElement
+    expect(panel().style.height).toBe('32px')
+    expect(panel().style.top).toBe('144px')
+
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(screen.getByRole('button', { name: '기록' }).style.width).toBe(`${TAB_SELECTED_WIDTH}px`)
+
+    틱(3)
+    expect(panel().style.height).toBe('116px')
+    틱(1)
+    expect(panel().style.height).toBe('212px')
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(screen.getByRole('button', { name: '진행' }).style.width).toBe(`${TAB_SELECTED_WIDTH}px`)
+  })
+
+  it('머리띠는 "2010프로야구" · 바닥 5 — 되돌아가기가 CLR 이다 (0x2fc1e)', () => {
+    const onBack = vi.fn()
+    const { container } = 띄우기({ onBack })
+    expect(container.querySelector('img[src*="game_frame/003"]')).not.toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: '되돌아가기' }))
+    틱(4)
     expect(onBack).toHaveBeenCalledTimes(1)
   })
 })

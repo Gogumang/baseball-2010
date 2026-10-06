@@ -1,5 +1,5 @@
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
-import { frameSlideOf } from '@/widgets/screen-frame/lib/frameSlide'
+import { FRAME_SLIDE_END, frameSlideOf } from '@/widgets/screen-frame/lib/frameSlide'
 import {
   BACK_ICON_X, FOOTER_BITS, FOOTER_CENTER_MARKS, FOOTER_CENTER_X, FOOTER_CORNER_X, FOOTER_LEFT_MARKS, FOOTER_LEFT_X,
   FOOTER_TILE_XS, FRAME_COLORS, GAME_POINT_DIGITS_RIGHT, GAME_POINT_LEFT, HEADER_CORNER_X, HEADER_TILE_XS, TITLE_IMAGES,
@@ -28,6 +28,11 @@ interface ScreenFrameProps {
    * 되돌아가기 표시는 비트 0x4 가 있을 때만 그리고, onBack 이 있으면 누를 수 있다.
    */
   readonly footer?: number
+  /**
+   * 머리띠·바닥띠가 미끄러져 들어오는가 ([skin+0x84]). 하위 상태 들어옴이 [+0x84] 를 안 세우면(예: 기록연감 0x2407c 는
+   * 0 으로 둔다) 앞 화면에서 다 내려온 그대로다 — false 면 처음부터 다 내려온 자리에 그린다.
+   */
+  readonly slides?: boolean
 }
 
 /**
@@ -35,9 +40,9 @@ interface ScreenFrameProps {
  * 뒤로 표시(y = B−6−13+3, 0x55226)는 바닥비트 0x4 일 때만, 그 밖 표시(재선택·타자·투수·닉네임 왼쪽 ·
  * 상세정보·경기설정·목표·레벨업 가운데)는 비트마다 game_frame 프레임으로 그린다(`FOOTER_BITS`, 0x552b6~0x554f4).
  */
-export function ScreenFrame({ title, gamePoint, onBack, footer = onBack === null ? 1 : 5 }: ScreenFrameProps) {
+export function ScreenFrame({ title, gamePoint, onBack, footer = onBack === null ? 1 : 5, slides = true }: ScreenFrameProps) {
   const updates = useUpdateCounter()
-  const slide = frameSlideOf(updates)
+  const slide = slides ? frameSlideOf(updates) : FRAME_SLIDE_END
   const top = headerTopOf(slide)
   const bottom = footerBottomOf(slide)
   const digits = [...String(gamePoint)]

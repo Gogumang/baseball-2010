@@ -106,7 +106,7 @@ export function SpecialScreen({ collection, renderAceSelect, hallOfFameDeletion,
   })
 
   if (view === '기록연감') {
-    return <RecordAnnals collection={collection} onBack={() => setView('목록')} />
+    return <RecordAnnals collection={collection} {...(gamePoint === undefined ? {} : { gamePoint })} onBack={() => setView('목록')} />
   }
 
   if (view === '마선수선택' && renderAceSelect !== undefined) {

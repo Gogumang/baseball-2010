@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
-import { Button, FrameSprite, RawScreen } from '@/shared/ui'
+import { useEffect, useRef, useState } from 'react'
+import { FrameSprite, RawScreen } from '@/shared/ui'
+import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import type { Collection } from '@/entities/collection/model/collection'
@@ -17,7 +18,8 @@ import {
 import { STAT_NAMES } from '@/pages/record/lib/statNames'
 import type { AnnalsDirection } from '@/pages/record/lib/annalsGrid'
 import {
-  ANNALS_GRID_SHAPES, DIRECTION_CODES, VISIBLE_GRID_ROWS, cursorShakeOf, hasDownMark, isBlinkOn, moveGridCursor,
+  ANNALS_GRID_SHAPES, DIRECTION_CODES, PANEL_ANIMATION_DRAWS, PANEL_FULL_HEIGHT, VISIBLE_GRID_ROWS,
+  closingPanelHeightOf, cursorShakeOf, hasDownMark, isBlinkOn, moveGridCursor, openingPanelHeightOf, panelTopOf,
   scrollTopAfter,
 } from '@/pages/record/lib/annalsGrid'
 import {
@@ -41,7 +43,12 @@ const nameWidthOf = (origins: ReturnType<typeof useFrameOrigins>, frame: number)
 interface RecordAnnalsProps {
   readonly collection: Collection
   readonly onBack: () => void
+  /** 머리띠 G포인트 */
+  readonly gamePoint?: number
 }
+
+/** 화면 크기 — 판 안 그림을 자르는 clip-path 를 잴 때 쓴다 */
+const SCREEN = { width: 240, height: 320 } as const
 
 /**
  * 기록연감 (메인 메뉴 상태 30, 그리기 0x2e29c — P6 2c 확정).
@@ -65,7 +72,7 @@ interface RecordAnnalsProps {
  * OK·↓ 로 본문에 들어가 ←→ 는 쪽(진행·스킬은 같은 줄 안 커서 감기), ↑↓ 는 커서 — 진행·스킬은 보이는 3줄 창이
  * 커서를 따라 한 줄씩 움직인다. 취소는 본문 → 탭 막대 → 닫기. 탭 아이콘·칸 누르기는 웹 덧붙임이다.
  */
-export function RecordAnnals({ collection, onBack }: RecordAnnalsProps) {
+export function RecordAnnals({ collection, onBack, gamePoint = 0 }: RecordAnnalsProps) {
   const [tab, setTab] = useState(0)
   const [page, setPage] = useState(0)
   const [cursor, setCursor] = useState(0)
@@ -75,6 +82,18 @@ export function RecordAnnals({ collection, onBack }: RecordAnnalsProps) {
   const [gridTop, setGridTop] = useState(0)
   const tick = useUpdateCounter()
   const isBlinking = isBlinkOn(tick)
+  /** 탭 막대에서 CLR 을 누른 틱 — 판을 닫는 중 ([skin+0x99] = 0) */
+  const [closingAt, setClosingAt] = useState<number | null>(null)
+  const panelHeight = closingAt === null ? openingPanelHeightOf(tick) : closingPanelHeightOf(tick - closingAt)
+  /** 키를 받는가 — 여는 중이고 끝났고 높이 212 (0x2b87c~0x2b8b6) */
+  const isPanelOpen = closingAt === null && tick >= PANEL_ANIMATION_DRAWS
+  const hasLeftRef = useRef(false)
+  // 닫기가 끝난(넷째 그림) 다음 갱신에 스페셜 목록으로 (0x2bb0a)
+  useEffect(() => {
+    if (closingAt === null || tick - closingAt < PANEL_ANIMATION_DRAWS || hasLeftRef.current) return
+    hasLeftRef.current = true
+    onBack()
+  }, [closingAt, tick, onBack])
   /** 고른 칸 흔들림 — 방향 [this+0xfc] 과 시작 틱 ([this+0xf8] = 지금 틱 − 시작) */
   const [shake, setShake] = useState<{ readonly directionCode: number; readonly startedAt: number } | null>(null)
   const cursorShake = !isTabFocused && shake !== null ? cursorShakeOf(shake.directionCode, tick - shake.startedAt) : null
@@ -101,16 +120,19 @@ export function RecordAnnals({ collection, onBack }: RecordAnnalsProps) {
     setGridTop(0)
   }
   const changeTab = (next: number) => restartTab((next + TAB_COUNT) % TAB_COUNT)
+  /** CLR — 본문이면 탭 막대로(0x2b95c), 탭 막대면 판을 닫기 시작한다(0x2b946) */
+  const pressClear = () => (isTabFocused ? setClosingAt(tick) : setIsTabFocused(true))
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const { key } = event
       // 숫자 키는 아직 안 열렸으면 비밀 번호 버퍼에 쌓인다 (0x2b7b4~0x2b838, 탭·초점과 상관없다)
       if (/^[0-9]$/.test(key)) setSecretCode((previous) => typeSecretDigit(previous, key))
+      // 판이 다 열리기 전·닫는 중에는 키를 안 받는다 (0x2b87c — 비밀 번호 버퍼 0x2b7b4 는 그 앞이라 받는다)
+      if (!isPanelOpen) return
       if (key === 'Escape' || key === 'Backspace') {
         event.preventDefault()
-        // CLR: 본문이면 탭 막대로(0x2b95c), 탭 막대면 닫는다(0x2b946)
-        return isTabFocused ? onBack() : setIsTabFocused(true)
+        return pressClear()
       }
       if (isTabFocused) {
         // 날 키 그대로 (격자 키 처리를 안 거친다): ← '4' · → '6' 은 탭, OK · '5' · ↓ 는 본문으로. '2' · '8' · ↑ 은 아무것도 안 한다
@@ -151,14 +173,22 @@ export function RecordAnnals({ collection, onBack }: RecordAnnalsProps) {
 
   /** 웹 덧붙임 — 보이는 칸을 누르면 본문에 들어가 그 칸을 고른다 (창은 그대로) */
   const selectCell = (index: number) => {
+    if (!isPanelOpen) return
     setIsTabFocused(false)
     setCursor(index)
   }
 
   return (
     <RawScreen>
+      {/* 판 (24, 160 − h/2, 192, h) — 들어올 때 32 에서 그림마다 커진다 (0x55e60 · 0x2fb94) */}
       <div className={styles.panel}
-        style={{ left: PANEL.x, top: PANEL.y, width: PANEL.width, height: PANEL.height }} />
+        style={{ left: PANEL.x, top: panelTopOf(panelHeight), width: PANEL.width, height: panelHeight }} />
+      {/* 판 안 그림 — 높이 ≤ 211 동안은 (24, 160 − h/2 + 5, 192, h − 10) 로 잘린다 (0x2e42e~0x2e452) */}
+      <div className={styles.content}
+        style={panelHeight >= PANEL_FULL_HEIGHT ? undefined : {
+          clipPath: `inset(${panelTopOf(panelHeight) + 5}px ${SCREEN.width - PANEL.x - PANEL.width}px `
+            + `${SCREEN.height - (panelTopOf(panelHeight) + panelHeight - 5)}px ${PANEL.x}px)`,
+        }}>
 
       {/* 탭 막대 — 고른 탭만 넓은 칸이라 탭마다 프레임이 다르다 */}
       <FrameSprite folder={SLT_FRAMES} frame={TAB_BAR.firstFrame + tab} origins={frames}
@@ -177,7 +207,7 @@ export function RecordAnnals({ collection, onBack }: RecordAnnalsProps) {
             left: tabIconXOf(index, tab), top: TAB_BAR.y,
             width: tabIconWidthOf(index, tab), height: TAB_BAR.height,
           }}
-          onClick={() => changeTab(index)} />
+          onClick={() => isPanelOpen && changeTab(index)} />
       ))}
 
       {pageCount > 0 && (
@@ -298,9 +328,12 @@ export function RecordAnnals({ collection, onBack }: RecordAnnalsProps) {
         <TotalRow frames={frames} textFrames={textFrames} value={statTotalTextOf(page) ?? ''} isRightAligned />
       )}
 
-      <Button variant="corner" className={styles.backButton} onClick={onBack}>
-        ‹ 돌아가기
-      </Button>
+      </div>
+
+      {/* 머리띠·바닥 — 그리기 꼬리 0x2fc1e `0x54d95(skin, 0, 5)` (판 자르기를 푼 뒤라 안 잘린다).
+          들어옴 0x2407c 가 [skin+0x84] = 0 이라 미끄러지지 않는다. 되돌아가기는 CLR 과 같은 일 */}
+      <ScreenFrame title="2010프로야구" gamePoint={gamePoint} footer={5} slides={false}
+        onBack={() => isPanelOpen && pressClear()} />
     </RawScreen>
   )
 }

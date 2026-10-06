@@ -113,3 +113,49 @@ export function cursorShakeOf(directionCode: number, tick: number): { readonly d
   if (tick < 0 || tick > 1) return { dx: 0, dy: 0 }
   return { dx: SHAKE_X[2 * directionCode + tick] ?? 0, dy: SHAKE_Y[3 * directionCode + tick] ?? 0 }
 }
+
+/**
+ * **판 열고 닫기** — 들어올 때 0x2407c: 높이 [skin+0x90] = 32 · 속도 [skin+0x94] = 1 · 끝남 [skin+0x98] = 0 ·
+ * 여는 중 [skin+0x99] = 1. 그리기 꼬리 0x2fb94(0x2fb9a~0x2fc12)가 그린 **뒤에** 높이를 고친다:
+ * ```
+ * 여는 중: 끝났으면 높이 = 212, 아니면 속도 ×= 4 · 높이 += 속도 — 212 이상이면 212 · 끝남 = 1
+ * 닫는 중: 끝났으면 높이 = 1,   아니면 속도 ×= 4 · 높이 −= 속도 — 10 이하면 10 · 끝남 = 1
+ * ```
+ * 그래서 그림마다 32 → 36 → 52 → 116 → 212 (넷째 그림 끝에 끝남). 탭 막대에서 CLR(0x2b946)은
+ * 끝남 = 0 · 속도 = 1 · 여는 중 = 0 을 세워 212 → 208 → 192 → 128 → 10 으로 닫고, 다음 갱신 0x2bb0a 가
+ * `!여는 중 && 끝남` 을 보고 스페셜 목록(하위 6)으로 간다.
+ * 키(0x2b87c~0x2b8b6)는 `여는 중 && 끝남 && 높이 == 212` 일 때만 받는다(닫는 쪽 `높이 == 1` 갈래는 그 전에 나간다).
+ * 판 안 그림은 높이 ≤ 211 동안 (24, 160 − 높이/2 + 5, 192, 높이 − 10) 으로 잘린다 (0x2e42e~0x2e452).
+ */
+export const PANEL_OPEN_START_HEIGHT = 0x20
+export const PANEL_FULL_HEIGHT = 0xd4
+const PANEL_CLOSED_HEIGHT = 0xa
+/** 끝남이 서기까지의 그림 수 — 열기·닫기 모두 4 */
+export const PANEL_ANIMATION_DRAWS = 4
+
+/** 그림 n 번 뒤 여는 판 높이 (n = 0 이 첫 그림이 쓰는 32) */
+export function openingPanelHeightOf(draws: number): number {
+  let height = PANEL_OPEN_START_HEIGHT
+  let speed = 1
+  for (let draw = 0; draw < draws; draw += 1) {
+    if (height >= PANEL_FULL_HEIGHT) return PANEL_FULL_HEIGHT
+    speed *= 4
+    height = Math.min(PANEL_FULL_HEIGHT, height + speed)
+  }
+  return height
+}
+
+/** CLR 뒤 그림 n 번 뒤 닫는 판 높이 (n = 0 이 CLR 틱의 그림이 쓰는 212) */
+export function closingPanelHeightOf(draws: number): number {
+  let height = PANEL_FULL_HEIGHT
+  let speed = 1
+  for (let draw = 0; draw < draws; draw += 1) {
+    if (height <= PANEL_CLOSED_HEIGHT) return PANEL_CLOSED_HEIGHT
+    speed *= 4
+    height = Math.max(PANEL_CLOSED_HEIGHT, height - speed)
+  }
+  return height
+}
+
+/** 판 높이 h 일 때 판 윗변 — 가운데 (H/2 = 160) 에서 h/2 (버림) 위 */
+export const panelTopOf = (height: number) => 160 - Math.trunc(height / 2)

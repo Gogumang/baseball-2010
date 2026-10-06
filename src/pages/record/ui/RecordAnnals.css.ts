@@ -130,8 +130,8 @@ export const pagerText = style({
   pointerEvents: 'none',
 })
 
-export const backButton = style({
+/** 판 안 그림 묶음 — 판이 열리고 닫히는 동안 clip-path 로 잘린다 */
+export const content = style({
   position: 'absolute',
-  right: '4px',
-  top: '4px',
+  inset: 0,
 })

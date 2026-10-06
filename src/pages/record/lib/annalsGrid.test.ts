@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  ANNALS_GRID_SHAPES, DIRECTION_CODES, cursorShakeOf, hasDownMark, isBlinkOn, moveGridCursor, scrollTopAfter,
+  ANNALS_GRID_SHAPES, DIRECTION_CODES, PANEL_ANIMATION_DRAWS, PANEL_OPEN_START_HEIGHT, closingPanelHeightOf, cursorShakeOf,
+  hasDownMark, isBlinkOn, moveGridCursor, openingPanelHeightOf, panelTopOf, scrollTopAfter,
 } from '@/pages/record/lib/annalsGrid'
 
 describe('기록연감 격자 키 처리 (0x2b7a0 · 0x2b640 · 0x6bead)', () => {
@@ -49,5 +50,21 @@ describe('기록연감 격자 키 처리 (0x2b7a0 · 0x2b640 · 0x6bead)', () =>
     expect(shakeOf('right')).toEqual([{ dx: 2, dy: 0 }, { dx: -2, dy: 0 }, { dx: 0, dy: 0 }])
     expect(shakeOf('up')).toEqual([{ dx: 0, dy: -2 }, { dx: 0, dy: 2 }, { dx: 0, dy: 0 }])
     expect(shakeOf('down')).toEqual([{ dx: 0, dy: 2 }, { dx: 0, dy: -2 }, { dx: 0, dy: 0 }])
+  })
+})
+
+describe('판 열고 닫기 (0x2407c · 0x2fb94)', () => {
+  it('열기는 그림마다 32 → 36 → 52 → 116 → 212, 넷째 그림에서 끝난다', () => {
+    expect([0, 1, 2, 3, 4, 5].map(openingPanelHeightOf)).toEqual([32, 36, 52, 116, 212, 212])
+    expect(PANEL_ANIMATION_DRAWS).toBe(4)
+  })
+
+  it('닫기는 212 → 208 → 192 → 128 → 10', () => {
+    expect([0, 1, 2, 3, 4].map(closingPanelHeightOf)).toEqual([212, 208, 192, 128, 10])
+  })
+
+  it('판은 가운데 160 에서 높이 반만큼 위 — 212 면 54', () => {
+    expect(panelTopOf(212)).toBe(54)
+    expect(panelTopOf(PANEL_OPEN_START_HEIGHT)).toBe(144)
   })
 })
