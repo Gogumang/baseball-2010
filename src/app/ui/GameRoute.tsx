@@ -19,6 +19,7 @@ import { BurstMissionWindow } from '@/widgets/burst-mission/ui/BurstMissionWindo
 import { ORIGINAL_BURST_TABLES } from '@/shared/config/original/burstMissions'
 import { TEAMS } from '@/shared/config/original/teams'
 import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
+import { useIsSceneConfirmAwaiting } from '@/features/play-game/model/useSceneConfirm'
 
 interface GameRouteProps {
   readonly session: ReturnType<typeof useCareerSession>
@@ -58,7 +59,12 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
   const [shownProposal, setShownProposal] = useState<BurstMissionRow | null>(null)
   const burst = progress.burst
   const resolution = progress.lastBurstResolution
-  const proposal = burst !== null && burst.current !== null && burst.current !== shownProposal
+  /**
+   * 돌발 제안 창(0x1b)은 상태 0xe 의 **OK 뒤**에 선다 — OK 메시지 1 의 0x50c18 이 0xf 를 예약한 뒤 0x50c42 의 0x8f158 이
+   * 뜨면 그 예약을 0x1b 로 덮는다. 같은 걸음에 0xe 를 두 번 지나면(CPU 투수 교체 뒤 다시 굴려 뜬 돌발) 두 OK 를 다 받은 뒤다.
+   */
+  const isAwaitingConfirm = useIsSceneConfirmAwaiting(progress.sceneConfirm)
+  const proposal = burst !== null && burst.current !== null && burst.current !== shownProposal && !isAwaitingConfirm
     ? burst.current
     : null
   const closeProposal = useCallback(() => setShownProposal(proposal), [proposal])

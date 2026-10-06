@@ -127,7 +127,7 @@ export function GameScreen({
    * **상태 0xe — 내 타석마다 사람 OK 를 기다린다** (`features/play-game/model/sceneConfirm`, 0x39e14 → 0x532b0).
    * 타석 결과 연출·돌발 창·1회초 판·벤치 클리어링·경기 중 메뉴·조작방법·설정이 덮고 있으면 받지 않는다.
    * 받은 OK 는 진행기가 실은 대기 객체에 남아, 수비 화면을 갔다 와 이 화면이 다시 서도 다시 묻지 않는다.
-   * ⚠️ 돌발 제안 창(0x1b)은 원본에서 OK 뒤에 서지만, 그 창을 띄우는 `app/ui/GameRoute` 가 이 대기를 몰라 지금은 OK 앞에 선다.
+   * 돌발 제안 창(0x1b)은 원본처럼 OK 뒤에 선다 — 그 창을 띄우는 `app/ui/GameRoute` 가 대기가 끝나기를 기다린다.
    * ⚠️ 미이식: 0xe 그리기 0x4d9ec 가 0xd 그리기 위에 얹는 안내 판 0x44944.
    */
   const sceneConfirm = useSceneConfirm(

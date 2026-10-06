@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 
@@ -24,6 +24,28 @@ const CONFIRM_KEYS: ReadonlySet<string> = new Set(['Enter', ' ', '5'])
 
 /** 대기 객체마다 받은 OK 수 — 화면이 다시 서도 남는다 (진행 상태가 같은 객체를 들고 있는 동안) */
 const confirmedCounts = new WeakMap<SceneConfirmWait, number>()
+
+/** OK 를 받을 때마다 부른다 — 대기를 화면 밖에서 보는 쪽(`useIsSceneConfirmAwaiting`)이 다시 그린다 */
+const confirmListeners = new Set<() => void>()
+const subscribeConfirm = (listener: () => void) => {
+  confirmListeners.add(listener)
+  return () => {
+    confirmListeners.delete(listener)
+  }
+}
+
+/** 대기 객체가 아직 OK 를 다 못 받았는가 */
+export function isSceneConfirmAwaiting(wait: SceneConfirmWait | null | undefined): boolean {
+  return wait != null && (confirmedCounts.get(wait) ?? 0) < wait.entries
+}
+
+/**
+ * 화면 밖(경로 부품)에서 대기를 본다 — OK 뒤에 서는 창(나리 타자편 돌발 제안 0x1b)을 OK 를 다 받을 때까지 미룬다.
+ * OK 는 화면의 `useSceneConfirm` 이 받는다.
+ */
+export function useIsSceneConfirmAwaiting(wait: SceneConfirmWait | null | undefined): boolean {
+  return useSyncExternalStore(subscribeConfirm, () => isSceneConfirmAwaiting(wait), () => isSceneConfirmAwaiting(wait))
+}
 
 export interface SceneConfirm {
   /** 상태 0xd·0xe — 사람 OK 를 기다리는 중 (메뉴가 떠 있어도 참이다) */
@@ -84,6 +106,7 @@ export function useSceneConfirm(wait: SceneConfirmWait | null | undefined, canAc
     confirmedCounts.set(current.wait, current.confirmed + 1)
     isUnlockedRef.current = false
     setVersion((version) => version + 1)
+    for (const listener of confirmListeners) listener()
   }, [])
 
   useEffect(() => {
