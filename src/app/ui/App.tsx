@@ -298,9 +298,10 @@ export function App() {
   // 스페셜 명예의 전당 "슬롯에서 삭제" (0x2ac00 · 0x62994) — 시즌 명단 정리 0x221dc 와 칸 비우기를 한 번에
   const seasonRoster = seasonSession.state === null ? null : seasonSession.roster
   const hallOfFameDeletion: HallOfFameDeletion = {
-    // ⚠️ 전역기록 +0x4e(시즌모드 경기가 중간 저장된 상태)는 웹에 없다 — 웹 시즌 경기는 중간 저장이 없어 늘 0 이라 막히지 않는다
-    isBlocked: (side, slot) =>
-      isHallOfFameDeleteBlocked(seasonRoster, hallOfFameRecordIdOf(side, slot), side === '투수', false),
+    // 0x2ae0e — 그 명전 선수가 내 시즌 팀에 있고 && 전역기록 +0x4e(시즌모드 경기 중간 저장, 시즌 저장의 `isGameInProgress`)
+    isBlocked: (side, slot) => isHallOfFameDeleteBlocked(
+      seasonRoster, hallOfFameRecordIdOf(side, slot), side === '투수', seasonSession.isGameInProgress,
+    ),
     onDelete: (side, slot) => {
       seasonSession.actions.removeHallOfFamer(hallOfFameRecordIdOf(side, slot), side === '투수')
       collection.deleteHallOfFamer(side, slot)

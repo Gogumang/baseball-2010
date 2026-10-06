@@ -283,8 +283,8 @@ export function EntryRoutes({
       onSelectMode={(mode) => {
         // 시즌모드·일반모드는 팀을 맡는 모드라 육성 선수가 없어도 들어간다
         if (mode === '시즌모드') {
-          // 하위 14 → this+0x13c = 2 → 상태 0x27 → 0x327b8(this, 2) — +0x3c = 2. 웹 시즌 경기는 중간 저장(+0x4e)이 없어
-          // 늘 장면 0x105(시즌 관리)로 간다
+          // 하위 14 → this+0x13c = 2 → 상태 0x27 → 0x327b8(this, 2) — +0x3c = 2. 그 모드 2 갈래(+0x42 && +0x4e 면 곧장 경기
+          // 0x104, 아니면 장면 0x105)는 `SeasonRoute` 가 들어오는 순간에 가른다 ([최근게임] 모드 2 도 이 길이다)
           onLastPlayedMode?.(SEASON_MODE)
           return setScreen({ kind: '시즌모드' })
         }

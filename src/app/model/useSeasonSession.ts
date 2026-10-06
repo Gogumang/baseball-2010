@@ -54,7 +54,7 @@ import { SEASON_END_CHAIN } from '@/entities/season-mode/model/seasonStateMachin
 import { PITCHERS_PER_TEAM, teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { FULL_STAMINA, recoverStaminaAfterGameDay } from '@/entities/pitcher-career/model/pitcherStamina'
 import { TEAMS } from '@/shared/config/original/teams'
-import type { TeamGameOptions, TeamGameSummary } from '@/features/play-team-game/model/teamGameFlow'
+import type { TeamGameOptions, TeamGameProgress, TeamGameSummary } from '@/features/play-team-game/model/teamGameFlow'
 import { rollOpponentAces } from '@/features/play-team-game/model/teamGameFlow'
 import { CHANCE_VALUE, MATCH_SETTING_KIND } from '@/features/play-team-game/model/matchSettings'
 import type { MatchProgressSettings } from '@/features/play-team-game/model/matchSettings'
@@ -171,6 +171,16 @@ export interface SeasonSession {
   readonly gameOptions: TeamGameOptions | null
   /** 그 경기가 정규·포스트시즌·국가대항전 중 무엇인가 */
   readonly gameKind: SeasonGameKind
+  /**
+   * 전역기록 **+0x4e — 시즌모드 경기가 중간 저장돼 있다** (`SeasonSave.isGameInProgress`). 명전 삭제 막기 [213](0x2ae0e) ·
+   * 모드 초기화 나리 칸 막기 [212]/[213](0x2c880 · 0x2c900) · 시즌모드 진입 0x327b8 모드 2 갈래(곧장 경기)가 본다.
+   */
+  readonly isGameInProgress: boolean
+  /**
+   * **이어 세울 경기 진행** — 이어하기(`resumeSavedGame`)로 들어온 경기면 그 저장 블록, 새 경기면 null.
+   * 경기 화면이 `resumeFrom` 으로 받는다 (원본 0x213c0(앱, 2, 0) → 장면 0x104 의 0x3f584 모드 2 갈래).
+   */
+  readonly resumeGame: TeamGameProgress | null
   /** 전역 저장 +0x145 — 리그 1위 G 를 이미 받은 문턱 비트 (`game_o.sav` 칸 — 웹은 `rewardStore` 에 저장) */
   readonly leagueFirstAwardedBits: number
   /**
@@ -313,6 +323,24 @@ export interface SeasonActions {
   readonly runOuting: (place: number) => void
   /** 팀 경기가 끝났다 — 종류에 맞게 정산한다 (정규는 관중수입 0xe9 으로) */
   readonly finishGame: (summary: TeamGameSummary) => void
+  /**
+   * 경기 화면이 이어하기 저장을 썼다 — 0xdd OK(0x847e: +0x4e = 1 · 칸 0xc 두 팀 · 0xd st · 파일) · 반 이닝 0x4f928(모드 2:
+   * 칸 0xb SR · 0xc · 0xd) · 경기 장면 진입 0x3a426(+0x4e = 1 · 파일). +0x4e 를 세우고 블록을 시즌 저장에 쓴다.
+   */
+  readonly saveGameProgress: (progress: TeamGameProgress) => void
+  /** 경기 끝 정산 진입 0x4ea0c → 0x4f3d6 — +0x4e = 0 (블록도 비운다) */
+  readonly enterGameSettlement: () => void
+  /**
+   * **시즌모드에 들어온다** — 0x327b8(this, 2) 의 모드 2 갈래(3284e): `(+0x42 && +0x4e)` 면 0x213c0(앱, 2, 0) 으로 시즌 저장을
+   * 올려 곧장 경기 장면 0x104 로, 아니면 장면 0x105(시즌 관리). 메인 메뉴 시즌모드(하위 14 → 0x24698)와 [최근게임] 모드 2 가
+   * 같은 길이다. 경기로 갔으면 참.
+   */
+  readonly resumeSavedGame: () => boolean
+  /**
+   * 경기 중 메뉴 "나가기" — 경기 상태 0x22 0x40140 은 모드를 가리지 않고 메인 메뉴(장면 0x103, 하위 4)로 나가며
+   * +0x4e 를 안 건드린다. 그래서 다음에 시즌모드로 들어오면 마지막 반 이닝 저장에서 다시 선다.
+   */
+  readonly leaveGame: () => void
   /** 결산 화면에서 포스트시즌을 한 걸음 진행시킨다 (0xef — 내 차례면 경기, 아니면 CPU 구간) */
   readonly continuePostseason: () => void
   /**
@@ -379,6 +407,32 @@ interface SeasonSave {
    * 없는 팀은 붙박이 표 명단(`tableRosterOf`)과 같다(옛 저장도 그렇다). 스태미나(+0x2c)는 `cpuPitcherStaminas` 가 주인이다.
    */
   readonly cpuRosters?: Readonly<Record<number, SeasonTeamRoster>>
+  /**
+   * **전역기록 +0x4e — 시즌모드 경기가 중간 저장돼 있다.** 원본은 전역기록(game_o.sav) 칸이지만 쓰고 지우는 곳이 모두
+   * 시즌 저장(game_s.sav)의 생사와 함께다 — 웹은 블록과 같이 시즌 저장에 둔다:
+   * - 1: 경기정보 0xdd OK 0x84a0 (곧이어 0x22754 로 파일) · 경기 장면 진입 0x39fdc 모드 2 갈래 0x3a426 (새 경기·이어하기 둘 다)
+   * - 0: 경기 끝 정산 진입 0x4ea0c(0x4f3d6) · 새 시즌 팀 고르기 0x5804(+0x42 = 1 과 함께) · 모드 저장 지우기 0x224ec(mgr, 2)
+   *   (시즌 파일을 지우며 같이)
+   * 경기 중 "나가기"(0x40140)는 안 건드린다. 읽는 곳: 0x327b8 모드 2 갈래 · 명전 삭제 막기 0x2ae0e · 선물 막기 0x2ad4c(🌐) ·
+   * 모드 초기화 나리 칸 0x2c880 · 0x2c900. (CORRECTIONS 의 "+0x4e 읽기 0x5804" 는 읽기가 아니라 이 0 쓰기다 — `adds r0,#0x4e ; strb r7(=0)`.)
+   */
+  readonly isGameInProgress?: boolean
+  /**
+   * **모드 2 저장 블록** — 0xdd OK 와 반 이닝 0x4f928 이 시즌 파일에 쓰는 칸 0xc(두 팀 0x290 바이트) · 0xd(st 0xa4 바이트).
+   * 칸 0xb(SR = 장면+0xf08)도 쓰지만 이어 세울 때 0x3f584 모드 2 갈래는 0xc · 0xd 만 되복사한다(SR 는 시즌 파일 그 자체다).
+   * 웹 진행(`TeamGameProgress`)에는 SR 쪽 경기 중 변화(돌발 보상 `burstRewardDeltas`)가 들어 있어 경기 끝 정산이 한꺼번에 얹는다.
+   * ⚠️ 웹 전용 그림자: `kind`(정규·포스트시즌·국가대항전 — 원본은 SR+0x12c · 리그 +0xb4 로 안다) · `ownRotationShift`
+   * (웹 명단 첨자 돌림 수 — `withOwnRecordRotation`). 진행 꼴이 바뀌어 못 읽으면 저장 없음으로 본다.
+   */
+  readonly gameSave?: SeasonGameSaveBlock | null
+}
+
+/** 시즌 저장의 경기 블록 (`SeasonSave.gameSave`) */
+interface SeasonGameSaveBlock {
+  /** 마지막으로 쓴 경기 진행 — 모르는 꼴로 담고 `seasonGameProgressOf` 가 가려 낸다 */
+  readonly progress: unknown
+  readonly kind: SeasonGameKind
+  readonly ownRotationShift: number
 }
 
 /** 엔트리 편집 0xe0 한 판 — 편집 객체 `[this+0xa8]` 와 그 목록 */
@@ -737,6 +791,38 @@ const SEASON_MANAGEMENT_BGM = 4
 /** 같은 경기 화면을 쓰는 세 갈래 — 끝났을 때 정산하는 곳이 다르다 */
 export type SeasonGameKind = '정규' | '포스트시즌' | '국가대항전'
 
+const SEASON_GAME_KINDS: readonly SeasonGameKind[] = ['정규', '포스트시즌', '국가대항전']
+
+/**
+ * **시즌 경기 블록 → 이어 세울 진행.** 시즌 저장이 블록을 모르는 값으로 들고 있으므로 시즌(모드 2) 경기 진행인지 가려 낸다.
+ * ⚠️ 웹 전용: 원본은 파일을 그대로 올린다(0x213c0). 웹은 진행 꼴이 바뀌어 옛 블록을 못 읽으면 null(저장 없음)로 거른다.
+ */
+export function seasonGameProgressOf(raw: unknown): TeamGameProgress | null {
+  if (raw === null || typeof raw !== 'object') return null
+  const progress = raw as Partial<TeamGameProgress>
+  const { options, game } = progress
+  if (options === undefined || options === null || typeof options !== 'object') return null
+  if (options.mode !== SEASON_GAME_MODE) return null
+  if (game === undefined || game === null || typeof game !== 'object') return null
+  if (typeof game.inning !== 'number' || (game.half !== '초' && game.half !== '말')) return null
+  if (!Array.isArray(progress.ourEntry) || !Array.isArray(progress.opponentEntry)) return null
+  if (!Array.isArray(progress.ourPitcherEntry) || !Array.isArray(progress.opponentPitcherEntry)) return null
+  return raw as TeamGameProgress
+}
+
+/** 저장의 경기 블록을 고른다 — 꼴이 안 맞으면 null */
+function normalizeGameSave(raw: unknown): SeasonGameSaveBlock | null {
+  if (raw === null || typeof raw !== 'object') return null
+  const value = raw as Partial<Record<keyof SeasonGameSaveBlock, unknown>>
+  if (seasonGameProgressOf(value.progress) === null) return null
+  const kind = SEASON_GAME_KINDS.find((candidate) => candidate === value.kind)
+  if (kind === undefined) return null
+  const shift = typeof value.ownRotationShift === 'number' && Number.isInteger(value.ownRotationShift)
+    ? value.ownRotationShift
+    : 0
+  return { progress: value.progress, kind, ownRotationShift: shift }
+}
+
 /** 시즌 외출 장소 표에서 **병원** 칸 (StrMODE[54+p] = 친선경기·회식·입원·야구교실·구단CF) */
 const HOSPITAL_PLACE = SEASON_OUTING_PLACES.indexOf('병원')
 
@@ -757,8 +843,12 @@ function normalizeSeasonSave(saved: Partial<SeasonSave> | null): SeasonSave | nu
   // 스태미나 표가 생기기 전 저장은 명단 투수를 0(표에서 만든 값)으로 적었고 경기는 늘 10000 으로 쳤다 —
   // 그 값 그대로 10000 으로 채운다
   const staminaKnown = saved.cpuPitcherStaminas !== undefined
+  // 옛 저장(칸 없음)은 경기 저장 없음 — 블록을 못 읽으면 +0x4e 도 내린다(웹 전용, 블록 없이 표시만 설 수는 없다)
+  const gameSave = normalizeGameSave(saved.gameSave)
   return {
     ...saved,
+    isGameInProgress: saved.isGameInProgress === true && gameSave !== null,
+    gameSave,
     state,
     league: saved.league ?? EMPTY_LEAGUE,
     roster: staminaKnown ? roster : withFullRosterStamina(roster),
@@ -899,6 +989,8 @@ export function useSeasonSession(
   )
   const [notice, setNotice] = useState('')
   const [gameOptions, setGameOptions] = useState<TeamGameOptions | null>(null)
+  /** 이어하기로 세울 진행 — 새 경기면 null (`SeasonSession.resumeGame`) */
+  const [resumeGame, setResumeGame] = useState<TeamGameProgress | null>(null)
   /** 지금 경기에 넘긴 내 팀 명단을 0x6548 로테이션 몇 칸 돌렸는가 (`withOwnRecordRotation`) — 끝 스태미나를 되돌린다 */
   const [ownRotationShift, setOwnRotationShift] = useState(0)
   /** 지금 치르는 경기가 무엇인가 — 끝났을 때 어디로 정산할지 갈린다 */
@@ -1011,8 +1103,12 @@ export function useSeasonSession(
     [recordStat, wallet],
   )
 
+  /** 마지막으로 쓴 저장 — 경기 화면의 이어하기 저장(effect)이 렌더 사이에 잇달아 와도 앞 것을 덮지 않게 */
+  const latestSave = useRef(save)
+  latestSave.current = save
   const commit = useCallback(
     (next: SeasonSave) => {
+      latestSave.current = next
       setSave(next)
       store.save(next)
     },
@@ -1108,6 +1204,7 @@ export function useSeasonSession(
 
   const chooseTeam = useCallback(
     (teamId: number) => {
+      // 새 시즌 0x57f4~0x5806: 전역기록 +0x42 = 1 · **+0x4e = 0** — 새 저장에는 경기 블록·표시 칸이 없다(= 0)
       const next: SeasonSave = {
         // 구단 이름은 원본 팀 이름을 그대로 쓴다 — 이름 입력 화면(0xc8)은 아직 없다
         state: startNewSeason(teamId, TEAMS[teamId]?.name ?? ''),
@@ -1269,6 +1366,7 @@ export function useSeasonSession(
     if (options === null) return
     clearGameRecord(save)
     setGameKind('정규')
+    setResumeGame(null)
     const prepared = withOwnRecordRotation({ ...options, ...staminaOptionsOf(save, options.opponentTeamId) })
     setOwnRotationShift(prepared.shift)
     setGameOptions(prepared.options)
@@ -1408,6 +1506,8 @@ export function useSeasonSession(
     clearGameRecord(save)
     setIsMatchSettingsOpen(false)
     setGameKind(pendingGame.kind)
+    // 새 경기 — +0x4e = 1 과 첫 블록(0x84a0 · 0x1fdb0 칸 0xc · 0xd)은 경기 화면이 세운 첫 진행으로 `saveGameProgress` 가 쓴다
+    setResumeGame(null)
     // 0x6548 이 돌린 저장 레코드 차례로 명단을 세운다 — 0번 선발 · 나머지 벤치 차례 (`withOwnRecordRotation`)
     const prepared = withOwnRecordRotation({
       ...pendingGame.options,
@@ -1586,6 +1686,7 @@ export function useSeasonSession(
   const finishGame = useCallback(
     (summary: TeamGameSummary) => {
       if (save === null) return
+      setResumeGame(null)
       const savedBefore = save
       // 돌발미션 보상·페널티 (0x8e34c 모드 2) — 원본은 판정이 난 경기 중에 SR·팀 사기에 바로 더하므로 평가보다 앞이다.
       // 요약이 경기 중 `resolveBurst` 의 deltas 를 판정 차례대로 싣고 온다(`burstRewardDeltas`)
@@ -2191,6 +2292,69 @@ export function useSeasonSession(
     commit({ ...save, state: { ...save.state, record: { ...save.state.record, endingSeen: true } } })
   }, [commit, save])
 
+  /**
+   * 경기 화면의 이어하기 저장 (`TeamGameScreen.onHalfInningSave`) — 진행 한 판마다 +0x4e = 1 과 블록을 시즌 저장에 쓴다.
+   * 첫 진행이 0xdd OK 몫(0x847e — 원본도 OK 가 두 팀·st 를 칸 0xc · 0xd 에 걸고 파일을 쓴 뒤 경기 장면으로 간다),
+   * 이어하기 경기의 첫 진행은 장면 진입 0x3a426 몫, 그 뒤는 반 이닝 0x4f928(모드 2 → 칸 0xb · 0xc · 0xd → 0x22754) 몫이다.
+   */
+  const saveGameProgress = useCallback(
+    (progress: TeamGameProgress) => {
+      const current = latestSave.current
+      if (current === null) return
+      commit({ ...current, isGameInProgress: true, gameSave: { progress, kind: gameKind, ownRotationShift } })
+    },
+    [commit, gameKind, ownRotationShift],
+  )
+
+  /**
+   * 정산 진입 (`TeamGameScreen.onSettlementEnter`) — 0x4ea0c 의 0x4f3d6 이 `+0x4c + 모드` 를 0 으로. 원본 파일의 블록 칸은
+   * 남지만 표시가 0 이면 읽힐 길이 없어 웹은 같이 비운다. ⚠️ 웹은 정산(`finishGame`)이 결과 화면 확인 뒤라 그 사이에 창을
+   * 닫으면 그 경기 정산이 빠진다 — 원본은 0x4ea0c 가 같은 자리에서 정산까지 한다.
+   */
+  const enterGameSettlement = useCallback(() => {
+    const current = latestSave.current
+    if (current === null || (current.isGameInProgress !== true && (current.gameSave ?? null) === null)) return
+    commit({ ...current, isGameInProgress: false, gameSave: null })
+  }, [commit])
+
+  /**
+   * 0x327b8 모드 2 갈래 — `+0x42(시즌 저장 있음) && +0x4e` 면 곧장 경기. 원본은 장면 0x105 를 세우지 않고 0x104 로 가서
+   * 0x3f584 모드 2 갈래가 칸 0xc · 0xd 를 팀·st 로 되복사하고 0x39fdc 모드 2 갈래(0x3a3c0)가 관중·수입 0xa34b8 을 다시 돌린 뒤
+   * +0x4e = 1 · 저장, 시뮬 초기화 rand(0, 2) → 인트로 → 판(`resumeTeamGame`).
+   * ⚠️ 원본은 이어 세울 때마다 0xa34b8(관중 수·경기 수입을 소지금에 더함)이 한 번 더 돈다 — 웹은 수입을 경기 뒤 0xe9 에서
+   *    한 번만 셈해(`GameIncomeScreen`) 이 겹침이 없다(미해결, 수입 시점 근사와 함께 고칠 것).
+   * 마선수 레벨은 원본이 경기 중 전역 칸에서 그때그때 읽으므로 지금 값으로 바꿔 끼운다.
+   */
+  const resumeSavedGame = useCallback((): boolean => {
+    const current = latestSave.current
+    if (current === null || current.isGameInProgress !== true) return false
+    const block = current.gameSave ?? null
+    const saved = block === null ? null : seasonGameProgressOf(block.progress)
+    if (block === null || saved === null) {
+      // ⚠️ 웹 전용: 블록을 경기로 못 읽으면 저장이 없는 것으로 보고 표시를 내린다
+      commit({ ...current, isGameInProgress: false, gameSave: null })
+      return false
+    }
+    const options: TeamGameOptions = { ...saved.options, ...(aceLevels === undefined ? {} : { aceLevels }) }
+    const restored: TeamGameProgress = { ...saved, options }
+    setGameKind(block.kind)
+    setOwnRotationShift(block.ownRotationShift)
+    setPendingGame(null)
+    setEntryEdit(null)
+    setIsMatchSettingsOpen(false)
+    setGameOptions(options)
+    setResumeGame(restored)
+    setScene(SEASON_SCENE_STATE.경기직전)
+    return true
+  }, [aceLevels, commit])
+
+  /** 경기 중 "나가기" — 장면만 내린다(+0x4e · 블록은 그대로). 다음 진입이 `resumeSavedGame` 으로 다시 세운다 */
+  const leaveGame = useCallback(() => {
+    setGameOptions(null)
+    setResumeGame(null)
+    setScene(SEASON_SCENE_STATE.관리메뉴)
+  }, [])
+
   const goto = useCallback((next: SeasonSceneState) => {
     // 구단관리 칸 3 코치채용 → this+0x11c = 2, 0xd7 (키 0x4e40)
     if (next === SEASON_SCENE_STATE.선수단) setSquadPurpose(SQUAD_PURPOSE.코치채용)
@@ -2222,6 +2386,8 @@ export function useSeasonSession(
     matchInfoStarterName,
     matchInfoOpponentStarterName,
     gameKind,
+    isGameInProgress: save?.isGameInProgress === true,
+    resumeGame,
     leagueFirstAwardedBits,
     // 지갑이 주인이다 (`?무한G` 도 지갑 안에서 갈린다) — 위 `gamePoints` 주석 참고
     gamePoints,
@@ -2243,7 +2409,8 @@ export function useSeasonSession(
       startPendingGame, cancelMatchInfo, toggleMatchSettings, applyMatchSettings,
       openEntryEdit, pressEntryKey: pressEntryKeyAction, pointEntryCursor: pointEntryCursorAction,
       closeEntryAceLocked,
-      playCupGame, finishCup, finishGame, continuePostseason,
+      playCupGame, finishCup, finishGame, saveGameProgress, enterGameSettlement, resumeSavedGame, leaveGame,
+      continuePostseason,
       runTraining, runOuting, nextSeasonEndStep, awardLeagueFirst, spendGamePoint, finishSeason,
       openStadiumItems, markEndingSeen, finishSeasonEvent, clearNotice, quit,
     },

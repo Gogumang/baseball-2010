@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useLayoutEffect, useMemo, useState } from 'react'
 import { ITEM_WINDOW_KIND } from '@/widgets/season/lib/seasonItemMenu'
 import type { ItemWindowKind } from '@/widgets/season/lib/seasonItemMenu'
 import {
@@ -148,6 +148,19 @@ export function SeasonRoute({
     () => (state === null ? { myRank: 0, opponentRank: 0 } : seasonRanksOf(league, state.record)),
     [league, state],
   )
+  /**
+   * 메인 메뉴에서 들어오는 길 = 0x327b8(this, 2) 의 모드 2 갈래 — `+0x42 && +0x4e` 면 장면 0x105 를 세우지 않고 곧장 경기
+   * 장면 0x104 다(메인 메뉴 시즌모드 0x24698 · [최근게임] 모드 2 가 같은 길). 첫 그림 전에 갈라 관리 화면이 한 번도 서지 않게
+   * 첫 렌더는 비워 둔다.
+   */
+  const [isEnteringGame, setEnteringGame] = useState(() => session.isGameInProgress)
+  useLayoutEffect(() => {
+    if (!isEnteringGame) return
+    actions.resumeSavedGame()
+    setEnteringGame(false)
+    // 들어올 때 한 번만 — 0x327b8 은 시즌모드에 들어오는 그 순간에만 돈다
+  }, [])
+  if (isEnteringGame) return null
 
   if (missingWindow !== null) {
     return (
@@ -608,7 +621,18 @@ export function SeasonRoute({
         options={gameOptions}
         random={random}
         onFinish={actions.finishGame}
-        onQuit={backToManagement}
+        // 경기 중 "나가기" — 경기 상태 0x22(0x40140)는 모드를 가리지 않고 메인 메뉴(장면 0x103)로 나간다. +0x4e 와 블록은
+        // 남아 다음 시즌모드 진입이 그 자리에서 다시 세운다
+        onQuit={() => {
+          actions.leaveGame()
+          onExit()
+        }}
+        // 이어하기 — 저장 블록에서 다시 세운다 (0x213c0(앱, 2, 0) → 장면 0x104)
+        {...(session.resumeGame === null ? {} : { resumeFrom: session.resumeGame })}
+        // 0xdd OK 0x847e · 반 이닝 0x4f928 · 장면 진입 0x3a426 — +0x4e = 1 과 블록
+        onHalfInningSave={actions.saveGameProgress}
+        // 정산 진입 0x4ea0c → 0x4f3d6 — +0x4e = 0
+        onSettlementEnter={actions.enterGameSettlement}
         // 자동진행 비용은 전역 저장 +0x64 에서 나간다 (시즌 사용내역 종류 3, 0x22c29)
         gamePoint={session.gamePoints}
         onSpendGamePoint={actions.spendGamePoint}

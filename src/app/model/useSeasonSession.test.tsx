@@ -1939,3 +1939,91 @@ describe('CPU 트레이드 요청 (0x953c → 0xec10 → 0xe5)', () => {
     expect(result.current.tradeRequest.isRequested).toBe(false)
   })
 })
+
+describe('시즌 경기 중간 저장 — 전역기록 +0x4e 와 모드 2 블록 (0x847e · 0x4f928 · 0x3a426 · 0x4f3d6 · 0x5804 · 0x327b8)', () => {
+  type 경기저장모양 = { isGameInProgress?: boolean; gameSave?: { progress: unknown; kind: string; ownRotationShift: number } | null }
+  const 경기시작 = (store: JsonStorePort) => {
+    const rendered = renderHook(() => useSeasonSession(store, createSeededRandom(20100901)))
+    시작(rendered.result, 0)
+    act(() => rendered.result.current.actions.openNextGame())
+    act(() => rendered.result.current.actions.confirmNextGame())
+    act(() => rendered.result.current.actions.choosePreGameAce(1))
+    act(() => rendered.result.current.actions.choosePreGameAce(8))
+    act(() => rendered.result.current.actions.startPendingGame())
+    return rendered
+  }
+
+  it('새 시즌(0x5804)은 +0x4e = 0, 0xdd OK 로 선 첫 진행을 쓰면 +0x4e = 1 · 블록이 시즌 저장에 남는다', () => {
+    const store = 메모리저장()
+    const { result } = 경기시작(store)
+    expect(result.current.isGameInProgress).toBe(false)
+    const options = result.current.gameOptions!
+    const 첫진행 = startTeamGame(options, createSeededRandom(7))
+
+    act(() => result.current.actions.saveGameProgress(첫진행))
+
+    expect(result.current.isGameInProgress).toBe(true)
+    const 저장 = store.load() as 경기저장모양
+    expect(저장.isGameInProgress).toBe(true)
+    expect(저장.gameSave?.kind).toBe('정규')
+    expect((저장.gameSave?.progress as { options: { mode: number } }).options.mode).toBe(2)
+  })
+
+  it('정산 진입(0x4f3d6)은 +0x4e = 0 · 블록 비움', () => {
+    const store = 메모리저장()
+    const { result } = 경기시작(store)
+    act(() => result.current.actions.saveGameProgress(startTeamGame(result.current.gameOptions!, createSeededRandom(7))))
+
+    act(() => result.current.actions.enterGameSettlement())
+
+    expect(result.current.isGameInProgress).toBe(false)
+    expect((store.load() as 경기저장모양).gameSave).toBeNull()
+  })
+
+  it('나가기는 표시를 남기고, 다시 들어오면(0x327b8 모드 2 · +0x42 && +0x4e) 곧장 그 경기로 선다', () => {
+    const store = 메모리저장()
+    const { result } = 경기시작(store)
+    const 진행 = startTeamGame(result.current.gameOptions!, createSeededRandom(7))
+    act(() => result.current.actions.saveGameProgress(진행))
+    act(() => result.current.actions.leaveGame())
+    expect(result.current.gameOptions).toBeNull()
+    expect(result.current.isGameInProgress).toBe(true)
+
+    // 새로 고친 뒤 — 저장에서 읽어 이어 세운다
+    const 다시 = renderHook(() => useSeasonSession(store, createSeededRandom(1)))
+    expect(다시.result.current.isGameInProgress).toBe(true)
+    let 갔나 = false
+    act(() => {
+      갔나 = 다시.result.current.actions.resumeSavedGame()
+    })
+
+    expect(갔나).toBe(true)
+    expect(다시.result.current.scene).toBe(SEASON_SCENE_STATE.경기직전)
+    expect(다시.result.current.gameKind).toBe('정규')
+    expect(다시.result.current.resumeGame?.game.inning).toBe(진행.game.inning)
+    expect(다시.result.current.gameOptions?.opponentTeamId).toBe(진행.options.opponentTeamId)
+  })
+
+  it('표시가 없으면 이어 세우지 않는다 · 블록을 못 읽으면 표시를 내린다(웹 전용)', () => {
+    const store = 메모리저장()
+    const { result } = 경기시작(store)
+    let 갔나 = true
+    act(() => {
+      갔나 = result.current.actions.resumeSavedGame()
+    })
+    expect(갔나).toBe(false)
+
+    const 깨진 = 메모리저장()
+    깨진.save({ ...(store.load() as object), isGameInProgress: true, gameSave: { progress: { 옛꼴: 1 }, kind: '정규', ownRotationShift: 0 } })
+    const 옛 = renderHook(() => useSeasonSession(깨진, createSeededRandom(1)))
+    expect(옛.result.current.isGameInProgress).toBe(false)
+  })
+
+  it('새 시즌을 고르면 +0x4e 가 내려간다 (0x5804)', () => {
+    const store = 메모리저장()
+    const { result } = 경기시작(store)
+    act(() => result.current.actions.saveGameProgress(startTeamGame(result.current.gameOptions!, createSeededRandom(7))))
+    act(() => result.current.actions.chooseTeam(3))
+    expect(result.current.isGameInProgress).toBe(false)
+  })
+})
