@@ -12,11 +12,15 @@ const 칸 = (overrides: Partial<TitleSlot>): TitleSlot => ({
   ...overrides,
 } as TitleSlot)
 
-const 시상 = (titles: readonly TitleSlot[], isMostValuablePlayer = false): SeasonAwards => ({
+const 시상 = (
+  titles: readonly TitleSlot[],
+  isMostValuablePlayer = false,
+  mostValuablePlayer = { teamId: 10, name: '' },
+): SeasonAwards => ({
   titles,
   wonCount: titles.filter((title) => title.isMine).length,
   isMostValuablePlayer,
-  mostValuablePlayer: null,
+  mostValuablePlayer,
 })
 
 const 나 = { teamId: 4, name: '홍길동' }
@@ -46,19 +50,23 @@ describe('타이틀 발표 창 0x8b3bc', () => {
 
 describe('MVP 발표 창 0x8b23c', () => {
   it('내가 MVP 면 내 팀·이름에 USER_EVT[84] 축하 문구를 붙인다', () => {
-    expect(mvpWindowTextOf(시상([칸({ isMine: true, teamId: 4, winnerName: '홍길동' })], true), 나)).toBe(
+    expect(mvpWindowTextOf(시상([칸({ isMine: true, teamId: 4, winnerName: '홍길동' })], true, 나))).toBe(
       '!C[!cFFFF00페넌트레이스 MVP!cFFFFFF]!N!N대구 라이온즈 홍길동!N!N' +
         '축하합니다!!!N[!cFFFF00페넌트레이스 MVP!cFFFFFF]!N로 선정되었습니다.!N',
     )
   })
 
-  it('아니면 내가 못 딴 첫 타이틀 칸의 사람 — 이름이 비었는지는 보지 않는다 (0x8df18)', () => {
-    const awards = 시상([
-      칸({ isMine: true, teamId: 4, winnerName: '홍길동' }),
-      칸({ userEventIndex: 77, teamId: 10, winnerName: '' }),
-      칸({ userEventIndex: 78, teamId: 1, winnerName: '김철수' }),
-    ])
-    expect(mvpWindowTextOf(awards, 나)).toBe('!C[!cFFFF00페넌트레이스 MVP!cFFFFFF]!N!N대한민국 !N!N')
+  it('아니면 시상 판정의 MVP 칸(내가 못 딴 첫 타이틀 칸) — 팀 10 · 빈 이름도 그대로 찍는다 (0x8df18)', () => {
+    const awards = 시상(
+      [
+        칸({ isMine: true, teamId: 4, winnerName: '홍길동' }),
+        칸({ userEventIndex: 77, teamId: 10, winnerName: '' }),
+        칸({ userEventIndex: 78, teamId: 1, winnerName: '김철수' }),
+      ],
+      false,
+      { teamId: 10, name: '' },
+    )
+    expect(mvpWindowTextOf(awards)).toBe('!C[!cFFFF00페넌트레이스 MVP!cFFFFFF]!N!N대한민국 !N!N')
   })
 
   it('system 3·4 가 아니면 null — 판정을 부르지 않는다', () => {
@@ -67,9 +75,9 @@ describe('MVP 발표 창 0x8b23c', () => {
       불림 += 1
       return 시상([])
     }
-    expect(awardWindowTextOf(0, awardsOf, 나)).toBeNull()
-    expect(awardWindowTextOf(1, awardsOf, 나)).toBeNull()
+    expect(awardWindowTextOf(0, awardsOf)).toBeNull()
+    expect(awardWindowTextOf(1, awardsOf)).toBeNull()
     expect(불림).toBe(0)
-    expect(awardWindowTextOf(3, awardsOf, 나)).toBe('!C')
+    expect(awardWindowTextOf(3, awardsOf)).toBe('!C')
   })
 })

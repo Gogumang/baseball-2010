@@ -130,10 +130,7 @@ export function PitcherLeagueRoute({
             }
             // 370·375 의 system 3·4 — 타이틀(0x8b3bc, 투수 문구 79~81 · 마무리 82)·MVP(0x8b23c) 발표 창 (130·131 과 같은 판정)
             systemWindowTextOf={(command) =>
-              awardWindowTextOf(command.sub, () => judgePitcherSeasonAwards(career), {
-                teamId: career.teamId,
-                name: career.name,
-              })
+              awardWindowTextOf(command.sub, () => judgePitcherSeasonAwards(career))
             }
           />
           </ScreenOverlay>

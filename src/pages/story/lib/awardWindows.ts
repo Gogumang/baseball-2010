@@ -1,6 +1,6 @@
 import { ORIGINAL_USER_EVENTS } from '@/shared/config/original/userEvents'
 import { TEAMS } from '@/shared/config/original/teams'
-import type { AwardWinner, SeasonAwards } from '@/entities/awards/model/seasonAwards'
+import type { SeasonAwards } from '@/entities/awards/model/seasonAwards'
 
 /**
  * 이벤트 명령 **system 3·4** — 타이틀·MVP 발표 창 (이벤트 큐 0x8cf64 의 하위 종류 점프표 0xd4ee4, 확정).
@@ -22,8 +22,6 @@ const MVP_HEADER_USER_EVENT = 83
 const MVP_CONGRATULATION_USER_EVENT = 84
 /** 대진 칸이 "없음" 인 팀 번호(0x8dad4 초기값) — 9 를 넘으면 그 칸을 건너뛴다 (0x8b462 `cmp r3,#9 ; bgt`) */
 const LAST_LEAGUE_TEAM = 9
-/** 0x8dd60 이 MVP 칸을 처음 채우는 팀 번호(0x8dd78) */
-const NO_MVP_TEAM = 10
 
 /** 팀 이름 표 `[0x1552cf8]` = StrCOMMON — 앞 15칸이 팀 이름이다 (`TEAMS` 와 같은 차례) */
 const teamNameOf = (teamId: number) => TEAMS[teamId]?.name ?? ''
@@ -54,17 +52,11 @@ export function titleWindowTextOf(awards: SeasonAwards): string {
  * 글 = USER_EVT[83] + 팀이름[+0x370] + " " + (+0x374) + "!N" + "!N"
  * 나만의리그(0x7b999 거짓)이고 +0x388 이면  + USER_EVT[84] + "!N"
  * ```
- * MVP 칸은 0x8dd60 이 채운다: 내가 MVP 면 내 팀 · 내 이름(0x8de9e~0x8dece), 아니면 **내가 못 딴 첫 타이틀 칸**의
- * 팀·이름(0x8df18~0x8df16 — 이름이 비었는지는 보지 않는다). 그런 칸이 없으면 처음 값 팀 10 · 빈 이름 그대로다.
+ * MVP 칸은 0x8dd60 이 채운다 — `SeasonAwards.mostValuablePlayer`(내가 MVP 면 나, 아니면 내가 못 딴 첫 타이틀 칸 그대로).
  * 이 창은 팀 번호가 9 를 넘어도 거르지 않아, 자격자 없는 칸이 뽑히면 팀 10 이름이 그대로 찍힌다 — 원본 그대로.
  */
-export function mvpWindowTextOf(awards: SeasonAwards, me: AwardWinner): string {
-  const shown: AwardWinner = awards.isMostValuablePlayer
-    ? me
-    : (() => {
-        const slot = awards.titles.find((title) => !title.isMine)
-        return slot === undefined ? { teamId: NO_MVP_TEAM, name: '' } : { teamId: slot.teamId, name: slot.winnerName }
-      })()
+export function mvpWindowTextOf(awards: SeasonAwards): string {
+  const shown = awards.mostValuablePlayer
   const header = userEventOf(MVP_HEADER_USER_EVENT) + teamNameOf(shown.teamId) + SPACE + shown.name + NEW_LINE + NEW_LINE
   return awards.isMostValuablePlayer ? header + userEventOf(MVP_CONGRATULATION_USER_EVENT) + NEW_LINE : header
 }
@@ -73,8 +65,8 @@ export function mvpWindowTextOf(awards: SeasonAwards, me: AwardWinner): string {
  * 재생기에 넘기는 창 글 — system 3·4 가 아니면 null(예전처럼 지나간다).
  * 시상 판정은 무거워서 창을 띄울 때만 부른다 (`awardsOf`).
  */
-export function awardWindowTextOf(sub: number, awardsOf: () => SeasonAwards, me: AwardWinner): string | null {
+export function awardWindowTextOf(sub: number, awardsOf: () => SeasonAwards): string | null {
   if (sub === SYSTEM_TITLE_WINDOW) return titleWindowTextOf(awardsOf())
-  if (sub === SYSTEM_MVP_WINDOW) return mvpWindowTextOf(awardsOf(), me)
+  if (sub === SYSTEM_MVP_WINDOW) return mvpWindowTextOf(awardsOf())
   return null
 }

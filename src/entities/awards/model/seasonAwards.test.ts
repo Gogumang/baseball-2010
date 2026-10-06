@@ -24,6 +24,7 @@ import {
   careerMvpCount,
   hasBackToBackMvp,
   hasMvpInSeason,
+  judgeAwards,
   judgeSeasonAwards,
   judgeTitles,
   mvpResultEventId,
@@ -130,6 +131,13 @@ describe('시즌 MVP — 0x8dd60 (B-3)', () => {
     expect(achievedGoalCountForMvp(career)).toBe(3)
     expect(awards.isMostValuablePlayer).toBe(false)
     expect(awards.mostValuablePlayer).toEqual({ teamId: 1, name: '김타점' })
+  })
+
+  it('자격자 없는 칸도 건너뛰지 않는다 — 첫 칸이 팀 10 · 빈 이름이면 그대로 MVP 칸이다 (0x8df18 → 0x8dee6)', () => {
+    const awards = judgeAwards({ teamId: 4, name: '마선수', achievedGoalCount: 5 }, [])
+    expect(awards.titles.every((title) => title.teamId === NO_TEAM)).toBe(true)
+    expect(awards.isMostValuablePlayer).toBe(false)
+    expect(awards.mostValuablePlayer).toEqual({ teamId: NO_TEAM, name: '' })
   })
 
   it('MVP 면 나를 보여 준다', () => {

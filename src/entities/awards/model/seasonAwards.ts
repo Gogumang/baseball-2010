@@ -161,9 +161,17 @@ export interface SeasonAwards {
   readonly wonCount: number
   /** 내가 시즌 MVP 인가 (이벤트 객체 +0x388) */
   readonly isMostValuablePlayer: boolean
-  /** 발표할 MVP — 내가 아니면 **내가 못 딴 첫 타이틀의 수상자**다 (0x8df18). 없으면 null */
-  readonly mostValuablePlayer: AwardWinner | null
+  /**
+   * 발표할 MVP 칸(+0x370 팀 · +0x374 이름) — 내가 MVP 면 나, 아니면 **내가 못 딴 첫 타이틀 칸**의 팀·이름 그대로다
+   * (0x8df18 — 이름이 비었는지 안 본다. 자격자 없는 칸이면 팀 10 · 빈 이름). 그런 칸이 없으면 처음 값 팀 10 · 빈 이름.
+   */
+  readonly mostValuablePlayer: AwardWinner
 }
+
+/** 0x8dd60 이 MVP 칸을 처음 채우는 값 — 팀 10(0x8dd78) · 빈 이름(0x8dd84) */
+const NO_MOST_VALUABLE_PLAYER: AwardWinner = { teamId: NO_TEAM, name: '' }
+/** 0x8de58(`tst +0x36c, #0xffffff`)·0x8df18(i ≤ 2) 이 보는 타이틀 칸 수 — 나리는 세 칸이다 */
+const MVP_TITLE_SLOT_COUNT = 3
 
 /**
  * 시상을 받는 **내 육성 선수** — 타자편·투수편이 함께 쓰는 꼴이다.
@@ -201,13 +209,16 @@ export function judgeAwards(
       mostValuablePlayer: { teamId: subject.teamId, name: subject.name },
     }
   }
-  // MVP 가 아니면 내가 못 딴 **첫** 타이틀의 수상자를 MVP 로 보여 준다 (0x8df18)
-  const shown = titles.find((title) => !title.isMine && title.winnerName !== '')
+  // MVP 가 아니면 +0x36c[i] == 0 인 **첫** 칸(i = 0..2)의 팀(+0x30c[i])·이름(+0x31c + 0x14·i)을 그대로 옮긴다
+  // (0x8df18 → 0x8dee6). 이름이 비었는지·팀이 10 인지는 보지 않는다.
+  // ⚠️ 세 칸이 모두 내 것인데 MVP 가 아닌 갈래(0x8df32~, 다른 순위표를 다시 세운다)는 안 읽었다 — 나리는 세 칸을 다
+  //    따면 MVP 라 이 갈래에 오지 않는다. 웹은 처음 값(팀 10 · 빈 이름)으로 둔다.
+  const shown = titles.slice(0, MVP_TITLE_SLOT_COUNT).find((title) => !title.isMine)
   return {
     titles,
     wonCount,
     isMostValuablePlayer,
-    mostValuablePlayer: shown ? { teamId: shown.teamId, name: shown.winnerName } : null,
+    mostValuablePlayer: shown ? { teamId: shown.teamId, name: shown.winnerName } : NO_MOST_VALUABLE_PLAYER,
   }
 }
 

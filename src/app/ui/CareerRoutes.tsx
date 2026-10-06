@@ -164,11 +164,7 @@ export function CareerRoutes({
             onMatch={(command, carried) => onAceMatch(command, carried, screen.context)}
             // 370·375 의 system 3·4 — 타이틀(0x8b3bc)·MVP(0x8b23c) 발표 창. 130·131 과 같은 판정(0x8dad4 타자 · 0x8dd60)이다
             systemWindowTextOf={(command) =>
-              awardWindowTextOf(
-                command.sub,
-                () => judgeSeasonAwards(career, careerLeagueRecordsOf(career), '타자'),
-                { teamId: career.teamId, name: career.name },
-              )
+              awardWindowTextOf(command.sub, () => judgeSeasonAwards(career, careerLeagueRecordsOf(career), '타자'))
             }
           />
           </ScreenOverlay>
