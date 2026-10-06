@@ -1409,7 +1409,8 @@ export function usePitcherLeagueSession(
       },
       confirmNextGameStandings: openMatchPrepare,
       // 142 확인 0x13cb6 → 144 → 경기. 굴린 마선수는 진입이 두 팀 명부에 넣었다(0xb88c8 · 0xb8870) — 경기에 그대로 실린다.
-      // 저장 [모드+0x4c] = 1(전역기록 +0x4f "모드 3 경기 중간 저장됨")은 읽는 곳이 없다 — 타자편 `confirmMatchPrepare` 주석
+      // 저장 [모드+0x4c] = 1(전역기록 +0x4f "모드 3 경기 중간 저장됨")은 [14]·[최근게임] 의 0x327b8 모드 3 갈래가 읽는다 —
+      // `+0x43 && +0x4f` 면 곧장 경기(`resumeInterruptedGame`). 89a6b81 의 "읽는 곳이 없다" 정정 — 타자편 `confirmMatchPrepare` 주석
       confirmMatchPrepare: () => {
         if (scene !== '경기준비') return
         // 0x13cca — +0x4f = 1 · 저장. 명부의 마선수는 나리 저장이 들고 간다 — 웹은 그림자로 남긴다 (웹 투수편엔 국가대항전이 없다)
