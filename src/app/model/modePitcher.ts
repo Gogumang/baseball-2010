@@ -11,6 +11,8 @@ import {
   rookiePitchMaskOf,
 } from '@/entities/pitcher-career/model/pitcherRegistration'
 import { magicPitchCountOf } from '@/entities/pitcher-career/model/magicPitch'
+import type { HallOfFamePitcher } from '@/entities/collection/model/collection'
+import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbility'
 import { fatiguedStatsOf, pitchSlotsOf } from '@/features/play-pitcher-game/model/pitcherPitch'
 import { PITCH_TYPES } from '@/shared/config/original/pitchTypes'
 import type { PitchTypeInfo } from '@/shared/config/original/pitchTypes'
@@ -31,10 +33,9 @@ import type { PitcherRepertoire, PitcherStats } from '@/features/play-pitcher-ga
  *
  * 그래서 부르는 쪽은 **투수편 커리어(저장된 것 포함)** 를 넘긴다 — `usePitcherLeagueSession` 은 시작할 때
  * 저장을 올려 두므로 `pitcherSession.career` 가 곧 저장된 투수다.
- * ⚠️ 미해결: 명예의 전당 투수 칸(+0x880, c3e66c1)은 생겼지만 미션 선수 고르기 창(StrMAINMENU[14], 0x62568 — 결과 3 →
- *    전역기록 +0xa5)이 없어 명예 투수 갈래(+0xa5 ≥ 0)는 아직 탈 수 없다. 또 웹 명전 기록(`HallOfFamePitcher`)은 0x30 바이트
- *    사본이 아니라 능력치·생김새만 들어 구질 마스크(+0x1c)·마구 번호(+0x18)·장착 비트(+0x14)가 없다 — 그 갈래를 열려면
- *    등록 때 그 칸들도 남겨야 한다.
+ * 명예 투수 갈래(+0xa5 ≥ 0)는 미션 선수 고르기(하위 17, `HallOfFameScreen` 선수고르기 모드)에서 코드 3 을 고를 때 탄다 —
+ * 세션이 `modePitcherOfHallOfFame` 으로 바꿔 든다. 명전 기록은 등록 때 0x30 바이트를 통째 옮긴 사본이라
+ * 나리 투수와 같은 칸(능력치·장비 니블·장착 비트 +0x14·마구 번호 +0x18·구질 마스크 +0x1c·생김새 +0xb)을 같은 식으로 읽는다.
  *
  * 능력치 — **0xb6414 = `equippedPitcherAbilityOf`** (장비·장착 스킬 5·7·22). 경기용 0xb570c 는 모드 5 에서
  * 질병·부상·사기 감소 갈래(모드 3·4 의 0xb574a)도 시즌 갈래(2)도 안 타고 곧장 피로 0xb58e6 으로 가며,
@@ -89,22 +90,56 @@ function rookieModePitcher(): ModePitcher {
   }
 }
 
-export function modePitcherOf(career: PitcherCareer | null): ModePitcher {
-  if (career === null) return rookieModePitcher()
+/** 선수 기록 한 장에서 미션 투수를 만든다 — 나리 투수(`[저장+0x3c]`)와 명전 투수(0x1f62c)가 같은 길이다 */
+function modePitcherFromRecord(
+  equippedAbility: PitcherAbility,
+  repertoire: { readonly pitchMask: number; readonly form: number; readonly magicNumber: number },
+  record: { readonly equippedSkillIds: readonly number[] },
+): ModePitcher {
   return {
-    stats: fatiguedStatsOf(equippedPitcherAbilityOf(career), MISSION_STAMINA),
-    repertoire: {
-      pitchMask: career.pitchMask,
-      form: pitcherFormOfCareer(career),
-      magicNumber: career.selectedMagicNumber,
-      isAce: false,
-    },
-    isSteady: isPitcherSkillEquipped(career, STEADY_SKILL),
-    isTimid: isPitcherSkillEquipped(career, TIMID_SKILL),
-    isCool: isPitcherSkillEquipped(career, COOL_SKILL),
-    hasSpiritSkill: isPitcherSkillEquipped(career, SPIRIT_SKILL),
+    stats: fatiguedStatsOf(equippedAbility, MISSION_STAMINA),
+    repertoire: { ...repertoire, isAce: false },
+    isSteady: isPitcherSkillEquipped(record, STEADY_SKILL),
+    isTimid: isPitcherSkillEquipped(record, TIMID_SKILL),
+    isCool: isPitcherSkillEquipped(record, COOL_SKILL),
+    hasSpiritSkill: isPitcherSkillEquipped(record, SPIRIT_SKILL),
   }
 }
+
+export function modePitcherOf(career: PitcherCareer | null): ModePitcher {
+  if (career === null) return rookieModePitcher()
+  return modePitcherFromRecord(
+    equippedPitcherAbilityOf(career),
+    { pitchMask: career.pitchMask, form: pitcherFormOfCareer(career), magicNumber: career.selectedMagicNumber },
+    career,
+  )
+}
+
+/** 등록은 FASTBALL(1) 을 무조건 준다(`0xb6dfd(p, 1)`) — 구질 마스크가 없는 옛 명전 기록의 대체 */
+const FASTBALL_ONLY_MASK = 1
+
+/**
+ * **명예 투수** — `0x1f62c(저장, +0xa5)` = 전역기록 +0x880 + i·0x30 의 기록. 0xb6414 · 0xb6d2c · 0xb62b4 를
+ * 나리 투수와 똑같이 그 기록에 건다 (폼 = 0xb6e24 = 2×타입 + 손, 생김새 +0xb).
+ * ⚠️ 옛 저장(기록 칸을 남기기 전에 등록한 선수): 장비 니블이 없으면 등록 때 남긴 0xb6415 값(`equippedAbility`)을 그대로,
+ *    장착 비트가 없으면 스킬 없음, 구질 마스크가 없으면 직구만, 마구 번호가 없으면 0 — 원본 기록에는 늘 있는 칸이다.
+ */
+export function modePitcherOfHallOfFame(famer: HallOfFamePitcher): ModePitcher {
+  const equippedSkillIds = famer.equippedSkillIds ?? []
+  const equippedAbility = famer.equipmentLevels === undefined
+    ? famer.equippedAbility
+    : equippedPitcherAbilityOf({ ability: famer.ability, equipmentLevels: famer.equipmentLevels, equippedSkillIds })
+  return modePitcherFromRecord(
+    equippedAbility,
+    {
+      pitchMask: famer.pitchMask ?? FASTBALL_ONLY_MASK,
+      form: pitcherFormOf(famer.look.typeIndex, famer.look.handIndex),
+      magicNumber: famer.selectedMagicNumber ?? 0,
+    },
+    { equippedSkillIds },
+  )
+}
+
 
 /**
  * **미션 투수의 한 경기 마구 횟수** — 팀+0x28 (0xaea10). 미션도 보통 경기 장면이라 팀 new 0xb891c 가 칸을 −1 로 두고

@@ -2,6 +2,8 @@ import type { BatterAbility } from '@/entities/batting/model/batter'
 import { ROOKIE_BATTER_ABILITY } from '@/entities/batting/model/batter'
 import { equippedAbilityOf } from '@/entities/career/model/condition'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
+import { hallOfFameBatterAt } from '@/entities/collection/model/collection'
+import type { Collection, HallOfFamer, HallOfFamePlayerPick } from '@/entities/collection/model/collection'
 
 /**
  * **미션(모드 5·6)·홈런더비(모드 7)에서 치는 육성 타자.**
@@ -42,4 +44,29 @@ export function modeBatterOf(career: PlayerCareer | null): ModeBatter {
     skillIds: career.equippedSkillIds,
     specialSwingNumber: career.specialSwingNumber,
   }
+}
+
+/**
+ * **명예 타자** — 선수 게터 `0x1fc20` 이 모드 5·6·7 · 전역기록 +0x11f == 0 · (s8)+0xa6 ≥ 0 이면 주는
+ * `0x1f640(저장, +0xa6)` = 전역기록 +0x940 + i·0x30 의 기록. 등록이 0x30 바이트를 통째 옮긴 사본이라
+ * 0xb6414(장비 니블·장착 비트 +0x14) · 필살타법 번호 +0x18 을 나리 타자와 같은 식으로 읽는다.
+ * ⚠️ 옛 저장(기록 칸을 남기기 전에 등록한 선수): 장비 니블이 없으면 등록 때 남긴 0xb6415 값(없으면 기본 능력치),
+ *    장착 비트가 없으면 스킬 없음, 필살 번호가 없으면 0 — 원본 기록에는 늘 있는 칸이다.
+ */
+export function modeBatterOfHallOfFame(famer: HallOfFamer): ModeBatter {
+  const skillIds = famer.equippedSkillIds ?? []
+  const ability = famer.equipmentLevels === undefined
+    ? (famer.equippedAbility ?? famer.ability)
+    : equippedAbilityOf({ ability: famer.ability, equipmentLevels: famer.equipmentLevels, equippedSkillIds: skillIds })
+  return { ability, skillIds, specialSwingNumber: famer.specialSwingNumber ?? 0 }
+}
+
+/**
+ * 고른 선수가 명예 타자(+0xa6 ≥ 0)면 그 기록의 타자, 아니면 null (나리 타자 — 부르는 쪽이 `modeBatterOf` 를 쓴다).
+ * 마선수 대결(+0x11f ≠ 0)이면 부르는 쪽이 `pick` 을 null 로 넘긴다.
+ */
+export function hallOfFameModeBatterOf(pick: HallOfFamePlayerPick | null, collection: Collection): ModeBatter | null {
+  if (pick?.side !== '타자' || pick.hallOfFameIndex === null) return null
+  const famer = hallOfFameBatterAt(collection, pick.hallOfFameIndex)
+  return famer === null ? null : modeBatterOfHallOfFame(famer)
 }

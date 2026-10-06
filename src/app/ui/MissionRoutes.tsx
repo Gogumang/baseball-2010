@@ -6,6 +6,9 @@ import { missionBatterSpecialSwingRemainingOf, missionOpponent, missionPitcherAb
 import type { useMissionSession } from '@/app/model/useMissionSession'
 import { MissionSelectScreen, MissionBriefing } from '@/pages/mission-select/ui/MissionSelectScreen'
 import { MissionPlayScreen } from '@/pages/mission-play/ui/MissionPlayScreen'
+import { HallOfFameScreen } from '@/pages/special/ui/SpecialScreen'
+import type { HallOfFameNariPlayer } from '@/pages/special/ui/SpecialScreen'
+import type { Collection } from '@/entities/collection/model/collection'
 import { PitchingScreen } from '@/pages/pitching/ui/PitchingScreen'
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
@@ -22,8 +25,12 @@ interface MissionRoutesProps {
   readonly session: ReturnType<typeof useMissionSession>
   readonly runner: AtBatRunner
   readonly random: RandomPort
-  /** 치는 육성 타자 — 0xb6414 능력치와 장착 스킬 (`modeBatterOf`) */
+  /** 치는 육성 타자 — 0xb6414 능력치와 장착 스킬 (`modeBatterOf`). 명예 타자를 고르면 세션의 `hallOfFameBatter` 가 대신한다 */
   readonly batter: ModeBatter
+  /** 선수 고르기 창(하위 17)이 그리는 명예의 전당 칸 */
+  readonly hallOfFame: Collection
+  /** 선수 고르기 칸 0·5 의 나리 투수·타자 (투수편·타자편 저장, `nariPitcherOf` · `nariBatterOf`) — 없으면 null */
+  readonly nari: { readonly 투수: HallOfFameNariPlayer | null; readonly 타자: HallOfFameNariPlayer | null }
   /** 경기 중 메뉴 "설정" 칸 */
   readonly gameSettings: ReturnType<typeof useGameSettings>
   readonly pitchControl: PitchControl
@@ -36,21 +43,39 @@ export function MissionRoutes({
   session,
   runner,
   random,
-  batter,
+  batter: nariBatter,
+  hallOfFame,
+  nari,
   pitchControl,
   gameSettings,
 }: MissionRoutesProps) {
   const { missionRun, pitcherRun, actions } = session
+  const batter = session.hallOfFameBatter ?? nariBatter
   const { ability } = batter
 
   const overlay = missionOverlayOf(session)
   if (overlay !== null) return overlay
 
+  // 미션 모드로 들어오면 먼저 선수를 고른다 (하위 17 — 진입 0x2613c · 갱신 0x29a54). 결과 0(되돌아가기)은
+  // 하위 5 모드 목록 — 웹은 메인 메뉴다. 1·3 → 모드 5(투수 미션), 2·4 → 모드 6(타자 미션) 목록으로 간다.
+  // 원본은 육성·명예 선수가 다 없으면 코드 5·6 팝업만 떠서 들어갈 수 없다(신인 대체 없음, Q2 3-1).
+  if (screen.kind === '미션선택' && session.player === null) {
+    return (
+      <HallOfFameScreen
+        collection={hallOfFame}
+        mode={{ kind: '선수고르기', nari, onPick: actions.choosePlayer, onCancel: () => setScreen({ kind: '메인메뉴' }) }}
+        onBack={() => setScreen({ kind: '메인메뉴' })}
+      />
+    )
+  }
+
   const selectScreen = (
     <MissionSelectScreen
       clearedKeys={session.clearedKeys}
       clearCounts={session.clearCounts}
-      initialSide={session.lastSide}
+      initialSide={session.player?.side ?? session.lastSide}
+      // 고른 선수가 편을 정한다 — 목록 안에서 편을 바꾸는 길은 원본에 없다
+      canSwitchSide={session.player === null}
       onSelect={(mission) => setScreen({ kind: '미션설명', mission })}
       onBack={() => setScreen({ kind: '메인메뉴' })}
     />

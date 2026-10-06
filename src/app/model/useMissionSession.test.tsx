@@ -21,6 +21,9 @@ import { runPickoffPlay } from '@/features/defense-play/model/pickoffPlay'
 import { isModeMagicPitchType, modePitchMenuOf, modePitcherOf } from '@/app/model/modePitcher'
 import type { ModePitcher } from '@/app/model/modePitcher'
 import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
+import { modePitcherOfHallOfFame } from '@/app/model/modePitcher'
+import { EMPTY_COLLECTION, registerHallOfFame, registerHallOfFamePitcher } from '@/entities/collection/model/collection'
+import { createCareer } from '@/entities/career/model/playerCareer'
 
 /**
  * 이벤트 112 의 match 명령이 여는 마선수 대결 — 이기면 114, 지면 115 로 돌아가야 한다.
@@ -508,6 +511,75 @@ describe('투수 미션 투수는 투수편 커리어의 0xb6414 값으로 던�
   it('투수가 바뀌어도 공 하나의 난수 수는 같다', () => {
     expect(drawsOfOnePitch(1, 9, true, 강투수).drawn).toBe(drawsOfOnePitch(1, 9, true).drawn)
     expect(drawsOfOnePitch(1, 0, false, 강투수).drawn).toBe(drawsOfOnePitch(1, 0, false).drawn)
+  })
+})
+
+/* ── 미션 선수 고르기 (하위 17 · +0xa5/+0xa6) ───────────────────────────── */
+
+describe('미션 선수 고르기 — 명예 선수를 고르면 0x1fbd0 · 0x1fc20 이 명전 기록을 준다', () => {
+  const 명전투수 = { ...createPitcherCareer('철완'), endingIndex: 5, ability: { control: 950, velocity: 950, breaking: 950, stamina: 950 }, selectedMagicNumber: 2 }
+  const 명전타자 = { ...createCareer('전설'), endingIndex: 4, equippedSkillIds: [22], specialSwingNumber: 3 }
+  const 투수등록 = registerHallOfFamePitcher(EMPTY_COLLECTION, 명전투수, 99_999)
+  if (투수등록.kind !== '등록') throw new Error('등록 실패')
+  const 타자등록 = registerHallOfFame(투수등록.collection, 명전타자, 99_999)
+  if (타자등록.kind !== '등록') throw new Error('등록 실패')
+  const hallOfFame = 타자등록.collection
+  const 나리투수 = modePitcherOf(createPitcherCareer('나리'))
+
+  function 세션(initial: Screen = { kind: '미션선택' }) {
+    const missionRecord: MissionRecordPort = { load: () => ({}), save: vi.fn() }
+    return renderHook(({ screen }: { screen: Screen }) =>
+      useMissionSession({
+        runner: useAtBatRunner(), random: createSeededRandom(1), missionRecord, screen, setScreen: vi.fn(),
+        pitcher: 나리투수, batterSkillIds: [7], hallOfFame,
+      }), { initialProps: { screen: initial } })
+  }
+
+  it('처음에는 아무도 안 골랐다 — 나리 투수·명예 타자 없음', () => {
+    const { result } = 세션()
+    expect(result.current.player).toBeNull()
+    expect(result.current.pitcher).toBe(나리투수)
+    expect(result.current.hallOfFameBatter).toBeNull()
+  })
+
+  it('명예 투수(코드 3)를 고르면 그 기록으로 던지고 목록 편이 투수가 된다 (모드 5)', () => {
+    const { result } = 세션()
+    act(() => result.current.actions.choosePlayer({ side: '투수', hallOfFameIndex: 0 }))
+    expect(result.current.pitcher).toEqual(modePitcherOfHallOfFame(hallOfFame.hallOfFamePitchers[0]))
+    expect(result.current.lastSide).toBe('투수')
+    expect(result.current.hallOfFameBatter).toBeNull()
+  })
+
+  it('명예 타자(코드 4)를 고르면 그 타자가 친다 — 투수는 나리 그대로', () => {
+    const { result } = 세션()
+    act(() => result.current.actions.choosePlayer({ side: '타자', hallOfFameIndex: 0 }))
+    expect(result.current.hallOfFameBatter).toMatchObject({ skillIds: [22], specialSwingNumber: 3 })
+    expect(result.current.pitcher).toBe(나리투수)
+    expect(result.current.lastSide).toBe('타자')
+  })
+
+  it('나리 선수(코드 1·2)는 −1 — 나리 값 그대로', () => {
+    const { result } = 세션()
+    act(() => result.current.actions.choosePlayer({ side: '투수', hallOfFameIndex: null }))
+    expect(result.current.pitcher).toBe(나리투수)
+  })
+
+  it('미션 모드 화면을 떠나면 고른 선수를 지운다 — 다시 들어오면 0x5eb8c 가 +0xa5/+0xa6 을 −1 로 되돌린다', () => {
+    const rendered = 세션()
+    act(() => rendered.result.current.actions.choosePlayer({ side: '투수', hallOfFameIndex: 0 }))
+    rendered.rerender({ screen: { kind: '미션설명', mission: MISSIONS[0] } })
+    expect(rendered.result.current.player).not.toBeNull()
+    rendered.rerender({ screen: { kind: '메인메뉴' } })
+    expect(rendered.result.current.player).toBeNull()
+  })
+
+  it('투수편 마선수 대결(+0x176 ≠ 0)은 고른 명예 투수가 아니라 나리 투수가 던진다', () => {
+    const rendered = 세션()
+    act(() => rendered.result.current.actions.choosePlayer({ side: '투수', hallOfFameIndex: 0 }))
+    const mission = aceMatchMissionOf(16, '투수')
+    if (mission === null) throw new Error('투수 미션 16 이 없다')
+    act(() => rendered.result.current.actions.beginPitcherAceMatch(mission))
+    expect(rendered.result.current.pitcher).toBe(나리투수)
   })
 })
 

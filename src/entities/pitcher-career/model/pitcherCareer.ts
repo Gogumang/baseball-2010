@@ -473,7 +473,7 @@ export function hasPitcherSkill(career: PitcherCareer, skillId: number): boolean
  * 장착 비트(선수기록 +0x14) — 0xb62b4 / 0xa4bf8. 투수 경기의 스태미나 소모(0xa5e14 의 18·10)·마구 횟수
  * (0xaebe4 의 23)·실투(0x33cbc)·경기 뒤 사기 행운(0xa741c)·훈련 병아리/몹쓸몸(0x17f5c)이 이 칸을 본다.
  */
-export function isPitcherSkillEquipped(career: PitcherCareer, skillId: number): boolean {
+export function isPitcherSkillEquipped(career: Pick<PitcherCareer, 'equippedSkillIds'>, skillId: number): boolean {
   return isSkillEquipped(career, skillId)
 }
 
@@ -530,7 +530,9 @@ const COOL_CONTROL_DIVISOR = 10
  *      그래서 제구는 999 를 넘을 수 있다(최대 999 + 99). 칭호 0x1ad7e 는 이 값을 `> 998` 로 보고,
  *      경기용 0xb570c 는 맨 끝(0xb5b06)에서야 0..999 로 자른다.
  */
-export function equippedPitcherAbilityOf(career: PitcherCareer): PitcherAbility {
+export function equippedPitcherAbilityOf(
+  career: Pick<PitcherCareer, 'ability' | 'equipmentLevels' | 'equippedSkillIds'>,
+): PitcherAbility {
   const adjust = (key: keyof PitcherAbility) => {
     let value = Math.min(MAXIMUM_ABILITY, career.ability[key] + equipmentBonusOf(career.equipmentLevels[key]))
     if (isPitcherSkillEquipped(career, POWERLESS_SKILL)) value = Math.max(0, value - SKILL_PENALTY)

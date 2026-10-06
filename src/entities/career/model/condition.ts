@@ -80,7 +80,9 @@ const reduceByPercent = (value: number, percent: number) =>
  * 장착 여부는 모두 0xb62b4 = 선수기록 +0x14 **장착** 비트 (H-modes 6절 "장착 칸").
  * 기본 능력치·장비 보너스가 0 이상이라 1 의 `clampAbility` 바닥은 값을 바꾸지 않는다.
  */
-export function equippedAbilityOf(career: PlayerCareer): BatterAbility {
+export function equippedAbilityOf(
+  career: Pick<PlayerCareer, 'ability' | 'equipmentLevels' | 'equippedSkillIds'>,
+): BatterAbility {
   const adjust = (key: keyof BatterAbility) => {
     let value = clampAbility(career.ability[key] + equipmentBonusOf(career.equipmentLevels[key]))
     if (isSkillEquipped(career, POWERLESS_SKILL)) value = clampAbility(value - SKILL_PENALTY)

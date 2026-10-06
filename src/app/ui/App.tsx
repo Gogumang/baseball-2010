@@ -11,6 +11,8 @@ import { createLocalStorageSaveGame } from '@/shared/api/save/localStorageSaveGa
 import { createLocalStorageMissionRecord } from '@/shared/api/save/localStorageMissionRecord'
 import { createLocalStorageJsonStore } from '@/shared/api/save/localStorageJsonStore'
 import { nariBatterOf, nariPitcherOf, useCollection } from '@/app/model/useCollection'
+import { EMPTY_COLLECTION } from '@/entities/collection/model/collection'
+import type { Collection } from '@/entities/collection/model/collection'
 import { GAME_POINT_USAGE } from '@/entities/collection/model/annalsStats'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 import { isEveryMissionCleared } from '@/entities/mission/model/missionGoal'
@@ -107,6 +109,8 @@ export function App() {
    * 세션들에는 이 고정 콜백을 넘기고 기록연감이 선 뒤 진짜 함수를 꽂는다.
    */
   const recordStatRef = useRef<(event: AnnalsStatEvent) => void>(() => {})
+  /** 미션 선수 고르기가 읽는 명예의 전당 — 기록연감 훅이 선 뒤 아래에서 채운다 (`recordStatRef` 와 같은 까닭) */
+  const hallOfFameForMissionRef = useRef<Collection>(EMPTY_COLLECTION)
   const recordStat = useCallback((event: AnnalsStatEvent) => recordStatRef.current(event), [])
   /**
    * 시즌 결산 0x6900 의 0x29 "오토봇 배트" 검사가 읽는 것 — 나리 투수편·타자편 저장의 +0x7a 와 전역 해금표 `app+0xc0`.
@@ -162,6 +166,9 @@ export function App() {
     // 투수편 세션은 시작할 때 저장을 올려 두므로 `career` 가 곧 저장된 투수다 (`modePitcherOf`)
     pitcher: pitcherMissionPitcher,
     ...(missionBatterSkillIds === undefined ? {} : { batterSkillIds: missionBatterSkillIds }),
+    // 선수 고르기에서 명예 선수(+0xa5/+0xa6 ≥ 0)를 고르면 0x1fbd0 · 0x1fc20 이 이 기록을 준다.
+    // 기록연감 훅은 미션 세션보다 늦게 서므로(올 클리어를 본다) 지난 그림의 값을 넘긴다 — 명전은 미션 중에 안 바뀐다
+    hallOfFame: hallOfFameForMissionRef.current,
   })
   // 투수편이 연 히든(장비 컬렉터 20·24·28·32)도 같은 전역 표 `app+0xc0` 에 모은다 (0x62368)
   // 시즌 결산이 연 전역 해금(0x29)도 같은 전역 표에 모은다
@@ -180,6 +187,7 @@ export function App() {
     pitcherSession.career,
   )
   const { recordStat: recordCollectionStat } = collection
+  hallOfFameForMissionRef.current = collection.collection
   const pitcherEditionFirsts = pitcherSession.career?.regularSeasonFirstCount ?? 0
   const batterEditionFirsts = (careerSession.career ?? careerSession.savedCareer)?.regularSeasonFirstCount ?? 0
   const seasonModeFirstCount = seasonSession.state?.record.regularSeasonFirsts ?? 0
@@ -242,8 +250,8 @@ export function App() {
     mission.actions.beginAceMatch(target, { resultEvents: command.resultEvents, context: '대결결과', carried })
   }
 
-  // 미션 모드는 메인 메뉴에서 바로 들어간다. 육성 선수가 없으면 신인 능력치로 한다
-  // (예전에는 커리어가 없으면 진입 화면으로 되돌려 미션 모드에 들어갈 수 없었다).
+  // 미션 모드는 메인 메뉴에서 들어가 선수 고르기(하위 17)부터 띄운다 — 육성·명예 선수가 다 없으면 원본대로
+  // 고르기 창에서 막힌다(StrCOMMON[38]·[39]). 고른 선수의 편이 투수(모드 5)/타자(모드 6) 미션을 정한다.
   if (MISSION_SCREENS.includes(screen.kind)) {
     return (
       <MissionRoutes
@@ -256,6 +264,12 @@ export function App() {
         // 저장된 선수다. 능력치는 0xb6414(장비·스킬)까지만: 0xb570c 의 질병·부상·사기 감소는 모드 3·4 갈래라
         // 미션에서는 안 먹는다 (`modeBatterOf`). 마선수 대결(이벤트)도 같은 화면이다.
         batter={modeBatterOf(careerSession.career ?? careerSession.savedCareer)}
+        // 선수 고르기 창(하위 17) — 칸 0·5 나리 투수·타자는 두 편 저장(0x213c0(…, 3|4, 1))이다
+        hallOfFame={collection.collection}
+        nari={{
+          투수: nariPitcherOf(pitcherSession.career),
+          타자: nariBatterOf(careerSession.career ?? careerSession.savedCareer),
+        }}
         pitchControl={gameSettings.settings.pitchControl}
         gameSettings={gameSettings}
       />

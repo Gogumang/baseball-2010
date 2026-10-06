@@ -4,7 +4,9 @@ import {
   modePitchMenuOf,
   modePitcherMagicRemainingOf,
   modePitcherOf,
+  modePitcherOfHallOfFame,
 } from '@/app/model/modePitcher'
+import { registerHallOfFamePitcher, EMPTY_COLLECTION } from '@/entities/collection/model/collection'
 import { createPitcherCareer, equippedPitcherAbilityOf } from '@/entities/pitcher-career/model/pitcherCareer'
 import { rookiePitcherAbilityOf } from '@/entities/pitcher-career/model/pitcherRegistration'
 import { PITCH_TYPES } from '@/shared/config/original/pitchTypes'
@@ -79,5 +81,31 @@ describe('투수 미션 투수 — 0x213c0 모드 5→3 나리 투수편 저장 
     expect(pitcher.stats).toEqual(rookiePitcherAbilityOf(0, 0))
     expect(pitcher).toMatchObject({ isSteady: false, isTimid: false, isCool: false })
     expect(pitcher.repertoire.magicNumber).toBe(0)
+  })
+})
+
+describe('명예 투수 — 0x1fbd0 의 +0xa5 ≥ 0 갈래 = 0x1f62c 명전 기록 (등록 때 0x30 바이트 통째 사본)', () => {
+  const 나리 = {
+    ...createPitcherCareer('철완', { role: 0, typeIndex: 2, handIndex: 0, skinIndex: 0, breakingPitchSlots: [1, 4] }),
+    endingIndex: 5,
+    ability: { control: 990, velocity: 700, breaking: 600, stamina: 500 },
+    equipmentLevels: { control: 0, velocity: 3, breaking: 0, stamina: 0 },
+    equippedSkillIds: [16, 22, 23],
+    selectedMagicNumber: 3,
+  }
+  const 등록 = registerHallOfFamePitcher(EMPTY_COLLECTION, 나리, 99_999)
+  if (등록.kind !== '등록') throw new Error('등록 실패')
+  const famer = 등록.collection.hallOfFamePitchers[0]
+
+  it('같은 기록이라 나리 투수와 같은 값을 낸다 — 능력치 0xb6414 · 구질 +0x1c · 폼 0xb6e24 · 마구 +0x18 · 장착 비트', () => {
+    expect(modePitcherOfHallOfFame(famer)).toEqual(modePitcherOf(나리))
+  })
+
+  it('기록 칸이 없는 옛 저장은 등록 때 남긴 0xb6415 값과 직구만·스킬 없음으로 던진다', () => {
+    const { equipmentLevels: _e, equippedSkillIds: _s, pitchMask: _p, selectedMagicNumber: _m, ...옛기록 } = famer
+    const pitcher = modePitcherOfHallOfFame(옛기록)
+    expect(pitcher.stats.velocity).toBe(famer.equippedAbility.velocity)
+    expect(pitcher.repertoire).toEqual({ pitchMask: 1, form: 4, magicNumber: 0, isAce: false })
+    expect(pitcher).toMatchObject({ isSteady: false, isCool: false, hasSpiritSkill: false })
   })
 })

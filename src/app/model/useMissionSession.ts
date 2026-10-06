@@ -53,7 +53,12 @@ import { MAGIC_PITCH_TYPE_NUMBER, ballMagicNumberAfterPitch } from '@/entities/p
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
 import { buildHumanPitch, pitchGradeOf } from '@/features/play-pitcher-game/model/pitcherPitch'
-import { isModeMagicPitchType, modePitcherMagicRemainingOf, modePitcherOf } from '@/app/model/modePitcher'
+import {
+  isModeMagicPitchType, modePitcherMagicRemainingOf, modePitcherOf, modePitcherOfHallOfFame,
+} from '@/app/model/modePitcher'
+import { hallOfFameModeBatterOf } from '@/app/model/modeBatter'
+import { hallOfFamePitcherAt } from '@/entities/collection/model/collection'
+import type { Collection, HallOfFamePlayerPick } from '@/entities/collection/model/collection'
 import { pitchReleaseSoundIdOf } from '@/widgets/batting-stage/lib/pitchReleaseSound'
 import type { ModePitcher } from '@/app/model/modePitcher'
 import { ROOKIE_BATTER_ABILITY } from '@/entities/batting/model/batter'
@@ -116,7 +121,20 @@ interface MissionSessionInput {
   readonly pitcher?: ModePitcher
   /** 타자 미션에서 치는 타자의 장착 스킬 (`modeBatterOf(...).skillIds`) — 압도 22 가 마투수 투구 소모를 ×2 한다 */
   readonly batterSkillIds?: readonly number[]
+  /**
+   * 명예의 전당 (전역기록 +0x880 투수 · +0x940 타자). 미션 선수 고르기에서 명예 선수를 고르면(+0xa5/+0xa6 ≥ 0)
+   * 선수 게터 0x1fbd0 · 0x1fc20 이 이 기록을 준다 — `pitcher`·`batterSkillIds` 대신 그 선수의 값이다.
+   * 안 넘기면 늘 나리 선수다.
+   */
+  readonly hallOfFame?: Collection
 }
+
+/**
+ * 미션 모드 안의 화면 — 이 밖으로 나가면 고른 선수를 지운다. 원본은 미션 모드로 들어올 때마다 선수 고르기
+ * 진입 0x2613c → 0x5eb8c 가 전역기록 +0xa5 · +0xa6 을 −1 로 되돌리고 다시 고르게 한다.
+ * (마선수 대결 '마선수대결' 은 이벤트에서 오는 길이라 넣지 않는다.)
+ */
+const MISSION_MODE_SCREENS: readonly Screen['kind'][] = ['미션선택', '미션설명', '미션진행', '투수미션']
 
 /** 미션 상대. 원본 레코드의 마선수 순번이 있으면 그 마선수다 (타자 미션이면 마투수). */
 export function missionOpponent(mission: OriginalMission): AcePlayer | null {
@@ -284,9 +302,19 @@ export function useMissionSession({
   throwModeManual,
   aceLevels,
   pitcher: pitcherInput,
-  batterSkillIds = NO_SKILLS,
+  batterSkillIds: nariBatterSkillIds = NO_SKILLS,
+  hallOfFame,
 }: MissionSessionInput) {
-  const pitcher = useMemo(() => pitcherInput ?? modePitcherOf(null), [pitcherInput])
+  const nariPitcher = useMemo(() => pitcherInput ?? modePitcherOf(null), [pitcherInput])
+  /**
+   * **미션 선수 고르기 결과** (하위 17 0x29a54 · 칸 코드 0x5eae0) — 편과 명전 번호(+0xa5 투수 · +0xa6 타자, 나리면 null).
+   * 아직 안 골랐으면 null — 화면이 고르기 창(`HallOfFameScreen` 선수고르기)을 먼저 띄운다.
+   */
+  const [player, setPlayer] = useState<HallOfFamePlayerPick | null>(null)
+  const isInMissionMode = MISSION_MODE_SCREENS.includes(screen.kind)
+  useEffect(() => {
+    if (!isInMissionMode) setPlayer(null)
+  }, [isInMissionMode])
   const silent = useMemo(() => createSilentSound(), [])
   const audio = sound ?? silent
   const [missionRun, setMissionRun] = useState<MissionRun | null>(null)
@@ -345,13 +373,33 @@ export function useMissionSession({
    * 미션에서는 CPU 가 이 공을 던질 일이 없다 — 투수 미션은 사람만 던지고 타자 미션은 사람이 안 던진다.
    */
   const [ballMagicNumber, setBallMagicNumber] = useState(0)
-  const pitcherMagicRemaining = modePitcherMagicRemainingOf(pitcherMagicStored, pitcher)
   /**
    * **투수편 마선수 대결로 연 투수 미션** — 아니면 null. 원본은 SYS 8(0x8d7e8)이 `g[0x175] = team − 1` ·
    * `g[0x176] = 1`(대기 표시)을 적고 미션 장면(모드 5)으로 나간다 (S13 4-1). 웹은 화면을 투수편 라우트가 그리므로
    * (`renderAceMatch`) 앱 화면(`screen`)을 '투수미션' 으로 바꾸지 않고 이 칸으로 대결 중임을 안다.
    */
   const [pitcherAceMatchMission, setPitcherAceMatchMission] = useState<OriginalMission | null>(null)
+  /**
+   * 던지는 투수 = 선수 게터 0x1fbd0: 모드 5 · 전역기록 +0x176 == 0(투수편 마선수 대결이 아님) · +0xa5 ≥ 0 이면
+   * 명예 투수(0x1f62c), 그 밖은 나리 투수(`pitcher` 입력).
+   */
+  const hallOfFamePitcher = useMemo(() => {
+    if (pitcherAceMatchMission !== null || hallOfFame === undefined) return null
+    if (player?.side !== '투수' || player.hallOfFameIndex === null) return null
+    const famer = hallOfFamePitcherAt(hallOfFame, player.hallOfFameIndex)
+    return famer === null ? null : modePitcherOfHallOfFame(famer)
+  }, [hallOfFame, pitcherAceMatchMission, player])
+  const pitcher = hallOfFamePitcher ?? nariPitcher
+  const pitcherMagicRemaining = modePitcherMagicRemainingOf(pitcherMagicStored, pitcher)
+  /**
+   * 치는 명예 타자 = 선수 게터 0x1fc20: 모드 6 · 전역기록 +0x11f == 0(마선수 대결이 아님) · +0xa6 ≥ 0 이면 0x1f640.
+   * null 이면 나리 타자 — 화면은 앱이 넘긴 `modeBatterOf` 를 쓴다.
+   */
+  const hallOfFameBatter = useMemo(
+    () => (screen.kind === '마선수대결' || hallOfFame === undefined ? null : hallOfFameModeBatterOf(player, hallOfFame)),
+    [hallOfFame, player, screen.kind],
+  )
+  const batterSkillIds = hallOfFameBatter?.skillIds ?? nariBatterSkillIds
   /** 결과를 확인하고 돌아갈 때 마지막으로 한 편의 목록을 연다 */
   const [lastSide, setLastSide] = useState<OriginalMission['side']>('타자')
   const [clearCounts, setClearCounts] = useState<MissionClearCounts>(() => missionRecord.load())
@@ -867,6 +915,14 @@ export function useMissionSession({
       runner.resetAtBat()
     },
 
+    /**
+     * 선수 고르기 결과 1~4 (0x29a54 → 표 0xcec00): 투수(1·3)면 모드 5, 타자(2·4)면 모드 6 — 그 편의 미션 목록으로 간다.
+     */
+    choosePlayer: (pick: HallOfFamePlayerPick) => {
+      setPlayer(pick)
+      setLastSide(pick.side)
+    },
+
     begin: (mission: OriginalMission) => {
       setLastSide(mission.side)
       resetForNewMatch(mission)
@@ -1033,6 +1089,7 @@ export function useMissionSession({
 
   return {
     missionRun, pitcherRun, pitcherAceMatchMission, clearedKeys, clearCounts, lastSide, aceLevels, pitcher,
+    player, hallOfFameBatter,
     missionConditionCode, pendingDefensePlay, pendingBenchClearing, pickoffReplay, handleMissionPitch, handleThrow, actions,
     batterSpecialSwingStored, pitcherMagicRemaining, stealableBases,
     /** 타자 미션 상대 마투수의 체력% `0xaebb0` = trunc(+0x2c / 100) — `missionPitcherAbility` 셋째 인자 */
