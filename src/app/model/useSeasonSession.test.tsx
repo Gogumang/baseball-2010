@@ -2,7 +2,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
-import { SEASON_DEFAULT_MATCH_SETTINGS, seasonGoalInputOf, useSeasonSession } from '@/app/model/useSeasonSession'
+import {
+  SEASON_DEFAULT_MATCH_SETTINGS, seasonGoalInputOf, seasonLeagueRecordsOf, useSeasonSession,
+} from '@/app/model/useSeasonSession'
 import {
   EMPTY_LEAGUE, pitcherOrdersAfterPostseason, postseasonGameOf, postseasonRotationTurnsOf, postseasonStarterSlotOf,
 } from '@/entities/league/model/league'
@@ -492,6 +494,67 @@ describe('시즌 목표 ③④ 의 재료 (seasonGoalInputOf)', () => {
     const 입력 = seasonGoalInputOf({ state: state!, league, roster, playerStats, series })
     expect(입력.teamBattingAverage).toBe(500)
     expect(입력.wins).toBe(1)
+  })
+})
+
+describe('트레이드로 옮겨 간 선수의 리그 성적은 선수를 따라간다 (레코드 +0x20~ · 0x9d789 는 열 팀 레코드를 훑는다)', () => {
+  /** 내 0번 타자 ↔ 3팀 5번 타자 · 내 1번 투수 ↔ 3팀 2번 투수 */
+  const 트레이드 = (result: ReturnType<typeof 띄우기>['result']) => {
+    for (const swap of [
+      { opponentTeamId: 3, tab: 1, myIndex: 0, opponentIndex: 5 },
+      { opponentTeamId: 3, tab: 0, myIndex: 1, opponentIndex: 2 },
+    ]) {
+      act(() => result.current.actions.finishTrade({
+        record: result.current.state!.record, gamePointCost: 0, isSuccess: true, swap,
+      }))
+    }
+  }
+
+  it('내 팀으로 온 선수의 사람 경기 기록은 옛 팀 표 자리로 쌓이고, 순위표에는 지금 팀(내 팀) 줄로 나온다', () => {
+    const { result } = 띄우기()
+    시작(result, 0)
+    트레이드(result)
+    act(() => result.current.actions.playNextGame())
+    const 옵션 = result.current.gameOptions!
+    const 첫타자 = entryBattersOfOrder(0, 옵션.ourEntryOrder!)[0]!
+    expect(첫타자).toMatchObject({ tableTeamId: 3, rosterSlot: 5 })
+    // 진행기가 그 칸으로 쌓아 보낸 타석 (표 팀 3 · 칸 5) — 홈런 둘
+    const 타석 = [
+      { teamId: 3, battingOrderIndex: 5, outcome: { kind: '홈런' } as const, runsBattedIn: 1 },
+      { teamId: 3, battingOrderIndex: 5, outcome: { kind: '홈런' } as const, runsBattedIn: 1 },
+    ]
+    act(() => result.current.actions.finishGame(요약({ leaguePlateAppearances: 타석 })))
+
+    const { state, league, roster, playerStats, series, cpuRosterOf } = result.current
+    const 원천 = { league, myTeamId: 0, roster, cpuRosterOf, playerStats }
+    const 타자줄 = seasonLeagueRecordsOf(원천, false)
+    const 옮겨온 = 타자줄.find((record) => record.name === teamBatters(3)[5]!.name)!
+    expect(옮겨온.teamId).toBe(0)
+    expect(옮겨온.homeRuns).toBeGreaterThanOrEqual(2)
+    // 0팀 줄 차례 = 내 명단 차례 — 옮겨 온 선수가 0팀 첫 줄이다
+    expect(타자줄[0]?.name).toBe(teamBatters(3)[5]!.name)
+    // 옮겨 간 내 0번 타자는 3팀 줄로 나온다 (3팀 레코드 5번 칸)
+    const 내준 = 타자줄.filter((record) => record.name === teamBatters(0)[0]!.name)
+    expect(내준.map((record) => record.teamId)).toEqual([3])
+    expect(타자줄.findIndex((record) => record.name === teamBatters(0)[0]!.name)).toBe(3 * 12 + 5)
+    // 목표 ③ 도 같은 열쇠로 읽는다 — 내 팀 0번 칸(옮겨 온 선수)의 줄이 빈 줄이 아니다
+    const 입력 = seasonGoalInputOf({ state: state!, league, roster, playerStats, series })
+    expect(입력.teamBattingAverage).toBeGreaterThan(0)
+
+    // 투수 줄도 지금 팀으로 — 내 팀에 온 3팀 2번 투수가 0팀 줄에 있다
+    const 투수줄 = seasonLeagueRecordsOf(원천, true)
+    expect(투수줄.filter((record) => record.name === teamPitchers(3)[2]!.name).map((record) => record.teamId)).toEqual([0])
+    expect(투수줄.filter((record) => record.name === teamPitchers(0)[1]!.name).map((record) => record.teamId)).toEqual([3])
+  })
+
+  it('트레이드가 없으면 타자 줄은 붙박이 표 차례·이름·팀 그대로다 (예전 leagueRecordsOf 와 같다)', () => {
+    const { result } = 띄우기()
+    시작(result, 0)
+    const { league, roster, playerStats, cpuRosterOf } = result.current
+    const 줄 = seasonLeagueRecordsOf({ league, myTeamId: 0, roster, cpuRosterOf, playerStats }, false)
+    expect(줄.map((record) => [record.teamId, record.name])).toEqual(
+      Array.from({ length: 10 }, (_u, team) => teamBatters(team).map((player) => [team, player.name])).flat(),
+    )
   })
 })
 

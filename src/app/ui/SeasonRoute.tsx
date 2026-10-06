@@ -19,7 +19,7 @@ import {
 } from '@/pages/general-mode/lib/generalModeSetup'
 import { MatchSettingsWindow } from '@/pages/match-settings'
 import { SQUAD_PURPOSE } from '@/entities/season-mode/model/preGameFlow'
-import { judgeTitles, leagueRecordsOf } from '@/entities/awards/model/seasonAwards'
+import { judgeTitles } from '@/entities/awards/model/seasonAwards'
 import { leaderOf } from '@/entities/awards/model/leaderboard'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { TeamSelectScreen } from '@/pages/create-player/ui/TeamSelectScreen'
@@ -34,7 +34,7 @@ import { NationalCupScreen } from '@/pages/national-cup/ui/NationalCupScreen'
 import { TeamGameScreen } from '@/pages/team-game/ui/TeamGameScreen'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { useGameSettings } from '@/app/model/useGameSettings'
-import { seasonGoalInputOf, seasonRanksOf } from '@/app/model/useSeasonSession'
+import { isPitcherLeaderKind, seasonGoalInputOf, seasonLeagueRecordsOf, seasonRanksOf } from '@/app/model/useSeasonSession'
 import type { SeasonSession } from '@/app/model/useSeasonSession'
 import { seasonStadiumOf } from '@/entities/season-mode/model/stadiumItems'
 import { PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
@@ -178,6 +178,9 @@ export function SeasonRoute({
   const backToTeamMenu = () => actions.goto(SEASON_SCENE_STATE.구단관리)
   // 목표 판정 0xa37bc 의 다섯 칸 — 시즌정보 화면과 목표 창(SYS sub 1)이 같은 값을 본다
   const goalInput = seasonGoalInputOf({ state, league, roster, playerStats, series })
+  const leagueRecordSource = {
+    league, myTeamId: state.record.teamId, roster, cpuRosterOf: session.cpuRosterOf, playerStats,
+  }
 
   // 이벤트 재생 0xd3 (갱신 0x5110 · 키 0x90ec · 그리기 0xa09c → 대화창 0x8b5ac).
   // ⚠️ 근사: 원본은 대화창 아래에 공통 틀(0x9f60, 이전 상태가 외출 지도면 지도)을 그린다 — 웹은 대화창만 얹는다.
@@ -497,8 +500,9 @@ export function SeasonRoute({
 
   if (scene === SEASON_SCENE_STATE.타자시상 || scene === SEASON_SCENE_STATE.투수시상) {
     const isBatter = scene === SEASON_SCENE_STATE.타자시상
-    // ⚠️ 시즌모드는 `isMine` 을 "1위 팀 == 내 팀" 으로 본다 (B 4절 2번) — 여기서 그렇게 채운다
-    const records = leagueRecordsOf(playerStats).map((record) => ({
+    // ⚠️ 시즌모드는 `isMine` 을 "1위 팀 == 내 팀" 으로 본다 (B 4절 2번) — 여기서 그렇게 채운다.
+    // 순위표 0x9d789 는 열 팀 레코드를 훑는다 — 트레이드로 옮겨 간 선수는 지금 팀 줄로, 투수 타이틀은 투수 배열에서
+    const records = seasonLeagueRecordsOf(leagueRecordSource, !isBatter).map((record) => ({
       ...record,
       isMine: record.teamId === state.record.teamId,
     }))
@@ -517,10 +521,11 @@ export function SeasonRoute({
   }
 
   if (scene === SEASON_SCENE_STATE.최우수선수) {
-    const records = leagueRecordsOf(playerStats)
-    // 시즌 MVP 는 표 0xd4f34 에서 rand(0..6) 으로 종류 하나를 골라 그 1위를 발표한다 (B-3)
+    // 시즌 MVP 는 표 0xd4f34 에서 rand(0..6) 으로 종류 하나를 골라 그 1위를 발표한다 (B-3) — 종류 ≤ 7 이면 투수 배열
     const kind = SEASON_MVP_LEADER_KINDS[randomIntegerBelow(random, 0, SEASON_MVP_LEADER_KINDS.length)]
-    const leader = kind === undefined ? null : leaderOf(records, kind)
+    const leader = kind === undefined
+      ? null
+      : leaderOf(seasonLeagueRecordsOf(leagueRecordSource, isPitcherLeaderKind(kind)), kind)
     const isMine = leader?.record.teamId === state.record.teamId
     return (
       <SeasonMvpScreen
