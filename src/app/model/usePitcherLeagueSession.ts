@@ -1382,7 +1382,8 @@ export function usePitcherLeagueSession(
         setScene('다음경기순위')
       },
       confirmNextGameStandings: openMatchPrepare,
-      // 142 확인 0x13cb6 → 144 → 경기. 굴린 마선수는 진입이 두 팀 명부에 넣었다(0xb88c8 · 0xb8870) — 경기에 그대로 실린다
+      // 142 확인 0x13cb6 → 144 → 경기. 굴린 마선수는 진입이 두 팀 명부에 넣었다(0xb88c8 · 0xb8870) — 경기에 그대로 실린다.
+      // 저장 [모드+0x4c] = 1(전역기록 +0x4f "모드 3 경기 중간 저장됨")은 읽는 곳이 없다 — 타자편 `confirmMatchPrepare` 주석
       confirmMatchPrepare: () => {
         if (scene !== '경기준비') return
         beginGame(matchAces)
