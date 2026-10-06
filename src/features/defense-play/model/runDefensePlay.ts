@@ -84,7 +84,11 @@ import {
   OUT_KIND,
   releaseForcesAfterOut,
 } from '@/entities/fielding/model/outJudgement'
-import { defenseArrivalTicks, secondBaseCoverSlot } from '@/entities/fielding/model/throwArrival'
+import {
+  defenseArrivalTicks,
+  secondBaseCoverSlot,
+  secondBaseHelperPlacement,
+} from '@/entities/fielding/model/throwArrival'
 import {
   planThrow,
   errantThrowFlight,
@@ -714,6 +718,8 @@ export interface DefensePlayState {
   rundownOuts: number
   /** 원본 `state[0x87]` — 마지막 아웃 판정이 태그였나 (`runOutJudgement` 주석) */
   tagOut: boolean
+  /** 플레이+0x126 — 판 시작 vt20(b11fe)이 1, 키스톤 야수가 중계 자리를 잡으면(b22f6) 0 */
+  relayFlag: boolean
 }
 
 /**
@@ -852,6 +858,7 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     rundowns: 0,
     rundownOuts: 0,
     tagOut: false,
+    relayFlag: true,
   }
 }
 
@@ -931,6 +938,7 @@ export function stepDefensePlay(
   let rundowns = state.rundowns
   let rundownOuts = state.rundownOuts
   let tagOut = state.tagOut
+  let relayFlag = state.relayFlag
 
   const contextAt = (at: number): DefenseContext => ({
     play,
@@ -1740,6 +1748,23 @@ export function stepDefensePlay(
     )
 
     // ── 6. 한 틱 움직이기 ──
+    // 0xb1c90(플레이 vt30, 매 틱)의 커버 배치 갈래 0xb203a — 2루 커버가 아닌 키스톤 야수의 자리(중계 자리 · 기본 자리)
+    if (!play.finished) {
+      const placement = secondBaseHelperPlacement({
+        context: contextAt(tick),
+        secondBaseCover: covers[2] ?? NONE,
+        ballToFirstSide: catchPoint.x > basePosition(0).x,
+        relayFlag,
+      })
+      if (placement.kind === '자리') {
+        if (placement.relayPlaced) relayFlag = false
+        fielders = fielders.map((fielder) =>
+          fielder.slot === placement.slot
+            ? { ...fielder, target: placement.target, aiState: AI_STATE.BUSY }
+            : fielder,
+        )
+      }
+    }
     fielders = fielders.map((fielder) => moveFielder(fielder, { chaserSlot, catchPoint, covers, tick, catchTick }))
     for (const runner of runners) {
       if (runner.state.isOut || runner.state.scored) continue
@@ -1856,6 +1881,7 @@ export function stepDefensePlay(
   state.rundowns = rundowns
   state.rundownOuts = rundownOuts
   state.tagOut = tagOut
+  state.relayFlag = relayFlag
   state.tick = tick + 1
   return state
 }
@@ -2071,8 +2097,8 @@ interface FielderMoveInput {
 function moveFielder(fielder: FielderState, input: FielderMoveInput): FielderState {
   // 협살(상태 8) 중인 야수는 분기표가 0xb48b6 으로 가므로 커버 이동을 하지 않는다 — 2b 절이 이미 옮겼다
   if (fielder.aiState === AI_STATE.RUNDOWN) return fielder
-  // 0xb2c90 이 세운 "공 들고 루로" (AI 상태 6 · vt48(루)) — 커버 배치보다 앞선다
-  if (fielder.aiState === AI_STATE.CARRY) {
+  // 0xb2c90 이 세운 "공 들고 루로" (AI 상태 6 · vt48(루)) · 0xb203a 가 세운 키스톤 야수 자리(AI 0xa) — 목표점으로 걷는다
+  if (fielder.aiState === AI_STATE.CARRY || (fielder.aiState === AI_STATE.BUSY && fielder.slot !== input.chaserSlot)) {
     if (isSamePoint(fielder.position, fielder.target)) return fielder
     return { ...fielder, position: stepToward(fielder.position, fielder.target, fielder.speed) }
   }

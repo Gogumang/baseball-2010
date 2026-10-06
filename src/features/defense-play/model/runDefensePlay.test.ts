@@ -477,6 +477,24 @@ describe('사람 조작 — 상태 0x17 키 표 (I-controls 0·2b·2d·3b)', () 
   })
 })
 
+describe('2루 커버가 아닌 키스톤 야수 자리 — 0xb1c90 의 0xb203a (매 틱, 송구 없음)', () => {
+  it('중견 앞 2루타에 1루 주자 — 2루 커버는 2루수, 유격수는 AI 0xa 로 표 0xd8764 자리 (14500, 17600) 로 걷는다', () => {
+    const state = startDefensePlay({
+      outcome: 이루타,
+      trajectory: battedBallTrajectory([90, 1300, 900, 0]),
+      bases: 주자1루,
+      outs: 0,
+    })
+    const 시작 = state.fielders[5].position
+    while (state.tick < 10) stepDefensePlay(state)
+
+    expect(state.covers[2]).toBe(3)
+    expect(state.fielders[5].aiState).toBe(0xa)
+    expect(state.fielders[5].target).toEqual({ x: 14_500, y: 0, z: 17_600 })
+    expect(state.fielders[5].position).not.toEqual(시작)
+  })
+})
+
 describe('필살타법 성공 타구는 야수가 잡지 못한다 — 공 비트 4 (0x51800 · 0xaf180 · 0xbc3, S13 6절)', () => {
   const 필살타구 = (outcome: AtBatOutcome, bases: BaseState, outs: number, pattern?: BattedBallPattern) =>
     runDefensePlay({

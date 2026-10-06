@@ -13,6 +13,7 @@ import {
   autoThrowTargetBase,
   defenseArrivalTicks,
   secondBaseCoverSlot,
+  secondBaseHelperPlacement,
   shouldReleaseThrow,
 } from '@/entities/fielding/model/throwArrival'
 
@@ -155,5 +156,49 @@ describe('2루 커버 규칙 0xb1e24', () => {
     expect(secondBaseCoverSlot(true, 5)).toBe(3)
     expect(secondBaseCoverSlot(false, 4)).toBe(3)
     expect(secondBaseCoverSlot(false, 3)).toBe(5)
+  })
+})
+
+describe('0xb1c90 의 커버 배치 갈래 0xb203a — 2루 커버가 아닌 키스톤 야수 자리 (송구 없음)', () => {
+  // 1루 주자가 2루로 뛰는 중 — 자동 고리가 고르는 루는 2
+  const 주자 = [{ ...createRunner(1, 1, runnerSpeedOf(500)), targetBase: 2 }]
+  const 배치 = (holderSlot: number, fielders: readonly FielderState[], extra: { relayFlag?: boolean; catchFielderSlot?: number } = {}) =>
+    secondBaseHelperPlacement({
+      context: 문맥(
+        { ballHolderSlot: holderSlot, catchFielderSlot: extra.catchFielderSlot ?? holderSlot },
+        { fielders, runners: 주자 },
+      ),
+      secondBaseCover: 3,
+      ballToFirstSide: false,
+      relayFlag: extra.relayFlag ?? true,
+    })
+
+  it('내야수가 공을 가졌으면 남은 키스톤 야수(유격수)는 표 0xd8764 자리 (14500, 17600) 로 간다', () => {
+    expect(배치(4, 야수들)).toEqual({ kind: '자리', slot: 5, target: { x: 14_500, y: 0, z: 17_600 }, relayPlaced: false })
+  })
+
+  it('먼 외야수가 아직 안 잡았으면 공가진야수 목표점과 루의 가운데 근처 — 중계 자리, +0x126 을 지운다', () => {
+    const 깊은중견 = 야수들.map((fielder) =>
+      fielder.slot === 8 ? { ...fielder, target: { x: 20_000, y: 0, z: 0 } } : fielder,
+    )
+    const 답 = 배치(8, 깊은중견)
+    expect(답.kind).toBe('자리')
+    if (답.kind !== '자리') return
+    expect(답.slot).toBe(5)
+    expect(답.relayPlaced).toBe(true)
+    // (20000, 0) ~ 2루 (20000, 19170) 의 가운데 (20000, 9585) — 가장 가까운 루(2루)에서 반경(1·2루 거리 / 2)보다 멀다
+    expect(답.target).toEqual({ x: 20_000, y: 0, z: 9_585 })
+  })
+
+  it('외야수가 이미 쥐었으면 +0x126 이 지워진 뒤엔 그 자리에 멈추고, 아니면 기본 자리다 (b2318)', () => {
+    const 쥔중견 = 야수들.map((fielder) =>
+      fielder.slot === 8 ? { ...fielder, target: { x: 20_000, y: 0, z: 0 }, holdingBall: true } : fielder,
+    )
+    expect(배치(8, 쥔중견, { relayFlag: false })).toMatchObject({ target: 쥔중견[5].position })
+    expect(배치(8, 쥔중견, { relayFlag: true })).toMatchObject({ target: { x: 14_500, y: 0, z: 17_600 } })
+  })
+
+  it('그 야수가 공을 잡을 야수(+0x170)면 건드리지 않는다 (b1f1c)', () => {
+    expect(배치(4, 야수들, { catchFielderSlot: 5 })).toEqual({ kind: '그대로' })
   })
 })

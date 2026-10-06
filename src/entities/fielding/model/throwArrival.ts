@@ -6,12 +6,15 @@ import {
   ticksToReach,
 } from '@/entities/fielding/model/fieldGeometry'
 import {
+  AI_STATE,
   fielderArrivalTicks,
   isRunnerStopped,
   NONE,
   type DefenseContext,
   type FielderState,
 } from '@/entities/fielding/model/fieldingState'
+import type { WorldPoint } from '@/entities/fielding/model/fieldGeometry'
+import { integerSquareRoot } from '@/shared/lib/math/originalTrigonometry'
 import {
   RELAY_DISTANCE,
   readyTicksOf,
@@ -115,7 +118,7 @@ export function shouldReleaseThrow(receiver: FielderState, holder: FielderState,
  * 결과 메시지 0xbba(9·13) 에서만 돈다 — 메시지 처리기 0x509a0 머리가 부르는 것은 경기 로직(vtable 0xd84cc)의
  * 빈 함수 0xae5f8 이다(S8 4-3 의 "메시지마다 0xafa60" 은 틀렸다). 그래서 **키 없는 사람 수비는 던지지 않는다**
  * (`runDefensePlay` 의 `throwMode` 주석). 이 함수는 진행기가 송구 목표로 쓰지 않는다 — 원본의 커버 배치 입력을
- * 옮겨 둔 것이다(커버 배치 갈래 0xb203a 는 아직 안 옮겼다).
+ * 옮겨 둔 것이다 — 그 루로 2루 커버/중계 야수 자리를 잡는 갈래 0xb203a 는 `secondBaseHelperPlacement`.
  */
 export function autoThrowTargetBase(context: DefenseContext): number {
   const { play, fielders, runners } = context
@@ -147,4 +150,104 @@ export function secondBaseCoverSlot(ballHeadingToFirstSide: boolean, catchFielde
   const preferred = ballHeadingToFirstSide ? 5 : 3
   if (catchFielderSlot !== preferred) return preferred
   return preferred === 5 ? 3 : 5
+}
+
+/** 0xd8764 — 2루 커버가 아닌 쪽 키스톤 야수의 기본 자리 [2루수(3), 유격수(5)] (x, z) */
+const KEYSTONE_DEFAULT_SPOTS: readonly WorldPoint[] = [
+  { x: 25_500, y: 0, z: 17_500 },
+  { x: 14_500, y: 0, z: 17_600 },
+]
+/** 0xb21a4: 가장 가까운 루를 고르는 시작값 999999 */
+const NEAREST_BASE_START = 999_999
+
+/** `secondBaseHelperPlacement` 의 답 */
+export type SecondBaseHelperPlacement =
+  /** 이 틱엔 안 건드린다 (공 잡을 야수 · AI 0xd/9 · 협살 중 · 키스톤 야수가 없음) */
+  | { readonly kind: '그대로' }
+  /** 목표점을 세우고 AI 0xa — `relayPlaced` 는 +0x126 을 지웠는가(중계 자리) */
+  | { readonly kind: '자리'; readonly slot: number; readonly target: WorldPoint; readonly relayPlaced: boolean }
+
+export interface SecondBaseHelperInput {
+  readonly context: DefenseContext
+  /** 2루 커버(+0xf0[2]) — 남은 키스톤 야수(3·5 중 다른 쪽)가 자리를 잡는다 */
+  readonly secondBaseCover: number
+  /** 공이 1루 쪽인가 — b229e 의 공.vt60 각 + 90 > 0 (`secondBaseCoverSlot` 와 같은 값) */
+  readonly ballToFirstSide: boolean
+  /** 플레이+0x126 이 아직 1 인가 — 판 시작 vt20(b11fe)이 1, 중계 자리를 잡으면(b22f6) 0 */
+  readonly relayFlag: boolean
+}
+
+/**
+ * **0xb1c90 의 커버 배치 갈래 0xb203a** — 2루 커버가 아닌 키스톤 야수(sp+0x58, 2루수 3 · 유격수 5)의 자리 잡기.
+ * 송구 호출은 없다(c8649a3). 0xb1c90(플레이 vt30)은 매 틱 돈다. 직접 뜬 것:
+ * ```
+ * b1c96  어느 야수든 AI 8(협살)이면 끝 · (+0x111 || +0x129) && 공 틱 > 담장 틱이면 끝 · state[7] == 0 이면 끝
+ * b1e2e  +0x130(공 가진 야수)이 3 이면 (커버 5, sp58 3) · 5 면 (커버 3, sp58 5) · 아니면 공 각+90 > 0 ? (5, 3) : (3, 5)
+ * b1e72  sp58 야수의 발밑 루가 2 면 둘을 바꾼다
+ * b1f1c  +0x170(잡을 야수) == sp58 이면 끝 · sp58 야수 AI ∈ {0xd, 9} 이면 끝
+ * b1f42  루 = +0x160 ≠ −1 ? +0x160 : 자동 고리(`autoThrowTargetBase`)
+ * b203a  A = 공가진야수 목표점(+0x2c) · B = 루 좌표 0xd86b0[루] · d = 거리(A, B)
+ * b20d6  외야수(칸 6~8) && d ≥ cfg+0x42(17000):
+ *   b210c  공 가진 야수가 아직 안 쥠(+0xe0 == 0) → 가운데 M = (A + B) >> 1 ;
+ *          M 에 가장 가까운 루 k(0~3, 999999 에서 작아질 때만) ; r = 거리(1루, 2루) / 2
+ *          거리(M, 루 k) < r 이면 M.x = 루k.x ± √(r² − (M.z − 루k.z)²)  (부호: k = 1 → − ; k = 2 → 공가진야수 6 이면 −,
+ *          8 이면 루 3 → − · 루 0 → 공이 1루 쪽이면 + 아니면 − · 그 밖 + ; 7 이면 + — 단 k = 2 이고 부호가 +
+ *          갈래에서 루가 2 면 M 그대로) ; +0x126 = 0 ; sp58.vt14(M) ; AI 0xa
+ *   b2318  쥐었으면 +0x126 == 0 이면 sp58.vt14(제 위치) — 그 자리에 멈춤 ; AI 0xa
+ * b232e  그 밖(내야수 · 가까움 · 쥐었고 +0x126 == 1) → 0xd8764[sp58 == 5] 자리 ; AI 0xa
+ * ```
+ * ⚠️ 웹 진행기는 커버를 판 시작에 한 번 정하므로 b1e2e·b1e72 의 매 틱 다시 고르기(공 가진 야수가 3·5 로 바뀔 때 ·
+ * 발밑 루 바꾸기)는 부르는 쪽이 넘긴 2루 커버를 그대로 쓴다.
+ */
+export function secondBaseHelperPlacement(input: SecondBaseHelperInput): SecondBaseHelperPlacement {
+  const { context, secondBaseCover } = input
+  const { play, fielders } = context
+  const stay = { kind: '그대로' } as const
+  if (fielders.some((fielder) => fielder.aiState === AI_STATE.RUNDOWN)) return stay
+  if (secondBaseCover !== 3 && secondBaseCover !== 5) return stay
+  const slot = secondBaseCover === 3 ? 5 : 3
+  const helper = fielders[slot]
+  if (helper === undefined || play.catchFielderSlot === slot) return stay
+  if (helper.aiState === AI_STATE.DIVE || helper.aiState === AI_STATE.RECEIVE) return stay
+  const holder = fielders[play.ballHolderSlot]
+  if (holder === undefined) return stay
+  const base = autoThrowTargetBase(context)
+  const defaultSpot = { kind: '자리', slot, target: KEYSTONE_DEFAULT_SPOTS[slot === 5 ? 1 : 0], relayPlaced: false } as const
+  if (base === NONE) return defaultSpot
+  const a = holder.target
+  const b = basePosition(base)
+  const outfield = isOutfieldSlot(holder.slot)
+  const far = horizontalDistance(a, b) >= RELAY_DISTANCE
+  if (!(outfield && far)) return defaultSpot
+  if (holder.holdingBall) {
+    return input.relayFlag ? defaultSpot : { kind: '자리', slot, target: helper.position, relayPlaced: false }
+  }
+  const middle = { x: (a.x + b.x) >> 1, y: (a.y + b.y) >> 1, z: (a.z + b.z) >> 1 }
+  let nearest = NONE
+  let nearestDistance = NEAREST_BASE_START
+  for (let k = 0; k <= 3; k += 1) {
+    const distance = horizontalDistance(middle, basePosition(k))
+    if (distance < nearestDistance) {
+      nearestDistance = distance
+      nearest = k
+    }
+  }
+  const radius = Math.trunc(horizontalDistance(basePosition(1), basePosition(2)) / 2)
+  if (nearestDistance >= radius) return { kind: '자리', slot, target: middle, relayPlaced: true }
+  const anchor = basePosition(nearest)
+  const dz = middle.z - anchor.z
+  const offset = integerSquareRoot(radius * radius - dz * dz)
+  let signed = offset
+  let keepMiddle = false
+  if (nearest === 1) signed = -offset
+  else if (nearest === 2) {
+    if (holder.slot === 6) {
+      signed = -offset
+      keepMiddle = base === 2
+    } else if (holder.slot === 8 && base === 3) signed = -offset
+    else if (holder.slot === 8 && base === 0) signed = input.ballToFirstSide ? offset : -offset
+    else keepMiddle = base === 2
+  }
+  const target = keepMiddle ? middle : { ...middle, x: anchor.x + signed }
+  return { kind: '자리', slot, target, relayPlaced: true }
 }
