@@ -5,6 +5,7 @@ import {
 } from '@/shared/config/helpSections'
 import { BODY_PANEL, FOOTER, HEADBAND, SCREEN } from '@/pages/help/lib/helpLayout'
 import * as styles from '@/pages/help/ui/HelpScreen.css'
+import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 
 const GAME_FRAME = './sprites/game_frame'
 const SLT_FRAME = './sprites/slt_frame'
@@ -17,6 +18,13 @@ interface HelpScreenProps {
   readonly chapter?: number
   /** 상태 10 은 `[뷰어+0x45c] = 1` 로 장 이동을 잠근다 (0x2668c) */
   readonly isChapterLocked?: boolean
+  /**
+   * 전역 G(`mgr+0x64`) — 메인 메뉴 도움말(상태 7) 그리기 0x2fc8c 끝의 머리띠 `0x54d95(skin, 0, 5)` 는 제목 0 이라
+   * G포인트(0x54a60)도 그린다(0x550dc). 넘기면 머리띠를 G 까지 그리고, 안 넘기면 예전 띠(G 없음) 그대로다.
+   * ⚠️ 경기 중 [조작방법](일시정지 그리기 0x3cdd0 의 갈래 4)은 뷰어 0x639a5 만 부르고 머리띠·바닥띠 0x54d95 를
+   *    아예 안 부른다 — 웹은 그쪽에도 예전 띠(되돌아가기 포함)를 그린다(미해결: 부르는 쪽이 여러 구역이라 안 고쳤다).
+   */
+  readonly gamePoint?: number
 }
 
 /**
@@ -34,7 +42,7 @@ interface HelpScreenProps {
  * 가운데 192 판에 기록연감 쪽 제목 줄을 썼고, 키도 웹판 나름이다
  * (원본은 좌우 키로 장을 넘긴다 — 0x637d0. 여기서는 좌우 = 쪽, 위아래 = 장).
  */
-export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false }: HelpScreenProps) {
+export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gamePoint }: HelpScreenProps) {
   const [section, setSection] = useState(chapter)
   const [page, setPage] = useState(0)
 
@@ -146,7 +154,9 @@ export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false }: Hel
         </>
       )}
 
-      <HelpBands onBack={onBack} />
+      {gamePoint === undefined
+        ? <HelpBands onBack={onBack} />
+        : <ScreenFrame title="2010프로야구" gamePoint={gamePoint} onBack={onBack} />}
     </RawScreen>
   )
 }

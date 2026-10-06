@@ -84,7 +84,8 @@ export function EntryRoutes({
   }
 
   if (screen.kind === '도움말') {
-    return <HelpScreen onBack={() => setScreen({ kind: '메인메뉴' })} />
+    // 도움말(상태 7) 그리기 0x2fc8c: 판 0x58371 · 뷰어 0x639a5 · 머리띠 0x54d95(skin, 0, 5) — 제목 0 이라 G 도 그린다
+    return <HelpScreen gamePoint={wallet.balance} onBack={() => setScreen({ kind: '메인메뉴' })} />
   }
 
   if (screen.kind === '스페셜') {

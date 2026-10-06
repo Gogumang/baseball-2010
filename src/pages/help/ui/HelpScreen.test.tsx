@@ -92,3 +92,24 @@ describe('랭킹 하위 메뉴 값 (상태 9 — 도움말이 아니다)', () =>
     expect(RANKING_MENU_ITEMS[0].description).toBe('일반모드의!N순위를 확인합니다')
   })
 })
+
+describe('머리띠 0x54d95(skin, 0, 5) — 도움말(상태 7) 그리기 0x2fc8c', () => {
+  const 그림들 = (container: HTMLElement) => [...container.querySelectorAll('img')].map((img) => img.getAttribute('src') ?? '')
+
+  it('G 를 넘기면 제목 0 "2010프로야구"(game_frame 3) + G포인트 + 되돌아가기', () => {
+    const onBack = vi.fn()
+    const { container } = 띄우기({ gamePoint: 305, onBack })
+
+    const srcs = 그림들(container)
+    expect(srcs).toContain('./sprites/game_frame/003.png')
+    expect(srcs).toContain('./sprites/gpoint/003.png')
+    expect(srcs).toContain('./sprites/gpoint/005.png')
+    fireEvent.click(칸('되돌아가기'))
+    expect(onBack).toHaveBeenCalledOnce()
+  })
+
+  it('G 를 안 넘기면 예전 띠 — G포인트가 없다', () => {
+    const { container } = 띄우기()
+    expect(그림들(container).filter((src) => src.startsWith('./sprites/gpoint/'))).toHaveLength(0)
+  })
+})
