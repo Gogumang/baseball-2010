@@ -114,6 +114,7 @@ import {
   aceLeveledAbility,
   entryBatterGameAbilities,
   entryPitcherGameAbilities,
+  entryPitcherGameAbilityParts,
   NO_ACE_BATTER,
   NO_ROSTER_SLOT,
   entryBattersOfOrder,
@@ -1461,16 +1462,27 @@ function pitcherRepertoireAt(
 /** 원본 0~999 를 타석 화면의 0~100 눈금으로 (다른 화면들이 쓰는 것과 같은 나눗셈) */
 const STAGE_PITCHER_DIVISOR = 10
 
-/** 지금 우리 타자를 상대하는 투수의 경기용 능력치 (0~100 눈금) */
+/**
+ * 지금 우리 타자를 상대하는 투수의 경기용 능력치 (0~100 눈금).
+ *
+ * 투구 AI·스윙 판정은 0~100 칸 대신 `gameAbility`·`staminaPercent` 로 원본 눈금을 다시 낸다 — 사람 타석의
+ * 0x34968·0x4dbac·0xab214(ab548·ab582)는 수비 투수를 `0xb570c(…, [sp] = 체력% 0xaebb0)` 로 불러 시즌 내 팀 보정 →
+ * **피로 0xb58e6** → 팀 능력치·코치 정액 차례로 먹인다 (45f5d4a). 체력%는 그 투수 레코드 +0x2c / 100.
+ */
 export function currentPitcherAbility(progress: TeamGameProgress): PitcherAbility {
   const teamId = progress.options.opponentTeamId
   const slot = progress.opponentPitcherIndex
   const ability = pitcherAbilitiesAt(progress, teamId, slot)
   const repertoire = pitcherRepertoireAt(progress, teamId, slot)
+  const entry = pitcherEntryAt(progress, teamId, slot)
   return {
     control: Math.round(ability[0] / STAGE_PITCHER_DIVISOR),
     velocity: Math.round(ability[1] / STAGE_PITCHER_DIVISOR),
     breaking: Math.round(ability[2] / STAGE_PITCHER_DIVISOR),
+    ...(entry === undefined
+      ? {}
+      : { gameAbility: entryPitcherGameAbilityParts(abilityContextOf(progress.options), teamId, entry) }),
+    staminaPercent: staminaPercentOf(progress.opponentStamina),
     repertoire: {
       form: repertoire.form,
       pitchMask: repertoire.pitchMask,

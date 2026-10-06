@@ -12,6 +12,7 @@ import { isInsideStrikeZone } from '@/shared/lib/geometry/coordinate'
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { Pitch, PitcherAbility } from '@/entities/pitching/model/pitch'
 import { projectToPlate } from '@/entities/pitching/model/pitchCurve'
+import { cpuPitchStatsOf } from '@/entities/pitching/model/pitcherGameStats'
 import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
@@ -89,7 +90,6 @@ export interface PitchOutcomeDetail {
 
 /** 존 좌표 1.0 이 원본 픽셀 몇 개인가 — 33px 존의 절반 (stageLayout 과 같은 값) */
 const ZONE_HALF_PIXELS = 16.5
-const PITCHER_ORIGINAL_SCALE = 10
 const SPECIAL_PITCH = 'SPECIAL'
 
 /** 판정 기준점 (표 0xcfb54) — side 0 · 1 */
@@ -188,6 +188,7 @@ export function resolvePitch(
   }
 
   const error = plateErrorOf(pitch, swing.shift)
+  const pitcherStats = cpuPitchStatsOf(context.pitcher)
   const result = swingResultOf(
     {
       horizontalError: error.horizontal,
@@ -196,10 +197,9 @@ export function resolvePitch(
       buntKind: swing.buntKind,
       controlTier: pitch.controlTier,
       batter: context.batter,
-      pitcher: {
-        control: context.pitcher.control * PITCHER_ORIGINAL_SCALE,
-        velocity: context.pitcher.velocity * PITCHER_ORIGINAL_SCALE,
-      },
+      // ab548(구속 k=1)·ab582(제구 k=0) 가 0xb570c 를 스택 인자 [sp+0xc8] = 투수 체력%로 부른다 (P7 G1) —
+      // 투구 AI 와 같은 피로·팀·코치 차례다. 원본 재료(`gameAbility`)가 없으면 옛 경계(×10, 피로 없음) 그대로
+      pitcher: { control: pitcherStats.control, velocity: pitcherStats.velocity },
       mode: context.mode,
       isBatterOwnPlayer: context.isBatterOwnPlayer,
       isPitcherOwnPlayer: context.isPitcherOwnPlayer,
@@ -208,7 +208,8 @@ export function resolvePitch(
       isOffenseHuman: true,
       isDefenseHuman: false,
       boost: context.swingBoost,
-      isPitcherExhausted: false,
+      // ab838 `[sp+0xc8] == 0` 이면 B·C 에 2000 (같은 체력% 인자)
+      isPitcherExhausted: !pitcherStats.isNotExhausted,
       batterSkillIds: context.batterSkillIds,
       pitcherSkillIds: [],
       situation: context.situation,

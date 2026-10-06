@@ -8,6 +8,7 @@ import { LoadingTip } from '@/widgets/loading-tip/ui/LoadingTip'
 import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 import { ScreenOverlay } from '@/shared/ui'
 import { pitcherAbilityOf } from '@/entities/game/model/aceOpponent'
+import { staminaPercentOf } from '@/entities/pitcher-career/model/pitcherStamina'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { useGameSettings } from '@/app/model/useGameSettings'
@@ -112,8 +113,13 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
         progress={progress}
         atBat={runner.atBat}
         // 지금 마운드의 상대 투수 — CPU 교체(0xac428)가 바꾸면 바뀐 투수가 던진다 (0xae83c).
-        // 마선수 대결의 마투수는 0xb6414 첫 단계 `v · 0xd88aa[mgr[0x13a + 순번]] / 100` 을 먹는다
-        pitcherAbility={progress.aceOpponent === null ? opponentPitcherAbilityOf(progress) : pitcherAbilityOf(progress.aceOpponent, aceLevels)}
+        // 마선수 대결의 마투수는 0xb6414 첫 단계 `v · 0xd88aa[mgr[0x13a + 순번]] / 100` 을 먹는다.
+        // 마투수도 마운드 레코드 +0x2c 로 체력% 0xaebb0 을 낸다 — 피로 0xb58e6 · 제구 등급 지친 갈래 0xb74bc
+        pitcherAbility={
+          progress.aceOpponent === null
+            ? opponentPitcherAbilityOf(progress)
+            : pitcherAbilityOf(progress.aceOpponent, aceLevels, staminaPercentOf(progress.opponentMound.stamina))
+        }
         aceLevels={aceLevels}
         isPaused={runner.isPaused || burstLines !== null}
         bannerText={runner.bannerText}

@@ -17,6 +17,8 @@
  * ```
  */
 
+import type { PitcherGameAbilityParts } from '@/entities/pitching/model/pitcherGameStats'
+
 /** 투수 칸 — 레코드 +0xc 부터 s16 네 칸 */
 export const PITCHER_SLOT = { 제구: 0, 구속: 1, 변화: 2, 체력: 3 } as const
 /** 타자 칸 */
@@ -191,12 +193,18 @@ export interface GameAbilityInput {
 }
 
 /**
- * 경기용 능력치 한 칸을 계산한다.
- *
- * 나만의리그 쪽 보정(장비·스킬·부상)은 이 함수가 건드리지 않는다 — 부르는 쪽이 이미 먹인
- * 값을 `base` 로 넘긴다. 팀 경기에는 육성 선수가 (영입하지 않는 한) 없어서 지금은 밑값 그대로다.
+ * `0xb570c` 를 피로(0xb58e6) 앞뒤로 쪼갠 한 칸 — 원본 차례는 모드 가지(시즌 질병·보직·사기) → **피로** →
+ * 팀 능력치 정액(0xb592c) → 코치(0xb5a74) → 0..999 자르기라, 투수 체력%를 먹이려면 피로를 정액 **앞에** 끼워야 한다
+ * (`entities/pitching/model/pitcherGameStats` 의 `PitcherGameAbilityParts`).
  */
-export function gameAbilityOf(input: GameAbilityInput): number {
+export interface GameAbilityParts {
+  /** 0xb58e6 에 들어가기 **전** 값 — 밑값에 시즌 내 팀 보정(0xb581a 가지)까지 먹인 값, 자르기 전 */
+  readonly beforeFatigue: number
+  /** 0xb58e6 **뒤에** 더하는 정액 — 팀 능력치(모드 1·2·8·9) + 코치(모드 2) */
+  readonly bonusAfterFatigue: number
+}
+
+export function gameAbilityPartsOf(input: GameAbilityInput): GameAbilityParts {
   const { mode, isPitcher, slot } = input
   let value = input.base
   const isSeason = mode === TEAM_GAME_MODE.시즌
@@ -217,17 +225,32 @@ export function gameAbilityOf(input: GameAbilityInput): number {
     if (value < 0) value = 0
   }
 
+  // (0xb58e6 체력% 피로 — 이 자리. 부르는 쪽이 체력%를 들고 `pitcherGameStatOf` 로 먹인다)
+  let bonus = 0
+
   // ── 팀 능력치 (모드 1·2·8·9) ──
   const teamAbilities = input.teamAbilities
   if (teamAbilities !== undefined && isTeamAbilityMode(mode)) {
-    value += teamAbilityBonusOf(teamAbilities[teamAbilitySlotFor(isPitcher, slot)] ?? 0)
+    bonus += teamAbilityBonusOf(teamAbilities[teamAbilitySlotFor(isPitcher, slot)] ?? 0)
   }
 
   // ── 코치 보너스 (모드 2). 팀 검사가 없다 — 유력 ──
   if (isSeason && season !== undefined && season.coach >= 0) {
-    value += coachBonusOf(season.coach, isPitcher, slot)
+    bonus += coachBonusOf(season.coach, isPitcher, slot)
   }
 
+  return { beforeFatigue: value, bonusAfterFatigue: bonus }
+}
+
+/**
+ * 경기용 능력치 한 칸을 계산한다 — 피로가 없는 값(체력 인자 90: 타자·야수·능력 합 0xb5b50).
+ *
+ * 나만의리그 쪽 보정(장비·스킬·부상)은 이 함수가 건드리지 않는다 — 부르는 쪽이 이미 먹인
+ * 값을 `base` 로 넘긴다. 팀 경기에는 육성 선수가 (영입하지 않는 한) 없어서 지금은 밑값 그대로다.
+ */
+export function gameAbilityOf(input: GameAbilityInput): number {
+  const parts = gameAbilityPartsOf(input)
+  const value = parts.beforeFatigue + parts.bonusAfterFatigue
   if (value < 0) return 0
   return value > ABILITY_LIMIT ? ABILITY_LIMIT : value
 }
@@ -241,4 +264,30 @@ export function gameAbilitiesOf(
 ): [number, number, number, number] {
   const at = (slot: number) => gameAbilityOf({ ...input, base: base[slot] ?? 0, slot })
   return [at(0), at(1), at(2), at(3)]
+}
+
+/**
+ * 투수 제구·구속·변화 세 칸을 피로 앞뒤로 쪼갠다 — 사람 타석 CPU 투수의 `PitcherAbility.gameAbility`
+ * (0x34968 · 0x4dbac · 0xab214 의 ab548·ab582 가 0xb570c 를 투수 체력%로 부른다).
+ */
+export function pitcherGameAbilityPartsOf(
+  base: readonly number[],
+  input: Omit<GameAbilityInput, 'base' | 'slot' | 'isPitcher'>,
+): PitcherGameAbilityParts {
+  const at = (slot: number) => gameAbilityPartsOf({ ...input, isPitcher: true, base: base[slot] ?? 0, slot })
+  const control = at(PITCHER_SLOT.제구)
+  const velocity = at(PITCHER_SLOT.구속)
+  const breaking = at(PITCHER_SLOT.변화)
+  return {
+    beforeFatigue: {
+      control: control.beforeFatigue,
+      velocity: velocity.beforeFatigue,
+      breaking: breaking.beforeFatigue,
+    },
+    bonusAfterFatigue: {
+      control: control.bonusAfterFatigue,
+      velocity: velocity.bonusAfterFatigue,
+      breaking: breaking.bonusAfterFatigue,
+    },
+  }
 }

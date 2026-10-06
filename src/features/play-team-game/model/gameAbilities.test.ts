@@ -7,6 +7,7 @@ import {
   TEAM_ABILITY_SLOT,
   coachBonusOf,
   gameAbilityOf,
+  pitcherGameAbilityPartsOf,
   hasPositionMismatch,
   isTeamAbilityMode,
   moraleFlatPenaltyOf,
@@ -187,5 +188,31 @@ describe('경기용 능력치 전체 (0xb570c 의 시즌·팀 부분)', () => {
       teamAbilities: [666, 0, 0, 0],
     })
     expect(value).toBe(ABILITY_LIMIT)
+  })
+})
+
+describe('피로(0xb58e6) 앞뒤로 쪼갠 재료 — 사람 타석 CPU 투수', () => {
+  it('시즌 내 팀 보정은 피로 앞, 팀 능력치·코치 정액은 피로 뒤에 둔다', () => {
+    // 제구 500 → 질병 −150 = 350 → 사기 30 −100 = 250 (피로 앞) · 팀 집중 500 +34 · 코치 2(제구) +10 (피로 뒤)
+    const parts = pitcherGameAbilityPartsOf([500, 600, 700, 400], {
+      mode: 2,
+      isMyTeam: true,
+      season: { illness: 2, morale: 30, coach: 2 },
+      teamAbilities: [400, 0, 500, 0],
+    })
+    expect(parts.beforeFatigue.control).toBe(250)
+    expect(parts.bonusAfterFatigue?.control).toBe(34 + 10)
+    // 구속·변화는 팀 투구 400 → +17, 코치 2 는 제구만
+    expect(parts.bonusAfterFatigue?.velocity).toBe(17)
+    expect(parts.bonusAfterFatigue?.breaking).toBe(17)
+  })
+
+  it('피로 없는(체력 인자 90) 값은 gameAbilityOf 와 같다', () => {
+    const input = { mode: 2, isMyTeam: false, season: { illness: 0, morale: 100, coach: 4 }, teamAbilities: [450, 0, 520, 0] }
+    const parts = pitcherGameAbilityPartsOf([510, 620, 330, 400], input)
+    for (const [slot, key] of [[0, 'control'], [1, 'velocity'], [2, 'breaking']] as const) {
+      const whole = gameAbilityOf({ ...input, base: [510, 620, 330][slot]!, isPitcher: true, slot })
+      expect(Math.min(ABILITY_LIMIT, parts.beforeFatigue[key] + (parts.bonusAfterFatigue?.[key] ?? 0))).toBe(whole)
+    }
   })
 })

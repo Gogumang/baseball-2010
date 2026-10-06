@@ -16,7 +16,8 @@ import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
 import { rosterPitcherRoleOf } from '@/entities/pitching/model/pitcherChange'
 import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
-import { gameAbilitiesOf } from '@/features/play-team-game/model/gameAbilities'
+import { gameAbilitiesOf, pitcherGameAbilityPartsOf } from '@/features/play-team-game/model/gameAbilities'
+import type { PitcherGameAbilityParts } from '@/entities/pitching/model/pitcherGameStats'
 import { aceLevelOf, aceLevelSlotOf, applyAceLevelRate } from '@/entities/mission/model/aceLevel'
 import type {
   FieldingAssignment,
@@ -164,11 +165,32 @@ export function stageBatterAbility(
 /** 원본 0~999 를 타석 화면의 0~100 눈금으로 (기존 화면들이 쓰는 것과 같은 나눗셈) */
 const STAGE_ABILITY_DIVISOR = 10
 
-/** 타석 화면이 보는 투수 능력치 (0~100 눈금) */
+/** 투수 한 명의 제구·구속·변화를 피로(0xb58e6) 앞뒤로 쪼갠 재료 — `pitcherGameAbilities` 와 같은 보정 */
+export function pitcherGameAbilityParts(
+  context: TeamGameAbilityContext,
+  teamId: number,
+  rosterSlot: number,
+): PitcherGameAbilityParts {
+  const roster = teamPitchers(teamId)
+  const slot = ((rosterSlot % PITCHERS_PER_TEAM) + PITCHERS_PER_TEAM) % PITCHERS_PER_TEAM
+  return pitcherGameAbilityPartsOf(roster[slot]?.ability ?? [0, 0, 0, 0], {
+    mode: context.mode,
+    isMyTeam: context.seasonTeamId === teamId,
+    teamAbilities: teamAbilitiesOf(context, teamId),
+    season: context.season,
+  })
+}
+
+/**
+ * 타석 화면이 보는 투수 능력치 (0~100 눈금) — 투구 AI 는 그 대신 `gameAbility`(0xb570c 의 피로 앞 값 ·
+ * 피로 뒤 팀·코치 정액)와 `staminaPercent`(0xaebb0) 로 원본 눈금 값을 다시 낸다 (`cpuPitchStatsOf`).
+ * 체력%를 안 넘기면 지치지 않은 것으로 본다.
+ */
 export function stagePitcherAbility(
   context: TeamGameAbilityContext,
   teamId: number,
   rosterSlot: number,
+  staminaPercent?: number,
 ): PitcherAbility {
   const ability = pitcherGameAbilities(context, teamId, rosterSlot)
   const repertoire = rosterRepertoireOf(teamId, rosterSlot)
@@ -176,6 +198,8 @@ export function stagePitcherAbility(
     control: Math.round(ability[0] / STAGE_ABILITY_DIVISOR),
     velocity: Math.round(ability[1] / STAGE_ABILITY_DIVISOR),
     breaking: Math.round(ability[2] / STAGE_ABILITY_DIVISOR),
+    gameAbility: pitcherGameAbilityParts(context, teamId, rosterSlot),
+    ...(staminaPercent === undefined ? {} : { staminaPercent }),
     repertoire: {
       form: repertoire.form,
       pitchMask: repertoire.pitchMask,
@@ -499,6 +523,20 @@ export function withAcePitcher(
   if (seated !== undefined) out.push(seated)
   out[PITCHER_ENTRY_ACE_SLOT] = inserted
   return out
+}
+
+/** 투수 명단 한 칸을 피로 앞뒤로 쪼갠 재료 — `entryPitcherGameAbilities` 와 같은 보정 (마선수는 레벨 배율 먼저) */
+export function entryPitcherGameAbilityParts(
+  context: TeamGameAbilityContext,
+  teamId: number,
+  entry: TeamEntryPitcher,
+): PitcherGameAbilityParts {
+  return pitcherGameAbilityPartsOf(aceLeveledAbility(entry.ability, '투수', entry.aceIndex, context.aceLevels), {
+    mode: context.mode,
+    isMyTeam: context.seasonTeamId === teamId,
+    teamAbilities: teamAbilitiesOf(context, teamId),
+    season: context.season,
+  })
 }
 
 /** 투수 명단 한 칸의 경기용 능력치 — `pitcherGameAbilities` 와 같은 보정을 명단 쪽으로 돌린 것 */

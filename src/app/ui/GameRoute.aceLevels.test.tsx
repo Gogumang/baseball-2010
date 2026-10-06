@@ -19,6 +19,7 @@ vi.mock('@/pages/game/ui/GameScreen', () => ({
 }))
 
 const { GameRoute } = await import('@/app/ui/GameRoute')
+const { staminaPercentOf } = await import('@/entities/pitcher-career/model/pitcherStamina')
 
 afterEach(() => {
   cleanup()
@@ -58,10 +59,12 @@ const 띄우기 = (aceLevels?: Readonly<Record<number, number>>) => {
 
 describe('나만의리그 마선수 대결 — 전역 마선수 레벨 (mgr[0x13a..0x143])', () => {
   it('상대 마투수 능력치에 0xb6414 배율 0xd88aa[레벨] 을 먹인다 — 레오니 Lv1 60%', () => {
-    expect(띄우기({}).pitcherAbility).toEqual(pitcherAbilityOf(레오니, {}))
+    // 마투수도 지금 마운드 +0x2c 의 체력% 0xaebb0 을 싣는다 — 투구 AI 의 피로 0xb58e6 · 지친 제구 등급 0xb74bc
+    const 체력 = staminaPercentOf(startGame(createSeededRandom(20100901)).opponentMound.stamina)
+    expect(띄우기({}).pitcherAbility).toEqual(pitcherAbilityOf(레오니, {}, 체력))
     expect(띄우기({}).pitcherAbility).toMatchObject({ control: 35, velocity: 51, breaking: 35 })
     // Lv5(칸 1 = 4) 는 100% — 날 값
-    expect(띄우기({ 1: 4 }).pitcherAbility).toEqual(pitcherAbilityOf(레오니))
+    expect(띄우기({ 1: 4 }).pitcherAbility).toEqual(pitcherAbilityOf(레오니, undefined, 체력))
   })
 
   it('레벨 칸을 타석 화면까지 넘긴다 — 마구 횟수 0xd8509[레벨] (0xaebe4) 이 본다', () => {

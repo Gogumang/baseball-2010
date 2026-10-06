@@ -281,6 +281,19 @@ describe('경기용 능력치가 화면까지 이어진다', () => {
     expect(ourPitcherStats(progress).stamina).toBeGreaterThan(0)
   })
 
+  it('상대 투수는 투구 AI 재료를 싣는다 — 피로 뒤 정액(팀 능력치·코치)과 지금 체력% (0xb570c · 0xaebb0)', () => {
+    const { progress } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT, season: { illness: 0, morale: 100, coach: 2 } })
+    const 능력 = currentPitcherAbility({ ...progress, opponentStamina: 1_999 })
+    expect(능력.staminaPercent).toBe(19)
+    // 코치 2(제구 +10)는 팀 검사가 없어 상대 투수에게도 붙는다 (J 4-2) — 피로 뒤에 더한다
+    const 코치없음 = currentPitcherAbility({
+      ...progress,
+      options: { ...progress.options, season: { illness: 0, morale: 100, coach: -1 } },
+    })
+    expect(능력.gameAbility?.beforeFatigue).toEqual(코치없음.gameAbility?.beforeFatigue)
+    expect((능력.gameAbility?.bonusAfterFatigue?.control ?? 0) - (코치없음.gameAbility?.bonusAfterFatigue?.control ?? 0)).toBe(10)
+  })
+
   it('팀 사기가 낮으면 능력치가 정액으로 깎인다 (시즌 전용)', () => {
     const 좋음 = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT, season: { illness: 0, morale: 100, coach: -1 } })
     const 나쁨 = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT, season: { illness: 0, morale: 5, coach: -1 } })

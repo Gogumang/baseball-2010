@@ -1,6 +1,9 @@
 import { derbyAcePitcherOf, pitcherAbilityOf } from '@/entities/game/model/aceOpponent'
 import type { AcePlayer } from '@/shared/config/original/acePlayers'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
+
+/** `0xaebb0` 의 모드 7 갈래 — 홈런더비 투수 체력%는 늘 100 */
+const HOME_RUN_DERBY_STAMINA_PERCENT = 100
 import { DERBY_MAGIC_PITCH_TYPE, DERBY_ORDINARY_PITCH_TYPE } from '@/entities/home-run-derby/model/derbyRules'
 
 /**
@@ -61,5 +64,6 @@ export function derbyPitcherOf(stage: number, aceLevels?: Readonly<Record<number
   const pitchType = stage > 0 ? DERBY_MAGIC_PITCH_TYPE : DERBY_ORDINARY_PITCH_TYPE
   const ace = derbyAcePitcherOf(stage)
   if (ace === null) return { stage, ace: null, ability: ORDINARY_DERBY_PITCHER, pitchType }
-  return { stage, ace, ability: pitcherAbilityOf(ace, aceLevels), pitchType }
+  // 홈런더비(모드 7)는 0xaebb0 이 늘 100 — 피로(0xb58e6, 55 이상 그대로)도 지친 제구 등급도 없다
+  return { stage, ace, ability: pitcherAbilityOf(ace, aceLevels, HOME_RUN_DERBY_STAMINA_PERCENT), pitchType }
 }

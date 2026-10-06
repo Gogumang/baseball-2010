@@ -822,6 +822,7 @@ const STAGE_PITCHER_DIVISOR = 10
  * P1 E-6)을 본다 — 공이 나갈 때(0x3de10 의 0x3de38·0xa5e14 의 0xa5e2a)도 같은 함수다. 그 칸은 CPU 교체
  * `0xac428`(사람 타석 시작 0x3da3e·간이 엔진 0xc1ce2)이 바꾸므로 교체 뒤에는 바뀐 투수가 던진다.
  * 모드 4 는 팀 능력치 보정(마스크 0x306)이 없어 로스터 밑값 그대로다 (`opponentDefenseAbilitiesOf` 와 같다).
+ * 투구 AI 는 `gameAbility`(피로 앞 밑값)와 `staminaPercent`(지금 마운드 +0x2c / 100)로 피로를 먹인다 (`cpuPitchStatsOf`).
  * 폼·구질·마구는 같은 레코드의 +0xb · +0x1c · +0x18 (`ROSTER_PITCHER_REPERTOIRES`, 전역 번호 팀 × 8 + 칸).
  *
  * ⚠️ 마선수 등판(`aceOpponent`)은 부르는 쪽이 `pitcherAbilityOf` 로 따로 고른다 — 정규 리그 경기엔 없다.
@@ -835,6 +836,12 @@ export function opponentPitcherAbilityOf(progress: GameProgress): PitcherAbility
     control: Math.round(pitcher.ability[0] / STAGE_PITCHER_DIVISOR),
     velocity: Math.round(pitcher.ability[1] / STAGE_PITCHER_DIVISOR),
     breaking: Math.round(pitcher.ability[2] / STAGE_PITCHER_DIVISOR),
+    // 투구 AI·스윙 판정(0x34968·0x4dbac·0xab214 의 ab548·ab582)은 0xb570c 를 투수 체력% 0xaebb0 로 부른다 — 모드 4 는
+    // 모드 가지(0xb574a 나리 질병·부상·사기)가 내 팀 육성 선수에만 붙고 팀·코치 정액이 없어, 피로 앞 값이 로스터 밑값이다
+    gameAbility: {
+      beforeFatigue: { control: pitcher.ability[0], velocity: pitcher.ability[1], breaking: pitcher.ability[2] },
+    },
+    staminaPercent: staminaPercentOf(progress.opponentMound.stamina),
     ...(repertoire === undefined
       ? {}
       : { repertoire: { form: repertoire.form, pitchMask: repertoire.pitchMask, magicId: repertoire.magicId } }),

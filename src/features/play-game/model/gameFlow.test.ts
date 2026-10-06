@@ -892,6 +892,17 @@ describe('내 타석의 상대 투수 — 지금 마운드 투수의 능력치 (
     expect(바뀜.repertoire?.pitchMask).toBe(ROSTER_PITCHER_REPERTOIRES[3 * 8 + 다른칸].pitchMask)
     expect(바뀜.control).toBe(Math.round(teamPitchers(3)[다른칸].ability[0] / 10))
   })
+
+  it('투구 AI 재료 — 피로 앞 값은 로스터 밑값(모드 4 는 정액 없음), 체력%는 마운드 +0x2c / 100 (0xaebb0)', () => {
+    const progress = startGame(createSeededRandom(1), 0, 9, 3)
+    const 지침 = { ...progress, opponentMound: { ...progress.opponentMound, stamina: 4_321 } }
+    const 능력 = opponentPitcherAbilityOf(지침)
+    const 투수 = teamPitchers(3)[progress.opponentMound.pitcherSlot]
+    expect(능력.gameAbility).toEqual({
+      beforeFatigue: { control: 투수.ability[0], velocity: 투수.ability[1], breaking: 투수.ability[2] },
+    })
+    expect(능력.staminaPercent).toBe(43)
+  })
 })
 
 describe('사구 — 사람 타석 결과 4 (0x35a20 → 0x9d57c) 를 경기에 먹인다', () => {
