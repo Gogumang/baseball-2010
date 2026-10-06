@@ -20,6 +20,11 @@ interface DerbyHudProps {
   readonly isEventZoneShown: boolean
   /** 깜빡임용 갱신 횟수 */
   readonly tick: number
+  /**
+   * 콤보 표시(장면 +0x1b60)가 켜져 있으면 그 값(+0x84), 아니면 null — `useHomeRunDerby` 의 `shownCombo`.
+   * 원본 `0x4585c` 는 +0x1b60 이 켜졌을 때만 그리고, 숫자는 늘 +0x84 를 읽는다. 지금 콤보(+0x39)는 안 본다.
+   */
+  readonly shownCombo?: number | null
 }
 
 const comboFrameSrc = `${COMBO_LABEL.folder}/${String(COMBO_LABEL.frame).padStart(3, '0')}.png`
@@ -31,7 +36,7 @@ const comboFrameSrc = `${COMBO_LABEL.folder}/${String(COMBO_LABEL.frame).padStar
  *
  * 좌표는 원본에서 못 읽어 `derbyHudLayout` 에 내가 정한 값으로 적어 두었다.
  */
-export function DerbyHud({ run, bestDistance, aceName, isEventZoneShown, tick }: DerbyHudProps) {
+export function DerbyHud({ run, bestDistance, aceName, isEventZoneShown, tick, shownCombo = null }: DerbyHudProps) {
   const ballNumber = derbyBallNumberOf(run)
   const ballCount = derbyBallCountOf(run)
   const isOverBest = run.totalDistance > bestDistance
@@ -88,8 +93,9 @@ export function DerbyHud({ run, bestDistance, aceName, isEventZoneShown, tick }:
         boxHeight={DISTANCE_ROWS.glyphHeight}
       />
 
-      {/* 콤보 — ui/combo.pzx 의 "Combo" 글자 (원본 좌표 미확인) */}
-      {run.combo > 0 && (
+      {/* 콤보 — ui/combo.pzx 의 "Combo" 글자 (원본 좌표 미확인).
+          ⚠️ 원본 0x4585c 는 combo.pzx 애니(장면 +0x19e8)를 끝 칸까지 돌린 뒤 숫자 +0x84 를 그린다 — 웹은 처음부터 글자·숫자를 같이 둔다 */}
+      {shownCombo !== null && shownCombo > 0 && (
         <>
           <img
             className={styles.sprite}
@@ -98,7 +104,7 @@ export function DerbyHud({ run, bestDistance, aceName, isEventZoneShown, tick }:
             alt="Combo"
           />
           <SpriteNumber
-            glyphs={numberGlyphsOf(run.combo)}
+            glyphs={numberGlyphsOf(shownCombo)}
             right={COMBO_ROW.x + COMBO_LABEL.width + 18}
             boxTop={COMBO_ROW.y}
             boxHeight={COMBO_LABEL.height}

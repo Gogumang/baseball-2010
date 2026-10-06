@@ -196,6 +196,7 @@ export function HomeRunDerbyScreen({
           aceName={ace?.name ?? null}
           isEventZoneShown={session.isEventZoneShown}
           tick={tick}
+          shownCombo={session.shownCombo}
         />
 
         <div className={styles.overlay}>

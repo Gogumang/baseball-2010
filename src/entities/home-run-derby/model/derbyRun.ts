@@ -23,6 +23,7 @@ import {
  * | isBonusGame | +0x3e |
  * | bonusGamePoint | +0x40 |
  * | pitchesThrown | +0x68 |
+ * | comboDisplay | +0x84 |
  *
  * (+0x3b "이번 공 홈런" 과 +0x3f "이번 공 이벤트 존" 은 공 하나가 끝나면 바로 지워지는 임시 칸이라
  *  여기 들고 있지 않고 `applyDerbyPitch` 의 인자로 받는다.)
@@ -38,6 +39,13 @@ export interface DerbyRun {
   readonly isBonusGame: boolean
   readonly bonusGamePoint: number
   readonly pitchesThrown: number
+  /**
+   * **콤보 표시값 +0x84** — 콤보를 올릴 때만 그 값을 쓴다(0xae46c `strb 콤보, [+0x84]`).
+   * 마지막 공에서 콤보(+0x39)를 0 으로 지워도(ae470) 이 칸은 **안 지운다**. 지우는 곳은 둘뿐이다:
+   * 경기 시작 상태 9 `0x39868`(+0x84 · 장면 +0x1b60 · +0x19ec = 0)과 표시가 끝날 때 `0x45a12`(→ `endComboDisplay`).
+   * 읽는 곳도 둘뿐이다: 다음 공 준비(상태 0xf) `0x3d954` 의 `0x3dbf8`(> 0 이면 표시 시작)과 HUD 콤보 그리기 `0x4585c`.
+   */
+  readonly comboDisplay: number
   /** 경기 상태 0x1a(결과 화면)로 넘어갔는가 */
   readonly isFinished: boolean
 }
@@ -65,6 +73,8 @@ export function createDerbyRun(): DerbyRun {
     isBonusGame: false,
     bonusGamePoint: 0,
     pitchesThrown: 0,
+    // 초기화 0xb6814 는 +0x84 를 안 건드리고, 경기 시작 상태 9 의 0x39868 이 0 으로 지운다
+    comboDisplay: 0,
     isFinished: false,
   }
 }
@@ -108,6 +118,8 @@ export function applyDerbyPitch(run: DerbyRun, outcome: DerbyPitchOutcome): Derb
   const maxCombo = isComboLinked ? Math.max(run.maxCombo, raisedCombo) : run.maxCombo
   let bonusGamePoint = run.bonusGamePoint + (isComboLinked ? raisedCombo * COMBO_BONUS_UNIT : 0)
   const combo = run.wasPreviousHomeRun && !(hasMoreChances && outcome.isHomeRun) ? 0 : raisedCombo
+  // 콤보 표시값 +0x84 는 올린 콤보로만 쓴다(ae46c) — 바로 뒤 ae470 이 콤보를 지워도 남는다
+  const comboDisplay = isComboLinked ? raisedCombo : run.comboDisplay
 
   // 5. 이벤트 존은 같은 처리 끝에서 더한다 (0xae548)
   if (outcome.isEventZoneHit) bonusGamePoint += EVENT_ZONE_BONUS
@@ -117,6 +129,7 @@ export function applyDerbyPitch(run: DerbyRun, outcome: DerbyPitchOutcome): Derb
     lastDistance: outcome.distance,
     maxCombo,
     bonusGamePoint,
+    comboDisplay,
   }
 
   // 2. 아직 기회가 남았다 — 다음 공
@@ -147,6 +160,25 @@ export function applyDerbyPitch(run: DerbyRun, outcome: DerbyPitchOutcome): Derb
 
   // 4. 끝
   return { ...run, ...common, combo, wasPreviousHomeRun: outcome.isHomeRun, isFinished: true }
+}
+
+/**
+ * HUD 콤보 표시가 도는 갱신 수 — `0x4585c` 끝(0x45a00~0x45a18)이 장면 +0x19ec 를 그릴 때마다 1 올리고
+ * `> 20` 이 되면 표시(+0x1b60)와 +0x84 를 지운다. 상태 0xf 진입(0x3dc04)에서 +0x19ec = 0 이므로 **21 번** 그린다.
+ */
+export const COMBO_DISPLAY_FRAMES = 21
+
+/**
+ * 다음 공 준비(상태 0xf, `0x3d954`)에서 콤보를 띄울지 — `0x3dbf8` `(s8)[+0x84] > 0` 이면 +0x1b60 = 1 · +0x19ec = 0.
+ * 판이 끝나(상태 0x1a) 상태 0xf 를 다시 안 지나면 마지막 공의 +0x84 는 남기만 하고 안 그려진다.
+ */
+export function shouldShowComboAtNextPitch(run: DerbyRun): boolean {
+  return !run.isFinished && run.comboDisplay > 0
+}
+
+/** 콤보 표시가 끝났다 — `0x45a12` `strb 0, [+0x84]` */
+export function endComboDisplay(run: DerbyRun): DerbyRun {
+  return run.comboDisplay === 0 ? run : { ...run, comboDisplay: 0 }
 }
 
 /**

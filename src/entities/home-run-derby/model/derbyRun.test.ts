@@ -5,6 +5,8 @@ import {
   derbyBallCountOf,
   derbyBallNumberOf,
   derbyResultOf,
+  endComboDisplay,
+  shouldShowComboAtNextPitch,
 } from '@/entities/home-run-derby/model/derbyRun'
 import type { DerbyPitchOutcome, DerbyRun } from '@/entities/home-run-derby/model/derbyRun'
 
@@ -83,6 +85,42 @@ describe('콤보 — 직전 공과 이번 공이 모두 홈런일 때만 오른�
     const 첫공 = applyDerbyPitch(보너스, 홈런(90))
     expect(첫공.combo).toBe(0)
     expect(첫공.bonusGamePoint).toBe(15)
+  })
+})
+
+describe('콤보 표시값 +0x84 — 올릴 때만 쓰고(ae46c), 콤보를 지워도 남는다', () => {
+  it('처음은 0 이다 (상태 9 의 0x39868)', () => {
+    expect(createDerbyRun().comboDisplay).toBe(0)
+  })
+
+  it('콤보를 올리면 그 값을 쓴다', () => {
+    const run = 여러번(createDerbyRun(), [홈런(90), 홈런(90), 홈런(90)])
+    expect(run.combo).toBe(2)
+    expect(run.comboDisplay).toBe(2)
+    expect(shouldShowComboAtNextPitch(run)).toBe(true)
+  })
+
+  it('콤보가 끊겨도 표시값은 안 지운다 — 지우는 것은 표시 끝(0x45a12)뿐이다', () => {
+    const run = 여러번(createDerbyRun(), [홈런(90), 홈런(90), 헛스윙])
+    expect(run.combo).toBe(0)
+    expect(run.comboDisplay).toBe(1)
+    expect(endComboDisplay(run).comboDisplay).toBe(0)
+  })
+
+  it('마지막 정규 공 홈런 — 콤보(+0x39)는 0 이 되지만 +0x84 는 올린 값이 남아 보너스 첫 공 준비에서 뜬다', () => {
+    const run = 여러번(createDerbyRun(), [...Array.from({ length: 8 }, () => 헛스윙), 홈런(90), 홈런(90)])
+    expect(run.isBonusGame).toBe(true)
+    expect(run.combo).toBe(0)
+    expect(run.comboDisplay).toBe(1)
+    expect(shouldShowComboAtNextPitch(run)).toBe(true)
+  })
+
+  it('판이 끝나면(상태 0x1a) 상태 0xf 를 다시 안 지나 남은 +0x84 는 안 그린다', () => {
+    const 열구 = [...Array.from({ length: 8 }, () => 헛스윙), 홈런(90), 홈런(90)]
+    const 보너스 = 여러번(createDerbyRun(), 열구)
+    const 끝 = 여러번(endComboDisplay(보너스), [홈런(90)])
+    expect(끝.isFinished).toBe(true)
+    expect(shouldShowComboAtNextPitch(끝)).toBe(false)
   })
 })
 
