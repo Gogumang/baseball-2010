@@ -46,7 +46,8 @@ export interface BigHitInput {
 
 /**
  * 감상 플래그 `+0x199a` (0x392ac 전문) — 세 조건이 다 맞을 때만 켜진다.
- * 같은 판정이 타구음 7 · "!" 효과도 고르지만 그쪽은 이 화면에 아직 없다.
+ * 같은 판정이 타구음 7(`features/play-at-bat/model/atBatSounds` 의 `isBigHit`)과 "!" 효과도 고른다 —
+ * 타구음은 그쪽이 고르고, 투수 머리 위 "!"(player_effect 애니 13, 0x3912c)는 이 화면에 아직 없다.
  *
  * 웹의 `fenceTick` 은 담장을 **넘어간** 공에도 서므로 원본의 "담장/폴 미접촉" 과 극성이 다르다.
  * 원본이 실제로 보는 칸은 폴 틱 `+0xab0` 하나뿐이라(R15 9-1) 여기서도 `poleTick` 만 본다.

@@ -164,7 +164,8 @@ interface BattingStageProps {
   /**
    * **공이 나는 동안(상태 0x11)인가** 를 밖에서 물을 수 있게 이 칸에 묻는 함수를 넣어 준다. 원본 도루 키(0x53610 →
    * 메시지 0x583)는 상태 0x11 에서만 받는다 — 타석 화면 밖 키 처리(`GameScreen` 등)가 이 함수로 거른다.
-   * 스윙·번트 키와 같은 판정(`isFlying` — 릴리스 뒤 · 스윙 전)이다. 화면이 내려가면 null 로 되돌린다.
+   * 스윙·번트 키와 같은 판정(`isFlying` — '투구중' 단계이고 공 프레임 ≥ 0 = 릴리스 뒤. 스윙·번트가 판정되면 단계가
+   * 넘어가 거짓이 된다)이다. 화면이 내려가면 null 로 되돌린다.
    */
   readonly flightProbeRef?: { current: (() => boolean) | null }
   /**
@@ -241,8 +242,9 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
     // 필살 성공(0x34c74 → 0x517e6)은 판정이 방향·패턴 뒤에 굴려 실어 준다 — 헛스윙이면 굴리지 않는다
     const isUncatchable = resolved.isUncatchable
     // 필살 연출 파티클은 **성공 여부와 무관**하게 `S+0x10` 이 켜져 있으면 나간다 (0x49aec).
-    // ⚠️ 원본은 상태 0x13 그리기에서 한 번(경기+0x196b) 쏘는데, 웹은 그 자리를 따로 두지 않아
-    //    스윙이 판정되는 이 시점에 쏜다 — **때는 근사**고 고르는 번호만 원본 그대로다.
+    // ⚠️ 원본은 상태 0x13 그리기에서 한 번(경기+0x196b) 쏜다. 웹도 이제 상태 0x13('타격' 단계)을 두지만
+    //    파티클은 여전히 스윙이 판정되는 이 시점(헛스윙 포함)에 쏜다 — 0x13 은 맞은 공만 거치므로 헛스윙에서도
+    //    나가는지는 미확인이다. **때는 근사**고 고르는 번호만 원본 그대로다.
     if (swing?.isSpecial === true) {
       // 한 줄이 파티클을 두 개까지 쏜다 — 원본 0x49dbc·0x49de0 의 차례 그대로다
       const specials = specialSwingParticlesOf(specialSwingNumber, latest.batterForm, aceBatterIndex)

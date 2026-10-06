@@ -93,8 +93,8 @@ export interface SceneryState {
    * 0x77494(하늘+구장+바닥+0x84490) 로 가고, 그 밖에는 0x78578(하늘+0x77974+바닥+0x78490) 로 간다.
    * 그래서 이 칸이 비어 있으면 아래쪽 일반 경기 길(0x77974, fence.pzf 한 벌)로 그린다.
    *
-   * ⚠️ 아직 **부르는 쪽이 안 배선했다** — 시즌 경기를 여는 `app/ui/SeasonRoute.tsx` 가
-   *    `record.stadiumEquipped` 를 `TeamGameScreen → BattingStage` 로 내려 줘야 한다.
+   * 시즌 경기는 `app/ui/SeasonRoute.tsx` 가 `seasonStadiumOf(record)` 를 `TeamGameScreen → BattingStage` 로 내려 준다
+   * (홈경기·대전일 때만 — 0x40ff0 의 갈림).
    */
   readonly seasonStadium?: SeasonStadium
   /**
