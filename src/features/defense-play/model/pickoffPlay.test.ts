@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { basePosition } from '@/entities/fielding/model/fieldGeometry'
 import { EMPTY_BASES } from '@/entities/game/model/baseState'
 import {
@@ -95,5 +96,25 @@ describe('견제 한 판 — 종류 4 (0xb28be · 0xb47da · 0xb4292)', () => {
     const result = runPickoffPlay({ targetBase: 3, bases: 만루, outs: 0 })
     expect(isPickoffPlayResult(result)).toBe(true)
     expect(isPickoffPlayResult(null)).toBe(false)
+  })
+})
+
+describe('견제사 뒤 결과 메시지 0xbba → 0xafa60 한 번 (0x51d40~0x51db4)', () => {
+  it('받은 야수는 쥐기 0xb2710(P, f, 1)의 준비 틱이 남아 있어 견제사 뒤에도 이어 던지지 않는다', () => {
+    let 견제사 = 0
+    for (const targetBase of [1, 2, 3] as const) {
+      for (let seed = 0; seed < 300; seed += 1) {
+        const result = runPickoffPlay({
+          targetBase,
+          bases: 만루,
+          outs: seed % 3,
+          runAbility: [300, 500, 700, 900][seed % 4],
+          random: createSeededRandom(seed),
+        })
+        if (result.resultCode === PICKOFF_RESULT.OUT) 견제사 += 1
+        expect(result.log.some((line) => line.includes('0xbba'))).toBe(false)
+      }
+    }
+    expect(견제사).toBeGreaterThan(0)
   })
 })

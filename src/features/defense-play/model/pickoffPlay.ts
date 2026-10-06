@@ -26,6 +26,8 @@ import { judgeOut, OUT_KIND, releaseForcesAfterOut } from '@/entities/fielding/m
 import { startPickoff } from '@/entities/fielding/model/pickoff'
 import { applyRunnerLead, runnerLeadOf } from '@/entities/fielding/model/runnerLead'
 import { defenseArrivalTicks } from '@/entities/fielding/model/throwArrival'
+import { readyTicksOf } from '@/entities/fielding/model/throwPlan'
+import { chooseThrowTargetBase } from '@/entities/fielding/model/throwTargetBase'
 import { EMPTY_BASES, type BaseState } from '@/entities/game/model/baseState'
 import type { ManualAutoMode } from '@/entities/settings/model/gameSettings'
 import { viewStateOf, type ActionMemory, type DefensePlayView } from '@/features/defense-play/model/defensePlayView'
@@ -56,7 +58,7 @@ import { runnerFateOf } from '@/features/defense-play/model/runnerFates'
  *
  * ## 난수 — 이 판이 굴리는 것
  * 판이 열릴 때 주자마다 리드 덧틱 `rand(0,100)` 한 번(0x3d7b8, 목록 차례) → **악송구 굴림 한 번**(`rand(0,10000)`),
- * 악송구면 두 번 더(속도·방향) — 0xa1828 그대로. 그 밖은 없다.
+ * 악송구면 넷 더(수평·수직 속도 · 방향 크기 · 부호, `errantThrowFlight`) — 0xa1828 그대로. 그 밖은 없다.
  *
  * ## 근사·미해결 (지어내지 않은 자리)
  * - ⚠️ **송구 시각**: 원본은 0xb2c90 이 "커버의 목표 루가 대상 루면" 곧바로 던지고 공은 궤적 물리
@@ -70,8 +72,8 @@ import { runnerFateOf } from '@/features/defense-play/model/runnerFates'
  * - ⚠️ **레이저 굴림(0x66a8c)을 안 굴린다**: 창 0xb2648 이 보는 포구 틱(P+0x174)을 견제 시작이
  *   세우지 않아 그 값이 무엇인지 문서에 없다. 굴림 차례를 지어 넣지 않는다 — **미해결**.
  * - 메시지 처리기 0x509a0 앞머리는 CPU 송구 결정이 아니라 경기 로직의 빈 함수 0xae5f8 을 부른다(S8 4-3 정정,
- *   `runDefensePlay` 의 `throwMode` 주석). ⚠️ 견제 아웃(결과 13) 뒤 결과 메시지 0xbba 가 부르는 0xafa60 한 번은
- *   이 판이 포구 틱에 끝나서 안 옮겼다.
+ *   `runDefensePlay` 의 `throwMode` 주석). 견제 아웃(결과 13) 뒤 결과 메시지 0xbba 의 0xafa60 한 번은 옮겼다 —
+ *   받은 야수의 준비 틱이 남아 실제로는 던지지 않는다(아래 루프의 0xbba 절).
  * - **사람 조작**: 견제 중 사람 키(송구 0x588)는 받지 않는다. 공은 처음부터 대상 루로 가고 있고 포구 틱에
  *   판정이 끝나므로(결과 9) 바꿀 것이 없어서, 이 판은 **미리 끝까지 돌려** 재생만 한다.
  */
@@ -176,6 +178,8 @@ export function runPickoffPlay(input: PickoffPlayInput): PickoffPlayResult {
   /** 공이 받는 쪽 손에 들어갔는가(악송구면 공이 루에 닿은 틱) */
   let caught = false
   let catchTick = -1
+  /** 이번 틱에 0xb36d0 이 아웃을 냈나 — 결과 코드 13 → 결과 메시지 0xbba */
+  let outJudgedThisTick = false
 
   const runnerStates = () => runners.map((runner) => runner.state)
   const contextAt = (tick: number): DefenseContext => ({
@@ -197,6 +201,7 @@ export function runPickoffPlay(input: PickoffPlayInput): PickoffPlayResult {
     victim.state = { ...victim.state, isOut: true, settled: true }
     outs += 1
     outsAdded += 1
+    outJudgedThisTick = true
     tagOut = judged.kind === OUT_KIND.TAG
     resultCode = PICKOFF_RESULT.OUT
     log.push(`${tick}틱 ${victim.state.index}번 주자 견제사 (0xb36d0 결과 ${judged.kind})`)
@@ -207,6 +212,13 @@ export function runPickoffPlay(input: PickoffPlayInput): PickoffPlayResult {
   }
 
   for (let tick = 0; tick <= MAXIMUM_TICKS && !play.finished; tick += 1) {
+    outJudgedThisTick = false
+    // ── 야수 틱 0xa1284 — 공 쥔 야수의 준비 틱 +0xc8 −= 1 (공용 갱신 0x3f060 이 슬롯 2 보다 먼저, 타구 진행기 0' 절) ──
+    fielders = fielders.map((fielder) =>
+      fielder.holdingBall && fielder.actionRemainingTicks > 0
+        ? { ...fielder, actionRemainingTicks: fielder.actionRemainingTicks - 1 }
+        : fielder,
+    )
     // ── 3. AI 상태 0xe — 0xb2c90 이 대상 루 커버에게 던진다 (첫 틱) ──
     if (tick === 0) {
       const coverSlot = play.coverOfBase[targetBase] ?? NONE
@@ -222,7 +234,11 @@ export function runPickoffPlay(input: PickoffPlayInput): PickoffPlayResult {
       }
       throwArrivalTick = tick + Math.max(1, arrival)
       receiverSlot = errantThrow ? NONE : coverSlot
-      play = { ...play, wantsThrow: true }
+      // 던지면 공이 손을 떠난다 — b2f80 투수+0xe0 = 0 · b3070 +0x12c = 0 (날아가는 동안 투수는 태그 못 한다)
+      fielders = fielders.map((fielder) =>
+        fielder.slot === PITCHER_SLOT ? { ...fielder, holdingBall: false } : fielder,
+      )
+      play = { ...play, held: false }
       log.push(
         `${tick}틱 ${targetBase}루 견제 송구 — ${throwArrivalTick}틱 도착` + (errantThrow ? ' (악송구)' : ''),
       )
@@ -235,20 +251,20 @@ export function runPickoffPlay(input: PickoffPlayInput): PickoffPlayResult {
     if (!caught && throwArrivalTick >= 0 && tick >= throwArrivalTick) {
       if (receiverSlot === NONE) {
         caught = true
-        play = { ...play, wantsThrow: false }
         log.push(`${tick}틱 악송구 — 받은 야수가 없다 (근사)`)
       } else if (isSamePoint(fielders[receiverSlot].position, basePosition(targetBase))) {
         caught = true
         catchTick = tick
-        play = { ...play, wantsThrow: false }
+        // 송구 받기 = 포구 틱 갈래 b42c8 의 쥐기 0xb2710(P, f, 1) — +0x128 = 1 · 준비 틱(+0xc8, 내야 3)
+        const receiver = receiverSlot
         fielders = fielders.map((fielder) =>
-          fielder.slot === receiverSlot
-            ? { ...fielder, holdingBall: true }
+          fielder.slot === receiver
+            ? { ...fielder, holdingBall: true, actionRemainingTicks: readyTicksOf(receiver) }
             : fielder.holdingBall
               ? { ...fielder, holdingBall: false }
               : fielder,
         )
-        play = { ...play, ballHolderSlot: receiverSlot, held: true }
+        play = { ...play, ballHolderSlot: receiver, catchFielderSlot: receiver, held: true, wantsThrow: true }
         runOutJudgement(tick)
         // 0xb4292 — 받은 야수가 선 루(vt0x58: 좌표 완전일치)에 마지막으로 닿은 산 주자가 제 목표점에 있으면 9
         const onBase = runners.find(
@@ -327,6 +343,22 @@ export function runPickoffPlay(input: PickoffPlayInput): PickoffPlayResult {
 
     // ── 틱 갱신 뒤 아웃 판정 (0xb43da) ──
     runOutJudgement(tick)
+
+    // ── 결과 메시지 0xbba — 견제사(결과 13) 뒤 0x51d40 이 `아웃 ≤ 2` 면 +0x128 = 1 · 0xafa60 한 번 (사람·CPU 모두) ──
+    // 0xafa60 은 공 쥔 야수가 준비(+0xc8 ≤ 0)돼야 고른다. 견제사는 송구를 받는 틱(쥐기가 준비 틱 3 을 막 넣은 틱)이나
+    // 돌아오는 주자가 닿는 한두 틱 뒤에 나서 준비가 안 끝나 있다 — 견제 3000판에서 한 번도 고르지 않는다.
+    // ⚠️ 받은 야수가 준비된 뒤 아웃이 나 점수식이 루를 고르면 원본은 던진다 — 그 송구(특수 굴림 · 0xb2c90 · 악송구 굴림)는
+    //    이 진행기에 송구를 한 번 더 다루는 길이 없어 **안 옮겼다**(기록만 남긴다). CPU 매 틱 0xafa60(슬롯 2, `0xae6c8`)도
+    //    이 판은 수비 CPU·송구 설정을 받지 않아 안 돈다(미해결 — 부르는 쪽이 넘길 칸).
+    if (outJudgedThisTick && outs <= 2 && !play.finished) {
+      play = { ...play, wantsThrow: true }
+      const holder = fielders[play.ballHolderSlot]
+      if (play.held && holder !== undefined && holder.holdingBall && holder.actionRemainingTicks <= 0) {
+        const active = runners.filter((runner) => !runner.state.isOut && !runner.state.scored).length
+        const base = chooseThrowTargetBase({ ...contextAt(tick), activeRunnerCount: active, outs })
+        if (base !== NONE) log.push(`${tick}틱 0xbba → 0xafa60 이 ${base}루를 골랐다 — 이어 던지기는 안 옮겼다`)
+      }
+    }
 
     // ── 끝났나 — 결과 코드가 섰거나, 송구가 끝났고 뛰는 주자가 없다 ──
     const stillActive = runners.some(
