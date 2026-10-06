@@ -166,6 +166,8 @@ export function App() {
     onGamePointReward: careerSession.actions.gainGamePoint,
     // 환경설정 "송구" (설정 +0xf4) — 투수편 미션은 사람이 늘 수비라 그대로 먹는다 (0xae6c8)
     throwModeManual: gameSettings.settings.throwMode === '수동',
+    // 환경설정 진동 (저장 +0x3b) — 투수 미션·투수편 마선수 대결의 사람 공 삼진 진동(0x4d0d6)이 본다
+    isVibrationOn: gameSettings.settings.isVibrationOn,
     aceLevels: aceLevels.levels,
     // 투수 미션(모드 5)은 0x213c0 이 5→3 으로 나리 투수편 저장을 올리고 0x1fbd0 이 그 투수(또는 명예 투수)를 준다.
     // 투수편 세션은 시작할 때 저장을 올려 두므로 `career` 가 곧 저장된 투수다 (`modePitcherOf`)

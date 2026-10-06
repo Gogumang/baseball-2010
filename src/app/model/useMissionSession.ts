@@ -87,6 +87,8 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { MissionClearCounts, MissionRecordPort } from '@/shared/api/save/missionRecordPort'
 import { missionRewardOf } from '@/entities/mission/model/missionReward'
 import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
+import { vibrate } from '@/entities/defense-controls/model/vibration'
+import { strikeoutVibrationMillisecondsOf } from '@/features/play-game/model/strikeoutVibration'
 
 interface MissionSessionInput {
   readonly runner: AtBatRunner
@@ -128,6 +130,11 @@ interface MissionSessionInput {
    * 안 넘기면 늘 나리 선수다.
    */
   readonly hallOfFame?: Collection
+  /**
+   * 환경설정 진동(저장 +0x3b) — 거짓이면 0x3a44 가 안 울린다. 안 넘기면 켬 (`BattingStage` · `usePitcherGame` 과 같다).
+   * 투수 미션(모드 5)의 사람 공 삼진 진동(상태 0x12 그리기 0x4ce9c 의 0x4d0d6)이 본다.
+   */
+  readonly isVibrationOn?: boolean
 }
 
 /**
@@ -305,6 +312,7 @@ export function useMissionSession({
   pitcher: pitcherInput,
   batterSkillIds: nariBatterSkillIds = NO_SKILLS,
   hallOfFame,
+  isVibrationOn,
 }: MissionSessionInput) {
   const nariPitcher = useMemo(() => pitcherInput ?? modePitcherOf(null), [pitcherInput])
   /**
@@ -717,6 +725,8 @@ export function useMissionSession({
     if (thrown.specialSwingRemaining !== null) setOpponentSpecialSwingStored(thrown.specialSwingRemaining)
 
     let nextRun = recordPitch(pitcherRun, grade === MAX_GAUGE_GRADE)
+    // 이 공 **전** 스트라이크 — 0x9d57c 의 st[4] (삼진 진동이 본다)
+    const strikesBefore = runner.atBatRef.current.strikes
     const nextAtBat = runner.applyPitch(resolution)
     runner.setBannerText(describePitchResolution(resolution))
     const outcome = isAtBatFinished(nextAtBat) ? nextAtBat.outcome : null
@@ -741,6 +751,11 @@ export function useMissionSession({
     // 투구 순간 소리 (0x3f378 — 투수 단계가 공을 놓는 칸에 닿을 때). 이어서 심판 콜.
     // ⚠️ **근사**: 웹은 던지는 순간에 결과가 다 나오므로 투구음과 심판 콜이 붙어 버린다.
     //    통로가 하나라 뒤 소리가 앞 소리를 끊는다 (원본은 공이 날아가는 동안이 사이에 있다).
+    // 삼진 진동 100ms — 미션(모드 5)도 경기 장면 0x104 라 못 맞힌 공은 0x11 → 0x12 를 지나고, 그 그리기 0x4ce9c 는
+    // 모드를 가리지 않는다(0x52fb6 표 0xd05a0[0x12]). 0x12 진입 3dfac 이 0x9d57c 로 state[0xc] = 5(삼진) 를 쓰면
+    // 첫 그리기(경기+0x2c == 0)의 4d0ba → 4d0d6 0x3a44(100, 100) (`strikeoutVibration`). 난수 없음.
+    // ⚠️ 근사(때): 웹은 던지는 순간 판정이 나오므로 심판 콜과 같은 자리에서 울린다 (투수편 `usePitcherGame` 과 같다)
+    vibrate(strikeoutVibrationMillisecondsOf(resolution, strikesBefore), isVibrationOn !== false)
     playSoundIds(audio, [
       // 0x3f378 3f46a — 구질 22 면 28. 미션 투수는 육성·명예 투수(비트7)라 0xb633d 가 거짓이어서
       // 공+0x10 갈래(3f488)는 안 탄다 → 투수 +0x18 을 0 으로 넘긴다 (b008959)
