@@ -17,6 +17,12 @@ export interface RosterPlayer {
    * 투수 명단에는 없다.
    */
   readonly position?: number
+  /**
+   * 레코드 +0x1b (u8) — 트레이드가 두 선수를 견주는 칸 (XlsBATTER_DATA·XlsPITCHER_DATA 행 바이트 27).
+   * CPU 트레이드 요청 0x93c8 은 내 선수 값 ≥ 상대 값일 때만 요청을 세우고, 진행 0xcf24 는 차이 × 10 으로
+   * 성공률을 깎고 성공하면 소지금(SR+2)에 더한다. 칸의 뜻(등급·몸값)은 미확정이다.
+   */
+  readonly grade: number
 }
 
 // JSON 은 네 칸 튜플을 나타내지 못해 한 번 더 단언한다

@@ -37,6 +37,12 @@ ABILITY_COUNT = 4
 POSITION_OFFSET = 28
 POSITION_MASK = 0xF
 
+# 선수 레코드 +0x1b (u8) — 트레이드가 두 선수를 견주는 칸 (뜻 미확정, 아래 셋이 읽는다. 직접 떴다).
+#   0x93c8  CPU 트레이드 요청: 내 선수 +0x1b ≥ 상대 선수 +0x1b 여야 요청이 선다 (0x94b6 · 0x94ca)
+#   0xcf24  트레이드 진행: d = (내 − 상대) × 10 (음수면 ×2) — 성공률 깎기 · 성공하면 SR+2 소지금 += d
+# 런타임 팀 레코드의 선수는 Xls 행 0x30 바이트를 그대로 복사한 것이다 (S6 3-1) — 행 바이트 27 이 곧 +0x1b.
+GRADE_OFFSET = 0x1B
+
 # StrCOMMON 안의 구간. 인덱스를 직접 확인해 정리한 것이다.
 COMMON_TEAM_RANGE = (0, 15)
 COMMON_ACE_PITCHER_RANGE = (15, 20)
@@ -115,6 +121,11 @@ def position_of(row_hex: str) -> int:
     """타자 레코드의 수비 위치 코드 (0xb1048 과 같은 식)."""
     row = bytes.fromhex(row_hex)
     return int.from_bytes(row[POSITION_OFFSET:POSITION_OFFSET + 4], 'little') & POSITION_MASK
+
+
+def grade_of(row_hex: str) -> int:
+    """선수 레코드 +0x1b 바이트 (트레이드가 견주는 칸 — 0x93c8 · 0xcf24)."""
+    return bytes.fromhex(row_hex)[GRADE_OFFSET]
 
 
 def quote(text: str) -> str:
@@ -359,7 +370,7 @@ def generate_roster() -> None:
         for index, (name, row) in enumerate(zip(data['names'], data['rows'])):
             if not name.strip():
                 continue
-            player = {'id': index, 'name': name, 'ability': abilities_of(row)}
+            player = {'id': index, 'name': name, 'ability': abilities_of(row), 'grade': grade_of(row)}
             # 수비 위치는 타자 표에만 있다. 투수 표의 같은 칸(+0x1c)은 다른 뜻이라 넣지 않는다.
             if label == 'batters':
                 player['position'] = position_of(row)
@@ -383,6 +394,12 @@ def generate_roster() -> None:
         '   * 투수 명단에는 없다.\n'
         '   */\n'
         '  readonly position?: number\n'
+        '  /**\n'
+        '   * 레코드 +0x1b (u8) — 트레이드가 두 선수를 견주는 칸 (XlsBATTER_DATA·XlsPITCHER_DATA 행 바이트 27).\n'
+        '   * CPU 트레이드 요청 0x93c8 은 내 선수 값 ≥ 상대 값일 때만 요청을 세우고, 진행 0xcf24 는 차이 × 10 으로\n'
+        '   * 성공률을 깎고 성공하면 소지금(SR+2)에 더한다. 칸의 뜻(등급·몸값)은 미확정이다.\n'
+        '   */\n'
+        '  readonly grade: number\n'
         '}\n'
         '\n'
         '// JSON 은 네 칸 튜플을 나타내지 못해 한 번 더 단언한다\n'
