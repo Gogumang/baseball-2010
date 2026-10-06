@@ -207,6 +207,8 @@ export function MissionPlayScreen({
           gameMode={MISSION_BATTER_MODE}
           // 환경설정 전광판(저장 +0x3a) — OFF 면 흐르는 글자를 안 그린다 (0x77726)
           isScoreboardOn={settings?.isScoreboardOn}
+          // 환경설정 진동(저장 +0x3b) — 맞은 공·사구 진동 (0x3a44)
+          isVibrationOn={settings?.isVibrationOn}
           pitcherAbility={pitcherAbility}
           isEagleEyeEnabled={false}
           // 시작 상황을 원본 HUD 에 보인다. 미션 팀 로고는 레코드에 없어 기본 두 팀을 쓴다 (추정)

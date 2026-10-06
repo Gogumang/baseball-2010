@@ -215,6 +215,8 @@ export function GameScreen({
           gameMode={BATTER_CAREER_MODE}
           // 환경설정 전광판(저장 +0x3a) — OFF 면 흐르는 글자를 안 그린다 (0x77726)
           isScoreboardOn={settings?.isScoreboardOn}
+          // 환경설정 진동(저장 +0x3b) — 맞은 공·사구 진동 (0x3a44)
+          isVibrationOn={settings?.isVibrationOn}
           // 타자 폼 = 원본 rec[0xb] 윗니블 `2 × 타입 + 손` (C 5절 0x16f9a) — 장타형이면 sluger 몸통이 나온다
           batterForm={career.battingTypeIndex * 2 + career.battingSide}
           // 고른 피부(0 황인 · 1 백인 · 2 흑인)와 장비를 타석 그림에 입힌다 —

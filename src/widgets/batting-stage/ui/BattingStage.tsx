@@ -15,6 +15,8 @@ import {
   specialSwingParticlesOf,
 } from '@/widgets/batting-stage/lib/hitParticles'
 import { ballPixelAt } from '@/widgets/batting-stage/lib/trajectory'
+import { pitchVibrationMillisecondsOf } from '@/widgets/batting-stage/lib/pitchVibration'
+import { vibrate } from '@/entities/defense-controls/model/vibration'
 import { batterSideOfForm, stageLayoutOf } from '@/widgets/batting-stage/lib/stageLayout'
 import type { SwingMode } from '@/entities/batting/model/swingResult'
 import type { BatterAbility } from '@/entities/batting/model/batter'
@@ -94,6 +96,11 @@ interface BattingStageProps {
    * 그리지 않는다 — 0x77494 의 0x77726 이 `0x1f1d9() + 0x3a ≠ 0` 을 본다 (R2 6절). 안 넘기면 켠 것으로 본다.
    */
   readonly isScoreboardOn?: boolean
+  /**
+   * **환경설정 "진동"** = 저장 +0x3b (`GameSettings.isVibrationOn`). 게임 쪽 진동 0x3a44 가 이 칸이 켜졌을 때만 울린다 —
+   * 맞은 공(0xbc5, 100/200/300ms)·사구(200ms). 안 넘기면 켠 것으로 본다(원본 기본값 켬).
+   */
+  readonly isVibrationOn?: boolean
   /**
    * **마선수 레벨 열 칸** = 원본 전역 기록 `mgr[0x13a..0x143]` (칸 0~4 마투수 · 5~9 마타자 → 레벨 0~4).
    * `entities/mission/model/useAceLevels` 의 `levels` 를 그대로 넘긴다. 상대가 마투수면 경기 첫 마구 상태를
@@ -225,6 +232,8 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
       specialSwing: { number: specialSwingNumber, isAceBatter: aceBatterIndex >= 0 },
     }
     const resolved = resolvePitch(pitch, swing, context, deck, latest.random)
+    // 진동 — 맞은 공은 0xbc5 → 0x5228c 의 100/200/300ms, 사구는 0x51b0e 의 200ms. 환경설정 진동(+0x3b)이 켜졌을 때만
+    vibrate(pitchVibrationMillisecondsOf(resolved.detail, swing?.frame ?? null, pitch), latest.isVibrationOn !== false)
     // 구질 번호(game+0xfc8)를 실어 보낸다 — 받는 쪽이 0xa5e14 처럼 상대 투수 투구 수·스태미나를 깎는다
     const pitchTypeNumber = pitchTypeNumberRef.current
     const result =

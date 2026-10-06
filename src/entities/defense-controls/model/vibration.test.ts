@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  vibrate,
   vibrationGradeOf,
   vibrationMillisecondsOf,
   VIBRATION_MILLISECONDS_BY_GRADE,
@@ -32,5 +33,24 @@ describe('스윙 타이밍 → 진동 길이 — 원본 0xac758 · 0x5228c', () 
     for (let t = 0; t <= 100; t += 1) {
       expect(vibrationGradeOf(t), `타이밍 ${t}`).not.toBe(1)
     }
+  })
+})
+
+describe('게임 쪽 진동 0x3a44 — 환경설정 진동이 켜졌을 때만', () => {
+  it('켜졌으면 그 길이로 울린다', () => {
+    const 울림: number[] = []
+    vibrate(300, true, (ms) => 울림.push(ms))
+    expect(울림).toEqual([300])
+  })
+
+  it('꺼졌거나 길이가 0 이면 안 울린다', () => {
+    const 울림: number[] = []
+    vibrate(300, false, (ms) => 울림.push(ms))
+    vibrate(0, true, (ms) => 울림.push(ms))
+    expect(울림).toEqual([])
+  })
+
+  it('진동을 지원하지 않는 곳(null)에서는 아무 일도 없다', () => {
+    expect(() => vibrate(200, true, null)).not.toThrow()
   })
 })
