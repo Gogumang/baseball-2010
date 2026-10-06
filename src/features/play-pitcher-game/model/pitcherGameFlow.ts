@@ -25,7 +25,7 @@ import {
   startingMoundOf,
 } from '@/entities/game/model/simulateHalfInning'
 import type { HalfInningDefense, HalfInningMound } from '@/entities/game/model/simulateHalfInning'
-import { rosterPitcherRoleOf } from '@/entities/pitching/model/pitcherChange'
+import { pitcherAbilitySumOf, rosterPitcherRoleOf } from '@/entities/pitching/model/pitcherChange'
 import { advanceRunners, runnerCountOf } from '@/entities/game/model/baseState'
 import {
   recordLineupPlay,
@@ -2222,8 +2222,23 @@ function quickDefenseOf(
     isOwnPlayerAt: (slot) => isOurs && slot === MY_PITCHER_SLOT,
     // 0xb6dec 보직 — 로스터 칸 0~3 선발 · 4~6 중간 · 7 마무리. 내 투수(칸 8)는 표 밖이라 0xabfcc 목록에 안 든다
     roleAt: (slot) => (isOurs && slot === MY_PITCHER_SLOT ? undefined : rosterPitcherRoleOf(slot)),
+    // 마무리 갈래(ac0be)의 정렬 열쇠 0xb5b50 = 0xb570c(팀, k, P, 1, 90, 1) 네 칸 합. 모드 3 은 팀 능력치(0x306)·코치
+    // 정액이 없고 0xb574a 가지는 내 육성 선수(0xb6388)에만 붙는다 — 로스터 투수는 밑값을 0..999 로 자른 합.
+    // 내 투수는 0xabfcc 가 모드 3 에서 거르므로(내선수거름) 그 칸 값은 쓰이지 않는다 — 실효 능력치 네 칸 합을 둔다
+    abilitySumAt: (slot) =>
+      isOurs && slot === MY_PITCHER_SLOT
+        ? pitcherAbilitySumOf([
+            options.stats.control,
+            options.stats.velocity,
+            options.stats.breaking,
+            options.staminaAbility,
+          ])
+        : pitcherAbilitySumOf(roster[slot % roster.length].ability.map(clampAbility)),
   }
 }
+
+/** 0xb5b06 — 경기용 능력치를 0..999 로 자른다 */
+const clampAbility = (value: number) => Math.min(999, Math.max(0, value))
 
 function ourQuickDefenseOf(progress: PitcherGameProgress): HalfInningDefense {
   return quickDefenseOf(progress, true)

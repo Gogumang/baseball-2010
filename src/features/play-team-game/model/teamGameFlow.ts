@@ -84,6 +84,7 @@ import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
 import {
   EMPTY_MOUND_COUNTERS,
   judgePitcherChange,
+  pitcherAbilitySumOf,
   replacementPitcherSlotOf,
 } from '@/entities/pitching/model/pitcherChange'
 import type { MoundPitcherCounters } from '@/entities/pitching/model/pitcherChange'
@@ -2984,6 +2985,15 @@ function judgeAutoPitcherChange(
       benchIsSpecialPitcherAt: (index) => (entries[index]?.aceIndex ?? -1) >= 0,
       // 0xabfcc 의 보직 목록 (0xb6dec)
       benchRoleOf: (index) => entries[index]?.role,
+      // 마무리 갈래(ac0be)의 정렬 열쇠 0xb5b50 = 경기용 능력치(체력 인자 90) 네 칸 합 — 시즌 내 팀 보정·팀 능력치·코치까지
+      benchAbilitySumOf: (index) =>
+        pitcherAbilitySumOf(
+          pitcherAbilitiesAt(
+            progress,
+            defendingIsOurs ? progress.options.ourTeamId : progress.options.opponentTeamId,
+            index,
+          ),
+        ),
     },
     random,
   )
@@ -3026,6 +3036,8 @@ export interface ReplacementPickInput {
   readonly benchIsSpecialPitcherAt?: (index: number) => boolean
   /** 벤치 투수 칸의 보직 `+0xb & 3` — 안 넘기면(또는 모르면) 0xabfcc 가 스태미나 최고 근사로 고른다 */
   readonly benchRoleOf?: (index: number) => PitcherRole | undefined
+  /** 벤치 투수 칸의 능력 합 `0xb5b50` — 마무리 갈래(ac0be) 정렬 열쇠. 안 넘기면 그 갈래는 스태미나 순 근사 */
+  readonly benchAbilitySumOf?: (index: number) => number
 }
 
 /**
@@ -3047,6 +3059,7 @@ export function replacementPitcherIndexOf(
       ...(input.benchStaminaOf === undefined ? {} : { stamina: input.benchStaminaOf(index) }),
       ...(input.benchIsSpecialPitcherAt?.(index) === true ? { isSpecialPitcher: true } : {}),
       ...(input.benchRoleOf === undefined ? {} : { role: input.benchRoleOf(index) }),
+      ...(input.benchAbilitySumOf === undefined ? {} : { abilitySum: input.benchAbilitySumOf(index) }),
     })),
     {
       saveSituation: input.saveSituation,

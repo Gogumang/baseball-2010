@@ -649,6 +649,23 @@ describe('새 투수 고르기 방향 (0xac5d8, V3-E 정정)', () => {
     currentStamina: 5_000,
   } as const
 
+  it('마무리 후보가 여럿이면 능력 합 0xb5b50 큰 순 (ac0be) — benchAbilitySumOf 를 후보에 싣는다', () => {
+    const 마무리둘 = {
+      ...상황,
+      saveSituation: true,
+      benchRoleOf: (index: number) => (index === 5 || index === 7 ? (2 as const) : (0 as const)),
+    }
+    // 합을 안 주면 스태미나 순 근사 — 같은 스태미나면 벤치 차례 앞
+    expect(replacementPitcherIndexOf(벤치, 마무리둘, createSeededRandom(1))).toBe(5)
+    expect(
+      replacementPitcherIndexOf(
+        벤치,
+        { ...마무리둘, benchAbilitySumOf: (index: number) => (index === 7 ? 2_400 : 2_000) },
+        createSeededRandom(1),
+      ),
+    ).toBe(7)
+  })
+
   it('마무리 상황이면 굴리지 않고 0xabfcc 로 간다 — 벤치 마지막이 아니다', () => {
     // 굴림 칸 1(9회)은 45% 라 씨앗을 여럿 훑어도 **한 번도** 벤치 마지막이 나오면 안 된다
     for (let seed = 1; seed <= 40; seed += 1) {

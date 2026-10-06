@@ -99,7 +99,7 @@ import {
 } from '@/features/play-game/model/gameDecisions'
 import type { MoundBySide, PitcherOfRecordNames } from '@/features/play-game/model/gameDecisions'
 import { rollHalfInningFielders } from '@/features/play-game/model/halfInningBoard'
-import { rosterPitcherRoleOf } from '@/entities/pitching/model/pitcherChange'
+import { pitcherAbilitySumOf, rosterPitcherRoleOf } from '@/entities/pitching/model/pitcherChange'
 import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
 import {
@@ -1228,8 +1228,14 @@ function quickDefenseOf(teamId: number, mound: HalfInningMound, lead: number): H
     lead,
     bothTeamsAreCpu: false,
     roleAt: rosterPitcherRoleOf,
+    // 마무리 갈래(ac0be)의 정렬 열쇠 0xb5b50 = 0xb570c(팀, k, P, 1, 90, 1) 네 칸 합. 모드 4 는 0xb574a 가지가 내 육성
+    // 선수(0xb6388)에만 붙고 팀 능력치(0x306)·코치(모드 2) 정액이 없어 로스터 밑값을 0..999 로 자른 합이다
+    abilitySumAt: (slot) => pitcherAbilitySumOf(roster[slot % roster.length].ability.map(clampAbility)),
   }
 }
+
+/** 0xb5b06 — 경기용 능력치를 0..999 로 자른다 */
+const clampAbility = (value: number) => Math.min(999, Math.max(0, value))
 
 /** 우리가 공격 중일 때 상대 팀 수비 — 리드는 상대 점수 − 우리 점수 */
 function opponentQuickDefenseOf(progress: GameProgress): HalfInningDefense {
