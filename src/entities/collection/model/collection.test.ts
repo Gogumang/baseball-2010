@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  deleteHallOfFame,
+  hallOfFameRecordIdOf,
   EMPTY_COLLECTION,
   HALL_OF_FAME_COST,
   HALL_OF_FAME_MAX_BATTERS,
@@ -164,5 +166,26 @@ describe('명예의 전당 — 등록 0x62cea (K 4-2 · Q2 4절)', () => {
     const loaded = normalizeCollection({ titles: [], skills: [], endings: [], hallOfFame: [famer, famer] })
     expect(loaded.hallOfFame.map((entry) => entry.slot)).toEqual([0, 1])
     expect(loaded.hallOfFamePitchers).toEqual([])
+  })
+})
+
+describe('명예의 전당 칸 삭제 — 0x22371 · 0x22339 (R11 3-2)', () => {
+  const famer = (slot: number) => ({
+    name: `타자${slot}`, ability: { hit: 1, power: 2, defense: 3, run: 4 }, endingIndex: 6, season: 13, titleIds: [], slot,
+  })
+
+  it('그 칸만 빈 칸이 되고 다른 칸 번호는 그대로다 — 없는 칸이면 같은 객체', () => {
+    const collection = { ...EMPTY_COLLECTION, hallOfFame: [famer(0), famer(2)] }
+
+    const next = deleteHallOfFame(collection, '타자', 0)
+
+    expect(next.hallOfFame.map((entry) => entry.slot)).toEqual([2])
+    expect(deleteHallOfFame(collection, '타자', 1)).toBe(collection)
+    expect(deleteHallOfFame(collection, '투수', 0)).toBe(collection)
+  })
+
+  it('기록 번호는 등록이 덮어쓴 칸 + 0xb4(투수) / + 0xc8(타자)', () => {
+    expect(hallOfFameRecordIdOf('투수', 1)).toBe(0xb5)
+    expect(hallOfFameRecordIdOf('타자', 3)).toBe(0xcb)
   })
 })

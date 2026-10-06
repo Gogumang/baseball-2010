@@ -7,11 +7,14 @@ import {
   hasRecruitedHallOfFamePlayer,
   insertBatter,
   insertPitcher,
+  isHallOfFameDeleteBlocked,
+  isHallOfFameRecord,
   isPitcherRecord,
   playerKindOf,
   recruitPlayer,
   recruitSourceOf,
   recruitsPitcher,
+  removeHallOfFamerFromRoster,
   slotOf,
   withSlot,
 } from '@/entities/season-mode/model/playerRecruit'
@@ -165,5 +168,52 @@ describe('중복 검사 — StrMODE[181] "이미 영입된 선수 입니다"', (
     expect(hasRecruitedHallOfFamePlayer(roster.batters, 명예타자.id)).toBe(false)
     const 뒤 = recruitPlayer(roster, 명예타자, false, 2).roster
     expect(hasRecruitedHallOfFamePlayer(뒤.batters, 명예타자.id)).toBe(true)
+  })
+})
+
+describe('명전 칸 삭제의 시즌 명단 정리 — 0x221dc · 0xb6348', () => {
+  const 명전투수 = (slot: number): SeasonPlayer => ({ id: 0xb4, kindByte: PLAYER_KIND.일반투수 | slot, fieldPosition: 0, stamina: 10_000 })
+  const 명전타자 = (slot: number, position: number): SeasonPlayer =>
+    ({ id: 0xc9, kindByte: PLAYER_KIND.일반타자 | slot, fieldPosition: position, stamina: 0 })
+
+  it('0xb6348 — 마선수 비트가 아니고 투수 id 0xb4..0xcc · 타자 id 0xc8..0xd0', () => {
+    expect(isHallOfFameRecord(명전투수(0))).toBe(true)
+    expect(isHallOfFameRecord({ ...명전투수(0), id: 0xb3 })).toBe(false)
+    expect(isHallOfFameRecord(명전타자(0, 3))).toBe(true)
+    expect(isHallOfFameRecord({ ...명전타자(0, 3), id: 0xd1 })).toBe(false)
+    expect(isHallOfFameRecord({ ...명전타자(0, 3), kindByte: PLAYER_KIND.마타자 })).toBe(false)
+  })
+
+  it('타자: 맨 끝 선수가 지운 자리로 와서 그 수비 위치·칸 번호를 이어받고 명단이 한 칸 준다', () => {
+    const roster: SeasonTeamRoster = { pitchers: [], batters: [타자(1, 0, 2), 명전타자(1, 6), 타자(3, 2, 7), 타자(4, 3, 0)] }
+
+    const next = removeHallOfFamerFromRoster(roster, 0xc9, false)
+
+    expect(next.batters.map((player) => player.id)).toEqual([1, 4, 3])
+    expect(next.batters[1].fieldPosition).toBe(6)
+    expect(slotOf(next.batters[1])).toBe(1)
+  })
+
+  it('투수: 맨 끝 선수가 옮겨 오고 칸 번호는 고치지 않는다 (원본 그대로)', () => {
+    const roster: SeasonTeamRoster = { pitchers: [명전투수(0), 투수(2, 1), 투수(3, 2)], batters: [] }
+
+    const next = removeHallOfFamerFromRoster(roster, 0xb4, true)
+
+    expect(next.pitchers.map((player) => player.id)).toEqual([3, 2])
+    expect(slotOf(next.pitchers[0])).toBe(2)
+  })
+
+  it('맨 끝이 그 선수면 그냥 빠지고, 없으면 같은 객체', () => {
+    const roster: SeasonTeamRoster = { pitchers: [투수(2, 0), 명전투수(1)], batters: [] }
+    expect(removeHallOfFamerFromRoster(roster, 0xb4, true).pitchers.map((player) => player.id)).toEqual([2])
+    expect(removeHallOfFamerFromRoster(roster, 0xb5, true)).toBe(roster)
+  })
+
+  it('막기 — 내 팀에 있고 시즌모드 경기 진행 중일 때만 (0xb50ad && 전역기록 +0x4e)', () => {
+    const roster: SeasonTeamRoster = { pitchers: [명전투수(0)], batters: [] }
+    expect(isHallOfFameDeleteBlocked(roster, 0xb4, true, true)).toBe(true)
+    expect(isHallOfFameDeleteBlocked(roster, 0xb4, true, false)).toBe(false)
+    expect(isHallOfFameDeleteBlocked(roster, 0xb5, true, true)).toBe(false)
+    expect(isHallOfFameDeleteBlocked(null, 0xb4, true, true)).toBe(false)
   })
 })

@@ -11,7 +11,9 @@ import { createLocalStorageSaveGame } from '@/shared/api/save/localStorageSaveGa
 import { createLocalStorageMissionRecord } from '@/shared/api/save/localStorageMissionRecord'
 import { createLocalStorageJsonStore } from '@/shared/api/save/localStorageJsonStore'
 import { nariBatterOf, nariPitcherOf, useCollection } from '@/app/model/useCollection'
-import { EMPTY_COLLECTION } from '@/entities/collection/model/collection'
+import { EMPTY_COLLECTION, hallOfFameRecordIdOf } from '@/entities/collection/model/collection'
+import { isHallOfFameDeleteBlocked } from '@/entities/season-mode/model/playerRecruit'
+import type { HallOfFameDeletion } from '@/pages/special/ui/SpecialScreen'
 import type { Collection } from '@/entities/collection/model/collection'
 import { GAME_POINT_USAGE } from '@/entities/collection/model/annalsStats'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
@@ -223,6 +225,18 @@ export function App() {
   const openedHiddenIds = collection.collection.openedHiddenIds
   useEffect(() => syncOpenedHidden(openedHiddenIds), [syncOpenedHidden, openedHiddenIds])
 
+  // 스페셜 명예의 전당 "슬롯에서 삭제" (0x2ac00 · 0x62994) — 시즌 명단 정리 0x221dc 와 칸 비우기를 한 번에
+  const seasonRoster = seasonSession.state === null ? null : seasonSession.roster
+  const hallOfFameDeletion: HallOfFameDeletion = {
+    // ⚠️ 전역기록 +0x4e(시즌모드 경기가 중간 저장된 상태)는 웹에 없다 — 웹 시즌 경기는 중간 저장이 없어 늘 0 이라 막히지 않는다
+    isBlocked: (side, slot) =>
+      isHallOfFameDeleteBlocked(seasonRoster, hallOfFameRecordIdOf(side, slot), side === '투수', false),
+    onDelete: (side, slot) => {
+      seasonSession.actions.removeHallOfFamer(hallOfFameRecordIdOf(side, slot), side === '투수')
+      collection.deleteHallOfFamer(side, slot)
+    },
+  }
+
   // 마선수 오픈(0xa3e2 · 0xa3f6)·레벨업(0x5fbee · 0x5fc0a) — 모자람 판정은 화면이 이미 했다.
   // `spend` 의 자르기 [0, 99999] 가 원본 clamp 와 같다. 일반모드(상태 21)·스페셜(상태 28)이 같이 쓴다
   const aceSelect = {
@@ -366,7 +380,13 @@ export function App() {
   }
 
   if (ENTRY_SCREENS.includes(screen.kind) || careerSession.career === null) {
-    return <EntryRoutes screen={screen} setScreen={setScreen} session={careerSession} gameSettings={gameSettings} collection={collection.collection} random={random} wallet={wallet} aceSelect={aceSelect} />
+    return (
+      <EntryRoutes
+        screen={screen} setScreen={setScreen} session={careerSession} gameSettings={gameSettings}
+        collection={collection.collection} random={random} wallet={wallet} aceSelect={aceSelect}
+        hallOfFameDeletion={hallOfFameDeletion}
+      />
+    )
   }
 
   return (

@@ -63,7 +63,7 @@ import {
   unrotatedPitchersOf,
 } from '@/entities/season-mode/model/seasonEntry'
 import type { SeasonEntryInput, SeasonEntryLists } from '@/entities/season-mode/model/seasonEntry'
-import { HALL_OF_FAME_FIRST_ID } from '@/entities/season-mode/model/playerRecruit'
+import { HALL_OF_FAME_FIRST_ID, removeHallOfFamerFromRoster } from '@/entities/season-mode/model/playerRecruit'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
 import { KOREA_TEAM_ID, createNationalCup, nationalCupSideOf } from '@/entities/national-cup/model/nationalCup'
@@ -211,6 +211,11 @@ export interface SeasonActions {
   readonly goto: (scene: SeasonSceneState) => void
   readonly updateRecord: (record: SeasonRecord) => void
   readonly updateRoster: (roster: SeasonTeamRoster) => void
+  /**
+   * 명전 칸을 지웠다 — 시즌 저장이 있으면 내 팀 명단에서 그 명전 선수(기록 번호 `id`)를 빼고 저장한다 (`0x221dc`,
+   * `removeHallOfFamerFromRoster`). 시즌 저장이 없으면 아무것도 안 한다.
+   */
+  readonly removeHallOfFamer: (id: number, isPitcher: boolean) => void
   /** 트레이드 한 번이 끝났다 (0xe7) — 커맨드 표시·명단·G 를 **한 번에** 적어 넣는다 */
   readonly finishTrade: (settlement: TradeSettlement) => void
   readonly playNextGame: () => void
@@ -904,6 +909,15 @@ export function useSeasonSession(
     (roster: SeasonTeamRoster) => {
       if (save === null) return
       commit({ ...save, roster })
+    },
+    [commit, save],
+  )
+
+  const removeHallOfFamer = useCallback(
+    (id: number, isPitcher: boolean) => {
+      if (save === null) return
+      const roster = removeHallOfFamerFromRoster(save.roster, id, isPitcher)
+      if (roster !== save.roster) commit({ ...save, roster })
     },
     [commit, save],
   )
@@ -1919,7 +1933,7 @@ export function useSeasonSession(
     eventPlayback,
     notice,
     actions: {
-      chooseTeam, goto, updateRecord, updateRoster, finishTrade, playNextGame,
+      chooseTeam, goto, updateRecord, updateRoster, removeHallOfFamer, finishTrade, playNextGame,
       openNextGame, confirmNextGame, cancelNextGame, confirmIncome,
       choosePreGameAce: choosePreGameAceAction, cancelPreGameAce: cancelPreGameAceAction,
       startPendingGame, cancelMatchInfo, toggleMatchSettings, applyMatchSettings,

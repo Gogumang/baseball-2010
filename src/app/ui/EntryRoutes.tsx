@@ -24,6 +24,7 @@ import type { useGameSettings } from '@/app/model/useGameSettings'
 import type { Collection } from '@/entities/collection/model/collection'
 import type { GamePointWalletSession } from '@/entities/wallet/model/useGamePointWallet'
 import { HallOfFameScreen, SpecialScreen } from '@/pages/special/ui/SpecialScreen'
+import type { HallOfFameDeletion } from '@/pages/special/ui/SpecialScreen'
 import { ACE_PHASE, AceSelectScreen } from '@/pages/general-mode'
 import { TitleScreen } from '@/pages/title/ui/TitleScreen'
 import { MainMenuScreen } from '@/pages/main-menu/ui/MainMenuScreen'
@@ -49,10 +50,14 @@ interface EntryRoutesProps {
     readonly onOpenAce: (cell: number) => void
     readonly onLevelUp: (cell: number, cost: number) => void
   }
+  /** 스페셜 명예의 전당 "슬롯에서 삭제" — 앱이 기록연감·시즌 명단 정리를 묶어 넘긴다 */
+  readonly hallOfFameDeletion?: HallOfFameDeletion
 }
 
 /** 커리어가 아직 없을 때의 화면 — 타이틀 → 메인 메뉴(도움말) → 선수 등록. */
-export function EntryRoutes({ screen, setScreen, session, gameSettings, collection, random, wallet, aceSelect }: EntryRoutesProps) {
+export function EntryRoutes({
+  screen, setScreen, session, gameSettings, collection, random, wallet, aceSelect, hallOfFameDeletion,
+}: EntryRoutesProps) {
   /**
    * 홈런더비 선수 고르기 결과 (하위 16 0x29ac8 — 코드 2 나리 타자 · 4 명예 타자, 전역기록 +0xa6).
    * null 이면 아직 안 골랐다 — 들어올 때마다 0x25e6c → 0x5eb8c 가 +0xa6 을 −1 로 되돌리고 다시 고르게 한다.
@@ -78,6 +83,7 @@ export function EntryRoutes({ screen, setScreen, session, gameSettings, collecti
     return (
       <SpecialScreen
         collection={collection}
+        {...(hallOfFameDeletion === undefined ? {} : { hallOfFameDeletion })}
         // 상태 28 = 공용 목록 k 11 + 레벨업 창 0x5f395 — OK·`0` 이 오픈/레벨업, CLR 이 상태 6 으로 (0x2af20)
         {...(aceSelect === undefined ? {} : {
           renderAceSelect: (onBack: () => void) => (

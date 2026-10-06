@@ -1516,3 +1516,26 @@ describe('결산 0x6900 의 세 모드 해금 0x29 "오토봇 배트"', () => {
     expect(열림.result.current.summaryEntry).toMatchObject({ opensAutobotBat: false })
   })
 })
+
+describe('명전 칸 삭제의 시즌 명단 정리 (0x221dc)', () => {
+  it('시즌 저장이 있으면 내 팀 명단에서 그 명전 선수를 빼고 저장한다', () => {
+    const store = 메모리저장()
+    const { result } = 띄우기(store)
+    act(() => result.current.actions.chooseTeam(0))
+    const { roster } = result.current
+    const 명전 = { id: 0xc8, kindByte: 0x20 | 2, fieldPosition: roster.batters[2].fieldPosition, stamina: 0 }
+    act(() => result.current.actions.updateRoster({ ...roster, batters: [...roster.batters.slice(0, 2), 명전, ...roster.batters.slice(3)] }))
+
+    act(() => result.current.actions.removeHallOfFamer(0xc8, false))
+
+    expect(result.current.roster.batters).toHaveLength(roster.batters.length - 1)
+    expect(result.current.roster.batters.some((player) => player.id === 0xc8)).toBe(false)
+    expect((store.load() as { roster: { batters: unknown[] } }).roster.batters).toHaveLength(roster.batters.length - 1)
+  })
+
+  it('시즌 저장이 없으면 아무것도 안 한다', () => {
+    const { result } = 띄우기()
+    act(() => result.current.actions.removeHallOfFamer(0xc8, false))
+    expect(result.current.state).toBeNull()
+  })
+})

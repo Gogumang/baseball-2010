@@ -6,9 +6,10 @@ import {
   openHiddenForMissions,
   registerHallOfFame,
   registerHallOfFamePitcher,
+  deleteHallOfFame,
   HALL_OF_FAME_COST,
 } from '@/entities/collection/model/collection'
-import type { Collection, EndingViewer, HallOfFameResult } from '@/entities/collection/model/collection'
+import type { Collection, EndingViewer, HallOfFameResult, HallOfFameSide } from '@/entities/collection/model/collection'
 import { applyAnnalsStat, GAME_POINT_USAGE } from '@/entities/collection/model/annalsStats'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
@@ -96,12 +97,20 @@ export function useCollection(
   const registerPitcher = (target: PitcherCareer, wallet: HallOfFameWallet, slot: number | null = null) =>
     commitRegistration(registerHallOfFamePitcher(collection, target, wallet.balance, slot), wallet, GAME_POINT_USAGE.pitcherLeague)
 
+  /**
+   * 명전 칸 삭제 (0x62994 → 0x22371 투수 · 0x22339 타자) — 칸을 비운다. 저장(0x1f1b9)은 위 저장 효과가 한다.
+   * 시즌 명단 정리(0x221dc)는 시즌 세션 몫이라 부르는 쪽이 같이 부른다.
+   */
+  const deleteHallOfFamer = useCallback((side: HallOfFameSide, slot: number) => {
+    setCollection((previous) => deleteHallOfFame(previous, side, slot))
+  }, [])
+
   /** 통계 기록 `[mgr+0xc8]` 에 한 건 쌓는다 (0x22e35 · 0x22c29 · 0xb663c) — 원본도 곧바로 저장(0x1f1e1)한다 */
   const recordStat = useCallback((event: AnnalsStatEvent) => {
     setCollection((previous) => ({ ...previous, stats: applyAnnalsStat(previous.stats, event) }))
   }, [])
 
-  return { collection, register, registerPitcher, recordStat }
+  return { collection, register, registerPitcher, deleteHallOfFamer, recordStat }
 }
 
 /** 등록 목록 칸 0·5 에 그리는 나리 선수 — 이름과 능력치 도형 값 `0xb6415(기록, k, 1)` */

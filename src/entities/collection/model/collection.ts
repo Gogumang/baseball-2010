@@ -257,6 +257,31 @@ export function registerHallOfFamePitcher(
   }
 }
 
+/**
+ * 명전 기록의 선수 번호 `+0` — 등록이 칸 번호로 덮어쓴다 (0x1f654 투수 `+0 = 칸 − 0x4c` · 0x1f680 타자 `+0 = 칸 − 0x38`,
+ * u8 로 칸 + 0xb4 / 칸 + 0xc8). 시즌 영입 중복 검사 0xb50ac 와 삭제 0x221dc 가 이 번호로 시즌 명단을 찾는다.
+ */
+export const HALL_OF_FAME_PITCHER_FIRST_RECORD_ID = 0xb4
+export const HALL_OF_FAME_BATTER_FIRST_RECORD_ID = 0xc8
+export function hallOfFameRecordIdOf(side: HallOfFameSide, slot: number): number {
+  return (side === '투수' ? HALL_OF_FAME_PITCHER_FIRST_RECORD_ID : HALL_OF_FAME_BATTER_FIRST_RECORD_ID) + slot
+}
+
+/**
+ * 명전 칸 삭제 — 스페셜 명예의 전당 말풍선 "슬롯에서 삭제" 확인 "예" (0x62994, R11 3-2):
+ * 투수 칸 `0x22371(저장, 칸)` · 타자 칸 `0x22339(저장, 칸)` 이 시즌 명단 정리 0x221dc 뒤 칸 0x30 바이트를 0 으로
+ * (`memset`, 0x1400428) — 빈 칸(상태 4)이 된다. 시즌 명단 정리는 `removeHallOfFamerFromRoster`(season-mode) 몫이다.
+ * 없는 칸이면 같은 객체.
+ */
+export function deleteHallOfFame(collection: Collection, side: HallOfFameSide, slot: number): Collection {
+  if (side === '투수') {
+    if (hallOfFamePitcherAt(collection, slot) === null) return collection
+    return { ...collection, hallOfFamePitchers: collection.hallOfFamePitchers.filter((famer) => famer.slot !== slot) }
+  }
+  if (hallOfFameBatterAt(collection, slot) === null) return collection
+  return { ...collection, hallOfFame: collection.hallOfFame.filter((famer, index) => (famer.slot ?? index) !== slot) }
+}
+
 const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((item) => typeof item === 'string')
 const isNumberArray = (value: unknown): value is number[] =>

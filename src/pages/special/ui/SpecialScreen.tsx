@@ -42,6 +42,8 @@ interface SpecialScreenProps {
    * 안 넘기면 칸을 눌러도 아무 일이 없다.
    */
   readonly renderAceSelect?: (onBack: () => void) => ReactNode
+  /** 명예의 전당 말풍선 "슬롯에서 삭제" (0x2ac00 · 0x62994). 안 넘기면 안내만 띄운다 */
+  readonly hallOfFameDeletion?: HallOfFameDeletion
   readonly onBack: () => void
 }
 
@@ -61,7 +63,7 @@ interface SpecialScreenProps {
  * ⚠️ 근사한 곳: 줄 y(원본은 굴러가는 목록이라 여덟 줄을 한 번에 세우려고 간격을 벌렸다 — `ROW` 주석),
  * 바퀴는 호와 공만(칸 여섯은 메인 메뉴 몫), 배경은 원본이 무엇을 까는지 아직 못 읽어 검정 그대로다.
  */
-export function SpecialScreen({ collection, renderAceSelect, onBack }: SpecialScreenProps) {
+export function SpecialScreen({ collection, renderAceSelect, hallOfFameDeletion, onBack }: SpecialScreenProps) {
   const [view, setView] = useState<SpecialView>('목록')
   const [cursor, setCursor] = useState(0)
   const [notice, setNotice] = useState<string | null>(null)
@@ -104,7 +106,10 @@ export function SpecialScreen({ collection, renderAceSelect, onBack }: SpecialSc
   }
 
   if (view === '명예의 전당') {
-    return <HallOfFameScreen collection={collection} mode={{ kind: '보기' }} onBack={() => setView('목록')} />
+    const mode: HallOfFameMode = hallOfFameDeletion === undefined
+      ? { kind: '보기' }
+      : { kind: '보기', deletion: hallOfFameDeletion }
+    return <HallOfFameScreen collection={collection} mode={mode} onBack={() => setView('목록')} />
   }
 
   const selected = SPECIAL_ITEMS[cursor]
@@ -240,8 +245,8 @@ export interface HallOfFameNariPlayer {
 
 /** 명예의 전당 목록의 두 쓰임 */
 export type HallOfFameMode =
-  /** 스페셜 명예의 전당 — 하위 상태 27, 목록 종류 2 (0x26024) */
-  | { readonly kind: '보기' }
+  /** 스페셜 명예의 전당 — 하위 상태 27, 목록 종류 2 (0x26024). `deletion` 을 넘기면 말풍선 "슬롯에서 삭제" 가 돈다 */
+  | { readonly kind: '보기'; readonly deletion?: HallOfFameDeletion }
   /**
    * 엔딩 뒤 등록 — 나리 상태 145, 목록 종류 3 (0x1c91e). 키는 0x62568 이 `0x5eae0` 결과 코드와 모드로 가른다.
    * `onRegister(칸)` 은 칸 번호(없으면 첫 빈 칸)로 등록을 해 보고 결과를 돌려준다. `onDone` 은 등록 뒤 메인 메뉴,
@@ -275,6 +280,24 @@ export type HallOfFameMode =
       readonly onCancel: () => void
     }
 
+/**
+ * 말풍선 "슬롯에서 삭제" (하위 27 갱신 0x2ac00 의 하위 1, OK · 칸 1 — R11 3-1·3-2).
+ * ```
+ * 막기: 0x213c1(저장, 2, 1) ; team = 0x1f571(저장, 내 팀) ; 0xb50ad(team, 타자?1:0, 칸) && 전역기록+0x4e ≠ 0
+ *       → StrMAINMENU[213] (팝업 종류 1, 하위 상태 그대로 — 말풍선이 남는다)
+ * 통과: StrMAINMENU[128] 예/아니오 (skin+0x314 = 4) · 하위 0 (말풍선 닫힘)
+ * 예(0x62994): 투수 0x22371 · 타자 0x22339 — 시즌 명단 정리 0x221dc 뒤 칸을 0 으로 · 0x5eb8c 다시 채움 · 저장 0x1f1b9 ·
+ *       StrCOMMON[46]
+ * ```
+ * ⚠️ 확인 창의 처음 커서 `0x749d5(popup, 1)`(둘째 칸 "아니오" 로 보임, 유력)는 공용 MessageBox 에 처음 커서 칸이 없어 안 옮겼다.
+ */
+export interface HallOfFameDeletion {
+  /** 막기 검사 — 그 명전 선수가 시즌 내 팀 명단에 있고(0xb50ac) 시즌모드 경기가 진행 중(전역기록 +0x4e)인가 */
+  readonly isBlocked: (side: HallOfFameSide, slot: number) => boolean
+  /** "예" — 칸을 비우고 시즌 명단을 정리하고 저장한다 */
+  readonly onDelete: (side: HallOfFameSide, slot: number) => void
+}
+
 /** 원본 문구 (StrCOMMON · 0xcc214 · StrMODE[219]) */
 const HALL_OF_FAME_TEXT = {
   nariFirst: '!C!cFFFFFF나만의리그 선수를!N먼저 등록해야합니다', // StrCOMMON[38]
@@ -283,6 +306,9 @@ const HALL_OF_FAME_TEXT = {
   done: '!C!cffffff명예의 전당에!N등록이 완료되었습니다', // StrCOMMON[52]
   shortage: '!C!cFF0000G포인트가 부족합니다.!cFFFFFF 구매!N페이지로 이동하시겠습니까?', // 0xcc214
   later: '!C나중에 등록 하시겠습니까?!N메인 메뉴로 이동합니다', // StrMODE[219]
+  deleteConfirm: '!C!cFFFFFF현재 명예선수를!N삭제 하시겠습니까?!N(!cFF0000삭제 시 복구 불가!cFFFFFF)', // StrMAINMENU[128]
+  deleteBlocked: '!C!cFFFFFF시즌모드 경기 진행 중에는!N삭제 하실 수 없습니다', // StrMAINMENU[213]
+  deleted: '!C!cffffff선수를 삭제하였습니다', // StrCOMMON[46]
   hallOfFameFirst: '!C!cFFFFFF명예의전당 선수를!N먼저 등록해야합니다', // StrCOMMON[39]
   // StrCOMMON[45] / [54] — 슬롯 현금 구매 (🌐)
   buyPitcherSlots: '!C!cFFFFFF슬롯을 오픈하여 명예선수를!N추가로 등록할 수 있습니다!N투수 슬롯 2개가 오픈됩니다!N!N!cFFFFFF실제 현금 !cFF0000500원!cFFFFFF의 추가 정보!N이용료 (통화료별도)가 부과!N됩니다. 아이템 구매 중 일부!N시간이 소요 될 수 있으므로!N강제종료 하지 마세요!N!N구매 하시겠습니까?',
@@ -296,6 +322,8 @@ type HallOfFamePopup =
   | { readonly kind: '나중에' }
   | { readonly kind: '완료' }
   | { readonly kind: '알림'; readonly text: string; readonly buttons: readonly string[] }
+  /** 스페셜 말풍선 삭제 확인 StrMAINMENU[128] (skin+0x314 = 4) */
+  | { readonly kind: '삭제확인'; readonly side: HallOfFameSide; readonly slot: number }
 
 /**
  * 명예의 전당 목록 (공용 목록 페이지 `0x63b15` 의 k = 8 — P6 2a-3 · S9 3~4절). 스페셜(상태 27)과 엔딩 뒤 등록(나리 상태 145)이 같이 쓴다.
@@ -305,8 +333,8 @@ type HallOfFamePopup =
  *
  * ⚠️ **웹에 값이 없어 못 그린 것**
  *  - 찬 칸의 **캐릭터 그림**([skin+0x290])과 **팀 로고**(캐릭터+0x30) — 원 두 개만 깔고 이름 막대를 얹는다.
- *  - "친구에게 선물" 은 통신이 필요하고, "슬롯에서 삭제"(StrCOMMON[46], 시즌 중 막기 StrMAINMENU[213]·[214])는
- *    아직 옮기지 않아 안내만 띄운다. 슬롯 현금 구매·G 충전 페이지(🌐)도 열 수 없어 목록으로 돌아온다.
+ *  - "친구에게 선물" 은 통신이 필요해 안내만 띄운다. "슬롯에서 삭제" 는 `deletion`(HallOfFameDeletion) 대로 돈다.
+ *    슬롯 현금 구매·G 충전 페이지(🌐)도 열 수 없어 목록으로 돌아온다.
  */
 export function HallOfFameScreen({ collection, mode, onBack }: {
   readonly collection: Collection
@@ -368,11 +396,43 @@ export function HallOfFameScreen({ collection, mode, onBack }: {
     return undefined
   }
 
+  /**
+   * 스페셜 목록의 키 확인 — 하위 27 갱신 0x2ac00 도 `0x62569(목록, 키, 0)` 이고 목록 종류 2(≠ 3)라 선수 고르기와 같은
+   * 0x627d4 갈래다: 6 → StrCOMMON[39] · 7 → [45]/[54](🌐) 는 0x62568 안에서 띄우고, 결과 3·4(명예 선수 칸)만 0x2ac00 이
+   * 하위 1(말풍선, 커서 0)로 받는다. 나리 칸(상태 0)은 코드 0 이라 아무 일이 없다.
+   */
+  const pressViewSlot = (target: number) => {
+    const code = hallOfFameKeyCodeOf(slots[target].state, target)
+    if (code === 3 || code === 4) {
+      setBubbleCursor(0)
+      return setIsBubbleOpen(true)
+    }
+    if (code === 6) return setPopup({ kind: '알림', text: HALL_OF_FAME_TEXT.hallOfFameFirst, buttons: ['확인'] })
+    if (code === 7) {
+      const text = target < HALL_OF_FAME_PITCHER_SLOTS ? HALL_OF_FAME_TEXT.buyPitcherSlots : HALL_OF_FAME_TEXT.buyBatterSlots
+      return setPopup({ kind: '알림', text, buttons: ['예', '아니오'] })
+    }
+    return undefined
+  }
+
   const pressSlot = (target: number) => {
     if (mode.kind === '등록') return pressRegisterSlot(target)
     if (mode.kind === '선수고르기') return pressPickSlot(target)
-    setBubbleCursor(0)
-    return setIsBubbleOpen(true)
+    return pressViewSlot(target)
+  }
+
+  /** 말풍선 OK (0x2ac00 하위 1) — 0 선물(🌐, 안내만) · 1 슬롯에서 삭제 */
+  const chooseBubble = (index: number) => {
+    const entry = hallOfFameEntryOfSlot(slot)
+    if (index !== HALL_OF_FAME_BUBBLE_DELETE || mode.kind !== '보기' || mode.deletion === undefined || entry === null) {
+      return setNotice(HALL_OF_FAME_BUBBLE_NOTICES[index])
+    }
+    // 막히면 [213] 만 띄우고 말풍선은 그대로(하위 상태 그대로), 통과하면 [128] 확인 + 하위 0(말풍선 닫힘)
+    if (mode.deletion.isBlocked(entry.side, entry.index)) {
+      return setPopup({ kind: '알림', text: HALL_OF_FAME_TEXT.deleteBlocked, buttons: ['확인'] })
+    }
+    setIsBubbleOpen(false)
+    return setPopup({ kind: '삭제확인', side: entry.side, slot: entry.index })
   }
 
   /** 되돌아가기 — 등록 목록은 결과 0 → StrMODE[219] (0x1ca4c), 선수 고르기는 결과 0 (0x6286e), 스페셜은 상태 6 */
@@ -393,7 +453,7 @@ export function HallOfFameScreen({ collection, mode, onBack }: {
         }
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault()
-          return setNotice(HALL_OF_FAME_BUBBLE_NOTICES[bubbleCursor])
+          return chooseBubble(bubbleCursor)
         }
         if (event.key === 'Escape' || event.key === 'Backspace') {
           event.preventDefault()
@@ -422,6 +482,12 @@ export function HallOfFameScreen({ collection, mode, onBack }: {
 
   /** 팝업 답 — 확인(0x16)·G 부족(0x17)·나중에(StrMODE[219])·완료(0x30) */
   const answerPopup = (index: number) => {
+    // 삭제 확인 "예"(결과 0) → 0x62994: 칸 비우기 · 저장 · StrCOMMON[46]. "아니오" 는 0x62e54 — 창만 닫는다
+    if (popup?.kind === '삭제확인' && mode.kind === '보기' && mode.deletion !== undefined) {
+      if (index !== 0) return setPopup(null)
+      mode.deletion.onDelete(popup.side, popup.slot)
+      return setPopup({ kind: '알림', text: HALL_OF_FAME_TEXT.deleted, buttons: ['확인'] })
+    }
     if (popup === null || mode.kind !== '등록') return setPopup(null)
     if (popup.kind === '확인') {
       if (index !== 0) return setPopup(null)
@@ -587,7 +653,7 @@ export function HallOfFameScreen({ collection, mode, onBack }: {
                 outline: index === bubbleCursor ? `1px solid ${HALL_OF_FAME_BUBBLE.selectedBorderColor}` : undefined,
               }}
               onMouseEnter={() => setBubbleCursor(index)}
-              onClick={() => setNotice(HALL_OF_FAME_BUBBLE_NOTICES[index])}
+              onClick={() => chooseBubble(index)}
             >
               {label}
             </button>
@@ -608,6 +674,7 @@ function popupTextOf(popup: HallOfFamePopup): { readonly text: string; readonly 
   if (popup.kind === 'G부족') return { text: HALL_OF_FAME_TEXT.shortage, buttons: ['예', '아니오'] }
   if (popup.kind === '나중에') return { text: HALL_OF_FAME_TEXT.later, buttons: ['예', '아니오'] }
   if (popup.kind === '완료') return { text: HALL_OF_FAME_TEXT.done, buttons: ['확인'] }
+  if (popup.kind === '삭제확인') return { text: HALL_OF_FAME_TEXT.deleteConfirm, buttons: ['예', '아니오'] }
   return { text: popup.text, buttons: popup.buttons }
 }
 
@@ -636,10 +703,16 @@ function HallOfFameAbilityChart({ center, values }: { readonly center: ChartPoin
 /** 팀 도형과 같은 채움 불투명도 0xb4 (TeamSelectScreen) */
 const CHART_FILL_ALPHA = 0xb4 / 0xff
 
-/** 말풍선 두 칸은 웹에서 아직 못 하는 일이라 안내만 띄운다 (원본 글은 통신·삭제 실행이다) */
+/** 말풍선 둘째 칸 — 슬롯에서 삭제 */
+const HALL_OF_FAME_BUBBLE_DELETE = 1
+
+/**
+ * 말풍선 칸을 웹이 못 할 때의 안내 — 선물은 통신(🌐)이라 늘 이 글이다. 삭제는 `deletion` 을 안 넘긴 화면에서만 뜬다.
+ * ⚠️ 원본 선물 칸은 막기 검사(StrMAINMENU[214]) 뒤 [127] 설명 · 통신(0x62956)이다 — 통신이라 옮기지 않았다.
+ */
 const HALL_OF_FAME_BUBBLE_NOTICES = [
   '친구에게 선물은!N통신이 필요합니다',
-  '슬롯에서 삭제는!N아직 만들지 않았습니다',
+  '슬롯에서 삭제는!N여기서 할 수 없습니다',
 ] as const
 
 type HallOfFameSlotView =

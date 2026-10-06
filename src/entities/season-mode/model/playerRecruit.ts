@@ -231,3 +231,61 @@ export function recruitPlayer(
     source: renumbered,
   }
 }
+
+/**
+ * 명전 선수인가 — `0xb6348(P)` (직접 떴다):
+ * ```
+ * if (P[0xa] & 0x40) return 0                          ; 0xb633c — 마선수 비트
+ * 투수(0xb6278): (u8)(id + 0x4c) <= 0x18 → 1            ; id 0xb4..0xcc
+ * 타자          : (u8)(id + 0x38) <= 8    → 1            ; id 0xc8..0xd0
+ * ```
+ */
+export function isHallOfFameRecord(player: SeasonPlayer): boolean {
+  if ((player.kindByte & 0x40) !== 0) return false
+  if (isPitcherRecord(player.id, player.kindByte)) return ((player.id + 0x4c) & 0xff) <= 0x18
+  return ((player.id + 0x38) & 0xff) <= 8
+}
+
+/**
+ * 명전 칸을 지울 때 시즌 명단에서 그 선수를 빼기 — `0x221dc(저장, 선수 번호, 투수?)` (직접 떴다, R11 3-2).
+ * ```
+ * 0x213c0(저장, 2, 1) ; [저장+0xb4] == 0 || 전역기록+0x42 == 0 → 끝      ; 시즌 저장이 없으면 아무것도 안 한다
+ * for 팀 0..9: T = 0x1f570(저장, 팀)
+ *   투수: j = 첫 0xb6348(P) && P[0] == 번호 →
+ *         memcpy(T[j], T[끝]) ; memset(T[끝], 0) ; 수 −= 1 ; 저장 0x211fc ; 끝
+ *   타자: pos = T[j][0x1c] & 0xf ; memcpy(T[j], T[끝]) ; memset(T[끝], 0) ; 0xb8e85(T[j], pos, 0) ; 0xb6605(T[j], j)
+ *         수 −= 1 ; 저장 ; 끝
+ * ```
+ * → **맨 끝 선수가 지운 자리로 옮겨 온다**(타자는 지운 선수의 수비 위치·칸 번호를 이어받고, 투수는 옛 칸 번호를 그대로
+ * 든다 — 영입 0xb521c 처럼 투수 쪽 칸 번호 정리가 없다). 첫 하나만 지우고 끝난다.
+ * 웹 시즌 저장의 명단은 내 팀 하나뿐이다 — 명전 선수는 영입(내 팀)으로만 들어가고 트레이드가 막혀(StrMODE[166])
+ * 다른 팀에 있을 수 없으니 열 팀을 도는 것과 결과가 같다. 없으면 같은 객체.
+ */
+export function removeHallOfFamerFromRoster(roster: SeasonTeamRoster, id: number, isPitcher: boolean): SeasonTeamRoster {
+  const players = isPitcher ? roster.pitchers : roster.batters
+  const found = players.findIndex((player) => isHallOfFameRecord(player) && player.id === id)
+  if (found < 0) return roster
+  const next = players.slice(0, -1)
+  const last = players[players.length - 1]
+  if (found < next.length) {
+    next[found] = isPitcher
+      ? last
+      : withSlot({ ...last, fieldPosition: players[found].fieldPosition & 0xf }, found)
+  }
+  return isPitcher ? { ...roster, pitchers: next } : { ...roster, batters: next }
+}
+
+/**
+ * 명전 칸 삭제·선물 막기 (스페셜 하위 27 의 0x2ac00 하위 1, R11 3-1):
+ * `0xb50ad(내 팀, 타자?1:0, 칸)` — 그 명전 기록 번호가 내 팀 명단에 있고 — && 전역기록 `+0x4e`(시즌모드 경기 진행 중) ≠ 0.
+ * 시즌 저장이 없으면(`roster` null) 명단에 있을 수 없다.
+ */
+export function isHallOfFameDeleteBlocked(
+  roster: SeasonTeamRoster | null,
+  id: number,
+  isPitcher: boolean,
+  isSeasonGameInProgress: boolean,
+): boolean {
+  if (roster === null || !isSeasonGameInProgress) return false
+  return hasRecruitedHallOfFamePlayer(isPitcher ? roster.pitchers : roster.batters, id)
+}

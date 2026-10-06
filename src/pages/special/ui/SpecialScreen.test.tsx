@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { HallOfFameScreen, SpecialScreen } from '@/pages/special/ui/SpecialScreen'
+import type { HallOfFameDeletion } from '@/pages/special/ui/SpecialScreen'
 import { EMPTY_COLLECTION } from '@/entities/collection/model/collection'
 import {
   HALL_OF_FAME_BUBBLE, HALL_OF_FAME_GRID, HALL_OF_FAME_SLOTS,
@@ -141,6 +142,21 @@ describe('명예의 전당 격자 5×3', () => {
     띄우기()
     fireEvent.click(칸('명예의전당'))
   }
+  /** 명예 투수 0번(칸 1)이 찬 스페셜 명예의 전당 — 말풍선은 결과 3·4(찬 칸)에서만 뜬다 (0x2ac00) */
+  const 찬투수 = {
+    name: '철완', ability: { control: 1, velocity: 2, breaking: 3, stamina: 4 },
+    equippedAbility: { control: 1, velocity: 2, breaking: 3, stamina: 4 }, endingIndex: 5, season: 10, titleIds: [], slot: 0,
+    look: { typeIndex: 0, handIndex: 0, skinIndex: 0, teamId: 1 },
+  }
+  const 찬칸열기 = (deletion?: HallOfFameDeletion) => {
+    render(
+      <HallOfFameScreen
+        collection={{ ...EMPTY_COLLECTION, hallOfFamePitchers: [찬투수] }}
+        mode={deletion === undefined ? { kind: '보기' } : { kind: '보기', deletion }}
+        onBack={vi.fn()}
+      />,
+    )
+  }
 
   it('슬롯 15칸이고 왼쪽 x 20 에서 40 씩, 줄은 179 에서 40 씩이다', () => {
     열기()
@@ -190,11 +206,11 @@ describe('명예의 전당 격자 5×3', () => {
   })
 
   it('칸을 누르면 말풍선이 칸 오른쪽 26px 에 뜨고, 오른쪽 두 열에서는 왼쪽으로 뒤집는다', () => {
-    열기()
+    찬칸열기()
 
-    fireEvent.click(screen.getByRole('button', { name: '1번 슬롯' }))
+    fireEvent.click(screen.getByRole('button', { name: '2번 슬롯' }))
     const 말풍선 = screen.getByRole('menu', { name: '명예의 전당 슬롯' })
-    expect(말풍선.style.left).toBe(`${hallOfFameCellOf(0).x + 26}px`)
+    expect(말풍선.style.left).toBe(`${hallOfFameCellOf(1).x + 26}px`)
     expect(말풍선.style.width).toBe(`${HALL_OF_FAME_BUBBLE.width}px`)
     expect(screen.getByRole('menuitem', { name: '친구에게 선물' })).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: '슬롯에서 삭제' })).toBeTruthy()
@@ -204,13 +220,66 @@ describe('명예의 전당 격자 5×3', () => {
     expect(hallOfFameBubblePositionOf(오른쪽).x).toBe(오른쪽.x + 13 - HALL_OF_FAME_BUBBLE.width)
   })
 
-  it('말풍선 두 칸은 아직 웹에서 못 하는 일이라 안내를 띄운다', () => {
-    열기()
+  it('선물은 통신(🌐)이라 안내만 띄운다', () => {
+    찬칸열기()
 
-    fireEvent.click(screen.getByRole('button', { name: '1번 슬롯' }))
+    fireEvent.click(screen.getByRole('button', { name: '2번 슬롯' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '친구에게 선물' }))
 
     expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain('통신')
+  })
+
+  it('빈 칸은 말풍선 대신 StrCOMMON[39], 잠긴 칸은 [45] 슬롯 구매 — 목록 종류 2 도 0x627d4 갈래다', () => {
+    찬칸열기()
+
+    fireEvent.click(screen.getByRole('button', { name: '3번 슬롯' }))
+    expect(screen.queryByRole('menu', { name: '명예의 전당 슬롯' })).toBeNull()
+    expect(screen.getByText(/명예의전당 선수를/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+
+    fireEvent.click(screen.getByRole('button', { name: '4번 슬롯' }))
+    expect(screen.getByText(/투수 슬롯 2개가 오픈됩니다/)).toBeTruthy()
+  })
+
+  it('슬롯에서 삭제 — [128] 확인 "예" 면 그 칸을 지우고 StrCOMMON[46] (0x62994)', () => {
+    const onDelete = vi.fn()
+    찬칸열기({ isBlocked: () => false, onDelete })
+
+    fireEvent.click(screen.getByRole('button', { name: '3번 슬롯' }))
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    fireEvent.click(screen.getByRole('button', { name: '2번 슬롯' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '슬롯에서 삭제' }))
+
+    // 통과하면 말풍선이 닫히고(하위 0) 확인 창이 뜬다
+    expect(screen.queryByRole('menu', { name: '명예의 전당 슬롯' })).toBeNull()
+    expect(screen.getByText(/현재 명예선수를/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+
+    expect(onDelete).toHaveBeenCalledWith('투수', 0)
+    expect(screen.getByText(/선수를 삭제하였습니다/)).toBeTruthy()
+  })
+
+  it('"아니오" 면 아무것도 지우지 않는다 (0x62e54)', () => {
+    const onDelete = vi.fn()
+    찬칸열기({ isBlocked: () => false, onDelete })
+
+    fireEvent.click(screen.getByRole('button', { name: '2번 슬롯' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '슬롯에서 삭제' }))
+    fireEvent.click(screen.getByRole('button', { name: '아니오' }))
+
+    expect(onDelete).not.toHaveBeenCalled()
+  })
+
+  it('시즌 팀에 있고 시즌모드 경기 진행 중이면 StrMAINMENU[213] 으로 막고 말풍선은 남는다', () => {
+    const onDelete = vi.fn()
+    찬칸열기({ isBlocked: () => true, onDelete })
+
+    fireEvent.click(screen.getByRole('button', { name: '2번 슬롯' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '슬롯에서 삭제' }))
+
+    expect(screen.getByText(/삭제 하실 수 없습니다/)).toBeTruthy()
+    expect(screen.getByRole('menu', { name: '명예의 전당 슬롯' })).toBeTruthy()
+    expect(onDelete).not.toHaveBeenCalled()
   })
 })
 
