@@ -135,6 +135,8 @@ export function runCpuPostseason(
   series: PostseasonSeries,
   myTeamId: number,
   random: RandomPort,
+  /** 마선수 레벨 열 칸 — 안 넘기면 Lv1(60%) */
+  aceLevels?: Readonly<Record<number, number>>,
 ): PostseasonSeries {
-  return runCpuPostseasonWithStamina(series, myTeamId, random).series
+  return runCpuPostseasonWithStamina(series, myTeamId, random, {}, aceLevels).series
 }

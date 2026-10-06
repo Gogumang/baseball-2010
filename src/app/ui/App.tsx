@@ -119,12 +119,16 @@ export function App() {
     // 환경설정 "송구" (설정 +0xf4) — 투수편은 사람이 늘 수비라 여기서만 이 설정이 먹는다 (0xae6c8)
     gameSettings.settings.throwMode === '수동',
     recordStat,
+    // 같은 날 CPU 끼리 경기·포스트시즌 CPU 경기의 마선수 배율(0xd88aa)도 전역 레벨 칸을 본다
+    aceLevels.levels,
   )
   const careerSession = useCareerSession({
     runner, random, saveGame, screen, setScreen, sound, wallet,
     // 환경설정 "주루" (설정 +0xbd) — 나리 타자편은 사람이 늘 공격이라 그대로 먹는다 (0xae690)
     runningModeManual: gameSettings.settings.runningMode === '수동',
     recordStat,
+    // 같은 날 CPU 끼리 경기·포스트시즌 CPU 경기의 마선수 배율(0xd88aa)도 전역 레벨 칸을 본다
+    aceLevels: aceLevels.levels,
   })
   const pitcherMissionPitcher = useMemo(() => modePitcherOf(pitcherSession.career), [pitcherSession.career])
   // 미션 보상 G (0x4ef72) — 지갑으로 들어간다. 육성 선수가 없어도 사라지지 않는다

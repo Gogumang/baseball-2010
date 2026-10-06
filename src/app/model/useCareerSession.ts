@@ -184,6 +184,11 @@ interface CareerSessionInput {
    * 안 넘기면 아무것도 안 쌓는다 — 테스트는 그대로 두면 된다.
    */
   readonly recordStat?: (event: AnnalsStatEvent) => void
+  /**
+   * 전역 마선수 레벨 열 칸 `mgr[0x13a..0x143]` (`useAceLevels().levels`). 같은 날 CPU 끼리 경기(0xc2a48)·포스트시즌
+   * CPU 경기(0xc2760)의 마선수 능력치 배율(0xd88aa)이 이 칸을 본다. 안 넘기면 Lv1(60%) — 테스트는 그대로 두면 된다.
+   */
+  readonly aceLevels?: Readonly<Record<number, number>>
 }
 
 const NO_STAT = () => {}
@@ -224,6 +229,7 @@ export function useCareerSession({
   wallet,
   runningModeManual = false,
   recordStat = NO_STAT,
+  aceLevels,
 }: CareerSessionInput) {
   // 통로를 안 받으면 조용한 포트로 — 아래 자리들이 `sound` 가 있는지 매번 보지 않게 한다
   const silent = useMemo(() => createSilentSound(), [])
@@ -416,7 +422,7 @@ export function useCareerSession({
       // CPU 끼리의 포스트시즌 경기는 **여기서 돌리지 않는다** — 원본은 대진 화면 128 의 [확인](0x13da0)에서 돌린다
       // (`pressPostseasonBracket`).
       const settled = applySeasonEnd(
-        applyLeagueDay(applyGameResult(currentCareer, summary), summary.ourTeamId, random),
+        applyLeagueDay(applyGameResult(currentCareer, summary), summary.ourTeamId, random, aceLevels),
       )
       const evaluated = applyGameEvaluation(settled, evaluation, isEvaluatedGame(currentCareer))
       // 스킬 조건용 경기 뒤 카운터 — 사기까지 반영된 뒤에 센다 (A-4)
@@ -445,7 +451,7 @@ export function useCareerSession({
         streakNotices: streak.notices,
       })
     },
-    [audio, random, recordStat, setScreen],
+    [aceLevels, audio, random, recordStat, setScreen],
   )
 
   /**
@@ -1166,7 +1172,7 @@ export function useCareerSession({
     pressPostseason: () => {
       if (career === null || career.postseason === null) return
       if (screen.kind !== '포스트시즌' || screen.popup !== null) return
-      const result = pressPostseasonBracket(career.postseason, career.teamId, random)
+      const result = pressPostseasonBracket(career.postseason, career.teamId, random, aceLevels)
       if (result.kind === '우승발표') {
         return setScreen({ ...screen, popup: { kind: '우승발표', champion: result.champion } })
       }

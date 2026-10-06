@@ -318,6 +318,11 @@ export function usePitcherLeagueSession(
    * 안 넘기면 아무것도 안 쌓는다.
    */
   recordStat: (event: AnnalsStatEvent) => void = NO_STAT,
+  /**
+   * 전역 마선수 레벨 열 칸 `mgr[0x13a..0x143]` (`useAceLevels().levels`). 같은 날 CPU 끼리 경기(0xc2a48)·포스트시즌
+   * CPU 경기(0xc2760)의 마선수 능력치 배율(0xd88aa)이 이 칸을 본다. 안 넘기면 Lv1(60%).
+   */
+  aceLevels?: Readonly<Record<number, number>>,
 ): PitcherLeagueSession {
   const loaded = useRef<PitcherCareer | null>(null)
   if (loaded.current === null) loaded.current = normalizePitcherCareer(store.load())
@@ -660,7 +665,7 @@ export function usePitcherLeagueSession(
       const recorded = applyPitcherGameResult(career, outcome)
       // 경기 끝 0x4ea0c: 기록 달성 G 를 저장 G 에 더한 뒤 0x4ec82 `0x22c7d(액수, 모드 3)` 로 획득 GP 통계에 적는다
       recordStat({ kind: 'G획득', mode: PITCHER_LEAGUE_MODE, amount: outcome.gamePointReward })
-      const day = applyPitcherLeagueDay(recorded, random)
+      const day = applyPitcherLeagueDay(recorded, random, aceLevels)
       // 45경기째면 하루 끝(0xb818c)이 정규시즌을 닫고 대진(0xb80a8)을 연다. CPU 끼리의 포스트시즌 경기는
       // 여기서 돌리지 않는다 — 원본은 대진 128 의 [확인](0x13da0)에서 돌린다 (`pressPostseasonBracket`)
       const seasoned = applyPitcherSeasonEnd(day)
@@ -743,7 +748,7 @@ export function usePitcherLeagueSession(
       commit(counted)
       setScene('관리')
     },
-    [career, commit, gameOptions, gaugeSettingOn, random, recordStat, throwModeManual],
+    [aceLevels, career, commit, gameOptions, gaugeSettingOn, random, recordStat, throwModeManual],
   )
 
   /** 새 시즌 처리 0x1b768 → 137 "N년차" 표지 → 105 관리 화면 (웹은 표지를 건너뛴다) */
@@ -1181,11 +1186,11 @@ export function usePitcherLeagueSession(
    */
   const pressPostseason = useCallback(() => {
     if (career === null || career.postseason === null || scene !== '포스트시즌' || postseasonPopup !== null) return
-    const result = pressPostseasonBracket(career.postseason, career.teamId, random)
+    const result = pressPostseasonBracket(career.postseason, career.teamId, random, aceLevels)
     if (result.kind === '우승발표') return setPostseasonPopup({ kind: '우승발표', champion: result.champion })
     if (result.kind === '내경기') return beginGame()
     commit({ ...career, postseason: result.series })
-  }, [beginGame, career, commit, postseasonPopup, random, scene])
+  }, [aceLevels, beginGame, career, commit, postseasonPopup, random, scene])
 
   /** 128 팝업 닫힘 — 틀 0x15984. 0xb 는 보상 뒤 128 에 머물고(해금 0x32 — 투수편), 7 → (내 팀 우승이면 8) → 132 */
   const closePostseasonPopup = useCallback(() => {

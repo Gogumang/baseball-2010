@@ -658,9 +658,14 @@ export function applyPitcherGameResult(career: PitcherCareer, outcome: PitcherGa
 }
 
 /** 같은 날 나머지 네 경기 (0xc2a48) — 타자편과 같은 코드를 부른다 */
-export function applyPitcherLeagueDay(career: PitcherCareer, random: RandomPort): PitcherCareer {
+export function applyPitcherLeagueDay(
+  career: PitcherCareer,
+  random: RandomPort,
+  /** 전역 마선수 레벨 열 칸 `mgr[0x13a..0x143]` — CPU 끼리 경기의 마선수 배율(0xd88aa). 안 넘기면 Lv1(60%) */
+  aceLevels?: Readonly<Record<number, number>>,
+): PitcherCareer {
   const day = Math.max(0, career.gamesPlayed - 1)
-  const played = playLeagueDay(career.league, day, career.teamId, random, career.leaguePlayerStats)
+  const played = playLeagueDay(career.league, day, career.teamId, random, career.leaguePlayerStats, {}, aceLevels)
   return { ...career, league: played.league, leaguePlayerStats: played.playerStats }
 }
 
@@ -676,9 +681,14 @@ export function applyPitcherSeasonEnd(career: PitcherCareer): PitcherCareer {
 }
 
 /** 포스트시즌을 내 차례까지 진행한다 (0x13da0) */
-export function applyPitcherPostseasonProgress(career: PitcherCareer, random: RandomPort): PitcherCareer {
+export function applyPitcherPostseasonProgress(
+  career: PitcherCareer,
+  random: RandomPort,
+  /** 전역 마선수 레벨 열 칸 — 안 넘기면 Lv1(60%) */
+  aceLevels?: Readonly<Record<number, number>>,
+): PitcherCareer {
   if (career.postseason === null) return career
-  const advanced = runCpuPostseason(career.postseason, career.teamId, random)
+  const advanced = runCpuPostseason(career.postseason, career.teamId, random, aceLevels)
   return advanced === career.postseason ? career : { ...career, postseason: advanced }
 }
 

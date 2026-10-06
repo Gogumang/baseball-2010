@@ -11,6 +11,7 @@ import { createCareer, startNextSeason } from '@/entities/career/model/playerCar
 import { EMPTY_LEAGUE, LEAGUE_TEAM_COUNT, startPostseason } from '@/entities/league/model/league'
 import type { League, PostseasonSeries } from '@/entities/league/model/league'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
+import { runCpuPostseasonWithStamina } from '@/entities/league/model/postseasonPlay'
 
 /** 팀 번호가 작을수록 많이 이긴 리그 — 순위가 0, 1, 2, … 가 된다 */
 const 순서대로리그: League = {
@@ -63,6 +64,17 @@ describe('128 키 0x13da0', () => {
       kind: '우승발표',
       champion: result.series.champion,
     })
+  })
+})
+
+describe('128 키의 CPU 경기는 전역 마선수 레벨을 본다 (0xc2760 · 0xd88aa)', () => {
+  it('넘긴 레벨이 CPU 고리에 그대로 간다 — 시즌모드 길(runCpuPostseasonWithStamina)과 같은 결과', () => {
+    const 레벨 = { 0: 4, 1: 4, 2: 4, 3: 4, 4: 4, 5: 4, 6: 4, 7: 4, 8: 4, 9: 4 }
+    for (let seed = 1; seed <= 20; seed += 1) {
+      const result = pressPostseasonBracket(대진(), 9, createSeededRandom(seed), 레벨)
+      const 기대 = runCpuPostseasonWithStamina(대진(), 9, createSeededRandom(seed), {}, 레벨).series
+      expect(result).toEqual({ kind: 'CPU진행', series: 기대 })
+    }
   })
 })
 

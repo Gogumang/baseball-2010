@@ -108,10 +108,12 @@ export function pressPostseasonBracket(
   series: PostseasonSeries,
   myTeamId: number,
   random: RandomPort,
+  /** 전역 마선수 레벨 열 칸 `mgr[0x13a..0x143]` — CPU 끼리 경기의 마선수 배율(0xd88aa). 안 넘기면 Lv1(60%) */
+  aceLevels?: Readonly<Record<number, number>>,
 ): PostseasonKeyResult {
   if (series.round === '종료') return { kind: '우승발표', champion: series.champion ?? -1 }
   if (isMyTurn(series, myTeamId)) return { kind: '내경기' }
-  return { kind: 'CPU진행', series: runCpuPostseason(series, myTeamId, random) }
+  return { kind: 'CPU진행', series: runCpuPostseason(series, myTeamId, random, aceLevels) }
 }
 
 /** 팝업 7 닫힘 (0x159b8~0x159f4) — 우승 팀이 내 팀이면 팝업 8, 아니면 null(→ 132) */

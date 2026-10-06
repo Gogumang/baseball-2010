@@ -686,10 +686,16 @@ export function applyGameResult(career: PlayerCareer, summary: GameSummary): Pla
  * 원본도 사람 경기 정산(0x4ea0c) 안에서 0xc2a48 을 따로 부른다 — 기록 갱신과 별개의 단계다.
  * `applyGameResult` 뒤에 부르는 것을 전제로 `gamesPlayed − 1` 을 일차로 쓴다.
  */
-export function applyLeagueDay(career: PlayerCareer, myTeamId: number, random: RandomPort): PlayerCareer {
+export function applyLeagueDay(
+  career: PlayerCareer,
+  myTeamId: number,
+  random: RandomPort,
+  /** 전역 마선수 레벨 열 칸 `mgr[0x13a..0x143]` — CPU 끼리 경기의 마선수 배율(0xd88aa). 안 넘기면 Lv1(60%) */
+  aceLevels?: Readonly<Record<number, number>>,
+): PlayerCareer {
   const day = Math.max(0, career.gamesPlayed - 1)
   // 원본 0xc2a48 은 승패만이 아니라 **선수별 타석 기록(0xa8024)도** 남긴다 — 둘 다 받아 넣는다
-  const played = playLeagueDay(career.league, day, myTeamId, random, career.leaguePlayerStats)
+  const played = playLeagueDay(career.league, day, myTeamId, random, career.leaguePlayerStats, {}, aceLevels)
   return { ...career, league: played.league, leaguePlayerStats: played.playerStats }
 }
 

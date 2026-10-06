@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   GAMES_PER_SEASON,
   applyPitcherGameResult,
+  applyPitcherLeagueDay,
   createPitcherCareer,
   effectivePitcherAbilityOf,
   equippedPitcherAbilityOf,
@@ -18,6 +19,8 @@ import type { PitcherCareer, PitcherGameOutcome } from '@/entities/pitcher-caree
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
 import { DEFAULT_PITCHER_ROOKIE_PROFILE } from '@/entities/pitcher-career/model/pitcherRegistration'
+import { playLeagueDay } from '@/entities/league/model/leagueDay'
+import { createSeededRandom } from '@/shared/api/random/seededRandom'
 
 const 투수 = (overrides: Partial<PitcherCareer> = {}): PitcherCareer => ({
   ...createPitcherCareer('테스트'),
@@ -228,5 +231,18 @@ describe('스킬 장착 칸 (선수기록 +0x14) — 모드 3 도 장착 동작 
     expect(pitcherSkillTableIdOf(8)).toBe(24)
     expect(pitcherSkillTableIdOf(18)).toBe(34)
     expect(pitcherSkillTableIdOf(23)).toBe(39)
+  })
+})
+
+describe('같은 날 CPU 끼리 경기는 전역 마선수 레벨을 본다 (0xc2a48 · 0xd88aa)', () => {
+  it('applyPitcherLeagueDay 가 넘긴 레벨을 playLeagueDay 에 그대로 건넨다', () => {
+    const 레벨 = { 0: 4, 1: 4, 2: 4, 3: 4, 4: 4, 5: 4, 6: 4, 7: 4, 8: 4, 9: 4 }
+    const career = 투수({ gamesPlayed: 3 })
+    for (let seed = 1; seed <= 10; seed += 1) {
+      const 결과 = applyPitcherLeagueDay(career, createSeededRandom(seed), 레벨)
+      const 기대 = playLeagueDay(career.league, 2, career.teamId, createSeededRandom(seed), career.leaguePlayerStats, {}, 레벨)
+      expect(결과.league).toEqual(기대.league)
+      expect(결과.leaguePlayerStats).toEqual(기대.playerStats)
+    }
   })
 })

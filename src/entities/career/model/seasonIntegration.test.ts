@@ -22,6 +22,8 @@ import { LEAGUE_TEAM_COUNT, rankingOf } from '@/entities/league/model/league'
 import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
 import type { GameSummary } from '@/entities/game/model/gameSummary'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { playLeagueDay } from '@/entities/league/model/leagueDay'
+import { createSeededRandom } from '@/shared/api/random/seededRandom'
 
 function 씨앗난수(seed: number): RandomPort {
   let state = seed
@@ -173,5 +175,18 @@ describe('한 시즌 통째로 — 경기 정산 흐름이 이어지는가', () 
     }
 
     expect(상대들.size).toBe(LEAGUE_TEAM_COUNT - 1)
+  })
+})
+
+describe('같은 날 CPU 끼리 경기는 전역 마선수 레벨을 본다 (0xc2a48 · 0xd88aa)', () => {
+  it('applyLeagueDay 가 넘긴 레벨을 playLeagueDay 에 그대로 건넨다', () => {
+    const 레벨 = { 0: 4, 1: 4, 2: 4, 3: 4, 4: 4, 5: 4, 6: 4, 7: 4, 8: 4, 9: 4 }
+    const career: PlayerCareer = { ...createCareer('레벨'), teamId: 0, gamesPlayed: 3 }
+    for (let seed = 1; seed <= 10; seed += 1) {
+      const 결과 = applyLeagueDay(career, 0, createSeededRandom(seed), 레벨)
+      const 기대 = playLeagueDay(career.league, 2, 0, createSeededRandom(seed), career.leaguePlayerStats, {}, 레벨)
+      expect(결과.league).toEqual(기대.league)
+      expect(결과.leaguePlayerStats).toEqual(기대.playerStats)
+    }
   })
 })

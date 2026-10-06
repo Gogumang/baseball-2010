@@ -594,7 +594,7 @@ export function playLeagueDay(
   pitcherStaminas: Readonly<Record<number, readonly number[]>> = {},
   /**
    * 마선수 레벨 열 칸 `mgr[0x13a..0x143]` — CPU 끼리 경기에 들어가는 마선수의 능력치 배율 `0xd88aa`.
-   * ⚠️ 안 넘기면 모두 Lv1(60%) — 커리어 모드들(투수편·타자편)은 아직 이 값을 안 넘긴다(미해결).
+   * 안 넘기면 모두 Lv1(60%). 앱은 시즌모드·커리어(타자편·투수편) 모두 `useAceLevels().levels` 를 넘긴다.
    */
   aceLevels?: Readonly<Record<number, number>>,
 ): LeagueDayResult {
