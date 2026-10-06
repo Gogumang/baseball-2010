@@ -242,11 +242,11 @@ describe('기록연감 칸 격자', () => {
     expect(screen.getAllByText('0G')).toHaveLength(8)
   })
 
-  it('스킬·닉네임 탭은 아래에 전체합계를 보여 준다', () => {
+  it('스킬·닉네임 탭은 아래에 전체합계를 보여 준다 — 닉네임은 쪽(공통 32) 안 얻은 수다 (0x2f8ee)', () => {
     띄우기({ collection: { ...EMPTY_COLLECTION, titles: [TITLE_NAMES[0]] } })
     fireEvent.click(screen.getByRole('button', { name: '닉네임' }))
 
-    expect(screen.getByText(`1/${TITLE_NAMES.length}`)).toBeTruthy()
+    expect(screen.getByText('1/32')).toBeTruthy()
   })
 })
 
@@ -399,5 +399,50 @@ describe('탭 0 설명 막대 (0x2e9b0~0x2ea86)', () => {
     fireEvent.keyDown(window, { key: 'ArrowRight' })
     // 쪽 1 · 줄 1 → 칸 9 = StrGAME[65]
     expect(screen.getByTestId('기록-설명').textContent).toBe(RECORD_DESCRIPTIONS[9])
+  })
+})
+
+describe('탭 3 닉네임 — 쪽(갈래)마다 흐르는 목록 (0x2f4ee · 0x61c54 · 0x61ce4)', () => {
+  const 닉네임탭본문 = () => {
+    fireEvent.click(screen.getByRole('button', { name: '닉네임' }))
+    fireEvent.keyDown(window, { key: 'Enter' })
+  }
+
+  it('쪽 0 은 공통 32칸 중 8줄, 못 얻은 칸은 이름 자리를 비운다 · 합계는 쪽 안 얻은 수/32', () => {
+    띄우기({ collection: { ...EMPTY_COLLECTION, titles: [TITLE_NAMES[1]] } })
+    닉네임탭본문()
+
+    expect(screen.getByTestId('닉네임-줄-0').textContent).toBe('1')
+    expect(screen.getByTestId('닉네임-줄-1').textContent).toBe(`2${TITLE_NAMES[1]}`)
+    expect(screen.queryByTestId('닉네임-줄-8')).toBeNull()
+    expect(screen.getByText('1/32')).toBeTruthy()
+  })
+
+  it('↓·8 로 한 줄씩 흐르고 막대가 3 씩 내려간다 — 끝(윗줄 24)에서 멈춘다', () => {
+    띄우기()
+    닉네임탭본문()
+
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    fireEvent.keyDown(window, { key: '8' })
+    expect(screen.queryByTestId('닉네임-줄-1')).toBeNull()
+    expect(screen.getByTestId('닉네임-줄-2')).toBeTruthy()
+    expect(screen.getByTestId('닉네임-줄-9')).toBeTruthy()
+    expect((screen.getByTestId('닉네임-스크롤-막대') as HTMLElement).style.top).toBe(`${94 + 6 + 1}px`)
+
+    for (let i = 0; i < 30; i += 1) fireEvent.keyDown(window, { key: 'ArrowDown' })
+    expect(screen.getByTestId('닉네임-줄-31')).toBeTruthy()
+    expect(screen.getByTestId('닉네임-줄-24')).toBeTruthy()
+  })
+
+  it('쪽을 넘기면 타자편 16칸(이름 32~47)이 처음부터 — 막대 길이 116', () => {
+    띄우기({ collection: { ...EMPTY_COLLECTION, titles: [TITLE_NAMES[32]] } })
+    닉네임탭본문()
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+
+    expect(screen.getByTestId('닉네임-줄-0').textContent).toBe(`1${TITLE_NAMES[32]}`)
+    expect(screen.getByText('1/16')).toBeTruthy()
+    expect((screen.getByTestId('닉네임-스크롤-막대') as HTMLElement).style.height).toBe('116px')
   })
 })

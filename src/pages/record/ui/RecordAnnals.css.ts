@@ -151,3 +151,16 @@ export const tickerText = style({
   lineHeight: '11px',
   whiteSpace: 'nowrap',
 })
+
+/** 탭 3 스크롤 막대 길 — RGB(0x20, 0x30, 0x9e) (0x58c5a) */
+export const scrollTrack = style({
+  position: 'absolute',
+  pointerEvents: 'none',
+})
+
+/** 탭 3 스크롤 막대 — 흰색 (0x58cbe) */
+export const scrollThumb = style({
+  position: 'absolute',
+  background: '#ffffff',
+  pointerEvents: 'none',
+})

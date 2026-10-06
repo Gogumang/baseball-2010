@@ -279,3 +279,20 @@ export function tickerTextXOf(counter: number, textWidth: number): number {
   const period = textWidth + width
   return period > 0 ? x + width - (counter % period) : x + width
 }
+
+/**
+ * 탭 3 스크롤 막대 — 0x58c10(…, x0 + 0xb3, y0 + 0x28, 그림) (0x58c56~0x58cf0):
+ * 길 (203, 94, 7, 길이 + 2) 을 RGB(0x20, 0x30, 0x9e) 로 채우고, slt_frame 이미지 78(▲ 7×5)을 (203, 90) ·
+ * 뒤집어 (203, 94 + 길이 + 1), 막대는 흰색 (204, 95 + 위치, 4, 막대 길이).
+ */
+export const NICKNAME_SCROLLBAR = {
+  x: PANEL.x + 0xb3,
+  y: PANEL.y + 0x28,
+  width: 7,
+  trackColor: '#20309e',
+  arrowImage: 78,
+  arrowDy: -4,
+  thumbWidth: 4,
+} as const
+/** 쪽 제목 "공통/타자/투수" 다음 "닉네임"(img_text 279)은 제목 폭 + 2 뒤 (0x2f5aa~0x2f5ca) */
+export const NICKNAME_TAB_LABEL = { frame: 279, gap: 2 } as const

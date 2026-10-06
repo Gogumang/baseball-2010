@@ -10,7 +10,7 @@ import { RECORD_NAMES } from '@/entities/game/model/gameRecords'
 import { parseGameMarkup, stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import { RECORD_DESCRIPTIONS } from '@/pages/record/lib/recordDescriptions'
 import {
-  ACHIEVEMENT_MARK, DESCRIPTION_BAR, DESCRIPTION_TICKER, RECORD_COUNT, tickerTextXOf, CELL_FRAMES, CELL_GRID, LIST_GRID, LOCKED_MARK, NAME_ROW, PAGER, PAGE_TITLE, PANEL,
+  ACHIEVEMENT_MARK, DESCRIPTION_BAR, NICKNAME_SCROLLBAR, NICKNAME_TAB_LABEL, DESCRIPTION_TICKER, RECORD_COUNT, tickerTextXOf, CELL_FRAMES, CELL_GRID, LIST_GRID, LOCKED_MARK, NAME_ROW, PAGER, PAGE_TITLE, PANEL,
   SPECIAL_RECORD_FIRST_CELL, SPECIAL_RECORD_NAMES,
   ENDING_CELL_NAMES, NARI_ENDING_CELL_COUNT, PROGRESS_ROW, SCROLL_MARKS, endingCellFrameOf, endingProgressOf, SKILL_DESCRIPTION, TAB_BAR, TAB_COUNT, TAB_CURSOR, TAB_NAMES,
   TAB_NAME_FRAMES, TAB_NAME_Y, TAB_PAGE_COUNTS, TOTAL_ROW, cellPositionOf, tabIconWidthOf,
@@ -20,9 +20,11 @@ import { STAT_NAMES } from '@/pages/record/lib/statNames'
 import type { AnnalsDirection } from '@/pages/record/lib/annalsGrid'
 import {
   ANNALS_GRID_SHAPES, DIRECTION_CODES, PANEL_ANIMATION_DRAWS, PANEL_FULL_HEIGHT, VISIBLE_GRID_ROWS,
-  closingPanelHeightOf, cursorShakeOf, hasDownMark, isBlinkOn, moveGridCursor, openingPanelHeightOf, panelTopOf,
-  scrollTopAfter,
+  NICKNAME_PAGE_FIRST_NAMES, NICKNAME_PAGE_TITLE_FRAMES, NICKNAME_PAGE_TOTALS, NICKNAME_SCROLL_TRACK,
+  NICKNAME_VISIBLE_ROWS, closingPanelHeightOf, cursorShakeOf, hasDownMark, isBlinkOn, moveGridCursor,
+  nicknameScrollDirectionOf, openingPanelHeightOf, panelTopOf, scrollNicknames, scrollTopAfter, startNicknameScroll,
 } from '@/pages/record/lib/annalsGrid'
+import type { NicknameScroll } from '@/pages/record/lib/annalsGrid'
 import {
   INITIAL_SECRET_CODE_STATE, UNLOCKED_STAT_PAGE_COUNT, statNameOffsetOf, statPageCellsOf, statTotalTextOf,
   statValueTextOf, typeSecretDigit,
@@ -113,12 +115,15 @@ export function RecordAnnals({ collection, onBack, gamePoint = 0 }: RecordAnnals
   // 쪽 넘기기 한도 — 통계 탭은 비밀 번호가 열려 있으면 8쪽 (0x2ba32 · 0x2ba8c). 쪽 번호 "/전체" 는 늘 표 값이다
   const pageLimit = tab === 4 && secretCode.isUnlocked ? UNLOCKED_STAT_PAGE_COUNT : TAB_PAGE_COUNTS[tab]
   const pageCount = TAB_PAGE_COUNTS[tab]
-  /** 0x2b640 — 탭 새로 시작: 쪽 0 · 커서 (0, 0) · 창 0~3 */
+  /** 탭 3 닉네임 스크롤 객체 (skin +0x108~+0x120) — 탭 3 을 새로 시작하거나 탭 3 에서 쪽을 넘길 때만 다시 세운다 */
+  const [nicknameScroll, setNicknameScroll] = useState<NicknameScroll>(() => startNicknameScroll(NICKNAME_PAGE_TOTALS[0]))
+  /** 0x2b640 — 탭 새로 시작: 쪽 0 · 커서 (0, 0) · 창 0~3 · 탭 3 이면 스크롤 0x61c54(…, 0x20) */
   const restartTab = (next: number) => {
     setTab(next)
     setPage(0)
     setCursor(0)
     setGridTop(0)
+    if (next === 3) setNicknameScroll(startNicknameScroll(NICKNAME_PAGE_TOTALS[0]))
   }
   const changeTab = (next: number) => restartTab((next + TAB_COUNT) % TAB_COUNT)
   /** CLR — 본문이면 탭 막대로(0x2b95c), 탭 막대면 판을 닫기 시작한다(0x2b946) */
@@ -152,7 +157,10 @@ export function RecordAnnals({ collection, onBack, gamePoint = 0 }: RecordAnnals
         }
         return
       }
-      // 본문: 격자가 숫자 2·4·6·8 을 방향으로 바꾼다 (표 0xd2e7c)
+      // 본문: 날 키를 스크롤 객체에도 넘긴다 (0x2b876 → 0x61ce4 — 세운 적이 있는 탭 3 에서만 보인다)
+      const scrollDirection = nicknameScrollDirectionOf(key)
+      if (scrollDirection !== null) setNicknameScroll((previous) => scrollNicknames(previous, scrollDirection))
+      // 격자가 숫자 2·4·6·8 을 방향으로 바꾼다 (표 0xd2e7c)
       const direction = annalsDirectionOf(key)
       if (direction === null) return
       event.preventDefault()
@@ -168,7 +176,11 @@ export function RecordAnnals({ collection, onBack, gamePoint = 0 }: RecordAnnals
       // 끝에 [skin+0x80] = 0 (0x2babe) — 탭 0·4 그림이 0 일 때만 목록 객체 [mgr+0xe0] 를 새 쪽으로 다시 짓고(0x79ed5 ·
       // 0x7a005, 0x2e8e0~0x2e996) 1 올리는 "다시 지어라" 깃발이다. 웹은 그릴 때마다 쪽에서 줄을 새로 뽑으므로 따로 둘 것이 없다
       const step = direction === 'right' ? 1 : -1
-      if (pageLimit > 0) setPage((previous) => (previous + step + pageLimit) % pageLimit)
+      if (pageLimit === 0) return
+      const nextPage = (page + step + pageLimit) % pageLimit
+      setPage(nextPage)
+      // 탭 3 이면 새 쪽의 개수로 스크롤을 다시 세운다 (0x2bac6: 쪽 0 ? 0x20 : 0x10)
+      if (tab === 3) setNicknameScroll(startNicknameScroll(nextPage === 0 ? 0x20 : 0x10))
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
@@ -281,8 +293,9 @@ export function RecordAnnals({ collection, onBack, gamePoint = 0 }: RecordAnnals
       {tab === 3 && (
         <NameRows
           frames={frames}
+          textFrames={textFrames}
           page={page}
-          names={TITLE_NAMES}
+          scroll={nicknameScroll}
           owned={collection.titles}
         />
       )}
@@ -328,7 +341,8 @@ export function RecordAnnals({ collection, onBack, gamePoint = 0 }: RecordAnnals
           textFrames={textFrames}
           value={tab === 2
             ? `${collection.skills.length}/${ORIGINAL_SKILLS.length}`
-            : `${collection.titles.length}/${TITLE_NAMES.length}`}
+            // 탭 3 은 쪽(갈래)마다 얻은 수 [skin+0x124] / 칸 수 — "!C!cffff00%d/%d" (0x2f8ee~0x2f8fa)
+            : `${ownedNicknameCountOf(page, collection.titles)}/${NICKNAME_PAGE_TOTALS[page] ?? 0}`}
         />
       )}
 
@@ -462,32 +476,71 @@ function annalsDirectionOf(key: string): AnnalsDirection | null {
   return null
 }
 
-/** 164×18 이름 줄 8개 (탭 3 닉네임) */
+/** 쪽(갈래) p 의 칸 i 를 얻었는가 — 0x61d90(mgr, p, i). 웹은 칭호를 이름으로 들고 있어 이름 첫 번호를 더해 찾는다 */
+const isNicknameOwned = (page: number, index: number, owned: readonly string[]) =>
+  owned.includes(TITLE_NAMES[(NICKNAME_PAGE_FIRST_NAMES[page] ?? 0) + index] ?? '')
+/** 쪽(갈래)에서 얻은 수 [skin+0x124] — 그릴 때마다 0 에서 센다 (0x2f5d8~0x2f692) */
+const ownedNicknameCountOf = (page: number, owned: readonly string[]) =>
+  Array.from({ length: NICKNAME_PAGE_TOTALS[page] ?? 0 }, (_, index) => index)
+    .filter((index) => isNicknameOwned(page, index, owned)).length
+
+/**
+ * 탭 3 닉네임 (0x2f4ee~0x2f920) — 쪽 제목 · 164×18 이름 줄 8개 · 스크롤 막대.
+ * ```
+ * 노란 네모 slt_frame 이미지 38 (34, 78) · 쪽 제목 img_text 표 0xced88[쪽] (42, 76) · "닉네임" img_text 279 (44 + 제목폭, 76)
+ * 0x58c10 → 보이는 칸 [윗줄, min(윗줄 + 8, 개수)) + 스크롤 막대 (203, 94)
+ * 칸 i (k = i − 윗줄): 프레임 12 (33, 89 + 19k) · 번호 i + 1 (48, 93 + 19k)
+ *                     얻었으면 이름 StrNICKNAME[첫 번호 + i] (70, 93 + 19k) — 못 얻었으면 이름 자리를 비운다
+ * ```
+ * 줄 커서는 그리지 않는다 (탭 3 은 0x7a571 을 안 부른다).
+ */
 function NameRows({
-  frames, page, names, owned,
+  frames, textFrames, page, scroll, owned,
 }: {
   readonly frames: ReturnType<typeof useFrameOrigins>
+  readonly textFrames: ReturnType<typeof useFrameOrigins>
   readonly page: number
-  readonly names: readonly string[]
+  readonly scroll: NicknameScroll
   readonly owned: readonly string[]
 }) {
-  const start = page * NAME_ROW.visibleRows
+  const end = Math.min(scroll.top + NICKNAME_VISIBLE_ROWS, scroll.total)
+  const indices = Array.from({ length: Math.max(0, end - scroll.top) }, (_, offset) => scroll.top + offset)
+  const titleFrame = NICKNAME_PAGE_TITLE_FRAMES[page] ?? NICKNAME_PAGE_TITLE_FRAMES[0]
+  const { x: barX, y: barY } = NICKNAME_SCROLLBAR
   return (
     <>
-      {names.slice(start, start + NAME_ROW.visibleRows).map((name, offset) => {
+      <img className={styles.sprite} alt="" src={imageSrc(SLT_FRAME, PAGE_TITLE.bulletImage)}
+        style={{ left: PAGE_TITLE.bulletX, top: PAGE_TITLE.bulletY }} />
+      <FrameSprite folder={IMG_TEXT} frame={titleFrame} origins={textFrames} x={PAGE_TITLE.x} y={PAGE_TITLE.y} />
+      <FrameSprite folder={IMG_TEXT} frame={NICKNAME_TAB_LABEL.frame} origins={textFrames}
+        x={PAGE_TITLE.x + nameWidthOf(textFrames, titleFrame) + NICKNAME_TAB_LABEL.gap} y={PAGE_TITLE.y} />
+      {indices.map((index, offset) => {
         const y = NAME_ROW.firstY + NAME_ROW.step * offset
+        const name = TITLE_NAMES[(NICKNAME_PAGE_FIRST_NAMES[page] ?? 0) + index] ?? ''
         return (
-          <div key={name}>
+          <div key={index} data-testid={`닉네임-줄-${index}`}>
             <FrameSprite folder={SLT_FRAMES} frame={NAME_ROW.frame} origins={frames} x={NAME_ROW.x} y={y} />
             <div className={styles.rowText} style={{ left: NAME_ROW.numberX, top: y + 4 }}>
-              {start + offset + 1}
+              {index + 1}
             </div>
-            <div className={styles.rowText} style={{ left: NAME_ROW.nameX, top: y + 4, width: 110 }}>
-              {owned.includes(name) ? name : '???'}
-            </div>
+            {isNicknameOwned(page, index, owned) && (
+              <div className={styles.rowText} style={{ left: NAME_ROW.nameX, top: y + 4, width: 110 }}>
+                {name}
+              </div>
+            )}
           </div>
         )
       })}
+      {/* 스크롤 막대 0x58c10 — 길 · ▲▼ · 흰 막대 */}
+      <div className={styles.scrollTrack} data-testid="닉네임-스크롤"
+        style={{ left: barX, top: barY, width: NICKNAME_SCROLLBAR.width, height: NICKNAME_SCROLL_TRACK + 2,
+          background: NICKNAME_SCROLLBAR.trackColor }} />
+      <img className={styles.sprite} alt="" src={imageSrc(SLT_FRAME, NICKNAME_SCROLLBAR.arrowImage)}
+        style={{ left: barX, top: barY + NICKNAME_SCROLLBAR.arrowDy }} />
+      <img className={styles.sprite} alt="" src={imageSrc(SLT_FRAME, NICKNAME_SCROLLBAR.arrowImage)}
+        style={{ left: barX, top: barY + NICKNAME_SCROLL_TRACK + 1, transform: 'scaleY(-1)' }} />
+      <div className={styles.scrollThumb} data-testid="닉네임-스크롤-막대"
+        style={{ left: barX + 1, top: barY + scroll.thumb + 1, width: NICKNAME_SCROLLBAR.thumbWidth, height: scroll.thumbLength }} />
     </>
   )
 }

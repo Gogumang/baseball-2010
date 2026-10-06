@@ -159,3 +159,58 @@ export function closingPanelHeightOf(draws: number): number {
 
 /** 판 높이 h 일 때 판 윗변 — 가운데 (H/2 = 160) 에서 h/2 (버림) 위 */
 export const panelTopOf = (height: number) => 160 - Math.trunc(height / 2)
+
+/**
+ * **탭 3 닉네임 = 쪽마다 흐르는 목록** (직접 떴다). 쪽 = 갈래 — 0 공통 32 · 1 타자편 16 · 2 투수편 16 (표 0xcedac),
+ * 칸 i 의 이름은 StrNICKNAME[i + (0 · 0x20 · 0x30)] (0x2f764~0x2f7ec), 얻었는가는 0x61d90(mgr, 쪽, i).
+ * 보이는 줄은 8 이고 위·아래 키로 한 줄씩 흐른다 — 스크롤 객체가 skin 안에 있다:
+ * ```
+ * 0x61c54(skin, 0x8e, 8, 개수)   ; 탭 3 새로 시작(0x2b740, 개수 0x20) · 탭 3 쪽 넘기기(0x2bac6, 쪽 0 ? 0x20 : 0x10)
+ *   윗줄 [+0x108] = 0 · 막대 위치 [+0x11c] = 0 · 길 [+0x118] = 0x8e − 2 = 140 · 보임 [+0x110] = 8 · 개수 [+0x114]
+ *   한 칸 [+0x10c] = 1 · 막대 길이 [+0x120] = 140
+ *   개수 > 8: 한 칸 = 140 / 8 = 17, 막대 길이 = 140 − (개수 − 8) × 17 — 그것이 한 칸보다 작으면
+ *             막대 길이 = 0x8e − 3 × (개수 − 8) − 2, 한 칸 = 3
+ * 0x61ce4(skin, 날 키)            ; 본문 초점일 때 키마다 (0x2b876 — 격자 키 처리 뒤, 키 문 0x2b87c 앞)
+ *   ↑(−1)·'2': 개수 > 보임 && 윗줄 > 0 → 윗줄 − 1, 막대 위치 −= 한 칸 (0 아래면 0)
+ *   ↓(−2)·'8': 개수 > 보임 && 윗줄 + 보임 < 개수 → 윗줄 + 1, 막대 위치 += 한 칸 (길 − 10 위면 길 − 10)
+ * ```
+ */
+export interface NicknameScroll {
+  readonly top: number
+  readonly total: number
+  readonly thumb: number
+  readonly step: number
+  readonly thumbLength: number
+}
+export const NICKNAME_VISIBLE_ROWS = 8
+export const NICKNAME_SCROLL_TRACK = 0x8e - 2
+/** 쪽별 칸 수 (표 0xcedac) · 이름 첫 번호 · 쪽 제목 img_text (표 0xced88) */
+export const NICKNAME_PAGE_TOTALS = [0x20, 0x10, 0x10] as const
+export const NICKNAME_PAGE_FIRST_NAMES = [0, 0x20, 0x30] as const
+export const NICKNAME_PAGE_TITLE_FRAMES = [281, 149, 150] as const
+
+export function startNicknameScroll(total: number): NicknameScroll {
+  const hidden = total - NICKNAME_VISIBLE_ROWS
+  if (hidden <= 0) return { top: 0, total, thumb: 0, step: 0, thumbLength: NICKNAME_SCROLL_TRACK }
+  const step = Math.trunc(NICKNAME_SCROLL_TRACK / NICKNAME_VISIBLE_ROWS)
+  const thumbLength = NICKNAME_SCROLL_TRACK - hidden * step
+  if (thumbLength >= step) return { top: 0, total, thumb: 0, step, thumbLength }
+  return { top: 0, total, thumb: 0, step: 3, thumbLength: NICKNAME_SCROLL_TRACK + 2 - 3 * hidden - 2 }
+}
+
+export function scrollNicknames(scroll: NicknameScroll, direction: 'up' | 'down'): NicknameScroll {
+  if (scroll.total <= NICKNAME_VISIBLE_ROWS) return scroll
+  if (direction === 'up') {
+    if (scroll.top <= 0) return scroll
+    return { ...scroll, top: scroll.top - 1, thumb: Math.max(0, scroll.thumb - scroll.step) }
+  }
+  if (scroll.top + NICKNAME_VISIBLE_ROWS >= scroll.total) return scroll
+  return { ...scroll, top: scroll.top + 1, thumb: Math.min(NICKNAME_SCROLL_TRACK - 10, scroll.thumb + scroll.step) }
+}
+
+/** 날 키 → 스크롤 방향 (0x61ce4 는 격자를 안 거친 키를 본다: −1 · '2' 위, −2 · '8' 아래) */
+export function nicknameScrollDirectionOf(key: string): 'up' | 'down' | null {
+  if (key === 'ArrowUp' || key === '2') return 'up'
+  if (key === 'ArrowDown' || key === '8') return 'down'
+  return null
+}

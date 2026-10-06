@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   ANNALS_GRID_SHAPES, DIRECTION_CODES, PANEL_ANIMATION_DRAWS, PANEL_OPEN_START_HEIGHT, closingPanelHeightOf, cursorShakeOf,
-  hasDownMark, isBlinkOn, moveGridCursor, openingPanelHeightOf, panelTopOf, scrollTopAfter,
+  hasDownMark, isBlinkOn, moveGridCursor, nicknameScrollDirectionOf, openingPanelHeightOf, panelTopOf, scrollNicknames,
+  scrollTopAfter, startNicknameScroll,
 } from '@/pages/record/lib/annalsGrid'
 import { DESCRIPTION_BAR, DESCRIPTION_TICKER, tickerTextXOf } from '@/pages/record/lib/recordAnnalsLayout'
 import { RECORD_DESCRIPTIONS } from '@/pages/record/lib/recordDescriptions'
@@ -85,5 +86,24 @@ describe('탭 0 설명 막대 (0x2e9b0 · 0x5a8c8)', () => {
     expect(RECORD_DESCRIPTIONS).toHaveLength(48)
     expect(RECORD_DESCRIPTIONS[0]).toBe('타자가 자신의 안타로 3루까지 진출')
     expect(RECORD_DESCRIPTIONS[47]).toContain('90000 G포인트')
+  })
+})
+
+describe('탭 3 닉네임 스크롤 (0x61c54 · 0x61ce4)', () => {
+  it('공통 32칸 — 한 칸 17 로는 막대가 모자라 3 씩, 막대 길이 68', () => {
+    expect(startNicknameScroll(32)).toEqual({ top: 0, total: 32, thumb: 0, step: 3, thumbLength: 68 })
+    expect(startNicknameScroll(16)).toEqual({ top: 0, total: 16, thumb: 0, step: 3, thumbLength: 116 })
+  })
+
+  it('↑ 는 윗줄 0 에서 멈추고 ↓ 는 윗줄 + 8 이 개수에 닿으면 멈춘다', () => {
+    let scroll = startNicknameScroll(16)
+    expect(scrollNicknames(scroll, 'up')).toBe(scroll)
+    for (let i = 0; i < 20; i += 1) scroll = scrollNicknames(scroll, 'down')
+    expect([scroll.top, scroll.thumb]).toEqual([8, 24])
+    expect(scrollNicknames(scroll, 'up')).toMatchObject({ top: 7, thumb: 21 })
+  })
+
+  it('날 키 — ↑·2 위, ↓·8 아래', () => {
+    expect(['ArrowUp', '2', 'ArrowDown', '8', '4'].map(nicknameScrollDirectionOf)).toEqual(['up', 'up', 'down', 'down', null])
   })
 })
