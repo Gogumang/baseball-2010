@@ -149,6 +149,8 @@ export function App() {
     careerSession.career,
     isEveryMissionCleared(mission.clearedKeys),
     pitcherSession.career?.openedHiddenIds,
+    // 엔딩 적재 0x87c7c 는 두 편 공용 — 투수편 엔딩·연애 엔딩도 기록연감 칸에 켠다
+    pitcherSession.career,
   )
   const { recordStat: recordCollectionStat } = collection
   useEffect(() => {

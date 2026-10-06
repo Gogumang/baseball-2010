@@ -3,6 +3,7 @@ import {
   EMPTY_COLLECTION,
   HALL_OF_FAME_BATTER_SLOTS,
   mergeCareerIntoCollection,
+  mergeEndingIntoCollection,
   normalizeCollection,
   openHiddenForMissions,
   registerHallOfFame,
@@ -18,7 +19,8 @@ describe('기록연감 — 모은 닉네임·스킬·엔딩 (StrHOWTO[28])', () 
 
     expect(twice.titles).toEqual(['이름 없는 신인', '안타제조기'])
     expect(twice.skills).toEqual([2, 7])
-    expect(twice.endings).toEqual([5])
+    // 본 엔딩 5 에 연애 엔딩 10(짝 없음 — 본 연애 이벤트 0)이 같이 켜진다 (0x87c7c)
+    expect(twice.endings).toEqual([5, 10])
   })
 
   it('저장값이 깨졌으면 빈 기록연감이다', () => {
@@ -31,6 +33,14 @@ describe('기록연감 — 모은 닉네임·스킬·엔딩 (StrHOWTO[28])', () 
     const raw = { titles: [], skills: [], endings: [], hallOfFame: [famer, { name: 3 }, null] }
 
     expect(normalizeCollection(raw).hallOfFame).toEqual([famer])
+  })
+})
+
+describe('엔딩 칸 — 엔딩 적재 0x87c7c', () => {
+  it('본 엔딩과 연애 엔딩 9 + c 를 켜고, 부상·방출엔 연애 엔딩이 없다', () => {
+    expect(mergeEndingIntoCollection(EMPTY_COLLECTION, { endingIndex: 7, seenEventIds: ['300', '302'] }).endings).toEqual([7, 12])
+    expect(mergeEndingIntoCollection(EMPTY_COLLECTION, { endingIndex: 1, seenEventIds: ['300'] }).endings).toEqual([1])
+    expect(mergeEndingIntoCollection(EMPTY_COLLECTION, { endingIndex: null, seenEventIds: [] })).toBe(EMPTY_COLLECTION)
   })
 })
 

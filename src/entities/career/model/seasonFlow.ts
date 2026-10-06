@@ -1,6 +1,6 @@
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { hasSkill, startNextSeason } from '@/entities/career/model/playerCareer'
-import { TITLE_NAMES } from '@/entities/career/model/titles'
+import { ROMANCE_EVENT_IDS, TITLE_NAMES } from '@/entities/career/model/titles'
 import { BATTER_YEAR_GOALS } from '@/shared/config/original/yearGoals'
 
 /**
@@ -109,6 +109,37 @@ export function judgeEnding(career: PlayerCareer): number | null {
   if (popularity > 1000) return 3
   // 원본은 "999 이하" 만 은퇴식이라 정확히 1000 이면 판정이 없다 (−1)
   return popularity <= 999 ? 2 : null
+}
+
+/** 연애 엔딩은 StrENDING[9 + c] — c = 1(짝 없음) … 5(넷 모두) 라 10~14 다 */
+const ROMANCE_ENDING_BASE = 9
+/** 연애 엔딩이 붙는 본 엔딩 — 0 부상 · 1 방출 에는 없다 (0x87fba `cmp [this+0x2e4], #1 ; ble`) */
+const LAST_ENDING_WITHOUT_ROMANCE = 1
+
+/**
+ * 본 연애 이벤트 — **이벤트 번호 순서**(300 메디카 · 301 레오니 · 302 로제 · 303 발렌타인).
+ * 엔딩 적재 0x87c7c 가 이 순서로 `0xb6e81`(본 이벤트인가)을 물어 c 를 세고(0x87f4c~0x87fb0),
+ * 제작진 화면의 인물도 같은 순서로 만든다(0x88080~0x88162).
+ */
+export function romanceEventsSeenOf(seenEventIds: readonly string[]): readonly number[] {
+  return Object.values(ROMANCE_EVENT_IDS)
+    .filter((eventId) => seenEventIds.includes(String(eventId)))
+    .sort((left, right) => left - right)
+}
+
+/**
+ * 연애 엔딩 번호 (엔딩 적재 0x87c7c — 0x87f4c~0x87fd6, 두 편 공용 장면 0x106):
+ * ```
+ * c = 1 + 본(300) + 본(301) + 본(302) + 본(303)
+ * if [this+0x2e4](본 엔딩) > 1:  전역기록 +0xb1 + c = 1 ; 저장      ; 기록연감 엔딩 칸 9 + c
+ * [this+0x340] = 10, c 가 2·3·4·5 면 11·12·13·14                   ; 제작진 앞에 붙는 글 StrENDING[9 + c]
+ * ```
+ * 본 엔딩 칸은 같은 함수 0x87f30 이 `+0xa8 + e` 에 쓰므로 +0xb1 + c = +0xa8 + (9 + c) — 기록연감 엔딩 10~14 와 맞는다.
+ * 부상·방출(0·1)이면 null.
+ */
+export function romanceEndingIndexOf(endingIndex: number, seenEventIds: readonly string[]): number | null {
+  if (endingIndex <= LAST_ENDING_WITHOUT_ROMANCE) return null
+  return ROMANCE_ENDING_BASE + 1 + romanceEventsSeenOf(seenEventIds).length
 }
 
 /** 엔딩 보너스 표 0xcc40c (단위 1000 G포인트) */

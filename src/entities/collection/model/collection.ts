@@ -1,5 +1,6 @@
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
+import { romanceEndingIndexOf } from '@/entities/career/model/seasonFlow'
 import { EMPTY_ANNALS_STATS, normalizeAnnalsStats } from '@/entities/collection/model/annalsStats'
 import type { AnnalsStats } from '@/entities/collection/model/annalsStats'
 
@@ -37,12 +38,30 @@ const union = <T>(left: readonly T[], right: readonly T[]): T[] => [...new Set([
 
 export function mergeCareerIntoCollection(collection: Collection, career: PlayerCareer): Collection {
   return {
-    ...collection,
+    ...mergeEndingIntoCollection(collection, career),
     titles: union(collection.titles, career.titleIds),
     skills: union(collection.skills, career.skillIds),
-    endings: career.endingIndex === null ? collection.endings : union(collection.endings, [career.endingIndex]),
     openedHiddenIds: union(collection.openedHiddenIds, career.openedHiddenIds),
   }
+}
+
+/** 엔딩을 본 선수 — 타자편·투수편 커리어 둘 다 이 두 칸을 갖는다 */
+export interface EndingViewer {
+  readonly endingIndex: number | null
+  readonly seenEventIds: readonly string[]
+}
+
+/**
+ * 엔딩 적재 0x87c7c 가 기록연감 엔딩 칸을 켠다 — 두 편 공용 장면(0x106)이라 투수편 엔딩도 같은 칸이다:
+ * 본 엔딩 `+0xa8 + e`(0x87f30) 와, e > 1 이면 연애 엔딩 `+0xb1 + c`(0x87fce) = 9 + c (`romanceEndingIndexOf`).
+ * 이미 다 있으면 같은 객체를 돌려준다.
+ */
+export function mergeEndingIntoCollection(collection: Collection, viewer: EndingViewer): Collection {
+  if (viewer.endingIndex === null) return collection
+  const romance = romanceEndingIndexOf(viewer.endingIndex, viewer.seenEventIds)
+  const seen = romance === null ? [viewer.endingIndex] : [viewer.endingIndex, romance]
+  if (seen.every((index) => collection.endings.includes(index))) return collection
+  return { ...collection, endings: union(collection.endings, seen) }
 }
 
 /** 미션 올 클리어 → 타자 헬멧 레벨 9 (0xa5184 — 모드 6 이면 id 37) */

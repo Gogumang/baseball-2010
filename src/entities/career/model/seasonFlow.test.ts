@@ -9,6 +9,8 @@ import {
   canContinueAfterEnding,
   continueAfterEnding,
   endingBonusOf,
+  romanceEndingIndexOf,
+  romanceEventsSeenOf,
   applySalaryChange,
   goalResultEventId,
   judgeEnding,
@@ -93,6 +95,25 @@ describe('엔딩 판정 — 0xa3a84 (P 인기도 · R 평판 · M 소지금 100�
     expect(judgeEnding(선수({ season: 8, popularity: 1001, money: 20_000 }))).toBe(4)
     expect(judgeEnding(선수({ season: 8, popularity: 1001 }))).toBe(3)
     expect(judgeEnding(선수({ season: 8, popularity: 999 }))).toBe(2)
+  })
+})
+
+describe('연애 엔딩 10~14 — 0x87c7c (0x87f4c~0x87fd6)', () => {
+  it('c = 1 + 본 연애 이벤트(300~303) 수, 엔딩은 9 + c', () => {
+    expect(romanceEndingIndexOf(2, [])).toBe(10)
+    expect(romanceEndingIndexOf(5, ['300'])).toBe(11)
+    expect(romanceEndingIndexOf(9, ['301', '303'])).toBe(12)
+    expect(romanceEndingIndexOf(3, ['300', '301', '302'])).toBe(13)
+    expect(romanceEndingIndexOf(8, ['303', '302', '301', '300', '128'])).toBe(14)
+  })
+
+  it('부상(0)·방출(1) 엔딩에는 붙지 않는다', () => {
+    expect(romanceEndingIndexOf(0, ['300'])).toBeNull()
+    expect(romanceEndingIndexOf(1, [])).toBeNull()
+  })
+
+  it('본 연애 이벤트는 이벤트 번호 순서로 센다', () => {
+    expect(romanceEventsSeenOf(['303', '300', '12'])).toEqual([300, 303])
   })
 })
 
