@@ -36,6 +36,9 @@ const PANEL = { x: 15, y: 55, width: 210, height: 220 } as const
 const VISIBLE_ROWS = 10
 const ROW = { x: 22, firstY: 92, height: 17, width: 196 } as const
 
+/** 머리띠 0x54d95 셋째 인자 — 투수 탭 0xf · 타자 탭 0x17 (일반 0x2e09e~0x2e0aa · 시즌 0xe0 그림 0xb08c~0xb098) */
+const ENTRY_FOOTER = { 투수: 0xf, 타자: 0x17 } as const
+
 const BATTER_ABILITY_LABELS = ['히트', '파워', '수비', '주루'] as const
 const PITCHER_ABILITY_LABELS = ['제구', '구속', '변화', '체력'] as const
 
@@ -146,12 +149,10 @@ export function EntryEditorScreen<B extends EntryBatterRow & EntryFace, P extend
         </div>
       )}
 
-      <div className={styles.hint} style={{ left: 0, top: PANEL.y + PANEL.height + 2, width: 240 }}>
-        {isPitcherTab ? '* 타자' : '* 투수'} · 0 상세정보 · 5 바꾸기
-      </div>
-
+      {/* 바닥 — 투수 탭 0xf "#타자"+"0상세정보"+되돌아가기 · 타자 탭 0x17 "#투수"+… (일반 0x2e0a2 · 시즌 0xb090).
+          표시는 "#" 지만 탭을 바꾸는 키는 편집기 0x55864 의 '*'(0x2a, 0x558c4)다 — '#'(0x23)는 아무 일도 안 한다. 원본 그대로 둔다. */}
       <ScreenFrame title={isPitcherTab ? '투수엔트리' : '타자엔트리'} gamePoint={gamePoint}
-        onBack={() => onKey('취소')} />
+        onBack={() => onKey('취소')} footer={isPitcherTab ? ENTRY_FOOTER.투수 : ENTRY_FOOTER.타자} />
 
       {isAceLocked && (
         <MessageBox text={ACE_ENTRY_LOCKED_TEXT} buttons={['OK']} onAnswer={onCloseAceLocked} />

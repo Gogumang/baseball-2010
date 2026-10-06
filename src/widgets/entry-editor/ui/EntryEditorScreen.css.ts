@@ -63,4 +63,3 @@ export const detail = style({
   pointerEvents: 'none',
 })
 
-export const hint = style({ ...text, fontSize: '10px', textAlign: 'center', pointerEvents: 'none' })

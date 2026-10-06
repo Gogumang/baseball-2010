@@ -60,4 +60,20 @@ describe('엔트리 편집 화면', () => {
     expect(onKey).not.toHaveBeenCalled()
     expect(screen.getByText(/바꿀수 없습니다/)).toBeTruthy()
   })
+
+  it('바닥은 투수 탭 0xf("#타자"·상세정보·되돌아가기) · 타자 탭 0x17("#투수"·…) — 0x2e098 · 0xb074', () => {
+    const marks = () => [...document.querySelectorAll('img[data-footer-mark]')].map((node) => Number((node as HTMLElement).dataset.footerMark))
+    띄우기()
+    expect(marks()).toEqual([3, 1])
+    expect(screen.getByRole('button', { name: '되돌아가기' })).toBeTruthy()
+    cleanup()
+    띄우기({ editor: { ...openEntryEditor(true), tab: ENTRY_TAB.타자 } })
+    expect(marks()).toEqual([2, 1])
+  })
+
+  it('"#" 표시지만 탭은 \'*\' 로 바꾼다 — \'#\' 는 넘기지 않는다 (0x558c4 cmp 0x2a)', () => {
+    const onKey = 띄우기()
+    fireEvent.keyDown(window, { key: '#' })
+    expect(onKey).not.toHaveBeenCalled()
+  })
 })
