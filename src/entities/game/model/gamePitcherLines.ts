@@ -29,6 +29,15 @@ export interface GameLeaguePitchers {
   readonly decision: GameEndDecision
   /** state 칸(측 0 = 초 공격 · 1 = 말 공격) → 그 측 팀 번호. 판정 받은 투수는 그 측 팀의 투수다 */
   readonly sideTeams: readonly [number, number]
+  /**
+   * 판정 받은 투수의 **붙박이 표 팀**이 측의 팀과 다를 때만 — 트레이드로 다른 팀 레코드에 옮겨 간 투수(원본 id 가 옛 팀
+   * Xls 행이라 기록이 그 자리로 쌓인다). 줄(`lines`)의 `teamId` 는 이미 그 표 팀이다. 없는 칸은 `sideTeams[측]`.
+   */
+  readonly decisionTableTeams?: {
+    readonly winner?: number
+    readonly loser?: number
+    readonly save?: number
+  }
 }
 
 /** 줄 하나에 더한다 — 없으면 새로 만든다 (나온 차례대로) */

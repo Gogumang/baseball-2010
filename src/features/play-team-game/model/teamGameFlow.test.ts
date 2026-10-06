@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { teamPitchers } from '@/entities/team/model/teamRoster'
+import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { createAtBat } from '@/entities/at-bat/model/atBatState'
 import { EMPTY_BATTER_GAME_LOG, recordBatterAtBat } from '@/entities/game/model/batterGameLog'
@@ -2239,5 +2239,79 @@ describe('36 필살송구 아웃 — 결과 코드 0xd(그 판의 아웃 판정)
       pendingDefensePlay: { ...progress.pendingDefensePlay!, outcome: { kind: '아웃', detail: '땅볼아웃' } as const },
     }
     expect(resolveDefensePlay(아웃타석, 아웃없음, random).recordIds).not.toContain(36)
+  })
+})
+
+describe('트레이드로 옮겨 온 선수 — 표 팀 + 칸으로 서고 그 자리로 쌓는다 (0xb8680 레코드 · 0xa8024 +0x20~)', () => {
+  /** 1팀 레코드: 0번 타자 자리에 5팀 표 0번 타자, 0번 투수 자리에 5팀 표 0번 투수 */
+  const 상대차례 = {
+    batters: Array.from({ length: 12 }, (_u, i) =>
+      i === 0 ? { rosterSlot: 0, position: 2, tableTeamId: 5 } : { rosterSlot: i, position: teamBatters(1)[i]?.position ?? 0 }),
+    pitchers: [{ tableTeamId: 5, tableSlot: 0 }, 1, 2, 3, 4, 5, 6, 7],
+  }
+
+  it('상대 명단을 그 팀 레코드 차례(opponentEntryOrder)로 세운다 — 옮겨 온 선수는 옛 팀 표 행이다', () => {
+    const { progress } = 시작({ opponentEntryOrder: 상대차례, opponentPitcherOrder: [0, 1, 2, 3, 4, 5, 6, 7] })
+    expect(progress.opponentEntry[0]).toMatchObject({ name: teamBatters(5)[0]!.name, rosterSlot: 0, tableTeamId: 5, position: 2 })
+    expect(progress.opponentEntry[1]).toMatchObject({ name: teamBatters(1)[1]!.name, rosterSlot: 1 })
+    expect(progress.opponentEntry[1]?.tableTeamId).toBeUndefined()
+    expect(progress.opponentPitcherEntry[0]).toMatchObject({ name: teamPitchers(5)[0]!.name, tableSlot: 0, tableTeamId: 5, orderIndex: 0 })
+  })
+
+  it('표와 같은 차례를 넘기면 명단·난수가 넘기지 않은 것과 같다', () => {
+    const 표차례 = {
+      batters: teamBatters(1).map((player, i) => ({ rosterSlot: i, position: player.position ?? 0 })),
+      pitchers: [0, 1, 2, 3, 4, 5, 6, 7],
+    }
+    const plain = 시작({ opponentPitcherOrder: [1, 2, 3, 0, 4, 5, 6, 7] })
+    const same = 시작({ opponentEntryOrder: 표차례, opponentPitcherOrder: [1, 2, 3, 0, 4, 5, 6, 7] })
+    expect(same.progress.opponentEntry).toEqual(plain.progress.opponentEntry)
+    expect(same.progress.opponentPitcherEntry).toEqual(plain.progress.opponentPitcherEntry)
+    expect(summaryOf(끝까지(same.progress, same.random))).toEqual({
+      ...summaryOf(끝까지(plain.progress, plain.random)),
+    })
+  })
+
+  it('옮겨 온 타자·투수의 타석·투구 줄은 옛 팀 표 자리로 쌓인다 — 경기 팀 표의 같은 칸이 아니다', () => {
+    const { progress, random } = 시작({ opponentEntryOrder: 상대차례, opponentPitcherOrder: [0, 1, 2, 3, 4, 5, 6, 7] })
+    const summary = summaryOf(끝까지(progress, random))
+    expect(summary.leaguePlateAppearances.some((line) => line.teamId === 5 && line.battingOrderIndex === 0)).toBe(true)
+    expect(summary.leaguePlateAppearances.some((line) => line.teamId === 1 && line.battingOrderIndex === 0)).toBe(false)
+    const lines = summary.leaguePitchers!.lines
+    expect(lines.some((line) => line.teamId === 5 && line.pitcherSlot === 0)).toBe(true)
+    expect(lines.some((line) => line.teamId === 1 && line.pitcherSlot === 0)).toBe(false)
+  })
+
+  it('판정 받은 투수가 옮겨 온 투수면 요약에 그 표 팀을 싣는다 (decisionTableTeams) — 없으면 칸째 없다', () => {
+    let seen = false
+    for (let seed = 1; seed < 30 && !seen; seed += 1) {
+      const { progress, random } = 시작({ opponentEntryOrder: 상대차례, opponentPitcherOrder: [0, 1, 2, 3, 4, 5, 6, 7] }, seed)
+      const pitchers = summaryOf(끝까지(progress, random)).leaguePitchers!
+      const teams = pitchers.decisionTableTeams
+      if (teams === undefined) continue
+      for (const key of ['winner', 'loser', 'save'] as const) {
+        if (teams[key] === undefined) continue
+        expect(teams[key]).toBe(5)
+        expect(pitchers.decision[key]?.number).toBe(0)
+        seen = true
+      }
+    }
+    expect(seen).toBe(true)
+    const { progress, random } = 시작()
+    expect(summaryOf(끝까지(progress, random)).leaguePitchers).not.toHaveProperty('decisionTableTeams')
+  })
+
+  it('내 팀 차례에 실린 표 팀 + 칸(ourEntryOrder)도 같다', () => {
+    const { progress } = 시작({
+      ourEntryOrder: {
+        batters: Array.from({ length: 12 }, (_u, i) =>
+          i === 3 ? { rosterSlot: 7, position: 4, tableTeamId: 6 } : { rosterSlot: i, position: 0 }),
+        pitchers: [0, 1, { tableTeamId: 6, tableSlot: 5 }, 3, 4, 5, 6, 7],
+      },
+    })
+    expect(progress.ourEntry[3]).toMatchObject({ name: teamBatters(6)[7]!.name, rosterSlot: 7, tableTeamId: 6 })
+    // 다른 표 팀의 칸은 경기 팀 표 칸을 차지하지 않는다
+    expect(progress.ourEntry.map((batter) => batter.rosterSlot)).toEqual([0, 1, 2, 7, 4, 5, 6, 7, 8, 9, 10, 11])
+    expect(progress.ourPitcherEntry[2]).toMatchObject({ name: teamPitchers(6)[5]!.name, tableSlot: 5, tableTeamId: 6 })
   })
 })

@@ -95,6 +95,11 @@ export interface SeasonMatchInfoInput {
    * 없으면 붙박이 표의 로테이션 칸으로 셈한다.
    */
   readonly myStarterName?: string | null
+  /**
+   * 상대 팀 "선발" 값 — 상대 팀 레코드 0번(`0x5e0e8`)의 이름. 트레이드로 바뀐 CPU 팀은 레코드 칸의 선수가 표 칸 선수와
+   * 달라 시즌 세션이 저장 명단에서 읽어 준다. 없으면 `opponentPitcherOrder` 0번 표 칸(그것도 없으면 날짜 칸)으로 셈한다
+   */
+  readonly opponentStarterName?: string | null
 }
 
 const LABELS = ['순위', '승패', '선발', '마투수', '마타자'] as const
@@ -144,9 +149,9 @@ export function seasonMatchInfoLines(input: SeasonMatchInfoInput): readonly Matc
     [winLossTextOf(input, myTeamId), winLossTextOf(input, opponentTeamId)],
     [
       input.myStarterName ?? starterNameOf(myTeamId, input.dayCounter),
-      input.opponentPitcherOrder === undefined
+      input.opponentStarterName ?? (input.opponentPitcherOrder === undefined
         ? starterNameOf(opponentTeamId, input.opponentDayCounter ?? input.dayCounter)
-        : teamPitchers(opponentTeamId)[input.opponentPitcherOrder[0] ?? 0]?.name ?? EMPTY_VALUE,
+        : teamPitchers(opponentTeamId)[input.opponentPitcherOrder[0] ?? 0]?.name ?? EMPTY_VALUE),
     ],
     [acePitcherNameOf(input.acePitcherId), acePitcherNameOf(input.opponentAces?.pitcher ?? -1)],
     [aceBatterNameOf(input.aceBatterId), aceBatterNameOf(input.opponentAces?.batter ?? -1)],

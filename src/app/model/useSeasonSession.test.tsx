@@ -12,6 +12,7 @@ import { SEASON_PLAYABLE_EVENTS } from '@/entities/season-mode/model/seasonEvent
 import { PRE_GAME_ACE_PHASE, SQUAD_PURPOSE } from '@/entities/season-mode/model/preGameFlow'
 import { ENTRY_SUB_TAB, ENTRY_TAB } from '@/entities/season-mode/model/entryEditor'
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
+import { entryBattersOfOrder } from '@/features/play-team-game/model/teamGameRoster'
 import { GAME_POINT_LIMIT } from '@/entities/season-mode/model/seasonRewards'
 import { clearSeasonGameRecord } from '@/entities/season-mode/model/seasonReputation'
 import { useGamePointWallet } from '@/entities/wallet/model/useGamePointWallet'
@@ -1444,9 +1445,38 @@ describe('투수 스태미나 +0x2c — 첫날 6850 0xb6190 · 하루 끝 4f2bc 
     // 상대 팀 레코드에는 내 0번 타자가 간다 — 그 팀 표 선수가 아니라 0팀 표의 0번
     expect(result.current.cpuRosterOf(3).batters[5]).toMatchObject({ id: 0, tableTeamId: 0, kindByte: 5 })
     const options = 경기까지(rendered)
+    // 명단 차례는 표 팀 + 칸(원본 id = 옛 팀 Xls 행)으로 실린다 — 팀 경기가 그 표 행으로 세우고 기록도 그 자리로 쌓는다
     const 첫타자 = options.ourEntryOrder!.batters[0]!
-    expect(첫타자.record?.name).toBe(teamBatters(3)[5]!.name)
-    expect(첫타자.record?.name).not.toBe(teamBatters(0)[5]!.name)
+    expect(첫타자).toMatchObject({ rosterSlot: 5, tableTeamId: 3 })
+    expect(entryBattersOfOrder(0, options.ourEntryOrder!)[0]).toMatchObject({
+      name: teamBatters(3)[5]!.name, rosterSlot: 5, tableTeamId: 3,
+    })
+  })
+
+  it('트레이드로 바뀐 CPU 팀과 붙으면 상대 명단을 시즌 저장의 그 팀 레코드로 세운다 (0xb8680 → 0x1f570)', () => {
+    // 같은 팀·같은 날이면 상대가 같다 — 한 판으로 상대를 알아 둔다
+    const probe = 띄우기(메모리저장())
+    시작(probe.result, 0)
+    const before = 경기까지(probe)
+    // 바뀌지 않은 팀은 넘기지 않는다 — 붙박이 표 그대로(예전 길)
+    expect(before.opponentEntryOrder).toBeUndefined()
+    const store = 메모리저장()
+    const rendered = 띄우기(store)
+    const { result } = rendered
+    시작(result, 0)
+    act(() => result.current.actions.finishTrade({
+      record: result.current.state!.record,
+      gamePointCost: 0,
+      isSuccess: true,
+      swap: { opponentTeamId: before.opponentTeamId, tab: 1, myIndex: 0, opponentIndex: 5 },
+    }))
+    const options = 경기까지(rendered)
+    expect(options.opponentTeamId).toBe(before.opponentTeamId)
+    const 상대명단 = entryBattersOfOrder(options.opponentTeamId, options.opponentEntryOrder!)
+    // 상대 5번 칸에는 내 0번 타자(0팀 표 0번)가 선다
+    expect(상대명단[5]).toMatchObject({ name: teamBatters(0)[0]!.name, rosterSlot: 0, tableTeamId: 0 })
+    expect(상대명단[4]).toMatchObject({ name: teamBatters(options.opponentTeamId)[4]!.name, rosterSlot: 4 })
+    expect(상대명단[4]?.tableTeamId).toBeUndefined()
   })
 })
 

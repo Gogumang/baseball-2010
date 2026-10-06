@@ -30,6 +30,13 @@ describe('시즌 경기정보 값 줄 (0x5dcc0 모드 2)', () => {
     expect(선발.cpu).toBe(teamPitchers(1)[5]?.name)
   })
 
+  it('상대 선발 이름을 받으면 그것을 쓴다 — 트레이드로 바뀐 레코드 0번 칸의 선수 (0x5e0e8)', () => {
+    const [, , 선발] = seasonMatchInfoLines({
+      ...기본, opponentPitcherOrder: [5, 0, 1, 2, 3, 4, 6, 7], opponentStarterName: '옮겨온투수',
+    })
+    expect(선발.cpu).toBe('옮겨온투수')
+  })
+
   it('상대 마선수 칸은 0xdd 진입에서 굴린 값이다 (0x6548 66f8·670a → 0xb56b5·0xb56e1)', () => {
     const [, , , 마투수, 마타자] = seasonMatchInfoLines({
       ...기본, acePitcherId: 0, aceBatterId: 1, opponentAces: { pitcher: 2, batter: 3 },

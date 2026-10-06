@@ -329,6 +329,14 @@ export interface TeamGameOptions {
    */
   readonly ourEntryOrder?: TeamEntryOrder
   /**
+   * **상대 팀 레코드의 명단 차례** — 있으면 붙박이 표 차례 대신 이 차례로 상대 타순·벤치·투수 명단을 세운다
+   * (`teamGameRoster.TeamEntryOrder`, 투수는 레코드 첨자 차례 — `opponentPitcherOrder` 가 그 첨자를 늘어세운다).
+   * 원본 경기용 팀 `0xb891c` 는 `team[i] = i` 첨자만 들고 선수는 `0xb8680` 이 모드 2·3·4 에서 `0x1f570(저장, 팀)` —
+   * **시즌 저장의 그 팀 레코드**에서 꺼낸다(b869e, 직접 떴다). 트레이드(0xd1cc~0xd3ae)가 CPU 팀 레코드도 바꾸므로
+   * 시즌은 바뀐 팀의 저장 명단(`SeasonSave.cpuRosters`)을 넘긴다. 안 넘기면 붙박이 표다.
+   */
+  readonly opponentEntryOrder?: TeamEntryOrder
+  /**
    * **이미 굴린 상대 마선수** 0~4 (`0x66968` 마투수 · `0x66994` 마타자). 있으면 `startTeamGame` 은 굴리지 않는다.
    * 원본은 경기 장면 전에 굴린다 — 일반모드 상태 22 진입 `0x314b0` → `0x30f20`(31058·3106c) ·
    * 시즌 0xdd 진입 `0x6548`(66ea·66fc). 그래서 경기정보·엔트리 화면이 이미 그 마선수를 본다.
@@ -802,7 +810,9 @@ function opponentAceIndexesOf(
  * `orderIndex` · 보직을 그대로 든다 — 로테이션 0xb5ca8 은 레코드째 옮긴다). 그 밖은 표 차례 그대로.
  */
 function opponentPitcherEntryOf(options: TeamGameOptions): readonly TeamEntryPitcher[] {
-  const table = rosterEntryPitchersOf(options.opponentTeamId)
+  const table = options.opponentEntryOrder === undefined
+    ? rosterEntryPitchersOf(options.opponentTeamId)
+    : entryPitchersOfOrder(options.opponentTeamId, options.opponentEntryOrder)
   const order = options.mode === TEAM_GAME_MODE.시즌 ? options.opponentPitcherOrder : undefined
   if (order === undefined) return table
   return order.flatMap((slot) => {
@@ -832,8 +842,11 @@ export function startTeamGame(options: TeamGameOptions, random: RandomPort): Tea
     ourOrder === undefined ? rosterEntryBattersOf(options.ourTeamId) : entryBattersOfOrder(options.ourTeamId, ourOrder),
     options.aceBatterId ?? NO_ACE_BATTER,
   )
+  // 상대 팀도 그 팀 레코드 차례로 선다 (0xb8680 → 0x1f570 — 트레이드로 바뀐 CPU 팀이면 바뀐 레코드)
   const opponentEntry = withAceBatter(
-    rosterEntryBattersOf(options.opponentTeamId),
+    options.opponentEntryOrder === undefined
+      ? rosterEntryBattersOf(options.opponentTeamId)
+      : entryBattersOfOrder(options.opponentTeamId, options.opponentEntryOrder),
     opponentAces.batter,
   )
   // 0x31042 · 0x31064 — 마타자와 **같은 자리에서** 마투수도 양 팀에 들어간다 (0xb88c8)
@@ -1337,7 +1350,9 @@ function withLeaguePlateAppearance(
 ): readonly LeaguePlateAppearance[] {
   const rosterSlot = entry[slot]?.rosterSlot ?? slot
   if (rosterSlot === NO_ROSTER_SLOT) return appearances
-  return [...appearances, { teamId, battingOrderIndex: rosterSlot, outcome, runsBattedIn }]
+  // 트레이드로 옮겨 온 선수는 옛 팀 표 자리(원본 id)로 쌓는다 — 레코드 +0x20~ 가 선수를 따라간다
+  const tableTeamId = entry[slot]?.tableTeamId ?? teamId
+  return [...appearances, { teamId: tableTeamId, battingOrderIndex: rosterSlot, outcome, runsBattedIn }]
 }
 
 /** 지금 타석에 선 우리 타자 (명단 칸 = 타순 칸) */
@@ -2963,7 +2978,8 @@ export function burstGameRecordOf(
         ? undefined
         : progress.pitcherLines.find(
             (candidate) =>
-              candidate.teamId === progress.options.opponentTeamId && candidate.pitcherSlot === entry.tableSlot,
+              candidate.teamId === (entry.tableTeamId ?? progress.options.opponentTeamId)
+              && candidate.pitcherSlot === entry.tableSlot,
           )
     return {
       hitsInGame: progress.ourEntryRecords[slot]?.hits ?? 0,
@@ -4067,7 +4083,8 @@ function chargeMoundLine(
   const teamId = ours ? progress.options.ourTeamId : progress.options.opponentTeamId
   const entry = pitcherEntryAt(progress, teamId, ours ? progress.ourPitcherIndex : progress.opponentPitcherIndex)
   if (entry?.tableSlot === undefined || entry.aceIndex >= 0) return progress.pitcherLines
-  return chargePitcherLine(progress.pitcherLines, teamId, entry.tableSlot, delta)
+  // 줄은 그 투수의 붙박이 표 자리로 — 트레이드로 옮겨 온 투수는 옛 팀이다 (`TeamEntryPitcher.tableTeamId`)
+  return chargePitcherLine(progress.pitcherLines, entry.tableTeamId ?? teamId, entry.tableSlot, delta)
 }
 
 /** 판정 칸(측 · 명단 칸)을 붙박이 표 칸으로 — 표 칸이 없는 투수(마투수)는 표 밖 칸(8)으로 둬 기록표가 건너뛴다 */
@@ -4077,6 +4094,32 @@ function decisionTableSlotOf(progress: TeamGameProgress, record: PitcherOfRecord
   const entry = (isOurs ? progress.ourPitcherEntry : progress.opponentPitcherEntry)[record.number]
   const tableSlot = entry === undefined || entry.aceIndex >= 0 ? undefined : entry.tableSlot
   return { side: record.side, number: tableSlot ?? PITCHERS_PER_TEAM }
+}
+
+/** 판정 받은 투수의 붙박이 표 팀 — 트레이드로 옮겨 온 투수만(그 밖은 측의 팀이라 undefined) */
+function decisionTableTeamOf(progress: TeamGameProgress, record: PitcherOfRecord | null): number | undefined {
+  if (record === null) return undefined
+  const isOurs = record.side === progress.game.playerSide
+  const entry = (isOurs ? progress.ourPitcherEntry : progress.opponentPitcherEntry)[record.number]
+  return entry === undefined || entry.aceIndex >= 0 ? undefined : entry.tableTeamId
+}
+
+/** 판정 셋의 표 팀 — 하나도 없으면 칸째 뺀다(트레이드가 없는 경기는 요약 모양이 예전과 같다) */
+function decisionTableTeamsOf(
+  progress: TeamGameProgress,
+  ended: { readonly winner: PitcherOfRecord | null; readonly loser: PitcherOfRecord | null; readonly save: PitcherOfRecord | null },
+): Pick<GameLeaguePitchers, 'decisionTableTeams'> {
+  const winner = decisionTableTeamOf(progress, ended.winner)
+  const loser = decisionTableTeamOf(progress, ended.loser)
+  const save = decisionTableTeamOf(progress, ended.save)
+  if (winner === undefined && loser === undefined && save === undefined) return {}
+  return {
+    decisionTableTeams: {
+      ...(winner === undefined ? {} : { winner }),
+      ...(loser === undefined ? {} : { loser }),
+      ...(save === undefined ? {} : { save }),
+    },
+  }
 }
 
 /** 측별 지금 마운드 투수 칸 — 승·패·세 칸이 "그 순간 마운드에 선 투수" 로 적는다 */
@@ -4222,6 +4265,7 @@ export function summaryOf(progress: TeamGameProgress): TeamGameSummary {
         game.playerSide === 0
           ? [progress.options.ourTeamId, progress.options.opponentTeamId]
           : [progress.options.opponentTeamId, progress.options.ourTeamId],
+      ...decisionTableTeamsOf(progress, ended),
     },
     burstRewardDeltas: progress.burstRewardDeltas,
   }

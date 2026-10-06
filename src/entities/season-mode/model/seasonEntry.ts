@@ -1,9 +1,7 @@
 import { ACE_BATTERS, ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
 import { ROTATION_SIZE, rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
-import { PITCHERS_PER_TEAM, teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
+import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { HALL_OF_FAME_FIRST_ID, tableTeamOf } from '@/entities/season-mode/model/playerRecruit'
-import { ROSTER_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
-import { rosterPitcherRoleOf } from '@/entities/pitching/model/pitcherChange'
 import type { SeasonPlayer, SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
 import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
 import type { EntryBatterRow, EntryLists, EntryPitcherRow } from '@/entities/season-mode/model/entryEditor'
@@ -234,9 +232,21 @@ export interface SeasonEntryRecordSource {
 }
 
 export interface SeasonEntryOrder {
-  readonly batters: readonly { readonly rosterSlot: number; readonly position: number; readonly record?: SeasonEntryBatterRecord }[]
-  /** 로스터 칸, 또는 표 밖 선수의 기록 */
-  readonly pitchers: readonly (number | SeasonEntryPitcherRecord)[]
+  readonly batters: readonly {
+    readonly rosterSlot: number
+    readonly position: number
+    readonly record?: SeasonEntryBatterRecord
+    /** `rosterSlot` 의 붙박이 표 팀 — 트레이드로 옮겨 온 선수만 (`SeasonPlayer.tableTeamId`) */
+    readonly tableTeamId?: number
+  }[]
+  /** 로스터 칸, 표 밖 선수의 기록, 또는 다른 팀 표 자리(트레이드로 옮겨 온 투수) */
+  readonly pitchers: readonly (number | SeasonEntryPitcherRecord | SeasonEntryTablePitcher)[]
+}
+
+/** 다른 팀 붙박이 표 자리의 투수 — 트레이드로 옮겨 온 투수 */
+export interface SeasonEntryTablePitcher {
+  readonly tableTeamId: number
+  readonly tableSlot: number
 }
 
 export function seasonEntryOrderOf(roster: SeasonTeamRoster, recordOf?: SeasonEntryRecordSource): SeasonEntryOrder {
@@ -244,16 +254,18 @@ export function seasonEntryOrderOf(roster: SeasonTeamRoster, recordOf?: SeasonEn
   return {
     batters: roster.batters.map((player) => {
       const position = player.fieldPosition & 0xf
-      const traded = tradedBatterRecordOf(player)
-      if (traded !== undefined) return { rosterSlot: NOT_IN_ROSTER, position, record: traded }
-      if (isTablePlayer(player)) return { rosterSlot: player.id, position }
+      if (isTablePlayer(player)) {
+        return player.tableTeamId === undefined
+          ? { rosterSlot: player.id, position }
+          : { rosterSlot: player.id, position, tableTeamId: player.tableTeamId }
+      }
       const record = player.record ?? recordOf?.batter(player)
       return record === undefined ? { rosterSlot: NOT_IN_ROSTER, position } : { rosterSlot: NOT_IN_ROSTER, position, record }
     }),
     pitchers: roster.pitchers.map((player) => {
-      const traded = tradedPitcherRecordOf(player)
-      if (traded !== undefined) return traded
-      if (isTablePlayer(player)) return player.id
+      if (isTablePlayer(player)) {
+        return player.tableTeamId === undefined ? player.id : { tableTeamId: player.tableTeamId, tableSlot: player.id }
+      }
       const carried = player.record
       if (carried !== undefined && 'repertoire' in carried) return carried
       return recordOf?.pitcher(player) ?? NOT_IN_ROSTER
@@ -263,23 +275,7 @@ export function seasonEntryOrderOf(roster: SeasonTeamRoster, recordOf?: SeasonEn
 
 /*
  * **트레이드로 옮겨 온 리그 선수**(`tableTeamId` 가 선 선수) — 원본 경기용 팀 0xb891c 는 팀 레코드의 0x30 바이트를 그대로
- * 쓰므로(0xb8680) 그 선수는 옛 팀 Xls 행 사본(이름 0xaa458 표의 제 id · 능력치 0xb6414 · 구질 · 보직 +0xb)으로 선다.
- * 팀 경기의 명단 칸(`rosterSlot`)은 **경기 팀 표의 칸**이라 그 선수를 가리킬 수 없어, 영입 선수처럼 기록을 실어 넘긴다.
- * ⚠️ 그래서 그 선수의 사람 경기 성적은 리그 기록표에 안 쌓인다(원본은 레코드 +0x20~ 에 쌓아 선수를 따라간다) — 팀 경기가
- *    "표 팀 + 칸" 을 따로 받게 되면 `leagueBatterIdOf(옛 팀, id)` 로 쌓을 수 있다. 미해결로 남긴다.
+ * 쓰므로(0xb8680) 그 선수는 옛 팀 Xls 행 사본(이름 0xaa458 표의 제 id · 능력치 0xb6414 · 구질 · 보직 +0xb)으로 서고, 기록 함수
+ * 0xa8024 는 그 레코드 +0x20~ 에 쌓아 성적이 선수를 따라간다. 그래서 명단 차례에 **표 팀 + 칸**(`tableTeamId` · id)을 실어
+ * 넘긴다 — 팀 경기가 그 표 행으로 세우고 리그 기록표도 그 자리(`leagueBatterIdOf(옛 팀, id)`)로 쌓는다.
  */
-function tradedBatterRecordOf(player: SeasonPlayer): SeasonEntryBatterRecord | undefined {
-  if (player.tableTeamId === undefined || player.id >= HALL_OF_FAME_FIRST_ID) return undefined
-  const row = teamBatters(player.tableTeamId)[player.id]
-  return row === undefined ? undefined : { name: row.name, ability: row.ability }
-}
-
-function tradedPitcherRecordOf(player: SeasonPlayer): SeasonEntryPitcherRecord | undefined {
-  if (player.tableTeamId === undefined || player.id >= HALL_OF_FAME_FIRST_ID) return undefined
-  const row = teamPitchers(player.tableTeamId)[player.id]
-  // 구질 표는 `PITCHERS` 와 같은 차례(전역 행 = 팀 × 8 + 칸) · 보직 +0xb & 3 은 팀 안 차례로 같다(`ROSTER_PITCHER_ROLES`)
-  const repertoire = ROSTER_PITCHER_REPERTOIRES[player.tableTeamId * PITCHERS_PER_TEAM + player.id]
-  if (row === undefined || repertoire === undefined) return undefined
-  const role = rosterPitcherRoleOf(player.id)
-  return { name: row.name, ability: row.ability, repertoire, ...(role === undefined ? {} : { role }) }
-}

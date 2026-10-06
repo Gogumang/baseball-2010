@@ -43,12 +43,15 @@ import { recordHumanGamePitchers } from '@/entities/pitcher-career/model/leagueP
 import { isMyTurn } from '@/entities/league/model/seasonEnd'
 import type { PostseasonSeries } from '@/entities/league/model/league'
 import {
-  EMPTY_LEAGUE_BATTER_LINE, EMPTY_LEAGUE_PLAYER_STATS, recordLeaguePlateAppearances,
+  EMPTY_LEAGUE_BATTER_LINE, EMPTY_LEAGUE_PLAYER_STATS, leaguePitcherAppearancesOf, recordLeaguePitcherAppearances,
+  recordLeaguePlateAppearances,
 } from '@/entities/league/model/leaguePlayerStats'
+import type { GameLeaguePitchers } from '@/entities/game/model/gamePitcherLines'
+import type { PitcherOfRecord } from '@/entities/game/model/winLossSave'
 import type { LeaguePlayerStats } from '@/entities/league/model/leaguePlayerStats'
 import { startNextYear } from '@/entities/season-mode/model/seasonRecord'
 import { SEASON_END_CHAIN } from '@/entities/season-mode/model/seasonStateMachine'
-import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
+import { PITCHERS_PER_TEAM, teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { FULL_STAMINA, recoverStaminaAfterGameDay } from '@/entities/pitcher-career/model/pitcherStamina'
 import { TEAMS } from '@/shared/config/original/teams'
 import type { TeamGameOptions, TeamGameSummary } from '@/features/play-team-game/model/teamGameFlow'
@@ -64,7 +67,7 @@ import {
 } from '@/entities/season-mode/model/entryEditor'
 import type { EntryEditorState, EntryKey } from '@/entities/season-mode/model/entryEditor'
 import {
-  rotatedPitchersOf, seasonEntryListsOf, seasonEntryOrderOf, seasonRosterOfEntry, seasonStarterNameOf, tableRosterOf,
+  playerFaceOf, rotatedPitchersOf, seasonEntryListsOf, seasonEntryOrderOf, seasonRosterOfEntry, seasonStarterNameOf, tableRosterOf,
   unrotatedPitchersOf,
 } from '@/entities/season-mode/model/seasonEntry'
 import type { SeasonEntryInput, SeasonEntryLists, SeasonEntryRecordSource } from '@/entities/season-mode/model/seasonEntry'
@@ -205,6 +208,8 @@ export interface SeasonSession {
    * 팀 경기도 같은 명단 차례로 선다 (옵션 `ourEntryOrder`).
    */
   readonly matchInfoStarterName: string | null
+  /** 0xdd 상대 "선발" 줄 — 상대 팀 레코드(트레이드로 바뀌었으면 저장의 것) 0번. 차례가 없으면 null */
+  readonly matchInfoOpponentStarterName: string | null
   /** 이벤트 재생 0xd3 — 트는 이벤트와 끝나고 돌아갈 상태(`this+0x24`). 그 장면이 아니면 null */
   readonly eventPlayback: SeasonEventPlayback | null
   /**
@@ -414,6 +419,34 @@ function withTablePositions(roster: SeasonTeamRoster, teamId: number): SeasonTea
 }
 
 const EMPTY_ROSTER: SeasonTeamRoster = { pitchers: [], batters: [] }
+
+/**
+ * 사람 경기(정규시즌) 투수 줄을 리그 기록표에 쌓는다 — `recordHumanGamePitchers` 와 같은 길에, 판정 받은 투수가 트레이드로
+ * 옮겨 온 투수면 그 붙박이 표 팀(요약 `decisionTableTeams`)으로 센다. 원본 경기 끝 0xa7de8 은 판정 투수의 레코드 +0x2e·+0x2f
+ * 를 올리고 그 레코드의 id(+0)가 옛 팀 Xls 행이라 기록이 선수를 따라간다. 표 팀이 없으면 그 함수 그대로다.
+ */
+function recordSeasonHumanGamePitchers(
+  stats: LeaguePlayerStats,
+  pitchers: GameLeaguePitchers | undefined,
+): LeaguePlayerStats {
+  const tableTeams = pitchers?.decisionTableTeams
+  if (pitchers === undefined || tableTeams === undefined) return recordHumanGamePitchers(stats, pitchers, true)
+  const recordOf = (record: PitcherOfRecord | null, teamId: number | undefined) =>
+    record === null
+      ? null
+      : { side: record.side, pitcherSlot: record.number, ...(teamId === undefined ? {} : { teamId }) }
+  const appearances = leaguePitcherAppearancesOf(
+    pitchers.lines,
+    {
+      winner: recordOf(pitchers.decision.winner, tableTeams.winner),
+      loser: recordOf(pitchers.decision.loser, tableTeams.loser),
+      save: recordOf(pitchers.decision.save, tableTeams.save),
+    },
+    (side) => pitchers.sideTeams[side] ?? pitchers.sideTeams[0],
+    (_teamId, pitcherSlot) => pitcherSlot < 0 || pitcherSlot >= PITCHERS_PER_TEAM,
+  )
+  return recordLeaguePitcherAppearances(stats, appearances)
+}
 
 /** CPU 팀 레코드 — 트레이드로 바뀌었으면 저장의 것, 아니면 붙박이 표 명단 */
 function cpuRosterOf(save: SeasonSave | null, teamId: number): SeasonTeamRoster {
@@ -1132,6 +1165,11 @@ export function useSeasonSession(
         // 레코드(0x1f570)에서 읽으므로 엔트리 편집(0xe0)이 고친 차례가 곧 타순·벤치·투수 차례다 (c041959).
         // 경기정보 뒤에 편집이 끼면 `startPendingGame` 이 고친 명단으로 다시 싣는다
         ourEntryOrder: entryOrderOf(save.roster),
+        // 상대 팀도 시즌 저장의 그 팀 레코드로 선다 (0xb891c → 0xb8680 → 0x1f570). 트레이드로 바뀐 팀만 저장에 있고
+        // 나머지는 붙박이 표라 넘기지 않는다(예전 길 그대로)
+        ...(save.cpuRosters?.[opponent] === undefined
+          ? {}
+          : { opponentEntryOrder: seasonEntryOrderOf(save.cpuRosters[opponent]) }),
       }
     },
     [aceLevels, entryOrderOf, save],
@@ -1454,6 +1492,19 @@ export function useSeasonSession(
       return seasonStarterNameOf(source.teamId, source.roster, source.dayCounter)
     })()
     : null
+  /**
+   * 0xdd 상대 "선발" 줄 — 0x5e0e8 이 상대 팀 레코드 0번을 읽는다. 레코드 0번 = 투수 차례(`opponentPitcherOrder`)의 0번 칸에
+   * 앉은 선수라, 트레이드로 바뀐 CPU 팀은 저장 명단(`cpuRosterOf`)의 그 칸 선수 이름이다. 차례가 없는 길(국가대항전)은 null
+   */
+  const matchInfoOpponentStarterName = save !== null && pendingGame !== null
+    && pendingGame.options.opponentPitcherOrder !== undefined
+    ? (() => {
+      const opponent = pendingGame.options.opponentTeamId
+      const index = pendingGame.options.opponentPitcherOrder?.[0] ?? 0
+      const player = cpuRosterOf(save, opponent).pitchers[index]
+      return player === undefined ? null : playerFaceOf(opponent, player, true, index).name
+    })()
+    : null
 
   /**
    * 취소 `0x48ea`: 이전 상태가 0xc9 일 때만 0xc9 로 돌아간다. 관리 메뉴 갱신이 phase 를 3 으로
@@ -1581,13 +1632,12 @@ export function useSeasonSession(
         random,
         // 투수 줄도 같은 정산 0xa8024 · 경기 끝 0xa7de8 이 쌓는다 — 0xa56dc 모드 2 갈래(0xa56fa)는 포스트시즌·국가대항전이면
         // 거짓이라 정규시즌 경기만이다(이 갈래가 곧 정규시즌이다). 요약 `leaguePitchers` 는 양 팀 표 칸으로 싣고 온다
-        recordHumanGamePitchers(
+        recordSeasonHumanGamePitchers(
           recordLeaguePlateAppearances(
             current.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS,
             summary.leaguePlateAppearances,
           ),
           summary.leaguePitchers,
-          true,
         ),
         afterGameStamina.cpuPitcherStaminas,
         aceLevels,
@@ -2102,6 +2152,7 @@ export function useSeasonSession(
     matchSettings: save?.matchSettings ?? SEASON_DEFAULT_MATCH_SETTINGS,
     entryEdit,
     matchInfoStarterName,
+    matchInfoOpponentStarterName,
     gameKind,
     leagueFirstAwardedBits,
     // 지갑이 주인이다 (`?무한G` 도 지갑 안에서 갈린다) — 위 `gamePoints` 주석 참고
@@ -2180,11 +2231,16 @@ export function seasonGoalInputOf(source: SeasonGoalSource): SeasonGoalInput {
   const batterLines = entryBattersOfOrder(team, order).map((batter) =>
     batter.rosterSlot === NO_ROSTER_SLOT
       ? EMPTY_LEAGUE_BATTER_LINE
-      : leagueBatterLineOf(source.playerStats, leagueBatterIdOf(team, batter.rosterSlot)))
-  const pitcherLines = order.pitchers.map((slot) =>
-    typeof slot === 'number' && slot >= 0
-      ? leaguePitcherLineOf(source.playerStats, leaguePitcherIdOf(team, slot))
-      : { outs: 0, runsAllowed: 0 })
+      // 트레이드로 옮겨 온 선수는 옛 팀 표 자리(원본 id)로 쌓였다 — 같은 열쇠로 읽는다
+      : leagueBatterLineOf(source.playerStats, leagueBatterIdOf(batter.tableTeamId ?? team, batter.rosterSlot)))
+  const pitcherLines = order.pitchers.map((slot) => {
+    if (typeof slot === 'number') {
+      return slot >= 0 ? leaguePitcherLineOf(source.playerStats, leaguePitcherIdOf(team, slot)) : { outs: 0, runsAllowed: 0 }
+    }
+    return 'tableSlot' in slot
+      ? leaguePitcherLineOf(source.playerStats, leaguePitcherIdOf(slot.tableTeamId, slot.tableSlot))
+      : { outs: 0, runsAllowed: 0 }
+  })
   return {
     rank: goalRankOf(team, regularRank, record.inPostseason ? goalBracketOf(source.series) : null),
     wins: source.league.wins[team] ?? 0,

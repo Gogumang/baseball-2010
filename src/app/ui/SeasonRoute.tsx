@@ -318,6 +318,7 @@ export function SeasonRoute({
             aceBatterId: isCup ? -1 : session.preGameAces.batter,
             opponentAces: options.opponentAces ?? null,
             myStarterName: session.matchInfoStarterName,
+            opponentStarterName: session.matchInfoOpponentStarterName,
           })}
           myTeamId={options.ourTeamId}
           opponentTeamId={options.opponentTeamId}

@@ -249,6 +249,12 @@ export interface TeamEntryBatter {
    * 선수 객체째 옮기는 웹 명단에서는 이 칸이 선수를 따라간다.
    */
   readonly rosterSlot: number
+  /**
+   * `rosterSlot` 이 가리키는 **붙박이 표 팀** — 트레이드(0xd1cc~0xd3ae)로 다른 팀 레코드에서 옮겨 온 선수만 든다(없으면 경기 팀).
+   * 원본 선수 레코드의 id(+0)는 Xls 행 번호(`팀 × 12 + 칸`)라 옮겨 와도 옛 팀 행이고, 기록 함수 0xa8024 는 그 레코드 +0x20~
+   * 에 쌓아 성적이 선수를 따라간다 — 웹 리그 기록표도 이 팀 · 칸(`leagueBatterIdOf`)으로 센다.
+   */
+  readonly tableTeamId?: number
 }
 
 /** 리그 로스터 선수가 아니다 (마타자 — `0x1f84c` 로 저장에서 꺼낸 레코드) */
@@ -381,6 +387,8 @@ export interface TeamEntryPitcher {
    * 엔트리 편집으로 표 칸과 갈릴 수 있다. 마투수(명단 밖 저장 레코드)는 없다.
    */
   readonly tableSlot?: number
+  /** `tableSlot` 의 붙박이 표 팀 — 트레이드로 옮겨 온 투수만 든다(없으면 경기 팀). `TeamEntryBatter.tableTeamId` 주석 */
+  readonly tableTeamId?: number
 }
 
 /**
@@ -438,9 +446,20 @@ export interface TeamEntryOrder {
     readonly position: number
     /** 붙박이 표 밖 선수(영입 id ≥ 0xb4)면 그 선수 기록 — 있으면 `rosterSlot` 대신 이것으로 선다 */
     readonly record?: TeamEntryBatterRecord
+    /**
+     * `rosterSlot` 의 붙박이 표 팀 — 트레이드로 옮겨 온 선수(원본 id 가 옛 팀 Xls 행)만 든다. 있으면 그 팀 표의
+     * `rosterSlot` 번째로 서고 기록도 그 자리로 쌓는다. 없으면 경기 팀
+     */
+    readonly tableTeamId?: number
   }[]
-  /** 로스터 칸, 또는 붙박이 표 밖 선수(영입 id ≥ 0xb4)의 기록 */
-  readonly pitchers: readonly (number | TeamEntryPitcherRecord)[]
+  /** 로스터 칸, 붙박이 표 밖 선수(영입 id ≥ 0xb4)의 기록, 또는 다른 팀 표 자리(트레이드로 옮겨 온 투수) */
+  readonly pitchers: readonly (number | TeamEntryPitcherRecord | TeamEntryTablePitcher)[]
+}
+
+/** 다른 팀 붙박이 표 자리의 투수 — 트레이드로 옮겨 온 투수 (원본 id = 옛 팀 `× 8 + 칸`) */
+export interface TeamEntryTablePitcher {
+  readonly tableTeamId: number
+  readonly tableSlot: number
 }
 
 /**
@@ -498,17 +517,34 @@ function tableSlotsOfOrder(slots: readonly (number | null)[], tableSize: number)
   })
 }
 
+/** 차례 한 칸이 경기 팀이 아닌 붙박이 표 팀을 가리키는가 (트레이드로 옮겨 온 선수) */
+const isForeignTable = (tableTeamId: number | undefined, teamId: number): tableTeamId is number =>
+  tableTeamId !== undefined && tableTeamId !== teamId
+
 /** 고친 차례로 세운 타자 명단 — 수비 위치는 차례가 든 값(편집기가 고친 +0x1c)이다 */
 export function entryBattersOfOrder(teamId: number, order: TeamEntryOrder): readonly TeamEntryBatter[] {
   const table = teamBatters(teamId)
   const slots = tableSlotsOfOrder(
-    order.batters.map((batter) => (batter.record === undefined ? batter.rosterSlot : null)),
+    order.batters.map((batter) =>
+      batter.record === undefined && !isForeignTable(batter.tableTeamId, teamId) ? batter.rosterSlot : null),
     table.length,
   )
   return order.batters.map((batter, index) => {
     const position = batter.position & 0xf
     if (batter.record !== undefined) {
       return { name: batter.record.name, ability: batter.record.ability, position, aceIndex: NO_ACE_BATTER, rosterSlot: NO_ROSTER_SLOT }
+    }
+    if (isForeignTable(batter.tableTeamId, teamId)) {
+      // 옮겨 온 선수 — 레코드는 옛 팀 Xls 행 사본이라 그 행의 이름·능력치로 서고, 기록도 그 자리로 쌓는다
+      const player = teamBatters(batter.tableTeamId)[batter.rosterSlot]
+      return {
+        name: player?.name ?? '',
+        ability: player?.ability ?? [0, 0, 0, 0],
+        position,
+        aceIndex: NO_ACE_BATTER,
+        rosterSlot: batter.rosterSlot,
+        tableTeamId: batter.tableTeamId,
+      }
     }
     const rosterSlot = slots[index] ?? 0
     const player = table[rosterSlot]
@@ -530,6 +566,21 @@ export function entryPitchersOfOrder(teamId: number, order: TeamEntryOrder): rea
     table.length,
   )
   return order.pitchers.map((pitcher, orderIndex): TeamEntryPitcher => {
+    if (typeof pitcher !== 'number' && 'tableSlot' in pitcher) {
+      // 옮겨 온 투수 — 옛 팀 표 행의 이름·능력치·구질(전역 행 = 팀 × 8 + 칸)·보직(+0xb & 3, 칸 차례)으로 선다
+      const player = teamPitchers(pitcher.tableTeamId)[pitcher.tableSlot]
+      const role = rosterPitcherRoleOf(pitcher.tableSlot)
+      return {
+        name: player?.name ?? '',
+        ability: player?.ability ?? [0, 0, 0, 0],
+        repertoire: rosterRepertoireOf(pitcher.tableTeamId, pitcher.tableSlot),
+        aceIndex: NO_ACE_BATTER,
+        orderIndex,
+        ...(role === undefined ? {} : { role }),
+        tableSlot: pitcher.tableSlot,
+        ...(pitcher.tableTeamId === teamId ? {} : { tableTeamId: pitcher.tableTeamId }),
+      }
+    }
     if (typeof pitcher !== 'number') {
       return {
         name: pitcher.name,
