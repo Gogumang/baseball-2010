@@ -18,7 +18,7 @@ import { defenseArrivalTicks } from '@/entities/fielding/model/throwArrival'
  * af934: for i = 주자수−1 .. 0:
  * af946:   주자.vt18() 거짓 && force == 0 → 건너뜀
  * af95e:   종류 = 플레이+0x118
- * af964:   플레이+0x111(끝남) ≠ 0 → 0xafa0e (**무조건 한 루**)      ; subs r2,#7  = 0x118−7
+ * af964:   플레이+0x111(홈런 — 사건 코드 8, 0xb2bd8) ≠ 0 → 0xafa0e (**무조건 한 루**)      ; subs r2,#7  = 0x118−7
  * af970:   플레이+0x129      ≠ 0 → 0xafa0e (**무조건 한 루**)      ; adds r2,#0x18 = 0x111+0x18
  * af97a:   종류 == 7 → 주자+0x8c ≥ 주자+0x90+2 면 건너뜀, 아니면 0xafa0e
  * af98e:   vt94() && 플레이+0x112 == 0 → **함수 끝**
@@ -102,7 +102,7 @@ export function autoAdvanceDecisions(input: AutoAdvanceInput): readonly AutoAdva
     // 부르는 자리(`runDefensePlay`)가 늘 `force: true` 라 겉으로 드러나지 않던 자리다.
     if (!isRunnerStopped(runner) && input.force !== true) continue
 
-    // ── 0xaf96e · 0xaf978 — **끝남(+0x111) 이나 +0x129 가 서 있으면 틱 비교 없이 한 루 진루** ──
+    // ── 0xaf96e · 0xaf978 — **홈런(+0x111) 이나 폴 홈런(+0x129) 이 서 있으면 틱 비교 없이 한 루 진루** ──
     // 두 검사 모두 `bne 0xafa0e` 로 **진루 자리로 곧장 뛴다**. 그러니 이 갈래에서는
     // 종류 2·3·8 거르개도, vt94(잡힐 뜬공) 도, 0xaf284 틱 비교도, 앞길 검사(0xa9924)도 **안 본다**.
     if (play.finished || play.suppressed) {

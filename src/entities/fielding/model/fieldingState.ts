@@ -150,7 +150,11 @@ export interface PlayView {
   readonly everHeld: boolean
   /** 지금 누군가 쥐고 있는가 (+0x12c) */
   readonly held: boolean
-  /** 플레이가 끝났는가 (+0x111) */
+  /**
+   * 원본 +0x111 = **사건 코드 8(홈런)** 표시다 — 0xb2bc4 b2bd8 이 세운다(`playGate.eventCodeEffectOf`).
+   * ⚠️ 진행기들은 이 칸을 "판이 끝났다" 표시로도 쓴다(판 진행 관문 0xb0d28 이 닫으면 참). 타구 진행기는 홈런 칸을
+   * `DefensePlayState.homeRunFlag` 로 따로 들고 자동 진루(`autoAdvanceDecisions`)에 넘길 때만 이 칸에 넣는다.
+   */
   readonly finished: boolean
   /**
    * 자동 주루의 **또 하나의 무조건 진루 갈래** (+0x129).

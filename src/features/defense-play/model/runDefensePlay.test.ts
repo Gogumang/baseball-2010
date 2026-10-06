@@ -1364,10 +1364,12 @@ describe('송구 0xb2e38 — 중계 b4616 · AI 9 미루기 · 던진 야수 AI 
       expect(기록.find((entry) => entry.tick === 18)?.ai).toBe(AI_STATE.IDLE)
     })
 
-    it('받을 야수가 끝내 못 닿으면 던지지 않는다 — AI 9 는 0xafa60 도 막는다', () => {
+    it('받을 야수가 늦게 닿으면 그때까지 안 던진다 — AI 9 는 0xafa60 도 막고, 판 끝 세기(+0x120) 51틱 안에 닿으면 그때 던진다', () => {
       const { state } = 미루기(17_575)
       expect(state.log.some((line) => line.includes('미룬다'))).toBe(true)
-      expect(state.log.some((line) => line.includes('송구 —'))).toBe(false)
+      // 판 진행 관문 0xb0d28 은 공을 쥔 채 주자가 다 선 틱을 51틱 더 돌린다 — 그사이 1루수가 닿아 b4838 이 놓아준다
+      const 송구들 = state.log.filter((line) => line.includes('송구 —'))
+      expect(송구들).toEqual(['37틱 1루로 송구 — 44틱 도착 (AI 9 미룬 송구) (4번 야수)'])
     })
   })
 
@@ -1442,7 +1444,8 @@ describe('뜬공 결과인데 낙구 전에 아무도 못 닿는 타구 — 자�
     // 타자주자는 결과 코드대로 아웃 · 1루 주자는 바운드 포스로 2루
     expect(result.advance.outsAdded).toBe(1)
     expect(result.advance.bases).toEqual({ first: false, second: true, third: false })
-    expect(result.ticks.length).toBeLessThan(60)
+    // 판 진행 관문 0xb0d28: 주자가 다 서고 공을 쥔 틱부터 +0x120 이 51틱을 세고 닫는다 (예전엔 240틱 끝까지 갔다)
+    expect(result.ticks.length).toBeLessThan(100)
   })
 
   it('낙구 전에 잡히는 뜬공은 그대로 뜬공이다', () => {
@@ -1451,5 +1454,116 @@ describe('뜬공 결과인데 낙구 전에 아무도 못 닿는 타구 — 자�
     expect(result.caughtOnTheFly).toBe(true)
     expect(result.catchTick).toBeLessThanOrEqual(battedBallTrajectory(pattern).landingTick)
     expect(result.advance.bases).toEqual(주자1루)
+  })
+})
+
+describe('판 진행 관문 0xb0d28 · 판 끝 결과 코드 0x9d5bc (b44f6) — playGate', () => {
+  /** 끝까지 돌리며 틱마다 상태를 적는다 */
+  const 돌리기 = (input: DefensePlayInput) => {
+    let state = startDefensePlay(input)
+    const 세기: number[] = []
+    const 주자: { tick: number; required: number[] }[] = []
+    while (!isDefensePlayFinished(state)) {
+      state = stepDefensePlay(state, null)
+      세기.push(state.endCounter)
+      주자.push({ tick: state.tick - 1, required: state.runners.map((runner) => runner.state.requiredBase) })
+    }
+    return { state, 세기, 주자 }
+  }
+
+  it('주자가 다 서고 공을 쥔 틱부터 +0x120 이 51틱을 세고, 52번째 관문에서 닫는다 (b0e46 `old > 50`)', () => {
+    const { state, 세기 } = 돌리기({
+      outcome: 땅볼아웃,
+      trajectory: battedBallTrajectory(representativePatternOf(땅볼아웃)),
+      bases: EMPTY_BASES,
+      outs: 0,
+    })
+    // 마지막 틱의 세기가 52(비교 전에 old + 1 을 적는다), 그 앞 51틱은 1 씩 올랐다
+    expect(세기.at(-1)).toBe(52)
+    const 시작 = 세기.lastIndexOf(1)
+    expect(세기.slice(시작)).toEqual(Array.from({ length: 52 }, (_unused, index) => index + 1))
+    expect(state.tick).toBe(시작 + 52)
+  })
+
+  it('공이 처음 땅에 닿는 틱에 결과 코드 6 을 내고 바운드 포스(0xa95e8)를 세운다 — 쥐기 전이다', () => {
+    const trajectory = battedBallTrajectory(representativePatternOf(땅볼아웃))
+    const { state, 주자 } = 돌리기({ outcome: 땅볼아웃, trajectory, bases: 주자1루, outs: 0 })
+    expect(state.log).toContain(`${trajectory.landingTick}틱 낙구 — 판 끝 결과 코드 6 (0x9d5bc)`)
+    expect(state.catchTick).toBeGreaterThan(trajectory.landingTick)
+    // 낙구 틱 끝에 1루 주자(목록 1번)의 요구 루가 2루로 선다
+    expect(주자.find((entry) => entry.tick === trajectory.landingTick - 1)?.required[1]).toBe(-1)
+    expect(주자.find((entry) => entry.tick === trajectory.landingTick)?.required[1]).toBe(2)
+    expect(state.lastEventCode).toBe(6)
+  })
+
+  it('먼저 쥔 뜬공은 0x9d5bc 를 안 부른다 — 결과는 vt90 의 13 뿐 (b444e `+0x112 ≠ 0 → b4540`)', () => {
+    const pattern: BattedBallPattern = [129, 802, 500, 0]
+    const { state } = 돌리기({ outcome: 뜬공아웃, trajectory: battedBallTrajectory(pattern), bases: EMPTY_BASES, outs: 0 })
+    expect(state.log.some((line) => line.includes('0x9d5bc'))).toBe(false)
+    expect(state.ballContacted).toBe(true)
+  })
+
+  it('리터치 요구 루를 밟기 전에는 그 너머로 못 간다 (주자 틱 a028c) — 요구 루를 못 푼 채 송구로 잡히던 아웃이 없다', () => {
+    // 2루 주자 · CPU 수비 · 깊은 중견수 뜬공: 예전엔 자동 진루가 리터치 틱에 3루로 보내 요구 루 2 가 남아 2루 송구로 죽었다
+    const result = runDefensePlay({
+      outcome: 뜬공아웃,
+      trajectory: battedBallTrajectory([90, 810, 1592, 0]),
+      bases: { first: false, second: true, third: false },
+      outs: 0,
+      runAbility: 500,
+      defenseIsCpu: true,
+      random: createSeededRandom(31),
+    })
+    expect(result.caughtOnTheFly).toBe(true)
+    expect(result.advance.outsAdded).toBe(1)
+    expect(result.log.some((line) => line.includes('루 아웃'))).toBe(false)
+  })
+
+  it('바운드 뒤 담장 위로 넘는 공은 낙구 틱에 결과 코드 10 — +0x124 · 종류 7(투구 때 루 + 2 까지 무조건 진루)', () => {
+    const 홈 = { x: 20_000, y: 1_000, z: 30_000 }
+    // 10틱에 떨어지고(높이 0) 20틱에 높이 2500 으로 담장선을 넘는 궤적 — 웹 궤적 근사에는 없는 모양이라 손으로 만든다
+    const pointAt = (tick: number) => {
+      const t = Math.max(0, Math.min(20, Math.trunc(tick)))
+      const y = t === 10 ? 0 : t < 10 ? 1_000 + (10 - Math.abs(5 - t)) * 100 : (t - 10) * 250
+      return { x: 20_000, y, z: 홈.z - t * 1_300 }
+    }
+    const trajectory = {
+      length: 21,
+      pointAt,
+      landingTick: 10,
+      fenceTick: 20,
+      poleTick: -1,
+      startedAtPlate: true,
+    }
+    let state = startDefensePlay({ outcome: 단타, trajectory, bases: 주자1루, outs: 0 })
+    while (state.tick <= 10) state = stepDefensePlay(state, null)
+    expect(state.log).toContain('10틱 낙구 — 판 끝 결과 코드 10 (0x9d5bc)')
+    expect(state.groundRuleFlag).toBe(true)
+    expect(state.play.kind).toBe(7)
+    expect(state.lastEventCode).toBe(10)
+  })
+
+  it('굴러서 담장에 닿은 공(높이 ≤ 1999)은 담장선 틱이 아니다 — 결과 코드 6', () => {
+    const pattern: BattedBallPattern = [90, 810, 1592, 0]
+    const trajectory = battedBallTrajectory(pattern)
+    expect(trajectory.fenceTick).toBeGreaterThan(trajectory.landingTick)
+    expect(trajectory.pointAt(trajectory.fenceTick).y).toBeLessThanOrEqual(1999)
+    const { state } = 돌리기({ outcome: 단타, trajectory, bases: 주자1루, outs: 0 })
+    expect(state.log).toContain(`${trajectory.landingTick}틱 낙구 — 판 끝 결과 코드 6 (0x9d5bc)`)
+    expect(state.play.kind).toBe(1)
+  })
+
+  it('협살이 풀린 틱에 날아가던 짝 송구도 짝이 받는다 — 공을 아무도 안 쥔 채 240틱까지 가지 않는다', () => {
+    const result = runDefensePlay({
+      outcome: 이루타,
+      trajectory: battedBallTrajectory([266, 94, 785, 0]),
+      bases: 주자1루,
+      outs: 1,
+      runAbility: 500,
+      defenseIsCpu: true,
+      random: createSeededRandom(173),
+    })
+    expect(result.rundowns).toBeGreaterThan(0)
+    expect(result.ticks.length).toBeLessThan(240)
   })
 })
