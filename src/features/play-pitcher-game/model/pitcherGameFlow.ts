@@ -1184,6 +1184,9 @@ export function pickoff(
     runAbility: opponentBatterAbility(progress.options.opponentTeamId, opponentRosterSlotOf(progress)).run,
     random,
     offenseIsCpu: true,
+    // 사람이 수비한다 — 0xae6c8 은 환경설정 "송구"(+0xf4) 혼자가 받은 야수의 0xafa60 을 켠다 (타구 진행기와 같은 배선)
+    defenseIsCpu: false,
+    throwMode: progress.options.throwModeManual === false ? '자동' : '수동',
   })
 
   // 0xa8d98 — 종류 4 는 R+0x138 을 안 올린다 (그대로 돌려받는다)

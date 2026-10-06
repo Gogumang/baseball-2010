@@ -1820,6 +1820,8 @@ export function cpuPickoff(progress: GameProgress, base: PickoffBase, random: Ra
     // 타자편은 사람이 늘 공격이다 — 환경설정 "주루" 혼자가 자동 진루 제어기를 켠다 (0xae690)
     offenseIsCpu: false,
     runningMode: progress.runningModeManual ? '수동' : '자동',
+    // 수비는 CPU 다 — 슬롯 2 의 0xae6c8 첫 항(경기[0x31 + 수비측] == 1)이 서서 받은 야수의 0xafa60 이 매 틱 돈다 (d80918a)
+    defenseIsCpu: true,
   })
 
   // 정산 0xa8024 — 종류 4 라 타석 칸(+0x14)이 안 오르고 안타·홈런 가지도 안 선다 (pinchHitAi 게이트)

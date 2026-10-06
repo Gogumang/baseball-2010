@@ -2598,6 +2598,9 @@ export function pickoff(progress: TeamGameProgress, webKey: string, random: Rand
     random,
     // 공격이 CPU 라 자동 진루 제어기(0xaf918)가 돈다 (0xae690 첫 항)
     offenseIsCpu: true,
+    // 사람이 수비한다 — 0xae6c8 은 환경설정 "송구"(+0xf4) 혼자가 받은 야수의 0xafa60 을 켠다 (타구 진행기와 같은 배선)
+    defenseIsCpu: false,
+    throwMode: progress.options.throwModeManual === false ? '자동' : '수동',
   })
   return applyPickoffPlay(progress, result, '수비', random)
 }
@@ -2630,6 +2633,8 @@ export function cpuPickoff(progress: TeamGameProgress, base: PickoffBase, random
     // 우리가 공격이다 — 환경설정 "주루" 가 먹는다 (0xae690 의 둘째 항)
     offenseIsCpu: false,
     runningMode: progress.options.runningModeManual === true ? '수동' : '자동',
+    // 수비는 CPU 다 — 0xae6c8 첫 항이 서서 받은 야수의 0xafa60 이 매 틱 돈다 (d80918a)
+    defenseIsCpu: true,
   })
   return applyPickoffPlay(progress, result, '공격', random)
 }
