@@ -124,6 +124,13 @@ interface BattingStageProps {
   readonly cpuMagic?: { readonly remaining: number; readonly ballMagicNumber: number }
   /** 참이면 새 공을 던지지 않는다. 타석 결과 연출 중에 쓴다. */
   readonly isPaused: boolean
+  /**
+   * **결과 창 뒤 배경** — 홈런더비 결과 창(상태 0x1a) 그리기 `0x45c18` 은 창보다 먼저 구름 `0x78448` 과
+   * 구장 `0x78578(구장, +0x17e2, 1)` 만 그린다(선수·공·HUD 없음). +0x17e2 는 들어선 뒤 틱마다 5 씩 150 까지 올라
+   * 구장·바닥이 아래로 가라앉는다(`resultBackdropOffsetAt`). 참인 동안은 공을 던지지 않고 파티클도 굴리지 않는다.
+   * 같은 캔버스를 그대로 쓰므로 구름·전광판 흐름은 타석에서 이어진다. 안 넘기면 타석 화면이다.
+   */
+  readonly isResultBackdrop?: boolean
   readonly random: RandomPort
   /**
    * **고른 필살타법 번호** (선수 레코드 +0x18, 1~4). 레벨(+0x201)이 아니다 — 경기는 이 번호만 본다

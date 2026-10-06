@@ -87,6 +87,8 @@ export interface StageLatest {
   /** 부르는 쪽이 드는 CPU 마구 상태 (팀+0x28 · 공+0x10) — `BattingStage` 의 같은 이름 props 주석 참고 */
   readonly cpuMagic?: { readonly remaining: number; readonly ballMagicNumber: number }
   readonly isPaused: boolean
+  /** 참이면 결과 창 뒤 배경만 그린다 — `BattingStage` 의 같은 이름 props 주석 참고 */
+  readonly isResultBackdrop?: boolean
   readonly random: RandomPort
   readonly swingMode: SwingMode
   readonly batterSkillIds: readonly number[]

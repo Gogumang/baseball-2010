@@ -13,6 +13,7 @@ import {
   judgeAnimationOf,
   judgeFrameAt,
   pitcherFrameAt,
+  resultBackdropOffsetAt,
   pitcherIdleFrameAt,
   skyColorsOf,
   teamIconOf,
@@ -137,5 +138,18 @@ describe('하늘 조명 모드 검사 — 0x784a2~0x784b0', () => {
 
   it('그 밖의 모드(일반 1·시즌 2·나리 3·4·대전 8·9)와 모드를 모를 때는 그린다', () => {
     expect([1, 2, 3, 4, 8, 9, undefined].map(isSkyLightModeShown)).toEqual([true, true, true, true, true, true, true])
+  })
+})
+
+describe('결과 창 뒤 구장 밀기 — +0x17e2 (진입 0x4f574 = 0 · 갱신 0x3c0b8 += 5, 150 상한)', () => {
+  it('들어선 틱의 그림부터 5 이고 틱마다 5 씩 오른다', () => {
+    expect(resultBackdropOffsetAt(0)).toBe(5)
+    expect(resultBackdropOffsetAt(1)).toBe(10)
+    expect(resultBackdropOffsetAt(28)).toBe(145)
+  })
+
+  it('150 에서 멈춘다', () => {
+    expect(resultBackdropOffsetAt(29)).toBe(150)
+    expect(resultBackdropOffsetAt(1_000)).toBe(150)
   })
 })

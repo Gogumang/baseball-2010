@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FrameSprite, RawScreen, SpriteNumber } from '@/shared/ui'
+import { FrameSprite, SpriteNumber } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { numberGlyphsOf } from '@/shared/lib/pixelNumber/pixelNumber'
 import type { DerbyResult } from '@/entities/home-run-derby/model/derbyRun'
@@ -39,8 +39,9 @@ interface DerbyResultWindowProps {
  * 다른 화면(`pages/settings` · `pages/record`)이 쓰는 것과 같은 근사다.
  *
  * 신기록 표시는 없다 — 0x45c18 은 신기록 칸 st+0x3c 를 읽지 않는다. 신기록은 진입 0x4f574 의 효과음 0x1f 로만 알린다.
- * ⚠️ 원본은 창 뒤에 구름 0x78448 · 구장 0x78578(장면 +0x17e2 를 틱마다 5 씩 150 까지 올리며 밀어 넣는다, 갱신 0x3c0b8)을
- *    그리는데, 웹은 아직 그 배경을 이 화면에 안 깐다(구장 그리기는 `widgets/batting-stage` 캔버스 안에만 있다).
+ *
+ * 창 뒤 배경(0x45c18 첫머리의 구름 0x78448 · 구장 0x78578(구장, +0x17e2, 1))은 이 창이 아니라 **밑에 깔린 타석 캔버스**가
+ * 그린다 — 화면이 `BattingStage` 를 `isResultBackdrop` 으로 두고 이 창을 그 위 240×320 판에 겹친다.
  */
 export function DerbyResultWindow({ result, heldGamePoint, onRetry, onExit }: DerbyResultWindowProps) {
   const [answer, setAnswer] = useState(RETRY_DEFAULT_ANSWER)
@@ -69,7 +70,7 @@ export function DerbyResultWindow({ result, heldGamePoint, onRetry, onExit }: De
   const pointValues = [result.gainedGamePoint, heldGamePoint]
 
   return (
-    <RawScreen>
+    <div className={styles.layer}>
       <div
         className={styles.window}
         style={{ left: RESULT_WINDOW.x, top: RESULT_WINDOW.y, width: RESULT_WINDOW.width, height: RESULT_WINDOW.height }}
@@ -145,6 +146,6 @@ export function DerbyResultWindow({ result, heldGamePoint, onRetry, onExit }: De
         </button>
       ))}
 
-    </RawScreen>
+    </div>
   )
 }

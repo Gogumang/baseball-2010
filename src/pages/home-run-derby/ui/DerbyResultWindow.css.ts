@@ -1,6 +1,16 @@
 import { style } from '@vanilla-extract/css'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 
+/** 타석 캔버스(240×320) 위에 그대로 겹치는 판 — 안쪽은 전부 원본 절대 좌표다 */
+export const layer = style({
+  position: 'absolute',
+  left: 0,
+  top: 0,
+  width: '100%',
+  height: '100%',
+  overflow: 'hidden',
+})
+
 /**
  * 공용 창 0x55e60 — #335FCD 둥근 판 + #080408 1px 테두리 + 안쪽 흰 선.
  * 모양은 선 목록만 확인돼 CSS 로 근사한다 (추정) — 다른 화면들과 같은 근사다.

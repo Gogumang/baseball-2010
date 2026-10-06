@@ -102,6 +102,13 @@ export interface SceneryState {
    * (0x784a2~0x784b0). 생략하면 그 셋이 아닌 것으로 본다. `BattingStage` 의 `gameMode` 가 그대로 내려온다.
    */
   readonly gameMode?: number
+  /**
+   * **세로 밀기** — `0x78578(구장, y, 움직임)` 의 둘째 인자. 구장 `0x77974`(위 = 구장+8 + y + 3)와
+   * 바닥 `0x7725c`(위 = 구장+8 + y + 0xe2)에만 더해지고 하늘·구름 `0x77fe8` 은 안 움직인다.
+   * 하늘 조명 `0x78490` 은 이 값이 0 이 아니면 안 그린다(784b8 `cmp r1,#0`). 타석에서는 늘 0 이다.
+   * 결과 창(상태 0x1a, `0x45c18`)이 장면 +0x17e2 를 넘긴다. 생략하면 0.
+   */
+  readonly offsetY?: number
 }
 
 const CAMERA = { x: -120, y: -70 }
@@ -189,9 +196,10 @@ export function drawScenery(context: CanvasRenderingContext2D, state: ScenerySta
   context.fillRect(0, 0, STAGE_WIDTH, STAGE_HEIGHT)
   const colorIndex = drawSky(context, state)
   if (isCloudVisible(colorIndex)) drawClouds(context, state.tick, cloudPaletteRowOf(colorIndex))
-  drawFence(context, state)
-  drawField(context, state.seasonStadium?.grassPalette ?? null)
-  drawSkyLight(context, state, colorIndex)
+  const offsetY = state.offsetY ?? 0
+  drawFence(context, state, offsetY)
+  drawField(context, state.seasonStadium?.grassPalette ?? null, offsetY)
+  if (offsetY === 0) drawSkyLight(context, state, colorIndex)
 }
 
 function drawSky(context: CanvasRenderingContext2D, state: SceneryState): number {
@@ -220,7 +228,7 @@ function drawClouds(context: CanvasRenderingContext2D, tick: number, paletteRow:
   }
 }
 
-function drawFence(context: CanvasRenderingContext2D, state: SceneryState): void {
+function drawFence(context: CanvasRenderingContext2D, state: SceneryState, offsetY: number): void {
   /**
    * ⚠️ **꺼 뒀다.** 우타일 때 펜스 묶음을 통째로 뒤집었더니 관중석 그림(`ppl`)에 박혀 있는
    *    **"GAMEVIL®" 광고 글자가 거울상**으로 나왔다. 원본 그림 파일에서는 그 글자가
@@ -233,6 +241,8 @@ function drawFence(context: CanvasRenderingContext2D, state: SceneryState): void
    */
   const isMirrored = false && (state.side ?? STAGE_SIDE) === BATTER_SIDE.우타
   context.save()
+  // 0x77974 의 기준 y = 구장+8 + 밀기 + 3 — 펜스·팀 아이콘·관중·전광판이 모두 이 기준에서 그려진다
+  context.translate(0, offsetY)
   if (isMirrored) {
     context.translate(STAGE_WIDTH, 0)
     context.scale(-1, 1)
@@ -371,12 +381,12 @@ function drawSkyLight(context: CanvasRenderingContext2D, state: SceneryState, co
  * `grassPalette` 가 있으면 그 `.mpl` 줄로 칠한 그림을 쓴다 (잔디 = 팔레트, `0x786c8`).
  * 칠하는 동안에는 구운 그림이 나가므로 첫 몇 프레임은 기본색이 보인다.
  */
-function drawField(context: CanvasRenderingContext2D, grassPalette: number | null): void {
+function drawField(context: CanvasRenderingContext2D, grassPalette: number | null, offsetY: number): void {
   const field = fieldBackground(grassPalette)
   if (field === null) return
   context.drawImage(
     field,
     STAGE_LAYOUT.fieldSourceX, 0, STAGE_WIDTH, field.height,
-    0, STAGE_LAYOUT.fieldTopY, STAGE_WIDTH, field.height,
+    0, STAGE_LAYOUT.fieldTopY + offsetY, STAGE_WIDTH, field.height,
   )
 }

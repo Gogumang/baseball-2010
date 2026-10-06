@@ -21,6 +21,7 @@ import { pitchReleaseSoundIdOf } from '@/widgets/batting-stage/lib/pitchReleaseS
 import { isBuntJudgeFrame } from '@/widgets/batting-stage/lib/buntStance'
 import type { StageRefs } from '@/widgets/batting-stage/model/stageRefs'
 import { DERBY_ORDINARY_PITCH_TYPE } from '@/entities/home-run-derby/model/derbyRules'
+import { resultBackdropOffsetAt } from '@/widgets/batting-stage/lib/stageScenery'
 
 /** 홈런더비 = 원본 전역 모드 7 */
 const HOME_RUN_DERBY_GAME_MODE = 7
@@ -195,9 +196,15 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
      */
     let particleTick = 0
     const PARTICLE_CATCH_UP_LIMIT = 4
+    /** 결과 창 뒤 배경(`isResultBackdrop`)으로 바뀐 시각 — 그때부터 +0x17e2 를 센다. 타석이면 null */
+    let backdropStartedAt: number | null = null
 
     const frame = (now: number) => {
-      advancePhase(now)
+      const isBackdrop = latestRef.current.isResultBackdrop === true
+      if (!isBackdrop) backdropStartedAt = null
+      else if (backdropStartedAt === null) backdropStartedAt = now
+      // 결과 창(상태 0x1a)에는 투구·파티클 갱신이 없다 — 투구 단계를 멈추고 파티클 틱도 그 자리에 묶어 둔다
+      if (!isBackdrop) advancePhase(now)
 
       const pitch = pitchRef.current
       const tickLength = millisecondsPerFrame()
@@ -213,7 +220,7 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
 
       const nowTick = pitchTickAt(now, openedAt, tickLength)
       if (particleTick === 0) particleTick = nowTick
-      const steps = Math.min(PARTICLE_CATCH_UP_LIMIT, nowTick - particleTick)
+      const steps = isBackdrop ? 0 : Math.min(PARTICLE_CATCH_UP_LIMIT, nowTick - particleTick)
       for (let step = 0; step < steps; step += 1) {
         tickParticles(particlesRef.current, latestRef.current.random)
       }
@@ -248,6 +255,8 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
         pitcherTick: isPitching ? pitchTickAt(now, phaseStartedAtRef.current, tickLength) : null,
         tick: nowTick,
         particles: particlesRef.current,
+        resultBackdropOffsetY:
+          backdropStartedAt === null ? null : resultBackdropOffsetAt(pitchTickAt(now, backdropStartedAt, tickLength)),
         resultTick: phaseRef.current === '결과' ? pitchTickAt(now, phaseStartedAtRef.current, tickLength) : 0,
         // 일반 구장 번호를 고르는 규칙(st+0x70)이 미확인이라 0 번 구장으로 둔다 (추정).
         // 시즌 구장 세 칸이 넘어오면 배경 묶음 자체가 0x77494 쪽으로 갈린다 (0x40ff0).

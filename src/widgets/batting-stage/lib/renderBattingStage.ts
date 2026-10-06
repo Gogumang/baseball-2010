@@ -104,6 +104,11 @@ export interface StageScene {
     readonly frameCount: number
     readonly stillUrl: string
   } | null
+  /**
+   * 차 있으면 **결과 창 뒤 배경**만 그린다 — `0x45c18` 의 0x78448(구름) · 0x78578(구장, 이 값, 1).
+   * 값은 장면 +0x17e2(구장·바닥을 내리는 y). 선수·공·파티클·HUD·판정 글자는 그리지 않는다.
+   */
+  readonly resultBackdropOffsetY?: number | null
 }
 
 export function renderBattingStage(
@@ -111,6 +116,7 @@ export function renderBattingStage(
   scene: StageScene,
 ): void {
   const side = scene.side ?? STAGE_SIDE
+  const backdropOffsetY = scene.resultBackdropOffsetY ?? null
   drawScenery(context, {
     ...scene.scenery,
     tick: scene.tick,
@@ -118,7 +124,9 @@ export function renderBattingStage(
     inning: scene.hud?.inning ?? 1,
     ourTeamId: scene.hud?.ourTeamId ?? null,
     opponentTeamId: scene.hud?.opponentTeamId ?? null,
+    offsetY: backdropOffsetY ?? 0,
   })
+  if (backdropOffsetY !== null) return
   const progress = scene.pitch === null || scene.frame < 0 ? -1 : scene.frame / scene.pitch.frameCount
   drawPitcher(context, scene.acePitcher, progress, scene.pitcherTick, scene.tick, side, scene.pitcherEquipment, scene.pitcherForm ?? 0, scene.pitcherHand ?? 0)
   drawBatter(context, scene.swingFrame, scene.shift, scene.bodyType, side, scene.batterSkinIndex, scene.batterTeamIndex, scene.batterEquipment)

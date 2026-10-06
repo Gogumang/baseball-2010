@@ -1,6 +1,7 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import {
-  scoreboardScrollX, seasonBoardFrameOf, seasonFenceFramesOf, seasonScoreboardBoxOf, seasonTeamIconBoxesOf,
+  drawScenery, scoreboardScrollX, seasonBoardFrameOf, seasonFenceFramesOf, seasonScoreboardBoxOf, seasonTeamIconBoxesOf,
 } from '@/widgets/batting-stage/lib/renderScenery'
 
 // 전광판 흐르는 글자 (0x77fb4, R2-game-effects.md 6절): 상자 폭+2 에서 시작해 틱당 1px 씩
@@ -88,5 +89,43 @@ describe('seasonFenceFramesOf — 관중석 바탕·관중 덧그림 프레임',
   it('관중석 4~6 은 hidden_fence_(칸−4) 의 0 번부터 다시 센다', () => {
     expect(seasonFenceFramesOf(4, 2)).toEqual({ folder: './sprites/hidden_fence_0/frames', standFrame: 0, crowdFrame: 3 })
     expect(seasonFenceFramesOf(6, 0)).toEqual({ folder: './sprites/hidden_fence_2/frames', standFrame: 0, crowdFrame: 1 })
+  })
+})
+
+// 0x78578(구장, y, 움직임): y 는 구장 0x77974 와 바닥 0x7725c 에만 더해진다 — 하늘 0x77fe8 은 인자가 없다.
+describe('drawScenery — 결과 창 밀기 offsetY (0x45c18 → 0x78578(구장, +0x17e2, 1))', () => {
+  function 기록컨텍스트() {
+    const translates: [number, number][] = []
+    const fills: number[][] = []
+    const context = {
+      fillStyle: '',
+      fillRect: (...rect: number[]) => fills.push(rect),
+      createLinearGradient: () => ({ addColorStop: () => {} }),
+      save: () => {},
+      restore: () => {},
+      translate: (x: number, y: number) => translates.push([x, y]),
+      scale: () => {},
+      drawImage: () => {},
+      beginPath: () => {},
+      rect: () => {},
+      clip: () => {},
+    }
+    return { context: context as unknown as CanvasRenderingContext2D, translates, fills }
+  }
+  const 장면 = { skyRow: 0, inning: 1, tick: 0, stadium: 0, ourTeamId: null, opponentTeamId: null }
+
+  it('타석(밀기 0)은 펜스를 제자리에 둔다', () => {
+    const { context, translates } = 기록컨텍스트()
+    drawScenery(context, 장면)
+    expect(translates).toEqual([[0, 0]])
+  })
+
+  it('밀기 값만큼 펜스 묶음을 아래로 내리고 하늘은 그대로 칠한다', () => {
+    const 기준 = 기록컨텍스트()
+    drawScenery(기준.context, 장면)
+    const { context, translates, fills } = 기록컨텍스트()
+    drawScenery(context, { ...장면, offsetY: 40 })
+    expect(translates).toEqual([[0, 40]])
+    expect(fills).toEqual(기준.fills)
   })
 })

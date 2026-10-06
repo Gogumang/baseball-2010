@@ -91,6 +91,12 @@ export function HomeRunDerbyScreen({
   const menu = useInGameMenuState()
   const isMenuOpen = menu.isOpen
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
+  /**
+   * 결과 창의 "예"(재도전)는 메인 메뉴 하위 39 를 거쳐 모드 7 장면을 **새로 세운다** — 타석 캔버스도 새로 띄운다
+   * (하늘 행 굴림이 새 장면마다 한 번이다). 경기 중 메뉴의 다시하기는 예전처럼 같은 캔버스를 쓴다.
+   */
+  const [stageSerial, setStageSerial] = useState(0)
+  const isResultShown = session.result !== null
 
   // 상태 0xe — 사람 OK 를 기다린다 (0x532b0). 경기 중 메뉴·조작방법·설정이 떠 있으면 경기 키가 안 간다(일시정지 팝업 0x754f9)
   const acceptsConfirm = session.isAwaitingConfirm && session.result === null && !isMenuOpen && overlay === null
@@ -123,17 +129,6 @@ export function HomeRunDerbyScreen({
     )
   }
 
-  if (session.result !== null) {
-    return (
-      <DerbyResultWindow
-        result={session.result}
-        heldGamePoint={gamePoint}
-        onRetry={session.restart}
-        onExit={onExit}
-      />
-    )
-  }
-
   const { run, pitcher } = session
   const ace = pitcher.ace
 
@@ -141,13 +136,20 @@ export function HomeRunDerbyScreen({
     <>
       <PixelScreen
         title="홈런더비"
-        badge={`${derbyBallNumberOf(run)} / ${derbyBallCountOf(run)}구${run.isBonusGame ? ' · 보너스' : ''}`}
-        rightKey={{
-          label: isMenuOpen ? '닫기' : '메뉴',
-          onPress: menu.toggle,
-        }}
+        badge={
+          isResultShown ? undefined : `${derbyBallNumberOf(run)} / ${derbyBallCountOf(run)}구${run.isBonusGame ? ' · 보너스' : ''}`
+        }
+        // 결과 창(상태 0x1a)은 키 0x40a08 이 예·아니오만 받는다 — 경기 중 메뉴를 안 띄운다
+        rightKey={
+          isResultShown
+            ? undefined
+            : {
+                label: isMenuOpen ? '닫기' : '메뉴',
+                onPress: menu.toggle,
+              }
+        }
       >
-        {isMenuOpen && (
+        {isMenuOpen && !isResultShown && (
           <InGameMenu
             // 홈런더비 행은 자동진행 자리에 **다시하기**가 온다 (표 0xcfcfc 행 1)
             mode={DERBY_MODE}
@@ -176,6 +178,7 @@ export function HomeRunDerbyScreen({
         {/* 0xe 에서 화면을 누르면 OK 로 본다 (터치용 웹판 편의 — 캔버스 탭이 스윙인 것과 같은 자리) */}
         <div className={styles.stageArea} onClick={acceptsConfirm ? confirm : undefined}>
           <BattingStage
+            key={stageSerial}
             batterAbility={ability}
             batterForm={batterForm}
             batterSkinIndex={batterSkinIndex}
@@ -203,29 +206,45 @@ export function HomeRunDerbyScreen({
             }
             // 조작방법 뷰어 동안은 일시정지 팝업이 떠 있어 경기 갱신이 멈춘다 (0x52cc6 0x754f9)
             isPaused={session.isPaused || overlay !== null}
+            // 결과 창(0x45c18)은 창 뒤에 구름·구장(+0x17e2 만큼 가라앉는다)만 그린다
+            isResultBackdrop={isResultShown}
             random={random}
             onPitchResolved={(detail) => session.onPitchResolved(detail)}
           />
 
-          <DerbyHud
-            run={run}
-            bestDistance={bestDistance}
-            isEventZoneShown={session.isEventZoneShown}
-            tick={tick}
-            shownCombo={session.shownCombo}
-            // 0x4585c 가 0xb63c1(지금 타자)로 콤보 표시 쪽을 가른다 — 타석 그림과 같은 폼(안 넘기면 0 = 우타)
-            batterSide={batterSideOfForm(batterForm ?? 0)}
-          />
+          {session.result !== null ? (
+            <DerbyResultWindow
+              result={session.result}
+              heldGamePoint={gamePoint}
+              onRetry={() => {
+                setStageSerial((serial) => serial + 1)
+                session.restart()
+              }}
+              onExit={onExit}
+            />
+          ) : (
+            <>
+              <DerbyHud
+                run={run}
+                bestDistance={bestDistance}
+                isEventZoneShown={session.isEventZoneShown}
+                tick={tick}
+                shownCombo={session.shownCombo}
+                // 0x4585c 가 0xb63c1(지금 타자)로 콤보 표시 쪽을 가른다 — 타석 그림과 같은 폼(안 넘기면 0 = 우타)
+                batterSide={batterSideOfForm(batterForm ?? 0)}
+              />
 
-          <div className={styles.overlay}>
-            {session.banner === '' ? (
-              <Hint>
-                {run.isBonusGame ? '보너스 게임' : '10구 안에 멀리 쳐라'} · 누적 {run.totalDistance}M
-              </Hint>
-            ) : (
-              <BigResult>{session.banner}</BigResult>
-            )}
-          </div>
+              <div className={styles.overlay}>
+                {session.banner === '' ? (
+                  <Hint>
+                    {run.isBonusGame ? '보너스 게임' : '10구 안에 멀리 쳐라'} · 누적 {run.totalDistance}M
+                  </Hint>
+                ) : (
+                  <BigResult>{session.banner}</BigResult>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </PixelScreen>
       {overlay === '조작방법' && (
