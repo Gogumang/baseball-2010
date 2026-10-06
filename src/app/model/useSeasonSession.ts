@@ -18,7 +18,7 @@ import {
   seasonHumanWonOf,
 } from '@/entities/season-mode/model/seasonEvaluation'
 import { clearSeasonGameRecord } from '@/entities/season-mode/model/seasonReputation'
-import type { SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
+import type { SeasonPlayer, SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
 import { swapTradedPlayers } from '@/entities/season-mode/model/playerTrade'
 import type { TradeSettlement, TradeSwap } from '@/entities/season-mode/model/playerTrade'
 import { NO_TRADE_REQUEST, rollTradeRequest } from '@/entities/season-mode/model/tradeRequest'
@@ -30,7 +30,7 @@ import {
 import type { League } from '@/entities/league/model/league'
 import { recordLeagueResult } from '@/entities/league/model/league'
 import { playLeagueDay } from '@/entities/league/model/leagueDay'
-import type { LeagueAbilityContext } from '@/entities/league/model/leagueDay'
+import type { LeagueAbilityContext, LeagueTeamRecord } from '@/entities/league/model/leagueDay'
 import { finishRegularSeason } from '@/entities/league/model/seasonEnd'
 import { runCpuPostseasonWithStamina } from '@/entities/league/model/postseasonPlay'
 import {
@@ -418,6 +418,21 @@ const EMPTY_ROSTER: SeasonTeamRoster = { pitchers: [], batters: [] }
 /** CPU 팀 레코드 — 트레이드로 바뀌었으면 저장의 것, 아니면 붙박이 표 명단 */
 function cpuRosterOf(save: SeasonSave | null, teamId: number): SeasonTeamRoster {
   return save?.cpuRosters?.[teamId] ?? tableRosterOf(teamId)
+}
+
+/**
+ * CPU 끼리 경기(0xc2a48 · 0xc2760 → 준비 0xc239c → 0xb891c·0xb8680)가 읽는 팀 레코드 — 트레이드로 바뀐 팀만 저장의 명단을
+ * 칸마다 붙박이 표 자리(`tableTeamOf` 팀 · id)로 넘긴다. 바뀌지 않은 팀은 undefined(표 그대로 — 예전과 같은 길).
+ * CPU 팀 레코드에는 리그 선수만 있다(나리·명전은 트레이드에서 거절된다) — 그 밖의 칸은 표 칸 그대로 둔다.
+ */
+function cpuLeagueRecordOf(save: SeasonSave, teamId: number): LeagueTeamRecord | undefined {
+  const roster = save.cpuRosters?.[teamId]
+  if (roster === undefined) return undefined
+  const seatOf = (player: SeasonPlayer, index: number) =>
+    player.id < HALL_OF_FAME_FIRST_ID
+      ? { tableTeamId: tableTeamOf(player, teamId), tableSlot: player.id }
+      : { tableTeamId: teamId, tableSlot: index }
+  return { batters: roster.batters.map(seatOf), pitchers: roster.pitchers.map(seatOf) }
 }
 
 /**
@@ -1520,6 +1535,7 @@ export function useSeasonSession(
             rested.cpuPitcherStaminas,
             aceLevels,
             seasonAbilityContextOf(current.state),
+            (team) => cpuLeagueRecordOf(current, team),
           )
           const advanced = cpu.series
           commit({
@@ -1578,6 +1594,8 @@ export function useSeasonSession(
         // 사람 경기 두 팀의 로테이션 한 칸(0x6548 670e~673e)은 여기서 리그 차례에 넣는다 — 선발은 `optionsFor` 가 미리 셈했다
         true,
         seasonAbilityContextOf(current.state),
+        // 트레이드로 바뀐 CPU 팀은 시즌 저장의 레코드로 선다 (0xc239c → 0xb8680 → 0x1f570)
+        (team) => cpuLeagueRecordOf(current, team),
       )
       const rested = withDayEndRecovery({ ...afterGameStamina, cpuPitcherStaminas: day.pitcherStaminas })
 
@@ -1727,6 +1745,7 @@ export function useSeasonSession(
     // 0xc2760 은 CPU 팀 투수 레코드 +0x2c 를 깎기만 한다 — 회복(0xb617c)은 다음 내 경기 끝 0x4ea0c 에서다
     const cpu = runCpuPostseasonWithStamina(
       series, myTeam, random, save.cpuPitcherStaminas, aceLevels, seasonAbilityContextOf(save.state),
+      (team) => cpuLeagueRecordOf(save, team),
     )
     const advanced = cpu.series
     commit({

@@ -232,6 +232,11 @@ export interface LeaguePitcherGameLine {
 export interface LeaguePitcherOfRecord {
   readonly side: number
   readonly pitcherSlot: number
+  /**
+   * 그 투수의 **붙박이 표 팀** — 트레이드로 다른 팀 레코드에 옮겨 간 투수는 기록이 옛 표 자리(원본 id)로 쌓이므로
+   * 부르는 쪽이 칸과 함께 표 팀을 넘긴다. 없으면 `teamOfSide(측)` 이다.
+   */
+  readonly teamId?: number
 }
 
 /**
@@ -257,7 +262,7 @@ export function leaguePitcherAppearancesOf(
     .map((line) => ({ ...line, decision: null }))
   const attach = (record: LeaguePitcherOfRecord | null, decision: LeaguePitcherDecision) => {
     if (record === null) return
-    const teamId = teamOfSide(record.side)
+    const teamId = record.teamId ?? teamOfSide(record.side)
     if (skip(teamId, record.pitcherSlot)) return
     const index = appearances.findIndex(
       (appearance) => appearance.teamId === teamId && appearance.pitcherSlot === record.pitcherSlot,

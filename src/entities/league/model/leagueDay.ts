@@ -215,6 +215,51 @@ export interface LeagueGameExtras {
   readonly pitcherOrders?: { readonly away?: readonly number[]; readonly home?: readonly number[] }
   /** 경기용 능력치(0xb570c)의 모드 갈래 — 교체 0xabfcc 마무리 갈래의 능력 합 0xb5b50 에 쓴다. 안 넘기면 모드 2 밖 */
   readonly abilityContext?: LeagueAbilityContext
+  /**
+   * 명단마다의 **팀 레코드 선수 배열** (`LeagueTeamRecord`) — 트레이드로 바뀐 팀만 넘긴다. 안 넘긴 명단은 붙박이 표 그대로
+   * (칸 k = 표 칸 k)다. 투수 차례(`pitcherOrders`)·스태미나 표의 칸은 이 배열의 첨자다.
+   */
+  readonly records?: { readonly away?: LeagueTeamRecord; readonly home?: LeagueTeamRecord }
+}
+
+/**
+ * 팀 레코드 한 칸에 앉은 선수의 **붙박이 표 자리** — 원본 선수 레코드의 id(+0)는 Xls 행 번호(투수 `팀 × 8 + 칸` ·
+ * 타자 `팀 × 12 + 칸`)라 트레이드(0xd1cc~0xd3ae)로 다른 팀 레코드에 옮겨져도 그대로다. 이름·능력치·구질·보직(+0xb)은
+ * 그 행의 사본이고, 성적 칸(+0x20~)도 레코드에 있어 선수를 따라간다 — 리그 선수 기록표는 이 자리(`leagueBatterIdOf` ·
+ * `leaguePitcherIdOf`)로 센다.
+ */
+export interface LeagueRecordPlayer {
+  readonly tableTeamId: number
+  readonly tableSlot: number
+}
+
+/**
+ * **팀 레코드의 선수 배열** — 시즌 저장 `0x1f570(저장, 팀)` 의 투수 8 · 타자 12. CPU 경기 준비 `0xc239c` 가 세우는 팀 객체
+ * `0xb891c` 는 `team[i] = i` 첨자만 들고 선수는 `0xb8680` 이 모드 2·3·4 에서 `팀객체+0x25` 의 팀 번호로 그 레코드에서
+ * 꺼낸다(b869e → 0x1f570 — 직접 떴다). 그래서 트레이드로 바뀐 레코드가 그대로 경기에 선다.
+ * 투수 배열은 로테이션 전 자리 차례(웹 명단 첨자)다 — 로테이션은 `pitcherOrders` 가 따로 든다.
+ */
+export interface LeagueTeamRecord {
+  readonly batters: readonly LeagueRecordPlayer[]
+  readonly pitchers: readonly LeagueRecordPlayer[]
+}
+
+/** 레코드 칸 k 의 붙박이 표 자리 — 레코드가 없거나 그 칸이 없으면 그 팀 표 칸 k 그대로 */
+function recordPlayerAt(
+  record: LeagueTeamRecord | undefined,
+  teamId: number,
+  isPitcher: boolean,
+  slot: number,
+): LeagueRecordPlayer {
+  const found = (isPitcher ? record?.pitchers : record?.batters)?.[slot]
+  return found ?? { tableTeamId: teamId, tableSlot: slot }
+}
+
+/** 레코드 칸 k 의 투수 표 줄 */
+function recordPitcherRowAt(record: LeagueTeamRecord | undefined, teamId: number, slot: number) {
+  const at = recordPlayerAt(record, teamId, true, slot)
+  const roster = teamPitchers(at.tableTeamId)
+  return roster[at.tableSlot % roster.length]
 }
 
 /**
@@ -388,8 +433,10 @@ function defenseOf(
   /** 투수 레코드 차례 — 벤치를 이 차례로 훑는다 (`LeagueGameExtras.pitcherOrders`) */
   order: readonly number[] = ALL_PITCHER_SLOTS,
   abilityContext?: LeagueAbilityContext,
+  /** 팀 레코드 선수 배열 — 트레이드로 옮겨 온 투수는 옛 팀 표 행으로 선다 (`LeagueTeamRecord`) */
+  record?: LeagueTeamRecord,
 ): HalfInningDefense {
-  const roster = teamPitchers(teamId)
+  const rowAt = (slot: number) => recordPitcherRowAt(record, teamId, slot)
   return {
     mound,
     // 마투수는 명단 8번 칸 = 벤치 맨 끝에 하나 더 (0xb88c8 → 0xb521c, 벤치 투수 수 team+0x33 +1)
@@ -397,19 +444,20 @@ function defenseOf(
     pitcherAt: (slot) =>
       slot === ACE_PITCHER_SLOT && acePitcher !== undefined
         ? acePitcher.quick
-        : quickPitcherOf(roster[slot % roster.length]),
+        : quickPitcherOf(rowAt(slot)),
     // 투수 능력치 순서는 제구·구속·변화·**체력** (칸 3)
     staminaAbilityAt: (slot) =>
       slot === ACE_PITCHER_SLOT && acePitcher !== undefined
         ? acePitcher.staminaAbility
-        : roster[slot % roster.length].ability[3],
+        : rowAt(slot).ability[3],
     // 벤치 투수는 제 레코드 값으로 올라온다 — 경기 사이에 이어진 값
     staminaAt: (slot) => staminas[slot] ?? FULL_STAMINA,
     lead,
     bothTeamsAreCpu: true,
     // 보직 `+0xb & 3` — 로스터 투수 표 칸 0~3 선발 · 4~6 중간 · 7 마무리 (0xb6dec). 로테이션 0xb5ca8 은 선발 넷만
-    // 섞어 칸의 보직이 그대로다. 마투수(8번)의 보직은 저장 레코드라 모른다 → 선발로 본다(changePitcherIfNeeded)
-    roleAt: rosterPitcherRoleOf,
+    // 섞어 칸의 보직이 그대로다. 마투수(8번)의 보직은 저장 레코드라 모른다 → 선발로 본다(changePitcherIfNeeded).
+    // 트레이드로 옮겨 온 투수는 레코드째 와서 제 표 칸의 보직을 든다
+    roleAt: (slot) => rosterPitcherRoleOf(slot === ACE_PITCHER_SLOT ? slot : recordPlayerAt(record, teamId, true, slot).tableSlot),
     // 마선수 0xb633c(+0xa 비트6) — 마투수 8번 칸. 마운드면 특수 문턱(ac4f2), 벤치에 있으면 0xb8a8d 가 참이라
     // 마무리 굴림 0xac360 을 지나고(CPU 끼리라 0xb6c20 이 늘 거짓), 0xabfcc 는 고르지 않는다(ac084)
     isSpecialPitcherAt: (slot) => slot === ACE_PITCHER_SLOT && acePitcher !== undefined,
@@ -424,7 +472,7 @@ function defenseOf(
             acePitcher.staminaAbility,
           ])
         : pitcherAbilitySumOf(
-            (roster[slot % roster.length]?.ability ?? [0, 0, 0, 0]).map((base, k) =>
+            (rowAt(slot)?.ability ?? [0, 0, 0, 0]).map((base, k) =>
               cpuPitcherGameAbilityOf(base, k, teamId, abilityContext),
             ),
           ),
@@ -550,8 +598,15 @@ export function simulateLeagueGame(
   const homeAceBatter = homeAces === undefined ? undefined : aceBatterOf(homeAces.batter, levels)
   const awayAcePitcher = awayAces === undefined ? undefined : acePitcherOf(awayAces.pitcher, levels)
   const homeAcePitcher = homeAces === undefined ? undefined : acePitcherOf(homeAces.pitcher, levels)
-  const batterOfTeam = (teamId: number, ace: QuickAtBatBatter | undefined) => (slot: number) =>
-    slot === ACE_BATTER_ROSTER_SLOT && ace !== undefined ? ace : batterAt(teamId, slot)
+  const awayRecord = extras?.records?.away
+  const homeRecord = extras?.records?.home
+  /** 명단의 레코드 칸 k 에 앉은 타자 — 트레이드로 옮겨 온 선수는 옛 팀 표 행이다 (`LeagueTeamRecord`) */
+  const recordBatterAt = (teamId: number, record: LeagueTeamRecord | undefined, slot: number) => {
+    const at = recordPlayerAt(record, teamId, false, slot)
+    return batterAt(at.tableTeamId, at.tableSlot)
+  }
+  const batterOfTeam = (teamId: number, ace: QuickAtBatBatter | undefined, record: LeagueTeamRecord | undefined) =>
+    (slot: number) => slot === ACE_BATTER_ROSTER_SLOT && ace !== undefined ? ace : recordBatterAt(teamId, record, slot)
   // CPU 대타 0xac228 은 타석 타자가 마선수(0xb633c)면 안 낸다 — 대타로 들어선 마타자는 다시 안 바뀐다.
   // 마타자 칸(12)은 마선수를 넣은 명단에만 있다
   const isAceRosterSlot = (slot: number) => slot === ACE_BATTER_ROSTER_SLOT
@@ -564,23 +619,29 @@ export function simulateLeagueGame(
     typeof startingPitcherSlot === 'object' ? startingPitcherSlot.home : startingPitcherSlot ?? rollStartingPitcherIndex(random)
   // 선발 능력은 아래 `defenseOf` 가 마운드 칸으로 다시 집으므로, 이 둘은 수비 쪽을 넘기지 않는
   // 길(포스트시즌 한 경기 등)에서 쓰는 기본값이다
-  const awayPitcher = startingPitcherOf(matchup.away, awaySlot)
-  const homePitcher = startingPitcherOf(matchup.home, homeSlot)
+  const awayPitcher = awayRecord === undefined
+    ? startingPitcherOf(matchup.away, awaySlot)
+    : quickPitcherOf(recordPitcherRowAt(awayRecord, matchup.away, awaySlot))
+  const homePitcher = homeRecord === undefined
+    ? startingPitcherOf(matchup.home, homeSlot)
+    : quickPitcherOf(recordPitcherRowAt(homeRecord, matchup.home, homeSlot))
   let awayRuns = 0
   let homeRuns = 0
   let awayOrder = 0
   let homeOrder = 0
   const plateAppearances: LeaguePlateAppearance[] = []
   /** 반 이닝이 내놓은 타석 결과를 공격 팀 것으로 적어 둔다 — 판정에는 손대지 않는다 */
-  const collect = (teamId: number, half: HalfInningResult) => {
+  const collect = (teamId: number, half: HalfInningResult, record: LeagueTeamRecord | undefined) => {
     for (const appearance of half.plateAppearances) {
       // ⚠️ 마타자의 타석은 쌓지 않는다 — 원본은 팀 레코드 9번에 복사된 마타자 레코드(0x30 바이트, 기록 칸 +0x20~
       //    포함)에 쌓지만 다음 경기의 0xb8870 이 그 칸을 저장 레코드로 통째로 덮는다. 웹 기록표에는 그 칸이 없다
       if (appearance.rosterSlot === ACE_BATTER_ROSTER_SLOT) continue
-      // 선수 기록은 **실제로 선 선수의 로스터 칸**에 쌓는다 — CPU 대타가 들어오면 타순 칸과 갈린다
+      // 선수 기록은 **실제로 선 선수의 로스터 칸**에 쌓는다 — CPU 대타가 들어오면 타순 칸과 갈린다.
+      // 기록 칸(+0x20~)은 레코드에 있어 선수를 따라가므로 그 칸에 앉은 선수의 붙박이 표 자리로 센다
+      const at = recordPlayerAt(record, teamId, false, appearance.rosterSlot ?? appearance.battingOrderIndex % BATTING_ORDER_SIZE)
       plateAppearances.push({
-        teamId,
-        battingOrderIndex: appearance.rosterSlot ?? appearance.battingOrderIndex % BATTING_ORDER_SIZE,
+        teamId: at.tableTeamId,
+        battingOrderIndex: at.tableSlot,
         outcome: appearance.outcome,
         runsBattedIn: appearance.runsBattedIn,
       })
@@ -628,8 +689,8 @@ export function simulateLeagueGame(
   // 마타자는 첫 벤치 칸(9번)에 앉는다 — 원본에서 마타자가 타석에 서는 길은 CPU 대타뿐이다
   let awayLineup = awayAceBatter === undefined ? rosterLineupOf(BATTERS_PER_TEAM) : withAceBatterLineup(rosterLineupOf(BATTERS_PER_TEAM))
   let homeLineup = homeAceBatter === undefined ? rosterLineupOf(BATTERS_PER_TEAM) : withAceBatterLineup(rosterLineupOf(BATTERS_PER_TEAM))
-  const awayBatterOf = batterOfTeam(matchup.away, awayAceBatter)
-  const homeBatterOf = batterOfTeam(matchup.home, homeAceBatter)
+  const awayBatterOf = batterOfTeam(matchup.away, awayAceBatter, awayRecord)
+  const homeBatterOf = batterOfTeam(matchup.home, homeAceBatter, homeRecord)
   let pinchHitUsed = false
   let steals = 0
   let pinchHits = 0
@@ -640,13 +701,13 @@ export function simulateLeagueGame(
     homeMound = resynced(homeMound, homeStaminas)
     const top = simulateHalfInning(
       awayOrder,
-      (order) => batterAt(matchup.away, order % BATTING_ORDER_SIZE),
+      (order) => recordBatterAt(matchup.away, awayRecord, order % BATTING_ORDER_SIZE),
       homePitcher,
       inning,
       random,
       undefined,
       undefined,
-      defenseOf(matchup.home, homeMound, homeRuns - awayRuns, homeStaminas, homeAcePitcher, homePitcherOrder, extras?.abilityContext),
+      defenseOf(matchup.home, homeMound, homeRuns - awayRuns, homeStaminas, homeAcePitcher, homePitcherOrder, extras?.abilityContext, homeRecord),
       { lineup: awayLineup, batterOf: awayBatterOf, pinchHitUsed, isAceRosterSlot },
     )
     decision = decisionsAfterHalfInning(decision, top, {
@@ -664,7 +725,7 @@ export function simulateLeagueGame(
     pinchHitUsed = top.pinchHitUsed ?? pinchHitUsed
     steals += top.steals
     pinchHits += top.pinchHits.length
-    collect(matchup.away, top)
+    collect(matchup.away, top, awayRecord)
     charge(matchup.home, top)
 
     // 홈이 이미 앞서 있으면 9회말은 치르지 않는다
@@ -673,13 +734,13 @@ export function simulateLeagueGame(
     awayMound = resynced(awayMound, awayStaminas)
     const bottom = simulateHalfInning(
       homeOrder,
-      (order) => batterAt(matchup.home, order % BATTING_ORDER_SIZE),
+      (order) => recordBatterAt(matchup.home, homeRecord, order % BATTING_ORDER_SIZE),
       awayPitcher,
       inning,
       random,
       undefined,
       undefined,
-      defenseOf(matchup.away, awayMound, awayRuns - homeRuns, awayStaminas, awayAcePitcher, awayPitcherOrder, extras?.abilityContext),
+      defenseOf(matchup.away, awayMound, awayRuns - homeRuns, awayStaminas, awayAcePitcher, awayPitcherOrder, extras?.abilityContext, awayRecord),
       { lineup: homeLineup, batterOf: homeBatterOf, pinchHitUsed, isAceRosterSlot },
     )
     decision = decisionsAfterHalfInning(decision, bottom, {
@@ -697,7 +758,7 @@ export function simulateLeagueGame(
     pinchHitUsed = bottom.pinchHitUsed ?? pinchHitUsed
     steals += bottom.steals
     pinchHits += bottom.pinchHits.length
-    collect(matchup.home, bottom)
+    collect(matchup.home, bottom, homeRecord)
     charge(matchup.away, bottom)
 
     if (inning >= REGULAR_INNINGS && awayRuns !== homeRuns) break
@@ -714,16 +775,29 @@ export function simulateLeagueGame(
    * 판정은 경기 안의 **실제 점수**로 한다 — 순위표 쪽의 칸·명단 엇갈림(`playLeagueDay`)과는 따로다.
    */
   const ended = gameEndDecisionOf(decision)
-  const recordOf = (record: PitcherOfRecord | null) =>
-    record === null ? null : { side: record.side, pitcherSlot: record.number }
+  // 투수 줄·판정도 레코드 칸에 앉은 선수의 붙박이 표 자리로 센다 (타자와 같다 — 기록 칸이 선수를 따라간다).
+  // 마투수 8번 칸은 표 자리가 없어 그대로 두고 아래에서 건너뛴다
+  const teamOfSide = (side: number) => (side === AWAY_SIDE ? matchup.away : matchup.home)
+  const tableSeatOf = (teamId: number, pitcherSlot: number): LeagueRecordPlayer =>
+    pitcherSlot === ACE_PITCHER_SLOT
+      ? { tableTeamId: teamId, tableSlot: pitcherSlot }
+      : recordPlayerAt(teamId === matchup.away ? awayRecord : homeRecord, teamId, true, pitcherSlot)
+  const recordOf = (record: PitcherOfRecord | null) => {
+    if (record === null) return null
+    const seat = tableSeatOf(teamOfSide(record.side), record.number)
+    return { side: record.side, pitcherSlot: seat.tableSlot, teamId: seat.tableTeamId }
+  }
   const lines = [...pitched.entries()].flatMap(([teamId, team]) =>
-    [...team.entries()].map(([pitcherSlot, line]) => ({ teamId, pitcherSlot, ...line })),
+    [...team.entries()].map(([pitcherSlot, line]) => {
+      const seat = tableSeatOf(teamId, pitcherSlot)
+      return { ...line, teamId: seat.tableTeamId, pitcherSlot: seat.tableSlot }
+    }),
   )
   const pitcherAppearances: readonly LeaguePitcherAppearance[] = leaguePitcherAppearancesOf(
     lines,
     { winner: recordOf(ended.winner), loser: recordOf(ended.loser), save: recordOf(ended.save) },
     // 칸 s 에서 **던진** 팀 — 초(칸 0) 수비는 home, 말(칸 1) 수비는 away. 판정 측은 그 칸의 팀이다
-    (side) => (side === AWAY_SIDE ? matchup.away : matchup.home),
+    teamOfSide,
     // 마투수 줄·판정은 쌓지 않는다 — 마타자와 같이 팀 레코드 8번 칸이 다음 경기에 저장 레코드로 덮인다
     (_teamId, pitcherSlot) => pitcherSlot === ACE_PITCHER_SLOT,
   )
@@ -856,6 +930,12 @@ export function playLeagueDay(
   rotatesHumanGameTeams: boolean = true,
   /** 경기용 능력치의 모드 갈래 (`LeagueAbilityContext`) — 시즌모드는 `{ mode: 2, teamAbilities, coach }`. 안 넘기면 모드 2 밖 */
   abilityContext?: LeagueAbilityContext,
+  /**
+   * 팀 번호 → 그 팀 레코드의 선수 배열 (`LeagueTeamRecord`) — 시즌모드는 트레이드로 바뀐 CPU 팀(`SeasonSave.cpuRosters`)만
+   * 준다. 원본 하루 경기 0xc2a48 → 준비 0xc239c → 팀 객체 0xb891c·0xb8680 이 시즌 저장의 팀 레코드(0x1f570)를 그대로
+   * 읽는다. 안 주거나 undefined 면 붙박이 표다.
+   */
+  recordOf: (teamId: number) => LeagueTeamRecord | undefined = () => undefined,
 ): LeagueDayResult {
   const plateAppearances: LeaguePlateAppearance[] = []
   const pitcherAppearances: LeaguePitcherAppearance[] = []
@@ -886,7 +966,13 @@ export function playLeagueDay(
       random,
       { away: orders.away[0] ?? 0, home: orders.home[0] ?? 0 },
       { away: staminas[sides.away], home: staminas[sides.home] },
-      { aces: cpuGameAcesOf(rolls), aceLevels, pitcherOrders: orders, abilityContext },
+      {
+        aces: cpuGameAcesOf(rolls),
+        aceLevels,
+        pitcherOrders: orders,
+        abilityContext,
+        records: { away: recordOf(sides.away), home: recordOf(sides.home) },
+      },
     )
     staminas[sides.away] = score.pitcherStaminas.away
     staminas[sides.home] = score.pitcherStaminas.home

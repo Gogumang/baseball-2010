@@ -13,6 +13,7 @@ import {
   rollCpuGamePrep,
   simulateLeagueGame,
 } from '@/entities/league/model/leagueDay'
+import type { LeagueTeamRecord } from '@/entities/league/model/leagueDay'
 import {
   EMPTY_LEAGUE,
   LEAGUE_SIDE_HOME,
@@ -30,6 +31,7 @@ import { BATTERS_PER_TEAM, PITCHERS_PER_TEAM, startingPitcherOf } from '@/entiti
 import { advanceRotation, rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
 import {
   EMPTY_LEAGUE_PLAYER_STATS,
+  leagueBatterIdOf,
   leaguePitcherIdOf,
   leaguePitcherLineOf,
 } from '@/entities/league/model/leaguePlayerStats'
@@ -760,5 +762,72 @@ describe('CPU 투수 경기용 능력치 0xb570c — 마무리 갈래 능력 합
     expect(cpuPitcherGameAbilityOf(500, 0, 0, { mode: 2, teamAbilities: 팀, coach: 2 })).toBe(561)
     expect(cpuPitcherGameAbilityOf(500, 1, 0, { mode: 2, teamAbilities: 팀, coach: 2 })).toBe(500)
     expect(cpuPitcherGameAbilityOf(990, 0, 0, { mode: 2, teamAbilities: 팀, coach: 2 })).toBe(999)
+  })
+})
+
+describe('CPU 팀 레코드가 트레이드로 바뀌면 그 레코드로 선다 (0xc239c → 0xb891c·0xb8680 → 0x1f570)', () => {
+  const identity = (teamId: number): LeagueTeamRecord => ({
+    batters: Array.from({ length: BATTERS_PER_TEAM }, (_, slot) => ({ tableTeamId: teamId, tableSlot: slot })),
+    pitchers: Array.from({ length: PITCHERS_PER_TEAM }, (_, slot) => ({ tableTeamId: teamId, tableSlot: slot })),
+  })
+  /** 1팀 타자 0번 ↔ 5팀 타자 0번, 1팀 투수 0번 ↔ 5팀 투수 0번 을 맞바꾼 1팀 레코드 */
+  const traded = (): LeagueTeamRecord => {
+    const base = identity(1)
+    return {
+      batters: base.batters.map((seat, slot) => (slot === 0 ? { tableTeamId: 5, tableSlot: 0 } : seat)),
+      pitchers: base.pitchers.map((seat, slot) => (slot === 0 ? { tableTeamId: 5, tableSlot: 0 } : seat)),
+    }
+  }
+
+  it('표와 같은 레코드를 넘기면 결과·난수 차례가 넘기지 않은 것과 같다 (트레이드 없는 시즌은 그대로)', () => {
+    for (const seed of [3, 17, 2024]) {
+      const day = 4
+      const plain = playLeagueDay(EMPTY_LEAGUE, day, 0, createSeededRandom(seed))
+      const same = playLeagueDay(
+        EMPTY_LEAGUE, day, 0, createSeededRandom(seed), EMPTY_LEAGUE_PLAYER_STATS, {}, undefined, true, undefined,
+        identity,
+      )
+      expect(same).toEqual(plain)
+    }
+  })
+
+  it('옮겨 온 선수의 타석·투구 기록은 옛 팀 표 자리(원본 id)로 쌓인다 — 레코드 칸이 아니다', () => {
+    let found = false
+    for (let seed = 1; seed < 40 && !found; seed += 1) {
+      const score = simulateLeagueGame(
+        { away: 1, home: 2 }, createSeededRandom(seed), { away: 0, home: 0 }, undefined, { records: { away: traded() } },
+      )
+      const pitched = score.pitcherAppearances.filter((line) => line.teamId === 5)
+      const batted = score.plateAppearances.filter((line) => line.teamId === 5)
+      // 1팀 칸 0 의 선수는 5팀 표 0번이다 — 1팀 표 0번(타자·투수)에는 하나도 안 쌓인다
+      expect(score.plateAppearances.some((line) => line.teamId === 1 && line.battingOrderIndex === 0)).toBe(false)
+      expect(score.pitcherAppearances.some((line) => line.teamId === 1 && line.pitcherSlot === 0)).toBe(false)
+      expect(batted.every((line) => line.battingOrderIndex === 0)).toBe(true)
+      expect(pitched.every((line) => line.pitcherSlot === 0)).toBe(true)
+      found = batted.length > 0 && pitched.length > 0
+    }
+    expect(found).toBe(true)
+  })
+
+  it('선발 칸 0 에 앉은 옮겨 온 투수의 능력치로 던진다 — 결과가 표 그대로와 갈린다', () => {
+    const differs = [1, 2, 3, 4, 5, 6].some((seed) => {
+      const plain = simulateLeagueGame({ away: 1, home: 2 }, createSeededRandom(seed), 0)
+      const swapped = simulateLeagueGame(
+        { away: 1, home: 2 }, createSeededRandom(seed), 0, undefined, { records: { away: traded() } },
+      )
+      return plain.awayRuns !== swapped.awayRuns || plain.homeRuns !== swapped.homeRuns
+    })
+    expect(differs).toBe(true)
+  })
+
+  it('playLeagueDay 는 recordOf 가 준 팀만 레코드로 세운다', () => {
+    const day = 4
+    const plain = playLeagueDay(EMPTY_LEAGUE, day, 0, createSeededRandom(9))
+    const withRecord = playLeagueDay(
+      EMPTY_LEAGUE, day, 0, createSeededRandom(9), EMPTY_LEAGUE_PLAYER_STATS, {}, undefined, true, undefined,
+      (team) => (team === 1 ? traded() : undefined),
+    )
+    expect(withRecord.playerStats.batters[leagueBatterIdOf(1, 0)]).toBeUndefined()
+    expect(plain.playerStats.batters[leagueBatterIdOf(1, 0)]).toBeDefined()
   })
 })
