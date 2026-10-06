@@ -40,5 +40,7 @@ describe('투수편 배경음 — 안쪽 장면을 본다 (128 진입 0x120a4 �
     expect(pitcherLeagueBgmOf('관리', false)).toBe(3)
     expect(pitcherLeagueBgmOf('포스트시즌', true)).toBe(4)
     expect(pitcherLeagueBgmOf('포스트시즌', false)).toBe(40)
+    // 109 진입 0x10d8c — 타자편과 같은 4 (이전 ≠ 105 면 0x6ea6d(…, 4, −1, 1), 105 에서 오면 105 의 4 그대로)
+    expect(pitcherLeagueBgmOf('다음경기순위', false)).toBe(4)
   })
 })

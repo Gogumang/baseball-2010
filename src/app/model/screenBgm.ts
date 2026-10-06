@@ -73,10 +73,13 @@ export function screenBgmOf(screen: Screen): number | null {
 /**
  * 투수편(장면 0x106 모드 3) 배경음 — 최상위 `Screen` 은 '투수편' 한 칸이라 안쪽 장면을 따로 본다.
  * 128 대진은 타자편과 같은 진입 0x120a4 다: 이어하기로 들어왔으면(이전 상태 1) 4, 아니면 114 의 40 이 이어진다.
+ * 109 순위표는 타자편과 같은 진입 0x10d8c(모드 갈림 없음)다: 이전 ≠ 105 면 `0x6ea6d(소리, 4, −1, 1)`, 105 에서 오면
+ * 105 진입 0x11910 이 튼 4 가 이어진다 — 어느 길이든 4 다.
  * 그 밖 장면은 예전 근사 그대로 준비 화면 배경음(3)이다 (머리 주석 ⚠️).
  */
 export function pitcherLeagueBgmOf(scene: PitcherScene, postseasonFromReentry: boolean): number {
   if (scene === '포스트시즌') return postseasonFromReentry ? POSTSEASON_REENTRY_BGM : SCREEN_BGM.이벤트
+  if (scene === '다음경기순위') return SCREEN_BGM.다음경기순위
   return SCREEN_BGM.투수편
 }
 
