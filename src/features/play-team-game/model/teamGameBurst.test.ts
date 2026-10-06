@@ -3,10 +3,14 @@ import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
 import {
   applyBatterOutcome,
+  closeBurstWindow,
   isBatterTurn,
   runAutoProgress,
   startTeamGame,
+  summaryOf,
 } from '@/features/play-team-game/model/teamGameFlow'
+import { BURST_TABLES } from '@/entities/burst-mission/model/burstMissionRow'
+import { BURST_GOAL } from '@/entities/burst-mission/model/burstMissionJudge'
 import type { TeamGameOptions, TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow'
 
 const 시즌옵션: TeamGameOptions = {
@@ -74,5 +78,21 @@ describe('남은 돌발을 판정 없이 내린다 (0x8f628) — 팀 경기(시�
     expect(가.current.game).toEqual(나.current.game)
     expect(가.current.burst).toEqual(나.current.burst)
     expect(가.next).toBe(나.next)
+  })
+})
+
+describe('요약의 돌발 보상 burstRewardDeltas — resolveBurst 의 deltas 를 판정 차례대로 (0x8e34c 모드 2)', () => {
+  it('판정이 나면 그 deltas 가 요약에 실리고, 판정이 없으면 빈 목록이다', () => {
+    const { progress, random } = 돌발뜬판()
+    expect(summaryOf(progress).burstRewardDeltas).toEqual([])
+    // 시즌 타자형 행 중 목표가 안타(0)인 첫 행 — 2루타는 성공이다
+    const row = BURST_TABLES.SEASON.slice(0, 31).find((candidate) => candidate.goal === BURST_GOAL.안타)!
+    const 뜬판 = { ...progress, burst: { ...progress.burst!, current: row } }
+    const 뒤 = applyBatterOutcome(뜬판, { kind: '안타', bases: 2 }, random)
+    expect(뒤.lastBurstResolution?.judgement).toBe('성공')
+    expect(뒤.lastBurstResolution?.deltas.length).toBeGreaterThan(0)
+    expect(summaryOf(뒤).burstRewardDeltas).toEqual(뒤.lastBurstResolution?.deltas)
+    // 창을 닫아도 요약 몫은 남는다
+    expect(summaryOf(closeBurstWindow(뒤)).burstRewardDeltas).toEqual(뒤.lastBurstResolution?.deltas)
   })
 })

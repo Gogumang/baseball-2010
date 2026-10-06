@@ -55,6 +55,7 @@ import {
 import type { CompleteGameKind, MySide } from '@/entities/season-mode/model/seasonReputation'
 import { cancelBurst, createBurstSession, resolveBurst, tryTriggerBurst } from '@/entities/burst-mission/model/burstMissionSession'
 import type { BurstResolution, BurstSession } from '@/entities/burst-mission/model/burstMissionSession'
+import type { BurstRewardDelta } from '@/entities/burst-mission/model/burstMissionReward'
 import { burstResultBitsOf } from '@/entities/burst-mission/model/burstResultBits'
 import {
   benchClearingEffectOf,
@@ -198,8 +199,8 @@ import { TEAMS } from '@/shared/config/original/teams'
  *                                   won: summary.won, opponentTeamId: summary.opponentTeamId,
  *                                   popularityCompleteGame: summary.popularityCompleteGame,
  *                                   reputationCompleteGame: summary.reputationCompleteGame })
- * 3. 돌발 보상은 경기 중에 난다 — `progress.lastBurstResolution.deltas` 를 시즌 레코드에 얹고
- *    `closeBurstWindow` 로 창을 닫는다 (종류 1 사기 · 2 인기도 · 3 평판 · 4 소지금).
+ * 3. 돌발 보상은 경기 중에 난다 (0x8e34c 모드 2 — 종류 1 사기 · 2 인기도 · 3 평판 · 4 소지금). 판정 차례대로 모은
+ *    `summary.burstRewardDeltas` 를 평가 **앞에서** 시즌 레코드에 얹는다. 결과 창은 `closeBurstWindow` 로 닫는다.
  * ```
  * 포스트시즌·국가대항전도 같은 화면을 쓴다 — `mode` 는 그대로 2 이고 상대 팀만 바뀐다.
  */
@@ -709,6 +710,8 @@ export interface TeamGameProgress {
   /** 이번 경기의 돌발미션 (경기 장면이 모드 2·3·4 에서만 만든다 — 팀 경기에서는 **시즌만**) */
   readonly burst: BurstSession | null
   readonly lastBurstResolution: BurstResolution | null
+  /** 이 경기에서 난 돌발 판정의 보상·페널티 — `resolveBurst` 의 `deltas` 를 판정 차례대로 이어 붙인다 */
+  readonly burstRewardDeltas: readonly BurstRewardDelta[]
   readonly log: readonly TeamGameLogEntry[]
   readonly nextLogId: number
 }
@@ -920,6 +923,7 @@ export function startTeamGame(options: TeamGameOptions, random: RandomPort): Tea
     leaguePlateAppearances: [],
     burst: createBurstSession(options.mode),
     lastBurstResolution: null,
+    burstRewardDeltas: [],
     log: [],
     nextLogId: 1,
   }
@@ -3038,6 +3042,8 @@ function resolveBurstFor(
     ...progress,
     burst: resolution.session,
     lastBurstResolution: resolution.judgement !== null ? resolution : null,
+    burstRewardDeltas:
+      resolution.deltas.length === 0 ? progress.burstRewardDeltas : [...progress.burstRewardDeltas, ...resolution.deltas],
   }
 }
 
@@ -4132,6 +4138,12 @@ export interface TeamGameSummary {
   readonly ourPitcherStaminas?: readonly number[]
   /** 상대 팀 투수의 끝 스태미나 — 표 칸 차례 (`opponentPitcherStaminas` 와 같은 차례) */
   readonly opponentPitcherStaminas?: readonly number[]
+  /**
+   * 이 경기 **돌발 보상·페널티** — `resolveBurst` 의 `deltas` 를 판정 차례대로 모은 것 (시즌 모드 2 만, 한 경기 최대 1회
+   * 발동이라 많아야 한 판정 몫). 원본 0x8e34c 는 판정이 난 경기 중에 더하므로 부르는 쪽이 경기 끝 평가 0x4ea0c **앞에**
+   * 먹인다 (`seasonRewards`, fded413).
+   */
+  readonly burstRewardDeltas?: readonly BurstRewardDelta[]
 }
 
 /** 명단 칸별 스태미나(지금 마운드 칸은 `current`)를 명단 차례로 되돌린다 — 마투수는 뺀다 */
@@ -4200,5 +4212,6 @@ export function summaryOf(progress: TeamGameProgress): TeamGameSummary {
           ? [progress.options.ourTeamId, progress.options.opponentTeamId]
           : [progress.options.opponentTeamId, progress.options.ourTeamId],
     },
+    burstRewardDeltas: progress.burstRewardDeltas,
   }
 }
