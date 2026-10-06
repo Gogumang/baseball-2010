@@ -226,6 +226,21 @@ export interface ReplacementCandidate {
   readonly isSpecialPitcher?: boolean
   /** 내 육성 선수인가 — 0xb6388 = 레코드 `+0xa` **비트7**(부호). 모드 3 에서만 거른다 */
   readonly isOwnPlayer?: boolean
+  /**
+   * 능력 합 `0xb5b50(팀, P)` — 마무리 갈래(ac0be)가 이 값 큰 순으로 줄 세운다. `pitcherAbilitySumOf` 로 만든다.
+   * 마무리 후보에 하나라도 없으면 그 갈래는 예전 근사(스태미나 순)로 고른다.
+   */
+  readonly abilitySum?: number
+}
+
+/**
+ * 능력 합 `0xb5b50(팀, P)` (b5b50~b5bb4, 확정): P 가 없으면 0, 아니면
+ * `0xb570c(팀, k, P, 1, [sp]=90, [sp+4]=1)` 을 k = 0·1·2·3(제구·구속·변화·**체력**) 네 칸 더한 값.
+ * 체력 인자 90 이라 피로(0xb58e6)는 없고, 팀 능력치·코치 정액과 0..999 자르기는 칸마다 먹는다 —
+ * 곧 **경기용 능력치 네 칸(체력 인자 90)의 합**이다.
+ */
+export function pitcherAbilitySumOf(gameAbilities: readonly number[]): number {
+  return (gameAbilities[0] ?? 0) + (gameAbilities[1] ?? 0) + (gameAbilities[2] ?? 0) + (gameAbilities[3] ?? 0)
 }
 
 /** 후보 스태미나가 이 값을 넘으면 마무리로 올릴 만하다 (0xabfcc 의 `> 30` = 0.3%) */
@@ -245,7 +260,8 @@ const MIDDLE_RELIEVER: PitcherRole = PITCHER_ROLE.unknown
  * ac032  보직마다: 벤치 i 중 0xb6dec == 보직 · !0xb633c(마선수) · !(내선수거름 && 0xb6388) 인 칸 목록
  *        비면 → 다음 보직
  * ac0be  2 마무리 : 0xb5b50(능력 합) 큰 순 거품 정렬 → "마운드 투수 +0x2c ≤ 0 이거나 후보 +0x2c > 30" 인 첫 후보
- *                   (없으면 다음 보직)
+ *                   (없으면 다음 보직). 거품 정렬은 `합(앞) < 합(뒤)` 일 때만 맞바꿔(ac112 `cmp; bge`)
+ *                   같은 합이면 벤치 차례 그대로다 — 안정 정렬과 같다
  * ac17a  1 중간   : +0x2c 큰 순 거품 정렬(같으면 앞 칸 그대로) → 첫 후보
  * ac1da  0 선발   : 목록의 **마지막**
  * ac1f4  다 비면 −1
@@ -256,7 +272,8 @@ const MIDDLE_RELIEVER: PitcherRole = PITCHER_ROLE.unknown
  * 후보에 `role` 이 하나도 안 실려 오면 위 순서를 세울 수 없어, 원본의 가장 흔한 갈래인
  * **"중간계투 = 스태미나가 가장 많은 후보"** 만 남긴다 (같으면 벤치 번호가 작은 쪽). **근사다.**
  * 보직을 채우려면 `XlsPITCHER_DATA` 의 레코드 `+0xb` 를 로스터 JSON 에 넣어야 한다.
- * 마무리 갈래의 "능력 합" 0xb5b50 도 웹 후보에 없어 스태미나 순으로 본다 — **근사다.**
+ * 마무리 갈래의 "능력 합" 0xb5b50 은 후보의 `abilitySum` 이다 — 마무리 후보 중 하나라도 이 값이 없으면
+ * 예전처럼 스태미나 순으로 본다(**근사**, 부르는 쪽이 아직 안 넘기는 길).
  */
 export function chooseReplacementPitcher(
   candidates: readonly ReplacementCandidate[],
@@ -295,8 +312,11 @@ export function chooseReplacementPitcher(
     const pool = usable.filter((candidate) => candidate.role === role)
     if (pool.length === 0) continue
     if (role === PITCHER_ROLE.relief) {
-      // 능력 합이 큰 순 — 웹 후보에 능력 합이 없으면 스태미나 순으로 본다 (근사)
-      const sorted = [...pool].sort((left, right) => staminaOf(right) - staminaOf(left))
+      // ac0be: 능력 합 0xb5b50 큰 순 (같으면 벤치 차례 — 안정 정렬). 합을 모르면 스태미나 순 (근사)
+      const sums = pool.map((candidate) => candidate.abilitySum)
+      const sorted = sums.every((sum) => sum !== undefined)
+        ? [...pool].sort((left, right) => (right.abilitySum ?? 0) - (left.abilitySum ?? 0))
+        : [...pool].sort((left, right) => staminaOf(right) - staminaOf(left))
       const picked = sorted.find(
         (candidate) => input.currentStamina <= 0 || staminaOf(candidate) > CLOSER_MINIMUM_STAMINA,
       )

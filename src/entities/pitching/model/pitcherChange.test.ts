@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   chooseReplacementPitcher,
+  pitcherAbilitySumOf,
   closerRollIndexOf,
   CLOSER_ROLL_PERCENTS,
   EMPTY_MOUND_COUNTERS,
@@ -246,6 +247,42 @@ describe('새 투수 고르기 0xabfcc', () => {
 
   it('후보가 없으면 −1 이다', () => {
     expect(chooseReplacementPitcher([], { inningIndex: 3, currentStamina: 0 })).toBe(-1)
+  })
+
+  it('마무리 갈래는 능력 합 0xb5b50 큰 순이다 — 스태미나가 아니다 (ac0be)', () => {
+    const 마무리 = (index: number, abilitySum: number, stamina: number) => ({
+      index,
+      role: PITCHER_ROLE.relief,
+      abilitySum,
+      stamina,
+    })
+    const 입력 = { inningIndex: 8, lateInningFlag: true, currentStamina: 5000 }
+    expect(chooseReplacementPitcher([마무리(6, 2000, FULL_STAMINA), 마무리(7, 2400, 4000)], 입력)).toBe(7)
+    // 능력 합이 가장 큰 후보가 스태미나 ≤ 30 이면 다음 후보
+    expect(chooseReplacementPitcher([마무리(6, 2000, FULL_STAMINA), 마무리(7, 2400, 30)], 입력)).toBe(6)
+    // 마운드 투수가 다 지쳤으면(+0x2c ≤ 0) 스태미나를 안 보고 능력 합 첫 후보
+    expect(
+      chooseReplacementPitcher([마무리(6, 2000, FULL_STAMINA), 마무리(7, 2400, 30)], { ...입력, currentStamina: 0 }),
+    ).toBe(7)
+    // 같은 합이면 벤치 차례 그대로 (거품 정렬은 `<` 일 때만 맞바꾼다)
+    expect(chooseReplacementPitcher([마무리(7, 2400, 4000), 마무리(6, 2400, FULL_STAMINA)], 입력)).toBe(7)
+  })
+
+  it('마무리 후보 중 하나라도 능력 합이 없으면 예전 근사(스태미나 순)다', () => {
+    expect(
+      chooseReplacementPitcher(
+        [
+          { index: 6, role: PITCHER_ROLE.relief, stamina: FULL_STAMINA },
+          { index: 7, role: PITCHER_ROLE.relief, abilitySum: 2400, stamina: 4000 },
+        ],
+        { inningIndex: 8, lateInningFlag: true, currentStamina: 5000 },
+      ),
+    ).toBe(6)
+  })
+
+  it('능력 합은 경기용 능력치 네 칸(체력 포함)의 합이다 (0xb5b50)', () => {
+    expect(pitcherAbilitySumOf([520, 610, 480, 700])).toBe(2310)
+    expect(pitcherAbilitySumOf([])).toBe(0)
   })
 })
 
