@@ -14,6 +14,7 @@ import {
   summaryOf,
   resolveBenchClearing,
   throwOpponentPitch,
+  withAutoStopLateInningSetup,
 } from '@/features/play-game/model/gameFlow'
 import { EMPTY_AT_BAT_PITCH_TALLY, tallyPitch } from '@/features/play-at-bat/model/atBatPitchTally'
 import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
@@ -1273,5 +1274,67 @@ describe('경기 시작 — 상태 9 갱신 0x3f584 의 시뮬 초기화 0xc0dac
     }
     startGame(random)
     expect(ranges[0]).toEqual([0, 2])
+  })
+})
+
+describe('자동진행이 내 차례에서 멈출 때 0xc22b4 — 모드 4 의 9회 이후 말 끝내기 판', () => {
+  /** next() 를 정해진 차례로 내는 난수 — 쓴 횟수를 센다 */
+  const 차례난수 = (values: readonly number[]) => {
+    let index = 0
+    const random: RandomPort = {
+      next: () => values[index++] ?? 0,
+      nextInRange: (minimum, maximum) => minimum + (values[index++] ?? 0) * (maximum - minimum),
+      pick: (candidates) => candidates[0],
+    }
+    return { random, used: () => index }
+  }
+  const 판 = (game: Partial<GameProgress['game']>): GameProgress => {
+    const progress = startGame(createSeededRandom(1), 0, PLAYER_BATTING_ORDER_INDEX + 1, opponentOf(0, 0), 1)
+    return {
+      ...progress,
+      game: {
+        ...progress.game,
+        inning: 9,
+        half: '말',
+        outs: 1,
+        bases: { first: true, second: false, third: false },
+        ourScore: 2,
+        opponentScore: 3,
+        ...game,
+      },
+    }
+  }
+
+  it('아웃 + 주자 = t 를 rand(0, t+1) 주자와 남은 아웃으로 다시 나눈다 — 루마다 n == 3 − i 이거나 rand(0, n+1) == 0 이면 세운다', () => {
+    // t = 1 + 1 = 2 · n = ⌊0.7×3⌋ = 2 → 아웃 0 · 1루 rand(0,3)=0 세움(n 1) · 2루 rand(0,2)=1 안 세움 · 3루 n == 1 세움
+    const { random, used } = 차례난수([0.7, 0, 0.9])
+    const 뒤 = withAutoStopLateInningSetup(판({}), random)
+    expect(뒤.game.outs).toBe(0)
+    expect(뒤.game.bases).toEqual({ first: true, second: false, third: true })
+    expect(used()).toBe(3)
+  })
+
+  it('n 이 0 이어도 rand(0, 1) 은 늘 0 이라 1루를 세우고 n 이 음수로 내려간다 (원본 그대로)', () => {
+    // t = 2 · n = 0 → 아웃 2 · 1루 rand(0,1)=0 세움(n −1) · 2루 rand(0,0)=0 세움(n −2) · 3루 rand(0,−1)=−1 안 세움
+    const { random } = 차례난수([0, 0, 0, 0])
+    const 뒤 = withAutoStopLateInningSetup(판({}), random)
+    expect(뒤.game.outs).toBe(2)
+    expect(뒤.game.bases).toEqual({ first: true, second: true, third: false })
+  })
+
+  it('8회 이전 · 초 공격 · 앞서거나 4점 이상 뒤짐 · 아웃+주자 < 점수 차 이면 아무것도 안 하고 굴리지도 않는다', () => {
+    const 그대로: Partial<GameProgress['game']>[] = [
+      { inning: 8 },
+      { half: '초' },
+      { ourScore: 4, opponentScore: 3 },
+      { ourScore: 0, opponentScore: 4 },
+      { ourScore: 0, opponentScore: 3, outs: 0, bases: { first: true, second: false, third: false } },
+    ]
+    for (const 덮개 of 그대로) {
+      const { random, used } = 차례난수([0.5, 0.5, 0.5, 0.5])
+      const 앞 = 판(덮개)
+      expect(withAutoStopLateInningSetup(앞, random)).toBe(앞)
+      expect(used()).toBe(0)
+    }
   })
 })

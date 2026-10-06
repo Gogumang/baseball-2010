@@ -1,5 +1,6 @@
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
+import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { describeOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { atBatRecordCodeOf } from '@/entities/batting/model/swingSkills'
 import { specialSwingCountOf } from '@/entities/batting/model/specialSwing'
@@ -1048,11 +1049,17 @@ function advanceUntilPlayerTurn(
   random: RandomPort,
 ): GameProgress {
   let current = progress
+  // 이번 부름에서 자동진행(0x21)으로 한 타석이라도 돌렸는가 — 0x21 이 멈출 때만 0xc22b4 를 부른다
+  let autoPlayed = false
 
   for (let step = 0; step < MAXIMUM_AUTO_STEPS; step += 1) {
     if (current.game.isFinished) return current
-    // 내 타석이 오면 그 자리가 곧 타석 준비(0xf)다 — 돌발을 굴리고 넘긴다
-    if (isPlayerTurn(current.game)) return prepareMyAtBat(current, random)
+    // 내 타석이 오면 그 자리가 곧 타석 준비(0xf)다 — 돌발을 굴리고 넘긴다.
+    // 자동진행이 내 차례에서 멈췄으면(경기 끝이 아니므로) 먼저 0xc0ee8·0xc22b4 를 지난다 (0x48558~0x48564)
+    if (isPlayerTurn(current.game)) {
+      return prepareMyAtBat(autoPlayed ? withAutoStopLateInningSetup(current, random) : current, random)
+    }
+    autoPlayed = true
     // 내 차례가 아니면 원본은 자동진행(0x21)이다 — 진입 0x3abf0 이 남은 돌발을 판정 없이 내린다 (0x8f628).
     // 동료·상대 타석은 0xf 를 안 지나므로 돌발을 굴리지도 판정하지도 않는다 (`burstContextOf` 머리말)
     current = withoutPendingBurst(current)
@@ -1062,6 +1069,64 @@ function advanceUntilPlayerTurn(
       : playOpponentInning(current, random)
   }
   throw new Error('경기 자동 진행이 끝나지 않았습니다 — 진행 규칙을 확인하세요')
+}
+
+/**
+ * **자동진행이 멈출 때의 `0xc22b4(sim)`** — 상태 0x21 갱신 `0x48480` 이 `0xc2198(sim, 1)` 거짓(내 차례)을 보면
+ * `+0x1784 = 0` · 다음 상태 0x18 을 걸고, **경기 끝(0xb68fc)이 아니면** `0xc0ee8(sim)` → `0xc22b4(sim)` 를 부른다
+ * (0x48538~0x48564). `0xc0ee8` 은 명단 확정(0xaebe4)·마선수 칸·카운트 지우기(0xb6764)·플레이 칸 지우기(0xb68bc) —
+ * 간이 타석이 타석째로 끝나 웹에서는 이미 그 상태라 할 일이 없고 굴림도 없다. `0xc22b4` 는 **모드 4 만**:
+ * ```
+ * c22c0  st[1] != 4 → 끝                         ; 나만의리그 타자편만 (팀경기·투수편은 아무것도 안 한다)
+ * c22d4  st[0x6b](이닝) < st[0x69](8) → 끝        ; 9회부터
+ * c22dc  st[9](공격 측) != 1 → 끝                  ; 말 공격
+ * c230a  d = 점수(측 0) − 점수(측 1) ; (u32)d > 3 → 끝   ; 후공이 0~3점 뒤지거나 동점
+ * c2310  t = st[6](아웃) + 주자 수 ; t < d → 끝
+ * c2318  n = rand(0, t + 1)                       ; 주자 수를 다시 정한다
+ * c232e  st[6] = max(0, t − n)                    ; 남은 몫이 아웃
+ * c2338  0xa9250 주자 지우기
+ * c2342  루 i = 0(1루)·1·2: n == 3 − i 이면 세움(n−1) · 아니면 rand(0, n + 1) == 0 일 때 세움(n−1)
+ * c237a  0xa9a9c(주자관리, 공격 팀, 수비 팀, 1루, 2루, 3루)  ; 앞 타자들로 주자를 세운다 (굴림 없음)
+ * ```
+ * 곧 9회 이후 말 공격에서 뒤진(또는 동점) 후공 팀의 내 타석 앞, `아웃 + 주자` 를 주자·아웃으로 다시 나눠
+ * 끝내기 판을 차린다. n 이 0 일 때 rand(0, 1) 은 늘 0 이라 주자를 세우고 n 이 −1 이 되는 것까지 원본 그대로다.
+ */
+/**
+ * 원본 `0xbfa54 rand(a, b)` 그대로 — a == b 면 a, a > b 면 `b + x % (a − b)`, 아니면 `a + x % (b − a)` (bfa6a~bfa88).
+ * `randomIntegerBelow` 는 a ≤ b 만 맞으므로, n 이 −1 까지 내려가 rand(0, 0)·rand(0, −1) 이 나오는 0xc22b4 는 이것으로 굴린다.
+ */
+function originalRandRange(random: RandomPort, a: number, b: number): number {
+  return a > b ? randomIntegerBelow(random, b, a) : randomIntegerBelow(random, a, b)
+}
+
+/** 경기 상태 초기화 0xb6814 가 `state+0x69`(마지막 정규 이닝, 0-기준)에 넣는 값 — 9회 */
+const LAST_REGULAR_INNING_INDEX = 8
+
+export function withAutoStopLateInningSetup(progress: GameProgress, random: RandomPort): GameProgress {
+  const game = progress.game
+  if (game.inning - 1 < LAST_REGULAR_INNING_INDEX) return progress
+  if (game.half !== '말') return progress
+  // 말 공격이 내 차례이므로 우리가 측 1(후공)이다 — 측 0 점수 = 상대, 측 1 = 우리
+  const deficit = game.opponentScore - game.ourScore
+  if (deficit < 0 || deficit > 3) return progress
+  const total = game.outs + runnerCountOf(game.bases)
+  if (total < deficit) return progress
+  let runners = randomIntegerBelow(random, 0, total + 1)
+  const outs = Math.max(0, total - runners)
+  const placed: boolean[] = []
+  for (let base = 0; base <= 2; base += 1) {
+    if (runners === 3 - base) {
+      placed.push(true)
+      runners -= 1
+    } else if (originalRandRange(random, 0, runners + 1) === 0) {
+      placed.push(true)
+      runners -= 1
+    } else {
+      placed.push(false)
+    }
+  }
+  const bases: BaseState = { first: placed[0] === true, second: placed[1] === true, third: placed[2] === true }
+  return { ...progress, game: { ...game, outs, bases } }
 }
 
 /**

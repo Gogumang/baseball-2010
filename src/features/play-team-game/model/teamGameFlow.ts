@@ -3692,8 +3692,14 @@ export function canAutoProgress(progress: TeamGameProgress): boolean {
  * ⚠️ **중계 화면(경기 상태 0x21)은 옮기지 않았다** — 속도 칸 v = 전역 +0xbc(0..2, 틱 간격 8·4·1)·주자 그림·
  *    "공격팀(PLAYER/COM)" 띠·CLR 중단 질문(StrGAME[6], 예 → sim+0xa0 = 0 · 0xc0ea8(sim, 1) → 다음 0xc2198 이 거짓)은
  *    R10 7절에 있다. 웹은 결과를 한 번에 계산해 사람이 도중에 멈출 틈이 없다.
- * ⚠️ 미해결: 대전에서 경기 끝 전에 멈출 때 원본은 `0xc0ee8(sim)`·`0xc22b4(sim)` 을 부른다 — 0xc22b4 안에 rand
- *    (0xbfa54) 호출이 있어 그 뒤 굴림 차례가 다를 수 있다. 안 읽었다.
+ * **멈출 때** (대전 7회 진입 — 경기 끝 전): 0x21 갱신 0x48480 이 `+0x1784 = 0` · 다음 상태 0x18 을 걸고 경기 끝(0xb68fc)이
+ * 아니면 `0xc0ee8(sim)` → `0xc22b4(sim)` 를 부른다 (0x48538~0x48564). 둘 다 팀 경기에서는 **굴림이 없다** (확정):
+ * ```
+ * 0xc0ee8  sim[0] = 1 · 수비 팀 0xaebe4(명단 확정) · 마투수 칸 sim+0xa8 · 공격 팀 지금/다음 타자가 다르면 0xaebe4 ·
+ *          마타자 칸 sim+0xa4 · 0xb6764(카운트 지우기) · 0xb68bc(플레이 칸 지우기) · sim[0] 되돌림 — 직접 부르는 함수에 rand 없음
+ * 0xc22b4  c22c0 st[1] != 4 → 끝 — 모드 4(타자편)만의 9회 끝내기 판 (`play-game/gameFlow.withAutoStopLateInningSetup`)
+ * ```
+ * 웹 간이 타석은 타석째로 끝나 카운트·플레이 칸이 이미 비어 있고 대타 교체도 그 자리에서 확정하므로 0xc0ee8 몫은 할 일이 없다.
  */
 export function runAutoProgress(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
   // 수비 진행 중에는 손대지 않는다 — 붙들어 둔 타구를 버리고 다음 타석으로 넘어가면 안 된다
