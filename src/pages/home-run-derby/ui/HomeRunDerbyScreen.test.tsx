@@ -33,11 +33,10 @@ describe('홈런더비 화면', () => {
     expect(screen.getByText('1 / 10구')).toBeTruthy()
   })
 
-  it('저장된 최고 비거리를 HUD 에 함께 보여 준다', () => {
-    const { container } = 띄우기()
-    // BEST 줄 딱지 — 숫자는 num.pzx 그림이라 글자로는 안 잡힌다
-    expect(screen.getByText('BEST')).toBeTruthy()
-    expect(container.querySelectorAll('img[data-state]')).toHaveLength(10)
+  it('HUD 판(trainning 프레임 2)과 최고 기록 칸을 함께 보여 준다', () => {
+    띄우기()
+    expect(screen.getByAltText('홈런더비 판')).toBeTruthy()
+    expect(screen.queryAllByTestId('최고기록').length).toBeGreaterThan(0)
   })
 })
 

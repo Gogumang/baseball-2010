@@ -9,41 +9,36 @@ afterEach(cleanup)
 
 const 헛스윙 = { isHomeRun: false, distance: 0, isEventZoneHit: false }
 
-const 띄우기 = (run: DerbyRun, bestDistance = 0, extra: { aceName?: string | null; isEventZoneShown?: boolean } = {}) =>
+const 띄우기 = (run: DerbyRun, bestDistance = 0, extra: { isEventZoneShown?: boolean } = {}) =>
   render(
-    <DerbyHud
-      run={run}
-      bestDistance={bestDistance}
-      aceName={extra.aceName ?? null}
-      isEventZoneShown={extra.isEventZoneShown ?? false}
-      tick={0}
-    />,
+    <DerbyHud run={run} bestDistance={bestDistance} isEventZoneShown={extra.isEventZoneShown ?? false} tick={0} />,
   )
 
-/** 공 아이콘 칸의 상태 목록 — 왼쪽부터 10칸 */
-const 아이콘상태 = (container: HTMLElement) =>
-  [...container.querySelectorAll('img[data-state]')].map((node) => node.getAttribute('data-state'))
+const 그림들 = (testId: string) => screen.queryAllByTestId(testId).map((node) => node.getAttribute('src'))
 
 describe('홈런더비 HUD (0x45a54)', () => {
-  it('공 아이콘은 늘 10칸이고, 첫 공에서는 1번 칸이 "이번 공" 이다', () => {
-    const { container } = 띄우기(createDerbyRun())
-    const states = 아이콘상태(container)
-    expect(states).toHaveLength(10)
-    expect(states[0]).toBe('now')
-    expect(states[1]).toBe('left')
+  it('오른쪽 위에 trainning 프레임 2 판을 (W − 83 − 6, 6) 에 놓는다', () => {
+    띄우기(createDerbyRun())
+    const panel = screen.getByAltText('홈런더비 판') as HTMLImageElement
+    expect(panel.getAttribute('src')).toBe('./sprites/trainning/frames/002.png')
+    expect([panel.style.left, panel.style.top]).toEqual(['151px', '6px'])
   })
 
-  it('공을 쓸수록 "이번 공" 칸이 오른쪽으로 간다 — 공 번호 = 10 − 남은 기회 + 1', () => {
+  it('판 머리에 "공 번호 / 공 수" 를 흰 글자로 쓴다 — 첫 공은 1/10 (0x3608c)', () => {
+    띄우기(createDerbyRun())
+    expect(그림들('공번호')).toEqual([
+      './sprites/num/001.png', './sprites/num/101.png', './sprites/num/001.png', './sprites/num/000.png',
+    ])
+  })
+
+  it('공을 쓸수록 공 번호가 오른다 — 공 번호 = 10 − 남은 기회 + 1', () => {
     let run = createDerbyRun()
     for (let index = 0; index < 4; index += 1) run = applyDerbyPitch(run, 헛스윙)
-    const { container } = 띄우기(run)
-    const states = 아이콘상태(container)
-    // 다섯 번째 공 차례다
-    expect(states.slice(0, 4)).toEqual(['used', 'used', 'used', 'used'])
-    expect(states[4]).toBe('now')
+    띄우기(run)
+    expect(그림들('공번호')[0]).toBe('./sprites/num/005.png')
   })
 
-  it('보너스 게임에서는 최대 콤보 수만큼만 칸이 산다', () => {
+  it('보너스 게임에서는 공 수가 최대 콤보다', () => {
     const 홈런 = { isHomeRun: true, distance: 90, isEventZoneHit: false }
     let run = createDerbyRun()
     run = applyDerbyPitch(run, 홈런)
@@ -52,22 +47,23 @@ describe('홈런더비 HUD (0x45a54)', () => {
     for (let index = 0; index < 7; index += 1) run = applyDerbyPitch(run, 헛스윙)
 
     expect(run.isBonusGame).toBe(true)
-    const { container } = 띄우기(run)
-    const states = 아이콘상태(container)
-    expect(states[0]).toBe('now')
-    expect(states.slice(2)).toEqual(Array.from({ length: 8 }, () => 'off'))
+    띄우기(run)
+    expect(그림들('공번호')).toEqual(['./sprites/num/001.png', './sprites/num/101.png', './sprites/num/002.png'])
   })
 
-  it('누적 비거리가 최고 기록을 넘으면 강조한다', () => {
+  it('최고 칸은 저장된 최고 기록이고, 누적이 넘으면 노랑(80~)·아니면 흰색(0~) 이다 — 현재 칸은 늘 노랑', () => {
     const run = { ...createDerbyRun(), totalDistance: 500 }
-    expect(띄우기(run, 400).queryByTestId('최고기록강조')).not.toBeNull()
+    띄우기(run, 400)
+    expect(그림들('최고기록')).toEqual(['./sprites/num/084.png', './sprites/num/080.png', './sprites/num/080.png'])
+    expect(그림들('현재비거리')).toEqual(['./sprites/num/085.png', './sprites/num/080.png', './sprites/num/080.png'])
     cleanup()
-    expect(띄우기(run, 500).queryByTestId('최고기록강조')).toBeNull()
+    띄우기(run, 500)
+    expect(그림들('최고기록')).toEqual(['./sprites/num/005.png', './sprites/num/000.png', './sprites/num/000.png'])
   })
 
-  it('마투수가 등판하면 이름을 보여 준다', () => {
-    띄우기(createDerbyRun(), 0, { aceName: '레오니' })
-    expect(screen.getByText('마투수 레오니')).toBeTruthy()
+  it('마투수 이름은 HUD 가 안 그린다 (0x45a54 에 없다)', () => {
+    띄우기(createDerbyRun())
+    expect(screen.queryByText(/마투수/)).toBeNull()
   })
 
   it('이벤트 존을 얻으면 존 그림을 띄운다', () => {
@@ -78,7 +74,7 @@ describe('홈런더비 HUD (0x45a54)', () => {
   it('콤보 표시는 trainning.pzx "Combo" 가 미끄러져 온 뒤 셋째 갱신부터 숫자를 붙인다 (0x4585c — combo.pzx 는 안 그린다)', () => {
     const run = createDerbyRun()
     const hud = (tick: number) => (
-      <DerbyHud run={run} bestDistance={0} aceName={null} isEventZoneShown={false} tick={tick} shownCombo={2} batterSide={1} />
+      <DerbyHud run={run} bestDistance={0} isEventZoneShown={false} tick={tick} shownCombo={2} batterSide={1} />
     )
     const { rerender } = render(hud(10))
     expect(screen.getByAltText('Combo').getAttribute('src')).toBe('./sprites/trainning/frames/003.png')

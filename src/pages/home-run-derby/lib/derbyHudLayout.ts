@@ -1,44 +1,118 @@
 /**
- * 홈런더비 HUD 배치 — 원본 `0x45a54`.
+ * 홈런더비 HUD 배치 — 원본 `0x45a54` (**직접 떴다**, 0x45a54~0x45be8).
  *
- * 타석 화면 그리기 `0x4c4bc` 가 모드 7 이면 일반 점수판(`0x373d0`) 대신 이 함수를 부른다.
- * **확정된 것은 규칙뿐이다**:
- *   - 공 아이콘 **10칸** (그리기 0x3608c)
- *   - 공 번호 = `(보너스 중 ? 최대 콤보 : 10) − 남은 기회 + 1`
- *   - 최고 기록(저장 +0x5c, u16)과 지금 누적 비거리를 비교해 **넘으면 강조**
- *   - 스프라이트 `ui/result.pzx` · `ui/trainning.pzx` (`ui/combo.pzx` 는 싣기만 하고 안 그린다 — `COMBO_DISPLAY`)
- *
- * ⚠️ **콤보 표시(`COMBO_DISPLAY`)만 원본 0x4585c 에서 뜬 좌표다. 나머지는 원본에서 못 읽어 내가 정한 배치다.** 고른 기준은
- * "일반 점수판이 있던 자리(6,6 에서 82×50)를 그대로 쓴다" 이다(renderHud 머리말).
- * 0x45a54 를 디스어셈으로 풀면 이 파일만 갈아 끼우면 된다.
+ * 타석 화면 그리기 `0x4c4bc` 가 모드 7 이면 일반 점수판(`0x373d0`) 대신 이 함수를 부른다(0x4c4fe).
+ * ```
+ * 45a5e  [장면+0x19e8](ui/trainning.pzx) 가 없으면 아무것도 안 그린다
+ * 45a78  0xba815(rect, trainning, 2, 종류 1)            ; 합성 프레임 2 의 상자 → 폭 83
+ * 45a94  x0 = W − 폭 − 6                                 ; 240 이면 151
+ * 45abc  0xba759(trainning, 2, 종류 1, x0, 6, …)        ; 판 "최고 ___M / 현재 ___M" (83×51)
+ * 45aec  0x3608c(장면, 공 번호, 공 수, x0 + 0x38, 10, 0) ; "공 번호 / 공 수" — 공 수 = 보너스 중 ? +0x3d : 10,
+ *                                                          공 번호 = 공 수 − 남은 기회(+0x33) + 1
+ * 45b08  r = 0x94a65(프레임 2, 상자 0) + (x0, 6)         ; 최고 칸 (32,19,35,10)
+ * 45b3a  최고(저장 +0x5c, u16) < 누적(+0x34) 이면 기준 0x50(노랑) 아니면 0(흰색) 으로
+ *        0xba719(r, 자간 0, 최고, 기준, num 이미지, 정렬 4)  ; 값은 둘 다 **최고 기록**이다 — 색만 바뀐다
+ * 45b9e  r = 0x94a65(프레임 2, 상자 1) + (x0, 6)         ; 현재 칸 (32,35,35,10)
+ * 45bd8  0xba719(r, 자간 0, 누적(+0x34), 기준 0x50, num 이미지, 정렬 4)
+ * 45bde  0x4585c(장면)                                   ; 콤보 표시 (`COMBO_DISPLAY`)
+ * ```
+ * - 공 아이콘은 없다. 0x3608c 는 num **이미지** 101(흰 "/")을 (x, y) 에 그리고, 그 왼쪽에 공 번호를 오른쪽 맞춤
+ *   (`0x585ad(…, x − 1, y, 간격 1, 자리 0, 정렬 4)`), 오른쪽에 공 수를 왼쪽 맞춤(`x + "/" 폭 + 1`, 정렬 1)으로 쓴다.
+ *   마지막 인자 0 이라 글자는 이미지 0~9(흰색)다.
+ * - 0x585ad 는 폭을 셀 때 간격을 **셋째 글자부터만** 더하고(0x58620 `cmp 차례,#1 · ble`) 그릴 때는 글자마다 폭 + 간격씩
+ *   나아간다 — 두 자리 공 번호("10")는 1px 오른쪽으로 밀려 "/" 에 닿는다. 원본 그대로 옮긴다.
+ * - 0xba51c(정렬 4): x = 상자 x + 상자 폭 − Σ(글자 폭 + 자간), 세로는 가장 큰 글자 높이에 아래를 맞춘다(위 = 상자 y).
+ * - 마투수 이름·이벤트 존은 이 함수가 안 그린다(이벤트 존은 0x41098).
  */
 
-/** 일반 점수판과 같은 왼쪽 위 여백 (0x373d0 의 (6,6)) */
-export const HUD_ORIGIN = { x: 6, y: 6 } as const
+/** 타석 캔버스 240×320 — W·H (0x14008b8 · 0x14008c8) */
+const SCREEN_WIDTH = 240
 
-/**
- * 공 아이콘 — `ball.pzx` 의 9×9 짜리 그림을 쓴다.
- * (0x3608c 가 어느 스프라이트의 몇 번인지는 미확인이라 경기 공 그림으로 대신한다.)
- */
-export const BALL_ICON = { url: './sprites/ball/007.png', size: 9, step: 10 } as const
+/** num.pzx 이미지 폴더 */
+const NUM_FOLDER = './sprites/num'
 
-/** 아이콘 줄의 왼쪽 위 */
-export const BALL_ROW = { x: HUD_ORIGIN.x, y: HUD_ORIGIN.y } as const
-
-export const ballIconLeftOf = (index: number) => BALL_ROW.x + BALL_ICON.step * index
-
-/** 비거리 두 줄 — 지금 누적 / 최고 기록 */
-export const DISTANCE_ROWS = {
-  x: HUD_ORIGIN.x,
-  firstY: BALL_ROW.y + BALL_ICON.size + 4,
-  step: 12,
-  /** num.pzx 숫자 한 줄 높이 */
-  glyphHeight: 10,
-  /** 숫자 오른쪽 끝 */
-  right: HUD_ORIGIN.x + 74,
+/** HUD 판 — trainning.pzx 합성 프레임 2 (83×51, 앵커 (0,0)) 를 (W − 83 − 6, 6) 에 */
+export const HUD_PANEL = {
+  folder: './sprites/trainning/frames',
+  frame: 2,
+  width: 83,
+  x: SCREEN_WIDTH - 83 - 6,
+  y: 6,
 } as const
 
-export const distanceRowTopOf = (row: number) => DISTANCE_ROWS.firstY + DISTANCE_ROWS.step * row
+/** 프레임 2 의 상자 (trainning/frames/boxes.json "002") — 0 = 최고 · 1 = 현재 */
+const PANEL_BOXES = [
+  { x: 32, y: 19, width: 35, height: 10 },
+  { x: 32, y: 35, width: 35, height: 10 },
+] as const
+
+/** 공 번호 칸 — 0x3608c(…, x0 + 0x38, 10) */
+export const BALL_COUNTER = { x: HUD_PANEL.x + 0x38, y: 10, slashImage: 101, slashWidth: 10, gap: 1 } as const
+
+/** 숫자 글꼴 기준 — 0 흰색 · 0x50 노랑 (num 이미지 0~9 · 80~89, 모두 8×10 이고 "1" 만 4×10) */
+export const HUD_DIGIT_BASE = { white: 0, yellow: 0x50 } as const
+const hudDigitWidthOf = (digit: number) => (digit === 1 ? 4 : 8)
+
+export interface HudGlyph {
+  readonly src: string
+  readonly left: number
+  readonly top: number
+}
+
+const numSrcOf = (image: number) => `${NUM_FOLDER}/${String(image).padStart(3, '0')}.png`
+const digitsOf = (value: number) => [...String(Math.max(0, Math.trunc(value)))].map(Number)
+
+/**
+ * `0x585ad` 숫자 — 정렬 4(오른쪽 맞춤, x = 오른끝) · 1(왼쪽 맞춤, x = 왼끝). 자리 채우기 0, 세로 맞춤 없음(위 = y).
+ * 폭은 셋째 글자부터 간격을 더해 센다(원본 그대로).
+ */
+function counterGlyphsOf(value: number, x: number, y: number, align: 1 | 4, base: number, gap: number): HudGlyph[] {
+  const digits = digitsOf(value)
+  const measured = digits.reduce((total, digit, index) => total + hudDigitWidthOf(digit) + (index > 1 ? gap : 0), 0)
+  let left = align === 1 ? x : x - measured
+  return digits.map((digit) => {
+    const placed = { src: numSrcOf(base + digit), left, top: y }
+    left += hudDigitWidthOf(digit) + gap
+    return placed
+  })
+}
+
+/** "공 번호 / 공 수" (0x3608c) — 공 번호는 "/" 왼쪽 1px 에 오른끝, 공 수는 "/" 다음 1px 부터 */
+export function ballCounterGlyphsOf(ballNumber: number, ballCount: number): HudGlyph[] {
+  const { x, y, slashImage, slashWidth, gap } = BALL_COUNTER
+  return [
+    ...counterGlyphsOf(ballNumber, x - 1, y, 4, HUD_DIGIT_BASE.white, gap),
+    { src: numSrcOf(slashImage), left: x, top: y },
+    ...counterGlyphsOf(ballCount, x + slashWidth + 1, y, 1, HUD_DIGIT_BASE.white, gap),
+  ]
+}
+
+/** 판 상자 안 숫자 (0xba719 → 0xba51c, 자간 0, 정렬 4) */
+function boxGlyphsOf(value: number, box: (typeof PANEL_BOXES)[number], base: number): HudGlyph[] {
+  const digits = digitsOf(value)
+  const boxLeft = HUD_PANEL.x + box.x
+  const boxTop = HUD_PANEL.y + box.y
+  let left = boxLeft + box.width - digits.reduce((total, digit) => total + hudDigitWidthOf(digit), 0)
+  return digits.map((digit) => {
+    // 글자 높이가 모두 10 이라 아래 맞춤(0xba628)을 해도 위 = 상자 y
+    const placed = { src: numSrcOf(base + digit), left, top: boxTop }
+    left += hudDigitWidthOf(digit)
+    return placed
+  })
+}
+
+/**
+ * 최고 칸 — 값은 **저장된 최고 기록**이고, 누적이 그것을 넘으면 노랑(0x50), 아니면 흰색(0) 이다 (0x45b3a `cmp 최고, 누적 · bge`).
+ */
+export function bestDistanceGlyphsOf(bestDistance: number, totalDistance: number): HudGlyph[] {
+  const base = bestDistance < totalDistance ? HUD_DIGIT_BASE.yellow : HUD_DIGIT_BASE.white
+  return boxGlyphsOf(bestDistance, PANEL_BOXES[0], base)
+}
+
+/** 현재 칸 — 누적 비거리, 늘 노랑(0x50) */
+export function totalDistanceGlyphsOf(totalDistance: number): HudGlyph[] {
+  return boxGlyphsOf(totalDistance, PANEL_BOXES[1], HUD_DIGIT_BASE.yellow)
+}
 
 /**
  * **콤보 표시 — 원본 `0x4585c` 그대로** (직접 떴다, 0x4585c~0x45a20).
@@ -126,9 +200,6 @@ export function comboDisplayPlacementOf(value: number, batterSide: number, drawI
     }),
   }
 }
-
-/** 마투수 이름 줄 — 단계 ≥ 1 일 때만 */
-export const ACE_NAME_ROW = { x: HUD_ORIGIN.x, y: distanceRowTopOf(2) + 2, width: 120 } as const
 
 /**
  * 이벤트 존 그림 자리 — 원본은 **공이 있던 자리**에 놓는데(0x36dfc) 이식판 타석 화면은

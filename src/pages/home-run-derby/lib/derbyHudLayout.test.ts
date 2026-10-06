@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { comboDisplayPlacementOf } from '@/pages/home-run-derby/lib/derbyHudLayout'
+import {
+  ballCounterGlyphsOf, bestDistanceGlyphsOf, comboDisplayPlacementOf, totalDistanceGlyphsOf,
+} from '@/pages/home-run-derby/lib/derbyHudLayout'
 
 describe('콤보 표시 배치 (0x4585c)', () => {
   it('좌타는 trainning 애니 1(칸 3·4·5·6)을 (0, H/2) 에 그리고, 끝 칸 전에는 숫자가 없다', () => {
@@ -32,5 +34,41 @@ describe('콤보 표시 배치 (0x4585c)', () => {
       { frame: 77, left: 20, top: 132 },
       { frame: 70, left: 51, top: 130 },
     ])
+  })
+})
+
+const n = (image: number) => `./sprites/num/${String(image).padStart(3, '0')}.png`
+
+describe('HUD 본문 배치 (0x45a54)', () => {
+  it('공 번호는 "/"(x0 + 0x38 = 207, y 10) 왼쪽 1px 에 오른끝, 공 수는 "/" 폭 10 + 1 뒤부터 (0x3608c)', () => {
+    expect(ballCounterGlyphsOf(3, 10)).toEqual([
+      { src: n(3), left: 198, top: 10 },
+      { src: n(101), left: 207, top: 10 },
+      { src: n(1), left: 218, top: 10 },
+      { src: n(0), left: 223, top: 10 },
+    ])
+  })
+
+  it('두 자리 공 번호는 폭을 셀 때 간격을 빼먹어 1px 오른쪽으로 밀린다 (0x585ad 원본 그대로)', () => {
+    // "11": 셈 폭 4 + 4 = 8 → 시작 206 − 8 = 198, 그리기는 4 + 1 씩 → 198 · 203 (끝 207 = "/" 자리)
+    expect(ballCounterGlyphsOf(11, 12).slice(0, 2)).toEqual([
+      { src: n(1), left: 198, top: 10 },
+      { src: n(1), left: 203, top: 10 },
+    ])
+  })
+
+  it('최고·현재 칸은 판 상자 (151+32, 6+19 / 6+35, 35×10) 안 오른쪽 맞춤, 자간 0 (0xba51c 정렬 4)', () => {
+    // 상자 오른끝 151 + 32 + 35 = 218. "120" = 4 + 8 + 8 = 20 → 198
+    expect(bestDistanceGlyphsOf(120, 0)).toEqual([
+      { src: n(1), left: 198, top: 25 },
+      { src: n(2), left: 202, top: 25 },
+      { src: n(0), left: 210, top: 25 },
+    ])
+    expect(totalDistanceGlyphsOf(0)).toEqual([{ src: n(80), left: 210, top: 41 }])
+  })
+
+  it('누적이 최고를 넘을 때만 최고 칸이 노랑이다 (같으면 흰색)', () => {
+    expect(bestDistanceGlyphsOf(300, 301)[0].src).toBe(n(83))
+    expect(bestDistanceGlyphsOf(300, 300)[0].src).toBe(n(3))
   })
 })

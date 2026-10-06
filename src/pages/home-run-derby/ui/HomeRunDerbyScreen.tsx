@@ -193,7 +193,6 @@ export function HomeRunDerbyScreen({
           <DerbyHud
             run={run}
             bestDistance={bestDistance}
-            aceName={ace?.name ?? null}
             isEventZoneShown={session.isEventZoneShown}
             tick={tick}
             shownCombo={session.shownCombo}
