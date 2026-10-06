@@ -39,7 +39,9 @@ import {
 import { recordHumanGamePitchers } from '@/entities/pitcher-career/model/leaguePitcherRecords'
 import { isMyTurn } from '@/entities/league/model/seasonEnd'
 import type { PostseasonSeries } from '@/entities/league/model/league'
-import { EMPTY_LEAGUE_PLAYER_STATS, recordLeaguePlateAppearances } from '@/entities/league/model/leaguePlayerStats'
+import {
+  EMPTY_LEAGUE_BATTER_LINE, EMPTY_LEAGUE_PLAYER_STATS, recordLeaguePlateAppearances,
+} from '@/entities/league/model/leaguePlayerStats'
 import type { LeaguePlayerStats } from '@/entities/league/model/leaguePlayerStats'
 import { startNextYear } from '@/entities/season-mode/model/seasonRecord'
 import { SEASON_END_CHAIN } from '@/entities/season-mode/model/seasonStateMachine'
@@ -62,7 +64,7 @@ import {
   rotatedPitchersOf, seasonEntryListsOf, seasonEntryOrderOf, seasonRosterOfEntry, seasonStarterNameOf, tableRosterOf,
   unrotatedPitchersOf,
 } from '@/entities/season-mode/model/seasonEntry'
-import type { SeasonEntryInput, SeasonEntryLists } from '@/entities/season-mode/model/seasonEntry'
+import type { SeasonEntryInput, SeasonEntryLists, SeasonEntryRecordSource } from '@/entities/season-mode/model/seasonEntry'
 import { HALL_OF_FAME_FIRST_ID, removeHallOfFamerFromRoster } from '@/entities/season-mode/model/playerRecruit'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
@@ -100,12 +102,14 @@ import { regularSeasonRankEventId } from '@/entities/season-mode/model/seasonSta
 import {
   leagueBatterIdOf, leagueBatterLineOf, leaguePitcherIdOf, leaguePitcherLineOf,
 } from '@/entities/league/model/leaguePlayerStats'
-import { entryBattersOfOrder } from '@/features/play-team-game/model/teamGameRoster'
+import { NO_ROSTER_SLOT, entryBattersOfOrder } from '@/features/play-team-game/model/teamGameRoster'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { MORALE_LIMIT, POPULARITY_LIMIT, REPUTATION_LIMIT, MONEY_LIMIT, clampTo } from '@/entities/season-mode/model/seasonRecord'
 import { isInfiniteGamePointOn } from '@/shared/lib/dev/devOptions'
 import type { GamePointWalletSession } from '@/entities/wallet/model/useGamePointWallet'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
+import { seasonHallOfFameRecordSourceOf } from '@/app/model/seasonHallOfFameRecords'
+import type { SeasonHallOfFame } from '@/app/model/seasonHallOfFameRecords'
 import { normalizeCollectionRewardRecord, withAwardedBit } from '@/entities/collection/model/collectionRewards'
 import type { CollectionRewardRecord } from '@/entities/collection/model/collectionRewards'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -678,7 +682,21 @@ export function useSeasonSession(
    * 받은 문턱이 새로 고쳐도 남는다. 안 넘기면 세션 상태로만 든다(테스트용 — 예전 동작).
    */
   rewardStore?: JsonStorePort,
+  /**
+   * 기록연감의 명전 칸 — 영입한 명전 선수(id ≥ 0xb4)를 팀 경기에 그 기록으로 세울 때 읽는다(`seasonHallOfFameRecordSourceOf`).
+   * 기록연감 훅이 시즌 세션보다 늦게 서므로 경기를 세울 때 부른다. 안 넘기면 그 선수는 예전 근사(남은 표 칸)로 선다.
+   */
+  readHallOfFame?: () => SeasonHallOfFame | undefined,
 ): SeasonSession {
+  /** 내 팀 명단 차례 — 영입한 명전 선수에게 기록을 싣는다 (7da5044 의 받는 쪽 `TeamEntryOrder.record`) */
+  const recordSourceNow = useCallback((): SeasonEntryRecordSource | undefined => {
+    const hallOfFame = readHallOfFame?.()
+    return hallOfFame === undefined ? undefined : seasonHallOfFameRecordSourceOf(hallOfFame)
+  }, [readHallOfFame])
+  const entryOrderOf = useCallback(
+    (roster: SeasonTeamRoster) => seasonEntryOrderOf(roster, recordSourceNow()),
+    [recordSourceNow],
+  )
   const loaded = useRef<SeasonSave | null>(null)
   if (loaded.current === null) loaded.current = withSceneConstructed(normalizeSeasonSave(store.load() as Partial<SeasonSave> | null))
 
@@ -998,10 +1016,10 @@ export function useSeasonSession(
         // 시즌 저장의 팀 레코드 차례 그대로 — 경기용 팀 객체 0xb891c 는 첨자만 들고 선수는 0xb8680 으로 같은
         // 레코드(0x1f570)에서 읽으므로 엔트리 편집(0xe0)이 고친 차례가 곧 타순·벤치·투수 차례다 (c041959).
         // 경기정보 뒤에 편집이 끼면 `startPendingGame` 이 고친 명단으로 다시 싣는다
-        ourEntryOrder: seasonEntryOrderOf(save.roster),
+        ourEntryOrder: entryOrderOf(save.roster),
       }
     },
-    [aceLevels, save],
+    [aceLevels, entryOrderOf, save],
   )
 
   /**
@@ -1183,7 +1201,7 @@ export function useSeasonSession(
     const prepared = withOwnRecordRotation({
       ...pendingGame.options,
       settings: save.matchSettings ?? SEASON_DEFAULT_MATCH_SETTINGS,
-      ourEntryOrder: seasonEntryOrderOf(roster),
+      ourEntryOrder: entryOrderOf(roster),
       // 투수 스태미나 +0x2c — 시즌 내내 이어진 값으로 선다. 국가대항전은 두 팀 모두 10000(기본)이다
       ...(isCup ? {} : staminaOptionsOf(save, pendingGame.options.opponentTeamId)),
       ...withAces,
@@ -1862,6 +1880,7 @@ export function useSeasonSession(
       if (lastCalled !== undefined && lastCalled !== playback.eventId) {
         eventCursor.current = cursorAfterCalling(eventCursor.current, lastCalled)
       }
+      const goalRecordOf = recordSourceNow()
       const followUp = seasonEventFollowUpOf(playback.eventId, () =>
         seasonGoalResultEventId(achievedSeasonGoalCount(
           applied.state.record.yearIndex,
@@ -1871,13 +1890,14 @@ export function useSeasonSession(
             roster: next.roster,
             playerStats: next.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS,
             series: next.series ?? null,
+            ...(goalRecordOf === undefined ? {} : { recordOf: goalRecordOf }),
           }),
         )))
       if (followUp !== null) return startEvent(followUp, playback.returnScene)
       setEventPlayback(null)
       setScene(playback.returnScene)
     },
-    [commit, eventPlayback, gainGamePoint, random, recordStat, save, startEvent],
+    [commit, eventPlayback, gainGamePoint, random, recordSourceNow, recordStat, save, startEvent],
   )
 
   /**
@@ -1960,6 +1980,8 @@ export interface SeasonGoalSource {
   readonly roster: SeasonTeamRoster
   readonly playerStats: LeaguePlayerStats
   readonly series: PostseasonSeries | null
+  /** 영입한 명전 선수의 기록 — 경기 명단(`entryOrderOf`)과 같은 칸을 보려고 같은 것을 넘긴다 */
+  readonly recordOf?: SeasonEntryRecordSource
 }
 
 /**
@@ -1977,7 +1999,9 @@ export interface SeasonGoalSource {
  * ⚠️ 한계 (지어내지 않고 남긴다):
  * - 웹 팀 경기 요약(`TeamGameSummary`)이 **사람 경기의 투수 등판 줄**을 싣지 않아 내 팀 투수 줄은 늘 0 이다 —
  *   원본은 사람 경기도 0xa8024·0xa7de8 로 쌓는다. 그래서 지금은 ④ 가 0(달성)으로 나온다.
- * - 영입 선수(id ≥ 0xb4)는 웹 붙박이 표에 없어 경기가 남은 표 칸으로 세우고(`tableSlotsOfOrder`) 그 칸으로 쌓는다 — 여기도 같은 칸을 읽는다.
+ * - 영입한 명전 선수(id ≥ 0xb4)는 경기가 그 기록으로 세우고(`recordOf`) 리그 기록표에 쌓지 않아 빈 줄로 센다 — 원본이 그 선수의
+ *   시즌 기록을 어디에 쌓는지는 미해결이다. 기록을 못 찾은 표 밖 선수(나리 0xfe 등)는 경기가 남은 표 칸으로 세우고
+ *   (`tableSlotsOfOrder`) 그 칸으로 쌓는다 — 여기도 같은 칸을 읽는다.
  * - 대진 칸의 플레이오프 아랫 시드(준PO 승자)는 한국시리즈가 시작된 뒤에는 시리즈 객체에 남지 않아 모른다 —
  *   목표 판정(392)은 포스트시즌 첫날에 돌아 닿지 않는다.
  */
@@ -1986,11 +2010,16 @@ export function seasonGoalInputOf(source: SeasonGoalSource): SeasonGoalInput {
   const team = record.teamId
   const ranking = rankingOf(source.league)
   const regularRank = Math.max(0, ranking.indexOf(team))
-  const order = seasonEntryOrderOf(source.roster)
+  const order = seasonEntryOrderOf(source.roster, source.recordOf)
+  // 기록을 실은 칸(영입한 명전 선수)은 경기가 리그 기록표에 쌓지 않는다 — 빈 줄로 센다 (⚠️ 원본 자리 미해결)
   const batterLines = entryBattersOfOrder(team, order).map((batter) =>
-    leagueBatterLineOf(source.playerStats, leagueBatterIdOf(team, batter.rosterSlot)))
+    batter.rosterSlot === NO_ROSTER_SLOT
+      ? EMPTY_LEAGUE_BATTER_LINE
+      : leagueBatterLineOf(source.playerStats, leagueBatterIdOf(team, batter.rosterSlot)))
   const pitcherLines = order.pitchers.map((slot) =>
-    slot >= 0 ? leaguePitcherLineOf(source.playerStats, leaguePitcherIdOf(team, slot)) : { outs: 0, runsAllowed: 0 })
+    typeof slot === 'number' && slot >= 0
+      ? leaguePitcherLineOf(source.playerStats, leaguePitcherIdOf(team, slot))
+      : { outs: 0, runsAllowed: 0 })
   return {
     rank: goalRankOf(team, regularRank, record.inPostseason ? goalBracketOf(source.series) : null),
     wins: source.league.wins[team] ?? 0,

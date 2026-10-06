@@ -1539,3 +1539,44 @@ describe('명전 칸 삭제의 시즌 명단 정리 (0x221dc)', () => {
     expect(result.current.state).toBeNull()
   })
 })
+
+describe('영입한 명전 선수는 그 기록으로 팀 경기 명단에 실린다 (0xb891c · 0xb8680 — 7da5044 의 받는 쪽)', () => {
+  const 명전 = {
+    hallOfFame: [{
+      name: '전설', ability: { hit: 500, power: 600, defense: 300, run: 200 }, endingIndex: 6, season: 13, titleIds: [], slot: 0,
+    }],
+    hallOfFamePitchers: [{
+      name: '철완', ability: { control: 700, velocity: 650, breaking: 600, stamina: 550 },
+      equippedAbility: { control: 710, velocity: 660, breaking: 610, stamina: 560 }, endingIndex: 5, season: 10, titleIds: [], slot: 1,
+      look: { typeIndex: 1, handIndex: 1, skinIndex: 0, teamId: 1 }, pitchMask: 0b101, selectedMagicNumber: 2,
+    }],
+  }
+
+  it('투수 id − 0xb4 · 타자 id − 0xc8 칸의 이름·0xb6414 능력치·레퍼토리를 싣는다', () => {
+    const rendered = renderHook(() => useSeasonSession(
+      메모리저장(), createSeededRandom(20100901), null, undefined, undefined, undefined, undefined, () => 명전,
+    ))
+    const { result } = rendered
+    시작(result, 0)
+    const { roster } = result.current
+    act(() => result.current.actions.updateRoster({
+      pitchers: [roster.pitchers[0]!, { ...roster.pitchers[1]!, id: 0xb5, kindByte: 1 }, ...roster.pitchers.slice(2)],
+      batters: [{ ...roster.batters[0]!, id: 0xc8, kindByte: 0x20 }, ...roster.batters.slice(1)],
+    }))
+    act(() => result.current.actions.openNextGame())
+    act(() => result.current.actions.confirmNextGame())
+    act(() => result.current.actions.choosePreGameAce(0))
+    act(() => result.current.actions.choosePreGameAce(5))
+    act(() => result.current.actions.toggleMatchSettings())
+    act(() => result.current.actions.startPendingGame())
+
+    const order = result.current.gameOptions?.ourEntryOrder
+    expect(order?.batters[0]).toEqual({ rosterSlot: -1, position: roster.batters[0]!.fieldPosition & 0xf, record: { name: '전설', ability: [500, 600, 300, 200] } })
+    const pitcher = order?.pitchers.find((entry) => typeof entry !== 'number')
+    expect(pitcher).toEqual({
+      name: '철완',
+      ability: [710, 660, 610, 560],
+      repertoire: { name: '철완', form: 3, magicId: 2, pitchMask: 0b101 },
+    })
+  })
+})

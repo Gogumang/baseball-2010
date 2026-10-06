@@ -117,6 +117,8 @@ export function App() {
   /** 미션 선수 고르기가 읽는 명예의 전당 — 기록연감 훅이 선 뒤 아래에서 채운다 (`recordStatRef` 와 같은 까닭) */
   const hallOfFameForMissionRef = useRef<Collection>(EMPTY_COLLECTION)
   const recordStat = useCallback((event: AnnalsStatEvent) => recordStatRef.current(event), [])
+  /** 시즌 팀 경기가 영입한 명전 선수를 그 기록으로 세울 때 읽는 명전 칸 — 위 ref 와 같은 값 */
+  const readHallOfFame = useCallback(() => hallOfFameForMissionRef.current, [])
   /**
    * 시즌 결산 0x6900 의 0x29 "오토봇 배트" 검사가 읽는 것 — 나리 투수편·타자편 저장의 +0x7a 와 전역 해금표 `app+0xc0`.
    * 기록연감·투수편 세션은 시즌 세션보다 늦게 서므로 아래에서 채우고 시즌 세션은 결산에 들어갈 때 읽는다.
@@ -131,7 +133,7 @@ export function App() {
   const readBatterOtherModes = useCallback(() => otherModesRef.current.batter, [])
   const readPitcherOtherModes = useCallback(() => otherModesRef.current.pitcher, [])
   const seasonSession = useSeasonSession(
-    seasonStore, random, wallet, aceLevels.levels, recordStat, readAutobotBatInput, collectionRewardStore,
+    seasonStore, random, wallet, aceLevels.levels, recordStat, readAutobotBatInput, collectionRewardStore, readHallOfFame,
   )
   // 투수편 G도 같은 지갑 한 칸이다 — 옛 투수 저장에 남은 G는 표식 칸을 보고 딱 한 번 옮겨 온다
   const pitcherSession = usePitcherLeagueSession(

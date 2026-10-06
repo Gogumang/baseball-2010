@@ -137,11 +137,11 @@ export function openHiddenForMissions(collection: Collection, isAllCleared: bool
 }
 
 /** 타자 칸 i 의 선수 (칸 번호를 따라 찾는다) */
-export function hallOfFameBatterAt(collection: Collection, slot: number): HallOfFamer | null {
+export function hallOfFameBatterAt(collection: Pick<Collection, 'hallOfFame'>, slot: number): HallOfFamer | null {
   return collection.hallOfFame.find((famer, index) => (famer.slot ?? index) === slot) ?? null
 }
 
-export function hallOfFamePitcherAt(collection: Collection, slot: number): HallOfFamePitcher | null {
+export function hallOfFamePitcherAt(collection: Pick<Collection, 'hallOfFamePitchers'>, slot: number): HallOfFamePitcher | null {
   return collection.hallOfFamePitchers.find((famer) => famer.slot === slot) ?? null
 }
 

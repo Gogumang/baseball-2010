@@ -198,18 +198,51 @@ export function seasonStarterNameOf(teamId: number, roster: SeasonTeamRoster, da
  * **팀 경기에 넘길 내 팀 명단 순서** — 팀 경기 옵션 `ourEntryOrder`(`teamGameRoster.TeamEntryOrder`)로 받는다.
  *
  * 받는 쪽은 타자 명단을 이 순서(로스터 칸 + 수비 위치)로, 투수 명단도 이 순서로 세우고 **선발 칸은
- * `rotationSlotOf(dayCounter)`** 를 쓴다 — 원본의 "g 번 돈 배열의 0번" 과 같다. 영입 선수(id ≥ 0xb4 · 0xfe)는
- * 표에 없어 `rosterSlot` 이 −1 이다 (받는 쪽이 안 쓴 표 칸으로 채운다 — 근사).
+ * `rotationSlotOf(dayCounter)`** 를 쓴다 — 원본의 "g 번 돈 배열의 0번" 과 같다.
+ *
+ * 영입 선수(id ≥ 0xb4 · 0xfe)는 붙박이 표에 없다. 원본 경기용 팀 0xb891c 는 팀 레코드의 0x30 바이트를 id 로 거르지 않고
+ * 그대로 쓰고(0xb8680), 이름은 0xaa458 표 밖이라 rec + 1, 능력치는 그 기록의 0xb6414 다 (7da5044) — 그래서
+ * `recordOf` 가 그 선수의 기록(명전 칸 사본)을 주면 그 칸에 **기록**을 싣는다. 못 주면 `rosterSlot` −1 (받는 쪽이 안 쓴
+ * 표 칸으로 채운다 — 근사).
  */
-export interface SeasonEntryOrder {
-  readonly batters: readonly { readonly rosterSlot: number; readonly position: number }[]
-  readonly pitchers: readonly number[]
+export interface SeasonEntryBatterRecord {
+  readonly name: string
+  /** 히트 · 파워 · 수비 · 주루 — 0xb6414(기록, k, 1) */
+  readonly ability: readonly [number, number, number, number]
 }
 
-export function seasonEntryOrderOf(roster: SeasonTeamRoster): SeasonEntryOrder {
-  const slotOfPlayer = (player: SeasonPlayer) => (player.id < HALL_OF_FAME_FIRST_ID ? player.id : NOT_IN_ROSTER)
+export interface SeasonEntryPitcherRecord {
+  readonly name: string
+  /** 제구 · 구속 · 변화 · 체력 — 0xb6414(기록, k, 1) */
+  readonly ability: readonly [number, number, number, number]
+  /** 이름 · 폼 0xb6e24 · 고른 마구 +0x18(`magicId` — 경기가 마구 번호로 쓴다) · 구질 마스크 +0x1c */
+  readonly repertoire: { readonly name: string; readonly form: number; readonly magicId: number; readonly pitchMask: number }
+}
+
+/** 표 밖 선수의 기록을 찾아 준다 — 없으면 undefined */
+export interface SeasonEntryRecordSource {
+  readonly batter: (player: SeasonPlayer) => SeasonEntryBatterRecord | undefined
+  readonly pitcher: (player: SeasonPlayer) => SeasonEntryPitcherRecord | undefined
+}
+
+export interface SeasonEntryOrder {
+  readonly batters: readonly { readonly rosterSlot: number; readonly position: number; readonly record?: SeasonEntryBatterRecord }[]
+  /** 로스터 칸, 또는 표 밖 선수의 기록 */
+  readonly pitchers: readonly (number | SeasonEntryPitcherRecord)[]
+}
+
+export function seasonEntryOrderOf(roster: SeasonTeamRoster, recordOf?: SeasonEntryRecordSource): SeasonEntryOrder {
+  const isTablePlayer = (player: SeasonPlayer) => player.id < HALL_OF_FAME_FIRST_ID
   return {
-    batters: roster.batters.map((player) => ({ rosterSlot: slotOfPlayer(player), position: player.fieldPosition & 0xf })),
-    pitchers: roster.pitchers.map(slotOfPlayer),
+    batters: roster.batters.map((player) => {
+      const position = player.fieldPosition & 0xf
+      if (isTablePlayer(player)) return { rosterSlot: player.id, position }
+      const record = recordOf?.batter(player)
+      return record === undefined ? { rosterSlot: NOT_IN_ROSTER, position } : { rosterSlot: NOT_IN_ROSTER, position, record }
+    }),
+    pitchers: roster.pitchers.map((player) => {
+      if (isTablePlayer(player)) return player.id
+      return recordOf?.pitcher(player) ?? NOT_IN_ROSTER
+    }),
   }
 }
