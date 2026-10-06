@@ -22,7 +22,8 @@ export interface PostseasonBracketWindowProps {
  * **#08044A** 로 모두 채운 뒤, **이긴 길만 빨강 RGB(255,0,0)** 으로 다시 채운다 (0x855b4~0x857ec).
  *
  * 안 옮긴 것 (원본에 있으나 문서가 '유력'·'다른 몫'이라 뺐다):
- *  - "프레임 54 박스 0 영역을 단계 7 로 어둡게"(0x7f4ed) — P6 도 '유력'
+ *  - "프레임 54 박스 0 영역을 단계 7 로 어둡게" — P6 도 '유력'. (P6 이 붙인 주소 0x7f4ed 는 어둡게가 아니라
+ *    끝(0x8585c)의 **머리띠·바닥 그리기** 0x7f4ec 다 — 시즌 0xef 는 `SeasonSummaryScreen` 이 ScreenFrame 으로 그린다)
  *  - 우승/탈락 문구(0x85e6c)는 공용 팝업 몫이다 (P6 4a-3) → `SeasonSummaryScreen` 이 띄운다
  *
  * ⚠️ 타자편 `src/pages/season-end/ui/PostseasonBracket.tsx` 와 **같은 그림**이다.

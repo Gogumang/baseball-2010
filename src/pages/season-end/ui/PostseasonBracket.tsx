@@ -33,7 +33,8 @@ interface PostseasonBracketProps {
  * **이긴 길만 빨강 RGB(255,0,0)** 으로 다시 채운다 (0x855b4~0x857ec).
  *
  * 안 옮긴 것:
- *  - "프레임 54 박스 0 을 단계 7 로 어둡게"(0x7f4ed) 는 P6 도 '유력' 이라 빼 뒀다.
+ *  - "프레임 54 박스 0 을 단계 7 로 어둡게" 는 P6 도 '유력' 이라 빼 뒀다. (P6 이 붙인 0x7f4ed 는 끝 0x8585c 의
+ *    머리띠·바닥 그리기 0x7f4ec 다 — `frame` 칸으로 받는다.)
  *  - 우승/탈락 문구(0x85e6c)는 공용 팝업 몫이라 여기서는 안 띄운다 (4a-3).
  */
 export function PostseasonBracket({ series, onShowStats, onNext, nextLabel = '다음', frame }: PostseasonBracketProps) {

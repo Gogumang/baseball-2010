@@ -12,6 +12,7 @@ import type {
 } from '@/entities/season-mode/model/seasonRewards'
 import { MILLION_TO_TEN_THOUSAND } from '@/widgets/season/lib/seasonWindowLayout'
 import { PostseasonBracketWindow } from '@/widgets/season/ui/PostseasonBracketWindow'
+import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import * as styles from '@/widgets/season/ui/SeasonEndWindow.css'
 
 /**
@@ -73,6 +74,8 @@ export interface SeasonSummaryScreenProps {
    * (연차 idx **짝수** → 0xf2 국가대항전 안내 · 홀수 → 새 해 `0x6e0c`).
    */
   readonly onFinish: () => void
+  /** 머리띠 G포인트 */
+  readonly gamePoint?: number
 }
 
 type Phase = '대진표' | '해금알림' | '리그1위' | '우승문구' | '한국시리즈보상'
@@ -108,7 +111,7 @@ const NO_CHAMPION = 0xf
 export function SeasonSummaryScreen(props: SeasonSummaryScreenProps) {
   const {
     record, series, postseasonRank, leagueFirstAwardedBits, entry,
-    onApplyKoreanSeriesReward, onLeagueFirstAward, onContinuePostseason, onFinish,
+    onApplyKoreanSeriesReward, onLeagueFirstAward, onContinuePostseason, onFinish, gamePoint = 0,
   } = props
 
   const [phase, setPhase] = useState<Phase>('대진표')
@@ -154,6 +157,8 @@ export function SeasonSummaryScreen(props: SeasonSummaryScreenProps) {
   return (
     <RawScreen>
       <PostseasonBracketWindow series={series} />
+      {/* 대진표 0x853ac 끝의 0x7f4ec — 공통 틀 0xb810 이 0xef 에 맡긴 (제목 10 시즌모드, 바닥 1 — 되돌아가기 없음) */}
+      <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={null} footer={1} />
 
       <div className={styles.caption} style={{ left: 0, top: 276, width: 240 }}>
         {isFinished

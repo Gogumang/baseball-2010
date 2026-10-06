@@ -155,6 +155,8 @@ export interface SeasonSession {
    * 같은 칸이다) — 그래서 지갑(`entities/wallet`)을 넘겨받으면 그 값이 그대로 여기로 나온다.
    */
   readonly gamePoints: number
+  /** 0xd8 다음경기에 관리 메뉴(0xc9)에서 들어왔는가 — 취소(0x48ea)와 바닥(0xb8b2: 5 / 1)이 본다 */
+  readonly isNextGameFromMenu: boolean
   /**
    * 열린 구장 히든 아이템 id (관중석 13·14·15 · 전광판 16·17·18).
    * 원본 자리는 **전역 저장** `app[0xe0 + 종류×4 + (칸−4)]` 다 (S3 7절) — 시즌 레코드가 아니라
@@ -1952,6 +1954,7 @@ export function useSeasonSession(
     leagueFirstAwardedBits,
     // 지갑이 주인이다 (`?무한G` 도 지갑 안에서 갈린다) — 위 `gamePoints` 주석 참고
     gamePoints,
+    isNextGameFromMenu: nextGameFromMenu,
     openedStadiumIds,
     openedHiddenIds,
     summaryEntry,

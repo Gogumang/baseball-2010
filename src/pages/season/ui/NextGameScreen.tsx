@@ -1,4 +1,5 @@
 import { Button, RawScreen } from '@/shared/ui'
+import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import type { League } from '@/entities/league/model/league'
 import { StandingsWindow } from '@/widgets/standings/ui/StandingsWindow'
 import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
@@ -14,6 +15,10 @@ export interface NextGameScreenProps {
    * 그 밖(경기 뒤 홀수 경기·저장에서 바로 들어옴)에는 아무 일도 없다 — 부르는 쪽이 가른다.
    */
   readonly onCancel: () => void
+  /** 관리 메뉴(0xc9)에서 들어왔는가 — 바닥 5(되돌아가기) / 1 */
+  readonly isFromManagement: boolean
+  /** 머리띠 G포인트 */
+  readonly gamePoint: number
 }
 
 /**
@@ -21,7 +26,8 @@ export interface NextGameScreenProps {
  *
  * ```
  * 그림 0xae24:  0x7f070(gfx, SR ? SR+0x80 : 0)   ; 리그 순위표 (P6 4a-2, widgets/standings)
- *               0x7f4ec(gfx)                      ; 바탕
+ *               0x7f4ec(gfx)                      ; 머리띠·바닥 — 공통 틀 0xb810 이 0x7f53c 로 맡긴 (제목 10 시즌모드,
+ *                                                 ;   바닥 이전 상태 == 0xc9 ? 5 : 1) 를 0x54d95 로 (0xb8aa~0xb8c4)
  * 키   0x48d0:  −5 · '5'(0x35) → SR+0xb4(포스트시즌) ? 0xef : (this+0x11c = 1, 0xd7 선수단)
  *               −16            → 이전 상태 == 0xc9 이면 0xc9
  *               그 밖          → [this+0x90] 객체 vtable+0x18 로 넘긴다 (아래 — 보이는 일이 없다)
@@ -39,7 +45,7 @@ export interface NextGameScreenProps {
  *   - 확인·취소 단추는 원본 소프트키 배치를 안 읽은 근사다 (키 −5·'5'·−16 은 원본 그대로 받는다).
  * *   - 순위표 줄 끝 이미지 106(내 팀 표시로 보임)은 `StandingsWindow` 에 아직 없다(P6 4a-2 조건 미확인).
  */
-export function NextGameScreen({ league, onConfirm, onCancel }: NextGameScreenProps) {
+export function NextGameScreen({ league, onConfirm, onCancel, isFromManagement, gamePoint }: NextGameScreenProps) {
   useSeasonCursor({ count: 1, onSelect: onConfirm, onCancel })
 
   return (
@@ -52,6 +58,8 @@ export function NextGameScreen({ league, onConfirm, onCancel }: NextGameScreenPr
       <Button variant="corner" className={styles.cornerButton} style={{ left: 'auto', right: 4 }} onClick={onCancel}>
         취소
       </Button>
+
+      <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={isFromManagement ? onCancel : null} />
     </RawScreen>
   )
 }

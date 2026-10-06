@@ -518,6 +518,7 @@ export function SeasonRoute({
         onLeagueFirstAward={actions.awardLeagueFirst}
         onContinuePostseason={actions.continuePostseason}
         onFinish={actions.finishSeason}
+        gamePoint={session.gamePoints}
       />
     )
   }
@@ -582,7 +583,10 @@ export function SeasonRoute({
 
   if (scene === SEASON_SCENE_STATE.다음경기) {
     // 0xd8 — 리그 순위표 한 장 (그림 0xae24 → 0x7f070). 확인은 경기로, 취소는 관리 메뉴에서 왔을 때만
-    return <NextGameScreen league={league} onConfirm={actions.confirmNextGame} onCancel={actions.cancelNextGame} />
+    return (
+      <NextGameScreen league={league} onConfirm={actions.confirmNextGame} onCancel={actions.cancelNextGame}
+        isFromManagement={session.isNextGameFromMenu} gamePoint={session.gamePoints} />
+    )
   }
 
   return (

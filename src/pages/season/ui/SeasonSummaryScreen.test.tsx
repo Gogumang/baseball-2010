@@ -327,3 +327,14 @@ describe('아직 안 끝난 포스트시즌', () => {
     expect(onContinue).toHaveBeenCalled()
   })
 })
+
+describe('머리띠·바닥 (0xef — 0x853ac 끝 0x7f4ec)', () => {
+  it('시즌모드 제목(그림 22) · 바닥 1 — 되돌아가기가 없다', () => {
+    const { container } = render(
+      <SeasonSummaryScreen record={기록()} series={우승시리즈()} postseasonRank={0} leagueFirstAwardedBits={0}
+        entry={null} onApplyKoreanSeriesReward={vi.fn()} onLeagueFirstAward={vi.fn()} onFinish={vi.fn()} />,
+    )
+    expect(container.querySelector('img[src*="game_frame/022"]')).not.toBeNull()
+    expect(screen.queryByRole('button', { name: '되돌아가기' })).toBeNull()
+  })
+})
