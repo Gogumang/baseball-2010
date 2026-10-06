@@ -26,8 +26,8 @@ describe('빠른실행 후보 목록', () => {
 
 describe('빠른실행 굴림', () => {
   it('원본 차례대로 유저 팀·AI 팀·선공·마투수·마타자를 뽑는다', () => {
-    // 0.35×10 = 3 · 0.75×10 = 7 · 0.6×2 = 1(후공) · 0.5×2 = 1(열린 것 중 둘째) · 마타자는 안 뽑는다
-    const setup = rollQuickStart(정해진난수([0.35, 0.75, 0.6, 0.5]), {
+    // 0.35×10 = 3 · 0.75×10 = 7 · 0.6×2 = 1(후공) · 0.5×2 = 1(열린 것 중 둘째) · 마타자는 bfa55(0,0) → −1
+    const setup = rollQuickStart(정해진난수([0.35, 0.75, 0.6, 0.5, 0.9]), {
       openedAcePitcherIds: [2, 4],
     })
 
@@ -56,6 +56,17 @@ describe('빠른실행 굴림', () => {
 
     expect(setup.userTeamId).toBe(14)
     expect(setup.stadiumId).toBe(14)
+  })
+
+  it('열린 마선수가 하나도 없어도 bfa55(0, 0) 이 난수 하나씩을 쓴다 — 늘 다섯 번 굴린다', () => {
+    let 쓴수 = 0
+    const 세기: RandomPort = {
+      next: () => { 쓴수 += 1; return 0 },
+      nextInRange: (minimum) => { 쓴수 += 1; return minimum },
+      pick: (candidates) => candidates[0],
+    }
+    rollQuickStart(세기)
+    expect(쓴수).toBe(5)
   })
 
   it('열린 마선수가 하나도 없으면 −1(없음) 이다', () => {

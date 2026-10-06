@@ -53,13 +53,17 @@ export function quickStartTeamCandidates(openedHiddenTeamIds: readonly number[] 
   return [...Array.from({ length: OPEN_TEAM_COUNT }, (_unused, index) => index), ...hidden]
 }
 
-/** `0x9f650` / `0x9f604` — 열린 마선수 중 균등. 하나도 없으면 표 0xd7638[0] = −1(없음) */
+/**
+ * `0x9f650` / `0x9f604` — 열린 마선수 중 균등. 하나도 없으면 표 0xd7638[0] = −1(없음).
+ * 하나도 없어도 `bfa55(0, 0)` 을 **부른다**(0x9f67c · 0x9f630 — 개수 검사가 없다). bfa55 는 범위를 보기 전에
+ * 씨앗부터 돌리므로(0xbfa5c~0xbfa68) 난수 하나를 쓰고 0 을 돌려준다 → 표 [0] = −1.
+ */
 function rollAce(random: RandomPort, opened: readonly number[] = []): number {
   const list = [...new Set(opened)]
     .filter((id) => id >= 0 && id < ACE_PER_ROLE)
     .sort((left, right) => left - right)
-  if (list.length === 0) return NO_ACE
-  return list[uniform(random, list.length)]
+  const index = uniform(random, list.length)
+  return list.length === 0 ? NO_ACE : list[index]
 }
 
 /**
