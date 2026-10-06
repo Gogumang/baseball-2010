@@ -135,3 +135,44 @@ describe('투수 미션 상태 0xe — 새 타석마다 사람 OK 를 기다린�
     }
   })
 })
+
+describe('투수 미션 경기 중 메뉴 — 원본 미션 장면(0x104)도 \'*\' 로 연다 (0x498d4 · 표 0xcfcfc 행 1)', () => {
+  function 메뉴화면(props: { onGiveUp?: () => void; onRestart?: () => void } = {}) {
+    render(
+      <PitchingScreen
+        run={startPitcherMission(PITCHER_MISSIONS[0]!)}
+        repertoire={[직구]}
+        usesGauge={false}
+        atBat={createAtBat()}
+        bannerText=""
+        onThrow={vi.fn()}
+        onGiveUp={props.onGiveUp ?? (() => {})}
+        onFinish={() => {}}
+        onRestart={props.onRestart}
+      />,
+    )
+  }
+
+  it("'*' 로 열면 계속·다시하기·조작방법·설정·나가기 다섯 칸이 뜨고, 그 동안 투구 단계가 가려진다", () => {
+    메뉴화면({ onRestart: vi.fn() })
+    expect(screen.queryByRole('button', { name: '포기' })).toBeNull()
+    fireEvent.keyDown(window, { key: '*' })
+    for (const 칸 of ['계속', '다시하기', '조작방법', '설정', '나가기']) {
+      expect(screen.getByText(칸)).toBeTruthy()
+    }
+    expect(screen.queryByText('자동진행')).toBeNull()
+    expect(screen.queryByText('1. 구질 선택')).toBeNull()
+    // '*' 로 닫는다
+    fireEvent.keyDown(window, { key: '*' })
+    expect(screen.getByText('1. 구질 선택')).toBeTruthy()
+  })
+
+  it('메뉴 소프트키로도 열리고, [나가기]를 확인하면 나가기 손잡이를 부른다', () => {
+    const onGiveUp = vi.fn()
+    메뉴화면({ onGiveUp })
+    fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
+    fireEvent.click(screen.getByText('나가기'))
+    fireEvent.click(screen.getByText('예'))
+    expect(onGiveUp).toHaveBeenCalled()
+  })
+})

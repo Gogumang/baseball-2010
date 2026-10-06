@@ -10,6 +10,11 @@ import { CourseGrid } from '@/pages/pitching/ui/CourseGrid'
 import { PitchGradeGauge } from '@/pages/pitching/ui/PitchGradeGauge'
 import { useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
+import type { GameSettings } from '@/entities/settings/model/gameSettings'
+import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
+import { useInGameMenuState } from '@/features/play-team-game/model/useInGameMenuState'
+import { HelpScreen } from '@/pages/help/ui/HelpScreen'
+import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 
 /**
  * 투구 화면. 원작 설명서 <투구 조작>의 세 단계를 그대로 따른다:
@@ -20,6 +25,13 @@ import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
  * (`pitcherPitch.pitchGradeOf`)이 원본 자리에서 뽑는다. 나리 투수편 `PitcherGameScreen` 과 같다.
  */
 type PitchPhase = '구질' | '코스' | '게이지'
+/** 경기 화면을 덮는 하위 화면 — 경기 중 메뉴가 연다 */
+type MenuOverlay = '조작방법' | '설정'
+/**
+ * 미션 투수편 = 원본 전역 모드 **5** (XlsPITCHER_MISSION, Q2-mission-rewards 1-0) — 경기 중 메뉴 표 0xcfcfc 의 **행 1**
+ * (모드 5~7 → 1: 자동진행 자리에 다시하기). 미션 장면도 경기 장면 0x104 라 '*' 가 같은 메뉴를 연다.
+ */
+const MISSION_PITCHER_MODE = 5
 
 interface PitchingScreenProps {
   readonly run: PitcherRun
@@ -47,8 +59,17 @@ interface PitchingScreenProps {
     gaugeCell: number,
     gaugeSettingOn: boolean,
   ) => void
+  /** 경기 중 메뉴 **"나가기"** (표 0xcfcfc 행 1 칸 4 — StrGAME[0]/[1] 확인 뒤 0x22 → 0x40140) */
   readonly onGiveUp: () => void
   readonly onFinish: () => void
+  /**
+   * 경기 중 메뉴 **"다시하기"** (표 0xcfcfc 행 1 · StrGAME[7], `0x3c706`) — 미션·홈런더비 행만 자동진행 자리에 이 칸이 온다.
+   * 안 넘기면 칸이 잠긴다.
+   */
+  readonly onRestart?: () => void
+  /** 경기 중 메뉴 "설정" 칸이 열 환경설정. 안 넘기면 칸이 잠긴다 */
+  readonly settings?: GameSettings
+  readonly onSettingsChange?: (settings: GameSettings) => void
   /**
    * **사람 견제 키** — 구질 고르기(상태 0xf)에서 누른 키를 그대로 넘긴다. '3' 1루 · '1' 2루 · '7' 3루 (0x53548 → 메시지 0x10).
    * 원본 0x53580 은 수비면 구질 0x534d8 뒤에 견제 0x53548 을 늘 이어 부른다 — 모드 5(투수 미션)도 막지 않는다.
@@ -75,20 +96,46 @@ export function PitchingScreen({
   onFinish,
   onPickoffKey,
   sceneConfirm: sceneConfirmWait,
+  onRestart,
+  settings,
+  onSettingsChange,
 }: PitchingScreenProps) {
   const [phase, setPhase] = useState<PitchPhase>('구질')
   const [pitchType, setPitchType] = useState<PitchTypeInfo | null>(null)
   const [courseCell, setCourseCell] = useState(4)
+  const menu = useInGameMenuState()
+  const isMenuOpen = menu.isOpen
+  const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
+  /** 일시정지 팝업(0x741a0)이 떠 있는가 — 경기 중 메뉴 또는 그 하위 [조작방법] 뷰어. 경기 키가 안 간다 */
+  const isPopupOpen = isMenuOpen || overlay !== null
+  const isRunning = run.status === '진행중'
+
+  /**
+   * 원본 공용 키 처리 `0x498d4` 의 '\*'(소프트키1 −6 도 '\*' 로 읽는다, 498e8) — 경기 상태 0xd~0x15 면 경기 중 메뉴를 연다.
+   * 미션 장면도 같은 경기 장면 0x104 라 그대로다. 결과 화면(끝난 미션)에서는 안 열린다.
+   */
+  useEffect(() => {
+    if (!isRunning) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat || event.key !== '*') return
+      // 조작방법 뷰어(경기 중 메뉴 하위 4)의 키는 0x3ca36 이 뷰어 0x637d0 에만 준다 — '*' 도 아무 일 안 한다
+      if (overlay === '조작방법') return
+      event.preventDefault()
+      menu.toggle()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [isRunning, menu.toggle, overlay])
   /**
    * **상태 0xe — 새 타석마다 사람 OK 를 기다린다** (0x39e14 → 0x532b0 — 공수·모드 갈림 없음). 결과 연출 동안은 받지 않는다.
    * ⚠️ 미이식: 0xe 그리기 0x4d9ec 가 0xd 그리기 위에 얹는 안내 판 0x44944.
    */
-  const sceneConfirm = useSceneConfirm(sceneConfirmWait, run.status === '진행중' && bannerText === '')
+  const sceneConfirm = useSceneConfirm(sceneConfirmWait, isRunning && bannerText === '' && !isPopupOpen)
   const isAwaitingConfirm = sceneConfirm.isAwaiting && run.status === '진행중'
 
   // 견제 — 구질 고르기(0xf)에서만. 끝난 미션(결과 화면)·0xe(OK 대기)는 키를 안 받는다
   const acceptsPickoff =
-    onPickoffKey !== undefined && phase === '구질' && run.status === '진행중' && !isAwaitingConfirm
+    onPickoffKey !== undefined && phase === '구질' && isRunning && !isAwaitingConfirm && !isPopupOpen
   useEffect(() => {
     if (!acceptsPickoff || onPickoffKey === undefined) return
     const onKeyDown = (event: KeyboardEvent) => {
@@ -107,6 +154,23 @@ export function PitchingScreen({
         <GoalBar goals={goals} />
         <BigResult>{run.status === '성공' ? '미션 성공!' : '미션 실패'}</BigResult>
       </PixelScreen>
+    )
+  }
+
+  // 경기 중 메뉴의 "설정"(0x3c326). "조작방법"(0x3c212)은 아래에서 경기 장면 위에 얹는다
+  if (overlay === '설정' && settings !== undefined && onSettingsChange !== undefined) {
+    return (
+      <SettingsScreen
+        settings={settings}
+        hasSavedCareer={false}
+        onChange={onSettingsChange}
+        onResetCareer={() => {}}
+        onBack={() => {
+          // [설정]에서 CLR(0x3cb0e)도 하위 0 · 팝업 0x741a0 을 다시 띄운다 — 경기 중 메뉴로, 커서는 그대로
+          setOverlay(null)
+          menu.reopen()
+        }}
+      />
     )
   }
 
@@ -134,23 +198,49 @@ export function PitchingScreen({
   }))
 
   return (
+    <>
     <PixelScreen
       title={run.mission.name}
       badge={remainingBadgeOf(run)}
       leftKey={
-        isAwaitingConfirm
+        isAwaitingConfirm && !isMenuOpen
           ? // 0xe — OK 하나만 받는다 (0x532b0). 구질 고르기(0xf)는 OK 뒤다
             { label: '확인', onPress: sceneConfirm.confirm, isDisabled: !sceneConfirm.acceptsConfirm }
           : undefined
       }
-      rightKey={{ label: '포기', onPress: onGiveUp }}
+      // 소프트키1 도 0x498d4 가 '*' 로 읽는다 (498e8) — 경기 중 메뉴
+      rightKey={{ label: isMenuOpen ? '닫기' : '메뉴', onPress: menu.toggle }}
     >
       <GoalBar goals={goals} />
       <Hint>
         {atBat.balls}볼 {atBat.strikes}스트라이크 {bannerText !== '' && `· ${bannerText}`}
       </Hint>
 
-      {phase === '구질' && !isAwaitingConfirm && (
+      {isMenuOpen && (
+        <InGameMenu
+          // 미션 투수편 = 모드 5 — 표 0xcfcfc 행 1(계속·다시하기·조작방법·설정·나가기)
+          mode={MISSION_PITCHER_MODE}
+          cursor={menu.cursor}
+          onCursorChange={menu.setCursor}
+          onContinue={menu.close}
+          onQuit={onGiveUp}
+          onRestart={onRestart}
+          onOpenHelp={() => {
+            menu.close()
+            setOverlay('조작방법')
+          }}
+          onOpenSettings={
+            settings === undefined || onSettingsChange === undefined
+              ? undefined
+              : () => {
+                  menu.close()
+                  setOverlay('설정')
+                }
+          }
+        />
+      )}
+
+      {!isPopupOpen && phase === '구질' && !isAwaitingConfirm && (
         <>
           <Panel heading="1. 구질 선택" />
           <MenuList
@@ -165,7 +255,7 @@ export function PitchingScreen({
         </>
       )}
 
-      {phase === '코스' && (
+      {!isPopupOpen && phase === '코스' && (
         <>
           <Panel heading={<>2. 코스 선택 — {pitchType?.name}</>} />
           <CourseGrid
@@ -186,7 +276,7 @@ export function PitchingScreen({
         </>
       )}
 
-      {phase === '게이지' && (
+      {!isPopupOpen && phase === '게이지' && (
         <>
           {/* 원본에는 결과 글자가 없다 — 작아지는 원 한 장뿐이라 안내 문구도 붙이지 않는다 (S5 U-15) */}
           <Panel heading="3. 투구 결정" />
@@ -194,6 +284,17 @@ export function PitchingScreen({
         </>
       )}
     </PixelScreen>
+    {overlay === '조작방법' && (
+      <HelpScreen
+        onBack={() => {
+          // 뷰어를 닫으면(0x3ca36: 0x637d0 ≠ 0) 하위 0 으로 돌아가 일시정지 팝업 0x741a0 을 다시 띄운다 — 경기 중 메뉴로,
+          // 메뉴 객체는 안 건드려 커서가 그대로다
+          setOverlay(null)
+          menu.reopen()
+        }}
+      />
+    )}
+    </>
   )
 }
 

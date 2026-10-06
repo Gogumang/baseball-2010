@@ -165,8 +165,13 @@ export function MissionRoutes({
         atBat={runner.atBat}
         bannerText={runner.bannerText}
         onThrow={session.handleThrow}
-        onGiveUp={actions.giveUpPitcher}
+        // 경기 중 메뉴 "나가기" — 보통 미션은 0x40140 이 0xa5368(…, 0) 뒤 곧장 메인 메뉴(결과 화면 없음, 모드 5·6 같은 갈래)
+        onGiveUp={actions.quitPitcherMission}
         onFinish={actions.finishPitcher}
+        // 경기 중 메뉴 "다시하기" (StrGAME[7]) — 같은 미션을 처음부터 다시 세운다
+        onRestart={() => actions.begin(pitcherRun.mission)}
+        settings={gameSettings.settings}
+        onSettingsChange={gameSettings.setSettings}
         // 사람 견제 '3'·'1'·'7' (0x53548 → 0x50f28) — 모드 5 도 막지 않는다 (`actions.pickoff` 주석)
         onPickoffKey={actions.pickoff}
         // 상태 0xe — 새 타석마다 사람 OK 를 기다린다
@@ -254,6 +259,8 @@ export function PitcherAceMatchRoute({ mission, session, runner, pitchControl, o
       // ⚠️ 근사: 원본 경기 중 메뉴 나가기 0x40140 은 모드 5·6 이면 0xa5368(obj,0) 뒤 메인 메뉴(장면 0x103)로 간다 —
       //    +0x176 이 서 있을 때 어디로 가는지는 안 읽었다. 웹은 보통 미션처럼 '실패' 로 두어 패배 결과로 잇는다.
       onGiveUp={actions.giveUpPitcher}
+      // ⚠️ 미해결: 경기 중 메뉴 "다시하기"(0x3c706)가 +0x176(투수편 대결) 중에 어디로 가는지 안 읽어 칸을 잠근다.
+      //    "설정" 은 이 라우트를 그리는 App 이 환경설정을 안 넘겨 잠긴다
       // 마선수 대결도 미션 장면(모드 5)이라 사람 견제 길이 같다
       onPickoffKey={actions.pickoff}
       // 대결도 미션 장면이라 새 타석마다 0xe 에서 OK 를 기다린다

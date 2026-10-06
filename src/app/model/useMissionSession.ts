@@ -1177,6 +1177,19 @@ export function useMissionSession({
       setScreen({ kind: '메인메뉴' })
     },
 
+    /**
+     * **경기 중 메뉴 "나가기"** (보통 투수 미션, 모드 5) — `quitBatterMission` 과 같은 길이다: 0x22 갱신 `0x40140` 의 모드 5·6
+     * 갈래가 `0xa5368(미션, 0)` 뒤 장면 0x103(메인 메뉴 처음 단)으로 간다. 결과 화면(0x19)도 미션 목록(0x107)도 안 지난다.
+     */
+    quitPitcherMission: () => {
+      setPendingDefensePlay(null)
+      setPickoffReplay(null)
+      setPendingBenchClearing(null)
+      setPitcherRun(null)
+      runner.setIsPaused(true)
+      setScreen({ kind: '메인메뉴' })
+    },
+
     giveUpPitcher: () => {
       setPendingDefensePlay(null)
       setPendingBenchClearing(null)

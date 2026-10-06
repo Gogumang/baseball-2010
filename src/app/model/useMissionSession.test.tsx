@@ -1153,3 +1153,16 @@ describe('상태 0xe 의 OK 대기 — 미션(모드 5·6)도 새 타석마다 (
     expect(rendered.result.current.session.sceneConfirm).not.toBe(처음)
   })
 })
+
+describe('투수 미션 경기 중 메뉴 "나가기" (0x40140 모드 5·6 갈래)', () => {
+  it('결과 화면 없이 곧장 메인 메뉴 — 클리어 기록을 안 건드린다', () => {
+    const { rendered, setScreen } = setUpSession()
+    const mission = MISSIONS.find((row) => row.side === '투수')
+    if (mission === undefined) throw new Error('투수 미션이 없다')
+    act(() => rendered.result.current.session.actions.begin(mission))
+    act(() => rendered.result.current.session.actions.quitPitcherMission())
+    expect(rendered.result.current.session.pitcherRun).toBeNull()
+    expect(setScreen).toHaveBeenLastCalledWith({ kind: '메인메뉴' })
+    expect(rendered.result.current.session.clearCounts).toEqual({})
+  })
+})
