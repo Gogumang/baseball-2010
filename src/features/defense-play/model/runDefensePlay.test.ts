@@ -1383,16 +1383,17 @@ describe('송구 0xb2e38 — 중계 b4616 · AI 9 미루기 · 던진 야수 AI 
   })
 
   it('결과 코드 9 — 공 든 야수가 루에 막 닿았는데 주자가 서 있으면 0xbba 로 0xafa60 을 한 번 부른다 (b43ec~b444a)', () => {
-    // 협살이 풀린 뒤 공을 든 2루수(3)가 2루 커버로 걸어가 닿는데, 2루타 타자주자가 이미 2루에 서 있다
+    // 3루수(4)가 잡은 땅볼 — b1d48 이 3루를 투수(0)에게 넘기고, 투수가 3루 송구를 받은 틱에 3루에 닿는데
+    // 2루 주자(1번)가 이미 3루에 서 있다
     const 결과 = runDefensePlay({
-      outcome: 이루타,
-      trajectory: battedBallTrajectory([111, 1000, 700, 0]),
-      bases: { first: true, second: false, third: true },
-      outs: 0,
+      outcome: 땅볼아웃,
+      trajectory: battedBallTrajectory([129, 802, 500, 0]),
+      bases: { first: false, second: true, third: false },
+      outs: 2,
       runAbility: 500,
       defenseIsCpu: true,
     })
 
-    expect(결과.log).toContain('47틱 결과 코드 9 — 3번 야수가 2루에 닿았지만 0번 주자가 서 있다')
+    expect(결과.log).toContain('27틱 결과 코드 9 — 0번 야수가 3루에 닿았지만 1번 주자가 서 있다')
   })
 })

@@ -86,10 +86,11 @@ import {
   releaseForcesAfterOut,
 } from '@/entities/fielding/model/outJudgement'
 import {
-  defenseArrivalTicks,
-  secondBaseCoverSlot,
-  secondBaseHelperPlacement,
-} from '@/entities/fielding/model/throwArrival'
+  assignCoversForTick,
+  baseAtPoint,
+  type CoverAssignment,
+} from '@/entities/fielding/model/coverAssignment'
+import { defenseArrivalTicks, secondBaseHelperPlacement } from '@/entities/fielding/model/throwArrival'
 import {
   planThrow,
   errantThrowFlight,
@@ -596,20 +597,6 @@ function leadRunnersForBattedBall(runners: readonly MutableRunner[], input: Defe
 const BATTED_BALL_PLAY_KIND = 1
 
 /**
- * 루 커버 배정 — 기본표 0xd85a8 = [포수, 1루수, 2루수, 3루수] 에 2루 규칙(0xb1e24)을 얹는다.
- * 공을 쫓는 야수는 커버를 못 하므로 1루만 투수(0)가 대신 들어가고, 나머지는 커버 없음(−1)이 된다
- * — `defenseArrivalTicks` 의 (A) 갈래가 그때 "직접 들고 뛰기" 를 본다.
- */
-function assignCovers(chaserSlot: number, ballToFirstSide: boolean): number[] {
-  const covers = [...BASE_DEFAULT_FIELDER]
-  covers[2] = secondBaseCoverSlot(ballToFirstSide, chaserSlot)
-  return covers.map((slot, base) => {
-    if (slot !== chaserSlot) return slot
-    return base === 1 ? 0 : NONE
-  })
-}
-
-/**
  * **한 플레이가 도는 동안 바뀌는 것 전부** — 지금까지 `runDefensePlay` 루프 안의 `let` 변수였던 것들이다.
  *
  * 앞쪽(`input`~`specialDefense`)은 시작할 때 한 번 정해지고 끝까지 안 바뀌는 것,
@@ -791,22 +778,24 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
   const chaserSlot = forecast.choice.slot
   let catchTick = Math.max(0, Math.min(forecast.choice.catchTick, maximumTicks))
   const catchPoint = trajectory.pointAt(catchTick)
-  const covers = assignCovers(chaserSlot, catchPoint.x > basePosition(0).x)
-
-  // 시작 목표를 미리 세워 둔다 — 첫 틱부터 쫓는 야수는 공 쪽, 커버 야수는 제 루 쪽을 보고 있어야 한다
-  fielders = fielders.map((fielder) => {
-    if (fielder.slot === chaserSlot) {
-      return { ...fielder, target: catchPoint, aiState: AI_STATE.CHASE }
-    }
-    const base = covers.indexOf(fielder.slot)
-    if (base < 0) return fielder
-    return {
-      ...fielder,
-      target: basePosition(base),
-      targetBase: base,
-      aiState: AI_STATE.COVER_HOME + base,
-    }
+  // 시작 목표를 미리 세워 둔다 — 첫 틱부터 쫓는 야수는 공 쪽, 커버 야수는 제 루 쪽을 보고 있어야 한다.
+  // 커버는 판 시작 상태로 0xb1c90 을 한 번 돌린 것이다(`assignCoversForTick` — 매 틱 6절이 다시 고른다)
+  fielders = fielders.map((fielder) =>
+    fielder.slot === chaserSlot ? { ...fielder, target: catchPoint, aiState: AI_STATE.CHASE } : fielder,
+  )
+  const startCovers = assignCoversForTick({
+    context: {
+      play: { ...initialPlayView(1), coverOfBase: [...BASE_DEFAULT_FIELDER], ballHolderSlot: chaserSlot },
+      fielders,
+      runners: runners.map((runner) => runner.state),
+      currentTick: 0,
+      landingTick: trajectory.landingTick,
+    },
+    ballToFirstSide: catchPoint.x > basePosition(0).x,
+    ballStartPoint: trajectory.pointAt(0),
   })
+  const covers = startCovers.covers
+  fielders = applyCoverAssignment(fielders, startCovers)
 
   let play: PlayView = {
     ...initialPlayView(1),
@@ -906,7 +895,6 @@ export function stepDefensePlay(
   const onTheFly = state.onTheFly
   const chaserSlot = state.chaserSlot
   const catchPoint = state.catchPoint
-  const covers = state.covers
   const defenseIsCpu = state.defenseIsCpu
   // 0xae690([장면+0x214], 설정+0xbd) — 공격이 CPU 거나 주루 설정이 자동이면 자동 진루 제어기가 돈다.
   // 안 넘기면 원본 기본값(자동)이라 지금까지와 똑같이 논다.
@@ -1864,11 +1852,22 @@ export function stepDefensePlay(
     )
 
     // ── 6. 한 틱 움직이기 ──
-    // 0xb1c90(플레이 vt30, 매 틱)의 커버 배치 갈래 0xb203a — 2루 커버가 아닌 키스톤 야수의 자리(중계 자리 · 기본 자리)
+    // 0xb1c90(플레이 vt30, 매 틱) — 커버(+0xf0) 다시 고르기(`assignCoversForTick`)와 그 가운데의 커버 배치 갈래 0xb203a
+    // (2루 커버가 아닌 키스톤 야수의 자리 — 중계 자리 · 기본 자리). 자리 잡기는 원본에서 b1f06 뒤 · b23a4 앞이라
+    // 공 가진 야수의 루(b23a4) 넣기 전의 2루 커버로 본다
     if (!play.finished) {
+      const assigned = assignCoversForTick({
+        context: contextAt(tick),
+        ballToFirstSide: catchPoint.x > basePosition(0).x,
+        ballStartPoint: trajectory.pointAt(0),
+      })
+      if (assigned.ran) {
+        play = { ...play, coverOfBase: assigned.covers }
+        fielders = applyCoverAssignment(fielders, assigned)
+      }
       const placement = secondBaseHelperPlacement({
         context: contextAt(tick),
-        secondBaseCover: covers[2] ?? NONE,
+        secondBaseCover: assigned.ran ? assigned.secondBaseCover : NONE,
         ballToFirstSide: catchPoint.x > basePosition(0).x,
         relayFlag,
       })
@@ -1883,7 +1882,7 @@ export function stepDefensePlay(
     }
     const beforeMove = fielders
     fielders = fielders.map((fielder) =>
-      moveFielder(fielder, { chaserSlot, catchPoint, covers: play.coverOfBase, tick, catchTick }),
+      moveFielder(fielder, { chaserSlot, catchPoint, tick, catchTick }),
     )
     // 야수+0x3b — 이번 갱신에 목표점에 막 닿았나 (0xbf0dc: 머리에서 지우고 닿은 갱신에서만 1)
     const arrivedThisTick = fielders.map(
@@ -2226,14 +2225,6 @@ function isCoverState(aiState: number): boolean {
   return aiState >= AI_STATE.COVER_HOME && aiState <= AI_STATE.COVER_THIRD
 }
 
-/** 야수 vt68 = 0xa0b4c — 목표점이 루 좌표표 0xd78f0[k](k = 0~3)와 좌표까지 같은 첫 k, 없으면 −1 */
-function baseAtPoint(point: WorldPoint): number {
-  for (let base = 0; base <= 3; base += 1) {
-    if (isSamePoint(point, basePosition(base))) return base
-  }
-  return NONE
-}
-
 function isAtTarget(runner: RunnerState): boolean {
   return isSamePoint(runner.position, basePosition(runner.targetBase))
 }
@@ -2268,17 +2259,17 @@ function basesOf(runners: readonly MutableRunner[]): BaseState {
 interface FielderMoveInput {
   readonly chaserSlot: number
   readonly catchPoint: WorldPoint
-  readonly covers: readonly number[]
   readonly tick: number
   readonly catchTick: number
 }
 
 /**
- * 야수 한 틱 — 쫓는 야수는 포구 지점으로, 커버(+0xf0)는 제 루로, 그 밖은 AI 상태가 세운 목표점으로.
- * - AI 6(들고 뛰기) · 9(미룬 송구, b30d0 vt48(루)) · 0xa(키스톤 자리) — 세워 둔 목표점으로 걷는다
- * - 커버 — `covers` 는 플레이+0xf0 이다(0xb2a48 직접 밟기가 바꾼다). 판 끝 고리 b2564 처럼 AI 루 + 2 · 루 좌표
+ * 야수 한 틱 — AI 상태가 세운 목표점으로 걷는다.
+ * - AI 6(들고 뛰기) · 9(미룬 송구, b30d0 vt48(루)) · 0xa(키스톤 자리) — 세워 둔 목표점으로
+ * - AI 2~5(루 커버) — 그 루 좌표로 (b2564 가 커버 야수에게 vt14(루) · AI 루 + 2 를 준다 — `assignCoversForTick`)
+ * - 쫓는 야수는 포구 전까지 포구 지점으로(AI 1)
  * - AI 0 — 플레이 틱 b476a: vtcc(+0xb0 == 0 && +0xb4 ≤ 0 && +0xcc ≤ 0)면 목표점이 시작 자리 0xd86ec 와 다를 때
- *   그 자리로 (vt50 = vt14). 던진 뒤 AI 0 이 된 야수(b2e14 · b48ac)가 돌아간다
+ *   그 자리로 (vt50 = vt14). 던진 뒤(b2e14 · b48ac)·커버를 내준 뒤(b2540) AI 0 이 된 야수가 돌아간다
  */
 function moveFielder(fielder: FielderState, input: FielderMoveInput): FielderState {
   // 협살(상태 8) 중인 야수는 분기표가 0xb48b6 으로 가므로 커버 이동을 하지 않는다 — 2b 절이 이미 옮겼다
@@ -2294,18 +2285,31 @@ function moveFielder(fielder: FielderState, input: FielderMoveInput): FielderSta
   ) {
     return walk(fielder.target)
   }
-  const chasing = fielder.slot === input.chaserSlot && input.tick < input.catchTick
-  const base = input.covers.indexOf(fielder.slot)
-  if (base >= 0 && !chasing) {
-    const point = basePosition(base)
-    return { ...walk(point), targetBase: base, aiState: AI_STATE.COVER_HOME + base }
+  if (isCoverState(fielder.aiState)) {
+    const base = fielder.aiState - AI_STATE.COVER_HOME
+    return { ...walk(basePosition(base)), targetBase: base }
   }
   if (fielder.slot === input.chaserSlot) {
-    if (chasing) return { ...walk(input.catchPoint), aiState: AI_STATE.CHASE }
+    if (input.tick < input.catchTick) return { ...walk(input.catchPoint), aiState: AI_STATE.CHASE }
     if (fielder.aiState !== AI_STATE.IDLE) return fielder
   }
   if (fielder.aiState === AI_STATE.IDLE) return walk(FIELDER_START_POSITIONS[fielder.slot] ?? fielder.target)
   return fielder
+}
+
+/** `assignCoversForTick` 의 답을 야수에게 — AI 0(시작 자리로) 뒤 커버 야수 AI 루 + 2 · 루 좌표 (b1d38 · b2540 · b2564) */
+function applyCoverAssignment(fielders: readonly FielderState[], assigned: CoverAssignment): readonly FielderState[] {
+  return fielders.map((fielder) => {
+    let next = fielder
+    if (assigned.idleSlots.includes(fielder.slot)) {
+      next = { ...next, aiState: AI_STATE.IDLE, target: FIELDER_START_POSITIONS[fielder.slot] ?? next.target, targetBase: NONE }
+    }
+    const cover = assigned.coverStates.find((entry) => entry.slot === fielder.slot)
+    if (cover !== undefined) {
+      next = { ...next, aiState: AI_STATE.COVER_HOME + cover.base, target: basePosition(cover.base), targetBase: cover.base }
+    }
+    return next
+  })
 }
 
 interface BallPointInput {

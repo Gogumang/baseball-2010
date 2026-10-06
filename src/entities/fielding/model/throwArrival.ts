@@ -196,8 +196,7 @@ export interface SecondBaseHelperInput {
  *   b2318  쥐었으면 +0x126 == 0 이면 sp58.vt14(제 위치) — 그 자리에 멈춤 ; AI 0xa
  * b232e  그 밖(내야수 · 가까움 · 쥐었고 +0x126 == 1) → 0xd8764[sp58 == 5] 자리 ; AI 0xa
  * ```
- * ⚠️ 웹 진행기는 커버를 판 시작에 한 번 정하므로 b1e2e·b1e72 의 매 틱 다시 고르기(공 가진 야수가 3·5 로 바뀔 때 ·
- * 발밑 루 바꾸기)는 부르는 쪽이 넘긴 2루 커버를 그대로 쓴다.
+ * 2루 커버는 부르는 쪽이 매 틱 b1e2e·b1e72 대로 다시 고른 값(`coverAssignment.assignCoversForTick` 의 secondBaseCover)을 넘긴다.
  */
 export function secondBaseHelperPlacement(input: SecondBaseHelperInput): SecondBaseHelperPlacement {
   const { context, secondBaseCover } = input
