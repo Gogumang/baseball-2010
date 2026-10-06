@@ -420,8 +420,17 @@ export function App() {
         onGameStart={modeSave.startGeneralGame}
         // 반 이닝 자동 저장 0x4f928 → 0x22754 — 블록만
         onGameSave={modeSave.saveGeneralGame}
-        // 정산 진입 0x4ea0c → 0x4f3d6 — +0x4d = 0
-        onSettlementEnter={modeSave.finishGeneralGame}
+        // 정산 진입 0x4ea0c — 한 판 치고 끝이라 선수 정산은 없지만, 모드 1 에서도 기록 달성 G 합을 전역 G(+0x64)에
+        // 더하고(4ec5a, 99999 상한) 0x4ec82 `0x22c7d(합, 모드 1)` 로 획득 GP 통계(칸 0 일반)에 적는다 (fc7f196).
+        // 이어서 0x4ec8a `0x22e10` — 이번 경기 기록달성 횟수(0x1fce0, 모드 1)를 통계 [mgr+0xc8]+4+n 누계에 더한다.
+        // 같은 진입 끝 0x4f3d6 이 +0x4d = 0. 결과 화면 확인(onFinish) 앞이라 그 사이에 창을 닫아도 정산은 남는다
+        onSettlementEnter={(summary) => {
+          const earned = summary.gamePoints ?? 0
+          if (earned !== 0) wallet.gain(earned)
+          recordStat({ kind: 'G획득', mode: GENERAL_STAT_MODE, amount: earned })
+          recordStat({ kind: '기록달성', recordIds: summary.recordIds ?? [] })
+          modeSave.finishGeneralGame()
+        }}
         // 진입 창 [13] 의 빠른실행 (this+0x14c) — 1~6 단계를 건너뛰고 경기정보로
         isQuickStart={isGeneralQuickStart}
         openedHiddenTeamIds={collection.collection.openedHiddenIds}
@@ -443,16 +452,8 @@ export function App() {
         runningModeManual={gameSettings.settings.runningMode === '수동'}
         // 환경설정 "송구" (설정 +0xf4) — 팀 경기는 사람이 **수비하는 타석**에서만 먹는다 (0xae6c8)
         throwModeManual={gameSettings.settings.throwMode === '수동'}
-        // 한 판 치고 끝이라 선수 정산은 없지만, 경기 끝 0x4ea0c 는 모드 1 에서도 기록 달성 G 합을 전역 G(+0x64)에
-        // 더하고(4ec5a, 99999 상한) 0x4ec82 `0x22c7d(합, 모드 1)` 로 획득 GP 통계(칸 0 일반)에 적는다 (fc7f196)
-        onFinish={(summary) => {
-          const earned = summary.gamePoints ?? 0
-          if (earned !== 0) wallet.gain(earned)
-          recordStat({ kind: 'G획득', mode: GENERAL_STAT_MODE, amount: earned })
-          // 이어서 0x4ec8a `0x22e10` — 이번 경기 기록달성 횟수(0x1fce0, 모드 1)를 통계 [mgr+0xc8]+4+n 누계에 더한다
-          recordStat({ kind: '기록달성', recordIds: summary.recordIds ?? [] })
-          leaveGeneralMode()
-        }}
+        // 결과 화면 확인 — 정산은 위 정산 진입(0x4ea0c)이 이미 했다
+        onFinish={leaveGeneralMode}
         onExit={leaveGeneralMode}
       />
     )

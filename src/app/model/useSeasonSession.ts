@@ -334,15 +334,21 @@ export interface SeasonActions {
   readonly runTraining: (slot: number) => void
   /** 시즌 외출 한 번 — 굴리고 적용한다 (연출 0xe3 → 결과 0xc81c) */
   readonly runOuting: (place: number) => void
-  /** 팀 경기가 끝났다 — 종류에 맞게 정산한다 (정규는 관중수입 0xe9 으로) */
+  /**
+   * 경기 결과 화면 확인 — 정산 진입(`enterGameSettlement`)이 정해 둔 장면으로 간다(정규는 관중수입 0xe9). 정산 진입을
+   * 거치지 않았으면 여기서 정산한다
+   */
   readonly finishGame: (summary: TeamGameSummary) => void
   /**
    * 경기 화면이 이어하기 저장을 썼다 — 0xdd OK(0x847e: +0x4e = 1 · 칸 0xc 두 팀 · 0xd st · 파일) · 반 이닝 0x4f928(모드 2:
    * 칸 0xb SR · 0xc · 0xd) · 경기 장면 진입 0x3a426(+0x4e = 1 · 파일). +0x4e 를 세우고 블록을 시즌 저장에 쓴다.
    */
   readonly saveGameProgress: (progress: TeamGameProgress) => void
-  /** 경기 끝 정산 진입 0x4ea0c → 0x4f3d6 — +0x4e = 0 (블록도 비운다) */
-  readonly enterGameSettlement: () => void
+  /**
+   * 경기 끝 정산 진입 0x4ea0c — 정산을 다 하고 +0x4e = 0(0x4f3d6, 블록도 비운다) · 저장. 화면은 결과 화면 확인(`finishGame`)이
+   * 넘긴다
+   */
+  readonly enterGameSettlement: (summary: TeamGameSummary) => void
   /**
    * **시즌모드에 들어온다** — 0x327b8(this, 2) 의 모드 2 갈래(3284e): `(+0x42 && +0x4e)` 면 0x213c0(앱, 2, 0) 으로 시즌 저장을
    * 올려 곧장 경기 장면 0x104 로, 아니면 장면 0x105(시즌 관리). 메인 메뉴 시즌모드(하위 14 → 0x24698)와 [최근게임] 모드 2 가
@@ -801,6 +807,12 @@ const SEASON_GAME_MODE = 2
 /** 경기 뒤 마무리 0xf1 진입 0x953c 가 트는 배경음 — 관리 화면 4 (`0x6ea6d(소리, 4, −1, 1)`) */
 const SEASON_MANAGEMENT_BGM = 4
 
+/** 정산 진입에서 정산을 마친 경기 — 결과 화면 확인 뒤 갈 장면과 그때 낼 평가 징글 */
+interface SettledSeasonGame {
+  readonly next: SeasonSceneState
+  readonly jingle: number | null
+}
+
 /** 같은 경기 화면을 쓰는 세 갈래 — 끝났을 때 정산하는 곳이 다르다 */
 export type SeasonGameKind = '정규' | '포스트시즌' | '국가대항전'
 
@@ -1118,6 +1130,8 @@ export function useSeasonSession(
     [recordStat, wallet],
   )
 
+  /** 정산 진입(0x4ea0c)에서 정산을 마친 경기 — 결과 화면 확인(`finishGame`)이 다음 장면으로 넘긴다 */
+  const settledGame = useRef<SettledSeasonGame | null>(null)
   /** 마지막으로 쓴 저장 — 경기 화면의 이어하기 저장(effect)이 렌더 사이에 잇달아 와도 앞 것을 덮지 않게 */
   const latestSave = useRef(save)
   latestSave.current = save
@@ -1726,11 +1740,12 @@ export function useSeasonSession(
    * 선수 기록표에 **양 팀 타석**을 쌓고(0xa8024), 평가(0xa719c)를 얹은 뒤 관중수입(0xe9)으로 간다.
    * 평가는 **정규시즌 경기만** 받는다 — 포스트시즌·국가대항전은 원본 0x4ea0c 가 건너뛴다.
    */
-  const finishGame = useCallback(
-    (summary: TeamGameSummary) => {
-      if (save === null) return
-      setResumeGame(null)
-      const savedBefore = save
+  const settleGame = useCallback(
+    (summary: TeamGameSummary): SettledSeasonGame | null => {
+      const latest = latestSave.current
+      if (latest === null) return null
+      // 0x4f3d6 — 같은 진입이 +0x4c+모드(+0x4e)를 0 으로 쓰고 0x1fded · 0x22755 · 0x1f1b9 로 저장한다. 정산과 한 커밋이다
+      const savedBefore: SeasonSave = { ...latest, isGameInProgress: false, gameSave: null }
       // 돌발미션 보상·페널티 (0x8e34c 모드 2) — 원본은 판정이 난 경기 중에 SR·팀 사기에 바로 더하므로 평가보다 앞이다.
       // 요약이 경기 중 `resolveBurst` 의 deltas 를 판정 차례대로 싣고 온다(`burstRewardDeltas`)
       const burstDeltas = summary.burstRewardDeltas ?? []
@@ -1775,7 +1790,7 @@ export function useSeasonSession(
       if (!seasonGameIsEvaluated(stage)) {
         if (stage.postseason) {
           const series = current.series ?? null
-          if (series === null) return
+          if (series === null) return null
           const winner = won ? record.teamId : opponent
           // 4f268 → 4f29a 0xb818c(포스트시즌 갈래는 스태미나를 안 건드린다) → 4f2bc 열 팀 +20%.
           // 그 뒤 결산 0xef 키 0x9dc8 이 CPU 끼리 경기 0xc2760 을 돌린다 — 회복이 **끝난** 표로 서고 깎인 값이
@@ -1800,11 +1815,10 @@ export function useSeasonSession(
               record: { ...played, postseasonChampion: advanced.champion ?? NO_CHAMPION },
             },
           })
-          setGameOptions(null)
-          return setScene(SEASON_SCENE_STATE.시즌결산)
+          return { next: SEASON_SCENE_STATE.시즌결산, jingle: null }
         }
         const cup = current.cup ?? null
-        if (cup === null) return
+        if (cup === null) return null
         // 내 쪽은 시즌 팀(SR[1], 0~9)이 아니라 **경기에 들어간 대한민국(10)** 이다 — 0x6548 국가대항전
         // 가지(65e2 `cmp r5,#0xa`)가 경기[0x28+side] 에 10 을 꽂았고, 결과 장면 0x4ea0c 는 그 경기 팀으로
         // 0xb76dc/0xb77e0 을 부른다. 시즌 팀 번호를 넘기면 참가국 표(10~13)에 없어 대한민국 승패가 안 쌓이고
@@ -1818,8 +1832,7 @@ export function useSeasonSession(
           cup: advanceNationalCupDay(cup, winner, loser, random, summary.opponentPitcherStaminas),
           state: { ...current.state, record: played },
         })
-        setGameOptions(null)
-        return setScene(SEASON_SCENE_STATE.국가대항전)
+        return { next: SEASON_SCENE_STATE.국가대항전, jingle: null }
       }
 
       const afterMyGame = won
@@ -1886,12 +1899,40 @@ export function useSeasonSession(
           },
         },
       })
-      setGameOptions(null)
-      // 관중수입 창(0xe9)이 뜨면서 나는 평가 징글 36·37·38 (0xdec4/0xdede)
-      activeSound().play(seasonEvaluationJingleIdOf(evaluation.popularityChange))
-      setScene(SEASON_SCENE_STATE.관중수입)
+      // 관중수입 창(0xe9)이 뜨면서 나는 평가 징글 36·37·38 (0xdec4/0xdede) — 창은 결과 화면 확인 뒤에 선다
+      return { next: SEASON_SCENE_STATE.관중수입, jingle: seasonEvaluationJingleIdOf(evaluation.popularityChange) }
     },
-    [aceLevels, commit, gainGamePoint, gameKind, gameOptions, ownRotationShift, random, recordStat, save],
+    [aceLevels, commit, gainGamePoint, gameKind, gameOptions, ownRotationShift, random, recordStat],
+  )
+
+  /**
+   * **정산 진입** (`TeamGameScreen.onSettlementEnter` — 경기 끝 결과 판 OK → 상태 0x19, 진입 0x4ea0c).
+   * 원본 0x4ea0c 는 이 자리에서 정산을 **다** 한다 — 기록 달성 G(4ec5a) · 갈래별 리그·평가·CPU 경기·하루 끝(4f216~4f31e) ·
+   * 경기 끝 꼬리(4f374~4f3b2) 뒤 0x1fded · 0x22755(저장, 1) 파일 쓰기 → +0x4c+모드 = 0(0x4f3d6) → 0x1f1b9.
+   * 그래서 결과 화면을 보는 사이에 창을 닫아도 정산은 남는다. 화면 넘김(0xe9 · 결산 · 대회)은 결과 화면 확인(`finishGame`)이다.
+   */
+  const enterGameSettlement = useCallback(
+    (summary: TeamGameSummary) => {
+      if (settledGame.current !== null) return
+      settledGame.current = settleGame(summary)
+    },
+    [settleGame],
+  )
+
+  /**
+   * 결과 화면 확인 — 정산 진입에서 정해 둔 다음 장면으로 간다. 정산 진입을 거치지 않고 왔으면(테스트 · 옛 길) 여기서 정산한다.
+   */
+  const finishGame = useCallback(
+    (summary: TeamGameSummary) => {
+      const settled = settledGame.current ?? settleGame(summary)
+      settledGame.current = null
+      setResumeGame(null)
+      if (settled === null) return
+      setGameOptions(null)
+      if (settled.jingle !== null) activeSound().play(settled.jingle)
+      setScene(settled.next)
+    },
+    [settleGame],
   )
 
   /** 관중수입 창에서 확인 — 정산된 레코드를 받아 경기 뒤 마무리로 간다 (0xf1) */
@@ -2343,22 +2384,12 @@ export function useSeasonSession(
   const saveGameProgress = useCallback(
     (progress: TeamGameProgress) => {
       const current = latestSave.current
-      if (current === null) return
+      // 정산 진입(0x4ea0c) 뒤에는 반 이닝 저장이 없다 — 늦게 온 effect 가 +0x4e 를 되세우지 않게
+      if (current === null || settledGame.current !== null) return
       commit({ ...current, isGameInProgress: true, gameSave: { progress, kind: gameKind, ownRotationShift } })
     },
     [commit, gameKind, ownRotationShift],
   )
-
-  /**
-   * 정산 진입 (`TeamGameScreen.onSettlementEnter`) — 0x4ea0c 의 0x4f3d6 이 `+0x4c + 모드` 를 0 으로. 원본 파일의 블록 칸은
-   * 남지만 표시가 0 이면 읽힐 길이 없어 웹은 같이 비운다. ⚠️ 웹은 정산(`finishGame`)이 결과 화면 확인 뒤라 그 사이에 창을
-   * 닫으면 그 경기 정산이 빠진다 — 원본은 0x4ea0c 가 같은 자리에서 정산까지 한다.
-   */
-  const enterGameSettlement = useCallback(() => {
-    const current = latestSave.current
-    if (current === null || (current.isGameInProgress !== true && (current.gameSave ?? null) === null)) return
-    commit({ ...current, isGameInProgress: false, gameSave: null })
-  }, [commit])
 
   /**
    * 0x327b8 모드 2 갈래 — `+0x42(시즌 저장 있음) && +0x4e` 면 곧장 경기. 원본은 장면 0x105 를 세우지 않고 0x104 로 가서

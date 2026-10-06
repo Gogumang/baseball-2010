@@ -1974,10 +1974,47 @@ describe('시즌 경기 중간 저장 — 전역기록 +0x4e 와 모드 2 블록
     const { result } = 경기시작(store)
     act(() => result.current.actions.saveGameProgress(startTeamGame(result.current.gameOptions!, createSeededRandom(7))))
 
-    act(() => result.current.actions.enterGameSettlement())
+    act(() => result.current.actions.enterGameSettlement(요약({ opponentTeamId: result.current.gameOptions!.opponentTeamId })))
 
     expect(result.current.isGameInProgress).toBe(false)
     expect((store.load() as 경기저장모양).gameSave).toBeNull()
+  })
+
+  it('정산 진입(0x4ea0c)이 정산을 다 하고 저장한다 — 결과 화면 확인 전에 창을 닫아도 그 경기는 남는다', () => {
+    const store = 메모리저장()
+    const { result } = 경기시작(store)
+    act(() => result.current.actions.saveGameProgress(startTeamGame(result.current.gameOptions!, createSeededRandom(7))))
+    const 앞경기수 = result.current.state!.record.games
+
+    act(() => result.current.actions.enterGameSettlement(요약({ opponentTeamId: result.current.gameOptions!.opponentTeamId })))
+
+    // 결과 화면은 아직 서 있다 — 장면은 확인 뒤에 넘어간다
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.경기직전)
+    expect(result.current.gameOptions).not.toBeNull()
+    const 저장 = store.load() as 경기저장모양 & { state: { record: { games: number; phase: number } } }
+    expect(저장.state.record.games).toBe(앞경기수 + 1)
+    expect(저장.state.record.phase).toBe(SEASON_PHASE.경기끝)
+    expect(저장.isGameInProgress).toBe(false)
+
+    // 창을 닫고 다시 열면 경기 저장 없이 정산된 시즌이다
+    const 다시 = renderHook(() => useSeasonSession(store, createSeededRandom(1)))
+    expect(다시.result.current.isGameInProgress).toBe(false)
+    expect(다시.result.current.state!.record.games).toBe(앞경기수 + 1)
+  })
+
+  it('결과 화면 확인은 정산을 다시 하지 않고 정해 둔 장면(0xe9)으로 간다', () => {
+    const store = 메모리저장()
+    const { result } = 경기시작(store)
+    const 끝 = 요약({ opponentTeamId: result.current.gameOptions!.opponentTeamId })
+    act(() => result.current.actions.enterGameSettlement(끝))
+    const 정산뒤 = result.current.state!.record
+
+    act(() => result.current.actions.finishGame(끝))
+
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.관중수입)
+    expect(result.current.gameOptions).toBeNull()
+    expect(result.current.state!.record.games).toBe(정산뒤.games)
+    expect(result.current.state!.record.money).toBe(정산뒤.money)
   })
 
   it('나가기는 표시를 남기고, 다시 들어오면(0x327b8 모드 2 · +0x42 && +0x4e) 곧장 그 경기로 선다', () => {

@@ -61,8 +61,11 @@ export interface GeneralModeScreenProps {
   readonly onGameStart?: (save: TeamGameProgress) => void
   /** **반 이닝 자동 저장** (0x4f928 → 0x22754) — 블록만 고쳐 쓴다. 이어하기 경기도 같다 */
   readonly onGameSave?: (save: TeamGameProgress) => void
-  /** **정산 진입** (0x4ea0c → 0x4f3d6) — 받는 쪽이 +0x4d 를 지운다 */
-  readonly onSettlementEnter?: () => void
+  /**
+   * **정산 진입** (0x4ea0c) — 받는 쪽이 이 자리에서 정산(기록 달성 G · 통계)을 하고 +0x4d 를 지운다(0x4f3d6).
+   * `onFinish` 는 그 뒤 결과 화면 확인이다
+   */
+  readonly onSettlementEnter?: (summary: TeamGameSummary) => void
   /**
    * 준비 첫 화면에서 CLR, 또는 경기 중 메뉴에서 나가기.
    * 원본은 메인 메뉴 하위 상태 5(모드 목록)로 돌아간다.

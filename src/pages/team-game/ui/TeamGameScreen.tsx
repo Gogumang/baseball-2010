@@ -125,9 +125,10 @@ interface TeamGameScreenProps {
    */
   readonly onHalfInningSave?: (save: TeamGameProgress) => void
   /**
-   * **정산(0x19)에 들어섰다** — 경기 끝 결과 판의 OK. 원본 0x4ea0c 가 이 자리에서 전역기록 +0x4c+모드 를 0 으로 지운다(0x4f3d6).
+   * **정산(0x19)에 들어섰다** — 경기 끝 결과 판의 OK. 원본 0x4ea0c 가 이 자리에서 정산을 다 하고(기록 달성 G · 모드별 정산 ·
+   * 저장) 전역기록 +0x4c+모드 를 0 으로 지운다(0x4f3d6). 그래서 요약을 함께 넘긴다 — `onFinish` 는 결과 화면 확인이다.
    */
-  readonly onSettlementEnter?: () => void
+  readonly onSettlementEnter?: (summary: TeamGameSummary) => void
 }
 
 export function TeamGameScreen({
@@ -357,7 +358,7 @@ export function TeamGameScreen({
           setEndBoardClosed(true)
           // 정산 0x19 진입 — 승리 31 · 패배 32 징글 (0x4ea0c). 같은 진입이 +0x4c+모드 를 지운다(0x4f3d6)
           actions.enterSettlement()
-          onSettlementEnter?.()
+          onSettlementEnter?.(summary)
         }}
       />
     )
