@@ -268,6 +268,8 @@ export function EntryRoutes({
       onSettings={() => setScreen({ kind: '환경설정' })}
       onSpecial={() => setScreen({ kind: '스페셜' })}
       onTopMenuTenthTick={claimReward}
+      // 하위 4·5 그리기 0x2866c · 0x2863c 끝의 머리띠 0x54d95(skin, 0, 1|5) — 제목 0 이라 전역 G(mgr+0x64)도 그린다
+      gamePoint={wallet.balance}
       overlay={collectionRewardText !== null && (
         <MessageBox text={collectionRewardText} buttons={['OK']} onAnswer={claimReward} />
       )}

@@ -21,6 +21,7 @@ import { DescriptionPanel } from '@/pages/main-menu/ui/DescriptionPanel'
 import { MenuBand } from '@/pages/main-menu/ui/MenuBand'
 import { MenuWheel } from '@/pages/main-menu/ui/MenuWheel'
 import * as styles from '@/pages/main-menu/ui/MainMenuScreen.css'
+import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 
 export type GameMode = '미션' | '홈런더비' | '시즌모드' | '일반모드'
 
@@ -44,6 +45,13 @@ interface MainMenuScreenProps {
   readonly onTopMenuTenthTick?: () => void
   /** 메뉴 위에 얹는 것 — 전부 수집 보상 팝업 0x292f8 */
   readonly overlay?: ReactNode
+  /**
+   * 전역 G(`mgr+0x64`) — 두 단 그리기가 다 맨 끝에 머리띠 0x54d95 를 부른다:
+   *   윗단(하위 4) 0x2866c = `0x24b1c` → `0x54d95(skin, 0, 1)` · 아랫단(하위 5) 0x2863c = `0x24b1c` → `0x2524c(this, 5, 틱)` → `0x54d95(skin, 0, 5)`.
+   * 제목 0 "2010프로야구" 라 G포인트(0x54a60)도 그린다(0x550dc). 바닥 1 은 비트 0x4 가 없어 **뒤로 표시가 없고**(띠·탭만),
+   * 바닥 5 는 뒤로 표시가 있다. 안 넘기면 예전처럼 머리띠를 안 그린다.
+   */
+  readonly gamePoint?: number
 }
 
 /** 판정을 부르는 상태 틱 (0x29520 `cmp r3,#0xa`) */
@@ -94,6 +102,7 @@ export function MainMenuScreen({
   onSpecial,
   onTopMenuTenthTick,
   overlay,
+  gamePoint,
 }: MainMenuScreenProps) {
   const { state, dispatch } = useMainMenu(hasSavedGame, false, (effect) => {
     if (effect === '이어하기') onContinue()
@@ -293,6 +302,12 @@ export function MainMenuScreen({
         <DescriptionPanel raw={panelText} />
       </div>
 
+      {/* 머리띠·바닥띠는 두 단 다 마지막에 그린다 — 윗단 바닥 1(뒤로 표시 없음) · 아랫단 바닥 5(뒤로 표시) */}
+      {gamePoint !== undefined && (
+        <ScreenFrame title="2010프로야구" gamePoint={gamePoint}
+          onBack={isWheel ? null : () => dispatch({ type: '뒤로' })} />
+      )}
+
       {state.lockedNotice !== null && (
         <div className={styles.confirmKeys}>
           {/* 원본 확인 팝업(0x74ef5 종류 1)은 아무 키나 받아 닫는다 */}
@@ -311,10 +326,11 @@ export function MainMenuScreen({
         </div>
       )}
 
-      {/* 취소 — 아랫단이면 윗단으로, 윗단이면 타이틀로 (원본은 CLR 키다, 버튼은 웹 임시) */}
-      <button type="button" data-turn={`${turn.direction}/${turn.counter}/${turn.fromCursor}/${scroll}`} className={styles.backButton} onClick={() => dispatch({ type: '뒤로' })}>
+      {/* 취소 — 아랫단이면 윗단으로, 윗단이면 타이틀로 (원본은 CLR 키다, 버튼은 웹 임시).
+          머리띠를 그리면 아랫단은 바닥띠 뒤로 표시(바닥 5)가 같은 일을 하므로 이 임시 버튼은 윗단에만 둔다 */}
+      {(gamePoint === undefined || isWheel) && <button type="button" data-turn={`${turn.direction}/${turn.counter}/${turn.fromCursor}/${scroll}`} className={styles.backButton} onClick={() => dispatch({ type: '뒤로' })}>
         {state.tier === 5 ? '‹ 처음 메뉴' : '‹ 타이틀'}
-      </button>
+      </button>}
 
       {overlay}
     </RawScreen>
