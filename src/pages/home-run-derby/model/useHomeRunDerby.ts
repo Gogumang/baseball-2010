@@ -27,9 +27,18 @@ const BANNER_MILLISECONDS = 1_500
 /**
  * 상태 0xe 에 들어선 뒤 OK 를 안 받는 갱신 수 — 키 처리 0x498d4 끝(0x49a26~0x49a30)이
  * `[장면+0x1c] == 0xe && [장면+0x2c](이 상태의 틱) ≤ 2` 이면 사람 조작 객체에 키를 넘기지 않는다.
- * 진입 틱을 0 으로 세어 틱 0·1·2 셋을 거른다 (⚠️ 틱 0 이 진입 틱인지는 유력 — 0xbca05 의 +0x2c 올리는 자리를 안 봤다).
+ * 진입 틱이 0 이라 틱 0·1·2 셋을 거른다 (확정: 상태 기계 0xbc9c8 이 상태를 바꾸는 그림에서 +0x14(= 장면+0x2c) = 0,
+ * 그대로면 +0x14++ — 매 그림 0x52c50 이 0xbc9c8 → 진입 → 키 0x498d4 → 갱신 → 그리기 차례로 부른다).
  */
 export const CONFIRM_LOCK_FRAMES = 3
+
+/**
+ * 상태 0xd 가 머무는 갱신 수 — 갱신 0x39e14 는 `[점수판 +0xf10]+0x6c ≠ 1 && 틱 > 0` 이면 0xe 를 예약한다.
+ * 점수판 +0x6c 는 1 이 되는 일이 없다: 쓰는 곳이 만들기 0x76b16(0) · 0xd 진입 0x48f42(2, +0x61 == 0 일 때) ·
+ * 점수판 갱신 0x785a8(1 → 2 0x785c8 · 2·3 → 0 0x78626 · 4·5 → 0 0x78650) 뿐이다(전체 디스어셈 `str …, #0x6c]` 전수,
+ * 0x785a8 이 받는 객체는 0x41230 의 [장면+0xf10]). 그래서 늘 **틱 0(진입)·틱 1(예약)** 두 그림 뒤 0xe 다.
+ */
+export const SCENE_D_FRAMES = 2
 
 export interface HomeRunDerbyOptions {
   /** 저장된 최고 비거리 (저장 +0x5c, u16) */
@@ -112,7 +121,8 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
   const [banner, setBanner] = useState('')
   const [isPaused, setIsPaused] = useState(false)
   // 경기 시작: 적재 상태 8 끝이 모드 7 이면 미리 넣어 둔 0xd 로 간다(0x3fa4c~0x3fa50 · R10 0x48b20) → 0x39e14 → 0xe
-  const [isAwaitingConfirm, setIsAwaitingConfirm] = useState(true)
+  const [isPreparing, setIsPreparing] = useState(true)
+  const [isAwaitingConfirm, setIsAwaitingConfirm] = useState(false)
   const [isEventZoneShown, setIsEventZoneShown] = useState(false)
   const [shownCombo, setShownCombo] = useState<number | null>(null)
   const [result, setResult] = useState<DerbyResult | null>(null)
@@ -170,15 +180,39 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
   }
   const isAwaitingConfirmRef = useRef(isAwaitingConfirm)
 
-  // 첫 공 앞의 0xe — 잠금 시계만 건다 (StrictMode 의 효과 두 번 돌기에도 같은 결과다)
+  /** 상태 0xd — `SCENE_D_FRAMES` 갱신 뒤 0xe 로 간다 (0x39e14) */
+  const prepareTimerRef = useRef<number | null>(null)
+  const clearPrepareTimer = () => {
+    if (prepareTimerRef.current !== null) window.clearTimeout(prepareTimerRef.current)
+    prepareTimerRef.current = null
+  }
+  const armScenePrepare = () => {
+    clearPrepareTimer()
+    prepareTimerRef.current = window.setTimeout(() => {
+      prepareTimerRef.current = null
+      setIsPreparing(false)
+      enterConfirmWait()
+    }, SCENE_D_FRAMES * millisecondsPerFrame())
+  }
+  /** 상태 0xd 로 들어선다 — 아직 OK 를 받지 않는다 */
+  const enterScenePrepare = () => {
+    isAwaitingConfirmRef.current = false
+    clearConfirmLockTimer()
+    setIsAwaitingConfirm(false)
+    setIsPreparing(true)
+    armScenePrepare()
+  }
+
+  // 첫 공 앞의 0xd — 시계만 건다 (StrictMode 의 효과 두 번 돌기에도 같은 결과다)
   useEffect(() => {
-    if (isAwaitingConfirmRef.current) armConfirmLock()
+    armScenePrepare()
   }, [])
 
   useEffect(() => () => {
     clearTimer()
     clearComboTimer()
     clearConfirmLockTimer()
+    clearPrepareTimer()
   }, [])
 
   const audio = activeSound()
@@ -282,10 +316,10 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
       //   0xe 키 0x532b0 — OK(−5·'5') → 메시지 1 → 0x50c18: 인자 0xe 면 상태 0xf (돌발 객체 +0xf28 이 있고 0x8f158 참일 때만 0x1b → 0xf)
       //   0xf 진입 0x3d954 → 0x3db92~0x3dbf2(모드 7 애니 되돌리기) · 0x3dbf8(+0x84 > 0 → 표시 켜기)
       // (예전 근거 "0x48d50 의 0x49846" 은 0x49846 이 교체 화면 키 0x495fc 안이라 틀린 주소였다.)
-      // ⚠️ 0xd 가 머무는 틱 수(점수판 +0x6c 를 기다림)는 웹이 따로 세지 않는다 — 결과 연출(웹판 1.5초) 뒤 곧바로 0xe 로 본다.
+      //   0xd 는 늘 두 그림(`SCENE_D_FRAMES`) 머문다 — 점수판 +0x6c 는 1 이 되는 일이 없다.
       // 0xe 그리기 0x4d9ec 는 0xd 그리기에 0x44944(투수·타자 소개 판)를 더 그린다 — 화면이 `isAwaitingConfirm` 동안 띄운다.
       if (nextSceneState === 0xd) {
-        enterConfirmWait()
+        enterScenePrepare()
         return
       }
       // 보통 공(0xf)은 곧바로 다음 공 준비다
@@ -299,7 +333,7 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
     clearComboTimer()
     setShownCombo(null)
     // 경기 시작과 같이 적재 8 → 0xd → 0xe 로 와서 OK 를 기다린다 (⚠️ 아래 7 → 9 를 다시 타는지와 함께 유력)
-    enterConfirmWait()
+    enterScenePrepare()
     // 다시하기도 경기 장면을 새로 세운다 — 같은 시작 굴림 둘 (⚠️ 다시하기가 상태 7 → 9 를 다시 타는지는 유력)
     if (randomRef.current !== undefined) rollDerbySceneStart(randomRef.current)
     const fresh = createDerbyRun()
@@ -315,7 +349,7 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
     run,
     pitcher: derbyPitcherOf(run.stage, aceLevels),
     banner,
-    isPaused: isPaused || isAwaitingConfirm,
+    isPaused: isPaused || isPreparing || isAwaitingConfirm,
     isAwaitingConfirm,
     confirm,
     isEventZoneShown,

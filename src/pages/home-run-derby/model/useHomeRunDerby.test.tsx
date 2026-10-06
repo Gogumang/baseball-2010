@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
-import { CONFIRM_LOCK_FRAMES, useHomeRunDerby } from '@/pages/home-run-derby/model/useHomeRunDerby'
+import { CONFIRM_LOCK_FRAMES, SCENE_D_FRAMES, useHomeRunDerby } from '@/pages/home-run-derby/model/useHomeRunDerby'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import type { DerbyResult } from '@/entities/home-run-derby/model/derbyRun'
 
@@ -44,7 +44,7 @@ function 한구(rendered: { result: { current: ReturnType<typeof useHomeRunDerby
 /** 상태 0xe 의 키 잠금(틱 ≤ 2)이 풀리도록 갱신 세 번(62ms × 3)을 흘리고 OK 를 누른다 */
 function OK(rendered: { result: { current: ReturnType<typeof useHomeRunDerby> } }) {
   act(() => {
-    vi.advanceTimersByTime(CONFIRM_LOCK_FRAMES * 62)
+    vi.advanceTimersByTime((SCENE_D_FRAMES + CONFIRM_LOCK_FRAMES) * 62)
   })
   act(() => rendered.result.current.confirm())
 }
@@ -146,7 +146,7 @@ describe('홈런더비 한 판', () => {
     expect(rendered.result.current.run.isBonusGame).toBe(true)
     expect(rendered.result.current.shownCombo).toBeNull()
     act(() => {
-      vi.advanceTimersByTime(1_500)
+      vi.advanceTimersByTime(1_500 + SCENE_D_FRAMES * 62)
     })
     // 0xd → 0xe: OK 를 기다리는 동안은 아직 0xf 가 아니다
     expect(rendered.result.current.isAwaitingConfirm).toBe(true)
@@ -180,8 +180,19 @@ describe('홈런더비 한 판', () => {
     expect(rendered.result.current.run.combo).toBe(1)
   })
 
-  it('첫 공 앞은 상태 0xe — OK 를 누를 때까지 멈춰 있고, 들어선 뒤 세 갱신 안의 OK 는 먹지 않는다 (0x3fa50 · 0x49a26 · 0x532b0)', () => {
+  it('첫 공 앞은 0xd 두 그림 뒤 상태 0xe — OK 를 누를 때까지 멈춰 있고, 들어선 뒤 세 갱신 안의 OK 는 먹지 않는다 (0x3fa50 · 0x39e14 · 0x49a26 · 0x532b0)', () => {
     const rendered = renderHook(() => useHomeRunDerby({ bestDistance: 0 }))
+    // 0xd — 아직 OK 를 안 받는다
+    expect(rendered.result.current.isAwaitingConfirm).toBe(false)
+    expect(rendered.result.current.isPaused).toBe(true)
+    act(() => rendered.result.current.confirm())
+    act(() => {
+      vi.advanceTimersByTime(SCENE_D_FRAMES * 62 - 1)
+    })
+    expect(rendered.result.current.isAwaitingConfirm).toBe(false)
+    act(() => {
+      vi.advanceTimersByTime(1)
+    })
     expect(rendered.result.current.isAwaitingConfirm).toBe(true)
     expect(rendered.result.current.isPaused).toBe(true)
     // 틱 ≤ 2 — 무시
@@ -232,7 +243,12 @@ describe('홈런더비 한 판', () => {
     expect(rendered.result.current.run.remainingPitches).toBe(10)
     expect(rendered.result.current.run.totalDistance).toBe(0)
     expect(rendered.result.current.result).toBeNull()
-    // 새 장면도 첫 공 앞 0xe 에서 OK 를 기다린다
+    // 새 장면도 첫 공 앞 0xd 를 지나 0xe 에서 OK 를 기다린다
+    expect(rendered.result.current.isAwaitingConfirm).toBe(false)
+    expect(rendered.result.current.isPaused).toBe(true)
+    act(() => {
+      vi.advanceTimersByTime(SCENE_D_FRAMES * 62)
+    })
     expect(rendered.result.current.isAwaitingConfirm).toBe(true)
   })
 

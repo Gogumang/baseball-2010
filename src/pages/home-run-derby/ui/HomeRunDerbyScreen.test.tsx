@@ -33,9 +33,10 @@ describe('홈런더비 화면', () => {
     expect(screen.getByText('1 / 10구')).toBeTruthy()
   })
 
-  it('첫 공 앞 상태 0xe 에서 소개 판(0x44944)을 띄운다 — 투수 판 COM · 타자 판 PLAYER', () => {
+  it('첫 공 앞 0xd 두 그림 뒤 상태 0xe 에서 소개 판(0x44944)을 띄운다 — 투수 판 COM · 타자 판 PLAYER', async () => {
     띄우기()
-    expect(screen.getByTestId('소개판')).toBeTruthy()
+    expect(screen.queryByTestId('소개판')).toBeNull()
+    expect(await screen.findByTestId('소개판')).toBeTruthy()
     expect(screen.getByTestId('투수팀').getAttribute('src')).toBe('./sprites/img_text/frames/158.png')
     expect(screen.getByTestId('타자팀').getAttribute('src')).toBe('./sprites/img_text/frames/157.png')
   })
