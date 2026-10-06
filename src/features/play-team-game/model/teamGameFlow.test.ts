@@ -17,6 +17,7 @@ import {
   autoProgressCostOf,
   availablePinchHitters,
   availablePitchers,
+  burstGameRecordOf,
   canAutoProgress,
   canOpenPinchHit,
   canOpenPitcherChange,
@@ -2009,5 +2010,49 @@ describe('투수 스태미나를 경기 사이에 잇는다 — 레코드 +0x2c 
     expect(progress.ourPitcherIndex).toBe(0)
     expect(progress.stamina).toBe(첫경기.ourPitcherStaminas?.[0])
     expect(progress.stamina).toBeLessThan(10_000)
+  })
+})
+
+describe('돌발 경기 기록 검사 0x8ec9c — 공격 팀 지금 타순 칸 +0x12·+0x13 · 수비 투수 0xb8cec[0]', () => {
+  it('사람 공격이면 우리 타순 칸 안타·홈런과 상대 지금 투수의 탈삼진을 본다 (팀 누계가 아니다)', () => {
+    const { progress } = 시작()
+    const slot = progress.game.battingOrderIndex
+    const ourEntryRecords = progress.ourEntryRecords.map((record, index) =>
+      index === slot ? { ...record, hits: 2 } : { ...record, hits: 5 },
+    )
+    const ourBatterLogs = progress.ourBatterLogs.map((log, index) =>
+      index === slot ? { ...log, stats: { ...log.stats, homeRuns: 1 } } : log,
+    )
+    const 상대투수 = progress.opponentPitcherEntry[progress.opponentPitcherIndex]
+    const pitcherLines =
+      상대투수?.tableSlot === undefined
+        ? progress.pitcherLines
+        : [
+            {
+              teamId: progress.options.opponentTeamId,
+              pitcherSlot: 상대투수.tableSlot,
+              outs: 3,
+              runsAllowed: 0,
+              strikeouts: 4,
+              pitches: 20,
+            },
+          ]
+    const 기록 = burstGameRecordOf({ ...progress, ourEntryRecords, ourBatterLogs, ourHits: 9, pitcherLines }, true)
+    expect(기록.hitsInGame).toBe(2)
+    expect(기록.homeRunsInGame).toBe(1)
+    expect(기록.strikeoutsInGame).toBe(상대투수?.tableSlot === undefined ? 0 : 4)
+  })
+
+  it('사람 수비면 상대 타순 칸 안타와 우리 지금 투수의 탈삼진(R[0])을 본다', () => {
+    const { progress } = 시작()
+    const slot = progress.opponentOrderIndex
+    const opponentEntryRecords = progress.opponentEntryRecords.map((record, index) =>
+      index === slot ? { ...record, hits: 1 } : record,
+    )
+    const 기록 = burstGameRecordOf(
+      { ...progress, opponentEntryRecords, recordTally: { ...progress.recordTally, moundStrikeouts: 6 } },
+      false,
+    )
+    expect(기록).toEqual({ hitsInGame: 1, homeRunsInGame: 0, strikeoutsInGame: 6 })
   })
 })

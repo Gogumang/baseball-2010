@@ -2889,14 +2889,57 @@ function readyAtBat(progress: TeamGameProgress, random: RandomPort): TeamGamePro
       // 정규 경기에 마선수가 무작위로 나오는 코드는 원본에 없다 — 이벤트 match 명령으로만
       opponentAceBatterId: null,
       opponentAcePitcherId: null,
-      // 웹 로스터에 선수별 경기 기록 칸이 없어 팀 누계를 쓴다 (근사)
-      hitsInGame: ours ? progress.ourHits : progress.pitching.hitsAllowed,
-      homeRunsInGame: 0,
-      strikeoutsInGame: 0,
+      ...burstGameRecordOf(progress, ours),
     },
     random,
   )
   return enterPitchSelection({ ...progress, burst: next, atBatPrepared: true }, random)
+}
+
+/**
+ * 돌발 경기 기록 검사 `0x8ec9c`(b6·b7)가 보는 세 값 — 돌발 객체의 state(+0x22c)·팀 표(+0x230)로 읽는다:
+ * ```
+ * 8ecbe  b6 == 1: team = 팀[state[9]](공격) ; rec = team + 0x34 + team[0x32]·0x18 ; rec[+0x12]   ; 그 타순 칸 안타
+ * 8ece8  b6 == 2:                                 같은 rec 의 [+0x13]                            ; 그 타순 칸 홈런
+ * 8ed14  b6 == 3: team = 팀[state[0xa]](수비) ; 0xb8cec(team)[0]                                ; 지금 투수 경기 탈삼진
+ * ```
+ * `+0x13` 은 정산 `0xa8024` 의 안타 갈래 a874c 가 `[sp+0x24] > 0` 일 때 올린다 — sp+0x24 는 홈런 이벤트(8)·그라운드
+ * 홈런(state[0x25])이 세는 **홈런 수**다(a80a8 · E-defense 1e, 바로 뒤가 한 타자 홈런 0xa7b00·대타 홈런 5).
+ * `0xb8cec` 는 `team + 0x244 + 4·team[0]` — 지금 마운드 투수의 경기 기록이고 R[0] 이 탈삼진이다(`recordTally` 주석).
+ *
+ * 웹 칸: 안타 = 타순 칸 기록 `+0x12`(`*EntryRecords[칸].hits`), 우리 홈런 = 타순 칸 결과 목록(`ourBatterLogs`),
+ * 우리 투수 탈삼진 = `recordTally.moundStrikeouts`(교체 때 0), 상대 투수 탈삼진 = 그 투수의 경기 줄(`pitcherLines`).
+ *
+ * ⚠️ 미해결 둘 — **상대 타순 칸의 홈런**(+0x13)과 **상대 마투수의 탈삼진**은 웹이 들고 있지 않아 0 이다.
+ *    `BatterGameRecord.runScoringHits` 가 같은 +0x13 바이트를 "적시타 수" 로 세는데, 위 a874c 로 보면 홈런 수라
+ *    그 칸을 빌려 쓰지 않았다(`entities/batting/model/pinchHitAi`). 마투수는 리그 붙박이 표 칸이 없어 경기 줄이 없다.
+ *    시즌 표(XlsSEASON_BURST 56행)에는 b6 ≠ 0 인 행이 하나도 없어 지금 경기 결과는 같다 (b6 은 타자·투수편 표만 쓴다).
+ */
+export function burstGameRecordOf(
+  progress: TeamGameProgress,
+  humanBatting: boolean,
+): { readonly hitsInGame: number; readonly homeRunsInGame: number; readonly strikeoutsInGame: number } {
+  if (humanBatting) {
+    const slot = progress.game.battingOrderIndex
+    const entry = pitcherEntryAt(progress, progress.options.opponentTeamId, progress.opponentPitcherIndex)
+    const line =
+      entry?.tableSlot === undefined || entry.aceIndex >= 0
+        ? undefined
+        : progress.pitcherLines.find(
+            (candidate) =>
+              candidate.teamId === progress.options.opponentTeamId && candidate.pitcherSlot === entry.tableSlot,
+          )
+    return {
+      hitsInGame: progress.ourEntryRecords[slot]?.hits ?? 0,
+      homeRunsInGame: progress.ourBatterLogs[slot]?.stats.homeRuns ?? 0,
+      strikeoutsInGame: line?.strikeouts ?? 0,
+    }
+  }
+  return {
+    hitsInGame: progress.opponentEntryRecords[progress.opponentOrderIndex]?.hits ?? 0,
+    homeRunsInGame: 0,
+    strikeoutsInGame: progress.recordTally.moundStrikeouts,
+  }
 }
 
 /**
