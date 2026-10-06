@@ -23,11 +23,9 @@ import { BATTERS_PER_TEAM, PITCHERS_PER_TEAM } from '@/entities/team/model/teamR
  * 여기에도 넣으면 두 번 세게 된다. 순위표를 만들 때 `seasonAwards.myLeagueRecordOf`(타자) ·
  * `pitcherSeasonFlow.myPitcherLeagueRecordOf`(투수) 로 끼워 넣는다.
  *
- * ⚠️ **아직 빈 곳**: 타자 줄은 사람 경기도 채우지만(`gameFlow.leaguePlateAppearances`),
- * **사람 경기의 상대 팀 선발 투수 줄은 아직 안 온다** — `features/play-game`·`play-team-game`·
- * `play-pitcher-game` 의 요약에 투수 등판 칸이 없다. 그래서 내 팀과 붙은 날의 상대 선발만
- * 그 하루치 등판을 못 받는다(45경기 중 팀마다 ~5경기). 원본은 사람 경기도 같은 0xa8024·0xa7de8 을
- * 부르므로 요약에 칸이 생기면 `recordLeaguePitcherAppearances` 로 그대로 이으면 된다.
+ * **사람 경기의 투수 줄도 같은 길로 받는다.** 원본은 사람 경기도 같은 0xa8024(타석)·0xa7de8(경기 끝 승·패·세)을
+ * 부르므로, 사람 경기 요약이 상대(와 로스터) 투수의 등판 줄을 `leaguePitcherAppearancesOf` 로 만들어
+ * `recordLeaguePitcherAppearances` 에 넘기면 CPU 끼리 경기와 똑같이 쌓인다.
  */
 export interface LeagueBatterLine {
   /** +0x20 타수 */
@@ -59,9 +57,10 @@ export interface LeaguePitcherLine {
   /**
    * +0x24 세이브.
    *
-   * ⚠️ **웹은 늘 0 이다.** 원본은 경기 끝 0xa7de8 이 `state+0x5c/0x60`(세이브 측·투수)을 보고
-   * 매기는데, 웹 간이 엔진은 **구원 교체가 아예 없어** 선발 하나가 끝까지 던진다 — 세이브 상황이
-   * 생길 수가 없다. 지어내지 않고 0 으로 둔다 (그래서 마무리 보직의 세이브왕은 아직 못 준다).
+   * ⚠️ **원본에서도 늘 0 이다 (원본 버그 그대로).** 세이브 후보는 교체 0xa60c0 이 잡지만, 같은 자리에서
+   * 세이브 종류 코드 `state+0x64` 를 1·3·9 로 세우고 그 칸을 0 으로 되돌리는 코드가 없어 경기 끝 0xa7de8 의
+   * `코드 > 0 이면 건너뜀`(0xa7eaa)에 늘 걸린다 (S1 4-1, CORRECTIONS 2-1). 판정은 `winLossSave` 가 원본대로 돌리고
+   * 여기서는 그 결과(`'세'`)가 오면 그대로 +1 한다 — 실제로는 오지 않는다.
    */
   readonly saves: number
   /** +0x26 탈삼진 */
@@ -197,7 +196,7 @@ export function recordLeaguePlateAppearances(
  */
 export interface LeaguePitcherAppearance {
   readonly teamId: number
-  /** 로스터 투수 칸 (선발이면 `rotationSlotOf(day)`) */
+  /** 로스터 투수 칸 (붙박이 표 칸 — 로테이션으로 섞여도 레코드를 따라간다) */
   readonly pitcherSlot: number
   /** +0x20 잡은 아웃 수 */
   readonly outs: number
@@ -208,10 +207,80 @@ export interface LeaguePitcherAppearance {
   /** +0x28 투구 수 */
   readonly pitches: number
   /**
-   * 승패 투수 판정 (0xa7de8 이 `state+0x44/0x48`·`+0x50/0x54` 로 찾는 자리).
-   * 없으면 `null` — 웹 안전망으로 무승부가 났을 때뿐이다.
+   * 경기 끝 0xa7de8 이 이 투수에게 매긴 것 — `state+0x44/0x48`(승)·`+0x50/0x54`(패)·`+0x5c/0x60`(세).
+   * 판정은 `entities/game/model/winLossSave` (득점마다 0xa5c34 · 교체마다 0xa60c0) 그대로다. 없으면 `null`.
+   * 한 레코드가 승과 패를 함께 받을 수 있어(국가대항전 CPU 경기는 두 팀이 레코드 하나를 같이 쓴다) 그때는
+   * 줄이 둘이다 (`leaguePitcherAppearancesOf`).
    */
-  readonly decision: '승' | '패' | null
+  readonly decision: LeaguePitcherDecision | null
+}
+
+/** 경기 끝 0xa7de8 이 올리는 칸 — 승 +0x2e · 패 +0x2f · 세 +0x24 */
+export type LeaguePitcherDecision = '승' | '패' | '세'
+
+/** 한 경기에서 한 투수가 던진 줄 — 판정을 붙이기 전 */
+export interface LeaguePitcherGameLine {
+  readonly teamId: number
+  readonly pitcherSlot: number
+  readonly outs: number
+  readonly runsAllowed: number
+  readonly strikeouts: number
+  readonly pitches: number
+}
+
+/** 경기 끝 판정 하나 — 측(0 = 초 공격 칸 · 1 = 말 공격 칸)과 그 칸 팀의 투수 칸 */
+export interface LeaguePitcherOfRecord {
+  readonly side: number
+  readonly pitcherSlot: number
+}
+
+/**
+ * 한 경기의 투수 줄에 경기 끝 판정(0xa7de8)을 붙인다 — CPU 끼리 경기(`simulateLeagueGame`)와 사람 경기 요약이
+ * 같이 쓴다. `teamOfSide(측)` 은 그 측(state 칸)에서 **던진** 팀 번호다.
+ *
+ * 판정 받은 투수에게 줄이 없으면(던지지 않았는데 그 순간 마운드에 서 있던 투수) 0 줄을 하나 만들어 붙이고,
+ * 이미 다른 판정을 받은 줄이면 0 줄을 하나 더 붙인다 — 원본은 레코드 칸을 따로 올리므로 둘 다 남는다.
+ * `skip` 이 참인 칸(마선수 8번처럼 다음 경기에 덮이는 칸)은 판정도 줄도 쌓지 않는다.
+ */
+export function leaguePitcherAppearancesOf(
+  lines: readonly LeaguePitcherGameLine[],
+  decisions: {
+    readonly winner: LeaguePitcherOfRecord | null
+    readonly loser: LeaguePitcherOfRecord | null
+    readonly save: LeaguePitcherOfRecord | null
+  },
+  teamOfSide: (side: number) => number,
+  skip: (teamId: number, pitcherSlot: number) => boolean = () => false,
+): LeaguePitcherAppearance[] {
+  const appearances: LeaguePitcherAppearance[] = lines
+    .filter((line) => !skip(line.teamId, line.pitcherSlot))
+    .map((line) => ({ ...line, decision: null }))
+  const attach = (record: LeaguePitcherOfRecord | null, decision: LeaguePitcherDecision) => {
+    if (record === null) return
+    const teamId = teamOfSide(record.side)
+    if (skip(teamId, record.pitcherSlot)) return
+    const index = appearances.findIndex(
+      (appearance) => appearance.teamId === teamId && appearance.pitcherSlot === record.pitcherSlot,
+    )
+    const found = index < 0 ? undefined : appearances[index]
+    if (found !== undefined && found.decision === null) {
+      appearances[index] = { ...found, decision }
+      return
+    }
+    appearances.push({
+      teamId,
+      pitcherSlot: record.pitcherSlot,
+      outs: 0,
+      runsAllowed: 0,
+      strikeouts: 0,
+      pitches: 0,
+      decision,
+    })
+  }
+  attach(decisions.winner, '승')
+  attach(decisions.loser, '패')
+  attach(decisions.save, '세')
+  return appearances
 }
 
 /** 원본 투구 수 칸은 u16 을 0~9999 에서 자른다 (P1 3-1 · 6절) */
@@ -224,8 +293,8 @@ function addPitcherAppearance(
   return {
     outs: line.outs + appearance.outs,
     runsAllowed: line.runsAllowed + appearance.runsAllowed,
-    // ⚠️ 세이브는 웹에 구원 교체가 없어 늘 0 이다 (`LeaguePitcherLine.saves` 주석)
-    saves: line.saves,
+    // 원본에서 세이브는 늘 0 이다 — 판정이 `'세'` 를 내지 않는다 (`LeaguePitcherLine.saves` 주석)
+    saves: line.saves + (appearance.decision === '세' ? 1 : 0),
     strikeouts: line.strikeouts + appearance.strikeouts,
     pitches: Math.min(MAXIMUM_PITCH_COUNT, line.pitches + appearance.pitches),
     wins: line.wins + (appearance.decision === '승' ? 1 : 0),
