@@ -194,7 +194,9 @@ export function TeamGameScreen({
       if (isDefenseInPlay) return
       if (event.key === '*') {
         event.preventDefault()
-        closeChangeWindow()
+        // 교체 창(상태 0xb)에서는 '*' 가 안 먹는다 — 0x498d4 의 '*' 가지(4991c)는 상태 0xd~0x15 만 받고,
+        // 0xb 의 키 함수 0x495fc 는 '2'·'8'·'#'·'0'·'5' 만 본다. 창을 닫지도 메뉴를 열지도 않는다
+        if (changeWindow !== null && !isMenuOpen) return
         return setMenuOpen((open) => !open)
       }
       if (isMenuOpen || overlay !== null) {
@@ -447,10 +449,9 @@ export function TeamGameScreen({
         }
         rightKey={{
           label: isMenuOpen ? '닫기' : '메뉴',
-          onPress: () => {
-            closeChangeWindow()
-            setMenuOpen((open) => !open)
-          },
+          // 소프트키1 도 0x498d4 가 '*' 로 읽는다(498e8) — 교체 창(0xb)에서는 안 먹는다
+          isDisabled: changeWindow !== null && !isMenuOpen,
+          onPress: () => setMenuOpen((open) => !open),
         }}
       >
         <div className={styles.hud}>

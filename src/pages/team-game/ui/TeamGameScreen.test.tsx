@@ -257,6 +257,24 @@ describe('투수 교체 (#)', () => {
     expect(screen.getByText(/지금 투수 —/)).toBeTruthy()
   })
 
+  it("교체 창(상태 0xb)에서는 '*'·메뉴 소프트키가 안 먹는다 — 창이 그대로고 메뉴도 안 열린다 (0x498d4 '*' 는 0xd~0x15 만)", () => {
+    띄우기()
+    fireEvent.click(screen.getByRole('button', { name: '# 교체' }))
+    fireEvent.keyDown(window, { key: '*' })
+
+    expect(screen.getByText('투수 교체')).toBeTruthy()
+    expect(screen.queryByText('경기 중 메뉴')).toBeNull()
+    const 메뉴 = screen.getByRole('button', { name: '메뉴' })
+    expect((메뉴 as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(메뉴)
+    expect(screen.getByText('투수 교체')).toBeTruthy()
+    expect(screen.queryByText('경기 중 메뉴')).toBeNull()
+    // 창을 닫으면(0x495fc 의 '#'·CLR) 다시 먹는다
+    fireEvent.click(screen.getByRole('button', { name: '취소' }))
+    fireEvent.keyDown(window, { key: '*' })
+    expect(screen.getByText('경기 중 메뉴')).toBeTruthy()
+  })
+
   it('우리 공격 차례에는 교체 입구가 없다 — 원본은 그 자리에서 대타를 연다', () => {
     띄우기({ playerSide: PLAYER_SIDE_FIRST_BAT })
 
