@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
-import { seasonGoalInputOf, useSeasonSession } from '@/app/model/useSeasonSession'
+import { SEASON_DEFAULT_MATCH_SETTINGS, seasonGoalInputOf, useSeasonSession } from '@/app/model/useSeasonSession'
 import { postseasonGameOf, postseasonRotationTurnsOf } from '@/entities/league/model/league'
 import { SEASON_GAME_COUNT } from '@/entities/season-mode/model/seasonRecord'
 import { SEASON_PHASE, SEASON_SCENE_STATE } from '@/entities/season-mode/model/seasonStateMachine'
@@ -10,7 +10,6 @@ import { SEASON_PLAYABLE_EVENTS } from '@/entities/season-mode/model/seasonEvent
 import { PRE_GAME_ACE_PHASE, SQUAD_PURPOSE } from '@/entities/season-mode/model/preGameFlow'
 import { ENTRY_SUB_TAB, ENTRY_TAB } from '@/entities/season-mode/model/entryEditor'
 import { teamPitchers } from '@/entities/team/model/teamRoster'
-import { FULL_PLAY_SETTINGS } from '@/features/play-team-game/model/matchSettings'
 import { GAME_POINT_LIMIT } from '@/entities/season-mode/model/seasonRewards'
 import { clearSeasonGameRecord } from '@/entities/season-mode/model/seasonReputation'
 import { useGamePointWallet } from '@/entities/wallet/model/useGamePointWallet'
@@ -874,11 +873,31 @@ describe('경기 전 흐름 0xd8 → 0xd7 → 0xdd → 0xe1', () => {
     expect(result.current.pendingGame?.kind).toBe('정규')
   })
 
+  it('경기진행 설정의 기본은 원본 저장 0 초기값 — 찬스 · 공격 득점권 (전역 +0x12c+1)', () => {
+    const { result } = 띄우기()
+    시작(result, 0)
+    expect(result.current.matchSettings).toEqual(SEASON_DEFAULT_MATCH_SETTINGS)
+    expect(result.current.matchSettings).toMatchObject({ kind: 0, value: 0 })
+  })
+
+  it('경기진행 설정과 창을 본 표시는 전역 칸이라 새 시즌이 넘겨받는다 (+0x12c+1 · +0x11e)', () => {
+    const { result } = 다음경기확인()
+    act(() => result.current.actions.choosePreGameAce(1))
+    act(() => result.current.actions.choosePreGameAce(8))
+    const 설정 = { ...SEASON_DEFAULT_MATCH_SETTINGS, kind: 1, value: 2 }
+    act(() => result.current.actions.applyMatchSettings(설정))
+
+    시작(result, 4)
+
+    expect(result.current.state?.record.teamId).toBe(4)
+    expect(result.current.matchSettings).toEqual(설정)
+  })
+
   it('0xdd 확인이면 고른 마선수를 내 팀에 싣고 경기로 간다 — 설정은 시즌 칸 값이다', () => {
     const { result } = 다음경기확인()
     act(() => result.current.actions.choosePreGameAce(1))
     act(() => result.current.actions.choosePreGameAce(8))
-    const 설정 = { ...FULL_PLAY_SETTINGS, kind: 1, value: 2 }
+    const 설정 = { ...SEASON_DEFAULT_MATCH_SETTINGS, kind: 1, value: 2 }
     act(() => result.current.actions.applyMatchSettings(설정))
     expect(result.current.isMatchSettingsOpen).toBe(false)
 

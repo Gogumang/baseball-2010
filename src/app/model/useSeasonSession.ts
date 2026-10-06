@@ -38,7 +38,7 @@ import { FULL_STAMINA, recoverStaminaAfterGameDay } from '@/entities/pitcher-car
 import { TEAMS } from '@/shared/config/original/teams'
 import type { TeamGameOptions, TeamGameSummary } from '@/features/play-team-game/model/teamGameFlow'
 import { rollOpponentAces } from '@/features/play-team-game/model/teamGameFlow'
-import { FULL_PLAY_SETTINGS } from '@/features/play-team-game/model/matchSettings'
+import { CHANCE_VALUE, MATCH_SETTING_KIND } from '@/features/play-team-game/model/matchSettings'
 import type { MatchProgressSettings } from '@/features/play-team-game/model/matchSettings'
 import {
   PRE_GAME_ACES_START, SQUAD_PURPOSE, cancelPreGameAce, choosePreGameAce, matchInfoCancelScene,
@@ -273,13 +273,15 @@ interface SeasonSave {
    */
   readonly cupRoster?: SeasonTeamRoster | null
   /**
-   * 경기진행 설정 시즌 칸 (저장 +0x12c+m 계열, m = 1). ⚠️ 원본은 **전역 저장**이라 시즌을 새로 해도
-   * 남지만 웹에는 그 전역 저장 객체가 없어 시즌 저장에 둔다 — 근사.
+   * 경기진행 설정 시즌 칸 (전역 저장 +0x12c+m 계열, m = 1). 원본은 **전역 저장**이라 시즌을 새로 해도 남는다 —
+   * 웹엔 그 전역 저장 객체가 없어 시즌 저장에 두되, 새 시즌(`chooseTeam`)이 앞 저장의 값을 그대로 넘겨받는다.
+   * ⚠️ 시즌 저장 칸을 통째로 지우면(브라우저 저장 삭제) 함께 사라진다 — 그 점만 근사다.
+   * 한 번도 고치지 않았으면 원본 저장의 0 초기값(`SEASON_DEFAULT_MATCH_SETTINGS` — 찬스 · 공격 득점권)이다.
    */
   readonly matchSettings?: MatchProgressSettings
   /**
-   * 저장 +0x11e — 경기진행 설정 창을 한 번 봤는가. 0 이면 0xdd 들어옴 0x6548 이 창을 저절로 열고 1 로 쓴다.
-   * ⚠️ 위 칸과 같은 까닭으로 시즌 저장에 둔다 — 근사.
+   * 전역 저장 +0x11e — 경기진행 설정 창을 한 번 봤는가. 0 이면 0xdd 들어옴 0x6548 이 창을 저절로 열고 1 로 쓴다.
+   * 위 칸과 같이 새 시즌이 넘겨받는다.
    */
   readonly matchSettingsSeen?: boolean
   /**
@@ -435,6 +437,21 @@ function staminaOptionsOf(save: SeasonSave, opponentTeamId: number): Partial<Tea
 
 /** SR+0xb7 = 0xf 는 "우승팀 미정" 이다 (P4 1a) */
 const NO_CHAMPION = 0xf
+
+/**
+ * 경기진행 설정의 원본 기본값 — 전역 저장이 0 으로 초기화되므로 모든 칸이 0 이다:
+ * 종류 0 **찬스** · 값 0 **공격 득점권**(사람이 공격 중 2·3루에 주자가 있을 때만 조작) · 상세 비트 모두 0.
+ * 예전에는 웹판 판단으로 "모든 이닝 직접"(`FULL_PLAY_SETTINGS`)을 박아 두었다 — 원본과 달라 걷었다.
+ * 처음 경기정보(0xdd)에 들어오면 설정 창이 저절로 열리므로(+0x11e) 사람이 바로 고를 수 있다.
+ */
+export const SEASON_DEFAULT_MATCH_SETTINGS: MatchProgressSettings = {
+  kind: MATCH_SETTING_KIND.찬스,
+  value: CHANCE_VALUE.공격득점권,
+  battingOrderBits: 0,
+  pitchingInningBits: 0,
+  offenseRunnerBits: 0,
+  defenseRunnerBits: 0,
+}
 /** 시즌모드 = 원본 게임 모드 2 (능력치 보정 마스크 0x306 에 든다) */
 const SEASON_GAME_MODE = 2
 
@@ -731,13 +748,16 @@ export function useSeasonSession(
         ranking: [],
         cup: null,
         cpuPitcherStaminas: fullCpuPitcherStaminas(teamId),
+        // 경기진행 설정(+0x12c+1)과 창을 본 표시(+0x11e)는 전역 저장 칸이라 새 시즌이 넘겨받는다
+        ...(save?.matchSettings === undefined ? {} : { matchSettings: save.matchSettings }),
+        ...(save?.matchSettingsSeen === undefined ? {} : { matchSettingsSeen: save.matchSettingsSeen }),
       }
       commit(next)
       // 0xcc → 0xcb: 새 시즌 초기화에서 왔으니 새 선수 플래그가 선다 — 관리 메뉴 첫 폴링이 400 을 튼다
       newPlayerFlag.current = true
       setScene(SEASON_SCENE_STATE.관리메뉴)
     },
-    [commit],
+    [commit, save],
   )
 
   const updateRecord = useCallback(
@@ -812,8 +832,8 @@ export function useSeasonSession(
         seasonTeamId: record.teamId,
         opponentTeamId: opponent,
         playerSide: side === LEAGUE_SIDE_HOME ? PLAYER_SIDE_LAST_BAT : PLAYER_SIDE_FIRST_BAT,
-        // 경기진행 설정 시즌 칸 — 0xdd 의 '0' 창이 고친 값. 한 번도 안 고쳤으면 웹판 기본(모든 이닝 직접)
-        settings: save.matchSettings ?? FULL_PLAY_SETTINGS,
+        // 경기진행 설정 시즌 칸 — 0xdd 의 '0' 창이 고친 값. 한 번도 안 고쳤으면 원본 0 초기값(찬스 · 공격 득점권)
+        settings: save.matchSettings ?? SEASON_DEFAULT_MATCH_SETTINGS,
         // 코치는 SR+0x185 다 — 채용 화면(0xd7)이 채운 칸을 그대로 넘긴다 (−1 = 없음)
         // 질병 −30% 는 질병 종류 SR+5 가 아니라 **SR+6 > 0** 을 본다 (0xb5824 `ldrsb [SR,#6]`) — `illnessPenaltyFieldOf`
         season: { illness: illnessPenaltyFieldOf(record), morale: save.state.teamMorale, coach: record.coach },
@@ -1007,7 +1027,7 @@ export function useSeasonSession(
     setGameKind(pendingGame.kind)
     setGameOptions({
       ...pendingGame.options,
-      settings: save.matchSettings ?? FULL_PLAY_SETTINGS,
+      settings: save.matchSettings ?? SEASON_DEFAULT_MATCH_SETTINGS,
       ourEntryOrder: seasonEntryOrderOf(roster),
       // 투수 스태미나 +0x2c — 시즌 내내 이어진 값으로 선다. 국가대항전은 두 팀 모두 10000(기본)이다
       ...(isCup ? {} : staminaOptionsOf(save, pendingGame.options.opponentTeamId)),
@@ -1723,7 +1743,7 @@ export function useSeasonSession(
     preGameAces,
     pendingGame,
     isMatchSettingsOpen,
-    matchSettings: save?.matchSettings ?? FULL_PLAY_SETTINGS,
+    matchSettings: save?.matchSettings ?? SEASON_DEFAULT_MATCH_SETTINGS,
     entryEdit,
     matchInfoStarterName,
     gameKind,
