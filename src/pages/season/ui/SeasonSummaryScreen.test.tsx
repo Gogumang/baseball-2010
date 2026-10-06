@@ -192,13 +192,13 @@ describe('리그 1위 누적 G (StrMODE[223])', () => {
   })
 })
 
-describe('0x29 가 새로 열린 결산 진입 (0x69ce → 0x6ac8)', () => {
-  it('리그 1위 G 검사를 건너뛰고 곧장 끝낸다 — 원본 버그 그대로', () => {
+describe('0x29 가 새로 열린 결산 진입 (0x69ce → 0x6ac8 · 닫힘 0x87e8)', () => {
+  const 띄우기 = (regularSeasonFirsts: number) => {
     const onAward = vi.fn()
     const onFinish = vi.fn()
     render(
       <SeasonSummaryScreen
-        record={기록({ regularSeasonFirsts: 1 })}
+        record={기록({ regularSeasonFirsts })}
         series={우승시리즈()}
         postseasonRank={2}
         leagueFirstAwardedBits={0}
@@ -208,11 +208,34 @@ describe('0x29 가 새로 열린 결산 진입 (0x69ce → 0x6ac8)', () => {
         onFinish={onFinish}
       />,
     )
+    return { onAward, onFinish }
+  }
+
+  it('해금 알림 창이 먼저 뜨고, 닫으면 리그 1위 G 를 한 번 본다 — 문턱 미달이면 아무것도 없다', () => {
+    const { onAward, onFinish } = 띄우기(1)
+    expect(document.body.textContent).toContain('오토봇 배트')
+    확인()
+    expect(onAward).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: '결과' }))
     확인()
-
     expect(onAward).not.toHaveBeenCalled()
+    expect(onFinish).toHaveBeenCalled()
+  })
+
+  it('문턱을 넘었으면 알림을 닫을 때 하나만 주고(꼬리표 1 이라 이어지지 않는다) 뒤 사슬은 건너뛴다', () => {
+    const { onAward, onFinish } = 띄우기(20)
+    확인() // 해금 알림
+    expect(document.body.textContent).toContain('G포인트')
+    확인() // G 팝업
+    expect(onAward).toHaveBeenCalledTimes(1)
+    // 문턱 표의 첫 칸 하나만
+    expect(onAward.mock.calls[0]?.[0]).toMatchObject({ bit: 0 })
+    expect(screen.queryByRole('button', { name: 'OK' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: '결과' }))
+    확인()
+    expect(onAward).toHaveBeenCalledTimes(1)
     expect(onFinish).toHaveBeenCalled()
   })
 })

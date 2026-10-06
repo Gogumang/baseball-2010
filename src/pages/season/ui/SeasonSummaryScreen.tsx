@@ -1,9 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button, MessageBox, RawScreen } from '@/shared/ui'
 import { TEAMS } from '@/shared/config/original/teams'
 import type { PostseasonSeries } from '@/entities/league/model/league'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
-import { koreanSeriesRewardOf, nextLeagueFirstAward } from '@/entities/season-mode/model/seasonRewards'
+import {
+  SEASON_AUTOBOT_BAT_HIDDEN_ID, koreanSeriesRewardOf, nextLeagueFirstAward,
+} from '@/entities/season-mode/model/seasonRewards'
+import { hiddenOpenTextOf } from '@/entities/career/model/equipment'
 import type { LeagueFirstAward, SeasonReward } from '@/entities/season-mode/model/seasonRewards'
 import { MILLION_TO_TEN_THOUSAND } from '@/widgets/season/lib/seasonWindowLayout'
 import { PostseasonBracketWindow } from '@/widgets/season/ui/PostseasonBracketWindow'
@@ -45,8 +48,10 @@ export interface SeasonSummaryScreenProps {
   /** 저장(전역) **+0x145** — 리그 1위 G 를 이미 받은 문턱 비트 (시즌을 새로 시작해도 유지된다) */
   readonly leagueFirstAwardedBits: number
   /**
-   * 이번 결산 진입(0x6900)에서 세 모드 해금 0x29 "오토봇 배트" 가 새로 열려 **리그 1위 G 검사를 건너뛴다** —
-   * 0x69ce 가 0x62369 의 결과로 곧장 함수 끝(0x6ac8)으로 간다 (원본 버그 그대로). 참이면 G 사슬 없이 끝낸다.
+   * 이번 결산 진입(0x6900)에서 세 모드 해금 0x29 "오토봇 배트" 가 새로 열렸다 — 0x62369 가 해금 알림 창(0x62368 →
+   * 0x74ef5, 꼬리표 g+0x248 = 0)을 띄우고 0x69ce 가 곧장 함수 끝(0x6ac8)으로 가 **진입의 리그 1위 G 검사를 건너뛴다**.
+   * 그 창을 OK 로 닫으면 0xef 갱신 0x85ec 의 0x87e8(`[g+9] ≠ 0 && 꼬리표 == 0 && 결과 ∈ {0, 0x14}`)이 같은 G 검사를
+   * **한 번** 돌린다 — 준 G 팝업은 0xbbef8 이 꼬리표 1 을 세워 다시 0x87e8 을 부르지 않는다. 참이면 이 진입의 뒤 G 사슬은 없다.
    */
   readonly skipsLeagueFirstAward?: boolean
   /** 한국시리즈 보상 적용 (`0x85ec` — 팝업 7 이 닫힐 때 인기도·평판·소지금을 더한다) */
@@ -66,7 +71,7 @@ export interface SeasonSummaryScreenProps {
   readonly onFinish: () => void
 }
 
-type Phase = '대진표' | '우승문구' | '한국시리즈보상' | '리그1위'
+type Phase = '대진표' | '해금알림' | '해금뒤리그1위' | '우승문구' | '한국시리즈보상' | '리그1위'
 
 /** SR+0xb7 = 0xf 는 "우승팀 미정" 이다 (P4 1a) */
 const NO_CHAMPION = 0xf
@@ -100,6 +105,13 @@ export function SeasonSummaryScreen(props: SeasonSummaryScreenProps) {
   const [phase, setPhase] = useState<Phase>('대진표')
   const [awardedBits, setAwardedBits] = useState(leagueFirstAwardedBits)
   const [pendingAward, setPendingAward] = useState<LeagueFirstAward | null>(null)
+  // 0x29 해금 알림은 그 진입에 한 번 — 세션이 진입 효과(0x6900)에서 이 값을 세우므로 화면이 선 뒤에 올 수 있다
+  const autobotNoticeShown = useRef(false)
+  useEffect(() => {
+    if (!skipsLeagueFirstAward || autobotNoticeShown.current) return
+    autobotNoticeShown.current = true
+    setPhase('해금알림')
+  }, [skipsLeagueFirstAward])
 
   const isFinished = series !== null && series.round === '종료'
   const championId = series?.champion ?? (record.postseasonChampion === NO_CHAMPION ? null : record.postseasonChampion)
@@ -108,8 +120,8 @@ export function SeasonSummaryScreen(props: SeasonSummaryScreenProps) {
 
   /** 리그 1위 G 는 한 번에 하나다 — 줄 것이 없으면 결산이 끝난다 (`0x87e8`) */
   const goToLeagueFirst = (bits: number) => {
-    // ⚠️ 웹은 결산 진입(0x6900)과 팝업 닫힘(0x87e8)의 두 G 검사를 이 한 자리에 모았다 — 0x29 가 열린 진입이면 건너뛴다.
-    //    원본에서 그 뒤 팝업 닫힘(0x87e8)이 같은 진입 안에서 G 를 다시 볼 수 있는지는 확인하지 못했다(미해결)
+    // ⚠️ 웹은 결산 진입(0x6900)과 팝업 닫힘(0x87e8)의 G 검사를 이 한 자리에 모았다 — 0x29 가 열린 진입이면 그 검사는
+    //    해금 알림 창을 닫을 때(0x87e8) 이미 한 번 돌았으므로 여기서는 건너뛴다
     const award = skipsLeagueFirstAward ? null : nextLeagueFirstAward(record, bits)
     if (award === null) {
       onFinish()
@@ -140,6 +152,33 @@ export function SeasonSummaryScreen(props: SeasonSummaryScreenProps) {
       <Button variant="corner" className={styles.cornerButton} onClick={onPressNext}>
         {isFinished ? '결과' : '경기'}
       </Button>
+
+      {phase === '해금알림' && (
+        <MessageBox
+          text={hiddenOpenTextOf(SEASON_AUTOBOT_BAT_HIDDEN_ID) ?? ''}
+          buttons={['OK']}
+          onAnswer={() => {
+            // 0x87e8 — 리그 1위 G 검사를 한 번 (문턱 3·10·20 중 아직 안 받은 첫 칸 하나)
+            const award = nextLeagueFirstAward(record, awardedBits)
+            setPendingAward(award)
+            setPhase(award === null ? '대진표' : '해금뒤리그1위')
+          }}
+        />
+      )}
+
+      {phase === '해금뒤리그1위' && pendingAward !== null && (
+        <MessageBox
+          text={formatted(TEXT.leagueFirst, [pendingAward.threshold, pendingAward.gamePoint])}
+          buttons={['OK']}
+          onAnswer={() => {
+            // G 팝업(0xbbef8, 꼬리표 1)을 닫아도 0x87e8 은 다시 안 돈다 — 대진표로 돌아간다
+            onLeagueFirstAward(pendingAward)
+            setAwardedBits(awardedBits | (1 << pendingAward.bit))
+            setPendingAward(null)
+            setPhase('대진표')
+          }}
+        />
+      )}
 
       {phase === '우승문구' && (
         <MessageBox

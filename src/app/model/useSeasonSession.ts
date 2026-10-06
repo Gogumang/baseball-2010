@@ -162,8 +162,8 @@ export interface SeasonSession {
    */
   readonly openedHiddenIds: readonly number[]
   /**
-   * 이번 결산 진입(0x6900)에서 0x29 를 새로 열어 **리그 1위 G 검사를 건너뛰었는가** — 원본 버그 그대로
-   * (`opensSeasonAutobotBat` 주석). 결산 화면이 G 사슬을 타지 않고 곧장 끝낸다.
+   * 이번 결산 진입(0x6900)에서 0x29 를 새로 열어 **진입의 리그 1위 G 검사를 건너뛰었는가** (`opensSeasonAutobotBat`
+   * 주석). 결산 화면이 해금 알림 창을 띄우고, 닫힐 때(0x87e8) G 검사를 한 번 돌린 뒤 뒤 G 사슬은 타지 않는다.
    */
   readonly skipsLeagueFirstAward: boolean
   /** 진행 중인 국가대항전. 없으면 null (원본 L+0xa8~ 칸) */
@@ -829,8 +829,9 @@ export function useSeasonSession(
       return
     }
 
-    // 결산 0xef 진입 0x6900 — 들어갈 때마다 머리에서 세 모드 해금 0x29 를 본다. 새로 열리면 그 진입의 리그 1위 G
-    // 검사를 건너뛴다(0x69ce → 0x6ac8, 원본 버그 그대로). ⚠️ 해금 알림 창(0x62368 이 띄우는 글)은 웹에 아직 없다
+    // 결산 0xef 진입 0x6900 — 들어갈 때마다 머리에서 세 모드 해금 0x29 를 본다. 새로 열리면 해금 알림 창(0x62368 →
+    // 0x74ef5)을 띄우고 그 진입의 리그 1위 G 검사를 건너뛴다(0x69ce → 0x6ac8). 창을 닫으면 0x87e8 이 G 검사를 한 번
+    // 돌린다 — 결산 화면(`SeasonSummaryScreen`)이 이 값으로 그 창과 검사를 맡는다
     if (scene === SEASON_SCENE_STATE.시즌결산) {
       const input = autobotBatInputRef.current?.()
       const opens = input !== undefined && opensSeasonAutobotBat(record, {
