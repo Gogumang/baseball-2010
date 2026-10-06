@@ -12,7 +12,8 @@ import { createLocalStorageMissionRecord } from '@/shared/api/save/localStorageM
 import { createLocalStorageJsonStore } from '@/shared/api/save/localStorageJsonStore'
 import { nariBatterOf, nariPitcherOf, useCollection } from '@/app/model/useCollection'
 import { EMPTY_COLLECTION, hallOfFameRecordIdOf } from '@/entities/collection/model/collection'
-import { isHallOfFameDeleteBlocked } from '@/entities/season-mode/model/playerRecruit'
+import { hasCareerPlayerInSeasonTeam, isHallOfFameDeleteBlocked } from '@/entities/season-mode/model/playerRecruit'
+import { careerResetTargetOf, judgeModeReset } from '@/entities/settings/model/modeReset'
 import type { HallOfFameDeletion } from '@/pages/special/ui/SpecialScreen'
 import type { Collection } from '@/entities/collection/model/collection'
 import { GAME_POINT_USAGE } from '@/entities/collection/model/annalsStats'
@@ -497,6 +498,25 @@ export function App() {
         hallOfFameDeletion={hallOfFameDeletion}
         onRenamePlayer={editedNames.rename}
         onResetEditedNames={editedNames.clear}
+        // 모드 초기화 나리 칸 — 0x224ec(mgr, 4 타자 / 3 투수): 그 편 저장(game_br/pr.sav)·+0x40+m·+0x4c+m 지움 → 0x223a8 이
+        // 시즌 내 팀에서 그 편 나리 선수를 빼고 시즌 저장
+        onResetCareerEdition={(edition) => {
+          if (edition === '타자편') {
+            careerSession.actions.resetCareer()
+          } else {
+            // 투수편 세션의 reset 은 상태와 +0x4f 만 지운다 — 파일 지우기는 엔딩 끝(finishEnding)처럼 빈 덩어리로 덮는다
+            pitcherStore.save({})
+            pitcherSession.actions.reset()
+          }
+          seasonSession.actions.removeCareerPlayer(edition === '투수편')
+        }}
+        // 하위 1 막기 — 0xb5054(내 시즌 팀, 편) && +0x4e (0x2c880 · 0x2c900). 투수편 글은 [213](원본 버그)
+        careerResetBlockOf={(edition) => judgeModeReset(careerResetTargetOf(edition), {
+          isSeasonGameInProgress: seasonSession.isGameInProgress,
+          isCareerPlayerInSeasonTeam: hasCareerPlayerInSeasonTeam(seasonRoster, edition === '투수편'),
+        }).blockText}
+        // 시즌모드 초기화 0x224ec(mgr, 2) — 시즌 저장(+0x42)·+0x4e
+        onResetSeason={seasonSession.actions.resetSeason}
         // 일반모드 진입 창 [13] — 빠른실행이면 경기정보(상태 22)부터 (0x299f8 this+0x14c = 1)
         onStartGeneralMode={(isQuickStart) => {
           setGeneralQuickStart(isQuickStart)

@@ -8,6 +8,8 @@ import { PITCH_CONTROLS, SOUND_LEVEL_COUNT, SPEED_LEVEL_COUNT } from '@/entities
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
 import { VIBRATION_TOGGLE_MILLISECONDS, vibrate } from '@/entities/defense-controls/model/vibration'
 import { SETTINGS_TEXT } from '@/shared/config/settingsMenu'
+import { MODE_RESET_TEXT } from '@/entities/settings/model/modeReset'
+import type { CareerResetEdition } from '@/entities/settings/model/modeReset'
 import {
   DETAIL_CHOICES, DETAIL_COLORS, DETAIL_ROWS, DETAIL_ROW_COUNT, DETAIL_TITLE,
   FIRST_MENU_ROW, IN_GAME_PANEL, IN_GAME_ROW_COUNT, MENU_ROW, MODE_RESET_ROW, MODE_RESET_ROW_COUNT, MODE_RESET_TITLE,
@@ -29,9 +31,22 @@ const imageSrc = (folder: string, id: number) => `${folder}/${String(id).padStar
 
 interface SettingsScreenProps {
   readonly settings: GameSettings
+  /**
+   * ⚠️ 이제 안 읽는다 — 원본 모드 초기화 나리 칸(0x2c746)은 저장 유무를 안 보고 늘 고르기 창을 띄운다. 경기 중 "설정" 들이
+   * 아직 넘기므로 칸만 남긴다.
+   */
   readonly hasSavedCareer: boolean
   readonly onChange: (settings: GameSettings) => void
-  readonly onResetCareer: () => void
+  /**
+   * 나만의리그 초기화 — 고르기 창 답 0 타자편 → `0x224ec(mgr, 4)` · 1 투수편 → `0x224ec(mgr, 3)` (하위 2 의 예).
+   * 받는 쪽이 그 편 저장·경기 중간 저장 표시를 지우고 시즌 내 팀에서 그 편 나리 선수를 뺀다(0x223a8).
+   */
+  readonly onResetCareer: (edition: CareerResetEdition) => void
+  /**
+   * 하위 1 의 시즌 중 막기 — `0xb5054(내 시즌 팀, 편) && 전역기록 +0x4e` 면 띄울 글(타자편 [212] · 투수편 [213]), 통과면 null.
+   * 안 넘기면 늘 통과(경기 중 "설정" — 모드 초기화 줄이 없다).
+   */
+  readonly careerResetBlockOf?: (edition: CareerResetEdition) => string | null
   /**
    * 에디트 초기화 `0x204c1` = 이름표 memset (모드 초기화 칸 2).
    * 메인 메뉴 환경설정(상태 8)만 넘긴다 — 경기 중 메뉴 "설정" 은 작은 판이라 모드 초기화 줄이 아예 없다
@@ -39,8 +54,8 @@ interface SettingsScreenProps {
    */
   readonly onResetEditedNames?: () => void
   /**
-   * 시즌모드 초기화 `0x224ed(mgr, 2)` (모드 초기화 칸 1). 웹 시즌 저장 지우기가 아직 없어 안 넘기면
-   * 칸은 보이되 OK 가 아무 일도 하지 않는다 (⚠️ 미배선).
+   * 시즌모드 초기화 `0x224ec(mgr, 2)` (모드 초기화 칸 1) — 시즌 저장·경기 중간 저장(+0x4e)을 지운다.
+   * 안 넘기면 칸은 보이되 OK 가 아무 일도 하지 않는다.
    */
   readonly onResetSeason?: () => void
   /**
@@ -85,7 +100,7 @@ function SettingsFrame({ mainMenu, onBack, slides = true }: {
  * 상세 설정에는 웹이 실제로 쓰는 항목(투구 게이지)을 둔다.
  */
 export function SettingsScreen({
-  settings, hasSavedCareer, onChange, onResetCareer, onResetEditedNames, onResetSeason, mainMenu, onBack,
+  settings, onChange, onResetCareer, careerResetBlockOf, onResetEditedNames, onResetSeason, mainMenu, onBack,
 }: SettingsScreenProps) {
   const [cursor, setCursor] = useState(0)
   /** 하위 페이지(상세 설정·모드 초기화)에서 돌아왔는가 — 돌아온 첫 화면은 머리띠가 다시 미끄러지지 않는다 */
@@ -223,8 +238,8 @@ export function SettingsScreen({
   if (isModeResetOpen && onResetEditedNames !== undefined) {
     return (
       <ModeResetPage
-        hasSavedCareer={hasSavedCareer}
         onResetCareer={onResetCareer}
+        {...(careerResetBlockOf === undefined ? {} : { careerResetBlockOf })}
         onResetEditedNames={onResetEditedNames}
         {...(onResetSeason === undefined ? {} : { onResetSeason })}
         mainMenu={mainMenu}
@@ -520,7 +535,13 @@ function DetailSettings({ settings, onChange, mainMenu, onBack }: {
   )
 }
 
-type ModeResetPopup = '나리확인' | '시즌확인' | '에디트확인' | '완료'
+type ModeResetPopup =
+  | { readonly kind: '나리고르기' }
+  | { readonly kind: '나리막힘'; readonly text: string }
+  | { readonly kind: '나리확인'; readonly edition: CareerResetEdition }
+  | { readonly kind: '시즌확인' }
+  | { readonly kind: '에디트확인' }
+  | { readonly kind: '완료' }
 
 /**
  * 세 확인 창의 처음 커서 — 띄운 바로 뒤 `0x749d5(창, 1)` 로 둘째 칸 **"아니오"** 에 둔다
@@ -528,34 +549,42 @@ type ModeResetPopup = '나리확인' | '시즌확인' | '에디트확인' | '완
  */
 const CONFIRM_FIRST_CURSOR = 1
 
+/**
+ * 나만의리그 칸 고르기 창 0xcf848 (종류 0x10, 0x2c746~0x2c7e4) — 버튼은 메인 메뉴 [14] 와 같은 그림:
+ * 0 타자편 popup 고른 13 / 보통 11 (이미지 표 +0x34/+0x2c) · 1 투수편 14 / 12 (+0x38/+0x30). 2열×1행 · 간격 0x74805(창, 0x3c, 0).
+ * 처음 커서 0x749d5 를 안 불러 타자편에서 시작한다. CLR → −1 → 하위 0.
+ */
+const CAREER_CHOOSE_BUTTONS = ['타자편', '투수편'] as const
+const CAREER_CHOOSE_FRAMES = [{ normal: 11, selected: 13 }, { normal: 12, selected: 14 }] as const
+const CAREER_CHOOSE_GRID = { columns: 2, gapX: 0x3c, gapY: 0 } as const
+const CAREER_CHOOSE_CANCEL = -1
+
 const MODE_RESET_NAMES = [SETTINGS_TEXT.careerReset, SETTINGS_TEXT.seasonReset, SETTINGS_TEXT.editReset] as const
 
 /**
  * 환경설정 → **모드 초기화** (메인 메뉴 상태 0x21 — 갱신 0x2c6d8 · 그리기 0x2dc00 → 0x593c8 종류 0x21 · 0x5a316 직접 읽음).
  *
- * 하위 상태 [this+0x18] (점프표 0xcece0):
+ * 하위 상태 [this+0x18] (점프표 0xcece0) — 전부는 `entities/settings` 의 `modeReset` 머리글:
  * ```
  * 하위 0 목록    CLR(−16) → 0xbcb49(…, 8) 환경설정 첫 화면 · OK(−5) → 칸별
  *   칸 0 [82] 나만의리그  → 고르기 창 0xcf848 "초기화할 데이터를 선택하세요"(종류 0x10) → 하위 1
- *                          → 편별 확인 [210]/[211] (종류 2) + 0x749d5(창, 1) (0x2c928 · 0x2c930)
  *   칸 1 [83] 시즌모드    → 확인 0xcf870 (종류 2) + 0x749d5(창, 1) → 하위 3
  *   칸 2 [84] 에디트      → 확인 0xcf8d4 (종류 2) + 0x749d5(창, 1) → 하위 4
- * 하위 3 답 0(예) → 하위 0 · 0x224ed(mgr, 2) · 알림 0xcf900 "초기화 되었습니다" / 답 1·−1 → 하위 0
+ * 하위 1 답 0 타자편 · 1 투수편 → 시즌 중 막기(0xb5054 && +0x4e) ? [212] / 투수편은 [213](원본 버그) 종류 1 → 하위 0
+ *                                                         : [210] / [211] 종류 2 + 0x749d5(창, 1) → 하위 2 · −1 → 하위 0
+ * 하위 2 답 0(예) → 하위 0 · 0x224ec(mgr, 타자편 4 / 투수편 3) · 알림 0xcf900 / 1·−1 → 하위 0
+ * 하위 3 답 0(예) → 하위 0 · 0x224ec(mgr, 2) · 알림 0xcf900 "초기화 되었습니다" / 답 1·−1 → 하위 0
  * 하위 4 답 0(예) → 하위 0 · 0x204c1(mgr) = memset(이름표, 0, 0x708) · 알림 0xcf900 / 답 1·−1 → 하위 0
  * ```
+ * 나리 칸은 그 편 저장이 있는지 안 본다 — 없어도 고르기·확인·지우기·알림이 다 돈다.
  * 파일 저장은 이 상태에 없다 — 환경설정 첫 화면을 CLR·OK 로 나갈 때 0x295e2 가 0x1f1b9 로 저장한다.
- * 웹 이름표 고리(`useEditedNames.clear`)는 비우는 즉시 저장한다(웹 환경설정 값들도 바꾸는 즉시 저장한다) —
- * 창을 닫아 버리는 경우만 다르다.
+ * 웹 저장 고리들은 지우는 즉시 저장한다(웹 환경설정 값들도 바꾸는 즉시 저장한다) — 창을 닫아 버리는 경우만 다르다.
  *
- * ⚠️ 근사·미해결:
- *  - 칸 0 나만의리그: 원본은 고르기 창(타자편/투수편 두 칸, 0x74ea9 로 채움)을 먼저 띄우고, 편별로
- *    시즌 중 막기 [212] → 확인 [210]/[211] → 0x224ed(4 타자 / 3 투수) 다(R11 3-1). 웹은 투수편 지우기·
- *    시즌 중 막기 배선이 다른 작업 구역(app/model)이라 **예전처럼 타자편 저장이 있을 때만 [210] 확인**으로 둔다.
- *  - 칸 1 시즌모드: 웹에 시즌 저장 지우기(0x224ed(2))가 없어 `onResetSeason` 을 안 받으면 OK 가 아무 일도 안 한다.
+ * ⚠️ 칸 1 시즌모드: `onResetSeason` 을 안 받으면 OK 가 아무 일도 안 한다.
  */
-function ModeResetPage({ hasSavedCareer, onResetCareer, onResetEditedNames, onResetSeason, mainMenu, onBack }: {
-  readonly hasSavedCareer: boolean
-  readonly onResetCareer: () => void
+function ModeResetPage({ onResetCareer, careerResetBlockOf, onResetEditedNames, onResetSeason, mainMenu, onBack }: {
+  readonly onResetCareer: (edition: CareerResetEdition) => void
+  readonly careerResetBlockOf?: (edition: CareerResetEdition) => string | null
   readonly onResetEditedNames: () => void
   readonly onResetSeason?: () => void
   readonly mainMenu: { readonly gamePoint: number } | undefined
@@ -568,16 +597,24 @@ function ModeResetPage({ hasSavedCareer, onResetCareer, onResetEditedNames, onRe
   const titleFrames = useFrameOrigins(IMG_TEXT)
 
   const openRow = (index: number) => {
-    if (index === 0) return hasSavedCareer ? setPopup('나리확인') : undefined
-    if (index === 1) return onResetSeason === undefined ? undefined : setPopup('시즌확인')
-    setPopup('에디트확인')
+    if (index === 0) return setPopup({ kind: '나리고르기' })
+    if (index === 1) return onResetSeason === undefined ? undefined : setPopup({ kind: '시즌확인' })
+    setPopup({ kind: '에디트확인' })
+  }
+
+  /** 하위 1 — 고르기 창 답. 막히면 [212]/[213] 알림 뒤 하위 0, 통과면 편별 확인 */
+  const answerCareerChoose = (answer: number) => {
+    if (answer !== 0 && answer !== 1) return setPopup(null)
+    const edition: CareerResetEdition = answer === 0 ? '타자편' : '투수편'
+    const blockText = careerResetBlockOf?.(edition) ?? null
+    setPopup(blockText === null ? { kind: '나리확인', edition } : { kind: '나리막힘', text: blockText })
   }
 
   /** 확인 창 답 — 예(0)면 지우고 0xcf900 알림, 아니오는 하위 0 으로 */
   const answerConfirm = (reset: () => void) => (answer: number) => {
     if (answer !== 0) return setPopup(null)
     reset()
-    setPopup('완료')
+    setPopup({ kind: '완료' })
   }
 
   useEffect(() => {
@@ -642,19 +679,34 @@ function ModeResetPage({ hasSavedCareer, onResetCareer, onResetEditedNames, onRe
 
       <SettingsFrame mainMenu={mainMenu} onBack={onBack} />
 
-      {popup === '나리확인' && (
-        <MessageBox text={SETTINGS_TEXT.careerResetConfirm} buttons={['예', '아니오']} initialSelected={CONFIRM_FIRST_CURSOR}
-          onAnswer={answerConfirm(onResetCareer)} />
+      {popup?.kind === '나리고르기' && (
+        <MessageBox
+          text={MODE_RESET_TEXT.careerChoose}
+          buttons={CAREER_CHOOSE_BUTTONS}
+          buttonFrames={CAREER_CHOOSE_FRAMES}
+          grid={CAREER_CHOOSE_GRID}
+          cancelAnswer={CAREER_CHOOSE_CANCEL}
+          onAnswer={answerCareerChoose}
+        />
       )}
-      {popup === '시즌확인' && onResetSeason !== undefined && (
+      {popup?.kind === '나리막힘' && (
+        <MessageBox text={popup.text} buttons={['확인']} onAnswer={() => setPopup(null)} />
+      )}
+      {popup?.kind === '나리확인' && (
+        <MessageBox
+          text={popup.edition === '타자편' ? MODE_RESET_TEXT.careerBatterConfirm : MODE_RESET_TEXT.careerPitcherConfirm}
+          buttons={['예', '아니오']} initialSelected={CONFIRM_FIRST_CURSOR}
+          onAnswer={answerConfirm(() => onResetCareer(popup.edition))} />
+      )}
+      {popup?.kind === '시즌확인' && onResetSeason !== undefined && (
         <MessageBox text={SETTINGS_TEXT.seasonResetConfirm} buttons={['예', '아니오']} initialSelected={CONFIRM_FIRST_CURSOR}
           onAnswer={answerConfirm(onResetSeason)} />
       )}
-      {popup === '에디트확인' && (
+      {popup?.kind === '에디트확인' && (
         <MessageBox text={SETTINGS_TEXT.editResetConfirm} buttons={['예', '아니오']} initialSelected={CONFIRM_FIRST_CURSOR}
           onAnswer={answerConfirm(onResetEditedNames)} />
       )}
-      {popup === '완료' && (
+      {popup?.kind === '완료' && (
         <MessageBox text={SETTINGS_TEXT.resetDone} buttons={['확인']} onAnswer={() => setPopup(null)} />
       )}
     </RawScreen>

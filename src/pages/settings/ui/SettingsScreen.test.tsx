@@ -281,6 +281,8 @@ describe('환경설정 → 모드 초기화 (원본 상태 0x21, 세 줄)', () =
 
     for (const name of ['나만의리그 초기화', '시즌모드 초기화', '에디트 초기화']) {
       fireEvent.click(줄(name))
+      // 나리 칸은 고르기 창이 먼저 — 타자편을 고르면 [210]
+      if (name === '나만의리그 초기화') fireEvent.click(screen.getByRole('button', { name: '타자편' }))
       expect(screen.getByRole('button', { name: '아니오' }).querySelector('img')?.getAttribute('src'))
         .toContain('popup/frames/007.png')
       // 바로 OK 를 누르면 [아니오] — 아무것도 안 지운다
@@ -305,18 +307,69 @@ describe('환경설정 → 모드 초기화 (원본 상태 0x21, 세 줄)', () =
     expect(줄('사운드')).toBeTruthy()
   })
 
-  it('나만의리그: 저장이 있을 때만 [210] 확인 → 예면 지우고 0xcf900', () => {
+  it('나만의리그: 저장 유무와 상관없이 고르기 창 0xcf848 — 타자편(고른 13)·투수편(보통 12), 처음 커서 타자편', () => {
+    모드초기화열기({ hasSavedCareer: false })
+
+    fireEvent.click(줄('나만의리그 초기화'))
+    expect(screen.getByRole('dialog').textContent).toContain('초기화할 데이터를 선택하세요')
+    expect(screen.getByRole('button', { name: '타자편' }).querySelector('img')?.getAttribute('src'))
+      .toContain('popup/frames/013.png')
+    expect(screen.getByRole('button', { name: '투수편' }).querySelector('img')?.getAttribute('src'))
+      .toContain('popup/frames/012.png')
+  })
+
+  it('나만의리그: 타자편 → [210] 예 → 0x224ec(4) · 0xcf900 / 투수편 → [211] 예 → 0x224ec(3)', () => {
     const onResetCareer = vi.fn()
     모드초기화열기({ onResetCareer })
 
     fireEvent.click(줄('나만의리그 초기화'))
+    fireEvent.click(screen.getByRole('button', { name: '타자편' }))
+    expect(screen.getByRole('dialog').textContent).toContain('나만의 리그 타자편')
     fireEvent.click(screen.getByRole('button', { name: '예' }))
-
-    expect(onResetCareer).toHaveBeenCalledTimes(1)
+    expect(onResetCareer).toHaveBeenLastCalledWith('타자편')
     expect(screen.getByRole('dialog').textContent).toContain('초기화 되었습니다')
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+
+    fireEvent.click(줄('나만의리그 초기화'))
+    fireEvent.click(screen.getByRole('button', { name: '투수편' }))
+    expect(screen.getByRole('dialog').textContent).toContain('나만의 리그 투수편')
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+    expect(onResetCareer).toHaveBeenLastCalledWith('투수편')
+    expect(onResetCareer).toHaveBeenCalledTimes(2)
   })
 
-  it('시즌모드: 시즌 지우기를 안 넘기면(웹 미배선) 확인 창이 안 뜨고, 넘기면 0xcf870 확인', () => {
+  it('나만의리그: 고르기 창 CLR(−1) 은 목록으로 — 아무것도 안 지운다', () => {
+    const onResetCareer = vi.fn()
+    모드초기화열기({ onResetCareer })
+
+    fireEvent.click(줄('나만의리그 초기화'))
+    fireEvent.keyDown(window, { key: 'Escape' })
+
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(onResetCareer).not.toHaveBeenCalled()
+  })
+
+  it('나만의리그: 시즌 중 막기면 그 글(종류 1)만 띄우고 확인 창 없이 목록으로 — 투수편은 [213] 글이다', () => {
+    const onResetCareer = vi.fn()
+    const careerResetBlockOf = vi.fn((edition: '타자편' | '투수편') =>
+      (edition === '투수편' ? '시즌모드 경기 진행 중에는!N삭제 하실 수 없습니다' : null))
+    모드초기화열기({ onResetCareer, careerResetBlockOf })
+
+    fireEvent.click(줄('나만의리그 초기화'))
+    fireEvent.click(screen.getByRole('button', { name: '투수편' }))
+    expect(careerResetBlockOf).toHaveBeenLastCalledWith('투수편')
+    expect(screen.getByRole('dialog').textContent).toContain('삭제 하실 수 없습니다')
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(onResetCareer).not.toHaveBeenCalled()
+
+    // 타자편은 통과 — [210]
+    fireEvent.click(줄('나만의리그 초기화'))
+    fireEvent.click(screen.getByRole('button', { name: '타자편' }))
+    expect(screen.getByRole('dialog').textContent).toContain('나만의 리그 타자편')
+  })
+
+  it('시즌모드: 시즌 지우기를 안 넘기면 확인 창이 안 뜨고, 넘기면 0xcf870 확인', () => {
     모드초기화열기()
     fireEvent.click(줄('시즌모드 초기화'))
     expect(screen.queryByRole('dialog')).toBeNull()

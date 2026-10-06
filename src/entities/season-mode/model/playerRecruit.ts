@@ -335,6 +335,41 @@ export function removeHallOfFamerFromRoster(roster: SeasonTeamRoster, id: number
 }
 
 /**
+ * 나만의리그 초기화가 시즌 명단에서 그 편 나리 선수를 빼기 — `0x223a8(mgr, 투수?)` (모드 저장 지우기 0x224ec 칸 3 → 1 · 칸 4 → 0,
+ * 직접 떴다):
+ * ```
+ * 0x213c0(앱, 2, 1) ; [mgr+0xb4] == 0 || 전역기록+0x42 == 0 → 끝      ; 시즌 저장이 없으면 아무것도 안 한다
+ * T = 0x1f571(저장, SR[1])                                             ; **내 팀 하나**만 본다 (열 팀을 돌지 않는다)
+ * 투수: j = 첫 0xb6388(P) (= +0xa bit7, 나리 선수) → memcpy(T[j], T[끝]) · memset(T[끝]) · 수 −1 · 0x211fc(mgr, 2) 저장
+ * 타자: j = 첫 0xb6388(P) → pos = T[j][0x1c] & 0xf · memcpy · memset · 0xb8e85(T[j], pos, 0) · 0xb6605(T[j], j) · 수 −1 · 저장
+ * 못 찾으면 0x1f24c(mgr, 2)
+ * ```
+ * 명전 삭제 `0x221dc` 와 같은 꼴이다(투수는 칸 번호 정리가 없다). 첫 하나만 뺀다. 없으면 같은 객체.
+ */
+export function removeCareerPlayerFromRoster(roster: SeasonTeamRoster, isPitcher: boolean): SeasonTeamRoster {
+  const players = isPitcher ? roster.pitchers : roster.batters
+  const found = players.findIndex((player) => (player.kindByte & PLAYER_OWN_BIT) !== 0)
+  if (found < 0) return roster
+  const next = players.slice(0, -1)
+  const last = players[players.length - 1]
+  if (found < next.length) {
+    next[found] = isPitcher
+      ? last
+      : withSlot({ ...last, fieldPosition: players[found].fieldPosition & 0xf }, found)
+  }
+  return isPitcher ? { ...roster, pitchers: next } : { ...roster, batters: next }
+}
+
+/**
+ * 모드 초기화 나리 칸의 막기 조건 앞쪽 — `0xb5054(내 시즌 팀, 쪽)`: 타자편이면 타자 쪽, 투수편이면 투수 쪽에 나리 선수(+0xa bit7)가
+ * 있는가. 시즌 저장이 없으면(`roster` null) 거짓.
+ */
+export function hasCareerPlayerInSeasonTeam(roster: SeasonTeamRoster | null, isPitcher: boolean): boolean {
+  if (roster === null) return false
+  return hasRecruitedCareerPlayer(isPitcher ? roster.pitchers : roster.batters)
+}
+
+/**
  * 명전 칸 삭제·선물 막기 (스페셜 하위 27 의 0x2ac00 하위 1, R11 3-1):
  * `0xb50ad(내 팀, 타자?1:0, 칸)` — 그 명전 기록 번호가 내 팀 명단에 있고 — && 전역기록 `+0x4e`(시즌모드 경기 진행 중) ≠ 0.
  * 시즌 저장이 없으면(`roster` null) 명단에 있을 수 없다.

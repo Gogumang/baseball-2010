@@ -2027,3 +2027,33 @@ describe('시즌 경기 중간 저장 — 전역기록 +0x4e 와 모드 2 블록
     expect(result.current.isGameInProgress).toBe(false)
   })
 })
+
+describe('모드 초기화 — 0x224ec(mgr, 2) 시즌 · 0x223a8 나리 선수 빼기', () => {
+  it('시즌 초기화는 시즌 저장(+0x42)과 +0x4e 를 지우고 다음 진입은 팀 고르기다', () => {
+    const store = 메모리저장()
+    const { result } = 띄우기(store)
+    act(() => result.current.actions.chooseTeam(0))
+    act(() => result.current.actions.resetSeason())
+
+    expect(result.current.state).toBeNull()
+    expect(result.current.isGameInProgress).toBe(false)
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.팀고르기)
+    expect(renderHook(() => useSeasonSession(store, createSeededRandom(1))).result.current.state).toBeNull()
+  })
+
+  it('나리 초기화는 내 시즌 팀에서 그 편 첫 나리 선수를 빼고 저장한다', () => {
+    const store = 메모리저장()
+    const { result } = 띄우기(store)
+    act(() => result.current.actions.chooseTeam(0))
+    const { roster } = result.current
+    const 나리투수 = { id: 0xfe, kindByte: 0x80, fieldPosition: 0, stamina: 10_000 }
+    act(() => result.current.actions.updateRoster({ ...roster, pitchers: [...roster.pitchers, 나리투수] }))
+
+    act(() => result.current.actions.removeCareerPlayer(false))
+    expect(result.current.roster.pitchers).toHaveLength(roster.pitchers.length + 1)
+
+    act(() => result.current.actions.removeCareerPlayer(true))
+    expect(result.current.roster.pitchers).toHaveLength(roster.pitchers.length)
+    expect((store.load() as { roster: { pitchers: unknown[] } }).roster.pitchers).toHaveLength(roster.pitchers.length)
+  })
+})

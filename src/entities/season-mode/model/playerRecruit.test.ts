@@ -3,6 +3,7 @@ import {
   PLAYER_KIND,
   PLAYER_OWN_BIT,
   RECRUIT_PITCHER_STAMINA,
+  hasCareerPlayerInSeasonTeam,
   hasRecruitedCareerPlayer,
   hasRecruitedHallOfFamePlayer,
   insertBatter,
@@ -15,6 +16,7 @@ import {
   recruitPlayer,
   recruitSourceOf,
   recruitsPitcher,
+  removeCareerPlayerFromRoster,
   removeHallOfFamerFromRoster,
   slotOf,
   withSlot,
@@ -216,6 +218,45 @@ describe('명전 칸 삭제의 시즌 명단 정리 — 0x221dc · 0xb6348', () 
     expect(isHallOfFameDeleteBlocked(roster, 0xb4, true, false)).toBe(false)
     expect(isHallOfFameDeleteBlocked(roster, 0xb5, true, true)).toBe(false)
     expect(isHallOfFameDeleteBlocked(null, 0xb4, true, true)).toBe(false)
+  })
+})
+
+describe('나만의리그 초기화의 시즌 명단 정리 — 0x223a8 · 0xb6388 · 막기 앞쪽 0xb5054', () => {
+  const 나리타자 = (slot: number, position: number): SeasonPlayer =>
+    ({ id: 0xfe, kindByte: PLAYER_OWN_BIT | PLAYER_KIND.일반타자 | slot, fieldPosition: position, stamina: 0 })
+
+  it('타자편: 첫 나리 타자 자리로 맨 끝 선수가 와서 수비 위치·칸 번호를 이어받는다', () => {
+    const roster: SeasonTeamRoster = { pitchers: [나리투수], batters: [타자(1, 0, 2), 나리타자(1, 6), 타자(3, 2, 7), 타자(4, 3, 0)] }
+
+    const next = removeCareerPlayerFromRoster(roster, false)
+
+    expect(next.batters.map((player) => player.id)).toEqual([1, 4, 3])
+    expect(next.batters[1].fieldPosition).toBe(6)
+    expect(slotOf(next.batters[1])).toBe(1)
+    // 투수 쪽은 건드리지 않는다
+    expect(next.pitchers).toBe(roster.pitchers)
+  })
+
+  it('투수편: 맨 끝 투수가 옮겨 오고 칸 번호는 고치지 않는다', () => {
+    const roster: SeasonTeamRoster = { pitchers: [투수(2, 0), 나리투수, 투수(3, 2)], batters: [] }
+
+    const next = removeCareerPlayerFromRoster(roster, true)
+
+    expect(next.pitchers.map((player) => player.id)).toEqual([2, 3])
+    expect(slotOf(next.pitchers[1])).toBe(2)
+  })
+
+  it('그 쪽에 나리 선수가 없으면 같은 객체', () => {
+    const roster = 로스터()
+    expect(removeCareerPlayerFromRoster(roster, true)).toBe(roster)
+    expect(removeCareerPlayerFromRoster(roster, false)).toBe(roster)
+  })
+
+  it('0xb5054 — 타자편은 타자 쪽, 투수편은 투수 쪽만 본다. 시즌 저장이 없으면 거짓', () => {
+    const roster: SeasonTeamRoster = { pitchers: [나리투수], batters: [타자(1, 0, 2)] }
+    expect(hasCareerPlayerInSeasonTeam(roster, true)).toBe(true)
+    expect(hasCareerPlayerInSeasonTeam(roster, false)).toBe(false)
+    expect(hasCareerPlayerInSeasonTeam(null, true)).toBe(false)
   })
 })
 

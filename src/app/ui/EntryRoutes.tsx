@@ -27,6 +27,7 @@ import { TeamSelectScreen } from '@/pages/create-player/ui/TeamSelectScreen'
 import { HelpScreen } from '@/pages/help/ui/HelpScreen'
 import { SpecialEditScreen } from '@/pages/special-edit/ui/SpecialEditScreen'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
+import type { CareerResetEdition } from '@/entities/settings/model/modeReset'
 
 interface EntryRoutesProps {
   readonly screen: Screen
@@ -57,6 +58,15 @@ interface EntryRoutesProps {
   /** 환경설정 → 모드 초기화 → 에디트 초기화 0x204c1 (이름표 memset) — 앱의 에디트 이름표 고리 */
   readonly onResetEditedNames?: () => void
   /**
+   * 환경설정 → 모드 초기화 나리 칸 — 고르기 창 답 → 0x224ec(mgr, 타자편 4 / 투수편 3). 앱이 그 편 저장·+0x4c+m 을 지우고
+   * 시즌 내 팀에서 그 편 나리 선수를 뺀다(0x223a8). 안 넘기면 타자편·투수편 모두 타자편 저장 지우기(예전 동작).
+   */
+  readonly onResetCareerEdition?: (edition: CareerResetEdition) => void
+  /** 같은 칸의 시즌 중 막기 — `0xb5054(내 시즌 팀, 편) && +0x4e` 면 그 글([212] / 투수편 [213]) */
+  readonly careerResetBlockOf?: (edition: CareerResetEdition) => string | null
+  /** 시즌모드 초기화 0x224ec(mgr, 2) */
+  readonly onResetSeason?: () => void
+  /**
    * 일반모드 진입 창 [13](하위 12 0x296f0)에서 새로하기(상태 18) · 빠른실행(this+0x14c = 1 → 상태 22)을 골랐다.
    * 앱이 빠른실행 여부를 일반모드 화면에 넘긴다. 안 넘기면 새로하기처럼 들어간다.
    */
@@ -84,7 +94,7 @@ const HOME_RUN_DERBY_MODE = 7
 /** 커리어가 아직 없을 때의 화면 — 타이틀 → 메인 메뉴(도움말) → 선수 등록. */
 export function EntryRoutes({
   screen, setScreen, session, gameSettings, collection, random, wallet, aceSelect, hallOfFameDeletion, claimCollectionReward,
-  onRenamePlayer, onResetEditedNames, onStartGeneralMode,
+  onRenamePlayer, onResetEditedNames, onResetCareerEdition, careerResetBlockOf, onResetSeason, onStartGeneralMode,
   isGeneralGameInProgress = false, lastPlayedMode = 1, onLastPlayedMode, onResumeGeneralGame,
   nariGameReady, onResumeNariGame,
 }: EntryRoutesProps) {
@@ -154,8 +164,10 @@ export function EntryRoutes({
         settings={gameSettings.settings}
         hasSavedCareer={session.savedCareer !== null}
         onChange={gameSettings.setSettings}
-        onResetCareer={session.actions.resetCareer}
+        onResetCareer={onResetCareerEdition ?? (() => session.actions.resetCareer())}
         {...(onResetEditedNames === undefined ? {} : { onResetEditedNames })}
+        {...(careerResetBlockOf === undefined ? {} : { careerResetBlockOf })}
+        {...(onResetSeason === undefined ? {} : { onResetSeason })}
         mainMenu={{ gamePoint: wallet.balance }}
         onBack={() => setScreen({ kind: '메인메뉴' })}
       />

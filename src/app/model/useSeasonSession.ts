@@ -71,7 +71,9 @@ import {
   unrotatedPitchersOf,
 } from '@/entities/season-mode/model/seasonEntry'
 import type { SeasonEntryInput, SeasonEntryLists, SeasonEntryRecordSource } from '@/entities/season-mode/model/seasonEntry'
-import { HALL_OF_FAME_FIRST_ID, removeHallOfFamerFromRoster, tableTeamOf } from '@/entities/season-mode/model/playerRecruit'
+import {
+  HALL_OF_FAME_FIRST_ID, removeCareerPlayerFromRoster, removeHallOfFamerFromRoster, tableTeamOf,
+} from '@/entities/season-mode/model/playerRecruit'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
 import { KOREA_TEAM_ID, createNationalCup, nationalCupSideOf } from '@/entities/national-cup/model/nationalCup'
@@ -271,6 +273,16 @@ export interface SeasonActions {
    * `removeHallOfFamerFromRoster`). 시즌 저장이 없으면 아무것도 안 한다.
    */
   readonly removeHallOfFamer: (id: number, isPitcher: boolean) => void
+  /**
+   * 나만의리그 초기화가 시즌 내 팀에서 그 편 나리 선수를 뺀다 — 0x224ec 칸 3 → `0x223a8(mgr, 1)`(투수) · 칸 4 → `(mgr, 0)`(타자)
+   * (`removeCareerPlayerFromRoster`). 시즌 저장이 없으면 아무것도 안 한다.
+   */
+  readonly removeCareerPlayer: (isPitcher: boolean) => void
+  /**
+   * 시즌모드 초기화 — 모드 저장 지우기 `0x224ec(mgr, 2)`: game_s.sav 를 지우고 전역기록 +0x42(시즌 커리어 있음) ·
+   * +0x4e(경기 중간 저장)를 0 으로. 다음 시즌모드 진입은 팀 고르기다.
+   */
+  readonly resetSeason: () => void
   /** 트레이드 한 번이 끝났다 (0xe7) — 커맨드 표시·명단·G 를 **한 번에** 적어 넣는다 */
   readonly finishTrade: (settlement: TradeSettlement) => void
   readonly playNextGame: () => void
@@ -836,6 +848,8 @@ const HOSPITAL_PLACE = SEASON_OUTING_PLACES.indexOf('병원')
  */
 function normalizeSeasonSave(saved: Partial<SeasonSave> | null): SeasonSave | null {
   if (saved === null || saved === undefined || typeof saved !== 'object') return null
+  // 시즌 초기화(`resetSeason` — game_s.sav 지움)가 남긴 빈 덩어리 — 저장소에 clear 가 없어 {} 를 덮어쓴다
+  if (saved.state === undefined) return null
   const state = normalizeSeasonState(saved.state)
   const roster = saved.roster === undefined
     ? rosterOf(state.record.teamId)
@@ -1251,6 +1265,33 @@ export function useSeasonSession(
     },
     [commit, save],
   )
+
+  const removeCareerPlayer = useCallback(
+    (isPitcher: boolean) => {
+      const current = latestSave.current
+      if (current === null) return
+      const roster = removeCareerPlayerFromRoster(current.roster, isPitcher)
+      if (roster !== current.roster) commit({ ...current, roster })
+    },
+    [commit],
+  )
+
+  /**
+   * 0x224ec(mgr, 2) — 시즌 파일 지움(+0x42 = 0) · +0x4e = 0. 웹 시즌 저장 한 칸이 곧 그 파일이고 +0x4e 도 그 안에 있다.
+   * ⚠️ 같은 함수가 지우는 전역기록 +0x48 · +0x49 · +0x54/+0x55(대전) · +0xf8~+0x117 · +0x138 · +8 은 웹에 짝지은 칸이 없어
+   * 안 지운다(미해결). 경기진행 설정(+0x12c+1)·창 본 표시(+0x11e)는 이 함수가 안 건드리는 전역 칸인데 웹은 시즌 저장에
+   * 두었으므로 함께 사라진다(근사).
+   */
+  const resetSeason = useCallback(() => {
+    latestSave.current = null
+    setSave(null)
+    store.save({})
+    setGameOptions(null)
+    setResumeGame(null)
+    setPendingGame(null)
+    setEntryEdit(null)
+    setScene(SEASON_SCENE_STATE.팀고르기)
+  }, [store])
 
   /**
    * 트레이드 진행 결과 (0xe7 — `docs/re/J-modes-rules.md` 4-4).
@@ -2402,7 +2443,7 @@ export function useSeasonSession(
     menuCursors,
     notice,
     actions: {
-      chooseTeam, goto, updateRecord, updateRoster, removeHallOfFamer, finishTrade, playNextGame,
+      chooseTeam, goto, updateRecord, updateRoster, removeHallOfFamer, removeCareerPlayer, resetSeason, finishTrade, playNextGame,
       openNextGame, confirmNextGame, cancelNextGame, confirmIncome, confirmDayResults,
       answerTradeRequest, cancelTradeRequest, closeTradeResult, moveMenuCursor,
       choosePreGameAce: choosePreGameAceAction, cancelPreGameAce: cancelPreGameAceAction,
