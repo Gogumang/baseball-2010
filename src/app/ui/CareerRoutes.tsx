@@ -42,6 +42,8 @@ interface CareerRoutesProps {
     /** 칸 0 나리 투수 — 투수편 저장이 있으면 (0x5eb8c 의 g+0x43 · 0x1fbd0) */
     readonly nariPitcher: HallOfFameNariPlayer | null
     readonly register: (career: PlayerCareer, slot: number | null) => HallOfFameResult['kind']
+    /** 전역 G(`mgr+0x64`) — 등록 목록(상태 145) 머리띠 0x54d95 가 그린다 */
+    readonly gamePoint?: number
   }
   readonly onAceMatch: AceMatchStarter
   /** 경기 중 메뉴 "설정" 칸이 열 환경설정 — 안 넘기면 그 칸이 잠긴다 */
@@ -247,6 +249,7 @@ export function CareerRoutes({
               타자: nariBatterOf(career),
             },
             onRegister: (slot) => hallOfFame.register(career, slot),
+            ...(hallOfFame.gamePoint === undefined ? {} : { gamePoint: hallOfFame.gamePoint }),
           }}
           onContinue={actions.continueAfterEnding}
           onFinish={actions.finishEnding} />

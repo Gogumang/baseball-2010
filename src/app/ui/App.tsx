@@ -387,6 +387,8 @@ export function App() {
           collection: collection.collection,
           nariBatter: nariBatterOf(careerSession.career ?? careerSession.savedCareer),
           register: (target, slot) => collection.registerPitcher(target, wallet, slot),
+          // 등록 목록(상태 145) 머리띠 0x54d95(skin, 9 "나만의리그 투수편", 5) 가 전역 G 를 그린다
+          gamePoint: wallet.balance,
         }}
         onExit={() => setScreen({ kind: '메인메뉴' })}
         // 마선수 대결 (SYS 8 → 투수 미션 team − 1) — 미션 세션이 투수편 내 투수(`pitcherMissionPitcher`)로 던지고
@@ -429,6 +431,8 @@ export function App() {
         collection: collection.collection,
         nariPitcher: nariPitcherOf(pitcherSession.career),
         register: (target, slot) => collection.register(target, wallet, slot),
+        // 등록 목록(상태 145) 머리띠 0x54d95(skin, 8 "나만의리그 타자편", 5) 가 전역 G 를 그린다
+        gamePoint: wallet.balance,
       }}
       onAceMatch={startAceMatch}
       gameSettings={gameSettings}

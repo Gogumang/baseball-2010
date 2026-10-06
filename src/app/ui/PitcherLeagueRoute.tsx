@@ -40,6 +40,8 @@ interface PitcherLeagueRouteProps {
     readonly collection: Collection
     readonly nariBatter: HallOfFameNariPlayer | null
     readonly register: (career: PitcherCareer, slot: number | null) => HallOfFameResult['kind']
+    /** 전역 G(`mgr+0x64`) — 등록 목록(상태 145) 머리띠 0x54d95 가 그린다 */
+    readonly gamePoint?: number
   }
   /**
    * 마선수 대결 화면 — 투수 미션 레코드(team − 1)를 사람이 던지는 미션 장면(모드 5). 끝나면 `onFinish(이겼나)`.
@@ -205,6 +207,7 @@ export function PitcherLeagueRoute({
           edition: '투수',
           nari: { 투수: nariPitcherOf(career), 타자: hallOfFame?.nariBatter ?? null },
           onRegister: (slot) => hallOfFame?.register(career, slot) ?? '빈칸없음',
+          ...(hallOfFame?.gamePoint === undefined ? {} : { gamePoint: hallOfFame.gamePoint }),
         }}
         onContinue={actions.continueAfterEnding}
         onFinish={() => {

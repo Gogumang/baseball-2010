@@ -256,3 +256,46 @@ describe('엔딩 흐름', () => {
     expect(onFinish).toHaveBeenCalled()
   })
 })
+
+describe('명예의 전당 등록 목록(상태 145) 머리띠 — 0x15d54 → 0x7f4ec, 칸은 0x16928 기본 갈래가 세운다', () => {
+  const 그림들 = (container: HTMLElement) => [...container.querySelectorAll('img')].map((img) => img.getAttribute('src') ?? '')
+  const 등록목록까지 = () => {
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+  }
+  const 명전 = (edition: '타자' | '투수', gamePoint?: number) => ({
+    collection: EMPTY_COLLECTION,
+    edition,
+    nari: { 투수: null, 타자: { name: '홍길동', equippedAbility: [500, 500, 500, 500] as const } },
+    onRegister: vi.fn(() => '등록' as const),
+    ...(gamePoint === undefined ? {} : { gamePoint }),
+  })
+
+  it('타자편([this+0xcc] == 4)은 제목 8 "나만의리그"(game_frame 9) + "타자편"(10) + G포인트', () => {
+    const { container } = 띄우기({ bonusGamePoint: 0, hallOfFame: 명전('타자', 42) })
+    등록목록까지()
+
+    const srcs = 그림들(container)
+    expect(srcs).toContain('./sprites/game_frame/009.png')
+    expect(srcs).toContain('./sprites/game_frame/010.png')
+    expect(srcs).not.toContain('./sprites/game_frame/003.png')
+    expect(srcs).toContain('./sprites/gpoint/004.png')
+    expect(srcs).toContain('./sprites/gpoint/002.png')
+  })
+
+  it('투수편(모드 3)은 제목 9 — 부제가 "투수편"(game_frame 11)', () => {
+    const { container } = 띄우기({ bonusGamePoint: 0, hallOfFame: 명전('투수', 0) })
+    등록목록까지()
+
+    const srcs = 그림들(container)
+    expect(srcs).toContain('./sprites/game_frame/009.png')
+    expect(srcs).toContain('./sprites/game_frame/011.png')
+  })
+
+  it('G 를 안 넘기면 예전 띠(제목 0, G 없음)', () => {
+    const { container } = 띄우기({ bonusGamePoint: 0, hallOfFame: 명전('타자') })
+    등록목록까지()
+    expect(그림들(container).filter((src) => src.startsWith('./sprites/gpoint/'))).toHaveLength(0)
+  })
+})

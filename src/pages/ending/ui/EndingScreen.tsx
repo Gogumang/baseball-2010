@@ -40,6 +40,14 @@ interface EndingScreenProps {
     readonly edition: HallOfFameSide
     readonly nari: { readonly 투수: HallOfFameNariPlayer | null; readonly 타자: HallOfFameNariPlayer | null }
     readonly onRegister: (slot: number | null) => HallOfFameResult['kind']
+    /**
+     * 전역 G(`mgr+0x64`) — 상태 145 그리기 0x15d54 는 목록 0x63b15(…, 6, 1, [this+0x2c], −1) 뒤에 머리띠 객체
+     * 0x7f4ec([this+0xe0]) = `0x54d95(skin, 제목, 바닥)` 을 부르고, 그 칸은 매 틱 0x16a34 → 0x16928 이 세운다:
+     * 상태 0x76·0x6d·0x65·0x80 이 아니면 기본 갈래 0x169ea 로 `0x7f53c(hdr, [this+0xcc] == 4 ? 8 : 9, 5, 0)` —
+     * 타자편(모드 4)은 제목 8 "나만의리그 + 타자편", 투수편(모드 3)은 9 "… + 투수편", 바닥 5 = 되돌아가기만.
+     * 제목이 −1 이 아니라 G포인트도 그린다(0x550dc). 넘기면 그 머리띠를, 안 넘기면 예전 띠(제목 0, G 없음)를 그린다.
+     */
+    readonly gamePoint?: number
   }
   /** 5000 G포인트로 이어하기. 모자라면 false */
   readonly onContinue: () => boolean
@@ -135,6 +143,12 @@ export function EndingScreen(props: EndingScreenProps) {
           onLater: onFinish,
         }}
         onBack={onFinish}
+        {...(hallOfFame.gamePoint === undefined ? {} : {
+          frame: {
+            title: hallOfFame.edition === '타자' ? '나만의리그타자편' : '나만의리그투수편',
+            gamePoint: hallOfFame.gamePoint,
+          },
+        })}
       />
     )
   }
