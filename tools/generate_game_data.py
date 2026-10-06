@@ -1116,6 +1116,39 @@ def generate_events() -> None:
     ]
     write('eventMeta.ts', '\n'.join(meta) + '\n')
 
+
+def generate_season_events() -> None:
+    """
+    시즌모드(장면 0x105)가 쓰는 s_event.zt1 — r_event 와 **같은 형식**이라(P4 2a) 같은 해석으로 옮긴다.
+    알림(system 0)의 글은 s_event_txt 에서 찾는다. 대상(+4) 4 = 시즌 자동 발동, 0 = 코드·선택지로만 부름.
+    """
+    events = json.loads(Path('base/extracted/s_event.json').read_text(encoding='utf-8'))
+    texts = json.loads(Path('base/extracted/s_event_txt.json').read_text(encoding='utf-8'))
+    out = [
+        {
+            'id': e['id'],
+            'audience': e['enabled'],
+            'repeatable': bool(e['repeatable']),
+            'trigger': e['trigger'],
+            'requiresEvent': e['requiresEvent'],
+            'dateFrom': e['dateFrom'],
+            'dateTo': e['dateTo'],
+            'conditions': e['conditions'],
+            'commands': [_event_command(c, texts) for c in e['commands']],
+        }
+        for e in events
+    ]
+    write_json_module(
+        'seasonEvents.ts',
+        'seasonEvents.json',
+        out,
+        "/** s_event 는 대상 4(시즌 자동 발동)를 쓴다 — r_event 의 0~3 밖이라 넓혀 둔다 */\n"
+        "export type SeasonOriginalEvent = Omit<OriginalEvent, 'audience'> & { readonly audience: 0 | 4 }\n\n"
+        '/** 원본 data/s_event.zt1 시즌모드 이벤트 스크립트 30편 (r_event 와 같은 형식 — 0xadd10 해석기). 파일 차례 그대로다. */\n'
+        'export const ORIGINAL_SEASON_EVENTS: readonly SeasonOriginalEvent[] = data as readonly SeasonOriginalEvent[]',
+        imports="import type { OriginalEvent } from '@/shared/config/original/eventTypes'",
+    )
+
 PATTERN_FILE = Path('base/work/jar/data/pattern.dat')
 PATTERN_FLAG_FILE = Path('base/work/jar/data/pattern_plag.dat')
 # pattern.dat 은 앞 9바이트 뒤(파일 +9)부터, pattern_plag.dat 은 파일 처음부터 같은 구조다:
@@ -1801,6 +1834,7 @@ def main() -> None:
     generate_missions()
     generate_pitch_types()
     generate_events()
+    generate_season_events()
     generate_batted_ball_patterns()
     generate_pitch_curves()
     generate_trigonometry_tables()
