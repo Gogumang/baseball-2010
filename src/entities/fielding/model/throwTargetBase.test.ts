@@ -103,25 +103,27 @@ describe('점수식 0xafb24 — 후보표와 최종 점수 (0아웃 = 점수식)
   it('후보표: 주자 도착 틱은 "그 주자가 달려가는 루(+0x7c)" 칸에 들어간다 (0xafbae)', () => {
     // 타자주자 → 1루 칸, 홈으로 가는 3루 주자(+0x7c = 4) → 4 & 3 = 홈 칸
     expect(결과.candidates.map((candidate) => candidate.runTick)).toEqual([23, 23, NONE, NONE])
-    expect(결과.candidates.map((candidate) => candidate.defTick)).toEqual([16, 12, 9, 7])
+    // 수비 틱은 송구 틱 0xa1adc(포물선, throwPlan.throwTicksTo) 기준
+    expect(결과.candidates.map((candidate) => candidate.defTick)).toEqual([13, 10, 9, 7])
     // forced(vt0x80)도 +0x7c 칸에 — 타자주자(늘 1)의 1루만 선다
     expect(결과.candidates.map((candidate) => candidate.forced)).toEqual([false, true, false, false])
   })
 
   it('여유 = 주자 틱 − 수비 틱, 확실한 아웃 후보(포스 = 타자주자의 1루)에만 적힌다', () => {
-    expect(결과.margins).toEqual([NONE, 11, NONE, NONE])
+    expect(결과.margins).toEqual([NONE, 13, NONE, NONE])
   })
 
   it('루 기본 점수는 표 0xd85ac 대로 홈이 가장 크다', () => {
     expect(BASE_SCORE).toEqual([4000, 1000, 2000, 3000])
   })
 
-  it('불확실한 홈 보너스 1000000 — 0아웃의 점수식은 밀리지 않는 3루 주자라도 홈을 고른다', () => {
+  it('불확실한 홈 보너스 1000000 은 둘째 루 항에도 붙는다 — 1루로 잡고 홈까지 되던질 여유가 있으면 1루가 이긴다', () => {
     // 홈 = 4000 + 1000000(A) + 2×10000 + 500(B) = 1024500 — 둘째 루 항은 확실(effective)한 첫 루에만 붙는다
-    // 1루 = 1000(A) + 2×(100011 + 5001(밖·1루) + 10000(달리는 중)) + 500(B) = 231524
+    // 1루 = 1000 + (4000 + 1000000)(A: 둘째 루 홈 항) + 2×(100013 + 5001(밖·1루) + 10000(달리는 중))
+    //      + 10000(둘째 루 홈, 불확실) + 500(B) = 1245528 — 1루 → 홈 되던지기(0xa1adc)가 3루 주자보다 빠르다
     // 후보가 없는 루도 바닥값 500 은 받는다 (`+500`)
-    expect(결과.topScores).toEqual([1_024_500, 231_524, 500, 500])
-    expect(결과.chosen).toBe(0)
+    expect(결과.topScores).toEqual([1_024_500, 1_245_528, 500, 500])
+    expect(결과.chosen).toBe(1)
   })
 
   it('아웃 0~1 에서는 점수식, 2 이상(인자 + 유효 > 2)에서는 "여유 최대" 규칙으로 바뀐다', () => {
@@ -157,7 +159,7 @@ describe('도루 주자 — 떠난 루가 아니라 달려가는 루로 던진�
       ),
     )
     expect(결과.candidates.map((candidate) => candidate.runTick)).toEqual([NONE, NONE, 23, NONE])
-    expect(결과.margins).toEqual([NONE, NONE, 8, NONE])
+    expect(결과.margins).toEqual([NONE, NONE, 11, NONE])
     expect(결과.chosen).toBe(2)
   })
 })

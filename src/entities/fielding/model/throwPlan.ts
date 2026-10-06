@@ -6,6 +6,8 @@ import {
   type WorldPoint,
 } from '@/entities/fielding/model/fieldGeometry'
 import { AI_STATE, NONE, type FielderState } from '@/entities/fielding/model/fieldingState'
+import { SINE_HUNDRED_TABLE } from '@/shared/config/original/trigonometryTables'
+import { atan2Degrees, cosineSixteen, sineSixteen } from '@/shared/lib/math/originalTrigonometry'
 
 /**
  * 송구 계획 0xb3444 (플레이 vt 0x8c) 와 송구 도착 틱 (야수 vt 0xbc = 0xa1adc).
@@ -18,10 +20,21 @@ export const INFIELD_READY_TICKS = 3
 export const OUTFIELD_READY_TICKS = 6
 /** cfg+0x42 = 17000 — 중계 문턱 (파일 0x3e, 미정렬 u32 로 읽어도 17000) */
 export const RELAY_DISTANCE = 17_000
-/** cfg+0x1c = 70 — 내야 송구 속도 계수(%) */
+/** cfg+0x1c = 70 — 내야(칸 ≤ 5) 송구 공 **중력** 배율(%) — 0xa1adc · 0xa16f4 가 공+0x44 에 곱한다 */
 export const THROW_COEFFICIENT_INFIELD = 70
-/** cfg+0x1e = 80 — 외야 송구 속도 계수(%) */
+/** cfg+0x1e = 80 — 외야 송구 공 중력 배율(%) */
 export const THROW_COEFFICIENT_OUTFIELD = 80
+/**
+ * 공 중력 공+0x44 = **90**. 공 생성 0xa267c 가 `0xbef18(공, 0x5a)` 로 넣고, 화면 초기화 0x3edd0 이
+ * `[장면+0x19cc]`(0xb08e8 = data/pattern.dat 적재본)+4 바이트[4] 로 다시 넣는데 그 파일 바이트 4 도 0x5a 다.
+ * 송구 0xa1620 은 0xa279c 로 잠깐 배율을 곱했다가 궤적을 다 만든 0xa2a88 끝(a2b24)에서 되돌린다 —
+ * 그래서 0xa1adc 가 읽을 때는 늘 90 이다.
+ */
+const BALL_GRAVITY = 90
+/** 0xa1adc 가 수평 속도 0 일 때 돌려주는 값 (a1b7e) */
+const NEVER_ARRIVES = 0x7fffffff
+/** 0xbfab0 역사인 표(0xd8de0, sin×100 0~90°)의 마지막 칸 */
+const LAST_ARCSINE_INDEX = 90
 /** 직접 송구에 "특수" 표시가 붙는 문턱 (0xb3444 의 `[1] = 외야수 && 특수 && 송구틱 > 17`) */
 const SPECIAL_THROW_TICKS = 17
 /** 중계맨 후보 = 내야 칸 2~5 */
@@ -30,23 +43,71 @@ const RELAY_SLOTS = [2, 3, 4, 5] as const
 const RELAY_FALLBACK_SHORTSTOP = 5
 const RELAY_FALLBACK_SECOND = 3
 
-/** 송구 유효 속도 = 송구 공 속도 × (내야 70 / 외야 80) ÷ 100 (0xa1adc, S8 2-3) */
+/**
+ * 송구 공 속도 × (내야 70 / 외야 80) ÷ 100 — **악송구 도착 틱 근사에만 쓴다**.
+ * ⚠️ 원본의 70/80 % 는 속도가 아니라 공 **중력**에 곱하는 배율이다(0xa1adc · 0xa16f4, `throwTicksTo`).
+ * 악송구 속도 보정(0xa1828 의 rand(−50,51))도 +0xdc 에 더해진다 — 이 값으로 비율을 잡는 것은 근사다.
+ */
 export function effectiveThrowSpeedOf(fielder: FielderState): number {
   const coefficient = isOutfieldSlot(fielder.slot) ? THROW_COEFFICIENT_OUTFIELD : THROW_COEFFICIENT_INFIELD
   return Math.trunc((fielder.throwSpeed * coefficient) / 100)
 }
 
+/** 0xbfab0 — sin×100 표(0xd8de0) 이진 탐색. lo 0 · hi 90 에서 가운데가 두 번 같으면 멈춘다. 음수는 −asin(−x) */
+function arcsineDegrees(value: number): number {
+  if (value < 0) return -arcsineDegrees(-value)
+  let low = 0
+  let high = LAST_ARCSINE_INDEX
+  let previous = -1
+  for (;;) {
+    const middle = (low + high) >> 1
+    if (middle === previous) return middle
+    previous = middle
+    if (value < SINE_HUNDRED_TABLE[middle]) high = middle
+    else low = middle
+  }
+}
+
 /**
- * 송구가 어떤 점에 닿는 틱 — 야수 vt 0xbc = 0xa1adc (야수 vt 0xb8 이 점을, vt 0xb4 가 다른 캐릭터를 받는다).
- *
- * **근사**: 원본은 거리와 속도로 asin/cos 표(0xbfab0·0x6c7f4)를 써 포물선을 만든 뒤 그 길이를 센다.
- * 그 탄도 계산은 타구 궤적과 같은 물리 루프라 아직 안 풀었다 — 여기서는 "거리 ÷ 유효 속도" 로 둔다.
- * (거리 20400 을 넘으면 원바운드가 되는 것도 그쪽 몫이다 — `BOUNCE_THROW_DISTANCE`)
+ * 송구가 어떤 점에 닿는 틱 — 야수 vt 0xbc = **0xa1adc** (야수 vt 0xb8 = 0xa1a98 이 제 위치 +0x20 과 점을,
+ * vt 0xb4 = 0xa1a60 이 상대의 +0x20 을 넘긴다). 궤적 물리 루프(0xb401c)가 아니라 정수 산술과 표뿐이다 (직접 뜬 것):
+ * ```
+ * a1aea  g = [야수+0xd0](공)+0x44 = 90 ; c = 칸(+0x88) ≤ 5 ? cfg+0x1c(70) : cfg+0x1e(80)
+ * a1b10  g' = c·g / 100                                     ; 63 · 72
+ * a1b40  d = 0xbf9f0(위치, 점) = isqrt(dx² + dz²) ; d == 0 → 0
+ * a1b4c  s = d·g'·100 / v²      (v = 야수+0xdc 송구 속도)   ; sin(2θ)×100
+ * a1b66  θ = 0xbfab0(s) >> 1                                ; 표 0xd8de0 역사인
+ * a1b74  h = (v · cos16(θ)) >> 16 ; h == 0 → 0x7fffffff     ; 수평 속도
+ * a1b8a  방향 φ: dx == 0 → dz > 0 ? 90 : −90, 아니면 0x6c71c(|dz·10000/dx|) 를 사분면에 붙인다
+ * a1bd8  |dx| > |dz| → ⌈|dx| / |h·cos16(φ) >> 16|⌉ , 아니면 ⌈|dz| / |h·sin16(φ) >> 16|⌉   (0x6c5d8 = 올림 나눗셈)
+ * ```
+ * 곧 **70/80 % 는 속도가 아니라 중력 배율**이고, 공은 수평 속도 v·cosθ 로 큰 축을 따라 한 틱씩 간다
+ * (공 틱 0xa28c0 의 `x += cos·속도 >> 16` 과 같은 걸음). 송구 0xa1620 도 같은 식으로 쏜다.
+ * ⚠️ 원본 그대로: v 는 +0xdc **지난 송구의 속도**다 — 0xa1620 이 송구마다 특수면 +0xd8(130%), 아니면 +0xd4 로
+ * 덮어쓴다(a16ec). 웹 야수는 판마다 새로 만들어 늘 +0xd4 다(특수 송구 뒤 남는 130% 는 안 옮겼다).
+ * (거리 20400 을 넘으면 원바운드가 되는 것은 0xa1620 쪽이다 — `BOUNCE_THROW_DISTANCE`)
  */
 export function throwTicksTo(fielder: FielderState, point: WorldPoint): number {
-  const speed = effectiveThrowSpeedOf(fielder)
+  const from = fielder.position
+  const distance = horizontalDistance(from, point)
+  if (distance === 0) return 0
+  const speed = fielder.throwSpeed
   if (speed <= 0) return UNREACHABLE_TICKS
-  return Math.trunc(horizontalDistance(fielder.position, point) / speed)
+  const coefficient = isOutfieldSlot(fielder.slot) ? THROW_COEFFICIENT_OUTFIELD : THROW_COEFFICIENT_INFIELD
+  const gravity = Math.trunc((coefficient * BALL_GRAVITY) / 100)
+  const sineOfDouble = Math.trunc((distance * gravity * 100) / (speed * speed))
+  const elevation = arcsineDegrees(sineOfDouble) >> 1
+  const horizontalSpeed = (speed * cosineSixteen(elevation)) >> 16
+  if (horizontalSpeed === 0) return NEVER_ARRIVES
+  const dx = point.x - from.x
+  const dz = point.z - from.z
+  const direction = atan2Degrees(dx, dz)
+  const alongX = Math.abs(dx) > Math.abs(dz)
+  const axisDistance = alongX ? Math.abs(dx) : Math.abs(dz)
+  const axisSpeed = Math.abs((horizontalSpeed * (alongX ? cosineSixteen(direction) : sineSixteen(direction))) >> 16)
+  // 큰 축 성분은 cos/sin 45° 이상이라 0 이 안 된다 — 0 이면 원본은 0 으로 나눈다(지어내지 않고 도달 못 함으로 둔다)
+  if (axisSpeed === 0) return NEVER_ARRIVES
+  return Math.ceil(axisDistance / axisSpeed)
 }
 
 /** 다른 야수에게 던지는 틱 — vt 0xb4 = 0xa1a60 (상대 +0x20 위치를 vt 0xb8 에 넘긴다) */

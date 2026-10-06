@@ -43,12 +43,12 @@ describe('0xaf284 — 커버가 없을 때는 "직접 뛰기 vs 루 담당 야�
 })
 
 describe('0xaf284 — 커버가 있으면 "남은 틱 + max(송구 + 준비, 커버 도착 − 남은 틱)"', () => {
-  it('아직 안 잡은 내야 송구: 남은 6 + (송구 6 + 준비 3) = 15', () => {
+  it('아직 안 잡은 내야 송구: 남은 6 + (송구 5 + 준비 3) = 14', () => {
     const 문 = 문맥(
       { ballHolderSlot: 3, catchFielderSlot: 3, coverOfBase: [NONE, 2, NONE, NONE], catchTick: 10 },
       { currentTick: 4 },
     )
-    expect(defenseArrivalTicks(문, 1)).toBe(15)
+    expect(defenseArrivalTicks(문, 1)).toBe(14)
   })
 
   it('이미 잡았으면 준비 틱 대신 진행 중인 동작의 남은 틱(+0xc8)이 붙는다', () => {
@@ -59,17 +59,17 @@ describe('0xaf284 — 커버가 있으면 "남은 틱 + max(송구 + 준비, 커
       { ballHolderSlot: 3, catchFielderSlot: 3, coverOfBase: [NONE, 2, NONE, NONE], catchTick: 10 },
       { fielders: 야수, currentTick: 4 },
     )
-    expect(defenseArrivalTicks(문, 1)).toBe(8) // 송구 6 + 동작 2
+    expect(defenseArrivalTicks(문, 1)).toBe(7) // 송구 5 + 동작 2
   })
 
-  it('외야에서 17000 이상이면 중계가 끼고 준비 틱도 6 이 된다 — 중계 32 + 준비 6 = 38', () => {
+  it('외야에서 17000 이상이면 중계가 끼고 준비 틱도 6 이 된다 — 중계 30 + 준비 6 = 36', () => {
     const 문 = 문맥({
       ballHolderSlot: 8,
       catchFielderSlot: 8,
       coverOfBase: [1, NONE, NONE, NONE],
       catchTick: 0,
     })
-    expect(defenseArrivalTicks(문, 0)).toBe(38)
+    expect(defenseArrivalTicks(문, 0)).toBe(36)
   })
 
   it('커버 야수가 루에서 멀면 그 도착 틱이 하한이 된다', () => {

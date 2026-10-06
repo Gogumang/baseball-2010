@@ -17,7 +17,7 @@ import {
 const 야수들 = createFielders(Array.from({ length: 9 }, () => 500))
 
 describe('설정값 — d_level.dat (S7 5-2)', () => {
-  it('준비 틱 내야 3 · 외야 6, 중계 문턱 17000, 속도 계수 70 / 80', () => {
+  it('준비 틱 내야 3 · 외야 6, 중계 문턱 17000, 중력 배율 70 / 80', () => {
     expect([INFIELD_READY_TICKS, OUTFIELD_READY_TICKS]).toEqual([3, 6])
     expect(RELAY_DISTANCE).toBe(17_000)
     expect([THROW_COEFFICIENT_INFIELD, THROW_COEFFICIENT_OUTFIELD]).toEqual([70, 80])
@@ -36,7 +36,7 @@ describe('송구 계획 0xb3444', () => {
     const 계획 = planThrow({ fielders: 야수들, fromSlot: 3, finalSlot: 2, base: 1 })
     expect(계획.relayed).toBe(false)
     expect(계획.firstLegTicks).toBe(계획.totalTicks)
-    expect(계획.totalTicks).toBe(6)
+    expect(계획.totalTicks).toBe(5)
   })
 
   it('외야에서 17000 이상 떨어진 송구는 내야 중계를 끼고 +3틱 이 붙는다', () => {
@@ -44,15 +44,15 @@ describe('송구 계획 0xb3444', () => {
     expect(계획.relayed).toBe(true)
     expect(계획.toSlot).toBe(3) // 중계맨은 내야 2~5 중 두 구간 합이 최소인 칸
     expect(계획.finalSlot).toBe(1)
-    expect(계획.totalTicks).toBe(계획.firstLegTicks + 15 + INFIELD_READY_TICKS)
-    expect(계획.totalTicks).toBe(33)
+    expect(계획.totalTicks).toBe(계획.firstLegTicks + 12 + INFIELD_READY_TICKS)
+    expect(계획.totalTicks).toBe(30)
   })
 
-  it('특수(레이저) 송구면 거리가 멀어도 중계를 안 끼고, 27틱 > 17 이라 특수 표시가 선다', () => {
+  it('특수(레이저) 송구면 거리가 멀어도 중계를 안 끼고, 32틱 > 17 이라 특수 표시가 선다', () => {
     const 계획 = planThrow({ fielders: 야수들, fromSlot: 8, finalSlot: 1, base: 0, special: true })
     expect(계획.relayed).toBe(false)
     expect(계획.special).toBe(true)
-    expect(계획.totalTicks).toBe(27)
+    expect(계획.totalTicks).toBe(32)
   })
 
   it('중계맨은 "외야수→후보 목표점 + 후보→최종 목표점" 이 최소인 내야 칸 2~5 다', () => {
@@ -60,7 +60,16 @@ describe('송구 계획 0xb3444', () => {
     expect([2, 3, 4, 5]).toContain(chooseRelaySlot(야수들, 야수들[6], 야수들[1]))
   })
 
-  it('거리 ÷ 유효 속도 근사 — 중견수에서 홈까지 21705 ÷ 777 = 27틱', () => {
-    expect(throwTicksTo(야수들[8], { x: 20_000, y: 0, z: 29_705 })).toBe(27)
+  it('0xa1adc 포물선 — 중견수에서 홈까지 21705: 중력 90×80% = 72, sin2θ×100 = 165 → θ 44° → 수평 699 → 32틱', () => {
+    // s = ⌊21705·72·100 / 972²⌋ = 165 > 100 → 0xbfab0 이 89 에 멈춘다 → θ = 44, h = 972·cos16(44)>>16 = 699
+    // 방향 90°(dx = 0) → z 축 성분 699·65535>>16 = 698 → ⌈21705 / 698⌉ = 32
+    expect(throwTicksTo(야수들[8], { x: 20_000, y: 0, z: 29_705 })).toBe(32)
+  })
+
+  it('가까운 송구는 거의 수평 — 1루수까지 낮은 각도라 공 속도 그대로에 가깝다', () => {
+    // 2루수(22130, 19610) → 1루(25946, 24175): d = 5949, 내야 중력 63 → s = 39 → asin 23 → θ 11
+    // h = 972·cos16(11)>>16 = 954 → z 축(|dz| 4565 > |dx| 3816) 성분 954·sin16(50°)>>16 = 730 → ⌈4565 / 730⌉ = 7
+    expect(throwTicksTo(야수들[3], { x: 25_946, y: 0, z: 24_175 })).toBe(7)
+    expect(throwTicksTo(야수들[3], 야수들[3].position)).toBe(0)
   })
 })

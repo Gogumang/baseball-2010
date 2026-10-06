@@ -136,13 +136,14 @@ describe('협살 한 틱 0xb48b6', () => {
   })
 
   it('공이 없는 쪽은 주자 도착이 송구 도착보다 4틱 넘게 늦을 때만 쫓아가고, 그 사이면 멈춰 기다린다', () => {
-    // 2루수가 2루에 붙어 있으면 주자 16틱 > 송구 9틱 + 4 → 쫓아간다
+    // 2루수가 2루에 붙어 있으면 주자 16틱 > 송구 7틱(0xa1adc) + 4 → 쫓아간다
     const 루위 = 야수들.map((fielder, slot) =>
       slot === 3 ? { ...fielder, position: basePosition(2) } : fielder,
     )
     expect(rundownAction(틱(3, 2, { fielders: 루위 })).kind).toBe('주자추적')
-    // 제자리(2루수 시작 위치)면 주자 10틱 > 송구 6틱 이지만 +4 를 못 넘겨 대기다
-    expect(rundownAction(틱(3, 2)).kind).toBe('대기')
+    // 주자가 절반(50%)까지 왔으면 주자 11틱 > 송구 7틱 이지만 +4 를 못 넘겨 대기다
+    const 절반 = [타자주자, 사이주자(1, 50)]
+    expect(rundownAction(틱(3, 2, { fielders: 루위, runners: 절반 })).kind).toBe('대기')
   })
 
   it('주자가 코앞이면 내 루로 가서 밟는다', () => {
