@@ -42,6 +42,7 @@ import {
   BASE_DEFAULT_FIELDER,
   basePosition,
   FIELDER_COUNT,
+  FIELDER_START_POSITIONS,
   horizontalDistance,
   isSamePoint,
   progressPercent,
@@ -720,6 +721,14 @@ export interface DefensePlayState {
   tagOut: boolean
   /** 플레이+0x126 — 판 시작 vt20(b11fe)이 1, 키스톤 야수가 중계 자리를 잡으면(b22f6) 0 */
   relayFlag: boolean
+  /** 송구 계획 [4](+0x150) — 지금 계획이 중계([0] = 1)면 최종 받는 야수, 아니면 −1. 중계맨이 쥐면 b4616 이 그에게 던진다 */
+  relayFinalSlot: number
+  /** 그 중계의 목표 루 [7](+0x153) */
+  relayBase: number
+  /** +0x15c — 0xb2e38 이 송구를 미룰 때(AI 9) 적은 받을 야수 */
+  deferredThrowReceiver: number
+  /** +0x158 — 미룬 송구의 목표 루 */
+  deferredThrowBase: number
 }
 
 /**
@@ -859,6 +868,10 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     rundownOuts: 0,
     tagOut: false,
     relayFlag: true,
+    relayFinalSlot: NONE,
+    relayBase: NONE,
+    deferredThrowReceiver: NONE,
+    deferredThrowBase: NONE,
   }
 }
 
@@ -939,6 +952,10 @@ export function stepDefensePlay(
   let rundownOuts = state.rundownOuts
   let tagOut = state.tagOut
   let relayFlag = state.relayFlag
+  let relayFinalSlot = state.relayFinalSlot
+  let relayBase = state.relayBase
+  let deferredThrowReceiver = state.deferredThrowReceiver
+  let deferredThrowBase = state.deferredThrowBase
 
   const contextAt = (at: number): DefenseContext => ({
     play,
@@ -1061,31 +1078,74 @@ export function stepDefensePlay(
   }
 
   /**
-   * **공 가진 야수가 루 `base` 로 던진다** — 송구 0xb2e38 → 던지기 0xa1620. 루로 보내기 0xb2c90 의 관문은
-   * `sendToBase` 가 먼저 본다. `chooser` 는 누가 고른 루인가: '사람'(+0x160, b4660~b46a8) · 'CPU'(0xafa60 → 0xafb24).
-   * `cpuSpecial` 은 0xafa60 이 홈을 골랐을 때 굴린 20% 특수(`afad2`)다 — 굴림은 부르는 쪽이 한다.
-   *
-   * 던지면 공이 손을 떠난다(직접 뜬 것):
+   * **송구 0xb2e38**(플레이.vt5c, 인자 받을 야수 C · 특수) — 공 가진 야수가 C 에게 던진다. 던졌거나 미뤘으면(AI 9) 참.
+   * 부르는 곳은 루로 보내기 0xb2c90(`sendToBase`)과 중계 이어 던지기 b4616 둘이다. 직접 뜬 것:
    * ```
-   * b2f80: 던진 야수+0xe0 = 0                      ; 공 쥠 풀림
-   * b3070: 플레이+0x12c = 0                        ; 아무도 안 쥠
-   * b307c: 플레이.vt24(0) = 0xb12d0 포구 예보       ; +0x170(받을 야수) · +0x174(받는 틱)를 송구공으로 다시 세운다
+   * b2e44: 공가진야수.vtC4()(준비, +0xc8 ≤ 0) 가 거짓이면 0
+   * b2e6c: +0x154 = C ; +0x134 = +0x130 ; vt8c = 0xb3444 송구 계획 → +0x14c..+0x153 ([0] 중계 [1] 특수 [2] 던지는 야수
+   *        [3] 받는 야수(중계면 중계맨) [4] 최종 받는 야수 [5] 1구간 틱 [6] 전체 틱 [7] 목표 루)
+   * b2eb2: R = 야수[[3]] ; !R.vt18()(목표점에 없음) && R.vtc0() > [5] → b30a2 미루기:
+   * b30a2:   공가진야수 AI == 9 → 0 / 아니면 +0x15c = [3] · +0x158 = [7] · AI 9 · 공가진야수.vt48([7]) ; 1
+   * b2ee6: [3] ≤ 5 && [2] ≤ 5 → 플레이.vt64(0)(+0x1f4 레이저 = 0) · [1] = 0      ; 내야 → 내야는 레이저가 없다
+   * b2f06: +0x1f4 면 vtb0 = 0xa222c(레이저) 뒤 vt64(0), 아니면 vtac = 0xa1620([1]) — 공은 R 의 목표점(+0x2c)으로
+   * b2f80: 공가진야수+0xe0 = 0 ; b3070 +0x12c = 0 ; b307c vt24(0) 포구 예보 ; vt30 = 0xb1c90 ; 1
    * ```
-   * 그래서 날아가는 동안 수비 틱 예측 0xaf284 의 "잡을 야수"(+0x170)는 받을 야수이고 "남은 틱" 은 받는 틱까지다.
-   * 웹은 받는 틱을 이 진행기의 도착 틱으로 둔다(궤적 물리 0xb401c 는 해독 금지 구역).
+   * 중계([0])면 받는 야수는 중계맨이고, 그가 쥐면(쥐기 0xb2710 — 준비 틱 내야 3) 플레이 틱 b4616 이 [4] 에게 다시 0xb2e38
+   * 을 부른다(1a 절). 웹은 받는 틱을 이 진행기의 도착 틱으로 둔다(궤적 물리 0xb401c 는 해독 금지 구역):
+   * 직접 송구 = `defenseArrivalTicks` 의 커버 갈래(중계 없이) · 중계 1구간 = 중계맨 목표점까지의 송구 틱(0xa1adc)과
+   * 중계맨이 그 점에 닿는 틱 중 늦은 쪽.
    */
-  const launchThrow = (fromSlot: number, base: number, chooser: '사람' | 'CPU', cpuSpecial: boolean): void => {
-    const coverSlot = play.coverOfBase[wrapBase(base)] ?? NONE
-    // 레이저 송구 — 반짝임 창 안에 새로 누른 키가 들어왔고 공을 쥐었으면 특수 송구가 나간다 (0x400bc)
-    const laser = canFireLaser({
+  const throwBall = (
+    fromSlot: number,
+    coverSlot: number,
+    base: number,
+    chooser: ThrowChooser,
+    cpuSpecial: boolean,
+  ): boolean => {
+    const holder = fielders[fromSlot]
+    const receiverFinal = fielders[coverSlot]
+    if (holder === undefined || receiverFinal === undefined) return false
+    // vtC4 = 0xa20ec(+0xb0 == 0 && +0xb4 ≤ 0 && +0xc8 ≤ 0). 던지기 0xa1620 은 끝(a1a32)에서 야수+0xb1 = 1 을 세워
+    // +0xb0 워드를 0 이 아니게 만든다 — 던진 야수는 그 동작이 끝날 때까지 vtC4 가 거짓이라 다시 못 던진다.
+    // ⚠️ 그 잠금이 풀리는 틱(야수 갱신 a143e~a144c 의 동작 칸 +0xa8·+0xac 조건)은 다 뜨지 않았다 — 웹은 공을 안 쥔
+    //    야수는 못 던지는 것으로 본다(0xa1620 머리 a165a 도 공 칸 +0xd0 이 비면 0 을 돌려준다).
+    if (!holder.holdingBall || holder.actionRemainingTicks > 0) return false
+    // 레이저 송구 — 반짝임 창 안에 새로 누른 키가 들어왔고 공을 쥐었으면 +0x1f4 (0x400bc)
+    let laser = canFireLaser({
       isLaserConfirmed: laserConfirmed,
       hasChosenThrowTarget: play.manualThrowBase !== NONE,
       isBallHeld: true,
       isThrowerReady: true,
     })
+    const plan = planThrow({ fielders, fromSlot, finalSlot: coverSlot, base, special: laser || cpuSpecial })
+    // b2eb2~b2ee4: 받는 야수(중계면 중계맨)가 목표점에 없고 1구간 틱 안에 못 닿으면 미룬다 (AI 9)
+    const receiver = fielders[plan.toSlot]
+    if (
+      receiver !== undefined &&
+      !isSamePoint(receiver.position, receiver.target) &&
+      fielderArrivalTicks(receiver) > plan.firstLegTicks
+    ) {
+      if (holder.aiState === AI_STATE.RECEIVE) return false
+      deferredThrowReceiver = plan.toSlot
+      deferredThrowBase = plan.base
+      const point = basePosition(plan.base)
+      fielders = fielders.map((fielder) =>
+        fielder.slot === fromSlot
+          ? { ...fielder, aiState: AI_STATE.RECEIVE, target: point, targetBase: wrapBase(plan.base) }
+          : fielder,
+      )
+      log.push(
+        `${tick}틱 ${fromSlot}번 야수가 ${plan.base}루 송구를 미룬다 — ${plan.toSlot}번 야수가 늦다 (AI 9)` +
+          (chooser === 'CPU' ? ' (CPU 결정)' : ''),
+      )
+      return true
+    }
+    // b2ee6: 내야수 → 내야수 송구면 레이저 표시를 지운다
+    if (plan.toSlot <= 5 && fromSlot <= 5) laser = false
     if (laser) laserThrow = true
     // CPU 홈 송구 20% 특수 송구 — 효과는 `cpuSpecialThrowOf` 참고. 레이저는 0xb2e38 이 다른 함수로 던진다(아래)
     const special = !laser && cpuSpecial ? cpuSpecialThrowOf(fielders, fromSlot, coverSlot) : NO_CPU_SPECIAL_THROW
+    const relayed = plan.relayed && !laser && !special.special
     let error: ThrowErrorResult = NO_THROW_ERROR
     let arrivalTicks: number
     if (laser) {
@@ -1105,9 +1165,18 @@ export function stepDefensePlay(
       }
       // a16dc~a16ec: +0xdc = 특수 ? +0xd8 : +0xd4 — 던질 때 덮어쓰고 그 판 동안 남는다(`FielderState.throwSpeed`)
       fielders = fielders.map((fielder) => (fielder.slot === fromSlot ? thrownWith(fielder, special.special) : fielder))
-      arrivalTicks = special.special
-        ? specialThrowArrivalTicks(contextAt(tick), base, fielders[fromSlot])
-        : defenseArrivalTicks(contextAt(tick), base)
+      const thrower = fielders[fromSlot]
+      if (relayed) {
+        // 중계 1구간 — 공은 중계맨의 목표점(+0x2c)으로 간다 (b2f52)
+        const relay = fielders[plan.toSlot]
+        arrivalTicks = Math.max(
+          throwTicksTo(thrower, relay.target),
+          ticksToReach(relay.position, relay.target, relay.speed),
+        )
+      } else {
+        // 직접 송구 — 0xaf284 의 커버 갈래를 중계 없이 (특수면 +0xd8 속도로)
+        arrivalTicks = specialThrowArrivalTicks(contextAt(tick), base, thrower)
+      }
     }
     if (error.errant) errantThrow = true
     if (error.errant && input.random !== undefined) {
@@ -1116,33 +1185,39 @@ export function stepDefensePlay(
       // 그 큰 축 거리를 가는 틱. **근사**: 그 뒤 공 경로는 해독 금지 구역이라 "그 송구는 아무도 못 받는다" 로 본다.
       arrivalTicks = errantArrivalTicks(fielders, fromSlot, coverSlot, base, special.special, error, input.random)
     }
+    const firstReceiver = relayed ? plan.toSlot : coverSlot
     throwBase = base
     throwArrivalTick = tick + Math.max(1, arrivalTicks)
     throwFromSlot = fromSlot
     throwReleaseTick = tick
-    throwReceiverSlot = error.errant ? NONE : coverSlot
+    throwReceiverSlot = error.errant ? NONE : firstReceiver
+    // +0x14c..: 계획을 덮어쓴다 — 중계면 [0] = 1 · [4] = 최종 받는 야수 (b4616 이 본다)
+    relayFinalSlot = relayed ? coverSlot : NONE
+    relayBase = relayed ? base : NONE
     throwCount += 1
     if (firstThrowBase === NONE) {
       firstThrowBase = base
       firstThrowArrivalTick = throwArrivalTick
     }
-    // 손을 떠난다 — 준비 틱(+0xc8)도 다 썼다. 받을 야수 · 받는 틱을 다시 세운다 (b2f80 · b3070 · b307c)
+    // 손을 떠난다 — 받을 야수 · 받는 틱을 다시 세운다 (b2f80 · b3070 · b307c)
     fielders = fielders.map((fielder) =>
       fielder.slot === fromSlot ? { ...fielder, holdingBall: false, actionRemainingTicks: 0 } : fielder,
     )
     play = {
       ...play,
       held: false,
-      catchFielderSlot: coverSlot === NONE ? play.catchFielderSlot : coverSlot,
+      catchFielderSlot: firstReceiver === NONE ? play.catchFielderSlot : firstReceiver,
       catchTick: throwArrivalTick,
     }
     log.push(
       `${tick}틱 ${base}루로 ${laser ? '레이저 ' : ''}${cpuSpecial ? '특수 ' : ''}송구 — ${throwArrivalTick}틱 도착` +
+        (relayed ? ` (${plan.toSlot}번 야수 중계)` : '') +
         (special.bounce ? ' (원바운드)' : '') +
         (error.errant ? ' (악송구)' : '') +
-        (chooser === 'CPU' ? ' (CPU 결정)' : '') +
+        (chooser === 'CPU' ? ' (CPU 결정)' : chooser === '미룬' ? ' (AI 9 미룬 송구)' : chooser === '중계' ? ' (중계 이어 던지기)' : '') +
         ` (${fromSlot}번 야수)`,
     )
+    return true
   }
 
   /**
@@ -1153,30 +1228,28 @@ export function stepDefensePlay(
    * b2cf0: C.vt68()(목표 루) ≠ 루 → 0
    * b2d14: t_run = 공가진야수.vt1c(루 좌표) ; t_throw = 공가진야수.vtb8(C 목표점) ; t_recv = C.vtc0()
    * b2d64: t_run ≤ max(t_throw, t_recv) → 0xb2a48(P, +0x130, 루) 직접 밟으러 간다 ; 1
-   * b2d7e: 거리(공가진야수, C) > 600 이고 C ≠ 자신 → +0x154 = C, vt5c(C, 특수) = 0xb2e38 송구 ; 그 결과
+   * b2d7e: 거리(공가진야수, C) > 600 이고 C ≠ 자신 → +0x154 = C, vt5c(C, 특수) = 0xb2e38 송구 ;
+   * b2df4:   그 결과가 참이고 공가진야수가 커버 상태(0xa0ff4: AI 2~5)도 AI 9 도 아니면 AI 0 ; 그 결과
    *        아니면 아무것도 안 함 ; 0
+   * 0xb2a48(P, f, 루): 옛 커버 C(−1 · f 가 아니면) AI 0 ; +0xf0[루] = f ; f.vt48(루) ; f AI 루 + 2
    * ```
    * 실패(0)하면 0xafa60 은 +0x128 을 안 지워 다음 틱에 다시 고른다.
-   * ⚠️ 0xb2e38 의 AI 상태 9 갈래(받을 야수가 늦으면 송구를 미룸, b2ec4)와 던진 야수 상태 0(제자리로 돌아감)은 안 옮겼다.
-   *    0xb2a48 의 걸음은 "들고 뛰기" 와 같은 상태 6 이동으로 둔다(AI 번호는 안 떴다).
+   * AI 0 은 플레이 틱 b476a 가 야수를 시작 자리 0xd86ec 로 걷게 한다(`moveFielder`).
    */
-  const sendToBase = (fromSlot: number, base: number, chooser: '사람' | 'CPU', cpuSpecial: boolean): boolean => {
+  const sendToBase = (fromSlot: number, base: number, chooser: ThrowChooser, cpuSpecial: boolean): boolean => {
     const holder = fielders[fromSlot]
     if (holder === undefined) return false
     const coverSlot = play.coverOfBase[wrapBase(base)] ?? NONE
     const basePoint = basePosition(base)
-    /** 공 든 채 루로 (AI 상태 6 · vt48(루)). 같은 루로 이미 가고 있으면 새로 적지 않는다 — 0xafa60 이 매 틱 다시 고른다 */
-    const carry = (why: string): void => {
-      if (holder.aiState === AI_STATE.CARRY && holder.targetBase === base) return
+    if (coverSlot === NONE) {
+      /** 공 든 채 루로 (AI 상태 6 · vt48(루)). 같은 루로 이미 가고 있으면 새로 적지 않는다 — 0xafa60 이 매 틱 다시 고른다 */
+      if (holder.aiState === AI_STATE.CARRY && holder.targetBase === base) return false
       fielders = fielders.map((fielder) =>
         fielder.slot === fromSlot
           ? { ...fielder, target: basePoint, targetBase: base, aiState: AI_STATE.CARRY }
           : fielder,
       )
-      log.push(`${tick}틱 ${fromSlot}번 야수가 ${why}`)
-    }
-    if (coverSlot === NONE) {
-      carry(`${base}루로 공을 들고 뛴다 (커버 없음)`)
+      log.push(`${tick}틱 ${fromSlot}번 야수가 ${base}루로 공을 들고 뛴다 (커버 없음)`)
       return false
     }
     const cover = fielders[coverSlot]
@@ -1185,22 +1258,44 @@ export function stepDefensePlay(
     const throwTicks = throwTicksTo(holder, cover.target)
     const receiveTicks = fielderArrivalTicks(cover)
     if (runTicks <= Math.max(throwTicks, receiveTicks)) {
-      if (runTicks > 0) carry(`${base}루를 직접 밟으러 간다`)
+      // 0xb2a48 — 공 가진 야수가 그 루의 커버가 된다
+      if (coverSlot !== fromSlot) {
+        const coverOfBase = [...play.coverOfBase]
+        coverOfBase[wrapBase(base)] = fromSlot
+        play = { ...play, coverOfBase }
+        fielders = fielders.map((fielder) =>
+          fielder.slot === coverSlot
+            ? { ...fielder, aiState: AI_STATE.IDLE, target: FIELDER_START_POSITIONS[fielder.slot], targetBase: NONE }
+            : fielder.slot === fromSlot
+              ? { ...fielder, target: basePoint, targetBase: wrapBase(base), aiState: AI_STATE.COVER_HOME + wrapBase(base) }
+              : fielder,
+        )
+        if (runTicks > 0) log.push(`${tick}틱 ${fromSlot}번 야수가 ${base}루를 직접 밟으러 간다`)
+      }
       return true
     }
     if (coverSlot === fromSlot || horizontalDistance(holder.position, cover.position) <= MINIMUM_THROW_DISTANCE) {
       return false
     }
-    launchThrow(fromSlot, base, chooser, cpuSpecial)
-    return true
+    const thrown = throwBall(fromSlot, coverSlot, base, chooser, cpuSpecial)
+    if (thrown) {
+      // b2df8~b2e14: 던진 야수가 커버(AI 2~5)도 AI 9 도 아니면 AI 0 — 시작 자리로 돌아간다
+      fielders = fielders.map((fielder) =>
+        fielder.slot === fromSlot && !isCoverState(fielder.aiState) && fielder.aiState !== AI_STATE.RECEIVE
+          ? { ...fielder, aiState: AI_STATE.IDLE, target: FIELDER_START_POSITIONS[fielder.slot], targetBase: NONE }
+          : fielder,
+      )
+    }
+    return thrown
   }
 
   /**
    * **CPU 송구 결정 0xafa60** — 플레이+0x128 이 서 있고 공 가진 야수가 준비됐을 때 점수식 0xafb24 로 루를 고르고
-   * (홈이면 20% 특수 굴림), 0xb2c90 이 성공하면 +0x128 = 0.
+   * (홈이면 20% 특수 굴림), 0xb2c90 이 성공하면 +0x128 = 0. 공 가진 야수가 AI 8(협살)·9(미룬 송구)면 안 고른다.
    */
   const cpuThrowDecision = (): void => {
     if (!play.wantsThrow || !isHolderReady()) return
+    if (fielders[play.ballHolderSlot]?.aiState === AI_STATE.RECEIVE) return
     const active = runners.filter((runner) => !runner.state.isOut && !runner.state.scored).length
     const base = chooseThrowTargetBase({ ...contextAt(tick), activeRunnerCount: active, outs })
     if (base === NONE) return
@@ -1427,6 +1522,24 @@ export function stepDefensePlay(
       }
     }
 
+    // ── 1a. 중계 이어 던지기 — 플레이 틱 vt4c(0xb45dc) 머리 b45ee~b465e (직접 뜬 것) ──
+    // ```
+    // b45f0: +0x12c(쥠) 이면
+    // b4608:   [4](+0x150) ≠ +0x130(공 가진 야수) && [0](+0x14c 중계) 이면 vt5c([4], 0) = 0xb2e38 ; 참이면 메시지 0xbc6
+    // b4638:   아니면 [4] == +0x130 이면 [0] = 0 · +0x117 = 0
+    // ```
+    // 중계맨은 쥐기(0xb2710)가 넣은 준비 틱(내야 3)이 끝난 틱에 던진다 — 0xb2e38 머리의 vtC4 가 그때까지 0 을 돌려준다.
+    // 0xb2c90 을 거치지 않으므로 들고 뛰기·직접 밟기 관문도, 던진 뒤 AI 0 도 없다.
+    if (!play.finished && !uncatchable && play.held) {
+      const holderSlot = play.ballHolderSlot
+      if (relayFinalSlot !== NONE && relayFinalSlot !== holderSlot) {
+        throwBall(holderSlot, relayFinalSlot, relayBase, '중계', false)
+      } else if (relayFinalSlot === holderSlot) {
+        relayFinalSlot = NONE
+        relayBase = NONE
+      }
+    }
+
     // ── 1b. 포구 뒤에 사람이 고른 목표 — 플레이 틱 vt4c(0xb45dc) 의 b4660~b46a8 (직접 뜬 것) ──
     // ```
     // b4660: +0x160 ≠ −1 && +0x12c(쥠) && 공가진야수.vtC4()(준비) 이면
@@ -1448,6 +1561,30 @@ export function stepDefensePlay(
         sendToBase(holderSlot, manual, '사람', false)
       }
       play = { ...play, manualThrowBase: NONE }
+    }
+
+    // ── 1c. AI 9 — 0xb2e38 이 미룬 송구 (vt4c 야수 고리의 분기표 0xd8808[9] = b4838, 직접 뜬 것) ──
+    // ```
+    // b4838: R = 야수[+0x15c] ; t1 = R.vtc0() ; H = 공 가진 야수 ; t2 = H.vtb8(0xd86b0[+0x158])
+    // b488c: t1 > t2 → 이번 틱은 기다린다
+    // b4892: 아니면 플레이.vt58(+0x158, 0) = 0xb2c90 ; 참이면 b48ac 이 야수 AI 0
+    // ```
+    // 미룰 때 공 가진 야수는 vt48(루)로 그 루를 향해 걷는다(`moveFielder`). 특수 인자는 0 으로 다시 보낸다.
+    if (!play.finished && deferredThrowReceiver !== NONE) {
+      for (let slot = 0; slot < fielders.length; slot += 1) {
+        if (fielders[slot]?.aiState !== AI_STATE.RECEIVE) continue
+        const receiver = fielders[deferredThrowReceiver]
+        const holder = fielders[play.ballHolderSlot]
+        if (receiver === undefined || holder === undefined) continue
+        if (fielderArrivalTicks(receiver) > throwTicksTo(holder, basePosition(deferredThrowBase))) continue
+        if (sendToBase(play.ballHolderSlot, deferredThrowBase, '미룬', false)) {
+          fielders = fielders.map((fielder) =>
+            fielder.slot === slot
+              ? { ...fielder, aiState: AI_STATE.IDLE, target: FIELDER_START_POSITIONS[slot], targetBase: NONE }
+              : fielder,
+          )
+        }
+      }
     }
 
     // ── 2. 송구 도착 — 공이 받은 야수의 손으로 옮겨 간다 ──
@@ -1697,6 +1834,7 @@ export function stepDefensePlay(
           throwArrivalTick,
           throwFromSlot,
           throwReleaseTick,
+          throwReceiverSlot,
           uncatchable,
         }),
         ballIsFlying:
@@ -1743,7 +1881,16 @@ export function stepDefensePlay(
         )
       }
     }
-    fielders = fielders.map((fielder) => moveFielder(fielder, { chaserSlot, catchPoint, covers, tick, catchTick }))
+    const beforeMove = fielders
+    fielders = fielders.map((fielder) =>
+      moveFielder(fielder, { chaserSlot, catchPoint, covers: play.coverOfBase, tick, catchTick }),
+    )
+    // 야수+0x3b — 이번 갱신에 목표점에 막 닿았나 (0xbf0dc: 머리에서 지우고 닿은 갱신에서만 1)
+    const arrivedThisTick = fielders.map(
+      (fielder, slot) =>
+        !isSamePoint(beforeMove[slot]?.position ?? fielder.position, fielder.target) &&
+        isSamePoint(fielder.position, fielder.target),
+    )
     for (const runner of runners) {
       if (runner.state.isOut || runner.state.scored) continue
       const target = basePosition(runner.state.targetBase)
@@ -1786,10 +1933,14 @@ export function stepDefensePlay(
     // ── 6b. 아웃 판정 0xb36d0 — 틱 갱신 뒤 갈래 (0xb43da) ──
     runOutJudgement()
 
-    // ── 6c. 아웃이 난 틱 끝의 CPU 송구 결정 — **사람 수비·수동 송구에서도 돈다** (직접 뜬 것) ──
+    // ── 6c. 결과 코드 9·13 — 틱 끝의 CPU 송구 결정, **사람 수비·수동 송구에서도 돈다** (직접 뜬 것) ──
     // ```
-    // b4540: 이번 틱 vt90 결과 ≠ 0 → 결과 코드 13 (b4556) → 메시지 0xbba(13) (b457c, 0xbfbac = 곧바로 부른다)
-    // 51a56: 화면 0xbba 처리 → 점프표 0xd0488[13] = 0x51b36(콜) → 0x51d3c → 0x51d40
+    // b43ec: H = 공 가진 야수 ; b = H.vt68()(목표점이 루 b 인가) ≠ −1 이고
+    // b4400:   R = 0xa97a0(b) = 아웃 아닌 주자 중 +0x8c(마지막으로 닿은 루) == b 인 첫 주자가 있고
+    // b4412:   H.vt18()(목표점에 있음) && H+0x3b(막 닿음) && H+0xe0(쥠) && R.vt18()(주자도 목표점) → 결과 코드 9
+    // b4540: 이번 틱 vt90 결과 ≠ 0 → 결과 코드 13 (b4556, 9 를 덮는다)
+    // b4562: 코드 ≠ 0 → vt44 · vt54 · 메시지 0xbba(코드) (b457c, 0xbfbac = 곧바로 부른다)
+    // 51a56: 화면 0xbba 처리 → 점프표 0xd0488[코드 − 1] → 0x51d40
     // 51d40: 결과 코드 ∈ {9, 13} 이면
     // 51d4e:   0x3403c(수비 조작 객체 +0x10 == 1, CPU) || 0x33fe4(== 0, 사람) 면 통과 — 사람·CPU 모두
     //          (그 밖의 종류 2 조작만 설정+0xf4 를 본다)
@@ -1797,12 +1948,32 @@ export function stepDefensePlay(
     // 51da8:     플레이+0x128 = 1 ; 0xaf8e0(제어기) = vt0xc = 0xafa60 CPU 송구 결정 (한 번)
     // ```
     // 0xafa60 은 공 가진 야수가 준비(vtC4)돼 있어야 던진다 — 포구 틱의 뜬공 아웃은 준비 틱이 남아 안 던진다.
-    // 결과 코드 9(0xb444a: 공 쥔 야수가 목표 루에 막 닿았고(+0x3b) 그 루에 주자가 서 있음)도 같은 길이다.
-    // ⚠️ 그 갈래는 안 옮겼다 — 공 들고 루로 가는 야수(0xb2c90 들고 뛰기 · 직접 밟기)가 닿는 틱에만 선다.
+    // 코드 9 는 "공 든 야수가 루에 막 닿았는데 주자가 이미 서 있다(세이프)" — 들고 뛰기(AI 6)·직접 밟기(0xb2a48)로
+    // 루에 닿는 틱에만 선다. 웹은 야수 이동(6절)이 원본의 다음 틱 야수 틱 자리라 그 뒤에서 본다.
+    // ⚠️ 미해결: b44f6 은 플레이+0x112·+0x114 가 서 있으면 결과 코드를 판 끝 판정 0x9d5bd 의 값으로 덮는다 — 그 칸들의
+    //    뜻을 확정하지 못해 판이 도는 동안은 안 덮인다고 보았다.
     // 받은 야수가 다시 던지는 병살 송구도 이 길이다 — 다만 송구를 받는 틱의 아웃은 쥐기가 준비 틱을 막 넣어
     // 그 자리 0xafa60 이 못 던지고, 사람 수비·수동 송구에서는 그 뒤 0xafa60 을 부르는 곳이 없어 이어 던지지 않는다.
     // (CPU 송구가 도는 쪽은 4c 절이 준비가 끝난 틱에 던진다.)
-    if (outJudgedThisTick && outs <= 2 && !play.finished && !uncatchable) {
+    let resultCode = outJudgedThisTick ? 13 : 0
+    if (resultCode === 0 && !play.finished && play.held) {
+      const holder = fielders[play.ballHolderSlot]
+      const holderBase = holder === undefined ? NONE : baseAtPoint(holder.target)
+      if (holder !== undefined && holderBase !== NONE) {
+        const standing = runners.find((runner) => !runner.state.isOut && runner.state.startBase === holderBase)
+        if (
+          standing !== undefined &&
+          isSamePoint(holder.position, holder.target) &&
+          arrivedThisTick[holder.slot] === true &&
+          holder.holdingBall &&
+          isAtTarget(standing.state)
+        ) {
+          resultCode = 9
+          log.push(`${tick}틱 결과 코드 9 — ${holder.slot}번 야수가 ${holderBase}루에 닿았지만 ${standing.state.index}번 주자가 서 있다`)
+        }
+      }
+    }
+    if (resultCode !== 0 && outs <= 2 && !play.finished && !uncatchable) {
       play = { ...play, wantsThrow: true }
       cpuThrowDecision()
     }
@@ -1871,6 +2042,10 @@ export function stepDefensePlay(
   state.rundownOuts = rundownOuts
   state.tagOut = tagOut
   state.relayFlag = relayFlag
+  state.relayFinalSlot = relayFinalSlot
+  state.relayBase = relayBase
+  state.deferredThrowReceiver = deferredThrowReceiver
+  state.deferredThrowBase = deferredThrowBase
   state.tick = tick + 1
   return state
 }
@@ -2043,6 +2218,22 @@ export function runDefensePlayForPattern(
 
 const wrapBase = (base: number) => ((base % 4) + 4) % 4
 
+/** 누가 고른 송구인가 — 기록 줄에만 쓰인다 */
+type ThrowChooser = '사람' | 'CPU' | '미룬' | '중계'
+
+/** 0xa0ff4 — AI 상태가 루 커버(2~5)인가 */
+function isCoverState(aiState: number): boolean {
+  return aiState >= AI_STATE.COVER_HOME && aiState <= AI_STATE.COVER_THIRD
+}
+
+/** 야수 vt68 = 0xa0b4c — 목표점이 루 좌표표 0xd78f0[k](k = 0~3)와 좌표까지 같은 첫 k, 없으면 −1 */
+function baseAtPoint(point: WorldPoint): number {
+  for (let base = 0; base <= 3; base += 1) {
+    if (isSamePoint(point, basePosition(base))) return base
+  }
+  return NONE
+}
+
 function isAtTarget(runner: RunnerState): boolean {
   return isSamePoint(runner.position, basePosition(runner.targetBase))
 }
@@ -2082,34 +2273,39 @@ interface FielderMoveInput {
   readonly catchTick: number
 }
 
-/** 야수 한 틱 — 쫓는 야수는 포구 지점으로, 커버는 제 루로, 나머지는 제자리 */
+/**
+ * 야수 한 틱 — 쫓는 야수는 포구 지점으로, 커버(+0xf0)는 제 루로, 그 밖은 AI 상태가 세운 목표점으로.
+ * - AI 6(들고 뛰기) · 9(미룬 송구, b30d0 vt48(루)) · 0xa(키스톤 자리) — 세워 둔 목표점으로 걷는다
+ * - 커버 — `covers` 는 플레이+0xf0 이다(0xb2a48 직접 밟기가 바꾼다). 판 끝 고리 b2564 처럼 AI 루 + 2 · 루 좌표
+ * - AI 0 — 플레이 틱 b476a: vtcc(+0xb0 == 0 && +0xb4 ≤ 0 && +0xcc ≤ 0)면 목표점이 시작 자리 0xd86ec 와 다를 때
+ *   그 자리로 (vt50 = vt14). 던진 뒤 AI 0 이 된 야수(b2e14 · b48ac)가 돌아간다
+ */
 function moveFielder(fielder: FielderState, input: FielderMoveInput): FielderState {
   // 협살(상태 8) 중인 야수는 분기표가 0xb48b6 으로 가므로 커버 이동을 하지 않는다 — 2b 절이 이미 옮겼다
   if (fielder.aiState === AI_STATE.RUNDOWN) return fielder
-  // 0xb2c90 이 세운 "공 들고 루로" (AI 상태 6 · vt48(루)) · 0xb203a 가 세운 키스톤 야수 자리(AI 0xa) — 목표점으로 걷는다
-  if (fielder.aiState === AI_STATE.CARRY || (fielder.aiState === AI_STATE.BUSY && fielder.slot !== input.chaserSlot)) {
-    if (isSamePoint(fielder.position, fielder.target)) return fielder
-    return { ...fielder, position: stepToward(fielder.position, fielder.target, fielder.speed) }
+  const walk = (target: WorldPoint): FielderState =>
+    isSamePoint(fielder.position, target)
+      ? { ...fielder, target }
+      : { ...fielder, target, position: stepToward(fielder.position, target, fielder.speed) }
+  if (
+    fielder.aiState === AI_STATE.CARRY ||
+    fielder.aiState === AI_STATE.RECEIVE ||
+    (fielder.aiState === AI_STATE.BUSY && fielder.slot !== input.chaserSlot)
+  ) {
+    return walk(fielder.target)
+  }
+  const chasing = fielder.slot === input.chaserSlot && input.tick < input.catchTick
+  const base = input.covers.indexOf(fielder.slot)
+  if (base >= 0 && !chasing) {
+    const point = basePosition(base)
+    return { ...walk(point), targetBase: base, aiState: AI_STATE.COVER_HOME + base }
   }
   if (fielder.slot === input.chaserSlot) {
-    if (input.tick >= input.catchTick) return fielder
-    return {
-      ...fielder,
-      target: input.catchPoint,
-      position: stepToward(fielder.position, input.catchPoint, fielder.speed),
-      aiState: AI_STATE.CHASE,
-    }
+    if (chasing) return { ...walk(input.catchPoint), aiState: AI_STATE.CHASE }
+    if (fielder.aiState !== AI_STATE.IDLE) return fielder
   }
-  const base = input.covers.indexOf(fielder.slot)
-  if (base < 0) return fielder
-  const point = basePosition(base)
-  return {
-    ...fielder,
-    target: point,
-    targetBase: base,
-    position: stepToward(fielder.position, point, fielder.speed),
-    aiState: AI_STATE.COVER_HOME + base,
-  }
+  if (fielder.aiState === AI_STATE.IDLE) return walk(FIELDER_START_POSITIONS[fielder.slot] ?? fielder.target)
+  return fielder
 }
 
 interface BallPointInput {
@@ -2126,6 +2322,8 @@ interface BallPointInput {
   readonly throwFromSlot: number
   /** 공이 손을 떠난 틱 */
   readonly throwReleaseTick: number
+  /** 이 송구를 받을 야수 — 중계 1구간이면 중계맨. 악송구면 −1 */
+  readonly throwReceiverSlot: number
   /** 아무도 잡지 않는 타구인가 — 그러면 공은 끝까지 궤적 위에 있다 */
   readonly uncatchable: boolean
 }
@@ -2147,7 +2345,8 @@ function ballPointAt(input: BallPointInput): WorldPoint {
   }
 
   const from = input.fielders[input.throwFromSlot]?.position ?? holder.position
-  const to = basePosition(input.throwBase)
+  // 공은 받을 야수의 목표점(+0x2c)으로 간다 (b2f52) — 중계 1구간이면 중계맨 자리, 악송구면 루 자리(근사)
+  const to = input.fielders[input.throwReceiverSlot]?.target ?? basePosition(input.throwBase)
   const whole = input.throwArrivalTick - input.throwReleaseTick
   if (whole <= 0) return to
   const done = input.tick - input.throwReleaseTick

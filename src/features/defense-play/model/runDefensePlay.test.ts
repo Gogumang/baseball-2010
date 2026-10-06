@@ -2,10 +2,15 @@ import { describe, expect, it } from 'vitest'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { AUTO_ADVANCE_TICK_MARGIN, beatsThrow } from '@/entities/fielding/model/autoAdvance'
-import { BASE_POSITIONS, FIELDER_COUNT } from '@/entities/fielding/model/fieldGeometry'
+import {
+  BASE_POSITIONS,
+  FIELDER_COUNT,
+  FIELDER_START_POSITIONS,
+  basePosition,
+} from '@/entities/fielding/model/fieldGeometry'
 import { EMPTY_BASES, type BaseState } from '@/entities/game/model/baseState'
 import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
-import { createFielders } from '@/entities/fielding/model/fieldingState'
+import { AI_STATE, createFielders } from '@/entities/fielding/model/fieldingState'
 import { throwTicksToFielder } from '@/entities/fielding/model/throwPlan'
 import {
   cpuSpecialThrowOf,
@@ -1274,5 +1279,120 @@ describe('슬라이딩 효과음 10 — 사람 키 0x5199c · 자동 0x5268c', (
       .filter((line) => line.includes('자동 슬라이딩'))
       .flatMap((line) => line.split('주자 ')[1].split('·'))
     expect(new Set(주자들).size).toBe(주자들.length)
+  })
+})
+
+describe('송구 0xb2e38 — 중계 b4616 · AI 9 미루기 · 던진 야수 AI 0 · 내야 레이저 지우기 · 결과 코드 9', () => {
+  it('외야수의 먼 송구는 중계맨이 받아 준비 틱(내야 3)이 지난 틱에 이어 던진다 (0xb3444 [0]·[4] · b4616)', () => {
+    const 결과 = runDefensePlay({
+      outcome: 땅볼아웃,
+      trajectory: battedBallTrajectory([132, 1323, 1054, 0]),
+      bases: EMPTY_BASES,
+      outs: 0,
+      runAbility: 500,
+      defenseIsCpu: true,
+    })
+    const [첫, 둘] = 결과.log.filter((line) => line.includes('송구 —'))
+
+    // 좌익수(7)가 2루로 — 거리 ≥ 17000 이라 유격수(5)가 중계한다. 첫 송구의 도착은 중계맨이 받는 틱이다
+    expect(첫).toMatch(/^40틱 2루로 송구 — \d+틱 도착 \(5번 야수 중계\) \(CPU 결정\) \(7번 야수\)$/)
+    const 받는틱 = Number(첫.split('— ')[1].split('틱')[0])
+    expect(결과.throwArrivalTick).toBe(받는틱)
+    // 쥐기 0xb2710 이 +0xc8 = 3 을 넣고, b4616 의 0xb2e38 은 vtC4 가 참이 되는 틱에 최종 받는 야수에게 던진다
+    expect(둘).toMatch(new RegExp(`^${받는틱 + 3}틱 2루로 송구 — \\d+틱 도착 \\(중계 이어 던지기\\) \\(5번 야수\\)$`))
+  })
+
+  it('던진 야수는 커버·AI 9 가 아니면 AI 0 — 시작 자리 0xd86ec 로 걸어 돌아간다 (b2df8~b2e14 · b476a)', () => {
+    const state = startDefensePlay({
+      outcome: 땅볼아웃,
+      trajectory: battedBallTrajectory([132, 1323, 1054, 0]),
+      bases: EMPTY_BASES,
+      outs: 0,
+      runAbility: 500,
+      defenseIsCpu: true,
+    })
+    while (state.tick <= 40) stepDefensePlay(state)
+    const 던진뒤 = state.fielders[7]
+    expect(던진뒤.aiState).toBe(AI_STATE.IDLE)
+    expect(던진뒤.target).toEqual(FIELDER_START_POSITIONS[7])
+    const 거리 = (point: { x: number; z: number }) =>
+      Math.hypot(point.x - FIELDER_START_POSITIONS[7].x, point.z - FIELDER_START_POSITIONS[7].z)
+    const 전 = 거리(던진뒤.position)
+    stepDefensePlay(state)
+    expect(거리(state.fielders[7].position)).toBeLessThan(전)
+  })
+
+  describe('AI 9 — 받을 야수가 1구간 틱 안에 못 닿으면 미루고, 닿을 때가 되면 0xb2c90 으로 다시 보낸다', () => {
+    // 3루 땅볼을 키 '6'(1루)으로 한 번 고르고, 포구 다음 틱에 1루수를 1루에서 6675 떨어진 곳으로 옮긴다
+    const 미루기 = (z: number) => {
+      let state = startDefensePlay({
+        outcome: 땅볼아웃,
+        trajectory: battedBallTrajectory(representativePatternOf(땅볼아웃)),
+        bases: EMPTY_BASES,
+        outs: 0,
+        controls: { side: '수비', keyAt: (tick) => (tick === 0 ? { key: '6', isRepeat: false } : null) },
+      })
+      const 기록: { tick: number; ai: number; target: { x: number; z: number } }[] = []
+      while (!isDefensePlayFinished(state)) {
+        if (state.tick === state.catchTick + 1) {
+          state.fielders = state.fielders.map((fielder) =>
+            fielder.slot === 2 ? { ...fielder, position: { x: 25_946, y: 0, z } } : fielder,
+          )
+        }
+        state = stepDefensePlay(state, state.tick === 0 ? { key: '6', isRepeat: false } : null)
+        const holder = state.fielders[4]
+        기록.push({ tick: state.tick - 1, ai: holder.aiState, target: holder.target })
+      }
+      return { state, 기록 }
+    }
+
+    it('미룰 때 공 가진 야수는 AI 9 로 그 루를 향해 걷고(vt48), 놓아주는 틱에 던지고 AI 0 이 된다 (b30a2 · b4838 · b48ac)', () => {
+      const { state, 기록 } = 미루기(20_500)
+      expect(state.log).toContain('15틱 4번 야수가 1루 송구를 미룬다 — 2번 야수가 늦다 (AI 9)')
+      const 송구 = state.log.find((line) => line.includes('(AI 9 미룬 송구)'))
+      expect(송구).toMatch(/^18틱 1루로 송구 — \d+틱 도착 \(AI 9 미룬 송구\) \(4번 야수\)$/)
+      const 미룬동안 = 기록.filter((entry) => entry.tick >= 15 && entry.tick < 18)
+      expect(미룬동안.every((entry) => entry.ai === AI_STATE.RECEIVE)).toBe(true)
+      expect(미룬동안[0]?.target).toEqual(basePosition(1))
+      expect(기록.find((entry) => entry.tick === 18)?.ai).toBe(AI_STATE.IDLE)
+    })
+
+    it('받을 야수가 끝내 못 닿으면 던지지 않는다 — AI 9 는 0xafa60 도 막는다', () => {
+      const { state } = 미루기(17_575)
+      expect(state.log.some((line) => line.includes('미룬다'))).toBe(true)
+      expect(state.log.some((line) => line.includes('송구 —'))).toBe(false)
+    })
+  })
+
+  it('내야수 → 내야수 송구는 레이저 표시를 지운다 — 확정돼 있어도 보통 송구(악송구 굴림 포함)로 나간다 (b2ee6)', () => {
+    let state = startDefensePlay({
+      outcome: 땅볼아웃,
+      trajectory: battedBallTrajectory(representativePatternOf(땅볼아웃)),
+      bases: 주자1루,
+      outs: 0,
+      random: 고정난수(0),
+      controls: 계속누름('수비', '6'),
+    })
+    while (!isDefensePlayFinished(state)) state = stepDefensePlay(state, { key: '6', isRepeat: false })
+
+    // 3루수(4)가 1루수(2)에게 — 레이저는 확정됐지만 0xb2e38 이 +0x1f4 를 지운다
+    expect(state.laserConfirmed).toBe(true)
+    expect(state.laserThrow).toBe(false)
+    expect(state.errantThrow).toBe(true)
+    expect(state.log.some((line) => line.includes('레이저'))).toBe(false)
+  })
+
+  it('결과 코드 9 — 공 든 야수가 루에 막 닿았는데 주자가 서 있으면 0xbba 로 0xafa60 을 한 번 부른다 (b43ec~b444a)', () => {
+    // 협살이 풀린 뒤 공을 든 2루수(3)가 2루 커버로 걸어가 닿는데, 2루타 타자주자가 이미 2루에 서 있다
+    const 결과 = runDefensePlay({
+      outcome: 이루타,
+      trajectory: battedBallTrajectory([111, 1000, 700, 0]),
+      bases: { first: true, second: false, third: true },
+      outs: 0,
+      runAbility: 500,
+      defenseIsCpu: true,
+    })
+
+    expect(결과.log).toContain('47틱 결과 코드 9 — 3번 야수가 2루에 닿았지만 0번 주자가 서 있다')
   })
 })

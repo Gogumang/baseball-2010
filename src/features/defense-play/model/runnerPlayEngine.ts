@@ -14,6 +14,7 @@ import {
 } from '@/entities/fielding/model/fieldingErrors'
 import {
   basePosition,
+  FIELDER_START_POSITIONS,
   horizontalDistance,
   isSamePoint,
   progressPercent,
@@ -22,6 +23,7 @@ import {
   type WorldPoint,
 } from '@/entities/fielding/model/fieldGeometry'
 import {
+  AI_STATE,
   fielderArrivalTicks,
   NONE,
   type DefenseContext,
@@ -37,7 +39,7 @@ import {
 } from '@/entities/fielding/model/heldRuns'
 import { judgeOut, OUT_KIND, releaseForcesAfterOut } from '@/entities/fielding/model/outJudgement'
 import { defenseArrivalTicks } from '@/entities/fielding/model/throwArrival'
-import { readyTicksOf, thrownWith, throwTicksTo } from '@/entities/fielding/model/throwPlan'
+import { planThrow, readyTicksOf, thrownWith, throwTicksTo } from '@/entities/fielding/model/throwPlan'
 import { chooseThrowTargetBase, isSpecialThrow } from '@/entities/fielding/model/throwTargetBase'
 import { EMPTY_BASES, type BaseState } from '@/entities/game/model/baseState'
 import type { ManualAutoMode } from '@/entities/settings/model/gameSettings'
@@ -186,6 +188,9 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
   let outJudgedThisTick = false
   /** 악송구로 공이 빠졌다 — 더는 아무도 쥐지 않는다 (근사) */
   let ballLost = false
+  /** +0x15c · +0x158 — 0xb2e38 이 미룬 송구(AI 9)의 받을 야수 · 목표 루 */
+  let deferredThrowReceiver = NONE
+  let deferredThrowBase = NONE
 
   const runnerStates = () => runners.map((runner) => runner.state)
   /** 공 쥔 야수 vtC4 = 0xa20ec — +0xc8(준비 틱)이 다 줄었나. 쥐기 0xb2710(P, f, 1)이 넣고 야수 틱 0xa1284 가 줄인다 */
@@ -243,7 +248,7 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
    * 커버 없음 → 공 가진 야수가 들고 뛴다(0) · 커버 목표 루 ≠ 루(0) · 직접 밟는 게 빠름(1) · 600 이하 · 자기 자신(0) ·
    * 그 밖에는 송구 0xb2e38 → 0xa1620(악송구 굴림 0xa1828)(1).
    */
-  const sendToBase = (tick: number, base: number, byHuman: boolean, cpuSpecial: boolean): boolean => {
+  const sendToBase = (tick: number, base: number, byHuman: boolean | '미룬', cpuSpecial: boolean): boolean => {
     const holderSlot = play.ballHolderSlot
     const holder = fielders[holderSlot]
     if (holder === undefined) return false
@@ -275,6 +280,28 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
     }
 
     // ── 송구 0xb2e38 → 0xa1620 (악송구 굴림 0xa1828) ──
+    // b2e44: vtC4(준비) — 던진 야수는 0xa1620 끝의 +0xb1 잠금으로 못 던진다(공을 안 쥔 야수는 못 던지는 것으로 본다,
+    // `runDefensePlay` 의 throwBall 과 같은 근사)
+    if (!holder.holdingBall || holder.actionRemainingTicks > 0) return false
+    // b2eb2~b30d6: 받는 야수가 목표점에 없고 1구간 틱(계획 [5]) 안에 못 닿으면 미룬다 — AI 9 · vt48(루)
+    const plan = planThrow({ fielders, fromSlot: holderSlot, finalSlot: coverSlot, base, special: cpuSpecial })
+    const receiver = fielders[plan.toSlot]
+    if (
+      receiver !== undefined &&
+      !isSamePoint(receiver.position, receiver.target) &&
+      fielderArrivalTicks(receiver) > plan.firstLegTicks
+    ) {
+      if (holder.aiState === AI_STATE.RECEIVE) return false
+      deferredThrowReceiver = plan.toSlot
+      deferredThrowBase = plan.base
+      fielders = fielders.map((fielder) =>
+        fielder.slot === holderSlot
+          ? { ...fielder, aiState: AI_STATE.RECEIVE, target: basePosition(plan.base), targetBase: wrapBase(plan.base) }
+          : fielder,
+      )
+      log.push(`${tick}틱 ${holderSlot}번 야수가 ${plan.base}루 송구를 미룬다 — ${plan.toSlot}번 야수가 늦다 (AI 9)`)
+      return true
+    }
     const special = cpuSpecial ? cpuSpecialThrowOf(fielders, holderSlot, coverSlot) : null
     const bounce = special !== null && special.special && special.bounce
     if (bounce && input.random !== undefined) randomIntegerBelow(input.random, 0, 2)
@@ -305,16 +332,24 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
       firstThrowBase = base
       firstThrowArrival = throwState.flight.arrivalTick
     }
-    // 던지면 손을 떠난다(b2f80 · b3070) — 준비 틱(+0xc8)도 썼다. vt24(b307c)가 받을 야수(+0x170)·받는 틱(+0x174)을 다시 세운다
-    fielders = fielders.map((fielder) =>
-      fielder.slot === holderSlot ? { ...fielder, holdingBall: false, actionRemainingTicks: 0 } : fielder,
-    )
+    // 던지면 손을 떠난다(b2f80 · b3070) — 준비 틱(+0xc8)도 썼다. vt24(b307c)가 받을 야수(+0x170)·받는 틱(+0x174)을 다시 세운다.
+    // 0xb2c90 b2df8~b2e14: 던진 야수가 커버(AI 2~5)도 AI 9 도 아니면 AI 0 — 시작 자리 0xd86ec 로 돌아간다(b476a)
+    fielders = fielders.map((fielder) => {
+      if (fielder.slot !== holderSlot) return fielder
+      const thrown = { ...fielder, holdingBall: false, actionRemainingTicks: 0 }
+      const keeps =
+        (fielder.aiState >= AI_STATE.COVER_HOME && fielder.aiState <= AI_STATE.COVER_THIRD) ||
+        fielder.aiState === AI_STATE.RECEIVE
+      return keeps
+        ? thrown
+        : { ...thrown, aiState: AI_STATE.IDLE, target: FIELDER_START_POSITIONS[holderSlot] ?? fielder.target, targetBase: NONE }
+    })
     play = { ...play, held: false, catchFielderSlot: coverSlot, catchTick: throwState.flight.arrivalTick }
     log.push(
       `${tick}틱 ${holderSlot}번 야수가 ${base}루로 송구 — ${throwState.flight.arrivalTick}틱 도착` +
         (cpuSpecial ? ' (특수)' : '') +
         (error.errant ? ' (악송구)' : '') +
-        (byHuman ? '' : ' (CPU 결정)'),
+        (byHuman === '미룬' ? ' (AI 9 미룬 송구)' : byHuman ? '' : ' (CPU 결정)'),
     )
     return true
   }
@@ -325,6 +360,8 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
    */
   const cpuThrowDecision = (tick: number): void => {
     if (!play.wantsThrow || !isHolderReady() || ballLost || throwState.flight !== null) return
+    // afa6c~afab8: 공 가진 야수가 AI 8 · 9 면 안 고른다
+    if (fielders[play.ballHolderSlot]?.aiState === AI_STATE.RECEIVE) return
     const active = runners.filter((runner) => !runner.state.isOut && !runner.state.scored).length
     const base = chooseThrowTargetBase({ ...contextAt(tick), activeRunnerCount: active, outs })
     if (base === NONE) return
@@ -404,6 +441,24 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
       play = { ...play, manualThrowBase: NONE }
       if (!isSamePoint(fielders[play.ballHolderSlot].position, basePosition(manualThrowBase))) {
         sendToBase(tick, manualThrowBase, true, false)
+      }
+    }
+
+    // ── 3c. AI 9 — 미룬 송구 (b4838): 받을 야수.vtc0() ≤ 공 가진 야수.vtb8(루 좌표) 가 되면 0xb2c90(루, 0), 참이면 AI 0 ──
+    if (!play.finished && !ballLost && deferredThrowReceiver !== NONE) {
+      for (let slot = 0; slot < fielders.length; slot += 1) {
+        if (fielders[slot]?.aiState !== AI_STATE.RECEIVE) continue
+        const receiver = fielders[deferredThrowReceiver]
+        const holder = fielders[play.ballHolderSlot]
+        if (receiver === undefined || holder === undefined) continue
+        if (fielderArrivalTicks(receiver) > throwTicksTo(holder, basePosition(deferredThrowBase))) continue
+        if (sendToBase(tick, deferredThrowBase, '미룬', false)) {
+          fielders = fielders.map((fielder) =>
+            fielder.slot === slot
+              ? { ...fielder, aiState: AI_STATE.IDLE, target: FIELDER_START_POSITIONS[slot] ?? fielder.target, targetBase: NONE }
+              : fielder,
+          )
+        }
       }
     }
 
