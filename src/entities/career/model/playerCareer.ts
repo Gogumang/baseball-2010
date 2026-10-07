@@ -554,15 +554,16 @@ const FRAGILE_SKILL = 4
 /**
  * 훈련 한 번을 센다 (0x18a80).
  * 통산 수와 함께 **칸별 연속 훈련 수**도 갱신한다 — 훈련한 칸은 +1, **나머지 칸은 모두 0** 이다.
- * 몹쓸몸·유리몸을 가진 채로 한 훈련도 따로 센다.
+ * 몹쓸몸·유리몸은 0x18b86~0x18bd6(모드 갈림 없음, 직접 떴다): 보유 비트(0xa3a75)면 u8 +0x75/+0x76 += 1, **아니면 0 으로** —
+ * 가진 채 이어 한 훈련 수다(예전 웹은 안 가졌을 때 그대로 두어, 풀린 뒤 다시 얻으면 곧 풀렸다).
  */
 export function countTraining(career: PlayerCareer, menuId: string): PlayerCareer {
   return {
     ...career,
     trainingCounts: { ...career.trainingCounts, [menuId]: trainingCountOf(career, menuId) + 1 },
     consecutiveTrainingCounts: { [menuId]: (career.consecutiveTrainingCounts[menuId] ?? 0) + 1 },
-    badBodyTrainings: career.badBodyTrainings + (hasSkill(career, BAD_BODY_SKILL) ? 1 : 0),
-    fragileTrainings: career.fragileTrainings + (hasSkill(career, FRAGILE_SKILL) ? 1 : 0),
+    badBodyTrainings: hasSkill(career, BAD_BODY_SKILL) ? (career.badBodyTrainings + 1) & 0xff : 0,
+    fragileTrainings: hasSkill(career, FRAGILE_SKILL) ? (career.fragileTrainings + 1) & 0xff : 0,
   }
 }
 

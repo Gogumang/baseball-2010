@@ -1,7 +1,7 @@
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { equippedPitcherAbilityOf, GAMES_PER_SEASON } from '@/entities/pitcher-career/model/pitcherCareer'
 import { PITCHER_ABILITY_NAMES, PITCHER_ABILITY_ORDER } from '@/entities/pitcher-career/model/pitcherAbility'
-import { seasonPitcherTrainingCountOf } from '@/entities/pitcher-career/model/pitcherManagement'
+import { seasonPitcherTrainingCountOf, seasonPitcherTrainingTotalOf } from '@/entities/pitcher-career/model/pitcherManagement'
 import { illnessChanceOf, OPENING_EVENT_ID, placeTriggerOf } from '@/entities/story/model/storyScene'
 import type { OriginalEvent } from '@/shared/config/original/eventTypes'
 import { ORIGINAL_USER_EVENTS } from '@/shared/config/original/userEvents'
@@ -113,6 +113,8 @@ const OUTS_PER_INNING = 3
 /** 투수 비트 번호 (8 이상은 표 번호 비트+16). 하위 표 칸 = 비트 − 2 (0xad292 `subs r0, r4, #3` = v − 3) */
 const PITCHER_SKILL = {
   먹튀: 2,
+  몹쓸몸: 3,
+  유리몸: 4,
   무력감: 5,
   끈기: 10,
   닥터K: 11,
@@ -127,16 +129,30 @@ const LAST_TABLE_SKILL = 20
 
 /**
  * 하위 표에서 **투수 갈래를 아직 옮기지 못한** 스킬 — 불발로 둔다 (지어내지 않는다).
- *   3 몹쓸몸 · 4 유리몸: 식은 두 편 공용으로 확정(A 4절)이지만, 투수 웹이 해제 쪽 칸(+0x75/+0x76 보유 중 훈련 수)을
- *     아직 세지 않는다 — 얻기만 하고 못 푸는 일을 막으려고 둘 다 불발.
- *   (2 먹튀 · 5 무력감은 116 카운터 +0x1c0/+0x1cd · +0x1c7 와 +0x1c2 를 세게 되어 옮겼다 — 아래 식.)
+ *   (2 먹튀 · 5 무력감은 116 카운터 +0x1c0/+0x1cd · +0x1c7 와 +0x1c2 를, 3 몹쓸몸 · 4 유리몸은 훈련 0x18b86 의 +0x75/+0x76 을
+ *    세게 되어 옮겼다 — 아래 식.)
  *   7 전설: +0x7a(우승 횟수 추정) — 투수 웹 칸 없음.
  *   12 좌타UP · 13 우타UP: 0xb63c0(투수 기록) 의 뜻(0xb6278 · 0xb63a0 갈래)을 다 풀지 못했다.
  *   14 투지: 지난 3년 연도 기록(0x1fa78(i) +0x24·+0x2e) — 투수 웹에 연도별 기록이 없다.
  */
-const UNPORTED_ACQUIRE: ReadonlySet<number> = new Set([3, 4, 7, 12, 13, 14])
-/** 해제 쪽 미이식 — 3·4 (위와 같은 칸) · 14 투지 (작년 +0x2e · +0x24, 0xada22) */
-const UNPORTED_RELEASE: ReadonlySet<number> = new Set([3, 4, 14])
+const UNPORTED_ACQUIRE: ReadonlySet<number> = new Set([7, 12, 13, 14])
+/** 해제 쪽 미이식 — 14 투지 (작년 +0x2e · +0x24, 0xada22) */
+const UNPORTED_RELEASE: ReadonlySet<number> = new Set([14])
+/** 몹쓸몸 · 유리몸 얻기 — 실효 능력치 넷 평균 상한 `0xaf << 2` (0xad324 · 0xad3f2) */
+const WEAK_BODY_AVERAGE_LIMIT = 700
+/** 몹쓸몸 · 유리몸 해제 — u8 S+0x75 > 5 (0xad9fc) · u8 S+0x76 > 7 (0xadb18) */
+const BAD_BODY_RELEASE_ABOVE = 5
+const FRAGILE_RELEASE_ABOVE = 7
+
+/**
+ * 조건 20 의 `평균실효` — `Σ i=0..3 0xb6415(0x1fc75(저장, 모드), i, 1)` 를 4 로 0 쪽 버림 나눗셈(asrs #2 앞 음수면 +3).
+ * 모드 3 레코드라 투수 능력치 넷의 실효값(장비 · 스킬 보정 — `equippedPitcherAbilityOf`)이다.
+ */
+function averageEquippedPitcherAbilityOf(career: PitcherCareer): number {
+  const ability = equippedPitcherAbilityOf(career)
+  return Math.trunc(PITCHER_ABILITY_ORDER.reduce((sum, key) => sum + ability[key], 0) / 4)
+}
+
 /** 먹튀 얻기 — 연차idx > 1 이고 g == 14 에서 +0x1c2 ≤ 15 · g == 32 에서 ≤ 35 (0xad2a2~) */
 const MONEY_GRUBBER_YEAR_ABOVE = 1
 /** 무력감 얻기 — 사기 ≤ 20 · 연차idx > 2 · rand(0,100) > 69 (0xad43a~0xad46e) */
@@ -161,6 +177,21 @@ function acquiresPitcherSkill(career: PitcherCareer, skill: number, random: Rand
       if (wasRemoved(career, skill) || yearIndex <= MONEY_GRUBBER_YEAR_ABOVE) return false
       const gain = toInt16(career.seasonPopularityGain)
       return (g === 14 && gain <= 15) || (g === 32 && gain <= 35)
+    }
+    case PITCHER_SKILL.몹쓸몸: {
+      // 0xad2e6: 0xa4f31(S, 3) 해제했으면 불발 → 평균실효 ≤ 700 → (g == 12 && T == 0) | (g == 28 && T ≤ 1) | (g == 42 && T ≤ 2)
+      // 모드 갈림이 없다 — 레코드만 0x1fc75(저장, [r6+8] 모드) 로 그 편 것을 읽는다
+      if (wasRemoved(career, skill) || averageEquippedPitcherAbilityOf(career) > WEAK_BODY_AVERAGE_LIMIT) return false
+      const t = seasonPitcherTrainingTotalOf(career)
+      return (g === 12 && t === 0) || (g === 28 && t <= 1) || (g === 42 && t <= 2)
+    }
+    case PITCHER_SKILL.유리몸: {
+      // 0xad3ac: 0xa4f31(S, 4) → 연차idx > 0([sp+8], 0xad3be) → 평균실효 ≤ 700 → (g == 18 && T ≤ 2) | (g == 38 && T ≤ 4)
+      if (wasRemoved(career, skill) || yearIndex <= 0 || averageEquippedPitcherAbilityOf(career) > WEAK_BODY_AVERAGE_LIMIT) {
+        return false
+      }
+      const t = seasonPitcherTrainingTotalOf(career)
+      return (g === 18 && t <= 2) || (g === 38 && t <= 4)
     }
     case PITCHER_SKILL.무력감:
       // 0xad43a: 해제 기록 → 사기(0xa3a25) ≤ 20 → 연차idx > 2 → rand(0,100) 굴림 (앞이 막히면 안 굴린다)
@@ -212,6 +243,9 @@ function releasesPitcherSkill(career: PitcherCareer, skill: number): boolean {
   }
   // 5 무력감 (0xada0e): s8 +0x1c7 > 5
   if (skill === PITCHER_SKILL.무력감) return (career.highMoraleStreak ?? 0) > 5
+  // 3 몹쓸몸 (0xad9f6): u8 S+0x75 > 5 · 4 유리몸 (0xada06 → 0xadb18): u8 S+0x76 > 7 — 가진 채 이어 한 훈련 수 (0x18b86)
+  if (skill === PITCHER_SKILL.몹쓸몸) return ((career.badBodyTrainings ?? 0) & 0xff) > BAD_BODY_RELEASE_ABOVE
+  if (skill === PITCHER_SKILL.유리몸) return ((career.fragileTrainings ?? 0) & 0xff) > FRAGILE_RELEASE_ABOVE
   const slot = PITCHER_RELEASE_STREAK_SLOT[skill]
   // 18·19·20 — 해제 카운터 +0x70+칸 > 7 (훈련 0x18a80: 그 스킬을 **가진 채** 그 칸만 연달아 8번)
   if (slot !== undefined) return (career.releaseTrainingStreaks[slot] ?? 0) > RELEASE_STREAK_LIMIT

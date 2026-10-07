@@ -7,7 +7,7 @@ import {
   pitcherPlaceEventOf,
   scanPitcherEventFrom,
 } from '@/entities/pitcher-career/model/pitcherStoryScene'
-import { countReleaseTrainingStreak } from '@/entities/pitcher-career/model/pitcherManagement'
+import { countPitcherTraining, countReleaseTrainingStreak } from '@/entities/pitcher-career/model/pitcherManagement'
 import { ORIGINAL_EVENTS } from '@/shared/config/original/events'
 
 const 투수 = (overrides: Partial<PitcherCareer> = {}): PitcherCareer => ({ ...createPitcherCareer('테스트'), ...overrides })
@@ -80,8 +80,8 @@ describe('조건 20/21 투수 갈래 (0xd8408 · 0xd8454 의 모드 3 쪽)', () 
     expect(meetsPitcherSkillCondition(투수({ releaseTrainingStreaks: 카운터(0, 8) }), 'release', 21)).toBe(false)
   })
 
-  it('미이식 갈래(몹쓸몸·유리몸·전설·좌우타UP·투지)는 불발로 둔다', () => {
-    for (const value of [4, 5, 8, 13, 14, 15]) {
+  it('미이식 갈래(전설·좌우타UP·투지)는 불발로 둔다', () => {
+    for (const value of [8, 13, 14, 15]) {
       expect(meetsPitcherSkillCondition(투수({ season: 13, gamesPlayed: 30, morale: 0 }), 'acquire', value)).toBe(false)
     }
   })
@@ -137,5 +137,49 @@ describe('자동 발동 훑기 0xadc70', () => {
       event: null,
       cursor: 0,
     })
+  })
+})
+
+describe('몹쓸몸 3 · 유리몸 4 — 두 편 공용 식 (0xad2e6 · 0xad3ac · 0xad9f6 · 0xada06), +0x75/+0x76 은 훈련 0x18b86', () => {
+  const 약골 = { control: 300, velocity: 300, breaking: 300, stamina: 300 }
+  const 훈련 = (count: number, start = 0) => ({ trainingCounts: { 제구: count }, seasonStartTrainingCounts: { 제구: start } })
+
+  it('몹쓸몸 얻기: 평균실효 ≤ 700 · (g == 12 & T == 0 | g == 28 & T ≤ 1 | g == 42 & T ≤ 2)', () => {
+    expect(meetsPitcherSkillCondition(투수({ ability: 약골, gamesPlayed: 12 }), 'acquire', 4)).toBe(true)
+    expect(meetsPitcherSkillCondition(투수({ ability: 약골, gamesPlayed: 12, ...훈련(1) }), 'acquire', 4)).toBe(false)
+    expect(meetsPitcherSkillCondition(투수({ ability: 약골, gamesPlayed: 28, ...훈련(1) }), 'acquire', 4)).toBe(true)
+    expect(meetsPitcherSkillCondition(투수({ ability: 약골, gamesPlayed: 42, ...훈련(5, 3) }), 'acquire', 4)).toBe(true)
+    expect(meetsPitcherSkillCondition(투수({ ability: 약골, gamesPlayed: 13 }), 'acquire', 4)).toBe(false)
+    // 평균 701 은 넘는다 · 그 해 이미 해제했으면(0xa4f31) 불발
+    const 넘침 = { control: 701, velocity: 701, breaking: 701, stamina: 701 }
+    expect(meetsPitcherSkillCondition(투수({ ability: 넘침, gamesPlayed: 12 }), 'acquire', 4)).toBe(false)
+    expect(meetsPitcherSkillCondition(투수({ ability: 약골, gamesPlayed: 12, removedMinusSkillIds: [3] }), 'acquire', 4)).toBe(false)
+  })
+
+  it('T 는 u8 통산 − s8 새 시즌 사본 — 사본이 128 을 넘으면 음수로 읽혀 T 가 부푼다 (원본 그대로)', () => {
+    // 통산 200 · 사본 200 → 200 − (−56) = 256 → g == 42 의 T ≤ 2 가 막힌다
+    expect(meetsPitcherSkillCondition(투수({ ability: 약골, gamesPlayed: 42, ...훈련(200, 200) }), 'acquire', 4)).toBe(false)
+    expect(meetsPitcherSkillCondition(투수({ ability: 약골, gamesPlayed: 42, ...훈련(100, 100) }), 'acquire', 4)).toBe(true)
+  })
+
+  it('유리몸 얻기: 연차idx > 0 · 평균실효 ≤ 700 · (g == 18 & T ≤ 2 | g == 38 & T ≤ 4)', () => {
+    expect(meetsPitcherSkillCondition(투수({ ability: 약골, season: 2, gamesPlayed: 18, ...훈련(2) }), 'acquire', 5)).toBe(true)
+    expect(meetsPitcherSkillCondition(투수({ ability: 약골, season: 1, gamesPlayed: 18 }), 'acquire', 5)).toBe(false)
+    expect(meetsPitcherSkillCondition(투수({ ability: 약골, season: 2, gamesPlayed: 38, ...훈련(4) }), 'acquire', 5)).toBe(true)
+    expect(meetsPitcherSkillCondition(투수({ ability: 약골, season: 2, gamesPlayed: 38, ...훈련(5) }), 'acquire', 5)).toBe(false)
+  })
+
+  it('해제: u8 +0x75 > 5 · u8 +0x76 > 7', () => {
+    expect(meetsPitcherSkillCondition(투수({ skillIds: [3], badBodyTrainings: 5 }), 'release', 4)).toBe(false)
+    expect(meetsPitcherSkillCondition(투수({ skillIds: [3], badBodyTrainings: 6 }), 'release', 4)).toBe(true)
+    expect(meetsPitcherSkillCondition(투수({ skillIds: [4], fragileTrainings: 7 }), 'release', 5)).toBe(false)
+    expect(meetsPitcherSkillCondition(투수({ skillIds: [4], fragileTrainings: 8 }), 'release', 5)).toBe(true)
+  })
+
+  it('훈련 0x18b86 — 가진 채면 +1, 안 가졌으면 0 으로', () => {
+    const 가짐 = countPitcherTraining(투수({ skillIds: [3], badBodyTrainings: 5, fragileTrainings: 3 }), '제구')
+    expect(가짐.badBodyTrainings).toBe(6)
+    expect(가짐.fragileTrainings).toBe(0)
+    expect(countPitcherTraining(투수({ skillIds: [4], fragileTrainings: 255 }), '마구').fragileTrainings).toBe(0)
   })
 })

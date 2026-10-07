@@ -1074,6 +1074,10 @@ describe('외출 [!] · [들어가기] (0x8cdc0 · 0x16c64 · 114)', () => {
 
     이벤트끝내기(result)
 
+    // 105 로 돌아오면 자동 발동(0x1cf9c) — 1년차 12경기 · 훈련 0 · 평균실효 ≤ 700 이라 몹쓸몸 획득(조건 20 값 4, 0xad2e6) 404 가 선다
+    expect(result.current.story?.eventId).toBe(404)
+    이벤트끝내기(result)
+    expect(result.current.career?.skillIds).toContain(3)
     expect(result.current.scene).toBe('관리')
     expect(result.current.career?.hasActedThisCycle).toBe(true)
     expect(result.current.career?.outingsThisSeason).toBe(1)

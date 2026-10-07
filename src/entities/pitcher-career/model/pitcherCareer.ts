@@ -365,6 +365,13 @@ export interface PitcherCareer {
    * 조건 21(0xadad0~)이 `> 7` 로 해제 이벤트를 연다. (`consecutiveTrainingCounts` 는 웹의 칸별 연속 수라 다르다.)
    */
   readonly releaseTrainingStreaks: readonly number[]
+  /**
+   * 몹쓸몸(3)·유리몸(4)을 **가진 채** 한 훈련 수 — 선수 S+0x75 · +0x76 (u8). 훈련 0x18a80 뒤 0x18b86~0x18bd6(모드 갈림 없음):
+   * 보유 비트(0xa3a75)가 서 있으면 +1, 아니면 **0 으로**. 조건 21 해제가 +0x75 > 5 · +0x76 > 7 로 본다(0xad9f6 · 0xada06).
+   * 옛 저장에는 없다(0).
+   */
+  readonly badBodyTrainings: number
+  readonly fragileTrainings: number
   readonly hasActedThisCycle: boolean
   readonly outingsThisSeason: number
   /** 지난 시즌 외출 수 — 칭호 25·26 이 새 시즌 첫 경기 전에 본다 (타자편 `outingsLastSeason` 과 같은 칸) */
@@ -529,6 +536,8 @@ export function createPitcherCareer(
     seasonStartTrainingCounts: {},
     consecutiveTrainingCounts: {},
     releaseTrainingStreaks: [0, 0, 0, 0, 0],
+    badBodyTrainings: 0,
+    fragileTrainings: 0,
     hasActedThisCycle: false,
     outingsThisSeason: 0,
     outingsLastSeason: 0,

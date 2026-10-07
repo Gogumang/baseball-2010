@@ -1,7 +1,7 @@
 import { pitcherOrdersAfterPostseason } from '@/entities/league/model/league'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { describe, expect, it } from 'vitest'
-import { applyGameResult, applySeasonEnd, countGameForSkills, countReputationZeroGame, createCareer, nextOpponentOf, GAMES_PER_SEASON, gamePointRewardOf, nameByteLengthOf, rookieAbilityOf, startNextSeason, leagueGamePitchersOf, applyLeagueDay, nariLastGameRecordLineOf, nariRecordLineTextOf } from '@/entities/career/model/playerCareer'
+import { applyGameResult, applySeasonEnd, countGameForSkills, countReputationZeroGame, createCareer, nextOpponentOf, GAMES_PER_SEASON, gamePointRewardOf, nameByteLengthOf, rookieAbilityOf, startNextSeason, leagueGamePitchersOf, applyLeagueDay, countTraining, nariLastGameRecordLineOf, nariRecordLineTextOf } from '@/entities/career/model/playerCareer'
 import type { NariLastGame } from '@/entities/career/model/playerCareer'
 import { EMPTY_LEAGUE, opponentOf, recordLeagueResult } from '@/entities/league/model/league'
 import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
@@ -413,5 +413,14 @@ describe('116 기록 줄 글 — 0x1278c 모드 4 갈래 12958~1299a', () => {
     expect(nariLastGameRecordLineOf(lastGame)).toEqual({ atBats: 4, hits: 1, runsBattedIn: 0, homeRuns: 0 })
     expect(nariLastGameRecordLineOf({ ...lastGame, recordLine: { atBats: 1, hits: 1, runsBattedIn: 1, homeRuns: 1 } }))
       .toEqual({ atBats: 1, hits: 1, runsBattedIn: 1, homeRuns: 1 })
+  })
+})
+
+describe('몹쓸몸 · 유리몸 훈련 수 +0x75/+0x76 — 0x18b86~0x18bd6', () => {
+  it('가진 채 훈련하면 +1, 안 가졌으면 0 으로 되돌린다(u8)', () => {
+    const 가짐 = countTraining({ ...createCareer('몸'), skillIds: [3], badBodyTrainings: 2, fragileTrainings: 4 }, '히트')
+    expect(가짐.badBodyTrainings).toBe(3)
+    expect(가짐.fragileTrainings).toBe(0)
+    expect(countTraining({ ...createCareer('몸'), skillIds: [4], fragileTrainings: 255 }, '히트').fragileTrainings).toBe(0)
   })
 })
