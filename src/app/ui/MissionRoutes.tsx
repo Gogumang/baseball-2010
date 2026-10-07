@@ -222,6 +222,8 @@ interface PitcherAceMatchRouteProps {
   readonly session: ReturnType<typeof useMissionSession>
   readonly runner: AtBatRunner
   readonly pitchControl: PitchControl
+  /** 경기 중 메뉴 "설정" 칸 — App 이 환경설정을 넘긴다 */
+  readonly gameSettings: ReturnType<typeof useGameSettings>
   /** 대결이 끝났다 — 저장 +0x177 의 결과 바이트 (이겼나) */
   readonly onFinish: (isWin: boolean) => void
 }
@@ -232,7 +234,9 @@ interface PitcherAceMatchRouteProps {
  * 끝나면 결과 화면에서 재도전 커서 없이(0x407f0 의 +0x176 갈래) 원래 모드로 돌아온다 (0x4b328 · 0x4090c).
  * 들어서면 `beginPitcherAceMatch` 로 미션을 세우고, 결과 [확인]에서 `finishPitcherAceMatch` 의 이겼나를 넘긴다.
  */
-export function PitcherAceMatchRoute({ mission, session, runner, pitchControl, onFinish }: PitcherAceMatchRouteProps) {
+export function PitcherAceMatchRoute(
+  { mission, session, runner, pitchControl, gameSettings, onFinish }: PitcherAceMatchRouteProps,
+) {
   const beginRef = useRef(session.actions.beginPitcherAceMatch)
   beginRef.current = session.actions.beginPitcherAceMatch
   useEffect(() => {
@@ -259,8 +263,13 @@ export function PitcherAceMatchRoute({ mission, session, runner, pitchControl, o
       // ⚠️ 근사: 원본 경기 중 메뉴 나가기 0x40140 은 모드 5·6 이면 0xa5368(obj,0) 뒤 메인 메뉴(장면 0x103)로 간다 —
       //    +0x176 이 서 있을 때 어디로 가는지는 안 읽었다. 웹은 보통 미션처럼 '실패' 로 두어 패배 결과로 잇는다.
       onGiveUp={actions.giveUpPitcher}
-      // ⚠️ 미해결: 경기 중 메뉴 "다시하기"(0x3c706)가 +0x176(투수편 대결) 중에 어디로 가는지 안 읽어 칸을 잠근다.
-      //    "설정" 은 이 라우트를 그리는 App 이 환경설정을 안 넘겨 잠긴다
+      // 경기 중 메뉴 "다시하기"(0x3c706 → StrGAME[7] 예 → 하위 3 0x3c98e) — 0x3c98e 는 +0x176 을 안 보고 모드 5·6 이면
+      // 0x140006c = 3 · 장면 0x107 로 간다. 0x107 진입 0x1d9a4 가 this+0x9c = 미션객체+0xbd 를 잡고 상태 3 0x1e908 이 그 미션을
+      // 곧장 다시 세운다(장면 0x104). 대결의 +0xbd 는 SYS 8 이 g[0x175] 와 같은 team − 1 로 적었고(0x8d88a~0x8d890), g[0x176] 은
+      // 아무도 안 내리므로 **같은 대결을 처음부터** 다시 치르고 끝나면 그대로 투수편으로 돌아간다
+      onRestart={() => actions.beginPitcherAceMatch(mission)}
+      settings={gameSettings.settings}
+      onSettingsChange={gameSettings.setSettings}
       // 마선수 대결도 미션 장면(모드 5)이라 사람 견제 길이 같다
       onPickoffKey={actions.pickoff}
       // 대결도 미션 장면이라 새 타석마다 0xe 에서 OK 를 기다린다

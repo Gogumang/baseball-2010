@@ -1021,9 +1021,9 @@ export function useMissionSession({
      * 이 적은 **성공 여부**다. 105 진입 0x10df8 이 이 바이트로 `resultEvents[이김 ? 0 : 1]` 을 고른다 (0x10e40).
      * 그래서 이김 = 미션 상태 '성공'. 미션 클리어 G 보상은 없다 (`rememberCleared` 를 안 부른다).
      *
-     * ⚠️ 미해결: 0xa5368(obj, 1) 은 플래그를 안 보고 `[obj+0xbd] ≤ 15` 면 클리어 횟수 칸(전역 +0x150 + 편×16 + idx)을
-     *    올린다. 대결에서 +0xbd 가 `g[0x175]`(= team − 1 = 15~19)로 채워지는지 못 찾았다 — 그렇다면 team 16(메디카,
-     *    레코드 15)을 이겼을 때만 투수 15번 칸이 오른다. 웹은 대결을 클리어 기록에 남기지 않는다(타자 대결과 같다).
+     * ⚠️ 미반영: 0xa5368(obj, 1) 은 플래그를 안 보고 `[obj+0xbd] ≤ 15` 면 클리어 횟수 칸(전역 +0x150 + 편×16 + idx)을
+     *    올린다. 대결의 +0xbd 는 SYS 8 이 `g[0x175]` 와 같은 team − 1(15~19)로 적는다(0x8d88a~0x8d890 확정) — 그래서
+     *    team 16(메디카, 레코드 15)을 이겼을 때만 투수 15번 칸이 오를 것이다. 웹은 아직 대결을 클리어 기록에 남기지 않는다.
      */
     finishPitcherAceMatch: (): boolean | null => {
       if (pitcherRun === null || pitcherAceMatchMission === null) return null

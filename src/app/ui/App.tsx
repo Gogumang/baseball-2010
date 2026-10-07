@@ -484,6 +484,7 @@ export function App() {
             session={mission}
             runner={runner}
             pitchControl={gameSettings.settings.pitchControl}
+            gameSettings={gameSettings}
             onFinish={onFinish}
           />
         )}
