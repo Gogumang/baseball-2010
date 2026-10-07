@@ -2506,6 +2506,8 @@ export function defensePlayResultOf(state: DefensePlayState): DefensePlayResult 
           homeRunEvent: state.homeRunEvent,
           flyOut: state.flyOut,
           outEvents: state.outEvents,
+          runsScored,
+          outsAfter: state.outs,
         }),
     tagOut: state.tagOut,
     throwBase: state.firstThrowBase,

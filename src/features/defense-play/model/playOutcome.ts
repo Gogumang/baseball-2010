@@ -45,7 +45,29 @@ import type { RunnerState } from '@/entities/fielding/model/fieldingState'
  *   (타수 +1 · 안타 0 · detail)과 같다. 다른 것은 B5(출루) 하나라 흐름이 판의 `runnerFates` 로 따로 켠다.
  *   안타 사건이 있는 판에서 타자주자가 살아 남으면 a81f8 이 늘 안타로 보내므로, 야수 선택 말고 "안타 없이 출루" 갈래는 없다
  *   (악송구 · 펌블로 산 타자도 안타다). `detail` 은 웹 전용이다: 뜬공 아웃(state[0x1f])이면 `뜬공아웃`, 아니면 `땅볼아웃`.
- *   ⚠️ 미해결: 희생 [sp+8](a83f2~a848e — 정산 객체 +0x15c~+0x15e 를 세우는 곳을 못 찾았다)이 서면 타수를 안 센다 — 웹 `아웃` 은 센다.
+ *
+ * ## 타수를 안 세는 아웃 (a882e ~ a88d4, 직접 뜬 것) — `noAtBat`
+ * ```
+ * a882e  [sp+0x28](사건 0xf = 득점 0xa5c34 가 1점마다) > 0 && [sp+0x30](아웃) > 0 && ![sp+0x14](안타) → a88d4 (타수 없음)
+ * a8840  [sp+0x2c](안타 사건 6 · 8) == 0 && [sp+0x30] == 0                                         → a88d4 (타수 없음)
+ * a884c  [sp+8](희생) ≠ 0                                                                          → a88e0 (타수 없음)
+ * a885e  state[0x26](판 종류) 4 · 5 가 아니면 a8896 기록 8 · 타자 +0x20 +1 (타수)
+ * ```
+ * **희생 [sp+8]** — 정산 객체 +0x15c~+0x15e(1~3루 칸)는 **투구 0xa5e14**(공마다, a5e7e~a5ece)가 세운다:
+ * ```
+ * a5e7e  +0x15c..+0x15e = 0 (0x1400428 memset 3)
+ * a5e90  주자 i = 0.. : b = +0x8c ; 1 ≤ b ≤ 3 이면 칸[b] = (+0x96 == 0)        ; 투구 때 루에 선 산 주자
+ * ```
+ * 정산 a83e2 (sp+8 = 0 으로 시작):
+ * ```
+ * a83e8  [sp+0x28](득점) == 0 && [sp+0x18](야수 선택) == 0 && [sp+0x2c](안타 사건) > 0 && 주자0 있음 &&
+ * a840c  state[6](판 뒤 아웃) ≤ 2 && 주자0 +0x96(끝 — 아웃 · 득점) 이면:
+ * a8424    i = 1.. : 주자 i 가 끝났으면(+0x96) 칸 셋을 지우고 멈춤 ; 아니면 b = +0x8c, 1 ≤ b ≤ 3 이면 칸[b] = 0
+ * a8472    [sp+8] = 칸[1] | 칸[2] | 칸[3] ; 칸 셋을 지운다
+ * ```
+ * 곧 "타자주자는 죽고(이닝은 안 끝나고) 공은 땅에 닿았고 득점 · 주자 아웃 없이 투구 때 주자가 있던 루가 비었으면" 희생이다.
+ * 공이 안 닿은(잡힌 뜬공) 판은 안타 사건이 없어 희생이 아니고, 득점이 난 판은 a882e(득점 아웃)로 타수에서 빠진다.
+ * [sp+8] 은 a88e0 에서 번트(state[0x13])면 결과비트 B6(0x40)도 켠다 — 그 배선(`burstResultBits` 의 `runnersAdvanced`)은 이 파일 밖이다.
  */
 
 export interface PlayOutcomeInput {
@@ -61,6 +83,10 @@ export interface PlayOutcomeInput {
   readonly flyOut: boolean
   /** 판에서 난 아웃 사건(0xd) 수 — 정산 [sp+0x30] */
   readonly outEvents: number
+  /** 판에서 점수판에 올라간 득점 — 정산 [sp+0x28](사건 0xf 수). 없으면 0 */
+  readonly runsScored?: number
+  /** 판이 끝난 뒤 아웃 수 state[6] — 희생 a840c 가 본다. 없으면 0 */
+  readonly outsAfter?: number
 }
 
 /** 홈을 가리키는 루 번호 — 진행기 루 표 [4] */
@@ -71,7 +97,44 @@ export function settledBatterOutcomeOf(input: PlayOutcomeInput): AtBatOutcome {
   const credited = creditedBasesOf(input)
   if (credited >= HOME_BASE) return { kind: '홈런' }
   if (credited >= 1) return { kind: '안타', bases: credited as 1 | 2 | 3 }
-  return { kind: '아웃', detail: input.flyOut ? '뜬공아웃' : '땅볼아웃' }
+  const detail = input.flyOut ? '뜬공아웃' : '땅볼아웃'
+  return countsAsSettledAtBat(input) ? { kind: '아웃', detail } : { kind: '아웃', detail, noAtBat: true }
+}
+
+/** a882e ~ a884c — 안타가 아닌 판에서 타수를 세나 (머리말 "타수를 안 세는 아웃") */
+function countsAsSettledAtBat(input: PlayOutcomeInput): boolean {
+  const runs = input.runsScored ?? 0
+  const hitEvents = input.hitEvent || input.homeRunEvent
+  if (runs > 0 && input.outEvents > 0) return false
+  if (!hitEvents && input.outEvents === 0) return false
+  return !isSacrificeOf(input)
+}
+
+/** 1~3루 칸 수 — 정산 객체 +0x15c ~ +0x15e */
+const SACRIFICE_BASE_SLOTS = 3
+
+/** **희생 [sp+8]** (a83e2 ~ a848e) — 칸은 투구 0xa5e14 가 투구 때 루(`pitchBase`)로 세운 것이다 (머리말) */
+export function isSacrificeOf(input: PlayOutcomeInput): boolean {
+  const runners = input.runners
+  const batter = runners[0]
+  if ((input.runsScored ?? 0) !== 0) return false
+  if (isFieldersChoice(runners)) return false
+  if (!(input.hitEvent || input.homeRunEvent)) return false
+  if (batter === undefined) return false
+  if ((input.outsAfter ?? 0) > 2) return false
+  if (!(batter.isOut || batter.scored)) return false
+  // a5e90 — 투구 때 루에 선 산 주자의 칸 (투구 때는 끝난 주자가 없다)
+  const slots = Array.from({ length: SACRIFICE_BASE_SLOTS + 1 }, () => false)
+  for (const runner of runners) {
+    if (runner.pitchBase >= 1 && runner.pitchBase <= SACRIFICE_BASE_SLOTS) slots[runner.pitchBase] = true
+  }
+  for (let index = 1; index < runners.length; index += 1) {
+    const runner = runners[index]
+    // a8432 — 끝난 주자가 있으면 칸 셋을 지우고 멈춘다
+    if (runner.isOut || runner.scored) return false
+    if (runner.startBase >= 1 && runner.startBase <= SACRIFICE_BASE_SLOTS) slots[runner.startBase] = false
+  }
+  return slots.some((slot) => slot)
 }
 
 /** 정산이 적는 루타 — 0 이면 안타가 아니다 */

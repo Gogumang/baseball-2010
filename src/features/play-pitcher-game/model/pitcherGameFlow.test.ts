@@ -1246,7 +1246,12 @@ describe('파울 각 공도 수비 판을 돈다 — 낙구 전에 잡히면 파
         // 어느 쪽이든 판 끝 정산 결과로 타석이 끝난다
         if (판.caughtOnTheFly) {
           뜬공아웃 += 1
-          expect(판.outcome).toEqual({ kind: '아웃', detail: '뜬공아웃' })
+          // 태그업 득점이 난 뜬공 아웃은 정산 a882e(득점 > 0 && 아웃 > 0 && 안타 아님)가 타수를 안 센다
+          expect(판.outcome).toEqual(
+            판.advance.runsScored > 0
+              ? { kind: '아웃', detail: '뜬공아웃', noAtBat: true }
+              : { kind: '아웃', detail: '뜬공아웃' },
+          )
         } else {
           expect(판.specialDefense.jumpUnlocked || 판.specialDefense.slideUnlocked).toBe(true)
         }

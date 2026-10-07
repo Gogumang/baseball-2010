@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { createRunner, type RunnerState } from '@/entities/fielding/model/fieldingState'
-import { creditedBasesOf, isBattedBallKind, settledBatterOutcomeOf } from '@/features/defense-play/model/playOutcome'
+import { countsAsAtBat } from '@/entities/at-bat/model/atBatOutcome'
+import {
+  creditedBasesOf,
+  isBattedBallKind,
+  isSacrificeOf,
+  settledBatterOutcomeOf,
+} from '@/features/defense-play/model/playOutcome'
 
 /** 판이 끝난 주자 — 출발 루 · 마지막으로 닿은 루(+0x8c) · 달려가던 루(+0x7c) · 아웃/득점 */
 const 주자 = (
@@ -81,5 +87,50 @@ describe('판 끝 정산 0xa8024 의 타자 갈래 (a8096 ~ a8266)', () => {
     expect(isBattedBallKind({ kind: '아웃', detail: '땅볼아웃' })).toBe(true)
     expect(isBattedBallKind({ kind: '삼진' })).toBe(false)
     expect(isBattedBallKind({ kind: '사구' })).toBe(false)
+  })
+})
+
+describe('타수를 안 세는 아웃 — 정산 a882e · 희생 [sp+8](칸은 투구 0xa5e14 가 세운다)', () => {
+  /** 1루 주자(투구 때 1루)가 2루에 닿고 타자주자는 1루에서 죽은 땅볼 — 보내기 번트 꼴 */
+  const 보내기 = [주자(0, 0, { reached: 0, target: 1, out: true }), 주자(1, 1, { reached: 2 })]
+
+  it('주자가 투구 때 루를 비우고 타자만 죽으면 희생이다 — 타수에 안 든다', () => {
+    const 결과 = settledBatterOutcomeOf({ ...기본, outEvents: 1, outsAfter: 1, runners: 보내기 })
+    expect(isSacrificeOf({ ...기본, outEvents: 1, outsAfter: 1, runners: 보내기 })).toBe(true)
+    expect(결과).toEqual({ kind: '아웃', detail: '땅볼아웃', noAtBat: true })
+    expect(countsAsAtBat(결과)).toBe(false)
+  })
+
+  it('주자가 제자리면 희생이 아니다 — 칸[1] 을 그 주자의 +0x8c 가 지운다', () => {
+    const 제자리 = [주자(0, 0, { reached: 0, target: 1, out: true }), 주자(1, 1, { reached: 1 })]
+    expect(isSacrificeOf({ ...기본, outEvents: 1, outsAfter: 1, runners: 제자리 })).toBe(false)
+    expect(countsAsAtBat(settledBatterOutcomeOf({ ...기본, outEvents: 1, outsAfter: 1, runners: 제자리 }))).toBe(true)
+  })
+
+  it('세 번째 아웃(state[6] > 2) · 공이 안 닿음(안타 사건 0) · 주자도 죽음 이면 희생이 아니다', () => {
+    expect(isSacrificeOf({ ...기본, outEvents: 1, outsAfter: 3, runners: 보내기 })).toBe(false)
+    expect(isSacrificeOf({ ...기본, hitEvent: false, flyOut: true, outEvents: 1, outsAfter: 1, runners: 보내기 })).toBe(false)
+    const 병살 = [주자(0, 0, { reached: 0, target: 1, out: true }), 주자(1, 1, { reached: 1, target: 2, out: true })]
+    expect(isSacrificeOf({ ...기본, outEvents: 2, outsAfter: 2, runners: 병살 })).toBe(false)
+  })
+
+  it('득점이 난 아웃(희생 뜬공 · 땅볼 타점)은 a882e 가 타수에서 뺀다', () => {
+    const 뜬공 = [주자(0, 0, { reached: 0, target: 1, out: true }), 주자(1, 3, { reached: 4, scored: true })]
+    const 결과 = settledBatterOutcomeOf({
+      ...기본,
+      hitEvent: false,
+      flyOut: true,
+      outEvents: 1,
+      runsScored: 1,
+      outsAfter: 1,
+      runners: 뜬공,
+    })
+    expect(결과).toEqual({ kind: '아웃', detail: '뜬공아웃', noAtBat: true })
+  })
+
+  it('득점 없는 보통 아웃은 타수다', () => {
+    const 결과 = settledBatterOutcomeOf({ ...기본, outEvents: 1, outsAfter: 1, runners: [주자(0, 0, { reached: 0, target: 1, out: true })] })
+    expect(결과).toEqual({ kind: '아웃', detail: '땅볼아웃' })
+    expect(countsAsAtBat(결과)).toBe(true)
   })
 })

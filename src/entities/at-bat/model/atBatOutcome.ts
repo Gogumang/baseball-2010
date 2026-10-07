@@ -12,7 +12,15 @@ export type AtBatOutcome =
   | { readonly kind: '사구' }
   | { readonly kind: '안타'; readonly bases: 1 | 2 | 3 }
   | { readonly kind: '홈런' }
-  | { readonly kind: '아웃'; readonly detail: '땅볼아웃' | '뜬공아웃' | '직선타아웃' }
+  | {
+      readonly kind: '아웃'
+      readonly detail: '땅볼아웃' | '뜬공아웃' | '직선타아웃'
+      /**
+       * 정산 0xa8024 a882e 가 **타수를 안 센** 판 — 판 끝 정산(`features/defense-play/model/playOutcome`)만 세운다:
+       * 득점(사건 0xf) > 0 && 아웃 > 0 && 안타 아님 · 안타 사건 == 0 && 아웃 == 0 · 희생 [sp+8](a83e2~a848e). 없으면 타수다.
+       */
+      readonly noAtBat?: true
+    }
 
 export function describeOutcome(outcome: AtBatOutcome): string {
   switch (outcome.kind) {
@@ -25,8 +33,12 @@ export function describeOutcome(outcome: AtBatOutcome): string {
   }
 }
 
-/** 타수에 포함되는가. 볼넷·사구는 타수에서 빠진다 (타수++ 0xa8894 는 안타·아웃 갈래에만 있다). */
+/**
+ * 타수에 포함되는가. 볼넷·사구는 타수에서 빠진다 (타수++ 0xa8894 는 안타·아웃 갈래에만 있다).
+ * 판 끝 정산이 타수를 안 센 아웃(`noAtBat` — 희생 · 득점 아웃, a882e)도 빠진다.
+ */
 export function countsAsAtBat(outcome: AtBatOutcome): boolean {
+  if (outcome.kind === '아웃' && outcome.noAtBat === true) return false
   return outcome.kind !== '볼넷' && outcome.kind !== '사구'
 }
 
