@@ -1825,10 +1825,10 @@ function batterPitch(
   if (!isBatterTurn(progress)) return progress
   progress = throwOpponentPitch(progress, detail.pitchTypeNumber)
   // 파울 각 공 — 원본도 판(상태 0x17)을 돈다. 연속 파울 기록(0xa7dbc)은 판의 결과 코드 7 메시지(51c5c)에서라 판이 파울로 닫힐 때 센다.
-  // ⚠️ 필살 스윙의 성공 굴림(0x517e6)은 타석 판정(resolvePitch)이 이미 굴렸다 — 원본은 판 시작의 필살수비 · 폴 굴림 뒤다(미해결,
-  //    타석 화면이 판을 도는 파울인지 모른다)
+  // 필살 스윙의 성공 굴림(0x517e6)은 타석 판정이 쏜 공(`detail.foulContact`)에 재료만 실어 판 시작(필살수비 · 폴 굴림 뒤)이 굴린다
   if (detail.resolution.kind === '파울' && detail.pattern !== undefined && detail.resultCode !== null) {
-    const started = startBatterFoulPlay(progress, { pattern: detail.pattern, resultCode: detail.resultCode }, random, options)
+    const contact = detail.foulContact ?? { pattern: detail.pattern, resultCode: detail.resultCode }
+    const started = startBatterFoulPlay(progress, contact, random, options)
     if (applyOutcome === startBatterOutcome) return started
     const pending = started.pendingDefensePlay
     if (pending === null) return started

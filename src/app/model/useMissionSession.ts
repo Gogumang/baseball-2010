@@ -490,6 +490,7 @@ export function useMissionSession({
       const hasSwung = detail.hasSwung
       // 파울 각 공 — 원본은 맞은 공이면 각과 무관하게 판(상태 0x17)을 돈다(메시지 0x11 → 0x13 → 0x17). 스트라이크(0xb6b58)는
       // 판이 파울로 닫힐 때(`finishDefensePlay`)다. 공 도착 판(0x3dfac)은 못 맞힌 공만이라 열지 않는다.
+      // 필살타법 성공 굴림(0x517e6)도 판 시작이 한다(`foulContact` 의 재료)
       // ⚠️ 파울 콜 25 는 아직 공 판정 자리(`pitchCallSoundIdOf`)에서 낸다 — 원본은 판의 결과 코드 7 메시지 51c5c
       const foulRun = missionRunRef.current
       if (
@@ -507,8 +508,6 @@ export function useMissionSession({
           side: '타자',
           input: {
             ...missionDefensePlayInputOf(foulRun.bases, foulRun.outs, foulOutcome, random),
-            // 타석 판정이 미리 굴린 필살타법 성공 — ⚠️ 원본 차례는 판 시작의 필살수비 · 폴 굴림 뒤다(미해결)
-            isUncatchable,
             stealingFrom: foulStealing,
             buntKind,
             // state[4] — 판 끝 결과 코드 11 · 판 뒤 스트라이크(0xb6b58)가 이 공 앞의 스트라이크를 본다

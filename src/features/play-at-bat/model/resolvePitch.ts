@@ -82,7 +82,7 @@ export interface PitchOutcomeDetail {
   /**
    * **판을 돌 파울 각 공** — 쏜 패턴 · 결과 코드 · 필살 스윙 재료(`BattedContact`). 파울(`resolution.kind === '파울'`)에만 있다.
    * 원본은 맞은 공이면 파울 각이라도 판(상태 0x17)을 돌아 낙구 · 담장선 틱에 0x9d5bc 가 7 을 내야 파울이고, 그 전에 잡히면
-   * 뜬공 아웃(13)이다. 받는 쪽이 이것으로 수비 판을 돌리고, 판이 파울로 닫히면
+   * 뜬공 아웃(13)이다. 받는 쪽이 이것으로 수비 판을 돌리고(필살타법 성공 굴림 0x517e6 도 판 시작이 한다), 판이 파울로 닫히면
    * 그제야 스트라이크를 올린다(0x35108 → 0xb6b58). CPU 타자의 `CpuPitchOutcome.foulContact` 와 같은 칸이다.
    */
   readonly foulContact?: BattedContact
@@ -260,15 +260,15 @@ export function resolvePitch(
     buntKind: swing.buntKind,
   })
   // 필살 성공 굴림 0x34c74 → 0x517e6 — 맞은 공(0xfd2 ≠ 0)이면 어느 갈래든 0x517c8 로 모인다. 원본 차례는 메시지 0x11
-  // (0x515c6 → 0x50faa: 필살수비 굴림 · 표시 패턴 · 쏘기의 폴 굴림) **뒤**라, 판을 도는 페어 타구는 굴림 재료만 쏜 공에 실어
-  // 보내고 수비 판 시작(`startDefensePlay`)이 그 차례에 굴린다. ⚠️ 파울 · 판정 11 은 아직 여기서 굴린다 — 파울 각 공은 이제
-  // 세션이 판을 돌리지만(`foulContact`) 굴림 차례는 아직 옛 자리다(미해결). 판정 11 은 판도 아직 안 돈다
+  // (0x515c6 → 0x50faa: 필살수비 굴림 · 표시 패턴 · 쏘기의 폴 굴림) **뒤**라, 판을 도는 페어 타구 · 파울 각 공은 굴림 재료만
+  // 쏜 공에 실어 보내고 수비 판 시작(`startDefensePlay`)이 그 차례에 굴린다. ⚠️ 판정 11(2스트라이크 번트 파울)만 웹이 아직
+  // 판을 안 돌려(원본은 이 공도 판을 돌아 0x9d5bc 가 11 을 낸다) 여기서 굴린다 — 그 공의 필살수비 · 폴 굴림도 없다(미해결)
   const specialSwing =
     swing.isSpecial === true
       ? { number: context.specialSwing?.number ?? 0, isAceBatter: context.specialSwing?.isAceBatter === true }
       : undefined
   const isUncatchable =
-    contact.kind !== '타구' &&
+    contact.kind === '번트파울아웃' &&
     specialSwing !== undefined &&
     rollSpecialSwing(specialSwing.number, random, specialSwing.isAceBatter)
   // 타격음 7·9·5·59·6 — 쏜 패턴의 각·세기·높이로 고른다 (0x515de~0x5164a — 0x514f2 의 특수 표 덮어쓰기 뒤)
@@ -287,8 +287,8 @@ export function resolvePitch(
           isBunt: false,
           resultCode: code,
           pattern,
-          // 파울 각이라도 판을 돈다 — 부르는 쪽이 이 쏜 공으로 판을 돌린다
-          foulContact: { pattern, resultCode: code },
+          // 파울 각이라도 판을 돈다 — 부르는 쪽이 이 쏜 공으로 판을 돌린다(필살타법 굴림까지 판 시작에 맡긴다)
+          foulContact: { pattern, resultCode: code, ...(specialSwing === undefined ? {} : { specialSwing }) },
           contactSoundId,
         }
       : contact.kind === '번트파울아웃'

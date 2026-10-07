@@ -243,6 +243,27 @@ describe('resolvePitch — 필살 성공 굴림 0x34c74 → 0x517e6', () => {
     expect(필살.count()).toBe(보통.count())
   })
 
+  it('파울 각 공도 굴리지 않는다 — 판을 도는 쏜 공(`foulContact`)에 재료를 싣고 판 시작(필살수비 · 폴 굴림 뒤)에 맡긴다', () => {
+    let 찾음 = false
+    for (const value of [0, 0.3, 0.6, 0.9]) {
+      for (let frame = 0; frame <= 30 && !찾음; frame += 1) {
+        const 보통 = 세는(value)
+        const 필살 = 세는(value)
+        const a = resolvePitch(직구(), { frame, shift: 0, buntKind: 0 }, 필살상황, 덱(), 보통.random)
+        if (a.detail.resolution.kind !== '파울') continue
+        const b = resolvePitch(직구(), { frame, shift: 0, buntKind: 0, isSpecial: true }, 필살상황, 덱(), 필살.random)
+        찾음 = true
+        expect(b.detail.resolution).toEqual({ kind: '파울' })
+        expect(b.isUncatchable).toBe(false)
+        expect(필살.count()).toBe(보통.count())
+        expect(a.detail.foulContact).toEqual({ pattern: a.detail.pattern, resultCode: a.detail.resultCode })
+        expect(b.detail.foulContact?.specialSwing).toEqual({ number: 1, isAceBatter: false })
+        expect(b.detail.foulContact?.pattern).toEqual(b.detail.pattern)
+      }
+    }
+    expect(찾음).toBe(true)
+  })
+
   it('보통 스윙은 굴리지 않는다', () => {
     const 필살 = 세는(0)
     expect(resolvePitch(직구(), { frame: 16, shift: 0, buntKind: 0 }, 필살상황, 덱(), 필살.random).isUncatchable).toBe(false)

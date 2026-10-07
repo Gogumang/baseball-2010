@@ -716,8 +716,6 @@ export function startPlayerFoulPlay(
     readonly strikes: number
     /** 장면 +0xfdc — 번트 종류 (판 시작 리드 · 판 끝 결과 코드 11) */
     readonly buntKind?: number
-    /** 타석 판정이 미리 굴린 필살타법 성공 (0x517e6) — ⚠️ 원본 차례는 판 시작의 필살수비 · 폴 굴림 뒤다(미해결) */
-    readonly isUncatchable?: boolean
   },
 ): GameProgress {
   if (progress.game.isFinished) return progress
@@ -725,10 +723,8 @@ export function startPlayerFoulPlay(
   return {
     ...withoutSteal(progress),
     pendingDefensePlay: withPredictedOutcome({
-      ...defensePlayInputOf(progress, outcome, contact.pattern, random, {
-        buntKind: options.buntKind,
-        isUncatchable: options.isUncatchable,
-      }),
+      // 필살타법 성공 굴림(0x517e6)은 쏜 공의 재료(`contact.specialSwing`)로 판 시작이 필살수비 · 폴 굴림 뒤에 한다
+      ...defensePlayInputOf(progress, outcome, contact.pattern, random, { buntKind: options.buntKind }),
       strikes: options.strikes,
     }),
   }
