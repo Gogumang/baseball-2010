@@ -49,6 +49,11 @@ export interface CatchForecast {
   readonly earliestCatchTick: number
   /** 포구 지점 */
   readonly point: WorldPoint
+  /**
+   * **담장 갈래 0xb3e5c~0xb3ebc** — 공이 담장선을 먼저 넘으면(공+0xaa4 ≠ −1 && aa4 < min(땅볼, 가슴, 낮은 공 틱)) 고른 야수는
+   * AI 0xb 로 공점(aa4 − 2)의 (x, 0, z) 에 간다(+0x90). 점프 · 슬라이딩 틱은 최소에 안 든다. 아니면 null
+   */
+  readonly fenceChasePoint: WorldPoint | null
 }
 
 /** 아무도 못 잡을 때 원본이 쓰는 큰 값 (플레이 +0x11c 초기값) */
@@ -203,7 +208,30 @@ export function forecastCatch(
     choice,
     earliestCatchTick: ticks.length === 0 ? NO_CATCH_TICK : Math.min(...ticks),
     point: trajectory.pointAt(choice.catchTick),
+    fenceChasePoint: fenceChasePointOf(trajectory, table),
   }
+}
+
+/**
+ * 0xb3b38 의 담장 갈래(직접 뜬 것):
+ * ```
+ * b3e5c  r3 = min(sp38 땅볼, sp3c 가슴, sp40 낮은 공)      ; 없으면 100000(b3b60)
+ * b3e6e  W = 공+0xaa4(sp44) ; W == −1 → b3ebe(백업) ; W ≥ r3 → b3ebe
+ * b3e7a  0xa25b0(공, W − 2) → (x, y, z) ; b3e8c 고른 야수 AI = 0xb(0xb8dbc) ; b3e96~b3eba 목표 +0x90 = (x, 0, z)
+ * ```
+ * AI 0xb(분기표 0xd8808 → 0xb4b5c)는 목표 +0x90 으로 걷는다 — 공이 아니라 담장 앞으로 간다.
+ */
+function fenceChasePointOf(trajectory: BattedBallTrajectory, table: CatchTable): WorldPoint | null {
+  const fenceTick = trajectory.fenceTick
+  if (fenceTick === -1) return null
+  const earliest = Math.min(
+    table.grounder?.tick ?? NO_LOW_TICK,
+    table.chest?.tick ?? NO_LOW_TICK,
+    table.low?.tick ?? NO_LOW_TICK,
+  )
+  if (fenceTick >= earliest) return null
+  const point = trajectory.pointAt(fenceTick - 2)
+  return { x: point.x, y: 0, z: point.z }
 }
 
 /** 0xb3b60 — 표가 비었을 때의 틱 100000 */

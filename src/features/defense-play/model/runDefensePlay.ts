@@ -895,8 +895,13 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
   const catchPoint = trajectory.pointAt(catchTick)
   // 시작 목표를 미리 세워 둔다 — 첫 틱부터 쫓는 야수는 공 쪽, 커버 야수는 제 루 쪽을 보고 있어야 한다.
   // 커버는 판 시작 상태로 0xb1c90 을 한 번 돌린 것이다(`assignCoversForTick` — 매 틱 6절이 다시 고른다)
+  // 0xb3b38 담장 갈래 — 담장선이 먼저면 고른 야수는 AI 0xb 로 담장 앞 공점(aa4 − 2)에 간다(`fenceChasePoint`)
   fielders = fielders.map((fielder) =>
-    fielder.slot === chaserSlot ? { ...fielder, target: catchPoint, aiState: AI_STATE.CHASE } : fielder,
+    fielder.slot === chaserSlot
+      ? forecast.fenceChasePoint !== null
+        ? { ...fielder, target: forecast.fenceChasePoint, aiState: AI_STATE.PICK_UP }
+        : { ...fielder, target: catchPoint, aiState: AI_STATE.CHASE }
+      : fielder,
   )
   const startCovers = assignCoversForTick({
     context: {
@@ -1475,7 +1480,16 @@ export function stepDefensePlay(
     catchPoint = options.thrownBall === true ? { x: caughtAt.x, y: 0, z: caughtAt.z } : caughtAt
     fielders = fielders.map((fielder) =>
       fielder.slot === chaserSlot
-        ? { ...fielder, target: catchPoint, aiState: AI_STATE.CHASE, holdingBall: false }
+        ? forecast.fenceChasePoint !== null
+          ? // 0xb3b38 담장 갈래 — AI 0xb · 목표 = 담장 앞 공점(aa4 − 2)의 (x, 0, z)
+            { ...fielder, target: forecast.fenceChasePoint, aiState: AI_STATE.PICK_UP, holdingBall: false }
+          : // b3e4e — 이미 AI 0xb 인 야수는 AI 1 로 안 바꾼다(머리의 되돌리기도 1 · 0xc 만 본다)
+            {
+              ...fielder,
+              target: fielder.aiState === AI_STATE.PICK_UP ? fielder.target : catchPoint,
+              aiState: fielder.aiState === AI_STATE.PICK_UP ? AI_STATE.PICK_UP : AI_STATE.CHASE,
+              holdingBall: false,
+            }
         : options.thrownBall === true && (fielder.aiState === AI_STATE.CHASE || fielder.aiState === AI_STATE.BACKUP)
           ? // 0xb3b38 머리 — AI 1 · 0xc 인 야수는 AI 0 으로 되돌린다(P2 1a). ⚠️ 다시 쏘기 갈래엔 아직 안 옮겼다
             { ...fielder, aiState: AI_STATE.IDLE, holdingBall: false }
@@ -1689,8 +1703,20 @@ export function stepDefensePlay(
     }
 
     // ── 1. 포구 ──
+    // 포구 틱 갈래 전체(b4074~b42ce: 동작 시작 · 펌블 굴림 · 필살타법 표시 · 결과 코드 9 · 쥐기)는 플레이 틱 0xb401c 머리
+    // b4064 의 플레이.vt50 = 0xb2ac8 이 참일 때만 돈다(직접 뜬 것):
+    // ```
+    // b2aca +0x12c(쥠) · b2ad8 +0x111(홈런 · 사건 8) · b2ae2 +0x124(바운드 담장 넘김 · 사건 10) · b2aec +0x129(폴 홈런 · 사건 12) ·
+    // b2af6 +0x110(파울 · 사건 7) 가 모두 0 일 때만 1 — 하나라도 서면 b4072 b b42ce 로 포구 틱 갈래를 통째로 건너뛴다
+    // ```
+    // 사건 코드는 같은 틱 뒤쪽 b44f6(6d 절)이 세우므로 담장선 · 낙구 틱에는 그 틱의 포구가 먼저 돈다. 그 뒤로는 아무도
+    // 공을 쥐지 않아(펌블 굴림도 없다) 담장을 넘은 공으로 주자를 잡을 수 없다. 예전 웹은 이 관문이 없어 담장선을 넘어 홈런
+    // 사건이 선 공을 쫓아간 야수가 쥐고 던져 홈에서 타자주자를 잡았다(원본 표 전체 CPU 수비 130판).
+    // 아웃 판정 0xb36d0 의 종류 거르개 0x58d 에 6(홈런 — 0xb2bd8 의 0xb0cb8(6))이 없는 것은 원본 그대로다 — 쥔 야수가 없으니
+    // 그 판정은 아무도 죽이지 못한다. 0xb2c58(vt54)도 사건 7 · 12 에만 야수 동작 0xf 를 주고 8 에는 안 준다(그대로 쫓는다)
+    const catchGateOpen = !play.held && !homeRunFlag && !groundRuleFlag && !play.suppressed && !foulFlag
     // 필살타법 성공 타구(비트 4)는 야수가 쥐지 않고 지나친다 — 포구 자체를 건너뛴다 (0xaf180·0xbc3)
-    if (tick === catchTick && uncatchable) {
+    if (tick === catchTick && catchGateOpen && uncatchable) {
       // b4228 — 펌블 굴림 rand(0, 10000) 은 필살타법 표시를 보기(b4246) 전에 늘 먹는다
       if (input.random !== undefined) randomIntegerBelow(input.random, 0, 10_000)
       // 필살타법 타구 — 공 속성 목록 +0x5c 의 비트 4(0xaf180) 때문에 포구 틱 갈래가 쥐기 대신 메시지 0xbc3 · 사건(sp+0x24) = 1
@@ -1704,7 +1730,7 @@ export function stepDefensePlay(
       )
       log.push(`${tick}틱 ${chaserSlot}번 야수에게 필살타법 타구가 맞았다 (0xbc3)`)
     }
-    if (tick === catchTick && !uncatchable && input.random !== undefined) {
+    if (tick === catchTick && catchGateOpen && !uncatchable && input.random !== undefined) {
       // 펌블 굴림 (0xb41d0) — **움직이는 공을 잡을 때마다** 걸린다(뜬공 직접 포구 포함).
       // 굴러와 멈춘 공을 줍는 것만 빠진다 — 공.vt18 = 0xa27f0(지금 점의 속도·수직 속도 워드 == 0 && 높이 0) 이 0 일 때만.
       // 손으로 만든 시험 궤적(원본 칸 없음)은 마지막 점을 멈춘 점으로 본다.
@@ -1718,7 +1744,7 @@ export function stepDefensePlay(
         log.push(`${tick}틱 ${chaserSlot}번 야수 펌블 (0xbc2)`)
       }
     }
-    if (tick === catchTick && !uncatchable && !ballEventThisTick) {
+    if (tick === catchTick && catchGateOpen && !uncatchable && !ballEventThisTick) {
       // b4292 (쥐기 b42c8 **앞**, 직접 뜬 것): b = 야수.vt58()(발밑 루 — 좌표 완전일치) ; b ≠ −1 이고 R = 0xa97a0(b)(아웃 아닌 주자 중
       // 그 루에 마지막으로 닿은 첫 주자)가 있고 R.vt18()(목표점에 있음)이면 결과 코드 sp+0x38 = 9 (b42bc). 모든 포구에 걸린다 —
       // 견제 · 주자 판(pickoffPlay · runnerPlayEngine)과 같은 갈래다. 쥐기 안 vt90 이 아웃을 내면 b4540 이 13 으로 덮는다.
@@ -2727,6 +2753,9 @@ function moveFielder(fielder: FielderState, input: FielderMoveInput): FielderSta
     const base = fielder.aiState - AI_STATE.COVER_HOME
     return { ...walk(basePosition(base)), targetBase: base }
   }
+  // AI 0xb(0xb4b5c) — 0xb3b38 담장 갈래가 세운 목표 +0x90(담장 앞)으로. ⚠️ 쥔 야수가 0xb 로 남는 경우(점프 · 슬라이딩 포구가
+  // 담장선보다 이를 때)의 0xb4b5c 뒤 조건(b482e)은 안 떴다 — 쥔 동안은 걷지 않는다(웹 관례)
+  if (fielder.aiState === AI_STATE.PICK_UP && !fielder.holdingBall) return walk(fielder.target)
   if (fielder.slot === input.chaserSlot) {
     if (input.tick < input.catchTick) return { ...walk(input.catchPoint), aiState: AI_STATE.CHASE }
     if (fielder.aiState !== AI_STATE.IDLE) return fielder

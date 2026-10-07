@@ -64,6 +64,10 @@ describe('협살 대상 고르기 0xb398c — 남은 비율 > 35%', () => {
     expect(chooseRundownRunner([사이주자(0, 30), 사이주자(1, 30)])).toBe(1)
   })
 
+  it('타자주자(0번)도 대상이다 — 고르기는 0번까지 본다 (다른 주자가 없을 때)', () => {
+    expect(chooseRundownRunner([사이주자(0, 30)])).toBe(0)
+  })
+
   it('아웃됐거나 판정끝(+0x94)인 주자는 건너뛴다', () => {
     expect(chooseRundownRunner([{ ...사이주자(1, 30), isOut: true }])).toBe(NONE)
     expect(chooseRundownRunner([{ ...사이주자(1, 30), settled: true }])).toBe(NONE)

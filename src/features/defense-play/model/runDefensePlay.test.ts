@@ -739,11 +739,10 @@ describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
     expect(전원.log.some((line) => line.includes('귀루'))).toBe(true)
   })
 
-  it('타자주자도 협살 대상이다 — 고르기 0xb398c 는 0번까지 본다', () => {
-    // 원본 고르기는 뒤 주자부터 보므로 타자주자(0번)는 다른 주자가 없을 때만 뽑힌다 — 예전 웹은 0번을 아예 뺐다.
-    // 원본 코드 24 [118, 961, 1367, 2]: 중계 끝에 3루수가 홈으로 던진 공을 포수(홈 커버)가 85틱에 받는다 — 홈으로 달려가는
-    // 타자주자의 달려가는 루(4) 커버가 공을 쥐었다
-    // ⚠️ 이 공은 29틱에 담장선을 넘어(결과 코드 8) 홈런 사건이 선 공이다 — 넘어간 공을 야수가 쫓는 것은 웹 미해결(보고)
+  it('담장선을 넘어 홈런 사건(8)이 선 공은 아무도 쥐지 않는다 — 포구 틱 갈래는 플레이.vt50 0xb2ac8(+0x111 등)에 막힌다', () => {
+    // 원본 코드 24 [118, 961, 1367, 2]: 29틱에 담장선을 넘는다(결과 코드 8 → 0xb2bd8 +0x111). 예전 웹은 42틱에 좌익수가 넘어간 공을
+    // 쥐고 중계해 85틱에 홈으로 달려가는 타자주자를 협살로 잡았다(0번 주자 4↔3루). 원본은 b4064 vt50 이 거짓이라 포구 틱 갈래를
+    // 통째로 건너뛰고, 관문 b0e04 가 주자가 다 들어올 때까지 판을 연다
     const 결과 = runDefensePlay({
       outcome: 삼루타,
       trajectory: battedBallTrajectory([118, 961, 1367, 2]),
@@ -752,7 +751,10 @@ describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
       defenseIsCpu: true,
     })
 
-    expect(결과.log).toContain('85틱 협살 시작 — 0번 주자 4↔3루 (야수 1·4)')
+    expect(결과.log).toContain('29틱 담장선 — 판 끝 결과 코드 8 (0x9d5bc)')
+    expect(결과.log.some((line) => line.includes('잡았다'))).toBe(false)
+    expect(결과.outcome).toEqual({ kind: '홈런' })
+    expect(결과.advance).toEqual({ bases: EMPTY_BASES, runsScored: 1, outsAdded: 0 })
   })
 })
 
@@ -1806,9 +1808,11 @@ describe('파울 판 — 쏜 공의 파울 각(511b8 state[0x1c])이면 낙구 �
     expect(잡힘.advance.outsAdded).toBe(1)
   })
 
-  it('파울 갈래 관문(b0d2c)은 공을 쥔 틱 다음에 판을 닫는다 — 쥔 공은 멈춘 공이다', () => {
-    const 주움 = 쏘기([209, 317, 295, 1], 9, 0)
-    expect(주움.log).toContain('30틱 1번 야수가 잡았다 (종류 0)')
-    expect(주움.ticks.length).toBeLessThanOrEqual(32)
+  it('파울 사건(7)이 선 공은 아무도 줍지 않는다 — 포구 틱 갈래가 플레이.vt50 0xb2ac8(+0x110)에 막혀 관문은 공이 멈출 때 닫는다', () => {
+    // 예전 웹은 30틱에 투수가 굴러온 파울을 쥐고 그다음 틱에 닫았다 — 원본은 +0x110 이 서면 b4064 가 포구 틱 갈래를 건너뛴다
+    const 굴림 = 쏘기([209, 317, 295, 1], 9, 0)
+    expect(굴림.log.some((line) => line.includes('잡았다'))).toBe(false)
+    expect(굴림.foulEnded).toBe(true)
+    expect(굴림.ticks.length).toBe(48)
   })
 })
