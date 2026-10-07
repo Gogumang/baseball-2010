@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { derbyBattedBallOf } from '@/entities/home-run-derby/model/derbyBattedBall'
+import { DERBY_PLAY_CLOSE_TICKS, derbyBallStopTickOf, derbyBattedBallOf } from '@/entities/home-run-derby/model/derbyBattedBall'
 import { DERBY_DISTANCE_LIMIT } from '@/entities/home-run-derby/model/derbyRules'
 import { isBigFlyPattern, isEventZoneHit, isEventZoneVisibleAt } from '@/entities/home-run-derby/model/eventZone'
 import { BATTED_BALL_PATTERNS } from '@/shared/config/original/battedBallPatterns'
@@ -52,5 +52,17 @@ describe('이벤트 존 — 플레이 +0x127 = 패턴 플래그 & 2 (0xb07c8)', 
     const 보임 = Array.from({ length: 16 }, (_unused, tick) => isEventZoneVisibleAt(tick))
     expect(보임.slice(0, 8)).toEqual(보임.slice(8, 16))
     expect(보임.filter(Boolean)).toHaveLength(8)
+  })
+})
+
+describe('판 끝 — 관문 0xb0d28 의 +0x125 갈래(공.vt18 멈춤) 뒤 10틱', () => {
+  it('처음 멈춘 점의 틱 + 10 이다 — 원본 코드 24 [126, 1337, 1006]', () => {
+    const 공 = derbyBattedBallOf([126, 1337, 1006, 0], true)
+    const 멈춘틱 = derbyBallStopTickOf(공.trajectory)
+
+    expect(공.trajectory.isStoppedAt?.(멈춘틱)).toBe(true)
+    expect(공.trajectory.isStoppedAt?.(멈춘틱 - 1)).toBe(false)
+    expect(멈춘틱).toBe(공.trajectory.length - 1)
+    expect(공.endTicks).toBe(멈춘틱 + DERBY_PLAY_CLOSE_TICKS)
   })
 })

@@ -1,5 +1,5 @@
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
-import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
+import { battedBallTrajectory, trajectoryWithRandom } from '@/entities/batting/model/battedBallFlight'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
@@ -143,8 +143,8 @@ import {
  * 득점**을 원본 규칙으로 정한다. 그래서 여기서 바뀌는 것은 `baseState` 의 두 근사 —
  * "희생플라이 보장" 과 "고정 진루표" — 이고, 그 자리를 `autoAdvanceDecisions` + `heldRuns` 가 채운다.
  *
- * ⚠️ 타구 궤적은 `entities/batting/model/battedBallFlight` 의 **근사**다. 원본 물리 루프
- * (0xb3b38·0xb401c)는 해독 금지 주제라 뜯지 않았고, 원본 패턴 데이터의 각·세기·높이만 읽어 썼다.
+ * 타구 궤적은 `entities/batting/model/battedBallFlight` 가 원본 물리 세계 0xbfed0 대로 미리 깐 점이다
+ * (점마다 속도·수직 속도·각·바운드 표시, 사건 틱 aa0 · aa4 · aa8 · ab0).
  */
 
 /** 능력치를 안 주면 쓰는 값 — 원본 평균대(등급 3) */
@@ -746,7 +746,7 @@ export interface DefensePlayState {
  * 그 순서와 횟수가 씨앗 결과를 정하므로 자리를 옮기면 안 된다.
  */
 export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
-  const trajectory = input.trajectory
+  let trajectory = input.trajectory
   const abilities =
     input.defenseAbilities ?? Array.from({ length: 9 }, () => DEFAULT_ABILITY)
   const speed = runnerSpeedOf(input.runAbility ?? DEFAULT_ABILITY)
@@ -792,7 +792,20 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     chaserSlot: forecast.choice.slot,
     uncatchable,
   })
-  if (specialDefense.jumpUnlocked || specialDefense.slideUnlocked) {
+  // ── 쏘기 + 세계 0xbfed0 (메시지 0x11 의 51172~511a4) — 필살수비 굴림(50fe6 · 51012) 뒤다 ──
+  // 궤적 계산 안의 굴림은 폴 충돌 0xa2c64 의 rand(−25, 25) 하나뿐이다. 부르는 쪽은 난수 없이 궤적을 깔아 넘기므로
+  // 그 굴림이 있던 궤적이면 여기서 난수로 다시 깐다 (굴림이 없던 궤적은 그대로 — 난수를 안 쓴다).
+  const rolledTrajectory = trajectoryWithRandom(trajectory, input.random)
+  const relaid = rolledTrajectory !== trajectory
+  trajectory = rolledTrajectory
+  if (relaid) {
+    forecast = forecastCatch(trajectory, fielders, window)
+    if (wantsFlyCatch && forecast.earliestCatchTick === NO_FORECAST_CATCH) {
+      window = wholeWindow
+      forecast = forecastCatch(trajectory, fielders, window)
+    }
+  }
+  if (specialDefense.jumpUnlocked || specialDefense.slideUnlocked || relaid) {
     forecast = forecastCatch(trajectory, fielders, window, {
       jumpUnlocked: specialDefense.jumpUnlocked,
       slideUnlocked: specialDefense.slideUnlocked,
@@ -1476,8 +1489,10 @@ export function stepDefensePlay(
     // 필살타법 성공 타구(비트 4)는 야수가 쥐지 않고 지나친다 — 포구 자체를 건너뛴다 (0xaf180·0xbc3)
     if (tick === catchTick && !uncatchable && input.random !== undefined && !fumbled) {
       // 펌블 굴림 (0xb41d0) — **움직이는 공을 잡을 때마다** 걸린다(뜬공 직접 포구 포함).
-      // 굴러와 멈춘 공을 줍는 것만 빠진다 (공 vt18 = "공이 멈췄는가", P2 3절 정정).
-      const ballIsMoving = tick < trajectory.length - 1
+      // 굴러와 멈춘 공을 줍는 것만 빠진다 — 공.vt18 = 0xa27f0(지금 점의 속도·수직 속도 워드 == 0 && 높이 0) 이 0 일 때만.
+      // 손으로 만든 시험 궤적(원본 칸 없음)은 마지막 점을 멈춘 점으로 본다.
+      const ballIsMoving =
+        trajectory.isStoppedAt === undefined ? tick < trajectory.length - 1 : !trajectory.isStoppedAt(tick)
       if (rollFumble(abilities[chaserSlot] ?? DEFAULT_ABILITY, ballIsMoving, input.random)) {
         fumbled = true
         // 야수+0xb8 = 6(놓침 동작), 야수+0xb4 = 15(동작 잠금), 공은 야수 vt78 로 **무작위 튕김**.
@@ -2051,13 +2066,10 @@ export function stepDefensePlay(
     // ⚠️ 근사: 사건(sp+0x24)은 안 본다. 송구 받기는 늘 +0x112 가 선 뒤이고, 웹 펌블은 같은 자리에서 15틱 뒤 다시 줍는
     //    근사라 뜬공을 펌블한 뒤에는 낙구 틱이 지나도 공이 안 떨어진 것으로 본다(원본은 vt78 로 튕긴 새 궤적의 낙구 —
     //    궤적 루프).
-    // 공+0xaa4 는 **담장 위로 넘는** 충돌(점 구조체 +0x3a/+0x39) 첫 틱이다 — 높이 ≤ 1999 에서 담장 면에 맞는 공은 따로 공+0xaa8
-    // (각도 바꿔 튕김 · 속도 ½, P2 1b)이라 0x9d5bc 의 state[0x20] 이 안 선다. 웹 궤적(`battedBallFlight`, 근사)은 굴러서
-    // 담장에 닿은 공에도 `fenceTick` 을 세우므로 그 틱 높이가 1999 를 넘을 때만 담장선 틱으로 읽는다(⚠️ 근사 — 담장 높이는 미확정).
-    const overFenceTick =
-      trajectory.fenceTick >= 0 && trajectory.pointAt(trajectory.fenceTick).y > WALL_FACE_HEIGHT
-        ? trajectory.fenceTick
-        : -1
+    // 공+0xaa4 는 **담장(또는 파울 관중석) 위로 넘는** 충돌 첫 틱이다(0x9f7e8 의 +0x29/+0x2a → 0xa2bf0). 높이 ≤ 1999 에서
+    // 담장 면에 맞은 공은 공+0xaa8(`wallTick`)로 따로 적혀 state[0x20] 이 안 선다. state[0x20] · [0x80] 은 타구 시작 511ea · 511f4 가
+    // 미리 깐 궤적의 aa4 · ab0 를 통째로 옮긴 값이라, 낙구 틱의 0x9d5bc 도 아직 오지 않은 담장 넘김을 본다(원본 그대로).
+    const overFenceTick = trajectory.fenceTick
     if (!ballContacted && !(fumbled && onTheFly)) {
       let landedNow = false
       if (tick === overFenceTick && !foulFlag) {
@@ -2253,9 +2265,6 @@ export function runDefensePlay(input: DefensePlayInput): DefensePlayResult {
   }
   return defensePlayResultOf(state)
 }
-
-/** 담장 면 충돌(공+0xaa8)로 보는 높이 상한 — P2 1b "높이 ≤ 1999 에서 맞은 다른 충돌" */
-const WALL_FACE_HEIGHT = 1999
 
 /** 예보 표가 비었을 때의 가장 이른 포구 틱 (플레이 +0x11c 초기값 0xffff — `forecastCatch`) */
 const NO_FORECAST_CATCH = 0xffff

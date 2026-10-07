@@ -1555,6 +1555,27 @@ describe('판 진행 관문 0xb0d28 · 판 끝 결과 코드 0x9d5bc (b44f6) —
     expect(state.play.kind).toBe(1)
   })
 
+  it('바운드 뒤 담장 위로 넘는 원본 궤적 — 낙구 틱에 0x9d5bc 가 미리 깐 aa4(state[0x20])를 보고 코드 10 (511ea · b44f6)', () => {
+    // 원본 코드 0 [92, 781, 1313]: 30틱에 떨어지고 39틱에 높이 2556 으로 가운데 담장을 넘는다
+    const trajectory = battedBallTrajectory([92, 781, 1313, 0])
+    expect(trajectory.landingTick).toBe(30)
+    expect(trajectory.fenceTick).toBe(39)
+    const { state } = 돌리기({ outcome: 단타, trajectory, bases: 주자1루, outs: 0 })
+    expect(state.log).toContain('30틱 낙구 — 판 끝 결과 코드 10 (0x9d5bc)')
+    expect(state.groundRuleFlag).toBe(true)
+  })
+
+  it('폴 충돌 굴림 rand(−25, 25)(0xa2c64)는 판 시작에서 필살수비 굴림 뒤에 난수로 다시 깐다 — 굴림이 없던 궤적은 그대로', () => {
+    // 원본 코드 24 [45, 1402, 991]: 20틱에 1루 쪽 폴 — 새 각 = 149 + rand(−25, 25)
+    const 폴 = battedBallTrajectory([45, 1402, 991, 0])
+    const 굴림 = startDefensePlay({ outcome: 단타, trajectory: 폴, bases: EMPTY_BASES, outs: 0, random: 고정난수(0) })
+    expect(굴림.trajectory).not.toBe(폴)
+    expect(굴림.trajectory.pointDetailAt?.(20).angle).toBe(149 - 25)
+    const 그대로 = startDefensePlay({ outcome: 단타, trajectory: 폴, bases: EMPTY_BASES, outs: 0 })
+    expect(그대로.trajectory).toBe(폴)
+    expect(그대로.trajectory.pointDetailAt?.(20).angle).toBe(149)
+  })
+
   it('협살이 풀린 틱에 날아가던 짝 송구도 짝이 받는다 — 공을 아무도 안 쥔 채 240틱까지 가지 않는다', () => {
     const result = runDefensePlay({
       outcome: 이루타,

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
-import { CONFIRM_LOCK_FRAMES, SCENE_D_FRAMES, useHomeRunDerby } from '@/pages/home-run-derby/model/useHomeRunDerby'
+import { CONFIRM_LOCK_FRAMES, resultHoldMillisecondsOf, SCENE_D_FRAMES, useHomeRunDerby } from '@/pages/home-run-derby/model/useHomeRunDerby'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import type { DerbyResult } from '@/entities/home-run-derby/model/derbyRun'
 
@@ -37,7 +37,7 @@ const 번트: PitchOutcomeDetail = {
 function 한구(rendered: { result: { current: ReturnType<typeof useHomeRunDerby> } }, detail: PitchOutcomeDetail) {
   act(() => rendered.result.current.onPitchResolved(detail))
   act(() => {
-    vi.advanceTimersByTime(2_000)
+    vi.advanceTimersByTime(resultHoldMillisecondsOf(detail) + 500)
   })
 }
 
@@ -146,7 +146,7 @@ describe('홈런더비 한 판', () => {
     expect(rendered.result.current.run.isBonusGame).toBe(true)
     expect(rendered.result.current.shownCombo).toBeNull()
     act(() => {
-      vi.advanceTimersByTime(1_500 + SCENE_D_FRAMES * 62)
+      vi.advanceTimersByTime(resultHoldMillisecondsOf(홈런) + SCENE_D_FRAMES * 62)
     })
     // 0xd → 0xe: OK 를 기다리는 동안은 아직 0xf 가 아니다
     expect(rendered.result.current.isAwaitingConfirm).toBe(true)
@@ -169,7 +169,7 @@ describe('홈런더비 한 판', () => {
     // 결과 연출 동안은 아직 안 켜진다
     expect(rendered.result.current.shownCombo).toBeNull()
     act(() => {
-      vi.advanceTimersByTime(1_500)
+      vi.advanceTimersByTime(resultHoldMillisecondsOf(홈런))
     })
     expect(rendered.result.current.shownCombo).toBe(1)
     act(() => {
@@ -217,8 +217,8 @@ describe('홈런더비 한 판', () => {
 
   it('단계가 오르면 0xd → 0xe 에서 OK 를 기다린 뒤에야 다음 공(0xf)이다 (0xae3e8 ae4e4)', () => {
     const rendered = 띄우기()
-    // 비거리 109 짜리 시험용 패턴 — 여덟 개면 누적 872 ≥ 800 → 단계 1
-    const 큰홈런: PitchOutcomeDetail = { ...홈런, pattern: [45, 2000, 1500, 0] }
+    // 원본 코드 24 [125, 1463, 1234] — 멀리 떨어지는 홈런이라 여덟 개 안에 누적 800 을 넘겨 단계 1
+    const 큰홈런: PitchOutcomeDetail = { ...홈런, pattern: [125, 1463, 1234, 0] }
     let 단계 = 0
     for (let index = 0; index < 9 && 단계 === 0; index += 1) {
       한구(rendered, 큰홈런)

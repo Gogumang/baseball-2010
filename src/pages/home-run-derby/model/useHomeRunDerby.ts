@@ -25,6 +25,15 @@ import { millisecondsPerFrame } from '@/shared/config/frameRate'
 const BANNER_MILLISECONDS = 1_500
 
 /**
+ * 결과 연출로 붙잡는 시간 — 맞은 공(패턴이 실려 온 공)은 원본 판 끝(공.vt18 멈춤 + 10틱, `derbyBattedBallOf` 의 endTicks)까지,
+ * 안 맞은 공은 알림 시간만.
+ */
+export function resultHoldMillisecondsOf(detail: PitchOutcomeDetail): number {
+  if (detail.pattern === undefined) return BANNER_MILLISECONDS
+  return derbyBattedBallOf(detail.pattern, false).endTicks * millisecondsPerFrame()
+}
+
+/**
  * 상태 0xe 에 들어선 뒤 OK 를 안 받는 갱신 수 — 키 처리 0x498d4 끝(0x49a26~0x49a30)이
  * `[장면+0x1c] == 0xe && [장면+0x2c](이 상태의 틱) ≤ 2` 이면 사람 조작 객체에 키를 넘기지 않는다.
  * 진입 틱이 0 이라 틱 0·1·2 셋을 거른다 (확정: 상태 기계 0xbc9c8 이 상태를 바꾸는 그림에서 +0x14(= 장면+0x2c) = 0,
@@ -327,7 +336,7 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
       }
       // 보통 공(0xf)은 곧바로 다음 공 준비다
       enterNextPitch()
-    }, BANNER_MILLISECONDS)
+    }, resultHoldMillisecondsOf(detail))
   }, [])
 
   /**
