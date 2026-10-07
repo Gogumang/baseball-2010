@@ -41,7 +41,6 @@ import {
   BOUNCE_THROW_DISTANCE,
   rollFumble,
   rollSpecialDefense,
-  type ThrowErrorResult,
 } from '@/entities/fielding/model/fieldingErrors'
 import type { BattedBallTrajectory } from '@/entities/fielding/model/catchPrediction'
 import {
@@ -95,10 +94,9 @@ import {
   baseAtPoint,
   type CoverAssignment,
 } from '@/entities/fielding/model/coverAssignment'
-import { defenseArrivalTicks, secondBaseHelperPlacement } from '@/entities/fielding/model/throwArrival'
+import { secondBaseHelperPlacement } from '@/entities/fielding/model/throwArrival'
 import {
   planThrow,
-  errantThrowFlight,
   LASER_THROW_SPEED,
   readyTicksOf,
   thrownWith,
@@ -2761,43 +2759,4 @@ export function cpuSpecialThrowOf(
     bounce: horizontalDistance(holder.position, fielders[receiverSlot].target) > BOUNCE_THROW_DISTANCE,
     thrower: thrownWith(holder, true),
   }
-}
-
-/**
- * 악송구 도착 틱 — 던지는 야수의 남은 동작 틱(+0xc8) + `errantThrowFlight`(0xa1620 악송구 갈래)의 틱.
- * 공을 쏘는 점은 송구 계획 0xb3444 의 [3](받는 야수 — 중계면 중계맨)의 목표점이다 (b2ea8 → b2f52 vtac).
- */
-export function errantArrivalTicks(
-  fielders: readonly FielderState[],
-  fromSlot: number,
-  coverSlot: number,
-  base: number,
-  special: boolean,
-  error: ThrowErrorResult,
-  random: RandomPort,
-): number {
-  const thrower = fielders[fromSlot]
-  const plan = planThrow({ fielders, fromSlot, finalSlot: coverSlot, base, special })
-  const target = fielders[plan.toSlot]?.target ?? basePosition(base)
-  return Math.max(1, thrower.actionRemainingTicks + errantThrowFlight(thrower, target, error, random).ticks)
-}
-
-/**
- * 특수 송구의 도착 틱 — `defenseArrivalTicks`(0xaf284) 의 "커버 있음" 갈래를 **중계 없이,
- * 속도만 +0xd8 로 바꿔** 그대로 따른다 (특수면 0xb3444 가 중계를 끼우지 않는다).
- */
-export function specialThrowArrivalTicks(context: DefenseContext, base: number, thrower: FielderState): number {
-  const { play, fielders } = context
-  const cover = fielders[play.coverOfBase[wrapBase(base)] ?? NONE]
-  if (cover === undefined) return defenseArrivalTicks(context, base)
-  let ticks = throwTicksToFielder(thrower, cover)
-  let remaining = 0
-  if (!thrower.holdingBall) {
-    remaining = play.catchTick - context.currentTick
-    ticks += readyTicksOf(thrower.slot)
-  } else {
-    ticks += thrower.actionRemainingTicks
-  }
-  ticks = Math.max(ticks, ticksToReach(cover.position, basePosition(base), cover.speed) - remaining)
-  return remaining + ticks
 }
