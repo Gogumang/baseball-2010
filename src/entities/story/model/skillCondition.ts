@@ -16,8 +16,8 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
  *   - 7 전설: 우승 횟수(+0x7a) · 그 해 MVP 비트(+0x1ca)
  *   - 10~16: 연도·통산 세부 기록 칸(+0x20~+0x2c, +0x1f0[])
  * 그 조건들은 **아직 통과시키지 않는다**(= 이벤트가 뜨지 않는다).
- * ⚠️ 미해결(구역 밖): 원본은 연초 115 의 0xa4ee8 이 +0x1d0 을 지워 "그 해" 해제 기록만 남는데, 웹 타자편은 `removedMinusSkillIds` 를
- *    해마다 비우지 않는다(투수편은 비운다 — usePitcherLeagueSession). 그래서 타자편은 한 번 푼 스킬을 다음 해에도 다시 못 얻는다.
+ * 해제 기록(`removedMinusSkillIds`)은 연초 115 의 0xa4ee8 이 +0x1d0 을 지워 "그 해" 것만 남는다 — 두 편 모두 105 진입이
+ * 115 를 열 때 비운다(useCareerSession · usePitcherLeagueSession).
  */
 
 /** 훈련 칸 — 원본 s = 0 히트 · 1 파워 · 2 수비 · 3 주루 · 4 필살타법 */

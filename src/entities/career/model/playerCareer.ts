@@ -217,7 +217,7 @@ export interface PlayerCareer {
   readonly money: number
   /**
    * 한 번 해제한 마이너스 스킬 (+0x1d0+k, 표 0xd7e10 = [2,3,4,5,17,18,19,20]).
-   * **다시 얻을 수 없다** — 이벤트 조건 20 이 이 플래그를 본다 (A-4).
+   * **그 해 안에는 다시 얻을 수 없다** — 이벤트 조건 20 이 이 플래그를 본다 (A-4). 연초 115 의 0xa4ee8 이 지운다(R9 7절).
    */
   readonly removedMinusSkillIds: readonly number[]
   readonly isInjured: boolean
@@ -774,7 +774,8 @@ export type SkillRewardCareer = Pick<PlayerCareer, 'skillIds' | 'removedMinusSki
 /**
  * 보상 종류 4 — 양수 n 은 스킬 n−1 획득, 음수 −n 은 스킬 n−1 해제 (0x8c5bc).
  *
- * **마이너스 스킬을 해제하면 `+0x1d0+k` 플래그가 서서 다시 얻지 못한다** (0xa4430, A-6).
+ * **마이너스 스킬을 해제하면 `+0x1d0+k` 플래그가 서서 그 해 안에는 다시 얻지 못한다** (0xa4430, A-6) — 연초 115 의
+ * 0xa4ee8 이 지운다(R9 7절, `useCareerSession` 105 진입).
  * 획득 쪽도 그 플래그를 보고 막는다 — 웹에 통째로 빠져 있던 규칙이다.
  */
 export function applySkillReward<T extends SkillRewardCareer>(career: T, value: number): T {

@@ -73,7 +73,13 @@ import {
   runRest,
 } from '@/entities/career/model/outing'
 import type { OutingResult } from '@/entities/career/model/outing'
-import { EVENT_TRIGGER, finishEvent, placeTriggerOf } from '@/entities/story/model/storyScene'
+import {
+  EVENT_TRIGGER,
+  finishEvent,
+  NARI_YEAR_START_EVENT,
+  NARI_YEAR_START_EVENT_ID,
+  placeTriggerOf,
+} from '@/entities/story/model/storyScene'
 import { selectShopItem } from '@/features/shop/model/shopSelection'
 import { BATTER_GP_ITEMS } from '@/entities/career/model/gpItems'
 import {
@@ -842,6 +848,11 @@ export function useCareerSession({
   )
 
   const story = useStorySchedule(career)
+  /** 재생기에 넘기는 목록 — 파일 이벤트 뒤에 연초 115 내장 이벤트를 붙인다 (훑기는 파일 것만 본다, 투수편과 같다) */
+  const storyEvents = useMemo(
+    () => (story.events === null ? null : [...story.events, NARI_YEAR_START_EVENT]),
+    [story.events],
+  )
   /**
    * 관리 화면에 들어설 때 trigger 0 이벤트를 본다. 경기를 마치고 들어올 때만 무작위 조건(질병)을 굴리고,
    * 이벤트 뒤 이어서 볼 때는 굴리지 않는다 — 반복 이벤트가 연달아 나오지 않게.
@@ -863,9 +874,21 @@ export function useCareerSession({
     setShouldForgetRepeatable(false)
     setCareer(forgetRepeatableEvents(career, story.events))
   }, [shouldForgetRepeatable, career, story.events])
+  /** 연초 115 를 연 105 진입의 검사 종류 — 114 가 끝나 105 로 다시 들어올 때 같은 진입 갈래(138 · 훑기)를 잇는다 */
+  const yearStartCheckRef = useRef<'무작위포함' | '고정'>('고정')
   useEffect(() => {
     if (managementCheck === null || screen.kind !== '관리' || career === null || story.events === null) return
     setManagementCheck(null)
+    /*
+     * 105 진입 0x11910 곁가지(0x11b24~): S+0x1b7 == 0(올해 목표 창 아직 안 봄) → **115 연초** 가 138 보다 먼저다.
+     * 115 진입 0x16aac: 내장 이벤트 0x8a681 → `[다음 114, 뒤 105]` → `0xa4ee9(S)` — 마이너스 스킬 해제 기록
+     * +0x1d0~+0x1d7 을 지운다(R9 7절). 그래서 해제 기록(0xa4f31)은 "그 해" 것만 남는다. 창이 닫히면 0x7fe90 이 S+0x1b7 = 1.
+     */
+    if (!career.hasSeenYearGoalWindow) {
+      yearStartCheckRef.current = managementCheck
+      if (career.removedMinusSkillIds.length > 0) setCareer({ ...career, removedMinusSkillIds: [] })
+      return setScreen({ kind: '이벤트', eventId: NARI_YEAR_START_EVENT_ID, context: '연초' })
+    }
     // 경기 뒤에는 타순 이벤트가 먼저다 (0x11910 → 상태 138)
     const orderEventId = managementCheck === '무작위포함' ? battingOrderEventId(career) : null
     if (orderEventId !== null) return setScreen({ kind: '이벤트', eventId: orderEventId, context: '관리' })
@@ -1581,6 +1604,12 @@ export function useCareerSession({
 
     completeScene: (rewards: readonly EventReward[], viewedEventIds: readonly number[]) => {
       if (career === null || screen.kind !== '이벤트') return
+      if (screen.context === '연초') {
+        // 내장 이벤트라 본 표시·보상이 없다. 목표 창이 닫히면 0x7fe90 이 S+0x1b7 = 1 (해마다 한 번) → 뒤 105
+        setCareer({ ...career, hasSeenYearGoalWindow: true })
+        setScreen({ kind: '관리' })
+        return setManagementCheck(yearStartCheckRef.current)
+      }
       const rewarded = applyEventRewards(finishEvent(career, viewedEventIds), rewards, random, screen.eventId)
       // 보상 19(0x8ca7e)는 타순 칸이 아니라 레코드를 고친다 — `0xb5d09(내 팀, 내 칸, 값 − 1)` 로 셋이 돈다
       const orderMoves = applyBattingOrderRewards(
@@ -1769,7 +1798,7 @@ export function useCareerSession({
     matchAces,
     /** 143 경기 전 엔트리 보기 — 142(`경기준비`) 위에 선다 */
     entryView: screen.kind === '경기준비' ? entryView : null,
-    storyEvents: story.events,
+    storyEvents,
     eventPlaceIds: story.eventPlaceIds,
     handlePitchResolved,
     actions,

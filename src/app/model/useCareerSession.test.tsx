@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { nariLineupSlotsOf } from '@/entities/career/model/nariTeamRecord'
 import { describe, expect, it } from 'vitest'
+import { NARI_YEAR_START_EVENT_ID } from '@/entities/story/model/storyScene'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { applyGameEvaluation, isEvaluatedGame, useCareerSession } from '@/app/model/useCareerSession'
 import { advancePostseason, EMPTY_LEAGUE, LEAGUE_TEAM_COUNT, startPostseason } from '@/entities/league/model/league'
@@ -1025,9 +1026,32 @@ describe('타자편 포스트시즌 대진 128 — 사람이 친다 (0x120a4 · 
   })
 })
 
+describe('연초 115 (0x16aac) — 105 진입이 S+0x1b7 == 0 이면 내장 이벤트를 틀고 0xa4ee8 이 해제 기록을 지운다', () => {
+  it('목표 창을 아직 안 봤으면 해제 기록을 비우고 115 를 연다 — 끝나면 S+0x1b7 = 1 로 해마다 한 번', async () => {
+    const rendered = 띄우기({ ...createCareer('연초'), season: 2, seenEventIds: ['451'], removedMinusSkillIds: [3, 17] })
+    const 세션 = () => rendered.result.current.session
+    await waitFor(() => expect(rendered.result.current.screen).toEqual({ kind: '이벤트', eventId: NARI_YEAR_START_EVENT_ID, context: '연초' }), { timeout: 5000 })
+    expect(세션().career?.removedMinusSkillIds).toEqual([])
+    expect(세션().storyEvents?.some((event) => event.id === NARI_YEAR_START_EVENT_ID)).toBe(true)
+    act(() => 세션().actions.completeScene([], [NARI_YEAR_START_EVENT_ID]))
+    expect(세션().career?.hasSeenYearGoalWindow).toBe(true)
+    // 내장 이벤트라 본 표시를 남기지 않는다
+    expect(세션().career?.seenEventIds).toEqual(['451'])
+    // 뒤 105 — 다시 들어온 105 가 진입 검사(자동 발동 훑기)를 잇는다. 115 는 다시 안 열린다
+    expect(rendered.result.current.screen).not.toEqual(expect.objectContaining({ context: '연초' }))
+  })
+
+  it('그 해 목표 창을 이미 봤으면 115 를 열지 않고 해제 기록도 그대로다', async () => {
+    const rendered = 띄우기({ ...createCareer('연중'), season: 2, seenEventIds: ['451'], removedMinusSkillIds: [3], hasSeenYearGoalWindow: true })
+    await waitFor(() => expect(rendered.result.current.session.storyEvents).not.toBeNull(), { timeout: 5000 })
+    expect(rendered.result.current.screen).not.toEqual(expect.objectContaining({ context: '연초' }))
+    expect(rendered.result.current.session.career?.removedMinusSkillIds).toEqual([3])
+  })
+})
+
 describe('칭호는 관리 화면에서 하나씩 — 판정 0x1a1c0 (0x1afac) · 팝업 0x1274c · 확인 0x1b1e4', () => {
   it('들어온 관리 화면에서 처음 맞는 하나만 띄우고, 확인하면 주고 곧바로 장착한 뒤 다음 것을 띄운다', async () => {
-    const rendered = 띄우기({ ...createCareer('칭호'), season: 2, gamesPlayed: 10, popularity: 4500, seenEventIds: ['451'], titleIds: [TITLE_NAMES[0]] })
+    const rendered = 띄우기({ ...createCareer('칭호'), season: 2, gamesPlayed: 10, popularity: 4500, seenEventIds: ['451'], titleIds: [TITLE_NAMES[0]], hasSeenYearGoalWindow: true })
     const 세션 = () => rendered.result.current.session
     // 관리 화면 진입 이벤트 검사(trigger 0)는 이벤트 본문이 도착한 뒤에 돈다 — 그 뒤 두 번째 틀이 판정이다.
     // 본문이 도착한 틀(storyEvents)과 판정 틀 사이에는 효과(검사 → managementCheck = null)와 다시 그리기가 한 번씩 더 끼어

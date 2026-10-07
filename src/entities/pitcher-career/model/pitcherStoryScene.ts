@@ -2,9 +2,14 @@ import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCaree
 import { equippedPitcherAbilityOf, GAMES_PER_SEASON } from '@/entities/pitcher-career/model/pitcherCareer'
 import { PITCHER_ABILITY_NAMES, PITCHER_ABILITY_ORDER } from '@/entities/pitcher-career/model/pitcherAbility'
 import { seasonPitcherTrainingCountOf, seasonPitcherTrainingTotalOf } from '@/entities/pitcher-career/model/pitcherManagement'
-import { illnessChanceOf, OPENING_EVENT_ID, placeTriggerOf } from '@/entities/story/model/storyScene'
+import {
+  illnessChanceOf,
+  NARI_YEAR_START_EVENT,
+  NARI_YEAR_START_EVENT_ID,
+  OPENING_EVENT_ID,
+  placeTriggerOf,
+} from '@/entities/story/model/storyScene'
 import type { OriginalEvent } from '@/shared/config/original/eventTypes'
-import { ORIGINAL_USER_EVENTS } from '@/shared/config/original/userEvents'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
 /**
@@ -311,37 +316,6 @@ export function pitcherOpeningScanOf(events: readonly OriginalEvent[], cursor: n
   return index < 0 ? { event: null, cursor } : { event: events[index], cursor: index + 1 }
 }
 
-/**
- * **연초 115** 의 내장 이벤트 (0x8a680 — 파일 이벤트가 아니다, R9 7절 확정).
- * ```
- *   cmd[0] say: 인물 1명 (캐릭터 2 = 감독, 오른쪽, 표정 0) · 글 StrUSER_EVT[1] · 말하는 이 2(StrMODE[93] "감독")
- *   cmd[1] system sub 1 arg 0 — 올해의 목표 창 (0x741a1 → 0x86fdc)
- * ```
- * 초상화 번호 = 캐릭터 기본번호 표 0xd0ae6[2] = 16 + 표정 0. 파일 레코드가 아니라 본 표시를 남기지 않는다.
- * ⚠️ 미해결: 올해의 목표 창(SYS 1)은 재생기가 아직 띄우지 않는다 — 392 의 SYS(1, 77) 과 같은 처지.
- */
-export const PITCHER_YEAR_START_EVENT_ID = -115
-const DIRECTOR_SPEAKER = 2
-const DIRECTOR_PORTRAIT_ANIMATION = 16
-const YEAR_START_TEXT_INDEX = 1
-
-export const PITCHER_YEAR_START_EVENT: OriginalEvent = {
-  id: PITCHER_YEAR_START_EVENT_ID,
-  audience: 0,
-  repeatable: true,
-  trigger: 0,
-  requiresEvent: 0,
-  dateFrom: [0, 0],
-  dateTo: [0, 0],
-  conditions: [],
-  commands: [
-    {
-      op: 'say',
-      text: ORIGINAL_USER_EVENTS[YEAR_START_TEXT_INDEX] ?? '',
-      speaker: DIRECTOR_SPEAKER,
-      format: 0,
-      portraits: [{ file: 'event_char_0', animation: DIRECTOR_PORTRAIT_ANIMATION, side: 'right' }],
-    },
-    { op: 'system', sub: 1, arg: 0 },
-  ],
-}
+/** **연초 115** 의 내장 이벤트 0x8a680 — 타자편과 같은 함수라 `entities/story` 의 것을 쓴다 */
+export const PITCHER_YEAR_START_EVENT_ID = NARI_YEAR_START_EVENT_ID
+export const PITCHER_YEAR_START_EVENT: OriginalEvent = NARI_YEAR_START_EVENT
