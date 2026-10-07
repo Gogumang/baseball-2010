@@ -19,6 +19,7 @@ import { BurstMissionWindow } from '@/widgets/burst-mission/ui/BurstMissionWindo
 import { ORIGINAL_BURST_TABLES } from '@/shared/config/original/burstMissions'
 import { TEAMS } from '@/shared/config/original/teams'
 import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
+import { humanVsComputerSidesOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import { useIsSceneConfirmAwaiting } from '@/features/play-game/model/useSceneConfirm'
 
 interface GameRouteProps {
@@ -89,6 +90,8 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
       <GameIntro
         awayName={TEAMS[side0Team]?.name ?? ''}
         homeName={TEAMS[side1Team]?.name ?? ''}
+        // 점수판 틀 0x41440 (0x419f4) 의 두 측 — 내 팀 PLAYER · 상대 COM (타석 교대 판과 같은 두 측)
+        scoreboardSides={humanVsComputerSidesOf(progress.game.playerSide, progress.ourTeamId, progress.opponentTeamId)}
         onDone={() => setIntroDone(true)}
       />
     )
