@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   deleteHallOfFame,
+  batterCollectorHiddenIdsOf,
+  pitcherCollectorHiddenIdsOf,
   hallOfFameEquipmentNibblesOf,
   syncHallOfFameEquipment,
   hallOfFameRecordIdOf,
@@ -224,5 +226,20 @@ describe('0x2328c — 시즌에서 명예 선수가 산 장비 니블을 명전 
     const collection = { ...EMPTY_COLLECTION, hallOfFame: [famer(0)] }
     expect(syncHallOfFameEquipment(collection, '타자', 0xc9, [1, 1, 1, 1])).toBe(collection)
     expect(syncHallOfFameEquipment(collection, '투수', 0xb4, [1, 1, 1, 1])).toBe(collection)
+  })
+})
+
+describe('컬렉터 해금 — 0x14a74 가 네 부위를 다 보고 전역 표 app+0xc0 에 쓴 칸', () => {
+  const 일곱칸 = (part: number) => Array.from({ length: 7 }, (_unused, level) => `${part}-${level}`)
+
+  it('타자편: 레벨 0~6 을 다 가진 부위마다 36 + 4t, 기록연감에 모일 때 커리어 칸이 비어 있어도 선다', () => {
+    const career = 선수({ ownedEquipment: [...일곱칸(1), ...일곱칸(3), '0-0'], openedHiddenIds: [] })
+    expect(batterCollectorHiddenIdsOf(career)).toEqual([40, 48])
+    expect(mergeCareerIntoCollection(EMPTY_COLLECTION, career).openedHiddenIds).toEqual([40, 48])
+  })
+
+  it('투수편: 20 + 4t', () => {
+    const career = { ...createPitcherCareer('철완'), ownedEquipment: 일곱칸(0) }
+    expect(pitcherCollectorHiddenIdsOf(career)).toEqual([20])
   })
 })

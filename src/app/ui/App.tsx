@@ -11,7 +11,7 @@ import { createLocalStorageSaveGame } from '@/shared/api/save/localStorageSaveGa
 import { createLocalStorageMissionRecord } from '@/shared/api/save/localStorageMissionRecord'
 import { createLocalStorageJsonStore } from '@/shared/api/save/localStorageJsonStore'
 import { nariBatterOf, nariPitcherOf, useCollection } from '@/app/model/useCollection'
-import { EMPTY_COLLECTION, hallOfFameRecordIdOf } from '@/entities/collection/model/collection'
+import { EMPTY_COLLECTION, hallOfFameRecordIdOf, pitcherCollectorHiddenIdsOf } from '@/entities/collection/model/collection'
 import { hasCareerPlayerInSeasonTeam, isHallOfFameDeleteBlocked } from '@/entities/season-mode/model/playerRecruit'
 import { careerResetTargetOf, judgeModeReset } from '@/entities/settings/model/modeReset'
 import type { HallOfFameDeletion } from '@/pages/special/ui/SpecialScreen'
@@ -243,11 +243,16 @@ export function App() {
   })
   // 투수편이 연 히든(장비 컬렉터 20·24·28·32)도 같은 전역 표 `app+0xc0` 에 모은다 (0x62368)
   // 시즌 결산이 연 전역 해금(0x29)도 같은 전역 표에 모은다
-  const pitcherOpenedHiddenIds = pitcherSession.career?.openedHiddenIds
+  // 컬렉터는 0x14a74 구매가 쓴 칸 — 옛 투수편 커리어는 비어 있을 수 있어 보유에서 다시 센다 (`pitcherCollectorHiddenIdsOf`)
+  const pitcherCareerForHidden = pitcherSession.career
   const seasonOpenedHiddenIds = seasonSession.openedHiddenIds
   const sharedOpenedHiddenIds = useMemo(
-    () => [...(pitcherOpenedHiddenIds ?? []), ...seasonOpenedHiddenIds],
-    [pitcherOpenedHiddenIds, seasonOpenedHiddenIds],
+    () => [
+      ...(pitcherCareerForHidden?.openedHiddenIds ?? []),
+      ...(pitcherCareerForHidden === null || pitcherCareerForHidden === undefined ? [] : pitcherCollectorHiddenIdsOf(pitcherCareerForHidden)),
+      ...seasonOpenedHiddenIds,
+    ],
+    [pitcherCareerForHidden, seasonOpenedHiddenIds],
   )
   // 시즌 엔딩 — 새 해 0x6e0c 가 판정 0xa3084 ≥ 0 으로 phase 6(엔딩)을 세우는 그 자리에서 전역기록 +0xa0+e = 1
   const seasonRecord = seasonSession.state?.record ?? null

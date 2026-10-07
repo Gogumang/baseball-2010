@@ -7,6 +7,8 @@ import { PITCHER_ABILITY_ORDER } from '@/entities/pitcher-career/model/pitcherAb
 import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbility'
 import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
 import { romanceEndingIndexOf } from '@/entities/career/model/seasonFlow'
+import { FIRST_HIDDEN_LEVEL, hiddenOpenIdOf, ownsEquipment } from '@/entities/career/model/equipment'
+import { ownsPitcherEquipment, pitcherHiddenOpenIdOf } from '@/entities/pitcher-career/model/pitcherEquipment'
 import { EMPTY_ANNALS_STATS, normalizeAnnalsStats } from '@/entities/collection/model/annalsStats'
 import type { AnnalsStats } from '@/entities/collection/model/annalsStats'
 
@@ -119,8 +121,41 @@ export function mergeCareerIntoCollection(collection: Collection, career: Player
     ...mergeEndingIntoCollection(collection, career),
     titles: union(collection.titles, career.titleIds),
     skills: union(collection.skills, career.skillIds),
-    openedHiddenIds: union(collection.openedHiddenIds, career.openedHiddenIds),
+    openedHiddenIds: union(collection.openedHiddenIds, union(career.openedHiddenIds, batterCollectorHiddenIdsOf(career))),
   }
+}
+
+/** 장비 부위 수 · 컬렉터 칸(레벨 8) */
+const COLLECTOR_PART_COUNT = 4
+const COLLECTOR_LEVEL = 8
+
+/**
+ * **컬렉터 해금 — 언제 전역 표 `app+0xc0` 에 쓰나** (직접 떴다, 0x14a74 0x14bae~0x14c86).
+ * 나리 장비 구매 확정(창 종류 3)이 저장 직후 **네 부위 모두** `0xa5020(기록, t)`(레벨 0~6 일곱 칸을 다 가졌나)를 보고, 참인
+ * 부위마다 `0x62368(ui, id, 0)` 로 전역 표에 켠다 — 타자편(모드 4) id 36·40·44·48 · 투수편 20·24·28·32. 다른 자리는 없다
+ * (0x62368 의 부르는 곳 전수: 0x14a74 넷 · 시즌 0x6900 · 0x7d90 구장 · 그 밖은 이벤트·미션·G 상한).
+ * 그래서 일곱 칸을 다 가진 기록이면 전역 표에 그 id 가 이미 서 있다 — 웹 커리어 구매(`purchaseEquipment`)도 같은 때 켜지만
+ * 그보다 앞서 산 옛 커리어는 칸이 비어 있을 수 있어, 기록연감에 모을 때 보유에서 다시 센다.
+ */
+export function batterCollectorHiddenIdsOf(career: PlayerCareer): number[] {
+  return collectorIdsOf((part, level) => ownsEquipment(career, part, level), (part) => hiddenOpenIdOf(part, COLLECTOR_LEVEL))
+}
+
+/** 투수편 짝 — id 20·24·28·32 (`batterCollectorHiddenIdsOf` 주석) */
+export function pitcherCollectorHiddenIdsOf(career: PitcherCareer): number[] {
+  return collectorIdsOf(
+    (part, level) => ownsPitcherEquipment(career, part, level),
+    (part) => pitcherHiddenOpenIdOf(part, COLLECTOR_LEVEL),
+  )
+}
+
+function collectorIdsOf(owns: (part: number, level: number) => boolean, idOf: (part: number) => number): number[] {
+  const ids: number[] = []
+  for (let part = 0; part < COLLECTOR_PART_COUNT; part += 1) {
+    const isCollector = Array.from({ length: FIRST_HIDDEN_LEVEL }, (_unused, level) => level).every((level) => owns(part, level))
+    if (isCollector) ids.push(idOf(part))
+  }
+  return ids
 }
 
 /** 엔딩을 본 선수 — 타자편·투수편 커리어 둘 다 이 두 칸을 갖는다 */
