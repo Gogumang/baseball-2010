@@ -28,6 +28,8 @@ import { GameEndBoard } from '@/widgets/game-scene/ui/GameEndBoard'
 import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
 import { teamHalfInningCardsOf } from '@/pages/team-game/lib/teamHalfInningCards'
 import { runScoreBoardSourceOf } from '@/pages/defense/lib/runScoreBoard'
+import { useRecordAlert } from '@/widgets/game-scene/model/useRecordAlert'
+import { RecordAlertPanel } from '@/widgets/game-scene/ui/RecordAlertPanel'
 import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 import { hasGameIntro } from '@/widgets/game-scene/lib/introSchedule'
@@ -393,6 +395,14 @@ export function TeamGameScreen({
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [acceptsPickoff, pickoff])
+  /**
+   * 경기 중 기록 달성 알림 0x4e35c — 경기 장면이 상태 0x17(수비 인플레이)이 아니면 그린다. 경기 끝(0x19)이면 새 칸을 안 넣는다.
+   * ⚠️ 미해결: 웹 투구 화면(우리 수비)에는 240×320 장면 판이 없어 그 동안은 그릴 자리가 없다 — 타석 화면에서만 보인다.
+   */
+  const recordAlert = useRecordAlert(progress.recordIds, {
+    isDrawing: isIntroDone && summary === null && !isDefenseInPlay && !isReplaying,
+    isSettled: progress.game.isFinished,
+  })
 
   const game = progress.game
   const staminaPercent = staminaPercentOf(progress.stamina)
@@ -739,6 +749,8 @@ export function TeamGameScreen({
             />
             {/* 0xe 그리기 0x4d9ec — 타석 장면 위에 투수·타자 소개 판 0x44944 */}
             {isMatchupShown && matchupCards}
+            {/* 경기 장면 프레임 0x52c50 의 덧그림 0x4e35c — 그리기 표 다음이라 맨 위 */}
+            <RecordAlertPanel frame={recordAlert} />
             </div>
             <Hint>
               {(game.battingOrderIndex % 9) + 1}번 {currentBatterEntry(progress)?.name ?? '타자'} ·

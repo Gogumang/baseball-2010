@@ -21,6 +21,7 @@ import { TEAMS } from '@/shared/config/original/teams'
 import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
 import { humanVsComputerSidesOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import { useIsSceneConfirmAwaiting } from '@/features/play-game/model/useSceneConfirm'
+import { useRecordAlert } from '@/widgets/game-scene/model/useRecordAlert'
 
 interface GameRouteProps {
   readonly session: ReturnType<typeof useCareerSession>
@@ -75,6 +76,15 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
    * 효과음 61 은 진입 예약음이라 세션이 로딩을 끝낼 때(`finishLoading`) 이미 낸다. 난수는 안 쓴다.
    */
   const [isIntroDone, setIntroDone] = useState(false)
+  /**
+   * 경기 중 기록 달성 알림 0x4e35c — 경기 장면 프레임이 상태 0x17(수비 인플레이)이 아니면 늘 그린다. 수비 재생 화면을
+   * 오가도 칸이 이어지도록 여기서 든다(GameScreen 은 수비 재생 동안 내려간다).
+   */
+  const isDefenseShown = progress.pendingDefensePlay !== null || (play !== null && play !== shownPlay && play.ticks.length > 0)
+  const recordAlert = useRecordAlert(progress.recordIds, {
+    isDrawing: session.loadingTip === null && isIntroDone && !isDefenseShown,
+    isSettled: progress.game.isFinished,
+  })
 
   if (session.loadingTip !== null) {
     return (
@@ -152,6 +162,7 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
         onSpecialSwingUsed={session.actions.spendSpecialSwing}
         settings={gameSettings.settings}
         onSettingsChange={gameSettings.setSettings}
+        recordAlert={recordAlert}
       />
       {/* 돌발 창도 화면 위 덮개라 기둥 안에 가둔다 — 안 그러면 창 전체로 퍼진다 */}
       {burstLines !== null && (

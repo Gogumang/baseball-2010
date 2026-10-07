@@ -10,6 +10,8 @@ import { effectiveAbilityOf } from '@/entities/career/model/condition'
 import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
+import { RecordAlertPanel } from '@/widgets/game-scene/ui/RecordAlertPanel'
+import type { RecordAlertFrame } from '@/widgets/game-scene/lib/recordAlert'
 import { humanVsComputerSidesOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import { HALF_INNING_JINGLE_TICK } from '@/features/play-game/model/halfInningBoard'
 import { HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
@@ -76,6 +78,8 @@ interface GameScreenProps {
    * 안 넘기면 횟수를 줄여도 받아 줄 곳이 없어 경기 내내 처음 횟수로 남는다.
    */
   readonly onSpecialSwingUsed?: (remaining: number) => void
+  /** 경기 중 기록 달성 알림 0x4e35c 의 이번 그림 (`useRecordAlert`, 부르는 쪽이 든다). 안 넘기면 안 그린다 */
+  readonly recordAlert?: RecordAlertFrame
 }
 
 /** 나만의리그 타자편 = 원본 전역 모드 4 — 경기 중 메뉴 표 0xcfcfc 의 **행 2**(네 칸)다 */
@@ -100,6 +104,7 @@ export function GameScreen({
   onSettingsChange,
   onBenchClearingDone,
   onSpecialSwingUsed,
+  recordAlert,
 }: GameScreenProps) {
   const menu = useInGameMenuState()
   const isMenuOpen = menu.isOpen
@@ -316,6 +321,8 @@ export function GameScreen({
             값은 `gameMatchupCardsOf` (내 레코드 · 상대 마운드).
           */}
           {sceneConfirm.isAwaiting && sceneConfirm.isInConfirmState && <SceneMatchupCards {...matchup} />}
+          {/* 경기 장면 프레임 0x52c50 의 덧그림 0x4e35c — 그리기 표 다음이라 맨 위 */}
+          {recordAlert !== undefined && <RecordAlertPanel frame={recordAlert} />}
         </div>
 
         {isMenuOpen ? (
