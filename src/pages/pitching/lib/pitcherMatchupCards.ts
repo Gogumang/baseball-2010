@@ -39,7 +39,7 @@ function gameLineFromResults(results: readonly number[]): MatchupBatterLine {
 /**
  * **나리 투수편 상태 0xe 의 소개 판 값** (0x44944) — 내가 던지는 타석에만 0xe 를 지난다.
  * - 투수 = 내 투수(PLAYER): 이름 · 보직(`options.role` = +0xb & 3) · 손 0xb63c0(폼 & 1) · 체력 막대(용량 0x66e44 · % 0xaebb0) ·
- *   시즌 줄 = `records.mySeason` + (기록 게이트 0xa56dc 모드 3 갈래: 포스트시즌이 아니면) 이 경기 내 줄
+ *   시즌 줄 = `records.mySeason` + (기록 게이트 0xa56dc 모드 3 갈래: 포스트시즌·국가대항전이 아니면) 이 경기 내 줄
  *   (`summaryOf` 의 seasonDelta 와 같은 칸 — 아웃 R+0x13c · 실점 · 탈삼진 R+0x134).
  * - 타자 = 상대(COM): 타순 `팀+0x32` · 이름 · 수비 · 손 · 시즌 줄 = 리그 기록표 줄 + 이 경기 줄 · 오늘 타석 기록 = 그 타순 칸 링.
  *   ⚠️ 이 경기 줄은 링에서 타수·안타·홈런만 센다 — 웹 투수편 진행기가 상대 타자의 타점을 리그 기록표로 넘기지 않아 타점은
@@ -52,7 +52,8 @@ export function pitcherMatchupCardsOf(
   records?: PitcherMatchupRecords,
 ): { readonly batterHand: number; readonly pitcher: MatchupPitcherCard; readonly batter: MatchupBatterCard } {
   const { options } = progress
-  const countsThisGame = !options.isPostseason
+  // 기록 게이트 0xa56dc 모드 3 갈래 0xa571c — 국가대항전(+0x12c) · 포스트시즌(+0xb4)이면 거짓 (진행기 `countsMyPitcherRecord` 와 같은 조건)
+  const countsThisGame = !options.isPostseason && options.isNationalCup !== true
   const batter = opponentBatterOf(progress)
   const batterHand =
     batter.aceIndex !== undefined ? batterHandOf(0, batter.aceIndex) : batterHandOf(batter.profile ?? 0)

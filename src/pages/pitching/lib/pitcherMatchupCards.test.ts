@@ -53,4 +53,19 @@ describe('나리 투수편 상태 0xe 소개 판 값 (0x44944)', () => {
     expect(batter.battingAverage).toBeGreaterThan(0)
     expect(batter.runsBattedIn).toBe(8)
   })
+
+  it('국가대항전 경기면 게이트 0xa56dc 가 거짓이라 이 경기 줄을 더하지 않는다 (포스트시즌과 같다)', () => {
+    const started = startPitcherGame({ ...기본옵션, isNationalCup: true }, createSeededRandom(20100901))
+    const progress = {
+      ...started,
+      runsAllowedByMe: 2,
+      record: { ...started.record, outsRecorded: 6, strikeouts: 3 },
+    }
+    const { pitcher } = pitcherMatchupCardsOf(progress, '나투수', {
+      mySeason: { outs: 54, runsAllowed: 4, strikeouts: 12 },
+      stats: { batters: {} },
+    })
+    expect(pitcher.strikeouts).toBe(12)
+    expect(pitcher.earnedRunAverage).toBe(Math.trunc((4 * 2700) / 54))
+  })
 })
