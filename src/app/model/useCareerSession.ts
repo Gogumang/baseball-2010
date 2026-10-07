@@ -898,6 +898,7 @@ export function useCareerSession({
      * 105 진입 0x11910 곁가지(0x11b24~): S+0x1b7 == 0(올해 목표 창 아직 안 봄) → **115 연초** 가 138 보다 먼저다.
      * 115 진입 0x16aac: 내장 이벤트 0x8a681 → `[다음 114, 뒤 105]` → `0xa4ee9(S)` — 마이너스 스킬 해제 기록
      * +0x1d0~+0x1d7 을 지운다(R9 7절). 그래서 해제 기록(0xa4f31)은 "그 해" 것만 남는다. 창이 닫히면 0x7fe90 이 S+0x1b7 = 1.
+     * 1b8807f 앞의 옛 저장은 이 칸이 늘 거짓이라 불러온 뒤 한 번 더 115 를 본다 — 원본과의 차이 판단은 `hasSeenYearGoalWindow` 주석.
      */
     if (!career.hasSeenYearGoalWindow) {
       yearStartCheckRef.current = managementCheck
