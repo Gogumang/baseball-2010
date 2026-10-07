@@ -164,6 +164,13 @@ describe('구장 상점 히든 해금 배선 (app+0xe0)', () => {
     // 미오픈(StrMODE[76]) 이 아니라 구매 확인(StrMODE[79]) 이 뜬다
     expect(알림글()).toContain('구매하겠습니까')
   })
+
+  it('상점(0xdc 종류 4)에서 취소하면 아이템 메뉴 0xd0 — 관리 메뉴가 아니다 (0x957c 0x9aa2 → 0x9bec)', () => {
+    const store = 메모리저장(세이브(관중석([])))
+    render(<시즌화면 store={store} 장면={SEASON_SCENE_STATE.아이템상점} onExit={vi.fn()} />)
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.getByRole('button', { name: '구장아이템' })).toBeTruthy()
+  })
 })
 
 describe('구단관리 트레이드·코치채용 배선 (0xe4 · 0xd7)', () => {

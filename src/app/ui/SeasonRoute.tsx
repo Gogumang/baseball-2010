@@ -337,7 +337,8 @@ export function SeasonRoute({
         isHiddenOpen={(unlockId) => session.openedStadiumIds.includes(unlockId)}
         onUnlock={actions.openStadiumItems}
         onChange={actions.updateRecord}
-        onBack={scene === SEASON_SCENE_STATE.구장관리 ? backToTeamMenu : backToManagement}
+        // 상점(0xdc 종류 4) 취소는 아이템 메뉴 0xd0 (0x957c 종류 4 갈래 0x9aa2 → 0x9bd4~0x9bec)
+        onBack={scene === SEASON_SCENE_STATE.구장관리 ? backToTeamMenu : () => actions.goto(SEASON_SCENE_STATE.아이템)}
       />
     )
   }
