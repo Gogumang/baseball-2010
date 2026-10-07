@@ -11,6 +11,7 @@ import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import {
   closeManagerHookWindow,
+  confirmScene,
   MY_PITCHER_SLOT,
   earnedRunAverageOf,
   giveUpPitching,
@@ -66,6 +67,11 @@ function 끝까지던지기(progress: PitcherGameProgress, seed = 1): PitcherGam
       continue
     }
     if (!isPitchTurn(current)) return current
+    // 0xe 에 서 있으면 OK 부터 (그 뒤 굴림 — 돌발 0x8f158 · 0xf 진입 0x3d954 의 CPU 대타)
+    if (current.sceneConfirmPending === true) {
+      current = confirmScene(current, random)
+      continue
+    }
     current = throwPitch(current, 한가운데직구, random)
   }
   throw new Error('경기가 끝나지 않았습니다')
@@ -207,6 +213,27 @@ describe('강판', () => {
     expect(after.game.isFinished).toBe(true)
   })
 
+  it("0xe 에서 '#' 강판 물음(0x4994a)에 '예' 하면 OK 뒤 굴림(돌발 0x8f158 · 0xf 진입 0x3d954)은 아예 안 돈다", () => {
+    for (let seed = 1; seed <= 40; seed += 1) {
+      const 대기 = startPitcherGame(기본옵션, 씨앗(seed))
+      if (대기.sceneConfirmPending !== true) continue
+      // 0xe 에서 "아니오" 는 진행기에 아무 일도 없다 — 그 뒤 OK 는 안 열고 OK 한 것과 같은 굴림이다
+      const 바로 = 각본난수(0.3)
+      const 그냥 = confirmScene(대기, 바로)
+      const 아니오뒤 = 각본난수(0.3)
+      expect(confirmScene(대기, 아니오뒤)).toEqual({ ...그냥, sceneConfirm: 그냥.sceneConfirm })
+      expect(아니오뒤.calls()).toBe(바로.calls())
+      expect(바로.calls()).toBeGreaterThan(0)
+      // 0xe 에서 "예" — 돌발을 안 굴린 채 0x21 로 간다
+      const 강판 = giveUpPitching(대기, 씨앗(9))
+      expect(강판.sceneConfirmPending).toBe(false)
+      expect(강판.burst?.triggeredCount ?? 0).toBe(0)
+      expect(confirmScene(강판, 씨앗(9))).toBe(강판)
+      return
+    }
+    throw new Error('0xe 에 선 경기가 없다')
+  })
+
   it('감독 강판 — 체력 0% 에서 평판이 낮으면 반드시 내려간다 (표 0xcfa58 행 1 칸 0 = 100%)', () => {
     const progress = startPitcherGame(
       { ...기본옵션, stamina: 0, reputation: 0 },
@@ -263,7 +290,11 @@ describe('돌발미션', () => {
   it('타석 준비에서 발동한다 — 뜬 행은 PITCHER 표의 행이고 목표가 수비 쪽이다', () => {
     let 뜬경기: PitcherGameProgress | null = null
     for (let seed = 1; seed <= 400 && 뜬경기 === null; seed += 1) {
-      const progress = startPitcherGame(기본옵션, 씨앗(seed))
+      const random = 씨앗(seed)
+      const 대기 = startPitcherGame(기본옵션, random)
+      // 0xe 에서는 아직 안 굴렸다 — OK(메시지 1) 뒤에 굴린다
+      expect(대기.burst?.current ?? null).toBeNull()
+      const progress = confirmScene(대기, random)
       if (progress.burst?.current != null) 뜬경기 = progress
     }
     expect(뜬경기).not.toBeNull()
@@ -290,7 +321,8 @@ describe('돌발미션', () => {
     let 뜬경기 = 0
     // 자동 타석에 대타·투수 교체 굴림이 끼면서 씨앗마다 8회 상황이 바뀌어 넓게 본다 (돌발이 뜨는 경기가 드물다)
     for (let seed = 1; seed <= 60; seed += 1) {
-      const progress = startPitcherGame(구원, 씨앗(seed))
+      const random = 씨앗(seed)
+      const progress = confirmScene(startPitcherGame(구원, random), random)
       // 8회 전에 콜드로 끝난 경기(씨앗 12 — 7회말 11-1)는 구원 등판이 없다
       if (progress.game.isFinished) continue
       expect(progress.onMound, `씨앗 ${seed}`).toBe(true)
@@ -874,14 +906,17 @@ describe('공수 교대 판 (상태 0x18) — 모드 3 은 1회초 판만', () =
       let 번 = 0
       return { ...rest, next: () => (번++ < n ? value : rest.next()) }
     }
+    /** 첫 타석 0xe 의 OK 까지 (OK 뒤 메시지 1 의 돌발 굴림) */
+    const OK까지 = (random: RandomPort) => {
+      const 대기 = startPitcherGame(기본옵션, random)
+      const 확인 = confirmScene(대기, random)
+      // 대기 객체는 걸음마다 새로 만드니 비교에서 뺀다
+      return { ...확인, sceneConfirm: null }
+    }
     // 판이 첫 36 개를 먹고 버리므로 그 값이 무엇이든 경기는 같다
-    const 낮음 = startPitcherGame(기본옵션, 앞값(36, 0.001))
-    const 높음 = startPitcherGame(기본옵션, 앞값(36, 0.999))
-    expect(낮음).toEqual(높음)
+    expect(OK까지(앞값(36, 0.001))).toEqual(OK까지(앞값(36, 0.999)))
     // 하나라도 타석 준비 쪽으로 새면 갈린다 — 이 비교가 실제로 무언가를 재는지 확인
-    const 새는낮음 = startPitcherGame(기본옵션, 앞값(37, 0.001))
-    const 새는높음 = startPitcherGame(기본옵션, 앞값(37, 0.999))
-    expect(새는낮음).not.toEqual(새는높음)
+    expect(OK까지(앞값(37, 0.001))).not.toEqual(OK까지(앞값(37, 0.999)))
   })
 })
 
@@ -967,8 +1002,15 @@ describe('내가 던지는 타석의 CPU 대타 0xac228 — 0xf 진입 0x3d954 (
     expect(안바뀜.scenePinchHit).toBeNull()
     expect(바뀜.scenePinchHit).toEqual({ serial: 1, by: 'CPU', incomingIsAce: false })
     expect(isPitchTurn(바뀜)).toBe(true)
-    // 대타 굴림 둘(rand(0,1000)·rand(0,벤치)) 뒤에 강판 판정·돌발 굴림(0xe → 메시지 1)이 한 번 더 돈다 — 두 번째 0xf 는 굴림 없음
-    expect(대타각본.calls()).toBeGreaterThan(평소.calls() + 1)
+    // 대타 굴림 둘(rand(0,1000)·rand(0,벤치)) 뒤 0x16 → 0xd → 0xe(강판 판정)에 다시 서서 OK 를 기다린다
+    expect(대타각본.calls()).toBeGreaterThanOrEqual(평소.calls() + 1)
+    expect(바뀜.sceneConfirmPending).toBe(true)
+    // OK 뒤 메시지 1 의 돌발 굴림이 한 번 더 돈다 — 두 번째 0xf 는 막음 칸이 서 있어 대타 굴림 없음
+    const 대타뒤 = 대타각본.calls()
+    const 확인 = confirmScene(바뀜, 대타각본)
+    expect(대타각본.calls()).toBeGreaterThan(대타뒤)
+    expect(확인.opponentLineup.benchBatters).toBe(2)
+    expect(확인.sceneConfirmPending).toBe(false)
 
     // 다음 공이 나가면 0xa5e14 가 막음 칸을 내린다
     const 다음공 = startPitch(바뀜, 한가운데직구, 각본난수(0.7))

@@ -358,11 +358,18 @@ describe('상태 0xe — 새 타석마다 사람 OK 를 기다린다 (0x39e14 �
     expect(screen.getByText('1. 구질 선택')).toBeTruthy()
   })
 
-  it("기다리는 동안 '#' 교체는 안 열리고 '*' 메뉴는 열린다 — 메뉴가 떠 있으면 OK 를 안 받는다", () => {
+  it("0xe 에서 '#' 교체 창이 열리고(0x4994a) 닫으면 다시 0xe — '*' 메뉴도 열리고 메뉴가 떠 있으면 OK 를 안 받는다", () => {
     판까지()
-    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_READY_FRAMES))
+    // 0xd(두 그림)는 '#' 가 여는 상태 범위(0xe·0xf) 밖이다
     fireEvent.keyDown(window, { key: '#' })
     expect(screen.queryByText('투수 교체')).toBeNull()
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_READY_FRAMES))
+    fireEvent.keyDown(window, { key: '#' })
+    expect(screen.getByText('투수 교체')).toBeTruthy()
+    // 창이 떠 있으면 OK 를 안 받는다 — '#' 로 닫으면(0x495fc 취소) 곧장 0xe 에 다시 선다
+    fireEvent.keyDown(window, { key: '#' })
+    expect(screen.queryByText('투수 교체')).toBeNull()
+    expect(screen.queryByText('1. 구질 선택')).toBeNull()
     fireEvent.keyDown(window, { key: '*' })
     expect(screen.getByText('경기 중 메뉴')).toBeTruthy()
     fireEvent.keyDown(window, { key: '5' })

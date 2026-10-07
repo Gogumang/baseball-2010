@@ -173,6 +173,9 @@ describe('투수편 화면의 소리 배선', () => {
         녹음.played.length = 0
         if (result.current.progress.pendingDefensePlay !== null) {
           act(() => result.current.actions.finishDefensePlay())
+        } else if (result.current.progress.sceneConfirmPending === true) {
+          // 0xe 의 OK — 그 뒤 0xf 진입 0x3d954 가 대타를 묻는다
+          act(() => result.current.actions.confirmScene())
         } else if (result.current.canPitch) {
           act(() => result.current.actions.throwPitch({ typeNumber: 1, courseCell: 4, gaugeCell: 0 }))
         } else {

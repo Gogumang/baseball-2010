@@ -218,6 +218,8 @@ export function TeamGameScreen({
   const isDefenseInPlay = session.pendingDefensePlay !== null
   /** 상태 0xe 에서 OK 를 기다리는 중인가 — 아래 `useSceneConfirm` 이 매 그리기마다 채운다 */
   const isAwaitingConfirmRef = useRef(false)
+  /** 대기 중 0xd 두 그림을 지나 0xe 에 들어섰는가 — '#' 는 0xe·0xf 에서만 열린다 */
+  const isInConfirmStateRef = useRef(false)
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat) return
@@ -248,9 +250,10 @@ export function TeamGameScreen({
         // 0x495fc 의 '#' 는 교체 화면을 닫는다(취소). 그 밖에서는 0x49598 의 갈림길 그대로 —
         // 공격이 사람이면 대타(0xaf06c), 아니면 투수 교체(0xaf09c)다
         if (changeWindow !== null) return closeChangeWindow()
-        // ⚠️ 원본 '#' 가지(0x4994a)는 0xe 에서도 열린다. 웹 진행기는 0xe 의 OK 뒤 굴림(돌발 0x8f158 · 0xf 진입 0x3d954)을
-        // 들어서는 걸음에서 미리 해 두어, 0xe 에서 교체를 열면 그 굴림이 한 번 더 돈다 — 그래서 OK 를 받은 뒤(0xf)에만 연다
-        if (isAwaitingConfirmRef.current) return
+        // '#' 가지(0x4994a)는 0xe·0xf 에서 열린다 — 0xe 의 OK 뒤 굴림(돌발 0x8f158 · 0xf 진입 0x3d954)은 진행기가
+        // OK 를 받을 때 돌리므로(`confirmScene`), 0xe 에서 열어 확정·취소해도 다시 선 0xe 의 OK 뒤 한 번뿐이다.
+        // 0xd(대기가 보인 뒤 두 그림)는 0x4994a 의 상태 범위 밖이라 안 열린다
+        if (isAwaitingConfirmRef.current && !isInConfirmStateRef.current) return
         if (session.canChangePitcher) return setChangeWindow('투수')
         if (session.canPinchHit) return setChangeWindow('대타')
         return
@@ -319,10 +322,11 @@ export function TeamGameScreen({
    * **상태 0xe — 사람 OK 를 기다린다** (`features/play-game/model/sceneConfirm`). 새 타석·반 이닝 시작·교체 연출 뒤·교체 창
    * 취소 뒤마다 진행기가 대기를 싣는다. 공격이든 수비든 같다 — 0x532b0 은 조작 객체의 공수(+0xc)를 안 본다.
    * 인트로·교대 판·수비 화면·벤치 클리어링·경기 중 메뉴·조작방법·설정·교체 창이 덮고 있으면 받지 않는다.
-   * ⚠️ 미이식: 0xe 그리기 0x4d9ec 가 0xd 그리기 위에 얹는 안내 판 0x44944 (홈런더비 쪽에서 옮기는 중인 공용 판이 생기면 쓴다).
+   * OK 뒤 굴림(돌발 0x8f158 · 0xf 진입 0x3d954)은 OK 를 받을 때 진행기가 돌린다 (`confirmScene`).
    */
   const sceneConfirm = useSceneConfirm(
-    progress.sceneConfirm,
+    // 진행기가 OK 를 아직 안 받은 0xe 대기 (OK 를 받으면 `confirmScene` 이 그 뒤 굴림을 돌린다)
+    progress.sceneConfirmPending === true ? progress.sceneConfirm : null,
     isIntroDone &&
       summary === null &&
       !isHalfInningBoardOpen &&
@@ -334,11 +338,13 @@ export function TeamGameScreen({
       changeWindow === null &&
       // 타석이 끝나며 난 돌발 결과 창(0x1d)은 다음 0xd 보다 먼저다 (+0x1b6c) — 닫은 뒤에야 0xe 다
       resolution === null,
+    actions.confirmScene,
   )
   const isAwaitingConfirm = sceneConfirm.isAwaiting && (canBat || canPitch)
   /** 정산 배경 전용 난수 — 경기 난수를 건드리지 않는다 (정산 갈래 주석) */
   const [backdropRandom] = useState(() => createSeededRandom(0))
   isAwaitingConfirmRef.current = isAwaitingConfirm
+  isInConfirmStateRef.current = sceneConfirm.isInConfirmState
   /** 0xd 두 그림을 지나 0xe 에 들어섰으면 소개 판을 그린다 (0x4d9ec → 0x44944) */
   const isMatchupShown = isAwaitingConfirm && sceneConfirm.isInConfirmState
   const ourBatting = canBat
@@ -566,7 +572,7 @@ export function TeamGameScreen({
           changeWindow !== null
             ? { label: '취소', onPress: closeChangeWindow }
             : isAwaitingConfirm
-              ? // 0xe — OK 하나만 받는다 (0x532b0). 교체는 OK 뒤에 연다 (위 '#' 주석)
+              ? // 0xe — OK 를 받는다 (0x532b0). '#' 교체는 키로 연다 (위 '#' 주석)
                 { label: '확인', onPress: sceneConfirm.confirm, isDisabled: !sceneConfirm.acceptsConfirm }
             : session.canChangePitcher
               ? { label: '# 교체', onPress: () => setChangeWindow('투수') }

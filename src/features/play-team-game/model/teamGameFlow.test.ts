@@ -23,6 +23,7 @@ import {
   canOpenPitcherChange,
   cancelSubstitution,
   changePitcher,
+  confirmScene,
   cpuPickoff,
   currentBatterAbility,
   currentBatterEntry,
@@ -85,6 +86,11 @@ function 첫구질(progress: TeamGameProgress): number {
 function 끝까지(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
   let current = progress
   for (let step = 0; step < 5_000 && !current.game.isFinished; step += 1) {
+    // 0xe 에 서 있으면 OK 부터 (그 뒤 굴림 — 돌발 0x8f158 · 0xf 진입 0x3d954)
+    if (current.sceneConfirmPending === true) {
+      current = confirmScene(current, random)
+      continue
+    }
     if (isPitchTurn(current)) {
       current = throwPitch(current, { typeNumber: 첫구질(current), courseCell: 4, gaugeCell: 0 }, random)
     } else if (isBatterTurn(current)) {
@@ -220,11 +226,16 @@ describe('사람 장면 0xf 진입 0x3d954 — 공마다 CPU 투수 교체(0xac4
   it('타석이 끝난 공(볼넷)은 0xf 로 안 돌아가 묻지 않는다 — 새 타석 준비(0xd → 0xe → 0xf)에서 묻는다', () => {
     const 판 = { ...지친상대(), atBat: createAtBat({ balls: 3, strikes: 0 }) }
     // 씨앗 2 — 공 도착 0x3dfac 의 0.1% 굴림(0x35034)이 하나 늘어 교체 판정 굴림이 한 칸 밀렸다
-    const 뒤 = applyBatterPitch(판, 볼, createSeededRandom(2))
+    const random = createSeededRandom(2)
+    const 뒤 = applyBatterPitch(판, 볼, random)
     expect(뒤.game.bases.first).toBe(true)
-    // 다음 타자의 타석 준비(prepareAtBat)에서 0x3d954 가 바꿨다 — 새 타석이라 카운트는 0-0
-    expect(뒤.opponentPitcherIndex).not.toBe(판.opponentPitcherIndex)
-    expect(뒤.atBat.balls).toBe(0)
+    // 다음 타자는 0xe 에 서서 OK 를 기다린다 — 아직 안 묻는다
+    expect(뒤.sceneConfirmPending).toBe(true)
+    expect(뒤.opponentPitcherIndex).toBe(판.opponentPitcherIndex)
+    // OK 뒤 0xf 진입 0x3d954 가 바꾼다 — 새 타석이라 카운트는 0-0
+    const 확인 = confirmScene(뒤, random)
+    expect(확인.opponentPitcherIndex).not.toBe(판.opponentPitcherIndex)
+    expect(확인.atBat.balls).toBe(0)
   })
 })
 
@@ -2113,8 +2124,12 @@ describe("사람 '#' 교체 뒤 0x16 → 0xd → 0xe → 0xf 재진입 · 교체
       atBat: createAtBat({ balls: 2, strikes: 1 }),
       recordTally: { ...지친상대().recordTally, foulStreak: 2 },
     }
-    const 뒤 = pinchHit(판, 9, createSeededRandom(1))
-    expect(뒤.ourEntry[판.game.battingOrderIndex]?.name).toBe(판.ourEntry[9]?.name)
+    const 대타 = pinchHit(판, 9)
+    expect(대타.ourEntry[판.game.battingOrderIndex]?.name).toBe(판.ourEntry[9]?.name)
+    // 0x16 → 0xd → 0xe 에 서서 OK 를 기다린다 — 0xf 진입은 OK 뒤
+    expect(대타.sceneConfirmPending).toBe(true)
+    expect(대타.opponentPitcherIndex).toBe(판.opponentPitcherIndex)
+    const 뒤 = confirmScene(대타, createSeededRandom(1))
     expect(뒤.opponentPitcherIndex).not.toBe(판.opponentPitcherIndex)
     expect(뒤.scenePitcherChange?.serial).toBe(1)
     expect(뒤.atBatPrepared).toBe(true)
@@ -2125,7 +2140,10 @@ describe("사람 '#' 교체 뒤 0x16 → 0xd → 0xe → 0xf 재진입 · 교체
 
   it('교체 창을 취소해도(0x495fc 의 #·CLR → 0xe) 0xf 진입을 다시 지난다', () => {
     const 판 = 지친상대()
-    const 뒤 = cancelSubstitution(판, createSeededRandom(1))
+    const 취소 = cancelSubstitution(판)
+    expect(취소.sceneConfirm).not.toBe(판.sceneConfirm)
+    expect(취소.opponentPitcherIndex).toBe(판.opponentPitcherIndex)
+    const 뒤 = confirmScene(취소, createSeededRandom(1))
     expect(뒤.opponentPitcherIndex).not.toBe(판.opponentPitcherIndex)
     // 경기가 끝났거나 사람 차례가 아니면 아무 일도 없다
     expect(cancelSubstitution({ ...판, atBatPrepared: false }, createSeededRandom(1))).toEqual({ ...판, atBatPrepared: false })
@@ -2143,7 +2161,10 @@ describe("사람 '#' 교체 뒤 0x16 → 0xd → 0xe → 0xf 재진입 · 교체
       ),
     }
     const random = 세는난수(createSeededRandom(1))
-    changePitcher(판, availablePitchers(판)[0]!, random)
+    const 바꾼뒤 = changePitcher(판, availablePitchers(판)[0]!, random)
+    // 확정은 0x16 → 0xd → 0xe 까지 — 굴림은 OK 뒤다
+    expect(random.rolls).toEqual([])
+    confirmScene(바꾼뒤, random)
     expect(random.rolls).toContain(1000)
   })
 
@@ -2389,31 +2410,96 @@ describe('상태 0xe 의 OK 대기 (0x39e14 → 0x532b0) — 진행기가 0xe �
     expect(취소.sceneConfirm).not.toBe(progress.sceneConfirm)
   })
 
-  it('새 타석의 OK 뒤 0xf 진입이 CPU 교체를 내면 0x16 → 0xd → 0xe 로 한 번 더 기다린다 (같은 걸음 대기 2)', () => {
-    let 겹침 = 0
-    let 홑 = 0
+  it('OK 뒤 0xf 진입이 CPU 교체를 내면 0x16 → 0xd → 0xe 로 다시 서서 OK 를 또 기다린다 — 그 OK 뒤에 다시 굴린다', () => {
+    let 다시섬 = 0
     for (let seed = 0; seed < 6; seed += 1) {
       const random = createSeededRandom(seed)
       let current = startTeamGame({ ...기본옵션, mode: 1 }, random)
       for (let step = 0; step < 3_000 && !current.game.isFinished; step += 1) {
         const before = current
+        if (current.sceneConfirmPending === true) {
+          current = confirmScene(current, random)
+          const 교체 =
+            current.scenePinchHit?.serial !== before.scenePinchHit?.serial ||
+            current.scenePitcherChange?.serial !== before.scenePitcherChange?.serial
+          if (교체) {
+            다시섬 += 1
+            expect(current.sceneConfirmPending).toBe(true)
+            expect(current.sceneConfirm).not.toBe(before.sceneConfirm)
+          } else {
+            expect(current.sceneConfirmPending).toBe(false)
+          }
+          continue
+        }
         current = isPitchTurn(current)
           ? throwPitch(current, { typeNumber: 첫구질(current), courseCell: 4, gaugeCell: 0 }, random)
           : applyBatterOutcome(current, { kind: '아웃', detail: '뜬공아웃' }, random)
-        const 교체 =
-          current.scenePinchHit?.serial !== before.scenePinchHit?.serial ||
-          current.scenePitcherChange?.serial !== before.scenePitcherChange?.serial
-        if (!교체 || current.sceneConfirm === before.sceneConfirm) continue
-        // 새 타석(카운트 0-0)에서 난 교체면 새 타석의 0xe 와 교체 뒤 0xe 둘
-        if (current.atBat.balls === 0 && current.atBat.strikes === 0) {
-          겹침 += 1
-          expect(current.sceneConfirm?.entries).toBe(2)
-        } else {
-          홑 += 1
-          expect(current.sceneConfirm?.entries).toBe(1)
-        }
       }
     }
-    expect(겹침).toBeGreaterThan(0)
+    expect(다시섬).toBeGreaterThan(0)
+  })
+
+  it("0xe 에서 '#' 교체 창을 열어 취소하거나 투수를 바꿔도 OK 뒤 굴림은 한 번 — 안 열고 OK 한 것과 굴림 차례가 같다", () => {
+    /** 모든 굴림(next · nextInRange · pick)을 차례대로 적는다 */
+    const 적는난수 = (seed: number) => {
+      const inner = createSeededRandom(seed)
+      const log: string[] = []
+      const random: RandomPort = {
+        next: () => {
+          const value = inner.next()
+          log.push(`next ${value}`)
+          return value
+        },
+        nextInRange: (minimum, maximum) => {
+          const value = inner.nextInRange(minimum, maximum)
+          log.push(`range ${minimum}..${maximum} ${value}`)
+          return value
+        },
+        pick: (candidates) => {
+          const value = inner.pick(candidates)
+          log.push('pick')
+          return value
+        },
+      }
+      return { random, log }
+    }
+    /** 사람 수비 · 0xf 진입의 CPU 대타 0xac228 이 rand(0,1000) 을 굴리는 판 (막음 조건을 다 지나는 타순 칸 기록) */
+    const 대타판 = (mode: number) => {
+      const { progress } = 시작({ mode })
+      const slot = progress.opponentOrderIndex
+      return {
+        ...progress,
+        opponentEntryRecords: progress.opponentEntryRecords.map((record, index) =>
+          index === slot ? { hits: 0, homeRuns: 0, plateAppearances: 2 } : record,
+        ),
+      }
+    }
+    /** 사람 공격 · 상대 투수가 다 지쳐 0xac428 이 바꾸는 판 */
+    const 지친판 = (mode: number) => ({ ...시작({ mode, playerSide: PLAYER_SIDE_FIRST_BAT }).progress, opponentStamina: 0 })
+    for (const progress of [대타판(1), 대타판(2), 지친판(1), 지친판(2)]) {
+      const 대타판임 = !isBatterTurn(progress)
+      expect(progress.sceneConfirmPending).toBe(true)
+      // 안 열고 OK
+      const 그냥 = 적는난수(7)
+      const 바로 = confirmScene(progress, 그냥.random)
+      // 0xe 에서 '#' → 취소(→ 0xe) → OK
+      const 취소길 = 적는난수(7)
+      const 취소 = cancelSubstitution(progress)
+      expect(취소길.log).toEqual([])
+      const 취소뒤 = confirmScene(취소, 취소길.random)
+      if (대타판임) expect(그냥.log.length).toBeGreaterThan(0)
+      expect(취소길.log).toEqual(그냥.log)
+      expect(취소뒤.burst).toEqual(바로.burst)
+      expect(취소뒤.opponentPitcherIndex).toBe(바로.opponentPitcherIndex)
+      expect(취소뒤.ourEntry).toEqual(바로.ourEntry)
+    }
+    // 우리 수비 — '#' 투수 교체 확정(0x16 → 0xd → 0xe)도 굴림 없이 0xe 에 다시 서고, OK 뒤에야 굴린다
+    const progress = 대타판(1)
+    const 바꾼뒤 = changePitcher(progress, availablePitchers(progress)[0]!)
+    expect(바꾼뒤.sceneConfirmPending).toBe(true)
+    expect(바꾼뒤.sceneConfirm).not.toBe(progress.sceneConfirm)
+    const 교체길 = 적는난수(7)
+    confirmScene(바꾼뒤, 교체길.random)
+    expect(교체길.log.length).toBeGreaterThan(0)
   })
 })

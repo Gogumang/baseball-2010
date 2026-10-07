@@ -71,7 +71,14 @@ export interface SceneConfirm {
  *   메뉴를 열었다 닫으면 처음부터 다시 센다 — 일시정지 팝업 동안 장면 틱이 도는지는 안 봤다.
  * - Enter·스페이스·'5' 를 OK 로 받는다. 화면 누르기는 부르는 쪽이 `confirm` 을 잇는다.
  */
-export function useSceneConfirm(wait: SceneConfirmWait | null | undefined, canAccept: boolean): SceneConfirm {
+export function useSceneConfirm(
+  wait: SceneConfirmWait | null | undefined,
+  canAccept: boolean,
+  /**
+   * OK 를 받을 때마다 — OK 뒤 굴림(메시지 1 의 돌발 0x8f158 · 0xf 진입 0x3d954)을 그때 돌리는 진행기(팀경기·투수편)가 잇는다
+   */
+  onConfirm?: () => void,
+): SceneConfirm {
   const [, setVersion] = useState(0)
   const confirmed = wait == null ? 0 : (confirmedCounts.get(wait) ?? 0)
   const isAwaiting = wait != null && confirmed < wait.entries
@@ -97,8 +104,8 @@ export function useSceneConfirm(wait: SceneConfirmWait | null | undefined, canAc
     }
   }, [acceptsConfirm, wait, confirmed])
 
-  const stateRef = useRef({ wait, confirmed, acceptsConfirm })
-  stateRef.current = { wait, confirmed, acceptsConfirm }
+  const stateRef = useRef({ wait, confirmed, acceptsConfirm, onConfirm })
+  stateRef.current = { wait, confirmed, acceptsConfirm, onConfirm }
   const confirm = useCallback(() => {
     const current = stateRef.current
     if (!current.acceptsConfirm || current.wait == null || !isUnlockedRef.current) return
@@ -107,6 +114,7 @@ export function useSceneConfirm(wait: SceneConfirmWait | null | undefined, canAc
     isUnlockedRef.current = false
     setVersion((version) => version + 1)
     for (const listener of confirmListeners) listener()
+    current.onConfirm?.()
   }, [])
 
   useEffect(() => {

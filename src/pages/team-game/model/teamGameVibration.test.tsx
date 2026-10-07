@@ -36,6 +36,11 @@ function 던지며모으기(isVibrationOn: boolean | undefined, seed: number) {
       act(() => result.current.actions.finishDefensePlay())
       continue
     }
+    // 0xe 의 OK — 화면은 OK 전에 공을 안 낸다
+    if (result.current.progress.sceneConfirmPending === true) {
+      act(() => result.current.actions.confirmScene())
+      continue
+    }
     if (result.current.canBat) {
       // 우리 공격 반쪽의 삼진은 타석 화면(`BattingStage`)이 울린다 — 이 고리는 울리지 않는다
       진동.mockClear()

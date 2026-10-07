@@ -137,6 +137,25 @@ describe('투수편 경기 화면', () => {
     expect(screen.getByText('예')).toBeTruthy()
   })
 
+  it("0xe(OK 대기)에서도 '#' 키가 강판 물음을 연다(0x4994a) — 0xd 두 그림 동안은 안 열리고, '아니오' 면 다시 OK 를 기다린다", () => {
+    vi.useFakeTimers()
+    render(<PitcherGameScreen options={기본옵션} random={createSeededRandom(20100901)} onFinish={vi.fn()} />)
+    fireEvent.keyDown(window, { key: '5' })
+    if (screen.queryByRole('button', { name: '메뉴' }) === null && screen.queryByText(/^\d+회[초말]$/) !== null) {
+      fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    }
+    expect(screen.getByRole('button', { name: '확인' })).toBeTruthy()
+    fireEvent.keyDown(window, { key: '#' })
+    expect(screen.queryByText('그만 던지시겠습니까?')).toBeNull()
+    act(() => void vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_READY_FRAMES))
+    fireEvent.keyDown(window, { key: '#' })
+    expect(screen.getByText('그만 던지시겠습니까?')).toBeTruthy()
+    fireEvent.click(screen.getByText('아니오'))
+    expect(screen.queryByText('1. 구질 선택')).toBeNull()
+    OK통과()
+    expect(screen.getByText('1. 구질 선택')).toBeTruthy()
+  })
+
   it('감독 강판이 나면 대사 창이 뜨고 던질 수 없다 (상태 0x23)', () => {
     띄우기({ stamina: 0, reputation: 0 })
 

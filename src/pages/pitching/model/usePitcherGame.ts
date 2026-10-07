@@ -3,6 +3,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import {
   closeBurstWindow,
   closeManagerHookWindow,
+  confirmScene,
   giveUpPitching,
   isPitchTurn,
   pickoff,
@@ -64,6 +65,8 @@ export interface PitcherGameSession {
     readonly pickoff: (key: string) => void
     /** 수비 화면이 한 타구를 다 돌렸다 (`DefensePlayback` 의 `onDone`) */
     readonly finishDefensePlay: (result?: DefensePlayResult) => void
+    /** 상태 0xe 의 OK — 그 뒤 굴림(돌발 0x8f158 · 0xf 진입 0x3d954 의 CPU 대타)을 돌린다 (`confirmScene`) */
+    readonly confirmScene: () => void
     /** `#` 스스로 강판 (StrGAME[104] 에 "예") */
     readonly giveUp: () => void
     /** 감독 대사 창(0x23) 확인 */
@@ -218,6 +221,7 @@ export function usePitcherGame(
               ? [pickoffCallSoundIdOf(after.lastDefensePlay)]
               : [],
         ),
+      confirmScene: () => step((current) => confirmScene(current, random)),
       giveUp: () => step((current) => giveUpPitching(current, random)),
       confirmManagerHook: () => step((current) => closeManagerHookWindow(current, random)),
       closeBurst: () => step((current) => closeBurstWindow(current)),

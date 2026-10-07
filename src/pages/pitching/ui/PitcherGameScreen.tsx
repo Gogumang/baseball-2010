@@ -164,10 +164,11 @@ export function PitcherGameScreen({
    * **상태 0xe — 내가 던지는 타석마다 사람 OK 를 기다린다** (`features/play-game/model/sceneConfirm`, 0x39e14 → 0x532b0 —
    * 0x532b0 은 조작 객체의 공수를 안 본다). 진입에서 감독 강판(0x504cc)이 참이면 0x23 이라 기다리지 않는다.
    * 인트로·교대 판·수비 화면·벤치 클리어링·경기 중 메뉴·조작방법·설정·강판 물음·돌발 결과 창·감독 대사 창이 덮으면 받지 않는다.
-   * ⚠️ 미이식: 0xe 그리기 0x4d9ec 가 0xd 그리기 위에 얹는 안내 판 0x44944.
+   * OK 뒤 굴림(돌발 0x8f158 · 0xf 진입 0x3d954 의 CPU 대타)은 OK 를 받을 때 진행기가 돌린다 (`confirmScene`).
    */
   const sceneConfirm = useSceneConfirm(
-    progress.sceneConfirm,
+    // 진행기가 OK 를 아직 안 받은 0xe 대기
+    progress.sceneConfirmPending === true ? progress.sceneConfirm : null,
     !isSceneShowing &&
       progress.pendingDefensePlay === null &&
       !isReplaying &&
@@ -177,6 +178,7 @@ export function PitcherGameScreen({
       // 타석이 끝나며 난 돌발 결과 창(0x1d)은 다음 0xd 보다 먼저다 (+0x1b6c)
       resolution === null &&
       progress.managerHookText === null,
+    actions.confirmScene,
   )
   const isAwaitingConfirm = sceneConfirm.isAwaiting && canPitch
   /** 돌발 제안 창(0x1b)은 0xe 의 OK 뒤 메시지 1 이 굴려 예약한다(0x50c42) — OK 전에는 안 띄운다. 결과 창은 0xe 앞이다 */
@@ -202,6 +204,33 @@ export function PitcherGameScreen({
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [acceptsPickoff, pickoff])
+
+  /**
+   * '#' — 공용 키 0x498d4 의 '#' 가지(0x4994a): 0x38984 참이고 경기 상태가 **0xe 또는 0xf** 면, 모드 3 은 StrGAME[104]
+   * "그만 던지시겠습니까?" 물음(0xbbef8(…, 2, 0x1b, 1))만 띄운다. 0xe 의 OK 뒤 굴림은 OK 를 받을 때 진행기가 돌리므로
+   * (`confirmScene`) 0xe 에서 "예" 하면 그 굴림이 아예 안 돈다. 0xd(대기가 보인 뒤 두 그림)·코스(0x10)·게이지(0x11)는 밖이다.
+   */
+  const acceptsGiveUpKey =
+    canPitch &&
+    !isSceneShowing &&
+    !isPopupOpen &&
+    overlay === null &&
+    !asksGiveUp &&
+    !isReplaying &&
+    progress.pendingDefensePlay === null &&
+    progress.managerHookText === null &&
+    visibleBurstLines === null &&
+    (isAwaitingConfirm ? sceneConfirm.isInConfirmState : phase === '구질')
+  useEffect(() => {
+    if (!acceptsGiveUpKey) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat || event.key !== '#') return
+      event.preventDefault()
+      setAsksGiveUp(true)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [acceptsGiveUpKey])
 
   const throwWith = (gaugeCell: number) => {
     if (slot === null) return
@@ -339,8 +368,7 @@ export function PitcherGameScreen({
         badge={`${staminaPercentOf(progress.stamina)}%`}
         leftKey={
           isAwaitingConfirm && !isPopupOpen
-            ? // 0xe — OK 하나만 받는다 (0x532b0). ⚠️ 원본 '#'(0x4994a)는 0xe 에서도 강판 물음을 열지만, 웹 진행기는 OK 뒤
-              // 굴림(돌발 0x8f158)을 들어서는 걸음에 미리 해 두어 0xe 에서 강판하면 굴림이 하나 더 남는다 — OK 뒤에만 연다
+            ? // 0xe — OK 를 받는다 (0x532b0). 강판 물음은 '#' 키로 연다 (위 `acceptsGiveUpKey`)
               { label: '확인', onPress: sceneConfirm.confirm, isDisabled: !sceneConfirm.acceptsConfirm }
             : canPitch && !isPopupOpen
               ? { label: '# 강판', onPress: () => setAsksGiveUp(true) }
