@@ -1184,6 +1184,20 @@ describe('이어하기 S+0x50 == 2 → 116 다시 띄우기 (0x1c154 1c26a · 0x
     expect(셋.result.current.session.career?.seasonPopularityGain).toBe(14)
   })
 
+  it('116 은 이 경기 홈런 > 3 이면 칭호 39 를 직접 준다(1299e) — 다시 띄워도 비트가 섰으면 안 준다', () => {
+    const 홈런넷 = {
+      ...평가중(),
+      lastGame: { ...지난경기, summary: { ...지난경기.summary, stats: { ...지난경기.summary.stats, homeRuns: 4 } } },
+    } as unknown as PlayerCareer
+    const rendered = 띄우기(홈런넷)
+    const screen = rendered.result.current.screen
+    expect(screen.kind === '경기결과' ? screen.newTitles : null).toEqual([TITLE_NAMES[39]])
+    expect(rendered.result.current.session.career?.titleIds).toContain(TITLE_NAMES[39])
+    const 다시 = 띄우기(rendered.result.current.session.career!)
+    const again = 다시.result.current.screen
+    expect(again.kind === '경기결과' ? again.newTitles : null).toEqual([])
+  })
+
   it('지난 경기 재료가 없는 옛 저장은 예전처럼 116 의 끝으로 가른다', () => {
     const rendered = 띄우기({ ...평가중(), lastGame: undefined })
     expect(rendered.result.current.screen).toEqual({ kind: '다음경기순위', fromManagement: false })

@@ -252,6 +252,25 @@ export function nationalCupStandingsTitleOf(owned: readonly string[]): string | 
   return owned.includes(title) ? null : title
 }
 
+/** 칭호 39 다이너마이트 배트 (0x27) */
+const DYNAMITE_BAT_TITLE = 39
+/** 116 의 문턱 — 이 경기 홈런 `S+0x1db` > 3 */
+const DYNAMITE_BAT_HOME_RUNS = 3
+
+/**
+ * **116 경기 뒤 평가 진입의 칭호 39** (0x1278c 모드 4 갈래 1299e~129c8, 직접 떴다):
+ * ```
+ * 1299e: if !0xa4089(S, 0x27) && u8 S+0x1d8[3](이 경기 홈런) > 3:  장면+0x270 = 0x27 ; 0x1274c(칭호 팝업 0x78)
+ * ```
+ * 판정 0x1a1c0 에는 39 가 없다 — 관리 화면이 아니라 116 이 한 경기 홈런 4개 이상으로 준다. 타자편만(모드 4 갈래). 이어하기로
+ * 116 을 다시 띄우면 비트를 다시 보므로 이미 받았으면 안 준다. 줄 칭호 이름 · 없으면 null.
+ */
+export function gameResultTitleOf(owned: readonly string[], homeRunsInGame: number): string | null {
+  if (homeRunsInGame <= DYNAMITE_BAT_HOME_RUNS) return null
+  const title = TITLE_NAMES[DYNAMITE_BAT_TITLE]
+  return title === undefined || owned.includes(title) ? null : title
+}
+
 /** 실효 능력치 999 — 원본은 `0xb6415(기록, k, 1) > 998` 이다 (P3 7절, 0x1ad9a~0x1adfc) */
 const MAXED_ABILITY = 998
 /** 필살타법/마구 4단계 — `s8 +0x201 > 3` (0x1ae04). 필드 뜻은 조건 문구로 붙인 것이라 **유력**이다 */
@@ -274,7 +293,7 @@ const BATTER_RULES: Readonly<Record<number, BatterRule>> = {
   35: (career) => career.careerStats.hits >= 500, // 통산 500안타
   36: (career) => career.careerStats.runsBattedIn >= 300, // 통산 300타점
   37: ({ careerStats }) => careerStats.hits >= 700 && careerStats.runsBattedIn >= 400 && careerStats.homeRuns >= 250,
-  39: (career) => career.bestHomeRunsInGame >= 4, // 한 경기 홈런 4회
+  // 39 다이너마이트 배트는 0x1a1c0 에 없다 — 116 진입이 이 경기 홈런으로 직접 준다 (`gameResultTitleOf`)
   40: (career) => career.careerStats.homeRuns >= 100,
   41: (career) => career.careerStats.homeRuns >= 200,
   42: (career) => career.careerStats.homeRuns >= 300,

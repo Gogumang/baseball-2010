@@ -58,7 +58,7 @@ import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { selectSpecialSwingNumber, setSkillEquipped } from '@/entities/career/model/playerCareer'
 import { expandSkillSlots } from '@/entities/career/model/skillEquip'
 import {
-  awardTitles, equipTitle, nationalCupStandingsTitleOf, nextTitleOf,
+  awardTitles, equipTitle, gameResultTitleOf, nationalCupStandingsTitleOf, nextTitleOf,
 } from '@/entities/career/model/titles'
 import { blockReasonOf, runTraining, specialSwingCostOf } from '@/entities/career/model/training'
 import { trainingBlockTextOf, trainingOutcomeLinesOf } from '@/entities/career/model/trainingText'
@@ -600,8 +600,11 @@ export function useCareerSession({
       // 부상은 경기 뒤가 아니라 훈련 결과 창을 닫을 때 굴린다 (0x1b4c4)
       // 경기 뒤 평가 116 진입 0x1278c 가 S+0x50 = 2 · 저장 — 이어하기가 116 을 다시 띄운다(`continueSaved`). S 의 +0x4a ·
       // +0x1d8 처럼 지난 경기 재료를 저장에 남긴다(`lastGame`).
-      // 칭호는 여기서 주지 않는다 — 판정 0x1a1c0 은 관리 화면 갱신 0x1aec4 에서만 돈다 (`pendingTitle`)
-      setCareer({ ...advanced, seasonEndState: 116, lastGame: nariLastGameOf(summary, evaluation) })
+      // 0x1a1c0 칭호는 여기서 주지 않는다(관리 화면 갱신 0x1aec4 `pendingTitle`) — 116 은 칭호 39 하나만 직접 띄운다
+      // (1299e: 이 경기 홈런 > 3 · 비트 없음 → 0x1274c 팝업). 웹은 팝업 대신 결과 화면 칭호 칸으로 보이고 그 자리에서 준다
+      const dynamite = gameResultTitleOf(advanced.titleIds, summary.stats.homeRuns)
+      const titled = dynamite === null ? advanced : awardTitles(advanced, [dynamite])
+      setCareer({ ...titled, seasonEndState: 116, lastGame: nariLastGameOf(summary, evaluation) })
       // 경기 끝 0x4ea0c: 기록 달성 G 합을 저장 G 에 더한 뒤 0x4ec82 `0x22c7d(액수, 모드 4)` 로 획득 GP 통계에 적는다
       recordStat({ kind: 'G획득', mode: BATTER_LEAGUE_MODE, amount: gamePointRewardOf(summary) })
       // 이어서 0x4ec8a `0x22e10` 이 이번 경기 기록 배열 40칸을 연감 달성 횟수 [+4+n] 에 더한다 (e48e922)
@@ -610,8 +613,8 @@ export function useCareerSession({
         kind: '경기결과',
         summary,
         gamePointReward: gamePointRewardOf(summary),
-        // 원본 116 은 0x1a1c0 칭호를 띄우지 않는다 — 얻은 칭호는 관리 화면에서 하나씩 팝업으로 받는다
-        newTitles: [],
+        // 원본 116 은 0x1a1c0 칭호를 띄우지 않는다 — 얻은 칭호는 관리 화면에서 하나씩 팝업으로 받는다. 39 만 116 이 준다
+        newTitles: dynamite === null ? [] : [dynamite],
         evaluation,
         streakNotices: streakEventOf(advanced).notices,
       })
@@ -1070,7 +1073,10 @@ export function useCareerSession({
       const lastGame = savedCareer.lastGame
       if (savedCareer.seasonEndState === 116 && lastGame !== undefined) {
         // 116 진입 0x1278c 다시 — 카운터를 한 번 더 쓰고(겹쳐 쌓임) 평가 창을 다시 띄운다
-        const replayed = countGameForSkills(savedCareer, lastGame.evaluation.popularityChange)
+        const counted = countGameForSkills(savedCareer, lastGame.evaluation.popularityChange)
+        // 1299e 도 다시 — 비트가 이미 섰으면 안 준다
+        const dynamite = gameResultTitleOf(counted.titleIds, lastGame.summary.stats.homeRuns)
+        const replayed = dynamite === null ? counted : awardTitles(counted, [dynamite])
         setCareer(replayed)
         playSoundIds(audio, [evaluationJingleIdOf(lastGame.evaluation.popularityChange)])
         return setScreen({
@@ -1078,7 +1084,7 @@ export function useCareerSession({
           summary: lastGame.summary,
           // 원본 116 은 G 를 보이지 않는다 — 결과 판 0x18 · 정산 0x4ea0c 의 몫이라 다시 주지도 않는다
           gamePointReward: 0,
-          newTitles: [],
+          newTitles: dynamite === null ? [] : [dynamite],
           evaluation: lastGame.evaluation,
           streakNotices: streakEventOf(replayed).notices,
         })

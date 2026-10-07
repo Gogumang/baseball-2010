@@ -16,8 +16,7 @@ import {
   TITLE_ROWS_PER_PAGE,
   TITLE_NAMES,
   titleListOf,
-  titleNumberOf,
-} from '@/entities/career/model/titles'
+  titleNumberOf, gameResultTitleOf } from '@/entities/career/model/titles'
 import { createCareer, GAMES_PER_SEASON, startNextSeason } from '@/entities/career/model/playerCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
@@ -109,11 +108,17 @@ describe('evaluateNewTitles — 원문 조건', () => {
     expect(evaluateNewTitles(선수({ popularity: 2000, season: 9 }))).toContain('카리스마 캡틴')
   })
 
-  it('한 경기 4홈런, 사이클링 히트 2회', () => {
+  it('사이클링 히트 2회 — 한 경기 4홈런(39)은 0x1a1c0 이 아니라 116 이 준다', () => {
     const titles = evaluateNewTitles(선수({ bestHomeRunsInGame: 4, cycleHitGames: 2 }))
 
-    expect(titles).toContain('다이너마이트 배트')
+    expect(titles).not.toContain('다이너마이트 배트')
     expect(titles).toContain('사이클링 히터')
+  })
+
+  it('116 진입 1299e — 이 경기 홈런 > 3 이고 비트가 없을 때만 39 (0x1274c 팝업)', () => {
+    expect(gameResultTitleOf([], 4)).toBe('다이너마이트 배트')
+    expect(gameResultTitleOf([], 3)).toBeNull()
+    expect(gameResultTitleOf(['다이너마이트 배트'], 5)).toBeNull()
   })
 
   it('6년차 18경기째에만 통산 타율 4할을 본다 (P3 9절)', () => {
