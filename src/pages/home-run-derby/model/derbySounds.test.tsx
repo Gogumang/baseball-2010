@@ -6,6 +6,11 @@ import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePit
 import { LOSE_SOUND, WIN_SOUND } from '@/features/play-game/model/gameSounds'
 import { setActiveSound } from '@/shared/api/audio/soundPort'
 import type { SoundPort } from '@/shared/api/audio/soundPort'
+import { DERBY_HOME_RUN_SOUND, derbyBattedBallOf } from '@/entities/home-run-derby/model/derbyBattedBall'
+import { FOUL_CALL_SOUND } from '@/features/play-at-bat/model/atBatSounds'
+import { isFairAngle } from '@/entities/batting/model/battedBallOutcome'
+import { BATTED_BALL_PATTERNS } from '@/shared/config/original/battedBallPatterns'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 
 /** 무엇이 몇 번 울렸는지 적어 두는 포트 */
 function 녹음포트() {
@@ -88,5 +93,42 @@ describe('홈런더비 소리', () => {
     for (let i = 0; i < 10; i += 1) 한구(실패, 헛스윙)
     expect(실패.result.current.result?.isNewRecord).toBe(false)
     expect(녹음.played.at(-1)).toBe(LOSE_SOUND)
+  })
+
+  it('판 안 소리 — 홈런 갈래 틱에 11(0x527c4), 파울 공이 땅에 닿는 틱에 "Foul!" 25(0x5284a)', () => {
+    const rendered = 띄우기()
+    // 첫 공 앞의 0xe OK 는 이 소리와 무관하다 — 공 하나를 곧장 넘긴다
+    const 홈런판 = derbyBattedBallOf(홈런.pattern!)
+    act(() => rendered.result.current.onPitchResolved(홈런))
+    act(() => {
+      vi.advanceTimersByTime(홈런판.homeRunTicks[0]! * millisecondsPerFrame() - 1)
+    })
+    expect(녹음.played).not.toContain(DERBY_HOME_RUN_SOUND)
+    act(() => {
+      vi.advanceTimersByTime(1)
+    })
+    expect(녹음.played).toContain(DERBY_HOME_RUN_SOUND)
+    expect(녹음.played).not.toContain(FOUL_CALL_SOUND)
+    act(() => {
+      vi.advanceTimersByTime(10_000)
+    })
+
+    녹음.played.length = 0
+    const 파울패턴 = Object.values(BATTED_BALL_PATTERNS).flat().find((pattern) => !isFairAngle(pattern[0]))!
+    const 파울판 = derbyBattedBallOf(파울패턴)
+    act(() =>
+      rendered.result.current.onPitchResolved({
+        resolution: { kind: '파울' },
+        hasSwung: true,
+        isBunt: false,
+        resultCode: 0,
+        pattern: 파울패턴,
+        contactSoundId: 6,
+      }),
+    )
+    act(() => {
+      vi.advanceTimersByTime(파울판.foulCallTick! * millisecondsPerFrame())
+    })
+    expect(녹음.played).toEqual([6, FOUL_CALL_SOUND])
   })
 })

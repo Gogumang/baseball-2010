@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { describePitchResolution } from '@/entities/at-bat/model/resolutionText'
 import { openScenePatternDeck } from '@/entities/batting/model/battedBallOutcome'
-import { derbyBattedBallOf } from '@/entities/home-run-derby/model/derbyBattedBall'
+import { DERBY_HOME_RUN_SOUND, derbyBattedBallOf } from '@/entities/home-run-derby/model/derbyBattedBall'
 import { derbyPitcherOf } from '@/entities/home-run-derby/model/derbyPitcher'
 import type { DerbyPitcher } from '@/entities/home-run-derby/model/derbyPitcher'
 import {
@@ -16,6 +16,7 @@ import {
 import type { DerbyResult, DerbyRun } from '@/entities/home-run-derby/model/derbyRun'
 import { isEventZoneHit } from '@/entities/home-run-derby/model/eventZone'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
+import { FOUL_CALL_SOUND } from '@/features/play-at-bat/model/atBatSounds'
 import { LOSE_SOUND, WIN_SOUND } from '@/features/play-game/model/gameSounds'
 import { activeSound, playSoundIds } from '@/shared/api/audio/soundPort'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -28,11 +29,11 @@ const BANNER_MILLISECONDS = 1_500
 
 /**
  * 결과 연출로 붙잡는 시간 — 맞은 공(패턴이 실려 온 공)은 원본 판 끝(공.vt18 멈춤 + 10틱, `derbyBattedBallOf` 의 endTicks)까지,
- * 안 맞은 공은 알림 시간만.
+ * 안 맞은 공은 알림 시간만. 난수를 안 쓰는 미리 보기다 — 폴에 맞는 공은 판 시작 굴림으로 다시 깐 궤적의 끝을 쓴다(`onPitchResolved`).
  */
 export function resultHoldMillisecondsOf(detail: PitchOutcomeDetail): number {
   if (detail.pattern === undefined) return BANNER_MILLISECONDS
-  return derbyBattedBallOf(detail.pattern, false).endTicks * millisecondsPerFrame()
+  return derbyBattedBallOf(detail.pattern).endTicks * millisecondsPerFrame()
 }
 
 /**
@@ -126,11 +127,12 @@ export interface HomeRunDerbySession {
  * **던진 공은 무엇이든 기회 한 번**이다. 그래서 볼카운트가 없다.
  *
  * **번트**도 같다 (90408d8 로 키가 열렸다): 번트 판정 0x51226(0x51108 안)·타구 시작 0x51408 에 모드 갈림이 없고,
- * 맞은 번트(파울 포함)는 인플레이 끝에서 0xae3e8 로 와 "홈런 아닌 공" 하나가 된다 — 기회 −1 · 비거리 0 · 직전 홈런이면 콤보 0.
+ * 맞은 번트(파울 포함)는 인플레이 끝에서 0xae3e8 로 와 "홈런 아닌 공" 하나가 된다 — 기회 −1 · 직전 홈런이면 콤보 0(페어 번트는 판이 낙구 비거리를 더한다).
  * 맞지 않은 번트는 0xae24c 로 같은 셈이다. 번트를 따로 다루는 갈래는 없다. 그래서 여기서도 `detail.isBunt` 를 보지 않는다.
  *
- * 비거리는 원본이 타구 궤적의 착지점에서 잰다(0xa600c) — 타석(`resolvePitch`)이 실제로 뽑은 패턴
- * (`detail.pattern`)을 `derbyBattedBallOf` 가 `battedBallFlight` 궤적으로 만든다 (그 파일 머리말 참고).
+ * 맞은 공(파울 · 번트 포함)은 **홈런더비 판(플레이 종류 8)** 을 돈다 — 타석(`resolvePitch`)이 실제로 뽑은 패턴(`detail.pattern`)으로
+ * `derbyBattedBallOf` 가 판을 돌려 홈런(슬롯 2 모드 7 갈래 0x52720) · 비거리(0xa600c) · 판 끝(공 멈춤 + 10틱)을 낸다(그 파일 머리말).
+ * 판 안 굴림은 폴 충돌 rand(−25, 25) 하나뿐이다 — 야수는 쫓지도 쥐지도 않는다(공 틱 vt48 · 플레이 틱 vt4c 가 종류 8 이면 안 돈다).
  */
 export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: HomeRunDerbyOptions): HomeRunDerbySession {
   const [run, setRun] = useState<DerbyRun>(createDerbyRun)
@@ -165,9 +167,15 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
   }, [])
 
   const timerRef = useRef<number | null>(null)
+  /** 판 안 소리(홈런 11 · 파울 25)를 그 공 틱에 내는 시계들 */
+  const playSoundTimersRef = useRef<number[]>([])
   const clearTimer = () => {
     if (timerRef.current !== null) window.clearTimeout(timerRef.current)
     timerRef.current = null
+  }
+  const clearPlaySoundTimers = () => {
+    for (const timer of playSoundTimersRef.current) window.clearTimeout(timer)
+    playSoundTimersRef.current = []
   }
   /** HUD 콤보 표시(+0x1b60)가 꺼질 때 — 상태 0xf 에서 켠 뒤 21 번 그리면 끈다 */
   const comboTimerRef = useRef<number | null>(null)
@@ -229,6 +237,7 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
 
   useEffect(() => () => {
     clearTimer()
+    clearPlaySoundTimers()
     clearComboTimer()
     clearConfirmLockTimer()
     clearPrepareTimer()
@@ -283,22 +292,32 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
     // 고르는 것은 `features/play-at-bat/model/atBatSounds` 가 이미 했고 여기는 울리기만 한다.
     // ⚠️ 심판 콜은 안 낸다 — 홈런더비는 볼·스트라이크를 세지 않아(H-2) 판정 스위치가 보는
     //    볼카운트 자체가 없고, 어느 갈래로 들어가는지도 문서에 없다.
-    //
-    // **파울 각 공 (2026-10-07 확인)**: 원본은 모드 7 도 맞은 공이면 각과 무관하게 판(상태 0x17)을 돌고 그 끝 0x52a52 →
-    // 0xae3e8 모드 7 갈래로 간다(H-2 · 번트 · 파울 포함). 그 갈래는 결과 코드 · 볼카운트를 안 봐 파울이든 아니든 "홈런 아닌 공"
-    // 하나다 — 그래서 셈은 판을 안 돌려도 같다. **파울 뜬공 아웃은 없다**: 아웃 판정 vt90 = 0xb36d0 머리(b36e8~b36f4)가 판 종류
-    // 마스크 0x58d(종류 0·2·3·7·8·10)면 판정 없이 0 을 내고, 더비 판은 종류 8(+0x125, b2a10)이다 — 뜬공 아웃(state[0x1f])이
-    // 서지 않는다. ⚠️ 미해결: 웹 더비는 페어 · 파울 모두 판을 안 돌려 판 안의 굴림(폴 rand(−25, 25) · 펌블 · 악송구 · 리드)이 없고,
-    // 파울 콜 25(결과 코드 7 메시지 51c5c — 모드 검사 없음)도 안 낸다. 25 는 낙구 · 담장선 틱(b44f6)에 아무도 공을 쥐지 않았어야
-    // 나는데(쥐기 b2766 이 +0x112 를 세우면 0x9d5bc 를 다시 안 돈다), 더비 판에서 야수가 공을 쥐는지는 안 떴다 — 지어 넣지 않는다.
-    // 필살타법은 더비 타석에 번호가 없어(`HomeRunDerbyScreen` 이 `specialSwingNumber` 를 안 넘김) 굴림 차례 문제가 없다.
     playSoundIds(audioRef.current, [detail.contactSoundId])
 
-    // 홈런 = 판 끝 결과 코드 0x9d5bc 가 8 · 12 를 내는 궤적(공이 땅에 닿기 전에 담장선 · 폴을 넘는다 — 더비 판 종류 8 은
-    // +0x125 로 공이 멈출 때 닫힌다). 타석 판정이 쏜 패턴의 궤적으로 그 코드를 미리 본 것이 결과 객체에 실려 온다
-    // (`battedContact.provisionalOutcomeOf`). 예전 웹은 결과 코드 묶음 · 속도 문턱(24~26 · 1100)으로 지어 정했다
-    const isHomeRun = detail.resolution.kind === '타구' && detail.resolution.outcome.kind === '홈런'
-    const batted = detail.pattern === undefined ? null : derbyBattedBallOf(detail.pattern, isHomeRun)
+    // **맞은 공은 홈런더비 판(종류 8)을 돈다** (2026-10-07 직접 뜸 — `derbyBattedBall` 머리말). 원본은 모드 7 도 맞은 공이면
+    // 각과 무관하게(파울 · 번트 포함) 판(상태 0x17)을 돌고 그 끝 0x52a52 → 0xae3e8 모드 7 갈래로 간다(H-2). 판 시작은 폴 충돌
+    // rand(−25, 25)(쏘기 · 세계 51172~511a4 안 — 필살수비 굴림은 0x50fba 가 모드 7 이면 없다) 하나만 굴린다. 공 틱 0xb401c 가
+    // 안 돌아 포구 · 쥐기(b2766) · 펌블 · 판 끝 결과 코드 · 메시지 0xbba 가 없다 — **파울 뜬공 아웃도 없다**.
+    // 필살타법은 더비 타석에 번호가 없어(`HomeRunDerbyScreen` 이 `specialSwingNumber` 를 안 넘김) 0x517e6 굴림 차례 문제가 없다.
+    // 홈런 = 땅에 닿기 전에 담장선 · 폴을 넘은 페어 공(0x52720). 예전 웹은 타석의 임시 결과(`provisionalOutcomeOf`)로 정했다
+    const batted = detail.pattern === undefined ? null : derbyBattedBallOf(detail.pattern, randomRef.current)
+    const isHomeRun = batted?.isHomeRun ?? false
+    // 판 안 소리 — 홈런 갈래 0x527c4 의 11 · 파울 공 낙구 0x5284a 의 25 "Foul!"(즉시, 그 공 틱에)
+    // ⚠️ 근사(때): 공 틱 0 을 이 자리(타석 화면이 상태 0x13 을 지나 판을 넘긴 때)로 센다
+    // ⚠️ 미해결: 같은 홈런 갈래의 HOMERUN 글자(+0x1960 = 1, 52790~527a6)는 타석 화면(`BattingStage`)이 타석 임시 결과로 켠다 —
+    //    폴 뒤 굴림 · 폴 뒤 바운드로 갈리는 드문 공만 다르다. 0x90191(…, 2, 1)(뜻 미확인)은 옮기지 않았다
+    clearPlaySoundTimers()
+    if (batted !== null) {
+      const soundTicks = [
+        ...batted.homeRunTicks.map((tick) => ({ tick, soundId: DERBY_HOME_RUN_SOUND })),
+        ...(batted.foulCallTick === null ? [] : [{ tick: batted.foulCallTick, soundId: FOUL_CALL_SOUND }]),
+      ]
+      for (const { tick, soundId } of soundTicks) {
+        playSoundTimersRef.current.push(
+          window.setTimeout(() => playSoundIds(audioRef.current, [soundId]), tick * millisecondsPerFrame()),
+        )
+      }
+    }
     // 이벤트 존은 "공이 날아가는 중" 조건이라 배트에 맞은 공에서만 본다 (0x36dfc) — 패턴 플래그 & 2 (+0x127)
     const zoneHit = isEventZoneHit({ pattern: detail.pattern ?? null })
 
@@ -313,7 +332,8 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
     setRun(next)
     setIsEventZoneShown(zoneHit)
 
-    const parts = [describePitchResolution(detail.resolution)]
+    // 홈런이면 판이 낸 홈런으로 적는다 — 타석의 임시 결과(판 앞 예측)와 갈릴 수 있다(폴 뒤 굴림 · 폴 뒤 바운드로 넘는 공)
+    const parts = [describePitchResolution(isHomeRun ? { kind: '타구', outcome: { kind: '홈런' } } : detail.resolution)]
     if (isHomeRun) parts.push(`${next.lastDistance}M`)
     // 콤보 문구는 지운 뒤의 콤보(+0x39)가 아니라 **표시값 +0x84** 를 본다 — 원본 HUD 0x4585c 가 읽는 칸이다.
     // 원본은 이 값을 다음 공 준비(상태 0xf)에서 띄우므로, 판이 끝나 0xf 를 안 지나면(마지막 공) 띄우지 않는다.
@@ -355,7 +375,7 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
       }
       // 보통 공(0xf)은 곧바로 다음 공 준비다
       enterNextPitch()
-    }, resultHoldMillisecondsOf(detail))
+    }, batted === null ? BANNER_MILLISECONDS : batted.endTicks * millisecondsPerFrame())
   }, [])
 
   /**
@@ -367,6 +387,7 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
    */
   const restart = useCallback(() => {
     clearTimer()
+    clearPlaySoundTimers()
     // 경기 시작 상태 9 의 0x39868 이 +0x84 · 표시(+0x1b60) · +0x19ec 를 지운다
     clearComboTimer()
     setShownCombo(null)

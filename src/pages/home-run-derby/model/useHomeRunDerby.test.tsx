@@ -4,6 +4,7 @@ import { act, renderHook } from '@testing-library/react'
 import { CONFIRM_LOCK_FRAMES, resultHoldMillisecondsOf, SCENE_D_FRAMES, useHomeRunDerby } from '@/pages/home-run-derby/model/useHomeRunDerby'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import type { DerbyResult } from '@/entities/home-run-derby/model/derbyRun'
+import { derbyBattedBallOf } from '@/entities/home-run-derby/model/derbyBattedBall'
 
 /** 홈런 결과 코드 하나 — `outcomeOfPattern` 의 마지막 갈래 */
 const 홈런코드 = 24
@@ -75,7 +76,7 @@ describe('홈런더비 한 판', () => {
     expect(rendered.result.current.run.totalDistance).toBeGreaterThan(0)
   })
 
-  it('번트 타구는 따로 다루지 않는다 — 0x17 끝 0xae3e8 의 "홈런 아닌 공" 하나: 기회 −1 · 비거리 그대로 · 콤보 끊김', () => {
+  it('번트 타구는 따로 다루지 않는다 — 0x17 끝 0xae3e8 의 "홈런 아닌 공" 하나: 기회 −1 · 콤보 끊김 · 페어면 낙구 비거리(0xa600c)', () => {
     const rendered = 띄우기()
     한구(rendered, 홈런)
     한구(rendered, 홈런)
@@ -86,7 +87,7 @@ describe('홈런더비 한 판', () => {
 
     const run = rendered.result.current.run
     expect(run.remainingPitches).toBe(7)
-    expect(run.totalDistance).toBe(누적)
+    expect(run.totalDistance).toBe(누적 + derbyBattedBallOf(번트.pattern!).distance)
     expect(run.combo).toBe(0)
     expect(run.wasPreviousHomeRun).toBe(false)
   })

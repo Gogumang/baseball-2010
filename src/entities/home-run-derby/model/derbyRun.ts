@@ -54,7 +54,7 @@ export interface DerbyRun {
 export interface DerbyPitchOutcome {
   /** 이번 공이 홈런이었나 (+0x3b) */
   readonly isHomeRun: boolean
-  /** 이번 타구의 비거리 (0xa600c). 홈런이 아니면 0 이다 */
+  /** 이번 타구가 누적에 더한 비거리 (0xa600c) — 홈런 · 홈런 아닌 페어 공의 낙구. 파울 · 못 맞힌 공은 0 이다 (`derbyBattedBall`) */
   readonly distance: number
   /** 이번 공이 이벤트 존에 들었나 (+0x3f) */
   readonly isEventZoneHit: boolean
@@ -108,7 +108,7 @@ export function createDerbyRun(): DerbyRun {
 export function applyDerbyPitch(run: DerbyRun, outcome: DerbyPitchOutcome): DerbyRun {
   if (run.isFinished) return run
 
-  // 0. 비거리는 타구가 날아가는 동안 이미 더해진다 (0xa600c) — 홈런일 때만 0 보다 크다
+  // 0. 비거리는 타구가 날아가는 동안 이미 더해진다 (0xa600c) — 홈런 순간 · 홈런 아닌 페어 공의 낙구 틱
   const totalDistance = run.totalDistance + outcome.distance
   const hasMoreChances = run.remainingPitches > 1
 

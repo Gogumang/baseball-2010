@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { DERBY_PLAY_CLOSE_TICKS, derbyBallStopTickOf, derbyBattedBallOf } from '@/entities/home-run-derby/model/derbyBattedBall'
-import { DERBY_DISTANCE_LIMIT } from '@/entities/home-run-derby/model/derbyRules'
+import { DERBY_DISTANCE_LIMIT, derbyDistanceOf } from '@/entities/home-run-derby/model/derbyRules'
+import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
+import { isFairAngle } from '@/entities/batting/model/battedBallOutcome'
+import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { isBigFlyPattern, isEventZoneHit, isEventZoneVisibleAt } from '@/entities/home-run-derby/model/eventZone'
 import { BATTED_BALL_PATTERNS } from '@/shared/config/original/battedBallPatterns'
 
@@ -9,22 +12,69 @@ const 홈런코드 = 24
 /** 그 묶음의 빠른 타구 한 장 */
 const 빠른홈런 = [75, 1451, 1004, 0] as const
 
-describe('타구 한 장 만들기', () => {
+describe('홈런더비 판(종류 8) 하나 — 슬롯 2 모드 7 갈래 0x526ca', () => {
   it('타석이 뽑은 패턴을 그대로 쓴다 — 다시 뽑지 않는다', () => {
     for (const pattern of BATTED_BALL_PATTERNS[홈런코드]!) {
-      expect(derbyBattedBallOf(pattern, true).pattern).toBe(pattern)
+      expect(derbyBattedBallOf(pattern).pattern).toBe(pattern)
     }
   })
 
-  it('홈런이면 비거리가 붙고, 아니면 0 이다', () => {
-    expect(derbyBattedBallOf(빠른홈런, true).distance).toBeGreaterThan(0)
-    expect(derbyBattedBallOf(빠른홈런, false).distance).toBe(0)
+  it('홈런은 땅에 닿기 전에 담장선을 넘은 페어 공 — 낙구 점 비거리를 더하고 그 틱에 11', () => {
+    const 공 = derbyBattedBallOf(빠른홈런)
+    expect(공.isHomeRun).toBe(true)
+    expect(공.homeRunTicks).toEqual([공.trajectory.fenceTick])
+    expect(공.trajectory.landingTick).toBeGreaterThanOrEqual(공.trajectory.fenceTick)
+    expect(공.distance).toBe(derbyDistanceOf(공.trajectory.pointAt(공.trajectory.landingTick)))
+    expect(공.foulCallTick).toBeNull()
   })
 
-  it('비거리는 상한 160 을 넘지 않는다', () => {
+  it('⚠️ 원본 그대로: 홈런 아닌 페어 공도 낙구 틱에 그 점 비거리를 더한다 (0xa600c 의 state[0x26] == 8 은 판 종류)', () => {
+    const 뜬공 = derbyBattedBallOf(BATTED_BALL_PATTERNS[15]![0]!)
+    expect(뜬공.isHomeRun).toBe(false)
+    expect(뜬공.distance).toBe(derbyDistanceOf(뜬공.trajectory.pointAt(뜬공.trajectory.landingTick)))
+    expect(뜬공.distance).toBeGreaterThan(0)
+    expect(뜬공.homeRunTicks).toEqual([])
+  })
+
+  it('파울 각 공은 비거리 0 · 홈런 아님 · 낙구 틱에 "Foul!" 25 (0x5284a)', () => {
+    const 파울패턴 = Object.values(BATTED_BALL_PATTERNS)
+      .flat()
+      .find((pattern) => !isFairAngle(pattern[0]) && battedBallTrajectory(pattern).fenceTick > 0)!
+    const 파울 = derbyBattedBallOf(파울패턴)
+    expect(파울.isHomeRun).toBe(false)
+    expect(파울.distance).toBe(0)
+    expect(파울.foulCallTick).toBe(파울.trajectory.landingTick)
+  })
+
+  it('비거리는 한 번에 상한 160 을 넘지 않는다', () => {
     for (const pattern of BATTED_BALL_PATTERNS[홈런코드]!) {
-      expect(derbyBattedBallOf(pattern, true).distance).toBeLessThanOrEqual(DERBY_DISTANCE_LIMIT)
+      expect(derbyBattedBallOf(pattern).distance).toBeLessThanOrEqual(DERBY_DISTANCE_LIMIT)
     }
+  })
+
+  it('판 안 굴림은 폴 충돌 rand(−25, 25) 하나뿐 — 폴에 안 맞는 공은 난수를 안 쓴다', () => {
+    const 센다 = (pattern: readonly [number, number, number, number]) => {
+      const seeded = createSeededRandom(7)
+      let 굴림 = 0
+      const random = {
+        next: () => {
+          굴림 += 1
+          return seeded.next()
+        },
+        nextInRange: (minimum: number, maximum: number) => {
+          굴림 += 1
+          return seeded.nextInRange(minimum, maximum)
+        },
+        pick: seeded.pick,
+      }
+      derbyBattedBallOf(pattern, random)
+      return 굴림
+    }
+    // 원본 표 24[18] 은 폴(ab0)에 맞는다 (I 2b 표본)
+    const 폴 = BATTED_BALL_PATTERNS[홈런코드]![18]!
+    expect(battedBallTrajectory(폴).poleTick).toBeGreaterThan(0)
+    expect(센다(폴)).toBe(1)
+    expect(센다(빠른홈런)).toBe(0)
   })
 })
 
@@ -57,7 +107,7 @@ describe('이벤트 존 — 플레이 +0x127 = 패턴 플래그 & 2 (0xb07c8)', 
 
 describe('판 끝 — 관문 0xb0d28 의 +0x125 갈래(공.vt18 멈춤) 뒤 10틱', () => {
   it('처음 멈춘 점의 틱 + 10 이다 — 원본 코드 24 [126, 1337, 1006]', () => {
-    const 공 = derbyBattedBallOf([126, 1337, 1006, 0], true)
+    const 공 = derbyBattedBallOf([126, 1337, 1006, 0])
     const 멈춘틱 = derbyBallStopTickOf(공.trajectory)
 
     expect(공.trajectory.isStoppedAt?.(멈춘틱)).toBe(true)
