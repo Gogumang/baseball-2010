@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { registerContact } from '@/entities/batting/model/battedContact'
+import { displayPatternListOf, openScenePatternDeck, scenePatternDeckOf } from '@/entities/batting/model/battedBallOutcome'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { AUTO_ADVANCE_TICK_MARGIN, beatsThrow } from '@/entities/fielding/model/autoAdvance'
@@ -1741,5 +1742,38 @@ describe('필살타법 성공 굴림 0x517e6 — 메시지 0x11(필살수비 · 
 
   it('필살 스윙이 아닌 공은 굴리지 않는다', () => {
     expect(시작(쏜공(), [0.999, 0.999, 0]).uncatchable).toBe(false)
+  })
+})
+
+describe('필살수비가 열리면 표시 패턴으로 바꿔 쏜다 — 5107c 점프 0xb097c · 5112c 슬라이딩 0xb09ac', () => {
+  const 쏜패턴: BattedBallPattern = [49, 802, 799, 0]
+  /** 장면 덱 섞기 1275 번은 0.5, 그 뒤는 values 차례 */
+  const 장면난수 = (values: readonly number[]) => {
+    const 섞기 = Object.values(BATTED_BALL_PATTERNS).reduce((sum, patterns) => sum + patterns.length, 0)
+    const random = 차례난수([...Array<number>(섞기).fill(0.5), ...values])
+    openScenePatternDeck(random)
+    return random
+  }
+  const 시작 = (random: RandomPort) =>
+    startDefensePlay({
+      outcome: registerContact(땅볼아웃, { pattern: 쏜패턴, resultCode: 15 }),
+      trajectory: battedBallTrajectory(쏜패턴),
+      bases: EMPTY_BASES,
+      outs: 0,
+      random,
+    })
+
+  it('점프 창(첫 굴림 0)이 열리면 rand(0, 개수) 한 장으로 궤적을 바꾼다 — 목록은 장면 덱이 섞인 차례다', () => {
+    const random = 장면난수([0, 0])
+    const 목록 = displayPatternListOf(scenePatternDeckOf(random)!.deck, 'jump')
+    const state = 시작(random)
+    expect(state.specialDefense.jumpUnlocked).toBe(true)
+    const 바꾼 = 목록[0]
+    expect(state.trajectory.pointAt(10)).toEqual(battedBallTrajectory([바꾼[0], 바꾼[1], 바꾼[2], 바꾼[3] & 1]).pointAt(10))
+  })
+
+  it('창이 안 열리면 쏜 패턴 그대로다', () => {
+    const state = 시작(장면난수([0.999, 0.999]))
+    expect(state.trajectory.pointAt(10)).toEqual(battedBallTrajectory(쏜패턴).pointAt(10))
   })
 })

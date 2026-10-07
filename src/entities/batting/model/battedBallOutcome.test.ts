@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest'
 import {
   contactOfPattern,
   createPatternDeck,
+  displayPatternListOf,
+  displayPatternOf,
   drawPattern,
   isFairAngle,
   launchPatternOf,
 } from '@/entities/batting/model/battedBallOutcome'
 import { BATTED_BALL_PATTERNS } from '@/shared/config/original/battedBallPatterns'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createSeededRandom } from '@/shared/api/random/seededRandom'
 
 const 고정 = (value: number): RandomPort => ({ next: () => value, nextInRange: () => 0, pick: (items) => items[0] })
 
@@ -134,5 +137,37 @@ describe('특수 타구 표 0xcfb3c — 결과 코드 25 · 26 의 2% (0x514f2 ~
     const random = 차례(0)
     expect(launchPatternOf(24, 덱패턴, random)).toBe(덱패턴)
     expect(random.used()).toBe(0)
+  })
+})
+
+describe('필살수비 표시 패턴 — 덱 목록 0xb086c(비트 2) · 0xb07ec(비트 3) · 바꿔 쏘기 0xb097c · 0xb09ac', () => {
+  const 덱 = createPatternDeck(createSeededRandom(7))
+
+  it('섞인 덱 차례(코드 0→26, 자리 0→n−1)로 비트 2 · 비트 3 패턴만 모은다 — 원본 표는 7 개 · 18 개', () => {
+    const 점프 = displayPatternListOf(덱, 'jump')
+    const 슬라이딩 = displayPatternListOf(덱, 'slide')
+    expect(점프).toHaveLength(7)
+    expect(슬라이딩).toHaveLength(18)
+    expect(점프.every((pattern) => (pattern[3] & 4) !== 0)).toBe(true)
+    expect(슬라이딩.every((pattern) => (pattern[3] & 8) !== 0)).toBe(true)
+    // 차례는 섞인 자리를 따른다 — 같은 코드 안의 두 비트 2 패턴(코드 18 · 19)은 덱 order 의 앞뒤대로 놓인다
+    const 자리 = (code: number, pattern: readonly number[]) =>
+      덱.orders[code].findIndex((index) => BATTED_BALL_PATTERNS[code][index] === pattern)
+    for (const code of [18, 19]) {
+      const 이코드 = 점프.filter((pattern) => BATTED_BALL_PATTERNS[code].includes(pattern))
+      expect(이코드).toHaveLength(2)
+      expect(자리(code, 이코드[0])).toBeLessThan(자리(code, 이코드[1]))
+    }
+  })
+
+  it('rand(0, 개수) 로 한 장을 골라 (a, b, c) 만 덮는다 — 높이 부호 비트 0 은 바꾼 패턴 것, 낙구 쫓기 비트 1 은 쏜 패턴 것', () => {
+    const 점프 = displayPatternListOf(덱, 'jump')
+    const 쏜 = [90, 900, 350, 2] as const
+    const 첫 = displayPatternOf(덱, 'jump', 쏜, 고정(0))
+    expect(첫.slice(0, 3)).toEqual(점프[0].slice(0, 3))
+    expect(첫[3]).toBe((점프[0][3] & 1) | 2)
+    const 끝 = displayPatternOf(덱, 'jump', [90, 900, 350, 0], 고정(0.999))
+    expect(끝.slice(0, 3)).toEqual(점프[점프.length - 1].slice(0, 3))
+    expect(끝[3] & 2).toBe(0)
   })
 })

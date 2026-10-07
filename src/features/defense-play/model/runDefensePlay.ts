@@ -7,6 +7,7 @@ import {
   trajectoryWithRandom,
   type BallTrajectory,
 } from '@/entities/batting/model/battedBallFlight'
+import { displayPatternOf, scenePatternDeckOf } from '@/entities/batting/model/battedBallOutcome'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
@@ -814,6 +815,28 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     gameMode: input.gameMode,
     chaserSlot: forecast.choice.slot,
   })
+  // ── 필살수비가 열리면 표시 패턴으로 바꿔 쏜다 — 5107c 점프 0xb097c(목록 비트 2) · 5112c 슬라이딩 0xb09ac(목록 비트 3) ──
+  // 장면 덱(덱을 섞을 때 만든 두 목록)에서 rand(0, 개수) 로 한 장을 골라 쏠 패턴의 (a, b, c) 를 덮는다(`displayPatternOf`).
+  // 바꿔 쏜 공의 각이 파울 각이면 511b8 state[0x1c] 도 그 각으로 선다(목록 B 에는 파울 각 패턴이 있다).
+  // ⚠️ 쏜 공(`contactOfOutcome`)이나 장면 덱이 없는 호출(시험 · 결과를 넘겨받은 옛 길)은 바꿀 패턴을 몰라 그대로 쏜다(웹 전용)
+  const swungContact = contactOfOutcome(input.outcome)
+  const sceneDeck = input.random === undefined ? undefined : scenePatternDeckOf(input.random)
+  let launchedPattern = swungContact?.pattern
+  if (
+    (specialDefense.jumpUnlocked || specialDefense.slideUnlocked) &&
+    input.random !== undefined &&
+    swungContact !== undefined &&
+    sceneDeck !== undefined
+  ) {
+    launchedPattern = displayPatternOf(
+      sceneDeck.deck,
+      specialDefense.jumpUnlocked ? 'jump' : 'slide',
+      swungContact.pattern,
+      input.random,
+    )
+    trajectory = battedBallTrajectory(launchedPattern)
+    forecast = forecastCatch(trajectory, fielders, window, chase)
+  }
   // ── 쏘기 + 세계 0xbfed0 (메시지 0x11 의 51172~511a4) — 필살수비 굴림(50fe6 · 51012) 뒤다 ──
   // 궤적 계산 안의 굴림은 폴 충돌 0xa2c64 의 rand(−25, 25) 하나뿐이다. 부르는 쪽은 난수 없이 궤적을 깔아 넘기므로
   // 그 굴림이 있던 궤적이면 여기서 난수로 다시 깐다 (굴림이 없던 궤적은 그대로 — 난수를 안 쓴다).
@@ -833,7 +856,6 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
   // 0x494b4 · 0xae89c)에는 굴림이 없다(호출 그래프). 성공하면 517ec 0xaf180(공+0x5c, 4) — 포구 틱 b4246 이 보고 0xbc3.
   // 예전 웹은 타석 판정 안(방향 · 패턴 바로 뒤)에서 굴려 필살수비 · 폴 굴림보다 앞섰고, "필살타법 타구면 필살수비를 안 굴린다"
   // 를 두었다 — 원본 차례에서는 필살수비를 굴릴 때 성공 여부를 아직 모른다
-  const swungContact = contactOfOutcome(input.outcome)
   if (!uncatchable && swungContact?.specialSwing !== undefined && input.random !== undefined) {
     uncatchable = rollSpecialSwing(swungContact.specialSwing.number, input.random, swungContact.specialSwing.isAceBatter)
   }
