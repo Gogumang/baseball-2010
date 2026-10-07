@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ITEM_WINDOW_KIND } from '@/widgets/season/lib/seasonItemMenu'
 import type { ItemWindowKind } from '@/widgets/season/lib/seasonItemMenu'
 import {
@@ -178,9 +178,18 @@ export function SeasonRoute({
   const [recordRank, setRecordRank] = useState<{ readonly side: SeasonRankingSide; readonly page: number }>({ side: '타자', page: 0 })
   /**
    * 훈련 결과 팝업 글 상자 첫 줄 [창+0x2d8] — 시즌 장면 창의 칸이라 팝업 · 0xcf 를 떠나도 남는다(시즌에서 비우는 곳이 없다,
-   * `SeasonTrainingScreen` 주석). 창이 장면과 함께 사니 이 화면이 사는 동안 든다.
+   * `SeasonTrainingScreen` 주석). **창의 수명은 장면 0x105 와 같다** (직접 떴다):
+   * - 창은 장면 0x105 초기화 0x3b14 의 0x3ef4~0x3f7c 가 `new(0x398)` → 0x7b7b9 로 만들어 [장면+0xc0] 에 넣는다.
+   *   new 0x1239 → 0x2ac4 는 잡은 칸을 0 으로 채우고(0x2ad4 memset) 생성자 0x7b4dc 는 +0x2d8 을 안 건드려 **새 창은 0** 이다.
+   * - 장면 전환 0x3874 는 [앱+0x20] 에 다음 장면이 서면 지금 장면을 소멸자(vt+4, 0x3948)로 지우고 다음 장면을 new 한다.
+   *   그래서 0xe1 → 경기 장면 0x104 로 가면 0x105 와 창이 사라지고, 경기 뒤 0x105 로 돌아오면 새 창(첫 줄 0)이다.
+   * 웹은 경기 화면이 이 라우트 안(`경기직전` 0xe1)에 있으므로 0xe1 에 들어설 때 0 으로 되돌린다. 메인 메뉴로 나가면 라우트가 내려가
+   * 다시 서며 0 이다.
    */
   const [trainingResultFirstLine, setTrainingResultFirstLine] = useState(0)
+  useEffect(() => {
+    if (scene === SEASON_SCENE_STATE.경기직전) setTrainingResultFirstLine(0)
+  }, [scene])
   /** 0xdf 목적 1 에서 나리 선수를 고르면 뜨는 StrMODE[220] 알림 (0xbbef9(…, 1, 1, 1) — 상태는 0xdf 그대로) */
   const [pickNotice, setPickNotice] = useState<string | null>(null)
   /**

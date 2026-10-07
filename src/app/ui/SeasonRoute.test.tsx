@@ -540,3 +540,46 @@ describe('아이템 → 서브아이템·GP아이템 = 상점 0xdc 종류 1·2 (
     expect(알림글()).toContain('G포인트가 부족')
   })
 })
+
+describe('훈련 결과 팝업 첫 줄 [창+0x2d8] 의 수명 — 창은 장면 0x105 와 함께 산다 (0x3b14 · 0x3874)', () => {
+  const 결과 = {
+    current: { ability: [106, 100, 100, 100], morale: 43 },
+    change: { ability: [6, 0, 0, 0], morale: -8 },
+    bonus: { ability: [0, 0, 0, 0], morale: -1 },
+    messages: ['가', '나', '다', '라', '마'],
+  }
+
+  function 결과화면({ store }: { readonly store: JsonStorePort }) {
+    const session = useSeasonSession(store, createSeededRandom(20100901))
+    const gameSettings = useGameSettings(설정저장)
+    return (
+      <>
+        <SeasonRoute session={{ ...session, trainingResult: 결과 }} random={createSeededRandom(20100901)}
+          gameSettings={gameSettings} onExit={vi.fn()} />
+        <button type="button" onClick={() => session.actions.goto(SEASON_SCENE_STATE.트레이닝)}>훈련으로</button>
+        <button type="button" onClick={() => session.actions.goto(SEASON_SCENE_STATE.경기직전)}>경기로</button>
+        <button type="button" onClick={() => session.actions.goto(SEASON_SCENE_STATE.관리메뉴)}>관리로</button>
+      </>
+    )
+  }
+  const 창글 = () => screen.getByRole('dialog', { name: '상세정보' }).textContent ?? ''
+
+  it('0x105 안에서는 남고, 경기 장면 0x104(0xe1)를 다녀오면 새 창이라 0 이다', () => {
+    const store = 메모리저장(세이브(레코드({ seenEvents: [400, 1], yearGoalShown: true })))
+    render(<결과화면 store={store} />)
+    fireEvent.click(screen.getByRole('button', { name: '훈련으로' }))
+    expect(창글()).toContain('가')
+    fireEvent.keyDown(window, { key: '8' })
+    expect(창글()).not.toContain('가')
+
+    // 관리 메뉴를 다녀와도 같은 창 — 첫 줄 1 이 남는다
+    fireEvent.click(screen.getByRole('button', { name: '관리로' }))
+    fireEvent.click(screen.getByRole('button', { name: '훈련으로' }))
+    expect(창글()).not.toContain('가')
+
+    // 0xe1 → 장면 0x104 로 가면 0x105 가 지워지고(0x3948) 돌아오면 new 한 창(0 채움)
+    fireEvent.click(screen.getByRole('button', { name: '경기로' }))
+    fireEvent.click(screen.getByRole('button', { name: '훈련으로' }))
+    expect(창글()).toContain('가')
+  })
+})
