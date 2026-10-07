@@ -13,7 +13,9 @@ import {
   moraleGaugeColumnsOf,
   moraleGaugeFrameOf,
   numberGlyphsOf,
-  seasonGameOf,
+  messageGameNumberOf,
+  messageLineLayoutOf,
+  nameBandSplitOf,
 } from '@/pages/management/lib/managementLayout'
 
 describe('하위 메뉴 · 등장 애니메이션 — 0x7e84c · 0x7ff8c (layout-re 2차)', () => {
@@ -85,10 +87,28 @@ describe('관리 화면 배치 — 0x7d34c · 0x7e418', () => {
     expect(glyphsWidthOf(glyphs)).toBe(6 + 1 + 9 + 3)
   })
 
-  it('경기 번호는 다음 경기(+1)이고 시즌을 다 치렀으면 45 로 둔다', () => {
-    expect(seasonGameOf(0)).toBe(1)
-    expect(seasonGameOf(44)).toBe(45)
-    expect(seasonGameOf(45)).toBe(45)
+  it('경기 번호 0x7d120 — g + 1, g == 0 이고 포스트시즌이면 45, 둘째 인자가 서면 1 보다 클 때 −1', () => {
+    expect(messageGameNumberOf(0, false)).toBe(1)
+    expect(messageGameNumberOf(44, false)).toBe(45)
+    // 45 로 자르지 않는다 — 정규시즌 g 가 45 면 46 이다
+    expect(messageGameNumberOf(45, false)).toBe(46)
+    // 포스트시즌 g 는 그 시리즈에서 치른 경기 수 — 0 일 때만 45 로 그린다
+    expect(messageGameNumberOf(0, true)).toBe(45)
+    expect(messageGameNumberOf(2, true)).toBe(3)
+    expect(messageGameNumberOf(3, false, true)).toBe(3)
+    expect(messageGameNumberOf(0, false, true)).toBe(1)
+  })
+
+  it('메시지줄 "/" 는 0xb9d35 oy 1 · 세로 가운데 내림이라 y 210 — 나머지 자리는 dx 를 줄여 간다', () => {
+    expect(messageLineLayoutOf(12)).toEqual({
+      gameLabelLeft: 81, totalRight: 79, slashLeft: 58, slashTop: 210, gameRight: 56,
+      yearLabelLeft: 28, yearRight: 26,
+    })
+  })
+
+  it('이름 띠가 꺾이는 x — 나만의리그 W/2 − 45 = 75 · 시즌 W/2 − 28 = 92 (0x7d43c)', () => {
+    expect(nameBandSplitOf(false)).toBe(75)
+    expect(nameBandSplitOf(true)).toBe(92)
   })
 
   it('경기장 띠는 6~15시 0 · 16~19시 1 · 그 밖 2', () => {

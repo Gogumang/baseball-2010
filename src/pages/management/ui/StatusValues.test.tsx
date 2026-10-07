@@ -54,3 +54,11 @@ describe('이글아이 남은 경기 수 — 0xba719(자간 0, 기준 0, ui/num,
     ])
   })
 })
+
+describe('메시지줄 0x7d120 — "N년 G/45경기"', () => {
+  it('"/"(num 127, 5×8)는 0xb9d35 oy 1 이라 y 210 에 놓인다', () => {
+    const { container } = render(<StatusValues career={createCareer('테스터')} />)
+    const slash = [...container.querySelectorAll('img')].find((img) => img.src.endsWith('/sprites/num/127.png'))
+    expect([slash?.style.left, slash?.style.top]).toEqual(['58px', '210px'])
+  })
+})

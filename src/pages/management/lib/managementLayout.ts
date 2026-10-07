@@ -95,7 +95,10 @@ export const BOARD_COLOR = { fill: ORIGINAL_COLORS.boardFill, edge: ORIGINAL_COL
 /** 경기장 띠 — f10 박스0 검정, mode_back 프레임을 (1,66) 에 70 높이로 자른다 (0x7b9ac) */
 export const STADIUM_BAND = { top: 65, height: 72, imageLeft: 1, imageTop: 66, imageHeight: 70 }
 
-/** 이름·칭호 띠 (0x7cfc8) */
+/**
+ * 이름·칭호 띠 (0x7cfc8) — 띠 = 프레임 10 박스 1 ∪ 박스 2, 꺾이는 자리(셋째 인자)는 0x7d43c~0x7d464:
+ * `W/2 − (0x7b998 시즌 ? 0x1c : 0x2d)` → 나만의리그 75 · 시즌모드 92 (`nameBandSplitOf`).
+ */
 export const NAME_BAND = {
   top: 136,
   height: 20,
@@ -135,6 +138,7 @@ export const MORALE_GAUGE_BACKGROUND = ORIGINAL_COLORS.gaugeBackground
 /** 상태 아이콘 줄 전진 = 박스 폭 20 + 2 (0x7ddb6). 아이콘 번호·조건은 `ui/StatusIconRow` */
 export const STATUS_ICON_STEP = 22
 
+const SCREEN_WIDTH = 240
 const MAXIMUM_MORALE = 100
 const GAUGE_COLUMN_COUNT = STATUS_BOXES.moraleGauge.width - 1
 
@@ -154,9 +158,69 @@ export type { Glyph } from '@/shared/lib/pixelNumber/pixelNumber'
 export { GLYPH_SPACING, SLASH_FRAME, glyphsWidthOf, moneyGlyphsOf, numberGlyphsOf } from '@/shared/lib/pixelNumber/pixelNumber'
 
 
-/** 경기 번호 = 치른 경기 + 1, 시즌을 다 치렀으면 45 (0x7d120) */
-export function seasonGameOf(gamesPlayed: number): number {
-  return Math.min(gamesPlayed + 1, GAMES_PER_SEASON)
+/** 이름 띠가 꺾이는 x — 0x7d43c: 시즌(모드 2)이면 W/2 − 0x1c, 아니면 W/2 − 0x2d */
+export function nameBandSplitOf(isSeasonMode: boolean): number {
+  return SCREEN_WIDTH / 2 - (isSeasonMode ? 0x1c : 0x2d)
+}
+
+/**
+ * 메시지줄 "N년 G/45경기" 의 경기 번호 — 0x7d120 (직접 떴다, 모드 갈림 없음 — 0x7b998 을 부르지만 값을 버린다):
+ * ```
+ * g = (s8)S+0xb2 (= L+0x32 날짜 카운터)
+ * g == 0 && S+0xb4(포스트시즌) ≠ 0 → 45 ; 그 밖 g + 1
+ * 0x7d34c 의 둘째 인자 ≠ 0 이고 위 값 > 1 → −1        ; 이벤트 대화창 0x8b5ac 만 [이벤트+0xb] 를 넘긴다(그 밖 0)
+ * ```
+ * 포스트시즌에는 g 가 그 시리즈에서 치른 경기 수라 "3/45경기" 처럼 시리즈 차례가 나온다 — 원본 그대로.
+ * 45 는 자르지 않는다(정규시즌 g == 45 면 46).
+ */
+export function messageGameNumberOf(dayCounter: number, isPostseason: boolean, isPreviousGame = false): number {
+  const game = dayCounter === 0 && isPostseason ? GAMES_PER_SEASON : dayCounter + 1
+  return isPreviousGame && game > 1 ? game - 1 : game
+}
+
+/**
+ * 메시지줄 배치 — 0x7d120 이 박스 10 (0,206,105,15) 오른쪽 끝에서 dx 를 줄여 가며 오른쪽부터 그린다.
+ * ```
+ * dx = −5 ; "경기"(img_text 335) 0xb9e05(정렬 0x24, ox dx)      ; dx −= 폭 + 2
+ * 45      0xba719(자간 1, 기준 20, 정렬 0x24, ox dx)          ; dx −= 2·폭(num 20) + 4
+ * "/"     0xb9d35(num 127, 정렬 0x24, ox dx, **oy 1**)        ; dx −= 폭 + 2
+ * G       0xba719(…, ox dx)                                   ; dx −= 자리수·폭(num 20) + 7
+ * "년"(334) 0xb9e05(정렬 0x24, ox dx)                          ; dx −= 폭 + 2
+ * N       0xba719(…, ox dx)
+ * ```
+ * "/" 는 0xb9c5c 라 세로 가운데가 내림 `trunc((15 − 8)/2) = 3` 에 oy 1 → y = 210.
+ */
+export interface MessageLineLayout {
+  readonly gameLabelLeft: number
+  readonly totalRight: number
+  readonly slashLeft: number
+  readonly slashTop: number
+  readonly gameRight: number
+  readonly yearLabelLeft: number
+  readonly yearRight: number
+}
+
+const MESSAGE_GAME_LABEL_WIDTH = 19
+const MESSAGE_YEAR_LABEL_WIDTH = 9
+const MESSAGE_SLASH = { width: 5, height: 8, oy: 1 }
+const MESSAGE_DIGIT_WIDTH = 6
+
+export function messageLineLayoutOf(game: number): MessageLineLayout {
+  const box = STATUS_BOXES.message
+  const right = box.x + box.width
+  let dx = -5
+  const gameLabelLeft = right + dx - MESSAGE_GAME_LABEL_WIDTH
+  dx -= MESSAGE_GAME_LABEL_WIDTH + 2
+  const totalRight = right + dx
+  dx -= 2 * MESSAGE_DIGIT_WIDTH + 4
+  const slashLeft = right + dx - MESSAGE_SLASH.width
+  const slashTop = box.y + Math.trunc((box.height - MESSAGE_SLASH.height) / 2) + MESSAGE_SLASH.oy
+  dx -= MESSAGE_SLASH.width + 2
+  const gameRight = right + dx
+  dx -= String(game).length * MESSAGE_DIGIT_WIDTH + 7
+  const yearLabelLeft = right + dx - MESSAGE_YEAR_LABEL_WIDTH
+  dx -= MESSAGE_YEAR_LABEL_WIDTH + 2
+  return { gameLabelLeft, totalRight, slashLeft, slashTop, gameRight, yearLabelLeft, yearRight: right + dx }
 }
 
 /** 경기장 띠 프레임 — 휴대폰 시각 기준 (this+0x1c) */
