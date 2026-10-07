@@ -27,6 +27,9 @@ import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
  * ⚠️ 게이지가 넘겨 주는 것은 **누른 칸 g(0~9)** 하나다 — 원본에는 PERFECT/GOOD/BAD 라는
  * 글자도 판정도 없다 (S5 U-15 확정, 누름 0x50e08). 등급 t = max(g−4, 1) 은 부르는 쪽
  * (`pitcherPitch.pitchGradeOf`)이 원본 자리에서 뽑는다. 나리 투수편 `PitcherGameScreen` 과 같다.
+ *
+ * 기록 달성 알림 0x4e35c 는 붙이지 않는다 — 프레임 0x52c50 이 미션(모드 5·6)에서도 부르지만 지급 0xa77f0 이
+ * a780a(`state[1] ∈ {5,6,7}` → 끝)에서 막아 줄도 G 누계도 늘 비어 있다(R8 1절) → 원본도 판이 안 선다.
  */
 type PitchPhase = '구질' | '코스' | '게이지'
 /** 경기 화면을 덮는 하위 화면 — 경기 중 메뉴가 연다 */

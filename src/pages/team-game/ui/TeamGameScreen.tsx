@@ -29,7 +29,7 @@ import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
 import { teamHalfInningCardsOf } from '@/pages/team-game/lib/teamHalfInningCards'
 import { runScoreBoardSourceOf } from '@/pages/defense/lib/runScoreBoard'
 import { usePitchEndSerial, useRecordAlert } from '@/widgets/game-scene/model/useRecordAlert'
-import { RecordAlertPanel } from '@/widgets/game-scene/ui/RecordAlertPanel'
+import { RecordAlertPanel, RecordAlertScreenOverlay } from '@/widgets/game-scene/ui/RecordAlertPanel'
 import { isGameEndRecord, leadingRecordCountOf } from '@/widgets/game-scene/lib/recordAlert'
 import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
@@ -876,6 +876,12 @@ export function TeamGameScreen({
           ))}
         </ul>
       </PixelScreen>
+
+      {/*
+        투구 화면(우리 수비)은 240×320 캔버스가 없다 — 경기 장면 프레임 0x52c50 의 덧그림 0x4e35c 를 화면 기둥 좌표로 얹는다.
+        타석 화면은 위 타석 캔버스 판 위에 그린다
+      */}
+      {canPitch && !canBat && <RecordAlertScreenOverlay frame={recordAlert} />}
 
       {visibleBurstLines !== null && (
         <BurstMissionWindow

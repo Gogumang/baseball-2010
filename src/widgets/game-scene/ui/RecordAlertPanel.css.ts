@@ -27,3 +27,25 @@ export const text = style({
   lineHeight: '11px',
   whiteSpace: 'nowrap',
 })
+
+/**
+ * 투구 화면(240×320 장면 캔버스가 없는 메뉴식 화면)에서 **화면 기둥 위에** 얹는 자리 — `ScreenOverlay` 와 같은 배율·가운데
+ * 규칙이지만 알림은 키·눌림을 안 받으므로 기둥도 눌림을 통과시킨다.
+ */
+export const screenLayer = style({
+  position: 'absolute',
+  inset: 0,
+  display: 'flex',
+  justifyContent: 'center',
+  pointerEvents: 'none',
+  zIndex: 4,
+})
+
+export const screenColumn = style({
+  position: 'relative',
+  flex: 'none',
+  width: 240,
+  height: 'calc(100dvh / var(--zoom))',
+  zoom: 'var(--zoom)',
+  pointerEvents: 'none',
+})

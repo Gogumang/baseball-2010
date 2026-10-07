@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import { BigResult, Hint, MenuList, Panel, PixelScreen, StatGrid } from '@/shared/ui'
 import type { MenuItem, StatEntry } from '@/shared/ui'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -40,6 +41,10 @@ import { runScoreBoardSourceOf } from '@/pages/defense/lib/runScoreBoard'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 import { GameEndBoard } from '@/widgets/game-scene/ui/GameEndBoard'
 import { humanVsComputerSidesOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
+import { usePitchEndSerial, useRecordAlert } from '@/widgets/game-scene/model/useRecordAlert'
+import { RecordAlertScreenOverlay } from '@/widgets/game-scene/ui/RecordAlertPanel'
+import { isGameEndRecord, leadingRecordCountOf } from '@/widgets/game-scene/lib/recordAlert'
+import { passesRecordTeamGate } from '@/entities/game/model/gameRecords'
 import * as styles from '@/pages/pitching/ui/PitcherGameScreen.css'
 
 /**
@@ -251,6 +256,58 @@ export function PitcherGameScreen({
 
   // 점수판 틀 0x41440 의 두 측 — 내 팀 PLAYER · 상대 COM
   const scoreboardSides = humanVsComputerSidesOf(options.playerSide, options.ourTeamId, options.opponentTeamId)
+
+  /**
+   * **경기 중 기록 달성 알림 0x4e35c** — 프레임 0x52c50 이 상태 0x17(수비 인플레이)만 빼고 늘 그리므로 내가 던지는 화면에도 뜬다.
+   * - 칸 채우기 0x4e600 은 공이 끝날 때(0x12 끝 · 0x17 끝) — 진행기가 그때마다 새로 세우는 칸(마지막 판정 · 마지막 수비 플레이 ·
+   *   붙든 타구가 풀림)이 바뀌면 공 끝으로 본다. 견제 판도 0x17 이라 같은 자리다.
+   * - 모드 3 의 우리 공격은 늘 자동진행(0x21, 0xc1eac) — 웹 진행기는 내 공 하나 뒤 우리 공격 반 이닝까지 한 걸음에 돌린다.
+   *   내 공 몫은 수비 계열(0xa77f0 방향 게이트 — 사람 수비)이 앞에 오고 동료 타석 몫(공격 계열)이 뒤에 온다 → 앞의 수비 계열만
+   *   이번 공 끝에 넣고 나머지는 다음 공 끝까지 줄에 둔다. 경기 끝 0xa7de8 몫(28~31·37~39)은 0x19 에서 쌓여 안 뜬다.
+   * - 화면이 서기 전에 진행기가 첫 사람 타석까지 미리 돌린 자동 타석(선공 1회초 · 구원 등판 앞) 몫도 줄에 넣어 첫 공 끝에 띄운다.
+   * - 강판 뒤(시뮬 +0 = `simpleEngineRunning`)에 0x4e600 이 불리면 줄을 버린다. 팝업(경기 중 메뉴 · 조작방법 · "그만
+   *   던지시겠습니까?" 질문 창)이 떠 있으면 [0x140005c]+9 — 폭·시간·틱이 멈춘다.
+   */
+  const pitchEndSerial = usePitchEndSerial([
+    progress.lastResolution,
+    progress.lastDefensePlay,
+    progress.pendingDefensePlay === null,
+  ])
+  const isInPlayShown = progress.pendingDefensePlay !== null || isReplaying
+  const recordAlert = useRecordAlert(progress.recordIds, {
+    isDrawing: !isInPlayShown,
+    isFrozen: isPopupOpen || asksGiveUp,
+    isSettled: progress.game.isFinished,
+    // ⚠️ 근사: 상태 틱 [+0x2c] 의 경계를 웹 화면 갈래(인트로 · 판 · 벤치 클리어링 · 0xe · 구질/코스/게이지 단계)로 가른다
+    sceneStateKey: !isIntroDone
+      ? 'intro'
+      : isHalfInningBoardOpen
+        ? `board-${board?.serial ?? 0}`
+        : isBenchClearing
+          ? 'benchClearing'
+          : summary !== null
+            ? isEndBoardClosed ? 'settlement' : 'endBoard'
+            : isAwaitingConfirm
+              ? `confirm-${pitchEndSerial}`
+              : `${phase}-${pitchEndSerial}`,
+    pitchEnd: {
+      serial: pitchEndSerial,
+      humanCountOf: (added) =>
+        leadingRecordCountOf(
+          added,
+          (id) => !isGameEndRecord(id) && passesRecordTeamGate(id, { offenseIsHuman: false, defenseIsHuman: true }),
+        ),
+    },
+    isPitcherRemoved: progress.simpleEngineRunning,
+    queuesInitialRecords: true,
+  })
+  /** 경기 장면 위에 알림을 얹는다 — 화면과 형제 자리(`position: relative` 판)에 기둥으로 */
+  const withRecordAlert = (screen: ReactNode) => (
+    <div className={styles.frame}>
+      {screen}
+      <RecordAlertScreenOverlay frame={recordAlert} />
+    </div>
+  )
   /**
    * 내가 던진 공이 인플레이로 갔으면 **수비 화면을 먼저 보여 준다** (원본 상태 0x17).
    * 진행 중인 타구가 있으면 여기서 **실시간으로 한 틱씩** 돌린다 — 원본도 공이 멈출 때까지
@@ -299,7 +356,7 @@ export function PitcherGameScreen({
 
   // 사구 뒤 벤치 클리어링 (상태 0x1e) — 타석이 붙들린 채 연출이 돈다. 진입 굴림 45 번은 진행기가 이미 썼다
   if (progress.pendingBenchClearing !== null) {
-    return <BenchClearingScene onDone={actions.finishBenchClearing} />
+    return withRecordAlert(<BenchClearingScene onDone={actions.finishBenchClearing} />)
   }
 
   /**
@@ -307,7 +364,7 @@ export function PitcherGameScreen({
    * 모드 3 에서는 1회초 판만 선다 (진행기 `withHalfInningBoard` 머리말).
    */
   if (isHalfInningBoardOpen && board !== null) {
-    return (
+    return withRecordAlert(
       <HalfInningBoard
         key={board.serial}
         inning={board.inning}
@@ -319,7 +376,7 @@ export function PitcherGameScreen({
         // 두 팀 판 0x42364("DUE UP") · 0x420dc("PITCHER")
         cards={pitcherHalfInningCardsOf(progress, pitcherName, board.half)}
         onConfirm={() => setClosedBoardSerial(board.serial)}
-      />
+      />,
     )
   }
 
@@ -345,7 +402,7 @@ export function PitcherGameScreen({
     const names = pitchersOfRecordOf(progress, pitcherName ?? null)
     // 측 0(선공) 점수가 왼쪽 — 사람 팀은 `playerSide` 측에 앉는다
     const ourSide = progress.game.playerSide
-    return (
+    return withRecordAlert(
       <GameEndBoard
         side0Score={ourSide === 0 ? progress.game.ourScore : progress.game.opponentScore}
         side1Score={ourSide === 1 ? progress.game.ourScore : progress.game.opponentScore}
@@ -355,12 +412,12 @@ export function PitcherGameScreen({
           setEndBoardClosed(true)
           actions.enterSettlement()
         }}
-      />
+      />,
     )
   }
 
   if (summary !== null) {
-    return (
+    return withRecordAlert(
       <PixelScreen
         title="경기 결과"
         leftKey={{ label: '확인', onPress: () => onFinish(summary) }}
@@ -370,7 +427,7 @@ export function PitcherGameScreen({
         </BigResult>
         <StatGrid entries={pitcherStatEntries(summary)} />
         {/* 감독 평가·변화 글은 경기 장면 밖 나리 상태 116(진입 0x1278c)의 몫이다 — 부르는 쪽(투수편 세션)이 띄운다 */}
-      </PixelScreen>
+      </PixelScreen>,
     )
   }
 
@@ -553,6 +610,9 @@ export function PitcherGameScreen({
           onConfirm={actions.confirmManagerHook}
         />
       )}
+
+      {/* 경기 장면 프레임 0x52c50 의 덧그림 0x4e35c (0x53066) — 그리기 표 다음 */}
+      <RecordAlertScreenOverlay frame={recordAlert} />
 
       {overlay === '조작방법' && (
         <HelpScreen
