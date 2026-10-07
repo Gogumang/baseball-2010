@@ -361,9 +361,10 @@ describe('확률 굴림은 난수를 줘야 돈다 — 펌블 · 악송구 · �
     expect(결과.log).toContain(`${보통.catchTick}틱 0번 야수 펌블 (0xbc2)`)
     // 다시 쏜 공: 속도 max(지금 점 속도·60%, 300) · v0 min(30%, 100) · 각 + 16
     const 튕김 = 결과.log.find((line) => line.includes('공 튕김'))
-    expect(튕김).toMatch(/^12틱 공 튕김 \(0xb3148\) — 속도 300 · v0 87 · 각 -92 · 0번 야수가 17틱에 줍는다$/)
-    expect(결과.catchTick).toBe(17)
-    expect(결과.log).toContain('17틱 0번 야수가 잡았다 (종류 0)')
+    // 펌블은 동작 잠금(+0xb4)이 없다 — 투수가 다시 줍되, 예보 n 이 추적야수가 건너뛴 4틱(b13ec)을 안 세어 t = 5 에 n = 1 부터다
+    expect(튕김).toMatch(/^12틱 공 튕김 \(0xb3148\) — 속도 300 · v0 87 · 각 -92 · 0번 야수가 20틱에 줍는다$/)
+    expect(결과.catchTick).toBe(20)
+    expect(결과.log).toContain('20틱 0번 야수가 잡았다 (종류 0)')
   })
 
   it('늘 0 인 난수면 줍는 족족 펌블한다 — 원본도 포구 틱마다 굴린다(0xb41d0)', () => {
@@ -548,8 +549,9 @@ describe('필살타법 성공 타구는 야수가 잡지 못한다 — 공 비�
     // 뜬 채로는 아무도 못 잡는다 — 중견수가 낙구(24) 뒤 25틱에 닿아 맞고 튕긴다
     expect(필살.caughtOnTheFly).toBe(false)
     expect(필살.log).toContain('25틱 8번 야수에게 필살타법 타구가 맞았다 (0xbc3)')
-    // 지금 점 속도 670 → 402 · v0 min(30%, 100) · 각 그대로(난수 없음)
-    expect(필살.log).toContain('25틱 공 튕김 (0xb3148) — 속도 402 · v0 100 · 각 -92 · 8번 야수가 35틱에 줍는다')
+    // 지금 점 속도 670 → 402 · v0 min(30%, 100) · 각 그대로(난수 없음).
+    // 맞은 중견수는 b4588 vt74 → 0xa1e60 으로 +0xb4 = 15 — 새 예보의 복제가 그 잠금을 물려받아 t = 5(건너뛴 4틱 뒤) ~ 19 는 판정이 없다
+    expect(필살.log).toContain('25틱 공 튕김 (0xb3148) — 속도 402 · v0 100 · 각 -92 · 8번 야수가 57틱에 줍는다')
   })
 
   it('다시 쏜 공은 보통 공이다 — 속성 목록 +0x5c 를 0xa2610 이 비워 새 예보의 야수가 그대로 쥔다', () => {
@@ -559,7 +561,8 @@ describe('필살타법 성공 타구는 야수가 잡지 못한다 — 공 비�
     const 잡음 = 필살.log.findIndex((line) => line.includes('잡았다'))
     expect(맞음).toBeGreaterThanOrEqual(0)
     expect(잡음).toBeGreaterThan(맞음)
-    expect(필살.log[잡음]).toBe('17틱 0번 야수가 잡았다 (종류 0)')
+    // 맞은 투수는 15틱 잠금(+0xb4) — 예보에서 빠지고(가까운 야수 0xb3c4c 도 잠금이면 건너뜀) 3루수가 줍는다
+    expect(필살.log[잡음]).toBe('28틱 4번 야수가 잡았다 (종류 0)')
   })
 
   it('튕기는 동안에도 3루 주자는 홈을 밟는다', () => {
@@ -652,9 +655,11 @@ describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
     // 원본 플레이 틱 `0xb401c` 의 차례가 **vt90(0xb42f2) → 협살 시작(0xb433c~0xb4378) → vt90(0xb43de)**
     // 이라 **송구를 받는 그 틱의 아웃 판정이 협살 기록칸보다 먼저** 이 주자를 잡는다.
     // 그래서 협살은 아예 서지 않고, 아웃은 협살 아웃이 아니라 평범한 태그 아웃으로 난다.
+    // 원본 코드 18 [5] — 대표 2루타 [67, 1350, 650, 2]는 플래그 비트 1(+0x127)로 좌익수가 낙구 지점부터 들러 35틱에야 쥐어
+    // 33틱 귀루가 송구보다 한참 앞서 협살 없이 태그가 안 난다. 비트 1 이 없는 원본 2루타로 바꿨다
     const 결과 = runDefensePlay({
       outcome: 이루타,
-      trajectory: battedBallTrajectory(representativePatternOf(이루타)),
+      trajectory: battedBallTrajectory(BATTED_BALL_PATTERNS[18][5]),
       bases: { first: true, second: true, third: false },
       outs: 0,
       defenseIsCpu: true,
@@ -672,7 +677,7 @@ describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
     const 같은판 = (isRepeat: boolean) =>
       runDefensePlay({
         outcome: 이루타,
-        trajectory: battedBallTrajectory(representativePatternOf(이루타)),
+        trajectory: battedBallTrajectory(BATTED_BALL_PATTERNS[18][5]),
         bases: { first: true, second: true, third: false },
         outs: 0,
         defenseIsCpu: true,
@@ -687,7 +692,7 @@ describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
     // 전원 귀루(CLR)는 게이트가 없어 반복이어도 먹는다
     const 전원 = runDefensePlay({
       outcome: 이루타,
-      trajectory: battedBallTrajectory(representativePatternOf(이루타)),
+      trajectory: battedBallTrajectory(BATTED_BALL_PATTERNS[18][5]),
       bases: { first: true, second: true, third: false },
       outs: 0,
       defenseIsCpu: true,
@@ -990,10 +995,16 @@ describe('포스 사슬 — 결과 코드가 준 최소 루가 앞 주자까지 
     expect(수동.advance.outsAdded).toBe(0)
   })
 
-  it('2루타 + 1루 주자: 자동과 수동이 같은 자리에 선다 — 포스가 모드에 안 흔들린다', () => {
-    expect(play2(이루타, 주자1루, 0, '수동').advance).toEqual(
-      play2(이루타, 주자1루, 0, '자동').advance,
-    )
+  it('2루타 + 1루 주자: 포스는 모드에 안 흔들린다 — 자동은 그 위에서 자동 진루(0xaf918)가 더 보낼 뿐이다', () => {
+    // 원본 코드 18 [0] [69, 1000, 700] — 자동 진루가 한 루 더 보낼 틈이 없는 공이라 두 모드가 같은 자리에 선다.
+    // (대표 2루타 [67, 1350, 650, 2]는 플래그 비트 1(+0x127)로 좌익수가 낙구 지점부터 들러 35틱에 쥐어, 자동이면 1루 주자가 홈까지 간다)
+    const 공 = battedBallTrajectory(BATTED_BALL_PATTERNS[18][0])
+    const 수동 = runDefensePlay({ outcome: 이루타, trajectory: 공, bases: 주자1루, outs: 0, runningMode: '수동' })
+    const 자동 = runDefensePlay({ outcome: 이루타, trajectory: 공, bases: 주자1루, outs: 0, runningMode: '자동' })
+    expect(수동.advance).toEqual(자동.advance)
+    expect(수동.advance.bases).toEqual({ first: false, second: true, third: true })
+    const 대표자동 = play2(이루타, 주자1루, 0, '자동')
+    expect(대표자동.advance.runsScored + (대표자동.advance.bases.third ? 1 : 0)).toBe(1)
   })
 
   it('3루타 + 1루 주자: 1루 주자는 홈까지 밀려 득점한다', () => {

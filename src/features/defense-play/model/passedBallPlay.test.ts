@@ -31,6 +31,7 @@ function 세는난수(ratio: number): RandomPort & { readonly count: () => numbe
 }
 
 const 가운데 = { angle: 95, strength: 220, verticalSpeed: -100 }
+const 짧은 = { angle: 95, strength: 150, verticalSpeed: -100 }
 const 만루 = { first: true, second: true, third: true }
 
 describe('낫아웃 갈래 0x3e09e~0x3e0e0 — 종류 9 안에서만', () => {
@@ -61,7 +62,8 @@ describe('폭투·포일 한 판 — 종류 9 (0x3507c · 0xb284a)', () => {
   })
 
   it('낫아웃이면 타자주자가 맨 앞(0번)에 서고 사람이 1루로 던지면 포스(결과 2)로 잡힌다 — 콜 20', () => {
-    const result = runPassedBallPlay({ shot: 가운데, bases: EMPTY_BASES, outs: 0, batterRuns: true, manualThrowBase: 1 })
+    // 예보 n 은 포수가 건너뛴 4틱을 안 센다(b13ec 가 n++ 앞) — 가운데(220)는 포수가 15틱에야 주워 1루가 늦다. 짧게 튄 공으로
+    const result = runPassedBallPlay({ shot: 짧은, bases: EMPTY_BASES, outs: 0, batterRuns: true, manualThrowBase: 1 })
     expect(result.ticks[0].runners.map((runner) => runner.index)).toEqual([0])
     expect(result.throwBase).toBe(1)
     expect(result.resultCode).toBe(RUNNER_PLAY_RESULT.OUT)

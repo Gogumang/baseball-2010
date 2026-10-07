@@ -48,6 +48,12 @@ export interface BattedBallTrajectory {
   }
   /** 공+0x68 = t 일 때 공 vt18(0xa27f0) 멈춤 — 손으로 만든 궤적에는 없다 */
   isStoppedAt?(tick: number): boolean
+  /**
+   * **플레이 +0x127** — 타구 시작 0x51408 이 뽑은 패턴의 플래그 비트 1(`0xb07c8` = `0xb0744(…) & 2`)이면 세운다(0x514e6).
+   * 공이 아니라 플레이 칸이지만 패턴에서만 오므로 궤적에 실어 넘긴다. 예보 0xb12d0(b1416)과 추적야수 AI 1(0xb4afe)이
+   * 낙구 틱까지 낙구 지점으로 달리게 한다. 쥐기 0xb2710 이 지운다(수비 진행기 `landingChase`). 없으면 0.
+   */
+  readonly landingChase?: boolean
 }
 
 /** 포구 종류 (+0x16c). 고르기 우선순위와 동작 시작 틱이 여기에 달려 있다 */

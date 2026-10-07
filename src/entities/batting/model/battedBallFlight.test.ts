@@ -206,3 +206,15 @@ describe('타구 궤적 — 원본 세계 0xbfed0 (공 vtable 0xd7afc)', () => {
     )
   })
 })
+
+describe('플레이 +0x127 — 패턴 플래그 비트 1 (0x514e6 · 0xb07c8)', () => {
+  it('비트 1 이 선 패턴만 landingChase 를 싣고, 다시 쏘거나(splice) 난수로 다시 깔아도 남는다', () => {
+    const 선 = battedBallTrajectory([67, 1350, 650, 2]) // 원본 2루타 묶음의 비트 1 패턴
+    expect(선.landingChase).toBe(true)
+    expect(battedBallTrajectory([67, 1350, 650, 0]).landingChase).toBeUndefined()
+    // 비트 0(높이 부호)만 선 패턴은 아니다
+    expect(battedBallTrajectory([112, 898, 898, 8]).landingChase).toBeUndefined()
+    const 다시 = launchTrajectory({ from: 선.pointAt(20), speed: 300, verticalSpeed: 50, angle: -90 })
+    expect(spliceTrajectory(선, 20, 다시).landingChase).toBe(true)
+  })
+})

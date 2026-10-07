@@ -155,6 +155,8 @@ import {
 
 /** 능력치를 안 주면 쓰는 값 — 원본 평균대(등급 3) */
 const DEFAULT_ABILITY = 500
+/** 야수.vte4 = 0xa1e60 — 필살타법 타구에 맞은 야수의 동작 잠금 +0xb4 (`movs r3, #0xf`, a1e70) */
+const HIT_STAGGER_LOCK_TICKS = 15
 /** 한 플레이가 이 틱을 넘기면 강제로 끊는다 (원본에는 없는 우리 쪽 안전망) */
 const DEFAULT_MAXIMUM_TICKS = 240
 /** 홈을 가리키는 루 번호 — 원본 루 표의 [4] 가 홈의 사본이라 진루는 4 로 센다 */
@@ -747,6 +749,16 @@ export interface DefensePlayState {
   homeRunFlag: boolean
   /** 플레이 +0x124 — 사건 코드 10(바운드로 담장을 넘은 2루타) */
   groundRuleFlag: boolean
+  /**
+   * **플레이 +0x127** — 타구 시작 0x51408 이 패턴 플래그 비트 1(0xb07c8)이면 세우고(0x514e6), 쥐기 0xb2710 이 지운다.
+   * 서 있으면 예보 0xb12d0 의 복제(b1416)와 추적야수 AI 1(0xb4afe)이 낙구 틱까지 **낙구 지점**으로 달린다.
+   */
+  landingChase: boolean
+  /**
+   * 지금 공의 공+0xaa0 을 판 틱으로 옮긴 값 — AI 1(0xb4afe)이 `aa0 ≥ 공+0x68` 로 본다. 다시 쏘면(0xb3148) 공 칸이 새로
+   * 깔리므로 새 궤적의 낙구 틱이다(`trajectory.landingTick` 은 state[0x1e] 처럼 처음 낙구를 지킨다).
+   */
+  ballLandingTick: number
 }
 
 /**
@@ -783,10 +795,13 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
   const bounceWindow = { from: trajectory.landingTick + 1, to: Number.POSITIVE_INFINITY }
   const wholeWindow = { from: 0, to: Number.POSITIVE_INFINITY }
   let window = wantsFlyCatch ? flyWindow : bounceWindow
-  let forecast = forecastCatch(trajectory, fielders, window)
+  // 플레이 +0x127 — 패턴 플래그 비트 1 (0x514e6). 예보 · 추적야수가 낙구 지점으로 달린다
+  const landingChase = trajectory.landingChase === true
+  const chase = { chaseToLanding: landingChase }
+  let forecast = forecastCatch(trajectory, fielders, window, chase)
   if (wantsFlyCatch && forecast.earliestCatchTick === NO_FORECAST_CATCH) {
     window = wholeWindow
-    forecast = forecastCatch(trajectory, fielders, window)
+    forecast = forecastCatch(trajectory, fielders, window, chase)
   }
 
   // ── 필살수비 굴림 (메시지 0x11 = 타구가 떠난 순간, I-controls 2c) ──
@@ -809,14 +824,15 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
   const relaid = rolledTrajectory !== trajectory
   trajectory = rolledTrajectory
   if (relaid) {
-    forecast = forecastCatch(trajectory, fielders, window)
+    forecast = forecastCatch(trajectory, fielders, window, chase)
     if (wantsFlyCatch && forecast.earliestCatchTick === NO_FORECAST_CATCH) {
       window = wholeWindow
-      forecast = forecastCatch(trajectory, fielders, window)
+      forecast = forecastCatch(trajectory, fielders, window, chase)
     }
   }
   if (specialDefense.jumpUnlocked || specialDefense.slideUnlocked || relaid) {
     forecast = forecastCatch(trajectory, fielders, window, {
+      ...chase,
       jumpUnlocked: specialDefense.jumpUnlocked,
       slideUnlocked: specialDefense.slideUnlocked,
     })
@@ -928,6 +944,8 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     foulFlag: false,
     homeRunFlag: false,
     groundRuleFlag: false,
+    landingChase,
+    ballLandingTick: trajectory.landingTick,
   }
 }
 
@@ -1018,6 +1036,8 @@ export function stepDefensePlay(
   let foulFlag = state.foulFlag
   let homeRunFlag = state.homeRunFlag
   let groundRuleFlag = state.groundRuleFlag
+  let landingChase = state.landingChase
+  let ballLandingTick = state.ballLandingTick
   /** sp+0x24 — 이번 틱 포구 틱의 사건(펌블 0xbc2 · 송구공 받음 0xbc3). 서면 틱 끝 b45a4 가 플레이.vt70 = 0xb3148 */
   let ballEventThisTick = false
 
@@ -1386,11 +1406,17 @@ export function stepDefensePlay(
       body: isBallTrajectory(trajectory) ? trajectory.flight.body : undefined,
     })
     trajectory = spliceTrajectory(trajectory, tick, next)
+    ballLandingTick = next.landingTick < 0 ? -1 : tick + next.landingTick
     uncatchable = false
     onTheFly = false
-    // vt24(1) — 예보는 새 궤적 t = 1 → 끝 · 추적야수(+0x130 = f)는 t ≤ 4 를 건너뛴다. 낙구 구간으로 자르지 않는다
+    // vt24(1) — 예보는 새 궤적 t = 1 → 끝 · 추적야수(+0x130 = f)는 t ≤ 4 를 건너뛴다. 낙구 구간으로 자르지 않는다.
+    // 복제는 진짜 야수를 통째로 베끼므로 필살타법 타구에 맞은 야수의 동작 잠금 +0xb4 = 15(b4594 vt74)도 따라간다 — 그 틱 동안은
+    // 판정도 n 도 없다. 필살수비 창(+0x1f5 · +0x1f6)과 +0x127 은 판 내내 남아 있는 플레이 칸이라 이 예보도 본다.
     const forecast = forecastCatch(next, fielders, { from: 0, to: Number.POSITIVE_INFINITY }, {
       initialChaserSlot: chaserSlot,
+      jumpUnlocked: state.specialDefense.jumpUnlocked,
+      slideUnlocked: state.specialDefense.slideUnlocked,
+      chaseToLanding: landingChase,
     })
     chaserSlot = forecast.choice.slot
     catchTick = Math.max(tick, Math.min(tick + forecast.choice.catchTick, maximumTicks))
@@ -1448,10 +1474,14 @@ export function stepDefensePlay(
     // ```
     // 곧 **야수 틱이 플레이 틱보다 먼저** 돈다 — 포구 틱에 쥐기(0xb2710)가 넣은 준비 틱 R 은 다음 틱부터 줄어
     // 포구 R 틱 뒤에 0 이 된다. 쥔 동안만 줄고, +0xc8 을 넣는 곳은 쥐기(vt88, b27aa·b27be)뿐이다.
+    // a12b4: 동작 잠금 +0xb4 > 0 이면 −1 만 하고(0 이 되면 vt10) 그 틱은 준비 틱 · 이동이 없다 — `lockedThisTick` 이 이동도 막는다
+    const lockedThisTick = fielders.map((fielder) => fielder.actionLockTicks > 0)
     fielders = fielders.map((fielder) =>
-      fielder.holdingBall && fielder.actionRemainingTicks > 0
-        ? { ...fielder, actionRemainingTicks: fielder.actionRemainingTicks - 1 }
-        : fielder,
+      fielder.actionLockTicks > 0
+        ? { ...fielder, actionLockTicks: fielder.actionLockTicks - 1 }
+        : fielder.holdingBall && fielder.actionRemainingTicks > 0
+          ? { ...fielder, actionRemainingTicks: fielder.actionRemainingTicks - 1 }
+          : fielder,
     )
 
     // ── 0. 사람 조작 (상태 0x17 갈래 0x53420 — I-controls 0·2b·3b절) ──
@@ -1568,6 +1598,12 @@ export function stepDefensePlay(
       // 필살타법 타구 — 공 속성 목록 +0x5c 의 비트 4(0xaf180) 때문에 포구 틱 갈래가 쥐기 대신 메시지 0xbc3 · 사건(sp+0x24) = 1
       // (b4250). 그 0xbc3 에는 처리기가 없고, 틱 끝 b45a4 의 사건 갈래가 공을 그 야수에게서 튕겨 다시 쏜다(0xb3148)
       ballEventThisTick = true
+      // b4258 sp+0x20 = 그 야수 → 틱 끝 b4588 플레이.vt74 = 0xb3420 → 야수.vte4 = 0xa1e60: 자세 13 · **+0xb4 = 15**(동작 잠금) ·
+      // 효과음 53. 펌블(b4274~)은 sp+0x20 을 안 세워 이 잠금이 없다 — 펌블은 +0xb8 = 6(그림 0x4381a 만 읽는 세기)뿐이다.
+      // vt74 는 vt70(0xb3148, 다시 쏘기 · 예보)보다 먼저라 새 예보의 복제가 이 잠금을 물려받는다
+      fielders = fielders.map((fielder) =>
+        fielder.slot === chaserSlot ? { ...fielder, actionLockTicks: HIT_STAGGER_LOCK_TICKS } : fielder,
+      )
       log.push(`${tick}틱 ${chaserSlot}번 야수에게 필살타법 타구가 맞았다 (0xbc3)`)
     }
     if (tick === catchTick && !uncatchable && input.random !== undefined) {
@@ -1599,6 +1635,8 @@ export function stepDefensePlay(
           : fielder,
       )
       play = { ...play, held: true, everHeld: true, wantsThrow: true }
+      // 쥐기 0xb2710 — +0x127 = 0
+      landingChase = false
       log.push(`${tick}틱 ${chaserSlot}번 야수가 잡았다 (종류 ${play.catchKind})`)
       // 공 쥐기 0xb2710 은 쥐자마자 vt90(아웃 판정)을 부른다 (0xb2758)
       runOutJudgement()
@@ -2034,8 +2072,12 @@ export function stepDefensePlay(
       }
     }
     const beforeMove = fielders
-    fielders = fielders.map((fielder) =>
-      moveFielder(fielder, { chaserSlot, catchPoint, tick, catchTick }),
+    // 추적야수 AI 1(0xb4afe): +0x127 && 낙구 틱 ≥ 공+0x68 이면 낙구 지점(x, 0, z), 아니면 포구 지점으로
+    const landingPoint = trajectory.pointAt(ballLandingTick)
+    const chaseTarget =
+      landingChase && ballLandingTick >= tick ? { x: landingPoint.x, y: 0, z: landingPoint.z } : catchPoint
+    fielders = fielders.map((fielder, slot) =>
+      lockedThisTick[slot] === true ? fielder : moveFielder(fielder, { chaserSlot, catchPoint: chaseTarget, tick, catchTick }),
     )
     // 야수+0x3b — 이번 갱신에 목표점에 막 닿았나 (0xbf0dc: 머리에서 지우고 닿은 갱신에서만 1)
     const arrivedThisTick = fielders.map(
@@ -2298,6 +2340,8 @@ export function stepDefensePlay(
   state.foulFlag = foulFlag
   state.homeRunFlag = homeRunFlag
   state.groundRuleFlag = groundRuleFlag
+  state.landingChase = landingChase
+  state.ballLandingTick = ballLandingTick
   state.tick = tick + 1
   return state
 }

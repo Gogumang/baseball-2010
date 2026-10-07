@@ -99,3 +99,55 @@ describe('거리 d 가 실제로 계산된다 — 포구 반경과 필살 창이
     expect(예보.choice.slot).not.toBe(1)
   })
 })
+
+/**
+ * 복제 틱 루프 0xb12d0 의 n · 동작 잠금 · +0x127 (b13ec · b1416 · b146c · b148e · b17fc).
+ * 손으로 만든 궤적 — 중견수(8)만 낮은 공 창이 열리게 `onlySlot` 을 준다(+0x1e8 모드, 다른 야수는 A · B 가 닫힌다).
+ */
+describe('예보 복제의 n — 판정받은 틱만 센다 (0xb12d0 직접 뜸)', () => {
+  const 중견 = FIELDER_START_POSITIONS[8]
+  /** 중견수에게서 z 로 300 + 220 × 6 떨어진 땅 위의 멈춘 공 — n = 6 이면 외야 반경 300 안 */
+  const 멈춘공 = {
+    length: 1,
+    pointAt: () => ({ x: 중견.x, y: 0, z: 중견.z - (300 + 220 * 6) }),
+    landingTick: 0,
+    fenceTick: -1,
+    poleTick: -1,
+    startedAtPlate: false,
+  }
+  const 전구간 = { from: 0, to: Number.POSITIVE_INFINITY }
+
+  it('보통 야수는 t 틱째에 n = t — 6틱에 닿는다', () => {
+    expect(forecastCatch(멈춘공, 야수들, 전구간, { onlySlot: 8 }).table.low).toEqual({ tick: 6, slot: 8 })
+  })
+
+  it('추적야수(+0x130)가 건너뛴 4틱(b13ec)은 n 에 안 든다 — n++(b1452)보다 앞이라 10틱에 닿는다', () => {
+    expect(forecastCatch(멈춘공, 야수들, 전구간, { onlySlot: 8, initialChaserSlot: 8 }).table.low).toEqual({ tick: 10, slot: 8 })
+  })
+
+  it('동작 잠금 +0xb4 를 복제가 물려받는다 — 잠긴 틱은 판정 없이 n 을 되돌리고(b148e) 복제 틱이 잠금을 하나씩 푼다', () => {
+    const 잠긴 = 야수들.map((야수) => (야수.slot === 8 ? { ...야수, actionLockTicks: 5 } : 야수))
+    expect(forecastCatch(멈춘공, 잠긴, 전구간, { onlySlot: 8 }).table.low).toEqual({ tick: 11, slot: 8 })
+    // 0xb3b38 의 가까운 야수(0xb3c4c)도 잠긴 야수는 건너뛴다
+    expect(nearestSlotTo(잠긴, 중견)).not.toBe(8)
+  })
+
+  it('+0x127 이면 낙구 틱까지 복제가 낙구 지점으로 실제로 달리고(b1416 vt14) n 은 낙구 뒤부터 센다', () => {
+    // 10틱까지 중견수 뒤 5000 위로 높이 3000(못 잡음) · 낙구 뒤엔 중견수 옆 600 에 멈춘 공
+    const 공 = {
+      length: 20,
+      pointAt: (tick: number) =>
+        tick <= 10 ? { x: 중견.x, y: tick === 10 ? 0 : 3000, z: 중견.z + 5000 } : { x: 중견.x + 600, y: 0, z: 중견.z },
+      landingTick: 10,
+      fenceTick: -1,
+      poleTick: -1,
+      startedAtPlate: false,
+    }
+    // 보통은 11틱에 n = 11 이라 곧바로 닿는다
+    expect(forecastCatch(공, 야수들, { from: 11, to: Number.POSITIVE_INFINITY }, { onlySlot: 8 }).table.low).toEqual({ tick: 11, slot: 8 })
+    // +0x127: 10틱 동안 2200 을 낙구 지점 쪽으로 달려 거리 isqrt(600² + 2200²) = 2280 · n 은 11틱에 1 → 2280 − 220n ≤ 300 은 n = 9
+    expect(
+      forecastCatch(공, 야수들, { from: 11, to: Number.POSITIVE_INFINITY }, { onlySlot: 8, chaseToLanding: true }).table.low,
+    ).toEqual({ tick: 19, slot: 8 })
+  })
+})

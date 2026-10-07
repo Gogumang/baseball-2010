@@ -112,7 +112,7 @@ export function battedBallTrajectory(
   options: BattedBallFlightOptions = {},
 ): BallTrajectory {
   const [angle, speed, height, flags] = pattern
-  return launchTrajectory({
+  const trajectory = launchTrajectory({
     from: options.origin ?? BATTING_POINT,
     speed,
     verticalSpeed: (flags & 1) !== 0 ? -height : height,
@@ -120,7 +120,12 @@ export function battedBallTrajectory(
     random: options.random,
     body: options.body,
   })
+  // 0x514e6 — 패턴 플래그 비트 1 이면 플레이 +0x127 (0xb07c8 = `lsls #0x1e` 로 비트 1 을 본다)
+  return (flags & LANDING_CHASE_FLAG) !== 0 ? { ...trajectory, landingChase: true } : trajectory
 }
+
+/** 패턴 플래그 비트 1 — 플레이 +0x127 (0xb07c8 · 0x514e6) */
+const LANDING_CHASE_FLAG = 2
 
 /** 원본 칸을 다 든 궤적인가 — 손으로 만든 시험 궤적이면 거짓 */
 export function isBallTrajectory(trajectory: BattedBallTrajectory): trajectory is BallTrajectory {
@@ -139,7 +144,9 @@ export function trajectoryWithRandom(
   if (trajectory.flight.randomRolls === 0) return trajectory
   const body = cloneBallBody(trajectory.launchBody)
   const from = { x: body.x, y: body.y, z: body.z }
-  return trajectoryOf(simulateBall(body, random), cloneBallBody(trajectory.launchBody), from)
+  const relaid = trajectoryOf(simulateBall(body, random), cloneBallBody(trajectory.launchBody), from)
+  // +0x127 은 공이 아니라 플레이 칸 — 다시 깔아도 그대로
+  return trajectory.landingChase === true ? { ...relaid, landingChase: true } : relaid
 }
 
 /**
@@ -175,6 +182,8 @@ export function spliceTrajectory(
     startedAtPlate: false,
     flight: next.flight,
     launchBody: next.launchBody,
+    // 플레이 +0x127 — 다시 쏘기(0xb3148)는 안 건드린다
+    landingChase: base.landingChase,
   }
 }
 
