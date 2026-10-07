@@ -490,6 +490,11 @@ describe('주자 처리는 수비 화면이 끝나야 정해진다 (상태 0x17 
     for (let pitch = 0; pitch < 300; pitch += 1) {
       if (!isPitchTurn(current)) break
       const next = startPitch(current, 한가운데직구, random)
+      // 파울 각 공의 판(타석이 아직 안 끝났다)은 화면이 돈 것으로 치고 넘긴다 — 페어 타구 판을 찾는다
+      if (next.pendingDefensePlay !== null && next.atBat.outcome === null) {
+        current = resolveDefensePlay(next, runDefensePlay(next.pendingDefensePlay), random)
+        continue
+      }
       if (next.pendingDefensePlay !== null) return { 직전: current, 진행중: next, random }
       current = next
     }
@@ -1190,5 +1195,67 @@ describe('상태 0xe 의 OK 대기 — 내가 던지는 타석마다 (0x39e14 �
       const 새타석 = progress.opponentOrderIndex !== before.opponentOrderIndex || progress.game.half !== before.game.half
       if (새타석 && isPitchTurn(progress)) expect(progress.sceneConfirm).not.toBe(before.sceneConfirm)
     }
+  })
+})
+
+describe('파울 각 공도 수비 판을 돈다 — 낙구 전에 잡히면 파울 뜬공 아웃(13), 아니면 판이 닫힌 뒤 스트라이크(0x35108 → 0xb6b58)', () => {
+  /** 씨앗들을 돌며 파울 판(타석이 안 끝난 채 붙들린 판)을 모은다 */
+  function 파울판들() {
+    const 판들: { 직전: ReturnType<typeof startPitcherGame>; 진행중: ReturnType<typeof startPitcherGame>; random: RandomPort }[] = []
+    for (let seed = 1; seed <= 12; seed += 1) {
+      const random = 씨앗(seed)
+      let current = startPitcherGame(기본옵션, random)
+      for (let pitch = 0; pitch < 200 && isPitchTurn(current); pitch += 1) {
+        const next = startPitch(current, 한가운데직구, random)
+        if (next.pendingDefensePlay !== null) {
+          if (next.atBat.outcome === null) 판들.push({ 직전: current, 진행중: next, random })
+          current = resolveDefensePlay(next, runDefensePlay(next.pendingDefensePlay), random)
+          continue
+        }
+        current = next
+      }
+    }
+    return 판들
+  }
+
+  it('파울 판은 타석을 끝내지 않고 붙든다 — 판 입력에 이 공 앞의 스트라이크가 실린다', () => {
+    const 판들 = 파울판들()
+    expect(판들.length).toBeGreaterThan(0)
+    for (const { 직전, 진행중 } of 판들) {
+      expect(isPitchTurn(진행중)).toBe(false)
+      expect(진행중.atBat).toEqual(직전.atBat)
+      expect(진행중.pendingDefensePlay!.strikes).toBe(직전.atBat.strikes)
+    }
+  })
+
+  it('판이 파울로 닫히면 스트라이크 ≤ 1 일 때만 +1 · 같은 타자 · 판 앞 루 그대로, 잡히면 파울 뜬공 아웃으로 타석이 끝난다', () => {
+    let 파울 = 0
+    let 뜬공아웃 = 0
+    for (const { 직전, 진행중, random } of 파울판들()) {
+      const 판 = runDefensePlay(진행중.pendingDefensePlay!)
+      const 끝 = resolveDefensePlay(진행중, 판, random)
+      expect(끝.pendingDefensePlay).toBeNull()
+      if (판.foulEnded === true) {
+        파울 += 1
+        expect(판.outcome).toBeUndefined()
+        expect(판.advance).toEqual({ bases: 직전.game.bases, runsScored: 0, outsAdded: 0 })
+        expect(끝.atBat.strikes).toBe(Math.min(직전.atBat.strikes + 1, 2))
+        expect(끝.opponentOrderIndex).toBe(직전.opponentOrderIndex)
+      } else {
+        // 파울 각 공을 낙구 전에 잡았거나(뜬공 아웃), 필살수비가 열려 페어 각 표시 패턴으로 바꿔 쐈다(0xb097c · 0xb09ac) —
+        // 어느 쪽이든 판 끝 정산 결과로 타석이 끝난다
+        if (판.caughtOnTheFly) {
+          뜬공아웃 += 1
+          expect(판.outcome).toEqual({ kind: '아웃', detail: '뜬공아웃' })
+        } else {
+          expect(판.specialDefense.jumpUnlocked || 판.specialDefense.slideUnlocked).toBe(true)
+        }
+        expect(판.outcome).toBeDefined()
+        // 다음 타자로 넘어간다
+        expect(끝.opponentOrderIndex).not.toBe(직전.opponentOrderIndex)
+      }
+    }
+    expect(파울).toBeGreaterThan(0)
+    expect(뜬공아웃).toBeGreaterThan(0)
   })
 })

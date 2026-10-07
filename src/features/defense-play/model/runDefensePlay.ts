@@ -7,7 +7,7 @@ import {
   trajectoryWithRandom,
   type BallTrajectory,
 } from '@/entities/batting/model/battedBallFlight'
-import { displayPatternOf, scenePatternDeckOf } from '@/entities/batting/model/battedBallOutcome'
+import { displayPatternOf, isFairAngle, scenePatternDeckOf } from '@/entities/batting/model/battedBallOutcome'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
@@ -113,6 +113,7 @@ import type { ManualAutoMode } from '@/entities/settings/model/gameSettings'
 import {
   eventCodeEffectOf,
   isFoulEnded,
+  strikesAfterPlay,
   liveRunnerCountOf,
   passPlayGate,
   playEndResultCode,
@@ -226,6 +227,11 @@ export interface DefensePlayInput {
    * 부르는 쪽이 실어 보낸다 — 안 주면 0(지금까지와 같다). 이 사건이 화면에 무엇인지는 미확인(P2 6절).
    */
   readonly specialEvent?: boolean
+  /**
+   * **state[4] — 이 공을 먹이기 전의 스트라이크 수**. 파울 판에서만 본다: 판 끝 결과 코드 0x9d5bc 의 2스트라이크 번트 파울(11)과
+   * 판이 닫힌 뒤 0x35108 → 0xb6b58 의 스트라이크 +1(≤ 1 일 때, `foulStrikesAfter`). 안 주면 0.
+   */
+  readonly strikes?: number
   readonly maximumTicks?: number
   /**
    * 난수. **주면 원본 확률 굴림이 돈다** — 필살수비(0x66b30/0x66be4) · 펌블(0xb41d0) ·
@@ -421,6 +427,15 @@ export interface DefensePlayResult {
    * 타구 판(`runDefensePlay`)만 낸다 — 견제·도루·폭투 판처럼 타석이 아닌 판에는 없다.
    */
   readonly outcome?: AtBatOutcome
+  /**
+   * **파울로 닫힌 판인가** — 판 끝 결과 코드 7(0x9d5bc 의 0xb68dc 파울 각 갈래)이 선 판. 판 끝 판정 B 0xae3e8 ae568 이 정산 0xa8024 를
+   * 건너뛰고(ae5a2 → ae5b6) 상태 0xf(같은 타석 다음 공)로 보낸다 — `outcome` 이 없고, 0x35108 의 0xa975c 가 주자를 판 앞 자리로
+   * 되돌리며(웹 `advance` 는 판 앞 루 그대로) 0xb6b58 이 스트라이크 ≤ 1 이면 +1 한다(`foulStrikes`). 파울 각 공이라도 낙구 전에 잡히면
+   * 뜬공 아웃(13)이라 파울 판이 아니다.
+   */
+  readonly foulEnded?: boolean
+  /** 파울 판이 닫힌 뒤의 스트라이크 수 — 0xb6b58 (`strikesAfterPlay`). 파울 판이 아니면 없다 */
+  readonly foulStrikes?: number
   /**
    * **아웃 판정(0xb36d0)이 마지막으로 적은 아웃이 태그였나** — 원본 `state[0x87]`.
    *
@@ -754,6 +769,8 @@ export interface DefensePlayState {
   ballContacted: boolean
   /** 플레이 +0x110 — 사건 코드 7(파울) */
   foulFlag: boolean
+  /** state[0x1c] — 쏜 공의 파울 각 (511b8 0x9d660(a) 의 반대). 표시 패턴으로 바꿔 쏘면 바꾼 각이다 */
+  foulAngle: boolean
   /** 플레이 +0x111 — 사건 코드 8(홈런). `PlayView.finished` 는 이 진행기의 판 끝 표시라 따로 든다 */
   homeRunFlag: boolean
   /** 플레이 +0x124 — 사건 코드 10(바운드로 담장을 넘은 2루타) */
@@ -968,6 +985,8 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     lastEventCode: 0,
     ballContacted: false,
     foulFlag: false,
+    // 511b8 state[0x1c] = 0x9d660(쏜 a) — 쏜 공(쏜 패턴)이 없는 호출(궤적만 받은 시험 · 옛 길)은 페어로 본다
+    foulAngle: launchedPattern !== undefined && !isFairAngle(launchedPattern[0]),
     homeRunFlag: false,
     groundRuleFlag: false,
     landingChase,
@@ -2263,10 +2282,10 @@ export function stepDefensePlay(
         const endState: PlayEndState = {
           flyOut: false,
           specialEvent: input.specialEvent === true,
-          // 이 진행기는 페어 타구만 돈다 — state[0x1c] = 0
-          foulAngle: false,
+          // state[0x1c] — 쏜 공의 파울 각 (511b8)
+          foulAngle: state.foulAngle,
           // 스트라이크는 파울 갈래(코드 11)에서만 본다
-          strikes: 0,
+          strikes: input.strikes ?? 0,
           buntKind: input.buntKind ?? 0,
           poleTick: trajectory.poleTick,
           fenceTick: overFenceTick,
@@ -2328,6 +2347,21 @@ export function stepDefensePlay(
     // 악송구는 예보 vt24(0)가 고른 야수가 포구 틱 갈래로 주워 쥔다(`takeLooseBall`).
     const gate = passPlayGate({
       foulFlag,
+      // 파울 갈래(b0d2c)만 본다 — 멈춤 · 담장선 넘은 뒤 떨어지는 틱 · 홈 뒤(z > 32599, −315 < 각 < −225)
+      foulBall: foulFlag
+        ? {
+            // 공.vt18 = 0xa27f0(속도 · 수직 속도 워드 0) — 야수가 쥔 공(쥐기 0xb2710 의 메시지 0x15)은 손에 붙어 움직이지 않는다.
+            // ⚠️ 쥔 공의 속도 칸이 0 이 되는 자리(메시지 0x15 처리)는 안 떴다 — 쥔 공을 멈춘 공으로 본다(유력)
+            stopped:
+              play.held ||
+              (trajectory.isStoppedAt === undefined ? tick >= trajectory.length - 1 : trajectory.isStoppedAt(tick)),
+            currentTick: tick,
+            landingTick: trajectory.landingTick,
+            fenceTick: trajectory.fenceTick,
+            z: trajectory.pointAt(tick).z,
+            angle: trajectory.pointDetailAt?.(tick).angle ?? 0,
+          }
+        : undefined,
       lastEventCode,
       outs,
       someRunnerActive: stillActive,
@@ -2419,27 +2453,34 @@ export function defensePlayResultOf(state: DefensePlayState): DefensePlayResult 
   const held = state.held
   const runners = state.runners
   const runsScored = held.scoreboardRuns
+  // 파울로 닫힌 판 — 0xae3e8 ae568 이 정산을 건너뛰고 0x35108 이 0xa975c(주자를 판 앞 자리로) · 0xb6b58(스트라이크) 를 부른다
+  const foulEnded = state.foulFlag && !state.flyOut
 
   return {
-    advance: {
-      bases: basesOf(runners),
-      runsScored,
-      outsAdded: state.outsAdded,
-    },
+    advance: foulEnded
+      ? { bases: state.input.bases, runsScored: 0, outsAdded: state.outsAdded }
+      : {
+          bases: basesOf(runners),
+          runsScored,
+          outsAdded: state.outsAdded,
+        },
+    ...(foulEnded ? { foulEnded: true, foulStrikes: strikesAfterPlay(state.input.strikes ?? 0, FOUL_RESULT_CODE) } : {}),
     ticks: state.ticks,
     catchFielderSlot: state.chaserSlot,
     catchTick: state.catchTick,
     // 필살타법으로 친 타구였나 — 첫 야수에게 맞고 튕긴 뒤로는 보통 공이 되지만(0xa2610 이 +0x5c 를 비운다) 결과는 친 공의 표시다
     isUncatchable: state.input.isUncatchable === true,
     caughtOnTheFly: state.flyOut,
-    outcome: settledBatterOutcomeOf({
-      runners: runners.map((runner) => runner.state),
-      previousTargets: runners.map((runner) => runner.previousTarget),
-      hitEvent: state.hitEvent,
-      homeRunEvent: state.homeRunEvent,
-      flyOut: state.flyOut,
-      outEvents: state.outEvents,
-    }),
+    outcome: foulEnded
+      ? undefined
+      : settledBatterOutcomeOf({
+          runners: runners.map((runner) => runner.state),
+          previousTargets: runners.map((runner) => runner.previousTarget),
+          hitEvent: state.hitEvent,
+          homeRunEvent: state.homeRunEvent,
+          flyOut: state.flyOut,
+          outEvents: state.outEvents,
+        }),
     tagOut: state.tagOut,
     throwBase: state.firstThrowBase,
     throwArrivalTick: state.firstThrowArrivalTick,
@@ -2500,6 +2541,9 @@ export function recordedOutcomeOf(input: DefensePlayInput, result: DefensePlayRe
   if (input.outcomeIsGiven === true) return input.outcome
   return result.outcome ?? input.outcome
 }
+
+/** 판 끝 결과 코드 7 — 파울 (0x9d5bc 의 0xb68dc 갈래) */
+const FOUL_RESULT_CODE = 7
 
 /** 예보 표가 비었을 때의 가장 이른 포구 틱 (플레이 +0x11c 초기값 0xffff — `forecastCatch`) */
 const NO_FORECAST_CATCH = 0xffff

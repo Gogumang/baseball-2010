@@ -43,6 +43,7 @@ import {
   pitchersOfRecordOf,
   rollTeamSetup,
   startBatterOutcome,
+  startBatterPitch,
   startTeamGame,
   startThrowPitch,
   stealableBases,
@@ -2506,5 +2507,71 @@ describe('상태 0xe 의 OK 대기 (0x39e14 → 0x532b0) — 진행기가 0xe �
     const 교체길 = 적는난수(7)
     confirmScene(바꾼뒤, 교체길.random)
     expect(교체길.log.length).toBeGreaterThan(0)
+  })
+})
+
+describe('파울 각 공도 수비 판을 돈다 — 판이 파울로 닫히면 스트라이크(0x35108 → 0xb6b58), 잡히면 파울 뜬공 아웃', () => {
+  it('사람이 던진 타석: CPU 타자의 파울 각 공은 타석을 끝내지 않고 붙들고, 파울로 닫히면 같은 타석 스트라이크 ≤ 1 이면 +1', () => {
+    let 파울판 = 0
+    for (let seed = 1; seed <= 6; seed += 1) {
+      let { progress, random } = 시작({}, seed)
+      for (let step = 0; step < 300 && !progress.game.isFinished; step += 1) {
+        if (progress.sceneConfirmPending === true) {
+          progress = confirmScene(progress, random)
+          continue
+        }
+        if (!isPitchTurn(progress)) break
+        const next = startThrowPitch(progress, { typeNumber: 첫구질(progress), courseCell: 4, gaugeCell: 0 }, random)
+        const pending = next.pendingDefensePlay
+        if (pending === null) {
+          progress = next
+          continue
+        }
+        const result = runDefensePlay(pending.input)
+        const 끝 = resolveDefensePlay(next, result, random)
+        if (next.atBat.outcome === null && result.foulEnded === true) {
+          파울판 += 1
+          expect(pending.side).toBe('수비')
+          expect(pending.input.strikes).toBe(progress.atBat.strikes)
+          expect(next.atBat).toEqual(progress.atBat)
+          expect(끝.atBat.strikes).toBe(Math.min(progress.atBat.strikes + 1, 2))
+          expect(끝.opponentOrderIndex).toBe(progress.opponentOrderIndex)
+          expect(끝.game.bases).toEqual(progress.game.bases)
+        }
+        progress = 끝
+      }
+    }
+    expect(파울판).toBeGreaterThan(0)
+  })
+
+  it('우리 타석: 쏜 패턴이 실린 파울은 공격 쪽 판으로 붙들고, 파울로 닫히면 그제야 스트라이크 · 연속 파울을 센다', () => {
+    const { progress: 시작판, random } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT }, 7)
+    let progress = 시작판
+    for (let step = 0; step < 50 && !isBatterTurn(progress); step += 1) {
+      if (progress.sceneConfirmPending === true) progress = confirmScene(progress, random)
+      else break
+    }
+    expect(isBatterTurn(progress)).toBe(true)
+    // 원본 코드 1 [160, 101, 752] — 1루 쪽 파울 각의 높은 공
+    const 파울: PitchOutcomeDetail = {
+      resolution: { kind: '파울' },
+      hasSwung: true,
+      isBunt: false,
+      resultCode: 1,
+      pattern: [160, 101, 752, 0],
+      contactSoundId: null,
+    }
+    const 붙든 = startBatterPitch(progress, 파울, random)
+    expect(붙든.pendingDefensePlay?.side).toBe('공격')
+    expect(붙든.pendingDefensePlay?.input.strikes).toBe(progress.atBat.strikes)
+    expect(붙든.atBat).toEqual(progress.atBat)
+    const result = runDefensePlay(붙든.pendingDefensePlay!.input)
+    const 끝 = resolveDefensePlay(붙든, result, random)
+    if (result.foulEnded === true) {
+      expect(끝.atBat.strikes).toBe(Math.min(progress.atBat.strikes + 1, 2))
+      expect(끝.recordTally.foulStreak).toBe(progress.recordTally.foulStreak + 1)
+    } else {
+      expect(result.caughtOnTheFly).toBe(true)
+    }
   })
 })

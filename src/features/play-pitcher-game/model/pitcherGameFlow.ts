@@ -73,8 +73,8 @@ import { chargedRunsOfFates, runnerFatesWithoutPlay } from '@/features/defense-p
 import { pickoffPlayForKey, PICKOFF_PLAY_KIND } from '@/entities/defense-controls/model/pickoff'
 import { fixturePatternFor } from '@/features/defense-play/model/representativePattern'
 import { isBattedBallKind } from '@/features/defense-play/model/playOutcome'
-import { contactOfOutcome } from '@/entities/batting/model/battedContact'
-import { pitchAgainstBatter } from '@/entities/pitching/model/simulateBatter'
+import { contactOfOutcome, registerContact } from '@/entities/batting/model/battedContact'
+import { pitchAgainstBatterDetailed } from '@/entities/pitching/model/simulateBatter'
 import { BATTER_SLOT, gameAbilityOf } from '@/features/play-team-game/model/gameAbilities'
 import { isMistakePitch } from '@/entities/pitching/model/mistakePitch'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
@@ -1010,7 +1010,7 @@ export function startPitch(
     },
     random,
   )
-  const resolution = pitchAgainstBatter(
+  const thrown = pitchAgainstBatterDetailed(
     pitch,
     batter,
     random,
@@ -1029,8 +1029,12 @@ export function startPitch(
       // ab3d0 sp40 = (모드 == 3 || 4) · ab41c 0xb6389(투수) = 내 육성 투수 rec[0xa] 비트7
       isPitcherOwnPlayer: true,
       careerYearIndex: options.careerYearIndex ?? 0,
+      // 파울 각 공도 수비 판을 돈다 — 낙구 전에 잡히면 파울 뜬공 아웃(13), 아니면 판이 닫힌 뒤 스트라이크(0x35108 → 0xb6b58)
+      playsFoulBall: true,
     },
   )
+  const resolution = thrown.resolution
+  const foulContact = thrown.foulContact
 
   // 스태미나는 게이지 결과와 무관하다 — 인자가 (game, 구질) 뿐이다 (P1 3-1 확정)
   const stamina = drainStamina({
@@ -1064,8 +1068,22 @@ export function startPitch(
     pitcherRecord: recordPitchGrade(progress.pitcherRecord, grade),
     lastPitch: pitch,
     lastResolution: resolution,
-    atBat: applyPitchResolution(progress.atBat, resolution),
+    // 판을 도는 파울 각 공은 판이 파울로 닫힌 뒤에야 스트라이크가 오른다(0x35108 → 0xb6b58)
+    atBat: foulContact === undefined ? applyPitchResolution(progress.atBat, resolution) : progress.atBat,
     stealingFrom,
+  }
+
+  // 파울 각 공 — 원본도 판(상태 0x17)을 돈다(맞은 공은 모두 메시지 0x11 → 0x13 → 0x17). 공 도착 판(0x3dfac)은 못 맞힌 공만이다.
+  // 타석은 아직 안 끝났다 — 판이 파울로 닫히면 `resolveDefensePlay` 가 스트라이크를 올리고 같은 타석 다음 공으로 간다
+  if (foulContact !== undefined) {
+    return {
+      ...withoutSteal(afterPitch),
+      pendingDefensePlay: withPredictedOutcome({
+        ...defensePlayInputOf(afterPitch, registerContact(FOUL_PLAY_OUTCOME, foulContact), random),
+        // 판 끝 결과 코드 11(2스트라이크 번트 파울) · 판 뒤 스트라이크(0xb6b58)가 이 공 앞의 스트라이크를 본다
+        strikes: progress.atBat.strikes,
+      }),
+    }
   }
 
   // 공 도착 0x3dfac — 못 맞힌 공이면 0.1% 폭투·포일(종류 9)이나 CPU 가 건 도루(종류 5) 판을 연다
@@ -1289,7 +1307,21 @@ export function resolveDefensePlay(
   playback: DefensePlayResult | null = null,
 ): PitcherGameProgress {
   if (progress.pendingDefensePlay === null) return progress
-  const atBatOutcome = progress.atBat.outcome
+  // 파울로 닫힌 판 — 판 끝 판정 B 0xae3e8 ae568 이 정산 0xa8024 를 건너뛰고 0xf(같은 타석 다음 공)로, 0x35108 이
+  // 0xa975c(주자를 판 앞 자리로) · 0xb6b58(스트라이크 ≤ 1 이면 +1)을 부른다 — 웹 타석 칸의 '파울' 과 같은 규칙이다
+  if (result.foulEnded === true) {
+    return enterPitchSelection(
+      {
+        ...progress,
+        pendingDefensePlay: null,
+        atBat: applyPitchResolution(progress.atBat, { kind: '파울' }),
+        lastDefensePlay: playback ?? progress.lastDefensePlay,
+      },
+      random,
+    )
+  }
+  // 파울 각 공을 낙구 전에 잡은 판(파울 뜬공 아웃)은 타석 칸에 결과가 없다 — 판 끝 정산의 뜬공 아웃이 타석 결과다
+  const atBatOutcome = progress.atBat.outcome ?? result.outcome ?? null
   // 타석이 안 끝났는데 붙들려 있을 수는 없다 — 그래도 칸은 비워 경기가 멈추지 않게 한다
   if (atBatOutcome === null) return { ...progress, pendingDefensePlay: null }
   // 기록은 판 끝 정산(0xa8024)이 낸 결과다 — 타석에 실린 결과는 타석을 끝낸 임시 값이다(`battedContact`)
@@ -1454,6 +1486,9 @@ function withMyRunnerPlay(
  * 내가 던진 인플레이 타구를 진행기에 넘길 꼴로 만든다 — 능력치·난수·모드·수비 주체까지 다 여기서 채운다.
  * 이 객체를 만드는 데는 난수를 **한 번도 쓰지 않는다** (굴림은 전부 진행기 안에서 돈다).
  */
+/** 파울 각 공 판의 임시 결과 칸 — 판이 파울로 닫히면 쓰지 않고, 잡히면 판 끝 정산(뜬공 아웃)이 갈아 끼운다 */
+const FOUL_PLAY_OUTCOME: AtBatOutcome = { kind: '아웃', detail: '뜬공아웃' }
+
 function defensePlayInputOf(
   progress: PitcherGameProgress,
   outcome: AtBatOutcome,

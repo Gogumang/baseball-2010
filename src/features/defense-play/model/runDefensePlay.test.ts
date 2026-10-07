@@ -1777,3 +1777,38 @@ describe('필살수비가 열리면 표시 패턴으로 바꿔 쏜다 — 5107c 
     expect(state.trajectory.pointAt(10)).toEqual(battedBallTrajectory(쏜패턴).pointAt(10))
   })
 })
+
+describe('파울 판 — 쏜 공의 파울 각(511b8 state[0x1c])이면 낙구 · 담장선 틱에 0x9d5bc 가 7, 잡히면 13', () => {
+  const 쏘기 = (pattern: BattedBallPattern, resultCode: number, strikes: number) =>
+    runDefensePlay({
+      outcome: registerContact(땅볼아웃, { pattern, resultCode }),
+      trajectory: battedBallTrajectory(pattern),
+      bases: 주자1루,
+      outs: 0,
+      strikes,
+    })
+
+  it('뒤로 튄 파울(코드 9 [311, 273, 247]) — 3틱 낙구에 7, 정산 없이 판 앞 루 그대로 · 스트라이크 ≤ 1 이면 +1', () => {
+    const 한스트 = 쏘기([311, 273, 247, 1], 9, 1)
+    expect(한스트.log).toContain('3틱 낙구 — 판 끝 결과 코드 7 (0x9d5bc)')
+    expect(한스트.foulEnded).toBe(true)
+    expect(한스트.outcome).toBeUndefined()
+    expect(한스트.advance).toEqual({ bases: 주자1루, runsScored: 0, outsAdded: 0 })
+    expect(한스트.foulStrikes).toBe(2)
+    expect(쏘기([311, 273, 247, 1], 9, 2).foulStrikes).toBe(2)
+  })
+
+  it('파울 각 뜬공을 낙구 전에 잡으면 뜬공 아웃(13) — 파울 판이 아니고 정산은 뜬공 아웃이다', () => {
+    const 잡힘 = 쏘기([160, 101, 752, 0], 1, 1)
+    expect(잡힘.log).toContain('17틱 0번 주자 뜬공 아웃 (0xb36d0 결과 1)')
+    expect(잡힘.foulEnded).toBeUndefined()
+    expect(잡힘.outcome).toEqual(뜬공아웃)
+    expect(잡힘.advance.outsAdded).toBe(1)
+  })
+
+  it('파울 갈래 관문(b0d2c)은 공을 쥔 틱 다음에 판을 닫는다 — 쥔 공은 멈춘 공이다', () => {
+    const 주움 = 쏘기([209, 317, 295, 1], 9, 0)
+    expect(주움.log).toContain('30틱 1번 야수가 잡았다 (종류 0)')
+    expect(주움.ticks.length).toBeLessThanOrEqual(32)
+  })
+})

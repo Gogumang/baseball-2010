@@ -226,6 +226,11 @@ export interface DefenseCallContext {
    * `battedContact`)보다 먼저다 — 원본 콜은 판 안의 결과 코드(13 아웃 · 9 세이프 · 8·12 홈런)로 난다.
    */
   readonly outcome?: AtBatOutcome
+  /**
+   * **파울로 닫힌 판**인가 — 수비 진행기 `DefensePlayResult.foulEnded`. 판의 콜은 결과 코드 7 메시지(51c5c)의 25("Foul!") 하나다.
+   * ⚠️ 웹 세션은 그 25 를 공 판정 자리(`pitchCallSoundIdOf` 의 '파울')에서 이미 낸다 — 판 끝에서는 아무 콜도 안 낸다
+   */
+  readonly foulEnded?: boolean
 }
 
 /** 아웃 콜 두 가지 — 62 는 "잡아서/태그해서 낸 아웃", 20 은 "루에서 잡은 포스 아웃" */
@@ -298,6 +303,8 @@ const SAFE_CALL = 17
  * 의 `quickEngineSteal`, 표 0xd9064 굴림 하나)는 소리 없이 지나간다.
  */
 export function inPlayCallSoundIdOf(atBatOutcome: AtBatOutcome, play?: DefenseCallContext | null): number | null {
+  // 파울로 닫힌 판 — 정산이 없고(0xae3e8 ae568) 콜은 결과 코드 7 의 25 뿐이다(위 칸 주석)
+  if (play?.foulEnded === true) return null
   // 판을 돈 타구는 정산 결과로 고른다 — 타석 결과는 타석을 끝낸 임시 값이다
   const outcome = play?.outcome ?? atBatOutcome
   if (outcome.kind === '홈런') return 11

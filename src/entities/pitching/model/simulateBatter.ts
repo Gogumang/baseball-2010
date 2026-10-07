@@ -7,7 +7,7 @@ import { remainingAfterSpecialSwing, rollSpecialSwing } from '@/entities/batting
 import { timingOf } from '@/entities/batting/model/swingTiming'
 import { hitDirectionOf } from '@/entities/batting/model/hitDirection'
 import { contactOfPattern, drawScenePattern, launchPatternOf } from '@/entities/batting/model/battedBallOutcome'
-import { provisionalOutcomeOf, registerContact } from '@/entities/batting/model/battedContact'
+import { provisionalOutcomeOf, registerContact, type BattedContact } from '@/entities/batting/model/battedContact'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { Pitch } from '@/entities/pitching/model/pitch'
@@ -226,6 +226,12 @@ export interface CpuBatterTraits {
   readonly isPitcherOwnPlayer?: boolean
   /** 나리 연차 idx (저장 레코드 +0xb3) — 투수 보너스 400 − 40 × 연차. 안 넘기면 0 */
   readonly careerYearIndex?: number
+  /**
+   * **파울 각 공도 수비 판으로 돌리는가** — 원본은 맞은 공이면 파울 각이라도 판(상태 0x17)을 돌아 낙구 · 담장선 틱에 0x9d5bc 가 7 을
+   * 내야 파울이고, 그 전에 잡히면 뜬공 아웃(13)이다. 참이면 파울 각 공을 `foulContact` 로 돌려주고 필살타법 굴림(0x517e6)도
+   * 판 시작에 맡긴다. 안 넘기면 예전처럼 여기서 곧장 파울로 끝낸다(판을 아직 안 잇는 부르는 쪽 — 웹 근사).
+   */
+  readonly playsFoulBall?: boolean
 }
 
 /** `pitchAgainstBatterDetailed` 의 결과 — 필살 칸을 부르는 쪽에 돌려준다 */
@@ -238,8 +244,13 @@ export interface CpuPitchOutcome {
    * `traits.specialSwing` 을 안 넘겼으면 null.
    */
   readonly specialSwingRemaining: number | null
-  /** 필살 성공 — 0x517e6 이 "송구공" 비트를 단 타구 (야수가 쥐지 못한다) */
+  /** 필살 성공 — 0x517e6 이 필살타법 표시(공 속성 4)를 단 타구 (야수가 쥐지 못한다). 판을 도는 공은 판 시작이 굴려 늘 거짓이다 */
   readonly isUncatchable: boolean
+  /**
+   * 판을 돌 파울 각 공(`traits.playsFoulBall`) — 쏜 패턴 · 결과 코드 · 필살 스윙 재료. 부르는 쪽이 이것으로 수비 판을 돌리고,
+   * 판이 파울로 닫히면(`DefensePlayResult.foulEnded`) 그제야 스트라이크를 올린다(0x35108 → 0xb6b58).
+   */
+  readonly foulContact?: BattedContact
 }
 
 /** 스윙 프레임 F = N − 2 + d — d = 0 이 타이밍 100 이다 (0x34be0) */
@@ -428,6 +439,13 @@ export function pitchAgainstBatterDetailed(
   // 판을 도는 페어 타구는 재료만 쏜 공에 실어 수비 판 시작(`startDefensePlay`)이 그 차례에 굴린다 — 판을 아직 안 도는
   // 파울 · 판정 11 만 여기서 굴린다(사람 타석 `resolvePitch` 와 같다, 미해결)
   const specialSwing = isSpecialSwing ? { number: specialNumber, isAceBatter: true } : undefined
+  if (contact.kind === '파울' && traits.playsFoulBall === true) {
+    // 파울 각이라도 판을 돈다 — 필살타법 굴림까지 판 시작(메시지 0x11 뒤 517e6)에 맡긴다
+    return {
+      ...swung({ kind: '파울' }, false),
+      foulContact: { pattern, resultCode: code, ...(specialSwing === undefined ? {} : { specialSwing }) },
+    }
+  }
   const isUncatchable = contact.kind !== '타구' && isSpecialSwing && rollSpecialSwing(specialNumber, random, true)
   if (contact.kind === '파울') return swung({ kind: '파울' }, isUncatchable)
   if (contact.kind === '번트파울아웃') {

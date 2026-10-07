@@ -49,7 +49,7 @@ import { PICKOFF_PLAY_KIND, pickoffPlayForKey } from '@/entities/defense-control
 import type { PickoffBase } from '@/entities/defense-controls/model/pickoff'
 import { fixturePatternFor } from '@/features/defense-play/model/representativePattern'
 import { isBattedBallKind } from '@/features/defense-play/model/playOutcome'
-import { contactOfOutcome } from '@/entities/batting/model/battedContact'
+import { contactOfOutcome, registerContact, type BattedContact } from '@/entities/batting/model/battedContact'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 import type { LeaguePlateAppearance, LeagueStolenBase } from '@/entities/league/model/leaguePlayerStats'
 import {
@@ -1824,6 +1824,17 @@ function batterPitch(
 ): TeamGameProgress {
   if (!isBatterTurn(progress)) return progress
   progress = throwOpponentPitch(progress, detail.pitchTypeNumber)
+  // 파울 각 공 — 원본도 판(상태 0x17)을 돈다. 연속 파울 기록(0xa7dbc)은 판의 결과 코드 7 메시지(51c5c)에서라 판이 파울로 닫힐 때 센다.
+  // ⚠️ 필살 스윙의 성공 굴림(0x517e6)은 타석 판정(resolvePitch)이 이미 굴렸다 — 원본은 판 시작의 필살수비 · 폴 굴림 뒤다(미해결,
+  //    타석 화면이 판을 도는 파울인지 모른다)
+  if (detail.resolution.kind === '파울' && detail.pattern !== undefined && detail.resultCode !== null) {
+    const started = startBatterFoulPlay(progress, { pattern: detail.pattern, resultCode: detail.resultCode }, random, options)
+    if (applyOutcome === startBatterOutcome) return started
+    const pending = started.pendingDefensePlay
+    if (pending === null) return started
+    const result = runDefensePlay(pending.input)
+    return resolveDefensePlay({ ...started, lastDefensePlay: result }, result, random)
+  }
   progress = withFoulRecords(progress, detail.resolution.kind === '파울')
   const atBat = applyPitchResolution(progress.atBat, detail.resolution)
   const outcome = atBat.outcome
@@ -2364,9 +2375,12 @@ function pitchOnce(
       // 팀 경기 모드 1·2·8·9 는 판정 묶음 '일반' — 수비(우리)가 사람이라 hit·power 쪽 −10 (0xab5c0).
       // 내 선수 보너스(모드 3·4)·투수 미션 +100(모드 5)은 없다 — 팀 명단에 비트7 선수가 없다
       swingMode: '일반',
+      // 파울 각 공도 수비 판을 돈다 — 낙구 전에 잡히면 파울 뜬공 아웃(13), 아니면 판이 닫힌 뒤 스트라이크(0x35108 → 0xb6b58)
+      playsFoulBall: true,
     },
   )
   const resolution = thrown.resolution
+  const foulContact = thrown.foulContact
 
   // 스태미나는 게이지 결과와 무관하다 — 인자가 (game, 구질) 뿐이다 (P1 3-1 확정)
   const stamina = drainStamina({
@@ -2421,8 +2435,19 @@ function pitchOnce(
     pitcherLines: chargeMoundLine(progress, true, { pitches: 1 }),
     lastPitch: pitch,
     lastResolution: resolution,
-    atBat: applyPitchResolution(progress.atBat, resolution),
+    // 판을 도는 파울 각 공은 판이 파울로 닫힌 뒤에야 스트라이크가 오른다(0x35108 → 0xb6b58)
+    atBat: foulContact === undefined ? applyPitchResolution(progress.atBat, resolution) : progress.atBat,
     stealingFrom,
+  }
+
+  // 파울 각 공 — 원본도 판(상태 0x17)을 돈다(맞은 공은 모두 메시지 0x11 → 0x13 → 0x17). 공 도착 판(0x3dfac)은 못 맞힌 공만이다
+  if (foulContact !== undefined) {
+    const started = startDefensiveFoulPlay(afterPitch, foulContact, random)
+    if (defer) return started
+    const pending = started.pendingDefensePlay
+    if (pending === null) return started
+    const result = runDefensePlay(pending.input)
+    return resolveDefensePlay({ ...started, lastDefensePlay: result }, result, random)
   }
 
   // 공 도착 0x3dfac — 못 맞힌 공이면 0.1% 폭투·포일(종류 9)이나 CPU 가 건 도루(종류 5) 판을 연다.
@@ -2541,6 +2566,52 @@ function startDefensiveAtBat(
         },
   )
   return { ...progress, pendingDefensePlay: { side: '수비', input, outcome: input.outcome } }
+}
+
+/** 파울 각 공 판의 임시 결과 칸 — 판이 파울로 닫히면 쓰지 않고, 잡히면 판 끝 정산(뜬공 아웃)이 갈아 끼운다 */
+const FOUL_PLAY_OUTCOME: AtBatOutcome = { kind: '아웃', detail: '뜬공아웃' }
+
+/**
+ * **사람이 던진 타석의 파울 각 공 판** — 맞은 공이라 판을 돈다(타석은 아직 안 끝났다). 판이 파울로 닫히면(`foulEnded`)
+ * `resolveDefensePlay` 가 스트라이크를 올리고 같은 타석 다음 공으로, 낙구 전에 잡히면 파울 뜬공 아웃으로 타석을 끝낸다.
+ */
+function startDefensiveFoulPlay(progress: TeamGameProgress, contact: BattedContact, random: RandomPort): TeamGameProgress {
+  const stealing = progress
+  const cleared = withoutSteal(progress)
+  const outcome = registerContact(FOUL_PLAY_OUTCOME, contact)
+  const input = withPredictedOutcome({
+    ...defensiveDefenseInputOf(stealing, outcome, contact.pattern, random, false),
+    // 판 끝 결과 코드 11(2스트라이크 번트 파울) · 판 뒤 스트라이크(0xb6b58)가 이 공 앞의 스트라이크를 본다
+    strikes: progress.atBat.strikes,
+  })
+  return { ...cleared, pendingDefensePlay: { side: '수비', input, outcome: input.outcome } }
+}
+
+/** **우리 타석의 파울 각 공 판** — `startDefensiveFoulPlay` 의 공격 쪽. 상대 수비(CPU)가 공을 쫓고 사람은 주루를 잡는다 */
+function startBatterFoulPlay(
+  progress: TeamGameProgress,
+  contact: BattedContact,
+  random: RandomPort,
+  options: BatterOutcomeOptions,
+): TeamGameProgress {
+  const stealing = progress
+  const cleared = withoutSteal(progress)
+  const outcome = registerContact(FOUL_PLAY_OUTCOME, contact)
+  const input = withPredictedOutcome({
+    ...batterDefenseInputOf(stealing, outcome, contact.pattern, random, options),
+    strikes: progress.atBat.strikes,
+  })
+  return { ...cleared, pendingDefensePlay: { side: '공격', input, outcome: input.outcome } }
+}
+
+/**
+ * **파울로 닫힌 판의 뒤** — 판 끝 판정 B 0xae3e8 ae568 이 정산 0xa8024 를 건너뛰고 0xf(같은 타석 다음 공)로, 0x35108 이
+ * 0xa975c(주자를 판 앞 자리로) · 0xb6b58(스트라이크 ≤ 1 이면 +1)을 부른다. 웹 타석 칸의 '파울' 과 같은 규칙이다.
+ * 우리 타석이면 판의 결과 코드 7 메시지(51c5c)의 연속 파울 기록(0xa7dbc)도 이때 센다.
+ */
+function afterFoulPlay(progress: TeamGameProgress, side: ControlSide, random: RandomPort): TeamGameProgress {
+  const recorded = side === '공격' ? withFoulRecords(progress, true) : progress
+  return enterPitchSelection({ ...recorded, atBat: applyPitchResolution(recorded.atBat, { kind: '파울' }) }, random)
 }
 
 /**
@@ -2733,6 +2804,8 @@ export function resolveDefensePlay(
   const pending = progress.pendingDefensePlay
   if (pending === null) return progress
   const cleared = { ...progress, pendingDefensePlay: null }
+  // 파울로 닫힌 판 — 같은 타석이 이어진다(정산 없음)
+  if (result.foulEnded === true) return afterFoulPlay(cleared, pending.side, random)
   if (pending.side === '공격') {
     // 우리 타석 쪽은 몸통 끝에서 이미 다음 사람 차례까지 민다
     // 기록은 판 끝 정산(0xa8024)이 낸 결과다 — `pending.outcome` 은 타석을 끝낸 임시 값이다(`battedContact`)
