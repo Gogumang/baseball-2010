@@ -190,3 +190,42 @@ describe('StoryScreen — 명령 5 화면효과', () => {
     expect(덮개.style.background).toContain('0, 0, 0')
   })
 })
+
+describe('system 1 — 올해의 목표 창 (0x8d304 → 0x741a1 · 그리기 0x86fdc)', () => {
+  const 연초 = {
+    ...이벤트,
+    id: -115,
+    commands: [
+      { op: 'say', text: '올해의 목표다!!', speaker: 2, format: 0, portraits: [] },
+      { op: 'system', sub: 1, arg: 0 },
+    ],
+  } as unknown as OriginalEvent
+  const 값 = { labelSet: 0 as const, current: [0, 0, 0, 0, 0], goals: [260, 44, 3, 22, 50] }
+
+  it('대사 뒤 창에서 멈추고, 누르면 닫혀 이벤트가 끝난다', () => {
+    let 끝 = 0
+    render(
+      <StoryScreen events={[연초]} event={연초} playerName="테스트" teamName="드래곤즈"
+        onComplete={() => { 끝 += 1 }} onMatch={() => {}} yearGoalWindowOf={() => 값} />,
+    )
+    fireEvent.click(screen.getByText('올해의 목표다!!'))
+    const 창 = screen.getByTestId('올해의-목표-창')
+    // 제목 358 · 이름 318 58 180 319 327 · 머리 87 148
+    const 글 = [...창.querySelectorAll('img[data-frame]')].map((node) => Number(node.getAttribute('data-frame')))
+    expect(글).toEqual([358, 318, 58, 180, 319, 327, 87, 148])
+    expect(끝).toBe(0)
+    fireEvent.click(창)
+    expect(끝).toBe(1)
+  })
+
+  it('값을 안 넘기면 예전처럼 지나간다', () => {
+    let 끝 = 0
+    render(
+      <StoryScreen events={[연초]} event={연초} playerName="테스트" teamName="드래곤즈"
+        onComplete={() => { 끝 += 1 }} onMatch={() => {}} />,
+    )
+    fireEvent.click(screen.getByText('올해의 목표다!!'))
+    expect(screen.queryByTestId('올해의-목표-창')).toBeNull()
+    expect(끝).toBe(1)
+  })
+})

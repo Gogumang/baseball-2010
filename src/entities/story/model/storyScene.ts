@@ -221,7 +221,7 @@ export function finishEvent(career: PlayerCareer, viewedEventIds: readonly numbe
  * ```
  * 초상화 번호 = 캐릭터 기본번호 표 0xd0ae6[2] = 16 + 표정 0. 파일 레코드가 아니라 본 표시를 남기지 않는다.
  * 나리 두 편(모드 3 · 4) 공용 — 진입 0x16aac 가 모드를 넘기지만 명령 두 줄은 모드로 갈리지 않는다(R9 7절).
- * ⚠️ 미해결: 올해의 목표 창(SYS 1)은 재생기가 아직 띄우지 않는다 — 392 의 SYS(1, 77) 과 같은 처지.
+ * 올해의 목표 창(SYS 1)은 재생기가 띄운다 — `pages/story/lib/yearGoalWindow`(0x8d304 → 0x86fdc · 0x8656c). 392 의 SYS(1, …) 도 같은 창.
  */
 export const NARI_YEAR_START_EVENT_ID = -115
 const DIRECTOR_SPEAKER = 2

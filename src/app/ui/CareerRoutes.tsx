@@ -30,6 +30,7 @@ import { nariLastGameRecordLineOf } from '@/entities/career/model/playerCareer'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { MatchCommand } from '@/pages/story/model/useEventPlayback'
 import { awardWindowTextOf } from '@/pages/story/lib/awardWindows'
+import { yearGoalWindowValuesOf } from '@/entities/career/model/seasonFlow'
 import { careerLeagueRecordsOf, judgeSeasonAwards } from '@/entities/awards/model/seasonAwards'
 import type { StoryCarry } from '@/entities/story/model/aceMatch'
 import type { StoryContext } from '@/app/model/useStorySchedule'
@@ -219,6 +220,8 @@ export function CareerRoutes({
             systemWindowTextOf={(command) =>
               awardWindowTextOf(command.sub, () => judgeSeasonAwards(career, careerLeagueRecordsOf(career), '타자'))
             }
+            // system 1 올해의 목표 창 — 연초 115 · 392 (0x8d304 → 0x86fdc)
+            yearGoalWindowOf={() => yearGoalWindowValuesOf(career)}
           />
           </ScreenOverlay>
         </>

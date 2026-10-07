@@ -36,6 +36,47 @@ export function yearGoalsOf(career: PlayerCareer): readonly number[] {
   return table[Math.min(career.season, table.length) - 1]
 }
 
+/**
+ * **올해의 목표 창(SYS sub 1)의 줄 묶음** — 그리기 0x8656c 가 고르는 이름 그림 다섯 장의 차례 (표 0xd41d6[묶음·5 + i]).
+ * 0 타자(모드 4) · 1 투수 선발(보직 0xb6705 == 0) · 2 투수 그 밖(보직 ≠ 0 — 셋째 줄이 "세이브P", 값은 세이브 + 승)
+ */
+export type YearGoalWindowLabelSet = 0 | 1 | 2
+
+/**
+ * 올해의 목표 창이 그리는 값 — 0x8656c 가 줄마다 읽는 것 그대로.
+ * `current`·`goals` 의 첫 칸은 타자면 타율 ×1000(0xb8e3d · 0x8633c 로 "0.xxx"), 투수면 방어율 ×100(0xb6ce9 · 0x86248 로 "x.xx").
+ */
+export interface YearGoalWindowValues {
+  readonly labelSet: YearGoalWindowLabelSet
+  readonly current: readonly number[]
+  readonly goals: readonly number[]
+}
+
+/**
+ * 타자편(모드 4) 올해의 목표 창 값 (0x8656c 의 0x86842~0x868e2 · 0x86a12 · 0x86b9e~0x86c04):
+ * ```
+ *   현재  타율 0xb8e3d(내 타자) · 안타 s16 +0x22 · 홈런 s16 +0x28 · 타점 s16 +0x2a ·
+ *         인기도 상승 max(0, 0xb6e79(S) − u16 S+0x78)
+ *   목표  0x8645c(…, 4, S+0xb3) = u16 0xd4302[(+0xb >> 5)·65 + 연차idx·5 + i] — 판정 표 0xd7f9e 와 같은 값의 사본(U-23 닫음)
+ * ```
+ * 목표 값은 단계 보정이 없는 표 그대로다(연초 115 · 연말 392 가 같은 창).
+ */
+export function yearGoalWindowValuesOf(career: PlayerCareer): YearGoalWindowValues {
+  const { stats } = career
+  const average = stats.atBats > 0 ? Math.min(AVERAGE_SCALE, Math.trunc((stats.hits * AVERAGE_SCALE) / stats.atBats)) : 0
+  return {
+    labelSet: 0,
+    current: [
+      average,
+      stats.hits,
+      stats.homeRuns,
+      stats.runsBattedIn,
+      Math.max(0, career.popularity - career.popularityAtSeasonStart),
+    ],
+    goals: yearGoalsOf(career),
+  }
+}
+
 /** 목표 달성 수. 중간평가는 타율을 뺀 네 목표를 절반 기준으로 본다 (0xa3de8 단계 1) */
 export function achievedGoalCount(career: PlayerCareer, stage: GoalStage): number {
   const [average, hits, homeRuns, runsBattedIn, popularityGain] = yearGoalsOf(career)

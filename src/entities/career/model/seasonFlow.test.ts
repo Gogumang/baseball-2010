@@ -195,3 +195,17 @@ describe('엔딩 뒤 — 0x1220c', () => {
     expect(effectiveAbilityOf(continued)).toEqual(equippedAbilityOf(continued))
   })
 })
+
+describe('올해의 목표 창 값 — 0x8656c 타자 갈래', () => {
+  it('현재 = 타율(0xb8e3d) · 안타 · 홈런 · 타점 · max(0, 인기도 − 시즌 시작 인기도), 목표 = 표 그대로', async () => {
+    const { yearGoalWindowValuesOf, yearGoalsOf } = await import('@/entities/career/model/seasonFlow')
+    const career = {
+      ...createCareer('창'),
+      stats: { ...EMPTY_SEASON_STATS, atBats: 3, hits: 1, homeRuns: 2, runsBattedIn: 4 },
+      popularity: 90,
+      popularityAtSeasonStart: 100,
+    }
+    expect(yearGoalWindowValuesOf(career)).toEqual({ labelSet: 0, current: [333, 1, 2, 4, 0], goals: yearGoalsOf(career) })
+    expect(yearGoalWindowValuesOf({ ...career, stats: EMPTY_SEASON_STATS }).current[0]).toBe(0)
+  })
+})

@@ -11,6 +11,9 @@ import { useScreenEffect } from '@/pages/story/model/useScreenEffect'
 import type { MatchCommand, SystemCommand } from '@/pages/story/model/useEventPlayback'
 import type { StoryCarry } from '@/entities/story/model/aceMatch'
 import * as styles from '@/pages/story/ui/StoryScreen.css'
+import { YearGoalWindow } from '@/pages/story/ui/YearGoalWindow'
+import { SYSTEM_YEAR_GOAL_WINDOW } from '@/pages/story/lib/yearGoalWindow'
+import type { YearGoalWindowValues } from '@/entities/career/model/seasonFlow'
 
 /** 화자 번호 1 은 플레이어 이름으로 바꾼다. */
 const PLAYER_SPEAKER = 1
@@ -42,6 +45,11 @@ interface StoryScreenProps {
    */
   readonly systemWindowTextOf?: (command: SystemCommand) => string | null
   /**
+   * system 1 — **올해의 목표 창**(0x8d304 → 0x741a1 · 그리기 0x86fdc)의 값. 연초 115 · 392 가 연다.
+   * 창을 그릴 때 부른다(원본도 틀마다 커리어를 읽어 그린다). 안 넘기면 그 명령은 예전처럼 지나간다.
+   */
+  readonly yearGoalWindowOf?: () => YearGoalWindowValues
+  /**
    * 환경설정 진동(저장 +0x3b) — 명령 5 화면효과 1·2 의 500ms 진동(0x3a44)이 이 칸을 본다.
    * 안 넘기면 켠 것으로 본다(원본 기본값 켬).
    */
@@ -51,9 +59,14 @@ interface StoryScreenProps {
 /** 원작 이벤트. 대사마다 원본이 정한 인물·표정·자리로 초상화를 띄운다. */
 export function StoryScreen({
   events, event, playerName, teamName, skinIndex, battingTypeIndex, onComplete, onMatch, carried, replacementsFor,
-  systemWindowTextOf, isVibrationOn = true,
+  systemWindowTextOf, yearGoalWindowOf, isVibrationOn = true,
 }: StoryScreenProps) {
-  const { step, portraits, next, jump } = useEventPlayback(events, event, onComplete, onMatch, carried, systemWindowTextOf)
+  // 목표 창도 재생기가 멈추는 창이다 — 글 대신 빈 글로 세워 두고 아래에서 창을 그린다
+  const windowTextOf = systemWindowTextOf === undefined && yearGoalWindowOf === undefined
+    ? undefined
+    : (command: SystemCommand) =>
+      command.sub === SYSTEM_YEAR_GOAL_WINDOW && yearGoalWindowOf !== undefined ? '' : (systemWindowTextOf?.(command) ?? null)
+  const { step, portraits, next, jump } = useEventPlayback(events, event, onComplete, onMatch, carried, windowTextOf)
   // 명령 5 화면효과 — 흔들기 오프셋·덮개 (효과기 0xbd844)
   const effect = useScreenEffect(step, isVibrationOn)
   const command = step.command
@@ -79,6 +92,7 @@ export function StoryScreen({
           ]
         : null
   const isDialogue = command?.op === 'say' || command?.op === 'system'
+  const isYearGoalWindow = command?.op === 'system' && command.sub === SYSTEM_YEAR_GOAL_WINDOW && yearGoalWindowOf !== undefined
 
   return (
     <div className={styles.overlay}
@@ -95,6 +109,8 @@ export function StoryScreen({
           <MarkupText raw={dialogue} replacements={replacements} />
         </button>
       )}
+
+      {isYearGoalWindow && <YearGoalWindow values={yearGoalWindowOf()} onClose={next} />}
 
       {menu !== null ? (
         // 원본 선택지는 대사 창 안 글줄이라 화살표·판이 없고 고른 줄만 노랑이다 (0x7fd22, R14 3-4)

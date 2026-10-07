@@ -2,6 +2,7 @@ import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCaree
 import { seasonEarnedRunAverageOf } from '@/entities/pitcher-career/model/pitcherCareer'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import { PITCHER_YEAR_GOALS } from '@/shared/config/original/yearGoals'
+import type { YearGoalWindowValues } from '@/entities/career/model/seasonFlow'
 
 /**
  * 나만의리그 **투수편**(모드 3) 올해의 목표 — 판정 `0xa3de8(career, 단계)` 의 투수 갈래.
@@ -68,4 +69,32 @@ export function achievedPitcherGoalCount(career: PitcherCareer, stage: PitcherGo
     career.popularity - career.popularityAtSeasonStart >= popularityGain,
   ]
   return checks.filter(Boolean).length
+}
+
+/**
+ * 투수편(모드 3) **올해의 목표 창(SYS sub 1)** 값 — 그리기 0x8656c 의 투수 갈래(0x86934~0x86a0e · 0x86a12 · 0x86c06~0x86c5e):
+ * ```
+ *   줄 묶음  보직 0xb6705(내 투수) == 0 → 1(선발 "승") · 그 밖 → 2("세이브P")           (0x865b0~0x865cc)
+ *   현재     방어율 0xb6ce9 · 실점 s16 +0x22 · 묶음 1 이면 승 s8 +0x2e, 아니면 세이브 s16 +0x24 + 승 ·
+ *            탈삼진 s16 +0x26 · 인기도 상승 max(0, 0xb6e79(S) − u16 S+0x78)
+ *   목표     0x8645c(…, 3, S+0xb3) = u16 0xd41fe[연차idx·5 + i] (+0x82 바이트 = 마무리 표, 0xb6ded == 2) —
+ *            판정 표 0xd7e9a 와 같은 값의 사본
+ * ```
+ * ⚠️ 원본 그대로: 이름·현재 값은 보직 ≠ 0 이면 세이브 묶음인데, 목표 표는 보직 == 2 일 때만 마무리 표다 — 보직 1 은
+ *    "세이브P" 줄에 선발 표 목표가 붙는다(판정 0xa3de8 도 보직 2 만 세이브를 더한다).
+ */
+export function pitcherYearGoalWindowValuesOf(career: PitcherCareer): YearGoalWindowValues {
+  const { stats } = career
+  const isStarterLabels = career.role === PITCHER_ROLE.starter
+  return {
+    labelSet: isStarterLabels ? 1 : 2,
+    current: [
+      seasonEarnedRunAverageOf(stats),
+      stats.runsAllowed,
+      isStarterLabels ? stats.wins : stats.saves + stats.wins,
+      stats.strikeouts,
+      Math.max(0, career.popularity - career.popularityAtSeasonStart),
+    ],
+    goals: pitcherYearGoalsOf(career, '연말'),
+  }
 }

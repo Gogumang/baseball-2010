@@ -15,6 +15,7 @@ import { EndingScreen } from '@/pages/ending/ui/EndingScreen'
 import { OutingMapScreen } from '@/pages/outing-map/ui/OutingMapScreen'
 import { StoryScreen } from '@/pages/story/ui/StoryScreen'
 import { awardWindowTextOf } from '@/pages/story/lib/awardWindows'
+import { pitcherYearGoalWindowValuesOf } from '@/entities/pitcher-career/model/pitcherYearGoals'
 import { PostseasonScreen } from '@/pages/season-end/ui/PostseasonScreen'
 import { MessageBox, ScreenOverlay } from '@/shared/ui'
 import { TEAMS } from '@/shared/config/original/teams'
@@ -204,6 +205,8 @@ export function PitcherLeagueRoute({
             systemWindowTextOf={(command) =>
               awardWindowTextOf(command.sub, () => judgePitcherSeasonAwards(career))
             }
+            // system 1 올해의 목표 창 — 연초 115 · 392 (0x8d304 → 0x86fdc)
+            yearGoalWindowOf={() => pitcherYearGoalWindowValuesOf(career)}
           />
           </ScreenOverlay>
         </>

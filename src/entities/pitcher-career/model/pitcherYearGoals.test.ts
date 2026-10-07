@@ -73,3 +73,21 @@ describe('목표 판정 0xa3de8 — 투수 갈래', () => {
     expect(achievedPitcherGoalCount(투수())).toBe(2)
   })
 })
+
+describe('올해의 목표 창 값 — 0x8656c 투수 갈래', () => {
+  it('보직 0 은 "승" 묶음(승만) · 그 밖은 "세이브P" 묶음(세이브 + 승) — 목표 표는 보직 2 만 마무리 표', async () => {
+    const { pitcherYearGoalWindowValuesOf, pitcherYearGoalsOf } = await import('@/entities/pitcher-career/model/pitcherYearGoals')
+    const base = {
+      ...createPitcherCareer('창'),
+      stats: { ...EMPTY_PITCHER_SEASON_STATS, outs: 27, runsAllowed: 3, wins: 2, saves: 5, strikeouts: 9 },
+    }
+    const 선발 = pitcherYearGoalWindowValuesOf({ ...base, role: PITCHER_ROLE.starter })
+    expect(선발.labelSet).toBe(1)
+    expect(선발.current.slice(0, 4)).toEqual([300, 3, 2, 9])
+    const 보직1 = pitcherYearGoalWindowValuesOf({ ...base, role: PITCHER_ROLE.unknown })
+    expect(보직1.labelSet).toBe(2)
+    expect(보직1.current[2]).toBe(7)
+    expect(보직1.goals).toEqual(pitcherYearGoalsOf({ ...base, role: PITCHER_ROLE.starter }))
+    expect(pitcherYearGoalWindowValuesOf({ ...base, role: PITCHER_ROLE.relief }).goals).toEqual(PITCHER_YEAR_GOALS[1][0])
+  })
+})
