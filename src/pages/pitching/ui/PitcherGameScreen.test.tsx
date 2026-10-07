@@ -9,6 +9,7 @@ import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
 import { PitcherGameScreen } from '@/pages/pitching/ui/PitcherGameScreen'
 import type { PitcherGameOptions } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { SCENE_CONFIRM_READY_FRAMES } from '@/features/play-game/model/useSceneConfirm'
+import { liveGameInningIndex, resetLiveGameState } from '@/shared/lib/liveGameState/liveGameState'
 
 afterEach(() => {
   cleanup()
@@ -188,6 +189,19 @@ describe('투수편 경기 화면', () => {
     expect(screen.getByTestId('정산-점수-0')).toBeTruthy()
     // 감독 평가는 정산 판이 아니라 나리 상태 116 의 몫이다
     expect(screen.queryByText('감독 평가')).toBeNull()
+  })
+
+  it('경기 장면이 지금 이닝을 전역 경기 상태 +0x6b 에 둔다 (0xb6b6c) — 나가도 그 값이 남는다', () => {
+    resetLiveGameState()
+    띄우기()
+    expect(liveGameInningIndex()).toBe(0)
+    vi.useRealTimers()
+
+    cleanup()
+    띄우기({ dayCounter: 3 })
+    vi.useRealTimers()
+    // 등판일이 아니면 경기가 끝까지 돌아 있다 — 끝 이닝(9회 이상)
+    expect(liveGameInningIndex()).toBeGreaterThanOrEqual(8)
   })
 
   it('정산 판에서 \'0\' 이 아닌 키는 정산을 나간다 (키 0x407f0 → 메시지 0x3f3)', () => {

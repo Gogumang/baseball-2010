@@ -47,6 +47,7 @@ import { isGameEndRecord, leadingRecordCountOf } from '@/widgets/game-scene/lib/
 import { passesRecordTeamGate, recordGamePointsOf } from '@/entities/game/model/gameRecords'
 import { SettlementBoard } from '@/pages/team-game/ui/SettlementBoard'
 import { MAXIMUM_GAME_POINT } from '@/entities/career/model/playerCareer'
+import { setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
 import * as styles from '@/pages/pitching/ui/PitcherGameScreen.css'
 
 /**
@@ -143,6 +144,15 @@ export function PitcherGameScreen({
   const [shownProposal, setShownProposal] = useState<BurstMissionRow | null>(null)
   /** `#` 강판 물음이 떠 있는가 */
   const [asksGiveUp, setAsksGiveUp] = useState(false)
+
+  /**
+   * 전역 경기 상태 +0x6b (`liveGameState`) — 이닝 넘김 0xb6b6c 가 경기 장면에서 그때그때 쓴다. 경기 중 나가기(0x40140)는 이 칸을
+   * 안 지우므로 나간 그 이닝이 남는다(투수편 116 이어하기의 감독 글 38 이 본다). 0 으로 두는 것은 경기 셋업 0x3a200(세션)이다
+   */
+  const inningIndex = progress.game.inning - 1
+  useEffect(() => {
+    setLiveGameInningIndex(inningIndex)
+  }, [inningIndex])
 
   // 타석·차례가 바뀌면 1단계로 되돌린다
   useEffect(() => {
