@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { FrameSprite, SpriteNumber } from '@/shared/ui'
+import { FrameSprite } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { parseGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import { colorStepCoverOpacityOf } from '@/shared/lib/stepCover/stepCover'
@@ -13,6 +13,7 @@ import {
   settlementPanelLayoutOf, settlementRecordRowsOf, startSettlementScroll, versusRewardTextOf,
 } from '@/pages/team-game/lib/settlementBoard'
 import * as styles from '@/pages/team-game/ui/SettlementBoard.css'
+import { GamePointBadge } from '@/widgets/screen-frame/ui/GamePointBadge'
 import { ScoreboardFrame } from '@/widgets/scoreboard-frame/ui/ScoreboardFrame'
 import { SCOREBOARD_AT } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import type { ScoreboardSide } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
@@ -24,7 +25,6 @@ const IMG_TEXT_FRAMES = './sprites/img_text/frames'
 const POPUP_FRAMES = './sprites/popup/frames'
 const SLT_FRAME = './sprites/slt_frame'
 const NUM = './sprites/num'
-const GAME_POINT = './sprites/gpoint'
 const imageSrc = (folder: string, image: number) => `${folder}/${String(image).padStart(3, '0')}.png`
 
 /** num 70 + 자리 숫자 — 그림 폭(70~79) */
@@ -34,10 +34,6 @@ const SCORE_DIGIT_HEIGHTS = [36, 35, 35, 36, 36, 36, 36, 34, 36, 36] as const
 const GP_LABEL_FRAME = 252
 const SCROLL_TRACK_COLOR = '#20309e'
 const SCROLL_ARROW_IMAGE = 78
-
-/** gpoint 0~9 — "1" 만 4px */
-const gamePointGlyphsOf = (value: number) =>
-  [...String(Math.max(0, Math.trunc(value)))].map((digit) => ({ frame: Number(digit), width: digit === '1' ? 4 : 8 }))
 
 export interface SettlementBoardProps {
   readonly mode: number
@@ -66,7 +62,7 @@ export interface SettlementBoardProps {
  * **팀경기 정산 판** (그리기 0x4a384 의 그 밖 모드 갈래 · 키 0x407f0) — 좌표·흐름은 `lib/settlementBoard` 머리말.
  * 구름·구장 배경(+0x17e2)은 밑에 깔린 타석 캔버스가 그린다 — 이 판은 그 위 240×320 에 겹친다.
  * 점수판 틀 0x41440(장면, W/2 − 120, H/2 − 80) 은 `widgets/scoreboard-frame` 이 그린다.
- * ⚠️ 0x54a61 G 숫자의 둥근 판은 숫자만 둔다(홈런더비 결과와 같은 근사).
+ * G 숫자 0x54a61(둥근 판 · 동전 · "+" · 숫자)은 `widgets/screen-frame` 의 `GamePointBadge` 가 그린다.
  */
 export function SettlementBoard({
   mode, isWin, side0Score, side1Score, scoreboardSides, recordIds, gamePoints, heldGamePoints, versusWinBonus, onExit,
@@ -143,9 +139,9 @@ export function SettlementBoard({
               width: SETTLEMENT_INFO_BAR.imageWidth, height: SETTLEMENT_INFO_BAR.imageHeight }}
             onClick={() => act('판열기')} />
           {gamePoints > 0 && (
-            <SpriteNumber glyphs={gamePointGlyphsOf(gamePoints)}
-              right={SETTLEMENT_INFO_POINT.x + SETTLEMENT_INFO_POINT.width} boxTop={SETTLEMENT_INFO_POINT.y}
-              boxHeight={0x10} folder={GAME_POINT} glyphHeight={8} />
+            <GamePointBadge testId="정산-번-G" value={gamePoints} x={SETTLEMENT_INFO_POINT.x} y={SETTLEMENT_INFO_POINT.y}
+              width={SETTLEMENT_INFO_POINT.width} align={SETTLEMENT_INFO_POINT.align} plus={SETTLEMENT_INFO_POINT.plus}
+              plate={SETTLEMENT_INFO_POINT.plate} />
           )}
         </>
       ) : (
@@ -208,8 +204,9 @@ export function SettlementBoard({
                 <FrameSprite folder={IMG_TEXT_FRAMES} frame={row.label} origins={textOrigins} x={panel.pointLabelX} y={row.labelY} />
                 <FrameSprite folder={IMG_TEXT_FRAMES} frame={GP_LABEL_FRAME} origins={textOrigins} x={panel.pointGpX} y={row.labelY} />
                 {value !== undefined && (
-                  <SpriteNumber glyphs={gamePointGlyphsOf(value)} right={panel.pointValue.x + panel.pointValue.width}
-                    boxTop={row.valueY} boxHeight={panel.pointValue.height} folder={GAME_POINT} glyphHeight={8} />
+                  <GamePointBadge testId={`정산-${row.name}-G`} value={value} x={panel.pointValue.x} y={row.valueY}
+                    width={panel.pointValue.width} align={panel.pointValue.align} plus={row.plus}
+                    plate={panel.pointValue.plate} />
                 )}
               </div>
             )

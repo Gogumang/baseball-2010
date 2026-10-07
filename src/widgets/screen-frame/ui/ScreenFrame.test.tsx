@@ -59,3 +59,17 @@ describe('ScreenFrame 바닥비트', () => {
     expect([0, 8, 9, 17, 18].map(isGameSettingsMarkShown)).toEqual([true, true, false, false, true])
   })
 })
+
+describe('ScreenFrame 머리띠 G (0x54a60)', () => {
+  it('둥근 판 · 동전 (168, 머리띠y + 17) · 숫자 오른끝 168 + 0x41 + 2', () => {
+    const { container } = render(<ScreenFrame title="2010프로야구" gamePoint={30} onBack={null} slides={false} />)
+    const badge = screen.getByTestId('머리띠-G')
+    expect(badge.querySelector('[data-badge-plate]')?.children).toHaveLength(5)
+    const coin = badge.querySelector('[data-badge-coin]') as HTMLElement
+    expect(coin.style.left).toBe('168px')
+    const digits = [...badge.querySelectorAll('[data-badge-digit]')] as HTMLElement[]
+    expect(digits.map((node) => node.style.left)).toEqual(['217px', '226px'])
+    expect(container.querySelector('[data-badge-plus]')).toBeNull()
+  })
+})
+

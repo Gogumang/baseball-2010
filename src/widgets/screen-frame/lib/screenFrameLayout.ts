@@ -8,15 +8,13 @@ export const HEADER_CORNER_X = 135
 export const FOOTER_TILE_XS = [233, 226, 219, 212, 205, 198]
 export const FOOTER_CORNER_X = 182
 export const BACK_ICON_X = 206
-export const GAME_POINT_LEFT = 168
-/** 숫자 오른쪽 끝 = x0 + 67 */
-export const GAME_POINT_DIGITS_RIGHT = GAME_POINT_LEFT + 67
+/** 머리띠 G 숫자 0x54a60(skin, G, W − 72, 머리띠y + 0x12, 0x41, 0, 1, 1, 0, 1) (0x550e0~0x5510c) — `lib/gamePointBadge` */
+export const HEADER_GAME_POINT = { x: 240 - 72, dy: 0x12, width: 0x41, align: 1, plus: false, plate: true } as const
 export const FRAME_COLORS = {
   headerBand: ORIGINAL_COLORS.headerBand,
   headerLine: ORIGINAL_COLORS.headerLine,
   footerBand: ORIGINAL_COLORS.footerBand,
   footerLine: ORIGINAL_COLORS.footerLine,
-  pill: ORIGINAL_COLORS.panelDeep,
 }
 
 /** 머리띠 기준 Y (정착 −8) */
@@ -62,8 +60,6 @@ export const TITLE_IMAGES = {
 } as const
 export type ScreenFrameTitle = keyof typeof TITLE_IMAGES
 
-/** gpoint 숫자 그림 폭 — 1 만 4px, 나머지 8px (그림 크기) */
-export const gamePointDigitWidthOf = (digit: string) => (digit === '1' ? 4 : 8)
 
 /**
  * **바닥비트** (0x54d95 의 [sp+0x3c], 0x55220~0x554f4 — 직접 떴다). 비트 0 은 아무 데서도 안 본다.

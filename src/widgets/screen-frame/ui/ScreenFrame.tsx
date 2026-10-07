@@ -2,17 +2,15 @@ import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { FRAME_SLIDE_END, frameSlideOf } from '@/widgets/screen-frame/lib/frameSlide'
 import {
   BACK_ICON_X, FOOTER_BITS, FOOTER_CENTER_MARKS, FOOTER_CENTER_X, FOOTER_CORNER_X, FOOTER_LEFT_MARKS, FOOTER_LEFT_X,
-  FOOTER_TILE_XS, FRAME_COLORS, GAME_POINT_DIGITS_RIGHT, GAME_POINT_LEFT, HEADER_CORNER_X, HEADER_TILE_XS, TITLE_IMAGES,
-  footerBottomOf, footerMarkTopOf, gamePointDigitWidthOf, headerTopOf, isGameSettingsMarkShown,
+  FOOTER_TILE_XS, FRAME_COLORS, HEADER_CORNER_X, HEADER_GAME_POINT, HEADER_TILE_XS, TITLE_IMAGES,
+  footerBottomOf, footerMarkTopOf, headerTopOf, isGameSettingsMarkShown,
 } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLayout'
+import { GamePointBadge } from '@/widgets/screen-frame/ui/GamePointBadge'
 import * as styles from '@/widgets/screen-frame/ui/ScreenFrame.css'
-import { ORIGINAL_COLORS } from '@/shared/config/design'
 
 const frameImage = (index: number) => `./sprites/game_frame/${String(index).padStart(3, '0')}.png`
 const markImage = (frame: number) => `./sprites/game_frame/frames/${String(frame).padStart(3, '0')}.png`
-const pointImage = (index: number) => `./sprites/gpoint/${String(index).padStart(3, '0')}.png`
-const GAME_POINT_COIN = 11
 
 interface ScreenFrameProps {
   readonly title: ScreenFrameTitle
@@ -45,8 +43,6 @@ export function ScreenFrame({ title, gamePoint, onBack, footer = onBack === null
   const slide = slides ? frameSlideOf(updates) : FRAME_SLIDE_END
   const top = headerTopOf(slide)
   const bottom = footerBottomOf(slide)
-  const digits = [...String(gamePoint)]
-  let digitX = GAME_POINT_DIGITS_RIGHT - digits.reduce((total, digit) => total + gamePointDigitWidthOf(digit) + 1, 0)
 
   return (
     <>
@@ -55,20 +51,16 @@ export function ScreenFrame({ title, gamePoint, onBack, footer = onBack === null
         <rect x={0} y={top + 14} width={240} height={2} fill={FRAME_COLORS.headerLine} />
         <rect x={0} y={bottom - 5} width={240} height={5} fill={FRAME_COLORS.footerBand} />
         <rect x={0} y={bottom - 5} width={240} height={1} fill={FRAME_COLORS.footerLine} />
-        {/* G포인트 알약 (0x54a60) — (x0+9, y0+1, 60, 13) */}
-        <rect x={GAME_POINT_LEFT + 9} y={top + 19} width={60} height={13} rx={6} fill={FRAME_COLORS.pill} stroke={ORIGINAL_COLORS.black} />
       </svg>
       {HEADER_TILE_XS.map((x) => <img key={x} className={styles.layer} style={{ left: x, top: top + 11 }} src={frameImage(0)} alt="" />)}
       <img className={styles.layer} style={{ left: HEADER_CORNER_X, top: top + 11 }} src={frameImage(1)} alt="" />
       {TITLE_IMAGES[title].map((part) => (
         <img key={part.image} className={styles.layer} style={{ left: part.x, top: top + part.dy }} src={frameImage(part.image)} alt="" />
       ))}
-      <img className={styles.layer} style={{ left: GAME_POINT_LEFT, top: top + 17 }} src={pointImage(GAME_POINT_COIN)} alt="" />
-      {digits.map((digit, index) => {
-        const left = digitX
-        digitX += gamePointDigitWidthOf(digit) + 1
-        return <img key={index} className={styles.layer} style={{ left, top: top + 22 }} src={pointImage(Number(digit))} alt="" />
-      })}
+      {/* G포인트 0x54a60 — 둥근 판 (x+9, y+1, 60, 13) · 동전 (x, y−1) · 숫자 오른끝 x + 0x41 + 2 */}
+      <GamePointBadge testId="머리띠-G" value={gamePoint} x={HEADER_GAME_POINT.x} y={top + HEADER_GAME_POINT.dy}
+        width={HEADER_GAME_POINT.width} align={HEADER_GAME_POINT.align} plus={HEADER_GAME_POINT.plus}
+        plate={HEADER_GAME_POINT.plate} />
       {FOOTER_TILE_XS.map((x) => <img key={x} className={styles.layer} style={{ left: x, top: bottom - 20 }} src={frameImage(20)} alt="" />)}
       <img className={styles.layer} style={{ left: FOOTER_CORNER_X, top: bottom - 20 }} src={frameImage(19)} alt="" />
       {(footer & FOOTER_BITS.back) !== 0 && (onBack === null

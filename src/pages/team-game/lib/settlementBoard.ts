@@ -99,7 +99,9 @@ export const SETTLEMENT_INFO_BAR = {
 } as const
 
 /** 기본 화면의 이번에 번 G — 0x54a61(skin, 값, W/2 − 0x28, H − 12 − 0x13, 0x46, 0, …) */
-export const SETTLEMENT_INFO_POINT = { x: CENTER_X - 0x28, y: SCREEN_HEIGHT - 12 - 0x13, width: 0x46 } as const
+export const SETTLEMENT_INFO_POINT = {
+  x: CENTER_X - 0x28, y: SCREEN_HEIGHT - 12 - 0x13, width: 0x46, align: 2, plus: true, plate: true,
+} as const
 
 /** 대전모드(8·9) — 0x4aa88 `mode − 8 ≤ 1` */
 export const isVersusMode = (mode: number) => mode === 8 || mode === 9
@@ -133,12 +135,13 @@ export function settlementPanelLayoutOf(height: number, recordCount: number, has
   r7 += 0x5d
   const pointBox = { x: BOX_LEFT, y: r7, width: BOX_WIDTH, height: 0x2e }
   const pointRows = [
-    { label: 256, name: '획득', labelY: r7 + 8, valueY: r7 + 5 },
-    { label: 257, name: '보유', labelY: r7 + 0x1c, valueY: r7 + 0x19 },
+    { label: 256, name: '획득', labelY: r7 + 8, valueY: r7 + 5, plus: true },
+    { label: 257, name: '보유', labelY: r7 + 0x1c, valueY: r7 + 0x19, plus: false },
   ] as const
   const pointLabelX = BOX_LEFT + 0xf
   const pointGpX = BOX_LEFT + 0x2c
-  const pointValue = { x: BOX_LEFT + 0x46, width: 0x50, height: 0x10 }
+  // 0x54a61(skin, 값, x, y, 0x50, 0x10, 1, 1, 더하기, 0) — 획득은 "+" 를 붙이고 보유는 안 붙인다, 둥근 판 없음
+  const pointValue = { x: BOX_LEFT + 0x46, width: 0x50, height: 0x10, align: 1, plate: false }
   r7 += 0x32
   const rewardBox = hasRewardLine ? { x: BOX_LEFT, y: r7, width: BOX_WIDTH, height: 0x12 } : null
   const ticker = hasRewardLine ? { x: BOX_LEFT, y: r7 + 3, width: BOX_WIDTH, height: 18 } : null

@@ -42,6 +42,20 @@ describe('SettlementBoard — 정산 판 (0x4a384 · 키 0x407f0)', () => {
     expect(screen.getByTestId('점수판-로고-1').getAttribute('src')).toBe('./sprites/team_logo/007.png')
   })
 
+  it('G 숫자 0x54a61 — 기본 화면은 둥근 판 · "+" , 기록 판의 획득은 "+" · 보유는 숫자만', () => {
+    render(<SettlementBoard {...기본} onExit={vi.fn()} />)
+    const earned = screen.getByTestId('정산-번-G')
+    expect(earned.querySelector('[data-badge-plate]')).not.toBeNull()
+    expect(earned.querySelector('[data-badge-plus]')).not.toBeNull()
+
+    fireEvent.keyDown(window, { key: '0' })
+    expect(screen.getByTestId('정산-획득-G').querySelector('[data-badge-plus]')).not.toBeNull()
+    const held = screen.getByTestId('정산-보유-G')
+    expect(held.dataset.value).toBe('900')
+    expect(held.querySelector('[data-badge-plus]')).toBeNull()
+    expect(held.querySelector('[data-badge-plate]')).toBeNull()
+  })
+
   it('기록이 없으면 "기록이 없습니다!"', () => {
     render(<SettlementBoard {...기본} recordIds={[]} onExit={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: '0:INFO' }))
