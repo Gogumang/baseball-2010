@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   BALL_PATTERN_COLUMNS, BALL_PATTERN_PERIOD, BALL_PATTERN_ROWS, MAIN_TITLE_BACKDROP, ballPatternCounterAfter,
-  ballPatternTilesOf, mainTitleLineYs, nextBallPatternCounter,
+  ballPatternTilesOf, blurScreen565, mainTitleLineYs, nextBallPatternCounter, rgbOf565, rgbTo565, whitenStep3Of565,
 } from '@/pages/special/lib/skinBackdrops'
 import { GPOINT_ANIMATION } from '@/pages/special/ui/SkinBackdrops'
 
@@ -14,6 +14,35 @@ describe('메뉴 바탕 0x58371', () => {
     expect(ys).toHaveLength(107)
     expect(ys.slice(0, 3)).toEqual([0, 3, 6])
     expect(ys[ys.length - 1]).toBe(318)
+  })
+})
+
+describe('메뉴 바탕 16비트 연산 — 흐리기 0xbdc2c · 단계 덮기 0x9a628', () => {
+  it('565 ↔ 8비트는 비트 복제 — 에셋 값이 그대로 돈다', () => {
+    expect(rgbOf565(rgbTo565(82, 4, 99))).toEqual([82, 4, 99])
+    expect(rgbTo565(255, 255, 255)).toBe(0xffff)
+  })
+
+  it('흐리기 모드 1 — 가운데를 빼고 왼쪽·오른쪽·위·아래 넷의 평균, 제자리라 왼쪽·위는 이미 흐린 값', () => {
+    const white = 0xffff
+    const black = 0
+    // 3×3 에서 가운데 하나만 칠해진다 — 네 이웃이 흰·흰·흰·검정이면 3/4
+    const pixels = Uint16Array.from([white, white, white, white, black, black, white, black, black])
+    blurScreen565(pixels, 3, 3, 1)
+    const r = ((0xf8 * 2) >> 2) >> 3
+    expect(pixels[4]).toBe(rgbTo565(((0xf8 * 2) >> 2), ((0xfc * 2) >> 2), ((0xf8 * 2) >> 2)))
+    expect((pixels[4] >> 11) & 0x1f).toBe(r)
+    // 가장자리는 안쪽 값을 베낀다 — 줄 0 = 줄 1, 칸 0 = 칸 1
+    expect(pixels[1]).toBe(pixels[4])
+    expect(pixels[3]).toBe(pixels[4])
+  })
+
+  it('단계 3 은 색 몫 (3 + 1)/16 — 검정 위 흰색은 칸마다 7/31 · 15/63 (마스크로 낮은 비트를 버린다)', () => {
+    const covered = whitenStep3Of565(0, 0xffff)
+    expect([(covered >> 11) & 0x1f, (covered >> 5) & 0x3f, covered & 0x1f]).toEqual([7, 15, 7])
+    // 흰 위 흰색도 낮은 비트를 버려 29/31 · 61/63 으로 조금 어두워진다 (원본 그대로)
+    const white = whitenStep3Of565(0xffff, 0xffff)
+    expect([(white >> 11) & 0x1f, (white >> 5) & 0x3f, white & 0x1f]).toEqual([29, 61, 29])
   })
 })
 
