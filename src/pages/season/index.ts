@@ -35,6 +35,12 @@ export type { SeasonInfoScreenProps } from '@/pages/season/ui/SeasonInfoScreen'
 export { SEASON_INFO_MENU } from '@/widgets/season/lib/seasonInfoMenu'
 export type { SeasonInfoAction, SeasonInfoMenuEntry } from '@/widgets/season/lib/seasonInfoMenu'
 
+/** 시즌정보 칸 0 구단정보 0xd5 — 카드 0x7ba44 팀 갈래 + 정보 칸 0x7c450 */
+export { SeasonTeamInfoScreen } from '@/pages/season/ui/SeasonTeamInfoScreen'
+export type { SeasonTeamInfoScreenProps } from '@/pages/season/ui/SeasonTeamInfoScreen'
+export { seasonTeamInfoRowsOf, teamTypeFrameOf, stadiumLineOf } from '@/pages/season/lib/seasonTeamInfo'
+export type { TeamInfoRow, TeamInfoValue } from '@/pages/season/lib/seasonTeamInfo'
+
 /** 공용 선수 고르기 0xdf (목적 1·2) → 선수 카드 0xd9 ↔ 능력치 상세 창 0xda (글 0x897e8) */
 export { SeasonPlayerPickScreen } from '@/pages/season/ui/SeasonPlayerPickScreen'
 export type { SeasonPlayerPickScreenProps } from '@/pages/season/ui/SeasonPlayerPickScreen'

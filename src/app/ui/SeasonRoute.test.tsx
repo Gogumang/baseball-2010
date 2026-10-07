@@ -240,11 +240,20 @@ describe('시즌정보 0xcd → 선수정보(0xdf 목적 2) → 카드 0xd9 ↔ 
   }
   const 키 = (key: string) => fireEvent.keyDown(window, { key })
 
-  it('구단정보·아이템·기록순위는 웹에 화면이 없어 "아직 없음" 으로 막고 0xcd 에 남는다', () => {
-    띄우기()
+  it('구단정보 0xd5 — 일곱 줄을 띄우고 취소(0x4884)로 0xcd 에 돌아온다', () => {
+    띄우기({ coach: -1, regularSeasonFirsts: 2, games: 0 })
     fireEvent.click(screen.getByRole('button', { name: '구단정보' }))
-    expect(알림글()).toContain('상태 0xd5')
-    fireEvent.click(screen.getByRole('button', { name: 'OK' }))
+    expect(screen.getByRole('group', { name: '구단정보' })).toBeTruthy()
+    expect(screen.getByTestId('구단정보-값-0').textContent).toBe('테스터')
+    expect(screen.getByTestId('구단정보-값-1').textContent).toBe('----')
+    expect(screen.getByTestId('구단정보-값-5').textContent).toBe('2')
+    expect(screen.getByTestId('구단정보-값-6').textContent).toBe('--')
+    키('Escape')
+    expect(screen.getByRole('button', { name: '선수정보' })).toBeTruthy()
+  })
+
+  it('기록순위는 웹에 화면이 없어 "아직 없음" 으로 막고 0xcd 에 남는다', () => {
+    띄우기()
     fireEvent.click(screen.getByRole('button', { name: '기록순위' }))
     expect(알림글()).toContain('0xdb')
     fireEvent.click(screen.getByRole('button', { name: 'OK' }))

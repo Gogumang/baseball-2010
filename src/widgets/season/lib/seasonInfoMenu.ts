@@ -28,8 +28,9 @@ import type { SeasonSceneState } from '@/entities/season-mode/model/seasonStateM
  *         좌·우(−3·−4) · '4' · '6' → this+0x16c 뒤집기
  *         확인(−5 / '5') → 창 닫기 · 상태 0xdb          ; 기록 목록 (갱신 0x56fc · 키 0x74c4 → 0xcd)
  * ```
- * ⚠️ 미해결: 구단정보 0xd5(카드 0x7ba44 의 팀 도형 갈래 0x7bf9c + 0x7c450) · 아이템 0xd6(아이템 창 0x8453c) ·
- * 기록순위 창의 두 칸 그림과 0xdb 목록(0x5796c 계열)은 웹에 아직 없다. 칸을 고르면 부르는 쪽이 "아직 없음" 으로 막는다.
+ * 구단정보 0xd5 는 `pages/season/ui/SeasonTeamInfoScreen`(카드 0x7ba44 팀 갈래 0x7bf9c + 정보 칸 0x7c450).
+ * ⚠️ 미해결: 아이템 0xd6(아이템 창 0x8453c) · 기록순위 창의 두 칸 그림과 0xdb 목록(0x5796c 계열)은 웹에 아직 없다.
+ * 칸을 고르면 부르는 쪽이 "아직 없음" 으로 막는다.
  */
 
 /** 0x9008 의 칸 → 하는 일 */

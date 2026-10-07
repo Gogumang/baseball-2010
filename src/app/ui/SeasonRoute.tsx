@@ -9,6 +9,7 @@ import {
   seasonAwardRewardOf, seasonMvpResultEventId, seasonTitleResultEventId,
   SeasonMatchInfoScreen, seasonMatchInfoLines, DayResultBoardScreen,
   SeasonPlayerPickScreen, SeasonPlayerCardScreen, seasonCardAbilitiesOf, seasonPlayerDetailViewOf,
+  SeasonTeamInfoScreen, seasonTeamInfoRowsOf,
 } from '@/pages/season'
 import { fillModeText } from '@/widgets/season/lib/seasonText'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
@@ -587,7 +588,22 @@ export function SeasonRoute({
     )
   }
 
-  // 시즌정보 0xcd — 네 칸 하위 메뉴 (키 0x9008). 구단정보 0xd5 · 아이템 0xd6 · 기록순위 창(0x80 → 0xdb)은 웹에 아직 없다
+  // 구단정보 0xd5 (들어옴 0x5324 · 키 0x4884 취소 → 0xcd · 그림 0xae68)
+  if (scene === SEASON_SCENE_STATE.구단정보) {
+    const teamAbilities = state.teamAbilities[state.record.teamId] ?? []
+    return (
+      <SeasonTeamInfoScreen
+        teamId={state.record.teamId}
+        teamAbilities={teamAbilities}
+        // 순위 0xb7aa1(SR+0x80, 내 팀, 0) — 목표 ① 과 같은 함수·같은 인자
+        rows={seasonTeamInfoRowsOf({ record: state.record, teamAbilities, rank: goalInput.rank })}
+        gamePoint={session.gamePoints}
+        onBack={() => actions.goto(SEASON_SCENE_STATE.시즌정보)}
+      />
+    )
+  }
+
+  // 시즌정보 0xcd — 네 칸 하위 메뉴 (키 0x9008). 아이템 0xd6 · 기록순위 창(0x80 → 0xdb)은 웹에 아직 없다
   if (scene === SEASON_SCENE_STATE.시즌정보) {
     return (
       <SeasonInfoScreen
@@ -597,6 +613,7 @@ export function SeasonRoute({
         onCursorChange={(index) => actions.moveMenuCursor('seasonInfo', index)}
         onSelect={(entry) => {
           const { action } = entry
+          if (action.kind === '상태' && action.target === SEASON_SCENE_STATE.구단정보) return actions.goto(action.target)
           if (action.kind === '상태') return setMissingScreen(`시즌정보 ${entry.label} — 상태 0x${action.target.toString(16)}`)
           if (action.kind === '기록순위창') return setMissingScreen('시즌정보 기록순위 — 창 0x80 → 상태 0xdb')
           // 칸 2 — this+0x110 = 2 · 0xdf. 이전 상태가 0xcd 라 탭은 1(투수)
