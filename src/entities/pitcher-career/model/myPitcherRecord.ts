@@ -59,7 +59,7 @@ export function registeredMyPitcherOrderOf(role: PitcherRole): readonly number[]
 export interface MyPitcherDay {
   readonly dayCounter: number
   readonly role: PitcherRole
-  readonly isPostseason: boolean
+  readonly isNationalCup: boolean
 }
 
 /** `0x1b684` — 보직 2 가 아니면 내 투수 칸 k(마지막으로 찾은 줄)와 0 을 맞바꾼다 */
@@ -76,7 +76,7 @@ export function prepareMyPitcherOrder(order: readonly number[], day: MyPitcherDa
     mode: PITCHER_EDITION_MODE,
     dayCounter: day.dayCounter,
     role: day.role,
-    isPostseason: day.isPostseason,
+    isNationalCup: day.isNationalCup,
   })
   if (k === START_ASSIGNMENT.rotate) return advanceRotation(started)
   if (k === START_ASSIGNMENT.keep) return started

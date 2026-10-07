@@ -1,4 +1,4 @@
-import { opponentOf, rotateLeaguePitchers } from '@/entities/league/model/league'
+import { opponentOf, rotateLeaguePitchers, startPostseason } from '@/entities/league/model/league'
 import { describe, expect, it } from 'vitest'
 import {
   GAMES_PER_SEASON,
@@ -13,6 +13,7 @@ import {
   pitcherAbilityLimitsOf,
   pitcherFormOfCareer,
   pitcherSkillTableIdOf,
+  prepareMyPitcherMatch,
   seasonEarnedRunAverageOf,
   setPitcherSkillEquipped,
   startNextPitcherSeason,
@@ -302,5 +303,14 @@ describe('116 진입 경기 뒤 카운터 — 무력감 +0x1c7 · 먹튀 +0x1cd/
     expect(enterPitcherGameEvaluation(base)).toMatchObject({ highMoraleStreak: 1, moneyGrubberGames: 1, moneyGrubberPopularityGain: 3 })
     const 없음 = enterPitcherGameEvaluation({ ...base, skillIds: [], highMoraleStreak: 4, moneyGrubberGames: 2 })
     expect(없음).toMatchObject({ highMoraleStreak: 4, moneyGrubberGames: 0, moneyGrubberPopularityGain: 0 })
+  })
+})
+
+describe('0xa4f60 의 −2 는 국가대항전(S+0x12c)만 — 포스트시즌은 시리즈 날짜 g 로 맞바꾼다', () => {
+  it('선발 · 포스트시즌 시리즈 둘째 경기(g = 1) → 0↔1 맞바꿈이라 내가 0번이 아니다', () => {
+    const 선발 = createPitcherCareer('포스트')
+    const 시리즈 = { ...startPostseason([0, 1, 2, 3, 4, 5, 6, 7]), wins: [1, 0] as [number, number] }
+    const 준비 = prepareMyPitcherMatch({ ...선발, gamesPlayed: 45, postseason: 시리즈 })
+    expect(준비.positionCode).toBe(1)
   })
 })

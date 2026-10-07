@@ -1539,8 +1539,8 @@ export function usePitcherLeagueSession(
    * 대진 128 [다음] — 키 0x13da0 (팝업이 떠 있으면 키가 안 먹는다, 0x1d06a 의 0x754f9).
    * 끝났으면 [137] 우승 팀 발표(팝업 7) · 지금 라운드에 내 팀이 있으면 142 경기 준비(→ 144 → 경기 장면)
    * · 아니면 CPU 끼리 내 차례/끝까지 돌리고 128 에 머문다.
-   * 투수편 경기는 `isPostseason` 이라 0xa4f60 이 −2(그대로)를 돌려 **로스터 0번 = 내 투수가 늘 선발**이다 (P1 1-2) —
-   * 정규시즌처럼 짝수 날만이 아니다.
+   * 0xa4f60 의 −2(그대로)는 국가대항전(S+0x12c)일 때만이다 — 포스트시즌 경기도 시리즈 날짜 g 로 정규시즌처럼 맞바꾼다
+   * (g == 0 이면 0x1b684 로 내가 0번 · 그 뒤 k = ((g−1)%6)/2+1 — 선발은 시리즈 짝수 날 등판).
    */
   const pressPostseason = useCallback(() => {
     if (career === null || career.postseason === null || scene !== '포스트시즌' || postseasonPopup !== null) return

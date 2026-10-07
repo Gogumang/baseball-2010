@@ -250,11 +250,10 @@ function recordsAllowed(progress: PitcherGameProgress): boolean {
  *   - 정산 0xa8024 의 R+0x128 (0xa8f3c) · 레코드 +0x22 실점 (0xa8ef4) · +0x20 아웃 · +0x26 탈삼진 ([sp+0x38], 0xa8cb0·0xa8d00)
  * 웹 `seasonDelta` 의 아웃·탈삼진·실점은 이 R 칸에서 나오므로 함께 0 이 된다 (원본 +0x20·+0x26·+0x22 와 같다).
  *
- * ⚠️ 투수편 웹엔 국가대항전이 없어 포스트시즌만 본다. 또 웹은 45경기가 끝나면 곧장 시즌종료로 가서
- *    사람이 포스트시즌 경기를 던지지 않는다 — 지금은 닿지 않는 길이지만 원본대로 걸어 둔다.
+ * 포스트시즌(`isPostseason`)과 국가대항전(`isNationalCup`) 둘 다 본다.
  */
 function countsMyPitcherRecord(progress: PitcherGameProgress): boolean {
-  return !progress.options.isPostseason
+  return !progress.options.isPostseason && progress.options.isNationalCup !== true
 }
 
 export interface PitcherGameOptions {
@@ -268,7 +267,12 @@ export interface PitcherGameOptions {
   readonly positionCode: number
   /** 리그 날짜 카운터 g (`시즌+0xb2`) */
   readonly dayCounter: number
+  /** 포스트시즌 경기인가 (S+0xb4 = L+0x34) — 0xa56dc 기록 게이트가 본다 */
   readonly isPostseason: boolean
+  /**
+   * 국가대항전 경기인가 (S+0x12c = L+0xac) — 0xa56dc 기록 게이트와 0xa4f60 의 −2(맞바꿈 없음)가 본다. 안 넘기면 거짓
+   */
+  readonly isNationalCup?: boolean
   /** 투수 능력치 0~999 (제구·구속·변화·체력) */
   readonly stats: PitcherStats
   /** 체력 실효 능력치 — 스태미나 용량 X 의 바탕 (`0xb6415(P, 3, 1)`) */
@@ -547,7 +551,7 @@ export function startsToday(options: PitcherGameOptions): boolean {
     mode: PITCHER_EDITION_MODE,
     dayCounter: options.dayCounter,
     role: options.role,
-    isPostseason: options.isPostseason,
+    isNationalCup: options.isNationalCup === true,
   })
   // keep(−2) = 시즌 첫 경기·포스트시즌이라 맞바꿈이 없다 → 로스터 0번이 곧 내 투수다
   if (assignment === START_ASSIGNMENT.keep) return true
@@ -599,7 +603,7 @@ function rosterOurPitcherOrderOf(options: PitcherGameOptions): number[] {
     mode: PITCHER_EDITION_MODE,
     dayCounter: options.dayCounter,
     role: options.role,
-    isPostseason: options.isPostseason,
+    isNationalCup: options.isNationalCup === true,
   })
   if (options.role !== PITCHER_ROLE.starter) return [...rotatedPitcherSlots(options.dayCounter), MY_PITCHER_SLOT]
   const seasonStart = [

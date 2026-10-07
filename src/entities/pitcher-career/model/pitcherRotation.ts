@@ -76,7 +76,7 @@ export const SEASON_MODE = 2
 export const START_ASSIGNMENT = {
   /** -1 = 맞바꿈 없이 **보통 로테이션**을 돌린다 (구원·보직 1·투수편이 아님) */
   rotate: -1,
-  /** -2 = **아무것도 하지 않는다** (시즌 첫 경기 g==0, 포스트시즌) */
+  /** -2 = **아무것도 하지 않는다** (시즌 첫 경기 g==0, 국가대항전 S+0x12c) */
   keep: -2,
 } as const
 
@@ -87,23 +87,26 @@ export interface StartAssignmentInput {
   readonly dayCounter: number
   /** 내 투수 보직 (0xb6dec) */
   readonly role: PitcherRole
-  /** 포스트시즌 진행 중인가 (`S+0x12c`) */
-  readonly isPostseason: boolean
+  /**
+   * 국가대항전 진행 중인가 — `S+0x12c`(= L+0xac, a4f98). P1 1-2 가 "포스트시즌" 으로 읽었던 칸이다(P5 "0x12c 충돌 정리" 확정) —
+   * 포스트시즌(L+0x34 = S+0xb4)은 이 함수가 보지 않아 정규시즌처럼 맞바꾼다.
+   */
+  readonly isNationalCup: boolean
 }
 
 /**
  * `0xa4f60(S)` — 오늘 내 팀이 0번과 맞바꿀 로스터 칸 k.
  * 반환 ≥ 1 이면 맞바꿈, `START_ASSIGNMENT.rotate`(-1) 면 보통 로테이션, `keep`(-2) 면 그대로 둔다.
  *
- * 검사 순서도 원본 그대로다: 모드 → g==0 → 보직 2 → 보직 != 0 → 포스트시즌 → 식.
+ * 검사 순서도 원본 그대로다: 모드 → g==0 → 보직 2 → 보직 != 0 → 국가대항전(S+0x12c) → 식 (a4f60~a4fbe 직접 떴다).
  */
 export function startAssignmentOf(input: StartAssignmentInput): number {
-  const { mode, dayCounter, role, isPostseason } = input
+  const { mode, dayCounter, role, isNationalCup } = input
   if (mode !== PITCHER_EDITION_MODE) return START_ASSIGNMENT.rotate
   if (dayCounter === 0) return START_ASSIGNMENT.keep
   if (role === PITCHER_ROLE.relief) return START_ASSIGNMENT.rotate
   if (role !== PITCHER_ROLE.starter) return START_ASSIGNMENT.rotate
-  if (isPostseason) return START_ASSIGNMENT.keep
+  if (isNationalCup) return START_ASSIGNMENT.keep
   // k = ((g-1) % 6) / 2 + 1 → g 1,2 → 1 · 3,4 → 2 · 5,6 → 3 · 7,8 → 1 …
   return Math.trunc(((dayCounter - 1) % 6) / 2) + 1
 }
@@ -121,7 +124,7 @@ export interface PreGameRotationInput {
   readonly mode: number
   readonly dayCounter: number
   readonly role: PitcherRole
-  readonly isPostseason: boolean
+  readonly isNationalCup: boolean
 }
 
 export interface PreGameRotationPlan {
@@ -143,13 +146,13 @@ export interface PreGameRotationPlan {
  * 모드 3·4(사람이 뛰는 나만의리그) 기준이고, CPU 끼리의 경기는 `cpuGameRotationAdvances` 쪽이다.
  */
 export function preGameRotationPlanOf(input: PreGameRotationInput): PreGameRotationPlan {
-  const { mode, dayCounter, role, isPostseason } = input
+  const { mode, dayCounter, role, isNationalCup } = input
   const advanceOpponent = dayCounter !== 0
   if (mode !== PITCHER_EDITION_MODE) {
     // 모드 4(타자편): 내 팀도 그냥 한 칸 돈다
     return { advanceOpponent, advanceMine: dayCounter !== 0, swapSlot: 0, moveMineToStartSlot: false }
   }
-  const assignment = startAssignmentOf({ mode, dayCounter, role, isPostseason })
+  const assignment = startAssignmentOf({ mode, dayCounter, role, isNationalCup })
   return {
     advanceOpponent,
     advanceMine: assignment === START_ASSIGNMENT.rotate,

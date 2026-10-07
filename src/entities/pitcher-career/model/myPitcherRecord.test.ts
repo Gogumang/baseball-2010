@@ -32,7 +32,7 @@ describe('투수편 내 팀 투수 배열 — 등록 0x10fb4 · 0xb521c · 142 �
   })
 
   it('선발: 0xa4f60 의 k 로 맞바꿈이 영구로 쌓이고 두 날씩 되돌아온다', () => {
-    const day = (dayCounter: number) => ({ dayCounter, role: PITCHER_ROLE.starter, isPostseason: false })
+    const day = (dayCounter: number) => ({ dayCounter, role: PITCHER_ROLE.starter, isNationalCup: false })
     let order = registeredMyPitcherOrderOf(PITCHER_ROLE.starter)
     order = prepareMyPitcherOrder(order, day(0))
     expect(order[0]).toBe(나)
@@ -44,7 +44,7 @@ describe('투수편 내 팀 투수 배열 — 등록 0x10fb4 · 0xb521c · 142 �
   })
 
   it('구원: 0~3 이 포스트시즌에도 날마다 돌고(g ≠ 0) 내 칸 7 은 안 움직인다', () => {
-    const relief = { role: PITCHER_ROLE.relief, isPostseason: true }
+    const relief = { role: PITCHER_ROLE.relief, isNationalCup: true }
     let order = registeredMyPitcherOrderOf(PITCHER_ROLE.relief)
     order = prepareMyPitcherOrder(order, { ...relief, dayCounter: 0 })
     expect(order.slice(0, 4)).toEqual([0, 1, 2, 3])
@@ -54,7 +54,7 @@ describe('투수편 내 팀 투수 배열 — 등록 0x10fb4 · 0xb521c · 142 �
   })
 
   it('옛 저장(배열 없음)은 날짜 셈 — 오늘까지 밟으면 예전 웹 0번과 같다', () => {
-    const day = { dayCounter: 5, role: PITCHER_ROLE.relief, isPostseason: false }
+    const day = { dayCounter: 5, role: PITCHER_ROLE.relief, isNationalCup: false }
     expect(legacyMyPitcherOrderOf(day, true).slice(0, 4)).toEqual([1, 2, 3, 0])
     expect(legacyMyPitcherOrderOf(day, false).slice(0, 4)).toEqual([0, 1, 2, 3])
   })

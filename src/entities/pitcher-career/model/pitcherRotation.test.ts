@@ -43,7 +43,7 @@ describe('선발 등판 판정 0xa4f60', () => {
   const starter = {
     mode: PITCHER_EDITION_MODE,
     role: PITCHER_ROLE.starter,
-    isPostseason: false,
+    isNationalCup: false,
   } as const
 
   it('표 그대로 k 를 돌려준다 (g 1,2 → 1 · 3,4 → 2 · 5,6 → 3 · 7,8 → 1)', () => {
@@ -53,7 +53,7 @@ describe('선발 등판 판정 0xa4f60', () => {
 
   it('시즌 첫 경기(g=0)와 포스트시즌은 아무것도 하지 않는다', () => {
     expect(startAssignmentOf({ ...starter, dayCounter: 0 })).toBe(START_ASSIGNMENT.keep)
-    expect(startAssignmentOf({ ...starter, dayCounter: 4, isPostseason: true })).toBe(START_ASSIGNMENT.keep)
+    expect(startAssignmentOf({ ...starter, dayCounter: 4, isNationalCup: true })).toBe(START_ASSIGNMENT.keep)
   })
 
   it('구원과 보직 1 은 보통 로테이션만 돈다', () => {
@@ -81,7 +81,7 @@ describe('내 선발은 짝수 날마다 마운드에 선다 (StrHOWTO[11] "2경
         mode: PITCHER_EDITION_MODE,
         dayCounter,
         role: PITCHER_ROLE.starter,
-        isPostseason: false,
+        isNationalCup: false,
       })
       if (plan.advanceMine) roster = advanceRotation(roster)
       if (plan.swapSlot > 0) roster = swapWithStarter(roster, plan.swapSlot)
@@ -94,13 +94,13 @@ describe('내 선발은 짝수 날마다 마운드에 선다 (StrHOWTO[11] "2경
   })
 
   it('상대 팀은 첫 경기만 빼고 날마다 한 칸 돈다', () => {
-    const base = { mode: PITCHER_EDITION_MODE, role: PITCHER_ROLE.starter, isPostseason: false }
+    const base = { mode: PITCHER_EDITION_MODE, role: PITCHER_ROLE.starter, isNationalCup: false }
     expect(preGameRotationPlanOf({ ...base, dayCounter: 0 }).advanceOpponent).toBe(false)
     expect(preGameRotationPlanOf({ ...base, dayCounter: 1 }).advanceOpponent).toBe(true)
   })
 
   it('시즌 첫 경기에는 내 투수를 0번으로 끌어온다 — 구원이면 하지 않는다', () => {
-    const base = { mode: PITCHER_EDITION_MODE, dayCounter: 0, isPostseason: false }
+    const base = { mode: PITCHER_EDITION_MODE, dayCounter: 0, isNationalCup: false }
     expect(preGameRotationPlanOf({ ...base, role: PITCHER_ROLE.starter }).moveMineToStartSlot).toBe(true)
     expect(preGameRotationPlanOf({ ...base, role: PITCHER_ROLE.relief }).moveMineToStartSlot).toBe(false)
   })
@@ -110,7 +110,7 @@ describe('내 선발은 짝수 날마다 마운드에 선다 (StrHOWTO[11] "2경
       mode: BATTER_EDITION_MODE,
       dayCounter: 3,
       role: PITCHER_ROLE.starter,
-      isPostseason: false,
+      isNationalCup: false,
     })
     expect(plan).toMatchObject({ advanceMine: true, swapSlot: 0, moveMineToStartSlot: false })
   })

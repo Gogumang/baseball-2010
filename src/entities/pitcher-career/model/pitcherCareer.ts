@@ -863,9 +863,12 @@ export function applyPitcherLeagueDay(
   }
 }
 
-/** 오늘 경기 준비의 내 팀 몫 — 날짜 g · 보직 · 포스트시즌 */
+/**
+ * 오늘 경기 준비의 내 팀 몫 — 날짜 g · 보직. 0xa4f60 의 −2 는 국가대항전(S+0x12c)일 때만이라 리그 경기(포스트시즌 포함)는 거짓 —
+ * 국가대항전 경기는 대표팀 칸을 따로 준비한다(`pitcherCupTeams`).
+ */
 function myPitcherDayOf(career: PitcherCareer): MyPitcherDay {
-  return { dayCounter: leagueDayCounterOf(career), role: career.role, isPostseason: career.postseason !== null }
+  return { dayCounter: leagueDayCounterOf(career), role: career.role, isNationalCup: false }
 }
 
 /**
