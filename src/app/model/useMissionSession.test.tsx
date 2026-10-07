@@ -16,6 +16,7 @@ import { useAtBatRunner } from '@/app/model/useAtBatRunner'
 import type { Screen } from '@/app/model/screen'
 import { aceMatchMissionOf, EMPTY_STORY_CARRY } from '@/entities/story/model/aceMatch'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
+import { contactOfOutcome } from '@/entities/batting/model/battedContact'
 import type { MissionRecordPort } from '@/shared/api/save/missionRecordPort'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { MISSIONS } from '@/shared/config/original/missions'
@@ -194,9 +195,13 @@ function drawsOfOnePitch(missionId: number, gaugeCell = 9, gaugeSettingOn = true
   })
   const drawn = counter.drawn() - before
   const banner = rendered.result.current.runner.bannerText
+  // 이 공이 낸 타석 판정 — 타석 화면은 맞는 순간 결과 글자를 안 띄우므로(1e53a14) 글자 대신 판정 코드 · 쏜 패턴으로 가른다
+  const pending = rendered.result.current.session.pendingDefensePlay
+  const contact = pending === null ? undefined : contactOfOutcome(pending.outcome)
+  const result = `${banner}|${contact === undefined ? '판 없음' : `${contact.resultCode}:${contact.pattern.join(',')}`}`
   const maxGauges = rendered.result.current.session.pitcherRun?.perfectGauges ?? 0
   rendered.unmount()
-  return { drawn, banner, maxGauges }
+  return { drawn, banner, result, maxGauges }
 }
 
 describe('투수 미션 조준 흔들림 — 레코드 바이트 13 → 0x39c5c', () => {
@@ -247,15 +252,16 @@ describe('투수 미션 투구 게이지 — 누른 칸 g 를 그대로 받는�
    */
   it('게이지 칸이 달라져도 난수 차례는 같고, 게이지를 끄면 딱 한 번 더 뽑는다', () => {
     // 등급이 바뀌면 판정 값이 바뀌어 타구 결과(그 뒤 굴림 수)가 갈릴 수 있다 — 칸 9(t=5)는 비트7 투수 +100 ·
-    // 수비 사람 −10(모드 5, 16897fc)을 실은 뒤 아웃이 난다. 그래서 **같은 결과가 난 칸끼리** 굴림 수를 견준다
+    // 수비 사람 −10(모드 5, 16897fc)을 실은 뒤 다른 판정 코드(땅볼 쪽)가 난다. 다른 코드는 덱 · 특수 타구 표 굴림(514f2,
+    // 코드 25 · 26 만)이 달라 굴림 수가 갈린다. 그래서 **같은 판정 코드 · 같은 패턴이 난 칸끼리** 굴림 수를 견준다
     const 칸별 = [1, 5, 7, 8, 9, 0, 12].map((cell) => drawsOfOnePitch(1, cell))
     const 결과별 = new Map<string, Set<number>>()
-    for (const { banner, drawn } of 칸별) 결과별.set(banner, (결과별.get(banner) ?? new Set()).add(drawn))
-    for (const [banner, draws] of 결과별) {
-      expect(draws.size, `${banner} 칸마다 난수 차례가 다르다: ${[...draws].join(',')}`).toBe(1)
+    for (const { result, drawn } of 칸별) 결과별.set(result, (결과별.get(result) ?? new Set()).add(drawn))
+    for (const [result, draws] of 결과별) {
+      expect(draws.size, `${result} 칸마다 난수 차례가 다르다: ${[...draws].join(',')}`).toBe(1)
     }
     const 끔 = drawsOfOnePitch(1, 0, false)
-    const 같은결과 = 칸별.find((pitch) => pitch.banner === 끔.banner)
+    const 같은결과 = 칸별.find((pitch) => pitch.result === 끔.result)
     expect(같은결과).toBeDefined()
     expect(끔.drawn).toBe(같은결과!.drawn + 1)
   })
