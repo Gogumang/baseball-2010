@@ -1041,6 +1041,14 @@ describe('연초 115 (0x16aac) — 105 진입이 S+0x1b7 == 0 이면 내장 이�
     expect(rendered.result.current.screen).not.toEqual(expect.objectContaining({ context: '연초' }))
   })
 
+  it('새 선수는 오프닝 451 이 115 보다 먼저다 — 1cfa6 이 같은 틀에 115 예약을 덮는다(0x8bde0 모드 3·4 → 451)', async () => {
+    const rendered = 띄우기({ ...createCareer('신인'), seenEventIds: [], hasSeenYearGoalWindow: false })
+    const 세션 = () => rendered.result.current.session
+    await waitFor(() => expect(rendered.result.current.screen).toEqual({ kind: '이벤트', eventId: 451, context: '관리' }), { timeout: 5000 })
+    act(() => 세션().actions.completeScene([], [451]))
+    await waitFor(() => expect(rendered.result.current.screen).toEqual({ kind: '이벤트', eventId: NARI_YEAR_START_EVENT_ID, context: '연초' }))
+  })
+
   it('그 해 목표 창을 이미 봤으면 115 를 열지 않고 해제 기록도 그대로다', async () => {
     const rendered = 띄우기({ ...createCareer('연중'), season: 2, seenEventIds: ['451'], removedMinusSkillIds: [3], hasSeenYearGoalWindow: true })
     await waitFor(() => expect(rendered.result.current.session.storyEvents).not.toBeNull(), { timeout: 5000 })

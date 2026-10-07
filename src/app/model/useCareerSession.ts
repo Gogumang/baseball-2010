@@ -78,6 +78,7 @@ import {
   finishEvent,
   NARI_YEAR_START_EVENT,
   NARI_YEAR_START_EVENT_ID,
+  OPENING_EVENT_ID,
   placeTriggerOf,
 } from '@/entities/story/model/storyScene'
 import { selectShopItem } from '@/features/shop/model/shopSelection'
@@ -881,6 +882,18 @@ export function useCareerSession({
   useEffect(() => {
     if (managementCheck === null || screen.kind !== '관리' || career === null || story.events === null) return
     setManagementCheck(null)
+    /*
+     * **새 선수 오프닝 451 이 115 보다 먼저다** (모드 3·4 공용). 진입 0x11910 이 0x11bd6 에서 `0xbcb49(115)` 로 예약해도,
+     * 같은 틀에 상태 틀 0x1cdec 가 진입(점프표 0xcc728) 뒤 곧장 자동 발동 0x1cf9c 로 떨어지고, 거기 1cfa6 이
+     * 장면+0x165(새 선수 — 100 진입 끝 0x1c3be 가 이전 상태 104 면 켠다) ≠ 0 이면 `0x8bde0`(모드 2 → 400 · 3·4 → 451) ·
+     * `0xbcb49(105)` · `0xbcb49(114)` 로 예약을 덮는다(0xbcb48: +0xc = +8 ; +8 = s — 115 는 밀려 사라진다).
+     * 451 이 끝나 114 → 뒤 105 로 다시 들어오면 진입이 115 를 또 세운다 → **451 → 115**.
+     * 웹 타자편은 새 선수 플래그 대신 "451 을 안 봤다" 로 가른다(`scanEventFrom` 오프닝 갈래와 같은 잣대 · 굴림 없음).
+     */
+    if (!career.seenEventIds.includes(String(OPENING_EVENT_ID))) {
+      const opening = story.eventFor(career, EVENT_TRIGGER.관리, undefined)
+      if (opening !== null) return setScreen({ kind: '이벤트', eventId: opening.id, context: '관리' })
+    }
     /*
      * 105 진입 0x11910 곁가지(0x11b24~): S+0x1b7 == 0(올해 목표 창 아직 안 봄) → **115 연초** 가 138 보다 먼저다.
      * 115 진입 0x16aac: 내장 이벤트 0x8a681 → `[다음 114, 뒤 105]` → `0xa4ee9(S)` — 마이너스 스킬 해제 기록
