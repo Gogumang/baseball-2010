@@ -155,6 +155,8 @@ export function CareerRoutes({
           {...(career.lastGame === undefined ? {} : { recordLine: nariLastGameRecordLineOf(career.lastGame) })}
           career={career}
           onContinue={actions.confirmGameResult}
+          // 116(0x11e0c) → 114 평가 대화 0x8b5ac: 공 무늬 · 상태판([이벤트+0xb] = 1 — 0x8a71e) · 머리띠
+          underlay={<NariEventUnderlay career={career} isPreviousGame />}
         />
       )
 

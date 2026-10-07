@@ -52,6 +52,16 @@ const 그림찾기 = (container: HTMLElement, file: string) =>
   container.querySelector(`img[src$="${file}"]`) as HTMLElement | null
 
 describe('경기 결과 원본 배치', () => {
+  it('넘긴 밑그림(116 평가 대화의 상태판)을 맨 밑에 깐다', () => {
+    const { container } = render(
+      <GameResultScreen summary={요약()} gamePointReward={0} newTitles={[]} career={createCareer('선수')} onContinue={vi.fn()}
+        underlay={<div data-testid="밑그림" />} />,
+    )
+    const 밑그림 = screen.getByTestId('밑그림')
+    expect(밑그림.parentElement?.firstElementChild).toBe(밑그림)
+    expect(container.contains(밑그림)).toBe(true)
+  })
+
   it('띠는 (0,40) 240×30 이다', () => {
     const { container } = 띄우기()
     const band = container.querySelector(`div[style*="height: ${BAND.height}px"]`) as HTMLElement

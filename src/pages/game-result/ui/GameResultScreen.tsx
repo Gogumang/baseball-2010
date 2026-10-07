@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import {
   BigResult, Button, DialogueBox, MarkupText, Notice, Panel, PixelScreen, RawScreen, StatGrid, TitleTag,
 } from '@/shared/ui'
@@ -72,6 +73,11 @@ interface GameResultScreenProps {
   /** 평가가 반영된 뒤의 선수 — "현재 사기" 등을 보여준다 */
   readonly career: PlayerCareer
   readonly onContinue: () => void
+  /**
+   * 맨 밑에 까는 그림 — 나리 116 평가 대화(114 · 내장 이벤트 0x8a6fc)의 밑그림. 116 그림 0x11e0c 와 대화창 0x8b5ac 가
+   * 공 무늬 · 상태판 0x7d34c(gfx, [이벤트+0xb] = 1 — 메시지줄 경기 번호 −1) · 머리띠를 깐다. 부르는 쪽이 넘긴다.
+   */
+  readonly underlay?: ReactNode
 }
 
 /** StrUSER_EVT[75] "사기 변화: %d / 현재 사기: %d / … 평판" */
@@ -103,6 +109,7 @@ export function GameResultScreen({
   recordLine,
   career,
   onContinue,
+  underlay,
 }: GameResultScreenProps) {
   const [isDetailOpen, setIsDetailOpen] = useState(false)
   const { stats } = summary
@@ -189,6 +196,7 @@ export function GameResultScreen({
 
   return (
     <RawScreen>
+      {underlay}
       {/* 1. 패배(무승부 포함)면 화면 전체를 검정 단계 8 로 어둡게 (0x4a42a — 이기면 그대로) */}
       {summary.result !== '승' && (
         <div className={styles.loseDim} style={{ opacity: LOSE_DIM_OPACITY }} />
