@@ -289,3 +289,59 @@ describe('수비 장면 득점 점수판 0x41a64 — 실시간 갈래', () => {
     }
   })
 })
+
+describe('수비 장면 득점 점수판 0x41a64 — 판이 끝난 뒤 · 재생 갈래 홈런 갈래', () => {
+  const 측 = [{ team: 1, isComputer: true }, { team: 4, isComputer: false }] as const
+
+  it('실시간 갈래 — 플레이가 끝난 뒤 붙든 그림 위에는 판이 없다 (0x35108 이 타이머 0)', () => {
+    vi.useFakeTimers()
+    try {
+      const onDone = vi.fn()
+      const { queryByTestId } = render(
+        <DefensePlayback input={타구(단타, 주자3루)} onDone={onDone} holdUpdates={30}
+          runScoreBoard={{ sides: 측, scores: [2, 3], battingSide: 1 }} />,
+      )
+      const presence: boolean[] = []
+      for (let i = 0; i < 400 && onDone.mock.calls.length === 0; i += 1) {
+        act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
+        presence.push(queryByTestId('수비-득점판') !== null)
+      }
+      // 판은 섰다가(3루 주자 홈인) — 붙든 30 갱신 동안은 하나도 없다
+      expect(presence.some(Boolean)).toBe(true)
+      expect(presence.slice(-30).some(Boolean)).toBe(false)
+      expect(onDone).toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('재생 갈래 — 타자주자가 홈을 밟으면 판이 서고 공격 쪽 점수가 1점씩 올라간다 (마지막 틱 = 플레이 끝이면 내린다)', async () => {
+    const { homeRunPlaybackOf } = await import('@/features/defense-play/model/homeRunPlayback')
+    const 홈런 = homeRunPlaybackOf({ outcome: { kind: '홈런', bases: 4 } as AtBatOutcome, bases: 주자3루 })!
+    const last = 홈런.ticks[홈런.ticks.length - 1]!
+    // 원본 0x17 이 홈인 뒤에도 이어지는 경우를 흉내 낸다 — 마지막 그림을 60 틱 더 붙인다
+    const ticks = [...홈런.ticks, ...Array.from({ length: 60 }, () => last)]
+    vi.useFakeTimers()
+    try {
+      const onDone = vi.fn()
+      const { queryByTestId } = render(
+        <DefensePlayback ticks={ticks} onDone={onDone} holdUpdates={0}
+          runScoreBoard={{ sides: 측, scores: [0, 0], battingSide: 0 }} />,
+      )
+      const shown: string[] = []
+      for (let i = 0; i < 400 && onDone.mock.calls.length === 0; i += 1) {
+        act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
+        const board = queryByTestId('수비-득점판')
+        if (board !== null) shown.push(queryByTestId('수비-득점판-점수-0')?.dataset.value ?? '')
+      }
+      // 두 주자 — 타자주자 홈인에서 n = 2 · 간격 20 · 타이머 40: 0 → 1 → 2 로 오르고, 판은 끝 틱 앞에서 끊긴다
+      expect(shown[0]).toBe('0')
+      expect(shown).toContain('1')
+      expect(shown[shown.length - 1]).toBe('2')
+      // 21 + 20 + 20 번 — 붙인 60 틱과 홈인 틱 안에서 끝 틱(플레이 끝)은 그리지 않는다
+      expect(shown).toHaveLength(61)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})

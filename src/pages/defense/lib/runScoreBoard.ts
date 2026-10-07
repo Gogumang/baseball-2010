@@ -25,9 +25,20 @@
  * - 숫자 0x585ad: 폭 = Σ그림 폭 + 셋째 글자부터 간격, 정렬 2 → x −= 폭/2, 글자마다 폭 + 간격씩 나아간다
  *   (`widgets/matchup-cards` 의 `paddedNumberGlyphsOf` 와 같은 함수). num 이미지 0x46~0x4f 는 큰 파란 숫자(30×36 안팎).
  *
- * ⚠️ 미해결 — 홈런 갈래(0x52030~0x5206e · 0x41a9e~0x41b0e): 들어온 수 n 으로 간격 = min(40 / n, 20), 타이머 = 간격 × n,
- *    판을 세운 뒤 간격마다 1점씩 올려 보인다. 웹 홈런은 미리 계산한 비행 재생(`ticks`)이라 주자가 홈을 밟는 틱이 실려 오지
- *    않아 끼우지 않는다.
+ * ## 홈런 갈래 (0x357e0 참 = 결과 [+0xfd4] ∈ 0x18..0x1a 이고 [+0xfe7] == 0) — 직접 떴다
+ * ```
+ * 52030  메시지 0x13(주자 하나 홈인, 인자 = 주자 칸):  n = [+0x10fc] + 1 → [+0x10fc] · 간격 g = min(40 / n, 20) → [+0x1101]
+ *        주자 칸 == 0(타자주자) 이면  타이머 [+0x10f8] = g · n · [+0x1100] = 1
+ *        아니면                      타이머 = 0 · [+0x1100] = 0          ; 점수 +1 (0xa5c34) 은 갈래와 상관없이
+ * 41a9e  그리기:  [+0x1100] == 0 이면 안 그린다 · t < g·(n − 1) 이면 안 그린다
+ *        공격 쪽 점수 − n 으로 그린다 · t −= 1 · t < g·(n − 1) 이면 n −= 1, n < 0 이면 [+0x1100] = 0
+ * ```
+ * 곧 타자주자가 홈을 밟는 순간 판이 서고, g 번마다 1점씩 올라가 보이다가 다 오른 뒤 g 번 더 서 있다.
+ * [+0x10fc] 는 새 타석 0x48d50(48f7e)이 0 으로 비운다.
+ *
+ * ## 판이 끝난 뒤 — 상태 0x17 을 나가면 안 그린다
+ * 0x41a64 는 0x17 그리기 0x46c88 에서만 불리고(0x46e62), 0x17 끝 0x528b0 의 0x35108(3519c)이 타이머 [+0x10f8] = 0 으로 둔다.
+ * 웹 수비 재생은 플레이가 끝난 뒤 잠깐 마지막 그림을 붙들고 있다(웹 전용) — 그 동안은 판을 안 그린다.
  */
 
 /** 화면 240×320 — W · H */
@@ -121,4 +132,42 @@ export function runScoreBoardSourceOf<Side>(
     scores: game.playerSide === 0 ? [game.ourScore, game.opponentScore] : [game.opponentScore, game.ourScore],
     battingSide: game.half === '초' ? 0 : 1,
   }
+}
+
+/** 홈런 갈래의 칸 — [+0x10fc] 들어온 수 n · [+0x1101] 간격 g · [+0x10f8] 타이머 t · [+0x1100] 섰나 */
+export interface HomeRunScoreBoard {
+  readonly count: number
+  readonly gap: number
+  readonly timer: number
+  readonly active: boolean
+}
+
+/** 새 타석 0x48d50 이 비운 뒤 */
+export const EMPTY_HOME_RUN_SCORE_BOARD: HomeRunScoreBoard = { count: 0, gap: 0, timer: 0, active: false }
+
+/** 메시지 0x13 홈런 갈래 (0x52030~0x52072) — 주자 하나가 홈을 밟았다 */
+export function homeRunScoreBoardRunIn(board: HomeRunScoreBoard, isBatterRunner: boolean): HomeRunScoreBoard {
+  const count = board.count + 1
+  const gap = Math.min(Math.trunc(40 / count), RUN_SCORE_BOARD_TICKS)
+  return isBatterRunner ? { count, gap, timer: gap * count, active: true } : { count, gap, timer: 0, active: false }
+}
+
+/** 0x41a64 홈런 갈래 (0x41a9e~0x41b0e) — 그리기 한 번. `hiddenRuns` 는 공격 쪽 점수에서 뺄 수 */
+export function drawHomeRunScoreBoard(
+  board: HomeRunScoreBoard,
+): { readonly visible: boolean; readonly hiddenRuns: number; readonly next: HomeRunScoreBoard } {
+  if (!board.active || board.timer < board.gap * (board.count - 1)) return { visible: false, hiddenRuns: 0, next: board }
+  const timer = board.timer - 1
+  if (timer >= board.gap * (board.count - 1)) {
+    return { visible: true, hiddenRuns: board.count, next: { ...board, timer } }
+  }
+  const count = board.count - 1
+  return { visible: true, hiddenRuns: board.count, next: { ...board, timer, count, active: count >= 0 } }
+}
+
+/** 판에 보이는 두 점수 — 공격 쪽(st[9])에서 `hidden` 만큼 뺀다 */
+export function runScoreBoardHiddenScoresOf(
+  scores: readonly [number, number], battingSide: number, hidden: number,
+): readonly [number, number] {
+  return battingSide === 0 ? [scores[0] - hidden, scores[1]] : [scores[0], scores[1] - hidden]
 }

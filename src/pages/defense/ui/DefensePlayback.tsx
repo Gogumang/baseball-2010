@@ -18,7 +18,12 @@ import type {
 import { activeSound } from '@/shared/api/audio/soundPort'
 import { SLIDING_SOUND_EFFECT } from '@/entities/defense-controls/model/sliding'
 import type { ScoreboardSide } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
-import { RUN_SCORE_BOARD_TICKS, drawRunScoreBoard, runScoreBoardScoresOf } from '@/pages/defense/lib/runScoreBoard'
+import {
+  EMPTY_HOME_RUN_SCORE_BOARD, RUN_SCORE_BOARD_TICKS, drawHomeRunScoreBoard, drawRunScoreBoard, homeRunScoreBoardRunIn,
+  runScoreBoardHiddenScoresOf, runScoreBoardScoresOf,
+} from '@/pages/defense/lib/runScoreBoard'
+import type { HomeRunScoreBoard } from '@/pages/defense/lib/runScoreBoard'
+import { basePosition } from '@/entities/fielding/model/fieldGeometry'
 import { RunScoreBoard } from '@/pages/defense/ui/RunScoreBoard'
 
 /** 수비 장면 득점 점수판 0x41a64 의 재료 — 플레이가 시작될 때의 경기 (`lib/runScoreBoard`) */
@@ -59,7 +64,8 @@ interface DefensePlaybackProps {
   readonly grassPalette?: number | null
   /**
    * 수비 장면 득점 점수판 0x41a64 — 주면 실시간 갈래에서 1점마다 20번 세운다. 안 주면 안 그린다.
-   * 재생 갈래(`ticks`, 홈런 비행)는 홈런 갈래가 미해결이라 안 그린다.
+   * 재생 갈래(`ticks`)는 주자가 홈 자리에 닿은 틱을 메시지 0x13 으로 보고, 타자주자가 달리는 재생(홈런 비행)이면
+   * 홈런 갈래(간격 min(40/n, 20)로 1점씩), 아니면 보통 갈래로 센다 (`lib/runScoreBoard` 머리말).
    */
   readonly runScoreBoard?: RunScoreBoardSource
   readonly children?: React.ReactNode
@@ -117,6 +123,7 @@ export function DefensePlayback({
       onDone={onDone}
       holdUpdates={holdUpdates}
       grassPalette={grassPalette}
+      runScoreBoard={runScoreBoard}
     >
       {children}
     </RecordedPlayback>
@@ -128,7 +135,65 @@ interface RecordedPlaybackProps {
   readonly onDone: (result?: DefensePlayResult) => void
   readonly holdUpdates: number
   readonly grassPalette: number | null
+  readonly runScoreBoard?: RunScoreBoardSource
   readonly children?: React.ReactNode
+}
+
+/** 홈 자리 — 주자가 여기 닿은 틱이 메시지 0x13(주자 하나 홈인)이다 */
+const HOME_PLATE = basePosition(0)
+const isAtHome = (runner: { readonly x: number; readonly z: number }) =>
+  runner.x === HOME_PLATE.x && runner.z === HOME_PLATE.z
+
+/** 재생 갈래 득점 점수판의 셈 — 다음에 볼 틱 · 주자별 홈을 떠났나/밟았나 · 들어온 수 · 두 갈래 칸 */
+interface RecordedBoardTally {
+  readonly nextIndex: number
+  readonly leftHome: ReadonlySet<number>
+  readonly scored: ReadonlySet<number>
+  readonly runs: number
+  readonly timer: number
+  readonly homeRun: HomeRunScoreBoard
+}
+
+const EMPTY_RECORDED_TALLY: RecordedBoardTally = {
+  nextIndex: 0, leftHome: new Set(), scored: new Set(), runs: 0, timer: 0, homeRun: EMPTY_HOME_RUN_SCORE_BOARD,
+}
+
+/**
+ * 재생 틱 하나를 지난다 — 홈을 떠난 적 있는 주자(타자주자는 홈에서 출발한다)가 홈 자리에 닿으면 1점(메시지 0x13).
+ * 홈런 재생(타자주자가 달린다)은 홈런 갈래, 아니면 보통 갈래 타이머 20. 그 틱 그리기 한 번까지 돌린다.
+ */
+function stepRecordedBoard(
+  tally: RecordedBoardTally, view: DefenseViewState, isHomeRun: boolean,
+): { readonly tally: RecordedBoardTally; readonly visible: boolean; readonly hidden: number } {
+  const leftHome = new Set(tally.leftHome)
+  const scored = new Set(tally.scored)
+  let { runs, timer, homeRun } = tally
+  for (const runner of view.runners) {
+    if (scored.has(runner.index)) continue
+    if (!isAtHome(runner)) {
+      leftHome.add(runner.index)
+      continue
+    }
+    if (!leftHome.has(runner.index)) continue
+    scored.add(runner.index)
+    runs += 1
+    if (isHomeRun) homeRun = homeRunScoreBoardRunIn(homeRun, runner.index === 0)
+    else timer = RUN_SCORE_BOARD_TICKS
+  }
+  let visible: boolean
+  let hidden: number
+  if (isHomeRun) {
+    const drawn = drawHomeRunScoreBoard(homeRun)
+    homeRun = drawn.next
+    visible = drawn.visible
+    hidden = drawn.hiddenRuns
+  } else {
+    const drawn = drawRunScoreBoard(timer)
+    timer = drawn.timerAfter
+    visible = drawn.visible
+    hidden = drawn.previousScore ? 1 : 0
+  }
+  return { tally: { nextIndex: tally.nextIndex + 1, leftHome, scored, runs, timer, homeRun }, visible, hidden }
 }
 
 /**
@@ -140,20 +205,50 @@ interface RecordedPlaybackProps {
  * 펌블 동작(0xd)도 `fumbled` 칸도 실려 오지 않으므로 여기서는 알 길도 없다.
  * 두 갈래는 `input` 이 있으면 실시간, 없으면 재생으로 **서로 배타**라 겹쳐 울릴 일도 없다.
  */
-function RecordedPlayback({ ticks, onDone, holdUpdates, grassPalette, children }: RecordedPlaybackProps) {
+function RecordedPlayback({ ticks, onDone, holdUpdates, grassPalette, runScoreBoard, children }: RecordedPlaybackProps) {
   const update = useUpdateCounter(ticks.length > 0)
   const lastIndex = Math.max(0, ticks.length - 1)
   const index = Math.min(Math.floor(update / UPDATES_PER_TICK), lastIndex)
   const isFinished = ticks.length === 0 || update >= lastIndex * UPDATES_PER_TICK + holdUpdates
+  /** 득점 점수판 셈 — 틱을 한 번씩만 지나도록 ref 로 든다 (재생 묶음이 바뀌면 처음부터) */
+  const tallyRef = useRef<{ readonly ticks: readonly DefenseViewState[]; tally: RecordedBoardTally } | null>(null)
+  const boardRef = useRef<readonly [number, number] | null>(null)
 
   useEffect(() => {
     if (isFinished) onDone()
   }, [isFinished, onDone])
 
+  if (runScoreBoard !== undefined) {
+    if (tallyRef.current === null || tallyRef.current.ticks !== ticks) {
+      tallyRef.current = { ticks, tally: EMPTY_RECORDED_TALLY }
+      boardRef.current = null
+    }
+    // 타자주자(칸 0)가 달리는 재생 = 홈런 비행 — 웹 재생 갈래의 다른 판(견제·도루·폭투)은 타자주자를 안 싣는다
+    const isHomeRun = ticks[0]?.runners.some((runner) => runner.index === 0) === true
+    const holder = tallyRef.current
+    while (holder.tally.nextIndex <= index) {
+      const view = ticks[holder.tally.nextIndex]
+      if (view === undefined) break
+      const stepped = stepRecordedBoard(holder.tally, view, isHomeRun)
+      holder.tally = stepped.tally
+      const runs = stepped.tally.runs
+      const scores: readonly [number, number] = [
+        runScoreBoard.scores[0] + (runScoreBoard.battingSide === 0 ? runs : 0),
+        runScoreBoard.scores[1] + (runScoreBoard.battingSide === 1 ? runs : 0),
+      ]
+      boardRef.current = stepped.visible
+        ? runScoreBoardHiddenScoresOf(scores, runScoreBoard.battingSide, stepped.hidden)
+        : null
+    }
+  }
+
   const state = ticks[index]
   if (state === undefined) return null
+  // 마지막 틱 = 플레이 끝(0x17 을 나간다, 0x35108 이 타이머 0) — 그 뒤 붙든 그림 위에는 판이 없다
+  const board = index >= lastIndex ? null : boardRef.current
   return (
     <DefenseScreen state={state} grassPalette={grassPalette}>
+      {runScoreBoard !== undefined && board !== null && <RunScoreBoard sides={runScoreBoard.sides} scores={board} />}
       {children}
     </DefenseScreen>
   )
@@ -253,6 +348,11 @@ function LivePlayback({ input, side, onDone, holdUpdates, grassPalette, runScore
         board = drawn.visible
           ? { scores: runScoreBoardScoresOf(scores, runScoreBoard.battingSide, drawn.previousScore) }
           : null
+        // 플레이가 끝난 틱 — 0x17 끝 0x528b0 의 0x35108 이 타이머를 0 으로 두고 상태를 나간다. 그 뒤로는 그리지 않는다
+        if (isDefensePlayFinished(running)) {
+          runBoardTimerRef.current = 0
+          board = null
+        }
       }
       // 펌블 소리 53 — 진행기가 `state.fumbled` 를 세우는 **그 틱**에 낸다 (0xb41d0 굴림 → 동작 0xd).
       // 플레이 끝에 몰아서 내면 아웃 콜(0x51b36)을 덮는다 — 소리 통로가 하나뿐이기 때문이다.
@@ -284,7 +384,7 @@ function LivePlayback({ input, side, onDone, holdUpdates, grassPalette, runScore
   if (view === null) return null
   return (
     <DefenseScreen state={view} grassPalette={grassPalette}>
-      {runScoreBoard !== undefined && runBoard !== null && (
+      {runScoreBoard !== undefined && runBoard !== null && finishedAt === null && (
         <RunScoreBoard sides={runScoreBoard.sides} scores={runBoard.scores} />
       )}
       {children}
