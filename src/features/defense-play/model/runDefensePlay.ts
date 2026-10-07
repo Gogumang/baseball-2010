@@ -213,12 +213,9 @@ export interface DefensePlayInput {
    */
   readonly isUncatchable?: boolean
   /**
-   * **2스트라이크 번트 파울 아웃**(원본 판정 11)로 들어온 플레이인가 — 진행기는 이 칸을 보지 않는다.
-   *
-   * 원본은 판정 11 을 **수비 시뮬레이션 없이** 그 자리에서 내고 아웃 콜도 조건 없이 62 다
-   * (`0x51b20` → `0x51b2e movs r1,#0x3e`). 웹은 그 아웃을 `직선타아웃` 으로 옮겨 두어
-   * 수비 화면을 한 번 거치므로, 플레이가 끝나는 자리에서 콜을 고를 때
-   * (`play-at-bat/model/atBatSounds.inPlayCallSoundIdOf`) 이 표가 있어야 20 으로 새지 않는다.
+   * ⚠️ 옛 칸 — 진행기는 이 칸을 보지 않는다. 예전 웹은 2스트라이크 번트 파울(판정 11)을 판 없이 아웃으로 내고 이 표를 실었다.
+   * 원본은 그 공도 판을 돌아 낙구 · 담장선 틱의 0x9d5bc 가 11 을 낸다 — 지금은 파울 각 공 판(`strikes` · `buntKind`)이 그 코드를 내고
+   * 결과의 `DefensePlayResult.buntFoulOut` 이 콜 62 를 고정한다. 아무 타석도 이 칸을 더는 안 세운다.
    */
   readonly buntFoulOut?: boolean
   /**
@@ -436,6 +433,13 @@ export interface DefensePlayResult {
   readonly foulEnded?: boolean
   /** 파울 판이 닫힌 뒤의 스트라이크 수 — 0xb6b58 (`strikesAfterPlay`). 파울 판이 아니면 없다 */
   readonly foulStrikes?: number
+  /**
+   * **2스트라이크 번트 파울 아웃으로 닫힌 판인가** — 판 끝 결과 코드 11(0x9d5bc: 파울 각 · state[4] > 1 · 번트)이 선 판.
+   * vt44(11) → vt90 머리 b373a 가 타자주자(+0x98)를 끝내고(+0x96) state[6]++ 하며, 메시지 0xbba(11) → 0x51b20 이 아웃 사건
+   * 0xd(0xa7d0c)와 아웃 콜 62(조건 없음)를 낸다. 관문 b0db4 가 다음 틱에 닫고 0xae3e8 ae560 이 정산(0xd)한다 — `outcome` 은 아웃이다.
+   * 콜을 고르는 쪽(`atBatSounds.inPlayCallSoundIdOf` 의 `buntFoulOut`)이 62 로 고정한다.
+   */
+  readonly buntFoulOut?: boolean
   /**
    * **아웃 판정(0xb36d0)이 마지막으로 적은 아웃이 태그였나** — 원본 `state[0x87]`.
    *
@@ -2337,14 +2341,31 @@ export function stepDefensePlay(
       // 13 → 0x51b36 … 0x51bf2 → 0xa7d0c 사건 0xd. 판 끝 정산 0xa8024 가 이 사건들로 타자 결과를 낸다(`playOutcome`)
       if (resultCode === 6 || resultCode === 10) hitEvent = true
       if (resultCode === 8 || resultCode === 12) homeRunEvent = true
-      if (resultCode === 13) outEvents += 1
+      // 11 도 메시지 0xbba → 표 0xd0488[10] = 0x51b20 이 0xa7d0c(사건 0xd)를 부른다 (2스트라이크 번트 파울 아웃)
+      if (resultCode === 13 || resultCode === BUNT_FOUL_OUT_RESULT_CODE) outEvents += 1
       const effect = eventCodeEffectOf(resultCode)
       if (effect.foulFlag) foulFlag = true
       if (effect.homeRunFlag) homeRunFlag = true
       if (effect.groundRuleFlag) groundRuleFlag = true
       if (effect.poleHomeRunFlag) play = { ...play, suppressed: true }
       if (effect.playKind >= 0) play = { ...play, kind: effect.playKind }
-      if (effect.judgeOut) runOutJudgement()
+      if (effect.judgeOut) {
+        // b2c18 vt90 = 0xb36d0 — 종류 마스크(b36e8) 뒤 b3728~b375a: state[0xb] == 11 이고 주자 0 이 이번 타자(+0x98)면
+        // +0x96 = 1 · state[6]++ (2스트라이크 번트 파울 아웃). 그 뒤 보통 판정을 그대로 돈다
+        const batterRunner = runners[0]
+        if (
+          resultCode === BUNT_FOUL_OUT_RESULT_CODE &&
+          batterRunner !== undefined &&
+          batterRunner.state.isBatterRunner &&
+          !batterRunner.state.isOut
+        ) {
+          markOut(batterRunner)
+          outs += 1
+          outsAdded += 1
+          log.push(`${tick}틱 타자주자 아웃 — 2스트라이크 번트 파울 (0xb36d0 b373a)`)
+        }
+        runOutJudgement()
+      }
     }
     // 0x51d40 — 결과 코드 9·13 일 때만 `아웃 ≤ 2` 면 +0x128 = 1 · 0xafa60 한 번
     if ((resultCode === 9 || resultCode === 13) && outs <= 2 && !play.finished && !uncatchable) {
@@ -2492,6 +2513,7 @@ export function defensePlayResultOf(state: DefensePlayState): DefensePlayResult 
           outsAdded: state.outsAdded,
         },
     ...(foulEnded ? { foulEnded: true, foulStrikes: strikesAfterPlay(state.input.strikes ?? 0, FOUL_RESULT_CODE) } : {}),
+    ...(state.lastEventCode === BUNT_FOUL_OUT_RESULT_CODE ? { buntFoulOut: true } : {}),
     ticks: state.ticks,
     catchFielderSlot: state.chaserSlot,
     catchTick: state.catchTick,
@@ -2573,6 +2595,8 @@ export function recordedOutcomeOf(input: DefensePlayInput, result: DefensePlayRe
 
 /** 판 끝 결과 코드 7 — 파울 (0x9d5bc 의 0xb68dc 갈래) */
 const FOUL_RESULT_CODE = 7
+/** 판 끝 결과 코드 11 — 2스트라이크 번트 파울 아웃 (0x9d5bc 9d5fa) */
+const BUNT_FOUL_OUT_RESULT_CODE = 11
 
 /** 예보 표가 비었을 때의 가장 이른 포구 틱 (플레이 +0x11c 초기값 0xffff — `forecastCatch`) */
 const NO_FORECAST_CATCH = 0xffff

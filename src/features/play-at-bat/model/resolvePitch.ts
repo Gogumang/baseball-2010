@@ -7,7 +7,6 @@ import { hitDirectionOf } from '@/entities/batting/model/hitDirection'
 import { contactOfPattern, drawPattern, launchPatternOf } from '@/entities/batting/model/battedBallOutcome'
 import { provisionalOutcomeOf, registerContact, type BattedContact } from '@/entities/batting/model/battedContact'
 import { contactSoundIdOf } from '@/features/play-at-bat/model/atBatSounds'
-import { rollSpecialSwing } from '@/entities/batting/model/specialSwing'
 import type { PatternDeck } from '@/entities/batting/model/battedBallOutcome'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 import { isInsideStrikeZone } from '@/shared/lib/geometry/coordinate'
@@ -68,8 +67,8 @@ export interface PitchOutcomeDetail {
   /** 번트 성공 타구인지. 미션 목표 판정에 쓴다 */
   readonly isBunt: boolean
   /**
-   * **2스트라이크 번트 파울 아웃**(원본 판정 11, 0x9d5e2~0x9d600)인가.
-   * 아웃 콜을 조건 없이 **62** 로 내기 위한 표다 (`atBatSounds.inPlayCallSoundIdOf`).
+   * ⚠️ 옛 칸 — 이제 서지 않는다. 2스트라이크 번트 파울(원본 판정 11, 0x9d5e2~0x9d600)도 판을 도는 파울 각 공(`foulContact`)이라
+   * 판 끝 결과 코드가 11 을 내고 판 결과(`DefensePlayResult.buntFoulOut`)가 아웃 콜 62 를 고정한다.
    */
   readonly isBuntFoulOut?: boolean
   /** 방향까지 붙인 원본 결과 코드. 스윙하지 않았으면 null */
@@ -260,17 +259,12 @@ export function resolvePitch(
     buntKind: swing.buntKind,
   })
   // 필살 성공 굴림 0x34c74 → 0x517e6 — 맞은 공(0xfd2 ≠ 0)이면 어느 갈래든 0x517c8 로 모인다. 원본 차례는 메시지 0x11
-  // (0x515c6 → 0x50faa: 필살수비 굴림 · 표시 패턴 · 쏘기의 폴 굴림) **뒤**라, 판을 도는 페어 타구 · 파울 각 공은 굴림 재료만
-  // 쏜 공에 실어 보내고 수비 판 시작(`startDefensePlay`)이 그 차례에 굴린다. ⚠️ 판정 11(2스트라이크 번트 파울)만 웹이 아직
-  // 판을 안 돌려(원본은 이 공도 판을 돌아 0x9d5bc 가 11 을 낸다) 여기서 굴린다 — 그 공의 필살수비 · 폴 굴림도 없다(미해결)
+  // (0x515c6 → 0x50faa: 필살수비 굴림 · 표시 패턴 · 쏘기의 폴 굴림) **뒤**라, 맞은 공은 모두(페어 타구 · 파울 각 공 · 2스트라이크
+  // 번트 파울) 굴림 재료만 쏜 공에 실어 보내고 수비 판 시작(`startDefensePlay`)이 그 차례에 굴린다 — 여기서는 굴리지 않는다
   const specialSwing =
     swing.isSpecial === true
       ? { number: context.specialSwing?.number ?? 0, isAceBatter: context.specialSwing?.isAceBatter === true }
       : undefined
-  const isUncatchable =
-    contact.kind === '번트파울아웃' &&
-    specialSwing !== undefined &&
-    rollSpecialSwing(specialSwing.number, random, specialSwing.isAceBatter)
   // 타격음 7·9·5·59·6 — 쏜 패턴의 각·세기·높이로 고른다 (0x515de~0x5164a — 0x514f2 의 특수 표 덮어쓰기 뒤)
   const contactSoundId = contactSoundIdOf({
     hasSwung: true,
@@ -279,49 +273,39 @@ export function resolvePitch(
     resultCode: code,
     pattern,
   })
-  const detail: PitchOutcomeDetail =
-    contact.kind === '파울'
-      ? {
-          resolution: { kind: '파울' },
-          hasSwung: true,
-          isBunt: false,
-          resultCode: code,
-          pattern,
-          // 파울 각이라도 판을 돈다 — 부르는 쪽이 이 쏜 공으로 판을 돌린다(필살타법 굴림까지 판 시작에 맡긴다)
-          foulContact: { pattern, resultCode: code, ...(specialSwing === undefined ? {} : { specialSwing }) },
-          contactSoundId,
-        }
-      : contact.kind === '번트파울아웃'
-        ? {
-            // 판정 11 — 판 없이 아웃이다. 아웃 콜은 조건 없이 62 (0x51b20 → 0x51b2e)
-            resolution: { kind: '타구', outcome: registerContact(BUNT_FOUL_OUT, null) },
-            hasSwung: true,
-            isBunt: false,
-            isBuntFoulOut: true,
-            resultCode: code,
+  // 2스트라이크 번트 파울(판정 11)도 파울 각 공이다 — 원본은 이 공도 판(상태 0x17)을 돌아 낙구 · 담장선 틱의 0x9d5bc 가
+  // (state[4] > 1 && 번트) 로 11 을 낸다(9d5e2~9d600). 판 시작 · 판 끝은 부르는 쪽이 이 공 앞의 스트라이크 · 번트 종류를 실어 돌린다.
+  // 낙구 전에 잡히면 다른 파울처럼 뜬공 아웃(13)이다
+  const isFoulAngle = contact.kind === '파울' || contact.kind === '번트파울아웃'
+  const detail: PitchOutcomeDetail = isFoulAngle
+    ? {
+        resolution: { kind: '파울' },
+        hasSwung: true,
+        isBunt: false,
+        resultCode: code,
+        pattern,
+        // 파울 각이라도 판을 돈다 — 부르는 쪽이 이 쏜 공으로 판을 돌린다(필살타법 굴림까지 판 시작에 맡긴다)
+        foulContact: { pattern, resultCode: code, ...(specialSwing === undefined ? {} : { specialSwing }) },
+        contactSoundId,
+      }
+    : {
+        // 페어 타구 — 결과는 수비 판이 낸다. 타석에 싣는 결과는 **타석을 끝내기 위한 임시 값**이고(`provisionalOutcomeOf`),
+        // 쏜 패턴은 그 결과 객체에 묶어 둔다(`contactOfOutcome`) — 경기 진행기가 그 패턴으로 판을 돌린다
+        resolution: {
+          kind: '타구',
+          outcome: registerContact(provisionalOutcomeOf(pattern), {
             pattern,
-            contactSoundId,
-          }
-        : {
-            // 페어 타구 — 결과는 수비 판이 낸다. 타석에 싣는 결과는 **타석을 끝내기 위한 임시 값**이고(`provisionalOutcomeOf`),
-            // 쏜 패턴은 그 결과 객체에 묶어 둔다(`contactOfOutcome`) — 경기 진행기가 그 패턴으로 판을 돌린다
-            resolution: {
-              kind: '타구',
-              outcome: registerContact(provisionalOutcomeOf(pattern), {
-                pattern,
-                resultCode: code,
-                ...(specialSwing === undefined ? {} : { specialSwing }),
-              }),
-            },
-            hasSwung: true,
-            isBunt: contact.isBunt,
-            isBuntFoulOut: false,
             resultCode: code,
-            pattern,
-            contactSoundId,
-          }
-  return { detail, deck: drawn.deck, isUncatchable }
+            ...(specialSwing === undefined ? {} : { specialSwing }),
+          }),
+        },
+        hasSwung: true,
+        isBunt: contact.kind === '타구' && contact.isBunt,
+        isBuntFoulOut: false,
+        resultCode: code,
+        pattern,
+        contactSoundId,
+      }
+  return { detail, deck: drawn.deck, isUncatchable: false }
 }
 
-/** 판정 11 의 아웃 — 원본은 뜬공·땅볼을 가르지 않는다. 웹 갈래 중 진루를 안 시키는 `직선타아웃` 을 쓴다 */
-const BUNT_FOUL_OUT = { kind: '아웃', detail: '직선타아웃' } as const

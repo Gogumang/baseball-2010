@@ -336,8 +336,8 @@ export function useTeamGame(
             }),
             inPlayCallSoundIdOf(pending.outcome, {
               ...played,
-              // 진행기 입력에 실어 온 판정 11 표 — 아웃 콜을 조건 없이 62 로 만든다
-              buntFoulOut: pending.input.buntFoulOut,
+              // 판정 11(2스트라이크 번트 파울) — 판 끝 결과 코드가 낸다(`played.buntFoulOut`). 아웃 콜은 조건 없이 62 (0x51b20)
+              buntFoulOut: pending.input.buntFoulOut === true || played.buntFoulOut === true,
             }),
           ],
         )

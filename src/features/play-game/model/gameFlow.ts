@@ -580,8 +580,8 @@ export interface PlayerOutcomeOptions {
   readonly pattern?: BattedBallPattern
   readonly isUncatchable?: boolean
   /**
-   * **2스트라이크 번트 파울 아웃**(원본 판정 11)인가 — 아웃 콜을 조건 없이 62 로 내기 위한 표다.
-   * `resolvePitch` 의 `PitchOutcomeDetail.isBuntFoulOut` 이 그대로 들어온다.
+   * ⚠️ 옛 칸 — 2스트라이크 번트 파울(원본 판정 11)을 판 없이 아웃으로 넣던 표. 이제 타석이 이 공을 파울 각 공 판
+   * (`startPlayerFoulPlay` — 판 끝 결과 코드 11)으로 보내 `resolvePitch` 가 `isBuntFoulOut` 을 안 세운다.
    */
   readonly buntFoulOut?: boolean
   /**
@@ -669,8 +669,7 @@ export function startPlayerOutcome(
   }
   // 페어 타구면 쏜 패턴이 따라온다 — 넘겨받았거나(`options.pattern`) 타석 결과 객체에 묶여 있다(`contactOfOutcome`)
   const pattern = options.pattern ?? contactOfOutcome(outcome)?.pattern
-  // 판정 11(2스트라이크 번트 파울 아웃)은 판 없이 아웃이다 — 원본은 파울 판이 닫힌 뒤 0xae3e8 이 state[0xb] == 11 로
-  // 정산한다(주자는 판 앞 자리 그대로). 웹 `직선타아웃` 갈래는 진루를 시키지 않는다
+  // ⚠️ 옛 길: `buntFoulOut` 이 서면 판 없이 아웃이다 — 실제 타석의 판정 11 은 이제 파울 각 공 판(`startPlayerFoulPlay`)이 낸다
   if (options.buntFoulOut !== true && isBattedBallKind(outcome) && pattern !== undefined) {
     return {
       ...withoutSteal(progress),

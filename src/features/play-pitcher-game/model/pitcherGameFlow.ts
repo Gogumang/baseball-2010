@@ -1082,6 +1082,8 @@ export function startPitch(
         ...defensePlayInputOf(afterPitch, registerContact(FOUL_PLAY_OUTCOME, foulContact), random),
         // 판 끝 결과 코드 11(2스트라이크 번트 파울) · 판 뒤 스트라이크(0xb6b58)가 이 공 앞의 스트라이크를 본다
         strikes: progress.atBat.strikes,
+        // 장면 +0xfdc — CPU 타자의 번트 종류. 11 은 번트(state[0x13])일 때만 난다
+        buntKind: thrown.buntKind ?? 0,
       }),
     }
   }

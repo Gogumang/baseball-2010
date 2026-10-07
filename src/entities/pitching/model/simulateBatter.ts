@@ -251,6 +251,12 @@ export interface CpuPitchOutcome {
    * 판이 파울로 닫히면(`DefensePlayResult.foulEnded`) 그제야 스트라이크를 올린다(0x35108 → 0xb6b58).
    */
   readonly foulContact?: BattedContact
+  /**
+   * 이 공의 번트 종류 장면 +0xfdc (0 스윙 · 1~3 번트 — `cpuBuntKindOf`). 판을 도는 파울 각 공(`foulContact`)에만 싣는다 —
+   * 판 끝 결과 코드 0x9d5bc 가 state[4] > 1 이고 번트(state[0x13])면 11(2스트라이크 번트 파울 아웃)을 내고, 판 시작 리드(0x3d7b8)가
+   * +3 틱 · 필살수비 관문(50fc8)이 굴림 없음으로 본다.
+   */
+  readonly buntKind?: number
 }
 
 /** 스윙 프레임 F = N − 2 + d — d = 0 이 타이밍 100 이다 (0x34be0) */
@@ -436,14 +442,16 @@ export function pitchAgainstBatterDetailed(
   // 2스트라이크 번트 파울은 아웃 (0x9d5e2) — 사람 타석(resolvePitch)과 같은 판정이다
   const contact = contactOfPattern(code, pattern, { strikes: situation.strikes, buntKind })
   // 0x517e6 — 메시지 0x11(필살수비 · 표시 패턴 · 폴 굴림) 뒤. 마타자는 0x34c74 가 번호와 무관하게 30%.
-  // 판을 도는 페어 타구는 재료만 쏜 공에 실어 수비 판 시작(`startDefensePlay`)이 그 차례에 굴린다 — 판을 아직 안 도는
-  // 파울 · 판정 11 만 여기서 굴린다(사람 타석 `resolvePitch` 와 같다, 미해결)
+  // 판을 도는 공은 재료만 쏜 공에 실어 수비 판 시작(`startDefensePlay`)이 그 차례에 굴린다 — 판을 안 도는
+  // 옛 호출(`playsFoulBall` 없음)의 파울 · 판정 11 만 여기서 굴린다
   const specialSwing = isSpecialSwing ? { number: specialNumber, isAceBatter: true } : undefined
-  if (contact.kind === '파울' && traits.playsFoulBall === true) {
-    // 파울 각이라도 판을 돈다 — 필살타법 굴림까지 판 시작(메시지 0x11 뒤 517e6)에 맡긴다
+  if ((contact.kind === '파울' || contact.kind === '번트파울아웃') && traits.playsFoulBall === true) {
+    // 파울 각이라도 판을 돈다 — 필살타법 굴림까지 판 시작(메시지 0x11 뒤 517e6)에 맡긴다. 2스트라이크 번트 파울(판정 11)도
+    // 같은 판이다 — 판 끝 결과 코드 0x9d5bc 가 이 공 앞 스트라이크 · 번트 종류로 11 을 낸다(9d5e2~9d600)
     return {
       ...swung({ kind: '파울' }, false),
       foulContact: { pattern, resultCode: code, ...(specialSwing === undefined ? {} : { specialSwing }) },
+      buntKind,
     }
   }
   const isUncatchable = contact.kind !== '타구' && isSpecialSwing && rollSpecialSwing(specialNumber, random, true)

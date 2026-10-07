@@ -225,7 +225,7 @@ export interface DefenseCallContext {
   readonly throwArrivalTick?: number
   /**
    * **2스트라이크 번트 파울 아웃**(원본 판정 v11)인가 — 서 있으면 두 칸을 보지 않고 곧장 62 다.
-   * `features/defense-play` 의 `DefensePlayInput.buntFoulOut` 이 그대로 들어온다.
+   * 판 끝 결과 코드 11 로 닫힌 판의 `DefensePlayResult.buntFoulOut` 이 그대로 들어온다(메시지 0xbba(11) → 0x51b20).
    */
   readonly buntFoulOut?: boolean
   /**
@@ -279,8 +279,8 @@ const SAFE_CALL = 17
  *   **2 이면서 야수 +0x3b**(루에 닿아 있음, 0xb4312) 일 때 선다.
  *
  * → **62 = 잡아서·태그해서 낸 아웃**, **20 = 루에서 잡은 포스 아웃**.
- * (v11 = 2스트라이크 번트 파울 아웃도 62 다 — 이제 `DefenseCallContext.buntFoulOut` 으로 이었다.
- * 원본은 그 아웃을 수비 시뮬레이션 없이 내므로 **두 칸을 아예 보지 않는다**.)
+ * (v11 = 2스트라이크 번트 파울 아웃도 62 다 — `DefenseCallContext.buntFoulOut` 으로 이었다.
+ * 0x51b20 은 판 끝 결과 코드 11 의 갈래라 **두 칸을 아예 보지 않는다**.)
  *
  * ⚠️ `docs/re/L-sound-effects.md` 가 적던 "특수 모드" 는 오독이다. `0x1552d0c` 는 모드 플래그가
  * 아니라 **경기 상태 구조체 포인터**고, 두 칸은 이번 플레이의 아웃 종류다. 그 문서도 같이 고쳤다.

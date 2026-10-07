@@ -1921,8 +1921,8 @@ export interface BatterOutcomeOptions {
   readonly pattern?: BattedBallPattern
   readonly isUncatchable?: boolean
   /**
-   * **2스트라이크 번트 파울 아웃**(원본 판정 11)인가 — 아웃 콜을 조건 없이 62 로 내기 위한 표다.
-   * `resolvePitch` 의 `PitchOutcomeDetail.isBuntFoulOut` 이 그대로 들어온다.
+   * ⚠️ 옛 칸 — 2스트라이크 번트 파울(원본 판정 11)의 아웃 콜 62 표. 이제 그 공도 파울 각 공 판을 돌아 판 결과
+   * `DefensePlayResult.buntFoulOut` 이 콜을 고정한다(`resolvePitch` 가 `isBuntFoulOut` 을 안 세운다).
    * 진행(아웃·진루·난수)에는 한 톨도 안 닿는다 — 소리 고르기만 본다.
    */
   readonly buntFoulOut?: boolean
@@ -2442,7 +2442,7 @@ function pitchOnce(
 
   // 파울 각 공 — 원본도 판(상태 0x17)을 돈다(맞은 공은 모두 메시지 0x11 → 0x13 → 0x17). 공 도착 판(0x3dfac)은 못 맞힌 공만이다
   if (foulContact !== undefined) {
-    const started = startDefensiveFoulPlay(afterPitch, foulContact, random)
+    const started = startDefensiveFoulPlay(afterPitch, foulContact, random, thrown.buntKind ?? 0)
     if (defer) return started
     const pending = started.pendingDefensePlay
     if (pending === null) return started
@@ -2575,7 +2575,12 @@ const FOUL_PLAY_OUTCOME: AtBatOutcome = { kind: '아웃', detail: '뜬공아웃'
  * **사람이 던진 타석의 파울 각 공 판** — 맞은 공이라 판을 돈다(타석은 아직 안 끝났다). 판이 파울로 닫히면(`foulEnded`)
  * `resolveDefensePlay` 가 스트라이크를 올리고 같은 타석 다음 공으로, 낙구 전에 잡히면 파울 뜬공 아웃으로 타석을 끝낸다.
  */
-function startDefensiveFoulPlay(progress: TeamGameProgress, contact: BattedContact, random: RandomPort): TeamGameProgress {
+function startDefensiveFoulPlay(
+  progress: TeamGameProgress,
+  contact: BattedContact,
+  random: RandomPort,
+  buntKind: number,
+): TeamGameProgress {
   const stealing = progress
   const cleared = withoutSteal(progress)
   const outcome = registerContact(FOUL_PLAY_OUTCOME, contact)
@@ -2583,6 +2588,8 @@ function startDefensiveFoulPlay(progress: TeamGameProgress, contact: BattedConta
     ...defensiveDefenseInputOf(stealing, outcome, contact.pattern, random, false),
     // 판 끝 결과 코드 11(2스트라이크 번트 파울) · 판 뒤 스트라이크(0xb6b58)가 이 공 앞의 스트라이크를 본다
     strikes: progress.atBat.strikes,
+    // 장면 +0xfdc — CPU 타자의 번트 종류. 11 은 번트(state[0x13])일 때만 난다
+    buntKind,
   })
   return { ...cleared, pendingDefensePlay: { side: '수비', input, outcome: input.outcome } }
 }

@@ -1083,7 +1083,8 @@ export function useCareerSession({
           carryDistance: carryDistanceOf(pending.trajectory),
           caughtOnTheFly: played.caughtOnTheFly,
         }),
-        inPlayCallSoundIdOf(outcome, { ...played, buntFoulOut: pending.buntFoulOut }),
+        // 판정 11(2스트라이크 번트 파울)은 판 끝 결과 코드가 낸다(`played.buntFoulOut`) — 콜은 조건 없이 62 (0x51b20)
+        inPlayCallSoundIdOf(outcome, { ...played, buntFoulOut: pending.buntFoulOut === true || played.buntFoulOut === true }),
         ...gameStepSoundIdsOf(current, resolved),
       ])
       finishAtBat(resolved, outcome, runnersOnBase)

@@ -269,3 +269,36 @@ describe('resolvePitch — 필살 성공 굴림 0x34c74 → 0x517e6', () => {
     expect(resolvePitch(직구(), { frame: 16, shift: 0, buntKind: 0 }, 필살상황, 덱(), 필살.random).isUncatchable).toBe(false)
   })
 })
+
+describe('2스트라이크 번트 파울(판정 11)도 판을 도는 파울 각 공이다 — 원본은 판 끝 0x9d5bc 가 11 을 낸다(9d5e2~9d600)', () => {
+  it('타석 판정은 아웃을 정하지 않는다 — 스트라이크 0 의 같은 공과 똑같이 쏜 공(`foulContact`)을 싣고 굴림 수도 같다', () => {
+    const 이스트 = { ...상황, situation: { ...상황.situation, strikes: 2 } }
+    const 센다 = (seed: number) => {
+      const seeded = createSeededRandom(seed)
+      let count = 0
+      const random: RandomPort = {
+        ...seeded,
+        next: () => {
+          count += 1
+          return seeded.next()
+        },
+      }
+      return { random, count: () => count }
+    }
+    let 찾음 = false
+    for (let seed = 1; seed <= 400 && !찾음; seed += 1) {
+      const 앞 = 센다(seed)
+      const a = resolvePitch(직구(), { frame: 16, shift: 0, buntKind: 1 }, 상황, createPatternDeck(createSeededRandom(seed)), 앞.random)
+      if (a.detail.resolution.kind !== '파울') continue
+      const 뒤 = 센다(seed)
+      const b = resolvePitch(직구(), { frame: 16, shift: 0, buntKind: 1 }, 이스트, createPatternDeck(createSeededRandom(seed)), 뒤.random)
+      찾음 = true
+      expect(b.detail).toEqual(a.detail)
+      expect(b.detail.foulContact).toEqual({ pattern: b.detail.pattern, resultCode: b.detail.resultCode })
+      expect(b.detail.isBuntFoulOut).toBeUndefined()
+      expect(b.isUncatchable).toBe(false)
+      expect(뒤.count()).toBe(앞.count())
+    }
+    expect(찾음).toBe(true)
+  })
+})
