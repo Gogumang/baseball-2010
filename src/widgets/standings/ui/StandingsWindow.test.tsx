@@ -149,18 +149,7 @@ describe('기록실 순위표', () => {
     expect(rowOf(readStandings(), OUR_TEAM)?.winningPercent).toBe(666)
   })
 
-  it('무승부는 승도 패도 늘리지 않는다 (0xb76dc·0xb77e0 에 무승부 분기가 없다)', () => {
-    const drawn = afterGames(['승', '무', '무', '패'])
-    const withoutDraws = afterGames(['승', '패'])
-
-    render(<StandingsWindow league={drawn.league} onClose={vi.fn()} />)
-    const rows = readStandings()
-
-    expect(rowOf(rows, OUR_TEAM)).toMatchObject({ wins: 1, losses: 1, winningPercent: 500 })
-    expect(drawn.league).toEqual(withoutDraws.league)
-    // 선수 개인 기록에는 무승부가 남는다 — 순위표만 안 세는 것이다
-    expect(drawn.draws, `개인 무승부: ${drawn.draws}`).toBe(2)
-  })
+  // 무승부 갈래는 없다 — 경기 끝 0xb68fc 가 동점이면 끝을 안 내고, 정산 4f072 는 측 1 > 측 0 ? 측 1 승 : 측 0 승 뿐이다(a875ace)
 
   it('승이 많은 팀이 위에 온다 — 1위 줄이 우리 팀이다', () => {
     render(<StandingsWindow league={afterGames(['승', '승']).league} onClose={vi.fn()} />)
