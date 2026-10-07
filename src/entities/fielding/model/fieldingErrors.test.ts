@@ -49,9 +49,16 @@ describe('펌블 — 표 0xd87d4', () => {
     expect(rollFumble(100, true, 고정(0.02))).toBe(false)
   })
 
-  it('**멈춘 공을 주울 때는 굴리지 않는다** — 뜬공 직접 포구에는 걸린다 (P2 3절 정정)', () => {
+  it('**멈춘 공을 주울 때는 펌블이 안 난다** — 뜬공 직접 포구에는 걸린다 (P2 3절 정정)', () => {
     expect(rollFumble(100, false, 고정(0))).toBe(false)
     expect(rollFumble(100, true, 고정(0))).toBe(true)
+  })
+
+  it('멈춘 공이어도 굴림은 먹는다 — b4228 의 rand 는 멈춤(b4236)보다 앞이다', () => {
+    let 굴림 = 0
+    const 세는 = { next: () => (굴림++, 0), nextInRange: (minimum: number) => minimum, pick: <T,>(candidates: readonly T[]) => candidates[0] }
+    rollFumble(100, false, 세는)
+    expect(굴림).toBe(1)
   })
 })
 

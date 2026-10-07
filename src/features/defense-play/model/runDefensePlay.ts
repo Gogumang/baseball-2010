@@ -1673,6 +1673,8 @@ export function stepDefensePlay(
     // ── 1. 포구 ──
     // 필살타법 성공 타구(비트 4)는 야수가 쥐지 않고 지나친다 — 포구 자체를 건너뛴다 (0xaf180·0xbc3)
     if (tick === catchTick && uncatchable) {
+      // b4228 — 펌블 굴림 rand(0, 10000) 은 필살타법 표시를 보기(b4246) 전에 늘 먹는다
+      if (input.random !== undefined) randomIntegerBelow(input.random, 0, 10_000)
       // 필살타법 타구 — 공 속성 목록 +0x5c 의 비트 4(0xaf180) 때문에 포구 틱 갈래가 쥐기 대신 메시지 0xbc3 · 사건(sp+0x24) = 1
       // (b4250). 그 0xbc3 에는 처리기가 없고, 틱 끝 b45a4 의 사건 갈래가 공을 그 야수에게서 튕겨 다시 쏜다(0xb3148)
       ballEventThisTick = true

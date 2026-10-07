@@ -23,12 +23,19 @@ export function fumbleChanceOf(defenseAbility: number): number {
  * 펌블 굴림 — `rand(0, 10000) < 확률`.
  *
  * **I-controls 2a 정정 (P2 3절)**: 공 vt18 = 0xa27f0 은 "땅볼인가"가 아니라 **"공이 멈췄는가"** 다.
- * 그래서 펌블은 **움직이는 공을 잡을 때마다**(뜬공 직접 포구 포함) 걸리고,
- * 굴러와 멈춘 공을 주울 때만 없다. 송구 받기(공 목록 종류 4)는 이 굴림 전에 빠진다.
+ * 그래서 펌블은 **움직이는 공을 잡을 때마다**(뜬공 직접 포구 포함) 나고, 굴러와 멈춘 공을 주울 때만 없다.
+ *
+ * **굴림은 늘 먹는다** (직접 뜸, 포구 틱 갈래 0xb401c):
+ * ```
+ * b41e4  r7 = 야수+0xec(선수) 있으면 표 0xd87d4[등급] 아니면 0
+ * b4224  r4 = r7 > rand(0, 10000)            ; 멈춤 · 필살타법 표시(b4246) 보다 **앞**
+ * b4236  멈춤 = 공.vt18() ; 필살타법이면 0xbc3 ; r4 && !멈춤 → 펌블 ; 아니면 쥐기
+ * ```
+ * 예전 웹은 멈춘 공이면 굴리지 않아 그 뒤 난수 차례가 하나씩 밀렸다.
  */
 export function rollFumble(defenseAbility: number, ballIsMoving: boolean, random: RandomPort): boolean {
-  if (!ballIsMoving) return false
-  return fumbleChanceOf(defenseAbility) > randomIntegerBelow(random, 0, RANDOM_LIMIT)
+  const roll = randomIntegerBelow(random, 0, RANDOM_LIMIT)
+  return ballIsMoving && fumbleChanceOf(defenseAbility) > roll
 }
 
 /**
