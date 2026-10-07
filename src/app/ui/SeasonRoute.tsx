@@ -614,6 +614,8 @@ export function SeasonRoute({
           <HallOfFameScreen
             frame={{ title: '시즌모드', gamePoint: session.gamePoints }}
             backdrop="공무늬"
+            // 목록 애니 칸은 목록 주인별 모듈 값 — 시즌 선수영입 목록 (f5aee7b)
+            listOwner="시즌"
             collection={hallOfFame ?? EMPTY_COLLECTION}
             mode={{
               kind: '선수고르기',
