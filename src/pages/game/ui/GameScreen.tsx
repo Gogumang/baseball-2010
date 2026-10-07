@@ -16,6 +16,7 @@ import { HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
 import { useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
 import { SceneMatchupCards } from '@/widgets/matchup-cards/ui/SceneMatchupCards'
 import { gameMatchupCardsOf } from '@/pages/game/lib/gameMatchupCards'
+import { gameHalfInningCardsOf } from '@/pages/game/lib/gameHalfInningCards'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import { mySpecialSwingRemainingOf, stealableBasesOf } from '@/features/play-game/model/gameFlow'
@@ -185,6 +186,8 @@ export function GameScreen({
         }}
         // 점수판 틀 0x41440 의 두 측 — 내 팀 PLAYER · 상대 COM
         scoreboardSides={humanVsComputerSidesOf(progress.game.playerSide, career.teamId, progress.opponentTeamId)}
+        // 두 팀 판 0x42364("DUE UP") · 0x420dc("PITCHER")
+        cards={gameHalfInningCardsOf(progress, career, board.half)}
         onConfirm={() => setBoardClosed(true)}
       />
     )

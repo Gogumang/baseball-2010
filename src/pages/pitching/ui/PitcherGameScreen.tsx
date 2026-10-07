@@ -35,6 +35,7 @@ import { HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
 import { hasGameIntro } from '@/widgets/game-scene/lib/introSchedule'
 import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
 import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
+import { pitcherHalfInningCardsOf } from '@/pages/pitching/lib/pitcherHalfInningCards'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 import { GameEndBoard } from '@/widgets/game-scene/ui/GameEndBoard'
 import { humanVsComputerSidesOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
@@ -312,6 +313,8 @@ export function PitcherGameScreen({
           if (tick === HALF_INNING_JINGLE_TICK) audio.play(HALF_INNING_SOUND)
         }}
         scoreboardSides={scoreboardSides}
+        // 두 팀 판 0x42364("DUE UP") · 0x420dc("PITCHER")
+        cards={pitcherHalfInningCardsOf(progress, pitcherName, board.half)}
         onConfirm={() => setClosedBoardSerial(board.serial)}
       />
     )

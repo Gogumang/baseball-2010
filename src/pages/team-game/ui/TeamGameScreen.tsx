@@ -26,6 +26,7 @@ import {
 } from '@/features/play-team-game/model/teamGameFlow'
 import { GameEndBoard } from '@/widgets/game-scene/ui/GameEndBoard'
 import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
+import { teamHalfInningCardsOf } from '@/pages/team-game/lib/teamHalfInningCards'
 import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 import { hasGameIntro } from '@/widgets/game-scene/lib/introSchedule'
@@ -535,6 +536,8 @@ export function TeamGameScreen({
           if (tick === HALF_INNING_JINGLE_TICK) audio.play(HALF_INNING_SOUND)
         }}
         scoreboardSides={scoreboardSides}
+        // 두 팀 판 0x42364("DUE UP") · 0x420dc("PITCHER")
+        cards={teamHalfInningCardsOf(progress, board.half)}
         onConfirm={() => setClosedBoardSerial(board.serial)}
       />
     )
