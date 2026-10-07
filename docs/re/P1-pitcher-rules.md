@@ -215,7 +215,7 @@ a4f60: if S[0] != 3 → return -1                     ; 모드 3(투수편) 아�
        if g == 0 → return -2                        ; a4f80 beq → a4fa4 r0=2 → a4fbe rsbs
        if 0xb6dec(P) == 2 → return -1               ; 보직 2 = 구원
        if 0xb6dec(P) != 0 → return -1               ; 보직 1 도 -1
-       if S+0x12c (포스트시즌) → return -2
+       if S+0x12c (포스트시즌) → return -2        ; ← 정정 2026-10-07(6277551): S+0x12c = 국가대항전(P5 0x12c 충돌 정리). 포스트시즌(L+0x34)은 안 본다
        return ((g-1) % 6) / 2 + 1                   ; 0xca911 = 나머지, trunc/2
 ```
 - g = 1,2 → k=1 · 3,4 → 2 · 5,6 → 3 · 7,8 → 1 …
