@@ -807,6 +807,19 @@ PITCHER_GOAL_COUNT_FIELDS = {
 }
 
 
+# 두 측 · 사람 칸 — 미션 경기 준비 0xaa57c(모드 5·6) 를 직접 떴다:
+#   aa5e8  사람 칸 = +3 윗 4비트, 다른 칸 = (사람 칸 == 0 ? 1 : 0)
+#   aa658  0xb6c18(st, 사람 칸, 0) · 0xb6c18(st, 다른 칸, 1)       ; 경기[0x31 + 칸] — 0 사람 · 1 CPU
+#   aa688  st[0x6b] = min(+3 아래 4비트, 99)                       ; 0-기준 시작 이닝
+#   aa6ac  0xb6bc0(st, 모드 5 ? 다른 칸 : 사람 칸)                 ; st[9] 공격 측 · st[0xa] 수비 측
+#   aa6ca  +2 → 아래 4비트 r7 · 윗 4비트 r5
+#   aa72a  0xb6bd4(st, 사람 칸, r5) · 0xb6bd4(st, 다른 칸, r7)     ; 경기[0x28 + 칸] = 팀 번호
+#          (그 앞 aa6dc~aa728: 마선수 대결 g[0x11f]/g[0x176] 이고 g[0xf6] ∈ 2..4 이면 r5 를 나리 저장의 팀으로 바꾼다)
+#   aa608  측 s = 0, 1 마다 이닝 i = 0..8: 0xb6a70(st, i, s, +0x8e + 9·s + i) · 합 → 0xb6b44(st, s, 합)   ; 점수판·점수
+MISSION_TEAMS_OFFSET = 2
+MISSION_SIDE_OFFSET = 3
+
+
 # 시작 상황 (점검 에이전트, 0xaae7c) — 3번 바이트 아래 4비트 = 시작 이닝(0부터),
 # 4번 바이트 비트0-1 아웃 · 2-3 볼 · 4-5 스트라이크 (볼/스트라이크 순서는 추정 — 투수 14번 "3볼" 과 맞음),
 # 5번 바이트 주자 비트 4=1루 · 2=2루 · 1=3루 (0xa9a9c)
@@ -835,16 +848,35 @@ def fixed_cp949(row: bytes, offset: int, size: int) -> str:
     return row[offset:offset + size].split(b'\x00', 1)[0].decode('cp949').strip()
 
 
-# 142~159 = 9이닝 × 2팀 점수판 (0xaa610). 위 줄 = 원정 상대, 아래 줄 = 홈(우리) — 타자 12번 4:7 9회말 만루,
-# 투수 1번 3:1 로 앞선 9회(실점 한도 2 = 동점) 와 맞아서 이렇게 읽는다 (추정)
+# 142~159 = 9이닝 × 2측 점수판 (0xaa608~0xaa64e): 앞 9칸 = 측 0(선공), 뒤 9칸 = 측 1(후공). 우리 점수는 **사람 칸**(+3 윗 4비트)
+# 측의 합이다 — 예전엔 "뒤 줄 = 우리" 로 추정해 사람 칸이 0 인 미션의 두 점수가 뒤바뀌었다(값이 실제로 달라진 것은 투수 2·4·11 ·
+# 투수 대결 16~20 — 나머지는 0:0).
+#   타자 12번 사람 칸 1 · 측 0 7 · 측 1 4 → 4:7 9회말 만루 / 투수 1번 사람 칸 1 · 1:3 → 3:1 로 앞선 9회 / 투수 4번 사람 칸 0 · 7:5
 MISSION_SCOREBOARD_OFFSET = 142
 INNINGS = 9
 
 
+def human_side_of(row: bytes) -> int:
+    return row[MISSION_SIDE_OFFSET] >> 4
+
+
+def side_teams_of(row: bytes) -> str:
+    human = human_side_of(row)
+    teams = [0, 0]
+    teams[human] = row[MISSION_TEAMS_OFFSET] >> 4
+    teams[1 if human == 0 else 0] = row[MISSION_TEAMS_OFFSET] & 0xF
+    return f'[{teams[0]}, {teams[1]}]'
+
+
 def start_of(row: bytes) -> str:
     count = row[MISSION_COUNT_OFFSET]
-    opponent = sum(row[MISSION_SCOREBOARD_OFFSET:MISSION_SCOREBOARD_OFFSET + INNINGS])
-    ours = sum(row[MISSION_SCOREBOARD_OFFSET + INNINGS:MISSION_SCOREBOARD_OFFSET + 2 * INNINGS])
+    side_scores = [
+        sum(row[MISSION_SCOREBOARD_OFFSET + INNINGS * side:MISSION_SCOREBOARD_OFFSET + INNINGS * (side + 1)])
+        for side in (0, 1)
+    ]
+    human = human_side_of(row)
+    ours = side_scores[human]
+    opponent = side_scores[1 if human == 0 else 0]
     runners = row[MISSION_RUNNER_OFFSET]
     flag = lambda bit: 'true' if runners & bit else 'false'
     return (
@@ -898,9 +930,19 @@ def generate_missions() -> None:
         '   * 0 이면 흔들리지 않는다. 1~3 의 뜻은 `MISSION_AIM_SHAKES` 를 볼 것. 타자편은 모두 0 이다.',
         '   */',
         '  readonly conditionCode: number',
+        '  /**',
+        '   * 사람이 잡는 측 — 레코드 +3 윗 4비트 (0 선공 · 1 후공). 미션 준비 0xaa57c 가 경기[0x31 + 칸] = 0(사람) ·',
+        '   * 다른 칸 = 1(CPU) 로 세운다(0xb6c18). 공격 측 st[9] 는 투수 미션(모드 5)이면 다른 칸, 타자 미션(모드 6)이면 이 칸이다.',
+        '   */',
+        '  readonly humanSide: number',
+        '  /**',
+        '   * 측 0 · 측 1 의 팀 번호(경기[0x28 + 칸], 0xb6bd4) — 레코드 +2 의 **윗 4비트가 사람 칸**, 아래 4비트가 다른 칸이다.',
+        '   * ⚠️ 마선수 대결(g[0x11f] · g[0x176])은 사람 칸 팀을 나리 저장의 팀으로 바꾼다(0xaa6dc~0xaa728) — 이 값은 보통 미션 것이다.',
+        '   */',
+        '  readonly sideTeams: readonly [number, number]',
         '  /** 목표별 필요 개수 (레코드 뒤쪽 칸). 사이클링히트는 단타·2루타·3루타·홈런 각각이다. */',
         '  readonly goalCounts: Readonly<Record<string, number>>',
-        '  /** 시작 상황 — 이닝(1부터)·아웃·볼·스트라이크·주자 */',
+        '  /** 시작 상황 — 이닝(1부터)·아웃·볼·스트라이크·주자 · 사람 측(우리)·다른 측 점수(+0x8e 점수판의 측별 합) */',
         '  readonly start: {',
         '    readonly inning: number',
         '    readonly outs: number',
@@ -949,6 +991,7 @@ def generate_missions() -> None:
                 f"pitchLimit: {limits & 0xF}, "
                 f"opponentAce: {row[MISSION_OPPONENT_OFFSET] >> 4}, "
                 f"conditionCode: {row[MISSION_CONDITION_OFFSET]}, "
+                f"humanSide: {human_side_of(row)}, sideTeams: {side_teams_of(row)}, "
                 f"goalCounts: {{ {', '.join(f'{quote(k)}: {v}' for k, v in goal_counts_of(row, count_fields).items())} }}, "
                 f"start: {start_of(row)}, "
                 f"failLimits: {fail_limits_of(row, side)} }},"

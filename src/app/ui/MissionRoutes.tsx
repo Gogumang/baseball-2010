@@ -19,6 +19,7 @@ import type { PitchControl } from '@/entities/settings/model/gameSettings'
 import type { useGameSettings } from '@/app/model/useGameSettings'
 import type { OriginalMission } from '@/shared/config/original/missions'
 import { missionResultHeldOf } from '@/pages/mission-play/lib/missionResultBoard'
+import { missionRunScoreBoardOf } from '@/pages/mission-play/lib/missionRunScoreBoard'
 
 /**
  * 마선수 대결의 전역 기록 칸 — 타자편 대결은 SYS 8 이 g[0x11f] = 1, 투수편 대결은 g[0x176] = 1 을 적는다.
@@ -83,7 +84,7 @@ export function MissionRoutes({
   const batter = session.hallOfFameBatter ?? nariBatter
   const { ability } = batter
 
-  const overlay = missionOverlayOf(session)
+  const overlay = missionOverlayOf(session, screen.kind === '마선수대결')
   if (overlay !== null) return overlay
 
   // 미션 모드로 들어오면 먼저 선수를 고른다 (하위 17 — 진입 0x2613c · 갱신 0x29a54). 결과 0(되돌아가기)은
@@ -223,18 +224,31 @@ export function MissionRoutes({
  *
  * 사람이 잡는 쪽(`side`)은 편에 따라 다르다: 타자 미션은 내가 공격(주루), 투수 미션은 내가 수비(송구).
  *
- * ⚠️ 미해결 — 수비 장면 득점 점수판 0x41a64(`runScoreBoard`)는 안 넘긴다. 판은 점수판 틀 0x41440 의 두 측 팀(0xb6bdd)과
- *    사람/CPU 칸(0xb6c21) · 지금 두 점수 0xb69b0 · 공격 측 st[9] 를 그리는데, 미션은 미션 준비 0xaa57c 가 레코드 +2 의 두 팀과
- *    +3 윗 4비트(사람 칸)로 세운다 — 웹 미션 표(`OriginalMission`)에 그 두 바이트가 없고 경기 중 점수도 들고 있지 않다
- *    (시작 점수 `start.ourScore` · `opponentScore` 뿐). 지어내지 않고 둔다.
+ * 수비 장면 득점 점수판 0x41a64(`runScoreBoard`) — 두 측 팀 · 사람 칸 · 공격 측은 미션 준비 0xaa57c 가 레코드 +2 · +3 으로 세운
+ * 그대로다(`missionRunScoreBoardOf`). 두 점수는 플레이 시작 때 값:
+ * - 타자 미션: 우리 = 시작 점수 + 타점(화면 HUD 와 같은 근사 — 웹 미션은 득점 칸을 따로 안 든다), 상대 = 시작 점수.
+ * - 투수 미션: 우리 = 시작 점수, 상대 = 시작 점수 + 허용 실점(R 실점 칸 `allowed.runs`).
+ * ⚠️ 미해결 — 마선수 대결(`isAceMatch` · 투수편 대결)은 사람 칸 팀을 나리 저장의 팀으로 바꾼다(0xaa6dc~0xaa728:
+ *    g[0x11f]/g[0x176] 이고 g[0xf6] ∈ 2..4 이면 0x1f55d · 0x1f8d5 객체 +1) — 그 갈래를 안 읽어 대결에는 판을 안 넘긴다.
  */
-function missionOverlayOf(session: ReturnType<typeof useMissionSession>): ReactNode | null {
+function missionOverlayOf(session: ReturnType<typeof useMissionSession>, isAceMatch: boolean): ReactNode | null {
   const { pendingDefensePlay, actions } = session
   if (pendingDefensePlay !== null) {
+    const isPitcher = pendingDefensePlay.side === '투수'
+    const run = isPitcher ? session.pitcherRun : session.missionRun
+    const runScoreBoard =
+      isAceMatch || session.pitcherAceMatchMission !== null || run === null
+        ? undefined
+        : missionRunScoreBoardOf(run.mission, {
+            ours: run.mission.start.ourScore + (isPitcher ? 0 : (run.progress.counts['타점'] ?? 0)),
+            opponents:
+              run.mission.start.opponentScore + (isPitcher ? (session.pitcherRun?.allowed.runs ?? 0) : 0),
+          })
     return (
       <DefensePlayback
         input={pendingDefensePlay.input}
-        side={pendingDefensePlay.side === '투수' ? '수비' : '공격'}
+        side={isPitcher ? '수비' : '공격'}
+        runScoreBoard={runScoreBoard}
         onDone={actions.finishDefensePlay}
       />
     )
@@ -279,7 +293,7 @@ export function PitcherAceMatchRoute(
     beginRef.current(mission)
   }, [mission])
 
-  const overlay = missionOverlayOf(session)
+  const overlay = missionOverlayOf(session, true)
   if (overlay !== null) return overlay
 
   // 미션을 세우기 전(첫 그림) — 아무것도 안 그린다
