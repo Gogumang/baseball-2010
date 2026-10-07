@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import type { useCareerSession } from '@/app/model/useCareerSession'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
@@ -22,6 +22,10 @@ import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
 import { humanVsComputerSidesOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import { useIsSceneConfirmAwaiting } from '@/features/play-game/model/useSceneConfirm'
 import { useRecordAlert } from '@/widgets/game-scene/model/useRecordAlert'
+import { useBatterPitchEnd } from '@/pages/game/model/useBatterPitchEnd'
+import { batterHumanRecordCountOf } from '@/pages/game/lib/batterRecordAlert'
+import type { RecordAlertScene } from '@/pages/game/ui/GameScreen'
+import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 
 interface GameRouteProps {
   readonly session: ReturnType<typeof useCareerSession>
@@ -79,12 +83,45 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
   /**
    * 경기 중 기록 달성 알림 0x4e35c — 경기 장면 프레임이 상태 0x17(수비 인플레이)이 아니면 늘 그린다. 수비 재생 화면을
    * 오가도 칸이 이어지도록 여기서 든다(GameScreen 은 수비 재생 동안 내려간다).
+   * - 칸 채우기 0x4e600 은 **공이 끝날 때**(0x12 끝 0x4e796 · 0x17 끝 0x52a60 — `useBatterPitchEnd`). 그때까지
+   *   진행기의 새 기록을 들고 있다가(`released`) 공 끝 그림에 한꺼번에 넘긴다.
+   * - 웹 진행기는 내 공 뒤 자동진행(0x21 — 동료 타석 · 상대 공격)까지 한 걸음에 돌린다 — 그 몫은 줄에 남겨 다음 공 끝에 넣는다
+   *   (`batterHumanRecordCountOf`). 화면이 서기 전 미리 돈 자동 타석 몫(후공 · 내 앞 타순)도 줄에 넣어 첫 공 끝에 띄운다.
+   * - 경기 중 메뉴 · 조작방법 · 설정이 떠 있으면 멈춘다(GameScreen 이 알려 준다).
    */
   const isDefenseShown = progress.pendingDefensePlay !== null || (play !== null && play !== shownPlay && play.ticks.length > 0)
-  const recordAlert = useRecordAlert(progress.recordIds, {
+  const [alertScene, setAlertScene] = useState<RecordAlertScene>({ isFrozen: false, key: 'play' })
+  const reportAlertScene = useCallback((scene: RecordAlertScene) => {
+    setAlertScene((previous) => (previous.isFrozen === scene.isFrozen && previous.key === scene.key ? previous : scene))
+  }, [])
+  const pitchEnd = useBatterPitchEnd({ isPlayShown: isDefenseShown })
+  /** 알림이 지난번에 받은 진행 — 공 끝을 기다리는 동안은 이것을 그대로 넘긴다 */
+  const releasedRef = useRef(progress)
+  const released = pitchEnd.isHolding ? releasedRef.current : progress
+  const recordAlert = useRecordAlert(released.recordIds, {
     isDrawing: session.loadingTip === null && isIntroDone && !isDefenseShown,
-    isSettled: progress.game.isFinished,
+    isFrozen: alertScene.isFrozen,
+    isSettled: released.game.isFinished,
+    // ⚠️ 근사: 상태 틱 [+0x2c] 의 경계를 웹 화면 갈래(인트로 · 판 · 벤치 클리어링 · 0xe · 타석)와 공 끝으로 가른다
+    sceneStateKey: !isIntroDone ? 'intro' : `${alertScene.key}-${pitchEnd.serial}`,
+    pitchEnd: {
+      serial: pitchEnd.serial,
+      // 훅의 효과 안에서 불린다 — 그때 releasedRef 는 아직 지난번 값이다(아래 효과가 뒤에 돈다)
+      humanCountOf: (added) => batterHumanRecordCountOf(releasedRef.current, released, added),
+    },
+    queuesInitialRecords: true,
   })
+  useEffect(() => {
+    releasedRef.current = released
+  }, [released])
+  const { handlePitchResolved: resolvePitchInSession } = session
+  const handlePitchResolved = useCallback(
+    (detail: PitchOutcomeDetail, pitch: unknown, isUncatchable?: boolean, buntKind?: number) => {
+      pitchEnd.notePitchResolved()
+      resolvePitchInSession(detail, pitch, isUncatchable, buntKind)
+    },
+    [pitchEnd.notePitchResolved, resolvePitchInSession],
+  )
 
   if (session.loadingTip !== null) {
     return (
@@ -151,7 +188,7 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
         isPaused={runner.isPaused || burstLines !== null}
         bannerText={runner.bannerText}
         random={random}
-        onPitchResolved={session.handlePitchResolved}
+        onPitchResolved={handlePitchResolved}
         onQuit={session.actions.quitGame}
         onSteal={session.actions.stealBase}
         // CPU 견제 (0x345fc 종류 4 → 0x34848) — 판은 위 재생 갈래(`lastDefensePlay`)로 보인다
@@ -163,6 +200,7 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
         settings={gameSettings.settings}
         onSettingsChange={gameSettings.setSettings}
         recordAlert={recordAlert}
+        onRecordAlertSceneChange={reportAlertScene}
       />
       {/* 돌발 창도 화면 위 덮개라 기둥 안에 가둔다 — 안 그러면 창 전체로 퍼진다 */}
       {burstLines !== null && (

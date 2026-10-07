@@ -80,6 +80,19 @@ interface GameScreenProps {
   readonly onSpecialSwingUsed?: (remaining: number) => void
   /** 경기 중 기록 달성 알림 0x4e35c 의 이번 그림 (`useRecordAlert`, 부르는 쪽이 든다). 안 넘기면 안 그린다 */
   readonly recordAlert?: RecordAlertFrame
+  /** 알림을 든 쪽에 이 화면의 팝업 · 장면 갈래를 알린다 (`RecordAlertScene`) — 바뀔 때마다 */
+  readonly onRecordAlertSceneChange?: (scene: RecordAlertScene) => void
+}
+
+/**
+ * 기록 달성 알림을 든 쪽(`app/ui/GameRoute`)이 이 화면에서 알아야 할 것.
+ * - `isFrozen`: 팝업 관리자 [0x140005c]+9 — 경기 중 메뉴 · 그 하위(조작방법 · 설정)가 떠 있으면 0x52cc6 이 장면 갱신을 막아
+ *   알림의 폭 · 시간 · 상태 틱과 0x12 대기 틱이 안 오른다.
+ * - `key`: 상태 틱 [+0x2c] 를 0 부터 다시 세는 장면 갈래 — ⚠️ 근사(벤치 클리어링 0x1e · 1회초 판 0x18 · 0xe 대기 · 타석).
+ */
+export interface RecordAlertScene {
+  readonly isFrozen: boolean
+  readonly key: string
 }
 
 /** 나만의리그 타자편 = 원본 전역 모드 4 — 경기 중 메뉴 표 0xcfcfc 의 **행 2**(네 칸)다 */
@@ -105,6 +118,7 @@ export function GameScreen({
   onBenchClearingDone,
   onSpecialSwingUsed,
   recordAlert,
+  onRecordAlertSceneChange,
 }: GameScreenProps) {
   const menu = useInGameMenuState()
   const isMenuOpen = menu.isOpen
@@ -171,6 +185,19 @@ export function GameScreen({
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [isBenchClearing, isHalfInningBoardOpen, isMenuOpen, menu.toggle, onSteal, overlay, stealableBases])
+
+  // 기록 달성 알림의 팝업 멈춤 · 장면 갈래를 알림을 든 쪽에 알린다 (`RecordAlertScene`)
+  const isAlertFrozen = isMenuOpen || overlay !== null
+  const alertSceneKey = isBenchClearing
+    ? 'benchClearing'
+    : isHalfInningBoardOpen
+      ? `board-${board?.serial ?? 0}`
+      : sceneConfirm.isAwaiting
+        ? 'confirm'
+        : 'play'
+  useEffect(() => {
+    onRecordAlertSceneChange?.({ isFrozen: isAlertFrozen, key: alertSceneKey })
+  }, [alertSceneKey, isAlertFrozen, onRecordAlertSceneChange])
 
   // 사구 뒤 벤치 클리어링 (상태 0x1e) — 타석이 붙들린 채 연출이 돈다. 공용 키 '*'·도루도 0x1e 에서는 안 열린다
   if (progress.pendingBenchClearing !== null && onBenchClearingDone !== undefined) {
