@@ -1,0 +1,57 @@
+// @vitest-environment jsdom
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { SettlementBoard } from '@/pages/team-game/ui/SettlementBoard'
+import { resetSkinTickerCounter } from '@/shared/lib/skinTicker/skinTicker'
+
+afterEach(() => {
+  cleanup()
+  resetSkinTickerCounter()
+})
+
+const 기본 = {
+  mode: 2, isWin: true, side0Score: 3, side1Score: 5, recordIds: [3, 3, 7], gamePoints: 120, heldGamePoints: 900,
+}
+
+describe('SettlementBoard — 정산 판 (0x4a384 · 키 0x407f0)', () => {
+  it('기본 화면은 점수와 "0:INFO" 만 — \'0\' 으로 기록 판을 열고 OK 로 닫는다', () => {
+    const onExit = vi.fn()
+    render(<SettlementBoard {...기본} onExit={onExit} />)
+    expect(screen.getByTestId('정산-점수-0').dataset.value).toBe('3')
+    expect(screen.getByTestId('정산-점수-1').dataset.value).toBe('5')
+    expect(screen.queryByTestId('정산-기록-3')).toBeNull()
+
+    fireEvent.keyDown(window, { key: '0' })
+    expect(screen.getByTestId('정산-기록-3').textContent).toContain('2회')
+    expect(screen.getByTestId('정산-기록-7').textContent).toContain('1회')
+
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(screen.queryByTestId('정산-기록-3')).toBeNull()
+    expect(onExit).not.toHaveBeenCalled()
+
+    // 닫힌 판에서 '0' 이 아닌 키 → 메시지 0x3f3
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(onExit).toHaveBeenCalledTimes(1)
+  })
+
+  it('기록이 없으면 "기록이 없습니다!"', () => {
+    render(<SettlementBoard {...기본} recordIds={[]} onExit={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: '0:INFO' }))
+    expect(screen.getByText('기록이 없습니다!')).toBeTruthy()
+  })
+
+  it('흐르는 글 0x4aef0 은 대전모드(8·9)에서 이겼을 때만 — 자르기 (x + 2, y, w − 4, h)', () => {
+    const { unmount } = render(<SettlementBoard {...기본} mode={8} versusWinBonus={100} onExit={vi.fn()} />)
+    fireEvent.keyDown(window, { key: '0' })
+    const clip = screen.getByTestId('정산-흐르는-글')
+    expect(clip.style.left).toBe('41px')
+    expect(clip.style.top).toBe('224px')
+    expect(clip.style.width).toBe('158px')
+    expect(clip.textContent).toBe('승리 추가 보상[100 G포인트]')
+    unmount()
+
+    render(<SettlementBoard {...기본} mode={2} versusWinBonus={100} onExit={vi.fn()} />)
+    fireEvent.keyDown(window, { key: '0' })
+    expect(screen.queryByTestId('정산-흐르는-글')).toBeNull()
+  })
+})

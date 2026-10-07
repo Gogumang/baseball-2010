@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { BigResult, Hint, MenuList, Panel, PixelScreen, StatGrid } from '@/shared/ui'
-import type { MenuItem, StatEntry } from '@/shared/ui'
+import { Hint, MenuList, Panel, PixelScreen } from '@/shared/ui'
+import type { MenuItem } from '@/shared/ui'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { TEAMS } from '@/shared/config/original/teams'
 import { ORIGINAL_BURST_TABLES } from '@/shared/config/original/burstMissions'
@@ -33,6 +33,7 @@ import { HALF_INNING_JINGLE_TICK } from '@/features/play-game/model/halfInningBo
 import { HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
 import { useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
 import { settlementBackdropOffsetAt } from '@/pages/team-game/model/settlementBackdrop'
+import { SettlementBoard } from '@/pages/team-game/ui/SettlementBoard'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { SceneMatchupCards } from '@/widgets/matchup-cards/ui/SceneMatchupCards'
 import { teamMatchupCardsOf } from '@/pages/team-game/lib/teamMatchupCards'
@@ -429,15 +430,16 @@ export function TeamGameScreen({
   if (summary !== null) {
     // 정산 갱신 0x4b100 의 r7 — 사람 팀(우리)이 이겼나. 비기면 거짓
     const isHumanWin = summary.result === '승'
+    const ourSide = progress.game.playerSide
     return (
       <PixelScreen
         title="경기 결과"
         leftKey={{ label: '확인', onPress: () => onFinish(summary) }}
       >
         {/*
-          정산 그리기 0x4a384 — 결과 판보다 먼저 구름 0x78448 과 배경 고르기 0x40ff0(장면, +0x17e2)만 그린다 (선수·공·HUD 없음).
+          정산 그리기 0x4a384 — 구름 0x78448 과 배경 고르기 0x40ff0(장면, +0x17e2)을 먼저 그린다 (선수·공·HUD 없음).
           +0x17e2 는 이긴 판만 틱마다 3 씩 150 까지 올라 구장이 가라앉는다 (`settlementBackdropOffsetAt`).
-          ⚠️ 판 위 글자·숫자(0x4a404 진 판 · 0x4a448 이긴 판 갈래)는 아직 웹 요약 그대로다.
+          그 위에 정산 판(0x4a404 진 판 덮개 · 0x4a448 띠·승패 그림 · 0x4a948 점수·기본 화면/기록 판)을 겹친다 (`SettlementBoard`).
         */}
         <div className={styles.stageArea}>
           <BattingStage
@@ -459,14 +461,19 @@ export function TeamGameScreen({
             random={backdropRandom}
             onPitchResolved={() => {}}
           />
+          <SettlementBoard
+            mode={options.mode}
+            isWin={isHumanWin}
+            // 0xb69b0(st, 0/1) — 왼쪽이 측 0
+            side0Score={ourSide === 0 ? summary.ourScore : summary.opponentScore}
+            side1Score={ourSide === 1 ? summary.ourScore : summary.opponentScore}
+            recordIds={summary.recordIds ?? []}
+            gamePoints={summary.gamePoints ?? 0}
+            // [app+0x64] — 정산 진입(0x4ea0c)이 번 G 를 더한 뒤의 값. 부르는 쪽이 `onSettlementEnter` 에서 더한다
+            {...(gamePoint === undefined ? {} : { heldGamePoints: gamePoint })}
+            onExit={() => onFinish(summary)}
+          />
         </div>
-        <BigResult>
-          {summary.ourScore} : {summary.opponentScore} {summary.result}
-        </BigResult>
-        <StatGrid entries={summaryEntries(summary)} />
-        <Hint>
-          {TEAMS[summary.ourTeamId]?.name ?? ''} vs {TEAMS[summary.opponentTeamId]?.name ?? ''}
-        </Hint>
       </PixelScreen>
     )
   }
@@ -975,14 +982,4 @@ function slotItems(magicRemaining: number, slots: readonly PitchSlot[]): MenuIte
         ? `마구 · 남은 ${magicRemaining}회${magicRemaining === 0 ? ' (못 던짐)' : ''}`
         : undefined,
     }))
-}
-
-function summaryEntries(summary: TeamGameSummary): StatEntry[] {
-  const outs = summary.pitching.outsRecorded
-  return [
-    { label: '이닝', value: `${Math.trunc(outs / 3)}${['', '⅓', '⅔'][outs % 3]}` },
-    { label: '피안타', value: String(summary.pitching.hitsAllowed) },
-    { label: '볼넷', value: String(summary.pitching.walksAllowed) },
-    { label: '실점', value: String(summary.pitching.runsAllowed) },
-  ]
 }
