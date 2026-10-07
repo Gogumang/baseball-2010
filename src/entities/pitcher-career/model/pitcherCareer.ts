@@ -42,6 +42,18 @@ import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
 import { FULL_STAMINA, recoverStaminaAfterGameDay } from '@/entities/pitcher-career/model/pitcherStamina'
 import { PITCHER_EDITION_MODE, cpuGameRotationAdvances } from '@/entities/pitcher-career/model/pitcherRotation'
 import {
+  gameMyPitcherOrderOf,
+  legacyMyPitcherOrderOf,
+  moveMyPitcherToStart,
+  myPitcherPositionCodeOf,
+  prepareMyPitcherOrder,
+  recordedMyPitcherOrderOf,
+  withMyPitcherOrder,
+} from '@/entities/pitcher-career/model/myPitcherRecord'
+import type { MyPitcherDay } from '@/entities/pitcher-career/model/myPitcherRecord'
+import { myPitcherRegistrationSlotOf, registeredMyPitcherOrderOf } from '@/entities/pitcher-career/model/myPitcherRecord'
+import { createNariTeamRecords } from '@/entities/career/model/nariTeamRecord'
+import {
   DEFAULT_PITCHER_ROOKIE_PROFILE,
   pitcherFormOf,
   rookiePitcherAbilityOf,
@@ -299,7 +311,8 @@ export interface PitcherCareer {
   readonly league: League
   /**
    * **열 팀 나리 팀 레코드** (`entities/career/model/nariTeamRecord`) — 저장 블록 `[저장+0xb8] + 4 + 0x1c·팀`. 142 마선수 넣기가
-   * 고친다. 옛 저장·아직 안 고친 새 선수는 없다 — `nariTeamsOf` 가 붙박이 표로 세운다(투수편 내 투수 줄은 머리말 미해결).
+   * 고친다. 옛 저장·아직 안 고친 새 선수는 없다 — `nariTeamsOf` 가 붙박이 표로 세운다. 내 팀 레코드는 투수 배열(`pitchers` —
+   * 내 투수 줄 포함)도 들고 142 진입이 날마다 고친다 (`myPitcherRecord`).
    */
   readonly nariTeams?: NariTeamRecords
   readonly leaguePlayerStats: LeaguePlayerStats
@@ -339,6 +352,12 @@ export interface PitcherCareer {
   readonly losses: number
 }
 
+/** 등록 꼴 열 팀 레코드 — 타자 배열은 붙박이, 내 팀은 투수 배열에 내 투수 */
+function registeredNariTeamsOf(teamId: number, role: PitcherRole): NariTeamRecords {
+  return createNariTeamRecords(teamId, null).map((record, team) =>
+    team === teamId ? { ...record, pitchers: registeredMyPitcherOrderOf(role) } : record)
+}
+
 export function createPitcherCareer(
   name: string,
   profile: PitcherRookieProfile = DEFAULT_PITCHER_ROOKIE_PROFILE,
@@ -347,9 +366,10 @@ export function createPitcherCareer(
     name,
     ability: rookiePitcherAbilityOf(profile.role, profile.typeIndex),
     role: profile.role,
-    // 등록 셋업이 rec[+0xa] 에 0x80 을 쓴다 (bit7 = 내 육성 선수) — 아래 5비트는 0 이라
-    // 포지션 코드도 0 이다 → 경기 뒤 평가는 **선발형**(≤3)으로 본다 (C-4 · 0xb6394).
-    positionCode: 0,
+    // 생성 0x17360 이 rec[+0xa] 에 0x80(bit7 = 내 육성 선수)을 쓰고, 등록 0x10fb4 가 보직대로 아래 5비트를 고친다 —
+    // 선발 0 · 구원 7 (`0xb6605`, 0x111a8~0x111ae). 포지션 코드 `0xb6394` 가 그 칸이라 구원은 116 평가에서 **구원형**(> 3)이다.
+    // 그 칸에 내 투수를 넣은 열 팀 레코드는 아래 `nariTeams` (`0xb521d`)
+    positionCode: myPitcherRegistrationSlotOf(profile.role),
     typeIndex: profile.typeIndex,
     handIndex: profile.handIndex,
     skinIndex: profile.skinIndex,
@@ -413,6 +433,8 @@ export function createPitcherCareer(
     yearGoalEventDone: false,
     endingIndex: null,
     league: EMPTY_LEAGUE,
+    // 등록 0x204e1(저장, 3, 1) 로 열 팀을 마스터에서 다시 짓고 내 팀 투수 배열 칸 t 에 내 투수 (0xb521d, `myPitcherRecord`)
+    nariTeams: registeredNariTeamsOf(profile.teamId ?? DEFAULT_TEAM_ID, profile.role),
     leaguePlayerStats: EMPTY_LEAGUE_PLAYER_STATS,
     regularSeasonFirstCount: 0,
     regularSeasonRewardTaken: false,
@@ -738,6 +760,35 @@ export function applyPitcherLeagueDay(
   }
 }
 
+/** 오늘 경기 준비의 내 팀 몫 — 날짜 g · 보직 · 포스트시즌 */
+function myPitcherDayOf(career: PitcherCareer): MyPitcherDay {
+  return { dayCounter: leagueDayCounterOf(career), role: career.role, isPostseason: career.postseason !== null }
+}
+
+/**
+ * 오늘 경기의 내 팀 투수 배열 — 142 진입(`prepareMyPitcherMatch`)이 넣은 레코드 그대로. 레코드에 배열이 없는 옛 저장(142 를 안
+ * 거치고 곧장 경기로 가는 이어하기)은 예전 날짜 셈으로 오늘 준비까지 밟은 배열.
+ */
+export function todayMyPitcherOrderOf(career: PitcherCareer): readonly number[] {
+  return recordedMyPitcherOrderOf(career) ?? legacyMyPitcherOrderOf(myPitcherDayOf(career), true)
+}
+
+/**
+ * **142 진입 0x1c46c 의 내 팀 몫** — 마선수 넣기와 같은 문(장면+0x288 · 이전 상태 143) 안에서 한 번: 내 팀 투수 배열을 오늘
+ * 준비대로 고치고(`prepareMyPitcherOrder`), 포지션 코드를 새 칸으로(0xb8768), g == 0 이면 내 +0x2c = 10000(0x1c8a8).
+ */
+export function prepareMyPitcherMatch(career: PitcherCareer): PitcherCareer {
+  const day = myPitcherDayOf(career)
+  const before = recordedMyPitcherOrderOf(career) ?? legacyMyPitcherOrderOf(day, false)
+  const order = prepareMyPitcherOrder(before, day)
+  return {
+    ...career,
+    nariTeams: withMyPitcherOrder(career, order),
+    positionCode: myPitcherPositionCodeOf(order),
+    ...(day.dayCounter === 0 ? { stamina: FULL_STAMINA } : {}),
+  }
+}
+
 /**
  * 사람 경기 준비 `0x1c46c` 가 세운 투수 — 상대 팀 레코드 차례(0번 선발 · 벤치 차례)와 양 팀 칸별 `+0x2c`.
  * `PitcherGameOptions` 에 그대로 얹는다. 내 팀 차례는 진행기가 0xa4f60 맞바꿈으로 세운다.
@@ -747,14 +798,24 @@ export function pitcherLeagueGameSetupOf(
   opponentTeamId: number,
 ): {
   readonly opponentPitcherOrder: readonly number[]
+  /** 내 팀 투수 배열 — 진행기 칸 번호(내 투수 = 표 밖 8). 142 진입이 오늘 준비를 레코드에 넣은 뒤의 차례 (`myPitcherRecord`) */
+  readonly ourPitcherOrder: readonly number[]
+  /** 내 투수 포지션 코드 `0xb6394` = 그 배열 안 내 칸 (116 평가의 ≤3 선발형 판정) */
+  readonly positionCode: number
+  /** g == 0 이면 0x1c8a8 이 내 팀 레코드도 10000 으로 채운다 — 내 투수 +0x2c */
+  readonly stamina?: number
   readonly ourPitcherStaminas?: readonly number[]
   readonly opponentPitcherStaminas?: readonly number[]
 } {
   const day = leagueDayCounterOf(career)
   const ourPitcherStaminas = humanGamePitcherStaminasOf(career, day, career.teamId)
   const opponentPitcherStaminas = humanGamePitcherStaminasOf(career, day, opponentTeamId)
+  const order = todayMyPitcherOrderOf(career)
   return {
     opponentPitcherOrder: humanGamePitcherOrderOf(career, PITCHER_EDITION_MODE, day, opponentTeamId),
+    ourPitcherOrder: gameMyPitcherOrderOf(order),
+    positionCode: myPitcherPositionCodeOf(order),
+    ...(day === 0 ? { stamina: FULL_STAMINA } : {}),
     ...(ourPitcherStaminas === undefined ? {} : { ourPitcherStaminas }),
     ...(opponentPitcherStaminas === undefined ? {} : { opponentPitcherStaminas }),
   }
@@ -851,8 +912,12 @@ export function isPitcherSeasonFinished(career: PitcherCareer): boolean {
  * **스태미나 되돌리기**(시즌 시작 0xb6cc4 → 10000)가 하나 더 붙는다.
  */
 export function startNextPitcherSeason(career: PitcherCareer): PitcherCareer {
+  // 0x1b768 → 0x1b852 `0x1b684` — 보직 2 가 아니면 내 투수를 레코드 0번으로 (레코드에 배열이 있을 때만 — 옛 저장은 142 가 세운다)
+  const recorded = recordedMyPitcherOrderOf(career)
+  const order = recorded === null ? null : moveMyPitcherToStart(recorded, career.role)
   return {
     ...career,
+    ...(order === null ? {} : { nariTeams: withMyPitcherOrder(career, order), positionCode: myPitcherPositionCodeOf(order) }),
     season: career.season + 1,
     gamesPlayed: 0,
     // 칭호 25·26 은 새 시즌 첫 경기 전에 **지난해** 외출 수로 본다 (P3 9절)

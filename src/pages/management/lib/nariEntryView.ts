@@ -22,7 +22,7 @@
  * 그림 0x16738 = 기본 엔트리 목록 `0x5cfec` + 머리띠 `0x54d95(skin, 탭 1 ? 7 : 6, 탭 1 ? 0xf : 0x17, 0)` — 시즌 0xe0 과 같다.
  *
  * ⚠️ 근사·미해결: 화면 밀기(0xbdae9) 연출 없음. 국가대항전 두 팀은 대회 레코드(저장 +0x918 · +0x934)를 웹이 저장하지 않아
- * 붙박이 표로 보인다(대한민국에 내 선수가 안 낀다). 투수편 내 팀 투수 배열은 진행기 근사(`ourPitcherOrderOf`)를 보여 준다.
+ * 붙박이 표로 보인다(대한민국에 내 선수가 안 낀다).
  */
 import { leavesEntryEditor, openEntryEditor, pointEntryCursor, pressEntryKey } from '@/entities/season-mode/model/entryEditor'
 import type {

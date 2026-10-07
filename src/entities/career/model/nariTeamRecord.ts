@@ -23,8 +23,9 @@ import { EMPTY_BATTER_GAME_RECORD } from '@/entities/batting/model/pinchHitAi'
  * 투수 배열의 0~7 차례는 예전대로 리그 칸(`League.pitcherOrders` · 포스트시즌 `baseOrders` — 로테이션 `0xb5ca8` 이 섞는
  * 그 차례)이 들고, 여기에는 8번 칸 마투수(`0xb521c` 의 0x60 갈래)만 둔다.
  *
- * ⚠️ 미해결: 투수편 내 투수는 등록 0x10fb4 가 `0xb521d(내 팀, 내 투수, 1)` 로 투수 배열 **0번**(생성 +0xa = 0x80 → 칸 0,
- *    옛 0번은 맨 끝)에 넣는다 — 웹 투수편은 진행기(`ourPitcherOrderOf`)가 예전 근사로 따로 세운다. 그 배열은 여기 옮기지 않았다.
+ * 투수편 **내 팀** 은 투수 배열 전체(`pitchers` — 내 투수 줄 포함)를 레코드가 든다. 등록 0x10fb4 가 보직대로 칸을 정해
+ * (`0xb6605` — 선발 0 · 구원 7) `0xb521d(내 팀, 내 투수, 1)` 로 넣고, 142 진입 0x1c46c 가 날마다 그 배열을 제자리에서
+ * 돌리거나 맞바꾼다 (`entities/pitcher-career/model/myPitcherRecord`).
  */
 
 /** 내 선수 줄의 붙박이 표 칸 표지 — 원본 레코드 +0 = 0xfe (등록 0x10ff8 · 0x110e2) */
@@ -61,6 +62,11 @@ export interface NariTeamRecord {
   readonly batters: readonly NariRecordBatter[]
   /** 투수 배열 8번 칸의 마투수 번호 0~4 — 없으면 `NO_RECORD_ACE` */
   readonly acePitcher: number
+  /**
+   * 투수편 내 팀만 — 투수 배열 차례(마투수 8번 칸은 빼고): 붙박이 표 칸 0~7 · 내 투수 `MY_RECORD_SLOT`. 앞이 선발, 뒤가 벤치 차례.
+   * 마투수는 `acePitcher` 가 들고 8번 칸에 끼운다(옛 8번은 맨 끝 — 0xb521c 0x60 갈래). 없으면(옛 저장) 보직·날짜로 세운다.
+   */
+  readonly pitchers?: readonly number[]
 }
 
 /** 열 팀 레코드 (첨자 = 팀 번호 0~9) */

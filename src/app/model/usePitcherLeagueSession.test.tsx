@@ -1355,7 +1355,9 @@ describe('전역기록 +0x4f(모드 3 경기 중간 저장) — 142 확인 · �
     const { calls, rendered } = 손잡이띄우기()
     const { result } = rendered
     act(() => result.current.actions.create('투수', 신인))
-    act(() => result.current.actions.save({ ...result.current.career!, gamesPlayed: 4, seasonEndState: 109 }))
+    // 레코드가 없던 옛 저장 — 남은 match.aces 를 레코드에 넣는다
+    const { nariTeams: _없음, ...옛저장 } = result.current.career!
+    act(() => result.current.actions.save({ ...옛저장, gamesPlayed: 4, seasonEndState: 109 }))
     const aces = { myBatter: 0, myPitcher: 0, opponentPitcher: 4, opponentBatter: 1 }
     act(() => result.current.actions.resumeInterruptedGame({ aces, isNationalCup: false }))
     expect(result.current.scene).toBe('경기')

@@ -199,22 +199,17 @@ const TEAMMATE_PITCHER_NUMBER_BASE = -100
 const OPPONENT_PITCHER_NUMBER_BASE = -200
 
 /**
- * **내 투수가 우리 팀 투수 목록에서 서는 칸.** 웹 로스터(`teamPitchers`, 팀마다 8명)에는 내 육성 투수가 없어
- * 그 뒤 칸 번호(8)를 쓴다.
- *
- * ⚠️ **근사 — 원본 목록의 크기·내 투수 자리가 미해결이다.** 원본은 내 투수 레코드가 팀 투수 목록 어딘가(`0x1faa1`
- * 가 찾는 자리 p)에 들어 있고, 선발이면 새 시즌 `0x1b684` 가 그 자리와 0번을 맞바꾸고(그래서 0번이던 투수가 p 로),
- * 그 뒤 날마다 `0xa4f60` 의 k 로 0↔k 를 맞바꾼다 (P1 1-1·1-2). 구원이면 p 에 그대로 남고 0~3 이 돈다.
- * 웹은 **p = 목록 끝(8)** 으로 둔다 — 그래서 팀 투수가 원본(8명으로 보임)보다 하나 많은 9명이다
- * (`ourPitcherOrderOf`). 이 자리는 벤치 차례로 드러난다: 교체 AI 의 "벤치 마지막"(0xac360)·`0xabfcc` 동률·구원 갈래
- * 최소 벤치 `r7`(0xc1c46).
+ * **내 투수 줄의 웹 칸 번호.** 웹 로스터(`teamPitchers`, 팀마다 8명)에는 내 육성 투수가 없어 그 뒤 번호(8)를 붙인다 — 칸 번호일
+ * 뿐 배열 자리가 아니다. 원본 배열 자리는 등록 0x10fb4 가 정한다(선발 0번 `[나, 1…7, 0]` · 구원 7번 `[0…6, 나, 7]` — 옛 그 칸
+ * 선수는 맨 끝, 팀 투수 9명). 그 배열은 나리 팀 레코드가 들고(`ourPitcherOrder`), 날마다 0x1c46c 가 0↔k 맞바꿈·0~3 돌리기를
+ * 영구로 한다 (`entities/pitcher-career/model/myPitcherRecord`). 벤치 차례로 드러난다: 교체 AI 의 "벤치 마지막"(0xac360)·
+ * `0xabfcc` 동률·구원 갈래 최소 벤치 `r7`(0xc1c46).
  */
 export const MY_PITCHER_SLOT = PITCHERS_PER_TEAM
 
 /**
- * **우리 팀 마투수의 웹 칸 번호** — 원본은 `0xb521c` 가 목록 **8번 칸**에 넣고 옛 8번을 맨 끝으로 옮긴다. 웹은 8 을 내 투수
- * (`MY_PITCHER_SLOT`, 근사)가 쓰고 있어 다른 번호(9)를 붙인다 — 목록 차례로는 원본대로 8번 자리에 앉고 내 투수가 끝으로
- * 간다(`ourPitcherOrderOf`). 상대 팀 마투수는 `ACE_PITCHER_SLOT`(8) 그대로다.
+ * **우리 팀 마투수의 웹 칸 번호** — 원본은 `0xb521c` 가 목록 **8번 칸**에 넣고 옛 8번을 맨 끝으로 옮긴다. 웹은 번호 8 을 내 투수
+ * (`MY_PITCHER_SLOT`)가 쓰고 있어 다른 번호(9)를 붙인다 — 목록 차례로는 원본대로 8번 자리에 앉는다(`ourPitcherOrderOf`). 상대 팀 마투수는 `ACE_PITCHER_SLOT`(8) 그대로다.
  */
 export const OUR_ACE_PITCHER_SLOT = MY_PITCHER_SLOT + 1
 
@@ -323,6 +318,12 @@ export interface PitcherGameOptions {
    * 안 넘기면 날짜 g 로 돈 4인 로테이션 — 첫 시즌 정규시즌에서만 원본과 같다.
    */
   readonly opponentPitcherOrder?: readonly number[]
+  /**
+   * **우리 팀 투수 배열** — 저장의 나리 팀 레코드(내 팀)가 든 차례, 142 진입이 오늘 준비(0x1b684 · 0xa4f60 맞바꿈 · 0xb8c80
+   * 돌리기)를 넣은 뒤다 (`entities/pitcher-career/model/myPitcherRecord`). 내 투수 줄은 `MY_PITCHER_SLOT`. 마투수는 넣기 전.
+   * 안 넘기면 보직·날짜 g 로 세운 예전 셈(`rosterOurPitcherOrderOf`).
+   */
+  readonly ourPitcherOrder?: readonly number[]
   /**
    * 양 팀 투수 칸(붙박이 표 칸 0~7)별 **레코드 스태미나** `+0x2c` — 리그 표에서 이어 온 값. 벤치 투수는 이 값으로 올라온다.
    * 우리 팀 표의 내 자리(`MY_PITCHER_SLOT`)는 `stamina` 가 든다. 안 넘기면 모두 10000.
@@ -565,12 +566,13 @@ function rotatedPitcherSlots(dayCounter: number): number[] {
  * 오늘 **우리 팀 투수 목록**의 차례 — 0번이 선발이고 나머지가 그 차례대로 벤치다 (`0xb891c` 의 `team[i] = i`,
  * `0xb8b08(team, i)` = 벤치 i 번).
  *
- * - 선발 보직: 새 시즌 `0x1b684` 가 내 투수를 0번에 올린 목록 `[나, 1, …, 7, 0]`(0번이던 투수가 내 자리로 — `MY_PITCHER_SLOT`
- *   주석의 근사) 위에서 `0xa4f60` 의 k 로 0↔k 를 맞바꾼다. 내 선발 날(g 짝수)은 맞바꿈이 되돌아와 내가 0번이다.
- * - 그 밖(구원): 0~3 이 날마다 돌고(0xb8c80) 나는 끝에 그대로 있다.
+ * 리그 경기는 레코드 차례(`options.ourPitcherOrder`)를 받는다. 안 넘긴 길의 예전 셈:
+ * - 선발 보직: 등록 꼴 `[나, 1, …, 7, 0]` 위에서 `0xa4f60` 의 k 로 0↔k 를 맞바꾼다. 내 선발 날(g 짝수)은 맞바꿈이 되돌아와
+ *   내가 0번이다 (레코드 차례와 같다).
+ * - 그 밖(구원): 0~3 이 날마다 돌고(0xb8c80) 나는 끝 — 원본 등록 꼴(나 7번)과 다르다.
  */
 export function ourPitcherOrderOf(options: PitcherGameOptions): number[] {
-  const order = rosterOurPitcherOrderOf(options)
+  const order = options.ourPitcherOrder === undefined ? rosterOurPitcherOrderOf(options) : [...options.ourPitcherOrder]
   // 142 가 명부 8번 칸에 마투수를 넣었으면 옛 8번(웹 목록 끝)은 맨 끝으로 밀린다 (0xb521c b527e~b528e)
   if (gameAcePitcherOf(teamAcesOf(options, true).pitcher, undefined) === undefined) return order
   return [...order.slice(0, ACE_PITCHER_LIST_INDEX), OUR_ACE_PITCHER_SLOT, ...order.slice(ACE_PITCHER_LIST_INDEX)]

@@ -15,6 +15,7 @@ import {
   nextPitcherOpponentOf,
   spendPitcherCycleAction,
   pitcherLeagueGameSetupOf,
+  prepareMyPitcherMatch,
   startNextPitcherSeason,
   withPitcherGameLeagueRecords,
   withPitcherGameStaminas,
@@ -323,6 +324,8 @@ function normalizePitcherCareer(raw: unknown): PitcherCareer | null {
      * 슬롯 단계(+0x1c6)는 바탕의 0 이 그대로 들어간다.
      */
     equippedSkillIds: saved.equippedSkillIds ?? rebuildEquippedSkillIds(saved.skillIds ?? base.skillIds),
+    // 나리 팀 레코드는 바탕(기본 팀·선발 보직의 등록 꼴)을 쓰면 안 된다 — 없던 옛 저장은 없는 채로(`nariTeamsOf` · 날짜 셈이 세운다)
+    nariTeams: saved.nariTeams,
   }
 }
 
@@ -788,11 +791,15 @@ export function usePitcherLeagueSession(
       matchPreparedRef.current = true
       const aces = rollNariMatchAces(random, openedAces)
       setMatchAces(aces)
-      // 1c62e~1c660 — 굴린 넷을 두 팀 레코드에 넣는다(저장에 남는다 — 빼는 코드가 없다)
-      commitWith((current) => ({
-        ...current,
-        nariTeams: seatNariMatchAces(nariTeamsOf(current), current.teamId, nextPitcherOpponentOf(current), aces),
-      }))
+      // 1c574~1c5ea — 내 팀 투수 배열을 오늘 준비대로(g == 0 0x1b684 · 0xa4f60 돌리기/맞바꿈), 포지션 코드 · g == 0 스태미나
+      // (0x1c8a8) 도 같은 문 안이다. 1c62e~1c660 — 굴린 넷을 두 팀 레코드에 넣는다(저장에 남는다 — 빼는 코드가 없다)
+      commitWith((current) => {
+        const prepared = prepareMyPitcherMatch(current)
+        return {
+          ...prepared,
+          nariTeams: seatNariMatchAces(nariTeamsOf(prepared), prepared.teamId, nextPitcherOpponentOf(prepared), aces),
+        }
+      })
     }
     setEntryView(null)
     setScene('경기준비')
