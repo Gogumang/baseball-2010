@@ -32,9 +32,9 @@ describe('표 다섯 줄 (0x872a0)', () => {
     ])
   })
 
-  it('⚠️ 시즌 창은 창+0x20 == 2 라 투수도 타자 이름표(336~339)로 뜬다 — 원본 그대로', () => {
-    const { rows } = seasonPlayerDetailViewOf(투수(), 건강())
-    expect(rows.map((row) => row.labelFrame)).toEqual([336, 337, 338, 339, 84])
+  it('이름표 — 0x87320~0x8734a: 시즌(창+0x20 == 2) · [창+0x174] == 0xda 에서 투수면 340~343, 타자면 336~339', () => {
+    expect(seasonPlayerDetailViewOf(투수(), 건강()).rows.map((row) => row.labelFrame)).toEqual([340, 341, 342, 343, 84])
+    expect(seasonPlayerDetailViewOf(타자(), 건강()).rows.map((row) => row.labelFrame)).toEqual([336, 337, 338, 339, 84])
   })
 
   it('변화 칸은 팀 능력치 보정이 빠진(0xb570c 마지막 인자 0) 시즌 내 팀 값 — 사기 정액 · 코치', () => {

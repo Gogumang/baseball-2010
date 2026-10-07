@@ -11,7 +11,7 @@ import {
 } from '@/entities/season-mode/model/seasonPlayerRecord'
 import type { SeasonPlayerRecordView } from '@/entities/season-mode/model/seasonPlayerRecord'
 import { TEAM_GAME_MODE, gameAbilityOf, hasPositionMismatch } from '@/features/play-team-game/model/gameAbilities'
-import { BATTER_DETAIL_LABEL_FRAMES, detailRowsFromSlots } from '@/pages/management/lib/detailPopup'
+import { BATTER_DETAIL_LABEL_FRAMES, PITCHER_DETAIL_LABEL_FRAMES, detailRowsFromSlots } from '@/pages/management/lib/detailPopup'
 import type { DetailView } from '@/pages/management/lib/detailPopup'
 
 /**
@@ -28,8 +28,16 @@ import type { DetailView } from '@/pages/management/lib/detailPopup'
  *         변화 = 0xb570c(팀레코드, k, 선수, 1, 체력 100, 0) − 현재       ; 마지막 0 = 팀 능력치 보정 끔(0xb592c)
  * 사기 줄  현재 = (s16) 팀레코드+2 · 최대 100 · 변화 0 · 넷째(보너스) 칸은 모두 0
  * ```
- * 표 이름표는 0x872d4 가 `0x7b984(창)`(창+0x20 == 3)일 때만 투수 이름표 340~343 으로 바꾼다 — 시즌은 창+0x20 이 2 라
- * ⚠️ **투수도 타자 이름표(히트·파워·수비·주루)로 뜬다.** 원본 그대로.
+ * 표 이름표 (그리기 0x872d4 — 시즌 장면 그리기 0xf25c 가 [장면+0xc0] 창으로 부른다, 직접 떴다):
+ * ```
+ * 기본 [sp+0x80..] = 0xd4ad8 표 336 · 337 · 338 · 339 (히트·파워·수비·주루)
+ * 87314  0x7b984(창) (창+0x20 == 3, 투수편)            → 340~343
+ * 87320  0x7b998(창) (창+0x20 == 2, 시즌) 이고
+ * 87332    [창+0x174] == 0xda → 0xb6278([창+0x148] 선수) 참이면 340~343 (제구·구속·변화·체력), 거짓이면 기본
+ *          [창+0x174] ≠ 0xda → 46 · 347 · 204 · 205 (다른 시즌 창)
+ * ```
+ * [창+0x174] 는 시즌 상태 들어옴 0xe9ac 가 0xd3 · 0xdf · 0xe8 이 아니면 `0x7e84c(창, 상태)` 로 적는다 → 0xda 에서는 0xda.
+ * 그래서 **투수는 투수 이름표 340~343 으로 뜬다** (정정: 7264a07 의 "시즌은 타자 이름표" 는 0x87320~0x8734a 갈래를 놓쳤다).
  *
  * **글 줄** (창+0x354 + 4i, 개수 +0x37c · 스크롤 +0x380 = 0) — 이 차례로 조건이 맞는 것만:
  * ```
@@ -112,8 +120,8 @@ export function seasonPlayerDetailViewOf(view: SeasonPlayerRecordView, context: 
   const base = [0, 1, 2, 3].map((slot) => view.base[slot] ?? 0)
   const effective = [0, 1, 2, 3].map((slot) => seasonDetailEffectiveOf(view, slot, context))
   const rows = detailRowsFromSlots(
-    // 창+0x20 == 2 — 0x872d4 는 투수 이름표로 바꾸지 않는다
-    BATTER_DETAIL_LABEL_FRAMES,
+    // 0x87320~0x8734a: 시즌(창+0x20 == 2) ∧ [창+0x174] == 0xda ∧ 0xb6278(선수) → 340~343
+    view.isPitcher ? PITCHER_DETAIL_LABEL_FRAMES : BATTER_DETAIL_LABEL_FRAMES,
     { ability: base, morale: context.teamMorale },
     { ability: seasonAbilityLimitsOf(view), morale: MORALE_LIMIT },
     { ability: effective.map((value, slot) => value - (base[slot] ?? 0)), morale: 0 },
