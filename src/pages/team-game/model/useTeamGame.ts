@@ -331,6 +331,8 @@ export function useTeamGame(
               outcome: pending.outcome,
               carryDistance: carryDistanceOf(pending.input.trajectory),
               caughtOnTheFly: played.caughtOnTheFly,
+              // 파울로 닫힌 판에는 60 이 없다 — 콜은 결과 코드 7 메시지 51c5c 의 25 하나(`inPlayCallSoundIdOf` 의 `foulEnded`)
+              foulEnded: played.foulEnded,
             }),
             inPlayCallSoundIdOf(pending.outcome, {
               ...played,

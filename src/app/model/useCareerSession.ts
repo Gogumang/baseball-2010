@@ -781,9 +781,8 @@ export function useCareerSession({
         setProgress(thrown)
       }
       // 파울 각 공 — 원본은 맞은 공이면 각과 무관하게 판(상태 0x17)을 돈다(메시지 0x11 → 0x13 → 0x17). 스트라이크(0xb6b58) ·
-      // 연속 파울(0xa7dbc)은 판이 파울로 닫힐 때(`finishDefensePlay`)다. 공 도착 판(0x3dfac)은 못 맞힌 공만이라 열지 않는다.
-      // 필살타법 성공 굴림(0x517e6)도 판 시작이 한다(`foulContact` 의 재료 — 타석 화면의 셋째 인자는 파울에 늘 거짓)
-      // ⚠️ 파울 콜 25 는 아직 공 판정 자리(`pitchCallSoundIdOf`)에서 낸다 — 원본은 판의 결과 코드 7 메시지 51c5c
+      // 연속 파울(0xa7dbc) · 파울 콜 25(51c5c)는 판이 파울로 닫힐 때(`finishDefensePlay`)다 — 여기서는 타구음만 낸다.
+      // 공 도착 판(0x3dfac)은 못 맞힌 공만이라 열지 않는다. 필살타법 성공 굴림(0x517e6)도 판 시작이 한다(`foulContact`)
       if (detail.resolution.kind === '파울' && detail.foulContact !== undefined) {
         const beforeFoul = progressRef.current
         if (beforeFoul === null) return
@@ -793,7 +792,7 @@ export function useCareerSession({
         })
         progressRef.current = started
         setProgress(started)
-        playSoundIds(audio, [detail.contactSoundId, pitchCallSoundIdOf(detail.resolution, runner.atBatRef.current)])
+        playSoundIds(audio, [detail.contactSoundId])
         if (started.pendingDefensePlay === null) return
         foulPlayRef.current = true
         runner.setIsPaused(true)
@@ -1064,10 +1063,10 @@ export function useCareerSession({
       setProgress(resolved)
       if (played.foulEnded === true) {
         // 파울로 닫힌 판 — 0xae3e8 ae568 → 0xf(같은 타석 다음 공) · 0x35108 → 0xb6b58(스트라이크 ≤ 1 이면 +1).
-        // 결과 코드 7 메시지 51c5c 의 연속 파울(0xa7dbc)이 이 판의 것이다(⚠️ 원본은 7 이 난 틱 — 판 끝은 근사)
+        // 결과 코드 7 메시지 51c5c 의 연속 파울(0xa7dbc)과 파울 콜 25 가 이 판의 것이다(⚠️ 원본은 7 이 난 틱 — 판 끝은 근사)
         runner.applyPitch({ kind: '파울' })
         pitchTallyRef.current = tallyPitch(pitchTallyRef.current, { kind: '파울' })
-        playSoundIds(audio, gameStepSoundIdsOf(current, resolved))
+        playSoundIds(audio, [inPlayCallSoundIdOf(pending.outcome, played), ...gameStepSoundIdsOf(current, resolved)])
         runner.setIsPaused(false)
         return
       }

@@ -488,10 +488,9 @@ export function useMissionSession({
         )
       }
       const hasSwung = detail.hasSwung
-      // 파울 각 공 — 원본은 맞은 공이면 각과 무관하게 판(상태 0x17)을 돈다(메시지 0x11 → 0x13 → 0x17). 스트라이크(0xb6b58)는
-      // 판이 파울로 닫힐 때(`finishDefensePlay`)다. 공 도착 판(0x3dfac)은 못 맞힌 공만이라 열지 않는다.
-      // 필살타법 성공 굴림(0x517e6)도 판 시작이 한다(`foulContact` 의 재료)
-      // ⚠️ 파울 콜 25 는 아직 공 판정 자리(`pitchCallSoundIdOf`)에서 낸다 — 원본은 판의 결과 코드 7 메시지 51c5c
+      // 파울 각 공 — 원본은 맞은 공이면 각과 무관하게 판(상태 0x17)을 돈다(메시지 0x11 → 0x13 → 0x17). 스트라이크(0xb6b58) ·
+      // 파울 콜 25(51c5c)는 판이 파울로 닫힐 때(`finishDefensePlay`)다 — 여기서는 타구음만 낸다. 공 도착 판(0x3dfac)은 못 맞힌
+      // 공만이라 열지 않는다. 필살타법 성공 굴림(0x517e6)도 판 시작이 한다(`foulContact` 의 재료)
       const foulRun = missionRunRef.current
       if (
         detail.resolution.kind === '파울' &&
@@ -501,7 +500,7 @@ export function useMissionSession({
       ) {
         const foulOutcome = registerContact(FOUL_PLAY_OUTCOME, detail.foulContact)
         const foulStealing = takeStealingFrom()
-        playSoundIds(audio, [detail.contactSoundId, pitchCallSoundIdOf(detail.resolution, runner.atBatRef.current)])
+        playSoundIds(audio, [detail.contactSoundId])
         // 배트를 냈다 — 스윙 수는 휘두른 자리에서 준다. 다 썼는지는 판이 파울로 닫힌 뒤 본다
         if (hasSwung) setMissionRun((previous) => (previous === null ? previous : recordSwing(previous)))
         setPendingDefensePlay({
@@ -939,7 +938,8 @@ export function useMissionSession({
       setPendingDefensePlay(null)
       if (pending.isFoulPlay === true && played.foulEnded === true) {
         // 파울로 닫힌 판 — 0xae3e8 ae568 이 정산 없이 0xf(같은 타석 다음 공) · 0x35108 이 0xa975c(주자를 판 앞 자리로) ·
-        // 0xb6b58(스트라이크 ≤ 1 이면 +1)
+        // 0xb6b58(스트라이크 ≤ 1 이면 +1). 콜은 결과 코드 7 메시지 51c5c 의 25(⚠️ 원본은 7 이 난 틱 — 판 끝은 근사)
+        playSoundIds(audio, [inPlayCallSoundIdOf(pending.outcome, played)])
         runner.applyPitch({ kind: '파울' })
         if (pending.side === '투수') {
           setPitcherRun((previous) => (previous === null ? previous : checkPitchExhausted(previous)))

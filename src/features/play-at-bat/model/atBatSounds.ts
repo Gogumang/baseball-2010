@@ -141,7 +141,13 @@ export function contactSoundIdOf(input: ContactSoundInput): number | null {
  * | 스트라이크 (v1 기본) | **18** "Strike!" | 0x51aa2 |
  * | 스트라이크 카운트 2 (v1) | **39** "Strike two!" | `[sp+0xa4]+4 == 2` |
  * | 삼진 (v5) | **21** "Strike out!" | 0x51bf6 |
- * | 파울 (v7) | **25** "Foul!" | 0x51c5c · R2 8절 확정 |
+ * | 파울 (v7) | 여기서 **안 낸다** — 판 끝 `inPlayCallSoundIdOf`(`foulEnded`)가 25 | 아래 |
+ *
+ * **파울 콜 25 는 수비 판 안의 소리다**: 맞은 공은 파울 각이라도 판(상태 0x17)을 돌고, 낙구 · 담장선 틱 b44f6 의 0x9d5bc 가
+ * 7 을 내면 b457c 메시지 0xbba(7) → 화면 51a56 이 state[0xb] = 7 로 표 0xd0488[6] = **51c5c** 에 가서 `0x6ea6d(소리, 0x19)`
+ * (25 "Foul!") · 0xa7dbc(연속 파울)를 부른다 — 모드 검사가 없다. 공 판정 0x9d57c 는 7 을 내지 않는다. 그래서 공 판정 자리의
+ * '파울' 은 콜이 없고, 판이 파울로 닫힌 자리에서 낸다(⚠️ 원본은 판이 닫히는 때가 아니라 7 이 난 그 틱 — 함성 60 과 같은 근사).
+ * 낙구 전에 잡힌 파울 각 공(뜬공 아웃 13)은 7 이 안 나 25 도 없고, 아웃 콜(62)이 난다.
  *
  * ⚠️ **추정**: 39 의 조건 `[sp+0xa4]+4 == 2` 가 **올린 뒤**의 스트라이크 수인지 올리기 전인지는
  * 문서에 없다. 여기서는 올린 뒤로 읽어 두 번째 스트라이크에 39 를 낸다.
@@ -157,7 +163,8 @@ export function pitchCallSoundIdOf(resolution: PitchResolution, atBat: AtBatStat
       if (atBat.outcome?.kind === '삼진') return 21
       return atBat.strikes === 2 ? 39 : 18
     case '파울':
-      return 25
+      // 파울 콜 25 는 판의 결과 코드 7(51c5c)에서 난다 — `inPlayCallSoundIdOf` 의 `foulEnded`
+      return null
     case '타구':
       return null
   }
@@ -227,11 +234,14 @@ export interface DefenseCallContext {
    */
   readonly outcome?: AtBatOutcome
   /**
-   * **파울로 닫힌 판**인가 — 수비 진행기 `DefensePlayResult.foulEnded`. 판의 콜은 결과 코드 7 메시지(51c5c)의 25("Foul!") 하나다.
-   * ⚠️ 웹 세션은 그 25 를 공 판정 자리(`pitchCallSoundIdOf` 의 '파울')에서 이미 낸다 — 판 끝에서는 아무 콜도 안 낸다
+   * **파울로 닫힌 판**인가 — 수비 진행기 `DefensePlayResult.foulEnded`. 판의 콜은 결과 코드 7 메시지(51c5c)의 25("Foul!") 하나다
+   * (0x6ea6d(소리, 0x19) — 모드 검사 없음). 정산(0xa8024)이 없어 아웃 · 세이프 · 홈런 콜은 없다.
    */
   readonly foulEnded?: boolean
 }
+
+/** "Foul!" — 판의 결과 코드 7 메시지 51c5c (`movs r1,#0x19` → 0x6ea6d) */
+export const FOUL_CALL_SOUND = 25
 
 /** 아웃 콜 두 가지 — 62 는 "잡아서/태그해서 낸 아웃", 20 은 "루에서 잡은 포스 아웃" */
 const CAUGHT_OUT_CALL = 62
@@ -249,6 +259,7 @@ const SAFE_CALL = 17
  * | 아웃 (v11) | **62** | 0x51b20 → `movs r1,#0x3e` (조건 없음) |
  * | 아웃 (v13) | **62** 또는 **20** | 0x51b36 (아래) |
  * | 안타 (v6·v10) | 소리 없음 | 0x51d32·0x51d24 — 원본도 안 낸다 |
+ * | 파울 (v7) | **25** | 0x51c5c — 파울로 닫힌 판(`foulEnded`) |
  *
  * **62 / 20 을 가르는 자리 (0x51b36~0x51b48, 디스어셈 재확인 — 확정):**
  * ```
@@ -304,7 +315,7 @@ const SAFE_CALL = 17
  */
 export function inPlayCallSoundIdOf(atBatOutcome: AtBatOutcome, play?: DefenseCallContext | null): number | null {
   // 파울로 닫힌 판 — 정산이 없고(0xae3e8 ae568) 콜은 결과 코드 7 의 25 뿐이다(위 칸 주석)
-  if (play?.foulEnded === true) return null
+  if (play?.foulEnded === true) return FOUL_CALL_SOUND
   // 판을 돈 타구는 정산 결과로 고른다 — 타석 결과는 타석을 끝낸 임시 값이다
   const outcome = play?.outcome ?? atBatOutcome
   if (outcome.kind === '홈런') return 11
@@ -340,6 +351,11 @@ export interface DeepHitCheerInput {
   readonly carryDistance: number
   /** 뜬 채로 잡혔는가 — 잡혔으면 원본 `플레이+0x113` 이 서지 않는다 */
   readonly caughtOnTheFly?: boolean
+  /**
+   * 파울로 닫힌 판인가 (`DefensePlayResult.foulEnded`) — 원본 `공+0xac4` 는 **페어 각**의 깊은 낙구에만 서서(0xa29bc) 파울에는
+   * 60 이 없다. 파울 판의 임시 결과 칸은 판 앞 예측이라 안타일 수도 있어 따로 막는다
+   */
+  readonly foulEnded?: boolean
 }
 
 /**
@@ -365,6 +381,7 @@ export interface DeepHitCheerInput {
  * 세기가 모자라 홈런이 되지 못한 24~26 타구는 원본이라면 안 낼 함성을 내게 된다.
  */
 export function deepHitCheerSoundIdOf(input: DeepHitCheerInput): number | null {
+  if (input.foulEnded === true) return null
   if (input.outcome.kind === '홈런') return null
   if (input.caughtOnTheFly === true) return null
   if (input.outcome.kind === '아웃' && (input.outcome.detail === '뜬공아웃' || input.outcome.detail === '직선타아웃')) {

@@ -76,7 +76,7 @@ describe('투수편 화면의 소리 배선', () => {
     expect(녹음.played[0]).toBe(PITCH_RELEASE_SOUND)
 
     // 심판 콜은 난수가 정한다 — 몇 개 더 던져 볼·스트라이크 계열이 통로까지 가는지 본다
-    // (16 "Ball!" · 18 "Strike!" · 39 "Strike two!" · 21 삼진 · 24 볼넷 · 25 파울)
+    // (16 "Ball!" · 18 "Strike!" · 39 "Strike two!" · 21 삼진 · 24 볼넷 · 25 파울 — 25 는 파울 판이 닫힐 때)
     for (let pitch = 0; pitch < 12; pitch += 1) {
       if (result.current.progress.pendingDefensePlay !== null) {
         act(() => result.current.actions.finishDefensePlay())
@@ -196,5 +196,61 @@ describe('투수편 화면의 소리 배선', () => {
       unmount()
     }
     expect(대타소리).toBe(1)
+  })
+})
+
+describe('CPU 타자의 파울 각 공 판 — 판이 끝날 때 콜 (결과 코드 7 메시지 51c5c)', () => {
+  it('파울로 닫힌 판은 "Foul!" 25, 낙구 전에 잡힌 판(파울 뜬공 아웃)은 잡은 아웃 콜 62 — 공 판정 자리에서는 25 가 안 난다', () => {
+    let 파울 = 0
+    let 뜬공 = 0
+    for (let seed = 1; seed <= 3 && 파울 < 3; seed += 1) {
+      녹음.played.length = 0
+      const { result, unmount } = 띄우기(seed)
+      for (let pitch = 0; pitch < 300 && 파울 < 3; pitch += 1) {
+        const 진행 = result.current.progress
+        if (진행.pendingDefensePlay !== null) {
+          const pending = 진행.pendingDefensePlay
+          // 파울 각 공 판은 타석이 아직 안 끝났다(타석 칸에 결과가 없다)
+          const 파울판 = 진행.atBat.outcome === null
+          const played = runDefensePlay(pending)
+          녹음.played.length = 0
+          act(() => result.current.actions.finishDefensePlay(played))
+          if (파울판 && played.foulEnded === true) {
+            파울 += 1
+            expect(녹음.played[0]).toBe(25)
+          } else if (파울판) {
+            뜬공 += 1
+            expect(played.caughtOnTheFly).toBe(true)
+            expect(녹음.played).toContain(62)
+            expect(녹음.played).not.toContain(25)
+          }
+          continue
+        }
+        if (진행.managerHookText !== null) {
+          act(() => result.current.actions.confirmManagerHook())
+          continue
+        }
+        if (진행.burst !== null && 진행.burst.current !== null) {
+          act(() => result.current.actions.closeBurst())
+          continue
+        }
+        if (진행.pendingBenchClearing !== null) {
+          act(() => result.current.actions.finishBenchClearing(false))
+          continue
+        }
+        if (진행.sceneConfirmPending === true) {
+          act(() => result.current.actions.confirmScene())
+          continue
+        }
+        if (!result.current.canPitch) break
+        녹음.played.length = 0
+        act(() => result.current.actions.throwPitch({ typeNumber: 1, courseCell: pitch % 9, gaugeCell: 0 }))
+        expect(녹음.played).not.toContain(25)
+      }
+      unmount()
+    }
+    // 이 씨앗들은 파울 뜬공 아웃이 안 나온다(사람 수비 판을 키 없이 돌린다) — 파울 판만 꼭 본다. 뜬공 쪽 콜은 atBatSounds 시험
+    expect(파울).toBeGreaterThan(0)
+    expect(뜬공).toBeGreaterThanOrEqual(0)
   })
 })

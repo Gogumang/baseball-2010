@@ -109,8 +109,8 @@ describe('심판 콜 (판정 스위치 0x51a94)', () => {
     expect(pitchCallSoundIdOf({ kind: '스트라이크', isSwinging: true }, 카운트(0, 3, { kind: '삼진' }))).toBe(21)
   })
 
-  it('파울은 25', () => {
-    expect(pitchCallSoundIdOf({ kind: '파울' }, 카운트(0, 1))).toBe(25)
+  it('파울은 공 판정 자리에서 콜이 없다 — 25 는 판의 결과 코드 7 메시지 51c5c 가 낸다(공 판정 0x9d57c 는 1~5 뿐)', () => {
+    expect(pitchCallSoundIdOf({ kind: '파울' }, 카운트(0, 1))).toBeNull()
   })
 
   it('인플레이 타구는 이 자리에서 안 낸다 — 플레이가 끝나야 콜이 난다', () => {
@@ -151,6 +151,17 @@ describe('플레이가 끝난 뒤의 콜', () => {
     expect(inPlayCallSoundIdOf({ kind: '안타', bases: 2 }, { throwBase: -1, throwArrivalTick: -1 })).toBeNull()
   })
 
+  it('파울로 닫힌 판은 "Foul!" 25 하나다 (결과 코드 7 → 51c5c) — 판 앞 예측 칸이 무엇이든', () => {
+    expect(inPlayCallSoundIdOf({ kind: '안타', bases: 1 }, { foulEnded: true })).toBe(25)
+    expect(inPlayCallSoundIdOf({ kind: '아웃', detail: '뜬공아웃' }, { foulEnded: true, caughtOnTheFly: false })).toBe(25)
+  })
+
+  it('파울 각 공을 낙구 전에 잡은 판(파울 뜬공 아웃 13)은 25 가 아니라 잡은 아웃 콜 62 다', () => {
+    expect(
+      inPlayCallSoundIdOf({ kind: '안타', bases: 1 }, { outcome: { kind: '아웃', detail: '뜬공아웃' }, caughtOnTheFly: true }),
+    ).toBe(62)
+  })
+
   it('삼진·볼넷은 심판 콜 쪽이 이미 냈으므로 여기서 또 내지 않는다', () => {
     expect(inPlayCallSoundIdOf({ kind: '삼진' })).toBeNull()
     expect(inPlayCallSoundIdOf({ kind: '볼넷' })).toBeNull()
@@ -168,6 +179,10 @@ describe('깊은 타구 함성 60 (0x52b62~0x52ba4)', () => {
     expect(deepHitCheerSoundIdOf({ outcome: { kind: '아웃', detail: '뜬공아웃' }, carryDistance: 깊이 })).toBeNull()
     expect(deepHitCheerSoundIdOf({ outcome: { kind: '안타', bases: 3 }, carryDistance: 깊이, caughtOnTheFly: true })).toBeNull()
     expect(deepHitCheerSoundIdOf({ outcome: { kind: '홈런' }, carryDistance: 깊이 })).toBeNull()
+  })
+
+  it('파울로 닫힌 판은 안 낸다 — 공+0xac4 는 페어 각의 깊은 낙구에만 선다', () => {
+    expect(deepHitCheerSoundIdOf({ outcome: { kind: '안타', bases: 2 }, carryDistance: 20_000, foulEnded: true })).toBeNull()
   })
 })
 

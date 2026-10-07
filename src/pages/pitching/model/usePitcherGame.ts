@@ -197,17 +197,20 @@ export function usePitcherGame(
           // **수비 결과를 함께 넘겨야** 원본이 보는 칸(state[0x1f])과 세이프 갈래가 열린다
           // (`atBatSounds.inPlayCallSoundIdOf` 둘째 인자). 함성 60 은 원본이 **낙구 틱**에
           // 내는 것이라 이 자리는 근사다 — 타자편(`useCareerSession`)과 같은 근사·같은 순서다
-          (before) =>
-            before.atBat.outcome === null
-              ? []
-              : [
-                  deepHitCheerSoundIdOf({
-                    outcome: before.atBat.outcome,
-                    carryDistance: carryDistanceOf(pending.trajectory),
-                    caughtOnTheFly: played.caughtOnTheFly,
-                  }),
-                  inPlayCallSoundIdOf(before.atBat.outcome, played),
-                ],
+          // 파울 각 공 판은 타석 칸에 결과가 없다(타석이 아직 안 끝났다) — 파울로 닫히면 결과 코드 7 메시지 51c5c 의 25,
+          // 낙구 전에 잡히면(파울 뜬공 아웃) 판 끝 정산의 아웃 콜이다(`inPlayCallSoundIdOf` 는 `played.outcome` 을 먼저 본다)
+          (before) => {
+            const outcome = before.atBat.outcome ?? played.outcome ?? pending.outcome
+            return [
+              deepHitCheerSoundIdOf({
+                outcome,
+                carryDistance: carryDistanceOf(pending.trajectory),
+                caughtOnTheFly: played.caughtOnTheFly,
+                foulEnded: played.foulEnded,
+              }),
+              inPlayCallSoundIdOf(outcome, played),
+            ]
+          },
         )
       },
       pickoff: (key: string) =>

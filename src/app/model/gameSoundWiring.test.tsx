@@ -10,6 +10,9 @@ import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { GAME_INTRO_SOUND } from '@/features/play-game/model/gameSounds'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
+import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
+import { BATTED_BALL_PATTERNS } from '@/shared/config/original/battedBallPatterns'
+import { isFairAngle } from '@/entities/batting/model/battedBallOutcome'
 import type { SoundPort } from '@/shared/api/audio/soundPort'
 import type { SaveGamePort } from '@/shared/api/save/saveGamePort'
 
@@ -198,5 +201,89 @@ describe('경기 소리 배선', () => {
     act(() => rendered.result.current.session.actions.finishDefensePlay())
 
     expect(played.slice(0, 2)).toEqual([6, 20])
+  })
+})
+
+describe('내 타석의 파울 각 공 — 판을 돌고 판이 파울로 닫힐 때 "Foul!" 25 (결과 코드 7 메시지 51c5c)', () => {
+  const 파울코드 = Object.entries(BATTED_BALL_PATTERNS).flatMap(([code, patterns]) =>
+    patterns.filter((pattern) => !isFairAngle(pattern[0])).map((pattern) => ({ resultCode: Number(code), pattern })),
+  )[0]
+  const 파울 = 공({
+    resolution: { kind: '파울' },
+    hasSwung: true,
+    resultCode: 파울코드.resultCode,
+    pattern: 파울코드.pattern,
+    foulContact: 파울코드,
+    contactSoundId: 6,
+  })
+  const 띄우기 = () => {
+    const 녹음 = 녹음포트()
+    const saveGame = 메모리저장(createCareer('파울판'))
+    const random = createSeededRandom(20100901)
+    const rendered = renderHook(() => {
+      const [screen, setScreen] = useState<Screen>({ kind: '메인메뉴' })
+      const runner = useAtBatRunner()
+      return { runner, session: useCareerSession({ runner, random, saveGame, screen, setScreen, sound: 녹음.port }) }
+    })
+    떼어낼것.push(() => act(() => rendered.unmount()))
+    act(() => rendered.result.current.session.actions.continueSaved())
+    act(() => rendered.result.current.session.actions.runCommand('다음경기'))
+    act(() => rendered.result.current.session.actions.confirmNextGameStandings())
+    act(() => rendered.result.current.session.actions.confirmMatchPrepare())
+    act(() => rendered.result.current.session.actions.finishLoading())
+    녹음.played.length = 0
+    return { rendered, played: 녹음.played }
+  }
+
+  it('공 판정 자리에서는 타격음만 — 스트라이크는 판이 닫힐 때까지 안 오르고, 파울로 닫히면 +1 · 25 · 다음 공', () => {
+    const { rendered, played } = 띄우기()
+    act(() => rendered.result.current.session.handlePitchResolved(파울))
+
+    expect(played).toEqual([6])
+    const pending = rendered.result.current.session.progress?.pendingDefensePlay ?? null
+    expect(pending).not.toBeNull()
+    expect(pending?.strikes).toBe(0)
+    expect(rendered.result.current.runner.atBat.strikes).toBe(0)
+    expect(rendered.result.current.runner.isPaused).toBe(true)
+
+    const 경기전 = rendered.result.current.session.progress?.game
+    // 판이 파울로 닫힌 결과 — 진행기의 `foulEnded`(0x9d5bc 가 7) 갈래만 본다
+    act(() =>
+      rendered.result.current.session.actions.finishDefensePlay({
+        ...runDefensePlay(pending!),
+        foulEnded: true,
+        outcome: undefined,
+        caughtOnTheFly: false,
+      }),
+    )
+
+    expect(played).toEqual([6, 25])
+    expect(rendered.result.current.session.progress?.pendingDefensePlay).toBeNull()
+    expect(rendered.result.current.session.progress?.game).toEqual(경기전)
+    expect(rendered.result.current.runner.atBat.strikes).toBe(1)
+    expect(rendered.result.current.runner.isPaused).toBe(false)
+  })
+
+  it('낙구 전에 잡힌 파울 각 공(파울 뜬공 아웃)은 25 없이 잡은 아웃 콜 62 로 타석이 끝난다', () => {
+    const { rendered, played } = 띄우기()
+    act(() => rendered.result.current.session.handlePitchResolved(파울))
+    const pending = rendered.result.current.session.progress!.pendingDefensePlay!
+    const 경기전 = rendered.result.current.session.progress!.game
+    const played판 = runDefensePlay(pending)
+    act(() =>
+      rendered.result.current.session.actions.finishDefensePlay({
+        ...played판,
+        foulEnded: undefined,
+        foulStrikes: undefined,
+        outcome: { kind: '아웃', detail: '뜬공아웃' },
+        caughtOnTheFly: true,
+        advance: { bases: pending.bases, runsScored: 0, outsAdded: 1 },
+      }),
+    )
+
+    expect(played.slice(0, 2)).toEqual([6, 62])
+    expect(played).not.toContain(25)
+    const 뒤 = rendered.result.current.session.progress!.game
+    expect(뒤.outs !== 경기전.outs || 뒤.half !== 경기전.half || 뒤.inning !== 경기전.inning).toBe(true)
   })
 })
