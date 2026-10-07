@@ -1685,8 +1685,12 @@ export function useCareerSession({
     },
 
     /** [!] 장소에서 [들어가기] — 0x8ce58: 112 진입에 찍어 둔 그 장소 칸의 이벤트를 본다(다시 훑지 않는다) */
+    /**
+     * 113 칸 0 [들어가기] (키 0x16c64 의 0x16c8a~0x16cee, 직접 떴다) — 행동(S+4) · 인기도 가드가 없다(가드 0x16cf0 은 칸 1
+     * 장소 기능 쪽). 모드 갈림도 없어 투수편 `enterOutingPlace` 와 같다. 이벤트를 고르는 데 굴림은 없다.
+     */
     enterPlace: (place: OutingPlace) => {
-      if (career === null || career.hasActedThisCycle) return
+      if (career === null) return
       // 칸이 비었으면 "특별한 일이 없다" (0x16ccc — 440 + 장소)
       const eventId = outingSlots.get(place.id) ?? emptyPlaceEventId(place.frame)
       setScreen({ kind: '이벤트', eventId, context: '장소' })

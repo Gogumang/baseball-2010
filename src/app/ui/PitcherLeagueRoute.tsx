@@ -166,7 +166,6 @@ export function PitcherLeagueRoute({
 
   const outingMap = (
     <OutingMapScreen
-      career={career}
       noticeText={session.outingNotice}
       onRun={actions.runOutingFunction}
       // 112 취소 → 105 (키 0x13ba4)

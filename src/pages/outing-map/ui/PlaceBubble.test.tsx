@@ -18,7 +18,6 @@ const 띄우기 = (overrides: Partial<Parameters<typeof PlaceBubble>[0]> = {}) =
   render(
     <PlaceBubble
       place={경기장}
-      canEnter
       onEnter={vi.fn()}
       onRun={vi.fn()}
       onClose={vi.fn()}
@@ -76,13 +75,13 @@ describe('장소 기능 말풍선', () => {
     expect(onRun).toHaveBeenCalledWith(경기장.functions[0].id)
   })
 
-  it('이번 주기에 이미 행동했으면 [들어가기] 가 아무 일도 하지 않는다', () => {
+  it('[들어가기] 는 행동 가드가 없다 — 113 키 0x16c64 칸 0 은 곧장 배정 이벤트(0x8ce59)를 부른다', () => {
     const onEnter = vi.fn()
-    띄우기({ canEnter: false, onEnter })
+    띄우기({ onEnter })
 
     fireEvent.click(screen.getAllByRole('button')[0])
 
-    expect(onEnter).not.toHaveBeenCalled()
+    expect(onEnter).toHaveBeenCalledOnce()
   })
 
   it('위아래 키로 칸을 옮기고 Escape 로 닫는다', () => {

@@ -28,6 +28,7 @@ import { insertMyBatter, nariQuickLineupOf, seatAceBatter, tableNariTeamRecord }
 import type { QuickLineup } from '@/entities/game/model/quickLineup'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
+import { OUTING_PLACES } from '@/shared/config/outingPlaces'
 import { BATTED_BALL_PATTERNS } from '@/shared/config/original/battedBallPatterns'
 import { isFairAngle } from '@/entities/batting/model/battedBallOutcome'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
@@ -672,6 +673,16 @@ describe('외출 지도 [!] 칸 — 112 진입 0x118e4 → 0x8cdc0 이 한 번 �
     act(() => rendered.result.current.setScreen({ kind: '관리' }))
     act(() => rendered.result.current.setScreen({ kind: '외출' }))
     expect(rendered.result.current.session.eventPlaceIds).not.toBe(찍은것)
+  })
+
+  it('[들어가기] 는 이번 주기에 행동했어도 들어간다 — 113 키 0x16c64 칸 0 에는 행동 가드가 없다', () => {
+    const rendered = 띄우기({ ...createCareer('외출'), morale: 50, money: 1000 })
+    act(() => rendered.result.current.setScreen({ kind: '외출' }))
+    act(() => rendered.result.current.session.actions.runOutingFunction('외식'))
+    expect(rendered.result.current.session.career?.hasActedThisCycle).toBe(true)
+
+    act(() => rendered.result.current.session.actions.enterPlace(OUTING_PLACES[0]))
+    expect(rendered.result.current.screen).toMatchObject({ kind: '이벤트', context: '장소' })
   })
 })
 

@@ -175,7 +175,6 @@ export function CareerRoutes({
     case '외출':
       return (
         <OutingMapScreen
-          career={career}
           noticeText={session.outingNotice}
           onRun={actions.runOutingFunction}
           onBack={backToManagement}

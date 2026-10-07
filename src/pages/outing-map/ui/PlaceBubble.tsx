@@ -30,8 +30,10 @@ const CORNER_RADIUS = 1
 
 interface PlaceBubbleProps {
   readonly place: OutingPlace
-  /** "들어가기" 를 고를 수 있는가 — 이번 주기에 이미 행동했으면 못 한다 */
-  readonly canEnter: boolean
+  /**
+   * 칸 0 [들어가기] — 113 키 0x16c64 의 OK 갈래(0x16c8a~0x16cee)는 칸 번호가 0 이면 곧장 0x8ce59(배정 이벤트) · 없으면
+   * 0x8bdc9(440 + 장소) 를 부른다. 행동(S+4) · 인기도 가드가 없다 — 가드 0x16cf0 은 칸 1 장소 기능 쪽이다 (직접 떴다).
+   */
   readonly onEnter: () => void
   readonly onRun: (functionId: string) => void
   readonly onClose: () => void
@@ -44,14 +46,14 @@ function cellsOf(box: MapBox) {
   return [first, { ...first, y: first.y + height + CELL_GAP }]
 }
 
-export function PlaceBubble({ place, canEnter, onEnter, onRun, onClose }: PlaceBubbleProps) {
+export function PlaceBubble({ place, onEnter, onRun, onClose }: PlaceBubbleProps) {
   const [selected, setSelected] = useState(0)
   const activity = place.functions[0]
   const labels = ['들어가기', activity?.name ?? '']
   const cells = cellsOf(place.bubbleBox)
 
   const answer = (index: number) => {
-    if (index === 0) return canEnter ? onEnter() : undefined
+    if (index === 0) return onEnter()
     if (activity !== undefined) onRun(activity.id)
   }
 
