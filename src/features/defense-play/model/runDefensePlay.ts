@@ -1903,8 +1903,15 @@ export function stepDefensePlay(
         // **근사**: 원본은 이 판정을 매 틱 돌리지만, 여기서는 **지금 목표 루에 닿아 있을 때만** 묻는다.
         // 안 그러면 달리는 도중에 한 루씩 계속 얹혀 타구가 떠나기도 전에 홈까지 밀려 버린다.
         if (!isAtTarget(runner.state)) continue
-        // 타자주자는 결과 코드가 정한 루에서 멈춘다 — 안타 종류가 이미 정해져 있어 더 가면 기록과 어긋난다
-        if (runner.state.isBatterRunner && decision.toBase > runner.minimumBase) continue
+        // 타자주자는 결과 코드가 정한 루에서 멈춘다 — 안타 종류가 이미 정해져 있어 더 가면 기록과 어긋난다 (웹 다리).
+        // 단 원본의 **무조건 진루 갈래**(+0x111 홈런 af964 · +0x129 폴 홈런 af970 · 종류 7 af97a)는 틱 비교 없이 곧장
+        // afa0e 로 뛰어 타자주자도 다른 주자와 똑같이 보낸다 — 원본엔 결과 코드가 정한 루가 없다. 여기서까지 다리를
+        // 걸면 담장을 넘은 공(코드 8)에 타자주자가 결과 코드 루에 선 채 관문 b0e04(`+0x111 && 0xa990c == 0`)가 끝내
+        // 안 닫혀 판이 240틱 안전망까지 갔다(표본 336판 — 모두 패턴 24~26 의 담장 위로 넘는 공).
+        // ⚠️ 그래서 웹 타석 결과가 2루타(패턴 24~26 · 속도 < 1100 — `outcomeOfPattern` 근사)인데 공이 담장을 넘으면
+        //    기록은 2루타로 남고 타자주자는 홈을 밟는다 — 결과 코드를 먼저 정하는 웹 다리의 어긋남이다.
+        const unconditionalAdvance = homeRunFlag || play.suppressed || play.kind === 7
+        if (runner.state.isBatterRunner && decision.toBase > runner.minimumBase && !unconditionalAdvance) continue
         startLeg(runner, decision.toBase)
         // afa0e: 한 루 더 보내면 플레이+0x128 = 1 — CPU 송구 결정이 다시 고른다
         play = { ...play, wantsThrow: true }

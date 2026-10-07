@@ -20,7 +20,9 @@ const 단타: AtBatOutcome = { kind: '안타', bases: 1 }
 const 주자3루: BaseState = { first: false, second: false, third: true }
 const 주자13루: BaseState = { first: true, second: false, third: true }
 const 만루: BaseState = { first: true, second: true, third: true }
-const 깊은뜬공: BattedBallPattern = [90, 900, 1500, 0]
+// 원본 코드 0 [0] — 36틱에 뜬 채로 잡히고 3루 주자가 리터치해 홈을 밟는다.
+// (예전 손-패턴 [90, 900, 1500] 은 원본 궤적에서 32틱에 담장 위로 넘는 홈런 공이다 — 코드 8 · +0x111 로 타자주자까지 홈)
+const 깊은뜬공: BattedBallPattern = BATTED_BALL_PATTERNS[0][0]
 
 const fate = (fromBase: number, scored: boolean, retired: boolean): RunnerFate => ({ fromBase, scored, retired })
 

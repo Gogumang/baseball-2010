@@ -1582,6 +1582,23 @@ describe('판 진행 관문 0xb0d28 · 판 끝 결과 코드 0x9d5bc (b44f6) —
     expect(state.groundRuleFlag).toBe(true)
   })
 
+  it('무조건 진루 갈래(+0x111 · +0x129 · 종류 7 — af964 · af970 · af97a)는 타자주자도 결과 코드 루 너머로 보낸다', () => {
+    // 원본 코드 24 [7] [98, 995, 1369]: 속도 < 1100 이라 웹 타석 결과는 2루타지만 29틱에 담장 위로 넘는다(코드 8)
+    const 홈런공 = battedBallTrajectory(BATTED_BALL_PATTERNS[24][7])
+    expect(홈런공.fenceTick).toBe(29)
+    expect(홈런공.landingTick).toBe(32)
+    const 홈런 = 돌리기({ outcome: 이루타, trajectory: 홈런공, bases: 주자1루, outs: 0 })
+    expect(홈런.state.homeRunFlag).toBe(true)
+    // 타자주자까지 홈을 밟아 0xa990c == 0 — 관문 b0e04 가 닫는다(예전엔 타자주자가 2루에 선 채 240틱까지 갔다)
+    expect(홈런.state.runners.every((runner) => runner.state.scored)).toBe(true)
+    expect(홈런.state.held.scoreboardRuns).toBe(2)
+    expect(홈런.state.ticks.length).toBeLessThan(240)
+    // 바운드 뒤 담장을 넘는 코드 10(종류 7)은 투구 때 루 + 2 까지 — 단타 결과의 타자주자도 2루까지 간다
+    const 바운드 = 돌리기({ outcome: 단타, trajectory: battedBallTrajectory([92, 781, 1313, 0]), bases: EMPTY_BASES, outs: 0 })
+    expect(바운드.state.play.kind).toBe(7)
+    expect(바운드.state.runners[0].state.startBase).toBe(2)
+  })
+
   it('state[0x19](투구 판정 0.1% 사건)가 서면 낙구 틱의 0x9d5bc 가 0 — 사건 코드가 안 난다 (9d5ce)', () => {
     const trajectory = battedBallTrajectory([92, 781, 1313, 0])
     const 사건 = 돌리기({ outcome: 단타, trajectory, bases: 주자1루, outs: 0, specialEvent: true })
