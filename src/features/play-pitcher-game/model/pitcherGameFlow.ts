@@ -2735,6 +2735,11 @@ export interface PitcherGameSummary {
    */
   readonly hasEntered: boolean
   /**
+   * 경기 끝 이닝 `state+0x6b` (0-기준) — 평가 0xa719c 가 구원 연속 기록을 `> 6` 일 때만 잇고(0xa7334),
+   * 116 감독 글 38 이 `state+0x6a == state+0x6b` 로 본다(0x12ade).
+   */
+  readonly endedInningIndex: number
+  /**
    * 경기 끝 양 팀 투수 칸(붙박이 표 칸 0~7)별 레코드 스태미나 `+0x2c` — 리그 표로 이어지는 값(하루 끝 0xb617c 회복 전).
    * 마운드 값까지 얹었다. 내 값은 `stamina` 다.
    */
@@ -2830,6 +2835,7 @@ export function summaryOf(progress: PitcherGameProgress): PitcherGameSummary {
     stamina: progress.stamina,
     recordIds: gameEndRecordIdsFor(progress),
     hasEntered: progress.hasEntered,
+    endedInningIndex: progress.endedInningIndex,
     pitcherStaminas: {
       ours: withOutgoingStamina(progress.ourPitcherStaminas, progress.ourMound),
       opponent: withOutgoingStamina(progress.opponentPitcherStaminas, progress.opponentMound),

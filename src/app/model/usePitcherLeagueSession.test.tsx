@@ -222,6 +222,35 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     expect(result.current.career?.seasonEndState).toBe(109)
   })
 
+  it('연속 기록 +0x1bc — 정규시즌 평가가 잇고, 116 [확인](114)이 0x8a6fc 보상(평판)을 먹는다', () => {
+    const 승리요약 = {
+      ...경기요약,
+      decisionCode: 1,
+      endedInningIndex: 8,
+      record: { outsRecorded: 27, strikeouts: 3, runsAllowedField: 0, walksAllowed: 0, hitByPitch: 0, hitsAllowed: 4 },
+      evaluation: { popularityChange: 0, reputationChange: 0, moraleChange: 0, countedCompleteGame: '없음' },
+    } as typeof 경기요약
+    // 선발 · g = 4 (짝수, 선발 날) · 2연승 중
+    const result = 판짜기({ gamesPlayed: 4, reputation: 100, streaks: { win: 2, strikeout: 0, loss: 0 } })
+    act(() => result.current.actions.beginGame())
+    act(() => result.current.actions.finishGame(승리요약))
+    expect(result.current.career?.streaks).toEqual({ win: 3, strikeout: 0, loss: 0 })
+    expect(result.current.career?.reputation).toBe(100)
+    act(() => result.current.actions.confirmGameResult())
+    // 3연승 → 표 0xd4ddc[0] = 5
+    expect(result.current.career?.reputation).toBe(105)
+
+    // 포스트시즌 경기는 평가가 건너뛰어 잇지 않는다
+    const 포스트 = 판짜기({
+      gamesPlayed: 45,
+      streaks: { win: 1, strikeout: 0, loss: 0 },
+      postseason: startPostseason([3, 0, 1, 2, 4, 5, 6, 7]),
+    })
+    act(() => 포스트.current.actions.beginGame())
+    act(() => 포스트.current.actions.finishGame(승리요약))
+    expect(포스트.current.career?.streaks).toEqual({ win: 1, strikeout: 0, loss: 0 })
+  })
+
   it('이어하기 S+0x50 == 2 → 116 을 다시 띄우고 카운터가 겹쳐 쌓인다 (0x1c154 1c26a · 0x1278c)', () => {
     const 첫 = 판짜기({ gamesPlayed: 4, seasonPopularityGain: 10 })
     act(() => 첫.current.actions.beginGame())

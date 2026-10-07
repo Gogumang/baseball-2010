@@ -38,6 +38,8 @@ import {
 } from '@/entities/pitcher-career/model/pitcherAbility'
 import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbility'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
+import { EMPTY_PITCHER_STREAKS } from '@/entities/pitcher-career/model/pitcherStreaks'
+import type { PitcherStreaks } from '@/entities/pitcher-career/model/pitcherStreaks'
 import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
 import { FULL_STAMINA, recoverStaminaAfterGameDay } from '@/entities/pitcher-career/model/pitcherStamina'
 import { PITCHER_EDITION_MODE, cpuGameRotationAdvances } from '@/entities/pitcher-career/model/pitcherRotation'
@@ -203,6 +205,12 @@ export interface PitcherLastGame {
   readonly runs: number
   /** [3] 탈삼진 */
   readonly strikeouts: number
+  /** [4] 볼넷 + 사구 (R+0x144 + R+0x148, u8) — 0x8a6fc 더티볼. 옛 저장에는 없다(0) */
+  readonly walksAndHitByPitch?: number
+  /** [5] 피안타 (R+0x12c, u8) — 0x8a6fc 새가슴. 옛 저장에는 없다(0) */
+  readonly hitsAllowed?: number
+  /** [6] 투구 수 (R+0x140, u8) — 116 감독 글 38 의 셋째 조건(12af2). 옛 저장에는 없다(0) */
+  readonly pitches?: number
   /** 116 이 고른 StrUSER_EVT 감독 글 (2~37 · 38 등판 없음) */
   readonly managerCommentIndex: number
 }
@@ -391,6 +399,8 @@ export interface PitcherCareer {
   readonly lastEvaluation?: PitcherLastEvaluation
   /** 116 경기 뒤 평가를 다시 띄울 재료 (`PitcherLastGame`) — 경기마다 덮어쓴다. 옛 저장에는 없다 */
   readonly lastGame?: PitcherLastGame
+  /** 연속 기록 — 모드 레코드 +0x1bc u8 세 칸 (`pitcherStreaks`). 옛 저장에는 없다(0) */
+  readonly streaks?: PitcherStreaks
   readonly postseason: PostseasonSeries | null
   readonly lastMidSeasonGoalCount: number
   /**
@@ -498,6 +508,7 @@ export function createPitcherCareer(
     regularSeasonFirstCount: 0,
     regularSeasonRewardTaken: false,
     seasonEndState: null,
+    streaks: EMPTY_PITCHER_STREAKS,
     postseason: null,
     lastMidSeasonGoalCount: 0,
     reputationZeroGames: 0,
@@ -1003,6 +1014,8 @@ export function startNextPitcherSeason(career: PitcherCareer): PitcherCareer {
     regularSeasonRewardTaken: false,
     // 0x1b7ba `S[0x50] = 1` — 시즌 끝 사슬을 벗어난다
     seasonEndState: null,
+    // 0x1b882 `memset(S+0x1bc, 0, 4)` — 연속 기록 세 칸을 지운다
+    streaks: EMPTY_PITCHER_STREAKS,
     wins: 0,
     draws: 0,
     losses: 0,

@@ -25,7 +25,12 @@ import {
 import { isMyTurn } from '@/entities/league/model/seasonEnd'
 import type { PitcherLastGame } from '@/entities/pitcher-career/model/pitcherCareer'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
-import { NO_ENTRY_USER_EVENT_INDEX } from '@/entities/pitcher-career/model/pitcherRotation'
+import { reliefNeverEnteredOf } from '@/entities/pitcher-career/model/pitcherRotation'
+import {
+  advancePitcherStreaks,
+  EMPTY_PITCHER_STREAKS,
+  pitcherStreakEventOfCareer,
+} from '@/entities/pitcher-career/model/pitcherStreaks'
 import { managerCommentIndexOf } from '@/features/play-pitcher-game/model/pitcherGameEvaluation'
 import { activeSound, playSoundIds } from '@/shared/api/audio/soundPort'
 import {
@@ -911,16 +916,35 @@ export function usePitcherLeagueSession(
         : completed
       const lastEvaluation = withEvaluation.lastEvaluation ?? NO_LAST_EVALUATION
       /*
+       * 기록 줄 S+0x1d8 — 평가 0xa719c 의 모드 3 갈래(a7264~a72da: memset 8 뒤 [0] R+0x124 · [1] R+0x13c · [2] R+0x128 ·
+       * [3] R+0x134 · [4] R+0x144+R+0x148 · [5] R+0x12c · [6] R+0x140, 모두 strb)가 쓴다.
+       */
+      const thisLine = {
+        decisionCode: summary.decisionCode & 0xff,
+        outs: summary.record.outsRecorded & 0xff,
+        runs: summary.record.runsAllowedField & 0xff,
+        strikeouts: summary.record.strikeouts & 0xff,
+        walksAndHitByPitch: (summary.record.walksAllowed + summary.record.hitByPitch) & 0xff,
+        hitsAllowed: summary.record.hitsAllowed & 0xff,
+        pitches: summary.pitchCount & 0xff,
+      }
+      const line = thisLine
+      /*
        * 116 진입 0x1278c — 감독 글은 116 이 고른다: 모드 3 표 [−2…6](선발형이면 칸 3~8 두 배, 0x1285a)에서 +0x4a 칸 · 평판 +0x62
-       * (평가 뒤 값) 구간(0x128d2) · 구원이 등판 못 했으면 38(12ad4~12afe). 기록 줄은 S+0x1d8 (12a3c~12ac0).
+       * (평가 뒤 값) 구간(0x128d2) · 38 은 보직(0xb6705) ≠ 0 && state+0x6a == state+0x6b(이 경기) && S+0x1d8[6](투구 수) == 0
+       * (12ac4~12afe). 기록 줄은 S+0x1d8 (12a3c~12ac0).
        */
       const neverEntered = gameOptions.role !== PITCHER_ROLE.starter
-        && summary.evaluation.managerCommentIndex === NO_ENTRY_USER_EVENT_INDEX
+        && reliefNeverEnteredOf(summary.endedInningIndex)
+        && ((line.pitches ?? 0) & 0xff) === 0
       const lastGame: PitcherLastGame = {
-        decisionCode: summary.decisionCode,
-        outs: summary.record.outsRecorded,
-        runs: summary.record.runsAllowedField,
-        strikeouts: summary.record.strikeouts,
+        decisionCode: line.decisionCode,
+        outs: line.outs,
+        runs: line.runs,
+        strikeouts: line.strikeouts,
+        walksAndHitByPitch: line.walksAndHitByPitch,
+        hitsAllowed: line.hitsAllowed,
+        pitches: line.pitches,
         managerCommentIndex: managerCommentIndexOf(
           {
             role: gameOptions.role,
@@ -931,9 +955,19 @@ export function usePitcherLeagueSession(
           lastEvaluation.popularityChange,
         ),
       }
+      // 연속 기록 +0x1bc — 0xa719c 모드 3 갈래라 평가가 도는 정규시즌 경기만 잇는다 (`advancePitcherStreaks`)
+      const streaks = isEvaluated
+        ? advancePitcherStreaks(career.streaks ?? EMPTY_PITCHER_STREAKS, {
+          role: career.role,
+          dayCounter: leagueDayCounterOf(career),
+          endedInningIndex: summary.endedInningIndex,
+          decisionCode: summary.decisionCode,
+          strikeouts: summary.record.strikeouts,
+        })
+        : withEvaluation.streaks
       setGameOptions(null)
       // S+0x50 = 2 · 저장 → 평가 창 → 경기 뒤 카운터 → 저장, 평가 징글 (`enterPitcherGameEvaluation`)
-      commit(enterPitcherGameEvaluation({ ...withEvaluation, lastGame }))
+      commit(enterPitcherGameEvaluation({ ...withEvaluation, lastGame, streaks }))
       playSoundIds(activeSound(), [pitcherEvaluationJingleIdOf(lastEvaluation.popularityChange)])
       setScene('경기결과')
     },
@@ -947,7 +981,12 @@ export function usePitcherLeagueSession(
   const confirmGameResult = useCallback(
     () => {
       if (career === null) return
-      const counted: PitcherCareer = { ...career, seasonEndState: null }
+      // 116 → 114: 0x8a6fc 가 쌓은 내장 이벤트를 114 가 틀며 연속 기록 보상 명령(평판 · 집중/새가슴/더티볼)을 먹는다 —
+      // 이어하기로 116 을 다시 띄웠으면 또 먹는다(원본 그대로, 타자편 `streakEventOf` 와 같은 자리)
+      const rewarded = career.seasonEndState === 116
+        ? applyPitcherEventRewards(career, pitcherStreakEventOfCareer(career).rewards)
+        : career
+      const counted: PitcherCareer = { ...rewarded, seasonEndState: null }
 
       /*
        * 포스트시즌 경기 뒤 — 116 의 끝(0x12b74~0x12b94)이 S+0xb4 ≠ 0 이면 **S+0xb2(= L+0x32) == 0 → [114 → 136],
