@@ -36,6 +36,7 @@ import {
 } from '@/entities/career/model/playerCareer'
 import type { SeasonEndState } from '@/entities/career/model/playerCareer'
 import type { NariTeamRecords } from '@/entities/career/model/nariTeamRecord'
+import type { NariCupTeams } from '@/entities/career/model/nariCupTeams'
 import {
   MAXIMUM_PITCHER_ABILITY,
   PITCHER_ABILITY_ORDER,
@@ -405,6 +406,11 @@ export interface PitcherCareer {
    * 내 투수 줄 포함)도 들고 142 진입이 날마다 고친다 (`myPitcherRecord`).
    */
   readonly nariTeams?: NariTeamRecords
+  /**
+   * 국가대항전 대회 레코드 두 칸 — 저장 블록 [저장+0xb8] 의 +0xbc4 대표팀(내 투수 복사본이 낀 투수 배열) · +0xbe0 상대국
+   * (`pitcherCupTeams`). 133 출전이 세우고 142 가 고친다. 옛 저장·대회 전에는 없다
+   */
+  readonly nariCupTeams?: NariCupTeams
   readonly leaguePlayerStats: LeaguePlayerStats
   /**
    * 리그 열 팀 투수의 레코드 스태미나 `+0x2c` — 팀 번호 → 붙박이 표 칸(0~7)별 값. 없는 팀·칸은 10000. 내 투수 값은

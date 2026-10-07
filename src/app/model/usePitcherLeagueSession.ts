@@ -61,10 +61,30 @@ import {
 import { EVENT_TRIGGER } from '@/entities/story/model/storyScene'
 import { achievedPitcherGoalCount } from '@/entities/pitcher-career/model/pitcherYearGoals'
 import {
+  careerNationalCupRewardItems,
   careerNationalTeamEventId,
   isCareerNationalCupYear,
   NATIONAL_CUP_EVENT,
 } from '@/entities/national-cup/model/nationalCupFlow'
+import type { NationalCupFinish } from '@/entities/national-cup/model/nationalCupFlow'
+import {
+  KOREA_TEAM_ID,
+  createNationalCup,
+  nationalCupMatchupOf,
+  nationalCupSideOf,
+} from '@/entities/national-cup/model/nationalCup'
+import type { NationalCup, NationalCupMatchup } from '@/entities/national-cup/model/nationalCup'
+import { advanceNationalCupDay } from '@/entities/national-cup/model/nationalCupPlay'
+import { nariCupRecordOf, nextNariCupDayTeams } from '@/entities/career/model/nariCupTeams'
+import type { NariCupTeams } from '@/entities/career/model/nariCupTeams'
+import {
+  createPitcherCupTeams,
+  pitcherCupPositionCodeOf,
+  preparePitcherCupMatch,
+} from '@/entities/pitcher-career/model/pitcherCupTeams'
+import { gameMyPitcherOrderOf } from '@/entities/pitcher-career/model/myPitcherRecord'
+import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
+import type { PlayerSide } from '@/entities/game/model/gameState'
 import {
   MID_SEASON_GAME,
   midSeasonEventId,
@@ -100,6 +120,7 @@ import type { PitcherRookieProfile } from '@/entities/pitcher-career/model/pitch
 import {
   pitcherGameOptionsOf,
   pitcherGameOutcomeOf,
+  teamMoraleOf,
 } from '@/pages/pitcher-league/model/pitcherGameOptions'
 import type { PitcherGameOptions, PitcherGameSummary } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
@@ -124,7 +145,7 @@ import type { OutingResult } from '@/entities/career/model/outing'
 import { OUTING_PLACES } from '@/shared/config/outingPlaces'
 import type { OutingPlace } from '@/shared/config/outingPlaces'
 import { PITCHER_MANAGEMENT_TEXT } from '@/pages/pitcher-league/lib/pitcherManagementMenu'
-import { nariMatchCancelTargetOf, rollNariMatchAces } from '@/pages/management/lib/nariMatchPrepare'
+import { nariMatchCancelTargetOf, rollNariMatchAces, rollNariMatchStadium } from '@/pages/management/lib/nariMatchPrepare'
 import {
   nariTeamRecordOf, nariTeamsOf, recordMatchAcesOf, recordTeamAcesOf, seatNariMatchAces,
 } from '@/entities/career/model/nariTeamRecord'
@@ -162,6 +183,8 @@ export type PitcherScene =
   | '경기준비'
   /** 경기 뒤 평가 (상태 116, 진입 0x1278c) — 타자편과 같은 상태. [확인] = 114 */
   | '경기결과'
+  /** 국가대항전 대진 134 · 순위 135 (0x19f30 · 0x19fdc · 0x10680) — 타자편과 같은 상태 */
+  | '국가대항전'
 
 /**
  * 이벤트 재생(상태 114)을 **어디서** 틀었나 — 끝난 뒤 갈 곳(장면+0x24 "뒤 상태")이 이것으로 갈린다.
@@ -235,6 +258,10 @@ export interface PitcherLeagueSession {
   readonly storyNotice: string
   /** 관리 화면에 띄울 칭호 팝업 하나 (0x1a1c0 → 0x1274c). 없으면 null */
   readonly pendingTitle: string | null
+  /** 국가대항전 대회 (장면 '국가대항전') — `atStandings` 면 135(순위)부터 (142 취소). 웹은 대회를 저장하지 않는다 */
+  readonly cup: { readonly cup: NationalCup; readonly atStandings: boolean } | null
+  /** 국가대항전 142 경기 준비의 대진 (135 에서 왔을 때). 리그 경기면 null */
+  readonly cupMatch: { readonly matchup: NationalCupMatchup; readonly cup: NationalCup } | null
   readonly actions: {
     /** 칭호 팝업 확인 0x1b1e4 — 비트·곧바로 장착·저장 */
     readonly confirmTitle: () => void
@@ -305,6 +332,10 @@ export interface PitcherLeagueSession {
     readonly pressPostseason: () => void
     /** 128 팝업 닫힘 — 틀 0x15984 */
     readonly closePostseasonPopup: () => void
+    /** 국가대항전 135 확인(0x10680) → 142 경기 준비 */
+    readonly startCupGame: (matchup: NationalCupMatchup, cup: NationalCup) => void
+    /** 국가대항전 끝 — 결과·보상 팝업을 닫았다 (0x1b92c → 새 시즌 0x1b768) */
+    readonly finishCup: (finish: NationalCupFinish) => void
     readonly reset: () => void
   }
 }
@@ -388,6 +419,44 @@ function pitcherEvaluationJingleIdOf(popularityChange: number): number {
 function leagueGameOptionsOf(career: PitcherCareer, settings: Parameters<typeof pitcherGameOptionsOf>[1]): PitcherGameOptions {
   const options = pitcherGameOptionsOf(career, settings)
   return { ...options, ...pitcherLeagueGameSetupOf(career, options.opponentTeamId) }
+}
+
+/** 저장의 국가대항전 대회 레코드 두 칸 — 없으면(대회 중 옛 저장) 대회 초기화 꼴로 세운다 */
+function pitcherCupTeamsOf(career: PitcherCareer, opponentTeamId: number): NariCupTeams {
+  return career.nariCupTeams ?? createPitcherCupTeams(career.positionCode, opponentTeamId)
+}
+
+/**
+ * **국가대항전 경기 옵션** — 경기 장면 0xb891c 가 대회 레코드 두 칸(0x1f940: S+0x12c 면 팀 10 → +0xbc4, 그 밖 → +0xbe0)으로 선다.
+ * 내 팀 = 대표팀(10) · 측 = 0xb7844 의 L+0xac 갈래(대진 칸 0 이 후공, `nationalCupSideOf`) · g = 대회 날짜 L+0x32 ·
+ * 대표팀 투수 배열(내 투수 복사본 — 포지션 코드는 그 칸) · 스태미나는 날마다 10000(0xb6190, 복사본 포함) · 팀 사기 = 마스터 복사본 +2 ·
+ * 마선수 없음(1c5fe) · 0xa56dc 는 S+0x12c 라 거짓(기록 안 셈).
+ */
+function cupGameOptionsOf(
+  career: PitcherCareer,
+  matchup: NationalCupMatchup,
+  cup: NationalCup,
+  settings: Parameters<typeof pitcherGameOptionsOf>[1],
+): PitcherGameOptions {
+  const teams = pitcherCupTeamsOf(career, matchup.opponent)
+  const options = pitcherGameOptionsOf(career, {
+    ...settings,
+    opponentTeamId: matchup.opponent,
+    playerSide: nationalCupSideOf(cup, matchup.myTeam) as PlayerSide,
+    teamMorale: teamMoraleOf(matchup.myTeam),
+  })
+  return {
+    ...options,
+    ourTeamId: matchup.myTeam,
+    dayCounter: cup.day,
+    isPostseason: false,
+    isNationalCup: true,
+    positionCode: pitcherCupPositionCodeOf(teams),
+    stamina: FULL_STAMINA,
+    ourPitcherOrder: gameMyPitcherOrderOf(teams.korea.pitchers ?? []),
+    opponentPitcherOrder: nariCupRecordOf(teams, matchup.opponent).pitchers,
+    isRivalGame: false,
+  }
 }
 
 /** 보상 종류 7 — 히든 오픈 |v| */
@@ -853,6 +922,11 @@ export function usePitcherLeagueSession(
    */
   const matchPreparedRef = useRef(false)
 
+  /** 국가대항전 대회 · 142 대진 · 치르는 대회 경기 (웹은 대회를 저장하지 않는다 — 타자편과 같다) */
+  const [cupView, setCupView] = useState<{ cup: NationalCup; atStandings: boolean } | null>(null)
+  const [cupMatch, setCupMatch] = useState<{ matchup: NationalCupMatchup; cup: NationalCup } | null>(null)
+  const cupGameRef = useRef<NationalCup | null>(null)
+
   /** 142 경기 준비에 들어선다 — 이 장면에서 처음이면 마선수 넷을 굴린다(난수 4). 웹 투수편엔 국가대항전이 없다 */
   const openMatchPrepare = useCallback(() => {
     if (!matchPreparedRef.current) {
@@ -877,9 +951,45 @@ export function usePitcherLeagueSession(
    * 경기 뒤 정산 — 성적·스태미나·전적을 넣고, 같은 날 나머지 네 경기를 돌린 뒤
    * 정규시즌·포스트시즌을 넘긴다 (타자편 `finishGame` 과 같은 차례다).
    */
+  /**
+   * 국가대항전 사람 경기가 끝났다 — 결과 장면 0x4ea0c 차례(내 경기 승패 0xb76dc/0xb77e0 → 같은 라운드 CPU 경기 0xc2dac → 하루 끝
+   * 0xb818c)를 `advanceNationalCupDay` 가 하고, 재진입 0x1c154 가 S+0x12c 를 보고 134 로 돌려보낸다(116 을 안 지난다).
+   * 커리어(리그 승패·평가·기록 G·스태미나)는 건드리지 않는다 — 내 기록은 대표팀 칸 복사본에 쌓이고(0xa56dc 거짓) 대회 끝
+   * 0x1faa1 이 포인터를 원래 레코드로 돌린다. ⚠️ 웹판 임시(타자편과 같다): 원본은 대회 경기 뒤에도 결과 판(0x18)을 보인다.
+   */
+  const finishCupGame = useCallback(
+    (summary: PitcherGameSummary, cup: NationalCup, options: PitcherGameOptions) => {
+      cupGameRef.current = null
+      // 경기 장면 0x104 를 지나 나리 장면이 새로 선다 — 장면+0x288 = 0
+      matchPreparedRef.current = false
+      // 정산 진입 0x4ea0c 의 0x4f3d6 — 모드를 가리지 않고 +0x4c + 모드 = 0
+      nariGameSaveRef.current?.clear()
+      // 전역 경기 상태 +0x6b 는 대회 경기도 남긴다
+      liveGameStateInningIndex = summary.endedInningIndex ?? 0
+      // 무승부는 대한민국의 패로 친다 — CPU 경기(0xc2f12)도 동점이면 뒷 칸이 이긴다. **근사다** (타자편과 같다)
+      const won = summary.result === '승'
+      const winner = won ? options.ourTeamId : options.opponentTeamId
+      const loser = won ? options.opponentTeamId : options.ourTeamId
+      // 같은 날 CPU 경기 두 나라는 상대국 칸 레코드를 쓴다 — 사람 경기 끝 상대 투수 칸별 +0x2c 에서 선다(701a7a9)
+      const next = advanceNationalCupDay(cup, winner, loser, random, summary.pitcherStaminas?.opponent)
+      // 하루 끝 b8216 — 다음 날 사람 경기 상대를 +0xbe0 에 마스터에서 새로 복사
+      commitWith((current) => current.nariCupTeams === undefined
+        ? current
+        : { ...current, nariCupTeams: nextNariCupDayTeams(current.nariCupTeams, nationalCupMatchupOf(next)?.opponent ?? null) })
+      setGameOptions(null)
+      setCupMatch(null)
+      setCupView({ cup: next, atStandings: false })
+      setScene('국가대항전')
+    },
+    [commitWith, random],
+  )
+
   const finishGame = useCallback(
     (summary: PitcherGameSummary) => {
       if (career === null || gameOptions === null) return
+      // 국가대항전 경기는 커리어 정산을 타지 않고 대회 하루를 넘긴다 (142 → 경기 → 101 → 134)
+      const cupGame = cupGameRef.current
+      if (cupGame !== null) return finishCupGame(summary, cupGame, gameOptions)
       // 경기 장면 0x104 를 지나 나리 장면이 새로 선다 — 장면+0x288 = 0
       matchPreparedRef.current = false
       // 정산 진입 0x4ea0c 의 0x4f3d6 — 전역기록 +0x4c + 모드(+0x4f) = 0
@@ -1001,7 +1111,7 @@ export function usePitcherLeagueSession(
       playSoundIds(activeSound(), [pitcherEvaluationJingleIdOf(lastEvaluation.popularityChange)])
       setScene('경기결과')
     },
-    [aceLevels, career, commit, gameOptions, random, recordStat],
+    [aceLevels, career, commit, finishCupGame, gameOptions, random, recordStat],
   )
 
   /**
@@ -1130,11 +1240,18 @@ export function usePitcherLeagueSession(
   const continueYearEnd = useCallback(
     (current: PitcherCareer, viewed: readonly number[]) => {
       if (viewed.includes(NATIONAL_CUP_EVENT.출전)) {
-        // 대회는 옮기지 않았지만 순위 화면 134 에 들어오는 첫 틀(0x1b92c 머리 — 장면 0x106 은 모드 3·4 공용)이 주는
-        // 칭호 8 "국가 대표" 는 그 화면에 들어오기만 하면 받는 것이라 여기서 준다
+        // 463 출전 — 상태 133 이 0xb7bf1(L) 로 대회를 세우고(+0xbc4 대표팀 마스터 복사 · +0xbe0 첫날 상대) 모드 3 갈래
+        // 0xb521d(대표팀, 내 투수, 1) 로 내 칸 k 에 내 투수 복사본을 넣고 134 를 줄에 넣는다. 134 의 틀 0x1b92c 머리가 들어온
+        // 첫 틀에 비트 8 이 없으면 칭호 8 "국가 대표" 를 준다 (장면 0x106 은 모드 3·4 공용)
         const nationalTitle = nationalCupStandingsTitleOf(current.titleIds)
-        setStoryNotice(PITCHER_MANAGEMENT_TEXT.notPorted)
-        return startNewSeason(nationalTitle === null ? current : awardPitcherTitles(current, [nationalTitle]))
+        const titled = nationalTitle === null ? current : awardPitcherTitles(current, [nationalTitle])
+        const cup = createNationalCup()
+        commit({
+          ...titled,
+          nariCupTeams: createPitcherCupTeams(titled.positionCode, nationalCupMatchupOf(cup)?.opponent ?? KOREA_TEAM_ID),
+        })
+        setCupView({ cup, atStandings: false })
+        return setScene('국가대항전')
       }
       // 464 거절은 S+0x12c = 0 으로 곧 새 시즌 (P5) · 462 탈락은 근사 (위 머리글)
       if (viewed.includes(NATIONAL_CUP_EVENT.거절) || viewed.includes(NATIONAL_CUP_EVENT.탈락)) {
@@ -1158,7 +1275,7 @@ export function usePitcherLeagueSession(
       }
       startNewSeason(current)
     },
-    [enterEnding, openYearEndEvent, startNewSeason],
+    [commit, enterEnding, openYearEndEvent, startNewSeason],
   )
 
   /** 시즌 끝 화면 [다음] → 136 의 이벤트 392 "올해의 목표" 부터 연말 사슬을 튼다 */
@@ -1610,6 +1727,8 @@ export function usePitcherLeagueSession(
     pendingTitle,
     aceMatch,
     postseasonPopup,
+    cup: cupView,
+    cupMatch,
     actions: {
       confirmTitle,
       create,
@@ -1621,6 +1740,8 @@ export function usePitcherLeagueSession(
       // (반 이닝 저장이 없어 처음부터 · 142 를 안 거쳐 굴림 없음 · 명부의 마선수 그대로). 경기 뒤 나리 장면이 새로 선다
       resumeInterruptedGame: (match: NariGameMatch | null) => {
         if (career === null) return
+        // ⚠️ 웹 전용: 국가대항전 경기는 웹이 대회를 저장하지 않아 다시 세울 수 없다 — 이어하기 자리(장면이 선 그대로)로 둔다(타자편과 같다)
+        if (match?.isNationalCup === true) return
         matchPreparedRef.current = false
         // 마선수는 저장의 나리 팀 레코드에 있다. 레코드가 없던 옛 저장이면 모드 저장 칸에 남겨 둔 그림자를 넣는다
         const loaded = career.nariTeams === undefined && match?.aces !== null && match?.aces !== undefined
@@ -1644,14 +1765,28 @@ export function usePitcherLeagueSession(
       // 저장 [모드+0x4c] = 1(전역기록 +0x4f "모드 3 경기 중간 저장됨")은 [14]·[최근게임] 의 0x327b8 모드 3 갈래가 읽는다 —
       // `+0x43 && +0x4f` 면 곧장 경기(`resumeInterruptedGame`). 89a6b81 의 "읽는 곳이 없다" 정정 — 타자편 `confirmMatchPrepare` 주석
       confirmMatchPrepare: () => {
-        if (scene !== '경기준비') return
-        // 0x13cca — +0x4f = 1 · 저장. 명부의 마선수는 커리어 저장의 나리 팀 레코드(`nariTeams`)가 들고 간다 (웹 투수편엔 국가대항전이 없다)
-        nariGameSaveRef.current?.start({ aces: null, isNationalCup: false })
+        if (career === null || scene !== '경기준비') return
+        // 0x13cca — +0x4f = 1 · 저장. 명부의 마선수는 커리어 저장의 나리 팀 레코드(`nariTeams`)가 들고 간다. 모드 저장 칸에는
+        // 국가대항전 여부(S+0x12c)만 남긴다
+        nariGameSaveRef.current?.start({ aces: null, isNationalCup: cupMatch !== null })
+        if (cupMatch !== null) {
+          // 국가대항전 — 대회 레코드 두 칸으로 선다(`cupGameOptionsOf`). 끝나면 이 대회로 하루를 넘긴다 (`finishCupGame`)
+          cupGameRef.current = cupMatch.cup
+          setGameOptions(cupGameOptionsOf(career, cupMatch.matchup, cupMatch.cup, { gaugeSettingOn, throwModeManual }))
+          return setScene('경기')
+        }
         beginGame()
       },
-      // 142 의 '4'/왼 · '6'/오른 → 143 경기 전 엔트리 보기(0x16af8, 보기 전용 — 타자편 `openEntryView` 와 같다)
+      // 142 의 '4'/왼 · '6'/오른 → 143 경기 전 엔트리 보기(0x16af8, 보기 전용 — 타자편 `openEntryView` 와 같다).
+      // 국가대항전이면 대회 레코드 두 칸(0x1f9a9 → 0x1f940 — S+0x12c)을 보인다
       openEntryView: (isMyTeam: boolean) => {
         if (career === null || scene !== '경기준비') return
+        if (cupMatch !== null) {
+          const options = cupGameOptionsOf(career, cupMatch.matchup, cupMatch.cup, { gaugeSettingOn, throwModeManual })
+          return setEntryView(pitcherNariEntryViewOf(
+            career, options, isMyTeam, pitcherCupTeamsOf(career, cupMatch.matchup.opponent),
+          ))
+        }
         setEntryView(pitcherNariEntryViewOf(career, recordGameOptionsOf(career), isMyTeam))
       },
       // 143 키 0x1457c — 끝 코드 1 · 2(상대 팀) · 3(내 팀)이면 142 로 (142 진입은 이전이 143 이라 다시 안 굴린다)
@@ -1665,7 +1800,13 @@ export function usePitcherLeagueSession(
       },
       cancelMatchPrepare: () => {
         if (career === null || scene !== '경기준비') return
-        const target = nariMatchCancelTargetOf({ isNationalCup: false, isPostseason: career.postseason !== null })
+        const target = nariMatchCancelTargetOf({ isNationalCup: cupMatch !== null, isPostseason: career.postseason !== null })
+        if (target === '국가대항전' && cupMatch !== null) {
+          // 0x13c72 −16 → S+0x12c 면 135 — 135 는 진입 함수가 없어 순위표가 그대로 다시 선다. 장면+0x288 은 그대로(다시 안 돌린다)
+          setCupView({ cup: cupMatch.cup, atStandings: true })
+          setCupMatch(null)
+          return setScene('국가대항전')
+        }
         if (target === '포스트시즌') {
           // 128 진입 0x120a4 를 다시 — S+0x50 = 0xf · 저장, 정규시즌 우승 보상을 아직 안 받았으면 팝업 0xb
           commitWith((current) => (current.seasonEndState === 128 ? current : { ...current, seasonEndState: 128 }))
@@ -1685,6 +1826,43 @@ export function usePitcherLeagueSession(
       },
       finishGame,
       confirmGameResult,
+      /**
+       * 135 [확인](0x10680) → **142 경기 준비** — 0x1c46c 가 내 팀을 대진 칸 0·1 중 대한민국(10)으로 끼운다. S+0x12c 라 마선수
+       * 넣기(1c5fe)를 건너뛰고, 같은 문(장면+0x288) 안에서 대회 레코드를 오늘 준비로 고친다(`preparePitcherCupMatch` — 상대국 g ≠ 0
+       * 이면 돌리기 · 대표팀은 모드 3 갈래). 이전 상태가 143 이 아니면 구장 0x78664(무대, 홈 팀) — 대회 팀은 10~13 이라
+       * **rand(0, 10) 한 번**(취소로 135 에 갔다 다시 와도 또).
+       */
+      startCupGame: (matchup: NationalCupMatchup, cup: NationalCup) => {
+        if (career === null) return
+        if (!matchPreparedRef.current) {
+          commitWith((current) => ({
+            ...current,
+            nariCupTeams: preparePitcherCupMatch(pitcherCupTeamsOf(current, matchup.opponent), cup.day, current.role),
+          }))
+        }
+        matchPreparedRef.current = true
+        rollNariMatchStadium(random, nationalCupSideOf(cup, matchup.myTeam) === 1 ? matchup.myTeam : matchup.opponent)
+        setEntryView(null)
+        setMatchAces(null)
+        setCupView(null)
+        setCupMatch({ matchup, cup })
+        setScene('경기준비')
+      },
+      /**
+       * 대회 끝 — 결과 팝업 0x25 · 보상 팝업 0x26 을 닫았다 (0x1b92c). 우승이면 보상(인기 +20 · 평판 +30 · 2000만 · G +1000 —
+       * 0x22c7d(g, 1000, 모드 3))을 얹고, S+0x12c = 0 · 0x1faa1(g, 1, 1) 로 내 투수 포인터를 원래 레코드로 · 새 시즌 0x1b768.
+       * 열린 히든 팀(0x19f30)은 `openedHiddenIds` 에 넣는다 (타자편 `finishCup` 과 같다).
+       */
+      finishCup: (finish: NationalCupFinish) => {
+        if (career === null) return
+        const rewarded = applyPitcherEventRewards(career, careerNationalCupRewardItems(finish.reward), random)
+        if (finish.reward.gamePoint > 0) {
+          recordStat({ kind: 'G획득', mode: PITCHER_LEAGUE_MODE, amount: finish.reward.gamePoint })
+        }
+        const missing = finish.openedTeams.filter((id) => !rewarded.openedHiddenIds.includes(id))
+        setCupView(null)
+        startNewSeason({ ...rewarded, openedHiddenIds: [...rewarded.openedHiddenIds, ...missing] })
+      },
       beginYearEnd,
       continueCareer,
       retire,

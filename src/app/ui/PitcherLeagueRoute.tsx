@@ -3,7 +3,8 @@ import { PitcherManagementScreen } from '@/pages/pitcher-league/ui/PitcherManage
 import { NextGameStandingsScreen } from '@/pages/management/ui/NextGameStandingsScreen'
 import { NariMatchInfoScreen } from '@/pages/management/ui/NariMatchInfoScreen'
 import { EntryEditorScreen } from '@/widgets/entry-editor'
-import { pitcherMatchInfoOf } from '@/pages/pitcher-league/lib/pitcherMatchInfo'
+import { pitcherCupMatchInfoOf, pitcherMatchInfoOf } from '@/pages/pitcher-league/lib/pitcherMatchInfo'
+import { NationalCupScreen } from '@/pages/national-cup/ui/NationalCupScreen'
 import { PitcherSeasonEndScreen } from '@/pages/pitcher-league/ui/PitcherSeasonEndScreen'
 import { PitcherYearEndScreen } from '@/pages/pitcher-league/ui/PitcherYearEndScreen'
 import { PitcherGameEvaluationScreen } from '@/pages/pitcher-league/ui/PitcherGameEvaluationScreen'
@@ -133,7 +134,10 @@ export function PitcherLeagueRoute({
       )
     }
     // 142 경기 준비 — 진입 0x1c46c · 키 0x13c30 · 그림 0x15d98 (타자편과 같은 상태)
-    const match = pitcherMatchInfoOf(career, session.matchAces)
+    // 국가대항전(135 에서 옴)이면 대회 표 · 마선수 "-" (1c5fe)
+    const match = session.cupMatch === null
+      ? pitcherMatchInfoOf(career, session.matchAces)
+      : pitcherCupMatchInfoOf(career, session.cupMatch.matchup, session.cupMatch.cup)
     return (
       <NariMatchInfoScreen lines={match.lines} myTeamId={match.myTeamId} opponentTeamId={match.opponentTeamId}
         playerSide={match.playerSide} edition="투수편" gamePoint={career.gamePoint}
@@ -216,6 +220,24 @@ export function PitcherLeagueRoute({
     )
   }
 
+  // 국가대항전 134 대진 · 135 순위 — 타자편과 같은 상태·같은 화면 (모드 3·4 공용 0x19f30 · 0x19fdc · 0x10680)
+  if (scene === '국가대항전' && session.cup !== null) {
+    return (
+      <NationalCupScreen
+        mode="나만의리그"
+        cup={session.cup.cup}
+        // 제 n 회 = (연차 idx >> 1) + 1 (0x85e6c) — 대회는 끝난 해의 연말이라 지금 시즌 − 1
+        yearIndex={career.season - 1}
+        gamePoint={career.gamePoint}
+        random={random}
+        onStartGame={actions.startCupGame}
+        onFinish={actions.finishCup}
+        // 142 취소로 돌아오면 135(순위표)부터
+        initialStep={session.cup.atStandings ? '순위' : '대진'}
+      />
+    )
+  }
+
   if (scene === '시즌종료') {
     return <PitcherSeasonEndScreen career={career} onYearEnd={actions.beginYearEnd} />
   }
@@ -293,7 +315,7 @@ export function PitcherLeagueRoute({
       {session.outingRecoveryNotice !== '' && (
         <MessageBox text={session.outingRecoveryNotice} buttons={['확인']} onAnswer={actions.dismissOutingRecoveryNotice} />
       )}
-      {/* 이벤트 뒤 알림 — 히든 오픈(보상 7, 0x62368) · 옮기지 않은 갈래(투수편 국가대항전) */}
+      {/* 이벤트 뒤 알림 — 히든 오픈(보상 7, 0x62368) · 옮기지 않은 갈래 */}
       {session.storyNotice !== '' && session.outingRecoveryNotice === '' && (
         <MessageBox text={session.storyNotice} buttons={['확인']} onAnswer={actions.dismissStoryNotice} />
       )}

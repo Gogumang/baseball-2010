@@ -601,7 +601,7 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     expect(result.current.career?.season).toBe(4)
   })
 
-  it('국가대표 선발(461) → 거절(464)은 평판 −20 뒤 곧 새 시즌, 출전(463)은 미해결 알림과 함께 새 시즌', () => {
+  it('국가대표 선발(461) → 거절(464)은 평판 −20 뒤 곧 새 시즌, 출전(463)은 국가대항전 134 로', () => {
     // 목표 단계 3 (표 그대로) 넷 이상 — 방어율 0(안 던짐)·실점 0 · 탈삼진·승·인기도는 크게
     const 잘함 = {
       season: 1,
@@ -621,12 +621,62 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     const 출전 = 판짜기(잘함)
     act(() => 출전.current.actions.beginYearEnd())
     연말끝까지(출전, { 380: [383], 461: [463] })
-    expect(출전.current.scene).toBe('관리')
-    expect(출전.current.career?.season).toBe(2)
-    expect(출전.current.storyNotice).not.toBe('')
+    expect(출전.current.scene).toBe('국가대항전')
+    expect(출전.current.career?.season).toBe(1)
+    expect(출전.current.storyNotice).toBe('')
+    // 0xb521d — 대표팀 투수 배열 칸 k(내 칸, 선발 0)에 내 투수 복사본, 옛 0번은 맨 끝
+    expect(출전.current.career?.nariCupTeams?.korea.pitchers).toEqual([-1, 1, 2, 3, 4, 5, 6, 7, 0])
     // 순위 화면 134 에 들어오는 것만으로 받는 칭호 8 "국가 대표" (0x1b92c) — 거절은 못 받는다
     expect(출전.current.career?.titleIds).toContain(TITLE_NAMES[8])
     expect(거절.current.career?.titleIds).not.toContain(TITLE_NAMES[8])
+  })
+
+  it('국가대항전 한 바퀴 — 135 → 142(대회 표) → 대표팀으로 던지고 → 134, 커리어 정산 없이 대회만 하루 넘긴다', () => {
+    const 잘함 = {
+      season: 1,
+      gamesPlayed: 45,
+      popularity: 2000,
+      popularityAtSeasonStart: 0,
+      stats: { ...createPitcherCareer('x').stats, wins: 30, strikeouts: 300 },
+    }
+    const result = 판짜기(잘함)
+    act(() => result.current.actions.beginYearEnd())
+    연말끝까지(result, { 380: [383], 461: [463] })
+    const cup = result.current.cup!.cup
+    const matchup = { myTeam: 10, opponent: 11 }
+    act(() => result.current.actions.startCupGame(matchup, cup))
+    expect(result.current.scene).toBe('경기준비')
+    expect(result.current.cupMatch?.matchup).toEqual(matchup)
+    // 취소(−16) → 135 순위부터
+    act(() => result.current.actions.cancelMatchPrepare())
+    expect(result.current.scene).toBe('국가대항전')
+    expect(result.current.cup?.atStandings).toBe(true)
+    act(() => result.current.actions.startCupGame(matchup, cup))
+    act(() => result.current.actions.confirmMatchPrepare())
+    expect(result.current.scene).toBe('경기')
+    const options = result.current.gameOptions!
+    expect(options).toMatchObject({
+      ourTeamId: 10, opponentTeamId: 11, isNationalCup: true, isPostseason: false, dayCounter: 0, stamina: 10000, playerSide: 1,
+      positionCode: 0,
+    })
+    expect(options.ourPitcherOrder?.[0]).toBe(8)
+    const 앞 = result.current.career!
+    act(() => result.current.actions.finishGame({ ...경기요약, result: '승' } as typeof 경기요약))
+    expect(result.current.scene).toBe('국가대항전')
+    expect(result.current.cup?.cup.day).toBe(1)
+    expect(result.current.cup?.cup.wins[0]).toBe(1)
+    expect(result.current.career?.stats).toEqual(앞.stats)
+    expect(result.current.career?.wins).toBe(앞.wins)
+    // 다음 날 상대국 칸은 마스터에서 새로
+    expect(result.current.career?.nariCupTeams?.opponentTeamId).toBe(12)
+
+    act(() => result.current.actions.finishCup({
+      reward: { messageId: 199, popularity: 20, reputation: 30, money: 20, gamePoint: 1000 },
+      openedTeams: [10],
+    } as never))
+    expect(result.current.scene).toBe('관리')
+    expect(result.current.career?.season).toBe(2)
+    expect(result.current.career?.openedHiddenIds).toContain(10)
   })
 
   it('7년차 인기도 499 이하면 연말 사슬 끝이 방출(501) → 엔딩(1)이다', () => {
