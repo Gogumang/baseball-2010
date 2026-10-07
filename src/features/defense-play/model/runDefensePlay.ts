@@ -213,9 +213,10 @@ export interface DefensePlayInput {
    */
   readonly isUncatchable?: boolean
   /**
-   * ⚠️ 옛 칸 — 진행기는 이 칸을 보지 않는다. 예전 웹은 2스트라이크 번트 파울(판정 11)을 판 없이 아웃으로 내고 이 표를 실었다.
-   * 원본은 그 공도 판을 돌아 낙구 · 담장선 틱의 0x9d5bc 가 11 을 낸다 — 지금은 파울 각 공 판(`strikes` · `buntKind`)이 그 코드를 내고
-   * 결과의 `DefensePlayResult.buntFoulOut` 이 콜 62 를 고정한다. 아무 타석도 이 칸을 더는 안 세운다.
+   * @deprecated 옛 칸 — 진행기는 보지 않고 features 의 어느 입력 만들기도 이제 안 싣는다. 예전 웹은 2스트라이크 번트 파울(판정 11)을
+   * 판 없이 아웃으로 내고 이 표를 실었다. 원본은 그 공도 판을 돌아 낙구 · 담장선 틱의 0x9d5bc 가 11 을 낸다 — 지금은 파울 각 공 판
+   * (`strikes` · `buntKind`)이 그 코드를 내고 결과의 `DefensePlayResult.buntFoulOut` 이 콜 62 를 고정한다.
+   * ⚠️ 칸은 읽는 곳(app/model/useCareerSession · pages/team-game/model/useTeamGame 의 `pending…buntFoulOut`)을 걷어낸 뒤 지운다.
    */
   readonly buntFoulOut?: boolean
   /**

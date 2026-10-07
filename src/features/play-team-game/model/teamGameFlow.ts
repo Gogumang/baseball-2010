@@ -1921,9 +1921,9 @@ export interface BatterOutcomeOptions {
   readonly pattern?: BattedBallPattern
   readonly isUncatchable?: boolean
   /**
-   * ⚠️ 옛 칸 — 2스트라이크 번트 파울(원본 판정 11)의 아웃 콜 62 표. 이제 그 공도 파울 각 공 판을 돌아 판 결과
-   * `DefensePlayResult.buntFoulOut` 이 콜을 고정한다(`resolvePitch` 가 `isBuntFoulOut` 을 안 세운다).
-   * 진행(아웃·진루·난수)에는 한 톨도 안 닿는다 — 소리 고르기만 본다.
+   * @deprecated 옛 칸 — 보지 않는다. 2스트라이크 번트 파울(원본 판정 11)의 아웃 콜 62 표였다. 이제 그 공도 파울 각 공 판을 돌아
+   * 판 결과 `DefensePlayResult.buntFoulOut` 이 콜을 고정한다(`resolvePitch` 가 `isBuntFoulOut` 을 안 세운다).
+   * ⚠️ 칸은 넘기는 곳(pages/team-game/model/useTeamGame)을 걷어낸 뒤 지운다.
    */
   readonly buntFoulOut?: boolean
   /**
@@ -1996,10 +1996,8 @@ export function startBatterOutcome(
   }
   // 페어 타구면 쏜 패턴이 따라온다 — 넘겨받았거나(`options.pattern`) 타석 결과 객체에 묶여 있다(`contactOfOutcome`)
   const pattern = options.pattern ?? contactOfOutcome(outcome)?.pattern
-  // 판정 11(2스트라이크 번트 파울 아웃)은 판 없이 아웃이다(주자는 판 앞 자리 그대로 — `직선타아웃` 갈래)
-  const inPlay =
-    options.buntFoulOut !== true &&
-    (pattern !== undefined ? isBattedBallKind(outcome) : isBattedBallInPlay(outcome))
+  // 판정 11(2스트라이크 번트 파울 아웃)도 파울 각 공 판이 낸다 — 여기 오는 맞은 공은 모두 판을 돈다
+  const inPlay = pattern !== undefined ? isBattedBallKind(outcome) : isBattedBallInPlay(outcome)
   if (!inPlay) {
     const arrival = options.arrivalPlay ?? null
     // 낫아웃 — 폭투·포일 판의 진루(타자주자 포함)를 이 삼진 타석의 진루로 먹인다 (0x3e0d0 state[0x1a])
@@ -2118,8 +2116,6 @@ function batterDefenseInputOf(
     isUncatchable: options.isUncatchable,
     // 장면 +0xfdc — 번트면 도루 안 한 주자의 판 시작 리드가 +3 틱 (0x3d7b8)
     buntKind: options.buntKind ?? 0,
-    // 판정 11(2스트라이크 번트 파울 아웃)이면 아웃 콜이 조건 없이 62 다 — 진행기는 안 본다
-    buntFoulOut: options.buntFoulOut,
   }
 }
 

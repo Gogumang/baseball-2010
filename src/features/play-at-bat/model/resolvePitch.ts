@@ -67,8 +67,10 @@ export interface PitchOutcomeDetail {
   /** 번트 성공 타구인지. 미션 목표 판정에 쓴다 */
   readonly isBunt: boolean
   /**
-   * ⚠️ 옛 칸 — 이제 서지 않는다. 2스트라이크 번트 파울(원본 판정 11, 0x9d5e2~0x9d600)도 판을 도는 파울 각 공(`foulContact`)이라
-   * 판 끝 결과 코드가 11 을 내고 판 결과(`DefensePlayResult.buntFoulOut`)가 아웃 콜 62 를 고정한다.
+   * @deprecated 옛 칸 — 아무 길도 세우지 않는다(늘 undefined). 2스트라이크 번트 파울(원본 판정 11, 0x9d5e2~0x9d600)도 판을 도는
+   * 파울 각 공(`foulContact`)이라 판 끝 결과 코드가 11 을 내고 판 결과(`DefensePlayResult.buntFoulOut`)가 아웃 콜 62 를 고정한다.
+   * ⚠️ 칸 자체는 구역 밖 읽는 곳(app/model/useCareerSession · pages/team-game/model/useTeamGame · widgets/batting-stage/lib/stageText)을
+   * 걷어낸 뒤 지운다.
    */
   readonly isBuntFoulOut?: boolean
   /** 방향까지 붙인 원본 결과 코드. 스윙하지 않았으면 null */
@@ -301,7 +303,6 @@ export function resolvePitch(
         },
         hasSwung: true,
         isBunt: contact.kind === '타구' && contact.isBunt,
-        isBuntFoulOut: false,
         resultCode: code,
         pattern,
         contactSoundId,
