@@ -8,6 +8,7 @@ import { ORIGINAL_SKILLS } from '@/shared/config/original/skills'
 import { TITLE_NAMES } from '@/entities/career/model/titles'
 import { RECORD_NAMES } from '@/entities/game/model/gameRecords'
 import { parseGameMarkup, stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
+import { useSkinTickerCounter } from '@/shared/lib/skinTicker/skinTicker'
 import { RECORD_DESCRIPTIONS } from '@/pages/record/lib/recordDescriptions'
 import {
   ACHIEVEMENT_MARK, DESCRIPTION_BAR, LIST_CURSOR, LIST_ROW_FRAME_DY, listFirstYOf, listRowFrameOf, NICKNAME_SCROLLBAR, NICKNAME_TAB_LABEL, DESCRIPTION_TICKER, RECORD_COUNT, tickerTextXOf, CELL_FRAMES, CELL_GRID, LIST_GRID, LOCKED_MARK, NAME_ROW, PAGER, PAGE_TITLE, PANEL,
@@ -455,31 +456,15 @@ function CellGrid({
   )
 }
 
-/**
- * 흐르는 글 카운터 [skin+0x284] — 메인 메뉴 객체(앱에 하나, 0x2ed8 → 0x53b24 → 0x5390c 가 만든다)의 칸이라
- * 기록연감을 나갔다 들어와도, 탭·초점·고른 줄이 바뀌어도 이어진다. 0 으로 지우는 곳은 둘뿐이다(직접 떴다):
- * 객체를 만들 때 0x5390c(0x53a00~0x53a08) · 메인 메뉴 상태 15(대전, 0x31918) 의 0x31c60~0x31c6a.
- * 같은 칸을 0x5a8c8 을 부르는 다른 화면(0x2785c · 0x4a384 · 0x5b798 선수 정보 창 · 0x7c450)도 올리지만
- * 웹은 아직 그 화면들의 흐르는 글을 이 칸에 잇지 않았다 — 기록연감 설명만 센다.
- */
-const skinTickerCounter = { value: 0 }
-/** 앱을 새로 띄운 것과 같다 (0x5390c) — 테스트용 */
-export const resetSkinTickerCounter = () => {
-  skinTickerCounter.value = 0
-}
+/** 앱을 새로 띄운 것과 같다 (0x5390c) — 테스트용. 카운터는 `shared/lib/skinTicker` 에 앱 하나로 있다 */
+export { resetSkinTickerCounter } from '@/shared/lib/skinTicker/skinTicker'
 
 /**
  * 탭 0 설명 — 흐르는 글 0x5a8c8. [skin+0x284] 로 x 를 정해 그린 **뒤** 3 올린다(0x5a958~0x5a962) —
  * 그래서 올리기는 그림이 화면에 나간 뒤(effect)에 한다.
  */
 function DescriptionTicker({ text, tick }: { readonly text: string; readonly tick: number }) {
-  const lastDrawnTick = useRef(tick - 1)
-  useEffect(() => {
-    skinTickerCounter.value += DESCRIPTION_TICKER.step * Math.max(0, tick - lastDrawnTick.current)
-    lastDrawnTick.current = tick
-  }, [tick])
-  // 건너뛴 갱신(그림을 못 낸 틱)도 원본에선 한 번씩 그렸다 — 그만큼 앞당겨 센 값으로 그린다
-  const counter = skinTickerCounter.value + DESCRIPTION_TICKER.step * Math.max(0, tick - lastDrawnTick.current - 1)
+  const counter = useSkinTickerCounter(tick)
   const textRef = useRef<HTMLSpanElement>(null)
   const [textWidth, setTextWidth] = useState(0)
   useLayoutEffect(() => setTextWidth(textRef.current?.offsetWidth ?? 0), [text])
