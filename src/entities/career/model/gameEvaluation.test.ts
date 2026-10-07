@@ -170,11 +170,12 @@ describe('evaluateGame — 경기 뒤 인기도·평판·사기 (0xa719c)', () =
 })
 
 describe('연속 기록 — 0x8a6fc', () => {
-  it('2안타 경기가 3연속이면 평판 +10 과 코멘트 108', () => {
-    const result = updateStreaks(선수({ streaks: { multiHit: 2, homeRun: 0, hitless: 0 } }), 기록({ hits: 2 }))
+  it('2안타 경기가 5연속이면 평판 +10 과 코멘트 108 — 표 0xd4dfc (3연속은 투수편 표라 알림 없음)', () => {
+    const result = updateStreaks(선수({ streaks: { multiHit: 4, homeRun: 0, hitless: 0 } }), 기록({ hits: 2 }))
 
-    expect(result.career.streaks.multiHit).toBe(3)
-    expect(result.notices).toEqual([{ labelIndex: 100, count: 3, commentIndex: 108, reputationChange: 10 }])
+    expect(result.career.streaks.multiHit).toBe(5)
+    expect(result.notices).toEqual([{ labelIndex: 100, count: 5, commentIndex: 108, reputationChange: 10 }])
+    expect(updateStreaks(선수({ streaks: { multiHit: 2, homeRun: 0, hitless: 0 } }), 기록({ hits: 2 })).notices).toEqual([])
   })
 
   it('무안타 4연속이면 평판 −10 · 코멘트 111, 3년차 이상이면 하락세(17) 스킬을 얻는다', () => {

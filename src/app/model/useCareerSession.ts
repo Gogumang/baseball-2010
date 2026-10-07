@@ -596,7 +596,8 @@ export function useCareerSession({
       const counted = countGameForSkills(evaluated, evaluation.popularityChange)
       // 연속 기록 칸을 잇는다. 116 의 0x8a6fc 는 그 칸을 읽어 알림 줄과 **보상 명령**(평판 · 슬럼프 스킬)을 내장 이벤트에
       // 쌓을 뿐이라, 보상은 114 가 이벤트를 틀 때(웹은 [확인] `confirmGameResult`) 먹는다 (`streakEventOf`)
-      const advanced = advanceStreaks(counted, summary.stats)
+      // 0xa4ce0 은 평가 0xa719c 안이라 포스트시즌 경기는 잇지 않는다 (0x4f268) — 116 은 지난 칸으로 알림·보상을 다시 쌓는다
+      const advanced = isEvaluatedGame(currentCareer) ? advanceStreaks(counted, summary.stats) : counted
       // 부상은 경기 뒤가 아니라 훈련 결과 창을 닫을 때 굴린다 (0x1b4c4)
       // 경기 뒤 평가 116 진입 0x1278c 가 S+0x50 = 2 · 저장 — 이어하기가 116 을 다시 띄운다(`continueSaved`). S 의 +0x4a ·
       // +0x1d8 처럼 지난 경기 재료를 저장에 남긴다(`lastGame`).

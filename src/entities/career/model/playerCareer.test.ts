@@ -378,3 +378,10 @@ describe('사람 경기 투수 줄 — 정산 0xa8024 · 경기 끝 0xa7de8 (정
     expect(applyGameResult(career, 경기).leaguePlayerStats.pitchers).toBeUndefined()
   })
 })
+
+describe('새 시즌 0x1b882 — memset(S+0x1bc, 0, 4)', () => {
+  it('연속 기록 세 칸을 지운다', () => {
+    const career = { ...createCareer('연속'), streaks: { multiHit: 4, homeRun: 2, hitless: 1 } }
+    expect(startNextSeason(career).streaks).toEqual({ multiHit: 0, homeRun: 0, hitless: 0 })
+  })
+})

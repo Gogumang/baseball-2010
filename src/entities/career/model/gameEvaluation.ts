@@ -278,7 +278,11 @@ export interface StreakNotice {
   readonly reputationChange: number
 }
 
-const MULTI_HIT_STREAKS = [3, 5, 10, 15, 20]
+/**
+ * 0x8a6fc 모드 4 갈래는 [0](2안타 이상)·[1](홈런) **둘 다** 표 0xd4dfc(스택 +0x58) = [5,10,20,30,40] 와 견준다(8a8ec · 8a9b2).
+ * [3,5,10,15,20](0xd4e10, 스택 +0x44)은 투수편 표다 — 예전 웹은 2안타 칸을 그 표로 보고 있었다.
+ */
+const MULTI_HIT_STREAKS = [5, 10, 20, 30, 40]
 const HOME_RUN_STREAKS = [5, 10, 20, 30, 40]
 const HITLESS_STREAKS = [3, 4, 5]
 const STREAK_REWARDS = [10, 15, 20, 25, 30]
@@ -290,14 +294,18 @@ const SLUMP_SKILL_YEAR = 3
 const SLUMP_GAIN_STREAK = 4
 const SLUMP_CLEAR_STREAK = 10
 
-/** 경기 뒤 연속 기록 칸만 잇는다 — 안타 2개 이상 · 홈런 · 무안타 경기 수 */
+/**
+ * 경기 뒤 연속 기록 칸만 잇는다 — 안타 2개 이상 · 홈런 · 무안타 경기 수. 평가 0xa719c 모드 4 갈래(a71d0~a7262)의
+ * `0xa4ce0(S, 칸, 참?)` 이 참이면 +1(u8), 아니면 0. **평가가 도는 정규시즌 경기만** 부른다(0x4f268, 부르는 쪽이 가른다).
+ */
 export function advanceStreaks(career: PlayerCareer, stats: SeasonStats): PlayerCareer {
+  const step = (count: number, on: boolean) => (on ? (count + 1) & 0xff : 0)
   return {
     ...career,
     streaks: {
-      multiHit: stats.hits >= 2 ? career.streaks.multiHit + 1 : 0,
-      homeRun: stats.homeRuns >= 1 ? career.streaks.homeRun + 1 : 0,
-      hitless: stats.hits === 0 ? career.streaks.hitless + 1 : 0,
+      multiHit: step(career.streaks.multiHit, stats.hits >= 2),
+      homeRun: step(career.streaks.homeRun, stats.homeRuns >= 1),
+      hitless: step(career.streaks.hitless, stats.hits === 0),
     },
   }
 }

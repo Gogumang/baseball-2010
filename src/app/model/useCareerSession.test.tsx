@@ -1140,7 +1140,7 @@ describe('이어하기 S+0x50 == 2 → 116 다시 띄우기 (0x1c154 1c26a · 0x
     },
     evaluation: { popularityChange: 2, reputationChange: 3, moraleChange: 1, commentIndex: 40 },
   }
-  // 116 진입이 저장한 자리 — 연속 기록 칸(안타 2개 이상 3경기 → 알림 · 평판 +10)은 정산이 이미 이었다
+  // 116 진입이 저장한 자리 — 연속 기록 칸(안타 2개 이상 5경기 → 알림 · 평판 +10)은 정산이 이미 이었다
   const 평가중 = (): PlayerCareer => ({
     ...createCareer('평가'),
     gamesPlayed: 3,
@@ -1148,7 +1148,7 @@ describe('이어하기 S+0x50 == 2 → 116 다시 띄우기 (0x1c154 1c26a · 0x
     lastGame: 지난경기 as unknown as PlayerCareer['lastGame'],
     seasonPopularityGain: 10,
     reputation: 300,
-    streaks: { multiHit: 3, homeRun: 0, hitless: 0 },
+    streaks: { multiHit: 5, homeRun: 0, hitless: 0 },
   })
 
   it('평가 창을 다시 띄우고 경기 뒤 카운터를 한 번 더 쓴다 — 정산(G · 평가 · 리그)은 다시 안 돈다', () => {

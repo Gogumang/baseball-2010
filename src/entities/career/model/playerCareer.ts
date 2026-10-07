@@ -968,6 +968,8 @@ export function startNextSeason(career: PlayerCareer): PlayerCareer {
     regularSeasonRewardTaken: false,
     // 0x1b7ba `S[0x50] = 1` — 시즌 끝 사슬을 벗어난다
     seasonEndState: null,
+    // 0x1b882 `memset(S+0x1bc, 0, 4)` — 나리 S 의 +0x1bc 는 연속 기록 세 칸이다(0xa4ce0 · 0x8a6fc)
+    streaks: { multiHit: 0, homeRun: 0, hitless: 0 },
     wins: 0,
     draws: 0,
     losses: 0,
