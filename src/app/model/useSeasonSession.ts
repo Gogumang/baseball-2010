@@ -89,12 +89,11 @@ import type { SeasonAutobotBatInput } from '@/entities/season-mode/model/seasonR
 import type { LeagueFirstAward, SeasonSummaryEntry } from '@/entities/season-mode/model/seasonRewards'
 import type { SeasonAwardReward } from '@/widgets/season/lib/seasonAwardEvents'
 import { activeSound } from '@/shared/api/audio/soundPort'
+import { HELL_TRAINING_GAME_POINT, HELL_TRAINING_INDEX } from '@/widgets/season/lib/seasonTraining'
 import {
-  HELL_TRAINING_GAIN_RANGE, HELL_TRAINING_GAME_POINT, HELL_TRAINING_INDEX,
-  HELL_TRAINING_MORALE_LOSS_RANGE,
-  MASSAGER_MORALE_RELIEF, TRAINING_APPLY_LIMIT, TRAINING_GAIN_RANGE,
-  TRAINING_MORALE_LOSS_RANGE, TRAINING_SUB_ITEM_GAIN,
-} from '@/widgets/season/lib/seasonTraining'
+  applySeasonTraining, rollSeasonTraining, seasonTrainingResultOf,
+} from '@/widgets/season/lib/seasonTrainingResult'
+import type { SeasonTrainingResult } from '@/widgets/season/lib/seasonTrainingResult'
 import { SEASON_OUTING_EFFECTS, SEASON_OUTING_PLACES } from '@/widgets/season/lib/seasonOuting'
 import {
   NATIONAL_CUP_INTRO_EVENT_ID, OPENING_EVENT_ID, SEASON_FINAL_EVENT_ID, SEASON_GOAL_INTRO_EVENT_ID, START_SEASON_EVENT_CURSOR,
@@ -249,6 +248,11 @@ export interface SeasonSession {
    */
   readonly tradeRequest: TradeRequest
   /**
+   * 팀 트레이닝 결과 팝업(0xc074 의 0x741a0) — 굴림 · 적용을 마친 값. 떠 있는 동안 상태는 0xde 그대로이고
+   * (웹은 0xcf 화면 안에서 띄운다) 닫으면 0xc9. 없으면 null
+   */
+  readonly trainingResult: SeasonTrainingResult | null
+  /**
    * 관리 메뉴(0xc9) 진입에서 요청 알림 StrMODE[203] 이 떠 있는가 — 0xe9ac 의 0xec10: 이벤트 폴링이 아무것도 안
    * 틀었고 상태가 0xc9 이고 this+0x148 ≠ 0 이면 팝업 id 0x27(예·아니오). 답은 0xc9 그림 0x73b8 이 받는다.
    */
@@ -366,8 +370,10 @@ export interface SeasonActions {
   /** 국가대항전 한 경기 — 사람이 대표팀을 조작한다 */
   readonly playCupGame: (myTeam: number, opponent: number) => void
   readonly finishCup: (finish: NationalCupFinish) => void
-  /** 팀 트레이닝 한 번 — 굴리고 적용한다 (연출 0xde → 굴림 0xc074 → 적용 0xa2f24) */
+  /** 팀 트레이닝 한 번 — 굴리고 적용한 뒤 결과 팝업을 띄운다 (연출 0xde → 굴림 0xc074 → 적용 0xa2f24 → 팝업) */
   readonly runTraining: (slot: number) => void
+  /** 훈련 결과 팝업 키 0xf2c8 의 확인 · 취소 — 팝업을 닫고(0x742a9) 관리 메뉴 0xc9 */
+  readonly closeTrainingResult: () => void
   /** 시즌 외출 한 번 — 굴리고 적용한다 (연출 0xe3 → 결과 0xc81c) */
   readonly runOuting: (place: number) => void
   /**
@@ -1122,6 +1128,7 @@ export function useSeasonSession(
   const [tradeRequest, setTradeRequest] = useState<TradeRequest>(NO_TRADE_REQUEST)
   /** 관리 메뉴 진입의 요청 알림 [203] (팝업 0x27) 이 떠 있는가 */
   const [isTradeRequestAlertOpen, setTradeRequestAlertOpen] = useState(false)
+  const [trainingResult, setTrainingResult] = useState<SeasonTrainingResult | null>(null)
   /** 관리 메뉴·구단관리 메뉴 객체의 커서 — 장면 생성(0x3b14)에서 0, 상태를 오가도 남는다 */
   const [menuCursors, setMenuCursors] = useState<SeasonMenuCursors>(INITIAL_SEASON_MENU_CURSORS)
   /** 이전 상태 this+0x24 — 진입 갈래(0x4efc · 0x47d8)가 본다 */
@@ -2277,48 +2284,42 @@ export function useSeasonSession(
   )
 
   /**
-   * 팀 트레이닝 (굴림 `0xc074` → 적용 `0xa2f24`, J 4-6).
-   * 칸 0~3 은 그 칸만, 지옥훈련(4)은 **네 칸을 따로 굴린다**. 서브 아이템은 해당 칸 +2,
-   * 자동안마기는 사기 감소 −1 이다. 상승은 999 로 자른다.
+   * 팀 트레이닝 — 0xde 연출이 끝난 틀에 굴림 `0xc074` 한 번 (`rollSeasonTraining` — 난수 차례 원본 그대로:
+   * 칸 0~3 은 상승 → 감소, **지옥훈련은 감소 → 상승 넷**) → 적용 `0xa2f24` → 결과 팝업(0x741a0, 상태는 0xde 그대로).
+   * 서브 아이템은 해당 칸 +2, 자동안마기는 사기 감소 −1 이다. 상승은 999 로 자른다.
    */
   const runTraining = useCallback(
     (slot: number) => {
       if (save === null) return
       const { record, teamAbilities, teamMorale } = save.state
       const myTeam = record.teamId
-      const isHell = slot === HELL_TRAINING_INDEX
-      const gainRange = isHell ? HELL_TRAINING_GAIN_RANGE : TRAINING_GAIN_RANGE
-      const lossRange = isHell ? HELL_TRAINING_MORALE_LOSS_RANGE : TRAINING_MORALE_LOSS_RANGE
-
-      const mine = [...(teamAbilities[myTeam] ?? [])]
-      const raise = (index: number) => {
-        const bonus = record.trainingSubItems[index] === true ? TRAINING_SUB_ITEM_GAIN : 0
-        const gain = randomIntegerBelow(random, gainRange[0], gainRange[1]) + bonus
-        mine[index] = Math.min(TRAINING_APPLY_LIMIT, (mine[index] ?? 0) + gain)
-      }
-      if (isHell) mine.forEach((_value, index) => raise(index))
-      else raise(slot)
-
-      const relief = record.massager ? MASSAGER_MORALE_RELIEF : 0
-      const loss = Math.max(0, randomIntegerBelow(random, lossRange[0], lossRange[1]) - relief)
+      const roll = rollSeasonTraining(random, slot, record)
+      const applied = applySeasonTraining(teamAbilities[myTeam] ?? [], teamMorale, roll)
 
       commit({
         ...save,
         state: {
           ...save.state,
-          teamAbilities: teamAbilities.map((row, team) => (team === myTeam ? mine : row)),
-          teamMorale: clampTo(teamMorale - loss, MORALE_LIMIT),
+          teamAbilities: teamAbilities.map((row, team) => (team === myTeam ? applied.abilities : row)),
+          teamMorale: applied.teamMorale,
           // ⚠️ 트레이닝이 SR+4 를 세우는 자리는 문서에 없다. 외출(0xc81c)과 같은 규칙으로 둔다 (추정)
           record: { ...record, acted: true },
         },
       })
       // 지옥훈련이면 G −= 500 (0xa2fca 리터럴, 0..99999 로 자른다 — J 4-6).
       // 예전에는 시즌 G 칸이 늘 0 이라 이 차감이 통째로 빠져 있었다
-      if (isHell) spendGamePoint(HELL_TRAINING_GAME_POINT)
-      setScene(SEASON_SCENE_STATE.관리메뉴)
+      if (slot === HELL_TRAINING_INDEX) spendGamePoint(HELL_TRAINING_GAME_POINT)
+      // 결과 팝업 — 현재값은 적용 뒤 팀 레코드를 다시 읽는다(0xc290). 닫을 때 0xc9 로 간다(`closeTrainingResult`)
+      setTrainingResult(seasonTrainingResultOf(slot, record, roll, applied))
     },
     [commit, random, save, spendGamePoint],
   )
+
+  /** 결과 팝업 키 0xf2c8 — 확인 · 취소면 0x742a9(닫기) · 상태 0xc9 */
+  const closeTrainingResult = useCallback(() => {
+    setTrainingResult(null)
+    setScene(SEASON_SCENE_STATE.관리메뉴)
+  }, [])
 
   /**
    * 시즌 외출 (결과 `0xc81c`, P4 3절 표).
@@ -2618,6 +2619,7 @@ export function useSeasonSession(
     cup: save?.cup ?? null,
     eventPlayback,
     tradeRequest,
+    trainingResult,
     isTradeRequestAlertOpen,
     menuCursors,
     notice,
@@ -2633,7 +2635,7 @@ export function useSeasonSession(
       closeEntryAceLocked,
       playCupGame, finishCup, finishGame, saveGameProgress, enterGameSettlement, resumeSavedGame, leaveGame,
       continuePostseason,
-      runTraining, runOuting, nextSeasonEndStep, awardLeagueFirst, spendGamePoint, finishSeason,
+      runTraining, closeTrainingResult, runOuting, nextSeasonEndStep, awardLeagueFirst, spendGamePoint, finishSeason,
       openStadiumItems, markEndingSeen, finishSeasonEvent, clearNotice, quit,
     },
   }

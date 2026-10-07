@@ -16,7 +16,7 @@ import type { TrainingAnimationFile } from '@/shared/config/original/trainingAni
  *         1 → 표 0xd4a48(9칸, 8 에서 자름)           · (가운데 + 0x37, 바닥 − 2)
  *         그 밖 → 캐릭터 없음
  * 키 0x4968  확인(−5 / '5') → [gfx+0x1d0] = [gfx+0x1d8] (게이지 끝으로) · 그 밖 키 없음
- * 끝 0xc384  0x84e58(애니 끝) → 0xc074 굴림 → 팝업 0x13 → 0xc9
+ * 끝 0xc384  0x84e58(애니 끝) → 0xc074 굴림 → 결과 팝업(0x741a0 · 그리기 0xf25c · 키 0xf2c8 → 0xc9). 0xc384 의 코드 0x13 갈래는 이 팝업이 코드를 0 으로 둬 안 탄다
  * ```
  */
 export interface SeasonTrainingFigure {

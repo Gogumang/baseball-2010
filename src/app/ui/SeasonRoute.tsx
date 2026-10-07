@@ -667,6 +667,8 @@ export function SeasonRoute({
         gamePoints={session.gamePoints}
         onTrain={(_slot, index) => actions.runTraining(index)}
         onBack={backToManagement}
+        result={session.trainingResult}
+        onCloseResult={actions.closeTrainingResult}
       />
     )
   }

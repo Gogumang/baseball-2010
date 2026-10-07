@@ -154,4 +154,41 @@ describe('시즌 팀 트레이닝 (상태 0xcf)', () => {
 
     expect(onBack).toHaveBeenCalled()
   })
+  it('결과 팝업 0xf25c — 시즌 팀 이름표 · dy 0 표, 확인으로 닫고 위·아래는 글 줄을 돈다 (키 0xf2c8)', () => {
+    const onCloseResult = vi.fn()
+    const result = {
+      current: { ability: [106, 100, 100, 100], morale: 43 },
+      change: { ability: [6, 0, 0, 0], morale: -8 },
+      bonus: { ability: [0, 0, 0, 0], morale: -1 },
+      messages: ['가', '나', '다', '라', '마'],
+    }
+    const { container } = render(
+      <SeasonTrainingScreen state={시즌()} gamePoints={1000} onTrain={vi.fn()} onBack={vi.fn()}
+        result={result} onCloseResult={onCloseResult} />,
+    )
+    const 창 = screen.getByRole('dialog', { name: '상세정보' })
+    const 이름표 = [...창.querySelectorAll('img')].map((img) => img.getAttribute('src'))
+      .filter((src) => /img_text\/frames\/(046|347|204|205|084)\.png$/.test(src ?? ''))
+    expect(이름표).toHaveLength(5)
+    // 0x872d4(창, 0) — 글 상자는 박스 5 y 180 그대로 (나리 0x8a0a4 는 −4)
+    expect(container.querySelector('[data-part="track"]')?.getAttribute('y')).toBe('180')
+
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    expect(창.textContent).not.toContain('가')
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    expect(창.textContent).toContain('가')
+    fireEvent.keyDown(window, { key: '5' })
+    expect(onCloseResult).toHaveBeenCalledTimes(1)
+  })
+
+  it('보정 글이 없으면 글 상자 · 스크롤 막대를 안 그린다 (0x87700 빈 글)', () => {
+    const result = {
+      current: { ability: [106, 100, 100, 100], morale: 43 },
+      change: { ability: [6, 0, 0, 0], morale: -8 },
+      bonus: { ability: [0, 0, 0, 0], morale: 0 },
+      messages: [],
+    }
+    render(<SeasonTrainingScreen state={시즌()} gamePoints={1000} onTrain={vi.fn()} onBack={vi.fn()} result={result} />)
+    expect(screen.queryByTestId('상세스크롤막대')).toBeNull()
+  })
 })

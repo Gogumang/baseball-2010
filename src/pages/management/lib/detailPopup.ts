@@ -23,6 +23,11 @@ export const DETAIL_CURRENT_DX = -15
 export const DETAIL_MAXIMUM_DX = 18
 export const DETAIL_CHANGE_X = 160
 export const DETAIL_MESSAGE_BOX = { x: 36, y: 180 + DETAIL_Y_OFFSET, width: 170, height: 70 }
+/**
+ * 0x872d4(창, dy) 의 둘째 인자 dy 로 표 · 글 상자를 내린다 — 나리 상세 창 0x8a0a4 는 −4(`DETAIL_Y_OFFSET`),
+ * 시즌 훈련 결과 창 0xf25c 는 0 이다.
+ */
+export const detailMessageBoxOf = (yOffset: number = DETAIL_Y_OFFSET) => ({ ...DETAIL_MESSAGE_BOX, y: 180 + yOffset })
 export const DETAIL_MESSAGE_LINE_HEIGHT = 16
 
 /**
@@ -57,8 +62,8 @@ export interface DetailScrollBar {
 }
 
 /** 스크롤 막대 세 사각형 — 줄 수 `lineCount`(창+0x37c) · 첫 줄 `scrollOffset`(창+0x380) */
-export function detailScrollBarOf(lineCount: number, scrollOffset: number): DetailScrollBar {
-  const box = DETAIL_MESSAGE_BOX
+export function detailScrollBarOf(lineCount: number, scrollOffset: number, yOffset: number = DETAIL_Y_OFFSET): DetailScrollBar {
+  const box = detailMessageBoxOf(yOffset)
   const x = box.x + box.width - DETAIL_SCROLL_BAR_WIDTH
   const track = { x, y: box.y, width: DETAIL_SCROLL_BAR_WIDTH, height: box.height }
   if (lineCount <= DETAIL_SCROLL_FULL_LINES) {
@@ -79,7 +84,9 @@ export function detailScrollBarOf(lineCount: number, scrollOffset: number): Deta
 /** ▲ mode_ui 61 · ▼ 62 */
 export const CHANGE_ARROW_FRAMES = { up: 61, down: 62 }
 
-export const DETAIL_ROW_TOP = (index: number) => 76 + 17 * (index + 1) + DETAIL_Y_OFFSET
+/** i 번째 줄 위 — 0x872d4 의 dy 를 받는다 (나리 −4 · 시즌 훈련 결과 0) */
+export const detailRowTopOf = (index: number, yOffset: number) => 76 + 17 * (index + 1) + yOffset
+export const DETAIL_ROW_TOP = (index: number) => detailRowTopOf(index, DETAIL_Y_OFFSET)
 
 /** 이름표 표 0xd4ad8 — 336 히트 · 337 파워 · 338 수비 · 339 주루 · 84 사기 */
 const ABILITY_ROWS: readonly (readonly [keyof BatterAbility, number])[] = [

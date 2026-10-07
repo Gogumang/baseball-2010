@@ -321,6 +321,11 @@ describe('시즌 관리 커맨드', () => {
     expect(후.teamAbilities[내팀][0]).toBe(전.teamAbilities[내팀][0])
     expect(후.teamMorale).toBeLessThan(전.teamMorale)
     expect(후.record.acted).toBe(true)
+    // 결과 팝업(0x741a0)이 뜨고 상태는 그대로 — 닫으면(키 0xf2c8) 관리 메뉴 0xc9
+    expect(result.current.trainingResult?.current.ability[1]).toBe(후.teamAbilities[내팀][1])
+    act(() => result.current.actions.closeTrainingResult())
+    expect(result.current.trainingResult).toBeNull()
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.관리메뉴)
   })
 
   it('지옥훈련은 네 칸을 모두 올린다', () => {

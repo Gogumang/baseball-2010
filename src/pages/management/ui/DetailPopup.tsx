@@ -5,9 +5,9 @@ import { parseGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import { glyphsWidthOf, numberGlyphsOf } from '@/pages/management/lib/managementLayout'
 import {
   CHANGE_ARROW_FRAMES, DETAIL_CHANGE_X, DETAIL_CURRENT_DX, DETAIL_HEADER, DETAIL_LABEL_BOX, DETAIL_MAXIMUM_DX,
-  DETAIL_MESSAGE_BOX, DETAIL_MESSAGE_LINE_HEIGHT, DETAIL_ROW_TOP, DETAIL_SLASH_FRAME, DETAIL_TABLE_FRAME,
+  DETAIL_MESSAGE_LINE_HEIGHT, DETAIL_SLASH_FRAME, DETAIL_TABLE_FRAME,
   DETAIL_SCROLL_BAR_COLORS, DETAIL_TITLE_FRAME, DETAIL_VALUE_BOX, DETAIL_WINDOW, DETAIL_Y_OFFSET, detailRowsOf,
-  detailScrollBarOf,
+  detailMessageBoxOf, detailRowTopOf, detailScrollBarOf,
 } from '@/pages/management/lib/detailPopup'
 import type { DetailResult, DetailRow, ScrollBarRect } from '@/pages/management/lib/detailPopup'
 import * as styles from '@/pages/management/ui/DetailPopup.css'
@@ -56,13 +56,24 @@ interface DetailWindowProps {
    * 능력치 상세(120)만 0x8a044 로 민다. 안 주면 0.
    */
   readonly scrollOffset?: number
+  /** 0x872d4 의 dy — 표 · 글 상자를 이만큼 내린다. 나리 0x8a0a4 는 −4, 시즌 훈련 결과 0xf25c 는 0 */
+  readonly tableYOffset?: number
+  /**
+   * 글이 비면 글 · 스크롤 막대를 안 그린다 — 0x872d4 는 0x1552af4 가 빈 글이면(0x87700 strlen == 0) 끝으로 건너뛴다.
+   * 나리 상세 창은 0x8a0a4 가 막대를 따로 늘 그리므로 거짓으로 둔다.
+   */
+  readonly hidesEmptyMessages?: boolean
 }
 
 /**
  * 상세정보 창 — 표와 메시지 줄. 누르면 닫힌다. 창 모양(0x55e60)은 선 목록만 확인돼 CSS 로 근사한다 (추정)
  * 두 모드 공용 창(0x872d4)이라 줄(이름표 포함)만 받는다 — 투수편은 이름표 340~343 으로 세운 줄을 넘긴다.
  */
-export function DetailWindow({ rows, messages, onClose, scrollOffset = 0 }: DetailWindowProps) {
+export function DetailWindow({
+  rows, messages, onClose, scrollOffset = 0, tableYOffset = DETAIL_Y_OFFSET, hidesEmptyMessages = false,
+}: DetailWindowProps) {
+  const messageBox = detailMessageBoxOf(tableYOffset)
+  const showsMessages = !hidesEmptyMessages || messages.length > 0
   const origins = useFrameOrigins(MODE_UI)
   const textOrigins = useFrameOrigins(IMG_TEXT)
   const sway = Math.floor(useUpdateCounter() / ARROW_SWAY_UPDATES) % 2
@@ -78,11 +89,11 @@ export function DetailWindow({ rows, messages, onClose, scrollOffset = 0 }: Deta
       <div className={styles.window} style={{ left: DETAIL_WINDOW.x, top: DETAIL_WINDOW.y, width: DETAIL_WINDOW.width, height: DETAIL_WINDOW.height }} />
       <img className={styles.layer} alt="" src={`./sprites/management/label_navy_${DETAIL_TITLE_FRAME}.png`}
         style={{ left: DETAIL_WINDOW.x + Math.trunc((85 - widthOf(DETAIL_TITLE_FRAME)) / 2), top: DETAIL_WINDOW.y + 5 }} />
-      <FrameSprite folder={MODE_UI} frame={DETAIL_TABLE_FRAME} origins={origins} x={0} y={DETAIL_Y_OFFSET} />
+      <FrameSprite folder={MODE_UI} frame={DETAIL_TABLE_FRAME} origins={origins} x={0} y={tableYOffset} />
       <img className={styles.layer} alt="" src={imageOf(IMG_TEXT, DETAIL_HEADER.frame)}
         style={{ left: valueCenter - Math.trunc(widthOf(DETAIL_HEADER.frame) / 2), top: DETAIL_HEADER.box.y + 3 }} />
       {rows.map((row, index) => {
-        const top = DETAIL_ROW_TOP(index)
+        const top = detailRowTopOf(index, tableYOffset)
         return (
           <div key={row.labelFrame}>
             <img className={styles.layer} alt="" src={imageOf(IMG_TEXT, row.labelFrame)}
@@ -112,7 +123,8 @@ export function DetailWindow({ rows, messages, onClose, scrollOffset = 0 }: Deta
           </div>
         )
       })}
-      <div className={styles.messages} style={{ left: DETAIL_MESSAGE_BOX.x, top: DETAIL_MESSAGE_BOX.y, width: DETAIL_MESSAGE_BOX.width, height: DETAIL_MESSAGE_BOX.height }}>
+      {showsMessages && (<>
+      <div className={styles.messages} style={{ left: messageBox.x, top: messageBox.y, width: messageBox.width, height: messageBox.height }}>
         {/* 글은 0xba269 가 색 마크업(!c)을 읽으며 그린다 — 능력치 상세(120)의 "[!cFFFF00이름!cFFFFFF]" */}
         {messages.slice(scrollOffset).map((message, index) => (
           <div key={scrollOffset + index} style={{ height: DETAIL_MESSAGE_LINE_HEIGHT }}>
@@ -125,10 +137,11 @@ export function DetailWindow({ rows, messages, onClose, scrollOffset = 0 }: Deta
       {/* 오른쪽 스크롤 막대 (0x8a182~0x8a2a4) — 줄 수 ≤ 3 이면 가득, 아니면 4줄 몫 손잡이 */}
       <svg className={styles.layer} style={{ left: 0, top: 0 }} viewBox="0 0 240 320" width={240} height={320}
         shapeRendering="crispEdges" data-testid="상세스크롤막대">
-        {scrollBarRects(detailScrollBarOf(messages.length, scrollOffset)).map(([name, rect, fill]) => (
+        {scrollBarRects(detailScrollBarOf(messages.length, scrollOffset, tableYOffset)).map(([name, rect, fill]) => (
           <rect key={name} data-part={name} x={rect.x} y={rect.y} width={rect.width} height={Math.max(rect.height, 0)} fill={fill} />
         ))}
       </svg>
+      </>)}
     </div>
   )
 }

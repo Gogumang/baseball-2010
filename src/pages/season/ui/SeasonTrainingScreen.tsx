@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
 import type { SeasonState } from '@/entities/season-mode/model/seasonRecord'
 import {
@@ -12,6 +12,12 @@ import { SEASON_SUB_COMMAND_SLOTS, seasonParentSlotOf } from '@/pages/season/lib
 import { SeasonCommonFrame } from '@/pages/season/ui/SeasonCommonFrame'
 import { SeasonTrainingPopup } from '@/pages/season/ui/SeasonTrainingPopup'
 import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
+import { DetailWindow } from '@/pages/management/ui/DetailPopup'
+import { detailRowsFromSlots } from '@/pages/management/lib/detailPopup'
+import {
+  SEASON_TEAM_DETAIL_LABEL_FRAMES, SEASON_TRAINING_MAXIMUMS, scrollSeasonTrainingMessages,
+} from '@/widgets/season/lib/seasonTrainingResult'
+import type { SeasonTrainingResult } from '@/widgets/season/lib/seasonTrainingResult'
 
 /** StrMODE 번호 (가드 0x9108 이 0x702b4 로 꺼내는 글 — 직접 떴다) */
 const TEXT = {
@@ -91,12 +97,61 @@ export interface SeasonTrainingScreenProps {
    * 칸을 골라 확인까지 마쳤다.
    *
    * 원본은 확인 뒤 **연출 0xde**(훈련 팝업 0x848d0 — `SeasonTrainingPopup`)를 돌고, 애니가 끝나면 굴림 `0xc074` →
-   * 적용 `0xa2f24` → 결과 팝업 0x13 → 관리 메뉴 0xc9 로 돌아온다. 이 화면은 연출이 끝난 때 부른다 — 굴림은
+   * 적용 `0xa2f24` → 결과 팝업(0x741a0 — `result`) → 관리 메뉴 0xc9 로 돌아온다. 이 화면은 연출이 끝난 때 부른다 — 굴림은
    * 표(`widgets/season/lib/seasonTraining.ts`)를 보고 부르는 쪽이 한다.
    */
   readonly onTrain: (slot: TrainingSlot, index: number) => void
   /** 취소(−16) — 관리 메뉴(0xc9)로 되돌아간다 */
   readonly onBack: () => void
+  /** 굴림 뒤 결과 팝업 (0xc074 → 0x741a0) — null 이면 없음 */
+  readonly result?: SeasonTrainingResult | null
+  /** 결과 팝업 키 0xf2c8 의 확인 · 취소 — 닫고 0xc9 */
+  readonly onCloseResult?: () => void
+}
+
+/** 결과 팝업 0xf25c 가 0x872d4 에 넘기는 dy — 나리 상세 창(−4)과 달리 0 이다 */
+const SEASON_RESULT_TABLE_Y_OFFSET = 0
+
+/**
+ * 훈련 결과 팝업 — 그리기 0xf25c · 키 0xf2c8 (직접 떴다).
+ * ```
+ * 0xf25c  창 = 프레임 90 박스 0 → 0x871f8(창, 박스, 이름표 372 "RESULT"(img_text), 0) → 0x872d4(창, dy 0) → 0x7f4ed(머리띠)
+ * 0xf2c8  확인(−5 · '5') · 취소(−16) → 0x742a9(닫기) · 상태 0xc9
+ *         위(−1 · '2') → 0x7d0d8 · 아래(−2 · '8') → 0x7d0fc — 글 상자 첫 줄을 끝에서 반대쪽으로 돌며 옮긴다
+ * ```
+ * 표는 시즌 팀 이름표(46 · 347 · 204 · 205 · 84), 글은 서브 아이템 보정 줄 — 없으면 0x872d4 가 글 상자를 건너뛴다.
+ * ⚠️ 0x7f4ed 머리띠를 창 위에 한 번 더 그리지만 창이 머리띠 자리를 안 덮어 보이는 것이 같다 — 따로 안 그린다.
+ * ⚠️ 첫 줄 gfx+0x2d8 을 팝업을 열 때 비우는 곳은 확인하지 않았다 — 0 에서 시작한다.
+ */
+function SeasonTrainingResultPopup({ result, onClose }: { readonly result: SeasonTrainingResult; readonly onClose: () => void }) {
+  const [firstLine, setFirstLine] = useState(0)
+  const lineCount = result.messages.length
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Enter' || event.key === '5' || event.key === ' ' || event.key === 'Escape' || event.key === 'Backspace') {
+        event.preventDefault()
+        onClose()
+      } else if (event.key === 'ArrowUp' || event.key === '2') {
+        event.preventDefault()
+        setFirstLine((line) => scrollSeasonTrainingMessages(line, lineCount, -1))
+      } else if (event.key === 'ArrowDown' || event.key === '8') {
+        event.preventDefault()
+        setFirstLine((line) => scrollSeasonTrainingMessages(line, lineCount, 1))
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [lineCount, onClose])
+  return (
+    <DetailWindow
+      rows={detailRowsFromSlots(SEASON_TEAM_DETAIL_LABEL_FRAMES, result.current, SEASON_TRAINING_MAXIMUMS, result.change, result.bonus)}
+      messages={result.messages}
+      onClose={onClose}
+      scrollOffset={firstLine}
+      tableYOffset={SEASON_RESULT_TABLE_Y_OFFSET}
+      hidesEmptyMessages
+    />
+  )
 }
 
 /**
@@ -114,7 +169,9 @@ export interface SeasonTrainingScreenProps {
  * SR+4 로 **트레이닝·외출 두 칸을 함께** 끄는 것을 보면 트레이닝도 세우는 것이 맞겠지만,
  * 그 자리를 확인하지 못해 이 화면은 손대지 않는다 — 부르는 쪽이 정한다.
  */
-export function SeasonTrainingScreen({ state, gamePoints, onTrain, onBack }: SeasonTrainingScreenProps) {
+export function SeasonTrainingScreen({
+  state, gamePoints, onTrain, onBack, result = null, onCloseResult,
+}: SeasonTrainingScreenProps) {
   const { record, teamMorale, teamAbilities } = state
   const abilities = teamAbilities[record.teamId] ?? []
   const [popup, setPopup] = useState<TrainingPopup | null>(null)
@@ -138,6 +195,7 @@ export function SeasonTrainingScreen({ state, gamePoints, onTrain, onBack }: Sea
         <SeasonCommonFrame record={record} teamMorale={teamMorale} gamePoint={gamePoints} onBack={playingIndex === null ? onBack : null}
           // 0xde 는 공통 틀에서 가운데 판을 빼고 0x848d0 을 덧그린다
           showsCenterStage={playingIndex === null}
+          // 결과 팝업이 떠 있는 동안도 상태는 0xde — 끝난 연출 위에 팝업이 뜬다
           overlay={playingIndex === null ? undefined : (
             <SeasonTrainingPopup slot={playingIndex} teamIndex={record.teamId}
               onFinished={() => onTrain(TRAINING_SLOTS[playingIndex], playingIndex)} />
@@ -148,6 +206,8 @@ export function SeasonTrainingScreen({ state, gamePoints, onTrain, onBack }: Sea
             onSelect: (id) => select(TRAINING_SLOTS.findIndex((label) => label === id)),
           }} />
       </div>
+
+      {result !== null && <SeasonTrainingResultPopup result={result} onClose={() => onCloseResult?.()} />}
 
       {popup !== null && (
         <MessageBox
