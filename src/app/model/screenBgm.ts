@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { SoundPort } from '@/shared/api/audio/soundPort'
 import type { Screen } from '@/app/model/screen'
 import type { PitcherScene } from '@/app/model/usePitcherLeagueSession'
 
@@ -111,6 +112,56 @@ export function usePitcherLeagueBgm(isActive: boolean, scene: PitcherScene): num
   }
   // 위에서 상태를 고쳤으면 React 가 이 그리기를 버리고 곧바로 다시 그린다 — 돌려주는 값은 고친 상태로 다시 구한다
   return isActive ? pitcherLeagueBgmOf(scene, fromReentry) : null
+}
+
+/** 시즌 관리 메뉴 상태 0xc9 · 장면 생성 뒤 첫 상태(진입 분기) 0xcb */
+const SEASON_MANAGEMENT_MENU = 0xc9
+const SEASON_ENTRY_BRANCH = 0xcb
+/** 관리 메뉴 배경음 (`0x6ea6d(소리, 4, −1, 1)`) */
+const SEASON_MANAGEMENT_BGM = 4
+/**
+ * 시즌 관리 메뉴 0xc9 의 틀 0x73b8 이 배경음 4 를 트는 이전 상태 (0x73c2~0x73ea 직접 떴다):
+ * ```
+ * 0x73ba  [sm+0x2c](상태 틀 수) == 2 일 때만
+ * 0x73c2  이전 상태 ∈ {0xcb, 0xcc, 0xe3, 0xde, 0xf9, 0xe4, 0xe6, 0xe5, 0xd3, 1}
+ * 0x73ec  0x6ea6d([0x1400058], 4, −1, 1)   ; 배경음 4 반복 즉시 재생
+ * ```
+ */
+const SEASON_MENU_BGM_FROM: ReadonlySet<number> = new Set([0xcb, 0xcc, 0xe3, 0xde, 0xf9, 0xe4, 0xe6, 0xe5, 0xd3, 1])
+/**
+ * 웹이 원본 상태를 건너뛰는 자리 — 원본에서는 아래 상태가 위 목록의 상태를 거쳐 0xc9 에 온다.
+ * - 0xca 팀고르기 · 0xc8 팀결정확인: 웹은 곧장 0xc9 로 간다. 원본은 0xcc(새 시즌 초기화) → 0xcb → 0xc9.
+ * - 0xcf 트레이닝: 웹은 0xde 연출과 결과 팝업을 0xcf 화면 안에서 띄우고 닫으면 0xc9 로 간다(원본 0xde → 0xc9).
+ *   ⚠️ 0xcf 에서 취소로 돌아올 때도 4 를 다시 부른다 — 원본은 안 부르지만 그때 이미 4 가 돌고 있어(0xc9 → 0xcf 는 배경음을
+ *   안 바꾼다) 같은 번호라 그대로 이어진다.
+ * - 0xd1 외출 지도: 웹은 외출 결과 0xe3 을 지도 위에 띄우고 닫으면 0xc9 로 간다(원본 0xe3 → 0xc9).
+ * - 0xe1 경기: 원본은 경기 장면 0x104 를 나와 장면 0x105 를 새로 지으므로 0xcb 를 지난다.
+ */
+const SEASON_MENU_BGM_WEB_STAND_INS: ReadonlySet<number> = new Set([0xca, 0xc8, 0xcf, 0xd1, 0xe1])
+
+/**
+ * 관리 메뉴 0xc9 에 들어설 때 틀 배경음 — 이전 상태가 목록에 들면 4, 아니면 null(안 바꾼다).
+ * `previous` 가 null 이면 시즌 장면에 막 들어선 때다 — 원본은 장면 생성 0x3b14 의 첫 상태가 진입 분기 0xcb 다.
+ */
+export function seasonMenuBgmOf(previous: number | null): number | null {
+  const from = previous ?? SEASON_ENTRY_BRANCH
+  return SEASON_MENU_BGM_FROM.has(from) || SEASON_MENU_BGM_WEB_STAND_INS.has(from) ? SEASON_MANAGEMENT_BGM : null
+}
+
+/**
+ * 시즌모드(장면 0x105) 관리 메뉴의 배경음 4 — 원본은 상태 0xc9 의 틀 0x73b8 이 이전 상태를 보고 **한 번** 튼다.
+ * 최상위 화면 표(`SCREEN_BGM` 시즌모드 3)를 고른 **뒤에** 불러야 한다 — 같은 컴포넌트의 효과는 선언 차례로 돈다.
+ */
+export function useSeasonMenuBgm(sound: SoundPort, isActive: boolean, scene: number): void {
+  /** 앞 틀의 상태 — 시즌모드가 아니었으면 null */
+  const previousRef = useRef<number | null>(null)
+  useEffect(() => {
+    const previous = previousRef.current
+    previousRef.current = isActive ? scene : null
+    if (!isActive || scene !== SEASON_MANAGEMENT_MENU || previous === scene) return
+    const bgm = seasonMenuBgmOf(previous)
+    if (bgm !== null) sound.playBgm(bgm)
+  }, [sound, isActive, scene])
 }
 
 /**

@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import { renderHook } from '@testing-library/react'
-import { pitcherLeagueBgmOf, screenBgmOf, usePitcherLeagueBgm } from '@/app/model/screenBgm'
+import { pitcherLeagueBgmOf, screenBgmOf, seasonMenuBgmOf, usePitcherLeagueBgm, useSeasonMenuBgm } from '@/app/model/screenBgm'
+import { createSilentSound } from '@/shared/api/audio/soundPort'
 import type { PitcherScene } from '@/app/model/usePitcherLeagueSession'
 
 describe('포스트시즌 대진 128 배경음 — 진입 0x120a4 (이전 상태 1 일 때만 4)', () => {
@@ -55,5 +56,35 @@ describe('투수편 배경음 — 안쪽 장면을 본다 (128 진입 0x120a4 �
     expect(pitcherLeagueBgmOf('다음경기순위', false)).toBe(4)
     // 142 진입 0x1c46c 는 배경음을 안 건드린다
     expect(pitcherLeagueBgmOf('경기준비', false)).toBeNull()
+  })
+})
+
+describe('시즌 관리 메뉴 0xc9 의 틀 0x73b8 — 이전 상태가 목록에 들면 배경음 4', () => {
+  it('원본 목록 {0xcb, 0xcc, 0xe3, 0xde, 0xf9, 0xe4, 0xe6, 0xe5, 0xd3, 1} 과 장면 첫 진입(0xcb)', () => {
+    for (const from of [0xcb, 0xcc, 0xe3, 0xde, 0xf9, 0xe4, 0xe6, 0xe5, 0xd3, 1]) expect(seasonMenuBgmOf(from)).toBe(4)
+    expect(seasonMenuBgmOf(null)).toBe(4)
+  })
+
+  it('목록 밖(0xcd 시즌정보 · 0xce 구단관리 · 0xd8 다음경기 · 0xf1 마무리)이면 안 바꾼다', () => {
+    for (const from of [0xcd, 0xce, 0xd8, 0xf1, 0xd0]) expect(seasonMenuBgmOf(from)).toBeNull()
+  })
+
+  it('훅 — 시즌모드에 들어서며 0xc9 면 틀고, 목록 밖에서 돌아오면 안 튼다', () => {
+    const sound = createSilentSound()
+    const played: number[] = []
+    const port = { ...sound, playBgm: (id: number) => { played.push(id) } }
+    const { rerender } = renderHook(
+      ({ isActive, scene }: { isActive: boolean; scene: number }) => useSeasonMenuBgm(port, isActive, scene),
+      { initialProps: { isActive: false, scene: 0xc9 } },
+    )
+    expect(played).toEqual([])
+    rerender({ isActive: true, scene: 0xc9 })
+    expect(played).toEqual([4])
+    rerender({ isActive: true, scene: 0xcd })
+    rerender({ isActive: true, scene: 0xc9 })
+    expect(played).toEqual([4])
+    rerender({ isActive: true, scene: 0xd3 })
+    rerender({ isActive: true, scene: 0xc9 })
+    expect(played).toEqual([4, 4])
   })
 })

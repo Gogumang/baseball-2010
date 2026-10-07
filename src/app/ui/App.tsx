@@ -25,7 +25,7 @@ import { modePitcherOf } from '@/app/model/modePitcher'
 import type { AceMatchStarter } from '@/app/ui/CareerRoutes'
 import { useGameSettings } from '@/app/model/useGameSettings'
 import { useSceneBgm, useSceneEnterSound, useSound } from '@/app/model/useSound'
-import { screenBgmOf, screenEnterSoundOf, usePitcherLeagueBgm } from '@/app/model/screenBgm'
+import { screenBgmOf, screenEnterSoundOf, usePitcherLeagueBgm, useSeasonMenuBgm } from '@/app/model/screenBgm'
 import { useSeasonSession } from '@/app/model/useSeasonSession'
 import { SeasonRoute } from '@/app/ui/SeasonRoute'
 import { usePitcherLeagueSession } from '@/app/model/usePitcherLeagueSession'
@@ -210,6 +210,8 @@ export function App() {
   // 화면이 바뀌면 그 화면의 배경음으로 갈아탄다 (`screenBgm.ts` 의 표). 투수편은 안쪽 장면(128 이어하기 4)을 본다
   const pitcherBgm = usePitcherLeagueBgm(screen.kind === '투수편', pitcherSession.scene)
   useSceneBgm(sound, screen.kind === '투수편' ? pitcherBgm : screenBgmOf(screen))
+  // 시즌 관리 메뉴 0xc9 의 틀 0x73b8 — 이전 상태가 목록에 들면 배경음 4 (위 화면 표 뒤에 돌아야 이긴다)
+  useSeasonMenuBgm(sound, screen.kind === '시즌모드', seasonSession.scene)
   const careerSession = useCareerSession({
     runner, random, saveGame, screen, setScreen, sound, wallet,
     // 환경설정 "주루" (설정 +0xbd) — 나리 타자편은 사람이 늘 공격이라 그대로 먹는다 (0xae690)

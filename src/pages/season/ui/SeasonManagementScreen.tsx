@@ -64,8 +64,7 @@ export interface SeasonManagementScreenProps {
  * 상태판 0x7d34c · 가운데 판 0x7f814(감독 · 코치) · 머리띠(시즌모드, 되돌아가기).
  * 틀 0x73b8 은 상태 틀 수로 칸 등장 0x7ff8c 을 돌리고, 틀 2 에 이전 상태가 0xcb·0xcc·0xe3·0xde·0xf9·0xe4·0xe6·0xe5·0xd3·1 이면
  * `0x6ea6d([0x1400058], 4, −1, 1)` = **배경음 4(관리 화면) 반복** 즉시 재생(L 1-A — 0x6ea6c play(obj, n, vol, loop)).
- * ⚠️ 옮기지 않았다: 웹 배경음은 앱(`app/model/screenBgm` · `App`)이 최상위 화면 단위로 고르고 시즌모드 전체를 3 으로 둔다 —
- * 시즌 안쪽 장면 번호를 앱에 넘기는 배선이 이 구역 밖이다.
+ * 배경음은 앱이 튼다 — `app/model/screenBgm` 의 `useSeasonMenuBgm`(App 이 시즌 장면 번호를 넘긴다).
  */
 export function SeasonManagementScreen({
   state, onSelect, onExit, alert = null, cursor: heldCursor, onCursorChange, gamePoint = 0, centerSlidesIn = false,
