@@ -9,6 +9,7 @@ import {
   registerHallOfFame,
   registerHallOfFamePitcher,
   deleteHallOfFame,
+  syncHallOfFameEquipment,
   HALL_OF_FAME_COST,
 } from '@/entities/collection/model/collection'
 import type { Collection, EndingViewer, HallOfFameResult, HallOfFameSide } from '@/entities/collection/model/collection'
@@ -132,6 +133,11 @@ export function useCollection(
     setCollection((previous) => deleteHallOfFame(previous, side, slot))
   }, [])
 
+  /** 시즌 장비 창 0x7d90 → 0x2328c — 명예 선수가 산 장비 니블을 명전 기록에도 (`syncHallOfFameEquipment`) */
+  const syncSeasonHallOfFameEquipment = useCallback((side: HallOfFameSide, recordId: number, nibbles: readonly number[]) => {
+    setCollection((previous) => syncHallOfFameEquipment(previous, side, recordId, nibbles))
+  }, [])
+
   /** 통계 기록 `[mgr+0xc8]` 에 한 건 쌓는다 (0x22e35 · 0x22c29 · 0xb663c) — 원본도 곧바로 저장(0x1f1e1)한다 */
   const recordStat = useCallback((event: AnnalsStatEvent) => {
     setCollection((previous) => ({ ...previous, stats: applyAnnalsStat(previous.stats, event) }))
@@ -176,7 +182,9 @@ export function useCollection(
     [],
   )
 
-  return { collection, register, registerPitcher, deleteHallOfFamer, recordStat, claimCollectionReward }
+  return {
+    collection, register, registerPitcher, deleteHallOfFamer, syncSeasonHallOfFameEquipment, recordStat, claimCollectionReward,
+  }
 }
 
 /** 등록 목록 칸 0·5 에 그리는 나리 선수 — 이름과 능력치 도형 값 `0xb6415(기록, k, 1)` */

@@ -46,11 +46,12 @@ import type { SeasonSession } from '@/app/model/useSeasonSession'
 import { seasonStadiumOf } from '@/entities/season-mode/model/stadiumItems'
 import { PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import {
-  EMPTY_COLLECTION, HALL_OF_FAME_MAX_BATTERS, HALL_OF_FAME_MAX_PITCHERS, hallOfFameRecordIdOf,
+  EMPTY_COLLECTION, HALL_OF_FAME_BATTER_FIRST_RECORD_ID, HALL_OF_FAME_MAX_BATTERS, HALL_OF_FAME_MAX_PITCHERS,
+  HALL_OF_FAME_PITCHER_FIRST_RECORD_ID, hallOfFameEquipmentNibblesOf, hallOfFameRecordIdOf,
 } from '@/entities/collection/model/collection'
 import { HallOfFameScreen } from '@/pages/special/ui/SpecialScreen'
 import type { HallOfFameNariPlayer } from '@/pages/special/ui/SpecialScreen'
-import type { Collection } from '@/entities/collection/model/collection'
+import type { Collection, HallOfFameSide } from '@/entities/collection/model/collection'
 import type { RecruitCandidate, RecruitListInput } from '@/pages/season'
 import { nariRecruitPlayerOf } from '@/entities/season-mode/model/playerRecruit'
 import {
@@ -86,6 +87,11 @@ interface SeasonRouteProps {
    * 앱의 `collection.collection` 을 그대로 넘기면 된다.
    */
   readonly hallOfFame?: Collection
+  /**
+   * 장비 창 0xdc 의 적용 0x7d90 이 명예 선수(0xb6348)의 장비를 산 뒤 0x2328c 로 명전 기록에도 니블을 옮긴다.
+   * 앱의 `collection.syncSeasonHallOfFameEquipment` 를 넘기면 된다. 안 넘기면 명전 기록은 그대로다.
+   */
+  readonly onHallOfFameEquipment?: (side: HallOfFameSide, recordId: number, nibbles: readonly number[]) => void
   /**
    * 영입 목록 나리 칸 0·5 (0x5eb8c 목록 종류 0 — 나리 투수편·타자편 저장이 있으면 상태 1, 없으면 2).
    * 안 넘기면 둘 다 없음(상태 2)으로 그린다.
@@ -152,7 +158,7 @@ function hallOfFameRecruitsOf(hallOfFame: SeasonRouteProps['hallOfFame']): Pick<
  * 알림을 띄우고 관리 메뉴로 되돌린다 — 조용히 아무것도 안 하는 것보다 낫다.
  */
 export function SeasonRoute({
-  session, random, gameSettings, onExit, aceSelect, hallOfFame, nari, nariRecords,
+  session, random, gameSettings, onExit, aceSelect, hallOfFame, nari, nariRecords, onHallOfFameEquipment,
 }: SeasonRouteProps) {
   const { state, scene, league, roster, playerStats, series, cup, gameOptions, notice, actions } = session
 
@@ -310,17 +316,28 @@ export function SeasonRoute({
       const view = seasonPlayerRecordOf(state.record.teamId, player, isPitcher, pick.cursor, recordOf)
       // 해금표 app+0xc0 — 기록연감의 전역 해금 목록과 이 세션이 연 칸
       const opened = [...(hallOfFame?.openedHiddenIds ?? []), ...session.openedHiddenIds]
+      // 명예 선수(0xb6348) — 영입 0xc554 가 옮긴 명전 기록의 니블이 처음 값이다(웹 명단엔 사본이 없어 지금 명전 칸을 읽는다)
+      const side: HallOfFameSide = isPitcher ? '투수' : '타자'
+      // 0xb6348: 타자면 id − 0xc8 ≤ 8, 투수면 id − 0xb4 ≤ 0x18 (나리 0xfe 는 둘 다 아니다)
+      const isHallOfFamer = player.id >= HALL_OF_FAME_PITCHER_FIRST_RECORD_ID && player.id <= HALL_OF_FAME_BATTER_FIRST_RECORD_ID + HALL_OF_FAME_MAX_BATTERS
+      const equipment = player.equipment === undefined && isHallOfFamer && hallOfFame !== undefined
+        ? hallOfFameEquipmentNibblesOf(hallOfFame, side, player.id) ?? seasonPlayerEquipmentOf(player, state.record.teamId, isPitcher)
+        : seasonPlayerEquipmentOf(player, state.record.teamId, isPitcher)
       return (
         <SeasonEquipmentScreen
           record={state.record}
           teamMorale={state.teamMorale}
           playerName={view.name}
           isBatter={!isPitcher}
-          equipment={seasonPlayerEquipmentOf(player, state.record.teamId, isPitcher)}
+          equipment={equipment}
           abilities={seasonCardAbilitiesOf(view, { record: state.record, teamMorale: state.teamMorale })}
           isHiddenOpen={(id) => opened.includes(id)}
           gamePoint={session.gamePoints}
-          onPurchase={({ money, equipment }) => actions.equipSeasonPlayer({ isPitcher, recordIndex: pick.cursor, money, equipment })}
+          onPurchase={(bought) => {
+            actions.equipSeasonPlayer({ isPitcher, recordIndex: pick.cursor, money: bought.money, equipment: bought.equipment })
+            // 0x7ef4~0x7f12 — 명예 선수면 0x2328c(저장, 줄, ed+0x33f) 로 명전 기록에도
+            if (isHallOfFamer) onHallOfFameEquipment?.(side, player.id, bought.equipment)
+          }}
           onBack={() => {
             // 0x5980 — 목록을 다시 채워 커서 0, 탭은 창+0x24c(이 선수가 타자였는가)대로
             setPlayerPick({ ...pick, cursor: 0 })

@@ -3,6 +3,7 @@ import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { equippedAbilityOf } from '@/entities/career/model/condition'
 import { equippedPitcherAbilityOf } from '@/entities/pitcher-career/model/pitcherCareer'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
+import { PITCHER_ABILITY_ORDER } from '@/entities/pitcher-career/model/pitcherAbility'
 import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbility'
 import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
 import { romanceEndingIndexOf } from '@/entities/career/model/seasonFlow'
@@ -296,6 +297,63 @@ export const HALL_OF_FAME_PITCHER_FIRST_RECORD_ID = 0xb4
 export const HALL_OF_FAME_BATTER_FIRST_RECORD_ID = 0xc8
 export function hallOfFameRecordIdOf(side: HallOfFameSide, slot: number): number {
   return (side === '투수' ? HALL_OF_FAME_PITCHER_FIRST_RECORD_ID : HALL_OF_FAME_BATTER_FIRST_RECORD_ID) + slot
+}
+
+/** 장비 니블 차례 t → 능력치 칸 (타자 0x897e8 의 부위 차례 · 투수 `PITCHER_ABILITY_ORDER`) */
+const BATTER_EQUIPMENT_KEYS: readonly (keyof BatterAbility)[] = ['hit', 'power', 'defense', 'run']
+
+/**
+ * 명전 기록의 장비 니블 네 칸 (+0x19 윗·아랫니블 · +0x1a 윗·아랫니블) — 시즌에 영입한 명예 선수의 팀 레코드 줄은 영입 0xc554 가
+ * 이 0x30 바이트를 통째로 옮긴 사본이라 처음 니블이 이것이다. 칸이 없거나 옛 기록(니블 칸 없음)이면 null.
+ */
+export function hallOfFameEquipmentNibblesOf(
+  collection: Pick<Collection, 'hallOfFame' | 'hallOfFamePitchers'>,
+  side: HallOfFameSide,
+  recordId: number,
+): readonly number[] | null {
+  const slot = recordId - (side === '투수' ? HALL_OF_FAME_PITCHER_FIRST_RECORD_ID : HALL_OF_FAME_BATTER_FIRST_RECORD_ID)
+  if (side === '투수') {
+    const levels = hallOfFamePitcherAt(collection, slot)?.equipmentLevels
+    return levels === undefined ? null : PITCHER_ABILITY_ORDER.map((key) => levels[key])
+  }
+  const levels = hallOfFameBatterAt(collection, slot)?.equipmentLevels
+  return levels === undefined ? null : BATTER_EQUIPMENT_KEYS.map((key) => levels[key])
+}
+
+/**
+ * **0x2328c(저장, 줄, 투수?)** — 시즌 장비 창 0xdc 의 적용 0x7d90 이 명예 선수(0xb6348)의 장비를 산 뒤 부른다(0x7ef4~0x7f12).
+ * ```
+ * 투수? ≠ 0: i = 0..3  0x1f62c(저장, i) (명전 투수 칸) 의 +0 == 줄+0 이면 +0x19 · +0x1a 를 줄의 것으로 · 저장 0x1f1b8
+ * 투수? = 0: i = 0..7  0x1f640(저장, i) (명전 타자 칸) 같은 식
+ * ```
+ * 니블 두 바이트를 통째로 옮기므로 네 부위가 모두 줄의 값이 된다. 칸 +0 은 등록이 칸 + 0xb4 / + 0xc8 로 덮어쓴 번호라
+ * 번호에서 칸을 되찾는다(빈 칸은 +0 = 0 이라 맞지 않는다). 맞는 칸이 없으면 같은 객체.
+ */
+export function syncHallOfFameEquipment(
+  collection: Collection,
+  side: HallOfFameSide,
+  recordId: number,
+  nibbles: readonly number[],
+): Collection {
+  const slot = recordId - (side === '투수' ? HALL_OF_FAME_PITCHER_FIRST_RECORD_ID : HALL_OF_FAME_BATTER_FIRST_RECORD_ID)
+  const nibbleAt = (part: number) => nibbles[part] ?? 0
+  if (side === '투수') {
+    if (slot < 0 || slot >= HALL_OF_FAME_MAX_PITCHERS || hallOfFamePitcherAt(collection, slot) === null) return collection
+    // 니블 t ↔ `PITCHER_ABILITY_ORDER[t]` (제구·구속·변화·체력)
+    const equipmentLevels: PitcherAbility = {
+      control: nibbleAt(0), velocity: nibbleAt(1), breaking: nibbleAt(2), stamina: nibbleAt(3),
+    }
+    return {
+      ...collection,
+      hallOfFamePitchers: collection.hallOfFamePitchers.map((famer) => (famer.slot === slot ? { ...famer, equipmentLevels } : famer)),
+    }
+  }
+  if (slot < 0 || slot >= HALL_OF_FAME_MAX_BATTERS || hallOfFameBatterAt(collection, slot) === null) return collection
+  const equipmentLevels: BatterAbility = { hit: nibbleAt(0), power: nibbleAt(1), defense: nibbleAt(2), run: nibbleAt(3) }
+  return {
+    ...collection,
+    hallOfFame: collection.hallOfFame.map((famer, index) => ((famer.slot ?? index) === slot ? { ...famer, equipmentLevels } : famer)),
+  }
 }
 
 /**

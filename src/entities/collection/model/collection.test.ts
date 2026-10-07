@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   deleteHallOfFame,
+  hallOfFameEquipmentNibblesOf,
+  syncHallOfFameEquipment,
   hallOfFameRecordIdOf,
   EMPTY_COLLECTION,
   HALL_OF_FAME_COST,
@@ -201,5 +203,26 @@ describe('명예의 전당 칸 삭제 — 0x22371 · 0x22339 (R11 3-2)', () => {
   it('기록 번호는 등록이 덮어쓴 칸 + 0xb4(투수) / + 0xc8(타자)', () => {
     expect(hallOfFameRecordIdOf('투수', 1)).toBe(0xb5)
     expect(hallOfFameRecordIdOf('타자', 3)).toBe(0xcb)
+  })
+})
+
+describe('0x2328c — 시즌에서 명예 선수가 산 장비 니블을 명전 기록에도', () => {
+  const famer = (slot: number) => ({
+    name: `타자${slot}`, ability: { hit: 1, power: 2, defense: 3, run: 4 }, endingIndex: 6, season: 13, titleIds: [], slot,
+    equipmentLevels: { hit: 2, power: 0, defense: 0, run: 5 },
+  })
+
+  it('번호 0xc8 + 칸 의 타자 칸 니블 네 칸을 통째로 바꾼다 — 칸 t ↔ 히트·파워·수비·주루', () => {
+    const collection = { ...EMPTY_COLLECTION, hallOfFame: [famer(0), famer(3)] }
+    expect(hallOfFameEquipmentNibblesOf(collection, '타자', 0xcb)).toEqual([2, 0, 0, 5])
+    const next = syncHallOfFameEquipment(collection, '타자', 0xcb, [2, 7, 0, 5])
+    expect(next.hallOfFame[1]?.equipmentLevels).toEqual({ hit: 2, power: 7, defense: 0, run: 5 })
+    expect(next.hallOfFame[0]?.equipmentLevels).toEqual({ hit: 2, power: 0, defense: 0, run: 5 })
+  })
+
+  it('맞는 칸이 없으면 같은 객체 (빈 칸 · 투수 쪽)', () => {
+    const collection = { ...EMPTY_COLLECTION, hallOfFame: [famer(0)] }
+    expect(syncHallOfFameEquipment(collection, '타자', 0xc9, [1, 1, 1, 1])).toBe(collection)
+    expect(syncHallOfFameEquipment(collection, '투수', 0xb4, [1, 1, 1, 1])).toBe(collection)
   })
 })

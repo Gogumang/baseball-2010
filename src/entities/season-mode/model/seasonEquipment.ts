@@ -29,7 +29,7 @@ import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
  *     예전에 샀던 것을 다시 끼우려면 다시 산다(되돌려 받는 돈도 없다). "이미 가지고 있는" 은 지금 낀 칸만이다.
  *   - 소지금은 9999(= 99억 9900만) 위로 자른다 — 빼기만 하는 자리라 실제로 닿지 않는다.
  *   - 인기도는 깎지 않는다(조건일 뿐).
- * ⚠️ 미해결: 0x2328d(명예 선수의 명전 기록 반영)는 웹 명전 기록 칸이 장비를 들지 않아 옮기지 않았다.
+ * 0x2328d(명예 선수의 명전 기록 반영)는 `collection.syncHallOfFameEquipment` — 라우트가 앱의 기록연감에 넘긴다.
  */
 
 export const SEASON_EQUIPMENT_PART_COUNT = 4
