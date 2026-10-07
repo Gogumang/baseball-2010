@@ -46,7 +46,11 @@ import { RecordAlertScreenOverlay } from '@/widgets/game-scene/ui/RecordAlertPan
 import { isGameEndRecord, leadingRecordCountOf } from '@/widgets/game-scene/lib/recordAlert'
 import { passesRecordTeamGate, recordGamePointsOf } from '@/entities/game/model/gameRecords'
 import { SettlementBoard } from '@/pages/team-game/ui/SettlementBoard'
-import { MAXIMUM_GAME_POINT } from '@/entities/career/model/playerCareer'
+import { settlementBackdropOffsetAt } from '@/pages/team-game/model/settlementBackdrop'
+import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
+import { createSeededRandom } from '@/shared/api/random/seededRandom'
+import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
+import { MAXIMUM_GAME_POINT, STARTING_ABILITY } from '@/entities/career/model/playerCareer'
 import { setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
 import * as styles from '@/pages/pitching/ui/PitcherGameScreen.css'
 
@@ -122,6 +126,8 @@ export function PitcherGameScreen({
   const [closedBoardSerial, setClosedBoardSerial] = useState(0)
   /** 경기 끝 결과 판(0x18)에서 OK 를 눌러 정산(0x19)으로 넘어갔는가 */
   const [isEndBoardClosed, setEndBoardClosed] = useState(false)
+  /** 정산 배경 전용 난수 — 경기 난수를 건드리지 않는다 (팀경기 `TeamGameScreen` 정산 갈래와 같다) */
+  const [backdropRandom] = useState(() => createSeededRandom(0))
   const board = progress.halfInningBoard
   const isHalfInningBoardOpen = board !== null && board.serial !== closedBoardSerial && summary === null
   const isBenchClearing = progress.pendingBenchClearing !== null
@@ -447,10 +453,28 @@ export function PitcherGameScreen({
         leftKey={{ label: '확인', onPress: () => onFinish(summary) }}
       >
         {/*
-          ⚠️ 판 밑의 구름 0x78448 · 배경 0x40ff0(+0x17e2 가라앉기)은 투구 화면에 타석 캔버스가 없어 아직 안 그린다(팀경기는 BattingStage).
+          정산 그리기 0x4a384 — 구름 0x78448 과 배경 고르기 0x40ff0(장면, +0x17e2)을 먼저 그린다 (선수·공·HUD 없음, 모드를 안 가린다).
+          +0x17e2 는 갱신 0x4b100 이 사람 팀이 이긴 판만 틱마다 3 씩 150 까지 올려 구장이 가라앉는다 (`settlementBackdropOffsetAt`).
+          모드 3 은 시즌 홈·대전이 아니라 0x78578 갈래다 — 팀경기와 같은 `BattingStage` 결과 배경을 쓴다(시즌 구장 없음).
           감독 평가·변화 글은 경기 장면 밖 나리 상태 116(진입 0x1278c)의 몫이다 — 부르는 쪽(투수편 세션)이 띄운다
         */}
         <div className={styles.matchupFrame}>
+          <BattingStage
+            // 결과 배경은 선수·공을 안 그려 능력치를 읽지 않는다 — 꼴을 채우는 기본값
+            batterAbility={STARTING_ABILITY}
+            pitcherAbility={DEFAULT_PITCHER_ABILITY}
+            swingMode="일반"
+            gameMode={PITCHER_CAREER_MODE}
+            isEagleEyeEnabled={false}
+            hud={null}
+            acePitcher={null}
+            isPaused
+            isResultBackdrop
+            resultBackdropOffsetOf={(tick) => settlementBackdropOffsetAt(tick, isHumanWin)}
+            // ⚠️ 웹 타석 그림이 세울 때 굴리는 하늘 줄 rand(0, 6)(추정 대체)이 경기 난수에 새지 않게 따로 든 난수로 세운다
+            random={backdropRandom}
+            onPitchResolved={() => {}}
+          />
           <SettlementBoard
             mode={PITCHER_CAREER_MODE}
             isWin={isHumanWin}

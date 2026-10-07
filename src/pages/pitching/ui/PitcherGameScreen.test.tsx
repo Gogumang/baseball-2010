@@ -187,6 +187,8 @@ describe('투수편 경기 화면', () => {
     // 정산 그리기 0x4a384 — 모드 3 도 팀경기와 같은 판(점수판 틀 · 점수 · 기본 화면)이다
     expect(screen.getByTestId('정산-판')).toBeTruthy()
     expect(screen.getByTestId('정산-점수-0')).toBeTruthy()
+    // 판 밑 구름 0x78448 · 배경 0x40ff0 — 팀경기와 같은 결과 배경 캔버스가 판 아래에 선다
+    expect(screen.getByTestId('정산-판').parentElement?.querySelector('canvas')).not.toBeNull()
     // 감독 평가는 정산 판이 아니라 나리 상태 116 의 몫이다
     expect(screen.queryByText('감독 평가')).toBeNull()
   })

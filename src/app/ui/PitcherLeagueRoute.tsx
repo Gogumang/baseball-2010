@@ -84,6 +84,8 @@ export function PitcherLeagueRoute({
       <PitcherGameScreen
         options={gameOptions}
         pitcherName={career.name}
+        // 정산 판(0x4a384) 보유 GP 줄 — 전역 G [app+0x64] (커리어 칸은 지갑과 다리로 이어진다). 판이 이 경기 G 를 더해 보인다
+        gamePoint={career.gamePoint}
         random={random}
         onFinish={actions.finishGame}
         // 경기 중 "나가기" — 상태 0x22 갱신 0x40140 은 모드를 가리지 않고 0x140006c = 4 · 장면 0x103(메인 메뉴 처음 단).
