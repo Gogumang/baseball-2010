@@ -1684,3 +1684,21 @@ describe('판 진행 관문 0xb0d28 · 판 끝 결과 코드 0x9d5bc (b44f6) —
     expect(result.ticks.length).toBeLessThan(240)
   })
 })
+
+describe('포구 틱 b4292 — 발밑 루에 주자가 서 있는 포구는 결과 코드 9 (쥐기 b42c8 앞)', () => {
+  it('2루 위에서 송구를 받는 틱에 2루에 마지막으로 닿은 주자가 서 있으면 9 — 타구 포구뿐 아니라 송구 받기에도 걸린다', () => {
+    // 원본 코드 0 [90, 810, 1592]: 중견수 뜬공 아웃 뒤 2루 위의 3번 야수가 송구를 받는다
+    const result = runDefensePlay({
+      outcome: 땅볼아웃,
+      trajectory: battedBallTrajectory([90, 810, 1592, 0]),
+      bases: 주자1루,
+      outs: 1,
+      defenseIsCpu: true,
+      throwMode: '자동',
+      random: createSeededRandom(4),
+    })
+    expect(result.log).toContain('64틱 결과 코드 9 — 3번 야수가 2루 위에서 잡았지만 1번 주자가 서 있다 (b4292)')
+    // 9 를 내는 틱에도 쥐기는 그대로 돈다(b42c8)
+    expect(result.log).toContain('64틱 3번 야수가 잡았다 (종류 0)')
+  })
+})

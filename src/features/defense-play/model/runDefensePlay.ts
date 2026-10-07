@@ -85,6 +85,7 @@ import {
   type HeldRunState,
 } from '@/entities/fielding/model/heldRuns'
 import {
+  baseUnderFoot,
   judgeOut,
   OUT_KIND,
   releaseForcesAfterOut,
@@ -1036,6 +1037,8 @@ export function stepDefensePlay(
   let receivingThrow = state.receivingThrow
   /** sp+0x24 — 이번 틱 포구 틱의 사건(펌블 0xbc2 · 필살타법 표시 공 0xbc3 — 송구 받기는 사건 없이 b42c8 쥐기). 서면 틱 끝 b45a4 가 플레이.vt70 = 0xb3148 */
   let ballEventThisTick = false
+  /** sp+0x38 — 포구 틱 b4292 가 세운 결과 코드 9(발밑 루에 주자가 서 있는 포구). 6c 절의 결과 코드가 이어받는다 */
+  let catchResultCode = 0
 
   const contextAt = (at: number): DefenseContext => ({
     play,
@@ -1663,6 +1666,19 @@ export function stepDefensePlay(
       }
     }
     if (tick === catchTick && !uncatchable && !ballEventThisTick) {
+      // b4292 (쥐기 b42c8 **앞**, 직접 뜬 것): b = 야수.vt58()(발밑 루 — 좌표 완전일치) ; b ≠ −1 이고 R = 0xa97a0(b)(아웃 아닌 주자 중
+      // 그 루에 마지막으로 닿은 첫 주자)가 있고 R.vt18()(목표점에 있음)이면 결과 코드 sp+0x38 = 9 (b42bc). 모든 포구에 걸린다 —
+      // 견제 · 주자 판(pickoffPlay · runnerPlayEngine)과 같은 갈래다. 쥐기 안 vt90 이 아웃을 내면 b4540 이 13 으로 덮는다.
+      // 웹 다리: 야수 이동이 슬롯 2 뒤라 쥐기와 같이 포구 지점에 선 야수로 본다(runnerPlayEngine 과 같다)
+      const catcher = fielders[chaserSlot]
+      const footBase = catcher === undefined ? NONE : baseUnderFoot({ ...catcher, position: catchPoint })
+      if (footBase !== NONE) {
+        const standing = runners.find((runner) => !runner.state.isOut && runner.state.startBase === footBase)
+        if (standing !== undefined && isAtTarget(standing.state)) {
+          catchResultCode = 9
+          log.push(`${tick}틱 결과 코드 9 — ${chaserSlot}번 야수가 ${footBase}루 위에서 잡았지만 ${standing.state.index}번 주자가 서 있다 (b4292)`)
+        }
+      }
       fielders = fielders.map((fielder) =>
         fielder.slot === chaserSlot
           ? {
@@ -2155,7 +2171,7 @@ export function stepDefensePlay(
     // 받은 야수가 다시 던지는 병살 송구도 이 길이다 — 다만 송구를 받는 틱의 아웃은 쥐기가 준비 틱을 막 넣어
     // 그 자리 0xafa60 이 못 던지고, 사람 수비·수동 송구에서는 그 뒤 0xafa60 을 부르는 곳이 없어 이어 던지지 않는다.
     // (CPU 송구가 도는 쪽은 4c 절이 준비가 끝난 틱에 던진다.)
-    let resultCode = 0
+    let resultCode = catchResultCode
     if (!outJudgedThisTick && !play.finished && play.held) {
       const holder = fielders[play.ballHolderSlot]
       const holderBase = holder === undefined ? NONE : baseAtPoint(holder.target)
