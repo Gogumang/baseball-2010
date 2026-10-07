@@ -19,6 +19,8 @@ import { rewardsIn } from '@/entities/story/model/eventReward'
 import type { EventReward } from '@/entities/story/model/eventReward'
 import { OUTING_PLACES } from '@/shared/config/outingPlaces'
 import type { NariGameMatch, NariGameSavePort } from '@/pages/management/lib/nariMatchPrepare'
+import { startPitcherGame } from '@/features/play-pitcher-game/model/pitcherGameFlow'
+import { nariLineupSlotsOf } from '@/entities/career/model/nariTeamRecord'
 
 /** 나만의리그 투수편 한 판 (원본 모드 3, 장면 0x106) — 저장·장면 전환만 본다 */
 
@@ -1302,9 +1304,29 @@ describe('전역기록 +0x4f(모드 3 경기 중간 저장) — 142 확인 · �
     act(() => result.current.actions.confirmNextGameStandings())
     const aces = result.current.matchAces
     act(() => result.current.actions.confirmMatchPrepare())
-    expect(calls).toEqual(['지움', { aces, isNationalCup: false }])
+    // 마선수는 커리어 저장의 나리 팀 레코드에 들었다 — 모드 저장 칸에는 국가대항전 여부만
+    expect(aces).not.toBeNull()
+    expect(calls).toEqual(['지움', { aces: null, isNationalCup: false }])
+    const 레코드 = result.current.career!.nariTeams!
+    expect(레코드[result.current.career!.teamId].acePitcher).toBe(aces!.myPitcher)
+    expect(레코드[result.current.gameOptions!.opponentTeamId].batters[9]).toEqual({ slot: 12, position: 0, ace: aces!.opponentBatter })
     act(() => result.current.actions.finishGame(경기요약))
-    expect(calls).toEqual(['지움', { aces, isNationalCup: false }, '지움'])
+    expect(calls).toEqual(['지움', { aces: null, isNationalCup: false }, '지움'])
+  })
+
+  it('경기는 레코드로 선다 — 투수편 타자 배열은 붙박이 + 9번 마타자라 진행기가 세우는 명단과 같다', () => {
+    const { rendered } = 손잡이띄우기()
+    const { result } = rendered
+    act(() => result.current.actions.create('투수', 신인))
+    act(() => result.current.actions.save({ ...result.current.career!, gamesPlayed: 4 }))
+    act(() => result.current.actions.openNextGameStandings())
+    act(() => result.current.actions.confirmNextGameStandings())
+    act(() => result.current.actions.confirmMatchPrepare())
+    const career = result.current.career!
+    const options = result.current.gameOptions!
+    const progress = startPitcherGame(options, createSeededRandom(5))
+    expect(progress.ourLineup.rosterSlots).toEqual(nariLineupSlotsOf(career.nariTeams![career.teamId]))
+    expect(progress.opponentLineup.rosterSlots).toEqual(nariLineupSlotsOf(career.nariTeams![options.opponentTeamId]))
   })
 
   it('곧장 경기 — 142 를 거치지 않고(굴림 없음) 남겨 둔 마선수로 경기를 처음부터 세운다', () => {

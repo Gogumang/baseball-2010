@@ -30,6 +30,7 @@ import { equipmentBonusOf } from '@/entities/career/model/equipment'
 import { NO_EQUIPPED_TITLE } from '@/entities/career/model/titles'
 import { isSkillEquipped, setSkillEquipped } from '@/entities/career/model/playerCareer'
 import type { SeasonEndState } from '@/entities/career/model/playerCareer'
+import type { NariTeamRecords } from '@/entities/career/model/nariTeamRecord'
 import {
   MAXIMUM_PITCHER_ABILITY,
   PITCHER_ABILITY_ORDER,
@@ -296,6 +297,11 @@ export interface PitcherCareer {
   readonly yearGoalEventDone: boolean
   readonly endingIndex: number | null
   readonly league: League
+  /**
+   * **열 팀 나리 팀 레코드** (`entities/career/model/nariTeamRecord`) — 저장 블록 `[저장+0xb8] + 4 + 0x1c·팀`. 142 마선수 넣기가
+   * 고친다. 옛 저장·아직 안 고친 새 선수는 없다 — `nariTeamsOf` 가 붙박이 표로 세운다(투수편 내 투수 줄은 머리말 미해결).
+   */
+  readonly nariTeams?: NariTeamRecords
   readonly leaguePlayerStats: LeaguePlayerStats
   /**
    * 리그 열 팀 투수의 레코드 스태미나 `+0x2c` — 팀 번호 → 붙박이 표 칸(0~7)별 값. 없는 팀·칸은 10000. 내 투수 값은

@@ -19,7 +19,9 @@ import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 import { useGamePointWallet } from '@/entities/wallet/model/useGamePointWallet'
 import { gamePointRewardOf } from '@/entities/career/model/playerCareer'
 import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
-import { summaryOf } from '@/features/play-game/model/gameFlow'
+import { startGame, summaryOf } from '@/features/play-game/model/gameFlow'
+import { insertMyBatter, nariQuickLineupOf, seatAceBatter, tableNariTeamRecord } from '@/entities/career/model/nariTeamRecord'
+import type { QuickLineup } from '@/entities/game/model/quickLineup'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 import { BATTER_GP_ITEMS } from '@/entities/career/model/gpItems'
@@ -338,7 +340,12 @@ describe('연속 파울 기록 32·33 (0xa7dbc) — 실제 타석에서 경기 �
     expect(progress?.aces?.ours).toEqual({ batter: aces?.myBatter, pitcher: aces?.myPitcher })
     expect(progress?.aces?.opponent).toEqual({ batter: aces?.opponentBatter, pitcher: aces?.opponentPitcher })
     expect(progress?.opponentPitcherOrder).toHaveLength(9)
-    expect(progress?.ourLineup.rosterSlots).toHaveLength(13)
+    // 내 팀 명단은 저장의 나리 팀 레코드 차례 — 등록 0xb53f1 이 내 칸(타순 − 1)의 선수를 맨 끝 벤치로 보냈고(13명),
+    // 142 의 0xb53f1 이 마타자를 9번 칸에 넣으며 옛 9번을 맨 끝으로(14명). 벤치 수 +0x28c = 14 − 9
+    const 내칸 = rendered.result.current.session.career!.battingOrder - 1
+    expect(progress?.ourLineup.rosterSlots).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 12, 10, 11, 내칸, 9])
+    expect(progress?.ourLineup.benchBatters).toBe(5)
+    expect(progress?.opponentLineup.rosterSlots).toHaveLength(13)
   })
 
   it('한 타석 파울 넷이면 32·33 이 경기 기록에 들어가고 G 수입이 된다', () => {
@@ -1010,7 +1017,13 @@ describe('전역기록 +0x50(모드 4 경기 중간 저장) — 142 확인이 �
     act(() => rendered.result.current.session.actions.confirmNextGameStandings())
     const aces = rendered.result.current.session.matchAces
     act(() => rendered.result.current.session.actions.confirmMatchPrepare())
-    expect(calls).toEqual([{ aces, isNationalCup: false }])
+    // 마선수는 커리어 저장의 나리 팀 레코드에 들었다 — 모드 저장 칸에는 국가대항전 여부만
+    expect(aces).not.toBeNull()
+    expect(calls).toEqual([{ aces: null, isNationalCup: false }])
+    const 레코드 = rendered.result.current.session.career!.nariTeams!
+    const 나 = 레코드[rendered.result.current.session.career!.teamId]
+    expect(나.acePitcher).toBe(aces!.myPitcher)
+    expect(나.batters[9]).toEqual({ slot: 12, position: 0, ace: aces!.myBatter })
 
     const 대회 = 손잡이()
     const cupRendered = 띄우기2(목표달성선수(), 대회.port)
@@ -1047,5 +1060,28 @@ describe('전역기록 +0x50(모드 4 경기 중간 저장) — 142 확인이 �
     const rendered = 띄우기2(null, port)
     act(() => rendered.result.current.session.actions.resetCareer())
     expect(calls).toEqual(['지움'])
+  })
+})
+
+describe('나리 팀 레코드로 경기를 세운다 — 0x39fdc 의 0xb891c(team[0xe + i] = i) · 벤치 +0x28c = 타자 수 − 9', () => {
+  const 세우기 = (lineup?: QuickLineup) => {
+    const random = createSeededRandom(77)
+    const aces = { ours: { batter: 1, pitcher: 0 }, opponent: { batter: 2, pitcher: 3 } }
+    const progress = startGame(random, 3, 8, 4, PLAYER_SIDE_LAST_BAT, 5, false, undefined, aces, lineup)
+    return { progress, next: random.next() }
+  }
+
+  it('레코드가 예전 근사(붙박이 표 + 9번 마타자)와 같으면 경기·난수가 한 톨도 안 바뀐다', () => {
+    const 근사 = 세우기()
+    const 레코드 = 세우기(nariQuickLineupOf(seatAceBatter(tableNariTeamRecord(3), 1)))
+    expect(레코드.progress).toEqual(근사.progress)
+    expect(레코드.next).toBe(근사.next)
+  })
+
+  it('등록이 내 칸 선수를 벤치 끝으로 보낸 레코드는 벤치가 하나 많다 (CPU 대타 rand(0, 벤치 수) 범위가 는다)', () => {
+    const 근사 = 세우기()
+    const 레코드 = 세우기(nariQuickLineupOf(seatAceBatter(insertMyBatter(tableNariTeamRecord(3), 7), 1)))
+    expect(근사.progress.ourLineup.benchBatters).toBe(4)
+    expect(레코드.progress.ourLineup.benchBatters).toBe(5)
   })
 })

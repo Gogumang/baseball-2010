@@ -12,6 +12,7 @@ import {
   gainPitcherReputation,
   isPitcherManagementCycleOpen,
   isPitcherSeasonFinished,
+  nextPitcherOpponentOf,
   spendPitcherCycleAction,
   pitcherLeagueGameSetupOf,
   startNextPitcherSeason,
@@ -110,7 +111,10 @@ import type { OutingResult } from '@/entities/career/model/outing'
 import { OUTING_PLACES } from '@/shared/config/outingPlaces'
 import type { OutingPlace } from '@/shared/config/outingPlaces'
 import { PITCHER_MANAGEMENT_TEXT } from '@/pages/pitcher-league/lib/pitcherManagementMenu'
-import { nariGameAcesOf, nariMatchCancelTargetOf, rollNariMatchAces } from '@/pages/management/lib/nariMatchPrepare'
+import { nariMatchCancelTargetOf, rollNariMatchAces } from '@/pages/management/lib/nariMatchPrepare'
+import {
+  nariTeamRecordOf, nariTeamsOf, recordMatchAcesOf, recordTeamAcesOf, seatNariMatchAces,
+} from '@/entities/career/model/nariTeamRecord'
 import type { NariGameMatch, NariGameSavePort, NariMatchAces, NariOpenedAces } from '@/pages/management/lib/nariMatchPrepare'
 import { DEFAULT_OPENED_ACE_BATTER_IDS, DEFAULT_OPENED_ACE_PITCHER_IDS } from '@/pages/general-mode/lib/generalModeSetup'
 
@@ -219,7 +223,7 @@ export interface PitcherLeagueSession {
     readonly goto: (scene: PitcherScene) => void
     /** 경기 중 메뉴 "나가기"(상태 0x22 → 0x40140 → 장면 0x103) — 부르는 쪽이 메인 메뉴로 간다. 저장·+0x4f 는 그대로 */
     readonly quitGame: () => void
-    readonly beginGame: (aces?: NariMatchAces | null) => void
+    readonly beginGame: () => void
     /** [14] 투수편·[최근게임](모드 3) 의 "곧장 경기" — 0x327b8 모드 3 갈래(+0x43 && +0x4f) → 0x213c0(앱, 3, 0) → 장면 0x104 */
     readonly resumeInterruptedGame: (match: NariGameMatch | null) => void
     /** 관리 [다음경기] → 109 순위표 (이전 상태 105) */
@@ -724,11 +728,22 @@ export function usePitcherLeagueSession(
   )
 
   const beginGame = useCallback(
-    (aces?: NariMatchAces | null) => {
-      if (career === null) return
-      const options = leagueGameOptionsOf(career, { gaugeSettingOn, throwModeManual })
-      // 142 진입 0x1c46c 가 두 팀 명부(저장의 나리 팀 레코드)에 넣은 마선수 — 경기 장면 0x39fdc 가 같은 명부로 팀을 세운다
-      setGameOptions(aces === undefined || aces === null ? options : { ...options, aces: nariGameAcesOf(aces, aceLevels) })
+    (from?: PitcherCareer) => {
+      const current = from ?? career
+      if (current === null) return
+      const options = leagueGameOptionsOf(current, { gaugeSettingOn, throwModeManual })
+      // 경기 장면 0x39fdc 모드 3 갈래 — 두 팀은 저장의 나리 팀 레코드로 선다: 142 진입 0x1c46c 가 넣은 마선수는 두 팀 레코드의
+      // 9번(마타자)·8번(마투수) 칸이다. 타자 배열은 붙박이 + 마타자라 진행기가 세우는 명단(`withAceBatterLineup`)과 같다
+      const records = nariTeamsOf(current)
+      const recordAces = recordMatchAcesOf(records, current.teamId, options.opponentTeamId)
+      setGameOptions(recordAces === null ? options : {
+        ...options,
+        aces: {
+          ours: recordTeamAcesOf(nariTeamRecordOf(records, current.teamId)),
+          opponent: recordTeamAcesOf(nariTeamRecordOf(records, options.opponentTeamId)),
+          ...(aceLevels === undefined ? {} : { levels: aceLevels }),
+        },
+      })
       setScene('경기')
     },
     [aceLevels, career, gaugeSettingOn, throwModeManual],
@@ -749,10 +764,16 @@ export function usePitcherLeagueSession(
   const openMatchPrepare = useCallback(() => {
     if (!matchPreparedRef.current) {
       matchPreparedRef.current = true
-      setMatchAces(rollNariMatchAces(random, openedAces))
+      const aces = rollNariMatchAces(random, openedAces)
+      setMatchAces(aces)
+      // 1c62e~1c660 — 굴린 넷을 두 팀 레코드에 넣는다(저장에 남는다 — 빼는 코드가 없다)
+      commitWith((current) => ({
+        ...current,
+        nariTeams: seatNariMatchAces(nariTeamsOf(current), current.teamId, nextPitcherOpponentOf(current), aces),
+      }))
     }
     setScene('경기준비')
-  }, [openedAces, random])
+  }, [commitWith, openedAces, random])
 
   /**
    * 경기 뒤 정산 — 성적·스태미나·전적을 넣고, 같은 날 나머지 네 경기를 돌린 뒤
@@ -1417,14 +1438,22 @@ export function usePitcherLeagueSession(
       save: saveFromScreen,
       goto,
       quitGame,
-      beginGame,
+      beginGame: () => beginGame(),
       // 곧장 경기 — 0x213c0(앱, 3, 0) 이 올린 투수편 저장으로 장면 0x104 의 셋업 0x39fdc 모드 3 갈래가 경기를 새로 세운다
       // (반 이닝 저장이 없어 처음부터 · 142 를 안 거쳐 굴림 없음 · 명부의 마선수 그대로). 경기 뒤 나리 장면이 새로 선다
       resumeInterruptedGame: (match: NariGameMatch | null) => {
         if (career === null) return
         matchPreparedRef.current = false
-        setMatchAces(match?.aces ?? null)
-        beginGame(match?.aces ?? null)
+        // 마선수는 저장의 나리 팀 레코드에 있다. 레코드가 없던 옛 저장이면 모드 저장 칸에 남겨 둔 그림자를 넣는다
+        const loaded = career.nariTeams === undefined && match?.aces !== null && match?.aces !== undefined
+          ? {
+            ...career,
+            nariTeams: seatNariMatchAces(nariTeamsOf(career), career.teamId, nextPitcherOpponentOf(career), match.aces),
+          }
+          : career
+        if (loaded !== career) commit(loaded)
+        setMatchAces(recordMatchAcesOf(nariTeamsOf(loaded), loaded.teamId, nextPitcherOpponentOf(loaded)))
+        beginGame(loaded)
       },
       openNextGameStandings: () => {
         // 109 진입 0x10d8c — S+0x50 = 4 · 저장 (이어하기가 109 로 돌아온다)
@@ -1438,9 +1467,9 @@ export function usePitcherLeagueSession(
       // `+0x43 && +0x4f` 면 곧장 경기(`resumeInterruptedGame`). 89a6b81 의 "읽는 곳이 없다" 정정 — 타자편 `confirmMatchPrepare` 주석
       confirmMatchPrepare: () => {
         if (scene !== '경기준비') return
-        // 0x13cca — +0x4f = 1 · 저장. 명부의 마선수는 나리 저장이 들고 간다 — 웹은 그림자로 남긴다 (웹 투수편엔 국가대항전이 없다)
-        nariGameSaveRef.current?.start({ aces: matchAces, isNationalCup: false })
-        beginGame(matchAces)
+        // 0x13cca — +0x4f = 1 · 저장. 명부의 마선수는 커리어 저장의 나리 팀 레코드(`nariTeams`)가 들고 간다 (웹 투수편엔 국가대항전이 없다)
+        nariGameSaveRef.current?.start({ aces: null, isNationalCup: false })
+        beginGame()
       },
       cancelMatchPrepare: () => {
         if (career === null || scene !== '경기준비') return

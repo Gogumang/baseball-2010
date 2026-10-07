@@ -38,6 +38,8 @@ import {
   recordGamePlayed,
 } from '@/entities/career/model/seasonStats'
 import type { SeasonStats } from '@/entities/career/model/seasonStats'
+import { ROOKIE_BATTER_SLOT } from '@/entities/career/model/nariTeamRecord'
+import type { NariTeamRecords } from '@/entities/career/model/nariTeamRecord'
 
 /** 원본 능력치 상한 (0xb6414 가 999 로 자른다) */
 export const MAXIMUM_ABILITY = BALANCE.ability.maximum
@@ -252,7 +254,16 @@ export interface PlayerCareer {
    * 0xa3c26~0xa3cc6 확인). 0 으로 둔다(**추정**). 이 칸이 없던 옛 저장도 0 으로 채워진다.
    */
   readonly specialSwingNumber: number
+  /**
+   * 타순 — 내 선수 레코드의 칸 번호 `0xb6395 + 1` (타순 판정 0xa4c2c · 보상 19 가 이 값을 본다). 142 진입·경기 장면이
+   * `0xb8768` 로 칸 번호를 첨자로 다시 매기므로 곧 나리 팀 레코드(`nariTeams`) 안 내 줄의 첨자 + 1 이다.
+   */
   readonly battingOrder: number
+  /**
+   * **열 팀 나리 팀 레코드** (`entities/career/model/nariTeamRecord`) — 저장 블록 `[저장+0xbc] + 4 + 0x1c·팀`.
+   * 142 마선수 넣기·타순 보상 19 가 고친다. 옛 저장·아직 안 고친 새 선수는 없다 — `nariTeamsOf` 가 등록 때의 꼴로 세운다.
+   */
+  readonly nariTeams?: NariTeamRecords
   /** 목표 타순 경로 — 이벤트 487 에서 고른다. 고르기 전에는 null */
   readonly battingOrderPath: '4번' | '1번' | null
   /** 지난 중간평가 달성 수 (원본 +0x1cc) — 칭호 "전년 대비 성적 우수" */
@@ -411,7 +422,8 @@ export function createCareer(name: string, profile: RookieProfile = DEFAULT_ROOK
     specialSwingLevel: 0,
     specialSwingSessions: 0,
     specialSwingNumber: 0,
-    battingOrder: 9,
+    // 생성 0x17360 이 +0xa = 0xa7 → 등록 0x10fb4 의 0xb53f1 이 레코드 7번 칸에 넣는다 (8번 타자 — `ROOKIE_BATTER_SLOT`)
+    battingOrder: ROOKIE_BATTER_SLOT + 1,
     battingOrderPath: null,
     lastMidSeasonGoalCount: 0,
     skillIds: STARTING_SKILL_IDS,

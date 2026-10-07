@@ -423,6 +423,13 @@ export function startGame(
    * `0xb8870` 마타자 → 명단 9번(첫 벤치, 옛 9번은 맨 끝). 안 넘기면 아무도 안 싣는다(예전 그대로).
    */
   aces?: GameAceSetup,
+  /**
+   * 내 팀 명단 — 저장의 나리 팀 레코드 타자 배열 차례(`entities/career/model/nariTeamRecord` 의 `nariQuickLineupOf`)다.
+   * 경기 장면 0x39fdc 의 `0xb891c` 가 `team[0xe + i] = i` 로 레코드 차례를 그대로 타순·벤치로 세운다(벤치 수 `+0x28c` =
+   * 타자 수 − 9). 142 가 넣은 마타자(`ACE_BATTER_ROSTER_SLOT`)도 이미 들어 있어 `aces.ours.batter` 로 다시 넣지 않는다.
+   * 안 넘기면 붙박이 표 차례에 마타자를 넣는다(예전 그대로).
+   */
+  ourRecordLineup?: QuickLineup,
 ): GameProgress {
   const ourAces = aces?.ours ?? NO_GAME_ACES
   const opponentAces = aces?.opponent ?? NO_GAME_ACES
@@ -459,7 +466,7 @@ export function startGame(
     opponentMound: startingMoundOf(opponentStarter, opponentPitcherStaminas[opponentStarter] ?? FULL_STAMINA),
     opponentInningRunsAllowed: 0,
     // 마타자는 첫 벤치 칸(9번)에 앉는다 — 타석에 서는 길은 CPU 대타(0xac228)뿐이다 (0xb8870)
-    ourLineup: withAceBatterLineup(rosterLineupOf(BATTERS_PER_TEAM), ourAces.batter),
+    ourLineup: ourRecordLineup ?? withAceBatterLineup(rosterLineupOf(BATTERS_PER_TEAM), ourAces.batter),
     opponentLineup: withAceBatterLineup(rosterLineupOf(BATTERS_PER_TEAM), opponentAces.batter),
     pinchHitUsed: false,
     myStats: EMPTY_SEASON_STATS,

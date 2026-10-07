@@ -84,7 +84,7 @@ import type { RookieProfile } from '@/entities/career/model/playerCareer'
 import { useStorySchedule } from '@/app/model/useStorySchedule'
 import { enterSeasonEvent, nextSeasonStep, resumePointOf } from '@/app/model/seasonEvents'
 import {
-  nariGameAcesOf, nariMatchCancelTargetOf, rollNariMatchAces, rollNariMatchStadium,
+  nariMatchCancelTargetOf, rollNariMatchAces, rollNariMatchStadium,
 } from '@/pages/management/lib/nariMatchPrepare'
 import type { NariGameMatch, NariGameSavePort, NariMatchAces, NariOpenedAces } from '@/pages/management/lib/nariMatchPrepare'
 import { DEFAULT_OPENED_ACE_BATTER_IDS, DEFAULT_OPENED_ACE_PITCHER_IDS } from '@/pages/general-mode/lib/generalModeSetup'
@@ -133,6 +133,17 @@ import {
 import type { NationalCupFinish } from '@/entities/national-cup/model/nationalCupFlow'
 import type { GamePointWalletSession } from '@/entities/wallet/model/useGamePointWallet'
 import { leagueDayCounterOf, leagueGamePlayerSideOf } from '@/entities/career/model/leagueGameSetup'
+import {
+  applyBattingOrderRewards,
+  nariQuickLineupOf,
+  nariTeamRecordOf,
+  nariTeamsOf,
+  recordMatchAcesOf,
+  recordTeamAcesOf,
+  renumberedBattingOrderOf,
+  seatNariMatchAces,
+} from '@/entities/career/model/nariTeamRecord'
+import type { QuickLineup } from '@/entities/game/model/quickLineup'
 import { PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import type { PlayerSide } from '@/entities/game/model/gameState'
 
@@ -419,10 +430,13 @@ export function useCareerSession({
       pitchers?: GamePitcherSetup,
       /** 142 가 두 팀 명부에 넣은 마선수 (0xb88c8 · 0xb8870). 국가대항전은 안 넘긴다 */
       aces?: GameAceSetup,
+      /** 내 팀 명단 — 나리 팀 레코드 타자 배열 차례(`nariQuickLineupOf`). 국가대항전은 안 넘긴다 */
+      ourRecordLineup?: QuickLineup,
     ) => {
       // 환경설정 "주루" 를 경기에 태운다 — 타자편은 사람이 늘 공격이라 설정이 그대로 먹는다 (0xae690)
       const started = startGame(
         random, ourTeamId, battingOrder, opponentTeamId, playerSide, dayCounter, runningModeManualRef.current, pitchers, aces,
+        ourRecordLineup,
       )
       progressRef.current = started
       setProgress(started)
@@ -436,14 +450,27 @@ export function useCareerSession({
     [random, runner, setScreen],
   )
 
-  const beginGame = useCallback((aces: NariMatchAces | null, from?: PlayerCareer) => {
+  /**
+   * 경기 장면 0x39fdc 모드 3·4 갈래 — 두 팀을 `0xb891c(…, 모드, 팀)` 로 세우고 `0xb8768` 로 칸 번호를 다시 매긴다(0x3a2fa).
+   * 선수는 저장의 **나리 팀 레코드**에서 나온다(`nariTeamsOf`): 내 팀 타순·벤치는 레코드 타자 배열 차례, 142 가 넣은 마선수는
+   * 두 팀 레코드의 9번(마타자)·8번(마투수) 칸이다. 투수 0~7 차례는 리그 칸(`leagueGamePitchersOf`)이다.
+   */
+  const beginGame = useCallback((from?: PlayerCareer) => {
     // `from` — 메인 메뉴의 "곧장 경기"(0x327b8 모드 4 갈래)는 저장을 올린 그 자리에서 세운다(아직 그려지기 전이라 ref 가 옛 값)
     const current = from ?? careerRef.current
     cupGameRef.current = null
     const opponent = current === null || current === undefined ? undefined : nextOpponentOf(current)
+    const records = current === null || current === undefined ? undefined : nariTeamsOf(current)
+    const mine = records === undefined || current === null || current === undefined
+      ? undefined
+      : nariTeamRecordOf(records, current.teamId)
+    const theirs = records === undefined || opponent === undefined ? undefined : nariTeamRecordOf(records, opponent)
+    const recordAces = records === undefined || current === null || current === undefined || opponent === undefined
+      ? null
+      : recordMatchAcesOf(records, current.teamId, opponent)
     startMatch(
       current?.teamId ?? 0,
-      current?.battingOrder,
+      current === null || current === undefined ? undefined : renumberedBattingOrderOf(current),
       // 상대는 일정표(정규시즌)나 지금 시리즈(포스트시즌)가 정한다 — 무작위가 아니다
       opponent,
       // 날짜 카운터 g = S+0xb2(= L+0x32) — 경기 준비 0x1c46c 가 0x1c576 에서 읽고 0이 아니면 두 팀 로테이션을 돌린다.
@@ -460,7 +487,14 @@ export function useCareerSession({
         ? undefined
         : leagueGamePitchersOf(current, opponent),
       // 142 진입 0x1c46c 가 두 팀 명부(저장의 나리 팀 레코드)에 넣은 마선수 — 경기 장면 0x39fdc 가 같은 명부로 팀을 세운다
-      aces === null ? undefined : nariGameAcesOf(aces, aceLevels),
+      recordAces === null || mine === undefined || theirs === undefined
+        ? undefined
+        : {
+          ours: recordTeamAcesOf(mine),
+          opponent: recordTeamAcesOf(theirs),
+          ...(aceLevels === undefined ? {} : { levels: aceLevels }),
+        },
+      mine === undefined ? undefined : nariQuickLineupOf(mine),
     )
   }, [aceLevels, startMatch])
 
@@ -484,8 +518,21 @@ export function useCareerSession({
     (postseasonFromReentry?: boolean) => {
       if (!matchPreparedRef.current) {
         matchPreparedRef.current = true
-        setMatchAces(rollNariMatchAces(random, openedAces))
+        const aces = rollNariMatchAces(random, openedAces)
+        setMatchAces(aces)
+        // 1c62e~1c660 — 굴린 넷을 두 팀 레코드에 넣는다(저장에 남는다 — 빼는 코드가 없다)
+        setCareer((current) => {
+          if (current === null) return current
+          const nariTeams = seatNariMatchAces(nariTeamsOf(current), current.teamId, nextOpponentOf(current), aces)
+          return { ...current, nariTeams }
+        })
       }
+      // 0x1c54a — 두 팀 칸 번호를 다시 매긴다(0xb8768): 타순 = 레코드 안 내 줄 첨자 + 1
+      setCareer((current) => {
+        if (current === null) return current
+        const battingOrder = renumberedBattingOrderOf(current)
+        return battingOrder === current.battingOrder ? current : { ...current, battingOrder }
+      })
       setScreen(postseasonFromReentry === undefined ? { kind: '경기준비' } : { kind: '경기준비', postseasonFromReentry })
     },
     [openedAces, random, setScreen],
@@ -1010,9 +1057,16 @@ export function useCareerSession({
       }
       // 경기 뒤 나리 장면이 새로 선다 — 장면+0x288 = 0
       matchPreparedRef.current = false
-      setMatchAces(match?.aces ?? null)
-      setCareer(savedCareer)
-      beginGame(match?.aces ?? null, savedCareer)
+      // 마선수는 저장의 나리 팀 레코드에 있다(142 가 넣었다). 레코드가 없던 옛 저장이면 모드 저장 칸에 남겨 둔 그림자를 넣는다
+      const loaded = savedCareer.nariTeams === undefined && match?.aces !== null && match?.aces !== undefined
+        ? {
+          ...savedCareer,
+          nariTeams: seatNariMatchAces(nariTeamsOf(savedCareer), savedCareer.teamId, nextOpponentOf(savedCareer), match.aces),
+        }
+        : savedCareer
+      setMatchAces(recordMatchAcesOf(nariTeamsOf(loaded), loaded.teamId, nextOpponentOf(loaded)))
+      setCareer(loaded)
+      beginGame(loaded)
     },
 
     runCommand: (command: ManagementCommand) => {
@@ -1158,14 +1212,15 @@ export function useCareerSession({
      */
     confirmMatchPrepare: () => {
       if (career === null || screen.kind !== '경기준비') return
-      // 0x13cca — 전역기록 +0x4c + 모드(+0x50) = 1 · 저장. 명부(마선수)·S+0x12c 는 나리 저장이 들고 간다 — 웹은 그림자로 남긴다
-      nariGameSaveRef.current?.start({ aces: screen.cup === undefined ? matchAces : null, isNationalCup: screen.cup !== undefined })
+      // 0x13cca — 전역기록 +0x4c + 모드(+0x50) = 1 · 저장. 마선수는 커리어 저장의 나리 팀 레코드(`nariTeams`)가 들고 간다 —
+      // 모드 저장 칸에는 국가대항전 여부(S+0x12c, 웹은 대회를 저장하지 않는다)만 남긴다
+      nariGameSaveRef.current?.start({ aces: null, isNationalCup: screen.cup !== undefined })
       if (screen.cup !== undefined) {
         // 국가대항전 — 1c5fe 가 마선수를 안 넣었다. 경기가 끝나면 이 대회로 하루를 넘긴다 (`finishCupGame`)
         cupGameRef.current = screen.cup.cup
         return startMatch(screen.cup.matchup.myTeam, career.battingOrder, screen.cup.matchup.opponent)
       }
-      beginGame(matchAces)
+      beginGame()
     },
 
     /** 142 취소(−16, 0x13c72) — S+0xb4(포스트시즌) → 128 진입 0x120a4 를 다시, 그 밖 → 109 (이전 상태 142 라 취소가 안 먹는다) */
@@ -1334,7 +1389,13 @@ export function useCareerSession({
 
     completeScene: (rewards: readonly EventReward[], viewedEventIds: readonly number[]) => {
       if (career === null || screen.kind !== '이벤트') return
-      const viewed = applyEventRewards(finishEvent(career, viewedEventIds), rewards, random, screen.eventId)
+      const rewarded = applyEventRewards(finishEvent(career, viewedEventIds), rewards, random, screen.eventId)
+      // 보상 19(0x8ca7e)는 타순 칸이 아니라 레코드를 고친다 — `0xb5d09(내 팀, 내 칸, 값 − 1)` 로 셋이 돈다
+      const orderMoves = applyBattingOrderRewards(
+        career,
+        rewards.filter((reward) => reward.kind === EVENT_REWARD_KIND.타순).map((reward) => reward.value),
+      )
+      const viewed = orderMoves === null ? rewarded : { ...rewarded, ...orderMoves }
       // 이벤트 G 보상 0x8c6ac 는 한 줄마다 0x8c6e2 `0x22c7d(값, 전역 모드)` 로 적는다 (G 보상에는 연차 보정이 없다)
       rewards
         .filter((reward) => reward.kind === EVENT_REWARD_KIND.G포인트)

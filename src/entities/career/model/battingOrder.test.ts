@@ -6,13 +6,15 @@ import { battingOrderEventId, emptyPlaceEventId } from '@/entities/career/model/
 const 선수 = (overrides: Partial<PlayerCareer> = {}): PlayerCareer => ({ ...createCareer('테스트'), ...overrides })
 
 describe('타순 — 0xa4c2c · 표 0xd7e30~0xd7e80', () => {
-  it('신인은 9번 타자로 시작한다', () => {
-    expect(선수().battingOrder).toBe(9)
+  it('신인은 8번 타자로 시작한다 — 생성 0x17646 이 +0xa = 0xa7, 등록 0xb53f1 이 레코드 7번 칸에 넣는다', () => {
+    expect(선수().battingOrder).toBe(8)
+    // 사다리 0xd7e80 4번 경로 칸 1 — 시작 평판 300 은 320(승격)·150(강등) 사이라 이벤트가 없다
+    expect(battingOrderEventId(선수())).toBeNull()
   })
 
-  it('평판 200 이상이면 8번으로 올리는 470', () => {
-    expect(battingOrderEventId(선수({ reputation: 199 }))).toBeNull()
-    expect(battingOrderEventId(선수({ reputation: 200 }))).toBe(470)
+  it('9번에서 평판 200 이상이면 8번으로 올리는 470', () => {
+    expect(battingOrderEventId(선수({ battingOrder: 9, reputation: 199 }))).toBeNull()
+    expect(battingOrderEventId(선수({ battingOrder: 9, reputation: 200 }))).toBe(470)
   })
 
   it('6번 다음은 경로를 따른다 — 고르기 전에는 원본 기본값(4번 경로)', () => {
