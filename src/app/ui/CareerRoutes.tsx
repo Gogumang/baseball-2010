@@ -17,6 +17,7 @@ import { RecordScreen } from '@/pages/record/ui/RecordScreen'
 import { SeasonEndScreen } from '@/pages/season-end/ui/SeasonEndScreen'
 import { PostseasonScreen } from '@/pages/season-end/ui/PostseasonScreen'
 import { NationalCupScreen } from '@/pages/national-cup/ui/NationalCupScreen'
+import { NariScreenPush } from '@/pages/management/ui/NariScreenPush'
 import { EndingScreen } from '@/pages/ending/ui/EndingScreen'
 import type { Collection, HallOfFameResult } from '@/entities/collection/model/collection'
 import { nariBatterOf } from '@/app/model/useCollection'
@@ -220,13 +221,17 @@ export function CareerRoutes({
       )
 
     case '경기준비': {
-      // 143 경기 전 엔트리 보기 — 진입 0x16af8 · 키 0x1457c · 그림 0x16738 (보기 전용, 끝 코드로 142 로 돌아간다)
+      // 142 ↔ 143 은 화면 밀기(효과기 종류 8, 0xbdae9(…, 8, 0, 3/4, 1000))로 바뀐다 (`NariScreenPush`)
       const entryView = session.entryView
+      const pushView = entryView === null ? '142' : entryView.isMyTeam ? '143:내팀' : '143:상대'
+      // 143 경기 전 엔트리 보기 — 진입 0x16af8 · 키 0x1457c · 그림 0x16738 (보기 전용, 끝 코드로 142 로 돌아간다)
       if (entryView !== null) {
         return (
-          <EntryEditorScreen editor={entryView.editor} lists={entryView.lists}
-            teamName={TEAMS[entryView.teamId]?.name ?? ''} isAceLocked={false} gamePoint={career.gamePoint}
-            onKey={actions.pressEntryViewKey} onMoveCursor={actions.pointEntryViewCursor} onCloseAceLocked={() => {}} />
+          <NariScreenPush view={pushView}>
+            <EntryEditorScreen editor={entryView.editor} lists={entryView.lists}
+              teamName={TEAMS[entryView.teamId]?.name ?? ''} isAceLocked={false} gamePoint={career.gamePoint}
+              onKey={actions.pressEntryViewKey} onMoveCursor={actions.pointEntryViewCursor} onCloseAceLocked={() => {}} />
+          </NariScreenPush>
         )
       }
       // 142 경기 준비 — 진입 0x1c46c · 키 0x13c30 · 그림 0x15d98
@@ -235,9 +240,11 @@ export function CareerRoutes({
         ? batterMatchInfoOf(career, session.matchAces)
         : cupMatchInfoOf(career, screen.cup.matchup, screen.cup.cup)
       return (
-        <NariMatchInfoScreen lines={match.lines} myTeamId={match.myTeamId} opponentTeamId={match.opponentTeamId}
-          playerSide={match.playerSide} edition="타자편" gamePoint={career.gamePoint}
-          onStart={actions.confirmMatchPrepare} onCancel={actions.cancelMatchPrepare} onEntry={actions.openEntryView} />
+        <NariScreenPush view={pushView}>
+          <NariMatchInfoScreen lines={match.lines} myTeamId={match.myTeamId} opponentTeamId={match.opponentTeamId}
+            playerSide={match.playerSide} edition="타자편" gamePoint={career.gamePoint}
+            onStart={actions.confirmMatchPrepare} onCancel={actions.cancelMatchPrepare} onEntry={actions.openEntryView} />
+        </NariScreenPush>
       )
     }
 

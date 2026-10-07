@@ -45,7 +45,7 @@ export interface NariMatchInfoScreenProps {
  * '4'/왼(−3) · '6'/오른(−4) → 장면+0x164 = 1/0 · 밀기 → **143 경기 전 엔트리 보기**(`onEntry`, 0x16af8 — 내 팀 · 상대 팀,
  * 둘 다 보기 전용: `pages/management/lib/nariEntryView`). 143 의 끝 코드가 142 로 돌려보낸다.
  *
- * ⚠️ 미해결: 0x63b15 넷째 인자(이전 ≠ 143)의 줄 나타남 애니 · 화면 밀기(0xbdae9) 연출은 안 옮겼다.
+ * ⚠️ 미해결: 0x63b15 넷째 인자(이전 ≠ 143)의 줄 나타남 애니는 안 옮겼다. 화면 밀기(0xbdae9 종류 8)는 라우트가 `NariScreenPush` 로 건다.
  */
 export function NariMatchInfoScreen({
   lines, myTeamId, opponentTeamId, playerSide, edition, gamePoint, onStart, onCancel, onEntry,

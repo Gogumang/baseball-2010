@@ -22,7 +22,7 @@
  * 그림 0x16738 = 기본 엔트리 목록 `0x5cfec` + 머리띠 `0x54d95(skin, 탭 1 ? 7 : 6, 탭 1 ? 0xf : 0x17, 0)` — 시즌 0xe0 과 같다.
  *
  * 국가대항전 두 팀은 저장의 대회 레코드 두 칸(+0xbc4 대표팀 · +0xbe0 상대국, `entities/career/model/nariCupTeams`)이다.
- * ⚠️ 미해결: 화면 밀기(0xbdae9) 연출 없음.
+ * 화면 밀기(0xbdae9 종류 8)는 라우트가 `NariScreenPush` 로 건다.
  */
 import { leavesEntryEditor, openEntryEditor, pointEntryCursor, pressEntryKey } from '@/entities/season-mode/model/entryEditor'
 import type {
