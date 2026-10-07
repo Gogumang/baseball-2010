@@ -48,7 +48,30 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
  *   누적에 더해진다**(527f0). 파울 각 공은 더하지 않고 낙구 틱에 "Foul!" 25 를 낸다.
  * - ⚠️ **원본 그대로**: 52720 은 state[0x1d] 를 안 봐서 폴에 맞고(ab0) 땅에 닿기 전에 담장선(aa4)도 넘는 공은 두 번 홈런 갈래를
  *   지나 비거리를 두 번 더하고 11 도 두 번 낸다.
- * - [장면+0xfe7] 은 0x17 진입 0x46460 이 0 으로 지우고 세우는 곳은 메시지 0xbba 갈래(0x51a0c)뿐이라 더비 판에서는 늘 0 이다.
+ * - (재검증 2026-10-07 — 0xa600c · 0xb0cb8 · 0xae600 · 0xae61c · 0x524c0 직접 뜸) state[0x26] 에 쓰는 곳은 **0xb0cb8 하나뿐**이다
+ *   (`adds rX,#0x26 ; strb` 전수 — 0x3db6c · 0x9f802 · 0xb884c~0xb8992 는 다른 구조체). 0xb0cb8 을 부르는 곳과 값:
+ *   0x3de10(1, 공 준비) · 0x3dfac(9 · 5 · 2) · 0x46418(8, 모드 7 의 0x17 진입) · 0x4e6d4(5) · 0x50d34(4, 견제) · 사건 0xb2bc4(6 · 7 · 0xa).
+ *   0x17 동안 사건 0xb2bc4 를 부르는 공 틱 vt48(0x525e8)은 0xae61c 가 거짓이면(종류 8) 안 돈다 → 더비 판 내내 8 이다.
+ *   0xa600c 를 부르는 곳은 이 갈래의 0x52794 · 0x52828 둘뿐이라 그 `== 8` 은 "더비 판인가" 문지기다. 읽는 쪽(0xa8024 의 4·5 ·
+ *   0xae576 · 0xae600 · 0xae61c)도 모두 판 종류로 읽는다. 해독 문서 H-modes "결과 코드(+0x26)가 8(홈런)" 은 틀린 풀이다.
+ *   [this+8] 은 0xa5fac(+0x13 번트) · 0xa8024(+0x26) 와 같은 경기 상태이고, +0x34 를 HUD 0x45a54 · 단계 0xae4b6 · 정산 0x4f644 가 읽는다.
+ * - [장면+0xfe7] (재검증): 0x17 진입 0x46460 이 0 으로 지우고, 세우는 곳은 **키 메시지 0x587 처리 0x519cc** 하나다 — 0x17 키 처리
+ *   0x53420 이 키마다 끝에 0x587(0)을 보내고(0x53452), 0x509a0 분기(0x50afe)가 0x519cc 로 간다. 0x519cc 는
+ *   `state[0x1d] || 플레이+0x129 || state[0xb] ∈ {3, 4}` 일 때만 +0xfe7 = 1 · HOMERUN 글자 +0x1960 = 0 · +0x1100 = 0(0x51a04~0x51a18).
+ *   더비는 사건이 없어 홈런 갈래가 state[0x1d] 를 세운 뒤에만 선다 → 527f0 은 이미 state[0x1d] 로 막혀 있어 비거리 셈과 무관하다.
+ *   ⚠️ 미이식: +0xfe7 이 서면 5284e 가 틱마다 0xbf01c(공) → 0xa25ac(공+0x68 = 그 값)으로 공 틱을 끝으로 넘긴다(홈런 뒤 키로 건너뛰기) —
+ *   웹 더비는 키 건너뛰기가 없어 판 길이를 끝까지 붙든다(건너뛰면 폴 뒤 담장선 두 번째 홈런 갈래도 안 설 수 있다).
+ * - 표시 비거리 +0x36 (526d0): aa0 ≥ t 인 틱마다 지금 점으로 다시 쓴다 — 홈런 · 파울 가리지 않고 **낙구 틱 점의 비거리**가 남는다
+ *   (`displayDistance`). 더하는 값(`distance`)과 달리 두 번 더한 공도 한 번 값이다. 쓰는 곳은 이 526d0 · 일반 갈래 0x5297a ·
+ *   초기화 0xb687e 뿐이라 안 맞은 공은 앞 값을 그대로 둔다. 읽는 곳은 비거리 판 그리기 0x36cd4(플레이+0x118 == 8 이거나 +0x1960 이면
+ *   trainning.pzx 프레임 11 을 (W/2 − 폭/2, 10) 에, 그 밑 +0x36 숫자 — ← 0x37388 · 0x46cb6). ⚠️ 그 판 그리기는 미이식.
+ * - HOMERUN 글자 (재검증): 이 갈래는 +0x1961(단계) = [sp+0x10](= 0xb68dc 결과 = 0) · +0x1960 = 1 만 쓴다(0x5279a~0x527ac).
+ *   일반 홈런 0x51cd8 과 달리 **+0x1963(틱 셈) = 0 · 글자 칸 +0x1964+i = 5+i 를 안 쓴다** — 칸을 쓰는 곳은 0x51cf6 · 그리기 0x40b18 뿐이고
+ *   더비 장면은 일반 홈런 갈래를 안 지나 칸이 장면 new 의 0 그대로다 → 날아 들어오기 없이 0 칸(제자리)부터, 단계 0 은 (2 − 남은 +0x1963) 그림.
+ *   글자를 끄는 곳은 0x17 끝 0x35108(0x351d0) · 위 키 건너뛰기. ⚠️ 미이식: 그리기는 widgets/batting-stage 가 타석 임시 결과로 켠다(구역 밖).
+ * - 0x90191([0x1400064], 2, 1) 뒤 +8 = +9 = 1 (0x527b4~0x527c0): 장면 효과 객체(0x90190 → 0x8fe58)를 **종류 2(알갱이 칸 7)** 로 다시
+ *   깔고 켠다 — 일반 홈런 0x51d1e · 0x4f4d8 과 같은 홈런 효과다. 켜지면 틱 0x901a0(← 0x40b18 의 0x40fb4 · 0x4a384)이 돌아 난수를 쓴다.
+ *   ⚠️ 미이식(모든 모드 공통 — 일반 홈런 0x51d1e 도 웹에 없다): 종류 2 깔기 · 틱 굴림 수는 아직 안 셌다.
  * - 관문 0xb0d28: 파울 표시 +0x110 · 사건 코드 11 · 주자 · 아웃 갈래는 사건이 없어 안 서고, +0x125 갈래가 공.vt18(멈춤)에서 닫는다.
  *   공 틱은 0x3f060 이 관문이 열려 있을 때만 올리므로(0x3f3b2 → 0xa2594) 위 갈래는 t = 1 … (처음 멈춘 틱 − 1)에서 돈다.
  *   닫힌 뒤 529f0 이 +0x1094 10틱 → 0xbb9 → 52a52 0xae3e8 모드 7 갈래(`applyDerbyPitch`).
@@ -69,6 +92,11 @@ export interface DerbyBattedBall {
   readonly isHomeRun: boolean
   /** 이 공으로 누적(+0x34)에 더한 비거리 (0xa600c — 홈런 · 홈런 아닌 페어 공의 낙구, 파울은 0) */
   readonly distance: number
+  /**
+   * 표시 비거리 +0x36 — 526d0 이 aa0 ≥ t 인 틱마다 지금 점으로 다시 쓴 마지막 값(낙구 틱 점, 파울 포함, 상한 160).
+   * 그런 틱이 하나도 없으면 null(앞 값 그대로).
+   */
+  readonly displayDistance: number | null
   /** 홈런 갈래를 지난 공 틱들 — 그 틱에 소리 11 (`DERBY_HOME_RUN_SOUND`) */
   readonly homeRunTicks: readonly number[]
   /** 파울 각 공이 땅에 닿은 틱 — 그 틱에 소리 25 "Foul!"(0x5284a). 없으면 null */
@@ -106,7 +134,10 @@ export function derbyBattedBallOf(pattern: BattedBallPattern, random?: RandomPor
   let distance = 0
   const homeRunTicks: number[] = []
   let foulCallTick: number | null = null
+  let displayDistance: number | null = null
   for (let tick = 1; tick < stopTick; tick += 1) {
+    // 526d0 — 아직 낙구 전(aa0 ≥ t)이면 state[0x36] = 지금 점 비거리 (홈런 · 파울 가리지 않음)
+    if (landingTick >= tick) displayDistance = derbyDistanceOf(trajectory.pointAt(tick))
     // 52720 — 담장선 틱(aa4)이 낙구 이전이거나, 폴 틱(ab0)이 낙구 이전
     const reachesHomeRun =
       (trajectory.fenceTick === tick && landingTick >= tick) ||
@@ -130,6 +161,7 @@ export function derbyBattedBallOf(pattern: BattedBallPattern, random?: RandomPor
     landing: landingPointOf(trajectory),
     isHomeRun,
     distance,
+    displayDistance,
     homeRunTicks,
     foulCallTick,
     endTicks: stopTick + DERBY_PLAY_CLOSE_TICKS,

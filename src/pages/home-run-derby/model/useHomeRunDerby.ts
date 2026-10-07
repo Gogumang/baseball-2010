@@ -304,8 +304,9 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
     const isHomeRun = batted?.isHomeRun ?? false
     // 판 안 소리 — 홈런 갈래 0x527c4 의 11 · 파울 공 낙구 0x5284a 의 25 "Foul!"(즉시, 그 공 틱에)
     // ⚠️ 근사(때): 공 틱 0 을 이 자리(타석 화면이 상태 0x13 을 지나 판을 넘긴 때)로 센다
-    // ⚠️ 미해결: 같은 홈런 갈래의 HOMERUN 글자(+0x1960 = 1, 52790~527a6)는 타석 화면(`BattingStage`)이 타석 임시 결과로 켠다 —
-    //    폴 뒤 굴림 · 폴 뒤 바운드로 갈리는 드문 공만 다르다. 0x90191(…, 2, 1)(뜻 미확인)은 옮기지 않았다
+    // ⚠️ 미이식: 같은 홈런 갈래의 HOMERUN 글자(+0x1960 = 1 · 단계 +0x1961 = 0, 0x5279a~0x527ac — 글자 칸 +0x1964+i 는 안 써
+    //    날아 들어오기 없이 제자리부터)는 타석 화면(`BattingStage`, widgets)이 타석 임시 결과로 켠다. 0x90191(…, 2, 1) 은
+    //    홈런 효과 객체 종류 2 켜기(일반 홈런 0x51d1e 와 같음, 모든 모드 미이식) — `derbyBattedBall` 머리말
     clearPlaySoundTimers()
     if (batted !== null) {
       const soundTicks = [
@@ -324,6 +325,7 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
     const next = applyDerbyPitch(current, {
       isHomeRun,
       distance: batted?.distance ?? 0,
+      displayDistance: batted?.displayDistance ?? null,
       isEventZoneHit: zoneHit,
     })
     // 0xae3e8/0xae24c 가 돌려주는 다음 상태 — 0xd(→ 0xe OK 대기) · 0xf · 0x1a

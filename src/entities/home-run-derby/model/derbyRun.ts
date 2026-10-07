@@ -56,6 +56,11 @@ export interface DerbyPitchOutcome {
   readonly isHomeRun: boolean
   /** 이번 타구가 누적에 더한 비거리 (0xa600c) — 홈런 · 홈런 아닌 페어 공의 낙구. 파울 · 못 맞힌 공은 0 이다 (`derbyBattedBall`) */
   readonly distance: number
+  /**
+   * 이번 판이 남긴 표시 비거리 +0x36 (526d0 — 낙구 틱 점, 파울 포함). 판을 안 돈 공(못 맞힌 공)이나 그런 틱이 없던 판은
+   * 생략 · null — 원본은 +0x36 을 판 밖에서 안 지워 앞 값이 남는다(쓰는 곳 526d0 · 0x5297a · 초기화 0xb687e 뿐).
+   */
+  readonly displayDistance?: number | null
   /** 이번 공이 이벤트 존에 들었나 (+0x3f) */
   readonly isEventZoneHit: boolean
 }
@@ -126,7 +131,7 @@ export function applyDerbyPitch(run: DerbyRun, outcome: DerbyPitchOutcome): Derb
 
   const common = {
     totalDistance,
-    lastDistance: outcome.distance,
+    lastDistance: outcome.displayDistance ?? run.lastDistance,
     maxCombo,
     bonusGamePoint,
     comboDisplay,

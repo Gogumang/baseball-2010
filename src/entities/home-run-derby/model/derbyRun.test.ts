@@ -12,7 +12,12 @@ import {
 import type { DerbyPitchOutcome, DerbyRun } from '@/entities/home-run-derby/model/derbyRun'
 
 const 헛스윙: DerbyPitchOutcome = { isHomeRun: false, distance: 0, isEventZoneHit: false }
-const 홈런 = (distance: number): DerbyPitchOutcome => ({ isHomeRun: true, distance, isEventZoneHit: false })
+const 홈런 = (distance: number): DerbyPitchOutcome => ({
+  isHomeRun: true,
+  distance,
+  displayDistance: distance,
+  isEventZoneHit: false,
+})
 const 존적중: DerbyPitchOutcome = { isHomeRun: false, distance: 0, isEventZoneHit: true }
 
 const 여러번 = (run: DerbyRun, outcomes: readonly DerbyPitchOutcome[]): DerbyRun =>
@@ -39,6 +44,17 @@ describe('누적 비거리는 홈런일 때만 쌓인다', () => {
     const run = 여러번(createDerbyRun(), [홈런(90), 홈런(100)])
     expect(run.totalDistance).toBe(190)
     expect(run.lastDistance).toBe(100)
+  })
+
+  it('표시 비거리 +0x36 은 판 밖에서 안 지운다 — 못 맞힌 공은 앞 값 그대로, 판이 낸 값은 더한 값과 따로 (526d0)', () => {
+    const 홈런뒤헛스윙 = 여러번(createDerbyRun(), [홈런(120), 헛스윙])
+    expect(홈런뒤헛스윙.lastDistance).toBe(120)
+    const 두번더한공 = applyDerbyPitch(createDerbyRun(), { ...홈런(240), displayDistance: 120 })
+    expect(두번더한공.totalDistance).toBe(240)
+    expect(두번더한공.lastDistance).toBe(120)
+    const 파울 = applyDerbyPitch(홈런뒤헛스윙, { ...헛스윙, displayDistance: 37 })
+    expect(파울.totalDistance).toBe(120)
+    expect(파울.lastDistance).toBe(37)
   })
 })
 

@@ -26,6 +26,8 @@ describe('홈런더비 판(종류 8) 하나 — 슬롯 2 모드 7 갈래 0x526ca
     expect(공.trajectory.landingTick).toBeGreaterThanOrEqual(공.trajectory.fenceTick)
     expect(공.distance).toBe(derbyDistanceOf(공.trajectory.pointAt(공.trajectory.landingTick)))
     expect(공.foulCallTick).toBeNull()
+    // 표시 비거리 +0x36 — 낙구 틱까지 지금 점으로 다시 써서 낙구 점 값이 남는다 (526d0)
+    expect(공.displayDistance).toBe(derbyDistanceOf(공.trajectory.pointAt(공.trajectory.landingTick)))
   })
 
   it('⚠️ 원본 그대로: 홈런 아닌 페어 공도 낙구 틱에 그 점 비거리를 더한다 (0xa600c 의 state[0x26] == 8 은 판 종류)', () => {
@@ -44,6 +46,8 @@ describe('홈런더비 판(종류 8) 하나 — 슬롯 2 모드 7 갈래 0x526ca
     expect(파울.isHomeRun).toBe(false)
     expect(파울.distance).toBe(0)
     expect(파울.foulCallTick).toBe(파울.trajectory.landingTick)
+    // 표시 비거리 +0x36 은 파울도 낙구 점으로 쓴다 (526d0 은 0xb68dc 를 안 본다)
+    expect(파울.displayDistance).toBe(derbyDistanceOf(파울.trajectory.pointAt(파울.trajectory.landingTick)))
   })
 
   it('비거리는 한 번에 상한 160 을 넘지 않는다', () => {
