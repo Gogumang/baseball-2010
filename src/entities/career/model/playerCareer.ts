@@ -584,12 +584,20 @@ const toInt8 = (value: number) => (value << 24) >> 24
 const toInt16 = (value: number) => (value << 16) >> 16
 
 /**
+ * **+0x1c2 이번 시즌 인기도 변화 합을 쌓는다** — 116 의 12c14~12c30 `ldrsh +0x1c2 · + ldrsb +0x4a · strh`(모드 3·4 공용).
+ * 더하는 쪽 +0x4a 는 **s8 로 읽고**(−128~127 을 넘는 변화는 잘려 돈다), 합은 s16 칸에 적는다(넘치면 음수로 돈다).
+ */
+export function addSeasonPopularityGain(gain: number, popularityChange: number): number {
+  return toInt16(gain + toInt8(popularityChange))
+}
+
+/**
  * **116 진입의 경기 뒤 카운터** (12bc2~12c84, 모드 3·4 공용 — 스킬은 `0xa3a75(S, 5|2)` 보유 비트 5 무력감 · 2 먹튀, 두 편 같은 번호):
  * ```
  * 무력감 있고 사기(0xa3a25) > 89  → s8 +0x1c7 += 1
  * 무력감 있고 사기 ≤ 89          → +0x1c7 = 0
  * 무력감 없음                     → 그대로 (지우지 않는다)
- * (+0x1c2 += +0x4a · 0xa4d09)
+ * (s16 +0x1c2 += s8 +0x4a · 0xa4d09 — `addSeasonPopularityGain`)
  * 먹튀 있음 → s8 +0x1cd += 1 · s16 +0x1c0 += s8 +0x4a  /  없음 → 둘 다 0
  * ```
  */
@@ -620,7 +628,7 @@ export function countGameForSkills(
 ): PlayerCareer {
   return {
     ...career,
-    seasonPopularityGain: career.seasonPopularityGain + popularityChange,
+    seasonPopularityGain: addSeasonPopularityGain(career.seasonPopularityGain, popularityChange),
     ...countSkillGameCounters(career, {
       hasHelpless: hasSkill(career, HELPLESS_SKILL),
       hasMoneyGrubber: hasSkill(career, MONEY_GRUBBER_SKILL),

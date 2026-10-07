@@ -30,6 +30,7 @@ import { equipmentBonusOf } from '@/entities/career/model/equipment'
 import { NO_EQUIPPED_TITLE } from '@/entities/career/model/titles'
 import {
   countReputationZeroGame,
+  addSeasonPopularityGain,
   countSkillGameCounters,
   endNationalCup,
   isSkillEquipped,
@@ -237,7 +238,7 @@ export const NO_LAST_EVALUATION: PitcherLastEvaluation = { popularityChange: 0, 
 
 /**
  * **116 경기 뒤 평가 진입 0x1278c 의 저장 칸 몫** — S+0x50 = 2(0x1279a) 뒤, 0x8a6fc 다음의 경기 뒤 카운터(12bc2~12c3c):
- * `+0x1c2 += +0x4a`(이번 시즌 인기도 변화 합) · `0xa4d09`(평판 0 연속 +0x184). 이어하기(S+0x50 == 2)가 다시 들어오면
+ * `s16 +0x1c2 += s8 +0x4a`(이번 시즌 인기도 변화 합, `addSeasonPopularityGain`) · `0xa4d09`(평판 0 연속 +0x184). 이어하기(S+0x50 == 2)가 다시 들어오면
  * **한 번 더** 쌓인다(원본 그대로 — 타자편 `countGameForSkills` 와 같은 자리).
  * 무력감 +0x1c7 · 먹튀 +0x1c0/+0x1cd 도 같은 자리(12bc2~12c84)다 — `0xa3a75(S, 5|2)` 의 5·2 는 보유 비트 번호이고 투수 비트 0~7 은
  * 타자와 같은 공통 스킬(5 무력감 · 2 먹튀)이라 짝이 그대로다(`countSkillGameCounters`, 0x8457c 이름표 · skills.json 공통).
@@ -260,7 +261,7 @@ export function enterPitcherGameEvaluation(career: PitcherCareer): PitcherCareer
         popularityChange,
       },
     ),
-    seasonPopularityGain: career.seasonPopularityGain + popularityChange,
+    seasonPopularityGain: addSeasonPopularityGain(career.seasonPopularityGain, popularityChange),
     reputationZeroGames: countReputationZeroGame(career.reputationZeroGames, career.reputation),
   }
 }

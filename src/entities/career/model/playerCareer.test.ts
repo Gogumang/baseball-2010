@@ -401,6 +401,16 @@ describe('116 경기 뒤 카운터 12bc2~12c84 — 무력감 +0x1c7 · 먹튀 +0
   })
 })
 
+describe('116 의 +0x1c2 쌓기 12c14~12c30 — s16 합 += s8 +0x4a', () => {
+  it('+0x4a 는 s8 로 읽어 −128~127 을 넘는 변화는 잘려 돌고, 합은 s16 으로 돈다', () => {
+    const base = createCareer('인기')
+    expect(countGameForSkills({ ...base, seasonPopularityGain: 10 }, 5).seasonPopularityGain).toBe(15)
+    expect(countGameForSkills({ ...base, seasonPopularityGain: 10 }, 130).seasonPopularityGain).toBe(10 - 126)
+    expect(countGameForSkills({ ...base, seasonPopularityGain: 10 }, -129).seasonPopularityGain).toBe(10 + 127)
+    expect(countGameForSkills({ ...base, seasonPopularityGain: 32767 }, 1).seasonPopularityGain).toBe(-32768)
+  })
+})
+
 describe('116 기록 줄 글 — 0x1278c 모드 4 갈래 12958~1299a', () => {
   it('S+0x1d8 [0]~[3] 을 "타수 · 안타 · 타점 · 홈런!N" 으로 잇는다', () => {
     expect(nariRecordLineTextOf({ atBats: 5, hits: 3, runsBattedIn: 4, homeRuns: 2 })).toBe('5타수 3안타 4타점 2홈런!N')

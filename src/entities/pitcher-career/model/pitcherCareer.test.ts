@@ -306,6 +306,19 @@ describe('116 진입 경기 뒤 카운터 — 무력감 +0x1c7 · 먹튀 +0x1cd/
   })
 })
 
+describe('116 의 +0x1c2 쌓기 12c14~12c30 — s16 합 += s8 +0x4a', () => {
+  it('+0x4a 는 s8 로 읽어 −128~127 을 넘는 변화는 잘려 돌고, 합은 s16 으로 돈다', () => {
+    const base = { ...createPitcherCareer('인기'), seasonPopularityGain: 10 }
+    const 쌓기 = (popularityChange: number, gain = 10) =>
+      enterPitcherGameEvaluation({ ...base, seasonPopularityGain: gain, lastEvaluation: { popularityChange, reputationChange: 0, moraleChange: 0 } })
+        .seasonPopularityGain
+    expect(쌓기(5)).toBe(15)
+    expect(쌓기(130)).toBe(10 - 126)
+    expect(쌓기(-129)).toBe(10 + 127)
+    expect(쌓기(1, 32767)).toBe(-32768)
+  })
+})
+
 describe('0xa4f60 의 −2 는 국가대항전(S+0x12c)만 — 포스트시즌은 시리즈 날짜 g 로 맞바꾼다', () => {
   it('선발 · 포스트시즌 시리즈 둘째 경기(g = 1) → 0↔1 맞바꿈이라 내가 0번이 아니다', () => {
     const 선발 = createPitcherCareer('포스트')
