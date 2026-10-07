@@ -1029,8 +1029,13 @@ describe('칭호는 관리 화면에서 하나씩 — 판정 0x1a1c0 (0x1afac) �
   it('들어온 관리 화면에서 처음 맞는 하나만 띄우고, 확인하면 주고 곧바로 장착한 뒤 다음 것을 띄운다', async () => {
     const rendered = 띄우기({ ...createCareer('칭호'), season: 2, gamesPlayed: 10, popularity: 4500, seenEventIds: ['451'], titleIds: [TITLE_NAMES[0]] })
     const 세션 = () => rendered.result.current.session
-    // 관리 화면 진입 이벤트 검사(trigger 0)는 이벤트 본문이 도착한 뒤에 돈다 — 그 뒤 두 번째 틀이 판정이다
-    await waitFor(() => expect(세션().storyEvents).not.toBeNull(), { timeout: 5000 })
+    // 관리 화면 진입 이벤트 검사(trigger 0)는 이벤트 본문이 도착한 뒤에 돈다 — 그 뒤 두 번째 틀이 판정이다.
+    // 본문이 도착한 틀(storyEvents)과 판정 틀 사이에는 효과(검사 → managementCheck = null)와 다시 그리기가 한 번씩 더 끼어
+    // 부하 때 waitFor 의 50ms 검사가 그 틈에 걸리면 판정 전 값(null)을 읽었다 — 판정이 선 틀까지 기다린다
+    await waitFor(() => {
+      expect(세션().storyEvents).not.toBeNull()
+      expect(세션().pendingTitle).not.toBeNull()
+    }, { timeout: 5000 })
     // 경기 결과·훈련 같은 곳에서는 주지 않는다 — 관리 화면 갱신에서만
     expect(세션().career?.titleIds).toEqual([TITLE_NAMES[0]])
     expect(rendered.result.current.screen).toEqual({ kind: '관리' })
