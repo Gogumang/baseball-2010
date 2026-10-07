@@ -7,6 +7,9 @@ import {
   drawPattern,
   isFairAngle,
   launchPatternOf,
+  openScenePatternDeck,
+  rollSceneEffectInit,
+  SCENE_EFFECT_INIT_ROLL_COUNT,
 } from '@/entities/batting/model/battedBallOutcome'
 import { BATTED_BALL_PATTERNS } from '@/shared/config/original/battedBallPatterns'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -169,5 +172,21 @@ describe('필살수비 표시 패턴 — 덱 목록 0xb086c(비트 2) · 0xb07ec
     const 끝 = displayPatternOf(덱, 'jump', [90, 900, 350, 0], 고정(0.999))
     expect(끝.slice(0, 3)).toEqual(점프[점프.length - 1].slice(0, 3))
     expect(끝[3] & 2).toBe(0)
+  })
+})
+
+describe('장면 초기화 0x3e340 — 덱 섞기 3ed76 뒤 효과 객체 3ef6e 0x90190(종류 0)', () => {
+  it('rand 2 + 200 × 6 = 1202 번을 덱 섞기 바로 뒤에 굴린다 — 값은 버려진다', () => {
+    let 수 = 0
+    const 씨 = createSeededRandom(5)
+    const random: RandomPort = { ...씨, next: () => { 수 += 1; return 씨.next() } }
+    rollSceneEffectInit(random)
+    expect(SCENE_EFFECT_INIT_ROLL_COUNT).toBe(1202)
+    expect(수).toBe(1202)
+
+    수 = 0
+    openScenePatternDeck(random)
+    const 덱굴림 = Object.values(BATTED_BALL_PATTERNS).reduce((sum, patterns) => sum + patterns.length, 0)
+    expect(수).toBe(덱굴림 + 1202)
   })
 })

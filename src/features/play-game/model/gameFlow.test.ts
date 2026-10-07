@@ -37,10 +37,12 @@ import { runPitchArrivalPlay } from '@/features/defense-play/model/pitchArrivalP
 import { runStealPlay } from '@/features/defense-play/model/stealPlay'
 import { rollPassedBall } from '@/entities/fielding/model/passedBall'
 import { BATTED_BALL_PATTERNS } from '@/shared/config/original/battedBallPatterns'
-import { isFairAngle } from '@/entities/batting/model/battedBallOutcome'
+import { isFairAngle, SCENE_EFFECT_INIT_ROLL_COUNT } from '@/entities/batting/model/battedBallOutcome'
 
 /** 장면 초기화 0x3e340 의 패턴 덱 섞기 0xb0614 — 코드마다 i = 0..n−1 에 rand(0, n) 하나 (경기 시작마다, 상태 9 굴림보다 앞) */
-const 장면덱굴림 = Object.values(BATTED_BALL_PATTERNS).reduce((sum, patterns) => sum + patterns.length, 0)
+/** 장면 초기화 0x3e340 의 굴림 — 덱 섞기 3ed76(패턴 수 합) + 효과 객체 3ef6e(1202) */
+const 장면덱굴림 =
+  Object.values(BATTED_BALL_PATTERNS).reduce((sum, patterns) => sum + patterns.length, 0) + SCENE_EFFECT_INIT_ROLL_COUNT
 
 describe('startGame', () => {
   it('커리어 타순(9번)이면 플레이어는 아홉 번째 타자다', () => {
@@ -1251,7 +1253,7 @@ describe('1회초 판 (상태 0x18) — 선공·1번 타자일 때만', () => {
     const 세우기 = (n: number, value: number) => startGame(앞값(n, value), 0, 1, undefined, PLAYER_SIDE_FIRST_BAT)
     // 판이 첫 36 개를 먹고 버리므로 그 값이 무엇이든 경기는 같다
     expect(세우기(36, 0.001)).toEqual(세우기(36, 0.999))
-    // 경기를 세우는 동안 쓴 굴림 = 장면 덱 섞기 + 판 36 + 첫 타석 준비(1회초 첫 타석이라 CPU 투수 교체·돌발 후보가 없어 0)
+    // 경기를 세우는 동안 쓴 굴림 = 장면 덱 섞기 + 효과 객체 1202 + 판 36 + 첫 타석 준비(1회초 첫 타석이라 CPU 투수 교체·돌발 후보가 없어 0)
     let 수 = 0
     const 씨 = createSeededRandom(77)
     startGame({ ...씨, next: () => { 수 += 1; return 씨.next() } }, 0, 1, undefined, PLAYER_SIDE_FIRST_BAT)

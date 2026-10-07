@@ -1426,17 +1426,17 @@ describe('시즌 평판 16칸을 경기가 채운다 (0xa8024 → 0xa755c → 0x
 })
 
 describe('한 경기를 끝까지 돌리면 16칸이 실제로 찬다', () => {
-  it('자동으로 소화한 시즌 한 경기 — 16칸과 평판 등급 (seed 20100901)', () => {
-    const random = createSeededRandom(20100901)
+  it('자동으로 소화한 시즌 한 경기 — 16칸과 평판 등급 (seed 1)', () => {
+    const random = createSeededRandom(1)
     const 끝 = runAutoProgress(startTeamGame({ ...기본옵션, settings: 전부자동 }, random), random)
     const summary = summaryOf(끝)
 
-    // 장면 덱 섞기(상태 7 0x3e340 → 0xb08e8) · 경기 시작 rand(0, 2)(상태 9 0x3fa0e → 0xc0dac)와 자동진행 rand(0, 2)가
-    // 앞에 서는 차례 — 1-2 완투패
+    // 장면 덱 섞기(상태 7 0x3e340 → 0xb08e8) · 효과 객체 1202 번(3ef6e) · 경기 시작 rand(0, 2)(상태 9 0x3fa0e → 0xc0dac)와
+    // 자동진행 rand(0, 2)가 앞에 서는 차례 — 1-2 완투패 (씨앗 20100901 은 효과 객체 굴림이 든 뒤 0-7 이라 평판 비교가 안 선다)
     expect(summary.ourScore).toBe(1)
     expect(summary.opponentScore).toBe(2)
     expect(summary.pitching.outsRecorded).toBe(27)
-    expect(summary.gameRecord).toEqual([0, 0, 6, 0, 0, 8, 10, 12, 4, 0, 0, 0, 0, 0, 0, 0])
+    expect(summary.gameRecord).toEqual([0, 0, 12, 0, 0, 13, 9, 8, 3, 0, 0, 0, 0, 0, 0, 0])
 
     const context = {
       opponentRuns: summary.opponentScore,

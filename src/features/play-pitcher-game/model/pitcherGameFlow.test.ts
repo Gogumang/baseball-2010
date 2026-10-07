@@ -33,6 +33,7 @@ import type {
   PitcherGameProgress,
 } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { BATTED_BALL_PATTERNS } from '@/shared/config/original/battedBallPatterns'
+import { SCENE_EFFECT_INIT_ROLL_COUNT } from '@/entities/batting/model/battedBallOutcome'
 
 const 씨앗 = (seed: number) => createSeededRandom(seed)
 
@@ -906,8 +907,9 @@ describe('공수 교대 판 (상태 0x18) — 모드 3 은 1회초 판만', () =
   })
 
   it('판이 서면 0x3fac4 의 걸음 굴림 36 개가 첫 타석 준비(0xe 강판·0xf 돌발)보다 앞에 끼어든다', () => {
-    /** 장면 덱 섞기(0x3e340 → 0xb08e8, 코드마다 패턴 수만큼 rand) 다음 n 개는 고정값, 나머지는 씨앗 77 */
-    const 장면덱굴림 = Object.values(BATTED_BALL_PATTERNS).reduce((sum, patterns) => sum + patterns.length, 0)
+    /** 장면 덱 섞기(0x3e340 → 0xb08e8, 코드마다 패턴 수만큼 rand) · 효과 객체(3ef6e, 1202) 다음 n 개는 고정값, 나머지는 씨앗 77 */
+    const 장면덱굴림 =
+      Object.values(BATTED_BALL_PATTERNS).reduce((sum, patterns) => sum + patterns.length, 0) + SCENE_EFFECT_INIT_ROLL_COUNT
     const 앞값 = (n: number, value: number): RandomPort => {
       const rest = 씨앗(77)
       let 번 = 0
