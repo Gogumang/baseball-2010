@@ -15,6 +15,7 @@ import { SALARY_ACCEPT_EVENT_ID } from '@/entities/career/model/seasonFlow'
 import { careerNationalCupRewardOf } from '@/entities/national-cup/model/nationalCupFlow'
 import { createNationalCup } from '@/entities/national-cup/model/nationalCup'
 import { createNariCupTeams } from '@/entities/career/model/nariCupTeams'
+import { liveGameInningIndex, setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { SaveGamePort } from '@/shared/api/save/saveGamePort'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
@@ -166,6 +167,22 @@ describe('국가대항전 저장 · 이어하기 (S+0x12c · L+0xa8~ — 463 끝
   it('S+0x50 특수값(132 연말 등)이 S+0x12c 보다 먼저다 — 463 전에 끊긴 저장은 132 로', () => {
     const rendered = 띄우기(목표달성선수({ seasonEndState: 132, nationalCup: createNationalCup() }))
     expect(rendered.result.current.screen.kind).toBe('이벤트')
+  })
+})
+
+describe('전역 경기 상태 +0x6b — 타자편 경기도 같은 칸 (0x1c47a · 0x3a200 · 0xb6b6c)', () => {
+  it('142 진입이 0 으로 되돌리고, 경기 중 나가면 그 이닝이 남는다', () => {
+    const rendered = 띄우기({ ...createCareer('상태'), gamesPlayed: 4 })
+    setLiveGameInningIndex(6)
+    act(() => rendered.result.current.session.actions.runCommand('다음경기'))
+    act(() => rendered.result.current.session.actions.confirmNextGameStandings())
+    expect(liveGameInningIndex()).toBe(0)
+    act(() => rendered.result.current.session.actions.confirmMatchPrepare())
+    setLiveGameInningIndex(5)
+    // 내 첫 타석까지 간이로 흘러간 그 이닝에서 나간다 — 0 부터 센 이닝 인덱스
+    const 이닝 = rendered.result.current.session.progress!.game.inning
+    act(() => rendered.result.current.session.actions.quitGame())
+    expect(liveGameInningIndex()).toBe(이닝 - 1)
   })
 })
 

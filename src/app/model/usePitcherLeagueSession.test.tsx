@@ -8,6 +8,7 @@ import { NO_EQUIPPED_TITLE, TITLE_NAMES } from '@/entities/career/model/titles'
 import { createPitcherCareer, pitcherLastGameLineOf } from '@/entities/pitcher-career/model/pitcherCareer'
 import { createNationalCup } from '@/entities/national-cup/model/nationalCup'
 import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
+import { liveGameInningIndex, setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import { useGamePointWallet } from '@/entities/wallet/model/useGamePointWallet'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
@@ -302,6 +303,14 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     act(() => 콜드.current.actions.beginGame())
     act(() => 콜드.current.actions.finishGame({ ...경기요약, endedInningIndex: 6 } as typeof 경기요약))
     expect(다시띄우기(구원116(콜드.current.career!)).current.career?.lastGame?.managerCommentIndex).toBe(38)
+    // 다른 모드 경기도 같은 칸을 쓴다 — 그 뒤 다른 모드 경기가 9회까지 갔으면(+0x6b = 8) 38 이 아니다
+    setLiveGameInningIndex(8)
+    expect(다시띄우기(구원116(콜드.current.career!)).current.career?.lastGame?.managerCommentIndex).toBe(5)
+    // 그 뒤 나리 142 에 들어서기만 해도 0xb6814 가 +0x6b = 0 으로
+    setLiveGameInningIndex(6)
+    act(() => 콜드.current.actions.openNextGameStandings())
+    act(() => 콜드.current.actions.confirmNextGameStandings())
+    expect(liveGameInningIndex()).toBe(0)
   })
 
   it('이어하기 S+0x50 == 2 → 116 을 다시 띄우고 카운터가 겹쳐 쌓인다 (0x1c154 1c26a · 0x1278c)', () => {

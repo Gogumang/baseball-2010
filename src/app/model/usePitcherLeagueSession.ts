@@ -79,6 +79,7 @@ import { advanceNationalCupDay } from '@/entities/national-cup/model/nationalCup
 import { nariCupRecordOf, nextNariCupDayTeams } from '@/entities/career/model/nariCupTeams'
 import type { NariCupTeams } from '@/entities/career/model/nariCupTeams'
 import { nariCupGameResultOf, settleNariCupGame } from '@/entities/career/model/nariCupGame'
+import { liveGameInningIndex, resetLiveGameState, setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
 import {
   createPitcherCupTeams,
   pitcherCupPositionCodeOf,
@@ -398,15 +399,6 @@ const NO_STAT = () => {}
  * 116 평가 징글 — 진입 끝 12c96~12cc6 `0x6e499(소리, …)`: S+0x4a < 0 → 38 · ≤ 1 → 37 · > 1 → 36 (모드 3·4 공용 — 타자편과 같다).
  */
 /**
- * **전역 경기 상태 `[0x1552d0c]+0x6b`** — 앱 시작 0x2ed8 이 한 번 만들고(0x3016) memset 뒤 0xb6814 로 세운다(+0x6a = 6 · +0x6b = 0,
- * 0xb6798). 경기마다 그 경기의 끝 이닝이 남고 장면이 바뀌어도 지우지 않는다. 116 진입 0x1278c 가 감독 글 38 을 `+0x6a == +0x6b`
- * 로 가르므로(12ad8~12af0) **이어하기가 116 을 다시 돌 때는 이 칸의 지금 값**을 본다 — 앱을 새로 켰으면 0(≠ 6)이라 38 이 안 나온다.
- * 웹은 모듈 칸으로 든다: 새로 고침(= 앱 다시 켜기)이면 0, 같은 페이지 안이면 마지막 투수편 경기 값.
- * ⚠️ 근사: 원본은 다른 모드(타자편·시즌·홈런더비) 경기도 같은 칸에 남기는데 웹은 투수편 경기만 적는다.
- */
-let liveGameStateInningIndex = 0
-
-/**
  * 이어하기 116 다시 돌기의 감독 글 — 0x1278c 는 저장의 S+0x4a(지난 평가 인기도 변화) · S+0x62(지금 평판) · 포지션 코드
  * (0xb6395, 내 투수 레코드)와 **전역 경기 상태**(위) · S+0x1d8[6] 으로 **다시 고른다**(12822~12afe). 저장해 둔 글 번호를 쓰지 않는다.
  */
@@ -414,7 +406,8 @@ function resumedPitcherLastGameOf(career: PitcherCareer): PitcherCareer {
   const { lastGame } = career
   if (lastGame === undefined) return career
   const neverEntered = career.role !== PITCHER_ROLE.starter
-    && reliefNeverEnteredOf(liveGameStateInningIndex)
+    // 전역 경기 상태 +0x6b 의 지금 값 — 앱을 새로 켰으면 0, 아니면 마지막으로 돈 경기(모드 불문)의 이닝 (`liveGameState`)
+    && reliefNeverEnteredOf(liveGameInningIndex())
     && ((lastGame.pitches ?? 0) & 0xff) === 0
   const managerCommentIndex = managerCommentIndexOf(
     { role: career.role, neverEntered, reputation: career.reputation, positionCode: career.positionCode },
@@ -921,6 +914,8 @@ export function usePitcherLeagueSession(
     (from?: PitcherCareer) => {
       const current = from ?? career
       if (current === null) return
+      // 경기 장면 셋업 0x39fdc 모드 3·4 갈래(0x3a200) — 0xb6814(전역 상태): +0x6b = 0
+      resetLiveGameState()
       setGameOptions(recordGameOptionsOf(current))
       setScene('경기')
     },
@@ -953,6 +948,8 @@ export function usePitcherLeagueSession(
 
   /** 142 경기 준비에 들어선다 — 이 장면에서 처음이면 마선수 넷을 굴린다(난수 4). 웹 투수편엔 국가대항전이 없다 */
   const openMatchPrepare = useCallback(() => {
+    // 142 진입 0x1c46c 의 첫 줄(0x1c47a) — 0xb6814(전역 상태): +0x6b = 0
+    resetLiveGameState()
     if (!matchPreparedRef.current) {
       matchPreparedRef.current = true
       const aces = rollNariMatchAces(random, openedAces)
@@ -991,7 +988,7 @@ export function usePitcherLeagueSession(
       // 정산 진입 0x4ea0c 의 0x4f3d6 — 모드를 가리지 않고 +0x4c + 모드 = 0
       nariGameSaveRef.current?.clear()
       // 전역 경기 상태 +0x6b 는 대회 경기도 남긴다
-      liveGameStateInningIndex = summary.endedInningIndex ?? 0
+      setLiveGameInningIndex(summary.endedInningIndex ?? 0)
       // 0x4ea0c 4f072~4f136 — 후공(측 1) 점수가 더 많을 때만 후공 승, 동점이면 선공(측 0) 승 (`nariCupGameResultOf`, 타자편과 같다)
       const { winner, loser } = nariCupGameResultOf({
         mySide: options.playerSide,
@@ -1143,7 +1140,7 @@ export function usePitcherLeagueSession(
         })
         : withEvaluation.streaks
       // 전역 경기 상태 +0x6b 에 이 경기 끝 이닝이 남는다 (이어하기 116 의 감독 글 38 판정이 본다)
-      liveGameStateInningIndex = summary.endedInningIndex ?? 0
+      setLiveGameInningIndex(summary.endedInningIndex ?? 0)
       setGameOptions(null)
       // S+0x50 = 2 · 저장 → 평가 창 → 경기 뒤 카운터 → 저장, 평가 징글 (`enterPitcherGameEvaluation`)
       commit(enterPitcherGameEvaluation({ ...withEvaluation, lastGame, streaks }))
@@ -1371,6 +1368,8 @@ export function usePitcherLeagueSession(
    * `pitcherResumePointOf`)로 되돌려 둔다. ⚠️ 웹 전용 갈래: +0x4f 손잡이가 없어 곧장 경기가 안 될 때만 이 장면이 보인다.
    */
   const quitGame = useCallback(() => {
+    // ⚠️ 원본은 나간 그 이닝이 +0x6b 에 남는다(0x40140 은 상태를 안 지운다) — 웹 투수 경기 화면(pages/pitching)이 지금 이닝을 넘기지
+    // 않아 경기 시작 때의 0 이 남는다 (미해결)
     setGameOptions(null)
     setNextGameFromManagement(false)
     matchPreparedRef.current = false
@@ -1799,6 +1798,7 @@ export function usePitcherLeagueSession(
           setCupView(null)
           setCupMatch({ matchup, cup })
           cupGameRef.current = cup
+          resetLiveGameState()
           setGameOptions(cupGameOptionsOf(career, matchup, cup, { gaugeSettingOn, throwModeManual }))
           return setScene('경기')
         }
@@ -1831,6 +1831,7 @@ export function usePitcherLeagueSession(
         if (cupMatch !== null) {
           // 국가대항전 — 대회 레코드 두 칸으로 선다(`cupGameOptionsOf`). 끝나면 이 대회로 하루를 넘긴다 (`finishCupGame`)
           cupGameRef.current = cupMatch.cup
+          resetLiveGameState()
           setGameOptions(cupGameOptionsOf(career, cupMatch.matchup, cupMatch.cup, { gaugeSettingOn, throwModeManual }))
           return setScene('경기')
         }
@@ -1893,6 +1894,8 @@ export function usePitcherLeagueSession(
        */
       startCupGame: (matchup: NationalCupMatchup, cup: NationalCup) => {
         if (career === null) return
+        // 142 진입 0x1c46c(0x1c47a) — +0x6b = 0
+        resetLiveGameState()
         if (!matchPreparedRef.current) {
           commitWith((current) => ({
             ...current,

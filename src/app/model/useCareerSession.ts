@@ -131,6 +131,7 @@ import {
 } from '@/entities/career/model/nariCupTeams'
 import type { NariCupTeams } from '@/entities/career/model/nariCupTeams'
 import { nariCupGameResultOf, settleNariCupGame } from '@/entities/career/model/nariCupGame'
+import { resetLiveGameState, setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
 import { UNSHUFFLED_PITCHER_ORDER } from '@/entities/league/model/league'
 import type { NationalCup, NationalCupMatchup } from '@/entities/national-cup/model/nationalCup'
 import { advanceNationalCupDay } from '@/entities/national-cup/model/nationalCupPlay'
@@ -469,6 +470,8 @@ export function useCareerSession({
       /** 내 팀 명단 — 나리 팀 레코드 타자 배열 차례(`nariQuickLineupOf`) · 국가대항전은 대표팀 칸(+0xbc4) */
       ourRecordLineup?: QuickLineup,
     ) => {
+      // 경기 장면 셋업 0x39fdc 모드 3·4 갈래(0x3a200) — 0xb6814(전역 상태): +0x6b = 0 (`liveGameState`)
+      resetLiveGameState()
       // 환경설정 "주루" 를 경기에 태운다 — 타자편은 사람이 늘 공격이라 설정이 그대로 먹는다 (0xae690)
       const started = startGame(
         random, ourTeamId, battingOrder, opponentTeamId, playerSide, dayCounter, runningModeManualRef.current, pitchers, aces,
@@ -552,6 +555,8 @@ export function useCareerSession({
    */
   const enterMatchPrepare = useCallback(
     (postseasonFromReentry?: boolean) => {
+      // 142 진입 0x1c46c 의 첫 줄(0x1c47a) — 0xb6814(전역 상태): +0x6b = 0
+      resetLiveGameState()
       if (!matchPreparedRef.current) {
         matchPreparedRef.current = true
         const aces = rollNariMatchAces(random, openedAces)
@@ -607,6 +612,8 @@ export function useCareerSession({
       matchPreparedRef.current = false
       // 정산 진입 0x4ea0c 의 0x4f3d6 — 전역기록 +0x4c + 모드(+0x50) = 0
       nariGameSaveRef.current?.clear()
+      // 전역 경기 상태 +0x6b 에 이 경기 끝 이닝이 남는다(0xb6b6c) — 투수편 이어하기 116 의 감독 글 38 이 본다 (`liveGameState`)
+      setLiveGameInningIndex(finished.game.inning - 1)
       const summary = summaryOf(finished)
       // 경기 후 평가 — 인기도 → 평판 → 사기 (0xa719c), 이어서 연속 기록 (0x8a6fc)
       const thisEvaluation = evaluateGame(currentCareer, summary)
@@ -700,6 +707,8 @@ export function useCareerSession({
       matchPreparedRef.current = false
       // 대회 경기도 정산 진입 0x4ea0c 를 지난다 — 0x4f3d6 은 모드를 가리지 않고 +0x4c + 모드 = 0
       nariGameSaveRef.current?.clear()
+      // 전역 경기 상태 +0x6b — 대회 경기도 끝 이닝을 남긴다
+      setLiveGameInningIndex(finished.game.inning - 1)
       // 같은 날 CPU 경기 두 나라는 상대국 슬롯 레코드(base+0x934) 하나를 쓴다 — 사람 경기가 깎아 둔 그 레코드의
       // 투수 +0x2c 에서 선다 (701a7a9). 사람 경기 끝 상대 투수 칸별 값을 넘긴다
       const next = advanceNationalCupDay(cup, winner, loser, random, summary.pitcherStaminas?.opponent)
@@ -1611,6 +1620,8 @@ export function useCareerSession({
 
     /** 경기 중 [메뉴] → 나가기. StrGAME[0] "현재 이닝의 기록과 획득한 G포인트가 사라집니다" */
     quitGame: () => {
+      // 상태 0x22 → 장면 0x103 은 전역 경기 상태를 안 지운다 — 나간 그 이닝이 +0x6b 에 남는다
+      if (progressRef.current !== null) setLiveGameInningIndex(progressRef.current.game.inning - 1)
       progressRef.current = null
       setProgress(null)
       runner.resetAtBat()
@@ -1682,6 +1693,8 @@ export function useCareerSession({
      */
     startCupGame: (matchup: NationalCupMatchup, cup: NationalCup) => {
       if (career === null) return
+      // 142 진입 0x1c46c(0x1c47a) — +0x6b = 0
+      resetLiveGameState()
       if (!matchPreparedRef.current) {
         // 1c574 — 대회 날짜 g ≠ 0 이면 대표팀·상대국 칸 투수 0~3 을 한 칸씩 돌린다(영구, 같은 문 안이라 한 번만)
         setCareer((current) => current === null
