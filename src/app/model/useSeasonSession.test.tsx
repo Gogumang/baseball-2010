@@ -50,9 +50,9 @@ type 세션결과 = { readonly current: ReturnType<typeof useSeasonSession> }
  * 이벤트 재생 0xd3 을 끝까지 넘긴다 — 이벤트 명령의 보상을 그대로 모아 넘기고, 본 이벤트는 그 한 편으로 친다
  * (선택지로 건너가는 이벤트는 따로 고르지 않는다). 지나온 이벤트 번호를 차례대로 돌려준다.
  */
-function 이벤트넘기기(result: 세션결과): number[] {
+function 이벤트넘기기(result: 세션결과, limit = 20): number[] {
   const 지나온: number[] = []
-  for (let guard = 0; guard < 20 && result.current.scene === SEASON_SCENE_STATE.이벤트재생; guard += 1) {
+  for (let guard = 0; guard < limit && result.current.scene === SEASON_SCENE_STATE.이벤트재생; guard += 1) {
     const playback = result.current.eventPlayback
     if (playback === null) break
     const event = SEASON_PLAYABLE_EVENTS.find((candidate) => candidate.id === playback.eventId)
@@ -631,7 +631,7 @@ describe('시즌 끝 사슬', () => {
     expect(result.current.eventPlayback?.eventId).toBe(392)
   })
 
-  it('사슬은 0xee → 0xeb → 0xec → 0xed → 0xf0 → 0xef 차례다', () => {
+  it('사슬은 0xee → 0xeb → 0xec → 0xed → 0xf0 → 0xef 차례다 — 시상 셋은 한 틀 뒤 곧장 이벤트(370 · 371 · 376)를 튼다', () => {
     const { result } = 띄우기()
     시작(result, 0)
     act(() => result.current.actions.confirmIncome({
@@ -639,28 +639,37 @@ describe('시즌 끝 사슬', () => {
     }))
 
     // 0xee: 392 → (끝에서 목표 판정) 393~396 → 0xeb
-    const 목표 = 이벤트넘기기(result)
-    expect(목표[0]).toBe(392)
-    expect([393, 394, 395, 396]).toContain(목표[1])
-    const 차례 = [result.current.scene]
-    for (let step = 0; step < 3; step += 1) {
-      act(() => result.current.actions.nextSeasonEndStep())
-      차례.push(result.current.scene)
-    }
-    // 0xf0 은 화면 없이 정규시즌 순위로 401·402·403 을 튼다 → 0xef
+    expect(이벤트넘기기(result, 2)).toEqual([392, expect.any(Number)])
+    // 0xeb 진입 0xe854: phase 0xc · 370 을 틀고 [다음 0xec]
+    expect(result.current.eventPlayback).toMatchObject({ eventId: 370, returnScene: SEASON_SCENE_STATE.투수시상 })
+    expect(result.current.state?.record.phase).toBe(0xc)
+    // 실행기 끝 0x8b04c → 372/373 · 0xec 371 → 374/375 · 0xed 376 → 0x8b370 → 378/379
+    const 시상 = 이벤트넘기기(result, 6)
+    expect(시상[0]).toBe(370)
+    expect([372, 373]).toContain(시상[1])
+    expect(시상[2]).toBe(371)
+    expect([374, 375]).toContain(시상[3])
+    expect(시상[4]).toBe(376)
+    expect([378, 379]).toContain(시상[5])
+    // 0xf0 은 정규시즌 순위로 401·402·403 을 튼다 → 0xef
     expect(result.current.eventPlayback?.returnScene).toBe(SEASON_SCENE_STATE.시즌결산)
     expect(result.current.state?.record.phase).toBe(SEASON_PHASE.정규시즌순위)
-    const 순위 = 이벤트넘기기(result)
-    차례.push(result.current.scene)
+    expect([401, 402, 403]).toContain(이벤트넘기기(result)[0])
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.시즌결산)
+  })
 
-    expect([401, 402, 403]).toContain(순위[0])
-    expect(차례).toEqual([
-      SEASON_SCENE_STATE.타자시상,
-      SEASON_SCENE_STATE.투수시상,
-      SEASON_SCENE_STATE.최우수선수,
-      SEASON_SCENE_STATE.이벤트재생,
-      SEASON_SCENE_STATE.시즌결산,
-    ])
+  it('시상 창 글은 system 3 · 4 일 때만 — 370 은 타자 타이틀 세 칸(0x8b3bc), 376 은 축하 줄 없는 MVP 창(시즌 갈래)', () => {
+    const { result } = 띄우기()
+    시작(result, 0)
+    act(() => result.current.actions.confirmIncome({
+      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
+    }))
+    이벤트넘기기(result, 2)
+
+    expect(result.current.awardWindowTextOf(1)).toBeNull()
+    const 타이틀창 = result.current.awardWindowTextOf(3) ?? ''
+    expect(타이틀창.startsWith('!C')).toBe(true)
+    expect(result.current.awardWindowTextOf(4)).toBeNull()
   })
 
   it('392 의 목표 결과는 달성 수로 갈리고 보상에 연차 보정이 붙는다 (0x8d0d2 · 0x8d508)', () => {
@@ -674,7 +683,7 @@ describe('시즌 끝 사슬', () => {
     }))
     const 전 = result.current.state!.record
 
-    expect(이벤트넘기기(result).slice(0, 2)).toEqual([392, 396])
+    expect(이벤트넘기기(result, 2)).toEqual([392, 396])
 
     // 396: 인기도 −10 −10y · 평판 −5 −2y (y = 1)
     const 후 = result.current.state!.record

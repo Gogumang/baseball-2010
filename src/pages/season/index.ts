@@ -84,22 +84,19 @@ export type { SeasonItemMenuScreenProps } from '@/pages/season/ui/SeasonItemMenu
  *
  * | 원본 상태 | 화면 |
  * |---|---|
- * | 0xee 포스트시즌 시작 | 화면 없음 — 공통 틀 + 이벤트 392 (0xd3, `SeasonRoute`) |
- * | 0xeb 타자시상 | `SeasonTitleAwardScreen` (`role="타자"`) |
- * | 0xec 투수시상 | `SeasonTitleAwardScreen` (`role="투수"`) |
- * | 0xed 최우수선수 | `SeasonMvpScreen` |
- * | 0xf0 정규시즌 순위 | 화면 없음 — 공통 틀 + 이벤트 401~403 (0xd3, `SeasonRoute`) |
+ * | 0xee 포스트시즌 시작 | `SeasonChainFrameScreen`(가운데 판 없음) 한 틀 → 이벤트 392 (0xd3) |
+ * | 0xeb 타자시상 | `SeasonChainFrameScreen` 한 틀 → 이벤트 370 → 372/373 (0xd3) |
+ * | 0xec 투수시상 | `SeasonChainFrameScreen` 한 틀 → 이벤트 371 → 374/375 (0xd3) |
+ * | 0xed 최우수선수 | `SeasonChainFrameScreen` 한 틀 → 이벤트 376 → 378/379 (0xd3) |
+ * | 0xf0 정규시즌 순위 | `SeasonChainFrameScreen` 한 틀 → 이벤트 401~403 (0xd3) |
  * | 0xef 시즌 결산 | `SeasonSummaryScreen` |
  * | 0xf5 엔딩 | `SeasonEndingScreen` |
  *
  * 단계 차례와 각 단계가 트는 이벤트는 `entities/season-mode` 의 `SEASON_END_CHAIN` 이 가진다.
  */
 
-export { SeasonTitleAwardScreen } from '@/pages/season/ui/SeasonTitleAwardScreen'
-export type { SeasonTitleAwardScreenProps } from '@/pages/season/ui/SeasonTitleAwardScreen'
-
-export { SeasonMvpScreen } from '@/pages/season/ui/SeasonMvpScreen'
-export type { SeasonMvpScreenProps } from '@/pages/season/ui/SeasonMvpScreen'
+export { SeasonChainFrameScreen } from '@/pages/season/ui/SeasonChainFrameScreen'
+export type { SeasonChainFrameScreenProps } from '@/pages/season/ui/SeasonChainFrameScreen'
 
 
 export { SeasonSummaryScreen } from '@/pages/season/ui/SeasonSummaryScreen'

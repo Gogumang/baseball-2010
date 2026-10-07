@@ -3,10 +3,9 @@ import { ITEM_WINDOW_KIND } from '@/widgets/season/lib/seasonItemMenu'
 import type { ItemWindowKind } from '@/widgets/season/lib/seasonItemMenu'
 import {
   GameIncomeScreen, NextGameScreen, PlayerRecruitScreen,
-  SeasonEndingScreen, SeasonInfoScreen, SeasonItemMenuScreen, SeasonManagementScreen, SeasonMvpScreen,
-  SeasonOutingScreen, SeasonSummaryScreen, SeasonTeamMenuScreen, SeasonTitleAwardScreen,
-  SeasonTrainingScreen, StadiumShopScreen, TradeScreen, CoachHireScreen, SEASON_MVP_LEADER_KINDS,
-  seasonAwardRewardOf, seasonMvpResultEventId, seasonTitleResultEventId,
+  SeasonEndingScreen, SeasonInfoScreen, SeasonItemMenuScreen, SeasonManagementScreen, SeasonChainFrameScreen,
+  SeasonOutingScreen, SeasonSummaryScreen, SeasonTeamMenuScreen,
+  SeasonTrainingScreen, StadiumShopScreen, TradeScreen, CoachHireScreen,
   SeasonMatchInfoScreen, seasonMatchInfoLines, DayResultBoardScreen,
   SeasonPlayerPickScreen, SeasonPlayerCardScreen, seasonCardAbilitiesOf, seasonPlayerDetailViewOf, seasonCardInfoOf,
   SeasonTeamInfoScreen, seasonTeamInfoRowsOf, SeasonOwnedItemsScreen, SeasonRecordPickPopup, SeasonRecordRankScreen,
@@ -26,9 +25,6 @@ import {
 } from '@/pages/general-mode/lib/generalModeSetup'
 import { MatchSettingsWindow } from '@/pages/match-settings'
 import { SQUAD_PURPOSE } from '@/entities/season-mode/model/preGameFlow'
-import { judgeTitles } from '@/entities/awards/model/seasonAwards'
-import { leaderOf } from '@/entities/awards/model/leaderboard'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { TeamSelectScreen } from '@/pages/create-player/ui/TeamSelectScreen'
 import { MessageBox, RawScreen, ScreenOverlay } from '@/shared/ui'
 import { StoryScreen } from '@/pages/story/ui/StoryScreen'
@@ -42,7 +38,7 @@ import { TeamGameScreen } from '@/pages/team-game/ui/TeamGameScreen'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { useGameSettings } from '@/app/model/useGameSettings'
 import {
-  isPitcherLeaderKind, seasonGoalInputOf, seasonGoalWindowNumbersFor, seasonLeagueRecordsOf,
+  seasonGoalInputOf, seasonGoalWindowNumbersFor, seasonLeagueRecordsOf,
 } from '@/app/model/useSeasonSession'
 import type { SeasonSession } from '@/app/model/useSeasonSession'
 import { seasonStadiumOf } from '@/entities/season-mode/model/stadiumItems'
@@ -280,6 +276,8 @@ export function SeasonRoute({
               onMatch={() => undefined}
               // SYS sub 1 올해의 목표 창 — 연초 0xd4 내장 이벤트 · 392 (0x8d304 → 0x86fdc, 0x8656c 모드 2 갈래)
               yearGoalWindowOf={() => ({ labelSet: SEASON_YEAR_GOAL_LABEL_SET, ...seasonGoalWindowNumbersFor(goalSource) })}
+              // SYS sub 3 · 4 — 시상 370 · 371 의 타이틀 창 0x8b3bc · 376 의 MVP 창 0x8b23c (시즌 갈래)
+              systemWindowTextOf={(command) => session.awardWindowTextOf(command.sub)}
             />
           </ScreenOverlay>
         </RawScreen>
@@ -817,48 +815,16 @@ export function SeasonRoute({
   }
 
   // ── 시즌 끝 사슬 (0xee → 0xeb → 0xec → 0xed → 0xf0 → 0xef) ──────────────────
-  // 0xee 포스트시즌 시작 · 0xf0 정규시즌 순위 — 그리기는 공통 틀(0xa008 · 0x9ff0 → 0x9f60)뿐이고 진입 함수가
-  // phase 를 세우고 이벤트(392 · 401~403)를 튼다. 세션이 들어온 틀에 곧장 0xd3 으로 넘긴다
-  if (scene === SEASON_SCENE_STATE.포스트시즌시작 || scene === SEASON_SCENE_STATE.정규시즌순위) {
-    return <RawScreen>{null}</RawScreen>
-  }
-
-  if (scene === SEASON_SCENE_STATE.타자시상 || scene === SEASON_SCENE_STATE.투수시상) {
-    const isBatter = scene === SEASON_SCENE_STATE.타자시상
-    // ⚠️ 시즌모드는 `isMine` 을 "1위 팀 == 내 팀" 으로 본다 (B 4절 2번) — 여기서 그렇게 채운다.
-    // 순위표 0x9d789 는 열 팀 레코드를 훑는다 — 트레이드로 옮겨 간 선수는 지금 팀 줄로, 투수 타이틀은 투수 배열에서
-    const records = seasonLeagueRecordsOf(leagueRecordSourceOf(), !isBatter).map((record) => ({
-      ...record,
-      isMine: record.teamId === state.record.teamId,
-    }))
-    const titles = judgeTitles(records, isBatter ? '타자' : '시즌투수')
+  // 그리기는 모두 0x9fe4 → 공통 틀 0x9f60(0xee 는 가운데 판 없음)이고, 진입 함수가 phase 를 세우고 이벤트
+  // (392 · 370 · 371 · 376 · 401~403)를 튼다. 세션이 들어온 틀에 곧장 0xd3 으로 넘기므로 한 틀만 그린다.
+  // 시상 내용은 이벤트의 system 3 · 4 창, 결과 이벤트는 세션의 실행기 끝 갈래(0x8b04c · 0x8b370)가 맡는다
+  if (
+    scene === SEASON_SCENE_STATE.포스트시즌시작 || scene === SEASON_SCENE_STATE.정규시즌순위
+    || scene === SEASON_SCENE_STATE.타자시상 || scene === SEASON_SCENE_STATE.투수시상 || scene === SEASON_SCENE_STATE.최우수선수
+  ) {
     return (
-      <SeasonTitleAwardScreen
-        role={isBatter ? '타자' : '투수'}
-        // 시즌모드 투수는 네 칸이라 역할 이름이 다르다 (다승·삼진·방어·세이브)
-        titles={titles}
-        // 시상 보상 (P4 2a) — 수상자가 내 팀이면 373·375 가 평판 +10 · 소지금 +5 를 준다
-        onNext={() => actions.nextSeasonEndStep(seasonAwardRewardOf(
-          seasonTitleResultEventId(isBatter ? '타자' : '투수', titles.some((slot) => slot.isMine)),
-        ))}
-      />
-    )
-  }
-
-  if (scene === SEASON_SCENE_STATE.최우수선수) {
-    // 시즌 MVP 는 표 0xd4f34 에서 rand(0..6) 으로 종류 하나를 골라 그 1위를 발표한다 (B-3) — 종류 ≤ 7 이면 투수 배열
-    const kind = SEASON_MVP_LEADER_KINDS[randomIntegerBelow(random, 0, SEASON_MVP_LEADER_KINDS.length)]
-    const leader = kind === undefined
-      ? null
-      : leaderOf(seasonLeagueRecordsOf(leagueRecordSourceOf(), isPitcherLeaderKind(kind)), kind)
-    const isMine = leader?.record.teamId === state.record.teamId
-    return (
-      <SeasonMvpScreen
-        winner={leader === null ? null : { name: leader.record.name, teamId: leader.record.teamId }}
-        isMine={isMine}
-        // MVP 보상 — 379(내 팀)면 인기도 +10 · 평판 +20 · 소지금 +10
-        onNext={() => actions.nextSeasonEndStep(seasonAwardRewardOf(seasonMvpResultEventId(isMine)))}
-      />
+      <SeasonChainFrameScreen state={state} gamePoint={session.gamePoints} cursor={session.menuCursors.management}
+        showsCenterStage={scene !== SEASON_SCENE_STATE.포스트시즌시작} />
     )
   }
 

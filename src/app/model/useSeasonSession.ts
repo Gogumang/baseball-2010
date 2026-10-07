@@ -88,6 +88,15 @@ import {
 import type { SeasonAutobotBatInput } from '@/entities/season-mode/model/seasonRewards'
 import type { LeagueFirstAward, SeasonSummaryEntry } from '@/entities/season-mode/model/seasonRewards'
 import type { SeasonAwardReward } from '@/widgets/season/lib/seasonAwardEvents'
+import {
+  SEASON_AWARD_INTRO_EVENT_ID, SEASON_MVP_LEADER_KINDS, seasonMvpResultEventId, seasonTitleResultEventId,
+} from '@/widgets/season/lib/seasonAwardEvents'
+import { judgeTitles, NO_TEAM } from '@/entities/awards/model/seasonAwards'
+import { leaderOf } from '@/entities/awards/model/leaderboard'
+import type { LeaderKind } from '@/entities/awards/model/leaderboard'
+import {
+  SYSTEM_MVP_WINDOW, SYSTEM_TITLE_WINDOW, mvpWindowTextOf, titleWindowTextOf,
+} from '@/pages/story/lib/awardWindows'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import { HELL_TRAINING_GAME_POINT, HELL_TRAINING_INDEX } from '@/widgets/season/lib/seasonTraining'
 import {
@@ -252,6 +261,11 @@ export interface SeasonSession {
    * (웹은 0xcf 화면 안에서 띄운다) 닫으면 0xc9. 없으면 null
    */
   readonly trainingResult: SeasonTrainingResult | null
+  /**
+   * 시상 이벤트 370 · 371 · 376 의 system 3 · 4 발표 창 글(0x8b3bc · 0x8b23c — 시즌 갈래). 지금 트는 이벤트가 그 셋이 아니거나
+   * 창 종류가 아니면 null
+   */
+  readonly awardWindowTextOf: (sub: number) => string | null
   /**
    * 관리 메뉴(0xc9) 진입에서 요청 알림 StrMODE[203] 이 떠 있는가 — 0xe9ac 의 0xec10: 이벤트 폴링이 아무것도 안
    * 틀었고 상태가 0xc9 이고 this+0x148 ≠ 0 이면 팝업 id 0x27(예·아니오). 답은 0xc9 그림 0x73b8 이 받는다.
@@ -1129,6 +1143,8 @@ export function useSeasonSession(
   /** 관리 메뉴 진입의 요청 알림 [203] (팝업 0x27) 이 떠 있는가 */
   const [isTradeRequestAlertOpen, setTradeRequestAlertOpen] = useState(false)
   const [trainingResult, setTrainingResult] = useState<SeasonTrainingResult | null>(null)
+  /** 0xed 진입 0xe7ac → 0x8dd60 이 굴린 시즌 MVP 순위 종류(표 0xd4f34 의 rand(0..6)) — 376 창 · 378/379 가 읽는다 */
+  const seasonMvpKind = useRef<LeaderKind | null>(null)
   /** 관리 메뉴·구단관리 메뉴 객체의 커서 — 장면 생성(0x3b14)에서 0, 상태를 오가도 남는다 */
   const [menuCursors, setMenuCursors] = useState<SeasonMenuCursors>(INITIAL_SEASON_MENU_CURSORS)
   /** 이전 상태 this+0x24 — 진입 갈래(0x4efc · 0x47d8)가 본다 */
@@ -1295,6 +1311,14 @@ export function useSeasonSession(
     if (scene === SEASON_SCENE_STATE.정규시즌순위) {
       const rank = Math.max(0, rankingOf(save.league).indexOf(record.teamId))
       return startEvent(regularSeasonRankEventId(rank), step.next)
+    }
+    // 0xeb 0xe854 · 0xec 0xe900 — 0x8dad5(evmgr, 0xc · 0xd) 로 타이틀 칸을 채우고 370 · 371 을 튼다(이전 = 다음 상태, 다음 = 0xd3)
+    if (scene === SEASON_SCENE_STATE.타자시상) return startEvent(SEASON_AWARD_INTRO_EVENT_ID.타자, step.next)
+    if (scene === SEASON_SCENE_STATE.투수시상) return startEvent(SEASON_AWARD_INTRO_EVENT_ID.투수, step.next)
+    // 0xed 0xe7ac — 0x8dd61(evmgr) 가 표 0xd4f34 에서 rand(0..6) 으로 MVP 순위 종류를 고른 뒤 376 을 튼다
+    if (scene === SEASON_SCENE_STATE.최우수선수) {
+      seasonMvpKind.current = SEASON_MVP_LEADER_KINDS[randomIntegerBelow(random, 0, SEASON_MVP_LEADER_KINDS.length)] ?? null
+      return startEvent(SEASON_AWARD_INTRO_EVENT_ID.MVP, step.next)
     }
   }, [commit, event100Awarded, openedHiddenIds, random, save, scene, startEvent, tradeRequest.isRequested])
 
@@ -2491,6 +2515,9 @@ export function useSeasonSession(
             ...(goalRecordOf === undefined ? {} : { recordOf: goalRecordOf }),
           }),
         )))
+      // 실행기 끝 0x8d134~0x8d19c: 370 · 371 은 0x8b04c, 376 은 0x8b370 이 결과 이벤트를 고른다(시즌 갈래)
+      const awardFollowUp = seasonAwardFollowUpOf(playback.eventId, next, goalRecordOf, seasonMvpKind.current)
+      if (awardFollowUp !== null) return startEvent(awardFollowUp, playback.returnScene)
       if (followUp !== null) return startEvent(followUp, playback.returnScene)
       setEventPlayback(null)
       setScene(playback.returnScene)
@@ -2620,6 +2647,10 @@ export function useSeasonSession(
     eventPlayback,
     tradeRequest,
     trainingResult,
+    awardWindowTextOf: (sub: number) =>
+      save === null || eventPlayback === null
+        ? null
+        : seasonAwardWindowTextOf(eventPlayback.eventId, sub, save, recordSourceNow(), seasonMvpKind.current),
     isTradeRequestAlertOpen,
     menuCursors,
     notice,
@@ -2710,6 +2741,80 @@ function recordNameOf(
     if (found !== undefined) return found.name
   }
   return playerFaceOf(team, player, isPitcher, index).name
+}
+
+/** 시상 판정의 재료 — 순위표 0x9d789 가 훑는 지금 레코드 (`seasonLeagueRecordsOf`) */
+function seasonAwardSourceOf(save: SeasonSave, recordOf: SeasonEntryRecordSource | undefined): SeasonLeagueRecordSource {
+  return {
+    league: save.league,
+    myTeamId: save.state.record.teamId,
+    roster: save.roster,
+    cpuRosterOf: (team: number) => cpuRosterOf(save, team),
+    playerStats: save.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS,
+    ...(recordOf === undefined ? {} : { recordOf }),
+  }
+}
+
+/** 0x8dad4(evt, 0xc 타자 · 0xd 투수) — 시즌은 **1위 팀 == 내 팀** 이면 그 칸이 내 것(evt+0x36c+i) */
+function seasonTitlesOf(save: SeasonSave, recordOf: SeasonEntryRecordSource | undefined, isPitcher: boolean) {
+  const records = seasonLeagueRecordsOf(seasonAwardSourceOf(save, recordOf), isPitcher).map((record) => ({
+    ...record,
+    isMine: record.teamId === save.state.record.teamId,
+  }))
+  return judgeTitles(records, isPitcher ? '시즌투수' : '타자')
+}
+
+/** 0x8dd60 — 고른 종류의 1위가 MVP 칸(evt+0x370 팀 · +0x374 이름), 그 팀이 내 팀이면 +0x388 */
+function seasonMvpOf(save: SeasonSave, recordOf: SeasonEntryRecordSource | undefined, kind: LeaderKind | null) {
+  const leader = kind === null
+    ? null
+    : leaderOf(seasonLeagueRecordsOf(seasonAwardSourceOf(save, recordOf), isPitcherLeaderKind(kind)), kind)
+  return {
+    winner: leader === null ? { teamId: NO_TEAM, name: '' } : { teamId: leader.record.teamId, name: leader.record.name },
+    isMine: leader !== null && leader.record.teamId === save.state.record.teamId,
+  }
+}
+
+/**
+ * 시상 이벤트가 끝난 뒤 결과 이벤트 — 0x8b04c(시즌 갈래): 타자(evt+0x308 == 0xc)는 칸 0~2, 투수는 칸 0~3 중 내 칸이 있으면
+ * 373 · 375, 없으면 372 · 374. 0x8b370(시즌 갈래): evt+0x388 이면 379, 아니면 378. 그 밖 이벤트면 null.
+ */
+function seasonAwardFollowUpOf(
+  eventId: number,
+  save: SeasonSave,
+  recordOf: SeasonEntryRecordSource | undefined,
+  mvpKind: LeaderKind | null,
+): number | null {
+  if (eventId === SEASON_AWARD_INTRO_EVENT_ID.타자 || eventId === SEASON_AWARD_INTRO_EVENT_ID.투수) {
+    const isPitcher = eventId === SEASON_AWARD_INTRO_EVENT_ID.투수
+    const hasMine = seasonTitlesOf(save, recordOf, isPitcher).some((slot) => slot.isMine)
+    return seasonTitleResultEventId(isPitcher ? '투수' : '타자', hasMine)
+  }
+  if (eventId === SEASON_AWARD_INTRO_EVENT_ID.MVP) return seasonMvpResultEventId(seasonMvpOf(save, recordOf, mvpKind).isMine)
+  return null
+}
+
+/**
+ * 시상 발표 창 글 — 370 · 371 의 system 3 은 0x8b3bc(문구 표 0xd4e30 — 시즌 투수는 넷째 칸 82 세이브왕까지),
+ * 376 의 system 4 는 0x8b23c. 시즌(0x7b999 참)은 MVP 창에 축하 줄 StrUSER_EVT[84] 를 안 붙인다.
+ */
+function seasonAwardWindowTextOf(
+  eventId: number,
+  sub: number,
+  save: SeasonSave,
+  recordOf: SeasonEntryRecordSource | undefined,
+  mvpKind: LeaderKind | null,
+): string | null {
+  if (sub === SYSTEM_TITLE_WINDOW
+    && (eventId === SEASON_AWARD_INTRO_EVENT_ID.타자 || eventId === SEASON_AWARD_INTRO_EVENT_ID.투수)) {
+    const titles = seasonTitlesOf(save, recordOf, eventId === SEASON_AWARD_INTRO_EVENT_ID.투수)
+    return titleWindowTextOf({ titles, wonCount: 0, isMostValuablePlayer: false, mostValuablePlayer: { teamId: NO_TEAM, name: '' } })
+  }
+  if (sub === SYSTEM_MVP_WINDOW && eventId === SEASON_AWARD_INTRO_EVENT_ID.MVP) {
+    const { winner } = seasonMvpOf(save, recordOf, mvpKind)
+    return mvpWindowTextOf({ titles: [], wonCount: 0, isMostValuablePlayer: false, mostValuablePlayer: winner })
+  }
+  return null
 }
 
 /**
