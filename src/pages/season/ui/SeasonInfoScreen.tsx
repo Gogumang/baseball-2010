@@ -5,7 +5,7 @@ import { SEASON_INFO_MENU } from '@/widgets/season/lib/seasonInfoMenu'
 import type { SeasonInfoMenuEntry } from '@/widgets/season/lib/seasonInfoMenu'
 import { SeasonListWindow } from '@/widgets/season/ui/SeasonListWindow'
 import type { SeasonListRow } from '@/widgets/season/ui/SeasonListWindow'
-import { SeasonStatusBar } from '@/widgets/season/ui/SeasonStatusBar'
+import { SeasonStatusPanel } from '@/pages/season/ui/SeasonStatusPanel'
 import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
 
 export interface SeasonInfoScreenProps {
@@ -53,6 +53,8 @@ export function SeasonInfoScreen({
 
   return (
     <RawScreen>
+      {/* 상태판 0x7d34c 를 먼저 그리고 그 위에 다른 것이 덮인다 (원본 그리기 차례) */}
+      <SeasonStatusPanel record={state.record} teamMorale={state.teamMorale} />
       <SeasonListWindow
         title="시즌정보"
         rows={rows}
@@ -61,7 +63,6 @@ export function SeasonInfoScreen({
         onSelect={select}
         onBack={onBack}
       />
-      <SeasonStatusBar record={state.record} teamMorale={state.teamMorale} />
       {overlay}
     </RawScreen>
   )

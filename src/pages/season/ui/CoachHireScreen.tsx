@@ -8,7 +8,6 @@ import {
 import type { CoachHireRefusal } from '@/entities/season-mode/model/seasonCoach'
 import { SeasonListWindow } from '@/widgets/season/ui/SeasonListWindow'
 import type { SeasonListRow } from '@/widgets/season/ui/SeasonListWindow'
-import { SeasonStatusBar } from '@/widgets/season/ui/SeasonStatusBar'
 import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
 import { fillModeText, seasonMoneyTextOf } from '@/widgets/season/lib/seasonText'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
@@ -109,14 +108,13 @@ export function CoachHireScreen({ state, gamePoints = 0, onHire, onBack }: Coach
         cursor={cursor}
         onMoveCursor={moveTo}
         onSelect={select}
-        // 두 줄까지만 쓴다 — 판 아래 띠가 두 줄치라 세 줄이면 상태바에 닿는다.
+        // 두 줄까지만 쓴다 — 판 아래 띠가 두 줄치라 세 줄이면 화면 아래로 넘친다(0xd7 은 상태판을 그리지 않는다).
         // 계약금은 목록 각 줄에 이미 있으므로 효과와 필요 인기도만 아래에 적는다
         footer={[
           coachEffectTextOf(cursor),
           `${fillModeText(CONTRACT_LABEL, seasonMoneyTextOf(coachFeeOf(cursor) ?? 0))}   ${fillModeText(REQUIRED_LABEL, coachRequiredPopularityOf(cursor) ?? 0)}`,
         ].join('\n')}
       />
-      <SeasonStatusBar record={record} teamMorale={state.teamMorale} />
 
       {question !== null && (
         <MessageBox

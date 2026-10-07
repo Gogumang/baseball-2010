@@ -32,7 +32,6 @@ const 띄우기 = (record: SeasonRecord, 나머지: Partial<Parameters<typeof St
   render(
     <StadiumShopScreen
       record={record}
-      teamMorale={100}
       onChange={onChange}
       onBack={vi.fn()}
       {...나머지}
@@ -159,7 +158,7 @@ describe('키 조작 (0x957c)', () => {
   it('취소(−16)로 되돌아간다', () => {
     const onBack = vi.fn()
     render(
-      <StadiumShopScreen record={레코드()} teamMorale={100} onChange={vi.fn()} onBack={onBack} />,
+      <StadiumShopScreen record={레코드()} onChange={vi.fn()} onBack={onBack} />,
     )
 
     fireEvent.keyDown(window, { key: 'Escape' })

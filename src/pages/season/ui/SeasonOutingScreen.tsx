@@ -8,7 +8,6 @@ import {
 import type { SeasonOutingPlace, SeasonOutingRefusal } from '@/widgets/season/lib/seasonOuting'
 import { SeasonListWindow } from '@/widgets/season/ui/SeasonListWindow'
 import type { SeasonListRow } from '@/widgets/season/ui/SeasonListWindow'
-import { SeasonStatusBar } from '@/widgets/season/ui/SeasonStatusBar'
 import { seasonMoneyTextOf } from '@/widgets/season/lib/seasonText'
 import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
 
@@ -114,7 +113,6 @@ export function SeasonOutingScreen({ state, outingSubItems = [], onRun, onBack }
         onBack={onBack}
         footer={footer}
       />
-      <SeasonStatusBar record={record} teamMorale={teamMorale} />
 
       {notice !== null && (
         <MessageBox text={notice} buttons={['확인']} onAnswer={() => setNotice(null)} />

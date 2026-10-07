@@ -4,7 +4,7 @@ import { ORIGINAL_COLORS } from '@/shared/config/design'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import { SEASON_SUB_ITEM_COUNT, seasonSubItemsOf } from '@/widgets/season/lib/seasonSubItems'
 import { seasonMoneyTextOf } from '@/widgets/season/lib/seasonText'
-import { SeasonStatusBar } from '@/widgets/season/ui/SeasonStatusBar'
+import { SeasonStatusPanel } from '@/pages/season/ui/SeasonStatusPanel'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import {
   DESCRIPTION_BOX, HEAD_LABEL_FRAME, LEFT_TAB_BOX, NAME_BOX, RIGHT_TAB_BOX, SLOT_COLUMNS, SLOT_SIZE, VALUE_BOX, WINDOW_BOX,
@@ -69,7 +69,8 @@ export function SeasonOwnedItemsScreen({ record, teamMorale, gamePoint = 0, onBa
 
   return (
     <RawScreen>
-      <SeasonStatusBar record={record} teamMorale={teamMorale} />
+      {/* 상태판 0x7d34c 를 먼저 그리고 그 위에 다른 것이 덮인다 (원본 그리기 차례) */}
+      <SeasonStatusPanel record={record} teamMorale={teamMorale} />
       <div role="group" aria-label="보유 아이템">
         <div className={windowStyles.window}
           style={{ left: WINDOW_BOX.x, top: WINDOW_BOX.y, width: WINDOW_BOX.width, height: WINDOW_BOX.height }} />

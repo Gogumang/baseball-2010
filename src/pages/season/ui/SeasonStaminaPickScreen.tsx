@@ -1,10 +1,8 @@
 import { useState } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
-import type { SeasonState } from '@/entities/season-mode/model/seasonRecord'
 import { SEASON_SHOP_TEXT, seasonShopTextOf } from '@/entities/season-mode/model/seasonItemShop'
 import { SeasonListWindow } from '@/widgets/season/ui/SeasonListWindow'
 import type { SeasonListRow } from '@/widgets/season/ui/SeasonListWindow'
-import { SeasonStatusBar } from '@/widgets/season/ui/SeasonStatusBar'
 import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
 
 const STAMINA_PER_PERCENT = 100
@@ -16,7 +14,6 @@ export interface SeasonStaminaPitcher {
 }
 
 export interface SeasonStaminaPickScreenProps {
-  readonly state: SeasonState
   /** 0x1f9a9 — 내 팀 투수 (레코드 차례) */
   readonly pitchers: readonly SeasonStaminaPitcher[]
   /** 키 0x7c00 확인 — 글과 회복했는가(결과 0x1d) */
@@ -38,7 +35,7 @@ export interface SeasonStaminaPickScreenProps {
  * ```
  * ⚠️ 근사: 목록 창(0x5cfec + 0x54d94)의 열·배치는 안 풀었다 — 공용 목록 창에 이름과 스태미나 %를 적는다.
  */
-export function SeasonStaminaPickScreen({ state, pitchers, onPick, onBack }: SeasonStaminaPickScreenProps) {
+export function SeasonStaminaPickScreen({ pitchers, onPick, onBack }: SeasonStaminaPickScreenProps) {
   const [notice, setNotice] = useState<{ readonly text: string; readonly leave: boolean } | null>(
     { text: seasonShopTextOf(SEASON_SHOP_TEXT.스태미나선택), leave: false },
   )
@@ -56,7 +53,6 @@ export function SeasonStaminaPickScreen({ state, pitchers, onPick, onBack }: Sea
   return (
     <RawScreen>
       <SeasonListWindow title="투수" rows={rows} cursor={cursor} onMoveCursor={moveTo} onSelect={select} onBack={onBack} />
-      <SeasonStatusBar record={state.record} teamMorale={state.teamMorale} />
       {notice !== null && (
         <MessageBox text={notice.text} buttons={['OK']} onAnswer={() => {
           setNotice(null)

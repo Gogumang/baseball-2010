@@ -329,7 +329,6 @@ export function SeasonRoute({
       return (
         <SeasonEquipmentScreen
           record={state.record}
-          teamMorale={state.teamMorale}
           playerName={view.name}
           isBatter={!isPitcher}
           equipment={equipment}
@@ -385,7 +384,6 @@ export function SeasonRoute({
     }))
     return (
       <SeasonStaminaPickScreen
-        state={state}
         pitchers={pitchers}
         onPick={actions.recoverSeasonPitcherStamina}
         onBack={() => {
@@ -401,7 +399,6 @@ export function SeasonRoute({
     return (
       <StadiumShopScreen
         record={state.record}
-        teamMorale={state.teamMorale}
         mode={scene === SEASON_SCENE_STATE.구장관리 ? '구장관리' : '상점'}
         // 히든 칸 해금 플래그 `app[0xe0 + 종류×4 + (칸−4)]` (S3 7절) — 전역 저장 칸이라
         // 시즌 레코드가 아니라 세션이 들고 있다. 안 넘기면 히든이 영영 안 열린다
@@ -887,7 +884,6 @@ export function SeasonRoute({
     return (
       <GameIncomeScreen
         record={state.record}
-        teamMorale={state.teamMorale}
         onConfirm={(settlement) => actions.confirmIncome(settlement.record)}
       />
     )

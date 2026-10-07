@@ -7,7 +7,6 @@ import {
 } from '@/entities/season-mode/model/stadiumItems'
 import type { StadiumKind, StadiumPurchaseRefusal } from '@/entities/season-mode/model/stadiumItems'
 import { StadiumShopWindow, stadiumItemNameOf } from '@/widgets/season/ui/StadiumShopWindow'
-import { SeasonStatusBar } from '@/widgets/season/ui/SeasonStatusBar'
 import { seasonMoneyTextOf } from '@/widgets/season/lib/seasonText'
 import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
 import { STADIUM_BOXES } from '@/widgets/season/lib/seasonWindowLayout'
@@ -33,8 +32,6 @@ const PURCHASE_QUESTION = (price: number) =>
 
 export interface StadiumShopScreenProps {
   readonly record: SeasonRecord
-  /** 팀 레코드 +2 — 아래 수치 줄에만 쓴다 */
-  readonly teamMorale: number
   /**
    * **상점**(구단관리 → 아이템 창 종류 4, 키 0x957c)인가,
    * **구장관리**(구단관리 하위 칸 0, 키 0x7958)인가. 기본은 상점이다.
@@ -60,7 +57,7 @@ export interface StadiumShopScreenProps {
  * 그리고 **잔디는 1·2·3억을 받으면서 어떤 계산에도 들어가지 않는다** (S3 8절).
  */
 export function StadiumShopScreen({
-  record, teamMorale, mode = '상점', isHiddenOpen = () => false, onChange, onUnlock, onBack,
+  record, mode = '상점', isHiddenOpen = () => false, onChange, onUnlock, onBack,
 }: StadiumShopScreenProps) {
   const [kind, setKind] = useState<StadiumKind>(STADIUM_KINDS[0])
   const [notice, setNotice] = useState<string | null>(null)
@@ -119,7 +116,6 @@ export function StadiumShopScreen({
         onMoveSlot={moveTo}
         onSelect={select}
       />
-      <SeasonStatusBar record={record} teamMorale={teamMorale} />
       {/* 원본은 바닥띠(0x54d94)의 뒤로 표시가 취소 키를 대신한다 — 머리띠·바닥띠는 아직 시즌 제목이 없다 */}
       <button
         type="button"

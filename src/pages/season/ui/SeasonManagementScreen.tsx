@@ -6,7 +6,7 @@ import {
 } from '@/entities/season-mode/model/seasonStateMachine'
 import type { ManagementMenuItem, SeasonSceneState } from '@/entities/season-mode/model/seasonStateMachine'
 import { SeasonListWindow } from '@/widgets/season/ui/SeasonListWindow'
-import { SeasonStatusBar } from '@/widgets/season/ui/SeasonStatusBar'
+import { SeasonStatusPanel } from '@/pages/season/ui/SeasonStatusPanel'
 import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
 import type { SeasonListRow } from '@/widgets/season/ui/SeasonListWindow'
 
@@ -75,6 +75,8 @@ export function SeasonManagementScreen({
 
   return (
     <RawScreen>
+      {/* 상태판 0x7d34c 를 먼저 그리고 그 위에 다른 것이 덮인다 (원본 그리기 차례) */}
+      <SeasonStatusPanel record={record} teamMorale={state.teamMorale} />
       <SeasonListWindow
         title="관리 메뉴"
         rows={rows}
@@ -90,7 +92,6 @@ export function SeasonManagementScreen({
           illness
         }
       />
-      <SeasonStatusBar record={record} teamMorale={state.teamMorale} />
       {alert !== null && (
         // 팝업 0x27 답: 0 예 · 1 아니오 · 0x14 취소 — 아니오·취소는 같은 갈래다 (7488~749e)
         <MessageBox text={alert.text} buttons={['예', '아니오']} onAnswer={(answer) => alert.onAnswer(answer === 0)} />

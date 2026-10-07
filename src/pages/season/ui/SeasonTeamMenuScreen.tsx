@@ -3,7 +3,7 @@ import type { SeasonState } from '@/entities/season-mode/model/seasonRecord'
 import { TEAM_MENU, teamMenuTarget } from '@/entities/season-mode/model/seasonStateMachine'
 import type { SeasonSceneState } from '@/entities/season-mode/model/seasonStateMachine'
 import { SeasonListWindow } from '@/widgets/season/ui/SeasonListWindow'
-import { SeasonStatusBar } from '@/widgets/season/ui/SeasonStatusBar'
+import { SeasonStatusPanel } from '@/pages/season/ui/SeasonStatusPanel'
 import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
 import type { SeasonListRow } from '@/widgets/season/ui/SeasonListWindow'
 
@@ -50,6 +50,8 @@ export function SeasonTeamMenuScreen({
 
   return (
     <RawScreen>
+      {/* 상태판 0x7d34c 를 먼저 그리고 그 위에 다른 것이 덮인다 (원본 그리기 차례) */}
+      <SeasonStatusPanel record={state.record} teamMorale={state.teamMorale} />
       <SeasonListWindow
         title="구단관리"
         rows={rows}
@@ -59,7 +61,6 @@ export function SeasonTeamMenuScreen({
         onBack={onBack}
         footer={'구장관리 · 트레이드 · 선수영입 · 코치채용'}
       />
-      <SeasonStatusBar record={state.record} teamMorale={state.teamMorale} />
     </RawScreen>
   )
 }

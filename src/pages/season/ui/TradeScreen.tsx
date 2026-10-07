@@ -14,7 +14,6 @@ import { myTradeEntriesOf, opponentTradeEntriesOf } from '@/widgets/season/lib/t
 import type { TradePlayerEntry } from '@/widgets/season/lib/tradeList'
 import { SeasonListWindow } from '@/widgets/season/ui/SeasonListWindow'
 import type { SeasonListRow } from '@/widgets/season/ui/SeasonListWindow'
-import { SeasonStatusBar } from '@/widgets/season/ui/SeasonStatusBar'
 import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
 import { TeamSelectScreen } from '@/pages/create-player/ui/TeamSelectScreen'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
@@ -398,7 +397,6 @@ export function TradeScreen({
         onSelect={(index) => (step.kind === '확인' ? chooseBoost(index) : listSelect(index))}
         footer={footer}
       />
-      <SeasonStatusBar record={record} teamMorale={state.teamMorale} />
 
       {question !== null && (
         <MessageBox

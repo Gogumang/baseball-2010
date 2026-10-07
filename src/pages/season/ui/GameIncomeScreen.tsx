@@ -8,7 +8,6 @@ import type { IncomeSettlement } from '@/entities/season-mode/model/seasonAttend
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import { SeasonListWindow } from '@/widgets/season/ui/SeasonListWindow'
 import type { SeasonListRow } from '@/widgets/season/ui/SeasonListWindow'
-import { SeasonStatusBar } from '@/widgets/season/ui/SeasonStatusBar'
 import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
 import { incomeTextOf, seasonMoneyTextOf } from '@/widgets/season/lib/seasonText'
 import { MILLION_TO_TEN_THOUSAND } from '@/widgets/season/lib/seasonWindowLayout'
@@ -16,8 +15,6 @@ import { MILLION_TO_TEN_THOUSAND } from '@/widgets/season/lib/seasonWindowLayout
 export interface GameIncomeScreenProps {
   /** 경기가 끝난 직후의 레코드 — 수입은 경기 장면 셋업(0xa34b8)이 이미 소지금에 더했다 */
   readonly record: SeasonRecord
-  /** 팀 레코드 +2 — 아래 수치 줄에만 쓴다 */
-  readonly teamMorale: number
   /**
    * 확인(−5) — 구내매점 카운터를 줄인 레코드를 넘긴다.
    * 원본은 그 뒤 포스트시즌이면 (경기수 0 ? 0xee : 0xef), 아니면 0xf1 로 간다 (그 사이에 이벤트 0xd3).
@@ -37,7 +34,7 @@ export interface GameIncomeScreenProps {
  *
  * ⚠️ **원본 배치 미해독 — 근사**: 0xdea0 의 좌표가 안 풀려 공용 판 목록으로 그린다.
  */
-export function GameIncomeScreen({ record, teamMorale, onConfirm }: GameIncomeScreenProps) {
+export function GameIncomeScreen({ record, onConfirm }: GameIncomeScreenProps) {
   const settlement = settleGameIncome(record)
   const [isExpiredShown, setExpiredShown] = useState(false)
 
@@ -82,7 +79,6 @@ export function GameIncomeScreen({ record, teamMorale, onConfirm }: GameIncomeSc
         backLabel="확인"
         footer={'관중이 많을수록 수입이 늘어난다'}
       />
-      <SeasonStatusBar record={settlement.record} teamMorale={teamMorale} />
 
       {isNoticeOpen && (
         <MessageBox

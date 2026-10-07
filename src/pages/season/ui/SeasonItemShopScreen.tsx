@@ -3,7 +3,7 @@ import { MessageBox, RawScreen } from '@/shared/ui'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import { checkSeasonGpItem, checkSeasonSubItem } from '@/entities/season-mode/model/seasonItemShop'
 import { seasonGpItemsOf, seasonSubItemsOf } from '@/widgets/season/lib/seasonSubItems'
-import { SeasonStatusBar } from '@/widgets/season/ui/SeasonStatusBar'
+import { SeasonStatusPanel } from '@/pages/season/ui/SeasonStatusPanel'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { ShopWindow } from '@/pages/shop/ui/ShopWindow'
 import type { ShopEntry } from '@/pages/shop/lib/shopEntries'
@@ -85,7 +85,8 @@ export function SeasonItemShopScreen({
 
   return (
     <RawScreen>
-      <SeasonStatusBar record={record} teamMorale={teamMorale} />
+      {/* 상태판 0x7d34c 를 먼저 그리고 그 위에 다른 것이 덮인다 (원본 그리기 차례) */}
+      <SeasonStatusPanel record={record} teamMorale={teamMorale} />
       <div role="group" aria-label={kind === 1 ? '서브아이템 상점' : 'GP아이템 상점'}>
         <ShopWindow
           kind={kind === 1 ? '서브' : 'GP'}

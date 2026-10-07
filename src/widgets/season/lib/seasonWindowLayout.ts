@@ -55,6 +55,7 @@ export const VISIBLE_ROWS = 10
  * 설명 줄을 쓰는 화면이 열 곳이라 모두 같은 증상이었다 (코치채용이 제일 심했다).
  * 목록 열 줄을 그대로 두려고 설명 줄을 **판 아래 빈 띠**로 내리고 상태바를 화면 맨 아래로
  * 옮겼다. 원본 배치(0xaa24·0x5cfec·0xd4e8)는 미해독이라 어느 쪽이든 근사다.
+ * (그 근사 상태바는 걷었다 — 상태판은 원본 0x7d34c 그대로 `pages/season/ui/SeasonStatusPanel` 이 화면 원점에 그린다.)
  */
 export const FOOTER_HEIGHT = 26
 
@@ -62,16 +63,13 @@ export function rowBoxOf(index: number): SeasonBox {
   return { x: LIST_ORIGIN.x, y: LIST_ORIGIN.y + ROW_STEP * index, width: ROW_WIDTH, height: ROW_HEIGHT }
 }
 
-/** 판 아래 빈 띠의 설명 줄 (**근사**) — 판(바닥 266)과 상태바(296) 사이 */
+/** 판 아래 빈 띠의 설명 줄 (**근사**) — 판 바닥 266 아래 */
 export const FOOTER_BOX: SeasonBox = {
   x: SEASON_WINDOW.x + WINDOW_INSET,
   y: SEASON_WINDOW.y + SEASON_WINDOW.height + 2,
   width: ROW_WIDTH,
   height: FOOTER_HEIGHT,
 }
-
-/** 상태바 줄 — 화면 맨 아래 (**근사**). 설명 줄 아래로 내려 겹치지 않게 한다 */
-export const STATUS_BAR_Y = SCREEN.height - 24
 
 /**
  * 구장 아이템 창 `0x83378` — mode_ui **프레임 32 의 박스 0~6** (P6 3절 확정).

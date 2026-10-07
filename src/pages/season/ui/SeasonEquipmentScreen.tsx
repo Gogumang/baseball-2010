@@ -11,7 +11,6 @@ import {
 } from '@/entities/season-mode/model/seasonEquipment'
 import type { SeasonCardAbility } from '@/pages/season/lib/seasonPlayerDetail'
 import { fillModeText, seasonMoneyTextOf } from '@/widgets/season/lib/seasonText'
-import { SeasonStatusBar } from '@/widgets/season/ui/SeasonStatusBar'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import * as styles from '@/widgets/season/ui/SeasonWindow.css'
 
@@ -29,7 +28,6 @@ const modeText = (id: number) => ORIGINAL_MODE_TEXT[id] ?? ''
 
 export interface SeasonEquipmentScreenProps {
   readonly record: SeasonRecord
-  readonly teamMorale: number
   readonly playerName: string
   /** [win+0x24c] — 0xdf 에서 고른 선수가 타자였는가 */
   readonly isBatter: boolean
@@ -52,11 +50,11 @@ export interface SeasonEquipmentScreenProps {
  * 두 층 목록: 부위([win+0x198]) 에서 확인하면 칸([win+0x19c], 0..10)으로 들어가고, 칸에서 취소하면 부위로 돌아가며 칸 커서는 0.
  * 부위에서 취소하면 선수 고르기 0xdf(탭은 이 선수 쪽 — 0x5980 이 창+0x24c 를 본다).
  *
- * ⚠️ 근사: 그림 0xb1f8(카드 0x7ba44 · 구장 그림 · 창 0x83378 · 상태판)의 배치, 선수 그림과 칸을 옮길 때 그림에 미리 끼워 보이기
+ * ⚠️ 근사: 그림 0xb1f8 창 종류 3 갈래(아이템 창 0x8453c → 카드 0x7ba44 — 상태판·커맨드 줄은 그리지 않는다, 0xb296)의 배치, 선수 그림과 칸을 옮길 때 그림에 미리 끼워 보이기
  * (0x81a9a — 그림만 바꾸고 니블은 안 건드린다)는 안 옮겼다. 부위 이름은 나리 장비 창의 이름을 빌렸다.
  */
 export function SeasonEquipmentScreen({
-  record, teamMorale, playerName, isBatter, equipment, abilities, isHiddenOpen, gamePoint = 0, onPurchase, onBack,
+  record, playerName, isBatter, equipment, abilities, isHiddenOpen, gamePoint = 0, onPurchase, onBack,
 }: SeasonEquipmentScreenProps) {
   // 카드 숫자는 들어올 때 사본 그대로 (0x7d90 은 팀 레코드만 고친다)
   const [cardAbilities] = useState(abilities)
@@ -115,7 +113,6 @@ export function SeasonEquipmentScreen({
 
   return (
     <RawScreen>
-      <SeasonStatusBar record={record} teamMorale={teamMorale} />
       <div role="group" aria-label="장비">
         <div className={styles.window} style={{ left: CARD.x, top: CARD.y, width: CARD.width, height: CARD.height }} />
         <div className={styles.title} data-testid="장비-선수" style={{ left: CARD.x, top: CARD.y + 6, width: CARD.width }}>{playerName}</div>

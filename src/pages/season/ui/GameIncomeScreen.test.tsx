@@ -23,7 +23,7 @@ const 레코드 = (덮어쓰기: Partial<SeasonRecord> = {}): SeasonRecord => ({
 /** 경기 장면 셋업(0xa34b8)을 거친 레코드로 창을 띄운다 */
 const 띄우기 = (record: SeasonRecord, input: AttendanceInput = { myRank: 0, opponentRank: 4 }) => {
   const onConfirm = vi.fn()
-  render(<GameIncomeScreen record={applyGameIncome(record, input)} teamMorale={100} onConfirm={onConfirm} />)
+  render(<GameIncomeScreen record={applyGameIncome(record, input)} onConfirm={onConfirm} />)
   return onConfirm
 }
 
