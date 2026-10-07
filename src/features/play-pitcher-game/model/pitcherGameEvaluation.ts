@@ -417,7 +417,7 @@ export const MANAGER_TEXT_SECTION_STARTS: readonly number[] = [2, 11, 20, 29]
  * (그 상황이면 인기도 p 도 0 이 되므로(5-3) 실제 결과는 같을 것으로 본다 — 추정.)
  */
 export function managerCommentIndexOf(
-  context: PitcherEvaluationContext,
+  context: Pick<PitcherEvaluationContext, 'role' | 'neverEntered' | 'reputation' | 'positionCode'>,
   popularity: number,
 ): number {
   if (context.role !== PITCHER_ROLE.starter && context.neverEntered) {

@@ -6,7 +6,6 @@ import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
-import { ORIGINAL_USER_EVENTS } from '@/shared/config/original/userEvents'
 import { PitcherGameScreen } from '@/pages/pitching/ui/PitcherGameScreen'
 import type { PitcherGameOptions } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { SCENE_CONFIRM_READY_FRAMES } from '@/features/play-game/model/useSceneConfirm'
@@ -184,8 +183,8 @@ describe('투수편 경기 화면', () => {
     }
 
     expect(screen.getByText('경기 결과')).toBeTruthy()
-    // 감독 평가 글은 StrUSER_EVT 에서 온다
-    expect(ORIGINAL_USER_EVENTS.length).toBeGreaterThan(38)
+    // 감독 평가는 정산 판이 아니라 나리 상태 116 의 몫이다
+    expect(screen.queryByText('감독 평가')).toBeNull()
   })
 })
 

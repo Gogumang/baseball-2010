@@ -16,11 +16,18 @@ import {
   spendPitcherCycleAction,
   pitcherLeagueGameSetupOf,
   prepareMyPitcherMatch,
+  enterPitcherGameEvaluation,
+  NO_LAST_EVALUATION,
   startNextPitcherSeason,
   withPitcherGameLeagueRecords,
   withPitcherGameStaminas,
 } from '@/entities/pitcher-career/model/pitcherCareer'
 import { isMyTurn } from '@/entities/league/model/seasonEnd'
+import type { PitcherLastGame } from '@/entities/pitcher-career/model/pitcherCareer'
+import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
+import { NO_ENTRY_USER_EVENT_INDEX } from '@/entities/pitcher-career/model/pitcherRotation'
+import { managerCommentIndexOf } from '@/features/play-pitcher-game/model/pitcherGameEvaluation'
+import { activeSound, playSoundIds } from '@/shared/api/audio/soundPort'
 import {
   enterPitcherYearEndEvent,
   finishPitcherYearEndEvent,
@@ -92,7 +99,7 @@ import {
 import type { PitcherGameOptions, PitcherGameSummary } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
 import {
-  MAXIMUM_GAME_POINT, countReputationZeroGame, rebuildEquippedSkillIds,
+  MAXIMUM_GAME_POINT, rebuildEquippedSkillIds,
 } from '@/entities/career/model/playerCareer'
 import { nationalCupStandingsTitleOf } from '@/entities/career/model/titles'
 import { isInfiniteGamePointOn } from '@/shared/lib/dev/devOptions'
@@ -148,6 +155,8 @@ export type PitcherScene =
   | '다음경기순위'
   /** 경기 준비(매치업, 상태 142) — 타자편과 같은 진입 0x1c46c · 키 0x13c30 · 그림 0x15d98 */
   | '경기준비'
+  /** 경기 뒤 평가 (상태 116, 진입 0x1278c) — 타자편과 같은 상태. [확인] = 114 */
+  | '경기결과'
 
 /**
  * 이벤트 재생(상태 114)을 **어디서** 틀었나 — 끝난 뒤 갈 곳(장면+0x24 "뒤 상태")이 이것으로 갈린다.
@@ -248,6 +257,8 @@ export interface PitcherLeagueSession {
     /** 109 취소(−16) — 이전 상태가 105 일 때만 105 로 (0x1060e) */
     readonly cancelNextGameStandings: () => void
     readonly finishGame: (summary: PitcherGameSummary) => void
+    /** 116 경기 뒤 평가 [확인] → 114 → 105/109/128/136 (116 의 끝 0x12b74) */
+    readonly confirmGameResult: () => void
     /** 시즌 끝 화면 [다음] → 연말 사슬 136 → 130 → 131 → 132 (→ 133) 을 이벤트 392 부터 튼다 */
     readonly beginYearEnd: () => void
     /** 연말 502 "연봉 협상한다" → 이벤트 380 (연봉협상) */
@@ -330,6 +341,14 @@ function normalizePitcherCareer(raw: unknown): PitcherCareer | null {
 }
 
 const NO_STAT = () => {}
+
+/**
+ * 116 평가 징글 — 진입 끝 12c96~12cc6 `0x6e499(소리, …)`: S+0x4a < 0 → 38 · ≤ 1 → 37 · > 1 → 36 (모드 3·4 공용 — 타자편과 같다).
+ */
+function pitcherEvaluationJingleIdOf(popularityChange: number): number {
+  if (popularityChange < 0) return 38
+  return popularityChange > 1 ? 36 : 37
+}
 
 /**
  * 리그 경기 옵션 — 화면 쪽 옵션(`pitcherGameOptionsOf`)에 경기 준비 0x1c46c 가 세운 리그 투수를 얹는다:
@@ -441,7 +460,10 @@ export function usePitcherLeagueSession(
     const saved = loaded.current
     const point: PitcherResumePoint = saved === null ? { kind: '관리' } : pitcherResumePointOf(saved)
     resumed.current = {
-      career: saved !== null && point.kind === '이벤트' ? enterPitcherYearEndEvent(saved, point.eventId) : saved,
+      career: saved !== null && point.kind === '이벤트'
+        ? enterPitcherYearEndEvent(saved, point.eventId)
+        // S+0x50 == 2 → 116 진입 0x1278c 다시 — 경기 뒤 카운터를 한 번 더 쓴다(겹쳐 쌓임). 정산(0x4ea0c)은 다시 안 돈다
+        : saved !== null && point.kind === '경기결과' ? enterPitcherGameEvaluation(saved) : saved,
       point,
     }
   }
@@ -477,7 +499,7 @@ export function usePitcherLeagueSession(
             // 109 — 이전 상태가 1(자원 적재)이라 `nextGameFromManagement` 는 거짓 그대로다
             : resumePoint.kind === '다음경기순위'
               ? '다음경기순위'
-              : '관리',
+              : resumePoint.kind === '경기결과' ? '경기결과' : '관리',
   )
   const [gameOptions, setGameOptions] = useState<PitcherGameOptions | null>(null)
   const [story, setStory] = useState<PitcherStory | null>(() =>
@@ -545,6 +567,21 @@ export function usePitcherLeagueSession(
    * ⚠️ 저장을 고치는 함수 안에서 하므로 `StrictMode` 에서는 **같은 값을 두 번 쓴다** — 값이 같아
    *    문제는 없다.
    */
+  /**
+   * 이어하기로 116 을 다시 띄웠으면(`resumePoint` '경기결과') 진입 끝처럼 저장(12c84)하고 평가 징글을 다시 낸다 — 한 번만.
+   */
+  const replayedEvaluationRef = useRef(false)
+  useEffect(() => {
+    if (replayedEvaluationRef.current || resumePoint.kind !== '경기결과') return
+    replayedEvaluationRef.current = true
+    const replayed = resumed.current?.career
+    if (replayed === null || replayed === undefined) return
+    store.save(replayed)
+    playSoundIds(activeSound(), [
+      pitcherEvaluationJingleIdOf((replayed.lastEvaluation ?? NO_LAST_EVALUATION).popularityChange),
+    ])
+  }, [resumePoint.kind, store])
+
   const commitWith = useCallback(
     (update: (current: PitcherCareer) => PitcherCareer) => {
       setCareer((current) => {
@@ -861,15 +898,56 @@ export function usePitcherLeagueSession(
         : seasoned
       // 선발형 승리 완투 계열 → +0x1e0/+0x1f0 (0xa690c 안이라 평가가 도는 정규시즌 경기만)
       const completed = isEvaluated ? countCompleteGame(evaluated, summary.evaluation.countedCompleteGame) : evaluated
-      // 경기 뒤 평가 116 의 `0xa4d08(S)`(0x12c32) — 평판 0 이면 +0x184 +1, 아니면 0. 116 은 장면 0x106 의 모드 3·4 공용
-      // 상태이고 포스트시즌 경기 뒤에도 돈다(평가 0xa719c 만 건너뛴다) — 타자편 `countGameForSkills` 와 같은 자리다
-      const counted = {
-        ...completed,
-        reputationZeroGames: countReputationZeroGame(completed.reputationZeroGames, completed.reputation),
-        // 116 진입 0x1278c 의 S+0x50 = 2 — 경기 전 109 의 4 를 덮는다 (웹 null). 사슬 상태 값은 아래 갈래가 다시 쓴다
-        seasonEndState: completed.seasonEndState === 109 ? null : completed.seasonEndState,
+      // 평가가 돈 경기만 S+0x4a · +0x64 · +7 을 덮는다 — 포스트시즌 경기 뒤 116 은 앞 경기 값을 다시 읽는다
+      const withEvaluation: PitcherCareer = isEvaluated
+        ? {
+          ...completed,
+          lastEvaluation: {
+            popularityChange: summary.evaluation.popularityChange,
+            reputationChange: summary.evaluation.reputationChange,
+            moraleChange: summary.evaluation.moraleChange,
+          },
+        }
+        : completed
+      const lastEvaluation = withEvaluation.lastEvaluation ?? NO_LAST_EVALUATION
+      /*
+       * 116 진입 0x1278c — 감독 글은 116 이 고른다: 모드 3 표 [−2…6](선발형이면 칸 3~8 두 배, 0x1285a)에서 +0x4a 칸 · 평판 +0x62
+       * (평가 뒤 값) 구간(0x128d2) · 구원이 등판 못 했으면 38(12ad4~12afe). 기록 줄은 S+0x1d8 (12a3c~12ac0).
+       */
+      const neverEntered = gameOptions.role !== PITCHER_ROLE.starter
+        && summary.evaluation.managerCommentIndex === NO_ENTRY_USER_EVENT_INDEX
+      const lastGame: PitcherLastGame = {
+        decisionCode: summary.decisionCode,
+        outs: summary.record.outsRecorded,
+        runs: summary.record.runsAllowedField,
+        strikeouts: summary.record.strikeouts,
+        managerCommentIndex: managerCommentIndexOf(
+          {
+            role: gameOptions.role,
+            neverEntered,
+            reputation: withEvaluation.reputation,
+            positionCode: gameOptions.positionCode,
+          },
+          lastEvaluation.popularityChange,
+        ),
       }
       setGameOptions(null)
+      // S+0x50 = 2 · 저장 → 평가 창 → 경기 뒤 카운터 → 저장, 평가 징글 (`enterPitcherGameEvaluation`)
+      commit(enterPitcherGameEvaluation({ ...withEvaluation, lastGame }))
+      playSoundIds(activeSound(), [pitcherEvaluationJingleIdOf(lastEvaluation.popularityChange)])
+      setScene('경기결과')
+    },
+    [aceLevels, career, commit, gameOptions, random, recordStat],
+  )
+
+  /**
+   * 116 [확인] → 114 — 0x8a6fc 가 쌓은 평가 내장 이벤트를 틀고, 114 진입 0x11d00 이 S+0x50 = 2 → 3(웹 null), 116 의 끝
+   * (0x12b74~0x12bb2)이 고른 뒤 상태로 간다.
+   */
+  const confirmGameResult = useCallback(
+    () => {
+      if (career === null) return
+      const counted: PitcherCareer = { ...career, seasonEndState: null }
 
       /*
        * 포스트시즌 경기 뒤 — 116 의 끝(0x12b74~0x12b94)이 S+0xb4 ≠ 0 이면 **S+0xb2(= L+0x32) == 0 → [114 → 136],
@@ -878,13 +956,13 @@ export function usePitcherLeagueSession(
        * **다시 돈다** — 136 진입 0x10bb0 이 0x8bdc9(392) 를 본 표시 없이 다시 튼다(0x8bdc8 → 0xae170). 원본 그대로다.
        * 45번째 경기는 경기 전 대진이 없어 아래 시즌종료로 간다(그때도 L+0x32 = 0 → 136 이다).
        */
-      if (career.postseason !== null) {
+      if (counted.postseason !== null) {
         if (leagueDayCounterOf(counted) === 0) {
-          // 116 진입 0x1278c 의 S+0x50 = 2 — 사슬 상태를 벗어난다 (이어하기도 116 의 끝처럼 136 으로)
-          commit({ ...counted, seasonEndState: null })
+          // 114 진입 0x11d00 이 2 → 0xb(포스트시즌 g == 0) — 136 진입이 다시 쓴다 (웹 null)
+          commit(counted)
           return setScene('시즌종료')
         }
-        // 128 진입 0x120a4 — S+0x50 = 0xf · 저장 (116 진입 0x1278c 의 2 를 곧바로 덮는다)
+        // 128 진입 0x120a4 — S+0x50 = 0xf · 저장
         commit({ ...counted, seasonEndState: 128 })
         setPostseasonPopup(regularSeasonPopupOnEnter(counted))
         return setScene('포스트시즌')
@@ -930,7 +1008,7 @@ export function usePitcherLeagueSession(
       commit(counted)
       setScene('관리')
     },
-    [aceLevels, career, commit, gameOptions, gaugeSettingOn, random, recordStat, throwModeManual],
+    [career, commit],
   )
 
   /** 새 시즌 처리 0x1b768 → 137 "N년차" 표지 → 105 관리 화면 (웹은 표지를 건너뛴다) */
@@ -1537,6 +1615,7 @@ export function usePitcherLeagueSession(
         setScene('관리')
       },
       finishGame,
+      confirmGameResult,
       beginYearEnd,
       continueCareer,
       retire,

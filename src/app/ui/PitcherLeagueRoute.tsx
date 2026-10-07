@@ -6,6 +6,7 @@ import { EntryEditorScreen } from '@/widgets/entry-editor'
 import { pitcherMatchInfoOf } from '@/pages/pitcher-league/lib/pitcherMatchInfo'
 import { PitcherSeasonEndScreen } from '@/pages/pitcher-league/ui/PitcherSeasonEndScreen'
 import { PitcherYearEndScreen } from '@/pages/pitcher-league/ui/PitcherYearEndScreen'
+import { PitcherGameEvaluationScreen } from '@/pages/pitcher-league/ui/PitcherGameEvaluationScreen'
 import { PitcherGameScreen } from '@/pages/pitching/ui/PitcherGameScreen'
 import { PitcherShopScreen } from '@/pages/shop/ui/PitcherShopScreen'
 import { EndingScreen } from '@/pages/ending/ui/EndingScreen'
@@ -93,6 +94,11 @@ export function PitcherLeagueRoute({
         onSettingsChange={gameSettings.setSettings}
       />
     )
+  }
+
+  // 116 경기 뒤 평가 — [확인] = 114 → 105/109/128/136
+  if (scene === '경기결과' && career.lastGame !== undefined) {
+    return <PitcherGameEvaluationScreen career={career} lastGame={career.lastGame} onConfirm={actions.confirmGameResult} />
   }
 
   const management = (

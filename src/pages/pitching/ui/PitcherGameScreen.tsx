@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { BigResult, Hint, MenuList, Panel, PixelScreen, StatGrid } from '@/shared/ui'
 import type { MenuItem, StatEntry } from '@/shared/ui'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { ORIGINAL_USER_EVENTS } from '@/shared/config/original/userEvents'
 import { ORIGINAL_BURST_TABLES } from '@/shared/config/original/burstMissions'
 import { BurstMissionWindow } from '@/widgets/burst-mission/ui/BurstMissionWindow'
 import type { BurstMissionRow } from '@/entities/burst-mission/model/burstMissionRow'
@@ -358,13 +357,7 @@ export function PitcherGameScreen({
           {summary.ourScore} : {summary.opponentScore} {summary.result}
         </BigResult>
         <StatGrid entries={pitcherStatEntries(summary)} />
-        <Panel heading="감독 평가" />
-        <Hint>{ORIGINAL_USER_EVENTS[summary.evaluation.managerCommentIndex] ?? ''}</Hint>
-        <Hint>
-          인기도 {signed(summary.evaluation.popularityChange)} · 평판{' '}
-          {signed(summary.evaluation.reputationChange)} · 사기{' '}
-          {signed(summary.evaluation.moraleChange)}
-        </Hint>
+        {/* 감독 평가·변화 글은 경기 장면 밖 나리 상태 116(진입 0x1278c)의 몫이다 — 부르는 쪽(투수편 세션)이 띄운다 */}
       </PixelScreen>
     )
   }
@@ -578,10 +571,6 @@ function slotItems(magicRemaining: number, slots: readonly PitchSlot[]): MenuIte
         ? `마구 · 남은 ${magicRemaining}회${magicRemaining === 0 ? ' (못 던짐)' : ''}`
         : undefined,
     }))
-}
-
-function signed(value: number): string {
-  return value > 0 ? `+${value}` : `${value}`
 }
 
 function pitcherStatEntries(summary: PitcherGameSummary): StatEntry[] {

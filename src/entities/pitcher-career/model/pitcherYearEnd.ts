@@ -178,6 +178,8 @@ const SEASON_END_STATE_OF_EVENT: Readonly<Partial<Record<number, SeasonEndState>
 export type PitcherResumePoint =
   /** S+0x50 == 0xb · 0xd · 0xe · 9 → 136 · 130 · 131 · 132 — 그 상태가 진입에서 트는 이벤트로 */
   | { readonly kind: '이벤트'; readonly eventId: number }
+  /** S+0x50 == 2 — 116 경기 뒤 평가를 다시 띄운다(진입 0x1278c 다시 — 카운터가 겹쳐 쌓인다). 재료가 없는 옛 저장은 아래 갈래 */
+  | { readonly kind: '경기결과' }
   /** 128 대진 — S+0x50 == 0xf, 또는 경기 뒤(2) 116 이 g ≠ 0 이라 128 로 */
   | { readonly kind: '포스트시즌' }
   /** 경기 뒤(2) 116 이 포스트시즌 중 g == 0 이라 136 으로 — 웹은 시즌 끝 화면(136 자리) */
@@ -194,13 +196,14 @@ export type PitcherResumePoint =
  * 그 밖: S+0x12c → 134 · S+0xb4 ≠ 0 → 128
  * 116 끝 0x12b74: S+0xb4 ≠ 0 이면 S+0xb2(= L+0x32) == 0 → [114 → 136], 아니면 [114 → 128]
  * ```
- * 웹 투수편은 경기 뒤 116 을 null 로 두므로(116 진입 0x1278c 가 S+0x50 = 2), 대진이 있는데 사슬 상태가 아니면
- * 116 의 끝처럼 g 로 가른다. 엔딩 141 · 국가대항전은 웹 투수편이 따로 돌아가지 않는다 (타자편과 같다).
+ * S+0x50 == 2(116 진입 0x1278c)이고 재료(`lastGame`)가 있으면 116 을 다시 띄운다. 재료가 없는 옛 저장은 예전처럼 대진이 있는데
+ * 사슬 상태가 아니면 116 의 끝처럼 g 로 가른다. 엔딩 141 · 국가대항전은 웹 투수편이 따로 돌아가지 않는다 (타자편과 같다).
  * 대진이 없으면 맨 끝 갈래(1c38e~1c3b6): S+0x50 == 4(109 진입 0x10db0)면 109, null(1 · 2 · 3)이면 g 짝수 105 · 홀수 109 —
  * 2 는 116 의 끝(0x12b98)이 같은 g 짝홀로 가른다 (타자편 `resumePointOf` 머리 주석에 S+0x50 쓰는 곳 표).
  */
 export function pitcherResumePointOf(career: PitcherCareer): PitcherResumePoint {
   if (career.endingIndex !== null) return { kind: '관리' }
+  if (career.seasonEndState === 116 && career.lastGame !== undefined) return { kind: '경기결과' }
   switch (career.seasonEndState) {
     case 136:
       return { kind: '이벤트', eventId: GOAL_INTRO_EVENT_ID }

@@ -5,7 +5,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { usePitcherLeagueSession } from '@/app/model/usePitcherLeagueSession'
 import { EMPTY_LEAGUE, startPostseason } from '@/entities/league/model/league'
 import { NO_EQUIPPED_TITLE, TITLE_NAMES } from '@/entities/career/model/titles'
-import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
+import { createPitcherCareer, pitcherLastGameLineOf } from '@/entities/pitcher-career/model/pitcherCareer'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import { useGamePointWallet } from '@/entities/wallet/model/useGamePointWallet'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
@@ -150,6 +150,9 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
   const 경기치르기 = (result: ReturnType<typeof 띄우기>['result']) => {
     act(() => result.current.actions.beginGame())
     act(() => result.current.actions.finishGame(경기요약))
+    // 116 경기 뒤 평가 [확인] = 114
+    expect(result.current.scene).toBe('경기결과')
+    act(() => result.current.actions.confirmGameResult())
   }
 
   type 커리어 = Parameters<ReturnType<typeof 띄우기>['result']['current']['actions']['save']>[0]
@@ -194,6 +197,54 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     act(() => 있음.current.actions.beginGame())
     act(() => 있음.current.actions.finishGame(경기요약))
     expect(있음.current.career?.reputationZeroGames).toBe(0)
+  })
+
+  it('경기 뒤 116 — S+0x50 = 2 · 기록 줄 · +0x1c2 += +0x4a, [확인]이 116 의 끝으로 가른다', () => {
+    const 평가요약 = {
+      ...경기요약,
+      decisionCode: 1,
+      record: { outsRecorded: 20, strikeouts: 6, runsAllowedField: 2 },
+      evaluation: { popularityChange: 3, reputationChange: 0, moraleChange: 1, countedCompleteGame: '없음', managerCommentIndex: 9 },
+    } as typeof 경기요약
+    const result = 판짜기({ gamesPlayed: 4, seasonPopularityGain: 10 })
+    act(() => result.current.actions.beginGame())
+    act(() => result.current.actions.finishGame(평가요약))
+    expect(result.current.scene).toBe('경기결과')
+    const career = result.current.career!
+    expect(career.seasonEndState).toBe(116)
+    expect(career.seasonPopularityGain).toBe(13)
+    expect(career.lastEvaluation).toEqual({ popularityChange: 3, reputationChange: 0, moraleChange: 1 })
+    expect(career.lastGame).toMatchObject({ decisionCode: 1, outs: 20, strikeouts: 6, runs: 2 })
+    expect(pitcherLastGameLineOf(career.lastGame!)).toBe('승리 6.2이닝 6삼진 2실점')
+    act(() => result.current.actions.confirmGameResult())
+    // g = 5 홀수 → [114 → 109]
+    expect(result.current.scene).toBe('다음경기순위')
+    expect(result.current.career?.seasonEndState).toBe(109)
+  })
+
+  it('이어하기 S+0x50 == 2 → 116 을 다시 띄우고 카운터가 겹쳐 쌓인다 (0x1c154 1c26a · 0x1278c)', () => {
+    const 첫 = 판짜기({ gamesPlayed: 4, seasonPopularityGain: 10 })
+    act(() => 첫.current.actions.beginGame())
+    act(() => 첫.current.actions.finishGame({
+      ...경기요약,
+      evaluation: { ...경기요약.evaluation, popularityChange: 2 },
+    } as typeof 경기요약))
+    const 끊김 = 첫.current.career!
+    expect(끊김.seasonPopularityGain).toBe(12)
+    const 저장 = (career: object) => {
+      const store = 메모리저장()
+      store.save(career)
+      return 띄우기(store).result
+    }
+    const result = 저장(끊김)
+    expect(result.current.scene).toBe('경기결과')
+    expect(result.current.career?.seasonPopularityGain).toBe(14)
+    act(() => result.current.actions.confirmGameResult())
+    expect(result.current.scene).toBe('다음경기순위')
+
+    // 재료 없는 옛 저장은 예전처럼 116 의 끝으로
+    const { lastGame: _없음, ...옛 } = 끊김
+    expect(저장(옛).current.scene).toBe('다음경기순위')
   })
 
   /** 저장해 두고 다시 띄운다 — 장면 0x106 에 다시 들어오는 이어하기 (상태 100 진입 0x1c154) */
@@ -321,6 +372,7 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
         // 포스트시즌은 0xa4f60 이 −2(그대로) — 늘 내 투수가 선발이다
         경기들.push(result.current.gameOptions!.isPostseason)
         act(() => result.current.actions.finishGame(경기요약))
+        act(() => result.current.actions.confirmGameResult())
         // 116 끝: 시리즈가 이어지면 128, 내 시리즈가 끝났으면(g == 0) 136 시즌 끝 사슬을 다시 돈다
         expect(['포스트시즌', '시즌종료']).toContain(result.current.scene)
         continue

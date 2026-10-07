@@ -28,7 +28,7 @@ import type { LeaguePlayerStats } from '@/entities/league/model/leaguePlayerStat
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { equipmentBonusOf } from '@/entities/career/model/equipment'
 import { NO_EQUIPPED_TITLE } from '@/entities/career/model/titles'
-import { isSkillEquipped, setSkillEquipped } from '@/entities/career/model/playerCareer'
+import { countReputationZeroGame, isSkillEquipped, setSkillEquipped } from '@/entities/career/model/playerCareer'
 import type { SeasonEndState } from '@/entities/career/model/playerCareer'
 import type { NariTeamRecords } from '@/entities/career/model/nariTeamRecord'
 import {
@@ -183,6 +183,58 @@ export function countCompleteGame(
   }
 }
 
+/** S+0x4a · +0x64 · +7 — 지난 평가 경기의 인기도·평판·사기 변화 */
+export interface PitcherLastEvaluation {
+  readonly popularityChange: number
+  readonly reputationChange: number
+  readonly moraleChange: number
+}
+
+/**
+ * **116 경기 뒤 평가 창 재료** — 진입 0x1278c 의 모드 3 갈래(12a3c~12ac0)가 S+0x1d8 바이트로 짓는 기록 줄
+ * `[0] 1~3 → "승리 "·"패배 "·"세이브 "(표 0xcc690) · [1]/3 "." [1]%3 "이닝 " · [3] "삼진 " · [2] "실점!N"` 과 감독 글 번호.
+ */
+export interface PitcherLastGame {
+  /** S+0x1d8[0] — 1 승 · 2 패 · 3 세이브 · 0 없음 */
+  readonly decisionCode: number
+  /** [1] 잡은 아웃 */
+  readonly outs: number
+  /** [2] 실점 */
+  readonly runs: number
+  /** [3] 탈삼진 */
+  readonly strikeouts: number
+  /** 116 이 고른 StrUSER_EVT 감독 글 (2~37 · 38 등판 없음) */
+  readonly managerCommentIndex: number
+}
+
+/** 116 기록 줄 [0] 의 글 — 표 0xcc690 → 0xcc958 · 0xcc960 · 0xcc968 */
+const DECISION_LABELS: Readonly<Record<number, string>> = { 1: '승리 ', 2: '패배 ', 3: '세이브 ' }
+
+/** 116 기록 줄 (12a3c~12ac0) — 판단 글 · `이닝 ` · `삼진 ` · `실점` */
+export function pitcherLastGameLineOf(game: PitcherLastGame): string {
+  const innings = `${Math.trunc(game.outs / 3)}.${game.outs % 3}`
+  return `${DECISION_LABELS[game.decisionCode] ?? ''}${innings}이닝 ${game.strikeouts}삼진 ${game.runs}실점`
+}
+
+/** 비어 있는 +0x4a · +0x64 · +7 */
+export const NO_LAST_EVALUATION: PitcherLastEvaluation = { popularityChange: 0, reputationChange: 0, moraleChange: 0 }
+
+/**
+ * **116 경기 뒤 평가 진입 0x1278c 의 저장 칸 몫** — S+0x50 = 2(0x1279a) 뒤, 0x8a6fc 다음의 경기 뒤 카운터(12bc2~12c3c):
+ * `+0x1c2 += +0x4a`(이번 시즌 인기도 변화 합) · `0xa4d09`(평판 0 연속 +0x184). 이어하기(S+0x50 == 2)가 다시 들어오면
+ * **한 번 더** 쌓인다(원본 그대로 — 타자편 `countGameForSkills` 와 같은 자리).
+ * ⚠️ 미해결: 무력감 +0x1c7 · 먹튀 +0x1c0/+0x1cd 는 `0xa3a75(S, 5|2)` 스킬 칸인데 투수편 스킬 번호와의 짝을 안 읽어 안 센다.
+ */
+export function enterPitcherGameEvaluation(career: PitcherCareer): PitcherCareer {
+  const popularityChange = (career.lastEvaluation ?? NO_LAST_EVALUATION).popularityChange
+  return {
+    ...career,
+    seasonEndState: 116,
+    seasonPopularityGain: career.seasonPopularityGain + popularityChange,
+    reputationZeroGames: countReputationZeroGame(career.reputationZeroGames, career.reputation),
+  }
+}
+
 export interface PitcherCareer {
   readonly name: string
   /** 제구·구속·변화·체력 (레코드 +0xc 부터 s16 네 칸) */
@@ -332,6 +384,13 @@ export interface PitcherCareer {
    * 이어하기(상태 100 진입 0x1c154, 모드 3·4 공용)가 이 값으로 돌아간다 (`pitcherResumePointOf`).
    */
   readonly seasonEndState: SeasonEndState | null
+  /**
+   * 지난 평가 경기의 변화 — 원본 S 의 **+0x4a 인기도 · +0x64 평판 · +7 사기** 변화 칸. 평가 0xa719c 가 도는 정규시즌 경기만
+   * 덮어쓰므로 포스트시즌 경기 뒤 116 은 앞 경기 값을 그대로 다시 읽는다(원본 그대로). 옛 저장·첫 경기 전에는 없다(0).
+   */
+  readonly lastEvaluation?: PitcherLastEvaluation
+  /** 116 경기 뒤 평가를 다시 띄울 재료 (`PitcherLastGame`) — 경기마다 덮어쓴다. 옛 저장에는 없다 */
+  readonly lastGame?: PitcherLastGame
   readonly postseason: PostseasonSeries | null
   readonly lastMidSeasonGoalCount: number
   /**
