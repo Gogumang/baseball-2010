@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { BigResult, Hint, MenuList, Panel, PixelScreen } from '@/shared/ui'
+import { Hint, MenuList, Panel, PixelScreen } from '@/shared/ui'
 import type { MenuItem } from '@/shared/ui'
 import { goalsOf } from '@/entities/mission/model/missionGoal'
 import { GoalBar } from '@/entities/mission/ui/GoalBar'
@@ -11,6 +11,8 @@ import { PitchGradeGauge } from '@/pages/pitching/ui/PitchGradeGauge'
 import { useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
 import { SceneMatchupCards } from '@/widgets/matchup-cards/ui/SceneMatchupCards'
 import * as styles from '@/pages/pitching/ui/PitcherGameScreen.css'
+import { MissionResultBoard } from '@/pages/mission-play/ui/MissionResultBoard'
+import type { MissionResultBoardProps } from '@/pages/mission-play/ui/MissionResultBoard'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
@@ -63,7 +65,15 @@ interface PitchingScreenProps {
   ) => void
   /** 경기 중 메뉴 **"나가기"** (표 0xcfcfc 행 1 칸 4 — StrGAME[0]/[1] 확인 뒤 0x22 → 0x40140) */
   readonly onGiveUp: () => void
+  /** 결과 판에서 미션 목록으로(0x140006c = 1) — 마선수 대결이면 대결 끝 */
   readonly onFinish: () => void
+  /**
+   * 결과 판에서 "예"(0x140006c = 3) — 같은 미션을 곧바로 다시. 안 넘기면 `onFinish` 와 같다.
+   * 마선수 대결(`resultBoard.aceMatch`)은 어느 키든 `onFinish` 다.
+   */
+  readonly onRetry?: () => void
+  /** 결과 판 0x4a384(모드 5·6) 의 값 — 번 G [+0x17f4] · 보유 G g[0x64] · 마선수 대결 칸 */
+  readonly resultBoard?: Pick<MissionResultBoardProps, 'earnedGamePoint' | 'heldGamePoint' | 'aceMatch'>
   /**
    * 경기 중 메뉴 **"다시하기"** (표 0xcfcfc 행 1 · StrGAME[7], `0x3c706`) — 미션·홈런더비 행만 자동진행 자리에 이 칸이 온다.
    * 안 넘기면 칸이 잠긴다.
@@ -96,6 +106,8 @@ export function PitchingScreen({
   onThrow,
   onGiveUp,
   onFinish,
+  onRetry,
+  resultBoard,
   onPickoffKey,
   sceneConfirm: sceneConfirmWait,
   onRestart,
@@ -152,9 +164,21 @@ export function PitchingScreen({
 
   if (run.status !== '진행중') {
     return (
-      <PixelScreen title={run.mission.name} leftKey={{ label: '확인', onPress: onFinish }}>
+      <PixelScreen title={run.mission.name}>
         <GoalBar goals={goals} />
-        <BigResult>{run.status === '성공' ? '미션 성공!' : '미션 실패'}</BigResult>
+        {/* 경기 상태 0x19 — 미션 결과 판 0x4a384(모드 5·6) · 키 0x407f0 */}
+        <div className={styles.matchupFrame}>
+          <MissionResultBoard
+            isSuccess={run.status === '성공'}
+            earnedGamePoint={resultBoard?.earnedGamePoint ?? 0}
+            {...(resultBoard?.heldGamePoint === undefined ? {} : { heldGamePoint: resultBoard.heldGamePoint })}
+            {...(resultBoard?.aceMatch === undefined ? {} : { aceMatch: resultBoard.aceMatch })}
+            onExit={(exit) => {
+              if (resultBoard?.aceMatch === undefined && exit === '다시' && onRetry !== undefined) onRetry()
+              else onFinish()
+            }}
+          />
+        </div>
       </PixelScreen>
     )
   }

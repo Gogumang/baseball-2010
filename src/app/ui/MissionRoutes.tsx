@@ -18,6 +18,30 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { PitchControl } from '@/entities/settings/model/gameSettings'
 import type { useGameSettings } from '@/app/model/useGameSettings'
 import type { OriginalMission } from '@/shared/config/original/missions'
+import { missionResultHeldOf } from '@/pages/mission-play/lib/missionResultBoard'
+
+/**
+ * 마선수 대결의 전역 기록 칸 — 타자편 대결은 SYS 8 이 g[0x11f] = 1, 투수편 대결은 g[0x176] = 1 을 적는다.
+ * 결과 판 0x4a384 는 둘 중 하나라도 서면 앞부분만 그리고, 0x4ea0c 는 G 보상을 건너뛴다.
+ */
+const BATTER_ACE_MATCH_FLAGS = { flag11f: true, flag176: false } as const
+const PITCHER_ACE_MATCH_FLAGS = { flag11f: false, flag176: true } as const
+
+/** 결과 판의 번 G · 보유 G (0x4ea0c 가 더한 뒤 — `missionResultHeldOf`) */
+function resultBoardOf(
+  session: ReturnType<typeof useMissionSession>,
+  mission: OriginalMission,
+  status: string,
+  gamePoint: number | undefined,
+  aceMatch?: { readonly flag11f: boolean; readonly flag176: boolean },
+) {
+  const earnedGamePoint = session.resultEarnedGamePointOf(mission, status, aceMatch !== undefined)
+  return {
+    earnedGamePoint,
+    ...(gamePoint === undefined ? {} : { heldGamePoint: missionResultHeldOf(gamePoint, earnedGamePoint) }),
+    ...(aceMatch === undefined ? {} : { aceMatch }),
+  }
+}
 
 interface MissionRoutesProps {
   readonly screen: Screen
@@ -141,6 +165,10 @@ export function MissionRoutes({
         //    105 진입이 결과 이벤트를 어떻게 잇는지 못 읽어 예전(실패 결과 → 진 이벤트) 그대로 둔다
         onGiveUp={screen.kind === '마선수대결' ? actions.giveUpBatter : actions.quitBatterMission}
         onFinish={screen.kind === '마선수대결' ? actions.finishAceMatch : actions.finishBatter}
+        // 결과 판 0x4a384(모드 5·6) — "예"는 같은 미션 곧바로 다시(0x140006c = 3)
+        onRetry={actions.retryBatter}
+        resultBoard={resultBoardOf(session, missionRun.mission, missionRun.status, gamePoint,
+          screen.kind === '마선수대결' ? BATTER_ACE_MATCH_FLAGS : undefined)}
         // 경기 중 메뉴 "다시하기" (StrGAME[7]) — 같은 미션을 처음부터 다시 세운다
         onRestart={() => actions.begin(missionRun.mission)}
         settings={gameSettings.settings}
@@ -168,6 +196,9 @@ export function MissionRoutes({
         // 경기 중 메뉴 "나가기" — 보통 미션은 0x40140 이 0xa5368(…, 0) 뒤 곧장 메인 메뉴(결과 화면 없음, 모드 5·6 같은 갈래)
         onGiveUp={actions.quitPitcherMission}
         onFinish={actions.finishPitcher}
+        // 결과 판 0x4a384(모드 5·6) — "예"는 같은 미션 곧바로 다시(0x140006c = 3)
+        onRetry={actions.retryPitcher}
+        resultBoard={resultBoardOf(session, pitcherRun.mission, pitcherRun.status, gamePoint)}
         // 경기 중 메뉴 "다시하기" (StrGAME[7]) — 같은 미션을 처음부터 다시 세운다
         onRestart={() => actions.begin(pitcherRun.mission)}
         settings={gameSettings.settings}
@@ -283,6 +314,8 @@ export function PitcherAceMatchRoute(
         const isWin = actions.finishPitcherAceMatch()
         if (isWin !== null) onFinish(isWin)
       }}
+      // 결과 판 0x4a384 — g[0x176] 이 서 있어 앞부분(띠 · YOU WIN/LOSE)만, G 보상 없음
+      resultBoard={resultBoardOf(session, pitcherRun.mission, pitcherRun.status, undefined, PITCHER_ACE_MATCH_FLAGS)}
     />
   )
 }

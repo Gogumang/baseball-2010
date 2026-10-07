@@ -88,6 +88,7 @@ import type { PitchTypeInfo } from '@/shared/config/original/pitchTypes'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { MissionClearCounts, MissionRecordPort } from '@/shared/api/save/missionRecordPort'
 import { missionRewardOf } from '@/entities/mission/model/missionReward'
+import { missionResultEarnedOf } from '@/pages/mission-play/lib/missionResultBoard'
 import { aceMatchClearCountAfterWin, aceMatchClearKeyOf } from '@/entities/mission/model/aceMatchClear'
 import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
 import { vibrate } from '@/entities/defense-controls/model/vibration'
@@ -1216,6 +1217,7 @@ export function useMissionSession({
       if (pitcherRun !== null) setPitcherRun({ ...pitcherRun, status: '실패' })
     },
 
+    /** 결과 판(0x19) "아니오"·CLR — 0x140006c = 1 → 장면 0x107 상태 1(미션 목록) */
     finishBatter: () => {
       if (missionRun === null) return
       rememberCleared(missionRun.mission, missionRun.status)
@@ -1229,7 +1231,36 @@ export function useMissionSession({
       setPitcherRun(null)
       setScreen({ kind: '미션선택' })
     },
+
+    /**
+     * 결과 판(0x19) "예" — 0x140006c = 3 → 장면 0x107 상태 3 진입 0x1e908: 같은 미션(obj+0xbd = this+0x9c)을
+     * `0xa5368(obj, 0)` 뒤 곧바로 장면 0x104 로 다시 세운다(목록을 안 지난다, Q2 2a). 보상은 진입 0x4ea0c 가 이미 줬다.
+     */
+    retryBatter: () => {
+      if (missionRun === null) return
+      rememberCleared(missionRun.mission, missionRun.status)
+      actions.begin(missionRun.mission)
+    },
+
+    retryPitcher: () => {
+      if (pitcherRun === null) return
+      rememberCleared(pitcherRun.mission, pitcherRun.status)
+      actions.begin(pitcherRun.mission)
+    },
   }
+
+  /**
+   * 결과 판 0x4a384 의 번 G [+0x17f4] — 진입 0x4ea0c(0x4ef18~0x4efba): 성공이고 g[0x11f] · g[0x176](마선수 대결)이
+   * 안 섰으면 [미션+0xa0] = 0xa5368 이 적은 보상 0xa52b0(이번 클리어를 더하기 전 횟수로), 실패면 0.
+   * ⚠️ 근사: 원본은 이 진입에서 g[0x64] 에 보상을 더한다. 웹은 판을 나갈 때(`rememberCleared`) 더하므로 판의 보유 G 는
+   *    부르는 쪽이 `missionResultHeldOf` 로 더해 보인다 — 보이는 값은 같다.
+   */
+  const resultEarnedGamePointOf = (mission: OriginalMission, status: string, isAceMatch: boolean): number =>
+    missionResultEarnedOf(
+      status === '성공',
+      isAceMatch,
+      missionRewardOf(mission.stage, clearCounts[missionKeyOf(mission)] ?? 0),
+    )
 
   /** 타자 미션에서 지금 출발시킬 수 있는 루 — `canStartSteal`(0xa9924 앞길 검사). 이번 공에 이미 출발한 주자는 빠진다 */
   const stealableBases: readonly StealBase[] =
@@ -1241,7 +1272,7 @@ export function useMissionSession({
     missionRun, pitcherRun, pitcherAceMatchMission, clearedKeys, clearCounts, lastSide, aceLevels, pitcher,
     player, hallOfFameBatter,
     missionConditionCode, pendingDefensePlay, pendingBenchClearing, pickoffReplay, handleMissionPitch, handleThrow, actions,
-    batterSpecialSwingStored, pitcherMagicRemaining, stealableBases,
+    batterSpecialSwingStored, pitcherMagicRemaining, stealableBases, resultEarnedGamePointOf,
     /** 상태 0xe 의 OK 대기 — 화면이 `useSceneConfirm` 에 넘긴다 */
     sceneConfirm,
     /** 타자 미션 상대 마투수의 체력% `0xaebb0` = trunc(+0x2c / 100) — `missionPitcherAbility` 셋째 인자 */

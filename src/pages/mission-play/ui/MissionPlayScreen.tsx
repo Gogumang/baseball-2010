@@ -21,6 +21,8 @@ import type { AcePlayer } from '@/shared/config/original/acePlayers'
 import { useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
 import { SceneMatchupCards } from '@/widgets/matchup-cards/ui/SceneMatchupCards'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
+import { MissionResultBoard } from '@/pages/mission-play/ui/MissionResultBoard'
+import type { MissionResultBoardProps } from '@/pages/mission-play/ui/MissionResultBoard'
 
 interface MissionPlayScreenProps {
   readonly run: MissionRun
@@ -48,7 +50,17 @@ interface MissionPlayScreenProps {
   /** 필살 스윙이 나가 남은 횟수가 줄었다 (0x4e136) — 인자는 줄인 뒤 값 */
   readonly onSpecialSwingUsed?: (remaining: number) => void
   readonly onGiveUp: () => void
+  /** 결과 판에서 미션 목록으로(0x140006c = 1) — 마선수 대결이면 대결 끝(결과 이벤트로) */
   readonly onFinish: () => void
+  /**
+   * 결과 판에서 "예"(0x140006c = 3) — 같은 미션을 곧바로 다시. 안 넘기면 `onFinish` 와 같다.
+   * 마선수 대결(`resultBoard.aceMatch`)은 어느 키든 `onFinish` 다(0x4b100 이 원래 모드로 돌려보낸다).
+   */
+  readonly onRetry?: () => void
+  /**
+   * 결과 판 0x4a384(모드 5·6) 의 값 — 번 G [+0x17f4] · 보유 G g[0x64] · 마선수 대결 칸. 안 넘기면 번 G 0 · 보유 칸 비움
+   */
+  readonly resultBoard?: Pick<MissionResultBoardProps, 'earnedGamePoint' | 'heldGamePoint' | 'aceMatch'>
   /**
    * 마선수 레벨 열 칸 (`useAceLevels` 의 `levels`) — `BattingStage` 로 그대로 넘긴다.
    * 상대 마투수의 마구 횟수가 `0xd8509[레벨]` = [3,4,5,6,7] 을 따른다 (타석 교대 0xaebe4). 안 넘기면 Lv1 = 3회.
@@ -106,6 +118,8 @@ export function MissionPlayScreen({
   onPickoff,
   onGiveUp,
   onFinish,
+  onRetry,
+  resultBoard,
   onSteal,
   stealableBases = [],
   onRestart,
@@ -185,7 +199,8 @@ export function MissionPlayScreen({
         badge={badgeParts.join(' · ') || undefined}
         leftKey={
           isOver
-            ? { label: '확인', onPress: onFinish }
+            ? // 결과 판(0x19)은 제 키(0x407f0)를 받는다
+              undefined
             : isAwaitingConfirm && !isMenuOpen
               ? // 0xe — OK 하나만 받는다 (0x532b0)
                 { label: '확인', onPress: sceneConfirm.confirm, isDisabled: !sceneConfirm.acceptsConfirm }
@@ -287,9 +302,7 @@ export function MissionPlayScreen({
           )}
 
           <div className={styles.overlay}>
-            {isOver ? (
-              <BigResult>{run.status === '성공' ? '미션 성공!' : '미션 실패'}</BigResult>
-            ) : bannerText === '' ? (
+            {isOver ? null : bannerText === '' ? (
               <Hint>
                 {atBat.balls}볼 {atBat.strikes}스트라이크
                 {canBunt && ' · 8·7·9(Shift)·길게 눌러 번트'}
@@ -301,6 +314,20 @@ export function MissionPlayScreen({
               <BigResult>{bannerText}</BigResult>
             )}
           </div>
+
+          {/* 경기 상태 0x19 — 미션 결과 판 0x4a384(모드 5·6) · 키 0x407f0 */}
+          {isOver && (
+            <MissionResultBoard
+              isSuccess={run.status === '성공'}
+              earnedGamePoint={resultBoard?.earnedGamePoint ?? 0}
+              {...(resultBoard?.heldGamePoint === undefined ? {} : { heldGamePoint: resultBoard.heldGamePoint })}
+              {...(resultBoard?.aceMatch === undefined ? {} : { aceMatch: resultBoard.aceMatch })}
+              onExit={(exit) => {
+                if (resultBoard?.aceMatch === undefined && exit === '다시' && onRetry !== undefined) onRetry()
+                else onFinish()
+              }}
+            />
+          )}
         </div>
       </PixelScreen>
       {overlay === '조작방법' && (
