@@ -26,12 +26,18 @@ import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import type { SkinBackdropKind } from '@/pages/special/ui/SkinBackdrops'
 import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLayout'
+import { HallOfFameFigure, useHallOfFameFigure } from '@/pages/special/ui/HallOfFameFigure'
+import type { HallOfFameListOwner } from '@/pages/special/ui/HallOfFameFigure'
+import { HALL_OF_FAME_FIGURE_TEAM } from '@/pages/special/lib/hallOfFameFigure'
+import type { HallOfFameFigureLook } from '@/pages/special/lib/hallOfFameFigure'
 
 const MAIN_UI = './sprites/main_ui'
 const MAIN_UI_FRAMES = `${MAIN_UI}/frames`
 const MAIN_BALL_FRAMES = './sprites/main_ball/frames'
 const GAME_FRAME = './sprites/game_frame'
 const IMG_TEXT_FRAMES = './sprites/img_text/frames'
+/** ui/team_logo.pzx — 메뉴 진입 0x24924 가 [this+0xa8] 에 올려 0x663c5 로 목록에 넘긴다 */
+const TEAM_LOGO = './sprites/team_logo'
 
 const imageSrc = (folder: string, id: number) => `${folder}/${String(id).padStart(3, '0')}.png`
 
@@ -267,6 +273,11 @@ export interface HallOfFameNariPlayer {
   readonly name: string
   /** `0xb6415(기록, k, 1)` — 능력치 도형 값 */
   readonly equippedAbility: readonly number[]
+  /**
+   * A 자리 몸 그림 — 나리 저장 기록의 폼·피부·장비 니블과 **나리 저장의 팀**(목록 +0x4c4 투수 · +0x4c0 타자, 0x5ec0a · 0x5ec60).
+   * 칸 0·5 는 그 팀의 team_logo 도 A 가운데에 찍는다. 안 넘기면 몸 그림·로고를 안 그린다.
+   */
+  readonly figure?: HallOfFameFigureLook
 }
 
 /** 명예의 전당 목록의 두 쓰임 */
@@ -365,7 +376,7 @@ type HallOfFamePopup =
  *  - "친구에게 선물" 은 통신이 필요해 안내만 띄운다. "슬롯에서 삭제" 는 `deletion`(HallOfFameDeletion) 대로 돈다.
  *    슬롯 현금 구매·G 충전 페이지(🌐)도 열 수 없어 목록으로 돌아온다.
  */
-export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop }: {
+export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, listOwner }: {
   readonly collection: Collection
   readonly mode: HallOfFameMode
   readonly onBack: () => void
@@ -381,6 +392,11 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop }: 
    * 시즌 선수영입 0xe2 는 공통 앞그림 0xb810 이 0xdd · 0xe0 · 0xe1 밖이라 `0x5fd61` — 그 화면은 '공무늬' 를 넘겨야 원본과 같다.
    */
   readonly backdrop?: SkinBackdropKind
+  /**
+   * 목록 객체 — 몸 그림의 그린 수·머무름·자세([목록+0x40c] · +0x208 · +0x204)가 이 객체 칸이라 화면을 건너 잇는다.
+   * 안 주면 등록은 '나리'(나리 [this+0xd8]), 그 밖은 '메뉴'(스킨 [this+0x120]). 시즌 선수영입 0xe2 는 '시즌' 을 넘겨야 원본과 같다.
+   */
+  readonly listOwner?: HallOfFameListOwner
 }) {
   const [slot, setSlot] = useState(initialHallOfFameSlotOf(mode))
   const [isBubbleOpen, setIsBubbleOpen] = useState(false)
@@ -393,6 +409,15 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop }: 
   const current = slots[slot]
   const cell = hallOfFameCellOf(slot - view.firstSlot)
   const { a, b } = HALL_OF_FAME_DETAIL
+  const figure = useHallOfFameFigure(listOwner ?? (mode.kind === '등록' ? '나리' : '메뉴'), {
+    slot,
+    isBatterSlot: slot >= HALL_OF_FAME_PITCHER_SLOTS,
+    look: current.kind === '찬칸' ? current.figure : null,
+    // 홈런더비 하위 16 은 그리기 0x32dd8 이 0x669c1 을 부르지 않는다(0x11 · 0x1b 만)
+    capturesImage: !(mode.kind === '선수고르기' && mode.purpose === '홈런더비'),
+  })
+  const teamLogo = current.kind === '찬칸' && (slot === NARI_PITCHER_SLOT || slot === NARI_BATTER_SLOT) && current.figure !== null
+    ? current.figure.team : null
 
   /** 등록 목록의 키 확인 (0x62604~0x627d0) — 결과 코드와 지금 모드(3 투수 · 4 타자)로 가른다 */
   const pressRegisterSlot = (target: number) => {
@@ -556,15 +581,12 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop }: 
     <RawScreen>
       <SkinBackdrop kind={backdrop ?? (mode.kind === '등록' ? '공무늬' : '메뉴바탕')} />
       {/*
-        ⚠️ 미해결(안 그림): 덧그림 0x669c1(목록) 은 바탕이 아니다 — 0x65e80(목록, &[0x1552ae0], [목록+0x298], [목록+0x204]) 이
-        (0, 0, 54, 75) 를 RGB(255,0,255)(투명 키)로 채우고 고른 선수 그림 객체 [목록+0x298] 의 vt+0x10 으로 (27, 62) 에 그린 뒤
-        그 54×75 를 이미지 [0x1552ae0] 로 떠 두고 화면을 검정으로 지운다(바탕은 그 뒤에 그린다). 목록 A 자리(0x655cc)가
-        그 이미지를 0x98975 로 (A.x − ([목록+0x3c] ? 0x32 : 0x3b), A.y − 0x61) 에 찍는다 — 고른 선수의 **몸 그림**이다.
-        부르는 곳: 메인 메뉴 그리기 0x32dd8(하위 17 · 27 앞) · 나리 0x16a34(상태 145) · 시즌 0xe9ac. 웹은 선수 몸 그림 합성을
-        이 화면에 아직 잇지 않았다.
+        A 자리 — 빈 칸·잠긴 칸(0x5ea18 이 0, 0x6535a~)만 원 두 개 (A−38 지름 77 · A−31 지름 63) 를 깐다.
+        찬 칸(0x6522e~)은 원 없이 나리 칸(0·5)이면 team_logo 프레임 [그림+0x30](= 팀) 을 A 가운데(0x65554~0x65598),
+        그 위에 고른 선수 몸 그림 — 타자는 그림을 바로, 투수는 그리기 앞에 0x669c1 → 0x65e80 이 떠 둔 54×75 이미지
+        [0x1552ae0] 를 (A.x − (손 ? 0x32 : 0x3b), A.y − 0x61) 에 (`lib/hallOfFameFigure.ts`).
       */}
-      {/* A 자리 — 원 두 개 (A−38 지름 77 · A−31 지름 63) 가 빈 칸·잠긴 칸의 바탕이다 */}
-      {HALL_OF_FAME_SLOT_ART.circles.map((circle) => (
+      {current.kind !== '찬칸' && HALL_OF_FAME_SLOT_ART.circles.map((circle) => (
         <div
           key={circle.size}
           className={styles.hofCircle}
@@ -574,6 +596,8 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop }: 
           }}
         />
       ))}
+      {teamLogo !== null && <TeamLogo team={teamLogo} x={a.x} y={a.y} />}
+      <HallOfFameFigure drawing={figure} ax={a.x} ay={a.y} />
 
       {/* 빈 칸·잠긴 칸 아이콘은 A 가운데 (글러브 23 · 방망이 24 · 자물쇠 31) */}
       {current.kind !== '찬칸' && (
@@ -779,7 +803,14 @@ const HALL_OF_FAME_BUBBLE_NOTICES = [
 ] as const
 
 type HallOfFameSlotView =
-  | { readonly kind: '찬칸'; readonly state: HallOfFameSlotState; readonly name: string; readonly chartValues: readonly number[] }
+  | {
+      readonly kind: '찬칸'
+      readonly state: HallOfFameSlotState
+      readonly name: string
+      readonly chartValues: readonly number[]
+      /** 몸 그림 — 옛 저장(생김새가 없는 명전 타자)이나 `figure` 를 안 준 나리는 null */
+      readonly figure: HallOfFameFigureLook | null
+    }
   | { readonly kind: '빈칸'; readonly state: HallOfFameSlotState }
 
 const batterChartOf = (ability: BatterAbility) => [ability.hit, ability.power, ability.defense, ability.run]
@@ -797,7 +828,7 @@ function hallOfFameSlotsOf(collection: Collection, mode: HallOfFameMode): readon
       const nari = index === NARI_PITCHER_SLOT ? mode.nari.투수 : mode.nari.타자
       return nari === null
         ? { kind: '빈칸', state: 2 }
-        : { kind: '찬칸', state: 1, name: nari.name, chartValues: nari.equippedAbility }
+        : { kind: '찬칸', state: 1, name: nari.name, chartValues: nari.equippedAbility, figure: nari.figure ?? null }
     }
     const entry = hallOfFameEntryOfSlot(index)
     if (entry === null) return { kind: '빈칸', state: 0 }
@@ -806,14 +837,51 @@ function hallOfFameSlotsOf(collection: Collection, mode: HallOfFameMode): readon
       const famer = hallOfFamePitcherAt(collection, entry.index)
       return famer === null
         ? { kind: '빈칸', state: 4 }
-        : { kind: '찬칸', state: 3, name: famer.name, chartValues: pitcherChartOf(famer.equippedAbility) }
+        : {
+            kind: '찬칸', state: 3, name: famer.name, chartValues: pitcherChartOf(famer.equippedAbility),
+            figure: hallOfFameFigureLookOf(famer.look, famer.equipmentLevels === undefined ? undefined : pitcherChartOf(famer.equipmentLevels)),
+          }
     }
     const famer = hallOfFameBatterAt(collection, entry.index)
     // 옛 저장(장비 얹은 값이 없는 선수)은 기본 능력치로 그린다
     return famer === null
       ? { kind: '빈칸', state: 4 }
-      : { kind: '찬칸', state: 3, name: famer.name, chartValues: batterChartOf(famer.equippedAbility ?? famer.ability) }
+      : {
+          kind: '찬칸', state: 3, name: famer.name, chartValues: batterChartOf(famer.equippedAbility ?? famer.ability),
+          figure: famer.look === undefined ? null
+            : hallOfFameFigureLookOf(famer.look, famer.equipmentLevels === undefined ? undefined : batterChartOf(famer.equipmentLevels)),
+        }
   })
+}
+
+/**
+ * 명전 칸 몸 그림 — 기록 +0xb 의 폼(2 × 타입 + 손)·피부와 장비 니블, 팀은 늘 14 (0x65296).
+ * 니블 차례는 능력치 차례 그대로다(부위 0~3 = rec[0x19] 윗·아랫 · rec[0x1a] 윗·아랫). 옛 저장(니블 없음)은 맨몸.
+ */
+function hallOfFameFigureLookOf(
+  look: { readonly typeIndex: number; readonly handIndex: number; readonly skinIndex: number },
+  nibbles: readonly number[] | undefined,
+): HallOfFameFigureLook {
+  const [first = 0, second = 0, third = 0, fourth = 0] = nibbles ?? []
+  return {
+    form: look.typeIndex * 2 + look.handIndex,
+    skin: look.skinIndex,
+    team: HALL_OF_FAME_FIGURE_TEAM,
+    equipment: [first, second, third, fourth],
+  }
+}
+
+/** team_logo 프레임 `팀` 을 (x, y) 가운데에 — 0xba815 로 크기를 얻어 (x − (w >> 1), y − (h >> 1)) */
+function TeamLogo({ team, x, y }: { readonly team: number; readonly x: number; readonly y: number }) {
+  const [size, setSize] = useState<{ readonly width: number; readonly height: number } | null>(null)
+  return (
+    <img className={styles.sprite} alt="" data-testid="명전-팀로고" src={imageSrc(TEAM_LOGO, team)}
+      onLoad={(event) => setSize({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight })}
+      style={{
+        left: x - ((size?.width ?? 0) >> 1), top: y - ((size?.height ?? 0) >> 1),
+        visibility: size === null ? 'hidden' : undefined,
+      }} />
+  )
 }
 
 /**

@@ -529,3 +529,48 @@ describe('머리띠 0x54d95 — 제목이 있으면 G포인트도 그린다 (0x5
     expect(그림들(container).filter((src) => src.startsWith('./sprites/gpoint/'))).toHaveLength(0)
   })
 })
+
+describe('A 자리 고른 선수 몸 그림 — 0x63b14 찬 칸 갈래 · 0x669c0 → 0x65e80', () => {
+  const 나리타자 = {
+    name: '홍길동', equippedAbility: [1, 2, 3, 4],
+    figure: { form: 1, skin: 1, team: 4, equipment: [0, 0, 0, 0] as [number, number, number, number] },
+  }
+  const 명예투수 = {
+    name: '철완', ability: { control: 1, velocity: 2, breaking: 3, stamina: 4 },
+    equippedAbility: { control: 1, velocity: 2, breaking: 3, stamina: 4 }, endingIndex: 5, season: 10, titleIds: [], slot: 0,
+    look: { typeIndex: 0, handIndex: 1, skinIndex: 0, teamId: 1 },
+  }
+  const 열기 = () => render(
+    <HallOfFameScreen
+      collection={{ ...EMPTY_COLLECTION, hallOfFamePitchers: [명예투수] }}
+      mode={{ kind: '선수고르기', nari: { 투수: null, 타자: 나리타자 }, onPick: vi.fn(), onCancel: vi.fn() }}
+      onBack={vi.fn()}
+    />,
+  )
+
+  it('빈 칸은 원 두 개, 찬 칸은 원 없이 몸 그림 (0x6535a 갈래만 원을 깐다)', () => {
+    const { container } = 열기()
+    // 처음 커서는 칸 0(나리 투수 없음, 상태 2)
+    expect(screen.queryByTestId('명전-타자그림')).toBeNull()
+    expect(container.querySelectorAll('[class*="hofCircle"]').length).toBe(2)
+    fireEvent.mouseEnter(screen.getByRole('button', { name: '6번 슬롯' }))
+    expect(container.querySelectorAll('[class*="hofCircle"]').length).toBe(0)
+  })
+
+  it('나리 타자 칸 5 — 그림을 (A.x, A.y + 45) 에 바로, 좌타(폼 1)는 안 뒤집고 팀 로고는 나리 팀', () => {
+    열기()
+    fireEvent.mouseEnter(screen.getByRole('button', { name: '6번 슬롯' }))
+    const 그림 = screen.getByTestId('명전-타자그림')
+    expect(그림.style.left).toBe('58px')
+    expect(그림.dataset.mirrored).toBeUndefined()
+    expect(screen.getByTestId('명전-팀로고').getAttribute('src')).toBe('./sprites/team_logo/004.png')
+  })
+
+  it('명전 투수 칸 1 — 54×75 이미지를 (A.x − 0x32, A.y − 0x61) 에 (좌완), 팀 로고는 없다', () => {
+    열기()
+    fireEvent.mouseEnter(screen.getByRole('button', { name: '2번 슬롯' }))
+    const 이미지 = screen.getByTestId('명전-투수그림')
+    expect([이미지.style.left, 이미지.style.top, 이미지.style.width, 이미지.style.height]).toEqual(['8px', '13px', '54px', '75px'])
+    expect(screen.queryByTestId('명전-팀로고')).toBeNull()
+  })
+})

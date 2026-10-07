@@ -105,3 +105,20 @@ export const hofBubbleCell = style({
   textAlign: 'center',
   cursor: 'pointer',
 })
+
+/** 명예의 전당 A 자리 몸 그림 — 그림 x 에 놓은 폭 0 상자(뒤집을 때 축) */
+export const hofFigureAxis = style({
+  position: 'absolute',
+  top: 0,
+  width: 0,
+  height: 0,
+  transformOrigin: '0 0',
+  pointerEvents: 'none',
+})
+
+/** 투수 이미지 [0x1552ae0] 54×75 — 그 밖은 잘린다 */
+export const hofFigureImage = style({
+  position: 'absolute',
+  overflow: 'hidden',
+  pointerEvents: 'none',
+})
