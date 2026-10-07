@@ -811,7 +811,12 @@ export function useCareerSession({
       const arrival =
         beforeArrival === null
           ? null
-          : arrivePitch(beforeArrival, { resolution: detail.resolution, outcomeAfter: nextAtBat.outcome }, random)
+          : arrivePitch(
+              beforeArrival,
+              // 못 맞힌 번트의 번트 종류(장면 +0xfdc)도 싣는다 — 도루 판 리드 0x3d7b8
+              { resolution: detail.resolution, outcomeAfter: nextAtBat.outcome, buntKind: buntKind ?? 0 },
+              random,
+            )
       if (beforeArrival !== null && arrival !== null && arrival.progress !== beforeArrival) {
         progressRef.current = arrival.progress
         setProgress(arrival.progress)

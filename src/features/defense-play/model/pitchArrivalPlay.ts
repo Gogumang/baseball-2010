@@ -144,6 +144,16 @@ export interface PitchArrivalPlayInput {
   readonly aceIndexes?: readonly (number | null | undefined)[]
   readonly defenseTeamIndex?: number
   readonly offenseTeamIndex?: number
+  /**
+   * 장면 +0xfdc — 공이 도착할 때의 번트 종류(0 = 없음). 판 시작 리드 `0x3d7b8`(3d8e0 이 장면 +0xfdc 를 바로 읽는다)이
+   * 도루 안 한 주자에게 +3 틱을 더한다 — 도루 판(종류 5)의 `runStealPlay` 로 넘긴다. 못 맞힌 번트(번트 헛스윙 · 번트 자세로 맞이한 볼)면
+   * 그 공의 번트 종류가 서 있다. 기본 0.
+   * ⚠️ 종류 9(폭투·포일) 판은 웹이 판 시작 리드를 아직 안 옮겨(`runPassedBallPlay`) 이 값을 안 본다.
+   * ⚠️ 미해결(남은 것): +0xfdc 를 쓰는 곳은 CPU 스윙 결정 0x34436(휘두를 때만 0 → 번트면 rand(1, 4)) · 사람 키
+   *   0x51dce · 0x51e2c(스윙 0) · 0x51e84(번트 종류) · 0x51eba(번트 거두기 0) 다섯뿐이라(`xval 0xfdc` 전수), 안 휘두른 공은
+   *   **앞 공의 값이 그대로 남는다** — 부르는 쪽은 아직 이 공의 번트 종류만 넘기고 안 휘두른 공은 0 으로 둔다.
+   */
+  readonly buntKind?: number
 }
 
 export type PitchArrivalPlay =
@@ -218,6 +228,8 @@ export function runPitchArrivalPlay(input: PitchArrivalPlayInput, random: Random
   const result = runStealPlay({
     ...common,
     stealingFrom: input.stealingFrom,
+    // 0x3d7b8 — 도루 안 한 주자의 리드 +3 틱(번트 종류가 서 있으면)
+    buntKind: input.buntKind,
     runAbilities:
       runAbilities === undefined ? undefined : { 1: runAbilities[1], 2: runAbilities[2], 3: runAbilities[3] },
   })

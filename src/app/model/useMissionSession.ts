@@ -543,6 +543,8 @@ export function useMissionSession({
                 // 진행기 기본값(500)이다(레코드에 팀·타순이 없다, 근사). 주루 설정은 안 넘긴다(기본 자동 — 견제와 같다)
                 defenseIsCpu: true,
                 offenseIsCpu: false,
+                // 장면 +0xfdc — 못 맞힌 번트의 번트 종류. 도루 판 리드 0x3d7b8 이 도루 안 한 주자에게 +3 틱
+                buntKind,
               },
               random,
             )
@@ -813,6 +815,8 @@ export function useMissionSession({
             defenseIsCpu: false,
             offenseIsCpu: true,
             throwMode: throwModeManual === false ? '자동' : '수동',
+            // 장면 +0xfdc — CPU 타자의 이 공 번트 종류(⚠️ 번트 헛스윙은 `simulateBatter` 가 아직 안 낸다)
+            buntKind: thrown.buntKind ?? 0,
           },
           random,
         )
@@ -889,6 +893,8 @@ export function useMissionSession({
           isUncatchable: thrown.isUncatchable,
           // CPU 가 공이 나는 동안 건 도루 — 판 시작 리드(0x3d7b8)가 다음 루로 몰아 돌린다
           stealingFrom,
+          // 장면 +0xfdc — CPU 타자의 번트 종류. 페어 번트 판도 판 시작 리드(0x3d7b8 +3 틱) · 필살수비 관문(50fc8) · 정산이 본다
+          buntKind: thrown.buntKind ?? 0,
         },
         outcome,
         isBunt: false,

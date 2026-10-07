@@ -1089,7 +1089,11 @@ export function startPitch(
   }
 
   // 공 도착 0x3dfac — 못 맞힌 공이면 0.1% 폭투·포일(종류 9)이나 CPU 가 건 도루(종류 5) 판을 연다
-  const arrival = arrivePitcherPitch(afterPitch, { resolution, outcomeAfter: afterPitch.atBat.outcome }, random)
+  const arrival = arrivePitcherPitch(
+    afterPitch,
+    { resolution, outcomeAfter: afterPitch.atBat.outcome, buntKind: thrown.buntKind ?? 0 },
+    random,
+  )
   // 판에서 반 이닝·경기가 끝났다 — 이 타석은 끊긴다 (판정 B 0xae3e8: 아웃 > 2 → 0x18)
   if (arrival.interrupted) return advance(arrival.progress, random)
   const arrived = arrival.progress
@@ -1154,14 +1158,21 @@ interface PitcherPitchArrival {
  * ⚠️ 근사: 루에 선 주자 = 상대 타순 1·2·3칸 앞 타자(`runAbilitiesOnBaseOf`).
  * ⚠️ 미해결: 삼진 + 도루(종류 5)면 원본 판정 B 는 정산 0xa8024 를 **종류 5 로 한 번** 부른다 — R+0x138(타자 수)이
  *   안 오르는 갈래다(0xa8d98). 웹은 주자 판 뒤 보통 삼진 길(`applyDefensivePlay`)로 타자 수를 센다.
- * ⚠️ 미해결: CPU 타자의 번트 종류(scene+0xfdc)를 이 주자 판(`runPitchArrivalPlay`)에는 아직 안 싣는다 — 헛스윙 · 볼 번트의
- *   `simulateBatter` 결과는 번트 종류를 안 내고, 주자 판 입력에도 그 칸이 없다(맞은 공의 타구 판에는 싣는다).
+ * - 번트 종류(장면 +0xfdc): `simulateBatter` 가 낸 이 공의 값(`thrown.buntKind`)을 주자 판에 싣는다 — 도루 판 리드 0x3d7b8 이
+ *   도루 안 한 주자에게 +3 틱을 더한다.
+ *   ⚠️ 남은 것: `simulateBatter`(entities/pitching)가 **번트 헛스윙**의 번트 종류를 아직 안 낸다(타구 · 파울 각 공에만) — 그 칸을
+ *   내면 이 자리가 그대로 싣는다. 안 휘두른 공은 원본이 앞 공의 +0xfdc 를 그대로 두는데(쓰는 곳 0x34436 은 휘두를 때만) 웹은 0 이다.
  *
  * 난수: `rollPassedBall` 1번(매 못 맞힌 공) → 판이 열리면 그 안의 굴림 (`runPitchArrivalPlay`).
  */
 function arrivePitcherPitch(
   progress: PitcherGameProgress,
-  pitch: { readonly resolution: PitchResolution; readonly outcomeAfter: AtBatOutcome | null },
+  pitch: {
+    readonly resolution: PitchResolution
+    readonly outcomeAfter: AtBatOutcome | null
+    /** 장면 +0xfdc — 이 공의 번트 종류(못 맞힌 번트면 그 종류, 안 휘둘렀으면 0). 도루 판 리드 0x3d7b8 이 본다 */
+    readonly buntKind?: number
+  },
   random: RandomPort,
 ): PitcherPitchArrival {
   if (!arrivesUnhit(pitch.resolution)) {
@@ -1183,6 +1194,7 @@ function arrivePitcherPitch(
       // 공격이 CPU 라 늘 자동 진루, 송구만 환경설정이 먹는다 (0xae6c8 의 첫 항이 거짓) — 원본 기본값은 수동
       offenseIsCpu: true,
       throwMode: progress.options.throwModeManual === false ? '자동' : '수동',
+      buntKind: pitch.buntKind ?? 0,
     },
     random,
   )

@@ -1887,7 +1887,12 @@ export interface PitchArrivalStep {
  */
 export function arrivePitch(
   progress: GameProgress,
-  pitch: { readonly resolution: PitchResolution; readonly outcomeAfter: AtBatOutcome | null },
+  pitch: {
+    readonly resolution: PitchResolution
+    readonly outcomeAfter: AtBatOutcome | null
+    /** 장면 +0xfdc — 이 공의 번트 종류(못 맞힌 번트면 그 종류, 안 휘둘렀으면 0). 도루 판 리드 0x3d7b8 이 본다 */
+    readonly buntKind?: number
+  },
   random: RandomPort,
 ): PitchArrivalStep {
   const before = progress.game
@@ -1913,6 +1918,9 @@ export function arrivePitch(
       // 타자편은 사람이 늘 공격이다 — 환경설정 "주루" 혼자가 자동 진루 제어기를 켠다 (0xae690)
       offenseIsCpu: false,
       runningMode: progress.runningModeManual ? '수동' : '자동',
+      // 장면 +0xfdc — 못 맞힌 번트면 도루 판 리드 0x3d7b8 이 도루 안 한 주자에게 +3 틱
+      // (안 휘두른 공은 원본이 앞 공의 값을 그대로 두지만 웹은 0 — 미해결, `PitchArrivalPlayInput.buntKind`)
+      buntKind: pitch.buntKind ?? 0,
     },
     random,
   )

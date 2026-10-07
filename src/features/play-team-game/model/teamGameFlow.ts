@@ -1841,7 +1841,8 @@ function batterPitch(
   // 공 도착 0x3dfac — 못 맞힌 공이면 0.1% 폭투·포일(종류 9)이나 출발한 도루(종류 5) 판을 연다
   const arrival = arriveTeamPitch(
     { ...progress, atBat },
-    { resolution: detail.resolution, outcomeAfter: outcome },
+    // 사람 타자의 이 공 번트 종류 — 못 맞힌 번트면 그 종류 (useTeamGame 이 타석 화면에서 받아 넘긴다)
+    { resolution: detail.resolution, outcomeAfter: outcome, buntKind: options.buntKind ?? 0 },
     '공격',
     random,
   )
@@ -2447,7 +2448,8 @@ function pitchOnce(
   // 우리 수비라 송구는 사람 쪽이다 — 판은 키 없는 사람 수비로 미리 다 돌려 재생한다 (견제와 같은 근사)
   const arrival = arriveTeamPitch(
     afterPitch,
-    { resolution, outcomeAfter: afterPitch.atBat.outcome },
+    // CPU 타자의 이 공 번트 종류(`simulateBatter`) — ⚠️ 번트 헛스윙은 아직 안 낸다(pitcherGameFlow `arrivePitcherPitch` 머리말)
+    { resolution, outcomeAfter: afterPitch.atBat.outcome, buntKind: thrown.buntKind ?? 0 },
     '수비',
     random,
   )
@@ -3043,7 +3045,12 @@ interface TeamPitchArrival {
  */
 function arriveTeamPitch(
   progress: TeamGameProgress,
-  pitch: { readonly resolution: PitchResolution; readonly outcomeAfter: AtBatOutcome | null },
+  pitch: {
+    readonly resolution: PitchResolution
+    readonly outcomeAfter: AtBatOutcome | null
+    /** 장면 +0xfdc — 이 공의 번트 종류(못 맞힌 번트면 그 종류, 안 휘둘렀으면 0). 도루 판 리드 0x3d7b8 이 본다 */
+    readonly buntKind?: number
+  },
   humanSide: ControlSide,
   random: RandomPort,
 ): TeamPitchArrival {
@@ -3077,6 +3084,8 @@ function arriveTeamPitch(
             offenseIsCpu: true,
             throwMode: options.throwModeManual === false ? ('자동' as const) : ('수동' as const),
           }),
+      // 장면 +0xfdc — 도루 판 리드 0x3d7b8 이 도루 안 한 주자에게 +3 틱 (안 휘두른 공의 남은 값은 미해결 — `PitchArrivalPlayInput.buntKind`)
+      buntKind: pitch.buntKind ?? 0,
     },
     random,
   )

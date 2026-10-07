@@ -107,6 +107,32 @@ describe('투구 하나의 주자 판 — 0x3dfac 의 0x35034 → 0x9d57c → �
     expect(play !== null && arrivalApplicationOf(play)).toBe('runnerOnly')
   })
 
+  it('번트 종류(장면 +0xfdc)를 도루 판에 싣는다 — 도루 안 한 주자의 판 시작 리드 0x3d7b8 이 +3 틱', () => {
+    // 1·2루, 2루 주자만 출발 — 1루 주자는 도루 안 한 주자라 리드 6 틱(번트 종류가 서면 9 틱) 뒤 제 루로 돌아오는 중이다
+    const 일이루 = { ...EMPTY_BASES, first: true, second: true }
+    const playOf = (buntKind?: number) =>
+      runPitchArrivalPlay(
+        {
+          gameMode: 4,
+          pitchJudgement: PITCH_JUDGEMENT.STRIKE,
+          stealingFrom: [2],
+          bases: 일이루,
+          outs: 0,
+          runAbility: 500,
+          ...(buntKind === undefined ? {} : { buntKind }),
+        },
+        세는난수(0.5),
+      )
+    const 번트 = playOf(2)
+    const 그냥 = playOf(0)
+    expect(번트?.kind).toBe(5)
+    expect(그냥?.kind).toBe(5)
+    // 안 넘기면 0 과 같다
+    expect(JSON.stringify(playOf()?.result.ticks[0])).toBe(JSON.stringify(그냥?.result.ticks[0]))
+    // 판 첫 틱의 1루 주자 자리가 다르다(리드 틱 수가 다르다)
+    expect(JSON.stringify(번트?.result.ticks[0])).not.toBe(JSON.stringify(그냥?.result.ticks[0]))
+  })
+
   it('2아웃 삼진이면 도루 판이 안 열린다', () => {
     expect(
       runPitchArrivalPlay(
