@@ -129,6 +129,13 @@ export function randomPattern(code: number, random: RandomPort): BattedBallPatte
  * 웹은 장면 상태를 한 객체로 들고 다니지 않아(세션 · 진행기 · 타석 화면이 따로 돈다) 장면 덱을 **그 장면의 난수 객체에 묶어** 둔다 —
  * 경기를 여는 진행기가 `openScenePatternDeck(random)` 을 부르고, 같은 난수로 도는 타석 화면 · CPU 타자가 `scenePatternDeckOf(random)`
  * 로 되찾는다. 덱은 원본처럼 고쳐 쓰는 한 칸이다(`deck` 을 갈아 끼운다).
+ *
+ * ⚠️ **안 옮긴 굴림 (확정 — 직접 뜬 것)**: 같은 0x3e340 의 3ef6e 가 덱 섞기(3ed76) 뒤 곧은 길(갈래 없음)에서
+ * `0x90190([0x1400064], 0, 0)` 을 부른다 → 객체+4 = 0 · 0x8fe58: 종류 0 갈래(8fe8c) rand(1, 3) · rand(−3, 4) 두 번,
+ * 9005c 에서 칸 수 [sp+0x18] = 200(8fe6c) 만큼 0x8f63c 를 돌리고 종류 0 갈래(8f65e)가 칸마다 rand 여섯 번(8f6e0 · 8f6ec ·
+ * 8f6fc · 8f728 · 8f734 · 8f740 — 조건 없음). rand 0xbfa54 는 범위와 무관하게 LCG 를 한 번씩 돌린다 → **경기 시작마다 1202 번**.
+ * (인자는 화면 크기 0x14008b8 · 0x14008c8 를 쓴다 — 효과 알갱이 초기화로 보인다.) 옮기면 경기 시작 굴림 차례가 모두 밀려
+ * app 세션 시험(useMissionSession 등 — 이 일의 구역 밖)의 씨앗을 다시 골라야 해 아직 안 넣었다.
  */
 export interface ScenePatternDeck {
   deck: PatternDeck
