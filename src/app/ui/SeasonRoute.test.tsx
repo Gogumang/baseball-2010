@@ -255,6 +255,10 @@ describe('시즌정보 0xcd → 선수정보(0xdf 목적 2) → 카드 0xd9 ↔ 
     expect(screen.getByTestId('구단정보-값-1').textContent).toBe('----')
     expect(screen.getByTestId('구단정보-값-5').textContent).toBe('2')
     expect(screen.getByTestId('구단정보-값-6').textContent).toBe('--')
+    // 구장 줄 0x7ca7e — 흐르는 글 0x5a8c8: 자르기 (x + 2, y + 2, w − 4, h), w = 81 × 2 − 14
+    const 구장 = screen.getByTestId('구단정보-값-3') as HTMLElement
+    expect(구장.style.left).toBe('62px')
+    expect(구장.style.width).toBe('144px')
     키('Escape')
     expect(screen.getByRole('button', { name: '선수정보' })).toBeTruthy()
   })

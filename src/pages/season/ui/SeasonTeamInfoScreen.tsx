@@ -1,7 +1,9 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { RawScreen } from '@/shared/ui'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 import { TEAMS } from '@/shared/config/original/teams'
+import { SKIN_TICKER_CLIP_INSET, skinTickerTextXOf, useSkinTickerCounter } from '@/shared/lib/skinTicker/skinTicker'
+import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { abilityChartFrameOf, abilityChartVerticesOf } from '@/pages/create-player/lib/teamSelectLayout'
 import { ABILITY_TITLE, INFO_BOARD, INFO_ROW_HEIGHT, INFO_ROW_STEP, INFO_TOP, RADAR_CENTER, RADAR_RADIUS } from '@/pages/management/lib/basicInfoLayout'
@@ -54,7 +56,7 @@ function valueOf(row: TeamInfoRow) {
  * 값과 차례는 `pages/season/lib/seasonTeamInfo.ts` 머리 주석(직접 떴다).
  *
  * ⚠️ 근사: 카드 판(mode_ui 프레임 0 박스)·팀 이름 판·로고 위 덧그림 [gfx+0x168]("PLAYER" 딱지 쪽)은 그림 자리를 다 풀지 않았다.
- * 구장 줄의 흐르는 글 0x5a8c8 은 넘치면 잘린 한 줄로 둔다.
+ * 구장 줄은 흐르는 글 0x5a8c8 (`StadiumTicker`).
  */
 export function SeasonTeamInfoScreen({ teamId, teamAbilities, rows, gamePoint = 0, onBack }: SeasonTeamInfoScreenProps) {
   const latestBack = useRef(onBack)
@@ -102,15 +104,50 @@ export function SeasonTeamInfoScreen({ teamId, teamAbilities, rows, gamePoint = 
             <div key={row.labelFrame} data-testid={`구단정보-줄-${index}`}>
               <img className={styles.layer} alt="" data-frame={row.labelFrame} src={frameSrc(row.labelFrame)}
                 style={{ left: column.label.x + column.label.width, top: top + 3, transform: 'translateX(-100%)' }} />
-              <div className={styles.infoValue} data-testid={`구단정보-값-${index}`}
-                style={{ left: column.value.x, top, width, height: INFO_ROW_HEIGHT, color: ORIGINAL_COLORS.text }}>
-                {valueOf(row)}
-              </div>
+              {row.value.kind === '흐르는글'
+                ? <StadiumTicker text={row.value.text} index={index} box={{ x: column.value.x, y: top + 2, width, height: INFO_ROW_HEIGHT }} />
+                : (
+                  <div className={styles.infoValue} data-testid={`구단정보-값-${index}`}
+                    style={{ left: column.value.x, top, width, height: INFO_ROW_HEIGHT, color: ORIGINAL_COLORS.text }}>
+                    {valueOf(row)}
+                  </div>
+                )}
             </div>
           )
         })}
       </div>
       <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={onBack} footer={5} />
     </RawScreen>
+  )
+}
+
+/**
+ * 구장 줄 0x7ca7e — `0x5a8c8(skin, 글, 상자 x, y + 2, w, h, 1, 1, 1)`: 자르기 (x + 2, y, w − 4, h) ·
+ * 글 왼쪽 = x + w − [skin+0x284] % (글폭 + w) · 그린 뒤 3 올린다 (`shared/lib/skinTicker` — 앱에 하나인 카운터).
+ */
+function StadiumTicker({ text, index, box }: {
+  readonly text: string
+  readonly index: number
+  readonly box: { readonly x: number; readonly y: number; readonly width: number; readonly height: number }
+}) {
+  const tick = useUpdateCounter()
+  const counter = useSkinTickerCounter(tick)
+  const textRef = useRef<HTMLSpanElement>(null)
+  const [textWidth, setTextWidth] = useState(0)
+  useLayoutEffect(() => setTextWidth(textRef.current?.offsetWidth ?? 0), [text])
+  const clipLeft = box.x + SKIN_TICKER_CLIP_INSET
+  return (
+    <div className={styles.layer} data-testid={`구단정보-값-${index}`}
+      style={{
+        left: clipLeft, top: box.y, width: box.width - SKIN_TICKER_CLIP_INSET * 2, height: box.height, overflow: 'hidden',
+      }}>
+      <span ref={textRef} className={styles.infoValue}
+        style={{
+          left: skinTickerTextXOf(box.x, box.width, counter, textWidth) - clipLeft, top: 0, width: 'auto', whiteSpace: 'nowrap',
+          color: ORIGINAL_COLORS.text,
+        }}>
+        {text}
+      </span>
+    </div>
   )
 }
