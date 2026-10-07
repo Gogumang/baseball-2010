@@ -49,7 +49,7 @@ export const YEAR_GOAL_LABELS: readonly (readonly number[])[] = [
 
 /** img_text 프레임 크기 (PNG 를 읽어 적었다 — 높이는 모두 10) */
 const TEXT_WIDTH: Readonly<Record<number, number>> = {
-  47: 20, 330: 21,
+  47: 20, 330: 21, 359: 41, 84: 20, 331: 22,
   358: 56, 87: 22, 148: 21, 318: 21, 58: 21, 180: 20, 319: 21, 327: 30, 316: 20, 328: 20, 124: 10, 317: 21, 407: 39,
 }
 const TEXT_HEIGHT = 10
@@ -222,15 +222,24 @@ function seasonCellOf(value: number, area: CardBox, row: number): YearGoalNumber
   return numberPiecesOf(value, area)
 }
 
-/** 창 한 장의 글·숫자 자리 — 박스 3·4 는 머리 줄 다음(1줄째)부터 값이다 */
-export function yearGoalWindowLayoutOf(values: YearGoalWindowSource): YearGoalWindowLayout {
-  const B = YEAR_GOAL_BOXES
+/** 0x8656c 가 받는 박스 셋 — 이름 줄 · 현재 열 · 목표 열 */
+export interface GoalTableBoxes {
+  readonly labels: CardBox
+  readonly current: CardBox
+  readonly goals: CardBox
+}
+
+/**
+ * **0x8656c(w, 이름 박스, 현재 박스, 목표 박스, 0)** 한 번 — 이름 다섯 줄 · "현재"/"목표" 머리 · 값 다섯 줄.
+ * 박스 현재 · 목표는 머리 줄 다음(1줄째)부터 값이다. 올해의 목표 창(0x86fdc, 박스 2·3·4)과 경기 평가 변화 창
+ * (0x86c90, 박스 7·5·6)이 같이 부른다.
+ */
+export function goalTableLayoutOf(values: YearGoalWindowSource, boxes: GoalTableBoxes): YearGoalWindowLayout {
   const labels = values.labelSet === SEASON_YEAR_GOAL_LABEL_SET ? SEASON_YEAR_GOAL_LABELS : YEAR_GOAL_LABELS[values.labelSet]
   const texts: YearGoalTextPiece[] = [
-    textPieceOf(YEAR_GOAL_TEXT.title, B.title, 0x22, 3),
-    ...labels.map((frame, row) => textPieceOf(frame, rowOf(B.labels, row), 0x24, 0)),
-    textPieceOf(YEAR_GOAL_TEXT.current, B.current, 0x22, 0),
-    textPieceOf(YEAR_GOAL_TEXT.goal, B.goals, 0x22, 0),
+    ...labels.map((frame, row) => textPieceOf(frame, rowOf(boxes.labels, row), 0x24, 0)),
+    textPieceOf(YEAR_GOAL_TEXT.current, boxes.current, 0x22, 0),
+    textPieceOf(YEAR_GOAL_TEXT.goal, boxes.goals, 0x22, 0),
   ]
   const firstGlyphsOf = values.labelSet === 0 ? averageGlyphsOf : earnedRunAverageGlyphsOf
   const cellOf = values.labelSet === SEASON_YEAR_GOAL_LABEL_SET
@@ -238,5 +247,23 @@ export function yearGoalWindowLayoutOf(values: YearGoalWindowSource): YearGoalWi
     : (value: number, area: CardBox, row: number) => row === 0 ? firstGlyphsOf(value, area) : numberPiecesOf(value, area)
   const columnOf = (column: readonly number[], area: CardBox) =>
     column.slice(0, ROWS).flatMap((value, row) => cellOf(value, rowOf(area, row + 1), row))
-  return { texts, numbers: [...columnOf(values.current, B.current), ...columnOf(values.goals, B.goals)] }
+  return { texts, numbers: [...columnOf(values.current, boxes.current), ...columnOf(values.goals, boxes.goals)] }
+}
+
+/** 창 한 장의 글·숫자 자리 — 제목 뒤 0x8656c(w, 박스 2, 박스 3, 박스 4, 0) */
+export function yearGoalWindowLayoutOf(values: YearGoalWindowSource): YearGoalWindowLayout {
+  const B = YEAR_GOAL_BOXES
+  const table = goalTableLayoutOf(values, B)
+  return { texts: [textPieceOf(YEAR_GOAL_TEXT.title, B.title, 0x22, 3), ...table.texts], numbers: table.numbers }
+}
+
+/** img_text 한 장을 박스에 정렬해 놓는다 (0xb9e05 — ox 는 [sp+8]) — 다른 이벤트 창도 쓴다 */
+export function placedTextOf(frame: number, area: CardBox, align: number, palette: 0 | 3, ox = 0): YearGoalTextPiece {
+  const piece = textPieceOf(frame, area, align, palette)
+  return { ...piece, x: piece.x + ox }
+}
+
+/** 0xba719 — 자간 1 · 주황(기준 0x14) · 정렬 0x24 · ox — 다른 이벤트 창도 쓴다 */
+export function placedNumberOf(value: number, area: CardBox, ox: number): YearGoalNumberPiece[] {
+  return numberPiecesOf(value, area, ox)
 }

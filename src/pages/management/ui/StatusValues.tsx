@@ -64,7 +64,6 @@ export function StatusLabels({ lastLabelFrame = NARI_LAST_LABEL_FRAME }: { reado
  */
 export function MessageLine({ year, game }: { readonly year: number; readonly game: number }) {
   const { message } = STATUS_BOXES
-  const layout = messageLineLayoutOf(game)
   return (
     <>
       <svg className={styles.board} viewBox="0 0 240 320" shapeRendering="crispEdges">
@@ -77,13 +76,23 @@ export function MessageLine({ year, game }: { readonly year: number; readonly ga
           </g>
         ))}
       </svg>
-      <img className={styles.layer} src="./sprites/management/label_yellow_335.png" alt="" style={{ left: layout.gameLabelLeft, top: message.y + 3 }} />
-      <SpriteNumber glyphs={numberGlyphsOf(GAMES_PER_SEASON)} right={layout.totalRight} boxTop={message.y} boxHeight={message.height} />
+      <MessageLineText year={year} game={game} box={message} />
+    </>
+  )
+}
+
+/** 0x7d120 의 글만 — 사각형 오른쪽 끝부터 "N년 G/45경기" (경기 평가 변화 창 0x86c90 도 부른다) */
+export function MessageLineText({ year, game, box }: { readonly year: number; readonly game: number; readonly box: Box }) {
+  const layout = messageLineLayoutOf(game, box)
+  return (
+    <>
+      <img className={styles.layer} src="./sprites/management/label_yellow_335.png" alt="" style={{ left: layout.gameLabelLeft, top: layout.labelTop }} />
+      <SpriteNumber glyphs={numberGlyphsOf(GAMES_PER_SEASON)} right={layout.totalRight} boxTop={box.y} boxHeight={box.height} />
       <img className={styles.layer} src={`./sprites/num/${String(SLASH_FRAME).padStart(3, '0')}.png`} alt=""
         style={{ left: layout.slashLeft, top: layout.slashTop }} />
-      <SpriteNumber glyphs={numberGlyphsOf(game)} right={layout.gameRight} boxTop={message.y} boxHeight={message.height} />
-      <img className={styles.layer} src="./sprites/management/label_yellow_334.png" alt="" style={{ left: layout.yearLabelLeft, top: message.y + 3 }} />
-      <SpriteNumber glyphs={numberGlyphsOf(year)} right={layout.yearRight} boxTop={message.y} boxHeight={message.height} />
+      <SpriteNumber glyphs={numberGlyphsOf(game)} right={layout.gameRight} boxTop={box.y} boxHeight={box.height} />
+      <img className={styles.layer} src="./sprites/management/label_yellow_334.png" alt="" style={{ left: layout.yearLabelLeft, top: layout.labelTop }} />
+      <SpriteNumber glyphs={numberGlyphsOf(year)} right={layout.yearRight} boxTop={box.y} boxHeight={box.height} />
     </>
   )
 }

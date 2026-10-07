@@ -104,8 +104,16 @@ describe('관리 화면 배치 — 0x7d34c · 0x7e418', () => {
   it('메시지줄 "/" 는 0xb9d35 oy 1 · 세로 가운데 내림이라 y 210 — 나머지 자리는 dx 를 줄여 간다', () => {
     expect(messageLineLayoutOf(12)).toEqual({
       gameLabelLeft: 81, totalRight: 79, slashLeft: 58, slashTop: 210, gameRight: 56,
-      yearLabelLeft: 28, yearRight: 26,
+      yearLabelLeft: 28, yearRight: 26, labelTop: 209,
     })
+  })
+
+  it('메시지줄은 다른 사각형에도 — 경기 평가 변화 창 0x86c90 이 (37, 57, 62×3 − 8, 11) 을 넘긴다', () => {
+    const layout = messageLineLayoutOf(12, { x: 37, y: 57, width: 178, height: 11 })
+    // 오른쪽 끝 215 에서 dx −5 · "경기" 폭 19 · 글 세로 가운데 올림((11 − 10)/2) = 1
+    expect(layout.gameLabelLeft).toBe(215 - 5 - 19)
+    expect(layout.labelTop).toBe(58)
+    expect(layout.slashTop).toBe(57 + 1 + 1)
   })
 
   it('이름 띠가 꺾이는 x — 나만의리그 W/2 − 45 = 75 · 시즌 W/2 − 28 = 92 (0x7d43c)', () => {

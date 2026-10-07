@@ -217,15 +217,17 @@ export interface MessageLineLayout {
   readonly gameRight: number
   readonly yearLabelLeft: number
   readonly yearRight: number
+  /** "경기" · "년" 글 위 — 0xb9e05 정렬 0x24 의 세로 가운데 올림((h − 10) / 2) */
+  readonly labelTop: number
 }
 
 const MESSAGE_GAME_LABEL_WIDTH = 19
 const MESSAGE_YEAR_LABEL_WIDTH = 9
 const MESSAGE_SLASH = { width: 5, height: 8, oy: 1 }
 const MESSAGE_DIGIT_WIDTH = 6
+const MESSAGE_LABEL_HEIGHT = 10
 
-export function messageLineLayoutOf(game: number): MessageLineLayout {
-  const box = STATUS_BOXES.message
+export function messageLineLayoutOf(game: number, box: Box = STATUS_BOXES.message): MessageLineLayout {
   const right = box.x + box.width
   let dx = -5
   const gameLabelLeft = right + dx - MESSAGE_GAME_LABEL_WIDTH
@@ -239,7 +241,9 @@ export function messageLineLayoutOf(game: number): MessageLineLayout {
   dx -= String(game).length * MESSAGE_DIGIT_WIDTH + 7
   const yearLabelLeft = right + dx - MESSAGE_YEAR_LABEL_WIDTH
   dx -= MESSAGE_YEAR_LABEL_WIDTH + 2
-  return { gameLabelLeft, totalRight, slashLeft, slashTop, gameRight, yearLabelLeft, yearRight: right + dx }
+  const labelGap = box.height - MESSAGE_LABEL_HEIGHT
+  const labelTop = box.y + (labelGap >> 1) + (labelGap % 2)
+  return { gameLabelLeft, totalRight, slashLeft, slashTop, gameRight, yearLabelLeft, yearRight: right + dx, labelTop }
 }
 
 /** 경기장 띠 프레임 — 휴대폰 시각 기준 (this+0x1c) */
