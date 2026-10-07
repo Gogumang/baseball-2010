@@ -14,6 +14,7 @@ import type { ReactNode } from 'react'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { Button, FrameSprite } from '@/shared/ui'
 import * as styles from '@/pages/outing-map/ui/OutingMapScreen.css'
+import { placeLabelTopLeftOf } from '@/pages/outing-map/lib/placeLabelPosition'
 
 /**
  * [!] 표시 기준점 (0x7ed6c, F-2 2-6 확정) — `mapX + bx + (bw >> 1)`, `mapY + by`.
@@ -80,10 +81,10 @@ export function OutingMap({ selectedPlaceId, eventPlaceIds, noticeText, onOpen, 
                   src={`${MAP_FRAMES}/${String(place.frame).padStart(3, '0')}.png`} alt="" />
               </button>
             )}
+            {/* 이름은 박스에 mapY 를 안 더한다 (F-2 2-4 확정) — 앞서 웹은 MAP_TOP 을 더하고 있었다 */}
             {label !== undefined && (
               <FrameSprite folder={PLACE_LABEL_FRAMES} frame={place.labelFrame} origins={labelOrigins}
-                x={place.nameBox.x + Math.round((place.nameBox.width - label.width) / 2)}
-                y={place.nameBox.y + Math.round((place.nameBox.height - label.height) / 2) + styles.MAP_TOP} />
+                {...placeLabelTopLeftOf(place.nameBox, label.width, label.height)} />
             )}
             {eventPlaceIds.has(place.id) && animated(EVENT_MARKER_ANIMATION, markerAnchorOf(place.markerBox), `${place.id}-event`)}
             {place.id === selectedPlaceId && animated(CURSOR_ANIMATION, cursorAnchorOf(place.cursorBox), `${place.id}-cursor`)}
