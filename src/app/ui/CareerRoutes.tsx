@@ -26,6 +26,7 @@ import { endingBonusOf, isContinuableEnding } from '@/entities/career/model/seas
 import { TEAMS } from '@/shared/config/original/teams'
 import { conditionTextOf } from '@/entities/career/model/titles'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
+import { nariLastGameRecordLineOf } from '@/entities/career/model/playerCareer'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { MatchCommand } from '@/pages/story/model/useEventPlayback'
 import { awardWindowTextOf } from '@/pages/story/lib/awardWindows'
@@ -140,6 +141,8 @@ export function CareerRoutes({
           newTitles={screen.newTitles}
           evaluation={screen.evaluation}
           streakNotices={screen.streakNotices}
+          // 116 의 S+0x1d8 — 정산이 남긴 줄(포스트시즌 경기 뒤에는 앞 평가 경기 줄)
+          {...(career.lastGame === undefined ? {} : { recordLine: nariLastGameRecordLineOf(career.lastGame) })}
           career={career}
           onContinue={actions.confirmGameResult}
         />

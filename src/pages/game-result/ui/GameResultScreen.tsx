@@ -4,7 +4,8 @@ import {
 } from '@/shared/ui'
 import { EndBoardRows } from '@/widgets/game-scene/ui/EndBoardRows'
 import type { GameEvaluation, StreakNotice } from '@/entities/career/model/gameEvaluation'
-import type { PlayerCareer } from '@/entities/career/model/playerCareer'
+import { nariRecordLineTextOf } from '@/entities/career/model/playerCareer'
+import type { NariRecordLine, PlayerCareer } from '@/entities/career/model/playerCareer'
 import { ORIGINAL_USER_EVENTS } from '@/shared/config/original/userEvents'
 import type { GameSummary } from '@/entities/game/model/gameSummary'
 import { RECORD_NAMES } from '@/entities/game/model/gameRecords'
@@ -63,6 +64,11 @@ interface GameResultScreenProps {
    */
   readonly evaluation?: GameEvaluation
   readonly streakNotices?: readonly StreakNotice[]
+  /**
+   * 116 기록 줄 S+0x1d8 (타수 · 안타 · 타점 · 홈런) — 평가 대사가 이 줄 뒤에 감독 글을 잇는다(`nariRecordLineTextOf`).
+   * 포스트시즌 경기 뒤에는 앞 평가 경기의 줄이다. 안 넘기면 감독 글만.
+   */
+  readonly recordLine?: NariRecordLine
   /** 평가가 반영된 뒤의 선수 — "현재 사기" 등을 보여준다 */
   readonly career: PlayerCareer
   readonly onContinue: () => void
@@ -94,6 +100,7 @@ export function GameResultScreen({
   newTitles,
   evaluation,
   streakNotices = [],
+  recordLine,
   career,
   onContinue,
 }: GameResultScreenProps) {
@@ -118,8 +125,11 @@ export function GameResultScreen({
         </Panel>
 
         {evaluation !== undefined && <Panel heading="감독 평가">
+          {/* 0x8bab8 — 이벤트 +0x2cc 의 기록 줄(…홈런!N) 뒤에 감독 글을 이어 한 대사로 */}
           <DialogueBox>
-            <MarkupText raw={ORIGINAL_USER_EVENTS[evaluation.commentIndex] ?? ''} />
+            <MarkupText
+              raw={`${recordLine === undefined ? '' : nariRecordLineTextOf(recordLine)}${ORIGINAL_USER_EVENTS[evaluation.commentIndex] ?? ''}`}
+            />
           </DialogueBox>
           <MarkupText
             raw={fillNumbers(ORIGINAL_USER_EVENTS[EVALUATION_POPUP_INDEX] ?? '', [

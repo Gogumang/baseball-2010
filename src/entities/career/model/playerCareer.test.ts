@@ -1,7 +1,8 @@
 import { pitcherOrdersAfterPostseason } from '@/entities/league/model/league'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { describe, expect, it } from 'vitest'
-import { applyGameResult, applySeasonEnd, countGameForSkills, countReputationZeroGame, createCareer, nextOpponentOf, GAMES_PER_SEASON, gamePointRewardOf, nameByteLengthOf, rookieAbilityOf, startNextSeason, leagueGamePitchersOf, applyLeagueDay } from '@/entities/career/model/playerCareer'
+import { applyGameResult, applySeasonEnd, countGameForSkills, countReputationZeroGame, createCareer, nextOpponentOf, GAMES_PER_SEASON, gamePointRewardOf, nameByteLengthOf, rookieAbilityOf, startNextSeason, leagueGamePitchersOf, applyLeagueDay, nariLastGameRecordLineOf, nariRecordLineTextOf } from '@/entities/career/model/playerCareer'
+import type { NariLastGame } from '@/entities/career/model/playerCareer'
 import { EMPTY_LEAGUE, opponentOf, recordLeagueResult } from '@/entities/league/model/league'
 import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
 import type { GameSummary } from '@/entities/game/model/gameSummary'
@@ -398,5 +399,19 @@ describe('116 경기 뒤 카운터 12bc2~12c84 — 무력감 +0x1c7 · 먹튀 +0
     const base = { ...createCareer('카운터'), moneyGrubberGames: 2, moneyGrubberPopularityGain: 5 }
     expect(countGameForSkills({ ...base, skillIds: [...base.skillIds, 2] }, -2)).toMatchObject({ moneyGrubberGames: 3, moneyGrubberPopularityGain: 3 })
     expect(countGameForSkills(base, 4)).toMatchObject({ moneyGrubberGames: 0, moneyGrubberPopularityGain: 0 })
+  })
+})
+
+describe('116 기록 줄 글 — 0x1278c 모드 4 갈래 12958~1299a', () => {
+  it('S+0x1d8 [0]~[3] 을 "타수 · 안타 · 타점 · 홈런!N" 으로 잇는다', () => {
+    expect(nariRecordLineTextOf({ atBats: 5, hits: 3, runsBattedIn: 4, homeRuns: 2 })).toBe('5타수 3안타 4타점 2홈런!N')
+  })
+
+  it('줄이 없던 옛 저장은 그 경기 성적으로 짓는다', () => {
+    const stats = { ...createCareer('x').stats, atBats: 4, hits: 1, runsBattedIn: 0, homeRuns: 0 }
+    const lastGame = { summary: { stats } } as unknown as NariLastGame
+    expect(nariLastGameRecordLineOf(lastGame)).toEqual({ atBats: 4, hits: 1, runsBattedIn: 0, homeRuns: 0 })
+    expect(nariLastGameRecordLineOf({ ...lastGame, recordLine: { atBats: 1, hits: 1, runsBattedIn: 1, homeRuns: 1 } }))
+      .toEqual({ atBats: 1, hits: 1, runsBattedIn: 1, homeRuns: 1 })
   })
 })

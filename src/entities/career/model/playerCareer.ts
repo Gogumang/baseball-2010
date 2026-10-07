@@ -102,6 +102,25 @@ export function nariRecordLineOf(stats: Pick<GameSummary['stats'], 'atBats' | 'h
   }
 }
 
+/**
+ * **116 기록 줄 글** — 진입 0x1278c 의 모드 4 갈래(12958~1299a, 직접 떴다): 글 상자(sp+0x4c, 0xbc75d)에 S+0x1d8 의 네 바이트를
+ * 차례로 숫자(0xbc73d — ldrb 라 u8 그대로)와 글로 붙인다.
+ * ```
+ * [0] + "타수 "(0xcc938) · [1] + "안타 "(0xcc940) · [2] + "타점 "(0xcc948) · [3] + "홈런!N"(0xcc950)
+ * ```
+ * 이 글은 평가 내장 이벤트 0x8a6fc 의 넷째 인자로 이벤트 +0x2cc 에 담기고(0x8a76c), 이벤트 글을 짓는 0x8bab8 이 +0xb 가 서 있으면
+ * **이 줄 뒤에 감독 글(StrUSER_EVT[+0x1e])을 이어 붙여** 한 대사로 띄운다(0x8bb66~0x8bbac). 끝의 `!N` 이 줄바꿈이라 감독 글이 다음 줄이다.
+ * 포스트시즌 경기 뒤에는 S+0x1d8 이 앞 평가 경기 값이다(`NariLastGame.recordLine`, a2ad0a7).
+ */
+export function nariRecordLineTextOf(line: NariRecordLine): string {
+  return `${line.atBats}타수 ${line.hits}안타 ${line.runsBattedIn}타점 ${line.homeRuns}홈런!N`
+}
+
+/** 116 이 읽는 S+0x1d8 — 저장의 줄, 줄이 없던 옛 저장이면 그 경기 성적으로 */
+export function nariLastGameRecordLineOf(lastGame: NariLastGame): NariRecordLine {
+  return lastGame.recordLine ?? nariRecordLineOf(lastGame.summary.stats)
+}
+
 /** 경기 요약에서 116 재료만 — 리그 선수 기록·투수 줄·스태미나 표는 정산이 이미 먹었다 */
 export function nariLastGameOf(
   summary: GameSummary,

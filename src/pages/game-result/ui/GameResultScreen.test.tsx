@@ -182,6 +182,24 @@ describe('웹 전용 단추', () => {
     expect(screen.getByText('오늘의 성적')).toBeTruthy()
   })
 
+  it('116 평가 대사는 기록 줄 "N타수 N안타 N타점 N홈런" 뒤에 감독 글을 다음 줄로 잇는다 (0x1278c 12958~1299a · 0x8bab8)', () => {
+    render(
+      <GameResultScreen
+        summary={요약()}
+        gamePointReward={0}
+        newTitles={[]}
+        evaluation={{ popularityChange: 1, reputationChange: 0, moraleChange: 2, commentIndex: 40 }}
+        recordLine={{ atBats: 4, hits: 2, runsBattedIn: 3, homeRuns: 1 }}
+        career={createCareer('선수')}
+        onContinue={vi.fn()}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: '자세히' }))
+    const 줄 = screen.getByText('4타수 2안타 3타점 1홈런')
+    // !N 이 줄을 끊는다 — 기록 줄은 제 줄(<p>) 하나다
+    expect(줄.closest('p')?.textContent).toBe('4타수 2안타 3타점 1홈런')
+  })
+
   it('국가대항전 경기(116 평가 없음)는 같은 결과 판에 평가 칸이 없다', () => {
     const onContinue = vi.fn()
     render(
