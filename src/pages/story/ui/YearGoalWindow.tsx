@@ -2,8 +2,8 @@ import { useId } from 'react'
 import { FrameSprite } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import * as windowStyles from '@/shared/ui/GameWindow/GameWindow.css'
-import type { YearGoalWindowValues } from '@/entities/career/model/seasonFlow'
 import { YEAR_GOAL_BOXES, YEAR_GOAL_MODE_UI_FRAME, yearGoalWindowLayoutOf } from '@/pages/story/lib/yearGoalWindow'
+import type { YearGoalWindowSource } from '@/pages/story/lib/yearGoalWindow'
 
 const MODE_UI = './sprites/mode_ui/frames'
 const IMG_TEXT = './sprites/img_text/frames'
@@ -12,11 +12,12 @@ const pad = (frame: number) => String(frame).padStart(3, '0')
 
 /**
  * **올해의 목표 창** — 이벤트 system sub 1 (그리기 0x86fdc · 0x8656c, 배치는 `pages/story/lib/yearGoalWindow`).
+ * 나리 두 편(묶음 0~2)과 시즌모드(모드 2 갈래, 묶음 3)가 같은 창을 쓴다.
  * 240×320 화면 좌표 그대로 이야기 덮개 위에 놓는다. 누르면(원본 OK · '5') 닫힌다 — 키는 재생기(`useEventPlayback`)가 받는다.
  * ⚠️ 공용 창 0x55e61 의 그림은 웹 공용 근사(`GameWindow.css` window)다 — 선 목록만 확인됐다.
  * ⚠️ 미해결: 팝업이 떠 있는 동안 앞 대사 창이 밑에 남아 그려지는지는 확인하지 않았다 — 웹은 창만 그린다.
  */
-export function YearGoalWindow({ values, onClose }: { readonly values: YearGoalWindowValues; readonly onClose: () => void }) {
+export function YearGoalWindow({ values, onClose }: { readonly values: YearGoalWindowSource; readonly onClose: () => void }) {
   const modeUiOrigins = useFrameOrigins(MODE_UI)
   const navyFilterId = `palette3-${useId().replace(/:/g, '')}`
   const layout = yearGoalWindowLayoutOf(values)

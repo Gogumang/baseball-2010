@@ -218,9 +218,13 @@ describe('이벤트 재생 0xd3 배선', () => {
 
     expect(document.body.textContent).toContain('올해의 목표다!!')
     fireEvent.click(screen.getByText(/올해의 목표다!!/))
-    // SYS(sub 1) 창 — 제목 StrUSER_EVT[0] 아래에 1년차 다섯 목표
-    expect(document.body.textContent).toContain('순위 5위 이내')
-    fireEvent.click(screen.getByText(/순위 5위 이내/))
+    // SYS(sub 1) 창 — 0x8656c 모드 2 갈래: 이름 0xd41f4 [순위 · 승률 · 타율 · 방어 · 인기도]
+    const 창 = screen.getByTestId('올해의-목표-창')
+    const 글 = [...창.querySelectorAll('img[data-frame]')].map((image) => Number(image.getAttribute('data-frame')))
+    expect(글).toEqual([358, 47, 330, 318, 316, 327, 87, 148])
+    // 승률 두 칸에 "%"(num 106)
+    expect([...창.querySelectorAll('img')].filter((image) => image.getAttribute('src')?.endsWith('num/106.png'))).toHaveLength(2)
+    fireEvent.click(창)
 
     expect(screen.getByRole('button', { name: '다음경기' })).toBeDefined()
   })

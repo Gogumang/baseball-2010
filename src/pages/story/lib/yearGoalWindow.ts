@@ -22,7 +22,7 @@ import type { CardBox } from '@/widgets/matchup-cards/lib/matchupCardsLayout'
  * 숫자  0xba719(박스, 자간 1, 값, 기준 0x14(num 주황), num, 정렬 0x24, ox −4, oy 0) — 줄마다 박스.y += h + 2
  *       타율 0x8633c / 방어율 0x86248 은 아래 `averageGlyphsOf` · `earnedRunAverageGlyphsOf`.
  * ```
- * 모드 2(시즌) 갈래(0xd41f4 이름 · 팀 기록 · 0xd4406 목표)는 시즌모드 화면이라 여기 옮기지 않았다.
+ * 모드 2(시즌모드, `[w+0x20]` == 2 — 0x7b998) 갈래는 아래 `SeasonYearGoalWindowValues` · `seasonColumnOf` (직접 떴다).
  */
 
 /** 이벤트 system 하위 종류 1 (0xd4ee4[1] = 0x8d304) */
@@ -49,6 +49,7 @@ export const YEAR_GOAL_LABELS: readonly (readonly number[])[] = [
 
 /** img_text 프레임 크기 (PNG 를 읽어 적었다 — 높이는 모두 10) */
 const TEXT_WIDTH: Readonly<Record<number, number>> = {
+  47: 20, 330: 21,
   358: 56, 87: 22, 148: 21, 318: 21, 58: 21, 180: 20, 319: 21, 327: 30, 316: 20, 328: 20, 124: 10, 317: 21, 407: 39,
 }
 const TEXT_HEIGHT = 10
@@ -65,6 +66,42 @@ const DOT_OY = 5
 /** 줄 간격 — 박스.y += 박스 높이 + 2 */
 const ROW_GAP = 2
 const ROWS = 5
+
+/**
+ * **시즌모드(모드 2) 갈래** — 같은 창(0x86fdc, 박스·제목·머리 같음)에서 0x8656c 가 고르는 것만 다르다 (직접 떴다):
+ * ```
+ * 이름  0x8662c: img_text u16 0xd41f4[i] = [47 순위 · 330 승률 · 318 타율 · 316 방어 · 327 인기도]   ; 묶음 표 0xd41d6 대신
+ * 현재  0x866e2~0x86830 (S = [w+0x150] = SR):
+ *   ① S+0xb2 == 0 && S+0xb4 == 0 → 0 · 그 밖 0xb7aa0(S+0x80, 팀, **1**) + 1   ; 정규시즌 순위(1부터). 숫자 ox −4
+ *   ② w = 0xb7908(L, 팀, 1) · l = 0xb7968(L, 팀, 1) · w+l ≠ 0 이면 w×100 / (w+l) 아니면 w×100(= 0)
+ *      → 숫자 **ox −10** · 그 뒤 num [num+0x1a8](프레임 106 "%")를 0xb9d35(박스, 0x24, ox −2, oy 1)
+ *   ③ 0xa3700(S, 1) → 0x8633c(타율) · ④ 0xa3764(S) → 0x86248(방어율) · ⑤ 0x86a12 공용 인기도 max(0, 0xb6e79(S) − u16 S+0x78)
+ * 목표  0x86ac6~0x86b9c: 0x8645c(w, 버퍼, 2, S+0xb3) = u16 0xd4406[연차idx·5 + i] (자르기 없음)
+ *   i 0 숫자(표 값 그대로) · 1 숫자 ox −10 + "%" · 2 0x8633c · 3 0x86248 · 4 숫자
+ * ```
+ * 표 0xd4406 은 판정 0xa37bc 의 표 0xd7cf6 과 50칸 모두 같은 사본이다(직접 비교) — 웹은 `seasonGoalsOf` 하나를 쓴다.
+ * 원본 그대로: 목표 ① 은 0부터 센 순위 문턱을 그대로 그린다(1년차 "4" — 판정은 5위까지 달성)인데 현재 ① 은 1부터다.
+ * 392(포스트시즌 시작 뒤)에서도 현재 ① 은 셋째 인자 1 이라 정규시즌 순위다 — 판정(셋째 인자 0, 대진 순위)과 다를 수 있다.
+ */
+export const SEASON_YEAR_GOAL_LABEL_SET = 3
+export const SEASON_YEAR_GOAL_LABELS: readonly number[] = [47, 330, 318, 316, 327]
+
+export interface SeasonYearGoalWindowValues {
+  readonly labelSet: typeof SEASON_YEAR_GOAL_LABEL_SET
+  /** 현재 다섯 — 순위(1부터, 시즌 첫날 전이면 0) · 승률% · 팀 타율 ×1000 · 팀 방어율 ×100 · 인기도 상승(≥ 0) */
+  readonly current: readonly number[]
+  /** 목표 다섯 — 0xd4406[연차idx·5 + i] 그대로 */
+  readonly goals: readonly number[]
+}
+
+/** 창이 받는 값 — 나리 두 편(묶음 0~2) 또는 시즌모드(3) */
+export type YearGoalWindowSource = YearGoalWindowValues | SeasonYearGoalWindowValues
+
+/** 승률 숫자 ox · "%" (num 106, 6×8) 자리 — 0x86788~0x867e6 · 0x86ade~0x86b24 */
+const WIN_RATE_OX = -10
+export const YEAR_GOAL_PERCENT_FRAME = 106
+const PERCENT_SIZE = { width: 6, height: 8 }
+const PERCENT_OFFSET = { x: -2, y: 1 }
 
 export interface YearGoalTextPiece {
   readonly frame: number
@@ -105,13 +142,28 @@ function numberPiecesOf(value: number, area: CardBox, ox = NUMBER_OX): YearGoalN
     .map((glyph) => ({ frame: glyph.image, x: glyph.x, y: glyph.y }))
 }
 
-/** 소수점 0xb9d35(num 103, 박스, 정렬 0x24, ox, oy 5) → 0xb9c5c: x += w − 1 · y += trunc((h − 2)/2) */
-function dotPieceOf(area: CardBox, ox: number): YearGoalNumberPiece {
+/** num 한 장 0xb9d35(그림, 박스, 정렬 0x24, ox, oy) → 0xb9c5c: x += w − W · y += trunc((h − H)/2) */
+function imagePieceOf(
+  frame: number, size: { readonly width: number; readonly height: number }, area: CardBox, ox: number, oy: number,
+): YearGoalNumberPiece {
   return {
-    frame: YEAR_GOAL_DOT_FRAME,
-    x: area.x + ox + area.width - DOT_SIZE.width,
-    y: area.y + DOT_OY + Math.trunc((area.height - DOT_SIZE.height) / 2),
+    frame,
+    x: area.x + ox + area.width - size.width,
+    y: area.y + oy + Math.trunc((area.height - size.height) / 2),
   }
+}
+
+/** 소수점 0xb9d35(num 103, 박스, 정렬 0x24, ox, oy 5) */
+function dotPieceOf(area: CardBox, ox: number): YearGoalNumberPiece {
+  return imagePieceOf(YEAR_GOAL_DOT_FRAME, DOT_SIZE, area, ox, DOT_OY)
+}
+
+/** 승률 — 숫자를 ox −10 에, "%"(num 106)를 ox −2 · oy 1 에 */
+function winRateGlyphsOf(value: number, area: CardBox): YearGoalNumberPiece[] {
+  return [
+    ...numberPiecesOf(value, area, WIN_RATE_OX),
+    imagePieceOf(YEAR_GOAL_PERCENT_FRAME, PERCENT_SIZE, area, PERCENT_OFFSET.x, PERCENT_OFFSET.y),
+  ]
 }
 
 /** 한 자리 칸 = num 기준(0) 그림 폭 + 1 — 0x8633c · 0x86248 이 `[num+0x50]`(프레임 20)의 폭으로 잰다 */
@@ -162,10 +214,18 @@ export function earnedRunAverageGlyphsOf(value: number, area: CardBox, ox = NUMB
 
 const rowOf = (area: CardBox, row: number): CardBox => ({ ...area, y: area.y + row * (area.height + ROW_GAP) })
 
+/** 시즌모드 한 칸 — ① 숫자 · ② 승률 · ③ 타율 · ④ 방어율 · ⑤ 숫자 (현재·목표 같은 꼴) */
+function seasonCellOf(value: number, area: CardBox, row: number): YearGoalNumberPiece[] {
+  if (row === 1) return winRateGlyphsOf(value, area)
+  if (row === 2) return averageGlyphsOf(value, area)
+  if (row === 3) return earnedRunAverageGlyphsOf(value, area)
+  return numberPiecesOf(value, area)
+}
+
 /** 창 한 장의 글·숫자 자리 — 박스 3·4 는 머리 줄 다음(1줄째)부터 값이다 */
-export function yearGoalWindowLayoutOf(values: YearGoalWindowValues): YearGoalWindowLayout {
+export function yearGoalWindowLayoutOf(values: YearGoalWindowSource): YearGoalWindowLayout {
   const B = YEAR_GOAL_BOXES
-  const labels = YEAR_GOAL_LABELS[values.labelSet]
+  const labels = values.labelSet === SEASON_YEAR_GOAL_LABEL_SET ? SEASON_YEAR_GOAL_LABELS : YEAR_GOAL_LABELS[values.labelSet]
   const texts: YearGoalTextPiece[] = [
     textPieceOf(YEAR_GOAL_TEXT.title, B.title, 0x22, 3),
     ...labels.map((frame, row) => textPieceOf(frame, rowOf(B.labels, row), 0x24, 0)),
@@ -173,8 +233,10 @@ export function yearGoalWindowLayoutOf(values: YearGoalWindowValues): YearGoalWi
     textPieceOf(YEAR_GOAL_TEXT.goal, B.goals, 0x22, 0),
   ]
   const firstGlyphsOf = values.labelSet === 0 ? averageGlyphsOf : earnedRunAverageGlyphsOf
+  const cellOf = values.labelSet === SEASON_YEAR_GOAL_LABEL_SET
+    ? seasonCellOf
+    : (value: number, area: CardBox, row: number) => row === 0 ? firstGlyphsOf(value, area) : numberPiecesOf(value, area)
   const columnOf = (column: readonly number[], area: CardBox) =>
-    column.slice(0, ROWS).flatMap((value, row) =>
-      row === 0 ? firstGlyphsOf(value, rowOf(area, 1)) : numberPiecesOf(value, rowOf(area, row + 1)))
+    column.slice(0, ROWS).flatMap((value, row) => cellOf(value, rowOf(area, row + 1), row))
   return { texts, numbers: [...columnOf(values.current, B.current), ...columnOf(values.goals, B.goals)] }
 }

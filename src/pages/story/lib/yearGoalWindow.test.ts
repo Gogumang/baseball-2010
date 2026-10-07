@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
-  averageGlyphsOf, earnedRunAverageGlyphsOf, YEAR_GOAL_BOXES, yearGoalWindowLayoutOf,
+  averageGlyphsOf, earnedRunAverageGlyphsOf, SEASON_YEAR_GOAL_LABEL_SET, YEAR_GOAL_BOXES, YEAR_GOAL_PERCENT_FRAME,
+  yearGoalWindowLayoutOf,
 } from '@/pages/story/lib/yearGoalWindow'
+import type { SeasonYearGoalWindowValues } from '@/pages/story/lib/yearGoalWindow'
 
 /** 첫 값 줄 = 박스 3/4 의 머리 다음 줄 (y 88 + 17) */
 const 현재1 = { ...YEAR_GOAL_BOXES.current, y: 105 }
@@ -48,5 +50,39 @@ describe('올해의 목표 창 배치 — 0x86fdc · 0x8656c', () => {
       { frame: 103, x: 116, y: 116 },
       { frame: 23, x: 109, y: 108 },
     ])
+  })
+})
+
+describe('올해의 목표 창 — 시즌모드(모드 2) 갈래 0x8656c', () => {
+  /** 1년차: 현재 [순위 3 · 승률 57% · 0.281 · 3.45 · 인기도 12] / 목표 0xd4406[0..4] */
+  const 값: SeasonYearGoalWindowValues = { labelSet: SEASON_YEAR_GOAL_LABEL_SET, current: [3, 57, 281, 345, 12], goals: [4, 55, 250, 390, 50] }
+
+  it('이름은 0xd41f4 [순위 · 승률 · 타율 · 방어 · 인기도] — 제목·머리는 같은 창', () => {
+    const { texts } = yearGoalWindowLayoutOf(값)
+    expect(texts.map((piece) => piece.frame)).toEqual([358, 47, 330, 318, 316, 327, 87, 148])
+    // "순위"(20) 오른끝 정렬
+    expect(texts[1]).toEqual({ frame: 47, x: 41 + 35 - 20, y: 108, palette: 0 })
+  })
+
+  it('승률은 숫자를 ox −10 에, "%"(num 106, 6×8)를 ox −2 · oy 1 에 — 현재·목표 둘 다', () => {
+    const { numbers } = yearGoalWindowLayoutOf(값)
+    const 퍼센트 = numbers.filter((piece) => piece.frame === YEAR_GOAL_PERCENT_FRAME)
+    // 둘째 값 줄 y = 105 + 17, oy 1 + trunc((15 − 8)/2)
+    expect(퍼센트).toEqual([
+      { frame: 106, x: 81 - 2 + 55 - 6, y: 122 + 1 + 3 },
+      { frame: 106, x: 140 - 2 + 55 - 6, y: 122 + 1 + 3 },
+    ])
+    // 57 — "7"(폭 6 + 자간 1) 오른끝이 81 − 10 + 55
+    const 승률 = numbers.filter((piece) => piece.y === 125 && piece.x < 140 && piece.frame !== 106)
+    expect(승률.map((piece) => piece.frame)).toEqual([25, 27])
+    expect(승률[1]!.x + 7).toBe(81 - 10 + 55)
+  })
+
+  it('셋째 줄은 타율(0x8633c) · 넷째 줄은 방어율(0x86248) — 둘 다 소수점이 있다', () => {
+    const { numbers } = yearGoalWindowLayoutOf(값)
+    const 셋째 = { ...YEAR_GOAL_BOXES.current, y: 105 + 2 * 17 }
+    const 넷째 = { ...YEAR_GOAL_BOXES.current, y: 105 + 3 * 17 }
+    expect(numbers).toEqual(expect.arrayContaining([...averageGlyphsOf(281, 셋째), ...earnedRunAverageGlyphsOf(345, 넷째)]))
+    expect(numbers.filter((piece) => piece.frame === 103)).toHaveLength(4)
   })
 })

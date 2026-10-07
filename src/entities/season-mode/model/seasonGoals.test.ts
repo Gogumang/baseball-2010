@@ -10,6 +10,8 @@ import {
   teamBattingAverageOf,
   teamEarnedRunAverageOf,
   seasonGoalResultEventId,
+  seasonGoalWindowNumbersOf,
+  seasonGoalWindowRankOf,
   seasonGoalYearBonusOf,
   seasonGoalsOf,
   winRatePercentOf,
@@ -117,5 +119,23 @@ describe('목표 ① 순위 0xb7aa0(L, 팀, 0)', () => {
     expect(goalRankOf(4, 3, 대진)).toBe(3)
     expect(goalRankOf(7, 6, 대진)).toBe(POSTSEASON_OUTSIDE_RANK)
     expect(goalRankOf(4, 3, { ...대진, champion: 4 })).toBe(0)
+  })
+})
+
+describe('올해의 목표 창 시즌모드 갈래의 숫자 (0x8656c 모드 2)', () => {
+  it('목표는 0xd4406 — 판정 표 0xd7cf6 과 같은 값을 그대로(순위는 0부터 센 문턱 그대로) 그린다', () => {
+    expect(seasonGoalWindowNumbersOf(3, 다섯개달성, 1).goals).toEqual([3, 64, 280, 360, 80])
+  })
+
+  it('현재 ②~④ 는 판정 재료 그대로 · ⑤ 인기도 상승만 0 아래를 자른다', () => {
+    const 입력 = { ...다섯개달성, wins: 25, losses: 20, popularityGain: -7 }
+    expect(seasonGoalWindowNumbersOf(0, 입력, 2).current).toEqual([2, 55, 400, 100, 0])
+  })
+
+  it('현재 ① — 경기 수 0 · 포스트시즌 아님이면 0, 그 밖 정규시즌 순위 + 1 (0xb7aa0 셋째 인자 1)', () => {
+    expect(seasonGoalWindowRankOf(4, 0, false)).toBe(0)
+    expect(seasonGoalWindowRankOf(4, 3, false)).toBe(5)
+    // 포스트시즌 첫날(392)은 경기 수가 0 이어도 정규시즌 순위를 그린다 — 판정의 대진 순위와 다를 수 있다
+    expect(seasonGoalWindowRankOf(2, 0, true)).toBe(3)
   })
 })

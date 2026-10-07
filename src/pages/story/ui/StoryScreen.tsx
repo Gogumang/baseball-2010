@@ -13,7 +13,7 @@ import type { StoryCarry } from '@/entities/story/model/aceMatch'
 import * as styles from '@/pages/story/ui/StoryScreen.css'
 import { YearGoalWindow } from '@/pages/story/ui/YearGoalWindow'
 import { SYSTEM_YEAR_GOAL_WINDOW } from '@/pages/story/lib/yearGoalWindow'
-import type { YearGoalWindowValues } from '@/entities/career/model/seasonFlow'
+import type { YearGoalWindowSource } from '@/pages/story/lib/yearGoalWindow'
 
 /** 화자 번호 1 은 플레이어 이름으로 바꾼다. */
 const PLAYER_SPEAKER = 1
@@ -48,7 +48,7 @@ interface StoryScreenProps {
    * system 1 — **올해의 목표 창**(0x8d304 → 0x741a1 · 그리기 0x86fdc)의 값. 연초 115 · 392 가 연다.
    * 창을 그릴 때 부른다(원본도 틀마다 커리어를 읽어 그린다). 안 넘기면 그 명령은 예전처럼 지나간다.
    */
-  readonly yearGoalWindowOf?: () => YearGoalWindowValues
+  readonly yearGoalWindowOf?: () => YearGoalWindowSource
   /**
    * 환경설정 진동(저장 +0x3b) — 명령 5 화면효과 1·2 의 500ms 진동(0x3a44)이 이 칸을 본다.
    * 안 넘기면 켠 것으로 본다(원본 기본값 켬).

@@ -58,6 +58,47 @@ export function achievedSeasonGoalCount(yearIndex: number, input: SeasonGoalInpu
   return checks.filter(Boolean).length
 }
 
+/**
+ * **올해의 목표 창(SYS sub 1) 시즌모드 갈래의 숫자** — 0x8656c 의 모드 2 갈래 (직접 떴다, 배치는 `pages/story/lib/yearGoalWindow`).
+ * ```
+ * 현재  ① 순위 `windowRank`(아래) · ② 0xb7908·0xb7968(셋째 인자 1) 승률 · ③ 0xa3700(S,1) · ④ 0xa3764(S) ·
+ *       ⑤ max(0, 0xb6e79(S) − u16 S+0x78)       ; ⑤ 만 0 아래를 자른다 — 판정 0xa37bc 는 자르지 않는다
+ * 목표  0x8645c(…, 2, S+0xb3) = u16 0xd4406[연차idx·5 + i] — 판정 표 0xd7cf6 과 50칸 모두 같은 값이라 `seasonGoalsOf` 를 쓴다
+ * ```
+ * ②③④ 는 판정과 같은 함수·같은 인자다. ① 만 다르다 — `seasonGoalWindowRankOf`.
+ */
+export interface SeasonGoalWindowNumbers {
+  readonly current: readonly number[]
+  readonly goals: readonly number[]
+}
+
+export function seasonGoalWindowNumbersOf(
+  yearIndex: number,
+  input: SeasonGoalInput,
+  windowRank: number,
+): SeasonGoalWindowNumbers {
+  return {
+    current: [
+      windowRank,
+      winRatePercentOf(input.wins, input.losses),
+      input.teamBattingAverage,
+      input.teamEarnedRunAverage,
+      Math.max(0, input.popularityGain),
+    ],
+    goals: [...seasonGoalsOf(yearIndex)],
+  }
+}
+
+/**
+ * 창의 현재 순위 ① (0x866e2~0x86742):
+ * `S+0xb2`(경기 수) == 0 && `S+0xb4`(포스트시즌) == 0 → **0**, 그 밖 `0xb7aa0(L, 팀, 1) + 1` — 셋째 인자 1 이라 늘
+ * **정규시즌 순위**(1부터)다. 판정(셋째 인자 0)은 포스트시즌 중이면 대진 순위를 보므로 392 에서 둘이 다를 수 있다 — 원본 그대로.
+ */
+export function seasonGoalWindowRankOf(regularSeasonRank: number, games: number, inPostseason: boolean): number {
+  if (games === 0 && !inPostseason) return 0
+  return regularSeasonRank + 1
+}
+
 /** 목표 확인 이벤트 (정규시즌 종료) */
 export const SEASON_GOAL_INTRO_EVENT_ID = 392
 

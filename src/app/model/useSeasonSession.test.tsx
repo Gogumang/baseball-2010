@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 import {
-  SEASON_DEFAULT_MATCH_SETTINGS, seasonGoalInputOf, seasonLeagueRecordsOf, useSeasonSession,
+  SEASON_DEFAULT_MATCH_SETTINGS, seasonGoalInputOf, seasonGoalWindowNumbersFor, seasonLeagueRecordsOf, useSeasonSession,
 } from '@/app/model/useSeasonSession'
 import {
   EMPTY_LEAGUE, pitcherOrdersAfterPostseason, postseasonGameOf, postseasonRotationTurnsOf, postseasonStarterSlotOf,
@@ -495,6 +495,17 @@ describe('시즌 목표 ③④ 의 재료 (seasonGoalInputOf)', () => {
     const 입력 = seasonGoalInputOf({ state: state!, league, roster, playerStats, series })
     expect(입력.teamBattingAverage).toBe(500)
     expect(입력.wins).toBe(1)
+    // 목표 창(SYS sub 1) 시즌 갈래 — ① 정규시즌 순위 + 1 · ② 승률 % · ③ 같은 팀 타율 · 목표는 1년차 줄
+    const 창 = seasonGoalWindowNumbersFor({ state: state!, league, roster, playerStats, series })
+    expect(창.current.slice(0, 3)).toEqual([입력.rank + 1, 100, 500])
+    expect(창.goals).toEqual([4, 55, 250, 390, 50])
+  })
+
+  it('목표 창 ① — 시즌 첫 경기 전(SR+0xb2 == 0)이면 0', () => {
+    const { result } = 띄우기()
+    시작(result, 0)
+    const { state, league, roster, playerStats, series } = result.current
+    expect(seasonGoalWindowNumbersFor({ state: state!, league, roster, playerStats, series }).current[0]).toBe(0)
   })
 })
 

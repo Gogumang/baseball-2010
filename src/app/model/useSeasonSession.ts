@@ -104,9 +104,10 @@ import {
 } from '@/entities/season-mode/model/seasonEventFlow'
 import type { SeasonEventCursor, SeasonEventReward } from '@/entities/season-mode/model/seasonEventFlow'
 import {
-  achievedSeasonGoalCount, goalRankOf, seasonGoalResultEventId, teamBattingAverageOf, teamEarnedRunAverageOf,
+  achievedSeasonGoalCount, goalRankOf, seasonGoalResultEventId, seasonGoalWindowNumbersOf, seasonGoalWindowRankOf,
+  teamBattingAverageOf, teamEarnedRunAverageOf,
 } from '@/entities/season-mode/model/seasonGoals'
-import type { GoalPostseasonBracket, SeasonGoalInput } from '@/entities/season-mode/model/seasonGoals'
+import type { GoalPostseasonBracket, SeasonGoalInput, SeasonGoalWindowNumbers } from '@/entities/season-mode/model/seasonGoals'
 import {
   INITIAL_SEASON_MENU_CURSORS, TRADE_REQUEST_MENU_CURSOR, menuCursorsOnEnter, regularSeasonRankEventId,
 } from '@/entities/season-mode/model/seasonStateMachine'
@@ -2833,6 +2834,20 @@ export function seasonGoalInputOf(source: SeasonGoalSource): SeasonGoalInput {
     teamEarnedRunAverage: teamEarnedRunAverageOf(pitcherLines),
     popularityGain: record.popularity - record.popularityAtSeasonStart,
   }
+}
+
+/**
+ * 올해의 목표 창(SYS sub 1) 시즌모드 갈래의 숫자 — ②~⑤ 는 판정 입력(`seasonGoalInputOf`)과 같고 ① 만 정규시즌 순위다
+ * (`seasonGoalWindowRankOf` — 0xb7aa0 셋째 인자 1).
+ */
+export function seasonGoalWindowNumbersFor(source: SeasonGoalSource): SeasonGoalWindowNumbers {
+  const { record } = source.state
+  const regularRank = Math.max(0, rankingOf(source.league).indexOf(record.teamId))
+  return seasonGoalWindowNumbersOf(
+    record.yearIndex,
+    seasonGoalInputOf(source),
+    seasonGoalWindowRankOf(regularRank, record.games, record.inPostseason),
+  )
 }
 
 /**

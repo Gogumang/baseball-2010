@@ -32,8 +32,8 @@ import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { TeamSelectScreen } from '@/pages/create-player/ui/TeamSelectScreen'
 import { MessageBox, RawScreen, ScreenOverlay } from '@/shared/ui'
 import { StoryScreen } from '@/pages/story/ui/StoryScreen'
-import { SEASON_GOAL_WINDOW_SUB, SEASON_PLAYABLE_EVENTS } from '@/entities/season-mode/model/seasonEventFlow'
-import { seasonGoalWindowText } from '@/pages/season/lib/seasonGoalLines'
+import { SEASON_PLAYABLE_EVENTS } from '@/entities/season-mode/model/seasonEventFlow'
+import { SEASON_YEAR_GOAL_LABEL_SET } from '@/pages/story/lib/yearGoalWindow'
 import { SEASON_SCENE_STATE } from '@/entities/season-mode/model/seasonStateMachine'
 import { applySeasonReward, judgeSeasonEnding } from '@/entities/season-mode/model/seasonRewards'
 import type { PostseasonSeries } from '@/entities/league/model/league'
@@ -41,7 +41,9 @@ import { NationalCupScreen } from '@/pages/national-cup/ui/NationalCupScreen'
 import { TeamGameScreen } from '@/pages/team-game/ui/TeamGameScreen'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { useGameSettings } from '@/app/model/useGameSettings'
-import { isPitcherLeaderKind, seasonGoalInputOf, seasonLeagueRecordsOf } from '@/app/model/useSeasonSession'
+import {
+  isPitcherLeaderKind, seasonGoalInputOf, seasonGoalWindowNumbersFor, seasonLeagueRecordsOf,
+} from '@/app/model/useSeasonSession'
 import type { SeasonSession } from '@/app/model/useSeasonSession'
 import { seasonStadiumOf } from '@/entities/season-mode/model/stadiumItems'
 import { PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
@@ -225,12 +227,13 @@ export function SeasonRoute({
 
   const backToManagement = () => actions.goto(SEASON_SCENE_STATE.관리메뉴)
   const backToTeamMenu = () => actions.goto(SEASON_SCENE_STATE.구단관리)
-  // 목표 판정 0xa37bc 의 다섯 칸 — 시즌정보 화면과 목표 창(SYS sub 1)이 같은 값을 본다
+  // 목표 판정 0xa37bc 의 다섯 칸 — 팀정보 순위와 목표 창(SYS sub 1)이 같은 재료를 본다
   // 영입한 명전 선수의 기록(recordSource)도 세션 판정(392)과 같이 넘긴다 — 그 칸의 줄을 같은 열쇠로 센다
   const goalRecordOf = session.recordSource()
-  const goalInput = seasonGoalInputOf({
+  const goalSource = {
     state, league, roster, playerStats, series, ...(goalRecordOf === undefined ? {} : { recordOf: goalRecordOf }),
-  })
+  }
+  const goalInput = seasonGoalInputOf(goalSource)
   // 시상 순위표의 재료 — 시상 화면에서만 만든다(명전 기록을 그때 읽는다)
   const leagueRecordSourceOf = () => {
     const recordOf = session.recordSource()
@@ -261,8 +264,8 @@ export function SeasonRoute({
               onComplete={actions.finishSeasonEvent}
               // s_event 에는 경기(match) 명령이 없다
               onMatch={() => undefined}
-              systemWindowTextOf={(command) =>
-                command.sub === SEASON_GOAL_WINDOW_SUB ? seasonGoalWindowText(state.record.yearIndex, goalInput) : null}
+              // SYS sub 1 올해의 목표 창 — 연초 0xd4 내장 이벤트 · 392 (0x8d304 → 0x86fdc, 0x8656c 모드 2 갈래)
+              yearGoalWindowOf={() => ({ labelSet: SEASON_YEAR_GOAL_LABEL_SET, ...seasonGoalWindowNumbersFor(goalSource) })}
             />
           </ScreenOverlay>
         </RawScreen>
