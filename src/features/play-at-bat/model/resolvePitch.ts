@@ -246,19 +246,24 @@ export function resolvePitch(
   // 0x51490 덱 꺼내기 → 0x514f2 코드 25·26 의 특수 타구 표 (rand(0,1000) ≤ 19 → rand(0,4))
   const drawn = drawPattern(deck, code, random)
   const pattern = launchPatternOf(code, drawn.pattern, random)
-  // 필살 성공 굴림 0x34c74 → 0x517e6 — 맞은 공(0xfd2 ≠ 0)이면 어느 갈래든 0x517c8 로 모인다.
-  // ⚠️ 원본 차례는 메시지 0x11(0x515c6 → 0x50faa: 필살수비 굴림 · 쏘기 세계의 폴 굴림) **뒤**다. 웹은 그 둘을 수비 판
-  //    시작(`startDefensePlay`)에서 굴리고 이 굴림은 여기 남아 있어 차례가 앞선다 — 타석 화면이 성공 여부를 받아
-  //    판 입력(`isUncatchable`)으로 넘기는 배선이 이 자리를 묶어 둔다(미해결).
-  const isUncatchable =
-    swing.isSpecial === true &&
-    rollSpecialSwing(context.specialSwing?.number ?? 0, random, context.specialSwing?.isAceBatter === true)
   // 파울 각(state[0x1c], 0x9d660)만 여기서 가른다 — 페어 각은 판이 결과를 낸다(`battedContact` 머리말).
   // 2스트라이크 번트 파울은 아웃이다 (0x9d5e2~0x9d600). `situation.strikes` 는 이 공을 먹이기 전의 카운트다
   const contact = contactOfPattern(code, pattern, {
     strikes: context.situation.strikes,
     buntKind: swing.buntKind,
   })
+  // 필살 성공 굴림 0x34c74 → 0x517e6 — 맞은 공(0xfd2 ≠ 0)이면 어느 갈래든 0x517c8 로 모인다. 원본 차례는 메시지 0x11
+  // (0x515c6 → 0x50faa: 필살수비 굴림 · 표시 패턴 · 쏘기의 폴 굴림) **뒤**라, 판을 도는 페어 타구는 굴림 재료만 쏜 공에 실어
+  // 보내고 수비 판 시작(`startDefensePlay`)이 그 차례에 굴린다. ⚠️ 판을 안 도는 파울 · 판정 11 은 웹이 아직 판을 안 돌려
+  // (원본은 이 공들도 판을 돈다) 여기서 굴린다 — 그 공들의 필살수비 · 폴 굴림도 아직 없다(미해결, 판 배선은 세션 몫)
+  const specialSwing =
+    swing.isSpecial === true
+      ? { number: context.specialSwing?.number ?? 0, isAceBatter: context.specialSwing?.isAceBatter === true }
+      : undefined
+  const isUncatchable =
+    contact.kind !== '타구' &&
+    specialSwing !== undefined &&
+    rollSpecialSwing(specialSwing.number, random, specialSwing.isAceBatter)
   // 타격음 7·9·5·59·6 — 쏜 패턴의 각·세기·높이로 고른다 (0x515de~0x5164a — 0x514f2 의 특수 표 덮어쓰기 뒤)
   const contactSoundId = contactSoundIdOf({
     hasSwung: true,
@@ -284,7 +289,14 @@ export function resolvePitch(
         : {
             // 페어 타구 — 결과는 수비 판이 낸다. 타석에 싣는 결과는 **타석을 끝내기 위한 임시 값**이고(`provisionalOutcomeOf`),
             // 쏜 패턴은 그 결과 객체에 묶어 둔다(`contactOfOutcome`) — 경기 진행기가 그 패턴으로 판을 돌린다
-            resolution: { kind: '타구', outcome: registerContact(provisionalOutcomeOf(pattern), { pattern, resultCode: code }) },
+            resolution: {
+              kind: '타구',
+              outcome: registerContact(provisionalOutcomeOf(pattern), {
+                pattern,
+                resultCode: code,
+                ...(specialSwing === undefined ? {} : { specialSwing }),
+              }),
+            },
             hasSwung: true,
             isBunt: contact.isBunt,
             isBuntFoulOut: false,

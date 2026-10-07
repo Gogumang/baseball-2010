@@ -10,6 +10,7 @@ import {
 } from '@/entities/pitching/model/simulateBatter'
 import type { BatterSituation } from '@/entities/pitching/model/simulateBatter'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
+import { contactOfOutcome } from '@/entities/batting/model/battedContact'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -402,15 +403,21 @@ describe('pitchAgainstBatter — 사구 0x35a20', () => {
 describe('pitchAgainstBatterDetailed — CPU 마타자 필살 (0x34488 → 0x4e136 → 0x34d6c → 0x517e6)', () => {
   const 마타자 = { isMagicBatter: true, specialSwing: { swingNumber: 7, remaining: 2, aceOrder: 2, aceLevel: 4 } }
 
-  it('맞은 공이면 방향·패턴 뒤에 rand(0,1000) 하나를 더 굴리고(30% — 0 이면 성공), 남은 횟수를 1 줄인다', () => {
+  it('맞은 페어 공이면 성공 굴림 0x517e6 의 재료(마타자 30%)를 쏜 공에 싣고 판 시작에 맡긴다 — 여기서는 안 굴리고 남은 횟수만 1 줄인다', () => {
+    // 원본 차례: 메시지 0x11(필살수비 · 표시 패턴 · 폴 굴림) 뒤 517e6 — 수비 판 시작(startDefensePlay)이 굴린다
     const 보통 = 각본([0])
     const 필살 = 각본([0])
     const a = pitchAgainstBatterDetailed(한가운데, 타자(500), 보통, undefined, undefined, { isMagicBatter: true })
     const b = pitchAgainstBatterDetailed(한가운데, 타자(500), 필살, undefined, undefined, 마타자)
     expect(a.resolution.kind).toBe('타구')
+    expect(b.resolution.kind).toBe('타구')
     expect(a).toMatchObject({ isSpecialSwing: false, specialSwingRemaining: null, isUncatchable: false })
-    expect(b).toMatchObject({ isSpecialSwing: true, specialSwingRemaining: 1, isUncatchable: true })
-    expect(필살.used()).toBe(보통.used() + 1)
+    expect(b).toMatchObject({ isSpecialSwing: true, specialSwingRemaining: 1, isUncatchable: false })
+    if (a.resolution.kind !== '타구' || b.resolution.kind !== '타구') throw new Error('타구가 아니다')
+    expect(contactOfOutcome(a.resolution.outcome)?.specialSwing).toBeUndefined()
+    expect(contactOfOutcome(b.resolution.outcome)?.specialSwing?.isAceBatter).toBe(true)
+    expect(contactOfOutcome(b.resolution.outcome)?.specialSwing?.number).toBeGreaterThan(0)
+    expect(필살.used()).toBe(보통.used())
   })
 
   it('헛스윙이면 굴리지 않지만 횟수는 준다 — 소모는 스윙 틱(0x4e136)이라 결과와 무관', () => {

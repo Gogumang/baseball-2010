@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { registerContact } from '@/entities/batting/model/battedContact'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { AUTO_ADVANCE_TICK_MARGIN, beatsThrow } from '@/entities/fielding/model/autoAdvance'
@@ -1709,5 +1710,36 @@ describe('포구 틱 b4292 — 발밑 루에 주자가 서 있는 포구는 결�
     expect(result.log).toContain('64틱 결과 코드 9 — 3번 야수가 2루 위에서 잡았지만 1번 주자가 서 있다 (b4292)')
     // 9 를 내는 틱에도 쥐기는 그대로 돈다(b42c8)
     expect(result.log).toContain('64틱 3번 야수가 잡았다 (종류 0)')
+  })
+})
+
+describe('필살타법 성공 굴림 0x517e6 — 메시지 0x11(필살수비 · 쏘기) 뒤, 판 시작에서', () => {
+  // 코드 15 [49, 802, 799] — 쫓는 야수가 투수·포수가 아니라 필살수비 굴림 둘(점프 · 슬라이딩)이 돈다. 폴에 안 닿는다
+  const 쏜공 = (specialSwing?: { number: number; isAceBatter: boolean }) =>
+    registerContact(땅볼아웃, { pattern: [49, 802, 799, 0], resultCode: 15, ...(specialSwing === undefined ? {} : { specialSwing }) })
+  const 시작 = (outcome: AtBatOutcome, values: readonly number[]) =>
+    startDefensePlay({
+      outcome,
+      trajectory: battedBallTrajectory([49, 802, 799, 0]),
+      bases: EMPTY_BASES,
+      outs: 0,
+      random: 차례난수(values),
+    })
+
+  it('필살수비 두 굴림(실패) 다음 셋째 굴림이 필살타법이다 — 0 이면 15·10 > 0 이라 성공', () => {
+    // 예전 웹은 타석 판정 안에서 먼저 굴려 첫 값(0.999)을 먹고 실패했다
+    expect(시작(쏜공({ number: 1, isAceBatter: false }), [0.999, 0.999, 0]).uncatchable).toBe(true)
+    expect(시작(쏜공({ number: 1, isAceBatter: false }), [0.999, 0.999, 0.999]).uncatchable).toBe(false)
+  })
+
+  it('필살수비는 필살타법 성공 여부와 무관하게 굴린다 — 원본 차례에서는 그때 아직 모른다', () => {
+    // 첫 굴림 0 → 점프 창이 열린다(필살타법 타구라도)
+    const 열림 = 시작(쏜공({ number: 1, isAceBatter: false }), [0, 0])
+    expect(열림.specialDefense.jumpUnlocked).toBe(true)
+    expect(열림.uncatchable).toBe(true)
+  })
+
+  it('필살 스윙이 아닌 공은 굴리지 않는다', () => {
+    expect(시작(쏜공(), [0.999, 0.999, 0]).uncatchable).toBe(false)
   })
 })

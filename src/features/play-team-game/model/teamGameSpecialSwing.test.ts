@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { startDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import { ACE_BATTERS } from '@/entities/game/model/aceOpponent'
@@ -97,20 +98,25 @@ describe('사람이 던지는 타석의 CPU 마타자 필살 — 0x34488 → 0x4
     expect(지켜봄).toBeGreaterThan(0)
   })
 
-  it('필살로 맞힌 인플레이 타구 일부(30%)는 송구공 비트가 서서 수비 입력에 실린다 · 남은 0 이면 하나도 없다', () => {
+  it('필살로 맞힌 인플레이 타구 일부(30%)는 판 시작(0x517e6 — 메시지 0x11 뒤)에서 필살타법 표시가 선다 · 남은 0 이면 하나도 없다', () => {
+    // 굴림은 타석 판정이 아니라 수비 판 시작이 한다 — 수비 입력에는 쏜 공(필살 스윙 재료)만 실린다
+    const 판의필살 = (progress: TeamGameProgress): boolean => {
+      const input = progress.pendingDefensePlay?.input
+      return input !== undefined && input.isUncatchable !== true && startDefensePlay(input).input.isUncatchable === true
+    }
     let 송구공 = 0
     let 남은0송구공 = 0
     for (let seed = 1; seed <= 200; seed += 1) {
       const progress = 상대마타자(시작({}, seed))
       const after = startThrowPitch(progress, 한가운데직구, createSeededRandom(seed + 5000))
-      if (after.pendingDefensePlay?.input.isUncatchable === true) 송구공 += 1
+      if (판의필살(after)) 송구공 += 1
 
       const 다씀 = {
         ...progress,
         opponentSpecialSwingRemaining: progress.opponentSpecialSwingRemaining.map(() => 0),
       }
       const 뒤 = startThrowPitch(다씀, 한가운데직구, createSeededRandom(seed + 5000))
-      if (뒤.pendingDefensePlay?.input.isUncatchable === true) 남은0송구공 += 1
+      if (판의필살(뒤)) 남은0송구공 += 1
       expect(뒤.opponentSpecialSwingRemaining[progress.opponentOrderIndex]).toBe(0)
     }
     expect(송구공).toBeGreaterThan(0)

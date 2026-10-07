@@ -421,18 +421,28 @@ export function pitchAgainstBatterDetailed(
   const drawn = drawScenePattern(code, random)
   // 0x514f2 — 코드 25·26 의 2% 특수 타구 표
   const pattern = launchPatternOf(code, drawn, random)
-  // 0x517e6 — 방향·패턴 뒤. 마타자는 0x34c74 가 번호와 무관하게 30%
-  const isUncatchable = isSpecialSwing && rollSpecialSwing(specialNumber, random, true)
   // 파울 각만 여기서 가른다 — 페어 타구의 안타·아웃은 수비 판이 낸다(`battedBallOutcome.contactOfPattern` 머리말).
   // 2스트라이크 번트 파울은 아웃 (0x9d5e2) — 사람 타석(resolvePitch)과 같은 판정이다
   const contact = contactOfPattern(code, pattern, { strikes: situation.strikes, buntKind })
+  // 0x517e6 — 메시지 0x11(필살수비 · 표시 패턴 · 폴 굴림) 뒤. 마타자는 0x34c74 가 번호와 무관하게 30%.
+  // 판을 도는 페어 타구는 재료만 쏜 공에 실어 수비 판 시작(`startDefensePlay`)이 그 차례에 굴린다 — 판을 아직 안 도는
+  // 파울 · 판정 11 만 여기서 굴린다(사람 타석 `resolvePitch` 와 같다, 미해결)
+  const specialSwing = isSpecialSwing ? { number: specialNumber, isAceBatter: true } : undefined
+  const isUncatchable = contact.kind !== '타구' && isSpecialSwing && rollSpecialSwing(specialNumber, random, true)
   if (contact.kind === '파울') return swung({ kind: '파울' }, isUncatchable)
   if (contact.kind === '번트파울아웃') {
     return swung({ kind: '타구', outcome: registerContact({ kind: '아웃', detail: '직선타아웃' }, null) }, isUncatchable)
   }
   // 타석을 끝내는 임시 결과 — 쏜 패턴을 묶어 투수편 진행기가 그 패턴으로 판을 돌린다(`battedContact`)
   return swung(
-    { kind: '타구', outcome: registerContact(provisionalOutcomeOf(pattern), { pattern, resultCode: code }) },
+    {
+      kind: '타구',
+      outcome: registerContact(provisionalOutcomeOf(pattern), {
+        pattern,
+        resultCode: code,
+        ...(specialSwing === undefined ? {} : { specialSwing }),
+      }),
+    },
     isUncatchable,
   )
 }

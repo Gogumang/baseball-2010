@@ -3,6 +3,7 @@ import { isHitByPitch, plateErrorOf, resolvePitch } from '@/features/play-at-bat
 import type { BattingContext } from '@/features/play-at-bat/model/resolvePitch'
 import { createPatternDeck, lastDrawnPattern } from '@/entities/batting/model/battedBallOutcome'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
+import { contactOfOutcome } from '@/entities/batting/model/battedContact'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
@@ -217,15 +218,18 @@ describe('resolvePitch — 필살 성공 굴림 0x34c74 → 0x517e6', () => {
   const 덱 = () => createPatternDeck(createSeededRandom(11))
   const 필살상황: BattingContext = { ...상황, specialSwing: { number: 1, isAceBatter: false } }
 
-  it('맞은 공이면 방향·패턴 뒤에 rand(0,1000) 하나를 더 굴린다 — 0 이면 15·10 > 0 이라 성공', () => {
+  it('맞은 페어 공이면 성공 굴림 0x517e6 의 재료를 쏜 공에 싣고 판 시작에 맡긴다 — 여기서는 안 굴린다', () => {
+    // 원본 차례: 메시지 0x11(필살수비 · 표시 패턴 · 폴 굴림) 뒤 517e6 — 수비 판 시작(startDefensePlay)이 굴린다
     const 보통 = 세는(0)
     const 필살 = 세는(0)
     const a = resolvePitch(직구(), { frame: 16, shift: 0, buntKind: 0 }, 필살상황, 덱(), 보통.random)
     const b = resolvePitch(직구(), { frame: 16, shift: 0, buntKind: 0, isSpecial: true }, 필살상황, 덱(), 필살.random)
     expect(a.detail.resultCode).not.toBeNull()
     expect(a.isUncatchable).toBe(false)
-    expect(b.isUncatchable).toBe(true)
-    expect(필살.count()).toBe(보통.count() + 1)
+    expect(b.isUncatchable).toBe(false)
+    if (b.detail.resolution.kind !== '타구') throw new Error('페어 타구가 아니다')
+    expect(contactOfOutcome(b.detail.resolution.outcome)?.specialSwing).toEqual({ number: 1, isAceBatter: false })
+    expect(필살.count()).toBe(보통.count())
   })
 
   it('헛스윙이면 굴리지 않는다 — 0xfd2 == 0 은 0x51840 으로 건너뛴다', () => {

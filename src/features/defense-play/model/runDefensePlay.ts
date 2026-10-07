@@ -121,6 +121,8 @@ import {
 import { forecastCatch } from '@/features/defense-play/model/catchForecast'
 import { forecastOptionsOf, launchThrow, type ThrownBall } from '@/features/defense-play/model/throwLaunch'
 import { runnerFateOf, type RunnerFate } from '@/features/defense-play/model/runnerFates'
+import { carryContact, contactOfOutcome } from '@/entities/batting/model/battedContact'
+import { rollSpecialSwing } from '@/entities/batting/model/specialSwing'
 import { settledBatterOutcomeOf } from '@/features/defense-play/model/playOutcome'
 import {
   viewStateOf,
@@ -785,7 +787,8 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
   const maximumTicks = input.maximumTicks ?? DEFAULT_MAXIMUM_TICKS
 
   let fielders = createFielders(abilities)
-  const uncatchable = input.isUncatchable === true
+  // 결과를 넘겨받은 호출(옛 길 · 시험)이 미리 굴려 둔 필살타법 성공. 쏜 공(`contactOfOutcome`)의 필살 스윙은 아래 0x517e6 자리에서 굴린다
+  let uncatchable = input.isUncatchable === true
 
   // ── 포구 예보 ──
   // 원본 예보 0xb12d0 은 틱 구간을 자르지 않고 궤적 끝까지(t = 1 → 공+0x6c − 1) 한 표를 만들고, 0xb3b38 은 낙구 전 포구
@@ -810,7 +813,6 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     skillIds: input.fielderSkillIds?.[forecast.choice.slot],
     gameMode: input.gameMode,
     chaserSlot: forecast.choice.slot,
-    uncatchable,
   })
   // ── 쏘기 + 세계 0xbfed0 (메시지 0x11 의 51172~511a4) — 필살수비 굴림(50fe6 · 51012) 뒤다 ──
   // 궤적 계산 안의 굴림은 폴 충돌 0xa2c64 의 rand(−25, 25) 하나뿐이다. 부르는 쪽은 난수 없이 궤적을 깔아 넘기므로
@@ -825,6 +827,15 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
       jumpUnlocked: specialDefense.jumpUnlocked,
       slideUnlocked: specialDefense.slideUnlocked,
     })
+  }
+  // ── 필살타법 성공 굴림 0x517e6 (0x34c74 · p·10 > rand(0, 1000)) — 메시지 0x11(515c6 → 0x50faa: 필살수비 굴림 · 표시 패턴 ·
+  // 51188 쏘기의 폴 굴림) **뒤**다. 515c6 과 517e6 사이(0x392ac · 0x35988 · 0x39304 · 0x34be0 · 0xac758 · 메시지 0xbc5 진동 ·
+  // 0x494b4 · 0xae89c)에는 굴림이 없다(호출 그래프). 성공하면 517ec 0xaf180(공+0x5c, 4) — 포구 틱 b4246 이 보고 0xbc3.
+  // 예전 웹은 타석 판정 안(방향 · 패턴 바로 뒤)에서 굴려 필살수비 · 폴 굴림보다 앞섰고, "필살타법 타구면 필살수비를 안 굴린다"
+  // 를 두었다 — 원본 차례에서는 필살수비를 굴릴 때 성공 여부를 아직 모른다
+  const swungContact = contactOfOutcome(input.outcome)
+  if (!uncatchable && swungContact?.specialSwing !== undefined && input.random !== undefined) {
+    uncatchable = rollSpecialSwing(swungContact.specialSwing.number, input.random, swungContact.specialSwing.isAceBatter)
   }
   // 잡힐 뜬공인가(vt94) — 고른 포구가 낙구 전(0xb3b38 우선순위 1~5)일 때. 점프·슬라이딩 창이 열려 낙구 전 포구가 생기면
   // 그것도 뜬공이다. 필살타법 타구(공 속성 4 = 필살타법 표시)는 아무도 쥐지 않는다. 실제 뜬공 아웃(state[0x1f])은 쥐는 틱의 0xb36d0 이 낸다
@@ -875,7 +886,8 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
   }
 
   return {
-    input,
+    // 판 시작이 굴린 필살타법 성공(0x517e6)을 입력 칸에 적어 둔다 — 결과의 `isUncatchable` 이 그 값을 낸다
+    input: uncatchable === (input.isUncatchable === true) ? input : { ...input, isUncatchable: uncatchable },
     trajectory,
     abilities,
     maximumTicks,
@@ -2454,7 +2466,8 @@ export function predictedOutcomeOf(input: DefensePlayInput): AtBatOutcome {
  */
 export function withPredictedOutcome(input: DefensePlayInput): DefensePlayInput {
   if (input.outcomeIsGiven === true) return input
-  return { ...input, outcome: predictedOutcomeOf(input) }
+  // 쏜 공(필살 스윙 재료 · 쏜 패턴)은 판 시작이 임시 결과 칸에서 되찾는다 — 갈아 끼운 칸에도 묶어 둔다
+  return { ...input, outcome: carryContact(input.outcome, { ...predictedOutcomeOf(input) }) }
 }
 
 /**
@@ -2477,7 +2490,6 @@ interface SpecialDefenseRollInput {
   readonly skillIds?: readonly number[]
   readonly gameMode?: number
   readonly chaserSlot: number
-  readonly uncatchable: boolean
 }
 
 /**
@@ -2491,7 +2503,6 @@ function rollSpecialDefenseFor(input: SpecialDefenseRollInput): {
 } {
   const 닫힘 = { jumpUnlocked: false, slideUnlocked: false }
   if (input.random === undefined) return 닫힘
-  if (input.uncatchable) return 닫힘
   if (input.gameMode === HOME_RUN_DERBY_MODE) return 닫힘
   if (input.chaserSlot === 0 || input.chaserSlot === 1) return 닫힘
   return rollSpecialDefense(input.ability, input.random, {

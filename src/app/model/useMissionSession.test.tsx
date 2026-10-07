@@ -1049,8 +1049,8 @@ describe('투수편 마선수 대결 — 투수 미션 team − 1 을 던지고 
   })
 
   it('아웃을 잡으면(성공) 이겼다 — G 보상은 없고(0x4ef3e 의 +0x176 갈래) 투수 15번 칸만 −1 → 0 (0xa5368)', () => {
-    // 씨앗 9 — 한가운데 공으로 아웃을 잡는 판. 장면 덱 섞기(0x3e340)가 끼며 씨앗 1 은 맞는 판이 됐다
-    const { status, isWin, after, save, onGamePointReward } = playPitcherAceMatch(9)
+    // 씨앗 1 — 한가운데 공으로 아웃을 잡는 판(필살타법 굴림이 판 시작으로 옮겨 가며 다시 아웃 판이 됐다)
+    const { status, isWin, after, save, onGamePointReward } = playPitcherAceMatch(1)
 
     expect(status).toBe('성공')
     expect(isWin).toBe(true)

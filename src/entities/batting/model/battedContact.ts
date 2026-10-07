@@ -24,6 +24,12 @@ export interface BattedContact {
   readonly pattern: BattedBallPattern
   /** 방향까지 붙인 결과 코드 */
   readonly resultCode: number
+  /**
+   * 필살 스윙(S+0x10 ≠ 0)으로 맞은 공이면 그 성공 굴림 0x517e6(`rollSpecialSwing`)의 재료 — **굴림은 판 시작이 한다**.
+   * 원본은 메시지 0x11(0x515c6 → 0x50faa: 필살수비 굴림 · 표시 패턴 바꿔 쏘기 · 쏘기의 폴 굴림) **뒤**인 517e6 에서 굴리므로
+   * 수비 판 시작(`startDefensePlay`)이 그 차례에 굴린다. 필살 스윙이 아니면 없다.
+   */
+  readonly specialSwing?: { readonly number: number; readonly isAceBatter: boolean }
 }
 
 const CONTACTS = new WeakMap<object, BattedContact>()
@@ -38,6 +44,13 @@ export function registerContact(outcome: AtBatOutcome, contact: BattedContact | 
 /** 이 타석 결과가 페어 타구로 끝났다면 그 패턴. 바깥에서 만든 결과(시험·간이 엔진)면 undefined */
 export function contactOfOutcome(outcome: AtBatOutcome): BattedContact | undefined {
   return CONTACTS.get(outcome)
+}
+
+/** `from` 에 묶인 패턴을 `to` 에도 묶는다 — 판 입력의 임시 결과 칸을 갈아 끼울 때(`withPredictedOutcome`) 쏜 공을 잃지 않게 */
+export function carryContact(from: AtBatOutcome, to: AtBatOutcome): AtBatOutcome {
+  const contact = CONTACTS.get(from)
+  if (contact !== undefined && from !== to) CONTACTS.set(to, contact)
+  return to
 }
 
 /**
