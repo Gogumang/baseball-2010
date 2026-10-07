@@ -125,7 +125,7 @@ import { forecastOptionsOf, launchThrow, type ThrownBall } from '@/features/defe
 import { runnerFateOf, type RunnerFate } from '@/features/defense-play/model/runnerFates'
 import { carryContact, contactOfOutcome } from '@/entities/batting/model/battedContact'
 import { rollSpecialSwing } from '@/entities/batting/model/specialSwing'
-import { settledBatterOutcomeOf } from '@/features/defense-play/model/playOutcome'
+import { isSacrificeOf, settledBatterOutcomeOf, type PlayOutcomeInput } from '@/features/defense-play/model/playOutcome'
 import {
   viewStateOf,
   type ActionMemory,
@@ -440,6 +440,13 @@ export interface DefensePlayResult {
    * 콜을 고르는 쪽(`atBatSounds.inPlayCallSoundIdOf` 의 `buntFoulOut`)이 62 로 고정한다.
    */
   readonly buntFoulOut?: boolean
+  /** **번트 타구였나** — state[0x13](= 장면 +0xfdc, 타구 시작 0x511da 가 옮긴다) ≠ 0. 입력 `buntKind` 그대로다 */
+  readonly buntBall?: boolean
+  /**
+   * **희생 [sp+8]** — 정산 a83e2 ~ a8472(`playOutcome.isSacrificeOf`). 정산이 이 칸으로 타수를 빼고(a884c), 번트 타구면
+   * a88e0 이 결과비트 B6(0x40)을 켠다(`burstResultBits` 의 `runnersAdvanced`). 파울로 닫힌 판은 정산이 없어 없다
+   */
+  readonly sacrifice?: boolean
   /**
    * **아웃 판정(0xb36d0)이 마지막으로 적은 아웃이 태그였나** — 원본 `state[0x87]`.
    *
@@ -2503,6 +2510,17 @@ export function defensePlayResultOf(state: DefensePlayState): DefensePlayResult 
   const runsScored = held.scoreboardRuns
   // 파울로 닫힌 판 — 0xae3e8 ae568 이 정산을 건너뛰고 0x35108 이 0xa975c(주자를 판 앞 자리로) · 0xb6b58(스트라이크) 를 부른다
   const foulEnded = state.foulFlag && !state.flyOut
+  // 정산 0xa8024 가 보는 판 끝 값 — 타자 결과(a8192~a88d4)와 희생 [sp+8](a83e2)이 같은 값을 본다
+  const settleInput: PlayOutcomeInput = {
+    runners: runners.map((runner) => runner.state),
+    previousTargets: runners.map((runner) => runner.previousTarget),
+    hitEvent: state.hitEvent,
+    homeRunEvent: state.homeRunEvent,
+    flyOut: state.flyOut,
+    outEvents: state.outEvents,
+    runsScored,
+    outsAfter: state.outs,
+  }
 
   return {
     advance: foulEnded
@@ -2520,18 +2538,9 @@ export function defensePlayResultOf(state: DefensePlayState): DefensePlayResult 
     // 필살타법으로 친 타구였나 — 첫 야수에게 맞고 튕긴 뒤로는 보통 공이 되지만(0xa2610 이 +0x5c 를 비운다) 결과는 친 공의 표시다
     isUncatchable: state.input.isUncatchable === true,
     caughtOnTheFly: state.flyOut,
-    outcome: foulEnded
-      ? undefined
-      : settledBatterOutcomeOf({
-          runners: runners.map((runner) => runner.state),
-          previousTargets: runners.map((runner) => runner.previousTarget),
-          hitEvent: state.hitEvent,
-          homeRunEvent: state.homeRunEvent,
-          flyOut: state.flyOut,
-          outEvents: state.outEvents,
-          runsScored,
-          outsAfter: state.outs,
-        }),
+    outcome: foulEnded ? undefined : settledBatterOutcomeOf(settleInput),
+    ...((state.input.buntKind ?? 0) !== 0 ? { buntBall: true } : {}),
+    ...(!foulEnded && isSacrificeOf(settleInput) ? { sacrifice: true } : {}),
     tagOut: state.tagOut,
     throwBase: state.firstThrowBase,
     throwArrivalTick: state.firstThrowArrivalTick,

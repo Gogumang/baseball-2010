@@ -1841,6 +1841,9 @@ function resolveBurstFor(
       inningEnded,
       // B5 — 안타 없이 살아 나간 타자주자(야수 선택)도 출루다 (0xa87ba r5)
       batterRunnerSafe: defensePlay === null ? undefined : batterRunnerSafeOfFates(defensePlay.runnerFates),
+      // B6 — 번트 타구(state[0x13]) && (희생 [sp+8] || 득점) (a88e0 · a88f8)
+      isBunt: defensePlay?.buntBall === true,
+      runnersAdvanced: defensePlay?.sacrifice === true,
       // ⚠️ 0xa89f0 — 사람 팀 승리로 경기가 끝나면 홈런·볼넷 비트를 함께 켠다 (P7 K1)
       humanTeamWalkOff:
         progress.game.isFinished && progress.game.ourScore > progress.game.opponentScore,

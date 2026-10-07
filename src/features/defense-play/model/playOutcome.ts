@@ -67,7 +67,8 @@ import type { RunnerState } from '@/entities/fielding/model/fieldingState'
  * ```
  * 곧 "타자주자는 죽고(이닝은 안 끝나고) 공은 땅에 닿았고 득점 · 주자 아웃 없이 투구 때 주자가 있던 루가 비었으면" 희생이다.
  * 공이 안 닿은(잡힌 뜬공) 판은 안타 사건이 없어 희생이 아니고, 득점이 난 판은 a882e(득점 아웃)로 타수에서 빠진다.
- * [sp+8] 은 a88e0 에서 번트(state[0x13])면 결과비트 B6(0x40)도 켠다 — 그 배선(`burstResultBits` 의 `runnersAdvanced`)은 이 파일 밖이다.
+ * [sp+8] 은 a88e0 에서 번트(state[0x13])면 결과비트 B6(0x40)도 켠다 — 판 결과 `DefensePlayResult.sacrifice` 로 흐름이
+ * `burstResultBits` 의 `runnersAdvanced` 에 싣는다.
  */
 
 export interface PlayOutcomeInput {

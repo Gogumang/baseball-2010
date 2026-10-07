@@ -2196,6 +2196,9 @@ function finishBatterOutcome(
     inningEnded,
     humanTeamWalkOff: isWalkOff,
     batterRunnerSafe: defensePlay === null ? undefined : batterRunnerSafeOfFates(defensePlay.runnerFates),
+    // B6 — 번트 타구(state[0x13]) && (희생 [sp+8] || 득점) (a88e0 · a88f8)
+    isBunt: defensePlay?.buntBall === true,
+    runnersAdvanced: defensePlay?.sacrifice === true,
   })
 
   return advance(
@@ -2780,6 +2783,9 @@ function finishDefensiveAtBat(
         humanTeamWalkOff:
           applied.game.isFinished && applied.game.ourScore > applied.game.opponentScore,
         batterRunnerSafe: defensePlay === null ? undefined : batterRunnerSafeOfFates(defensePlay.runnerFates),
+        // B6 — 번트 타구(state[0x13]) && (희생 [sp+8] || 득점) (a88e0 · a88f8)
+        isBunt: defensePlay?.buntBall === true,
+        runnersAdvanced: defensePlay?.sacrifice === true,
       })
     : recorded
 
@@ -3338,6 +3344,10 @@ function resolveBurstFor(
     humanTeamWalkOff: boolean
     /** B5 — 안타 없이 살아 나간 타자주자(야수 선택)도 출루다 (0xa87ba r5). 판 없는 타석은 undefined */
     batterRunnerSafe?: boolean
+    /** B6 — 번트 타구(state[0x13]) */
+    isBunt?: boolean
+    /** B6 — 희생 [sp+8] (`DefensePlayResult.sacrifice`) */
+    runnersAdvanced?: boolean
   },
 ): TeamGameProgress {
   if (progress.burst === null) return progress

@@ -919,7 +919,9 @@ function finishPlayerOutcome(
             humanTeamWalkOff: isWalkOff,
             // B5 — 안타 없이 살아 나간 타자주자(야수 선택)도 출루다 (0xa87ba r5)
             batterRunnerSafe: defensePlay === null ? undefined : batterRunnerSafeOfFates(defensePlay.runnerFates),
-            // 웹 타석에는 번트가 없어 B6·B7 은 늘 꺼져 있다
+            // B6 — 번트 타구(state[0x13]) && (희생 [sp+8] || 득점) (a88e0 · a88f8). ⚠️ B7(a88fc 고리)은 아직 안 싣는다
+            isBunt: defensePlay?.buntBall === true,
+            runnersAdvanced: defensePlay?.sacrifice === true,
           }),
         )
 

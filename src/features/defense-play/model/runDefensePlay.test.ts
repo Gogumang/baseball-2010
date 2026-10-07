@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { BURST_RESULT_BIT, burstResultBitsOf, hasBit } from '@/entities/burst-mission/model/burstResultBits'
 import { registerContact } from '@/entities/batting/model/battedContact'
 import { displayPatternListOf, openScenePatternDeck, scenePatternDeckOf } from '@/entities/batting/model/battedBallOutcome'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
@@ -1819,5 +1820,48 @@ describe('파울 판 — 쏜 공의 파울 각(511b8 state[0x1c])이면 낙구 �
     expect(굴림.log.some((line) => line.includes('잡았다'))).toBe(false)
     expect(굴림.foulEnded).toBe(true)
     expect(굴림.ticks.length).toBe(48)
+  })
+})
+
+describe('희생 [sp+8] · 번트 타구 state[0x13] — 정산 a83e2 · a88e0 이 결과비트 B6(0x40)을 켠다', () => {
+  // 1루 주자 · 무사 땅볼 [51, 435, 315, 1] — 타자만 죽고 1루 주자가 2루로 간다(득점 · 주자 아웃 없음)
+  const 보내기 = (buntKind: number) =>
+    runDefensePlay({
+      outcome: 땅볼아웃,
+      trajectory: battedBallTrajectory([51, 435, 315, 1]),
+      bases: { first: true, second: false, third: false },
+      outs: 0,
+      buntKind,
+    })
+
+  it('번트로 보내면 희생이고 번트 타구다 — B6 이 선다', () => {
+    const 결과 = 보내기(1)
+    expect(결과.advance).toEqual({ bases: { first: false, second: true, third: false }, runsScored: 0, outsAdded: 1 })
+    expect(결과.sacrifice).toBe(true)
+    expect(결과.buntBall).toBe(true)
+    const bits = burstResultBitsOf({
+      outcome: 결과.outcome!,
+      runsBattedIn: 0,
+      outsBefore: 0,
+      outsAdded: 1,
+      isBunt: 결과.buntBall,
+      runnersAdvanced: 결과.sacrifice,
+    })
+    expect(hasBit(bits, BURST_RESULT_BIT.번트진루)).toBe(true)
+  })
+
+  it('스윙 땅볼로 같은 판이면 희생(타수 없음)이지만 번트 타구가 아니라 B6 은 없다', () => {
+    const 결과 = 보내기(0)
+    expect(결과.sacrifice).toBe(true)
+    expect(결과.buntBall).toBeUndefined()
+    const bits = burstResultBitsOf({
+      outcome: 결과.outcome!,
+      runsBattedIn: 0,
+      outsBefore: 0,
+      outsAdded: 1,
+      isBunt: 결과.buntBall,
+      runnersAdvanced: 결과.sacrifice,
+    })
+    expect(hasBit(bits, BURST_RESULT_BIT.번트진루)).toBe(false)
   })
 })

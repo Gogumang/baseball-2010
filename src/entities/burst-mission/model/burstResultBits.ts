@@ -59,7 +59,7 @@ export interface BurstResultBitsInput {
   readonly outsAdded: number
   /** 타자주자가 살아남았는가 (0xa87ba~0xa87fa 의 r5) */
   readonly batterRunnerSafe?: boolean
-  /** 이 플레이로 1~3루 주자가 하나라도 진루했는가 (0xa83f2~0xa848e 의 [sp+8]) */
+  /** **희생 [sp+8]** (0xa83e2~0xa8472, `playOutcome.isSacrificeOf` → `DefensePlayResult.sacrifice`) — 득점 · 주자 아웃 없이 투구 때 주자가 섰던 루가 비고 타자만 죽은 땅에 닿은 공 */
   readonly runnersAdvanced?: boolean
   /** 플레이가 끝난 뒤 2루나 3루에 (아웃되지 않은) 주자가 있는가 — B7 의 루프 0xa88fc */
   readonly runnerInScoringPositionAfter?: boolean
