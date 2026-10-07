@@ -1,4 +1,4 @@
-import { battedBallTrajectory, carryDistanceOf, FENCE_DISTANCE } from '@/entities/batting/model/battedBallFlight'
+import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { lastDrawnPattern } from '@/entities/batting/model/battedBallOutcome'
 import type { PatternDeck } from '@/entities/batting/model/battedBallOutcome'
 
@@ -23,16 +23,17 @@ export const CARRY_THRESHOLD = 111
 /** 플래그가 꺼졌을 때 넘어가는 틱 (0x406e8) */
 export const SHORT_HIT_TICKS = 8
 
+/** 0xa2a88 a2b02 — 거리를 이것으로 나눈다 (0x109) */
+export const CARRY_SCALE_DIVISOR = 265
+
 /**
- * 낙구 지점까지의 거리 → 원본 `공+0xac0` 눈금 (0~160).
- *
- * 원본은 `min(거리 × 0x109…, 160)` 인데(E 2-1b) 곱하는 상수의 남은 자리도, 그 거리가
- * 어떤 단위인지도 문서에 없다. 그래서 **근사다** — 담장 거리(`FENCE_DISTANCE`)를 눈금 160 으로 본다.
- * 그러면 문턱 111 은 담장의 약 70% 지점(≈ 18000)이 된다.
+ * 거리 → 원본 `공+0xac0` 눈금 (0~160) — 마무리 0xa2a88 a2af2~a2b12:
+ * `min(isqrt(dx² + dz²) / 265, 160)`, 거리는 타구 시작점 (20000, 1000, 30000)(0xd7bdc) 에서 낙구점(aa0)까지.
+ * 원본은 이 값을 **담장을 넘은(aa4 ≠ −1) 페어 타구에만** 적는다 — 궤적이 이미 그렇게 든 값이 `trajectory.carryScale` 이다.
  */
 export function carryScaleOf(distance: number): number {
   if (distance <= 0) return 0
-  return Math.min(CARRY_SCALE_MAX, Math.trunc((distance * CARRY_SCALE_MAX) / FENCE_DISTANCE))
+  return Math.min(CARRY_SCALE_MAX, Math.trunc(distance / CARRY_SCALE_DIVISOR))
 }
 
 export interface BigHitInput {
@@ -49,8 +50,7 @@ export interface BigHitInput {
  * 같은 판정이 타구음 7(`features/play-at-bat/model/atBatSounds` 의 `isBigHit`)과 "!" 효과도 고른다 —
  * 타구음은 그쪽이 고르고, 투수 머리 위 "!"(player_effect 애니 13, 0x3912c)는 이 화면에 아직 없다.
  *
- * 웹의 `fenceTick` 은 담장을 **넘어간** 공에도 서므로 원본의 "담장/폴 미접촉" 과 극성이 다르다.
- * 원본이 실제로 보는 칸은 폴 틱 `+0xab0` 하나뿐이라(R15 9-1) 여기서도 `poleTick` 만 본다.
+ * 원본이 실제로 보는 칸은 폴 틱 `+0xab0` · 눈금 `+0xac0` 둘이다(R15 9-1) — 담장 틱 `+0xaa4` 는 안 본다.
  */
 export function isBigHit({ resultCode, poleTick, carryScale }: BigHitInput): boolean {
   if (poleTick >= 0) return false
@@ -109,6 +109,6 @@ export function pauseInputOf(resultCode: number, deck: PatternDeck): HitPauseInp
     angle: pattern[0],
     landingTick: trajectory.landingTick,
     poleTick: trajectory.poleTick,
-    carryScale: carryScaleOf(carryDistanceOf(trajectory)),
+    carryScale: trajectory.carryScale,
   }
 }

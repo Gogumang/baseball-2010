@@ -13,7 +13,8 @@ const 뜬공구간 = (landingTick: number) => ({ from: 0, to: landingTick })
 
 describe('포구 예보 — 가장 먼저 닿는 야수가 잡는다 (P2 2a)', () => {
   it('가운데 깊은 뜬공은 중견수(8)가 잡는다', () => {
-    const 궤적 = battedBallTrajectory([90, 900, 1500, 0])
+    // 원본 코드 0 [92, 895, 1017] — 낙구 24 전 23틱에 중견수
+    const 궤적 = battedBallTrajectory([92, 895, 1017, 0])
     const 예보 = forecastCatch(궤적, 야수들, 뜬공구간(궤적.landingTick))
 
     expect(예보.choice.slot).toBe(8)
@@ -70,7 +71,8 @@ describe('포구 예보 — 가장 먼저 닿는 야수가 잡는다 (P2 2a)', (
  */
 describe('거리 d 가 실제로 계산된다 — 포구 반경과 필살 창이 살아 있다 (P2 2a)', () => {
   it('필살 슬라이딩 창을 열면 슬라이딩 캐치(종류 4)가 실제로 골라진다', () => {
-    const 궤적 = battedBallTrajectory([92, 955, 1159, 0])
+    // 원본 코드 3 [55, 700, 200] — 낮게 깔린 타구라 낙구(8) 전엔 보통 포구가 없고, 슬라이딩 창이 열리면 1루수가 6틱에 몸을 던진다
+    const 궤적 = battedBallTrajectory([55, 700, 200, 0])
     const 닫힘 = forecastCatch(궤적, 야수들, 뜬공구간(궤적.landingTick))
     const 열림 = forecastCatch(궤적, 야수들, 뜬공구간(궤적.landingTick), { slideUnlocked: true })
 

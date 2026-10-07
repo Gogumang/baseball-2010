@@ -49,7 +49,7 @@ describe('주자 운명 목록 — 정산 0xa8024 가 읽는 +0x95·+0x96', () =
     // 2아웃 땅볼 — 타자주자가 1루에서 죽는 틱에 3루 주자가 홈을 밟아 보류(0xaa1c0), 3아웃이라 안 풀린다(0xaa388)
     const 결과 = runDefensePlay({
       outcome: 땅볼아웃,
-      trajectory: battedBallTrajectory([74, 722, 362, 0]),
+      trajectory: battedBallTrajectory([70, 1000, 202, 0]), // 원본 코드 3
       bases: 주자3루,
       outs: 2,
       runAbility: 500,

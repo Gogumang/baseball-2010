@@ -8,7 +8,7 @@ import {
   pauseInputOf,
   SHORT_HIT_TICKS,
 } from '@/widgets/batting-stage/lib/hitPause'
-import { FENCE_DISTANCE } from '@/entities/batting/model/battedBallFlight'
+import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { createPatternDeck, drawPattern } from '@/entities/batting/model/battedBallOutcome'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 
@@ -36,15 +36,22 @@ describe('감상 플래그 +0x199a (0x392ac)', () => {
   })
 })
 
-describe('낙구 거리 눈금 공+0xac0 (근사)', () => {
-  it('담장 거리를 눈금 160 으로 보고 상한에서 자른다', () => {
-    expect(carryScaleOf(FENCE_DISTANCE)).toBe(160)
-    expect(carryScaleOf(FENCE_DISTANCE * 2)).toBe(160)
+describe('낙구 거리 눈금 공+0xac0 — 마무리 0xa2a88', () => {
+  it('거리 ÷ 265 를 160 에서 자른다', () => {
+    expect(carryScaleOf(265 * 160)).toBe(160)
+    expect(carryScaleOf(265 * 400)).toBe(160)
+    expect(carryScaleOf(265 * 111 + 264)).toBe(111)
     expect(carryScaleOf(0)).toBe(0)
   })
 
-  it('담장의 절반이면 80 쯤이다', () => {
-    expect(carryScaleOf(FENCE_DISTANCE / 2)).toBe(80)
+  it('궤적은 담장을 넘은 페어 타구에만 눈금을 든다 — 원본 패턴 그대로', () => {
+    // 코드 24 [126, 1337, 1006] 은 담장을 넘어 페어로 떨어지고, 코드 0 첫 패턴 [90, 810, 1592] 는 담장 면에 맞는다
+    const 넘김 = battedBallTrajectory([126, 1337, 1006, 0])
+    const 담장면 = battedBallTrajectory([90, 810, 1592, 0])
+    expect(넘김.fenceTick).toBeGreaterThan(0)
+    expect(넘김.carryScale).toBeGreaterThan(0)
+    expect(담장면.fenceTick).toBe(-1)
+    expect(담장면.carryScale).toBe(0)
   })
 })
 

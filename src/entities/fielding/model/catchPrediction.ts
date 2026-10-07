@@ -11,8 +11,8 @@ import {
  * 틱마다 "종류별 가장 이른 포구 틱" 표를 만든다. 그래서 수비는 "가장 가까운 야수"가 아니라
  * **가장 먼저 잡을 수 있는 야수**를 고른다 (P2 2a·1a, 확정).
  *
- * 궤적 자체(타구 물리)는 이 저장소에서 아직 안 푼 영역이다 — `BattedBallTrajectory` 인터페이스만 두고
- * 값은 바깥에서 넣는다. **투구 궤적은 pitch.zt1 원본 데이터를 쓰기로 이미 정해져 있다**(D 결정).
+ * 궤적 자체(타구 물리 — 세계 0xbfed0 · 공 vtable 0xd7afc)는 `entities/batting/model/ballPhysics` 가 원본대로 깐다.
+ * 이 파일은 `BattedBallTrajectory` 인터페이스만 둔다. **투구 궤적은 pitch.zt1 원본 데이터를 그대로 쓴다**(D 결정).
  */
 
 /** 타구 궤적. 원본 공 객체 +0x74(점 목록) · +0x6c(점 개수) · +0xaa0(낙구 틱) 에 대응한다 */
@@ -29,6 +29,25 @@ export interface BattedBallTrajectory {
   readonly poleTick: number
   /** 타구 시작점이 표준 배팅 지점 (20000, 1000, 30000) 인가 — 다이빙 후보 판정의 전제 (P2 2a) */
   readonly startedAtPlate: boolean
+  /**
+   * 담장 면(높이 ≤ 1999)에 맞고 꺾인 첫 틱 (공 +0xaa8). 없으면 −1.
+   * 손으로 만든 시험 궤적은 안 줘도 된다 — 원본 물리(`battedBallFlight`)가 만든 궤적만 싣는다.
+   */
+  readonly wallTick?: number
+  /** 담장을 넘은 페어 타구의 낙구 거리 눈금 0~160 (공 +0xac0, 0xa2a88) */
+  readonly carryScale?: number
+  /**
+   * t 번째 점의 원본 칸 — 속도(+0xc) · 수직 속도(+0xe) · 각(+0x10) · 바운드 표시(+0x12) (0xa29bc).
+   * 손으로 만든 궤적에는 없다.
+   */
+  pointDetailAt?(tick: number): {
+    readonly speed: number
+    readonly verticalSpeed: number
+    readonly angle: number
+    readonly bounceMark: number
+  }
+  /** 공+0x68 = t 일 때 공 vt18(0xa27f0) 멈춤 — 손으로 만든 궤적에는 없다 */
+  isStoppedAt?(tick: number): boolean
 }
 
 /** 포구 종류 (+0x16c). 고르기 우선순위와 동작 시작 틱이 여기에 달려 있다 */

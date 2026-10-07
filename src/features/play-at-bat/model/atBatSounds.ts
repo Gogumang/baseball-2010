@@ -1,6 +1,6 @@
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import type { AtBatState, PitchResolution } from '@/entities/at-bat/model/atBatState'
-import { battedBallTrajectory, carryDistanceOf, FENCE_DISTANCE } from '@/entities/batting/model/battedBallFlight'
+import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 
 /**
@@ -33,22 +33,6 @@ export const PITCH_RELEASE_SOUND = 12
 const BIG_HIT_CODES: ReadonlySet<number> = new Set([24, 25, 26])
 /** 0x392ac 의 `공+0xac0 > 111` */
 const CARRY_THRESHOLD = 111
-/** 원본 `공+0xac0` 눈금의 상한 (E 2-1b) */
-const CARRY_SCALE_MAX = 160
-
-/**
- * 낙구 거리 → 원본 `공+0xac0` 눈금 (0~160). **근사다** — 곱하는 상수를 문서가 안 적어
- * 담장 거리를 눈금 160 으로 본다.
- *
- * ⚠️ 같은 식이 `widgets/batting-stage/lib/hitPause.ts` 에도 있다 (화면을 붙잡아 두는 틱을 고를 때).
- * 그 파일은 이 작업의 담당 폴더 밖이라 합치지 않고 같은 식을 여기 다시 적었다 —
- * 한쪽을 고치면 다른 쪽도 같이 고쳐야 한다.
- */
-function carryScaleOf(distance: number): number {
-  if (distance <= 0) return 0
-  return Math.min(CARRY_SCALE_MAX, Math.trunc((distance * CARRY_SCALE_MAX) / FENCE_DISTANCE))
-}
-
 /**
  * 0x392ac — 큰 타구(감상 플래그 `+0x199a`) 판정. 타구음 7 과 상태 19 연출을 같이 고른다.
  * 원본이 보는 칸은 결과 코드 · 폴 틱 `+0xab0` · 거리 눈금 `+0xac0` 셋이다 (R15 9-1).
@@ -57,7 +41,8 @@ function isBigHit(resultCode: number, pattern: BattedBallPattern): boolean {
   if (!BIG_HIT_CODES.has(resultCode)) return false
   const trajectory = battedBallTrajectory(pattern)
   if (trajectory.poleTick >= 0) return false
-  return carryScaleOf(carryDistanceOf(trajectory)) > CARRY_THRESHOLD
+  // 공+0xac0 = 마무리 0xa2a88 이 담장을 넘은 페어 타구에 적은 낙구 거리 눈금(÷265, 상한 160)
+  return trajectory.carryScale > CARRY_THRESHOLD
 }
 
 /**

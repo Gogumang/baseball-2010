@@ -230,7 +230,7 @@ describe('슬라이딩 소리 10 (0x5268c · 0x5199c)', () => {
     try {
       const input: DefensePlayInput = {
         outcome: { kind: '아웃', detail: '땅볼아웃' },
-        trajectory: battedBallTrajectory([92, 698, 565, 0]),
+        trajectory: battedBallTrajectory([113, 500, 300, 0]), // 원본 코드 3
         bases: 주자1루,
         outs: 0,
         runAbility: 500,

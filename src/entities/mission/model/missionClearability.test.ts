@@ -220,13 +220,13 @@ describe('판정 규칙', () => {
    * 자동 진루 0xaf918 이 2루 주자를 홈까지 불러들인다 (P2 7절 "1루타에 2루 주자 득점").
    * 실점 한도 1 짜리 미션이라 그 자리에서 실패다. 씨앗이 아니라 **상태로 못 박았다**.
    */
-  it('투수 5번 — 단타는 2루 주자가 3루에 서서 버티고, 2루타는 실점 한도 1 에 닿아 실패다', () => {
-    // 투수편은 사람 수비 · 송구 설정 기본 수동이다. 키를 안 누르면 원본은 아무도 던지지 않아
-    // (0xb1c90 자동 가지에는 송구 호출이 없다) 공 쥔 외야수가 공을 들고 있고, 자동 진루 0xaf918 의
-    // 수비 틱 예측(0xaf284)이 그 외야수 → 홈으로 잡혀 2루 주자는 3루에서 멈춘다.
+  it('투수 5번 — 2루 주자가 있어 단타·2루타 모두 실점 한도 1 에 닿아 실패다', () => {
+    // 투수편은 사람 수비 · 송구 설정 기본 수동이다. 키를 안 누르면 원본은 아무도 던지지 않는다
+    // (0xb1c90 자동 가지에는 송구 호출이 없다). 대표 단타(원본 코드 2 [47, 1038, 596])는 원본 궤적으로
+    // 1루 쪽 깊숙이 떨어져 우익수가 늦게 줍고, 자동 진루 0xaf918 이 2루 주자를 홈까지 보낸다.
     const afterSingle = applyPitcherOutcome(startPitcherMission(findMission('투수', 5)), SINGLE)
-    expect(afterSingle.allowed.runs).toBe(0)
-    expect(afterSingle.status).toBe('진행중')
+    expect(afterSingle.allowed.runs).toBe(1)
+    expect(afterSingle.status).toBe('실패')
 
     expect(applyPitcherOutcome(startPitcherMission(findMission('투수', 5)), DOUBLE).status).toBe('실패')
   })

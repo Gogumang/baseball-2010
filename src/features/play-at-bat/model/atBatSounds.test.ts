@@ -63,13 +63,15 @@ describe('타구 순간 소리 (0x515de~0x5164a)', () => {
   })
 
   it('홈런성 결과 코드로 멀리 날아가면 특수 타구 7 (0x392ac) — 번트보다도 먼저다', () => {
-    const 큰타구 = 패턴(90, 1500, 1200)
+    // 원본 코드 24 [126, 1337, 1006] — 담장을 넘어 페어로 떨어져 0xa2a88 이 ac0 = 121 (> 111) 을 적는다
+    const 큰타구 = 패턴(126, 1337, 1006)
     expect(contactSoundIdOf({ hasSwung: true, hasHit: true, buntKind: 0, resultCode: 24, pattern: 큰타구 })).toBe(7)
     expect(contactSoundIdOf({ hasSwung: true, hasHit: true, buntKind: 1, resultCode: 24, pattern: 큰타구 })).toBe(7)
   })
 
   it('폴에 맞는 각(45·135)이면 큰 타구로 보지 않는다 (0x392ac 의 +0xab0 == −1)', () => {
-    expect(contactSoundIdOf({ hasSwung: true, hasHit: true, buntKind: 0, resultCode: 24, pattern: 패턴(45, 1500, 1200) })).toBe(5)
+    expect(contactSoundIdOf({ hasSwung: true, hasHit: true, buntKind: 0, resultCode: 24, pattern: 패턴(45, 1402, 991) })).toBe(5)
+    // ↑ 원본 코드 24 [45, 1402, 991] — 틱 20 에 1루 쪽 폴(ab0)에 맞는다 → 큰 타구가 아니라 강한 타구 5
   })
 
   it('세기 800 을 넘고 세기+|높이| 가 1599 를 넘으면 강한 타구다 — 높이 부호는 안 본다 (0xb0614 플래그)', () => {

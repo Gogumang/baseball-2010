@@ -1249,7 +1249,21 @@ def generate_batted_ball_patterns() -> None:
             f'[{w >> 23}, {(w >> 11) & 0xFFF}, {w & 0x7FF}, {flag}]' for w, flag in zip(words, code_flags)
         )
         lines.append(f'  {code}: [{items}],')
+    header = PATTERN_FILE.read_bytes()[:PATTERN_BASE]
     body = [
+        '/**',
+        ' * 원본 data/pattern.dat 머리 바이트 4~8 — 장면 초기화 0x3edd0 이 공 두 개(타구 · 송구)에 싣는다.',
+        ' * 4 → 공+0x44 중력(0xbef18) · 5 → +4 바운드 수평 % · 6 → +8 바운드 수직 % · 7 → +0xc 구르기 % ·',
+        ' * 8 → +0x10 멈춘 공 수직 %. 쓰는 곳은 공 한 틱 0xbf094(0xa28c0 · 0xa292c · 0xbf348).',
+        ' */',
+        'export const BATTED_BALL_PHYSICS = {',
+        f'  gravity: {header[4]},',
+        f'  bounceHorizontalPercent: {header[5]},',
+        f'  bounceVerticalPercent: {header[6]},',
+        f'  rollPercent: {header[7]},',
+        f'  restVerticalPercent: {header[8]},',
+        '} as const',
+        '',
         '/**',
         ' * 원본 data/pattern.dat · pattern_plag.dat — 타구 결과 코드(0~26, 21~23 없음)별 타구 패턴.',
         ' * 항목 = [a, b, c, 플래그]. u32 w 에서 a = w>>23, b = (w>>11)&0xfff, c = w&0x7ff (0xb0614 · 위치 분석 3차).',

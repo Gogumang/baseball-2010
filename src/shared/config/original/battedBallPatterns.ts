@@ -2,6 +2,19 @@
 // 직접 고치지 말고 생성기를 고칠 것.
 
 /**
+ * 원본 data/pattern.dat 머리 바이트 4~8 — 장면 초기화 0x3edd0 이 공 두 개(타구 · 송구)에 싣는다.
+ * 4 → 공+0x44 중력(0xbef18) · 5 → +4 바운드 수평 % · 6 → +8 바운드 수직 % · 7 → +0xc 구르기 % ·
+ * 8 → +0x10 멈춘 공 수직 %. 쓰는 곳은 공 한 틱 0xbf094(0xa28c0 · 0xa292c · 0xbf348).
+ */
+export const BATTED_BALL_PHYSICS = {
+  gravity: 90,
+  bounceHorizontalPercent: 75,
+  bounceVerticalPercent: 50,
+  rollPercent: 95,
+  restVerticalPercent: 0,
+} as const
+
+/**
  * 원본 data/pattern.dat · pattern_plag.dat — 타구 결과 코드(0~26, 21~23 없음)별 타구 패턴.
  * 항목 = [a, b, c, 플래그]. u32 w 에서 a = w>>23, b = (w>>11)&0xfff, c = w&0x7ff (0xb0614 · 위치 분석 3차).
  * 뜻(추정): a 수평각(90 = 가운데, 45~135 밖이면 파울) · b 타구 속도 · c 높이. 플래그 비트0 = c 부호 반전.

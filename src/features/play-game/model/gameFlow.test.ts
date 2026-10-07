@@ -268,7 +268,7 @@ describe('사람 타석은 수비 시뮬레이션을 돌린다 — CPU 간이 �
   })
 
   it('깊은 뜬공은 3루 주자를 불러들이고, 얕은 뜬공은 못 불러들인다 (희생플라이 보장 제거)', () => {
-    const 깊은뜬공: BattedBallPattern = [90, 900, 1500, 0]
+    const 깊은뜬공: BattedBallPattern = [92, 895, 1017, 0] // 원본 코드 0 — 중견수가 낙구 전 23틱에 잡는다
     const 얕은뜬공: BattedBallPattern = [90, 250, 700, 0]
     const 시작 = 내타석({ first: false, second: false, third: true }, 0)
     const 뜬공아웃 = { kind: '아웃', detail: '뜬공아웃' } as const
@@ -290,7 +290,7 @@ describe('사람 타석은 수비 시뮬레이션을 돌린다 — CPU 간이 �
    * 3아웃이면 영영 안 풀린다(0xaa388). 타자주자가 살아 뛰던 때 바로 올린 득점은 남는다(원본 그대로).
    */
   it('2아웃에 타자주자가 죽은 뒤 홈을 밟은 3루 주자 득점은 무효가 된다 (0xaa1c0 · 0xaa388)', () => {
-    const 땅볼: BattedBallPattern = [70, 1068, 455, 0]
+    const 땅볼: BattedBallPattern = [80, 800, 150, 0] // 원본 코드 3 — 원본 궤적에서 타자주자가 죽는 틱에 3루 주자가 홈을 밟는다
     const 땅볼아웃 = { kind: '아웃', detail: '땅볼아웃' } as const
     const 이사 = 내타석({ first: false, second: false, third: true }, 2)
     const play = applyPlayerOutcome(이사, 땅볼아웃, createSeededRandom(3), { pattern: 땅볼 }).lastDefensePlay!
@@ -381,7 +381,7 @@ describe('환경설정 "주루" 가 나만의리그 타자편에도 먹는다 (�
   //          = (경기[0x31 + 경기[9](공격측)] == 1) || (설정+0xbd != 0)
   //   그 값이 0 이면 52660 의 자동 진루 제어기(0xaf8c0 = vt8 = 0xaf918)를 통째로 안 돌린다.
   // 타자편은 사람이 늘 공격이라 앞 항이 늘 거짓 → 설정이 그대로 먹는다.
-  const 깊은뜬공: BattedBallPattern = [90, 900, 1500, 0]
+  const 깊은뜬공: BattedBallPattern = [92, 895, 1017, 0] // 원본 코드 0 — 중견수가 낙구 전 23틱에 잡는다
   const 땅볼: BattedBallPattern = [45, 300, 200, 0]
   const 뜬공아웃 = { kind: '아웃', detail: '뜬공아웃' } as const
 
