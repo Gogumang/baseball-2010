@@ -230,7 +230,7 @@ describe('슬라이딩 소리 10 (0x5268c · 0x5199c)', () => {
     try {
       const input: DefensePlayInput = {
         outcome: { kind: '아웃', detail: '땅볼아웃' },
-        trajectory: battedBallTrajectory([113, 500, 300, 0]), // 원본 코드 3
+        trajectory: battedBallTrajectory([81, 897, 290, 1]), // 원본 표 패턴(코드 3 땅볼) — 손 패턴 [113,500,300] 은 다리 없이 돌리면 투수가 뜬 채 잡는다
         bases: 주자1루,
         outs: 0,
         runAbility: 500,
