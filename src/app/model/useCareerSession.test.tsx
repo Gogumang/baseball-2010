@@ -1116,3 +1116,64 @@ describe('143 경기 전 엔트리 보기 — 142 위에 선다 (0x16af8 · 0x14
     expect(rendered.result.current.session.progress?.aces?.ours).toEqual({ batter: aces?.myBatter, pitcher: aces?.myPitcher })
   })
 })
+
+describe('이어하기 S+0x50 == 2 → 116 다시 띄우기 (0x1c154 1c26a · 0x1278c — 겹쳐 쌓인다)', () => {
+  const 지난경기 = {
+    summary: {
+      result: '승' as const, ourScore: 5, opponentScore: 2,
+      stats: { ...createCareer('x').stats, atBats: 4, hits: 2 },
+      popularityPoints: 3, doublePlays: 0, scoringPositionOuts: 0,
+      reputationCounts: { grandSlams: 0, walkOffs: 0, walks: 0, goAheadRuns: 0 },
+      ourTeamId: 0, opponentTeamId: 1, recordIds: [],
+    },
+    evaluation: { popularityChange: 2, reputationChange: 3, moraleChange: 1, commentIndex: 40 },
+  }
+  // 116 진입이 저장한 자리 — 연속 기록 칸(안타 2개 이상 3경기 → 알림 · 평판 +10)은 정산이 이미 이었다
+  const 평가중 = (): PlayerCareer => ({
+    ...createCareer('평가'),
+    gamesPlayed: 3,
+    seasonEndState: 116,
+    lastGame: 지난경기 as unknown as PlayerCareer['lastGame'],
+    seasonPopularityGain: 10,
+    reputation: 300,
+    streaks: { multiHit: 3, homeRun: 0, hitless: 0 },
+  })
+
+  it('평가 창을 다시 띄우고 경기 뒤 카운터를 한 번 더 쓴다 — 정산(G · 평가 · 리그)은 다시 안 돈다', () => {
+    const rendered = 띄우기(평가중())
+    const screen = rendered.result.current.screen
+    expect(screen.kind).toBe('경기결과')
+    if (screen.kind !== '경기결과') return
+    expect(screen.gamePointReward).toBe(0)
+    expect(screen.evaluation).toEqual(지난경기.evaluation)
+    expect(screen.streakNotices.map((notice) => notice.reputationChange)).toEqual([10])
+    const career = rendered.result.current.session.career!
+    // +0x1c2 += +0x4a (12c1e~12c30) — 한 번 더
+    expect(career.seasonPopularityGain).toBe(12)
+    expect(career.gamesPlayed).toBe(3)
+    expect(career.reputation).toBe(300)
+    expect(career.seasonEndState).toBe(116)
+  })
+
+  it('[확인] = 114 가 이벤트를 틀며 연속 기록 보상을 먹는다 — 116 에서 끊고 이어하면 카운터만 또 쌓인다', () => {
+    const 첫 = 띄우기(평가중())
+    act(() => 첫.result.current.session.actions.confirmGameResult())
+    expect(첫.result.current.session.career?.reputation).toBe(310)
+    // 114 진입이 2 → 3 으로 내리고, 관리 주기가 아니라 [114 → 109] 의 109 진입이 4 를 쓴다
+    expect(첫.result.current.screen).toEqual({ kind: '다음경기순위', fromManagement: false })
+    expect(첫.result.current.session.career?.seasonEndState).toBe(109)
+
+    // 116 에서 끊고 두 번 이어하면 카운터는 두 번 더, 보상은 마지막 114 에서 한 번
+    const 둘 = 띄우기(평가중())
+    const 셋 = 띄우기(둘.result.current.session.career!)
+    expect(셋.result.current.session.career?.seasonPopularityGain).toBe(14)
+    act(() => 셋.result.current.session.actions.confirmGameResult())
+    expect(셋.result.current.session.career?.reputation).toBe(310)
+    expect(셋.result.current.session.career?.seasonPopularityGain).toBe(14)
+  })
+
+  it('지난 경기 재료가 없는 옛 저장은 예전처럼 116 의 끝으로 가른다', () => {
+    const rendered = 띄우기({ ...평가중(), lastGame: undefined })
+    expect(rendered.result.current.screen).toEqual({ kind: '다음경기순위', fromManagement: false })
+  })
+})

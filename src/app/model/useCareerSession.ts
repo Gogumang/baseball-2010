@@ -43,6 +43,7 @@ import {
   gainGamePoint,
   countGameForSkills,
   MAXIMUM_GAME_POINT,
+  nariLastGameOf,
 } from '@/entities/career/model/playerCareer'
 import {
   applyKoreanSeriesReward,
@@ -108,7 +109,7 @@ import { applyEventRewards } from '@/entities/story/model/eventReward'
 import { rollTrainingInjury } from '@/entities/career/model/condition'
 import type { ManagementDetail } from '@/app/model/managementDetail'
 import { restDetailChangesOf, trainingDetailChangesOf } from '@/pages/management/lib/detailPopup'
-import { evaluateGame, updateStreaks } from '@/entities/career/model/gameEvaluation'
+import { advanceStreaks, evaluateGame, streakEventOf } from '@/entities/career/model/gameEvaluation'
 import type { GameEvaluation } from '@/entities/career/model/gameEvaluation'
 import type { EventReward } from '@/entities/story/model/eventReward'
 import type { ManagementCommand } from '@/pages/management/ui/ManagementScreen'
@@ -577,13 +578,14 @@ export function useCareerSession({
       //    (0xa8362·0xa8498·0xa84d6·0xa8538·0xa8578·0xa85c4·0xa8866·0xa895c …)이 막힌다 — 어느 칸이 웹 `applyGameResult`
       //    의 어느 줄인지 아직 다 짝짓지 못해 기록은 그대로 센다.
       const counted = countGameForSkills(evaluated, evaluation.popularityChange)
-      const streak = updateStreaks(counted, summary.stats)
-      const streakReputation = streak.notices.reduce((total, notice) => total + notice.reputationChange, 0)
+      // 연속 기록 칸을 잇는다. 116 의 0x8a6fc 는 그 칸을 읽어 알림 줄과 **보상 명령**(평판 · 슬럼프 스킬)을 내장 이벤트에
+      // 쌓을 뿐이라, 보상은 114 가 이벤트를 틀 때(웹은 [확인] `confirmGameResult`) 먹는다 (`streakEventOf`)
+      const advanced = advanceStreaks(counted, summary.stats)
       // 부상은 경기 뒤가 아니라 훈련 결과 창을 닫을 때 굴린다 (0x1b4c4)
-      const rolled = gainReputation(streak.career, streakReputation)
-      // 경기 뒤 평가 116 진입 0x1278c 가 S+0x50 = 2 · 저장 — 시즌 끝 사슬 상태를 벗어난다 (이어하기는 116 의 끝처럼 가른다).
+      // 경기 뒤 평가 116 진입 0x1278c 가 S+0x50 = 2 · 저장 — 이어하기가 116 을 다시 띄운다(`continueSaved`). S 의 +0x4a ·
+      // +0x1d8 처럼 지난 경기 재료를 저장에 남긴다(`lastGame`).
       // 칭호는 여기서 주지 않는다 — 판정 0x1a1c0 은 관리 화면 갱신 0x1aec4 에서만 돈다 (`pendingTitle`)
-      setCareer(rolled.seasonEndState === null ? rolled : { ...rolled, seasonEndState: null })
+      setCareer({ ...advanced, seasonEndState: 116, lastGame: nariLastGameOf(summary, evaluation) })
       // 경기 끝 0x4ea0c: 기록 달성 G 합을 저장 G 에 더한 뒤 0x4ec82 `0x22c7d(액수, 모드 4)` 로 획득 GP 통계에 적는다
       recordStat({ kind: 'G획득', mode: BATTER_LEAGUE_MODE, amount: gamePointRewardOf(summary) })
       // 이어서 0x4ec8a `0x22e10` 이 이번 경기 기록 배열 40칸을 연감 달성 횟수 [+4+n] 에 더한다 (e48e922)
@@ -595,7 +597,7 @@ export function useCareerSession({
         // 원본 116 은 0x1a1c0 칭호를 띄우지 않는다 — 얻은 칭호는 관리 화면에서 하나씩 팝업으로 받는다
         newTitles: [],
         evaluation,
-        streakNotices: streak.notices,
+        streakNotices: streakEventOf(advanced).notices,
       })
     },
     [aceLevels, audio, random, recordStat, setScreen],
@@ -1024,18 +1026,34 @@ export function useCareerSession({
      * 128 은 진입 0x120a4 를 다시 밟는다(S+0x77 이 서 있으면 정규시즌 우승 팝업을 다시 안 띄운다).
      * 팝업 7·8 은 저장되지 않는다 — 원본도 128 [확인]이 우승 팀 발표부터 다시 띄우고, 팝업 8 보상은 132 진입과 함께 적힌다.
      *
-     * ⚠️ 미해결: S+0x50 == 2(1c26a) 면 원본은 **116 을 다시 띄운다**. 116 진입 0x1278c 는 S+0x50 = 2 · 저장 뒤 S 의 칸
-     *    (+7 · 사기 0xa3a25 · +0x4a 인기도 변화 · 인기도 0xb6e79 · +0x64 · +0x62 평판 · S+0x1d8 기록)으로 0x8a6fc(12b6e)를
-     *    부르고 경기 뒤 카운터(12bc2~12c3c: 0xa3a75 · 0xa3a25 · +0x1c7 · +0x1cd …)를 다시 쓴 뒤 저장 → [114 → 105/109/136/128].
-     *    곧 이어하기마다 그 일이 한 번 더 일어난다(원본 그대로라면 겹쳐 쌓인다). 웹은 지난 경기 재료(요약·평가)를 저장에 두지
-     *    않아 116 을 다시 세울 수 없다 — 지금은 116 의 끝처럼 갈라 105/109 로 간다(예전 근사). 0x8a6fc 의 인자 짝과
-     *    S+0x1d8 기록 칸을 다 짝지은 뒤 옮길 것.
+     *
+     * **S+0x50 == 2(1c26a) 면 116 을 다시 띄운다** (0x1278c 직접 떴다): 진입이 S+0x50 = 2 · 저장 뒤 S 의 칸(+7 · 사기 0xa3a25 ·
+     * +0x4a 인기도 변화 · 인기도 0xb6e79 · +0x64 · +0x62 평판 · S+0x1d8 기록)으로 0x8a6fc(12b6e)를 불러 평가 내장 이벤트를 다시
+     * 쌓고, 경기 뒤 카운터(12bc2~12c3c: +0x1c7 무력감 · +0x1c2 += +0x4a · 0xa4d09 · +0x1cd/+0x1c0 먹튀)를 **다시 쓴 뒤** 저장 →
+     * [114 → 105/109/136/128]. 114 가 그 이벤트를 틀면 연속 기록 보상 명령도 다시 먹는다 — 이어하기마다 겹쳐 쌓인다(원본 그대로).
+     * 경기 정산(0x4ea0c — 승패 · G · 평가 0xa719c · 리그 하루)은 다시 안 돈다. 결과 판(상태 0x18)의 승패 징글도 없다.
      */
     continueSaved: () => {
       if (savedCareer === null) return
       // 장면 0x106 이 새로 선다 — 장면+0x288 = 0 (0xfb7c)
       matchPreparedRef.current = false
       setShouldForgetRepeatable(true)
+      const lastGame = savedCareer.lastGame
+      if (savedCareer.seasonEndState === 116 && lastGame !== undefined) {
+        // 116 진입 0x1278c 다시 — 카운터를 한 번 더 쓰고(겹쳐 쌓임) 평가 창을 다시 띄운다
+        const replayed = countGameForSkills(savedCareer, lastGame.evaluation.popularityChange)
+        setCareer(replayed)
+        playSoundIds(audio, [evaluationJingleIdOf(lastGame.evaluation.popularityChange)])
+        return setScreen({
+          kind: '경기결과',
+          summary: lastGame.summary,
+          // 원본 116 은 G 를 보이지 않는다 — 결과 판 0x18 · 정산 0x4ea0c 의 몫이라 다시 주지도 않는다
+          gamePointReward: 0,
+          newTitles: [],
+          evaluation: lastGame.evaluation,
+          streakNotices: streakEventOf(replayed).notices,
+        })
+      }
       const point = resumePointOf(savedCareer)
       if (point.kind === '이벤트') {
         setCareer(enterSeasonEvent(savedCareer, point.eventId))
@@ -1171,7 +1189,13 @@ export function useCareerSession({
     },
 
     confirmGameResult: () => {
-      if (career === null) return
+      if (rawCareer === null) return
+      // 116 → 114: 0x8a6fc 가 쌓은 내장 이벤트를 114 가 틀며 보상 명령(연속 기록 평판 · 슬럼프 스킬)을 먹고, 114 진입 0x11d00 이
+      // S+0x50 = 2 → 3 으로 둔다(웹 null — 포스트시즌 g == 0 의 0xb 는 136 진입이 다시 쓴다)
+      const career = rawCareer.seasonEndState === 116
+        ? { ...streakEventOf(rawCareer).apply(rawCareer), seasonEndState: null }
+        : rawCareer
+      setCareer(career)
       // 경기 뒤 평가 116 의 끝(0x12b74~0x12b94) — S+0xb4(포스트시즌 중) ≠ 0 이면 **S+0xb2(= L+0x32) == 0 → [114 → 136],
       // 아니면 [114 → 128]** 이다. 관리 주기·중간평가를 안 탄다 (R9 116절).
       //   - 45번째 경기: 하루 끝 0xb818c 가 대진 0xb80a8 을 열며 L+0x32 = 0 → 136(392 목표 평가) 사슬.

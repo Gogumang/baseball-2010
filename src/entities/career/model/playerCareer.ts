@@ -1,5 +1,6 @@
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { GameSummary } from '@/entities/game/model/gameSummary'
+import type { GameEvaluation } from '@/entities/career/model/gameEvaluation'
 import type { League } from '@/entities/league/model/league'
 import { BALANCE } from '@/shared/config/original/balance'
 import type { PostseasonSeries } from '@/entities/league/model/league'
@@ -57,9 +58,41 @@ export const GAMES_PER_SEASON = BALANCE.season.gamesPerSeason
 
 /**
  * S+0x50(돌아온 까닭)을 쓰는 상태 번호 — `PlayerCareer.seasonEndState`. 시즌 끝 사슬(S+0x50 값 0xb·0xc·0xe·0xf·9)과
- * 다음경기 앞 순위표 109(진입 0x10d8c 의 `S+0x50 = 4`, 0x10db0)다. 그 밖 값(1 · 2 · 3)은 웹이 null 로 든다.
+ * 다음경기 앞 순위표 109(진입 0x10d8c 의 `S+0x50 = 4`, 0x10db0), 경기 뒤 평가 116(진입 0x1278c 의 `S+0x50 = 2`, 0x1279a)이다.
+ * 그 밖 값(1 · 3)은 웹이 null 로 든다.
  */
-export type SeasonEndState = 136 | 130 | 131 | 128 | 132 | 109
+export type SeasonEndState = 136 | 130 | 131 | 128 | 132 | 109 | 116
+
+/**
+ * **116 경기 뒤 평가를 다시 띄울 재료** — 원본은 S 의 칸(+0x4a 지난 경기 인기도 변화 · +0x1d8 이 경기 기록 바이트)이 저장에 남아
+ * 이어하기(S+0x50 == 2)가 116 진입 0x1278c 를 그대로 다시 돈다. 웹은 그 칸 대신 지난 경기 요약(리그 기록 재료는 뺀다)과
+ * 평가를 둔다. 경기마다 덮어쓴다.
+ */
+export interface NariLastGame {
+  readonly summary: Omit<GameSummary, 'leaguePlateAppearances' | 'leaguePitchers' | 'pitcherStaminas'>
+  readonly evaluation: GameEvaluation
+}
+
+/** 경기 요약에서 116 재료만 — 리그 선수 기록·투수 줄·스태미나 표는 정산이 이미 먹었다 */
+export function nariLastGameOf(summary: GameSummary, evaluation: GameEvaluation): NariLastGame {
+  return {
+    summary: {
+      result: summary.result,
+      ourScore: summary.ourScore,
+      opponentScore: summary.opponentScore,
+      stats: summary.stats,
+      popularityPoints: summary.popularityPoints,
+      doublePlays: summary.doublePlays,
+      scoringPositionOuts: summary.scoringPositionOuts,
+      reputationCounts: summary.reputationCounts,
+      ourTeamId: summary.ourTeamId,
+      opponentTeamId: summary.opponentTeamId,
+      recordIds: summary.recordIds,
+      ...(summary.pitchersOfRecord === undefined ? {} : { pitchersOfRecord: summary.pitchersOfRecord }),
+    },
+    evaluation,
+  }
+}
 
 /** 경기를 치르면 회복하는 체력 */
 
@@ -229,12 +262,14 @@ export interface PlayerCareer {
   /**
    * 시즌 끝 사슬의 어느 상태에 들어와 있는가 — 원본 세이브 레코드 **S+0x50(돌아온 까닭)** 의 시즌 끝 값.
    * 상태 진입마다 값을 쓰고 곧바로 저장한다: 136 → 0xb (0x10bba) · 130 → 0xc 타자 (0x19848) · 131 → 0xe (0x19782) ·
-   * 128 → 0xf (0x120ce) · 132 → 9 (0x10c60) · 109 → 4 (0x10db0). 새 시즌 처리 0x1b768 이 1 로(0x1b7ba), 116 진입이
-   * 2 로(0x1279a), 105 진입이 3 으로(0x11990) 되돌린다 — 웹은 셋 다 null.
+   * 128 → 0xf (0x120ce) · 132 → 9 (0x10c60) · 109 → 4 (0x10db0) · 116 → 2 (0x1279a). 새 시즌 처리 0x1b768 이 1 로(0x1b7ba),
+   * 105 진입이 3 으로(0x11990), 114 진입 0x11d00 이 2 → 3(0x11d88) 으로 되돌린다 — 웹은 1 · 3 을 null 로 든다.
    * 이어하기(상태 100 진입 0x1c154)는 이 값으로 136·130·131·132 에 돌아가고, 0xf 는 S+0xb4(포스트시즌 중) 갈래로 128,
    * 4 는 맨 끝 갈래(S+0x50 ∉ {1,3})로 109 다.
    */
   readonly seasonEndState: SeasonEndState | null
+  /** 116 다시 띄우기 재료 (`NariLastGame`) — 경기를 한 번도 안 치렀거나 옛 저장이면 없다 */
+  readonly lastGame?: NariLastGame
   /** 진행 중인 포스트시즌. 정규시즌 중에는 null 이다 (0xb80a8 이 45경기째에 연다) */
   readonly postseason: PostseasonSeries | null
   /** 또또상품권 구매 수(상한 200, +0x186) · 1등 횟수 — 칭호 21·22 */
