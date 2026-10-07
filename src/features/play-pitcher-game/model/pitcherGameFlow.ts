@@ -1106,7 +1106,11 @@ export function startPitch(
     return {
       ...withoutSteal(arrived),
       // 진행기 입력의 결과 칸은 판 앞 예측이다(`predictedOutcomeOf`) — 기록은 실제 판의 정산 결과다
-      pendingDefensePlay: withPredictedOutcome(defensePlayInputOf(arrived, outcome, random)),
+      pendingDefensePlay: withPredictedOutcome({
+        ...defensePlayInputOf(arrived, outcome, random),
+        // 장면 +0xfdc — CPU 타자의 번트 종류. 페어 번트 판도 판 시작 리드(0x3d7b8 +3 틱) · 필살수비 관문(50fc8) · 정산이 본다
+        buntKind: thrown.buntKind ?? 0,
+      }),
     }
   }
   // 낫아웃 — 폭투·포일 판의 진루(타자주자 포함)를 이 삼진 타석의 진루로 먹인다 (0x3e0d0 state[0x1a]).
@@ -1150,7 +1154,8 @@ interface PitcherPitchArrival {
  * ⚠️ 근사: 루에 선 주자 = 상대 타순 1·2·3칸 앞 타자(`runAbilitiesOnBaseOf`).
  * ⚠️ 미해결: 삼진 + 도루(종류 5)면 원본 판정 B 는 정산 0xa8024 를 **종류 5 로 한 번** 부른다 — R+0x138(타자 수)이
  *   안 오르는 갈래다(0xa8d98). 웹은 주자 판 뒤 보통 삼진 길(`applyDefensivePlay`)로 타자 수를 센다.
- * ⚠️ 미해결: CPU 타자의 번트 종류(scene+0xfdc)는 `simulateBatter` 가 밖으로 안 내 판에 못 싣는다.
+ * ⚠️ 미해결: CPU 타자의 번트 종류(scene+0xfdc)를 이 주자 판(`runPitchArrivalPlay`)에는 아직 안 싣는다 — 헛스윙 · 볼 번트의
+ *   `simulateBatter` 결과는 번트 종류를 안 내고, 주자 판 입력에도 그 칸이 없다(맞은 공의 타구 판에는 싣는다).
  *
  * 난수: `rollPassedBall` 1번(매 못 맞힌 공) → 판이 열리면 그 안의 굴림 (`runPitchArrivalPlay`).
  */

@@ -2477,7 +2477,7 @@ function pitchOnce(
     return defer ? held : resolveBenchClearing(held, { reachedTargetTick: true }, random)
   }
   // 0x517e6 — CPU 마타자 필살이 성공한 타구는 "송구공" 비트(0xaf180)가 서서 야수가 쥐지 못한다
-  const started = startDefensiveAtBat(cleared, outcome, true, random, thrown.isUncatchable, arrival.play)
+  const started = startDefensiveAtBat(cleared, outcome, true, random, thrown.isUncatchable, arrival.play, thrown.buntKind ?? 0)
   const pending = started.pendingDefensePlay
   // 수비 진행 중 — 화면이 틱을 돌리는 동안 경기를 붙들어 둔다 (원본 상태 0x17)
   if (pending === null) return advance(started, random)
@@ -2542,6 +2542,8 @@ function startDefensiveAtBat(
   isUncatchable = false,
   /** 이 공이 도착하며 연 주자 판 (`arriveTeamPitch`) — 낫아웃이면 그 판의 진루가 이 삼진 타석의 진루다 */
   arrival: PitchArrivalPlay | null = null,
+  /** 장면 +0xfdc — CPU 타자의 번트 종류(`simulateBatter`). 판 시작 리드(0x3d7b8) · 필살수비 관문(50fc8) · 정산이 본다 */
+  buntKind = 0,
 ): TeamGameProgress {
   // 출발 칸은 이 공 하나의 것이다 — 타구 판 입력이 읽고 나면 비운다
   const stealing = progress
@@ -2562,9 +2564,10 @@ function startDefensiveAtBat(
   // 결과 칸은 판 앞 예측이다(`predictedOutcomeOf`) — 기록은 실제 판의 정산 결과다
   const input = withPredictedOutcome(
     pattern !== undefined
-      ? defensiveDefenseInputOf(stealing, outcome, pattern, random, isUncatchable)
+      ? { ...defensiveDefenseInputOf(stealing, outcome, pattern, random, isUncatchable), buntKind }
       : {
           ...defensiveDefenseInputOf(stealing, outcome, fixturePatternFor(outcome), random, isUncatchable),
+          buntKind,
           outcomeIsGiven: true,
         },
   )

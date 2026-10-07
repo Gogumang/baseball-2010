@@ -227,6 +227,18 @@ describe('CPU 번트 — 원본 0x3445a', () => {
     expect(result).toEqual({ kind: '타구', outcome: { kind: '아웃', detail: '땅볼아웃' } })
   })
 
+  it('페어 번트 타구도 번트 종류(장면 +0xfdc)를 싣는다 — 판 시작 리드 · 필살수비 관문 · 정산이 본다', () => {
+    const random = 각본([0.65, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    const thrown = pitchAgainstBatterDetailed(한가운데, 타자(500), random, undefined, 무사주자없음)
+    expect(thrown.resolution.kind).toBe('타구')
+    expect(thrown.buntKind).toBe(1)
+    // 휘두른 타구는 0
+    const 굴림 = [0.65, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    expect(
+      pitchAgainstBatterDetailed(한가운데, 타자(500), 각본(굴림), undefined, 무사주자없음, { isMagicBatter: true }).buntKind,
+    ).toBe(0)
+  })
+
   it('마선수는 번트 칸을 뽑아도 휘두른다', () => {
     // 같은 굴림으로 보통 타자는 희생번트, 마선수는 0xab214 보통 스윙(첫 굴림들이 0 이라 강타)이다.
     // 결과는 판이 정하므로 타석에 실리는 것은 임시 값이다 — 희생번트 패턴은 땅볼아웃, 강타(코드 24)는 담장을 먼저 넘는 궤적이라 홈런

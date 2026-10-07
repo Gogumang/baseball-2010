@@ -252,9 +252,10 @@ export interface CpuPitchOutcome {
    */
   readonly foulContact?: BattedContact
   /**
-   * 이 공의 번트 종류 장면 +0xfdc (0 스윙 · 1~3 번트 — `cpuBuntKindOf`). 판을 도는 파울 각 공(`foulContact`)에만 싣는다 —
+   * 이 공의 번트 종류 장면 +0xfdc (0 스윙 · 1~3 번트 — `cpuBuntKindOf`). 판을 도는 맞은 공 — 파울 각 공(`foulContact`)과
+   * 페어 타구(`resolution.outcome` 에 쏜 패턴이 묶인 공) — 에 싣는다. 원본 판은 타석이 친 공의 번트 종류를 그대로 본다:
    * 판 끝 결과 코드 0x9d5bc 가 state[4] > 1 이고 번트(state[0x13])면 11(2스트라이크 번트 파울 아웃)을 내고, 판 시작 리드(0x3d7b8)가
-   * +3 틱 · 필살수비 관문(50fc8)이 굴림 없음으로 본다.
+   * +3 틱 · 필살수비 관문(50fc8)이 굴림 없음으로 보며, 정산 0xa8024 가 번트 타구(결과비트 B6 · 희생)로 센다.
    */
   readonly buntKind?: number
 }
@@ -459,18 +460,22 @@ export function pitchAgainstBatterDetailed(
   if (contact.kind === '번트파울아웃') {
     return swung({ kind: '타구', outcome: registerContact({ kind: '아웃', detail: '직선타아웃' }, null) }, isUncatchable)
   }
-  // 타석을 끝내는 임시 결과 — 쏜 패턴을 묶어 투수편 진행기가 그 패턴으로 판을 돌린다(`battedContact`)
-  return swung(
-    {
-      kind: '타구',
-      outcome: registerContact(provisionalOutcomeOf(pattern), {
-        pattern,
-        resultCode: code,
-        ...(specialSwing === undefined ? {} : { specialSwing }),
-      }),
-    },
-    isUncatchable,
-  )
+  // 타석을 끝내는 임시 결과 — 쏜 패턴을 묶어 투수편 진행기가 그 패턴으로 판을 돌린다(`battedContact`).
+  // 페어 번트 판도 이 공의 번트 종류(장면 +0xfdc)를 싣는다 — 판 시작 리드 · 필살수비 관문 · 정산이 본다
+  return {
+    ...swung(
+      {
+        kind: '타구',
+        outcome: registerContact(provisionalOutcomeOf(pattern), {
+          pattern,
+          resultCode: code,
+          ...(specialSwing === undefined ? {} : { specialSwing }),
+        }),
+      },
+      isUncatchable,
+    ),
+    buntKind,
+  }
 }
 
 const ZONE_HALF_PIXELS = 16.5
