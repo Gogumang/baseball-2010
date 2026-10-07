@@ -38,6 +38,7 @@ import {
   leaguePitcherAppearancesOf,
   recordLeaguePitcherAppearances,
   recordLeaguePlateAppearances,
+  recordLeagueStolenBases,
 } from '@/entities/league/model/leaguePlayerStats'
 import {
   EMPTY_DECISION_STATE,
@@ -51,6 +52,7 @@ import type {
   LeaguePitcherAppearance,
   LeaguePlateAppearance,
   LeaguePlayerStats,
+  LeagueStolenBase,
 } from '@/entities/league/model/leaguePlayerStats'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
@@ -124,11 +126,13 @@ export interface LeagueGameScore {
    * 매긴다 (P1-pitcher-rules.md 6절). 세이브 +0x24 는 **원본이 한 번도 안 준다** (CORRECTIONS 2-1).
    */
   readonly pitcherAppearances: readonly LeaguePitcherAppearance[]
-  /**
-   * 이 경기에서 나온 도루 수 (0xc1818, E-5). 원본은 주자 레코드에 도루를 +1 하지만
-   * 웹 리그 선수 기록표(`LeagueBatterLine`)에는 도루 칸이 없어 **경기 합계만** 내놓는다.
-   */
+  /** 이 경기에서 나온 도루 수 (0xc1818, E-5) */
   readonly steals: number
+  /**
+   * 도루로 한 루 간 주자들 (0xc1a42~0xc1a98) — `playLeagueDay` 가 레코드 +0x2c(`LeagueBatterLine.steals`)에 쌓는다.
+   * 마타자 칸은 뺀다(0xa56dc 의 마선수 거짓). ⚠️ 주자 신원은 반 이닝 엔진의 근사(`HalfInningStolenBase`)다.
+   */
+  readonly stolenBases: readonly LeagueStolenBase[]
   /**
    * 이 경기에 들어온 CPU 대타 (0xac228) — 막음 칸 `state[0xe]` 는 공마다 내려가므로(`0xa5e14` a5e7c) 한 경기에
    * **여러 번** 나올 수 있다. 상한은 두 팀 벤치 수(`team+0x28c`, 붙박이 로스터는 셋씩)다.
@@ -630,6 +634,7 @@ export function simulateLeagueGame(
   let awayOrder = 0
   let homeOrder = 0
   const plateAppearances: LeaguePlateAppearance[] = []
+  const stolenBases: LeagueStolenBase[] = []
   /** 반 이닝이 내놓은 타석 결과를 공격 팀 것으로 적어 둔다 — 판정에는 손대지 않는다 */
   const collect = (teamId: number, half: HalfInningResult, record: LeagueTeamRecord | undefined) => {
     for (const appearance of half.plateAppearances) {
@@ -645,6 +650,12 @@ export function simulateLeagueGame(
         outcome: appearance.outcome,
         runsBattedIn: appearance.runsBattedIn,
       })
+    }
+    // 0xc1a42~0xc1a98 — 도루로 루를 옮긴 주자마다 레코드 +0x2c 를 +1 (0xa56dc 가 마선수를 뺀다)
+    for (const steal of half.stolenBases) {
+      if (steal.rosterSlot === ACE_BATTER_ROSTER_SLOT) continue
+      const at = recordPlayerAt(record, teamId, false, steal.rosterSlot ?? steal.battingOrderIndex % BATTING_ORDER_SIZE)
+      stolenBases.push({ teamId: at.tableTeamId, battingOrderIndex: at.tableSlot })
     }
   }
   /**
@@ -806,6 +817,7 @@ export function simulateLeagueGame(
     awayRuns,
     homeRuns,
     plateAppearances,
+    stolenBases,
     pitcherAppearances,
     steals,
     pinchHits,
@@ -938,6 +950,7 @@ export function playLeagueDay(
   recordOf: (teamId: number) => LeagueTeamRecord | undefined = () => undefined,
 ): LeagueDayResult {
   const plateAppearances: LeaguePlateAppearance[] = []
+  const stolenBases: LeagueStolenBase[] = []
   const pitcherAppearances: LeaguePitcherAppearance[] = []
   const matchups = matchupsOf(day)
   const scoresA = matchups.map(() => LEAGUE_DAY_NO_SCORE)
@@ -979,6 +992,7 @@ export function playLeagueDay(
     if (score.acePitcherStaminas.away !== undefined) aceStaminas[sides.away] = score.acePitcherStaminas.away
     if (score.acePitcherStaminas.home !== undefined) aceStaminas[sides.home] = score.acePitcherStaminas.home
     plateAppearances.push(...score.plateAppearances)
+    stolenBases.push(...score.stolenBases)
     pitcherAppearances.push(...score.pitcherAppearances)
     // 점수표 c2b8a·c2b9a — A(홈) 명단이 친 칸 0 점수가 scoreA 다 (`LeagueDayBoard` 주석)
     scoresA[slot] = score.awayRuns
@@ -1000,7 +1014,7 @@ export function playLeagueDay(
     },
     league: played,
     playerStats: recordLeaguePitcherAppearances(
-      recordLeaguePlateAppearances(playerStats, plateAppearances),
+      recordLeagueStolenBases(recordLeaguePlateAppearances(playerStats, plateAppearances), stolenBases),
       pitcherAppearances,
     ),
     pitcherStaminas: staminas,

@@ -227,6 +227,18 @@ describe('playLeagueDay — 선수별 타석 기록이 쌓인다', () => {
     expect(ids.filter((id) => Math.trunc(id / BATTERS_PER_TEAM) === 상대)).toEqual([])
   })
 
+  it('CPU 경기 간이 엔진의 도루(0xc1818 끝)가 주자 레코드 +0x2c 에 쌓인다 — 열흘이면 누군가는 훔친다', () => {
+    let league = EMPTY_LEAGUE
+    let stats = EMPTY_LEAGUE_PLAYER_STATS
+    for (let day = 0; day < 10; day += 1) {
+      const result = playLeagueDay(league, day, 4, 씨앗난수(100 + day), stats)
+      league = result.league
+      stats = result.playerStats
+    }
+    const 도루 = Object.values(stats.batters).reduce((sum, line) => sum + (line.steals ?? 0), 0)
+    expect(도루).toBeGreaterThan(0)
+  })
+
   it('이어서 돌리면 앞서 쌓은 표 위에 더해진다', () => {
     const 하루 = playLeagueDay(EMPTY_LEAGUE, 0, 4, 씨앗난수(5))
     const 이틀 = playLeagueDay(하루.league, 1, 4, 씨앗난수(6), 하루.playerStats)

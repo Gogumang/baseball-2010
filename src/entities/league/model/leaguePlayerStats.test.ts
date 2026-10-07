@@ -7,6 +7,7 @@ import {
   leaguePitcherLineOf,
   recordLeaguePitcherAppearances,
   recordLeaguePlateAppearances,
+  recordLeagueStolenBases,
 } from '@/entities/league/model/leaguePlayerStats'
 import type {
   LeaguePitcherAppearance,
@@ -165,5 +166,26 @@ describe('표 밖 선수(영입한 명전·나리)의 줄 — 원본 id 열쇠 (
     )
     expect(appearances).toHaveLength(1)
     expect(appearances[0]).toMatchObject({ recordId: 0xb4, decision: '승' })
+  })
+})
+
+describe('recordLeagueStolenBases — 도루 +0x2c (0xa8380 · 0xc1a98)', () => {
+  it('주자마다 +1, 표 밖 선수는 원본 id 로, 타석 기록은 그대로', () => {
+    const 타석 = recordLeaguePlateAppearances(EMPTY_LEAGUE_PLAYER_STATS, [
+      { teamId: 1, battingOrderIndex: 2, outcome: { kind: '볼넷' }, runsBattedIn: 0 },
+    ])
+    const 쌓음 = recordLeagueStolenBases(타석, [
+      { teamId: 1, battingOrderIndex: 2 },
+      { teamId: 1, battingOrderIndex: 2 },
+      { teamId: 0, battingOrderIndex: -1, recordId: 0xb4 },
+    ])
+    expect(쌓음.batters[14]?.steals).toBe(2)
+    expect(쌓음.batters[14]?.atBats).toBe(0)
+    expect(쌓음.recordBatters?.[0xb4]?.steals).toBe(1)
+    // 다음 타석이 와도 도루는 남는다
+    const 이어 = recordLeaguePlateAppearances(쌓음, [
+      { teamId: 1, battingOrderIndex: 2, outcome: { kind: '볼넷' }, runsBattedIn: 0 },
+    ])
+    expect(이어.batters[14]?.steals).toBe(2)
   })
 })

@@ -42,7 +42,7 @@ import { PICKOFF_PLAY_KIND, pickoffPlayForKey } from '@/entities/defense-control
 import type { PickoffBase } from '@/entities/defense-controls/model/pickoff'
 import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
-import type { LeaguePlateAppearance } from '@/entities/league/model/leaguePlayerStats'
+import type { LeaguePlateAppearance, LeagueStolenBase } from '@/entities/league/model/leaguePlayerStats'
 import {
   popularityCompleteGameOf,
   reputationCompleteGameOf,
@@ -720,6 +720,8 @@ export interface TeamGameProgress {
   readonly ourHits: number
   /** 리그 선수 기록표에 넘길 타석 결과 — **양 팀 전부** (원본 0xa8024 가 사람 경기도 같게 쌓는다) */
   readonly leaguePlateAppearances: readonly LeaguePlateAppearance[]
+  /** 리그 기록표 +0x2c 에 넘길 도루 (`withLeagueStolenBases`). 없으면 빈 것 */
+  readonly leagueStolenBases?: readonly LeagueStolenBase[]
   /** 이번 경기의 돌발미션 (경기 장면이 모드 2·3·4 에서만 만든다 — 팀 경기에서는 **시즌만**) */
   readonly burst: BurstSession | null
   readonly lastBurstResolution: BurstResolution | null
@@ -2971,10 +2973,51 @@ function arriveTeamPitch(
 
   let next = withRunnerOnlyAdvance({ ...opened, lastDefensePlay: play.result }, play.result.advance, humanSide).progress
   next = withGameRecords(next, play.recordIds, humanOffense)
+  next = withLeagueStolenBases(next, progress, play, humanOffense)
   next = appendLog(next, `${before.inning}회${before.half} ${describeArrivalPlay(play, humanOffense)}`, true)
   const interrupted =
     next.game.isFinished || next.game.inning !== before.inning || next.game.half !== before.half
   return { progress: next, play, interrupted }
+}
+
+/**
+ * 도루 판(종류 5) 정산의 리그 기록 — 0xa8024 의 0xa8340~0xa83c0 (R8 5-2, 직접 떴다).
+ * ```
+ * sp+0x34 = 0xa56dc(ctx, 지금 타자, 0)                 ; 시즌 모드 2: 국가대항전·포스트시즌 아님 && 타자가 마선수 아님
+ * (가) 잡힌 도루 주자가 하나라도 있으면 아무도 안 쌓는다
+ * (나) 루를 옮긴 도루 주자 r 마다: p = 0xb8b99(공격팀, r) ; sp+0x34 && p && !마선수(p) → p+0x2c += 1
+ * ```
+ * 원본 그대로: 게이트가 **주자가 아니라 지금 타자**를 본다 — 마타자 타석에 한 도루는 아무도 안 쌓인다.
+ * 국가대항전·포스트시즌 거르기는 기록표에 넣는 쪽(시즌 세션의 정규시즌 갈래)이 맡는다.
+ * ⚠️ 주자 신원 근사: 루 b 의 주자를 타순 − b 로 본다(`runAbilitiesOnBaseOf` 와 같은 근사).
+ */
+function withLeagueStolenBases(
+  next: TeamGameProgress,
+  before: TeamGameProgress,
+  play: PitchArrivalPlay,
+  humanOffense: boolean,
+): TeamGameProgress {
+  if (play.kind !== 5 || play.result.caughtFrom.length > 0 || play.result.stolenFrom.length === 0) return next
+  const teamId = humanOffense ? before.options.ourTeamId : before.options.opponentTeamId
+  const entry = humanOffense ? before.ourEntry : before.opponentEntry
+  const order = humanOffense ? before.game.battingOrderIndex : before.opponentOrderIndex
+  const slotOf = (back: number) => (((order - back) % BATTING_ORDER_SIZE) + BATTING_ORDER_SIZE) % BATTING_ORDER_SIZE
+  const isAce = (slot: number) => (entry[slot]?.aceIndex ?? NO_ACE_BATTER) >= 0
+  if (isAce(slotOf(0))) return next
+  const stolen: LeagueStolenBase[] = []
+  for (const from of play.result.stolenFrom) {
+    const slot = slotOf(from)
+    if (isAce(slot)) continue
+    const rosterSlot = entry[slot]?.rosterSlot ?? slot
+    if (rosterSlot === NO_ROSTER_SLOT) {
+      const recordId = entry[slot]?.recordId
+      if (recordId !== undefined) stolen.push({ teamId, battingOrderIndex: NO_ROSTER_SLOT, recordId })
+      continue
+    }
+    stolen.push({ teamId: entry[slot]?.tableTeamId ?? teamId, battingOrderIndex: rosterSlot })
+  }
+  if (stolen.length === 0) return next
+  return { ...next, leagueStolenBases: [...(next.leagueStolenBases ?? []), ...stolen] }
 }
 
 function describeArrivalPlay(play: PitchArrivalPlay, humanOffense: boolean): string {
@@ -4388,6 +4431,8 @@ export interface TeamGameSummary {
   readonly pitching: TeamPitchingLine
   /** 리그 선수 기록표에 그대로 넣는다 (`recordLeaguePlateAppearances`) */
   readonly leaguePlateAppearances: readonly LeaguePlateAppearance[]
+  /** 리그 기록표 +0x2c 도루 (`recordLeagueStolenBases`) — 양 팀. 없으면 빈 것 */
+  readonly leagueStolenBases?: readonly LeagueStolenBase[]
   /** 시즌 평가 `evaluateSeasonGame` 에 그대로 넘기는 두 칸 (인기도·평판이 서로 다른 이닝 칸을 본다) */
   readonly popularityCompleteGame: CompleteGameKind
   readonly reputationCompleteGame: CompleteGameKind
@@ -4463,6 +4508,7 @@ export function summaryOf(progress: TeamGameProgress): TeamGameSummary {
     inningsPlayed: game.inning,
     pitching: progress.pitching,
     leaguePlateAppearances: progress.leaguePlateAppearances,
+    leagueStolenBases: progress.leagueStolenBases ?? [],
     // ⚠️ 원본 그대로 — 인기도는 `st+0x6b`(현재 이닝), 평판은 `st+0x69`(정규 마지막 이닝)를 본다.
     //    그래서 **연장 완투는 인기도만 보너스를 받는다** (P4 "원본 버그·이상" 3번)
     popularityCompleteGame: popularityCompleteGameOf(outs, game.inning - 1, flags),

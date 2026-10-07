@@ -45,7 +45,7 @@ import { isMyTurn } from '@/entities/league/model/seasonEnd'
 import type { PostseasonSeries } from '@/entities/league/model/league'
 import {
   EMPTY_LEAGUE_BATTER_LINE, EMPTY_LEAGUE_PLAYER_STATS, leaguePitcherAppearancesOf, recordLeaguePitcherAppearances,
-  recordLeaguePlateAppearances,
+  recordLeaguePlateAppearances, recordLeagueStolenBases,
 } from '@/entities/league/model/leaguePlayerStats'
 import type { GameLeaguePitchers } from '@/entities/game/model/gamePitcherLines'
 import type { PitcherOfRecord } from '@/entities/game/model/winLossSave'
@@ -1977,9 +1977,13 @@ export function useSeasonSession(
         // 투수 줄도 같은 정산 0xa8024 · 경기 끝 0xa7de8 이 쌓는다 — 0xa56dc 모드 2 갈래(0xa56fa)는 포스트시즌·국가대항전이면
         // 거짓이라 정규시즌 경기만이다(이 갈래가 곧 정규시즌이다). 요약 `leaguePitchers` 는 양 팀 표 칸으로 싣고 온다
         recordSeasonHumanGamePitchers(
-          recordLeaguePlateAppearances(
-            current.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS,
-            summary.leaguePlateAppearances,
+          // 도루 +0x2c 도 같은 정산 0xa8024 가 쌓는다(도루 판 종류 5) — 같은 정규시즌 갈래
+          recordLeagueStolenBases(
+            recordLeaguePlateAppearances(
+              current.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS,
+              summary.leaguePlateAppearances,
+            ),
+            summary.leagueStolenBases ?? [],
           ),
           summary.leaguePitchers,
         ),
@@ -2721,6 +2725,8 @@ export function seasonLeagueRecordsOf(source: SeasonLeagueRecordSource, isPitche
           hits: line.hits,
           homeRuns: line.homeRuns,
           runsBattedIn: line.runsBattedIn,
+          // +0x2c 도루 — 순위 종류 10 (0x9d789). 옛 저장은 칸이 없어 0
+          batterExtra: line.steals ?? 0,
         })
       })
       continue

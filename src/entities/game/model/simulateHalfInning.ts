@@ -68,6 +68,17 @@ export interface HalfInningPlateAppearance {
   readonly pitcherSlot?: number
 }
 
+/**
+ * 간이 엔진 도루로 한 루 간 주자 하나 (0xc1818 끝 0xc1a42~0xc1aba) — 원본은 주자마다 `0xb8b99(공격팀, 주자)` 의 레코드
+ * +0x2c 를 +1 한다(0xa56dc 가 참일 때). 누구의 레코드에 넣을지는 부르는 쪽이 `HalfInningPlateAppearance` 처럼 정한다.
+ * ⚠️ 주자 신원은 근사 — 반 이닝 엔진이 주자를 들고 있지 않아 루 b 의 주자를 타순 커서 − b 로 본다(`onPitchJudged` 주석).
+ */
+export interface HalfInningStolenBase {
+  readonly battingOrderIndex: number
+  /** 그 타순 칸에 앉은 선수의 로스터 칸 (`offense` 를 넘겼을 때만) */
+  readonly rosterSlot?: number
+}
+
 /** 이 이닝에 들어온 CPU 대타 한 번 (0xac228) */
 export interface HalfInningPinchHit {
   readonly battingOrderIndex: number
@@ -97,6 +108,8 @@ export interface HalfInningResult {
   readonly strikeoutCombo: number
   /** 이 이닝에 허용한 도루 수 (0xc1818, E-5) — 원본은 주자마다 도루 기록 +1 을 준다 */
   readonly steals: number
+  /** 도루로 한 루 간 주자들 — 일어난 차례대로 (`steals` 와 같은 수) */
+  readonly stolenBases: readonly HalfInningStolenBase[]
   /**
    * 이 이닝에 던진 투수마다 한 줄 (`defense` 를 넘겼을 때만 채운다).
    * 교체가 없으면 한 줄이고, 교체가 있으면 던진 순서대로 여러 줄이다.
@@ -325,6 +338,7 @@ export function simulateHalfInning(
   let strikeouts = 0
   let pitches = 0
   let steals = 0
+  const stolenBases: HalfInningStolenBase[] = []
   let combo = before.strikeoutCombo
   let order = battingOrderIndex
   const recordIds: number[] = []
@@ -458,6 +472,17 @@ export function simulateHalfInning(
           { hit: 0, power: 0, defense: 0, run: runner.run },
           random,
         )
+        // 0xc1a42 — 루를 옮긴 주자마다 (1루·2루 주자, 같은 근사로 타순 커서 − 루)
+        if (stolen.stolen > 0) {
+          for (const [onBase, runnerBase] of [[bases.first, 1], [bases.second, 2]] as const) {
+            if (!onBase) continue
+            const cursor = Math.max(0, order - runnerBase)
+            stolenBases.push({
+              battingOrderIndex: cursor,
+              ...(lineup === undefined ? {} : { rosterSlot: rosterSlotAt(lineup, cursor) }),
+            })
+          }
+        }
         bases = stolen.bases
         steals += stolen.stolen
       },
@@ -551,6 +576,7 @@ export function simulateHalfInning(
     recordIds,
     strikeoutCombo: combo,
     steals,
+    stolenBases,
     pitcherLines: [...lines.values()],
     mound,
     pitcherChanges,

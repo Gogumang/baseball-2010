@@ -36,6 +36,11 @@ export interface LeagueBatterLine {
   readonly homeRuns: number
   /** +0x2a 타점 */
   readonly runsBattedIn: number
+  /**
+   * +0x2c 도루 — 사람 경기 0xa8024(0xa8362~0xa8380, 도루 판 종류 5 에서 아무도 안 잡혔을 때 루를 옮긴 주자마다)와
+   * CPU 경기 0xc1818 끝(0xc1a42~0xc1a98, 성공한 도루의 주자마다)이 올린다. 옛 저장에는 없어 0 으로 본다.
+   */
+  readonly steals?: number
 }
 
 export const EMPTY_LEAGUE_BATTER_LINE: LeagueBatterLine = {
@@ -193,7 +198,39 @@ function addPlateAppearance(
     hits: line.hits + (isHit(outcome) ? 1 : 0),
     homeRuns: line.homeRuns + (outcome.kind === '홈런' ? 1 : 0),
     runsBattedIn: line.runsBattedIn + runsBattedIn,
+    ...(line.steals === undefined ? {} : { steals: line.steals }),
   }
+}
+
+/** 도루 한 번 — 어느 팀 어느 로스터 칸(또는 표 밖 선수 id)의 주자가 한 루를 갔는가 */
+export interface LeagueStolenBase {
+  readonly teamId: number
+  /** 그 주자의 로스터 칸 (`LeaguePlateAppearance.battingOrderIndex` 와 같은 뜻) */
+  readonly battingOrderIndex: number
+  /** 붙박이 표 밖 선수(영입한 명전·나리)의 원본 id */
+  readonly recordId?: number
+}
+
+const addSteal = (line: LeagueBatterLine): LeagueBatterLine => ({ ...line, steals: (line.steals ?? 0) + 1 })
+
+/** 도루를 +0x2c 에 쌓는다 (0xa8380 · 0xc1a98 — `strh` 라 s16, 실제로 넘칠 일은 없다) */
+export function recordLeagueStolenBases(
+  stats: LeaguePlayerStats,
+  stolenBases: readonly LeagueStolenBase[],
+): LeaguePlayerStats {
+  if (stolenBases.length === 0) return stats
+  const batters: Record<number, LeagueBatterLine> = { ...stats.batters }
+  let recordBatters: Record<number, LeagueBatterLine> | undefined
+  for (const steal of stolenBases) {
+    if (steal.recordId !== undefined) {
+      recordBatters ??= { ...stats.recordBatters }
+      recordBatters[steal.recordId] = addSteal(recordBatters[steal.recordId] ?? EMPTY_LEAGUE_BATTER_LINE)
+      continue
+    }
+    const id = leagueBatterIdOf(steal.teamId, steal.battingOrderIndex)
+    batters[id] = addSteal(batters[id] ?? EMPTY_LEAGUE_BATTER_LINE)
+  }
+  return recordBatters === undefined ? { ...stats, batters } : { ...stats, batters, recordBatters }
 }
 
 /**
