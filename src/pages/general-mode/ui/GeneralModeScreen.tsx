@@ -33,7 +33,8 @@ export interface GeneralModeScreenProps {
   readonly onLevelUpAce?: (cell: number, cost: number) => void
   /**
    * 들고 있는 G포인트 (원본은 전역 기록 `mgr+0x64`, 웹판은 육성 선수 칸).
-   * 마선수 오픈 값과 머리띠 숫자가 이것을 본다.
+   * 마선수 오픈 값과 머리띠 숫자, 그리고 경기 정산 판의 "보유 GP"(0x4ae2e `[0x1f1d9()+0x64]`)가 이것을 본다 —
+   * 정산 진입 0x4ea0c 가 번 G 를 먼저 더하고(4ec5a) 판을 그리므로, 받는 쪽이 `onSettlementEnter` 에서 더한 값이 그대로 보인다.
    */
   readonly gamePoint?: number
   /** 마선수 한 칸을 G로 열었다 (0xa3f6) — 받는 쪽이 G를 빼고 오픈 플래그를 세운다 */
@@ -101,7 +102,7 @@ export function GeneralModeScreen(props: GeneralModeScreenProps) {
  */
 function GeneralModeResume(props: GeneralModeScreenProps & { readonly resumeGame: TeamGameProgress }) {
   const {
-    random, resumeGame, aceLevels, gaugeSettingOn, runningModeManual, throwModeManual,
+    random, resumeGame, aceLevels, gaugeSettingOn, runningModeManual, throwModeManual, gamePoint,
     onFinish, onExit, onGameSave, onSettlementEnter,
   } = props
   const [resumeFrom] = useState<TeamGameProgress>(() => ({
@@ -121,6 +122,8 @@ function GeneralModeResume(props: GeneralModeScreenProps & { readonly resumeGame
       random={random}
       onFinish={onFinish}
       onQuit={onExit}
+      // 정산 판의 보유 GP — 자동진행은 `onSpendGamePoint` 가 없어 여전히 잠긴다
+      {...(gamePoint === undefined ? {} : { gamePoint })}
       {...(onGameSave === undefined ? {} : { onHalfInningSave: onGameSave })}
       {...(onSettlementEnter === undefined ? {} : { onSettlementEnter })}
     />
@@ -161,6 +164,8 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
         random={random}
         onFinish={onFinish}
         onQuit={onExit}
+        // 정산 판의 보유 GP — 자동진행은 `onSpendGamePoint` 가 없어 여전히 잠긴다
+        {...(gamePoint === undefined ? {} : { gamePoint })}
         onHalfInningSave={(save) => {
           if (isFirstSaveRef.current) {
             isFirstSaveRef.current = false
