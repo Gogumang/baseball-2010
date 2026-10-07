@@ -71,7 +71,23 @@ export interface CatchForecastOptions {
    * (0x514e6), 쥐기 0xb2710 이 지운다. 서 있으면 낙구 틱까지 복제가 낙구 지점으로 **실제로 달린다**(b1416).
    */
   readonly chaseToLanding?: boolean
+  /**
+   * **인자 a = 0** (송구 0xb2e38 의 vt24(0), b307c) — 움직임허용[j] = `a ≠ 0 || 공+0xaac ≠ 0`(b1376~b138c)이고,
+   * 궤적 끝(t == 공+0x6c, b1878)까지 남은틱이 안 끝나면 두 번째 패스: 추적야수 +0xc0 = 4 · 공+0xaac = 1 · a = 1 ·
+   * 움직임허용 모두 1 · **t = 10 부터 다시**(n · 복제 · 표는 그대로, b1888~b18ba). 안 주면 a = 1(타구 · 다시 쏘기).
+   */
+  readonly secondPass?: { readonly movable: boolean }
+  /**
+   * 방금 던진 야수 — 던지기 0xa1620 끝(a1a3a)이 +0xb1 = 1 을 세워 복제의 vtc8 이 거짓이다. 동작 5(a1a2c vt44(5) — +0xac = 0)는
+   * 야수 틱 0xa1284 가 +0xac == 2 인 틱(a13ae)에 +0xb0~+0xb2 를 지운다 — 복제 틱 둘째 번에 풀린다.
+   */
+  readonly thrownSlot?: number
 }
+
+/** 0xa13ae — 동작 5(던지기)의 +0xac == 2 에서 +0xb1 이 풀린다 */
+const THROW_MOTION_CLEAR_TICKS = 2
+/** b18b6 — 두 번째 패스는 t = 10 부터 */
+const SECOND_PASS_FIRST_TICK = 10
 
 /** 추적야수를 건너뛰는 구간 (P2 2a) */
 const CHASER_SKIP_TICKS = 4
@@ -109,7 +125,11 @@ export function forecastCatch(
     runTicks: 0,
     lockTicks: fielder.actionLockTicks,
     slackTicks: fielder.arrivalSlackTicks,
+    throwMotionTicks: fielder.slot === options.thrownSlot ? THROW_MOTION_CLEAR_TICKS : 0,
   }))
+  // 움직임허용 — a = 1 이면 모두. a = 0 이면 공+0xaac(악송구 · 원바운드 송구)일 때만
+  let movable = options.secondPass === undefined ? true : options.secondPass.movable
+  let firstPass = options.secondPass !== undefined
   let remainingTicks = EXTRA_TICKS_AFTER_FIRST
   for (let tick = FIRST_FORECAST_TICK; tick <= last; tick += 1) {
     const ball = trajectory.pointAt(tick)
@@ -117,12 +137,12 @@ export function forecastCatch(
     for (const [index, fielder] of fielders.entries()) {
       const clone = clones[index]
       if (fielder.slot === initialChaserSlot && tick <= CHASER_SKIP_TICKS) continue
-      // b1416 — +0x127 && aa0 ≥ t 면 낙구 지점으로 달린다(정지 아님 · n 안 셈)
-      const runningToLanding = options.chaseToLanding === true && trajectory.landingTick >= tick
-      const standing = !runningToLanding
+      // b1416 — +0x127 && aa0 ≥ t 면 낙구 지점으로 달린다(정지 아님 · n 안 셈). 움직임허용이 아니면 정지도 n 도 없다
+      const runningToLanding = movable && options.chaseToLanding === true && trajectory.landingTick >= tick
+      const standing = movable && !runningToLanding
       if (standing) clone.runTicks += 1
-      // b146c — vtc8(+0xcc ≤ 0) && +0xb4 ≤ 0 이 아니면 판정 없이 복제 틱만 (정지면 n 을 되돌린다)
-      if (!(clone.slackTicks <= 0 && clone.lockTicks <= 0)) {
+      // b146c — vtc8(+0xb1 == 0 && +0xcc ≤ 0) && +0xb4 ≤ 0 이 아니면 판정 없이 복제 틱만 (정지면 n 을 되돌린다)
+      if (!(clone.throwMotionTicks <= 0 && clone.slackTicks <= 0 && clone.lockTicks <= 0)) {
         if (standing) clone.runTicks -= 1
         tickClone(clone, runningToLanding ? landingTarget : null, fielder.speed)
         continue
@@ -141,9 +161,13 @@ export function forecastCatch(
           slideUnlocked: options.slideUnlocked,
           onlySlot: options.onlySlot,
         })
+        // 야수마다 종류별 min(t) 를 적고 0xb3b38 이 칸 차례로 `<` 비교해 고른다 — 두 번째 패스가 t 를 되돌리면 더 이른 틱이 덮는다
         for (const kind of kinds) {
           const key = keyOf[kind]
-          if (table[key] === null) table[key] = { tick, slot: fielder.slot }
+          const entry = table[key]
+          if (entry === null || tick < entry.tick || (tick === entry.tick && fielder.slot < entry.slot)) {
+            table[key] = { tick, slot: fielder.slot }
+          }
         }
       }
       // b17fc 복제.vt0c — 낙구 지점으로 달리는 중이면 한 틱 이동(정지면 vt10 이 이미 멈췄다)
@@ -153,6 +177,12 @@ export function forecastCatch(
     if (table.low !== null || table.chest !== null || table.grounder !== null || table.jump !== null || table.slide !== null) {
       remainingTicks -= 1
       if (remainingTicks <= 0) break
+    }
+    // b1878 — a = 0 이고 t 가 궤적 끝(공+0x6c)이면 두 번째 패스: 모두 움직임허용 · t = 10 부터 (n · 복제 · 표는 그대로)
+    if (firstPass && tick === trajectory.length) {
+      firstPass = false
+      movable = true
+      tick = SECOND_PASS_FIRST_TICK - 1
     }
   }
 
@@ -180,11 +210,13 @@ interface ForecastClone {
   runTicks: number
   lockTicks: number
   slackTicks: number
+  throwMotionTicks: number
 }
 
 /**
  * 복제의 야수 틱 0xa1284 — 동작 잠금 +0xb4 가 있으면 −1 만 하고 끝(a12b4~a12d6), 아니면 +0xcc −1(a1330) 뒤
- * 이동 조건(vtc8 && +0xb4 ≤ 0, a1346~a1376)이 서면 목표로 한 틱(기반 캐릭터 이동 0xbf158 = `stepToward`).
+ * 이동 조건(vtc8 && +0xb4 ≤ 0, a1346~a1376)이 서면 목표로 한 틱(기반 캐릭터 이동 0xbf158 = `stepToward`),
+ * 끝에 던지기 동작(+0xa8 = 5)이 +0xac == 2 면 +0xb0~+0xb2 를 지운다(a13ae · a143e).
  */
 function tickClone(clone: ForecastClone, target: WorldPoint | null, speed: number): void {
   if (clone.lockTicks > 0) {
@@ -192,7 +224,11 @@ function tickClone(clone: ForecastClone, target: WorldPoint | null, speed: numbe
     return
   }
   if (clone.slackTicks > 0) clone.slackTicks = Math.max(0, clone.slackTicks - 1)
-  if (target !== null && clone.slackTicks <= 0) clone.position = stepToward(clone.position, target, speed)
+  // a1346 이동은 vtc8(+0xb1 · +0xcc) 뒤 · a143e 의 +0xb1 지우기는 이동 뒤다
+  if (target !== null && clone.slackTicks <= 0 && clone.throwMotionTicks <= 0) {
+    clone.position = stepToward(clone.position, target, speed)
+  }
+  if (clone.throwMotionTicks > 0) clone.throwMotionTicks -= 1
 }
 
 /**

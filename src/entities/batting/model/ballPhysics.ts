@@ -249,6 +249,31 @@ export function placeBall(body: BallBody, point: WorldPoint): void {
   }
 }
 
+/** 공 vt14 = 0xbf2cc — 목표(+0x2c)가 다르면 옮기고 +0x54 = 1. 송구 0xa1620 이 놓은 뒤(0xbef58) 받는 점으로 부른다(a1a0e) */
+export function aimBall(body: BallBody, point: WorldPoint): void {
+  if (body.targetX === point.x && body.targetY === point.y && body.targetZ === point.z) return
+  body.targetX = point.x
+  body.targetY = point.y
+  body.targetZ = point.z
+  body.relaunched = true
+}
+
+/**
+ * 0xa279c(공, c) — 중력 +0x44 를 +0xab8 에 맡기고 `g·c / 100` 으로 바꾼 뒤 +0xabc = 1. 송구 0xa1620(a1708)이 칸 ≤ 5 면 cfg+0x1c(70),
+ * 아니면 cfg+0x1e(80)로 부르고, 세계 마무리 0xa2a88 의 a2b14~a2b28 이 +0xabc 면 되돌린다 — 그래서 점은 바뀐 중력으로 깔린다.
+ * 돌려주는 값이 맡긴 중력이다(`restoreGravity` 에 넘긴다).
+ */
+export function scaleGravity(body: BallBody, percent: number): number {
+  const saved = body.gravity
+  body.gravity = divide(multiply(saved, percent), 100)
+  return saved
+}
+
+/** 0xa2a88 a2b14~a2b28 — 맡긴 중력(+0xab8)을 되돌린다 */
+export function restoreGravity(body: BallBody, saved: number): void {
+  body.gravity = saved
+}
+
 /** vt44 = 0xa2870(속도, v0, 각) — 0xbec7c 로 +0x3c · +0x40, +0x70 = 각, +0x54 = 1 */
 export function launchBall(body: BallBody, speed: number, verticalSpeed: number, angle: number): void {
   body.bounceMark = 0

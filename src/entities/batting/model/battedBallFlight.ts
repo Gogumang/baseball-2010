@@ -1,4 +1,5 @@
 import {
+  aimBall,
   BALL_LAUNCH_POINT,
   ballPointAt,
   cloneBallBody,
@@ -7,6 +8,8 @@ import {
   launchBall,
   MAXIMUM_BALL_POINTS,
   placeBall,
+  restoreGravity,
+  scaleGravity,
   simulateBall,
   type BallBody,
   type BallFlight,
@@ -83,6 +86,42 @@ export function launchTrajectory(input: {
   const launchBody = cloneBallBody(body)
   return trajectoryOf(simulateBall(body, input.random), launchBody, input.from)
 }
+
+/**
+ * **송구 공을 세계로 다시 깐다** — 던지기 0xa1620 의 끝(a19d6~a1a20) 뒤 0xb2e38 이 메시지 0x12(b2f8c → 0x51f2e)로
+ * 같은 공([장면+0x204] = 야수+0xd0)에 세계 0xbfed0 을 돌린다 (직접 뜬 것):
+ * ```
+ * a1640  놓는 점 = (야수 x, 1000, 야수 z) · a16d0 받는 점 = (점 x, 1000, 점 z)
+ * a1708  0xa279c(공, 칸 ≤ 5 ? 70 : 80) — 중력 배율, 마무리 0xa2a88(a2b14)이 되돌린다
+ * a19f2  0xbef58(공, 놓는 점) · a1a10 공.vt14(받는 점) = 0xbf2cc · a1a20 공.vt44(h, w, φ)
+ * ```
+ * 악송구(a1908 → 공+0xaac = 1)는 b2f9c 의 받는 점 끼워 넣기(점[T−1] = 받는 점)를 건너뛰어 이 궤적 그대로 굴러간다.
+ */
+export function thrownBallTrajectory(input: {
+  readonly from: WorldPoint
+  readonly target: WorldPoint
+  readonly speed: number
+  readonly verticalSpeed: number
+  readonly angle: number
+  /** 중력 배율 % — 칸 ≤ 5 면 70, 아니면 80 */
+  readonly gravityPercent: number
+  readonly random?: RandomPort
+  readonly body?: BallBody
+}): BallTrajectory {
+  const body = input.body === undefined ? createBallBody() : cloneBallBody(input.body)
+  const from = { x: input.from.x, y: THROW_HEIGHT, z: input.from.z }
+  placeBall(body, from)
+  const saved = scaleGravity(body, input.gravityPercent)
+  aimBall(body, { x: input.target.x, y: THROW_HEIGHT, z: input.target.z })
+  launchBall(body, input.speed, input.verticalSpeed, input.angle)
+  const launchBody = cloneBallBody(body)
+  const flight = simulateBall(body, input.random)
+  restoreGravity(flight.body, saved)
+  return trajectoryOf(flight, launchBody, from)
+}
+
+/** 송구 공을 놓고 받는 높이 — 0xa1640 · 0xa16d0 `movs #0xfa ; lsls #2` */
+const THROW_HEIGHT = 1_000
 
 function trajectoryOf(flight: BallFlight, launchBody: BallBody, from: WorldPoint): BallTrajectory {
   const { points, events, body } = flight
