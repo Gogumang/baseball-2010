@@ -179,8 +179,8 @@ export function CareerRoutes({
           noticeText={session.outingNotice}
           onRun={actions.runOutingFunction}
           onBack={backToManagement}
-          // 이벤트도 외출 행동이라 이번 주기에 이미 무언가 했으면 [!] 가 없다
-          eventPlaceIds={career.hasActedThisCycle ? new Set() : session.eventPlaceIds}
+          // [!] 칸 [gfx+0x9c] — 112 진입 0x118e4 에 찍은 값 그대로(0x7ed6c 는 행동 여부를 안 본다)
+          eventPlaceIds={session.eventPlaceIds}
           onEnter={actions.enterPlace}
           // 126 효과 팝업 → [확인] → 105 (입원 회복 글은 관리 화면 알림으로)
           resultText={session.outingResult?.effectText ?? null}
@@ -213,7 +213,7 @@ export function CareerRoutes({
         <>
           {(screen.context === '관리' || screen.context === '연초' || screen.context === '시즌') && <NariEventUnderlay career={career} />}
           {(screen.context === '외출진입' || screen.context === '장소' || screen.context === '대결결과') && (
-            <OutingMapUnderlay eventPlaceIds={career.hasActedThisCycle ? new Set() : session.eventPlaceIds} hour={new Date().getHours()} />
+            <OutingMapUnderlay eventPlaceIds={session.eventPlaceIds} hour={new Date().getHours()} />
           )}
           {/* 대사창은 화면 **위에 얹히는 덮개**다 — 안 감싸면 창 전체로 퍼져 구석에 그려진다 */}
           <ScreenOverlay>

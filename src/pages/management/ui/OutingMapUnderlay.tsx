@@ -31,7 +31,8 @@ export interface OutingMapUnderlayProps {
  * ```
  * ⚠️ 미해결: 대화창이 막 열린 첫 틀([gfx+0xea] = 0)에 0x71 이면 sel + 1 = 프레임 0 의 박스 3 으로 말풍선을 한 번 그릴 수 있다 —
  * 프레임 0 의 박스 3 이 있는지 확인하지 않아 그리지 않는다.
- * [!] 칸은 원본이 112 진입 때 한 번 채운 값이다. 웹은 지도 화면과 같은 판정(`eventPlaceIds`)을 넘겨 받는다(근사).
+ * [!] 칸은 원본이 112 진입(0x118e4 — 140 대결결과 길은 105 진입이 다시 부른다) 때 한 번 채운 값이다. 세션이 그때 찍은
+ * 칸(`pages/outing-map/lib/outingPlaceSlots`)을 `eventPlaceIds` 로 넘겨 받는다.
  */
 export function OutingMapUnderlay({ eventPlaceIds, hour }: OutingMapUnderlayProps) {
   const origins = useFrameOrigins(MAP_FRAMES)

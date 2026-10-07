@@ -79,8 +79,10 @@ import {
   NARI_YEAR_START_EVENT,
   NARI_YEAR_START_EVENT_ID,
   OPENING_EVENT_ID,
+  nextEventFor,
   placeTriggerOf,
 } from '@/entities/story/model/storyScene'
+import { EMPTY_OUTING_PLACE_SLOTS, outingPlaceSlotsOf, outingSlotPlaceIdsOf } from '@/pages/outing-map/lib/outingPlaceSlots'
 import { selectShopItem } from '@/features/shop/model/shopSelection'
 import { BATTER_GP_ITEMS } from '@/entities/career/model/gpItems'
 import {
@@ -875,6 +877,31 @@ export function useCareerSession({
   )
 
   const story = useStorySchedule(career)
+  /**
+   * 외출 지도 [!] 칸 [gfx+0x9c] — 112 진입 0x118e4 → 0x8cdc0 이 **들어설 때 한 번** 찍은 값(`outingPlaceSlotsOf`). 지도 그림
+   * 0x7ed6c 의 [!] 와 [들어가기] 0x8ce58 이 모두 이 값을 쓴다. 웹 화면이 112 진입이 되는 때(`isOutingMapEntry`):
+   * 밖에서 '외출' 로 들어옴 · 이벤트 '외출진입'(원본은 112 진입 다음 폴링 0x1cf9c 가 찾는다) · 그 이벤트에서 '외출' 로 돌아옴(`뒤 112`)
+   * · 이벤트 '대결결과'(105 진입 0x11910 의 0x11bb2 가 0x118e4 를 부르고 140). 장소 이벤트('장소')에서 돌아오는 길은 113 이라 안 찍는다.
+   * 이벤트 본문이 아직 안 왔으면 오는 때 찍는다.
+   */
+  const careerForSlotsRef = useRef(career)
+  careerForSlotsRef.current = career
+  const outingEntryRef = useRef<{ readonly screen: Screen; readonly count: number }>({
+    screen,
+    count: isOutingMapEntry(null, screen) ? 1 : 0,
+  })
+  if (outingEntryRef.current.screen !== screen) {
+    const entered = isOutingMapEntry(outingEntryRef.current.screen, screen)
+    outingEntryRef.current = { screen, count: outingEntryRef.current.count + (entered ? 1 : 0) }
+  }
+  const outingEntryCount = outingEntryRef.current.count
+  const outingSlots = useMemo(() => {
+    const current = careerForSlotsRef.current
+    const events = story.events
+    if (outingEntryCount === 0 || current === null || events === null) return EMPTY_OUTING_PLACE_SLOTS
+    return outingPlaceSlotsOf((placeFrame) => nextEventFor(current, events, placeTriggerOf(placeFrame)))
+  }, [outingEntryCount, story.events])
+  const eventPlaceIds = useMemo(() => outingSlotPlaceIdsOf(outingSlots), [outingSlots])
   /** 재생기에 넘기는 목록 — 파일 이벤트 뒤에 연초 115 내장 이벤트를 붙인다 (훑기는 파일 것만 본다, 투수편과 같다) */
   const storyEvents = useMemo(
     () => (story.events === null ? null : [...story.events, NARI_YEAR_START_EVENT]),
@@ -1653,12 +1680,11 @@ export function useCareerSession({
       setCareer(visited)
     },
 
-    /** [!] 장소에서 [들어가기] — 그 장소(trigger 2~6)의 이벤트를 본다 */
+    /** [!] 장소에서 [들어가기] — 0x8ce58: 112 진입에 찍어 둔 그 장소 칸의 이벤트를 본다(다시 훑지 않는다) */
     enterPlace: (place: OutingPlace) => {
       if (career === null || career.hasActedThisCycle) return
-      // 이벤트가 없는 장소는 "특별한 일이 없다" (0x16ccc)
-      const event = story.eventFor(career, placeTriggerOf(place.frame))
-      const eventId = event?.id ?? emptyPlaceEventId(place.frame)
+      // 칸이 비었으면 "특별한 일이 없다" (0x16ccc — 440 + 장소)
+      const eventId = outingSlots.get(place.id) ?? emptyPlaceEventId(place.frame)
       setScreen({ kind: '이벤트', eventId, context: '장소' })
     },
 
@@ -1860,8 +1886,19 @@ export function useCareerSession({
     /** 143 경기 전 엔트리 보기 — 142(`경기준비`) 위에 선다 */
     entryView: screen.kind === '경기준비' ? entryView : null,
     storyEvents,
-    eventPlaceIds: story.eventPlaceIds,
+    eventPlaceIds,
     handlePitchResolved,
     actions,
   }
+}
+
+/**
+ * 웹 화면 바뀜이 원본 112 진입(0x118e4)인가 — `outingSlots` 주석. 장소 이벤트에서 돌아온 '외출' 은 113 이라 아니다.
+ */
+function isOutingMapEntry(previous: Screen | null, next: Screen): boolean {
+  if (next.kind === '이벤트') return next.context === '외출진입' || next.context === '대결결과'
+  if (next.kind !== '외출') return false
+  if (previous === null) return true
+  if (previous.kind === '외출') return false
+  return !(previous.kind === '이벤트' && previous.context === '장소')
 }

@@ -146,6 +146,7 @@ import type { PitcherShopTab } from '@/features/shop/model/pitcherShopSelection'
 import { outingBlockReasonOf, outingBlockTextOf, performOuting } from '@/entities/career/model/outing'
 import type { OutingResult } from '@/entities/career/model/outing'
 import { OUTING_PLACES } from '@/shared/config/outingPlaces'
+import { EMPTY_OUTING_PLACE_SLOTS, outingPlaceSlotsOf, outingSlotPlaceIdsOf } from '@/pages/outing-map/lib/outingPlaceSlots'
 import type { OutingPlace } from '@/shared/config/outingPlaces'
 import { PITCHER_MANAGEMENT_TEXT } from '@/pages/pitcher-league/lib/pitcherManagementMenu'
 import { nariMatchCancelTargetOf, rollNariMatchAces, rollNariMatchStadium } from '@/pages/management/lib/nariMatchPrepare'
@@ -1494,11 +1495,18 @@ export function usePitcherLeagueSession(
   const [outingNotice, setOutingNotice] = useState('')
   const [outingResult, setOutingResult] = useState<OutingResult | null>(null)
   const [outingRecoveryNotice, setOutingRecoveryNotice] = useState('')
+  /**
+   * 112 진입(0x118e4) 횟수 — 늘 때마다 [!] 칸을 다시 찍는다(`outingSlots`). 105 → 112(`openOuting`) · 지도 자동 이벤트에서
+   * 돌아옴(`뒤 112`) · 대결결과 140(105 진입 0x11910 의 0x11bb2 가 0x118e4 를 부른다)에서 는다. 장소(113)에서 돌아오는 길은 아니다.
+   */
+  const [outingEntryCount, setOutingEntryCount] = useState(0)
+  const enterOutingMap = useCallback(() => setOutingEntryCount((count) => count + 1), [])
   const openOuting = useCallback(() => {
     setOutingNotice('')
     setOutingResult(null)
+    enterOutingMap()
     setScene('외출')
-  }, [])
+  }, [enterOutingMap])
   const runOutingFunction = useCallback(
     (functionId: string) => {
       if (career === null) return
@@ -1523,17 +1531,19 @@ export function usePitcherLeagueSession(
   }, [outingResult])
   const dismissOutingRecoveryNotice = useCallback(() => setOutingRecoveryNotice(''), [])
   /**
-   * 외출 지도 [!] — 지도 진입 0x118e4 → 0x8cdc0 이 장소마다 파일 순서 첫 이벤트(대상 1·3, trigger 2~6)를 넣는다.
+   * 외출 지도 [!] 칸 [gfx+0x9c] — 112 진입 0x118e4 → 0x8cdc0 이 장소마다 파일 순서 첫 이벤트(대상 1·3, trigger 2~6)를
+   * **들어설 때 한 번** 넣는다(`outingPlaceSlotsOf`). 지도 그림 0x7ed6c 의 [!] 와 [들어가기] 0x8ce58 이 다음 112 진입까지 이 값을 쓴다.
    * 모드 갈림이 없는 코드라 판정만 투수 갈래(`pitcherStoryScene`)로 본다. 무작위는 굴리지 않는다.
+   * 이벤트 본문이 아직 안 왔으면 오는 때 찍는다.
    */
-  const eventPlaceIds = useMemo(() => {
-    if (career === null || fileEvents === null) return new Set<string>()
-    return new Set(
-      OUTING_PLACES.filter((place) => pitcherPlaceEventOf(career, fileEvents, place.frame) !== null).map(
-        (place) => place.id,
-      ),
-    )
-  }, [career, fileEvents])
+  const careerForSlotsRef = useRef(career)
+  careerForSlotsRef.current = career
+  const outingSlots = useMemo(() => {
+    const current = careerForSlotsRef.current
+    if (outingEntryCount === 0 || current === null || fileEvents === null) return EMPTY_OUTING_PLACE_SLOTS
+    return outingPlaceSlotsOf((placeFrame) => pitcherPlaceEventOf(current, fileEvents, placeFrame))
+  }, [outingEntryCount, fileEvents])
+  const eventPlaceIds = useMemo(() => outingSlotPlaceIdsOf(outingSlots), [outingSlots])
 
   /**
    * **외출 지도(112)의 자동 발동** — 0x1cf9c 는 현재 상태가 112 일 때도 같은 훑기를 화면코드 112 로 돈다
@@ -1564,10 +1574,10 @@ export function usePitcherLeagueSession(
     (place: OutingPlace) => {
       if (career === null || fileEvents === null) return
       setOutingNotice('')
-      const event = pitcherPlaceEventOf(career, fileEvents, place.frame)
-      openStory({ eventId: event?.id ?? emptyPlaceEventId(place.frame), context: '장소', viewed: [] })
+      // 0x8ce58 — 112 진입에 찍어 둔 그 장소 칸의 번호(다시 훑지 않는다), 비었으면 440 + 장소
+      openStory({ eventId: outingSlots.get(place.id) ?? emptyPlaceEventId(place.frame), context: '장소', viewed: [] })
     },
-    [career, fileEvents, openStory],
+    [career, fileEvents, openStory, outingSlots],
   )
 
   /** 380 "올해 네 연봉은 %s만 상승해서 %s만이다" — 0x8bc4c 가 상승분·새 연봉을 ×100 해서 금액 서식 0x55cf4 로 */
@@ -1611,6 +1621,8 @@ export function usePitcherLeagueSession(
       }
       if (story.context === '지도') {
         commit(viewed)
+        // `뒤 112` — 112 에 다시 들어서 0x118e4 가 [!] 칸을 다시 찍는다
+        enterOutingMap()
         return setScene('외출')
       }
       // 140 → 뒤 105. 장소 끝 처리(행동·외출 수)는 대결로 **나갈 때** 이미 했다 (아래 `settlePlaceForAceMatch`)
@@ -1629,7 +1641,7 @@ export function usePitcherLeagueSession(
       commit(viewed)
       setScene('관리')
     },
-    [career, commit, continueYearEnd, random, recordStat, story],
+    [career, commit, continueYearEnd, enterOutingMap, random, recordStat, story],
   )
 
   /**
@@ -1680,6 +1692,8 @@ export function usePitcherLeagueSession(
     (isWin: boolean) => {
       if (aceMatch === null) return
       setAceMatch(null)
+      // 105 진입의 +0x176 갈래(0x11bb2)가 현재를 112 로 두고 0x118e4 — [!] 칸을 다시 찍는다(140 밑 지도가 이 값을 그린다)
+      enterOutingMap()
       openStory({
         eventId: matchResultEventOf(aceMatch.resultEvents, isWin),
         context: '대결결과',
@@ -1687,7 +1701,7 @@ export function usePitcherLeagueSession(
         carried: aceMatch.carried,
       })
     },
-    [aceMatch, openStory],
+    [aceMatch, enterOutingMap, openStory],
   )
   const dismissStoryNotice = useCallback(() => setStoryNotice(''), [])
 

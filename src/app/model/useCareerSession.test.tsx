@@ -658,6 +658,23 @@ describe('마선수 대결로 나가는 장소 이벤트 — match 의 "끝남" 
   })
 })
 
+describe('외출 지도 [!] 칸 — 112 진입 0x118e4 → 0x8cdc0 이 한 번 찍는다', () => {
+  it('지도에 머문 채 장소 기능으로 커리어가 바뀌어도 [!] 칸은 다시 재지 않는다 · 밖에서 다시 들어오면 다시 찍는다', async () => {
+    const rendered = 띄우기({ ...createCareer('외출'), morale: 50, money: 1000 })
+    act(() => rendered.result.current.setScreen({ kind: '외출' }))
+    await waitFor(() => expect(rendered.result.current.session.storyEvents).not.toBeNull(), { timeout: 5000 })
+    const 찍은것 = rendered.result.current.session.eventPlaceIds
+
+    act(() => rendered.result.current.session.actions.runOutingFunction('외식'))
+    expect(rendered.result.current.session.career?.hasActedThisCycle).toBe(true)
+    expect(rendered.result.current.session.eventPlaceIds).toBe(찍은것)
+
+    act(() => rendered.result.current.setScreen({ kind: '관리' }))
+    act(() => rendered.result.current.setScreen({ kind: '외출' }))
+    expect(rendered.result.current.session.eventPlaceIds).not.toBe(찍은것)
+  })
+})
+
 describe('외출 126 — 효과 팝업 → 105 (0x15234 · 0x1575c)', () => {
   it('장소 기능을 고르면 효과 팝업이 뜨고, [확인] 이면 관리 화면으로 가며 입원 회복 글은 관리 알림이 된다', () => {
     const rendered = 띄우기({ ...createCareer('외출'), morale: 50, money: 1000, isInjured: true, injuryRemaining: 1 })

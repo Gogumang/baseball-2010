@@ -1103,6 +1103,21 @@ describe('외출 [!] · [들어가기] (0x8cdc0 · 0x16c64 · 114)', () => {
     expect(result.current.storyNotice).toMatch(/^히든 아이템 오픈!! \[.+\] 나만의리그 투수편에서 사용가능합니다!N히든 아이템 오픈!! \[.+\] 나만의리그 타자편에서 사용가능합니다$/)
   })
 
+  it('[!] 칸은 112 에 들어설 때 한 번 찍는다(0x118e4) — 지도에 있는 동안 커리어가 바뀌어도 그대로, [들어가기] 도 그 칸(0x8ce58)', async () => {
+    const result = await 판짜기({ gamesPlayed: 12 })
+    act(() => result.current.actions.openOuting())
+    const 찍은것 = [...result.current.eventPlaceIds]
+    expect(찍은것.length).toBeGreaterThan(0)
+    const 경기장 = OUTING_PLACES.find((place) => result.current.eventPlaceIds.has(place.id))!
+
+    // 지도에 머문 채 경기 수가 바뀌어도(다른 판정이 될 값) 칸은 다시 재지 않는다
+    act(() => result.current.actions.save({ ...result.current.career!, gamesPlayed: 0 }))
+    expect([...result.current.eventPlaceIds]).toEqual(찍은것)
+    act(() => result.current.actions.enterOutingPlace(경기장))
+    expect(result.current.story?.context).toBe('장소')
+    expect(result.current.story!.eventId).toBeLessThan(440)
+  })
+
   it('이벤트가 없는 장소는 빈 장소 440+장소 — 행동을 안 쓰고 지도(113)로 돌아온다', async () => {
     const result = await 판짜기({ gamesPlayed: 0 })
     act(() => result.current.actions.openOuting())
