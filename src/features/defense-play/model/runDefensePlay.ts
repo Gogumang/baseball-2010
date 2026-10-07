@@ -2798,9 +2798,12 @@ function moveFielder(fielder: FielderState, input: FielderMoveInput): FielderSta
     const base = fielder.aiState - AI_STATE.COVER_HOME
     return { ...walk(basePosition(base)), targetBase: base }
   }
-  // AI 0xb(0xb4b5c) — 0xb3b38 담장 갈래가 세운 목표 +0x90(담장 앞)으로. ⚠️ 쥔 야수가 0xb 로 남는 경우(점프 · 슬라이딩 포구가
-  // 담장선보다 이를 때)의 0xb4b5c 뒤 조건(b482e)은 안 떴다 — 쥔 동안은 걷지 않는다(웹 관례)
-  if (fielder.aiState === AI_STATE.PICK_UP && !fielder.holdingBall) return walk(fielder.target)
+  // AI 0xb(0xb4b5c) — 0xb3b38 담장 갈래가 세운 목표 +0x90(담장 앞)으로. **공을 쥐었어도 걷는다** (직접 뜬 것):
+  // 분기 앞 b46c4~b46ec 은 상태 0 · 0xa · 0xd · 커버(2~5)만 다이빙 검사로 보내고 0xb 는 곧장 분기표 0xd8808[0xb] = b4b5c 로 간다.
+  // b4b5c 는 +0x90 을 [sp+0x40] 에 베끼고 r4 = 야수 vt14 로 b482e 에 가며, b482e 는 조건 없이 vt14(야수, x, y, z) 를 부르고
+  // b4c60(다음 야수)로 끝난다. vt14 = 0xa14c8 이 보는 것은 동작 잠금 +0xb4 ≤ 0 · vtc8(0xa2118 = +0xb1(던진 뒤 잠금) == 0 &&
+  // +0xcc ≤ 0) · 목표가 바뀌었나(0xbc0f4)뿐 — 공 쥠 +0xe0 은 어디에도 없다(다른 AI 상태의 vt14 와 같은 관문이라 웹 `walk` 처럼 본다)
+  if (fielder.aiState === AI_STATE.PICK_UP) return walk(fielder.target)
   if (fielder.slot === input.chaserSlot) {
     if (input.tick < input.catchTick) return { ...walk(input.catchPoint), aiState: AI_STATE.CHASE }
     if (fielder.aiState !== AI_STATE.IDLE) return fielder
