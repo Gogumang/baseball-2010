@@ -41,8 +41,9 @@ export function SeasonEndScreen({
       }
     >
       <Panel>
+        {/* 무승부는 원본에 없다(0xb68fc 연장 상한 없음 · 정산 4f072 는 승/패 둘뿐, d73367e) — "N무" 를 걷었다 */}
         <BigResult>
-          {career.wins}승 {career.draws}무 {career.losses}패
+          {career.wins}승 {career.losses}패
         </BigResult>
       </Panel>
 

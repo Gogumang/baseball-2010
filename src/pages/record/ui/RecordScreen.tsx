@@ -17,7 +17,8 @@ export function RecordScreen({
   return (
     <PixelScreen
       title="성적"
-      badge={`${career.wins}승 ${career.draws}무 ${career.losses}패`}
+      // 무승부는 원본에 없다(정산 4f072 는 승/패 둘뿐, d73367e) — "N무" 를 걷었다
+      badge={`${career.wins}승 ${career.losses}패`}
       rightKey={{ label: '돌아가기', onPress: onBack }}
     >
       <Panel heading={<>{career.season}시즌</>}>

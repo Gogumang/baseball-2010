@@ -383,7 +383,7 @@ export interface PlayerCareer {
   /** 연속 기록 (전역 저장 +0x1bc) — 2안타 이상 경기 · 홈런 경기 · 무안타 경기 */
   readonly streaks: { readonly multiHit: number; readonly homeRun: number; readonly hitless: number }
   readonly wins: number
-  /** 원본에 없는 칸 — 나리 경기는 무승부로 끝나지 않아(0xb68fc · 정산 4f072) 늘 0 이다. 옛 화면(성적 · 시즌 종료)이 읽어 남겨 둔다 */
+  /** 원본에 없는 칸 — 나리 경기는 무승부로 끝나지 않아(0xb68fc · 정산 4f072) 늘 0 이다. 화면은 더 읽지 않고(성적 · 시즌 종료의 "N무" 를 걷었다) 옛 저장 호환으로 칸만 남겨 둔다 */
   readonly draws: number
   readonly losses: number
 }

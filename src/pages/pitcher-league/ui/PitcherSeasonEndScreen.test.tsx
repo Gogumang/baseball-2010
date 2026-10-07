@@ -24,7 +24,9 @@ describe('투수편 시즌 끝 화면', () => {
     render(<PitcherSeasonEndScreen career={투수()} onYearEnd={() => {}} />)
 
     expect(screen.getByText('2시즌 종료')).toBeDefined()
-    expect(screen.getByText(/20승 1무 24패/)).toBeDefined()
+    expect(screen.getByText(/20승 24패/)).toBeDefined()
+    // 무승부는 원본에 없다 — 옛 저장의 draws 칸이 남아 있어도 "N무" 를 그리지 않는다
+    expect(screen.queryByText(/\d+무/)).toBeNull()
   })
 
   it('타율·홈런이 아니라 이닝·탈삼진·방어율을 보여 준다', () => {

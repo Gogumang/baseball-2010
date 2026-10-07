@@ -472,7 +472,7 @@ export interface PitcherCareer {
   readonly midSeasonEvaluatedYears: readonly number[]
   /** 팀 전적 (내 팀이 치른 경기) */
   readonly wins: number
-  /** 원본에 없는 칸 — 나리 경기는 무승부로 끝나지 않아(0xb68fc · 정산 4f072) 늘 0 이다. 옛 화면이 읽어 남겨 둔다 */
+  /** 원본에 없는 칸 — 나리 경기는 무승부로 끝나지 않아(0xb68fc · 정산 4f072) 늘 0 이다. 화면은 더 읽지 않고(시즌 종료 · 상태판의 "N무" 를 걷었다) 옛 저장 호환으로 칸만 남겨 둔다 */
   readonly draws: number
   readonly losses: number
 }

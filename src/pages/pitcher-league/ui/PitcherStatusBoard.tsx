@@ -103,7 +103,8 @@ export function PitcherStatusBoard({ career }: PitcherStatusBoardProps) {
         <Row label="평판" value={`${career.reputation}`} />
         <Row label="소지금" value={`${career.money}만원`} />
         <Row label="연봉" value={`${career.salary}만원`} />
-        <Row label="팀 전적" value={`${career.wins}승 ${career.draws}무 ${career.losses}패`} />
+        {/* 무승부는 원본에 없다(정산 4f072 는 승/패 둘뿐, d73367e) — "N무" 를 걷었다 */}
+        <Row label="팀 전적" value={`${career.wins}승 ${career.losses}패`} />
         <Row label="방어율" value={earnedRunAverageTextOf(career)} />
         {career.isInjured && <Row label="부상" value={`${career.injuryRemaining}경기`} />}
         {career.isSick && <Row label="질병" value={career.illnessName ?? ''} />}
