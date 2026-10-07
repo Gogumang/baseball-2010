@@ -4,7 +4,7 @@ import type { Screen } from '@/app/model/screen'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import { isAtBatFinished } from '@/entities/at-bat/model/atBatState'
 import { describeOutcomeBanner } from '@/entities/at-bat/model/resolutionText'
-import { arrivePitch, cpuPickoff, resolveBenchClearing, resolveDefensePlay, spendMySpecialSwing, startGame, startPlayerOutcome, startSteal, summaryOf, throwOpponentPitch } from '@/features/play-game/model/gameFlow'
+import { arrivePitch, cpuPickoff, resolveBenchClearing, resolveDefensePlay, spendMySpecialSwing, startGame, startPlayerFoulPlay, startPlayerOutcome, startSteal, summaryOf, throwOpponentPitch } from '@/features/play-game/model/gameFlow'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
@@ -380,6 +380,11 @@ export function useCareerSession({
    * 타석이 끝나거나 경기를 세우거나 나갈 때 비운다.
    */
   const pitchTallyRef = useRef<AtBatPitchTally>(EMPTY_AT_BAT_PITCH_TALLY)
+  /**
+   * 지금 붙든 수비 판이 **파울 각 공 판**인가 (`startPlayerFoulPlay`) — 판이 파울로 닫히면 같은 타석이 이어지고, 낙구 전에
+   * 잡히면(파울 뜬공 아웃) 이 타석에서 앞서 난 연속 파울 기록을 판 끝 정산과 함께 넘긴다.
+   */
+  const foulPlayRef = useRef(false)
   // 경기를 세우는 `startMatch` 가 읽는다 — 설정이 바뀔 때마다 콜백 신원이 흔들리지 않게 ref 로 둔다
   const runningModeManualRef = useRef(runningModeManual)
   runningModeManualRef.current = runningModeManual
@@ -488,6 +493,7 @@ export function useCareerSession({
       setProgress(started)
       runner.resetAtBat()
       pitchTallyRef.current = EMPTY_AT_BAT_PITCH_TALLY
+      foulPlayRef.current = false
       runner.setBannerText('')
       runner.setIsPaused(true)
       setLoadingTip(pickLoadingTip(random))
@@ -774,6 +780,25 @@ export function useCareerSession({
         progressRef.current = thrown
         setProgress(thrown)
       }
+      // 파울 각 공 — 원본은 맞은 공이면 각과 무관하게 판(상태 0x17)을 돈다(메시지 0x11 → 0x13 → 0x17). 스트라이크(0xb6b58) ·
+      // 연속 파울(0xa7dbc)은 판이 파울로 닫힐 때(`finishDefensePlay`)다. 공 도착 판(0x3dfac)은 못 맞힌 공만이라 열지 않는다.
+      // ⚠️ 파울 콜 25 는 아직 공 판정 자리(`pitchCallSoundIdOf`)에서 낸다 — 원본은 판의 결과 코드 7 메시지 51c5c
+      if (detail.resolution.kind === '파울' && detail.foulContact !== undefined) {
+        const beforeFoul = progressRef.current
+        if (beforeFoul === null) return
+        const started = startPlayerFoulPlay(beforeFoul, detail.foulContact, random, {
+          strikes: runner.atBatRef.current.strikes,
+          buntKind: buntKind ?? 0,
+          isUncatchable,
+        })
+        progressRef.current = started
+        setProgress(started)
+        playSoundIds(audio, [detail.contactSoundId, pitchCallSoundIdOf(detail.resolution, runner.atBatRef.current)])
+        if (started.pendingDefensePlay === null) return
+        foulPlayRef.current = true
+        runner.setIsPaused(true)
+        return
+      }
       const nextAtBat = runner.applyPitch(detail.resolution)
       // 공마다 연속 파울(ctx+0x15f)을 센다 — 32·33 은 타석 결과와 함께 gameFlow 로 넘긴다 (0xa7dbc)
       const tally = tallyPitch(pitchTallyRef.current, detail.resolution)
@@ -1029,9 +1054,25 @@ export function useCareerSession({
       const { bases } = current.game
       const runnersOnBase = [bases.first, bases.second, bases.third].filter(Boolean).length
       const played = result ?? runDefensePlay(pending)
-      const resolved = resolveDefensePlay(current, played, random)
+      const isFoulPlay = foulPlayRef.current
+      foulPlayRef.current = false
+      // 파울 각 공 판을 낙구 전에 잡았다(파울 뜬공 아웃) — 이 타석에서 앞서 난 연속 파울 기록(32·33)을 정산과 함께 넘긴다
+      const resolved = resolveDefensePlay(current, played, random, {
+        foulRecordIds: isFoulPlay && played.foulEnded !== true ? pitchTallyRef.current.foulRecordIds : undefined,
+      })
       progressRef.current = resolved
       setProgress(resolved)
+      if (played.foulEnded === true) {
+        // 파울로 닫힌 판 — 0xae3e8 ae568 → 0xf(같은 타석 다음 공) · 0x35108 → 0xb6b58(스트라이크 ≤ 1 이면 +1).
+        // 결과 코드 7 메시지 51c5c 의 연속 파울(0xa7dbc)이 이 판의 것이다(⚠️ 원본은 7 이 난 틱 — 판 끝은 근사)
+        runner.applyPitch({ kind: '파울' })
+        pitchTallyRef.current = tallyPitch(pitchTallyRef.current, { kind: '파울' })
+        playSoundIds(audio, gameStepSoundIdsOf(current, resolved))
+        runner.setIsPaused(false)
+        return
+      }
+      // 파울 뜬공 아웃으로 타석이 끝났다 — 다음 타석은 새 카운터로 (타석 초기화 0xa5bcc 가 ctx+0x15f 를 지운다)
+      if (isFoulPlay) pitchTallyRef.current = EMPTY_AT_BAT_PITCH_TALLY
       // 배너·소리는 **판 끝 정산 0xa8024 가 낸 결과**로 낸다 — `pending.outcome` 은 판 앞 예측(`predictedOutcomeOf`)이라
       // 판이 다르게 끝나면(예: 예측 아웃인데 판에서 안타) 어긋난다. 타구 판이 아닌 결과(옛 호출)만 예측으로 남는다
       const outcome = played.outcome ?? pending.outcome
@@ -1048,7 +1089,7 @@ export function useCareerSession({
       ])
       finishAtBat(resolved, outcome, runnersOnBase)
     },
-    [audio, finishAtBat, random],
+    [audio, finishAtBat, random, runner],
   )
 
   /**
@@ -1674,6 +1715,7 @@ export function useCareerSession({
       setProgress(null)
       runner.resetAtBat()
       pitchTallyRef.current = EMPTY_AT_BAT_PITCH_TALLY
+      foulPlayRef.current = false
       runner.setIsPaused(true)
       setScreen({ kind: '메인메뉴' })
     },

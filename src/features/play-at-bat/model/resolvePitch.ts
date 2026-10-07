@@ -5,7 +5,7 @@ import type { SwingBoost } from '@/entities/batting/model/swingBoost'
 import { timingOf } from '@/entities/batting/model/swingTiming'
 import { hitDirectionOf } from '@/entities/batting/model/hitDirection'
 import { contactOfPattern, drawPattern, launchPatternOf } from '@/entities/batting/model/battedBallOutcome'
-import { provisionalOutcomeOf, registerContact } from '@/entities/batting/model/battedContact'
+import { provisionalOutcomeOf, registerContact, type BattedContact } from '@/entities/batting/model/battedContact'
 import { contactSoundIdOf } from '@/features/play-at-bat/model/atBatSounds'
 import { rollSpecialSwing } from '@/entities/batting/model/specialSwing'
 import type { PatternDeck } from '@/entities/batting/model/battedBallOutcome'
@@ -79,6 +79,13 @@ export interface PitchOutcomeDetail {
    * 맞은 공(파울 포함)에만 있다. 홈런더비는 이 패턴으로 비거리(0xa600c)와 이벤트 존 플래그(0xb07c8 = flags & 2)를 본다.
    */
   readonly pattern?: BattedBallPattern
+  /**
+   * **판을 돌 파울 각 공** — 쏜 패턴 · 결과 코드 · 필살 스윙 재료(`BattedContact`). 파울(`resolution.kind === '파울'`)에만 있다.
+   * 원본은 맞은 공이면 파울 각이라도 판(상태 0x17)을 돌아 낙구 · 담장선 틱에 0x9d5bc 가 7 을 내야 파울이고, 그 전에 잡히면
+   * 뜬공 아웃(13)이다. 받는 쪽이 이것으로 수비 판을 돌리고, 판이 파울로 닫히면
+   * 그제야 스트라이크를 올린다(0x35108 → 0xb6b58). CPU 타자의 `CpuPitchOutcome.foulContact` 와 같은 칸이다.
+   */
+  readonly foulContact?: BattedContact
   /**
    * **타구 순간에 울릴 소리 번호** (`atBatSounds.contactSoundIdOf`). 울릴 것이 없으면 null.
    *
@@ -254,8 +261,8 @@ export function resolvePitch(
   })
   // 필살 성공 굴림 0x34c74 → 0x517e6 — 맞은 공(0xfd2 ≠ 0)이면 어느 갈래든 0x517c8 로 모인다. 원본 차례는 메시지 0x11
   // (0x515c6 → 0x50faa: 필살수비 굴림 · 표시 패턴 · 쏘기의 폴 굴림) **뒤**라, 판을 도는 페어 타구는 굴림 재료만 쏜 공에 실어
-  // 보내고 수비 판 시작(`startDefensePlay`)이 그 차례에 굴린다. ⚠️ 판을 안 도는 파울 · 판정 11 은 웹이 아직 판을 안 돌려
-  // (원본은 이 공들도 판을 돈다) 여기서 굴린다 — 그 공들의 필살수비 · 폴 굴림도 아직 없다(미해결, 판 배선은 세션 몫)
+  // 보내고 수비 판 시작(`startDefensePlay`)이 그 차례에 굴린다. ⚠️ 파울 · 판정 11 은 아직 여기서 굴린다 — 파울 각 공은 이제
+  // 세션이 판을 돌리지만(`foulContact`) 굴림 차례는 아직 옛 자리다(미해결). 판정 11 은 판도 아직 안 돈다
   const specialSwing =
     swing.isSpecial === true
       ? { number: context.specialSwing?.number ?? 0, isAceBatter: context.specialSwing?.isAceBatter === true }
@@ -274,7 +281,16 @@ export function resolvePitch(
   })
   const detail: PitchOutcomeDetail =
     contact.kind === '파울'
-      ? { resolution: { kind: '파울' }, hasSwung: true, isBunt: false, resultCode: code, pattern, contactSoundId }
+      ? {
+          resolution: { kind: '파울' },
+          hasSwung: true,
+          isBunt: false,
+          resultCode: code,
+          pattern,
+          // 파울 각이라도 판을 돈다 — 부르는 쪽이 이 쏜 공으로 판을 돌린다
+          foulContact: { pattern, resultCode: code },
+          contactSoundId,
+        }
       : contact.kind === '번트파울아웃'
         ? {
             // 판정 11 — 판 없이 아웃이다. 아웃 콜은 조건 없이 62 (0x51b20 → 0x51b2e)

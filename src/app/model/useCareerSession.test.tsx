@@ -27,6 +27,9 @@ import { startGame, summaryOf } from '@/features/play-game/model/gameFlow'
 import { insertMyBatter, nariQuickLineupOf, seatAceBatter, tableNariTeamRecord } from '@/entities/career/model/nariTeamRecord'
 import type { QuickLineup } from '@/entities/game/model/quickLineup'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
+import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
+import { BATTED_BALL_PATTERNS } from '@/shared/config/original/battedBallPatterns'
+import { isFairAngle } from '@/entities/batting/model/battedBallOutcome'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 import { BATTER_GP_ITEMS } from '@/entities/career/model/gpItems'
 import type { NariGameMatch, NariGameSavePort } from '@/pages/management/lib/nariMatchPrepare'
@@ -415,6 +418,36 @@ describe('연속 파울 기록 32·33 (0xa7dbc) — 실제 타석에서 경기 �
       const 나머지 = summary.recordIds.filter((id) => id !== 32 && id !== 33)
       expect(recordGamePointsOf([32, 33])).toBeGreaterThan(0)
       expect(gamePointRewardOf(summary)).toBe(recordGamePointsOf(나머지) + recordGamePointsOf([32, 33]))
+    } finally {
+      act(() => rendered.unmount())
+    }
+  })
+
+  it('판을 도는 파울 각 공도 같다 — 판이 파울로 닫힐 때(결과 코드 7 메시지 51c5c 의 0xa7dbc) 센다', () => {
+    const 파울코드 = Object.entries(BATTED_BALL_PATTERNS).flatMap(([code, patterns]) =>
+      patterns.filter((pattern) => !isFairAngle(pattern[0])).map((pattern) => ({ resultCode: Number(code), pattern })),
+    )[0]
+    const 판파울: PitchOutcomeDetail = { ...파울, resultCode: 파울코드.resultCode, pattern: 파울코드.pattern, foulContact: 파울코드 }
+    const rendered = 경기띄우기()
+    try {
+      for (let i = 0; i < 4; i += 1) {
+        act(() => rendered.result.current.session.handlePitchResolved(판파울))
+        const pending = rendered.result.current.session.progress!.pendingDefensePlay!
+        expect(pending).not.toBeNull()
+        // 판이 파울로 닫혔다 — 진행기의 `foulEnded` 갈래만 본다
+        act(() =>
+          rendered.result.current.session.actions.finishDefensePlay({
+            ...runDefensePlay(pending),
+            foulEnded: true,
+            outcome: undefined,
+            caughtOnTheFly: false,
+          }),
+        )
+      }
+      // 스트라이크는 2 에서 멈춘다(0xb6b58 은 ≤ 1 일 때만 +1)
+      expect(rendered.result.current.runner.atBat.strikes).toBe(2)
+      던지기(rendered, [헛스윙])
+      expect(파울기록(rendered.result.current.session.progress?.recordIds)).toEqual([32, 33])
     } finally {
       act(() => rendered.unmount())
     }

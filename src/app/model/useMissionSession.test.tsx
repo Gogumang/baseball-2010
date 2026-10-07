@@ -30,6 +30,9 @@ import { modePitcherOfHallOfFame } from '@/app/model/modePitcher'
 import { EMPTY_COLLECTION, registerHallOfFame, registerHallOfFamePitcher } from '@/entities/collection/model/collection'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
+import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
+import { BATTED_BALL_PATTERNS } from '@/shared/config/original/battedBallPatterns'
+import { isFairAngle } from '@/entities/batting/model/battedBallOutcome'
 
 /**
  * 이벤트 112 의 match 명령이 여는 마선수 대결 — 이기면 114, 지면 115 로 돌아가야 한다.
@@ -1184,5 +1187,81 @@ describe('투수 미션 경기 중 메뉴 "나가기" (0x40140 모드 5·6 갈�
     expect(rendered.result.current.session.pitcherRun).toBeNull()
     expect(setScreen).toHaveBeenLastCalledWith({ kind: '메인메뉴' })
     expect(rendered.result.current.session.clearCounts).toEqual({})
+  })
+})
+
+describe('미션의 파울 각 공도 수비 판을 돈다 — 파울로 닫히면 같은 타석 스트라이크(0x35108 → 0xb6b58), 잡히면 파울 뜬공 아웃', () => {
+  const 파울코드 = Object.entries(BATTED_BALL_PATTERNS).flatMap(([code, patterns]) =>
+    patterns.filter((pattern) => !isFairAngle(pattern[0])).map((pattern) => ({ resultCode: Number(code), pattern })),
+  )[0]
+
+  it('타자 미션: 쏜 공이 실린 파울은 판을 붙들고 스트라이크는 판이 파울로 닫힐 때 오른다', () => {
+    const rendered = setUpBatterMission(1)
+    act(() => {
+      rendered.result.current.session.handleMissionPitch({
+        resolution: { kind: '파울' },
+        hasSwung: true,
+        isBunt: false,
+        resultCode: 파울코드.resultCode,
+        pattern: 파울코드.pattern,
+        foulContact: 파울코드,
+      })
+    })
+    const pending = rendered.result.current.session.pendingDefensePlay
+    expect(pending?.isFoulPlay).toBe(true)
+    expect(pending?.input.strikes).toBe(0)
+    expect(contactOfOutcome(pending!.outcome)?.pattern).toEqual(파울코드.pattern)
+    expect(rendered.result.current.runner.atBat.strikes).toBe(0)
+
+    act(() => {
+      rendered.result.current.session.actions.finishDefensePlay({
+        ...runDefensePlay(pending!.input),
+        foulEnded: true,
+        outcome: undefined,
+        caughtOnTheFly: false,
+      })
+    })
+    expect(rendered.result.current.session.pendingDefensePlay).toBeNull()
+    expect(rendered.result.current.runner.atBat.strikes).toBe(1)
+    expect(rendered.result.current.runner.atBat.outcome).toBeNull()
+    expect(rendered.result.current.session.missionRun?.status).toBe('진행중')
+    rendered.unmount()
+  })
+
+  it('투수 미션: CPU 타자의 파울 각 공(`playsFoulBall`)도 판을 붙든다 — 볼카운트는 판이 닫힐 때까지 그대로', () => {
+    let 파울판 = 0
+    for (let seed = 1; seed <= 8 && 파울판 === 0; seed += 1) {
+      const rendered = setUpPitcherMission(12, seed)
+      for (let pitch = 0; pitch < 40 && rendered.result.current.session.pitcherRun?.status === '진행중'; pitch += 1) {
+        const session = rendered.result.current.session
+        if (session.pendingBenchClearing !== null) {
+          act(() => session.actions.finishBenchClearing(false))
+          continue
+        }
+        if (session.pendingDefensePlay !== null) {
+          act(() => session.actions.finishDefensePlay())
+          continue
+        }
+        const 앞 = rendered.result.current.runner.atBat
+        act(() => session.handleThrow(PITCH_TYPES[0], pitch % 9, 9, true))
+        const pending = rendered.result.current.session.pendingDefensePlay
+        if (pending?.isFoulPlay !== true) continue
+        파울판 += 1
+        expect(pending.side).toBe('투수')
+        expect(pending.input.strikes).toBe(앞.strikes)
+        expect(rendered.result.current.runner.atBat).toEqual(앞)
+        const result = runDefensePlay(pending.input)
+        act(() => rendered.result.current.session.actions.finishDefensePlay(result))
+        expect(rendered.result.current.session.pendingDefensePlay).toBeNull()
+        if (result.foulEnded === true) {
+          expect(rendered.result.current.runner.atBat.strikes).toBe(Math.min(앞.strikes + 1, 2))
+        } else {
+          expect(result.outcome).toEqual({ kind: '아웃', detail: '뜬공아웃' })
+        }
+        break
+      }
+      rendered.unmount()
+    }
+    expect(파울판).toBeGreaterThan(0)
   })
 })

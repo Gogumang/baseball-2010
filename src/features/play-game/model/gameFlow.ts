@@ -101,7 +101,7 @@ import { PICKOFF_PLAY_KIND } from '@/entities/defense-controls/model/pickoff'
 import type { PickoffBase } from '@/entities/defense-controls/model/pickoff'
 import { EMPTY_BATTER_GAME_RECORD, recordPlateAppearance } from '@/entities/batting/model/pinchHitAi'
 import { fixturePatternFor } from '@/features/defense-play/model/representativePattern'
-import { contactOfOutcome } from '@/entities/batting/model/battedContact'
+import { contactOfOutcome, registerContact, type BattedContact } from '@/entities/batting/model/battedContact'
 import type { BurstResolution, BurstSession } from '@/entities/burst-mission/model/burstMissionSession'
 import {
   cancelBurst,
@@ -697,6 +697,43 @@ export function startPlayerOutcome(
   }
 }
 
+/** 파울 각 공 판의 임시 결과 칸 — 판이 파울로 닫히면 쓰지 않고, 잡히면 판 끝 정산(뜬공 아웃)이 갈아 끼운다 */
+const FOUL_PLAY_OUTCOME: AtBatOutcome = { kind: '아웃', detail: '뜬공아웃' }
+
+/**
+ * **내 타석의 파울 각 공 판** — 원본은 맞은 공이면 각과 무관하게 메시지 0x11 → 0x13 → 0x17 판을 돈다(a769b8e 머리말).
+ * 타석은 아직 안 끝났다: 판이 파울로 닫히면(`DefensePlayResult.foulEnded`) `resolveDefensePlay` 가 경기 상태를 그대로 두고
+ * 세션이 스트라이크(0x35108 → 0xb6b58)를 올려 같은 타석 다음 공으로, 낙구 전에 잡히면 판 끝 정산(뜬공 아웃 13)이 타석을 끝낸다.
+ * 이 공이 나는 동안 출발한 도루 주자도 판에 싣는다(판이 파울로 닫히면 0xa975c 가 판 앞 자리로 되돌린다).
+ * 팀경기 우리 타석(`teamGameFlow.startBatterFoulPlay`)과 같은 길이다. 판을 만드는 데 난수를 쓰지 않는다.
+ */
+export function startPlayerFoulPlay(
+  progress: GameProgress,
+  contact: BattedContact,
+  random: RandomPort,
+  options: {
+    /** state[4] — 이 공을 먹이기 전의 스트라이크 (판 끝 결과 코드 11 · 판 뒤 스트라이크가 본다) */
+    readonly strikes: number
+    /** 장면 +0xfdc — 번트 종류 (판 시작 리드 · 판 끝 결과 코드 11) */
+    readonly buntKind?: number
+    /** 타석 판정이 미리 굴린 필살타법 성공 (0x517e6) — ⚠️ 원본 차례는 판 시작의 필살수비 · 폴 굴림 뒤다(미해결) */
+    readonly isUncatchable?: boolean
+  },
+): GameProgress {
+  if (progress.game.isFinished) return progress
+  const outcome = registerContact(FOUL_PLAY_OUTCOME, contact)
+  return {
+    ...withoutSteal(progress),
+    pendingDefensePlay: withPredictedOutcome({
+      ...defensePlayInputOf(progress, outcome, contact.pattern, random, {
+        buntKind: options.buntKind,
+        isUncatchable: options.isUncatchable,
+      }),
+      strikes: options.strikes,
+    }),
+  }
+}
+
 /**
  * 화면이 다 돌린 수비 플레이를 **그때** 경기 상태에 먹인다.
  *
@@ -708,9 +745,15 @@ export function resolveDefensePlay(
   progress: GameProgress,
   result: DefensePlayResult,
   random: RandomPort,
+  options: { readonly foulRecordIds?: readonly number[] } = {},
 ): GameProgress {
   const pending = progress.pendingDefensePlay
   if (pending === null) return progress
+  // 파울로 닫힌 판 — 판 끝 판정 B 0xae3e8 ae568 이 정산 0xa8024 를 건너뛰고 0xf(같은 타석 다음 공)로, 0x35108 이
+  // 0xa975c(주자를 판 앞 자리로)를 부른다 — 경기 상태는 그대로다. 스트라이크(0xb6b58)와 연속 파울(0xa7dbc)은 타석 칸을 든 세션이 센다
+  if (result.foulEnded === true) return { ...progress, pendingDefensePlay: null }
+  // 이 타석에서 앞서 난 연속 파울 기록(32·33) — 파울 각 공을 낙구 전에 잡아(파울 뜬공 아웃) 판이 타석을 끝낼 때 넘겨받는다
+  progress = withFoulRecords(progress, options.foulRecordIds)
   // 기록은 판 끝 정산(0xa8024)이 낸 결과다 — `pending.outcome` 은 타석을 끝낸 임시 값이다(`battedContact`)
   return finishPlayerOutcome({ ...progress, pendingDefensePlay: null }, recordedOutcomeOf(pending, result), random, result, null)
 }

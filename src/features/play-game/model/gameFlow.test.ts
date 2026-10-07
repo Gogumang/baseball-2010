@@ -8,6 +8,7 @@ import {
   mySpecialSwingRemainingOf,
   spendMySpecialSwing,
   UNFILLED_SPECIAL_SWING_COUNT,
+  startPlayerFoulPlay,
   startPlayerOutcome,
   startSteal,
   arrivePitch,
@@ -36,6 +37,7 @@ import { runPitchArrivalPlay } from '@/features/defense-play/model/pitchArrivalP
 import { runStealPlay } from '@/features/defense-play/model/stealPlay'
 import { rollPassedBall } from '@/entities/fielding/model/passedBall'
 import { BATTED_BALL_PATTERNS } from '@/shared/config/original/battedBallPatterns'
+import { isFairAngle } from '@/entities/batting/model/battedBallOutcome'
 
 /** 장면 초기화 0x3e340 의 패턴 덱 섞기 0xb0614 — 코드마다 i = 0..n−1 에 rand(0, n) 하나 (경기 시작마다, 상태 9 굴림보다 앞) */
 const 장면덱굴림 = Object.values(BATTED_BALL_PATTERNS).reduce((sum, patterns) => sum + patterns.length, 0)
@@ -1361,5 +1363,56 @@ describe('상태 0xe 의 OK 대기 — 내 타석 준비(0xd → 0xe)마다 새 
       expect(after.sceneConfirm).not.toBe(progress.sceneConfirm)
       expect(after.sceneConfirm?.entries).toBeGreaterThanOrEqual(1)
     }
+  })
+})
+
+describe('내 타석의 파울 각 공도 수비 판을 돈다 — startPlayerFoulPlay (원본 메시지 0x11 → 0x13 → 0x17)', () => {
+  /** 원본 표의 파울 각 패턴 전부 — (결과 코드, 패턴) */
+  const 파울패턴들 = Object.entries(BATTED_BALL_PATTERNS).flatMap(([code, patterns]) =>
+    patterns.filter((pattern) => !isFairAngle(pattern[0])).map((pattern) => ({ resultCode: Number(code), pattern })),
+  )
+
+  it('판을 붙들기만 하고 경기 상태는 안 건드린다 — 입력에 쏜 공 · 이 공 앞의 스트라이크(state[4])가 실린다', () => {
+    expect(파울패턴들.length).toBeGreaterThan(0)
+    const random = createSeededRandom(3)
+    const 시작 = startGame(random)
+    const { pattern, resultCode } = 파울패턴들[0]
+    const 붙듦 = startPlayerFoulPlay(시작, { pattern, resultCode }, random, { strikes: 1, buntKind: 0 })
+
+    expect(붙듦.game).toEqual(시작.game)
+    expect(붙듦.recordIds).toEqual(시작.recordIds)
+    expect(붙듦.pendingDefensePlay?.strikes).toBe(1)
+    expect(붙듦.pendingDefensePlay?.trajectory).toBeDefined()
+  })
+
+  it('파울로 닫힌 판은 경기 상태 그대로 판만 푼다 · 낙구 전에 잡힌 판은 뜬공 아웃으로 타석을 끝내고 앞서 난 연속 파울 기록을 얹는다', () => {
+    let 파울 = 0
+    let 뜬공아웃 = 0
+    for (const { pattern, resultCode } of 파울패턴들.slice(0, 60)) {
+      const random = createSeededRandom(7)
+      const 시작 = startGame(random)
+      const 붙듦 = startPlayerFoulPlay(시작, { pattern, resultCode }, random, { strikes: 0 })
+      const pending = 붙듦.pendingDefensePlay
+      if (pending === null) throw new Error('판이 안 섰다')
+      const result = runDefensePlay(pending)
+      const 끝 = resolveDefensePlay(붙듦, result, random, { foulRecordIds: [32] })
+      if (result.foulEnded === true) {
+        파울 += 1
+        expect(result.outcome).toBeUndefined()
+        expect(끝.pendingDefensePlay).toBeNull()
+        expect(끝.game).toEqual(시작.game)
+        // 파울로 닫힌 판의 연속 파울은 타석 칸을 든 세션이 센다 — 여기서는 얹지 않는다
+        expect(끝.recordIds).toEqual(시작.recordIds)
+        expect(result.foulStrikes).toBe(1)
+      } else {
+        뜬공아웃 += 1
+        expect(result.caughtOnTheFly).toBe(true)
+        expect(result.outcome).toEqual({ kind: '아웃', detail: '뜬공아웃' })
+        expect(끝.pendingDefensePlay).toBeNull()
+        expect(끝.recordIds.slice(시작.recordIds.length, 시작.recordIds.length + 1)).toEqual([32])
+      }
+    }
+    expect(파울).toBeGreaterThan(0)
+    expect(뜬공아웃).toBeGreaterThan(0)
   })
 })

@@ -67,6 +67,7 @@ import { pitchReleaseSoundIdOf } from '@/widgets/batting-stage/lib/pitchReleaseS
 import type { ModePitcher } from '@/app/model/modePitcher'
 import { ROOKIE_BATTER_ABILITY } from '@/entities/batting/model/batter'
 import { recordedOutcomeOf, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
+import { registerContact } from '@/entities/batting/model/battedContact'
 import type { DefensePlayInput, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { pickoffCallSoundIdOf, runPickoffPlay } from '@/features/defense-play/model/pickoffPlay'
 import { pickoffPlayForKey } from '@/entities/defense-controls/model/pickoff'
@@ -287,7 +288,15 @@ interface PendingMissionDefense {
   readonly isBunt: boolean
   /** 타구 직전의 주자 수 — 결과 띠("2타점" 따위)가 이 값을 쓴다 */
   readonly runnersOnBase: number
+  /**
+   * **파울 각 공 판**인가 — 원본은 맞은 공이면 파울 각이라도 판을 돈다. 판이 파울로 닫히면(`foulEnded`) 정산 없이 같은 타석
+   * 다음 공(0xae3e8 ae568 → 0xf · 0x35108 → 0xb6b58 스트라이크)이고, 낙구 전에 잡히면 뜬공 아웃(13)으로 타석이 끝난다.
+   */
+  readonly isFoulPlay?: boolean
 }
+
+/** 파울 각 공 판의 임시 결과 칸 — 판이 파울로 닫히면 쓰지 않고, 잡히면 판 끝 정산(뜬공 아웃)이 갈아 끼운다 */
+const FOUL_PLAY_OUTCOME: AtBatOutcome = { kind: '아웃', detail: '뜬공아웃' }
 
 /**
  * 게이지에서 t=5(최상)로 던진 공만 "MAX게이지" 로 센다.
@@ -470,7 +479,6 @@ export function useMissionSession({
       /** 이 공의 번트 종류 장면 +0xfdc (`BattingStage` 의 넷째 인자) — 타구 판 리드(0x3d7b8)가 본다 */
       buntKind = 0,
     ) => {
-      const nextAtBat = runner.applyPitch(detail.resolution)
       const pitchingRun = missionRunRef.current
       // 견제는 공이 아니라 구질이 오지 않는다 (`PitchOutcomeDetail.pitchTypeNumber`)
       const pitchTypeNumber = detail.pitchTypeNumber
@@ -480,6 +488,41 @@ export function useMissionSession({
         )
       }
       const hasSwung = detail.hasSwung
+      // 파울 각 공 — 원본은 맞은 공이면 각과 무관하게 판(상태 0x17)을 돈다(메시지 0x11 → 0x13 → 0x17). 스트라이크(0xb6b58)는
+      // 판이 파울로 닫힐 때(`finishDefensePlay`)다. 공 도착 판(0x3dfac)은 못 맞힌 공만이라 열지 않는다.
+      // ⚠️ 파울 콜 25 는 아직 공 판정 자리(`pitchCallSoundIdOf`)에서 낸다 — 원본은 판의 결과 코드 7 메시지 51c5c
+      const foulRun = missionRunRef.current
+      if (
+        detail.resolution.kind === '파울' &&
+        detail.foulContact !== undefined &&
+        foulRun !== null &&
+        foulRun.status === '진행중'
+      ) {
+        const foulOutcome = registerContact(FOUL_PLAY_OUTCOME, detail.foulContact)
+        const foulStealing = takeStealingFrom()
+        playSoundIds(audio, [detail.contactSoundId, pitchCallSoundIdOf(detail.resolution, runner.atBatRef.current)])
+        // 배트를 냈다 — 스윙 수는 휘두른 자리에서 준다. 다 썼는지는 판이 파울로 닫힌 뒤 본다
+        if (hasSwung) setMissionRun((previous) => (previous === null ? previous : recordSwing(previous)))
+        setPendingDefensePlay({
+          side: '타자',
+          input: {
+            ...missionDefensePlayInputOf(foulRun.bases, foulRun.outs, foulOutcome, random),
+            // 타석 판정이 미리 굴린 필살타법 성공 — ⚠️ 원본 차례는 판 시작의 필살수비 · 폴 굴림 뒤다(미해결)
+            isUncatchable,
+            stealingFrom: foulStealing,
+            buntKind,
+            // state[4] — 판 끝 결과 코드 11 · 판 뒤 스트라이크(0xb6b58)가 이 공 앞의 스트라이크를 본다
+            strikes: runner.atBatRef.current.strikes,
+          },
+          outcome: foulOutcome,
+          isBunt: false,
+          runnersOnBase: runnerCountOf(foulRun.bases),
+          isFoulPlay: true,
+        })
+        runner.setIsPaused(true)
+        return
+      }
+      const nextAtBat = runner.applyPitch(detail.resolution)
       const outcome = isAtBatFinished(nextAtBat) ? nextAtBat.outcome : null
       // 맞은 공(쏜 패턴이 묶인 안타·아웃·홈런)이면 수비 화면(상태 0x17)이 먼저 돈다 — 결과·콜은 그 뒤다
       const runsDefense = outcome !== null && isMissionPlayOutcome(outcome)
@@ -741,18 +784,22 @@ export function useMissionSession({
         // 연차(+0xb3)는 모드 3·4 갈래(sp40)에서만 읽혀 여기서는 안 쓰인다 — 넘기지 않는다
         swingMode: '투수미션',
         isPitcherOwnPlayer: true,
+        // 파울 각 공도 수비 판을 돈다 — 낙구 전에 잡히면 파울 뜬공 아웃(13), 아니면 판이 닫힌 뒤 스트라이크(0x35108 → 0xb6b58)
+        playsFoulBall: true,
       },
     )
     const resolution = thrown.resolution
+    const foulContact = thrown.foulContact
     // 0x4e136 — 필살 스윙이 나간 틱에 남은 −1 (헛스윙도). 마타자가 아니면 null 이라 칸을 안 건드린다
     if (thrown.specialSwingRemaining !== null) setOpponentSpecialSwingStored(thrown.specialSwingRemaining)
 
     let nextRun = recordPitch(pitcherRun, grade === MAX_GAUGE_GRADE)
     // 이 공 **전** 스트라이크 — 0x9d57c 의 st[4] (삼진 진동이 본다)
     const strikesBefore = runner.atBatRef.current.strikes
-    const nextAtBat = runner.applyPitch(resolution)
+    // 판을 도는 파울 각 공은 판이 파울로 닫힌 뒤에야 스트라이크가 오른다(0x35108 → 0xb6b58)
+    const nextAtBat = foulContact === undefined ? runner.applyPitch(resolution) : runner.atBatRef.current
     // 맞은 공의 결과는 수비 판이 끝나야 정해진다 — 타석에 실린 결과는 임시 값이라(`battedContact`) 판정 글자를 띄우지 않는다
-    runner.setBannerText(resolution.kind === '타구' ? '' : describePitchResolution(resolution))
+    runner.setBannerText(resolution.kind === '타구' || foulContact !== undefined ? '' : describePitchResolution(resolution))
     const outcome = isAtBatFinished(nextAtBat) ? nextAtBat.outcome : null
     const runsDefense = outcome !== null && isMissionPlayOutcome(outcome)
     // 공 도착 0x3dfac — 못 맞힌 공이면 0.1% 폭투·포일(종류 9)이나 CPU 가 건 도루(종류 5) 판을 연다.
@@ -801,6 +848,27 @@ export function useMissionSession({
         setPitcherRun(checkPitchExhausted(nextRun))
         return
       }
+    }
+
+    // 파울 각 공 — 원본도 판(상태 0x17)을 돈다(맞은 공은 모두 메시지 0x11 → 0x13 → 0x17). 타석은 아직 안 끝났다 —
+    // 판이 파울로 닫히면 `finishDefensePlay` 가 스트라이크를 올리고 같은 타석 다음 공으로, 잡히면 판 끝 정산(뜬공 아웃)이다
+    if (foulContact !== undefined) {
+      const foulOutcome = registerContact(FOUL_PLAY_OUTCOME, foulContact)
+      setPendingDefensePlay({
+        side: '투수',
+        input: {
+          ...missionDefensePlayInputOf(nextRun.bases, nextRun.outs, foulOutcome, random, MISSION_PITCHER_MODE, throwModeManual),
+          stealingFrom,
+          // state[4] — 판 끝 결과 코드 11 · 판 뒤 스트라이크(0xb6b58)가 이 공 앞의 스트라이크를 본다
+          strikes: strikesBefore,
+        },
+        outcome: foulOutcome,
+        isBunt: false,
+        runnersOnBase: runnerCountOf(nextRun.bases),
+        isFoulPlay: true,
+      })
+      setPitcherRun(nextRun)
+      return
     }
 
     if (runsDefense && outcome !== null) {
@@ -870,6 +938,18 @@ export function useMissionSession({
       if (pending === null) return
       const played = result ?? runDefensePlay(pending.input)
       setPendingDefensePlay(null)
+      if (pending.isFoulPlay === true && played.foulEnded === true) {
+        // 파울로 닫힌 판 — 0xae3e8 ae568 이 정산 없이 0xf(같은 타석 다음 공) · 0x35108 이 0xa975c(주자를 판 앞 자리로) ·
+        // 0xb6b58(스트라이크 ≤ 1 이면 +1)
+        runner.applyPitch({ kind: '파울' })
+        if (pending.side === '투수') {
+          setPitcherRun((previous) => (previous === null ? previous : checkPitchExhausted(previous)))
+        } else {
+          setMissionRun((previous) => (previous === null ? previous : checkSwingsExhausted(previous)))
+        }
+        runner.setIsPaused(false)
+        return
+      }
       // 플레이가 끝난 자리 — 아웃 콜(0x51b36)·세이프 콜(0x51c14)과 장타 함성은 여기서야 난다.
       // 함성 60 은 원본이 **낙구 틱**에 내는 것이라 이 자리는 근사다 (atBatSounds 주석)
       // 판 끝 정산(0xa8024)이 낸 결과 — `pending.outcome` 은 타석을 끝낸 임시 값이다(`battedContact`)
