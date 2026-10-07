@@ -19,9 +19,43 @@ describe('조건 20 — 스킬 획득 (0xad1ba)', () => {
     ])
   })
 
-  it('한 번 해제한 마이너스 스킬은 다시 얻지 못한다 (+0x1d0)', () => {
+  it('그 해 해제한 마이너스 스킬(+0x1d0, 0xa4f31)은 2·3·4·5·18·19·20 의 하위 조건이 맨 앞에서 막는다', () => {
+    const 항상 = { next: () => 0, nextInRange: () => 99, pick: <T,>(c: readonly T[]) => c[0] }
+    const 약함 = { hit: 400, power: 400, defense: 400, run: 400 }
+    const 경우: readonly (readonly [number, Partial<PlayerCareer>])[] = [
+      [2, { season: 3, gamesPlayed: 14, seasonPopularityGain: 0 }],
+      [3, { gamesPlayed: 12, ability: 약함 }],
+      [4, { season: 2, gamesPlayed: 18, ability: 약함 }],
+      [5, { season: 4, morale: 0 }],
+      [18, { gamesPlayed: 40, ability: 약함 }],
+      [19, { gamesPlayed: 20, ability: 약함 }],
+      [20, { season: 4, gamesPlayed: 30, ability: 약함 }],
+    ]
+    for (const [id, overrides] of 경우) {
+      expect(meetsSkillAcquireCondition(선수({ skillIds: [], ...overrides }), 값(id), 항상)).toBe(true)
+      expect(meetsSkillAcquireCondition(선수({ skillIds: [], ...overrides, removedMinusSkillIds: [id] }), 값(id), 항상)).toBe(false)
+    }
+  })
+
+  it('17 하락세는 0xad9a2(추가 조건 없음)라 그 해 해제했어도 다시 얻는다 — 0xa4f31 을 안 본다', () => {
     const career = 선수({ skillIds: [], removedMinusSkillIds: [17] })
-    expect(meetsSkillAcquireCondition(career, 값(17), undefined)).toBe(false)
+    expect(meetsSkillAcquireCondition(career, 값(17), undefined)).toBe(true)
+  })
+
+  it('3 몹쓸몸의 T 는 u8 통산 − s8 시즌 사본이다 — 사본이 128 을 넘으면 음수로 읽혀 T 가 커진다 (0xad334)', () => {
+    const 기본 = { skillIds: [], gamesPlayed: 12, ability: { hit: 400, power: 400, defense: 400, run: 400 } }
+    // 통산 = 사본 = 100 → T = 0
+    expect(meetsSkillAcquireCondition(
+      선수({ ...기본, trainingCounts: { 히트: 100 }, seasonStartTrainingCounts: { 히트: 100 } }), 값(3), undefined,
+    )).toBe(true)
+    // 통산 = 사본 = 200 → u8 200 − s8(−56) = 256 ≠ 0
+    expect(meetsSkillAcquireCondition(
+      선수({ ...기본, trainingCounts: { 히트: 200 }, seasonStartTrainingCounts: { 히트: 200 } }), 값(3), undefined,
+    )).toBe(false)
+    // 통산 256(u8 0) · 사본 256(s8 0) → T = 0
+    expect(meetsSkillAcquireCondition(
+      선수({ ...기본, trainingCounts: { 히트: 256 }, seasonStartTrainingCounts: { 히트: 256 } }), 값(3), undefined,
+    )).toBe(true)
   })
 
   it('5 무력감은 사기 ≤ 20 · 연차 인덱스 ≥ 3 · 30% 를 본다', () => {

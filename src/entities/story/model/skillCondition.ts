@@ -1,5 +1,5 @@
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
-import { hasSkill, seasonTrainingCountOf, seasonTrainingTotalOf } from '@/entities/career/model/playerCareer'
+import { hasSkill, seasonTrainingCountOf } from '@/entities/career/model/playerCareer'
 import { equippedAbilityOf } from '@/entities/career/model/condition'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
@@ -16,6 +16,8 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
  *   - 7 전설: 우승 횟수(+0x7a) · 그 해 MVP 비트(+0x1ca)
  *   - 10~16: 연도·통산 세부 기록 칸(+0x20~+0x2c, +0x1f0[])
  * 그 조건들은 **아직 통과시키지 않는다**(= 이벤트가 뜨지 않는다).
+ * ⚠️ 미해결(구역 밖): 원본은 연초 115 의 0xa4ee8 이 +0x1d0 을 지워 "그 해" 해제 기록만 남는데, 웹 타자편은 `removedMinusSkillIds` 를
+ *    해마다 비우지 않는다(투수편은 비운다 — usePitcherLeagueSession). 그래서 타자편은 한 번 푼 스킬을 다음 해에도 다시 못 얻는다.
  */
 
 /** 훈련 칸 — 원본 s = 0 히트 · 1 파워 · 2 수비 · 3 주루 · 4 필살타법 */
@@ -30,49 +32,78 @@ const averageEquipped = (career: PlayerCareer) => {
 /** 0-기준 연차 */
 const yearIndexOf = (career: PlayerCareer) => career.season - 1
 
+/**
+ * `0xa4f31(S, k)` — 표 0xd7e10 = [2,3,4,5,17,18,19,20] 에서 k 의 칸을 찾아 u8 S+0x1d0+칸(그 해 해제함)을 돌려준다(표에 없으면 0).
+ * 획득 하위 조건 가운데 **2 · 3 · 4 · 5 · 18 · 19 · 20** 만 맨 앞에서 이 값을 보고 불발한다(0xad2a6 · 0xad2ea · 0xad3b0 · 0xad43e ·
+ * 0xad846 · 0xad8cc · 0xad93e — `0xa4f31` 부르는 곳 전수). **17 하락세는 0xad9a2(추가 조건 없음)라 안 본다** — 그 해 풀었어도
+ * 다시 얻는다(원본 그대로).
+ */
+const wasRemoved = (career: PlayerCareer, skillId: number) => career.removedMinusSkillIds.includes(skillId)
+
+/** 칸 값 읽기 — +0x4b+i 는 u8(ldrb), +0x6b+i 사본은 s8(ldrb → lsl/asr 24) */
+const toUint8 = (value: number) => value & 0xff
+const toInt8 = (value: number) => ((value & 0xff) << 24) >> 24
+
+/**
+ * 몹쓸몸·유리몸의 T — 0xad334~0xad34c: `Σ i=0..4 (u8 S+0x4b+i − s8 S+0x6b+i)` (통산 훈련 수 − 시즌 시작 사본).
+ * 칸이 u8 이라 256 회째에 0 으로 돌고, 사본은 128 을 넘으면 음수로 읽힌다 — 원본 그대로(투수편 `seasonPitcherTrainingTotalOf` 와 같은 식).
+ */
+function seasonTrainingByteTotalOf(career: PlayerCareer): number {
+  const menuIds = new Set([...Object.keys(career.trainingCounts), ...Object.keys(career.seasonStartTrainingCounts)])
+  let total = 0
+  for (const menuId of menuIds) {
+    total += toUint8(career.trainingCounts[menuId] ?? 0) - toInt8(career.seasonStartTrainingCounts[menuId] ?? 0)
+  }
+  return total
+}
+
 /** 조건표를 옮긴 스킬 — 나머지는 아직 판정하지 않는다 */
 const ACQUIRE_RULES: Readonly<Record<number, (career: PlayerCareer, random: RandomPort | undefined) => boolean>> = {
-  // 3 몹쓸몸 — 평균실효 ≤ 700 이고 (g==12 && T==0 | g==28 && T≤1 | g==42 && T≤2) (0xad2e6)
+  // 3 몹쓸몸 — 0xa4f31 불발 → 평균실효 ≤ 700 이고 (g==12 && T==0 | g==28 && T≤1 | g==42 && T≤2) (0xad2e6)
   3: (career) => {
-    if (averageEquipped(career) > 700) return false
+    if (wasRemoved(career, 3) || averageEquipped(career) > 700) return false
     const g = career.gamesPlayed
-    const t = seasonTrainingTotalOf(career)
+    const t = seasonTrainingByteTotalOf(career)
     return (g === 12 && t === 0) || (g === 28 && t <= 1) || (g === 42 && t <= 2)
   },
-  // 4 유리몸 — 연차 ≥ 1, 평균실효 ≤ 700, (g==18 && T≤2 | g==38 && T≤4) (0xad3ac)
+  // 4 유리몸 — 0xa4f31 불발 → 연차 ≥ 1, 평균실효 ≤ 700, (g==18 && T≤2 | g==38 && T≤4) (0xad3ac)
   4: (career) => {
-    if (yearIndexOf(career) < 1 || averageEquipped(career) > 700) return false
+    if (wasRemoved(career, 4) || yearIndexOf(career) < 1 || averageEquipped(career) > 700) return false
     const g = career.gamesPlayed
-    const t = seasonTrainingTotalOf(career)
+    const t = seasonTrainingByteTotalOf(career)
     return (g === 18 && t <= 2) || (g === 38 && t <= 4)
   },
-  // 2 먹튀 — 연차 ≥ 2 이고 (g==14 && 이번 시즌 인기도 합 ≤ 15 | g==32 && ≤ 35) (0xad2a2)
+  // 2 먹튀 — 0xa4f31 불발 → 연차 ≥ 2 이고 (g==14 && 이번 시즌 인기도 합 ≤ 15 | g==32 && ≤ 35) (0xad2a2)
   2: (career) => {
-    if (yearIndexOf(career) < 2) return false
+    if (wasRemoved(career, 2) || yearIndexOf(career) < 2) return false
     const g = career.gamesPlayed
     const gain = career.seasonPopularityGain
     return (g === 14 && gain <= 15) || (g === 32 && gain <= 35)
   },
-  // 5 무력감 — 사기 ≤ 20, 연차 ≥ 3, rand[0,100) ≥ 70 (30%) (0xad43a)
+  // 5 무력감 — 0xa4f31 불발 → 사기 ≤ 20, 연차 ≥ 3, rand[0,100) ≥ 70 (30%) (0xad43a — 앞이 막히면 안 굴린다)
   5: (career, random) =>
+    !wasRemoved(career, 5) &&
     career.morale <= 20 && yearIndexOf(career) >= 3 && random !== undefined && random.nextInRange(0, 100) >= 70,
   // 추가 조건이 없는 것들 (0xad9a2)
   6: () => true, // 행운
   8: () => true, // 의외성
   9: () => true, // 베테랑
   17: () => true, // 하락세
-  // 18 헛스윙 — 히트 실효 ≤ 600, g==40, 이번 시즌 히트 훈련 ≤ 1 (0xad842)
+  // 18 헛스윙 — 0xa4f31 불발 → 히트 실효 ≤ 600, g==40, 이번 시즌 히트 훈련 ≤ 1 (0xad842)
   18: (career) =>
+    !wasRemoved(career, 18) &&
     equippedAbilityOf(career).hit <= 600 &&
     career.gamesPlayed === 40 &&
     seasonTrainingCountOf(career, TRAINING.히트) <= 1,
-  // 19 똑딱이 — 파워 실효 ≤ 600, g==20, 이번 시즌 파워 훈련 0 (0xad8c8)
+  // 19 똑딱이 — 0xa4f31 불발 → 파워 실효 ≤ 600, g==20, 이번 시즌 파워 훈련 0 (0xad8c8)
   19: (career) =>
+    !wasRemoved(career, 19) &&
     equippedAbilityOf(career).power <= 600 &&
     career.gamesPlayed === 20 &&
     seasonTrainingCountOf(career, TRAINING.파워) === 0,
-  // 20 에러왕 — 연차 ≥ 3, 수비 실효 ≤ 400, g==30, 이번 시즌 수비 훈련 0 (0xad93a)
+  // 20 에러왕 — 0xa4f31 불발 → 연차 ≥ 3, 수비 실효 ≤ 400, g==30, 이번 시즌 수비 훈련 0 (0xad93a)
   20: (career) =>
+    !wasRemoved(career, 20) &&
     yearIndexOf(career) >= 3 &&
     equippedAbilityOf(career).defense <= 400 &&
     career.gamesPlayed === 30 &&
@@ -111,8 +142,7 @@ export function meetsSkillAcquireCondition(
 ): boolean {
   const skillId = value - 1
   if (hasSkill(career, skillId)) return false
-  // 한 번 해제한 마이너스 스킬은 다시 얻지 못한다 (+0x1d0)
-  if (career.removedMinusSkillIds.includes(skillId)) return false
+  // 그 해 해제한 마이너스 스킬(+0x1d0)은 하위 조건마다 맨 앞에서 본다(`wasRemoved`) — 17 하락세는 안 본다
   return ACQUIRE_RULES[skillId]?.(career, random) ?? false
 }
 
