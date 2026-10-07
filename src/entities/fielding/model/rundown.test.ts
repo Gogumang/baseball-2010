@@ -75,13 +75,14 @@ describe('협살 계획 0xb3a04 · 시작 조건', () => {
 
   it('두 루의 커버 야수와 대상 주자를 기록한다', () => {
     const 계획 = buildRundownPlan(문맥({ coverOfBase: [1, 2, 3, 4], ballHolderSlot: 2 }, 주자들), 1)
+    // 0xb3a04: [2] = 주자가 달려가는 루(+0x7c = 2) · [3] = 마지막으로 닿은 루(+0x8c = 1) · [k] = 그 루의 커버
     expect(계획).toEqual({
-      backFielder: 2, // 1루 커버
-      frontFielder: 3, // 2루 커버
-      backBase: 1,
-      frontBase: 2,
+      backFielder: 3, // 2루 커버 — 주자가 달려가는 루
+      frontFielder: 2, // 1루 커버
+      backBase: 2,
+      frontBase: 1,
       runnerIndex: 1,
-      holderSide: 0, // 1루 쪽 야수가 공을 쥐었다
+      holderSide: 1, // 1루 쪽 야수가 공을 쥐었다
     })
     expect(rundownBasePoint(계획, 3)).toEqual(basePosition(2))
   })
@@ -91,10 +92,27 @@ describe('협살 계획 0xb3a04 · 시작 조건', () => {
     expect(buildRundownPlan(문맥({ coverOfBase: [1, 2, 3, 4] }, [타자주자, 제자리]), 1).frontBase).toBe(2)
   })
 
+  /** 2루 커버(3번)가 공을 쥔 수비 — 1→2루 주자가 달려가는 루의 커버다 */
+  const 이루커버쥠 = 야수들.map((fielder, slot) => (slot === 3 ? { ...fielder, holdingBall: true } : fielder))
+
   it('**사람이 수비하면 협살이 일어나지 않는다** (state[0x31+수비측] == 1 일 때만)', () => {
-    const 문 = 문맥({ coverOfBase: [1, 2, 3, 4], ballHolderSlot: 2 }, 주자들)
+    const 문 = { ...문맥({ coverOfBase: [1, 2, 3, 4], ballHolderSlot: 3 }, 주자들), fielders: 이루커버쥠 }
     expect(canStartRundown(문, true)).toBe(true)
     expect(canStartRundown(문, false)).toBe(false)
+  })
+
+  it('주자가 달려가는 루의 커버가 공을 쥐어야 한다 (b3ff0 야수 [0] +0xe0) — 지나온 루 커버가 쥔 공으로는 안 선다', () => {
+    const 일루커버쥠 = 야수들.map((fielder, slot) => (slot === 2 ? { ...fielder, holdingBall: true } : fielder))
+    const 문 = { ...문맥({ coverOfBase: [1, 2, 3, 4], ballHolderSlot: 2 }, 주자들), fielders: 일루커버쥠 }
+    expect(canStartRundown(문, true)).toBe(false)
+  })
+
+  it('공 가진 야수가 외야수(6 넘음)면 시작하지 않는다 (b4004 +0x130 > 5)', () => {
+    const 외야커버 = 야수들.map((fielder, slot) => (slot === 6 ? { ...fielder, holdingBall: true } : fielder))
+    const 문 = { ...문맥({ coverOfBase: [1, 2, 6, 4], ballHolderSlot: 6 }, 주자들), fielders: 외야커버 }
+    expect(canStartRundown(문, true)).toBe(false)
+    const 내야 = { ...문맥({ coverOfBase: [1, 2, 5, 4], ballHolderSlot: 5 }, 주자들), fielders: 야수들.map((fielder, slot) => (slot === 5 ? { ...fielder, holdingBall: true } : fielder)) }
+    expect(canStartRundown(내야, true)).toBe(true)
   })
 
   it('공 쥔 야수가 두 커버 중 하나가 아니면 시작하지 않는다', () => {
@@ -110,7 +128,8 @@ describe('협살 계획 0xb3a04 · 시작 조건', () => {
 
 describe('협살 한 틱 0xb48b6', () => {
   const 주자들 = [타자주자, 사이주자(1, 30)]
-  const 계획 = { backFielder: 2, frontFielder: 3, backBase: 1, frontBase: 2, runnerIndex: 1, holderSide: 0 }
+  // buildRundownPlan 이 1→2루 주자에게 세우는 계획 — [0] 은 달려가는 루(2루)의 커버 3번
+  const 계획 = { backFielder: 3, frontFielder: 2, backBase: 2, frontBase: 1, runnerIndex: 1, holderSide: 1 }
   const 공목표 = { x: 24_000, y: 0, z: 23_000 }
 
   const 틱 = (slot: number, ballHolderSlot: number, overrides: Partial<DefenseContext> = {}) => ({
@@ -130,9 +149,9 @@ describe('협살 한 틱 0xb48b6', () => {
     expect(rundownAction(틱(2, 2))).toEqual({ kind: '공쫓기', target: 공목표 })
   })
 
-  it('공을 쥐었고 내가 주자 뒤쪽 루를 보면 주자를 쫓는다', () => {
-    const 야수 = 야수들.map((fielder, slot) => (slot === 2 ? { ...fielder, holdingBall: true } : fielder))
-    expect(rundownAction(틱(2, 2, { fielders: 야수 }))).toEqual({ kind: '주자추적', runnerIndex: 1 })
+  it('공을 쥐었고 내가 주자가 달려가는 루(+0x7c)의 커버면 늘 주자를 쫓는다 (b4976)', () => {
+    const 야수 = 야수들.map((fielder, slot) => (slot === 3 ? { ...fielder, holdingBall: true } : fielder))
+    expect(rundownAction(틱(3, 3, { fielders: 야수 }))).toEqual({ kind: '주자추적', runnerIndex: 1 })
   })
 
   it('공이 없는 쪽은 주자 도착이 송구 도착보다 4틱 넘게 늦을 때만 쫓아가고, 그 사이면 멈춰 기다린다', () => {

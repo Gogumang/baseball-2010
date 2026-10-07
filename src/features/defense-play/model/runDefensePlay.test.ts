@@ -627,15 +627,18 @@ describe('수비 아홉 칸 능력치 — 자리 코드 −1 이 칸 번호다 (
 })
 
 describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
-  // 판 시작 리드(0x3d7b8) 뒤로 대표 단타는 협살이 안 선다 — 1루 주자가 3루까지 노리다 2·3루 사이에 갇히는 깊은 타구.
-  // 송구를 준비 틱이 끝난 틱(포구 + R)에 고른 뒤로 [95,1299,785,0] 은 2루로 던져 협살이 안 선다 — 같은 모양의 타구로 바꿨다
+  // 시작 0xb3fa8 은 **주자가 달려가는 루(+0x7c)의 커버가 공을 쥐고** 공 가진 야수가 내야(≤ 5)일 때만이다.
+  // 원본 코드 15 [87, 1388, 222] 씨앗 0: 투수 펌블로 튄 공을 유격수(5)가 11틱에 줍고 2루를 직접 밟으러 가는데, 2루 커버인
+  // 그가 공을 쥔 채라 15틱에 1루 주자(1→2루, 남은 > 35%)를 두고 협살이 선다
+  // (예전 장면 [85, 1203, 600] 은 3루로 간 송구가 날아가는 틱에 +0x130 만 보고 선 협살이었다 — 받는 커버가 아직 안 쥐어 원본엔 없다)
   const 협살상황 = (defenseIsCpu: boolean) =>
     runDefensePlay({
       outcome: 단타,
-      trajectory: battedBallTrajectory([85, 1203, 600, 0]), // 원본 코드 15
+      trajectory: battedBallTrajectory([87, 1388, 222, 0]), // 원본 코드 15
       bases: 주자1루,
       outs: 0,
       defenseIsCpu,
+      random: createSeededRandom(0),
     })
 
   it('수비가 CPU 일 때만 걸린다 — 사람이 수비하면 원본에서도 안 일어난다 (state[0x31+수비측])', () => {
@@ -655,18 +658,28 @@ describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
     expect(기본.log.some((line) => line.includes('협살'))).toBe(false)
   })
 
-  it('송구가 닿으면 공은 받은 야수의 손으로 옮겨 간다 — 그래야 협살 조건이 선다 (0xb2734)', () => {
-    const 결과 = 협살상황(true)
-    const 시작 = 결과.log.find((line) => line.includes('협살 시작'))
+  it('송구가 닿으면 공은 받은 야수의 손으로 옮겨 간다 — 받은 짝이 다시 던질 수 있다 (0xb2734)', () => {
+    // 같은 판에서 16틱에 귀루 키('3')를 누르면 주자의 달려가는 루가 1루로 바뀌어 유격수(2루 커버)가 짝(1루수 2)에게 던지고,
+    // 받은 1루수가 공을 쥐어 다시 유격수에게 던진다
+    const 결과 = runDefensePlay({
+      outcome: 단타,
+      trajectory: battedBallTrajectory([87, 1388, 222, 0]),
+      bases: 주자1루,
+      outs: 0,
+      defenseIsCpu: true,
+      random: createSeededRandom(0),
+      controls: { side: '공격', keyAt: (tick) => (tick === 16 ? { key: '3' } : null) },
+    })
 
     expect(결과.rundowns).toBe(1)
-    // 3루로 간 송구를 받은 3루수(4)와 2루 커버 유격수(5)가 1번 주자를 2·3루 사이에 둔다
-    expect(시작).toContain('1번 주자 2↔3루')
+    expect(결과.log).toContain('15틱 협살 시작 — 1번 주자 2↔1루 (야수 5·2)')
+    expect(결과.log).toContain('16틱 협살 송구 5→2 — 24틱 도착')
+    expect(결과.log).toContain('24틱 협살 송구 2→5 — 30틱 도착')
   })
 
   it('**주자가 안 되돌면 태그가 안 난다** — 원본에도 주자 쪽 협살 AI 가 없다', () => {
-    // 자동 주루(0xaf918)는 앞으로 가는 판정만 한다. 뒤를 쫓는 야수는 220/틱, 주자는 ≈335/틱 이라
-    // 절대 못 따라잡고, 주자가 루에 35% 미만으로 붙으면 고르기(0xb398c)가 −1 이 되어 협살이 풀린다.
+    // 자동 주루(0xaf918)는 앞으로 가는 판정만 한다. 공 쥔 2루 커버가 마주 달려가도 주자가 먼저 2루에 붙으면
+    // (주자 vt18) 태그가 안 되고, 루에 35% 미만으로 붙으면 고르기(0xb398c)가 −1 이 되어 협살이 풀린다.
     const 결과 = 협살상황(true)
 
     expect(결과.rundowns).toBe(1)
@@ -674,32 +687,25 @@ describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
     expect(결과.log.some((line) => line.includes('협살 태그'))).toBe(false)
   })
 
-  it('사람이 귀루 키를 누르면 되돌아 뛰다가 태그로 죽는다 — 협살이 서기 전에 아웃 판정이 먼저 잡는다', () => {
+  it('사람이 귀루 키를 누르면 되돌아 뛰다가 협살 태그로 죽는다', () => {
     // 협살은 수비가 CPU 일 때만 걸리므로 공격은 늘 사람이다. 되돌아 뛰는 것은 귀루 키('3' = 1루 주자,
-    // 메시지 0x584)이고, 아웃은 거리 ≤ 499 태그(0xb36d0 결과 3)다.
-    //
-    // ⚠️ **예전에는 이 아웃이 `rundownOuts` 로 셌다.** 그때는 진행기가 아웃 판정을 협살 갈래 안에서만
-    // 돌렸기 때문이다. 이제는 원본대로 아웃 판정 `0xb36d0` 이 **공을 쥘 때마다·틱마다** 돌고,
-    // 원본 플레이 틱 `0xb401c` 의 차례가 **vt90(0xb42f2) → 협살 시작(0xb433c~0xb4378) → vt90(0xb43de)**
-    // 이라 **송구를 받는 그 틱의 아웃 판정이 협살 기록칸보다 먼저** 이 주자를 잡는다.
-    // 그래서 협살은 아예 서지 않고, 아웃은 협살 아웃이 아니라 평범한 태그 아웃으로 난다.
-    // 원본 코드 20 [47, 1038, 596] — 우익수가 20틱에 줍고 26틱에 2루로 던진다. 송구 0xb2e38 의 vt34(0xb3b38)가 받을
-    // 유격수를 던지는 틱부터 +0x130 으로 세우므로 공이 날아가는 27틱에 1번 주자(2↔3루) 협살 기록칸이 먼저 선다
-    // (0xb3fa8 은 +0x130 만 본다). 32틱 귀루로 주자가 2루 쪽에 붙어 그 협살은 풀리고, 받는 쪽의 아웃 판정이 평범한 태그로 잡는다.
-    // (예전의 원본 코드 18 [5] 는 결과를 먼저 정하던 다리 없이 돌리면 좌익수가 뜬 채로 잡는 공이다)
+    // 메시지 0x584)이고, 아웃은 거리 ≤ 499 태그(0xb36d0 결과 3)다 — 협살 중이라 협살 아웃으로 센다.
+    // 같은 [87, 1388, 222] 판 20틱 귀루: 달려가는 루가 1루로 바뀐 주자를 쫓던 유격수가 22틱에 태그한다
     const 결과 = runDefensePlay({
-      outcome: 이루타,
-      trajectory: battedBallTrajectory([47, 1038, 596, 0]),
-      bases: { first: true, second: true, third: false },
+      outcome: 단타,
+      trajectory: battedBallTrajectory([87, 1388, 222, 0]),
+      bases: 주자1루,
       outs: 0,
       defenseIsCpu: true,
-      controls: { side: '공격', keyAt: (tick) => (tick === 32 ? { key: '3' } : null) },
+      random: createSeededRandom(0),
+      controls: { side: '공격', keyAt: (tick) => (tick === 20 ? { key: '3' } : null) },
     })
 
-    expect(결과.log.some((line) => line.includes('귀루'))).toBe(true)
+    expect(결과.log).toContain('20틱 귀루 — 주자 1')
     expect(결과.rundowns).toBe(1)
-    expect(결과.rundownOuts).toBe(0)
-    expect(결과.log.some((line) => line.includes('태그 아웃 (0xb36d0 결과 3)'))).toBe(true)
+    expect(결과.rundownOuts).toBe(1)
+    expect(결과.log).toContain('22틱 협살 태그 — 1번 주자 아웃')
+    expect(결과.advance.outsAdded).toBe(1)
   })
 
   it('같은 귀루 키도 **누르고 있어서 되풀이된 사건**이면 안 먹는다 — 원본 [조작+0x1c] & 0xf0 (0x53370~0x53390)', () => {
@@ -731,22 +737,20 @@ describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
     expect(전원.log.some((line) => line.includes('귀루'))).toBe(true)
   })
 
-  it('타자주자도 협살 대상이다 — 걸렸다가 3루에 살아 서면 판 끝 정산이 3루타로 적는다', () => {
-    // 원본 고르기 0xb398c 는 뒤 주자부터 보므로 타자주자(0번)는 다른 주자가 없을 때만 뽑힌다 — 예전 웹은 0번을 아예 뺐다
+  it('타자주자도 협살 대상이다 — 고르기 0xb398c 는 0번까지 본다', () => {
+    // 원본 고르기는 뒤 주자부터 보므로 타자주자(0번)는 다른 주자가 없을 때만 뽑힌다 — 예전 웹은 0번을 아예 뺐다.
+    // 원본 코드 24 [118, 961, 1367, 2]: 중계 끝에 3루수가 홈으로 던진 공을 포수(홈 커버)가 85틱에 받는다 — 홈으로 달려가는
+    // 타자주자의 달려가는 루(4) 커버가 공을 쥐었다
+    // ⚠️ 이 공은 29틱에 담장선을 넘어(결과 코드 8) 홈런 사건이 선 공이다 — 넘어간 공을 야수가 쫓는 것은 웹 미해결(보고)
     const 결과 = runDefensePlay({
       outcome: 삼루타,
-      trajectory: battedBallTrajectory(fixturePatternFor(삼루타)),
+      trajectory: battedBallTrajectory([118, 961, 1367, 2]),
       bases: EMPTY_BASES,
       outs: 0,
       defenseIsCpu: true,
     })
 
-    expect(결과.advance.outsAdded).toBe(0)
-    expect(결과.advance.bases).toEqual({ first: false, second: false, third: true })
-    expect(결과.rundowns).toBe(1)
-    expect(결과.log.some((line) => line.includes('협살 시작 — 0번 주자'))).toBe(true)
-    expect(결과.rundownOuts).toBe(0)
-    expect(결과.outcome).toEqual(삼루타)
+    expect(결과.log).toContain('85틱 협살 시작 — 0번 주자 4↔3루 (야수 1·4)')
   })
 })
 
@@ -1176,8 +1180,9 @@ describe('송구 수동/자동 — 환경설정 +0xf4 (0x5269c → 0xae6c8 → 0
       // 받는 점 (홈 목표 x, 1000, z) 를 점[T − 1] 에 끼워 넣어(b2f9c) 포수가 11틱에 받는다
       expect(첫).toBe('8틱 0루로 송구 — 11틱 도착 (CPU 결정) (0번 야수)')
       expect(결과.log).toContain('11틱 3번 주자 루 아웃 (0xb36d0 결과 2)')
-      // 11틱에 받아(+0xc8 = 3) 준비 틱이 지난 뒤 0xafa60 이 1루를 고른다(타자주자가 0↔1루 협살에 걸려 있던 틱은 못 던진다)
-      expect(둘).toMatch(/^1[45]틱 1루로 송구 — \d+틱 도착 \(CPU 결정\) \(1번 야수\)$/)
+      // 11틱에 받아(+0xc8 = 3) 준비 틱이 지난 14틱에 0xafa60 이 1루를 고른다 — 포수(홈 커버)가 쥔 공으로는 1루로 뛰는 타자주자의
+      // 협살이 안 선다(0xb3fa8 은 달려가는 루 1루의 커버가 쥐어야 한다)
+      expect(둘).toMatch(/^14틱 1루로 송구 — \d+틱 도착 \(CPU 결정\) \(1번 야수\)$/)
       expect(결과.log.some((line) => line.includes('0번 주자 루 아웃'))).toBe(true)
       expect(결과.advance.outsAdded).toBe(2)
       // 결과의 송구 칸은 첫 송구다
@@ -1198,9 +1203,9 @@ describe('송구 수동/자동 — 환경설정 +0xf4 (0x5269c → 0xae6c8 → 0
       const 사람 = 송구들(이어던지기({ throwMode: '자동' }))
       const CPU = 송구들(이어던지기({ defenseIsCpu: true }))
       expect(사람[0]).toBe(CPU[0])
-      // 둘째 송구 틱만 다를 수 있다 — 협살(타자주자 0↔1루)은 CPU 수비에서만 서서(state[0x31+수비측]) 그동안 못 던진다
+      // 둘째 송구도 같다 — 예전 웹은 포수가 쥔 공으로 타자주자 0↔1루 협살을 세워 CPU 수비만 한 틱 늦게(15틱) 던졌다
       expect(사람[1]).toMatch(/^14틱 1루로 송구 — \d+틱 도착 \(CPU 결정\) \(1번 야수\)$/)
-      expect(CPU[1]).toMatch(/^15틱 1루로 송구 — \d+틱 도착 \(CPU 결정\) \(1번 야수\)$/)
+      expect(CPU[1]).toBe(사람[1])
     })
 
     it('사람 수비·수동 송구는 이어 던지지 않는다 — 받는 틱의 아웃은 준비 틱이 막고, 그 뒤 0xafa60 을 부르는 곳이 없다', () => {
@@ -1456,20 +1461,21 @@ describe('송구 0xb2e38 — 중계 b4616 · AI 9 미루기 · 던진 야수 AI 
   })
 
   it('결과 코드 9 — 공 든 야수가 루에 막 닿았는데 주자가 서 있으면 0xbba 로 0xafa60 을 한 번 부른다 (b43ec~b444a)', () => {
-    // 1아웃 1루 — 좌익수가 뜬 공을 잡아 2루로 던진 흔들린 긴 송구(a198c)를, 2루로 달려 들어온 2루수가 받는 그 틱에
-    // 리터치한 1번 주자가 이미 2루에 서 있다. (예전 장면 — 코드 17 [65, 1012, 150] · 씨앗 5923 — 은 결과를 먼저 정하던
-    // 다리 없이 돌리면 1루수 펌블 뒤 단타로 끝나 코드 9 가 안 선다)
+    // 무사 1루 — 원본 코드 15 [94, 1359, 221] 씨앗 1: 2루 커버(3)가 쥔 공으로 1번 주자 1↔2루 협살이 서고, 19틱 귀루 키에
+    // 2루수가 짝 1루수(2)에게 던진다. 받은 1루수가 1루로 가 닿는 31틱에 타자주자(0번)가 이미 1루에 서 있다.
+    // (예전 장면 [134, 944, 944] 씨앗 12 는 2루 커버가 아직 공을 안 쥔 송구 비행 중에 협살을 세우던 웹 근사에 기대 있었다)
     const 결과 = runDefensePlay({
-      outcome: 이루타,
-      trajectory: battedBallTrajectory([134, 944, 944, 0]), // 원본 코드 19
+      outcome: 단타,
+      trajectory: battedBallTrajectory([94, 1359, 221, 0]), // 원본 코드 15
       bases: 주자1루,
-      outs: 1,
+      outs: 0,
       runAbility: 500,
-      random: createSeededRandom(12),
+      random: createSeededRandom(1),
       defenseIsCpu: true,
+      controls: { side: '공격', keyAt: (tick) => (tick === 19 ? { key: '3' } : null) },
     })
 
-    expect(결과.log).toContain('52틱 결과 코드 9 — 3번 야수가 2루에 닿았지만 1번 주자가 서 있다')
+    expect(결과.log).toContain('31틱 결과 코드 9 — 2번 야수가 1루에 닿았지만 0번 주자가 서 있다')
   })
 
   it('3아웃이면 그 틱 끝에서 판이 닫힌다 — 판 진행 관문 0xb0d28 의 state[6] > 2 (b0dbe)', () => {
@@ -1669,18 +1675,21 @@ describe('판 진행 관문 0xb0d28 · 판 끝 결과 코드 0x9d5bc (b44f6) —
   })
 
   it('협살이 풀린 틱에 날아가던 짝 송구도 짝이 받는다 — 공을 아무도 안 쥔 채 240틱까지 가지 않는다', () => {
+    // 원본 코드 15 [87, 1388, 222] 씨앗 0 · 18틱 귀루: 유격수가 18틱에 짝 1루수에게 던진 공이 날아가는 동안 주자가 1루에 붙어
+    // 고르기(0xb398c)가 −1 이 되며 협살이 풀린다
+    // (예전 장면 [92, 955, 1159] 씨앗 173 은 2루 커버가 아직 안 쥔 공으로 협살을 세우던 웹 근사에 기대 있었다)
     const result = runDefensePlay({
-      outcome: 이루타,
-      // 원본 코드 0 — 중견수가 잡은 뒤 리터치한 1루 주자가 1·2루 사이에서 협살에 걸린다
-      // (예전 [92, 174, 897] 은 결과를 먼저 정하던 다리 없이 돌리면 투수가 뜬 채로 잡아 협살이 안 선다)
-      trajectory: battedBallTrajectory([92, 955, 1159, 0]),
+      outcome: 단타,
+      trajectory: battedBallTrajectory([87, 1388, 222, 0]),
       bases: 주자1루,
-      outs: 1,
+      outs: 0,
       runAbility: 500,
       defenseIsCpu: true,
-      random: createSeededRandom(173),
+      random: createSeededRandom(0),
+      controls: { side: '공격', keyAt: (tick) => (tick === 18 ? { key: '3' } : null) },
     })
     expect(result.rundowns).toBeGreaterThan(0)
+    expect(result.log).toContain('18틱 협살 송구 5→2 — 26틱 도착')
     expect(result.ticks.length).toBeLessThan(240)
   })
 })

@@ -63,19 +63,22 @@ export function chooseRundownRunner(runners: readonly RunnerState[]): number {
   return NONE
 }
 
-/** 협살 기록칸 P+0x1ec ~ +0x1f3 (8바이트) */
+/**
+ * 협살 기록칸 P+0x1ec ~ +0x1f3 (8바이트) — 0xb3a04 가 채운다 (직접 뜬 것, 아래 `buildRundownPlan`).
+ * ⚠️ 이름의 '뒤(back)·앞(front)' 은 웹 관례다 — 원본 [0] 은 주자가 **달려가는 루(+0x7c)** 쪽이다.
+ */
 export interface RundownPlan {
-  /** +0x1ec 주자의 현재 루를 커버하는 야수 번호 */
+  /** +0x1ec [0] — `backBase`(주자가 달려가는 루 +0x7c)를 커버하는 야수 번호 */
   readonly backFielder: number
-  /** +0x1ed 주자의 목표 루를 커버하는 야수 번호 */
+  /** +0x1ed [1] — `frontBase` 를 커버하는 야수 번호 */
   readonly frontFielder: number
-  /** +0x1ee 주자의 현재 루 */
+  /** +0x1ee [2] — 주자가 **달려가는 루** `+0x7c`(`targetBase`) */
   readonly backBase: number
-  /** +0x1ef 주자의 목표 루 (현재 루와 같으면 +1) */
+  /** +0x1ef [3] — 주자가 마지막으로 닿은 루 `+0x8c`(`startBase`). 두 루가 같으면(루 위에 선 주자) +0x8c + 1 */
   readonly frontBase: number
   /** +0x1f0 협살 대상 주자 번호 */
   readonly runnerIndex: number
-  /** +0x1f1 두 야수 중 지금 공을 쥔 쪽 (0/1), 없으면 −1 */
+  /** +0x1f1 두 야수 중 공을 쥔 쪽(+0x130 과 같은 칸 — 둘 다면 1), 없으면 −1 */
   readonly holderSide: number
 }
 
@@ -88,24 +91,45 @@ export const NO_RUNDOWN: RundownPlan = {
   holderSide: NONE,
 }
 
-/** 협살 계획 만들기 0xb3a04 */
+/**
+ * 협살 계획 만들기 0xb3a04 (직접 뜬 것):
+ * ```
+ * b3a1a  8바이트 = −1 ; i = 0xb398c() ; −1 이면 끝
+ * b3a3c  [2] = 주자+0x7c(달려가는 루) ; [3] = +0x7c == +0x8c ? +0x8c + 1 : +0x8c ; [4] = i
+ * b3a52  k = 0, 1: [k] = 커버[[2 + k] % 4](+0xf0 표) ; [k] == 플레이+0x130(공 가진 야수) 이면 [5] = k
+ * ```
+ * ⚠️ 예전 웹은 주자 칸 이름이 거꾸로 적혀 있던 때(`fieldingState` 의 `startBase` 주석)를 따라 [2] 를 +0x8c 로 두어
+ * 두 루 · 두 야수가 서로 바뀌어 있었다.
+ */
 export function buildRundownPlan(context: DefenseContext, runnerIndex: number): RundownPlan {
   if (runnerIndex === NONE) return NO_RUNDOWN
   const runner = context.runners[runnerIndex]
   if (runner === undefined) return NO_RUNDOWN
-  const backBase = runner.startBase
-  const frontBase = runner.targetBase === backBase ? runner.targetBase + 1 : runner.targetBase
+  const backBase = runner.targetBase
+  const frontBase = runner.targetBase === runner.startBase ? runner.startBase + 1 : runner.startBase
   const backFielder = context.play.coverOfBase[(((backBase % 4) + 4) % 4)] ?? NONE
   const frontFielder = context.play.coverOfBase[(((frontBase % 4) + 4) % 4)] ?? NONE
   const holderSlot = context.play.ballHolderSlot
-  const holderSide = backFielder === holderSlot ? 0 : frontFielder === holderSlot ? 1 : NONE
+  // k = 0 → 1 차례로 덮어쓴다 — 둘 다 같은 야수면 1
+  const holderSide = frontFielder === holderSlot ? 1 : backFielder === holderSlot ? 0 : NONE
   return { backFielder, frontFielder, backBase, frontBase, runnerIndex, holderSide }
 }
 
+/** 0xb3fa8 — 공 가진 야수 번호(플레이+0x130)가 이 값을 넘으면(외야수 6·7·8) 협살을 시작하지 않는다 */
+const RUNDOWN_MAXIMUM_HOLDER_SLOT = 5
+
 /**
- * 협살을 시작할 수 있는가 (0xb3fa8 + 0xb4358).
- * 대상 주자가 있고, 두 루 모두 커버 야수가 있고, **공을 쥔 야수가 그 두 명 중 하나**여야 하며,
- * **수비가 CPU 일 때만** 걸린다.
+ * 협살을 시작할 수 있는가 (0xb3fa8 + 0xb4358, 직접 뜬 것):
+ * ```
+ * b3fb0  0xb398c() == −1 → 0
+ * b3fbe  계획 0xb3a04 ; [5] ≠ −1 이고 ([0] == +0x130 || [1] == +0x130) → 1
+ * b3ff0  야수 [0](주자가 달려가는 루의 커버)가 있고 +0xe0(쥠) == 0 → 0
+ * b4004  +0x130(공 가진 야수) > 5 → 0
+ * ```
+ * 곧 **주자가 달려가는 루의 커버가 공을 쥐고**, 공 가진 야수가 내야(0~5)일 때만이다. 1루로 뛰는 타자주자면 1루 커버가
+ * 쥐어야 하고, 홈 커버(포수)가 쥔 공으로는 0↔1루 협살이 안 선다. **수비가 CPU 일 때만** 걸린다(부르는 쪽 `state[0x31 + 수비측]`).
+ * ⚠️ 원본은 커버 칸이 −1 인지 따로 보지 않는다 — 웹은 빈 커버면 시작하지 않는다(협살 AI 가 짝 없이 돌 수 없어서. 커버 배정
+ * 0xb1c90 은 늘 칸을 채우므로 실제로는 안 갈린다).
  */
 export function canStartRundown(context: DefenseContext, defenseIsCpu: boolean): boolean {
   if (!defenseIsCpu) return false
@@ -113,7 +137,10 @@ export function canStartRundown(context: DefenseContext, defenseIsCpu: boolean):
   if (runnerIndex === NONE) return false
   const plan = buildRundownPlan(context, runnerIndex)
   if (plan.backFielder === NONE || plan.frontFielder === NONE) return false
-  return plan.holderSide !== NONE
+  if (plan.holderSide === NONE) return false
+  const targetCover = context.fielders[plan.backFielder]
+  if (targetCover !== undefined && !targetCover.holdingBall) return false
+  return context.play.ballHolderSlot <= RUNDOWN_MAXIMUM_HOLDER_SLOT
 }
 
 /** 협살 중인 야수가 이번 틱에 할 일 (0xb48b6) */
@@ -141,9 +168,9 @@ export interface RundownTickInput extends DefenseContext {
 /**
  * 협살 한 틱. 공을 쥔 쪽과 아닌 쪽의 여유 틱이 **5 와 4 로 다르다** — 원본 그대로 옮긴다.
  *
- * ⚠️ **원본 그대로**: 공을 쥔 야수가 **주자 뒤쪽 루를 보는 쪽이면 `coversBack` 이 늘 참**이라
- * 짝에게 던지지 않고 끝까지 쫓기만 한다(0xb4a96). 야수 220 < 주자 ≈335 이라 뒤에서는 절대
- * 못 따라잡으므로, 그 배치에서 시작된 협살은 주자가 되돌아 뛰지 않는 한 태그로 안 끝난다.
+ * ⚠️ **원본 그대로**: 공을 쥔 야수가 **주자가 달려가는 루(+0x7c)의 커버면 `coversBack` 이 늘 참**이라
+ * 짝에게 던지지 않고 주자를 쫓기만 한다(b4976 → 0xb4a96). 마주 달려오는 주자라 태그(≤ 499)로 끝나기 쉽다.
+ * (예전 웹은 이 칸을 지나온 루 +0x8c 로 보아 "뒤에서 쫓기만 해 절대 못 잡는다" 고 적었다 — 칸 이름이 거꾸로였던 때의 해석)
  */
 export function rundownAction(input: RundownTickInput): RundownAction {
   const { plan, slot, play, fielders, runners } = input
@@ -160,7 +187,8 @@ export function rundownAction(input: RundownTickInput): RundownAction {
   if (slot === play.ballHolderSlot) {
     // ── 내가 공을 쥐었다 ──
     if (!self.holdingBall) return { kind: '공쫓기', target: input.ballTarget }
-    const coversBack = slot === (play.coverOfBase[(((runner.startBase % 4) + 4) % 4)] ?? NONE)
+    // b4976 — 내가 주자가 **달려가는 루(+0x7c)** 의 커버인가
+    const coversBack = slot === (play.coverOfBase[(((runner.targetBase % 4) + 4) % 4)] ?? NONE)
     const safe =
       ticksToReach(runner.position, partner.position, runner.speed) >
       throwTicksToFielder(partner, self) + HOLDER_MARGIN_TICKS
