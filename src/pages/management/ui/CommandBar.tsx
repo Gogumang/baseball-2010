@@ -13,6 +13,11 @@ interface CommandBarProps {
   /** 메뉴가 열린 뒤 갱신 수 — 칸이 y170 에서 내려온다 (0x7ff8c) */
   readonly slideUpdates: number
   readonly disabledIds: ReadonlySet<string>
+  /**
+   * 흑백으로 **그리기만** 하는 칸 — 고르기는 막지 않는다. 시즌 0xce 하위 메뉴 켬 표는 0x7e418 이 그림에만 쓰고
+   * 키 0x4e40 은 보지 않는다.
+   */
+  readonly grayedIds?: ReadonlySet<string>
   readonly labelWidths: Readonly<Record<number, number>>
   /** 하위 메뉴일 때 부모 칸 — 주황 아이콘으로 (6,245) 까지 미끄러진다 */
   readonly parent: MenuSlot | null
@@ -74,7 +79,8 @@ export function CommandBar(props: CommandBarProps) {
           onFocus={() => onHover(index)}
           onClick={() => onSelect(slot.id)}
         >
-          <img className={styles.commandIcon} style={{ top: -1 + (index === cursor ? bounce : 0) }}
+          <img className={styles.commandIcon}
+            style={{ top: -1 + (index === cursor ? bounce : 0), ...(props.grayedIds?.has(slot.id) === true ? { filter: 'grayscale(1)' } : {}) }}
             src={iconOf(slot.icon, index === cursor)} alt="" />
         </button>
       ))}

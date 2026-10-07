@@ -20,6 +20,8 @@ export interface SeasonCommandBarProps {
   /** 하위 메뉴의 부모 칸(관리 메뉴 커서 칸) — 없으면 메인 메뉴 */
   readonly parent: MenuSlot | null
   readonly disabledIds?: ReadonlySet<string>
+  /** 흑백으로 그리기만 하는 칸 (0xce 하위 메뉴 켬 표 — 키는 막지 않는다) */
+  readonly grayedIds?: ReadonlySet<string>
   readonly onHover?: (index: number) => void
   readonly onSelect?: (id: string) => void
 }
@@ -30,7 +32,7 @@ const NO_IDS: ReadonlySet<string> = new Set()
  * 시즌 커맨드 줄 — 공용 0x7e418(`CommandBar`)에 시즌 표(`lib/seasonCommandBar`)를 넘긴다.
  * 칸 등장(0x7ff8c · 부모 칸 0x8003c)은 상태의 틀 수 [this+0x2c] 로 그린다 — 화면이 서고 난 갱신 수.
  */
-export function SeasonCommandBar({ slots, cursor, parent, disabledIds = NO_IDS, onHover, onSelect }: SeasonCommandBarProps) {
+export function SeasonCommandBar({ slots, cursor, parent, disabledIds = NO_IDS, grayedIds, onHover, onSelect }: SeasonCommandBarProps) {
   const update = useUpdateCounter()
   const labelOrigins = useFrameOrigins('./sprites/img_text/frames')
   const [movedAt, setMovedAt] = useState<number | null>(null)
@@ -49,7 +51,7 @@ export function SeasonCommandBar({ slots, cursor, parent, disabledIds = NO_IDS, 
   return (
     <CommandBar slots={slots} cursor={cursor}
       bounce={movedAt === null ? 0 : (BOUNCE_BY_UPDATE[update - movedAt] ?? 0)}
-      slideUpdates={update} disabledIds={disabledIds} labelWidths={labelWidths} parent={parent}
+      slideUpdates={update} disabledIds={disabledIds} grayedIds={grayedIds} labelWidths={labelWidths} parent={parent}
       onHover={onHover ?? (() => undefined)} onSelect={onSelect ?? (() => undefined)} />
   )
 }

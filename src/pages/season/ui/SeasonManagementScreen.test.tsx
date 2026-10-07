@@ -151,6 +151,22 @@ describe('구단관리 하위 메뉴 (상태 0xce)', () => {
     expect(onSelect).toHaveBeenLastCalledWith('코치채용', SEASON_SCENE_STATE.선수단)
   })
 
+  it('0x47d8 — SR+0x56 == 1 이면 트레이드 칸만 흑백으로 그리고, 키 0x4e40 은 막지 않는다', () => {
+    const onSelect = vi.fn()
+    render(<SeasonTeamMenuScreen state={시즌({ tradeUsed: 1 })} onSelect={onSelect} onBack={vi.fn()} />)
+
+    const 아이콘필터 = (이름: string) => screen.getByRole('button', { name: 이름 }).querySelector('img')?.style.filter ?? ''
+    expect(아이콘필터('트레이드')).toBe('grayscale(1)')
+    expect(아이콘필터('구장관리')).toBe('')
+    fireEvent.click(screen.getByRole('button', { name: '트레이드' }))
+    expect(onSelect).toHaveBeenLastCalledWith('트레이드', SEASON_SCENE_STATE.트레이드)
+  })
+
+  it('SR+0x56 == 0 이면 다 켠 칸이다', () => {
+    render(<SeasonTeamMenuScreen state={시즌({ tradeUsed: 0 })} onSelect={vi.fn()} onBack={vi.fn()} />)
+    expect(screen.getByRole('button', { name: '트레이드' }).querySelector('img')?.style.filter ?? '').toBe('')
+  })
+
   it('취소는 관리 메뉴로 되돌아간다', () => {
     const onBack = vi.fn()
     render(<SeasonTeamMenuScreen state={시즌()} onSelect={vi.fn()} onBack={onBack} />)

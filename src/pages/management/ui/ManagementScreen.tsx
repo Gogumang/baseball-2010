@@ -10,6 +10,7 @@ import type { ManagementCommand } from '@/pages/management/lib/managementLayout'
 import { useManagementMenu } from '@/pages/management/model/useManagementMenu'
 import { ManagementBoard } from '@/pages/management/ui/ManagementBoard'
 import { CommandBar } from '@/pages/management/ui/CommandBar'
+import { nariMainMenuOffIdsOf } from '@/pages/management/lib/nariMenuEnable'
 import { BasicInfoCard } from '@/pages/management/ui/BasicInfoCard'
 import { DetailPopup, DetailWindow } from '@/pages/management/ui/DetailPopup'
 import { batterAbilityDetailViewOf } from '@/pages/management/lib/abilityDetail'
@@ -126,6 +127,8 @@ export function ManagementScreen(props: ManagementScreenProps) {
       )}
       <CommandBar slots={slots} cursor={menu.cursor} bounce={menu.bounce} slideUpdates={menu.slideUpdates}
         disabledIds={menu.disabledIds} labelWidths={labelWidths} parent={menu.parent}
+        // 켬 표 0 칸은 흑백 — 105 진입 0x11910(첫 해 10경기 전 외출 포함). 0x7e418 은 하위 메뉴가 없을 때만 본다
+        grayedIds={menu.parent === null ? nariMainMenuOffIdsOf(career) : undefined}
         onHover={menu.moveCursor} onSelect={menu.select} />
       {/*
         기본정보 카드는 커맨드 줄 **뒤에** 그린다. 원본 그리기 순서(0x167cc)도 상태판 → 커맨드 줄 →

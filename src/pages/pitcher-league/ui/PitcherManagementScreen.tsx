@@ -6,6 +6,7 @@ import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { createCareer } from '@/entities/career/model/playerCareer'
+import { nariMainMenuOffIdsOf } from '@/pages/management/lib/nariMenuEnable'
 import { TitleListWindow } from '@/widgets/management/ui/TitleListWindow'
 import { SkillWindow } from '@/widgets/skill-window/ui/SkillWindow'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -75,9 +76,11 @@ const BOUNCE_BY_UPDATE = [1, -1]
  * 키는 위·아래·좌·우 칸 옮기기 · 확인(Enter · '5') · 취소(−16).
  * 하위 메뉴에서 돌아오면 커서가 그 하위 메뉴 칸에 선다(타자편 `useManagementMenu` 와 같다).
  */
-function PitcherCommandBar({ menu, isKeyEnabled }: {
+function PitcherCommandBar({ menu, isKeyEnabled, mainOffIds }: {
   readonly menu: PitcherManagementMenu
   readonly isKeyEnabled: boolean
+  /** 관리 메뉴 [this+0x8c] 켬 표가 0 인 칸 — 105 진입 0x11910 (`nariMainMenuOffIdsOf`) */
+  readonly mainOffIds: ReadonlySet<string>
 }) {
   const kind = menu.kind as PitcherCommandKind
   const slots = PITCHER_COMMAND_BAR[kind]
@@ -125,9 +128,10 @@ function PitcherCommandBar({ menu, isKeyEnabled }: {
     <CommandBar slots={slots} cursor={cursor}
       bounce={state.movedAt === null ? 0 : (BOUNCE_BY_UPDATE[update - state.movedAt] ?? 0)}
       slideUpdates={Math.max(0, update - state.openedAt)}
-      // ⚠️ 메인 메뉴 켬 표(흑백 0xc37a8)를 투수편이 끄는 자리는 안 읽었다 — 다 켠 채로 두고, 이미 행동한 칸은
-      // 고를 때 r_event_txt[176] 알림이 막는다(`usePitcherManagementMenu`)
+      // 메인 메뉴 켬 표(흑백 0xc37a8)는 105 진입 0x11910 이 타자편과 같은 코드로 끈다 — 0x7e418 은 하위 메뉴가 없을 때만
+      // 그 표를 본다. 흑백은 그림만이고, 이미 행동한 칸을 고르면 r_event_txt[176] 알림이 막는다(`usePitcherManagementMenu`)
       disabledIds={NO_DISABLED}
+      grayedIds={kind === '관리' ? mainOffIds : undefined}
       labelWidths={labelWidths} parent={pitcherParentSlotOf(kind)}
       labelDxOf={(slot) => pitcherLabelDxOf(kind, slot)}
       onHover={moveTo} onSelect={menu.select} />
@@ -174,7 +178,7 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
       {isMenuShown && (
         <>
           <SkinBackdrop kind="공무늬" />
-          <PitcherCommandBar menu={menu}
+          <PitcherCommandBar menu={menu} mainOffIds={nariMainMenuOffIdsOf(career)}
             isKeyEnabled={menu.choice === null && menu.detail === null && menu.question === null && menu.notice === ''} />
           <PitcherStatusBoard career={career} />
           <CenterStage slidesIn={props.centerSlidesIn ?? false} characters={nariStageCharactersOf({

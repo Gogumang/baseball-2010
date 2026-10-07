@@ -16,6 +16,10 @@ const NEXT_GAME_INDEX = 5
 /**
  * 0x4efc 가 끄는 칸 — 메뉴 켬 표(메뉴 +0x28) 를 0 으로: SR+4(행동함) 면 칸 2·3, SR+0x1bc(엔딩 본 시즌) 면 칸 2·3·5.
  * 꺼진 칸은 커맨드 줄이 흑백(0xc37a8)으로 그린다.
+ *
+ * **다시 켜는 곳은 장면을 새로 지을 때뿐이다**(직접 떴다): 장면 0x105 생성 0xfe58 → 0xf684 가 메뉴 [this+0x70] 을 만들고
+ * vt+0x1c = 0x6c4bc 가 켬 표를 (행 × 열) 바이트로 새로 잡아 memset(1) 한다. 0x4efc 는 끄기만 한다. SR+4 는 경기 정산
+ * (0x4f158 — 장면 0x104)에서 지워지고 경기 뒤에는 장면 0x105 를 새로 지으므로, 들어올 때 레코드로 정하는 이 식과 같다.
  */
 export function disabledManagementIndexesOf(record: SeasonState['record']): readonly number[] {
   const disabled = new Set<number>()
@@ -59,7 +63,9 @@ export interface SeasonManagementScreenProps {
  * 그리기는 공통 틀(`SeasonCommonFrame`): 공 무늬 바탕 · 커맨드 줄 0x7e418(표 0xd47f4 · 0xd4800 — `lib/seasonCommandBar`) ·
  * 상태판 0x7d34c · 가운데 판 0x7f814(감독 · 코치) · 머리띠(시즌모드, 되돌아가기).
  * 틀 0x73b8 은 상태 틀 수로 칸 등장 0x7ff8c 을 돌리고, 틀 2 에 이전 상태가 0xcb·0xcc·0xe3·0xde·0xf9·0xe4·0xe6·0xe5·0xd3·1 이면
- * 소리 0x6ea6d(…, 4, −1, 1) — ⚠️ 그 소리는 옮기지 않았다.
+ * `0x6ea6d([0x1400058], 4, −1, 1)` = **배경음 4(관리 화면) 반복** 즉시 재생(L 1-A — 0x6ea6c play(obj, n, vol, loop)).
+ * ⚠️ 옮기지 않았다: 웹 배경음은 앱(`app/model/screenBgm` · `App`)이 최상위 화면 단위로 고르고 시즌모드 전체를 3 으로 둔다 —
+ * 시즌 안쪽 장면 번호를 앱에 넘기는 배선이 이 구역 밖이다.
  */
 export function SeasonManagementScreen({
   state, onSelect, onExit, alert = null, cursor: heldCursor, onCursorChange, gamePoint = 0, centerSlidesIn = false,
