@@ -102,6 +102,14 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
       <DefensePlayback
         input={progress.pendingDefensePlay}
         side="공격"
+        // 수비 장면 득점 점수판 0x41a64 — 점수판 틀 두 측 · 플레이 시작 점수 · 공격 측 st[9]
+        runScoreBoard={{
+          sides: humanVsComputerSidesOf(progress.game.playerSide, progress.ourTeamId, progress.opponentTeamId),
+          scores: progress.game.playerSide === 0
+            ? [progress.game.ourScore, progress.game.opponentScore]
+            : [progress.game.opponentScore, progress.game.ourScore],
+          battingSide: progress.game.half === '초' ? 0 : 1,
+        }}
         onDone={session.actions.finishDefensePlay}
       />
     )

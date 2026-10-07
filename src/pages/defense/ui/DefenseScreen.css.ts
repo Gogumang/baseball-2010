@@ -56,3 +56,20 @@ export const laserShining = style({
   filter:
     'brightness(0) saturate(100%) invert(16%) sepia(99%) saturate(7404%) hue-rotate(1deg) brightness(105%) contrast(118%)',
 })
+
+/** 득점 점수판 0x41a64 한 벌 — 안쪽은 240×320 원본 절대 좌표 */
+export const runScoreBoard = style({
+  position: 'absolute',
+  left: 0,
+  top: 0,
+  width: 0,
+  height: 0,
+  pointerEvents: 'none',
+})
+
+/** 득점 점수판 숫자 (num 이미지 0x46~) */
+export const runScoreDigit = style({
+  position: 'absolute',
+  imageRendering: 'pixelated',
+  pointerEvents: 'none',
+})

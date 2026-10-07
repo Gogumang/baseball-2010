@@ -17,6 +17,19 @@ import type {
 } from '@/features/defense-play/model/runDefensePlay'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import { SLIDING_SOUND_EFFECT } from '@/entities/defense-controls/model/sliding'
+import type { ScoreboardSide } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
+import { RUN_SCORE_BOARD_TICKS, drawRunScoreBoard, runScoreBoardScoresOf } from '@/pages/defense/lib/runScoreBoard'
+import { RunScoreBoard } from '@/pages/defense/ui/RunScoreBoard'
+
+/** 수비 장면 득점 점수판 0x41a64 의 재료 — 플레이가 시작될 때의 경기 (`lib/runScoreBoard`) */
+export interface RunScoreBoardSource {
+  /** 점수판 틀 0x41440 의 두 측 */
+  readonly sides: readonly [ScoreboardSide, ScoreboardSide]
+  /** 플레이 시작 때 두 점수 0xb69b0(st, 0/1) */
+  readonly scores: readonly [number, number]
+  /** st[9] — 지금 공격하는 측. 이 플레이의 득점(`held.scoreboardRuns`)이 이 측에 붙는다 */
+  readonly battingSide: number
+}
 
 interface DefensePlaybackProps {
   /**
@@ -44,6 +57,11 @@ interface DefensePlaybackProps {
    * 시즌 **홈경기**에서만 값이 오고, 그 밖에는 null(구운 그림 = 칸 3 특급천연잔디)이다.
    */
   readonly grassPalette?: number | null
+  /**
+   * 수비 장면 득점 점수판 0x41a64 — 주면 실시간 갈래에서 1점마다 20번 세운다. 안 주면 안 그린다.
+   * 재생 갈래(`ticks`, 홈런 비행)는 홈런 갈래가 미해결이라 안 그린다.
+   */
+  readonly runScoreBoard?: RunScoreBoardSource
   readonly children?: React.ReactNode
 }
 
@@ -76,6 +94,7 @@ export function DefensePlayback({
   onDone,
   holdUpdates = DEFAULT_HOLD_UPDATES,
   grassPalette = null,
+  runScoreBoard,
   children,
 }: DefensePlaybackProps) {
   if (input !== undefined) {
@@ -86,6 +105,7 @@ export function DefensePlayback({
         onDone={onDone}
         holdUpdates={holdUpdates}
         grassPalette={grassPalette}
+        runScoreBoard={runScoreBoard}
       >
         {children}
       </LivePlayback>
@@ -145,7 +165,13 @@ interface LivePlaybackProps {
   readonly onDone: (result?: DefensePlayResult) => void
   readonly holdUpdates: number
   readonly grassPalette: number | null
+  readonly runScoreBoard?: RunScoreBoardSource
   readonly children?: React.ReactNode
+}
+
+/** 득점 점수판이 이번 그리기에 보이는 모습 */
+interface RunScoreBoardView {
+  readonly scores: readonly [number, number]
 }
 
 /**
@@ -155,7 +181,7 @@ interface LivePlaybackProps {
  * 여기서는 `keydown` 을 줄 세워 두고 **한 틱에 한 개씩** 진행기에 먹인다.
  * 키 → 뜻은 진행기 안에서 `inPlayCommandOf` 가 한다 — 표를 여기서 다시 만들지 않는다.
  */
-function LivePlayback({ input, side, onDone, holdUpdates, grassPalette, children }: LivePlaybackProps) {
+function LivePlayback({ input, side, onDone, holdUpdates, grassPalette, runScoreBoard, children }: LivePlaybackProps) {
   const update = useUpdateCounter(true)
   const stateRef = useRef<DefensePlayState | null>(null)
   const builtFromRef = useRef<DefensePlayInput | null>(null)
@@ -171,7 +197,10 @@ function LivePlayback({ input, side, onDone, holdUpdates, grassPalette, children
    * 따라잡을 때 같은 갱신 안에서 두 번 보지 않게 여기서도 한 번으로 막는다.
    */
   const fumbleSoundPlayedRef = useRef(false)
+  /** 득점 점수판 타이머 [+0x10f8] — 메시지 0x13(1점)마다 20, 그릴 때마다 1 씩 (0x52074 · 0x41b10) */
+  const runBoardTimerRef = useRef(0)
   const [view, setView] = useState<DefenseViewState | null>(null)
+  const [runBoard, setRunBoard] = useState<RunScoreBoardView | null>(null)
   const [finishedAt, setFinishedAt] = useState<number | null>(null)
 
   useEffect(() => {
@@ -193,7 +222,9 @@ function LivePlayback({ input, side, onDone, holdUpdates, grassPalette, children
       startedAtRef.current = update
       pressesRef.current = []
       fumbleSoundPlayedRef.current = false
+      runBoardTimerRef.current = 0
       setView(null)
+      setRunBoard(null)
       setFinishedAt(null)
     }
     const state = stateRef.current
@@ -203,9 +234,26 @@ function LivePlayback({ input, side, onDone, holdUpdates, grassPalette, children
     const wanted = Math.floor((update - startedAtRef.current) / UPDATES_PER_TICK) + 1
     let running = state
     let moved = false
+    let board: RunScoreBoardView | null = null
     while (running.tick < wanted && !isDefensePlayFinished(running)) {
+      const runsBefore = running.held.scoreboardRuns
       running = stepDefensePlay(running, pressesRef.current.shift() ?? null)
       moved = true
+      // 득점 점수판 0x41a64 — 점수판에 1점 오를 때마다(메시지 0x13) 타이머 20, 그 틱 그리기부터 센다.
+      // 한 갱신에 여러 틱을 따라잡으면 마지막 틱 모습만 보인다
+      if (runScoreBoard !== undefined) {
+        if (running.held.scoreboardRuns > runsBefore) runBoardTimerRef.current = RUN_SCORE_BOARD_TICKS
+        const drawn = drawRunScoreBoard(runBoardTimerRef.current)
+        runBoardTimerRef.current = drawn.timerAfter
+        const runs = running.held.scoreboardRuns
+        const scores: readonly [number, number] = [
+          runScoreBoard.scores[0] + (runScoreBoard.battingSide === 0 ? runs : 0),
+          runScoreBoard.scores[1] + (runScoreBoard.battingSide === 1 ? runs : 0),
+        ]
+        board = drawn.visible
+          ? { scores: runScoreBoardScoresOf(scores, runScoreBoard.battingSide, drawn.previousScore) }
+          : null
+      }
       // 펌블 소리 53 — 진행기가 `state.fumbled` 를 세우는 **그 틱**에 낸다 (0xb41d0 굴림 → 동작 0xd).
       // 플레이 끝에 몰아서 내면 아웃 콜(0x51b36)을 덮는다 — 소리 통로가 하나뿐이기 때문이다.
       if (running.fumbled && !fumbleSoundPlayedRef.current) {
@@ -218,9 +266,12 @@ function LivePlayback({ input, side, onDone, holdUpdates, grassPalette, children
       if (running.slidingSoundThisTick) activeSound().play(SLIDING_SOUND_EFFECT)
     }
     stateRef.current = running
-    if (moved) setView(running.ticks[running.ticks.length - 1] ?? null)
+    if (moved) {
+      setView(running.ticks[running.ticks.length - 1] ?? null)
+      setRunBoard(board)
+    }
     if (isDefensePlayFinished(running) && finishedAt === null) setFinishedAt(update)
-  }, [update, input, side, finishedAt])
+  }, [update, input, side, finishedAt, runScoreBoard])
 
   const isFinished = finishedAt !== null && update >= finishedAt + holdUpdates
 
@@ -233,6 +284,9 @@ function LivePlayback({ input, side, onDone, holdUpdates, grassPalette, children
   if (view === null) return null
   return (
     <DefenseScreen state={view} grassPalette={grassPalette}>
+      {runScoreBoard !== undefined && runBoard !== null && (
+        <RunScoreBoard sides={runScoreBoard.sides} scores={runBoard.scores} />
+      )}
       {children}
     </DefenseScreen>
   )

@@ -250,3 +250,42 @@ describe('슬라이딩 소리 10 (0x5268c · 0x5199c)', () => {
     }
   })
 })
+
+describe('수비 장면 득점 점수판 0x41a64 — 실시간 갈래', () => {
+  it('3루 주자가 들어오는 틱부터 20번 선다 — 처음 5번은 앞 점수, 그 뒤 새 점수 (메시지 0x13 → 타이머 0x14)', () => {
+    vi.useFakeTimers()
+    try {
+      const onDone = vi.fn()
+      const { queryByTestId } = render(
+        <DefensePlayback input={타구(단타, 주자3루)} onDone={onDone}
+          runScoreBoard={{ sides: [{ team: 1, isComputer: true }, { team: 4, isComputer: false }], scores: [2, 3], battingSide: 1 }} />,
+      )
+      const shown: string[] = []
+      for (let i = 0; i < 400 && onDone.mock.calls.length === 0; i += 1) {
+        act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
+        const board = queryByTestId('수비-득점판')
+        if (board !== null) {
+          shown.push(`${queryByTestId('수비-득점판-점수-0')?.dataset.value}:${queryByTestId('수비-득점판-점수-1')?.dataset.value}`)
+        }
+      }
+      expect(shown.length).toBeGreaterThan(0)
+      expect(shown.slice(0, 5)).toEqual(['2:3', '2:3', '2:3', '2:3', '2:3'])
+      expect(shown[5]).toBe('2:4')
+      expect(shown.length).toBeLessThanOrEqual(20)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('runScoreBoard 를 안 주면 그리지 않는다', () => {
+    vi.useFakeTimers()
+    try {
+      const onDone = vi.fn()
+      const { queryByTestId } = render(<DefensePlayback input={타구(단타, 주자3루)} onDone={onDone} />)
+      끝까지(onDone)
+      expect(queryByTestId('수비-득점판')).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
