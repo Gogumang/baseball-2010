@@ -2,6 +2,7 @@ import { PitcherCreateFlow } from '@/pages/pitcher-league/ui/PitcherCreateFlow'
 import { useRef } from 'react'
 import { PitcherManagementScreen } from '@/pages/pitcher-league/ui/PitcherManagementScreen'
 import { PitcherEventUnderlay } from '@/pages/pitcher-league/ui/PitcherEventUnderlay'
+import { OutingMapUnderlay } from '@/pages/management/ui/OutingMapUnderlay'
 import { NextGameStandingsScreen } from '@/pages/management/ui/NextGameStandingsScreen'
 import { NariMatchInfoScreen } from '@/pages/management/ui/NariMatchInfoScreen'
 import { EntryEditorScreen } from '@/widgets/entry-editor'
@@ -186,13 +187,14 @@ export function PitcherLeagueRoute({
     if (session.storyEvents !== null && event !== undefined) {
       // 114 그림 0x19e64 → 대화창 0x8b5ac: [gfx+0x174] 가 0x70·0x71(112 · 113 · 140 진입)이면 외출 지도, 그 밖(105 · 115 ·
       // 116 · 117 · 130~138 뒤)은 공 무늬 + 상태판 + 머리띠 (`PitcherEventUnderlay`) — 커맨드 줄은 없다.
-      // ⚠️ 장소(113) · 대결결과(140) 이벤트의 지도 밑그림은 아직 없다
+      // 지도(112) · 장소(113) · 대결결과(140) 뒤는 지도 0x7ea64(gfx, −1, 0) 만 — 선택 화살표 · 말풍선 · 머리띠 없음 (`OutingMapUnderlay`)
       const isOverStatusBoard =
         story.context === '관리' || story.context === '중간평가' || story.context === '연초' || story.context === '연말'
+      const isOverMap = story.context === '지도' || story.context === '장소' || story.context === '대결결과'
       return (
         <>
           {isOverStatusBoard && <PitcherEventUnderlay career={career} />}
-          {story.context === '지도' && outingMap}
+          {isOverMap && <OutingMapUnderlay eventPlaceIds={session.eventPlaceIds} hour={new Date().getHours()} />}
           <ScreenOverlay>
           <StoryScreen
             // 명령 5 의 500ms 진동(0x3a44)은 환경설정 진동(옵션 +0x3b)이 켜졌을 때만
