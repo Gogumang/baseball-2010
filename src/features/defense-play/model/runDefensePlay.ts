@@ -203,6 +203,12 @@ export interface DefensePlayInput {
    * (`play-at-bat/model/atBatSounds.inPlayCallSoundIdOf`) 이 표가 있어야 20 으로 새지 않는다.
    */
   readonly buntFoulOut?: boolean
+  /**
+   * **state[0x19] — 투구 판정 0.1% 사건** (0x3e04e: 상태 0x12 진입 0x3dfac 가 0x35034 = `모드 ≠ 7 && rand(0, 10000) < cfg+0x2e(10)` 를 적는다).
+   * 서 있으면 판 끝 결과 코드 0x9d5bc 가 0(9d5ce)이라 낙구·담장선 틱에 사건 코드가 안 난다. 굴림은 투구 흐름 쪽 자리라
+   * 부르는 쪽이 실어 보낸다 — 안 주면 0(지금까지와 같다). 이 사건이 화면에 무엇인지는 미확인(P2 6절).
+   */
+  readonly specialEvent?: boolean
   readonly maximumTicks?: number
   /**
    * 난수. **주면 원본 확률 굴림이 돈다** — 필살수비(0x66b30/0x66be4) · 펌블(0xb41d0) ·
@@ -2158,7 +2164,7 @@ export function stepDefensePlay(
       if (ballContacted) {
         const endState: PlayEndState = {
           flyOut: false,
-          specialEvent: false,
+          specialEvent: input.specialEvent === true,
           // 이 진행기는 페어 타구만 돈다 — state[0x1c] = 0
           foulAngle: false,
           // 스트라이크는 파울 갈래(코드 11)에서만 본다

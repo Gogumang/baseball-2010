@@ -1582,6 +1582,14 @@ describe('판 진행 관문 0xb0d28 · 판 끝 결과 코드 0x9d5bc (b44f6) —
     expect(state.groundRuleFlag).toBe(true)
   })
 
+  it('state[0x19](투구 판정 0.1% 사건)가 서면 낙구 틱의 0x9d5bc 가 0 — 사건 코드가 안 난다 (9d5ce)', () => {
+    const trajectory = battedBallTrajectory([92, 781, 1313, 0])
+    const 사건 = 돌리기({ outcome: 단타, trajectory, bases: 주자1루, outs: 0, specialEvent: true })
+    expect(사건.state.log).toContain('30틱 낙구 — 판 끝 결과 코드 0 (0x9d5bc)')
+    expect(사건.state.groundRuleFlag).toBe(false)
+    expect(사건.state.lastEventCode).not.toBe(10)
+  })
+
   it('폴 충돌 굴림 rand(−25, 25)(0xa2c64)는 판 시작에서 필살수비 굴림 뒤에 난수로 다시 깐다 — 굴림이 없던 궤적은 그대로', () => {
     // 원본 코드 24 [45, 1402, 991]: 20틱에 1루 쪽 폴 — 새 각 = 149 + rand(−25, 25)
     const 폴 = battedBallTrajectory([45, 1402, 991, 0])
