@@ -16,6 +16,11 @@ afterEach(cleanup)
 const 키 = (key: string) => fireEvent.keyDown(window, { key })
 
 describe('선수 고르기 0xdf', () => {
+  it('공통 앞그림 0xb810 — 0xdf 는 0xdd · 0xe0 · 0xe1 밖이라 공 무늬를 먼저 깐다', () => {
+    render(<SeasonPlayerPickScreen teamId={0} roster={tableRosterOf(0)} initialTab={ENTRY_TAB.투수} onPick={vi.fn()} onBack={vi.fn()} />)
+    expect(screen.getByTestId('바탕-공무늬')).toBeTruthy()
+  })
+
   it('보기 전용 — 확인은 줄을 고르지 않고 고른 탭·커서를 넘긴다', () => {
     const onPick = vi.fn()
     render(<SeasonPlayerPickScreen teamId={0} roster={tableRosterOf(0)} initialTab={ENTRY_TAB.투수} onPick={onPick} onBack={vi.fn()} />)

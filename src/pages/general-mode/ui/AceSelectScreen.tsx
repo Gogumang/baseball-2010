@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import { FrameSprite, Hint, MessageBox, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
@@ -62,6 +63,11 @@ export interface AceSelectScreenProps {
   readonly onOpenAce?: (cell: number) => void
   readonly onSelect: (cell: number) => void
   readonly onCancel: () => void
+  /**
+   * 화면 맨 밑에 먼저 깔 것 — 시즌 장면 0x105 는 상태별 그리기 앞에 늘 공통 앞그림 0xb810 을 부르고, 0xd7 마선수 고르기는 0xdd · 0xe0 · 0xe1 밖이라
+   * 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 깐다(0xe9ac 0xefaa). 이 화면을 쓰는 다른 모드는 넘기지 않는다.
+   */
+  readonly underlay?: ReactNode
 }
 
 /**
@@ -91,7 +97,7 @@ export interface AceSelectScreenProps {
  */
 export function AceSelectScreen({
   phase, openedAcePitcherIds = [], openedAceBatterIds = [], levels, mode = '고르기', gamePoint = 0,
-  onOpenAce, onLevelUp, onSelect, onCancel,
+  onOpenAce, onLevelUp, onSelect, onCancel, underlay,
 }: AceSelectScreenProps) {
   const imgTextOrigins = useFrameOrigins(IMG_TEXT_FRAME)
   const cellCount = ACE_LAYOUT.grid.columns * ACE_LAYOUT.grid.rows
@@ -202,6 +208,7 @@ export function AceSelectScreen({
 
   return (
     <RawScreen>
+      {underlay}
       {/*
         ⚠️ **A 딱지는 그리지 않는다 — 원본도 마선수 고르기(k 2·11)에서는 안 그린다.**
         공용 목록 0x63b15 는 A 딱지 플래그 `[sp+0xb4]` 를 기본 1 로 두는데(0x63cea `movs r2,#1`

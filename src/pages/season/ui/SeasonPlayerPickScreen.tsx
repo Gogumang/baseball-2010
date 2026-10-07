@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import type { ReactNode } from 'react'
 import { EntryEditorScreen } from '@/widgets/entry-editor'
+import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { TEAMS } from '@/shared/config/original/teams'
 import {
   ENTRY_TAB, openEntryEditor, pointEntryCursor, pressEntryKey,
@@ -91,6 +92,8 @@ export function SeasonPlayerPickScreen({
       isAceLocked={false}
       gamePoint={gamePoint}
       overlay={overlay}
+      // 공통 앞그림 0xb810 — 0xdf 는 0xdd · 0xe0 · 0xe1 밖이라 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 먼저 깐다
+      underlay={<SkinBackdrop kind="공무늬" />}
       onKey={onKey}
       onMoveCursor={(index) => setEditor((current) => pointEntryCursor(current, lists, index))}
       onCloseAceLocked={() => undefined}

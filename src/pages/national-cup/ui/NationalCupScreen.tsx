@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { TEAMS } from '@/shared/config/original/teams'
@@ -41,6 +42,11 @@ export interface NationalCupScreenProps {
   readonly onFinish: (finish: NationalCupFinish, cup: NationalCup) => void
   /** 처음 그릴 단계 — 나리 142 취소(0x13c72 의 S+0x12c 갈래)는 135(순위)로 돌아온다. 안 주면 134(대진) */
   readonly initialStep?: '대진' | '순위'
+  /**
+   * 화면 맨 밑에 먼저 깔 것 — 시즌 장면 0x105 는 상태별 그리기 앞에 늘 공통 앞그림 0xb810 을 부르고, 0xf3 국가대항전은 0xdd · 0xe0 · 0xe1 밖이라
+   * 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 깐다(0xe9ac 0xefaa). 이 화면을 쓰는 다른 모드는 넘기지 않는다.
+   */
+  readonly underlay?: ReactNode
 }
 
 type Step = '대진' | '순위' | '결과' | '보상'
@@ -74,7 +80,7 @@ type Step = '대진' | '순위' | '결과' | '보상'
  *   시즌 0xf4 키 0x4a18 은 −16 → 0xf3 이 있다. 134 · 0xf3 키(0x19fdc · 0xe6f8)도 확인만 본다.
  */
 export function NationalCupScreen({
-  mode, cup, yearIndex, gamePoint = 0, random, onStartGame, onFinish, initialStep = '대진',
+  mode, cup, yearIndex, gamePoint = 0, random, onStartGame, onFinish, initialStep = '대진', underlay,
 }: NationalCupScreenProps) {
   const [step, setStep] = useState<Step>(initialStep)
   /** 동전 던지기(`0xb858c`)가 우승국을 바꿀 수 있어 확인 뒤 대회를 따로 들고 있는다 */
@@ -101,6 +107,7 @@ export function NationalCupScreen({
 
   return (
     <RawScreen>
+      {underlay}
       {step === '순위' && matchup !== null ? (
         // 135 키 0x10680 · 0xf4 키 0x4a18: 확인 → 142 경기 준비 / 0xdd 경기정보
         <NationalCupStandings cup={cup} onConfirm={() => onStartGame(matchup, cup)} />

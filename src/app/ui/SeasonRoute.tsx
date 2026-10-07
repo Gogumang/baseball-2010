@@ -64,6 +64,7 @@ import { seasonPlayerRecordOf } from '@/entities/season-mode/model/seasonPlayerR
 import { ENTRY_TAB } from '@/entities/season-mode/model/entryEditor'
 import type { EntryTab } from '@/entities/season-mode/model/entryEditor'
 import type { SeasonEntryBatterRecord, SeasonEntryPitcherRecord } from '@/entities/season-mode/model/seasonEntry'
+import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 
 interface SeasonRouteProps {
   readonly session: SeasonSession
@@ -463,6 +464,8 @@ export function SeasonRoute({
         gamePoint={session.gamePoints}
         onSelect={actions.choosePreGameAce}
         onCancel={actions.cancelPreGameAce}
+        // 공통 앞그림 0xb810 — 0xd7 는 0xdd · 0xe0 · 0xe1 밖이라 공 무늬를 먼저 깐다(일반모드 상태 21 은 장면이 달라 안 넘긴다)
+        underlay={<SkinBackdrop kind="공무늬" />}
       />
     )
   }
@@ -807,6 +810,8 @@ export function SeasonRoute({
         // ⚠️ 웹판 임시 — 원본은 여기서 사람이 대표팀을 조작해 경기를 친다 (시즌 221)
         onStartGame={(matchup) => actions.playCupGame(matchup.myTeam, matchup.opponent)}
         onFinish={(finish) => actions.finishCup(finish)}
+        // 공통 앞그림 0xb810 — 0xf3 · 0xf4 는 0xdd · 0xe0 · 0xe1 밖이라 공 무늬를 먼저 깐다(그림 0x896c 는 화면을 안 지운다)
+        underlay={<SkinBackdrop kind="공무늬" />}
       />
     )
   }

@@ -37,6 +37,11 @@ export interface EntryEditorScreenProps<B extends EntryBatterRow & EntryFace, P 
   /** 웹 전용 — 줄을 눌러 커서를 옮긴다 */
   readonly onMoveCursor: (index: number) => void
   readonly onCloseAceLocked: () => void
+  /**
+   * 화면 맨 밑에 먼저 깔 것 — 시즌 장면 0x105 는 상태별 그리기 앞에 늘 공통 앞그림 0xb810 을 부르고, 0xdf 선수 고르기는 0xdd · 0xe0 · 0xe1 밖이라
+   * 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 깐다(0xe9ac 0xefaa). 이 화면을 쓰는 다른 모드는 넘기지 않는다.
+   */
+  readonly underlay?: ReactNode
 }
 
 /** 판 (15, 55, 210, 220) — P6 2f 의 0x5c984 공용 판 (유력) */
@@ -61,7 +66,7 @@ const PITCHER_ABILITY_LABELS = ['제구', '구속', '변화', '체력'] as const
  *    줄에는 이름·수비 위치 글자만 적는다. 화면 밀기(0xbdae9, 1000) 연출도 없다.
  */
 export function EntryEditorScreen<B extends EntryBatterRow & EntryFace, P extends EntryPitcherRow & EntryFace>({
-  editor, lists, teamName, isAceLocked, gamePoint = 0, title, overlay, onKey, onMoveCursor, onCloseAceLocked,
+  editor, lists, teamName, isAceLocked, gamePoint = 0, title, overlay, underlay, onKey, onMoveCursor, onCloseAceLocked,
 }: EntryEditorScreenProps<B, P>) {
   useEffect(() => {
     if (isAceLocked) return undefined
@@ -107,6 +112,7 @@ export function EntryEditorScreen<B extends EntryBatterRow & EntryFace, P extend
 
   return (
     <RawScreen>
+      {underlay}
       <div className={styles.panel}
         style={{ left: PANEL.x, top: PANEL.y, width: PANEL.width, height: PANEL.height }} />
       <div className={styles.tabLine} style={{ left: PANEL.x, top: PANEL.y + 4, width: PANEL.width }}>

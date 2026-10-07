@@ -35,6 +35,11 @@ const 칸들 = () =>
     .filter((button): button is HTMLButtonElement => button.style.width === '40px')
 
 describe('격자', () => {
+  it('밑그림은 넘긴 것만 맨 밑에 깐다 — 시즌 0xd7 이 공 무늬를 넘기고 일반모드 상태 21 은 안 넘긴다', () => {
+    const { container } = 띄우기({ underlay: <div data-testid="밑그림" /> })
+    expect(container.querySelector('[data-testid="밑그림"]')).toBeTruthy()
+  })
+
   it('10칸이다 — 윗줄 마투수 · 아랫줄 마타자', () => {
     띄우기()
 
