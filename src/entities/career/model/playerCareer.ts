@@ -511,24 +511,60 @@ const HELPLESS_SKILL = 5
 /** 무력감 해제 카운터가 이어지는 기준 사기 (A-4) */
 const HIGH_MORALE = 90
 
+/** 무력감 · 먹튀 경기 뒤 카운터 세 칸 (+0x1c7 · +0x1cd · +0x1c0) */
+export interface SkillGameCounters {
+  readonly highMoraleStreak: number
+  readonly moneyGrubberGames: number
+  readonly moneyGrubberPopularityGain: number
+}
+
+const toInt8 = (value: number) => (value << 24) >> 24
+const toInt16 = (value: number) => (value << 16) >> 16
+
 /**
- * 경기 뒤 카운터 (A-4) — 인기도 변화가 정해진 다음에 부른다.
+ * **116 진입의 경기 뒤 카운터** (12bc2~12c84, 모드 3·4 공용 — 스킬은 `0xa3a75(S, 5|2)` 보유 비트 5 무력감 · 2 먹튀, 두 편 같은 번호):
+ * ```
+ * 무력감 있고 사기(0xa3a25) > 89  → s8 +0x1c7 += 1
+ * 무력감 있고 사기 ≤ 89          → +0x1c7 = 0
+ * 무력감 없음                     → 그대로 (지우지 않는다)
+ * (+0x1c2 += +0x4a · 0xa4d09)
+ * 먹튀 있음 → s8 +0x1cd += 1 · s16 +0x1c0 += s8 +0x4a  /  없음 → 둘 다 0
+ * ```
+ */
+export function countSkillGameCounters(
+  counters: SkillGameCounters,
+  input: { readonly hasHelpless: boolean; readonly hasMoneyGrubber: boolean; readonly morale: number; readonly popularityChange: number },
+): SkillGameCounters {
+  return {
+    highMoraleStreak: !input.hasHelpless
+      ? counters.highMoraleStreak
+      : input.morale >= HIGH_MORALE ? toInt8(counters.highMoraleStreak + 1) : 0,
+    moneyGrubberGames: input.hasMoneyGrubber ? toInt8(counters.moneyGrubberGames + 1) : 0,
+    moneyGrubberPopularityGain: input.hasMoneyGrubber
+      ? toInt16(counters.moneyGrubberPopularityGain + toInt8(input.popularityChange))
+      : 0,
+  }
+}
+
+/**
+ * 경기 뒤 카운터 (A-4 · 116 진입 12bc2~12c3c) — 인기도 변화가 정해진 다음에 부른다.
  *   +0x1c2 이번 시즌 인기도 변화 합 · +0x1c0/+0x1cd 먹튀 보유 중 합/경기 수
- *   +0x1c7 무력감 보유 중 "경기 뒤 사기 ≥ 90" 연속 경기 수
- * 먹튀·무력감 카운터는 그 스킬이 **없으면 0** 으로 되돌린다.
+ *   +0x1c7 무력감 보유 중 "경기 뒤 사기 ≥ 90" 연속 경기 수 (`countSkillGameCounters`)
+ * 먹튀 카운터는 그 스킬이 **없으면 0** 으로 되돌리고, 무력감 카운터는 없으면 **그대로 둔다**(12bee~12bfc).
  */
 export function countGameForSkills(
   career: PlayerCareer,
   popularityChange: number,
 ): PlayerCareer {
-  const hasMoneyGrubber = hasSkill(career, MONEY_GRUBBER_SKILL)
-  const hasHelpless = hasSkill(career, HELPLESS_SKILL)
   return {
     ...career,
     seasonPopularityGain: career.seasonPopularityGain + popularityChange,
-    moneyGrubberPopularityGain: hasMoneyGrubber ? career.moneyGrubberPopularityGain + popularityChange : 0,
-    moneyGrubberGames: hasMoneyGrubber ? career.moneyGrubberGames + 1 : 0,
-    highMoraleStreak: hasHelpless && career.morale >= HIGH_MORALE ? career.highMoraleStreak + 1 : 0,
+    ...countSkillGameCounters(career, {
+      hasHelpless: hasSkill(career, HELPLESS_SKILL),
+      hasMoneyGrubber: hasSkill(career, MONEY_GRUBBER_SKILL),
+      morale: career.morale,
+      popularityChange,
+    }),
     reputationZeroGames: countReputationZeroGame(career.reputationZeroGames, career.reputation),
   }
 }

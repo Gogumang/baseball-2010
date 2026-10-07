@@ -28,7 +28,12 @@ import type { LeaguePlayerStats } from '@/entities/league/model/leaguePlayerStat
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { equipmentBonusOf } from '@/entities/career/model/equipment'
 import { NO_EQUIPPED_TITLE } from '@/entities/career/model/titles'
-import { countReputationZeroGame, isSkillEquipped, setSkillEquipped } from '@/entities/career/model/playerCareer'
+import {
+  countReputationZeroGame,
+  countSkillGameCounters,
+  isSkillEquipped,
+  setSkillEquipped,
+} from '@/entities/career/model/playerCareer'
 import type { SeasonEndState } from '@/entities/career/model/playerCareer'
 import type { NariTeamRecords } from '@/entities/career/model/nariTeamRecord'
 import {
@@ -231,17 +236,35 @@ export const NO_LAST_EVALUATION: PitcherLastEvaluation = { popularityChange: 0, 
  * **116 경기 뒤 평가 진입 0x1278c 의 저장 칸 몫** — S+0x50 = 2(0x1279a) 뒤, 0x8a6fc 다음의 경기 뒤 카운터(12bc2~12c3c):
  * `+0x1c2 += +0x4a`(이번 시즌 인기도 변화 합) · `0xa4d09`(평판 0 연속 +0x184). 이어하기(S+0x50 == 2)가 다시 들어오면
  * **한 번 더** 쌓인다(원본 그대로 — 타자편 `countGameForSkills` 와 같은 자리).
- * ⚠️ 미해결: 무력감 +0x1c7 · 먹튀 +0x1c0/+0x1cd 는 `0xa3a75(S, 5|2)` 스킬 칸인데 투수편 스킬 번호와의 짝을 안 읽어 안 센다.
+ * 무력감 +0x1c7 · 먹튀 +0x1c0/+0x1cd 도 같은 자리(12bc2~12c84)다 — `0xa3a75(S, 5|2)` 의 5·2 는 보유 비트 번호이고 투수 비트 0~7 은
+ * 타자와 같은 공통 스킬(5 무력감 · 2 먹튀)이라 짝이 그대로다(`countSkillGameCounters`, 0x8457c 이름표 · skills.json 공통).
  */
 export function enterPitcherGameEvaluation(career: PitcherCareer): PitcherCareer {
   const popularityChange = (career.lastEvaluation ?? NO_LAST_EVALUATION).popularityChange
   return {
     ...career,
     seasonEndState: 116,
+    ...countSkillGameCounters(
+      {
+        highMoraleStreak: career.highMoraleStreak ?? 0,
+        moneyGrubberGames: career.moneyGrubberGames ?? 0,
+        moneyGrubberPopularityGain: career.moneyGrubberPopularityGain ?? 0,
+      },
+      {
+        hasHelpless: hasPitcherSkill(career, HELPLESS_SKILL),
+        hasMoneyGrubber: hasPitcherSkill(career, MONEY_GRUBBER_SKILL),
+        morale: career.morale,
+        popularityChange,
+      },
+    ),
     seasonPopularityGain: career.seasonPopularityGain + popularityChange,
     reputationZeroGames: countReputationZeroGame(career.reputationZeroGames, career.reputation),
   }
 }
+
+/** 공통 스킬 비트 — 무력감 · 먹튀 (투수 비트 0~7 은 타자와 같은 번호) */
+const HELPLESS_SKILL = 5
+const MONEY_GRUBBER_SKILL = 2
 
 export interface PitcherCareer {
   readonly name: string
@@ -364,6 +387,13 @@ export interface PitcherCareer {
    */
   readonly completeGameCounts: CompleteGameCounts
   readonly seasonPopularityGain: number
+  /**
+   * 116 경기 뒤 카운터 — +0x1c7 무력감 보유 중 "사기 ≥ 90" 연속 · +0x1cd/+0x1c0 먹튀 보유 중 경기 수/인기도 변화 합
+   * (타자편 `PlayerCareer` 와 같은 칸, `countSkillGameCounters`). 스킬 조건 20·21 의 2·5 가 본다. 옛 저장에는 없다(0)
+   */
+  readonly highMoraleStreak?: number
+  readonly moneyGrubberGames?: number
+  readonly moneyGrubberPopularityGain?: number
   readonly popularityAtSeasonStart: number
   readonly hasSeenYearGoalWindow: boolean
   readonly yearGoalEventDone: boolean

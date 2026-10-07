@@ -80,10 +80,38 @@ describe('조건 20/21 투수 갈래 (0xd8408 · 0xd8454 의 모드 3 쪽)', () 
     expect(meetsPitcherSkillCondition(투수({ releaseTrainingStreaks: 카운터(0, 8) }), 'release', 21)).toBe(false)
   })
 
-  it('미이식 갈래(먹튀·몹쓸몸·유리몸·무력감·전설·좌우타UP·투지)는 불발로 둔다', () => {
-    for (const value of [3, 4, 5, 6, 8, 13, 14, 15]) {
+  it('미이식 갈래(몹쓸몸·유리몸·전설·좌우타UP·투지)는 불발로 둔다', () => {
+    for (const value of [4, 5, 8, 13, 14, 15]) {
       expect(meetsPitcherSkillCondition(투수({ season: 13, gamesPlayed: 30, morale: 0 }), 'acquire', value)).toBe(false)
     }
+  })
+})
+
+describe('먹튀 2 · 무력감 5 — 116 카운터를 세게 되어 두 편 공용 식 그대로 (0xad2a2 · 0xad43a · 0xad9ce · 0xada0e)', () => {
+  it('먹튀 얻기: 연차idx > 1 · g == 14 에서 +0x1c2 ≤ 15 · g == 32 에서 ≤ 35', () => {
+    expect(meetsPitcherSkillCondition(투수({ season: 3, gamesPlayed: 14, seasonPopularityGain: 15 }), 'acquire', 3)).toBe(true)
+    expect(meetsPitcherSkillCondition(투수({ season: 3, gamesPlayed: 14, seasonPopularityGain: 16 }), 'acquire', 3)).toBe(false)
+    expect(meetsPitcherSkillCondition(투수({ season: 2, gamesPlayed: 14, seasonPopularityGain: 0 }), 'acquire', 3)).toBe(false)
+    expect(meetsPitcherSkillCondition(투수({ season: 3, gamesPlayed: 32, seasonPopularityGain: 35 }), 'acquire', 3)).toBe(true)
+    expect(meetsPitcherSkillCondition(투수({ season: 3, gamesPlayed: 14, removedMinusSkillIds: [2] }), 'acquire', 3)).toBe(false)
+  })
+
+  it('무력감 얻기: 사기 ≤ 20 · 연차idx > 2 뒤에만 rand(0,100) > 69 를 굴린다', () => {
+    let rolls = 0
+    const 굴림 = (value: number) => ({ nextInRange: () => { rolls += 1; return value } }) as never
+    expect(meetsPitcherSkillCondition(투수({ season: 4, morale: 20 }), 'acquire', 6, 굴림(70))).toBe(true)
+    expect(meetsPitcherSkillCondition(투수({ season: 4, morale: 20 }), 'acquire', 6, 굴림(69))).toBe(false)
+    expect(rolls).toBe(2)
+    expect(meetsPitcherSkillCondition(투수({ season: 3, morale: 20 }), 'acquire', 6, 굴림(99))).toBe(false)
+    expect(meetsPitcherSkillCondition(투수({ season: 4, morale: 21 }), 'acquire', 6, 굴림(99))).toBe(false)
+    expect(rolls).toBe(2)
+  })
+
+  it('해제: 먹튀 +0x1cd > 4 이고 평균 > 3 · 무력감 +0x1c7 > 5', () => {
+    expect(meetsPitcherSkillCondition(투수({ skillIds: [2], moneyGrubberGames: 5, moneyGrubberPopularityGain: 20 }), 'release', 3)).toBe(true)
+    expect(meetsPitcherSkillCondition(투수({ skillIds: [2], moneyGrubberGames: 5, moneyGrubberPopularityGain: 19 }), 'release', 3)).toBe(false)
+    expect(meetsPitcherSkillCondition(투수({ skillIds: [5], highMoraleStreak: 6 }), 'release', 6)).toBe(true)
+    expect(meetsPitcherSkillCondition(투수({ skillIds: [5], highMoraleStreak: 5 }), 'release', 6)).toBe(false)
   })
 })
 

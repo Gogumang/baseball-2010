@@ -54,7 +54,7 @@ function meetsConditions(event: OriginalEvent, career: PitcherCareer, random: Ra
       case CONDITION.안봤음:
         return condition.value <= 0 || !hasSeen(career, condition.value)
       case CONDITION.스킬획득:
-        return meetsPitcherSkillCondition(career, 'acquire', condition.value)
+        return meetsPitcherSkillCondition(career, 'acquire', condition.value, random)
       case CONDITION.스킬해제:
         return meetsPitcherSkillCondition(career, 'release', condition.value)
       case CONDITION.질병:
@@ -112,6 +112,8 @@ const OUTS_PER_INNING = 3
 
 /** 투수 비트 번호 (8 이상은 표 번호 비트+16). 하위 표 칸 = 비트 − 2 (0xad292 `subs r0, r4, #3` = v − 3) */
 const PITCHER_SKILL = {
+  먹튀: 2,
+  무력감: 5,
   끈기: 10,
   닥터K: 11,
   안정감: 16,
@@ -125,16 +127,23 @@ const LAST_TABLE_SKILL = 20
 
 /**
  * 하위 표에서 **투수 갈래를 아직 옮기지 못한** 스킬 — 불발로 둔다 (지어내지 않는다).
- *   2 먹튀 · 3 몹쓸몸 · 4 유리몸 · 5 무력감: 식은 두 편 공용으로 확정(A 4절)이지만, 투수 웹이 해제 쪽 칸
- *     (+0x1c0/+0x1cd 먹튀 카운터 · +0x75/+0x76 보유 중 훈련 수 · +0x1c7 사기 연속) 과 획득 쪽 +0x1c2(시즌 인기도 변화 합)를
+ *   3 몹쓸몸 · 4 유리몸: 식은 두 편 공용으로 확정(A 4절)이지만, 투수 웹이 해제 쪽 칸(+0x75/+0x76 보유 중 훈련 수)을
  *     아직 세지 않는다 — 얻기만 하고 못 푸는 일을 막으려고 둘 다 불발.
+ *   (2 먹튀 · 5 무력감은 116 카운터 +0x1c0/+0x1cd · +0x1c7 와 +0x1c2 를 세게 되어 옮겼다 — 아래 식.)
  *   7 전설: +0x7a(우승 횟수 추정) — 투수 웹 칸 없음.
  *   12 좌타UP · 13 우타UP: 0xb63c0(투수 기록) 의 뜻(0xb6278 · 0xb63a0 갈래)을 다 풀지 못했다.
  *   14 투지: 지난 3년 연도 기록(0x1fa78(i) +0x24·+0x2e) — 투수 웹에 연도별 기록이 없다.
  */
-const UNPORTED_ACQUIRE: ReadonlySet<number> = new Set([2, 3, 4, 5, 7, 12, 13, 14])
-/** 해제 쪽 미이식 — 2·3·4·5 (위와 같은 칸) · 14 투지 (작년 +0x2e · +0x24, 0xada22) */
-const UNPORTED_RELEASE: ReadonlySet<number> = new Set([2, 3, 4, 5, 14])
+const UNPORTED_ACQUIRE: ReadonlySet<number> = new Set([3, 4, 7, 12, 13, 14])
+/** 해제 쪽 미이식 — 3·4 (위와 같은 칸) · 14 투지 (작년 +0x2e · +0x24, 0xada22) */
+const UNPORTED_RELEASE: ReadonlySet<number> = new Set([3, 4, 14])
+/** 먹튀 얻기 — 연차idx > 1 이고 g == 14 에서 +0x1c2 ≤ 15 · g == 32 에서 ≤ 35 (0xad2a2~) */
+const MONEY_GRUBBER_YEAR_ABOVE = 1
+/** 무력감 얻기 — 사기 ≤ 20 · 연차idx > 2 · rand(0,100) > 69 (0xad43a~0xad46e) */
+const HELPLESS_MORALE_LIMIT = 20
+const HELPLESS_YEAR_ABOVE = 2
+const HELPLESS_ROLL_ABOVE = 69
+const PERCENT_ROLL = 100
 
 /** 해제 카운터 +0x70+s 를 보는 칸 — 0xadad0~0xadb20 모드 3 갈래: 18 → +0x73 · 19 → +0x72 · 20 → +0x70 */
 export const PITCHER_RELEASE_STREAK_SLOT: Readonly<Record<number, number>> = { 18: 3, 19: 2, 20: 0 }
@@ -143,10 +152,20 @@ const RELEASE_STREAK_LIMIT = 7
 /** `0xa4f31(S, k)` — 그 해 이미 해제한 마이너스 스킬이면 획득 불발 (연초 115 의 0xa4ee8 이 지운다) */
 const wasRemoved = (career: PitcherCareer, skill: number) => career.removedMinusSkillIds.includes(skill)
 
-function acquiresPitcherSkill(career: PitcherCareer, skill: number): boolean {
+function acquiresPitcherSkill(career: PitcherCareer, skill: number, random: RandomPort | undefined): boolean {
   const yearIndex = career.season - 1
   const g = career.gamesPlayed
   switch (skill) {
+    case PITCHER_SKILL.먹튀: {
+      // 0xad2a2: 0xa4f31(S, 2) 해제했으면 불발 · s16 +0x1c2(이번 시즌 인기도 변화 합) — 두 편 공용 식
+      if (wasRemoved(career, skill) || yearIndex <= MONEY_GRUBBER_YEAR_ABOVE) return false
+      const gain = toInt16(career.seasonPopularityGain)
+      return (g === 14 && gain <= 15) || (g === 32 && gain <= 35)
+    }
+    case PITCHER_SKILL.무력감:
+      // 0xad43a: 해제 기록 → 사기(0xa3a25) ≤ 20 → 연차idx > 2 → rand(0,100) 굴림 (앞이 막히면 안 굴린다)
+      if (wasRemoved(career, skill) || career.morale > HELPLESS_MORALE_LIMIT || yearIndex <= HELPLESS_YEAR_ABOVE) return false
+      return random !== undefined && random.nextInRange(0, PERCENT_ROLL) > HELPLESS_ROLL_ABOVE
     case PITCHER_SKILL.끈기: {
       // 0xad4ac: 0xb6415(기록, 3, 1) > 599 (체력 실효) 이고 통산 +8(투구 수) ≥ 6000
       return equippedPitcherAbilityOf(career).stamina > 599 && toInt16(career.careerStats.pitches) >= 6000
@@ -186,6 +205,13 @@ function acquiresPitcherSkill(career: PitcherCareer, skill: number): boolean {
 }
 
 function releasesPitcherSkill(career: PitcherCareer, skill: number): boolean {
+  // 2 먹튀 (0xad9ce): s8 +0x1cd > 4 이고 s16 +0x1c0 / +0x1cd (0 쪽 버림, 0xca7b5) > 3
+  if (skill === PITCHER_SKILL.먹튀) {
+    const games = career.moneyGrubberGames ?? 0
+    return games > 4 && Math.trunc((career.moneyGrubberPopularityGain ?? 0) / games) > 3
+  }
+  // 5 무력감 (0xada0e): s8 +0x1c7 > 5
+  if (skill === PITCHER_SKILL.무력감) return (career.highMoraleStreak ?? 0) > 5
   const slot = PITCHER_RELEASE_STREAK_SLOT[skill]
   // 18·19·20 — 해제 카운터 +0x70+칸 > 7 (훈련 0x18a80: 그 스킬을 **가진 채** 그 칸만 연달아 8번)
   if (slot !== undefined) return (career.releaseTrainingStreaks[slot] ?? 0) > RELEASE_STREAK_LIMIT
@@ -206,12 +232,13 @@ export function meetsPitcherSkillCondition(
   career: PitcherCareer,
   kind: 'acquire' | 'release',
   value: number,
+  random?: RandomPort,
 ): boolean {
   const skill = value - 1
   const owns = career.skillIds.includes(skill)
   if (kind === 'acquire' ? owns : !owns) return false
   if (skill < FIRST_TABLE_SKILL || skill > LAST_TABLE_SKILL) return true
-  if (kind === 'acquire') return !UNPORTED_ACQUIRE.has(skill) && acquiresPitcherSkill(career, skill)
+  if (kind === 'acquire') return !UNPORTED_ACQUIRE.has(skill) && acquiresPitcherSkill(career, skill, random)
   return !UNPORTED_RELEASE.has(skill) && releasesPitcherSkill(career, skill)
 }
 

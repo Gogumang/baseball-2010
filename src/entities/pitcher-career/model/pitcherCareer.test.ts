@@ -7,6 +7,7 @@ import {
   pitcherLeagueGameSetupOf,
   createPitcherCareer,
   effectivePitcherAbilityOf,
+  enterPitcherGameEvaluation,
   equippedPitcherAbilityOf,
   isPitcherManagementCycleOpen,
   pitcherAbilityLimitsOf,
@@ -287,5 +288,19 @@ describe('리그 투수 레코드 — 차례와 스태미나 (0x1c46c · 4f304 �
     } as never)
     const 결과 = applyPitcherLeagueDay(career, createSeededRandom(1))
     expect(결과.league).toBe(career.league)
+  })
+})
+
+describe('116 진입 경기 뒤 카운터 — 무력감 +0x1c7 · 먹튀 +0x1cd/+0x1c0 (12bc2~12c84, 모드 3·4 공용)', () => {
+  it('보유 비트 5 · 2 로 센다 — 옛 저장(칸 없음)은 0 에서', () => {
+    const base = {
+      ...createPitcherCareer('카운터'),
+      skillIds: [2, 5],
+      morale: 90,
+      lastEvaluation: { popularityChange: 3, reputationChange: 0, moraleChange: 0 },
+    }
+    expect(enterPitcherGameEvaluation(base)).toMatchObject({ highMoraleStreak: 1, moneyGrubberGames: 1, moneyGrubberPopularityGain: 3 })
+    const 없음 = enterPitcherGameEvaluation({ ...base, skillIds: [], highMoraleStreak: 4, moneyGrubberGames: 2 })
+    expect(없음).toMatchObject({ highMoraleStreak: 4, moneyGrubberGames: 0, moneyGrubberPopularityGain: 0 })
   })
 })

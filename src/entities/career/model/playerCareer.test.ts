@@ -385,3 +385,18 @@ describe('새 시즌 0x1b882 — memset(S+0x1bc, 0, 4)', () => {
     expect(startNextSeason(career).streaks).toEqual({ multiHit: 0, homeRun: 0, hitless: 0 })
   })
 })
+
+describe('116 경기 뒤 카운터 12bc2~12c84 — 무력감 +0x1c7 · 먹튀 +0x1cd/+0x1c0', () => {
+  it('무력감이 없으면 +0x1c7 를 지우지 않고 그대로 둔다 · 있으면 사기 ≥ 90 → +1, 아니면 0', () => {
+    const base = { ...createCareer('카운터'), highMoraleStreak: 6, morale: 95 }
+    expect(countGameForSkills(base, 0).highMoraleStreak).toBe(6)
+    expect(countGameForSkills({ ...base, skillIds: [...base.skillIds, 5] }, 0).highMoraleStreak).toBe(7)
+    expect(countGameForSkills({ ...base, skillIds: [...base.skillIds, 5], morale: 89 }, 0).highMoraleStreak).toBe(0)
+  })
+
+  it('먹튀가 있으면 경기 수 +1 · 인기도 변화 합, 없으면 둘 다 0', () => {
+    const base = { ...createCareer('카운터'), moneyGrubberGames: 2, moneyGrubberPopularityGain: 5 }
+    expect(countGameForSkills({ ...base, skillIds: [...base.skillIds, 2] }, -2)).toMatchObject({ moneyGrubberGames: 3, moneyGrubberPopularityGain: 3 })
+    expect(countGameForSkills(base, 4)).toMatchObject({ moneyGrubberGames: 0, moneyGrubberPopularityGain: 0 })
+  })
+})
