@@ -259,7 +259,7 @@ export interface PitcherLeagueSession {
   readonly storyNotice: string
   /** 관리 화면에 띄울 칭호 팝업 하나 (0x1a1c0 → 0x1274c). 없으면 null */
   readonly pendingTitle: string | null
-  /** 국가대항전 대회 (장면 '국가대항전') — `atStandings` 면 135(순위)부터 (142 취소). 웹은 대회를 저장하지 않는다 */
+  /** 국가대항전 대회 (장면 '국가대항전') — `atStandings` 면 135(순위)부터 (142 취소). 대회 칸은 커리어 `nationalCup` 에도 저장된다 */
   readonly cup: { readonly cup: NationalCup; readonly atStandings: boolean } | null
   /** 국가대항전 142 경기 준비의 대진 (135 에서 왔을 때). 리그 경기면 null */
   readonly cupMatch: { readonly matchup: NationalCupMatchup; readonly cup: NationalCup } | null
@@ -614,7 +614,10 @@ export function usePitcherLeagueSession(
             // 109 — 이전 상태가 1(자원 적재)이라 `nextGameFromManagement` 는 거짓 그대로다
             : resumePoint.kind === '다음경기순위'
               ? '다음경기순위'
-              : resumePoint.kind === '경기결과' ? '경기결과' : '관리',
+              : resumePoint.kind === '경기결과'
+                ? '경기결과'
+                // 0x1c154 그 밖 갈래 S+0x12c → 134 — 저장의 대회로 대진판부터
+                : resumePoint.kind === '국가대항전' ? '국가대항전' : '관리',
   )
   const [gameOptions, setGameOptions] = useState<PitcherGameOptions | null>(null)
   const [story, setStory] = useState<PitcherStory | null>(() =>
@@ -937,8 +940,13 @@ export function usePitcherLeagueSession(
    */
   const matchPreparedRef = useRef(false)
 
-  /** 국가대항전 대회 · 142 대진 · 치르는 대회 경기 (웹은 대회를 저장하지 않는다 — 타자편과 같다) */
-  const [cupView, setCupView] = useState<{ cup: NationalCup; atStandings: boolean } | null>(null)
+  /**
+   * 국가대항전 대회 · 142 대진 · 치르는 대회 경기. 대회 칸은 커리어 저장(`nationalCup` — S+0x12c · L+0xa8~)에도 들어 이어하기가
+   * 134 로 돌아온다(0x1c154 1c348~1c358).
+   */
+  const [cupView, setCupView] = useState<{ cup: NationalCup; atStandings: boolean } | null>(() =>
+    resumePoint.kind === '국가대항전' ? { cup: resumePoint.cup, atStandings: false } : null,
+  )
   const [cupMatch, setCupMatch] = useState<{ matchup: NationalCupMatchup; cup: NationalCup } | null>(null)
   const cupGameRef = useRef<NationalCup | null>(null)
 
@@ -987,10 +995,14 @@ export function usePitcherLeagueSession(
       const loser = won ? options.opponentTeamId : options.ourTeamId
       // 같은 날 CPU 경기 두 나라는 상대국 칸 레코드를 쓴다 — 사람 경기 끝 상대 투수 칸별 +0x2c 에서 선다(701a7a9)
       const next = advanceNationalCupDay(cup, winner, loser, random, summary.pitcherStaminas?.opponent)
-      // 하루 끝 b8216 — 다음 날 사람 경기 상대를 +0xbe0 에 마스터에서 새로 복사
-      commitWith((current) => current.nariCupTeams === undefined
-        ? current
-        : { ...current, nariCupTeams: nextNariCupDayTeams(current.nariCupTeams, nationalCupMatchupOf(next)?.opponent ?? null) })
+      // 하루 끝 b8216 — 다음 날 사람 경기 상대를 +0xbe0 에 마스터에서 새로 복사. 대회 칸(L+0xa8~ · L+0x32)은 정산 끝 0x4f3c4 가 저장
+      commitWith((current) => ({
+        ...current,
+        nationalCup: next,
+        ...(current.nariCupTeams === undefined
+          ? {}
+          : { nariCupTeams: nextNariCupDayTeams(current.nariCupTeams, nationalCupMatchupOf(next)?.opponent ?? null) }),
+      }))
       setGameOptions(null)
       setCupMatch(null)
       setCupView({ cup: next, atStandings: false })
@@ -1247,8 +1259,7 @@ export function usePitcherLeagueSession(
    * 국가대표 판정의 목표 단계 3 은 투수 갈래(0xa3e56 표 그대로)다 — `achievedPitcherGoalCount(_, '국가대표')`.
    *
    * ⚠️ 미해결·근사 (타자편 `useCareerSession.continueSeason` 과 같은 자리):
-   *   - 463 출전 → 134 국가대항전 순위 화면 → 142 → 투수 경기: 투수편 국가대항전은 옮기지 않았다.
-   *     알림을 띄우고 새 시즌으로 넘긴다 (대회 보상·히든 팀 오픈 없음).
+   *   - 463 출전 → 134 국가대항전 대진판 → 135 → 142 → 대표팀으로 던지는 경기 → 결과·보상 → 새 시즌 (8eceab3).
    *   - 462 탈락: 원본은 뒤 = 105 로만 적혀 있고 새 시즌 처리가 안 보인다 — 타자편과 같이 새 시즌으로 넘긴다.
    *   (128 포스트시즌 대진은 131 과 132 사이 — 아래 `pressPostseason` · `closePostseasonPopup`)
    */
@@ -1261,8 +1272,11 @@ export function usePitcherLeagueSession(
         const nationalTitle = nationalCupStandingsTitleOf(current.titleIds)
         const titled = nationalTitle === null ? current : awardPitcherTitles(current, [nationalTitle])
         const cup = createNationalCup()
+        // 463 끝 0x8cca2 — S+0x50 = 3(웹 null) · S+0x12c = 1, 0x8cd44 저장. 대회 칸(0xb7bf1)은 133 이 세운 그대로 파일에 든다
         commit({
           ...titled,
+          seasonEndState: null,
+          nationalCup: cup,
           nariCupTeams: createPitcherCupTeams(titled.positionCode, nationalCupMatchupOf(cup)?.opponent ?? KOREA_TEAM_ID),
         })
         setCupView({ cup, atStandings: false })
@@ -1356,6 +1370,12 @@ export function usePitcherLeagueSession(
       return setScene('이벤트')
     }
     if (point.kind === '포스트시즌') setPostseasonPopup(regularSeasonPopupOnEnter(career))
+    if (point.kind === '국가대항전') {
+      // 그 밖 갈래 S+0x12c → 134 대진판 (1c348~1c358)
+      cupGameRef.current = null
+      setCupMatch(null)
+      setCupView({ cup: point.cup, atStandings: false })
+    }
     setScene(point.kind)
   }, [career])
 
@@ -1755,9 +1775,21 @@ export function usePitcherLeagueSession(
       // (반 이닝 저장이 없어 처음부터 · 142 를 안 거쳐 굴림 없음 · 명부의 마선수 그대로). 경기 뒤 나리 장면이 새로 선다
       resumeInterruptedGame: (match: NariGameMatch | null) => {
         if (career === null) return
-        // ⚠️ 웹 전용: 국가대항전 경기는 웹이 대회를 저장하지 않아 다시 세울 수 없다 — 이어하기 자리(장면이 선 그대로)로 둔다(타자편과 같다)
-        if (match?.isNationalCup === true) return
         matchPreparedRef.current = false
+        if (match?.isNationalCup === true) {
+          // 대회 경기 — 셋업 0x39fdc 모드 3 갈래가 올린 저장의 S+0x12c · 대회 칸(L+0xa8~)과 142 가 고쳐 둔 대표팀 칸 두 개로
+          // 그 경기를 처음부터 다시 세운다(0x1f940 — 팀 10 → +0xbc4 · 그 밖 → +0xbe0). 142 를 안 거쳐 구장 굴림이 없다.
+          // 대회가 없는 옛 웹 저장이면(대회를 저장하지 않던 때) 이어하기 자리(장면이 선 그대로)로 둔다
+          const cup = career.nationalCup
+          const matchup = cup === undefined ? null : nationalCupMatchupOf(cup)
+          if (cup === undefined || matchup === null) return
+          setMatchAces(null)
+          setCupView(null)
+          setCupMatch({ matchup, cup })
+          cupGameRef.current = cup
+          setGameOptions(cupGameOptionsOf(career, matchup, cup, { gaugeSettingOn, throwModeManual }))
+          return setScene('경기')
+        }
         // 마선수는 저장의 나리 팀 레코드에 있다. 레코드가 없던 옛 저장이면 모드 저장 칸에 남겨 둔 그림자를 넣는다
         const loaded = career.nariTeams === undefined && match?.aces !== null && match?.aces !== undefined
           ? {

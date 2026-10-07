@@ -6,6 +6,7 @@ import { usePitcherLeagueSession } from '@/app/model/usePitcherLeagueSession'
 import { EMPTY_LEAGUE, startPostseason } from '@/entities/league/model/league'
 import { NO_EQUIPPED_TITLE, TITLE_NAMES } from '@/entities/career/model/titles'
 import { createPitcherCareer, pitcherLastGameLineOf } from '@/entities/pitcher-career/model/pitcherCareer'
+import { createNationalCup } from '@/entities/national-cup/model/nationalCup'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import { useGamePointWallet } from '@/entities/wallet/model/useGamePointWallet'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
@@ -683,6 +684,45 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     expect(result.current.scene).toBe('관리')
     expect(result.current.career?.season).toBe(2)
     expect(result.current.career?.openedHiddenIds).toContain(10)
+  })
+
+  it('국가대항전 저장 · 이어하기 — 463 끝(S+0x50 = 3 · S+0x12c) · 정산이 넘긴 대회가 저장에 들고, 새로 띄우면 134 · 곧장 경기는 그날 경기로', () => {
+    const 잘함 = {
+      season: 1,
+      gamesPlayed: 45,
+      popularity: 2000,
+      popularityAtSeasonStart: 0,
+      stats: { ...createPitcherCareer('x').stats, wins: 30, strikeouts: 300 },
+    }
+    const store = 메모리저장()
+    const { result } = 띄우기(store)
+    act(() => result.current.actions.create('투수', 신인))
+    act(() => result.current.actions.save({ ...result.current.career!, ...잘함 }))
+    act(() => result.current.actions.beginYearEnd())
+    연말끝까지(result, { 380: [383], 461: [463] })
+    expect(result.current.career?.nationalCup).toEqual(createNationalCup())
+    expect(result.current.career?.seasonEndState).toBeNull()
+    act(() => result.current.actions.startCupGame({ myTeam: 10, opponent: 11 }, result.current.cup!.cup))
+    act(() => result.current.actions.confirmMatchPrepare())
+    act(() => result.current.actions.finishGame({ ...경기요약, result: '승', ourScore: 3, opponentScore: 1 } as typeof 경기요약))
+    const 저장된대회 = result.current.career!.nationalCup!
+    expect(저장된대회.day).toBe(1)
+    expect(저장된대회.wins[0]).toBe(1)
+
+    const 다시 = 띄우기(store).result
+    expect(다시.current.scene).toBe('국가대항전')
+    expect(다시.current.cup).toEqual({ cup: 저장된대회, atStandings: false })
+    act(() => 다시.current.actions.resumeInterruptedGame({ aces: null, isNationalCup: true }))
+    expect(다시.current.scene).toBe('경기')
+    // 둘째 날 — 대한민국 대 쿠바(12), 대회 날짜 1
+    expect(다시.current.gameOptions).toMatchObject({ ourTeamId: 10, opponentTeamId: 12, isNationalCup: true, dayCounter: 1 })
+
+    // 대회 끝 → 새 시즌 0x1b768 이 S+0x12c 를 내린다
+    act(() => 다시.current.actions.finishCup({
+      reward: { messageId: 0, popularity: 0, reputation: 0, money: 0, gamePoint: 0 },
+      openedTeams: [10],
+    } as never))
+    expect(다시.current.career?.nationalCup).toBeUndefined()
   })
 
   it('7년차 인기도 499 이하면 연말 사슬 끝이 방출(501) → 엔딩(1)이다', () => {

@@ -42,6 +42,7 @@ import type { SeasonStats } from '@/entities/career/model/seasonStats'
 import { ROOKIE_BATTER_SLOT } from '@/entities/career/model/nariTeamRecord'
 import type { NariTeamRecords } from '@/entities/career/model/nariTeamRecord'
 import type { NariCupTeams } from '@/entities/career/model/nariCupTeams'
+import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
 
 /** 원본 능력치 상한 (0xb6414 가 999 로 자른다) */
 export const MAXIMUM_ABILITY = BALANCE.ability.maximum
@@ -337,6 +338,14 @@ export interface PlayerCareer {
    * 대회를 시작할 때(0xb7bf0 · 133) 세우고 142·하루 끝이 고친다. 대회 밖에서는 읽지 않는다. 옛 저장에는 없다.
    */
   readonly nariCupTeams?: NariCupTeams
+  /**
+   * **국가대항전 진행 중** — 원본 `S+0x12c`(= 리그 `L+0xac`) 플래그와 같은 리그 구조체의 대회 칸 `L+0xa8`~`L+0xc4` · 날짜 `L+0x32`.
+   * 리그 구조체 L = S+0x80 은 나리 저장 블록 안이라 저장 0x22755 가 대회째 파일에 쓴다: 133 진입 0x1a090(대회 초기화 0xb7bf1 뒤
+   * 0x1a14e~0x1a15c 저장) · 463 끝 0x8c460(0x8cca2 S+0x50 = 3 · S+0x12c = 1 → 0x8cd44 저장) · 경기 정산 0x4ea0c(하루 끝 0xb818d 뒤
+   * 0x4f3c4 저장). 이어하기 0x1c154 는 S+0x50 이 특수값이 아니면 S+0x12c 로 134 에 돌아온다(1c348~1c358).
+   * 있으면 대회 중 · 없으면 아님. 새 시즌 0x1b768 이 내린다(`endNationalCup`). 옛 저장에는 없다.
+   */
+  readonly nationalCup?: NationalCup
   /** 목표 타순 경로 — 이벤트 487 에서 고른다. 고르기 전에는 null */
   readonly battingOrderPath: '4번' | '1번' | null
   /** 지난 중간평가 달성 수 (원본 +0x1cc) — 칭호 "전년 대비 성적 우수" */
@@ -998,9 +1007,20 @@ export function isSeasonFinished(career: PlayerCareer): boolean {
  * → 나리 누적 카운터 한 벌이 해를 넘겨 계속 쌓인다.
  * 웹판에는 그 두 벌짜리 누적 카운터 자체가 없어 **옮길 코드가 없다** — 사실만 적어 둔다.
  */
+/**
+ * 국가대항전 플래그를 내린다 — 원본 `S+0x12c = 0`(대회 끝 0x1b9ea · 0x1bae6 · 새 시즌 0x1b768 의 1b774). 대회 칸(L+0xa8~)은
+ * 지우지 않지만 플래그가 꺼지면 아무도 안 읽으므로 웹은 칸째 뺀다. 대표팀 칸 두 개(`nariCupTeams`)는 남긴다(원본도 안 지운다).
+ */
+export function endNationalCup<T extends { readonly nationalCup?: NationalCup }>(career: T): T {
+  if (career.nationalCup === undefined) return career
+  const next = { ...career }
+  delete (next as { nationalCup?: NationalCup }).nationalCup
+  return next
+}
+
 export function startNextSeason(career: PlayerCareer): PlayerCareer {
   return {
-    ...career,
+    ...endNationalCup(career),
     season: career.season + 1,
     gamesPlayed: 0,
     // 칭호 25·26 은 새 시즌 첫 경기 전에 **지난해** 외출 수로 본다 (P3 9절) — 세는 칸을 비우기 전에 떠 둔다

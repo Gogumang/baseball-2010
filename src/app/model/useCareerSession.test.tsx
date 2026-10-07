@@ -14,6 +14,7 @@ import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { SALARY_ACCEPT_EVENT_ID } from '@/entities/career/model/seasonFlow'
 import { careerNationalCupRewardOf } from '@/entities/national-cup/model/nationalCupFlow'
 import { createNationalCup } from '@/entities/national-cup/model/nationalCup'
+import { createNariCupTeams } from '@/entities/career/model/nariCupTeams'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { SaveGamePort } from '@/shared/api/save/saveGamePort'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
@@ -147,6 +148,27 @@ describe('연말 국가대표 선발 판정 (상태 133 = 0x1a090)', () => {
   })
 })
 
+describe('국가대항전 저장 · 이어하기 (S+0x12c · L+0xa8~ — 463 끝 0x8cd44 · 정산 0x4f3c4 저장, 0x1c154 1c348~1c358)', () => {
+  it('출전(463) 끝 — S+0x50 = 3(웹 null) · 대회 칸이 저장에 든다', () => {
+    const rendered = 띄우기(목표달성선수())
+    연봉사슬끝내기(rendered)
+    이벤트보기(rendered, [461, 463])
+    expect(rendered.result.current.session.career?.nationalCup).toEqual(createNationalCup())
+    expect(rendered.result.current.session.career?.seasonEndState).toBeNull()
+  })
+
+  it('대회 중 저장을 이어하면 저장의 대회로 134 대진판에 돌아온다', () => {
+    const cup = { ...createNationalCup(), stage: 3, day: 1, wins: [1, 0, 1, 0], losses: [0, 1, 0, 1] }
+    const rendered = 띄우기(목표달성선수({ seasonEndState: null, nationalCup: cup }))
+    expect(rendered.result.current.screen).toEqual({ kind: '국가대항전', cup })
+  })
+
+  it('S+0x50 특수값(132 연말 등)이 S+0x12c 보다 먼저다 — 463 전에 끊긴 저장은 132 로', () => {
+    const rendered = 띄우기(목표달성선수({ seasonEndState: 132, nationalCup: createNationalCup() }))
+    expect(rendered.result.current.screen.kind).toBe('이벤트')
+  })
+})
+
 describe('대회 끝 정산 (0x1b92c)', () => {
   it('우승 보상이 커리어에 들어가고 히든 팀이 열린 뒤 새 시즌으로 간다', () => {
     const 시작 = 목표달성선수({ popularity: 100, reputation: 0, money: 0, gamePoint: 0 })
@@ -165,6 +187,8 @@ describe('대회 끝 정산 (0x1b92c)', () => {
     )
 
     const 끝난뒤 = rendered.result.current.session.career
+    // 새 시즌 0x1b768 의 1b774 — S+0x12c = 0 (대회 칸째 빠진다)
+    expect(끝난뒤?.nationalCup).toBeUndefined()
     expect(끝난뒤?.popularity).toBe(120)
     expect(끝난뒤?.reputation).toBe(30)
     // 소지금 보상 한 칸 = 100만원, 웹 소지금은 만원 단위라 +2000 이다.
@@ -1059,7 +1083,27 @@ describe('전역기록 +0x50(모드 4 경기 중간 저장) — 142 확인이 �
     expect(calls).toEqual([])
   })
 
-  it('곧장 경기 — 국가대항전이었다면 웹은 대회를 다시 세울 수 없어 이어하기로 간다 (웹 전용)', () => {
+  it('곧장 경기 — 국가대항전(S+0x12c)이면 저장의 대회 칸 · 대표팀 칸으로 그 경기를 처음부터 다시 세운다 (0x39fdc 모드 4)', () => {
+    const { calls, port } = 손잡이()
+    const cup = createNationalCup()
+    const saved: PlayerCareer = {
+      ...createCareer('대회'),
+      gamesPlayed: 45,
+      nationalCup: cup,
+      nariCupTeams: createNariCupTeams(0, 11),
+    }
+    const rendered = 띄우기2(saved, port)
+    act(() => rendered.result.current.session.actions.resumeInterruptedGame({ aces: null, isNationalCup: true }))
+    expect(rendered.result.current.screen).toEqual({ kind: '경기' })
+    // 대한민국(10) 대 그날 상대 일본(11) — 풀리그 첫날이라 대한민국이 후공
+    expect(rendered.result.current.session.progress?.ourTeamId).toBe(10)
+    expect(rendered.result.current.session.progress?.opponentTeamId).toBe(11)
+    expect(rendered.result.current.session.progress?.game.playerSide).toBe(PLAYER_SIDE_LAST_BAT)
+    // 0x327b8 는 +0x4c + 모드를 다시 쓰지 않는다
+    expect(calls).toEqual([])
+  })
+
+  it('곧장 경기 — 대회 칸이 없는 옛 웹 저장의 국가대항전 경기는 이어하기로 간다', () => {
     const { port } = 손잡이()
     const rendered = 띄우기2({ ...createCareer('대회'), gamesPlayed: 4 }, port)
     act(() => rendered.result.current.session.actions.resumeInterruptedGame({ aces: null, isNationalCup: true }))

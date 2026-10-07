@@ -574,6 +574,31 @@ export function useCareerSession({
     [openedAces, random, setScreen],
   )
 
+  /**
+   * 국가대항전 경기를 세운다 — 142 확인(`confirmMatchPrepare`)과 곧장 경기(`resumeInterruptedGame`)가 같이 쓴다.
+   * 1c5fe 가 마선수를 안 넣었다. 경기가 끝나면 이 대회로 하루를 넘긴다 (`finishCupGame`).
+   * 경기 장면 0xb891c — 두 팀을 대회 레코드 두 칸으로 세운다: 타순 = 대표팀 타자 배열(내 선수 · 벤치로 간 선수),
+   * 선발 = 두 칸 투수 0번(142 가 돌린 차례). 두 칸 스태미나는 날마다 10000(대표팀 b81e0 · 상대국 새 복사).
+   */
+  const beginCupGame = (current: PlayerCareer, matchup: NationalCupMatchup, cup: NationalCup) => {
+    cupGameRef.current = cup
+    const teams = cupTeamsOf(current, matchup.opponent)
+    startMatch(
+      matchup.myTeam,
+      nariCupBattingOrderOf(teams) ?? current.battingOrder,
+      matchup.opponent,
+      0,
+      // 0xb7844 의 L+0xac 갈래 — 대진 칸 0 이 후공: 풀리그는 늘 대한민국 · 결승은 풀리그 1위라 대한민국이 2위면 선공
+      nationalCupSideOf(cup, matchup.myTeam) as PlayerSide,
+      {
+        ourOrder: nariCupRecordOf(teams, matchup.myTeam).pitchers ?? UNSHUFFLED_PITCHER_ORDER,
+        opponentOrder: nariCupRecordOf(teams, matchup.opponent).pitchers ?? UNSHUFFLED_PITCHER_ORDER,
+      },
+      undefined,
+      nariQuickLineupOf(teams.korea),
+    )
+  }
+
   /** 경기가 끝났을 때 보상·칭호를 정산하고 결과 화면으로 넘어간다. */
   const finishGame = useCallback(
     (finished: GameProgress, currentCareer: PlayerCareer) => {
@@ -675,10 +700,16 @@ export function useCareerSession({
       // 같은 날 CPU 경기 두 나라는 상대국 슬롯 레코드(base+0x934) 하나를 쓴다 — 사람 경기가 깎아 둔 그 레코드의
       // 투수 +0x2c 에서 선다 (701a7a9). 사람 경기 끝 상대 투수 칸별 값을 넘긴다
       const next = advanceNationalCupDay(cup, winner, loser, random, summary.pitcherStaminas?.opponent)
-      // 하루 끝 b8216 — 다음 날 사람 경기 상대를 +0xbe0 에 마스터에서 새로 복사
-      setCareer((current) => current === null || current.nariCupTeams === undefined
+      // 하루 끝 b8216 — 다음 날 사람 경기 상대를 +0xbe0 에 마스터에서 새로 복사. 대회 칸(L+0xa8~ · L+0x32)은 정산 끝 0x4f3c4 가 저장
+      setCareer((current) => current === null
         ? current
-        : { ...current, nariCupTeams: nextNariCupDayTeams(current.nariCupTeams, nationalCupMatchupOf(next)?.opponent ?? null) })
+        : {
+          ...current,
+          nationalCup: next,
+          ...(current.nariCupTeams === undefined
+            ? {}
+            : { nariCupTeams: nextNariCupDayTeams(current.nariCupTeams, nationalCupMatchupOf(next)?.opponent ?? null) }),
+        })
       setScreen({ kind: '국가대항전', cup: next })
     },
     [random, setCareer, setScreen],
@@ -862,9 +893,12 @@ export function useCareerSession({
       const nationalTitle = nationalCupStandingsTitleOf(viewed.titleIds)
       const titled = nationalTitle === null ? viewed : awardTitles(viewed, [nationalTitle])
       const cup = createNationalCup()
-      // 0xb7bf0 대회 레코드 두 칸(+0xbc4 대표팀 · +0xbe0 첫날 상대) + 133 의 0xb53f1 — 대표팀 내 칸 t 에 내 선수 · 저장
+      // 0xb7bf0 대회 레코드 두 칸(+0xbc4 대표팀 · +0xbe0 첫날 상대) + 133 의 0xb53f1 — 대표팀 내 칸 t 에 내 선수 · 저장.
+      // 463 끝 0x8cca2 — S+0x50 = 3(웹 null) · S+0x12c = 1 → 0x8cd44 저장: 대회 칸(L+0xa8~)째 파일에 든다(`nationalCup`)
       setCareer({
         ...titled,
+        seasonEndState: null,
+        nationalCup: cup,
         nariCupTeams: createNariCupTeams(
           renumberedBattingOrderOf(titled) - 1,
           nationalCupMatchupOf(cup)?.opponent ?? KOREA_TEAM_ID,
@@ -1121,6 +1155,11 @@ export function useCareerSession({
         setCareer(enterSeasonEvent(savedCareer, point.eventId))
         return setScreen({ kind: '이벤트', eventId: point.eventId, context: '시즌' })
       }
+      // 그 밖 갈래의 첫 줄 1c348~1c358 — S+0x12c(국가대항전 중)면 134 대진판. 463 끝이 S+0x50 = 3 으로 두므로 대회 중엔 늘 이 갈래다
+      if (savedCareer.nationalCup !== undefined) {
+        setCareer(savedCareer)
+        return setScreen({ kind: '국가대항전', cup: savedCareer.nationalCup })
+      }
       if (point.kind === '포스트시즌') return enterPostseason(savedCareer, true)
       setCareer(savedCareer)
       if (point.kind === '시즌종료') return setScreen({ kind: '시즌종료' })
@@ -1135,16 +1174,22 @@ export function useCareerSession({
      * `0x213c0(앱, 4, 0)` 으로 타자편 저장을 올려 장면 0x104 → 셋업 0x39fdc 모드 3·4 갈래가 그 저장으로 경기를 새로 세운다
      * (나리 경기는 반 이닝 저장이 없어 그만둔 경기를 처음부터 — 같은 일정·142 가 명부에 넣은 마선수 그대로). 장면 0x106 을
      * 거치지 않아 142 진입(마선수 굴림)도 없다. 경기가 끝나면 나리 장면이 새로 서고 상태 100 0x1c154 로 이어진다.
-     * ⚠️ 웹 전용: 국가대항전 경기는 웹이 대회를 저장하지 않아 다시 세울 수 없다 — 이어하기(`continueSaved`)로 간다.
+     * 국가대항전 경기(S+0x12c)는 저장의 대회 칸과 대표팀 칸 두 개로 다시 세운다(대회가 없는 옛 웹 저장만 이어하기로).
      */
     resumeInterruptedGame: (match: NariGameMatch | null): void => {
       if (savedCareer === null) return
-      if (match?.isNationalCup === true) {
-        actions.continueSaved()
-        return
-      }
       // 경기 뒤 나리 장면이 새로 선다 — 장면+0x288 = 0
       matchPreparedRef.current = false
+      if (match?.isNationalCup === true) {
+        // 대회 경기 — 셋업 0x39fdc 모드 4 갈래가 올린 저장의 S+0x12c · 대회 칸(L+0xa8~)과 142 가 고쳐 둔 대표팀 칸 두 개로 그 경기를
+        // 처음부터 다시 세운다(0x1f8f8 — 팀 10 → +0xbc4 · 그 밖 → +0xbe0). 142 를 안 거쳐 구장 굴림이 없다.
+        // 대회가 없는 옛 웹 저장(대회를 저장하지 않던 때)이면 이어하기로 간다
+        const cup = savedCareer.nationalCup
+        const matchup = cup === undefined ? null : nationalCupMatchupOf(cup)
+        if (cup === undefined || matchup === null) return actions.continueSaved()
+        setCareer(savedCareer)
+        return beginCupGame(savedCareer, matchup, cup)
+      }
       // 마선수는 저장의 나리 팀 레코드에 있다(142 가 넣었다). 레코드가 없던 옛 저장이면 모드 저장 칸에 남겨 둔 그림자를 넣는다
       const loaded = savedCareer.nariTeams === undefined && match?.aces !== null && match?.aces !== undefined
         ? {
@@ -1307,29 +1352,9 @@ export function useCareerSession({
     confirmMatchPrepare: () => {
       if (career === null || screen.kind !== '경기준비') return
       // 0x13cca — 전역기록 +0x4c + 모드(+0x50) = 1 · 저장. 마선수는 커리어 저장의 나리 팀 레코드(`nariTeams`)가 들고 간다 —
-      // 모드 저장 칸에는 국가대항전 여부(S+0x12c, 웹은 대회를 저장하지 않는다)만 남긴다
+      // 모드 저장 칸에는 국가대항전 여부(S+0x12c)만 남긴다(대회 칸은 커리어 저장의 `nationalCup`)
       nariGameSaveRef.current?.start({ aces: null, isNationalCup: screen.cup !== undefined })
-      if (screen.cup !== undefined) {
-        // 국가대항전 — 1c5fe 가 마선수를 안 넣었다. 경기가 끝나면 이 대회로 하루를 넘긴다 (`finishCupGame`)
-        cupGameRef.current = screen.cup.cup
-        // 경기 장면 0xb891c — 두 팀을 대회 레코드 두 칸으로 세운다: 타순 = 대표팀 타자 배열(내 선수 · 벤치로 간 선수),
-        // 선발 = 두 칸 투수 0번(142 가 돌린 차례). 두 칸 스태미나는 날마다 10000(대표팀 b81e0 · 상대국 새 복사)
-        const teams = cupTeamsOf(career, screen.cup.matchup.opponent)
-        return startMatch(
-          screen.cup.matchup.myTeam,
-          nariCupBattingOrderOf(teams) ?? career.battingOrder,
-          screen.cup.matchup.opponent,
-          0,
-          // 0xb7844 의 L+0xac 갈래 — 대진 칸 0 이 후공: 풀리그는 늘 대한민국 · 결승은 풀리그 1위라 대한민국이 2위면 선공
-          nationalCupSideOf(screen.cup.cup, screen.cup.matchup.myTeam) as PlayerSide,
-          {
-            ourOrder: nariCupRecordOf(teams, screen.cup.matchup.myTeam).pitchers ?? UNSHUFFLED_PITCHER_ORDER,
-            opponentOrder: nariCupRecordOf(teams, screen.cup.matchup.opponent).pitchers ?? UNSHUFFLED_PITCHER_ORDER,
-          },
-          undefined,
-          nariQuickLineupOf(teams.korea),
-        )
-      }
+      if (screen.cup !== undefined) return beginCupGame(career, screen.cup.matchup, screen.cup.cup)
       beginGame()
     },
 
@@ -1657,9 +1682,7 @@ export function useCareerSession({
      * 전역 기록 `+0x70` 히든 팀 목록으로 흘러간다 — `App.tsx` 가 그렇게 넘긴다).
      * 그 뒤 원본대로 새 시즌 처리(`0x1b768`)다.
      *
-     * 국가대항전 플래그(`S+0x12c`)는 커리어 저장에 자리가 없고 대회 레코드를 화면이 들고 있어,
-     * 화면을 떠나면 그대로 없어진다 — 시즌모드의 "플래그가 안 내려가 다음 시즌이 막힌다" 는
-     * 원본 버그와는 **무관하다** (그쪽 동작은 건드리지 않았다).
+     * 국가대항전 플래그(`S+0x12c` — 커리어 `nationalCup`)는 새 시즌 처리(`startNextSeason`, 1b774)가 내린다.
      */
     finishCup: (finish: NationalCupFinish) => {
       if (career === null) return

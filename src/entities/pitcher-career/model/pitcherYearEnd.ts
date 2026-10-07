@@ -1,5 +1,6 @@
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import type { SeasonEndState } from '@/entities/career/model/playerCareer'
+import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
 import { leagueDayCounterOf } from '@/entities/career/model/leagueGameSetup'
 import { applyPitcherEventRewards } from '@/entities/pitcher-career/model/pitcherEventReward'
 import {
@@ -188,6 +189,8 @@ export type PitcherResumePoint =
   | { readonly kind: '관리' }
   /** 그 밖 갈래의 나머지 → 109 다음경기 앞 순위표 (S+0x50 == 4 이거나 g 홀수). 이전 상태가 1 이라 취소가 안 먹는다 */
   | { readonly kind: '다음경기순위' }
+  /** 그 밖 갈래의 첫 줄 S+0x12c(국가대항전 중) → 134 대진판 (1c348~1c358) — 저장의 대회 그대로 */
+  | { readonly kind: '국가대항전'; readonly cup: NationalCup }
 
 /**
  * 이어하기 분기 0x1c154 (R9 2b — 장면 0x106 이라 모드 3·4 공용):
@@ -197,7 +200,7 @@ export type PitcherResumePoint =
  * 116 끝 0x12b74: S+0xb4 ≠ 0 이면 S+0xb2(= L+0x32) == 0 → [114 → 136], 아니면 [114 → 128]
  * ```
  * S+0x50 == 2(116 진입 0x1278c)이고 재료(`lastGame`)가 있으면 116 을 다시 띄운다. 재료가 없는 옛 저장은 예전처럼 대진이 있는데
- * 사슬 상태가 아니면 116 의 끝처럼 g 로 가른다. 엔딩 141 · 국가대항전은 웹 투수편이 따로 돌아가지 않는다 (타자편과 같다).
+ * 사슬 상태가 아니면 116 의 끝처럼 g 로 가른다. 엔딩 141 은 웹 투수편이 따로 돌아가지 않는다. 국가대항전(S+0x12c)은 저장의 대회로 134.
  * 대진이 없으면 맨 끝 갈래(1c38e~1c3b6): S+0x50 == 4(109 진입 0x10db0)면 109, null(1 · 2 · 3)이면 g 짝수 105 · 홀수 109 —
  * 2 는 116 의 끝(0x12b98)이 같은 g 짝홀로 가른다 (타자편 `resumePointOf` 머리 주석에 S+0x50 쓰는 곳 표).
  */
@@ -216,6 +219,8 @@ export function pitcherResumePointOf(career: PitcherCareer): PitcherResumePoint 
     default:
       break
   }
+  // 그 밖 갈래 1c348~1c358 — S+0x12c(국가대항전 중)면 134. 463 끝 0x8cca2 가 S+0x50 = 3 으로 두므로 대회 중엔 늘 이 갈래다
+  if (career.nationalCup !== undefined) return { kind: '국가대항전', cup: career.nationalCup }
   if (career.postseason === null) {
     if (career.seasonEndState === 109) return { kind: '다음경기순위' }
     return leagueDayCounterOf(career) % 2 === 0 ? { kind: '관리' } : { kind: '다음경기순위' }

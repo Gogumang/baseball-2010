@@ -31,12 +31,14 @@ import { NO_EQUIPPED_TITLE } from '@/entities/career/model/titles'
 import {
   countReputationZeroGame,
   countSkillGameCounters,
+  endNationalCup,
   isSkillEquipped,
   setSkillEquipped,
 } from '@/entities/career/model/playerCareer'
 import type { SeasonEndState } from '@/entities/career/model/playerCareer'
 import type { NariTeamRecords } from '@/entities/career/model/nariTeamRecord'
 import type { NariCupTeams } from '@/entities/career/model/nariCupTeams'
+import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
 import {
   MAXIMUM_PITCHER_ABILITY,
   PITCHER_ABILITY_ORDER,
@@ -411,6 +413,12 @@ export interface PitcherCareer {
    * (`pitcherCupTeams`). 133 출전이 세우고 142 가 고친다. 옛 저장·대회 전에는 없다
    */
   readonly nariCupTeams?: NariCupTeams
+  /**
+   * **국가대항전 진행 중** — 원본 `S+0x12c`(= `L+0xac`) 플래그와 리그 구조체의 대회 칸(`L+0xa8`~`L+0xc4` · 날짜 `L+0x32`).
+   * 장면 0x106 은 모드 3·4 공용이라 타자편 `PlayerCareer.nationalCup` 과 같은 자리·같은 저장 시점(133 · 463 끝 · 경기 정산)이다.
+   * 새 시즌 0x1b768 이 내린다. 옛 저장에는 없다.
+   */
+  readonly nationalCup?: NationalCup
   readonly leaguePlayerStats: LeaguePlayerStats
   /**
    * 리그 열 팀 투수의 레코드 스태미나 `+0x2c` — 팀 번호 → 붙박이 표 칸(0~7)별 값. 없는 팀·칸은 10000. 내 투수 값은
@@ -1028,7 +1036,8 @@ export function startNextPitcherSeason(career: PitcherCareer): PitcherCareer {
   const recorded = recordedMyPitcherOrderOf(career)
   const order = recorded === null ? null : moveMyPitcherToStart(recorded, career.role)
   return {
-    ...career,
+    // 0x1b768 의 1b774 `S+0x12c = 0` — 국가대항전 플래그를 내린다
+    ...endNationalCup(career),
     ...(order === null ? {} : { nariTeams: withMyPitcherOrder(career, order), positionCode: myPitcherPositionCodeOf(order) }),
     season: career.season + 1,
     gamesPlayed: 0,
