@@ -27,6 +27,7 @@ import {
 import { GameEndBoard } from '@/widgets/game-scene/ui/GameEndBoard'
 import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
 import { teamHalfInningCardsOf } from '@/pages/team-game/lib/teamHalfInningCards'
+import { runScoreBoardSourceOf } from '@/pages/defense/lib/runScoreBoard'
 import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 import { hasGameIntro } from '@/widgets/game-scene/lib/introSchedule'
@@ -499,6 +500,8 @@ export function TeamGameScreen({
         input={pending.input}
         side={pending.side}
         grassPalette={seasonStadium?.grassPalette ?? null}
+        // 수비 장면 득점 점수판 0x41a64 — 점수판 틀 두 측 · 플레이 시작 점수 · 공격 측 st[9]
+        runScoreBoard={runScoreBoardSourceOf(progress.game, scoreboardSides)}
         onDone={actions.finishDefensePlay}
       />
     )

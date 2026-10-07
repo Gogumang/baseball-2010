@@ -191,6 +191,11 @@ export function MissionRoutes({
  * 다 돌고 나서야 `0xae3e8` 이 다음 타석으로 보낸다 — 그 자리가 `finishDefensePlay` 다.
  *
  * 사람이 잡는 쪽(`side`)은 편에 따라 다르다: 타자 미션은 내가 공격(주루), 투수 미션은 내가 수비(송구).
+ *
+ * ⚠️ 미해결 — 수비 장면 득점 점수판 0x41a64(`runScoreBoard`)는 안 넘긴다. 판은 점수판 틀 0x41440 의 두 측 팀(0xb6bdd)과
+ *    사람/CPU 칸(0xb6c21) · 지금 두 점수 0xb69b0 · 공격 측 st[9] 를 그리는데, 미션은 미션 준비 0xaa57c 가 레코드 +2 의 두 팀과
+ *    +3 윗 4비트(사람 칸)로 세운다 — 웹 미션 표(`OriginalMission`)에 그 두 바이트가 없고 경기 중 점수도 들고 있지 않다
+ *    (시작 점수 `start.ourScore` · `opponentScore` 뿐). 지어내지 않고 둔다.
  */
 function missionOverlayOf(session: ReturnType<typeof useMissionSession>): ReactNode | null {
   const { pendingDefensePlay, actions } = session

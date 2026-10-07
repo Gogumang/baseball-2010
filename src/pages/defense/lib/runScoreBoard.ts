@@ -98,3 +98,27 @@ export function runScoreBoardScoresOf(
   if (!previousScore) return scores
   return battingSide === 0 ? [scores[0] - 1, scores[1]] : [scores[0], scores[1] - 1]
 }
+
+/** 득점 점수판 재료를 이루는 경기 칸 — 플레이가 시작될 때의 경기 (`GameState` 의 일부) */
+export interface RunScoreBoardGame {
+  /** 사람 팀이 선 측 — 0 선공 · 1 후공 */
+  readonly playerSide: number
+  readonly ourScore: number
+  readonly opponentScore: number
+  readonly half: '초' | '말'
+}
+
+/**
+ * 수비 재생(`DefensePlayback.runScoreBoard`)에 넘길 값 — 두 점수 0xb69b0(st, 0/1)은 측 0(선공)이 왼쪽,
+ * 공격 측 st[9] 는 초 0 · 말 1. 두 측(점수판 틀 0x41440)은 부르는 화면이 정한다.
+ */
+export function runScoreBoardSourceOf<Side>(
+  game: RunScoreBoardGame,
+  sides: readonly [Side, Side],
+): { readonly sides: readonly [Side, Side]; readonly scores: readonly [number, number]; readonly battingSide: number } {
+  return {
+    sides,
+    scores: game.playerSide === 0 ? [game.ourScore, game.opponentScore] : [game.opponentScore, game.ourScore],
+    battingSide: game.half === '초' ? 0 : 1,
+  }
+}

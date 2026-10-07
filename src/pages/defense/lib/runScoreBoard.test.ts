@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   RUN_SCORE_BOARD_FRAME_AT, RUN_SCORE_BOARD_TICKS, RUN_SCORE_SLOTS, drawRunScoreBoard, runScoreBoardScoresOf,
-  runScoreGlyphsOf,
+  runScoreBoardSourceOf, runScoreGlyphsOf,
 } from '@/pages/defense/lib/runScoreBoard'
 
 describe('수비 장면 득점 점수판 0x41a64', () => {
@@ -37,5 +37,17 @@ describe('수비 장면 득점 점수판 0x41a64', () => {
       { image: 0x47, x: 160, y: 205 },
       { image: 0x46, x: 190, y: 205 },
     ])
+  })
+})
+
+describe('수비 재생에 넘길 득점 점수판 재료 (팀경기 · 투수편 · 타자편 공통)', () => {
+  const sides = ['측0', '측1'] as const
+  it('선공(측 0)이면 내 점수가 왼쪽, 초면 공격 측 0', () => {
+    expect(runScoreBoardSourceOf({ playerSide: 0, ourScore: 3, opponentScore: 1, half: '초' }, sides))
+      .toEqual({ sides, scores: [3, 1], battingSide: 0 })
+  })
+  it('후공(측 1)이면 상대 점수가 왼쪽, 말이면 공격 측 1', () => {
+    expect(runScoreBoardSourceOf({ playerSide: 1, ourScore: 3, opponentScore: 1, half: '말' }, sides))
+      .toEqual({ sides, scores: [1, 3], battingSide: 1 })
   })
 })

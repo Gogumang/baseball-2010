@@ -36,6 +36,7 @@ import { hasGameIntro } from '@/widgets/game-scene/lib/introSchedule'
 import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
 import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
 import { pitcherHalfInningCardsOf } from '@/pages/pitching/lib/pitcherHalfInningCards'
+import { runScoreBoardSourceOf } from '@/pages/defense/lib/runScoreBoard'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 import { GameEndBoard } from '@/widgets/game-scene/ui/GameEndBoard'
 import { humanVsComputerSidesOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
@@ -285,6 +286,8 @@ export function PitcherGameScreen({
       <DefensePlayback
         input={progress.pendingDefensePlay}
         side="수비"
+        // 수비 장면 득점 점수판 0x41a64 — 점수판 틀 두 측 · 플레이 시작 점수 · 공격 측 st[9]
+        runScoreBoard={runScoreBoardSourceOf(progress.game, scoreboardSides)}
         onDone={actions.finishDefensePlay}
       />
     )
