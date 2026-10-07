@@ -2,6 +2,7 @@ import { PitcherCreateFlow } from '@/pages/pitcher-league/ui/PitcherCreateFlow'
 import { PitcherManagementScreen } from '@/pages/pitcher-league/ui/PitcherManagementScreen'
 import { NextGameStandingsScreen } from '@/pages/management/ui/NextGameStandingsScreen'
 import { NariMatchInfoScreen } from '@/pages/management/ui/NariMatchInfoScreen'
+import { EntryEditorScreen } from '@/widgets/entry-editor'
 import { pitcherMatchInfoOf } from '@/pages/pitcher-league/lib/pitcherMatchInfo'
 import { PitcherSeasonEndScreen } from '@/pages/pitcher-league/ui/PitcherSeasonEndScreen'
 import { PitcherYearEndScreen } from '@/pages/pitcher-league/ui/PitcherYearEndScreen'
@@ -116,12 +117,21 @@ export function PitcherLeagueRoute({
   }
 
   if (scene === '경기준비') {
+    // 143 경기 전 엔트리 보기 — 진입 0x16af8 · 키 0x1457c · 그림 0x16738 (보기 전용, 끝 코드로 142 로 돌아간다)
+    const entryView = session.entryView
+    if (entryView !== null) {
+      return (
+        <EntryEditorScreen editor={entryView.editor} lists={entryView.lists}
+          teamName={TEAMS[entryView.teamId]?.name ?? ''} isAceLocked={false} gamePoint={career.gamePoint}
+          onKey={actions.pressEntryViewKey} onMoveCursor={actions.pointEntryViewCursor} onCloseAceLocked={() => {}} />
+      )
+    }
     // 142 경기 준비 — 진입 0x1c46c · 키 0x13c30 · 그림 0x15d98 (타자편과 같은 상태)
     const match = pitcherMatchInfoOf(career, session.matchAces)
     return (
       <NariMatchInfoScreen lines={match.lines} myTeamId={match.myTeamId} opponentTeamId={match.opponentTeamId}
         playerSide={match.playerSide} edition="투수편" gamePoint={career.gamePoint}
-        onStart={actions.confirmMatchPrepare} onCancel={actions.cancelMatchPrepare} />
+        onStart={actions.confirmMatchPrepare} onCancel={actions.cancelMatchPrepare} onEntry={actions.openEntryView} />
     )
   }
 

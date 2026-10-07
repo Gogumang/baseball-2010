@@ -144,6 +144,11 @@ import {
   seatNariMatchAces,
 } from '@/entities/career/model/nariTeamRecord'
 import type { QuickLineup } from '@/entities/game/model/quickLineup'
+import {
+  batterNariEntryViewOf, pointNariEntryCursor, pressNariEntryKey,
+} from '@/pages/management/lib/nariEntryView'
+import type { NariEntryView } from '@/pages/management/lib/nariEntryView'
+import type { EntryKey } from '@/entities/season-mode/model/entryEditor'
 import { PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import type { PlayerSide } from '@/entities/game/model/gameState'
 
@@ -317,6 +322,8 @@ export function useCareerSession({
   const [loadingTip, setLoadingTip] = useState<string | null>(null)
   /** 142 진입 0x1c46c 가 이 장면에서 굴린 마선수 — 경기정보 마투수·마타자 줄이 읽는다 */
   const [matchAces, setMatchAces] = useState<NariMatchAces | null>(null)
+  /** 143 경기 전 엔트리 보기 (진입 0x16af8 · 키 0x1457c) — 142 위에 선다. 없으면 null */
+  const [entryView, setEntryView] = useState<NariEntryView | null>(null)
   /**
    * 장면+0x288 — 142 진입의 마선수 넣기를 **장면마다 한 번**만 하게 막는 칸 (1c566~1c572 · 1c668). 장면 셋업 0xfb7c 가
    * 0 으로 둔다 → 장면이 새로 서는 이어하기(`continueSaved`)와 경기 뒤(`finishGame`)에 내린다.
@@ -533,6 +540,7 @@ export function useCareerSession({
         const battingOrder = renumberedBattingOrderOf(current)
         return battingOrder === current.battingOrder ? current : { ...current, battingOrder }
       })
+      setEntryView(null)
       setScreen(postseasonFromReentry === undefined ? { kind: '경기준비' } : { kind: '경기준비', postseasonFromReentry })
     },
     [openedAces, random, setScreen],
@@ -1223,6 +1231,35 @@ export function useCareerSession({
       beginGame()
     },
 
+    /**
+     * 142 의 '4'/왼(−3) · '6'/오른(−4) — 장면+0x164 = 1/0 · 밀기(8, 0, 4/3, 1000) → **143 경기 전 엔트리 보기**(0x16af8).
+     * 내 팀('4')이든 상대 팀('6')이든 보기 전용이다(0x5561c 셋째 인자 0 — `pages/management/lib/nariEntryView` 머리말).
+     */
+    openEntryView: (isMyTeam: boolean) => {
+      if (career === null || screen.kind !== '경기준비') return
+      const cup = screen.cup === undefined ? undefined : screen.cup.matchup
+      setEntryView(batterNariEntryViewOf(career, isMyTeam, cup))
+    },
+
+    /** 143 키 0x1457c — 끝 코드 1 · 2(상대 팀) · 3(내 팀)이면 142 로. 142 진입은 이전이 143 이라 마선수를 다시 안 굴린다 */
+    pressEntryViewKey: (key: EntryKey) => {
+      if (entryView === null) return
+      const pressed = pressNariEntryKey(entryView, key)
+      if (!pressed.leaves) return setEntryView(pressed.view)
+      setEntryView(null)
+      // 142 진입 0x1c54a — 칸 번호 다시 매기기(보기 전용이라 바뀐 것이 없다)
+      setCareer((current) => {
+        if (current === null) return current
+        const battingOrder = renumberedBattingOrderOf(current)
+        return battingOrder === current.battingOrder ? current : { ...current, battingOrder }
+      })
+    },
+
+    /** 웹 전용 — 143 줄을 눌러 커서를 옮긴다 */
+    pointEntryViewCursor: (index: number) => {
+      if (entryView !== null) setEntryView(pointNariEntryCursor(entryView, index))
+    },
+
     /** 142 취소(−16, 0x13c72) — S+0xb4(포스트시즌) → 128 진입 0x120a4 를 다시, 그 밖 → 109 (이전 상태 142 라 취소가 안 먹는다) */
     cancelMatchPrepare: () => {
       if (career === null || screen.kind !== '경기준비') return
@@ -1503,6 +1540,7 @@ export function useCareerSession({
       matchPreparedRef.current = true
       // 홈 팀 — 웹 대회 경기는 후공(내 팀이 홈)으로 친다. 대회 팀은 모두 > 9 라 어느 쪽이든 한 번 굴린다
       rollNariMatchStadium(random, matchup.myTeam)
+      setEntryView(null)
       setScreen({ kind: '경기준비', cup: { matchup, cup } })
     },
 
@@ -1567,6 +1605,8 @@ export function useCareerSession({
     pendingTitle,
     loadingTip,
     matchAces,
+    /** 143 경기 전 엔트리 보기 — 142(`경기준비`) 위에 선다 */
+    entryView: screen.kind === '경기준비' ? entryView : null,
     storyEvents: story.events,
     eventPlaceIds: story.eventPlaceIds,
     handlePitchResolved,

@@ -13,11 +13,12 @@ const 띄우기 = () => {
   const match = batterMatchInfoOf(createCareer('준비'), { myBatter: 0, myPitcher: 0, opponentPitcher: 1, opponentBatter: 1 })
   const onStart = vi.fn()
   const onCancel = vi.fn()
+  const onEntry = vi.fn()
   render(
     <NariMatchInfoScreen lines={match.lines} myTeamId={match.myTeamId} opponentTeamId={match.opponentTeamId}
-      playerSide={match.playerSide} edition="타자편" gamePoint={0} onStart={onStart} onCancel={onCancel} />,
+      playerSide={match.playerSide} edition="타자편" gamePoint={0} onStart={onStart} onCancel={onCancel} onEntry={onEntry} />,
   )
-  return { onStart, onCancel }
+  return { onStart, onCancel, onEntry }
 }
 
 describe('142 경기 준비', () => {
@@ -44,6 +45,19 @@ describe('142 경기 준비', () => {
   it("'0' 경기진행 설정 갈래가 없다 — 시즌 0xdd 와 다르다", () => {
     const { onStart, onCancel } = 띄우기()
     fireEvent.keyDown(window, { key: '0' })
+    expect(onStart).not.toHaveBeenCalled()
+    expect(onCancel).not.toHaveBeenCalled()
+  })
+})
+
+describe('142 → 143 경기 전 엔트리 보기 (0x13c30 의 −3 · \'4\' / −4 · \'6\')', () => {
+  it("'4'·왼 → 내 팀(장면+0x164 = 1) · '6'·오른 → 상대 팀(0)", () => {
+    const { onEntry, onStart, onCancel } = 띄우기()
+    fireEvent.keyDown(window, { key: '4' })
+    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+    fireEvent.keyDown(window, { key: '6' })
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(onEntry.mock.calls).toEqual([[true], [true], [false], [false]])
     expect(onStart).not.toHaveBeenCalled()
     expect(onCancel).not.toHaveBeenCalled()
   })

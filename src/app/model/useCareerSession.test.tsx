@@ -1085,3 +1085,34 @@ describe('나리 팀 레코드로 경기를 세운다 — 0x39fdc 의 0xb891c(te
     expect(레코드.progress.ourLineup.benchBatters).toBe(5)
   })
 })
+
+describe('143 경기 전 엔트리 보기 — 142 위에 선다 (0x16af8 · 0x1457c, 보기 전용)', () => {
+  it("142 '4' → 내 팀 레코드 · 고치지 못하고 오른 끝(3)에서 142 로, '6' → 상대 팀 · 왼 끝(2)에서 142 로", () => {
+    const rendered = 띄우기({ ...createCareer('보기'), gamesPlayed: 4 })
+    act(() => rendered.result.current.session.actions.runCommand('다음경기'))
+    act(() => rendered.result.current.session.actions.confirmNextGameStandings())
+    const 앞 = rendered.result.current.session.career
+    act(() => rendered.result.current.session.actions.openEntryView(true))
+    const view = rendered.result.current.session.entryView
+    expect(view?.isMyTeam).toBe(true)
+    expect(view?.lists.batters[7].name).toBe('보기')
+    expect(rendered.result.current.screen.kind).toBe('경기준비')
+    act(() => rendered.result.current.session.actions.pressEntryViewKey('확인'))
+    act(() => rendered.result.current.session.actions.pressEntryViewKey('왼'))
+    expect(rendered.result.current.session.entryView).not.toBeNull()
+    act(() => rendered.result.current.session.actions.pressEntryViewKey('오른'))
+    expect(rendered.result.current.session.entryView).toBeNull()
+    expect(rendered.result.current.session.career).toEqual(앞)
+
+    act(() => rendered.result.current.session.actions.openEntryView(false))
+    expect(rendered.result.current.session.entryView?.isMyTeam).toBe(false)
+    act(() => rendered.result.current.session.actions.pressEntryViewKey('오른'))
+    expect(rendered.result.current.session.entryView).not.toBeNull()
+    act(() => rendered.result.current.session.actions.pressEntryViewKey('왼'))
+    expect(rendered.result.current.session.entryView).toBeNull()
+    // 142 로 돌아와도 마선수를 다시 안 굴린다(장면+0x288) — 경기는 그대로 선다
+    const aces = rendered.result.current.session.matchAces
+    act(() => rendered.result.current.session.actions.confirmMatchPrepare())
+    expect(rendered.result.current.session.progress?.aces?.ours).toEqual({ batter: aces?.myBatter, pitcher: aces?.myPitcher })
+  })
+})

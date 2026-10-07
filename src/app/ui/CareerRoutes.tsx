@@ -7,6 +7,7 @@ import { GameResultScreen } from '@/pages/game-result/ui/GameResultScreen'
 import { ManagementScreen } from '@/pages/management/ui/ManagementScreen'
 import { NextGameStandingsScreen } from '@/pages/management/ui/NextGameStandingsScreen'
 import { NariMatchInfoScreen } from '@/pages/management/ui/NariMatchInfoScreen'
+import { EntryEditorScreen } from '@/widgets/entry-editor'
 import { batterMatchInfoOf, cupMatchInfoOf } from '@/pages/management/lib/nariMatchPrepare'
 import { ShopScreen } from '@/pages/shop/ui/ShopScreen'
 import { OutingMapScreen } from '@/pages/outing-map/ui/OutingMapScreen'
@@ -219,6 +220,15 @@ export function CareerRoutes({
       )
 
     case '경기준비': {
+      // 143 경기 전 엔트리 보기 — 진입 0x16af8 · 키 0x1457c · 그림 0x16738 (보기 전용, 끝 코드로 142 로 돌아간다)
+      const entryView = session.entryView
+      if (entryView !== null) {
+        return (
+          <EntryEditorScreen editor={entryView.editor} lists={entryView.lists}
+            teamName={TEAMS[entryView.teamId]?.name ?? ''} isAceLocked={false} gamePoint={career.gamePoint}
+            onKey={actions.pressEntryViewKey} onMoveCursor={actions.pointEntryViewCursor} onCloseAceLocked={() => {}} />
+        )
+      }
       // 142 경기 준비 — 진입 0x1c46c · 키 0x13c30 · 그림 0x15d98
       // 국가대항전(135 에서 옴)이면 대회 표 · 마선수 "-" (1c5fe)
       const match = screen.cup === undefined
@@ -227,7 +237,7 @@ export function CareerRoutes({
       return (
         <NariMatchInfoScreen lines={match.lines} myTeamId={match.myTeamId} opponentTeamId={match.opponentTeamId}
           playerSide={match.playerSide} edition="타자편" gamePoint={career.gamePoint}
-          onStart={actions.confirmMatchPrepare} onCancel={actions.cancelMatchPrepare} />
+          onStart={actions.confirmMatchPrepare} onCancel={actions.cancelMatchPrepare} onEntry={actions.openEntryView} />
       )
     }
 

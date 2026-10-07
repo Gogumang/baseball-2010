@@ -21,6 +21,7 @@ import { OUTING_PLACES } from '@/shared/config/outingPlaces'
 import type { NariGameMatch, NariGameSavePort } from '@/pages/management/lib/nariMatchPrepare'
 import { startPitcherGame } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { nariLineupSlotsOf } from '@/entities/career/model/nariTeamRecord'
+import { ACE_BATTERS } from '@/entities/game/model/aceOpponent'
 
 /** 나만의리그 투수편 한 판 (원본 모드 3, 장면 0x106) — 저장·장면 전환만 본다 */
 
@@ -1327,6 +1328,27 @@ describe('전역기록 +0x4f(모드 3 경기 중간 저장) — 142 확인 · �
     const progress = startPitcherGame(options, createSeededRandom(5))
     expect(progress.ourLineup.rosterSlots).toEqual(nariLineupSlotsOf(career.nariTeams![career.teamId]))
     expect(progress.opponentLineup.rosterSlots).toEqual(nariLineupSlotsOf(career.nariTeams![options.opponentTeamId]))
+  })
+
+  it("143 경기 전 엔트리 보기 — '4' 내 팀(내 투수 · 마투수 칸) · 보기 전용 · 오른 끝에서 142 로", () => {
+    const { rendered } = 손잡이띄우기()
+    const { result } = rendered
+    act(() => result.current.actions.create('투수', 신인))
+    act(() => result.current.actions.save({ ...result.current.career!, gamesPlayed: 4 }))
+    act(() => result.current.actions.openNextGameStandings())
+    act(() => result.current.actions.confirmNextGameStandings())
+    const aces = result.current.matchAces!
+    act(() => result.current.actions.openEntryView(true))
+    const view = result.current.entryView!
+    expect(view.lists.pitchers.map((row) => row.name)).toContain('투수')
+    expect(view.lists.pitchers.filter((row) => row.isAce)).toHaveLength(1)
+    expect(view.lists.batters[9].isAce).toBe(true)
+    expect(view.lists.batters[9].name).toBe(ACE_BATTERS[aces.myBatter].name)
+    act(() => result.current.actions.pressEntryViewKey('확인'))
+    expect(result.current.entryView?.editor.first).toBe(-1)
+    act(() => result.current.actions.pressEntryViewKey('오른'))
+    expect(result.current.entryView).toBeNull()
+    expect(result.current.scene).toBe('경기준비')
   })
 
   it('곧장 경기 — 142 를 거치지 않고(굴림 없음) 남겨 둔 마선수로 경기를 처음부터 세운다', () => {

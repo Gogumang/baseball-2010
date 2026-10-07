@@ -115,6 +115,10 @@ import { nariMatchCancelTargetOf, rollNariMatchAces } from '@/pages/management/l
 import {
   nariTeamRecordOf, nariTeamsOf, recordMatchAcesOf, recordTeamAcesOf, seatNariMatchAces,
 } from '@/entities/career/model/nariTeamRecord'
+import { pointNariEntryCursor, pressNariEntryKey } from '@/pages/management/lib/nariEntryView'
+import type { NariEntryView } from '@/pages/management/lib/nariEntryView'
+import { pitcherNariEntryViewOf } from '@/pages/pitcher-league/lib/pitcherEntryView'
+import type { EntryKey } from '@/entities/season-mode/model/entryEditor'
 import type { NariGameMatch, NariGameSavePort, NariMatchAces, NariOpenedAces } from '@/pages/management/lib/nariMatchPrepare'
 import { DEFAULT_OPENED_ACE_BATTER_IDS, DEFAULT_OPENED_ACE_PITCHER_IDS } from '@/pages/general-mode/lib/generalModeSetup'
 
@@ -184,6 +188,8 @@ export interface PitcherLeagueSession {
   readonly nextGameFromManagement: boolean
   /** 142 진입 0x1c46c 가 이 장면에서 굴린 마선수 — 경기정보 마투수·마타자 줄 */
   readonly matchAces: NariMatchAces | null
+  /** 143 경기 전 엔트리 보기 — 142(`경기준비`) 위에 선다 */
+  readonly entryView: NariEntryView | null
   /** 지금 경기를 세울 옵션. 경기 장면이 아니면 null */
   readonly gameOptions: PitcherGameOptions | null
   /** 상점 장면의 창 — '장착' 111 장비 상점 · '착용' 121 장비착용 */
@@ -232,6 +238,10 @@ export interface PitcherLeagueSession {
     readonly confirmNextGameStandings: () => void
     /** 142 확인(−5 · '5') → 144 → 경기 */
     readonly confirmMatchPrepare: () => void
+    /** 142 '4'/왼 · '6'/오른 → 143 (내 팀 · 상대 팀, 보기 전용) */
+    readonly openEntryView: (isMyTeam: boolean) => void
+    readonly pressEntryViewKey: (key: EntryKey) => void
+    readonly pointEntryViewCursor: (index: number) => void
     /** 142 취소(−16) — 포스트시즌이면 128, 아니면 109 (0x13c72) */
     readonly cancelMatchPrepare: () => void
     /** 109 취소(−16) — 이전 상태가 105 일 때만 105 로 (0x1060e) */
@@ -727,27 +737,39 @@ export function usePitcherLeagueSession(
     [commit],
   )
 
-  const beginGame = useCallback(
-    (from?: PitcherCareer) => {
-      const current = from ?? career
-      if (current === null) return
+  /**
+   * 경기 장면 0x39fdc 모드 3 갈래가 세울 경기 — 두 팀은 저장의 나리 팀 레코드로 선다: 142 진입 0x1c46c 가 넣은 마선수는 두 팀
+   * 레코드의 9번(마타자)·8번(마투수) 칸이다. 타자 배열은 붙박이 + 마타자라 진행기가 세우는 명단(`withAceBatterLineup`)과 같다
+   */
+  const recordGameOptionsOf = useCallback(
+    (current: PitcherCareer): PitcherGameOptions => {
       const options = leagueGameOptionsOf(current, { gaugeSettingOn, throwModeManual })
-      // 경기 장면 0x39fdc 모드 3 갈래 — 두 팀은 저장의 나리 팀 레코드로 선다: 142 진입 0x1c46c 가 넣은 마선수는 두 팀 레코드의
-      // 9번(마타자)·8번(마투수) 칸이다. 타자 배열은 붙박이 + 마타자라 진행기가 세우는 명단(`withAceBatterLineup`)과 같다
       const records = nariTeamsOf(current)
       const recordAces = recordMatchAcesOf(records, current.teamId, options.opponentTeamId)
-      setGameOptions(recordAces === null ? options : {
+      return recordAces === null ? options : {
         ...options,
         aces: {
           ours: recordTeamAcesOf(nariTeamRecordOf(records, current.teamId)),
           opponent: recordTeamAcesOf(nariTeamRecordOf(records, options.opponentTeamId)),
           ...(aceLevels === undefined ? {} : { levels: aceLevels }),
         },
-      })
+      }
+    },
+    [aceLevels, gaugeSettingOn, throwModeManual],
+  )
+
+  const beginGame = useCallback(
+    (from?: PitcherCareer) => {
+      const current = from ?? career
+      if (current === null) return
+      setGameOptions(recordGameOptionsOf(current))
       setScene('경기')
     },
-    [aceLevels, career, gaugeSettingOn, throwModeManual],
+    [career, recordGameOptionsOf],
   )
+
+  /** 143 경기 전 엔트리 보기 (진입 0x16af8 · 키 0x1457c) — 142 위에 선다. 없으면 null */
+  const [entryView, setEntryView] = useState<NariEntryView | null>(null)
 
   /** 109 순위표의 이전 상태가 105(관리)인가 — 취소·바닥 5 가 이것으로 갈린다 (0x105f0 · 0x16928) */
   const [nextGameFromManagement, setNextGameFromManagement] = useState(false)
@@ -772,6 +794,7 @@ export function usePitcherLeagueSession(
         nariTeams: seatNariMatchAces(nariTeamsOf(current), current.teamId, nextPitcherOpponentOf(current), aces),
       }))
     }
+    setEntryView(null)
     setScene('경기준비')
   }, [commitWith, openedAces, random])
 
@@ -1417,6 +1440,7 @@ export function usePitcherLeagueSession(
     scene,
     nextGameFromManagement,
     matchAces,
+    entryView: scene === '경기준비' ? entryView : null,
     gameOptions,
     shopTab,
     shopNotice,
@@ -1470,6 +1494,20 @@ export function usePitcherLeagueSession(
         // 0x13cca — +0x4f = 1 · 저장. 명부의 마선수는 커리어 저장의 나리 팀 레코드(`nariTeams`)가 들고 간다 (웹 투수편엔 국가대항전이 없다)
         nariGameSaveRef.current?.start({ aces: null, isNationalCup: false })
         beginGame()
+      },
+      // 142 의 '4'/왼 · '6'/오른 → 143 경기 전 엔트리 보기(0x16af8, 보기 전용 — 타자편 `openEntryView` 와 같다)
+      openEntryView: (isMyTeam: boolean) => {
+        if (career === null || scene !== '경기준비') return
+        setEntryView(pitcherNariEntryViewOf(career, recordGameOptionsOf(career), isMyTeam))
+      },
+      // 143 키 0x1457c — 끝 코드 1 · 2(상대 팀) · 3(내 팀)이면 142 로 (142 진입은 이전이 143 이라 다시 안 굴린다)
+      pressEntryViewKey: (key: EntryKey) => {
+        if (entryView === null) return
+        const pressed = pressNariEntryKey(entryView, key)
+        setEntryView(pressed.leaves ? null : pressed.view)
+      },
+      pointEntryViewCursor: (index: number) => {
+        if (entryView !== null) setEntryView(pointNariEntryCursor(entryView, index))
       },
       cancelMatchPrepare: () => {
         if (career === null || scene !== '경기준비') return
