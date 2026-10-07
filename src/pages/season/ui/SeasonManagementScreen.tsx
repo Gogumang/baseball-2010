@@ -1,21 +1,28 @@
 import { MessageBox, RawScreen } from '@/shared/ui'
 import type { SeasonState } from '@/entities/season-mode/model/seasonRecord'
-import { SEASON_GAME_COUNT } from '@/entities/season-mode/model/seasonRecord'
 import {
-  MANAGEMENT_MENU, managementMenuTarget, opensManagementMenu,
+  MANAGEMENT_MENU, managementMenuTarget,
 } from '@/entities/season-mode/model/seasonStateMachine'
 import type { ManagementMenuItem, SeasonSceneState } from '@/entities/season-mode/model/seasonStateMachine'
-import { SeasonListWindow } from '@/widgets/season/ui/SeasonListWindow'
-import { SeasonStatusPanel } from '@/pages/season/ui/SeasonStatusPanel'
+import { SEASON_COMMAND_SLOTS } from '@/pages/season/lib/seasonCommandBar'
+import { SeasonCommonFrame } from '@/pages/season/ui/SeasonCommonFrame'
 import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
-import type { SeasonListRow } from '@/widgets/season/ui/SeasonListWindow'
 
-/** 트레이닝·외출 칸 번호 (점프표 0xcbe40 의 2·3) */
+/** 트레이닝·외출·다음경기 칸 번호 (점프표 0xcbe40 의 2·3·5) */
 const TRAINING_INDEX = 2
 const OUTING_INDEX = 3
+const NEXT_GAME_INDEX = 5
 
-/** 질병 이름 — StrMODE[185 + 종류] (P4 6절). 원본 문자열표가 웹에 없어 이름만 옮겼다 */
-const ILLNESS_NAMES: readonly string[] = ['건강', '감기', '몸살', '식중독', '배탈']
+/**
+ * 0x4efc 가 끄는 칸 — 메뉴 켬 표(메뉴 +0x28) 를 0 으로: SR+4(행동함) 면 칸 2·3, SR+0x1bc(엔딩 본 시즌) 면 칸 2·3·5.
+ * 꺼진 칸은 커맨드 줄이 흑백(0xc37a8)으로 그린다.
+ */
+export function disabledManagementIndexesOf(record: SeasonState['record']): readonly number[] {
+  const disabled = new Set<number>()
+  if (record.acted) [TRAINING_INDEX, OUTING_INDEX].forEach((index) => disabled.add(index))
+  if (record.endingSeen) [TRAINING_INDEX, OUTING_INDEX, NEXT_GAME_INDEX].forEach((index) => disabled.add(index))
+  return [...disabled].sort((a, b) => a - b)
+}
 
 export interface SeasonManagementScreenProps {
   readonly state: SeasonState
@@ -37,61 +44,52 @@ export interface SeasonManagementScreenProps {
    */
   readonly cursor?: number
   readonly onCursorChange?: (index: number) => void
+  /** 머리띠 G포인트 (저장 +0x64) */
+  readonly gamePoint?: number
+  /** 가운데 판이 미끄러져 들어오는가 — 이전 상태가 1 · 0xd3 · 0xcb · 0xf5 · 0xf1 이면 0x8a2d8 (0x5044~0x505e) */
+  readonly centerSlidesIn?: boolean
 }
 
 /**
- * 시즌 관리 메뉴 (장면 0x105 상태 **0xc9**, 갱신 0x4efc · 키 0x8f30 · 그리기 0x73b8).
+ * 시즌 관리 메뉴 (장면 0x105 상태 **0xc9**, 진입 0x4efc · 키 0x8f30 · 틀 0x73b8 · 그리기 0x9fe4 → 공통 틀 0x9f60).
  *
- * 6칸은 `0x6c219(메뉴, 6, 1, 1)` 로 만든 한 열짜리 메뉴다 (P4 1b 확정).
+ * 6칸은 `0x6c219(메뉴, 6, 1, 1)` 로 만든 한 열짜리 메뉴다 (P4 1b 확정) — 위·아래로 옮긴다.
  * 이 화면은 **경기 수가 짝수일 때만** 열린다 — StrHOWTO[18] "2경기마다 관리 메뉴".
  *
- * ⚠️ 관리 메뉴 그리기(0x73b8)의 좌표는 아직 안 풀렸다 — **원본 배치 미해독 — 근사**로
- * 공용 판 (24, 54, 192, 212) 에 한 열 목록을 얹었다 (`seasonWindowLayout.ts` 머리 주석).
+ * 그리기는 공통 틀(`SeasonCommonFrame`): 공 무늬 바탕 · 커맨드 줄 0x7e418(표 0xd47f4 · 0xd4800 — `lib/seasonCommandBar`) ·
+ * 상태판 0x7d34c · 가운데 판 0x7f814(감독 · 코치) · 머리띠(시즌모드, 되돌아가기).
+ * 틀 0x73b8 은 상태 틀 수로 칸 등장 0x7ff8c 을 돌리고, 틀 2 에 이전 상태가 0xcb·0xcc·0xe3·0xde·0xf9·0xe4·0xe6·0xe5·0xd3·1 이면
+ * 소리 0x6ea6d(…, 4, −1, 1) — ⚠️ 그 소리는 옮기지 않았다.
  */
 export function SeasonManagementScreen({
-  state, onSelect, onExit, alert = null, cursor: heldCursor, onCursorChange,
+  state, onSelect, onExit, alert = null, cursor: heldCursor, onCursorChange, gamePoint = 0, centerSlidesIn = false,
 }: SeasonManagementScreenProps) {
   const { record } = state
-  // 갱신 0x4efc: SR+4 가 서 있으면 트레이닝·외출 칸을 끈다 — 이벤트 4 대사
-  // "트레이닝, 외출 중 딱 한 가지 일만" 과 같은 규칙이다 (P4 3절 확정).
-  const rows: readonly SeasonListRow[] = MANAGEMENT_MENU.map((label, index) => ({
-    id: label,
-    label,
-    isDisabled: record.acted && (index === TRAINING_INDEX || index === OUTING_INDEX),
-  }))
+  const disabled = disabledManagementIndexesOf(record)
+  const disabledIds = new Set(disabled.map((index) => MANAGEMENT_MENU[index]))
 
   const select = (index: number) => {
     const target = managementMenuTarget(index)
-    if (target === null || rows[index].isDisabled === true) return
+    if (target === null || disabled.includes(index)) return
     onSelect(MANAGEMENT_MENU[index], target)
   }
   const { cursor, moveTo } = useSeasonCursor({
-    count: rows.length, onSelect: select, onCancel: onExit, isEnabled: alert === null,
+    count: MANAGEMENT_MENU.length, onSelect: select, onCancel: onExit, isEnabled: alert === null,
     ...(heldCursor === undefined ? {} : { cursor: heldCursor }),
     ...(onCursorChange === undefined ? {} : { onCursorChange }),
   })
 
-  const illness = record.illness === 0 ? '' : `\n질병 : ${ILLNESS_NAMES[record.illness] ?? '질병'}`
-
   return (
     <RawScreen>
-      {/* 상태판 0x7d34c 를 먼저 그리고 그 위에 다른 것이 덮인다 (원본 그리기 차례) */}
-      <SeasonStatusPanel record={record} teamMorale={state.teamMorale} />
-      <SeasonListWindow
-        title="관리 메뉴"
-        rows={rows}
-        cursor={cursor}
-        onMoveCursor={moveTo}
-        onSelect={select}
-        onBack={onExit}
-        backLabel="메인 메뉴"
-        footer={
-          `${record.yearIndex + 1}년차 ${record.games}/${SEASON_GAME_COUNT}경기` +
-          `${opensManagementMenu(record) ? '' : ' (관리 메뉴가 열리는 때가 아니다)'}` +
-          `${record.acted ? '\n이번 주기에는 트레이닝·외출 중 하나만 할 수 있다' : ''}` +
-          illness
-        }
-      />
+      <div role="group" aria-label="관리 메뉴">
+        <SeasonCommonFrame record={record} teamMorale={state.teamMorale} gamePoint={gamePoint} onBack={onExit}
+          centerSlidesIn={centerSlidesIn}
+          commandBar={{
+            slots: SEASON_COMMAND_SLOTS, cursor, parent: null, disabledIds,
+            onHover: moveTo,
+            onSelect: (id) => select(MANAGEMENT_MENU.findIndex((label) => label === id)),
+          }} />
+      </div>
       {alert !== null && (
         // 팝업 0x27 답: 0 예 · 1 아니오 · 0x14 취소 — 아니오·취소는 같은 갈래다 (7488~749e)
         <MessageBox text={alert.text} buttons={['예', '아니오']} onAnswer={(answer) => alert.onAnswer(answer === 0)} />

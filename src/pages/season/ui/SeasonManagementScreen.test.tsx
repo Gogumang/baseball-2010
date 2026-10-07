@@ -19,17 +19,35 @@ const 시즌 = (덮어쓰기: Partial<SeasonState['record']> = {}): SeasonState 
   return { ...state, record: { ...state.record, ...덮어쓰기 } }
 }
 
-/** 줄 글 — 커서 표시(▶)는 aria-hidden 이라 이름에서 빼고 본다 */
-const 칸이름들 = () =>
-  screen.getAllByRole('button').map((button) => (button.textContent ?? '').replace('▶', '').trim())
+/** 커맨드 줄 칸 이름 — 단추 이름이 칸 id 다 (바닥 되돌아가기가 끝에 붙는다) */
+const 칸이름들 = () => screen.getAllByRole('button').map((button) => button.getAttribute('aria-label'))
 
 describe('시즌 관리 메뉴 (상태 0xc9)', () => {
   it('StrHOWTO[18] 차례 그대로 6칸이 나온다', () => {
     render(<SeasonManagementScreen state={시즌()} onSelect={vi.fn()} onExit={vi.fn()} />)
 
     expect(칸이름들()).toEqual([
-      '시즌정보', '구단관리', '트레이닝', '외출', '아이템', '다음경기', '메인 메뉴',
+      '시즌정보', '구단관리', '트레이닝', '외출', '아이템', '다음경기', '되돌아가기',
     ])
+  })
+
+  it('커맨드 줄 0x7e418 — 시즌 표 0xd47f4 아이콘 · 0xd4800 이름표, 칸 자리는 0xd4740 계단형', () => {
+    const { container } = render(<SeasonManagementScreen state={시즌()} onSelect={vi.fn()} onExit={vi.fn()} />)
+
+    const 아이콘 = [...container.querySelectorAll('[data-testid="command-bar"] button img')].map((img) => img.getAttribute('src'))
+    expect(아이콘).toEqual([
+      './sprites/management/icon_selected_21.png', './sprites/mode_icon/022.png', './sprites/mode_icon/001.png',
+      './sprites/mode_icon/003.png', './sprites/mode_icon/004.png', './sprites/mode_icon/005.png',
+    ])
+    const 이름표 = container.querySelector('[data-testid="command-bar"] > img:last-child')?.getAttribute('src')
+    expect(이름표).toBe('./sprites/management/command_label_117.png')
+  })
+
+  it('엔딩을 본 시즌(SR+0x1bc)이면 트레이닝·외출·다음경기 칸이 꺼진다 (0x4efc)', () => {
+    render(<SeasonManagementScreen state={시즌({ endingSeen: true })} onSelect={vi.fn()} onExit={vi.fn()} />)
+
+    const 꺼짐 = (이름: string) => (screen.getByRole('button', { name: 이름 }) as HTMLButtonElement).disabled
+    expect(['트레이닝', '외출', '다음경기', '아이템'].map(꺼짐)).toEqual([true, true, true, false])
   })
 
   it('칸마다 점프표 0xcbe40 이 가리키는 장면 상태로 간다', () => {
@@ -84,12 +102,13 @@ describe('시즌 관리 메뉴 (상태 0xc9)', () => {
     expect(onSelect).toHaveBeenCalledWith('구단관리', SEASON_SCENE_STATE.구단관리)
   })
 
-  it('연차와 치른 경기 수를 보여 준다', () => {
+  it('상태판 0x7d34c 와 가운데 판 0x7f814(감독)를 깐다 — 연차·경기 수는 상태판 메시지줄이 그린다', () => {
     render(
       <SeasonManagementScreen state={시즌({ yearIndex: 2, games: 12 })} onSelect={vi.fn()} onExit={vi.fn()} />,
     )
 
-    expect(screen.getByRole('group', { name: '관리 메뉴' }).textContent).toContain('3년차 12/45경기')
+    expect(screen.getByRole('group', { name: '상태판' })).toBeTruthy()
+    expect(screen.getByTestId('가운데판')).toBeTruthy()
   })
 })
 
@@ -115,6 +134,9 @@ describe('구단관리 하위 메뉴 (상태 0xce)', () => {
     render(<SeasonTeamMenuScreen state={시즌()} onSelect={vi.fn()} onBack={vi.fn()} />)
 
     expect(칸이름들()).toEqual(['구장관리', '트레이드', '선수영입', '코치채용', '되돌아가기'])
+    // 부모 칸 구단관리(0xd47f4[1] = 22)가 주황으로 (6, 245) 쪽에 선다
+    expect(document.querySelector('[data-testid="command-bar"] > img')?.getAttribute('src'))
+      .toBe('./sprites/management/icon_selected_22.png')
   })
 
   it('선수영입은 0xe2, 코치채용은 선수단 화면(0xd7)으로 간다', () => {
@@ -148,7 +170,7 @@ describe('메뉴 커서를 부르는 쪽이 든다 (메뉴 객체 this+0x70 · t
       <SeasonManagementScreen state={시즌()} onSelect={vi.fn()} onExit={vi.fn()} cursor={1} onCursorChange={onCursorChange} />,
     )
 
-    expect(커서칸()?.textContent).toContain('구단관리')
+    expect(커서칸()?.getAttribute('aria-label')).toBe('구단관리')
     fireEvent.keyDown(window, { key: 'ArrowDown' })
     expect(onCursorChange).toHaveBeenCalledWith(2)
   })
@@ -156,6 +178,6 @@ describe('메뉴 커서를 부르는 쪽이 든다 (메뉴 객체 this+0x70 · t
   it('구단관리도 같다 — 칸 1 은 트레이드', () => {
     render(<SeasonTeamMenuScreen state={시즌()} onSelect={vi.fn()} onBack={vi.fn()} cursor={1} onCursorChange={vi.fn()} />)
 
-    expect(커서칸()?.textContent).toContain('트레이드')
+    expect(커서칸()?.getAttribute('aria-label')).toBe('트레이드')
   })
 })

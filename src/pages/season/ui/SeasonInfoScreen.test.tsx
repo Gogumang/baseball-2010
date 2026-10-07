@@ -19,8 +19,8 @@ describe('시즌정보 (상태 0xcd)', () => {
   it('칸 넷 — 구단정보 · 아이템 · 선수정보 · 기록순위', () => {
     render(<SeasonInfoScreen state={시즌()} onSelect={vi.fn()} onBack={vi.fn()} />)
 
-    const 글들 = screen.getAllByRole('button').map((button) => (button.textContent ?? '').replace('▶', '').trim())
-    expect(글들).toEqual(['구단정보', '아이템', '선수정보', '기록순위', '되돌아가기'])
+    const 칸들 = screen.getAllByRole('button').map((button) => button.getAttribute('aria-label'))
+    expect(칸들).toEqual(['구단정보', '아이템', '선수정보', '기록순위', '되돌아가기'])
     expect(SEASON_INFO_MENU.map((entry) => entry.textFrame)).toEqual([283, 94, 90, 111])
     expect(SEASON_INFO_MENU.map((entry) => entry.iconFrame)).toEqual([23, 8, 9, 10])
   })

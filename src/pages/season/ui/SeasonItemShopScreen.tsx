@@ -4,6 +4,9 @@ import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import { checkSeasonGpItem, checkSeasonSubItem } from '@/entities/season-mode/model/seasonItemShop'
 import { seasonGpItemsOf, seasonSubItemsOf } from '@/widgets/season/lib/seasonSubItems'
 import { SeasonStatusPanel } from '@/pages/season/ui/SeasonStatusPanel'
+import { SeasonCommandBar } from '@/pages/season/ui/SeasonCommonFrame'
+import { seasonParentSlotOf } from '@/pages/season/lib/seasonCommandBar'
+import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { ShopWindow } from '@/pages/shop/ui/ShopWindow'
 import type { ShopEntry } from '@/pages/shop/lib/shopEntries'
@@ -86,7 +89,10 @@ export function SeasonItemShopScreen({
   return (
     <RawScreen>
       {/* 상태판 0x7d34c 를 먼저 그리고 그 위에 다른 것이 덮인다 (원본 그리기 차례) */}
+      <SkinBackdrop kind="공무늬" />
       <SeasonStatusPanel record={record} teamMorale={teamMorale} />
+      {/* 커맨드 줄 0x7e418 — 이 상태는 0x7e84c 가 칸 수를 0 으로 비워 하위 메뉴 객체의 부모 칸(아이템)만 (6, 245) 에 남는다 */}
+      <SeasonCommandBar slots={[]} cursor={0} parent={seasonParentSlotOf('아이템')} />
       <div role="group" aria-label={kind === 1 ? '서브아이템 상점' : 'GP아이템 상점'}>
         <ShopWindow
           kind={kind === 1 ? '서브' : 'GP'}

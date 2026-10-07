@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import type { Screen } from '@/app/model/screen'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import type { useCareerSession } from '@/app/model/useCareerSession'
@@ -76,6 +77,10 @@ export function CareerRoutes({
 }: CareerRoutesProps) {
   const { actions } = session
   const backToManagement = () => setScreen({ kind: '관리' })
+  /** 이전 화면 — 105 진입 0x11910 이 이전 상태 1 · 114 · 100 이면 가운데 판을 미끄러뜨린다 (0x8a2d8) */
+  const screenTrail = useRef<{ readonly kind: Screen['kind']; readonly previous: Screen['kind'] | null }>({ kind: screen.kind, previous: null })
+  if (screenTrail.current.kind !== screen.kind) screenTrail.current = { kind: screen.kind, previous: screenTrail.current.kind }
+  const previousKind = screenTrail.current.previous
 
   const management = (
     <ManagementScreen
@@ -96,6 +101,8 @@ export function CareerRoutes({
       onEquipSkill={actions.equipSkill}
       onExpandSkillSlots={actions.expandSkillSlots}
       onExit={() => setScreen({ kind: '메인메뉴' })}
+      // 114(이벤트) · 100(경기 뒤 재진입 — 경기결과) · 1(자원 적재 — 처음 선다)
+      centerSlidesIn={previousKind === null || previousKind === '이벤트' || previousKind === '경기결과'}
     />
   )
 

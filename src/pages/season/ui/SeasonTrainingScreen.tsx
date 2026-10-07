@@ -2,15 +2,14 @@ import { useState } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
 import type { SeasonState } from '@/entities/season-mode/model/seasonRecord'
 import {
-  HELL_TRAINING_GAME_POINT, HELL_TRAINING_INDEX, TRAINING_GUARD_CEILING, TRAINING_SLOTS,
+  HELL_TRAINING_INDEX, TRAINING_GUARD_CEILING, TRAINING_SLOTS,
   checkSeasonTraining,
 } from '@/widgets/season/lib/seasonTraining'
 import type { TrainingSlot } from '@/widgets/season/lib/seasonTraining'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { fillModeText } from '@/widgets/season/lib/seasonText'
-import { SeasonListWindow } from '@/widgets/season/ui/SeasonListWindow'
-import type { SeasonListRow } from '@/widgets/season/ui/SeasonListWindow'
-import { SeasonStatusPanel } from '@/pages/season/ui/SeasonStatusPanel'
+import { SEASON_SUB_COMMAND_SLOTS, seasonParentSlotOf } from '@/pages/season/lib/seasonCommandBar'
+import { SeasonCommonFrame } from '@/pages/season/ui/SeasonCommonFrame'
 import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
 
 /** StrMODE 번호 (가드 0x9108 이 0x702b4 로 꺼내는 글 — 직접 떴다) */
@@ -105,9 +104,9 @@ export interface SeasonTrainingScreenProps {
  * 칸 0~3 = 팀 능력치 투구·타격·집중·근성(팀 레코드 +4..+0xa), 칸 4 = **지옥훈련 500G**
  * (J 4-6 확정). 가드 순서·값은 `widgets/season/lib/seasonTraining.ts` 가 가진다.
  *
- * ⚠️ **원본 배치 미해독 — 근사**: 0xcf 의 그리기(0xa0e4)는 **공통 틀**(커맨드 줄 0x7e418 +
- * 상태판 0x7d34c + 가운데 판 0x7f814 + 바탕 0x7f4ec, R13 1절) 뿐이라 칸 줄의 좌표가 없다.
- * 그래서 다른 시즌 화면들과 같은 공용 판 (24, 54, 192, 212) 목록으로 그린다.
+ * 그리기 0xa0e4 = 공통 틀(`SeasonCommonFrame` — 커맨드 줄 하위 칸 표 0xd47c0 · 0xd47ca: 254 투구훈련 · 119 타격훈련 ·
+ * 286 집중훈련 · 287 근성훈련 · 121 지옥훈련, 부모 칸 트레이닝) — 상태 0xde 일 때만 0x848d0 을 덧그린다.
+ * 칸 옆 값(능력치·500G)은 원본이 그리지 않는다.
  *
  * ⚠️ **SR+4(행동함)를 세우는 자리는 문서에 없다**: 외출은 결과 0xc81c 끝에서 세우는 것이 확정인데
  * (P4 3절), 트레이닝 적용 `0xa2f24` 에는 그런 줄이 적혀 있지 않다. 관리 메뉴 갱신 0x4efc 가
@@ -119,19 +118,12 @@ export function SeasonTrainingScreen({ state, gamePoints, onTrain, onBack }: Sea
   const abilities = teamAbilities[record.teamId] ?? []
   const [popup, setPopup] = useState<TrainingPopup | null>(null)
 
-  const rows: readonly SeasonListRow[] = TRAINING_SLOTS.map((label, index) => ({
-    id: label,
-    label,
-    // 능력치 칸은 지금 값을, 지옥훈련 칸은 StrMODE[141] 의 값(500G)을 오른쪽에 적는다
-    value: index === HELL_TRAINING_INDEX ? `${HELL_TRAINING_GAME_POINT}G` : String(abilities[index] ?? 0),
-  }))
-
   const select = (index: number) => {
     setPopup(trainingPopupOf(checkSeasonTraining({ abilities, teamMorale, gamePoints }, index), index, abilities))
   }
 
   const { cursor, moveTo } = useSeasonCursor({
-    count: rows.length,
+    count: TRAINING_SLOTS.length,
     onSelect: select,
     onCancel: onBack,
     isEnabled: popup === null,
@@ -139,16 +131,14 @@ export function SeasonTrainingScreen({ state, gamePoints, onTrain, onBack }: Sea
 
   return (
     <RawScreen>
-      {/* 상태판 0x7d34c 를 먼저 그리고 그 위에 다른 것이 덮인다 (원본 그리기 차례) */}
-      <SeasonStatusPanel record={record} teamMorale={teamMorale} />
-      <SeasonListWindow
-        title="트레이닝"
-        rows={rows}
-        cursor={cursor}
-        onMoveCursor={moveTo}
-        onSelect={select}
-        onBack={onBack}
-      />
+      <div role="group" aria-label="트레이닝">
+        <SeasonCommonFrame record={record} teamMorale={teamMorale} gamePoint={gamePoints} onBack={onBack}
+          commandBar={{
+            slots: SEASON_SUB_COMMAND_SLOTS.트레이닝, cursor, parent: seasonParentSlotOf('트레이닝'),
+            onHover: moveTo,
+            onSelect: (id) => select(TRAINING_SLOTS.findIndex((label) => label === id)),
+          }} />
+      </div>
 
       {popup !== null && (
         <MessageBox

@@ -5,6 +5,9 @@ import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import { SEASON_SUB_ITEM_COUNT, seasonSubItemsOf } from '@/widgets/season/lib/seasonSubItems'
 import { seasonMoneyTextOf } from '@/widgets/season/lib/seasonText'
 import { SeasonStatusPanel } from '@/pages/season/ui/SeasonStatusPanel'
+import { SeasonCommandBar } from '@/pages/season/ui/SeasonCommonFrame'
+import { seasonParentSlotOf } from '@/pages/season/lib/seasonCommandBar'
+import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import {
   DESCRIPTION_BOX, HEAD_LABEL_FRAME, LEFT_TAB_BOX, NAME_BOX, RIGHT_TAB_BOX, SLOT_COLUMNS, SLOT_SIZE, VALUE_BOX, WINDOW_BOX,
@@ -38,7 +41,7 @@ export interface SeasonOwnedItemsScreenProps {
  * 커서 칸이 비었으면 이름·값·설명도 그리지 않는다(0x82646~0x82656). 종류 1 의 보유 표시 0xc3858 은 없다.
  * 사고팔기는 없다 — 키 0x5f10 은 0x13460(나리 상점)·0x957c(시즌 상점) 어느 쪽도 부르지 않는다.
  *
- * ⚠️ 근사: 커맨드 줄 0x7e418 · 캐릭터 미리보기 0x7e765 는 안 그린다. 격자 커서 이동은 나리 상점 창(`ShopWindow`)과 같게
+ * 커맨드 줄 0x7e418 은 칸 수 0(0x7e84c 기본 갈래)이라 부모 칸 시즌정보만 그린다. ⚠️ 근사: 0x7e765 는 안 그린다. 격자 커서 이동은 나리 상점 창(`ShopWindow`)과 같게
  * 끝에서 감긴다(원본 목록 0xca7b5 의 감김은 안 풀었다).
  */
 export function SeasonOwnedItemsScreen({ record, teamMorale, gamePoint = 0, onBack }: SeasonOwnedItemsScreenProps) {
@@ -70,7 +73,10 @@ export function SeasonOwnedItemsScreen({ record, teamMorale, gamePoint = 0, onBa
   return (
     <RawScreen>
       {/* 상태판 0x7d34c 를 먼저 그리고 그 위에 다른 것이 덮인다 (원본 그리기 차례) */}
+      <SkinBackdrop kind="공무늬" />
       <SeasonStatusPanel record={record} teamMorale={teamMorale} />
+      {/* 커맨드 줄 0x7e418 — 이 상태는 0x7e84c 가 칸 수를 0 으로 비워 하위 메뉴 객체의 부모 칸(시즌정보)만 (6, 245) 에 남는다 */}
+      <SeasonCommandBar slots={[]} cursor={0} parent={seasonParentSlotOf('시즌정보')} />
       <div role="group" aria-label="보유 아이템">
         <div className={windowStyles.window}
           style={{ left: WINDOW_BOX.x, top: WINDOW_BOX.y, width: WINDOW_BOX.width, height: WINDOW_BOX.height }} />

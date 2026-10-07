@@ -19,8 +19,8 @@ describe('시즌 아이템 메뉴 (상태 0xd0)', () => {
   it('칸 넷 — 0 장착아이템 · 1 구장아이템 · 2 서브아이템 · 3 GP아이템 (0x5f3c 의 창 종류 3·4·1·2)', () => {
     render(<SeasonItemMenuScreen state={시즌()} onSelect={vi.fn()} onBack={vi.fn()} />)
 
-    const 글들 = screen.getAllByRole('button').map((button) => (button.textContent ?? '').replace('▶', '').trim())
-    expect(글들).toEqual(['장착아이템', '구장아이템', '서브아이템', 'GP아이템', '되돌아가기'])
+    const 칸들 = screen.getAllByRole('button').map((button) => button.getAttribute('aria-label'))
+    expect(칸들).toEqual(['장착아이템', '구장아이템', '서브아이템', 'GP아이템', '되돌아가기'])
     expect(SEASON_ITEM_MENU.map((entry) => entry.windowKind)).toEqual([3, 4, 1, 2])
   })
 

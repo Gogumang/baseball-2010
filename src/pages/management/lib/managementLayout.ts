@@ -88,6 +88,25 @@ export const COMMAND_SLOT_SIZE = 32
 export const COMMAND_LABEL_OFFSET_Y = 34
 export const COMMAND_LABEL_HEIGHT = 12
 
+/**
+ * 이름표 정렬 — 0x7e418 이 0x7e300 에 넘기는 정렬 (0x7e666~0x7e67e 직접 떴다):
+ * ```
+ * [gfx+0x15c](하위 메뉴) ≠ 0 && 칸 > 1 && 칸 ≠ 4 → 0x21(왼쪽) ; 그 밖 0x22(가운데)
+ * ```
+ * 하위 메뉴의 칸 2·3 만 칸 왼끝에 붙는다(원본 그대로 — 칸 4 는 다시 가운데).
+ */
+export const COMMAND_LABEL_ALIGN = { left: 0x21, center: 0x22 } as const
+
+export function commandLabelAlignOf(isSubMenu: boolean, index: number): number {
+  return isSubMenu && index > 1 && index !== 4 ? COMMAND_LABEL_ALIGN.left : COMMAND_LABEL_ALIGN.center
+}
+
+/** 이름표 그림 왼쪽 — 그림은 테두리 1px 을 둘러 글자보다 1px 왼쪽에서 시작한다 */
+export function commandLabelLeftOf(slotX: number, labelWidth: number, align: number): number {
+  const glyphLeft = align === COMMAND_LABEL_ALIGN.left ? slotX : slotX + Math.trunc((COMMAND_SLOT_SIZE - labelWidth) / 2)
+  return glyphLeft - 1
+}
+
 /** 계단형 배경판 (설정자 0x76704: top 35, height 190, offset 30 → 식 0x7650c) */
 export const BOARD_POLYGON = '0,54 141,54 160,35 240,35 240,206 160,206 141,225 0,225'
 export const BOARD_COLOR = { fill: ORIGINAL_COLORS.boardFill, edge: ORIGINAL_COLORS.boardEdge, highlight: ORIGINAL_COLORS.boardHighlight }

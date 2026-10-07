@@ -21,18 +21,25 @@ const 시즌 = (능력치: readonly number[] = [100, 100, 100, 100], 사기 = 50
   }
 }
 
-/** 줄 단추 — 이름에 값이 붙어 있어 글을 품고 있는지로 찾는다 */
-const 줄 = (이름: string) =>
-  screen.getAllByRole('button').find((button) => (button.textContent ?? '').includes(이름)) as HTMLElement
+/** 커맨드 줄 칸 — 단추 이름이 칸 id 다 */
+const 줄 = (이름: string) => screen.getByRole('button', { name: 이름 })
 
 const 알림글 = () => screen.getByRole('dialog', { name: '알림' }).textContent ?? ''
 
 describe('시즌 팀 트레이닝 (상태 0xcf)', () => {
-  it('칸 0~3 능력치와 칸 4 지옥훈련이 차례대로 나온다', () => {
-    render(<SeasonTrainingScreen state={시즌([111, 222, 333, 444])} gamePoints={1000} onTrain={vi.fn()} onBack={vi.fn()} />)
+  it('칸 0~3 능력치와 칸 4 지옥훈련이 차례대로 나온다 — 커맨드 줄 표 0xd47c0 · 0xd47ca (값은 그리지 않는다)', () => {
+    const { container } = render(
+      <SeasonTrainingScreen state={시즌([111, 222, 333, 444])} gamePoints={1000} onTrain={vi.fn()} onBack={vi.fn()} />,
+    )
 
-    const 글들 = screen.getAllByRole('button').map((button) => (button.textContent ?? '').replace('▶', '').trim())
-    expect(글들.slice(0, 5)).toEqual(['투구111', '타격222', '집중333', '근성444', '지옥훈련500G'])
+    const 칸들 = screen.getAllByRole('button').map((button) => button.getAttribute('aria-label'))
+    expect(칸들.slice(0, 5)).toEqual(['투구', '타격', '집중', '근성', '지옥훈련'])
+    const 아이콘 = [...container.querySelectorAll('[data-testid="command-bar"] button img')].map((img) => img.getAttribute('src'))
+    expect(아이콘).toEqual([
+      './sprites/management/icon_selected_17.png', './sprites/mode_icon/011.png', './sprites/mode_icon/013.png',
+      './sprites/mode_icon/014.png', './sprites/mode_icon/019.png',
+    ])
+    expect(container.textContent).not.toContain('500G')
   })
 
   it('능력치 칸을 고르면 확인 팝업을 거쳐 그 칸을 넘긴다', () => {

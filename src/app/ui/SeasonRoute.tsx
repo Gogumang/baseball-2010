@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { ITEM_WINDOW_KIND } from '@/widgets/season/lib/seasonItemMenu'
 import type { ItemWindowKind } from '@/widgets/season/lib/seasonItemMenu'
 import {
@@ -109,6 +109,11 @@ interface SeasonRouteProps {
   }
 }
 
+/** 관리 메뉴 진입 0x5044~0x505e — 이 이전 상태에서 오면 0x8a2d8 로 가운데 판을 오른쪽에서 미끄러뜨린다 */
+const CENTER_SLIDE_FROM: readonly number[] = [
+  1, SEASON_SCENE_STATE.이벤트재생, SEASON_SCENE_STATE.진입분기, SEASON_SCENE_STATE.엔딩, SEASON_SCENE_STATE.경기뒤마무리,
+]
+
 /** 나리 칸 후보 — id 0xfe · +0xa 0x80/0xa0 · 기록 사본 (`nariRecruitPlayerOf`) */
 function nariRecruitOf(
   record: SeasonEntryBatterRecord | SeasonEntryPitcherRecord | null | undefined,
@@ -191,6 +196,13 @@ export function SeasonRoute({
    * 장면 0x104 다(메인 메뉴 시즌모드 0x24698 · [최근게임] 모드 2 가 같은 길). 첫 그림 전에 갈라 관리 화면이 한 번도 서지 않게
    * 첫 렌더는 비워 둔다.
    */
+  /**
+   * 이전 장면 — 관리 메뉴 0xc9 진입 0x4efc 가 이전 상태 1 · 0xd3 · 0xcb · 0xf5 · 0xf1 이면 가운데 판을 미끄러뜨린다(0x8a2d8).
+   * 처음 서는 관리 메뉴(이전 없음)는 진입 분기 0xcb 를 지난 것이다.
+   */
+  const sceneTrail = useRef<{ readonly scene: number; readonly previous: number | null }>({ scene, previous: null })
+  if (sceneTrail.current.scene !== scene) sceneTrail.current = { scene, previous: sceneTrail.current.scene }
+  const previousScene = sceneTrail.current.previous
   const [isEnteringGame, setEnteringGame] = useState(() => session.isGameInProgress)
   useLayoutEffect(() => {
     if (!isEnteringGame) return
@@ -292,6 +304,8 @@ export function SeasonRoute({
           actions.goto(target)
         }}
         onExit={onExit}
+        gamePoint={session.gamePoints}
+        centerSlidesIn={previousScene === null || CENTER_SLIDE_FROM.includes(previousScene)}
       />
     )
   }
@@ -305,6 +319,7 @@ export function SeasonRoute({
         onCursorChange={(index) => actions.moveMenuCursor('teamMenu', index)}
         onSelect={(_item, target) => actions.goto(target)}
         onBack={backToManagement}
+        gamePoint={session.gamePoints}
       />
     )
   }
@@ -689,6 +704,7 @@ export function SeasonRoute({
           return windowKind === ITEM_WINDOW_KIND.구장아이템 ? actions.goto(target) : setMissingWindow(windowKind)
         }}
         onBack={backToManagement}
+        gamePoint={session.gamePoints}
       />
     )
   }
@@ -745,6 +761,7 @@ export function SeasonRoute({
     return (
       <SeasonInfoScreen
         state={state}
+        gamePoint={session.gamePoints}
         isKeyEnabled={recordPick === null}
         overlay={recordPick === null ? undefined : (
           <SeasonRecordPickPopup

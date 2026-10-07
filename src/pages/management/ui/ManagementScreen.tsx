@@ -19,6 +19,9 @@ import { SpecialSwingWindow } from '@/widgets/special-swing/ui/SpecialSwingWindo
 import { TitleListWindow } from '@/widgets/management/ui/TitleListWindow'
 import { SkillWindow } from '@/widgets/skill-window/ui/SkillWindow'
 import type { DetailResult } from '@/pages/management/lib/detailPopup'
+import { CenterStage } from '@/pages/management/ui/CenterStage'
+import { nariStageCharactersOf } from '@/pages/management/lib/centerStage'
+import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import * as styles from '@/pages/management/ui/ManagementScreen.css'
 
 export type { ManagementCommand } from '@/pages/management/lib/managementLayout'
@@ -64,13 +67,20 @@ export interface ManagementScreenProps {
   readonly onExpandSkillSlots?: () => void
   /** 메인 메뉴로 나간다. 진행 상황은 이미 저장되어 있다. */
   readonly onExit: () => void
+  /**
+   * 가운데 판 0x7f814 의 선수가 미끄러져 들어오는가 — 105 진입 0x11910 이 이전 상태 1 · 114(이벤트) · 100(경기 뒤)이면
+   * 0x8a2d8 을 부른다(0x11c6e~0x11c80). 그 밖(상점 · 외출 취소 등)에서 돌아오면 제자리에 선다.
+   */
+  readonly centerSlidesIn?: boolean
 }
 
 /** 기본정보 카드 그림 0x166cc 의 바닥비트 (0x166f2 `movs r2, #0x87`) */
 const BASIC_INFO_FOOTER = 0x87
 
 /**
- * 관리 메뉴 — 원본 좌표 그대로 (0x167cc: 상태판 0x7d34c → 커맨드 줄 0x7e418 → 훈련 팝업 0x7f814 → 머리띠·바닥띠 0x54d94).
+ * 관리 메뉴 — 원본 좌표 그대로. 앞그림 0x16a34 → 0x16928 이 공 무늬 바탕 0x5fd61(142~144 밖)을 깔고,
+ * 105~108·110·122·123 그림 0x19da4 가 커맨드 줄 0x7e418 → 상태판 0x7d34c → 가운데 판 0x7f814(114 · 125 · 126 · 127 · 136 밖,
+ * 선수 하나 — `lib/centerStage`) → 머리띠·바닥띠 0x54d94 를 그린다. 훈련 팝업은 0x848d0 이다.
  * [선수정보]·[트레이닝]·[아이템] 은 화면을 바꾸지 않고 하단 줄이 하위 메뉴로 바뀐다 (0x7e84c).
  */
 export function ManagementScreen(props: ManagementScreenProps) {
@@ -84,8 +94,19 @@ export function ManagementScreen(props: ManagementScreenProps) {
 
   return (
     <RawScreen>
+      <SkinBackdrop kind="공무늬" />
       {!menu.isShowingBasicInfo && (
         <ManagementBoard career={career} titleName={currentTitleOf(career)} hour={new Date().getHours()} />
+      )}
+      {/* 가운데 판 0x7f814 — 기본정보(119, 그림 0x166cc)와 훈련 연출(125)에는 없다 */}
+      {!menu.isShowingBasicInfo && menu.playingMenuId === null && (
+        <CenterStage slidesIn={props.centerSlidesIn ?? false} characters={nariStageCharactersOf({
+          morale: career.morale,
+          isSick: career.isSick,
+          isInjured: career.isInjured,
+          isSlugger: career.battingTypeIndex >= 1,
+          skinIndex: career.skinIndex,
+        })} />
       )}
       {menu.playingMenuId !== null && (
         <div className={styles.trainingPopup}>

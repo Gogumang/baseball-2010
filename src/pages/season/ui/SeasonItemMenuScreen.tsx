@@ -3,9 +3,8 @@ import type { SeasonState } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonSceneState } from '@/entities/season-mode/model/seasonStateMachine'
 import { SEASON_ITEM_MENU } from '@/widgets/season/lib/seasonItemMenu'
 import type { ItemWindowKind, SeasonItemMenuEntry } from '@/widgets/season/lib/seasonItemMenu'
-import { SeasonListWindow } from '@/widgets/season/ui/SeasonListWindow'
-import type { SeasonListRow } from '@/widgets/season/ui/SeasonListWindow'
-import { SeasonStatusPanel } from '@/pages/season/ui/SeasonStatusPanel'
+import { SEASON_SUB_COMMAND_SLOTS, seasonParentSlotOf } from '@/pages/season/lib/seasonCommandBar'
+import { SeasonCommonFrame } from '@/pages/season/ui/SeasonCommonFrame'
 import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
 
 export interface SeasonItemMenuScreenProps {
@@ -20,6 +19,8 @@ export interface SeasonItemMenuScreenProps {
   readonly onSelect: (item: SeasonItemMenuEntry, target: SeasonSceneState, windowKind: ItemWindowKind) => void
   /** 취소(−16) — 관리 메뉴(0xc9)로 되돌아간다 */
   readonly onBack: () => void
+  /** 머리띠 G포인트 (저장 +0x64) */
+  readonly gamePoint?: number
 }
 
 /**
@@ -28,36 +29,28 @@ export interface SeasonItemMenuScreenProps {
  * 관리 메뉴 칸 4 에서 들어와 칸 0 은 선수 고르기 0xdf, 나머지는 아이템 상점 **0xdc** 로 간다.
  * 칸 넷과 차례·창 종류는 `widgets/season/lib/seasonItemMenu.ts` 머리 주석 (0x4da4 · 0x5f3c 직접 떴다).
  *
- * ⚠️ **원본 배치 미해독 — 근사**: 그리기는 **공통 틀**(0x9f60)의 가운데 판이라 줄 좌표가 없다.
- * 다른 시즌 화면들과 같은 공용 판 (24, 54, 192, 212) 목록으로 그린다. 칸 글은 그림 글로 보여
- * 이벤트·설명서 글이 부르는 이름을 적었다.
+ * 그리기는 공통 틀(`SeasonCommonFrame`) — 커맨드 줄 하위 칸(표 0xd47b0 · 0xd47b8: 100 장착아이템 · 288 구장아이템 ·
+ * 105 서브아이템 · 110 GP아이템)과 부모 칸 아이템.
  */
-export function SeasonItemMenuScreen({ state, onSelect, onBack }: SeasonItemMenuScreenProps) {
-  const rows: readonly SeasonListRow[] = SEASON_ITEM_MENU.map((entry) => ({
-    id: entry.label,
-    label: entry.label,
-  }))
+export function SeasonItemMenuScreen({ state, onSelect, onBack, gamePoint = 0 }: SeasonItemMenuScreenProps) {
 
   const select = (index: number) => {
     const entry = SEASON_ITEM_MENU[index]
     if (entry === undefined) return
     onSelect(entry, entry.target, entry.windowKind)
   }
-  const { cursor, moveTo } = useSeasonCursor({ count: rows.length, onSelect: select, onCancel: onBack })
+  const { cursor, moveTo } = useSeasonCursor({ count: SEASON_ITEM_MENU.length, onSelect: select, onCancel: onBack })
 
   return (
     <RawScreen>
-      {/* 상태판 0x7d34c 를 먼저 그리고 그 위에 다른 것이 덮인다 (원본 그리기 차례) */}
-      <SeasonStatusPanel record={state.record} teamMorale={state.teamMorale} />
-      <SeasonListWindow
-        title="아이템"
-        rows={rows}
-        cursor={cursor}
-        onMoveCursor={moveTo}
-        onSelect={select}
-        onBack={onBack}
-        footer={SEASON_ITEM_MENU[cursor]?.description ?? ''}
-      />
+      <div role="group" aria-label="아이템">
+        <SeasonCommonFrame record={state.record} teamMorale={state.teamMorale} gamePoint={gamePoint} onBack={onBack}
+          commandBar={{
+            slots: SEASON_SUB_COMMAND_SLOTS.아이템, cursor, parent: seasonParentSlotOf('아이템'),
+            onHover: moveTo,
+            onSelect: (id) => select(SEASON_ITEM_MENU.findIndex((entry) => entry.label === id)),
+          }} />
+      </div>
     </RawScreen>
   )
 }

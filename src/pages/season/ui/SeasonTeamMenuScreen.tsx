@@ -2,10 +2,9 @@ import { RawScreen } from '@/shared/ui'
 import type { SeasonState } from '@/entities/season-mode/model/seasonRecord'
 import { TEAM_MENU, teamMenuTarget } from '@/entities/season-mode/model/seasonStateMachine'
 import type { SeasonSceneState } from '@/entities/season-mode/model/seasonStateMachine'
-import { SeasonListWindow } from '@/widgets/season/ui/SeasonListWindow'
-import { SeasonStatusPanel } from '@/pages/season/ui/SeasonStatusPanel'
+import { SEASON_SUB_COMMAND_SLOTS, seasonParentSlotOf } from '@/pages/season/lib/seasonCommandBar'
+import { SeasonCommonFrame } from '@/pages/season/ui/SeasonCommonFrame'
 import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
-import type { SeasonListRow } from '@/widgets/season/ui/SeasonListWindow'
 
 export type TeamMenuItem = (typeof TEAM_MENU)[number]
 
@@ -21,6 +20,8 @@ export interface SeasonTeamMenuScreenProps {
   /** 메뉴 커서 — 원본 메뉴 객체 this+0x78 은 장면이 사는 동안 남는다(세션이 든다). 안 주면 화면이 0 에서 든다 */
   readonly cursor?: number
   readonly onCursorChange?: (index: number) => void
+  /** 머리띠 G포인트 (저장 +0x64) */
+  readonly gamePoint?: number
 }
 
 /**
@@ -28,14 +29,12 @@ export interface SeasonTeamMenuScreenProps {
  *
  * StrHOWTO[21] "구단 관리 커맨드" 가 네 칸을 그대로 설명한다.
  *
- * ⚠️ **원본 배치 미해독 — 근사**: 0xce 에는 그리기 함수가 따로 없고(상태표의 그림 칸이 비어 있다)
- * 관리 메뉴 화면 위에서 하위 메뉴만 바뀌는 것으로 보이지만 좌표를 확인하지 못했다.
- * 여기서는 관리 메뉴와 같은 공용 판 목록으로 그린다.
+ * 그리기 0x9fcc → 공통 틀 0x9f60(`SeasonCommonFrame`) — 커맨드 줄 하위 칸(표 0xd47d4 · 0xd47dc)과 부모 칸 구단관리.
+ * 0x7e418 은 상태 0xce 일 때만 하위 메뉴 켬 표(메뉴 +0x28)로 칸을 흑백으로 그린다 — 그 표를 끄는 곳은 아직 못 찾아 다 켠 것으로 둔다.
  */
 export function SeasonTeamMenuScreen({
-  state, onSelect, onBack, cursor: heldCursor, onCursorChange,
+  state, onSelect, onBack, cursor: heldCursor, onCursorChange, gamePoint = 0,
 }: SeasonTeamMenuScreenProps) {
-  const rows: readonly SeasonListRow[] = TEAM_MENU.map((label) => ({ id: label, label }))
 
   const select = (index: number) => {
     const target = teamMenuTarget(index)
@@ -43,24 +42,21 @@ export function SeasonTeamMenuScreen({
     onSelect(TEAM_MENU[index], target)
   }
   const { cursor, moveTo } = useSeasonCursor({
-    count: rows.length, onSelect: select, onCancel: onBack,
+    count: TEAM_MENU.length, onSelect: select, onCancel: onBack,
     ...(heldCursor === undefined ? {} : { cursor: heldCursor }),
     ...(onCursorChange === undefined ? {} : { onCursorChange }),
   })
 
   return (
     <RawScreen>
-      {/* 상태판 0x7d34c 를 먼저 그리고 그 위에 다른 것이 덮인다 (원본 그리기 차례) */}
-      <SeasonStatusPanel record={state.record} teamMorale={state.teamMorale} />
-      <SeasonListWindow
-        title="구단관리"
-        rows={rows}
-        cursor={cursor}
-        onMoveCursor={moveTo}
-        onSelect={select}
-        onBack={onBack}
-        footer={'구장관리 · 트레이드 · 선수영입 · 코치채용'}
-      />
+      <div role="group" aria-label="구단관리">
+        <SeasonCommonFrame record={state.record} teamMorale={state.teamMorale} gamePoint={gamePoint} onBack={onBack}
+          commandBar={{
+            slots: SEASON_SUB_COMMAND_SLOTS.구단관리, cursor, parent: seasonParentSlotOf('구단관리'),
+            onHover: moveTo,
+            onSelect: (id) => select(TEAM_MENU.findIndex((label) => label === id)),
+          }} />
+      </div>
     </RawScreen>
   )
 }

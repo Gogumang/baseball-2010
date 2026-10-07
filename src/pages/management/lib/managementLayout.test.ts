@@ -16,6 +16,8 @@ import {
   messageGameNumberOf,
   messageLineLayoutOf,
   nameBandSplitOf,
+  commandLabelAlignOf,
+  commandLabelLeftOf,
 } from '@/pages/management/lib/managementLayout'
 
 describe('하위 메뉴 · 등장 애니메이션 — 0x7e84c · 0x7ff8c (layout-re 2차)', () => {
@@ -113,5 +115,17 @@ describe('관리 화면 배치 — 0x7d34c · 0x7e418', () => {
 
   it('경기장 띠는 6~15시 0 · 16~19시 1 · 그 밖 2', () => {
     expect([6, 15, 16, 19, 20, 5].map(backgroundFrameOf)).toEqual([0, 0, 1, 1, 2, 2])
+  })
+})
+
+describe('커맨드 줄 이름표 정렬 — 0x7e666~0x7e67e', () => {
+  it('하위 메뉴의 칸 2·3 만 왼쪽(0x21), 그 밖은 가운데(0x22)', () => {
+    expect([0, 1, 2, 3, 4].map((index) => commandLabelAlignOf(true, index))).toEqual([0x22, 0x22, 0x21, 0x21, 0x22])
+    expect([0, 2, 3, 5].map((index) => commandLabelAlignOf(false, index))).toEqual([0x22, 0x22, 0x22, 0x22])
+  })
+
+  it('왼쪽이면 칸 x 에 글자가 붙는다 — 테두리 그림은 1px 앞', () => {
+    expect(commandLabelLeftOf(122, 50, 0x21)).toBe(121)
+    expect(commandLabelLeftOf(122, 20, 0x22)).toBe(122 + 6 - 1)
   })
 })
