@@ -21,8 +21,8 @@
  * 시즌 0x7044 · 일반 0x2a370 과 같은 규칙이다(`leavesEntryEditor`). 저장은 따로 안 한다.
  * 그림 0x16738 = 기본 엔트리 목록 `0x5cfec` + 머리띠 `0x54d95(skin, 탭 1 ? 7 : 6, 탭 1 ? 0xf : 0x17, 0)` — 시즌 0xe0 과 같다.
  *
- * ⚠️ 근사·미해결: 화면 밀기(0xbdae9) 연출 없음. 국가대항전 두 팀은 대회 레코드(저장 +0x918 · +0x934)를 웹이 저장하지 않아
- * 붙박이 표로 보인다(대한민국에 내 선수가 안 낀다).
+ * 국가대항전 두 팀은 저장의 대회 레코드 두 칸(+0xbc4 대표팀 · +0xbe0 상대국, `entities/career/model/nariCupTeams`)이다.
+ * ⚠️ 미해결: 화면 밀기(0xbdae9) 연출 없음.
  */
 import { leavesEntryEditor, openEntryEditor, pointEntryCursor, pressEntryKey } from '@/entities/season-mode/model/entryEditor'
 import type {
@@ -33,6 +33,7 @@ import {
 } from '@/entities/career/model/nariTeamRecord'
 import type { NariTeamRecord } from '@/entities/career/model/nariTeamRecord'
 import { leagueGamePitchersOf, nextOpponentOf } from '@/entities/career/model/playerCareer'
+import { nariCupRecordOf } from '@/entities/career/model/nariCupTeams'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { ACE_PITCHER_SLOT } from '@/entities/league/model/leagueDay'
 import { UNSHUFFLED_PITCHER_ORDER } from '@/entities/league/model/league'
@@ -140,29 +141,32 @@ function recordAcePitcherSpecial(record: NariTeamRecord) {
 
 /**
  * **타자편** 143 — 정규·포스트시즌은 저장의 나리 팀 레코드(`nariTeams`)와 142 진입이 돌린 투수 차례(`leagueGamePitchersOf` —
- * g ≠ 0 이면 0xb8c80 로 한 칸 돈 것 · 포스트시즌은 시리즈 이월), 국가대항전(`cup`)은 대회 두 팀 붙박이 표다(머리말 근사).
+ * g ≠ 0 이면 0xb8c80 로 한 칸 돈 것 · 포스트시즌은 시리즈 이월), 국가대항전(`cup`)은 대회 레코드 두 칸이다.
  */
 export function batterNariEntryViewOf(
   career: PlayerCareer,
   isMyTeam: boolean,
   cup?: { readonly myTeam: number; readonly opponent: number },
 ): NariEntryView {
+  const me: NariEntryFace = {
+    name: career.name,
+    ability: [career.ability.hit, career.ability.power, career.ability.defense, career.ability.run],
+  }
   if (cup !== undefined) {
+    // 국가대항전 — 0x1f9a9 가 팀 10 은 대표팀 칸(+0xbc4, 내 선수가 낀), 그 밖은 상대국 칸(+0xbe0)을 준다. 투수는 142 가 돌린 그 칸 차례
     const teamId = isMyTeam ? cup.myTeam : cup.opponent
-    const record = tableNariTeamRecord(teamId)
+    const record = career.nariCupTeams === undefined
+      ? tableNariTeamRecord(teamId)
+      : nariCupRecordOf(career.nariCupTeams, teamId)
     return openNariEntryView(isMyTeam, teamId, {
-      batters: nariEntryBattersOf(record, teamId, null),
-      pitchers: nariEntryPitchersOf(teamId, UNSHUFFLED_PITCHER_ORDER),
+      batters: nariEntryBattersOf(record, teamId, me),
+      pitchers: nariEntryPitchersOf(teamId, record.pitchers ?? UNSHUFFLED_PITCHER_ORDER),
     })
   }
   const opponent = nextOpponentOf(career)
   const teamId = isMyTeam ? career.teamId : opponent
   const record = nariTeamRecordOf(nariTeamsOf(career), teamId)
   const pitchers = leagueGamePitchersOf(career, opponent)
-  const me: NariEntryFace = {
-    name: career.name,
-    ability: [career.ability.hit, career.ability.power, career.ability.defense, career.ability.run],
-  }
   return openNariEntryView(isMyTeam, teamId, {
     batters: nariEntryBattersOf(record, teamId, me),
     pitchers: nariEntryPitchersOf(

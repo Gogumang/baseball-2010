@@ -119,7 +119,16 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { isInfiniteGamePointOn } from '@/shared/lib/dev/devOptions'
 import { pickLoadingTip } from '@/shared/config/loadingTips'
 import type { SaveGamePort } from '@/shared/api/save/saveGamePort'
-import { createNationalCup } from '@/entities/national-cup/model/nationalCup'
+import { KOREA_TEAM_ID, createNationalCup, nationalCupMatchupOf } from '@/entities/national-cup/model/nationalCup'
+import {
+  createNariCupTeams,
+  nariCupBattingOrderOf,
+  nariCupRecordOf,
+  nextNariCupDayTeams,
+  prepareNariCupMatch,
+} from '@/entities/career/model/nariCupTeams'
+import type { NariCupTeams } from '@/entities/career/model/nariCupTeams'
+import { UNSHUFFLED_PITCHER_ORDER } from '@/entities/league/model/league'
 import type { NationalCup, NationalCupMatchup } from '@/entities/national-cup/model/nationalCup'
 import { advanceNationalCupDay } from '@/entities/national-cup/model/nationalCupPlay'
 import { isMyTurn } from '@/entities/league/model/seasonEnd'
@@ -178,6 +187,13 @@ const MY_LEAGUE_EVALUATION_THRESHOLD = 1
 function evaluationJingleIdOf(popularityChange: number): number {
   if (popularityChange < 0) return 38
   return popularityChange > MY_LEAGUE_EVALUATION_THRESHOLD ? 36 : 37
+}
+
+/**
+ * 저장의 국가대항전 대회 레코드 두 칸 — 없으면(대회 중 옛 저장) 대회 초기화 꼴로 세운다 (`createNariCupTeams`)
+ */
+function cupTeamsOf(career: PlayerCareer, opponentTeamId: number): NariCupTeams {
+  return career.nariCupTeams ?? createNariCupTeams(renumberedBattingOrderOf(career) - 1, opponentTeamId)
 }
 
 /** 타자 스킬 22 압도 — 상대 투수 투구 스태미나 소모 ×2 (0xa5f0e) */
@@ -434,11 +450,11 @@ export function useCareerSession({
       dayCounter = 0,
       /** 내 팀이 앉는 측 (`0xb7844` → `경기[0x28+side]`). 안 주면 후공 — 국가대항전 자리 (그 갈래는 아직 안 옮겼다) */
       playerSide: PlayerSide = PLAYER_SIDE_LAST_BAT,
-      /** 리그 경기의 두 팀 투수 레코드 차례·칸별 +0x2c (`leagueGamePitchersOf`). 국가대항전은 안 넘긴다 */
+      /** 리그 경기의 두 팀 투수 레코드 차례·칸별 +0x2c (`leagueGamePitchersOf`) · 국가대항전은 대회 레코드 두 칸의 차례 */
       pitchers?: GamePitcherSetup,
       /** 142 가 두 팀 명부에 넣은 마선수 (0xb88c8 · 0xb8870). 국가대항전은 안 넘긴다 */
       aces?: GameAceSetup,
-      /** 내 팀 명단 — 나리 팀 레코드 타자 배열 차례(`nariQuickLineupOf`). 국가대항전은 안 넘긴다 */
+      /** 내 팀 명단 — 나리 팀 레코드 타자 배열 차례(`nariQuickLineupOf`) · 국가대항전은 대표팀 칸(+0xbc4) */
       ourRecordLineup?: QuickLineup,
     ) => {
       // 환경설정 "주루" 를 경기에 태운다 — 타자편은 사람이 늘 공격이라 설정이 그대로 먹는다 (0xae690)
@@ -622,16 +638,20 @@ export function useCareerSession({
       const winner = won ? summary.ourTeamId : summary.opponentTeamId
       const loser = won ? summary.opponentTeamId : summary.ourTeamId
       cupGameRef.current = null
+      // 경기 장면 0x104 를 지나 나리 장면이 새로 선다 — 장면+0x288 = 0
+      matchPreparedRef.current = false
       // 대회 경기도 정산 진입 0x4ea0c 를 지난다 — 0x4f3d6 은 모드를 가리지 않고 +0x4c + 모드 = 0
       nariGameSaveRef.current?.clear()
       // 같은 날 CPU 경기 두 나라는 상대국 슬롯 레코드(base+0x934) 하나를 쓴다 — 사람 경기가 깎아 둔 그 레코드의
       // 투수 +0x2c 에서 선다 (701a7a9). 사람 경기 끝 상대 투수 칸별 값을 넘긴다
-      setScreen({
-        kind: '국가대항전',
-        cup: advanceNationalCupDay(cup, winner, loser, random, summary.pitcherStaminas?.opponent),
-      })
+      const next = advanceNationalCupDay(cup, winner, loser, random, summary.pitcherStaminas?.opponent)
+      // 하루 끝 b8216 — 다음 날 사람 경기 상대를 +0xbe0 에 마스터에서 새로 복사
+      setCareer((current) => current === null || current.nariCupTeams === undefined
+        ? current
+        : { ...current, nariCupTeams: nextNariCupDayTeams(current.nariCupTeams, nationalCupMatchupOf(next)?.opponent ?? null) })
+      setScreen({ kind: '국가대항전', cup: next })
     },
-    [random, setScreen],
+    [random, setCareer, setScreen],
   )
 
   /**
@@ -810,8 +830,17 @@ export function useCareerSession({
       // 463 출전 — 상태 133 이 `0xb7bf1(L)` 로 대회를 세우고 순위 화면 134 를 줄에 넣는다.
       // 134 의 틀 0x1b92c 머리가 들어온 첫 틀(장면+0x2c == 1)에 비트 8 이 없으면 칭호 8 "국가 대표" 를 준다 — 그 뒤다
       const nationalTitle = nationalCupStandingsTitleOf(viewed.titleIds)
-      setCareer(nationalTitle === null ? viewed : awardTitles(viewed, [nationalTitle]))
-      return setScreen({ kind: '국가대항전', cup: createNationalCup() })
+      const titled = nationalTitle === null ? viewed : awardTitles(viewed, [nationalTitle])
+      const cup = createNationalCup()
+      // 0xb7bf0 대회 레코드 두 칸(+0xbc4 대표팀 · +0xbe0 첫날 상대) + 133 의 0xb53f1 — 대표팀 내 칸 t 에 내 선수 · 저장
+      setCareer({
+        ...titled,
+        nariCupTeams: createNariCupTeams(
+          renumberedBattingOrderOf(titled) - 1,
+          nationalCupMatchupOf(cup)?.opponent ?? KOREA_TEAM_ID,
+        ),
+      })
+      return setScreen({ kind: '국가대항전', cup })
     }
     if (viewedEventIds.includes(NATIONAL_CUP_EVENT.거절) || viewedEventIds.includes(NATIONAL_CUP_EVENT.탈락)) {
       // 464 거절은 `S+0x12c = 0` 으로 바로 새 시즌이다 (P5 요약, 확정).
@@ -1250,7 +1279,22 @@ export function useCareerSession({
       if (screen.cup !== undefined) {
         // 국가대항전 — 1c5fe 가 마선수를 안 넣었다. 경기가 끝나면 이 대회로 하루를 넘긴다 (`finishCupGame`)
         cupGameRef.current = screen.cup.cup
-        return startMatch(screen.cup.matchup.myTeam, career.battingOrder, screen.cup.matchup.opponent)
+        // 경기 장면 0xb891c — 두 팀을 대회 레코드 두 칸으로 세운다: 타순 = 대표팀 타자 배열(내 선수 · 벤치로 간 선수),
+        // 선발 = 두 칸 투수 0번(142 가 돌린 차례). 두 칸 스태미나는 날마다 10000(대표팀 b81e0 · 상대국 새 복사)
+        const teams = cupTeamsOf(career, screen.cup.matchup.opponent)
+        return startMatch(
+          screen.cup.matchup.myTeam,
+          nariCupBattingOrderOf(teams) ?? career.battingOrder,
+          screen.cup.matchup.opponent,
+          0,
+          PLAYER_SIDE_LAST_BAT,
+          {
+            ourOrder: nariCupRecordOf(teams, screen.cup.matchup.myTeam).pitchers ?? UNSHUFFLED_PITCHER_ORDER,
+            opponentOrder: nariCupRecordOf(teams, screen.cup.matchup.opponent).pitchers ?? UNSHUFFLED_PITCHER_ORDER,
+          },
+          undefined,
+          nariQuickLineupOf(teams.korea),
+        )
       }
       beginGame()
     },
@@ -1555,12 +1599,17 @@ export function useCareerSession({
      * 건너뛰고 장면+0x288 만 세운다. 이전 상태가 143 이 아니면 구장 `0x78664(무대, 홈 팀)` — 대회 팀은 10~13 이라
      * **rand(0, 10) 한 번**(취소로 135 에 갔다 다시 와도 또 굴린다).
      *
-     * ⚠️ **웹판 임시**: 원본은 여기서 **내 선수가 낀 대표팀 명단**(P5 2절, `0xb53f1`/`0xb521d`)으로
-     * 치르는데, 웹은 팀 로스터가 붙박이 표(`entities/team`)라 내 선수를 끼워 넣을 자리가 없다 —
-     * 대한민국 기본 명단으로 친다.
+     * 경기는 **내 선수가 낀 대표팀 칸**(+0xbc4, 133 의 `0xb53f1`)과 그날 상대국 칸(+0xbe0)으로 선다 (`nariCupTeams`).
+     * 같은 문(장면+0x288) 안에서 대회 날짜 g ≠ 0 이면 두 칸 투수를 한 칸 돌린다(1c574).
      */
     startCupGame: (matchup: NationalCupMatchup, cup: NationalCup) => {
       if (career === null) return
+      if (!matchPreparedRef.current) {
+        // 1c574 — 대회 날짜 g ≠ 0 이면 대표팀·상대국 칸 투수 0~3 을 한 칸씩 돌린다(영구, 같은 문 안이라 한 번만)
+        setCareer((current) => current === null
+          ? current
+          : { ...current, nariCupTeams: prepareNariCupMatch(cupTeamsOf(current, matchup.opponent), cup.day) })
+      }
       matchPreparedRef.current = true
       // 홈 팀 — 웹 대회 경기는 후공(내 팀이 홈)으로 친다. 대회 팀은 모두 > 9 라 어느 쪽이든 한 번 굴린다
       rollNariMatchStadium(random, matchup.myTeam)

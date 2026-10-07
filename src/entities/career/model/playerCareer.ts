@@ -41,6 +41,7 @@ import {
 import type { SeasonStats } from '@/entities/career/model/seasonStats'
 import { ROOKIE_BATTER_SLOT } from '@/entities/career/model/nariTeamRecord'
 import type { NariTeamRecords } from '@/entities/career/model/nariTeamRecord'
+import type { NariCupTeams } from '@/entities/career/model/nariCupTeams'
 
 /** 원본 능력치 상한 (0xb6414 가 999 로 자른다) */
 export const MAXIMUM_ABILITY = BALANCE.ability.maximum
@@ -299,6 +300,11 @@ export interface PlayerCareer {
    * 142 마선수 넣기·타순 보상 19 가 고친다. 옛 저장·아직 안 고친 새 선수는 없다 — `nariTeamsOf` 가 등록 때의 꼴로 세운다.
    */
   readonly nariTeams?: NariTeamRecords
+  /**
+   * **국가대항전 대회 레코드 두 칸** (`entities/career/model/nariCupTeams`) — 저장 블록 +0xbc4 대표팀(내 선수가 낀) · +0xbe0 상대국.
+   * 대회를 시작할 때(0xb7bf0 · 133) 세우고 142·하루 끝이 고친다. 대회 밖에서는 읽지 않는다. 옛 저장에는 없다.
+   */
+  readonly nariCupTeams?: NariCupTeams
   /** 목표 타순 경로 — 이벤트 487 에서 고른다. 고르기 전에는 null */
   readonly battingOrderPath: '4번' | '1번' | null
   /** 지난 중간평가 달성 수 (원본 +0x1cc) — 칭호 "전년 대비 성적 우수" */

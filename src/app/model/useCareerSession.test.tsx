@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { useState } from 'react'
+import { nariLineupSlotsOf } from '@/entities/career/model/nariTeamRecord'
 import { describe, expect, it } from 'vitest'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { applyGameEvaluation, isEvaluatedGame, useCareerSession } from '@/app/model/useCareerSession'
@@ -124,6 +125,17 @@ describe('연말 국가대표 선발 판정 (상태 133 = 0x1a090)', () => {
     // 순위 화면 134 의 첫 틀(0x1b92c)이 칭호 8 "국가 대표" 를 주고 곧바로 장착한다
     expect(출전.result.current.session.career?.titleIds).toContain(TITLE_NAMES[8])
     expect(출전.result.current.session.career?.equippedTitle).toBe(8)
+    // 0xb7bf0 + 133 — 대회 레코드 두 칸: 대표팀에 내 선수(내 칸) · 첫날 상대 일본
+    const 대회칸 = 출전.result.current.session.career?.nariCupTeams
+    expect(대회칸?.opponentTeamId).toBe(11)
+    expect(대회칸?.korea.batters.some((row) => row.slot === -1)).toBe(true)
+
+    // 142 → 경기: 대표팀 칸 타자 배열로 서고 내 선수가 그 칸 차례에 선다(벤치로 간 선수 하나가 는다)
+    act(() => 출전.result.current.session.actions.startCupGame({ myTeam: 10, opponent: 11 }, createNationalCup()))
+    act(() => 출전.result.current.session.actions.confirmMatchPrepare())
+    const 경기 = 출전.result.current.session.progress!
+    expect(경기.ourLineup.rosterSlots).toEqual(nariLineupSlotsOf(대회칸!.korea))
+    expect(경기.ourLineup.benchBatters).toBe(대회칸!.korea.batters.length - 9)
 
     const 거절 = 띄우기(목표달성선수())
     연봉사슬끝내기(거절)
