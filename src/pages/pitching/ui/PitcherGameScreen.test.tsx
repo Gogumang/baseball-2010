@@ -183,8 +183,34 @@ describe('투수편 경기 화면', () => {
     }
 
     expect(screen.getByText('경기 결과')).toBeTruthy()
+    // 정산 그리기 0x4a384 — 모드 3 도 팀경기와 같은 판(점수판 틀 · 점수 · 기본 화면)이다
+    expect(screen.getByTestId('정산-판')).toBeTruthy()
+    expect(screen.getByTestId('정산-점수-0')).toBeTruthy()
     // 감독 평가는 정산 판이 아니라 나리 상태 116 의 몫이다
     expect(screen.queryByText('감독 평가')).toBeNull()
+  })
+
+  it('정산 판에서 \'0\' 이 아닌 키는 정산을 나간다 (키 0x407f0 → 메시지 0x3f3)', () => {
+    const onFinish = vi.fn()
+    vi.useFakeTimers()
+    try {
+      render(
+        <PitcherGameScreen options={{ ...기본옵션, dayCounter: 3 }} random={createSeededRandom(20100901)} onFinish={onFinish}
+          gamePoint={100} />,
+      )
+      // 인트로(0xc)를 '5' 로 건너뛰면 경기 끝 결과 판(0x18) — 10틱 잠금 뒤 OK 로 정산(0x19)
+      fireEvent.keyDown(window, { key: '5' })
+      expect(screen.getByAltText('세이브')).toBeTruthy()
+      act(() => void vi.advanceTimersByTime(millisecondsPerFrame() * 10))
+      fireEvent.keyDown(window, { key: '5' })
+    } finally {
+      vi.useRealTimers()
+    }
+    expect(screen.getByTestId('정산-판')).toBeTruthy()
+
+    fireEvent.keyDown(window, { key: '5' })
+
+    expect(onFinish).toHaveBeenCalledTimes(1)
   })
 })
 

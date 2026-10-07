@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { BigResult, Hint, MenuList, Panel, PixelScreen, StatGrid } from '@/shared/ui'
-import type { MenuItem, StatEntry } from '@/shared/ui'
+import { Hint, MenuList, Panel, PixelScreen } from '@/shared/ui'
+import type { MenuItem } from '@/shared/ui'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { ORIGINAL_BURST_TABLES } from '@/shared/config/original/burstMissions'
 import { BurstMissionWindow } from '@/widgets/burst-mission/ui/BurstMissionWindow'
@@ -44,7 +44,9 @@ import { humanVsComputerSidesOf } from '@/widgets/scoreboard-frame/lib/scoreboar
 import { usePitchEndSerial, useRecordAlert } from '@/widgets/game-scene/model/useRecordAlert'
 import { RecordAlertScreenOverlay } from '@/widgets/game-scene/ui/RecordAlertPanel'
 import { isGameEndRecord, leadingRecordCountOf } from '@/widgets/game-scene/lib/recordAlert'
-import { passesRecordTeamGate } from '@/entities/game/model/gameRecords'
+import { passesRecordTeamGate, recordGamePointsOf } from '@/entities/game/model/gameRecords'
+import { SettlementBoard } from '@/pages/team-game/ui/SettlementBoard'
+import { MAXIMUM_GAME_POINT } from '@/entities/career/model/playerCareer'
 import * as styles from '@/pages/pitching/ui/PitcherGameScreen.css'
 
 /**
@@ -88,6 +90,11 @@ interface PitcherGameScreenProps {
    */
   readonly pitcherName?: string
   /**
+   * 경기 전 보유 G [app+0x64] — 정산 판(0x4a384)의 "보유 GP" 줄. 정산 진입 0x4ea0c 가 이 경기 기록 달성 G 를 먼저 더하고(4ec5a,
+   * 0~99999) 판을 그리므로 판은 더한 값을 보인다. 안 주면 그 줄 숫자를 비운다.
+   */
+  readonly gamePoint?: number
+  /**
    * 상태 0xe 소개 판(0x44944)의 시즌 줄 출처 — 내 투수 시즌 줄과 리그 선수 기록표. 안 주면 방어율·탈삼진·타율·홈런·타점을
    * 비운다 (`pitcherMatchupCardsOf`).
    */
@@ -103,6 +110,7 @@ export function PitcherGameScreen({
   onSettingsChange,
   pitcherName,
   matchupRecords,
+  gamePoint,
 }: PitcherGameScreenProps) {
   const session = usePitcherGame(options, random, settings?.isVibrationOn)
   const { progress, canPitch, summary, actions } = session
@@ -417,16 +425,37 @@ export function PitcherGameScreen({
   }
 
   if (summary !== null) {
+    // 정산 그리기 0x4a384 — 모드 3 은 5·6 이 아니라 팀경기와 같은 갈래 0x4a948(점수판 틀 · 점수 · 기본 화면/기록 판)이다.
+    // 이겼나 = 0x4a350(0xb6c21(경기, 0xb6a0d) == 0 — 앞선 측이 사람 팀). 원본 경기는 동점으로 안 끝난다(0xb68fc)
+    const isHumanWin = summary.result === '승'
+    const ourSide = progress.game.playerSide
+    // [+0x17f4] — 진입 0x4ea0c 4ebaa~4ec7c 가 기록 달성 횟수로 센 이번 경기 G (투수편 세션 `finishGame` 과 같은 식)
+    const earned = recordGamePointsOf(summary.recordIds)
     return withRecordAlert(
       <PixelScreen
         title="경기 결과"
         leftKey={{ label: '확인', onPress: () => onFinish(summary) }}
       >
-        <BigResult>
-          {summary.ourScore} : {summary.opponentScore} {summary.result}
-        </BigResult>
-        <StatGrid entries={pitcherStatEntries(summary)} />
-        {/* 감독 평가·변화 글은 경기 장면 밖 나리 상태 116(진입 0x1278c)의 몫이다 — 부르는 쪽(투수편 세션)이 띄운다 */}
+        {/*
+          ⚠️ 판 밑의 구름 0x78448 · 배경 0x40ff0(+0x17e2 가라앉기)은 투구 화면에 타석 캔버스가 없어 아직 안 그린다(팀경기는 BattingStage).
+          감독 평가·변화 글은 경기 장면 밖 나리 상태 116(진입 0x1278c)의 몫이다 — 부르는 쪽(투수편 세션)이 띄운다
+        */}
+        <div className={styles.matchupFrame}>
+          <SettlementBoard
+            mode={PITCHER_CAREER_MODE}
+            isWin={isHumanWin}
+            // 0xb69b0(st, 0/1) — 왼쪽이 측 0
+            side0Score={ourSide === 0 ? summary.ourScore : summary.opponentScore}
+            side1Score={ourSide === 1 ? summary.ourScore : summary.opponentScore}
+            scoreboardSides={scoreboardSides}
+            recordIds={summary.recordIds}
+            gamePoints={earned}
+            {...(gamePoint === undefined
+              ? {}
+              : { heldGamePoints: Math.min(MAXIMUM_GAME_POINT, Math.max(0, gamePoint + earned)) })}
+            onExit={() => onFinish(summary)}
+          />
+        </div>
       </PixelScreen>,
     )
   }
@@ -643,16 +672,4 @@ function slotItems(magicRemaining: number, slots: readonly PitchSlot[]): MenuIte
         ? `마구 · 남은 ${magicRemaining}회${magicRemaining === 0 ? ' (못 던짐)' : ''}`
         : undefined,
     }))
-}
-
-function pitcherStatEntries(summary: PitcherGameSummary): StatEntry[] {
-  const outs = summary.record.outsRecorded
-  return [
-    { label: '이닝', value: `${Math.trunc(outs / 3)}${['', '⅓', '⅔'][outs % 3]}` },
-    { label: '피안타', value: String(summary.record.hitsAllowed) },
-    { label: '볼넷', value: String(summary.record.walksAllowed) },
-    { label: '탈삼진', value: String(summary.record.strikeouts) },
-    { label: '투구수', value: String(summary.pitchCount) },
-    { label: '방어율', value: (summary.earnedRunAverage / 100).toFixed(2) },
-  ]
 }
