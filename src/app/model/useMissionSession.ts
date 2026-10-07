@@ -88,6 +88,7 @@ import type { PitchTypeInfo } from '@/shared/config/original/pitchTypes'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { MissionClearCounts, MissionRecordPort } from '@/shared/api/save/missionRecordPort'
 import { missionRewardOf } from '@/entities/mission/model/missionReward'
+import { aceMatchClearCountAfterWin, aceMatchClearKeyOf } from '@/entities/mission/model/aceMatchClear'
 import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
 import { vibrate } from '@/entities/defense-controls/model/vibration'
 import { strikeoutVibrationMillisecondsOf } from '@/features/play-game/model/strikeoutVibration'
@@ -913,6 +914,18 @@ export function useMissionSession({
     missionRecord.save(next)
   }
 
+  /**
+   * **마선수 대결을 이겼을 때** — 0xa5368(obj, 1) 이 g[0x11f]·g[0x176] 을 안 보고 `[obj+0xbd] = team − 1 ≤ 15` 면
+   * 그 편의 클리어 칸을 올린다(−1 에서 시작, 99 상한). 보상 G 는 0x4ef3e 가 건너뛴다 (`entities/mission/model/aceMatchClear`).
+   */
+  const rememberAceMatchCleared = (mission: OriginalMission) => {
+    const key = aceMatchClearKeyOf(mission)
+    if (key === null) return
+    const next = { ...clearCounts, [key]: aceMatchClearCountAfterWin(clearCounts[key]) }
+    setClearCounts(next)
+    missionRecord.save(next)
+  }
+
   /** 새 경기 — 필살·마구 남은 칸은 0xaebe4 가 다시 채운다 (팀 new 0xb891c 가 −1), 공 객체도 새것 */
   const resetForNewMatch = (mission: OriginalMission) => {
     // 새 경기 — 0xaae7c 가 저장된 마투수 레코드(+0x2c = 10000)를 다시 베낀다
@@ -978,7 +991,7 @@ export function useMissionSession({
       setScreen({ kind: '미션진행', mission })
     },
 
-    /** 이벤트 match — 공략 레코드를 치르고 결과 이벤트로 돌아간다. 미션 클리어 기록에는 남기지 않는다 */
+    /** 이벤트 match — 공략 레코드를 치르고 결과 이벤트로 돌아간다 (이기면 `finishAceMatch` 가 클리어 칸을 올린다) */
     beginAceMatch: (mission: OriginalMission, pending: Omit<Extract<Screen, { kind: '마선수대결' }>, 'kind' | 'mission'>) => {
       setOpponentMoundStamina(FULL_STAMINA)
       setBatterSpecialSwingStored(UNFILLED_SPECIAL_SWING)
@@ -1021,13 +1034,14 @@ export function useMissionSession({
      * 이 적은 **성공 여부**다. 105 진입 0x10df8 이 이 바이트로 `resultEvents[이김 ? 0 : 1]` 을 고른다 (0x10e40).
      * 그래서 이김 = 미션 상태 '성공'. 미션 클리어 G 보상은 없다 (`rememberCleared` 를 안 부른다).
      *
-     * ⚠️ 미반영: 0xa5368(obj, 1) 은 플래그를 안 보고 `[obj+0xbd] ≤ 15` 면 클리어 횟수 칸(전역 +0x150 + 편×16 + idx)을
-     *    올린다. 대결의 +0xbd 는 SYS 8 이 `g[0x175]` 와 같은 team − 1(15~19)로 적는다(0x8d88a~0x8d890 확정) — 그래서
-     *    team 16(메디카, 레코드 15)을 이겼을 때만 투수 15번 칸이 오를 것이다. 웹은 아직 대결을 클리어 기록에 남기지 않는다.
+     * 0xa5368(obj, 1) 은 플래그를 안 보고 `[obj+0xbd] ≤ 15` 면 클리어 횟수 칸(전역 +0x150 + 편×16 + idx)을 올린다.
+     * 대결의 +0xbd 는 SYS 8 이 `g[0x175]` 와 같은 team − 1(15~19)로 적는다(0x8d88a~0x8d890) — 그래서
+     * team 16(메디카, 레코드 15)을 이겼을 때만 투수 15번 칸이 −1 에서 하나 오른다 (`rememberAceMatchCleared`).
      */
     finishPitcherAceMatch: (): boolean | null => {
       if (pitcherRun === null || pitcherAceMatchMission === null) return null
       const isWin = pitcherRun.status === '성공'
+      if (isWin) rememberAceMatchCleared(pitcherAceMatchMission)
       setPitcherRun(null)
       setPitcherAceMatchMission(null)
       setPendingDefensePlay(null)
@@ -1035,8 +1049,14 @@ export function useMissionSession({
       return isWin
     },
 
+    /**
+     * 타자편 마선수 대결이 끝났다 — 결과 이벤트로 돌아간다. SYS 8 의 타자편 갈래(0x8d782~0x8d7ce)도 g[0xf7] = team − 1 ·
+     * g[0x11f] = 1 을 적고 미션객체 +0xbd = team − 1 · +0xbf = 6 이라, 이기면 0xa5368(obj, 1) 이 타자 15번 칸을 올린다
+     * (team 16 일 때만 — `rememberAceMatchCleared`). G 보상은 0x4ef3e 가 g[0x11f] 로 건너뛴다.
+     */
     finishAceMatch: () => {
       if (missionRun === null || screen.kind !== '마선수대결') return
+      if (missionRun.status === '성공') rememberAceMatchCleared(screen.mission)
       const eventId = matchResultEventOf(screen.resultEvents, missionRun.status === '성공')
       setMissionRun(null)
       setScreen({ kind: '이벤트', eventId, context: screen.context, carried: screen.carried })

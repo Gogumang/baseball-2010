@@ -39,7 +39,8 @@ const WIN_EVENT_ID = 114
 const LOSE_EVENT_ID = 115
 
 function setUpSession() {
-  const missionRecord: MissionRecordPort = { load: () => ({}), save: vi.fn() }
+  const save = vi.fn()
+  const missionRecord: MissionRecordPort = { load: () => ({}), save }
   const random = createSeededRandom(1)
   let screen: Screen = { kind: '관리' }
   const setScreen = vi.fn((next: Screen) => {
@@ -54,12 +55,12 @@ function setUpSession() {
     }
   })
 
-  return { rendered, setScreen, screenNow: () => screen }
+  return { rendered, setScreen, screenNow: () => screen, save }
 }
 
 /** 대결을 시작하고 타구 하나로 끝낸다 */
 function playAceMatch(hit: boolean) {
-  const { rendered, screenNow } = setUpSession()
+  const { rendered, screenNow, save } = setUpSession()
   const mission = aceMatchMissionOf(SIKER_TEAM)
   if (mission === null) throw new Error('싸이커 공략 레코드가 없다')
 
@@ -106,7 +107,7 @@ function playAceMatch(hit: boolean) {
   })
 
   rendered.unmount()
-  return { afterStart, status, afterFinish: screenNow() }
+  return { afterStart, status, afterFinish: screenNow(), save }
 }
 
 describe('마선수 대결 화면 전환', () => {
@@ -125,10 +126,19 @@ describe('마선수 대결 화면 전환', () => {
   })
 
   it('삼진이면 패배 이벤트 115 로 돌아간다 — 승리 경로와 같은 번호로 새지 않는다', () => {
-    const { status, afterFinish } = playAceMatch(false)
+    const { status, afterFinish, save } = playAceMatch(false)
 
     expect(status, `대결 결과가 실패가 아니다: ${status}`).toBe('실패')
     expect(afterFinish).toMatchObject({ kind: '이벤트', eventId: LOSE_EVENT_ID })
+    // 0xa5368(obj, 0) — 횟수를 안 건드린다
+    expect(save).not.toHaveBeenCalled()
+  })
+
+  it('team 16 을 이기면 0xa5368(obj, 1) 이 타자 15번 칸(타자:16)을 −1 → 0 으로 올린다 (g[0x11f] 를 안 본다)', () => {
+    const { status, save } = playAceMatch(true)
+
+    expect(status).toBe('성공')
+    expect(save).toHaveBeenCalledWith({ '타자:16': 0 })
   })
 })
 
@@ -1029,14 +1039,14 @@ describe('투수편 마선수 대결 — 투수 미션 team − 1 을 던지고 
     expect(setScreen).not.toHaveBeenCalled()
   })
 
-  it('아웃을 잡으면(성공) 이겼다 — 미션 클리어 기록·G 보상은 없다 (0x4ef3e 의 +0x176 갈래)', () => {
+  it('아웃을 잡으면(성공) 이겼다 — G 보상은 없고(0x4ef3e 의 +0x176 갈래) 투수 15번 칸만 −1 → 0 (0xa5368)', () => {
     const { status, isWin, after, save, onGamePointReward } = playPitcherAceMatch(1)
 
     expect(status).toBe('성공')
     expect(isWin).toBe(true)
     expect(after.pitcherRun).toBeNull()
     expect(after.pitcherAceMatchMission).toBeNull()
-    expect(save).not.toHaveBeenCalled()
+    expect(save).toHaveBeenCalledWith({ '투수:16': 0 })
     expect(onGamePointReward).not.toHaveBeenCalled()
   })
 
