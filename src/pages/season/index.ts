@@ -41,6 +41,10 @@ export type { SeasonTeamInfoScreenProps } from '@/pages/season/ui/SeasonTeamInfo
 export { seasonTeamInfoRowsOf, teamTypeFrameOf, stadiumLineOf } from '@/pages/season/lib/seasonTeamInfo'
 export type { TeamInfoRow, TeamInfoValue } from '@/pages/season/lib/seasonTeamInfo'
 
+/** 시즌정보 칸 1 아이템 0xd6 — 아이템 창 종류 5 (보유 서브아이템 보기) */
+export { SeasonOwnedItemsScreen } from '@/pages/season/ui/SeasonOwnedItemsScreen'
+export type { SeasonOwnedItemsScreenProps } from '@/pages/season/ui/SeasonOwnedItemsScreen'
+
 /** 공용 선수 고르기 0xdf (목적 1·2) → 선수 카드 0xd9 ↔ 능력치 상세 창 0xda (글 0x897e8) */
 export { SeasonPlayerPickScreen } from '@/pages/season/ui/SeasonPlayerPickScreen'
 export type { SeasonPlayerPickScreenProps } from '@/pages/season/ui/SeasonPlayerPickScreen'

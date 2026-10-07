@@ -252,6 +252,18 @@ describe('시즌정보 0xcd → 선수정보(0xdf 목적 2) → 카드 0xd9 ↔ 
     expect(screen.getByRole('button', { name: '선수정보' })).toBeTruthy()
   })
 
+  it('아이템 0xd6 — 가진 서브아이템만 아이콘·이름이 서고, 취소(0x5f10)로 0xcd', () => {
+    띄우기({ trainingSubItems: [false, true, false, false] })
+    fireEvent.click(screen.getByRole('button', { name: '아이템' }))
+    expect(screen.getByRole('group', { name: '보유 아이템' })).toBeTruthy()
+    expect(screen.queryByTestId('보유아이템-이름')).toBeNull() // 커서 칸 0 은 비었다
+    키('ArrowRight')
+    expect(screen.getByTestId('보유아이템-이름').textContent).toBe('피칭머신')
+    expect(screen.getByRole('button', { name: '빈 칸 0' })).toBeTruthy()
+    키('Escape')
+    expect(screen.getByRole('button', { name: '선수정보' })).toBeTruthy()
+  })
+
   it('기록순위는 웹에 화면이 없어 "아직 없음" 으로 막고 0xcd 에 남는다', () => {
     띄우기()
     fireEvent.click(screen.getByRole('button', { name: '기록순위' }))
