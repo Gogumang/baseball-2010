@@ -139,3 +139,25 @@ describe('올해의 목표 창 시즌모드 갈래의 숫자 (0x8656c 모드 2)'
     expect(seasonGoalWindowRankOf(2, 0, true)).toBe(3)
   })
 })
+
+describe('판정 0xa37bc 와 창 0x8656c 는 같은 목표 값을 본다 (표 0xd7cf6 = 사본 0xd4406)', () => {
+  it('해마다 창의 목표 다섯이 판정이 비교하는 문턱과 같다 — 문턱에 딱 맞으면 다섯 모두 달성', () => {
+    SEASON_YEAR_GOALS.forEach((row, year) => {
+      const 창 = seasonGoalWindowNumbersOf(year, 다섯개달성, 1)
+      expect(창.goals).toEqual(row)
+      const [rank, winRate, battingAverage, earnedRunAverage, popularityGain] = 창.goals
+      const 문턱 = {
+        rank: rank!, wins: winRate!, losses: 100 - winRate!,
+        teamBattingAverage: battingAverage!, teamEarnedRunAverage: earnedRunAverage!, popularityGain: popularityGain!,
+      }
+      expect(achievedSeasonGoalCount(year, 문턱)).toBe(5)
+      expect(achievedSeasonGoalCount(year, { ...문턱, rank: rank! + 1 })).toBe(4)
+    })
+  })
+
+  it('인기도 상승이 음수면 창은 0 을 그리지만 판정은 그 음수로 견준다', () => {
+    const 입력 = { ...다섯개달성, popularityGain: -3 }
+    expect(seasonGoalWindowNumbersOf(0, 입력, 1).current[4]).toBe(0)
+    expect(achievedSeasonGoalCount(0, 입력)).toBe(4)
+  })
+})
