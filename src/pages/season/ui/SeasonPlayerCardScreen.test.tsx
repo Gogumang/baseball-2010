@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { SeasonPlayerCardScreen } from '@/pages/season/ui/SeasonPlayerCardScreen'
-import { seasonCardAbilitiesOf, seasonPlayerDetailViewOf } from '@/pages/season/lib/seasonPlayerDetail'
+import { seasonCardAbilitiesOf, seasonCardInfoOf, seasonPlayerDetailViewOf } from '@/pages/season/lib/seasonPlayerDetail'
 import { seasonPlayerRecordOf } from '@/entities/season-mode/model/seasonPlayerRecord'
 import { tableRosterOf } from '@/entities/season-mode/model/seasonEntry'
 import { startNewSeason } from '@/entities/season-mode/model/seasonRecord'
@@ -22,6 +22,7 @@ function 띄우기(isDetailOpen: boolean, teamMorale = 100) {
   }
   render(
     <SeasonPlayerCardScreen teamId={0} view={view} abilities={seasonCardAbilitiesOf(view, context)}
+      info={seasonCardInfoOf(view, '서울 드래곤즈', 0)}
       detail={seasonPlayerDetailViewOf(view, context)} isDetailOpen={isDetailOpen} {...props} />,
   )
   return props
@@ -43,6 +44,12 @@ describe('선수 카드 0xd9', () => {
     띄우기(false, 20)
     expect(screen.getByTestId('선수상세-이름').textContent).toBe('박택용')
     expect(screen.getByTestId('선수상세-능력-0').textContent).toBe('히트470')
+  })
+
+  it('정보 칸 0x7c450 — 타자는 여덟 줄(끝이 노란 타순)', () => {
+    띄우기(false)
+    expect(screen.getByTestId('선수상세-정보값-1').textContent).toBe('박택용')
+    expect(screen.getByTestId('선수상세-정보값-7').textContent).toBe('1')
   })
 })
 

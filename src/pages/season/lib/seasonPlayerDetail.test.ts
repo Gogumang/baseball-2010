@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { seasonCardAbilitiesOf, seasonPlayerDetailViewOf } from '@/pages/season/lib/seasonPlayerDetail'
+import { seasonCardAbilitiesOf, seasonCardInfoOf, seasonPlayerDetailViewOf } from '@/pages/season/lib/seasonPlayerDetail'
 import type { SeasonPlayerDetailContext } from '@/pages/season/lib/seasonPlayerDetail'
 import type { SeasonPlayerRecordView } from '@/entities/season-mode/model/seasonPlayerRecord'
+import { seasonPlayerRecordOf } from '@/entities/season-mode/model/seasonPlayerRecord'
+import { tableRosterOf } from '@/entities/season-mode/model/seasonEntry'
 
 /**
  * 시즌 능력치 상세 창 글 0x897e8 — 표 다섯 줄과 글 줄 (차례·문구·조건은 0x897e8~0x8a00c 를 직접 떴다).
@@ -104,5 +106,23 @@ describe('카드 도형 0x7ba44 시즌 갈래', () => {
       { base: 500, shown: 400 },
       { base: 500, shown: 400 },
     ])
+  })
+})
+
+describe('정보 칸 0x7c450 시즌 · 0xd9 갈래 — seasonCardInfoOf', () => {
+  it('타자: 타입 +0xb>>5 · 보직 +0xb&3 · 손 (+0xb>>4)&1 · 피부 (+0xb&0xc)/4 · 타순 (+0xa&0x1f)+1, 필살은 표 +0x18 = 0 이라 빈칸', () => {
+    const view = { ...seasonPlayerRecordOf(0, tableRosterOf(0).batters[0]!, false, 0), profile: 17 }
+    expect(seasonCardInfoOf(view, '서울 드래곤즈', 3)).toEqual({
+      values: ['서울 드래곤즈', view.name, '타격형', '', '외야', '좌타', '황인'],
+      battingOrder: 4,
+    })
+  })
+
+  it('투수: 타입·손은 +2 칸, 보직은 min(r, 1) + 2 · 타순 없음', () => {
+    const view = { ...seasonPlayerRecordOf(0, tableRosterOf(0).pitchers[0]!, true, 0), profile: 0b0010_0110 }
+    expect(seasonCardInfoOf(view, 'T', 0)).toEqual({
+      values: ['T', view.name, '사이드암', '', '구원', '우완', '백인'],
+      battingOrder: null,
+    })
   })
 })

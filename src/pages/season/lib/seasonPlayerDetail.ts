@@ -163,3 +163,51 @@ export interface SeasonCardAbility {
 export function seasonCardAbilitiesOf(view: SeasonPlayerRecordView, context: SeasonPlayerDetailContext): readonly SeasonCardAbility[] {
   return [0, 1, 2, 3].map((slot) => ({ base: view.base[slot] ?? 0, shown: seasonDetailEffectiveOf(view, slot, context) }))
 }
+
+/** 정보 칸 문자열 표 (.data 포인터 표를 직접 읽었다) */
+const TYPE_NAMES = ['타격형', '장타형', '오버핸드', '사이드암'] // 0x1400258
+const ROLE_NAMES = ['내야', '외야', '선발', '구원'] // 0x1400248
+const HAND_NAMES = ['우타', '좌타', '우완', '좌완'] // 0x1400238
+const SKIN_NAMES = ['황인', '백인', '흑인', '우타'] // 0x140022c — 넷째 칸은 손 표의 "우타" 를 가리킨다(원본 그대로)
+/** 이름표 img_text — 타자 0xd4898 (여덟 줄, 끝이 326 타순) · 투수 0xd488a (일곱 줄) */
+export const SEASON_CARD_INFO_LABELS = { 타자: [81, 320, 321, 322, 323, 324, 325, 326], 투수: [81, 320, 321, 322, 323, 324, 325] } as const
+
+export interface SeasonCardInfo {
+  /** 줄마다 값 — 팀명 · 이름 · 타입 · 필살 · 보직 · 손 · 피부 */
+  readonly values: readonly string[]
+  /** 타순 (타자만) — 0xb6394(선수) + 1 = (+0xa & 0x1f) + 1, 노란 글 */
+  readonly battingOrder: number | null
+}
+
+/**
+ * **정보 칸 0x7c450 시즌 · 0xd9 갈래** (직접 떴다 — 0x7c4c0~0x7cfa4 의 `상태 == 0xd9` 가지).
+ * 판은 mode_ui 프레임 (창+0x24c 타자 ? 2 : 1), 줄 수는 타자 8 · 투수 7(0x7c562), 이름표는 위 표.
+ * ```
+ * 팀명  img_text 0x41 + 팀
+ * 이름  0xb62c1(선수)
+ * 타입  0x1400258[(+0xb >> 5) + (투수 ? 2 : 0)]
+ * 필살  +0x18 > 0 이면 StrCOMMON[+0x18 + 0x18 (+6 투수) (+ (+0xb >> 5) if +0x18 == 4)], 0 이면 비운다
+ * 보직  r = 0xb6704 = +0xb & 3 ; 타자 0x1400248[r] · 투수 0x1400248[min(r, 1) + 2]
+ * 손    0x1400238[0xb63c0(선수) + (투수 ? 2 : 0)] — 마선수가 아니면 0xb63c0 = (+0xb >> 4) & 1
+ * 피부  0x140022c[(+0xb & 0xc) / 4]
+ * 타순  타자만, 0xb6394(선수) + 1 — 글색 (255, 255, 0)
+ * ```
+ * 리그 선수 표(XlsBATTER_DATA · XlsPITCHER_DATA 300행)의 +0x18 은 모두 0 이라(추출본을 직접 셌다) 필살 줄은 비어 있다.
+ * ⚠️ 미해결: 영입한 나리·명예 선수는 웹 명단이 0x30 바이트(+0xb · +0x18)를 들지 않아 타입·손·피부·필살이 표 기본(0)으로 나온다.
+ */
+export function seasonCardInfoOf(view: SeasonPlayerRecordView, teamName: string, kindByte: number): SeasonCardInfo {
+  const pitcherShift = view.isPitcher ? 2 : 0
+  const role = view.profile & 3
+  return {
+    values: [
+      teamName,
+      view.name,
+      TYPE_NAMES[(view.profile >> 5) + pitcherShift] ?? '',
+      '',
+      ROLE_NAMES[view.isPitcher ? Math.min(role, 1) + 2 : role] ?? '',
+      HAND_NAMES[((view.profile >> 4) & 1) + pitcherShift] ?? '',
+      SKIN_NAMES[(view.profile & 0xc) >> 2] ?? '',
+    ],
+    battingOrder: view.isPitcher ? null : (kindByte & 0x1f) + 1,
+  }
+}

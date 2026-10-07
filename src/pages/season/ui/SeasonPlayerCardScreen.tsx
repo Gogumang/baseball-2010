@@ -5,7 +5,10 @@ import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { TEAMS } from '@/shared/config/original/teams'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import type { SeasonPlayerRecordView } from '@/entities/season-mode/model/seasonPlayerRecord'
-import type { SeasonCardAbility } from '@/pages/season/lib/seasonPlayerDetail'
+import { SEASON_CARD_INFO_LABELS } from '@/pages/season/lib/seasonPlayerDetail'
+import type { SeasonCardAbility, SeasonCardInfo } from '@/pages/season/lib/seasonPlayerDetail'
+import { INFO_BOARD, INFO_COLUMNS, INFO_ROW_HEIGHT, INFO_ROW_STEP, INFO_TOP, RIGHT_PANEL } from '@/pages/management/lib/basicInfoLayout'
+import * as infoStyles from '@/pages/management/ui/ManagementScreen.css'
 import { DetailWindow } from '@/pages/management/ui/DetailPopup'
 import type { DetailView } from '@/pages/management/lib/detailPopup'
 import { abilityDetailScrollKeyOf, scrollAbilityDetail } from '@/pages/management/lib/abilityDetail'
@@ -16,6 +19,8 @@ export interface SeasonPlayerCardScreenProps {
   readonly view: SeasonPlayerRecordView
   /** 카드 도형 네 칸 — 0x7ba44 시즌 갈래 (`seasonCardAbilitiesOf`) */
   readonly abilities: readonly SeasonCardAbility[]
+  /** 정보 칸 0x7c450 시즌 · 0xd9 갈래 (`seasonCardInfoOf`) — 없으면 안 그린다 */
+  readonly info?: SeasonCardInfo
   /** 능력치 상세 창 글 0x897e8 (`seasonPlayerDetailViewOf`) — 상태 0xda 일 때만 그린다 */
   readonly detail: DetailView
   /** 상태 0xda(능력치 상세 창)인가 */
@@ -32,9 +37,11 @@ export interface SeasonPlayerCardScreenProps {
 /** StrMODE[35..38] 히트·파워·수비·주루 / [40..43] 제구·구속·변화·체력 */
 const BATTER_NAME_BASE = 35
 const PITCHER_NAME_BASE = 40
-/** 카드 판 — ⚠️ 근사 (원본은 0x7ba44 프레임 박스 + 0x7c450 정보 칸) */
-const CARD = { x: 15, y: 50, width: 210, height: 220 } as const
-const ROW = { x: 30, firstY: 120, height: 20, width: 180 } as const
+/** 카드 판 — ⚠️ 근사 (원본은 0x7ba44 프레임 박스) */
+const CARD = { x: 15, y: 50, width: 210, height: 120 } as const
+/** 네 칸 숫자 — ⚠️ 근사: 원본은 오른쪽 판(mode_ui 프레임 0 박스 1)의 도형 0x5a991 이다 */
+const ROW = { x: RIGHT_PANEL.x, firstY: RIGHT_PANEL.y + 8, height: 18, width: RIGHT_PANEL.width } as const
+const IMG_TEXT = './sprites/img_text/frames'
 
 /** 숫자 색 — 0x7bf48~0x7bf6c: 기본 > 실효 → (0xff,0,0) · 기본 < 실효 → (0,0xff,0x40) · 같으면 흰 글 */
 function colorOf({ base, shown }: SeasonCardAbility): string {
@@ -59,12 +66,12 @@ function colorOf({ base, shown }: SeasonCardAbility): string {
  * ```
  * 머리띠는 제목 10 "시즌모드" · 바닥 7(되돌아가기 + "0상세정보").
  *
+ * 정보 칸 0x7c450 의 시즌 · 0xd9 줄(팀명 · 이름 · 타입 · 필살 · 보직 · 손 · 피부 · 타순)은 `seasonCardInfoOf` 로 판 아래에 그린다.
  * ⚠️ **원본 배치 미해독 — 근사**: 카드 0x7ba44 의 시즌 갈래는 도형 숫자(실효값, 기본값과 견준 색)까지만 풀었다 —
- * 선수 그림(투수 [0x1552ae0] · 타자 겹 그림)과 정보 칸 0x7c450 의 시즌 줄은 안 풀어 이름·팀만 적고, 도형 대신 네 줄
- * 숫자로 적는다. 창 0x8a0a4 는 나리 120 과 같은 창이라 `DetailWindow` 를 그대로 쓴다.
+ * 선수 그림(투수 [0x1552ae0] · 타자 겹 그림)은 안 풀어 이름·팀만 적고, 도형 대신 네 줄 숫자로 적는다. 창 0x8a0a4 는 나리 120 과 같은 창이라 `DetailWindow` 를 그대로 쓴다.
  */
 export function SeasonPlayerCardScreen({
-  teamId, view, abilities, detail, isDetailOpen, onOpenDetail, onCloseDetail, onBack, gamePoint = 0,
+  teamId, view, abilities, info, detail, isDetailOpen, onOpenDetail, onCloseDetail, onBack, gamePoint = 0,
 }: SeasonPlayerCardScreenProps) {
   const [scrollOffset, setScrollOffset] = useState(0)
   // 0x52f4 가 들어올 때마다 글을 새로 만들고 창+0x380 = 0 — 창을 다시 열면 맨 위부터
@@ -106,10 +113,10 @@ export function SeasonPlayerCardScreen({
   return (
     <RawScreen>
       <div className={styles.window} style={{ left: CARD.x, top: CARD.y, width: CARD.width, height: CARD.height }} />
-      <div className={styles.title} style={{ left: CARD.x, top: CARD.y + 12, width: CARD.width }}>
+      <div className={styles.title} style={{ left: CARD.x, top: CARD.y + 12, width: RIGHT_PANEL.x - CARD.x }}>
         {TEAMS[teamId]?.name ?? ''}
       </div>
-      <div className={styles.title} style={{ left: CARD.x, top: CARD.y + 34, width: CARD.width }} data-testid="선수상세-이름">
+      <div className={styles.title} style={{ left: CARD.x, top: CARD.y + 34, width: RIGHT_PANEL.x - CARD.x }} data-testid="선수상세-이름">
         {view.name}
       </div>
       {abilities.map((ability, slot) => (
@@ -119,6 +126,29 @@ export function SeasonPlayerCardScreen({
           <span className={styles.rowValue} style={{ color: colorOf(ability) }}>{ability.shown}</span>
         </div>
       ))}
+
+      {info !== undefined && (
+        <>
+          <div className={infoStyles.layer}
+            style={{ left: INFO_BOARD.x, top: INFO_BOARD.y, width: INFO_BOARD.width, height: INFO_BOARD.height, background: INFO_BOARD.color }} />
+          {SEASON_CARD_INFO_LABELS[view.isPitcher ? '투수' : '타자'].map((frame, row) => {
+            const column = INFO_COLUMNS[row < 4 ? 0 : 1]
+            const top = INFO_TOP + (row % 4) * INFO_ROW_STEP
+            const isBattingOrder = row === 7
+            return (
+              <div key={frame} data-testid={`선수상세-정보-${row}`}>
+                <img className={infoStyles.layer} alt="" src={`${IMG_TEXT}/${String(frame).padStart(3, '0')}.png`}
+                  style={{ left: column.label.x + column.label.width, top: top + 3, transform: 'translateX(-100%)' }} />
+                <div className={infoStyles.infoValue} data-testid={`선수상세-정보값-${row}`}
+                  style={{ left: column.value.x, top, width: column.value.width, height: INFO_ROW_HEIGHT,
+                    color: isBattingOrder ? ORIGINAL_COLORS.highlightYellow : ORIGINAL_COLORS.text }}>
+                  {isBattingOrder ? info.battingOrder : info.values[row]}
+                </div>
+              </div>
+            )
+          })}
+        </>
+      )}
 
       <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={isDetailOpen ? onCloseDetail : onBack} footer={7} />
 

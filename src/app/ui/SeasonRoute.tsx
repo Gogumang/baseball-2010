@@ -8,7 +8,7 @@ import {
   SeasonTrainingScreen, StadiumShopScreen, TradeScreen, CoachHireScreen, SEASON_MVP_LEADER_KINDS,
   seasonAwardRewardOf, seasonMvpResultEventId, seasonTitleResultEventId,
   SeasonMatchInfoScreen, seasonMatchInfoLines, DayResultBoardScreen,
-  SeasonPlayerPickScreen, SeasonPlayerCardScreen, seasonCardAbilitiesOf, seasonPlayerDetailViewOf,
+  SeasonPlayerPickScreen, SeasonPlayerCardScreen, seasonCardAbilitiesOf, seasonPlayerDetailViewOf, seasonCardInfoOf,
   SeasonTeamInfoScreen, seasonTeamInfoRowsOf, SeasonOwnedItemsScreen, SeasonRecordPickPopup, SeasonRecordRankScreen,
   SeasonEquipmentScreen,
 } from '@/pages/season'
@@ -507,6 +507,7 @@ export function SeasonRoute({
           teamId={state.record.teamId}
           view={view}
           abilities={seasonCardAbilitiesOf(view, context)}
+          info={seasonCardInfoOf(view, TEAMS[state.record.teamId]?.name ?? '', player.kindByte)}
           detail={seasonPlayerDetailViewOf(view, context)}
           isDetailOpen={scene === SEASON_SCENE_STATE.능력치상세}
           gamePoint={session.gamePoints}

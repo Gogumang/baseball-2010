@@ -59,9 +59,9 @@ export type { SeasonPlayerPickScreenProps } from '@/pages/season/ui/SeasonPlayer
 export { SeasonPlayerCardScreen } from '@/pages/season/ui/SeasonPlayerCardScreen'
 export type { SeasonPlayerCardScreenProps } from '@/pages/season/ui/SeasonPlayerCardScreen'
 export {
-  seasonCardAbilitiesOf, seasonDetailEffectiveOf, seasonPlayerDetailViewOf,
+  seasonCardAbilitiesOf, seasonCardInfoOf, seasonDetailEffectiveOf, seasonPlayerDetailViewOf,
 } from '@/pages/season/lib/seasonPlayerDetail'
-export type { SeasonCardAbility, SeasonPlayerDetailContext } from '@/pages/season/lib/seasonPlayerDetail'
+export type { SeasonCardAbility, SeasonCardInfo, SeasonPlayerDetailContext } from '@/pages/season/lib/seasonPlayerDetail'
 
 /** 경기 뒤 마무리 0xf1 — 같은 날 다른 네 경기 결과판 (그림 0xb400) */
 export { DayResultBoardScreen } from '@/pages/season/ui/DayResultBoardScreen'
