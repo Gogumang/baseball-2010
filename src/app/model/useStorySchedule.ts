@@ -54,5 +54,14 @@ export function useStorySchedule(career: PlayerCareer | null) {
     return scan.event
   }
 
-  return { events, eventPlaceIds, eventFor }
+  /**
+   * **112 진입의 [!] 칸 찍기 0x8cdc0 이 커서를 0 으로 되감는다** (직접 떴다): 머리 0x8cdd4 에서 reader+0x28 = 0 으로 놓고
+   * 끝까지 acfbc 로 훑은 뒤 끝 0x8ce34 에서 다시 reader+0x28 = 0. 0x8cdc0 을 부르는 곳은 0x118e4 하나(112 진입 0x1cdec ·
+   * 105 진입 0x11910 의 140 대결결과 갈래 0x11bb2)라, 그 뒤 자동 발동(0x1cf9c)은 처음부터 훑는다.
+   */
+  const rewindCursor = () => {
+    cursorRef.current = 0
+  }
+
+  return { events, eventPlaceIds, eventFor, rewindCursor }
 }

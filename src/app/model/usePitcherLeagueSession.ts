@@ -1500,7 +1500,11 @@ export function usePitcherLeagueSession(
    * 돌아옴(`뒤 112`) · 대결결과 140(105 진입 0x11910 의 0x11bb2 가 0x118e4 를 부른다)에서 는다. 장소(113)에서 돌아오는 길은 아니다.
    */
   const [outingEntryCount, setOutingEntryCount] = useState(0)
-  const enterOutingMap = useCallback(() => setOutingEntryCount((count) => count + 1), [])
+  const enterOutingMap = useCallback(() => {
+    setOutingEntryCount((count) => count + 1)
+    // 0x8cdc0 은 머리 0x8cdd4 · 끝 0x8ce34 에서 reader+0x28 = 0 — 112 진입 뒤 자동 발동은 처음부터 훑는다
+    cursorRef.current = 0
+  }, [])
   const openOuting = useCallback(() => {
     setOutingNotice('')
     setOutingResult(null)

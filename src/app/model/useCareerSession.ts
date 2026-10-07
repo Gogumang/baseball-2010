@@ -897,6 +897,8 @@ export function useCareerSession({
   if (outingEntryRef.current.screen !== screen) {
     const entered = isOutingMapEntry(outingEntryRef.current.screen, screen)
     outingEntryRef.current = { screen, count: outingEntryRef.current.count + (entered ? 1 : 0) }
+    // 0x8cdc0 은 찍고 나서 reader+0x28 = 0 (`rewindCursor`) — 다음 훑기는 처음부터다
+    if (entered) story.rewindCursor()
   }
   const outingEntryCount = outingEntryRef.current.count
   const outingSlots = useMemo(() => {
@@ -1365,6 +1367,9 @@ export function useCareerSession({
       if (command === '외출') {
         setOutingNotice('')
         setOutingResult(null)
+        // 112 진입 0x118e4 → 0x8cdc0 이 커서를 0 으로 되감은 **뒤에** 자동 발동 0x1cf9c 가 훑는다 — 웹은 그 훑기를 화면을
+        // 바꾸기 전에 하므로 되감기를 먼저 한다
+        story.rewindCursor()
         // trigger 1 — 외출 지도에 들어설 때 먼저 보는 이벤트
         const event = story.eventFor(career, EVENT_TRIGGER.외출)
         if (event !== null) return setScreen({ kind: '이벤트', eventId: event.id, context: '외출진입' })
@@ -1684,9 +1689,9 @@ export function useCareerSession({
       setCareer(visited)
     },
 
-    /** [!] 장소에서 [들어가기] — 0x8ce58: 112 진입에 찍어 둔 그 장소 칸의 이벤트를 본다(다시 훑지 않는다) */
     /**
-     * 113 칸 0 [들어가기] (키 0x16c64 의 0x16c8a~0x16cee, 직접 떴다) — 행동(S+4) · 인기도 가드가 없다(가드 0x16cf0 은 칸 1
+     * [!] 장소에서 [들어가기] — 0x8ce58: 112 진입에 찍어 둔 그 장소 칸의 이벤트를 본다(다시 훑지 않는다).
+     * 113 칸 0 (키 0x16c64 의 0x16c8a~0x16cee, 직접 떴다)에는 행동(S+4) · 인기도 가드가 없다(가드 0x16cf0 은 칸 1
      * 장소 기능 쪽). 모드 갈림도 없어 투수편 `enterOutingPlace` 와 같다. 이벤트를 고르는 데 굴림은 없다.
      */
     enterPlace: (place: OutingPlace) => {
