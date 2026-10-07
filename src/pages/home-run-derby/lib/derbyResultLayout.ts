@@ -14,7 +14,7 @@
  *   값 칸 (W/2 + 15, H/2 − 66 + 16i, 42, 12) 오른쪽 정렬
  * 칸 B 0x5eec4(162×44, 위끝 H/2 + 4)               → (39, 164)
  *   img_text 256 "획득" · 257 "보유" (W/2 − 66, H/2 + 12 / +32) · 252 "GP" (W/2 − 37, 같은 y)
- *   G 숫자 0x54a60 (W/2 − 11, H/2 + 9 / +29, 85×16)
+ *   G 숫자 0x54a60(skin, 값, W/2 − 11, H/2 + 9 / +29, 0x55, 0x10, 판 1, 정렬 1, 더하기 1 / 0, 둥근판 0)   ; 0x46174 · 0x461f2
  * 칸 C 0x5eec4(162×49, 위끝 H/2 + 53)              → (39, 213)
  *   StrMAINMENU[53] "재도전하시겠습니까?" (W/2 − 81, H/2 + 61) 폭 162 흰색
  *   popup 프레임 1·2(41×15, 고르면 6·7) (W/2 − 81 − 41/2 + 0x30 · +0x72, H/2 + 53 − 15/2 + 0x24)
@@ -79,17 +79,20 @@ export const statValueTopOf = (row: number) => STAT_VALUE_BOX.firstY + STAT_ROW_
 /** 칸 B — 획득 GP / 보유 GP */
 export const POINT_BOX = { x: CENTER_X - 81, y: CENTER_Y + 4, width: 162, height: 44 } as const
 
-/** 두 줄 — img_text 256 "획득" · 257 "보유", 252 "GP" */
+/** 두 줄 — img_text 256 "획득" · 257 "보유", 252 "GP". G 숫자의 "+" 는 획득 줄만 (0x46160 · 0x461ee) */
 export const POINT_ROWS = [
-  { label: 256, name: '획득', labelY: CENTER_Y + 12, valueY: CENTER_Y + 9 },
-  { label: 257, name: '보유', labelY: CENTER_Y + 32, valueY: CENTER_Y + 29 },
+  { label: 256, name: '획득', labelY: CENTER_Y + 12, valueY: CENTER_Y + 9, plus: true },
+  { label: 257, name: '보유', labelY: CENTER_Y + 32, valueY: CENTER_Y + 29, plus: false },
 ] as const
 
 export const POINT_LABEL_X = CENTER_X - 66
 export const POINT_GP_FRAME = 252
 export const POINT_GP_X = CENTER_X - 37
-/** 0x54a60 알약 — (W/2 − 11, y, 0x55, 0x10) */
-export const POINT_VALUE_BOX = { x: CENTER_X - 11, width: 0x55, height: 0x10 } as const
+/**
+ * G 숫자 0x54a60 의 인자 — (W/2 − 11, y, 폭 0x55, 높이 0x10, 판 1, 정렬 1, 더하기, 둥근판 0) (0x46148~0x461f2 직접 떴다).
+ * 그림은 `widgets/screen-frame` 의 `GamePointBadge`(동전 · "+" · 숫자, 둥근 판 없음).
+ */
+export const POINT_VALUE_BOX = { x: CENTER_X - 11, width: 0x55, height: 0x10, align: 1, plate: false } as const
 
 /** 칸 C — 재도전 묻기 */
 export const RETRY_BOX = { x: CENTER_X - 81, y: CENTER_Y + 53, width: 162, height: 49 } as const
@@ -113,17 +116,3 @@ export const RETRY_BUTTONS = [
 
 /** 예/아니오 커서 기본값 = 예 (scene+0x17f9, R14 1-5) */
 export const RETRY_DEFAULT_ANSWER = true
-
-/**
- * G 숫자 글자 — `0x54a60` 이 쓰는 `ui/gpoint.pzx` 의 0~9 그림이다.
- * "1" 만 4px 이고 나머지는 8px 인 것은 `widgets/screen-frame` 이 이미 확인한 규칙이다.
- */
-export const GAME_POINT_FOLDER = './sprites/gpoint'
-export const GAME_POINT_GLYPH_HEIGHT = 8
-
-export function gamePointGlyphsOf(value: number): { frame: number; width: number }[] {
-  return [...String(Math.max(0, Math.trunc(value)))].map((digit) => ({
-    frame: Number(digit),
-    width: digit === '1' ? 4 : 8,
-  }))
-}

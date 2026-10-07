@@ -80,3 +80,20 @@ describe('홈런더비 결과 화면 (0x45c18)', () => {
     ])
   })
 })
+
+describe('홈런더비 결과 칸 B 의 G 숫자 0x54a60 (0x46174 · 0x461f2)', () => {
+  it('획득은 (109, 169) 에 동전 · "+" · 숫자, 보유는 (109, 189) 에 "+" 없이 — 둥근 판은 둘 다 없다', () => {
+    render(
+      <DerbyResultWindow result={결과({ gainedGamePoint: 25 })} heldGamePoint={1_234} onRetry={vi.fn()} onExit={vi.fn()} />,
+    )
+    const gained = screen.getByTestId('더비-획득-G')
+    const held = screen.getByTestId('더비-보유-G')
+    expect(gained.dataset.value).toBe('25')
+    expect(held.dataset.value).toBe('1234')
+    expect(gained.querySelector('[data-badge-plus]')).not.toBeNull()
+    expect(held.querySelector('[data-badge-plus]')).toBeNull()
+    expect(gained.querySelector('[data-badge-plate]')).toBeNull()
+    const coin = gained.querySelector<HTMLElement>('[data-badge-coin]')!
+    expect([coin.style.left, coin.style.top]).toEqual(['109px', '168px'])
+  })
+})

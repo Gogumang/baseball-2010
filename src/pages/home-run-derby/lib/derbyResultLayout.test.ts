@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   POINT_BOX, POINT_ROWS, POINT_VALUE_BOX, RESULT_TITLE, RESULT_WINDOW, RETRY_BOX, RETRY_BUTTONS,
   STAT_BOX, STAT_BOX_TITLE, STAT_ROWS, STAT_VALUE_BOX,
-  gamePointGlyphsOf, statLabelTopOf, statValueTopOf,
+  statLabelTopOf, statValueTopOf,
 } from '@/pages/home-run-derby/lib/derbyResultLayout'
 
 /**
@@ -47,7 +47,8 @@ describe('결과 화면 0x45c18 배치', () => {
   it('칸 B 는 162×44, 위끝 164 이고 두 줄은 획득 · 보유 다', () => {
     expect(POINT_BOX).toEqual({ x: 39, y: 164, width: 162, height: 44 })
     expect(POINT_ROWS.map((row) => row.label)).toEqual([256, 257])
-    expect(POINT_VALUE_BOX).toEqual({ x: 109, width: 0x55, height: 0x10 })
+    expect(POINT_VALUE_BOX).toEqual({ x: 109, width: 0x55, height: 0x10, align: 1, plate: false })
+    expect(POINT_ROWS.map((row) => row.plus)).toEqual([true, false])
   })
 
   it('칸 C 는 162×49, 위끝 213', () => {
@@ -60,15 +61,5 @@ describe('결과 화면 0x45c18 배치', () => {
     expect(yes.y).toBe(no.y)
     expect([yes.frame, yes.selectedFrame]).toEqual([1, 6])
     expect([no.frame, no.selectedFrame]).toEqual([2, 7])
-  })
-})
-
-describe('G 숫자 글자 (gpoint.pzx)', () => {
-  it('"1" 만 4px 이고 나머지는 8px 이다', () => {
-    expect(gamePointGlyphsOf(105)).toEqual([
-      { frame: 1, width: 4 },
-      { frame: 0, width: 8 },
-      { frame: 5, width: 8 },
-    ])
   })
 })

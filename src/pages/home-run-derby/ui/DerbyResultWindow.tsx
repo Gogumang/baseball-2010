@@ -4,13 +4,14 @@ import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { numberGlyphsOf } from '@/shared/lib/pixelNumber/pixelNumber'
 import type { DerbyResult } from '@/entities/home-run-derby/model/derbyRun'
 import {
-  GAME_POINT_FOLDER, GAME_POINT_GLYPH_HEIGHT, POINT_BOX, POINT_GP_FRAME, POINT_GP_X, POINT_LABEL_X,
+  POINT_BOX, POINT_GP_FRAME, POINT_GP_X, POINT_LABEL_X,
   POINT_ROWS, POINT_VALUE_BOX, RESULT_TITLE, RESULT_WINDOW, RETRY_BOX, RETRY_BUTTONS,
   RETRY_DEFAULT_ANSWER, RETRY_QUESTION, RETRY_TEXT, STAT_BOX, STAT_BOX_TITLE, STAT_LABEL_X,
   STAT_ROWS, STAT_UNIT_X, STAT_VALUE_BOX, STAT_VALUE_GLYPH_HEIGHT, STAT_VALUE_PLATE,
-  gamePointGlyphsOf, statLabelTopOf, statPlateTopOf, statValueTopOf,
+  statLabelTopOf, statPlateTopOf, statValueTopOf,
 } from '@/pages/home-run-derby/lib/derbyResultLayout'
 import * as styles from '@/pages/home-run-derby/ui/DerbyResultWindow.css'
+import { GamePointBadge } from '@/widgets/screen-frame/ui/GamePointBadge'
 
 const IMG_TEXT_FRAMES = './sprites/img_text/frames'
 const GAME_UI_FRAMES = './sprites/game_ui/frames'
@@ -109,14 +110,9 @@ export function DerbyResultWindow({ result, heldGamePoint, onRetry, onExit }: De
         <div key={row.name}>
           <FrameSprite folder={IMG_TEXT_FRAMES} frame={row.label} origins={textOrigins} x={POINT_LABEL_X} y={row.labelY} />
           <FrameSprite folder={IMG_TEXT_FRAMES} frame={POINT_GP_FRAME} origins={textOrigins} x={POINT_GP_X} y={row.labelY} />
-          <SpriteNumber
-            glyphs={gamePointGlyphsOf(pointValues[index])}
-            right={POINT_VALUE_BOX.x + POINT_VALUE_BOX.width}
-            boxTop={row.valueY}
-            boxHeight={POINT_VALUE_BOX.height}
-            folder={GAME_POINT_FOLDER}
-            glyphHeight={GAME_POINT_GLYPH_HEIGHT}
-          />
+          {/* G 숫자 0x54a60 — 동전 · ("+") · 숫자 (0x46174 · 0x461f2) */}
+          <GamePointBadge testId={`더비-${row.name}-G`} value={pointValues[index]!} x={POINT_VALUE_BOX.x} y={row.valueY}
+            width={POINT_VALUE_BOX.width} align={POINT_VALUE_BOX.align} plus={row.plus} plate={POINT_VALUE_BOX.plate} />
         </div>
       ))}
 
