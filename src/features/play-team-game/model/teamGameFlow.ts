@@ -1921,12 +1921,6 @@ export interface BatterOutcomeOptions {
   readonly pattern?: BattedBallPattern
   readonly isUncatchable?: boolean
   /**
-   * @deprecated 옛 칸 — 보지 않는다. 2스트라이크 번트 파울(원본 판정 11)의 아웃 콜 62 표였다. 이제 그 공도 파울 각 공 판을 돌아
-   * 판 결과 `DefensePlayResult.buntFoulOut` 이 콜을 고정한다(`resolvePitch` 가 `isBuntFoulOut` 을 안 세운다).
-   * ⚠️ 칸은 넘기는 곳(pages/team-game/model/useTeamGame)을 걷어낸 뒤 지운다.
-   */
-  readonly buntFoulOut?: boolean
-  /**
    * 이 공이 도착하며 연 주자 판(`arriveTeamPitch`). 낫아웃(종류 9 · `'batterRuns'`)이면 그 판의 advance 가 곧
    * 이 삼진 타석의 진루다. 그 밖(볼넷·사구·삼진 + 도루·폭투)은 이미 주자 판으로 먹였으니 재생 칸만 지킨다.
    */

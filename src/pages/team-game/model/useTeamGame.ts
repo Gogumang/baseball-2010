@@ -217,11 +217,10 @@ export function useTeamGame(
       // 인플레이 타구가 나오면 **여기서 멈춘다** — 주자 처리는 수비 화면이 끝난 뒤다 (상태 0x17)
       resolvePitch: (detail: PitchOutcomeDetail, isUncatchable?: boolean, buntKind?: number) =>
         step(
-          // 판정 11(2스트라이크 번트 파울 아웃)이면 아웃 콜이 조건 없이 62 다 — 플레이 끝까지 간다.
+          // 판정 11(2스트라이크 번트 파울)은 파울 각 공 판이 판 끝 결과 코드 11 로 낸다(콜 62 는 판 결과 `played.buntFoulOut`).
           // 번트 종류(장면 +0xfdc)는 타구 판 리드(0x3d7b8)가 도루 안 한 주자에게 +3 틱을 더하는 데 쓴다
           (current) =>
             startBatterPitch(current, detail, random, {
-              buntFoulOut: detail.isBuntFoulOut,
               isUncatchable: isUncatchable === true,
               buntKind: buntKind ?? 0,
             }),
@@ -334,11 +333,8 @@ export function useTeamGame(
               // 파울로 닫힌 판에는 60 이 없다 — 콜은 결과 코드 7 메시지 51c5c 의 25 하나(`inPlayCallSoundIdOf` 의 `foulEnded`)
               foulEnded: played.foulEnded,
             }),
-            inPlayCallSoundIdOf(pending.outcome, {
-              ...played,
-              // 판정 11(2스트라이크 번트 파울) — 판 끝 결과 코드가 낸다(`played.buntFoulOut`). 아웃 콜은 조건 없이 62 (0x51b20)
-              buntFoulOut: pending.input.buntFoulOut === true || played.buntFoulOut === true,
-            }),
+            // 판정 11(2스트라이크 번트 파울) — 판 끝 결과 코드가 낸다(`played.buntFoulOut`). 아웃 콜은 조건 없이 62 (0x51b20)
+            inPlayCallSoundIdOf(pending.outcome, played),
           ],
         )
       },

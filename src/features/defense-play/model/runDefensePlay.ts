@@ -213,13 +213,6 @@ export interface DefensePlayInput {
    */
   readonly isUncatchable?: boolean
   /**
-   * @deprecated 옛 칸 — 진행기는 보지 않고 features 의 어느 입력 만들기도 이제 안 싣는다. 예전 웹은 2스트라이크 번트 파울(판정 11)을
-   * 판 없이 아웃으로 내고 이 표를 실었다. 원본은 그 공도 판을 돌아 낙구 · 담장선 틱의 0x9d5bc 가 11 을 낸다 — 지금은 파울 각 공 판
-   * (`strikes` · `buntKind`)이 그 코드를 내고 결과의 `DefensePlayResult.buntFoulOut` 이 콜 62 를 고정한다.
-   * ⚠️ 칸은 읽는 곳(app/model/useCareerSession · pages/team-game/model/useTeamGame 의 `pending…buntFoulOut`)을 걷어낸 뒤 지운다.
-   */
-  readonly buntFoulOut?: boolean
-  /**
    * **state[0x19] — 투구 판정 0.1% 사건** (0x3e04e: 상태 0x12 진입 0x3dfac 가 0x35034 = `모드 ≠ 7 && rand(0, 10000) < cfg+0x2e(10)` 를 적는다).
    * 서 있으면 판 끝 결과 코드 0x9d5bc 가 0(9d5ce)이라 낙구·담장선 틱에 사건 코드가 안 난다. 굴림은 투구 흐름 쪽 자리라
    * 부르는 쪽이 실어 보낸다 — 안 주면 0(지금까지와 같다). 이 사건이 화면에 무엇인지는 미확인(P2 6절).

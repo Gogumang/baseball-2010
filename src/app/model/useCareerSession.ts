@@ -841,12 +841,11 @@ export function useCareerSession({
       const runnersOnBase = [bases.first, bases.second, bases.third].filter(Boolean).length
       // 타석 결과(안타/아웃 코드)만 먼저 정한다 — 인플레이 타구면 주자 처리는 화면 뒤로 미뤄진다.
       // 필살타법이 성공한 타구면 야수가 쥐지 않는다 (0x51800)
-      // 판정 11(2스트라이크 번트 파울 아웃)은 아웃 콜이 조건 없이 62 다 — 플레이 끝까지 실어 보낸다
+      // 판정 11(2스트라이크 번트 파울)은 파울 각 공 판이 판 끝 결과 코드 11 로 낸다 — 콜 62 는 판 결과(`played.buntFoulOut`)가 고정한다
       const advanced = startPlayerOutcome(currentProgress, nextAtBat.outcome, random, {
         isUncatchable,
         // 쏜 패턴(0xb0930 덱에서 뽑은 것)을 그대로 판에 싣는다 — 타석 결과 객체에 묶인 것과 같은 값을 명시적으로 넘긴다
         pattern: detail.pattern,
-        buntFoulOut: detail.isBuntFoulOut,
         foulRecordIds: tally.foulRecordIds,
         arrivalPlay: arrival?.play ?? null,
         // 이 공의 번트 종류(장면 +0xfdc) — 타구 판 시작 리드(0x3d7b8)가 도루 안 한 주자에게 +3 틱을 더한다
@@ -1111,7 +1110,7 @@ export function useCareerSession({
           caughtOnTheFly: played.caughtOnTheFly,
         }),
         // 판정 11(2스트라이크 번트 파울)은 판 끝 결과 코드가 낸다(`played.buntFoulOut`) — 콜은 조건 없이 62 (0x51b20)
-        inPlayCallSoundIdOf(outcome, { ...played, buntFoulOut: pending.buntFoulOut === true || played.buntFoulOut === true }),
+        inPlayCallSoundIdOf(outcome, played),
         ...gameStepSoundIdsOf(current, resolved),
       ])
       finishAtBat(resolved, outcome, runnersOnBase)

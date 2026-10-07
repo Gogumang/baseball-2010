@@ -196,12 +196,9 @@ export const ORIGINAL_SOUNDS: readonly OriginalSound[] = [
    * v11 은 조건 없이 62 이고, 그 v11 은 **2스트라이크 번트 파울 아웃**(0x9d5e2~0x9d600)이다.
    * 그래서 62 = 잡아서·태그해서 낸 아웃 + 번트 파울 아웃, 20 = 루에서 잡은 포스 아웃.
    *
-   * **v11 몫도 이제 이었다.** 웹은 그 아웃을 `직선타아웃` 으로 옮겨 수비 화면을 한 번 거치는데,
-   * 그대로 두면 수비 진행기 결과(`caughtOnTheFly`)에 끌려 20 으로 샐 수 있었다.
-   * `battedBallOutcome.isBuntFoulOut` → `PitchOutcomeDetail.isBuntFoulOut` →
-   * `DefensePlayInput.buntFoulOut` → `DefenseCallContext.buntFoulOut` 으로 실어 보내
-   * **조건 없이 62** 를 내게 했다 (나만의리그 타자편 `useCareerSession`).
-   * ⚠️ 팀경기 쪽(`features/play-team-game`)은 아직 그 표를 안 싣는다.
+   * **v11 몫도 이었다.** 원본처럼 그 공도 파울 각 공 판(상태 0x17)을 돌아 판 끝 결과 코드 0x9d5bc 가 11 을 내고,
+   * 판 결과 `DefensePlayResult.buntFoulOut` → `DefenseCallContext.buntFoulOut` 이 **조건 없이 62** 를 고정한다
+   * (나만의리그 타자편 `useCareerSession` · 팀경기 `useTeamGame` 둘 다). 판 없이 아웃으로 넣던 옛 표(`isBuntFoulOut`)는 걷었다.
    */
   { id: 62, role: 'voice', name: '아웃 콜 (잡아서·태그해서 낸 아웃)', scene: '판정 v11 (0x51b20, 2스트라이크 번트 파울 아웃) · v13 에서 state[0x1f] 나 state[0x87] 이 선 갈래' },
 ]

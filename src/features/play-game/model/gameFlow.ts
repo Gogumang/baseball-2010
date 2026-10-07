@@ -580,12 +580,6 @@ export interface PlayerOutcomeOptions {
   readonly pattern?: BattedBallPattern
   readonly isUncatchable?: boolean
   /**
-   * @deprecated 옛 칸 — 보지 않는다. 2스트라이크 번트 파울(원본 판정 11)을 판 없이 아웃으로 넣던 표였다. 이제 타석이 이 공을
-   * 파울 각 공 판(`startPlayerFoulPlay` — 판 끝 결과 코드 11)으로 보내 `resolvePitch` 가 `isBuntFoulOut` 을 안 세운다.
-   * ⚠️ 칸은 넘기는 곳(app/model/useCareerSession)을 걷어낸 뒤 지운다.
-   */
-  readonly buntFoulOut?: boolean
-  /**
    * 이 타석 투구 중에 난 **연속 파울 기록**(32·33, `0xa7dbc`) — 타석 쪽 집계
    * (`features/play-at-bat/model/atBatPitchTally`)의 `foulRecordIds` 를 그대로 넘긴다.
    * 원본은 파울이 난 그 순간 `0x51408` v=7 갈래에서 지급하므로 타석 결과보다 **먼저** 얹는다 —

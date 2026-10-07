@@ -295,7 +295,7 @@ describe('2스트라이크 번트 파울(판정 11)도 판을 도는 파울 각 
       찾음 = true
       expect(b.detail).toEqual(a.detail)
       expect(b.detail.foulContact).toEqual({ pattern: b.detail.pattern, resultCode: b.detail.resultCode })
-      expect(b.detail.isBuntFoulOut).toBeUndefined()
+      expect('isBuntFoulOut' in b.detail).toBe(false)
       expect(b.isUncatchable).toBe(false)
       expect(뒤.count()).toBe(앞.count())
     }
