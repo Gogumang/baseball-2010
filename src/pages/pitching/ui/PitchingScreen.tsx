@@ -19,6 +19,7 @@ import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
 import { useInGameMenuState } from '@/features/play-team-game/model/useInGameMenuState'
 import { HelpScreen } from '@/pages/help/ui/HelpScreen'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
+import { setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
 
 /**
  * 투구 화면. 원작 설명서 <투구 조작>의 세 단계를 그대로 따른다:
@@ -117,6 +118,16 @@ export function PitchingScreen({
   settings,
   onSettingsChange,
 }: PitchingScreenProps) {
+  /**
+   * 전역 경기 상태 +0x6b (`liveGameState`) — 미션 준비 0xaa57c 가 0xb6814 로 0 을 둔 뒤(0xaa5fc) 곧바로 0xaa698 이
+   * `min(레코드 +3 아래 4비트, 0x63)` = 시작 이닝 인덱스를 쓴다(`start.inning` − 1). 재도전 · 다시하기도 같은 준비를 다시 돈다.
+   * ⚠️ 미해결: 미션 경기 안의 이닝 넘김(0xb6b6c)은 웹 미션 진행에 이닝 칸이 없어 따라가지 않는다.
+   */
+  const missionStartInningIndex = run.mission.start.inning - 1
+  useEffect(() => {
+    setLiveGameInningIndex(missionStartInningIndex)
+  }, [run.mission, missionStartInningIndex])
+
   const [phase, setPhase] = useState<PitchPhase>('구질')
   const [pitchType, setPitchType] = useState<PitchTypeInfo | null>(null)
   const [courseCell, setCourseCell] = useState(4)

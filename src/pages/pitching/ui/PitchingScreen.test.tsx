@@ -10,6 +10,7 @@ import type { PitchTypeInfo } from '@/shared/config/original/pitchTypes'
 import { PITCHER_MISSIONS } from '@/entities/mission/model/missionGoal'
 import { startPitcherMission } from '@/entities/mission/model/pitcherRun'
 import { createAtBat } from '@/entities/at-bat/model/atBatState'
+import { liveGameInningIndex, setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
 
 afterEach(cleanup)
 
@@ -35,6 +36,15 @@ function 띄우기(magicRemaining: number | undefined) {
   )
   return onThrow
 }
+
+describe('미션 준비 0xaa57c — 전역 경기 상태 +0x6b', () => {
+  it('0 을 둔 뒤 곧바로 시작 이닝 인덱스(레코드 +3 아래 4비트)를 쓴다 (0xaa5fc · 0xaa698)', () => {
+    setLiveGameInningIndex(12)
+    띄우기(undefined)
+
+    expect(liveGameInningIndex()).toBe(PITCHER_MISSIONS[0]!.start.inning - 1)
+  })
+})
 
 describe('투수 미션 투구 화면의 마구 칸 (0x50db8)', () => {
   it('남은 횟수가 0 이면 마구 칸을 골라도 구질 단계에 그대로 머문다 — 키가 버려진다', () => {

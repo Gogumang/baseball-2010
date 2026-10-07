@@ -23,6 +23,7 @@ import { SceneMatchupCards } from '@/widgets/matchup-cards/ui/SceneMatchupCards'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 import { MissionResultBoard } from '@/pages/mission-play/ui/MissionResultBoard'
 import type { MissionResultBoardProps } from '@/pages/mission-play/ui/MissionResultBoard'
+import { setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
 
 interface MissionPlayScreenProps {
   readonly run: MissionRun
@@ -127,6 +128,16 @@ export function MissionPlayScreen({
   onSettingsChange,
   sceneConfirm: sceneConfirmWait,
 }: MissionPlayScreenProps) {
+  /**
+   * 전역 경기 상태 +0x6b (`liveGameState`) — 미션 준비 0xaa57c 가 0xb6814 로 0 을 둔 뒤(0xaa5fc) 곧바로 0xaa698 이
+   * `min(레코드 +3 아래 4비트, 0x63)` = 시작 이닝 인덱스를 쓴다(`start.inning` − 1). 재도전 · 다시하기도 같은 준비를 다시 돈다.
+   * ⚠️ 미해결: 미션 경기 안의 이닝 넘김(0xb6b6c)은 웹 미션 진행에 이닝 칸이 없어 따라가지 않는다.
+   */
+  const missionStartInningIndex = run.mission.start.inning - 1
+  useEffect(() => {
+    setLiveGameInningIndex(missionStartInningIndex)
+  }, [run.mission, missionStartInningIndex])
+
   const menu = useInGameMenuState()
   const isMenuOpen = menu.isOpen
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
