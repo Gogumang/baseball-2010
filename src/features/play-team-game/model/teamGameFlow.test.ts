@@ -1507,8 +1507,10 @@ describe('견제 — 메시지 0x10 → 0x50f28 → 플레이 종류 4 (사람 �
     expect(play.ticks.length).toBeGreaterThan(0)
     // 루에 붙은 주자는 견제로 안 죽는다 (0xb36d0 · 0x4677a) — 악송구가 아니면 결과 9
     if (!play.errantThrow) expect(play.resultCode).toBe(PICKOFF_RESULT.SAFE)
-    // 주자마다 리드 rand(0,100) 1번(0x3d7b8) → 악송구 굴림 1번(악송구면 +2번)
-    expect(counter.draws).toBe(2 + (play.errantThrow ? 3 : 1))
+    // 주자마다 리드 rand(0,100) 1번(0x3d7b8) → 악송구 굴림 1번 → 받는 펌블 굴림 1번(b4224)
+    // (악송구면 흔들기 넷 · 줍는 야수의 펌블 굴림 · 튕김이 더 붙는다)
+    if (play.errantThrow) expect(counter.draws).toBeGreaterThan(2 + 2)
+    else expect(counter.draws).toBe(2 + 2)
     expect(after.log[0]?.text).toContain('3루 견제')
     // 다시 던질 수 있다 — 상태 0xf 로 돌아온다 (0xae592)
     expect(isPitchTurn(after)).toBe(true)
@@ -1539,7 +1541,9 @@ describe('견제 — 메시지 0x10 → 0x50f28 → 플레이 종류 4 (사람 �
     const play = after.lastDefensePlay
     if (!isPickoffPlayResult(play)) throw new Error('견제 판이 아니다')
     expect(play.throwBase).toBe(1)
-    expect(counter.draws).toBe(1 + (play.errantThrow ? 3 : 1))
+    // 리드 1번 → 악송구 굴림 1번 → 받는 펌블 굴림 1번(b4224) (악송구면 더 붙는다)
+    if (play.errantThrow) expect(counter.draws).toBeGreaterThan(1 + 2)
+    else expect(counter.draws).toBe(1 + 2)
     expect(after.atBat).toEqual(판.atBat)
     expect(after.game.battingOrderIndex).toBe(판.game.battingOrderIndex)
     expect(isBatterTurn(after)).toBe(true)

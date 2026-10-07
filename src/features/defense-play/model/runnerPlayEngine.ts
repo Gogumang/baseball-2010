@@ -8,11 +8,7 @@ import {
   requiredBasesOnBounce,
 } from '@/entities/fielding/model/autoAdvance'
 import type { BattedBallTrajectory } from '@/entities/fielding/model/catchPrediction'
-import {
-  NO_THROW_ERROR,
-  rollFumble,
-  rollThrowError,
-} from '@/entities/fielding/model/fieldingErrors'
+import { rollFumble } from '@/entities/fielding/model/fieldingErrors'
 import {
   basePosition,
   FIELDER_START_POSITIONS,
@@ -21,7 +17,6 @@ import {
   progressPercent,
   stepToward,
   ticksToReach,
-  type WorldPoint,
 } from '@/entities/fielding/model/fieldGeometry'
 import {
   AI_STATE,
@@ -38,21 +33,23 @@ import {
   releaseHeldRuns,
   type HeldRunState,
 } from '@/entities/fielding/model/heldRuns'
-import { judgeOut, OUT_KIND, releaseForcesAfterOut } from '@/entities/fielding/model/outJudgement'
+import { baseUnderFoot, judgeOut, OUT_KIND, releaseForcesAfterOut } from '@/entities/fielding/model/outJudgement'
 import { liveRunnerCountOf, passPlayGate, someRunnerStillActive } from '@/entities/fielding/model/playGate'
-import { defenseArrivalTicks } from '@/entities/fielding/model/throwArrival'
 import { planThrow, readyTicksOf, thrownWith, throwTicksTo } from '@/entities/fielding/model/throwPlan'
 import { chooseThrowTargetBase, isSpecialThrow } from '@/entities/fielding/model/throwTargetBase'
 import { EMPTY_BASES, type BaseState } from '@/entities/game/model/baseState'
 import type { ManualAutoMode } from '@/entities/settings/model/gameSettings'
 import { viewStateOf, type ActionMemory, type DefensePlayView } from '@/features/defense-play/model/defensePlayView'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
-import {
-  cpuSpecialThrowOf,
-  errantArrivalTicks,
-  specialThrowArrivalTicks,
-} from '@/features/defense-play/model/runDefensePlay'
+import { cpuSpecialThrowOf } from '@/features/defense-play/model/runDefensePlay'
 import { runnerFateOf } from '@/features/defense-play/model/runnerFates'
+import {
+  bounceOffFielder,
+  chaseLooseBall,
+  initialLooseBallChase,
+  type LooseBallChase as ChasedBall,
+} from '@/features/defense-play/model/looseBallChase'
+import { forecastOptionsOf, launchThrow } from '@/features/defense-play/model/throwLaunch'
 
 /**
  * **주자 판 진행기** — 타구가 없는 수비 판(플레이 종류 5 도루 · 9 폭투·포일)을 틱 단위로 돈다.
@@ -63,9 +60,9 @@ import { runnerFateOf } from '@/features/defense-play/model/runnerFates'
  *
  * ## 한 틱의 차례 (원본 장면 갱신 0x52c50 = 공용 갱신 0x3f060(야수·주자 틱) → 슬롯 2 0x524c0)
  * 0. 야수 틱 0xa1284 — 공 쥔 야수의 준비 틱 +0xc8 −= 1
- * 1. (종류 9) 쫓는 야수가 포구 틱에 공을 쥔다 — 펌블 굴림 0xb41d0 → 공 쥐기 0xb2710(P, f, 1)
+ * 1. 포구 틱 갈래 0xb401c — 쫓는 공(종류 9 의 폭투 · 포일 공 · 송구공 · 튕긴 공)을 고른 야수가 포구 틱에: 펌블 굴림 b4224
+ *    (늘 먹는다) → 움직이는 공이면 펌블(0xbc2 · 틱 끝 0xb3148 튕김) / 아니면 b4292 결과 9 검사 · 쥐기 0xb2710(P, f, 1) · vt90
  *    · 낙구 틱에 포스 요구 루 0xa95e8 (P2 2b: 0xb4510~0xb453c)
- * 3. 송구 도착 = 받는 야수가 루 위에서 쥔다(0xb2710(P, f, 1) — +0x128 = 1, 준비 틱) → 아웃 판정 0xb36d0 → 결과 9(0xb4292)
  * 3b. 사람 목표 +0x160 — 플레이 틱 vt4c 의 b4660~b46a8: 쥠 && 준비면 루로 보내기 `0xb2c90`, 그리고 −1
  * 4. 자동 추가 진루 0xaf918 (`0xae690` 갈림, 진루시키면 +0x128 = 1) · 자동 슬라이딩 0xb030c
  * 4c. CPU 송구 결정 `0xafa60 → 0xafb24` — `0xae6c8`(수비 CPU || 송구 자동)일 때 매 틱, +0x128 && 준비일 때만 고르고
@@ -74,11 +71,14 @@ import { runnerFateOf } from '@/features/defense-play/model/runnerFates'
  * 5. 그림 · 6. 움직이기 · 7. 아웃 판정 0xb36d0 → 아웃이 났으면 결과 메시지 0xbba 의 CPU 송구 결정 한 번
  *    (0x51d40~0x51db4, 사람 수비에서도) · 8. 2아웃 보류 득점 풀기 0xaa34c · 9. 판 진행 관문 0xb0d28
  *
+ * ## 송구 — 타구 진행기와 같은 원본 길
+ * 0xb2e38 → 0xa1620(악송구 · 긴 송구 흔들림 · 원바운드 갈래) · 세계 0xbfed0 · 받는 점 끼워 넣기 b2f9c(`launchThrow`) →
+ * 예보 vt24(0) · 고르기 vt34(`chaseLooseBall`) — 받는 것도 줍는 것도 1 절 포구 틱 갈래다.
+ *
  * ## 근사 (지어내지 않은 자리 — 견제 진행기와 같다)
- * - ⚠️ 송구 도착 틱은 `defenseArrivalTicks`(0xaf284) 근사다 — 원본은 궤적 물리(0xb401c, 해독 금지 구역).
- *   커버가 루를 밟기 전에 공이 닿으면 커버가 루를 밟는 틱까지 포구를 미룬다 (`pickoffPlay` 와 같다).
  * - ⚠️ 움직이기·아웃 판정(5~7)은 원본에서 야수·주자 틱(0절 자리) 안이다 — 웹은 슬롯 2 뒤로 두었다(타구 진행기와 같다).
- * - ⚠️ 악송구 뒤 공 경로·주자 반응은 미해결 — "그 송구는 아무도 못 받는다" 로 둔다(타구 진행기와 같다).
+ *   그래서 고른 야수는 포구 틱에 포구 지점(x, 0, z)으로 옮겨 쥔다(타구 진행기와 같은 다리).
+ * - ⚠️ 중계 이어 던지기(b4616)는 이 판에 없다 — 중계맨이 받으면 쥐기의 +0x128 로 CPU 송구 결정이 다시 고른다.
  * - 자동 추가 진루는 결과 코드가 선 뒤에도 판이 닫힐 때까지 매 틱 묻는다 — +0x111 은 "끝" 이 아니라 홈런 코드 8 이다
  *   (`playGate`). 판은 0xb0d28 대로 주자가 다 서고 공을 쥔 채 51틱 뒤에 닫힌다.
  * - 사람 주루 키(0x582·0x584)·슬라이딩 키(0x585)·레이저(0x400bc)는 받지 않는다 — 미리 끝까지 돌려 재생만 한다.
@@ -89,8 +89,6 @@ const DEFAULT_MAXIMUM_TICKS = 240
 /** 능력치를 안 주면 쓰는 값 — 원본 평균대(등급 3) */
 const DEFAULT_ABILITY = 500
 const HOME_BASE = 4
-/** 펌블 뒤 동작 잠금 틱 — 야수+0xb4 = 15 (타구 진행기 `FUMBLE_LOCK_TICKS` 와 같다) */
-const FUMBLE_LOCK_TICKS = 15
 /** 0xb2c90: 받는 야수까지 이 거리 이하면 던지지 않는다 */
 const MINIMUM_THROW_DISTANCE = 600
 
@@ -148,13 +146,11 @@ interface PlayRunner {
   counted: boolean
 }
 
+/** 날아가는 송구 — 던진 야수 · 목표 루 · 손을 떠난 틱 (받는 틱 · 받는 야수는 쫓는 공 `LooseBallChase`) */
 interface ThrowInFlight {
   readonly from: number
   readonly base: number
   readonly releaseTick: number
-  readonly arrivalTick: number
-  /** 받을 야수. 악송구면 −1 */
-  readonly receiver: number
 }
 
 export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineResult {
@@ -163,7 +159,6 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
   const autoBaserunningEnabled = input.offenseIsCpu === true || (input.runningMode ?? '자동') !== '수동'
   const cpuThrowEnabled = input.defenseIsCpu === true || (input.throwMode ?? '수동') !== '수동'
   const manualThrowBase = input.manualThrowBase ?? NONE
-  const chase = input.chase
   const log: string[] = []
   const ticks: DefensePlayView[] = []
   const previousActions: ActionMemory = new Map<string, { action: number; since: number }>()
@@ -177,19 +172,26 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
   let ballOnGround = input.ballOnGround
   let tagOut = false
   let resultCode: RunnerPlayResultCode | null = null
-  let catchTick = chase?.catchTick ?? 0
-  let caught = chase === undefined
+  /** 쫓는 공 — 종류 9 의 폭투 · 포일 공(0xb284a), 송구공(b307c), 튕긴 공(0xb3148). 쥐면 null */
+  let chase: ChasedBall | null =
+    input.chase === undefined ? null : initialLooseBallChase(input.chase.trajectory, input.chase.slot, input.chase.catchTick)
+  /** 처음 공을 쥔 틱 (종류 9) */
+  let firstCatchTick = -1
   let fumbled = false
   let errantThrow = false
   let firstThrowBase = NONE
   let firstThrowArrival = -1
-  const throwState: { flight: ThrowInFlight | null } = { flight: null }
+  /** 지금 날아가는 송구 — 자동 슬라이딩 · 그림이 본다 */
+  // (닫힘 안에서 바뀌어 흐름 좁히기가 못 따라간다 — 넓은 꼴로 둔다)
+  let flight = null as ThrowInFlight | null
+  /** 공 객체 칸 — 다음 쏘기가 이어 받는다 */
+  let ballBody = chase?.body
+  /** sp+0x24 — 이번 틱 포구 틱의 사건(펌블 0xbc2). 서면 틱 끝 b45a4 가 0xb3148 */
+  let ballEventThisTick = false
   /** 사람 목표 +0x160 이 아직 안 쓰였나 — 공 가진 야수가 준비되면 한 번 보고 −1 (b46a4) */
   let manualPending = manualThrowBase !== NONE
   /** 이번 틱에 0xb36d0 이 아웃을 냈나 — 결과 코드 13 → 메시지 0xbba */
   let outJudgedThisTick = false
-  /** 악송구로 공이 빠졌다 — 더는 아무도 쥐지 않는다 (근사) */
-  let ballLost = false
   /** 플레이 +0x120 — 판 진행 관문 0xb0d28 의 판 끝 세기 */
   let endCounter = 0
   /** +0x15c · +0x158 — 0xb2e38 이 미룬 송구(AI 9)의 받을 야수 · 목표 루 */
@@ -208,7 +210,7 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
     fielders,
     runners: runnerStates(),
     currentTick: tick,
-    landingTick: chase?.trajectory.landingTick ?? 0,
+    landingTick: input.chase?.trajectory.landingTick ?? 0,
   })
 
   /** 0xb36d0 한 번 — 원본처럼 모든 주자를 본다(타자주자 제외 없음) */
@@ -307,55 +309,68 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
       return true
     }
     const special = cpuSpecial ? cpuSpecialThrowOf(fielders, holderSlot, coverSlot) : null
-    const bounce = special !== null && special.special && special.bounce
-    if (bounce && input.random !== undefined) randomIntegerBelow(input.random, 0, 2)
-    const error =
-      input.random === undefined || bounce
-        ? NO_THROW_ERROR
-        : rollThrowError(abilities[holderSlot] ?? DEFAULT_ABILITY, special?.special === true, input.random)
-    // a16dc~a16ec: +0xdc = 특수 ? +0xd8 : +0xd4 — 던질 때 덮어쓰고 그 판 동안 남는다
     const isSpecial = special !== null && special.special
+    // a16dc~a16ec: +0xdc = 특수 ? +0xd8 : +0xd4 — 던질 때 덮어쓰고 그 판 동안 남는다
     fielders = fielders.map((fielder) => (fielder.slot === holderSlot ? thrownWith(fielder, isSpecial) : fielder))
-    const thrower = fielders[holderSlot]
-    let arrival = isSpecial
-      ? specialThrowArrivalTicks(contextAt(tick), base, thrower)
-      : defenseArrivalTicks(contextAt(tick), base)
-    if (error.errant && input.random !== undefined) {
-      // 악송구 갈래(a1868~a1908) — 흔들린 수평 속도·방향으로 도착 틱, 굴림 둘 더 (`errantArrivalTicks`)
-      arrival = errantArrivalTicks(fielders, holderSlot, coverSlot, base, isSpecial, error, input.random)
-    }
-    if (error.errant) errantThrow = true
-    throwState.flight = {
-      from: holderSlot,
-      base,
-      releaseTick: tick,
-      arrivalTick: tick + Math.max(1, arrival),
-      receiver: error.errant ? NONE : coverSlot,
-    }
+    // 0xa1620 — 원바운드(a17fc) · 악송구(a1828) · 긴 송구 흔들림(a198c) 갈래와 세계 0xbfed0 · 받는 점 끼워 넣기(b2f9c).
+    // 공은 계획 [3](중계면 중계맨)의 목표점으로 간다(b2f52)
+    const thrown = launchThrow({
+      thrower: fielders[holderSlot],
+      target: fielders[plan.toSlot]?.target ?? basePosition(base),
+      special: isSpecial,
+      bounce: isSpecial && special.bounce,
+      ability: abilities[holderSlot] ?? DEFAULT_ABILITY,
+      random: input.random,
+      body: ballBody,
+    })
+    if (thrown.errant) errantThrow = true
+    // b307c vt24(0) · vt34 — 받을(주울) 야수 · 포구 틱. 예보는 던진 야수가 손을 떠나기 전 칸으로 본다(b2f80 뒤지만 위치 · 목표는 같다)
+    takeLooseBall(chaseLooseBall(thrown.ball, tick, fielders, forecastOptionsOf(thrown, holderSlot, coverSlot), maximumTicks))
+    flight = { from: holderSlot, base, releaseTick: tick }
     if (firstThrowBase === NONE) {
       firstThrowBase = base
-      firstThrowArrival = throwState.flight.arrivalTick
+      firstThrowArrival = chase?.catchTick ?? tick
     }
-    // 던지면 손을 떠난다(b2f80 · b3070) — 준비 틱(+0xc8)도 썼다. vt24(b307c)가 받을 야수(+0x170)·받는 틱(+0x174)을 다시 세운다.
+    // 던지면 손을 떠난다(b2f80 · b3070) — 준비 틱(+0xc8)도 썼다.
     // 0xb2c90 b2df8~b2e14: 던진 야수가 커버(AI 2~5)도 AI 9 도 아니면 AI 0 — 시작 자리 0xd86ec 로 돌아간다(b476a)
     fielders = fielders.map((fielder) => {
       if (fielder.slot !== holderSlot) return fielder
-      const thrown = { ...fielder, holdingBall: false, actionRemainingTicks: 0 }
+      const released = { ...fielder, holdingBall: false, actionRemainingTicks: 0 }
       const keeps =
         (fielder.aiState >= AI_STATE.COVER_HOME && fielder.aiState <= AI_STATE.COVER_THIRD) ||
         fielder.aiState === AI_STATE.RECEIVE
       return keeps
-        ? thrown
-        : { ...thrown, aiState: AI_STATE.IDLE, target: FIELDER_START_POSITIONS[holderSlot] ?? fielder.target, targetBase: NONE }
+        ? released
+        : { ...released, aiState: AI_STATE.IDLE, target: FIELDER_START_POSITIONS[holderSlot] ?? fielder.target, targetBase: NONE }
     })
-    play = { ...play, held: false, catchFielderSlot: coverSlot, catchTick: throwState.flight.arrivalTick }
     log.push(
-      `${tick}틱 ${holderSlot}번 야수가 ${base}루로 송구 — ${throwState.flight.arrivalTick}틱 도착` +
+      `${tick}틱 ${holderSlot}번 야수가 ${base}루로 송구 — ${chase?.catchTick ?? tick}틱 도착` +
         (cpuSpecial ? ' (특수)' : '') +
-        (error.errant ? ' (악송구)' : '') +
+        (thrown.bounce ? ' (원바운드)' : '') +
+        (thrown.errant ? ' (악송구)' : thrown.wobbled ? ' (흔들린 긴 송구)' : '') +
+        (chase !== null && chase.slot !== coverSlot ? ` (${chase.slot}번 야수가 줍는다)` : '') +
         (byHuman === '미룬' ? ' (AI 9 미룬 송구)' : byHuman ? '' : ' (CPU 결정)'),
     )
     return true
+  }
+
+  /**
+   * 새로 깐 공을 쫓게 한다 — 고르기 0xb3b38: AI 1 · 0xc 인 야수는 AI 0 으로, 고른 야수(+0x130)는 AI 1 · 목표 = 포구 지점(x, 0, z).
+   * 공은 아무도 안 쥔다(b2f80 · b3070 · 0xb3148).
+   */
+  const takeLooseBall = (next: ChasedBall): void => {
+    chase = next
+    ballBody = next.body
+    fielders = fielders.map((fielder) =>
+      fielder.slot === next.slot
+        ? { ...fielder, target: next.catchPoint, aiState: AI_STATE.CHASE, holdingBall: false }
+        : fielder.aiState === AI_STATE.CHASE || fielder.aiState === AI_STATE.BACKUP
+          ? { ...fielder, aiState: AI_STATE.IDLE, holdingBall: false }
+          : fielder.holdingBall
+            ? { ...fielder, holdingBall: false }
+            : fielder,
+    )
+    play = { ...play, held: false, ballHolderSlot: next.slot, catchFielderSlot: next.slot, catchTick: next.catchTick }
   }
 
   /**
@@ -363,7 +378,7 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
    * 홈이면 20% 특수 굴림(`afad2`, 0xb2c90 이 실패해도 먹는다), 0xb2c90 이 성공하면 +0x128 = 0.
    */
   const cpuThrowDecision = (tick: number): void => {
-    if (!play.wantsThrow || !isHolderReady() || ballLost || throwState.flight !== null) return
+    if (!play.wantsThrow || !isHolderReady()) return
     // afa6c~afab8: 공 가진 야수가 AI 8 · 9 면 안 고른다
     if (fielders[play.ballHolderSlot]?.aiState === AI_STATE.RECEIVE) return
     const active = runners.filter((runner) => !runner.state.isOut && !runner.state.scored).length
@@ -382,65 +397,57 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
         ? { ...fielder, actionRemainingTicks: fielder.actionRemainingTicks - 1 }
         : fielder,
     )
-    // ── 1. (종류 9) 포구 ──
-    if (chase !== undefined && !caught && tick === catchTick) {
-      const ballIsMoving = tick < chase.trajectory.length - 1
-      if (
-        !fumbled &&
-        input.random !== undefined &&
-        rollFumble(abilities[chase.slot] ?? DEFAULT_ABILITY, ballIsMoving, input.random)
-      ) {
-        // 펌블 (0xb41d0) — 타구 진행기와 같은 근사: 같은 자리에서 15틱 뒤 다시 줍는다
+    ballEventThisTick = false
+    // ── 1. 포구 틱 갈래 0xb401c — 쫓는 공을 고른 야수가 포구 틱(+0x174)에 ──
+    // ```
+    // b4224  r4 = 펌블표[등급] > rand(0, 10000)       ; 늘 먹는다
+    // b4236  멈춤 = 공.vt18() ; r4 && !멈춤 → 야수+0xb8 = 6 · 메시지 0xbc2 · 사건 sp+0x24 = 1 (쥐지 않음)
+    // b4292  아니면 b = 야수.vt58()(발밑 루) ; b ≠ −1 && 0xa97a0(b)(그 루에 마지막으로 닿은 산 주자).vt18() → 결과 코드 9
+    // b42c8  쥐기 0xb2710(P, f, 1) — +0x128 · +0x130 · +0x12c · +0x112 · 준비 틱(내야 3 · 외야 6) · vt90
+    // ```
+    const current = chase
+    if (current !== null && !play.held && tick === current.catchTick) {
+      const ballIsMoving =
+        current.trajectory.isStoppedAt === undefined
+          ? tick < current.trajectory.length - 1
+          : !current.trajectory.isStoppedAt(tick)
+      if (input.random !== undefined && rollFumble(abilities[current.slot] ?? DEFAULT_ABILITY, ballIsMoving, input.random)) {
         fumbled = true
-        catchTick = Math.min(tick + FUMBLE_LOCK_TICKS, maximumTicks)
-        log.push(`${tick}틱 ${chase.slot}번 야수 펌블 — ${catchTick}틱에 다시 줍는다`)
+        ballEventThisTick = true
+        log.push(`${tick}틱 ${current.slot}번 야수 펌블 (0xbc2)`)
       } else {
-        caught = true
-        const point = chase.trajectory.pointAt(chase.catchTick)
-        // 0xb2710(P, f, 1) — 셋째 인자가 1 이라 준비 틱(내야 3 · 외야 6)을 +0xc8 에 넣는다
-        grab(tick, chase.slot, {
-          position: { x: point.x, y: 0, z: point.z },
-          target: { x: point.x, y: 0, z: point.z },
-          actionRemainingTicks: readyTicksOf(chase.slot),
-        })
-        log.push(`${tick}틱 ${chase.slot}번 야수가 공을 주웠다`)
+        chase = null
+        flight = null
+        if (firstCatchTick < 0) firstCatchTick = tick
+        // 웹 다리: 야수 이동이 슬롯 2 뒤라 포구 틱에 포구 지점(AI 1 목표)으로 옮겨 쥔다
+        fielders = fielders.map((fielder) =>
+          fielder.slot === current.slot ? { ...fielder, position: current.catchPoint, target: current.catchPoint } : fielder,
+        )
+        const footBase = baseUnderFoot(fielders[current.slot])
+        const onBase =
+          footBase === NONE
+            ? undefined
+            : runners.find((runner) => !runner.state.isOut && wrapBase(runner.state.startBase) === footBase)
+        grab(tick, current.slot, { actionRemainingTicks: readyTicksOf(current.slot) })
+        log.push(`${tick}틱 ${current.slot}번 야수가 공을 쥐었다`)
+        if (resultCode === null && onBase !== undefined && isAtTarget(onBase.state)) {
+          resultCode = RUNNER_PLAY_RESULT.SAFE
+          log.push(`${tick}틱 ${footBase}루 세이프 (결과 9)`)
+        }
       }
     }
-    if (chase !== undefined && tick === chase.trajectory.landingTick && !ballOnGround) {
-      // 낙구 0xb4492~0xb453c: state[0x1e] = 1, 포스 요구 루 0xa95e8
-      ballOnGround = true
+    // 낙구 0xb4492~0xb453c — +0x112(쥐었거나 땅에 닿음)가 아직이면 state[0x1e] = 1 · 포스 요구 루 0xa95e8.
+    // 사건(펌블)만 있는 틱도 b44f8 이 포스를 세운다
+    if (!ballOnGround && chase !== null && (tick === chase.trajectory.landingTick || ballEventThisTick)) {
+      if (!ballEventThisTick) ballOnGround = true
       const required = requiredBasesOnBounce(runnerStates())
       runners.forEach((runner, index) => {
         runner.state = { ...runner.state, requiredBase: required[index] ?? runner.state.requiredBase }
       })
     }
 
-    // ── 3. 송구 도착 ──
-    const inFlight: ThrowInFlight | null = throwState.flight
-    if (inFlight !== null && tick >= inFlight.arrivalTick) {
-      if (inFlight.receiver === NONE) {
-        throwState.flight = null
-        ballLost = true
-        play = { ...play, wantsThrow: false }
-        log.push(`${tick}틱 악송구 — 받은 야수가 없다 (근사)`)
-      } else if (isSamePoint(fielders[inFlight.receiver].position, basePosition(inFlight.base))) {
-        throwState.flight = null
-        play = { ...play, wantsThrow: false }
-        // 송구 받기도 포구 틱 갈래(b42c8)의 0xb2710(P, f, **1**)이다 — 받은 야수도 준비 틱(내야 3 · 외야 6)을 +0xc8 에 넣는다
-        grab(tick, inFlight.receiver, { actionRemainingTicks: readyTicksOf(inFlight.receiver) })
-        // 0xb4292 — 받은 야수가 선 루에 마지막으로 닿은 산 주자가 제 목표점에 있으면 결과 9
-        const onBase = runners.find(
-          (runner) => !runner.state.isOut && wrapBase(runner.state.startBase) === wrapBase(inFlight.base),
-        )
-        if (resultCode === null && onBase !== undefined && isAtTarget(onBase.state)) {
-          resultCode = RUNNER_PLAY_RESULT.SAFE
-          log.push(`${tick}틱 ${inFlight.base}루 세이프 (결과 9)`)
-        }
-      }
-    }
-
     // ── 3b. 사람 목표 +0x160 — 플레이 틱 vt4c 의 b4660~b46a8: 쥠 && 준비(vtC4) 이면 발밑 루가 아닐 때 vt58, 그리고 −1 ──
-    if (!play.finished && !ballLost && manualPending && isHolderReady()) {
+    if (!play.finished && manualPending && isHolderReady()) {
       manualPending = false
       play = { ...play, manualThrowBase: NONE }
       if (!isSamePoint(fielders[play.ballHolderSlot].position, basePosition(manualThrowBase))) {
@@ -449,7 +456,7 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
     }
 
     // ── 3c. AI 9 — 미룬 송구 (b4838): 받을 야수.vtc0() ≤ 공 가진 야수.vtb8(루 좌표) 가 되면 0xb2c90(루, 0), 참이면 AI 0 ──
-    if (!play.finished && !ballLost && deferredThrowReceiver !== NONE) {
+    if (!play.finished && deferredThrowReceiver !== NONE) {
       for (let slot = 0; slot < fielders.length; slot += 1) {
         if (fielders[slot]?.aiState !== AI_STATE.RECEIVE) continue
         const receiver = fielders[deferredThrowReceiver]
@@ -483,11 +490,11 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
       }
     }
     if (!play.finished) {
-      const throwing = throwState.flight !== null && tick < throwState.flight.arrivalTick
+      const throwing = flight !== null && chase !== null && tick < chase.catchTick
       const slid = autoSlideRunnerIndexes({
         isThrowInFlight: throwing,
-        throwTargetBase: throwing && throwState.flight !== null ? throwState.flight.base : NONE,
-        throwArrivalTicks: throwState.flight !== null ? throwState.flight.arrivalTick - tick : -1,
+        throwTargetBase: throwing && flight !== null ? flight.base : NONE,
+        throwArrivalTicks: flight !== null && chase !== null ? chase.catchTick - tick : -1,
         runners: runners.map((runner) => slidingRunnerOf(runner.state)),
       })
       for (const index of slid) {
@@ -505,15 +512,14 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
     ticks.push(
       viewStateOf({
         tick,
-        ball: ballPointAt(tick, chase, caught, catchTick, fielders, play.ballHolderSlot, throwState.flight),
-        ballIsFlying: (chase !== undefined && !caught) || throwState.flight !== null,
+        ball: chase !== null ? chase.trajectory.pointAt(tick) : (fielders[play.ballHolderSlot]?.position ?? basePosition(0)),
+        ballIsFlying: chase !== null,
         fielders,
         runners: runnerStates(),
         catchKind: null,
         chaserSlot: chase?.slot ?? play.ballHolderSlot,
-        throwingSlot:
-          throwState.flight !== null && tick < throwState.flight.releaseTick + 3 ? throwState.flight.from : NONE,
-        throwBase: throwState.flight?.base ?? NONE,
+        throwingSlot: flight !== null && tick < flight.releaseTick + 3 ? flight.from : NONE,
+        throwBase: flight?.base ?? NONE,
         previousActions,
         aceIndexes: input.aceIndexes,
         defenseTeamIndex: input.defenseTeamIndex,
@@ -522,10 +528,11 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
     )
 
     // ── 6. 움직이기 ──
+    const chasing = chase
     fielders = fielders.map((fielder) => {
-      if (chase !== undefined && !caught && fielder.slot === chase.slot) {
-        const point = chase.trajectory.pointAt(chase.catchTick)
-        const goal = { x: point.x, y: 0, z: point.z }
+      // AI 1(0xb4aca~0xb4afe) — 고른 야수는 쥐기 전까지 포구 지점(x, 0, z)으로
+      if (chasing !== null && fielder.slot === chasing.slot) {
+        const goal = chasing.catchPoint
         return { ...fielder, target: goal, position: stepToward(fielder.position, goal, fielder.speed) }
       }
       if (isSamePoint(fielder.position, fielder.target)) return fielder
@@ -578,6 +585,21 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
       cpuThrowDecision(tick)
     }
 
+    // ── 7c. 틱 끝 b45a0 — 사건(펌블)이 있었으면 플레이.vt70 = 0xb3148: 공을 그 야수에게서 튕겨 다시 쏘고 vt24(1) · vt34 ──
+    const fumbledBall = chase
+    if (ballEventThisTick && fumbledBall !== null && !play.finished) {
+      const holder = fielders[fumbledBall.slot]
+      const bounced = bounceOffFielder(fumbledBall, tick, holder.position, input.random)
+      if (bounced !== null) {
+        takeLooseBall(chaseLooseBall(bounced.ball, tick, fielders, { initialChaserSlot: fumbledBall.slot }, maximumTicks))
+        flight = null
+        log.push(
+          `${tick}틱 공 튕김 (0xb3148) — 속도 ${bounced.speed} · v0 ${bounced.verticalSpeed} · 각 ${bounced.angle} · ` +
+            `${chase?.slot ?? NONE}번 야수가 ${chase?.catchTick ?? tick}틱에 줍는다`,
+        )
+      }
+    }
+
     // ── 8. 보류 득점 풀기 (0xaa34c) — aa364 의 "진행 중인 주자" 도 0xaa05c(+0x94 항까지) ──
     const stillActive = someRunnerStillActive(runnerStates(), isAtTarget)
     held = releaseHeldRuns(held, {
@@ -590,7 +612,6 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
     // ── 9. 판 진행 관문 0xb0d28 (`playGate.passPlayGate`) — 원본은 다음 틱 슬롯 2 머리에서 돈다. 웹은 그 틱 끝에서 본다 ──
     // 3아웃 · 처리 안 끝난 주자 · 아무도 안 쥠(종류 9 의 줍기 전 · 송구 중) → 이어 감, 공을 쥔 채 51틱(+0x120) → 닫음.
     // state[0xb] 는 이 판의 결과 코드(9 · 13)다. 낙구·담장 결과 코드(b44f6)는 이 판에 타구가 없어 안 선다.
-    // ⚠️ 근사: 악송구는 아무도 못 받는 것으로 옮겼다 — 공이 루에 닿은 뒤로는 "쥔 것" 으로 센다(원본은 누가 줍는다).
     const gate = passPlayGate({
       foulFlag: false,
       lastEventCode: resultCode ?? 0,
@@ -600,7 +621,7 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
       homeRunFlag: false,
       poleHomeRunFlag: false,
       liveRunnerCount: liveRunnerCountOf(runnerStates()),
-      ballHeld: play.held || ballLost,
+      ballHeld: play.held,
       groundRuleFlag: false,
       endCounter,
     })
@@ -614,8 +635,8 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
     resultCode,
     advance: { bases: basesOf(runners), runsScored: held.scoreboardRuns, outsAdded },
     ticks,
-    catchFielderSlot: chase?.slot ?? input.play.ballHolderSlot,
-    catchTick: chase !== undefined ? catchTick : 0,
+    catchFielderSlot: input.chase?.slot ?? input.play.ballHolderSlot,
+    catchTick: input.chase !== undefined ? firstCatchTick : 0,
     isUncatchable: false,
     caughtOnTheFly: false,
     tagOut,
@@ -673,30 +694,4 @@ function slidingRunnerOf(runner: RunnerState): SlidingRunner {
     targetBase: runner.targetBase,
     ticksToArrive: ticksToReach(runner.position, target, runner.speed),
   }
-}
-
-/** 공 그림 자리 — 줍기 전엔 궤적, 송구 중엔 낮은 포물선(타구 진행기와 같은 근사), 그 밖엔 쥔 야수 손 */
-function ballPointAt(
-  tick: number,
-  chase: LooseBallChase | undefined,
-  caught: boolean,
-  catchTick: number,
-  fielders: readonly FielderState[],
-  holderSlot: number,
-  flight: ThrowInFlight | null,
-): WorldPoint {
-  if (chase !== undefined && !caught) return chase.trajectory.pointAt(Math.min(tick, catchTick))
-  if (flight !== null) {
-    const from = fielders[flight.from]?.position ?? basePosition(0)
-    const to = basePosition(flight.base)
-    const whole = flight.arrivalTick - flight.releaseTick
-    const done = Math.min(whole, tick - flight.releaseTick)
-    if (whole <= 0) return to
-    return {
-      x: from.x + Math.trunc(((to.x - from.x) * done) / whole),
-      y: Math.trunc((1200 * done * (whole - done)) / (whole * whole)),
-      z: from.z + Math.trunc(((to.z - from.z) * done) / whole),
-    }
-  }
-  return fielders[holderSlot]?.position ?? basePosition(0)
 }

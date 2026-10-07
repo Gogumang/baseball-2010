@@ -77,13 +77,14 @@ describe('폭투·포일 한 판 — 종류 9 (0x3507c · 0xb284a)', () => {
     expect(result.ticks[0].runners.map((runner) => runner.index)).toEqual([1, 2, 3])
   })
 
-  it('난수는 줍는 순간 펌블 굴림(0xb41d0) 한 번 — 송구가 나가면 악송구 굴림이 하나 더', () => {
+  it('난수는 줍는 순간 펌블 굴림(0xb41d0) 한 번 — 송구가 나가면 악송구 굴림 · 긴 송구 흔들림 굴림 · 받는 펌블 굴림이 더', () => {
     const quiet = 세는난수(0.9)
     runPassedBallPlay({ shot: 가운데, bases: EMPTY_BASES, outs: 0, random: quiet })
     expect(quiet.count()).toBe(1)
     const throwing = 세는난수(0.9)
     runPassedBallPlay({ shot: 가운데, bases: EMPTY_BASES, outs: 0, batterRuns: true, random: throwing, manualThrowBase: 1 })
-    expect(throwing.count()).toBe(2)
+    // 줍기 펌블(b4224) · 악송구(a1828) · 흔들림(a198c — 투수가 1루까지 8200 넘게 던진다) · 받는 1루수의 펌블(b4224)
+    expect(throwing.count()).toBe(4)
     // 키 없는 사람 수동 송구는 던지지 않는다 — 낫아웃 타자주자는 1루에 산다
     const holding = 세는난수(0.9)
     const kept = runPassedBallPlay({ shot: 가운데, bases: EMPTY_BASES, outs: 0, batterRuns: true, random: holding })

@@ -71,17 +71,21 @@ describe('도루 한 판 — 종류 5 (0xb2950 · 0xb1c90 · 0xb36d0 · 0xb4292)
   it('난수는 판이 열릴 때 도루 주자 리드 rand(0,9) 한 번, 송구 때 악송구 굴림(0xa1828) 한 번 — 악송구면 넷 더(수평·수직 속도 · 방향 크기 · 부호)', () => {
     const quiet = 세는난수(0.5)
     const plain = runStealPlay({ bases: 일루, stealingFrom: [1], outs: 0, runAbility: 0, random: quiet, manualThrowBase: 2 })
-    expect(quiet.count()).toBe(2)
+    // 리드 · 악송구 · 긴 송구 흔들림(a198c — 홈 → 2루 10275 > 8200) · 받는 2루수의 펌블 굴림(b4224)
+    expect(quiet.count()).toBe(4)
     expect(plain.throwBase).toBe(2)
     expect(plain.errantThrow).toBe(false)
 
+    // 늘 0 인 난수 — 악송구(+4)가 나고, 예보 vt24(0)가 고른 야수가 줍는 족족 움직이는 공을 펌블해 0xb3148 로 튕긴다
+    // (튕김 rand(−20, 20) · 다시 줍는 펌블 굴림) — 그사이 도루 주자가 홈까지 간다
     const wild = 세는난수(0)
     const errant = runStealPlay({ bases: 일루, stealingFrom: [1], outs: 0, runAbility: 0, random: wild, manualThrowBase: 2 })
-    expect(wild.count()).toBe(6)
+    expect(wild.count()).toBe(36)
     expect(errant.errantThrow).toBe(true)
+    expect(errant.fumbled).toBe(true)
     expect(errant.resultCode).toBeNull()
     expect(stealCallSoundIdOf(errant)).toBeNull()
-    expect(errant.advance.bases).toEqual({ ...EMPTY_BASES, second: true })
+    expect(errant.advance).toEqual({ bases: EMPTY_BASES, runsScored: 1, outsAdded: 0 })
   })
 
   it('사람 수비·수동 송구에서 키가 없으면 포수는 공을 들고 있다 — 0xb1c90 자동 가지에는 송구 호출이 없다', () => {
