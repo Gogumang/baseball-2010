@@ -137,6 +137,7 @@ import type { CollectionRewardRecord } from '@/entities/collection/model/collect
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { GAME_POINT_USAGE } from '@/entities/collection/model/annalsStats'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
+import { resetLiveGameState, setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
 
 /** 시즌모드 = 원본 모드 2 (0x22c7d 의 획득 GP 칸 3) */
 const SEASON_STAT_MODE = 2
@@ -1620,6 +1621,8 @@ export function useSeasonSession(
    */
   const enterMatchInfo = useCallback(
     (current: SeasonSave, pending: PendingSeasonGame, aces: PreGameAces | null) => {
+      // 0x6548 의 65ec~6626 — 0xb6814(전역 상태): +0x6b = 0 (`liveGameState`). 0xe0 에서 돌아온 길(6556 → 6850)은 안 지난다
+      resetLiveGameState()
       setPendingGame(
         pending.kind === '국가대항전' || aces === null
           ? pending
@@ -1873,6 +1876,8 @@ export function useSeasonSession(
     (summary: TeamGameSummary): SettledSeasonGame | null => {
       const latest = latestSave.current
       if (latest === null) return null
+      // 전역 경기 상태 +0x6b 에 이 경기 끝 이닝이 남는다(0xb6b6c — 정규·포스트시즌·국가대항전 모두) (`liveGameState`)
+      setLiveGameInningIndex(summary.inningsPlayed - 1)
       // 0x4f3d6 — 같은 진입이 +0x4c+모드(+0x4e)를 0 으로 쓰고 0x1fded · 0x22755 · 0x1f1b9 로 저장한다. 정산과 한 커밋이다
       const savedBefore: SeasonSave = { ...latest, isGameInProgress: false, gameSave: null }
       // 돌발미션 보상·페널티 (0x8e34c 모드 2) — 원본은 판정이 난 경기 중에 SR·팀 사기에 바로 더하므로 평가보다 앞이다.
@@ -2519,6 +2524,9 @@ export function useSeasonSession(
       const current = latestSave.current
       // 정산 진입(0x4ea0c) 뒤에는 반 이닝 저장이 없다 — 늦게 온 effect 가 +0x4e 를 되세우지 않게
       if (current === null || settledGame.current !== null) return
+      // 반 이닝 저장(0x4f928)은 이닝 넘김 0xb6b6c 뒤다 — 전역 경기 상태 +0x6b 가 지금 이닝이다. 경기 중 나가기(0x40140)는
+      // 이 칸을 안 지우므로 나간 그 이닝이 남는다 (`liveGameState`). 이어하기 첫 진행은 블록에서 되복사한 st 의 이닝이다
+      setLiveGameInningIndex(progress.game.inning - 1)
       commit({ ...current, isGameInProgress: true, gameSave: { progress, kind: gameKind, ownRotationShift } })
     },
     [commit, gameKind, ownRotationShift],

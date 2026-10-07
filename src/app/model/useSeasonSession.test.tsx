@@ -27,6 +27,7 @@ import { BURST_TABLES } from '@/entities/burst-mission/model/burstMissionRow'
 import { BURST_GOAL } from '@/entities/burst-mission/model/burstMissionJudge'
 import { PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
+import { liveGameInningIndex, setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
 
 /** 시즌 모드 한 판을 잇는 훅 (원본 장면 0x105) — 저장·장면 전환만 본다 */
 
@@ -2017,6 +2018,27 @@ describe('시즌 경기 중간 저장 — 전역기록 +0x4e 와 모드 2 블록
     expect(result.current.gameOptions).toBeNull()
     expect(result.current.state!.record.games).toBe(정산뒤.games)
     expect(result.current.state!.record.money).toBe(정산뒤.money)
+  })
+
+  it('전역 경기 상태 +0x6b — 0xdd 진입 0x6548 이 0, 반 이닝 저장 · 나가기는 그 이닝, 정산 진입은 끝 이닝 (liveGameState)', () => {
+    setLiveGameInningIndex(5)
+    const store = 메모리저장()
+    const { result } = 경기시작(store)
+    expect(liveGameInningIndex()).toBe(0)
+
+    const 진행 = startTeamGame(result.current.gameOptions!, createSeededRandom(7))
+    act(() => result.current.actions.saveGameProgress({ ...진행, game: { ...진행.game, inning: 4 } }))
+    expect(liveGameInningIndex()).toBe(3)
+    act(() => result.current.actions.leaveGame())
+    expect(liveGameInningIndex()).toBe(3)
+
+    const 다시 = 경기시작(메모리저장())
+    expect(liveGameInningIndex()).toBe(0)
+    act(() => 다시.result.current.actions.enterGameSettlement({
+      ...요약({ opponentTeamId: 다시.result.current.gameOptions!.opponentTeamId }),
+      inningsPlayed: 11,
+    }))
+    expect(liveGameInningIndex()).toBe(10)
   })
 
   it('나가기는 표시를 남기고, 다시 들어오면(0x327b8 모드 2 · +0x42 && +0x4e) 곧장 그 경기로 선다', () => {

@@ -3,6 +3,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { FULL_PLAY_SETTINGS } from '@/features/play-team-game/model/matchSettings'
 import type { MatchProgressSettings } from '@/features/play-team-game/model/matchSettings'
 import { rollTeamSetup } from '@/features/play-team-game/model/teamGameFlow'
+import { resetLiveGameState } from '@/shared/lib/liveGameState/liveGameState'
 import type { TeamGameOptions, TeamSetupRolls } from '@/features/play-team-game/model/teamGameFlow'
 import type { PlayerSide } from '@/entities/game/model/gameState'
 import { swapWithStarter } from '@/entities/pitcher-career/model/pitcherRotation'
@@ -352,7 +353,11 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
   }
 }
 
-/** `0x30f20` 의 굴림 넷 — 준비 기록의 마선수(`+0xe`·`+0xd`)가 상대 마선수 굴림의 입력이다 */
+/**
+ * `0x30f20` 의 굴림 넷 — 준비 기록의 마선수(`+0xe`·`+0xd`)가 상대 마선수 굴림의 입력이다.
+ * 같은 함수가 0x310a8 에서 0xb6814(전역 상태)를 불러 +0x6b = 0 으로 둔다 (`liveGameState` — 상태 22 진입 3158c · 재굴림 끝 31290)
+ */
 function rollsOf(setup: GeneralModeSetup, random: RandomPort): TeamSetupRolls {
+  resetLiveGameState()
   return rollTeamSetup(setup.acePitcherId, setup.aceBatterId, random)
 }

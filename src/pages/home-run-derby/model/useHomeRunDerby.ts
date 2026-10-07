@@ -20,6 +20,7 @@ import { activeSound, playSoundIds } from '@/shared/api/audio/soundPort'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { resetLiveGameState } from '@/shared/lib/liveGameState/liveGameState'
 
 /** 공 하나의 결과를 보여 주는 시간 — 타석 화면들이 쓰는 값과 같다 (원본에 없는 웹판 연출) */
 const BANNER_MILLISECONDS = 1_500
@@ -152,9 +153,12 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
   // 장면에 들어선 첫 그림 뒤 한 번 — 첫 공(상태 0xd → 투구)보다 앞이다. StrictMode 의 효과 두 번 돌기에도 한 번만
   const isSceneStartRolledRef = useRef(false)
   useEffect(() => {
-    if (isSceneStartRolledRef.current || randomRef.current === undefined) return
+    if (isSceneStartRolledRef.current) return
     isSceneStartRolledRef.current = true
-    rollDerbySceneStart(randomRef.current)
+    // 0x39fdc 모드 7 갈래 3a49c — 0xb6814(전역 상태): +0x6b = 0 (`liveGameState`). 더비는 한 공 끝 판정 A 가 0x18 로
+    // 안 가(모드 7 → 0xd / 0x1a) 이닝 넘김 0xb6b6c 를 안 지나므로 그대로 0 이 남는다
+    resetLiveGameState()
+    if (randomRef.current !== undefined) rollDerbySceneStart(randomRef.current)
   }, [])
 
   const timerRef = useRef<number | null>(null)
@@ -353,7 +357,8 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
     setShownCombo(null)
     // 경기 시작과 같이 적재 8 → 0xd → 0xe 로 와서 OK 를 기다린다
     enterScenePrepare()
-    // 새 경기 장면의 상태 9 — 같은 시작 굴림 둘
+    // 새 경기 장면의 상태 9 — 같은 시작 굴림 둘 (0x39fdc 모드 7 의 +0x6b = 0 도 다시)
+    resetLiveGameState()
     if (randomRef.current !== undefined) rollDerbySceneStart(randomRef.current)
     const fresh = createDerbyRun()
     runRef.current = fresh

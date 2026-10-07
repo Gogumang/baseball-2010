@@ -13,6 +13,7 @@ import { MatchInfoScreen } from '@/pages/general-mode/ui/MatchInfoScreen'
 import { MatchSettingsWindow } from '@/pages/general-mode/ui/MatchSettingsWindow'
 import { EntryEditorScreen } from '@/widgets/entry-editor'
 import { TEAMS } from '@/shared/config/original/teams'
+import { setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
 
 export interface GeneralModeScreenProps {
   readonly random: RandomPort
@@ -91,8 +92,41 @@ export interface GeneralModeScreenProps {
  *    길이 없다. 문구를 만드는 함수는 `lib/hiddenTeam.ts` 의 `hiddenTeamHintMessage` 에 있다.
  */
 export function GeneralModeScreen(props: GeneralModeScreenProps) {
-  if (props.resumeGame !== undefined) return <GeneralModeResume {...props} resumeGame={props.resumeGame} />
-  return <GeneralModePrepare {...props} />
+  const live = withLiveGameInning(props)
+  if (live.resumeGame !== undefined) return <GeneralModeResume {...live} resumeGame={live.resumeGame} />
+  return <GeneralModePrepare {...live} />
+}
+
+/**
+ * **전역 경기 상태 +0x6b** (`liveGameState`) — 경기 장면이 이닝을 넘길 때(0xb6b6c) 지금 이닝을 적는다. 반 이닝 저장(0x4f928)이
+ * 그 뒤라 저장이 오는 때의 이닝이 곧 이 칸이고, 경기 중 나가기(0x40140)는 이 칸을 안 지워 나간 그 이닝이 남는다.
+ * 경기 끝(정산 진입 · 결과 확인)은 끝 이닝. 0 으로 두는 자리는 상태 22 의 0x30f20(`useGeneralMode`)이다.
+ */
+function withLiveGameInning(props: GeneralModeScreenProps): GeneralModeScreenProps {
+  const { onGameStart, onGameSave, onSettlementEnter, onFinish } = props
+  return {
+    ...props,
+    onGameStart: (save) => {
+      setLiveGameInningIndex(save.game.inning - 1)
+      onGameStart?.(save)
+    },
+    onGameSave: (save) => {
+      setLiveGameInningIndex(save.game.inning - 1)
+      onGameSave?.(save)
+    },
+    ...(onSettlementEnter === undefined
+      ? {}
+      : {
+          onSettlementEnter: (summary: TeamGameSummary) => {
+            setLiveGameInningIndex(summary.inningsPlayed - 1)
+            onSettlementEnter(summary)
+          },
+        }),
+    onFinish: (summary) => {
+      setLiveGameInningIndex(summary.inningsPlayed - 1)
+      onFinish(summary)
+    },
+  }
 }
 
 /**

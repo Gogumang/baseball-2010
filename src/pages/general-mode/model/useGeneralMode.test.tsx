@@ -10,6 +10,7 @@ import {
   QUICK_RESPIN_TICKS, finishQuickRespin, rollQuickRespinTeams, rollQuickStart,
 } from '@/pages/general-mode/lib/quickStart'
 import { useGeneralMode } from '@/pages/general-mode/model/useGeneralMode'
+import { liveGameInningIndex, setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
 
 /**
  * 상태 22 진입 `0x314b0` → `0x30f20` — 원본은 경기 장면이 아니라 경기정보에 들어올 때 마선수 둘·선발 둘을 굴린다
@@ -25,6 +26,13 @@ const 빠른실행 = () => {
 }
 
 describe('일반모드 0x30f20 굴림 넷은 상태 22 진입에서 돈다', () => {
+  it('0x30f20 은 전역 경기 상태 +0x6b 를 0 으로 둔다 (0x310a8 → 0xb6814, liveGameState)', () => {
+    setLiveGameInningIndex(7)
+    빠른실행()
+
+    expect(liveGameInningIndex()).toBe(0)
+  })
+
   it('빠른실행 — 기록 굴림 바로 뒤에 0x30f20 넷이 돌고 경기 옵션이 그 값을 든다', () => {
     const { result } = 빠른실행()
     const 따로 = createSeededRandom(씨앗)
