@@ -181,6 +181,19 @@ describe('웹 전용 단추', () => {
     expect(screen.getByText('감독 평가')).toBeTruthy()
     expect(screen.getByText('오늘의 성적')).toBeTruthy()
   })
+
+  it('국가대항전 경기(116 평가 없음)는 같은 결과 판에 평가 칸이 없다', () => {
+    const onContinue = vi.fn()
+    render(
+      <GameResultScreen summary={요약()} gamePointReward={30} newTitles={[]} career={createCareer('선수')} onContinue={onContinue} />,
+    )
+    expect(screen.getByText('30 G포인트')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '자세히' }))
+    expect(screen.queryByText('감독 평가')).toBeNull()
+    expect(screen.getByText('오늘의 성적')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    expect(onContinue).toHaveBeenCalledOnce()
+  })
 })
 
 describe('승·패·세 이름', () => {

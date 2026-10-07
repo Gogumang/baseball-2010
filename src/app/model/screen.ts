@@ -43,6 +43,16 @@ export type Screen =
       readonly evaluation: GameEvaluation
       readonly streakNotices: readonly StreakNotice[]
     }
+  /**
+   * 나리 국가대항전 사람 경기 결과 — 경기 끝 판(상태 0x18) · 정산 그림(0x19 · 0x4a384)을 정규 경기 결과 화면 한 장으로 보인다.
+   * 116 평가는 없다(대회는 S+0x50 = 2 를 안 쓴다). [확인] → 134 대진판(0x1c154 의 S+0x12c 갈래). `cup` 은 하루를 넘긴 대회.
+   */
+  | {
+      readonly kind: '대회경기결과'
+      readonly summary: GameSummary
+      readonly gamePointReward: number
+      readonly cup: NationalCup
+    }
   | { readonly kind: '관리' }
   /**
    * 나만의리그 다음경기 앞 순위표 (원본 상태 109). 관리 [다음경기]에서 오거나(이전 105), 경기 뒤 관리 주기가 아니면

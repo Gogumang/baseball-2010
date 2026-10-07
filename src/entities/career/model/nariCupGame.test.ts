@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { nariCupGameResultOf } from '@/entities/career/model/nariCupGame'
+import { nariCupGameResultOf, settleNariCupGame } from '@/entities/career/model/nariCupGame'
 
 describe('나리 국가대항전 사람 경기 승패 — 0x4ea0c 4f072~4f136', () => {
   it('후공(측 1) 점수가 더 많을 때만 후공 승', () => {
@@ -19,5 +19,34 @@ describe('나리 국가대항전 사람 경기 승패 — 0x4ea0c 4f072~4f136', 
       .toEqual({ winner: 10, loser: 13 })
     expect(nariCupGameResultOf({ mySide: 0, myTeam: 10, opponentTeam: 13, myScore: 1, opponentScore: 2 }))
       .toEqual({ winner: 13, loser: 10 })
+  })
+})
+
+describe('대회 사람 경기의 커리어 몫 — 0x4ea0c 4ebaa~4ec7c · 4f156 · 4f344 · 4f374', () => {
+  const 바탕 = {
+    gamePoint: 99_990,
+    hasActedThisCycle: true,
+    isInjured: true,
+    injuredGamesPlayed: 3,
+    illnessCooldown: 1,
+    eagleEyeGamesRemaining: 0,
+  }
+
+  it('기록 G 는 99999 에서 자르고 · 행동함을 내리고 · 부상 경기 수 +1 · 쿨다운과 이글아이는 0 아래로 안 간다', () => {
+    expect(settleNariCupGame(바탕, 50)).toEqual({
+      gamePoint: 99_999,
+      hasActedThisCycle: false,
+      isInjured: true,
+      injuredGamesPlayed: 4,
+      illnessCooldown: 0,
+      eagleEyeGamesRemaining: 0,
+    })
+  })
+
+  it('이글아이 칸이 없는 투수편 커리어는 그 칸을 만들지 않는다', () => {
+    const { eagleEyeGamesRemaining: _없음, ...투수 } = 바탕
+    const settled = settleNariCupGame({ ...투수, isInjured: false }, 0)
+    expect(settled).toEqual({ ...투수, isInjured: false, hasActedThisCycle: false, illnessCooldown: 0 })
+    expect('eagleEyeGamesRemaining' in settled).toBe(false)
   })
 })

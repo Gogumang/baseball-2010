@@ -145,6 +145,18 @@ export function CareerRoutes({
         />
       )
 
+    // 국가대항전 경기 결과 — 정규 경기와 같은 결과 판(0x18 · 0x4a384), 116 평가 없이 [확인] → 134 대진판
+    case '대회경기결과':
+      return (
+        <GameResultScreen
+          summary={screen.summary}
+          gamePointReward={screen.gamePointReward}
+          newTitles={[]}
+          career={career}
+          onContinue={actions.confirmCupGameResult}
+        />
+      )
+
     case '외출':
       return (
         <OutingMapScreen

@@ -130,7 +130,7 @@ import {
   prepareNariCupMatch,
 } from '@/entities/career/model/nariCupTeams'
 import type { NariCupTeams } from '@/entities/career/model/nariCupTeams'
-import { nariCupGameResultOf } from '@/entities/career/model/nariCupGame'
+import { nariCupGameResultOf, settleNariCupGame } from '@/entities/career/model/nariCupGame'
 import { UNSHUFFLED_PITCHER_ORDER } from '@/entities/league/model/league'
 import type { NationalCup, NationalCupMatchup } from '@/entities/national-cup/model/nationalCup'
 import { advanceNationalCupDay } from '@/entities/national-cup/model/nationalCupPlay'
@@ -676,15 +676,13 @@ export function useCareerSession({
   )
 
   /**
-   * 국가대항전 사람 경기가 끝났다 — 결과 장면 `0x4ea0c` 차례(내 경기 승패 기록 → 같은 라운드
-   * CPU 경기 `0xc2dac` → 하루 끝 `0xb818c`)를 `advanceNationalCupDay` 가 그대로 한다.
-   * 그 뒤 상태 101 재진입(`0x1c154`)이 `S+0x12c` 를 보고 순위 화면 134 로 돌려보낸다 (P5 1a·5절).
-   *
-   * ⚠️ **웹판 임시**: 원본은 대회 경기 뒤에도 경기 결과 화면을 한 번 보여 주는데, 웹 `경기결과`
-   * 화면의 [확인]은 정규시즌 정산(`confirmGameResult`)에 묶여 있어 대회 경기에는 쓸 수 없다 —
-   * 곧장 순위 화면으로 돌아간다.
-   * 대회 경기는 커리어 기록(리그 승패·연속 기록·칭호·G포인트)을 건드리지 않는다. 원본도 국가대항전
-   * 승패는 4국 칸(`L+0xb0`/`L+0xb4`)에만 넣고 "정규 기록은 건드리지 않는다"(P5 1a).
+   * 국가대항전 사람 경기가 끝났다 — 경기 장면 0x104 의 경기 끝 판(상태 0x18) → [OK] → 상태 0x19 진입 `0x4ea0c`(정산 · 그림
+   * 0x4a384) → [OK] → 나리 장면 0x106 상태 100 `0x1c154` → S+0x12c 라 134 대진판. 116 은 안 지난다 — 0x4ea0c 4f03a 가 S+0x50 = 2 를
+   * 대회가 아닐 때만 쓰고(대회면 4eb3e 의 3 그대로), 0x1c154 는 S+0x50 == 2 일 때만 116 이다.
+   * 정산 차례: 기록 달성 G(4ebaa~4ec90) → 승패 4f072~4f136 → 행동 S+4 = 0(4f156) → 같은 라운드 CPU 경기 `0xc2dac` → 하루 끝
+   * `0xb818c`(`advanceNationalCupDay`) → 부상 경기 수 · S+0x54 · S+0x7c(4f344~4f3b2) → 저장 (`settleNariCupGame`).
+   * 리그 승패 · 평가 0xa719c(4f216 이 건너뛴다) · 내 시즌 기록(0xa56dc 거짓) · 경기 수 · 칭호는 안 건드린다.
+   * 웹 경기 끝 판 · 정산 그림은 정규 경기처럼 결과 화면(`GameResultScreen`) 한 장이다 — [확인]이 134 로 간다(`confirmCupGameResult`).
    */
   const finishCupGame = useCallback(
     (finished: GameProgress, cup: NationalCup) => {
@@ -705,19 +703,26 @@ export function useCareerSession({
       // 같은 날 CPU 경기 두 나라는 상대국 슬롯 레코드(base+0x934) 하나를 쓴다 — 사람 경기가 깎아 둔 그 레코드의
       // 투수 +0x2c 에서 선다 (701a7a9). 사람 경기 끝 상대 투수 칸별 값을 넘긴다
       const next = advanceNationalCupDay(cup, winner, loser, random, summary.pitcherStaminas?.opponent)
+      // 기록 달성 G (4ebaa~4ec7c — 사람 팀 공·수로 거른 기록이라 대회 경기도 쌓인다)
+      const gamePointReward = gamePointRewardOf(summary)
       // 하루 끝 b8216 — 다음 날 사람 경기 상대를 +0xbe0 에 마스터에서 새로 복사. 대회 칸(L+0xa8~ · L+0x32)은 정산 끝 0x4f3c4 가 저장
       setCareer((current) => current === null
         ? current
         : {
-          ...current,
+          ...settleNariCupGame(current, gamePointReward),
           nationalCup: next,
           ...(current.nariCupTeams === undefined
             ? {}
             : { nariCupTeams: nextNariCupDayTeams(current.nariCupTeams, nationalCupMatchupOf(next)?.opponent ?? null) }),
         })
-      setScreen({ kind: '국가대항전', cup: next })
+      // 0x4ec82 `0x22c7d(G, 모드 4)` 획득 GP 통계 · 0x4ec8a `0x22e10` 기록 달성 횟수 — 모드를 가리지 않는다
+      recordStat({ kind: 'G획득', mode: BATTER_LEAGUE_MODE, amount: gamePointReward })
+      recordStat({ kind: '기록달성', recordIds: summary.recordIds ?? [] })
+      // 승리 31 · 패배 32 징글 — 정규 경기 결과 화면과 같은 자리 (116 의 평가 징글은 없다)
+      playSoundIds(audio, [gameResultSoundIdOf(summary.result)])
+      setScreen({ kind: '대회경기결과', summary, gamePointReward, cup: next })
     },
-    [random, setCareer, setScreen],
+    [audio, random, recordStat, setCareer, setScreen],
   )
 
   /**
@@ -1334,6 +1339,15 @@ export function useCareerSession({
       }
       // 관리 주기가 아니면 116 의 끝(0x12bb0)이 [114 → 109] 로 보낸다 — 이전 상태가 105 가 아니라 취소가 안 먹는다
       enterNextGameStandings(false)
+    },
+
+    /**
+     * 대회 경기 결과 화면 [확인] — 정산 0x19 의 OK 가 나리 장면 0x106 을 새로 세우고 상태 100 `0x1c154` 가 S+0x12c 로 134 대진판에
+     * 돌려보낸다(1c348~1c358). 134 진입 0x19f30 은 히든 팀을 열고(대한민국 · 우승이면 결승 상대) 대진판을 그린다.
+     */
+    confirmCupGameResult: () => {
+      if (screen.kind !== '대회경기결과') return
+      setScreen({ kind: '국가대항전', cup: screen.cup })
     },
 
     /** 109 순위표 확인(−5 · '5', 0x105f0) → 142 경기 준비 */

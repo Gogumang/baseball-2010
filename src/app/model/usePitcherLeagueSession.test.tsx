@@ -7,6 +7,7 @@ import { EMPTY_LEAGUE, startPostseason } from '@/entities/league/model/league'
 import { NO_EQUIPPED_TITLE, TITLE_NAMES } from '@/entities/career/model/titles'
 import { createPitcherCareer, pitcherLastGameLineOf } from '@/entities/pitcher-career/model/pitcherCareer'
 import { createNationalCup } from '@/entities/national-cup/model/nationalCup'
+import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import { useGamePointWallet } from '@/entities/wallet/model/useGamePointWallet'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
@@ -667,13 +668,19 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
       positionCode: 0,
     })
     expect(options.ourPitcherOrder?.[0]).toBe(8)
-    const 앞 = result.current.career!
-    act(() => result.current.actions.finishGame({ ...경기요약, result: '승', ourScore: 2, opponentScore: 0 } as typeof 경기요약))
+    const 앞 = { ...result.current.career!, hasActedThisCycle: true }
+    act(() => result.current.actions.save(앞))
+    // 3루타(0) 기록 하나 — 정산 4ebaa 의 기록 G 는 대회 경기에도 쌓인다
+    act(() => result.current.actions.finishGame({ ...경기요약, result: '승', ourScore: 2, opponentScore: 0, recordIds: [0] } as typeof 경기요약))
     expect(result.current.scene).toBe('국가대항전')
     expect(result.current.cup?.cup.day).toBe(1)
     expect(result.current.cup?.cup.wins[0]).toBe(1)
     expect(result.current.career?.stats).toEqual(앞.stats)
     expect(result.current.career?.wins).toBe(앞.wins)
+    expect(result.current.career?.gamesPlayed).toBe(앞.gamesPlayed)
+    expect(result.current.career?.gamePoint).toBe(앞.gamePoint + recordGamePointsOf([0]))
+    // 4f156 S+4 = 0
+    expect(result.current.career?.hasActedThisCycle).toBe(false)
     // 다음 날 상대국 칸은 마스터에서 새로
     expect(result.current.career?.nariCupTeams?.opponentTeamId).toBe(12)
 

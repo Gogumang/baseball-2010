@@ -78,7 +78,7 @@ import type { NationalCup, NationalCupMatchup } from '@/entities/national-cup/mo
 import { advanceNationalCupDay } from '@/entities/national-cup/model/nationalCupPlay'
 import { nariCupRecordOf, nextNariCupDayTeams } from '@/entities/career/model/nariCupTeams'
 import type { NariCupTeams } from '@/entities/career/model/nariCupTeams'
-import { nariCupGameResultOf } from '@/entities/career/model/nariCupGame'
+import { nariCupGameResultOf, settleNariCupGame } from '@/entities/career/model/nariCupGame'
 import {
   createPitcherCupTeams,
   pitcherCupPositionCodeOf,
@@ -976,10 +976,12 @@ export function usePitcherLeagueSession(
    * 정규시즌·포스트시즌을 넘긴다 (타자편 `finishGame` 과 같은 차례다).
    */
   /**
-   * 국가대항전 사람 경기가 끝났다 — 결과 장면 0x4ea0c 차례(내 경기 승패 0xb76dc/0xb77e0 → 같은 라운드 CPU 경기 0xc2dac → 하루 끝
-   * 0xb818c)를 `advanceNationalCupDay` 가 하고, 재진입 0x1c154 가 S+0x12c 를 보고 134 로 돌려보낸다(116 을 안 지난다).
-   * 커리어(리그 승패·평가·기록 G·스태미나)는 건드리지 않는다 — 내 기록은 대표팀 칸 복사본에 쌓이고(0xa56dc 거짓) 대회 끝
-   * 0x1faa1 이 포인터를 원래 레코드로 돌린다. ⚠️ 웹판 임시(타자편과 같다): 원본은 대회 경기 뒤에도 결과 판(0x18)을 보인다.
+   * 국가대항전 사람 경기가 끝났다 — 경기 끝 판(상태 0x18, 웹은 경기 화면의 `GameEndBoard`) [OK] 뒤 정산 0x4ea0c 차례(기록 달성 G →
+   * 내 경기 승패 0xb76dc/0xb77e0 → S+4 = 0 → 같은 라운드 CPU 경기 0xc2dac → 하루 끝 0xb818c → 부상 경기 수 · S+0x7c)를 하고, 재진입
+   * 0x1c154 가 S+0x12c 를 보고 134 로 돌려보낸다(116 을 안 지난다 — 4f03a 의 S+0x50 = 2 는 대회가 아닐 때만). 기록 G · 행동 · 부상 · 질병
+   * 칸은 `settleNariCupGame`(타자편과 같다). 리그 승패 · 평가 · 스태미나 · 시즌 기록은 안 건드린다 — 내 기록은 대표팀 칸 복사본에
+   * 쌓이고(0xa56dc 거짓) 대회 끝 0x1faa1 이 포인터를 원래 레코드로 돌린다.
+   * ⚠️ 정산 그림 0x4a384(YOU WIN/LOSE · 보상 글)는 웹 투수편이 정규 경기에서도 안 그린다 — 대회도 같다.
    */
   const finishCupGame = useCallback(
     (summary: PitcherGameSummary, cup: NationalCup, options: PitcherGameOptions) => {
@@ -1000,9 +1002,14 @@ export function usePitcherLeagueSession(
       })
       // 같은 날 CPU 경기 두 나라는 상대국 칸 레코드를 쓴다 — 사람 경기 끝 상대 투수 칸별 +0x2c 에서 선다(701a7a9)
       const next = advanceNationalCupDay(cup, winner, loser, random, summary.pitcherStaminas?.opponent)
+      // 기록 달성 G (4ebaa~4ec7c — 사람 팀 공·수로 거른 기록이라 대회 경기도 쌓인다. 강판 뒤는 0xa77f0 이 막아 요약에 없다)
+      const gamePointReward = recordGamePointsOf(summary.recordIds)
+      // 0x4ec82 `0x22c7d(G, 모드 3)` 획득 GP 통계 · 0x4ec8a `0x22e10` 기록 달성 횟수 — 모드를 가리지 않는다
+      recordStat({ kind: 'G획득', mode: PITCHER_LEAGUE_MODE, amount: gamePointReward })
+      recordStat({ kind: '기록달성', recordIds: summary.recordIds ?? [] })
       // 하루 끝 b8216 — 다음 날 사람 경기 상대를 +0xbe0 에 마스터에서 새로 복사. 대회 칸(L+0xa8~ · L+0x32)은 정산 끝 0x4f3c4 가 저장
       commitWith((current) => ({
-        ...current,
+        ...settleNariCupGame(current, gamePointReward),
         nationalCup: next,
         ...(current.nariCupTeams === undefined
           ? {}
@@ -1013,7 +1020,7 @@ export function usePitcherLeagueSession(
       setCupView({ cup: next, atStandings: false })
       setScene('국가대항전')
     },
-    [commitWith, random],
+    [commitWith, random, recordStat],
   )
 
   const finishGame = useCallback(

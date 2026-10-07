@@ -57,8 +57,12 @@ interface GameResultScreenProps {
   readonly pitcherNames?: PitcherOfRecordNames
   readonly gamePointReward: number
   readonly newTitles: readonly string[]
-  readonly evaluation: GameEvaluation
-  readonly streakNotices: readonly StreakNotice[]
+  /**
+   * 116 경기 뒤 평가 — 감독 글 · 변화 글 · 연속 기록. 국가대항전 경기는 116 을 안 지나(0x4ea0c 4f03a 가 S+0x50 = 2 를 대회가 아닐 때만
+   * 쓴다) 없다 — 그때 [자세히]에는 평가 칸이 없다.
+   */
+  readonly evaluation?: GameEvaluation
+  readonly streakNotices?: readonly StreakNotice[]
   /** 평가가 반영된 뒤의 선수 — "현재 사기" 등을 보여준다 */
   readonly career: PlayerCareer
   readonly onContinue: () => void
@@ -89,7 +93,7 @@ export function GameResultScreen({
   gamePointReward,
   newTitles,
   evaluation,
-  streakNotices,
+  streakNotices = [],
   career,
   onContinue,
 }: GameResultScreenProps) {
@@ -113,7 +117,7 @@ export function GameResultScreen({
           </BigResult>
         </Panel>
 
-        <Panel heading="감독 평가">
+        {evaluation !== undefined && <Panel heading="감독 평가">
           <DialogueBox>
             <MarkupText raw={ORIGINAL_USER_EVENTS[evaluation.commentIndex] ?? ''} />
           </DialogueBox>
@@ -134,7 +138,7 @@ export function GameResultScreen({
               {notice.reputationChange})
             </Notice>
           ))}
-        </Panel>
+        </Panel>}
 
         <Panel heading="오늘의 성적">
           <StatGrid
