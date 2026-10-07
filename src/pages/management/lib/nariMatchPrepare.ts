@@ -37,7 +37,6 @@ import { rollOpponentAceIndex } from '@/entities/game/model/aceOpponent'
 import type { League, PostseasonSeries } from '@/entities/league/model/league'
 import { EMPTY_VALUE } from '@/pages/general-mode/lib/matchInfoLines'
 import type { MatchInfoLine } from '@/pages/general-mode/lib/matchInfoLines'
-import { PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import type { PlayerSide } from '@/entities/game/model/gameState'
 import { leagueGamePitchersOf, nextOpponentOf } from '@/entities/career/model/playerCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
@@ -46,6 +45,8 @@ import { teamPitchers } from '@/entities/team/model/teamRoster'
 import { seasonMatchInfoLines } from '@/pages/season/lib/seasonMatchInfo'
 import type { GameAceSetup } from '@/features/play-game/model/gameAces'
 import type { NationalCup, NationalCupMatchup } from '@/entities/national-cup/model/nationalCup'
+import { nationalCupSideOf } from '@/entities/national-cup/model/nationalCup'
+import { nariCupRecordOf } from '@/entities/career/model/nariCupTeams'
 
 /** 마선수 번호가 없을 때 — 표 0xd7638[0] = −1 */
 export const NO_NARI_ACE = -1
@@ -244,23 +245,27 @@ export function batterMatchInfoOf(career: PlayerCareer, aces: NariMatchAces | nu
  * 국가대항전 142 — 135 확인(0x10680)에서 온다. 내 팀은 `0xb7614(L, n, 0)` 의 대한민국(10), 상대는 그 라운드 대진.
  * 순위·승패는 대회 표, 마선수 칸은 "-"(1c5fe 가 안 넣는다).
  *
- * ⚠️ 근사(예전 그대로): 웹 국가대항전 경기는 두 팀 로테이션(0x1c46c 의 0xb8c80)과 측(0xb7844)을 아직 안 옮겨 날짜 0 차례 ·
- *    후공으로 친다(`useCareerSession.startCupGame` 주석). 선발 줄도 그 경기와 같은 값(두 팀 레코드 0번)을 적는다.
+ * 두 팀은 저장의 대회 레코드 두 칸(+0xbc4 대표팀 · +0xbe0 상대국, `nariCupTeams` — 142 가 이미 오늘 준비로 돌린 것)이고 선발 줄은
+ * 그 0번 · 측은 0xb7844 의 L+0xac 갈래(대진 칸 0 이 후공 — 결승에서 대한민국이 2위면 선공, `nationalCupSideOf`).
  */
 export function cupMatchInfoOf(career: PlayerCareer, matchup: NationalCupMatchup, cup: NationalCup): NariMatchScreenData {
+  const teams = career.nariCupTeams
+  const myOrder = teams === undefined ? [0] : nariCupRecordOf(teams, matchup.myTeam).pitchers ?? [0]
   return {
     lines: nariMatchInfoLines({
       league: career.league,
       postseason: null,
       myTeamId: matchup.myTeam,
       opponentTeamId: matchup.opponent,
-      myStarterName: teamPitchers(matchup.myTeam)[0]?.name ?? EMPTY_VALUE,
-      opponentPitcherOrder: teamPitchers(matchup.opponent).map((_pitcher, slot) => slot),
+      myStarterName: teamPitchers(matchup.myTeam)[myOrder[0] ?? 0]?.name ?? EMPTY_VALUE,
+      opponentPitcherOrder: teams === undefined
+        ? teamPitchers(matchup.opponent).map((_pitcher, slot) => slot)
+        : nariCupRecordOf(teams, matchup.opponent).pitchers ?? [],
       aces: null,
       cup,
     }),
     myTeamId: matchup.myTeam,
     opponentTeamId: matchup.opponent,
-    playerSide: PLAYER_SIDE_LAST_BAT,
+    playerSide: nationalCupSideOf(cup, matchup.myTeam) as PlayerSide,
   }
 }

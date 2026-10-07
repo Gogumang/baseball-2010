@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import {
+  cupMatchInfoOf,
   NO_NARI_ACE, batterMatchInfoOf, nariGameMatchOfSave, nariMatchCancelTargetOf, rollNariMatchAces, rollNariMatchStadium,
 } from '@/pages/management/lib/nariMatchPrepare'
 import { createCareer } from '@/entities/career/model/playerCareer'
+import { createNationalCup } from '@/entities/national-cup/model/nationalCup'
 
 /** next() 가 차례로 이 값들을 내는 난수 — 부른 횟수와 구간을 적는다 */
 const 차례난수 = (values: readonly number[]) => {
@@ -100,5 +102,15 @@ describe('nariGameMatchOfSave — 142 확인이 모드 저장 칸에 남긴 명�
     expect(nariGameMatchOfSave('x')).toBeNull()
     expect(nariGameMatchOfSave({ aces: { myBatter: 9, myPitcher: 0, opponentPitcher: 0, opponentBatter: 0 } }))
       .toEqual({ aces: null, isNationalCup: false })
+  })
+})
+
+describe('cupMatchInfoOf — 국가대항전 142 의 측은 0xb7844 L+0xac 갈래 (대진 칸 0 이 후공)', () => {
+  it('풀리그는 대한민국 후공 · 결승에서 대한민국이 2위면 선공', () => {
+    const career = createCareer('대회')
+    const 풀리그 = createNationalCup()
+    expect(cupMatchInfoOf(career, { myTeam: 10, opponent: 11 }, 풀리그).playerSide).toBe(1)
+    const 결승 = { ...풀리그, stage: 1, finalists: [12, 10] as [number, number] }
+    expect(cupMatchInfoOf(career, { myTeam: 10, opponent: 12 }, 결승).playerSide).toBe(0)
   })
 })

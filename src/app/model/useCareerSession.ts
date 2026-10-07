@@ -120,7 +120,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { isInfiniteGamePointOn } from '@/shared/lib/dev/devOptions'
 import { pickLoadingTip } from '@/shared/config/loadingTips'
 import type { SaveGamePort } from '@/shared/api/save/saveGamePort'
-import { KOREA_TEAM_ID, createNationalCup, nationalCupMatchupOf } from '@/entities/national-cup/model/nationalCup'
+import { KOREA_TEAM_ID, createNationalCup, nationalCupMatchupOf, nationalCupSideOf } from '@/entities/national-cup/model/nationalCup'
 import {
   createNariCupTeams,
   nariCupBattingOrderOf,
@@ -1310,7 +1310,8 @@ export function useCareerSession({
           nariCupBattingOrderOf(teams) ?? career.battingOrder,
           screen.cup.matchup.opponent,
           0,
-          PLAYER_SIDE_LAST_BAT,
+          // 0xb7844 의 L+0xac 갈래 — 대진 칸 0 이 후공: 풀리그는 늘 대한민국 · 결승은 풀리그 1위라 대한민국이 2위면 선공
+          nationalCupSideOf(screen.cup.cup, screen.cup.matchup.myTeam) as PlayerSide,
           {
             ourOrder: nariCupRecordOf(teams, screen.cup.matchup.myTeam).pitchers ?? UNSHUFFLED_PITCHER_ORDER,
             opponentOrder: nariCupRecordOf(teams, screen.cup.matchup.opponent).pitchers ?? UNSHUFFLED_PITCHER_ORDER,
@@ -1634,8 +1635,8 @@ export function useCareerSession({
           : { ...current, nariCupTeams: prepareNariCupMatch(cupTeamsOf(current, matchup.opponent), cup.day) })
       }
       matchPreparedRef.current = true
-      // 홈 팀 — 웹 대회 경기는 후공(내 팀이 홈)으로 친다. 대회 팀은 모두 > 9 라 어느 쪽이든 한 번 굴린다
-      rollNariMatchStadium(random, matchup.myTeam)
+      // 홈 팀 = 후공 측(0xb7844 L+0xac 갈래 — 대진 칸 0). 대회 팀은 모두 > 9 라 어느 쪽이든 한 번 굴린다
+      rollNariMatchStadium(random, nationalCupSideOf(cup, matchup.myTeam) === 1 ? matchup.myTeam : matchup.opponent)
       setEntryView(null)
       setScreen({ kind: '경기준비', cup: { matchup, cup } })
     },
