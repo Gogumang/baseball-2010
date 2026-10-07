@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { applyPitchResolution, createAtBat } from '@/entities/at-bat/model/atBatState'
 import { basePosition, isSamePoint } from '@/entities/fielding/model/fieldGeometry'
 import { createRunner, NONE, type RunnerState } from '@/entities/fielding/model/fieldingState'
 import {
@@ -9,6 +10,7 @@ import {
   playEndResultCode,
   PLAY_END_COUNT_LIMIT,
   someRunnerStillActive,
+  strikesAfterPlay,
   type PlayEndState,
   type PlayGateInput,
 } from '@/entities/fielding/model/playGate'
@@ -195,5 +197,26 @@ describe('0xaa05c · 0xa990c (주자관리)', () => {
     expect(
       liveRunnerCountOf([루에선주자(1), 루에선주자(2, { isOut: true }), 루에선주자(3, { scored: true })]),
     ).toBe(1)
+  })
+})
+
+describe('파울 판이 닫힌 뒤 0x35108 → 0xb6b58 — 스트라이크', () => {
+  it('마지막 결과 코드([장면+0x10ac])가 7 이면 스트라이크 ≤ 1 일 때만 +1', () => {
+    expect(strikesAfterPlay(0, 7)).toBe(1)
+    expect(strikesAfterPlay(1, 7)).toBe(2)
+    expect(strikesAfterPlay(2, 7)).toBe(2)
+  })
+
+  it('11(2스트라이크 번트 파울 아웃) · 13(파울 뜬공 아웃) · 6 은 안 건드린다', () => {
+    expect(strikesAfterPlay(2, 11)).toBe(2)
+    expect(strikesAfterPlay(1, 13)).toBe(1)
+    expect(strikesAfterPlay(1, 6)).toBe(1)
+  })
+
+  it('웹 타석 카운트(atBatState 의 파울)와 같은 규칙이다', () => {
+    for (const strikes of [0, 1, 2]) {
+      const state = applyPitchResolution(createAtBat({ balls: 0, strikes }), { kind: '파울' })
+      expect(state.strikes).toBe(strikesAfterPlay(strikes, 7))
+    }
   })
 })
