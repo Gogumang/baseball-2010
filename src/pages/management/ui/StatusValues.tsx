@@ -88,24 +88,57 @@ export function MessageLine({ year, game }: { readonly year: number; readonly ga
   )
 }
 
-/** 값 칸 네 개 · 이름표 · 메시지줄 "N년 G/45경기" · 상태 아이콘 */
-/**
- * `isPreviousGame` = 0x7d34c 둘째 인자 — 이벤트 대화창 0x8b5ac 만 [이벤트+0xb] 를 넘긴다. 그 칸은 경기 뒤 평가 내장 이벤트
- * 0x8a6fc 만 1 로 세우고(0x8a71e) 이벤트 끝 0x8a380 이 0 으로 지운다 — 막 치른 경기의 번호를 보여 주는 것이다.
- */
-export function StatusValues({ career, isPreviousGame = false }: { readonly career: PlayerCareer; readonly isPreviousGame?: boolean }) {
+/** 나만의리그 두 편(모드 3 · 4)이 상태판 값 칸에 넘기는 값 — 0x7d34c 의 이 부분은 두 편이 같다 */
+export interface NariStatusFields {
+  /** 0xb6e79 인기도 */
+  readonly popularity: number
+  /** 소지금 (만원) — 0x63331 */
+  readonly money: number
+  readonly reputation: number
+  /** 연봉 (100만원 칸) */
+  readonly salary: number
+  /** 연차 SR+0xb3 + 1 */
+  readonly season: number
+  /** 날짜 카운터 L+0x32 */
+  readonly dayCounter: number
+  readonly isPostseason: boolean
+  readonly icons: StatusIconState
+}
+
+/** 값 칸 네 개 · 이름표 · 메시지줄 "N년 G/45경기" · 상태 아이콘 (모드 3 · 4 공용) */
+export function NariStatusValues({ fields, isPreviousGame = false }: { readonly fields: NariStatusFields; readonly isPreviousGame?: boolean }) {
   const { popularity, money, reputation, salary } = STATUS_BOXES
-  const game = messageGameNumberOf(leagueDayCounterOf(career), career.postseason !== null, isPreviousGame)
+  const game = messageGameNumberOf(fields.dayCounter, fields.isPostseason, isPreviousGame)
 
   return (
     <>
       <StatusLabels />
-      <SpriteNumber glyphs={numberGlyphsOf(career.popularity)} right={valueRightOf(popularity)} boxTop={popularity.y} boxHeight={popularity.height} />
-      <SpriteNumber glyphs={moneyGlyphsOf(career.money)} right={valueRightOf(money)} boxTop={money.y} boxHeight={money.height} />
-      <SpriteNumber glyphs={numberGlyphsOf(career.reputation)} right={valueRightOf(reputation)} boxTop={reputation.y} boxHeight={reputation.height} />
-      <SpriteNumber glyphs={moneyGlyphsOf(career.salary * ORIGINAL_MONEY_UNIT)} right={valueRightOf(salary)} boxTop={salary.y} boxHeight={salary.height} />
-      <MessageLine year={career.season} game={game} />
-      <StatusIconRow state={statusIconStateOf(career)} />
+      <SpriteNumber glyphs={numberGlyphsOf(fields.popularity)} right={valueRightOf(popularity)} boxTop={popularity.y} boxHeight={popularity.height} />
+      <SpriteNumber glyphs={moneyGlyphsOf(fields.money)} right={valueRightOf(money)} boxTop={money.y} boxHeight={money.height} />
+      <SpriteNumber glyphs={numberGlyphsOf(fields.reputation)} right={valueRightOf(reputation)} boxTop={reputation.y} boxHeight={reputation.height} />
+      <SpriteNumber glyphs={moneyGlyphsOf(fields.salary * ORIGINAL_MONEY_UNIT)} right={valueRightOf(salary)} boxTop={salary.y} boxHeight={salary.height} />
+      <MessageLine year={fields.season} game={game} />
+      <StatusIconRow state={fields.icons} />
     </>
+  )
+}
+
+/**
+ * 타자편 값 칸 — `NariStatusValues` 에 타자 커리어를 넘긴다.
+ * `isPreviousGame` = 0x7d34c 둘째 인자 — 이벤트 대화창 0x8b5ac 만 [이벤트+0xb] 를 넘긴다. 그 칸은 경기 뒤 평가 내장 이벤트
+ * 0x8a6fc 만 1 로 세우고(0x8a71e) 이벤트 끝 0x8a380 이 0 으로 지운다 — 막 치른 경기의 번호를 보여 주는 것이다.
+ */
+export function StatusValues({ career, isPreviousGame = false }: { readonly career: PlayerCareer; readonly isPreviousGame?: boolean }) {
+  return (
+    <NariStatusValues isPreviousGame={isPreviousGame} fields={{
+      popularity: career.popularity,
+      money: career.money,
+      reputation: career.reputation,
+      salary: career.salary,
+      season: career.season,
+      dayCounter: leagueDayCounterOf(career),
+      isPostseason: career.postseason !== null,
+      icons: statusIconStateOf(career),
+    }} />
   )
 }

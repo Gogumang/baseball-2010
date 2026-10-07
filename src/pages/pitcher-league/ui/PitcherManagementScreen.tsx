@@ -1,4 +1,7 @@
-import { MenuList, MessageBox, Panel, RawScreen } from '@/shared/ui'
+import { useEffect, useRef, useState } from 'react'
+import { MessageBox, Panel, RawScreen } from '@/shared/ui'
+import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
+import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
@@ -16,6 +19,13 @@ import { PitchTrainingScreen } from '@/pages/pitcher-league/ui/PitchTrainingScre
 import { DetailWindow } from '@/pages/management/ui/DetailPopup'
 import { pitcherAbilityDetailViewOf } from '@/pages/pitcher-league/lib/pitcherDetailPopup'
 import * as styles from '@/pages/pitcher-league/ui/PitcherManagementScreen.css'
+import { CommandBar } from '@/pages/management/ui/CommandBar'
+import { CenterStage } from '@/pages/management/ui/CenterStage'
+import { nariStageCharactersOf } from '@/pages/management/lib/centerStage'
+import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
+import { PITCHER_COMMAND_BAR, pitcherLabelDxOf, pitcherParentSlotOf } from '@/pages/pitcher-league/lib/pitcherCommandBar'
+import type { PitcherCommandKind } from '@/pages/pitcher-league/lib/pitcherCommandBar'
+import type { PitcherManagementMenu } from '@/pages/pitcher-league/model/usePitcherManagementMenu'
 
 /**
  * 나만의리그 **투수편 관리 화면** — 원본 장면 **0x106** 의 상태 **105(허브)** 와 그 하위
@@ -52,6 +62,76 @@ export interface PitcherManagementScreenProps {
   readonly onOpenShop?: (tab: PitcherShopTab) => void
   /** 105 취소 — 메인 메뉴 장면 0x103 */
   readonly onExit: () => void
+  /** 가운데 판의 선수가 미끄러져 들어오는가 — 105 진입 0x11910 의 이전 상태 1 · 114 · 100 (0x8a2d8) */
+  readonly centerSlidesIn?: boolean
+}
+
+const NO_DISABLED: ReadonlySet<string> = new Set()
+/** 커서를 옮긴 뒤 두 번 그리는 동안 +1, −1 로 튄다 (카운터 [gfx+0x98]) */
+const BOUNCE_BY_UPDATE = [1, -1]
+
+/**
+ * 커맨드 줄 0x7e418 (투수 표 `lib/pitcherCommandBar`). 칸 등장 0x7ff8c · 부모 칸 0x8003c 는 메뉴가 열린 뒤 갱신 수로,
+ * 키는 위·아래·좌·우 칸 옮기기 · 확인(Enter · '5') · 취소(−16).
+ * 하위 메뉴에서 돌아오면 커서가 그 하위 메뉴 칸에 선다(타자편 `useManagementMenu` 와 같다).
+ */
+function PitcherCommandBar({ menu, isKeyEnabled }: {
+  readonly menu: PitcherManagementMenu
+  readonly isKeyEnabled: boolean
+}) {
+  const kind = menu.kind as PitcherCommandKind
+  const slots = PITCHER_COMMAND_BAR[kind]
+  const update = useUpdateCounter()
+  const labelOrigins = useFrameOrigins('./sprites/img_text/frames')
+  const [state, setState] = useState({ kind, cursor: 0, openedAt: 0, movedAt: null as number | null })
+  if (state.kind !== kind) {
+    const returning = kind === '관리' ? Math.max(0, slots.findIndex((slot) => slot.id === state.kind)) : 0
+    setState({ kind, cursor: returning, openedAt: update, movedAt: null })
+  }
+  const cursor = Math.min(state.cursor, slots.length - 1)
+  const moveTo = (index: number) => {
+    if (index === cursor) return
+    setState((held) => ({ ...held, cursor: index, movedAt: update }))
+  }
+  const latest = useRef({ cursor, slots, moveTo, menu })
+  latest.current = { cursor, slots, moveTo, menu }
+  useEffect(() => {
+    if (!isKeyEnabled) return undefined
+    const onKey = (event: KeyboardEvent) => {
+      const held = latest.current
+      const step = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1
+        : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 0
+      if (step !== 0) {
+        event.preventDefault()
+        return held.moveTo((held.cursor + step + held.slots.length) % held.slots.length)
+      }
+      if (event.key === 'Enter' || event.key === ' ' || event.key === '5') {
+        event.preventDefault()
+        return held.menu.select(held.slots[held.cursor].id)
+      }
+      if (event.key === 'Escape' || event.key === 'Backspace') {
+        event.preventDefault()
+        held.menu.back()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [isKeyEnabled])
+
+  const labelWidths = Object.fromEntries(
+    slots.map((slot) => [slot.labelFrame, labelOrigins?.[String(slot.labelFrame).padStart(3, '0')]?.width ?? 0]),
+  )
+  return (
+    <CommandBar slots={slots} cursor={cursor}
+      bounce={state.movedAt === null ? 0 : (BOUNCE_BY_UPDATE[update - state.movedAt] ?? 0)}
+      slideUpdates={Math.max(0, update - state.openedAt)}
+      // ⚠️ 메인 메뉴 켬 표(흑백 0xc37a8)를 투수편이 끄는 자리는 안 읽었다 — 다 켠 채로 두고, 이미 행동한 칸은
+      // 고를 때 r_event_txt[176] 알림이 막는다(`usePitcherManagementMenu`)
+      disabledIds={NO_DISABLED}
+      labelWidths={labelWidths} parent={pitcherParentSlotOf(kind)}
+      labelDxOf={(slot) => pitcherLabelDxOf(kind, slot)}
+      onHover={moveTo} onSelect={menu.select} />
+  )
 }
 
 /** 기본정보 카드 그림 0x166cc 의 바닥비트 (0x166f2 `movs r2, #0x87`) */
@@ -84,36 +164,49 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
   }
 
   const isBasicInfo = menu.subWindow === '기본정보'
+  const isMenuShown = menu.subWindow === null
   return (
     <RawScreen>
-      {/* 하위 메뉴(106·107)가 열려도 화면은 그대로고 아래 줄만 바뀐다 (0x7e84c). 본문은 근사 — 머리띠·바닥띠 사이 판 */}
-      <div className={styles.frameBody}>
-        {menu.subWindow === null && <PitcherStatusBoard career={career} />}
-        {isBasicInfo && <PitcherBasicInfoPanel career={career} />}
-        {menu.subWindow === '구질목록' && (
-          <PitcherRepertoirePanel
-            career={career}
-            tab={menu.pitchWindowTab}
-            onChangeTab={menu.changePitchTab}
-            onSelectMagic={menu.selectMagicCell}
-            onSelectPitch={menu.selectPitchCell}
-          />
-        )}
-        {menu.subWindow === '기록실' && <PitcherRecordPanel career={career} tab={menu.recordWindowTab} />}
+      {/*
+        105 · 106 · 107 · 110 그림 0x19da4 — 앞그림 0x16928 의 공 무늬 → 커맨드 줄 0x7e418 → 상태판 0x7d34c(모드 3) →
+        가운데 판 0x7f814(선수 하나) → 머리띠. 하위 메뉴(106·107·110)가 열려도 화면은 그대로고 아래 줄만 바뀐다 (0x7e84c).
+      */}
+      {isMenuShown && (
+        <>
+          <SkinBackdrop kind="공무늬" />
+          <PitcherCommandBar menu={menu}
+            isKeyEnabled={menu.choice === null && menu.detail === null && menu.question === null && menu.notice === ''} />
+          <PitcherStatusBoard career={career} />
+          <CenterStage slidesIn={props.centerSlidesIn ?? false} characters={nariStageCharactersOf({
+            morale: career.morale, isSick: career.isSick, isInjured: career.isInjured, isSlugger: false, skinIndex: career.skinIndex,
+          })} />
+        </>
+      )}
+      {/* 하위 창(119 · 123 · 124)은 본문 근사 — 머리띠·바닥띠 사이 판 */}
+      {!isMenuShown && (
+        <div className={styles.frameBody}>
+          {isBasicInfo && <PitcherBasicInfoPanel career={career} />}
+          {menu.subWindow === '구질목록' && (
+            <PitcherRepertoirePanel
+              career={career}
+              tab={menu.pitchWindowTab}
+              onChangeTab={menu.changePitchTab}
+              onSelectMagic={menu.selectMagicCell}
+              onSelectPitch={menu.selectPitchCell}
+            />
+          )}
+          {menu.subWindow === '기록실' && <PitcherRecordPanel career={career} tab={menu.recordWindowTab} />}
+        </div>
+      )}
 
-        {menu.subWindow === null && menu.choice === null && menu.detail === null && (
-          <Panel heading={menu.kind === '관리' ? '커맨드' : menu.kind}>
-            <MenuList items={menu.items} onSelect={menu.select} />
-          </Panel>
-        )}
-
-        {/*
-          팝업 0x78 — StrMODE[59] "원하는 항목을 선택해주세요".
-          원본은 좌우 키로 `+0x166` 을 토글하고 확인으로 고르는 작은 창이다
-          (그리기 0x190f8 · 키 0x19398) — 키는 `usePitcherManagementMenu` 가 본다.
-          ⚠️ **원본 배치 미해독 — 근사**: 여기서는 두 칸 버튼을 가로로 놓고 고른 칸을 눌러 그린다.
-        */}
-        {menu.choice !== null && (
+      {/*
+        팝업 0x78 — StrMODE[59] "원하는 항목을 선택해주세요".
+        원본은 좌우 키로 `+0x166` 을 토글하고 확인으로 고르는 작은 창이다
+        (그리기 0x190f8 · 키 0x19398) — 키는 `usePitcherManagementMenu` 가 본다.
+        ⚠️ **원본 배치 미해독 — 근사**: 여기서는 두 칸 버튼을 가로로 놓고 고른 칸을 눌러 그린다.
+      */}
+      {menu.choice !== null && (
+        <div className={styles.choiceLayer}>
           <Panel heading={menu.choice.text}>
             <div className={styles.tabRow}>
               {menu.choice.labels.map((label, index) => (
@@ -130,8 +223,8 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
               ))}
             </div>
           </Panel>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* 능력치 상세(120) — 그림 0x1b2e4 = 기본정보 카드 → 창 0x8a0a4 → 머리띠(0x7f4ed). 표·글은 0x88fe8 */}
       {isBasicInfo && menu.abilityDetailOffset !== null && (() => {

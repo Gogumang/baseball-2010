@@ -121,3 +121,12 @@ export const statusIconRow = style({
   height: '19px',
   marginLeft: '-10px',
 })
+
+/** 팝업 0x78 · 0x80 (⚠️ 원본 배치 미해독 — 근사) — 화면 가운데 위에 얹는다 */
+export const choiceLayer = style({
+  position: 'absolute',
+  left: 10,
+  right: 10,
+  top: 120,
+  zIndex: 2,
+})

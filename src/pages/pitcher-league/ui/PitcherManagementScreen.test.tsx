@@ -56,9 +56,9 @@ const 화면 = (options: 화면옵션 = {}) =>
 /** 메시지 상자 버튼([예]·[확인])은 글자가 아니라 그림이라 이름표로 찾는다 */
 const 칸 = (name: string) => screen.getByRole('button', { name })
 
-/** 칸 글자 — `MenuList` 는 커서 '▶' 를 칸 안에 넣고, 옆에 값이 붙는 칸도 있다 */
+/** 칸 글자 — 팝업 단추는 글자, 커맨드 줄 칸(0x7e418)은 그림이라 단추 이름표가 칸 id 다 */
 const 칸이름 = (element: Element) => (element.textContent ?? '').replace('▶', '').trim()
-const 칸이름들 = () => screen.getAllByRole('option').map(칸이름)
+const 칸이름들 = () => [...document.querySelectorAll('[data-testid="command-bar"] button')].map((button) => button.getAttribute('aria-label'))
 
 /** 커맨드·하위 메뉴 칸 (`role="option"`) 과 보통 버튼을 함께 찾는다 */
 function 누르기(name: string) {
@@ -120,33 +120,29 @@ describe('커맨드 여섯 칸 (상태 105 · 점프표 0xcc540)', () => {
   })
 })
 
-describe('등판 예고 · 스태미나 · 보직 (투수편만 있는 줄)', () => {
-  it('선발은 날짜 카운터가 짝수인 날 등판한다 (0xa4f60, StrHOWTO[11] "2경기마다")', () => {
-    화면({ career: 투수({ gamesPlayed: 2 }) })
+describe('상태판 0x7d34c 모드 3 · 커맨드 줄 0x7e418 투수 표', () => {
+  it('105 는 공 무늬 · 상태판 · 가운데 판(선수 하나)을 깔고, 스태미나 막대를 그린다', () => {
+    const { container } = 화면({ career: 투수({ stamina: 4_250 }) })
 
-    // 보직 줄과 오늘 등판 줄 둘 다 '선발' 이다
-    expect(screen.getAllByText('선발')).toHaveLength(2)
-    expect(screen.getByText('오늘')).toBeTruthy()
+    expect(screen.getByTestId('바탕-공무늬')).toBeTruthy()
+    expect(screen.getByRole('group', { name: '상태판' })).toBeTruthy()
+    expect(screen.getByTestId('스태미나막대')).toBeTruthy()
+    expect(container.querySelector('[data-testid="가운데판"]')).not.toBeNull()
   })
 
-  it('홀수 날 선발은 대기이고 다음 선발이 한 경기 뒤다', () => {
-    화면({ career: 투수({ gamesPlayed: 3 }) })
+  it('트레이닝 하위 메뉴는 투수 표 0xd4818 아이콘 · 0xd4822 이름표, 칸 4 이름표 116 은 x −6 (0x7e30c)', () => {
+    const { container } = 화면()
+    누르기('트레이닝')
+    for (let i = 0; i < 4; i += 1) fireEvent.keyDown(window, { key: 'ArrowRight' })
 
-    expect(screen.getByText('대기')).toBeTruthy()
-    expect(screen.getByText('1경기 뒤')).toBeTruthy()
-  })
-
-  it('구원은 늘 매 경기 8회 등판이다 (0xc1ba4)', () => {
-    화면({ career: 투수({ role: PITCHER_ROLE.relief, gamesPlayed: 3 }) })
-
-    expect(screen.getAllByText('구원')).toHaveLength(2)
-    expect(screen.getByText('매 경기 8회')).toBeTruthy()
-  })
-
-  it('스태미나(+0x2c)를 퍼센트로 보여 준다 — 경기 사이에 이어지는 칸이다', () => {
-    화면({ career: 투수({ stamina: 4_250 }) })
-
-    expect(screen.getByText('42%')).toBeTruthy()
+    const 아이콘 = [...container.querySelectorAll('[data-testid="command-bar"] button img')].map((img) => img.getAttribute('src'))
+    expect(아이콘).toEqual([
+      './sprites/mode_icon/016.png', './sprites/mode_icon/017.png', './sprites/mode_icon/018.png',
+      './sprites/mode_icon/012.png', './sprites/management/icon_selected_19.png',
+    ])
+    const 이름표 = container.querySelector('img[src$="command_label_116.png"]') as HTMLElement
+    // 칸 4 (199, 236) 은 가운데 정렬 — 폭을 못 읽는 jsdom 에선 trunc(32/2) = 16 → 199 − 6 + 16 − 1
+    expect(이름표.style.left).toBe('208px')
   })
 })
 
@@ -156,15 +152,8 @@ describe('트레이닝 하위 메뉴 (상태 107 · 키 0x12d48)', () => {
 
     누르기('트레이닝')
 
-    // 칸마다 지금 값 / 보직 한계(선발 800)가 붙는다. 칸 4 는 마구 레벨이다
-    const 신인 = 투수()
-    expect(칸이름들()).toEqual([
-      `제구${신인.ability.control}/800`,
-      `구속${신인.ability.velocity}/800`,
-      `변화${신인.ability.breaking}/800`,
-      `체력${신인.ability.stamina}/800`,
-      '마구레벨 0/4',
-    ])
+    // 커맨드 줄 칸에는 값을 적지 않는다 (0x7e418 은 아이콘 · 이름표뿐)
+    expect(칸이름들()).toEqual(['제구', '구속', '변화', '체력', '마구'])
   })
 
   it('StrMODE[85] 확인 상자에 예를 하면 훈련한 커리어를 돌려주고 105 로 돌아온다', () => {
@@ -185,7 +174,7 @@ describe('트레이닝 하위 메뉴 (상태 107 · 키 0x12d48)', () => {
     const 창 = screen.getByRole('dialog', { name: '상세정보' })
     expect(창.textContent).toContain('제구 4 상승하였습니다')
     fireEvent.click(창)
-    expect(screen.getByText('다음경기')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '다음경기' })).toBeTruthy()
   })
 
   it('상세 결과 창 이름표는 img_text 340~343 · 사기 84 다 (0x87314 `0x7b984` 모드 3 갈래)', () => {
@@ -577,7 +566,7 @@ describe('두 갈래 팝업의 키 (0x19398 · StrictMode)', () => {
     expect(screen.queryByText('원하는 항목을 선택해주세요')).toBeNull()
     expect(screen.queryByText('구질 훈련')).toBeNull()
     // 107 목록이 그대로 있다 (칸 4 는 마구 레벨을 옆에 적는다)
-    expect(칸이름들()).toContain('마구레벨 0/4')
+    expect(칸이름들()).toContain('마구')
   })
 
   it('키만으로 마구 훈련 한 바퀴를 끝까지 돈다 — 확인 상자도 키로 닫힌다', () => {

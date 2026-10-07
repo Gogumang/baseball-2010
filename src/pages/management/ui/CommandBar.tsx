@@ -20,6 +20,11 @@ interface CommandBarProps {
    * 하위 메뉴 객체 [gfx+0x15c] 가 서 있는가 — 이름표 정렬(칸 2·3 왼쪽)이 이것으로 갈린다. 안 주면 `parent` 가 있으면 참.
    */
   readonly isSubMenu?: boolean
+  /**
+   * 이름표 칸 x 보정 — 0x7e300 이 투수편(모드 3)의 상태 0x6b · 0x6c 에서 이름표 116 "마구/변화구" 일 때만 칸 x 를 −6 한다.
+   * 칸 id 와 이름표 그림으로 그 보정을 돌려준다(없으면 0).
+   */
+  readonly labelDxOf?: (slot: MenuSlot) => number
   readonly onHover: (index: number) => void
   readonly onSelect: (id: string) => void
 }
@@ -79,7 +84,7 @@ export function CommandBar(props: CommandBarProps) {
           src={`./sprites/management/command_label_${selected.labelFrame}.png`}
           alt=""
           style={{
-            left: commandLabelLeftOf(selected.x, labelWidth, commandLabelAlignOf(isSubMenu, cursor)),
+            left: commandLabelLeftOf(selected.x + (props.labelDxOf?.(selected) ?? 0), labelWidth, commandLabelAlignOf(isSubMenu, cursor)),
             top: selectedY + COMMAND_LABEL_OFFSET_Y + Math.trunc((COMMAND_LABEL_HEIGHT - LABEL_GLYPH_HEIGHT + 1) / 2) - 1,
           }}
         />

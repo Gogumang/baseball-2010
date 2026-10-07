@@ -1,5 +1,7 @@
 import { PitcherCreateFlow } from '@/pages/pitcher-league/ui/PitcherCreateFlow'
+import { useRef } from 'react'
 import { PitcherManagementScreen } from '@/pages/pitcher-league/ui/PitcherManagementScreen'
+import { PitcherEventUnderlay } from '@/pages/pitcher-league/ui/PitcherEventUnderlay'
 import { NextGameStandingsScreen } from '@/pages/management/ui/NextGameStandingsScreen'
 import { NariMatchInfoScreen } from '@/pages/management/ui/NariMatchInfoScreen'
 import { EntryEditorScreen } from '@/widgets/entry-editor'
@@ -75,6 +77,10 @@ export function PitcherLeagueRoute({
   session, random, openedHiddenIds = [], gameSettings, onExit, renderAceMatch, hallOfFame,
 }: PitcherLeagueRouteProps) {
   const { career, scene, gameOptions, shopTab, shopNotice, shopGpDetail, actions } = session
+  /** 이전 장면 — 105 진입 0x11910 이 이전 상태 1 · 114 · 100 이면 가운데 판을 미끄러뜨린다 (0x8a2d8) */
+  const sceneTrail = useRef<{ readonly scene: string; readonly previous: string | null }>({ scene, previous: null })
+  if (sceneTrail.current.scene !== scene) sceneTrail.current = { scene, previous: sceneTrail.current.scene }
+  const previousScene = sceneTrail.current.previous
 
   if (career === null || scene === '등록') {
     return <PitcherCreateFlow openedHiddenIds={openedHiddenIds} onCreate={actions.create} onCancel={onExit} />
@@ -116,6 +122,8 @@ export function PitcherLeagueRoute({
       onOuting={actions.openOuting}
       onOpenShop={actions.openShop}
       onExit={onExit}
+      // 114(이벤트) · 100(경기 뒤 — 경기결과) · 1(처음 선다)
+      centerSlidesIn={previousScene === null || previousScene === '이벤트' || previousScene === '경기결과'}
     />
   )
 
@@ -176,13 +184,14 @@ export function PitcherLeagueRoute({
     const event = session.storyEvents?.find((candidate) => candidate.id === story.eventId)
     // 이벤트 본문이 오기 전에는 관리 화면을 깔아 둔다
     if (session.storyEvents !== null && event !== undefined) {
-      // 대사창은 그 상태의 화면 위에 얹힌다 — 105 에서 튼 것(자동 발동·연초 115·중간평가 117·대결 결과 140)은 관리 화면 위,
-      // 112 자동 발동은 지도 위다
-      const isOverManagement =
-        story.context === '관리' || story.context === '중간평가' || story.context === '연초' || story.context === '대결결과'
+      // 114 그림 0x19e64 → 대화창 0x8b5ac: [gfx+0x174] 가 0x70·0x71(112 · 113 · 140 진입)이면 외출 지도, 그 밖(105 · 115 ·
+      // 116 · 117 · 130~138 뒤)은 공 무늬 + 상태판 + 머리띠 (`PitcherEventUnderlay`) — 커맨드 줄은 없다.
+      // ⚠️ 장소(113) · 대결결과(140) 이벤트의 지도 밑그림은 아직 없다
+      const isOverStatusBoard =
+        story.context === '관리' || story.context === '중간평가' || story.context === '연초' || story.context === '연말'
       return (
         <>
-          {isOverManagement && management}
+          {isOverStatusBoard && <PitcherEventUnderlay career={career} />}
           {story.context === '지도' && outingMap}
           <ScreenOverlay>
           <StoryScreen

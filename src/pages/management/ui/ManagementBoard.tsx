@@ -26,6 +26,8 @@ interface StatusBoardBaseProps {
   readonly morale: number
   /** 이름 띠 박스 1·2 에 얹는 것 (모드마다 다르다) */
   readonly nameContent: ReactNode
+  /** 사기 이름표 · 막대(박스 0 · 1)의 y 보정 — 투수편(모드 3, 0x7b984)은 −3 (0x7d652 · 0x7d706) */
+  readonly moraleOffsetY?: number
 }
 
 /**
@@ -38,12 +40,13 @@ interface StatusBoardBaseProps {
  * 0xba19d(프레임 11, 0, 0)                       ; 값 칸 바탕
  * 박스 0 img_text 84 "사기" (정렬 0x22) · 박스 1 #18216B 채움 + 오른쪽 세로줄 · 사기 × (w−1)/100 열 (mode_ui 12·13·14)
  * ```
- * 투수편(모드 3)의 y −3 과 스태미나 막대(0x7d80e~0x7d9c4)는 웹 투수편이 이 판을 안 쓰므로 옮기지 않았다.
+ * 투수편(모드 3)은 사기 박스 둘을 y −3 에 그리고(`moraleOffsetY`) 그 아래에 스태미나 막대를 더한다(`PitcherStatusPanel`).
  */
-export function StatusBoardBase({ hour, nameBandSplit, morale, nameContent }: StatusBoardBaseProps) {
+export function StatusBoardBase({ hour, nameBandSplit, morale, nameContent, moraleOffsetY = 0 }: StatusBoardBaseProps) {
   const uiOrigins = useFrameOrigins(MODE_UI)
   const backOrigins = useFrameOrigins(MODE_BACK)
-  const gauge = STATUS_BOXES.moraleGauge
+  const gauge = { ...STATUS_BOXES.moraleGauge, y: STATUS_BOXES.moraleGauge.y + moraleOffsetY }
+  const moraleLabelY = STATUS_BOXES.moraleLabel.y + moraleOffsetY
   const columns = moraleGaugeColumnsOf(morale)
   const band = NAME_BAND
   const bandBottom = band.top + band.height - 1
@@ -78,7 +81,7 @@ export function StatusBoardBase({ hour, nameBandSplit, morale, nameContent }: St
 
       <FrameSprite folder={MODE_UI} frame={STATUS_FRAME} origins={uiOrigins} x={0} y={0} />
       {/* "사기" 20×10 을 박스 (33×15) 가운데에 */}
-      <img className={styles.layer} style={{ left: STATUS_BOXES.moraleLabel.x + 6, top: STATUS_BOXES.moraleLabel.y + 3 }}
+      <img className={styles.layer} style={{ left: STATUS_BOXES.moraleLabel.x + 6, top: moraleLabelY + 3 }}
         src={`${IMG_TEXT}/${String(MORALE_LABEL_FRAME).padStart(3, '0')}.png`} alt="" />
       {Array.from({ length: columns }, (_unused, index) => (
         <img key={index} className={styles.layer} style={{ left: gauge.x + 1 + index, top: gauge.y + 1 }}
