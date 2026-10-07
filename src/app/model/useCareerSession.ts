@@ -1,3 +1,4 @@
+import { batterCollectorHiddenIdsOf } from '@/entities/collection/model/collection'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Screen } from '@/app/model/screen'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
@@ -190,6 +191,13 @@ function evaluationJingleIdOf(popularityChange: number): number {
   return popularityChange > MY_LEAGUE_EVALUATION_THRESHOLD ? 36 : 37
 }
 
+/** 옛 저장의 컬렉터 해금을 보유에서 다시 센다 — 이미 있으면 그대로 */
+function withBatterCollectorIds(career: PlayerCareer | null): PlayerCareer | null {
+  if (career === null) return null
+  const missing = batterCollectorHiddenIdsOf(career).filter((id) => !career.openedHiddenIds.includes(id))
+  return missing.length === 0 ? career : { ...career, openedHiddenIds: [...career.openedHiddenIds, ...missing] }
+}
+
 /**
  * 저장의 국가대항전 대회 레코드 두 칸 — 없으면(대회 중 옛 저장) 대회 초기화 꼴로 세운다 (`createNariCupTeams`)
  */
@@ -304,7 +312,9 @@ export function useCareerSession({
   // 통로를 안 받으면 조용한 포트로 — 아래 자리들이 `sound` 가 있는지 매번 보지 않게 한다
   const silent = useMemo(() => createSilentSound(), [])
   const audio = sound ?? silent
-  const [savedCareer, setSavedCareer] = useState<PlayerCareer | null>(() => saveGame.load())
+  // 컬렉터 해금(36·40·44·48)은 구매 확정 0x14a74 가 전역 표에 켜 둔 것이다 — 그보다 앞서 산 옛 저장은 칸이 비어 있을 수 있어
+  // 보유에서 다시 센다(`batterCollectorHiddenIdsOf`). `isHiddenOpen` 은 이 표만 본다
+  const [savedCareer, setSavedCareer] = useState<PlayerCareer | null>(() => withBatterCollectorIds(saveGame.load()))
   const [rawCareer, setCareer] = useState<PlayerCareer | null>(null)
   /**
    * 커리어가 내보이는 G 는 **지갑 값**이다 (원본 `mgr[+0x64]` 한 칸). 상점·관리 화면·상태 막대가

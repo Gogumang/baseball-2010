@@ -105,6 +105,12 @@ describe('투수편 세션', () => {
     expect(result.current.career?.teamId).toBe(3)
   })
 
+  it('옛 저장의 컬렉터 해금은 불러올 때 보유에서 다시 센다 — 0x14a74 가 전역 표에 켜 둔 20 (isPitcherHiddenOpen 은 표만 본다)', () => {
+    const store = 메모리저장()
+    store.save({ ...createPitcherCareer('옛'), ownedEquipment: ['0-0', '0-1', '0-2', '0-3', '0-4', '0-5', '0-6'], openedHiddenIds: [] })
+    expect(띄우기(store).result.current.career?.openedHiddenIds).toContain(20)
+  })
+
   it('타자편과 **다른 저장 칸**을 쓴다 — 다시 띄우면 이어진다', () => {
     const store = 메모리저장()
     const 첫판 = 띄우기(store)

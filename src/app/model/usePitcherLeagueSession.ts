@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { pitcherCollectorHiddenIdsOf } from '@/entities/collection/model/collection'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import {
   applyPitcherGameResult,
@@ -373,7 +374,21 @@ function normalizePitcherCareer(raw: unknown): PitcherCareer | null {
     equippedSkillIds: saved.equippedSkillIds ?? rebuildEquippedSkillIds(saved.skillIds ?? base.skillIds),
     // 나리 팀 레코드는 바탕(기본 팀·선발 보직의 등록 꼴)을 쓰면 안 된다 — 없던 옛 저장은 없는 채로(`nariTeamsOf` · 날짜 셈이 세운다)
     nariTeams: saved.nariTeams,
+    /*
+     * 컬렉터 해금(20·24·28·32)은 구매 확정 0x14a74 가 전역 표에 켜 둔 것이다 — 그보다 앞서 산 옛 저장은 칸이 비어 있을 수 있어
+     * 보유에서 다시 센다(`pitcherCollectorHiddenIdsOf`). `isPitcherHiddenOpen` 은 이 표만 본다.
+     */
+    openedHiddenIds: withCollectorIds(saved.openedHiddenIds ?? base.openedHiddenIds, pitcherCollectorHiddenIdsOf({
+      ...base,
+      ...saved,
+    } as PitcherCareer)),
   }
+}
+
+/** 해금 id 를 더한다 — 이미 있으면 그대로 */
+function withCollectorIds(ids: readonly number[], collector: readonly number[]): readonly number[] {
+  const missing = collector.filter((id) => !ids.includes(id))
+  return missing.length === 0 ? ids : [...ids, ...missing]
 }
 
 const NO_STAT = () => {}

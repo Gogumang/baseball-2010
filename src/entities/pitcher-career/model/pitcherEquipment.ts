@@ -123,14 +123,14 @@ const isCollector = (career: PitcherCareer, part: number) =>
     ownsPitcherEquipment(career, part, level))
 
 /**
- * 히든 레벨이 열렸는가 — 원본은 전역 해금표(`app+0xc0`, 0x9f69c)를 본다.
- * 웹은 커리어의 `openedHiddenIds`(앱이 전역 기록연감 것을 얹어 넘긴다)와, 컬렉터 칸이면 지금 보유로 본다
- * (타자편 `isHiddenOpen` 과 같은 방식).
+ * 히든 레벨이 열렸는가 — 원본은 **전역 해금표**(`app+0xc0`, 0x9f69c)만 본다. 웹은 커리어의 `openedHiddenIds`(앱이 전역 기록연감 것을
+ * 얹어 넘긴다)가 그 표다. 컬렉터 칸(레벨 8)도 따로 보지 않는다 — 구매 확정 0x14a74(0x14bae~0x14c86)가 저장 직후 네 부위의 0xa5020 을
+ * 보고 표에 켜 두기 때문이다(`purchasePitcherEquipment`). 그보다 앞서 산 옛 커리어는 불러올 때 보유에서 다시 센다
+ * (`pitcherCollectorHiddenIdsOf` — `usePitcherLeagueSession` 의 불러오기 · 앱의 공용 해금 목록). 타자편 `isHiddenOpen` 과 같다.
  */
 export function isPitcherHiddenOpen(career: PitcherCareer, part: number, level: number): boolean {
   if (level < FIRST_HIDDEN_LEVEL) return true
-  if (career.openedHiddenIds.includes(pitcherHiddenOpenIdOf(part, level))) return true
-  return level === COLLECTOR_LEVEL && isCollector(career, part)
+  return career.openedHiddenIds.includes(pitcherHiddenOpenIdOf(part, level))
 }
 
 export type PitcherEquipmentBlockReason = '미오픈' | '이미보유' | '인기도부족' | '소지금부족'
@@ -171,7 +171,12 @@ export function purchasePitcherEquipment(career: PitcherCareer, part: number, le
     part,
     level,
   )
-  return isCollector(bought, part) ? openHidden(bought, pitcherHiddenOpenIdOf(part, COLLECTOR_LEVEL)) : bought
+  // 0x14bae~0x14c86 — 저장 직후 **네 부위 모두** 0xa5020 을 보고 참인 부위마다 0x62368(ui, 컬렉터 id, 0)
+  return PITCHER_EQUIPMENT_PARTS.reduce(
+    (current, _part, index) =>
+      (isCollector(current, index) ? openHidden(current, pitcherHiddenOpenIdOf(index, COLLECTOR_LEVEL)) : current),
+    bought,
+  )
 }
 
 /** 장비착용(121) — 가진 장비로 바꿔 낀다 (0x17ad0 → 확인 팝업 81, 니블에 sel+1) */

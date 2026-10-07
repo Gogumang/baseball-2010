@@ -112,10 +112,15 @@ export function hiddenOpenIdOf(part: number, level: number): number {
 const isCollector = (career: PlayerCareer, part: number) =>
   Array.from({ length: FIRST_HIDDEN_LEVEL }, (_unused, index) => index).every((owned) => ownsEquipment(career, part, owned))
 
+/**
+ * 히든 레벨이 열렸는가 — 원본은 **전역 해금표**(`app+0xc0`, 0x61f5c)만 본다. 웹은 커리어 `openedHiddenIds`(앱이 기록연감의 전역
+ * 해금 id 를 얹는다)가 그 표다. 컬렉터 칸(레벨 8)도 따로 보지 않는다 — 구매 확정 0x14a74(0x14bae~0x14c86)가 저장 직후 네 부위의
+ * 0xa5020 을 보고 표에 켜 두기 때문이다(`purchaseEquipment`). 그보다 앞서 산 옛 커리어는 불러올 때 보유에서 다시 센다
+ * (`batterCollectorHiddenIdsOf` — `useCareerSession` · 기록연감 `mergeCareerIntoCollection`).
+ */
 export function isHiddenOpen(career: PlayerCareer, part: number, level: number): boolean {
   if (level < FIRST_HIDDEN_LEVEL) return true
-  if (career.openedHiddenIds.includes(hiddenOpenIdOf(part, level))) return true
-  return level === COLLECTOR_LEVEL && isCollector(career, part)
+  return career.openedHiddenIds.includes(hiddenOpenIdOf(part, level))
 }
 
 const BATTER_HIDDEN_ID_END = BATTER_HIDDEN_ID_START + EQUIPMENT_PARTS.length * HIDDEN_LEVELS_PER_PART
@@ -173,7 +178,11 @@ export function purchaseEquipment(career: PlayerCareer, part: number, level: num
     part,
     level,
   )
-  return isCollector(bought, part) ? openHidden(bought, hiddenOpenIdOf(part, COLLECTOR_LEVEL)) : bought
+  // 0x14bae~0x14c86 — 저장 직후 **네 부위 모두** 0xa5020 을 보고 참인 부위마다 0x62368(ui, 컬렉터 id, 0)
+  return EQUIPMENT_PARTS.reduce(
+    (current, _part, index) => (isCollector(current, index) ? openHidden(current, hiddenOpenIdOf(index, COLLECTOR_LEVEL)) : current),
+    bought,
+  )
 }
 
 /** 산 적 있는 장비로 바꿔 낀다 */

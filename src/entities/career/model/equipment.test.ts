@@ -45,12 +45,18 @@ describe('장착 아이템 — 0x13460 · 0x14a74', () => {
     expect(equipmentBlockReasonOf(선수({ money: 999999 }), 0, 7)).toBe('미오픈')
   })
 
-  it('레벨 0~6 을 모두 가진 부위는 레벨 8 이 열린다 — 힌트 둘째 줄 "○○ 컬렉터" (0xa5020, 누락 탐색 7차)', () => {
+  it('레벨 8(컬렉터)도 전역 해금표만 본다 — 보유만으로는 안 열리고, 구매 0x14a74 가 표에 켠 id 로 연다', () => {
     const 컬렉터 = 선수({ ownedEquipment: ['0-0', '0-1', '0-2', '0-3', '0-4', '0-5', '0-6'] })
 
-    expect(isHiddenOpen(컬렉터, 0, 8)).toBe(true)
-    expect(isHiddenOpen(컬렉터, 0, 7)).toBe(false)
-    expect(isHiddenOpen(컬렉터, 1, 8)).toBe(false)
+    expect(isHiddenOpen(컬렉터, 0, 8)).toBe(false)
+    expect(isHiddenOpen({ ...컬렉터, openedHiddenIds: [36] }, 0, 8)).toBe(true)
+    expect(isHiddenOpen({ ...컬렉터, openedHiddenIds: [36] }, 0, 7)).toBe(false)
+  })
+
+  it('구매 확정은 네 부위 모두 0xa5020 을 본다 — 이미 다 모은 다른 부위의 비어 있던 id 도 그때 켠다 (0x14bae~0x14c86)', () => {
+    const 헬멧다 = ['0-0', '0-1', '0-2', '0-3', '0-4', '0-5', '0-6']
+    const bought = purchaseEquipment(선수({ money: 999999, popularity: 999, ownedEquipment: 헬멧다 }), 1, 0)
+    expect(bought.openedHiddenIds).toContain(36)
   })
 
   it('타자 히든 오픈 id 는 35 + 부위×4 + (레벨−7) 이고, 열린 id 는 전역 기록에서 온다 (0x61f5c)', () => {
