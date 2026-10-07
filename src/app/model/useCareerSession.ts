@@ -817,6 +817,8 @@ export function useCareerSession({
       // 판정 11(2스트라이크 번트 파울 아웃)은 아웃 콜이 조건 없이 62 다 — 플레이 끝까지 실어 보낸다
       const advanced = startPlayerOutcome(currentProgress, nextAtBat.outcome, random, {
         isUncatchable,
+        // 쏜 패턴(0xb0930 덱에서 뽑은 것)을 그대로 판에 싣는다 — 타석 결과 객체에 묶인 것과 같은 값을 명시적으로 넘긴다
+        pattern: detail.pattern,
         buntFoulOut: detail.isBuntFoulOut,
         foulRecordIds: tally.foulRecordIds,
         arrivalPlay: arrival?.play ?? null,
@@ -1016,18 +1018,21 @@ export function useCareerSession({
       const resolved = resolveDefensePlay(current, played, random)
       progressRef.current = resolved
       setProgress(resolved)
+      // 배너·소리는 **판 끝 정산 0xa8024 가 낸 결과**로 낸다 — `pending.outcome` 은 판 앞 예측(`predictedOutcomeOf`)이라
+      // 판이 다르게 끝나면(예: 예측 아웃인데 판에서 안타) 어긋난다. 타구 판이 아닌 결과(옛 호출)만 예측으로 남는다
+      const outcome = played.outcome ?? pending.outcome
       // 플레이가 끝난 자리 — 아웃 콜(0x51b36)·세이프 콜(0x51c14)과 진행 소리는 여기서야 난다.
       // 함성 60 은 원본이 **낙구 틱**에 내는 것이라 이 자리는 근사다 (atBatSounds 주석)
       playSoundIds(audio, [
         deepHitCheerSoundIdOf({
-          outcome: pending.outcome,
+          outcome,
           carryDistance: carryDistanceOf(pending.trajectory),
           caughtOnTheFly: played.caughtOnTheFly,
         }),
-        inPlayCallSoundIdOf(pending.outcome, { ...played, buntFoulOut: pending.buntFoulOut }),
+        inPlayCallSoundIdOf(outcome, { ...played, buntFoulOut: pending.buntFoulOut }),
         ...gameStepSoundIdsOf(current, resolved),
       ])
-      finishAtBat(resolved, pending.outcome, runnersOnBase)
+      finishAtBat(resolved, outcome, runnersOnBase)
     },
     [audio, finishAtBat, random],
   )
