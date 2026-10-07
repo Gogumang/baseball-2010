@@ -34,6 +34,7 @@ import { HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
 import { useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
 import { settlementBackdropOffsetAt } from '@/pages/team-game/model/settlementBackdrop'
 import { SettlementBoard } from '@/pages/team-game/ui/SettlementBoard'
+import { humanVsComputerSidesOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { SceneMatchupCards } from '@/widgets/matchup-cards/ui/SceneMatchupCards'
 import { teamMatchupCardsOf } from '@/pages/team-game/lib/teamMatchupCards'
@@ -393,6 +394,8 @@ export function TeamGameScreen({
 
   const game = progress.game
   const staminaPercent = staminaPercentOf(progress.stamina)
+  // 점수판 틀 0x41440 의 두 측 — 사람 팀(우리) PLAYER · 상대 COM
+  const scoreboardSides = humanVsComputerSidesOf(options.playerSide, options.ourTeamId, options.opponentTeamId)
 
   /**
    * 경기 시작 인트로 — 적재(상태 8) 끝에서 모드 1~4 만 0xc 로 온다. 54틱 또는 OK 뒤 1회초 판(0x18)이나 첫 타석.
@@ -405,6 +408,7 @@ export function TeamGameScreen({
       <GameIntro
         awayName={TEAMS[side0Team]?.name ?? ''}
         homeName={TEAMS[side1Team]?.name ?? ''}
+        scoreboardSides={scoreboardSides}
         onDone={() => setIntroDone(true)}
       />
     )
@@ -418,6 +422,7 @@ export function TeamGameScreen({
         side0Score={ourSide === 0 ? game.ourScore : game.opponentScore}
         side1Score={ourSide === 1 ? game.ourScore : game.opponentScore}
         names={[names.win, names.loss, names.save]}
+        scoreboardSides={scoreboardSides}
         onConfirm={() => {
           setEndBoardClosed(true)
           // 정산 0x19 진입 — 승리 31 · 패배 32 징글 (0x4ea0c). 같은 진입이 +0x4c+모드 를 지운다(0x4f3d6)
@@ -467,6 +472,7 @@ export function TeamGameScreen({
             // 0xb69b0(st, 0/1) — 왼쪽이 측 0
             side0Score={ourSide === 0 ? summary.ourScore : summary.opponentScore}
             side1Score={ourSide === 1 ? summary.ourScore : summary.opponentScore}
+            scoreboardSides={scoreboardSides}
             recordIds={summary.recordIds ?? []}
             gamePoints={summary.gamePoints ?? 0}
             // [app+0x64] — 정산 진입(0x4ea0c)이 번 G 를 더한 뒤의 값. 부르는 쪽이 `onSettlementEnter` 에서 더한다
@@ -528,6 +534,7 @@ export function TeamGameScreen({
         onTick={(tick) => {
           if (tick === HALF_INNING_JINGLE_TICK) audio.play(HALF_INNING_SOUND)
         }}
+        scoreboardSides={scoreboardSides}
         onConfirm={() => setClosedBoardSerial(board.serial)}
       />
     )

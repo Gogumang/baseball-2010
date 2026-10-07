@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { GameEndBoard } from '@/widgets/game-scene/ui/GameEndBoard'
+import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 
 afterEach(() => {
@@ -31,5 +32,24 @@ describe('경기 끝 결과 판 (상태 0x18 경기 끝 가지)', () => {
     fireEvent.keyDown(window, { key: '5' })
     fireEvent.keyDown(window, { key: '5' })
     expect(onConfirm).toHaveBeenCalledTimes(1)
+  })
+
+  it('점수판 틀 0x41440(경기, 0, 3) — 경기 끝 판은 늘 그린다', () => {
+    render(<GameEndBoard side0Score={0} side1Score={1} names={[null, null, null]}
+      scoreboardSides={[{ team: 1, isComputer: true }, { team: 4, isComputer: false }]} onConfirm={() => {}} />)
+    const frame = screen.getByTestId('점수판-틀')
+    expect([frame.dataset.x, frame.dataset.y]).toEqual(['0', '3'])
+  })
+})
+
+describe('공수 교대 판 (상태 0x18 교대 가지)', () => {
+  it('점수판 틀 0x41440(경기, 0, 0) 은 틱 > 0x45 부터 (0x4ff00)', () => {
+    vi.useFakeTimers()
+    render(<HalfInningBoard inning={3} half="말" onConfirm={() => {}}
+      scoreboardSides={[{ team: 1, isComputer: true }, { team: 4, isComputer: false }]} />)
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 69))
+    expect(screen.queryByTestId('점수판-틀')).toBeNull()
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
+    expect(screen.getByTestId('점수판-틀').dataset.y).toBe('0')
   })
 })

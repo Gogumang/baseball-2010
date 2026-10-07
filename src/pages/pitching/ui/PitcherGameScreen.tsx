@@ -37,6 +37,7 @@ import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
 import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 import { GameEndBoard } from '@/widgets/game-scene/ui/GameEndBoard'
+import { humanVsComputerSidesOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import * as styles from '@/pages/pitching/ui/PitcherGameScreen.css'
 
 /**
@@ -246,6 +247,8 @@ export function PitcherGameScreen({
     setSlot(null)
   }
 
+  // 점수판 틀 0x41440 의 두 측 — 내 팀 PLAYER · 상대 COM
+  const scoreboardSides = humanVsComputerSidesOf(options.playerSide, options.ourTeamId, options.opponentTeamId)
   /**
    * 내가 던진 공이 인플레이로 갔으면 **수비 화면을 먼저 보여 준다** (원본 상태 0x17).
    * 진행 중인 타구가 있으면 여기서 **실시간으로 한 틱씩** 돌린다 — 원본도 공이 멈출 때까지
@@ -270,6 +273,7 @@ export function PitcherGameScreen({
       <GameIntro
         awayName={TEAMS[side0Team]?.name ?? ''}
         homeName={TEAMS[side1Team]?.name ?? ''}
+        scoreboardSides={scoreboardSides}
         onDone={() => setIntroDone(true)}
       />
     )
@@ -307,6 +311,7 @@ export function PitcherGameScreen({
         onTick={(tick) => {
           if (tick === HALF_INNING_JINGLE_TICK) audio.play(HALF_INNING_SOUND)
         }}
+        scoreboardSides={scoreboardSides}
         onConfirm={() => setClosedBoardSerial(board.serial)}
       />
     )
@@ -339,6 +344,7 @@ export function PitcherGameScreen({
         side0Score={ourSide === 0 ? progress.game.ourScore : progress.game.opponentScore}
         side1Score={ourSide === 1 ? progress.game.ourScore : progress.game.opponentScore}
         names={[names.win, names.loss, names.save]}
+        scoreboardSides={scoreboardSides}
         onConfirm={() => {
           setEndBoardClosed(true)
           actions.enterSettlement()

@@ -13,6 +13,9 @@ import {
   settlementPanelLayoutOf, settlementRecordRowsOf, startSettlementScroll, versusRewardTextOf,
 } from '@/pages/team-game/lib/settlementBoard'
 import * as styles from '@/pages/team-game/ui/SettlementBoard.css'
+import { ScoreboardFrame } from '@/widgets/scoreboard-frame/ui/ScoreboardFrame'
+import { SCOREBOARD_AT } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
+import type { ScoreboardSide } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 
 const GAME_UI = './sprites/game_ui'
 const GAME_UI_FRAMES = './sprites/game_ui/frames'
@@ -42,6 +45,8 @@ export interface SettlementBoardProps {
   readonly isWin: boolean
   readonly side0Score: number
   readonly side1Score: number
+  /** 점수판 틀 0x41440 의 두 측 — 팀(0xb6bdd)·CPU(0xb6c21) */
+  readonly scoreboardSides: readonly [ScoreboardSide, ScoreboardSide]
   /** 이번 경기 기록달성 번호 (같은 번호가 여러 번이면 그 횟수) */
   readonly recordIds: readonly number[]
   /** [+0x17f4] 이번에 번 G */
@@ -60,10 +65,11 @@ export interface SettlementBoardProps {
 /**
  * **팀경기 정산 판** (그리기 0x4a384 의 그 밖 모드 갈래 · 키 0x407f0) — 좌표·흐름은 `lib/settlementBoard` 머리말.
  * 구름·구장 배경(+0x17e2)은 밑에 깔린 타석 캔버스가 그린다 — 이 판은 그 위 240×320 에 겹친다.
- * ⚠️ 점수판 틀 0x41440 은 그림 미해결이라 그리지 않는다(점수 숫자만). 0x54a61 G 숫자의 둥근 판도 숫자만 둔다(홈런더비 결과와 같은 근사).
+ * 점수판 틀 0x41440(장면, W/2 − 120, H/2 − 80) 은 `widgets/scoreboard-frame` 이 그린다.
+ * ⚠️ 0x54a61 G 숫자의 둥근 판은 숫자만 둔다(홈런더비 결과와 같은 근사).
  */
 export function SettlementBoard({
-  mode, isWin, side0Score, side1Score, recordIds, gamePoints, heldGamePoints, versusWinBonus, onExit,
+  mode, isWin, side0Score, side1Score, scoreboardSides, recordIds, gamePoints, heldGamePoints, versusWinBonus, onExit,
 }: SettlementBoardProps) {
   const [isPanelOpen, setPanelOpen] = useState(false)
   const rows = settlementRecordRowsOf(recordIds)
@@ -118,6 +124,8 @@ export function SettlementBoard({
         frame={isWin ? SETTLEMENT_RESULT_SPRITE.winFrame : SETTLEMENT_RESULT_SPRITE.loseFrame}
         origins={resultOrigins} x={SETTLEMENT_RESULT_SPRITE.x} y={SETTLEMENT_RESULT_SPRITE.y} />
 
+      {/* 4a97a 점수판 틀 0x41440(장면, W/2 − 120, H/2 − 80, 0, 0, 0) */}
+      <ScoreboardFrame {...SCOREBOARD_AT.settlement} side0={scoreboardSides[0]} side1={scoreboardSides[1]} />
       {/* 4a980 점수 — num 70 + 자리, x 가 가운데 */}
       <ScoreNumber value={side0Score} centerX={SETTLEMENT_SCORE.side0.centerX} y={SETTLEMENT_SCORE.side0.y} testId="정산-점수-0" />
       <ScoreNumber value={side1Score} centerX={SETTLEMENT_SCORE.side1.centerX} y={SETTLEMENT_SCORE.side1.y} testId="정산-점수-1" />

@@ -10,6 +10,7 @@ import { effectiveAbilityOf } from '@/entities/career/model/condition'
 import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
+import { humanVsComputerSidesOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import { HALF_INNING_JINGLE_TICK } from '@/features/play-game/model/halfInningBoard'
 import { HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
 import { useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
@@ -182,6 +183,8 @@ export function GameScreen({
         onTick={(tick) => {
           if (tick === HALF_INNING_JINGLE_TICK) activeSound().play(HALF_INNING_SOUND)
         }}
+        // 점수판 틀 0x41440 의 두 측 — 내 팀 PLAYER · 상대 COM
+        scoreboardSides={humanVsComputerSidesOf(progress.game.playerSide, career.teamId, progress.opponentTeamId)}
         onConfirm={() => setBoardClosed(true)}
       />
     )

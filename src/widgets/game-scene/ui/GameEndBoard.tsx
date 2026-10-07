@@ -4,12 +4,17 @@ import { GAME_END_INPUT_LOCK_TICKS } from '@/widgets/game-scene/lib/endBoardLayo
 import { isOkKey, useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
 import { EndBoardRows } from '@/widgets/game-scene/ui/EndBoardRows'
 import * as styles from '@/widgets/game-scene/ui/GameScene.css'
+import { ScoreboardFrame } from '@/widgets/scoreboard-frame/ui/ScoreboardFrame'
+import { SCOREBOARD_AT } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
+import type { ScoreboardSide } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 
 interface GameEndBoardProps {
   readonly side0Score: number
   readonly side1Score: number
   /** 승리투수·패전투수·세이브 (state+0x44/0x50/0x5c 그대로 — 측 2 면 null) */
   readonly names: readonly (string | null)[]
+  /** 점수판 틀 0x41440(경기, 0, 3) 의 두 측 — 팀(0xb6bdd)·CPU(0xb6c21). 안 주면 틀을 안 그린다 */
+  readonly scoreboardSides?: readonly [ScoreboardSide, ScoreboardSide]
   /** OK — 메시지 1(인자 0x18) → 0xae3a0 → 경기 끝이라 **정산 0x19** */
   readonly onConfirm: () => void
 }
@@ -26,7 +31,7 @@ interface GameEndBoardProps {
  * - 효과음은 내지 않는다.
  *
  * 모드를 가리지 않는다 — 경기 끝 가지(0x4f94e)는 모드를 안 보므로 나만의리그 타자편·투수편·팀 경기 모두 같은 판이다.
- * ⚠️ 판 머리의 점수판 틀 `0x41440` 은 그림 미해결이라 안 그린다 (`endBoardLayout` 머리말).
+ * 판 머리의 점수판 틀 `0x41440(경기, 0, 3, 0, 0, 0)` 은 `widgets/scoreboard-frame` 이 그린다 (0x4fed8 — 경기 끝이면 y = 3).
  *
  * ## 0x18 을 거치지 않는 끝 — 메시지 2 "경기 끝 요청"(0x50cb0 → 곧장 0x19)의 발신자 (미해결, 2026-10-05 조사)
  * 메시지는 모두 `0xbfbac(받는곳, 번호, 인자, …)`(곧바로 0xbfb78 → 받는곳 vt+0xc = 0x509a0) 이나 큐 `0xbfc44`
@@ -40,7 +45,7 @@ interface GameEndBoardProps {
  * "경기 끝 → 0x18" 로 이 판을 거친다. 웹도 그대로 늘 이 판을 거친다. (레지스터로 번호를 계산해 보내는 자리가
  * 있을 가능성은 남는다.)
  */
-export function GameEndBoard({ side0Score, side1Score, names, onConfirm }: GameEndBoardProps) {
+export function GameEndBoard({ side0Score, side1Score, names, scoreboardSides, onConfirm }: GameEndBoardProps) {
   const tick = useSceneTick()
   const isLocked = tick < GAME_END_INPUT_LOCK_TICKS
   const confirmRef = useRef(onConfirm)
@@ -67,6 +72,9 @@ export function GameEndBoard({ side0Score, side1Score, names, onConfirm }: GameE
 
   return (
     <RawScreen>
+      {scoreboardSides !== undefined && (
+        <ScoreboardFrame {...SCOREBOARD_AT.gameEnd} side0={scoreboardSides[0]} side1={scoreboardSides[1]} />
+      )}
       <EndBoardRows side0Score={side0Score} side1Score={side1Score} names={names} />
       {/* 원본에 없는 웹 전용 단추 — 원본은 OK 키가 한다. 10틱 동안은 원본처럼 먹지 않는다 */}
       <Button variant="corner" className={styles.okButton} disabled={isLocked} onClick={confirm}>

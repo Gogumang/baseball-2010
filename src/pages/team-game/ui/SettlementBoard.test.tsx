@@ -11,7 +11,8 @@ afterEach(() => {
 
 const 기본 = {
   mode: 2, isWin: true, side0Score: 3, side1Score: 5, recordIds: [3, 3, 7], gamePoints: 120, heldGamePoints: 900,
-}
+  scoreboardSides: [{ team: 2, isComputer: false }, { team: 7, isComputer: true }],
+} as const
 
 describe('SettlementBoard — 정산 판 (0x4a384 · 키 0x407f0)', () => {
   it('기본 화면은 점수와 "0:INFO" 만 — \'0\' 으로 기록 판을 열고 OK 로 닫는다', () => {
@@ -32,6 +33,13 @@ describe('SettlementBoard — 정산 판 (0x4a384 · 키 0x407f0)', () => {
     // 닫힌 판에서 '0' 이 아닌 키 → 메시지 0x3f3
     fireEvent.keyDown(window, { key: 'Enter' })
     expect(onExit).toHaveBeenCalledTimes(1)
+  })
+
+  it('점수판 틀 0x41440 을 (W/2 − 120, H/2 − 80) = (0, 80) 에', () => {
+    render(<SettlementBoard {...기본} onExit={vi.fn()} />)
+    const frame = screen.getByTestId('점수판-틀')
+    expect([frame.dataset.x, frame.dataset.y]).toEqual(['0', '80'])
+    expect(screen.getByTestId('점수판-로고-1').getAttribute('src')).toBe('./sprites/team_logo/007.png')
   })
 
   it('기록이 없으면 "기록이 없습니다!"', () => {
