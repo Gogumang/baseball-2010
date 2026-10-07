@@ -202,8 +202,9 @@ export interface DefensePlayInput {
    * **첫 야수가 쥐지 못하는 타구** — 필살타법이 성공한 타구 (0x51800, S13 6절 확정).
    *
    * 원본은 확률 굴림에 성공하면 공 객체(`[경기+0x204]`)의 속성 목록 `+0x5c` 에
-   * `0xaf180(목록, 4, 0, −1)` 로 **비트 4 = 송구공 표시**를 단다. 야수는 포구 틱에 그 비트를 보고(0xb41c6)
-   * 메시지 `0xbc3`(받음)만 보낸 뒤 **쥐기(0xb2710)로 가지 않고** 사건(sp+0x24) = 1 이 된다(b4250). 그 `0xbc3` 은
+   * `0xaf180(목록, 4, 0, −1)` 로 **속성 4 = 필살타법 표시**를 단다(이 속성을 다는 곳은 0x51408 안 51812 · 518b8 뿐 — 송구 공에는
+   * 달리지 않는다). 야수는 포구 틱에 그 속성을 보고(0xb41c6 목록.vt24(4)) 펌블 굴림(b4224) 뒤 b4246 에서 속성을 떼고(b425e 목록.vt1c(4))
+   * 메시지 `0xbc3`(필살타법 공 맞음 — 송구 받기가 아니다. 보통 공·송구 공을 받는 것은 b42c8 쥐기 0xb2710)만 보낸 뒤 **쥐기(0xb2710)로 가지 않고** 사건(sp+0x24) = 1 이 된다(b4250). 그 `0xbc3` 은
    * 전용 처리기가 없고, 틱 끝 b45a0 의 사건 갈래가 플레이.vt70 = 0xb3148 로 공을 그 야수에게서 튕겨 다시 쏜다 —
    * 다시 쏜 공은 0xa2610 이 속성 목록을 비워 보통 공이라 새 예보의 야수가 줍는다 (`relaunchFromFielder`).
    */
@@ -827,7 +828,7 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     })
   }
   // 잡힐 뜬공인가(vt94) — 고른 포구가 낙구 전(0xb3b38 우선순위 1~5)일 때. 점프·슬라이딩 창이 열려 낙구 전 포구가 생기면
-  // 그것도 뜬공이다. 필살타법 타구(송구공 표시)는 아무도 쥐지 않는다. 실제 뜬공 아웃(state[0x1f])은 쥐는 틱의 0xb36d0 이 낸다
+  // 그것도 뜬공이다. 필살타법 타구(공 속성 4 = 필살타법 표시)는 아무도 쥐지 않는다. 실제 뜬공 아웃(state[0x1f])은 쥐는 틱의 0xb36d0 이 낸다
   const onTheFly = !uncatchable && forecast.choice.catchTick <= trajectory.landingTick
   // 0xa9e44 의 1루 주자 예외 (a9ed6) — 2아웃 전 잡힐 뜬공이면 1루 주자는 포스 목표를 안 받는다
   const runners = createPlayRunners(
@@ -1035,7 +1036,7 @@ export function stepDefensePlay(
   let landingChase = state.landingChase
   let ballLandingTick = state.ballLandingTick
   let receivingThrow = state.receivingThrow
-  /** sp+0x24 — 이번 틱 포구 틱의 사건(펌블 0xbc2 · 송구공 받음 0xbc3). 서면 틱 끝 b45a4 가 플레이.vt70 = 0xb3148 */
+  /** sp+0x24 — 이번 틱 포구 틱의 사건(펌블 0xbc2 · 필살타법 표시 공 0xbc3 — 송구 받기는 사건 없이 b42c8 쥐기). 서면 틱 끝 b45a4 가 플레이.vt70 = 0xb3148 */
   let ballEventThisTick = false
 
   const contextAt = (at: number): DefenseContext => ({
@@ -1090,7 +1091,7 @@ export function stepDefensePlay(
    *    - `+0x3b` 의 뜻은 **확정**이다. 야수 vtable `0xd7934` 의 vt30 도 주자와 같은 `0xbf0dc` 라,
    *      갱신 머리에서 지우고(bf0e6) 목표점에 **막 닿은 갱신에서만** 1 이 된다(bf146) — 한 틱짜리 맥박.
    *    - 0xb4300~0xb4314 는 **타구 포구 틱 구역**(`b42ce`)에만 있다. 들어오는 길은 공 쥐기
-   *      `b42c8 0xb2710` 과 필살타법 타구 `b4290`(메시지 0xbc3) 둘뿐이고, 틱마다 도는 `b43da` 판정은
+   *      `b42c8 0xb2710` 과 메시지 갈래 `b428c`(필살타법 표시 공 0xbc3 · 펌블 0xbc2 둘 다 → b4290 b b42ce) 뿐이고, 틱마다 도는 `b43da` 판정은
    *      이 칸을 결과 2 로 세우지 않는다. 그 구역은 `b42e0`: `0xa99d8`(막 닿은 산 주자가 있나) ||
    *      야수+0x3b 면 vt90 을 **한 번 더** 부르고(b42f2), 그 결과가 2 이고 야수+0x3b 면 1 을 적는다.
    *    - 결과 2 는 공 쥔 야수의 발밑 루(`0xa0ae4`, 좌표 **비트까지** 같음)가 주자의 루와 같아야 서는데,
@@ -2180,7 +2181,7 @@ export function stepDefensePlay(
     // b445a  +0x114 ≠ 0 && 이번 틱 사건 없음 → b4540     ; +0x114 는 +0x112 와 함께만 서서 실제로는 안 닿는 갈래
     // b446c  공+0x68 == 공+0xaa4(담장선) && 사건 없음 → +0x110(파울) == 0 이면 +0x112 = +0x114 = +0x115 = 1
     // b4492  아니고 공+0x68 == 공+0xaa0(낙구) && 사건 없음 → +0x112 = 1 · +0x113 = 1 · state[0x1e] = 1 · 소리 0x51c
-    // b44be  사건(sp+0x24 = 포구 틱의 송구 받음 0xbc3 · 펌블 0xbc2)이 있고 +0x112 == 0 → state[0x1b] = 1
+    // b44be  사건(sp+0x24 = 포구 틱의 필살타법 표시 공 0xbc3 · 펌블 0xbc2)이 있고 +0x112 == 0 → state[0x1b] = 1
     // b44d6  (+0x112 || +0x114) && 사건 없음 → 결과 코드 = 0x9d5bc(state)          ; ★ b44f6
     // b44f8  +0x112 || +0x114 || 사건 → +0x12b == 0 이면 (0xb68dc 파울 ? 0xa9620 리터치 : 0xa95e8 포스) ; 0xa95c0(+0x94 = 1)
     // b4540  이번 틱 vt90 결과 ≠ 0 → (state[0x1f] 면 +0x12b = 1) 결과 코드 = 13

@@ -170,7 +170,7 @@ export function resolvePitch(
   readonly detail: PitchOutcomeDetail
   readonly deck: PatternDeck
   /**
-   * 필살타법이 성공한 타구인가 — 0x517e6 `p·10 > rand(0,1000)` 이 참이면 0xaf180(…, 4, 0, −1) 이 "송구공" 비트를 단다
+   * 필살타법이 성공한 타구인가 — 0x517e6 `p·10 > rand(0,1000)` 이 참이면 0xaf180(…, 4, 0, −1) 이 공 속성 4(필살타법 표시 — 송구 공과 무관, 포구 틱 b4246 이 보고 0xbc3)를 단다
    * (야수가 쥐지 않고 지나친다, `features/defense-play` 의 `isUncatchable`).
    */
   readonly isUncatchable: boolean

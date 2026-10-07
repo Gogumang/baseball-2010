@@ -816,7 +816,7 @@ export function useMissionSession({
             // 사람이 수비다 — 환경설정 송구(+0xf4)가 그대로 0xae6c8 의 답이 된다
             throwModeManual,
           ),
-          // 0x517e6 — 마타자 필살이 성공한 타구는 송구공 비트(0xaf180)가 서서 야수가 쥐지 못한다
+          // 0x517e6 — 마타자 필살이 성공한 타구는 필살타법 표시 속성 4(0xaf180 — 송구 공과 무관)가 서서 야수가 쥐지 못한다
           isUncatchable: thrown.isUncatchable,
           // CPU 가 공이 나는 동안 건 도루 — 판 시작 리드(0x3d7b8)가 다음 루로 몰아 돌린다
           stealingFrom,
