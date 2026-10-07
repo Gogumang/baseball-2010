@@ -10,6 +10,7 @@ import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { fillModeText } from '@/widgets/season/lib/seasonText'
 import { SEASON_SUB_COMMAND_SLOTS, seasonParentSlotOf } from '@/pages/season/lib/seasonCommandBar'
 import { SeasonCommonFrame } from '@/pages/season/ui/SeasonCommonFrame'
+import { SeasonTrainingPopup } from '@/pages/season/ui/SeasonTrainingPopup'
 import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
 
 /** StrMODE 번호 (가드 0x9108 이 0x702b4 로 꺼내는 글 — 직접 떴다) */
@@ -89,9 +90,9 @@ export interface SeasonTrainingScreenProps {
   /**
    * 칸을 골라 확인까지 마쳤다.
    *
-   * 원본은 여기서 **연출 0xde**(훈련 애니, R13 5절)로 넘어가 애니가 끝나면 굴림 `0xc074` →
-   * 적용 `0xa2f24` → 결과 팝업 0x13 → 관리 메뉴 0xc9 로 돌아온다. 굴림에는 난수가 필요해
-   * 이 화면에서 하지 않는다 — 표(`widgets/season/lib/seasonTraining.ts`)를 보고 부르는 쪽이 한다.
+   * 원본은 확인 뒤 **연출 0xde**(훈련 팝업 0x848d0 — `SeasonTrainingPopup`)를 돌고, 애니가 끝나면 굴림 `0xc074` →
+   * 적용 `0xa2f24` → 결과 팝업 0x13 → 관리 메뉴 0xc9 로 돌아온다. 이 화면은 연출이 끝난 때 부른다 — 굴림은
+   * 표(`widgets/season/lib/seasonTraining.ts`)를 보고 부르는 쪽이 한다.
    */
   readonly onTrain: (slot: TrainingSlot, index: number) => void
   /** 취소(−16) — 관리 메뉴(0xc9)로 되돌아간다 */
@@ -105,7 +106,7 @@ export interface SeasonTrainingScreenProps {
  * (J 4-6 확정). 가드 순서·값은 `widgets/season/lib/seasonTraining.ts` 가 가진다.
  *
  * 그리기 0xa0e4 = 공통 틀(`SeasonCommonFrame` — 커맨드 줄 하위 칸 표 0xd47c0 · 0xd47ca: 254 투구훈련 · 119 타격훈련 ·
- * 286 집중훈련 · 287 근성훈련 · 121 지옥훈련, 부모 칸 트레이닝) — 상태 0xde 일 때만 0x848d0 을 덧그린다.
+ * 286 집중훈련 · 287 근성훈련 · 121 지옥훈련, 부모 칸 트레이닝) — 상태 0xde 일 때만 가운데 판 대신 0x848d0 을 덧그린다.
  * 칸 옆 값(능력치·500G)은 원본이 그리지 않는다.
  *
  * ⚠️ **SR+4(행동함)를 세우는 자리는 문서에 없다**: 외출은 결과 0xc81c 끝에서 세우는 것이 확정인데
@@ -117,6 +118,8 @@ export function SeasonTrainingScreen({ state, gamePoints, onTrain, onBack }: Sea
   const { record, teamMorale, teamAbilities } = state
   const abilities = teamAbilities[record.teamId] ?? []
   const [popup, setPopup] = useState<TrainingPopup | null>(null)
+  /** 상태 0xde — 확인한 칸의 훈련 팝업이 돈다 */
+  const [playingIndex, setPlayingIndex] = useState<number | null>(null)
 
   const select = (index: number) => {
     setPopup(trainingPopupOf(checkSeasonTraining({ abilities, teamMorale, gamePoints }, index), index, abilities))
@@ -126,13 +129,19 @@ export function SeasonTrainingScreen({ state, gamePoints, onTrain, onBack }: Sea
     count: TRAINING_SLOTS.length,
     onSelect: select,
     onCancel: onBack,
-    isEnabled: popup === null,
+    isEnabled: popup === null && playingIndex === null,
   })
 
   return (
     <RawScreen>
       <div role="group" aria-label="트레이닝">
-        <SeasonCommonFrame record={record} teamMorale={teamMorale} gamePoint={gamePoints} onBack={onBack}
+        <SeasonCommonFrame record={record} teamMorale={teamMorale} gamePoint={gamePoints} onBack={playingIndex === null ? onBack : null}
+          // 0xde 는 공통 틀에서 가운데 판을 빼고 0x848d0 을 덧그린다
+          showsCenterStage={playingIndex === null}
+          overlay={playingIndex === null ? undefined : (
+            <SeasonTrainingPopup slot={playingIndex} teamIndex={record.teamId}
+              onFinished={() => onTrain(TRAINING_SLOTS[playingIndex], playingIndex)} />
+          )}
           commandBar={{
             slots: SEASON_SUB_COMMAND_SLOTS.트레이닝, cursor, parent: seasonParentSlotOf('트레이닝'),
             onHover: moveTo,
@@ -147,7 +156,8 @@ export function SeasonTrainingScreen({ state, gamePoints, onTrain, onBack }: Sea
           onAnswer={(answer) => {
             const trainIndex = popup.trainIndex
             setPopup(null)
-            if (popup.asks && answer === 0 && trainIndex !== null) onTrain(TRAINING_SLOTS[trainIndex], trainIndex)
+            // 팝업 0x11 · 0x12 에 예 → 상태 0xde(0x7570) — 굴림은 연출이 끝난 뒤(0xc384 → 0xc074)
+            if (popup.asks && answer === 0 && trainIndex !== null) setPlayingIndex(trainIndex)
           }}
         />
       )}

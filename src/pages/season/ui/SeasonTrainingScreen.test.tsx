@@ -51,6 +51,11 @@ describe('시즌 팀 트레이닝 (상태 0xcf)', () => {
     expect(알림글()).toContain('[타격훈련]을 하시겠습니까?')
 
     fireEvent.click(screen.getByRole('button', { name: '예' }))
+    // 예 → 상태 0xde 훈련 팝업 0x848d0 — 굴림(onTrain)은 연출이 끝난 뒤다
+    expect(onTrain).not.toHaveBeenCalled()
+    expect(screen.getByTestId('시즌-훈련팝업').getAttribute('data-slot')).toBe('1')
+    // 확인 키(0x4968)는 게이지 끝으로 건너뛴다
+    fireEvent.keyDown(window, { key: 'Enter' })
     expect(onTrain).toHaveBeenCalledWith('타격', 1)
   })
 
@@ -63,6 +68,7 @@ describe('시즌 팀 트레이닝 (상태 0xcf)', () => {
     expect(알림글()).toContain('500 G포인트가 소모됩니다')
 
     fireEvent.click(screen.getByRole('button', { name: '예' }))
+    fireEvent.keyDown(window, { key: '5' })
     expect(onTrain).toHaveBeenCalledWith('지옥훈련', 4)
   })
 
@@ -107,6 +113,11 @@ describe('시즌 팀 트레이닝 (상태 0xcf)', () => {
 
     fireEvent.click(줄('타격'))
     fireEvent.click(screen.getByRole('button', { name: '예' }))
+    // 예 → 상태 0xde 훈련 팝업 0x848d0 — 굴림(onTrain)은 연출이 끝난 뒤다
+    expect(onTrain).not.toHaveBeenCalled()
+    expect(screen.getByTestId('시즌-훈련팝업').getAttribute('data-slot')).toBe('1')
+    // 확인 키(0x4968)는 게이지 끝으로 건너뛴다
+    fireEvent.keyDown(window, { key: 'Enter' })
     expect(onTrain).toHaveBeenCalledWith('타격', 1)
   })
 
@@ -120,6 +131,7 @@ describe('시즌 팀 트레이닝 (상태 0xcf)', () => {
     expect(알림글()).toContain('[지옥훈련]을 하시겠습니까?')
 
     fireEvent.click(screen.getByRole('button', { name: '예' }))
+    fireEvent.keyDown(window, { key: '5' })
     expect(onTrain).toHaveBeenCalledWith('지옥훈련', 4)
   })
 
