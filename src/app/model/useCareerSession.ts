@@ -130,6 +130,7 @@ import {
   prepareNariCupMatch,
 } from '@/entities/career/model/nariCupTeams'
 import type { NariCupTeams } from '@/entities/career/model/nariCupTeams'
+import { nariCupGameResultOf } from '@/entities/career/model/nariCupGame'
 import { UNSHUFFLED_PITCHER_ORDER } from '@/entities/league/model/league'
 import type { NationalCup, NationalCupMatchup } from '@/entities/national-cup/model/nationalCup'
 import { advanceNationalCupDay } from '@/entities/national-cup/model/nationalCupPlay'
@@ -688,10 +689,14 @@ export function useCareerSession({
   const finishCupGame = useCallback(
     (finished: GameProgress, cup: NationalCup) => {
       const summary = summaryOf(finished)
-      // 무승부는 대한민국의 패로 친다 — 원본 CPU 경기(`0xc2f12`)도 동점이면 뒷 칸이 이긴다. **근사다**
-      const won = summary.result === '승'
-      const winner = won ? summary.ourTeamId : summary.opponentTeamId
-      const loser = won ? summary.opponentTeamId : summary.ourTeamId
+      // 0x4ea0c 4f072~4f136 — 후공(측 1) 점수가 더 많을 때만 후공 승, 동점이면 선공(측 0) 승 (`nariCupGameResultOf`)
+      const { winner, loser } = nariCupGameResultOf({
+        mySide: finished.game.playerSide,
+        myTeam: summary.ourTeamId,
+        opponentTeam: summary.opponentTeamId,
+        myScore: summary.ourScore,
+        opponentScore: summary.opponentScore,
+      })
       cupGameRef.current = null
       // 경기 장면 0x104 를 지나 나리 장면이 새로 선다 — 장면+0x288 = 0
       matchPreparedRef.current = false

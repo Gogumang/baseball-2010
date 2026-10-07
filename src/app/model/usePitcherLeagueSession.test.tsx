@@ -668,7 +668,7 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     })
     expect(options.ourPitcherOrder?.[0]).toBe(8)
     const 앞 = result.current.career!
-    act(() => result.current.actions.finishGame({ ...경기요약, result: '승' } as typeof 경기요약))
+    act(() => result.current.actions.finishGame({ ...경기요약, result: '승', ourScore: 2, opponentScore: 0 } as typeof 경기요약))
     expect(result.current.scene).toBe('국가대항전')
     expect(result.current.cup?.cup.day).toBe(1)
     expect(result.current.cup?.cup.wins[0]).toBe(1)
@@ -684,6 +684,24 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     expect(result.current.scene).toBe('관리')
     expect(result.current.career?.season).toBe(2)
     expect(result.current.career?.openedHiddenIds).toContain(10)
+  })
+
+  it('국가대항전 무승부 — 0x4ea0c 4f09a 는 동점이면 선공(측 0) 승: 풀리그 대한민국(후공)은 패로 들어간다', () => {
+    const 잘함 = {
+      season: 1,
+      gamesPlayed: 45,
+      popularity: 2000,
+      popularityAtSeasonStart: 0,
+      stats: { ...createPitcherCareer('x').stats, wins: 30, strikeouts: 300 },
+    }
+    const result = 판짜기(잘함)
+    act(() => result.current.actions.beginYearEnd())
+    연말끝까지(result, { 380: [383], 461: [463] })
+    act(() => result.current.actions.startCupGame({ myTeam: 10, opponent: 11 }, result.current.cup!.cup))
+    act(() => result.current.actions.confirmMatchPrepare())
+    act(() => result.current.actions.finishGame({ ...경기요약, result: '무', ourScore: 2, opponentScore: 2 } as typeof 경기요약))
+    expect(result.current.cup?.cup.losses[0]).toBe(1)
+    expect(result.current.cup?.cup.wins[1]).toBe(1)
   })
 
   it('국가대항전 저장 · 이어하기 — 463 끝(S+0x50 = 3 · S+0x12c) · 정산이 넘긴 대회가 저장에 들고, 새로 띄우면 134 · 곧장 경기는 그날 경기로', () => {

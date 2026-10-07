@@ -78,6 +78,7 @@ import type { NationalCup, NationalCupMatchup } from '@/entities/national-cup/mo
 import { advanceNationalCupDay } from '@/entities/national-cup/model/nationalCupPlay'
 import { nariCupRecordOf, nextNariCupDayTeams } from '@/entities/career/model/nariCupTeams'
 import type { NariCupTeams } from '@/entities/career/model/nariCupTeams'
+import { nariCupGameResultOf } from '@/entities/career/model/nariCupGame'
 import {
   createPitcherCupTeams,
   pitcherCupPositionCodeOf,
@@ -989,10 +990,14 @@ export function usePitcherLeagueSession(
       nariGameSaveRef.current?.clear()
       // 전역 경기 상태 +0x6b 는 대회 경기도 남긴다
       liveGameStateInningIndex = summary.endedInningIndex ?? 0
-      // 무승부는 대한민국의 패로 친다 — CPU 경기(0xc2f12)도 동점이면 뒷 칸이 이긴다. **근사다** (타자편과 같다)
-      const won = summary.result === '승'
-      const winner = won ? options.ourTeamId : options.opponentTeamId
-      const loser = won ? options.opponentTeamId : options.ourTeamId
+      // 0x4ea0c 4f072~4f136 — 후공(측 1) 점수가 더 많을 때만 후공 승, 동점이면 선공(측 0) 승 (`nariCupGameResultOf`, 타자편과 같다)
+      const { winner, loser } = nariCupGameResultOf({
+        mySide: options.playerSide,
+        myTeam: options.ourTeamId,
+        opponentTeam: options.opponentTeamId,
+        myScore: summary.ourScore,
+        opponentScore: summary.opponentScore,
+      })
       // 같은 날 CPU 경기 두 나라는 상대국 칸 레코드를 쓴다 — 사람 경기 끝 상대 투수 칸별 +0x2c 에서 선다(701a7a9)
       const next = advanceNationalCupDay(cup, winner, loser, random, summary.pitcherStaminas?.opponent)
       // 하루 끝 b8216 — 다음 날 사람 경기 상대를 +0xbe0 에 마스터에서 새로 복사. 대회 칸(L+0xa8~ · L+0x32)은 정산 끝 0x4f3c4 가 저장
