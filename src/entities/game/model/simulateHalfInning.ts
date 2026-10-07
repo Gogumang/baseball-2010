@@ -96,7 +96,7 @@ export interface HalfInningResult {
   readonly hits: number
   /** 이 이닝에 내준 볼넷 수 — state+0x88 (투구 판정 0xc1818 에서 나온다) */
   readonly walks: number
-  /** 이 이닝에 잡은 아웃 수 — 3아웃으로 끝나지 않는 경우가 없어 보통 3 이다 */
+  /** 이 이닝에 잡은 아웃 수 — 보통 3 이다. 경기 끝 판정(`hooks.endsGame`)으로 멈춘 반 이닝은 3 보다 적을 수 있다 */
   readonly outs: number
   /** 이 이닝에 잡은 삼진 수 */
   readonly strikeouts: number
@@ -132,6 +132,8 @@ export interface HalfInningResult {
   readonly pinchHitUsed?: boolean
   /** 이 이닝에 들어온 CPU 대타 */
   readonly pinchHits: readonly HalfInningPinchHit[]
+  /** 경기 끝 판정 0xb68fc(`hooks.endsGame`)이 참을 낸 타석에서 멈췄다 — 경기가 끝났다 */
+  readonly gameEnded?: boolean
 }
 
 /* ── 공격 쪽: 명단과 CPU 대타 (0xc1ba4 → 0xac228 → 0xaebe4) ───────────────────── */
@@ -317,6 +319,12 @@ export interface HalfInningHooks {
     readonly outsAdded: number
     readonly inningEnded: boolean
   }) => void
+  /**
+   * **경기 끝 판정 0xb68fc** — 원본 간이 경기 고리는 타석(0xc262c 한 번)마다 0xc2198 머리 c21d6 에서 이것을 보고
+   * 참이면 그 자리에서 경기를 끝낸다(3아웃 전이어도 — 말 공격의 끝내기 · 홈 10점 콜드). 이 반 이닝의 득점·아웃을 받아
+   * 부르는 쪽이 경기 점수로 `isGameOverAt` 을 본다. 안 주면 3아웃까지 돈다.
+   */
+  readonly endsGame?: (state: { readonly runs: number; readonly outs: number }) => boolean
 }
 
 export function simulateHalfInning(
@@ -358,6 +366,8 @@ export function simulateHalfInning(
    * 반 이닝마다 0 에서 시작한다 (P7 E1).
    */
   let inningRunsAllowed = 0
+  /** `hooks.endsGame` 이 참을 낸 타석에서 멈췄나 */
+  let gameEnded = false
   const lines = new Map<number, HalfInningPitcherLine>()
   const addLine = (slot: number, add: Omit<HalfInningPitcherLine, 'pitcherSlot'>) => {
     const line = lines.get(slot) ?? { pitcherSlot: slot, outs: 0, runsAllowed: 0, strikeouts: 0, pitches: 0 }
@@ -560,6 +570,11 @@ export function simulateHalfInning(
     // 같은 0xa5e14 가 state[0xe](CPU 대타 막음)도 내린다 (a5e7c) — 다음 타석은 다시 대타를 묻는다
     if (pinchHitUsed !== undefined) pinchHitUsed = false
     order += 1
+    // 0xc2198 c21d6 — 타석 뒤 경기 끝 판정 0xb68fc (3아웃이 된 타석 뒤에도 반 이닝 넘김보다 먼저 본다)
+    if (hooks.endsGame?.({ runs, outs }) === true) {
+      gameEnded = true
+      break
+    }
   }
 
   recordIds.push(...threePitchInningRecordIdsOf(pitches, outs))
@@ -583,6 +598,7 @@ export function simulateHalfInning(
     lineup,
     pinchHitUsed,
     pinchHits,
+    gameEnded,
   }
 }
 

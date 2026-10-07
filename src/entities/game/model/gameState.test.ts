@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   applyAtBatOutcome,
   applyOpponentInning,
+  isGameOverAt,
   createGame,
   INNINGS_PER_GAME,
   isPlayerTurn,
@@ -254,9 +255,46 @@ describe('사람이 맡는 측 — 설정 레코드 +8 (0x30f44, S13 1-2)', () =
     expect([game.isFinished, game.half]).toEqual([false, '말'])
   })
 
-  it('측 0 이어도 콜드게임은 공격 중인 우리가 10점 앞서는 순간이다 (0xb6976)', () => {
+  it('측 0(원정)이면 초 공격 중에는 10점 앞서도 끝나지 않는다 — 0xb68fc b696e 는 초 3아웃 전 콜드를 안 본다', () => {
     const game = applyAtBatOutcome(선공경기({ inning: 7, ourScore: 9 }), { kind: '홈런' })
 
-    expect([game.ourScore, game.isFinished]).toEqual([10, true])
+    expect([game.ourScore, game.isFinished]).toEqual([10, false])
+    // 상대(홈)의 말 3아웃 뒤에도 원정이 10점 앞서 있으면 그때 끝난다 (b6962)
+    const 말끝 = applyOpponentInning({ ...game, half: '말' }, 0)
+    expect(말끝.isFinished).toBe(true)
+  })
+
+  it('측 0 이면 상대(홈)가 말 3아웃 뒤 10점 앞서도 콜드다 (b6976)', () => {
+    const game = applyOpponentInning(선공경기({ inning: 7, half: '말', opponentScore: 10 }), 0)
+
+    expect(game.isFinished).toBe(true)
+  })
+})
+
+describe('경기 끝 판정 0xb68fc 그대로 (`isGameOverAt`)', () => {
+  const 판정 = (inning: number, half: '초' | '말', outs: number, awayScore: number, homeScore: number) =>
+    isGameOverAt({ inning, half, outs, awayScore, homeScore })
+
+  it('8회까지는 콜드 말고는 안 끝난다', () => {
+    expect(판정(8, '말', 3, 1, 2)).toBe(false)
+    expect(판정(8, '말', 1, 0, 5)).toBe(false)
+  })
+
+  it('9회 이후 — 말 3아웃은 점수가 다르면 · 말 공격 중은 홈이 앞서면 · 초 3아웃은 홈이 앞서면 끝', () => {
+    expect(판정(9, '말', 3, 2, 1)).toBe(true)
+    expect(판정(9, '말', 3, 2, 2)).toBe(false)
+    expect(판정(9, '말', 0, 2, 3)).toBe(true)
+    expect(판정(9, '초', 3, 1, 2)).toBe(true)
+    expect(판정(9, '초', 2, 1, 2)).toBe(false)
+  })
+
+  it('7회 이후 콜드 — 말 공격 중 홈 10점 차는 곧바로, 원정 10점 차는 말 3아웃에만, 초 공격 중에는 없다', () => {
+    expect(판정(7, '말', 0, 0, 10)).toBe(true)
+    expect(판정(7, '말', 0, 10, 0)).toBe(false)
+    expect(판정(7, '말', 3, 10, 0)).toBe(true)
+    expect(판정(7, '초', 1, 10, 0)).toBe(false)
+    expect(판정(7, '초', 3, 10, 0)).toBe(false)
+    expect(판정(7, '초', 3, 0, 10)).toBe(true)
+    expect(판정(6, '말', 3, 0, 20)).toBe(false)
   })
 })

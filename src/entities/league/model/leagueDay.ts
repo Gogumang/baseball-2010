@@ -9,6 +9,7 @@ import {
 } from '@/entities/league/model/league'
 import type { League } from '@/entities/league/model/league'
 import { simulateHalfInning, startingMoundOf } from '@/entities/game/model/simulateHalfInning'
+import { isGameOverAt } from '@/entities/game/model/gameState'
 import type {
   HalfInningDefense,
   HalfInningMound,
@@ -70,8 +71,10 @@ export const REGULAR_INNINGS = 9
  * 없으며, 점수판 0xb6988 은 `이닝 mod 9` 로 칸을 돌려 쓴다. 그래서 아래 루프도 점수가 갈릴 때까지 돈다
  * (예전 웹의 30회 안전망 `MAXIMUM_INNINGS` 는 원본에 없어 뺐다). 0xc262c 의 이닝 14 는 상한이 아니라 "15회에 스윙 강제"
  * 였다(`quickAtBat.ts`).
- * ⚠️ 미해결(이 커밋 밖): 0xb68fc 의 콜드(이닝 > 5 · 10점 차 — 초 3아웃 뒤 홈 10점 앞섬 · 말 중 홈 10점 앞섬 · 말 3아웃 뒤
- * 원정 10점 앞섬)를 CPU 끼리 경기는 아직 안 본다 — 반 이닝 엔진(`simulateHalfInning`)이 타석마다 끊어야 한다.
+ * 경기 끝은 **타석마다** 본다: 고리 `do 0xc262c(한 타석) while 0xc2198(sim, 1)` 의 0xc2198 머리 c21d6 이 0xb68fc 를 부르고
+ * (반 이닝 넘김 0xb6b6c 보다 먼저), 참이면 그 자리에서 고리가 멈춘다 — 말 공격 중의 끝내기(9회 이후 홈이 앞서는 타석)와
+ * 콜드(7회 이후 — 말 공격 중 홈 10점 차 · 초 3아웃 뒤 홈 10점 차 · 말 3아웃 뒤 원정 10점 차)가 3아웃을 기다리지 않는다.
+ * 반 이닝 엔진에 `endsGame`(= `isGameOverAt`)을 넘겨 타석마다 끊는다.
  */
 
 export interface LeagueMatchup {
@@ -720,7 +723,11 @@ export function simulateLeagueGame(
       inning,
       random,
       undefined,
-      undefined,
+      // 0xc2198 c21d6 — 타석마다 경기 끝 판정 0xb68fc
+      {
+        endsGame: ({ runs, outs }) =>
+          isGameOverAt({ inning, half: '초', outs, awayScore: awayRuns + runs, homeScore: homeRuns }),
+      },
       defenseOf(matchup.home, homeMound, homeRuns - awayRuns, homeStaminas, homeAcePitcher, homePitcherOrder, extras?.abilityContext, homeRecord),
       { lineup: awayLineup, batterOf: awayBatterOf, pinchHitUsed, isAceRosterSlot },
     )
@@ -742,8 +749,8 @@ export function simulateLeagueGame(
     collect(matchup.away, top, awayRecord)
     charge(matchup.home, top)
 
-    // 홈이 이미 앞서 있으면 9회말은 치르지 않는다
-    if (inning >= REGULAR_INNINGS && homeRuns > awayRuns) break
+    // 0xb68fc 가 끝을 냈으면(초 3아웃 뒤 — 9회 이후 홈이 앞섬 · 7회 이후 홈 10점 차) 말은 치르지 않는다
+    if (top.gameEnded === true) break
 
     awayMound = resynced(awayMound, awayStaminas)
     const bottom = simulateHalfInning(
@@ -753,7 +760,10 @@ export function simulateLeagueGame(
       inning,
       random,
       undefined,
-      undefined,
+      {
+        endsGame: ({ runs, outs }) =>
+          isGameOverAt({ inning, half: '말', outs, awayScore: awayRuns, homeScore: homeRuns + runs }),
+      },
       defenseOf(matchup.away, awayMound, awayRuns - homeRuns, awayStaminas, awayAcePitcher, awayPitcherOrder, extras?.abilityContext, awayRecord),
       { lineup: homeLineup, batterOf: homeBatterOf, pinchHitUsed, isAceRosterSlot },
     )
@@ -775,7 +785,7 @@ export function simulateLeagueGame(
     collect(matchup.home, bottom, homeRecord)
     charge(matchup.away, bottom)
 
-    if (inning >= REGULAR_INNINGS && awayRuns !== homeRuns) break
+    if (bottom.gameEnded === true) break
   }
 
   /**

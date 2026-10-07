@@ -9,6 +9,8 @@ import {
   applyAtBatOutcome,
   applyOpponentInning,
   createGame,
+  endSituationOf,
+  isGameOverAt,
   PLAYER_BATTING_ORDER_INDEX,
   PLAYER_SIDE_LAST_BAT,
   isPlayerTurn,
@@ -1385,7 +1387,11 @@ function playOpponentInning(progress: GameProgress, random: RandomPort): GamePro
     progress.game.inning,
     random,
     { strikeoutCombo: progress.pitching.strikeoutCombo, strikeouts: progress.pitching.strikeouts },
-    {},
+    // 자동진행도 타석마다 0xc2198 → 경기 끝 판정 0xb68fc — 상대가 홈(말)이면 끝내기 · 홈 10점 콜드에서 3아웃 전에 멈춘다
+    {
+      endsGame: ({ runs, outs }) =>
+        isGameOverAt(endSituationOf({ ...progress.game, opponentScore: progress.game.opponentScore + runs }, outs)),
+    },
     // 우리 투수도 CPU 가 던진다 — 타석마다 0xc1ba4 → 0xac428 교체, 투구마다 0xa5e14 소모
     quickDefenseOf(
       progress.ourTeamId,

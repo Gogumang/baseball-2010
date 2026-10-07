@@ -17,6 +17,43 @@ const COLD_GAME_MARGIN = BALANCE.coldGame.margin
 export const BATTING_ORDER_SIZE = 9
 export const OUTS_PER_HALF_INNING = 3
 
+/** 경기 끝 판정 0xb68fc 가 보는 칸 — 이닝(1부터) · 공격 반(state[9]) · 아웃(state[6]) · 두 팀 점수(st+0x7e 원정 · +0x7f 홈) */
+export interface GameEndSituation {
+  readonly inning: number
+  readonly half: InningHalf
+  readonly outs: number
+  readonly awayScore: number
+  readonly homeScore: number
+}
+
+/**
+ * **경기 끝 판정 0xb68fc 그대로** (직접 뜬 것). CPU 끼리 경기 고리(0xc2a48 등 `do 0xc262c while 0xc2198`)와
+ * 사람 경기의 자동진행은 **타석(0xc262c 한 번 = 타자가 바뀔 때까지의 공 고리)마다** 0xc2198 머리 c21d6 에서 이것을 본다 —
+ * 3아웃이 된 타석 뒤에도 반 이닝 넘김 0xb6b6c(c21fc)보다 먼저다.
+ * ```
+ * b691e  이닝 index(st+0x6b) ≥ st+0x69(8):
+ * b6928    말: 아웃 > 2 → 점수가 다르면 끝(b6934) ; 아웃 ≤ 2 → 홈 > 원정이면 끝(b6942 — 끝내기)
+ * b693a    초: 아웃 > 2 → 홈 > 원정이면 끝 ; 아웃 ≤ 2 → 아님
+ * b694c  이닝 index > 5 (콜드):
+ * b6956    말: 아웃 > 2 && 원정 ≥ 홈 + 10 → 끝 ; 그리고(아웃과 무관하게) b6976 홈 ≥ 원정 + 10 → 끝
+ * b696e    초: 아웃 ≤ 2 → 아님 ; 아웃 > 2 → b6976 홈 ≥ 원정 + 10 → 끝
+ * ```
+ * 곧 **초 공격 중에는 콜드가 없다** — 원정이 10점 앞서도 말 3아웃(b6962)까지 간다. 말 공격 중의 홈 10점 차만 곧바로 끝난다.
+ */
+export function isGameOverAt(situation: GameEndSituation): boolean {
+  const { inning, half, outs, awayScore, homeScore } = situation
+  const threeOuts = outs >= OUTS_PER_HALF_INNING
+  if (inning >= INNINGS_PER_GAME) {
+    if (half === '말' && (threeOuts ? awayScore !== homeScore : homeScore > awayScore)) return true
+    if (half === '초' && threeOuts && homeScore > awayScore) return true
+  }
+  if (inning >= COLD_GAME_FROM_INNING) {
+    if (half === '말' && threeOuts && awayScore >= homeScore + COLD_GAME_MARGIN) return true
+    if ((half === '말' || threeOuts) && homeScore >= awayScore + COLD_GAME_MARGIN) return true
+  }
+  return false
+}
+
 /** 타순을 따로 주지 않을 때의 플레이어 타순 칸(3번). 나만의리그는 커리어 타순을 쓴다. */
 export const PLAYER_BATTING_ORDER_INDEX = 2
 
@@ -135,45 +172,36 @@ export function applyAtBatOutcome(
     battingOrderIndex: (game.battingOrderIndex + 1) % BATTING_ORDER_SIZE,
   }
 
-  // 끝내기 — **말 공격 중인 홈팀**이 마지막 이닝 이후 앞서는 순간 끝난다.
-  // 사람이 선공(측 0)이면 우리 공격은 초라 끝내기가 성립하지 않는다.
-  const isWalkOff =
-    game.half === '말' &&
-    game.inning >= INNINGS_PER_GAME &&
-    homeScoreOf(afterAtBat) > awayScoreOf(afterAtBat)
-  if (isWalkOff) return { ...afterAtBat, isFinished: true }
-  // 콜드게임은 공격 중에는 **아웃 수와 무관하게 타석마다** 본다 (0xb6976 — 직접 디스어셈해 확인).
-  // 원본은 공격 중인 팀이 10점 차로 달아나는 순간 바로 끝낸다. 3아웃까지 기다리지 않는다.
-  if (isColdGame(afterAtBat)) return { ...afterAtBat, isFinished: true }
-  if (outs < OUTS_PER_HALF_INNING) return afterAtBat
+  // 타석마다 경기 끝 판정 0xb68fc (`isGameOverAt`) — 3아웃 전에는 말 공격 중의 끝내기(9회 이후 홈 > 원정)와
+  // 콜드(7회 이후 홈 ≥ 원정 + 10)만 선다. 초 공격 중에는 원정이 10점 앞서도 끝나지 않는다(b696e) — 예전 웹은 공격 중인
+  // 우리가 10점 앞서면 초에도 끝냈다. 3아웃이면 아래 반 이닝 넘김이 같은 판정을 아웃 3 으로 본다
+  if (outs < OUTS_PER_HALF_INNING) {
+    return isGameOverAt(endSituationOf(afterAtBat)) ? { ...afterAtBat, isFinished: true } : afterAtBat
+  }
   return game.half === '초' ? endTopHalf(afterAtBat) : endBottomHalf(afterAtBat)
 }
 
-/** 7회 이후 **공격 중인 우리**가 10점 앞서 있는가 (0xb6976). 공격 중이면 매 타석 본다 */
-function isColdGame(game: GameState): boolean {
-  return game.inning >= COLD_GAME_FROM_INNING && game.ourScore - game.opponentScore >= COLD_GAME_MARGIN
+/** 경기 상태를 0xb68fc 가 보는 칸으로 — 측으로 원정 · 홈 점수를 가른다. `outs` 를 주면 그 아웃 수로 본다 */
+export function endSituationOf(game: GameState, outs = game.outs): GameEndSituation {
+  return { inning: game.inning, half: game.half, outs, awayScore: awayScoreOf(game), homeScore: homeScoreOf(game) }
 }
 
 /**
- * 초가 끝났다 — 마지막 이닝 이후 홈팀이 앞서면 말 공격 없이 끝난다.
+ * 초가 끝났다 — 0xb68fc 를 아웃 3 으로: 마지막 이닝 이후 홈팀이 앞서면 말 공격 없이 끝난다.
  * 7회 이후 홈팀이 10점 앞서 있으면 콜드다. (측과 무관하게 홈·원정 점수로 본다)
  */
 function endTopHalf(game: GameState): GameState {
-  const home = homeScoreOf(game)
-  const away = awayScoreOf(game)
-  const isOver =
-    (game.inning >= INNINGS_PER_GAME && home > away) ||
-    (game.inning >= COLD_GAME_FROM_INNING && home - away >= COLD_GAME_MARGIN)
+  const isOver = isGameOverAt(endSituationOf(game, OUTS_PER_HALF_INNING))
 
   return { ...game, half: '말', outs: 0, bases: EMPTY_BASES, isFinished: isOver }
 }
 
-/** 말 3아웃 — 마지막 이닝 이후 동점이 아니면 끝, 동점이면 상한 없이 연장(0xb6934). 7회 이후 원정팀이 10점 앞서면 콜드 */
+/**
+ * 말 3아웃 — 0xb68fc 를 아웃 3 으로: 마지막 이닝 이후 동점이 아니면 끝, 동점이면 상한 없이 연장(0xb6934).
+ * 7회 이후 어느 쪽이든 10점 앞서면 콜드(b6962 원정 · b6976 홈 — 상대가 홈이면 그 반 이닝 끝에 홈 10점 차도 끝이다)
+ */
 function endBottomHalf(game: GameState): GameState {
-  const isTied = game.ourScore === game.opponentScore
-  const isLastInning =
-    (game.inning >= INNINGS_PER_GAME && !isTied) ||
-    (game.inning >= COLD_GAME_FROM_INNING && awayScoreOf(game) - homeScoreOf(game) >= COLD_GAME_MARGIN)
+  const isLastInning = isGameOverAt(endSituationOf(game, OUTS_PER_HALF_INNING))
 
   return {
     ...game,
