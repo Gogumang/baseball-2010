@@ -264,11 +264,25 @@ describe('시즌정보 0xcd → 선수정보(0xdf 목적 2) → 카드 0xd9 ↔ 
     expect(screen.getByRole('button', { name: '선수정보' })).toBeTruthy()
   })
 
-  it('기록순위는 웹에 화면이 없어 "아직 없음" 으로 막고 0xcd 에 남는다', () => {
+  it('기록순위 — 창 0x80 은 타자기록에서 열리고 좌우로 뒤집는다 · 취소는 창만 닫는다 · 확인은 0xdb', () => {
     띄우기()
     fireEvent.click(screen.getByRole('button', { name: '기록순위' }))
-    expect(알림글()).toContain('0xdb')
-    fireEvent.click(screen.getByRole('button', { name: 'OK' }))
+    expect(screen.getByRole('dialog', { name: '기록순위' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '타자기록' }).getAttribute('aria-pressed')).toBe('true')
+    키('Escape')
+    expect(screen.queryByRole('dialog', { name: '기록순위' })).toBeNull()
+    expect(screen.getByRole('button', { name: '선수정보' })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: '기록순위' }))
+    키('ArrowRight')
+    expect(screen.getByRole('button', { name: '투수기록' }).getAttribute('aria-pressed')).toBe('true')
+    키('Enter')
+    expect(screen.getByRole('group', { name: '기록순위 투수 방어율' })).toBeTruthy()
+    키('ArrowLeft') // 쪽 0 에서 멈춘다
+    expect(screen.getByRole('group', { name: '기록순위 투수 방어율' })).toBeTruthy()
+    키('ArrowRight')
+    expect(screen.getByRole('group', { name: '기록순위 투수 승' })).toBeTruthy()
+    키('Escape')
     expect(screen.getByRole('button', { name: '선수정보' })).toBeTruthy()
   })
 

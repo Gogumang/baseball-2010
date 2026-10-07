@@ -9,8 +9,10 @@ import {
   seasonAwardRewardOf, seasonMvpResultEventId, seasonTitleResultEventId,
   SeasonMatchInfoScreen, seasonMatchInfoLines, DayResultBoardScreen,
   SeasonPlayerPickScreen, SeasonPlayerCardScreen, seasonCardAbilitiesOf, seasonPlayerDetailViewOf,
-  SeasonTeamInfoScreen, seasonTeamInfoRowsOf, SeasonOwnedItemsScreen,
+  SeasonTeamInfoScreen, seasonTeamInfoRowsOf, SeasonOwnedItemsScreen, SeasonRecordPickPopup, SeasonRecordRankScreen,
 } from '@/pages/season'
+import { moveRankingPage, rankSeasonRecords, rankingCategoriesOf } from '@/entities/season-mode/model/seasonRecordRanking'
+import type { SeasonRankingSide } from '@/entities/season-mode/model/seasonRecordRanking'
 import { fillModeText } from '@/widgets/season/lib/seasonText'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { AceSelectScreen } from '@/pages/general-mode'
@@ -153,8 +155,10 @@ export function SeasonRoute({
 
   /** 아이템 메뉴에서 고른, 웹에 아직 없는 창 종류 (`[win+0x1a4]`) */
   const [missingWindow, setMissingWindow] = useState<ItemWindowKind | null>(null)
-  /** 시즌정보(0xcd)에서 고른, 웹에 아직 없는 화면 — 원본 상태·창 이름 */
-  const [missingScreen, setMissingScreen] = useState<string | null>(null)
+  /** 기록순위 창 0x80 — this+0x16c (1 타자기록 · 0 투수기록). 0x9008 칸 3 이 1 로 열고, null 이면 창이 없다 */
+  const [recordPick, setRecordPick] = useState<SeasonRankingSide | null>(null)
+  /** 0xdb 목록 — 창에서 고른 쪽과 ed+0x444(종류표의 쪽). 0x5761c 가 들어올 때마다 쪽 0 으로 만든다 */
+  const [recordRank, setRecordRank] = useState<{ readonly side: SeasonRankingSide; readonly page: number }>({ side: '타자', page: 0 })
   /** 0xdf 목적 1 에서 나리 선수를 고르면 뜨는 StrMODE[220] 알림 (0xbbef9(…, 1, 1, 1) — 상태는 0xdf 그대로) */
   const [pickNotice, setPickNotice] = useState<string | null>(null)
   /**
@@ -188,18 +192,6 @@ export function SeasonRoute({
           text={`이 화면은 아직 없습니다 (장면 0xdc 창 종류 ${missingWindow})`}
           buttons={['OK']}
           onAnswer={() => setMissingWindow(null)}
-        />
-      </RawScreen>
-    )
-  }
-
-  if (missingScreen !== null) {
-    return (
-      <RawScreen>
-        <MessageBox
-          text={`이 화면은 아직 없습니다 (${missingScreen})`}
-          buttons={['OK']}
-          onAnswer={() => setMissingScreen(null)}
         />
       </RawScreen>
     )
@@ -615,11 +607,44 @@ export function SeasonRoute({
     )
   }
 
-  // 시즌정보 0xcd — 네 칸 하위 메뉴 (키 0x9008). 기록순위 창(0x80 → 0xdb)은 웹에 아직 없다
+  // 기록순위 0xdb (들어옴 0x56fc → 0x5761c · 키 0x74c4 → 0x5787c · 그림 0xafa8 → 0x5796c)
+  if (scene === SEASON_SCENE_STATE.기록순위) {
+    const category = rankingCategoriesOf(recordRank.side)[recordRank.page] ?? rankingCategoriesOf(recordRank.side)[0]
+    // 순위 객체 0x9d789(…, 종류, 모드 2, 큰쪽 1, 고정문턱 0) — 열 팀 레코드를 훑는다. 규정 문턱은 SR+0xb2 경기 수
+    const entries = rankSeasonRecords(
+      seasonLeagueRecordsOf(leagueRecordSourceOf(), recordRank.side === '투수'), category.kind, state.record.games,
+    )
+    return (
+      <SeasonRecordRankScreen
+        side={recordRank.side}
+        page={recordRank.page}
+        entries={entries}
+        myTeamId={state.record.teamId}
+        gamePoint={session.gamePoints}
+        onMovePage={(step) => setRecordRank((held) => ({ ...held, page: moveRankingPage(held.side, held.page, step) }))}
+        onBack={() => actions.goto(SEASON_SCENE_STATE.시즌정보)}
+      />
+    )
+  }
+
+  // 시즌정보 0xcd — 네 칸 하위 메뉴 (키 0x9008)
   if (scene === SEASON_SCENE_STATE.시즌정보) {
     return (
       <SeasonInfoScreen
         state={state}
+        isKeyEnabled={recordPick === null}
+        overlay={recordPick === null ? undefined : (
+          <SeasonRecordPickPopup
+            side={recordPick}
+            onToggle={() => setRecordPick((held) => (held === '타자' ? '투수' : '타자'))}
+            onConfirm={() => {
+              setRecordRank({ side: recordPick, page: 0 })
+              setRecordPick(null)
+              actions.goto(SEASON_SCENE_STATE.기록순위)
+            }}
+            onCancel={() => setRecordPick(null)}
+          />
+        )}
         // 메뉴 객체 this+0x74 의 커서 — 관리 메뉴에서 들어오면 0 (0x4d58), 하위 화면에서 돌아오면 남는다
         cursor={session.menuCursors.seasonInfo}
         onCursorChange={(index) => actions.moveMenuCursor('seasonInfo', index)}
@@ -627,7 +652,8 @@ export function SeasonRoute({
           const { action } = entry
           // 칸 0 구단정보 0xd5 · 칸 1 아이템 0xd6
           if (action.kind === '상태') return actions.goto(action.target)
-          if (action.kind === '기록순위창') return setMissingScreen('시즌정보 기록순위 — 창 0x80 → 상태 0xdb')
+          // 칸 3 — this+0x16c = 1(타자기록) · 창 0x80
+          if (action.kind === '기록순위창') return setRecordPick('타자')
           // 칸 2 — this+0x110 = 2 · 0xdf. 이전 상태가 0xcd 라 탭은 1(투수)
           setPlayerPick({ purpose: PLAYER_PICK_PURPOSE.선수정보, tab: ENTRY_TAB.투수, cursor: 0 })
           actions.goto(SEASON_SCENE_STATE.선수고르기)

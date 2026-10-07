@@ -29,9 +29,9 @@ import type { SeasonSceneState } from '@/entities/season-mode/model/seasonStateM
  *         확인(−5 / '5') → 창 닫기 · 상태 0xdb          ; 기록 목록 (갱신 0x56fc · 키 0x74c4 → 0xcd)
  * ```
  * 구단정보 0xd5 는 `pages/season/ui/SeasonTeamInfoScreen`(카드 0x7ba44 팀 갈래 0x7bf9c + 정보 칸 0x7c450),
- * 아이템 0xd6 은 `SeasonOwnedItemsScreen`(아이템 창 0x8453c 종류 5 — 보유 서브아이템 보기).
- * ⚠️ 미해결: 기록순위 창의 두 칸 그림과 0xdb 목록(0x5796c 계열)은 웹에 아직 없다.
- * 칸을 고르면 부르는 쪽이 "아직 없음" 으로 막는다.
+ * 아이템 0xd6 은 `SeasonOwnedItemsScreen`(아이템 창 0x8453c 종류 5 — 보유 서브아이템 보기),
+ * 기록순위는 `SeasonRecordPickPopup`(창 0x80) → `SeasonRecordRankScreen`(0xdb, 리그 개인 순위표 0x9d789 · 그림 0x5796c).
+ * ⚠️ 미해결: 기록순위 창 칸 그림 0x858fd(6 / 10)의 그림 묶음.
  */
 
 /** 0x9008 의 칸 → 하는 일 */

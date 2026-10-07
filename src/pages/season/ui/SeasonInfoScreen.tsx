@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { RawScreen } from '@/shared/ui'
 import type { SeasonState } from '@/entities/season-mode/model/seasonRecord'
 import { SEASON_INFO_MENU } from '@/widgets/season/lib/seasonInfoMenu'
@@ -19,6 +20,10 @@ export interface SeasonInfoScreenProps {
    */
   readonly cursor?: number
   readonly onCursorChange?: (index: number) => void
+  /** 팝업(기록순위 창 0x80)이 떠 있으면 메뉴는 키를 안 받는다 (0x9008 머리 `[this+0xc0]+0x99`) */
+  readonly isKeyEnabled?: boolean
+  /** 메뉴 위에 얹을 팝업 */
+  readonly overlay?: ReactNode
 }
 
 /**
@@ -30,7 +35,9 @@ export interface SeasonInfoScreenProps {
  * 머리띠 0x7f4ec)이라 하위 메뉴 칸은 커맨드 줄 위에 img_text 글 그림으로 뜬다. 웹은 다른 시즌 하위 메뉴(아이템 0xd0)와
  * 같이 공용 판 목록에 칸 글을 적는다.
  */
-export function SeasonInfoScreen({ state, onSelect, onBack, cursor: heldCursor, onCursorChange }: SeasonInfoScreenProps) {
+export function SeasonInfoScreen({
+  state, onSelect, onBack, cursor: heldCursor, onCursorChange, isKeyEnabled = true, overlay,
+}: SeasonInfoScreenProps) {
   const rows: readonly SeasonListRow[] = SEASON_INFO_MENU.map((entry) => ({ id: entry.label, label: entry.label }))
 
   const select = (index: number) => {
@@ -39,7 +46,7 @@ export function SeasonInfoScreen({ state, onSelect, onBack, cursor: heldCursor, 
     onSelect(entry, index)
   }
   const { cursor, moveTo } = useSeasonCursor({
-    count: rows.length, onSelect: select, onCancel: onBack,
+    count: rows.length, onSelect: select, onCancel: onBack, isEnabled: isKeyEnabled,
     ...(heldCursor === undefined ? {} : { cursor: heldCursor }),
     ...(onCursorChange === undefined ? {} : { onCursorChange }),
   })
@@ -55,6 +62,7 @@ export function SeasonInfoScreen({ state, onSelect, onBack, cursor: heldCursor, 
         onBack={onBack}
       />
       <SeasonStatusBar record={state.record} teamMorale={state.teamMorale} />
+      {overlay}
     </RawScreen>
   )
 }

@@ -45,6 +45,10 @@ export type { TeamInfoRow, TeamInfoValue } from '@/pages/season/lib/seasonTeamIn
 export { SeasonOwnedItemsScreen } from '@/pages/season/ui/SeasonOwnedItemsScreen'
 export type { SeasonOwnedItemsScreenProps } from '@/pages/season/ui/SeasonOwnedItemsScreen'
 
+/** 시즌정보 칸 3 기록순위 — 창 0x80(타자기록·투수기록) → 0xdb 리그 개인 순위표(0x5796c) */
+export { SeasonRecordPickPopup, SeasonRecordRankScreen } from '@/pages/season/ui/SeasonRecordRankScreen'
+export type { SeasonRecordPickPopupProps, SeasonRecordRankScreenProps } from '@/pages/season/ui/SeasonRecordRankScreen'
+
 /** 공용 선수 고르기 0xdf (목적 1·2) → 선수 카드 0xd9 ↔ 능력치 상세 창 0xda (글 0x897e8) */
 export { SeasonPlayerPickScreen } from '@/pages/season/ui/SeasonPlayerPickScreen'
 export type { SeasonPlayerPickScreenProps } from '@/pages/season/ui/SeasonPlayerPickScreen'
