@@ -7,6 +7,7 @@ import {
   landingPointOf,
   launchTrajectory,
   MAXIMUM_TRAJECTORY_POINTS,
+  spliceTrajectory,
   trajectoryWithRandom,
 } from '@/entities/batting/model/battedBallFlight'
 import { BATTED_BALL_PATTERNS } from '@/shared/config/original/battedBallPatterns'
@@ -183,6 +184,20 @@ describe('타구 궤적 — 원본 세계 0xbfed0 (공 vtable 0xd7afc)', () => {
     expect(궤적.landingTick).toBe(1)
     // cos16(0) = 65535 → (65535·300) >> 16 = 299 · 바운드 0xa292c(+0x39): +0x48 = 180·50/100 = 90 · 속도 300·75/100 = 225
     expect(궤적.pointDetailAt(1)).toMatchObject({ x: 20_299, y: 0, verticalSpeed: 90, speed: 225 })
+  })
+
+  it('다시 쏜 공은 그 틱부터 새 궤적의 0 번 점이다 — 사건 틱은 새 것, 이미 떨어진 공의 낙구는 그대로 (0xb3148 · b12da)', () => {
+    const 앞 = battedBallTrajectory(BATTED_BALL_PATTERNS[4][0]) // 낙구 4
+    const 새 = launchTrajectory({ from: 앞.pointAt(12), speed: 300, verticalSpeed: 87, angle: -92, body: 앞.flight.body })
+    const 이음 = spliceTrajectory(앞, 12, 새)
+
+    expect(이음.pointAt(11)).toEqual(앞.pointAt(11))
+    expect(이음.pointAt(12)).toEqual(새.pointAt(0))
+    expect(이음.pointAt(13)).toEqual(새.pointAt(1))
+    expect(이음.landingTick).toBe(앞.landingTick)
+    expect(이음.fenceTick).toBe(-1)
+    expect(이음.length).toBe(12 + 새.length)
+    expect(이음.isStoppedAt(12 + 새.length - 1)).toBe(true)
   })
 
   it('세기가 크면 더 멀리 간다', () => {

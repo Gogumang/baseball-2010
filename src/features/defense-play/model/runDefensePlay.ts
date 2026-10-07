@@ -1,5 +1,11 @@
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
-import { battedBallTrajectory, trajectoryWithRandom } from '@/entities/batting/model/battedBallFlight'
+import {
+  battedBallTrajectory,
+  isBallTrajectory,
+  launchTrajectory,
+  spliceTrajectory,
+  trajectoryWithRandom,
+} from '@/entities/batting/model/battedBallFlight'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
@@ -179,15 +185,13 @@ export interface DefensePlayInput {
    */
   readonly buntKind?: number
   /**
-   * **이 타구는 잡히지 않는다** — 필살타법이 성공한 타구 (0x51800, S13 6절 확정).
+   * **첫 야수가 쥐지 못하는 타구** — 필살타법이 성공한 타구 (0x51800, S13 6절 확정).
    *
    * 원본은 확률 굴림에 성공하면 공 객체(`[경기+0x204]`)의 속성 목록 `+0x5c` 에
-   * `0xaf180(목록, 4, 0, −1)` 로 **비트 4 = 송구공 표시**를 단다. 야수는 포구 틱에 그 비트를 보고
-   * 메시지 `0xbc3`(받음)만 보낸 뒤 **쥐기(0xb2710)로 가지 않고**, 그 `0xbc3` 은 전용 처리기가
-   * 아예 없다(P2 2b 181행 · S8 4절). 결국 그 타구는 아무도 잡지 못한다.
-   *
-   * ⚠️ 비트를 읽는 쪽(`0xb425c`)은 궤적 물리 루프(`0xb401c` 계열) 안이라 해독 금지 구역이다 —
-   * 이미 공개된 두 노트의 읽기만 근거로 삼았고 물리식은 건드리지 않았다.
+   * `0xaf180(목록, 4, 0, −1)` 로 **비트 4 = 송구공 표시**를 단다. 야수는 포구 틱에 그 비트를 보고(0xb41c6)
+   * 메시지 `0xbc3`(받음)만 보낸 뒤 **쥐기(0xb2710)로 가지 않고** 사건(sp+0x24) = 1 이 된다(b4250). 그 `0xbc3` 은
+   * 전용 처리기가 없고, 틱 끝 b45a0 의 사건 갈래가 플레이.vt70 = 0xb3148 로 공을 그 야수에게서 튕겨 다시 쏜다 —
+   * 다시 쏜 공은 0xa2610 이 속성 목록을 비워 보통 공이라 새 예보의 야수가 줍는다 (`relaunchFromFielder`).
    */
   readonly isUncatchable?: boolean
   /**
@@ -618,17 +622,17 @@ const BATTED_BALL_PLAY_KIND = 1
 export interface DefensePlayState {
   // ── 시작할 때 정해지는 것 ──
   readonly input: DefensePlayInput
-  readonly trajectory: BattedBallTrajectory
+  trajectory: BattedBallTrajectory
   readonly abilities: readonly number[]
   readonly maximumTicks: number
   /** 아무도 잡지 못하는 타구인가 (필살타법 0x51800) */
-  readonly uncatchable: boolean
+  uncatchable: boolean
   /** 뜬 채로 잡히는 타구인가 */
-  readonly onTheFly: boolean
+  onTheFly: boolean
   /** 공을 쫓는 야수 칸 */
-  readonly chaserSlot: number
+  chaserSlot: number
   /** 포구 지점 — 펌블로 포구 틱이 밀려도 **자리는 그대로다** (⚠️ 원본 그대로) */
-  readonly catchPoint: WorldPoint
+  catchPoint: WorldPoint
   /** 루 커버 배정 (0xd85a8 + 0xb1e24) */
   readonly covers: readonly number[]
   readonly defenseIsCpu: boolean
@@ -945,13 +949,14 @@ export function stepDefensePlay(
   if (isDefensePlayFinished(state)) return state
 
   const input = state.input
-  const trajectory = state.trajectory
+  // 펌블 · 필살타법 타구가 야수에게 맞고 튕기면(0xb3148) 판 도중 새 궤적 · 새 추적야수가 된다 — 그래서 let
+  let trajectory = state.trajectory
   const abilities = state.abilities
   const maximumTicks = state.maximumTicks
-  const uncatchable = state.uncatchable
-  const onTheFly = state.onTheFly
-  const chaserSlot = state.chaserSlot
-  const catchPoint = state.catchPoint
+  let uncatchable = state.uncatchable
+  let onTheFly = state.onTheFly
+  let chaserSlot = state.chaserSlot
+  let catchPoint = state.catchPoint
   const defenseIsCpu = state.defenseIsCpu
   // 0xae690([장면+0x214], 설정+0xbd) — 공격이 CPU 거나 주루 설정이 자동이면 자동 진루 제어기가 돈다.
   // 안 넘기면 원본 기본값(자동)이라 지금까지와 똑같이 논다.
@@ -1007,6 +1012,8 @@ export function stepDefensePlay(
   let foulFlag = state.foulFlag
   let homeRunFlag = state.homeRunFlag
   let groundRuleFlag = state.groundRuleFlag
+  /** sp+0x24 — 이번 틱 포구 틱의 사건(펌블 0xbc2 · 송구공 받음 0xbc3). 서면 틱 끝 b45a4 가 플레이.vt70 = 0xb3148 */
+  let ballEventThisTick = false
 
   const contextAt = (at: number): DefenseContext => ({
     play,
@@ -1341,6 +1348,70 @@ export function stepDefensePlay(
   }
 
   /**
+   * **플레이.vt70 = 0xb3148 — 공을 야수에게서 튕겨 다시 쏜다** (직접 뜬 것). 틱 끝 b45a0 이 사건(sp+0x24)이면 부른다.
+   * ```
+   * b3148 p = 공.vt60(지금 점) ; 속도 = max(p.속도·60/100, 300) · v0 = min(p.수직속도·30/100, 100) · 각 = p.각 + rand(−20, 20)
+   * b31c8 f = 0xb0c90(+0x130 공 가진 야수) ; f+0xb4 ≤ 0 && !f+0xbc 면 f.vt10
+   * b3200 0xbef58(공, f 위치) · 공.vt44(속도, v0, 각) · 메시지 0x12 → 세계 0xbfed0 (궤적 다시 깔기, 0x51f2e)
+   * b323c state[0x1f] = 0 · (파울이면 state[0x1c] 다시) · state[0x20] = aa4 · state[0x80] = ab0 · +0x12c = 0
+   * b3294 vt24(1) = 0xb12d0 예보(공+0x68 = 0 — b12da) · vt34 = 0xb3b38 고르기 · vt30 = 0xb1c90 커버
+   * ```
+   * 무작위 방향으로 튀기는 vt78 = 0xb32e8 은 부르는 곳을 못 찾았다(vtable 0xd8690 외 참조 없음) — 펌블도 이 0xb3148 이다.
+   * 다시 쏜 공은 속성 목록 +0x5c 가 0xa2610 에서 비워져 필살타법 표시(비트 4)가 없는 보통 공이다.
+   */
+  const relaunchFromFielder = (): void => {
+    if (trajectory.pointDetailAt === undefined) {
+      // 손으로 만든 시험 궤적 — 원본 점 칸이 없어 다시 쏠 수 없다. 공은 그 자리에 둔다
+      log.push(`${tick}틱 공 튕김 — 궤적 칸이 없어 다시 쏘지 않는다`)
+      return
+    }
+    const point = trajectory.pointDetailAt(tick)
+    const speed = Math.max(Math.trunc((point.speed * 60) / 100), 300)
+    const verticalSpeed = Math.min(Math.trunc((point.verticalSpeed * 30) / 100), 100)
+    // rand(−20, 20) — 난수가 없으면 굴리지 않고 0 (이 진행기의 규약)
+    const turn = input.random === undefined ? 0 : randomIntegerBelow(input.random, -20, 20)
+    const holder = fielders[chaserSlot]
+    const next = launchTrajectory({
+      from: holder.position,
+      speed,
+      verticalSpeed,
+      angle: point.angle + turn,
+      random: input.random,
+      body: isBallTrajectory(trajectory) ? trajectory.flight.body : undefined,
+    })
+    trajectory = spliceTrajectory(trajectory, tick, next)
+    uncatchable = false
+    onTheFly = false
+    // vt24(1) — 예보는 새 궤적 t = 1 → 끝 · 추적야수(+0x130 = f)는 t ≤ 4 를 건너뛴다. 낙구 구간으로 자르지 않는다
+    const forecast = forecastCatch(next, fielders, { from: 0, to: Number.POSITIVE_INFINITY }, {
+      initialChaserSlot: chaserSlot,
+    })
+    chaserSlot = forecast.choice.slot
+    catchTick = Math.max(tick, Math.min(tick + forecast.choice.catchTick, maximumTicks))
+    catchPoint = next.pointAt(catchTick - tick)
+    fielders = fielders.map((fielder) =>
+      fielder.slot === chaserSlot
+        ? { ...fielder, target: catchPoint, aiState: AI_STATE.CHASE, holdingBall: false }
+        : fielder.holdingBall
+          ? { ...fielder, holdingBall: false }
+          : fielder,
+    )
+    play = {
+      ...play,
+      held: false,
+      ballHolderSlot: chaserSlot,
+      catchFielderSlot: chaserSlot,
+      catchKind: forecast.choice.kind,
+      catchTick,
+      actionStartTick: tick + forecast.choice.actionStartTick,
+      earliestCatchTick: forecast.earliestCatchTick === NO_FORECAST_CATCH ? 0xffff : tick + forecast.earliestCatchTick,
+    }
+    log.push(
+      `${tick}틱 공 튕김 (0xb3148) — 속도 ${speed} · v0 ${verticalSpeed} · 각 ${point.angle + turn} · ${chaserSlot}번 야수가 ${catchTick}틱에 줍는다`,
+    )
+  }
+
+  /**
    * **CPU 송구 결정 0xafa60** — 플레이+0x128 이 서 있고 공 가진 야수가 준비됐을 때 점수식 0xafb24 로 루를 고르고
    * (홈이면 20% 특수 굴림), 0xb2c90 이 성공하면 +0x128 = 0. 공 가진 야수가 AI 8(협살)·9(미룬 송구)면 안 고른다.
    */
@@ -1487,7 +1558,13 @@ export function stepDefensePlay(
 
     // ── 1. 포구 ──
     // 필살타법 성공 타구(비트 4)는 야수가 쥐지 않고 지나친다 — 포구 자체를 건너뛴다 (0xaf180·0xbc3)
-    if (tick === catchTick && !uncatchable && input.random !== undefined && !fumbled) {
+    if (tick === catchTick && uncatchable) {
+      // 필살타법 타구 — 공 속성 목록 +0x5c 의 비트 4(0xaf180) 때문에 포구 틱 갈래가 쥐기 대신 메시지 0xbc3 · 사건(sp+0x24) = 1
+      // (b4250). 그 0xbc3 에는 처리기가 없고, 틱 끝 b45a4 의 사건 갈래가 공을 그 야수에게서 튕겨 다시 쏜다(0xb3148)
+      ballEventThisTick = true
+      log.push(`${tick}틱 ${chaserSlot}번 야수에게 필살타법 타구가 맞았다 (0xbc3)`)
+    }
+    if (tick === catchTick && !uncatchable && input.random !== undefined) {
       // 펌블 굴림 (0xb41d0) — **움직이는 공을 잡을 때마다** 걸린다(뜬공 직접 포구 포함).
       // 굴러와 멈춘 공을 줍는 것만 빠진다 — 공.vt18 = 0xa27f0(지금 점의 속도·수직 속도 워드 == 0 && 높이 0) 이 0 일 때만.
       // 손으로 만든 시험 궤적(원본 칸 없음)은 마지막 점을 멈춘 점으로 본다.
@@ -1495,18 +1572,13 @@ export function stepDefensePlay(
         trajectory.isStoppedAt === undefined ? tick < trajectory.length - 1 : !trajectory.isStoppedAt(tick)
       if (rollFumble(abilities[chaserSlot] ?? DEFAULT_ABILITY, ballIsMoving, input.random)) {
         fumbled = true
-        // 야수+0xb8 = 6(놓침 동작), 야수+0xb4 = 15(동작 잠금), 공은 야수 vt78 로 **무작위 튕김**.
-        // **근사 1**: 튕김 궤적은 만들지 않는다(궤적 물리 루프는 해독 금지 구역). 같은 자리에서
-        // 동작 잠금 15틱 뒤에 다시 줍는 것으로 본다 (R3 5절 동작 0xd = `+0xb4 = 15`).
-        // **근사 2**: 원본은 뜬공을 펌블하면 공이 땅에 닿아 타자주자 표시(+0x98)가 풀려 **뜬공 아웃이
-        // 사라진다**. 여기서는 타석 결과 코드가 이미 '아웃' 이라 그것을 뒤집으면 기록과 어긋난다 —
-        // 그래서 아웃은 그대로 두고 **시간만 잃는** 것으로 옮겼다 (주자들은 그사이 더 간다).
-        catchTick = Math.min(tick + FUMBLE_LOCK_TICKS, maximumTicks)
-        play = { ...play, catchTick, actionStartTick: catchTick }
-        log.push(`${tick}틱 ${chaserSlot}번 야수 펌블 — ${catchTick}틱에 다시 줍는다`)
+        // b4280: 야수+0xb8 = 6(놓침 동작) · 메시지 0xbc2 · 사건(sp+0x24) = 1 — 쥐지 않는다. 틱 끝 b45a4 가 플레이.vt70 = 0xb3148 로
+        // 공을 그 야수 자리에서 지금 점의 속도·각으로 다시 쏘고 새 예보로 줍는 야수를 다시 고른다(아래 `relaunchFromFielder`)
+        ballEventThisTick = true
+        log.push(`${tick}틱 ${chaserSlot}번 야수 펌블 (0xbc2)`)
       }
     }
-    if (tick === catchTick && !uncatchable) {
+    if (tick === catchTick && !uncatchable && !ballEventThisTick) {
       fielders = fielders.map((fielder) =>
         fielder.slot === chaserSlot
           ? {
@@ -2063,14 +2135,19 @@ export function stepDefensePlay(
     // 그래서 0x9d5bc 는 **판에 많아야 한 번** — 아무도 쥐기 전에 공이 떨어지거나 담장선을 넘는 그 틱에만 돈다.
     // (예전 미해결 메모의 "첫 포구 뒤 매 틱 0x9d5bc" 는 b4454 의 `+0x112 ≠ 0 → b4540` 을 놓친 것이었다.)
     // 굴러간 공의 포스(0xa95e8)도 이때 선다 — 웹은 예전에 포구 틱에 세웠다.
-    // ⚠️ 근사: 사건(sp+0x24)은 안 본다. 송구 받기는 늘 +0x112 가 선 뒤이고, 웹 펌블은 같은 자리에서 15틱 뒤 다시 줍는
-    //    근사라 뜬공을 펌블한 뒤에는 낙구 틱이 지나도 공이 안 떨어진 것으로 본다(원본은 vt78 로 튕긴 새 궤적의 낙구 —
-    //    궤적 루프).
+    // 사건(sp+0x24 = 펌블 0xbc2 · 필살타법 타구 0xbc3)이 있는 틱은 결과 코드를 안 내고(b44d6) 포스만 세운다(b44f8).
+    // 그 공은 틱 끝 0xb3148 이 다시 쏘아 새 궤적의 낙구 틱에 다시 이 절을 지난다.
     // 공+0xaa4 는 **담장(또는 파울 관중석) 위로 넘는** 충돌 첫 틱이다(0x9f7e8 의 +0x29/+0x2a → 0xa2bf0). 높이 ≤ 1999 에서
     // 담장 면에 맞은 공은 공+0xaa8(`wallTick`)로 따로 적혀 state[0x20] 이 안 선다. state[0x20] · [0x80] 은 타구 시작 511ea · 511f4 가
     // 미리 깐 궤적의 aa4 · ab0 를 통째로 옮긴 값이라, 낙구 틱의 0x9d5bc 도 아직 오지 않은 담장 넘김을 본다(원본 그대로).
     const overFenceTick = trajectory.fenceTick
-    if (!ballContacted && !(fumbled && onTheFly)) {
+    if (!ballContacted && ballEventThisTick) {
+      // b44f8 — 사건만으로도 +0x12b == 0 이면 포스(0xa95e8, 파울이면 0xa9620) · 0xa95c0. 결과 코드(b44d6)는 없다
+      const required = requiredBasesOnBounce(runners.map((runner) => runner.state))
+      runners.forEach((runner, index) => {
+        runner.state = { ...runner.state, requiredBase: required[index] }
+      })
+    } else if (!ballContacted) {
       let landedNow = false
       if (tick === overFenceTick && !foulFlag) {
         ballContacted = true
@@ -2120,6 +2197,9 @@ export function stepDefensePlay(
       cpuThrowDecision()
     }
 
+    // ── 6e. 틱 끝 b45a0 — 사건이 있었으면 플레이.vt70 = 0xb3148: 공을 그 야수에게서 튕겨 다시 쏜다 ──
+    if (ballEventThisTick) relaunchFromFielder()
+
     // ── 7. 보류 득점 풀기 (0xaa34c) ──
     // aa364 의 "진행 중인 주자" 도 0xaa05c 다 — +0x94(요구 루) 항까지 본다
     const stillActive = someRunnerStillActive(
@@ -2139,7 +2219,6 @@ export function stepDefensePlay(
     // 웹 쪽 규약 셋(근사):
     // - 타자주자의 아웃은 결과 코드 다리라 1루 송구 도착 틱(`batterOutTick`)에 적는다 — 그 틱까지는 "진행 중인 주자" 로 센다
     // - 악송구는 아무도 못 받는 것으로 옮겼다(궤적 루프) — 원본은 vt24 예보로 누가 주워 쥔다. 도착 틱 뒤로는 쥔 것으로 센다
-    // - 필살타법 타구(아무도 못 잡음)는 낙구 뒤로 쥔 것으로 센다 — 원본에서 그 공을 누가 줍는지는 궤적 루프 안이다
     const batterSettled = batterOutTick < 0 || tick >= batterOutTick
     const errantSettled = throwReceiverSlot === NONE && throwArrivalTick >= 0 && tick >= throwArrivalTick
     const gate = passPlayGate({
@@ -2151,7 +2230,7 @@ export function stepDefensePlay(
       homeRunFlag,
       poleHomeRunFlag: play.suppressed,
       liveRunnerCount: liveRunnerCountOf(runners.map((runner) => runner.state)),
-      ballHeld: play.held || errantSettled || (uncatchable && tick >= trajectory.landingTick),
+      ballHeld: play.held || errantSettled,
       groundRuleFlag,
       endCounter,
     })
@@ -2175,6 +2254,11 @@ export function stepDefensePlay(
   state.firstThrowArrivalTick = firstThrowArrivalTick
   state.batterOutTick = batterOutTick
   state.catchTick = catchTick
+  state.trajectory = trajectory
+  state.uncatchable = uncatchable
+  state.onTheFly = onTheFly
+  state.chaserSlot = chaserSlot
+  state.catchPoint = catchPoint
   state.fumbled = fumbled
   state.errantThrow = errantThrow
   state.autoBaserunning = autoBaserunning
@@ -2234,7 +2318,8 @@ export function defensePlayResultOf(state: DefensePlayState): DefensePlayResult 
     ticks: state.ticks,
     catchFielderSlot: state.chaserSlot,
     catchTick: state.catchTick,
-    isUncatchable: state.uncatchable,
+    // 필살타법으로 친 타구였나 — 첫 야수에게 맞고 튕긴 뒤로는 보통 공이 되지만(0xa2610 이 +0x5c 를 비운다) 결과는 친 공의 표시다
+    isUncatchable: state.input.isUncatchable === true,
     caughtOnTheFly: state.onTheFly,
     tagOut: state.tagOut,
     throwBase: state.firstThrowBase,
@@ -2268,8 +2353,6 @@ export function runDefensePlay(input: DefensePlayInput): DefensePlayResult {
 
 /** 예보 표가 비었을 때의 가장 이른 포구 틱 (플레이 +0x11c 초기값 0xffff — `forecastCatch`) */
 const NO_FORECAST_CATCH = 0xffff
-/** 펌블 뒤 동작 잠금 틱 — 야수+0xb4 = 15 (놓침 동작 0xd, R3 2-1) */
-const FUMBLE_LOCK_TICKS = 15
 /** 0xb2c90: 받는 야수까지 이 거리 이하면 던지지 않는다 */
 const MINIMUM_THROW_DISTANCE = 600
 

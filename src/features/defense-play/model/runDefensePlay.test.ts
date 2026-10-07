@@ -352,12 +352,26 @@ describe('확률 굴림은 난수를 줘야 돈다 — 펌블 · 악송구 · �
     expect(결과.laserThrow).toBe(false)
   })
 
-  it('난수가 늘 0 이면 펌블이 난다 — 동작 잠금 15틱만큼 포구가 늦어진다 (야수+0xb4 = 15)', () => {
+  it('펌블이 나면 쥐지 않고, 틱 끝 0xb3148 이 공을 그 야수 자리에서 다시 쏘아 새 예보로 줍는다 (b4280 · b45a4)', () => {
+    // 굴림 차례: 레이저 실패(0.9) → 펌블 성공(0) → 0xb3148 의 rand(−20, 20)(0.9 → +16)
+    const 결과 = 굴림포함(차례난수([0.9, 0, 0.9]))
+    const 보통 = play(땅볼아웃, EMPTY_BASES, 0)
+
+    expect(결과.fumbled).toBe(true)
+    expect(결과.log).toContain(`${보통.catchTick}틱 0번 야수 펌블 (0xbc2)`)
+    // 다시 쏜 공: 속도 max(지금 점 속도·60%, 300) · v0 min(30%, 100) · 각 + 16
+    const 튕김 = 결과.log.find((line) => line.includes('공 튕김'))
+    expect(튕김).toMatch(/^12틱 공 튕김 \(0xb3148\) — 속도 300 · v0 87 · 각 -92 · 0번 야수가 17틱에 줍는다$/)
+    expect(결과.catchTick).toBe(17)
+    expect(결과.log).toContain('17틱 0번 야수가 잡았다 (종류 0)')
+  })
+
+  it('늘 0 인 난수면 줍는 족족 펌블한다 — 원본도 포구 틱마다 굴린다(0xb41d0)', () => {
     const 결과 = 굴림포함(고정난수(0))
 
     expect(결과.fumbled).toBe(true)
-    expect(결과.log.some((line) => line.includes('펌블'))).toBe(true)
-    expect(결과.catchTick).toBe(play(땅볼아웃, EMPTY_BASES, 0).catchTick + 15)
+    expect(결과.log.filter((line) => line.includes('펌블')).length).toBeGreaterThan(1)
+    expect(결과.log.some((line) => line.includes('잡았다'))).toBe(false)
   })
 
   it('악송구가 나면 그 송구로는 아무도 못 잡는다 (0xa1828 — 방향이 틀어진다)', () => {
@@ -455,14 +469,17 @@ describe('사람 조작 — 상태 0x17 키 표 (I-controls 0·2b·2d·3b)', () 
       trajectory: battedBallTrajectory(representativePatternOf(단타)),
       bases: 주자1루,
       outs: 0,
-      random: 고정난수(0),
+      // 굴림 차례: 필살수비 A(0, 성공) → 레이저(0, 성공) → 펌블(0.999, 실패) → 그 뒤 모두 0
+      random: 차례난수([0, 0, 0.999, 0]),
     }
-    const 눌렀다 = runDefensePlay({ ...공통, controls: 계속누름('수비', '2') })
+    const 굴림 = () => 차례난수([0, 0, 0.999, 0])
+    const 눌렀다 = runDefensePlay({ ...공통, random: 굴림(), controls: 계속누름('수비', '2') })
     const 누르고있다 = runDefensePlay({
       ...공통,
+      random: 굴림(),
       controls: { side: '수비', keyAt: () => ({ key: '2', isRepeat: true }) },
     })
-    const 안눌렀다 = runDefensePlay({ ...공통, controls: { side: '수비', keyAt: () => null } })
+    const 안눌렀다 = runDefensePlay({ ...공통, random: 굴림(), controls: { side: '수비', keyAt: () => null } })
 
     expect(눌렀다.laserThrow).toBe(true)
     // 누르고 있기로는 안 된다 — 원본이 키 반복 계수 0 만 받는다
@@ -476,17 +493,22 @@ describe('사람 조작 — 상태 0x17 키 표 (I-controls 0·2b·2d·3b)', () 
       trajectory: battedBallTrajectory(representativePatternOf(단타)),
       bases: 주자1루,
       outs: 0,
-      // rand 가 늘 0 이면 0xa1828 의 rand(0,10000) = 0 < 기준이라 0xa1620 송구는 늘 악송구다
-      random: 고정난수(0),
     }
-    const 레이저 = runDefensePlay({ ...공통, controls: 계속누름('수비', '2') })
-    const 보통 = runDefensePlay({ ...공통, controls: { side: '수비', keyAt: () => ({ key: '2', isRepeat: true }) } })
+    // 굴림 차례: 필살수비 A(0) → 레이저(0) → 펌블(0.999, 실패) → 그 뒤 0 — 0xa1828 의 rand(0,10000) = 0 < 기준이라
+    // 0xa1620 송구는 늘 악송구다
+    const 굴림 = () => 차례난수([0, 0, 0.999, 0])
+    const 레이저 = runDefensePlay({ ...공통, random: 굴림(), controls: 계속누름('수비', '2') })
+    const 보통 = runDefensePlay({
+      ...공통,
+      random: 굴림(),
+      controls: { side: '수비', keyAt: () => ({ key: '2', isRepeat: true }) },
+    })
 
     expect(레이저.laserThrow).toBe(true)
     expect(레이저.errantThrow).toBe(false)
     expect(보통.laserThrow).toBe(false)
     expect(보통.errantThrow).toBe(true)
-    // 같은 틱(펌블 뒤 36틱)에 같은 루로 던져도 레이저(2000)가 먼저 닿는다
+    // 같은 틱에 같은 루로 던져도 레이저(2000)가 먼저 닿는다
     expect(레이저.throwArrivalTick).toBeLessThan(보통.throwArrivalTick)
   })
 })
@@ -519,37 +541,31 @@ describe('필살타법 성공 타구는 야수가 잡지 못한다 — 공 비�
       isUncatchable: true,
     })
 
-  it('뜬공아웃이어도 잡히지 않아 아웃이 하나도 안 난다', () => {
-    const 보통 = play(뜬공아웃, EMPTY_BASES, 0, 깊은뜬공)
+  it('첫 야수는 쥐지 못하고 0xbc3 · 사건만 난다 — 틱 끝 0xb3148 이 공을 그 야수에게서 튕겨 다시 쏜다', () => {
     const 필살 = 필살타구(뜬공아웃, EMPTY_BASES, 0, 깊은뜬공)
 
-    expect(보통.advance.outsAdded).toBe(1)
-    expect(필살.advance.outsAdded).toBe(0)
     expect(필살.isUncatchable).toBe(true)
+    // 뜬 채로는 아무도 못 잡는다 — 중견수가 낙구(24) 뒤 25틱에 닿아 맞고 튕긴다
     expect(필살.caughtOnTheFly).toBe(false)
+    expect(필살.log).toContain('25틱 8번 야수에게 필살타법 타구가 맞았다 (0xbc3)')
+    // 지금 점 속도 670 → 402 · v0 min(30%, 100) · 각 그대로(난수 없음)
+    expect(필살.log).toContain('25틱 공 튕김 (0xb3148) — 속도 402 · v0 100 · 각 -92 · 8번 야수가 35틱에 줍는다')
   })
 
-  it('포구를 건너뛰므로 송구도 없다 — 진행 기록에 "잡았다" 가 없다', () => {
+  it('다시 쏜 공은 보통 공이다 — 속성 목록 +0x5c 를 0xa2610 이 비워 새 예보의 야수가 그대로 쥔다', () => {
     const 필살 = 필살타구(땅볼아웃, EMPTY_BASES, 0)
 
-    expect(필살.log.some((line) => line.includes('잡았다'))).toBe(false)
-    expect(필살.throwBase).toBe(-1)
-    expect(필살.throwArrivalTick).toBe(-1)
+    const 맞음 = 필살.log.findIndex((line) => line.includes('필살타법 타구가 맞았다'))
+    const 잡음 = 필살.log.findIndex((line) => line.includes('잡았다'))
+    expect(맞음).toBeGreaterThanOrEqual(0)
+    expect(잡음).toBeGreaterThan(맞음)
+    expect(필살.log[잡음]).toBe('17틱 0번 야수가 잡았다 (종류 0)')
   })
 
-  it('3루 주자는 잡히지 않은 타구에 그대로 홈을 밟는다', () => {
+  it('튕기는 동안에도 3루 주자는 홈을 밟는다', () => {
     const 필살 = 필살타구(뜬공아웃, 주자3루, 2, 깊은뜬공)
 
     expect(필살.advance.runsScored).toBe(1)
-    expect(필살.advance.outsAdded).toBe(0)
-  })
-
-  it('공은 끝까지 궤적 위에 있다 — 야수 손으로 옮겨 가지 않는다', () => {
-    const 필살 = 필살타구(땅볼아웃, EMPTY_BASES, 0)
-    const 궤적 = battedBallTrajectory(representativePatternOf(땅볼아웃))
-    const 마지막 = 필살.ticks[필살.ticks.length - 1]
-
-    expect(마지막.ball.x).toBe(궤적.pointAt(필살.ticks.length - 1).x)
   })
 })
 
@@ -1380,12 +1396,13 @@ describe('송구 0xb2e38 — 중계 b4616 · AI 9 미루기 · 던진 야수 AI 
       trajectory: battedBallTrajectory(representativePatternOf(땅볼아웃)),
       bases: 주자1루,
       outs: 0,
-      random: 고정난수(0),
+      // 굴림 차례: 레이저(0, 확정) → 펌블(0.999, 실패) → 그 뒤 0 (투수가 줍는 대표 땅볼이라 필살수비는 안 굴린다)
+      random: 차례난수([0, 0.999, 0]),
       controls: 계속누름('수비', '6'),
     })
     while (!isDefensePlayFinished(state)) state = stepDefensePlay(state, { key: '6', isRepeat: false })
 
-    // 3루수(4)가 1루수(2)에게 — 레이저는 확정됐지만 0xb2e38 이 +0x1f4 를 지운다
+    // 투수(0)가 1루수(2)에게 — 레이저는 확정됐지만 0xb2e38 이 +0x1f4 를 지운다
     expect(state.laserConfirmed).toBe(true)
     expect(state.laserThrow).toBe(false)
     expect(state.errantThrow).toBe(true)
