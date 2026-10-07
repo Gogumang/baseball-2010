@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  EMPTY_RECORD_ALERT, RECORD_ALERT_LIFETIME, accrueRecordGamePoint, drawRecordAlert, fillRecordAlertSlots,
+  EMPTY_RECORD_ALERT, RECORD_ALERT_LIFETIME, accrueRecordGamePoint, drawRecordAlert, enqueueRecordAlert,
+  fillRecordAlertSlots, flushRecordAlertQueue, isGameEndRecord, leadingRecordCountOf,
 } from '@/widgets/game-scene/lib/recordAlert'
 import { RECORD_NAMES, recordGamePointsOf } from '@/entities/game/model/gameRecords'
 
@@ -55,5 +56,30 @@ describe('경기 중 기록 달성 알림 0x4e35c · 0x4e600', () => {
     const { frame } = drawRecordAlert(stale, 0, true)
     expect(frame.panel!.x).toBe(140)
     expect(frame.rows[0]).toMatchObject({ slot: 1, x: 243, y: 42 })
+  })
+
+  it('0xa77f0 은 누계에 더하고 줄에 넣기만 — 0x4e600 이 줄을 칸으로 옮기고 비운다', () => {
+    const queued = enqueueRecordAlert(EMPTY_RECORD_ALERT, [1, 15])
+    expect(queued.slots).toEqual(EMPTY_RECORD_ALERT.slots)
+    expect(queued.queue).toEqual([1, 15])
+    expect(queued.pendingGamePoint).toBe(recordGamePointsOf([1, 15]))
+    const flushed = flushRecordAlertQueue(queued, {})
+    expect(flushed.slots.slice(0, 2)).toEqual([1, 15])
+    expect(flushed.queue).toEqual([])
+  })
+
+  it('0x4e600 — 정산(0x19)이면 줄을 두고, 강판 뒤(시뮬 +0)면 줄을 버리고 누계 0', () => {
+    const queued = enqueueRecordAlert(EMPTY_RECORD_ALERT, [16])
+    expect(flushRecordAlertQueue(queued, { isSettled: true })).toBe(queued)
+    const dropped = flushRecordAlertQueue(queued, { isPitcherRemoved: true, isSettled: true })
+    expect(dropped.queue).toEqual([])
+    expect(dropped.pendingGamePoint).toBe(0)
+    expect(dropped.slots).toEqual(EMPTY_RECORD_ALERT.slots)
+  })
+
+  it('경기 끝 기록은 28~31 · 37~39 (0xa7818 마스크 0xe0f) — 앞쪽 몫 세기', () => {
+    expect([27, 28, 31, 32, 36, 37, 39].map(isGameEndRecord)).toEqual([false, true, true, false, false, true, true])
+    expect(leadingRecordCountOf([16, 17, 1, 16], (id) => id >= 16)).toBe(2)
+    expect(leadingRecordCountOf([16], (id) => id >= 16)).toBe(1)
   })
 })

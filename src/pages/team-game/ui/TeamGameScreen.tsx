@@ -28,8 +28,9 @@ import { GameEndBoard } from '@/widgets/game-scene/ui/GameEndBoard'
 import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
 import { teamHalfInningCardsOf } from '@/pages/team-game/lib/teamHalfInningCards'
 import { runScoreBoardSourceOf } from '@/pages/defense/lib/runScoreBoard'
-import { useRecordAlert } from '@/widgets/game-scene/model/useRecordAlert'
+import { usePitchEndSerial, useRecordAlert } from '@/widgets/game-scene/model/useRecordAlert'
 import { RecordAlertPanel } from '@/widgets/game-scene/ui/RecordAlertPanel'
+import { isGameEndRecord, leadingRecordCountOf } from '@/widgets/game-scene/lib/recordAlert'
 import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 import { hasGameIntro } from '@/widgets/game-scene/lib/introSchedule'
@@ -396,12 +397,31 @@ export function TeamGameScreen({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [acceptsPickoff, pickoff])
   /**
-   * 경기 중 기록 달성 알림 0x4e35c — 경기 장면이 상태 0x17(수비 인플레이)이 아니면 그린다. 경기 끝(0x19)이면 새 칸을 안 넣는다.
-   * ⚠️ 미해결: 웹 투구 화면(우리 수비)에는 240×320 장면 판이 없어 그 동안은 그릴 자리가 없다 — 타석 화면에서만 보인다.
+   * 경기 중 기록 달성 알림 0x4e35c — 경기 장면이 상태 0x17(수비 인플레이)이 아니면 그린다(타석 · 투구 화면 모두).
+   * - 칸 채우기 0x4e600 은 **공이 끝날 때**(0x12 끝 · 0x17 끝): 타석 공은 `onPitchResolved`, 내 공은 마지막 판정, 인플레이 ·
+   *   견제는 마지막 수비 플레이 · 붙든 타구가 풀림이 바뀌는 그림이다. 30G 자동진행(0x21)은 그 자리를 안 지나므로 그동안 쌓인
+   *   기록은 줄에 남았다가 다음 사람 공이 끝날 때 뜬다(일반·시즌은 경기 끝까지 돌아 끝내 안 뜬다).
+   * - 경기 끝 0xa7de8 몫(28~31·37~39)은 0x19 에서 쌓여 줄에 남는다. 팝업(경기 중 메뉴 · 조작방법)이 떠 있으면 멈춘다.
    */
+  const [battingPitchEnds, setBattingPitchEnds] = useState(0)
+  const pitchEndSerial = usePitchEndSerial([
+    progress.lastResolution,
+    progress.lastDefensePlay,
+    progress.pendingDefensePlay === null,
+    battingPitchEnds,
+  ])
   const recordAlert = useRecordAlert(progress.recordIds, {
     isDrawing: isIntroDone && summary === null && !isDefenseInPlay && !isReplaying,
+    isFrozen: isMenuOpen || overlay === '조작방법',
     isSettled: progress.game.isFinished,
+    // ⚠️ 근사: 상태 틱 [+0x2c] 의 경계를 웹 화면 갈래(판 · 타석/투구 · 확인 대기 · 공 끝)로 가른다
+    sceneStateKey: isHalfInningBoardOpen
+      ? `board-${board?.serial ?? 0}`
+      : `${canBat ? 'bat' : canPitch ? phase : 'auto'}-${isAwaitingConfirm ? 'confirm' : 'play'}-${pitchEndSerial}`,
+    pitchEnd: {
+      serial: pitchEndSerial,
+      humanCountOf: (added) => leadingRecordCountOf(added, (id) => !isGameEndRecord(id)),
+    },
   })
 
   const game = progress.game
@@ -740,9 +760,11 @@ export function TeamGameScreen({
               // 0xe 에서는 공이 안 나간다 — 타석 장면(0xd 그리기)만 선다
               isPaused={visibleBurstLines !== null || isAwaitingConfirm}
               random={random}
-              onPitchResolved={(detail, _pitch, isUncatchable, buntKind) =>
+              onPitchResolved={(detail, _pitch, isUncatchable, buntKind) => {
                 actions.resolvePitch(detail, isUncatchable, buntKind)
-              }
+                // 타석 공 하나가 끝났다 — 0x12 끝 0x4e796 (인플레이면 0x17 끝은 수비 플레이가 풀릴 때)
+                setBattingPitchEnds((count) => count + 1)
+              }}
               flightProbeRef={flightProbeRef}
               // CPU 투수 견제 (0x345fc 종류 4 → 0x34848 → 메시지 0x10) — 루가 정해진 뒤는 진행기가 판을 돌린다
               onPickoff={(base) => actions.cpuPickoff(base)}
