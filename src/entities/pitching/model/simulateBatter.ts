@@ -6,7 +6,7 @@ import { pitcherBoostSideOf, swingBoostOf } from '@/entities/batting/model/swing
 import { remainingAfterSpecialSwing, rollSpecialSwing } from '@/entities/batting/model/specialSwing'
 import { timingOf } from '@/entities/batting/model/swingTiming'
 import { hitDirectionOf } from '@/entities/batting/model/hitDirection'
-import { contactOfPattern, launchPatternOf, randomPattern } from '@/entities/batting/model/battedBallOutcome'
+import { contactOfPattern, drawScenePattern, launchPatternOf } from '@/entities/batting/model/battedBallOutcome'
 import { provisionalOutcomeOf, registerContact } from '@/entities/batting/model/battedContact'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import type { BatterAbility } from '@/entities/batting/model/batter'
@@ -416,9 +416,9 @@ export function pitchAgainstBatterDetailed(
   if (result.kind === '헛스윙') return swung({ kind: '스트라이크', isSwinging: true }, false)
 
   const code = result.code + hitDirectionOf({ code: result.code, frame, frameCount: pitch.frameCount, batterSide: 0 }, random)
-  // ⚠️ 원본은 사람 타석과 같은 장면 덱(0x3e340 이 만든 하나)에서 꺼낸다(0x51490). 투수편 진행기는 덱을 들고 있지 않아
-  //    덱 없이 한 장을 뽑는다 — 굴림 하나가 원본에 없다(미해결: 장면 덱을 경기 상태로 옮겨야 한다)
-  const drawn = randomPattern(code, random)
+  // 0x51490 — 사람 타석과 같은 장면 덱(0x3e340 이 경기 시작에 연 하나, `openScenePatternDeck`)에서 꺼낸다.
+  // 장면을 열지 않은 호출(시험 · 옛 길)만 덱 없이 한 장을 굴린다(`drawScenePattern`)
+  const drawn = drawScenePattern(code, random)
   // 0x514f2 — 코드 25·26 의 2% 특수 타구 표
   const pattern = launchPatternOf(code, drawn, random)
   // 0x517e6 — 방향·패턴 뒤. 마타자는 0x34c74 가 번호와 무관하게 30%

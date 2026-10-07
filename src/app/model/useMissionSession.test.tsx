@@ -17,6 +17,7 @@ import type { Screen } from '@/app/model/screen'
 import { aceMatchMissionOf, EMPTY_STORY_CARRY } from '@/entities/story/model/aceMatch'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { contactOfOutcome } from '@/entities/batting/model/battedContact'
+import { createPatternDeck } from '@/entities/batting/model/battedBallOutcome'
 import type { MissionRecordPort } from '@/shared/api/save/missionRecordPort'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { MISSIONS } from '@/shared/config/original/missions'
@@ -533,6 +534,8 @@ function setUpPitcherMissionOf(mission: (typeof MISSIONS)[number], seed: number,
 /** 같은 씨앗으로 시작 굴림 하나를 먹인 난수 — 세션이 견제 판에 넘기는 난수와 같은 자리 */
 function seededAfterStart(seed: number): RandomPort {
   const random = createSeededRandom(seed)
+  // 경기 장면 시작 — 상태 7 장면 덱 섞기(0x3e340 → 0xb08e8) · 상태 9 시뮬 초기화 rand(0, 2)
+  createPatternDeck(random)
   rollSimulatorInit(random)
   return random
 }
@@ -620,7 +623,7 @@ describe('투수 미션 사람 견제 — 구질 고르기 0xf 의 0x53548 은 �
 /* ── 견제사도 '아웃' 목표에 든다 (아웃 콜 결과 13 → 0xa7d0c → R+0x13c · 판정 0xaaa6c aacd6) ──────── */
 
 describe("투수 미션 견제사는 '아웃' 목표(R+0x13c)에 든다 — 0x51b36 → 0xa7d0c(a7d52) · 판 끝 판정 0xaaa6c(ae5c4)", () => {
-  // 미션 12 "최강의 챔피언" 1사 1·3루 — 씨앗 1 의 1루 견제는 견제사다 (같은 씨앗의 기대 판으로 확인)
+  // 미션 12 "최강의 챔피언" 1사 1·3루 — 씨앗 20 의 1루 견제는 견제사다 (같은 씨앗의 기대 판으로 확인 — 장면 덱 섞기가 끼며 씨앗 1 은 세이프가 됐다)
   const mission12 = MISSIONS.find((row) => row.side === '투수' && row.id === 12)!
   const expectedOf = (seed: number) =>
     runPickoffPlay({
@@ -634,8 +637,8 @@ describe("투수 미션 견제사는 '아웃' 목표(R+0x13c)에 든다 — 0x51
     })
 
   it("견제사 하나 = '아웃' 칸 +1 · 이닝 아웃 +1 — 목표가 탈삼진뿐이면 진행 중 그대로", () => {
-    expect(expectedOf(1).advance.outsAdded).toBe(1)
-    const rendered = setUpPitcherMission(12, 1)
+    expect(expectedOf(20).advance.outsAdded).toBe(1)
+    const rendered = setUpPitcherMission(12, 20)
     const before = rendered.result.current.session.pitcherRun!
 
     act(() => rendered.result.current.session.actions.pickoff('3'))
@@ -652,7 +655,7 @@ describe("투수 미션 견제사는 '아웃' 목표(R+0x13c)에 든다 — 0x51
 
   it("'아웃' 목표가 견제사로 차면 판 끝 판정에서 바로 성공 — 0xaa928 이 상태 1 로 안 남는다", () => {
     const 아웃한개 = { ...mission12, goals: ['아웃'], goalCounts: { '아웃': 1 } }
-    const rendered = setUpPitcherMissionOf(아웃한개, 1)
+    const rendered = setUpPitcherMissionOf(아웃한개, 20)
 
     act(() => rendered.result.current.session.actions.pickoff('3'))
 
@@ -1046,7 +1049,8 @@ describe('투수편 마선수 대결 — 투수 미션 team − 1 을 던지고 
   })
 
   it('아웃을 잡으면(성공) 이겼다 — G 보상은 없고(0x4ef3e 의 +0x176 갈래) 투수 15번 칸만 −1 → 0 (0xa5368)', () => {
-    const { status, isWin, after, save, onGamePointReward } = playPitcherAceMatch(1)
+    // 씨앗 9 — 한가운데 공으로 아웃을 잡는 판. 장면 덱 섞기(0x3e340)가 끼며 씨앗 1 은 맞는 판이 됐다
+    const { status, isWin, after, save, onGamePointReward } = playPitcherAceMatch(9)
 
     expect(status).toBe('성공')
     expect(isWin).toBe(true)

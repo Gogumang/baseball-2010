@@ -35,6 +35,10 @@ import { isPickoffPlayResult, PICKOFF_RESULT } from '@/features/defense-play/mod
 import { runPitchArrivalPlay } from '@/features/defense-play/model/pitchArrivalPlay'
 import { runStealPlay } from '@/features/defense-play/model/stealPlay'
 import { rollPassedBall } from '@/entities/fielding/model/passedBall'
+import { BATTED_BALL_PATTERNS } from '@/shared/config/original/battedBallPatterns'
+
+/** 장면 초기화 0x3e340 의 패턴 덱 섞기 0xb0614 — 코드마다 i = 0..n−1 에 rand(0, n) 하나 (경기 시작마다, 상태 9 굴림보다 앞) */
+const 장면덱굴림 = Object.values(BATTED_BALL_PATTERNS).reduce((sum, patterns) => sum + patterns.length, 0)
 
 describe('startGame', () => {
   it('커리어 타순(9번)이면 플레이어는 아홉 번째 타자다', () => {
@@ -909,7 +913,8 @@ describe('내 타석의 상대 투수 — 지금 마운드 투수의 능력치 (
 
 describe('리그 투수 차례·레코드 스태미나 — startGame 마지막 인자', () => {
   it('차례 0번이 선발이고, 그 레코드 +0x2c 로 선다', () => {
-    const progress = startGame(createSeededRandom(1), 0, 9, 3, undefined, 7, false, {
+    // 씨앗 3 — 첫 사람 차례까지 우리 선발이 안 바뀌는 판(바뀌면 나간 투수 스태미나가 표에 적힌다). 장면 덱 섞기가 끼며 씨앗 1 은 바뀌는 판이 됐다
+    const progress = startGame(createSeededRandom(3), 0, 9, 3, undefined, 7, false, {
       ourOrder: [2, 0, 1, 3, 4, 5, 6, 7],
       opponentOrder: [3, 1, 2, 0, 4, 5, 6, 7],
       opponentStaminas: [10_000, 10_000, 10_000, 6_500, 10_000, 10_000, 10_000, 10_000],
@@ -1218,11 +1223,17 @@ describe('승·패·세 칸 — 결과 판(0x4fe9c)이 그대로 읽는 state+0x
  * 인트로 뒤 첫 장면이 그것이면(선공·1번 타자) 판이 서고, 그 밖의 반 이닝 앞은 늘 0x21(자동)이라 판이 없다.
  */
 describe('1회초 판 (상태 0x18) — 선공·1번 타자일 때만', () => {
-  /** 앞 n 개는 고정값, 그 뒤는 씨앗 77 */
+  /** 장면 덱 섞기(0x3e340 → 0xb08e8, 코드마다 패턴 수만큼 rand) 다음 n 개는 고정값, 나머지는 씨앗 77 */
   const 앞값 = (n: number, value: number): RandomPort => {
     const rest = createSeededRandom(77)
     let 번 = 0
-    return { ...rest, next: () => (번++ < n ? value : rest.next()) }
+    return {
+      ...rest,
+      next: () => {
+        const 지금 = 번++
+        return 지금 >= 장면덱굴림 && 지금 < 장면덱굴림 + n ? value : rest.next()
+      },
+    }
   }
 
   it('선공·1번 타자면 판이 서고, 후공이거나 1번이 아니면 안 선다', () => {
@@ -1238,11 +1249,11 @@ describe('1회초 판 (상태 0x18) — 선공·1번 타자일 때만', () => {
     const 세우기 = (n: number, value: number) => startGame(앞값(n, value), 0, 1, undefined, PLAYER_SIDE_FIRST_BAT)
     // 판이 첫 36 개를 먹고 버리므로 그 값이 무엇이든 경기는 같다
     expect(세우기(36, 0.001)).toEqual(세우기(36, 0.999))
-    // 경기를 세우는 동안 쓴 굴림 = 판 36 + 첫 타석 준비(1회초 첫 타석이라 CPU 투수 교체·돌발 후보가 없어 0)
+    // 경기를 세우는 동안 쓴 굴림 = 장면 덱 섞기 + 판 36 + 첫 타석 준비(1회초 첫 타석이라 CPU 투수 교체·돌발 후보가 없어 0)
     let 수 = 0
     const 씨 = createSeededRandom(77)
     startGame({ ...씨, next: () => { 수 += 1; return 씨.next() } }, 0, 1, undefined, PLAYER_SIDE_FIRST_BAT)
-    expect(수).toBe(36)
+    expect(수).toBe(장면덱굴림 + 36)
   })
 })
 

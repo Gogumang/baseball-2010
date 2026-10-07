@@ -1,5 +1,6 @@
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
+import { openScenePatternDeck } from '@/entities/batting/model/battedBallOutcome'
 import { describeOutcome, isFreePass, isHit } from '@/entities/at-bat/model/atBatOutcome'
 import { applyPitchResolution, createAtBat } from '@/entities/at-bat/model/atBatState'
 import type { AtBatState, PitchResolution } from '@/entities/at-bat/model/atBatState'
@@ -832,6 +833,8 @@ export function resumeTeamGame(saved: TeamGameProgress, random: RandomPort): Tea
     lastBurstResolution: null,
     halfInningSave: null,
   }
+  // 이어하기도 상태 7(0x3e340)부터 장면을 새로 연다 — 3ed76 → 0xb08e8 패턴 덱을 새로 섞는다
+  openScenePatternDeck(random)
   // 상태 9 의 공통 꼬리 0x3fa0e — 새 경기와 같은 rand(0, 2) 한 번
   rollSimulatorInit(random)
   return advance({ ...restored, halfInningSave: savePointOf(restored) }, random)
@@ -1055,6 +1058,8 @@ export function startTeamGame(options: TeamGameOptions, random: RandomPort): Tea
     nextLogId: 1,
   }
   // 상태 9 갱신 0x3f584 의 공통 꼬리 0x3fa0e — 시뮬 초기화 0xc0dac 의 rand(0, 2) 한 번 (모든 모드 — 마선수·선발 굴림 0x30f20 뒤, 1회초 판 0x18 보다 앞)
+  // 상태 7 장면 초기화 0x3e340 의 3ed76 → 0xb08e8 — 이 경기 장면의 패턴 덱을 섞는다(상태 9 의 시뮬 초기화보다 앞)
+  openScenePatternDeck(random)
   rollSimulatorInit(random)
   // 경기정보 OK(0x3136e)가 0x30f20 이 세운 두 팀·st 를 저장 블록에 두고 파일을 쓴다 — 이어하기의 첫 자리다
   return advance({ ...initial, halfInningSave: savePointOf(initial) }, random)

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo } from 'react'
 import { resolvePitch } from '@/features/play-at-bat/model/resolvePitch'
 import type { BattingSwing } from '@/features/play-at-bat/model/resolvePitch'
 import { nextBatterShift } from '@/features/play-at-bat/model/batterShift'
-import { createPatternDeck, lastDrawnPattern } from '@/entities/batting/model/battedBallOutcome'
+import { createPatternDeck, lastDrawnPattern, scenePatternDeckOf } from '@/entities/batting/model/battedBallOutcome'
 import { emitParticles } from '@/entities/particle/model/particleScene'
 import { particleConfigOf } from '@/widgets/particles/lib/particleCatalog'
 import { batterEquipmentOf, NO_EQUIPMENT } from '@/widgets/batting-stage/lib/batterLayers'
@@ -218,7 +218,10 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
     const pitch = pitchRef.current
     if (pitch === null) return
     const latest = latestRef.current
-    const deck = deckRef.current ?? createPatternDeck(latest.random)
+    // 장면 덱(0x3e340 이 경기 시작에 연 하나 — 같은 난수로 도는 진행기가 연다)을 CPU 타자와 같이 쓴다.
+    // 장면을 열지 않은 화면(시험 · 장면 없는 연습)만 이 화면이 첫 공에 덱을 섞어 들고 있는다(웹 전용)
+    const scene = scenePatternDeckOf(latest.random)
+    const deck = scene?.deck ?? deckRef.current ?? createPatternDeck(latest.random)
     const context = {
       batter: latest.batterAbility,
       pitcher: latest.pitcherAbility,
@@ -281,7 +284,8 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
         )
       }
     }
-    deckRef.current = result.deck
+    if (scene !== undefined) scene.deck = result.deck
+    else deckRef.current = result.deck
     buntRef.current = null
     const resultText = describeResolution(result.detail)
     // 홈런이면 판정 글자 대신 HOMERUN 글자 연출을 켠다 (원본 0x51cd8 의 +0x1960, 사운드 11 은 웹에 없음)

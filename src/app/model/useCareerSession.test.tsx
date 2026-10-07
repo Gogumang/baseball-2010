@@ -545,7 +545,8 @@ describe('CPU 견제 (0x345fc 종류 4 → 0x34848) — 타자편도 견제 판�
 
   it('주자 있는 루면 견제 판이 재생 칸에 들고 볼카운트·투구 수는 그대로다 — 빈 루면 아무 일도 없다', () => {
     const saveGame = 메모리저장(createCareer('견제'))
-    const random = createSeededRandom(20100901)
+    // 씨앗 1 — 볼넷으로 주자가 서는 판. 장면 덱 섞기(경기 시작 0x3e340)가 끼며 20100901 은 볼넷 타석 앞에 이닝이 바뀌는 판이 됐다
+    const random = createSeededRandom(1)
     const rendered = renderHook(() => {
       const [screen, setScreen] = useState<Screen>({ kind: '메인메뉴' })
       const runner = useAtBatRunner()

@@ -60,6 +60,7 @@ import {
 } from '@/app/model/modePitcher'
 import { hallOfFameModeBatterOf } from '@/app/model/modeBatter'
 import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
+import { openScenePatternDeck } from '@/entities/batting/model/battedBallOutcome'
 import { hallOfFamePitcherAt } from '@/entities/collection/model/collection'
 import type { Collection, HallOfFamePlayerPick } from '@/entities/collection/model/collection'
 import { pitchReleaseSoundIdOf } from '@/widgets/batting-stage/lib/pitchReleaseSound'
@@ -948,7 +949,9 @@ export function useMissionSession({
     stealingFromRef.current = []
     setStealingFrom([])
     // 경기 장면 상태 9 갱신 0x3f584 의 공통 꼬리 0x3fa0e — 시뮬 초기화 0xc0dac 의 rand(0, 2) 한 번.
-    // 미션(모드 5·6)도 보통 경기 장면이라 모드 점프 뒤 이 꼬리를 탄다 — 1회초 판·첫 타석 준비보다 앞
+    // 미션(모드 5·6)도 보통 경기 장면이라 모드 점프 뒤 이 꼬리를 탄다 — 1회초 판·첫 타석 준비보다 앞.
+    // 그 앞 상태 7 장면 초기화 0x3e340 의 3ed76 → 0xb08e8 이 이 장면의 패턴 덱을 섞는다(사람 · CPU 타자가 같이 쓴다)
+    openScenePatternDeck(random)
     rollSimulatorInit(random)
   }
 
@@ -1009,7 +1012,8 @@ export function useMissionSession({
       setPendingBenchClearing(null)
       stealingFromRef.current = []
       setStealingFrom([])
-      // 마선수 대결도 미션 장면(모드 6)으로 나간다 — 0x3fa0e 의 rand(0, 2) 한 번 (`resetForNewMatch` 와 같다)
+      // 마선수 대결도 미션 장면(모드 6)으로 나간다 — 장면 덱(0x3e340 → 0xb08e8) · 0x3fa0e 의 rand(0, 2) 한 번 (`resetForNewMatch` 와 같다)
+      openScenePatternDeck(random)
       rollSimulatorInit(random)
       setMissionRun(startMission(mission))
       setScreen({ kind: '마선수대결', mission, ...pending })

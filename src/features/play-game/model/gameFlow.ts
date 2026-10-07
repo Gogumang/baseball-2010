@@ -1,5 +1,6 @@
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
+import { openScenePatternDeck } from '@/entities/batting/model/battedBallOutcome'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { describeOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { atBatRecordCodeOf } from '@/entities/batting/model/swingSkills'
@@ -506,6 +507,8 @@ export function startGame(
     stealingFrom: [],
   }
   // 상태 9 갱신 0x3f584 의 공통 꼬리 0x3fa0e — 시뮬 초기화 0xc0dac 의 rand(0, 2) 한 번 (모든 모드, 1회초 판 0x18 보다 앞)
+  // 상태 7 장면 초기화 0x3e340 의 3ed76 → 0xb08e8 — 이 경기 장면의 패턴 덱을 섞는다(상태 9 의 시뮬 초기화보다 앞)
+  openScenePatternDeck(random)
   rollSimulatorInit(random)
   return advanceUntilPlayerTurn(withFirstInningBoard(initial, random), random)
 }

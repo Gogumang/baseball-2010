@@ -1430,11 +1430,12 @@ describe('한 경기를 끝까지 돌리면 16칸이 실제로 찬다', () => {
     const 끝 = runAutoProgress(startTeamGame({ ...기본옵션, settings: 전부자동 }, random), random)
     const summary = summaryOf(끝)
 
-    // 경기 시작 rand(0, 2)(상태 9 0x3fa0e → 0xc0dac)와 자동진행 rand(0, 2)가 앞에 서는 차례 — 1-6 완투패
+    // 장면 덱 섞기(상태 7 0x3e340 → 0xb08e8) · 경기 시작 rand(0, 2)(상태 9 0x3fa0e → 0xc0dac)와 자동진행 rand(0, 2)가
+    // 앞에 서는 차례 — 1-2 완투패
     expect(summary.ourScore).toBe(1)
-    expect(summary.opponentScore).toBe(6)
+    expect(summary.opponentScore).toBe(2)
     expect(summary.pitching.outsRecorded).toBe(27)
-    expect(summary.gameRecord).toEqual([0, 0, 13, 0, 0, 13, 13, 6, 3, 1, 0, 0, 0, 0, 0, 0])
+    expect(summary.gameRecord).toEqual([0, 0, 6, 0, 0, 8, 10, 12, 4, 0, 0, 0, 0, 0, 0, 0])
 
     const context = {
       opponentRuns: summary.opponentScore,
@@ -1442,10 +1443,10 @@ describe('한 경기를 끝까지 돌리면 16칸이 실제로 찬다', () => {
       won: summary.won,
       completeGame: summary.reputationCompleteGame,
     }
-    // 16칸이 비었을 때는 패배·완투·상대 득점만 남아 −2 다
-    expect(seasonReputationChangeOf(clearSeasonGameRecord(), context)).toBe(-2)
-    // 채워진 16칸이 그만큼을 메워 0 이 된다
-    expect(seasonReputationChangeOf(summary.gameRecord, context)).toBe(0)
+    // 16칸이 비었을 때는 패배·완투·상대 득점만 남아 −1 이다
+    expect(seasonReputationChangeOf(clearSeasonGameRecord(), context)).toBe(-1)
+    // 채워진 16칸이 그만큼을 메우고 넘어 +1 이 된다
+    expect(seasonReputationChangeOf(summary.gameRecord, context)).toBe(1)
   })
 })
 

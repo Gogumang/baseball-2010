@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { describePitchResolution } from '@/entities/at-bat/model/resolutionText'
+import { openScenePatternDeck } from '@/entities/batting/model/battedBallOutcome'
 import { derbyBattedBallOf } from '@/entities/home-run-derby/model/derbyBattedBall'
 import { derbyPitcherOf } from '@/entities/home-run-derby/model/derbyPitcher'
 import type { DerbyPitcher } from '@/entities/home-run-derby/model/derbyPitcher'
@@ -77,6 +78,8 @@ export interface HomeRunDerbyOptions {
  * ⚠️ 뽑은 상대 팀(수비 팀)은 웹 더비가 그리지 않아 버린다 — 굴림 차례만 맞춘다.
  */
 export function rollDerbySceneStart(random: RandomPort): void {
+  // 상태 7 장면 초기화 0x3e340 의 3ed76 → 0xb08e8 — 이 장면의 패턴 덱을 섞는다(상태 9 의 3a454 보다 앞)
+  openScenePatternDeck(random)
   random.nextInRange(0, 9)
   rollSimulatorInit(random)
 }
