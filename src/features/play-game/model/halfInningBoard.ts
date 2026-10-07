@@ -32,7 +32,9 @@ import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
  * 두 팀 판 0x42364 · 0x420dc(현재 투수 이름 카드 — 0xae83c(팀[st[0xa]]) → 0xb62c0) 를 (W/2 − 판폭/2, H/2 − 2) ·
  * (W/2 + 판폭/2 − 76, H/2 − 2) 에, 초(st[9] = 0)면 왼쪽이 0x42364 · 말이면 0x420dc.
  * - 점수판 틀 0x41440 은 확정·적용 — `widgets/scoreboard-frame`(0x4ff12, 경기 끝 판이면 y 3), 판은 `widgets/game-scene/ui/HalfInningBoard`.
- * - ⚠️ 미해결 — 운동장 전경 0x4fb8c 와 두 팀 판 0x42364 · 0x420dc 의 판 속 그림 번호·글 배치.
+ * - 두 팀 판 0x42364("DUE UP") · 0x420dc("PITCHER") 도 확정·적용 — 판폭 212(game_ui 프레임 19 상자 4)라 (14, 158) · (150, 158),
+ *   `widgets/game-scene/lib/halfInningCardsLayout`.
+ * - ⚠️ 미해결 — 운동장 전경 0x4fb8c (틱과 상관없이 늘 바탕, 틱 ≤ 69 는 이것만).
  */
 
 /** 0x3fac4 루프 — i = 8..0 */

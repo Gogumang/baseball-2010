@@ -64,3 +64,30 @@ export const introBand = style({
   fontSize: '13px',
   pointerEvents: 'none',
 })
+
+/** 공수 교대 판의 두 팀 판 한 벌 — 안쪽은 240×320 원본 절대 좌표 */
+export const cardLayer = style({
+  position: 'absolute',
+  left: 0,
+  top: 0,
+  width: 0,
+  height: 0,
+  pointerEvents: 'none',
+})
+
+/** 둥근 칠 0xba0bd 의 직사각형 한 조각 */
+export const block = style({
+  position: 'absolute',
+  pointerEvents: 'none',
+})
+
+/** 두 팀 판 이름 — `"!R!cffffff%s"`(0xd0714) 흰 글 오른쪽 맞춤, 0xba269(글, x, y, 폭, −1, 0) */
+export const cardName = style({
+  position: 'absolute',
+  color: ORIGINAL_COLORS.text,
+  textAlign: 'right',
+  fontSize: '11px',
+  lineHeight: '11px',
+  whiteSpace: 'nowrap',
+  pointerEvents: 'none',
+})

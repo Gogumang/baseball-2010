@@ -53,3 +53,26 @@ describe('공수 교대 판 (상태 0x18 교대 가지)', () => {
     expect(screen.getByTestId('점수판-틀').dataset.y).toBe('0')
   })
 })
+
+describe('공수 교대 판의 두 팀 판 0x42364 · 0x420dc', () => {
+  const cards = {
+    battingSide: 1,
+    count: { strikes: 0, balls: 0, outs: 0 },
+    pitcherName: '김투수',
+    currentOrder: 8,
+    dueUpNames: ['구번', '일번', '이번'],
+  }
+
+  it('틱 > 0x45 부터 — 말이면 왼쪽(14)이 PITCHER · 오른쪽(150)이 DUE UP', () => {
+    vi.useFakeTimers()
+    render(<HalfInningBoard inning={1} half="말" cards={cards} onConfirm={() => {}} />)
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 69))
+    expect(screen.queryByTestId('교대판-투수')).toBeNull()
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
+    expect(screen.getByTestId('교대판-투수').dataset.x).toBe('14')
+    expect(screen.getByTestId('교대판-타자').dataset.x).toBe('150')
+    expect(screen.getByTestId('교대판-투수이름').textContent).toBe('김투수')
+    expect([0, 1, 2].map((row) => screen.getByTestId(`교대판-타순-${row}`).dataset.order)).toEqual(['9', '1', '2'])
+    expect(screen.getByTestId('교대판-타자이름-1').textContent).toBe('일번')
+  })
+})
