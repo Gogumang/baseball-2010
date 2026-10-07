@@ -66,6 +66,7 @@ import { cancelBurst, createBurstSession, resolveBurst, tryTriggerBurst } from '
 import type { BurstResolution, BurstSession } from '@/entities/burst-mission/model/burstMissionSession'
 import type { BurstRewardDelta } from '@/entities/burst-mission/model/burstMissionReward'
 import { burstResultBitsOf } from '@/entities/burst-mission/model/burstResultBits'
+import { batterRunnerSafeOfFates } from '@/features/defense-play/model/runnerFates'
 import {
   benchClearingEffectOf,
   rollsIntoBenchClearing,
@@ -2178,6 +2179,7 @@ function finishBatterOutcome(
     outsAdded,
     inningEnded,
     humanTeamWalkOff: isWalkOff,
+    batterRunnerSafe: defensePlay === null ? undefined : batterRunnerSafeOfFates(defensePlay.runnerFates),
   })
 
   return advance(
@@ -2694,6 +2696,7 @@ function finishDefensiveAtBat(
         // ⚠️ 0xa89f0 — 사람 팀 승리로 경기가 끝나면 홈런·볼넷 비트를 함께 켠다 (P7 K1)
         humanTeamWalkOff:
           applied.game.isFinished && applied.game.ourScore > applied.game.opponentScore,
+        batterRunnerSafe: defensePlay === null ? undefined : batterRunnerSafeOfFates(defensePlay.runnerFates),
       })
     : recorded
 
@@ -3248,6 +3251,8 @@ function resolveBurstFor(
     outsAdded: number
     inningEnded: boolean
     humanTeamWalkOff: boolean
+    /** B5 — 안타 없이 살아 나간 타자주자(야수 선택)도 출루다 (0xa87ba r5). 판 없는 타석은 undefined */
+    batterRunnerSafe?: boolean
   },
 ): TeamGameProgress {
   if (progress.burst === null) return progress

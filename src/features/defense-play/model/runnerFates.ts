@@ -120,3 +120,19 @@ export function baserunnerAllowedOfFates(fates: readonly RunnerFate[]): boolean 
   const last = fates[fates.length - 1]
   return last !== undefined && !last.retired
 }
+
+/**
+ * **타자주자가 살아남았나** — 정산 `0xa87ba~0xa87fa` 의 r5 (직접 뜬 것):
+ * ```
+ * a87c2  목록 0번 주자가 없으면 r5 = 0
+ * a87d2  0번이 이번 타자(+0x98)면 +0x96(끝) == 0 → r5 = 1 , 아니면 +0x95(득점) ≠ 0 → r5 = 1
+ * a87ea  0번이 타자가 아니면 +0x95(득점) ≠ 0 → r5 = 1
+ * a8816  안타 || 볼 4개 || 사구 || r5 → (아웃 state[6] + 이번 아웃 [sp+0x30] ≤ 2 면) 결과비트 B5(0x20, 0xa882a)
+ * ```
+ * 안타 없이 살아 나간 타자(야수 선택)도 B5 를 켠다 — 기록(타수 · 결과 링)은 아웃 갈래 그대로다(`playOutcome` 머리말).
+ */
+export function batterRunnerSafeOfFates(fates: readonly RunnerFate[]): boolean {
+  const first = fates[0]
+  if (first === undefined) return false
+  return (first.fromBase === 0 && !first.retired) || first.scored
+}

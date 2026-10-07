@@ -8,6 +8,7 @@ import { representativePatternOf } from '@/features/defense-play/model/represent
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import {
   baserunnerAllowedOfFates,
+  batterRunnerSafeOfFates,
   chargedRunsOfFates,
   runnerFatesWithoutPlay,
   type RunnerFate,
@@ -132,5 +133,18 @@ describe('R+0x128 · R+0x130 셈', () => {
     expect(baserunnerAllowedOfFates([fate(0, false, false)])).toBe(true)
     expect(baserunnerAllowedOfFates([fate(0, false, false), fate(3, true, true)])).toBe(false)
     expect(baserunnerAllowedOfFates([fate(0, false, true), fate(2, false, false)])).toBe(true)
+  })
+})
+
+describe('타자주자 생존 r5 (0xa87ba~0xa87fa) — 결과비트 B5 출루', () => {
+  it('0번이 타자주자면 끝나지 않았거나 득점했을 때, 타자가 아니면 득점했을 때만 1', () => {
+    expect(batterRunnerSafeOfFates([])).toBe(false)
+    // 야수 선택 — 타자는 살고 1루 주자가 2루에서 죽었다
+    expect(batterRunnerSafeOfFates([fate(0, false, false), fate(1, false, true)])).toBe(true)
+    expect(batterRunnerSafeOfFates([fate(0, false, true), fate(1, false, false)])).toBe(false)
+    expect(batterRunnerSafeOfFates([fate(0, true, true)])).toBe(true)
+    // 목록 0번이 타자가 아닌 판(도루 · 폭투)
+    expect(batterRunnerSafeOfFates([fate(1, false, false)])).toBe(false)
+    expect(batterRunnerSafeOfFates([fate(3, true, true)])).toBe(true)
   })
 })

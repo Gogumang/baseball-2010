@@ -121,6 +121,7 @@ import {
 } from '@/entities/burst-mission/model/burstMissionSession'
 import type { BurstResolution, BurstSession } from '@/entities/burst-mission/model/burstMissionSession'
 import { burstResultBitsOf } from '@/entities/burst-mission/model/burstResultBits'
+import { batterRunnerSafeOfFates } from '@/features/defense-play/model/runnerFates'
 import {
   benchClearingEffectOf,
   rollsIntoBenchClearing,
@@ -1677,7 +1678,7 @@ function applyDefensivePlay(
   // 0x8f414 는 사람 장면의 타석 끝(0x12 갱신 0x4e6d4 · 0x17 끝 0x528b0)에서만 돈다 — 내가 던진 타석만.
   // 내가 마운드에 없는 타석은 간이 엔진(0x21)이라 판정이 없다 (`triggerBurstAtPrep` 머리말)
   const resolved = mine
-    ? resolveBurstFor(next, outcome, applied.runsScored, before.outs, applied.outsAdded, inningEnded)
+    ? resolveBurstFor(next, outcome, applied.runsScored, before.outs, applied.outsAdded, inningEnded, defensePlay)
     : next
   const halfChanged = applied.game.half !== before.half || applied.game.inning !== before.inning
   const closed: PitcherGameProgress = halfChanged
@@ -1786,6 +1787,7 @@ function resolveBurstFor(
   outsBefore: number,
   outsAdded: number,
   inningEnded: boolean,
+  defensePlay: DefensePlayResult | null,
 ): PitcherGameProgress {
   if (progress.burst === null) return progress
   const resolution = resolveBurst(
@@ -1797,6 +1799,8 @@ function resolveBurstFor(
       outsBefore,
       outsAdded,
       inningEnded,
+      // B5 — 안타 없이 살아 나간 타자주자(야수 선택)도 출루다 (0xa87ba r5)
+      batterRunnerSafe: defensePlay === null ? undefined : batterRunnerSafeOfFates(defensePlay.runnerFates),
       // ⚠️ 0xa89f0 — 사람 팀 승리로 경기가 끝나면 홈런·볼넷 비트를 함께 켠다 (P7 K1)
       humanTeamWalkOff:
         progress.game.isFinished && progress.game.ourScore > progress.game.opponentScore,

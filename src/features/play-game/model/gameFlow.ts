@@ -109,6 +109,7 @@ import {
   tryTriggerBurst,
 } from '@/entities/burst-mission/model/burstMissionSession'
 import { burstResultBitsOf } from '@/entities/burst-mission/model/burstResultBits'
+import { batterRunnerSafeOfFates } from '@/features/defense-play/model/runnerFates'
 import { benchClearingEffectOf, rollsIntoBenchClearing } from '@/entities/game/model/benchClearing'
 import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
@@ -873,6 +874,8 @@ function finishPlayerOutcome(
             outsAdded: outsInPlay,
             inningEnded: progress.game.outs + outsInPlay >= OUTS_PER_INNING,
             humanTeamWalkOff: isWalkOff,
+            // B5 — 안타 없이 살아 나간 타자주자(야수 선택)도 출루다 (0xa87ba r5)
+            batterRunnerSafe: defensePlay === null ? undefined : batterRunnerSafeOfFates(defensePlay.runnerFates),
             // 웹 타석에는 번트가 없어 B6·B7 은 늘 꺼져 있다
           }),
         )
