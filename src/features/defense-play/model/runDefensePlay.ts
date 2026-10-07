@@ -4,7 +4,6 @@ import {
   isBallTrajectory,
   launchTrajectory,
   spliceTrajectory,
-  thrownBallTrajectory,
   trajectoryWithRandom,
   type BallTrajectory,
 } from '@/entities/batting/model/battedBallFlight'
@@ -43,7 +42,6 @@ import {
   NO_THROW_ERROR,
   rollFumble,
   rollSpecialDefense,
-  rollThrowError,
   type ThrowErrorResult,
 } from '@/entities/fielding/model/fieldingErrors'
 import type { BattedBallTrajectory } from '@/entities/fielding/model/catchPrediction'
@@ -102,9 +100,6 @@ import { defenseArrivalTicks, secondBaseHelperPlacement } from '@/entities/field
 import {
   planThrow,
   errantThrowFlight,
-  rollLongThrowWobble,
-  throwGravityPercentOf,
-  wobbledThrowFlight,
   LASER_THROW_SPEED,
   readyTicksOf,
   thrownWith,
@@ -126,6 +121,7 @@ import {
   type PlayEndState,
 } from '@/entities/fielding/model/playGate'
 import { forecastCatch } from '@/features/defense-play/model/catchForecast'
+import { forecastOptionsOf, launchThrow, type ThrownBall } from '@/features/defense-play/model/throwLaunch'
 import { runnerFateOf, type RunnerFate } from '@/features/defense-play/model/runnerFates'
 import {
   viewStateOf,
@@ -764,6 +760,11 @@ export interface DefensePlayState {
    * 깔리므로 새 궤적의 낙구 틱이다(`trajectory.landingTick` 은 state[0x1e] 처럼 처음 낙구를 지킨다).
    */
   ballLandingTick: number
+  /**
+   * 지금 쫓는 공이 **받을 야수에게 던진 송구공**(공+0xaac == 0 — 보통 · 흔들린 · 레이저 송구)인가. 받는 것도 포구 틱 갈래(1 절)지만
+   * 결과 코드 다리의 타자주자 1루 도착 틱(`batterOutTick`)은 예전 도착 모델처럼 다시 재지 않는다 (웹 다리).
+   */
+  receivingThrow: boolean
 }
 
 /**
@@ -951,6 +952,7 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     groundRuleFlag: false,
     landingChase,
     ballLandingTick: trajectory.landingTick,
+    receivingThrow: false,
   }
 }
 
@@ -1043,6 +1045,7 @@ export function stepDefensePlay(
   let groundRuleFlag = state.groundRuleFlag
   let landingChase = state.landingChase
   let ballLandingTick = state.ballLandingTick
+  let receivingThrow = state.receivingThrow
   /** sp+0x24 — 이번 틱 포구 틱의 사건(펌블 0xbc2 · 송구공 받음 0xbc3). 서면 틱 끝 b45a4 가 플레이.vt70 = 0xb3148 */
   let ballEventThisTick = false
 
@@ -1180,9 +1183,9 @@ export function stepDefensePlay(
    * b2f80: 공가진야수+0xe0 = 0 ; b3070 +0x12c = 0 ; b307c vt24(0) 포구 예보 ; vt30 = 0xb1c90 ; 1
    * ```
    * 중계([0])면 받는 야수는 중계맨이고, 그가 쥐면(쥐기 0xb2710 — 준비 틱 내야 3) 플레이 틱 b4616 이 [4] 에게 다시 0xb2e38
-   * 을 부른다(1a 절). 웹은 받는 틱을 이 진행기의 도착 틱으로 둔다(궤적 물리 0xb401c 는 해독 금지 구역):
-   * 직접 송구 = `defenseArrivalTicks` 의 커버 갈래(중계 없이) · 중계 1구간 = 중계맨 목표점까지의 송구 틱(0xa1adc)과
-   * 중계맨이 그 점에 닿는 틱 중 늦은 쪽.
+   * 을 부른다(1a 절). 공은 0xa1620(레이저 0xa222c)이 쏘고 b2f8c 의 세계 0xbfed0 이 깐 뒤 b2f9c 가 점[T − 1] 에 받는 점을
+   * 끼워 넣는다(`launchThrow`). 받는 야수 · 받는 틱은 b307c 예보 vt24(0) · 고르기 vt34 가 정하고, 받는 것은 보통 포구 틱
+   * 갈래(1 절 — 펌블 굴림 b4228 · 쥐기 0xb2710 · 펌블이면 0xb3148 튕김)다. ⚠️ 원바운드(a17fc)만 아직 옛 도착 모델(2 절)이다.
    */
   const throwBall = (
     fromSlot: number,
@@ -1236,83 +1239,58 @@ export function stepDefensePlay(
     const special = !laser && cpuSpecial ? cpuSpecialThrowOf(fielders, fromSlot, coverSlot) : NO_CPU_SPECIAL_THROW
     const relayed = plan.relayed && !laser && !special.special
     let error: ThrowErrorResult = NO_THROW_ERROR
-    let arrivalTicks: number
+    // 원바운드(아직 옛 도착 모델)만 도착 틱을 잰다. 그 밖은 공을 세계로 깔고(`launchThrow`) 예보가 받는 야수 · 틱을 정한다
+    let arrivalTicks = -1
+    let thrown: ThrownBall | null = null
+    // 공은 송구 계획 [3](중계면 중계맨, b2ea8)의 목표점(+0x2c)으로 쏜다
+    const receiverTarget = fielders[plan.toSlot]?.target ?? basePosition(base)
+    const ballBody = isBallTrajectory(trajectory) ? trajectory.flight.body : undefined
     if (laser) {
       // b2f06: 플레이+0x1f4(레이저) 면 0xa1620(vtac) 대신 야수 vtb0 = 0xa222c 로 던진다 (직접 뜬 것):
-      //   a229c `+0xdc = 2000` 고정 속도 · 0xa1adc 와 같은 정수 산술(0xa279d 중력 배율 · 0xbfab0 · cos) · **난수 굴림 없음**
-      //   (0xbfa54 호출이 없다 — 악송구가 안 난다). 특수라 0xb3444 가 중계도 안 끼운다(b3528).
+      //   a229c `+0xdc = 2000` 고정 속도 · 0xa1620 과 같은 h · w · φ 산술(0xa279d 중력 배율 · 0xbfab0 · cos) · **난수 굴림 없음**
+      //   (0xbfa54 호출이 없다 — 악송구도 흔들림도 없다) · a23ae 공+0xaac = a23ba 공+0xaad = 0 이라 받는 점을 끼워 넣는다.
+      //   특수라 0xb3444 가 중계도 안 끼운다(b3528).
       fielders = fielders.map((fielder) =>
         fielder.slot === fromSlot ? { ...fielder, throwSpeed: LASER_THROW_SPEED } : fielder,
       )
-      arrivalTicks = specialThrowArrivalTicks(contextAt(tick), base, fielders[fromSlot])
+      thrown = launchThrow({
+        thrower: fielders[fromSlot],
+        target: receiverTarget,
+        laser: true,
+        ability: abilities[fromSlot] ?? DEFAULT_ABILITY,
+        random: input.random,
+        body: ballBody,
+      })
     } else {
       // 원바운드(0xa17fc 갈래)는 악송구 굴림 대신 rand(0,2) 한 번으로 각도 부호(±1)만 정한다
       if (special.bounce && input.random !== undefined) randomIntegerBelow(input.random, 0, 2)
-      // 악송구 굴림 (0xa1828). CPU 특수 송구는 0xa1620 의 다섯째 인자(= 계획 [1])로 기준 +100 에 들어간다
-      if (input.random !== undefined && !special.bounce) {
-        error = rollThrowError(abilities[fromSlot] ?? DEFAULT_ABILITY, special.special, input.random)
-      }
       // a16dc~a16ec: +0xdc = 특수 ? +0xd8 : +0xd4 — 던질 때 덮어쓰고 그 판 동안 남는다(`FielderState.throwSpeed`)
       fielders = fielders.map((fielder) => (fielder.slot === fromSlot ? thrownWith(fielder, special.special) : fielder))
       const thrower = fielders[fromSlot]
-      if (relayed) {
-        // 중계 1구간 — 공은 중계맨의 목표점(+0x2c)으로 간다 (b2f52)
-        const relay = fielders[plan.toSlot]
-        arrivalTicks = Math.max(
-          throwTicksTo(thrower, relay.target),
-          ticksToReach(relay.position, relay.target, relay.speed),
-        )
-      } else {
-        // 직접 송구 — 0xaf284 의 커버 갈래를 중계 없이 (특수면 +0xd8 속도로)
+      if (special.bounce) {
+        // ⚠️ 원바운드는 아직 옛 도착 모델 — 0xaf284 의 커버 갈래를 중계 없이 (특수면 +0xd8 속도로)
         arrivalTicks = specialThrowArrivalTicks(contextAt(tick), base, thrower)
+      } else {
+        // 0xa1620 — 악송구 굴림(a1828, CPU 특수 송구는 다섯째 인자 = 계획 [1] 로 기준 +100) · 악송구면 흔들기 굴림 둘 ·
+        // 아니면 긴 송구 흔들림 굴림(a198c) · 세계 0xbfed0 · 받는 점 끼워 넣기(b2f9c)
+        thrown = launchThrow({
+          thrower,
+          target: receiverTarget,
+          special: special.special,
+          ability: abilities[fromSlot] ?? DEFAULT_ABILITY,
+          random: input.random,
+          body: ballBody,
+        })
+        error = thrown.error
       }
     }
     if (error.errant) errantThrow = true
-    let errantBall: BallTrajectory | null = null
-    let wobbledBall: BallTrajectory | null = null
-    if (error.errant && input.random !== undefined) {
-      // 악송구 갈래(a1868~a1908) — 수평 속도·수직 속도·방향을 흔들고 굴림 둘을 더 먹는다(`errantThrowFlight`), 공+0xaac = 1(a193c).
-      // 공은 송구 계획 [3](중계면 중계맨, b2ea8)의 목표점(+0x2c)을 받는 점으로 (x, 1000, z) 에서 쏘고(a19f2~a1a20), 0xb2e38 이
-      // 메시지 0x12(b2f8c → 0x51f2e)로 같은 공에 세계 0xbfed0 을 돌린다. +0xaac 라 받는 점 끼워 넣기(b2f9c)도 +0x1e8 도 없이
-      // 예보 vt24(0)(b307c — 움직임허용 = 공+0xaac 라 모두)이 줍는 야수를 고른다(아래 `takeLooseBall`).
-      const thrower = fielders[fromSlot]
-      const target = fielders[plan.toSlot]?.target ?? basePosition(base)
-      const flight = errantThrowFlight(thrower, target, error, input.random)
-      errantBall = thrownBallTrajectory({
-        from: thrower.position,
-        target,
-        speed: flight.horizontalSpeed,
-        verticalSpeed: flight.verticalSpeed,
-        angle: flight.direction,
-        gravityPercent: throwGravityPercentOf(fromSlot),
-        random: input.random,
-        body: isBallTrajectory(trajectory) ? trajectory.flight.body : undefined,
-      })
-    } else if (!laser && !special.bounce && input.random !== undefined) {
-      // a198c — 악송구가 아닌 보통 송구가 0x2008 을 넘으면 흔들림 굴림. 걸리면 h · w 85% · 공+0xaad = 1(받는 점 끼워 넣기 없음)
-      const thrower = fielders[fromSlot]
-      const target = fielders[plan.toSlot]?.target ?? basePosition(base)
-      if (rollLongThrowWobble(thrower, target, special.special, input.random) === true) {
-        const flight = wobbledThrowFlight(thrower, target)
-        wobbledBall = thrownBallTrajectory({
-          from: thrower.position,
-          target,
-          speed: flight.horizontalSpeed,
-          verticalSpeed: flight.verticalSpeed,
-          angle: flight.direction,
-          gravityPercent: throwGravityPercentOf(fromSlot),
-          random: input.random,
-          body: isBallTrajectory(trajectory) ? trajectory.flight.body : undefined,
-        })
-      }
-    }
-    const looseBall = errantBall ?? wobbledBall
     const firstReceiver = relayed ? plan.toSlot : coverSlot
     throwBase = base
-    throwArrivalTick = tick + Math.max(1, arrivalTicks)
+    throwArrivalTick = thrown === null ? tick + Math.max(1, arrivalTicks) : -1
     throwFromSlot = fromSlot
     throwReleaseTick = tick
-    throwReceiverSlot = looseBall !== null ? NONE : firstReceiver
+    throwReceiverSlot = thrown !== null ? NONE : firstReceiver
     // +0x14c..: 계획을 덮어쓴다 — 중계면 [0] = 1 · [4] = 최종 받는 야수 (b4616 이 본다)
     relayFinalSlot = relayed ? coverSlot : NONE
     relayBase = relayed ? base : NONE
@@ -1327,19 +1305,13 @@ export function stepDefensePlay(
       catchFielderSlot: firstReceiver === NONE ? play.catchFielderSlot : firstReceiver,
       catchTick: throwArrivalTick,
     }
-    if (looseBall !== null) {
+    if (thrown !== null) {
       // b307c vt24(0) — +0x130 = 던진 야수(t ≤ 4 건너뜀) · 그 복제는 +0xb1(a1a3a)로 두 틱 더 빠진다 · a = 0 이라 궤적 끝까지
-      // 못 줍으면 t = 10 부터 두 번째 패스. 줍는 틱이 이 송구의 "도착" 이다(받을 야수 없음).
-      // 악송구는 공+0xaac = 1 이라 움직임허용 모두 · +0x1e8 없음. 흔들린 긴 송구는 +0xaac = 0 이라 움직임허용 없음(복제가 제자리 ·
-      // n 없음)이고, 던진 야수 · 받을 야수(+0x154 = 루의 커버 C)가 둘 다 내야(칸 ≤ 5)면 +0x1e8 = 1(b305a~b306c) — C 만 낮은 공 ·
-      // 가슴 높이로 잡는다
-      const infieldOnly = errantBall === null && fromSlot <= 5 && coverSlot <= 5
-      takeLooseBall(looseBall, {
-        initialChaserSlot: fromSlot,
-        thrownSlot: fromSlot,
-        secondPass: { movable: errantBall !== null },
-        onlySlot: infieldOnly ? coverSlot : undefined,
-      })
+      // 못 줍으면 t = 10 부터 두 번째 패스 · vt34 = 0xb3b38 이 받을(주울) 야수를 AI 1 로. 받는 틱 = 그 포구 틱이다.
+      // 보통 · 흔들린 · 레이저 송구는 공+0xaac = 0 이라 움직임허용 없음(복제가 제자리 · n 없음)이고, 던진 야수 · C(+0x154)가
+      // 둘 다 내야(칸 ≤ 5)면 +0x1e8 = 1(b305a~b306c) — C 만 낮은 공 · 가슴 높이로 잡는다. 악송구는 움직임허용 모두 · +0x1e8 없음
+      takeLooseBall(thrown.ball, { ...forecastOptionsOf(thrown, fromSlot, coverSlot), thrownBall: true })
+      receivingThrow = !thrown.loose
       throwArrivalTick = catchTick
     }
     if (firstThrowBase === NONE) {
@@ -1350,12 +1322,12 @@ export function stepDefensePlay(
       `${tick}틱 ${base}루로 ${laser ? '레이저 ' : ''}${cpuSpecial ? '특수 ' : ''}송구 — ${throwArrivalTick}틱 도착` +
         (relayed ? ` (${plan.toSlot}번 야수 중계)` : '') +
         (special.bounce ? ' (원바운드)' : '') +
-        (errantBall !== null
-          ? ` (악송구 — ${chaserSlot}번 야수가 줍는다)`
-          : wobbledBall !== null
-            ? ` (흔들린 긴 송구 — ${chaserSlot}번 야수가 받는다)`
-            : error.errant
-              ? ' (악송구)'
+        (thrown === null
+          ? ''
+          : thrown.errant
+            ? ` (악송구 — ${chaserSlot}번 야수가 줍는다)`
+            : thrown.wobbled
+              ? ` (흔들린 긴 송구 — ${chaserSlot}번 야수가 받는다)`
               : '') +
         (chooser === 'CPU' ? ' (CPU 결정)' : chooser === '미룬' ? ' (AI 9 미룬 송구)' : chooser === '중계' ? ' (중계 이어 던지기)' : '') +
         ` (${fromSlot}번 야수)`,
@@ -1445,8 +1417,11 @@ export function stepDefensePlay(
       readonly thrownSlot?: number
       readonly secondPass?: { readonly movable: boolean }
       readonly onlySlot?: number
+      /** 송구 0xb2e38 이 깐 공 — 아래 AI 1 목표 · 0xb3b38 머리의 AI 1 · 0xc 되돌리기를 원본대로 한다 */
+      readonly thrownBall?: boolean
     },
   ): void => {
+    receivingThrow = false
     trajectory = spliceTrajectory(trajectory, tick, next)
     ballLandingTick = next.landingTick < 0 ? -1 : tick + next.landingTick
     const forecast = forecastCatch(next, fielders, { from: 0, to: Number.POSITIVE_INFINITY }, {
@@ -1457,13 +1432,19 @@ export function stepDefensePlay(
     })
     chaserSlot = forecast.choice.slot
     catchTick = Math.max(tick, Math.min(tick + forecast.choice.catchTick, maximumTicks))
-    catchPoint = next.pointAt(catchTick - tick)
+    const caughtAt = next.pointAt(catchTick - tick)
+    // 송구공: 추적야수 AI 1(0xb4aca~0xb4afe)은 포구 틱 점의 (x, 0, z) 로 간다 — 받는 점 (목표 x, 1000, 목표 z) 에서 받으면
+    // 그 루 위에 선다(쥐기 0xb2710 은 야수를 옮기지 않는다). ⚠️ 타구 · 다시 쏘기(0xb3148)는 아직 웹 관례(높이째 포구 지점)다
+    catchPoint = options.thrownBall === true ? { x: caughtAt.x, y: 0, z: caughtAt.z } : caughtAt
     fielders = fielders.map((fielder) =>
       fielder.slot === chaserSlot
         ? { ...fielder, target: catchPoint, aiState: AI_STATE.CHASE, holdingBall: false }
-        : fielder.holdingBall
-          ? { ...fielder, holdingBall: false }
-          : fielder,
+        : options.thrownBall === true && (fielder.aiState === AI_STATE.CHASE || fielder.aiState === AI_STATE.BACKUP)
+          ? // 0xb3b38 머리 — AI 1 · 0xc 인 야수는 AI 0 으로 되돌린다(P2 1a). ⚠️ 다시 쏘기 갈래엔 아직 안 옮겼다
+            { ...fielder, aiState: AI_STATE.IDLE, holdingBall: false }
+          : fielder.holdingBall
+            ? { ...fielder, holdingBall: false }
+            : fielder,
     )
     play = {
       ...play,
@@ -1765,7 +1746,8 @@ export function stepDefensePlay(
       // 그 틱의 1b · 4c 절이 **그때의 주자·야수 자리**로 고른다(07e80dc · 46d8420 이 옮긴 차례 그대로).
       // 땅볼·직선타로 타자주자가 죽는 시각은 1루에 공이 닿는 때다 — 공이 손을 떠나기 전(쥔 채)의 0xaf284 로 잰다
       // (타자주자의 운명을 결과 코드가 정하는 이 진행기의 규약 — 근사)
-      if (input.outcome.kind === '아웃' && !onTheFly) {
+      // 받을 야수에게 던진 송구공(공+0xaac == 0)을 받는 쥐기는 예전 도착 모델(2 절)처럼 다시 재지 않는다 — 웹 다리
+      if (input.outcome.kind === '아웃' && !onTheFly && !receivingThrow) {
         batterOutTick = tick + defenseArrivalTicks(contextAt(tick), 1)
       }
     }
@@ -2384,6 +2366,7 @@ export function stepDefensePlay(
   state.throwFromSlot = throwFromSlot
   state.throwReleaseTick = throwReleaseTick
   state.throwReceiverSlot = throwReceiverSlot
+  state.receivingThrow = receivingThrow
   state.throwCount = throwCount
   state.firstThrowBase = firstThrowBase
   state.firstThrowArrivalTick = firstThrowArrivalTick

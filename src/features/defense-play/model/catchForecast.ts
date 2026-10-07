@@ -31,8 +31,9 @@ import type { FielderState } from '@/entities/fielding/model/fieldingState'
  *
  * **웹 다리**: `window` — 원본은 틱 구간을 자르지 않는다. 웹은 타자주자의 운명을 결과 코드가 먼저 정하므로 구간 밖 틱은
  * **판정만** 안 적는다(복제의 n · 잠금 · 이동은 t = 1 부터 원본대로 돈다).
- * **안 옮긴 것**: +0xb1(던진 동작 표시 — 판 시작 예보에선 늘 0)과 복제가 물려받는 움직이던 목표점(+0x2c). 정지 판정 틱의
- * vt10 이 곧바로 멈추고, 잠금 · +0xcc 틱엔 이동 조건(vtc8)이 닫혀 판 시작 예보에선 결과가 같다.
+ * **복제가 물려받는 목표점(+0x2c)** 은 움직임허용이 아닐 때(송구 0xb2e38 의 vt24(0) · 공+0xaac == 0)만 옮겼다 — 정지(b1452)가
+ * 안 서 vt10 이 없으니 복제가 vt0c 로 그 목표를 향해 걷는다. 움직임허용이면 정지 판정 틱의 vt10 이 곧바로 멈추고, 잠금 · +0xcc
+ * 틱엔 이동 조건(vtc8)이 닫혀 결과가 같다(⚠️ +0xcc 가 막 0 이 되는 틱의 걸음은 안 옮겼다).
  */
 
 /** 표를 만들 때 살펴볼 최대 틱 — 원본은 끝이 없다(첫 포구 가능 틱 뒤 5틱에서 끝). n 이 쌓여 그 전에 늘 누군가 닿는다 */
@@ -142,9 +143,12 @@ export function forecastCatch(
       const standing = movable && !runningToLanding
       if (standing) clone.runTicks += 1
       // b146c — vtc8(+0xb1 == 0 && +0xcc ≤ 0) && +0xb4 ≤ 0 이 아니면 판정 없이 복제 틱만 (정지면 n 을 되돌린다)
+      // 움직임허용이 아니면(a = 0 이고 공+0xaac == 0 — 보통 송구) 정지(vt10)도 낙구 달리기(vt14)도 없어 복제는 진짜 야수에게서
+      // 물려받은 목표점 +0x2c 로 vt0c(0xa1284 → 0xbf158) 걸음을 그대로 걷는다 — 루로 달려가던 커버가 루에 닿아 받는다
+      const cloneTarget = runningToLanding ? landingTarget : movable ? null : fielder.target
       if (!(clone.throwMotionTicks <= 0 && clone.slackTicks <= 0 && clone.lockTicks <= 0)) {
         if (standing) clone.runTicks -= 1
-        tickClone(clone, runningToLanding ? landingTarget : null, fielder.speed)
+        tickClone(clone, cloneTarget, fielder.speed)
         continue
       }
       if (recording) {
@@ -170,8 +174,8 @@ export function forecastCatch(
           }
         }
       }
-      // b17fc 복제.vt0c — 낙구 지점으로 달리는 중이면 한 틱 이동(정지면 vt10 이 이미 멈췄다)
-      tickClone(clone, runningToLanding ? landingTarget : null, fielder.speed)
+      // b17fc 복제.vt0c — 낙구 지점으로 달리는 중이면 한 틱 이동(정지면 vt10 이 이미 멈췄다) · 움직임허용이 아니면 물려받은 목표로
+      tickClone(clone, cloneTarget, fielder.speed)
     }
     // 끝내기 0xb185e: 한 종류라도 적히고 나면 5틱만 더 보고 끝낸다 (P2 2a "남은틱 = 5")
     if (table.low !== null || table.chest !== null || table.grounder !== null || table.jump !== null || table.slide !== null) {

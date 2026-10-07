@@ -230,6 +230,34 @@ export function wobbledThrowFlight(
   }
 }
 
+/** 송구 공의 쏘기 값 — 공.vt44(h, w, φ) 의 세 인자 (a1a20 · 레이저 a2402) */
+export interface ThrowLaunch {
+  /** 수평 속도 h */
+  readonly horizontalSpeed: number
+  /** 수직 속도 w */
+  readonly verticalSpeed: number
+  /** 방향 φ (도) */
+  readonly direction: number
+}
+
+/**
+ * **보통 송구의 쏘기 값** — 0xa1620 a173c~a17ee (레이저 0xa222c a22f2~a23aa 도 같은 산술, 속도만 +0xdc = 2000):
+ * ```
+ * a173c  h = v·cos16(θ) >> 16 (θ = 0xbfab0(d·g'·100 / v²) >> 1)
+ * a17e0  t = ⌈큰 축 거리 / |h·cos|sin(φ) >> 16|⌉ (0x6c5d8)
+ * a17ee  w = g'·t >> 1   (g' = 0xa279c 가 배율을 곱한 공+0x44)
+ * ```
+ * 악송구 · 흔들림 · 원바운드 갈래가 아니면 이 값 그대로 a19d6 으로 가 쏜다.
+ */
+export function throwLaunchOf(fielder: FielderState, point: WorldPoint): ThrowLaunch {
+  const flight = throwFlightOf(fielder, point)
+  return {
+    horizontalSpeed: flight.horizontalSpeed,
+    verticalSpeed: (flight.gravity * flight.ticks) >> 1,
+    direction: flight.direction,
+  }
+}
+
 /** 레이저 송구(플레이+0x1f4) 속도 — 0xb2e38 이 고르는 야수 vtb0 = 0xa222c 가 `+0xdc = 0xfa << 3` 으로 넣는다 (a229c) */
 export const LASER_THROW_SPEED = 2000
 
