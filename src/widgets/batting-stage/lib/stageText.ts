@@ -34,14 +34,12 @@ export function describeResolution(detail: PitchOutcomeDetail): string {
     case '스트라이크':
       return resolution.isSwinging ? '헛스윙' : '스트라이크'
     case '타구': {
-      const outcome = resolution.outcome
-      if (outcome.kind === '홈런') return '홈런!'
-      if (outcome.kind === '안타') {
-        return outcome.bases === 1 ? '안타!' : `${outcome.bases}루타!`
-      }
-      // 아웃은 원본 game_judge 그림(아웃)으로 띄운다
-      if (outcome.kind === '아웃') return '아웃'
-      return outcome.kind
+      // 2스트라이크 번트 파울 아웃(판정 11)은 판 없이 그 자리에서 아웃이다 — 원본 game_judge 그림(아웃)
+      if (detail.isBuntFoulOut === true) return '아웃'
+      // 맞은 공의 안타·아웃은 수비 판(상태 0x17)이 끝나야 정해진다 — 타석에 실린 결과는 임시 값이라(`battedContact`)
+      // 맞는 순간에는 글자를 띄우지 않는다. 담장을 먼저 넘는 궤적만 HOMERUN 연출(아래 `isHomeRunResolution`)로 간다
+      if (resolution.outcome.kind === '홈런') return '홈런!'
+      return ''
     }
   }
 }

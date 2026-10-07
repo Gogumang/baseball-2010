@@ -6,7 +6,8 @@ import { pitcherBoostSideOf, swingBoostOf } from '@/entities/batting/model/swing
 import { remainingAfterSpecialSwing, rollSpecialSwing } from '@/entities/batting/model/specialSwing'
 import { timingOf } from '@/entities/batting/model/swingTiming'
 import { hitDirectionOf } from '@/entities/batting/model/hitDirection'
-import { outcomeOfPattern, randomPattern } from '@/entities/batting/model/battedBallOutcome'
+import { contactOfPattern, launchPatternOf, randomPattern } from '@/entities/batting/model/battedBallOutcome'
+import { provisionalOutcomeOf, registerContact } from '@/entities/batting/model/battedContact'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { Pitch } from '@/entities/pitching/model/pitch'
@@ -317,7 +318,7 @@ export function pitchAgainstBatter(
  *          헛스윙이면 여기서 끝 (0x5135c → 0x51840)
  * 0x51430~ 방향 · 타구 패턴
  * 0x517e6  S+0x10 ≠ 0 이면 0x34c74 의 p(마타자 30) 로 p·10 > rand(0,1000)
- *          ── 그 뒤 수비 (웹은 outcomeOfPattern 대체 근사)
+ *          ── 그 뒤 수비 판(상태 0x17)이 안타·아웃을 낸다 (`features/defense-play`)
  * ```
  */
 export function pitchAgainstBatterDetailed(
@@ -415,15 +416,25 @@ export function pitchAgainstBatterDetailed(
   if (result.kind === '헛스윙') return swung({ kind: '스트라이크', isSwinging: true }, false)
 
   const code = result.code + hitDirectionOf({ code: result.code, frame, frameCount: pitch.frameCount, batterSide: 0 }, random)
-  const pattern = randomPattern(code, random)
-  // 0x517e6 — 방향·패턴 뒤, 수비(대체 근사) 앞. 마타자는 0x34c74 가 번호와 무관하게 30%
+  // ⚠️ 원본은 사람 타석과 같은 장면 덱(0x3e340 이 만든 하나)에서 꺼낸다(0x51490). 투수편 진행기는 덱을 들고 있지 않아
+  //    덱 없이 한 장을 뽑는다 — 굴림 하나가 원본에 없다(미해결: 장면 덱을 경기 상태로 옮겨야 한다)
+  const drawn = randomPattern(code, random)
+  // 0x514f2 — 코드 25·26 의 2% 특수 타구 표
+  const pattern = launchPatternOf(code, drawn, random)
+  // 0x517e6 — 방향·패턴 뒤. 마타자는 0x34c74 가 번호와 무관하게 30%
   const isUncatchable = isSpecialSwing && rollSpecialSwing(specialNumber, random, true)
+  // 파울 각만 여기서 가른다 — 페어 타구의 안타·아웃은 수비 판이 낸다(`battedBallOutcome.contactOfPattern` 머리말).
   // 2스트라이크 번트 파울은 아웃 (0x9d5e2) — 사람 타석(resolvePitch)과 같은 판정이다
-  const batted = outcomeOfPattern(code, pattern, random, {
-    strikes: situation.strikes,
-    buntKind,
-  })
-  return swung(batted.kind === '파울' ? { kind: '파울' } : { kind: '타구', outcome: batted.outcome }, isUncatchable)
+  const contact = contactOfPattern(code, pattern, { strikes: situation.strikes, buntKind })
+  if (contact.kind === '파울') return swung({ kind: '파울' }, isUncatchable)
+  if (contact.kind === '번트파울아웃') {
+    return swung({ kind: '타구', outcome: registerContact({ kind: '아웃', detail: '직선타아웃' }, null) }, isUncatchable)
+  }
+  // 타석을 끝내는 임시 결과 — 쏜 패턴을 묶어 투수편 진행기가 그 패턴으로 판을 돌린다(`battedContact`)
+  return swung(
+    { kind: '타구', outcome: registerContact(provisionalOutcomeOf(pattern), { pattern, resultCode: code }) },
+    isUncatchable,
+  )
 }
 
 const ZONE_HALF_PIXELS = 16.5

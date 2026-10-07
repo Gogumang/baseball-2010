@@ -1,4 +1,17 @@
 import { describe, expect, it } from 'vitest'
+import { registerContact } from '@/entities/batting/model/battedContact'
+import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
+import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
+
+/** 타석 판정이 쏜 패턴을 묶은 결과 — 진행기가 그 패턴으로 판을 돌리고 기록은 판 끝 정산 결과다(`battedContact`) */
+const 쏜공 = (outcome: AtBatOutcome, pattern: BattedBallPattern, resultCode: number): AtBatOutcome =>
+  registerContact(outcome, { pattern, resultCode })
+/** 원본 코드 2 [47, 1038, 596] — 1루 쪽 깊숙이 떨어져 우익수가 20틱에 줍는 단타 */
+const 깊은단타 = (): AtBatOutcome => 쏜공({ kind: '안타', bases: 1 }, [47, 1038, 596, 0], 2)
+/** 원본 코드 0 [0] [90, 810, 1592] — 중견수가 뜬 채로 잡는다(키 없는 사람 수비도 쥐기만 하면 뜬공 아웃이다) */
+const 잡히는뜬공 = (): AtBatOutcome => 쏜공({ kind: '아웃', detail: '뜬공아웃' }, [90, 810, 1592, 0], 0)
+/** 내야 뒤에 겨우 뜬 공 — 뜬 채로 잡히고 3루 주자는 태그업으로 못 들어온다 */
+const 얕은뜬공 = (): AtBatOutcome => 쏜공({ kind: '아웃', detail: '뜬공아웃' }, [90, 250, 700, 0], 0)
 import {
   applyPitcherOutcome,
   checkPitchExhausted,
@@ -202,8 +215,9 @@ describe('이닝 단위 미션 — 노히트노런 · 퍼펙트게임', () => {
 
   it('아웃만 쌓이면 퍼펙트게임도 성공한다', () => {
     let run = startPitcherMission(퍼펙트)
+    // 사람 수비 · 송구 기본 수동이라 키 없이는 땅볼에 아무도 안 던진다(0xb1c90) — 뜬 채로 잡히는 공으로 아웃을 쌓는다
     for (let i = 0; i < 6 * OUTS_PER_INNING; i += 1) {
-      run = applyPitcherOutcome(run, { kind: '아웃', detail: '땅볼아웃' })
+      run = applyPitcherOutcome(run, 잡히는뜬공())
     }
 
     expect(run.status).toBe('성공')
@@ -229,21 +243,22 @@ describe('수비 진행 — 미션도 수비 시뮬레이션이 돌린다 (P2 7�
   it('2루 주자가 있는 단타 — 수비 진행기가 정한다: 키 없는 사람 수비는 안 던지고 2루 주자는 홈까지 간다', () => {
     expect(사우팅.start.runners).toEqual({ first: false, second: true, third: false })
 
-    const run = applyPitcherOutcome(startPitcherMission(사우팅), { kind: '안타', bases: 1 })
+    const run = applyPitcherOutcome(startPitcherMission(사우팅), 깊은단타())
 
     // 투수편은 사람 수비 · 송구 설정 기본 수동 — 원본은 키가 없으면 아무도 던지지 않는다(0xb1c90 자동 가지에
-    // 송구 호출이 없다). 대표 단타(원본 코드 2 [47, 1038, 596])는 원본 궤적(세계 0xbfed0)으로 1루 쪽 깊숙이
+    // 송구 호출이 없다). 이 단타(원본 코드 2 [47, 1038, 596])는 원본 궤적(세계 0xbfed0)으로 1루 쪽 깊숙이
     // 떨어져 우익수(6)가 20틱에 줍는다 — 그 자리에서 홈까지의 수비 틱 예측(0xaf284)보다 주자가 빨라
     // 자동 진루 0xaf918 이 2루 주자를 홈까지 보낸다.
     expect(run.allowed.runs).toBe(1)
     expect(run.bases).toEqual({ first: true, second: false, third: false })
   })
 
-  it('1·3루 땅볼 — 판 시작 리드(0x3d7b8) 뒤로 아웃 하나, 3루 주자는 못 들어온다', () => {
+  it('1·3루 얕은 뜬공 — 판 시작 리드(0x3d7b8) 뒤로 아웃 하나, 3루 주자는 못 들어온다', () => {
     const 챔피언 = PITCHER_MISSIONS.find((m) => m.name === '최강의 챔피언')!
     expect(챔피언.start.runners).toEqual({ first: true, second: false, third: true })
 
-    const run = applyPitcherOutcome(startPitcherMission(챔피언), { kind: '아웃', detail: '땅볼아웃' })
+    // 사람 수비 · 키 없음이라 땅볼에는 아무도 안 던진다 — 뜬 채로 잡히는 얕은 공으로 본다
+    const run = applyPitcherOutcome(startPitcherMission(챔피언), 얕은뜬공())
 
     expect(run.totalOuts).toBe(1)
     expect(run.allowed.runs).toBe(0)
@@ -300,10 +315,10 @@ describe('R+0x130 — 주자 목록 마지막 원소의 +0x96 (0xa8c5c~0xa8c86)'
   const FIRST = { first: true, second: false, third: false }
   const withBases = (bases: typeof EMPTY): PitcherRun => ({ ...startPitcherMission(노히트노런), bases })
 
-  it('빈 루: 타자주자가 루에 남으면 1, 홈런처럼 득점하면 0 (+0x96 이 선다), 땅볼 아웃이면 0', () => {
-    expect(applyPitcherOutcome(withBases(EMPTY), { kind: '안타', bases: 1 }).allowed.baserunner).toBe(1)
+  it('빈 루: 타자주자가 루에 남으면 1, 홈런처럼 득점하면 0 (+0x96 이 선다), 아웃이면 0', () => {
+    expect(applyPitcherOutcome(withBases(EMPTY), 깊은단타()).allowed.baserunner).toBe(1)
     expect(applyPitcherOutcome(withBases(EMPTY), { kind: '홈런' }).allowed.baserunner).toBe(0)
-    expect(applyPitcherOutcome(withBases(EMPTY), { kind: '아웃', detail: '땅볼아웃' }).allowed.baserunner).toBe(0)
+    expect(applyPitcherOutcome(withBases(EMPTY), 잡히는뜬공()).allowed.baserunner).toBe(0)
   })
 
   it('빈 루 삼진은 목록이 비어 0 이다', () => {

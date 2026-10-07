@@ -58,13 +58,21 @@ import {
 import { EMPTY_BATTER_GAME_LOG, recordBatterAtBat } from '@/entities/game/model/batterGameLog'
 import type { BatterGameLog } from '@/entities/game/model/batterGameLog'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
-import { defenseAbilitiesOf, isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
+import {
+  defenseAbilitiesOf,
+  isBattedBallInPlay,
+  recordedOutcomeOf,
+  runDefensePlay,
+  withPredictedOutcome,
+} from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayInput, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { homeRunPlaybackOf } from '@/features/defense-play/model/homeRunPlayback'
 import { PICKOFF_RESULT, runPickoffPlay } from '@/features/defense-play/model/pickoffPlay'
 import { chargedRunsOfFates, runnerFatesWithoutPlay } from '@/features/defense-play/model/runnerFates'
 import { pickoffPlayForKey, PICKOFF_PLAY_KIND } from '@/entities/defense-controls/model/pickoff'
-import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
+import { fixturePatternFor } from '@/features/defense-play/model/representativePattern'
+import { isBattedBallKind } from '@/features/defense-play/model/playOutcome'
+import { contactOfOutcome } from '@/entities/batting/model/battedContact'
 import { pitchAgainstBatter } from '@/entities/pitching/model/simulateBatter'
 import { BATTER_SLOT, gameAbilityOf } from '@/features/play-team-game/model/gameAbilities'
 import { isMistakePitch } from '@/entities/pitching/model/mistakePitch'
@@ -1064,11 +1072,18 @@ export function startPitch(
   const outcome = arrived.atBat.outcome
   // 볼·스트라이크·파울 — 판정 A 0xae24c 의 "그 밖 → 0xf" 라 다음 공을 고르기 전에 0xf 진입 0x3d954 를 다시 지난다
   if (outcome === null) return enterPitchSelection(arrived, random)
-  if (isBattedBallInPlay(outcome)) {
+  // 맞은 공은 쏜 패턴(`simulateBatter` 가 결과 객체에 묶어 둔 것)으로 판을 돈다 — 홈런도 판 안에서 끝난다.
+  // 판정 11(2스트라이크 번트 파울 아웃)은 묶인 패턴이 없어 판 없이 아웃이다
+  const contact = contactOfOutcome(outcome)
+  if (contact !== undefined ? isBattedBallKind(outcome) : isBattedBallInPlay(outcome)) {
     // 여기서 멈춘다 — 화면이 이 타구를 실시간으로 돌리고 결과를 `resolveDefensePlay` 에 넘긴다.
     // `atBat` 은 아직 안 비웠으므로 끝난 타석의 결과 코드·볼 카운트가 그대로 남아 있다.
     // 출발 칸은 타구 판 입력(리드 0x3d7b8)이 읽고 나면 비운다
-    return { ...withoutSteal(arrived), pendingDefensePlay: defensePlayInputOf(arrived, outcome, random) }
+    return {
+      ...withoutSteal(arrived),
+      // 진행기 입력의 결과 칸은 판 앞 예측이다(`predictedOutcomeOf`) — 기록은 실제 판의 정산 결과다
+      pendingDefensePlay: withPredictedOutcome(defensePlayInputOf(arrived, outcome, random)),
+    }
   }
   // 낫아웃 — 폭투·포일 판의 진루(타자주자 포함)를 이 삼진 타석의 진루로 먹인다 (0x3e0d0 state[0x1a]).
   // 삼진 기록(0xa7c4c)은 그대로 남는다 — `applyDefensivePlay` 의 보통 삼진 길을 판의 결과로 지난다
@@ -1270,9 +1285,11 @@ export function resolveDefensePlay(
   playback: DefensePlayResult | null = null,
 ): PitcherGameProgress {
   if (progress.pendingDefensePlay === null) return progress
-  const outcome = progress.atBat.outcome
+  const atBatOutcome = progress.atBat.outcome
   // 타석이 안 끝났는데 붙들려 있을 수는 없다 — 그래도 칸은 비워 경기가 멈추지 않게 한다
-  if (outcome === null) return { ...progress, pendingDefensePlay: null }
+  if (atBatOutcome === null) return { ...progress, pendingDefensePlay: null }
+  // 기록은 판 끝 정산(0xa8024)이 낸 결과다 — 타석에 실린 결과는 타석을 끝낸 임시 값이다(`battedContact`)
+  const outcome = recordedOutcomeOf(progress.pendingDefensePlay, result)
   return advance(
     applyDefensivePlay(
       { ...progress, pendingDefensePlay: null },
@@ -1439,8 +1456,12 @@ function defensePlayInputOf(
   random: RandomPort,
 ): DefensePlayInput {
   return {
+    // 타석을 끝낸 임시 결과 — 진행기는 보지 않는다(결과는 판 끝 정산이 낸다)
     outcome,
-    trajectory: battedBallTrajectory(representativePatternOf(outcome)),
+    // 쏜 패턴 그대로 — ⚠️ 묶인 패턴이 없으면(시험·옛 호출, 원본에 없는 길) 결과에 맞는 패턴을 원본 표에서 고르고
+    // 기록은 넘겨받은 결과 그대로다(`outcomeIsGiven`)
+    trajectory: battedBallTrajectory(contactOfOutcome(outcome)?.pattern ?? fixturePatternFor(outcome)),
+    outcomeIsGiven: contactOfOutcome(outcome) === undefined,
     bases: progress.game.bases,
     outs: progress.game.outs,
     // CPU 가 공이 나는 동안 건 도루 — 판 시작 리드(0x3d7b8)가 다음 루로 몰아 돌린다

@@ -227,7 +227,9 @@ describe('CPU 번트 — 원본 0x3445a', () => {
   })
 
   it('마선수는 번트 칸을 뽑아도 휘두른다', () => {
-    // 같은 굴림으로 보통 타자는 희생번트, 마선수는 0xab214 보통 스윙(첫 굴림들이 0 이라 강타)이다
+    // 같은 굴림으로 보통 타자는 희생번트, 마선수는 0xab214 보통 스윙(첫 굴림들이 0 이라 강타)이다.
+    // 결과는 판이 정하므로 타석에 실리는 것은 임시 값이다 — 희생번트 패턴은 땅볼아웃, 강타(코드 24)는 담장을 먼저 넘는 궤적이라 홈런
+    // (`battedContact.provisionalOutcomeOf`)
     const 굴림 = [0.65, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     expect(pitchAgainstBatter(한가운데, 타자(500), 각본(굴림), undefined, 무사주자없음)).toEqual({
       kind: '타구',
@@ -235,7 +237,7 @@ describe('CPU 번트 — 원본 0x3445a', () => {
     })
     expect(
       pitchAgainstBatter(한가운데, 타자(500), 각본(굴림), undefined, 무사주자없음, { isMagicBatter: true }),
-    ).toEqual({ kind: '타구', outcome: { kind: '안타', bases: 2 } })
+    ).toEqual({ kind: '타구', outcome: { kind: '홈런' } })
   })
 })
 

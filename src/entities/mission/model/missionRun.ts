@@ -7,7 +7,9 @@ import type { AdvanceResult, BaseState } from '@/entities/game/model/baseState'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayInput, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
-import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
+import { fixturePatternFor } from '@/features/defense-play/model/representativePattern'
+import { isBattedBallKind } from '@/features/defense-play/model/playOutcome'
+import { contactOfOutcome } from '@/entities/batting/model/battedContact'
 import { runnerFatesWithoutPlay, type RunnerFate } from '@/features/defense-play/model/runnerFates'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
@@ -71,9 +73,9 @@ export function startMission(mission: OriginalMission): MissionRun {
  * "안타 진루 고정" — 은 미션에서도 더 이상 쓰이지 않는다. 삼진·볼넷·홈런은 수비가 개입할 것이
  * 없어 예전 길 그대로다.
  *
- * ⚠️ 어느 원본 패턴이었는지는 미션 타석 쪽이 아직 안 넘겨 주므로 `representativePatternOf` 로
- * 같은 결과를 내는 원본 패턴 하나를 골라 궤적을 만든다 — **고르는 규칙은 근사다**
- * (타자편 `applyPlayerOutcome` 도 패턴을 못 받으면 같은 길을 쓴다).
+ * 궤적은 타석 판정(`resolvePitch` · `simulateBatter`)이 **쏜 패턴 그대로**다 — 결과 객체에 묶여 온다(`contactOfOutcome`).
+ * 안타·아웃·홈런은 판 끝 정산(0xa8024 — `playOutcome`)이 낸다. 넘겨받은 결과는 타석을 끝낸 임시 값이다.
+ * ⚠️ 묶인 패턴이 없는 결과(시험·옛 호출 — 원본에 없는 길)만 결과에 맞는 패턴을 원본 표에서 고른다(`fixturePatternFor`).
  *
  * `random` 을 주면 원본 확률 굴림(펌블 0xb41d0 · 악송구 0xa1828 · 필살수비 0x66b30/0x66be4)이
  * **돌고**, 안 주면 지금까지처럼 결정론이다. 미션 화면(`app/model/useMissionSession`)이 아직
@@ -103,6 +105,8 @@ export function missionAdvance(
 /** 미션 타석 하나의 결과 — 진루·아웃·득점에 **주자 목록의 운명**(정산 0xa8024 가 읽는 +0x95·+0x96)을 붙인 것 */
 export interface MissionPlay {
   readonly advance: AdvanceResult
+  /** 기록할 결과 — 판을 돈 타구는 판 끝 정산이 낸 것, 아니면 넘겨받은 그대로 */
+  readonly outcome: AtBatOutcome
   /** 원본 목록 순서(`[타자주자?, 1루?, 2루?, 3루?]`)의 운명 — `features/defense-play/model/runnerFates` */
   readonly runnerFates: readonly RunnerFate[]
 }
@@ -117,13 +121,27 @@ export function missionPlay(
   outcome: AtBatOutcome,
   options: Parameters<typeof missionAdvance>[3] = {},
 ): MissionPlay {
-  if (!isBattedBallInPlay(outcome)) {
-    return { advance: advanceRunners(bases, outcome, outs), runnerFates: runnerFatesWithoutPlay(bases, outcome) }
+  if (!isMissionPlayOutcome(outcome)) {
+    return {
+      advance: advanceRunners(bases, outcome, outs),
+      outcome,
+      runnerFates: runnerFatesWithoutPlay(bases, outcome),
+    }
   }
   const played =
     options.played ??
     runDefensePlay(missionDefensePlayInputOf(bases, outs, outcome, options.random, options.gameMode))
-  return { advance: played.advance, runnerFates: played.runnerFates }
+  // 기록은 판 끝 정산 결과 — 묶인 패턴 없이 결과만 넘겨받은 호출(시험·옛 호출)만 넘겨받은 결과 그대로다
+  const settled = contactOfOutcome(outcome) === undefined ? outcome : (played.outcome ?? outcome)
+  return { advance: played.advance, outcome: settled, runnerFates: played.runnerFates }
+}
+
+/**
+ * 이 결과가 수비 판을 도는가 — 쏜 패턴이 묶여 있으면 안타·아웃·홈런 모두(원본은 담장을 넘긴 공도 판 안에서 끝난다),
+ * 묶인 패턴이 없으면(시험·옛 호출·판정 11) 예전처럼 안타·아웃만 판을 돈다.
+ */
+export function isMissionPlayOutcome(outcome: AtBatOutcome): boolean {
+  return contactOfOutcome(outcome) !== undefined ? isBattedBallKind(outcome) : isBattedBallInPlay(outcome)
 }
 
 /**
@@ -151,8 +169,11 @@ export function missionDefensePlayInputOf(
   // 협살(AI 상태 8)은 `state[0x31 + 수비측] == 1` 이 아니라 안 돈다 (S8 1-4). 타자편은 그 반대다.
   const isPitcherSide = gameMode === MISSION_PITCHER_SIDE_MODE
   return {
+    // 타석을 끝낸 임시 결과 — 진행기는 보지 않는다(결과는 판 끝 정산이 낸다)
     outcome,
-    trajectory: battedBallTrajectory(representativePatternOf(outcome)),
+    trajectory: battedBallTrajectory(contactOfOutcome(outcome)?.pattern ?? fixturePatternFor(outcome)),
+    // ⚠️ 묶인 패턴이 없으면(시험·옛 호출) 기록은 넘겨받은 결과 그대로다
+    outcomeIsGiven: contactOfOutcome(outcome) === undefined,
     bases,
     outs,
     random,
@@ -196,13 +217,19 @@ export function advanceSituation(
   random?: RandomPort,
   /** 화면이 이미 다 돌린 수비 플레이. 주면 여기서 다시 굴리지 않는다 */
   played?: DefensePlayResult,
-): { bases: BaseState; outs: number; runsScored: number } {
-  const advance = missionAdvance(run.bases, run.outs, outcome, { random, played })
+): { bases: BaseState; outs: number; runsScored: number; outcome: AtBatOutcome } {
+  const play = missionPlay(run.bases, run.outs, outcome, { random, played })
+  const advance = play.advance
   const outs = run.outs + advance.outsAdded
   if (outs >= OUTS_PER_INNING) {
-    return { bases: run.mission.start.runners, outs: run.mission.start.outs, runsScored: advance.runsScored }
+    return {
+      bases: run.mission.start.runners,
+      outs: run.mission.start.outs,
+      runsScored: advance.runsScored,
+      outcome: play.outcome,
+    }
   }
-  return { bases: advance.bases, outs, runsScored: advance.runsScored }
+  return { bases: advance.bases, outs, runsScored: advance.runsScored, outcome: play.outcome }
 }
 
 /** 배트를 냈다 (헛스윙·파울 포함). 스윙 제한이 있는 미션만 줄어든다. */
@@ -233,9 +260,10 @@ export function applyOutcome(
   if (run.status !== '진행중') return run
 
   const situation = advanceSituation(run, outcome, random, played)
+  // 목표는 판 끝 정산(0xa8024 → 미션 판정 0xaaa6c)이 낸 결과로 센다 — 넘겨받은 결과는 타석을 끝낸 임시 값이다
   const progress = recordOutcome(
     run.progress,
-    outcome,
+    situation.outcome,
     situation.runsScored,
     isBunt,
     runnerCountOf(run.bases),

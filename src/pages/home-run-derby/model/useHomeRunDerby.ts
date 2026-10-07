@@ -282,6 +282,9 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
     //    볼카운트 자체가 없고, 어느 갈래로 들어가는지도 문서에 없다.
     playSoundIds(audioRef.current, [detail.contactSoundId])
 
+    // 홈런 = 판 끝 결과 코드 0x9d5bc 가 8 · 12 를 내는 궤적(공이 땅에 닿기 전에 담장선 · 폴을 넘는다 — 더비 판 종류 8 은
+    // +0x125 로 공이 멈출 때 닫힌다). 타석 판정이 쏜 패턴의 궤적으로 그 코드를 미리 본 것이 결과 객체에 실려 온다
+    // (`battedContact.provisionalOutcomeOf`). 예전 웹은 결과 코드 묶음 · 속도 문턱(24~26 · 1100)으로 지어 정했다
     const isHomeRun = detail.resolution.kind === '타구' && detail.resolution.outcome.kind === '홈런'
     const batted = detail.pattern === undefined ? null : derbyBattedBallOf(detail.pattern, isHomeRun)
     // 이벤트 존은 "공이 날아가는 중" 조건이라 배트에 맞은 공에서만 본다 (0x36dfc) — 패턴 플래그 & 2 (+0x127)

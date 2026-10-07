@@ -221,6 +221,11 @@ export interface DefenseCallContext {
    * `features/defense-play` 의 `DefensePlayInput.buntFoulOut` 이 그대로 들어온다.
    */
   readonly buntFoulOut?: boolean
+  /**
+   * **판 끝 정산(0xa8024)이 낸 결과** — 수비 진행기 `DefensePlayResult.outcome`. 있으면 첫 인자(타석을 끝낸 임시 결과,
+   * `battedContact`)보다 먼저다 — 원본 콜은 판 안의 결과 코드(13 아웃 · 9 세이프 · 8·12 홈런)로 난다.
+   */
+  readonly outcome?: AtBatOutcome
 }
 
 /** 아웃 콜 두 가지 — 62 는 "잡아서/태그해서 낸 아웃", 20 은 "루에서 잡은 포스 아웃" */
@@ -292,7 +297,9 @@ const SAFE_CALL = 17
  * (`PitchArrivalPlay.callSoundId`) 이 함수는 도루를 따로 다루지 않는다. 간이 엔진 도루(`entities/game/model/steal`
  * 의 `quickEngineSteal`, 표 0xd9064 굴림 하나)는 소리 없이 지나간다.
  */
-export function inPlayCallSoundIdOf(outcome: AtBatOutcome, play?: DefenseCallContext | null): number | null {
+export function inPlayCallSoundIdOf(atBatOutcome: AtBatOutcome, play?: DefenseCallContext | null): number | null {
+  // 판을 돈 타구는 정산 결과로 고른다 — 타석 결과는 타석을 끝낸 임시 값이다
+  const outcome = play?.outcome ?? atBatOutcome
   if (outcome.kind === '홈런') return 11
   if (outcome.kind === '아웃') {
     // 판정 v11(2스트라이크 번트 파울 아웃)은 **조건 없이** 62 다 (0x51b20 → 0x51b2e).

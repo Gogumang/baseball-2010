@@ -130,7 +130,7 @@ function brokenConditionsOf(mission: OriginalMission, allowed: PitcherRun['allow
  * 실점(`allowed.runs`)·이닝 목표(`totalOuts`)가 이 결과를 그대로 받는다 (P2 7절 · U-02).
  */
 function advanceDefense(run: PitcherRun, outcome: AtBatOutcome, options: PitcherOutcomeOptions) {
-  const { advance, runnerFates } = missionPlay(run.bases, run.outs, outcome, {
+  const { advance, runnerFates, outcome: settled } = missionPlay(run.bases, run.outs, outcome, {
     random: options.random,
     played: options.played,
     gameMode: MISSION_PITCHER_MODE,
@@ -141,6 +141,8 @@ function advanceDefense(run: PitcherRun, outcome: AtBatOutcome, options: Pitcher
     bases: isInningOver ? EMPTY_BASES : advance.bases,
     outs: isInningOver ? 0 : outs,
     outsAdded: advance.outsAdded,
+    /** 기록할 결과 — 판을 돈 타구는 판 끝 정산(0xa8024)이 낸 것 */
+    outcome: settled,
     /** 정산(0xa8024)이 보는 주자 목록 — 이닝 정리보다 앞이다 */
     runnerFates,
     /**
@@ -170,18 +172,20 @@ export function applyPitcherOutcome(
   if (run.status !== '진행중') return run
 
   const defense = advanceDefense(run, outcome, options)
+  // 목표·피안타는 판 끝 정산이 낸 결과로 센다 — 넘겨받은 결과는 타석을 끝낸 임시 값이다(`battedContact`)
+  const settled = defense.outcome
   const allowed = {
     // R+0x128 = +0x95 주자 수, 3아웃이고 목록 0번이 끝났으면 0 (0xa8ea4~0xa8f56)
     runs: run.allowed.runs + chargedRunsOfFates(defense.runnerFates, defense.outsAtSettlement),
-    hits: run.allowed.hits + (isHit(outcome) ? 1 : 0),
+    hits: run.allowed.hits + (isHit(settled) ? 1 : 0),
     // R+0x144 = 볼넷만 (사구는 R+0x148 — `brokenConditionsOf` 머리글)
-    walks: run.allowed.walks + (outcome.kind === '볼넷' ? 1 : 0),
+    walks: run.allowed.walks + (settled.kind === '볼넷' ? 1 : 0),
     // R+0x130 = 이번 플레이 하나의 값 (덮어쓴다) — 목록 마지막 원소의 +0x96 이 꺼져 있나
     baserunner: baserunnerAllowedOfFates(defense.runnerFates) ? 1 : 0,
   }
   const progress = recordPitcherOutcome(
     run.progress,
-    outcome,
+    settled,
     run.perfectGauges,
     brokenConditionsOf(run.mission, allowed),
     // 아웃 콜 수 — 병살 2 · 삼중살 3 · 안타 판의 주자 아웃 1 (R+0x13c, `recordPitcherOutcome` 머리글). 셋째 아웃에서 판이 끝난다

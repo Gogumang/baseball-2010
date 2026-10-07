@@ -8,6 +8,7 @@ import { matchResultEventOf } from '@/entities/story/model/aceMatch'
 import { runnerCountOf } from '@/entities/game/model/baseState'
 import {
   applyOutcome as applyMissionOutcome,
+  isMissionPlayOutcome,
   applyPickoff,
   checkSwingsExhausted,
   giveUp as giveUpMission,
@@ -64,7 +65,7 @@ import type { Collection, HallOfFamePlayerPick } from '@/entities/collection/mod
 import { pitchReleaseSoundIdOf } from '@/widgets/batting-stage/lib/pitchReleaseSound'
 import type { ModePitcher } from '@/app/model/modePitcher'
 import { ROOKIE_BATTER_ABILITY } from '@/entities/batting/model/batter'
-import { isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
+import { recordedOutcomeOf, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayInput, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { pickoffCallSoundIdOf, runPickoffPlay } from '@/features/defense-play/model/pickoffPlay'
 import { pickoffPlayForKey } from '@/entities/defense-controls/model/pickoff'
@@ -479,8 +480,8 @@ export function useMissionSession({
       }
       const hasSwung = detail.hasSwung
       const outcome = isAtBatFinished(nextAtBat) ? nextAtBat.outcome : null
-      // 인플레이 타구면 수비 화면(상태 0x17)이 먼저 돈다 — 아웃·세이프 콜은 그 뒤다
-      const runsDefense = outcome !== null && isBattedBallInPlay(outcome)
+      // 맞은 공(쏜 패턴이 묶인 안타·아웃·홈런)이면 수비 화면(상태 0x17)이 먼저 돈다 — 결과·콜은 그 뒤다
+      const runsDefense = outcome !== null && isMissionPlayOutcome(outcome)
       const current = missionRunRef.current
       const runnersOnBase = current === null ? 0 : runnerCountOf(current.bases)
 
@@ -749,9 +750,10 @@ export function useMissionSession({
     // 이 공 **전** 스트라이크 — 0x9d57c 의 st[4] (삼진 진동이 본다)
     const strikesBefore = runner.atBatRef.current.strikes
     const nextAtBat = runner.applyPitch(resolution)
-    runner.setBannerText(describePitchResolution(resolution))
+    // 맞은 공의 결과는 수비 판이 끝나야 정해진다 — 타석에 실린 결과는 임시 값이라(`battedContact`) 판정 글자를 띄우지 않는다
+    runner.setBannerText(resolution.kind === '타구' ? '' : describePitchResolution(resolution))
     const outcome = isAtBatFinished(nextAtBat) ? nextAtBat.outcome : null
-    const runsDefense = outcome !== null && isBattedBallInPlay(outcome)
+    const runsDefense = outcome !== null && isMissionPlayOutcome(outcome)
     // 공 도착 0x3dfac — 못 맞힌 공이면 0.1% 폭투·포일(종류 9)이나 CPU 가 건 도루(종류 5) 판을 연다.
     // 사람 수비라 송구는 환경설정이 먹는다 — 판은 키 없는 사람 수비로 미리 다 돌려 재생한다 (견제와 같은 근사)
     const play = arrivesUnhit(resolution)
@@ -869,13 +871,15 @@ export function useMissionSession({
       setPendingDefensePlay(null)
       // 플레이가 끝난 자리 — 아웃 콜(0x51b36)·세이프 콜(0x51c14)과 장타 함성은 여기서야 난다.
       // 함성 60 은 원본이 **낙구 틱**에 내는 것이라 이 자리는 근사다 (atBatSounds 주석)
+      // 판 끝 정산(0xa8024)이 낸 결과 — `pending.outcome` 은 타석을 끝낸 임시 값이다(`battedContact`)
+      const settled = recordedOutcomeOf(pending.input, played)
       playSoundIds(audio, [
         deepHitCheerSoundIdOf({
-          outcome: pending.outcome,
+          outcome: settled,
           carryDistance: carryDistanceOf(pending.input.trajectory),
           caughtOnTheFly: played.caughtOnTheFly,
         }),
-        inPlayCallSoundIdOf(pending.outcome, played),
+        inPlayCallSoundIdOf(settled, played),
       ])
 
       if (pending.side === '투수') {
@@ -894,7 +898,7 @@ export function useMissionSession({
       )
       // 결과 연출 뒤 새 타석 — 0xd → 0xe
       setSceneConfirm(enterSceneConfirm())
-      runner.pauseWithBanner(describeOutcomeBanner(pending.outcome, pending.runnersOnBase))
+      runner.pauseWithBanner(describeOutcomeBanner(settled, pending.runnersOnBase))
     },
     [audio, random, runner],
   )

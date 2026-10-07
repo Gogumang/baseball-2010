@@ -123,6 +123,7 @@ import {
 import { forecastCatch } from '@/features/defense-play/model/catchForecast'
 import { forecastOptionsOf, launchThrow, type ThrownBall } from '@/features/defense-play/model/throwLaunch'
 import { runnerFateOf, type RunnerFate } from '@/features/defense-play/model/runnerFates'
+import { settledBatterOutcomeOf } from '@/features/defense-play/model/playOutcome'
 import {
   viewStateOf,
   type ActionMemory,
@@ -145,10 +146,12 @@ import {
  *   자동 추가 진루(0xaf918) → 2아웃 득점 보류(state[0]).
  *
  * ## 무엇이 무엇을 정하는가 (중요)
- * **타자주자의 운명은 결과 코드가 정한다.** 안타·아웃은 `battedBallOutcome.outcomeOfPattern` 이
- * 이미 정해 놓았고(그 자체가 위치 분석 4차의 근사다), 이 진행기는 **나머지 주자의 진루·추가 아웃·
- * 득점**을 원본 규칙으로 정한다. 그래서 여기서 바뀌는 것은 `baseState` 의 두 근사 —
- * "희생플라이 보장" 과 "고정 진루표" — 이고, 그 자리를 `autoAdvanceDecisions` + `heldRuns` 가 채운다.
+ * **원본처럼 이 판이 다 정한다.** 타석 판정(0x51408)은 덱에서 뽑은 패턴을 그대로 쏠 뿐이고(메시지 0x11 → 51188),
+ * 타자주자도 다른 주자처럼 포구 예보 · 아웃 판정 0xb36d0(1루 포스 · 태그 · 쥐는 순간의 뜬공 아웃) · 자동 진루 0xaf918 로
+ * 움직인다. 판이 끝나면 판 끝 정산 0xa8024 의 타자 갈래(`playOutcome`)가 사건(6 안타 · 8 홈런 · 0xd 아웃)과 타자주자 칸
+ * (+0x7c · +0x84 · +0x8c)으로 기록할 결과를 낸다 — `DefensePlayResult.outcome`.
+ * (예전 웹은 타석 결과 코드를 먼저 정하고 그에 맞춰 예보 구간 자르기 · 타자주자 최소 루 · 1루 송구 도착 틱 아웃 ·
+ * 타자주자 판정 빼기 같은 다리를 걸었다. 2026-10-07 에 모두 걷었다.)
  *
  * 타구 궤적은 `entities/batting/model/battedBallFlight` 가 원본 물리 세계 0xbfed0 대로 미리 깐 점이다
  * (점마다 속도·수직 속도·각·바운드 표시, 사건 틱 aa0 · aa4 · aa8 · ab0).
@@ -164,8 +167,17 @@ const DEFAULT_MAXIMUM_TICKS = 240
 const HOME_BASE = 4
 
 export interface DefensePlayInput {
-  /** 타석 결과 — 타자주자의 운명이 여기서 온다 */
+  /**
+   * 타석을 끝낸 **임시 결과** — ⚠️ 진행기는 이 칸을 **보지 않는다**. 결과는 판 끝 정산이 낸다(`DefensePlayResult.outcome`).
+   * 받는 쪽(세션 · 화면)이 판이 끝나기 전에 그림·소리를 고르는 데만 남겨 둔 칸이다(`battedContact.provisionalOutcomeOf`).
+   */
   readonly outcome: AtBatOutcome
+  /**
+   * ⚠️ **결과를 넘겨받은 호출**(쏜 패턴 없이 결과만 준 시험·옛 호출 — 원본에 없는 길)인가. 서 있으면 판은 결과에 맞춰 고른
+   * 패턴(`fixturePatternFor`)으로 돌고, 기록은 넘겨받은 `outcome` 그대로다(`recordedOutcomeOf`). 진행기는 보지 않는다.
+   * 실제 타석(쏜 패턴이 있는 판)은 늘 거짓이다.
+   */
+  readonly outcomeIsGiven?: boolean
   /** 원본 패턴에서 만든 타구 궤적 */
   readonly trajectory: BattedBallTrajectory
   /** 투구 때의 루 상황 */
@@ -400,8 +412,13 @@ export interface DefensePlayResult {
   readonly catchTick: number
   /** 필살타법 성공으로 아무도 잡지 못한 타구인가 (0x51800) */
   readonly isUncatchable: boolean
-  /** 뜬공을 뜬 채로 잡았는가 (태그업이 걸리는 조건) */
+  /** 뜬공을 뜬 채로 잡았는가 — 원본 state[0x1f](쥐기의 아웃 판정이 타자주자를 뜬공 아웃으로 죽였다) */
   readonly caughtOnTheFly: boolean
+  /**
+   * **판 끝 정산 0xa8024 가 타자에게 적는 결과** — 안타 루타 · 홈런(담장 · 그라운드) · 아웃 (`playOutcome`).
+   * 타구 판(`runDefensePlay`)만 낸다 — 견제·도루·폭투 판처럼 타석이 아닌 판에는 없다.
+   */
+  readonly outcome?: AtBatOutcome
   /**
    * **아웃 판정(0xb36d0)이 마지막으로 적은 아웃이 태그였나** — 원본 `state[0x87]`.
    *
@@ -410,8 +427,6 @@ export interface DefensePlayResult {
    *
    * **"한 번이라도" 가 아니라 "마지막 판정" 이다** — 근거는 `runOutJudgement` 주석에 적었다.
    * 쓰는 자리는 원본 판정을 옮긴 두 곳뿐이다: `runOutJudgement` 와 협살 태그.
-   * 타자주자의 "선언된 운명"(`batterOutTick`)은 원본 판정이 아니라 이 진행기의 규약이라
-   * 이 칸을 건드리지 않는다 — **근사**다.
    */
   readonly tagOut: boolean
   /** **첫** 송구의 목표 루(사람 키든 CPU 결정이든). −1 이면 안 던졌다 */
@@ -447,32 +462,25 @@ export interface DefensePlayResult {
 }
 
 /**
- * 이 타석이 수비 시뮬레이션을 돌릴 타구인가 — 삼진·볼넷·홈런은 돌릴 것이 없다.
+ * **쏜 패턴 없이 결과만 들고 온 호출**(시험·옛 화면)이 판을 돌릴 결과인가 — 안타·아웃.
  *
- * 홈런은 아무도 잡지 못하고 진루·득점도 타석 쪽이 이미 정해 놓으므로 여기서 빼 두고,
- * **날아가는 그림만** `homeRunPlayback.ts` 가 따로 만든다.
+ * 실제 타석은 쏜 패턴이 결과 객체에 묶여 와 홈런까지 판을 돈다(`playOutcome.isBattedBallKind`). 패턴 없이 온 홈런은
+ * 판을 안 돌리고 **날아가는 그림만** `homeRunPlayback.ts` 가 따로 만든다(점수는 타석 쪽 규칙 — 옛 길).
  */
 export function isBattedBallInPlay(outcome: AtBatOutcome): boolean {
   return outcome.kind === '안타' || outcome.kind === '아웃'
 }
 
-/** 뜬 채로 잡히는 타구인가. 땅볼 아웃은 "잡히는 타구" 가 아니라 굴러간 공을 주운 것이다 */
-function catchesOnTheFly(outcome: AtBatOutcome): boolean {
-  return outcome.kind === '아웃' && (outcome.detail === '뜬공아웃' || outcome.detail === '직선타아웃')
-}
-
-/** 타자주자가 최소한 몇 루까지 가는가 */
-function batterMinimumBaseOf(outcome: AtBatOutcome): number {
-  if (outcome.kind === '안타') return outcome.bases
-  if (outcome.kind === '홈런') return HOME_BASE
-  return 1
-}
-
 /** 진행기 안에서 **제자리에서 바뀌는** 주자 한 명 */
 export interface MutableRunner {
   state: RunnerState
-  /** 최소 진루 루 — 타자주자는 결과 코드가, 앞 주자들은 포스 사슬이 정한다 (`createPlayRunners`) */
+  /** 최소 진루 루 — 포스 사슬이 정한다(타자주자는 1루) (`createPlayRunners`) */
   minimumBase: number
+  /**
+   * 원본 `+0x84` — 직전의 `+0x7c`(달려가던 루). a07b0 vt48 이 목표를 바꿀 때 옛 +0x7c 를 옮기고, 도착 0xa040c 가
+   * `+0x84 = +0x8c = +0x7c` 로 적는다. 판 끝 정산 0xa8024 가 타자주자에게 "1루를 넘봤나" 로 읽는다(`playOutcome`)
+   */
+  previousTarget: number
   /** 이미 득점 처리를 했는가 */
   counted: boolean
 }
@@ -486,30 +494,22 @@ export interface MutableRunner {
  * "루 b 의 주자" `0xa97a0` 이 `+0x8c`(목표 루) == b 인 주자를 **하나만** 집어 오고,
  * 주루 키의 앞길·뒷길 검사(`0xa99a8` · `0xa9924`, 0xa9b04 에서 부른다)가 겹치는 루로는 못 보낸다 (I 3b).
  *
- * 웹판은 타자주자의 운명을 **타석 결과 코드가 먼저 정한다**(이 파일 머리말). 그러면 사슬 머리가
- * 1루가 아니라 **결과 코드가 준 최소 루 M** 이 된다: 타자주자가 반드시 M 에 선다면 그 앞 주자는
- * M+1, 그 앞은 M+2 … 에 서 있어야 원본이 절대 만들지 않는 "한 루에 둘" 이 안 생긴다.
- *
- * 그래서 **최소 진루 루 = min(홈, max(출발 루, M + 목록 번호))** 로 잇는다. 목록은 타자주자(0)부터
- * 앞선 주자 쪽으로 빈 루를 건너뛰며 쌓이므로, 번호 k 는 "타자주자 앞으로 k 번째 주자" 다.
- *
- * ⚠️ **M = 1 일 때는 예전 `forcedFlagsOf` 와 한 톨도 다르지 않다.** 목록은 오름차순이라
+ * 그래서 **최소 진루 루 = min(홈, max(출발 루, 1 + 목록 번호))** 로 잇는다. 목록은 타자주자(0)부터
+ * 앞선 주자 쪽으로 빈 루를 건너뛰며 쌓이므로, 번호 k 는 "타자주자 앞으로 k 번째 주자" 다. 목록은 오름차순이라
  * `출발루[k] ≥ k` 이고, 밀리는 조건 `1 + k > 출발루[k]` 는 `출발루[k] == k`, 곧
- * "1루부터 내 앞까지 빈 루 없이 차 있다" 와 같은 말이다 — 땅볼·뜬공·단타는 그대로다.
- *
- * ⚠️ **근사**: M 이 2 이상인 타구(2·3루타)에서 사슬을 잇는 것은 웹판이 결과 코드를 먼저 정하기
- *    때문에 필요한 **다리**다. 원본에는 대응하는 코드가 없다(원본은 애초에 M 을 미리 정하지 않는다).
+ * "1루부터 내 앞까지 빈 루 없이 차 있다" 와 같은 말이다(0xa9f60).
+ * (예전 웹은 타석 결과 코드가 준 최소 루 M(2·3루타)을 사슬 머리로 썼다 — 결과를 먼저 정한 웹 다리라 걷었다.)
  *
  * 포스로 밀리는(최소 루가 출발 루보다 큰) 주자만 첫 틱부터 뛴다.
  * 나머지는 루에 붙어 있다가 자동 진루(0xaf918)가 보내 준다 — 그쪽은 **주루 수동이면 안 돈다**.
  */
 function createPlayRunners(
   bases: BaseState,
-  outcome: AtBatOutcome,
   speed: number,
   firstBaseException: FirstBaseException | null = null,
 ): MutableRunner[] {
-  const batterMinimum = batterMinimumBaseOf(outcome)
+  // 포스 사슬 머리 — 타자주자는 1루로 간다 (0xa93ac 가 +0x88 = 1)
+  const batterMinimum = 1
   // 0 = 타자주자. 그 뒤는 **뒤 주자 → 앞선 주자** 순서다 (자동 진루가 목록 끝부터 = 앞선 주자부터 본다)
   const fromBases = [0]
   if (bases.first) fromBases.push(1)
@@ -524,6 +524,7 @@ function createPlayRunners(
     return {
       state: createRunner(index, fromBase, speed, { targetBase, isBatterRunner: index === 0 }),
       minimumBase,
+      previousTarget: fromBase,
       counted: false,
     }
   })
@@ -678,7 +679,12 @@ export interface DefensePlayState {
   /** 첫 송구의 목표 루 · 도착 틱 — 결과(`DefensePlayResult.throwBase`)로 내보낸다 */
   firstThrowBase: number
   firstThrowArrivalTick: number
-  batterOutTick: number
+  /** state[0x1f] — 쥐기 0xb2710 의 아웃 판정이 타자주자를 뜬공 아웃(결과 1)으로 죽였다 */
+  flyOut: boolean
+  /** 판 끝 정산 0xa8024 가 세는 사건 — 6(안타 · 결과 코드 6·10) · 8(홈런 · 8·12)이 났나, 0xd(아웃 · 결과 코드 13) 몇 번 */
+  hitEvent: boolean
+  homeRunEvent: boolean
+  outEvents: number
   /** 포구 틱 — 펌블이 나면 15틱 뒤로 밀린다 */
   catchTick: number
   fumbled: boolean
@@ -761,8 +767,7 @@ export interface DefensePlayState {
    */
   ballLandingTick: number
   /**
-   * 지금 쫓는 공이 **받을 야수에게 던진 송구공**(공+0xaac == 0 — 보통 · 흔들린 · 레이저 송구)인가. 받는 것도 포구 틱 갈래(1 절)지만
-   * 결과 코드 다리의 타자주자 1루 도착 틱(`batterOutTick`)은 예전 도착 모델처럼 다시 재지 않는다 (웹 다리).
+   * 지금 쫓는 공이 **받을 야수에게 던진 송구공**(공+0xaac == 0 — 보통 · 흔들린 · 레이저 송구)인가. 받는 것도 포구 틱 갈래(1 절)다.
    */
   receivingThrow: boolean
 }
@@ -782,33 +787,18 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
 
   let fielders = createFielders(abilities)
   const uncatchable = input.isUncatchable === true
-  // 잡히지 않는 타구는 뜬 채로 잡힐 일도 없다 — 떨어진 뒤 굴러가는 공처럼 본다
-  const wantsFlyCatch = !uncatchable && catchesOnTheFly(input.outcome)
 
   // ── 포구 예보 ──
-  // 뜬 채로 잡히는 타구는 낙구 전까지만, 굴러간 타구는 낙구 **다음** 틱부터 본다.
-  // (낙구 틱에 걸리면 `chooseChaser` 우선순위 1~5 = "낙구 전 포구" 가 되어 잡힌 공이 된다)
-  //
-  // **결과 코드가 뜬공·직선타 아웃인데 낙구 전에 아무도 못 닿는 타구** — 원본 예보 0xb12d0 은 틱 구간을 자르지 않고
-  // 궤적 끝까지(t = 1 → 공+0x6c − 1) 한 표를 만들고, 0xb3b38 은 낙구 전 포구(우선순위 1~5)가 없으면 6~8 갈래로
-  // **바운드 뒤에 줍는 야수**를 고른다(P2 1a · 2a). 웹의 구간 자르기는 결과 코드 다리라, 그 구간이 비면 표가 비어
-  // 포구 틱이 100000(→ 판 끝 240)이 되고 야수가 끝내 공을 못 쥐었다(표본 2279판 — 모두 뜬공아웃 결과 + 낙구가 이른 패턴).
-  // 그때는 원본처럼 자르지 않은 예보로 바운드 뒤 포구를 고른다. 원본에서 "잡힐 뜬공" 은 예보가 정한다 —
-  // 플레이.vt94 = 0xb1b2c(+0x11c 가장 이른 포구 틱 ≤ 낙구 틱)가 0xa9e44(a9ed6)·0xaf918(af98e)에 넘기는 그 값 —
-  // 그래서 이 판은 바운드 판(포스 요구 루 0xa95e8 · 1루 주자 예외 없음 · 타자주자는 1루 송구로)이 된다.
-  // ⚠️ 타석 결과(아웃)는 그대로 — 타자주자가 아웃인 것은 결과 코드 다리의 규약이고, 뜬공 아웃 대신 땅볼처럼 1루에서 죽는다.
-  const flyWindow = { from: 0, to: trajectory.landingTick }
-  const bounceWindow = { from: trajectory.landingTick + 1, to: Number.POSITIVE_INFINITY }
-  const wholeWindow = { from: 0, to: Number.POSITIVE_INFINITY }
-  let window = wantsFlyCatch ? flyWindow : bounceWindow
+  // 원본 예보 0xb12d0 은 틱 구간을 자르지 않고 궤적 끝까지(t = 1 → 공+0x6c − 1) 한 표를 만들고, 0xb3b38 은 낙구 전 포구
+  // (우선순위 1~5)가 있으면 그것을, 없으면 6~8 갈래로 **바운드 뒤에 줍는 야수**를 고른다(P2 1a · 2a). 잡힐 뜬공인지는 이 예보가
+  // 정한다 — 플레이.vt94 = 0xb1b2c(+0x11c 가장 이른 포구 틱 ≤ 낙구 틱)가 0xa9e44(a9ed6)·0xaf918(af98e)에 넘기는 그 값이다.
+  // (예전 웹은 타석 결과 코드가 뜬공·직선타 아웃이면 낙구 전까지만, 그 밖이면 낙구 다음 틱부터 보도록 구간을 잘랐다 —
+  // 결과를 먼저 정한 웹 다리였다. 원본처럼 결과는 이 판의 끝 정산이 내므로 걷었다.)
+  const window = { from: 0, to: Number.POSITIVE_INFINITY }
   // 플레이 +0x127 — 패턴 플래그 비트 1 (0x514e6). 예보 · 추적야수가 낙구 지점으로 달린다
   const landingChase = trajectory.landingChase === true
   const chase = { chaseToLanding: landingChase }
   let forecast = forecastCatch(trajectory, fielders, window, chase)
-  if (wantsFlyCatch && forecast.earliestCatchTick === NO_FORECAST_CATCH) {
-    window = wholeWindow
-    forecast = forecastCatch(trajectory, fielders, window, chase)
-  }
 
   // ── 필살수비 굴림 (메시지 0x11 = 타구가 떠난 순간, I-controls 2c) ──
   // A(점프, +0x1f5) 를 먼저 굴리고 실패했을 때만 B(슬라이딩, +0x1f6). 창을 여는 것뿐이라
@@ -829,13 +819,7 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
   const rolledTrajectory = trajectoryWithRandom(trajectory, input.random)
   const relaid = rolledTrajectory !== trajectory
   trajectory = rolledTrajectory
-  if (relaid) {
-    forecast = forecastCatch(trajectory, fielders, window, chase)
-    if (wantsFlyCatch && forecast.earliestCatchTick === NO_FORECAST_CATCH) {
-      window = wholeWindow
-      forecast = forecastCatch(trajectory, fielders, window, chase)
-    }
-  }
+  if (relaid) forecast = forecastCatch(trajectory, fielders, window, chase)
   if (specialDefense.jumpUnlocked || specialDefense.slideUnlocked || relaid) {
     forecast = forecastCatch(trajectory, fielders, window, {
       ...chase,
@@ -843,13 +827,12 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
       slideUnlocked: specialDefense.slideUnlocked,
     })
   }
-  // 뜬 채로 잡히는가 — 고른 포구가 낙구 전(0xb3b38 우선순위 1~5)일 때만. 자르지 않은 예보에서 점프·슬라이딩 창이
-  // 열려 낙구 전 포구가 생기면 그것도 뜬공이다
-  const onTheFly = wantsFlyCatch && forecast.choice.catchTick <= trajectory.landingTick
+  // 잡힐 뜬공인가(vt94) — 고른 포구가 낙구 전(0xb3b38 우선순위 1~5)일 때. 점프·슬라이딩 창이 열려 낙구 전 포구가 생기면
+  // 그것도 뜬공이다. 필살타법 타구(송구공 표시)는 아무도 쥐지 않는다. 실제 뜬공 아웃(state[0x1f])은 쥐는 틱의 0xb36d0 이 낸다
+  const onTheFly = !uncatchable && forecast.choice.catchTick <= trajectory.landingTick
   // 0xa9e44 의 1루 주자 예외 (a9ed6) — 2아웃 전 잡힐 뜬공이면 1루 주자는 포스 목표를 안 받는다
   const runners = createPlayRunners(
     input.bases,
-    input.outcome,
     speed,
     onTheFly && input.outs !== 2 ? { stealingFrom: input.stealingFrom ?? [] } : null,
   )
@@ -888,7 +871,8 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     catchKind: forecast.choice.kind,
     catchTick,
     actionStartTick: forecast.choice.actionStartTick,
-    earliestCatchTick: onTheFly ? forecast.earliestCatchTick : 0xffff,
+    // +0x11c — 예보 표의 가장 이른 포구 틱(없으면 0xffff)
+    earliestCatchTick: forecast.earliestCatchTick,
   }
 
   return {
@@ -922,7 +906,10 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     throwCount: 0,
     firstThrowBase: NONE,
     firstThrowArrivalTick: -1,
-    batterOutTick: -1,
+    flyOut: false,
+    hitEvent: false,
+    homeRunEvent: false,
+    outEvents: 0,
     catchTick,
     fumbled: false,
     errantThrow: false,
@@ -1015,7 +1002,10 @@ export function stepDefensePlay(
   let throwCount = state.throwCount
   let firstThrowBase = state.firstThrowBase
   let firstThrowArrivalTick = state.firstThrowArrivalTick
-  let batterOutTick = state.batterOutTick
+  let flyOut = state.flyOut
+  let hitEvent = state.hitEvent
+  let homeRunEvent = state.homeRunEvent
+  let outEvents = state.outEvents
   let catchTick = state.catchTick
   let fumbled = state.fumbled
   let errantThrow = state.errantThrow
@@ -1066,8 +1056,8 @@ export function stepDefensePlay(
    * 잡는 순간에도 한 번 도는 것이 중요하다 — 그러지 않으면 "송구가 닿는 그 틱에 루를 밟은 주자" 가
    * 늘 세이프가 되어, 예전의 송구 도착 판정과 아슬아슬한 경우의 답이 달라진다.
    *
-   * ⚠️ **0번(타자주자)은 뺀다.** 이 진행기의 규약이 "타자주자의 운명은 결과 코드가 정한다" 여서,
-   * 판정이 3루타 주자를 태그로 잡으면 기록과 어긋난다. 원본에는 이 제외가 없다 — **근사**다.
+   * 원본처럼 **타자주자(0번)도 판정한다** — 1루 포스·태그 아웃과 쥐는 순간의 뜬공 아웃(결과 1)이 모두 여기서 난다.
+   * (예전 웹은 타자주자의 운명을 타석 결과 코드가 정한다며 0번을 뺐다 — 결과를 먼저 정한 웹 다리라 걷었다.)
    *
    * ## `tagOut`(원본 `state[0x87]`)은 "한 번이라도" 가 아니라 **"마지막 판정"** 이다 — 직접 뜬 근거
    * ```
@@ -1118,7 +1108,9 @@ export function stepDefensePlay(
    */
   const runOutJudgement = (): void => {
     if (play.finished) return
-    const judged = judgeOut({ ...contextAt(tick), skipRunnerIndexes: [0] })
+    // +0x112 — 웹은 쥔 적(everHeld)과 땅·담장선에 닿음(ballContacted)을 따로 든다. 판정은 둘을 합친 원본 칸을 본다
+    const judged = judgeOut({ ...contextAt(tick), play: { ...play, everHeld: play.everHeld || ballContacted } })
+    judgedKindThisCall = judged.kind
     if (judged.kind === OUT_KIND.NONE) return
     const victim = runners[judged.runnerIndex]
     if (victim === undefined || victim.state.isOut) return
@@ -1151,6 +1143,8 @@ export function stepDefensePlay(
 
   /** 이번 틱에 0xb36d0 이 아웃을 냈나 — 결과 코드 13 → 메시지 0xbba (6c 절) */
   let outJudgedThisTick = false
+  /** 바로 앞 `runOutJudgement` 한 번의 결과 종류 — 쥐기의 뜬공 아웃(결과 1)을 가른다 */
+  let judgedKindThisCall: number = OUT_KIND.NONE
 
   /**
    * **공 가진 야수가 던질 준비가 됐나** — 0xafa60 · b4674 가 보는 `야수.vtC4()` = 0xa20ec
@@ -1695,21 +1689,22 @@ export function stepDefensePlay(
             }
           : fielder,
       )
-      // +0x112 — 이번 판에서 처음 쥐었나. vt90(0xb36d0)의 뜬공 아웃은 +0x112 == 0 일 때만이라 악송구 공을 줍는 쥐기엔 없다
-      const firstGrab = !play.everHeld
-      play = { ...play, held: true, everHeld: true, wantsThrow: true }
+      // 공 쥐기 0xb2710(b2710~b2782, 직접 뜬 것): +0x12c = 1(쥠) → b2758 vt90 = 0xb36d0 아웃 판정 → b2766 +0x112 = 1.
+      // 그래서 쥐는 그 판정은 +0x112(아무도 안 쥐었고 · 땅에도 담장선에도 안 닿음)가 0 인 채로 본다 — 타자주자의
+      // 뜬공 아웃(0xb3834, 결과 1)은 이 한 번에만 날 수 있다. 결과가 1 이면 b2770 이 0xa9620(리터치) · 0xa95c0 을 부르고
+      // state[0x1f] = 1 이다(0xb2774). 악송구 공·튕긴 공을 줍는 쥐기에는 +0x112 가 이미 서 있어 뜬공 아웃이 없다
+      play = { ...play, held: true, wantsThrow: true }
       // 쥐기 0xb2710 — +0x127 = 0
       landingChase = false
       log.push(`${tick}틱 ${chaserSlot}번 야수가 잡았다 (종류 ${play.catchKind})`)
-      // 공 쥐기 0xb2710 은 쥐자마자 vt90(아웃 판정)을 부른다 (0xb2758)
+      judgedKindThisCall = OUT_KIND.NONE
       runOutJudgement()
+      const caughtFly = judgedKindThisCall === OUT_KIND.FLY
+      play = { ...play, everHeld: true }
 
-      if (onTheFly && firstGrab) {
-        // 뜬공 아웃 — 타자주자는 여기서 죽고, 나머지는 리터치(0xa9620) 뒤 태그업 판정을 받는다
-        markOut(runners[0])
-        outs += 1
-        outsAdded += 1
-        batterOutTick = tick
+      if (caughtFly) {
+        // 뜬공 아웃 — 타자주자는 0xb36d0 이 죽였다. 나머지는 리터치(0xa9620) 뒤 태그업 판정을 받는다
+        flyOut = true
         const required = requiredBasesOnFlyCatch(runners.map((runner) => runner.state))
         for (let index = 1; index < runners.length; index += 1) {
           const runner = runners[index]
@@ -1744,12 +1739,7 @@ export function stepDefensePlay(
       // ```
       // 야수 틱 0xa1284(0' 절)가 플레이 틱보다 먼저 +0xc8 을 줄이므로 포구 c 틱에 넣은 R 은 c + R 틱 머리에서 0 이 되고,
       // 그 틱의 1b · 4c 절이 **그때의 주자·야수 자리**로 고른다(07e80dc · 46d8420 이 옮긴 차례 그대로).
-      // 땅볼·직선타로 타자주자가 죽는 시각은 1루에 공이 닿는 때다 — 공이 손을 떠나기 전(쥔 채)의 0xaf284 로 잰다
-      // (타자주자의 운명을 결과 코드가 정하는 이 진행기의 규약 — 근사)
-      // 받을 야수에게 던진 송구공(공+0xaac == 0)을 받는 쥐기는 예전 도착 모델(2 절)처럼 다시 재지 않는다 — 웹 다리
-      if (input.outcome.kind === '아웃' && !onTheFly && !receivingThrow) {
-        batterOutTick = tick + defenseArrivalTicks(contextAt(tick), 1)
-      }
+      // 타자주자도 다른 주자처럼 1루 포스(요구 루 1 — 낙구 틱의 0xa95e8)·태그로 0xb36d0 이 죽인다 — 정해 둔 아웃 틱은 없다
     }
 
     // ── 1a. 중계 이어 던지기 — 플레이 틱 vt4c(0xb45dc) 머리 b45ee~b465e (직접 뜬 것) ──
@@ -1873,12 +1863,9 @@ export function stepDefensePlay(
       if (rundown.runnerIndex === NONE) {
         const context = contextAt(tick)
         const target = chooseRundownRunner(context.runners)
-        // ⚠️ **근사**: 대상이 타자주자(0번)면 협살을 걸지 않는다. 이 진행기의 규약이
-        // "타자주자의 운명은 결과 코드가 정한다" 여서, 송구 도착 아웃 판정도 같은 이유로
-        // `index >= 1` 부터 본다. 협살이 타자주자를 잡으면 3루타가 아웃으로 뒤집혀 기록과 어긋난다.
-        // 원본은 위치 분석이 결과를 정하지 않으므로 타자주자도 협살 대상이 된다.
-        // 고르기(0xb398c)가 **뒤 주자부터** 보므로 0번은 다른 주자가 없을 때만 뽑힌다.
-        if (target !== NONE && target !== 0 && canStartRundown(context, true)) {
+        // 원본처럼 타자주자(0번)도 협살 대상이다 — 고르기(0xb398c)가 **뒤 주자부터** 보므로 0번은 다른 주자가 없을 때만
+        // 뽑힌다. (예전 웹은 타자주자의 운명을 결과 코드가 정한다며 0번을 뺐다 — 결과를 먼저 정한 웹 다리라 걷었다)
+        if (target !== NONE && canStartRundown(context, true)) {
           rundown = buildRundownPlan(context, target)
           rundowns += 1
           fielders = fielders.map((fielder) =>
@@ -1970,14 +1957,6 @@ export function stepDefensePlay(
       }
     }
 
-    // ── 3. 타자주자의 선언된 운명 ──
-    if (batterOutTick >= 0 && tick === batterOutTick && !runners[0].state.isOut) {
-      markOut(runners[0])
-      outs += 1
-      outsAdded += 1
-      log.push(`${tick}틱 타자주자 아웃`)
-    }
-
     // ── 4. 자동 추가 진루 (0xaf918) ──
     // 멈춘 주자(루에 붙은 주자·태그업 대기)까지 보려면 force 가 필요하다 — 원본 인자 그대로다.
     //
@@ -2005,15 +1984,8 @@ export function stepDefensePlay(
         // **근사**: 원본은 이 판정을 매 틱 돌리지만, 여기서는 **지금 목표 루에 닿아 있을 때만** 묻는다.
         // 안 그러면 달리는 도중에 한 루씩 계속 얹혀 타구가 떠나기도 전에 홈까지 밀려 버린다.
         if (!isAtTarget(runner.state)) continue
-        // 타자주자는 결과 코드가 정한 루에서 멈춘다 — 안타 종류가 이미 정해져 있어 더 가면 기록과 어긋난다 (웹 다리).
-        // 단 원본의 **무조건 진루 갈래**(+0x111 홈런 af964 · +0x129 폴 홈런 af970 · 종류 7 af97a)는 틱 비교 없이 곧장
-        // afa0e 로 뛰어 타자주자도 다른 주자와 똑같이 보낸다 — 원본엔 결과 코드가 정한 루가 없다. 여기서까지 다리를
-        // 걸면 담장을 넘은 공(코드 8)에 타자주자가 결과 코드 루에 선 채 관문 b0e04(`+0x111 && 0xa990c == 0`)가 끝내
-        // 안 닫혀 판이 240틱 안전망까지 갔다(표본 336판 — 모두 패턴 24~26 의 담장 위로 넘는 공).
-        // ⚠️ 그래서 웹 타석 결과가 2루타(패턴 24~26 · 속도 < 1100 — `outcomeOfPattern` 근사)인데 공이 담장을 넘으면
-        //    기록은 2루타로 남고 타자주자는 홈을 밟는다 — 결과 코드를 먼저 정하는 웹 다리의 어긋남이다.
-        const unconditionalAdvance = homeRunFlag || play.suppressed || play.kind === 7
-        if (runner.state.isBatterRunner && decision.toBase > runner.minimumBase && !unconditionalAdvance) continue
+        // 타자주자도 다른 주자와 똑같이 보낸다 — 원본엔 결과 코드가 정한 루가 없다(타자주자가 선 루가 곧 루타다,
+        // 판 끝 정산 0xa8024). 예전 웹은 타석 결과 코드의 루에서 타자주자를 세웠다 — 결과를 먼저 정한 웹 다리라 걷었다
         startLeg(runner, decision.toBase)
         // afa0e: 한 루 더 보내면 플레이+0x128 = 1 — CPU 송구 결정이 다시 고른다
         play = { ...play, wantsThrow: true }
@@ -2176,7 +2148,9 @@ export function stepDefensePlay(
             ? NONE
             : runner.state.requiredBase,
       }
-      // 결과 코드가 정한 루까지는 반드시 간다 (타자주자의 1·2·3루타). 한 루씩 이어 달린다
+      // 0xa040c 는 +0x84 = +0x8c = +0x7c 로 적는다
+      runner.previousTarget = touched
+      // 포스로 밀린 루까지는 반드시 간다 (포스 사슬의 최소 루). 한 루씩 이어 달린다
       if (runner.state.targetBase < runner.minimumBase) {
         startLeg(runner, runner.state.targetBase + 1)
         continue
@@ -2302,6 +2276,11 @@ export function stepDefensePlay(
     // b4562 vt44 = 0xb2bc4 — 모든 코드를 state[0xb] 에 적고 표 0xd87a0 대로 칸을 세운다
     if (resultCode !== 0) {
       lastEventCode = resultCode
+      // 메시지 0xbba → 표 0xd0488: 6·10 → 0x51d32·0x51d24 → 0xa5ffc 사건 6 · 8·12 → 0x51c82 → 0xa5fec 사건 8 ·
+      // 13 → 0x51b36 … 0x51bf2 → 0xa7d0c 사건 0xd. 판 끝 정산 0xa8024 가 이 사건들로 타자 결과를 낸다(`playOutcome`)
+      if (resultCode === 6 || resultCode === 10) hitEvent = true
+      if (resultCode === 8 || resultCode === 12) homeRunEvent = true
+      if (resultCode === 13) outEvents += 1
       const effect = eventCodeEffectOf(resultCode)
       if (effect.foulFlag) foulFlag = true
       if (effect.homeRunFlag) homeRunFlag = true
@@ -2335,14 +2314,12 @@ export function stepDefensePlay(
     // ── 8. 판 진행 관문 0xb0d28 — 원본은 다음 틱 슬롯 2 머리 52502 에서 돈다. 웹은 그 틱 끝에서 본다 ──
     // (전문은 `entities/fielding/model/playGate.ts`). 주자가 다 서고(+0x94 까지) 누가 공을 쥔 틱이 51틱 이어지면 닫힌다 —
     // 그 51틱 동안에도 자동 진루 · CPU 송구가 돈다. 3아웃(b0dbe) · 사건 코드 11(b0db4)이면 곧바로 닫힌다.
-    // 웹 쪽 규약(근사): 타자주자의 아웃은 결과 코드 다리라 1루 송구 도착 틱(`batterOutTick`)에 적는다 — 그 틱까지는
-    // "진행 중인 주자" 로 센다. 악송구는 예보 vt24(0)가 고른 야수가 포구 틱 갈래로 주워 쥔다(`takeLooseBall`).
-    const batterSettled = batterOutTick < 0 || tick >= batterOutTick
+    // 악송구는 예보 vt24(0)가 고른 야수가 포구 틱 갈래로 주워 쥔다(`takeLooseBall`).
     const gate = passPlayGate({
       foulFlag,
       lastEventCode,
       outs,
-      someRunnerActive: stillActive || !batterSettled,
+      someRunnerActive: stillActive,
       homeRunDerby: false,
       homeRunFlag,
       poleHomeRunFlag: play.suppressed,
@@ -2370,7 +2347,10 @@ export function stepDefensePlay(
   state.throwCount = throwCount
   state.firstThrowBase = firstThrowBase
   state.firstThrowArrivalTick = firstThrowArrivalTick
-  state.batterOutTick = batterOutTick
+  state.flyOut = flyOut
+  state.hitEvent = hitEvent
+  state.homeRunEvent = homeRunEvent
+  state.outEvents = outEvents
   state.catchTick = catchTick
   state.trajectory = trajectory
   state.uncatchable = uncatchable
@@ -2440,7 +2420,15 @@ export function defensePlayResultOf(state: DefensePlayState): DefensePlayResult 
     catchTick: state.catchTick,
     // 필살타법으로 친 타구였나 — 첫 야수에게 맞고 튕긴 뒤로는 보통 공이 되지만(0xa2610 이 +0x5c 를 비운다) 결과는 친 공의 표시다
     isUncatchable: state.input.isUncatchable === true,
-    caughtOnTheFly: state.onTheFly,
+    caughtOnTheFly: state.flyOut,
+    outcome: settledBatterOutcomeOf({
+      runners: runners.map((runner) => runner.state),
+      previousTargets: runners.map((runner) => runner.previousTarget),
+      hitEvent: state.hitEvent,
+      homeRunEvent: state.homeRunEvent,
+      flyOut: state.flyOut,
+      outEvents: state.outEvents,
+    }),
     tagOut: state.tagOut,
     throwBase: state.firstThrowBase,
     throwArrivalTick: state.firstThrowArrivalTick,
@@ -2469,6 +2457,36 @@ export function runDefensePlay(input: DefensePlayInput): DefensePlayResult {
     state = stepDefensePlay(state, input.controls?.keyAt(state.tick) ?? null)
   }
   return defensePlayResultOf(state)
+}
+
+/**
+ * **판 앞의 예측 결과** — 같은 입력을 **굴림 없이 · 키 없이** 끝까지 돌려 본 판 끝 정산 결과다. 난수를 한 톨도 안 쓴다.
+ *
+ * ⚠️ 웹 전용 값이다 — 원본에는 판 앞의 결과가 없다. 세션·화면이 판이 끝나기 전에 고르는 그림·소리·배너(진행기 입력의
+ * `outcome` 칸)를 실제 판에 가깝게 맞추려고만 쓴다. 기록·진루는 언제나 **실제로 돈 판**의 `DefensePlayResult.outcome` 이다
+ * (펌블 · 악송구 · 필살수비 · 폴 굴림 · 사람 키가 결과를 바꿀 수 있다 — 사람 수동 송구는 키가 없으면 안 던진 판이다).
+ */
+export function predictedOutcomeOf(input: DefensePlayInput): AtBatOutcome {
+  const played = runDefensePlay({ ...input, random: undefined, controls: undefined })
+  return played.outcome ?? input.outcome
+}
+
+/**
+ * 입력의 임시 결과 칸(`outcome`)을 판 앞 예측(`predictedOutcomeOf`)으로 바꿔 끼운다.
+ * 결과를 넘겨받은 호출(`outcomeIsGiven`)은 넘겨받은 결과를 그대로 둔다.
+ */
+export function withPredictedOutcome(input: DefensePlayInput): DefensePlayInput {
+  if (input.outcomeIsGiven === true) return input
+  return { ...input, outcome: predictedOutcomeOf(input) }
+}
+
+/**
+ * **기록할 타석 결과** — 판 끝 정산(0xa8024)이 낸 결과(`DefensePlayResult.outcome`).
+ * ⚠️ 결과를 넘겨받은 호출(`outcomeIsGiven` — 시험·옛 호출, 원본에 없는 길)만 넘겨받은 결과를 그대로 적는다.
+ */
+export function recordedOutcomeOf(input: DefensePlayInput, result: DefensePlayResult): AtBatOutcome {
+  if (input.outcomeIsGiven === true) return input.outcome
+  return result.outcome ?? input.outcome
 }
 
 /** 예보 표가 비었을 때의 가장 이른 포구 틱 (플레이 +0x11c 초기값 0xffff — `forecastCatch`) */
@@ -2599,6 +2617,8 @@ function markOut(runner: MutableRunner): void {
 
 /** 다음 구간 시작 — 출발점(+0x14)과 출발 루(+0x7c)를 새로 잡아야 진행률·협살 계산이 맞는다 */
 function startLeg(runner: MutableRunner, toBase: number): void {
+  // a07b0 vt48 — 새 목표가 지금 +0x7c 와 다르면 +0x84 = 옛 +0x7c
+  if (runner.state.targetBase !== toBase) runner.previousTarget = runner.state.targetBase
   runner.state = {
     ...runner.state,
     legStart: runner.state.position,

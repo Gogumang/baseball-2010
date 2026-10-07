@@ -25,6 +25,7 @@ import {
 import type { PitcherRun } from '@/entities/mission/model/pitcherRun'
 import { MISSIONS } from '@/shared/config/original/missions'
 import type { OriginalMission } from '@/shared/config/original/missions'
+import { registerContact } from '@/entities/batting/model/battedContact'
 
 const SINGLE: AtBatOutcome = { kind: '안타', bases: 1 }
 const DOUBLE: AtBatOutcome = { kind: '안타', bases: 2 }
@@ -222,9 +223,10 @@ describe('판정 규칙', () => {
    */
   it('투수 5번 — 2루 주자가 있어 단타·2루타 모두 실점 한도 1 에 닿아 실패다', () => {
     // 투수편은 사람 수비 · 송구 설정 기본 수동이다. 키를 안 누르면 원본은 아무도 던지지 않는다
-    // (0xb1c90 자동 가지에는 송구 호출이 없다). 대표 단타(원본 코드 2 [47, 1038, 596])는 원본 궤적으로
+    // (0xb1c90 자동 가지에는 송구 호출이 없다). 타석이 쏜 단타(원본 코드 2 [47, 1038, 596])는 원본 궤적으로
     // 1루 쪽 깊숙이 떨어져 우익수가 늦게 줍고, 자동 진루 0xaf918 이 2루 주자를 홈까지 보낸다.
-    const afterSingle = applyPitcherOutcome(startPitcherMission(findMission('투수', 5)), SINGLE)
+    const 깊은단타 = registerContact(SINGLE, { pattern: [47, 1038, 596, 0], resultCode: 2 })
+    const afterSingle = applyPitcherOutcome(startPitcherMission(findMission('투수', 5)), 깊은단타)
     expect(afterSingle.allowed.runs).toBe(1)
     expect(afterSingle.status).toBe('실패')
 

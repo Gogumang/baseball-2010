@@ -84,7 +84,14 @@ import {
 import type { GameAcePitcher, GameAceSetup } from '@/features/play-game/model/gameAces'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
-import { defenseAbilitiesOf, isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
+import {
+  defenseAbilitiesOf,
+  isBattedBallInPlay,
+  recordedOutcomeOf,
+  runDefensePlay,
+  withPredictedOutcome,
+} from '@/features/defense-play/model/runDefensePlay'
+import { isBattedBallKind } from '@/features/defense-play/model/playOutcome'
 import type { DefensePlayInput, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { homeRunPlaybackOf } from '@/features/defense-play/model/homeRunPlayback'
 import { PICKOFF_RESULT, runPickoffPlay } from '@/features/defense-play/model/pickoffPlay'
@@ -92,7 +99,8 @@ import type { PickoffPlayResult } from '@/features/defense-play/model/pickoffPla
 import { PICKOFF_PLAY_KIND } from '@/entities/defense-controls/model/pickoff'
 import type { PickoffBase } from '@/entities/defense-controls/model/pickoff'
 import { EMPTY_BATTER_GAME_RECORD, recordPlateAppearance } from '@/entities/batting/model/pinchHitAi'
-import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
+import { fixturePatternFor } from '@/features/defense-play/model/representativePattern'
+import { contactOfOutcome } from '@/entities/batting/model/battedContact'
 import type { BurstResolution, BurstSession } from '@/entities/burst-mission/model/burstMissionSession'
 import {
   cancelBurst,
@@ -529,12 +537,13 @@ function withFirstInningBoard(progress: GameProgress, random: RandomPort): GameP
  * 플레이어 타석의 결과를 반영하고, 다시 플레이어 차례가 올 때까지 자동 진행한다.
  *
  * **원본은 CPU 끼리의 경기에만 간이 엔진(0xc11f0)을 쓰고 사람 경기는 수비 시뮬레이션을 돌린다.**
- * 그래서 여기서는 타구가 인플레이면 `features/defense-play` 진행기를 돌려 아웃·득점·루 상황을
- * 그 결과로 갈아 끼운다 — `baseState` 의 희생플라이 보장·고정 진루표 근사는 이 길에서 안 쓰인다.
- * 삼진·볼넷·홈런은 수비가 개입할 것이 없어 지금까지의 길(0xc11f0 과 같은 규칙)을 그대로 쓴다.
+ * 그래서 여기서는 맞은 공(안타·아웃·홈런으로 끝난 타석)이면 `features/defense-play` 진행기에 **쏜 패턴 그대로**를
+ * 넘겨 돌리고, 아웃·득점·루 상황은 물론 **기록할 결과**(안타 루타·아웃·홈런)도 판 끝 정산(0xa8024 —
+ * `playOutcome`)이 낸 것으로 갈아 끼운다. 넘겨받은 결과는 타석을 끝내기 위한 임시 값이다.
+ * 삼진·볼넷·사구는 수비가 개입할 것이 없어 지금까지의 길(0xc11f0 과 같은 규칙)을 그대로 쓴다.
  *
- * `pattern` 을 주면 그 원본 패턴으로 궤적을 만든다. 안 주면 같은 결과를 내는 대표 패턴을
- * 원본 표에서 골라 쓴다 (`representativePatternOf`).
+ * 패턴은 `options.pattern` 이나, `resolvePitch` 가 결과 객체에 묶어 둔 것(`contactOfOutcome`)을 쓴다.
+ * ⚠️ 둘 다 없으면(시험·옛 호출 — 원본에 없는 길) 결과에 맞는 패턴을 원본 표에서 골라 쓴다 (`fixturePatternFor`).
  * `isUncatchable` 은 필살타법 성공 타구 — 야수가 포구를 건너뛴다 (0x51800, S13 6절).
  *
  * ⚠️ 사람이 주루를 조작하는 화면은 이것을 쓰지 않는다 — `startPlayerOutcome` 으로 타석 결과만
@@ -557,7 +566,8 @@ export function applyPlayerOutcome(
   // 미리 다 돌려 버린다 — `runDefensePlay` 는 스테퍼를 끝까지 도는 얇은 껍데기다.
   // 이 갈래는 아직 아무것도 안 보여 줬으므로 돌린 결과를 그대로 재생거리로 넘긴다 (예전 그대로).
   const result = runDefensePlay(pending)
-  return finishPlayerOutcome({ ...started, pendingDefensePlay: null }, outcome, random, result, result)
+  // 판 끝 정산(0xa8024)이 낸 결과로 적는다 — 넘겨받은 결과는 타석을 끝낸 임시 값이다
+  return finishPlayerOutcome({ ...started, pendingDefensePlay: null }, recordedOutcomeOf(pending, result), random, result, result)
 }
 
 export interface PlayerOutcomeOptions {
@@ -651,20 +661,35 @@ export function startPlayerOutcome(
     rollBenchClearingEntry(random)
     return { ...cleared, pendingBenchClearing: { outcome } }
   }
-  if (!isBattedBallInPlay(outcome)) {
+  // 페어 타구면 쏜 패턴이 따라온다 — 넘겨받았거나(`options.pattern`) 타석 결과 객체에 묶여 있다(`contactOfOutcome`)
+  const pattern = options.pattern ?? contactOfOutcome(outcome)?.pattern
+  // 판정 11(2스트라이크 번트 파울 아웃)은 판 없이 아웃이다 — 원본은 파울 판이 닫힌 뒤 0xae3e8 이 state[0xb] == 11 로
+  // 정산한다(주자는 판 앞 자리 그대로). 웹 `직선타아웃` 갈래는 진루를 시키지 않는다
+  if (options.buntFoulOut !== true && isBattedBallKind(outcome) && pattern !== undefined) {
+    return {
+      ...withoutSteal(progress),
+      pendingDefensePlay: withPredictedOutcome(defensePlayInputOf(progress, outcome, pattern, random, options)),
+    }
+  }
+  if (!isBattedBallInPlay(outcome) || options.buntFoulOut === true) {
     const arrival = options.arrivalPlay ?? null
     // 낫아웃 — 폭투·포일 판의 진루(타자주자 포함)를 이 삼진 타석의 진루로 먹인다 (0x3e0d0 state[0x1a])
     if (arrival !== null && arrivalApplicationOf(arrival) === 'batterRuns') {
       return finishPlayerOutcome(withoutSteal(progress), outcome, random, arrival.result, arrival.result)
     }
-    // 홈런은 날아가는 그림만 따로 만들어 재생시킨다 — 점수는 타석 쪽이 이미 맞게 한다
+    // ⚠️ 패턴 없이 들어온 홈런(시험·옛 호출)은 날아가는 그림만 따로 만든다 — 점수는 타석 쪽 규칙(전원 득점)이다
     const playback =
       homeRunPlaybackOf({ outcome, bases: progress.game.bases, pattern: options.pattern }) ?? arrival?.result ?? null
     return finishPlayerOutcome(withoutSteal(progress), outcome, random, null, playback)
   }
+  // ⚠️ 패턴 없이 들어온 안타·아웃(시험·옛 호출) — 원본에 없는 길이다. 결과에 맞는 패턴을 원본 표에서 골라 판을 돌린다
+  //    (`fixturePatternFor`). 실제 타석(`resolvePitch`)은 늘 패턴을 싣는다
   return {
     ...withoutSteal(progress),
-    pendingDefensePlay: defensePlayInputOf(progress, outcome, random, options),
+    pendingDefensePlay: {
+      ...defensePlayInputOf(progress, outcome, fixturePatternFor(outcome), random, options),
+      outcomeIsGiven: true,
+    },
   }
 }
 
@@ -682,7 +707,8 @@ export function resolveDefensePlay(
 ): GameProgress {
   const pending = progress.pendingDefensePlay
   if (pending === null) return progress
-  return finishPlayerOutcome({ ...progress, pendingDefensePlay: null }, pending.outcome, random, result, null)
+  // 기록은 판 끝 정산(0xa8024)이 낸 결과다 — `pending.outcome` 은 타석을 끝낸 임시 값이다(`battedContact`)
+  return finishPlayerOutcome({ ...progress, pendingDefensePlay: null }, recordedOutcomeOf(pending, result), random, result, null)
 }
 
 /**
@@ -750,12 +776,14 @@ function withFoulRecords(progress: GameProgress, foulRecordIds: readonly number[
 function defensePlayInputOf(
   progress: GameProgress,
   outcome: AtBatOutcome,
+  pattern: BattedBallPattern,
   random: RandomPort,
   options: PlayerOutcomeOptions,
 ): DefensePlayInput {
   return {
+    // 타석을 끝낸 임시 결과 — 진행기는 보지 않는다(결과는 판 끝 정산이 낸다)
     outcome,
-    trajectory: battedBallTrajectory(options.pattern ?? representativePatternOf(outcome)),
+    trajectory: battedBallTrajectory(pattern),
     bases: progress.game.bases,
     outs: progress.game.outs,
     // 수비는 상대 팀이다 — 로스터의 수비 자리 코드로 아홉 칸을 채운다

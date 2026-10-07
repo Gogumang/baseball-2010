@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { inPlayCallSoundIdOf, walkCheerSoundIdOf, WALK_CHEER_SOUND } from '@/features/play-at-bat/model/atBatSounds'
-import { outcomeOfPattern } from '@/entities/batting/model/battedBallOutcome'
-import { createSeededRandom } from '@/shared/api/random/seededRandom'
+import { contactOfPattern } from '@/entities/batting/model/battedBallOutcome'
 
 /**
  * 이번에 새로 이은 두 갈래만 본다 — **볼넷 뒤 함성 29**(0x51afa~0x51b02) 와
@@ -30,17 +29,13 @@ describe('판정 v11 — 2스트라이크 번트 파울 아웃의 아웃 콜 (0x
   /** 각이 페어 범위(45~135) 밖이라 반드시 파울이 되는 패턴 */
   const 파울패턴 = [20, 600, 300, 0] as const
 
-  it('2스트라이크 번트 파울은 `isBuntFoulOut` 을 단 아웃이 된다 (0x9d5e2~0x9d600)', () => {
-    const result = outcomeOfPattern(0, 파울패턴, createSeededRandom(1), { strikes: 2, buntKind: 1 })
-    expect(result.kind).toBe('타구')
-    if (result.kind !== '타구') return
-    expect(result.outcome).toEqual({ kind: '아웃', detail: '직선타아웃' })
-    expect(result.isBuntFoulOut).toBe(true)
+  it('2스트라이크 번트 파울은 판정 11(아웃)이 된다 (0x9d5e2~0x9d600)', () => {
+    expect(contactOfPattern(0, 파울패턴, { strikes: 2, buntKind: 1 })).toEqual({ kind: '번트파울아웃' })
   })
 
   it('1스트라이크거나 번트가 아니면 그냥 파울이다 — 표가 안 붙는다', () => {
-    expect(outcomeOfPattern(0, 파울패턴, createSeededRandom(1), { strikes: 1, buntKind: 1 }).kind).toBe('파울')
-    expect(outcomeOfPattern(0, 파울패턴, createSeededRandom(1), { strikes: 2, buntKind: 0 }).kind).toBe('파울')
+    expect(contactOfPattern(0, 파울패턴, { strikes: 1, buntKind: 1 }).kind).toBe('파울')
+    expect(contactOfPattern(0, 파울패턴, { strikes: 2, buntKind: 0 }).kind).toBe('파울')
   })
 
   it('그 표가 서면 수비 결과를 보지 않고 62 다 — 원본 v11 은 조건이 없다', () => {
