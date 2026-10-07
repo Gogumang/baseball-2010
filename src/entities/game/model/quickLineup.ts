@@ -1,3 +1,4 @@
+import { atBatResultCodeOf } from '@/entities/batting/model/atBatResultRing'
 import {
   EMPTY_BATTER_GAME_RECORD,
   judgeCpuPinchHit,
@@ -62,6 +63,8 @@ export function recordLineupPlay(lineup: QuickLineup, order: number, outcome: At
   records[slot] = recordPlateAppearance(records[slot] ?? EMPTY_BATTER_GAME_RECORD, {
     isHit: isHit(outcome),
     isHomeRun: outcome.kind === '홈런',
+    // 같은 정산이 오늘 타석 결과 링에도 넣는다 (0xa908c)
+    resultCode: atBatResultCodeOf(outcome),
   })
   return { ...lineup, records }
 }

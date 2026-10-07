@@ -684,6 +684,50 @@ function opponentBatterAbility(options: PitcherGameOptions, rosterSlot: number) 
   }
 }
 
+/**
+ * **지금 상대 타자의 소개 판 재료** (상태 0xe 의 0x44944 — 타자 `0xae89c(공격 팀)`): 붙박이 표 칸이면 그 행의 이름·수비
+ * `+0x1c & 0xf`·폼(`+0xb`, 손 0xb63c0 의 재료), 142 가 9번에 넣은 마타자면 이름과 마타자 순번. `rosterSlot` 은 리그 기록표 칸
+ * (마타자면 null — 표에 칸이 없다).
+ */
+export function opponentBatterOf(progress: PitcherGameProgress): {
+  readonly name?: string
+  readonly position?: number
+  readonly profile?: number
+  readonly aceIndex?: number
+  readonly rosterSlot: number | null
+} {
+  const rosterSlot = rosterSlotAt(progress.opponentLineup, progress.opponentOrderIndex)
+  if (rosterSlot === ACE_BATTER_ROSTER_SLOT) {
+    const index = teamAcesOf(progress.options, false).batter
+    const player = aceBatterPlayerOf(index)
+    return { ...(player === undefined ? {} : { name: player.name, aceIndex: index }), rosterSlot: null }
+  }
+  const roster = teamBatters(progress.options.opponentTeamId)
+  const player = roster[rosterSlot % roster.length]
+  if (player === undefined) return { rosterSlot }
+  return {
+    name: player.name,
+    ...(player.position === undefined ? {} : { position: player.position }),
+    profile: player.profile,
+    rosterSlot: rosterSlot % roster.length,
+  }
+}
+
+/** 내 마운드 스태미나 재료 — 공마다 깎는 셈(`drainStamina`)과 같은 칸 (소개 판 체력 막대 0x44ea0~) */
+export function myMoundStaminaOf(progress: PitcherGameProgress): {
+  readonly staminaAbility: number
+  readonly teamMorale: number
+  readonly isFirstPitcher: boolean
+  readonly stamina: number
+} {
+  return {
+    staminaAbility: progress.options.staminaAbility,
+    teamMorale: progress.options.teamMorale,
+    isFirstPitcher: startsToday(progress.options),
+    stamina: progress.stamina,
+  }
+}
+
 /** 상대 마타자의 레벨 배율 먹은 네 칸 (히트·파워·수비·주루) */
 function aceBatterAbilityOf(options: PitcherGameOptions) {
   const index = teamAcesOf(options, false).batter

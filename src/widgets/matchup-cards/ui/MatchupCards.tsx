@@ -2,7 +2,7 @@ import {
   BATTER_BOXES, BATTER_CARD_FRAME, CARD_COLORS, GAME_UI_FOLDER, GAME_UI_FRAMES, IMG_TEXT_FOLDER, IMG_TEXT_FRAMES, LABEL,
   NUMBER_BASE, NUM_FOLDER, PITCHER_BOXES, PITCHER_CARD_FRAME,
   batterPositionBadgeOf, battingAverageGlyphsOf, boxNumberGlyphsOf, cardBackgroundOf, cardOriginsAt,
-  earnedRunAverageGlyphsOf, framePlacementOf, pitcherRoleBadgeOf, recentResultChipsOf, staminaGaugeRectsOf,
+  earnedRunAverageGlyphsOf, framePlacementOf, pitcherRoleBadgeOf, recentResultChipsOf, roundFillRectsOf, staminaGaugeRectsOf,
 } from '@/widgets/matchup-cards/lib/matchupCardsLayout'
 import type {
   CardBox, FillRect, FrameSize, NumberGlyph, Placed, StaminaGauge,
@@ -62,17 +62,22 @@ interface MatchupCardsProps {
 const pad = (frame: number) => String(frame).padStart(3, '0')
 
 function Fill({ rect }: { readonly rect: FillRect }) {
+  // 0xba0bc 의 둥근 칠(둥글기 > 0)은 0x6b7d4 가 사각 칠 하나와 선 넷으로 그린다 (`roundFillRectsOf`)
+  const parts = rect.round > 0 ? roundFillRectsOf(rect) : [rect]
   return (
-    <div
-      className={styles.fill}
-      style={{
-        left: rect.x, top: rect.y, width: Math.max(0, rect.width), height: Math.max(0, rect.height),
-        background: rect.color,
-        // ⚠️ 0x6b7d4 의 둥근 칠(둥글기 ≤ 3 은 선 긋기, 7 상한)은 웹이 border-radius 로 갈음한다 (근사)
-        borderRadius: rect.round,
-      }}
-      data-testid="판칠"
-    />
+    <>
+      {parts.map((part, index) => (
+        <div
+          key={index}
+          className={styles.fill}
+          style={{
+            left: part.x, top: part.y, width: Math.max(0, part.width), height: Math.max(0, part.height),
+            background: rect.color,
+          }}
+          data-testid="판칠"
+        />
+      ))}
+    </>
   )
 }
 

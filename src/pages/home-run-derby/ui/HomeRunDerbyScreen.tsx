@@ -58,7 +58,7 @@ interface HomeRunDerbyScreenProps {
   /**
    * 상태 0xe 소개 판(0x44944)의 타자 판 칸 — 모드 타자 기록(0x1fc20)의 이름(0xb62c0) · 수비(+0x1c & 0xf) ·
    * 타율(0xb8e3c) · 홈런(+0x28) · 타점(+0x2a) · 타순(팀 +0x32 = 0xb6394(기록) = +0xa & 0x1f) · 오늘 타석 기록.
-   * ⚠️ 아직 부르는 쪽(app)이 안 넘긴다 — 안 넘긴 칸은 비워 둔다.
+   * 앱(`EntryRoutes` 의 `derbyMatchupBatterOf`)이 넘긴다 — 안 넘긴 칸은 비워 둔다.
    */
   readonly matchupBatter?: Omit<MatchupBatterCard, 'isComputer'>
 }

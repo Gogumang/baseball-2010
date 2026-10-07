@@ -278,6 +278,46 @@ export interface FillRect {
 const fill = (x: number, y: number, width: number, height: number, color: string, round = 0): FillRect =>
   ({ x, y, width, height, color, round })
 
+export interface PlainRect {
+  readonly x: number
+  readonly y: number
+  readonly width: number
+  readonly height: number
+}
+
+/** 기기 선 긋기(0x14006c8) 한 줄 — 두 끝을 다 칠한다. 끝이 거꾸로면 작은 쪽부터 */
+const lineRect = (x1: number, y1: number, x2: number, y2: number): PlainRect => ({
+  x: Math.min(x1, x2),
+  y: Math.min(y1, y2),
+  width: Math.abs(x2 - x1) + 1,
+  height: Math.abs(y2 - y1) + 1,
+})
+
+/**
+ * **둥근 칠 `0x6b7d4(gfx, x, y, w, h, 둥글기, 색)`** (직접 떴다, 0x6b7d4~0x6ba0a) — 둥글기는 7 로 자르고(6b7e4), 실제 모양은
+ * 둘뿐이다. 칠 0x14006e8 = 기기 사각 칠(x, y, w, h) · 선 0x14006c8 = 기기 선(x1, y1, x2, y2). R = x + w · B = y + h.
+ * ```
+ * 둥글기 ≤ 3 (6b812):  칠(x+1, y+1, w−1, h−1) · 선(x+1, y, R−1, y) · 선(x+1, B, R−1, B) · 선(x, y+1, x, B−1) · 선(R, y+1, R, B−1)
+ * 둥글기 4~7 (6b8c0):  칠(x+1, y+1, w−1, h−1) · 선(x+2, y, R−2, y) · 선(x+2, B, R−2, B) · 선(x, y+2, x, B−2) · 선(R, y+2, R, B−2)
+ * ```
+ * 그래서 둥근 칠은 **(w+1) × (h+1)** 칸을 덮고 모서리를 1칸(≤3) 또는 3칸(4~7, ㄱ자) 비운다 — 네모 칠 0xb9f74(→ 0x6a9f0 →
+ * 같은 기기 사각 칠)은 w × h 다. (둥글기 > 7 갈래 6b952 는 자르기 때문에 안 탄다.) 폭이 음수인 칠은 아무것도 안 칠한다.
+ */
+export function roundFillRectsOf(rect: Pick<FillRect, 'x' | 'y' | 'width' | 'height' | 'round'>): PlainRect[] {
+  const { x, y, width: w, height: h } = rect
+  const right = x + w
+  const bottom = y + h
+  const inset = Math.min(7, rect.round) <= 3 ? 1 : 2
+  const body: PlainRect[] = w - 1 > 0 && h - 1 > 0 ? [{ x: x + 1, y: y + 1, width: w - 1, height: h - 1 }] : []
+  return [
+    ...body,
+    lineRect(x + inset, y, right - inset, y),
+    lineRect(x + inset, bottom, right - inset, bottom),
+    lineRect(x, y + inset, x, bottom - inset),
+    lineRect(right, y + inset, right, bottom - inset),
+  ]
+}
+
 /** 판 바탕 — 박스 0 둥글기 5 검정 · (+1, +1, −2, −2) 둥글기 5 #335FCD (0x44a96 · 0x44ae0 / 0x4516e · 0x451b2) */
 export function cardBackgroundOf(origin: Placed): FillRect[] {
   const base = PITCHER_BOXES[0]

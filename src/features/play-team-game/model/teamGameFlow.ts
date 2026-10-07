@@ -162,6 +162,7 @@ import type { BatterGameRecord } from '@/entities/batting/model/pinchHitAi'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { enterSceneConfirm } from '@/features/play-game/model/sceneConfirm'
+import { atBatResultCodeOf } from '@/entities/batting/model/atBatResultRing'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 import { TEAMS } from '@/shared/config/original/teams'
 
@@ -1435,7 +1436,8 @@ function withPlateAppearance(
   next[slot] = recordPlateAppearance(next[slot] ?? EMPTY_BATTER_GAME_RECORD, {
     isHit: outcome !== null && isHit(outcome),
     isHomeRun: outcome !== null && outcome.kind === '홈런',
-    ...(outcome === null ? { playKind: PICKOFF_PLAY_KIND } : {}),
+    // 같은 정산이 오늘 타석 결과 링에도 넣는다 (0xa908c) — 견제 판은 게이트에 막힌다
+    ...(outcome === null ? { playKind: PICKOFF_PLAY_KIND } : { resultCode: atBatResultCodeOf(outcome) }),
   })
   return next
 }
@@ -4219,6 +4221,32 @@ function playAutoDefenseAtBat(progress: TeamGameProgress, random: RandomPort): T
     false,
     random,
   )
+}
+
+/**
+ * 지금 마운드 투수의 스태미나 재료 — 용량 X `0x66e44(사기, 투수, f)` 와 % `0xaebb0` 을 셈하는 칸들. 공마다 깎는 셈
+ * (`drainStamina` · `quickPitcherDrainOf`)이 쓰는 값 그대로다 — 상태 0xe 의 소개 판 체력 막대(0x44ea0~)가 읽는다.
+ * ⚠️ 상대 팀 사기는 투구 소모와 같이 100 으로 둔다(진행기 근사 그대로).
+ */
+export function moundStaminaOf(progress: TeamGameProgress, ours: boolean): {
+  readonly staminaAbility: number
+  readonly teamMorale: number
+  readonly isFirstPitcher: boolean
+  readonly stamina: number
+} {
+  return ours
+    ? {
+        staminaAbility: ourPitcherStats(progress).stamina,
+        teamMorale: ourTeamMoraleOf(progress.options),
+        isFirstPitcher: progress.ourUsedPitchers.length === 0,
+        stamina: progress.stamina,
+      }
+    : {
+        staminaAbility: opponentPitcherStaminaAbility(progress),
+        teamMorale: 100,
+        isFirstPitcher: progress.opponentUsedPitchers.length === 0,
+        stamina: progress.opponentStamina,
+      }
 }
 
 /** 상대 투수의 체력 능력치 (칸 3) — 스태미나 용량 X 의 바탕 */

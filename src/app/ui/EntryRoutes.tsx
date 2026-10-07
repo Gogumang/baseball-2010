@@ -2,6 +2,10 @@ import { useMemo, useState } from 'react'
 import type { Screen } from '@/app/model/screen'
 import { MessageBox } from '@/shared/ui'
 import { HomeRunDerbyScreen } from '@/pages/home-run-derby/ui/HomeRunDerbyScreen'
+import type { PlayerCareer } from '@/entities/career/model/playerCareer'
+import { myBatterIndexOf, nariTeamRecordOf, nariTeamsOf } from '@/entities/career/model/nariTeamRecord'
+import { batterCardStatsOf } from '@/widgets/matchup-cards/lib/matchupRecord'
+import type { MatchupBatterCard } from '@/widgets/matchup-cards/ui/MatchupCards'
 import { modeBatterOf, modeBatterOfHallOfFame } from '@/app/model/modeBatter'
 import { nariBatterOf } from '@/app/model/useCollection'
 import { hallOfFameBatterAt } from '@/entities/collection/model/collection'
@@ -29,6 +33,31 @@ import { SpecialEditScreen } from '@/pages/special-edit/ui/SpecialEditScreen'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import type { CareerResetEdition } from '@/entities/settings/model/modeReset'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
+
+/**
+ * **홈런더비 상태 0xe 의 타자 판 값** (0x44944 — 타자 `0xae89c(팀 0)` = 모드 타자 기록 0x1fc20).
+ * - 나리 타자편 저장(0x213c0(앱, 4, 0))의 내 선수 레코드: 이름 · 수비 `+0x1c & 0xf`(내 팀 레코드의 내 줄) ·
+ *   타순 `팀+0x32` = `0xb6394(기록)` = `+0xa & 0x1f`(142·경기 장면이 0xb8768 로 배열 첨자로 다시 매긴 내 칸) ·
+ *   시즌 줄 `career.stats`(웹이 내 레코드 +0x20~ 대신 세는 칸) — 기록 게이트 0xa56dc 는 모드 7 에서 거짓이라 더비 중에는 안 오른다.
+ * - 명예 타자 기록(0x1f640)은 이름만 — ⚠️ 웹 명전 기록에 수비·시즌 줄 칸이 없어 비운다(미해결).
+ * ⚠️ 미해결: 오늘 타석 기록(링) — 더비 타석이 정산 0xa8024 를 지나는지 안 읽어 비운다.
+ */
+function derbyMatchupBatterOf(
+  famer: { readonly name: string } | null,
+  career: PlayerCareer | null | undefined,
+): Omit<MatchupBatterCard, 'isComputer'> | undefined {
+  if (famer !== null) return { name: famer.name }
+  if (career === null || career === undefined) return undefined
+  const record = nariTeamRecordOf(nariTeamsOf(career), career.teamId)
+  const index = myBatterIndexOf(record)
+  const position = record.batters[index]?.position
+  return {
+    name: career.name,
+    ...(index < 0 ? {} : { battingOrder: index }),
+    ...(position === undefined ? {} : { position }),
+    ...batterCardStatsOf(career.stats),
+  }
+}
 
 interface EntryRoutesProps {
   readonly screen: Screen
@@ -269,6 +298,8 @@ export function EntryRoutes({
         }}
         settings={gameSettings.settings}
         onSettingsChange={gameSettings.setSettings}
+        // 상태 0xe 소개 판의 타자 판 — 모드 타자 기록(0x1fc20)에서 (`derbyMatchupBatterOf`)
+        matchupBatter={derbyMatchupBatterOf(famer, career)}
         onExit={leave}
       />
     )

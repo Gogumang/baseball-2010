@@ -35,6 +35,8 @@ import { useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
 import { settlementBackdropOffsetAt } from '@/pages/team-game/model/settlementBackdrop'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { SceneMatchupCards } from '@/widgets/matchup-cards/ui/SceneMatchupCards'
+import { teamMatchupCardsOf } from '@/pages/team-game/lib/teamMatchupCards'
+import type { TeamMatchupRecords } from '@/pages/team-game/lib/teamMatchupCards'
 import type {
   TeamEntryBatter,
   TeamEntryPitcher,
@@ -133,6 +135,11 @@ interface TeamGameScreenProps {
    * 저장) 전역기록 +0x4c+모드 를 0 으로 지운다(0x4f3d6). 그래서 요약을 함께 넘긴다 — `onFinish` 는 결과 화면 확인이다.
    */
   readonly onSettlementEnter?: (summary: TeamGameSummary) => void
+  /**
+   * 상태 0xe 소개 판(0x44944)의 시즌 줄 출처 — 시즌 레코드 +0x20~ 의 웹 자리인 리그 선수 기록표와, 이 경기 줄을 더할지
+   * (기록 게이트 0xa56dc). 안 주면 방어율·탈삼진·타율·홈런·타점 칸을 비운다 (`teamMatchupCardsOf`).
+   */
+  readonly matchupRecords?: TeamMatchupRecords
 }
 
 export function TeamGameScreen({
@@ -148,6 +155,7 @@ export function TeamGameScreen({
   resumeFrom,
   onHalfInningSave,
   onSettlementEnter,
+  matchupRecords,
 }: TeamGameScreenProps) {
   const session = useTeamGame(options, random, settings?.isVibrationOn, resumeFrom)
   const { progress, canBat, canPitch, summary, actions } = session
@@ -347,33 +355,13 @@ export function TeamGameScreen({
   isInConfirmStateRef.current = sceneConfirm.isInConfirmState
   /** 0xd 두 그림을 지나 0xe 에 들어섰으면 소개 판을 그린다 (0x4d9ec → 0x44944) */
   const isMatchupShown = isAwaitingConfirm && sceneConfirm.isInConfirmState
-  const ourBatting = canBat
-  const matchupBatterEntry = ourBatting
-    ? currentBatterEntry(progress)
-    : progress.opponentEntry[progress.opponentOrderIndex]
-  const matchupPitcherEntry = ourBatting
-    ? progress.opponentPitcherEntry[progress.opponentPitcherIndex]
-    : progress.ourPitcherEntry[progress.ourPitcherIndex]
   /**
-   * 소개 판 — 팀 글자는 `0xb6c20(st, 측)`(사람 팀 PLAYER · CPU 팀 COM): 우리가 치면 타자가 PLAYER, 던지면 투수가 PLAYER.
-   * ⚠️ 웹 명단에 없는 칸(투수 보직·좌우·방어율·탈삼진·체력 막대 / 타자 좌우·타율·홈런·타점·오늘 타석 기록)은 비운다 —
-   *    판은 모르는 칸을 안 그린다. 타자 손을 몰라 우타(0) 배치로 둔다.
+   * 소개 판 값 — 투수 `0xae83c(수비 팀)` · 타자 `0xae89c(공격 팀)` 레코드에서 (`teamMatchupCardsOf`).
+   * 팀 글자는 `0xb6c20(st, 측)`(사람 팀 PLAYER · CPU 팀 COM): 우리가 치면 타자가 PLAYER, 던지면 투수가 PLAYER.
    */
+  const matchup = teamMatchupCardsOf(progress, matchupRecords)
   const matchupCards = (
-    <SceneMatchupCards
-      batterHand={0}
-      pitcher={{
-        isComputer: ourBatting,
-        ...(matchupPitcherEntry === undefined ? {} : { name: matchupPitcherEntry.name }),
-      }}
-      batter={{
-        isComputer: !ourBatting,
-        battingOrder: ourBatting ? progress.game.battingOrderIndex % 9 : progress.opponentOrderIndex % 9,
-        ...(matchupBatterEntry === undefined
-          ? {}
-          : { name: matchupBatterEntry.name, position: matchupBatterEntry.position }),
-      }}
-    />
+    <SceneMatchupCards batterHand={matchup.batterHand} pitcher={matchup.pitcher} batter={matchup.batter} />
   )
   /**
    * 띄울 돌발 창 — 결과 창(0x1d)은 0xe 앞이라 늘 띄우고, 제안 창(0x1b)은 0xe 의 OK 뒤 메시지 1 이 0x8f158 을 굴려

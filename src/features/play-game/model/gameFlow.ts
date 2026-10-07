@@ -105,7 +105,8 @@ import { benchClearingEffectOf, rollsIntoBenchClearing } from '@/entities/game/m
 import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
-import { ROSTER_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
+import { ACE_PITCHER_REPERTOIRES, ROSTER_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
+import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
 import { EMPTY_DECISION_STATE, gameEndDecisionOf } from '@/entities/game/model/winLossSave'
 import type { DecisionState } from '@/entities/game/model/winLossSave'
 import {
@@ -966,6 +967,56 @@ export function opponentPitcherAbilityOf(progress: GameProgress): PitcherAbility
     ...(repertoire === undefined
       ? {}
       : { repertoire: { form: repertoire.form, pitchMask: repertoire.pitchMask, magicId: repertoire.magicId } }),
+  }
+}
+
+/**
+ * **지금 상대 마운드 투수의 소개 판 재료** (상태 0xe 의 0x44944 — 투수 `0xae83c(수비 팀)`).
+ * - 이름 · 보직 `+0xb & 3`(로스터 칸 표) · 손 0xb63c0(폼 & 1 · 마투수 표 `pitcherHandOf`) — 레코드는 붙박이 표 칸 또는 142 가
+ *   8번 칸에 넣은 마투수다. 마선수 대결 투수(`aceOpponent`)는 이름만 안다.
+ * - 체력 막대 재료 — 공마다 깎는 셈(`drainPitcherForPitch`)이 쓰는 용량 X 의 칸 그대로(사기 `defense.morale` · 첫 투수 = 이미
+ *   내려간 투수가 없다).
+ * - `pitcherSlot` — 리그 기록표의 그 투수 칸(마투수·대결 투수면 null — 표에 칸이 없다).
+ */
+export function opponentMoundOf(progress: GameProgress): {
+  readonly name?: string
+  readonly role?: number
+  readonly throwsLeft?: boolean
+  readonly pitcherSlot: number | null
+  readonly staminaAbility: number
+  readonly teamMorale: number
+  readonly isFirstPitcher: boolean
+  readonly stamina: number
+} {
+  const mound = progress.opponentMound
+  const defense = opponentQuickDefenseOf(progress)
+  const stamina = {
+    staminaAbility: defense.staminaAbilityAt(mound.pitcherSlot),
+    teamMorale: defense.morale ?? 100,
+    isFirstPitcher: mound.usedSlots.length === 0,
+    stamina: mound.stamina,
+  }
+  if (progress.aceOpponent !== null) return { name: progress.aceOpponent.name, pitcherSlot: null, ...stamina }
+  const ace = moundAcePitcherOf(progress, false)
+  const aceIndex = progress.aces?.opponent?.pitcher
+  if (ace !== undefined && aceIndex !== undefined) {
+    const form = ACE_PITCHER_REPERTOIRES[aceIndex]?.form
+    return {
+      name: ace.player.name,
+      ...(form === undefined ? {} : { throwsLeft: pitcherHandOf(form, true) === 1 }),
+      pitcherSlot: null,
+      ...stamina,
+    }
+  }
+  const pitcher = teamPitchers(progress.opponentTeamId)[mound.pitcherSlot]
+  const repertoire = ROSTER_PITCHER_REPERTOIRES[progress.opponentTeamId * PITCHERS_PER_TEAM + mound.pitcherSlot]
+  const role = rosterPitcherRoleOf(mound.pitcherSlot)
+  return {
+    ...(pitcher === undefined ? {} : { name: pitcher.name }),
+    ...(role === undefined ? {} : { role }),
+    ...(repertoire === undefined ? {} : { throwsLeft: pitcherHandOf(repertoire.form, false) === 1 }),
+    pitcherSlot: mound.pitcherSlot,
+    ...stamina,
   }
 }
 

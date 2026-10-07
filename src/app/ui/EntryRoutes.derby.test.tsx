@@ -55,6 +55,24 @@ describe('홈런더비 진입 — 하위 16 선수 고르기 (0x25e6c · 0x29ac8
     expect(받은것.at(-1)).toMatchObject({ ability: modeBatterOf(나리).ability, batterForm: 2, batterSkinIndex: 2 })
   })
 
+  it('상태 0xe 소개 판의 타자 판 값을 넘긴다 — 나리 기록이면 이름·타순(+0xa & 0x1f)·시즌 줄, 명전 기록이면 이름만', () => {
+    const 기록있는나리 = { ...나리, stats: { ...나리.stats, atBats: 20, hits: 7, homeRuns: 2, runsBattedIn: 5 } }
+    띄우기(기록있는나리)
+    fireEvent.click(view.getByRole('button', { name: '6번 슬롯' }))
+    expect(받은것.at(-1)?.['matchupBatter']).toMatchObject({
+      name: '나리',
+      // 신인은 8번 타자 칸(첨자 7)
+      battingOrder: 7,
+      battingAverage: 350,
+      homeRuns: 2,
+      runsBattedIn: 5,
+    })
+    cleanup()
+    띄우기(나리)
+    fireEvent.click(view.getByRole('button', { name: '7번 슬롯' }))
+    expect(받은것.at(-1)?.['matchupBatter']).toEqual({ name: '전설' })
+  })
+
   it('명예 타자(칸 6, 코드 4)를 고르면 그 기록으로 — 장착 스킬·생김새도 기록 것이다', () => {
     띄우기(나리)
     fireEvent.click(view.getByRole('button', { name: '7번 슬롯' }))

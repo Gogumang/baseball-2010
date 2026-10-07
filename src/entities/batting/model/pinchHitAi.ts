@@ -1,3 +1,4 @@
+import { withAtBatResult } from '@/entities/batting/model/atBatResultRing'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
 /**
@@ -67,6 +68,11 @@ export interface BatterGameRecord {
    * 사람 견제가 붙으면서 거짓이 되어 고쳤다.)
    */
   readonly plateAppearances: number
+  /**
+   * 같은 24바이트 앞쪽의 **오늘 타석 결과 링**(코드, 오래된 차례 — `atBatResultRing`). 상태 0xe 의 소개 판 0x44944 가
+   * 마지막 넷을 그린다. 없으면 빈 링.
+   */
+  readonly results?: readonly number[]
 }
 
 export const EMPTY_BATTER_GAME_RECORD: BatterGameRecord = {
@@ -91,13 +97,23 @@ const RUNNER_ONLY_PLAY_KINDS: readonly number[] = [4, 5]
  */
 export function recordPlateAppearance(
   record: BatterGameRecord,
-  play: { readonly isHit: boolean; readonly isHomeRun: boolean; readonly playKind?: number },
+  play: {
+    readonly isHit: boolean
+    readonly isHomeRun: boolean
+    readonly playKind?: number
+    /** 링에 넣을 코드(`atBatResultCodeOf`) — 넣는 다섯 자리도 같은 게이트 안이다. 안 주면 링을 안 건드린다 */
+    readonly resultCode?: number
+  },
 ): BatterGameRecord {
   const countsAsPlateAppearance = !RUNNER_ONLY_PLAY_KINDS.includes(play.playKind ?? 1)
+  const pushesResult = countsAsPlateAppearance && play.resultCode !== undefined
   return {
     hits: record.hits + (play.isHit ? 1 : 0),
     homeRuns: record.homeRuns + (play.isHit && play.isHomeRun ? 1 : 0),
     plateAppearances: record.plateAppearances + (countsAsPlateAppearance ? 1 : 0),
+    ...(pushesResult
+      ? { results: withAtBatResult(record.results, play.resultCode!) }
+      : record.results === undefined ? {} : { results: record.results }),
   }
 }
 

@@ -14,6 +14,7 @@ import { HALF_INNING_JINGLE_TICK } from '@/features/play-game/model/halfInningBo
 import { HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
 import { useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
 import { SceneMatchupCards } from '@/widgets/matchup-cards/ui/SceneMatchupCards'
+import { gameMatchupCardsOf } from '@/pages/game/lib/gameMatchupCards'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import { mySpecialSwingRemainingOf, stealableBasesOf } from '@/features/play-game/model/gameFlow'
@@ -128,8 +129,9 @@ export function GameScreen({
    * 타석 결과 연출·돌발 창·1회초 판·벤치 클리어링·경기 중 메뉴·조작방법·설정이 덮고 있으면 받지 않는다.
    * 받은 OK 는 진행기가 실은 대기 객체에 남아, 수비 화면을 갔다 와 이 화면이 다시 서도 다시 묻지 않는다.
    * 돌발 제안 창(0x1b)은 원본처럼 OK 뒤에 선다 — 그 창을 띄우는 `app/ui/GameRoute` 가 대기가 끝나기를 기다린다.
-   * ⚠️ 미이식: 0xe 그리기 0x4d9ec 가 0xd 그리기 위에 얹는 안내 판 0x44944.
    */
+  /** 상태 0xe 소개 판 값 (0x44944) */
+  const matchup = gameMatchupCardsOf(progress, career)
   const sceneConfirm = useSceneConfirm(
     progress.sceneConfirm,
     !isPaused &&
@@ -305,15 +307,9 @@ export function GameScreen({
           />
           {/*
             0xe 그리기 0x4d9ec — 0xd 두 그림 뒤 타석 장면 위에 투수·타자 소개 판 0x44944. 팀 글자는 0xb6c20: 내 팀 PLAYER · 상대 COM.
-            ⚠️ 웹 경기 상태에 없는 칸(투수 이름·보직·좌우·방어율·탈삼진·체력 막대 / 내 수비·타율·홈런·타점·오늘 타석 기록)은 비운다.
+            값은 `gameMatchupCardsOf` (내 레코드 · 상대 마운드).
           */}
-          {sceneConfirm.isAwaiting && sceneConfirm.isInConfirmState && (
-            <SceneMatchupCards
-              batterHand={career.battingSide}
-              pitcher={{ isComputer: true, ...(ace === null ? {} : { name: ace.name }) }}
-              batter={{ isComputer: false, name: career.name, battingOrder: career.battingOrder - 1 }}
-            />
-          )}
+          {sceneConfirm.isAwaiting && sceneConfirm.isInConfirmState && <SceneMatchupCards {...matchup} />}
         </div>
 
         {isMenuOpen ? (

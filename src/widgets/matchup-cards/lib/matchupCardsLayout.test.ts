@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   BATTER_BOXES, BATTER_CARD_TOP, PITCHER_BOXES, PITCHER_CARD_TOP,
   batterPositionBadgeOf, battingAverageGlyphsOf, boxNumberGlyphsOf, cardOriginsAt, earnedRunAverageGlyphsOf,
-  framePlacementOf, paddedNumberGlyphsOf, pitcherRoleBadgeOf, recentResultChipsOf, slideOffsetAt, staminaGaugeRectsOf,
+  framePlacementOf, paddedNumberGlyphsOf, pitcherRoleBadgeOf, recentResultChipsOf, roundFillRectsOf, slideOffsetAt,
+  staminaGaugeRectsOf,
 } from '@/widgets/matchup-cards/lib/matchupCardsLayout'
 
 describe('밀림 (0x44944 머리 — sin 표 0x6c7c0)', () => {
@@ -107,5 +108,35 @@ describe('칸', () => {
 
   it('타자 판 박스 11 은 타율 (43, 24, 21, 13)', () => {
     expect(BATTER_BOXES[11]).toEqual({ x: 43, y: 24, width: 21, height: 13 })
+  })
+})
+
+describe('둥근 칠 0x6b7d4 — 사각 칠 하나와 선 넷 (둥글기 ≤ 3 · 4~7 두 모양)', () => {
+  /** 칠한 칸 집합 */
+  const cellsOf = (rects: readonly { x: number; y: number; width: number; height: number }[]) => {
+    const cells = new Set<string>()
+    for (const rect of rects) {
+      for (let x = rect.x; x < rect.x + rect.width; x += 1) {
+        for (let y = rect.y; y < rect.y + rect.height; y += 1) cells.add(`${x},${y}`)
+      }
+    }
+    return cells
+  }
+
+  it('둥글기 5 는 (w+1)×(h+1) 을 덮고 모서리마다 ㄱ자 세 칸을 비운다', () => {
+    const cells = cellsOf(roundFillRectsOf({ x: 0, y: 0, width: 6, height: 4, round: 5 }))
+    expect(cells.size).toBe(7 * 5 - 4 * 3)
+    for (const missing of ['0,0', '1,0', '0,1', '6,0', '5,0', '6,1', '0,4', '1,4', '0,3', '6,4', '5,4', '6,3']) {
+      expect(cells.has(missing)).toBe(false)
+    }
+    expect(cells.has('1,1')).toBe(true)
+  })
+
+  it('둥글기 1 은 모서리 한 칸씩만 비운다 — 7 보다 크면 7 로 자른다', () => {
+    const cells = cellsOf(roundFillRectsOf({ x: 10, y: 10, width: 4, height: 3, round: 1 }))
+    expect(cells.size).toBe(5 * 4 - 4)
+    expect(['10,10', '14,10', '10,13', '14,13'].some((cell) => cells.has(cell))).toBe(false)
+    expect(cellsOf(roundFillRectsOf({ x: 0, y: 0, width: 6, height: 4, round: 99 })))
+      .toEqual(cellsOf(roundFillRectsOf({ x: 0, y: 0, width: 6, height: 4, round: 5 })))
   })
 })
