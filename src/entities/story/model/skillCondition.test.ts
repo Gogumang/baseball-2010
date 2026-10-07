@@ -81,6 +81,14 @@ describe('조건 20 — 스킬 획득 (0xad1ba)', () => {
     expect(meetsSkillAcquireCondition(선수({ ...기본, season: 2, seasonPopularityGain: 0 }), 값(2), undefined)).toBe(false)
   })
 
+  it('2 먹튀의 인기도 합은 s16 +0x1c2 를 ldrsh 로 읽는다 (0xad2c0) — 32767 을 넘긴 합은 음수로 돌아 걸린다', () => {
+    const 기본 = { skillIds: [], season: 3, gamesPlayed: 14 }
+    // 0x8000 = −32768 · 0x10010 = 16
+    expect(meetsSkillAcquireCondition(선수({ ...기본, seasonPopularityGain: 0x8000 }), 값(2), undefined)).toBe(true)
+    expect(meetsSkillAcquireCondition(선수({ ...기본, seasonPopularityGain: 0x10010 }), 값(2), undefined)).toBe(false)
+    expect(meetsSkillAcquireCondition(선수({ ...기본, seasonPopularityGain: 0x1000f }), 값(2), undefined)).toBe(true)
+  })
+
   it('20 에러왕 — 연차 ≥ 3 · 수비 실효 ≤ 400 · 30경기째 · 이번 시즌 수비 훈련 0', () => {
     const 기본 = { skillIds: [], season: 4, gamesPlayed: 30, ability: { hit: 400, power: 400, defense: 400, run: 400 } }
     expect(meetsSkillAcquireCondition(선수(기본), 값(20), undefined)).toBe(true)

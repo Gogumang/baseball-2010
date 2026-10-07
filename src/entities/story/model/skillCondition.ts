@@ -43,6 +43,8 @@ const wasRemoved = (career: PlayerCareer, skillId: number) => career.removedMinu
 /** 칸 값 읽기 — +0x4b+i 는 u8(ldrb), +0x6b+i 사본은 s8(ldrb → lsl/asr 24) */
 const toUint8 = (value: number) => value & 0xff
 const toInt8 = (value: number) => ((value & 0xff) << 24) >> 24
+/** s16 칸 읽기(ldrsh) — 넘치면 음수로 돈다 */
+const toInt16 = (value: number) => ((value & 0xffff) << 16) >> 16
 
 /**
  * 몹쓸몸·유리몸의 T — 0xad334~0xad34c: `Σ i=0..4 (u8 S+0x4b+i − s8 S+0x6b+i)` (통산 훈련 수 − 시즌 시작 사본).
@@ -74,10 +76,12 @@ const ACQUIRE_RULES: Readonly<Record<number, (career: PlayerCareer, random: Rand
     return (g === 18 && t <= 2) || (g === 38 && t <= 4)
   },
   // 2 먹튀 — 0xa4f31 불발 → 연차 ≥ 2 이고 (g==14 && 이번 시즌 인기도 합 ≤ 15 | g==32 && ≤ 35) (0xad2a2)
+  // 합은 s16 +0x1c2 를 ldrsh 로 읽는다(0xad2c0 — 116 의 12c26~12c30 도 ldrsh · strh 로 쌓는다) — 32767 을 넘기면 음수로 돈다(원본 그대로).
+  // 투수편 `acquiresPitcherSkill` 과 같은 읽기다
   2: (career) => {
     if (wasRemoved(career, 2) || yearIndexOf(career) < 2) return false
     const g = career.gamesPlayed
-    const gain = career.seasonPopularityGain
+    const gain = toInt16(career.seasonPopularityGain)
     return (g === 14 && gain <= 15) || (g === 32 && gain <= 35)
   },
   // 5 무력감 — 0xa4f31 불발 → 사기 ≤ 20, 연차 ≥ 3, rand[0,100) ≥ 70 (30%) (0xad43a — 앞이 막히면 안 굴린다)
