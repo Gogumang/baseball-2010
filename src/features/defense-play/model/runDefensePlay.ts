@@ -39,7 +39,6 @@ import {
 } from '@/entities/fielding/model/autoAdvance'
 import {
   BOUNCE_THROW_DISTANCE,
-  NO_THROW_ERROR,
   rollFumble,
   rollSpecialDefense,
   type ThrowErrorResult,
@@ -1179,7 +1178,7 @@ export function stepDefensePlay(
    * 중계([0])면 받는 야수는 중계맨이고, 그가 쥐면(쥐기 0xb2710 — 준비 틱 내야 3) 플레이 틱 b4616 이 [4] 에게 다시 0xb2e38
    * 을 부른다(1a 절). 공은 0xa1620(레이저 0xa222c)이 쏘고 b2f8c 의 세계 0xbfed0 이 깐 뒤 b2f9c 가 점[T − 1] 에 받는 점을
    * 끼워 넣는다(`launchThrow`). 받는 야수 · 받는 틱은 b307c 예보 vt24(0) · 고르기 vt34 가 정하고, 받는 것은 보통 포구 틱
-   * 갈래(1 절 — 펌블 굴림 b4228 · 쥐기 0xb2710 · 펌블이면 0xb3148 튕김)다. ⚠️ 원바운드(a17fc)만 아직 옛 도착 모델(2 절)이다.
+   * 갈래(1 절 — 펌블 굴림 b4228 · 쥐기 0xb2710 · 펌블이면 0xb3148 튕김)다. 원바운드(a17fc)도 같은 공(공+0xaac = 1)이다.
    */
   const throwBall = (
     fromSlot: number,
@@ -1232,10 +1231,7 @@ export function stepDefensePlay(
     // CPU 홈 송구 20% 특수 송구 — 효과는 `cpuSpecialThrowOf` 참고. 레이저는 0xb2e38 이 다른 함수로 던진다(아래)
     const special = !laser && cpuSpecial ? cpuSpecialThrowOf(fielders, fromSlot, coverSlot) : NO_CPU_SPECIAL_THROW
     const relayed = plan.relayed && !laser && !special.special
-    let error: ThrowErrorResult = NO_THROW_ERROR
-    // 원바운드(아직 옛 도착 모델)만 도착 틱을 잰다. 그 밖은 공을 세계로 깔고(`launchThrow`) 예보가 받는 야수 · 틱을 정한다
-    let arrivalTicks = -1
-    let thrown: ThrownBall | null = null
+    let thrown: ThrownBall
     // 공은 송구 계획 [3](중계면 중계맨, b2ea8)의 목표점(+0x2c)으로 쏜다
     const receiverTarget = fielders[plan.toSlot]?.target ?? basePosition(base)
     const ballBody = isBallTrajectory(trajectory) ? trajectory.flight.body : undefined
@@ -1256,35 +1252,29 @@ export function stepDefensePlay(
         body: ballBody,
       })
     } else {
-      // 원바운드(0xa17fc 갈래)는 악송구 굴림 대신 rand(0,2) 한 번으로 각도 부호(±1)만 정한다
-      if (special.bounce && input.random !== undefined) randomIntegerBelow(input.random, 0, 2)
       // a16dc~a16ec: +0xdc = 특수 ? +0xd8 : +0xd4 — 던질 때 덮어쓰고 그 판 동안 남는다(`FielderState.throwSpeed`)
       fielders = fielders.map((fielder) => (fielder.slot === fromSlot ? thrownWith(fielder, special.special) : fielder))
-      const thrower = fielders[fromSlot]
-      if (special.bounce) {
-        // ⚠️ 원바운드는 아직 옛 도착 모델 — 0xaf284 의 커버 갈래를 중계 없이 (특수면 +0xd8 속도로)
-        arrivalTicks = specialThrowArrivalTicks(contextAt(tick), base, thrower)
-      } else {
-        // 0xa1620 — 악송구 굴림(a1828, CPU 특수 송구는 다섯째 인자 = 계획 [1] 로 기준 +100) · 악송구면 흔들기 굴림 둘 ·
-        // 아니면 긴 송구 흔들림 굴림(a198c) · 세계 0xbfed0 · 받는 점 끼워 넣기(b2f9c)
-        thrown = launchThrow({
-          thrower,
-          target: receiverTarget,
-          special: special.special,
-          ability: abilities[fromSlot] ?? DEFAULT_ABILITY,
-          random: input.random,
-          body: ballBody,
-        })
-        error = thrown.error
-      }
+      // 0xa1620 — 원바운드(a17fc: 특수 && 거리 > 20400)면 rand(0, 2) 한 번으로 φ ± 1 · 공+0xaac = 1 (악송구 · 흔들림 굴림 없음),
+      // 아니면 악송구 굴림(a1828, CPU 특수 송구는 다섯째 인자 = 계획 [1] 로 기준 +100) · 악송구면 흔들기 굴림 둘 ·
+      // 아니면 긴 송구 흔들림 굴림(a198c) — 그리고 세계 0xbfed0 · 받는 점 끼워 넣기(b2f9c)
+      thrown = launchThrow({
+        thrower: fielders[fromSlot],
+        target: receiverTarget,
+        special: special.special,
+        bounce: special.bounce,
+        ability: abilities[fromSlot] ?? DEFAULT_ABILITY,
+        random: input.random,
+        body: ballBody,
+      })
     }
-    if (error.errant) errantThrow = true
+    if (thrown.errant) errantThrow = true
     const firstReceiver = relayed ? plan.toSlot : coverSlot
     throwBase = base
-    throwArrivalTick = thrown === null ? tick + Math.max(1, arrivalTicks) : -1
+    throwArrivalTick = -1
     throwFromSlot = fromSlot
     throwReleaseTick = tick
-    throwReceiverSlot = thrown !== null ? NONE : firstReceiver
+    // 받을 야수는 예보가 고른다(아래) — 2 절의 "받은 야수 손으로 옮기기" 는 더 없다
+    throwReceiverSlot = NONE
     // +0x14c..: 계획을 덮어쓴다 — 중계면 [0] = 1 · [4] = 최종 받는 야수 (b4616 이 본다)
     relayFinalSlot = relayed ? coverSlot : NONE
     relayBase = relayed ? base : NONE
@@ -1299,7 +1289,7 @@ export function stepDefensePlay(
       catchFielderSlot: firstReceiver === NONE ? play.catchFielderSlot : firstReceiver,
       catchTick: throwArrivalTick,
     }
-    if (thrown !== null) {
+    {
       // b307c vt24(0) — +0x130 = 던진 야수(t ≤ 4 건너뜀) · 그 복제는 +0xb1(a1a3a)로 두 틱 더 빠진다 · a = 0 이라 궤적 끝까지
       // 못 줍으면 t = 10 부터 두 번째 패스 · vt34 = 0xb3b38 이 받을(주울) 야수를 AI 1 로. 받는 틱 = 그 포구 틱이다.
       // 보통 · 흔들린 · 레이저 송구는 공+0xaac = 0 이라 움직임허용 없음(복제가 제자리 · n 없음)이고, 던진 야수 · C(+0x154)가
@@ -1316,13 +1306,11 @@ export function stepDefensePlay(
       `${tick}틱 ${base}루로 ${laser ? '레이저 ' : ''}${cpuSpecial ? '특수 ' : ''}송구 — ${throwArrivalTick}틱 도착` +
         (relayed ? ` (${plan.toSlot}번 야수 중계)` : '') +
         (special.bounce ? ' (원바운드)' : '') +
-        (thrown === null
-          ? ''
-          : thrown.errant
-            ? ` (악송구 — ${chaserSlot}번 야수가 줍는다)`
-            : thrown.wobbled
-              ? ` (흔들린 긴 송구 — ${chaserSlot}번 야수가 받는다)`
-              : '') +
+        (thrown.errant
+          ? ` (악송구 — ${chaserSlot}번 야수가 줍는다)`
+          : thrown.wobbled
+            ? ` (흔들린 긴 송구 — ${chaserSlot}번 야수가 받는다)`
+            : '') +
         (chooser === 'CPU' ? ' (CPU 결정)' : chooser === '미룬' ? ' (AI 9 미룬 송구)' : chooser === '중계' ? ' (중계 이어 던지기)' : '') +
         ` (${fromSlot}번 야수)`,
     )
@@ -1807,37 +1795,11 @@ export function stepDefensePlay(
       }
     }
 
-    // ── 2. 송구 도착 — 공이 받은 야수의 손으로 옮겨 간다 ──
-    //
-    // ⚠️ 예전에는 여기서 **"그 루로 가던 주자가 아직 못 닿았으면 아웃"** 을 바로 찍었다.
-    // 그것은 원본에 없는 갈래다. 원본은 아웃 판정 `0xb36d0`(vt90) 하나가 **틱마다** 돌면서
-    // 포스(2)와 태그(3)를 **갈라서** 잡는다 — 포스가 안 걸린 주자는 루에 공이 먼저 닿아도
-    // 안 죽고 태그(≤499)를 받아야 죽는다. 그래서 그 갈래를 통째로 6b 절로 옮겼다.
-    // (`outJudgement.judgeOut` · 근거는 그 파일 머리에 다 적어 두었다.)
-    if (throwArrivalTick >= 0 && tick === throwArrivalTick) {
-      // 공은 **받은 야수의 손으로 옮겨 간다** — 송구공도 포구 틱 갈래 b42c8 의 쥐기 0xb2710(P, f, **1**)로 잡는다:
-      // `+0x128 = 1 · P+0x130 = 받은 야수 · +0x12c = 1 · 야수+0xe0 = 1` 에 준비 틱(내야 3 · 외야 6, vt88)을 넣고
-      // 그 자리에서 vt90(아웃 판정)을 부른다. 이 줄이 없으면 공 쥔 야수가 끝까지 "쫓아간 야수" 로 남아
-      // 협살 조건("공 쥔 야수가 두 커버 야수 중 하나", 0xb3fa8)이 영영 서지 않는다.
-      const receiverSlot = throwReceiverSlot
-      if (receiverSlot !== NONE) {
-        fielders = fielders.map((fielder) =>
-          fielder.slot === receiverSlot
-            ? { ...fielder, holdingBall: true, actionRemainingTicks: readyTicksOf(receiverSlot) }
-            : fielder.holdingBall
-              ? { ...fielder, holdingBall: false }
-              : fielder,
-        )
-        play = {
-          ...play,
-          ballHolderSlot: receiverSlot,
-          catchFielderSlot: receiverSlot,
-          held: true,
-          wantsThrow: true,
-        }
-        runOutJudgement()
-      }
-    }
+    // ── 2. 송구 도착 ──
+    // 송구공은 모두 세계 0xbfed0 공이고(`launchThrow`), 받는 야수 · 받는 틱은 송구 0xb2e38 의 예보 vt24(0) · 고르기 vt34 가 정한다.
+    // 받는 것은 1 절 포구 틱 갈래(b42c8 쥐기 0xb2710(P, f, 1) — +0x128 · +0x130 · +0x12c · 준비 틱 · vt90)다.
+    // 예전 "받은 야수 손으로 옮기기" 근사는 원바운드(a17fc)까지 옮겨 걷었다.
+    // 아웃 판정은 원본처럼 0xb36d0(vt90) 하나가 쥘 때 · 틱마다 돌며 포스(2)와 태그(3)를 가른다(6b 절 · `outJudgement.judgeOut`).
 
     // ── 2b. 협살 (AI 상태 8) ──
     // 원본은 플레이 틱 0xb401c 안 0xb433c~0xb4378 에서, 송구 판정 바로 뒤에 이 갈래를 본다:

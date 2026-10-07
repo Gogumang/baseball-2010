@@ -4,6 +4,7 @@ import type { WorldPoint } from '@/entities/fielding/model/fieldGeometry'
 import { NO_THROW_ERROR, rollThrowError, type ThrowErrorResult } from '@/entities/fielding/model/fieldingErrors'
 import type { FielderState } from '@/entities/fielding/model/fieldingState'
 import {
+  bounceThrowLaunchOf,
   errantThrowFlight,
   rollLongThrowWobble,
   throwGravityPercentOf,
@@ -13,6 +14,7 @@ import {
   type ThrowLaunch,
 } from '@/entities/fielding/model/throwPlan'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 
 /**
  * **송구 공 쏘기** — 던지기 0xa1620(또는 레이저 0xa222c)가 공을 놓고 쏜 뒤, 송구 0xb2e38 이 같은 공을 세계 0xbfed0 으로 깔고
@@ -21,7 +23,9 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
  * a1640  놓는 점 = (야수 x, 1000, 야수 z) · a16d0 받는 점 = (점 x, 1000, 점 z)      ; 점 = 받을 야수 R(계획 [3]) 의 목표 +0x2c
  * a16dc  +0xdc = 특수 ? +0xd8 : +0xd4                                              ; 레이저는 a229c +0xdc = 2000
  * a1708  0xa279c(공, 칸 ≤ 5 ? 70 : 80) — 중력 배율 (세계 마무리 a2b14 가 되돌림)
+ * a16be  특수 && d > 20400 → 앙각을 구할 d = 20400 · 원바운드 표시
  * a173c  h · t · w = g'·t >> 1 (`throwLaunchOf`) ; a17f0 공+0xaac = 공+0xaad = 0
+ * a17fc  원바운드면 rand(0, 2) ≠ 0 ? φ + 1 : φ − 1 · 공+0xaac = 1 → a19d6 (`bounceThrowLaunchOf` — 아래 두 굴림 없음)
  * a1828  rand(0, 10000) < 기준 → 악송구(a184a~a1944 — h · w · φ 흔들기 · 공+0xaac = 1)
  * a198c  아니면 d > 0x2008 → rand(0, 10000) < 특수·100 + 1000 → h · w × 85% · 공+0xaad = 1
  * a19f2  0xbef58(공, 놓는 점) · 공.vt14(받는 점) · 공.vt44(h, w, φ)
@@ -43,7 +47,9 @@ export interface ThrownBall {
   readonly errant: boolean
   /** 긴 송구 흔들림 (a19a6 — 공+0xaad) */
   readonly wobbled: boolean
-  /** 공+0xaac — 악송구(원바운드 포함). 예보의 움직임허용 · 끼워 넣기 · +0x1e8 이 이것을 본다 */
+  /** 원바운드 갈래 (a17fc) */
+  readonly bounce: boolean
+  /** 공+0xaac — 악송구 · 원바운드. 예보의 움직임허용 · 끼워 넣기 · +0x1e8 이 이것을 본다 */
   readonly loose: boolean
   /** 악송구 굴림 결과 (a1828) */
   readonly error: ThrowErrorResult
@@ -58,6 +64,8 @@ export interface ThrowLaunchInput {
   readonly laser?: boolean
   /** 0xa1620 다섯째 인자(계획 [1]) */
   readonly special?: boolean
+  /** 원바운드 — 특수 && 거리 > 20400 (a16be, `cpuSpecialThrowOf`) */
+  readonly bounce?: boolean
   /** 던지는 야수 수비 능력 — 악송구 기준 +0xe4 */
   readonly ability: number
   /** 없으면 굴리지 않는다(이 진행기들의 규약) */
@@ -73,7 +81,12 @@ export function launchThrow(input: ThrowLaunchInput): ThrownBall {
   let error: ThrowErrorResult = NO_THROW_ERROR
   let launch: ThrowLaunch = throwLaunchOf(thrower, target)
   let wobbled = false
-  if (input.laser !== true && input.random !== undefined) {
+  const bounce = input.laser !== true && input.bounce === true
+  if (bounce) {
+    // a1802 0xbfaa0 = rand(0, 2) — 난수가 없으면 굴리지 않고 0(φ − 1)
+    const turnsLeft = input.random !== undefined && randomIntegerBelow(input.random, 0, 2) !== 0
+    launch = bounceThrowLaunchOf(thrower, target, turnsLeft)
+  } else if (input.laser !== true && input.random !== undefined) {
     error = rollThrowError(input.ability, special, input.random)
     if (error.errant) {
       launch = errantThrowFlight(thrower, target, error, input.random)
@@ -82,7 +95,7 @@ export function launchThrow(input: ThrowLaunchInput): ThrownBall {
       wobbled = true
     }
   }
-  const loose = error.errant
+  const loose = error.errant || bounce
   let ball = thrownBallTrajectory({
     from: thrower.position,
     target,
@@ -96,7 +109,7 @@ export function launchThrow(input: ThrowLaunchInput): ThrownBall {
   if (!loose && !wobbled) {
     ball = withReceivePoint(ball, throwTicksTo(thrower, target) - 1, target)
   }
-  return { ball, errant: error.errant, wobbled, loose, error }
+  return { ball, errant: error.errant, wobbled, bounce, loose, error }
 }
 
 /** 송구 공 예보 vt24(0) 의 칸 — 던진 야수(+0x130 · +0xb1) · 움직임허용 공+0xaac · +0x1e8 (b303c~b307c) */

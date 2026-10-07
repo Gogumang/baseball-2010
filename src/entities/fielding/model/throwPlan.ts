@@ -96,7 +96,11 @@ interface ThrowFlight {
   readonly axisDistance: number
 }
 
-function throwFlightOf(fielder: FielderState, point: WorldPoint): ThrowFlight {
+/**
+ * @param elevationCap 0xa1620 의 원바운드 갈래(a16be~a16ce): 특수 && 거리 > 상한이면 **앙각을 구할 거리만** 상한으로 바꾼다
+ *   (큰 축 틱 t 는 a1796~a17e0 이 실제 dx · dz 로 잰다).
+ */
+function throwFlightOf(fielder: FielderState, point: WorldPoint, elevationCap?: number): ThrowFlight {
   const from = fielder.position
   const coefficient = isOutfieldSlot(fielder.slot) ? THROW_COEFFICIENT_OUTFIELD : THROW_COEFFICIENT_INFIELD
   const gravity = Math.trunc((coefficient * BALL_GRAVITY) / 100)
@@ -110,7 +114,8 @@ function throwFlightOf(fielder: FielderState, point: WorldPoint): ThrowFlight {
   if (distance === 0) return { ...base, ticks: 0, horizontalSpeed: 0 }
   const speed = fielder.throwSpeed
   if (speed <= 0) return { ...base, ticks: UNREACHABLE_TICKS, horizontalSpeed: 0 }
-  const sineOfDouble = Math.trunc((distance * gravity * 100) / (speed * speed))
+  const elevationDistance = elevationCap !== undefined && distance > elevationCap ? elevationCap : distance
+  const sineOfDouble = Math.trunc((elevationDistance * gravity * 100) / (speed * speed))
   const elevation = arcsineDegrees(sineOfDouble) >> 1
   const horizontalSpeed = (speed * cosineSixteen(elevation)) >> 16
   if (horizontalSpeed === 0) return { ...base, ticks: NEVER_ARRIVES, horizontalSpeed }
@@ -257,6 +262,27 @@ export function throwLaunchOf(fielder: FielderState, point: WorldPoint): ThrowLa
     direction: flight.direction,
   }
 }
+
+/**
+ * **원바운드 송구 갈래** — 0xa1620 (직접 뜬 것):
+ * ```
+ * a16be  특수 && d > cfg+0x42 × 120 / 100(= 20400) → d = 20400 · 원바운드 표시(sp+0x10) = 1
+ * a1710  θ 는 그 줄인 d 로 (h 가 커지고 앙각이 낮아 받는 점 앞에 떨어진다) · t 는 실제 dx · dz 로 · w = g'·t >> 1
+ * a17fc  원바운드면 0xbfaa0 = rand(0, 2) ≠ 0 ? φ + 1 : φ − 1 · 야수+0xc0 = 4 · 공+0xaac = 1 → a19d6 (악송구 · 흔들림 굴림 없음)
+ * ```
+ * 공+0xaac 라 0xb2e38 의 받는 점 끼워 넣기(b2f9c)도 +0x1e8 도 없고, 예보 vt24(0) 은 움직임허용 모두로 줍는 야수를 고른다.
+ */
+export function bounceThrowLaunchOf(fielder: FielderState, point: WorldPoint, turnsLeft: boolean): ThrowLaunch {
+  const flight = throwFlightOf(fielder, point, BOUNCE_THROW_ELEVATION_DISTANCE)
+  return {
+    horizontalSpeed: flight.horizontalSpeed,
+    verticalSpeed: (flight.gravity * flight.ticks) >> 1,
+    direction: flight.direction + (turnsLeft ? 1 : -1),
+  }
+}
+
+/** a16b0~a16ba — cfg+0x42(17000) × 0x78 / 0x64 = 20400 (`BOUNCE_THROW_DISTANCE` 와 같은 값) */
+const BOUNCE_THROW_ELEVATION_DISTANCE = 20_400
 
 /** 레이저 송구(플레이+0x1f4) 속도 — 0xb2e38 이 고르는 야수 vtb0 = 0xa222c 가 `+0xdc = 0xfa << 3` 으로 넣는다 (a229c) */
 export const LASER_THROW_SPEED = 2000

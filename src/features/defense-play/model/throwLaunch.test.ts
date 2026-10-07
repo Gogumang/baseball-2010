@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { basePosition } from '@/entities/fielding/model/fieldGeometry'
 import { createFielders } from '@/entities/fielding/model/fieldingState'
-import { throwTicksTo } from '@/entities/fielding/model/throwPlan'
+import { throwLaunchOf, throwTicksTo, thrownWith } from '@/entities/fielding/model/throwPlan'
 import { forecastOptionsOf, launchThrow } from '@/features/defense-play/model/throwLaunch'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
@@ -72,5 +72,39 @@ describe('송구 공 쏘기 — 0xa1620 · 세계 0xbfed0 · 받는 점 끼워 �
 
     expect(굴림).toBe(0)
     expect(공.ball.pointAt(throwTicksTo({ ...투수, position: 이루 }, 홈) - 1)).toEqual({ x: 홈.x, y: 1000, z: 홈.z })
+  })
+
+  it('원바운드(a17fc)는 앙각만 20400 으로 줄여 받는 점 앞에 떨어지고, rand(0, 2) 하나로 φ ± 1 · 공+0xaac 라 끼워 넣지 않는다', () => {
+    let 굴림 = 0
+    const 세는난수 = (value: number): RandomPort => ({
+      next: () => {
+        굴림 += 1
+        return value
+      },
+      nextInRange: (min, max) => {
+        굴림 += 1
+        return min + Math.floor(value * (max - min))
+      },
+      pick: (candidates) => candidates[0],
+    })
+    // 깊은 중견수(8)가 홈으로 — 거리 25445 > 20400, 특수라 +0xdc = +0xd8
+    const 중견수 = thrownWith({ ...야수들[8], position: { x: 20_000, y: 0, z: 4_000 } }, true)
+    const 홈 = basePosition(0)
+    const 보통 = throwLaunchOf(중견수, 홈)
+    const 왼쪽 = launchThrow({ thrower: 중견수, target: 홈, special: true, bounce: true, ability: 500, random: 세는난수(0.9) })
+    expect(굴림).toBe(1)
+    const 오른쪽 = launchThrow({ thrower: 중견수, target: 홈, special: true, bounce: true, ability: 500, random: 세는난수(0) })
+
+    expect(왼쪽.bounce).toBe(true)
+    expect(왼쪽.loose).toBe(true)
+    expect(왼쪽.errant).toBe(false)
+    expect(왼쪽.ball.pointDetailAt(0).angle).toBe(보통.direction + 1)
+    expect(오른쪽.ball.pointDetailAt(0).angle).toBe(보통.direction - 1)
+    // 앙각을 낮춰(줄인 거리) 수평 속도가 보통 송구보다 빠르고, 받는 점에 닿기 전에 땅에 떨어진다
+    expect(왼쪽.ball.pointDetailAt(0).speed).toBeGreaterThan(보통.horizontalSpeed)
+    const T = throwTicksTo(중견수, 홈)
+    expect(왼쪽.ball.landingTick).toBeLessThan(T)
+    expect(왼쪽.ball.pointAt(T - 1)).not.toEqual({ x: 홈.x, y: 1000, z: 홈.z })
+    expect(forecastOptionsOf(왼쪽, 8, 1).secondPass).toEqual({ movable: true })
   })
 })
