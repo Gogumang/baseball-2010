@@ -223,6 +223,11 @@ export function achievementMarkOf(stats: AnnalsStats, kind: number): number {
 export type AnnalsStatEvent =
   /** `0x22e35` + `0x22c29` — 나리 상점 GP 아이템 구매 확정 (0x14ffe · 0x1501e) */
   | { readonly kind: 'GP아이템구매'; readonly mode: number; readonly index: number; readonly price: number }
+  /**
+   * `0x22e35` 단독 — 시즌 GP 상점은 `0x22c29(3, 값)` → 효과 0xa310c → `0x22e35(2, 칸)` 으로 두 칸을 따로 적는다
+   * (0x8058 · 0x8086, 0xe8 십전대보탕 0x7cd8 · 0x7ce8). 나리 차례(`GP아이템구매`)와 사용처가 달라 나눴다
+   */
+  | { readonly kind: 'GP아이템수'; readonly mode: number; readonly index: number }
   /** `0x22c29` 단독 */
   | { readonly kind: 'G사용'; readonly usage: number; readonly amount: number }
   /** `0xb663c` 가 새로 켤 때 */
@@ -253,6 +258,7 @@ export function applyAnnalsStat(stats: AnnalsStats, event: AnnalsStatEvent): Ann
     // 0x14ffe 0x22e35(모드, 칸) → 0x1501e 0x22c29(모드 4 ? 1 : 2, 값) 순서
     return addGamePointUsage(countItemPurchase(stats, event.mode, event.index), leagueUsageOf(event.mode), event.price)
   }
+  if (event.kind === 'GP아이템수') return countItemPurchase(stats, event.mode, event.index)
   if (event.kind === 'G사용') return addGamePointUsage(stats, event.usage, event.amount)
   if (event.kind === 'G획득') return addGamePointEarned(stats, event.amount, event.mode)
   if (event.kind === '달성표시') return markAchievement(stats, event.index)

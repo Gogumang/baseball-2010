@@ -120,6 +120,10 @@ import { EMPTY_LEAGUE_RECORD } from '@/entities/awards/model/leaderboard'
 import type { LeagueRecord } from '@/entities/awards/model/leaderboard'
 import { NO_ROSTER_SLOT, entryBattersOfOrder } from '@/features/play-team-game/model/teamGameRoster'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
+import {
+  FULL_PITCHER_STAMINA, SEASON_SHOP_TEXT, SEASON_STAMINA_ITEM, applySeasonGpItem, applySeasonSubItem, seasonGpItemPriceOf,
+  seasonShopTextOf,
+} from '@/entities/season-mode/model/seasonItemShop'
 import { MORALE_LIMIT, POPULARITY_LIMIT, REPUTATION_LIMIT, MONEY_LIMIT, clampTo } from '@/entities/season-mode/model/seasonRecord'
 import { isInfiniteGamePointOn } from '@/shared/lib/dev/devOptions'
 import type { GamePointWalletSession } from '@/entities/wallet/model/useGamePointWallet'
@@ -301,6 +305,21 @@ export interface SeasonActions {
    * `recordIndex` 는 선수 고르기 0xdf 목록(레코드 차례 — 투수는 로테이션으로 섞인 차례)의 칸이다.
    */
   readonly equipSeasonPlayer: (purchase: SeasonEquipPurchase) => void
+  /**
+   * 서브아이템 상점 0xdc(종류 1) 구매 확정 — 0x7d90 결과 0xc: 소지금 − 값 × 10 · SR[0x58 + k] = 1 · 저장.
+   * 돌려주는 글은 팝업 StrMODE[92] (가드는 화면이 `checkSeasonSubItem` 으로 먼저 본다)
+   */
+  readonly buySeasonSubItem: (slot: number) => string
+  /**
+   * GP 상점 0xdc(종류 2) 구매 확정 — 0x7d90 결과 0xd. 칸 3(십전대보탕)은 G 를 안 빼고 null(→ 상태 0xe8),
+   * 그 밖은 G 차감 · 0x22c29(3, 값) · 효과 0xa310c · 0x22e35(2, 칸) · 저장 뒤 효과 글을 돌려준다
+   */
+  readonly buySeasonGpItem: (slot: number) => string | null
+  /**
+   * 상태 0xe8 키 0x7c00 — 투수(레코드 차례 칸)의 스태미나가 가득이면 StrMODE[211] 만, 아니면 G 차감 · 0x22c29(3, 값) ·
+   * 0x22e35(2, 3) · 스태미나 10000 · 저장 뒤 StrMODE[178]. `recovered` 가 참이면 결과 0x1d(→ 0xdc)
+   */
+  readonly recoverSeasonPitcherStamina: (recordIndex: number) => { readonly notice: string; readonly recovered: boolean }
   readonly playNextGame: () => void
   /** 관리 메뉴의 "다음경기" — 다음경기 화면 0xd8 로 (들어옴 0x4cb8: phase = 4 · 저장) */
   readonly openNextGame: () => void
@@ -1161,7 +1180,7 @@ export function useSeasonSession(
   const spendGamePoint = useCallback(
     (cost: number) => {
       // 시즌이 G 를 쓰는 자리 셋 — 트레이드 0xd152 · 지옥훈련 0xa2fee(500) · 자동진행 0x3c862(모드 2 → k 3, |값|) —
-      // 모두 G 를 뺀 뒤 `0x22c29(mgr, 3, 액수)` 로 시즌 소모 GP 에 적는다. 시즌 GP 아이템(0x7cd8·0x8058)은 웹에 없다
+      // 모두 G 를 뺀 뒤 `0x22c29(mgr, 3, 액수)` 로 시즌 소모 GP 에 적는다. 시즌 GP 아이템(0x8058)·십전대보탕(0x7cd8)도 여기로 온다
       recordStat?.({ kind: 'G사용', usage: GAME_POINT_USAGE.season, amount: Math.abs(cost) })
       if (wallet !== null) return wallet.spend(cost)
       setOwnGamePoints((points) => Math.max(0, points - cost))
@@ -1375,6 +1394,53 @@ export function useSeasonSession(
       })
     },
     [commit],
+  )
+
+  const buySeasonSubItem = useCallback(
+    (slot: number) => {
+      const current = latestSave.current
+      if (current === null) return ''
+      const applied = applySeasonSubItem(current.state.record, slot)
+      commit({ ...current, state: { ...current.state, record: applied.record } })
+      return applied.notice
+    },
+    [commit],
+  )
+
+  const buySeasonGpItem = useCallback(
+    (slot: number) => {
+      const current = latestSave.current
+      if (current === null || slot === SEASON_STAMINA_ITEM) return null
+      // 0x8034~0x8058: G 를 빼고 0x22c29(3, 값) — spendGamePoint 가 같은 차례로 적는다
+      spendGamePoint(seasonGpItemPriceOf(slot))
+      const effect = applySeasonGpItem(current.state.record, current.state.teamMorale, slot, random)
+      commit({ ...current, state: { ...current.state, record: effect.record, teamMorale: effect.teamMorale } })
+      // 0x8086 — 0x22e35(2, 칸)
+      recordStat?.({ kind: 'GP아이템수', mode: SEASON_STAT_MODE, index: slot })
+      return effect.notice
+    },
+    [commit, random, recordStat, spendGamePoint],
+  )
+
+  const recoverSeasonPitcherStamina = useCallback(
+    (recordIndex: number) => {
+      const current = latestSave.current
+      if (current === null) return { notice: '', recovered: false }
+      const rosterIndex = recordPitcherIndexOf(current, current.state.record.teamId, current.roster, recordIndex)
+      const pitcher = current.roster.pitchers[rosterIndex]
+      if (pitcher === undefined) return { notice: '', recovered: false }
+      if (pitcher.stamina === FULL_PITCHER_STAMINA) {
+        return { notice: seasonShopTextOf(SEASON_SHOP_TEXT.스태미나최대), recovered: false }
+      }
+      // 0x7ca2~0x7ce8: G −= 0xcbbe3[3] × 100 · 0x22c29(3, 값) · 0x22e35(2, 3) · 스태미나 = 10000 · 저장
+      spendGamePoint(seasonGpItemPriceOf(SEASON_STAMINA_ITEM))
+      recordStat?.({ kind: 'GP아이템수', mode: SEASON_STAT_MODE, index: SEASON_STAMINA_ITEM })
+      const pitchers = current.roster.pitchers.map((player, index) =>
+        (index === rosterIndex ? { ...player, stamina: FULL_PITCHER_STAMINA } : player))
+      commit({ ...current, roster: { ...current.roster, pitchers } })
+      return { notice: seasonShopTextOf(SEASON_SHOP_TEXT.스태미나회복), recovered: true }
+    },
+    [commit, recordStat, spendGamePoint],
   )
 
   const finishTrade = useCallback(
@@ -2544,6 +2610,7 @@ export function useSeasonSession(
     notice,
     actions: {
       chooseTeam, goto, updateRecord, updateRoster, removeHallOfFamer, removeCareerPlayer, resetSeason, finishTrade, equipSeasonPlayer,
+      buySeasonSubItem, buySeasonGpItem, recoverSeasonPitcherStamina,
       playNextGame,
       openNextGame, confirmNextGame, cancelNextGame, confirmIncome, confirmDayResults,
       answerTradeRequest, cancelTradeRequest, closeTradeResult, moveMenuCursor,

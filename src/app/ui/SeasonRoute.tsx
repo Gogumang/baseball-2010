@@ -10,9 +10,10 @@ import {
   SeasonMatchInfoScreen, seasonMatchInfoLines, DayResultBoardScreen,
   SeasonPlayerPickScreen, SeasonPlayerCardScreen, seasonCardAbilitiesOf, seasonPlayerDetailViewOf, seasonCardInfoOf,
   SeasonTeamInfoScreen, seasonTeamInfoRowsOf, SeasonOwnedItemsScreen, SeasonRecordPickPopup, SeasonRecordRankScreen,
-  SeasonEquipmentScreen,
+  SeasonEquipmentScreen, SeasonItemShopScreen, SeasonStaminaPickScreen,
 } from '@/pages/season'
 import { seasonPlayerEquipmentOf } from '@/entities/season-mode/model/seasonPlayerRecord'
+import { SEASON_STAMINA_ITEM } from '@/entities/season-mode/model/seasonItemShop'
 import { moveRankingPage, rankSeasonRecords, rankingCategoriesOf } from '@/entities/season-mode/model/seasonRecordRanking'
 import type { SeasonRankingSide } from '@/entities/season-mode/model/seasonRecordRanking'
 import { fillModeText } from '@/widgets/season/lib/seasonText'
@@ -157,6 +158,10 @@ export function SeasonRoute({
 
   /** 아이템 메뉴에서 고른, 웹에 아직 없는 창 종류 (`[win+0x1a4]`) */
   const [missingWindow, setMissingWindow] = useState<ItemWindowKind | null>(null)
+  /** 아이템 상점 0xdc 의 창 종류 1 서브아이템 · 2 GP (0x5f3c 가 0xd0 의 칸으로 고른다). null 이면 구장·장비 갈래 */
+  const [shopKind, setShopKind] = useState<1 | 2 | null>(null)
+  /** 0xe8 에서 돌아오면 GP 창 커서를 칸 3 으로 (0x5f3c 이전 상태 0xe8 갈래) */
+  const [shopCursor, setShopCursor] = useState(0)
   /** 기록순위 창 0x80 — this+0x16c (1 타자기록 · 0 투수기록). 0x9008 칸 3 이 1 로 열고, null 이면 창이 없다 */
   const [recordPick, setRecordPick] = useState<SeasonRankingSide | null>(null)
   /** 0xdb 목록 — 창에서 고른 쪽과 ed+0x444(종류표의 쪽). 0x5761c 가 들어올 때마다 쪽 0 으로 만든다 */
@@ -324,6 +329,52 @@ export function SeasonRoute({
         />
       )
     }
+  }
+
+  // 아이템 상점 0xdc 종류 1·2 (키 0x957c · 적용 0x7d90) — 취소는 아이템 메뉴 0xd0 (0x9be8)
+  if (scene === SEASON_SCENE_STATE.아이템상점 && shopKind !== null) {
+    return (
+      <SeasonItemShopScreen
+        key={`${shopKind}-${shopCursor}`}
+        kind={shopKind}
+        record={state.record}
+        teamMorale={state.teamMorale}
+        gamePoint={session.gamePoints}
+        initialCursor={shopCursor}
+        onBuySubItem={actions.buySeasonSubItem}
+        onBuyGpItem={(slot) => {
+          const text = actions.buySeasonGpItem(slot)
+          // 칸 3 십전대보탕 — 0x7d90 0x8012: 상태 0xe8 로
+          if (text === null) actions.goto(SEASON_SCENE_STATE.스태미나회복)
+          return text
+        }}
+        onBack={() => {
+          setShopKind(null)
+          actions.goto(SEASON_SCENE_STATE.아이템)
+        }}
+      />
+    )
+  }
+
+  // 십전대보탕 투수 고르기 0xe8 (들어옴 0x5870 · 키 0x7c00) — 취소·회복 뒤 0xdc(GP 창 커서 3)
+  if (scene === SEASON_SCENE_STATE.스태미나회복) {
+    const recordOf = session.recordSource()
+    const pitchers = session.tradeRoster.pitchers.map((player, index) => ({
+      name: seasonPlayerRecordOf(state.record.teamId, player, true, index, recordOf).name,
+      stamina: player.stamina,
+    }))
+    return (
+      <SeasonStaminaPickScreen
+        state={state}
+        pitchers={pitchers}
+        onPick={actions.recoverSeasonPitcherStamina}
+        onBack={() => {
+          setShopKind(ITEM_WINDOW_KIND.GP아이템)
+          setShopCursor(SEASON_STAMINA_ITEM)
+          actions.goto(SEASON_SCENE_STATE.아이템상점)
+        }}
+      />
+    )
   }
 
   if (scene === SEASON_SCENE_STATE.구장관리 || scene === SEASON_SCENE_STATE.아이템상점) {
@@ -600,16 +651,22 @@ export function SeasonRoute({
     return (
       <SeasonItemMenuScreen
         state={state}
-        // 0xdc 는 칸마다 다른 창(0x5f3c)을 연다 — 웹엔 구장 창(종류 4)만 있다. 서브아이템·GP아이템은 아직 화면이 없어
-        // 지어내지 않고 "아직 없음" 으로 막는다. 칸 0 장착아이템은 먼저 선수 고르기 0xdf(this+0x110 = 1, 키 0x4da4)다
+        // 0xdc 는 칸마다 다른 창(0x5f3c)을 연다 — 칸 1 구장(종류 4) · 2 서브아이템(1) · 3 GP(2).
+        // 칸 0 장착아이템은 먼저 선수 고르기 0xdf(this+0x110 = 1, 키 0x4da4)다
         onSelect={(_item, target, windowKind) => {
           if (target === SEASON_SCENE_STATE.선수고르기) {
             // 이전 상태가 0xd0 이라 탭은 1(투수) · 커서 0 (0x5980)
             setPlayerPick({ purpose: PLAYER_PICK_PURPOSE.장착아이템, tab: ENTRY_TAB.투수, cursor: 0 })
             return actions.goto(target)
           }
-          // 구장 창(종류 4)은 선수 고르기를 안 거친다 — 장비 창 갈래(0xdf 목적 1)로 잘못 들어가지 않게 지운다
+          // 구장·서브·GP 창은 선수 고르기를 안 거친다 — 장비 창 갈래(0xdf 목적 1)로 잘못 들어가지 않게 지운다
           setPlayerPick(null)
+          if (windowKind === ITEM_WINDOW_KIND.서브아이템 || windowKind === ITEM_WINDOW_KIND.GP아이템) {
+            setShopKind(windowKind)
+            setShopCursor(0)
+            return actions.goto(target)
+          }
+          setShopKind(null)
           return windowKind === ITEM_WINDOW_KIND.구장아이템 ? actions.goto(target) : setMissingWindow(windowKind)
         }}
         onBack={backToManagement}

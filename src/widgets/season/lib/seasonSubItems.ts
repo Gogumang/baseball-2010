@@ -67,3 +67,37 @@ export function seasonSubItemsOf(record: Pick<SeasonRecord, 'trainingSubItems' |
     isOwned: ownsSeasonSubItem(record, slot),
   }))
 }
+
+/**
+ * **시즌 GP 아이템 7칸** — 창 0x81dc0 종류 2 시즌 갈래 (직접 떴다, 0x8243c~0x82930).
+ * ```
+ * 아이콘   item_icon 0xd4662[k] — 0 이하면 안 그린다 (칸 7~9 는 −1)
+ * 이름     StrITEM[0x77 + k] (k ≤ 6)
+ * 값       0xd4630[k] × 100 G (숫자 그대로, 머리에 img_text 303 "가격")
+ * 설명     "!cFFFFFF" + StrITEM[0xf2 + k] + "!N효과 : !cFFFF00" + StrITEM[0xeb + k]
+ * ```
+ */
+export const SEASON_GP_ITEM_ICONS: readonly number[] = [15, 16, 17, 20, 19, 21, 22]
+const GP_PRICES: readonly number[] = [3, 3, 5, 5, 10, 20, 20]
+const GP_NAME_BASE = 0x77
+const GP_DESCRIPTION_BASE = 0xf2
+const GP_EFFECT_BASE = 0xeb
+
+export interface SeasonGpItem {
+  readonly slot: number
+  readonly name: string
+  readonly description: string
+  /** G */
+  readonly price: number
+  readonly iconFrame: number
+}
+
+export function seasonGpItemsOf(): readonly SeasonGpItem[] {
+  return SEASON_GP_ITEM_ICONS.map((iconFrame, slot) => ({
+    slot,
+    name: ORIGINAL_ITEMS[GP_NAME_BASE + slot] ?? '',
+    description: `!cFFFFFF${ORIGINAL_ITEMS[GP_DESCRIPTION_BASE + slot] ?? ''}${EFFECT_HEAD}${ORIGINAL_ITEMS[GP_EFFECT_BASE + slot] ?? ''}`,
+    price: (GP_PRICES[slot] ?? 0) * 100,
+    iconFrame,
+  }))
+}

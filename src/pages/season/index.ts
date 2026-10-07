@@ -162,3 +162,9 @@ export { SeasonMatchInfoScreen } from '@/pages/season/ui/SeasonMatchInfoScreen'
 export type { SeasonMatchInfoScreenProps } from '@/pages/season/ui/SeasonMatchInfoScreen'
 export { seasonMatchInfoLines, nationalCupMatchInfoRankOf, POSTSEASON_RANK_TEXT } from '@/pages/season/lib/seasonMatchInfo'
 export type { SeasonMatchInfoInput } from '@/pages/season/lib/seasonMatchInfo'
+
+/** 아이템 상점 0xdc 종류 1 서브아이템 · 2 GP (키 0x957c · 적용 0x7d90) · 십전대보탕 투수 고르기 0xe8 (0x7c00) */
+export { SeasonItemShopScreen } from '@/pages/season/ui/SeasonItemShopScreen'
+export type { SeasonItemShopScreenProps } from '@/pages/season/ui/SeasonItemShopScreen'
+export { SeasonStaminaPickScreen } from '@/pages/season/ui/SeasonStaminaPickScreen'
+export type { SeasonStaminaPickScreenProps, SeasonStaminaPitcher } from '@/pages/season/ui/SeasonStaminaPickScreen'

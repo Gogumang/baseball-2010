@@ -227,13 +227,13 @@ describe('이벤트 재생 0xd3 배선', () => {
 })
 
 describe('아이템 메뉴 0xd0 배선', () => {
-  it('구장아이템은 아이템 상점(0xdc 창 4)으로 가고, 웹에 없는 창(GP아이템 2)은 "아직 없음" 으로 막는다', () => {
+  it('구장아이템은 아이템 상점(0xdc 창 4)으로 가고, GP아이템(창 2)에서 취소하면 다시 아이템 메뉴', () => {
     const store = 메모리저장(세이브(레코드({ seenEvents: [400, 1], yearGoalShown: true })))
     render(<시즌화면 store={store} 장면={SEASON_SCENE_STATE.아이템} onExit={vi.fn()} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'GP아이템' }))
-    expect(알림글()).toContain('창 종류 2')
-    fireEvent.click(screen.getByRole('button', { name: 'OK' }))
+    expect(screen.getByRole('group', { name: 'GP아이템 상점' })).toBeTruthy()
+    fireEvent.keyDown(window, { key: 'Escape' })
 
     fireEvent.click(screen.getByRole('button', { name: '구장아이템' }))
     expect(screen.getAllByRole('button', { name: /관중석/ }).length).toBeGreaterThan(0)
@@ -494,5 +494,41 @@ describe('선수영입 나리 칸 0·5 — 0x22168 · 0x220ec 의 내 선수 기
     fireEvent.click(자리0()!)
     const saved = store.load() as { roster: { batters: { id: number; kindByte: number; record?: unknown }[] } }
     expect(saved.roster.batters[0]).toMatchObject({ id: 0xfe, kindByte: 0xa0, record: 나리타자 })
+  })
+})
+
+describe('아이템 → 서브아이템·GP아이템 = 상점 0xdc 종류 1·2 (0x5f3c · 키 0x957c · 적용 0x7d90)', () => {
+  const 키 = (key: string) => fireEvent.keyDown(window, { key })
+
+  it('서브아이템 — 사면 소지금이 줄고 SR+0x58 이 서며, 다시 사면 [78], 취소는 아이템 메뉴 0xd0', () => {
+    const store = 메모리저장(세이브(레코드({ seenEvents: [400, 1], yearGoalShown: true, money: 300 })))
+    render(<시즌화면 store={store} 장면={SEASON_SCENE_STATE.아이템} onExit={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole('button', { name: '서브아이템' }))
+    expect(screen.getByRole('group', { name: '서브아이템 상점' })).toBeTruthy()
+    키('Enter') // 칸 0 — 값 25 × 10 = 250 ≤ 300
+    expect(알림글()).toContain('소모됩니다')
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+    expect(알림글()).toContain('구매 완료')
+    fireEvent.click(screen.getByRole('button', { name: 'OK' }))
+    const saved = store.load() as { state: { record: { money: number; trainingSubItems: boolean[] } } }
+    expect(saved.state.record.money).toBe(50)
+    expect(saved.state.record.trainingSubItems[0]).toBe(true)
+
+    키('Enter')
+    expect(알림글()).toContain('이미 가지고 있는')
+    fireEvent.click(screen.getByRole('button', { name: 'OK' }))
+    키('Escape')
+    expect(screen.getByRole('button', { name: '서브아이템' })).toBeTruthy()
+  })
+
+  it('GP아이템 — G 가 모자라면 [65] 만 뜨고 아무것도 안 바뀐다', () => {
+    const store = 메모리저장(세이브(레코드({ seenEvents: [400, 1], yearGoalShown: true })))
+    render(<시즌화면 store={store} 장면={SEASON_SCENE_STATE.아이템} onExit={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'GP아이템' }))
+    expect(screen.getByRole('group', { name: 'GP아이템 상점' })).toBeTruthy()
+    키('Enter')
+    expect(알림글()).toContain('G포인트가 부족')
   })
 })
