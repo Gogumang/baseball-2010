@@ -43,6 +43,26 @@ describe('효과기 그리기 0xbd844 — 프레임마다 단계', () => {
   })
 })
 
+describe('덮개 불투명도 — 검정 덮기 [0x15605d4] · 색 덮기 [0x15605d0]', () => {
+  it('종류 1(검정에서밝아짐)은 검정 덮기라 16 은 안 칠하고 0 에서 완전 검정 — 실제로는 어두워진다(원본 그대로)', () => {
+    const 진하기 = Array.from({ length: 9 }, (_unused, frame) => screenEffectFrameAt('검정에서밝아짐', '검정', frame)?.overlay?.opacity)
+    expect(진하기).toEqual([0, 2, 4, 6, 8, 10, 12, 14, 16].map((n) => n / 16))
+  })
+
+  it('종류 2(검게어두워짐)는 완전 검정에서 시작해 16 에서 안 칠한다', () => {
+    const 진하기 = Array.from({ length: 9 }, (_unused, frame) => screenEffectFrameAt('검게어두워짐', '검정', frame)?.overlay?.opacity)
+    expect(진하기).toEqual([16, 14, 12, 10, 8, 6, 4, 2, 0].map((n) => n / 16))
+  })
+
+  it('종류 3·4 는 색 덮기 — 색 몫 (단계 + 1)/16, 16 은 안 칠한다', () => {
+    const 덮임 = Array.from({ length: 9 }, (_unused, frame) => screenEffectFrameAt('색으로덮임', '흰색', frame)?.overlay)
+    expect(덮임[0]).toEqual({ color: '흰색', level: 0, opacity: 1 / 16 })
+    expect(덮임[7]?.opacity).toBe(15 / 16)
+    expect(덮임[8]?.opacity).toBe(0)
+    expect(screenEffectFrameAt('색에서밝아짐', '흰색', 1)?.overlay?.opacity).toBe(15 / 16)
+  })
+})
+
 describe('지나온 명령에서 풀기', () => {
   it('진동은 모두 울리고 효과기는 마지막 것만 남는다', () => {
     const 결과 = screenEffectsIn([

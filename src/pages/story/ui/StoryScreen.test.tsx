@@ -168,10 +168,10 @@ describe('StoryScreen — system 3·4 발표 창 (0x8cf64 → 0x8b3bc · 0x8b23c
 })
 
 describe('StoryScreen — 명령 5 화면효과', () => {
-  it('검은 화면에서 밝아짐(6)은 덮개를 단계 16(완전 검정)부터 띄운다', () => {
+  it('id 4(효과기 종류 2)는 검정 덮기 단계 0 — 완전 검정부터 띄운다 (0x9aac4 단계 0 = 0)', () => {
     const 효과이벤트 = {
       ...이벤트,
-      commands: [{ op: 'effect', id: 6 }, { op: 'say', text: '안녕', speaker: 0, format: 0, portraits: [] }],
+      commands: [{ op: 'effect', id: 4 }, { op: 'say', text: '안녕', speaker: 0, format: 0, portraits: [] }],
     } as unknown as OriginalEvent
 
     render(

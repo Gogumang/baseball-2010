@@ -24,6 +24,7 @@ import { openHelpViewer, stepHelpViewer } from '@/pages/help/lib/helpViewer'
 import type { HelpViewerKey, HelpViewerState } from '@/pages/help/lib/helpViewer'
 import * as styles from '@/pages/help/ui/HelpScreen.css'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
+import { colorStepCoverOpacityOf } from '@/shared/lib/stepCover/stepCover'
 
 const SLT_FRAME = './sprites/slt_frame'
 const SLT_FRAMES = './sprites/slt_frame/frames'
@@ -364,11 +365,11 @@ export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gameP
    * `[+0x24f](경기 장면 0x3301c 가 1) && 팝업 && [+0x250] == 0` 일 때만 장면을 건너뛰므로 **다시 띄운 첫 프레임에 장면을 한 번 그리고**,
    * 팝업 그리기 0x746cc 가 그 위를 0x74704~0x7474a 로 **검정 단계 5** 로 한 번 덮은 뒤 +0x250 · +0x24d 를 지운다.
    * 그 뒤로는 장면도 덮개도 다시 안 그려 **멈춘 장면 + 어둡게** 가 뷰어 뒤에 남는다(경기 갱신도 0x754f9 가 막는다).
-   * 단계 5 의 불투명도는 칠하기 함수 [0x15605d0] 본문을 못 읽어 단계/16 으로 둔다(경기 결과 판의 단계 8 과 같은 근사).
+   * 덮개는 [0x15605d0] = 색 덮기 0x9b3f4 에 색 0x1400748(0,0,0) 을 넘긴 것이라(0x74726~0x74744) 검정 몫 = (5 + 1)/16 이다.
    */
   return (
     <ScreenOverlay>
-      <div className={styles.overGameDim} style={{ opacity: POPUP_DIM_STAGE / DIM_STAGE_MAX }} />
+      <div className={styles.overGameDim} style={{ opacity: colorStepCoverOpacityOf(POPUP_DIM_STAGE) }} />
       <div className={styles.overGameCenter}>
         <div className={styles.overGameStage}>{body}</div>
       </div>
@@ -378,8 +379,6 @@ export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gameP
 
 /** 팝업 덮개 단계 — 0x7473c `movs r3, #5` (F-ui-layout 1절) */
 const POPUP_DIM_STAGE = 5
-/** 단계의 끝 — 단계/16 근사 (CORRECTIONS: 반투명 L/16) */
-const DIM_STAGE_MAX = 16
 
 /** 게임물 등급표 — 장 6 둘째 쪽(빈 StrHOWTO[33]) 자리 (0x54330, `HELP_RATING_TABLE`) */
 function RatingTable() {

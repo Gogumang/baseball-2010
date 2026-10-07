@@ -22,6 +22,7 @@
  * 자리가 부딪혀 안 옮겼다.
  */
 
+import { colorStepCoverOpacityOf } from '@/shared/lib/stepCover/stepCover'
 import { PITCHER_ROWS, pitcherRowTopOf } from '@/widgets/game-scene/lib/endBoardLayout'
 
 const SCREEN_WIDTH = 240
@@ -29,11 +30,10 @@ const SCREEN_WIDTH = 240
 /** 패배면 화면 전체를 검정 **단계 8** 로 어둡게 (0x4a42a~0x4a444, F-7 1 확정) */
 export const LOSE_DIM_STAGE = 8
 /**
- * 단계 → 불투명도 환산은 원본에서 못 읽었다 (F 4절 0: "정확한 불투명도는 미확인").
- * 알파가 4비트 단계로 보여 16 을 분모로 삼는다 — 근사다.
+ * 덮개는 [0x15605d0] = 색 덮기 0x9b3f4 에 색 0x1400748(0,0,0) 을 넘긴 것이다(0x4a420~0x4a444) —
+ * 16비트 몸통 0x9a52c 의 색 몫 (단계 + 1)/16 이라 검정 9/16 (`colorStepCoverOpacityOf`).
  */
-export const DIM_STAGE_MAX = 16
-export const LOSE_DIM_OPACITY = LOSE_DIM_STAGE / DIM_STAGE_MAX
+export const LOSE_DIM_OPACITY = colorStepCoverOpacityOf(LOSE_DIM_STAGE)
 
 /** 띠 `fillRect(0, 40, W, 30, 0x80304EA2)` = RGB(48,78,162) 50% 반투명 (0x4a466~0x4a478, 확정) */
 export const BAND = {

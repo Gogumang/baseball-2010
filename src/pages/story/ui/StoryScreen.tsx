@@ -8,7 +8,6 @@ import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import { EventPortraits } from '@/widgets/event-portraits/ui/EventPortraits'
 import { useEventPlayback } from '@/pages/story/model/useEventPlayback'
 import { useScreenEffect } from '@/pages/story/model/useScreenEffect'
-import { FULL_LEVEL } from '@/entities/story/model/screenEffect'
 import type { MatchCommand, SystemCommand } from '@/pages/story/model/useEventPlayback'
 import type { StoryCarry } from '@/entities/story/model/aceMatch'
 import * as styles from '@/pages/story/ui/StoryScreen.css'
@@ -105,11 +104,11 @@ export function StoryScreen({
       )}
 
       {effect?.overlay != null && (
-        // 화면 전체 덮개 — 진하기 = 단계 / 16 (추정, `screenEffect` 머리말)
+        // 화면 전체 덮개 — 검정 덮기 (16 − 단계)/16 · 색 덮기 (단계 + 1)/16 (`screenEffect` 머리말)
         <div className={styles.effectCover} data-testid="screen-effect-cover"
           style={{
             background: effect.overlay.color === '흰색' ? '#FFFFFF' : '#000000',
-            opacity: effect.overlay.level / FULL_LEVEL,
+            opacity: effect.overlay.opacity,
           }} />
       )}
     </div>

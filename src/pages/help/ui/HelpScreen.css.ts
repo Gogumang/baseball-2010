@@ -114,7 +114,7 @@ export const pagerText = style({
   pointerEvents: 'none',
 })
 
-/** 경기 중 [조작방법] — 멈춘 경기 장면을 검정으로 한 번 덮는다 (불투명도는 부르는 쪽이 단계/16 으로 준다) */
+/** 경기 중 [조작방법] — 멈춘 경기 장면을 검정으로 한 번 덮는다 (불투명도는 부르는 쪽이 색 덮기 단계로 준다) */
 export const overGameDim = style({
   position: 'absolute',
   inset: 0,

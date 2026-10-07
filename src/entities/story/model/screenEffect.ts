@@ -1,4 +1,5 @@
 import type { EventCommand } from '@/shared/config/original/eventTypes'
+import { blackStepCoverOpacityOf, colorStepCoverOpacityOf } from '@/shared/lib/stepCover/stepCover'
 
 /**
  * 이벤트 명령 5 — 화면효과 (A-7 · L 1-E2). 실행기 0x8cf64 의 0x8d456 이 id 를 [this+0x2c4] 에 두고 0x8ceac 를 부른다.
@@ -22,8 +23,15 @@ import type { EventCommand } from '@/shared/config/original/eventTypes'
  * 종류 9    시작 0              단계 ≤ 5 면 0xba888(오프셋 표 0xd8c4c[단계]) → 단계 > 5 면 끝, 아니면 +1 ; 6 프레임
  * 끝(+0x10 = 2) 다음 프레임에 효과기를 비운다(+4 = 0, 0xbd85e) — 어두워진 화면도 그때 걷힌다.
  * ```
- * ⚠️ 추정: 단계 → 덮개 진하기. 칠하기는 함수 포인터 0x15605d4(검정)·0x15605d0(색)에 (0, 0, 화면 폭, 화면 높이, [색,] 단계)
- * 를 넘기는데 그 함수 본문(플랫폼 쪽)은 못 읽었다 — 웹은 **불투명도 = 단계 / 16** 으로 둔다.
+ * 칠하기(직접 떴다): 종류 1·2 는 [0x15605d4] 검정 덮기(0, 0, W, H, 단계) · 종류 3·4 는 [0x15605d0] 색 덮기(0, 0, W, H, 색 +8, 단계)
+ * (0xbd89a · 0xbd8b4 · 0xbd8ce · 0xbd8ec). 두 함수는 단계 > 15 면 안 칠하고, 검정은 화면을 **단계/16 남기고**
+ * 색은 **색 몫 (단계 + 1)/16** 이다(`shared/lib/stepCover`). 그래서 실제 모습은 이름과 다르다(원본 그대로):
+ * ```
+ * 종류 1 (id 6, '검정에서밝아짐')  16 안 칠함 → 14 검정 2/16 → … → 0 완전 검정 → 다음 프레임 걷힘   ; 점점 어두워진다
+ * 종류 2 (id 4, '검게어두워짐')    0 완전 검정 → 2 검정 14/16 → … → 14 검정 2/16 → 16 안 칠함      ; 검정에서 밝아진다
+ * 종류 3 (id 7, '색에서밝아짐')    16 안 칠함 → 14 색 15/16 → … → 0 색 1/16
+ * 종류 4 (id 5, '색으로덮임')      0 색 1/16 → … → 14 색 15/16 → 16 안 칠함
+ * ```
  */
 
 /** 효과기 종류 (0xbdae8 둘째 인자) 가운데 이벤트가 쓰는 것 */
@@ -72,17 +80,26 @@ const LEVEL_STEP = 2
 const BRIGHTEN_START = 16
 /** 어두워짐 계열이 멈추는 문턱 — 0xbd90a `cmp r2,#0xf ; bgt` */
 const DARKEN_LIMIT = 15
-/** 단계 16 = 다 덮임 */
-export const FULL_LEVEL = 16
 
 export interface ScreenEffectFrame {
-  /** 이 프레임에 칠할 덮개. null 이면 덮개 없음 */
-  readonly overlay: { readonly color: '검정' | '흰색'; readonly level: number } | null
+  /**
+   * 이 프레임에 칠할 덮개. null 이면 덮개 없음.
+   * `opacity` 는 덮개 색의 불투명도 — 종류 1·2 는 검정 덮기 (16 − 단계)/16, 종류 3·4 는 색 덮기 (단계 + 1)/16, 단계 16 은 0
+   */
+  readonly overlay: { readonly color: '검정' | '흰색'; readonly level: number; readonly opacity: number } | null
   /** 이 프레임의 화면 오프셋 (흔들기) */
   readonly offset: { readonly x: number; readonly y: number }
 }
 
 const NO_OFFSET = { x: 0, y: 0 }
+
+/** 종류 1·2 는 검정 덮기 [0x15605d4] — 색을 안 넘기므로 늘 검정. 종류 3·4 는 색 덮기 [0x15605d0] */
+function coverOf(kind: ScreenEffectKind, color: '검정' | '흰색', level: number) {
+  const isBlackCover = kind === '검정에서밝아짐' || kind === '검게어두워짐'
+  return isBlackCover
+    ? { color: '검정' as const, level, opacity: blackStepCoverOpacityOf(level) }
+    : { color, level, opacity: colorStepCoverOpacityOf(level) }
+}
 
 /**
  * 효과를 건 뒤 `frame` 번째 그리기(0 부터)의 모습. 효과가 끝나 비워졌으면 null.
@@ -102,14 +119,14 @@ export function screenEffectFrameAt(kind: ScreenEffectKind, color: '검정' | '�
       // 16,14,…,0 을 칠하고 0 을 칠한 프레임에 끝 → 9 프레임
       const level = BRIGHTEN_START - LEVEL_STEP * frame
       if (level < 0) return null
-      return { overlay: { color, level }, offset: NO_OFFSET }
+      return { overlay: coverOf(kind, color, level), offset: NO_OFFSET }
     }
     case '검게어두워짐':
     case '색으로덮임': {
       // 0,2,…,16 을 칠하고 15 를 넘긴 단계를 칠한 프레임에 끝 → 9 프레임
       const level = LEVEL_STEP * frame
       if (level > DARKEN_LIMIT + 1) return null
-      return { overlay: { color, level }, offset: NO_OFFSET }
+      return { overlay: coverOf(kind, color, level), offset: NO_OFFSET }
     }
   }
 }
