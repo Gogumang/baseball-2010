@@ -71,12 +71,44 @@ export type SeasonEndState = 136 | 130 | 131 | 128 | 132 | 109 | 116
  */
 export interface NariLastGame {
   readonly summary: Omit<GameSummary, 'leaguePlateAppearances' | 'leaguePitchers' | 'pitcherStaminas'>
+  /**
+   * 116 이 읽는 S+0x4a · +0x64 · +7 과 그 감독 글. 평가 0xa719c 가 도는 정규시즌 경기만 덮어쓰므로 포스트시즌 경기 뒤에는
+   * **앞 평가 경기 값**이다(감독 글은 116 이 그 +0x4a 와 지금 평판으로 다시 고른다).
+   */
   readonly evaluation: GameEvaluation
+  /**
+   * S+0x1d8 기록 줄 (0xa719c 모드 4 a71d0~a7222: [0] 타수 · [1] 안타 · [2] 타점 · [3] 홈런, u8) — 116 이 줄
+   * "타수 안타 타점 홈런"(12958~12998)과 칭호 39 판정([3] > 3, 129b2)에 읽는다. 정규시즌 경기만 덮어쓴다. 옛 저장에는 없다
+   */
+  readonly recordLine?: NariRecordLine
+}
+
+/** 타자편 S+0x1d8 네 바이트 */
+export interface NariRecordLine {
+  readonly atBats: number
+  readonly hits: number
+  readonly runsBattedIn: number
+  readonly homeRuns: number
+}
+
+/** 이 경기 성적으로 S+0x1d8 줄을 짓는다 (strb — u8) */
+export function nariRecordLineOf(stats: Pick<GameSummary['stats'], 'atBats' | 'hits' | 'runsBattedIn' | 'homeRuns'>): NariRecordLine {
+  return {
+    atBats: stats.atBats & 0xff,
+    hits: stats.hits & 0xff,
+    runsBattedIn: stats.runsBattedIn & 0xff,
+    homeRuns: stats.homeRuns & 0xff,
+  }
 }
 
 /** 경기 요약에서 116 재료만 — 리그 선수 기록·투수 줄·스태미나 표는 정산이 이미 먹었다 */
-export function nariLastGameOf(summary: GameSummary, evaluation: GameEvaluation): NariLastGame {
+export function nariLastGameOf(
+  summary: GameSummary,
+  evaluation: GameEvaluation,
+  recordLine: NariRecordLine = nariRecordLineOf(summary.stats),
+): NariLastGame {
   return {
+    recordLine,
     summary: {
       result: summary.result,
       ourScore: summary.ourScore,

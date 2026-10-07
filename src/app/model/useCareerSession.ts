@@ -44,6 +44,7 @@ import {
   countGameForSkills,
   MAXIMUM_GAME_POINT,
   nariLastGameOf,
+  nariRecordLineOf,
 } from '@/entities/career/model/playerCareer'
 import {
   applyKoreanSeriesReward,
@@ -109,7 +110,7 @@ import { applyEventRewards } from '@/entities/story/model/eventReward'
 import { rollTrainingInjury } from '@/entities/career/model/condition'
 import type { ManagementDetail } from '@/app/model/managementDetail'
 import { restDetailChangesOf, trainingDetailChangesOf } from '@/pages/management/lib/detailPopup'
-import { advanceStreaks, evaluateGame, streakEventOf } from '@/entities/career/model/gameEvaluation'
+import { advanceStreaks, evaluateGame, managerCommentIndexOf, streakEventOf } from '@/entities/career/model/gameEvaluation'
 import type { GameEvaluation } from '@/entities/career/model/gameEvaluation'
 import type { EventReward } from '@/entities/story/model/eventReward'
 import type { ManagementCommand } from '@/pages/management/ui/ManagementScreen'
@@ -572,12 +573,22 @@ export function useCareerSession({
       nariGameSaveRef.current?.clear()
       const summary = summaryOf(finished)
       // 경기 후 평가 — 인기도 → 평판 → 사기 (0xa719c), 이어서 연속 기록 (0x8a6fc)
-      const evaluation = evaluateGame(currentCareer, summary)
+      const thisEvaluation = evaluateGame(currentCareer, summary)
+      const isEvaluated = isEvaluatedGame(currentCareer)
+      /*
+       * 116 이 읽는 S+0x4a · +0x64 · +7 · S+0x1d8 은 평가 0xa719c(정규시즌만, 0x4f268)가 쓰는 칸이라 **포스트시즌 경기 뒤에는 앞 평가
+       * 경기 값**이다 — 평가 창 숫자 · 감독 글 · 징글 · 경기 뒤 카운터(+0x1c2 · 먹튀) · 칭호 39 모두. 옛 저장에 앞 값이 없으면 이 경기 값.
+       */
+      const previous = currentCareer.lastGame
+      const staleEvaluation = isEvaluated || previous === undefined ? thisEvaluation : previous.evaluation
+      const recordLine = isEvaluated || previous === undefined
+        ? nariRecordLineOf(summary.stats)
+        : previous.recordLine ?? nariRecordLineOf(previous.summary.stats)
       // 승리 31 · 패배 32 징글 (무승부는 원본이 어느 쪽을 내는지 문서에 없어 비워 둔다) →
-      // 평가 창 징글 36·37·38. 원본은 두 화면이 따로지만 웹은 한 화면이라 이어서 낸다
+      // 평가 창 징글 36·37·38 (12c96~: +0x4a). 원본은 두 화면이 따로지만 웹은 한 화면이라 이어서 낸다
       playSoundIds(audio, [
         gameResultSoundIdOf(summary.result),
-        evaluationJingleIdOf(evaluation.popularityChange),
+        evaluationJingleIdOf(staleEvaluation.popularityChange),
       ])
       // 같은 날 나머지 네 경기도 원본대로 치러 순위표에 넣는다 (0xc2a48)
       // 45경기째면 하루 끝(0xb818c)이 정규시즌을 닫고 대진(0xb80a8)을 연다.
@@ -586,26 +597,31 @@ export function useCareerSession({
       const settled = applySeasonEnd(
         applyLeagueDay(applyGameResult(currentCareer, summary), summary.ourTeamId, random, aceLevels),
       )
-      const evaluated = applyGameEvaluation(settled, evaluation, isEvaluatedGame(currentCareer))
-      // 스킬 조건용 경기 뒤 카운터 — 사기까지 반영된 뒤에 센다 (A-4)
-      // ⚠️ 미해결: 이 카운터(0x12bc2~0x12c3c)와 연속 기록(0x8a6fc @0x12b6e)은 평가 0xa719c 밖, 상태 116 쪽이다.
-      //    포스트시즌에 116 이 그대로 돌고 그때 +0x4a(인기도 변화)가 무엇인지 안 읽어 예전대로 둔다.
-      //    또 포스트시즌엔 정산 0xa8024 의 [sp+0x34] = 0xa56dc(현재 타자) 가 거짓이라 내 타자 기록 칸 쓰기 아홉 곳
+      const evaluated = applyGameEvaluation(settled, thisEvaluation, isEvaluated)
+      // 116 감독 글은 진입이 +0x4a 와 **평가 뒤** 평판 +0x62 로 고른다 (0x128d2~0x12938 — 모드 4 표 39~74)
+      const evaluation = {
+        ...staleEvaluation,
+        commentIndex: managerCommentIndexOf(evaluated, staleEvaluation.popularityChange),
+      }
+      // 스킬 조건용 경기 뒤 카운터 — 사기까지 반영된 뒤에 센다 (A-4). 116 쪽(0x12bc2~0x12c3c)이라 포스트시즌에도 돈다 — 그때
+      // +0x4a 는 앞 평가 경기 값이다(위).
+      //    ⚠️ 미해결: 포스트시즌엔 정산 0xa8024 의 [sp+0x34] = 0xa56dc(현재 타자) 가 거짓이라 내 타자 기록 칸 쓰기 아홉 곳
       //    (0xa8362·0xa8498·0xa84d6·0xa8538·0xa8578·0xa85c4·0xa8866·0xa895c …)이 막힌다 — 어느 칸이 웹 `applyGameResult`
       //    의 어느 줄인지 아직 다 짝짓지 못해 기록은 그대로 센다.
       const counted = countGameForSkills(evaluated, evaluation.popularityChange)
       // 연속 기록 칸을 잇는다. 116 의 0x8a6fc 는 그 칸을 읽어 알림 줄과 **보상 명령**(평판 · 슬럼프 스킬)을 내장 이벤트에
       // 쌓을 뿐이라, 보상은 114 가 이벤트를 틀 때(웹은 [확인] `confirmGameResult`) 먹는다 (`streakEventOf`)
       // 0xa4ce0 은 평가 0xa719c 안이라 포스트시즌 경기는 잇지 않는다 (0x4f268) — 116 은 지난 칸으로 알림·보상을 다시 쌓는다
-      const advanced = isEvaluatedGame(currentCareer) ? advanceStreaks(counted, summary.stats) : counted
+      const advanced = isEvaluated ? advanceStreaks(counted, summary.stats) : counted
       // 부상은 경기 뒤가 아니라 훈련 결과 창을 닫을 때 굴린다 (0x1b4c4)
       // 경기 뒤 평가 116 진입 0x1278c 가 S+0x50 = 2 · 저장 — 이어하기가 116 을 다시 띄운다(`continueSaved`). S 의 +0x4a ·
       // +0x1d8 처럼 지난 경기 재료를 저장에 남긴다(`lastGame`).
       // 0x1a1c0 칭호는 여기서 주지 않는다(관리 화면 갱신 0x1aec4 `pendingTitle`) — 116 은 칭호 39 하나만 직접 띄운다
       // (1299e: 이 경기 홈런 > 3 · 비트 없음 → 0x1274c 팝업). 웹은 팝업 대신 결과 화면 칭호 칸으로 보이고 그 자리에서 준다
-      const dynamite = gameResultTitleOf(advanced.titleIds, summary.stats.homeRuns)
+      // 칭호 39 는 S+0x1d8[3] 을 본다 — 포스트시즌 경기 뒤에는 앞 평가 경기의 홈런 수다
+      const dynamite = gameResultTitleOf(advanced.titleIds, recordLine.homeRuns)
       const titled = dynamite === null ? advanced : awardTitles(advanced, [dynamite])
-      setCareer({ ...titled, seasonEndState: 116, lastGame: nariLastGameOf(summary, evaluation) })
+      setCareer({ ...titled, seasonEndState: 116, lastGame: nariLastGameOf(summary, evaluation, recordLine) })
       // 경기 끝 0x4ea0c: 기록 달성 G 합을 저장 G 에 더한 뒤 0x4ec82 `0x22c7d(액수, 모드 4)` 로 획득 GP 통계에 적는다
       recordStat({ kind: 'G획득', mode: BATTER_LEAGUE_MODE, amount: gamePointRewardOf(summary) })
       // 이어서 0x4ec8a `0x22e10` 이 이번 경기 기록 배열 40칸을 연감 달성 횟수 [+4+n] 에 더한다 (e48e922)
@@ -1076,7 +1092,7 @@ export function useCareerSession({
         // 116 진입 0x1278c 다시 — 카운터를 한 번 더 쓰고(겹쳐 쌓임) 평가 창을 다시 띄운다
         const counted = countGameForSkills(savedCareer, lastGame.evaluation.popularityChange)
         // 1299e 도 다시 — 비트가 이미 섰으면 안 준다
-        const dynamite = gameResultTitleOf(counted.titleIds, lastGame.summary.stats.homeRuns)
+        const dynamite = gameResultTitleOf(counted.titleIds, (lastGame.recordLine ?? lastGame.summary.stats).homeRuns)
         const replayed = dynamite === null ? counted : awardTitles(counted, [dynamite])
         setCareer(replayed)
         playSoundIds(audio, [evaluationJingleIdOf(lastGame.evaluation.popularityChange)])

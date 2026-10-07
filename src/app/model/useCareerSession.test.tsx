@@ -1198,6 +1198,15 @@ describe('이어하기 S+0x50 == 2 → 116 다시 띄우기 (0x1c154 1c26a · 0x
     expect(again.kind === '경기결과' ? again.newTitles : null).toEqual([])
   })
 
+  it('칭호 39 는 S+0x1d8[3](recordLine) 을 본다 — 포스트시즌 경기 뒤에는 앞 평가 경기 줄이다', () => {
+    const 앞줄 = {
+      ...평가중(),
+      lastGame: { ...지난경기, recordLine: { atBats: 5, hits: 4, runsBattedIn: 6, homeRuns: 4 } },
+    } as unknown as PlayerCareer
+    const screen = 띄우기(앞줄).result.current.screen
+    expect(screen.kind === '경기결과' ? screen.newTitles : null).toEqual([TITLE_NAMES[39]])
+  })
+
   it('지난 경기 재료가 없는 옛 저장은 예전처럼 116 의 끝으로 가른다', () => {
     const rendered = 띄우기({ ...평가중(), lastGame: undefined })
     expect(rendered.result.current.screen).toEqual({ kind: '다음경기순위', fromManagement: false })

@@ -916,8 +916,10 @@ export function usePitcherLeagueSession(
         : completed
       const lastEvaluation = withEvaluation.lastEvaluation ?? NO_LAST_EVALUATION
       /*
-       * 기록 줄 S+0x1d8 — 평가 0xa719c 의 모드 3 갈래(a7264~a72da: memset 8 뒤 [0] R+0x124 · [1] R+0x13c · [2] R+0x128 ·
-       * [3] R+0x134 · [4] R+0x144+R+0x148 · [5] R+0x12c · [6] R+0x140, 모두 strb)가 쓴다.
+       * 기록 줄 S+0x1d8 — 쓰는 곳은 평가 0xa719c 의 모드 3 갈래(a7264~a72da: memset 8 뒤 [0] R+0x124 · [1] R+0x13c · [2] R+0x128 ·
+       * [3] R+0x134 · [4] R+0x144+R+0x148 · [5] R+0x12c · [6] R+0x140, 모두 strb)뿐이다(0x1d8 상수를 만드는 자리 전수 — 그 밖은 다른
+       * 객체). 포스트시즌 경기는 0x4f268 이 평가를 건너뛰므로 **116 은 앞 평가 경기(정규시즌 마지막 경기)의 줄을 다시 읽는다** —
+       * 기록 줄 · 감독 글 38 의 [6] · 0x8a6fc 의 새가슴/더티볼 모두. 원본 그대로. 옛 저장에 앞 줄이 없으면 이 경기 값.
        */
       const thisLine = {
         decisionCode: summary.decisionCode & 0xff,
@@ -928,7 +930,7 @@ export function usePitcherLeagueSession(
         hitsAllowed: summary.record.hitsAllowed & 0xff,
         pitches: summary.pitchCount & 0xff,
       }
-      const line = thisLine
+      const line = isEvaluated || career.lastGame === undefined ? thisLine : career.lastGame
       /*
        * 116 진입 0x1278c — 감독 글은 116 이 고른다: 모드 3 표 [−2…6](선발형이면 칸 3~8 두 배, 0x1285a)에서 +0x4a 칸 · 평판 +0x62
        * (평가 뒤 값) 구간(0x128d2) · 38 은 보직(0xb6705) ≠ 0 && state+0x6a == state+0x6b(이 경기) && S+0x1d8[6](투구 수) == 0

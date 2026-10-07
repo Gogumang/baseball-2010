@@ -251,6 +251,24 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     expect(포스트.current.career?.streaks).toEqual({ win: 1, strikeout: 0, loss: 0 })
   })
 
+  it('포스트시즌 경기 뒤 116 은 S+0x1d8 기록 줄을 앞 평가 경기 값으로 다시 읽는다 (0xa719c 만 쓴다 · 0x4f268)', () => {
+    const 앞줄 = { decisionCode: 2, outs: 18, runs: 4, strikeouts: 3, walksAndHitByPitch: 1, hitsAllowed: 9, pitches: 101, managerCommentIndex: 3 }
+    const 포스트 = 판짜기({
+      gamesPlayed: 45,
+      lastGame: 앞줄,
+      postseason: startPostseason([3, 0, 1, 2, 4, 5, 6, 7]),
+    })
+    act(() => 포스트.current.actions.beginGame())
+    act(() => 포스트.current.actions.finishGame({
+      ...경기요약,
+      decisionCode: 1,
+      record: { outsRecorded: 27, strikeouts: 9, runsAllowedField: 0, walksAllowed: 0, hitByPitch: 0, hitsAllowed: 2 },
+    } as typeof 경기요약))
+    expect(포스트.current.career?.lastGame).toMatchObject({
+      decisionCode: 2, outs: 18, runs: 4, strikeouts: 3, walksAndHitByPitch: 1, hitsAllowed: 9, pitches: 101,
+    })
+  })
+
   it('이어하기 S+0x50 == 2 → 116 을 다시 띄우고 카운터가 겹쳐 쌓인다 (0x1c154 1c26a · 0x1278c)', () => {
     const 첫 = 판짜기({ gamesPlayed: 4, seasonPopularityGain: 10 })
     act(() => 첫.current.actions.beginGame())

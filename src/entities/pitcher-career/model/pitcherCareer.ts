@@ -427,7 +427,10 @@ export interface PitcherCareer {
    * 덮어쓰므로 포스트시즌 경기 뒤 116 은 앞 경기 값을 그대로 다시 읽는다(원본 그대로). 옛 저장·첫 경기 전에는 없다(0).
    */
   readonly lastEvaluation?: PitcherLastEvaluation
-  /** 116 경기 뒤 평가를 다시 띄울 재료 (`PitcherLastGame`) — 경기마다 덮어쓴다. 옛 저장에는 없다 */
+  /**
+   * 116 경기 뒤 평가를 다시 띄울 재료 (`PitcherLastGame`) — 감독 글은 경기마다, 기록 줄 S+0x1d8 바이트는 **평가가 도는 정규시즌
+   * 경기만** 덮어쓴다(0xa719c 가 유일한 쓰기 — 포스트시즌 116 은 앞 줄을 다시 읽는다). 옛 저장에는 없다
+   */
   readonly lastGame?: PitcherLastGame
   /** 연속 기록 — 모드 레코드 +0x1bc u8 세 칸 (`pitcherStreaks`). 옛 저장에는 없다(0) */
   readonly streaks?: PitcherStreaks
