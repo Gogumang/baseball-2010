@@ -269,6 +269,33 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     })
   })
 
+  it('이어하기 116 은 감독 글을 다시 고른다 — 38 은 전역 경기 상태 +0x6a == +0x6b(마지막 경기, 앱을 새로 켜면 0)로 (12ad8~12afe)', () => {
+    const 구원116 = (career: object) => ({
+      ...career,
+      role: PITCHER_ROLE.relief,
+      positionCode: 7,
+      reputation: 100,
+      seasonEndState: 116,
+      lastEvaluation: { popularityChange: 1, reputationChange: 0, moraleChange: 0 },
+      lastGame: { decisionCode: 0, outs: 0, runs: 0, strikeouts: 0, walksAndHitByPitch: 0, hitsAllowed: 0, pitches: 0, managerCommentIndex: 38 },
+    })
+    const 다시띄우기 = (career: object) => {
+      const store = 메모리저장()
+      store.save(career)
+      return 띄우기(store).result
+    }
+    // 마지막 경기가 9회까지 갔다 → +0x6b = 8 ≠ 6 → 표에서 고른다 (평판 100 → 구간 0 · 구원형 등급 1 → 2 + 3)
+    const 앞 = 판짜기({ gamesPlayed: 4 })
+    act(() => 앞.current.actions.beginGame())
+    act(() => 앞.current.actions.finishGame({ ...경기요약, endedInningIndex: 8 } as typeof 경기요약))
+    expect(다시띄우기(구원116(앞.current.career!)).current.career?.lastGame?.managerCommentIndex).toBe(5)
+    // 마지막 경기가 7회 콜드 → +0x6b = 6 → 38
+    const 콜드 = 판짜기({ gamesPlayed: 4 })
+    act(() => 콜드.current.actions.beginGame())
+    act(() => 콜드.current.actions.finishGame({ ...경기요약, endedInningIndex: 6 } as typeof 경기요약))
+    expect(다시띄우기(구원116(콜드.current.career!)).current.career?.lastGame?.managerCommentIndex).toBe(38)
+  })
+
   it('이어하기 S+0x50 == 2 → 116 을 다시 띄우고 카운터가 겹쳐 쌓인다 (0x1c154 1c26a · 0x1278c)', () => {
     const 첫 = 판짜기({ gamesPlayed: 4, seasonPopularityGain: 10 })
     act(() => 첫.current.actions.beginGame())

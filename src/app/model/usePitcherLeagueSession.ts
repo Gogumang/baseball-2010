@@ -350,6 +350,32 @@ const NO_STAT = () => {}
 /**
  * 116 평가 징글 — 진입 끝 12c96~12cc6 `0x6e499(소리, …)`: S+0x4a < 0 → 38 · ≤ 1 → 37 · > 1 → 36 (모드 3·4 공용 — 타자편과 같다).
  */
+/**
+ * **전역 경기 상태 `[0x1552d0c]+0x6b`** — 앱 시작 0x2ed8 이 한 번 만들고(0x3016) memset 뒤 0xb6814 로 세운다(+0x6a = 6 · +0x6b = 0,
+ * 0xb6798). 경기마다 그 경기의 끝 이닝이 남고 장면이 바뀌어도 지우지 않는다. 116 진입 0x1278c 가 감독 글 38 을 `+0x6a == +0x6b`
+ * 로 가르므로(12ad8~12af0) **이어하기가 116 을 다시 돌 때는 이 칸의 지금 값**을 본다 — 앱을 새로 켰으면 0(≠ 6)이라 38 이 안 나온다.
+ * 웹은 모듈 칸으로 든다: 새로 고침(= 앱 다시 켜기)이면 0, 같은 페이지 안이면 마지막 투수편 경기 값.
+ * ⚠️ 근사: 원본은 다른 모드(타자편·시즌·홈런더비) 경기도 같은 칸에 남기는데 웹은 투수편 경기만 적는다.
+ */
+let liveGameStateInningIndex = 0
+
+/**
+ * 이어하기 116 다시 돌기의 감독 글 — 0x1278c 는 저장의 S+0x4a(지난 평가 인기도 변화) · S+0x62(지금 평판) · 포지션 코드
+ * (0xb6395, 내 투수 레코드)와 **전역 경기 상태**(위) · S+0x1d8[6] 으로 **다시 고른다**(12822~12afe). 저장해 둔 글 번호를 쓰지 않는다.
+ */
+function resumedPitcherLastGameOf(career: PitcherCareer): PitcherCareer {
+  const { lastGame } = career
+  if (lastGame === undefined) return career
+  const neverEntered = career.role !== PITCHER_ROLE.starter
+    && reliefNeverEnteredOf(liveGameStateInningIndex)
+    && ((lastGame.pitches ?? 0) & 0xff) === 0
+  const managerCommentIndex = managerCommentIndexOf(
+    { role: career.role, neverEntered, reputation: career.reputation, positionCode: career.positionCode },
+    (career.lastEvaluation ?? NO_LAST_EVALUATION).popularityChange,
+  )
+  return { ...career, lastGame: { ...lastGame, managerCommentIndex } }
+}
+
 function pitcherEvaluationJingleIdOf(popularityChange: number): number {
   if (popularityChange < 0) return 38
   return popularityChange > 1 ? 36 : 37
@@ -468,7 +494,7 @@ export function usePitcherLeagueSession(
       career: saved !== null && point.kind === '이벤트'
         ? enterPitcherYearEndEvent(saved, point.eventId)
         // S+0x50 == 2 → 116 진입 0x1278c 다시 — 경기 뒤 카운터를 한 번 더 쓴다(겹쳐 쌓임). 정산(0x4ea0c)은 다시 안 돈다
-        : saved !== null && point.kind === '경기결과' ? enterPitcherGameEvaluation(saved) : saved,
+        : saved !== null && point.kind === '경기결과' ? enterPitcherGameEvaluation(resumedPitcherLastGameOf(saved)) : saved,
       point,
     }
   }
@@ -967,6 +993,8 @@ export function usePitcherLeagueSession(
           strikeouts: summary.record.strikeouts,
         })
         : withEvaluation.streaks
+      // 전역 경기 상태 +0x6b 에 이 경기 끝 이닝이 남는다 (이어하기 116 의 감독 글 38 판정이 본다)
+      liveGameStateInningIndex = summary.endedInningIndex ?? 0
       setGameOptions(null)
       // S+0x50 = 2 · 저장 → 평가 창 → 경기 뒤 카운터 → 저장, 평가 징글 (`enterPitcherGameEvaluation`)
       commit(enterPitcherGameEvaluation({ ...withEvaluation, lastGame, streaks }))
