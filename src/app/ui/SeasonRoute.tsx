@@ -928,6 +928,9 @@ export function SeasonRoute({
             ? seasonStadiumOf(state.record)
             : undefined
         }
+        // 상태 0xe 소개 판 0x44944 의 시즌 줄 — 레코드 +0x20~ 의 웹 자리(리그 기록표)와, 이 경기 줄을 더할지:
+        // 기록 게이트 0xa56dc 모드 2 갈래(0xa56fa)는 국가대항전·포스트시즌이면 거짓, 그 밖엔 마선수만 거짓(받는 쪽이 거른다)
+        matchupRecords={{ stats: playerStats, countsThisGame: session.gameKind === '정규' }}
       />
     )
   }
