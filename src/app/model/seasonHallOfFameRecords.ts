@@ -8,6 +8,7 @@ import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCaree
 import { equippedAbilityOf } from '@/entities/career/model/condition'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { pitcherFormOf } from '@/entities/pitcher-career/model/pitcherRegistration'
+import { seasonRecordProfileOf } from '@/entities/season-mode/model/seasonEntry'
 import type {
   SeasonEntryBatterRecord, SeasonEntryPitcherRecord, SeasonEntryRecordSource,
 } from '@/entities/season-mode/model/seasonEntry'
@@ -43,7 +44,15 @@ export function seasonHallOfFameRecordSourceOf(hallOfFame: SeasonHallOfFame): Se
       const famer = hallOfFameBatterAt(hallOfFame, slot)
       if (famer === null) return undefined
       const { ability } = modeBatterOfHallOfFame(famer)
-      return { name: famer.name, ability: [ability.hit, ability.power, ability.defense, ability.run] }
+      return {
+        name: famer.name,
+        ability: [ability.hit, ability.power, ability.defense, ability.run],
+        // +0xb · +0x18 — 등록이 0x30 바이트를 그대로 옮긴 칸 (내외야는 등록 때 남긴 칸, 옛 기록은 0)
+        profile: seasonRecordProfileOf(
+          famer.look?.typeIndex ?? 0, famer.look?.handIndex ?? 0, famer.look?.skinIndex ?? 0, famer.positionIndex ?? 0,
+        ),
+        specialNumber: famer.specialSwingNumber ?? 0,
+      }
     },
     pitcher: (player) => {
       const slot = player.id - HALL_OF_FAME_PITCHER_FIRST_RECORD_ID
@@ -65,6 +74,7 @@ export function seasonHallOfFameRecordSourceOf(hallOfFame: SeasonHallOfFame): Se
           pitchMask: famer.pitchMask ?? FASTBALL_ONLY_MASK,
         },
         ...(famer.role === undefined ? {} : { role: famer.role }),
+        profile: seasonRecordProfileOf(famer.look.typeIndex, famer.look.handIndex, famer.look.skinIndex, famer.role ?? 0),
       }
     },
   }
@@ -88,13 +98,20 @@ export function seasonNariPitcherRecordOf(career: PitcherCareer): SeasonEntryPit
       pitchMask: career.pitchMask,
     },
     role: career.role,
+    profile: seasonRecordProfileOf(career.typeIndex, career.handIndex, career.skinIndex, career.role),
   }
 }
 
 /** **나리 타자 기록** — 칸 5 의 원본 `0x220ec(저장)` = 타자편 저장(칸 4)의 내 타자. 이름 rec + 1 · 0xb6414 (`modeBatterOf` 와 같다) */
 export function seasonNariBatterRecordOf(career: PlayerCareer): SeasonEntryBatterRecord {
   const ability = equippedAbilityOf(career)
-  return { name: career.name, ability: [ability.hit, ability.power, ability.defense, ability.run] }
+  return {
+    name: career.name,
+    ability: [ability.hit, ability.power, ability.defense, ability.run],
+    // +0xb (등록 0x16f28) · +0x18 고른 필살타법 — 영입 0xc554 가 통째로 옮기는 0x30 바이트의 칸
+    profile: seasonRecordProfileOf(career.battingTypeIndex, career.battingSide, career.skinIndex, career.positionIndex),
+    specialNumber: career.specialSwingNumber,
+  }
 }
 
 /** 영입 목록 나리 칸 0·5 의 기록 — 저장이 없으면 null (칸 상태 2) */

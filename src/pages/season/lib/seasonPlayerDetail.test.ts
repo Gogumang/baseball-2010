@@ -3,7 +3,8 @@ import { seasonCardAbilitiesOf, seasonCardInfoOf, seasonPlayerDetailViewOf } fro
 import type { SeasonPlayerDetailContext } from '@/pages/season/lib/seasonPlayerDetail'
 import type { SeasonPlayerRecordView } from '@/entities/season-mode/model/seasonPlayerRecord'
 import { seasonPlayerRecordOf } from '@/entities/season-mode/model/seasonPlayerRecord'
-import { tableRosterOf } from '@/entities/season-mode/model/seasonEntry'
+import { seasonRecordProfileOf, tableRosterOf } from '@/entities/season-mode/model/seasonEntry'
+import { nariRecruitPlayerOf } from '@/entities/season-mode/model/playerRecruit'
 
 /**
  * 시즌 능력치 상세 창 글 0x897e8 — 표 다섯 줄과 글 줄 (차례·문구·조건은 0x897e8~0x8a00c 를 직접 떴다).
@@ -124,5 +125,21 @@ describe('정보 칸 0x7c450 시즌 · 0xd9 갈래 — seasonCardInfoOf', () => 
       values: ['T', view.name, '사이드암', '', '구원', '우완', '백인'],
       battingOrder: null,
     })
+  })
+
+  it('영입한 나리 타자 — 기록 사본의 +0xb · +0x18 을 읽는다 (장타형 · 좌타 · 흑인 · 외야, 필살 4 + 타입 = 메테오 스윙)', () => {
+    const player = nariRecruitPlayerOf({
+      name: '나리', ability: [600, 600, 600, 600], profile: seasonRecordProfileOf(1, 1, 2, 1), specialNumber: 4,
+    }, false)
+    const view = seasonPlayerRecordOf(0, player, false, 0)
+    expect(seasonCardInfoOf(view, 'T', player.kindByte).values).toEqual(['T', '나리', '장타형', '메테오 스윙', '외야', '좌타', '흑인'])
+  })
+
+  it('영입한 투수 — +0x18 은 고른 마구, 옛 사본(+0xb 칸 없음)은 보직만', () => {
+    const player = nariRecruitPlayerOf({
+      name: '철완', ability: [1, 1, 1, 1], repertoire: { name: '철완', form: 0, magicId: 2, pitchMask: 1 }, role: 2,
+    }, true)
+    const view = seasonPlayerRecordOf(0, player, true, 0)
+    expect(seasonCardInfoOf(view, 'T', player.kindByte).values).toEqual(['T', '철완', '오버핸드', '웨이브 볼', '구원', '우완', '황인'])
   })
 })

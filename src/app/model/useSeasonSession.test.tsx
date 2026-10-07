@@ -1770,6 +1770,8 @@ describe('영입한 명전 선수는 그 기록으로 팀 경기 명단에 실�
       ability: [710, 660, 610, 560],
       repertoire: { name: '철완', form: 3, magicId: 2, pitchMask: 0b101 },
       recordId: 0xb5,
+      // +0xb = 타입 1 << 5 | 손 1 << 4 (폼 3 = 2 × 타입 + 손) · 피부 0 · 보직 0
+      profile: 48,
     })
   })
 

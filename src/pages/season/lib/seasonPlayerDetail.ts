@@ -1,6 +1,7 @@
 import { ORIGINAL_ITEMS } from '@/shared/config/original/items'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { ORIGINAL_SKILLS } from '@/shared/config/original/skills'
+import { BATTER_BURSTS, PITCHER_BURSTS } from '@/shared/config/original/bursts'
 import { equipmentBonusOf } from '@/entities/career/model/equipment'
 import { MORALE_LIMIT } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
@@ -193,7 +194,10 @@ export interface SeasonCardInfo {
  * 타순  타자만, 0xb6394(선수) + 1 — 글색 (255, 255, 0)
  * ```
  * 리그 선수 표(XlsBATTER_DATA · XlsPITCHER_DATA 300행)의 +0x18 은 모두 0 이라(추출본을 직접 셌다) 필살 줄은 비어 있다.
- * ⚠️ 미해결: 영입한 나리·명예 선수는 웹 명단이 0x30 바이트(+0xb · +0x18)를 들지 않아 타입·손·피부·필살이 표 기본(0)으로 나온다.
+ * 영입한 나리·명예 선수는 기록 사본의 +0xb(`profile`) · +0x18(`specialNumber`)을 읽는다 — 옛 사본(칸이 생기기 전 영입)은
+ * 칸이 없어 표 기본(0)으로 나온다.
+ * StrCOMMON 줄: 타자 [24 + n] = 필살타법 이름(`BATTER_BURSTS[n − 1]`), 투수 [30 + n] = 마구 이름(`PITCHER_BURSTS[n − 1]`),
+ * n == 4 면 + 타입(미라지·메테오 / 샤이닝·캐넌·미라지).
  */
 export function seasonCardInfoOf(view: SeasonPlayerRecordView, teamName: string, kindByte: number): SeasonCardInfo {
   const pitcherShift = view.isPitcher ? 2 : 0
@@ -203,7 +207,7 @@ export function seasonCardInfoOf(view: SeasonPlayerRecordView, teamName: string,
       teamName,
       view.name,
       TYPE_NAMES[(view.profile >> 5) + pitcherShift] ?? '',
-      '',
+      specialNameOf(view),
       ROLE_NAMES[view.isPitcher ? Math.min(role, 1) + 2 : role] ?? '',
       HAND_NAMES[((view.profile >> 4) & 1) + pitcherShift] ?? '',
       SKIN_NAMES[(view.profile & 0xc) >> 2] ?? '',
@@ -211,3 +215,15 @@ export function seasonCardInfoOf(view: SeasonPlayerRecordView, teamName: string,
     battingOrder: view.isPitcher ? null : (kindByte & 0x1f) + 1,
   }
 }
+
+/** +0x18 == 4 면 이름 칸에 타입을 더한다 */
+const SPECIAL_TYPED_NUMBER = 4
+
+/** 필살 줄 — StrCOMMON[24 + n] 타자 · [30 + n] 투수 (n == 4 면 + 타입) */
+function specialNameOf(view: SeasonPlayerRecordView): string {
+  const number = view.specialNumber ?? 0
+  if (number <= 0) return ''
+  const shifted = number - 1 + (number === SPECIAL_TYPED_NUMBER ? view.profile >> 5 : 0)
+  return (view.isPitcher ? PITCHER_BURSTS : BATTER_BURSTS)[shifted] ?? ''
+}
+

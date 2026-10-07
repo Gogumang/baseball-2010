@@ -2,7 +2,7 @@ import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { equipmentBonusOf } from '@/entities/career/model/equipment'
 import { HALL_OF_FAME_FIRST_ID, tableTeamOf } from '@/entities/season-mode/model/playerRecruit'
 import type { SeasonPlayer } from '@/entities/season-mode/model/playerRecruit'
-import type { SeasonEntryPitcherRecord, SeasonEntryRecordSource } from '@/entities/season-mode/model/seasonEntry'
+import type { SeasonEntryBatterRecord, SeasonEntryPitcherRecord, SeasonEntryRecordSource } from '@/entities/season-mode/model/seasonEntry'
 
 /**
  * **시즌 선수 한 명의 레코드 칸** — 선수 상세 카드 0xd9(0x7ba44 시즌 갈래) · 능력치 상세 글 0x897e8 이 읽는 것만.
@@ -34,10 +34,12 @@ export interface SeasonPlayerRecordView {
   readonly equipment: readonly number[]
   /** +0x1c & 0xf (투수는 0) */
   readonly fieldPosition: number
+  /** +0x18 — 고른 필살타법 · 마구 번호 (0 안 고름). 붙박이 표 300행은 모두 0 */
+  readonly specialNumber?: number
   /**
    * 위 칸을 원본 레코드에서 모두 읽었는가. 영입한 나리·명예 선수(id ≥ 0xb4)는 웹 명단이 0x30 바이트를 들지 않아
    * 기록 사본의 이름·능력치(0xb6414 플래그 1 값)만 있다 — ⚠️ 그때는 `base` 가 장비·스킬을 얹은 값이고
-   * +0xb · +0x14 · 장비 니블은 0 으로 둔다(미해결, 아래 `seasonPlayerRecordOf` 주석).
+   * +0x14 · 장비 니블은 0 으로 둔다(미해결, 아래 `seasonPlayerRecordOf` 주석). +0xb · +0x18 은 기록 사본에 있으면 그 값이다.
    */
   readonly isComplete: boolean
 }
@@ -57,9 +59,9 @@ export function seasonPlayerEquipmentOf(player: SeasonPlayer, ownerTeamId: numbe
  *
  * - 리그 선수(id < 0xb4): 그 선수의 붙박이 표 팀(`tableTeamOf` — 트레이드로 옮겨 온 선수는 옛 팀) 표의 id 번째 행.
  * - 영입 선수: 나리 선수는 영입 때 옮긴 기록 사본(`SeasonPlayer.record`), 명예 선수는 `recordOf` 가 주는 명전 칸 기록.
- *   ⚠️ 둘 다 이름과 `0xb6414(기록, k, 1)` 능력치만 있다 — 원본은 옮긴 0x30 바이트에서 기본값(플래그 0)·+0xb·+0x14·
- *   장비 니블을 따로 읽지만 웹 명단에는 그 칸이 없다. 그래서 `isComplete: false` 로 표시하고 그 값을 기본값 자리에 둔다
- *   (보직만은 투수 기록의 `role` 이 +0xb & 3 이라 싣는다).
+ *   ⚠️ 둘 다 이름 · `0xb6414(기록, k, 1)` 능력치 · +0xb(`profile`) · +0x18 만 있다 — 원본은 옮긴 0x30 바이트에서
+ *   기본값(플래그 0)·+0x14·장비 니블도 따로 읽지만 웹 사본에는 그 칸이 없다. 그래서 `isComplete: false` 로 표시하고 능력치를
+ *   기본값 자리에 둔다. 옛 사본(+0xb 칸이 생기기 전)은 투수 보직(`role`)만 +0xb & 3 에 싣는다.
  * - 셋 다 없으면 이름 `투수 N번` 과 빈 능력치 (`playerFaceOf` 와 같다).
  */
 export function seasonPlayerRecordOf(
@@ -87,13 +89,16 @@ export function seasonPlayerRecordOf(
     }
   }
   const record = player.record ?? (isPitcher ? recordOf?.pitcher(player) : recordOf?.batter(player))
-  // 투수 기록의 보직 = +0xb & 3 (0xb6dec). 타자 기록에는 그 칸이 없다
-  const role: number = isPitcher ? (record as SeasonEntryPitcherRecord | undefined)?.role ?? 0 : 0
+  const pitcherRecord = isPitcher ? record as SeasonEntryPitcherRecord | undefined : undefined
+  const batterRecord = isPitcher ? undefined : record as SeasonEntryBatterRecord | undefined
+  // +0xb — 기록 사본의 바이트, 옛 사본(칸이 생기기 전)은 투수 보직(+0xb & 3, 0xb6dec)만
+  const role: number = pitcherRecord?.role ?? 0
   return {
     name: record?.name ?? `${isPitcher ? '투수' : '타자'} ${index + 1}번`,
     isPitcher,
     base: record?.ability ?? [],
-    profile: role & 3,
+    profile: record?.profile ?? role & 3,
+    specialNumber: (isPitcher ? pitcherRecord?.repertoire.magicId : batterRecord?.specialNumber) ?? 0,
     skillBits: 0,
     equipment: player.equipment ?? NO_EQUIPMENT,
     fieldPosition,

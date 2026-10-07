@@ -67,6 +67,8 @@ export interface HallOfFamer extends HallOfFameRecordFields<BatterAbility> {
   readonly look?: HallOfFameLook
   /** 고른 필살타법 번호 — 기록 +0x18 (`career.specialSwingNumber`, 0 이면 안 고름) */
   readonly specialSwingNumber?: number
+  /** 내야 0 · 외야 1 — 기록 `+0xb & 3` (등록이 0x30 바이트를 그대로 옮긴다). 옛 저장에는 없다 */
+  readonly positionIndex?: number
 }
 
 /** 명예의 전당 투수 (+0x880 칸) */
@@ -285,6 +287,7 @@ export function registerHallOfFame(
     equipmentLevels: career.equipmentLevels,
     equippedSkillIds: career.equippedSkillIds,
     specialSwingNumber: career.specialSwingNumber,
+    positionIndex: career.positionIndex,
   }
   return { kind: '등록', slot: target, collection: { ...collection, hallOfFame: [...collection.hallOfFame, famer] } }
 }
@@ -439,7 +442,8 @@ function isHallOfFamer(value: unknown): value is HallOfFamer {
     (candidate.equippedAbility === undefined || hasNumbers(candidate.equippedAbility, ABILITY_KEYS)) &&
     (candidate.look === undefined || isLook(candidate.look)) &&
     hasRecordFields(candidate, ABILITY_KEYS) &&
-    isOptionalNumber(candidate.specialSwingNumber)
+    isOptionalNumber(candidate.specialSwingNumber) &&
+    isOptionalNumber(candidate.positionIndex)
   )
 }
 

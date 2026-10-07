@@ -216,6 +216,18 @@ export interface SeasonEntryBatterRecord {
   readonly ability: readonly [number, number, number, number]
   /** 원본 id(+0) — 명단 차례에 실을 때 붙인다. 팀 경기가 그 선수의 시즌 기록을 표 밖 줄로 쌓는다 */
   readonly recordId?: number
+  /** +0xb — 타입(비트5~7) · 손(비트4) · 피부(비트2~3) · 내외야(비트0~1) (`seasonRecordProfileOf`). 옛 사본엔 없다 */
+  readonly profile?: number
+  /** +0x18 — 고른 필살타법 번호 (0 안 고름). 옛 사본엔 없다 */
+  readonly specialNumber?: number
+}
+
+/**
+ * 기록 +0xb 한 바이트 — 등록(타자 0x16f28 · 투수 0x16f9a)이 쓴 그대로: `타입 << 5 | 손 << 4 | 피부 << 2 | 아랫 2비트`.
+ * 아랫 2비트는 타자 내야 0 · 외야 1, 투수 보직(0xb6dec). 카드 정보 칸 0x7c450 이 이 비트로 타입·손·피부·보직을 읽는다.
+ */
+export function seasonRecordProfileOf(typeIndex: number, handIndex: number, skinIndex: number, low: number): number {
+  return ((typeIndex & 7) << 5) | ((handIndex & 1) << 4) | ((skinIndex & 3) << 2) | (low & 3)
 }
 
 export interface SeasonEntryPitcherRecord {
@@ -228,6 +240,8 @@ export interface SeasonEntryPitcherRecord {
   readonly role?: PitcherRole
   /** 원본 id(+0) — `SeasonEntryBatterRecord.recordId` 와 같다 */
   readonly recordId?: number
+  /** +0xb 한 바이트 (`seasonRecordProfileOf`, 아랫 2비트 = `role`). 옛 사본엔 없다 */
+  readonly profile?: number
 }
 
 /** 표 밖 선수의 기록을 찾아 준다 — 없으면 undefined */
