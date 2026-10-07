@@ -11,6 +11,7 @@ import type { SeasonListRow } from '@/widgets/season/ui/SeasonListWindow'
 import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
 import { recruitEntriesOf } from '@/widgets/season/lib/recruitList'
 import type { RecruitCandidate, RecruitListInput } from '@/widgets/season/lib/recruitList'
+import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 
 /** StrMODE[181] — 중복 (0xb5054 / 0xb50ac 가 걸릴 때) */
 const ALREADY_RECRUITED = ORIGINAL_MODE_TEXT[181] ?? ''
@@ -160,6 +161,8 @@ export function PlayerRecruitScreen({ roster, list, rosterNames, onRecruit, onBa
 
   return (
     <RawScreen>
+      {/* 공통 앞그림 0xb810 — 0xe2 · 0xdf 는 공 무늬 0x5fd61 을 먼저 깐다 (명전 목록 renderCandidates 는 제 바탕을 깐다) */}
+      {!(step === null && renderCandidates !== undefined) && <SkinBackdrop kind="공무늬" />}
       {step === null && renderCandidates !== undefined ? (
         renderCandidates({ choose: chooseCandidate, back: onBack })
       ) : step === null ? (

@@ -12,6 +12,7 @@ import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
 import { fillModeText, seasonMoneyTextOf } from '@/widgets/season/lib/seasonText'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
+import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 
 /** StrMODE — 코치채용 문구 (J 4-3 가드 순서와 같은 번호) */
 const ALREADY_HIRED = ORIGINAL_MODE_TEXT[147] // "현재 채용중인 마선수입니다"
@@ -94,6 +95,8 @@ export function CoachHireScreen({ state, gamePoints = 0, onHire, onBack }: Coach
 
   return (
     <RawScreen>
+      {/* 공통 앞그림 0xb810 — 0xd7 는 0xdd · 0xe0 · 0xe1 밖이라 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 먼저 깐다 */}
+      <SkinBackdrop kind="공무늬" />
       {ace !== null && (
         // 마선수 얼굴 — ace_icon 33×33 (공용 판 오른쪽 위 모서리, **근사**)
         <img

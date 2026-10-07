@@ -11,6 +11,7 @@ import { seasonMoneyTextOf } from '@/widgets/season/lib/seasonText'
 import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
 import { STADIUM_BOXES } from '@/widgets/season/lib/seasonWindowLayout'
 import * as styles from '@/widgets/season/ui/SeasonWindow.css'
+import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 
 /** 가드 문구 — 원본 StrMODE (S3 4절). 웹에 StrMODE 표가 없어 다른 화면들처럼 글을 그대로 적는다 */
 const REFUSAL_TEXT: Readonly<Record<StadiumPurchaseRefusal, (required: number) => string>> = {
@@ -103,6 +104,8 @@ export function StadiumShopScreen({
 
   return (
     <RawScreen>
+      {/* 공통 앞그림 0xb810 — 0xea · 0xdc 는 0xdd · 0xe0 · 0xe1 밖이라 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 먼저 깐다 */}
+      <SkinBackdrop kind="공무늬" />
       <StadiumShopWindow
         record={record}
         kind={kind}

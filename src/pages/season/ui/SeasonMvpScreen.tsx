@@ -8,6 +8,7 @@ import { SeasonListWindow } from '@/widgets/season/ui/SeasonListWindow'
 import type { SeasonListRow } from '@/widgets/season/ui/SeasonListWindow'
 import { MILLION_TO_TEN_THOUSAND } from '@/widgets/season/lib/seasonWindowLayout'
 import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
+import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 
 export interface SeasonMvpScreenProps {
   /**
@@ -70,6 +71,8 @@ export function SeasonMvpScreen({ winner, isMine, onNext }: SeasonMvpScreenProps
 
   return (
     <RawScreen>
+      {/* 공통 앞그림 0xb810 — 0xed 는 0xdd · 0xe0 · 0xe1 밖이라 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 먼저 깐다 */}
+      <SkinBackdrop kind="공무늬" />
       <SeasonListWindow
         title="최우수선수"
         rows={rows}

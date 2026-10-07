@@ -4,6 +4,7 @@ import type { League } from '@/entities/league/model/league'
 import { StandingsWindow } from '@/widgets/standings/ui/StandingsWindow'
 import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
 import * as styles from '@/widgets/season/ui/SeasonEndWindow.css'
+import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 
 export interface NextGameScreenProps {
   /** 시즌 리그 `SR+0x80` — 순위표가 그대로 그린다 */
@@ -50,6 +51,8 @@ export function NextGameScreen({ league, onConfirm, onCancel, isFromManagement, 
 
   return (
     <RawScreen>
+      {/* 공통 앞그림 0xb810 — 0xd8 는 0xdd · 0xe0 · 0xe1 밖이라 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 먼저 깐다 */}
+      <SkinBackdrop kind="공무늬" />
       <StandingsWindow league={league} onClose={onConfirm} />
 
       <Button variant="corner" className={styles.cornerButton} onClick={onConfirm}>

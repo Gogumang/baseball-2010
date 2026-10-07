@@ -13,6 +13,7 @@ import { DetailWindow } from '@/pages/management/ui/DetailPopup'
 import type { DetailView } from '@/pages/management/lib/detailPopup'
 import { abilityDetailScrollKeyOf, scrollAbilityDetail } from '@/pages/management/lib/abilityDetail'
 import * as styles from '@/widgets/season/ui/SeasonWindow.css'
+import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 
 export interface SeasonPlayerCardScreenProps {
   readonly teamId: number
@@ -112,6 +113,8 @@ export function SeasonPlayerCardScreen({
 
   return (
     <RawScreen>
+      {/* 공통 앞그림 0xb810 — 0xd9 · 0xda 는 0xdd · 0xe0 · 0xe1 밖이라 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 먼저 깐다 */}
+      <SkinBackdrop kind="공무늬" />
       <div className={styles.window} style={{ left: CARD.x, top: CARD.y, width: CARD.width, height: CARD.height }} />
       <div className={styles.title} style={{ left: CARD.x, top: CARD.y + 12, width: RIGHT_PANEL.x - CARD.x }}>
         {TEAMS[teamId]?.name ?? ''}

@@ -11,6 +11,7 @@ import {
 } from '@/pages/season/lib/dayResultBoard'
 import type { BoardBox, PanelRect } from '@/pages/season/lib/dayResultBoard'
 import * as styles from '@/widgets/season/ui/SeasonEndWindow.css'
+import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 
 export interface DayResultBoardScreenProps {
   /** SR+0x1c0 — 오늘 리그 다섯 경기 점수표 (내 경기 줄은 −1) */
@@ -83,6 +84,8 @@ export function DayResultBoardScreen({ board, onConfirm, gamePoint }: DayResultB
 
   return (
     <RawScreen>
+      {/* 공통 앞그림 0xb810 — 0xf1 는 0xdd · 0xe0 · 0xe1 밖이라 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 먼저 깐다 */}
+      <SkinBackdrop kind="공무늬" />
       <div role="group" aria-label="오늘의 경기 결과">
         {rows.map((_row, index) => (
           <div key={`판${index}`}>

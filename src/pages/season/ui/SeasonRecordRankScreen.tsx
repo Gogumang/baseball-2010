@@ -9,6 +9,7 @@ import {
 import type { SeasonRankingEntry, SeasonRankingSide } from '@/entities/season-mode/model/seasonRecordRanking'
 import * as windowStyles from '@/shared/ui/GameWindow/GameWindow.css'
 import * as styles from '@/widgets/season/ui/SeasonWindow.css'
+import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 
 const IMG_TEXT = './sprites/img_text/frames'
 const frameSrc = (frame: number) => `${IMG_TEXT}/${String(frame).padStart(3, '0')}.png`
@@ -138,6 +139,8 @@ export function SeasonRecordRankScreen({
 
   return (
     <RawScreen>
+      {/* 공통 앞그림 0xb810 — 0xdb 는 0xdd · 0xe0 · 0xe1 밖이라 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 먼저 깐다 */}
+      <SkinBackdrop kind="공무늬" />
       <div role="group" aria-label={`기록순위 ${side} ${category.label}`}>
         <div className={windowStyles.window} style={{ left: 14, top: 52, width: 212, height: 216 }} />
         {headerFrames.map((frame, index) => (

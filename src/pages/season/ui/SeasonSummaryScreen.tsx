@@ -14,6 +14,7 @@ import { MILLION_TO_TEN_THOUSAND } from '@/widgets/season/lib/seasonWindowLayout
 import { PostseasonBracketWindow } from '@/widgets/season/ui/PostseasonBracketWindow'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import * as styles from '@/widgets/season/ui/SeasonEndWindow.css'
+import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 
 /**
  * 원본 문구 (`base/extracted/StrMODE.json` 그대로 — 번호는 P4 4b 확정).
@@ -156,6 +157,8 @@ export function SeasonSummaryScreen(props: SeasonSummaryScreenProps) {
 
   return (
     <RawScreen>
+      {/* 공통 앞그림 0xb810 — 0xef 는 0xdd · 0xe0 · 0xe1 밖이라 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 먼저 깐다 */}
+      <SkinBackdrop kind="공무늬" />
       <PostseasonBracketWindow series={series} />
       {/* 대진표 0x853ac 끝의 0x7f4ec — 공통 틀 0xb810 이 0xef 에 맡긴 (제목 10 시즌모드, 바닥 1 — 되돌아가기 없음) */}
       <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={null} footer={1} />

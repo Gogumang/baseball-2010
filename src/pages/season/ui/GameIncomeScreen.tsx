@@ -11,6 +11,7 @@ import type { SeasonListRow } from '@/widgets/season/ui/SeasonListWindow'
 import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
 import { incomeTextOf, seasonMoneyTextOf } from '@/widgets/season/lib/seasonText'
 import { MILLION_TO_TEN_THOUSAND } from '@/widgets/season/lib/seasonWindowLayout'
+import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 
 export interface GameIncomeScreenProps {
   /** 경기가 끝난 직후의 레코드 — 수입은 경기 장면 셋업(0xa34b8)이 이미 소지금에 더했다 */
@@ -69,6 +70,8 @@ export function GameIncomeScreen({ record, onConfirm }: GameIncomeScreenProps) {
 
   return (
     <RawScreen>
+      {/* 공통 앞그림 0xb810 — 0xe9 는 0xdd · 0xe0 · 0xe1 밖이라 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 먼저 깐다 */}
+      <SkinBackdrop kind="공무늬" />
       <SeasonListWindow
         title="경기 수입"
         rows={rows}

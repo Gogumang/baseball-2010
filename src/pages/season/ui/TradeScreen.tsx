@@ -22,6 +22,7 @@ import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import { TEAMS } from '@/shared/config/original/teams'
 import * as styles from '@/widgets/season/ui/SeasonWindow.css'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 
 /** StrMODE — 트레이드 문구 [163]~[175] · CPU 요청 [204]·[205]·[216] */
 const CHOOSE_ACQUIRED = ORIGINAL_MODE_TEXT[163] // "상대 팀에서 우리 팀으로 영입할 선수를 선택합니다"
@@ -368,6 +369,8 @@ export function TradeScreen({
 
   return (
     <RawScreen>
+      {/* 공통 앞그림 0xb810 — 0xe4~0xe7 는 0xdd · 0xe0 · 0xe1 밖이라 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 먼저 깐다 */}
+      <SkinBackdrop kind="공무늬" />
       {step.kind !== '확인' && forced === null && (
         // 목록 탭(ed+0x33f) — 단추는 '*' 뒤집기와 같다. 요청이면 '*' 가 편집기에 안 가(0x7104 `키 == 0x2a` 거르기)
         // 탭이 요청 값으로 묶여 단추를 안 둔다. ⚠️ 단추 자리는 원본 편집기 탭 그림 좌표를 못 풀어 근사다

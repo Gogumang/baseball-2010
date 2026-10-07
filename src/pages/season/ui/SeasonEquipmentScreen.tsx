@@ -13,6 +13,7 @@ import type { SeasonCardAbility } from '@/pages/season/lib/seasonPlayerDetail'
 import { fillModeText, seasonMoneyTextOf } from '@/widgets/season/lib/seasonText'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import * as styles from '@/widgets/season/ui/SeasonWindow.css'
+import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 
 /** StrMODE[35..38] 히트·파워·수비·주루 / [40..43] 제구·구속·변화·체력 */
 const BATTER_NAME_BASE = 35
@@ -113,6 +114,8 @@ export function SeasonEquipmentScreen({
 
   return (
     <RawScreen>
+      {/* 공통 앞그림 0xb810 — 0xdc 는 0xdd · 0xe0 · 0xe1 밖이라 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 먼저 깐다 */}
+      <SkinBackdrop kind="공무늬" />
       <div role="group" aria-label="장비">
         <div className={styles.window} style={{ left: CARD.x, top: CARD.y, width: CARD.width, height: CARD.height }} />
         <div className={styles.title} data-testid="장비-선수" style={{ left: CARD.x, top: CARD.y + 6, width: CARD.width }}>{playerName}</div>

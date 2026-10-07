@@ -30,6 +30,11 @@ const 띄우기 = (record: SeasonRecord, input: AttendanceInput = { myRank: 0, o
 const 창글 = () => screen.getByRole('group', { name: '경기 수입' }).textContent ?? ''
 
 describe('경기 수입 정산', () => {
+  it('0xe9 는 그리기가 없어 공통 앞그림 0xb810 의 공 무늬만 깔린다', () => {
+    띄우기(레코드())
+    expect(screen.getByTestId('바탕-공무늬')).toBeTruthy()
+  })
+
   it('J 4-7 의 보기 그대로 18160명 · 1300만이 나온다', () => {
     띄우기(레코드({ reputation: 300, games: 10 }))
 

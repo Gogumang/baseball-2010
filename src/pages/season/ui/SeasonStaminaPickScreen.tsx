@@ -4,6 +4,7 @@ import { SEASON_SHOP_TEXT, seasonShopTextOf } from '@/entities/season-mode/model
 import { SeasonListWindow } from '@/widgets/season/ui/SeasonListWindow'
 import type { SeasonListRow } from '@/widgets/season/ui/SeasonListWindow'
 import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
+import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 
 const STAMINA_PER_PERCENT = 100
 
@@ -52,6 +53,8 @@ export function SeasonStaminaPickScreen({ pitchers, onPick, onBack }: SeasonStam
 
   return (
     <RawScreen>
+      {/* 공통 앞그림 0xb810 — 0xe8 는 0xdd · 0xe0 · 0xe1 밖이라 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 먼저 깐다 */}
+      <SkinBackdrop kind="공무늬" />
       <SeasonListWindow title="투수" rows={rows} cursor={cursor} onMoveCursor={moveTo} onSelect={select} onBack={onBack} />
       {notice !== null && (
         <MessageBox text={notice.text} buttons={['OK']} onAnswer={() => {

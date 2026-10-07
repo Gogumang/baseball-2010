@@ -10,6 +10,7 @@ import { ABILITY_TITLE, INFO_BOARD, INFO_ROW_HEIGHT, INFO_ROW_STEP, INFO_TOP, RA
 import { TEAM_INFO_LEFT_ROWS, TEAM_NAME_FRAME_BASE } from '@/pages/season/lib/seasonTeamInfo'
 import type { TeamInfoRow } from '@/pages/season/lib/seasonTeamInfo'
 import * as styles from '@/pages/management/ui/ManagementScreen.css'
+import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 
 const IMG_TEXT = './sprites/img_text/frames'
 const frameSrc = (frame: number) => `${IMG_TEXT}/${String(frame).padStart(3, '0')}.png`
@@ -76,6 +77,8 @@ export function SeasonTeamInfoScreen({ teamId, teamAbilities, rows, gamePoint = 
 
   return (
     <RawScreen>
+      {/* 공통 앞그림 0xb810 — 0xd5 는 0xdd · 0xe0 · 0xe1 밖이라 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 먼저 깐다 */}
+      <SkinBackdrop kind="공무늬" />
       <div role="group" aria-label="구단정보">
         {team !== undefined && (
           <img className={styles.layer} alt={team.name} src={team.logoUrl}
