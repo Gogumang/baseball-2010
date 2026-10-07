@@ -181,6 +181,30 @@ describe('시즌 팀 트레이닝 (상태 0xcf)', () => {
     expect(onCloseResult).toHaveBeenCalledTimes(1)
   })
 
+  it('첫 줄 [창+0x2d8] 은 팝업을 열 때 비우지 않는다 — 부르는 쪽이 든 첫 줄이 다음 팝업에도 남는다', () => {
+    const result = {
+      current: { ability: [106, 100, 100, 100], morale: 43 },
+      change: { ability: [6, 0, 0, 0], morale: -8 },
+      bonus: { ability: [0, 0, 0, 0], morale: -1 },
+      messages: ['가', '나', '다', '라', '마'],
+    }
+    const onResultFirstLineChange = vi.fn()
+    const { rerender } = render(
+      <SeasonTrainingScreen state={시즌()} gamePoints={1000} onTrain={vi.fn()} onBack={vi.fn()}
+        result={result} resultFirstLine={0} onResultFirstLineChange={onResultFirstLineChange} />,
+    )
+    fireEvent.keyDown(window, { key: '8' })
+    expect(onResultFirstLineChange).toHaveBeenLastCalledWith(1)
+    // 닫았다가 다시 열어도 1 에서 시작한다
+    rerender(<SeasonTrainingScreen state={시즌()} gamePoints={1000} onTrain={vi.fn()} onBack={vi.fn()}
+      result={null} resultFirstLine={1} onResultFirstLineChange={onResultFirstLineChange} />)
+    rerender(<SeasonTrainingScreen state={시즌()} gamePoints={1000} onTrain={vi.fn()} onBack={vi.fn()}
+      result={result} resultFirstLine={1} onResultFirstLineChange={onResultFirstLineChange} />)
+    expect(screen.getByRole('dialog', { name: '상세정보' }).textContent).not.toContain('가')
+    fireEvent.keyDown(window, { key: '8' })
+    expect(onResultFirstLineChange).toHaveBeenLastCalledWith(0)
+  })
+
   it('보정 글이 없으면 글 상자 · 스크롤 막대를 안 그린다 (0x87700 빈 글)', () => {
     const result = {
       current: { ability: [106, 100, 100, 100], morale: 43 },

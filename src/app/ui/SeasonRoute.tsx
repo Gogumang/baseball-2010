@@ -176,6 +176,11 @@ export function SeasonRoute({
   const [recordPick, setRecordPick] = useState<SeasonRankingSide | null>(null)
   /** 0xdb 목록 — 창에서 고른 쪽과 ed+0x444(종류표의 쪽). 0x5761c 가 들어올 때마다 쪽 0 으로 만든다 */
   const [recordRank, setRecordRank] = useState<{ readonly side: SeasonRankingSide; readonly page: number }>({ side: '타자', page: 0 })
+  /**
+   * 훈련 결과 팝업 글 상자 첫 줄 [창+0x2d8] — 시즌 장면 창의 칸이라 팝업 · 0xcf 를 떠나도 남는다(시즌에서 비우는 곳이 없다,
+   * `SeasonTrainingScreen` 주석). 창이 장면과 함께 사니 이 화면이 사는 동안 든다.
+   */
+  const [trainingResultFirstLine, setTrainingResultFirstLine] = useState(0)
   /** 0xdf 목적 1 에서 나리 선수를 고르면 뜨는 StrMODE[220] 알림 (0xbbef9(…, 1, 1, 1) — 상태는 0xdf 그대로) */
   const [pickNotice, setPickNotice] = useState<string | null>(null)
   /**
@@ -670,6 +675,8 @@ export function SeasonRoute({
         onBack={backToManagement}
         result={session.trainingResult}
         onCloseResult={actions.closeTrainingResult}
+        resultFirstLine={trainingResultFirstLine}
+        onResultFirstLineChange={setTrainingResultFirstLine}
       />
     )
   }

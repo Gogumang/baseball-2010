@@ -86,7 +86,9 @@ const subItemLineOf = (nameIndex: number, effect: string) =>
 
 /**
  * 결과 창 글 줄 — 글 버퍼 0x1552af4 를 `!N` 으로 끊은 줄들. 보정이 없으면 빈 글이라 창이 글 상자를 안 그린다.
- * ⚠️ 끝의 `!N` 뒤 빈 줄을 줄 수(gfx+0x2d4, 0x6ef4d 가 센다)에 넣는지는 확인하지 않았다 — 빈 줄은 뺀다.
+ * **끝의 `!N` 뒤 빈 줄은 줄 수에 안 든다** (직접 떴다): 0x872d4 가 그릴 때마다 0x6ef4d(…, 첫 줄 0, 줄 수 −1, 출력)로 재어
+ * [창+0x2d4] 에 넣는다. 0x6ef4d 는 `!N`(0x6f02a 걸음 2)이나 글 끝(0x6f0bc `i ≥ 길이 − 걸음`)에서 줄 수 [sp+0x48] 를
+ * 하나 올리는데, 끝의 `!N` 은 두 조건이 한 번에 서서 한 번만 센다 → 줄 수 = 줄 개수.
  */
 export function seasonTrainingMessagesOf(slot: number, items: TrainingItems): string[] {
   const lines = trainedSlotsOf(slot)
