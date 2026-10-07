@@ -10,7 +10,7 @@ import {
   SeasonMatchInfoScreen, seasonMatchInfoLines, DayResultBoardScreen,
   SeasonPlayerPickScreen, SeasonPlayerCardScreen, seasonCardAbilitiesOf, seasonPlayerDetailViewOf, seasonCardInfoOf,
   SeasonTeamInfoScreen, seasonTeamInfoRowsOf, SeasonOwnedItemsScreen, SeasonRecordPickPopup, SeasonRecordRankScreen,
-  SeasonEquipmentScreen, SeasonItemShopScreen, SeasonStaminaPickScreen,
+  SeasonEquipmentScreen, SeasonItemShopScreen, SeasonStaminaPickScreen, SeasonEventUnderlay,
 } from '@/pages/season'
 import { seasonPlayerEquipmentOf } from '@/entities/season-mode/model/seasonPlayerRecord'
 import { SEASON_STAMINA_ITEM } from '@/entities/season-mode/model/seasonItemShop'
@@ -256,13 +256,14 @@ export function SeasonRoute({
   }
 
   // 이벤트 재생 0xd3 (갱신 0x5110 · 키 0x90ec · 그리기 0xa09c → 대화창 0x8b5ac).
-  // ⚠️ 근사: 원본은 대화창 아래에 공통 틀(0x9f60, 이전 상태가 외출 지도면 지도)을 그린다 — 웹은 대화창만 얹는다.
+  // 대화창 0x8b5ac 가 공 무늬 · 상태판(둘째 인자 [이벤트+0xb]) · 머리띠를 먼저 깐다 (`SeasonEventUnderlay`).
   if (scene === SEASON_SCENE_STATE.이벤트재생 && session.eventPlayback !== null) {
     const playback = session.eventPlayback
     const event = SEASON_PLAYABLE_EVENTS.find((candidate) => candidate.id === playback.eventId)
     if (event !== undefined) {
       return (
         <RawScreen>
+          <SeasonEventUnderlay record={state.record} teamMorale={state.teamMorale} gamePoint={session.gamePoints} />
           <ScreenOverlay>
             <StoryScreen
               // 명령 5 의 500ms 진동(0x3a44)은 환경설정 진동(옵션 +0x3b)이 켜졌을 때만

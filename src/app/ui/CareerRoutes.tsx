@@ -19,6 +19,7 @@ import { SeasonEndScreen } from '@/pages/season-end/ui/SeasonEndScreen'
 import { PostseasonScreen } from '@/pages/season-end/ui/PostseasonScreen'
 import { NationalCupScreen } from '@/pages/national-cup/ui/NationalCupScreen'
 import { NariScreenPush } from '@/pages/management/ui/NariScreenPush'
+import { NariEventUnderlay } from '@/pages/management/ui/NariEventUnderlay'
 import { EndingScreen } from '@/pages/ending/ui/EndingScreen'
 import type { Collection, HallOfFameResult } from '@/entities/collection/model/collection'
 import { nariBatterOf } from '@/app/model/useCollection'
@@ -201,13 +202,13 @@ export function CareerRoutes({
     case '이벤트': {
       const event = session.storyEvents?.find((candidate) => candidate.id === screen.eventId)
       if (session.storyEvents === null || event === undefined) return management
-      // 원본은 이벤트를 따로 된 화면으로 띄우지 않는다. `trigger` 가 **어느 화면 위에 뜨는지**를 가리킨다
-      // (0 관리 화면 · 1 외출 지도 · 2~6 장소). 관리 화면(trigger 0)만 확인돼서 그것부터 깔아 둔다 —
-      // 외출·장소 이벤트의 뒷 화면은 아직 확인하지 못해 예전처럼 덮개만 띄운다.
+      // 114 그림 0x19e64 → 대화창 0x8b5ac: [gfx+0x174](0x7e84c 가 받은 마지막 상태)가 0x70·0x71 이면 외출 지도,
+      // 그 밖(105 · 115 · 116 · 117 · 130~138 뒤)은 공 무늬 + 상태판(둘째 인자 [이벤트+0xb]) + 머리띠 (`NariEventUnderlay`).
+      // 웹이 트는 이벤트는 파일 이벤트라 [이벤트+0xb] 는 0 이다(경기 뒤 평가 내장 이벤트는 경기결과 화면이 맡는다).
+      // ⚠️ 외출진입(112) · 장소(113) · 대결결과(140 — 진입 0x10df8 이 0x7e84c(gfx, 0x70))는 지도 위인데 지도 밑그림은 아직 없다.
       return (
         <>
-          {/* 140 결과 이벤트(0x10e40) · 115 연초(0x16aac)도 뒤 상태가 105 다 */}
-          {(screen.context === '관리' || screen.context === '대결결과' || screen.context === '연초') && management}
+          {(screen.context === '관리' || screen.context === '연초' || screen.context === '시즌') && <NariEventUnderlay career={career} />}
           {/* 대사창은 화면 **위에 얹히는 덮개**다 — 안 감싸면 창 전체로 퍼져 구석에 그려진다 */}
           <ScreenOverlay>
           <StoryScreen

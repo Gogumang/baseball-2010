@@ -27,14 +27,21 @@ export interface SeasonStatusPanelProps {
   readonly teamMorale: number
   /** 경기장 띠의 시간대를 고르는 휴대폰 시각 (시즌 장면 0x4b50 → 0x7b934) */
   readonly hour?: number
+  /**
+   * 0x7d34c 둘째 인자 — 이벤트 대화창 0x8b5ac 만 [이벤트+0xb] 를 넘긴다(경기 뒤 평가 내장 이벤트 0x8a6fc 만 1).
+   * 서면 메시지줄 경기 번호가 −1(막 치른 경기).
+   */
+  readonly isPreviousGame?: boolean
 }
 
 /**
  * 시즌모드 상태판 — 공용 상태판 0x7d34c 의 모드 2 갈래 (`lib/seasonStatusPanel` 머리 주석).
  * 화면 원점에 그리고 그 위에 다른 것(커맨드 줄·가운데 판·창)이 덮인다 — 부르는 쪽은 맨 먼저 둔다.
  */
-export function SeasonStatusPanel({ record, teamMorale, hour = new Date().getHours() }: SeasonStatusPanelProps) {
-  const layout = seasonStatusPanelLayoutOf(record)
+export function SeasonStatusPanel({
+  record, teamMorale, hour = new Date().getHours(), isPreviousGame = false,
+}: SeasonStatusPanelProps) {
+  const layout = seasonStatusPanelLayoutOf(record, isPreviousGame)
   const { popularity, money, reputation, salary } = STATUS_BOXES
   const digit = layout.goalRankDigit
   const digitSource = `${NUM}/${pad(digit.frame)}.png`

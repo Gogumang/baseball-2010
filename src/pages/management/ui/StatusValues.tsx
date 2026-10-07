@@ -89,9 +89,13 @@ export function MessageLine({ year, game }: { readonly year: number; readonly ga
 }
 
 /** 값 칸 네 개 · 이름표 · 메시지줄 "N년 G/45경기" · 상태 아이콘 */
-export function StatusValues({ career }: { readonly career: PlayerCareer }) {
+/**
+ * `isPreviousGame` = 0x7d34c 둘째 인자 — 이벤트 대화창 0x8b5ac 만 [이벤트+0xb] 를 넘긴다. 그 칸은 경기 뒤 평가 내장 이벤트
+ * 0x8a6fc 만 1 로 세우고(0x8a71e) 이벤트 끝 0x8a380 이 0 으로 지운다 — 막 치른 경기의 번호를 보여 주는 것이다.
+ */
+export function StatusValues({ career, isPreviousGame = false }: { readonly career: PlayerCareer; readonly isPreviousGame?: boolean }) {
   const { popularity, money, reputation, salary } = STATUS_BOXES
-  const game = messageGameNumberOf(leagueDayCounterOf(career), career.postseason !== null)
+  const game = messageGameNumberOf(leagueDayCounterOf(career), career.postseason !== null, isPreviousGame)
 
   return (
     <>

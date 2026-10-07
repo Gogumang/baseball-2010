@@ -92,10 +92,12 @@ interface ManagementBoardProps {
   readonly career: PlayerCareer
   readonly titleName: string
   readonly hour: number
+  /** 0x7d34c 둘째 인자 [이벤트+0xb] — 메시지줄 경기 번호 −1 (`StatusValues`) */
+  readonly isPreviousGame?: boolean
 }
 
 /** 상태판 0x7d34c (나만의리그 타자편) — 계단형 판 · 경기장 띠 · 이름/칭호 띠 · 사기 게이지 · 값 칸 · 메시지줄 */
-export function ManagementBoard({ career, titleName, hour }: ManagementBoardProps) {
+export function ManagementBoard({ career, titleName, hour, isPreviousGame = false }: ManagementBoardProps) {
   const band = NAME_BAND
   return (
     <>
@@ -106,7 +108,7 @@ export function ManagementBoard({ career, titleName, hour }: ManagementBoardProp
             <div className={styles.nameText} style={{ left: band.titleBox.x, top: band.top, width: band.titleBox.width }}>{titleName}</div>
           </>
         )} />
-      <StatusValues career={career} />
+      <StatusValues career={career} isPreviousGame={isPreviousGame} />
     </>
   )
 }
