@@ -10,7 +10,9 @@ import {
   SeasonMatchInfoScreen, seasonMatchInfoLines, DayResultBoardScreen,
   SeasonPlayerPickScreen, SeasonPlayerCardScreen, seasonCardAbilitiesOf, seasonPlayerDetailViewOf,
   SeasonTeamInfoScreen, seasonTeamInfoRowsOf, SeasonOwnedItemsScreen, SeasonRecordPickPopup, SeasonRecordRankScreen,
+  SeasonEquipmentScreen,
 } from '@/pages/season'
+import { seasonPlayerEquipmentOf } from '@/entities/season-mode/model/seasonPlayerRecord'
 import { moveRankingPage, rankSeasonRecords, rankingCategoriesOf } from '@/entities/season-mode/model/seasonRecordRanking'
 import type { SeasonRankingSide } from '@/entities/season-mode/model/seasonRecordRanking'
 import { fillModeText } from '@/widgets/season/lib/seasonText'
@@ -293,6 +295,37 @@ export function SeasonRoute({
     )
   }
 
+  // 장비 창 0xdc 종류 3 (들어옴 0x5f3c 칸 0 · 키 0x957c · 적용 0x7d90) — 선수 고르기 0xdf 목적 1 의 확인으로만 온다
+  if (scene === SEASON_SCENE_STATE.아이템상점 && playerPick !== null && playerPick.purpose === PLAYER_PICK_PURPOSE.장착아이템) {
+    const pick = playerPick
+    const isPitcher = pick.tab === ENTRY_TAB.투수
+    const player = (isPitcher ? session.tradeRoster.pitchers : session.tradeRoster.batters)[pick.cursor]
+    if (player !== undefined) {
+      const recordOf = session.recordSource()
+      const view = seasonPlayerRecordOf(state.record.teamId, player, isPitcher, pick.cursor, recordOf)
+      // 해금표 app+0xc0 — 기록연감의 전역 해금 목록과 이 세션이 연 칸
+      const opened = [...(hallOfFame?.openedHiddenIds ?? []), ...session.openedHiddenIds]
+      return (
+        <SeasonEquipmentScreen
+          record={state.record}
+          teamMorale={state.teamMorale}
+          playerName={view.name}
+          isBatter={!isPitcher}
+          equipment={seasonPlayerEquipmentOf(player, state.record.teamId, isPitcher)}
+          abilities={seasonCardAbilitiesOf(view, { record: state.record, teamMorale: state.teamMorale })}
+          isHiddenOpen={(id) => opened.includes(id)}
+          gamePoint={session.gamePoints}
+          onPurchase={({ money, equipment }) => actions.equipSeasonPlayer({ isPitcher, recordIndex: pick.cursor, money, equipment })}
+          onBack={() => {
+            // 0x5980 — 목록을 다시 채워 커서 0, 탭은 창+0x24c(이 선수가 타자였는가)대로
+            setPlayerPick({ ...pick, cursor: 0 })
+            actions.goto(SEASON_SCENE_STATE.선수고르기)
+          }}
+        />
+      )
+    }
+  }
+
   if (scene === SEASON_SCENE_STATE.구장관리 || scene === SEASON_SCENE_STATE.아이템상점) {
     return (
       <StadiumShopScreen
@@ -444,11 +477,11 @@ export function SeasonRoute({
           // 0xc3e8 확인 — 목적 2 → 카드 0xd9
           if (pick.purpose === PLAYER_PICK_PURPOSE.선수정보) return actions.goto(SEASON_SCENE_STATE.선수상세)
           // 목적 1 — 0xb5694(팀, ed+0x33f ? 0 : 1, 커서) 가 나리 선수(0xb6388)면 StrMODE[220], 아니면 장비 창 0xdc(종류 3).
-          // ⚠️ 웹엔 장비 창이 아직 없다 — "아직 없음" 알림 뒤 0xdf 에 남는다 (0xdc 의 취소가 어디로 가는지는 미해결)
+          // 장비 창에서 부위 목록 취소 → 0xdf (0x97bc~0x97d6)
           const player = (tab === ENTRY_TAB.투수 ? session.tradeRoster.pitchers : session.tradeRoster.batters)[index]
           if (player === undefined) return undefined
           if (refusesEquipment(player)) return setPickNotice(ORIGINAL_MODE_TEXT[NARI_EQUIP_REFUSAL_TEXT_ID] ?? '')
-          return setMissingWindow(ITEM_WINDOW_KIND.장비)
+          return actions.goto(SEASON_SCENE_STATE.아이템상점)
         }}
         onBack={() => {
           setPlayerPick(null)
@@ -573,6 +606,8 @@ export function SeasonRoute({
             setPlayerPick({ purpose: PLAYER_PICK_PURPOSE.장착아이템, tab: ENTRY_TAB.투수, cursor: 0 })
             return actions.goto(target)
           }
+          // 구장 창(종류 4)은 선수 고르기를 안 거친다 — 장비 창 갈래(0xdf 목적 1)로 잘못 들어가지 않게 지운다
+          setPlayerPick(null)
           return windowKind === ITEM_WINDOW_KIND.구장아이템 ? actions.goto(target) : setMissingWindow(windowKind)
         }}
         onBack={backToManagement}

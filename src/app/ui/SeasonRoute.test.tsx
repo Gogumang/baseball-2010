@@ -334,16 +334,33 @@ describe('시즌정보 0xcd → 선수정보(0xdf 목적 2) → 카드 0xd9 ↔ 
 describe('아이템 → 장착아이템 = 선수 고르기 0xdf 목적 1 (키 0x4da4 → 0xc3e8)', () => {
   const 키 = (key: string) => fireEvent.keyDown(window, { key })
 
-  it('리그 선수를 고르면 장비 창 0xdc(종류 3) — 웹엔 없어 "아직 없음", 취소는 아이템 메뉴 0xd0', () => {
-    const store = 메모리저장(세이브(레코드({ seenEvents: [400, 1], yearGoalShown: true })))
+  it('리그 선수를 고르면 장비 창 0xdc(종류 3) — 사면 소지금·니블을 함께 저장, 부위에서 취소하면 0xdf, 거기서 취소는 0xd0', () => {
+    const store = 메모리저장(세이브(레코드({ seenEvents: [400, 1], yearGoalShown: true, money: 50 })))
     render(<시즌화면 store={store} 장면={SEASON_SCENE_STATE.아이템} onExit={vi.fn()} />)
 
     fireEvent.click(screen.getByRole('button', { name: '장착아이템' }))
     expect(screen.getByTestId('엔트리-줄-0').textContent).toContain('봉은중')
     키('Enter')
-    expect(알림글()).toContain('창 종류 3')
+    expect(screen.getByRole('group', { name: '장비' })).toBeTruthy()
+    expect(screen.getByTestId('장비-선수').textContent).toContain('봉은중')
+
+    키('Enter') // 부위 0 → 칸 목록
+    키('Enter') // 칸 0 — 투수 앞 44칸 4 × 10 = 40 ≤ 50
+    expect(알림글()).toContain('소모됩니다')
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+    expect(알림글()).toContain('해당 장비를 장착 했습니다')
+    fireEvent.click(screen.getByRole('button', { name: 'OK' }))
+    const saved = store.load() as { state: { record: { money: number } } ; roster: { pitchers: { equipment?: number[] }[] } }
+    expect(saved.state.record.money).toBe(10)
+    expect(saved.roster.pitchers.some((player) => player.equipment?.[0] === 1)).toBe(true)
+
+    키('Enter') // 같은 칸을 다시 — 지금 낀 것
+    expect(알림글()).toContain('이미 가지고 있는')
     fireEvent.click(screen.getByRole('button', { name: 'OK' }))
 
+    키('Escape') // 칸 → 부위
+    키('Escape') // 부위 → 0xdf
+    expect(screen.getByTestId('엔트리-줄-0')).toBeTruthy()
     키('Escape')
     expect(screen.getByRole('button', { name: '장착아이템' })).toBeTruthy()
   })

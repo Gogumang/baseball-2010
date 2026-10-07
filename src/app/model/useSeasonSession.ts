@@ -264,6 +264,16 @@ export interface SeasonEventPlayback {
   readonly serial: number
 }
 
+/** `equipSeasonPlayer` 의 인자 */
+export interface SeasonEquipPurchase {
+  readonly isPitcher: boolean
+  readonly recordIndex: number
+  /** 새 소지금 (100만 원 단위) */
+  readonly money: number
+  /** 새 니블 네 칸 */
+  readonly equipment: readonly number[]
+}
+
 export interface SeasonActions {
   readonly chooseTeam: (teamId: number) => void
   readonly goto: (scene: SeasonSceneState) => void
@@ -286,6 +296,11 @@ export interface SeasonActions {
   readonly resetSeason: () => void
   /** 트레이드 한 번이 끝났다 (0xe7) — 커맨드 표시·명단·G 를 **한 번에** 적어 넣는다 */
   readonly finishTrade: (settlement: TradeSettlement) => void
+  /**
+   * 장비 창 0xdc(종류 3)의 구매 확정 — 0x7d90 결과 0x14: 소지금과 그 선수(팀 레코드 칸)의 장비 니블을 **한 번에** 커밋한다.
+   * `recordIndex` 는 선수 고르기 0xdf 목록(레코드 차례 — 투수는 로테이션으로 섞인 차례)의 칸이다.
+   */
+  readonly equipSeasonPlayer: (purchase: SeasonEquipPurchase) => void
   readonly playNextGame: () => void
   /** 관리 메뉴의 "다음경기" — 다음경기 화면 0xd8 로 (들어옴 0x4cb8: phase = 4 · 저장) */
   readonly openNextGame: () => void
@@ -1342,6 +1357,26 @@ export function useSeasonSession(
    * 레코드(SR+0x56)·명단·G(저장+0x64)가 한꺼번에 바뀌므로 **한 번에 커밋한다** —
    * `updateRecord` 와 `updateRoster` 를 잇달아 부르면 같은 `save` 를 보고 한쪽이 덮인다.
    */
+  const equipSeasonPlayer = useCallback(
+    (purchase: SeasonEquipPurchase) => {
+      const current = latestSave.current
+      if (current === null) return
+      const myTeamId = current.state.record.teamId
+      const rosterIndex = purchase.isPitcher
+        ? recordPitcherIndexOf(current, myTeamId, current.roster, purchase.recordIndex)
+        : purchase.recordIndex
+      const players = purchase.isPitcher ? current.roster.pitchers : current.roster.batters
+      if (players[rosterIndex] === undefined) return
+      const replaced = players.map((player, index) => (index === rosterIndex ? { ...player, equipment: purchase.equipment } : player))
+      commit({
+        ...current,
+        state: { ...current.state, record: { ...current.state.record, money: purchase.money } },
+        roster: purchase.isPitcher ? { ...current.roster, pitchers: replaced } : { ...current.roster, batters: replaced },
+      })
+    },
+    [commit],
+  )
+
   const finishTrade = useCallback(
     (settlement: TradeSettlement) => {
       if (save === null) return
@@ -2508,7 +2543,8 @@ export function useSeasonSession(
     menuCursors,
     notice,
     actions: {
-      chooseTeam, goto, updateRecord, updateRoster, removeHallOfFamer, removeCareerPlayer, resetSeason, finishTrade, playNextGame,
+      chooseTeam, goto, updateRecord, updateRoster, removeHallOfFamer, removeCareerPlayer, resetSeason, finishTrade, equipSeasonPlayer,
+      playNextGame,
       openNextGame, confirmNextGame, cancelNextGame, confirmIncome, confirmDayResults,
       answerTradeRequest, cancelTradeRequest, closeTradeResult, moveMenuCursor,
       choosePreGameAce: choosePreGameAceAction, cancelPreGameAce: cancelPreGameAceAction,

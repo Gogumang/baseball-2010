@@ -49,6 +49,10 @@ export type { SeasonOwnedItemsScreenProps } from '@/pages/season/ui/SeasonOwnedI
 export { SeasonRecordPickPopup, SeasonRecordRankScreen } from '@/pages/season/ui/SeasonRecordRankScreen'
 export type { SeasonRecordPickPopupProps, SeasonRecordRankScreenProps } from '@/pages/season/ui/SeasonRecordRankScreen'
 
+/** 장비 창 0xdc (종류 3) — 아이템 → 장착아이템 → 선수 고르기 0xdf 목적 1 → 확인 */
+export { SeasonEquipmentScreen } from '@/pages/season/ui/SeasonEquipmentScreen'
+export type { SeasonEquipmentScreenProps } from '@/pages/season/ui/SeasonEquipmentScreen'
+
 /** 공용 선수 고르기 0xdf (목적 1·2) → 선수 카드 0xd9 ↔ 능력치 상세 창 0xda (글 0x897e8) */
 export { SeasonPlayerPickScreen } from '@/pages/season/ui/SeasonPlayerPickScreen'
 export type { SeasonPlayerPickScreenProps } from '@/pages/season/ui/SeasonPlayerPickScreen'
