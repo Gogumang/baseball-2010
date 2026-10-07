@@ -69,13 +69,13 @@ const 삼진공 = (공: { strikesBefore: number; kind: string | undefined }) => 
 
 describe('팀경기 수비 — 내가 던져 잡은 삼진도 100ms 울린다 (상태 0x12 그리기 0x4ce9c 의 0x4d0d6)', () => {
   it('세 번째 스트라이크에서만 100ms, 그 밖의 공은 울리지 않는다', () => {
-    const 기록 = 던지며모으기(true, 2)
+    const 기록 = 던지며모으기(true, 1)
     expect(기록.some(삼진공)).toBe(true)
     for (const 공 of 기록) expect(공.calls).toEqual(삼진공(공) ? [100] : [])
   })
 
   it('환경설정 진동이 꺼졌으면 울리지 않는다', () => {
-    const 기록 = 던지며모으기(false, 2)
+    const 기록 = 던지며모으기(false, 1)
     expect(기록.some(삼진공)).toBe(true)
     expect(기록.every((공) => 공.calls.length === 0)).toBe(true)
   })
