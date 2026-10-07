@@ -43,8 +43,8 @@ const BALL: PitchOutcomeDetail = {
   contactSoundId: null,
 }
 
-describe('나리 타자편 기록 달성 알림 — 칸 채우기 0x4e600 은 원본 공 끝에', () => {
-  it('볼넷 타석의 내 몫(2볼넷 34)은 그 공 끝에 들고, 같은 걸음의 자동 타석 몫(동료 3루타 0)은 다음 공 끝에 든다', () => {
+describe('나리 타자편 기록 달성 알림 — 칸 채우기 0x4e600 은 원본 공 끝(0x12 대기 끝)에', () => {
+  it('볼넷 타석의 내 몫(2볼넷 34)은 31틱 뒤에 들고, 같은 걸음의 자동 타석 몫(동료 3루타 0)은 다음 공 끝에 든다', () => {
     const started = startGame(createSeededRandom(20101007))
     const base: GameProgress = {
       ...started,
@@ -80,11 +80,16 @@ describe('나리 타자편 기록 달성 알림 — 칸 채우기 0x4e600 은 �
       화면.onPitchResolved!(BALL)
       rerender(<GameRoute {...props(after, 0)} />)
     })
+    // 상태 틱 31 에 칸이 차고 그 다음 갱신의 0x4e35c 가 그린다
+    tick(31)
+    expect(화면.recordAlert?.rows ?? []).toHaveLength(0)
     tick()
     expect(화면.recordAlert?.rows.map((row) => row.slot)).toEqual([0])
 
     // 다음 사람 공(볼 하나) 끝 — 줄에 남은 동료 몫이 든다
     act(() => 화면.onPitchResolved!(BALL))
+    tick(15)
+    expect(화면.recordAlert?.rows.map((row) => row.slot)).toEqual([0])
     tick()
     expect(화면.recordAlert?.rows.map((row) => row.slot)).toEqual([0, 1])
   })

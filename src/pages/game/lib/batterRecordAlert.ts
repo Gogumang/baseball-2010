@@ -3,6 +3,20 @@ import { recordBatterAtBat } from '@/entities/game/model/batterGameLog'
 import { backToBackRecordOf } from '@/entities/game/model/gameRecords'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 
+/**
+ * 상태 0x12(맞히지 못한 공 결과) 갱신 0x4e6d4 의 대기 틱 — 판정 st[0xb] 가 3(볼넷) · 4(사구) · 5(삼진)면 0x1f,
+ * 아니면 0xf (0x4e6de~0x4e6f0). 상태 틱 [+0x2c] 가 이 값에 닿은 갱신에서 판정 A 0xae24c 와 칸 채우기 0x4e600(0x4e796)이 돈다.
+ * `outcomeAfter` 는 이 공으로 끝난 타석 결과(안 끝났으면 null)다. 4 = 사구는 0x9d57c 머리(0x9d582)로 확정, 3 = 볼넷 · 5 = 삼진은
+ * 판정 A 가 3·4 를 밀어내기 0x17 로, 5·0xd 를 다음 타자 0xd 로 보내는 갈래로 읽은 것이다(R10 6절 — 0x9d57c 본문은 안 읽음).
+ */
+export const RESULT_WAIT_TICKS = 0xf
+export const RESULT_WAIT_TICKS_AT_BAT_END = 0x1f
+
+export function resultWaitTicksOf(outcomeAfter: AtBatOutcome | null): number {
+  const kind = outcomeAfter?.kind
+  return kind === '볼넷' || kind === '사구' || kind === '삼진' ? RESULT_WAIT_TICKS_AT_BAT_END : RESULT_WAIT_TICKS
+}
+
 /** 사람 장면의 공 하나에 붙는 플레이 기록 — 8 도루 성공(주자 판) · 32·33 연속 파울. 자동 타석(0x21)에서는 안 나온다 */
 const HUMAN_PLAY_RECORD_IDS: ReadonlySet<number> = new Set([8, 32, 33])
 

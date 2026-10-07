@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { startGame } from '@/features/play-game/model/gameFlow'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
-import { batterHumanRecordCountOf, myAtBatRecordCountOf } from '@/pages/game/lib/batterRecordAlert'
+import {
+  RESULT_WAIT_TICKS, RESULT_WAIT_TICKS_AT_BAT_END, batterHumanRecordCountOf, myAtBatRecordCountOf, resultWaitTicksOf,
+} from '@/pages/game/lib/batterRecordAlert'
 
 const base = startGame(createSeededRandom(20101007))
 
@@ -10,6 +12,17 @@ const withStats = (progress: GameProgress, patch: Partial<GameProgress['myStats'
   ...progress,
   ...rest,
   myStats: { ...progress.myStats, ...patch },
+})
+
+describe('0x12 대기 틱 (0x4e6de~0x4e6f0)', () => {
+  it('st[0xb] 가 3 볼넷 · 4 사구 · 5 삼진이면 31, 아니면 15', () => {
+    expect(RESULT_WAIT_TICKS).toBe(15)
+    expect(RESULT_WAIT_TICKS_AT_BAT_END).toBe(31)
+    expect(resultWaitTicksOf({ kind: '볼넷' })).toBe(31)
+    expect(resultWaitTicksOf({ kind: '사구' })).toBe(31)
+    expect(resultWaitTicksOf({ kind: '삼진' })).toBe(31)
+    expect(resultWaitTicksOf(null)).toBe(15)
+  })
 })
 
 describe('타자편 공 끝 몫 — 내 공 몫만 이번에, 자동 타석 몫은 다음 공 끝에', () => {
