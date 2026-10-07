@@ -383,6 +383,7 @@ export interface PlayerCareer {
   /** 연속 기록 (전역 저장 +0x1bc) — 2안타 이상 경기 · 홈런 경기 · 무안타 경기 */
   readonly streaks: { readonly multiHit: number; readonly homeRun: number; readonly hitless: number }
   readonly wins: number
+  /** 원본에 없는 칸 — 나리 경기는 무승부로 끝나지 않아(0xb68fc · 정산 4f072) 늘 0 이다. 옛 화면(성적 · 시즌 종료)이 읽어 남겨 둔다 */
   readonly draws: number
   readonly losses: number
 }
@@ -865,11 +866,12 @@ export function applyGameResult(career: PlayerCareer, summary: GameSummary): Pla
             { teamId: summary.opponentTeamId, staminas: summary.pitcherStaminas.opponent },
           ]),
         }),
-    // 무승부는 원본도 승·패 어디에도 넣지 않는다.
+    // 정산 0x4ea0c 모드 4 → 4f020 → 4f072: 측 1 점수 > 측 0 점수 ? 측 1 승 : 측 0 승 — 무승부 갈래가 없다.
+    // 경기 끝 0xb68fc 가 동점이면 끝을 안 내 경기는 늘 갈리므로(웹 경기도 연장 상한이 없다 — `gameState`) 이긴 쪽 = 점수가 많은 쪽이다.
     // **포스트시즌 중에는 정규시즌 전적을 건드리지 않는다** — 0xb76dc 가 포스트시즌 플래그로 갈라져
     // 시리즈 승수만 깎는다. 그래서 45경기 뒤에 치른 경기가 순위표에 더 쌓이지 않는다.
     league:
-      summary.result === '무' || career.postseason !== null
+      career.postseason !== null
         ? career.league
         : recordLeagueResult(
             career.league,
@@ -878,15 +880,14 @@ export function applyGameResult(career: PlayerCareer, summary: GameSummary): Pla
           ),
     // 포스트시즌 경기는 시리즈 승수로 들어간다 (0xb76dc 포스트시즌 분기)
     postseason:
-      career.postseason === null || summary.result === '무'
+      career.postseason === null
         ? career.postseason
         : advancePostseason(
             career.postseason,
             summary.result === '승' ? summary.ourTeamId : summary.opponentTeamId,
           ),
     wins: career.wins + (summary.result === '승' ? 1 : 0),
-    draws: career.draws + (summary.result === '무' ? 1 : 0),
-    losses: career.losses + (summary.result === '패' ? 1 : 0),
+    losses: career.losses + (summary.result === '승' ? 0 : 1),
   }
 }
 

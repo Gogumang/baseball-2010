@@ -13,8 +13,8 @@ import { MAXIMUM_GAME_POINT } from '@/entities/career/model/playerCareer'
  * ```
  * 곧 **동점이면 선공(측 0) 팀이 이긴다** — 대회 중이면 0xb76dd/0xb77e1 이 4국 승패(L+0xb0/L+0xb4)와 결승 날 우승국(L+0xc4)으로 간다.
  * 풀리그는 대한민국이 늘 후공이라 동점이면 대한민국 패, 결승에서 대한민국이 2위(선공)면 동점이면 대한민국 승이다.
- * 원본 경기는 연장 상한이 없어(경기 끝 0xb68fc) 동점으로 끝나지 않지만, 웹 경기는 30회 상한(`MAXIMUM_INNINGS`)이 있어 날 수 있다 —
- * 그때도 원본 비교식 그대로 가른다.
+ * 원본 경기는 연장 상한이 없어(경기 끝 0xb68fc) 동점으로 끝나지 않는다 — 웹 경기도 같다(`gameState`, a875ace). 비교식은 원본 모양
+ * 그대로 둔다.
  */
 export interface NariCupGameScore {
   /** 내 팀(대한민국)이 앉은 측 — 0 선공 · 1 후공 (`nationalCupSideOf`) */

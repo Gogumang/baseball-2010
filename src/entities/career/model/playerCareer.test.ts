@@ -48,14 +48,13 @@ describe('리그 전적 — 0xb76dc · 0xb77e0', () => {
   const 경기 = (overrides = {}) =>
     ({ result: '승', stats: EMPTY_SEASON_STATS, recordIds: [], ourTeamId: 0, opponentTeamId: 3, ...overrides }) as unknown as GameSummary
 
-  it('내 팀 경기 결과를 승·패에 넣는다 — 무승부는 어느 쪽도 세지 않는다', () => {
+  it('내 팀 경기 결과를 승·패에 넣는다 — 정산 4f072 에 무승부 갈래가 없다', () => {
     const 이김 = applyGameResult(createCareer('선수'), 경기())
     expect([이김.league.wins[0], 이김.league.losses[3]]).toEqual([1, 1])
 
     const 짐 = applyGameResult(createCareer('선수'), 경기({ result: '패' }))
     expect([짐.league.wins[3], 짐.league.losses[0]]).toEqual([1, 1])
-
-    expect(applyGameResult(createCareer('선수'), 경기({ result: '무' })).league).toEqual(EMPTY_LEAGUE)
+    expect([짐.wins, 짐.draws, 짐.losses]).toEqual([0, 0, 1])
   })
 })
 

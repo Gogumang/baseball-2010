@@ -471,6 +471,7 @@ export interface PitcherCareer {
   readonly midSeasonEvaluatedYears: readonly number[]
   /** 팀 전적 (내 팀이 치른 경기) */
   readonly wins: number
+  /** 원본에 없는 칸 — 나리 경기는 무승부로 끝나지 않아(0xb68fc · 정산 4f072) 늘 0 이다. 옛 화면이 읽어 남겨 둔다 */
   readonly draws: number
   readonly losses: number
 }
@@ -765,6 +766,7 @@ export function pitcherFormOfCareer(career: PitcherCareer): number {
  * (entities 는 features 를 모르는 층이라 필요한 칸만 받는 꼴로 둔다.)
  */
 export interface PitcherGameOutcome {
+  /** 경기 끝 0xb68fc 가 동점이면 끝을 안 내 '무' 는 오지 않는다 — 요약 꼴(`GameResult`)을 그대로 받는다 */
   readonly result: '승' | '패' | '무'
   readonly ourTeamId: number
   readonly opponentTeamId: number
@@ -824,8 +826,10 @@ export function applyPitcherGameResult(career: PitcherCareer, outcome: PitcherGa
     injuredGamesPlayed: career.injuredGamesPlayed + (career.isInjured ? 1 : 0),
     illnessCooldown: Math.max(0, career.illnessCooldown - 1),
     hasActedThisCycle: false,
+    // 정산 0x4ea0c 모드 3 → 4f020 → 4f072: 측 1 점수 > 측 0 점수 ? 측 1 승 : 측 0 승 — 무승부 갈래가 없다.
+    // 경기 끝 0xb68fc 가 동점이면 끝을 안 내 경기는 늘 갈린다(웹 경기도 연장 상한이 없다 — `gameState`).
     league:
-      outcome.result === '무' || career.postseason !== null
+      career.postseason !== null
         ? career.league
         : recordLeagueResult(
             career.league,
@@ -833,15 +837,14 @@ export function applyPitcherGameResult(career: PitcherCareer, outcome: PitcherGa
             outcome.result === '승' ? outcome.opponentTeamId : outcome.ourTeamId,
           ),
     postseason:
-      career.postseason === null || outcome.result === '무'
+      career.postseason === null
         ? career.postseason
         : advancePostseason(
             career.postseason,
             outcome.result === '승' ? outcome.ourTeamId : outcome.opponentTeamId,
           ),
     wins: career.wins + (outcome.result === '승' ? 1 : 0),
-    draws: career.draws + (outcome.result === '무' ? 1 : 0),
-    losses: career.losses + (outcome.result === '패' ? 1 : 0),
+    losses: career.losses + (outcome.result === '승' ? 0 : 1),
   }
 }
 
