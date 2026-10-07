@@ -4,7 +4,6 @@ import {
   applyOpponentInning,
   createGame,
   INNINGS_PER_GAME,
-  MAXIMUM_INNINGS,
   isPlayerTurn,
   opponentHalfOf,
   ourHalfOf,
@@ -155,10 +154,10 @@ describe('경기 종료 규칙 — 0xb68fc (누락 탐색 9차)', () => {
     expect([game.isFinished, game.inning, game.half]).toEqual([false, 10, '초'])
   })
 
-  it('연장은 12회까지다 — 원본 상한 코드는 없다 (추정)', () => {
-    const game = applyAtBatOutcome(우리공격상태({ inning: MAXIMUM_INNINGS, outs: 2 }), 땅볼아웃)
+  it('연장 상한이 없다 — 30회말 3아웃에도 동점이면 31회초로 간다 (0xb68fc · 0xb6b6c)', () => {
+    const game = applyAtBatOutcome(우리공격상태({ inning: 30, outs: 2 }), 땅볼아웃)
 
-    expect([game.isFinished, resultOf(game)]).toEqual([true, '무'])
+    expect([game.isFinished, game.inning, game.half]).toEqual([false, 31, '초'])
   })
 
   it('7회 이후 초 공격이 끝났을 때 우리가 10점 이상 앞서면 콜드게임', () => {

@@ -64,13 +64,15 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
  * **무승부가 없다.** 리그 구조체에 무승부 칸 자체가 없어서, 점수가 같으면 한쪽이 승으로 들어간다.
  */
 export const REGULAR_INNINGS = 9
-/**
- * **원본에는 연장 상한이 없다** (E 3d 확정): 이닝 증가 0xb6b6c 에 막는 값이 없고, 경기 끝 판정
- * 0xb68fc 는 동점이면 절대 끝내지 않으며, 점수판 0xb6988 은 `이닝 mod 9` 로 칸을 돌려 쓴다.
- * 여기 값은 무한 루프를 막는 **우리 쪽 안전망**일 뿐이라 원본 동작이 아니다 — 실제로 걸리는 일은 거의 없다.
- * (0xc262c 의 이닝 14 는 상한이 아니라 "15회에 스윙 강제" 였다. `quickAtBat.ts` 참고)
+/*
+ * **연장 상한은 없다** (E 3d 확정): CPU 끼리 경기 루프 0xc2760 · 0xc2a48 · 0xc2dac 는 `while (0xc2198(sim, 1))` 뿐이고
+ * 0xc2198 은 경기 끝 판정 0xb68fc 가 참이면 멈춘다 — 0xb68fc 는 동점이면 끝을 안 내고, 이닝 넘김 0xb6b6c 에 막는 값이
+ * 없으며, 점수판 0xb6988 은 `이닝 mod 9` 로 칸을 돌려 쓴다. 그래서 아래 루프도 점수가 갈릴 때까지 돈다
+ * (예전 웹의 30회 안전망 `MAXIMUM_INNINGS` 는 원본에 없어 뺐다). 0xc262c 의 이닝 14 는 상한이 아니라 "15회에 스윙 강제"
+ * 였다(`quickAtBat.ts`).
+ * ⚠️ 미해결(이 커밋 밖): 0xb68fc 의 콜드(이닝 > 5 · 10점 차 — 초 3아웃 뒤 홈 10점 앞섬 · 말 중 홈 10점 앞섬 · 말 3아웃 뒤
+ * 원정 10점 앞섬)를 CPU 끼리 경기는 아직 안 본다 — 반 이닝 엔진(`simulateHalfInning`)이 타석마다 끊어야 한다.
  */
-export const MAXIMUM_INNINGS = 30
 
 export interface LeagueMatchup {
   /** 먼저 공격하는 쪽 */
@@ -708,7 +710,8 @@ export function simulateLeagueGame(
   /** 승·패·세 칸 `state+0x44..+0x64` — 경기 상태 초기화 0xb6814 가 셋 다 2(없음)로 둔다 */
   let decision: DecisionState = EMPTY_DECISION_STATE
 
-  for (let inning = 1; inning <= MAXIMUM_INNINGS; inning += 1) {
+  // 상한 없이 점수가 갈릴 때까지 (0xc2198 → 0xb68fc)
+  for (let inning = 1; ; inning += 1) {
     homeMound = resynced(homeMound, homeStaminas)
     const top = simulateHalfInning(
       awayOrder,
@@ -782,7 +785,6 @@ export function simulateLeagueGame(
    *     안 나면 **승리 투수가 없다**(패전 투수는 이닝 조건이 없어 남는다). 선발 5이닝 요건 같은 진짜 규칙은 없다.
    *   - 세이브는 **한 번도 기록되지 않는다** — 후보는 교체 0xa60c0 이 잡지만 세이브 코드 `state+0x64` 를 0 으로
    *     되돌리는 곳이 없어 0xa7eaa 에 늘 걸린다 (S1 4-1, CORRECTIONS 2-1).
-   *   - 동점(웹 안전망 30이닝까지 안 갈린 경우)은 승·패 모두 없다.
    * 판정은 경기 안의 **실제 점수**로 한다 — 순위표 쪽의 칸·명단 엇갈림(`playLeagueDay`)과는 따로다.
    */
   const ended = gameEndDecisionOf(decision)

@@ -186,8 +186,8 @@ export function moraleChangeOf(won: boolean, rival: boolean): number {
  * 모드를 보지 않고 동점이면 끝을 안 내며 이닝 상한도 없다 → 점수가 갈릴 때까지 연장이다. 한 공이 끝날 때
  * 판정 A `0xae24c`(ae258) · 인플레이 끝 B `0xae3e8`(ae3f4) 가 이 함수를 불러 "경기 끝 → 0x18" 로 간다.
  * 예전 근거로 적었던 메시지 2 "경기 끝 요청"(0x50cb0, 모드 5·6 이 아니면 동점 요청 무시 — S1 6절)는 그 메시지를 상수로
- * 보내는 곳이 원본에 없어(3e04a0d) 시즌 경기의 끝을 정하지 않는다. 웹은 이닝 안전망 `MAXIMUM_INNINGS` 에 닿으면
- * 동점으로 끝나므로(원본에 없음), 그때 원본 코드 모양 그대로 판정하려고 둔다.
+ * 보내는 곳이 원본에 없어(3e04a0d) 시즌 경기의 끝을 정하지 않는다. 웹 경기도 이제 연장 상한이 없어(`gameState`) 동점으로
+ * 끝나지 않지만, 정산 4f072 의 비교식 모양 그대로 판정한다.
  */
 export function seasonHumanWonOf(myRuns: number, opponentRuns: number, mySide: 0 | 1): boolean {
   const runsOf = (side: 0 | 1) => (side === mySide ? myRuns : opponentRuns)

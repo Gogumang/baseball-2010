@@ -4,12 +4,13 @@ import { advanceRunners, EMPTY_BASES } from '@/entities/game/model/baseState'
 import type { AdvanceResult, BaseState } from '@/entities/game/model/baseState'
 
 export const INNINGS_PER_GAME = 9
-/**
- * **원본에는 연장 상한이 없다** (E 3d 확정) — 동점이면 점수가 갈릴 때까지 돈다.
- * 14회 분기는 상한이 아니라 "15회에 스윙 강제"(0xc26e0, 0-기준 0xe)였다.
- * 여기 값은 끝없는 경기를 막는 **우리 쪽 안전망**이라 원본 동작이 아니다.
+/*
+ * **연장 상한은 없다** (E 3d 확정 · 경기 끝 판정 0xb68fc 직접 떴다) — 동점이면 점수가 갈릴 때까지 돈다.
+ * b691e 이닝(s8 st+0x6b) < st+0x69(8) 이면 끝 아님 · 말 아웃 > 2 → 점수가 다르면 끝(b6934) · 그 밖은 홈이 앞설 때(b6942)와
+ * 콜드(b694c 이닝 > 5 · 10점 차 — 동점일 수 없다)뿐이고, 이닝 넘김 0xb6b6c 도 막는 값이 없다. 그래서 사람 경기(모든 모드)는
+ * 동점으로 끝나지 않는다. 예전 웹의 30회 안전망(`MAXIMUM_INNINGS`)과 그때의 무승부는 원본에 없어 뺐다.
+ * (14회 분기는 상한이 아니라 "15회에 스윙 강제"(0xc26e0, 0-기준 0xe)였다.)
  */
-export const MAXIMUM_INNINGS = 30
 /** 콜드게임 — 7회(이닝 인덱스 > 5) 이후 10점 차 (0xb68fc) */
 const COLD_GAME_FROM_INNING = BALANCE.coldGame.fromInning
 const COLD_GAME_MARGIN = BALANCE.coldGame.margin
@@ -167,11 +168,11 @@ function endTopHalf(game: GameState): GameState {
   return { ...game, half: '말', outs: 0, bases: EMPTY_BASES, isFinished: isOver }
 }
 
-/** 말 3아웃 — 마지막 이닝 이후 동점이 아니면 끝, 동점이면 연장(상한은 우리 쪽 안전망). 7회 이후 원정팀이 10점 앞서면 콜드 */
+/** 말 3아웃 — 마지막 이닝 이후 동점이 아니면 끝, 동점이면 상한 없이 연장(0xb6934). 7회 이후 원정팀이 10점 앞서면 콜드 */
 function endBottomHalf(game: GameState): GameState {
   const isTied = game.ourScore === game.opponentScore
   const isLastInning =
-    (game.inning >= INNINGS_PER_GAME && (!isTied || game.inning >= MAXIMUM_INNINGS)) ||
+    (game.inning >= INNINGS_PER_GAME && !isTied) ||
     (game.inning >= COLD_GAME_FROM_INNING && awayScoreOf(game) - homeScoreOf(game) >= COLD_GAME_MARGIN)
 
   return {
