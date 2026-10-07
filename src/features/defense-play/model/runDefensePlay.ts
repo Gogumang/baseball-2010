@@ -831,6 +831,7 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     skillIds: input.fielderSkillIds?.[forecast.choice.slot],
     gameMode: input.gameMode,
     chaserSlot: forecast.choice.slot,
+    buntKind: input.buntKind ?? 0,
   })
   // ── 필살수비가 열리면 표시 패턴으로 바꿔 쏜다 — 5107c 점프 0xb097c(목록 비트 2) · 5112c 슬라이딩 0xb09ac(목록 비트 3) ──
   // 장면 덱(덱을 섞을 때 만든 두 목록)에서 rand(0, 개수) 로 한 장을 골라 쏠 패턴의 (a, b, c) 를 덮는다(`displayPatternOf`).
@@ -2584,12 +2585,20 @@ interface SpecialDefenseRollInput {
   readonly skillIds?: readonly number[]
   readonly gameMode?: number
   readonly chaserSlot: number
+  /** state[0x13] — 번트 종류 (0 = 스윙) */
+  readonly buntKind: number
 }
 
 /**
- * 필살수비 굴림의 관문 (0x50faa 가지, I-controls 2c).
- * 모드 7(홈런더비) 제외 · 공 쫓는 야수가 투수(0)·포수(1)가 아닐 것 — 나머지 조건(경기+0x13·0x19·0x1e,
- * 담장 판정 0x36140)은 이 진행기가 도는 시점에 이미 참이다(페어 인플레이 타구만 돌린다).
+ * 필살수비 굴림의 관문 (0x50faa 가지, I-controls 2c — 직접 뜬 것):
+ * ```
+ * 50fba  [장면+0x1104](모드) == 7 → 굴림 없음
+ * 50fc0  0x36140(장면) ≠ 0 → 굴림 없음
+ * 50fc8  (s8)state[0x13](번트 종류) ≠ 0 → 굴림 없음          ; 번트 타구는 필살수비를 안 굴린다
+ * 50fda  장면+0xfe8 == 0 이면 A 0x50930 · 아직 0 이면 B 0x508c0
+ * ```
+ * 0x50930 · 0x508c0 안에서 공 쫓는 야수가 투수(0)·포수(1)면 굴리지 않는다. 나머지 조건(경기+0x19·0x1e, 담장 판정 0x36140)은
+ * 이 진행기가 도는 시점에 이미 참이다(페어 인플레이 타구만 돌린다).
  */
 function rollSpecialDefenseFor(input: SpecialDefenseRollInput): {
   readonly jumpUnlocked: boolean
@@ -2598,6 +2607,7 @@ function rollSpecialDefenseFor(input: SpecialDefenseRollInput): {
   const 닫힘 = { jumpUnlocked: false, slideUnlocked: false }
   if (input.random === undefined) return 닫힘
   if (input.gameMode === HOME_RUN_DERBY_MODE) return 닫힘
+  if (input.buntKind !== 0) return 닫힘
   if (input.chaserSlot === 0 || input.chaserSlot === 1) return 닫힘
   return rollSpecialDefense(input.ability, input.random, {
     hasSixthSense: input.skillIds?.includes(SIXTH_SENSE_SKILL_ID) === true,

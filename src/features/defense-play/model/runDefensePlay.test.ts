@@ -444,6 +444,11 @@ describe('확률 굴림은 난수를 줘야 돈다 — 펌블 · 악송구 · �
     })
     expect(홈런더비.specialDefense).toEqual({ jumpUnlocked: false, slideUnlocked: false })
   })
+
+  it('번트 타구(state[0x13] ≠ 0)는 필살수비를 안 굴린다 — 관문 50fc8', () => {
+    const 번트 = 굴림포함(고정난수(0), { trajectory: battedBallTrajectory(깊은뜬공), outcome: 뜬공아웃, buntKind: 1 })
+    expect(번트.specialDefense).toEqual({ jumpUnlocked: false, slideUnlocked: false })
+  })
 })
 
 describe('사람 조작 — 상태 0x17 키 표 (I-controls 0·2b·2d·3b)', () => {
