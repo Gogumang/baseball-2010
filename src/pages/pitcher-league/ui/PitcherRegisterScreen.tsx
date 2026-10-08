@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { MarkupText, MessageBox, Panel, PixelScreen, StatGrid, TextField } from '@/shared/ui'
 import type { StatEntry } from '@/shared/ui'
 import { TEAMS } from '@/shared/config/original/teams'
@@ -22,6 +22,7 @@ import {
 import type { PitcherRookieProfile } from '@/entities/pitcher-career/model/pitcherRegistration'
 import { DEFAULT_TEAM_ID } from '@/entities/pitcher-career/model/pitcherCareer'
 import { pitchTypeNameOf } from '@/entities/pitcher-career/model/pitchTraining'
+import { nameWithoutLastChar, registerKeyOf, registerKeyOutcomeOf } from '@/pages/create-player/lib/registerKeys'
 import * as styles from '@/pages/pitcher-league/ui/PitcherRegisterScreen.css'
 
 /**
@@ -74,7 +75,6 @@ export function PitcherRegisterScreen({
   const [phase, setPhase] = useState<Phase>('등록')
   const [popup, setPopup] = useState<PitchPopup | null>(null)
 
-  const trimmedName = name.trim()
   const ability = rookiePitcherAbilityOf(profile.role, profile.typeIndex)
 
   /** 0x67 OK 칸(8) — 0x12410: 고른 수 ≤ 1 이면 StrMODE[13], 아니면 StrMODE[2] */
@@ -105,6 +105,47 @@ export function PitcherRegisterScreen({
     })
   }
 
+  /**
+   * 키 — 0x66 줄 고르기는 타자편과 같은 갱신 0x16f28 이다(`registerKeyOutcomeOf`, 마지막 줄 OK 만 0x67 로).
+   * 0x67 은 OK = OK 칸(8) · CLR = 0x66 (0x12410). ⚠️ 0x67 격자 [this+0x88] 의 칸 옮기기 키는 아직 웹에 없다(누르기만).
+   */
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (popup !== null) return
+      const isTyping = event.target instanceof HTMLInputElement
+      if (phase === '변화구') {
+        const key = registerKeyOf(event.key, false)
+        if (key === 'clr') setPhase('등록')
+        else if (key === 'ok') pressPitchOk()
+        else return
+        return event.preventDefault()
+      }
+      const row = ROW_ORDER.indexOf(selectedRow)
+      const key = registerKeyOf(event.key, selectedRow === '이름')
+      if (key !== null) {
+        const outcome = registerKeyOutcomeOf(row, key, name.length)
+        if (outcome.kind === 'deleteChar' && isTyping && event.key === 'Backspace') return
+        event.preventDefault()
+        if (outcome.kind === 'cancel') return onCancel()
+        if (outcome.kind === 'deleteChar') return setName(nameWithoutLastChar(name))
+        if (outcome.kind === 'finish') return setPhase('변화구')
+        if (outcome.kind === 'move') {
+          const nameInput = document.querySelector<HTMLInputElement>('input[aria-label="이름"]')
+          if (outcome.row === 0) nameInput?.focus()
+          else nameInput?.blur()
+          setSelectedRow(ROW_ORDER[outcome.row] ?? '이름')
+        }
+        return
+      }
+      if ((event.key === 'ArrowLeft' || event.key === 'ArrowRight') && !isTyping && selectedRow !== '이름') {
+        event.preventDefault()
+        changeValue(selectedRow, event.key === 'ArrowRight' ? 1 : -1)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  })
+
   const abilityEntries: readonly StatEntry[] = PITCHER_ABILITY_ORDER.map((key, slot) => ({
     label: PITCHER_ABILITY_NAMES[slot],
     value: ability[key],
@@ -116,7 +157,7 @@ export function PitcherRegisterScreen({
       badge={(TEAMS[teamId] ?? TEAMS[0]).name}
       leftKey={{ label: '취소', onPress: phase === '등록' ? onCancel : () => setPhase('등록') }}
       rightKey={phase === '등록'
-        ? { label: '등록', onPress: () => setPhase('변화구'), isDisabled: trimmedName.length === 0 }
+        ? { label: '등록', onPress: () => setPhase('변화구'), isDisabled: name.length === 0 }
         : { label: 'OK', onPress: pressPitchOk }}
     >
       {phase === '등록' && <Panel heading="기본 정보">
@@ -182,7 +223,7 @@ export function PitcherRegisterScreen({
         <MessageBox
           text={CONFIRM_TEXT}
           buttons={['예', '아니오']}
-          onAnswer={(index) => (index === 0 ? onCreate(trimmedName, profile) : setPopup(null))}
+          onAnswer={(index) => (index === 0 ? onCreate(name, profile) : setPopup(null))}
         />
       )}
     </PixelScreen>

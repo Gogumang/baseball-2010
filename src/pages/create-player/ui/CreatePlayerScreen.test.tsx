@@ -45,6 +45,7 @@ describe('선수 등록 배치', () => {
 
   it('아래 키로 줄을 옮기면 커서가 원본 순서(이름 → 타입)로 내려간다', () => {
     화면()
+    이름넣기('테스트')
 
     fireEvent.keyDown(window, { key: 'ArrowDown' })
 
@@ -78,6 +79,73 @@ describe('선수 등록 배치', () => {
     fireEvent.click(screen.getByRole('button', { name: '손 다음' }))
 
     expect(screen.getByText('좌타')).toBeTruthy()
+  })
+})
+
+describe('선수 등록 — 줄 고르기 키 (0x16f28)', () => {
+  const 줄 = (row: number) => {
+    const rect = cursorRectOf(row)
+    expect(커서().style.top).toBe(`${rect.y}px`)
+  }
+  const 키 = (key: string) => fireEvent.keyDown(window, { key })
+
+  it('이름이 비면 OK · ↓ 를 받지 않는다', () => {
+    화면()
+    키('Enter')
+    키('ArrowDown')
+    줄(0)
+  })
+
+  it('OK 는 다음 줄로, 마지막 줄(피부)에서만 확인 상자다', () => {
+    화면()
+    이름넣기('테스트')
+    for (let row = 1; row <= 4; row += 1) {
+      키('Enter')
+      줄(row)
+    }
+    expect(screen.queryByText(/이대로 결정/)).toBeNull()
+
+    키('Enter')
+    expect(screen.getByText(/이대로 결정/)).toBeTruthy()
+  })
+
+  it('줄 목록은 끝에서 멈춘다 — 감지 않는다 (꼴 0)', () => {
+    화면()
+    이름넣기('테스트')
+    키('ArrowUp')
+    줄(0)
+    for (let step = 0; step < 6; step += 1) 키('ArrowDown')
+    줄(4)
+  })
+
+  it('CLR 은 다른 줄에선 위로, 이름 줄에선 한 글자를 지우고 비었을 때만 팀 고르기로', () => {
+    let cancelled = 0
+    render(<CreatePlayerScreen onCreate={() => {}} onCancel={() => { cancelled += 1 }} />)
+    이름넣기('AB')
+    키('ArrowDown')
+    키('ArrowDown')
+    키('Escape')
+    줄(1)
+    키('Escape')
+    줄(0)
+
+    키('Escape')
+    expect((screen.getByRole('textbox') as HTMLInputElement).value).toBe('A')
+    expect(cancelled).toBe(0)
+    키('Escape')
+    expect(cancelled).toBe(0)
+    키('Escape')
+    expect(cancelled).toBe(1)
+  })
+
+  it('이름은 다듬지 않는다 — 공백도 글자다 (strlen)', () => {
+    let created = ''
+    화면((name) => { created = name })
+    이름넣기(' ')
+    fireEvent.click(screen.getByRole('button', { name: '등록' }))
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+
+    expect(created).toBe(' ')
   })
 })
 

@@ -88,6 +88,19 @@ describe('투수 등록 화면', () => {
     expect(눌림('SINKER')).toBe('true')
   })
 
+  it('키: 마지막 줄(피부)에서 OK 를 누르면 변화구 고르기로, CLR 은 등록 줄로 (0x16f28 · 0x12410)', () => {
+    화면()
+    이름넣기('투수')
+    for (let row = 0; row < 4; row += 1) fireEvent.keyDown(window, { key: 'Enter' })
+    expect(screen.queryByRole('button', { name: 'TWO-SEAM' })).toBeNull()
+
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(screen.getByRole('button', { name: 'TWO-SEAM' })).toBeTruthy()
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.getByLabelText('이름')).toBeTruthy()
+  })
+
   it('CLR 로 등록 줄에 돌아갔다 와도 고른 변화구가 남는다', () => {
     화면()
     이름넣기('테스트')

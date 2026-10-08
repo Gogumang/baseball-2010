@@ -18,6 +18,8 @@ import {
   INFO_FRAME, ROOKIE_BATTING_ORDER, ROW_HINTS, ROW_ORDER, choiceStepped, cursorRectOf, isCursorVisibleAt,
 } from '@/pages/create-player/lib/createPlayerLayout'
 import type { CreatePlayerRowId, InfoCellId } from '@/pages/create-player/lib/createPlayerLayout'
+import { nameWithoutLastChar, registerKeyOf, registerKeyOutcomeOf } from '@/pages/create-player/lib/registerKeys'
+import type { RegisterKey } from '@/pages/create-player/lib/registerKeys'
 import * as styles from '@/pages/create-player/ui/CreatePlayerScreen.css'
 
 const MODE_UI = './sprites/mode_ui/frames'
@@ -56,7 +58,6 @@ export function CreatePlayerScreen({ teamId = DEFAULT_TEAM_ID, onCreate, onCance
   const labelOrigins = useFrameOrigins(IMG_TEXT)
   const uiOrigins = useFrameOrigins(MODE_UI)
 
-  const trimmedName = name.trim()
   const ability = rookieAbilityOf(profile.battingTypeIndex, profile.positionIndex)
   const selectedId = ROW_ORDER[selectedRow]
 
@@ -75,9 +76,27 @@ export function CreatePlayerScreen({ teamId = DEFAULT_TEAM_ID, onCreate, onCance
     setProfile((previous) => choiceStepped(previous, id, step))
   }
 
+  // 빈 이름으로는 확인할 수 없다 (R11 1b — 원본 입력기도 strlen 0 이면 OK 를 안 받는다). 공백도 글자다 (strlen 만)
   const askToCreate = () => {
-    // 빈 이름으로는 확인할 수 없다 (R11 1b — 원본 입력기도 strlen 0 이면 OK 를 안 받는다)
-    if (trimmedName.length > 0) setIsConfirming(true)
+    if (name.length > 0) setIsConfirming(true)
+  }
+
+  /** 줄 고르기 키 (0x16f28, `registerKeyOutcomeOf`). 이름 칸을 떠나면 입력 초점을 놓아 좌우가 값 바꾸기로 간다 */
+  const pressRowKey = (key: RegisterKey, isNativeDelete: boolean): boolean => {
+    const outcome = registerKeyOutcomeOf(selectedRow, key, name.length)
+    if (outcome.kind === 'cancel') onCancel()
+    else if (outcome.kind === 'deleteChar') {
+      // 입력칸 안의 Backspace 는 브라우저가 한 글자를 지운다 — 두 번 지우지 않는다
+      if (isNativeDelete) return false
+      setName(nameWithoutLastChar(name))
+    } else if (outcome.kind === 'finish') setIsConfirming(true)
+    else if (outcome.kind === 'move') {
+      const nameInput = document.querySelector<HTMLInputElement>('input[aria-label="이름"]')
+      if (outcome.row === ROW_ORDER.indexOf('이름')) nameInput?.focus()
+      else nameInput?.blur()
+      setSelectedRow(outcome.row)
+    }
+    return true
   }
 
   // 커서 깜빡임용 틱. 원본은 게임 루프의 갱신 횟수([this+0x2c])를 그대로 쓴다
@@ -88,15 +107,12 @@ export function CreatePlayerScreen({ teamId = DEFAULT_TEAM_ID, onCreate, onCance
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if (isConfirming) return
       const isTyping = event.target instanceof HTMLInputElement
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        return onCancel()
-      }
-      if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-        event.preventDefault()
-        const step = event.key === 'ArrowDown' ? 1 : -1
-        return setSelectedRow((previous) => (previous + step + ROW_ORDER.length) % ROW_ORDER.length)
+      const rowKey = registerKeyOf(event.key, selectedId === '이름')
+      if (rowKey !== null) {
+        if (pressRowKey(rowKey, isTyping && event.key === 'Backspace')) event.preventDefault()
+        return
       }
       // 이름 칸에서는 좌우가 글자 커서 몫이다 (원본 입력기도 좌우를 입력 모드 전환에 쓴다)
       if ((event.key === 'ArrowLeft' || event.key === 'ArrowRight') && !isTyping && selectedId !== '이름') {
@@ -163,7 +179,7 @@ export function CreatePlayerScreen({ teamId = DEFAULT_TEAM_ID, onCreate, onCance
             <img className={styles.layer} alt="" src={frameSrc(IMG_TEXT, cell.labelFrame)}
               style={{ left: cell.label.x + cell.label.width - labelWidthOf(cell.labelFrame), top: cell.value.y + 3 }} />
             {cell.id === '이름' ? (
-              <form onSubmit={(event) => { event.preventDefault(); askToCreate() }}>
+              <form onSubmit={(event) => event.preventDefault()}>
                 <TextField className={styles.nameInput} value={name} autoFocus aria-label="이름"
                   style={{ left: cell.value.x, top: cell.value.y, width: cell.value.width, height: cell.value.height }}
                   onFocus={() => setSelectedRow(ROW_ORDER.indexOf('이름'))}
@@ -217,7 +233,7 @@ export function CreatePlayerScreen({ teamId = DEFAULT_TEAM_ID, onCreate, onCance
       </Button>
       <Button variant="corner" className={styles.actionButton}
         style={{ left: ACTION_ROW.rightX - 40, top: ACTION_ROW.y, width: 40 }}
-        disabled={trimmedName.length === 0} onClick={askToCreate}>
+        disabled={name.length === 0} onClick={askToCreate}>
         등록
       </Button>
 
@@ -229,7 +245,7 @@ export function CreatePlayerScreen({ teamId = DEFAULT_TEAM_ID, onCreate, onCance
         <MessageBox
           text="!C이대로 결정 하시겠습니까?"
           buttons={['예', '아니오']}
-          onAnswer={(index) => (index === 0 ? onCreate(trimmedName, profile) : setIsConfirming(false))}
+          onAnswer={(index) => (index === 0 ? onCreate(name, profile) : setIsConfirming(false))}
         />
       )}
     </RawScreen>
