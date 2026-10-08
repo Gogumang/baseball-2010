@@ -18,6 +18,7 @@ import { NO_STAGE_EFFECTS, fireworksPortOf, stepStageFrame } from '@/widgets/bat
 import { tickParticles } from '@/entities/particle/model/particleScene'
 import { enterSettlementEffect, tickSettlementEffect, type SettlementEffect } from '@/entities/batting/model/settlementEffect'
 import { skyColorsOf } from '@/widgets/batting-stage/lib/stageScenery'
+import { settlementSkyInningOf } from '@/widgets/batting-stage/lib/settlementSky'
 import { particleConfigOf } from '@/widgets/particles/lib/particleCatalog'
 import { homeRunTextFrameAt } from '@/widgets/batting-stage/lib/homeRunBanner'
 import { preloadPtcParts } from '@/widgets/particles/lib/renderParticles'
@@ -312,6 +313,9 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
         // 판이 효과 층을 깔았으면 배경 캔버스에는 배경만 — 비 · 파티클은 아래에서 그 층에 그린다
         particles: settlement?.layers === undefined ? particlesRef.current : null,
         rain: settlement?.layers === undefined ? settlementRain : null,
+        // 정산 결과 배경의 하늘 칸 — 0x4a384 는 +0x14 를 안 바꾸므로 경기 끝 이닝 그대로, 지면 진입 0x4ea0c 4f4fe~4f506 이
+        // 구장객체 +0x18 = 12 → 0x76fc5(구장, 0) 으로 마지막 칸(밤)에 둔다
+        skyInning: settlement === undefined ? null : settlementSkyInningOf(settlement),
         resultBackdropOffsetY:
           backdropStartedAt === null
             ? null

@@ -118,6 +118,11 @@ export interface StageScene {
   readonly resultBackdropOffsetY?: number | null
   /** 경기 정산 비(종류 0) — 결과 배경 위에 빗방울 선 · 튐 점을 그린다 (0x8f8ec · 0x8fb08) */
   readonly rain?: SceneRain | null
+  /**
+   * 하늘 칸(구장객체 +0x14)을 HUD 이닝 대신 이 값으로 — 정산 결과 배경이 쓴다(HUD 가 없다). 이기면 경기 끝 이닝 그대로,
+   * 지면 정산 진입 0x4ea0c 가 0x76fc5 로 12 칸에 둔다. 없으면 HUD 이닝(없으면 1).
+   */
+  readonly skyInning?: number | null
 }
 
 export function renderBattingStage(
@@ -130,7 +135,7 @@ export function renderBattingStage(
     ...scene.scenery,
     tick: scene.tick,
     side,
-    inning: scene.hud?.inning ?? 1,
+    inning: scene.skyInning ?? scene.hud?.inning ?? 1,
     ourTeamId: scene.hud?.ourTeamId ?? null,
     opponentTeamId: scene.hud?.opponentTeamId ?? null,
     offsetY: backdropOffsetY ?? 0,
