@@ -687,22 +687,16 @@ function cpuRosterOf(save: SeasonSave | null, teamId: number): SeasonTeamRoster 
 }
 
 /**
- * CPU 끼리 경기(0xc2a48 · 0xc2760 → 준비 0xc239c → 0xb891c·0xb8680)가 읽는 팀 레코드 — 저장에 명단이 있는 팀(트레이드로
- * 바뀌었거나 새 해 장비 굴림 0x665e8 이 니블을 쓴 팀)만 칸마다 붙박이 표 자리(`tableTeamOf` 팀 · id)와 장비 니블로 넘긴다.
- * 없는 팀은 undefined(표 그대로 — 예전과 같은 길).
+ * CPU 끼리 경기(0xc2a48 · 0xc2760 → 준비 0xc239c → 0xb891c·0xb8680)가 읽는 팀 레코드 — 트레이드로 바뀐 팀만 저장의 명단을
+ * 칸마다 붙박이 표 자리(`tableTeamOf` 팀 · id)로 넘긴다. 바뀌지 않은 팀은 undefined(표 그대로 — 예전과 같은 길).
  * CPU 팀 레코드에는 리그 선수만 있다(나리·명전은 트레이드에서 거절된다) — 그 밖의 칸은 표 칸 그대로 둔다.
  */
 function cpuLeagueRecordOf(save: SeasonSave, teamId: number): LeagueTeamRecord | undefined {
   const roster = save.cpuRosters?.[teamId]
   if (roster === undefined) return undefined
-  // 장비 니블(새 해 0x665e8 이 쓴 것)도 레코드째 — CPU 간이 경기가 0xb6414 보너스로 먹는다 (`LeagueRecordPlayer.equipment`)
   const seatOf = (player: SeasonPlayer, index: number) =>
     player.id < HALL_OF_FAME_FIRST_ID
-      ? {
-          tableTeamId: tableTeamOf(player, teamId),
-          tableSlot: player.id,
-          ...(player.equipment === undefined ? {} : { equipment: player.equipment }),
-        }
+      ? { tableTeamId: tableTeamOf(player, teamId), tableSlot: player.id }
       : { tableTeamId: teamId, tableSlot: index }
   return { batters: roster.batters.map(seatOf), pitchers: roster.pitchers.map(seatOf) }
 }
@@ -1106,7 +1100,7 @@ function nextYearOf(save: SeasonSave, random: RandomPort): { readonly save: Seas
   }
   // 0x6ec6 `0x665e8(g, 새 연차, 내 팀)` — 연차 문턱마다 CPU 아홉 팀의 정해진 선수 장비 니블을 굴려 쓴다(`rollCpuEquipment`,
   // 줄마다 팀마다 rand(0, 2)). 투수 칸은 레코드 차례라 새 리그(이어진 로테이션 차례)로 명단 첨자를 찾는다.
-  // 장비 니블은 명단 차례(`seasonEntryOrderOf` → 팀 경기)·CPU 레코드(`cpuLeagueRecordOf` → 간이 경기)에 실려 0xb6414 보너스로 먹는다
+  // ⚠️ 장비 니블이 경기 능력치(0xb6414 니블 보너스)에 닿는 길은 아직 웹 팀 경기 명단·CPU 간이 경기에 없다(내 팀 장비도 같다)
   const equipped = applyCpuEquipment(
     rollCpuEquipment(random, started.state.record.yearIndex, record.teamId),
     (team) => cpuRosterOf(started, team),
@@ -3158,7 +3152,7 @@ export function seasonGoalInputOf(source: SeasonGoalSource): SeasonGoalInput {
     if (typeof slot === 'number') {
       return slot >= 0 ? leaguePitcherLineOf(source.playerStats, leaguePitcherIdOf(team, slot)) : { outs: 0, runsAllowed: 0 }
     }
-    if ('tableSlot' in slot) return leaguePitcherLineOf(source.playerStats, leaguePitcherIdOf(slot.tableTeamId ?? team, slot.tableSlot))
+    if ('tableSlot' in slot) return leaguePitcherLineOf(source.playerStats, leaguePitcherIdOf(slot.tableTeamId, slot.tableSlot))
     return slot.recordId === undefined
       ? { outs: 0, runsAllowed: 0 }
       : leagueRecordPitcherLineOf(source.playerStats, slot.recordId)

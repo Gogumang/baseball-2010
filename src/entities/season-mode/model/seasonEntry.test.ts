@@ -83,21 +83,3 @@ describe('영입한 나리 선수(0xfe)는 명단에 든 기록 사본으로 선
     expect(lists.pitchers[0]).toMatchObject({ name: '나리투', ability: [1, 2, 3, 4] })
   })
 })
-
-describe('명단 차례는 저장 명단의 장비 니블을 싣는다 — 팀 경기의 0xb6414 보너스', () => {
-  it('니블이 있는 리그 선수만 equipment 를 싣고, 투수는 표 자리 꼴(표 팀 없이)로 넘긴다', () => {
-    const roster = {
-      pitchers: [
-        { id: 3, kindByte: 3, fieldPosition: 0, stamina: 10000, equipment: [1, 0, 0, 0] },
-        { id: 1, kindByte: 1, fieldPosition: 0, stamina: 10000 },
-      ],
-      batters: [
-        { id: 4, kindByte: 4, fieldPosition: 5, stamina: 0, equipment: [0, 2, 0, 0] },
-        { id: 0, kindByte: 0, fieldPosition: 2, stamina: 0 },
-      ],
-    }
-    const order = seasonEntryOrderOf(roster)
-    expect(order.pitchers).toEqual([{ tableSlot: 3, equipment: [1, 0, 0, 0] }, 1])
-    expect(order.batters).toEqual([{ rosterSlot: 4, position: 5, equipment: [0, 2, 0, 0] }, { rosterSlot: 0, position: 2 }])
-  })
-})

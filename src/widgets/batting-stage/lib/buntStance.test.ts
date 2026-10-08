@@ -1,27 +1,61 @@
 import { describe, expect, it } from 'vitest'
-import { buntStanceAfterBuntKey, buntStanceAfterSwingKey, isBuntJudgeFrame, sceneBuntKindAfterKey, sceneBuntKindOnPitch } from '@/widgets/batting-stage/lib/buntStance'
+import {
+  buntStanceAfterBuntKey,
+  buntStanceAfterRelease,
+  isBuntJudgeFrame,
+  isBuntStanceSet,
+  sceneBuntKindAfterKey,
+  sceneBuntKindOnPitch,
+} from '@/widgets/batting-stage/lib/buntStance'
 
 describe('번트 판정 시점 — 0x4e060 의 r7 (S+8 && 틱 == N−1)', () => {
   it('공이 N−1 틱에 닿을 때 판정한다 (그 전은 아니다)', () => {
-    expect(isBuntJudgeFrame(16, 18)).toBe(false)
-    expect(isBuntJudgeFrame(17, 18)).toBe(true)
+    expect(isBuntJudgeFrame(16, 18, { kind: 1, frame: 3 })).toBe(false)
+    expect(isBuntJudgeFrame(17, 18, { kind: 1, frame: 3 })).toBe(true)
+  })
+
+  it('자세가 N − 1 을 지나 서면(키 틱 ≥ N − 1) 판정되지 않는다 — 안 친 공이 된다', () => {
+    expect(isBuntJudgeFrame(17, 18, { kind: 1, frame: 16 })).toBe(true)
+    expect(isBuntJudgeFrame(18, 18, { kind: 1, frame: 17 })).toBe(false)
+    expect(isBuntJudgeFrame(19, 18, { kind: 1, frame: 18 })).toBe(false)
   })
 })
 
-describe('번트 자세에서 스윙 키 — 0xb9374 가 S+8 이면 스윙을 안 낸다', () => {
-  it('번트 종류는 그대로, 판정 F(+0xfd8)만 누른 틱으로', () => {
-    expect(buntStanceAfterSwingKey({ kind: 2, frame: 4 }, 11)).toEqual({ kind: 2, frame: 11 })
-  })
-})
-
-describe('번트 키 0x6a7 → 0x51e48 — 마선수 타자(0xb633c)면 예약하지 않는다', () => {
-  it('없으면 세우고(+0xfe0 = 1 · +0xfdc = 종류 · +0xfd8 = 틱), 있으면 지운다', () => {
+describe('번트 키 0x6a7 → 0x51e48 — 누름', () => {
+  it('없으면 세운다(+0xfe0 = 1 · +0xfdc = 종류 · +0xfd8 = 틱)', () => {
     expect(buntStanceAfterBuntKey(null, 3, 7, false)).toEqual({ kind: 3, frame: 7 })
-    expect(buntStanceAfterBuntKey({ kind: 3, frame: 7 }, 1, 9, false)).toBeNull()
+  })
+
+  it('자세가 선 뒤(다음 틱부터)는 S+4 가 0 이라 다시 눌러도 그대로다 — 토글이 아니다', () => {
+    const 자세 = { kind: 3, frame: 7 }
+    expect(isBuntStanceSet(자세, 7)).toBe(false)
+    expect(isBuntStanceSet(자세, 8)).toBe(true)
+    expect(buntStanceAfterBuntKey(자세, 1, 9, false)).toBe(자세)
+  })
+
+  it('예약이 안 풀린 같은 틱에 또 누르면 예약을 지운다 (51e98)', () => {
+    expect(buntStanceAfterBuntKey({ kind: 3, frame: 7 }, 1, 7, false)).toBeNull()
   })
 
   it('마선수 타자면 아무것도 안 바뀐다 (51e66~51e7a)', () => {
     expect(buntStanceAfterBuntKey(null, 2, 7, true)).toBeNull()
+  })
+})
+
+describe('번트 키 뗌 0x6a8 → 0x51eba — 자세가 섰을 때만 푼다', () => {
+  it('선 자세는 떼면 풀린다', () => {
+    expect(buntStanceAfterRelease({ kind: 2, frame: 4 }, 9, false)).toBeNull()
+  })
+
+  it('누른 그 틱에 떼면(자세 전, S+4 가 아직 1) 못 풀고 자세가 남는다', () => {
+    const 자세 = { kind: 2, frame: 4 }
+    expect(buntStanceAfterRelease(자세, 4, false)).toBe(자세)
+  })
+
+  it('마선수 · 자세 없음이면 그대로', () => {
+    expect(buntStanceAfterRelease(null, 9, false)).toBeNull()
+    const 자세 = { kind: 2, frame: 4 }
+    expect(buntStanceAfterRelease(자세, 9, true)).toBe(자세)
   })
 })
 

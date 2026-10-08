@@ -257,19 +257,15 @@ export interface SeasonEntryOrder {
     readonly record?: SeasonEntryBatterRecord
     /** `rosterSlot` 의 붙박이 표 팀 — 트레이드로 옮겨 온 선수만 (`SeasonPlayer.tableTeamId`) */
     readonly tableTeamId?: number
-    /** 레코드 장비 니블 네 칸 — 저장 명단에 있을 때만 (`SeasonPlayer.equipment`, 경기가 0xb6414 보너스로 먹는다) */
-    readonly equipment?: readonly number[]
   }[]
   /** 로스터 칸, 표 밖 선수의 기록, 또는 다른 팀 표 자리(트레이드로 옮겨 온 투수) */
   readonly pitchers: readonly (number | SeasonEntryPitcherRecord | SeasonEntryTablePitcher)[]
 }
 
-/** 붙박이 표 자리의 투수 — 트레이드로 옮겨 온 투수, 또는 장비 니블을 든 제 팀 투수(`tableTeamId` 없음 = 그 팀) */
+/** 다른 팀 붙박이 표 자리의 투수 — 트레이드로 옮겨 온 투수 */
 export interface SeasonEntryTablePitcher {
-  readonly tableTeamId?: number
+  readonly tableTeamId: number
   readonly tableSlot: number
-  /** 레코드 장비 니블 네 칸 (`SeasonPlayer.equipment`) */
-  readonly equipment?: readonly number[]
 }
 
 export function seasonEntryOrderOf(roster: SeasonTeamRoster, recordOf?: SeasonEntryRecordSource): SeasonEntryOrder {
@@ -278,13 +274,9 @@ export function seasonEntryOrderOf(roster: SeasonTeamRoster, recordOf?: SeasonEn
     batters: roster.batters.map((player) => {
       const position = player.fieldPosition & 0xf
       if (isTablePlayer(player)) {
-        // 장비 니블(+0x19 · +0x1a)은 레코드에 있어 경기의 0xb6414 가 먹는다 — 저장 명단에 있을 때만 싣는다(없으면 표 행 값)
-        return {
-          rosterSlot: player.id,
-          position,
-          ...(player.tableTeamId === undefined ? {} : { tableTeamId: player.tableTeamId }),
-          ...(player.equipment === undefined ? {} : { equipment: player.equipment }),
-        }
+        return player.tableTeamId === undefined
+          ? { rosterSlot: player.id, position }
+          : { rosterSlot: player.id, position, tableTeamId: player.tableTeamId }
       }
       const record = player.record ?? recordOf?.batter(player)
       // 원본 id 를 함께 실어 그 선수의 시즌 기록을 제 줄(리그 기록표의 표 밖 줄)로 쌓게 한다
@@ -294,12 +286,7 @@ export function seasonEntryOrderOf(roster: SeasonTeamRoster, recordOf?: SeasonEn
     }),
     pitchers: roster.pitchers.map((player) => {
       if (isTablePlayer(player)) {
-        if (player.tableTeamId === undefined && player.equipment === undefined) return player.id
-        return {
-          ...(player.tableTeamId === undefined ? {} : { tableTeamId: player.tableTeamId }),
-          tableSlot: player.id,
-          ...(player.equipment === undefined ? {} : { equipment: player.equipment }),
-        }
+        return player.tableTeamId === undefined ? player.id : { tableTeamId: player.tableTeamId, tableSlot: player.id }
       }
       const carried = player.record
       const record = carried !== undefined && 'repertoire' in carried ? carried : recordOf?.pitcher(player)
