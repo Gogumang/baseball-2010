@@ -26,10 +26,10 @@ const 구질 = (name: string) => fireEvent.click(screen.getByRole('button', { na
 const 눌림 = (name: string) => screen.getByRole('button', { name }).getAttribute('aria-pressed')
 
 describe('투수 등록 화면', () => {
-  it('고르는 줄은 타입·보직·손·피부이고 기본값은 타입1 · 선발 · 우완 · 황인이다', () => {
+  it('고르는 줄은 타입·보직·손·피부이고 기본값은 오버핸드 · 선발 · 우완 · 황인이다', () => {
     화면()
 
-    expect(screen.getByText('타입 1')).toBeTruthy()
+    expect(screen.getByText('오버핸드')).toBeTruthy()
     expect(screen.getByText('선발')).toBeTruthy()
     expect(screen.getByText('우완')).toBeTruthy()
     expect(screen.getByText('황인')).toBeTruthy()

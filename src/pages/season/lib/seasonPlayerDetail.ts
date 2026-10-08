@@ -174,7 +174,7 @@ export function seasonCardAbilitiesOf(view: SeasonPlayerRecordView, context: Sea
 }
 
 /** 정보 칸 문자열 표 (.data 포인터 표를 직접 읽었다) */
-const TYPE_NAMES = ['타격형', '장타형', '오버핸드', '사이드암'] // 0x1400258
+const TYPE_NAMES = ['타격형', '장타형', '오버핸드', '사이드암', '언더스로'] // 0x1400258 — 다섯 칸, 투수는 [타입 + 2]
 const ROLE_NAMES = ['내야', '외야', '선발', '구원'] // 0x1400248
 const HAND_NAMES = ['우타', '좌타', '우완', '좌완'] // 0x1400238
 const SKIN_NAMES = ['황인', '백인', '흑인', '우타'] // 0x140022c — 넷째 칸은 손 표의 "우타" 를 가리킨다(원본 그대로)

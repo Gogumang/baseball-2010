@@ -24,10 +24,11 @@ import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbil
 export const PITCHER_TYPE_COUNT = 3
 
 /**
- * 타입 이름. **원본 글(StrMODE)을 해독 문서에서 못 찾았다** — 번호로 둔다.
- * 채울 값은 StrMODE 의 투수 타입 줄에서 와야 한다 (타자 쪽 "타격형/장타형" 과 같은 자리).
+ * 타입 이름 — 정보 칸 그리기(0x7c956~0x7c96a)가 .data 포인터 표 **0x1400258** 의 `[타입 + 2]` 를 쓴다
+ * (투수는 2 를 더한다). 표 다섯 칸 = 타격형 · 장타형 · 오버핸드 · 사이드암 · 언더스로 — 투수는 뒤 셋이다.
+ * 훈련 결과 창의 `PITCHER_TYPE_NAMES`(pitcherManagement, 표 0x1400080 [2 + 타입])와 같은 글이다.
  */
-export const PITCHER_TYPE_LABELS: readonly string[] = ['타입 1', '타입 2', '타입 3']
+export const PITCHER_TYPE_LABELS: readonly string[] = ['오버핸드', '사이드암', '언더스로']
 
 /** 보직 칸 — 목록 값 0·1 이고 **1 을 고르면 레코드에 2 가 저장된다** (0x1707c) */
 export const PITCHER_ROLE_LABELS: readonly string[] = ['선발', '구원']

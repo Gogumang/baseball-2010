@@ -127,6 +127,11 @@ describe('정보 칸 0x7c450 시즌 · 0xd9 갈래 — seasonCardInfoOf', () => 
     })
   })
 
+  it('투수 타입 2 는 표 0x1400258 다섯째 칸 언더스로다', () => {
+    const view = { ...seasonPlayerRecordOf(0, tableRosterOf(0).pitchers[0]!, true, 0), profile: 0b0100_0000 }
+    expect(seasonCardInfoOf(view, 'T', 0).values[2]).toBe('언더스로')
+  })
+
   it('영입한 나리 타자 — 기록 사본의 +0xb · +0x18 을 읽는다 (장타형 · 좌타 · 흑인 · 외야, 필살 4 + 타입 = 메테오 스윙)', () => {
     const player = nariRecruitPlayerOf({
       name: '나리', ability: [600, 600, 600, 600], profile: seasonRecordProfileOf(1, 1, 2, 1), specialNumber: 4,
