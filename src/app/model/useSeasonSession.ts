@@ -87,7 +87,6 @@ import {
 } from '@/entities/season-mode/model/seasonRewards'
 import type { SeasonAutobotBatInput } from '@/entities/season-mode/model/seasonRewards'
 import type { LeagueFirstAward, SeasonSummaryEntry } from '@/entities/season-mode/model/seasonRewards'
-import type { SeasonAwardReward } from '@/widgets/season/lib/seasonAwardEvents'
 import {
   SEASON_AWARD_INTRO_EVENT_ID, SEASON_MVP_LEADER_KINDS, seasonMvpResultEventId, seasonTitleResultEventId,
 } from '@/widgets/season/lib/seasonAwardEvents'
@@ -427,11 +426,6 @@ export interface SeasonActions {
   readonly leaveGame: () => void
   /** 결산 화면에서 포스트시즌을 한 걸음 진행시킨다 (0xef — 내 차례면 경기, 아니면 CPU 구간) */
   readonly continuePostseason: () => void
-  /**
-   * 시즌 끝 사슬의 다음 칸으로 (포스트시즌시작 → 시상 셋 → 정규시즌순위 → 결산).
-   * 그 칸의 **보상**(P4 2a)을 레코드에 얹고 넘어간다 — 화면은 문구만 보여 준다.
-   */
-  readonly nextSeasonEndStep: (reward?: SeasonAwardReward) => void
   /** 리그 1위 G 를 지급하고 받은 비트를 남긴다 (0x6900 · 0x87e8) */
   readonly awardLeagueFirst: (award: LeagueFirstAward) => void
   /** 경기 중 자동진행 값 등 G 를 쓴다 (모자라면 화면이 먼저 막는다) */
@@ -2385,7 +2379,7 @@ export function useSeasonSession(
           ...save.state,
           teamAbilities: teamAbilities.map((row, team) => (team === myTeam ? applied.abilities : row)),
           teamMorale: applied.teamMorale,
-          // ⚠️ 트레이닝이 SR+4 를 세우는 자리는 문서에 없다. 외출(0xc81c)과 같은 규칙으로 둔다 (추정)
+          // SR+4 = 1 — 적용 0xa2f24 끝 a3000~a3006 (`strb #1, [SR, #4]`) 뒤 0x1fded · 0x22755 · 0x1f1b9 로 저장한다 (직접 떴다)
           record: { ...record, acted: true },
         },
       })
@@ -2449,37 +2443,6 @@ export function useSeasonSession(
       setScene(SEASON_SCENE_STATE.관리메뉴)
     },
     [commit, random, save],
-  )
-
-  /**
-   * 시즌 끝 사슬 한 칸 (SEASON_END_CHAIN). 사슬 밖이면 결산으로 보낸다.
-   *
-   * 시상·목표·순위 이벤트의 **보상을 실제로 얹는다** (P4 2a) — 예전에는 화면이 문구만
-   * 띄우고 인기도·평판·소지금이 하나도 안 움직였다.
-   */
-  const nextSeasonEndStep = useCallback(
-    (reward?: SeasonAwardReward) => {
-      if (save !== null && reward !== undefined) {
-        const { record } = save.state
-        commit({
-          ...save,
-          state: {
-            ...save.state,
-            record: {
-              ...record,
-              popularity: clampTo(record.popularity + reward.popularity, POPULARITY_LIMIT),
-              reputation: clampTo(record.reputation + reward.reputation, REPUTATION_LIMIT),
-              money: clampTo(record.money + reward.money, MONEY_LIMIT),
-            },
-          },
-        })
-      }
-      setScene((current) => {
-        const step = SEASON_END_CHAIN.find((candidate) => candidate.state === current)
-        return step?.next ?? SEASON_SCENE_STATE.시즌결산
-      })
-    },
-    [commit, save],
   )
 
   /**
@@ -2814,7 +2777,7 @@ export function useSeasonSession(
       closeEntryAceLocked,
       playCupGame, finishCup, finishGame, constructScene: rollSceneLoadTip, saveGameProgress, enterGameSettlement, resumeSavedGame, leaveGame,
       continuePostseason,
-      runTraining, closeTrainingResult, runOuting, nextSeasonEndStep, awardLeagueFirst, spendGamePoint, finishSeason,
+      runTraining, closeTrainingResult, runOuting, awardLeagueFirst, spendGamePoint, finishSeason,
       openStadiumItems, receiveEndingBonus, finishEnding, finishSeasonEvent, giveSeasonEventReward, confirmSeasonEventChoice, confirmEventSystemWindow, clearNotice, quit,
     },
   }

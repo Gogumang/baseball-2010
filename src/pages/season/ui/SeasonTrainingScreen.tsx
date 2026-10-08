@@ -182,10 +182,8 @@ function SeasonTrainingResultPopup({ result, onClose, firstLine, onFirstLineChan
  * 286 집중훈련 · 287 근성훈련 · 121 지옥훈련, 부모 칸 트레이닝) — 상태 0xde 일 때만 가운데 판 대신 0x848d0 을 덧그린다.
  * 칸 옆 값(능력치·500G)은 원본이 그리지 않는다.
  *
- * ⚠️ **SR+4(행동함)를 세우는 자리는 문서에 없다**: 외출은 결과 0xc81c 끝에서 세우는 것이 확정인데
- * (P4 3절), 트레이닝 적용 `0xa2f24` 에는 그런 줄이 적혀 있지 않다. 관리 메뉴 갱신 0x4efc 가
- * SR+4 로 **트레이닝·외출 두 칸을 함께** 끄는 것을 보면 트레이닝도 세우는 것이 맞겠지만,
- * 그 자리를 확인하지 못해 이 화면은 손대지 않는다 — 부르는 쪽이 정한다.
+ * SR+4(행동함)는 트레이닝 적용 `0xa2f24` 끝(a3000~a3006 `strb #1, [SR, #4]`, 이어 저장)이 세운다 — 외출 0xc81c 와
+ * 같다(직접 떴다). 이 화면은 손대지 않고 부르는 쪽(`useSeasonSession.runTraining`)이 세운다.
  */
 export function SeasonTrainingScreen({
   state, gamePoints, onTrain, onBack, result = null, onCloseResult, resultFirstLine, onResultFirstLineChange,
