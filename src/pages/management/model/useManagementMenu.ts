@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { useTrainingPlayback } from '@/widgets/training-scene/model/useTrainingPlayback'
 import { COMMAND_MENUS, COMMAND_SLOTS } from '@/pages/management/lib/managementLayout'
@@ -7,6 +7,7 @@ import type { ManagementScreenProps } from '@/pages/management/ui/ManagementScre
 import {
   abilityDetailScrollKeyOf, batterAbilityDetailViewOf, scrollAbilityDetail,
 } from '@/pages/management/lib/abilityDetail'
+import { createNariMainMenuCursor, nariMainCursorOnEntry } from '@/pages/management/model/nariMainMenuCursor'
 
 /** 커서를 옮긴 뒤 두 번 갱신하는 동안 +1, −1 로 튄다 (카운터 +0x98) */
 const BOUNCE_BY_UPDATE = [1, -1]
@@ -28,7 +29,10 @@ export type ManagementOverlay = '기록실' | '필살타법' | '필살타법훈�
 /** 관리 화면 커서·하위 메뉴·훈련 연출 상태 */
 export function useManagementMenu(props: ManagementScreenProps) {
   const [kind, setKind] = useState<MenuKind>('main')
-  const [cursor, setCursor] = useState(0)
+  /** 관리 메뉴 [this+0x8c] 커서 — 루트가 들고 있으면 그것(다른 화면을 다녀와도 남는다), 아니면 이 화면 몫 */
+  const ownMainCursor = useRef(createNariMainMenuCursor()).current
+  const mainCursor = props.mainCursor ?? ownMainCursor
+  const [cursor, setCursor] = useState(() => mainCursor.current)
   const [parent, setParent] = useState<MenuSlot | null>(null)
   const [movedAt, setMovedAt] = useState<number | null>(null)
   const [openedAt, setOpenedAt] = useState(0)
@@ -48,11 +52,16 @@ export function useManagementMenu(props: ManagementScreenProps) {
   const playback = useTrainingPlayback((menuId) => {
     props.onTraining(menuId)
     open('main', null)
-    setCursor(COMMAND_SLOTS.findIndex((slot) => slot.id === '트레이닝'))
+    // 125 → 105 — 커서는 메뉴 객체 그대로(트레이닝 칸). 행동함이면 105 진입이 첫 칸으로 (아래 `awaitingEntry`)
+    setMainCursor(COMMAND_SLOTS.findIndex((slot) => slot.id === '트레이닝'))
   })
   const slots = kind === 'main' ? COMMAND_SLOTS : COMMAND_MENUS[kind]
   const disabledIds = new Set(kind === 'main' && props.career.hasActedThisCycle ? CYCLE_COMMANDS : [])
 
+  const setMainCursor = (index: number) => {
+    mainCursor.current = index
+    setCursor(index)
+  }
   const open = (next: MenuKind, nextParent: MenuSlot | null) => {
     setIsShowingBasicInfo(false)
     setAbilityDetailOffset(null)
@@ -64,6 +73,7 @@ export function useManagementMenu(props: ManagementScreenProps) {
   }
   const moveCursor = (index: number) => {
     if (index === cursor) return
+    if (kind === 'main') mainCursor.current = index
     setCursor(index)
     setMovedAt(update)
   }
@@ -75,10 +85,30 @@ export function useManagementMenu(props: ManagementScreenProps) {
     // 기본정보(119) 의 취소 → 106(선수정보 하위 메뉴) — 0x1056c (R9 「119·129·120」)
     if (isShowingBasicInfo) return setIsShowingBasicInfo(false)
     if (kind === 'main') return props.onExit()
+    // 106 · 107 · 110 취소 → 105 진입: 행동함이면 첫 칸, 단 110(아이템)에서 오면 남는다 (0x11910 1194a~11970)
     const index = COMMAND_SLOTS.findIndex((slot) => slot.id === kind)
     open('main', null)
-    setCursor(index)
+    setMainCursor(nariMainCursorOnEntry(index, props.career.hasActedThisCycle, kind === '아이템'))
   }
+
+  /*
+   * 화면 안에서 행동(훈련 125 · 휴식 127 — S+4 = 1)을 하면 원본은 그 상태를 거쳐 105 로 다시 들어온다. 그 105 진입이 행동함이라
+   * 커서를 첫 칸으로 되돌린다(이전 상태 125 · 127). 웹은 행동함이 막 선 것을 보고, 결과 창 · 연출이 걷혀 메인 메뉴만 남는 때에
+   * 그 진입을 친다.
+   */
+  const wasActed = useRef(props.career.hasActedThisCycle)
+  const [awaitingEntry, setAwaitingEntry] = useState(false)
+  const isIdleMain = kind === 'main' && playback.playingMenuId === null && props.detail === null && question === null
+    && overlay === null && !isShowingBasicInfo
+  useLayoutEffect(() => {
+    if (props.career.hasActedThisCycle && !wasActed.current) setAwaitingEntry(true)
+    wasActed.current = props.career.hasActedThisCycle
+  })
+  useLayoutEffect(() => {
+    if (!awaitingEntry || !isIdleMain) return
+    setAwaitingEntry(false)
+    setMainCursor(nariMainCursorOnEntry(mainCursor.current, props.career.hasActedThisCycle, false))
+  })
 
   const ask = (text: string, onYes: () => void) => setQuestion({ text, onYes })
   const answer = (isYes: boolean) => {

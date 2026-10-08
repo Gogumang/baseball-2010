@@ -4,6 +4,7 @@ import { PitcherManagementScreen } from '@/pages/pitcher-league/ui/PitcherManage
 import { PitcherEventUnderlay } from '@/pages/pitcher-league/ui/PitcherEventUnderlay'
 import { PitcherStatusBoard } from '@/pages/pitcher-league/ui/PitcherStatusBoard'
 import { NariMainCommandBar } from '@/pages/management/ui/NariMainCommandBar'
+import { createNariMainMenuCursor, nariMainCursorOnEntry } from '@/pages/management/model/nariMainMenuCursor'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { useEventEndFrame } from '@/app/model/useEventEndFrame'
@@ -89,6 +90,24 @@ export function PitcherLeagueRoute({
   const sceneTrail = useRef<{ readonly scene: string; readonly previous: string | null }>({ scene, previous: null })
   if (sceneTrail.current.scene !== scene) sceneTrail.current = { scene, previous: sceneTrail.current.scene }
   const previousScene = sceneTrail.current.previous
+  /**
+   * 관리 메뉴 [this+0x8c] 의 커서 — 타자편 `CareerRoutes` 와 같다(`NariMainMenuCursor`). 105 에 들어올 때마다(관리 장면, 또는
+   * 105 진입 곁가지로 바로 뜬 '관리' 이벤트) 0x11910 규칙: 행동함이고 이전이 109 · 110(웹 상점은 곧장 돌아온다)이 아니면 첫 칸.
+   */
+  const mainCursor = useRef(createNariMainMenuCursor()).current
+  const entryTrail = useRef<string | null>(null)
+  const entryKey = career === null ? null
+    : scene === '관리' ? '관리'
+      : scene === '이벤트' && session.story?.context === '관리' ? `이벤트:${session.story.eventId}` : null
+  if (entryKey !== entryTrail.current) {
+    const isFromManagementFrame = scene === '이벤트' && entryTrail.current === '관리'
+    if (career !== null && entryKey !== null && !isFromManagementFrame) {
+      // 이벤트 → 관리 · 이벤트 → 이벤트는 이전 114 다
+      const isFromKeptState = entryTrail.current === null && (previousScene === '다음경기순위' || previousScene === '상점')
+      mainCursor.current = nariMainCursorOnEntry(mainCursor.current, career.hasActedThisCycle, isFromKeptState)
+    }
+    entryTrail.current = entryKey
+  }
   /** 114 재생이 끝난 한 틀 — 대화창 없이 0x19da4 를 그린 뒤 넘긴다 (`useEventEndFrame`) */
   const eventEnd = useEventEndFrame(actions.completeStory)
 
@@ -134,6 +153,7 @@ export function PitcherLeagueRoute({
       onExit={onExit}
       // 114(이벤트) · 100(경기 뒤 — 경기결과) · 1(처음 선다)
       centerSlidesIn={previousScene === null || previousScene === '이벤트' || previousScene === '경기결과'}
+      mainCursor={mainCursor}
     />
   )
 
@@ -209,7 +229,7 @@ export function PitcherLeagueRoute({
           <>
             <SkinBackdrop kind="공무늬" />
             <PitcherStatusBoard career={career} />
-            {story.context === '관리' && <NariMainCommandBar menuEnable={career} />}
+            {story.context === '관리' && <NariMainCommandBar menuEnable={career} cursor={mainCursor.current} />}
             <ScreenFrame title="나만의리그투수편" gamePoint={career.gamePoint} onBack={null} footer={5} />
           </>
         )

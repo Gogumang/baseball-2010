@@ -343,3 +343,44 @@ describe('능력치 상세 창 — 기본정보(119)에서 \'0\' → 120 (키 0x
     expect(screen.getByText('사기')).toBeTruthy()
   })
 })
+
+describe('관리 메뉴 [this+0x8c] 커서 — 루트가 들고 105 진입 0x11910 이 행동함이면 첫 칸', () => {
+  it('다시 마운트돼도 루트 커서 칸에 서고, 옮기면 루트 값도 바뀐다', () => {
+    const mainCursor = { current: 5 }
+    render(<ManagementScreen {...propsWith({ mainCursor })} />)
+    expect(screen.getByRole('button', { name: '다음경기' }).getAttribute('aria-current')).toBe('true')
+
+    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+
+    expect(mainCursor.current).toBe(4)
+    expect(screen.getByRole('button', { name: '아이템' }).getAttribute('aria-current')).toBe('true')
+  })
+
+  it('하위 메뉴 106 · 107 취소 → 105: 행동함이면 첫 칸, 110(아이템)에서 오면 남는다', () => {
+    const career = { ...createCareer('테스터'), hasActedThisCycle: true }
+    const mainCursor = { current: 0 }
+    render(<ManagementScreen {...propsWith({ career, mainCursor })} />)
+
+    clickCommand('아이템')
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(mainCursor.current).toBe(4)
+
+    clickCommand('선수정보')
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(mainCursor.current).toBe(0)
+  })
+
+  it('화면 안 행동(휴식 127)으로 행동함이 서면, 결과 창이 걷힌 뒤 105 진입이 첫 칸으로', () => {
+    const mainCursor = { current: 2 }
+    const { rerender } = render(<ManagementScreen {...propsWith({ mainCursor })} />)
+    const acted = { ...createCareer('테스터'), hasActedThisCycle: true }
+    const detail = { before: acted, after: acted, messages: ['사기 1 상승하였습니다'] }
+    rerender(<ManagementScreen {...propsWith({ career: acted, mainCursor, detail })} />)
+    expect(mainCursor.current).toBe(2)
+
+    rerender(<ManagementScreen {...propsWith({ career: acted, mainCursor })} />)
+
+    expect(mainCursor.current).toBe(0)
+    expect(screen.getByRole('button', { name: '선수정보' }).getAttribute('aria-current')).toBe('true')
+  })
+})

@@ -8,6 +8,7 @@ import { TRAINING_PRESENTATION_OF } from '@/shared/config/original/trainingAnima
 import { COMMAND_MENUS, COMMAND_SLOTS } from '@/pages/management/lib/managementLayout'
 import type { ManagementCommand } from '@/pages/management/lib/managementLayout'
 import { useManagementMenu } from '@/pages/management/model/useManagementMenu'
+import type { NariMainMenuCursor } from '@/pages/management/model/nariMainMenuCursor'
 import { ManagementBoard } from '@/pages/management/ui/ManagementBoard'
 import { CommandBar } from '@/pages/management/ui/CommandBar'
 import { nariMainMenuOffIdsOf } from '@/pages/management/lib/nariMenuEnable'
@@ -73,6 +74,11 @@ export interface ManagementScreenProps {
    * 0x8a2d8 을 부른다(0x11c6e~0x11c80). 그 밖(상점 · 외출 취소 등)에서 돌아오면 제자리에 선다.
    */
   readonly centerSlidesIn?: boolean
+  /**
+   * 관리 메뉴 [this+0x8c] 의 커서 — 장면이 서 있는 동안 남는 값이라 루트가 들고(105 진입 규칙 `nariMainCursorOnEntry` 도 루트가
+   * 화면이 바뀔 때 친다), 이벤트 끝 틀(`NariMainCommandBar`)도 같은 값을 그린다. 안 넘기면 화면이 스스로 0 부터 든다.
+   */
+  readonly mainCursor?: NariMainMenuCursor
 }
 
 /** 기본정보 카드 그림 0x166cc 의 바닥비트 (0x166f2 `movs r2, #0x87`) */

@@ -15,15 +15,20 @@ const NOOP = () => undefined
  * 105(0x69)면 관리 6칸(`COMMAND_SLOTS`, 타자편 · 투수편 같은 표), 115 · 117 · 116 · 130~138 · 140 등은 0x7e84c 의 그 밖 갈래라
  * 칸 수 0(아무 칸도 안 그림). 메뉴 [gfx+0x158] 은 105 진입 0x11ae0 이 [this+0x8c](관리 6칸), [gfx+0x15c] = 0(하위 없음 — 부모 칸
  * 없음)이다. 칸이 0 인 켬 표는 흑백(`nariMainMenuOffIdsOf`).
- * ⚠️ 근사: 커서는 메뉴 [this+0x8c] 의 칸(105 진입이 S+4 면 0 으로 되돌림)인데 웹 관리 화면은 커서를 화면 안에만 들어 0 칸으로 둔다.
+ * 커서는 [gfx+0x158] 메뉴 객체의 +0x14 × +0x10 + +0xc 칸(0x7e4a2~0x7e53c) — 루트가 들고 있는 관리 메뉴 커서(`NariMainMenuCursor`,
+ * 105 진입이 행동함이면 0 으로 되돌린 뒤의 값)다.
  */
-export function NariMainCommandBar({ menuEnable }: { readonly menuEnable: NariMenuEnableInput }) {
+export function NariMainCommandBar({ menuEnable, cursor }: {
+  readonly menuEnable: NariMenuEnableInput
+  /** 관리 메뉴 [this+0x8c] 의 커서 칸 */
+  readonly cursor: number
+}) {
   const labelOrigins = useFrameOrigins('./sprites/img_text/frames')
   const labelWidths = Object.fromEntries(
     COMMAND_SLOTS.map((slot) => [slot.labelFrame, labelOrigins?.[String(slot.labelFrame).padStart(3, '0')]?.width ?? 0]),
   )
   return (
-    <CommandBar slots={COMMAND_SLOTS} cursor={0} bounce={0} slideUpdates={SETTLED_SLIDE_UPDATES}
+    <CommandBar slots={COMMAND_SLOTS} cursor={cursor} bounce={0} slideUpdates={SETTLED_SLIDE_UPDATES}
       disabledIds={NO_IDS} grayedIds={nariMainMenuOffIdsOf(menuEnable)} labelWidths={labelWidths} parent={null}
       onHover={NOOP} onSelect={NOOP} />
   )

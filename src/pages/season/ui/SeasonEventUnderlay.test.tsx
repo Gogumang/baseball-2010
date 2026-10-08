@@ -31,11 +31,11 @@ describe('이벤트 밑그림 (0x8b5ac)', () => {
 })
 
 describe('이벤트 재생이 끝난 한 틀 (0x8b5ac 가 0 — 0x19e64 → 0x19da4 · 0xa09c → 0x9f60)', () => {
-  it('나리 114 — 앞 상태 105 면 상태판(0) 위에 관리 6칸 커맨드 줄, 켬 표 0 칸(행동함 → 트레이닝 · 휴식 · 외출)은 흑백', () => {
+  it('나리 114 — 앞 상태 105 면 상태판(0) 위에 관리 6칸 커맨드 줄(커서 = 메뉴 [this+0x8c]), 켬 표 0 칸(행동함 → 트레이닝 · 휴식 · 외출)은 흑백', () => {
     const career = { ...createCareer('테스터'), hasActedThisCycle: true }
     render(
       <NariEventUnderlay career={career}>
-        <NariMainCommandBar menuEnable={career} />
+        <NariMainCommandBar menuEnable={career} cursor={4} />
       </NariEventUnderlay>,
     )
 
@@ -43,7 +43,7 @@ describe('이벤트 재생이 끝난 한 틀 (0x8b5ac 가 0 — 0x19e64 → 0x19
     for (const id of ['선수정보', '트레이닝', '휴식', '외출', '아이템', '다음경기']) {
       expect(screen.getByRole('button', { name: id })).toBeTruthy()
     }
-    expect(screen.getByRole('button', { name: '선수정보' }).getAttribute('aria-current')).toBe('true')
+    expect(screen.getByRole('button', { name: '아이템' }).getAttribute('aria-current')).toBe('true')
     const 흑백 = (id: string) => screen.getByRole('button', { name: id }).querySelector('img')?.style.filter
     expect(흑백('휴식')).toBe('grayscale(1)')
     expect(흑백('다음경기')).toBe('')

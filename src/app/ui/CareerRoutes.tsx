@@ -23,6 +23,7 @@ import { NationalCupScreen } from '@/pages/national-cup/ui/NationalCupScreen'
 import { NariScreenPush } from '@/pages/management/ui/NariScreenPush'
 import { NariEventUnderlay } from '@/pages/management/ui/NariEventUnderlay'
 import { NariMainCommandBar } from '@/pages/management/ui/NariMainCommandBar'
+import { createNariMainMenuCursor, nariMainCursorOnEntry } from '@/pages/management/model/nariMainMenuCursor'
 import { isBattingOrderEventId } from '@/entities/career/model/battingOrder'
 import { useEventEndFrame } from '@/app/model/useEventEndFrame'
 import { OutingMapUnderlay } from '@/pages/management/ui/OutingMapUnderlay'
@@ -90,6 +91,24 @@ export function CareerRoutes({
   const screenTrail = useRef<{ readonly kind: Screen['kind']; readonly previous: Screen['kind'] | null }>({ kind: screen.kind, previous: null })
   if (screenTrail.current.kind !== screen.kind) screenTrail.current = { kind: screen.kind, previous: screenTrail.current.kind }
   const previousKind = screenTrail.current.previous
+  /**
+   * 관리 메뉴 [this+0x8c] 의 커서 — 장면 0x106 이 서 있는 동안 남는다(`NariMainMenuCursor`). 105 에 들어올 때마다(관리 화면,
+   * 또는 105 진입 곁가지로 바로 뜬 '관리' 이벤트) 0x11910 의 규칙을 친다: 행동함이고 이전이 109(다음 경기 순위표) · 110(아이템 —
+   * 웹 상점은 110 을 거치지 않고 곧장 돌아온다)이 아니면 첫 칸. 105 틀에서 뜬 이벤트(이전 화면이 관리)는 새 진입이 아니다.
+   */
+  const mainCursor = useRef(createNariMainMenuCursor()).current
+  const entryTrail = useRef<string | null>(null)
+  const entryKey = screen.kind === '관리' ? '관리'
+    : screen.kind === '이벤트' && screen.context === '관리' ? `이벤트:${screen.eventId}` : null
+  if (entryKey !== entryTrail.current) {
+    const isFromManagementFrame = screen.kind === '이벤트' && entryTrail.current === '관리'
+    if (entryKey !== null && !isFromManagementFrame) {
+      // 이벤트 → 관리 · 이벤트 → 이벤트는 이전 114 다
+      const isFromKeptState = entryTrail.current === null && (previousKind === '다음경기순위' || previousKind === '아이템')
+      mainCursor.current = nariMainCursorOnEntry(mainCursor.current, career.hasActedThisCycle, isFromKeptState)
+    }
+    entryTrail.current = entryKey
+  }
 
   const management = (
     <ManagementScreen
@@ -112,6 +131,7 @@ export function CareerRoutes({
       onExit={() => setScreen({ kind: '메인메뉴' })}
       // 114(이벤트) · 100(경기 뒤 재진입 — 경기결과) · 1(자원 적재 — 처음 선다)
       centerSlidesIn={previousKind === null || previousKind === '이벤트' || previousKind === '경기결과'}
+      mainCursor={mainCursor}
     />
   )
 
@@ -242,7 +262,7 @@ export function CareerRoutes({
         }
         return (
           <NariEventUnderlay career={career}>
-            {screen.context === '관리' && !isBattingOrderEventId(screen.eventId) && <NariMainCommandBar menuEnable={career} />}
+            {screen.context === '관리' && !isBattingOrderEventId(screen.eventId) && <NariMainCommandBar menuEnable={career} cursor={mainCursor.current} />}
           </NariEventUnderlay>
         )
       }

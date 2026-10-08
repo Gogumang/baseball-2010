@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { MessageBox, Panel, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
@@ -27,6 +27,8 @@ import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { PITCHER_COMMAND_BAR, pitcherLabelDxOf, pitcherParentSlotOf } from '@/pages/pitcher-league/lib/pitcherCommandBar'
 import type { PitcherCommandKind } from '@/pages/pitcher-league/lib/pitcherCommandBar'
 import type { PitcherManagementMenu } from '@/pages/pitcher-league/model/usePitcherManagementMenu'
+import { createNariMainMenuCursor, nariMainCursorOnEntry } from '@/pages/management/model/nariMainMenuCursor'
+import type { NariMainMenuCursor } from '@/pages/management/model/nariMainMenuCursor'
 
 /**
  * 나만의리그 **투수편 관리 화면** — 원본 장면 **0x106** 의 상태 **105(허브)** 와 그 하위
@@ -65,6 +67,11 @@ export interface PitcherManagementScreenProps {
   readonly onExit: () => void
   /** 가운데 판의 선수가 미끄러져 들어오는가 — 105 진입 0x11910 의 이전 상태 1 · 114 · 100 (0x8a2d8) */
   readonly centerSlidesIn?: boolean
+  /**
+   * 관리 메뉴 [this+0x8c] 의 커서 — 루트가 들고(105 진입 규칙도 루트가 장면이 바뀔 때 친다) 이벤트 끝 틀도 같은 값을 그린다
+   * (타자편 `ManagementScreen` 과 같다). 안 넘기면 화면이 스스로 0 부터 든다.
+   */
+  readonly mainCursor?: NariMainMenuCursor
 }
 
 const NO_DISABLED: ReadonlySet<string> = new Set()
@@ -74,26 +81,34 @@ const BOUNCE_BY_UPDATE = [1, -1]
 /**
  * 커맨드 줄 0x7e418 (투수 표 `lib/pitcherCommandBar`). 칸 등장 0x7ff8c · 부모 칸 0x8003c 는 메뉴가 열린 뒤 갱신 수로,
  * 키는 위·아래·좌·우 칸 옮기기 · 확인(Enter · '5') · 취소(−16).
- * 하위 메뉴에서 돌아오면 커서가 그 하위 메뉴 칸에 선다(타자편 `useManagementMenu` 와 같다).
+ * 하위 메뉴에서 돌아오면 커서가 그 하위 메뉴 칸에 선다(타자편 `useManagementMenu` 와 같다) — 단 그 105 진입이 행동함이면 첫 칸
+ * (0x11910 1194a~11970, 110 아이템에서 오면 남는다). 관리 메뉴 커서는 루트의 `mainCursor` 에 산다.
  */
-function PitcherCommandBar({ menu, isKeyEnabled, mainOffIds }: {
+function PitcherCommandBar({ menu, isKeyEnabled, mainOffIds, mainCursor, hasActed }: {
   readonly menu: PitcherManagementMenu
   readonly isKeyEnabled: boolean
   /** 관리 메뉴 [this+0x8c] 켬 표가 0 인 칸 — 105 진입 0x11910 (`nariMainMenuOffIdsOf`) */
   readonly mainOffIds: ReadonlySet<string>
+  readonly mainCursor: NariMainMenuCursor
+  /** S+4(행동함) */
+  readonly hasActed: boolean
 }) {
   const kind = menu.kind as PitcherCommandKind
   const slots = PITCHER_COMMAND_BAR[kind]
   const update = useUpdateCounter()
   const labelOrigins = useFrameOrigins('./sprites/img_text/frames')
-  const [state, setState] = useState({ kind, cursor: 0, openedAt: 0, movedAt: null as number | null })
+  const [state, setState] = useState({ kind, cursor: kind === '관리' ? mainCursor.current : 0, openedAt: 0, movedAt: null as number | null })
   if (state.kind !== kind) {
-    const returning = kind === '관리' ? Math.max(0, slots.findIndex((slot) => slot.id === state.kind)) : 0
-    setState({ kind, cursor: returning, openedAt: update, movedAt: null })
+    if (kind === '관리') {
+      const returning = Math.max(0, slots.findIndex((slot) => slot.id === state.kind))
+      mainCursor.current = nariMainCursorOnEntry(returning, hasActed, state.kind === '아이템')
+    }
+    setState({ kind, cursor: kind === '관리' ? mainCursor.current : 0, openedAt: update, movedAt: null })
   }
-  const cursor = Math.min(state.cursor, slots.length - 1)
+  const cursor = Math.min(kind === '관리' ? mainCursor.current : state.cursor, slots.length - 1)
   const moveTo = (index: number) => {
     if (index === cursor) return
+    if (kind === '관리') mainCursor.current = index
     setState((held) => ({ ...held, cursor: index, movedAt: update }))
   }
   const latest = useRef({ cursor, slots, moveTo, menu })
@@ -155,6 +170,25 @@ function titleViewOf(career: PitcherCareer): PlayerCareer {
 export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
   const { career } = props
   const menu = usePitcherManagementMenu(props)
+  const ownMainCursor = useRef(createNariMainMenuCursor()).current
+  const mainCursor = props.mainCursor ?? ownMainCursor
+  /*
+   * 화면 안 행동(훈련 125 · 휴식 127 — S+4 = 1)은 그 상태를 거쳐 105 로 다시 들어온다 — 그 진입이 행동함이라 커서를 첫 칸으로.
+   * 행동함이 막 서면, 결과 창 · 하위 창이 걷혀 관리 메뉴만 남는 때에 그 진입을 친다(타자편 `useManagementMenu` 와 같다).
+   */
+  const wasActed = useRef(career.hasActedThisCycle)
+  const [awaitingEntry, setAwaitingEntry] = useState(false)
+  const isIdleMain = menu.kind === '관리' && menu.subWindow === null && menu.detail === null && menu.question === null
+    && menu.choice === null
+  useLayoutEffect(() => {
+    if (career.hasActedThisCycle && !wasActed.current) setAwaitingEntry(true)
+    wasActed.current = career.hasActedThisCycle
+  })
+  useLayoutEffect(() => {
+    if (!awaitingEntry || !isIdleMain) return
+    mainCursor.current = nariMainCursorOnEntry(mainCursor.current, career.hasActedThisCycle, false)
+    setAwaitingEntry(false)
+  })
 
   // 구질 훈련(상태 108 의 구질 탭)은 이미 있는 창을 그대로 쓴다 — 새로 만들지 않는다
   if (menu.subWindow === '구질훈련') {
@@ -179,6 +213,7 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
         <>
           <SkinBackdrop kind="공무늬" />
           <PitcherCommandBar menu={menu} mainOffIds={nariMainMenuOffIdsOf(career)}
+            mainCursor={mainCursor} hasActed={career.hasActedThisCycle}
             isKeyEnabled={menu.choice === null && menu.detail === null && menu.question === null && menu.notice === ''} />
           <PitcherStatusBoard career={career} />
           <CenterStage slidesIn={props.centerSlidesIn ?? false} characters={nariStageCharactersOf({
