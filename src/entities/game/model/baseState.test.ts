@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { advanceRunners, EMPTY_BASES, runnerCountOf , advanceOnGroundOut, canAdvanceOnGroundOut} from '@/entities/game/model/baseState'
+import { advanceRunners, EMPTY_BASES, runnerCountOf , advanceOnGroundOut, advanceOnQuickWalk, canAdvanceOnGroundOut} from '@/entities/game/model/baseState'
 import type { BaseState } from '@/entities/game/model/baseState'
 
 const 만루: BaseState = { first: true, second: true, third: true }
@@ -74,6 +74,18 @@ describe('advanceRunners — 볼넷', () => {
 
     expect(result.runsScored).toBe(1)
     expect(result.bases).toEqual(만루)
+  })
+})
+
+describe('advanceOnQuickWalk — 간이 엔진 볼넷 (0xc1818 c1918: 0xa93ac 뒤 0xc0fb4(sim, 1))', () => {
+  it('밀려나지 않는 주자도 모두 한 루씩 간다 — 3루 주자 혼자여도 득점한다 (원본 버그)', () => {
+    expect(advanceOnQuickWalk(주자3루)).toEqual({ bases: 주자1루, runsScored: 1, outsAdded: 0 })
+    expect(advanceOnQuickWalk({ first: false, second: true, third: false }).bases).toEqual({ first: true, second: false, third: true })
+  })
+
+  it('빈 루면 타자만 1루, 만루면 1점', () => {
+    expect(advanceOnQuickWalk(EMPTY_BASES)).toEqual({ bases: 주자1루, runsScored: 0, outsAdded: 0 })
+    expect(advanceOnQuickWalk(만루)).toEqual({ bases: 만루, runsScored: 1, outsAdded: 0 })
   })
 })
 

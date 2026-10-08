@@ -210,6 +210,24 @@ describe('반 이닝의 CPU 투수 교체·체력 소모 (0xc1ba4 → 0xac428 ·
   })
 })
 
+describe('간이 엔진 볼넷은 판정 자리에서 주자를 밀고 나서 도루를 굴린다 (0xc1818 c1918 → c1982)', () => {
+  it('빈 루 볼넷에도 1루에 선 타자주자가 곧장 뛸 수 있다', () => {
+    // 첫 타자: 판정 길(0.9) · 존 밖(0) 넷 = 포볼 → 도루 굴림 0 (주력 500 → 3000 미만) → 2루
+    // 그 뒤는 0.99: 판정 길 · 존 안 · 도루 실패 → 루킹 삼진 셋
+    const values = [0.9, 0, 0.9, 0, 0.9, 0, 0.9, 0, 0]
+    let index = 0
+    const random = createFractionRandom(() => values[index++] ?? 0.99)
+    const result = simulateHalfInning(0, () => 타자(500), 투수(500), 1, random)
+
+    expect(result.plateAppearances[0]?.outcome).toEqual({ kind: '볼넷' })
+    expect(result.steals).toBe(1)
+    // 볼넷 뒤 1루 주자는 방금 걸어 나간 타자다
+    expect(result.stolenBases).toEqual([{ battingOrderIndex: 0 }])
+    expect(result.outs).toBe(3)
+    expect(result.bases).toEqual({ first: false, second: true, third: false })
+  })
+})
+
 describe('공 하나 소모 drainPitcherForPitch — 0xa5e14 의 0xa5f0e~ → 0xaeb08', () => {
   const 수비: HalfInningDefense = {
     mound: startingMoundOf(0),

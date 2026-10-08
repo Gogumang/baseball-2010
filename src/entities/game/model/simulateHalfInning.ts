@@ -1,6 +1,7 @@
 import {
   GROUND_OUT_ADVANCE_LIMIT,
   advanceOnGroundOut,
+  advanceOnQuickWalk,
   advanceRunners,
   canAdvanceOnGroundOut,
   EMPTY_BASES,
@@ -552,6 +553,8 @@ export function* simulateHalfInningTicks(
         : pitcher
     /** 이 타석 동안 공마다 깎이는 스태미나 — 0xc262c 는 공을 던지기 **앞에** 0xa5e14 로 깎는다(c26c8) */
     let pitchStamina = mound?.stamina
+    /** 볼넷(판정 3)이 판정 자리에서 민 주자의 득점 — 볼넷이 아니면 null */
+    let walkRuns: number | null = null
     const rosterSlot = lineup !== undefined ? rosterSlotAt(lineup, order) : undefined
     const play = playQuickAtBat(batterOn(order), facing, { inning }, random, {
       ...(defense === undefined || mound === undefined
@@ -566,16 +569,28 @@ export function* simulateHalfInningTicks(
       /**
        * 투구 판정 경로 뒤에만 도루를 굴린다 (0xc1818, E-5). **실패가 없어** 주자를 잃지 않는다.
        *
+       * **볼넷이면 볼넷을 먼저 먹이고 굴린다** (c1918 → c1982): 판정 3(포볼)은 타자를 주자 목록에 넣고
+       * 모든 주자를 한 루씩 민 뒤(`advanceOnQuickWalk`) 도루 판정으로 떨어진다 — 그래서 빈 루 볼넷에도 1루에 선
+       * 타자주자가 뛸 수 있다. 앞선 주자는 목록 끝 칸(가장 오래된 주자 — 타자주자 포함)이다.
+       *
        * ⚠️ **주자가 누구인지가 근사다** — 반 이닝 엔진은 루에 선 주자의 신원을 들고 있지 않다.
-       * 1루 주자는 직전 타자, 2루 주자는 그 앞 타자로 보고 타순에서 거꾸로 센다
-       * (팀 경기 주자 판의 `teamGameFlow.runAbilitiesOnBaseOf` 도 같은 근사를 쓴다).
+       * 타석 중이면 1루 주자는 직전 타자, 2루 주자는 그 앞 타자로 보고 타순에서 거꾸로 센다
+       * (팀 경기 주자 판의 `teamGameFlow.runAbilitiesOnBaseOf` 도 같은 근사를 쓴다). 볼넷 뒤에는 1루가 지금 타자다.
        * 도루로 2루에 간 주자는 실제로는 직전 타자라 이 셈이 한 칸 어긋나고, 이닝 첫 타석처럼
        * 거꾸로 셀 타자가 모자라면 0번으로 막는다.
        */
-      onPitchJudged: () => {
+      onPitchJudged: (judged) => {
+        // 볼넷 뒤에는 타자가 1루에 섰다 — 루 b 의 주자는 타순 커서 − (b − 1)
+        let runnerShift = 0
+        if (judged === '포볼') {
+          const walked = advanceOnQuickWalk(bases)
+          bases = walked.bases
+          walkRuns = walked.runsScored
+          runnerShift = 1
+        }
         const base = quickStealBaseOf(bases)
         if (base === null) return
-        const runner = batterOn(Math.max(0, order - base))
+        const runner = batterOn(Math.max(0, order - base + runnerShift))
         const stolen = quickEngineSteal(
           bases,
           { hit: 0, power: 0, defense: 0, run: runner.run },
@@ -585,7 +600,7 @@ export function* simulateHalfInningTicks(
         if (stolen.stolen > 0) {
           for (const [onBase, runnerBase] of [[bases.first, 1], [bases.second, 2]] as const) {
             if (!onBase) continue
-            const cursor = Math.max(0, order - runnerBase)
+            const cursor = Math.max(0, order - runnerBase + runnerShift)
             stolenBases.push({
               battingOrderIndex: cursor,
               ...(lineup === undefined ? {} : { rosterSlot: rosterSlotAt(lineup, cursor) }),
@@ -616,7 +631,10 @@ export function* simulateHalfInningTicks(
       combo = 0
     }
     const isGroundOut = outcome.kind === '아웃' && outcome.detail === '땅볼아웃'
-    const advanced = advanceRunners(bases, outcome, outs, { quickEngine: true })
+    // 볼넷은 판정 자리(c1918)에서 이미 주자를 밀었다 (위 `onPitchJudged`) — 여기서는 그 득점만 싣는다
+    const advanced = walkRuns !== null
+      ? { bases, runsScored: walkRuns, outsAdded: 0 }
+      : advanceRunners(bases, outcome, outs, { quickEngine: true })
     bases = advanced.bases
     // 땅볼 아웃에 60% 로 주자가 한 루 나간다 (0xc15b8).
     // **원본은 아웃 ≤1 이면 주자가 없어도 난수를 먼저 뽑고**, 그 뒤에 주자·3루 조건을 본다 (E 3g).

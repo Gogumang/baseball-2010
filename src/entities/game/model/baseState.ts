@@ -90,6 +90,16 @@ function advanceForHit(bases: BaseState, hitBases: 1 | 2 | 3): AdvanceResult {
   }
 }
 
+/**
+ * **간이 엔진의 볼넷** (0xc1818 c1918~c194a, 디스어셈 대조 — 확정): 타자를 주자 목록 0번 칸에 넣고(0xa93ac, 루 0) 곧장
+ * `0xc0fb4(sim, 1)` 로 **모든 주자를 한 루씩** 민다 — 안타 진루와 같은 함수다. 밀려나지 않는 주자도 가므로(2루 주자 → 3루,
+ * 3루 주자 → 득점) 밀어내기가 아니다. ⚠️ 원본 버그 그대로.
+ * 사람 경기의 볼넷·사구(판정 A 0xae24c → 상태 0x17 밀어내기 주루)는 `advanceRunners` 의 밀어내기다.
+ */
+export function advanceOnQuickWalk(bases: BaseState): AdvanceResult {
+  return advanceForHit(bases, 1)
+}
+
 /** 볼넷·사구는 밀려난 주자만 진루한다. 만루에서만 점수가 난다. */
 function advanceForWalk(bases: BaseState): AdvanceResult {
   if (!bases.first) return { bases: { ...bases, first: true }, runsScored: 0, outsAdded: 0 }
