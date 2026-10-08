@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { MarkupText } from '@/shared/ui'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import * as boxStyles from '@/shared/ui/MessageBox/MessageBox.css'
+import { POPUP_DIM_OPACITY } from '@/shared/ui/MessageBox/popupDim'
 import { EVENT_MISSION_WINDOW } from '@/pages/mission-select/lib/missionSelectLayout'
 
 const SCREEN_WIDTH = 240
@@ -29,7 +30,8 @@ type Animation = { readonly kind: '열림'; readonly height: number } | { readon
  * ```
  * [this+0xa0] 은 장면 진입 0x1d9a4(0x1da06~0x1da0e)가 1(미션실행)로 두고 창은 건드리지 않는다 — 창을 다시 열어도 앞의 고름이 남는다.
  * 창 판·열림·닫힘은 같은 0x741a0 창인 스킬 보상 창(`RewardSkillWindow`)과 같다: 높이 6 에서 ×2 로 100 까지, 닫힘은 폭 ÷2.
- * ⚠️ 뒤 어둡게의 몫은 공용 근사(`MessageBox` 의 dim)다.
+ * 뒤 어둡게: 미션 장면 생성자 0x1d784(0x1d786~0x1d79e)가 [창+0x24f] = 0 · [창+0x24c] = 1 이라 0x741a0 이 [창+0x24e] = 0 을
+ * 옮겨 0x746cc 가 떠 있는 그리기마다 검정 단계 5 = 6/16 으로 덮는다 (`POPUP_DIM_OPACITY`).
  */
 export function EventMissionWindow({ isRunSelected, onToggle, onAnswer }: {
   /** [this+0xa0] ≠ 0 — 미션실행 쪽 */
@@ -105,7 +107,8 @@ export function EventMissionWindow({ isRunSelected, onToggle, onAnswer }: {
   const { text, run, download } = EVENT_MISSION_WINDOW
 
   return (
-    <div className={boxStyles.dim} role="dialog" aria-label="이벤트 미션" data-testid="이벤트-미션-창">
+    <div className={boxStyles.dim} role="dialog" aria-label="이벤트 미션" data-testid="이벤트-미션-창"
+      style={{ background: `rgba(0, 0, 0, ${POPUP_DIM_OPACITY})` }}>
       <div className={boxStyles.box}
         style={{
           height: shownHeight,

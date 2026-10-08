@@ -144,6 +144,8 @@ describe('미션 선택 격자', () => {
       애니끝내기()
 
       const dialog = screen.getByRole('dialog', { name: '이벤트 미션' })
+      // 뒤 어둡게 — 미션 장면 0x1d784 가 [창+0x24f] = 0 · [+0x24c] = 1 → 0x746cc 검정 단계 5 = 6/16
+      expect(dialog.style.background).toBe(`rgba(0, 0, 0, ${6 / 16})`)
       expect(dialog.textContent).toContain('어떤 메뉴를 실행하시')
       expect(screen.getByRole('button', { name: '미션실행' }).dataset.selected).toBe('true')
       expect(screen.getByRole('button', { name: '미션다운' }).dataset.selected).toBe('false')

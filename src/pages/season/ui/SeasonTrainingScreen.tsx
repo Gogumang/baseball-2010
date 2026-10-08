@@ -13,6 +13,7 @@ import { SeasonCommonFrame } from '@/pages/season/ui/SeasonCommonFrame'
 import { SeasonTrainingPopup } from '@/pages/season/ui/SeasonTrainingPopup'
 import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
 import { DetailWindow } from '@/pages/management/ui/DetailPopup'
+import { POPUP_DIM_OPACITY } from '@/shared/ui/MessageBox/popupDim'
 import { detailRowsFromSlots } from '@/pages/management/lib/detailPopup'
 import {
   SEASON_TEAM_DETAIL_LABEL_FRAMES, SEASON_TRAINING_MAXIMUMS, scrollSeasonTrainingMessages,
@@ -168,6 +169,8 @@ function SeasonTrainingResultPopup({ result, onClose, firstLine, onFirstLineChan
       scrollOffset={firstLine}
       tableYOffset={SEASON_RESULT_TABLE_Y_OFFSET}
       hidesEmptyMessages
+      // 0x741a0 창 — 시즌 장면 생성자 0x3b14(0x3b1c~0x3b2e)가 [창+0x24f] = 0 · [+0x24c] = 1 이라 그리기마다 검정 단계 5 로 덮는다
+      dimOpacity={POPUP_DIM_OPACITY}
     />
   )
 }
