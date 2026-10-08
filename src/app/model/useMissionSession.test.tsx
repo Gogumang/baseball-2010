@@ -207,8 +207,9 @@ function drawsOfOnePitch(missionId: number, gaugeCell = 9, gaugeSettingOn = true
   const contact = pending === null ? undefined : contactOfOutcome(pending.outcome)
   const result = `${banner}|${contact === undefined ? '판 없음' : `${contact.resultCode}:${contact.pattern.join(',')}`}`
   const maxGauges = rendered.result.current.session.pitcherRun?.perfectGauges ?? 0
+  const pitcherStamina = rendered.result.current.session.pitcherStamina
   rendered.unmount()
-  return { drawn, banner, result, maxGauges }
+  return { drawn, banner, result, maxGauges, pitcherStamina }
 }
 
 describe('투수 미션 조준 흔들림 — 레코드 바이트 13 → 0x39c5c', () => {
@@ -774,10 +775,25 @@ describe('투수 미션 투수는 투수편 커리어의 0xb6414 값으로 던�
     expect(bare.result.current.pitcher).toEqual(modePitcherOf(null))
   })
 
-  /** 실투 0x33cbc 는 구속·스킬이 확률 p 만 바꾸고 rand(0,100) 은 늘 한 번이다 — 난수 차례는 투수와 무관 */
-  it('투수가 바뀌어도 공 하나의 난수 수는 같다', () => {
-    expect(drawsOfOnePitch(1, 9, true, 강투수).drawn).toBe(drawsOfOnePitch(1, 9, true).drawn)
-    expect(drawsOfOnePitch(1, 0, false, 강투수).drawn).toBe(drawsOfOnePitch(1, 0, false).drawn)
+  it('투수 미션 사람 투수도 공마다 스태미나가 깎인다 — 시작 값은 저장된 투수 +0x2c (0xb8820 → 0xb521c 통째 사본, 0xa5e14 모드 갈래 없음)', () => {
+    const 지친투수 = modePitcherOf({ ...createPitcherCareer('테스트'), stamina: 4000 })
+    expect(지친투수.stamina).toBe(4000)
+    // 직구 c = 9 · 용량 X = 사기 100 보정(+체력/20) + 첫 투수 200 + 250 — 0x66e44 · 0xaeb08
+    const 용량 = 지친투수.staminaAbility + Math.trunc(지친투수.staminaAbility / 20) + 200 + 250
+    expect(drawsOfOnePitch(1, 9, true, 지친투수).pitcherStamina).toBe(4000 + Math.trunc(((용량 - 9) * 10000) / 용량) - 10000)
+  })
+
+  /**
+   * 실투 0x33cbc 는 스킬이 확률 p 만 바꾸고 rand(0,100) 은 늘 한 번이다 — 난수 차례는 실투 스킬과 무관.
+   * (능력치는 스윙 판정 0xab214 의 투수 값(ab548 · ab582)이라 결과 · 굴림 수가 바뀔 수 있어 같은 능력치끼리 견준다)
+   */
+  it('실투 스킬이 바뀌어도 공 하나의 난수 수는 같다', () => {
+    const 스킬없음 = modePitcherOf({
+      ...createPitcherCareer('테스트'),
+      ability: { control: 900, velocity: 900, breaking: 900, stamina: 900 },
+    })
+    expect(drawsOfOnePitch(1, 9, true, 강투수).drawn).toBe(drawsOfOnePitch(1, 9, true, 스킬없음).drawn)
+    expect(drawsOfOnePitch(1, 0, false, 강투수).drawn).toBe(drawsOfOnePitch(1, 0, false, 스킬없음).drawn)
   })
 })
 
@@ -1133,8 +1149,8 @@ describe('투수편 마선수 대결 — 투수 미션 team − 1 을 던지고 
   })
 
   it('아웃을 잡으면(성공) 이겼다 — G 보상은 없고(0x4ef3e 의 +0x176 갈래) 투수 15번 칸만 −1 → 0 (0xa5368)', () => {
-    // 씨앗 1 — 한가운데 공으로 아웃을 잡는 판 (원본 생성기 0xbfa54 기준)
-    const { status, isWin, after, save, onGamePointReward } = playPitcherAceMatch(1)
+    // 씨앗 6 — 한가운데 공으로 아웃을 잡는 판 (원본 생성기 0xbfa54 기준 · 투수 스태미나 소모 0xa5e14 · 스윙 0xab214 의 투수 값까지)
+    const { status, isWin, after, save, onGamePointReward } = playPitcherAceMatch(6)
 
     expect(status).toBe('성공')
     expect(isWin).toBe(true)
@@ -1145,7 +1161,7 @@ describe('투수편 마선수 대결 — 투수 미션 team − 1 을 던지고 
   })
 
   it('실패하면 졌다', () => {
-    // 씨앗 2 — 원본 생성기 0xbfa54 기준 (1~12 가운데 실패는 2 · 3 · 8 · 9 · 12)
+    // 씨앗 2 — 원본 생성기 0xbfa54 기준 (1~12 가운데 성공은 6 · 8 · 10 · 11, 나머지는 실패)
     const { status, isWin } = playPitcherAceMatch(2)
 
     expect(status).toBe('실패')
@@ -1685,7 +1701,11 @@ describe('대기가 서 있는 동안의 보통 미션 — 대결 꼴 (0xaa57c a
     const writeResult = vi.fn()
     const setScreen = vi.fn()
     const random = createSeededRandom(seed)
-    const pitcher = modePitcherOf(createPitcherCareer('투수'))
+    // 판을 깨는 씨앗을 고르기 쉽게 센 투수 — 스윙 판정 0xab214 가 투수 값(ab548 · ab582)을 본다
+    const pitcher = modePitcherOf({
+      ...createPitcherCareer('투수'),
+      ability: { control: 900, velocity: 900, breaking: 900, stamina: 900 },
+    })
     const screen: Screen = { kind: '미션선택' }
     const rendered = renderHook(() => {
       const runner = useAtBatRunner()
@@ -1732,10 +1752,10 @@ describe('대기가 서 있는 동안의 보통 미션 — 대결 꼴 (0xaa57c a
 
   it('사람 칸 = g[0xf6] 편 나리 저장의 팀 · 판을 닫으면 결과 바이트를 덮어쓰고 G 없이 그 편 장면으로', () => {
     // 한가운데 직구로 깨는 첫 씨앗 — 장면 앞 굴림 차례가 바뀌어도 성공 판을 고른다(판정 자체는 이 시험의 몫이 아니다)
-    const played = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    const played = Array.from({ length: 30 }, (_unused, index) => index + 1)
       .map((seed) => playHeldPitcherMission(seed, { batter: true, pitcher: false, originalMode: 4 }))
       .find((candidate) => candidate.status === '성공')
-    if (played === undefined) throw new Error('씨앗 1~12 에 성공 판이 없다')
+    if (played === undefined) throw new Error('씨앗 1~30 에 성공 판이 없다')
 
     // 0xaa57c aa6e0 — g[0x11f] 가 서 있어 m = g[0xf6] = 4 → 타자편 저장 팀
     expect(played.started?.game.humanBatting.teamId).toBe(5)

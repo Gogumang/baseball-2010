@@ -34,6 +34,16 @@ describe('투수 미션 투수 — 0x213c0 모드 5→3 나리 투수편 저장 
     expect(modePitcherOf(냉정).stats.control).toBe(999)
   })
 
+  it('스태미나 재료 — 시작 +0x2c 는 저장된 투수 값(0xb8820 → 0xb521c 통째 사본) · 용량 체력 0xb6415(P, 3, 1) · 비겁자 18 · 끈기 10', () => {
+    const 지친 = { ...투수, stamina: 3500, equippedSkillIds: [18, 10] }
+    const pitcher = modePitcherOf(지친)
+    expect(pitcher.stamina).toBe(3500)
+    expect(pitcher.staminaAbility).toBe(equippedPitcherAbilityOf(지친).stamina)
+    expect(pitcher.ability).toEqual(equippedPitcherAbilityOf(지친))
+    expect(pitcher.isCoward).toBe(true)
+    expect(pitcher.endures).toBe(true)
+  })
+
   it('폼·구질 마스크·고른 마구 번호를 레코드에서 가져온다', () => {
     const 마구투수 = { ...투수, selectedMagicNumber: 2 }
     const pitcher = modePitcherOf(마구투수)

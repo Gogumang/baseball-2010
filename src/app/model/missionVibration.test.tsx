@@ -56,7 +56,11 @@ function 던지며모으기(isVibrationOn: boolean | undefined, seed: number, ac
   const missionRecord: MissionRecordPort = { load: () => ({}), save: vi.fn() }
   const screen: Screen = aceMatch ? { kind: '투수편' } : { kind: '미션선택' }
   const random = 센난수(seed)
-  const pitcher = modePitcherOf(createPitcherCareer('진동투수'))
+  // 삼진이 나도록 센 투수 — 스윙 판정 0xab214 가 투수 값(ab548 · ab582)을 본다
+  const pitcher = modePitcherOf({
+    ...createPitcherCareer('진동투수'),
+    ability: { control: 900, velocity: 900, breaking: 900, stamina: 900 },
+  })
   let 판정: { strikesBefore: number; kind: PitchResolution['kind'] } | null = null
   const rendered = renderHook(() => {
     const base = useAtBatRunner()

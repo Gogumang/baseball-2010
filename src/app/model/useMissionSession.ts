@@ -57,7 +57,7 @@ import {
 } from '@/entities/pitcher-career/model/pitcherStamina'
 import { pitchAgainstBatterDetailed } from '@/entities/pitching/model/simulateBatter'
 import { RUTHLESS_SKILL_ID, specialSwingCountOf } from '@/entities/batting/model/specialSwing'
-import { rollsIntoBenchClearing } from '@/entities/game/model/benchClearing'
+import { benchClearingEffectOf, rollsIntoBenchClearing, staminaAfterBenchClearing } from '@/entities/game/model/benchClearing'
 import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
 import { BATTER_SLOT, gameAbilityOf } from '@/features/play-team-game/model/gameAbilities'
 import { isMistakePitch } from '@/entities/pitching/model/mistakePitch'
@@ -66,7 +66,7 @@ import { MAGIC_PITCH_TYPE_NUMBER, ballMagicNumberAfterPitch } from '@/entities/p
 import { countsTopGradePitch } from '@/entities/pitcher-career/model/pitcherGameRecord'
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
-import { buildHumanPitch, mistakeHumanPitchOf, pitchGradeOf } from '@/features/play-pitcher-game/model/pitcherPitch'
+import { buildHumanPitch, fatiguedStatsOf, mistakeHumanPitchOf, pitchGradeOf } from '@/features/play-pitcher-game/model/pitcherPitch'
 import {
   isModeMagicPitchType, modePitcherMagicRemainingOf, modePitcherOf, modePitcherOfHallOfFame,
 } from '@/app/model/modePitcher'
@@ -430,8 +430,6 @@ const MAX_GAUGE_GRADE = 5
 
 /** 투영 원점 0xcfb18 의 칸 — 미션 상대 타자의 좌우를 알 길이 없어 1 로 둔다 (추정, 예전 그대로) */
 const MISSION_STAGE_SIDE = 1
-/** 미션 투수는 체력 레코드가 없다 — 늘 100% 로 둔다 (추정) */
-const MISSION_STAMINA_PERCENT = 100
 
 const NO_SKILLS: readonly number[] = []
 
@@ -603,6 +601,12 @@ export function useMissionSession({
    * (`modePitcherMagicRemainingOf`) 코스 확정 0x50e9c 가 줄인다. 미션 한 판(새 경기)마다 −1 로 돌아간다.
    */
   const [pitcherMagicStored, setPitcherMagicStored] = useState(UNFILLED_SPECIAL_SWING)
+  /**
+   * **투수 미션 사람 투수의 레코드 +0x2c** — null 이면 미션 경기를 세울 때 베낀 값(`ModePitcher.stamina`, 0xb8820 → 0xb521c)이다.
+   * 공마다 0xa5e14 가 깎고(0x11 진입 0x3dec6 — 모드 갈래 없음) 벤치 클리어링 0x3ab7c 가 −1000 한다. 경기를 새로 세우면(다시하기 ·
+   * 다음 미션) 0x20094 가 팀을 다시 싣고 0xb8820 이 저장에서 다시 베끼므로 null 로 돌아간다 — 저장의 나리 투수 +0x2c 는 안 바뀐다.
+   */
+  const [pitcherStaminaStored, setPitcherStaminaStored] = useState<number | null>(null)
   /**
    * **공 객체 +0x10** — 투수 미션 사람 공에 실린 마구 번호 (0x3de10). 되돌리는 줄이 없어 마구 뒤 공에도 남는다(H2 3-4).
    * 경기 시작 0 (0x1239 new 의 0 채움은 원본 미확인 — 팀 경기 `ballMagicNumber` 와 같다).
@@ -992,14 +996,32 @@ export function useMissionSession({
       : Math.max(1, PITCH_TYPES.findIndex((candidate) => candidate.name === type.name) + 1)
     // 0x50db8 — 구질 22 는 남은 마구(0xaea10) > 0 일 때만 받는다. 아니면 무시 (난수 없음)
     if (isMagic && pitcherMagicRemaining <= 0) return
+    // 스태미나 소모 0xa5e14 — 0x11 진입 0x3de10 의 0x3dec6(모드 갈래 없음)이라 놓기 0x4dc78 의 등급 0x4dbac · 피로 0x34968 과
+    // CPU 타자 스윙 0xab214 가 **깎은 뒤** 체력을 본다. 용량 0x66e44 의 사기는 모드 5 라 100(`MISSION_TEAM_MORALE`), 첫 투수 +200 은
+    // 선다 — 0xb8820 이 투수를 넣으며 team+0x26 · +0x33 을 함께 +1 해 `+0x26 − +0x33 == 1` 그대로다(b884a~b885a)
+    const pitcherStamina = consumeStamina(
+      pitcherStaminaStored ?? pitcher.stamina,
+      pitchStaminaCostOf({
+        pitchTypeNumber: typeNumber,
+        // ⚠️ CPU 타자의 압도 22 — 실투 판정과 같이 늘 거짓으로 둔다(아래 `isMistakePitch` 주석)
+        batterIntimidates: false,
+        pitcherIsCoward: pitcher.isCoward,
+        pitcherEndures: pitcher.endures,
+      }),
+      staminaCapacityOf(pitcher.staminaAbility, MISSION_TEAM_MORALE, true),
+    )
+    setPitcherStaminaStored(pitcherStamina)
+    const pitcherStaminaPercent = staminaPercentOf(pitcherStamina)
+    // 0xb570c(모드 5) — 0xb6414 에 곧장 피로 0xb58e6 → 0..999 (`modePitcher` 머리말)
+    const fatigued = fatiguedStatsOf(pitcher.ability, pitcherStamina)
     // 게이지를 쓰면 칸에서 t = max(g−4, 1) 을, 안 쓰면 제구·체력 확률표 0xd896c 로 뽑는다 (0x4dbac)
     const grade = pitchGradeOf(
       {
         gaugeSettingOn,
         typeNumber,
         gaugeCell,
-        effectiveControl: pitcher.stats.control,
-        staminaPercent: MISSION_STAMINA_PERCENT,
+        effectiveControl: fatigued.control,
+        staminaPercent: pitcherStaminaPercent,
       },
       random,
     )
@@ -1009,7 +1031,7 @@ export function useMissionSession({
         courseCell,
         grade,
         gaugeCell,
-        stats: pitcher.stats,
+        stats: fatigued,
         repertoire: pitcher.repertoire,
         side: MISSION_STAGE_SIDE,
         // 조건코드 0 이면 `applyControlError` 가 난수를 한 톨도 안 뽑는다 = 예전과 같다
@@ -1058,7 +1080,7 @@ export function useMissionSession({
       ? mistakeHumanPitchOf(aimedPitch, {
           typeNumber,
           grade,
-          stats: pitcher.stats,
+          stats: fatigued,
           repertoire: pitcher.repertoire,
           side: MISSION_STAGE_SIDE,
         })
@@ -1109,7 +1131,8 @@ export function useMissionSession({
       pitch,
       batterAbility,
       random,
-      undefined,
+      // ab548(구속) · ab582(제구) — 0xb570c(…, 체력%)로 깎은 뒤 피로를 먹인 값
+      { control: fatigued.control, velocity: fatigued.velocity },
       {
         strikes: runner.atBatRef.current.strikes,
         balls: runner.atBatRef.current.balls,
@@ -1127,6 +1150,8 @@ export function useMissionSession({
         // 연차(+0xb3)는 모드 3·4 갈래(sp40)에서만 읽혀 여기서는 안 쓰인다 — 넘기지 않는다
         swingMode: '투수미션',
         isPitcherOwnPlayer: true,
+        // ab838 — 깎은 뒤 체력% 0 이면 B · C 에 +2000
+        pitcherStaminaPercent,
         // 파울 각 공도 수비 판을 돈다 — 낙구 전에 잡히면 파울 뜬공 아웃(13), 아니면 판이 닫힌 뒤 스트라이크(0x35108 → 0xb6b58)
         playsFoulBall: true,
       },
@@ -1258,8 +1283,7 @@ export function useMissionSession({
     if (outcome !== null) {
       // 사구면 상태 0x12 끝(0x4e74c)에서 벤치 클리어링을 굴린다 — 미션(모드 5)도 홈런더비가 아니라 늘 한 번 굴린다.
       // 굴림이 돌발 검사보다 앞이라 돌발 유무와 무관하게 난수는 한 번 쓴다.
-      // ⚠️ 들어갔을 때의 효과(수비가 사람 → 0xaeab0 미션 투수 스태미나 −1000)는 웹 미션이 스태미나를
-      //    들고 있지 않아(`MISSION_STAMINA_PERCENT` 고정) 남길 자리가 없다. S[1] 은 시즌(모드 2)만 적는다.
+      // 들어가면 수비가 사람이라 0x3ab7c 0xaeab0(수비 팀, 1000) — 미션 투수 +0x2c −1000. S[1] 은 시즌(모드 2)만 적는다.
       const entersBenchClearing = rollsIntoBenchClearing(
         { isHitByPitch: outcome.kind === '사구', isHomeRunDerby: false, burstInProgress: false },
         random,
@@ -1267,6 +1291,7 @@ export function useMissionSession({
       if (entersBenchClearing) {
         // 진입 0x3a5f0 — 공격 9명 자리·목표 굴림 45 번이 곧바로 나간다. 사구는 연출이 끝날 때까지 붙든다
         rollBenchClearingEntry(random)
+        setPitcherStaminaStored(staminaAfterBenchClearing(pitcherStamina, benchClearingEffectOf(true).defenseStaminaLoss))
         setPendingBenchClearing({
           run: nextRun,
           outcome,
@@ -1508,6 +1533,8 @@ export function useMissionSession({
     // 새 경기 — 0xaae7c 가 저장된 마투수 레코드(+0x2c = 10000)를 다시 베낀다
     setBatterSpecialSwingStored(UNFILLED_SPECIAL_SWING)
     setPitcherMagicStored(UNFILLED_SPECIAL_SWING)
+    // 0xb8820 이 저장의 투수 레코드를 다시 베낀다 — +0x2c 도 저장값에서 다시
+    setPitcherStaminaStored(null)
     setBallMagicNumber(0)
     // 시작 상황(카운트)은 상태 8 끝 48c86 의 0xaae7c(…, 0xd, 0x18, 0)(aaf10)이 0x18 앞에 깐다 — 0xe 대기는 첫 0x18 판 OK 뒤
     // (`openFirstHalfBoard` · `confirmHalfInningBoard`)
@@ -1963,6 +1990,8 @@ export function useMissionSession({
     random,
     /** 타자 미션 상대 마투수의 체력% `0xaebb0` = trunc(+0x2c / 100) — `missionPitcherAbility` 셋째 인자 */
     opponentStaminaPercent: staminaPercentOf(opponentMoundStamina),
+    /** 투수 미션 사람 투수의 지금 +0x2c (공마다 0xa5e14 가 깎는다 — `pitcherStaminaStored`) */
+    pitcherStamina: pitcherStaminaStored ?? pitcher.stamina,
     /**
      * 타자 미션 마운드 투수가 이 구질을 던져 **깎은 뒤**의 체력% — `PitcherAbility.staminaPercentAfterPitch` 로 타석 화면에 넘긴다.
      * 원본은 공이 손을 떠나는 0x11 진입(0x3dec6 → 0xa5e14)에서 깎고 놓기 0x4dc78 · 스윙 0xab214 가 그 뒤 체력을 본다.

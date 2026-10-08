@@ -39,8 +39,9 @@ import type { PitcherRepertoire, PitcherStats } from '@/features/play-pitcher-ga
  *
  * 능력치 — **0xb6414 = `equippedPitcherAbilityOf`** (장비·장착 스킬 5·7·22). 경기용 0xb570c 는 모드 5 에서
  * 질병·부상·사기 감소 갈래(모드 3·4 의 0xb574a)도 시즌 갈래(2)도 안 타고 곧장 피로 0xb58e6 으로 가며,
- * 팀 능력치 0xb592c 는 모드 1·2·8·9 만이다 (ab7cf84 와 같은 0xb5734~0xb5748 갈래). 미션 투수 체력은 100% 로 두므로
- * 피로 감소도 없고(54% 초과) 맨 끝 0xb5b06 의 0..999 자르기만 남는다 — 냉정 22 로 999 를 넘은 제구가 여기서 잘린다.
+ * 팀 능력치 0xb592c 는 모드 1·2·8·9 만이다 (ab7cf84 와 같은 0xb5734~0xb5748 갈래). `stats` 는 체력 100% 의 값이라
+ * 맨 끝 0xb5b06 의 0..999 자르기만 먹었고 — 냉정 22 로 999 를 넘은 제구가 여기서 잘린다 — 공마다의 피로는 세션이
+ * `ability` 와 깎은 체력%로 다시 낸다(`useMissionSession`).
  *
  * 레퍼토리 — 구질 마스크 +0x1c · 폼 0xb6e24(= 2×타입 + 손) · 고른 마구 번호 +0x18 (`pitcherGameOptionsOf` 와 같은 칸).
  *
@@ -62,9 +63,25 @@ export interface ModePitcher {
   readonly isCool: boolean
   /** 마구 횟수 0xaebe4 — 39 혼신 (투수 비트 23, 장착 `0xb62b4(P, 0x17)`) +2 */
   readonly hasSpiritSkill: boolean
+  /**
+   * 0xb6414 경기용 네 칸(장비 · 장착 스킬, 0..999 자르기 **앞**) — 공마다 깎은 체력%로 피로 0xb58e6 를 먹여 다시 낸다
+   * (`fatiguedStatsOf`, 0xb570c 는 모드 5 에서 곧장 피로 → 맨 끝 자르기). `stats` 는 체력 100% 의 값이다.
+   */
+  readonly ability: PitcherStats
+  /**
+   * 미션 시작의 레코드 +0x2c — 사람 칸 팀을 세우는 0xaa57c 의 aa826 `0xb8820(팀)` 이 선수 게터 0x1fbd0 의 기록을
+   * `0xb521c(팀 레코드, P, 1)` 로 0x30 바이트 통째(b5296 · b533e memcpy) 베낀다 — +0x2c 도 그 선수 저장값 그대로다.
+   */
+  readonly stamina: number
+  /** 스태미나 용량 0x66e44 의 체력 — `0xb6415(P, 3, 1)` (투수편 `pitcherGameOptions.staminaAbility` 와 같은 칸) */
+  readonly staminaAbility: number
+  /** 소모 0xa5e14 — 투수 스킬 18 비겁자 (×2) */
+  readonly isCoward: boolean
+  /** 소모 0xa5e14 — 투수 스킬 10 끈기 (−1) */
+  readonly endures: boolean
 }
 
-/** 미션 투수 체력 — 미션 경기에 체력 기록을 두지 않아 늘 100% (useMissionSession `MISSION_STAMINA_PERCENT` 와 같은 추정) */
+/** 체력 100% — `stats` 는 피로 없는 값이다 */
 const MISSION_STAMINA = 10000
 
 /** 실투 판정이 보는 투수 비트 번호 (커리어 `equippedSkillIds` 는 투수 비트 번호로 든다 — pitcherGameOptions 와 같다) */
@@ -72,12 +89,21 @@ const STEADY_SKILL = 16
 const TIMID_SKILL = 17
 const COOL_SKILL = 22
 const SPIRIT_SKILL = 23
+/** 소모 0xa5e14 가 보는 투수 비트 (`pitcherGameOptions` 의 COWARD · ENDURE 와 같다) */
+const COWARD_SKILL = 18
+const ENDURE_SKILL = 10
 
 function rookieModePitcher(): ModePitcher {
   // 등록 화면의 처음 값은 변화구가 비어 있다(0x10b18) — 커리어 없는 웹 대체 투수는 예전처럼 칸 0·1 을 준다
   const profile = { ...DEFAULT_PITCHER_ROOKIE_PROFILE, breakingPitchSlots: [0, 1] }
+  const ability = rookiePitcherAbilityOf(profile.role, profile.typeIndex)
   return {
-    stats: fatiguedStatsOf(rookiePitcherAbilityOf(profile.role, profile.typeIndex), MISSION_STAMINA),
+    stats: fatiguedStatsOf(ability, MISSION_STAMINA),
+    ability,
+    stamina: MISSION_STAMINA,
+    staminaAbility: ability.stamina,
+    isCoward: false,
+    endures: false,
     repertoire: {
       pitchMask: rookiePitchMaskOf(profile.breakingPitchSlots),
       form: pitcherFormOf(profile.typeIndex, profile.handIndex),
@@ -96,9 +122,15 @@ function modePitcherFromRecord(
   equippedAbility: PitcherAbility,
   repertoire: { readonly pitchMask: number; readonly form: number; readonly magicNumber: number },
   record: { readonly equippedSkillIds: readonly number[] },
+  stamina: number,
 ): ModePitcher {
   return {
     stats: fatiguedStatsOf(equippedAbility, MISSION_STAMINA),
+    ability: equippedAbility,
+    stamina,
+    staminaAbility: equippedAbility.stamina,
+    isCoward: isPitcherSkillEquipped(record, COWARD_SKILL),
+    endures: isPitcherSkillEquipped(record, ENDURE_SKILL),
     repertoire: { ...repertoire, isAce: false },
     isSteady: isPitcherSkillEquipped(record, STEADY_SKILL),
     isTimid: isPitcherSkillEquipped(record, TIMID_SKILL),
@@ -113,6 +145,8 @@ export function modePitcherOf(career: PitcherCareer | null): ModePitcher {
     equippedPitcherAbilityOf(career),
     { pitchMask: career.pitchMask, form: pitcherFormOfCareer(career), magicNumber: career.selectedMagicNumber },
     career,
+    // 저장된 나리 투수의 +0x2c (`PitcherCareer.stamina`)
+    career.stamina,
   )
 }
 
@@ -138,6 +172,9 @@ export function modePitcherOfHallOfFame(famer: HallOfFamePitcher): ModePitcher {
       magicNumber: famer.selectedMagicNumber ?? 0,
     },
     { equippedSkillIds },
+    // ⚠️ 미해결: 명전 기록 +0x2c 는 등록 0x1f654 가 그때 투수 레코드를 통째 베낀 값인데 웹 명전 기록(`HallOfFamePitcher`)이
+    //    그 칸을 안 남긴다 — 남길 때까지 10000 으로 둔다
+    MISSION_STAMINA,
   )
 }
 
