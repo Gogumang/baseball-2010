@@ -121,6 +121,27 @@ describe('팀 경기 화면 — 수비(투구) 차례', () => {
     expect(screen.getByText('1. 구질 선택')).toBeTruthy()
   })
 
+  it('경기 중 메뉴를 열어도 투구 단계는 숨긴 채 멈춘다 — 닫으면 게이지 틱이 이어진다 (팝업 동안 장면 정지 0x52cc6)', () => {
+    띄우기({ gaugeSettingOn: true })
+    구질고르기('FASTBALL')
+    조준확정()
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 5))
+
+    fireEvent.keyDown(window, { key: '*' })
+    // 내리지 않고 숨긴다
+    expect(screen.getByText('3. 투구 결정').closest('[hidden]')).not.toBeNull()
+    // 메뉴 동안은 틱이 안 흘러 공이 안 나간다
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 30))
+    fireEvent.keyDown(window, { key: '*' })
+
+    // 0x11 그대로 — 처음부터가 아니라 남은 다섯 틱 뒤에 놓는다
+    expect(screen.getByText('3. 투구 결정').closest('[hidden]')).toBeNull()
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 4))
+    expect(screen.getByText('3. 투구 결정')).toBeTruthy()
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
+    expect(screen.queryByText('3. 투구 결정')).toBeNull()
+  })
+
   it('게이지를 켜면 투구 결정 단계가 뜬다 (상태 0x11)', () => {
     띄우기({ gaugeSettingOn: true })
     구질고르기('FASTBALL')
