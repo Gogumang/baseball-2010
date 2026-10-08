@@ -7,6 +7,7 @@ import {
   recordBatterFaced,
   recordEntryLead,
   recordHitByPitch,
+  countsTopGradePitch,
   recordPitchGrade,
   saveSituationOf,
 } from '@/entities/pitcher-career/model/pitcherGameRecord'
@@ -65,6 +66,12 @@ describe('R+0x158 t=5 투구 수 (0xa5e00)', () => {
     let record = EMPTY_PITCHER_GAME_RECORD
     for (const grade of [0, 1, 2, 3, 4, 5, 5]) record = recordPitchGrade(record, grade)
     expect(record.topGradePitches).toBe(2)
+  })
+
+  it('세는 공은 0x3dfac 결과 코드 스위치의 스트라이크(3e13e) · 삼진(3e168) 갈래뿐 — 볼 · 맞은 공 · 낫아웃(v → 0)은 안 센다', () => {
+    expect(countsTopGradePitch(true, false)).toBe(true)
+    expect(countsTopGradePitch(false, false)).toBe(false)
+    expect(countsTopGradePitch(true, true)).toBe(false)
   })
 })
 

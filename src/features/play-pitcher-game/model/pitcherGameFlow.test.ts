@@ -191,6 +191,32 @@ describe('투구', () => {
     expect(지침.lastPitch).not.toEqual(버팀.lastPitch)
   })
 
+  it('R+0x158(t=5 투구 수)은 못 맞힌 스트라이크 · 삼진 판정에서만 센다 — 볼 · 파울 · 타구는 0x3dfac 스위치의 그 갈래를 안 지난다', () => {
+    let current = startPitcherGame({ ...기본옵션, gaugeSettingOn: true }, 씨앗(3))
+    const random = 씨앗(11)
+    let 스트라이크 = 0
+    let 그밖t5 = 0
+    for (let pitch = 0; pitch < 80 && !current.game.isFinished; pitch += 1) {
+      if (current.managerHookText !== null) {
+        current = closeManagerHookWindow(current, random)
+        continue
+      }
+      if (current.sceneConfirmPending === true) {
+        current = confirmScene(current, random)
+        continue
+      }
+      if (!isPitchTurn(current)) break
+      // 게이지 칸 9 = 등급 t 5 (0x50e08)
+      const before = current.pitcherRecord.topGradePitches
+      current = throwPitch(current, { ...한가운데직구, gaugeCell: 9 }, random)
+      const counted = current.pitcherRecord.topGradePitches - before
+      if (current.lastResolution?.kind === '스트라이크') 스트라이크 += counted
+      else 그밖t5 += counted
+    }
+    expect(스트라이크).toBeGreaterThan(0)
+    expect(그밖t5).toBe(0)
+  })
+
   it('마구는 코스 확정 때 횟수가 준다 — 다 쓰면 못 던진다 (0x50e9c · 0x50db8)', () => {
     let progress = startPitcherGame({ ...기본옵션, magicCount: 1 }, 씨앗(3))
     progress = throwPitch(progress, { typeNumber: 22, courseCell: 4, gaugeCell: 0 }, 씨앗(5))

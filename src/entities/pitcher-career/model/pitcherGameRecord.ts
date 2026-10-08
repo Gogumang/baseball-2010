@@ -103,11 +103,22 @@ export function recordHitByPitch(record: PitcherGameRecord): {
 
 /**
  * R+0x158 — 투구 등급 t 가 5 일 때만 +1 (0xa5e00 → 0xa5e0a).
- * 부르는 곳은 "공이 포수까지 갔다" 판정(0x3dfac)의 스트라이크·볼 두 갈래라 **판정마다 한 번**이다.
+ * 부르는 곳은 "공이 포수까지 갔다" 판정(0x3dfac)의 결과 코드 스위치(표 0xcffb4) 두 갈래 — **1 스트라이크(3e13e) · 5 삼진(3e168)** 뿐이다.
+ * 볼 · 볼넷 · 사구 갈래와 맞은 공 · 낫아웃(v 를 0 으로 지움)은 안 센다 — S5 5절의 "볼(state[5]++)" 은 삼진 갈래 5(뒤에 state[6]++, S8 5-7)를 잘못 읽은 것.
  */
 export function recordPitchGrade(record: PitcherGameRecord, grade: number): PitcherGameRecord {
   if (grade !== 5) return record
   return { ...record, topGradePitches: record.topGradePitches + 1 }
+}
+
+/**
+ * **R+0x158 을 세는 공인가** — 공 도착 0x3dfac 의 결과 코드 스위치(0x3e11a, `[장면+0x10ac] − 1` 로 표 0xcffb4)에서 0xa5e00(R, t)을 부르는
+ * 갈래는 1 스트라이크(0x3e134 → 3e13e) · 5 삼진(0x3e15e → 3e168) 둘뿐이다. 2 볼(0x3e156) · 3 볼넷(0x3e1ae) · 4 사구(0x3e1b4)는 안 부르고,
+ * 맞은 공(파울 · 타구)은 0x3dfac 를 안 지난다. 낫아웃(종류 9 판의 0x3e09e 가 v = 5 를 0 으로 지움)은 스위치를 건너뛴다.
+ * `isUnhitStrike` = 못 맞힌 스트라이크(헛스윙 · 지켜본 스트라이크 · 세 번째 스트라이크), `isDroppedThirdStrike` = 그 공이 연 판이 낫아웃.
+ */
+export function countsTopGradePitch(isUnhitStrike: boolean, isDroppedThirdStrike: boolean): boolean {
+  return isUnhitStrike && !isDroppedThirdStrike
 }
 
 export interface SaveSituationInput {

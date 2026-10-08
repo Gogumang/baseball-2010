@@ -62,6 +62,7 @@ import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/pla
 import { BATTER_SLOT, gameAbilityOf } from '@/features/play-team-game/model/gameAbilities'
 import { isMistakePitch } from '@/entities/pitching/model/mistakePitch'
 import { MAGIC_PITCH_TYPE_NUMBER, ballMagicNumberAfterPitch } from '@/entities/pitcher-career/model/magicPitch'
+import { countsTopGradePitch } from '@/entities/pitcher-career/model/pitcherGameRecord'
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
 import { buildHumanPitch, mistakeHumanPitchOf, pitchGradeOf } from '@/features/play-pitcher-game/model/pitcherPitch'
@@ -419,13 +420,10 @@ interface PendingMissionDefense {
 const FOUL_PLAY_OUTCOME: AtBatOutcome = { kind: '아웃', detail: '뜬공아웃' }
 
 /**
- * 게이지에서 t=5(최상)로 던진 공만 "MAX게이지" 로 센다.
- *
- * 원본에도 같은 칸이 있다 — 투수 평가 `R+0x158` 을 채우는 0xa5e00 이 `if t != 5 → return`
- * 한 줄뿐이다(S5 5절 확정). 게이지를 끄고 던져 표에서 t=5 가 나온 공과 마구(늘 t=5)도 함께 센다.
- *
- * ⚠️ **유력/추정**: 미션 레코드의 "MAX투구게이지" 목표가 세는 칸이 이 `R+0x158` 과 같은지는
- * 아직 못 밝혔다. t=5 말고 달리 "MAX" 라 부를 값이 없어 같은 줄로 둔다.
+ * 등급 t=5(최상)로 던진 공을 "MAX게이지" 로 센다 — 미션 판정 0xaaa6c 의 모드 5 갈래(aac76~aacd6)가 목표 +0xa1 위 니블을
+ * 투수 기록 `R+0x158` 과 견준다(Q2). 그 칸을 채우는 0xa5e00 은 `if t != 5 → return` 한 줄이고, 부르는 곳은 공 도착 0x3dfac 의
+ * 스트라이크 · 삼진 갈래뿐이다(`countsTopGradePitch` — 볼 · 볼넷 · 사구 · 맞은 공 · 낫아웃은 안 센다). 게이지를 끄고 던져 표에서
+ * t=5 가 나온 공과 마구(늘 t=5)도 함께 센다.
  */
 const MAX_GAUGE_GRADE = 5
 
@@ -1126,11 +1124,6 @@ export function useMissionSession({
         ? pitcherRun.cpu
         : withMissionCpuSpecialSwing(pitcherRun.cpu, batterOrderSlot, thrown.specialSwingRemaining)
 
-    // 0xa5e14 — 사람이 던져도 공마다 state[0xd] · state[0xe](CPU 대타 막음)를 내린다 (a5e72 · a5e7c)
-    let nextRun = recordPitch(
-      { ...pitcherRun, cpu: missionCpuAfterPitch(cpuAfterSwing, { pitchTypeNumber: typeNumber, batterIntimidates: false }) },
-      grade === MAX_GAUGE_GRADE,
-    )
     // 이 공 **전** 스트라이크 — 0x9d57c 의 st[4] (삼진 진동이 본다)
     const strikesBefore = runner.atBatRef.current.strikes
     // 판을 도는 파울 각 공은 판이 파울로 닫힌 뒤에야 스트라이크가 오른다(0x35108 → 0xb6b58)
@@ -1158,6 +1151,13 @@ export function useMissionSession({
           random,
         )
       : null
+    // 0xa5e14 — 사람이 던져도 공마다 state[0xd] · state[0xe](CPU 대타 막음)를 내린다 (a5e72 · a5e7c).
+    // MAX게이지(R+0x158)는 공 도착 0x3dfac 의 스트라이크 · 삼진 갈래만 센다 — 낫아웃 판(종류 9 · 타자주자)은 v 를 0 으로 지워 건너뛴다
+    let nextRun = recordPitch(
+      { ...pitcherRun, cpu: missionCpuAfterPitch(cpuAfterSwing, { pitchTypeNumber: typeNumber, batterIntimidates: false }) },
+      grade === MAX_GAUGE_GRADE &&
+        countsTopGradePitch(resolution.kind === '스트라이크', play !== null && arrivalApplicationOf(play) === 'batterRuns'),
+    )
     // 투구 순간 소리 (0x3f378 — 투수 단계가 공을 놓는 칸에 닿을 때). 이어서 심판 콜.
     // ⚠️ **근사**: 웹은 던지는 순간에 결과가 다 나오므로 투구음과 심판 콜이 붙어 버린다.
     //    통로가 하나라 뒤 소리가 앞 소리를 끊는다 (원본은 공이 날아가는 동안이 사이에 있다).

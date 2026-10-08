@@ -115,6 +115,7 @@ import {
   recordBatterFaced,
   recordEntryLead,
   recordHitByPitch,
+  countsTopGradePitch,
   recordPitchGrade,
   saveSituationOf,
 } from '@/entities/pitcher-career/model/pitcherGameRecord'
@@ -1127,8 +1128,6 @@ export function startPitch(
     // ctx+0x161 · ctx+0x16c — 투구 처리 0xa5e14 가 공 하나마다 둘 다 올린다
     atBatPitches: progress.atBatPitches + 1,
     halfInningPitches: progress.halfInningPitches + 1,
-    // R+0x158 — t == 5 로 던진 공. 마구는 늘 5 라 함께 센다
-    pitcherRecord: recordPitchGrade(progress.pitcherRecord, grade),
     lastPitch: pitch,
     lastResolution: resolution,
     // 판을 도는 파울 각 공은 판이 파울로 닫힌 뒤에야 스트라이크가 오른다(0x35108 → 0xb6b58)
@@ -1155,7 +1154,7 @@ export function startPitch(
   const resume = { buntKind: thrown.buntKind ?? 0 }
   const arrival = arrivePitcherPitch(
     afterPitch,
-    { resolution, outcomeAfter: afterPitch.atBat.outcome, buntKind: thrown.buntKind ?? 0 },
+    { resolution, outcomeAfter: afterPitch.atBat.outcome, buntKind: thrown.buntKind ?? 0, grade },
     random,
     live ? resume : undefined,
   )
@@ -1279,8 +1278,10 @@ function arrivePitcherPitch(
   pitch: {
     readonly resolution: PitchResolution
     readonly outcomeAfter: AtBatOutcome | null
-    /** 장면 +0xfdc — 이 공 뒤의 번트 종류(못 맞힌 번트면 그 종류, 안 휘둘렀으면 앞 공의 값). 도루 판 리드 0x3d7b8 이 본다 */
+    /** 장면 +0xfdc — 이 공 뒤의 번트 종류(못 맞힌 번트면 그 종류, 안 휘둘렀으면 0). 도루 판 리드 0x3d7b8 이 본다 */
     readonly buntKind?: number
+    /** 이 공의 등급 t (scene+0x17c0) — 결과 코드 스위치의 R+0x158(`recordPitchGrade`)이 본다 */
+    readonly grade: number
   },
   random: RandomPort,
   /** 화면이 도는 갈래면 도루 · 폭투 판을 붙든다 — `afterMyPitchArrival` 이 쓸 값 */
@@ -1310,17 +1311,24 @@ function arrivePitcherPitch(
     },
     random,
   )
-  if (opened === null) return { progress: withoutSteal(progress), play: null, interrupted: false }
+  // R+0x158 — 판 종류를 정한 같은 진입이 결과 코드 스위치(0x3e11a, 표 0xcffb4)로 간다 (`countsTopGradePitch`)
+  const graded = countsTopGradePitch(
+    pitch.resolution.kind === '스트라이크',
+    opened !== null && opened.kind === 9 && opened.strikeout === 'batterRuns',
+  )
+    ? { ...progress, pitcherRecord: recordPitchGrade(progress.pitcherRecord, pitch.grade) }
+    : progress
+  if (opened === null) return { progress: withoutSteal(graded), play: null, interrupted: false }
   // 도루 · 폭투 판 — 키(+0x160)로 던지므로 화면이 실시간으로 돌린다 (`liveRunnerPlay`). 밀어내기(종류 2)는 미리 돌린다
   if (live !== undefined && opened.kind !== 2) {
     return {
-      progress: { ...progress, pendingRunnerPlay: { kind: 'arrival', opened, resume: live } },
+      progress: { ...graded, pendingRunnerPlay: { kind: 'arrival', opened, resume: live } },
       play: null,
       interrupted: false,
       deferred: true,
     }
   }
-  return applyPitcherArrival(progress, runOpenedPitchArrivalPlay(opened))
+  return applyPitcherArrival(graded, runOpenedPitchArrivalPlay(opened))
 }
 
 /** 다 돈 공 도착 판을 경기에 먹인다 — `arrivePitcherPitch` 의 뒷부분. 실시간으로 보여 준 판(`shownLive`)은 재생 칸에 다시 안 넣는다 */

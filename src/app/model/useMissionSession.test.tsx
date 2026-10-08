@@ -237,13 +237,22 @@ describe('투수 미션 투구 게이지 — 누른 칸 g 를 그대로 받는�
   /**
    * 원본 누름 0x50e08~0x50e34: `g 가 1~9 가 아니면 무시` → `t = max(g − 4, 1)`.
    * 칸 9 만 최상 t=5 이고, 칸 8 은 t=4 다 (화면에서는 둘이 같은 그림이다 — S5 U-15 4절).
-   * "MAX게이지" 는 t=5 로 던진 공만 센다 (0xa5e00, S5 5절).
+   * "MAX게이지"(R+0x158)는 t=5 로 던진 공을 공 도착 0x3dfac 의 스트라이크 · 삼진 갈래(3e13e · 3e168)에서만 센다 (0xa5e00).
    */
-  it('칸 9 만 MAX게이지로 센다 — 칸 8·7·1 은 안 센다', () => {
-    expect(drawsOfOnePitch(1, 9).maxGauges).toBe(1)
-    expect(drawsOfOnePitch(1, 8).maxGauges).toBe(0)
-    expect(drawsOfOnePitch(1, 7).maxGauges).toBe(0)
-    expect(drawsOfOnePitch(1, 1).maxGauges).toBe(0)
+  it('칸 9 만 MAX게이지로 센다 — 칸 8·7·1 은 안 센다, 칸 9 도 못 맞힌 스트라이크(헛스윙 · 지켜본 스트라이크)일 때만', () => {
+    for (const missionId of [1, 2, 10]) {
+      for (const cell of [9, 8, 7, 1]) {
+        const pitch = drawsOfOnePitch(missionId, cell)
+        const 스트라이크판정 = pitch.banner === '헛스윙' || pitch.banner === '스트라이크'
+        expect(pitch.maxGauges, `미션 ${missionId} 칸 ${cell} (${pitch.banner})`).toBe(cell === 9 && 스트라이크판정 ? 1 : 0)
+      }
+    }
+  })
+
+  it('t=5 라도 맞은 공은 안 센다 — 0x3dfac 는 못 맞힌 공만 지나고 스위치의 스트라이크 · 삼진 갈래만 0xa5e00 을 부른다', () => {
+    const 맞음 = drawsOfOnePitch(1, 9)
+    expect(맞음.result).not.toMatch(/판 없음$/)
+    expect(맞음.maxGauges).toBe(0)
   })
 
   /** 칸이 1~9 밖이면 원본이 그냥 무시한다 = 안 누른 것과 같다 (0x50e1e `cmp r3,#8; bls`) */
