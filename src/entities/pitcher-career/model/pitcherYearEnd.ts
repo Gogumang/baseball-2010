@@ -1,6 +1,7 @@
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import type { SeasonEndState } from '@/entities/career/model/playerCareer'
 import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
+import { careerNationalTeamEventId, isCareerNationalCupYear } from '@/entities/national-cup/model/nationalCupFlow'
 import { leagueDayCounterOf } from '@/entities/career/model/leagueGameSetup'
 import { applyPitcherEventRewards } from '@/entities/pitcher-career/model/pitcherEventReward'
 import {
@@ -153,7 +154,8 @@ export function nextPitcherYearEndStep(
  * 연봉 등급 k(0xa4d78)가 이 비트를 읽는다.
  */
 export function enterPitcherYearEndEvent(career: PitcherCareer, eventId: number): PitcherCareer {
-  const state = SEASON_END_STATE_OF_EVENT[eventId]
+  // 0x1c154 의 0xa 갈래(연봉 보상 뒤 — 웹 133)가 501 · 504 를 틀 때는 132 를 거치지 않아 S+0x50 이 0xa 그대로다(1c2b2~1c2ee)
+  const state = career.seasonEndState === 133 ? undefined : SEASON_END_STATE_OF_EVENT[eventId]
   // 상태 진입이 S+0x50 을 쓰고 저장한다 — 이어하기가 이 값으로 돌아온다 (`seasonEndState`)
   const entered = state === undefined || career.seasonEndState === state ? career : { ...career, seasonEndState: state }
   return eventId === MVP_INTRO_EVENT_ID ? recordPitcherSeasonMvp(entered) : entered
@@ -176,7 +178,10 @@ const SEASON_END_STATE_OF_EVENT: Readonly<Partial<Record<number, SeasonEndState>
 
 /** 이어하기(상태 100 진입 0x1c154)가 돌아갈 곳 — 타자편 `app/model/seasonEvents.ResumePoint` 와 같은 꼴 */
 export type PitcherResumePoint =
-  /** S+0x50 == 0xb · 0xd · 0xe · 9 → 136 · 130 · 131 · 132 — 그 상태가 진입에서 트는 이벤트로 */
+  /**
+   * S+0x50 == 0xb · 0xd · 0xe · 9 → 136 · 130 · 131 · 132 — 그 상태가 진입에서 트는 이벤트로.
+   * 0xa(연봉 보상 뒤 — 웹 133)의 501 · 504 · 461 · 462 도 이 꼴이다
+   */
   | { readonly kind: '이벤트'; readonly eventId: number }
   /** S+0x50 == 2 — 116 경기 뒤 평가를 다시 띄운다(진입 0x1278c 다시 — 카운터가 겹쳐 쌓인다). 재료가 없는 옛 저장은 아래 갈래 */
   | { readonly kind: '경기결과' }
@@ -197,6 +202,7 @@ export type PitcherResumePoint =
  * 이어하기 분기 0x1c154 (R9 2b — 장면 0x106 이라 모드 3·4 공용):
  * ```
  * 1c24e: S+0x50 == 6|7 → 141 · 0x11 → 새 시즌 · 2 → 116 · 0xb → 136 · 9 → 132 · 0xc|0xd → 130 · 0xe → 131
+ *        0xa(연봉 보상 뒤 — 웹 133) → 판정 1 → 501 · 연차idx 12 → 504 · 짝수 → 133 · 홀수 → 새 시즌 (타자편 `resumePointOf`)
  * 그 밖: S+0x12c → 134 · S+0xb4 ≠ 0 → 128
  * 116 끝 0x12b74: S+0xb4 ≠ 0 이면 S+0xb2(= L+0x32) == 0 → [114 → 136], 아니면 [114 → 128]
  * ```
@@ -219,6 +225,8 @@ export function pitcherResumePointOf(career: PitcherCareer): PitcherResumePoint 
       return { kind: '이벤트', eventId: MVP_INTRO_EVENT_ID }
     case 132:
       return { kind: '이벤트', eventId: pitcherYearEndEventIdOf(career) }
+    case 133:
+      return pitcherSalaryResumePointOf(career)
     default:
       break
   }
@@ -230,6 +238,23 @@ export function pitcherResumePointOf(career: PitcherCareer): PitcherResumePoint 
   }
   if (career.seasonEndState === 128) return { kind: '포스트시즌' }
   return leagueDayCounterOf(career) === 0 ? { kind: '시즌종료' } : { kind: '포스트시즌' }
+}
+
+/** 13년차의 연차idx — 0x1c2c2 `cmp r5, #0xc` */
+const FINAL_YEAR_INDEX = 12
+
+/**
+ * 0x1c154 의 S+0x50 == 0xa 갈래(1c2a2~1c344, 모드 3 · 4 공용) — 연봉 결과의 보상 20(0x8cb90)이 쓴 값이다. 132 의 380 을 다시
+ * 틀지 않는다. 연차idx(S+0xb3)는 끝난 해의 것(`season − 1`)이고, 판정은 0xa3a85(S) — 투수편은 `judgePitcherEnding`.
+ */
+function pitcherSalaryResumePointOf(career: PitcherCareer): PitcherResumePoint {
+  const yearIndex = career.season - 1
+  if (judgePitcherEnding(career) === 1) return { kind: '이벤트', eventId: RELEASE_EVENT_ID }
+  if (yearIndex === FINAL_YEAR_INDEX) return { kind: '이벤트', eventId: FINAL_RETIREMENT_EVENT_ID }
+  if (isCareerNationalCupYear(yearIndex)) {
+    return { kind: '이벤트', eventId: careerNationalTeamEventId(achievedPitcherGoalCount(career, '국가대표')) }
+  }
+  return { kind: '새시즌' }
 }
 
 /** 이벤트 데이터의 보상 명령 7 (r_event) — 데이터(535KB)는 부르는 쪽이 넘긴다 (첫 화면 묶음에 넣지 않으려고) */

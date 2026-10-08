@@ -391,6 +391,12 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     // 0x1b768 은 그 자리(1b894~1b8a4)에서 저장한다 — 띄우기만 해도 저장이 새 시즌이다
     expect(거절.store.load()).toMatchObject({ season: 3, seasonEndState: null })
 
+    // 연봉 결과(384, 종류 20) — 8cb90 이 S+0x50 = 0xa. 이어하기는 380 을 다시 안 틀고 0xa 갈래: 2년차(연차idx 1 홀수)는 새 시즌
+    const 연봉 = 끊고다시(132, 384, [{ kind: 20, value: 0 }], [380, 384])
+    expect(연봉.저장.seasonEndState).toBe(133)
+    expect(연봉.다시.current.scene).toBe('관리')
+    expect(연봉.다시.current.career).toMatchObject({ season: 3, seasonEndState: null, salary: 연봉.받은뒤.salary })
+
     // 463 출전 — 대회가 저장에 들고 이어하기는 134 대진판, 134 첫 틀이 칭호 8
     const 출전 = 끊고다시(132, 463, [{ kind: 1, value: 10 }], [461, 463])
     expect(출전.저장).toMatchObject({ seasonEndState: null, nationalCup: createNationalCup() })

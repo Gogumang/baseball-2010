@@ -187,6 +187,15 @@ describe('이어하기 0x1c154 (모드 3·4 공용) — pitcherResumePointOf', (
     })
   })
 
+  it('연봉 보상 뒤(S+0x50 = 0xa — 웹 133) 1c2a2: 판정 1 → 501 · 연차idx 12 → 504 · 짝수 → 133 · 홀수 → 새 시즌', () => {
+    expect(pitcherResumePointOf(투수({ seasonEndState: 133, season: 7, popularity: 10 }))).toEqual({ kind: '이벤트', eventId: 501 })
+    expect(pitcherResumePointOf(투수({ seasonEndState: 133, season: 13, popularity: 1600 }))).toEqual({ kind: '이벤트', eventId: 504 })
+    expect(pitcherResumePointOf(투수({ seasonEndState: 133, season: 3 }))).toEqual({ kind: '이벤트', eventId: 462 })
+    expect(pitcherResumePointOf(투수({ seasonEndState: 133, season: 4 }))).toEqual({ kind: '새시즌' })
+    // 0xa 갈래가 트는 501 · 504 는 132 를 거치지 않는다 — S+0x50 그대로
+    expect(enterPitcherYearEndEvent(투수({ seasonEndState: 133 }), 501).seasonEndState).toBe(133)
+  })
+
   it('정규시즌 g 짝수·엔딩은 관리 화면', () => {
     expect(pitcherResumePointOf(투수({ gamesPlayed: 12 }))).toEqual({ kind: '관리' })
     expect(pitcherResumePointOf(투수({ seasonEndState: 132, endingIndex: 2 }))).toEqual({ kind: '관리' })

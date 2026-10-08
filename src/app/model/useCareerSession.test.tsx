@@ -222,6 +222,25 @@ describe('보상 명령 뒤 이어하기 자리 (0x8c460 끝 8cc2e — S+0x50 �
     expect(그밖.load()?.seasonEndState).toBe(132)
   })
 
+  it('연봉 결과 보상(종류 20) 뒤 끄면 S+0x50 = 0xa(8cb90) — 이어하기가 380 을 다시 틀지 않고 0xa 갈래로 간다(연봉이 한 번만 오른다)', () => {
+    // 2년차(연차idx 1, 홀수) — 새 시즌 0x1b768
+    const 홀수해 = 메모리저장(목표달성선수({ season: 2, seasonEndState: 132 }))
+    const 처음 = 열기(홀수해)
+    expect(처음.result.current.screen).toEqual({ kind: '이벤트', eventId: 380, context: '시즌' })
+    보상받기(처음, 384, [{ kind: 20, value: 0 }], [380, 384])
+    const 받은연봉 = 처음.result.current.session.career!.salary
+    expect(홀수해.load()?.seasonEndState).toBe(133)
+    const 다시 = 열기(홀수해)
+    expect(다시.result.current.screen).toEqual({ kind: '관리' })
+    expect(다시.result.current.session.career).toMatchObject({ season: 3, salary: 받은연봉 })
+
+    // 3년차(연차idx 2, 짝수) — 133 국가대표 판정 → 461(목표 4개 이상) 을 다시 튼다
+    const 짝수해 = 메모리저장(목표달성선수({ season: 3, seasonEndState: 132 }))
+    보상받기(열기(짝수해), 384, [{ kind: 20, value: 0 }], [380, 384])
+    expect(짝수해.load()?.seasonEndState).toBe(133)
+    expect(열기(짝수해).result.current.screen).toEqual({ kind: '이벤트', eventId: 461, context: '시즌' })
+  })
+
   it('464 거절 보상 뒤 끄면 S+0x50 = 0x11 — 이어하기가 새 시즌(0x1b768)으로 간다, 평판 −20 은 한 번', () => {
     const saveGame = 메모리저장(목표달성선수({ seasonEndState: 132 }))
     const 처음 = 열기(saveGame)

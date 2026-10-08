@@ -95,6 +95,15 @@ describe('이어하기 분기 0x1c154 — S+0x50(seasonEndState)', () => {
     expect(resumePointOf(선수({ seasonEndState: 132, endingIndex: 1 }))).toEqual({ kind: '관리' })
   })
 
+  it('연봉 보상 뒤(S+0x50 = 0xa — 웹 133) 0x1c154 1c2a2: 판정 1 → 501 · 연차idx 12 → 504 · 짝수 → 133 · 홀수 → 새 시즌', () => {
+    // 380 을 다시 틀지 않는다 — 연봉이 겹쳐 오르지 않는다
+    expect(resumePointOf(선수({ seasonEndState: 133, season: 7, popularity: 10 }))).toEqual({ kind: '이벤트', eventId: 501 })
+    expect(resumePointOf(선수({ seasonEndState: 133, season: 13, popularity: 1600 }))).toEqual({ kind: '이벤트', eventId: 504 })
+    // 연차idx 0(1년차) 짝수 → 133 국가대표 판정 0x1a090 — 목표 4개 미만이면 탈락 462
+    expect(resumePointOf(선수({ seasonEndState: 133, season: 1 }))).toEqual({ kind: '이벤트', eventId: 462 })
+    expect(resumePointOf(선수({ seasonEndState: 133, season: 2 }))).toEqual({ kind: '새시즌' })
+  })
+
   it('정규시즌 맨 끝 갈래 1c38e — S+0x50 == 4(109)면 g 와 상관없이 109', () => {
     expect(resumePointOf(선수({ gamesPlayed: 4, seasonEndState: 109 }))).toEqual({ kind: '다음경기순위' })
     expect(resumePointOf(선수({ gamesPlayed: 5, seasonEndState: 109 }))).toEqual({ kind: '다음경기순위' })

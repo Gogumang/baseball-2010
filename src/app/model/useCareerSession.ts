@@ -121,6 +121,7 @@ import {
   markRewardedEvent,
   withOutingEventActed,
   nariSeasonEndStateOfResumeCode,
+  rewardItemsResumeCodeOf,
   rewardResumePatchOf,
 } from '@/entities/story/model/storyScene'
 import { battingOrderEventId, emptyPlaceEventId, isEmptyPlaceEventId } from '@/entities/career/model/battingOrder'
@@ -245,13 +246,17 @@ function withNationalCupEntered(career: PlayerCareer): PlayerCareer {
  * 보상 명령 뒤 이어하기 자리 — 0x8c460 끝 8cc2e(나리 갈래, 모드 4 라 393~396 은 0xc) → 8cd44 저장 (`rewardResumePatchOf`).
  * 463 은 S+0x12c = 1(대회 진행 중)이라 웹은 대회를 이 자리에서 세운다. 464 는 S+0x50 = 0x11 · S+0x12c = 0 — 웹은 464 앞에
  * 대회를 세우지 않으므로(463 만 세운다) 0 은 이미 그 값이다.
+ * 그 앞, 줄을 도는 동안 보상 20(연봉)은 8cb90 에서 S+0x50 = 0xa 를 쓴다(`rewardItemsResumeCodeOf` — 웹 133).
  */
-function withRewardResumePatch(career: PlayerCareer, eventId: number): PlayerCareer {
+function withRewardResumePatch(career: PlayerCareer, eventId: number, items: readonly EventReward[]): PlayerCareer {
+  const itemsCode = rewardItemsResumeCodeOf(items)
+  const itemsState = itemsCode === null ? undefined : nariSeasonEndStateOfResumeCode(itemsCode)
+  const salaried = itemsState === undefined || career.seasonEndState === itemsState ? career : { ...career, seasonEndState: itemsState }
   const patch = rewardResumePatchOf(eventId, '나리타자')
-  if (patch === null) return career
-  if (patch.nationalCup === true) return withNationalCupEntered(career)
+  if (patch === null) return salaried
+  if (patch.nationalCup === true) return withNationalCupEntered(salaried)
   const state = nariSeasonEndStateOfResumeCode(patch.resumeCode)
-  return career.seasonEndState === state ? career : { ...career, seasonEndState: state }
+  return salaried.seasonEndState === state ? salaried : { ...salaried, seasonEndState: state }
 }
 
 /** 타자 스킬 22 압도 — 상대 투수 투구 스태미나 소모 ×2 (0xa5f0e) */
@@ -1807,7 +1812,7 @@ export function useCareerSession({
       // 8cc1a 0x8b0e4 의 0x8b12c — 112(외출 진입) · 113(장소)에서 연 이벤트면 440~444 를 빼고 행동함(S+4)을 켠 채 저장한다
       const acted = withOutingEventActed(marked, screen.context === '장소' || screen.context === '외출진입', eventId)
       // 8cc2e — 이벤트 번호로 이어하기 자리(S+0x50)를 고치고 8cd44 에서 다시 저장한다 (`withRewardResumePatch`)
-      setCareer(withRewardResumePatch(acted, eventId))
+      setCareer(withRewardResumePatch(acted, eventId, items))
     },
 
     /**

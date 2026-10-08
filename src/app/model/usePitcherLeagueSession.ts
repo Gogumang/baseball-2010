@@ -64,6 +64,7 @@ import {
   markRewardedEvent,
   withOutingEventActed,
   nariSeasonEndStateOfResumeCode,
+  rewardItemsResumeCodeOf,
   rewardResumePatchOf,
 } from '@/entities/story/model/storyScene'
 import { achievedPitcherGoalCount } from '@/entities/pitcher-career/model/pitcherYearGoals'
@@ -474,13 +475,17 @@ function withPitcherNationalCupEntered(career: PitcherCareer): PitcherCareer {
 /**
  * 보상 명령 뒤 이어하기 자리 — 0x8c460 끝 8cc2e(나리 갈래, 모드 3 이라 393~396 은 0xd) → 8cd44 저장 (`rewardResumePatchOf`).
  * 464 의 S+0x12c = 0 은 웹이 464 앞에 대회를 세우지 않아 이미 그 값이다.
+ * 그 앞, 줄을 도는 동안 보상 20(연봉)은 8cb90 에서 S+0x50 = 0xa 를 쓴다(`rewardItemsResumeCodeOf` — 웹 133).
  */
-function withPitcherRewardResumePatch(career: PitcherCareer, eventId: number): PitcherCareer {
+function withPitcherRewardResumePatch(career: PitcherCareer, eventId: number, items: readonly EventReward[]): PitcherCareer {
+  const itemsCode = rewardItemsResumeCodeOf(items)
+  const itemsState = itemsCode === null ? undefined : nariSeasonEndStateOfResumeCode(itemsCode)
+  const salaried = itemsState === undefined || career.seasonEndState === itemsState ? career : { ...career, seasonEndState: itemsState }
   const patch = rewardResumePatchOf(eventId, '나리투수')
-  if (patch === null) return career
-  if (patch.nationalCup === true) return withPitcherNationalCupEntered(career)
+  if (patch === null) return salaried
+  if (patch.nationalCup === true) return withPitcherNationalCupEntered(salaried)
   const state = nariSeasonEndStateOfResumeCode(patch.resumeCode)
-  return career.seasonEndState === state ? career : { ...career, seasonEndState: state }
+  return salaried.seasonEndState === state ? salaried : { ...salaried, seasonEndState: state }
 }
 
 /** 저장의 국가대항전 대회 레코드 두 칸 — 없으면(대회 중 옛 저장) 대회 초기화 꼴로 세운다 */
@@ -1759,7 +1764,7 @@ export function usePitcherLeagueSession(
       // 8cc1a 0x8b0e4 의 0x8b12c — 112(지도) · 113(장소)에서 연 이벤트면 440~444 를 빼고 행동함(S+4)을 켠 채 저장한다
       const acted = withOutingEventActed(marked, story.context === '지도' || story.context === '장소', eventId)
       // 8cc2e — 이벤트 번호로 이어하기 자리(S+0x50)를 고치고 8cd44 에서 다시 저장한다 (`withPitcherRewardResumePatch`)
-      commit(withPitcherRewardResumePatch(acted, eventId))
+      commit(withPitcherRewardResumePatch(acted, eventId, items))
     },
     [career, commit, random, recordStat, story, storyEvents],
   )

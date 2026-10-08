@@ -4,14 +4,17 @@ import {
   achievedGoalCount,
   GOAL_INTRO_EVENT_ID,
   goalResultEventId,
+  FINAL_RETIREMENT_EVENT_ID,
   judgeEnding,
   NO_ENDING_JUDGEMENT,
+  RELEASE_EVENT_ID,
   SALARY_ACCEPT_EVENT_ID,
   SALARY_FIRM_EVENT_ID,
   SALARY_POLITE_EVENT_ID,
   salaryResultEventId,
   yearEndEventId,
 } from '@/entities/career/model/seasonFlow'
+import { careerNationalTeamEventId, isCareerNationalCupYear } from '@/entities/national-cup/model/nationalCupFlow'
 import {
   careerLeagueRecordsOf,
   hasMvpInSeason,
@@ -79,7 +82,10 @@ const SEASON_END_STATE_OF_EVENT: Readonly<Partial<Record<number, SeasonEndState>
 
 /** 이어하기(상태 100 진입 0x1c154)가 돌아갈 곳 */
 export type ResumePoint =
-  /** S+0x50 == 0xb · 0xc · 0xe · 9 → 136 · 130 · 131 · 132 — 그 상태가 진입에서 트는 이벤트로 */
+  /**
+   * S+0x50 == 0xb · 0xc · 0xe · 9 → 136 · 130 · 131 · 132 — 그 상태가 진입에서 트는 이벤트로.
+   * 0xa(연봉 보상 뒤 — 웹 133)의 501 · 504 · 461 · 462 도 이 꼴이다
+   */
   | { readonly kind: '이벤트'; readonly eventId: number }
   /** S+0xb4(포스트시즌 중) ≠ 0 이고 S+0x50 이 위 값이 아님 → 128 대진 */
   | { readonly kind: '포스트시즌' }
@@ -110,14 +116,26 @@ export type ResumePoint =
  * 6  141 진입(0x1230e) · 9 132 · 0xb 136 · 0xc|0xd 130 · 0xe 131 · 0xf 128
  * ```
  * 7 · 0xa · 0x11 을 쓰는 곳은 이 장면 안에 없다. 0x11 은 이벤트 관리자의 보상 명령 끝 0x8ccba(464 거절)가 쓰고, 같은 자리
- * 8cc2e 가 결과 이벤트 보상 뒤 0xc|0xd · 0xe · 0xf · 3 도 쓴다(`rewardResumePatchOf`). 7 · 0xa 는 미해결.
+ * 8cc2e 가 결과 이벤트 보상 뒤 0xc|0xd · 0xe · 0xf · 3 도 쓴다(`rewardResumePatchOf`). 0xa 는 같은 0x8c460 의 보상 20(연봉) 갈래
+ * 끝 8cb90 이 쓴다(`rewardItemsResumeCodeOf` — 웹 `seasonEndState` 133). 7 은 쓰는 곳을 못 찾았다(미해결).
  * 정규시즌 웹 null 은 1 · 2 · 3 이다. 2 는 116 을 다시 띄워 그 끝(0x12b98~0x12bb0)이 g 짝수 → 105 · 홀수 → 109 로 가고,
  * 1 · 3 은 위 맨 끝 갈래가 같은 g 짝홀로 가른다 — 셋 모두 **g 짝수면 105, 홀수면 109** 다. 4 는 g 와 상관없이 109.
  * 웹은 국가대항전(S+0x12c)을 저장하지 않는다. S+0x50 == 2(116 경기 뒤 평가 — 웹은 경기 뒤 `seasonEndState` null)는
  * 116 의 끝(0x12b74)으로 옮긴다: 대진이 있으면 g(= L+0x32) == 0 → 136, 아니면 128 · 대진이 없으면 g 짝수 105 · 홀수 109.
  * 웹의 116 대응은 결과 화면이라 다시 못 띄우므로 그 다음 화면으로 돌아간다(⚠️ 116 · 114 를 다시 보이지 않는 것은 근사).
- * ⚠️ 132 뒤 국가대표 133·국가대항전 134 는 S+0x50 을 안 바꾼다(0x1a090·0x19f30 머리 확인) — 원본도 132 로 돌아가
- *    연말 이벤트를 다시 튼다. 엔딩 141(S+0x50 = 6, 0x1230e)·그 밖 0xa 갈래는 웹이 아직 따로 돌아가지 않는다.
+ * 132 뒤 국가대표 133·국가대항전 134 는 S+0x50 을 안 바꾼다(0x1a090·0x19f30 머리 확인) — 연봉 결과(384~391)의 보상 20 이
+ * 0xa 로 바꿔 둔 뒤라 이어하기는 0xa 갈래로 133 을 다시 밟는다(아래). 엔딩 141(S+0x50 = 6, 0x1230e)은 웹이 아직 따로 돌아가지 않는다.
+ *
+ * **0xa 갈래 (1c2a2~1c344, 직접 떴다)** — 연봉 보상 뒤 끊긴 자리:
+ * ```
+ * r5 = S+0xb3(연차idx) ; e = 0xa3a85(S)
+ * e == 1      → 0x8bdc8(501) · [다음 114, 뒤 141]          (1c2b2~1c2ee)
+ * r5 == 0xc   → 0x8bdc8(504) · [다음 114, 뒤 141]          (1c2c2~1c2ee)
+ * S+0xb3 bit0 == 0 → [다음 133]  국가대표 판정 0x1a090     (1c2f0~1c306)
+ *             그 밖 → 새 시즌 0x1b768                      (1c308)
+ * ```
+ * 곧 132 의 연봉 380 을 다시 틀지 않는다(연봉이 겹쳐 오르지 않는다). 501 · 504 를 트는 갈래는 S+0x50 을 안 바꾼다(0xa 그대로).
+ * ⚠️ 1c30e~1c342 의 `0x76705(this+0xe8, 0x23, 0xbe, 0x1e)` · `0x7dfad(this+0xe0)` · +0x158/+0x15c 칸 복사는 그림 쪽이라 옮기지 않았다.
  */
 export function resumePointOf(career: PlayerCareer): ResumePoint {
   // 엔딩 141 은 S+0x50 = 6(0x1230e) 갈래다 — 웹 이어하기는 엔딩으로 돌아가지 않는다(예전 그대로 관리 화면)
@@ -133,6 +151,8 @@ export function resumePointOf(career: PlayerCareer): ResumePoint {
       return { kind: '이벤트', eventId: MVP_INTRO_EVENT_ID }
     case 132:
       return { kind: '이벤트', eventId: yearEndEventId(career) }
+    case 133:
+      return salaryResumePointOf(career)
     default:
       break
   }
@@ -145,6 +165,20 @@ export function resumePointOf(career: PlayerCareer): ResumePoint {
   // 경기 뒤(S+0x50 == 2 → 116) — 116 의 끝처럼 g == 0 이면 136(시즌 끝 화면), 아니면 128
   return leagueDayCounterOf(career) === 0 ? { kind: '시즌종료' } : { kind: '포스트시즌' }
 }
+
+/** 0x1c154 의 S+0x50 == 0xa 갈래(1c2a2~1c344) — 연차idx(S+0xb3)는 끝난 해의 것(`season − 1`)이다 */
+function salaryResumePointOf(career: PlayerCareer): ResumePoint {
+  const yearIndex = career.season - 1
+  if (judgeEnding(career) === 1) return { kind: '이벤트', eventId: RELEASE_EVENT_ID }
+  if (yearIndex === FINAL_YEAR_INDEX) return { kind: '이벤트', eventId: FINAL_RETIREMENT_EVENT_ID }
+  if (isCareerNationalCupYear(yearIndex)) {
+    return { kind: '이벤트', eventId: careerNationalTeamEventId(achievedGoalCount(career, '연말')) }
+  }
+  return { kind: '새시즌' }
+}
+
+/** 13년차의 연차idx — 0x1c2c2 `cmp r5, #0xc` */
+const FINAL_YEAR_INDEX = 12
 
 /**
  * 연말 이벤트 연결 (누락 탐색 에이전트: 0x10bb0 · 0x8d0dc · 0x10c54 · 0x8d05a).

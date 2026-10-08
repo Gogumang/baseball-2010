@@ -5,6 +5,8 @@ import type { OriginalEvent } from '@/shared/config/original/eventTypes'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { ORIGINAL_USER_EVENTS } from '@/shared/config/original/userEvents'
 import { meetsSkillAcquireCondition, meetsSkillReleaseCondition } from '@/entities/story/model/skillCondition'
+import { EVENT_REWARD_KIND } from '@/entities/story/model/eventReward'
+import type { EventReward } from '@/entities/story/model/eventReward'
 
 /**
  * 원작 이벤트 일정 (r_event 레코드 머리).
@@ -313,11 +315,24 @@ export function rewardResumePatchOf(eventId: number, mode: RewardResumeMode): Re
   return null
 }
 
+/** 보상 20(연봉)이 쓰는 S+0x50 — 0x8cac0 갈래 끝 8cb84~8cb92: 새 연봉을 `0xa4fd9(S, 값)` 로 쓰고 곧 `S+0x50 = 0xa` */
+export const SALARY_REWARD_RESUME_CODE = 0xa
+
+/**
+ * **보상 명령의 줄이 쓰는 이어하기 자리** — 0x8c460 이 줄마다 갈래를 돌 때 종류 20(연봉, 0x8cac0)만 S+0x50 을 쓴다(0xa,
+ * 8cb90 — 바이너리 전체의 `str rX,[rY,#0x50]` 앞 `movs rX,#0xa` 를 훑어 이 자리 하나뿐이다). 이 값은 줄을 다 돈 뒤 8cc2e 가 이벤트 번호로 다시
+ * 고칠 수 있다(`rewardResumePatchOf` — 연봉 결과 384~391 은 그 목록에 없어 0xa 가 남는다). 연봉 줄이 없으면 null.
+ */
+export function rewardItemsResumeCodeOf(items: readonly EventReward[]): number | null {
+  return items.some((item) => item.kind === EVENT_REWARD_KIND.연봉) ? SALARY_REWARD_RESUME_CODE : null
+}
+
 /**
  * 나리 S+0x50 값 → 웹 `seasonEndState` (상태 번호). 0x1c154 가 그 값으로 돌아가는 상태다 — 0xc|0xd 130 · 0xe 131 · 0xf 128 ·
- * 0x11 새 시즌 0x1b768(→ 137). 3 은 웹이 null 로 든다(그 밖 갈래). 다른 값은 0x8cc2e 가 안 쓴다.
+ * 0x11 새 시즌 0x1b768(→ 137) · 0xa 연봉 뒤 갈래(→ 133, 1c2a2 — `resumePointOf`). 3 은 웹이 null 로 든다(그 밖 갈래).
  */
 export function nariSeasonEndStateOfResumeCode(resumeCode: number): SeasonEndState | null {
+  if (resumeCode === SALARY_REWARD_RESUME_CODE) return 133
   if (resumeCode === 0xc || resumeCode === 0xd) return 130
   if (resumeCode === 0xe) return 131
   if (resumeCode === 0xf) return 128
