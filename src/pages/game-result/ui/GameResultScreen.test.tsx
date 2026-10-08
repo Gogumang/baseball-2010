@@ -7,6 +7,7 @@ import { GameResultScreen } from '@/pages/game-result/ui/GameResultScreen'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
 import type { GameSummary } from '@/entities/game/model/gameSummary'
+import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import {
   BAND, PITCHER_LABELS, PITCHER_ROWS, PITCHER_ROW_X, RESULT_SPRITES, TITLE_BAR,
   pitcherRowTopOf,
@@ -54,6 +55,29 @@ const 그림찾기 = (container: HTMLElement, file: string) =>
   container.querySelector(`img[src$="${file}"]`) as HTMLElement | null
 
 describe('경기 결과 원본 배치', () => {
+  it('정산 0x4ea0c 를 지나 왔으면 배경 · 효과 층을 원본 0x4a384 차례로 — 배경 → 덮개 → 비 층 → 띠 … → 파티클 층(맨 위)', () => {
+    const random = createSeededRandom(1)
+    const next = vi.spyOn(random, 'next')
+    const { container } = render(
+      <GameResultScreen summary={요약({ result: '패', ourScore: 1, opponentScore: 4 })} gamePointReward={0} newTitles={[]}
+        career={createCareer('선수')} onContinue={vi.fn()} settlement={{ inning: 9, random }} />,
+    )
+    const stage = container.firstElementChild?.firstElementChild as HTMLElement
+    const layers = Array.from(stage.children)
+    const canvases = layers.filter((element) => element.tagName === 'CANVAS')
+    // 배경 캔버스는 첫 칸(감싼 div) 안 · 비 층은 덮개 바로 뒤 · 파티클 층은 맨 끝
+    expect(layers[0]?.querySelector('canvas')).not.toBeNull()
+    expect(layers[2]).toBe(canvases[0])
+    expect(layers[layers.length - 1]).toBe(canvases[1])
+    // jsdom 은 캔버스 그리기가 없어 rAF 효과 틱이 안 돈다 — 그려지기 전에는 경기 난수를 안 쓴다
+    expect(next).not.toHaveBeenCalled()
+  })
+
+  it('이어하기로 다시 띄운 116 앞 판(정산 재료 없음)은 배경 · 효과 없이 판만', () => {
+    const { container } = 띄우기()
+    expect(container.querySelector('canvas')).toBeNull()
+  })
+
   it('밑그림(116 평가 대화의 상태판)은 결과 판이 아니라 [확인] 뒤 평가 단계에 깐다', () => {
     render(
       <GameResultScreen summary={요약()} gamePointReward={0} newTitles={[]} career={createCareer('선수')} onContinue={vi.fn()}

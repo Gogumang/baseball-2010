@@ -157,6 +157,10 @@ export function CareerRoutes({
           onContinue={actions.confirmGameResult}
           // 116(0x11e0c) → 114 평가 대화 0x8b5ac: 공 무늬 · 상태판([이벤트+0xb] = 1 — 0x8a71e) · 머리띠
           underlay={<NariEventUnderlay career={career} isPreviousGame />}
+          // 정산 0x4ea0c 를 막 지났을 때만 — 결과 그림 0x4a384 의 배경 · 정산 효과(경기 난수)
+          {...(screen.settlementInning === undefined
+            ? {}
+            : { settlement: { inning: screen.settlementInning, random } })}
         />
       )
 
@@ -169,6 +173,8 @@ export function CareerRoutes({
           newTitles={[]}
           career={career}
           onContinue={actions.confirmCupGameResult}
+          // 대회 경기도 정산 0x4ea0c 꼬리를 지난다 — 결과 그림 0x4a384 의 배경 · 정산 효과(경기 난수)
+          settlement={{ inning: screen.settlementInning, random }}
         />
       )
 

@@ -42,6 +42,11 @@ export type Screen =
       readonly newTitles: readonly string[]
       readonly evaluation: GameEvaluation
       readonly streakNotices: readonly StreakNotice[]
+      /**
+       * 경기 정산 0x4ea0c 를 막 지났으면 경기 끝 이닝(1 부터) — 결과 그림 0x4a384 의 배경 · 정산 효과(밤 승리 불꽃 · 패배 비)가 쓴다.
+       * 이어하기가 116 을 다시 띄울 때(정산을 다시 안 돈다)는 없다.
+       */
+      readonly settlementInning?: number
     }
   /**
    * 나리 국가대항전 사람 경기 결과 — 경기 끝 판(상태 0x18) · 정산 그림(0x19 · 0x4a384)을 정규 경기 결과 화면 한 장으로 보인다.
@@ -52,6 +57,8 @@ export type Screen =
       readonly summary: GameSummary
       readonly gamePointReward: number
       readonly cup: NationalCup
+      /** 경기 끝 이닝(1 부터) — 대회 경기도 정산 0x4ea0c 꼬리(4f41a~)의 정산 효과를 깐다 */
+      readonly settlementInning: number
     }
   | { readonly kind: '관리' }
   /**

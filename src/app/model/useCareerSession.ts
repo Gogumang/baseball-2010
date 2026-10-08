@@ -692,6 +692,8 @@ export function useCareerSession({
         newTitles: dynamite === null ? [] : [dynamite],
         evaluation,
         streakNotices: streakEventOf(advanced).notices,
+        // 0x4ea0c 꼬리 4f41a~ 의 정산 효과 — 하늘 칸은 경기 끝 이닝 (구장객체 +0x14)
+        settlementInning: finished.game.inning,
       })
     },
     [aceLevels, audio, random, recordStat, setScreen],
@@ -744,7 +746,7 @@ export function useCareerSession({
       recordStat({ kind: '기록달성', recordIds: summary.recordIds ?? [] })
       // 승리 31 · 패배 32 징글 — 정규 경기 결과 화면과 같은 자리 (116 의 평가 징글은 없다)
       playSoundIds(audio, [gameResultSoundIdOf(summary.result)])
-      setScreen({ kind: '대회경기결과', summary, gamePointReward, cup: next })
+      setScreen({ kind: '대회경기결과', summary, gamePointReward, cup: next, settlementInning: finished.game.inning })
     },
     [audio, random, recordStat, setCareer, setScreen],
   )

@@ -22,9 +22,19 @@ import {
   BAND, LOSE_DIM_OPACITY, NO_RECORD_TEXT, RESULT_SPRITES, REWARD_TEXT, TITLE_BAR,
 } from '@/pages/game-result/lib/gameResultLayout'
 import * as styles from '@/pages/game-result/ui/GameResultScreen.css'
+import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
+import { SettlementEffectCanvas, useSettlementEffectLayers } from '@/widgets/batting-stage/ui/SettlementEffectCanvas'
+import { settlementBackdropOffsetAt } from '@/pages/team-game/model/settlementBackdrop'
+import { STARTING_ABILITY } from '@/entities/career/model/playerCareer'
+import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
+import { createSeededRandom } from '@/shared/api/random/seededRandom'
+import type { RandomPort } from '@/shared/api/random/randomPort'
 
 const GAME_UI_FRAMES = './sprites/game_ui/frames'
 const RESULT_FRAMES = './sprites/result/frames'
+
+/** 나리 타자편 — 게임 모드 4 (정산 그리기 0x4a384 는 팀경기와 같은 갈래 0x4a948) */
+const BATTER_CAREER_MODE = 4
 
 const frameSrc = (folder: string, frame: number) => `${folder}/${String(frame).padStart(3, '0')}.png`
 
@@ -86,6 +96,12 @@ interface GameResultScreenProps {
    * 결과 판(0x18 · 0x19 — 경기 장면)이 아니라 [확인] 뒤 평가 단계에만 깐다.
    */
   readonly underlay?: ReactNode
+  /**
+   * **경기 정산 0x19 를 지나 왔을 때** (경기 끝 판 OK → 진입 0x4ea0c) — 결과 그림 0x4a384 의 배경 · 정산 효과 재료.
+   * `inning` 은 경기 끝 이닝(타석 HUD 와 같은 1 부터 — 전역 경기 상태 +0x6b 의 칸), `random` 은 경기 난수.
+   * 이어하기로 116 을 다시 띄울 때(정산 0x4ea0c 를 다시 안 돈다)는 안 넘긴다 — 그때는 배경 · 효과 없이 판만.
+   */
+  readonly settlement?: { readonly inning: number; readonly random: RandomPort }
 }
 
 /**
@@ -111,8 +127,13 @@ export function GameResultScreen({
   career,
   onContinue,
   underlay,
+  settlement,
 }: GameResultScreenProps) {
   const [isDetailOpen, setIsDetailOpen] = useState(false)
+  // ⚠️ 웹 타석 그림이 세울 때 굴리는 하늘 줄 rand(0, 6)(추정 대체)이 경기 난수에 새지 않게 배경은 따로 든 난수로 세운다 (팀경기 · 투수편과 같은 근사)
+  const [backdropRandom] = useState(() => createSeededRandom(0))
+  /** 정산 효과 층 — 비는 진 판 덮개 위 · 띠 아래, 파티클은 판 맨 위 (원본 그리기 차례 0x4a384) */
+  const settlementLayers = useSettlementEffectLayers()
   const [isEvaluating, setIsEvaluating] = useState(false)
   // 결과 판 [확인] — 116 평가가 있으면 평가 이벤트로, 없으면(국가대항전) 곧장 다음
   const confirm = () => (evaluation === undefined ? onContinue() : setIsEvaluating(true))
@@ -199,13 +220,51 @@ export function GameResultScreen({
   }
 
   const resultSprite = resultSpriteOf(summary.result)
+  // 0x4a350 — 사람 팀이 앞섰나. 비기면 거짓(진 판 · 비)
+  const isWin = summary.result === '승'
 
   return (
     <RawScreen>
+      {/*
+        0. 정산 그리기 0x4a384 머리 — 구름 0x78448 · 배경 0x40ff0(장면, +0x17e2). 이긴 판만 갱신 0x4b100 이 +0x17e2 를 틱마다 3 씩
+           150 까지 올려 구장이 가라앉는다. 정산 효과 0x4ea0c(밤 승리 불꽃 · 패배 비)와 그림마다 효과 · 파티클 틱은 경기 난수로 돈다
+      */}
+      {settlement !== undefined && (
+        <div className={styles.backdrop}>
+          <BattingStage
+            // 결과 배경은 선수·공을 안 그려 능력치를 읽지 않는다 — 꼴을 채우는 기본값
+            batterAbility={STARTING_ABILITY}
+            pitcherAbility={DEFAULT_PITCHER_ABILITY}
+            swingMode="일반"
+            gameMode={BATTER_CAREER_MODE}
+            isEagleEyeEnabled={false}
+            hud={null}
+            acePitcher={null}
+            isPaused
+            isResultBackdrop
+            resultBackdropOffsetOf={(tick) => settlementBackdropOffsetAt(tick, isWin)}
+            random={backdropRandom}
+            settlement={{
+              isWin,
+              // 0xb69b0(st, 0/1) — 차이의 절댓값만 쓴다(비 방울 수). 판과 같이 왼쪽 측 0 = 상대
+              side0Score: summary.opponentScore,
+              side1Score: summary.ourScore,
+              inning: settlement.inning,
+              random: settlement.random,
+              layers: settlementLayers,
+            }}
+            onPitchResolved={() => {}}
+          />
+        </div>
+      )}
+
       {/* 1. 패배(무승부 포함)면 화면 전체를 검정 단계 8 로 어둡게 (0x4a42a — 이기면 그대로) */}
       {summary.result !== '승' && (
         <div className={styles.loseDim} style={{ opacity: LOSE_DIM_OPACITY }} />
       )}
+
+      {/* 1-1. 효과 틱 0x4a452(0x901a0) — 정산 비를 덮개 위 · 띠 아래에 */}
+      {settlement !== undefined && <SettlementEffectCanvas canvasRef={settlementLayers.rain} />}
 
       {/* 2. 띠 fillRect(0, 40, 240, 30, 0x80304EA2) (0x4a466) */}
       <div
@@ -255,6 +314,9 @@ export function GameResultScreen({
       <Button variant="corner" className={styles.continueButton} onClick={confirm}>
         확인
       </Button>
+
+      {/* 프레임 끝 0x6dd69 — 파티클(밤 승리 불꽃)은 판까지 다 그린 뒤 맨 위 (누르기는 밑으로 흘린다) */}
+      {settlement !== undefined && <SettlementEffectCanvas canvasRef={settlementLayers.particles} />}
     </RawScreen>
   )
 }
