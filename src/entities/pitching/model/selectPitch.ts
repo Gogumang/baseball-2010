@@ -52,6 +52,14 @@ const MAGIC_PITCH_CONTROL_TIER = 5
  */
 const CPU_PITCH_TYPE_ROLL_TICKS = 9
 
+/**
+ * 실투 공의 점 수 N — 0x4dec0: 구질(+0xfc8) == 1 이면 0x12(18), 아니면 0x14(20) 를 +0x109c 에 쓰고
+ * 0x9e301(공, N) 로 공 점 수를 바꾼다
+ */
+const MISTAKE_PITCH_FRAMES_FASTBALL = 18
+const MISTAKE_PITCH_FRAMES = 20
+const FASTBALL_TYPE_NUMBER = 1
+
 /** 마구 이름을 못 고를 때 쓰는 글자 — `features/play-pitcher-game` 의 사람 투구와 같은 대체값 */
 const MAGIC_PITCH_NAME = '마구'
 
@@ -75,14 +83,12 @@ export interface CpuPitchThrow {
   /**
    * 실투 판정 0x33cbc 의 결과 (참이면 원본은 `[scene+0xf98].byte8 = 4`, 0x4deae).
    *
-   * ⚠️ **미해결 — 사람 타석에서의 쓰임을 아직 옮기지 않았다.** 원본 0x4dc78 은 실투면 그 자리에서
-   *    (0x4debc~0x4df5e) 공을 다시 놓는다:
+   * 실투면 원본 0x4dc78 이 그 자리에서(0x4debc~0x4df5e) 공을 한가운데로 놓는다 — `selectPitch` 가 따른다:
    *      4dec0  N(scene+0x109c) = 구질(scene+0xfc8) == 1 ? 0x12(18) : 0x14(20)
-   *      4df1e  0x9e301(공 궤적)
+   *      4df1e  0x9e301(공, N) — 공+0x10(점 수)만 바꾸고 점 버퍼를 다시 잡는다
    *      4df22  목표점 = 표 0xcfbcc[scene+0x17e1](타자 좌우별 존 한가운데, (19415|20585, 1202, 29705))
-   *      4df5e  0x9e3c9(공 궤적, 투수판 0xcfa8c, 그 목표점)
-   *    목표점·비행 틱 수는 확정이지만 경로를 다시 짜는 0x9e301·0x9e3c9 는 궤적 코드라 해석하지 않았다
-   *    (pitch.zt1 데이터를 그대로 쓰는 방침). 그래서 지금 웹 공은 실투여도 원래 곡선으로 날아간다.
+   *      4df5e  0x9e3c9(공, 투수판 0xcfa8c, 그 목표점) — 실투가 아니어도 같은 자리에서 제구 오차 낸 점으로 부른다
+   *    그래서 실투 공의 `plate` 는 (0, 0), `frameCount` 는 18 · 20 이다.
    *    CPU 타자가 칠 때의 쓰임(0x34334 강제 치기·0x340f8 K = 10000)은 사람 타석과 상관없다.
    */
   readonly isMistakePitch: boolean
@@ -111,8 +117,8 @@ export interface CpuPickoffInput {
 /**
  * CPU 투구 — 원본 순서 그대로 난수를 뽑는다:
  *   구질(0x344dc, 상태 0xf 틱 0~8 에 **9번** — `CPU_PITCH_TYPE_ROLL_TICKS`) → 목표 종류(0x9eeac) → 목표점(0x345fc) → 제구 등급(0xb74bc, 마구면 굴림 없이 5 — 0x4dbac)
- *   → 제구 오차(0x4dc78) → 곡선
- *   → 실투 판정(0x33cbc, 0x4dea0 — 마구가 아니면 rand(0,100) 한 번)
+ *   → 제구 오차(0x4dc78)
+ *   → 실투 판정(0x33cbc, 0x4dea0 — 마구가 아니면 rand(0,100) 한 번) → 곡선(0x9e3c9, 실투면 한가운데 · N 18/20)
  * 목표 종류가 4(견제)이고 주자가 1·2명이면(`isCpuPickoff`, 0x34684) 목표점을 만들지 않고 0x34848 이
  * **견제 루**를 굴린 뒤 끝난다 — 목표점·제구 등급·제구 오차·곡선 굴림이 **없다** (`{ kind: '견제' }`).
  *   0x51214 bl 0x344dc(구질) → 0x5121e bl 0x345fc(→ 0x9eeac 종류 → 종류 4 면 0x34848 루프 → 메시지 0x10 → 0x348d6 끝)
@@ -208,17 +214,10 @@ export function selectPitch(
   const controlTier = isMagic
     ? MAGIC_PITCH_CONTROL_TIER
     : controlTierOf(stats.control, gameStats.isNotExhausted, random)
-  const finalTarget = applyControlError(target, { tier: controlTier, isComputer: true }, random)
+  const aimedTarget = applyControlError(target, { tier: controlTier, isComputer: true }, random)
   // 마구는 게이지를 쓰지 않고 등급이 늘 5 다 — 구속 단계 레코드가 없어 번호로 곧장 고른다 (H2 3-5·3-6)
   const speedStage = pitchSpeedStageOf(typeNumber - 1, stats, controlTier)
   const recordIndex = isMagic ? magicPitchRecordIndexOf(repertoire.magicId, repertoire.form) : null
-  const worldPath = pitchPathOf({
-    typeNumber,
-    form: repertoire.form,
-    speedStage,
-    target: finalTarget,
-    ...(recordIndex === null ? {} : { recordIndex }),
-  })
   const type = PITCH_TYPES[typeNumber - 1] ?? PITCH_TYPES[0]
 
   // 실투 판정 0x33cbc — 0x4dc78 이 궤적 준비 0x9e669(4de86) **뒤** 4dea0 에서 부른다. 사람이 칠 때도
@@ -240,6 +239,21 @@ export function selectPitch(
     },
     random,
   )
+
+  // 곡선 — 0x4df36~0x4df5e: 0x9e3c9(공, 투수판 0xcfa8c, 목표점) 를 실투 판정 **뒤** 한 번 부른다(굴림 없음).
+  // 실투면 그 앞(0x4dec0~0x4df34)에서 N = 구질 1 ? 18 : 20 으로 공 점 수를 바꾸고(0x9e301) 목표점을 제구 오차
+  // 낸 점 대신 타자 좌우별 존 한가운데(표 0xcfbcc[+0x17e1])로 바꾼다 — 레코드·구속 단계(0x9e669)는 그대로다
+  const finalTarget = isMistake ? derbyPitchTargetOf(situation.side) : aimedTarget
+  const worldPath = pitchPathOf({
+    typeNumber,
+    form: repertoire.form,
+    speedStage,
+    target: finalTarget,
+    ...(recordIndex === null ? {} : { recordIndex }),
+    ...(isMistake
+      ? { frames: typeNumber === FASTBALL_TYPE_NUMBER ? MISTAKE_PITCH_FRAMES_FASTBALL : MISTAKE_PITCH_FRAMES }
+      : {}),
+  })
 
   advanceMagicPitchGameState(magicState, typeNumber, repertoire.magicId, isHomeRunDerby)
 

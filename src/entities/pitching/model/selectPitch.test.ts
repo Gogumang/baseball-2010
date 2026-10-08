@@ -10,6 +10,7 @@ import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { isInsideStrikeZone } from '@/shared/lib/geometry/coordinate'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { ACE_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
+import { ZONE_CENTERS } from '@/entities/pitching/model/pitchCurve'
 import { createMagicPitchGameState } from '@/entities/pitching/model/magicPitchGame'
 
 const 상황: PitchSituation = { strikes: 0, balls: 0, outs: 0, runnerCount: 0, batterSide: 1, side: 1 }
@@ -345,8 +346,33 @@ describe('selectPitch 실투 판정 0x33cbc — 사람이 칠 때도 CPU 공마�
     const 정상 = 다시(0.995)
     expect(실투.kind === '투구' && 실투.isMistakePitch).toBe(true)
     expect(정상.kind === '투구' && 정상.isMistakePitch).toBe(false)
-    // 공 자체(구질·경로)는 같다 — 실투 굴림은 맨 끝이다
-    expect(실투.kind === '투구' && 정상.kind === '투구' && 실투.pitch).toEqual(정상.kind === '투구' && 정상.pitch)
+    // 실투 굴림은 맨 끝이라 구질·제구 등급은 같다. 공은 실투면 한가운데로 다시 놓인다 (0x4dec0~0x4df5e)
+    if (실투.kind !== '투구' || 정상.kind !== '투구') throw new Error('견제')
+    expect(실투.pitchTypeNumber).toBe(정상.pitchTypeNumber)
+    expect(실투.pitch.type).toBe(정상.pitch.type)
+    expect(실투.pitch.controlTier).toBe(정상.pitch.controlTier)
+    expect(실투.pitch.plate).toEqual({ x: 0, y: 0 })
+    expect(실투.pitch.frameCount).toBe(실투.pitchTypeNumber === 1 ? 18 : 20)
+    expect(실투.pitch.worldPath).toHaveLength(실투.pitch.frameCount)
+    expect(실투.pitch.worldPath?.at(-1)).toEqual(ZONE_CENTERS[상황.side])
+    expect(실투.pitch.flightDurationMilliseconds).toBe(실투.pitch.frameCount * millisecondsPerFrame())
+  })
+
+  it('실투 공의 N 은 구질 1(직구)이면 18, 아니면 20 — 레코드 N 과 상관없다 (0x4dec0 · 0x4df14)', () => {
+    const 결과 = new Map<number, number>()
+    for (let seed = 1; seed <= 400 && 결과.size < 2; seed += 1) {
+      const base = createSeededRandom(seed)
+      const 처음 = 기록난수(() => base.rand(0, 0x40000000) / 0x40000000)
+      const 공1 = selectChoice(투수(60), 상황, 처음.random)
+      if (공1.kind !== '투구') continue
+      const 재생 = [...처음.values]
+      const { random } = 기록난수(() => 재생.shift() ?? 0, new Map([[처음.values.length - 1, 0]]))
+      const 실투 = selectChoice(투수(60), 상황, random)
+      if (실투.kind !== '투구' || !실투.isMistakePitch) continue
+      결과.set(실투.pitchTypeNumber === 1 ? 1 : 0, 실투.pitch.frameCount)
+    }
+    expect(결과.get(1)).toBe(18)
+    expect(결과.get(0)).toBe(20)
   })
 
   it('타자 압도(스킬 22)는 실투율 +5 — 굴림 값 7.x% 에서 갈린다 (구속 600·등급 그대로 p 를 넘는다)', () => {

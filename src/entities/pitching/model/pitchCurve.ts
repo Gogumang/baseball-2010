@@ -68,10 +68,15 @@ export interface PitchPathRequest {
    * 마구는 구속 단계 레코드가 없고 번호가 `3(m−1) + 폼/2` 또는 `m + 7` 이다 (0x9e944, H2 3-5).
    */
   readonly recordIndex?: number
+  /**
+   * 점 수 N 을 레코드 값 대신 이것으로 — 실투면 0x4dc78 이 0x9e301(공, N) 로 공+0x10(N)만 바꾸고
+   * 같은 제어점으로 0x9e3c9 를 부른다(샘플러 0x9e390 이 공+0x10 을 점 수로 읽는다). 안 넘기면 레코드 N
+   */
+  readonly frames?: number
 }
 
 /** 월드 좌표 N 점. B-스플라인 레코드(곡선 종류 1)는 미해독이라 베지어로 돈다 (추정) */
-export function pitchPathOf({ typeNumber, form, speedStage, target, recordIndex }: PitchPathRequest): WorldPoint[] {
+export function pitchPathOf({ typeNumber, form, speedStage, target, recordIndex, frames }: PitchPathRequest): WorldPoint[] {
   const record =
     recordIndex === undefined
       ? pitchRecordOf(typeNumber, form, speedStage)
@@ -83,7 +88,8 @@ export function pitchPathOf({ typeNumber, form, speedStage, target, recordIndex 
     z: z + RELEASE_ORIGIN.z,
   }))
   const bent = bendControlPoints(controlPoints, target)
-  return Array.from({ length: record.frames }, (_unused, index) => bezierPoint3At(bent, index, record.frames))
+  const pointCount = frames ?? record.frames
+  return Array.from({ length: pointCount }, (_unused, index) => bezierPoint3At(bent, index, pointCount))
 }
 
 const CAMERA = { x: 20000, y: 3470, z: 31500 }
