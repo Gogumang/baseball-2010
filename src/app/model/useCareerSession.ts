@@ -112,6 +112,7 @@ import {
   judgeEnding,
   MID_SEASON_GAME,
   NO_ENDING_JUDGEMENT,
+  savedCareerOf,
   midSeasonEventId,
   midSeasonTitlesOf,
   yearEndEventId,
@@ -476,8 +477,10 @@ export function useCareerSession({
   // (`giveEventReward`). ⚠️ 다른 장면 전수 대조는 안 했다.
   useEffect(() => {
     if (career === null) return
-    saveGame.save(career)
-    setSavedCareer(career)
+    // 판정 없음(e = −1) 엔딩은 141 이 저장하지 않는다 — 엔딩 칸을 비운 114 끝의 커리어가 남는다 (`savedCareerOf`)
+    const persisted = savedCareerOf(career)
+    saveGame.save(persisted)
+    setSavedCareer(persisted)
   }, [career, saveGame])
 
   /**

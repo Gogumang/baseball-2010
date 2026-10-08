@@ -102,6 +102,7 @@ import {
   midSeasonTitlesOf,
   NO_ENDING_JUDGEMENT,
   RETIREMENT_CHOICE_EVENT_ID,
+  savedCareerOf,
   salaryOfferOf,
   SALARY_EVENT_ID,
 } from '@/entities/career/model/seasonFlow'
@@ -723,10 +724,11 @@ export function usePitcherLeagueSession(
   /** 새 선수 플래그 (장면+0x165) — 등록(104)에서 100 으로 왔을 때 켜진다 (0x1c3be). 오프닝 451 을 부른다 */
   const newPlayerRef = useRef(false)
 
+  /** 판정 없음(e = −1) 엔딩은 141 이 저장하지 않는다 — 엔딩 칸을 비운 114 끝의 커리어가 남는다 (`savedCareerOf`) */
   const commit = useCallback(
     (next: PitcherCareer) => {
       setCareer(next)
-      store.save(next)
+      store.save(savedCareerOf(next))
     },
     [store],
   )
@@ -777,7 +779,7 @@ export function usePitcherLeagueSession(
         if (current === null) return current
         const next = update(current)
         if (next === current) return current
-        store.save(next)
+        store.save(savedCareerOf(next))
         return next
       })
     },

@@ -138,7 +138,8 @@ export type ResumePoint =
  * ⚠️ 1c30e~1c342 의 `0x76705(this+0xe8, 0x23, 0xbe, 0x1e)` · `0x7dfad(this+0xe0)` · +0x158/+0x15c 칸 복사는 그림 쪽이라 옮기지 않았다.
  */
 export function resumePointOf(career: PlayerCareer): ResumePoint {
-  // 엔딩 141 은 S+0x50 = 6(0x1230e) 갈래다 — 웹 이어하기는 엔딩으로 돌아가지 않는다(예전 그대로 관리 화면)
+  // 엔딩 141 은 S+0x50 = 6(0x1230e) 갈래다 — 웹 이어하기는 엔딩으로 돌아가지 않는다(예전 그대로 관리 화면). 판정 없음(−1)은
+  // 저장에 엔딩 칸이 비어 이 줄에 오지 않는다(`savedCareerOf`) — 114 끝 저장의 S+0x50 으로 간다
   if (career.endingIndex !== null) return { kind: '관리' }
   // 1c25e — 0x11 은 6|7 바로 다음에 본다 (464 거절 보상 뒤 끊겼으면 새 시즌 처리부터)
   if (career.seasonEndState === 137) return { kind: '새시즌' }

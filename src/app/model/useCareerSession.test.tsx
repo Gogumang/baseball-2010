@@ -241,6 +241,22 @@ describe('보상 명령 뒤 이어하기 자리 (0x8c460 끝 8cc2e — S+0x50 �
     expect(열기(짝수해).result.current.screen).toEqual({ kind: '이벤트', eventId: 461, context: '시즌' })
   })
 
+  it('판정 없음(e = −1) 엔딩은 저장하지 않는다 — 141 은 S+0x50 = 6 을 메모리에만 써 다시 켜면 114 끝 저장(132)으로 502 를 다시 튼다', () => {
+    const saveGame = 메모리저장(목표달성선수({ season: 9, popularity: 1000, seasonEndState: 132 }))
+    const 처음 = 열기(saveGame)
+    expect(처음.result.current.screen).toEqual({ kind: '이벤트', eventId: 502, context: '시즌' })
+    act(() => 처음.result.current.session.actions.completeScene([], [502, 496, 503], 503))
+    expect(처음.result.current.screen).toEqual({ kind: '엔딩', endingIndex: -1 })
+    expect(처음.result.current.session.career?.endingIndex).toBe(-1)
+    expect(saveGame.load()).toMatchObject({ endingIndex: null, seasonEndState: 132 })
+    // 114 끝 0x8b0e4 가 저장한 본 표시는 남는다(503 은 첫 종류 21 이라 빠진다)
+    expect(saveGame.load()?.seenEventIds).toEqual(expect.arrayContaining(['502', '496']))
+
+    const 다시 = 열기(saveGame)
+    expect(다시.result.current.screen).toEqual({ kind: '이벤트', eventId: 502, context: '시즌' })
+    expect(다시.result.current.session.career?.endingIndex).toBeNull()
+  })
+
   it('464 거절 보상 뒤 끄면 S+0x50 = 0x11 — 이어하기가 새 시즌(0x1b768)으로 간다, 평판 −20 은 한 번', () => {
     const saveGame = 메모리저장(목표달성선수({ seasonEndState: 132 }))
     const 처음 = 열기(saveGame)

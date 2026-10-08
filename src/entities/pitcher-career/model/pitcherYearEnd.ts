@@ -212,6 +212,7 @@ export type PitcherResumePoint =
  * 2 는 116 의 끝(0x12b98)이 같은 g 짝홀로 가른다 (타자편 `resumePointOf` 머리 주석에 S+0x50 쓰는 곳 표).
  */
 export function pitcherResumePointOf(career: PitcherCareer): PitcherResumePoint {
+  // 판정 없음(−1) 엔딩은 저장에 엔딩 칸이 비어(`savedCareerOf`) 이 줄에 오지 않는다 — 114 끝 저장의 S+0x50 으로 간다
   if (career.endingIndex !== null) return { kind: '관리' }
   // 1c25e — 0x11 은 6|7 바로 다음, 2(116)보다 앞에 본다 (464 거절 보상 뒤 끊겼으면 새 시즌 처리부터)
   if (career.seasonEndState === 137) return { kind: '새시즌' }

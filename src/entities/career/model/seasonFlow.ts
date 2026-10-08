@@ -131,6 +131,17 @@ export function goalResultEventId(achieved: number): number {
  */
 export const NO_ENDING_JUDGEMENT = -1
 
+/**
+ * **저장에 드는 커리어** — 판정 없음(e = −1) 엔딩은 저장하지 않는다. 141 진입 0x12300 은 S+0x50 = 6 을 메모리에만 쓰고
+ * (1230e — 0x22755 를 부르지 않는다), 엔딩 판 0x87c7c 는 전역기록만 저장한다(0x1f1b9). 그 뒤 커리어를 저장하는 자리는 보너스
+ * 팝업 0x2b 를 닫는 1bc6e 와 이어하기 팝업 갈래뿐인데 e = −1 은 키 0x1220c · 틀 0x1bbc4 가 팝업을 띄우지 않는다(56a4f3f).
+ * 곧 저장은 114 끝 0x8b0e4(1c02e)가 쓴 것 그대로라 다시 켜면 그때의 S+0x50 으로 돌아간다(132 의 503 이면 9 → 502 다시).
+ * 웹은 엔딩 번호를 커리어 칸에 두므로 그 칸만 비워 저장한다 — 메모리의 커리어(화면 · 기록연감 +0xa7)는 그대로 −1 이다.
+ */
+export function savedCareerOf<C extends { readonly endingIndex: number | null }>(career: C): C {
+  return career.endingIndex === NO_ENDING_JUDGEMENT ? { ...career, endingIndex: null } : career
+}
+
 /** StrENDING 번호. 7년차 전에는 null */
 /** 부상 중 이만큼 경기를 치르면 부상 엔딩 (0xa3a84 의 `+0x1b6 > 19`) */
 const INJURED_GAMES_FOR_ENDING = 20

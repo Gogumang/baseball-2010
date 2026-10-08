@@ -824,6 +824,25 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     expect(result.current.career?.gamePoint).toBe(12_000)
   })
 
+  it('판정 없음(e = −1) 엔딩은 저장하지 않는다 — 141 은 S+0x50 = 6 을 메모리에만 써 다시 켜면 114 끝 저장(132)으로 502 를 다시 튼다', () => {
+    const store = 메모리저장()
+    const 첫판 = 띄우기(store).result
+    act(() => 첫판.current.actions.create('투수', 신인))
+    act(() => 첫판.current.actions.save({ ...첫판.current.career!, season: 9, gamesPlayed: 45, popularity: 1000, seasonEndState: 132 }))
+    // 132 로 이어하면 502 — 496 → 503(첫 종류 21)으로 끝낸다 (인기도 정확히 1000 이라 0xa3a84 는 −1)
+    const result = 띄우기(store).result
+    expect(result.current.story?.eventId).toBe(502)
+    act(() => result.current.actions.completeStory([], [502, 496, 503], 503))
+    expect(result.current.scene).toBe('엔딩')
+    expect(result.current.career?.endingIndex).toBe(-1)
+    expect(store.load()).toMatchObject({ endingIndex: null, seasonEndState: 132 })
+
+    const 다시 = 띄우기(store).result
+    expect(다시.current.scene).toBe('이벤트')
+    expect(다시.current.story?.eventId).toBe(502)
+    expect(다시.current.career?.endingIndex).toBeNull()
+  })
+
   it('은퇴 선택에서 연봉협상(380)을 고르면 다음 연차로 이어진다', () => {
     const result = 판짜기({ season: 10, gamesPlayed: 45, popularity: 1600 })
     act(() => result.current.actions.beginYearEnd())
