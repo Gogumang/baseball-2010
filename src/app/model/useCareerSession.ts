@@ -116,6 +116,7 @@ import {
 import {
   forgetRepeatableEvents,
   markRewardedEvent,
+  withOutingEventActed,
   nariSeasonEndStateOfResumeCode,
   rewardResumePatchOf,
 } from '@/entities/story/model/storyScene'
@@ -1789,8 +1790,10 @@ export function useCareerSession({
         .filter((reward) => reward.kind === EVENT_REWARD_KIND.G포인트)
         .forEach((reward) => recordStat({ kind: 'G획득', mode: BATTER_LEAGUE_MODE, amount: reward.value }))
       const marked = markRewardedEvent(given, storyEvents?.find((event) => event.id === eventId) ?? null, viewedEventIds)
+      // 8cc1a 0x8b0e4 의 0x8b12c — 112(외출 진입) · 113(장소)에서 연 이벤트면 440~444 를 빼고 행동함(S+4)을 켠 채 저장한다
+      const acted = withOutingEventActed(marked, screen.context === '장소' || screen.context === '외출진입', eventId)
       // 8cc2e — 이벤트 번호로 이어하기 자리(S+0x50)를 고치고 8cd44 에서 다시 저장한다 (`withRewardResumePatch`)
-      setCareer(withRewardResumePatch(marked, eventId))
+      setCareer(withRewardResumePatch(acted, eventId))
     },
 
     /**
@@ -1839,8 +1842,13 @@ export function useCareerSession({
         return setScreen({ kind: '관리' })
       }
       if (screen.context === '시즌') return continueSeason(viewed, viewedEventIds, endingEventId !== null)
+      if (screen.context === '외출진입') {
+        // 114 끝 0x1c014 → 0x8b0e4(1c02e)의 0x8b12c — 112 에서 연 이벤트도 행동함(S+4)을 켜고 저장한다. 뒤 112 라 장소 끝
+        // 처리(외출 수)는 없다. 지금 이벤트 번호는 연 이벤트로 본다(외출 진입 이벤트는 440~444 가 아니다)
+        setCareer(withOutingEventActed(viewed, true, screen.eventId))
+        return setScreen({ kind: '외출' })
+      }
       setCareer(viewed)
-      if (screen.context === '외출진입') return setScreen({ kind: '외출' })
       setScreen({ kind: '관리' })
       setManagementCheck('고정')
     },

@@ -6,6 +6,7 @@ import {
   forgetRepeatableEvents,
   illnessChanceOf,
   markRewardedEvent,
+  withOutingEventActed,
   nariSeasonEndStateOfResumeCode,
   nextEventFor,
   OPENING_EVENT_ID,
@@ -257,6 +258,20 @@ describe('finishEvent', () => {
 
     expect(after.seenEventIds).toEqual([String(OPENING_EVENT_ID), '2'])
     expect(before.seenEventIds).toEqual([])
+  })
+})
+
+describe('withOutingEventActed — 0x8b0e4 의 0x8b12c (연 상태가 112 · 113)', () => {
+  const 선수 = createCareer('외출')
+  it('112 · 113 에서 연 이벤트면 S+4 = 1, 440~444 는 뺀다(0x1b7 < e ≤ 0x1bc)', () => {
+    expect(withOutingEventActed(선수, true, 401).hasActedThisCycle).toBe(true)
+    expect(withOutingEventActed(선수, true, 439).hasActedThisCycle).toBe(true)
+    expect(withOutingEventActed(선수, true, 440).hasActedThisCycle).toBe(false)
+    expect(withOutingEventActed(선수, true, 444).hasActedThisCycle).toBe(false)
+    expect(withOutingEventActed(선수, true, 445).hasActedThisCycle).toBe(true)
+  })
+  it('다른 상태에서 연 이벤트는 그대로', () => {
+    expect(withOutingEventActed(선수, false, 401)).toBe(선수)
   })
 })
 

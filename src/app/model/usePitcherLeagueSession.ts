@@ -62,6 +62,7 @@ import {
 import {
   EVENT_TRIGGER,
   markRewardedEvent,
+  withOutingEventActed,
   nariSeasonEndStateOfResumeCode,
   rewardResumePatchOf,
 } from '@/entities/story/model/storyScene'
@@ -1681,7 +1682,8 @@ export function usePitcherLeagueSession(
         return setScene('관리')
       }
       if (story.context === '지도') {
-        commit(viewed)
+        // 114 끝 0x1c014 → 0x8b0e4(1c02e)의 0x8b12c — 112 에서 연 이벤트도 행동함(S+4)을 켜고 저장한다(외출 수는 113 몫)
+        commit(withOutingEventActed(viewed, true, story.eventId))
         // `뒤 112` — 112 에 다시 들어서 0x118e4 가 [!] 칸을 다시 찍는다
         enterOutingMap()
         return setScene('외출')
@@ -1725,8 +1727,10 @@ export function usePitcherLeagueSession(
         .filter((reward) => reward.kind === EVENT_REWARD_KIND.G포인트)
         .forEach((reward) => recordStat({ kind: 'G획득', mode: PITCHER_LEAGUE_MODE, amount: reward.value }))
       const marked = markRewardedEvent(rewarded, storyEvents?.find((event) => event.id === eventId) ?? null, viewedEventIds)
+      // 8cc1a 0x8b0e4 의 0x8b12c — 112(지도) · 113(장소)에서 연 이벤트면 440~444 를 빼고 행동함(S+4)을 켠 채 저장한다
+      const acted = withOutingEventActed(marked, story.context === '지도' || story.context === '장소', eventId)
       // 8cc2e — 이벤트 번호로 이어하기 자리(S+0x50)를 고치고 8cd44 에서 다시 저장한다 (`withPitcherRewardResumePatch`)
-      commit(withPitcherRewardResumePatch(marked, eventId))
+      commit(withPitcherRewardResumePatch(acted, eventId))
     },
     [career, commit, random, recordStat, story, storyEvents],
   )

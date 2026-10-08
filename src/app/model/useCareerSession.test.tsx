@@ -762,6 +762,31 @@ describe('보상 명령 하나 (0x8c460) — 끝(0x8cbe0~0x8cc1a)이 본 표시 
     expect(saved.outingsThisSeason).toBe(before.outingsThisSeason)
     expect(rendered.result.current.screen).toMatchObject({ kind: '이벤트', eventId: 101 })
   })
+
+  it('0x8b12c — 외출 진입(112)에서 연 이벤트는 trigger 와 상관없이 보상 · 끝마다 행동함(S+4)을 켠다 · 외출 수는 그대로', () => {
+    const rendered = 띄우기({ ...createCareer('외출진입'), morale: 50 })
+    // 401 — 외출 진입 이벤트(trigger 1)
+    act(() => rendered.result.current.setScreen({ kind: '이벤트', eventId: 401, context: '외출진입' }))
+    const before = rendered.result.current.session.career!
+    expect(before.hasActedThisCycle).toBe(false)
+    act(() => rendered.result.current.session.actions.giveEventReward([{ kind: 0, value: 1 }], 401))
+    expect(rendered.result.current.session.career?.hasActedThisCycle).toBe(true)
+
+    // 끝(0x1c014 → 0x8b0e4) — 보상 없이 끝나도 켠다
+    const ended = 띄우기({ ...createCareer('외출진입'), morale: 50 })
+    act(() => ended.result.current.setScreen({ kind: '이벤트', eventId: 401, context: '외출진입' }))
+    act(() => ended.result.current.session.actions.completeScene([], [401]))
+    expect(ended.result.current.screen).toEqual({ kind: '외출' })
+    expect(ended.result.current.session.career?.hasActedThisCycle).toBe(true)
+    expect(ended.result.current.session.career?.outingsThisSeason).toBe(before.outingsThisSeason)
+  })
+
+  it('0x8b12c — 장소의 빈 이벤트(440~444)는 보상 자리에서도 행동함을 켜지 않는다', () => {
+    const rendered = 띄우기({ ...createCareer('빈장소'), morale: 50 })
+    act(() => rendered.result.current.setScreen({ kind: '이벤트', eventId: 440, context: '장소' }))
+    act(() => rendered.result.current.session.actions.giveEventReward([{ kind: 0, value: 1 }], 440))
+    expect(rendered.result.current.session.career?.hasActedThisCycle).toBe(false)
+  })
 })
 
 describe('마선수 대결로 나가는 장소 이벤트 — match 의 "끝남" 으로 0x1c014 장소 끝 처리가 나가는 자리에서 돈다 (0x8d904)', () => {

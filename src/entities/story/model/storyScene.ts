@@ -1,5 +1,6 @@
 import type { PlayerCareer, SeasonEndState } from '@/entities/career/model/playerCareer'
 import { GAMES_PER_SEASON } from '@/entities/career/model/playerCareer'
+import { isEmptyPlaceEventId } from '@/entities/career/model/battingOrder'
 import type { OriginalEvent } from '@/shared/config/original/eventTypes'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { ORIGINAL_USER_EVENTS } from '@/shared/config/original/userEvents'
@@ -239,6 +240,29 @@ export function markRewardedEvent<C extends RewardedEventHolder>(
   const seen = added.length === 0 ? career : { ...career, seenEventIds: [...career.seenEventIds, ...added] }
   const isPlaceEvent = event !== null && event.id > 0 && event.trigger >= FIRST_PLACE_TRIGGER && event.trigger <= LAST_PLACE_TRIGGER
   return isPlaceEvent && !seen.hasActedThisCycle ? { ...seen, hasActedThisCycle: true } : seen
+}
+
+/**
+ * **0x8b0e4 안의 외출 갈래 0x8b12c~0x8b15e** (직접 떴다) — 떠나온 이벤트 줄 본 표시 뒤, 저장(0x1fded · 0x22755) **앞에**:
+ * ```
+ * 8b116  u = [mgr+0xb4]                                 ; 그림 객체(+0x20 = 모드, +0x174 = 마지막 상태)
+ * 8b11c  [u+0x174] == 0x70 | 0x71 ?                    ; 외출 지도 112 · 장소 113
+ * 8b12c    0x7b999(u)(시즌모드) → S+4 = 1
+ * 8b138    아니면 e = 0xacb61([mgr+4])(지금 이벤트): e ≤ 0x1b7 || e > 0x1bc → [[mgr+0x2f8]+4] = 1   ; 440~444 만 뺀다
+ * ```
+ * [u+0x174] 는 상태 틀 0x1cdec 가 상태를 바꿀 때마다 `0x7e84c(u, 새 상태)` 로 적는데 **새 상태가 114 면 안 적는다**(1ce18~1ce20)
+ * — 그래서 이벤트 재생 중에는 이벤트를 연 상태(112 외출 진입 · 113 장소)가 남는다. 0x8b0e4 는 보상 명령 끝(0x8c460 8cc1a) ·
+ * 선택지 확인(0x8b804) · 114 끝(0x1c014 1c02e)마다 돌므로, 112 · 113 에서 연 이벤트는 그 자리마다 행동함(S+4)이 켜진 채
+ * 저장된다. 113 끝 처리(1c03a~1c076 — +0x167 == 0 이면 S+4 · 외출 수 · 105)와 달리 **112 에서 연 이벤트(외출 진입)도 켠다.**
+ * 시즌모드 상태 번호(0xc9~)는 0x70 · 0x71 이 아니라 시즌에는 닿지 않는다.
+ */
+export function withOutingEventActed<C extends { readonly hasActedThisCycle: boolean }>(
+  career: C,
+  isOpenedFromOuting: boolean,
+  eventId: number,
+): C {
+  if (!isOpenedFromOuting || isEmptyPlaceEventId(eventId) || career.hasActedThisCycle) return career
+  return { ...career, hasActedThisCycle: true }
 }
 
 /** 0x8cc2e 가 가르는 모드 — `0x7b999([mgr+0xb4])`(게임 +0x20 == 2, 시즌모드)와 나리 갈래의 `0x7b971`(== 4, 타자편) */

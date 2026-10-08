@@ -1077,11 +1077,30 @@ describe('자동 발동 (0x1cf9c → 0x8be80 → 0xadc70) · 연초 115', () => 
     act(() => result.current.actions.openOuting())
 
     expect(result.current.story).toEqual({ eventId: 401, context: '지도', viewed: [] })
+    expect(result.current.career?.hasActedThisCycle).toBe(false)
     이벤트끝내기(result)
     expect(result.current.scene).toBe('외출')
     expect(result.current.career?.seenEventIds).toContain('401')
     // 스킬 보상 4 (값 2 → 스킬 1)
     expect(result.current.career?.skillIds).toContain(1)
+    // 114 끝 0x8b0e4 의 0x8b12c — 112 에서 연 이벤트라 행동함(S+4)이 켜진다. 외출 수는 113 몫이라 그대로
+    expect(result.current.career?.hasActedThisCycle).toBe(true)
+    expect(result.current.career?.outingsThisSeason).toBe(0)
+  })
+
+  it('0x8b12c — 지도 · 장소에서 연 이벤트의 보상 명령은 이벤트 trigger 와 상관없이 행동함을 켜고 저장한다(440~444 제외)', async () => {
+    const store = 메모리저장()
+    const { result } = 띄우기(store)
+    act(() => result.current.actions.create('투수', 신인))
+    await 이벤트불러오기(result)
+    첫이벤트넘기기(result)
+    while (result.current.scene === '이벤트') 이벤트끝내기(result)
+    act(() => result.current.actions.save({ ...result.current.career!, popularity: 3000 }))
+    act(() => result.current.actions.openOuting())
+    expect(result.current.story?.context).toBe('지도')
+    // trigger 0 이벤트 번호로 보상을 줘도(장소 trigger 가 아님) 연 상태가 112 라 켠다
+    act(() => result.current.actions.giveStoryReward([{ kind: 0, value: 1 }], 1))
+    expect((store.load() as { hasActedThisCycle: boolean }).hasActedThisCycle).toBe(true)
   })
 })
 
