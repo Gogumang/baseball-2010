@@ -134,19 +134,19 @@ describe('기록실 순위표', () => {
     expect(rowOf(rows, RIVAL_TEAM)).toMatchObject({ wins: 1, losses: 3 })
   })
 
-  it('승률은 승×1000÷(승+패) 를 버린 세 자리 숫자다 (P6 4a-2)', () => {
-    // 3승 1패 = 750, 상대는 1승 3패 = 250
+  it('승률은 승×100÷(승+패) 를 버린 숫자다 (0x7f31a `movs r3,#0x64`)', () => {
+    // 3승 1패 = 75, 상대는 1승 3패 = 25
     render(<StandingsWindow league={afterGames(['승', '승', '승', '패']).league} onClose={vi.fn()} />)
     const rows = readStandings()
 
-    expect(rowOf(rows, OUR_TEAM)?.winningPercent, `우리 승률: ${rowOf(rows, OUR_TEAM)?.winningPercent}`).toBe(750)
-    expect(rowOf(rows, RIVAL_TEAM)?.winningPercent).toBe(250)
+    expect(rowOf(rows, OUR_TEAM)?.winningPercent, `우리 승률: ${rowOf(rows, OUR_TEAM)?.winningPercent}`).toBe(75)
+    expect(rowOf(rows, RIVAL_TEAM)?.winningPercent).toBe(25)
   })
 
-  it('버림이라 2승 1패는 667 이 아니라 666 이다', () => {
+  it('버림이라 2승 1패는 67 이 아니라 66 이다', () => {
     render(<StandingsWindow league={afterGames(['승', '승', '패']).league} onClose={vi.fn()} />)
 
-    expect(rowOf(readStandings(), OUR_TEAM)?.winningPercent).toBe(666)
+    expect(rowOf(readStandings(), OUR_TEAM)?.winningPercent).toBe(66)
   })
 
   // 무승부 갈래는 없다 — 경기 끝 0xb68fc 가 동점이면 끝을 안 내고, 정산 4f072 는 측 1 > 측 0 ? 측 1 승 : 측 0 승 뿐이다(a875ace)

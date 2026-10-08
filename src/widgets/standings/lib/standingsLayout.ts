@@ -60,13 +60,14 @@ export { SKY_BLUE_GLYPH_HEIGHT as RANK_GLYPH_HEIGHT, skyBlueNumberGlyphsOf as ra
 export const valueGlyphsOf = numberGlyphsOf
 
 /**
- * 승률 = **승×1000÷(승+패)** (박스 4, 0xb815d·0xb812d 옆 — P6 4a-2 확정).
+ * 승률 = **승×100÷(승+패)** 뒤에 "%" (박스 4, 순위표 0x7f070 의 0x7f31a~0x7f32a: `r4 = 승 × 0x64`, 승+패 ≠ 0 이면
+ * 0xca7b4 로 나눈다 — 디스어셈 대조).
  *
- * 원본은 소수점 없는 세 자리 숫자(5할이면 `500`)를 numBox 로 오른쪽 맞춤해 그린다.
- * ⚠️ 예전에는 ×100 이라 화면에 `50` 이 나갔다 — 원본과 자릿수가 달랐다.
- * 한 경기도 치르지 않았으면 0 이다(원본도 나눗셈 전에 막는다).
+ * 원본은 소수점 없는 숫자(5할이면 `50`)를 numBox 로 오른쪽 맞춤해 그리고 그 옆에 "%" 를 붙인다(`PERCENT_OFFSET`).
+ * ⚠️ 0d40bcb 가 P6 4a-2 문서(×1000)를 따라 ×1000 으로 바꿨으나 바이너리는 `movs r3,#0x64` 다 — 다시 ×100.
+ * 한 경기도 치르지 않았으면 0 이다(원본도 승+패 == 0 이면 나눗셈을 건너뛰어 승×100 = 0 이 남는다).
  */
 export function winningPercentOf(wins: number, losses: number): number {
   const played = wins + losses
-  return played === 0 ? 0 : Math.trunc((wins * 1000) / played)
+  return played === 0 ? 0 : Math.trunc((wins * 100) / played)
 }
