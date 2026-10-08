@@ -1,12 +1,11 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import {
-  BigResult, Button, Notice, Panel, PixelScreen, RawScreen, StatGrid, TitleTag,
-} from '@/shared/ui'
-import { EndBoardRows } from '@/widgets/game-scene/ui/EndBoardRows'
+import { Button, MessageBox, RawScreen } from '@/shared/ui'
+import { GameEndBoard } from '@/widgets/game-scene/ui/GameEndBoard'
 import type { GameEvaluation, StreakNotice } from '@/entities/career/model/gameEvaluation'
 import { nariRecordLineTextOf } from '@/entities/career/model/playerCareer'
 import type { NariRecordLine, PlayerCareer } from '@/entities/career/model/playerCareer'
+import { conditionTextOf } from '@/entities/career/model/titles'
 import { ORIGINAL_USER_EVENTS } from '@/shared/config/original/userEvents'
 import { EvaluationEventPlayer } from '@/pages/story/ui/EvaluationEventPlayer'
 import { evaluationGaugeDivisorOf } from '@/pages/story/lib/evaluationGauge'
@@ -16,51 +15,28 @@ import { yearGoalWindowValuesOf } from '@/entities/career/model/seasonFlow'
 import { leagueDayCounterOf } from '@/entities/career/model/leagueGameSetup'
 import { messageGameNumberOf } from '@/pages/management/lib/managementLayout'
 import type { GameSummary } from '@/entities/game/model/gameSummary'
-import { RECORD_NAMES } from '@/entities/game/model/gameRecords'
-import { battingAverageOf, formatBattingAverage } from '@/entities/career/model/seasonStats'
-import {
-  BAND, LOSE_DIM_OPACITY, NO_RECORD_TEXT, RESULT_SPRITES, REWARD_TEXT, TITLE_BAR,
-} from '@/pages/game-result/lib/gameResultLayout'
+import type { PlayerSide } from '@/entities/game/model/gameState'
 import * as styles from '@/pages/game-result/ui/GameResultScreen.css'
 import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
-import { SettlementEffectCanvas, useSettlementEffectLayers } from '@/widgets/batting-stage/ui/SettlementEffectCanvas'
+import { useSettlementEffectLayers } from '@/widgets/batting-stage/ui/SettlementEffectCanvas'
 import { settlementBackdropOffsetAt } from '@/pages/team-game/model/settlementBackdrop'
+import { SettlementBoard } from '@/pages/team-game/ui/SettlementBoard'
+import { humanVsComputerSidesOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import { STARTING_ABILITY } from '@/entities/career/model/playerCareer'
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
-const GAME_UI_FRAMES = './sprites/game_ui/frames'
-const RESULT_FRAMES = './sprites/result/frames'
-
-/** 결과 판 자리 — 보일 때는 감싼 칸이 레이아웃에 끼지 않는다 */
-const SHOWN_BOARD = { display: 'contents' } as const
-/** [자세히](웹 전용)를 연 동안 판을 숨긴다 — 안 지우므로 배경 · 정산 효과가 그대로 돈다 */
-const HIDDEN_BOARD = { display: 'none' } as const
-
 /** 나리 타자편 — 게임 모드 4 (정산 그리기 0x4a384 는 팀경기와 같은 갈래 0x4a948) */
 const BATTER_CAREER_MODE = 4
 
-const frameSrc = (folder: string, frame: number) => `${folder}/${String(frame).padStart(3, '0')}.png`
-
 /**
- * 승패 글자 그림 — ui/result.pzx 합성 프레임 0 "YOU WIN", 1 "YOU LOSE".
- * 무승부 전용 그림이 원본에 없어 무승부도 패배 쪽 프레임이다 (F-7 4 확정).
- */
-const resultSpriteOf = (result: GameSummary['result']) =>
-  result === '승' ? RESULT_SPRITES.승 : RESULT_SPRITES.패
-
-/**
- * 승·패·세 투수 세 줄의 **이름**.
+ * 승·패·세 투수 세 줄의 **이름** — 상태 0x18 결과 판(0x4fe9c)이 그린다.
  *
  * 원본은 경기 상태 state+0x44/0x48(승) · +0x50/0x54(패) · +0x5c/0x60(세) 에
  * "그 순간 마운드에 선 투수" 를 한 점 날 때마다(0xa5c34)·투수 교체 때(0xa60c0) 적어 두고,
- * 경기 끝(0xa7de8)에 셋을 확정한다 (S1-win-loss-save.md 2~4절 확정 — 웹판 판정은
- * `features/play-pitcher-game/model/winLossSave.ts` 가 그대로 갖고 있다).
- *
- * 타자편 `gameFlow` 가 득점·교체마다 그 칸을 세어(`features/play-game/model/gameDecisions`)
- * `GameSummary.pitchersOfRecord` 로 실어 보낸다. 결과 판(0x4fe9c)은 경기 끝 거르기(0xa7de8)를
- * 거치지 않은 칸을 그대로 그리므로 세이브 줄도 후보가 있으면 이름이 나온다.
+ * 경기 끝(0xa7de8)에 셋을 확정한다 (S1-win-loss-save.md 2~4절 확정).
+ * 타자편 `gameFlow` 가 득점·교체마다 그 칸을 세어 `GameSummary.pitchersOfRecord` 로 실어 보낸다.
  * `pitcherNames` 를 넘기면 그것이 먼저다. 둘 다 없으면 원본 "측 == 2 = 없음" 처럼 비운다 (R10 5절).
  */
 const EMPTY_PITCHER_NAMES: readonly (string | null)[] = [null, null, null]
@@ -79,11 +55,15 @@ interface GameResultScreenProps {
    * 세 줄 모두 빈 칸이다 (원본도 "없음" 이면 비운다).
    */
   readonly pitcherNames?: PitcherOfRecordNames
+  /** [+0x17f4] 이번 경기에 번 G — 정산 진입 0x4ea0c 4ebaa~4ec7c 가 기록 달성 횟수로 센 값 */
   readonly gamePointReward: number
+  /**
+   * 116 진입 0x1278c 가 직접 주는 칭호(39 다이너마이트 배트 — 1299e~129c8) — 칭호 팝업 0x1274c(종류 0x78)로 띄운다.
+   */
   readonly newTitles: readonly string[]
   /**
-   * 116 경기 뒤 평가 — 감독 글 · 변화 글 · 연속 기록. 국가대항전 경기는 116 을 안 지나(0x4ea0c 4f03a 가 S+0x50 = 2 를 대회가 아닐 때만
-   * 쓴다) 없다 — 그때 [자세히]에는 평가 칸이 없다.
+   * 116 경기 뒤 평가 — 감독 글 · 변화 글 · 연속 기록. 국가대항전 경기는 116 을 안 지나(0x4ea0c 4f03a 가 S+0x50 = 2 를
+   * 대회가 아닐 때만 쓴다) 없다 — 그때는 정산 판 [OK] 가 곧장 다음(134 대진판)이다.
    */
   readonly evaluation?: GameEvaluation
   readonly streakNotices?: readonly StreakNotice[]
@@ -92,34 +72,39 @@ interface GameResultScreenProps {
    * 포스트시즌 경기 뒤에는 앞 평가 경기의 줄이다. 안 넘기면 감독 글만.
    */
   readonly recordLine?: NariRecordLine
-  /** 평가가 반영된 뒤의 선수 — "현재 사기" 등을 보여준다 */
+  /** 평가 · 정산이 반영된 뒤의 선수 — 변화 창의 "현재" 값과 정산 판의 보유 G(전역 +0x64, 4ec5a 가 먼저 더한 값) */
   readonly career: PlayerCareer
   readonly onContinue: () => void
   /**
    * 나리 116 평가 대화(114 · 내장 이벤트 0x8a6fc)의 밑그림. 116 그림 0x11e0c 와 대화창 0x8b5ac 가
    * 공 무늬 · 상태판 0x7d34c(gfx, [이벤트+0xb] = 1 — 메시지줄 경기 번호 −1) · 머리띠를 깐다. 부르는 쪽이 넘긴다.
-   * 결과 판(0x18 · 0x19 — 경기 장면)이 아니라 [확인] 뒤 평가 단계에만 깐다.
+   * 결과 판(0x18 · 0x19 — 경기 장면)이 아니라 평가 단계에만 깐다.
    */
   readonly underlay?: ReactNode
   /**
-   * **경기 정산 0x19 를 지나 왔을 때** (경기 끝 판 OK → 진입 0x4ea0c) — 결과 그림 0x4a384 의 배경 · 정산 효과 재료.
-   * `inning` 은 경기 끝 이닝(타석 HUD 와 같은 1 부터 — 전역 경기 상태 +0x6b 의 칸), `random` 은 경기 난수.
-   * 이어하기로 116 을 다시 띄울 때(정산 0x4ea0c 를 다시 안 돈다)는 안 넘긴다 — 그때는 배경 · 효과 없이 판만.
+   * **경기 장면 끝(0x18 → 0x19)을 지나 왔을 때** — 경기 끝 판 0x4fe9c 와 정산 그림 0x4a384 의 재료.
+   * `inning` 은 경기 끝 이닝(타석 HUD 와 같은 1 부터 — 전역 경기 상태 +0x6b 의 칸), `playerSide` 는 사람 팀의 측
+   * (점수 · 점수판 틀 두 측이 측 0 = 선공부터), `random` 은 경기 난수.
+   * 이어하기로 116 을 다시 띄울 때(1c26a → 0x1278c — 경기 장면도 정산 0x4ea0c 도 다시 안 돈다)는 안 넘긴다 — 곧장 평가다.
    */
-  readonly settlement?: { readonly inning: number; readonly random: RandomPort }
+  readonly settlement?: { readonly inning: number; readonly playerSide: PlayerSide; readonly random: RandomPort }
 }
 
+/** 화면 단계 — 경기 끝 판(0x18) → 정산(0x19 · 그림 0x4a384) → 116 평가(114 내장 이벤트) */
+type Phase = '끝판' | '정산' | '평가'
+
 /**
- * 경기 결과 (정산 그리기 0x4a384 + 상태 0x18 결과 판 0x4fe9c — F-7 · R10 5절).
+ * 나리 타자편 경기 결과 — 원본 차례 그대로:
  *
- * 패배면 화면을 단계 8 로 어둡게 하고, y40 반투명 띠 위에 game_ui 프레임 8 막대(y35)를 깔고
- * YOU WIN/LOSE 를 (120,50) 기준으로 얹는다. 그 아래가 점수 두 개와 **승리투수·패전투수·세이브
- * 세 줄**(img_text 388·389·329)이다.
- *
- * **116 경기 뒤 평가**(평가가 있을 때)는 [확인] 뒤에 원본 차례대로 튼다 — 장면 0x106 상태 116 → 114 가 내장 이벤트
- * 0x8a6fc 를 재생: 명령 1 say(기록 줄 + 감독 글) → 명령 2 system sub 2 변화 창(0x86c90, `EvaluationChangeWindow` —
- * 글 [75] 가 아니다) → (있으면) 명령 3 say(연속 기록) → 끝나면 `onContinue`(114 끝). 그림 틀은 투수편과 같은 `EvaluationEventPlayer`.
- * 오늘의 성적 · 보상은 원본 배치가 없어 **[자세히] 칸**에 둔다(원본에 없는 웹 전용 길).
+ * 1. **경기 끝 판** 상태 0x18(그리기 0x4fe9c — `GameEndBoard`): 점수판 틀 · 두 점수 · 승리/패전/세이브 투수. OK → 0x19.
+ * 2. **정산** 상태 0x19(진입 0x4ea0c · 그림 0x4a384): 모드 4 는 팀경기 · 투수편과 같은 갈래 4a948 이다(0x4a384 머리
+ *    4a562 — 모드 5·6 만 미션 판) — 진 판 덮개 · 띠 · YOU WIN/LOSE · 점수판 틀 0x41440 · 점수 · 기본 화면(0:INFO · 번 G) /
+ *    '0' 기록 판, 키 0x407f0(`SettlementBoard`). 밑에 결과 배경(구름 0x78448 · 0x40ff0(+0x17e2) — 이긴 판만 가라앉음)과
+ *    정산 효과(밤 승리 불꽃 · 패배 비, 경기 난수)가 깔린다. '0' 이 아닌 키 → 메시지 0x3f3 → 나리 장면 100.
+ * 3. **116 경기 뒤 평가**(평가가 있을 때) — 장면 0x106 상태 116 → 114 가 내장 이벤트 0x8a6fc 를 재생: 명령 1 say(기록 줄 +
+ *    감독 글) → 명령 2 system sub 2 변화 창(0x86c90) → (있으면) 명령 3 say(연속 기록) → 끝나면 `onContinue`.
+ *    칭호 39 를 막 받았으면 116 진입이 칭호 팝업 0x1274c 를 띄운다.
+ * 국가대항전 경기는 116 이 없어 정산 판을 나가면 곧장 `onContinue`(134 대진판)다.
  */
 export function GameResultScreen({
   summary,
@@ -134,199 +119,141 @@ export function GameResultScreen({
   underlay,
   settlement,
 }: GameResultScreenProps) {
-  const [isDetailOpen, setIsDetailOpen] = useState(false)
-  // ⚠️ 웹 타석 그림이 세울 때 굴리는 하늘 줄 rand(0, 6)(추정 대체)이 경기 난수에 새지 않게 배경은 따로 든 난수로 세운다 (팀경기 · 투수편과 같은 근사)
+  const [phase, setPhase] = useState<Phase>(() =>
+    settlement !== undefined ? '끝판' : evaluation !== undefined ? '평가' : '정산')
+  const [isTitlePopupOpen, setIsTitlePopupOpen] = useState(newTitles.length > 0)
+  // ⚠️ 근사: 웹 타석 그림이 세울 때 굴리는 하늘 줄 rand(0, 6)(추정 대체)이 경기 난수에 새지 않게 배경은 따로 든 난수로 세운다
+  //    (팀경기 · 투수편과 같은 근사). 원본은 경기 내내 같은 구장객체라 경기 중 하늘 줄 그대로다 — 경기 타석 캔버스를 이어 쓰려면
+  //    widgets/batting-stage · pages/game 쪽 배선이 필요하다(미해결)
   const [backdropRandom] = useState(() => createSeededRandom(0))
   /** 정산 효과 층 — 비는 진 판 덮개 위 · 띠 아래, 파티클은 판 맨 위 (원본 그리기 차례 0x4a384) */
   const settlementLayers = useSettlementEffectLayers()
-  const [isEvaluating, setIsEvaluating] = useState(false)
-  // 결과 판 [확인] — 116 평가가 있으면 평가 이벤트로, 없으면(국가대항전) 곧장 다음
-  const confirm = () => (evaluation === undefined ? onContinue() : setIsEvaluating(true))
-  const { stats } = summary
+  // 정산 판을 나간다(메시지 0x3f3) — 116 평가가 있으면 평가로, 없으면(국가대항전) 곧장 다음
+  const leaveSettlement = () => (evaluation === undefined ? onContinue() : setPhase('평가'))
   // 진행기가 요약에 실어 보낸 이름이 기본이다 (`gameFlow.pitchersOfRecordOf` — 득점 0xa5c34·교체 0xa60c0 로 센 칸)
   const names = pitcherNames ?? summary.pitchersOfRecord
   const rowNames =
     names === undefined ? EMPTY_PITCHER_NAMES : [names.win, names.loss, names.save]
+  // 0x4a350 — 사람 팀이 앞섰나. 비기면 거짓(진 판 · 비)
+  const isWin = summary.result === '승'
+  // 0xb69b0(st, 0/1) — 측 0(선공)이 왼쪽. 사람 팀은 `playerSide` 측 (이어하기처럼 재료가 없으면 원래 웹 배치대로 측 1)
+  const playerSide = settlement?.playerSide ?? 1
+  const side0Score = playerSide === 0 ? summary.ourScore : summary.opponentScore
+  const side1Score = playerSide === 1 ? summary.ourScore : summary.opponentScore
+  // 점수판 틀 0x41440 의 두 측 — 내 팀 PLAYER · 상대 COM
+  const scoreboardSides = humanVsComputerSidesOf(playerSide, summary.ourTeamId, summary.opponentTeamId)
 
-  if (isEvaluating && evaluation !== undefined) {
+  if (phase === '평가' && evaluation !== undefined) {
     // 0x86531(gfx, S+7, 사기, S+0x4a, 인기도, S+0x64, 평판) — 116 0x12b08~0x12b70 이 넘기는 차례
     const changeValues = {
       changes: [evaluation.moraleChange, evaluation.popularityChange, evaluation.reputationChange],
       currents: [career.morale, career.popularity, career.reputation],
     } as const
+    const title = newTitles[0]
     return (
       <RawScreen>
-        <EvaluationEventPlayer
-          underlay={underlay}
-          // 0x8bab8 — 이벤트 +0x2cc 의 기록 줄(…홈런!N) 뒤에 감독 글을 이어 한 대사로
-          dialogue={`${recordLine === undefined ? '' : nariRecordLineTextOf(recordLine)}${ORIGINAL_USER_EVENTS[evaluation.commentIndex] ?? ''}`}
-          dialogueExpression={batterEvaluationExpressionOf(career.reputation, evaluation.popularityChange)}
-          changeValues={changeValues}
-          goals={yearGoalWindowValuesOf(career)}
-          year={career.season}
-          // 0x7d120(…, 1) — 막 치른 경기 번호
-          game={messageGameNumberOf(leagueDayCounterOf(career), career.postseason !== null, true)}
-          streak={nariStreakSayOf(streakNotices, ORIGINAL_USER_EVENTS)}
-          streakExpression={streakSayExpressionOf(hasHitlessStreak(streakNotices))}
-          gauge={{ popularityChange: evaluation.popularityChange, divisor: evaluationGaugeDivisorOf({ kind: 'batter' }) }}
-          onDone={onContinue}
-        />
+        {isTitlePopupOpen && title !== undefined ? (
+          <>
+            {underlay}
+            {/*
+              116 진입 1299e~129c8 — 칭호 39 를 막 받았으면 칭호 팝업 0x1274c(종류 0x78)를 띄운다. 그림 0x1afe8 은 이름
+              StrNICKNAME[i] 와 조건 문구 [i+64] 다. ⚠️ 근사: 팝업 틀 배치는 관리 화면 칭호 팝업과 같은 알림 상자 —
+              팝업이 떠 있는 동안 밑의 평가 이벤트가 어디까지 도는지는 미해결이라 팝업을 닫은 뒤 이벤트를 튼다
+            */}
+            <MessageBox
+              text={`!C${title}!N${conditionTextOf(title) ?? ''}`}
+              buttons={['확인']}
+              onAnswer={() => setIsTitlePopupOpen(false)}
+            />
+          </>
+        ) : (
+          <EvaluationEventPlayer
+            underlay={underlay}
+            // 0x8bab8 — 이벤트 +0x2cc 의 기록 줄(…홈런!N) 뒤에 감독 글을 이어 한 대사로
+            dialogue={`${recordLine === undefined ? '' : nariRecordLineTextOf(recordLine)}${ORIGINAL_USER_EVENTS[evaluation.commentIndex] ?? ''}`}
+            dialogueExpression={batterEvaluationExpressionOf(career.reputation, evaluation.popularityChange)}
+            changeValues={changeValues}
+            goals={yearGoalWindowValuesOf(career)}
+            year={career.season}
+            // 0x7d120(…, 1) — 막 치른 경기 번호
+            game={messageGameNumberOf(leagueDayCounterOf(career), career.postseason !== null, true)}
+            streak={nariStreakSayOf(streakNotices, ORIGINAL_USER_EVENTS)}
+            streakExpression={streakSayExpressionOf(hasHitlessStreak(streakNotices))}
+            gauge={{ popularityChange: evaluation.popularityChange, divisor: evaluationGaugeDivisorOf({ kind: 'batter' }) }}
+            onDone={onContinue}
+          />
+        )}
       </RawScreen>
     )
   }
 
-  // [자세히]는 웹 전용 칸이다 — 판(정산 그림 0x4a384)은 뒤에 숨겨 둔 채 그대로 둔다. 원본 '0' 기록 판처럼 그 동안에도 배경 ·
-  // 정산 효과가 그림마다 돌고, 닫아도 효과를 새로 깔지 않는다(정산 진입 0x4ea0c 는 한 번)
-  const detail = !isDetailOpen ? null : (
-    <PixelScreen
-      title="경기 결과"
-      leftKey={{ label: '닫기', onPress: () => setIsDetailOpen(false) }}
-      rightKey={{ label: '확인', onPress: confirm }}
-    >
-      <Panel>
-        <BigResult>
-          {summary.ourScore} : {summary.opponentScore} {summary.result}
-        </BigResult>
-      </Panel>
-
-
-      <Panel heading="오늘의 성적">
-        <StatGrid
-          entries={[
-            { label: '타수', value: stats.atBats },
-            { label: '안타', value: stats.hits },
-            { label: '홈런', value: stats.homeRuns },
-            { label: '타점', value: stats.runsBattedIn },
-            { label: '볼넷', value: stats.walks },
-            { label: '삼진', value: stats.strikeouts },
-          ]}
-        />
-      </Panel>
-
-      <Panel heading="보상">
-        <Notice>
-          경기 타율 {formatBattingAverage(battingAverageOf(stats))} · G포인트 +
-          {gamePointReward.toLocaleString('ko-KR')}
-        </Notice>
-        {/* 달성 기록 목록 (0x4ea0c 결과 화면) — 이름 StrGAME[id+8] */}
-        {summary.recordIds.length > 0 && <Notice>달성 기록 · {summary.recordIds.map((id) => RECORD_NAMES[id]).join(' · ')}</Notice>}
-      </Panel>
-
-      {newTitles.length > 0 && (
-        <Panel heading="칭호 획득!">
-          {newTitles.map((title) => (
-            <TitleTag key={title}>
-              {title}
-            </TitleTag>
-          ))}
-        </Panel>
-      )}
-    </PixelScreen>
-  )
-
-  const resultSprite = resultSpriteOf(summary.result)
-  // 0x4a350 — 사람 팀이 앞섰나. 비기면 거짓(진 판 · 비)
-  const isWin = summary.result === '승'
+  if (phase === '끝판') {
+    // 경기 끝 판(상태 0x18 경기 끝 가지 0x4fe9c) — 10틱 뒤 OK → 정산 0x19 진입 0x4ea0c
+    return (
+      <GameEndBoard
+        side0Score={side0Score}
+        side1Score={side1Score}
+        names={rowNames}
+        scoreboardSides={scoreboardSides}
+        onConfirm={() => setPhase('정산')}
+      />
+    )
+  }
 
   return (
-    <>
-      {detail}
-      <div style={isDetailOpen ? HIDDEN_BOARD : SHOWN_BOARD}>
-        <RawScreen>
-          {/*
-            0. 정산 그리기 0x4a384 머리 — 구름 0x78448 · 배경 0x40ff0(장면, +0x17e2). 이긴 판만 갱신 0x4b100 이 +0x17e2 를 틱마다 3 씩
-               150 까지 올려 구장이 가라앉는다. 정산 효과 0x4ea0c(밤 승리 불꽃 · 패배 비)와 그림마다 효과 · 파티클 틱은 경기 난수로 돈다
-          */}
-          {settlement !== undefined && (
-            <div className={styles.backdrop}>
-              <BattingStage
-                // 결과 배경은 선수·공을 안 그려 능력치를 읽지 않는다 — 꼴을 채우는 기본값
-                batterAbility={STARTING_ABILITY}
-                pitcherAbility={DEFAULT_PITCHER_ABILITY}
-                swingMode="일반"
-                gameMode={BATTER_CAREER_MODE}
-                isEagleEyeEnabled={false}
-                hud={null}
-                acePitcher={null}
-                isPaused
-                isResultBackdrop
-                resultBackdropOffsetOf={(tick) => settlementBackdropOffsetAt(tick, isWin)}
-                random={backdropRandom}
-                settlement={{
-                  isWin,
-                  // 0xb69b0(st, 0/1) — 차이의 절댓값만 쓴다(비 방울 수). 판과 같이 왼쪽 측 0 = 상대
-                  side0Score: summary.opponentScore,
-                  side1Score: summary.ourScore,
-                  inning: settlement.inning,
-                  random: settlement.random,
-                  layers: settlementLayers,
-                }}
-                onPitchResolved={() => {}}
-              />
-            </div>
-          )}
-
-          {/* 1. 패배(무승부 포함)면 화면 전체를 검정 단계 8 로 어둡게 (0x4a42a — 이기면 그대로) */}
-          {summary.result !== '승' && (
-            <div className={styles.loseDim} style={{ opacity: LOSE_DIM_OPACITY }} />
-          )}
-
-          {/* 1-1. 효과 틱 0x4a452(0x901a0) — 정산 비를 덮개 위 · 띠 아래에 */}
-          {settlement !== undefined && <SettlementEffectCanvas canvasRef={settlementLayers.rain} />}
-
-          {/* 2. 띠 fillRect(0, 40, 240, 30, 0x80304EA2) (0x4a466) */}
-          <div
-            className={styles.band}
-            style={{ left: BAND.x, top: BAND.y, width: BAND.width, height: BAND.height, background: BAND.color }}
+    <RawScreen>
+      {/*
+        정산 그리기 0x4a384 머리 — 구름 0x78448 · 배경 0x40ff0(장면, +0x17e2). 이긴 판만 갱신 0x4b100 이 +0x17e2 를 틱마다 3 씩
+        150 까지 올려 구장이 가라앉는다. 정산 효과 0x4ea0c(밤 승리 불꽃 · 패배 비)와 그림마다 효과 · 파티클 틱은 경기 난수로 돈다
+      */}
+      {settlement !== undefined && (
+        <div className={styles.backdrop}>
+          <BattingStage
+            // 결과 배경은 선수·공을 안 그려 능력치를 읽지 않는다 — 꼴을 채우는 기본값
+            batterAbility={STARTING_ABILITY}
+            pitcherAbility={DEFAULT_PITCHER_ABILITY}
+            swingMode="일반"
+            gameMode={BATTER_CAREER_MODE}
+            isEagleEyeEnabled={false}
+            hud={null}
+            acePitcher={null}
+            isPaused
+            isResultBackdrop
+            resultBackdropOffsetOf={(tick) => settlementBackdropOffsetAt(tick, isWin)}
+            random={backdropRandom}
+            settlement={{
+              isWin,
+              // 0xb69b0(st, 0/1) — 차이의 절댓값만 쓴다(비 방울 수)
+              side0Score,
+              side1Score,
+              inning: settlement.inning,
+              random: settlement.random,
+              layers: settlementLayers,
+            }}
+            onPitchResolved={() => {}}
           />
+        </div>
+      )}
 
-          {/* 3. game_ui 프레임 8 (171×25) 을 (34, 35) (0x4a48e) */}
-          <img
-            className={styles.sprite}
-            style={{ left: TITLE_BAR.x, top: TITLE_BAR.y }}
-            src={frameSrc(GAME_UI_FRAMES, TITLE_BAR.frame)}
-            alt=""
-          />
+      {/* 4a404 진 판 덮개 · 4a448 띠 · 승패 그림 · 4a948 점수판 틀 · 점수 · 기본 화면 / '0' 기록 판 · 키 0x407f0 */}
+      <SettlementBoard
+        mode={BATTER_CAREER_MODE}
+        isWin={isWin}
+        side0Score={side0Score}
+        side1Score={side1Score}
+        scoreboardSides={scoreboardSides}
+        recordIds={summary.recordIds}
+        gamePoints={gamePointReward}
+        // [app+0x64] 보유 G — 정산 진입 4ec5a 가 번 G 를 먼저 더한 값(선수 정산이 이미 더해 두었다)
+        heldGamePoints={career.gamePoint}
+        onExit={leaveSettlement}
+        {...(settlement === undefined ? {} : { effectLayers: settlementLayers })}
+      />
 
-          {/* 4. result 프레임 0 "YOU WIN" / 1 "YOU LOSE" 를 기준점 (120, 50) (0x4a4d2·0x4a55c) */}
-          <img
-            className={styles.sprite}
-            style={{ left: resultSprite.x, top: resultSprite.y }}
-            src={frameSrc(RESULT_FRAMES, resultSprite.frame)}
-            alt={summary.result === '승' ? 'YOU WIN' : 'YOU LOSE'}
-          />
-
-          {/* 5·6. 두 팀 점수와 승리투수·패전투수·세이브 세 줄 — 상태 0x18 결과 판(0x4fe9c)과 같은 부품이다.
-              왼쪽이 측 0(초 = 상대), 오른쪽이 측 1(말 = 우리) */}
-          <EndBoardRows side0Score={summary.opponentScore} side1Score={summary.ourScore} names={rowNames} />
-
-          {/* 7. 보상·기록 글 (F-7 5 유력 — 판 좌표를 못 정해 줄만 둔다) */}
-          <div className={styles.rewardText} style={{ left: REWARD_TEXT.x, top: REWARD_TEXT.y, width: REWARD_TEXT.width }}>
-            {summary.result === '승' && (
-              <div>
-                승리 추가 보상 <span className={styles.rewardPoint}>{gamePointReward.toLocaleString('ko-KR')} G포인트</span>
-              </div>
-            )}
-            <div>
-              {summary.recordIds.length > 0
-                ? summary.recordIds.map((id) => RECORD_NAMES[id]).join(' · ')
-                : NO_RECORD_TEXT}
-            </div>
-            {newTitles.length > 0 && <div>칭호 획득 · {newTitles.join(' · ')}</div>}
-          </div>
-
-          {/* 원본에 없는 웹 전용 단추 — 원본은 소프트키가 한다 */}
-          <Button variant="corner" className={styles.detailButton} onClick={() => setIsDetailOpen(true)}>
-            자세히
-          </Button>
-          <Button variant="corner" className={styles.continueButton} onClick={confirm}>
-            확인
-          </Button>
-
-          {/* 프레임 끝 0x6dd69 — 파티클(밤 승리 불꽃)은 판까지 다 그린 뒤 맨 위 (누르기는 밑으로 흘린다) */}
-          {settlement !== undefined && <SettlementEffectCanvas canvasRef={settlementLayers.particles} />}
-        </RawScreen>
-      </div>
-    </>
+      {/* 원본에 없는 웹 전용 단추 — 원본은 '0' 이 아닌 키(소프트키 포함)가 정산을 나간다 */}
+      <Button variant="corner" className={styles.continueButton} onClick={leaveSettlement}>
+        확인
+      </Button>
+    </RawScreen>
   )
 }

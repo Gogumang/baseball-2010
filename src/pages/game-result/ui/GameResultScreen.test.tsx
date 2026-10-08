@@ -8,18 +8,19 @@ import { createCareer } from '@/entities/career/model/playerCareer'
 import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
 import type { GameSummary } from '@/entities/game/model/gameSummary'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
-import {
-  BAND, PITCHER_LABELS, PITCHER_ROWS, PITCHER_ROW_X, RESULT_SPRITES, TITLE_BAR,
-  pitcherRowTopOf,
-} from '@/pages/game-result/lib/gameResultLayout'
+import { GAME_END_INPUT_LOCK_TICKS, PITCHER_LABELS } from '@/widgets/game-scene/lib/endBoardLayout'
+import { resetSkinTickerCounter } from '@/shared/lib/skinTicker/skinTicker'
 
 /**
- * 경기 결과 (정산 0x4a384 + 상태 0x18 결과 판 0x4fe9c — F-7 · R10 5절).
- * y40 반투명 띠 위에 game_ui 프레임 8 막대와 YOU WIN/LOSE 가 놓이고,
- * 아래에 승리투수·패전투수·세이브 세 줄(img_text 388·389·329)이 온다.
+ * 나리 타자편 경기 결과 — 경기 끝 판 0x18(0x4fe9c) → 정산 0x19(0x4ea0c · 그림 0x4a384 의 4a948 갈래, 키 0x407f0)
+ * → 116 평가(114 내장 이벤트 0x8a6fc). 이어하기 116 은 곧장 평가.
  */
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  resetSkinTickerCounter()
+  vi.useRealTimers()
+})
 
 const 요약 = (overrides: Partial<GameSummary> = {}): GameSummary => ({
   result: '승',
@@ -38,274 +39,177 @@ const 요약 = (overrides: Partial<GameSummary> = {}): GameSummary => ({
   ...overrides,
 })
 
-const 띄우기 = (summary: GameSummary = 요약(), onContinue = vi.fn()) =>
-  render(
-    <GameResultScreen
-      summary={summary}
-      gamePointReward={120}
-      newTitles={[]}
-      evaluation={{ popularityChange: 1, reputationChange: 0, moraleChange: 2, commentIndex: 0 }}
-      streakNotices={[]}
-      career={createCareer('선수')}
-      onContinue={onContinue}
-    />,
-  )
+const 평가 = { popularityChange: 1, reputationChange: 0, moraleChange: 2, commentIndex: 40 } as const
 
-const 그림찾기 = (container: HTMLElement, file: string) =>
-  container.querySelector(`img[src$="${file}"]`) as HTMLElement | null
+const 프레임 = (count: number) => act(() => {
+  vi.advanceTimersByTime(count * millisecondsPerFrame())
+})
 
-describe('경기 결과 원본 배치', () => {
-  it('정산 0x4ea0c 를 지나 왔으면 배경 · 효과 층을 원본 0x4a384 차례로 — 배경 → 덮개 → 비 층 → 띠 … → 파티클 층(맨 위)', () => {
+/** 경기 끝 판을 10틱 기다려 OK — 정산 0x19 로 */
+const 끝판넘기기 = () => {
+  프레임(GAME_END_INPUT_LOCK_TICKS)
+  fireEvent.click(screen.getByRole('button', { name: '확인' }))
+}
+
+describe('경기 끝 판 (상태 0x18 · 0x4fe9c)', () => {
+  it('정산을 지나 왔으면 먼저 경기 끝 판 — 점수판 틀 · 승리/패전/세이브 줄, 배경 · 정산 판은 아직 없다', () => {
+    vi.useFakeTimers()
+    const { container } = render(
+      <GameResultScreen summary={요약({ pitchersOfRecord: { win: '승투', loss: '패투', save: null } })}
+        gamePointReward={0} newTitles={[]} career={createCareer('선수')} onContinue={vi.fn()}
+        settlement={{ inning: 9, playerSide: 1, random: createSeededRandom(1) }} />,
+    )
+    for (const label of PITCHER_LABELS) expect(screen.getByAltText(label.name)).toBeTruthy()
+    expect(screen.getByText('승투')).toBeTruthy()
+    expect(screen.getByText('패투')).toBeTruthy()
+    expect(screen.getByTestId('점수판-틀')).toBeTruthy()
+    expect(screen.queryByTestId('정산-판')).toBeNull()
+    expect(container.querySelector('canvas')).toBeNull()
+    expect(screen.queryByRole('button', { name: '자세히' })).toBeNull()
+  })
+})
+
+describe('정산 판 (0x4a384 의 4a948 갈래 — 팀경기 SettlementBoard)', () => {
+  it('OK 뒤 정산 — 배경 캔버스 위에 정산 판, 효과 층은 판 안(비는 덮개 위 · 파티클은 맨 위), 그리기 전엔 경기 난수를 안 쓴다', () => {
+    vi.useFakeTimers()
     const random = createSeededRandom(1)
     const next = vi.spyOn(random, 'next')
     const { container } = render(
       <GameResultScreen summary={요약({ result: '패', ourScore: 1, opponentScore: 4 })} gamePointReward={0} newTitles={[]}
-        career={createCareer('선수')} onContinue={vi.fn()} settlement={{ inning: 9, random }} />,
+        career={createCareer('선수')} onContinue={vi.fn()} settlement={{ inning: 9, playerSide: 1, random }} />,
     )
-    // 판 자리(감싼 칸) > RawScreen > 240×320 무대
-    const stage = container.firstElementChild?.firstElementChild?.firstElementChild as HTMLElement
-    const layers = Array.from(stage.children)
-    const canvases = layers.filter((element) => element.tagName === 'CANVAS')
-    // 배경 캔버스는 첫 칸(감싼 div) 안 · 비 층은 덮개 바로 뒤 · 파티클 층은 맨 끝
-    expect(layers[0]?.querySelector('canvas')).not.toBeNull()
-    expect(layers[2]).toBe(canvases[0])
-    expect(layers[layers.length - 1]).toBe(canvases[1])
-    // jsdom 은 캔버스 그리기가 없어 rAF 효과 틱이 안 돈다 — 그려지기 전에는 경기 난수를 안 쓴다
+    끝판넘기기()
+    const board = screen.getByTestId('정산-판')
+    const stage = board.parentElement as HTMLElement
+    // 0 = 결과 배경(타석 캔버스) 자리, 그다음 정산 판
+    expect(stage.children[0]?.querySelector('canvas')).not.toBeNull()
+    expect(stage.children[1]).toBe(board)
+    const boardCanvases = Array.from(board.children).filter((element) => element.tagName === 'CANVAS')
+    expect(board.children[1]).toBe(boardCanvases[0])
+    expect(board.children[board.children.length - 1]).toBe(boardCanvases[1])
+    expect(container.querySelectorAll('canvas').length).toBe(3)
+    // jsdom 은 캔버스 그리기가 없어 rAF 효과 틱이 안 돈다
     expect(next).not.toHaveBeenCalled()
   })
 
-  it('[자세히](웹 전용)를 열고 닫아도 판 · 배경을 지우지 않는다 — 정산 효과를 새로 깔지 않는다', () => {
-    const { container } = render(
-      <GameResultScreen summary={요약()} gamePointReward={0} newTitles={[]} career={createCareer('선수')}
-        onContinue={vi.fn()} settlement={{ inning: 9, random: createSeededRandom(1) }} />,
-    )
-    const backdrop = container.querySelector('canvas')
-    fireEvent.click(screen.getByRole('button', { name: '자세히' }))
-    expect(screen.getByText('오늘의 성적')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '닫기' }))
-    expect(container.querySelector('canvas')).toBe(backdrop)
-  })
-
-  it('이어하기로 다시 띄운 116 앞 판(정산 재료 없음)은 배경 · 효과 없이 판만', () => {
-    const { container } = 띄우기()
-    expect(container.querySelector('canvas')).toBeNull()
-  })
-
-  it('밑그림(116 평가 대화의 상태판)은 결과 판이 아니라 [확인] 뒤 평가 단계에 깐다', () => {
+  it('점수는 측 0(선공)이 왼쪽 — 사람 팀이 선공이면 우리 점수가 왼쪽', () => {
+    vi.useFakeTimers()
     render(
-      <GameResultScreen summary={요약()} gamePointReward={0} newTitles={[]} career={createCareer('선수')} onContinue={vi.fn()}
-        evaluation={{ popularityChange: 1, reputationChange: 0, moraleChange: 2, commentIndex: 40 }}
-        underlay={<div data-testid="밑그림" />} />,
+      <GameResultScreen summary={요약({ ourScore: 7, opponentScore: 2 })} gamePointReward={0} newTitles={[]}
+        career={createCareer('선수')} onContinue={vi.fn()}
+        settlement={{ inning: 9, playerSide: 0, random: createSeededRandom(1) }} />,
     )
-    expect(screen.queryByTestId('밑그림')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: '확인' }))
-    expect(screen.getByTestId('밑그림')).toBeTruthy()
+    끝판넘기기()
+    expect(screen.getByTestId('정산-점수-0').dataset.value).toBe('7')
+    expect(screen.getByTestId('정산-점수-1').dataset.value).toBe('2')
   })
 
-  it('띠는 (0,40) 240×30 이다', () => {
-    const { container } = 띄우기()
-    const band = container.querySelector(`div[style*="height: ${BAND.height}px"]`) as HTMLElement
-
-    expect(band.style.top).toBe(`${BAND.y}px`)
-    expect(band.style.width).toBe(`${BAND.width}px`)
-  })
-
-  it('game_ui 프레임 8 막대를 (34, 35) 에 둔다', () => {
-    const { container } = 띄우기()
-    const bar = 그림찾기(container, `game_ui/frames/${String(TITLE_BAR.frame).padStart(3, '0')}.png`)
-
-    expect(bar?.style.left).toBe(`${TITLE_BAR.x}px`)
-    expect(bar?.style.top).toBe(`${TITLE_BAR.y}px`)
-  })
-
-  it('이기면 YOU WIN 그림을 (43, 33) 에 두고 화면을 안 어둡게 한다', () => {
-    const { container } = 띄우기()
-    const win = screen.getByAltText('YOU WIN')
-
-    expect(win.style.left).toBe(`${RESULT_SPRITES.승.x}px`)
-    expect(win.style.top).toBe(`${RESULT_SPRITES.승.y}px`)
-    expect(그림찾기(container, 'result/frames/001.png')).toBeNull()
-  })
-
-  it('지면 YOU LOSE 그림이고 무승부도 같은 프레임을 쓴다 (전용 그림 없음)', () => {
-    띄우기(요약({ result: '패' }))
-    expect(screen.getByAltText('YOU LOSE').style.left).toBe(`${RESULT_SPRITES.패.x}px`)
-
-    cleanup()
-    띄우기(요약({ result: '무' }))
-    expect(screen.getByAltText('YOU LOSE')).toBeTruthy()
-  })
-})
-
-describe('승·패·세이브 투수 3줄', () => {
-  it('세 줄 딱지를 순서대로 보여 준다 — 승리투수·패전투수·세이브', () => {
-    띄우기()
-
-    for (const label of PITCHER_LABELS) {
-      expect(screen.getByAltText(label.name)).toBeTruthy()
-    }
-  })
-
-  it('줄은 y = H/2 + 33 부터 16px 간격이다', () => {
-    const { container } = 띄우기()
-    const plates = container.querySelectorAll(
-      `img[src$="game_ui/frames/${String(PITCHER_ROWS.labelPlate.frame).padStart(3, '0')}.png"]`,
-    )
-
-    expect(plates.length).toBe(PITCHER_ROWS.count)
-    plates.forEach((plate, row) => {
-      expect((plate as HTMLElement).style.top).toBe(`${pitcherRowTopOf(row)}px`)
-      expect((plate as HTMLElement).style.left).toBe(`${PITCHER_ROW_X}px`)
-    })
-  })
-
-  it('이름을 안 넘기면 세 칸이 비어 있다 — 타자편에 마운드 투수 기록이 없다', () => {
-    띄우기()
-
-    // 이름 칸은 딱지 칸 바로 오른쪽이다
-    const nameBoxLeft = PITCHER_ROW_X + PITCHER_ROWS.labelPlate.width
-    for (const label of PITCHER_LABELS) {
-      const plate = screen.getByAltText(label.name).parentElement as HTMLElement
-      const nameBox = plate.querySelector(`div[style*="left: ${nameBoxLeft}px"]`) as HTMLElement
-      expect(nameBox.textContent).toBe('')
-    }
-  })
-
-  it('이름을 넘기면 승·패·세 차례로 채운다 (state+0x44 · +0x50 · +0x5c)', () => {
-    const nameBoxLeft = PITCHER_ROW_X + PITCHER_ROWS.labelPlate.width
+  it("'0' 기록 판 — 기록 줄 · 획득 G · 보유 G(정산이 더한 선수 G)", () => {
+    vi.useFakeTimers()
     render(
-      <GameResultScreen
-        summary={요약()}
-        pitcherNames={{ win: '김승리', loss: '박패전', save: null }}
-        gamePointReward={0}
-        newTitles={[]}
-        evaluation={{ popularityChange: 0, reputationChange: 0, moraleChange: 0, commentIndex: 0 }}
-        streakNotices={[]}
-        career={createCareer('선수')}
-        onContinue={vi.fn()}
-      />,
+      <GameResultScreen summary={요약({ recordIds: [3, 3] })} gamePointReward={120} newTitles={[]}
+        career={{ ...createCareer('선수'), gamePoint: 4321 }} onContinue={vi.fn()}
+        settlement={{ inning: 9, playerSide: 1, random: createSeededRandom(1) }} />,
     )
-
-    const 이름 = (labelName: string) => {
-      const plate = screen.getByAltText(labelName).parentElement as HTMLElement
-      return (plate.querySelector(`div[style*="left: ${nameBoxLeft}px"]`) as HTMLElement).textContent
-    }
-    expect(이름('승리투수')).toBe('김승리')
-    expect(이름('패전투수')).toBe('박패전')
-    // 세이브는 "없음"(측 2) 이라 빈 칸이다
-    expect(이름('세이브')).toBe('')
-  })
-})
-
-describe('보상·기록 줄', () => {
-  it('기록이 없으면 "기록이 없습니다!" 로 둔다', () => {
-    띄우기()
-    expect(screen.getByText('기록이 없습니다!')).toBeTruthy()
+    끝판넘기기()
+    expect(screen.getByTestId('정산-번-G')).toBeTruthy()
+    fireEvent.keyDown(window, { key: '0' })
+    expect(screen.getByTestId('정산-기록-3').textContent).toContain('2회')
+    expect(screen.getByTestId('정산-획득-G')).toBeTruthy()
+    expect(screen.getByTestId('정산-보유-G')).toBeTruthy()
   })
 
-  it('이겼을 때만 승리 추가 보상을 보여 준다', () => {
-    띄우기()
-    expect(screen.getByText(/승리 추가 보상/)).toBeTruthy()
-
-    cleanup()
-    띄우기(요약({ result: '패' }))
-    expect(screen.queryByText(/승리 추가 보상/)).toBeNull()
-  })
-})
-
-describe('웹 전용 단추', () => {
-  it('[확인] 은 116 평가 이벤트를 튼다 — 대사 → 변화 창(system sub 2 · 0x86c90, 글 [75] 아님) → 114 끝에 다음으로', () => {
+  it('국가대항전(116 평가 없음) — 정산 판을 나가면 곧장 다음', () => {
     vi.useFakeTimers()
     const onContinue = vi.fn()
     render(
-      <GameResultScreen summary={요약()} gamePointReward={0} newTitles={[]}
-        evaluation={{ popularityChange: 1, reputationChange: 0, moraleChange: 2, commentIndex: 40 }}
-        recordLine={{ atBats: 4, hits: 2, runsBattedIn: 3, homeRuns: 1 }}
-        career={createCareer('선수')} onContinue={onContinue} />,
+      <GameResultScreen summary={요약()} gamePointReward={30} newTitles={[]} career={createCareer('선수')}
+        onContinue={onContinue} settlement={{ inning: 9, playerSide: 0, random: createSeededRandom(1) }} />,
     )
-    const 다찍기 = () => act(() => {
-      vi.advanceTimersByTime(200 * millisecondsPerFrame())
-    })
-    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    끝판넘기기()
     expect(onContinue).not.toHaveBeenCalled()
-    다찍기()
-    // 0x8bab8 — 기록 줄(…홈런!N) 뒤 감독 글, 첫 줄은 기록 줄 하나
+    // 닫힌 판에서 '0' 이 아닌 키 → 메시지 0x3f3
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(onContinue).toHaveBeenCalledOnce()
+  })
+})
+
+describe('116 평가 (114 내장 이벤트 0x8a6fc)', () => {
+  it('정산 판을 나가면 평가 — 대사(기록 줄 + 감독 글) → 변화 창 → 114 끝에 다음, 밑그림은 이 단계에만', () => {
+    vi.useFakeTimers()
+    const onContinue = vi.fn()
+    render(
+      <GameResultScreen summary={요약()} gamePointReward={0} newTitles={[]} evaluation={평가}
+        recordLine={{ atBats: 4, hits: 2, runsBattedIn: 3, homeRuns: 1 }}
+        career={createCareer('선수')} onContinue={onContinue} underlay={<div data-testid="밑그림" />}
+        settlement={{ inning: 9, playerSide: 1, random: createSeededRandom(1) }} />,
+    )
+    끝판넘기기()
+    expect(screen.queryByTestId('밑그림')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    expect(screen.getByTestId('밑그림')).toBeTruthy()
+    expect(onContinue).not.toHaveBeenCalled()
+    프레임(200)
     const 줄 = [...screen.getByTestId('대사-상자').querySelectorAll('[data-part="글줄"]')].map((line) => line.textContent)
     expect(줄[0]).toBe('4타수 2안타 3타점 1홈런')
     expect(screen.getByTestId('대사-상자').getAttribute('data-text')).toContain((ORIGINAL_USER_EVENTS[40] ?? '').replace(/!c[0-9A-Fa-f]{6}|!N/g, '').slice(0, 4))
     for (let page = 0; page < 5 && screen.queryByRole('dialog', { name: '경기 평가 변화' }) === null; page += 1) {
       fireEvent.keyDown(window, { key: 'Enter' })
-      다찍기()
+      프레임(200)
     }
     const 창 = screen.getByRole('dialog', { name: '경기 평가 변화' })
     const 글 = [...창.querySelectorAll('img[data-frame]')].map((img) => Number(img.getAttribute('data-frame')))
     expect(글.slice(0, 4)).toEqual([359, 84, 327, 331])
-    expect(screen.queryByRole('dialog', { name: '알림' })).toBeNull()
     fireEvent.keyDown(window, { key: '5' })
-    // 연속 기록 알림이 없으면 명령 3 이 없다 — 114 끝
     expect(onContinue).toHaveBeenCalledOnce()
-    vi.useRealTimers()
   })
 
   it('연속 기록이 있으면 변화 창 뒤 명령 3 say — 같은 상자에 " / " 로 이은 줄을 찍는다', () => {
     vi.useFakeTimers()
     const onContinue = vi.fn()
     render(
-      <GameResultScreen summary={요약()} gamePointReward={0} newTitles={[]}
-        evaluation={{ popularityChange: 1, reputationChange: 0, moraleChange: 2, commentIndex: 40 }}
+      <GameResultScreen summary={요약()} gamePointReward={0} newTitles={[]} evaluation={평가}
         streakNotices={[
           { labelIndex: 100, count: 5, commentIndex: 108, reputationChange: 10 },
           { labelIndex: 101, count: 5, commentIndex: 108, reputationChange: 10 },
         ]}
         career={createCareer('선수')} onContinue={onContinue} />,
     )
-    const 다찍기 = () => act(() => {
-      vi.advanceTimersByTime(200 * millisecondsPerFrame())
-    })
-    fireEvent.click(screen.getByRole('button', { name: '확인' }))
     for (let page = 0; page < 5 && screen.queryByRole('dialog', { name: '경기 평가 변화' }) === null; page += 1) {
-      다찍기()
+      프레임(200)
       fireEvent.keyDown(window, { key: 'Enter' })
     }
     fireEvent.keyDown(window, { key: '5' })
     expect(onContinue).not.toHaveBeenCalled()
     expect(screen.getByTestId('대사-상자').getAttribute('data-text')).toContain(' / 5')
     for (let page = 0; page < 5 && onContinue.mock.calls.length === 0; page += 1) {
-      다찍기()
+      프레임(200)
       fireEvent.keyDown(window, { key: 'Enter' })
     }
     expect(onContinue).toHaveBeenCalledOnce()
-    vi.useRealTimers()
   })
 
-  it('[자세히] 는 오늘의 성적 칸을 연다 — 감독 평가는 평가 이벤트 몫이라 없다', () => {
-    띄우기()
-
-    fireEvent.click(screen.getByRole('button', { name: '자세히' }))
-
-    expect(screen.queryByText('감독 평가')).toBeNull()
-    expect(screen.getByText('오늘의 성적')).toBeTruthy()
-  })
-
-  it('국가대항전 경기(116 평가 없음)는 같은 결과 판에 평가 칸이 없다', () => {
-    const onContinue = vi.fn()
-    render(
-      <GameResultScreen summary={요약()} gamePointReward={30} newTitles={[]} career={createCareer('선수')} onContinue={onContinue} />,
+  it('이어하기로 다시 띄운 116(정산 재료 없음)은 경기 끝 판 · 정산 판 없이 곧장 평가 — 배경 · 효과도 없다', () => {
+    const { container } = render(
+      <GameResultScreen summary={요약()} gamePointReward={0} newTitles={[]} evaluation={평가}
+        career={createCareer('선수')} onContinue={vi.fn()} underlay={<div data-testid="밑그림" />} />,
     )
-    expect(screen.getByText('30 G포인트')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '자세히' }))
-    expect(screen.queryByText('감독 평가')).toBeNull()
-    expect(screen.getByText('오늘의 성적')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '확인' }))
-    expect(onContinue).toHaveBeenCalledOnce()
+    expect(screen.getByTestId('밑그림')).toBeTruthy()
+    expect(screen.queryByTestId('정산-판')).toBeNull()
+    expect(screen.queryByTestId('점수판-틀')).toBeNull()
+    expect(container.querySelector('canvas')).toBeNull()
   })
-})
 
-describe('승·패·세 이름', () => {
-  it('요약에 실린 이름(gameFlow.pitchersOfRecordOf)을 세 줄에 적는다', () => {
-    띄우기(요약({ pitchersOfRecord: { win: '승투', loss: '패투', save: null } }))
-
-    expect(screen.getByText('승투')).toBeTruthy()
-    expect(screen.getByText('패투')).toBeTruthy()
+  it('116 이 준 칭호 39 는 칭호 팝업 0x1274c 로 — 닫으면 평가 이벤트', () => {
+    vi.useFakeTimers()
+    render(
+      <GameResultScreen summary={요약()} gamePointReward={0} newTitles={['다이너마이트 배트']} evaluation={평가}
+        career={createCareer('선수')} onContinue={vi.fn()} />,
+    )
+    expect(screen.queryByTestId('대사-상자')).toBeNull()
+    expect(screen.getByText(/다이너마이트 배트/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    프레임(200)
+    expect(screen.getByTestId('대사-상자')).toBeTruthy()
   })
 })

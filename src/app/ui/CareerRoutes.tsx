@@ -160,7 +160,7 @@ export function CareerRoutes({
           // 정산 0x4ea0c 를 막 지났을 때만 — 결과 그림 0x4a384 의 배경 · 정산 효과(경기 난수)
           {...(screen.settlementInning === undefined
             ? {}
-            : { settlement: { inning: screen.settlementInning, random } })}
+            : { settlement: { inning: screen.settlementInning, playerSide: screen.settlementPlayerSide ?? 1, random } })}
         />
       )
 
@@ -174,7 +174,7 @@ export function CareerRoutes({
           career={career}
           onContinue={actions.confirmCupGameResult}
           // 대회 경기도 정산 0x4ea0c 꼬리를 지난다 — 결과 그림 0x4a384 의 배경 · 정산 효과(경기 난수)
-          settlement={{ inning: screen.settlementInning, random }}
+          settlement={{ inning: screen.settlementInning, playerSide: screen.settlementPlayerSide, random }}
         />
       )
 
