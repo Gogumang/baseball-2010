@@ -120,7 +120,34 @@ export function restartsMenuBgm(previousKind: Screen['kind'] | null, screen: Scr
 }
 
 /**
- * 최상위 화면의 배경음과 **다시 틀기 표** — 화면이 바뀐 그리기에서 `restartsMenuBgm` 이 참이면 표가 하나 오른다.
+ * 외출 지도(112)에서 관리 화면(105)으로 돌아올 때 배경음 4 를 **처음부터** 다시 트는가 — 105 처리 0x1aec4 의 첫 틀
+ * (+0x2c == 2)이 이전 상태 ∈ {100, 116, 132, 125, 126, 114, 134, 1, 112} 면 `0x6ea6d(소리, 4, −1, 1)`(1aef4~1af02)를 부르고,
+ * 0x6ea6c 는 번호를 견주지 않아 112 동안 이어지던 4 를 끊고 새로 튼다. 웹 '외출' 에서 곧장 '관리' 로 오는 길은 지도 취소
+ * (112 → 105)다 — 장소(113)는 이벤트 114 를 지나 40 → 4 로 번호가 바뀌어 저절로 튼다. 상점(111 → 110)은 105 진입이 아니다.
+ * ⚠️ 화면이 '관리' 인 채 105 에 다시 드는 길 중 훈련 결과 창(125) · 외출 효과(126)도 목록에 들지만 웹 화면 표가 그 앞 상태를
+ * 몰라 다시 틀지 않는다(미이식).
+ */
+export function restartsManagementBgm(previousKind: string | null, kind: string): boolean {
+  return kind === '관리' && previousKind === '외출'
+}
+
+/**
+ * 투수편(장면 0x106) 안쪽 장면의 **다시 틀기 표** — 타자편과 같은 105 처리 0x1aec4 라 외출 지도(112) → 관리(105)에서
+ * 오른다(`restartsManagementBgm`). `useSceneBgm` 의 다시 틀기 표에 더해 넘긴다.
+ */
+export function usePitcherLeagueBgmRestart(isActive: boolean, scene: PitcherScene): number {
+  const [previousScene, setPreviousScene] = useState<PitcherScene | null>(null)
+  const [restartSerial, setRestartSerial] = useState(0)
+  const current = isActive ? scene : null
+  if (current !== previousScene) {
+    setPreviousScene(current)
+    if (current !== null && restartsManagementBgm(previousScene, current)) setRestartSerial((serial) => serial + 1)
+  }
+  return restartSerial
+}
+
+/**
+ * 최상위 화면의 배경음과 **다시 틀기 표** — 화면이 바뀐 그리기에서 `restartsMenuBgm` · `restartsManagementBgm` 이 참이면 표가 하나 오른다.
  * `useSceneBgm` 이 표가 오르면 같은 번호라도 끊고 처음부터 튼다.
  */
 export function useScreenBgm(screen: Screen): { readonly bgm: number | null; readonly restartSerial: number } {
@@ -131,7 +158,9 @@ export function useScreenBgm(screen: Screen): { readonly bgm: number | null; rea
   if (screen.kind !== previousKind) {
     setPreviousKind(screen.kind)
     setEnteredFrom(previousKind)
-    if (restartsMenuBgm(previousKind, screen)) setRestartSerial((serial) => serial + 1)
+    if (restartsMenuBgm(previousKind, screen) || restartsManagementBgm(previousKind, screen.kind)) {
+      setRestartSerial((serial) => serial + 1)
+    }
   }
   return { bgm: screenBgmOf(screen, enteredFrom), restartSerial }
 }
@@ -238,6 +267,9 @@ export function usePitcherLeagueBgm(
   return isActive ? pitcherLeagueBgmOf(scene, fromReentry, endingIndex, { storyContext, postseasonAfterGame }) : null
 }
 
+/** 시즌 트레이닝 0xcf · 그 연출 0xde (웹은 0xde 를 0xcf 화면 안 결과 팝업으로 갈음한다) */
+const SEASON_TRAINING = 0xcf
+const SEASON_TRAINING_EFFECT = 0xde
 /** 시즌 관리 메뉴 상태 0xc9 · 장면 생성 뒤 첫 상태(진입 분기) 0xcb */
 const SEASON_MANAGEMENT_MENU = 0xc9
 const SEASON_ENTRY_BRANCH = 0xcb
@@ -255,12 +287,12 @@ const SEASON_MENU_BGM_FROM: ReadonlySet<number> = new Set([0xcb, 0xcc, 0xe3, 0xd
 /**
  * 웹이 원본 상태를 건너뛰는 자리 — 원본에서는 아래 상태가 위 목록의 상태를 거쳐 0xc9 에 온다.
  * - 0xca 팀고르기 · 0xc8 팀결정확인: 웹은 곧장 0xc9 로 간다. 원본은 0xcc(새 시즌 초기화) → 0xcb → 0xc9.
- * - 0xcf 트레이닝: 웹은 0xde 연출과 결과 팝업을 0xcf 화면 안에서 띄우고 닫으면 0xc9 로 간다(원본 0xde → 0xc9).
- *   ⚠️ 0xcf 에서 취소로 돌아올 때도 4 를 다시 부른다 — 원본은 안 부르지만 그때 이미 4 가 돌고 있어(0xc9 → 0xcf 는 배경음을
- *   안 바꾼다) 같은 번호라 그대로 이어진다.
+ * - 0xcf 트레이닝: 웹은 0xde 연출과 결과 팝업을 0xcf 화면 안에서 띄우고 닫으면 0xc9 로 간다(원본 0xde → 0xc9 — 4 를
+ *   처음부터 다시 튼다). 결과 팝업이 섰던 0xcf 는 0xde 로 본다(`useSeasonMenuBgm` 의 `trainingShown`). 취소로 돌아오는
+ *   0xcf → 0xc9 는 목록 밖이라 안 부른다 — 0x6ea6c 는 같은 번호도 처음부터 다시 트니 이 둘이 갈린다.
  * - 0xe1 경기: 원본은 경기 장면 0x104 를 나와 장면 0x105 를 새로 지으므로 0xcb 를 지난다.
  */
-const SEASON_MENU_BGM_WEB_STAND_INS: ReadonlySet<number> = new Set([0xca, 0xc8, 0xcf, 0xe1])
+const SEASON_MENU_BGM_WEB_STAND_INS: ReadonlySet<number> = new Set([0xca, 0xc8, 0xe1])
 
 /**
  * 관리 메뉴 0xc9 에 들어설 때 틀 배경음 — 이전 상태가 목록에 들면 4, 아니면 null(안 바꾼다).
@@ -275,16 +307,22 @@ export function seasonMenuBgmOf(previous: number | null): number | null {
  * 시즌모드(장면 0x105) 관리 메뉴의 배경음 4 — 원본은 상태 0xc9 의 틀 0x73b8 이 이전 상태를 보고 **한 번** 튼다.
  * 최상위 화면 표(`SCREEN_BGM` 시즌모드 3)를 고른 **뒤에** 불러야 한다 — 같은 컴포넌트의 효과는 선언 차례로 돈다.
  */
-export function useSeasonMenuBgm(sound: SoundPort, isActive: boolean, scene: number): void {
+export function useSeasonMenuBgm(
+  sound: SoundPort,
+  isActive: boolean,
+  scene: number,
+  /** 0xcf 화면 안에 팀 트레이닝 결과 팝업이 섰다 — 원본은 그때 0xde 다 */
+  trainingShown = false,
+): void {
   /** 앞 틀의 상태 — 시즌모드가 아니었으면 null */
   const previousRef = useRef<number | null>(null)
   useEffect(() => {
     const previous = previousRef.current
-    previousRef.current = isActive ? scene : null
+    previousRef.current = !isActive ? null : scene === SEASON_TRAINING && trainingShown ? SEASON_TRAINING_EFFECT : scene
     if (!isActive || scene !== SEASON_MANAGEMENT_MENU || previous === scene) return
     const bgm = seasonMenuBgmOf(previous)
     if (bgm !== null) sound.playBgm(bgm)
-  }, [sound, isActive, scene])
+  }, [sound, isActive, scene, trainingShown])
 }
 
 /**

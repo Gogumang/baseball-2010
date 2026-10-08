@@ -191,7 +191,7 @@ describe('소리 포트 — 재생', () => {
     expect(fake.started).toHaveLength(1)
   })
 
-  it('같은 배경음을 다시 부르면 처음부터 다시 틀지 않는다', async () => {
+  it('같은 배경음을 다시 부르면 끊고 처음부터 다시 튼다 — 0x6ea6c 는 번호를 견주지 않고 0x6e9d4 로 넘긴다', async () => {
     const fake = createFakeAudio()
     const sound = createWebAudioSound(fake.options)
 
@@ -199,8 +199,11 @@ describe('소리 포트 — 재생', () => {
     await vi.waitFor(() => expect(fake.started).toHaveLength(1))
     sound.playBgm(1)
 
-    await vi.waitFor(() => expect(fake.fetched).toEqual(['sounds/001.mp3']))
-    expect(fake.started).toHaveLength(1)
+    await vi.waitFor(() => expect(fake.started).toHaveLength(2))
+    expect(fake.stopped).toEqual(['sounds/001.mp3'])
+    expect(fake.started[1]).toEqual({ url: 'sounds/001.mp3', loop: true })
+    // 받은 파일은 다시 안 받는다
+    expect(fake.fetched).toEqual(['sounds/001.mp3'])
   })
 
   it('효과음이 끝나도 배경음은 스스로 돌아오지 않는다 — 기억만 남는다 (0x6eb30 되돌리기 갈래는 죽어 있다)', async () => {

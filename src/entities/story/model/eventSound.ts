@@ -19,7 +19,7 @@ export function eventSoundCueOf(id: number): { readonly file: number; readonly l
 }
 
 /**
- * 명령 6 을 통로에 넣는다. ⚠️ 원본 0x6ea6c 는 같은 배경음이 돌고 있어도 처음부터 다시 트는데, 웹 `playBgm` 은 같은 번호면 둔다.
+ * 명령 6 을 통로에 넣는다. 원본 0x6ea6c 처럼 같은 배경음이 돌고 있어도 처음부터 다시 튼다(`playBgm`).
  */
 export function playEventSound(sound: SoundPort, id: number): void {
   const { file, loop } = eventSoundCueOf(id)

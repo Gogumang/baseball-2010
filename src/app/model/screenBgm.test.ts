@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import { renderHook } from '@testing-library/react'
-import { pitcherLeagueBgmOf, restartsMenuBgm, screenBgmOf, stopsSoundOnEnter, useSceneEnterStop, seasonEndingBgmOf, seasonMenuBgmOf, usePitcherLeagueBgm, useScreenBgm, useSeasonMenuBgm } from '@/app/model/screenBgm'
+import { pitcherLeagueBgmOf, restartsMenuBgm, screenBgmOf, stopsSoundOnEnter, useSceneEnterStop, seasonEndingBgmOf, seasonMenuBgmOf, usePitcherLeagueBgm, usePitcherLeagueBgmRestart, useScreenBgm, useSeasonMenuBgm } from '@/app/model/screenBgm'
 import type { Screen } from '@/app/model/screen'
 import { createSilentSound } from '@/shared/api/audio/soundPort'
 import { useSceneBgm } from '@/app/model/useSound'
@@ -95,6 +95,66 @@ describe('시즌 관리 메뉴 0xc9 의 틀 0x73b8 — 이전 상태가 목록�
     expect(played).toEqual([4])
     rerender({ isActive: true, scene: 0xd3 })
     rerender({ isActive: true, scene: 0xc9 })
+    expect(played).toEqual([4, 4])
+  })
+
+  it('트레이닝 0xcf — 결과 팝업이 섰으면(원본 0xde) 4 를 다시 틀고, 취소로 돌아오면 안 튼다', () => {
+    const played: number[] = []
+    const port = { ...createSilentSound(), playBgm: (id: number) => { played.push(id) } }
+    const { rerender } = renderHook(
+      ({ scene, shown }: { scene: number; shown: boolean }) => useSeasonMenuBgm(port, true, scene, shown),
+      { initialProps: { scene: 0xc9, shown: false } },
+    )
+    expect(played).toEqual([4])
+    rerender({ scene: 0xcf, shown: false })
+    rerender({ scene: 0xc9, shown: false })
+    expect(played).toEqual([4])
+    rerender({ scene: 0xcf, shown: false })
+    rerender({ scene: 0xcf, shown: true })
+    rerender({ scene: 0xc9, shown: false })
+    expect(played).toEqual([4, 4])
+  })
+})
+
+describe('관리 화면 105 처리 0x1aec4 — 외출 지도(112)에서 돌아오면 4 를 처음부터 다시 튼다', () => {
+  it('타자편 — 외출 → 관리는 다시 틀기 표가 오르고, 상점 → 관리는 안 오른다', () => {
+    const { result, rerender } = renderHook(({ screen }: { screen: Screen }) => useScreenBgm(screen), {
+      initialProps: { screen: { kind: '관리' } as Screen },
+    })
+    const start = result.current.restartSerial
+    rerender({ screen: { kind: '외출' } as Screen })
+    rerender({ screen: { kind: '관리' } as Screen })
+    expect(result.current.restartSerial).toBe(start + 1)
+    expect(result.current.bgm).toBe(4)
+    rerender({ screen: { kind: '아이템', tab: '장착' } as Screen })
+    rerender({ screen: { kind: '관리' } as Screen })
+    expect(result.current.restartSerial).toBe(start + 1)
+  })
+
+  it('투수편 — 안쪽 장면 외출 → 관리에서 오른다', () => {
+    const { result, rerender } = renderHook(
+      ({ scene }: { scene: '관리' | '외출' | '상점' }) => usePitcherLeagueBgmRestart(true, scene),
+      { initialProps: { scene: '관리' as '관리' | '외출' | '상점' } },
+    )
+    expect(result.current).toBe(0)
+    rerender({ scene: '외출' })
+    rerender({ scene: '관리' })
+    expect(result.current).toBe(1)
+    rerender({ scene: '상점' })
+    rerender({ scene: '관리' })
+    expect(result.current).toBe(1)
+  })
+
+  it('useSceneBgm — 표가 오르면 같은 4 도 처음부터 다시 튼다', () => {
+    const played: number[] = []
+    const port = { ...createSilentSound(), playBgm: (id: number) => { played.push(id) } , currentBgm: () => 4 }
+    const { rerender } = renderHook(({ serial }: { serial: number }) => useSceneBgm(port, 4, serial), {
+      initialProps: { serial: 0 },
+    })
+    expect(played).toEqual([4])
+    rerender({ serial: 0 })
+    expect(played).toEqual([4])
+    rerender({ serial: 1 })
     expect(played).toEqual([4, 4])
   })
 })

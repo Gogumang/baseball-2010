@@ -167,9 +167,9 @@ export function createWebAudioSound(options: WebAudioSoundOptions = {}): SoundPo
     },
 
     playBgm: (id) => {
+      // 원본 0x6ea6c 는 번호를 견주지 않는다 — 같은 번호가 울리고 있어도 0x6e9d4 가 끊고 처음부터 튼다
       rememberedBgmId = id
       if (volume === 0) return
-      if (playingBgmId === id && activeSource) return
       playingBgmId = id
       start(id, true)
     },

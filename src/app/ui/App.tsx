@@ -27,7 +27,7 @@ import type { AceMatchStarter } from '@/app/ui/CareerRoutes'
 import { useGameSettings } from '@/app/model/useGameSettings'
 import { useSceneBgm, useSceneEnterSound, useSound } from '@/app/model/useSound'
 import {
-  screenEnterSoundOf, usePitcherLeagueBgm, useSceneEnterStop, useScreenBgm, useSeasonMenuBgm,
+  screenEnterSoundOf, usePitcherLeagueBgm, usePitcherLeagueBgmRestart, useSceneEnterStop, useScreenBgm, useSeasonMenuBgm,
 } from '@/app/model/screenBgm'
 import { useSeasonSession } from '@/app/model/useSeasonSession'
 import { SeasonRoute } from '@/app/ui/SeasonRoute'
@@ -227,11 +227,17 @@ export function App() {
   const pitcherBgm = usePitcherLeagueBgm(
     screen.kind === '투수편', pitcherSession.scene, pitcherSession.career?.endingIndex ?? null, pitcherSession.story?.context ?? null,
   )
-  // 메인 메뉴는 환경설정에서 돌아올 때(0x24a40) · 게임시작 목록으로 새로 설 때(0x25b88) 1 을 처음부터 다시 튼다
+  // 메인 메뉴는 환경설정에서 돌아올 때(0x24a40) · 게임시작 목록으로 새로 설 때(0x25b88) 1 을, 관리 화면은 외출 지도에서
+  // 돌아올 때(0x1aec4) 4 를 처음부터 다시 튼다
   const screenBgm = useScreenBgm(screen)
-  useSceneBgm(sound, screen.kind === '투수편' ? pitcherBgm : screenBgm.bgm, screenBgm.restartSerial)
+  const pitcherBgmRestart = usePitcherLeagueBgmRestart(screen.kind === '투수편', pitcherSession.scene)
+  useSceneBgm(
+    sound,
+    screen.kind === '투수편' ? pitcherBgm : screenBgm.bgm,
+    screenBgm.restartSerial + pitcherBgmRestart,
+  )
   // 시즌 관리 메뉴 0xc9 의 틀 0x73b8 — 이전 상태가 목록에 들면 배경음 4 (위 화면 표 뒤에 돌아야 이긴다)
-  useSeasonMenuBgm(sound, screen.kind === '시즌모드', seasonSession.scene)
+  useSeasonMenuBgm(sound, screen.kind === '시즌모드', seasonSession.scene, seasonSession.trainingResult !== null)
   const careerSession = useCareerSession({
     runner, random, saveGame, screen, setScreen, sound, wallet,
     // 환경설정 "주루" (설정 +0xbd) — 나리 타자편은 사람이 늘 공격이라 그대로 먹는다 (0xae690)
