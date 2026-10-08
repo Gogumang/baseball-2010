@@ -2186,11 +2186,11 @@ function applyOpponentCpuPinchHit(
       runnerCount: runnerCountOf(progress.game.bases),
       strikes: progress.atBat.strikes,
       balls: progress.atBat.balls,
+      // ac23e~ac26e — 타석 타자가 마선수면 굴림 없이 0
+      batterIsAce: rosterSlotAt(progress.opponentLineup, slot) === ACE_BATTER_ROSTER_SLOT,
     },
     random,
   )
-      // ac23e~ac26e — 타석 타자가 마선수면 굴림 없이 0
-      batterIsAce: rosterSlotAt(progress.opponentLineup, slot) === ACE_BATTER_ROSTER_SLOT,
   if (pinch === null) return progress
   const opponentBatterLogs = { ...progress.opponentBatterLogs }
   delete opponentBatterLogs[slot]
