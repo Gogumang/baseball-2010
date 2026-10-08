@@ -767,6 +767,69 @@ describe('StoryScreen — 보상 명령 7 의 알림 창 (0x8d4c4 · 0x8daa0)', 
   })
 })
 
+describe('StoryScreen — 보상은 명령마다 그 자리에서 준다 (0x8d4c4 → 0x8c460)', () => {
+  const 고정난수 = { next: () => 0, nextInRange: () => 0, pick: <T,>(items: readonly T[]) => items[0] }
+
+  it('창을 띄운 그 걸음에 그 명령 보상을 준다 — 확인 전이다. 끝에 넘기는 보상은 비어 있다', () => {
+    const 보상이벤트 = {
+      ...이벤트,
+      commands: [
+        { op: 'reward', items: [{ kind: 0, value: 5 }] },
+        { op: 'reward', items: [{ kind: 1, value: 2 }] },
+      ],
+    } as unknown as OriginalEvent
+    const onReward = vi.fn()
+    const onComplete = vi.fn()
+    render(<StoryScreen events={[보상이벤트]} event={보상이벤트} playerName="테스트" teamName="드래곤즈"
+      onComplete={onComplete} onMatch={() => {}} onReward={onReward}
+      rewardNoticeContext={() => ({ mode: 4, years: 0, illness: 0, salaryBase: 10, random: 고정난수 })} />)
+    expect(onReward.mock.calls).toEqual([[[{ kind: 0, value: 5 }], 1]])
+    fireEvent.click(within(screen.getByRole('dialog', { name: '알림' })).getByRole('button', { name: 'OK' }))
+    expect(onReward.mock.calls).toEqual([[[{ kind: 0, value: 5 }], 1], [[{ kind: 1, value: 2 }], 1]])
+    fireEvent.click(within(screen.getByRole('dialog', { name: '알림' })).getByRole('button', { name: 'OK' }))
+    expect(onReward).toHaveBeenCalledTimes(2)
+    expect(onComplete).toHaveBeenCalledWith([], [1])
+  })
+
+  it('창이 없는 보상(첫 종류 7)도 주고 곧바로 넘긴다 — 뒤 보상의 글은 앞 보상을 준 뒤 값을 읽는다', () => {
+    const 보상이벤트 = {
+      ...이벤트,
+      commands: [
+        { op: 'reward', items: [{ kind: 7, value: 19 }] },
+        { op: 'reward', items: [{ kind: 20, value: 0 }] },
+      ],
+    } as unknown as OriginalEvent
+    // 세션의 커리어 — 준 보상이 연봉 기준을 바꾼다고 친다
+    let salaryBase = 10
+    const onReward = vi.fn((items: readonly { kind: number; value: number }[]) => {
+      if (items[0]?.kind === 7) salaryBase = 100
+    })
+    render(<StoryScreen events={[보상이벤트]} event={보상이벤트} playerName="테스트" teamName="드래곤즈"
+      onComplete={() => {}} onMatch={() => {}} onReward={onReward}
+      rewardNoticeContext={() => ({ mode: 4, years: 0, illness: 0, salaryBase, random: 고정난수 })} />)
+    expect(onReward.mock.calls.map(([items]) => items)).toEqual([[{ kind: 7, value: 19 }], [{ kind: 20, value: 0 }]])
+    // 연봉 100 × 1.3 = 130 → "13000만" (앞 보상 전 값 10 이면 1300만)
+    expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain('연봉 13000만 결정!')
+  })
+
+  it('보상을 준 뒤에도 끝 · 경기로 넘기는 보상은 비어 있다 — 결과 이벤트로 이어도 다시 안 준다', () => {
+    const 경기이벤트 = {
+      ...이벤트,
+      commands: [
+        { op: 'reward', items: [{ kind: 7, value: 19 }] },
+        { op: 'match', team: 16, resultEvents: [2, 3] },
+      ],
+    } as unknown as OriginalEvent
+    const onReward = vi.fn()
+    const onMatch = vi.fn()
+    render(<StoryScreen events={[경기이벤트]} event={경기이벤트} playerName="테스트" teamName="드래곤즈"
+      onComplete={() => {}} onMatch={onMatch} onReward={onReward} />)
+    expect(onReward).toHaveBeenCalledTimes(1)
+    expect(onMatch).toHaveBeenCalledTimes(1)
+    expect(onMatch.mock.calls[0][1]).toEqual({ rewards: [], viewedEventIds: [1] })
+  })
+})
+
 describe('StoryScreen — system 창 답 0 은 0x7fe90 (목표 창 봤음 · 저장)', () => {
   const 창이벤트 = {
     ...이벤트,

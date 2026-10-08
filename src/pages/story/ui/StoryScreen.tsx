@@ -6,7 +6,7 @@ import type { EventReward } from '@/entities/story/model/eventReward'
 import { EventPortraits } from '@/widgets/event-portraits/ui/EventPortraits'
 import { useEventPlayback } from '@/pages/story/model/useEventPlayback'
 import { isStepHeld, useScreenEffect } from '@/pages/story/model/useScreenEffect'
-import type { MatchCommand, SystemCommand } from '@/pages/story/model/useEventPlayback'
+import type { EventRewardHandler, MatchCommand, SystemCommand } from '@/pages/story/model/useEventPlayback'
 import type { StoryCarry } from '@/entities/story/model/aceMatch'
 import * as styles from '@/pages/story/ui/StoryScreen.css'
 import { YearGoalWindow } from '@/pages/story/ui/YearGoalWindow'
@@ -106,13 +106,19 @@ interface StoryScreenProps {
    * 예아니오(0x8d954) · 보상(0x8daa0)은 안 부른다. 안 넘기면 아무 일도 없다.
    */
   readonly onSystemWindowConfirm?: () => void
+  /**
+   * **보상 명령 7 을 그 자리에서 준다** — 0x8d4c4 가 글 · 창을 세운 그 갱신에 0x8c460(mgr, 명령)이 준다. 항목은 0x8beb8 이 고친
+   * 값(질병 번호)이고 이벤트 번호는 그 명령이 든 이벤트다(연차 보정 393~396 · 중간평가 452~454 가 본다). 주면 끝(`onComplete`)과
+   * 경기(`onMatch`)로 넘기는 보상은 비어 있다. 안 주면 예전처럼 끝에 모아 넘긴다.
+   */
+  readonly onReward?: EventRewardHandler
 }
 
 /** 원작 이벤트. 대사마다 원본이 정한 인물·표정·자리로 초상화를 띄운다. */
 export function StoryScreen({
   events, event, playerName, teamName, skinIndex, battingTypeIndex, onComplete, onMatch, carried, replacementsFor,
   systemWindowTextOf, yearGoalWindowOf, isVibrationOn = true, isSeasonMode = false, isOverOutingMap = false,
-  rewardNoticeContext, onSystemWindowConfirm,
+  rewardNoticeContext, onSystemWindowConfirm, onReward,
 }: StoryScreenProps) {
   // 목표 창도 재생기가 멈추는 창이다 — 글 대신 빈 글로 세워 두고 아래에서 창을 그린다
   const windowTextOf = systemWindowTextOf === undefined && yearGoalWindowOf === undefined
@@ -125,6 +131,7 @@ export function StoryScreen({
     events, event, onComplete, onMatch, carried, windowTextOf, (current) => isStepHeld(current, releasedKey),
     rewardNoticeContext === undefined ? undefined : (items, eventId) => rewardNoticeOf(items, eventId, rewardNoticeContext()),
     () => closeSystemWindow(),
+    onReward,
   )
   // 0x8b5ac 의 효과 칠 — [mgr+0x2c4](마지막 명령 5 id) · [mgr+0x2c8](칠 색). 재생은 0x8a380 이 비운 값으로 시작한다
   const [backdrop, setBackdrop] = useState<EventBackdropState>(INITIAL_EVENT_BACKDROP)

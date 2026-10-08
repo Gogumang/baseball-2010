@@ -1011,6 +1011,21 @@ describe('자동 발동 (0x1cf9c → 0x8be80 → 0xadc70) · 연초 115', () => 
     expect(result.current.scene).toBe('이벤트')
   })
 
+  it('보상 명령 하나를 그 자리에서 준다(0x8c460) — 저장은 0x7fe90 · 재생 끝 몫이라 안 한다', async () => {
+    const store = 메모리저장()
+    const { result } = 띄우기(store)
+    act(() => result.current.actions.create('투수', 신인))
+    await 이벤트불러오기(result)
+    const 전 = result.current.career!
+    const 저장전 = store.load()
+
+    act(() => result.current.actions.giveStoryReward([{ kind: 0, value: 7 }, { kind: 10, value: 30 }], 1))
+
+    expect(result.current.career?.popularity).toBe(전.popularity + 7)
+    expect(result.current.career?.gamePoint).toBe(전.gamePoint + 30)
+    expect(store.load()).toBe(저장전)
+  })
+
   it('외출 지도(112)에 들어오면 trigger 1 이벤트를 틀고 끝나면 지도로 돌아온다 (401 인기도 3000)', async () => {
     const { result } = 띄우기()
     act(() => result.current.actions.create('투수', 신인))

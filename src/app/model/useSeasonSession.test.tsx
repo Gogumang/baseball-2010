@@ -395,6 +395,24 @@ describe('시즌 이벤트 재생 0xd3', () => {
     expect(result.current.scene).toBe(SEASON_SCENE_STATE.이벤트재생)
   })
 
+  it('보상 명령 하나를 그 자리에서 준다(0x8c460 모드 2) — 저장은 0x7fe90 · 재생 끝 몫이라 안 한다', () => {
+    const store = 메모리저장()
+    const { result } = 띄우기(store)
+    act(() => result.current.actions.chooseTeam(0))
+    const 전 = result.current.state!.record
+    const 저장전 = store.load()
+
+    act(() => result.current.actions.giveSeasonEventReward([{ kind: 0, value: 25 }, { kind: 3, value: 35 }], 393))
+
+    // 393 은 연차 보정 +5y — 첫 해(y = 0)라 그대로
+    expect(result.current.state?.record.popularity).toBe(전.popularity + 25)
+    expect(result.current.state?.record.money).toBe(전.money + 35)
+    expect(store.load()).toBe(저장전)
+    // 다음 저장(0x7fe90)에는 그때까지 준 보상이 든다
+    act(() => result.current.actions.confirmEventSystemWindow())
+    expect((store.load() as { state: { record: { popularity: number } } }).state.record.popularity).toBe(전.popularity + 25)
+  })
+
   it('20경기 뒤 관리 메뉴에 들어오면 100 이 G 1000 을 준다 — 한 번 받으면 다시 안 뜬다 (전역 +0xbe)', () => {
     const { result } = 띄우기()
     시작(result, 0)

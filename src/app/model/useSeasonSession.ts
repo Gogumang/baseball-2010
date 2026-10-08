@@ -439,6 +439,11 @@ export interface SeasonActions {
    */
   readonly finishSeasonEvent: (rewards: readonly SeasonEventReward[], viewedEventIds: readonly number[]) => void
   /**
+   * 이벤트의 보상 명령 7 하나를 그 자리에서 준다 — 0x8d4c4 가 글 · 창을 세운 그 갱신의 0x8c460(모드 2 갈래). 저장은 안 한다
+   * (0x7fe90 · 재생 끝이 저장한다). `StoryScreen.onReward` 로 잇는다.
+   */
+  readonly giveSeasonEventReward: (rewards: readonly SeasonEventReward[], eventId: number) => void
+  /**
    * 이벤트의 system 창(알림 · 올해의 목표)을 답 0 으로 닫았다 — 0x8d928~0x8d942 의 0x7fe90: 시즌모드라 기록 +0x187 = 1 ·
    * 저장(0x22755). 하위와 상관없이 모든 system 창이다.
    */
@@ -2484,7 +2489,8 @@ export function useSeasonSession(
    * - **이어지는 이벤트**: 392 는 끝에서 `0xa37bc` 로 달성 수를 세어 393~396 을 번호로 튼다(8d0d2~8d12c).
    * - 선택지로 다른 이벤트를 번호로 불렀으면 커서 +0x2c 가 마지막으로 부른 레코드 다음을 가리킨다.
    *
-   * ⚠️ 안 옮긴 것: 보상 알림 글(0x8beb8 — "인기도 +n" 같은 팝업), 이벤트 배경음 40(0x5110 — 웹 배경음은 장면 단위다).
+   * 재생 화면은 보상을 명령마다 그 자리에서 준다(`giveSeasonEventReward`, 알림 글 0x8beb8 와 함께) — 그때 여기 오는 `rewards` 는 비어 있다.
+   * ⚠️ 안 옮긴 것: 이벤트 배경음 40(0x5110 — 웹 배경음은 장면 단위다).
    */
   const finishSeasonEvent = useCallback(
     (rewards: readonly SeasonEventReward[], viewedEventIds: readonly number[]) => {
@@ -2528,6 +2534,28 @@ export function useSeasonSession(
       setScene(playback.returnScene)
     },
     [commit, eventPlayback, gainGamePoint, random, recordSourceNow, recordStat, save, startEvent],
+  )
+
+  /**
+   * 보상 명령 하나를 그 자리에서 준다 — 0x8c460 모드 2 갈래(`applySeasonEventRewards`). 이벤트 번호는 그 명령이 든 이벤트다
+   * (연차 보정 0x8d508 · 이벤트 100 의 전역 +0xbe 가 지금 이벤트를 본다). G 는 지갑으로 · 0x8c6e4 `0x22c7d(v, 모드)` 통계.
+   * 저장은 하지 않는다 — 마지막 저장 칸(`latestSave`)만 옮겨 다음 저장(0x7fe90 · 재생 끝)이 이 값을 쓴다.
+   */
+  const giveSeasonEventReward = useCallback(
+    (rewards: readonly SeasonEventReward[], eventId: number) => {
+      const current = latestSave.current
+      if (current === null) return
+      const applied = applySeasonEventRewards(current.state, rewards, eventId, random)
+      const next: SeasonSave = { ...current, state: applied.state }
+      latestSave.current = next
+      setSave(next)
+      if (rewards.some((reward) => reward.kind === 10)) {
+        gainGamePoint(applied.gamePoint)
+        recordStat?.({ kind: 'G획득', mode: SEASON_STAT_MODE, amount: applied.gamePoint })
+      }
+      if (applied.event100Awarded) setEvent100Awarded(true)
+    },
+    [gainGamePoint, random, recordStat],
   )
 
   /**
@@ -2683,7 +2711,7 @@ export function useSeasonSession(
       playCupGame, finishCup, finishGame, saveGameProgress, enterGameSettlement, resumeSavedGame, leaveGame,
       continuePostseason,
       runTraining, closeTrainingResult, runOuting, nextSeasonEndStep, awardLeagueFirst, spendGamePoint, finishSeason,
-      openStadiumItems, markEndingSeen, finishSeasonEvent, confirmEventSystemWindow, clearNotice, quit,
+      openStadiumItems, markEndingSeen, finishSeasonEvent, giveSeasonEventReward, confirmEventSystemWindow, clearNotice, quit,
     },
   }
 }

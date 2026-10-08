@@ -1731,6 +1731,35 @@ export function useCareerSession({
       setCareer((previous) => (previous === null || previous.hasSeenYearGoalWindow ? previous : { ...previous, hasSeenYearGoalWindow: true }))
     },
 
+    /**
+     * 이벤트의 보상 명령 7 하나를 그 자리에서 준다 — 0x8d4c4 가 글 · 창을 세운 그 갱신의 0x8c460(모드 4 갈래). 이벤트 번호는 그
+     * 명령이 든 이벤트다(연차 보정 0x8d508 이 지금 이벤트를 본다). 재생 화면이 `StoryScreen.onReward` 로 부르면 `completeScene` 에
+     * 오는 보상은 비어 있다. 종류 7 의 히든 오픈 알림(0x62368)은 105 에서 띄운다(⚠️ 근사 — 원본은 이 명령이 그 창을 기다린다).
+     */
+    giveEventReward: (items: readonly EventReward[], eventId: number) => {
+      if (career === null || screen.kind !== '이벤트') return
+      const rewarded = applyEventRewards(career, items, random, eventId)
+      // 보상 19(0x8ca7e)는 타순 칸이 아니라 레코드를 고친다 — `0xb5d09(내 팀, 내 칸, 값 − 1)` 로 셋이 돈다
+      const orderMoves = applyBattingOrderRewards(
+        career,
+        items.filter((reward) => reward.kind === EVENT_REWARD_KIND.타순).map((reward) => reward.value),
+      )
+      const given = orderMoves === null ? rewarded : { ...rewarded, ...orderMoves }
+      // 이벤트 G 보상 0x8c6ac 는 한 줄마다 0x8c6e2 `0x22c7d(값, 전역 모드)` 로 적는다
+      items
+        .filter((reward) => reward.kind === EVENT_REWARD_KIND.G포인트)
+        .forEach((reward) => recordStat({ kind: 'G획득', mode: BATTER_LEAGUE_MODE, amount: reward.value }))
+      const openTexts = given.openedHiddenIds
+        .filter((id) => !career.openedHiddenIds.includes(id))
+        .map(hiddenOpenTextOf)
+        .filter((text): text is string => text !== null)
+      if (openTexts.length > 0) {
+        const opened = openTexts.join(' · ')
+        setManagementNotice((shown) => (shown === '' ? opened : `${shown} · ${opened}`))
+      }
+      setCareer(given)
+    },
+
     completeScene: (rewards: readonly EventReward[], viewedEventIds: readonly number[]) => {
       if (career === null || screen.kind !== '이벤트') return
       if (screen.context === '연초') {

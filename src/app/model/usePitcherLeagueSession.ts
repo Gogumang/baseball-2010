@@ -323,6 +323,11 @@ export interface PitcherLeagueSession {
     readonly closeOutingResult: () => void
     /** 105 위 입원 회복 팝업 [확인] */
     readonly dismissOutingRecoveryNotice: () => void
+    /**
+     * 이벤트의 보상 명령 7 하나를 그 자리에서 준다 — 0x8d4c4 가 글 · 창을 세운 그 갱신의 0x8c460(모드 3 갈래). 저장은 안 한다
+     * (원본도 0x7fe90 · 재생 끝 0x1c014 에서 저장한다). `StoryScreen.onReward` 로 잇는다.
+     */
+    readonly giveStoryReward: (items: readonly EventReward[], eventId: number) => void
     /** 이벤트 재생이 끝났다 — 지나온 보상과 본 이벤트 번호 (114 틀 0x1c014) */
     readonly completeStory: (rewards: readonly EventReward[], viewedEventIds: readonly number[]) => void
     /**
@@ -1654,6 +1659,28 @@ export function usePitcherLeagueSession(
   )
 
   /**
+   * 보상 명령 하나를 그 자리에서 준다 — 0x8c460 모드 3 갈래(`applyPitcherEventRewards`, 연말 사슬은 `finishPitcherYearEndEvent`).
+   * 이벤트 번호는 그 명령이 든 이벤트다 — 연차 보정 0x8d508(393~396) · 중간평가 비트 0x8cbaa(452~454)가 [mgr] 의 지금 이벤트를 본다.
+   * G 보상(종류 10)은 한 줄마다 0x8c6e2 `0x22c7d(값, 모드 3)` 로 적는다. 종류 7 의 히든 오픈 알림(0x62368)은 재생이 끝나 105 에서
+   * 띄운다(⚠️ 근사 — 원본은 이 명령이 그 창을 기다린다). 저장은 하지 않는다 — 0x7fe90 · 재생 끝이 저장한다.
+   */
+  const giveStoryReward = useCallback(
+    (items: readonly EventReward[], eventId: number) => {
+      if (career === null || story === null) return
+      const rewarded = story.context === '연말'
+        ? finishPitcherYearEndEvent(career, eventId, items)
+        : applyPitcherEventRewards(career, items, random, eventId)
+      items
+        .filter((reward) => reward.kind === EVENT_REWARD_KIND.G포인트)
+        .forEach((reward) => recordStat({ kind: 'G획득', mode: PITCHER_LEAGUE_MODE, amount: reward.value }))
+      const hiddenNotice = hiddenOpenNoticeOf(items)
+      if (hiddenNotice !== '') setStoryNotice((shown) => (shown === '' ? hiddenNotice : `${shown}!N${hiddenNotice}`))
+      setCareer(rewarded)
+    },
+    [career, random, recordStat, story],
+  )
+
+  /**
    * 이벤트 system 창 답 0 — 0x7fe90(상자): 모드 2 가 아니면 [[상자+0x150]+0x1b7] = 1, 그리고 0x22755([0x1400054], 1) 저장.
    * 이미 켜져 있어도 원본은 저장한다 — 그때까지 준 보상이 든 커리어가 저장된다.
    */
@@ -1972,6 +1999,7 @@ export function usePitcherLeagueSession(
       enterOutingPlace,
       closeOutingResult,
       dismissOutingRecoveryNotice,
+      giveStoryReward,
       completeStory,
       confirmEventSystemWindow,
       abortStoryAtMatch,

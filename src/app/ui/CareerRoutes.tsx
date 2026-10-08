@@ -260,6 +260,8 @@ export function CareerRoutes({
             rewardNoticeContext={() => rewardNoticeContextOf(career, BATTER_LEAGUE_MODE, random)}
             // system 창 답 0 → 0x7fe90 (S+0x1b7 = 1 · 저장)
             onSystemWindowConfirm={actions.confirmEventSystemWindow}
+            // 보상 명령 7 은 창을 세운 그 갱신에 준다 (0x8c460)
+            onReward={actions.giveEventReward}
           />
           </ScreenOverlay>
         </>

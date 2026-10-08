@@ -300,6 +300,8 @@ export function SeasonRoute({
               rewardNoticeContext={() => seasonRewardNoticeContextOf(state.record, random)}
               // system 창 답 0 → 0x7fe90 (기록 +0x187 = 1 · 저장)
               onSystemWindowConfirm={actions.confirmEventSystemWindow}
+              // 보상 명령 7 은 창을 세운 그 갱신에 준다 (0x8c460 모드 2)
+              onReward={actions.giveSeasonEventReward}
             />
           </ScreenOverlay>
         </RawScreen>

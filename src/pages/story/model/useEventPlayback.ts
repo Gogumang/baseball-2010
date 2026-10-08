@@ -31,8 +31,10 @@ function stopAtWindow(
   step: EventStep,
   windowTextOf: ((command: SystemCommand) => string | null) | undefined,
   noticeOf: ((command: RewardCommand, commandIndex: number) => RewardNoticeResult) | undefined,
+  /** 보상 명령마다 멈춘다 — 그 자리에서 주려고(`onReward`). 창을 안 띄우는 보상은 주고 곧바로 넘긴다 */
+  stopsAtEveryReward = false,
 ): EventStep {
-  if (windowTextOf === undefined && noticeOf === undefined) return step
+  if (windowTextOf === undefined && noticeOf === undefined && !stopsAtEveryReward) return step
   const firstIndex = step.cursor.commandIndex - step.passed.length
   const passed: EventCommand[] = []
   for (let index = 0; index < step.passed.length; index += 1) {
@@ -42,10 +44,12 @@ function stopAtWindow(
       const text = windowTextOf(command)
       if (text !== null) return { cursor: at, command: { ...command, text }, passed }
     }
-    if (command.op === 'reward' && noticeOf !== undefined) {
-      const result = noticeOf(command, at.commandIndex)
-      const resolved: RewardCommand = { ...command, items: result.items }
-      if (opensRewardWindow(result.notice)) return { cursor: at, command: resolved, passed }
+    if (command.op === 'reward' && (noticeOf !== undefined || stopsAtEveryReward)) {
+      const result = noticeOf?.(command, at.commandIndex)
+      const resolved: RewardCommand = result === undefined ? command : { ...command, items: result.items }
+      if (stopsAtEveryReward || (result !== undefined && opensRewardWindow(result.notice))) {
+        return { cursor: at, command: resolved, passed }
+      }
       passed.push(resolved)
       continue
     }
@@ -60,12 +64,18 @@ function stopAtWindow(
 const rewardsOfStep = (step: EventStep): readonly EventReward[] =>
   rewardsIn(step.command?.op === 'reward' ? [...step.passed, step.command] : step.passed)
 
+/** 보상 명령 하나를 그 자리에서 준다 — 항목(0x8beb8 이 고친 값)과 그 명령이 든 이벤트 번호(연차 보정 · 중간평가가 본다) */
+export type EventRewardHandler = (items: readonly EventReward[], eventId: number) => void
+
 /**
  * 이벤트 한 편을 원본 명령 순서대로 재생한다.
  * 대사·선택지는 초상화 묶음을 통째로 바꾸고(0x7f54c), 알림·예아니오는 앞 초상화를 그대로 둔다.
  * 선택지가 다른 이벤트를 가리키면 화면을 닫지 않고 그 이벤트로 이어 간다.
- * 지나온 보상 명령은 모아 두었다가 끝날 때 한꺼번에 넘긴다 — ⚠️ 원본은 명령마다 그 자리에서 준다(0x8c460). 차례는 같고
- * 웹은 재생 중에 커리어를 안 바꿔, 한 이벤트 안 뒤 보상의 알림 글(연봉 · 지금 질병)은 앞 보상 전 값을 읽는다(데이터에는 겹치는 곳이 없다).
+ * **보상**: `onReward` 를 주면 원본처럼 명령마다 그 자리에서 준다 — 0x8d4c4 가 글(0x8beb8)을 짓고 창을 띄운 **그 갱신에**
+ * 0x8c460 이 준다. 보상 명령마다 멈춰(`stopAtWindow`) 그 걸음이 돌 때(막는 효과를 다 기다린 뒤) 한 번 주고, 창을 안 띄우는
+ * 보상(첫 종류 7 · 21)은 주고 곧바로 다음 명령으로 넘긴다. 그래서 이벤트 도중의 저장(0x7fe90)에 그때까지 준 보상이 들고,
+ * 뒤 보상의 글은 앞 보상을 준 뒤 값을 읽는다. 이때 끝(`onComplete`) · 경기(`onMatch`)로 넘기는 보상은 비어 있다.
+ * `onReward` 가 없으면 예전처럼 지나온 보상 명령을 모아 두었다가 끝날 때 한꺼번에 넘긴다.
  * 경기(match)에 닿으면 모은 것을 들고 대결로 나간다 — 결과 이벤트로 돌아올 때 carried 로 다시 받는다.
  */
 export function useEventPlayback(
@@ -85,6 +95,8 @@ export function useEventPlayback(
   rewardNoticeOf?: RewardNoticeOf,
   /** 올해의 목표 창을 키(OK · '5')로 닫을 때 — 안 주면 곧바로 다음 명령. 주면 그쪽이 다음 명령까지 맡는다 */
   closeYearGoalWindow?: () => void,
+  /** 보상 명령을 그 자리에서 준다(0x8c460) — 안 주면 예전처럼 끝에 모아 넘긴다 */
+  onReward?: EventRewardHandler,
 ): {
   step: EventStep
   /** 멈출 명령이 돌고 있는가 (`isHeld` 가 거짓) */
@@ -110,6 +122,9 @@ export function useEventPlayback(
    * 커서 객체마다 담아 두니 선택지로 같은 이벤트에 다시 오면(새 커서) 원본처럼 새로 짓는다.
    */
   const noticeCacheRef = useRef(new WeakMap<EventCursor, Map<number, RewardNoticeResult>>())
+  const onRewardRef = useRef(onReward)
+  onRewardRef.current = onReward
+  const stopsAtEveryReward = onReward !== undefined
   const step = useMemo(() => {
     const noticeOf = rewardNoticeOfRef.current
     const cached = noticeCacheRef.current.get(cursor) ?? new Map<number, RewardNoticeResult>()
@@ -122,8 +137,8 @@ export function useEventPlayback(
         const result = noticeOf(command.items, cursor.eventId)
         cached.set(commandIndex, result)
         return result
-      })
-  }, [events, cursor])
+      }, stopsAtEveryReward)
+  }, [events, cursor, stopsAtEveryReward])
   const rewardNotice = step.command?.op === 'reward'
     ? (noticeCacheRef.current.get(cursor)?.get(step.cursor.commandIndex)?.notice ?? null)
     : null
@@ -137,10 +152,27 @@ export function useEventPlayback(
     if (command !== null && (command.op === 'say' || command.op === 'choice')) setPortraits(command.portraits)
   }, [step, isReleased])
 
-  // 같은 칸을 두 번 세지 않도록 커서별로 담는다 (개발 모드의 이펙트 재실행 포함).
-  const rewardsByCursorRef = useRef(new Map<string, readonly EventReward[]>())
+  /**
+   * 보상을 그 자리에서 준다 (`onReward`) — 보상 명령마다 멈춘 걸음이 돌 때(막는 효과를 다 기다린 뒤) 한 번.
+   * 커서 객체마다 한 번이라 개발 모드의 이펙트 재실행에는 다시 안 주고, 선택지로 같은 이벤트에 다시 오면(새 커서) 원본처럼 또 준다.
+   * 창을 안 띄우는 보상은 주고 곧바로 다음 명령으로 — 세션의 커리어가 바뀐 다음 렌더에 다음 걸음(과 그 글)을 짓는다.
+   */
+  const rewardedCursorsRef = useRef(new WeakSet<EventCursor>())
   useEffect(() => {
-    rewardsByCursorRef.current.set(`${step.cursor.eventId}:${step.cursor.commandIndex}`, rewardsOfStep(step))
+    const give = onRewardRef.current
+    if (give === undefined || !isReleased || step.command?.op !== 'reward') return
+    if (rewardedCursorsRef.current.has(cursor)) return
+    rewardedCursorsRef.current.add(cursor)
+    give(step.command.items, step.cursor.eventId)
+    const notice = noticeCacheRef.current.get(cursor)?.get(step.cursor.commandIndex)?.notice
+    if (notice === undefined || !opensRewardWindow(notice)) setCursor(advanceCursor(step.cursor))
+  }, [cursor, step, isReleased])
+
+  // 같은 칸을 두 번 세지 않도록 커서별로 담는다 (개발 모드의 이펙트 재실행 포함). 그 자리에서 준 보상은 담지 않는다
+  const rewardsByCursorRef = useRef(new Map<string, readonly EventReward[]>())
+  const collectedRewardsOf = (current: EventStep) => (onRewardRef.current === undefined ? rewardsOfStep(current) : [])
+  useEffect(() => {
+    rewardsByCursorRef.current.set(`${step.cursor.eventId}:${step.cursor.commandIndex}`, collectedRewardsOf(step))
   }, [step])
 
   const carriedRef = useRef(carried)
@@ -156,7 +188,7 @@ export function useEventPlayback(
     if (step.command?.op === 'match') {
       isCompletedRef.current = true
       // 경기 명령까지 지나온 보상도 담기도록 이 칸을 먼저 기록한다
-      rewardsByCursorRef.current.set(`${step.cursor.eventId}:${step.cursor.commandIndex}`, rewardsOfStep(step))
+      rewardsByCursorRef.current.set(`${step.cursor.eventId}:${step.cursor.commandIndex}`, collectedRewardsOf(step))
       onMatchRef.current(step.command, collect())
       return
     }
