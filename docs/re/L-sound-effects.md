@@ -120,7 +120,7 @@
 
 | # | `ldr`/`bl` | 함수·장면 | 번호 | loop | 웹 대응 |
 |---|---|---|---|---|---|
-| 1 | 0x6c48 / 0x6c5a | 0x6be8 = 0x105 상태 245 (엔딩) | r5==0 → **52**, 아니면 **46** | **1** | `app/model/screenBgm` 엔딩 = 46 (`playBgm`). 52 갈래는 안 이음 |
+| 1 | 0x6c48 / 0x6c5a | 0x6be8 = 0x105 상태 245 (엔딩) | r5==0 → **52**, 아니면 **46** | **1** | `app/model/screenBgm` 엔딩 = 46 (`playBgm`). ~~52 갈래는 안 이음~~ *(2026-10-08, 메인 49492f3: `seasonEndingBgmOf` — r5 = 0xa3085 판정이 0(비 인기 구단)이면 52, 1~4 · −1 이면 46)* |
 | 2 | 0xdec2 / 0xdec4 | 0xdea0 = 0x105 상태 233 경기 뒤 평가 | **38** (p<0) | 0 | `useSeasonSession.seasonEvaluationJingleIdOf` |
 | 3 | 0xdecc / 0xdede | 같은 함수 | **37**/**36** (문턱 3) | 0 | 같음 |
 | 4 | 0x12caa / 0x12cac | 0x129fc = 0x106 경기 뒤 평가 | **38** | 0 | `useCareerSession.evaluationJingleIdOf` |
