@@ -14,23 +14,22 @@ describe('이벤트 레코드 커서 reader+0x28', () => {
     const 앞 = { ...base, popularity: 3000, gamesPlayed: 20, seenEventIds: [...base.seenEventIds, '451'] }
     const 뒤 = { ...앞, seenEventIds: [...앞.seenEventIds, '9', '401'] }
 
-    let 첫: { readonly id: number } | null = null
-    let 이어서: { readonly id: number } | null = null
-    let 되감고: { readonly id: number } | null = null
+    type 뽑힘 = { readonly id: number } | null
+    const 본: { 첫: 뽑힘; 이어서: 뽑힘; 되감고: 뽑힘 } = { 첫: null, 이어서: null, 되감고: null }
     act(() => {
-      첫 = rendered.result.current.eventFor(앞, EVENT_TRIGGER.외출)
+      본.첫 = rendered.result.current.eventFor(앞, EVENT_TRIGGER.외출)
       // 커서가 401 에 멈춰 있어 그 앞의 10 을 못 보고 끝까지 가 "없음" (그리고 0 으로 되감긴다)
-      이어서 = rendered.result.current.eventFor(뒤, EVENT_TRIGGER.외출)
+      본.이어서 = rendered.result.current.eventFor(뒤, EVENT_TRIGGER.외출)
     })
-    expect(첫?.id).toBe(401)
-    expect(이어서).toBeNull()
+    expect(본.첫?.id).toBe(401)
+    expect(본.이어서).toBeNull()
 
     act(() => {
-      첫 = rendered.result.current.eventFor(앞, EVENT_TRIGGER.외출)
+      본.첫 = rendered.result.current.eventFor(앞, EVENT_TRIGGER.외출)
       rendered.result.current.rewindCursor()
-      되감고 = rendered.result.current.eventFor(뒤, EVENT_TRIGGER.외출)
+      본.되감고 = rendered.result.current.eventFor(뒤, EVENT_TRIGGER.외출)
     })
-    expect(첫?.id).toBe(401)
-    expect(되감고?.id).toBe(10)
+    expect(본.첫?.id).toBe(401)
+    expect(본.되감고?.id).toBe(10)
   })
 })
