@@ -24,6 +24,14 @@ export interface AnnalsGridShape {
   readonly wrapsColumns: boolean
   /** 꼴 비트 0x20 — 세로로 넘치면 감는다. 아니면 끝에서 멈춘다 */
   readonly wrapsRows: boolean
+  /**
+   * 꼴 비트 0x100 — 0x10 으로 가로가 감기면 줄이 둘 이상일 때 세로로 부호(dx) 한 칸 더 옮긴다
+   * (0x6bee8~0x6bf1c: 되부름 `vt+0xc(0, ±1, 깊이 + 1)` · 깊이 [sp] ≤ 1 일 때만 — 되부른 쪽은 더 넘기지 않는다).
+   * 안 주면 없다.
+   */
+  readonly carriesRowOnColumnWrap?: boolean
+  /** 꼴 비트 0x200 — 0x20 으로 세로가 감기면 열이 둘 이상일 때 가로로 부호(dy) 한 칸 더 옮긴다 (0x6bf66~0x6bf9a) */
+  readonly carriesColumnOnRowWrap?: boolean
 }
 
 /**
@@ -51,11 +59,31 @@ export const DIRECTION_CODES: Record<AnnalsDirection, number> = { left: 0, right
 export function moveGridCursor(shape: AnnalsGridShape, index: number, direction: AnnalsDirection): number {
   const dx = direction === 'left' ? -1 : direction === 'right' ? 1 : 0
   const dy = direction === 'up' ? -1 : direction === 'down' ? 1 : 0
-  const x = index % shape.columns
-  const y = Math.floor(index / shape.columns)
-  const nextX = stepOf(x, dx, shape.columns, shape.wrapsColumns)
-  const nextY = stepOf(y, dy, shape.rows, shape.wrapsRows)
-  return nextY * shape.columns + nextX
+  const cell = { x: index % shape.columns, y: Math.floor(index / shape.columns) }
+  moveCell(shape, cell, dx, dy, 0)
+  return cell.y * shape.columns + cell.x
+}
+
+/**
+ * 0x6bead(격자, dx, dy, 깊이) — 가로를 먼저(0x6bebc~0x6bf36), 세로를 뒤에(0x6bf38~) 옮긴다.
+ * 감기는 쪽(0x10 · 0x20)은 넘칠 때만(0x6bdc4 · 0x6bde0) `(값 + d + 개수) % 개수`, 아니면 0 ~ 개수−1 로 자른다.
+ */
+function moveCell(shape: AnnalsGridShape, cell: { x: number; y: number }, dx: number, dy: number, depth: number) {
+  const nextDepth = depth + 1
+  if (dx !== 0) {
+    const overflows = cell.x + dx < 0 || cell.x + dx >= shape.columns
+    cell.x = stepOf(cell.x, dx, shape.columns, shape.wrapsColumns)
+    if (overflows && shape.wrapsColumns && shape.carriesRowOnColumnWrap === true && shape.rows > 1 && nextDepth <= 1) {
+      moveCell(shape, cell, 0, Math.sign(dx), nextDepth)
+    }
+  }
+  if (dy !== 0) {
+    const overflows = cell.y + dy < 0 || cell.y + dy >= shape.rows
+    cell.y = stepOf(cell.y, dy, shape.rows, shape.wrapsRows)
+    if (overflows && shape.wrapsRows && shape.carriesColumnOnRowWrap === true && shape.columns > 1 && nextDepth <= 1) {
+      moveCell(shape, cell, Math.sign(dy), 0, nextDepth)
+    }
+  }
 }
 
 function stepOf(value: number, delta: number, count: number, wraps: boolean): number {

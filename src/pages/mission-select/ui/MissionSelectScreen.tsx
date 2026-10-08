@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react'
-import { Button, DialogueBox, FrameSprite, MarkupText, Notice, Panel, PixelScreen, RawScreen } from '@/shared/ui'
+import { Button, DialogueBox, FrameSprite, MarkupText, MessageBox, Notice, Panel, PixelScreen, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { BATTER_MISSIONS, PITCHER_MISSIONS, missionKeyOf } from '@/entities/mission/model/missionGoal'
 import type { OriginalMission } from '@/shared/config/original/missions'
 import { missionRewardOf } from '@/entities/mission/model/missionReward'
 import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import {
-  BOTTOM_FRAME, DESCRIPTION_BOX, DESCRIPTION_TEXT, GRID, NO_MISSION_TEXT, PANEL,
-  REWARD_ROW, SUCCESS_ROW, TAB_LABEL, TITLE, cellPositionOf,
+  BOTTOM_FRAME, DESCRIPTION_BOX, DESCRIPTION_TEXT, EVENT_MISSION_CELL, EVENT_MISSION_EMPTY_TEXT, GRID, MISSION_GRID_SHAPE,
+  NO_MISSION_TEXT, PANEL, REWARD_ROW, SUCCESS_ROW, TAB_LABEL, TITLE, cellPositionOf,
 } from '@/pages/mission-select/lib/missionSelectLayout'
+import { moveGridCursor } from '@/pages/record/lib/annalsGrid'
+import { EventMissionWindow } from '@/pages/mission-select/ui/EventMissionWindow'
+import type { EventMissionAnswer } from '@/pages/mission-select/ui/EventMissionWindow'
 import * as styles from '@/pages/mission-select/ui/MissionSelectScreen.css'
 
 const SLT_FRAME = './sprites/slt_frame'
@@ -39,6 +42,12 @@ interface MissionSelectScreenProps {
  * 모서리 버튼으로 둔다.
  *
  * 격자 칸 안쪽 그림은 아직 못 읽어(0x7a571 내부) 번호와 잠김·클리어 상태만 그린다.
+ *
+ * 키 0x1daa4 하위 0: 격자 `vt+0x18`(0x6c031 — 숫자키 꼴 1) 이 커서를 옮기고 돌려준 키로
+ * OK(−5 · '5') → 칸 14 면 이벤트 미션 창(`EventMissionWindow`), 아니면 미션 · CLR(−16) → 메인 메뉴(장면 상태 4).
+ * 격자 꼴은 0x330 이라 15칸을 감으며 넘긴다(`MISSION_GRID_SHAPE`).
+ * 이벤트 미션 창의 답: 미션실행 → 받은 미션이 없어(웹은 통신이 없다) 알림 `EVENT_MISSION_EMPTY_TEXT` 뒤 목록 ·
+ * 미션다운 → 원본은 장면 상태 2(0x1e798 — 통신으로 미션 받기 🌐) — ⚠️ 웹은 통신이 없어 창만 닫고 목록에 남는다(미해결).
  */
 export function MissionSelectScreen({
   clearedKeys,
@@ -50,12 +59,16 @@ export function MissionSelectScreen({
 }: MissionSelectScreenProps) {
   const [side, setSide] = useState<OriginalMission['side']>(initialSide)
   const [cursor, setCursor] = useState(0)
+  /** [this+0xa0] — 이벤트 미션 창의 고름(≠ 0 미션실행). 장면 진입 0x1d9a4 가 1 로 둔다 */
+  const [isEventRunSelected, setIsEventRunSelected] = useState(true)
+  const [eventWindow, setEventWindow] = useState<'창' | '알림' | null>(null)
   const frames = useFrameOrigins(`${SLT_FRAME}/frames`)
   const textFrames = useFrameOrigins(IMG_TEXT)
 
   const missions = side === '타자' ? BATTER_MISSIONS : PITCHER_MISSIONS
   const cellCount = GRID.columns * GRID.rows
-  const selected = missions[cursor]
+  /** 칸 14 는 이벤트 미션 칸이라 편의 미션 표에 없다 */
+  const selected = cursor === EVENT_MISSION_CELL ? undefined : missions[cursor]
 
   // 원작: "오픈 되지 않은 미션입니다. 이전 단계를 클리어해주세요"
   const isLockedAt = (index: number) => {
@@ -63,24 +76,34 @@ export function MissionSelectScreen({
     return previous !== undefined && !clearedKeys.includes(missionKeyOf(previous))
   }
 
+  const openEventWindowOrSelect = (index: number) => {
+    if (index === EVENT_MISSION_CELL) return setEventWindow('창')
+    const mission = missions[index]
+    if (mission !== undefined && !isLockedAt(index)) onSelect(mission)
+  }
+
+  const onEventAnswer = (answer: EventMissionAnswer) => {
+    // 미션실행 · [미션+0xa4] == 0 → 하위 3 알림 (0x1dd06~0x1dd18 · 0x1dc00) — 미션다운 · 취소는 목록으로
+    setEventWindow(answer === '미션실행' ? '알림' : null)
+  }
+
   useEffect(() => {
+    if (eventWindow !== null) return undefined
     const onKeyDown = (event: KeyboardEvent) => {
-      const step =
-        event.key === 'ArrowRight' ? 1
-        : event.key === 'ArrowLeft' ? -1
-        : event.key === 'ArrowDown' ? GRID.columns
-        : event.key === 'ArrowUp' ? -GRID.columns
-        : 0
-      if (step !== 0) {
+      // 숫자키 꼴 1 (표 0xd2e7c): '2' ↑ · '4' ← · '6' → · '8' ↓ · '5' OK
+      const direction =
+        event.key === 'ArrowRight' || event.key === '6' ? 'right'
+        : event.key === 'ArrowLeft' || event.key === '4' ? 'left'
+        : event.key === 'ArrowDown' || event.key === '8' ? 'down'
+        : event.key === 'ArrowUp' || event.key === '2' ? 'up'
+        : null
+      if (direction !== null) {
         event.preventDefault()
-        return setCursor((previous) => {
-          const next = previous + step
-          return next < 0 || next >= missions.length ? previous : next
-        })
+        return setCursor((previous) => moveGridCursor(MISSION_GRID_SHAPE, previous, direction))
       }
-      if (event.key === 'Enter' || event.key === ' ') {
+      if (event.key === 'Enter' || event.key === ' ' || event.key === '5') {
         event.preventDefault()
-        if (selected !== undefined && !isLockedAt(cursor)) onSelect(selected)
+        openEventWindowOrSelect(cursor)
         return
       }
       if (event.key === 'Escape' || event.key === 'Backspace') {
@@ -112,7 +135,9 @@ export function MissionSelectScreen({
         if (mission === undefined) {
           return (
             <div key={index} className={styles.cell}
-              style={{ left: x, top: y, width: GRID.cell, height: GRID.cell, background: '#1D2A55', color: '#4A5C8F' }} />
+              style={{ left: x, top: y, width: GRID.cell, height: GRID.cell, background: '#1D2A55', color: '#4A5C8F' }}
+              onMouseEnter={() => setCursor(index)}
+              onClick={() => { setCursor(index); openEventWindowOrSelect(index) }} />
           )
         }
         const isLocked = isLockedAt(index)
@@ -131,7 +156,7 @@ export function MissionSelectScreen({
         )
       })}
 
-      {cursor < missions.length && (
+      {cursor < cellCount && (
         <div className={styles.cursor}
           style={{ left: cursorCell.x, top: cursorCell.y, width: GRID.cell, height: GRID.cell }} />
       )}
@@ -179,6 +204,14 @@ export function MissionSelectScreen({
       <Button variant="corner" className={styles.backButton} onClick={onBack}>
         ‹ 돌아가기
       </Button>
+
+      {eventWindow === '창' && (
+        <EventMissionWindow isRunSelected={isEventRunSelected}
+          onToggle={() => setIsEventRunSelected((previous) => !previous)} onAnswer={onEventAnswer} />
+      )}
+      {eventWindow === '알림' && (
+        <MessageBox text={EVENT_MISSION_EMPTY_TEXT} buttons={['OK']} onAnswer={() => setEventWindow(null)} />
+      )}
     </RawScreen>
   )
 }

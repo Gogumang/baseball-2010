@@ -58,3 +58,43 @@ export const SUCCESS_ROW = { labelFrame: 258 } as const
 
 /** 미션이 하나도 없을 때 StrMAINMENU[57] */
 export const NO_MISSION_TEXT = '미션이 존재하지 않습니다'
+
+/**
+ * 미션 고르기 격자 [this+0x70] 의 꼴 — 장면 진입 0x1d9a4 가 `new` → 0x6c219(vtable 0xd2ea0) 뒤
+ * `vt+0x14(0, 0)` · `vt+0x1c(격자, 5열, 3줄, 숫자키 꼴 1, 꼴 0x330)`(0x1d9cc~0x1d9f6) 로 짓는다.
+ * 0x330 = 0x10 · 0x20(두 축 다 감기) + 0x100 · 0x200(감기면 다른 축 한 칸) — **15칸을 칸 번호 순으로 감으며 넘긴다**
+ * (→ 칸 4 → 5 · 칸 14 → 0, ↓ 칸 10 → 1 · 칸 14 → 0, ← 칸 0 → 14). 숫자키 꼴 1 이라 '2' '4' '6' '8' 은 ↑ ← → ↓, '5' 는 OK.
+ * 칸 14 는 이벤트(다운로드) 미션 칸이다 — `EVENT_MISSION_CELL`.
+ */
+export const MISSION_GRID_SHAPE = {
+  columns: GRID.columns, rows: GRID.rows,
+  wrapsColumns: true, wrapsRows: true, carriesRowOnColumnWrap: true, carriesColumnOnRowWrap: true,
+} as const
+
+/** 이벤트 미션 칸 — 키 0x1daa4 의 0x1db06 `칸 == 14` */
+export const EVENT_MISSION_CELL = 14
+
+/**
+ * 이벤트 미션 창 (0x741a1 높이 0x64 · 그리기 0x1dd58 — W 240 · H 320 기준 좌표).
+ * 글 0x6ef4c 는 문자열 앞 `!C` 로 폭 안 가운데 맞춤이다.
+ */
+export const EVENT_MISSION_WINDOW = {
+  height: 100,
+  /** 0x741a0 의 [창+0x212] = 6 */
+  openStartHeight: 6,
+  /** StrMAINMENU[56] — (W/2 − 0x58, H/2 − 0x23, 폭 0xb0) */
+  text: {
+    raw: '!C!cFFFFFF어떤 메뉴를 실행하시!N겠습니까? [!cFFFF00미션다운!cFFFFFF] 시!N소량의 통화료가 부과됩니다',
+    x: SCREEN_WIDTH / 2 - 0x58, y: 320 / 2 - 0x23, width: 0xb0,
+  },
+  /** 0xcd6f0 / 고름 0xcd718 — (W/2 − 0x50, H/2 + 0x14, 폭 0x50) */
+  run: { raw: '!C!cFFFFFF미션실행', selectedRaw: '!C!cFFFF00미션실행', x: SCREEN_WIDTH / 2 - 0x50, y: 320 / 2 + 0x14, width: 0x50 },
+  /** 0xcd704 / 고름 0xcd72c — (W/2, H/2 + 0x14, 폭 0x50) */
+  download: { raw: '!C!cFFFFFF미션다운', selectedRaw: '!C!cFFFF00미션다운', x: SCREEN_WIDTH / 2, y: 320 / 2 + 0x14, width: 0x50 },
+} as const
+
+/**
+ * 미션실행을 골랐는데 받은 이벤트 미션이 없을 때([미션+0xa4] == 0) — 하위 상태 3(0x1dc00)이
+ * `0x74ef5(창, 0xcd6c8, 종류 1)` 알림을 띄우고 하위 4 → 0 으로 목록에 돌아온다. 웹은 받을 길(통신)이 없어 늘 이 글이다.
+ */
+export const EVENT_MISSION_EMPTY_TEXT = '!C!cffffff이벤트 미션을 다운로드하세요'
