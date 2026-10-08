@@ -476,6 +476,11 @@ export interface TeamGameProgress {
   readonly options: TeamGameOptions
   readonly game: GameState
   /**
+   * 장면 +0xfdc — 마지막으로 쓴 번트 종류(0 스윙 · 1~3 번트). CPU 타자는 휘두를 때만(0x34436), 사람은 번트 · 스윙 키가 쓴다.
+   * 장면 new 의 0 에서 시작하고 공수가 바뀌어도 남는다. 안 휘두른 공의 주자 판(도루 리드 0x3d7b8)이 본다. 없으면 0
+   */
+  readonly sceneBuntKind?: number
+  /**
    * **승·패·세 투수 칸** state+0x44/0x50/0x5c (S1). 한 점마다(0xa5c34)·투수 교체마다(0xa60c0) 고친다.
    * 경기 끝 결과 판(상태 0x18, 0x4fe9c)이 그대로 읽는다 (`pitchersOfRecordOf`). 칸 번호 = 투수 명단 칸.
    */
@@ -1824,6 +1829,8 @@ function batterPitch(
 ): TeamGameProgress {
   if (!isBatterTurn(progress)) return progress
   progress = throwOpponentPitch(progress, detail.pitchTypeNumber)
+  // 장면 +0xfdc — 사람 타석은 번트 · 스윙 키(0x51dce · 0x51e2c · 0x51e84 · 0x51eba)가 쓴다. ⚠️ 웹 타석 화면은 안 휘두른 공을 0 으로 낸다
+  progress = { ...progress, sceneBuntKind: options.buntKind ?? 0 }
   // 파울 각 공 — 원본도 판(상태 0x17)을 돈다. 연속 파울 기록(0xa7dbc)은 판의 결과 코드 7 메시지(51c5c)에서라 판이 파울로 닫힐 때 센다.
   // 필살 스윙의 성공 굴림(0x517e6)은 타석 판정이 쏜 공(`detail.foulContact`)에 재료만 실어 판 시작(필살수비 · 폴 굴림 뒤)이 굴린다
   if (detail.resolution.kind === '파울' && detail.pattern !== undefined && detail.resultCode !== null) {
@@ -2371,6 +2378,8 @@ function pitchOnce(
       swingMode: '일반',
       // 파울 각 공도 수비 판을 돈다 — 낙구 전에 잡히면 파울 뜬공 아웃(13), 아니면 판이 닫힌 뒤 스트라이크(0x35108 → 0xb6b58)
       playsFoulBall: true,
+      // 장면 +0xfdc — 안 휘두른 공은 앞 공의 값이 남는다(0x34436 은 휘두를 때만 쓴다)
+      previousBuntKind: progress.sceneBuntKind ?? 0,
     },
   )
   const resolution = thrown.resolution
@@ -2432,6 +2441,7 @@ function pitchOnce(
     // 판을 도는 파울 각 공은 판이 파울로 닫힌 뒤에야 스트라이크가 오른다(0x35108 → 0xb6b58)
     atBat: foulContact === undefined ? applyPitchResolution(progress.atBat, resolution) : progress.atBat,
     stealingFrom,
+    sceneBuntKind: thrown.buntKind ?? 0,
   }
 
   // 파울 각 공 — 원본도 판(상태 0x17)을 돈다(맞은 공은 모두 메시지 0x11 → 0x13 → 0x17). 공 도착 판(0x3dfac)은 못 맞힌 공만이다
@@ -3084,7 +3094,7 @@ function arriveTeamPitch(
             offenseIsCpu: true,
             throwMode: options.throwModeManual === false ? ('자동' as const) : ('수동' as const),
           }),
-      // 장면 +0xfdc — 도루 판 리드 0x3d7b8 이 도루 안 한 주자에게 +3 틱 (안 휘두른 공의 남은 값은 미해결 — `PitchArrivalPlayInput.buntKind`)
+      // 장면 +0xfdc — 도루 판 리드 0x3d7b8 이 도루 안 한 주자에게 +3 틱 (안 휘두른 공은 앞 공의 값 — `sceneBuntKind`)
       buntKind: pitch.buntKind ?? 0,
     },
     random,

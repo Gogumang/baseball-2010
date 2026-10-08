@@ -232,6 +232,11 @@ export interface CpuBatterTraits {
    * 판 시작에 맡긴다. 안 넘기면 예전처럼 여기서 곧장 파울로 끝낸다(판을 아직 안 잇는 부르는 쪽 — 웹 근사).
    */
   readonly playsFoulBall?: boolean
+  /**
+   * 이 공 앞의 장면 +0xfdc — 앞 공의 번트 종류(CPU 스윙 0x34436~0x34464 · 사람 번트 키 0x51dce · 0x51e2c · 0x51e84 · 0x51eba 가 쓴다).
+   * 안 휘두른 공은 이 값을 그대로 돌려준다(`CpuPitchOutcome.buntKind`). 없으면 0 (장면 new).
+   */
+  readonly previousBuntKind?: number
 }
 
 /** `pitchAgainstBatterDetailed` 의 결과 — 필살 칸을 부르는 쪽에 돌려준다 */
@@ -252,7 +257,9 @@ export interface CpuPitchOutcome {
    */
   readonly foulContact?: BattedContact
   /**
-   * 이 공의 번트 종류 장면 +0xfdc (0 스윙 · 1~3 번트 — `cpuBuntKindOf`). 판을 도는 맞은 공 — 파울 각 공(`foulContact`)과
+   * 이 공 뒤의 장면 +0xfdc (0 스윙 · 1~3 번트 — `cpuBuntKindOf`). 휘두른 공(헛스윙 포함)은 이 공의 값, 안 휘두른 공은
+   * 앞 공의 값(`traits.previousBuntKind`)이다 — 쓰는 곳 다섯(0x34436 · 0x51dce · 0x51e2c · 0x51e84 · 0x51eba) 중 CPU 타석은
+   * 0x34436(휘두를 때만)뿐이다. 판을 도는 맞은 공 — 파울 각 공(`foulContact`)과
    * 페어 타구(`resolution.outcome` 에 쏜 패턴이 묶인 공) — 에 싣는다. 원본 판은 타석이 친 공의 번트 종류를 그대로 본다:
    * 판 끝 결과 코드 0x9d5bc 가 state[4] > 1 이고 번트(state[0x13])면 11(2스트라이크 번트 파울 아웃)을 내고, 판 시작 리드(0x3d7b8)가
    * +3 틱 · 필살수비 관문(50fc8)이 굴림 없음으로 보며, 정산 0xa8024 가 번트 타구(결과비트 B6 · 희생)로 센다.
@@ -349,11 +356,13 @@ export function pitchAgainstBatterDetailed(
 ): CpuPitchOutcome {
   const isMistake = traits.isMistakePitch === true
   const remainingBefore = traits.specialSwing?.remaining ?? null
+  // 안 휘두르면 0x34334 가 0x34436~0x34464(+0xfdc 쓰기)를 안 지나 앞 공의 번트 종류가 그대로 남는다
   const unswung = (resolution: PitchResolution): CpuPitchOutcome => ({
     resolution,
     isSpecialSwing: false,
     specialSwingRemaining: remainingBefore,
     isUncatchable: false,
+    buntKind: traits.previousBuntKind ?? 0,
   })
   const choice = cpuSwingChoiceOf(pitch, batter, random, situation, isMistake)
   if (choice === null) {
@@ -424,13 +433,15 @@ export function pitchAgainstBatterDetailed(
     },
     random,
   )
+  // 휘두른 공은 0x34436~0x34464 가 +0xfdc 에 이 공의 번트 종류(0 · 1~3)를 썼다 — 헛스윙 · 파울 · 타구 모두 싣는다
   const swung = (resolution: PitchResolution, isUncatchable: boolean): CpuPitchOutcome => ({
     resolution,
     isSpecialSwing,
     specialSwingRemaining: remainingAfter,
     isUncatchable,
+    buntKind,
   })
-  // 헛스윙은 0x5135c → 0x51840 — 필살 굴림이 없다
+  // 헛스윙은 0x5135c → 0x51840 — 필살 굴림이 없다. 번트 헛스윙도 0x3445a 가 쓴 번트 종류가 남는다
   if (result.kind === '헛스윙') return swung({ kind: '스트라이크', isSwinging: true }, false)
 
   const code = result.code + hitDirectionOf({ code: result.code, frame, frameCount: pitch.frameCount, batterSide: 0 }, random)

@@ -239,6 +239,29 @@ describe('CPU 번트 — 원본 0x3445a', () => {
     ).toBe(0)
   })
 
+  it('안 휘두른 공은 장면 +0xfdc 에 앞 공의 번트 종류가 남는다 — 0x34436 은 휘두를 때만 쓴다', () => {
+    const 지켜봄 = Array.from({ length: 40 }, (_unused, index) =>
+      pitchAgainstBatterDetailed(크게빠진공, 타자(500), createSeededRandom(index + 1), undefined, 무사주자없음, { previousBuntKind: 2 }),
+    ).filter((thrown) => thrown.resolution.kind === '볼')
+    expect(지켜봄.length).toBeGreaterThan(0)
+    expect(지켜봄.every((thrown) => thrown.buntKind === 2)).toBe(true)
+  })
+
+  it('번트 헛스윙도 그 공의 번트 종류를 낸다 (0x3445a)', () => {
+    // 높은 공(y 1.2)에 힘 1 타자 · 주자 있음 — 씨앗 17 은 번트 칸을 뽑고 0xab214 가 헛스윙을 낸다
+    const 높은공: Pitch = { ...한가운데, plate: { x: 0, y: 1.2 }, controlTier: 0 }
+    const thrown = pitchAgainstBatterDetailed(
+      높은공,
+      { hit: 1, power: 1, run: 500, defense: 500 },
+      createSeededRandom(17),
+      { control: 999, velocity: 999 },
+      { ...무사주자없음, hasRunner: true },
+      { previousBuntKind: 0 },
+    )
+    expect(thrown.resolution).toEqual({ kind: '스트라이크', isSwinging: true })
+    expect(thrown.buntKind).toBeGreaterThan(0)
+  })
+
   it('마선수는 번트 칸을 뽑아도 휘두른다', () => {
     // 같은 굴림으로 보통 타자는 희생번트, 마선수는 0xab214 보통 스윙(첫 굴림들이 0 이라 강타)이다.
     // 결과는 판이 정하므로 타석에 실리는 것은 임시 값이다 — 희생번트 패턴은 땅볼아웃, 강타(코드 24)는 담장을 먼저 넘는 궤적이라 홈런
