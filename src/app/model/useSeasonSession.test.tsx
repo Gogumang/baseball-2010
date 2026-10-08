@@ -66,7 +66,7 @@ function 이벤트넘기기(result: 세션결과, limit = 20): number[] {
 
 /** 팀을 고르고 첫 관리 메뉴의 이벤트(400 → 연초 목표 → 1)를 넘긴다 */
 function 시작(result: 세션결과, teamId: number): void {
-  act(() => result.current.actions.chooseTeam(teamId))
+  act(() => result.current.actions.chooseTeam(teamId, '테스터'))
   이벤트넘기기(result)
 }
 
@@ -406,7 +406,7 @@ describe('시즌 관리 커맨드', () => {
 describe('시즌 이벤트 재생 0xd3', () => {
   it('새 시즌 첫 관리 메뉴는 400(오프닝) → 연초 목표(0xd4 내장) → 1(환영) 차례로 튼다', () => {
     const { result } = 띄우기()
-    act(() => result.current.actions.chooseTeam(0))
+    act(() => result.current.actions.chooseTeam(0, '테스터'))
 
     expect(이벤트넘기기(result)).toEqual([400, 0, 1])
     expect(result.current.scene).toBe(SEASON_SCENE_STATE.관리메뉴)
@@ -418,7 +418,7 @@ describe('시즌 이벤트 재생 0xd3', () => {
   it('이벤트 system 창을 답 0 으로 닫으면 0x7fe90 — 그 자리에서 SR+0x187 = 1 · 저장 (재생 끝을 기다리지 않는다)', () => {
     const store = 메모리저장()
     const { result } = 띄우기(store)
-    act(() => result.current.actions.chooseTeam(0))
+    act(() => result.current.actions.chooseTeam(0, '테스터'))
     expect(result.current.scene).toBe(SEASON_SCENE_STATE.이벤트재생)
     expect(result.current.state?.record.yearGoalShown).toBe(false)
 
@@ -433,7 +433,7 @@ describe('시즌 이벤트 재생 0xd3', () => {
   it('보상 명령 하나를 그 자리에서 준다(0x8c460 모드 2) — 끝(0x8cbe0~0x8cd5e)이 본 표시 · phase 를 고치고 저장한다', () => {
     const store = 메모리저장()
     const { result } = 띄우기(store)
-    act(() => result.current.actions.chooseTeam(0))
+    act(() => result.current.actions.chooseTeam(0, '테스터'))
     // 시즌 끝 사슬 0xee(392) 안 — 포스트시즌 중 g == 0
     act(() => result.current.actions.updateRecord({ ...result.current.state!.record, inPostseason: true, games: 0, phase: 0xb }))
     const 전 = result.current.state!.record
@@ -464,7 +464,7 @@ describe('시즌 이벤트 재생 0xd3', () => {
 
   it('첫 종류 21 로 끝난 재생(0x8d4ce)은 그 이벤트만 본 표시를 안 한다 — 0xd3 끝 0x78f0 의 0x8b0e4 는 떠나온 줄만 켠다', () => {
     const { result } = 띄우기()
-    act(() => result.current.actions.chooseTeam(0))
+    act(() => result.current.actions.chooseTeam(0, '테스터'))
     const 지금 = result.current.eventPlayback!.eventId
     act(() => result.current.actions.finishSeasonEvent([], [지금], 지금))
     expect(result.current.state?.record.seenEvents).not.toContain(지금)
@@ -1223,7 +1223,7 @@ describe('전역 G 지갑 (mgr[+0x64])', () => {
 
   it('지옥훈련은 지갑에서 500G 를 뺀다 (0xa2fca)', () => {
     const { result } = 지갑띄우기(2000)
-    act(() => result.current.session.actions.chooseTeam(0))
+    act(() => result.current.session.actions.chooseTeam(0, '테스터'))
 
     act(() => result.current.session.actions.runTraining(4))
 
@@ -1232,7 +1232,7 @@ describe('전역 G 지갑 (mgr[+0x64])', () => {
 
   it('칸 0~3 팀 트레이닝은 G 를 안 쓴다 (J 4-6)', () => {
     const { result } = 지갑띄우기(2000)
-    act(() => result.current.session.actions.chooseTeam(0))
+    act(() => result.current.session.actions.chooseTeam(0, '테스터'))
 
     act(() => result.current.session.actions.runTraining(1))
 
@@ -1924,7 +1924,7 @@ describe('명전 칸 삭제의 시즌 명단 정리 (0x221dc)', () => {
   it('시즌 저장이 있으면 내 팀 명단에서 그 명전 선수를 빼고 저장한다', () => {
     const store = 메모리저장()
     const { result } = 띄우기(store)
-    act(() => result.current.actions.chooseTeam(0))
+    act(() => result.current.actions.chooseTeam(0, '테스터'))
     const { roster } = result.current
     const 명전 = { id: 0xc8, kindByte: 0x20 | 2, fieldPosition: roster.batters[2].fieldPosition, stamina: 0 }
     act(() => result.current.actions.updateRoster({ ...roster, batters: [...roster.batters.slice(0, 2), 명전, ...roster.batters.slice(3)] }))
@@ -2293,7 +2293,7 @@ describe('시즌 경기 중간 저장 — 전역기록 +0x4e 와 모드 2 블록
     const store = 메모리저장()
     const { result } = 경기시작(store)
     act(() => result.current.actions.saveGameProgress(startTeamGame(result.current.gameOptions!, createSeededRandom(7))))
-    act(() => result.current.actions.chooseTeam(3))
+    act(() => result.current.actions.chooseTeam(3, '테스터'))
     expect(result.current.isGameInProgress).toBe(false)
   })
 })
@@ -2349,7 +2349,7 @@ describe('모드 초기화 — 0x224ec(mgr, 2) 시즌 · 0x223a8 나리 선수 �
   it('시즌 초기화는 시즌 저장(+0x42)과 +0x4e 를 지우고 다음 진입은 팀 고르기다', () => {
     const store = 메모리저장()
     const { result } = 띄우기(store)
-    act(() => result.current.actions.chooseTeam(0))
+    act(() => result.current.actions.chooseTeam(0, '테스터'))
     act(() => result.current.actions.resetSeason())
 
     expect(result.current.state).toBeNull()
@@ -2390,7 +2390,7 @@ describe('모드 초기화 — 0x224ec(mgr, 2) 시즌 · 0x223a8 나리 선수 �
   it('나리 초기화는 내 시즌 팀에서 그 편 첫 나리 선수를 빼고 저장한다', () => {
     const store = 메모리저장()
     const { result } = 띄우기(store)
-    act(() => result.current.actions.chooseTeam(0))
+    act(() => result.current.actions.chooseTeam(0, '테스터'))
     const { roster } = result.current
     const 나리투수 = { id: 0xfe, kindByte: 0x80, fieldPosition: 0, stamina: 10_000 }
     act(() => result.current.actions.updateRoster({ ...roster, pitchers: [...roster.pitchers, 나리투수] }))

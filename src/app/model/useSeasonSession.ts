@@ -54,7 +54,6 @@ import { startNextYear } from '@/entities/season-mode/model/seasonRecord'
 import { SEASON_END_CHAIN } from '@/entities/season-mode/model/seasonStateMachine'
 import { PITCHERS_PER_TEAM, teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { FULL_STAMINA, recoverStaminaAfterGameDay } from '@/entities/pitcher-career/model/pitcherStamina'
-import { TEAMS } from '@/shared/config/original/teams'
 import type { TeamGameOptions, TeamGameProgress, TeamGameSummary } from '@/features/play-team-game/model/teamGameFlow'
 import { rollOpponentAces } from '@/features/play-team-game/model/teamGameFlow'
 import { CHANCE_VALUE, MATCH_SETTING_KIND } from '@/features/play-team-game/model/matchSettings'
@@ -301,7 +300,11 @@ export interface SeasonEquipPurchase {
 }
 
 export interface SeasonActions {
-  readonly chooseTeam: (teamId: number) => void
+  /**
+   * 새 시즌 — 0xc8 이름 입력에서 [2] 예(0x4a58) → 0xcc 0x5758. 이름은 0xa33e4 가 SR+0x17c 에 (≤ 8바이트, 끝 0).
+   * 단장 줄(0xd5)·이벤트 글의 %s 가 이 이름이다.
+   */
+  readonly chooseTeam: (teamId: number, name: string) => void
   readonly goto: (scene: SeasonSceneState) => void
   readonly updateRecord: (record: SeasonRecord) => void
   readonly updateRoster: (roster: SeasonTeamRoster) => void
@@ -1375,11 +1378,11 @@ export function useSeasonSession(
   }, [commit, event100Awarded, openedHiddenIds, random, recordSourceNow, save, scene, startEvent, tradeRequest.isRequested])
 
   const chooseTeam = useCallback(
-    (teamId: number) => {
+    (teamId: number, name: string) => {
       // 새 시즌 0x57f4~0x5806: 전역기록 +0x42 = 1 · **+0x4e = 0** — 새 저장에는 경기 블록·표시 칸이 없다(= 0)
       const next: SeasonSave = {
-        // 구단 이름은 원본 팀 이름을 그대로 쓴다 — 이름 입력 화면(0xc8)은 아직 없다
-        state: startNewSeason(teamId, TEAMS[teamId]?.name ?? ''),
+        // 0xa33e4(SR, 0x1552d00+0x28) — 0xc8 에서 입력한 이름이 SR+0x17c 로
+        state: startNewSeason(teamId, name),
         league: EMPTY_LEAGUE,
         roster: rosterOf(teamId),
         playerStats: EMPTY_LEAGUE_PLAYER_STATS,

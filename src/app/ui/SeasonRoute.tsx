@@ -274,12 +274,13 @@ export function SeasonRoute({
     )
   }
 
-  // 저장이 없으면 팀 고르기부터다 (0xca, 키 0x8da4). 열린 히든 팀(전역 +0x70)은 그림만 서고 힌트 팝업을 띄운다.
+  // 저장이 없으면 팀 고르기부터다 (0xca, 키 0x8da4) → 이름 입력 0xc8 → [2] 예 → 새 시즌(0xcc).
+  // 열린 히든 팀(전역 +0x70)은 그림만 서고 힌트 팝업을 띄운다.
   // 취소는 관리 메뉴 취소와 같이 [0x140006c] = 5 로 메인 메뉴에 나간다 (0x8ec8)
   if (state === null || scene === SEASON_SCENE_STATE.팀고르기) {
     return (
       <SeasonTeamSelectScreen openedHiddenIds={hallOfFame?.openedHiddenIds ?? []}
-        onPick={actions.chooseTeam} onExit={() => onExit(5)} />
+        onChoose={actions.chooseTeam} onExit={() => onExit(5)} />
     )
   }
 
