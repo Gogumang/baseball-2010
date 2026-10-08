@@ -6,6 +6,7 @@ import {
   ACE_PITCHER_SLOT,
   cpuGameAcesOf,
   cpuGameSidesOf,
+  cpuBatterGameAbilityOf,
   cpuPitcherGameAbilityOf,
   decisionsAfterHalfInning,
   LEAGUE_DAY_NO_SCORE,
@@ -772,6 +773,17 @@ describe('CPU 투수 경기용 능력치 0xb570c — 마무리 갈래 능력 합
     expect(cpuPitcherGameAbilityOf(500, 0, 0, { mode: 2, teamAbilities: 팀, coach: 2 })).toBe(561)
     expect(cpuPitcherGameAbilityOf(500, 1, 0, { mode: 2, teamAbilities: 팀, coach: 2 })).toBe(500)
     expect(cpuPitcherGameAbilityOf(990, 0, 0, { mode: 2, teamAbilities: 팀, coach: 2 })).toBe(999)
+  })
+
+  it('타자 쪽 — 히트·파워 ← 팀 타격(칸 1) · 주루 ← 근성(칸 3), 코치 5~9 만 (간이 타석 0xab214 의 타자 능력)', () => {
+    const 팀 = [[0, 400, 0, 330]]
+    expect(cpuBatterGameAbilityOf(500, 0, 0, { mode: 4, teamAbilities: 팀 })).toBe(500)
+    // 타격 400: trunc((6800 − 5100)/100) = 17 · 근성 330: 5
+    expect(cpuBatterGameAbilityOf(500, 1, 0, { mode: 2, teamAbilities: 팀 })).toBe(517)
+    expect(cpuBatterGameAbilityOf(500, 3, 0, { mode: 2, teamAbilities: 팀 })).toBe(505)
+    // 코치 8(히트·주루 +6) · 코치 2 는 투수 코치라 타자에 안 붙는다
+    expect(cpuBatterGameAbilityOf(500, 0, 0, { mode: 2, teamAbilities: 팀, coach: 8 })).toBe(523)
+    expect(cpuBatterGameAbilityOf(500, 0, 0, { mode: 2, teamAbilities: 팀, coach: 2 })).toBe(517)
   })
 })
 

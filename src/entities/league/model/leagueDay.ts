@@ -34,7 +34,7 @@ import {
 } from '@/entities/team/model/teamRoster'
 import { recordAbilityOf } from '@/entities/team/model/recordAbility'
 import { cpuGameRotationAdvances, SEASON_MODE } from '@/entities/pitcher-career/model/pitcherRotation'
-import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
+import { FULL_STAMINA, abilityAfterFatigue } from '@/entities/pitcher-career/model/pitcherStamina'
 import { pitcherAbilitySumOf, rosterPitcherRoleOf } from '@/entities/pitching/model/pitcherChange'
 import { TEAMS } from '@/shared/config/original/teams'
 import {
@@ -349,6 +349,49 @@ export function cpuPitcherGameAbilityOf(
   return Math.min(999, Math.max(0, value))
 }
 
+/** 타자 칸 → 팀 능력치 칸 — 히트·파워 → 타격(1), 수비 → 집중(2), 주루 → 근성(3) (0xb592c) */
+const TEAM_ABILITY_SLOT_OF_BATTER = [1, 1, 2, 3] as const
+/** 코치 번호 → 붙는 타자 칸 (히트 0 · 파워 1 · 수비 2 · 주루 3) — 점프표 0xd8858 의 5~9 */
+const COACH_BATTER_SLOTS: Readonly<Record<number, readonly number[]>> = {
+  5: [0],
+  6: [2, 3],
+  7: [1],
+  8: [0, 3],
+  9: [0, 1],
+}
+
+/**
+ * CPU 타자 한 칸의 경기용 능력치 — `cpuPitcherGameAbilityOf` 와 같은 `0xb570c(팀, k, B, 1, 90, 1)` 차례의 타자 쪽.
+ * 간이 타석의 스윙 0xab214 가 타자 능력을 이 인자로 읽는다(`0xb570d(…, 1, 0x5a, 1)`, quickAtBat 머리말).
+ */
+export function cpuBatterGameAbilityOf(
+  base: number,
+  slot: number,
+  teamId: number,
+  context: LeagueAbilityContext | undefined,
+): number {
+  let value = base
+  const mode = context?.mode ?? -1
+  if (mode >= 0 && mode <= 9 && ((1 << mode) & TEAM_ABILITY_MODE_MASK) !== 0) {
+    const abilities = context?.teamAbilities?.[teamId] ?? TEAMS[teamId]?.values.slice(XLS_TEAM_ABILITY_OFFSET)
+    const teamAbility = abilities?.[TEAM_ABILITY_SLOT_OF_BATTER[slot] ?? 3] ?? 0
+    if (teamAbility !== 0) value += Math.trunc((17 * teamAbility - 5100) / 100)
+  }
+  const coach = context?.coach ?? -1
+  if (mode === 2 && coach >= 0 && (COACH_BATTER_SLOTS[coach]?.includes(slot) ?? false)) value += COACH_BONUS[coach] ?? 0
+  return Math.min(999, Math.max(0, value))
+}
+
+/** 간이 타석 타자를 경기용 능력치(체력 인자 90)로 — 히트·파워·주루 (`cpuBatterGameAbilityOf`) */
+function gameQuickBatterOf(batter: QuickAtBatBatter, teamId: number, context: LeagueAbilityContext | undefined): QuickAtBatBatter {
+  return {
+    ...batter,
+    hit: cpuBatterGameAbilityOf(batter.hit, 0, teamId, context),
+    power: cpuBatterGameAbilityOf(batter.power, 1, teamId, context),
+    run: cpuBatterGameAbilityOf(batter.run, 3, teamId, context),
+  }
+}
+
 /**
  * 마투수 레코드의 스태미나 `+0x2c` — 원본은 `0xb521c` 가 저장의 마투수 레코드(`0x1f824` = 앱 데이터 +0xac → +0xc64
  * + 번호×0x30)를 **+0x2c 까지 통째로** 팀 레코드 8번 칸에 복사한다. 그 레코드는 `0x20094` 의 6번 갈래가
@@ -476,14 +519,30 @@ function defenseOf(
   record?: LeagueTeamRecord,
 ): HalfInningDefense {
   const rowAt = (slot: number) => recordPitcherRowAt(record, teamId, slot)
+  /** 그 칸 투수의 밑값 간이 능력 (마투수는 레벨 배율을 먹은 레코드 값) */
+  const quickAt = (slot: number): QuickAtBatPitcher =>
+    slot === ACE_PITCHER_SLOT && acePitcher !== undefined ? acePitcher.quick : recordQuickPitcherAt(record, teamId, slot)
   return {
     mound,
     // 마투수는 명단 8번 칸 = 벤치 맨 끝에 하나 더 (0xb88c8 → 0xb521c, 벤치 투수 수 team+0x33 +1)
     pitcherSlots: acePitcher === undefined ? order : [...order, ACE_PITCHER_SLOT],
-    pitcherAt: (slot) =>
-      slot === ACE_PITCHER_SLOT && acePitcher !== undefined
-        ? acePitcher.quick
-        : recordQuickPitcherAt(record, teamId, slot),
+    // 간이 타석의 투수 능력은 `0xb570c(…, 1, 90, 1)` — 밑값(0xb6414) 위에 팀 능력치 정액 · 코치를 먹인다
+    pitcherAt: (slot) => {
+      const quick = quickAt(slot)
+      return {
+        ...quick,
+        control: cpuPitcherGameAbilityOf(quick.control, 0, teamId, abilityContext),
+        velocity: cpuPitcherGameAbilityOf(quick.velocity, 1, teamId, abilityContext),
+      }
+    },
+    // 체력%로 부른 `0xb570c` — 피로 0xb58e6 이 팀 정액 · 코치보다 먼저 먹는다 (simulateHalfInning `tiredPitcherAt`)
+    tiredPitcherAt: (slot, staminaPercent) => {
+      const quick = quickAt(slot)
+      return {
+        control: cpuPitcherGameAbilityOf(abilityAfterFatigue(quick.control, staminaPercent), 0, teamId, abilityContext),
+        velocity: cpuPitcherGameAbilityOf(abilityAfterFatigue(quick.velocity, staminaPercent), 1, teamId, abilityContext),
+      }
+    },
     // 투수 능력치 순서는 제구·구속·변화·**체력** (칸 3) — 용량 0x66e44 는 `0xb6415(P, 3, 1)` 이라 장비 니블을 먹는다
     staminaAbilityAt: (slot) =>
       slot === ACE_PITCHER_SLOT && acePitcher !== undefined
@@ -648,8 +707,14 @@ export function simulateLeagueGame(
     const roster = teamBatters(at.tableTeamId)
     return quickBatterOf(roster[at.tableSlot % roster.length], at.equipment)
   }
+  // 간이 타석의 타자 능력은 `0xb570c(…, 1, 90, 1)` — 밑값 위에 팀 능력치 정액 · 코치 (`cpuBatterGameAbilityOf`)
   const batterOfTeam = (teamId: number, ace: QuickAtBatBatter | undefined, record: LeagueTeamRecord | undefined) =>
-    (slot: number) => slot === ACE_BATTER_ROSTER_SLOT && ace !== undefined ? ace : recordBatterAt(teamId, record, slot)
+    (slot: number) =>
+      gameQuickBatterOf(
+        slot === ACE_BATTER_ROSTER_SLOT && ace !== undefined ? ace : recordBatterAt(teamId, record, slot),
+        teamId,
+        extras?.abilityContext,
+      )
   // CPU 대타 0xac228 은 타석 타자가 마선수(0xb633c)면 안 낸다 — 대타로 들어선 마타자는 다시 안 바뀐다.
   // 마타자 칸(12)은 마선수를 넣은 명단에만 있다
   const isAceRosterSlot = (slot: number) => slot === ACE_BATTER_ROSTER_SLOT
