@@ -86,13 +86,27 @@ describe('기본 변화구 고르기 — 표 0xcc520 (J 3-1)', () => {
     expect((mask >>> 6) & 1).toBe(1)
   })
 
+  it('처음엔 아무것도 안 골라져 있다 (0x10b18 이 +0x13c..+0x143 = 0)', () => {
+    expect(DEFAULT_PITCHER_ROOKIE_PROFILE.breakingPitchSlots).toEqual([])
+  })
+
   it('두 개를 고르기 전에는 등록할 수 없다 (StrMODE[13])', () => {
     expect(canRegisterPitcher({ ...DEFAULT_PITCHER_ROOKIE_PROFILE, breakingPitchSlots: [0] })).toBe(false)
     expect(canRegisterPitcher({ ...DEFAULT_PITCHER_ROOKIE_PROFILE, breakingPitchSlots: [0, 3] })).toBe(true)
   })
 
-  it('세 번째를 고르면 가장 먼저 고른 칸이 빠진다', () => {
-    expect(toggleBreakingPitchSlot([0, 1], 5)).toEqual([1, 5])
-    expect(toggleBreakingPitchSlot([0, 1], 1)).toEqual([0])
+  it('켜면 짝 칸(k^1)이 꺼진다 — TWO-SEAM/H.FAST · SHOOT/SINKER · CURVE/SLIDER · FORK/CHANGEUP (0x123ac)', () => {
+    expect(toggleBreakingPitchSlot([0], 1)).toEqual([1])
+    expect(toggleBreakingPitchSlot([3, 4], 2)).toEqual([2, 4])
+    expect(toggleBreakingPitchSlot([0, 7], 6)).toEqual([0, 6])
+  })
+
+  it('세 번째를 켜면 방금 켠 칸이 아닌 것 중 번호가 가장 낮은 칸이 빠진다', () => {
+    expect(toggleBreakingPitchSlot([6, 2], 4)).toEqual([4, 6])
+    expect(toggleBreakingPitchSlot([2, 7], 0)).toEqual([0, 7])
+  })
+
+  it('켜진 칸을 누르면 꺼진다', () => {
+    expect(toggleBreakingPitchSlot([0, 2], 2)).toEqual([0])
   })
 })

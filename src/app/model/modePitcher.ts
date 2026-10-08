@@ -74,7 +74,8 @@ const COOL_SKILL = 22
 const SPIRIT_SKILL = 23
 
 function rookieModePitcher(): ModePitcher {
-  const profile = DEFAULT_PITCHER_ROOKIE_PROFILE
+  // 등록 화면의 처음 값은 변화구가 비어 있다(0x10b18) — 커리어 없는 웹 대체 투수는 예전처럼 칸 0·1 을 준다
+  const profile = { ...DEFAULT_PITCHER_ROOKIE_PROFILE, breakingPitchSlots: [0, 1] }
   return {
     stats: fatiguedStatsOf(rookiePitcherAbilityOf(profile.role, profile.typeIndex), MISSION_STAMINA),
     repertoire: {

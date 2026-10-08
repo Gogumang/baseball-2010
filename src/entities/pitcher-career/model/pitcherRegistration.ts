@@ -133,25 +133,45 @@ export interface PitcherRookieProfile {
   readonly teamId?: number
 }
 
+/**
+ * 처음 값 — 변화구는 **아무것도 안 골라진 채** 시작한다: 0x67 진입 0x10b18 이 고름 바이트
+ * `+0x13c..+0x143` 여덟 칸을 모두 0 으로 둔다(0x10b3e~0x10b50).
+ */
 export const DEFAULT_PITCHER_ROOKIE_PROFILE: PitcherRookieProfile = {
   role: PITCHER_ROLE.starter,
   typeIndex: 0,
   handIndex: 0,
   skinIndex: 0,
-  breakingPitchSlots: [0, 1],
+  breakingPitchSlots: [],
 }
 
-/** 등록을 마칠 수 있는가 — 변화구를 정확히 두 개 골라야 한다 (StrMODE[13]) */
+/**
+ * 고른 개수 0x12388 — 여덟 바이트 중 0 이 아닌 것의 수.
+ * 0x67 키 0x12410 이 OK 칸(8)에서 이 값이 **1 이하면** StrMODE[13] 상자, 아니면 StrMODE[2] 확인 상자를 띄운다.
+ */
 export function canRegisterPitcher(profile: PitcherRookieProfile): boolean {
-  return new Set(profile.breakingPitchSlots).size === ROOKIE_BREAKING_PITCH_COUNT
+  return new Set(profile.breakingPitchSlots).size > 1
 }
 
-/** 변화구 칸을 켜고 끈다 — 두 개를 넘겨 고르면 **가장 먼저 고른 것이 빠진다**(웹 편의, 원본 근거 없음) */
+/**
+ * 변화구 칸을 켜고 끈다 (0x123ac, 직접 떴다):
+ * ```
+ * 칸 k 를 뒤집는다
+ * 켜졌으면 짝 칸 k^1 을 끈다         ; TWO-SEAM/H.FAST · SHOOT/SINKER · CURVE/SLIDER · FORK/CHANGEUP
+ * 고른 수 > 2 면 0~7 을 앞에서부터 보며 k 가 아닌 켜진 첫 칸 하나를 끈다
+ * ```
+ * 곧 세 번째를 켜면 **먼저 고른 것이 아니라 번호가 가장 낮은 칸**이 빠진다. 돌려주는 칸은 번호 순이다.
+ */
 export function toggleBreakingPitchSlot(
   slots: readonly number[],
   slot: number,
 ): readonly number[] {
-  if (slots.includes(slot)) return slots.filter((chosen) => chosen !== slot)
-  const next = [...slots, slot]
-  return next.length > ROOKIE_BREAKING_PITCH_COUNT ? next.slice(next.length - ROOKIE_BREAKING_PITCH_COUNT) : next
+  const chosen = ROOKIE_BREAKING_PITCH_TYPES.map((_, index) => slots.includes(index))
+  chosen[slot] = !chosen[slot]
+  if (chosen[slot]) chosen[slot ^ 1] = false
+  if (chosen.filter(Boolean).length > ROOKIE_BREAKING_PITCH_COUNT) {
+    const lowest = chosen.findIndex((isOn, index) => isOn && index !== slot)
+    if (lowest >= 0) chosen[lowest] = false
+  }
+  return chosen.flatMap((isOn, index) => (isOn ? [index] : []))
 }

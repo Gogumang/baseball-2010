@@ -21,6 +21,9 @@ const 화면 = (onCreate: OnCreate = () => {}) =>
 const 이름넣기 = (name: string) =>
   fireEvent.change(screen.getByLabelText('이름'), { target: { value: name } })
 const 등록버튼 = () => screen.getByRole<HTMLButtonElement>('button', { name: '등록' })
+const OK버튼 = () => screen.getByRole<HTMLButtonElement>('button', { name: 'OK' })
+const 구질 = (name: string) => fireEvent.click(screen.getByRole('button', { name }))
+const 눌림 = (name: string) => screen.getByRole('button', { name }).getAttribute('aria-pressed')
 
 describe('투수 등록 화면', () => {
   it('고르는 줄은 타입·보직·손·피부이고 기본값은 타입1 · 선발 · 우완 · 황인이다', () => {
@@ -42,15 +45,60 @@ describe('투수 등록 화면', () => {
     expect(screen.getByText('100')).toBeTruthy()
   })
 
-  it('변화구를 두 개 고르기 전에는 등록할 수 없다 (StrMODE[13])', () => {
+  it('[등록] 은 변화구 고르기(0x67)로 간다 — 처음엔 아무것도 안 골라져 있고 정보 칸은 안 그린다', () => {
     화면()
     이름넣기('테스트')
-    expect(등록버튼().disabled).toBe(false)
+    expect(screen.queryByRole('button', { name: 'TWO-SEAM' })).toBeNull()
 
-    // 기본으로 고른 두 칸 중 하나를 끄면 막힌다
-    fireEvent.click(screen.getByRole('button', { name: 'TWO-SEAM' }))
+    fireEvent.click(등록버튼())
 
-    expect(등록버튼().disabled).toBe(true)
+    expect(눌림('TWO-SEAM')).toBe('false')
+    expect(눌림('H.FAST')).toBe('false')
+    expect(screen.queryByLabelText('이름')).toBeNull()
+  })
+
+  it('하나 이하로 OK 를 누르면 StrMODE[13] 알림, 두 개면 확인 상자다', () => {
+    화면()
+    이름넣기('테스트')
+    fireEvent.click(등록버튼())
+
+    fireEvent.click(OK버튼())
+    expect(screen.getByText(/기본 변화구를/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+
+    구질('CURVE')
+    fireEvent.click(OK버튼())
+    expect(screen.getByText(/기본 변화구를/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+
+    구질('FORK')
+    fireEvent.click(OK버튼())
+    expect(screen.getByText(/이대로 결정/)).toBeTruthy()
+  })
+
+  it('짝 칸을 켜면 같은 계열이 꺼진다 (0x123ac, k^1)', () => {
+    화면()
+    이름넣기('테스트')
+    fireEvent.click(등록버튼())
+
+    구질('SHOOT')
+    구질('SINKER')
+
+    expect(눌림('SHOOT')).toBe('false')
+    expect(눌림('SINKER')).toBe('true')
+  })
+
+  it('CLR 로 등록 줄에 돌아갔다 와도 고른 변화구가 남는다', () => {
+    화면()
+    이름넣기('테스트')
+    fireEvent.click(등록버튼())
+    구질('CURVE')
+
+    fireEvent.click(screen.getByRole('button', { name: '취소' }))
+    expect(screen.getByLabelText('이름')).toBeTruthy()
+    fireEvent.click(등록버튼())
+
+    expect(눌림('CURVE')).toBe('true')
   })
 
   it('이름이 비면 등록할 수 없다', () => {
@@ -66,22 +114,28 @@ describe('투수 등록 화면', () => {
     fireEvent.click(screen.getByRole('button', { name: '보직 다음' }))
     fireEvent.click(screen.getByRole('button', { name: '손 다음' }))
     fireEvent.click(등록버튼())
+    구질('TWO-SEAM')
+    구질('FORK')
+    fireEvent.click(OK버튼())
     fireEvent.click(screen.getByRole('button', { name: '예' }))
 
     expect(created).not.toBeNull()
     expect(created!.name).toBe('투수')
     expect(created!.profile.role).toBe(PITCHER_ROLE.relief)
     expect(created!.profile.handIndex).toBe(1)
-    expect(created!.profile.breakingPitchSlots).toHaveLength(2)
+    expect(created!.profile.breakingPitchSlots).toEqual([0, 6])
   })
 
   it('확인 상자는 화면을 비우지 않는다 — 뒤 항목이 그대로 보인다', () => {
     화면()
     이름넣기('투수')
     fireEvent.click(등록버튼())
+    구질('TWO-SEAM')
+    구질('FORK')
+    fireEvent.click(OK버튼())
 
     expect(screen.getByText(/이대로 결정/)).toBeTruthy()
-    expect(screen.getByText('선발')).toBeTruthy()
+    expect(screen.getByText('200')).toBeTruthy()
   })
 })
 
@@ -111,6 +165,9 @@ describe('만들기 흐름 — 0x65 팀 고르기 → 0x66 등록', () => {
     fireEvent.click(screen.getByRole('button', { name: '대전 호크스' }))
     fireEvent.change(screen.getByLabelText('이름'), { target: { value: '투수' } })
     fireEvent.click(screen.getByRole('button', { name: '등록' }))
+    구질('TWO-SEAM')
+    구질('FORK')
+    fireEvent.click(OK버튼())
     fireEvent.click(screen.getByRole('button', { name: '예' }))
 
     expect(created).not.toBeNull()
