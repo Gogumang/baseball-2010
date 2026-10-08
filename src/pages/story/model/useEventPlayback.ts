@@ -90,6 +90,14 @@ const rewardsOfStep = (step: EventStep): readonly EventReward[] =>
 export type EventRewardHandler = (items: readonly EventReward[], eventId: number, viewedEventIds: readonly number[]) => void
 
 /**
+ * **선택지 확인** — 대사 상자 키 0x8b804 가 선택지 명령에서 OK(−5)를 받으면(8b8b2~8b8d8) [mgr+0x2bc] = 고른 줄의 goto 이벤트 ·
+ * [mgr+8] = 1 을 쓰고 곧 0x8b0e4(mgr)를 부른다 — 떠나온 이벤트 줄(이 재생에서 선택지 · 예아니오로 떠난 이벤트)을 본 표시하고,
+ * 외출 갈래(0x8b12c — 지금 이벤트 0xacb61 이 440~444 가 아니면 S+4)를 지난 뒤 저장한다(0x1fded · 0x22755). 지금 이벤트는
+ * 아직 줄에 없다(이벤트 끝 0x8cfc8 이 넣는다). `eventId` 는 선택지가 든 지금 이벤트, `leftEventIds` 는 그 줄이다.
+ */
+export type EventChoiceConfirmHandler = (eventId: number, leftEventIds: readonly number[]) => void
+
+/**
  * 재생이 끝났다 — 끝에 모아 넘기는 보상 · 이 재생에서 거친 이벤트 · 엔딩 요청.
  * `endingEventId` 는 첫 종류 21 로 끝났을 때 그 이벤트다(0x8d4ce — [0x1552adc] = 1). 원본은 그 이벤트만 본 표시를 안 하고
  * 거친 다른 이벤트(선택지로 떠나온 줄)는 끝 0x8b0e4 가 본 표시한다. 보통 끝이면 null.
@@ -145,6 +153,8 @@ export function useEventPlayback(
   jump: (eventId: number) => void
   /** 초상화 셋을 비운다 — 0x7f7a8 → 0x7b870 (화면효과 6 · 7 이 끝난 그리기, `drawEventBackdrop`) */
   clearPortraits: () => void
+  /** 떠나온 이벤트 줄 [mgr+0x38a] — 이 재생에서 거친 이벤트(대결 앞 이벤트 포함) 중 지금 이벤트 말고 (`EventChoiceConfirmHandler`) */
+  leftEventIds: () => readonly number[]
 } {
   const [cursor, setCursor] = useState(() => jumpToEvent(startEvent.id))
   // 창 글은 커리어에서 나온다 — 부르는 쪽이 렌더마다 새 함수를 넘겨도 걸음이 다시 계산되지 않게 ref 로 든다
@@ -253,6 +263,7 @@ export function useEventPlayback(
   const skip = () => setCursor(skipSayCursor(events, stepRef.current.cursor))
   const jump = (eventId: number) => setCursor(jumpToEvent(eventId))
   const clearPortraits = () => setPortraits([])
+  const leftEventIds = () => collect().viewedEventIds.filter((id) => id !== stepRef.current.cursor.eventId)
 
   // 올해의 목표 창(system 1, 0x8d304 가 키 표에 OK −5 · '5' → 0 을 넣는다)은 Enter/Space 로 닫는다.
   // 대사(say)는 대사 상자(`EventDialogueBox` — 키 0x8b804)가, 선택지는 메뉴가, 알림 · 예아니오(0x74ef4)는 공용 창(`MessageBox`)이 키를 가져간다.
@@ -270,5 +281,5 @@ export function useEventPlayback(
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
-  return { step, isReleased, rewardNotice, portraits, next, skip, jump, clearPortraits }
+  return { step, isReleased, rewardNotice, portraits, next, skip, jump, clearPortraits, leftEventIds }
 }

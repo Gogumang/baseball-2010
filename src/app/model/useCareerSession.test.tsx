@@ -257,6 +257,20 @@ describe('보상 명령 뒤 이어하기 자리 (0x8c460 끝 8cc2e — S+0x50 �
     expect(다시.result.current.session.career?.endingIndex).toBeNull()
   })
 
+  it('선택지 확인(0x8b804 → 0x8b0e4) — 떠나온 줄을 본 표시하고 저장한다 · 장소에서 연 이벤트면 행동함(S+4)', () => {
+    const saveGame = 메모리저장(목표달성선수({ seasonEndState: 132 }))
+    const 처음 = 열기(saveGame)
+    act(() => 처음.result.current.setScreen({ kind: '이벤트', eventId: 496, context: '시즌' }))
+    act(() => 처음.result.current.session.actions.confirmEventChoice(496, [502]))
+    expect(saveGame.load()?.seenEventIds).toContain('502')
+    expect(saveGame.load()?.seenEventIds).not.toContain('496')
+    expect(saveGame.load()?.hasActedThisCycle).toBe(false)
+
+    act(() => 처음.result.current.setScreen({ kind: '이벤트', eventId: 120, context: '장소' }))
+    act(() => 처음.result.current.session.actions.confirmEventChoice(120, []))
+    expect(saveGame.load()?.hasActedThisCycle).toBe(true)
+  })
+
   it('464 거절 보상 뒤 끄면 S+0x50 = 0x11 — 이어하기가 새 시즌(0x1b768)으로 간다, 평판 −20 은 한 번', () => {
     const saveGame = 메모리저장(목표달성선수({ seasonEndState: 132 }))
     const 처음 = 열기(saveGame)

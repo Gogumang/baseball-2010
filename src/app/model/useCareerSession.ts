@@ -1840,6 +1840,17 @@ export function useCareerSession({
     },
 
     /**
+     * 선택지 확인 — 0x8b804 의 8b8d8 `0x8b0e4(mgr)`: 떠나온 이벤트 줄 본 표시 · 112/113 에서 연 이벤트면 S+4(0x8b12c — 지금
+     * 이벤트가 440~444 가 아니면) · 저장. 웹 저장은 커리어가 바뀌면 고리가 한다 — 안 바뀌면 원본 저장도 같은 내용이다.
+     */
+    confirmEventChoice: (eventId: number, leftEventIds: readonly number[]) => {
+      if (career === null || screen.kind !== '이벤트') return
+      const marked = markRewardedEvent(career, null, leftEventIds)
+      const acted = withOutingEventActed(marked, screen.context === '장소' || screen.context === '외출진입', eventId)
+      if (acted !== career) setCareer(acted)
+    },
+
+    /**
      * 재생 끝(114 끝 0x1c014). `endingEventId` 는 첫 종류 21 로 끝난 이벤트(0x8d4ce — [0x1552adc] = 1)다: 그 이벤트는 본 표시를
      * 안 하고(0x8cf8c 를 안 지난다) 거친 다른 이벤트는 0x8b0e4 가 본 표시한다. 엔딩은 그 칸으로 간다(`nextSeasonStep`).
      * 엔딩 이벤트(첫 종류 21 — 500 · 501 · 503 · 504, 모두 대상 0)를 트는 곳은 원본에서 둘이다: 시즌 끝 사슬(132 의 501 · 504 ·

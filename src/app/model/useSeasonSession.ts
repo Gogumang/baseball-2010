@@ -449,6 +449,11 @@ export interface SeasonActions {
    */
   readonly giveSeasonEventReward: (rewards: readonly SeasonEventReward[], eventId: number, viewedEventIds?: readonly number[]) => void
   /**
+   * 선택지 확인 — 0x8b804 의 8b8d8 `0x8b0e4(mgr)`: 떠나온 이벤트 줄 본 표시 → 저장(0x1fded · 0x22755). 0x8b12c 의 외출 갈래는
+   * [[mgr+0xb4]+0x174] 가 나리 외출 상태(0x70 · 0x71)일 때라 시즌에서는 안 탄다. `StoryScreen.onChoiceConfirm` 으로 잇는다.
+   */
+  readonly confirmSeasonEventChoice: (eventId: number, leftEventIds: readonly number[]) => void
+  /**
    * 이벤트의 system 창(알림 · 올해의 목표)을 답 0 으로 닫았다 — 0x8d928~0x8d942 의 0x7fe90: 시즌모드라 기록 +0x187 = 1 ·
    * 저장(0x22755). 하위와 상관없이 모든 system 창이다.
    */
@@ -2580,6 +2585,16 @@ export function useSeasonSession(
     [commit, gainGamePoint, random, recordStat],
   )
 
+  const confirmSeasonEventChoice = useCallback(
+    (_eventId: number, leftEventIds: readonly number[]) => {
+      const current = latestSave.current
+      if (current === null) return
+      const record = leftEventIds.filter((id) => id !== YEAR_GOAL_EVENT_ID).reduce(markEventSeen, current.state.record)
+      commit({ ...current, state: { ...current.state, record } })
+    },
+    [commit],
+  )
+
   /**
    * 이벤트 system 창 답 0 — 0x7fe90(상자): 0x7b998(모드 2)이면 [[상자+0x150]+0x187] = 1, 그리고 0x22755([0x1400054], 1) 저장.
    * 이미 켜져 있어도 원본은 저장한다. 재생이 끝날 때 목표 창 이벤트를 보고 켜는 자리(`finishSeasonEvent`)는 같은 값이라 그대로 둔다.
@@ -2733,7 +2748,7 @@ export function useSeasonSession(
       playCupGame, finishCup, finishGame, saveGameProgress, enterGameSettlement, resumeSavedGame, leaveGame,
       continuePostseason,
       runTraining, closeTrainingResult, runOuting, nextSeasonEndStep, awardLeagueFirst, spendGamePoint, finishSeason,
-      openStadiumItems, markEndingSeen, finishSeasonEvent, giveSeasonEventReward, confirmEventSystemWindow, clearNotice, quit,
+      openStadiumItems, markEndingSeen, finishSeasonEvent, giveSeasonEventReward, confirmSeasonEventChoice, confirmEventSystemWindow, clearNotice, quit,
     },
   }
 }

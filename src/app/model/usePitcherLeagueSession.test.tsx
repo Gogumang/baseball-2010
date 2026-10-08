@@ -397,6 +397,12 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     expect(연봉.다시.current.scene).toBe('관리')
     expect(연봉.다시.current.career).toMatchObject({ season: 3, seasonEndState: null, salary: 연봉.받은뒤.salary })
 
+    // 선택지 확인 0x8b804 → 0x8b0e4 — 떠나온 줄(502)을 본 표시하고 저장한다. 지금 이벤트는 아직 줄에 없다
+    const 선택 = 끊고다시(132, 380, [], [380])
+    act(() => 선택.다시.current.actions.confirmStoryChoice(496, [502]))
+    expect((선택.store.load() as 커리어).seenEventIds).toContain('502')
+    expect((선택.store.load() as 커리어).seenEventIds).not.toContain('496')
+
     // 463 출전 — 대회가 저장에 들고 이어하기는 134 대진판, 134 첫 틀이 칭호 8
     const 출전 = 끊고다시(132, 463, [{ kind: 1, value: 10 }], [461, 463])
     expect(출전.저장).toMatchObject({ seasonEndState: null, nationalCup: createNationalCup() })

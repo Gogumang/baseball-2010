@@ -5,7 +5,9 @@ import type { EventCommand, OriginalEvent } from '@/shared/config/original/event
 import { EventPortraits } from '@/widgets/event-portraits/ui/EventPortraits'
 import { useEventPlayback } from '@/pages/story/model/useEventPlayback'
 import { isStepHeld, useScreenEffect } from '@/pages/story/model/useScreenEffect'
-import type { EventCompleteHandler, EventRewardHandler, MatchCommand, SystemCommand } from '@/pages/story/model/useEventPlayback'
+import type {
+  EventChoiceConfirmHandler, EventCompleteHandler, EventRewardHandler, MatchCommand, SystemCommand,
+} from '@/pages/story/model/useEventPlayback'
 import type { StoryCarry } from '@/entities/story/model/aceMatch'
 import * as styles from '@/pages/story/ui/StoryScreen.css'
 import { YearGoalWindow } from '@/pages/story/ui/YearGoalWindow'
@@ -112,13 +114,18 @@ interface StoryScreenProps {
    * 경기(`onMatch`)로 넘기는 보상은 비어 있다. 안 주면 예전처럼 끝에 모아 넘긴다.
    */
   readonly onReward?: EventRewardHandler
+  /**
+   * **선택지를 OK 로 골랐다** — 0x8b804 의 8b8d8 `0x8b0e4(mgr)`: 떠나온 이벤트 줄 본 표시 · 외출 행동함(S+4) · 저장.
+   * 고른 이벤트로 넘어가기(0x8be20) 앞이다. 안 넘기면 아무 일도 없다(끝 · 보상 자리에서 같은 값이 된다).
+   */
+  readonly onChoiceConfirm?: EventChoiceConfirmHandler
 }
 
 /** 원작 이벤트. 대사마다 원본이 정한 인물·표정·자리로 초상화를 띄운다. */
 export function StoryScreen({
   events, event, playerName, teamName, skinIndex, battingTypeIndex, onComplete, onMatch, carried, replacementsFor,
   systemWindowTextOf, yearGoalWindowOf, isVibrationOn = true, isSeasonMode = false, isOverOutingMap = false,
-  rewardNoticeContext, onSystemWindowConfirm, onReward,
+  rewardNoticeContext, onSystemWindowConfirm, onReward, onChoiceConfirm,
 }: StoryScreenProps) {
   // 목표 창도 재생기가 멈추는 창이다 — 글 대신 빈 글로 세워 두고 아래에서 창을 그린다
   const windowTextOf = systemWindowTextOf === undefined && yearGoalWindowOf === undefined
@@ -127,7 +134,7 @@ export function StoryScreen({
       command.sub === SYSTEM_YEAR_GOAL_WINDOW && yearGoalWindowOf !== undefined ? '' : (systemWindowTextOf?.(command) ?? null)
   /** 막는 효과(id 4~7)를 다 기다린 걸음 — 그 걸음의 멈출 명령이 돈다 (0x8b564) */
   const [releasedKey, setReleasedKey] = useState<string | null>(null)
-  const { step, isReleased, rewardNotice, portraits, next, skip, jump: jumpToEvent, clearPortraits } = useEventPlayback(
+  const { step, isReleased, rewardNotice, portraits, next, skip, jump: jumpToEvent, clearPortraits, leftEventIds } = useEventPlayback(
     events, event, onComplete, onMatch, carried, windowTextOf, (current) => isStepHeld(current, releasedKey),
     rewardNoticeContext === undefined ? undefined : (items, eventId) => rewardNoticeOf(items, eventId, rewardNoticeContext()),
     () => closeSystemWindow(),
@@ -281,6 +288,8 @@ export function StoryScreen({
           // 0x8b8b6 — [mgr+0x2bc] = [명령+0x24 + 2 × 고른 줄] · [mgr+8] = 1 → 다음 틀에 그 이벤트를 싣는다(0x8be20)
           onChoiceConfirm={(selected) => {
             const choice = choiceCommand?.choices[selected]
+            // 8b8d8 0x8b0e4 — 고른 이벤트를 싣기(다음 틀 0x8be20) 앞에 떠나온 줄 본 표시 · S+4 · 저장
+            onChoiceConfirm?.(step.cursor.eventId, leftEventIds())
             if (choice !== undefined) jump(choice.gotoEvent)
           }} />
       )}

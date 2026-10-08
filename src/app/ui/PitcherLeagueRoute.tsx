@@ -227,6 +227,8 @@ export function PitcherLeagueRoute({
             onSystemWindowConfirm={actions.confirmEventSystemWindow}
             // 보상 명령 7 은 창을 세운 그 갱신에 준다 (0x8c460)
             onReward={actions.giveStoryReward}
+            // 선택지 OK → 0x8b0e4 (떠나온 줄 본 표시 · 저장)
+            onChoiceConfirm={actions.confirmStoryChoice}
           />
           </ScreenOverlay>
         </>

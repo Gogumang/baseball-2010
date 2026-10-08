@@ -339,6 +339,11 @@ export interface PitcherLeagueSession {
      * (원본도 0x7fe90 · 재생 끝 0x1c014 에서 저장한다). `StoryScreen.onReward` 로 잇는다.
      */
     readonly giveStoryReward: (items: readonly EventReward[], eventId: number, viewedEventIds?: readonly number[]) => void
+    /**
+     * 선택지 확인 — 0x8b804 의 8b8d8 `0x8b0e4(mgr)`: 떠나온 이벤트 줄 본 표시 · 112/113 에서 연 이벤트면 S+4 · 저장.
+     * `StoryScreen.onChoiceConfirm` 으로 잇는다.
+     */
+    readonly confirmStoryChoice: (eventId: number, leftEventIds: readonly number[]) => void
     /** 이벤트 재생이 끝났다 — 지나온 보상과 본 이벤트 번호 (114 틀 0x1c014) */
     readonly completeStory: (rewards: readonly EventReward[], viewedEventIds: readonly number[], endingEventId?: number | null) => void
     /**
@@ -1771,6 +1776,16 @@ export function usePitcherLeagueSession(
     [career, commit, random, recordStat, story, storyEvents],
   )
 
+  const confirmStoryChoice = useCallback(
+    (eventId: number, leftEventIds: readonly number[]) => {
+      if (career === null || story === null) return
+      const marked = markRewardedEvent(career, null, leftEventIds)
+      // 0x8b0e4 는 늘 저장한다(8b160~8b16e) — 커리어가 안 바뀌어도 쓴다
+      commit(withOutingEventActed(marked, story.context === '지도' || story.context === '장소', eventId))
+    },
+    [career, commit, story],
+  )
+
   /**
    * 이벤트 system 창 답 0 — 0x7fe90(상자): 모드 2 가 아니면 [[상자+0x150]+0x1b7] = 1, 그리고 0x22755([0x1400054], 1) 저장.
    * 이미 켜져 있어도 원본은 저장한다 — 그때까지 준 보상이 든 커리어가 저장된다.
@@ -2091,6 +2106,7 @@ export function usePitcherLeagueSession(
       closeOutingResult,
       dismissOutingRecoveryNotice,
       giveStoryReward,
+      confirmStoryChoice,
       completeStory,
       confirmEventSystemWindow,
       abortStoryAtMatch,
