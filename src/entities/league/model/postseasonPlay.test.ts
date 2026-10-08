@@ -8,6 +8,7 @@ import {
 import { advancePostseason, startPostseason } from '@/entities/league/model/league'
 import type { PostseasonSeries } from '@/entities/league/model/league'
 import { rollCpuGamePrep, simulateLeagueGame } from '@/entities/league/model/leagueDay'
+import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { createFractionRandom } from '@/shared/api/random/fractionRandom'
@@ -120,6 +121,8 @@ describe('선발은 0xc239c 의 로테이션이다 — 시리즈 안 경기 수 
   /** 원본 차례로 손으로 짠 한 경기 — 준비 굴림 다섯 → 초 공격 윗 시드 명단 → 덜 낸 명단의 팀 승 */
   function 기대승자(series: PostseasonSeries, seed: number, g: number): number {
     const random = createSeededRandom(seed)
+    // c28b0 시뮬 초기화 0xc0dac 의 rand(0, 2) → c28c0 준비 0xc239c
+    rollSimulatorInit(random)
     const rolls = rollCpuGamePrep(random)
     const 기대 = simulateLeagueGame({ away: series.teams[0], home: series.teams[1] }, random, g, undefined, {
       aces: { away: rolls.teamA, home: rolls.teamB },
@@ -140,16 +143,17 @@ describe('선발은 0xc239c 의 로테이션이다 — 시리즈 안 경기 수 
     }
   })
 
-  it('경기 준비 굴림은 구장 rand(0,4) · 마선수 rand(0,5) 넷뿐이다 — 선발 굴림이 없다', () => {
+  it('경기 굴림 머리는 시뮬 초기화 rand(0,2) 뒤 구장 rand(0,4) · 마선수 rand(0,5) 넷뿐이다 — 선발 굴림이 없다', () => {
     const 시작 = startPostseason(순위)
     const 세기 = 세는난수(5)
     playCpuSeriesGame(시작, 세기.port)
     const 그대로 = 세는난수(5)
+    rollSimulatorInit(그대로.port)
     const rolls = rollCpuGamePrep(그대로.port)
     simulateLeagueGame({ away: 시작.teams[0], home: 시작.teams[1] }, 그대로.port, 0, undefined, {
       aces: { away: rolls.teamA, home: rolls.teamB },
     })
-    expect(세기.범위.slice(0, 5)).toEqual([[0, 4], [0, 5], [0, 5], [0, 5], [0, 5]])
+    expect(세기.범위.slice(0, 6)).toEqual([[0, 2], [0, 4], [0, 5], [0, 5], [0, 5], [0, 5]])
     expect(세기.범위).toEqual(그대로.범위)
   })
 
@@ -161,6 +165,7 @@ describe('선발은 0xc239c 의 로테이션이다 — 시리즈 안 경기 수 
     // 윗 시드(2위, 기다린 팀) = 0번 · 올라온 팀 = (44 + 2) % 4 = 2번
     for (const seed of [8, 9, 10]) {
       const random = createSeededRandom(seed)
+      rollSimulatorInit(random)
       const rolls = rollCpuGamePrep(random)
       const 기대 = simulateLeagueGame({ away: series.teams[0], home: series.teams[1] }, random, { away: 0, home: 2 }, undefined, {
         aces: { away: rolls.teamA, home: rolls.teamB },

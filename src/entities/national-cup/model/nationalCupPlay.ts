@@ -1,4 +1,5 @@
 import { simulateLeagueGame } from '@/entities/league/model/leagueDay'
+import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
 import { rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import {
@@ -69,6 +70,8 @@ export function playCpuNationalCupGame(
   /** 그날 사람 경기가 끝났을 때 상대국 레코드의 투수 칸별 스태미나 `+0x2c` (두 팀이 같이 쓴다). 안 넘기면 10000 */
   startingStaminas?: readonly number[],
 ): NationalCupGameResult {
+  // c2ede — 간이 시뮬 초기화 0xc0dac 의 rand(0, 2) 가 준비 0xc2c4c(c2eee, 굴림 없음)보다 먼저다
+  rollSimulatorInit(random)
   const score = simulateLeagueGame(
     { away: rosterTeam, home: rosterTeam },
     random,

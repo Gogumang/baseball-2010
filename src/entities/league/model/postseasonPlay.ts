@@ -1,4 +1,5 @@
 import { LEAGUE_SIDE_HOME, advancePostseason, postseasonPitcherOrderOf } from '@/entities/league/model/league'
+import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
 import type { PostseasonSeries } from '@/entities/league/model/league'
 import {
   cpuGameAcesOf,
@@ -85,6 +86,8 @@ export function playCpuSeriesGameWithStamina(
     home: postseasonPitcherOrderOf(series, sides.home),
   }
   const starters = { away: orders.away[0] ?? 0, home: orders.home[0] ?? 0 }
+  // c28b0 — 간이 시뮬 초기화 0xc0dac 의 rand(0, 2) 가 준비 0xc239c(c28c0)보다 먼저다
+  rollSimulatorInit(random)
   // 경기 준비의 굴림 다섯 (c2464~c24ea) — 팀 A = 칸 sX(초)의 객체 = 윗 시드 명단
   const rolls = rollCpuGamePrep(random)
   const score = simulateLeagueGame(

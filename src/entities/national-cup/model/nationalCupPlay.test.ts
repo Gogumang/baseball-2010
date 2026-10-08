@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
 import { STARTING_PITCHER_CANDIDATES } from '@/entities/team/model/teamRoster'
 import {
   advanceNationalCupDay,
@@ -54,7 +55,10 @@ describe('CPU 끼리 한 경기 0xc2dac', () => {
       // 같은 경기가 나오고 칸만 바뀐다
       expect(짝2.firstSlotRuns).toBe(짝1.firstSlotRuns)
       expect(짝2.secondSlotRuns).toBe(짝1.secondSlotRuns)
-      const 직접 = simulateLeagueGame({ away: 11, home: 11 }, createSeededRandom(seed), 1, undefined, { sharedRoster: true })
+      // c2ede 시뮬 초기화 0xc0dac 의 rand(0, 2) 가 먼저다
+      const 직접난수 = createSeededRandom(seed)
+      rollSimulatorInit(직접난수)
+      const 직접 = simulateLeagueGame({ away: 11, home: 11 }, 직접난수, 1, undefined, { sharedRoster: true })
       expect([짝1.firstSlotRuns, 짝1.secondSlotRuns]).toEqual([직접.homeRuns, 직접.awayRuns])
     }
   })
@@ -64,7 +68,9 @@ describe('CPU 끼리 한 경기 0xc2dac', () => {
     let 달라짐 = 0
     for (let seed = 1; seed <= 12; seed += 1) {
       const 지침 = playCpuNationalCupGame(12, 13, 11, createSeededRandom(seed), 1, 지친표)
-      const 직접 = simulateLeagueGame({ away: 11, home: 11 }, createSeededRandom(seed), 1, { away: 지친표 }, { sharedRoster: true })
+      const 직접난수 = createSeededRandom(seed)
+      rollSimulatorInit(직접난수)
+      const 직접 = simulateLeagueGame({ away: 11, home: 11 }, 직접난수, 1, { away: 지친표 }, { sharedRoster: true })
       expect([지침.firstSlotRuns, 지침.secondSlotRuns]).toEqual([직접.homeRuns, 직접.awayRuns])
       const 가득 = playCpuNationalCupGame(12, 13, 11, createSeededRandom(seed), 1)
       if (가득.firstSlotRuns !== 지침.firstSlotRuns || 가득.secondSlotRuns !== 지침.secondSlotRuns) 달라짐 += 1

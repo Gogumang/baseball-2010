@@ -9,6 +9,7 @@ import {
 } from '@/entities/league/model/league'
 import type { League } from '@/entities/league/model/league'
 import { simulateHalfInning, startingMoundOf } from '@/entities/game/model/simulateHalfInning'
+import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
 import { isGameOverAt } from '@/entities/game/model/gameState'
 import type {
   HalfInningDefense,
@@ -1014,6 +1015,8 @@ export function playLeagueDay(
     // ⚠️ 칸과 명단이 엇갈린다 (0xc239c, 직접 떴다 — `cpuGameSidesOf` 주석): 홈 팀(A목록 X)의 **선수**가 칸 0
     //    (초 공격)에, 원정 팀(Y)의 선수가 칸 1(말 공격)에 선다. 그래서 X 명단을 먼저 공격으로 돌린다.
     const sides = cpuGameSidesOf(matchup.home, matchup.away)
+    // c2b54 — 경기마다 간이 시뮬 초기화 0xc0dac 의 rand(0, 2) 가 준비 0xc239c(c2b66)보다 먼저다
+    rollSimulatorInit(random)
     // 경기 준비의 굴림 다섯 — 구장 · 양 팀 마타자·마투수 (c2464~c24ea). 팀 A = 칸 1(X = 홈)의 객체 = 원정 명단
     const rolls = rollCpuGamePrep(random)
     // 굴림 뒤 c24fc~c254e: g ≠ 0 이면 두 팀 레코드를 0xb5ca8 로 한 칸 돌린다(영구) — 0번 레코드가 오늘의 선발이다

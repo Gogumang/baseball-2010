@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
 import {
   ACE_BATTER_ROSTER_SLOT,
   ACE_PITCHER_RECORD_STAMINA,
@@ -528,6 +529,8 @@ describe('0xc239c 는 칸의 팀 번호와 명단을 엇갈려 앉힌다 (c2494�
     const wins = Array.from({ length: LEAGUE_TEAM_COUNT }, () => 0)
     for (const matchup of matchupsOf(day)) {
       if (matchup.away === myTeam || matchup.home === myTeam) continue
+      // c2b54 시뮬 초기화 0xc0dac 의 rand(0, 2) → c2b66 준비 0xc239c
+      rollSimulatorInit(random)
       const rolls = rollCpuGamePrep(random)
       // 팀 A = 칸 1(홈 X)의 객체 = 원정 명단(말 공격) · 팀 B = 홈 명단(초 공격)
       // 빈 리그에서 g ≠ 0 인 날이면 오늘 준비에서 한 칸 돈 차례다 (c24fc~c254e) — 0번이 선발
@@ -582,7 +585,7 @@ describe('0xc239c 의 굴림 다섯과 마선수 (c2464~c24ea)', () => {
     expect(cpuGameAcesOf(rolls, 1 - LEAGUE_SIDE_HOME)).toEqual({ away: rolls.teamA, home: rolls.teamB })
   })
 
-  it('playLeagueDay 는 경기마다 준비 굴림 다섯을 먼저 부른다', () => {
+  it('playLeagueDay 는 경기마다 시뮬 초기화 rand(0,2)(0xc0dac c2b54) 뒤 준비 굴림 다섯을 먼저 부른다', () => {
     const 범위: Array<readonly [number, number]> = []
     const 바탕 = createSeededRandom(9)
     playLeagueDay(EMPTY_LEAGUE, 0, 0, {
@@ -592,7 +595,7 @@ describe('0xc239c 의 굴림 다섯과 마선수 (c2464~c24ea)', () => {
       },
       rand9d: (n) => 바탕.rand9d(n),
     })
-    expect(범위.slice(0, 5)).toEqual([[0, 4], [0, 5], [0, 5], [0, 5], [0, 5]])
+    expect(범위.slice(0, 6)).toEqual([[0, 2], [0, 4], [0, 5], [0, 5], [0, 5], [0, 5]])
   })
 
   it('마선수가 들어가도 기록표·스태미나 표에는 명단 밖 칸(마타자 12 · 마투수 8)이 안 남는다', () => {
