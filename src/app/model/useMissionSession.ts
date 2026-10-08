@@ -64,7 +64,7 @@ import { isMistakePitch } from '@/entities/pitching/model/mistakePitch'
 import { MAGIC_PITCH_TYPE_NUMBER, ballMagicNumberAfterPitch } from '@/entities/pitcher-career/model/magicPitch'
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
-import { buildHumanPitch, pitchGradeOf } from '@/features/play-pitcher-game/model/pitcherPitch'
+import { buildHumanPitch, mistakeHumanPitchOf, pitchGradeOf } from '@/features/play-pitcher-game/model/pitcherPitch'
 import {
   isModeMagicPitchType, modePitcherMagicRemainingOf, modePitcherOf, modePitcherOfHallOfFame,
 } from '@/app/model/modePitcher'
@@ -1016,7 +1016,7 @@ export function useMissionSession({
     )
     setPitcherMagicStored(magicRemainingAfter)
     setBallMagicNumber(nextBallMagicNumber)
-    const pitch = {
+    const aimedPitch = {
       ...builtPitch,
       magicNumber: nextBallMagicNumber,
       pitcherMagicNumber: pitcher.repertoire.magicNumber,
@@ -1040,6 +1040,16 @@ export function useMissionSession({
       },
       random,
     )
+    // 실투면 0x4dec0~0x4df5e 가 곡선 0x9e3c9 앞에서 공을 존 한가운데 · N 18/20 으로 다시 놓는다 (굴림 없음)
+    const pitch = isMistake
+      ? mistakeHumanPitchOf(aimedPitch, {
+          typeNumber,
+          grade,
+          stats: pitcher.stats,
+          repertoire: pitcher.repertoire,
+          side: MISSION_STAGE_SIDE,
+        })
+      : aimedPitch
     // 지금 타석의 CPU 타자 0xae89c(공격 팀) — 타순 team+0x32 칸에 선 명단 줄 (`missionCpuBatterOf`).
     // 마타자 칸이면 마선수 레코드(0xb6414 첫 단계 레벨 배율 0xd88aa[mgr[0x13f + 순번]] 을 네 칸 모두), 그 밖은 마스터 팀 줄의
     // 0xb6415(타자, k, 1) — 0xaae7c 는 마타자를 시작 타순 칸에만 세우고, 다른 칸 · 대타는 마스터 줄이다.
@@ -1574,14 +1584,6 @@ export function useMissionSession({
     choosePlayer: (pick: HallOfFamePlayerPick) => {
       setPlayer(pick)
       setLastSide(pick.side)
-    },
-
-    /**
-     * 미션 목록(장면 0x107)의 CLR 0x1e8d0 — `[0x140006c] = 0x11` · 장면 0x103 → 생성자 0x234d4 가 하위 17(선수 고르기)을 다시 연다.
-     * 고른 선수를 내려 고르기 창부터 다시 띄운다
-     */
-    returnToPlayerPick: () => {
-      setPlayer(null)
     },
 
     begin: (mission: OriginalMission) => {
