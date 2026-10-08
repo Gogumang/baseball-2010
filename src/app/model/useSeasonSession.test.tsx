@@ -1108,6 +1108,27 @@ describe('시즌 끝 사슬', () => {
     expect(이벤트넘기기(result)).toEqual([0])
     expect(result.current.scene).toBe(SEASON_SCENE_STATE.관리메뉴)
   })
+
+  it('대한민국 우승이면 G +1000 도 받는다 (0x8acc~0x8b04 — 전역 +0x64 · 0x22c7d 통계)', () => {
+    const { result } = 띄우기()
+    시작(result, 0)
+    act(() => result.current.actions.confirmIncome({
+      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
+    }))
+    act(() => result.current.actions.updateRecord({ ...result.current.state!.record, yearIndex: 2 }))
+    act(() => result.current.actions.finishSeason())
+    const 전 = result.current.gamePoints
+
+    act(() => result.current.actions.finishCup({
+      champion: 10,
+      isKoreaChampion: true,
+      koreaInFinal: true,
+      reward: { popularity: 30, reputation: 40, money: 50, gamePoint: 1000, messageId: 199 },
+      openedTeams: [],
+    }))
+
+    expect(result.current.gamePoints).toBe(전 + 1000)
+  })
 })
 
 describe('포스트시즌', () => {

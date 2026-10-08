@@ -2360,6 +2360,12 @@ export function useSeasonSession(
     (finish: NationalCupFinish) => {
       if (save === null) return
       const record = applySeasonReward(save.state.record, finish.reward)
+      // 우승(SR+0x144 == 10) 갈래 0x8acc~0x8b04 — 전역 +0x64 += 1000(0..99999) → 0x22c7d(전역, 1000, 2) 획득 GP 통계 →
+      // 0x1f1e1 통계 저장. 준우승 갈래(0x8b10~)에는 없다 — 보상표의 gamePoint 가 그 차이다
+      if (finish.reward.gamePoint > 0) {
+        gainGamePoint(finish.reward.gamePoint)
+        recordStat?.({ kind: 'G획득', mode: SEASON_STAT_MODE, amount: finish.reward.gamePoint })
+      }
       const next = nextYearOf({
         ...save,
         state: { ...save.state, record: { ...record, nationalCupChampion: finish.champion } },
@@ -2376,7 +2382,7 @@ export function useSeasonSession(
       if (next.scene === SEASON_SCENE_STATE.엔딩) return startEvent(SEASON_FINAL_EVENT_ID, next.scene)
       setScene(next.scene)
     },
-    [commit, save, startEvent],
+    [commit, gainGamePoint, recordStat, save, startEvent],
   )
 
   /**
