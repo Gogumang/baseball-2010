@@ -193,7 +193,7 @@ export type PitcherResumePoint =
   | { readonly kind: '관리' }
   /**
    * S+0x50 == 6|7(1c24e~1c25c) → 141 엔딩 — 보너스 팝업 0x2b 를 닫으며 저장한 커리어(`savedCareerOf`)다. 141 진입 0x12300 을
-   * 다시 밟는다
+   * 다시 밟는다. 7 은 쓰는 곳이 없어 닿지 않는 갈래다(타자편 `resumePointOf` 머리 주석)
    */
   | { readonly kind: '엔딩' }
   /** 그 밖 갈래의 나머지 → 109 다음경기 앞 순위표 (S+0x50 == 4 이거나 g 홀수). 이전 상태가 1 이라 취소가 안 먹는다 */
