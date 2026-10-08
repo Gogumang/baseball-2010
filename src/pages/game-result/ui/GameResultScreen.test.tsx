@@ -62,7 +62,8 @@ describe('경기 결과 원본 배치', () => {
       <GameResultScreen summary={요약({ result: '패', ourScore: 1, opponentScore: 4 })} gamePointReward={0} newTitles={[]}
         career={createCareer('선수')} onContinue={vi.fn()} settlement={{ inning: 9, random }} />,
     )
-    const stage = container.firstElementChild?.firstElementChild as HTMLElement
+    // 판 자리(감싼 칸) > RawScreen > 240×320 무대
+    const stage = container.firstElementChild?.firstElementChild?.firstElementChild as HTMLElement
     const layers = Array.from(stage.children)
     const canvases = layers.filter((element) => element.tagName === 'CANVAS')
     // 배경 캔버스는 첫 칸(감싼 div) 안 · 비 층은 덮개 바로 뒤 · 파티클 층은 맨 끝
@@ -71,6 +72,18 @@ describe('경기 결과 원본 배치', () => {
     expect(layers[layers.length - 1]).toBe(canvases[1])
     // jsdom 은 캔버스 그리기가 없어 rAF 효과 틱이 안 돈다 — 그려지기 전에는 경기 난수를 안 쓴다
     expect(next).not.toHaveBeenCalled()
+  })
+
+  it('[자세히](웹 전용)를 열고 닫아도 판 · 배경을 지우지 않는다 — 정산 효과를 새로 깔지 않는다', () => {
+    const { container } = render(
+      <GameResultScreen summary={요약()} gamePointReward={0} newTitles={[]} career={createCareer('선수')}
+        onContinue={vi.fn()} settlement={{ inning: 9, random: createSeededRandom(1) }} />,
+    )
+    const backdrop = container.querySelector('canvas')
+    fireEvent.click(screen.getByRole('button', { name: '자세히' }))
+    expect(screen.getByText('오늘의 성적')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }))
+    expect(container.querySelector('canvas')).toBe(backdrop)
   })
 
   it('이어하기로 다시 띄운 116 앞 판(정산 재료 없음)은 배경 · 효과 없이 판만', () => {

@@ -33,6 +33,11 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 const GAME_UI_FRAMES = './sprites/game_ui/frames'
 const RESULT_FRAMES = './sprites/result/frames'
 
+/** 결과 판 자리 — 보일 때는 감싼 칸이 레이아웃에 끼지 않는다 */
+const SHOWN_BOARD = { display: 'contents' } as const
+/** [자세히](웹 전용)를 연 동안 판을 숨긴다 — 안 지우므로 배경 · 정산 효과가 그대로 돈다 */
+const HIDDEN_BOARD = { display: 'none' } as const
+
 /** 나리 타자편 — 게임 모드 4 (정산 그리기 0x4a384 는 팀경기와 같은 갈래 0x4a948) */
 const BATTER_CAREER_MODE = 4
 
@@ -170,153 +175,158 @@ export function GameResultScreen({
     )
   }
 
-  if (isDetailOpen) {
-    return (
-      <PixelScreen
-        title="경기 결과"
-        leftKey={{ label: '닫기', onPress: () => setIsDetailOpen(false) }}
-        rightKey={{ label: '확인', onPress: confirm }}
-      >
-        <Panel>
-          <BigResult>
-            {summary.ourScore} : {summary.opponentScore} {summary.result}
-          </BigResult>
+  // [자세히]는 웹 전용 칸이다 — 판(정산 그림 0x4a384)은 뒤에 숨겨 둔 채 그대로 둔다. 원본 '0' 기록 판처럼 그 동안에도 배경 ·
+  // 정산 효과가 그림마다 돌고, 닫아도 효과를 새로 깔지 않는다(정산 진입 0x4ea0c 는 한 번)
+  const detail = !isDetailOpen ? null : (
+    <PixelScreen
+      title="경기 결과"
+      leftKey={{ label: '닫기', onPress: () => setIsDetailOpen(false) }}
+      rightKey={{ label: '확인', onPress: confirm }}
+    >
+      <Panel>
+        <BigResult>
+          {summary.ourScore} : {summary.opponentScore} {summary.result}
+        </BigResult>
+      </Panel>
+
+
+      <Panel heading="오늘의 성적">
+        <StatGrid
+          entries={[
+            { label: '타수', value: stats.atBats },
+            { label: '안타', value: stats.hits },
+            { label: '홈런', value: stats.homeRuns },
+            { label: '타점', value: stats.runsBattedIn },
+            { label: '볼넷', value: stats.walks },
+            { label: '삼진', value: stats.strikeouts },
+          ]}
+        />
+      </Panel>
+
+      <Panel heading="보상">
+        <Notice>
+          경기 타율 {formatBattingAverage(battingAverageOf(stats))} · G포인트 +
+          {gamePointReward.toLocaleString('ko-KR')}
+        </Notice>
+        {/* 달성 기록 목록 (0x4ea0c 결과 화면) — 이름 StrGAME[id+8] */}
+        {summary.recordIds.length > 0 && <Notice>달성 기록 · {summary.recordIds.map((id) => RECORD_NAMES[id]).join(' · ')}</Notice>}
+      </Panel>
+
+      {newTitles.length > 0 && (
+        <Panel heading="칭호 획득!">
+          {newTitles.map((title) => (
+            <TitleTag key={title}>
+              {title}
+            </TitleTag>
+          ))}
         </Panel>
-
-
-        <Panel heading="오늘의 성적">
-          <StatGrid
-            entries={[
-              { label: '타수', value: stats.atBats },
-              { label: '안타', value: stats.hits },
-              { label: '홈런', value: stats.homeRuns },
-              { label: '타점', value: stats.runsBattedIn },
-              { label: '볼넷', value: stats.walks },
-              { label: '삼진', value: stats.strikeouts },
-            ]}
-          />
-        </Panel>
-
-        <Panel heading="보상">
-          <Notice>
-            경기 타율 {formatBattingAverage(battingAverageOf(stats))} · G포인트 +
-            {gamePointReward.toLocaleString('ko-KR')}
-          </Notice>
-          {/* 달성 기록 목록 (0x4ea0c 결과 화면) — 이름 StrGAME[id+8] */}
-          {summary.recordIds.length > 0 && <Notice>달성 기록 · {summary.recordIds.map((id) => RECORD_NAMES[id]).join(' · ')}</Notice>}
-        </Panel>
-
-        {newTitles.length > 0 && (
-          <Panel heading="칭호 획득!">
-            {newTitles.map((title) => (
-              <TitleTag key={title}>
-                {title}
-              </TitleTag>
-            ))}
-          </Panel>
-        )}
-      </PixelScreen>
-    )
-  }
+      )}
+    </PixelScreen>
+  )
 
   const resultSprite = resultSpriteOf(summary.result)
   // 0x4a350 — 사람 팀이 앞섰나. 비기면 거짓(진 판 · 비)
   const isWin = summary.result === '승'
 
   return (
-    <RawScreen>
-      {/*
-        0. 정산 그리기 0x4a384 머리 — 구름 0x78448 · 배경 0x40ff0(장면, +0x17e2). 이긴 판만 갱신 0x4b100 이 +0x17e2 를 틱마다 3 씩
-           150 까지 올려 구장이 가라앉는다. 정산 효과 0x4ea0c(밤 승리 불꽃 · 패배 비)와 그림마다 효과 · 파티클 틱은 경기 난수로 돈다
-      */}
-      {settlement !== undefined && (
-        <div className={styles.backdrop}>
-          <BattingStage
-            // 결과 배경은 선수·공을 안 그려 능력치를 읽지 않는다 — 꼴을 채우는 기본값
-            batterAbility={STARTING_ABILITY}
-            pitcherAbility={DEFAULT_PITCHER_ABILITY}
-            swingMode="일반"
-            gameMode={BATTER_CAREER_MODE}
-            isEagleEyeEnabled={false}
-            hud={null}
-            acePitcher={null}
-            isPaused
-            isResultBackdrop
-            resultBackdropOffsetOf={(tick) => settlementBackdropOffsetAt(tick, isWin)}
-            random={backdropRandom}
-            settlement={{
-              isWin,
-              // 0xb69b0(st, 0/1) — 차이의 절댓값만 쓴다(비 방울 수). 판과 같이 왼쪽 측 0 = 상대
-              side0Score: summary.opponentScore,
-              side1Score: summary.ourScore,
-              inning: settlement.inning,
-              random: settlement.random,
-              layers: settlementLayers,
-            }}
-            onPitchResolved={() => {}}
+    <>
+      {detail}
+      <div style={isDetailOpen ? HIDDEN_BOARD : SHOWN_BOARD}>
+        <RawScreen>
+          {/*
+            0. 정산 그리기 0x4a384 머리 — 구름 0x78448 · 배경 0x40ff0(장면, +0x17e2). 이긴 판만 갱신 0x4b100 이 +0x17e2 를 틱마다 3 씩
+               150 까지 올려 구장이 가라앉는다. 정산 효과 0x4ea0c(밤 승리 불꽃 · 패배 비)와 그림마다 효과 · 파티클 틱은 경기 난수로 돈다
+          */}
+          {settlement !== undefined && (
+            <div className={styles.backdrop}>
+              <BattingStage
+                // 결과 배경은 선수·공을 안 그려 능력치를 읽지 않는다 — 꼴을 채우는 기본값
+                batterAbility={STARTING_ABILITY}
+                pitcherAbility={DEFAULT_PITCHER_ABILITY}
+                swingMode="일반"
+                gameMode={BATTER_CAREER_MODE}
+                isEagleEyeEnabled={false}
+                hud={null}
+                acePitcher={null}
+                isPaused
+                isResultBackdrop
+                resultBackdropOffsetOf={(tick) => settlementBackdropOffsetAt(tick, isWin)}
+                random={backdropRandom}
+                settlement={{
+                  isWin,
+                  // 0xb69b0(st, 0/1) — 차이의 절댓값만 쓴다(비 방울 수). 판과 같이 왼쪽 측 0 = 상대
+                  side0Score: summary.opponentScore,
+                  side1Score: summary.ourScore,
+                  inning: settlement.inning,
+                  random: settlement.random,
+                  layers: settlementLayers,
+                }}
+                onPitchResolved={() => {}}
+              />
+            </div>
+          )}
+
+          {/* 1. 패배(무승부 포함)면 화면 전체를 검정 단계 8 로 어둡게 (0x4a42a — 이기면 그대로) */}
+          {summary.result !== '승' && (
+            <div className={styles.loseDim} style={{ opacity: LOSE_DIM_OPACITY }} />
+          )}
+
+          {/* 1-1. 효과 틱 0x4a452(0x901a0) — 정산 비를 덮개 위 · 띠 아래에 */}
+          {settlement !== undefined && <SettlementEffectCanvas canvasRef={settlementLayers.rain} />}
+
+          {/* 2. 띠 fillRect(0, 40, 240, 30, 0x80304EA2) (0x4a466) */}
+          <div
+            className={styles.band}
+            style={{ left: BAND.x, top: BAND.y, width: BAND.width, height: BAND.height, background: BAND.color }}
           />
-        </div>
-      )}
 
-      {/* 1. 패배(무승부 포함)면 화면 전체를 검정 단계 8 로 어둡게 (0x4a42a — 이기면 그대로) */}
-      {summary.result !== '승' && (
-        <div className={styles.loseDim} style={{ opacity: LOSE_DIM_OPACITY }} />
-      )}
+          {/* 3. game_ui 프레임 8 (171×25) 을 (34, 35) (0x4a48e) */}
+          <img
+            className={styles.sprite}
+            style={{ left: TITLE_BAR.x, top: TITLE_BAR.y }}
+            src={frameSrc(GAME_UI_FRAMES, TITLE_BAR.frame)}
+            alt=""
+          />
 
-      {/* 1-1. 효과 틱 0x4a452(0x901a0) — 정산 비를 덮개 위 · 띠 아래에 */}
-      {settlement !== undefined && <SettlementEffectCanvas canvasRef={settlementLayers.rain} />}
+          {/* 4. result 프레임 0 "YOU WIN" / 1 "YOU LOSE" 를 기준점 (120, 50) (0x4a4d2·0x4a55c) */}
+          <img
+            className={styles.sprite}
+            style={{ left: resultSprite.x, top: resultSprite.y }}
+            src={frameSrc(RESULT_FRAMES, resultSprite.frame)}
+            alt={summary.result === '승' ? 'YOU WIN' : 'YOU LOSE'}
+          />
 
-      {/* 2. 띠 fillRect(0, 40, 240, 30, 0x80304EA2) (0x4a466) */}
-      <div
-        className={styles.band}
-        style={{ left: BAND.x, top: BAND.y, width: BAND.width, height: BAND.height, background: BAND.color }}
-      />
+          {/* 5·6. 두 팀 점수와 승리투수·패전투수·세이브 세 줄 — 상태 0x18 결과 판(0x4fe9c)과 같은 부품이다.
+              왼쪽이 측 0(초 = 상대), 오른쪽이 측 1(말 = 우리) */}
+          <EndBoardRows side0Score={summary.opponentScore} side1Score={summary.ourScore} names={rowNames} />
 
-      {/* 3. game_ui 프레임 8 (171×25) 을 (34, 35) (0x4a48e) */}
-      <img
-        className={styles.sprite}
-        style={{ left: TITLE_BAR.x, top: TITLE_BAR.y }}
-        src={frameSrc(GAME_UI_FRAMES, TITLE_BAR.frame)}
-        alt=""
-      />
-
-      {/* 4. result 프레임 0 "YOU WIN" / 1 "YOU LOSE" 를 기준점 (120, 50) (0x4a4d2·0x4a55c) */}
-      <img
-        className={styles.sprite}
-        style={{ left: resultSprite.x, top: resultSprite.y }}
-        src={frameSrc(RESULT_FRAMES, resultSprite.frame)}
-        alt={summary.result === '승' ? 'YOU WIN' : 'YOU LOSE'}
-      />
-
-      {/* 5·6. 두 팀 점수와 승리투수·패전투수·세이브 세 줄 — 상태 0x18 결과 판(0x4fe9c)과 같은 부품이다.
-          왼쪽이 측 0(초 = 상대), 오른쪽이 측 1(말 = 우리) */}
-      <EndBoardRows side0Score={summary.opponentScore} side1Score={summary.ourScore} names={rowNames} />
-
-      {/* 7. 보상·기록 글 (F-7 5 유력 — 판 좌표를 못 정해 줄만 둔다) */}
-      <div className={styles.rewardText} style={{ left: REWARD_TEXT.x, top: REWARD_TEXT.y, width: REWARD_TEXT.width }}>
-        {summary.result === '승' && (
-          <div>
-            승리 추가 보상 <span className={styles.rewardPoint}>{gamePointReward.toLocaleString('ko-KR')} G포인트</span>
+          {/* 7. 보상·기록 글 (F-7 5 유력 — 판 좌표를 못 정해 줄만 둔다) */}
+          <div className={styles.rewardText} style={{ left: REWARD_TEXT.x, top: REWARD_TEXT.y, width: REWARD_TEXT.width }}>
+            {summary.result === '승' && (
+              <div>
+                승리 추가 보상 <span className={styles.rewardPoint}>{gamePointReward.toLocaleString('ko-KR')} G포인트</span>
+              </div>
+            )}
+            <div>
+              {summary.recordIds.length > 0
+                ? summary.recordIds.map((id) => RECORD_NAMES[id]).join(' · ')
+                : NO_RECORD_TEXT}
+            </div>
+            {newTitles.length > 0 && <div>칭호 획득 · {newTitles.join(' · ')}</div>}
           </div>
-        )}
-        <div>
-          {summary.recordIds.length > 0
-            ? summary.recordIds.map((id) => RECORD_NAMES[id]).join(' · ')
-            : NO_RECORD_TEXT}
-        </div>
-        {newTitles.length > 0 && <div>칭호 획득 · {newTitles.join(' · ')}</div>}
+
+          {/* 원본에 없는 웹 전용 단추 — 원본은 소프트키가 한다 */}
+          <Button variant="corner" className={styles.detailButton} onClick={() => setIsDetailOpen(true)}>
+            자세히
+          </Button>
+          <Button variant="corner" className={styles.continueButton} onClick={confirm}>
+            확인
+          </Button>
+
+          {/* 프레임 끝 0x6dd69 — 파티클(밤 승리 불꽃)은 판까지 다 그린 뒤 맨 위 (누르기는 밑으로 흘린다) */}
+          {settlement !== undefined && <SettlementEffectCanvas canvasRef={settlementLayers.particles} />}
+        </RawScreen>
       </div>
-
-      {/* 원본에 없는 웹 전용 단추 — 원본은 소프트키가 한다 */}
-      <Button variant="corner" className={styles.detailButton} onClick={() => setIsDetailOpen(true)}>
-        자세히
-      </Button>
-      <Button variant="corner" className={styles.continueButton} onClick={confirm}>
-        확인
-      </Button>
-
-      {/* 프레임 끝 0x6dd69 — 파티클(밤 승리 불꽃)은 판까지 다 그린 뒤 맨 위 (누르기는 밑으로 흘린다) */}
-      {settlement !== undefined && <SettlementEffectCanvas canvasRef={settlementLayers.particles} />}
-    </RawScreen>
+    </>
   )
 }
