@@ -9,6 +9,8 @@ import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { PitcherRun } from '@/entities/mission/model/pitcherRun'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { missionOpponentOf } from '@/entities/game/model/aceOpponent'
+import { LOADING_TIPS } from '@/shared/config/loadingTips'
+import { rollSceneLoadingTip } from '@/entities/game/model/sceneLoadingTip'
 
 /** 투구 화면이 받은 속성 — 그림은 여기서 볼 것이 아니라 갈아 끼운다 */
 interface 받은속성 {
@@ -36,11 +38,27 @@ vi.mock('@/pages/defense/ui/DefensePlayback', () => ({
   },
 }))
 
+/** 로딩 판이 받은 팁 글 — 그림 대신 그리자마자 끝낸다(상태 7 · 9 · 8 적재를 다 그린 꼴) */
+const 받은팁: string[] = []
+vi.mock('@/widgets/loading-tip/ui/LoadingTip', async () => {
+  const { useEffect } = await import('react')
+  return {
+    LoadingTip: ({ tip, onDone }: { tip: string; onDone: () => void }) => {
+      useEffect(() => {
+        받은팁.push(tip)
+        onDone()
+      }, [])
+      return null
+    },
+  }
+})
+
 const { PitcherAceMatchRoute } = await import('@/app/ui/MissionRoutes')
 
 afterEach(() => {
   cleanup()
   받은것.length = 0
+  받은팁.length = 0
   재생.mockClear()
   vi.useRealTimers()
 })
@@ -155,6 +173,34 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
     expect(finished?.run.status).toBe('실패')
     act(() => finished?.onFinish())
     expect(onFinish).toHaveBeenCalledWith(false)
+  })
+
+  it('들어서면 첫 0x18 판보다 먼저 로딩 판 — 팁은 상태 7 진입 0x53dbc 의 rand(0, 73) 칸 StrTIP[1 + n] (다시하기도 다시 선다)', () => {
+    const mission = aceMatchMissionOf(18, '투수')
+    if (mission === null) throw new Error('투수 미션 18 이 없다')
+    let 세션: ReturnType<typeof useMissionSession> | null = null
+    function Harness() {
+      const runner = useAtBatRunner()
+      const session = useMissionSession({
+        runner, random: createSeededRandom(1), missionRecord: { load: () => ({}), save: vi.fn() }, screen: { kind: '투수편' },
+        setScreen: vi.fn(),
+      })
+      세션 = session
+      return (
+        <PitcherAceMatchRoute
+          mission={mission!} session={session} runner={runner} pitchControl="게이지" gameSettings={설정 as never}
+          onFinish={vi.fn()} onQuit={vi.fn()}
+        />
+      )
+    }
+    const view = render(<Harness />)
+    // 팁 굴림은 장면 시작 굴림의 맨 앞이다 — 같은 씨앗의 첫 rand(0, 73)
+    expect(받은팁).toEqual([LOADING_TIPS[rollSceneLoadingTip(createSeededRandom(1))]])
+    // 로딩 판을 다 그리면 첫 0x18 판
+    expect(세션!.loadingTip).toBeNull()
+    expect(view.getByText(/회(초|말)$/)).toBeTruthy()
+    act(() => 세션!.actions.beginPitcherAceMatch(mission))
+    expect(받은팁).toHaveLength(2)
   })
 
   it('첫 0x18 판은 틱 70 부터 두 팀 판 — PITCHER 는 넘겨받은 나리 투수 이름, DUE UP 첫 줄은 0xaae7c 가 끼운 마타자', () => {

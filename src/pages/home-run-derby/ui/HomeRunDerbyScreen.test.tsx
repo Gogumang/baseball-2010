@@ -4,6 +4,23 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { HomeRunDerbyScreen } from '@/pages/home-run-derby/ui/HomeRunDerbyScreen'
 import { ROOKIE_BATTER_ABILITY } from '@/entities/batting/model/batter'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
+import { LOADING_TIPS } from '@/shared/config/loadingTips'
+import { rollSceneLoadingTip } from '@/entities/game/model/sceneLoadingTip'
+
+/** 로딩 판이 받은 팁 글 — 그림 대신 그리자마자 끝낸다(상태 7 · 9 · 8 적재를 다 그린 꼴) */
+const 받은팁: string[] = []
+vi.mock('@/widgets/loading-tip/ui/LoadingTip', async () => {
+  const { useEffect } = await import('react')
+  return {
+    LoadingTip: ({ tip, onDone }: { tip: string; onDone: () => void }) => {
+      useEffect(() => {
+        받은팁.push(tip)
+        onDone()
+      }, [])
+      return null
+    },
+  }
+})
 
 // jsdom 에는 캔버스가 없다 — 타석 그리기는 컨텍스트가 없으면 스스로 멈춘다
 beforeEach(() => {
@@ -13,6 +30,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
+  받은팁.length = 0
 })
 
 const 띄우기 = () =>
@@ -27,6 +45,11 @@ const 띄우기 = () =>
   )
 
 describe('홈런더비 화면', () => {
+  it('첫 그림은 로딩 판 — 팁은 상태 7 진입 0x53dbc 의 rand(0, 73) 칸 StrTIP[1 + n]', () => {
+    띄우기()
+    expect(받은팁).toEqual([LOADING_TIPS[rollSceneLoadingTip(createSeededRandom(1))]])
+  })
+
   it('제목과 남은 공 표시가 뜬다 — 첫 공은 1 / 10구', () => {
     띄우기()
     expect(screen.getByText('홈런더비')).toBeTruthy()
@@ -87,5 +110,7 @@ describe('경기 중 메뉴 (표 0xcfcfc 행 1 — 자동진행 자리에 다시
     fireEvent.click(예!)
     // 처음부터 다시 — 첫 공으로 돌아온다
     expect(screen.getByText('1 / 10구')).toBeTruthy()
+    // 새 경기 장면 — 로딩 판도 다시 선다(상태 7 진입 0x39f88)
+    expect(받은팁).toHaveLength(2)
   })
 })

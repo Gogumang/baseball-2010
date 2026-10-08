@@ -71,6 +71,7 @@ import {
 import { hallOfFameModeBatterOf } from '@/app/model/modeBatter'
 import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
 import { rollSceneLoadingTip } from '@/entities/game/model/sceneLoadingTip'
+import { LOADING_TIPS } from '@/shared/config/loadingTips'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { SKY_ROW_COUNT } from '@/widgets/batting-stage/lib/stageScenery'
 import { openScenePatternDeck } from '@/entities/batting/model/battedBallOutcome'
@@ -553,6 +554,13 @@ export function useMissionSession({
   >(null)
   const halfInningBoardSerialRef = useRef(0)
   /**
+   * **경기 장면 로딩 판** — 상태 7 진입 0x39f88 이 로딩 판(0x667f8 — loadingbar.pzx · StrTIP)을 세우고 0x53dbc 가 팁 칸
+   * +0x315 = rand(0, 73)을 굴린다. 상태 7 · 9 · 8 의 적재가 한 단계씩 0x54128(진행 칸 +0x10 += 1, 끝 +0x14 = 0x24)과 그리기
+   * 0x53e04(StrTIP[1 + +0x315] · 진행 막대 · 막대 끝의 달리는 선수)를 부른다. 서 있으면 라우트가 로딩 판(`LoadingTip`)을 그리고,
+   * 다 그리면 `actions.finishLoading` 으로 내린다 — 그 뒤 첫 0x18 판(인트로 0xc 없음, 48bf0). 굴림은 세울 때 이미 썼다.
+   */
+  const [loadingTip, setLoadingTip] = useState<string | null>(null)
+  /**
    * **상태 0xf 진입 `0x3d954` 신호** — 미션도 공마다 0xf 로 들어서며 CPU 교체를 묻는다(`missionCpuTeam` 머리글).
    * `'new'` 는 새 타석(0xd → 0xe 확인 뒤), `'same'` 은 같은 타석 다음 공(판정 A 의 "그 밖" · 파울로 닫힌 판 · 주자 판 끝 ae592).
    * 진행이 다 먹인 뒤의 판을 봐야 해서 아래 효과가 그린 뒤에 돈다.
@@ -642,9 +650,11 @@ export function useMissionSession({
   )
 
   // 미션 제한 시간. 타자편·투수편 모두 진행 중일 때만 1초씩 흘린다.
-  const isBatterRunning = (screen.kind === '미션진행' || screen.kind === '마선수대결') && missionRun?.status === '진행중'
+  // 로딩 판(상태 7 · 9 · 8 의 적재) 동안은 경기 상태 틱이 안 돌아 흐르지 않는다 — 첫 0x18 판부터 흐른다(0xaada4)
+  const isLoading = loadingTip !== null
+  const isBatterRunning = !isLoading && (screen.kind === '미션진행' || screen.kind === '마선수대결') && missionRun?.status === '진행중'
   const isPitcherRunning =
-    (screen.kind === '투수미션' || pitcherAceMatchMission !== null) && pitcherRun?.status === '진행중'
+    !isLoading && (screen.kind === '투수미션' || pitcherAceMatchMission !== null) && pitcherRun?.status === '진행중'
   useEffect(() => {
     if (!isBatterRunning && !isPitcherRunning) return
     const handle = window.setInterval(() => {
@@ -1473,7 +1483,7 @@ export function useMissionSession({
     // 미션(모드 5·6)도 보통 경기 장면이라 모드 점프 뒤 이 꼬리를 탄다 — 1회초 판·첫 타석 준비보다 앞.
     // 그 앞 상태 7 장면 초기화 0x3e340 의 3ed76 → 0xb08e8 이 이 장면의 패턴 덱을 섞는다(사람 · CPU 타자가 같이 쓴다).
     // 맨 앞은 상태 7 **진입** 0x39f88 → 0x53dbc 의 로딩 팁 rand(0, 73) — 갱신 0x3e340 보다 한 걸음 먼저다 (`rollSceneLoadingTip`)
-    rollSceneLoadingTip(random)
+    setLoadingTip(LOADING_TIPS[rollSceneLoadingTip(random)] ?? null)
     openScenePatternDeck(random)
     rollSimulatorInit(random)
     // 상태 9 끝 3fa5e 가 예약한 상태 8 경기 적재(48774 → 0x352e8 → 0x783b0) — 하늘 줄 rand(0, 6)
@@ -1501,6 +1511,11 @@ export function useMissionSession({
   }
 
   const actions = {
+    /**
+     * 로딩 판을 다 그렸다 — 상태 8 끝(48bf0)이 첫 0x18 로 보낸다. 미션은 인트로 0xc 를 안 지나 예약음 61 도 없다. 굴림 없음.
+     */
+    finishLoading: () => setLoadingTip(null),
+
     /** 수비 화면이 끝났다 — 진루·아웃·실점을 이제 먹인다 */
     finishDefensePlay,
 
@@ -1582,7 +1597,7 @@ export function useMissionSession({
       dropAutoRelay()
       // 마선수 대결도 미션 장면(모드 6)으로 나간다 — 상태 7 진입 0x39f88 의 로딩 팁 rand(0, 73) · 장면 덱(0x3e340 → 0xb08e8) ·
       // 0x3fa0e 의 rand(0, 2) 한 번 (`resetForNewMatch` 와 같다)
-      rollSceneLoadingTip(random)
+      setLoadingTip(LOADING_TIPS[rollSceneLoadingTip(random)] ?? null)
       openScenePatternDeck(random)
       rollSimulatorInit(random)
       // 그 뒤 상태 8 경기 적재의 하늘 줄 rand(0, 6) (`rollSkyRow` 머리말)
@@ -1795,6 +1810,7 @@ export function useMissionSession({
       setPickoffReplay(null)
       setPendingBenchClearing(null)
       setMissionRun(null)
+      setLoadingTip(null)
       runner.setIsPaused(true)
       setScreen({ kind: '메인메뉴' })
     },
@@ -1808,6 +1824,7 @@ export function useMissionSession({
       setPickoffReplay(null)
       setPendingBenchClearing(null)
       setPitcherRun(null)
+      setLoadingTip(null)
       runner.setIsPaused(true)
       setScreen({ kind: '메인메뉴' })
     },
@@ -1881,6 +1898,8 @@ export function useMissionSession({
     batterSpecialSwingStored, pitcherMagicRemaining, stealableBases, resultEarnedGamePointOf,
     /** 상태 0xe 의 OK 대기 — 화면이 `useSceneConfirm` 에 넘긴다 */
     sceneConfirm,
+    /** 경기 장면 로딩 판의 팁 글(StrTIP[1 + rand(0, 73)]) — 서 있으면 라우트가 로딩 판을 그리고 끝나면 `actions.finishLoading` */
+    loadingTip,
     /** 미션 시작의 첫 0x18 판 — 서 있으면 라우트가 공수 교대 판을 그리고 OK 를 `actions.confirmHalfInningBoard` 로 */
     halfInningBoard,
     /** 0xe 의 OK 하나 — 화면이 `useSceneConfirm` 셋째 인자로 넘긴다 (새 타석이면 0xf 진입이 CPU 교체를 묻는다) */

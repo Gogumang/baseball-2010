@@ -20,6 +20,8 @@ import { DerbyResultWindow } from '@/pages/home-run-derby/ui/DerbyResultWindow'
 import { MatchupCards } from '@/widgets/matchup-cards/ui/MatchupCards'
 import type { MatchupBatterCard } from '@/widgets/matchup-cards/ui/MatchupCards'
 import * as styles from '@/pages/home-run-derby/ui/HomeRunDerbyScreen.css'
+import { LoadingTip } from '@/widgets/loading-tip/ui/LoadingTip'
+import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 
 interface HomeRunDerbyScreenProps {
   /**
@@ -134,6 +136,17 @@ export function HomeRunDerbyScreen({
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [acceptsConfirm, confirm])
+
+  // 경기 장면 로딩 판 — 상태 7 진입 0x39f88(로딩 판 0x667f8 · 진행 칸 0x54120 끝 0x24 · 팁 rand(0, 73) 0x53dbc) 뒤 7 · 9 · 8 의 적재가
+  // 한 단계마다 0x54128 · 0x53e04(바탕 · loadingbar 판 · StrTIP 팁 · 진행 막대 · 막대 끝 달리는 선수)를 그린다. 모드를 안 가려 더비도
+  // 첫 장면 · 다시하기 · 재도전마다 선다. ⚠️ 근사(시간): 원본 길이는 단말의 적재 시간 — 웹은 나리 타자편과 같은 `LoadingTip`
+  if (session.loadingTip !== null) {
+    return (
+      <RawScreen>
+        <LoadingTip tip={session.loadingTip} onDone={session.finishLoading} />
+      </RawScreen>
+    )
+  }
 
   // 경기 중 메뉴의 "설정"(0x3c326). "조작방법"(0x3c212)은 아래에서 경기 장면 위에 얹는다
   if (overlay === '설정' && settings !== undefined && onSettingsChange !== undefined) {

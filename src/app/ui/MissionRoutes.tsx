@@ -39,6 +39,8 @@ import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
 import { HALF_INNING_JINGLE_TICK } from '@/features/play-game/model/halfInningBoard'
 import { HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
 import { activeSound } from '@/shared/api/audio/soundPort'
+import { LoadingTip } from '@/widgets/loading-tip/ui/LoadingTip'
+import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 
 /*
  * **마선수 대결의 경기 중 "나가기"** — 확정 (0x40140 · 0xa5368 · SYS 8 0x8d764~0x8d846 · 105 진입 0x11b46~0x11bbe · 0x10df8 직접 뜸):
@@ -339,6 +341,17 @@ function missionOverlayOf(
   missionPitcherName?: string | null,
 ): ReactNode | null {
   const { pendingDefensePlay, actions } = session
+  // 경기 장면 로딩 판 — 상태 7 진입 0x39f88(0x667f8 로딩 판 · 0x54120 진행 칸 끝 0x24 · 0x53dbc 팁 rand(0, 73)) 뒤 상태 7 · 9 · 8 의
+  // 적재가 한 단계마다 0x54128(진행 +1) · 0x53e04(바탕 · loadingbar 판 · StrTIP[1 + +0x315] · 진행 막대 · 막대 끝 달리는 선수)를
+  // 부른다. 모드를 안 가려 미션 · 마선수 대결(타자 · 투수)도 같다. 다 그리면 상태 8 끝 48bf0 → 첫 0x18 판(인트로 0xc 없음).
+  // ⚠️ 근사(시간): 원본 길이는 단말의 적재 시간이다(틀 수가 아니라 동기 적재 사이마다 다시 그린다) — 웹은 나리 타자편과 같은 `LoadingTip`
+  if (session.loadingTip !== null) {
+    return (
+      <RawScreen>
+        <LoadingTip tip={session.loadingTip} onDone={actions.finishLoading} />
+      </RawScreen>
+    )
+  }
   if (pendingDefensePlay !== null) {
     const isPitcher = pendingDefensePlay.side === '투수'
     const run = isPitcher ? session.pitcherRun : session.missionRun

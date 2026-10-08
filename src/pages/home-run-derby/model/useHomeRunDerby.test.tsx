@@ -9,6 +9,7 @@ import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { rollSceneLoadingTip } from '@/entities/game/model/sceneLoadingTip'
+import { LOADING_TIPS } from '@/shared/config/loadingTips'
 import { createPatternDeck, rollSceneEffectInit } from '@/entities/batting/model/battedBallOutcome'
 
 /** 홈런 결과 코드 하나 — `outcomeOfPattern` 의 마지막 갈래 */
@@ -405,12 +406,48 @@ describe('더비 판의 HOMERUN 글자 · 비거리 판 · 홈런 뒤 키 건너
   })
 })
 
+describe('홈런더비 경기 장면 로딩 판 (상태 7 진입 0x39f88 → 7 · 9 · 8 적재)', () => {
+  it('장면을 세우면 로딩 판이 서고, 다 그린 뒤에야 0xd 두 그림 → 0xe 로 온다', () => {
+    const random = createSeededRandom(5)
+    const rendered = renderHook(() => useHomeRunDerby({ bestDistance: 0, random }))
+    expect(rendered.result.current.loadingTip).toBe(LOADING_TIPS[rollSceneLoadingTip(createSeededRandom(5))])
+    expect(rendered.result.current.isPaused).toBe(true)
+    // 로딩 판이 서 있는 동안은 0xd 시계가 안 돈다
+    act(() => {
+      vi.advanceTimersByTime((SCENE_D_FRAMES + CONFIRM_LOCK_FRAMES) * 62 * 4)
+    })
+    expect(rendered.result.current.isAwaitingConfirm).toBe(false)
+    act(() => rendered.result.current.finishLoading())
+    expect(rendered.result.current.loadingTip).toBeNull()
+    act(() => {
+      vi.advanceTimersByTime(SCENE_D_FRAMES * millisecondsPerFrame() + 1)
+    })
+    expect(rendered.result.current.isAwaitingConfirm).toBe(true)
+  })
+
+  it('다시하기도 새 장면이라 로딩 판이 다시 선다 — 다음 rand(0, 73) 칸', () => {
+    const random = createSeededRandom(5)
+    const rendered = renderHook(() => useHomeRunDerby({ bestDistance: 0, random }))
+    act(() => rendered.result.current.finishLoading())
+    act(() => rendered.result.current.restart())
+    const expected = createSeededRandom(5)
+    rollDerbySceneStart(expected)
+    expect(rendered.result.current.loadingTip).toBe(LOADING_TIPS[rollSceneLoadingTip(expected)])
+    expect(rendered.result.current.isAwaitingConfirm).toBe(false)
+  })
+
+  it('난수가 없으면(예전 시험) 로딩 판 없이 곧장 0xd', () => {
+    const rendered = renderHook(() => useHomeRunDerby({ bestDistance: 0 }))
+    expect(rendered.result.current.loadingTip).toBeNull()
+  })
+})
+
 describe('홈런더비 장면 시작 굴림 차례 (`rollDerbySceneStart`)', () => {
   it('상태 7 진입 팁 rand(0, 73) → 덱 1275 → 효과 1202 → 상태 9 rand(0, 9) → rand(0, 2) → 상태 8 하늘 줄 rand(0, 6)', () => {
     const random = createSeededRandom(21)
     const expected = createSeededRandom(21)
-    const skyRow = rollDerbySceneStart(random)
-    rollSceneLoadingTip(expected)
+    const { loadingTipIndex, skyRow } = rollDerbySceneStart(random)
+    expect(loadingTipIndex).toBe(rollSceneLoadingTip(expected))
     createPatternDeck(expected)
     rollSceneEffectInit(expected)
     randomIntegerBelow(expected, 0, 9)

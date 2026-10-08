@@ -27,6 +27,7 @@ import { activeSound, playSoundIds } from '@/shared/api/audio/soundPort'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
 import { rollSceneLoadingTip } from '@/entities/game/model/sceneLoadingTip'
+import { LOADING_TIPS } from '@/shared/config/loadingTips'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { SKY_ROW_COUNT } from '@/widgets/batting-stage/lib/stageScenery'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
@@ -141,16 +142,17 @@ export interface HomeRunDerbyOptions {
  * 그 밖 갈래다(`stadiumSkyRowOf`). 돌려주는 값이 이 장면의 하늘 줄(구장 +0x10 = 값 mod 6)이다.
  * 차례: 갱신 표 0x52e2a 7 → 0x3e340 · 0x52e3a 9 → 0x3f584 · 0x52e32 8 → 0x48658, 예약 3efe6(상태 7 끝) → 9 · 3fa5e(상태 9 끝) → 8.
  * ⚠️ 뽑은 상대 팀(수비 팀)은 웹 더비가 그리지 않아 버린다 — 굴림 차례만 맞춘다.
+ * 돌려주는 `loadingTipIndex` 는 로딩 판이 그릴 팁 칸(`LOADING_TIPS` — StrTIP[1 + +0x315]), `skyRow` 는 하늘 줄이다.
  */
-export function rollDerbySceneStart(random: RandomPort): number {
+export function rollDerbySceneStart(random: RandomPort): { readonly loadingTipIndex: number; readonly skyRow: number } {
   // 상태 7 진입 0x39f88 → 0x53dbc — 로딩 팁 rand(0, 73). 모드를 안 가려 더비도 장면마다 맨 앞에 한 번 (`rollSceneLoadingTip`)
-  rollSceneLoadingTip(random)
+  const loadingTipIndex = rollSceneLoadingTip(random)
   // 상태 7 장면 초기화 0x3e340 의 3ed76 → 0xb08e8 — 이 장면의 패턴 덱을 섞는다(상태 9 의 3a454 보다 앞)
   openScenePatternDeck(random)
   random.nextInRange(0, 9)
   rollSimulatorInit(random)
   // 상태 9 끝 3fa5e 가 예약한 상태 8 경기 적재 — 하늘 줄 rand(0, 6)
-  return randomIntegerBelow(random, 0, SKY_ROW_COUNT)
+  return { loadingTipIndex, skyRow: randomIntegerBelow(random, 0, SKY_ROW_COUNT) }
 }
 
 export interface HomeRunDerbySession {
@@ -197,6 +199,13 @@ export interface HomeRunDerbySession {
    * HOMERUN 글자를 끈다. ⚠️ 같은 처리의 소리 멈춤 0x6e418 은 소리 포트에 멈춤이 없어 안 옮겼다(shared — 구역 밖).
    */
   readonly skipHomeRun: () => void
+  /**
+   * **경기 장면 로딩 판의 팁 글** (StrTIP[1 + rand(0, 73)]) — 상태 7 진입 0x39f88 이 세운 로딩 판이 7 · 9 · 8 적재 내내 선다.
+   * 서 있으면 화면이 로딩 판(`LoadingTip`)을 그리고 다 그리면 `finishLoading`. 난수가 없으면(예전 시험) 늘 null
+   */
+  readonly loadingTip: string | null
+  /** 로딩 판을 다 그렸다 — 적재 8 끝이 모드 7 이면 0xd(0x3fa4c~0x3fa50) → 두 그림 뒤 0xe. 굴림 없음 */
+  readonly finishLoading: () => void
 
   readonly onPitchResolved: (detail: PitchOutcomeDetail) => void
   /** 경기 중 메뉴 [다시하기] 예 — 새 경기 장면 (0x3c98e 모드 7 갈래, `restart` 머리말) */
@@ -258,13 +267,24 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
   const isSceneStartRolledRef = useRef(false)
   /** 하늘 줄 — 구장 +0x10 (`rollDerbySceneStart` · 결과 진입 0x4f574). 굴리기 전(난수 없음)엔 undefined — 타석 그림이 굴린다 */
   const [skyRow, setSkyRow] = useState<number | undefined>(undefined)
+  /** 로딩 판의 팁 글 — 서 있는 동안 0xd 시계를 안 건다 (`finishLoading` 이 건다) */
+  const [loadingTip, setLoadingTip] = useState<string | null>(null)
+  const isLoadingRef = useRef(false)
+  /** 새 경기 장면의 시작 굴림 — 하늘 줄과 로딩 판 팁을 세운다. 난수가 없으면 아무것도 안 한다 */
+  const startScene = () => {
+    if (randomRef.current === undefined) return
+    const started = rollDerbySceneStart(randomRef.current)
+    setSkyRow(started.skyRow)
+    isLoadingRef.current = true
+    setLoadingTip(LOADING_TIPS[started.loadingTipIndex] ?? null)
+  }
   useEffect(() => {
     if (isSceneStartRolledRef.current) return
     isSceneStartRolledRef.current = true
     // 0x39fdc 모드 7 갈래 3a49c — 0xb6814(전역 상태): +0x6b = 0 (`liveGameState`). 더비는 한 공 끝 판정 A 가 0x18 로
     // 안 가(모드 7 → 0xd / 0x1a) 이닝 넘김 0xb6b6c 를 안 지나므로 그대로 0 이 남는다
     resetLiveGameState()
-    if (randomRef.current !== undefined) setSkyRow(rollDerbySceneStart(randomRef.current))
+    startScene()
   }, [])
 
   const timerRef = useRef<number | null>(null)
@@ -322,17 +342,26 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
       enterConfirmWait()
     }, SCENE_D_FRAMES * millisecondsPerFrame())
   }
-  /** 상태 0xd 로 들어선다 — 아직 OK 를 받지 않는다 */
+  /** 상태 0xd 로 들어선다 — 아직 OK 를 받지 않는다. 로딩 판이 서 있으면 시계는 `finishLoading` 이 건다 */
   const enterScenePrepare = () => {
     isAwaitingConfirmRef.current = false
     clearConfirmLockTimer()
     setIsAwaitingConfirm(false)
     setIsPreparing(true)
-    armScenePrepare()
+    if (isLoadingRef.current) clearPrepareTimer()
+    else armScenePrepare()
   }
 
-  // 첫 공 앞의 0xd — 시계만 건다 (StrictMode 의 효과 두 번 돌기에도 같은 결과다)
+  // 첫 공 앞의 0xd — 시계만 건다 (StrictMode 의 효과 두 번 돌기에도 같은 결과다). 로딩 판이 서 있으면 다 그린 뒤
   useEffect(() => {
+    if (!isLoadingRef.current) armScenePrepare()
+  }, [])
+
+  /** 로딩 판(상태 7 · 9 · 8)을 다 그렸다 — 적재 8 끝이 모드 7 이면 0xd 로 → 두 그림 뒤 0xe */
+  const finishLoading = useCallback(() => {
+    if (!isLoadingRef.current) return
+    isLoadingRef.current = false
+    setLoadingTip(null)
     armScenePrepare()
   }, [])
 
@@ -576,11 +605,11 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
     setHomeRunText(null)
     setDistanceBoard(null)
     setShownCombo(null)
-    // 경기 시작과 같이 적재 8 → 0xd → 0xe 로 와서 OK 를 기다린다
-    enterScenePrepare()
-    // 새 경기 장면의 상태 9 — 같은 시작 굴림 둘 (0x39fdc 모드 7 의 +0x6b = 0 도 다시)
+    // 새 경기 장면의 상태 7 · 9 · 8 — 같은 시작 굴림 (0x39fdc 모드 7 의 +0x6b = 0 도 다시) · 로딩 판
     resetLiveGameState()
-    if (randomRef.current !== undefined) setSkyRow(rollDerbySceneStart(randomRef.current))
+    startScene()
+    // 경기 시작과 같이 적재 8 → 0xd → 0xe 로 와서 OK 를 기다린다 (로딩 판이 서 있으면 다 그린 뒤 0xd 시계)
+    enterScenePrepare()
     const fresh = createDerbyRun()
     runRef.current = fresh
     setRun(fresh)
@@ -605,7 +634,7 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
     skyRow,
     pitcher: derbyPitcherOf(run.stage, aceLevels),
     banner,
-    isPaused: isPaused || isPreparing || isAwaitingConfirm,
+    isPaused: isPaused || isPreparing || isAwaitingConfirm || loadingTip !== null,
     isAwaitingConfirm,
     confirm,
     isEventZoneShown,
@@ -615,6 +644,8 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
     distanceBoard,
     effectsClearedAt,
     skipHomeRun,
+    loadingTip,
+    finishLoading,
     onPitchResolved,
     restart,
     retryFromResult,

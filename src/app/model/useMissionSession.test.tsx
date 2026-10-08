@@ -37,6 +37,7 @@ import { EMPTY_COLLECTION, registerHallOfFame, registerHallOfFamePitcher } from 
 import { createCareer } from '@/entities/career/model/playerCareer'
 import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
 import { rollSceneLoadingTip } from '@/entities/game/model/sceneLoadingTip'
+import { LOADING_TIPS } from '@/shared/config/loadingTips'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import { BATTED_BALL_PATTERNS } from '@/shared/config/original/battedBallPatterns'
 import { isFairAngle } from '@/entities/batting/model/battedBallOutcome'
@@ -1608,6 +1609,36 @@ describe('미션 시작의 첫 0x18 판 — 첫 반 이닝이 사람 몫이라 �
     expect(random.next()).toBe(expected.next())
     expect(rendered.result.current.halfInningBoard?.serial).toBe(2)
     expect(rendered.result.current.sceneConfirm).toBeNull()
+  })
+
+  it('장면을 세우면 첫 판보다 먼저 로딩 판 — 팁은 맨 앞 rand(0, 73) 칸, 서 있는 동안 제한 시간이 안 흐른다', () => {
+    vi.useFakeTimers()
+    try {
+      // 미션 14 — 제한 시간이 있다
+      const mission = MISSIONS.find((row) => row.side === '타자' && row.id === 14)!
+      expect(mission.timeLimitSeconds).toBeGreaterThan(0)
+      const { rendered } = sessionOf(7, { kind: '미션진행', mission })
+      act(() => rendered.result.current.actions.begin(mission))
+      expect(rendered.result.current.loadingTip).toBe(LOADING_TIPS[rollSceneLoadingTip(createSeededRandom(7))])
+      const seconds = rendered.result.current.missionRun!.remainingSeconds
+      act(() => {
+        vi.advanceTimersByTime(3_000)
+      })
+      expect(rendered.result.current.missionRun!.remainingSeconds).toBe(seconds)
+      act(() => rendered.result.current.actions.finishLoading())
+      expect(rendered.result.current.loadingTip).toBeNull()
+      act(() => {
+        vi.advanceTimersByTime(1_000)
+      })
+      expect(rendered.result.current.missionRun!.remainingSeconds).toBe(seconds! - 1)
+      // 마선수 대결도 미션 장면 — 로딩 판이 다시 선다
+      act(() => rendered.result.current.actions.beginAceMatch(
+        aceMatchMissionOf(16, '타자')!, { resultEvents: [1, 2], context: '대결결과', carried: EMPTY_STORY_CARRY },
+      ))
+      expect(rendered.result.current.loadingTip).not.toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('마선수 대결(타자편 · 투수편)도 미션 장면이라 같은 판 — 판이 OK 를 기다린다', () => {
