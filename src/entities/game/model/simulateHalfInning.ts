@@ -8,7 +8,7 @@ import {
 } from '@/entities/game/model/baseState'
 import type { BaseState } from '@/entities/game/model/baseState'
 import { playQuickAtBat } from '@/entities/game/model/quickAtBat'
-import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
+import type { QuickAtBatBatter, QuickAtBatPitcher, QuickAtBatSituation } from '@/entities/game/model/quickAtBat'
 import { runnerCountOf } from '@/entities/game/model/baseState'
 import { quickEngineSteal, quickStealBaseOf } from '@/entities/game/model/steal'
 import {
@@ -379,6 +379,9 @@ export interface HalfInningHooks {
   readonly stopsBefore?: (state: { readonly battingOrderIndex: number; readonly lineup?: QuickLineup }) => boolean
 }
 
+/** 반 이닝 내내 같은 0xab214 의 모드·팀 조작 칸 (`QuickAtBatSituation` 에서 이닝을 뺀 것) */
+export type HalfInningSwingContext = Omit<QuickAtBatSituation, 'inning'>
+
 export function simulateHalfInning(
   battingOrderIndex: number,
   batterAt: (battingOrderIndex: number) => QuickAtBatBatter,
@@ -389,8 +392,9 @@ export function simulateHalfInning(
   hooks: HalfInningHooks = {},
   defense?: HalfInningDefense,
   offense?: HalfInningOffense,
+  swing?: HalfInningSwingContext,
 ): HalfInningResult {
-  const ticks = simulateHalfInningTicks(battingOrderIndex, batterAt, pitcher, inning, random, before, hooks, defense, offense)
+  const ticks = simulateHalfInningTicks(battingOrderIndex, batterAt, pitcher, inning, random, before, hooks, defense, offense, swing)
   for (;;) {
     const next = ticks.next()
     if (next.done === true) return next.value
@@ -440,6 +444,8 @@ export function* simulateHalfInningTicks(
   hooks: HalfInningHooks = {},
   defense?: HalfInningDefense,
   offense?: HalfInningOffense,
+  /** 간이 타석이 0xab214 에 넘기는 모드·팀 조작 (`QuickAtBatSituation`). 안 넘기면 '일반' · 양 팀 CPU */
+  swing?: HalfInningSwingContext,
 ): Generator<HalfInningTick, HalfInningResult, void> {
   let bases = EMPTY_BASES
   let outs = 0
@@ -575,7 +581,7 @@ export function* simulateHalfInningTicks(
     /** 볼넷(판정 3)이 판정 자리에서 민 주자의 득점 — 볼넷이 아니면 null */
     let walkRuns: number | null = null
     const rosterSlot = lineup !== undefined ? rosterSlotAt(lineup, order) : undefined
-    const play = playQuickAtBat(batterOn(order), facing, { inning }, random, {
+    const play = playQuickAtBat(batterOn(order), facing, { ...swing, inning }, random, {
       ...(defense === undefined || mound === undefined
         ? {}
         : {

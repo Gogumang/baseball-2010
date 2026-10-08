@@ -219,3 +219,28 @@ describe('quickSwingBoostOf — 간이 타석의 마선수 보정 구조체 (0xc
     expect(quickSwingBoostOf(타자, { ...투수, ace: { order: 4, level: 3 } }).pitcherControl).toBe(200)
   })
 })
+
+describe('간이 타석도 0xab214 의 팀 조작 보정을 받는다 (0xab5c0~0xab5fc)', () => {
+  const 안타수 = (situation: Parameters<typeof simulateQuickAtBat>[2]) => {
+    let seed = 777
+    const random: RandomPort = createFractionRandom(() => {
+      seed = (seed * 1103515245 + 12345) % 2147483648
+      return seed / 2147483648
+    })
+    let hits = 0
+    for (let index = 0; index < 600; index += 1) {
+      const outcome = simulateQuickAtBat(타자, 투수, situation, random)
+      if (outcome.kind === '안타' || outcome.kind === '홈런') hits += 1
+    }
+    return hits
+  }
+
+  it('수비 팀이 사람이면(모드 3·4 밖) hit·power 쪽 −10 이 들어가 판정이 바뀐다 — 모드 6 의 공격 사람 +100 은 안타를 늘린다', () => {
+    const 기본 = 안타수({ inning: 1 })
+    // −10 은 작아 안타 수가 어느 쪽으로든 흔들린다 — 판정에 들어갔다는 것만 본다
+    expect(안타수({ inning: 1, isDefenseHuman: true })).not.toBe(기본)
+    expect(안타수({ inning: 1, mode: '미션', isOffenseHuman: true })).toBeGreaterThan(기본)
+    // 나만의리그(모드 3·4)는 −10 을 안 받는다
+    expect(안타수({ inning: 1, mode: '나만의리그', isDefenseHuman: true })).toBe(기본)
+  })
+})

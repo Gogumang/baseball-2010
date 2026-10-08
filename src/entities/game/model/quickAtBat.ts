@@ -3,6 +3,7 @@ import { swingResultOf } from '@/entities/batting/model/swingResult'
 import { BALANCE } from '@/shared/config/original/balance'
 import { D_LEVEL } from '@/shared/config/original/dLevel'
 import type { SwingBoost } from '@/entities/batting/model/swingBoost'
+import type { SwingMode } from '@/entities/batting/model/swingResult'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
 /**
@@ -121,6 +122,19 @@ export interface QuickAtBatPitcher {
 export interface QuickAtBatSituation {
   /** 1부터. 11회부터 연장 보정이 붙는다 (원본 이닝은 0-기준이라 `이닝 > 9`) */
   readonly inning: number
+  /**
+   * 0xab214 가 읽는 전역 모드(0x1552d10) 묶음 — 팀 조작 보정(0xab5c0~0xab5fc)과 내 선수 보너스 갈래가 본다.
+   * 간이 타석도 같은 0xab214 라 모드를 그대로 받는다(0xc11f0 은 모드를 넘기지 않고 0xab214 가 전역을 읽는다).
+   * 안 넘기면 '일반'.
+   */
+  readonly mode?: SwingMode
+  /** 공격 팀을 사람이 조작하는가 (state[0x31 + state[9]] == 0) — 모드 6 의 +100. 안 넘기면 거짓 */
+  readonly isOffenseHuman?: boolean
+  /**
+   * 수비 팀을 사람이 조작하는가 (state[0x31 + state[0xa]] == 0) — 모드 3·4 밖이면 hit·power 쪽 −10.
+   * 자동진행으로 넘긴 상대 타석이어도 사람 팀이 수비면 참이다. 안 넘기면 거짓(CPU 끼리 경기)
+   */
+  readonly isDefenseHuman?: boolean
 }
 
 const trunc = Math.trunc
@@ -294,7 +308,9 @@ function verdictOf(
       batter,
       pitcher: tired,
       boost: quickSwingBoostOf(batter, pitcher),
-      mode: '일반',
+      mode: situation.mode ?? '일반',
+      ...(situation.isOffenseHuman === true ? { isOffenseHuman: true } : {}),
+      ...(situation.isDefenseHuman === true ? { isDefenseHuman: true } : {}),
       isPitcherExhausted: pitcher.stamina === 0,
       batterSkillIds: batter.skillIds,
       pitcherSkillIds: pitcher.skillIds,
