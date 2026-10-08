@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
@@ -9,10 +9,14 @@ import type { NationalCup, NationalCupMatchup as Matchup } from '@/entities/nati
 import {
   confirmNationalCupStandings,
   finishNationalCup,
+  hiddenTeamOpenText,
   nationalCupEditionOf,
   nationalCupResultText,
   nationalCupRewardText,
+  newlyOpenedHiddenTeamsOf,
+  queuedPopupsOf,
 } from '@/entities/national-cup/model/nationalCupFlow'
+import { conditionTextOf } from '@/entities/career/model/titles'
 import type { NationalCupFinish, NationalCupMode } from '@/entities/national-cup/model/nationalCupFlow'
 import { NationalCupBracket } from '@/pages/national-cup/ui/NationalCupBracket'
 import { NationalCupStandings } from '@/pages/national-cup/ui/NationalCupStandings'
@@ -52,6 +56,52 @@ export interface NationalCupScreenProps {
    * 모드 4(타자편)면 제목 8 "나만의리그타자편", 모드 3(투수편)이면 제목 9 "나만의리그투수편". 시즌모드는 안 본다
    */
   readonly edition?: '타자편' | '투수편'
+  /**
+   * 나리 134 진입 `0x19f30` 의 히든 팀 열기 — 지금 열려 있는 히든 id(전역 해금표 `+0x7a+k`, 웹 `openedHiddenIds`).
+   * 주면 대진(134)으로 들어설 때마다 대한민국 · (우승이면) 결승 상대 중 **처음 열리는 팀**마다 StrCOMMON[138]
+   * "히든 팀 오픈!!" 팝업(0x22)을 띄우고 `onOpenHiddenTeams` 로 연다. 안 주면(시즌모드) 열지 않는다.
+   * 142 취소로 135 부터 들어오면(`initialStep` 순위) 134 진입이 아니라 열지 않는다.
+   */
+  readonly openedHiddenIds?: readonly number[]
+  /** 134 진입이 처음 연 히든 팀 — 원본은 그 자리에서 전역 `+0x7a+k = 1` · 전역 저장 `0x1f1b9` */
+  readonly onOpenHiddenTeams?: (teams: readonly number[]) => void
+  /**
+   * 나리 134 첫 틀 `0x1b92c` 머리(1b92e~1b958)의 칭호 8 "국가 대표" — 비트 8 이 없을 때의 칭호 이름(`nationalCupStandingsTitleOf`).
+   * 주면 들어설 때 칭호 팝업(0x1274c, 종류 0x78)을 띄우고, 확인(0x1b1e4)에서 `onConfirmEntryTitle` 이 주고 곧바로 장착한다.
+   */
+  readonly entryTitle?: string | null
+  readonly onConfirmEntryTitle?: () => void
+}
+
+/** 134 에 들어설 때 걸리는 팝업 — 히든 팀 오픈(0x22) · 칭호(0x78) */
+type EntryPopup =
+  | { readonly kind: '히든팀'; readonly text: string }
+  | { readonly kind: '칭호'; readonly text: string }
+
+interface EntryState {
+  /** 이번 진입이 처음 연 히든 팀 (팝업이 대기 칸에서 밀려도 열기는 다 일어난다) */
+  readonly openedTeams: readonly number[]
+  readonly popups: readonly EntryPopup[]
+}
+
+/**
+ * 134 진입 한 번의 팝업 — 진입 `0x19f30` 이 먼저 `0x65de4` 로 히든 팀 팝업을 걸고(대한민국 → 결승 상대), 같은 진입의 첫 틀
+ * `0x1b92c`(장면+0x2c == 1)가 칭호 8 팝업을 건다. 팝업 관리자는 띄운 것 하나 + 대기 한 칸이라 `queuedPopupsOf` 로 거른다.
+ */
+function entryStateOf(
+  cup: NationalCup,
+  isEntering: boolean,
+  openedHiddenIds: readonly number[] | undefined,
+  entryTitle: string | null | undefined,
+): EntryState {
+  if (!isEntering) return { openedTeams: [], popups: [] }
+  const openedTeams = openedHiddenIds === undefined ? [] : newlyOpenedHiddenTeamsOf(cup, openedHiddenIds)
+  const hiddenPopups: EntryPopup[] = openedTeams.map((team) => ({ kind: '히든팀', text: hiddenTeamOpenText(TEAMS[team]?.name ?? '') }))
+  const titlePopups: EntryPopup[] = entryTitle === null || entryTitle === undefined
+    ? []
+    // 칭호 팝업 그림 0x1afe8 — 이름 StrNICKNAME[i] 와 조건 문구 [i+64] (관리 화면 칭호 팝업과 같은 근사 — 알림 상자)
+    : [{ kind: '칭호', text: `!C${entryTitle}!N${conditionTextOf(entryTitle) ?? ''}` }]
+  return { openedTeams, popups: queuedPopupsOf([...hiddenPopups, ...titlePopups]) }
 }
 
 type Step = '대진' | '순위' | '결과' | '보상'
@@ -75,6 +125,10 @@ type Step = '대진' | '순위' | '결과' | '보상'
  * 대회가 끝나 결과 팝업이 뜨는 동안에도 뒤 그림은 134 · 0xf3 의 대진판이다(단계 0 → 프레임 68 우승국,
  * 결승 동전 던지기면 단계 1 그대로 프레임 67).
  *
+ * **134 진입 팝업** (나리만): 진입 0x19f30 이 처음 열리는 히든 팀마다 StrCOMMON[138] 팝업(0x22)을, 같은 진입의 첫 틀
+ * 0x1b92c 머리가 칭호 8 "국가 대표" 팝업(0x78)을 건다 — 히든 팀이 먼저, 닫으면 칭호(`queuedPopupsOf`). 135 로 바로 오는
+ * 142 취소 길은 134 진입이 아니라 없다.
+ *
  * ⚠️ 이벤트 461~464(선발·거절)와 경기 자체는 이 화면 밖이다 — 앱이 잇는다.
  *
  * **머리띠·바닥** (직접 떴다): 두 그림 모두 끝에서 0x7f4ec(판)로 판에 맡긴 제목·바닥을 0x54d95 에 넘긴다 —
@@ -86,8 +140,26 @@ type Step = '대진' | '순위' | '결과' | '보상'
  */
 export function NationalCupScreen({
   mode, cup, yearIndex, gamePoint = 0, random, onStartGame, onFinish, initialStep = '대진', underlay, edition: nariEdition = '타자편',
+  openedHiddenIds, onOpenHiddenTeams, entryTitle, onConfirmEntryTitle,
 }: NationalCupScreenProps) {
   const [step, setStep] = useState<Step>(initialStep)
+  /** 들어선 그 순간의 팝업 — 진입은 한 번이라 처음 그린 때의 값으로 굳힌다 */
+  const [entry] = useState<EntryState>(() => entryStateOf(cup, initialStep === '대진', openedHiddenIds, entryTitle))
+  const [entryPopupIndex, setEntryPopupIndex] = useState(0)
+  const entryPopup = entry.popups[entryPopupIndex] ?? null
+
+  // 0x65de4 — 처음 열린 팀은 팝업을 띄우는 그 자리에서 전역 해금표에 쓰고 저장한다
+  useEffect(() => {
+    if (entry.openedTeams.length > 0) onOpenHiddenTeams?.(entry.openedTeams)
+    // 진입 한 번에 한 번만 — 이 화면이 새로 설 때가 134 진입이다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entry])
+
+  const closeEntryPopup = () => {
+    // 칭호 팝업 확인 0x1b1e4 — 비트 · 곧바로 장착(+0x1c4) · 저장
+    if (entryPopup?.kind === '칭호') onConfirmEntryTitle?.()
+    setEntryPopupIndex((index) => index + 1)
+  }
   /** 동전 던지기(`0xb858c`)가 우승국을 바꿀 수 있어 확인 뒤 대회를 따로 들고 있는다 */
   const [resolved, setResolved] = useState<NationalCup>(cup)
 
@@ -117,7 +189,8 @@ export function NationalCupScreen({
         // 135 키 0x10680 · 0xf4 키 0x4a18: 확인 → 142 경기 준비 / 0xdd 경기정보
         <NationalCupStandings cup={cup} onConfirm={() => onStartGame(matchup, cup)} />
       ) : (
-        <NationalCupBracket cup={current} onConfirm={confirmBracket} isConfirmable={step === '대진'} />
+        // 팝업이 떠 있는 동안은 팝업 관리자가 키를 먹는다 — 대진판 확인은 팝업이 다 닫힌 뒤
+        <NationalCupBracket cup={current} onConfirm={confirmBracket} isConfirmable={step === '대진' && entryPopup === null} />
       )}
 
       {/* 시즌 0xf3 은 제목 10 · 바닥 1, 0xf4 는 10 · 5. 나리 134·135 는 제목 장면+0xcc == 4 ? 8(타자편) : 9(투수편) · 5 — 되돌아가기는 표시만 */}
@@ -126,6 +199,10 @@ export function NationalCupScreen({
             // 0xf4 키 0x4a18 만 −16 → 0xf3. 나리 0x10680 은 확인만 본다
             onBack={step === '순위' ? () => setStep('대진') : null} />
         : <ScreenFrame title={nariEdition === '투수편' ? '나만의리그투수편' : '나만의리그타자편'} gamePoint={gamePoint} onBack={null} footer={5} />}
+
+      {entryPopup !== null && (
+        <MessageBox text={entryPopup.text} buttons={['확인']} onAnswer={closeEntryPopup} />
+      )}
 
       {step === '결과' && (
         <MessageBox

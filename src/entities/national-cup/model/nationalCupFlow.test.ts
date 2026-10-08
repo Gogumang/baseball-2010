@@ -7,7 +7,10 @@ import {
   isCareerNationalCupYear,
   confirmNationalCupStandings,
   finishNationalCup,
+  hiddenTeamOpenText,
   hiddenTeamsToOpen,
+  newlyOpenedHiddenTeamsOf,
+  queuedPopupsOf,
   isCareerNationalCupCallUp,
   isSeasonNationalCupYear,
   nationalCupEditionOf,
@@ -182,6 +185,23 @@ describe('히든 팀 열기 (J-1)', () => {
 
   it('대한민국이 결승에서 지면 상대는 열리지 않는다', () => {
     expect(hiddenTeamsToOpen(대회({ finalists: [10, 11], champion: 11 }))).toEqual([10])
+  })
+
+  it('처음 열리는 팀만 고른다 — 0x65de4 는 전역 +0x7a+k 가 이미 1 이면 아무것도 안 한다', () => {
+    const 우승 = 대회({ finalists: [10, 13], champion: 10 })
+    expect(newlyOpenedHiddenTeamsOf(우승, [])).toEqual([10, 13])
+    expect(newlyOpenedHiddenTeamsOf(우승, [10])).toEqual([13])
+    expect(newlyOpenedHiddenTeamsOf(우승, [10, 13])).toEqual([])
+  })
+
+  it('알림 글은 StrCOMMON[138] 원문 + 팀 이름', () => {
+    expect(hiddenTeamOpenText('미국')).toBe('!C히든 팀 오픈!!!N[!cFFFF00미국!cFFFFFF]')
+  })
+
+  it('팝업 관리자는 띄운 것 하나 + 대기 한 칸 — 나중에 건 것이 대기 칸을 덮는다 (0x74ef4 · 0x741a0 · 0x75440)', () => {
+    expect(queuedPopupsOf(['히든', '칭호'])).toEqual(['히든', '칭호'])
+    expect(queuedPopupsOf(['대한민국', '일본', '칭호'])).toEqual(['대한민국', '칭호'])
+    expect(queuedPopupsOf([])).toEqual([])
   })
 })
 

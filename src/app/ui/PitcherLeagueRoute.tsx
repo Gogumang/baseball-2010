@@ -30,7 +30,7 @@ import { pitcherYearGoalWindowValuesOf } from '@/entities/pitcher-career/model/p
 import { PostseasonScreen } from '@/pages/season-end/ui/PostseasonScreen'
 import { MessageBox, ScreenOverlay } from '@/shared/ui'
 import { TEAMS } from '@/shared/config/original/teams'
-import { conditionTextOf } from '@/entities/career/model/titles'
+import { conditionTextOf, nationalCupStandingsTitleOf } from '@/entities/career/model/titles'
 import {
   isContinuablePitcherEnding,
   judgePitcherSeasonAwards,
@@ -316,6 +316,12 @@ export function PitcherLeagueRoute({
         onFinish={actions.finishCup}
         // 142 취소로 돌아오면 135(순위표)부터
         initialStep={session.cup.atStandings ? '순위' : '대진'}
+        // 134 진입 0x19f30 — 처음 열리는 히든 팀마다 StrCOMMON[138] 팝업 0x22 · 전역 해금. 전역 해금표(기록연감)까지 본다
+        openedHiddenIds={[...career.openedHiddenIds, ...openedHiddenIds]}
+        onOpenHiddenTeams={actions.openCupHiddenTeams}
+        // 134 첫 틀 0x1b92c 머리 — 비트 8 이 없으면 칭호 8 "국가 대표" 팝업 0x78, 확인 0x1b1e4 가 주고 장착
+        entryTitle={nationalCupStandingsTitleOf(career.titleIds)}
+        onConfirmEntryTitle={actions.confirmCupTitle}
       />
     )
   }

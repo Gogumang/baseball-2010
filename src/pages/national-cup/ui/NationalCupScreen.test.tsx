@@ -195,6 +195,76 @@ describe('나리 머리띠 제목 (0x169ea~0x16a00: 장면+0xcc == 4 ? 8 : 9)', 
   })
 })
 
+describe('나리 134 진입 — 히든 팀 오픈(0x19f30 → 0x65de4) · 칭호 8(0x1b92c 첫 틀)', () => {
+  const 나리 = (
+    cup: NationalCup,
+    props: {
+      openedHiddenIds?: readonly number[]
+      entryTitle?: string | null
+      initialStep?: '대진' | '순위'
+      onOpenHiddenTeams?: (teams: readonly number[]) => void
+      onConfirmEntryTitle?: () => void
+    },
+  ) =>
+    render(
+      <NationalCupScreen mode="나만의리그" cup={cup} yearIndex={2} random={고정난수(0)} onStartGame={vi.fn()} onFinish={vi.fn()}
+        openedHiddenIds={props.openedHiddenIds ?? []} onOpenHiddenTeams={props.onOpenHiddenTeams ?? vi.fn()}
+        entryTitle={props.entryTitle ?? null} onConfirmEntryTitle={props.onConfirmEntryTitle ?? vi.fn()}
+        initialStep={props.initialStep} />,
+    )
+  const 대진판확인 = () => screen.queryByRole('button', { name: '확인' })
+
+  it('첫 진입: 히든 팀 오픈 [대한민국] 이 먼저, 닫으면 칭호 "국가 대표" — 팝업이 다 닫혀야 대진판 확인이 먹는다', () => {
+    const onOpenHiddenTeams = vi.fn()
+    const onConfirmEntryTitle = vi.fn()
+    나리(createNationalCup(), { entryTitle: '국가 대표', onOpenHiddenTeams, onConfirmEntryTitle })
+
+    // 진입 그 자리에서 전역 해금 (0x65de4 65e0c~65e14)
+    expect(onOpenHiddenTeams).toHaveBeenCalledWith([10])
+    expect(글()).toContain('히든 팀 오픈!!')
+    expect(글()).toContain('[대한민국]')
+    expect(screen.getAllByRole('button', { name: '확인' })).toHaveLength(1)
+    확인()
+
+    expect(글()).toContain('국가 대표')
+    expect(onConfirmEntryTitle).not.toHaveBeenCalled()
+    확인()
+    expect(onConfirmEntryTitle).toHaveBeenCalledTimes(1)
+
+    // 팝업이 다 닫혔다 — 이제 대진판 확인
+    확인()
+    expect(screen.getByRole('group', { name: '국가대항전 순위' })).toBeTruthy()
+  })
+
+  it('이미 열린 대한민국은 다시 안 연다 — 칭호도 가졌으면 팝업 없이 대진판', () => {
+    const onOpenHiddenTeams = vi.fn()
+    나리(createNationalCup(), { openedHiddenIds: [10], onOpenHiddenTeams })
+    expect(onOpenHiddenTeams).not.toHaveBeenCalled()
+    expect(글()).not.toContain('히든 팀 오픈')
+    expect(대진판확인()).toBeTruthy()
+  })
+
+  it('결승 승리 뒤 돌아온 134 는 결승 상대를 연다 — 결과 팝업(134 키)보다 먼저', () => {
+    const onOpenHiddenTeams = vi.fn()
+    const 우승: NationalCup = { ...createNationalCup(), stage: 0, finalists: [12, 10], champion: 10 }
+    나리(우승, { openedHiddenIds: [10], onOpenHiddenTeams })
+
+    expect(onOpenHiddenTeams).toHaveBeenCalledWith([12])
+    expect(글()).toContain('[쿠바]')
+    확인()
+    // 그다음 대진판 확인 → 결과 팝업
+    확인()
+    expect(글()).toContain('제2회 국가대항전 우승!!')
+  })
+
+  it('142 취소로 135 부터 들어오면 134 진입이 아니라 팝업도 열기도 없다', () => {
+    const onOpenHiddenTeams = vi.fn()
+    나리(createNationalCup(), { entryTitle: '국가 대표', initialStep: '순위', onOpenHiddenTeams })
+    expect(onOpenHiddenTeams).not.toHaveBeenCalled()
+    expect(글()).not.toContain('국가 대표')
+  })
+})
+
 describe('나리 142 취소로 돌아왔을 때 (0x13c72 의 S+0x12c 갈래 → 135)', () => {
   it('initialStep 순위면 135 순위표부터 그리고, 확인하면 다시 142 로 넘긴다', () => {
     const onStartGame = vi.fn()

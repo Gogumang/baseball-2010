@@ -15,7 +15,7 @@ import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
 
 /**
  * 국가대항전 흐름 — 순위 화면 키 처리(`0x19fdc` 나리 / `0xe6f8` 시즌), 결과 문구(`0x85e6c`),
- * 보상(`0x1b92c` 나리 / `0x896c` 시즌), 히든 팀 열기(`0x19f30`/`0xe684`).
+ * 보상(`0x1b92c` 나리 / `0x896c` 시즌), 히든 팀 열기(134 진입 `0x19f30` / 243 진입 `0xe684`).
  *
  * 근거: `docs/re/_raw/notes/P5-national-match.md` 1a·1b·3·4·5 절 (확정).
  */
@@ -211,16 +211,17 @@ export function nationalCupRewardFor(mode: NationalCupMode, cup: NationalCup): S
 }
 
 /**
- * 대회가 끝나고 여는 히든 팀 (`0x19f30` 나리 / `0xe684` 시즌, J-1 확정).
+ * 순위(대진) 화면 134 에 **들어올 때마다** 여는 히든 팀 (`0x19f30` 나리 / `0xe684` 시즌, J-1 확정).
  *
  * ```
- * 0x65de5(g, 0)                                   ; 대한민국은 상태에 들어가기만 하면 열린다
- * if S+0x144 == 10:                                ; 대한민국이 우승했으면
- *     r1 = S+0x12e ; if r1 == 10: r1 = S+0x12f     ; 결승 상대
- *     0x65de5(g, r1 − 10)
+ * 19f46 0x65de5(g, 0)                             ; 대한민국은 상태에 들어가기만 하면 열린다
+ * 19f4e if S+0x144 == 10:                          ; 대한민국이 우승했으면 (결승 승 기록 0xb76dc 가 L+0xc4 를 쓴 뒤 다시 들어온 134)
+ *           r1 = S+0x12e ; if r1 == 10: r1 = S+0x12f   ; 결승 상대
+ * 19f78     0x65de5(g, r1 − 10)
  * ```
  * 즉 일본·쿠바·미국은 **대한민국이 결승에서 이긴 상대만** 열린다. 대한민국이 결승에 못 가면
- * `L+0xc4 != 10` 이라 아무도 안 열린다. (상태에 라운드마다 다시 들어오지만 이미 열려 있으면 아무 일 없다.)
+ * `L+0xc4 != 10` 이라 아무도 안 열린다. 결승 뒤 101 → 134 로 돌아온 그 진입에서 열리므로 결과 팝업(134 키)보다 앞이다.
+ * 차례는 대한민국 → 결승 상대.
  */
 export function hiddenTeamsToOpen(cup: NationalCup): readonly number[] {
   const opened = [KOREA_TEAM_ID]
@@ -230,13 +231,57 @@ export function hiddenTeamsToOpen(cup: NationalCup): readonly number[] {
   return opened
 }
 
+/**
+ * 134 진입에서 **처음 열리는** 히든 팀 — 여는 함수 `0x65de4(g, k)` 는 전역 `+0x7a+k` 가 이미 1 이면 0 을 돌려주고
+ * 아무것도 안 한다(65df8~65e00). 0 이었을 때만 1 로 쓰고 · 전역 저장 `0x1f1b9` · 팝업을 띄운다.
+ * 웹의 전역 해금표는 `openedHiddenIds`(팀은 10~14 번 그대로)다.
+ */
+export function newlyOpenedHiddenTeamsOf(cup: NationalCup, openedHiddenIds: readonly number[]): readonly number[] {
+  return hiddenTeamsToOpen(cup).filter((team) => !openedHiddenIds.includes(team))
+}
+
+/**
+ * StrCOMMON[138] 원문 — `base/extracted/StrCOMMON.json` 138 번 그대로다.
+ * (`shared/config/original` 에 StrCOMMON 묶음이 따로 없어 이 한 줄만 옮겨 둔다.)
+ */
+export const HIDDEN_TEAM_OPEN_TEXT = '!C히든 팀 오픈!!!N[!cFFFF00%s!cFFFFFF]'
+
+/**
+ * 히든 팀 오픈 알림 — `0x65de4` 65e18~65e52: `sprintf(buf, StrCOMMON[138], StrCOMMON[10 + k])` 를
+ * `0xbbef9(buf, 1, 0x22, 1)` (팝업 종류 0x22) 로 띄운다. StrCOMMON[10..14] 는 팀 이름(대한민국·일본·쿠바·미국·외인구단)이라
+ * 팀 표 이름과 같다.
+ */
+export function hiddenTeamOpenText(teamName: string): string {
+  return HIDDEN_TEAM_OPEN_TEXT.replace('%s', teamName)
+}
+
+/**
+ * 한 틀에 팝업이 여럿 걸릴 때 실제로 뜨는 차례 — 팝업 관리자 `[0x140005c]` 는 **띄운 것 하나 + 대기 한 칸**뿐이다.
+ *
+ * - 글 팝업 `0x74ef4`(0xbbef9 가 부름)·칭호 팝업 `0x741a0`(0x1274c 가 부름) 모두 이미 떠 있으면(`+9 != 0`) 대기 깃발
+ *   `+0x2a4 = 1` 을 세우고 대기 칸에 적는다 — 글은 `+0x2a8` 버퍼 · 종류 `+0x3a8`, 칭호는 `+0x3b0..+0x3bc`(종류 · 그리기 · 키 · this).
+ *   대기 칸은 하나라 나중에 적은 것이 앞의 것을 덮는다.
+ * - 닫힐 때 `0x75440` 이 대기 깃발을 보고, 그리기·키 콜백(`+0x3b4`/`+0x3b8`)이 있으면 `0x741a0`, 없으면 `0x74ef4` 로
+ *   다시 띄운 뒤 `+0x2a8` 부터 0x120 바이트를 지운다.
+ *
+ * 134 첫 진입은 진입 `0x19f30` 의 히든 팀 팝업(0x22) → 같은 진입의 첫 틀 `0x1b92c` 머리의 칭호 8 팝업(0x78) 차례로 걸리므로
+ * **히든 팀 오픈이 먼저 뜨고, 닫으면 칭호 "국가 대표"** 가 뜬다. 여기서는 칭호가 늘 마지막이라 "첫 것 + 마지막 것" 이다.
+ */
+export function queuedPopupsOf<T>(requested: readonly T[]): readonly T[] {
+  if (requested.length <= 2) return requested
+  return [requested[0], requested[requested.length - 1]]
+}
+
 export interface NationalCupFinish {
   readonly champion: number
   readonly isKoreaChampion: boolean
   /** 대한민국이 결승 두 팀에 들었는가 (시즌모드 준우승 보상 조건) */
   readonly koreaInFinal: boolean
   readonly reward: SeasonReward
-  /** 이번 대회로 열리는 히든 팀 번호 */
+  /**
+   * 이번 대회로 열리는 히든 팀 번호 (`hiddenTeamsToOpen`).
+   * 나만의리그는 이것을 쓰지 않는다 — 134 진입마다 화면이 이미 열었다(`NationalCupScreen` 의 `openedHiddenIds`).
+   */
   readonly openedTeams: readonly number[]
 }
 

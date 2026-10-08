@@ -33,7 +33,7 @@ import { nariBatterOf } from '@/app/model/useCollection'
 import type { HallOfFameNariPlayer } from '@/pages/special/ui/SpecialScreen'
 import { endingBonusOf, isContinuableEnding } from '@/entities/career/model/seasonFlow'
 import { TEAMS } from '@/shared/config/original/teams'
-import { conditionTextOf } from '@/entities/career/model/titles'
+import { conditionTextOf, nationalCupStandingsTitleOf } from '@/entities/career/model/titles'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { nariLastGameRecordLineOf } from '@/entities/career/model/playerCareer'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -379,6 +379,12 @@ export function CareerRoutes({
           onFinish={actions.finishCup}
           // 142 취소로 돌아오면 135(순위표)부터
           initialStep={screen.atStandings === true ? '순위' : '대진'}
+          // 134 진입 0x19f30 — 처음 열리는 히든 팀(대한민국 · 우승이면 결승 상대)마다 StrCOMMON[138] 팝업 0x22 · 전역 해금
+          openedHiddenIds={career.openedHiddenIds}
+          onOpenHiddenTeams={actions.syncOpenedHidden}
+          // 134 첫 틀 0x1b92c 머리 — 비트 8 이 없으면 칭호 8 "국가 대표" 팝업 0x78, 확인 0x1b1e4 가 주고 장착
+          entryTitle={nationalCupStandingsTitleOf(career.titleIds)}
+          onConfirmEntryTitle={actions.confirmCupTitle}
         />
       )
 

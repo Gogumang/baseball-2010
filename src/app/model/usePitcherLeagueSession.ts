@@ -377,6 +377,10 @@ export interface PitcherLeagueSession {
     readonly startCupGame: (matchup: NationalCupMatchup, cup: NationalCup) => void
     /** 국가대항전 끝 — 결과·보상 팝업을 닫았다 (0x1b92c → 새 시즌 0x1b768) */
     readonly finishCup: (finish: NationalCupFinish) => void
+    /** 국가대항전 134 진입 0x19f30 이 처음 연 히든 팀 — 전역 해금 */
+    readonly openCupHiddenTeams: (teams: readonly number[]) => void
+    /** 국가대항전 134 첫 틀 0x1b92c 의 칭호 8 팝업 확인 0x1b1e4 */
+    readonly confirmCupTitle: () => void
     readonly reset: () => void
   }
 }
@@ -473,12 +477,6 @@ function leagueGameOptionsOf(career: PitcherCareer, settings: Parameters<typeof 
  * S+0x12c = 1. 보상 명령 뒤(0x8cca2)와 재생 끝(`continueYearEnd`) 둘 다 이 꼴이다 — 굴림 없이 서므로 두 번 세워도 같은 값이다.
  * 칭호 8 은 134 첫 틀(0x1b92c 머리) 몫이라 여기 없다.
  */
-/** 134 첫 틀(0x1b92c 머리)의 칭호 8 — 비트 8 이 이미 섰으면 그대로 */
-function withNationalCupTitle(career: PitcherCareer): PitcherCareer {
-  const title = nationalCupStandingsTitleOf(career.titleIds)
-  return title === null ? career : awardPitcherTitles(career, [title])
-}
-
 function withPitcherNationalCupEntered(career: PitcherCareer): PitcherCareer {
   const cup = createNationalCup()
   return {
@@ -593,8 +591,7 @@ function pitcherResumeOf(saved: PitcherCareer | null): PitcherResume {
       ? enterPitcherYearEndEvent(saved, point.eventId)
       // 1c25e — S+0x50 == 0x11(464 거절 보상 뒤 끊김) → 새 시즌 처리 0x1b768 → 137 → 105
       : saved !== null && point.kind === '새시즌' ? startNextPitcherSeason(saved)
-      // 134 의 틀 0x1b92c 머리 — 들어온 첫 틀에 비트 8 이 없으면 칭호 8 "국가 대표" (463 보상 뒤 끊겼으면 아직 없다)
-      : saved !== null && point.kind === '국가대항전' ? withNationalCupTitle(saved)
+      // 국가대항전(134)은 저장 그대로 — 첫 틀 0x1b92c 의 칭호 8 팝업 · 진입 0x19f30 의 히든 팀 열기는 화면 몫이다
       // S+0x50 == 2 → 116 진입 0x1278c 다시 — 경기 뒤 카운터를 한 번 더 쓴다(겹쳐 쌓임). 정산(0x4ea0c)은 다시 안 돈다
       : saved !== null && point.kind === '경기결과' ? enterPitcherGameEvaluation(resumedPitcherLastGameOf(saved)) : saved,
     point,
@@ -1443,11 +1440,9 @@ export function usePitcherLeagueSession(
       if (viewed.includes(NATIONAL_CUP_EVENT.출전)) {
         // 463 출전 — 상태 133 이 0xb7bf1(L) 로 대회를 세우고(+0xbc4 대표팀 마스터 복사 · +0xbe0 첫날 상대) 모드 3 갈래
         // 0xb521d(대표팀, 내 투수, 1) 로 내 칸 k 에 내 투수 복사본을 넣고 134 를 줄에 넣는다. 134 의 틀 0x1b92c 머리가 들어온
-        // 첫 틀에 비트 8 이 없으면 칭호 8 "국가 대표" 를 준다 (장면 0x106 은 모드 3·4 공용)
-        const nationalTitle = nationalCupStandingsTitleOf(current.titleIds)
-        const titled = nationalTitle === null ? current : awardPitcherTitles(current, [nationalTitle])
+        // 첫 틀에 비트 8 이 없으면 칭호 8 "국가 대표" 팝업 — 화면이 띄우고 확인(0x1b1e4)이 준다(`confirmCupTitle`, 장면 0x106 은 모드 3·4 공용)
         // 463 보상 뒤 0x8cca2 — S+0x50 = 3(웹 null) · S+0x12c = 1, 0x8cd44 저장. 대회 칸(0xb7bf1)은 133 이 세운 그대로 파일에 든다
-        const entered = withPitcherNationalCupEntered(titled)
+        const entered = withPitcherNationalCupEntered(current)
         const cup = entered.nationalCup ?? createNationalCup()
         commit(entered)
         setCupView({ cup, atStandings: false })
@@ -2204,7 +2199,7 @@ export function usePitcherLeagueSession(
       /**
        * 대회 끝 — 결과 팝업 0x25 · 보상 팝업 0x26 을 닫았다 (0x1b92c). 우승이면 보상(인기 +20 · 평판 +30 · 2000만 · G +1000 —
        * 0x22c7d(g, 1000, 모드 3))을 얹고, S+0x12c = 0 · 0x1faa1(g, 1, 1) 로 내 투수 포인터를 원래 레코드로 · 새 시즌 0x1b768.
-       * 열린 히든 팀(0x19f30)은 `openedHiddenIds` 에 넣는다 (타자편 `finishCup` 과 같다).
+       * 히든 팀은 여기서 열지 않는다 — 134 진입 0x19f30 이 들어올 때마다 열었다(`openCupHiddenTeams`, 타자편과 같다).
        */
       finishCup: (finish: NationalCupFinish) => {
         if (career === null) return
@@ -2212,9 +2207,26 @@ export function usePitcherLeagueSession(
         if (finish.reward.gamePoint > 0) {
           recordStat({ kind: 'G획득', mode: PITCHER_LEAGUE_MODE, amount: finish.reward.gamePoint })
         }
-        const missing = finish.openedTeams.filter((id) => !rewarded.openedHiddenIds.includes(id))
         setCupView(null)
-        startNewSeason({ ...rewarded, openedHiddenIds: [...rewarded.openedHiddenIds, ...missing] })
+        startNewSeason(rewarded)
+      },
+      /**
+       * 134 진입 0x19f30 → 0x65de4 가 처음 연 히든 팀 — 전역 +0x7a+k = 1 · 전역 저장 0x1f1b9(커리어 저장은 아니다).
+       * 커리어 `openedHiddenIds` 에 넣으면 앱이 전역 기록으로 모은다(`App` 의 투수편 히든 모음).
+       */
+      openCupHiddenTeams: (teams: readonly number[]) => {
+        setCareer((previous) => {
+          if (previous === null) return previous
+          const missing = teams.filter((id) => !previous.openedHiddenIds.includes(id))
+          return missing.length === 0 ? previous : { ...previous, openedHiddenIds: [...previous.openedHiddenIds, ...missing] }
+        })
+      },
+      /** 134 첫 틀 0x1b92c 의 칭호 8 팝업 확인 0x1b1e4 — 비트 · 곧바로 장착 · 저장 (관리 화면 `confirmTitle` 과 같은 콜백) */
+      confirmCupTitle: () => {
+        commitWith((current) => {
+          const title = nationalCupStandingsTitleOf(current.titleIds)
+          return title === null ? current : awardPitcherTitles(current, [title])
+        })
       },
       beginYearEnd,
       continueCareer,

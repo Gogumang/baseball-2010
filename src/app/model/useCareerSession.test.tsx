@@ -132,7 +132,9 @@ describe('연말 국가대표 선발 판정 (상태 133 = 0x1a090)', () => {
     이벤트보기(출전, [461, 463])
 
     expect(출전.result.current.screen).toEqual({ kind: '국가대항전', cup: createNationalCup() })
-    // 순위 화면 134 의 첫 틀(0x1b92c)이 칭호 8 "국가 대표" 를 주고 곧바로 장착한다
+    // 134 첫 틀(0x1b92c)은 칭호 8 "국가 대표" 를 팝업(0x1274c)으로 띄울 뿐 — 주는 것은 확인 0x1b1e4 다
+    expect(출전.result.current.session.career?.titleIds).not.toContain(TITLE_NAMES[8])
+    act(() => 출전.result.current.session.actions.confirmCupTitle())
     expect(출전.result.current.session.career?.titleIds).toContain(TITLE_NAMES[8])
     expect(출전.result.current.session.career?.equippedTitle).toBe(8)
     // 0xb7bf0 + 133 — 대회 레코드 두 칸: 대표팀에 내 선수(내 칸) · 첫날 상대 일본
@@ -352,6 +354,9 @@ describe('보상 명령 뒤 이어하기 자리 (0x8c460 끝 8cc2e — S+0x50 �
 
     const 다시 = 열기(saveGame)
     expect(다시.result.current.screen).toEqual({ kind: '국가대항전', cup: createNationalCup() })
+    // 이어하기로 들어온 134 도 첫 틀이 칭호 8 팝업을 띄운다 — 확인이 준다
+    expect(다시.result.current.session.career?.titleIds).not.toContain(TITLE_NAMES[8])
+    act(() => 다시.result.current.session.actions.confirmCupTitle())
     expect(다시.result.current.session.career?.titleIds).toContain(TITLE_NAMES[8])
     expect(다시.result.current.session.career?.nariCupTeams?.opponentTeamId).toBe(11)
   })
@@ -499,7 +504,7 @@ describe('대회 끝 정산 (0x1b92c)', () => {
     // 5000 은 새 시즌 처리(0x1b768)가 같이 넣는 신인 연봉 50(=5000만)이다
     expect(끝난뒤?.money).toBe(2000 + 5000)
     expect(끝난뒤?.gamePoint).toBe(1000)
-    expect(끝난뒤?.openedHiddenIds).toEqual([10, 11])
+    expect(끝난뒤?.openedHiddenIds).toEqual([])
     expect(끝난뒤?.season).toBe(2)
     expect(rendered.result.current.screen).toEqual({ kind: '관리' })
   })
@@ -524,8 +529,8 @@ describe('대회 끝 정산 (0x1b92c)', () => {
     // 대회 보상은 0 — 남은 5000 은 새 시즌이 넣어 준 연봉뿐이다
     expect(끝난뒤?.money).toBe(5000)
     expect(끝난뒤?.gamePoint).toBe(0)
-    // 대한민국은 출전만 해도 열린다 (0x65de5(g, 0))
-    expect(끝난뒤?.openedHiddenIds).toEqual([10])
+    // 대회 끝은 히든 팀을 열지 않는다 — 대한민국은 134 에 들어서는 순간 열린다 (0x19f30 → 0x65de5(g, 0))
+    expect(끝난뒤?.openedHiddenIds).toEqual([])
     expect(끝난뒤?.season).toBe(2)
   })
 })

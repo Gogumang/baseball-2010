@@ -405,10 +405,12 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     expect((선택.store.load() as 커리어).seenEventIds).toContain('502')
     expect((선택.store.load() as 커리어).seenEventIds).not.toContain('496')
 
-    // 463 출전 — 대회가 저장에 들고 이어하기는 134 대진판, 134 첫 틀이 칭호 8
+    // 463 출전 — 대회가 저장에 들고 이어하기는 134 대진판, 134 첫 틀이 칭호 8 팝업 → 확인 0x1b1e4 가 준다
     const 출전 = 끊고다시(132, 463, [{ kind: 1, value: 10 }], [461, 463])
     expect(출전.저장).toMatchObject({ seasonEndState: null, nationalCup: createNationalCup() })
     expect(출전.다시.current.scene).toBe('국가대항전')
+    expect(출전.다시.current.career?.titleIds).not.toContain(TITLE_NAMES[8])
+    act(() => 출전.다시.current.actions.confirmCupTitle())
     expect(출전.다시.current.career?.titleIds).toContain(TITLE_NAMES[8])
   })
 
@@ -692,7 +694,9 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     expect(출전.current.storyNotice).toBe('')
     // 0xb521d — 대표팀 투수 배열 칸 k(내 칸, 선발 0)에 내 투수 복사본, 옛 0번은 맨 끝
     expect(출전.current.career?.nariCupTeams?.korea.pitchers).toEqual([-1, 1, 2, 3, 4, 5, 6, 7, 0])
-    // 순위 화면 134 에 들어오는 것만으로 받는 칭호 8 "국가 대표" (0x1b92c) — 거절은 못 받는다
+    // 134 첫 틀(0x1b92c)은 칭호 8 "국가 대표" 팝업만 띄운다 — 확인 0x1b1e4 가 주고 곧바로 장착. 거절은 못 받는다
+    expect(출전.current.career?.titleIds).not.toContain(TITLE_NAMES[8])
+    act(() => 출전.current.actions.confirmCupTitle())
     expect(출전.current.career?.titleIds).toContain(TITLE_NAMES[8])
     expect(거절.current.career?.titleIds).not.toContain(TITLE_NAMES[8])
   })
@@ -748,6 +752,9 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     } as never))
     expect(result.current.scene).toBe('관리')
     expect(result.current.career?.season).toBe(2)
+    // 대회 끝은 히든 팀을 열지 않는다 — 134 진입 0x19f30 이 화면에서 연다(`openCupHiddenTeams`)
+    expect(result.current.career?.openedHiddenIds).not.toContain(10)
+    act(() => result.current.actions.openCupHiddenTeams([10]))
     expect(result.current.career?.openedHiddenIds).toContain(10)
   })
 

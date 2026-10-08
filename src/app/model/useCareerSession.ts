@@ -575,6 +575,9 @@ export function useCareerSession({
       resetLiveGameState()
       // 상태 7 진입 0x39f88 → 0x53dbc 의 팁 rand(0, 73) — 경기 시작 굴림의 맨 앞(덱 1275 · 효과 1202 보다 앞, `rollSceneLoadingTip`)
       const tip = LOADING_TIPS[rollSceneLoadingTip(random)] ?? null
+      // 상태 7 갱신 0x3e340 의 맨 앞 0x3e350 이 울리던 소리를 끊는다(0x6e418) — 로딩 판부터 배경음이 없다.
+      // (관리 화면이 경기로 넘길 때 0x15cfa · 0x1e916 도 먼저 끊지만 들리는 것은 같다)
+      audio.stop()
       // 환경설정 "주루" 를 경기에 태운다 — 타자편은 사람이 늘 공격이라 설정이 그대로 먹는다 (0xae690)
       const started = startGame(
         random, ourTeamId, battingOrder, opponentTeamId, playerSide, dayCounter, runningModeManualRef.current, pitchers, aces,
@@ -1160,12 +1163,11 @@ export function useCareerSession({
     // ── 국가대표 이벤트(461~464)는 연말 사슬 밖이다. 상태 133 이 따로 예약한 것이라 먼저 가른다 ──
     if (viewedEventIds.includes(NATIONAL_CUP_EVENT.출전)) {
       // 463 출전 — 상태 133 이 `0xb7bf1(L)` 로 대회를 세우고 순위 화면 134 를 줄에 넣는다.
-      // 134 의 틀 0x1b92c 머리가 들어온 첫 틀(장면+0x2c == 1)에 비트 8 이 없으면 칭호 8 "국가 대표" 를 준다 — 그 뒤다
-      const nationalTitle = nationalCupStandingsTitleOf(viewed.titleIds)
-      const titled = nationalTitle === null ? viewed : awardTitles(viewed, [nationalTitle])
+      // 134 의 틀 0x1b92c 머리가 들어온 첫 틀(장면+0x2c == 1)에 비트 8 이 없으면 칭호 8 "국가 대표" 팝업 — 화면이 띄우고
+      // 확인(0x1b1e4)이 준다(`confirmCupTitle`). 진입 0x19f30 의 히든 팀 열기도 화면 몫이다(`syncOpenedHidden` 로 넣는다)
       // 0xb7bf0 대회 레코드 두 칸(+0xbc4 대표팀 · +0xbe0 첫날 상대) + 133 의 0xb53f1 — 대표팀 내 칸 t 에 내 선수 · 저장.
       // 463 보상 뒤 0x8cca2 — S+0x50 = 3(웹 null) · S+0x12c = 1 → 0x8cd44 저장: 대회 칸(L+0xa8~)째 파일에 든다(`nationalCup`)
-      const entered = withNationalCupEntered(titled)
+      const entered = withNationalCupEntered(viewed)
       setCareer(entered)
       return setScreen({ kind: '국가대항전', cup: entered.nationalCup ?? createNationalCup() })
     }
@@ -1441,10 +1443,9 @@ export function useCareerSession({
       }
       // 그 밖 갈래의 첫 줄 1c348~1c358 — S+0x12c(국가대항전 중)면 134 대진판. 463 끝이 S+0x50 = 3 으로 두므로 대회 중엔 늘 이 갈래다
       if (savedCareer.nationalCup !== undefined) {
-        // 134 의 틀 0x1b92c 머리 — 들어온 첫 틀에 비트 8 이 없으면 칭호 8 "국가 대표". 이어하기로 들어와도 같다
-        // (463 보상 뒤 끊겼으면 아직 없다 — 대회 중 끊겼으면 이미 있어 그대로)
-        const nationalTitle = nationalCupStandingsTitleOf(savedCareer.titleIds)
-        setCareer(nationalTitle === null ? savedCareer : awardTitles(savedCareer, [nationalTitle]))
+        // 134 의 틀 0x1b92c 머리 — 들어온 첫 틀에 비트 8 이 없으면 칭호 8 "국가 대표" 팝업. 이어하기로 들어와도 같다
+        // (463 보상 뒤 끊겼으면 아직 없다 — 대회 중 끊겼으면 이미 있어 안 뜬다). 팝업 · 히든 팀 열기는 화면 몫이다
+        setCareer(savedCareer)
         return setScreen({ kind: '국가대항전', cup: savedCareer.nationalCup })
       }
       if (point.kind === '포스트시즌') return enterPostseason(savedCareer, true)
@@ -2070,9 +2071,7 @@ export function useCareerSession({
 
     /**
      * 대회 끝 — 결과 팝업(`0x25`)과 보상 팝업(`0x26`)을 모두 닫았을 때 (`0x1b92c`).
-     * 보상은 커리어에 얹고, 열린 히든 팀은 `openedHiddenIds` 에 넣는다 (웹은 이 칸 하나가
-     * 전역 기록 `+0x70` 히든 팀 목록으로 흘러간다 — `App.tsx` 가 그렇게 넘긴다).
-     * 그 뒤 원본대로 새 시즌 처리(`0x1b768`)다.
+     * 보상은 커리어에 얹고, 그 뒤 원본대로 새 시즌 처리(`0x1b768`)다.
      *
      * 국가대항전 플래그(`S+0x12c` — 커리어 `nationalCup`)는 새 시즌 처리(`startNextSeason`, 1b774)가 내린다.
      */
@@ -2083,8 +2082,15 @@ export function useCareerSession({
       if (finish.reward.gamePoint > 0) {
         recordStat({ kind: 'G획득', mode: BATTER_LEAGUE_MODE, amount: finish.reward.gamePoint })
       }
-      const missing = finish.openedTeams.filter((id) => !rewarded.openedHiddenIds.includes(id))
-      startNewSeason({ ...rewarded, openedHiddenIds: [...rewarded.openedHiddenIds, ...missing] })
+      // 히든 팀은 여기서 열지 않는다 — 134 에 들어올 때마다 진입 0x19f30 이 열었다(결승 승리 뒤 진입이 결승 상대까지)
+      startNewSeason(rewarded)
+    },
+
+    /** 134 첫 틀 `0x1b92c` 의 칭호 8 팝업 확인 `0x1b1e4` — 비트 · 곧바로 장착 · 저장 (관리 화면 `confirmTitle` 과 같은 콜백) */
+    confirmCupTitle: () => {
+      if (career === null) return
+      const nationalTitle = nationalCupStandingsTitleOf(career.titleIds)
+      if (nationalTitle !== null) setCareer(awardTitles(career, [nationalTitle]))
     },
 
     /**
