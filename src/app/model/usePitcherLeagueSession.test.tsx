@@ -959,10 +959,16 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     expect(result.current.scene).toBe('엔딩')
   })
 
-  it('명예의 전당에 등록하고 떠나면 선수가 지워지고 저장도 빈다 (0x62d7e → 0x224ec(저장, 3))', () => {
+  it('명예의 전당에 등록하면 그 순간 저장이 빈다 — 떠나면 선수가 지워진다 (0x62d7e → 0x224ec(저장, 3))', () => {
     const store = 메모리저장()
     const { result } = 띄우기(store)
     act(() => result.current.actions.create('투수', 신인))
+
+    act(() => result.current.actions.eraseSaveForHallOfFame())
+    // 완료 창을 닫기 전에 꺼도 옛 선수가 살아나지 않는다 — 그 사이 커리어가 바뀌어도 다시 쓰지 않는다
+    expect(띄우기(store).result.current.career).toBeNull()
+    act(() => result.current.actions.save({ ...result.current.career!, gamePoint: 1 }))
+    expect(띄우기(store).result.current.career).toBeNull()
 
     act(() => result.current.actions.finishEnding(true))
 

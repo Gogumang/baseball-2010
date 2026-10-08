@@ -352,7 +352,12 @@ export function PitcherLeagueRoute({
           collection: hallOfFame?.collection ?? EMPTY_COLLECTION,
           edition: '투수',
           nari: { 투수: nariPitcherOf(career), 타자: hallOfFame?.nariBatter ?? null },
-          onRegister: (slot) => hallOfFame?.register(career, slot) ?? '빈칸없음',
+          // 등록이 된 그 순간 0x62dbe 가 모드 저장을 지운다(0x224ec) — 완료 창을 닫기 전이다
+          onRegister: (slot) => {
+            const result = hallOfFame?.register(career, slot) ?? '빈칸없음'
+            if (result === '등록') actions.eraseSaveForHallOfFame()
+            return result
+          },
           ...(hallOfFame?.gamePoint === undefined ? {} : { gamePoint: hallOfFame.gamePoint }),
         }}
         onContinue={actions.continueAfterEnding}

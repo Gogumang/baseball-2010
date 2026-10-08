@@ -62,7 +62,8 @@ interface EndingScreenProps {
   /** 5000 G포인트로 이어하기. 모자라면 false */
   readonly onContinue: () => boolean
   /**
-   * 엔딩을 떠나 메인 메뉴로 — `isRegistered` 는 명예의 전당에 등록하고 떠나는가(등록 0x62dbe 의 모드 저장 지우기 0x224ec).
+   * 엔딩을 떠나 메인 메뉴로 — `isRegistered` 는 명예의 전당에 등록하고 떠나는가. 모드 저장 지우기(0x62dbe 의 0x224ec)는 등록이 된
+   * 그 순간이라 `hallOfFame.onRegister` 를 넘기는 쪽이 '등록' 결과에서 한다.
    * 팝업 0x2d · 0x32 의 "아니오" · 145 의 "나중에 등록" · 안내 창은 등록 없이 떠난다(저장을 안 건드린다).
    */
   readonly onFinish: (isRegistered: boolean) => void
@@ -156,7 +157,7 @@ export function EndingScreen(props: EndingScreenProps) {
           edition: hallOfFame.edition,
           nari: hallOfFame.nari,
           onRegister: hallOfFame.onRegister,
-          // 등록 완료 창을 닫았다 — 0x62dbe 가 이미 모드 저장을 지웠다
+          // 등록 완료 창을 닫았다 — 모드 저장은 등록이 된 그 순간(`onRegister` 가 '등록' 을 돌려줄 때) 부르는 쪽이 이미 지웠다(0x62dbe)
           onDone: () => props.onFinish(true),
           onLater: onFinish,
         }}

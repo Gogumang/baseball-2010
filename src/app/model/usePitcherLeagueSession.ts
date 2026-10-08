@@ -320,6 +320,8 @@ export interface PitcherLeagueSession {
     readonly receiveEndingBonus: () => void
     /** 엔딩을 떠나 메인 메뉴로 — 명예의 전당에 등록했으면 선수 저장을 지운다(0x224ec), 아니면 저장이 남는다 */
     readonly finishEnding: (isRegistered: boolean) => void
+    /** 명예의 전당 등록이 된 그 순간 — 모드 저장을 지운다(0x62dbe → 0x224ec). 엔딩을 떠날 때까지 다시 저장하지 않는다 */
+    readonly eraseSaveForHallOfFame: () => void
     /** 111 장비 상점 · 121 장비착용을 연다 */
     readonly openShop: (tab: PitcherShopTab) => void
     /**
@@ -772,10 +774,15 @@ export function usePitcherLeagueSession(
   const newPlayerRef = useRef(false)
 
   /** 판정 없음(e = −1) 엔딩은 141 이 저장하지 않는다 — 엔딩 칸을 비운 114 끝의 커리어가 남는다 (`savedCareerOf`) */
+  /**
+   * 명예의 전당 등록(0x62dbe → 0x224ec(저장, 3))으로 모드 저장을 지운 뒤 — 등록 꼬리(0x62dc4~)는 G − 20000 · 전역 저장 0x1f1b9 ·
+   * 0x1f1e1 뿐이고 모드 저장 0x22755 를 다시 부르지 않는다. 엔딩을 떠날 때까지 커리어가 바뀌어도(지갑 다리의 G) 저장하지 않는다.
+   */
+  const isSaveErasedRef = useRef(false)
   const commit = useCallback(
     (next: PitcherCareer) => {
       setCareer(next)
-      store.save(savedCareerOf(next))
+      if (!isSaveErasedRef.current) store.save(savedCareerOf(next))
     },
     [store],
   )
@@ -826,7 +833,7 @@ export function usePitcherLeagueSession(
         if (current === null) return current
         const next = update(current)
         if (next === current) return current
-        store.save(savedCareerOf(next))
+        if (!isSaveErasedRef.current) store.save(savedCareerOf(next))
         return next
       })
     },
@@ -1506,12 +1513,22 @@ export function usePitcherLeagueSession(
    * 저장이 남는다. 다시 들어오면 장면 0x106 이 새로 서 100 → 0x1c154 가 **남은 저장으로** 이어한다(보너스를 받은 저장이면 141).
    * 웹은 세션이 앱 동안 살아 있어, 등록 없이 떠나면 그 자리에서 저장을 다시 읽어 이어할 자리를 고른다(`pitcherResumeOf`).
    */
+  /**
+   * 명예의 전당 등록이 된 그 순간 — 0x62dbe 의 0x224ec(저장, 3): 모드 저장을 지운다(경기 중간 저장 칸도). 원본은 등록 완료 창을
+   * 닫기 전에 지우므로 그 창에서 앱을 꺼도 저장은 없다.
+   */
+  const eraseSaveForHallOfFame = useCallback(() => {
+    isSaveErasedRef.current = true
+    // 저장소에 `clear` 가 없어 **이름 없는 빈 덩어리**를 덮어쓴다 — `normalizePitcherCareer` 가 null 로 읽는다
+    nariGameSaveRef.current?.clear()
+    store.save({})
+  }, [store])
+
   const finishEnding = useCallback((isRegistered: boolean) => {
     setGameOptions(null)
     if (isRegistered) {
-      // 저장소에 `clear` 가 없어 **이름 없는 빈 덩어리**를 덮어쓴다 — `normalizePitcherCareer` 가 null 로 읽는다
-      nariGameSaveRef.current?.clear()
-      store.save({})
+      // 저장은 등록하는 순간 지웠다 (`eraseSaveForHallOfFame`)
+      isSaveErasedRef.current = false
       setCareer(null)
       setScene('등록')
       return
@@ -2197,6 +2214,7 @@ export function usePitcherLeagueSession(
       continueAfterEnding,
       receiveEndingBonus,
       finishEnding,
+      eraseSaveForHallOfFame,
       openShop,
       purchase,
       closeShopGpDetail,

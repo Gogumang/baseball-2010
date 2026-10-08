@@ -501,8 +501,10 @@ export function useCareerSession({
   // 0x8b0e4 · 0x8cd44), system 창 답 0(0x7fe90), 경기 명령(0x8d870), 마지막 명령 뒤 끝(0x8cfc0)과 114 끝 처리(0x1c014)가
   // 저장한다 — 웹 커리어가 이벤트 중에 바뀌는 자리(보상 · 목표 창 · 끝)가 모두 그 자리라 이 자리에서는 원본보다 잦지 않다
   // (`giveEventReward`). ⚠️ 다른 장면 전수 대조는 안 했다.
+  /** 명예의 전당 등록으로 저장을 지운 뒤 엔딩을 떠날 때까지 — 다시 저장하지 않는다 (`eraseSaveForHallOfFame`) */
+  const isSaveErasedRef = useRef(false)
   useEffect(() => {
-    if (career === null) return
+    if (career === null || isSaveErasedRef.current) return
     // 판정 없음(e = −1) 엔딩은 141 이 저장하지 않는다 — 엔딩 칸을 비운 114 끝의 커리어가 남는다 (`savedCareerOf`)
     const persisted = savedCareerOf(career)
     saveGame.save(persisted)
@@ -2117,13 +2119,22 @@ export function useCareerSession({
      * 남아 이어하기가 그 자리로 돌아온다.
      */
     finishEnding: (isRegistered: boolean) => {
-      if (isRegistered) {
-        nariGameSaveRef.current?.clear()
-        saveGame.clear()
-        setSavedCareer(null)
-      }
+      // 등록했으면 저장은 등록하는 순간 지웠다 (`eraseSaveForHallOfFame`) — 여기서는 떠나기만 한다
+      if (isRegistered) isSaveErasedRef.current = false
       setCareer(null)
       setScreen({ kind: '메인메뉴' })
+    },
+
+    /**
+     * 명예의 전당 등록이 된 그 순간 — 0x62dbe 의 `0x224ec(저장, 4)`: 모드 저장(경기 중간 저장 칸도)을 지운다. 등록 꼬리(0x62dc4~)는
+     * G − 20000 · 전역 저장 0x1f1b9 · 0x1f1e1 뿐이라 모드 저장 0x22755 를 다시 부르지 않는다 — 웹은 엔딩을 떠날 때까지 커리어가
+     * 바뀌어도(지갑 다리의 G) 저장하지 않는다. 등록 완료 창에서 앱을 꺼도 저장은 없다.
+     */
+    eraseSaveForHallOfFame: () => {
+      isSaveErasedRef.current = true
+      nariGameSaveRef.current?.clear()
+      saveGame.clear()
+      setSavedCareer(null)
     },
   }
 

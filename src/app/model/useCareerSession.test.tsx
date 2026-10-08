@@ -304,10 +304,15 @@ describe('보상 명령 뒤 이어하기 자리 (0x8c460 끝 8cc2e — S+0x50 �
     act(() => 처음.result.current.session.actions.continueSaved())
     expect(처음.result.current.screen).toEqual({ kind: '엔딩', endingIndex: 5 })
 
-    // 등록하고 떠나면 지운다
-    act(() => 처음.result.current.session.actions.finishEnding(true))
+    // 등록이 된 그 순간(0x62dbe) 지운다 — 완료 창을 닫기 전, 그 사이 커리어가 바뀌어도(지갑 다리의 G) 다시 쓰지 않는다
+    act(() => 처음.result.current.session.actions.eraseSaveForHallOfFame())
     expect(saveGame.load()).toBeNull()
     expect(처음.result.current.session.savedCareer).toBeNull()
+    act(() => 처음.result.current.session.actions.receiveEndingBonus())
+    expect(saveGame.load()).toBeNull()
+    act(() => 처음.result.current.session.actions.finishEnding(true))
+    expect(saveGame.load()).toBeNull()
+    expect(처음.result.current.screen).toEqual({ kind: '메인메뉴' })
   })
 
   it('선택지 확인(0x8b804 → 0x8b0e4) — 떠나온 줄을 본 표시하고 저장한다 · 장소에서 연 이벤트면 행동함(S+4)', () => {

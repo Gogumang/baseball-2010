@@ -393,7 +393,12 @@ export function CareerRoutes({
               투수: hallOfFame.nariPitcher,
               타자: nariBatterOf(career),
             },
-            onRegister: (slot) => hallOfFame.register(career, slot),
+            // 등록이 된 그 순간 0x62dbe 가 모드 저장을 지운다(0x224ec) — 완료 창을 닫기 전이다
+            onRegister: (slot) => {
+              const result = hallOfFame.register(career, slot)
+              if (result === '등록') actions.eraseSaveForHallOfFame()
+              return result
+            },
             ...(hallOfFame.gamePoint === undefined ? {} : { gamePoint: hallOfFame.gamePoint }),
           }}
           onContinue={actions.continueAfterEnding}
