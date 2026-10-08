@@ -4,7 +4,7 @@ import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 /**
  * 원본 파티클 이미터 — `ptc/%03d.ptc` 51바이트 한 벌 (R5 8절 확정).
  *
- * 옮긴 코드: 입자 만들기 `0x6d56c` · 입자 갱신 `0x6d878` · 이미터 틱 `0x6dad0`.
+ * 옮긴 코드: 입자 만들기 `0x6d56c` · 입자 갱신 `0x6d878` · 이미터 틱 `0x6dad0` · 정리 `0x6dc08` · 공용 풀 `0x6d07c`(512).
  * 파일 51바이트는 `0x6d2b4` 가 이미터 `+0x24..` 에 그대로 memcpy 하므로 칸 이름은 파일 배치 그대로다.
  *
  * 단위 (R5 8절):
@@ -68,6 +68,30 @@ export interface Particle {
   life: number
 }
 
+/**
+ * 입자 공용 풀 (0x6d07c) — 앱 초기화 0x2f9c 가 `0x6d284(mgr, "ptc/ptcimg.pzx", 0x200, 1)` 로 **512 알**을 한 번 만든다.
+ * 이미터마다 따로가 아니라 관리자 하나가 모든 이미터에 나눠 준다. 알은 빈 칸 목록([pool+4])에서 꺼내고(0x6d58a)
+ * 수명이 다하면(0x6d878 의 life == 0 갈래) 그 목록 머리로 돌려준다. 알에는 이름이 없어 웹은 **남은 수**만 센다.
+ */
+export interface ParticlePool {
+  /** 빈 칸 수 — 0 이면 [pool+4] == 0 */
+  free: number
+}
+
+/** 0x2f9c 의 0x200 */
+export const PARTICLE_POOL_SIZE = 512
+
+export function createParticlePool(size = PARTICLE_POOL_SIZE): ParticlePool {
+  return { free: size }
+}
+
+/**
+ * 이미터 상태 +0x58 — 틱 0x6dad0 이 돌려주고 그대로 적는 값.
+ * 0 풀이 바닥(굴림 없음) · 1 뿌리는 중 · 2 이번 틱에 다 못 만들었다(총수 · 풀) · 3 끝(알이 없고 누계 > 0).
+ * 새 이미터는 calloc(0x2ac4) · 0x6d2f8 로 0 에서 시작한다.
+ */
+export type EmitterState = 0 | 1 | 2 | 3
+
 export interface ParticleEmitter {
   readonly config: ParticleConfig
   /** 이미터가 선 화면 좌표 (px) */
@@ -77,27 +101,38 @@ export interface ParticleEmitter {
   readonly img: number
   /** 이 이미터가 만들 입자 총수 (호출 인자 total ≠ −1 이면 파일 값을 덮어쓴다, 0x6d32c) */
   readonly total: number
+  /** 알을 꺼내 쓰는 관리자의 공용 풀 */
+  readonly pool: ParticlePool
   /** 지금까지 만든 누계 (+0x40) */
   spawned: number
+  /**
+   * 살아 있는 알 — 원본 +0x3c 목록 차례(**새 알이 머리**: 0x6d5e0 이 머리에 끼운다). 갱신 · 그리기가 이 차례로 돈다.
+   */
   readonly particles: Particle[]
+  /** +0x58 — 마지막 틱이 적은 상태 */
+  state: EmitterState
   /** 다 뿌리고 입자도 없어진 상태 3 (0x6dad0) — 관리자가 지운다 */
   done: boolean
 }
 
-/** 원본 `rand(n)` = `rand_range(0, n)` */
+/**
+ * 원본 `rand(n)` 0x9d468 — n ≤ 0 이면 **난수를 안 돌리고** 0, 아니면 한 번 돌려 [0, n).
+ */
 function roll(random: RandomPort, limit: number): number {
+  if (limit <= 0) return 0
   return randomIntegerBelow(random, 0, limit)
 }
 
-/** `값 + rand(폭+1) − 폭/2` — 원본이 흔들림을 넣는 식 (나눗셈은 정수) */
+/** `값 + rand(폭+1) − (폭 >> 1)` — 원본이 흔들림을 넣는 식 (반은 산술 시프트) */
 function jitter(random: RandomPort, base: number, range: number): number {
-  return base + roll(random, range + 1) - Math.trunc(range / 2)
+  return base + roll(random, range + 1) - (range >> 1)
 }
 
 /**
  * 이미터를 세운다 (0x6d32c).
  * `total` 을 주면 파일 값 대신 그 수를 쓴다 — 원본 호출 인자 `total ≠ −1` 과 같다.
  * 게임 안 호출지는 전부 −1 이라(R5 7절) 웹도 기본은 파일 값이다.
+ * `pool` 은 관리자의 공용 풀 — 따로 세운 이미터(시험)는 새 512 풀을 혼자 쓴다.
  */
 export function createEmitter(
   config: ParticleConfig,
@@ -105,6 +140,7 @@ export function createEmitter(
   y: number,
   img: number,
   total = -1,
+  pool: ParticlePool = createParticlePool(),
 ): ParticleEmitter {
   return {
     config,
@@ -112,85 +148,129 @@ export function createEmitter(
     y: Math.round(y),
     img,
     total: total === -1 ? config.total : total,
+    pool,
     spawned: 0,
     particles: [],
+    state: 0,
     done: false,
   }
 }
 
-/** 입자 하나 만들기 (0x6d56c) */
-function spawn(emitter: ParticleEmitter, random: RandomPort): Particle {
+/**
+ * 입자 하나 만들기 (0x6d56c). 누계가 총수에 닿았거나(+0x40 ≥ +0x30) 풀이 비었으면 못 만든다(null).
+ * 굴림 차례(0x6d5f4 ~ 0x6d808): 처음 위치 x · y → 방향 → 속력 → A 시작 → A 끝 → 수명(첫 값이 > 0 이면 한 번 더).
+ */
+function spawn(emitter: ParticleEmitter, random: RandomPort): Particle | null {
   const { config } = emitter
+  if (emitter.spawned >= emitter.total || emitter.pool.free <= 0) return null
+  emitter.pool.free -= 1
+
+  // 처음 위치 흩뿌림 — (rand(w+1) − w/2)/4 px 을 1/512 눈금으로 옮기면 `<< 7` 이다
+  const offX = (roll(random, config.w + 1) - (config.w >> 1)) << 7
+  const offY = (roll(random, config.h + 1) - (config.h >> 1)) << 7
   const direction = jitter(random, config.ang, config.spread)
-  const speed = jitter(random, config.spd, config.spdR)
   // ⚠️ 원본은 sin 표 0xd2eec(16.16) 을 쓴다. 웹은 Math 삼각함수로 대신하므로 끝자리가 다를 수 있다 — **근사**
   const radians = (direction * Math.PI) / 180
-
+  const speed = jitter(random, config.spd, config.spdR)
+  const a = jitter(random, config.a0, config.a0R)
+  const target = jitter(random, config.a1, config.a1R)
   // 수명: 첫 뽑기가 ≤0 이면 1, >0 이면 **한 번 더 뽑은 값**을 쓴다 — 원본 버릇 그대로 옮긴다 (R5 8절)
   const firstRoll = jitter(random, config.life, config.lifeR)
   const life = firstRoll <= 0 ? 1 : jitter(random, config.life, config.lifeR)
 
-  const a = jitter(random, config.a0, config.a0R)
-  const target = jitter(random, config.a1, config.a1R)
-
+  emitter.spawned += 1
   return {
     x: emitter.x,
     y: emitter.y,
-    // 처음 위치 흩뿌림 — (rand(w+1) − w/2)/4 px 을 1/512 눈금으로 옮기면 `<< 7` 이다
-    offX: (roll(random, config.w + 1) - Math.trunc(config.w / 2)) << 7,
-    offY: (roll(random, config.h + 1) - Math.trunc(config.h / 2)) << 7,
+    offX,
+    offY,
     vx: Math.trunc(speed * Math.cos(radians)),
     vy: Math.trunc(speed * Math.sin(radians)),
     a,
-    da: Math.trunc((target - a) / life),
+    // 0xca7b5 — (끝 − 시작) / (수명 & 0xffff), 0 쪽으로 자른다
+    da: Math.trunc((target - a) / (life & 0xffff)),
     life,
   }
 }
 
 /**
- * 이미터 한 틱 (0x6dad0).
- *
- * 1. 살아 있는 입자를 굴린다 (0x6d878): `life == 0` 이면 버리고, 아니면
- *    `off += v` → `v += (ax, ay)` → `A += dA` → `life−−`.
- *    (바람 칸 `e[0x5c]` 은 기본 0 이고 세우는 곳을 못 봤다 — 웹에는 없다.)
- * 2. 입자가 하나도 없고 누계 > 0 이면 끝(상태 3).
- * 3. 아니면 `emit ± emitR/2` 개를 새로 만든다. 누계가 `total` 에 닿으면 더 못 만든다.
- *
- * 이미터 상태를 제자리에서 고친다 — 매 프레임 도는 루프라 입자 배열을 새로 만들지 않는다.
- * 바깥 입력은 `random` 뿐이라 같은 난수를 주면 결과도 같다.
+ * 입자 갱신 (0x6d878) — 살아 있으면 **바람 굴림 하나**를 쓴다:
+ * `off.x += v.x + (바람 >> 1) + rand(바람 − (바람 >> 1) + 1)`. 바람 칸 +0x5c 는 0x6d2f8 의 0 뒤로 세우는 곳이 없어
+ * 늘 0 이라 값은 0 이지만 rand(1) 도 난수를 한 번 돌린다. 그 뒤 off.y += v.y → v += (ax, ay) → A += dA → life −1.
+ * 수명이 0 이면 목록에서 빼 풀로 돌려준다(되돌이 +0x44 는 0xbbc84 가 늘 0 이라 누계는 그대로).
  */
-export function tickEmitter(emitter: ParticleEmitter, random: RandomPort): void {
-  if (emitter.done) return
+const WIND = 0
+
+function updateParticle(emitter: ParticleEmitter, particle: Particle, random: RandomPort): boolean {
+  if (particle.life === 0) {
+    emitter.pool.free += 1
+    return false
+  }
+  const { config } = emitter
+  const drift = (WIND >> 1) + roll(random, WIND - (WIND >> 1) + 1)
+  particle.offX += particle.vx + drift
+  particle.offY += particle.vy
+  particle.vx += config.ax
+  particle.vy += config.ay
+  particle.a += particle.da
+  particle.life -= 1
+  return true
+}
+
+/**
+ * 이미터 한 틱 (0x6dad0) — 상태 +0x58 을 적고 돌려준다.
+ *
+ * 1. **틱 머리에서** 알 목록이 비었고 누계 > 0 이면 끝(3) — 굴림 없음.
+ * 2. 아니면 목록 차례로 알을 굴린다(`updateParticle` — 알마다 굴림 하나, 수명 0 은 풀로).
+ * 3. 풀이 비었으면(0x6dba4) 0 — 발생 수를 안 굴린다.
+ * 4. 발생 수 = `emit + rand(emitR+1) − (emitR >> 1)` 를 **총수에 닿은 뒤에도 늘 굴리고**(0x6dbcc),
+ *    그만큼 만들다가 못 만들면(총수 · 풀) 2, 다 만들면 1.
+ *
+ * 그래서 마지막 알이 사라진 틱은 아직 2 이고, 끝(3)은 그 **다음 틱**이다.
+ */
+export function tickEmitter(emitter: ParticleEmitter, random: RandomPort): EmitterState {
+  if (emitter.done) return emitter.state
   const { config, particles } = emitter
+
+  if (particles.length === 0 && emitter.spawned > 0) return finishTick(emitter, 3)
 
   let alive = 0
   for (const particle of particles) {
-    // 원본 0x6d878 은 life 를 **0 과만** 견준다. 파일 값으로는 수명이 0 밑으로 내려가지 않는다
-    if (particle.life === 0) continue
-    particle.offX += particle.vx
-    particle.offY += particle.vy
-    particle.vx += config.ax
-    particle.vy += config.ay
-    particle.a += particle.da
-    particle.life -= 1
+    if (!updateParticle(emitter, particle, random)) continue
     particles[alive] = particle
     alive += 1
   }
   particles.length = alive
 
-  if (alive === 0 && emitter.spawned > 0) {
-    emitter.done = true
-    return
-  }
-  if (emitter.spawned >= emitter.total) return
+  if (emitter.pool.free <= 0) return finishTick(emitter, 0)
 
-  const room = emitter.total - emitter.spawned
-  const wanted = jitter(random, config.emit, config.emitR)
-  const count = Math.min(room, wanted)
+  const count = config.emit + roll(random, config.emitR + 1) - (config.emitR >> 1)
+  const born: Particle[] = []
+  let state: EmitterState = 1
   for (let index = 0; index < count; index += 1) {
-    particles.push(spawn(emitter, random))
+    const particle = spawn(emitter, random)
+    if (particle === null) {
+      state = 2
+      break
+    }
+    born.push(particle)
   }
-  emitter.spawned += Math.max(0, count)
+  // 새 알은 하나씩 목록 머리에 끼우므로 나중에 만든 알이 앞이다
+  if (born.length > 0) particles.unshift(...born.reverse())
+  return finishTick(emitter, state)
+}
+
+function finishTick(emitter: ParticleEmitter, state: EmitterState): EmitterState {
+  emitter.state = state
+  emitter.done = state === 3
+  return state
+}
+
+/** 이미터 정리 (0x6dc08) — 남은 알을 모두 풀로 돌려주고 목록 · 누계를 비운다 */
+export function releaseEmitter(emitter: ParticleEmitter): void {
+  emitter.pool.free += emitter.particles.length
+  emitter.particles.length = 0
+  emitter.spawned = 0
 }
 
 /** 그리기로 넘어가는 A 값 = `A >> 8` (0~256, 0x6dd26) */

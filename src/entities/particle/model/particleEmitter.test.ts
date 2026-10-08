@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   createEmitter,
+  createParticlePool,
   drawStrengthOf,
   particlePixelOf,
   tickEmitter,
@@ -90,13 +91,89 @@ describe('입자 갱신 0x6d878', () => {
     expect(particlePixelOf(입자)).toEqual({ x: 100, y: 53 })
   })
 
-  it('life 가 0 이 된 입자는 다음 틱에 사라진다', () => {
+  it('life 가 0 이 된 입자는 다음 틱 갱신에서 빠지고, 끝(3)은 그 다음 틱 머리에서 선다 (0x6dad0)', () => {
     const emitter = createEmitter(고정설정({ life: 2, emit: 1, total: 1 }), 0, 0, 10)
-    // 만든 틱 + life 2,1 → 0 이 된 뒤 한 틱 더 살아 있다가 사라진다
-    for (let tick = 0; tick < 3; tick += 1) tickEmitter(emitter, 난수0)
+    // 1 만듦(상태 1) · 2 life 2→1 · 3 1→0 — 총수에 닿아 2
+    expect([tickEmitter(emitter, 난수0), tickEmitter(emitter, 난수0), tickEmitter(emitter, 난수0)]).toEqual([1, 2, 2])
     expect(emitter.particles.length).toBe(1)
+    // 4 life 0 인 알이 풀로 돌아가지만 이 틱은 아직 2
+    expect(tickEmitter(emitter, 난수0)).toBe(2)
+    expect([emitter.particles.length, emitter.done]).toEqual([0, false])
+    // 5 틱 머리에서 목록이 비었고 누계 > 0 — 끝
+    expect(tickEmitter(emitter, 난수0)).toBe(3)
+    expect(emitter.done).toBe(true)
+  })
+})
+
+/** 부른 수를 세는 난수 (값은 늘 0) */
+function 세는난수(): { readonly random: RandomPort; readonly count: () => number } {
+  let calls = 0
+  return {
+    random: {
+      next: () => {
+        calls += 1
+        return 0
+      },
+      nextInRange: (minimum) => minimum,
+      pick: (candidates) => candidates[0],
+    },
+    count: () => calls,
+  }
+}
+
+describe('굴림 수 — 원본 0x6dad0 · 0x6d878 · 0x6d56c', () => {
+  it('알 하나 만들기는 위치 2 · 방향 · 속력 · A 2 · 수명 2(첫 값 > 0) = 8 번, 발생 수 1 번', () => {
+    const { random, count } = 세는난수()
+    const emitter = createEmitter(고정설정({ emit: 1, total: 1, life: 3 }), 0, 0, 10)
+    tickEmitter(emitter, random)
+    expect(count()).toBe(1 + 8)
+  })
+
+  it('살아 있는 알은 갱신마다 바람 굴림 rand(1) 하나를 쓰고, 총수에 닿은 뒤에도 발생 수를 굴린다 (0x6dbcc)', () => {
+    const { random, count } = 세는난수()
+    const emitter = createEmitter(고정설정({ emit: 2, total: 2, life: 9 }), 0, 0, 10)
+    tickEmitter(emitter, random)
+    const 첫틱 = count()
+    tickEmitter(emitter, random)
+    // 알 2 × 바람 1 + 발생 수 1 (만들기는 총수에 막혀 굴림 없음)
+    expect(count() - 첫틱).toBe(2 + 1)
+    expect(emitter.state).toBe(2)
+  })
+
+  it('끝난 틱(3)은 굴리지 않는다', () => {
+    const { random, count } = 세는난수()
+    const emitter = createEmitter(고정설정({ life: 1, emit: 1, total: 1 }), 0, 0, 10)
+    while (tickEmitter(emitter, random) !== 3) {
+      /* 끝까지 */
+    }
+    const 끝 = count()
+    tickEmitter(emitter, random)
+    expect(count()).toBe(끝)
+  })
+})
+
+describe('공용 풀 512 (0x6d07c)', () => {
+  it('풀이 바닥이면 상태 0 — 발생 수를 굴리지 않는다', () => {
+    const { random, count } = 세는난수()
+    const 풀 = createParticlePool(3)
+    const emitter = createEmitter(고정설정({ emit: 5, total: 10, life: 9 }), 0, 0, 10, -1, 풀)
+    // 첫 틱: 셋 만들고 넷째에서 풀이 비어 2
+    expect(tickEmitter(emitter, random)).toBe(2)
+    expect([emitter.particles.length, 풀.free]).toEqual([3, 0])
+    const 앞 = count()
+    // 다음 틱: 알 3 갱신(바람 3) 뒤 풀이 비어 0
+    expect(tickEmitter(emitter, random)).toBe(0)
+    expect(count() - 앞).toBe(3)
+  })
+
+  it('수명이 다한 알은 풀로 돌아간다', () => {
+    const 풀 = createParticlePool(4)
+    const emitter = createEmitter(고정설정({ emit: 1, total: 1, life: 1 }), 0, 0, 10, -1, 풀)
     tickEmitter(emitter, 난수0)
-    expect([emitter.particles.length, emitter.done]).toEqual([0, true])
+    expect(풀.free).toBe(3)
+    tickEmitter(emitter, 난수0)
+    tickEmitter(emitter, 난수0)
+    expect(풀.free).toBe(4)
   })
 })
 
