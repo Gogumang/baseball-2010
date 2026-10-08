@@ -216,10 +216,9 @@ interface BattingStageProps {
    */
   readonly onPitchResolved: (detail: PitchOutcomeDetail, pitch: Pitch, isUncatchable?: boolean, buntKind?: number) => void
   /**
-   * **공이 나는 동안(상태 0x11)인가** 를 밖에서 물을 수 있게 이 칸에 묻는 함수를 넣어 준다. 원본 도루 키(0x53610 →
-   * 메시지 0x583)는 상태 0x11 에서만 받는다 — 타석 화면 밖 키 처리(`GameScreen` 등)가 이 함수로 거른다.
-   * 스윙·번트 키와 같은 판정(`isFlying` — '투구중' 단계이고 공 프레임 ≥ 0 = 릴리스 뒤. 스윙·번트가 판정되면 단계가
-   * 넘어가 거짓이 된다)이다. 화면이 내려가면 null 로 되돌린다.
+   * **상태 0x11 인가** 를 밖에서 물을 수 있게 이 칸에 묻는 함수를 넣어 준다. 원본 도루 키(0x53610 → 메시지 0x583)는
+   * 0x11 의 키 함수 0x53670 이 부른다 — 0x11 은 투수 와인드업부터(공 틱 0 인 동안도) 맞은 공 판정 · 공 끝(틱 N + 1)까지다.
+   * 타석 화면 밖 키 처리(`GameScreen` 등)가 이 함수로 거른다. 화면이 내려가면 null 로 되돌린다.
    */
   readonly flightProbeRef?: { current: (() => boolean) | null }
   /**
@@ -588,13 +587,11 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
     }
   }, [commitHit, specialSwingNumber, aceBatterIndex, specialSwingRemaining])
 
-  // 공이 나는 동안(상태 0x11)인가 — 도루 키(0x53610)를 받는 화면이 묻는다. 스윙·번트 키의 `isFlying` 과 같은 판정이다
+  // 상태 0x11 인가 — 도루 키(0x53610)를 받는 화면이 묻는다. 0x53670 은 0x11 **전체**(와인드업 포함, 공 틱이 0 인 동안도)에서
+  // 0x53610 을 부르므로 릴리스 전도 참이다. 0x11 은 맞은 공의 판정(→ 0x13)이나 공 끝(틱 N + 1 → 0x12)까지 이어진다
   useEffect(() => {
     if (flightProbeRef === undefined) return
-    flightProbeRef.current = () =>
-      phaseRef.current === '투구중' &&
-      pitchRef.current !== null &&
-      ballFrameAt(performance.now(), phaseStartedAtRef.current, millisecondsPerFrame()) >= 0
+    flightProbeRef.current = () => phaseRef.current === '투구중' && pitchRef.current !== null
     return () => {
       flightProbeRef.current = null
     }
