@@ -124,7 +124,7 @@ export interface CpuPickoffInput {
 /**
  * CPU 투구 — 원본 순서 그대로 난수를 뽑는다:
  *   구질(0x344dc, 상태 0xf 틱 0~8 에 **9번** — `CPU_PITCH_TYPE_ROLL_TICKS`) → 목표 종류(0x9eeac) → 목표점(0x345fc) → 제구 등급(0xb74bc, 마구면 굴림 없이 5 — 0x4dbac)
- *   → 표시 구속(0x34968, rand 한 번 — `displaySpeed`) → 제구 오차(0x4dc78)
+ *   → 표시 구속(0x34968, rand 한 번 — `displaySpeed`) → 제구 오차(0x4dc78, 홈런더비면 4dcce 에서 건너뜀)
  *   → 실투 판정(0x33cbc, 0x4dea0 — 마구가 아니면 rand(0,100) 한 번) → 곡선(0x9e3c9, 실투면 한가운데 · N 18/20)
  * 목표 종류가 4(견제)이고 주자가 1·2명이면(`isCpuPickoff`, 0x34684) 목표점을 만들지 않고 0x34848 이
  * **견제 루**를 굴린 뒤 끝난다 — 목표점·제구 등급·제구 오차·곡선 굴림이 **없다** (`{ kind: '견제' }`).
@@ -275,7 +275,12 @@ export function releaseCpuPitch(
     { typeNumber, stats, controlTier, magicNumber: repertoire.magicId, form: repertoire.form },
     random,
   )
-  const aimedTarget = applyControlError(target, { tier: controlTier, isComputer: true }, random)
+  // 4dcc6~4dcd2: 홈런더비(장면 [+0x1104] == 7)면 0x4de60 으로 뛰어 4dcd4~4de5e 를 통째로 건너뛴다 —
+  // 그림 칸 [+0x17bc] = t + 3(4dce0) · 흩어짐 rand(0,100)(4dcf6) · 반지름 · 방향 굴림이 모두 없어 목표점(존 한가운데)
+  // 그대로 던진다. 0x4de60 뒤(0xb6e25 · 궤적 준비 0x9e669 · 실투 0x33cbc · 곡선)는 더비에서도 그대로 돈다
+  const aimedTarget = isHomeRunDerby
+    ? target
+    : applyControlError(target, { tier: controlTier, isComputer: true }, random)
   // 마구는 게이지를 쓰지 않고 등급이 늘 5 다 — 구속 단계 레코드가 없어 번호로 곧장 고른다 (H2 3-5·3-6)
   const speedStage = pitchSpeedStageOf(typeNumber - 1, stats, controlTier)
   const recordIndex = isMagic ? magicPitchRecordIndexOf(repertoire.magicId, repertoire.form) : null

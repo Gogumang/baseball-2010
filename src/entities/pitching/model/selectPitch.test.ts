@@ -447,6 +447,16 @@ describe('홈런더비 목표점 (0x345fc 의 0x3460e 모드 7 갈래)', () => {
     expect(공더비.pitcherForm).toBe(0)
   })
 
+  it('놓기 0x4dc78 의 제구 흩어짐도 없다 — 4dcce 모드 7 이면 0x4de60 으로 건너뛰어 공이 늘 존 한가운데로 간다', () => {
+    const plates = new Set<string>()
+    for (let seed = 0; seed < 40; seed += 1) {
+      const choice = selectChoice(투수(10), 상황, createSeededRandom(seed), 'hard', undefined, undefined, false, 1)
+      plates.add(JSON.stringify(공(choice).plate))
+    }
+    // 실투(0x33cbc)도 존 한가운데라 어느 씨앗이든 한 점이다
+    expect(plates.size).toBe(1)
+  })
+
   it('주자가 있어도 견제하지 않는다', () => {
     const 주자상황 = { ...상황, runnerCount: 1 }
     for (let seed = 0; seed < 50; seed += 1) {
