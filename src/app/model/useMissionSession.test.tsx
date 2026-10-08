@@ -508,6 +508,49 @@ describe('타자 미션 CPU 견제 — 0x345fc 종류 4 → 0x34848 → 0x50f28 
   })
 })
 
+describe('타자 미션 CPU 견제 3아웃 — 판정 B 0xae3e8 아웃 > 2 → 0x18, 다음은 새 타석', () => {
+  it('2사 3루(타자 3)에서 견제사면 타석이 끊긴다 — 0xd → 0xe 대기를 새로 세우고 볼카운트는 새 타석 것', () => {
+    const mission = MISSIONS.find((row) => row.side === '타자' && row.id === 3)!
+    // 견제사가 나는 씨앗을 찾는다 — 세션과 같은 차례(시작 굴림 뒤 판)로 돌려 본다
+    let found: { seed: number } | null = null
+    for (let seed = 1; seed < 400 && found === null; seed += 1) {
+      const probe = setUpBatterMissionWithSeed(mission, seed)
+      const confirmBefore = probe.result.current.session.sceneConfirm
+      act(() => probe.result.current.session.actions.cpuPickoff(3))
+      const after = probe.result.current.session.missionRun!
+      if (probe.result.current.session.pickoffReplay?.advance.outsAdded === 1) {
+        found = { seed }
+        // 3아웃이면 새 타석 대기(0xd → 0xe)가 새로 선다
+        expect(probe.result.current.session.sceneConfirm).not.toBe(confirmBefore)
+        expect(probe.result.current.runner.atBat).toMatchObject({ balls: 0, strikes: 0 })
+        expect(after.remainingPlateAppearances).toBe(mission.plateAppearanceLimit > 0 ? mission.plateAppearanceLimit : null)
+      } else {
+        // 살면 같은 타석 0xf — 대기를 새로 세우지 않는다
+        expect(probe.result.current.session.sceneConfirm).toBe(confirmBefore)
+      }
+      probe.unmount()
+    }
+    expect(found).not.toBeNull()
+  })
+})
+
+function setUpBatterMissionWithSeed(mission: (typeof MISSIONS)[number], seed: number) {
+  const missionRecord: MissionRecordPort = { load: () => ({}), save: vi.fn() }
+  const random = createSeededRandom(seed)
+  let screen: Screen = { kind: '미션선택' }
+  const setScreen = vi.fn((next: Screen) => {
+    screen = next
+  })
+  const rendered = renderHook(() => {
+    const runner = useAtBatRunner()
+    return { runner, session: useMissionSession({ runner, random, missionRecord, screen, setScreen }) }
+  })
+  act(() => {
+    rendered.result.current.session.actions.begin(mission)
+  })
+  return rendered
+}
+
 /* ── 투수 미션 사람 견제 (0x53580 → 0x53548 → 메시지 0x10 → 0x50f28, 모드 5 갈림 없음) ───────────── */
 
 /** 투수 미션 하나를 세운다 — 씨앗 난수 하나를 시작(0x3fa0e rand(0, 2))부터 그대로 쓴다 */

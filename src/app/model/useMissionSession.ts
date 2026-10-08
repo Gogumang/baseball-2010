@@ -1307,7 +1307,8 @@ export function useMissionSession({
      * 미션 객체로 걸러지는 0x66864 는 CPU 투수 교체 0x3d954·0xc1ba4 에서만 불린다(xref) — 견제 길에는 없다.
      *
      * 판은 바로 다 돌려 진루·아웃을 먹이고(`applyPickoff`), 화면은 `pickoffReplay` 를 재생한다(나만의리그와 같은 꼴).
-     * 볼카운트·남은 타석·스윙은 그대로다 — 공을 안 던졌다.
+     * 남은 타석·스윙은 그대로다 — 공을 안 던졌다. 볼카운트도 그대로지만, 견제사로 3아웃이면 판정 B 0xae3e8 이 0x18 로 보내
+     * 이 타석이 끊기고 다음은 새 타석(0xd → 0xe)이다.
      * 수비 능력치·주루는 미션 타구(`missionDefensePlayInputOf`)와 같은 기본값이다: 아홉 칸 기본 능력치, 사람 공격,
      * 주루 설정은 안 넘긴다(진행기 기본 = 자동) — 미션 세션에는 환경설정 "주루" 가 들어오지 않는다(근사, 타구와 같다).
      *
@@ -1332,11 +1333,14 @@ export function useMissionSession({
         // 송구 설정(+0xf4)은 둘째 항이라 안 넘긴다
         defenseIsCpu: true,
       })
+      const interrupted = current.outs + result.advance.outsAdded >= MISSION_OUTS_PER_INNING
       setMissionRun((previous) => (previous === null ? previous : applyPickoff(previous, result.advance)))
       playSoundIds(audio, [pickoffCallSoundIdOf(result)])
       if (result.ticks.length > 0) setPickoffReplay(result)
-      // 견제 판 끝 0xae3e8 ae592 → 0xf (⚠️ 3아웃이면 원본은 0x18 → 새 타석이다 — 웹은 타석을 안 끊는다, 예전 그대로)
-      signalPitchSelection('same')
+      // 견제 판 끝 판정 B 0xae3e8 — 아웃 > 2 면 0x18(이 타석은 끊기고 다음은 새 타석 0xd → 0xe), 아니면 같은 타석 0xf(ae592).
+      // 공 도착 판의 3아웃(`handleMissionPitch`)과 같은 길 — 볼카운트는 새 타석 것, 남은 타석 · 스윙은 안 줄인다
+      if (interrupted) resetAtBatWithConfirm()
+      else signalPitchSelection('same')
     },
 
     /**
