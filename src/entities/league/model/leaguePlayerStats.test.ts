@@ -189,3 +189,16 @@ describe('recordLeagueStolenBases — 도루 +0x2c (0xa8380 · 0xc1a98)', () => 
     expect(이어.batters[14]?.steals).toBe(2)
   })
 })
+
+describe('2루타 +0x24 · 3루타 +0x26 (0xa8024 a8520~a85ac)', () => {
+  it('루타 2 면 +0x24, 3 이면 +0x26 — 1루타·홈런은 안 센다', () => {
+    const 쌓음 = recordLeaguePlateAppearances(EMPTY_LEAGUE_PLAYER_STATS, [
+      { teamId: 1, battingOrderIndex: 2, outcome: { kind: '안타', bases: 2 }, runsBattedIn: 0 },
+      { teamId: 1, battingOrderIndex: 2, outcome: { kind: '안타', bases: 3 }, runsBattedIn: 1 },
+      { teamId: 1, battingOrderIndex: 2, outcome: { kind: '안타', bases: 2 }, runsBattedIn: 0 },
+      { teamId: 1, battingOrderIndex: 2, outcome: { kind: '안타', bases: 1 }, runsBattedIn: 0 },
+      { teamId: 1, battingOrderIndex: 2, outcome: { kind: '홈런' }, runsBattedIn: 1 },
+    ])
+    expect(쌓음.batters[14]).toMatchObject({ hits: 5, doubles: 2, triples: 1, homeRuns: 1, runsBattedIn: 2 })
+  })
+})

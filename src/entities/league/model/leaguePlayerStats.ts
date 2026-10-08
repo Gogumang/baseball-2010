@@ -32,6 +32,12 @@ export interface LeagueBatterLine {
   readonly atBats: number
   /** +0x22 안타 */
   readonly hits: number
+  /**
+   * +0x24 2루타 · +0x26 3루타 — 정산 0xa8024 안타 가지가 루타 [sp+0x10] == 2 면 a8550, == 3 이면 a8592 에서 +1(9999 상한).
+   * 홈런은 +0x28 이다. 옛 저장에는 없어 0 으로 본다.
+   */
+  readonly doubles?: number
+  readonly triples?: number
   /** +0x28 홈런 */
   readonly homeRuns: number
   /** +0x2a 타점 */
@@ -188,6 +194,9 @@ export function leaguePitcherLineOf(stats: LeaguePlayerStats, pitcherId: number)
 }
 
 /** 타석 하나를 한 줄에 더한다 (0xa8024 의 네 칸). 타수는 볼넷을 빼고 센다 */
+/** +0x24·+0x26 의 상한 — a8552·a8594 `0x270f` */
+const EXTRA_BASE_HIT_LIMIT = 9999
+
 function addPlateAppearance(
   line: LeagueBatterLine,
   outcome: AtBatOutcome,
@@ -199,6 +208,13 @@ function addPlateAppearance(
     homeRuns: line.homeRuns + (outcome.kind === '홈런' ? 1 : 0),
     runsBattedIn: line.runsBattedIn + runsBattedIn,
     ...(line.steals === undefined ? {} : { steals: line.steals }),
+    // a8520~a85ac — 2루타 +0x24 · 3루타 +0x26 (9999 상한)
+    ...(outcome.kind === '안타' && outcome.bases === 2
+      ? { doubles: Math.min(EXTRA_BASE_HIT_LIMIT, (line.doubles ?? 0) + 1) }
+      : line.doubles === undefined ? {} : { doubles: line.doubles }),
+    ...(outcome.kind === '안타' && outcome.bases === 3
+      ? { triples: Math.min(EXTRA_BASE_HIT_LIMIT, (line.triples ?? 0) + 1) }
+      : line.triples === undefined ? {} : { triples: line.triples }),
   }
 }
 
