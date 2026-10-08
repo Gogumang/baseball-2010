@@ -1401,6 +1401,62 @@ describe('교체 연출 0x16 — 0xe 확인 뒤 0xf 진입의 CPU 투수 교체(
   })
 })
 
+describe('0xf 진입 0x3d954 는 공마다 — 판정 A 0xae24c 의 볼 · 스트라이크 · 파울 뒤 · 견제 판 끝(ae592)에도 CPU 투수 교체를 본다', () => {
+  /**
+   * 체력이 바닥난 상대 투수가 이미 타석 중간에 서 있다 — 공이 손을 떠나(0xa5e14) state[0xd] 가 내려간 뒤.
+   * 돌발 객체는 걷어 둔다(진행 중이면 3d9fc 가 건너뛴다 — 아래 시험이 따로 본다).
+   */
+  function 지친투수(seed: number): { progress: GameProgress; random: RandomPort } {
+    const random = createSeededRandom(seed)
+    const 시작 = startGame(random)
+    const progress: GameProgress = {
+      ...시작,
+      burst: null,
+      opponentMound: { ...시작.opponentMound, stamina: 0, justChanged: false },
+    }
+    return { progress, random }
+  }
+
+  it('볼(타석이 이어짐)이 도착한 뒤 0xf 진입이 상대 투수를 바꾸고 · 새 0xe 대기 하나 · 연출(confirmsBefore 0)을 싣는다', () => {
+    const { progress, random } = 지친투수(11)
+    const { progress: 뒤, play } = arrivePitch(progress, { resolution: { kind: '볼' }, outcomeAfter: null }, random)
+    if (play !== null) return // 0.1% 폭투·포일
+    expect(뒤.opponentMound.pitcherSlot).not.toBe(progress.opponentMound.pitcherSlot)
+    expect(뒤.sceneConfirm).not.toBe(progress.sceneConfirm)
+    expect(뒤.sceneConfirm?.entries).toBe(1)
+    expect(뒤.substitutionScene).toMatchObject({ timeSoundId: 22, confirmsBefore: 0 })
+  })
+
+  it('타석이 끝난 공(삼진)은 0xf 를 안 지난다 — 교체는 다음 타석 준비가 본다', () => {
+    const { progress, random } = 지친투수(11)
+    const { progress: 뒤 } = arrivePitch(
+      progress,
+      { resolution: { kind: '스트라이크', isSwinging: true }, outcomeAfter: { kind: '삼진' } },
+      random,
+    )
+    expect(뒤.opponentMound.pitcherSlot).toBe(progress.opponentMound.pitcherSlot)
+  })
+
+  it('돌발이 진행 중(0x8eb94)이면 건너뛴다 — 3d9fc', () => {
+    const random = createSeededRandom(11)
+    const 시작 = startGame(random)
+    // 씨앗 11 은 첫 타석에 돌발이 떠 있다
+    expect(시작.burst?.current).toBeTruthy()
+    const 진행중: GameProgress = { ...시작, opponentMound: { ...시작.opponentMound, stamina: 0, justChanged: false } }
+    const { progress: 뒤, play } = arrivePitch(진행중, { resolution: { kind: '볼' }, outcomeAfter: null }, random)
+    expect(play).toBeNull()
+    expect(뒤.opponentMound.pitcherSlot).toBe(진행중.opponentMound.pitcherSlot)
+  })
+
+  it('견제 판이 끝나 같은 타석이 이어지면 0xf 진입이 교체를 본다', () => {
+    const { progress, random } = 지친투수(11)
+    const 주자 = { ...progress, game: { ...progress.game, bases: { first: true, second: false, third: false } } }
+    const 뒤 = cpuPickoff(주자, 1, random)
+    if (!isPlayerTurn(뒤.game) || 뒤.game.outs !== 주자.game.outs) return // 견제사로 판이 바뀐 씨앗
+    expect(뒤.opponentMound.pitcherSlot).not.toBe(주자.opponentMound.pitcherSlot)
+  })
+})
+
 describe('내 타석의 파울 각 공도 수비 판을 돈다 — startPlayerFoulPlay (원본 메시지 0x11 → 0x13 → 0x17)', () => {
   /** 원본 표의 파울 각 패턴 전부 — (결과 코드, 패턴) */
   const 파울패턴들 = Object.entries(BATTED_BALL_PATTERNS).flatMap(([code, patterns]) =>

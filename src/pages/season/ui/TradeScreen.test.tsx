@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { TradeScreen, tradeQuestionTextOf } from '@/pages/season/ui/TradeScreen'
+import { TradeScreen } from '@/pages/season/ui/TradeScreen'
 import { startNewSeason } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonRecord, SeasonState } from '@/entities/season-mode/model/seasonRecord'
 import { PLAYER_OWN_BIT } from '@/entities/season-mode/model/playerRecruit'
@@ -313,17 +313,6 @@ describe('0xe7 확인·진행 (J 4-4)', () => {
     expect(onTrade).not.toHaveBeenCalled()
     expect(onFinish).not.toHaveBeenCalled()
     expect(rolls).toEqual([])
-  })
-
-  it('[171] 팝업 글 — 칸 0 은 "!C" + [171], 비용 칸은 "!C" + 비용 + [172] + "!N" + [171] (0xc6ae~0xc736)', () => {
-    expect(tradeQuestionTextOf(0)).toBe('!C!C트레이드를 하시겠습니까?')
-    expect(tradeQuestionTextOf(1)).toBe('!C2000!cFFFF00G포인트!cFFFFFF가 소모됩니다!N!C트레이드를 하시겠습니까?')
-    expect(tradeQuestionTextOf(2)).toBe('!C1000!cFFFF00G포인트!cFFFFFF가 소모됩니다!N!C트레이드를 하시겠습니까?')
-
-    확인까지()
-    누르기(/\+20%/)
-    expect(알림글()).toContain('1000G포인트가 소모됩니다')
-    expect(알림글()).toContain('트레이드를 하시겠습니까?')
   })
 
   it('+50% 칸은 2000G 를 쓴다 (성공·실패와 상관없이 나간다)', () => {

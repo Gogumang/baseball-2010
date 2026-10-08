@@ -643,7 +643,7 @@ export interface PlayerOutcomeOptions {
  * 타자편 진행기에 칸이 없다.
  *
  * 공마다 부른다 — 판정이 난 공(`PitchOutcomeDetail.pitchTypeNumber`)마다 한 번. 견제는 공이 아니라 안 부른다.
- * 깎은 스태미나는 다음 타석 시작의 CPU 교체(0xac428)와 동료 간이 타석이 본다. 난수는 쓰지 않는다.
+ * 깎은 스태미나는 다음 공의 0xf 진입(`enterPitchSelection` — CPU 교체 0xac428)과 동료 간이 타석이 본다. 난수는 쓰지 않는다.
  *
  * `batterIntimidates` = 타석에 선 내 선수가 타자 스킬 22 압도를 **장착**했는가.
  * 상대 투수 스킬 18 비겁자 · 10 끈기는 그 레코드 +0x14 (`quickDefenseOf` 의 `skillBitsAt` → `drainPitcherForPitch`).
@@ -775,7 +775,10 @@ export function resolveDefensePlay(
   if (pending === null) return progress
   // 파울로 닫힌 판 — 판 끝 판정 B 0xae3e8 ae568 이 정산 0xa8024 를 건너뛰고 0xf(같은 타석 다음 공)로, 0x35108 이
   // 0xa975c(주자를 판 앞 자리로)를 부른다 — 경기 상태는 그대로다. 스트라이크(0xb6b58)와 연속 파울(0xa7dbc)은 타석 칸을 든 세션이 센다
-  if (result.foulEnded === true) return { ...progress, pendingDefensePlay: null, defenseScene: result.scene }
+  // 그 0xf 진입 0x3d954 가 CPU 투수 교체를 다시 본다
+  if (result.foulEnded === true) {
+    return enterPitchSelection({ ...progress, pendingDefensePlay: null, defenseScene: result.scene }, random)
+  }
   // 이 타석에서 앞서 난 연속 파울 기록(32·33) — 파울 각 공을 낙구 전에 잡아(파울 뜬공 아웃) 판이 타석을 끝낼 때 넘겨받는다
   progress = withFoulRecords(progress, options.foulRecordIds)
   // 기록은 판 끝 정산(0xa8024)이 낸 결과다 — `pending.outcome` 은 타석을 끝낸 임시 값이다(`battedContact`)
@@ -1435,18 +1438,44 @@ export function withAutoStopLateInningSetup(progress: GameProgress, random: Rand
  * ```
  * 0x50c26  0xbcb48(…, 0xf)  — 0xf 를 **예약만** 한다 (다음 틱에 옮김)
  * 0x50c42  돌발 객체가 있으면 0x8f158 — 뜨면 예약을 0x1b(돌발 창)로 덮는다
- * (다음 틱) 0xf 진입 0x3d954: 수비 팀이 CPU(3d9e4) → 돌발 진행 중(0x8eb94, 3d9fc)이면 건너뜀,
- *           아니면 CPU 투수 교체 0xac428(3da3e). 바뀌면 0x16 → 0xd → 0xe → 메시지 1 → **0x8f158 을 다시** → 0xf 진입
+ * (다음 틱) 0xf 진입 0x3d954 (`enterPitchSelection`)
  * ```
- * 그래서 돌발 굴림이 상대 투수 교체보다 **앞**이고, 돌발이 뜨면 교체는 보지 않는다. 교체가 나면 돌발을 한 번 더 굴린 뒤
- * 0xf 진입을 다시 지난다 (팀 경기 `readyAtBat`·`enterPitchSelection` 과 같은 차례).
+ * 그래서 돌발 굴림이 상대 투수 교체보다 **앞**이고, 돌발이 뜨면 교체는 보지 않는다.
  */
 function prepareMyAtBat(progress: GameProgress, random: RandomPort): GameProgress {
   // 0xd → 0xe (0x39e14) — 사람 OK 를 기다린다 (0x532b0)
-  let current = triggerBurstForMyAtBat({ ...progress, sceneConfirm: enterSceneConfirm() }, random)
-  // 0xf 진입은 교체가 날 때마다 다시 온다 — 바뀐 쪽 막음 칸(state[0xd])이 서 있어 두 번째 판정에서 멈춘다
+  return enterPitchSelection(
+    triggerBurstForMyAtBat({ ...progress, sceneConfirm: enterSceneConfirm() }, random),
+    random,
+    true,
+  )
+}
+
+/**
+ * **상태 0xf 진입 `0x3d954`** — 내 타석에서 공 하나를 고르기 전마다 돈다 (팀 경기 `enterPitchSelection` 과 같은 자리).
+ *
+ * 0xf 로 들어서는 길: 0xe 확인(`prepareMyAtBat` — 새 타석 · 교체 연출 0x16 뒤), 인플레이 없이 끝난 공의 다음 공
+ * (판정 A `0xae24c` 의 볼 · 스트라이크 · 파울 → 0xf, `arrivePitch`), 판이 열린 공(도루 · 폭투)과 파울 각 공 판의 끝
+ * (판정 B `0xae3e8` → 0xf, `arrivePitch` · `resolveDefensePlay`), 견제 판 끝(ae592, `cpuPickoff`). 그때마다:
+ * ```
+ * 3d9e4  수비 팀이 CPU (state[0x31 + state[0xa]] == 1) — 타자편 내 타석은 늘 참
+ * 3d9fc  돌발 객체가 있고 0x8eb94(진행 중) 참 → 건너뜀
+ * 3da0e  0x66864() 거짓 → 건너뜀                       ; 리그 경기(모드 4)는 참
+ * 3da3e  0xac428(…, 수비 팀, …, state, ctx, 0, 0, 0)    ; CPU 투수 교체
+ * 3da74  바뀌면 22(3da88) → 0x16(3da94) → 0xd(앞 상태 0x16 이라 카운트 · 타석 초기화 건너뜀, 48e94) → 0xe
+ *        → OK 뒤 메시지 1 → **0x8f158 을 다시** → 0xf 진입
+ * ```
+ * 교체가 나면 돌발을 한 번 더 굴린 뒤 0xf 진입을 다시 지난다 — 바뀐 쪽 막음 칸(state[0xd])이 서 있어 두 번째 판정에서 멈춘다.
+ * state[0xd] 는 공이 손을 떠날 때(0xa5e14 a5e72, `throwOpponentPitch`) 내려가므로 공마다 다시 본다.
+ *
+ * `afterConfirm` — 방금 0xe 의 OK 대기를 실은 걸음(`prepareMyAtBat`)에서 불렀는가. 그러면 교체 연출 뒤 0xe 는 같은 걸음의
+ * 둘째 대기다(`chainSceneConfirm`). 타석 중간(다음 공 · 판 끝 · 견제 끝)에서는 앞 대기가 이미 OK 를 받았으니 새 대기다.
+ */
+function enterPitchSelection(progress: GameProgress, random: RandomPort, afterConfirm = false): GameProgress {
+  let current = progress
+  let pendingWait = afterConfirm ? progress.sceneConfirm : null
   for (let entry = 0; entry < MAXIMUM_SUBSTITUTION_CALLS; entry += 1) {
-    if (current.game.isFinished) return current
+    if (current.game.isFinished || !isPlayerTurn(current.game)) return current
     if (current.burst !== null && current.burst.current !== null) return current
     const changed = changeOpponentPitcher(current, random)
     if (changed === current) return current
@@ -1461,13 +1490,12 @@ function prepareMyAtBat(progress: GameProgress, random: RandomPort): GameProgres
         : {}),
       entrySoundId: substitutionEntrySoundIdOf({ isAce: incomingIsAce, bases: changed.game.bases }),
       timeSoundId: SUBSTITUTION_TIME_SOUND,
-      confirmsBefore: changed.sceneConfirm?.entries ?? 0,
+      confirmsBefore: pendingWait?.entries ?? 0,
     }
     // → 0xd → 0xe — OK 를 한 번 더 기다린다
-    current = triggerBurstForMyAtBat(
-      { ...changed, sceneConfirm: chainSceneConfirm(changed.sceneConfirm), substitutionScene: scene },
-      random,
-    )
+    const sceneConfirm = chainSceneConfirm(pendingWait)
+    pendingWait = sceneConfirm
+    current = triggerBurstForMyAtBat({ ...changed, sceneConfirm, substitutionScene: scene }, random)
   }
   return current
 }
@@ -2095,7 +2123,10 @@ export function arrivePitch(
   }
   if (!arrivesUnhit(pitch.resolution)) {
     const next = pitch.resolution.kind === '타구' ? progress : withoutSteal(progress)
-    return { progress: next, play: null, interrupted: false }
+    // 판 없이 온 파울(옛 길) — 판정 A 0xae24c 의 파울 → 같은 타석 다음 공 0xf 진입 0x3d954
+    const continued =
+      pitch.resolution.kind === '파울' && pitch.outcomeAfter === null ? enterPitchSelection(next, random) : next
+    return { progress: continued, play: null, interrupted: false }
   }
   const cleared = withoutSteal(progress)
   const play = runPitchArrivalPlay(
@@ -2119,7 +2150,14 @@ export function arrivePitch(
     },
     random,
   )
-  if (play === null) return { progress: cleared, play: null, interrupted: false }
+  // 판이 안 열린 공 — 판정 A 0xae24c: 타석이 이어지면(볼 · 스트라이크) 0xf 진입 0x3d954 가 CPU 투수 교체를 다시 본다
+  if (play === null) {
+    return {
+      progress: pitch.outcomeAfter === null ? enterPitchSelection(cleared, random) : cleared,
+      play: null,
+      interrupted: false,
+    }
+  }
   // 판이 남긴 수비 장면 연출 칸은 다음 판으로 (`defenseScene`)
   const opened: GameProgress = { ...cleared, defenseScene: play.result.scene }
   // 낫아웃 · 볼넷 · 사구는 타석 결과 쪽(`startPlayerOutcome` 의 `arrivalPlay`)이 먹인다 — 밀어내기 판은 재생 칸에만
@@ -2132,6 +2170,8 @@ export function arrivePitch(
   const interrupted =
     next.game.isFinished || next.game.inning !== before.inning || next.game.half !== before.half
   if (interrupted && !next.game.isFinished) next = advanceUntilPlayerTurn(next, random)
+  // 판정 B 0xae3e8 — 같은 타석이 이어지면 0xf(다음 공) 진입 0x3d954
+  else if (!interrupted && pitch.outcomeAfter === null) next = enterPitchSelection(next, random)
   return { progress: next, play, interrupted }
 }
 
@@ -2224,8 +2264,8 @@ function withRunnerOnlyPlay(progress: GameProgress, result: DefensePlayResult): 
  * ⚠️ 미해결·근사 (`teamGameFlow.cpuPickoff` 와 같은 자리)
  * - 견제사·진루·득점이 나면 루·아웃·점수·반 이닝 교대와 상대 투수 실점 A·B 에는 먹이지만, 0xa8024 의 나머지 칸
  *   (평판 16칸·리그 기록·돌발 판정 0x8f414)이 견제 판에서 어떻게 도는지는 손대지 않았다.
- * - 원본은 0xf 에 다시 들어서며 `0x3d954` 가 CPU 투수 교체(0xac428)를 다시 부른다 — 웹은 공마다도 안 다시 부르는
- *   기존 근사라 견제 뒤에도 안 부른다 (반 이닝이 바뀌어 내 타석이 끊긴 때만 `advanceUntilPlayerTurn` 이 부른다).
+ * - 같은 타석이 이어지면 원본은 0xf 에 다시 들어서며 `0x3d954` 가 CPU 투수 교체(0xac428)를 다시 부른다 —
+ *   `enterPitchSelection` 이 그 자리다 (반 이닝이 바뀌어 내 타석이 끊긴 때는 `advanceUntilPlayerTurn` 이 부른다).
  * - 3아웃으로 내 타석이 끊기면 타순 커서를 안 민다(타석이 안 끝났다) — 다음 이닝 나부터 다시 선다.
  */
 export function cpuPickoff(progress: GameProgress, base: PickoffBase, random: RandomPort): GameProgress {
@@ -2267,8 +2307,11 @@ export function cpuPickoff(progress: GameProgress, base: PickoffBase, random: Ra
     `${before.inning}회${before.half} 상대 ${base}루 견제 — ${call}${runs > 0 ? ` (${runs}점)` : ''}`,
     true,
   )
-  // 같은 타석이 이어지면(상태 0xf) 그대로 돌려준다. 반 이닝이 바뀌었거나 끝났으면 다음 내 차례까지 넘긴다
-  return isPlayerTurn(next.game) && !next.game.isFinished ? next : advanceUntilPlayerTurn(next, random)
+  // 같은 타석이 이어지면(판정 B ae592 → 상태 0xf) 0xf 진입 0x3d954 가 CPU 투수 교체를 다시 본다.
+  // 반 이닝이 바뀌었거나 끝났으면 다음 내 차례까지 넘긴다
+  return isPlayerTurn(next.game) && !next.game.isFinished
+    ? enterPitchSelection(next, random)
+    : advanceUntilPlayerTurn(next, random)
 }
 
 /** `applyAtBatOutcome` 은 `precomputed` 를 받으면 결과 코드를 안 읽는다 — 주자 판에는 타석 결과가 없어 자리만 채운다 */
