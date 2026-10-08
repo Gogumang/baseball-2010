@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import { RawScreen } from '@/shared/ui'
 import { TEAMS } from '@/shared/config/original/teams'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
@@ -53,7 +54,14 @@ interface TeamSelectScreenProps {
    */
   readonly gridShape?: AnnalsGridShape
   readonly onSelect: (teamId: number) => void
+  /**
+   * 잠긴 히든 칸에서 확인했다 — 안 주면 잠긴 칸은 확인을 안 받는다. 시즌 팀 고르기 0xca(0x8da4)처럼
+   * 잠긴 칸에서도 확인 키로 힌트 팝업을 띄우는 화면이 넘긴다.
+   */
+  readonly onSelectLocked?: (teamId: number) => void
   readonly onCancel: () => void
+  /** 화면 위에 얹을 팝업 — 같은 무대(RawScreen) 맨 위에 그린다 */
+  readonly overlay?: ReactNode
 }
 
 /**
@@ -69,7 +77,7 @@ interface TeamSelectScreenProps {
  *     확정했지만(아래 `TeamAbilityChart`), 값 도형을 채우는 호출은 못 짚었다.
  */
 export function TeamSelectScreen({
-  openedHiddenIds = [], title = '팀선택', gamePoint = 0, gridShape, onSelect, onCancel,
+  openedHiddenIds = [], title = '팀선택', gamePoint = 0, gridShape, onSelect, onSelectLocked, onCancel, overlay,
 }: TeamSelectScreenProps) {
   const [cursor, setCursor] = useState(0)
 
@@ -98,6 +106,9 @@ export function TeamSelectScreen({
       if (event.key === 'Enter' && isTeamOpen(cursor, openedHiddenIds)) {
         event.preventDefault()
         onSelect(cursor)
+      } else if (event.key === 'Enter' && onSelectLocked !== undefined) {
+        event.preventDefault()
+        onSelectLocked(cursor)
       }
       if (event.key === 'Escape') {
         event.preventDefault()
@@ -106,7 +117,7 @@ export function TeamSelectScreen({
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [cursor, openedHiddenIds, gridShape, onSelect, onCancel])
+  }, [cursor, openedHiddenIds, gridShape, onSelect, onSelectLocked, onCancel])
 
   return (
     <RawScreen>
@@ -165,7 +176,11 @@ export function TeamSelectScreen({
             aria-pressed={index === cursor}
             className={styles.cell}
             style={{ left: x, top: y, width: GRID.cell, height: GRID.cell }}
-            onClick={() => (open ? onSelect(index) : setCursor(index))}
+            onClick={() => {
+              if (open) return onSelect(index)
+              setCursor(index)
+              onSelectLocked?.(index)
+            }}
             onMouseEnter={() => setCursor(index)}
           >
             {/* 칸 바탕(slt_frame 0) 먼저 깔고 그 위에 로고·물음표를 얹는다 */}
@@ -192,6 +207,7 @@ export function TeamSelectScreen({
       {/* 바닥띠의 "되돌아가기" 가 원본의 되돌아가기 소프트키다 (P6 1-1) — 따로 둔 버튼은 없앴다:
           흐름 배치라 스테이지 왼쪽 위 (0,0) 에 그려져 머리띠 제목을 가리고 있었다 */}
       <ScreenFrame title={title} gamePoint={gamePoint} onBack={onCancel} />
+      {overlay}
     </RawScreen>
   )
 }

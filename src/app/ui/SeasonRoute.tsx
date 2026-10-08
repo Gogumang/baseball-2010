@@ -26,7 +26,7 @@ import {
 } from '@/pages/general-mode/lib/generalModeSetup'
 import { MatchSettingsWindow } from '@/pages/match-settings'
 import { SQUAD_PURPOSE } from '@/entities/season-mode/model/preGameFlow'
-import { TeamSelectScreen } from '@/pages/create-player/ui/TeamSelectScreen'
+import { SeasonTeamSelectScreen } from '@/pages/season/ui/SeasonTeamSelectScreen'
 import { MessageBox, RawScreen, ScreenOverlay } from '@/shared/ui'
 import { StoryScreen } from '@/pages/story/ui/StoryScreen'
 import { SEASON_PLAYABLE_EVENTS, YEAR_GOAL_EVENT_ID } from '@/entities/season-mode/model/seasonEventFlow'
@@ -266,9 +266,13 @@ export function SeasonRoute({
     )
   }
 
-  // 저장이 없으면 팀 고르기부터다 (0xca). 팀 고르기 화면은 선수 등록 쪽 것을 그대로 쓴다
+  // 저장이 없으면 팀 고르기부터다 (0xca, 키 0x8da4). 열린 히든 팀(전역 +0x70)은 그림만 서고 힌트 팝업을 띄운다.
+  // 취소는 관리 메뉴 취소와 같이 [0x140006c] = 5 로 메인 메뉴에 나간다 (0x8ec8)
   if (state === null || scene === SEASON_SCENE_STATE.팀고르기) {
-    return <TeamSelectScreen title="시즌모드" onSelect={actions.chooseTeam} onCancel={() => onExit()} />
+    return (
+      <SeasonTeamSelectScreen openedHiddenIds={hallOfFame?.openedHiddenIds ?? []}
+        onPick={actions.chooseTeam} onExit={() => onExit(5)} />
+    )
   }
 
   const backToManagement = () => actions.goto(SEASON_SCENE_STATE.관리메뉴)
