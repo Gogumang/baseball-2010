@@ -5,6 +5,7 @@ import { PitchTrainingScreen } from '@/pages/pitcher-league/ui/PitchTrainingScre
 import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { DEFAULT_PITCHER_ROOKIE_PROFILE } from '@/entities/pitcher-career/model/pitcherRegistration'
+import { hasPitchType } from '@/entities/pitcher-career/model/pitchTraining'
 
 /** 구질 훈련 창 (상태 0x78) — 표 0xcc390 과 가드 순서를 그대로 보인다 (J 3-2) */
 
@@ -16,8 +17,8 @@ const 투수 = (overrides: Partial<PitcherCareer> = {}): PitcherCareer => ({
   ...overrides,
 })
 
-const 화면 = (career: PitcherCareer, onTrain: (row: number, column: number) => void = () => {}) =>
-  render(<PitchTrainingScreen career={career} onTrain={onTrain} onClose={() => {}} />)
+const 화면 = (career: PitcherCareer, onTrained: (career: PitcherCareer) => void = () => {}) =>
+  render(<PitchTrainingScreen career={career} onTrained={onTrained} onClose={() => {}} />)
 
 describe('구질 훈련 창', () => {
   it('구질 20칸을 그리고 이미 가진 구질은 "보유" 로 보인다', () => {
@@ -51,15 +52,17 @@ describe('구질 훈련 창', () => {
     expect(screen.getByText(/G포인트가 부족/)).toBeTruthy()
   })
 
-  it('확인 상자에서 [예] 를 고르면 그 칸을 한 번 훈련한다 (StrMODE[66] 600G)', () => {
-    let chosen: readonly [number, number] | null = null
-    화면(투수(), (row, column) => { chosen = [row, column] })
+  it('확인 상자에서 [예] 를 고르면 구질을 배우고 G포인트가 준다 (600G)', () => {
+    let trained: PitcherCareer | null = null
+    화면(투수(), (career) => { trained = career })
 
     fireEvent.click(screen.getByRole('button', { name: 'CUT FAST' }))
     expect(screen.getByText(/600 G포인트가 소모됩니다/)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '예' }))
 
-    expect(chosen).toEqual([0, 2])
+    expect(trained).not.toBeNull()
+    expect(hasPitchType(trained!, 10)).toBe(true)
+    expect(trained!.gamePoint).toBe(5000 - 600)
   })
 
   it('이미 가진 구질은 아무 말 없이 무시한다', () => {

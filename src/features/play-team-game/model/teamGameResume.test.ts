@@ -29,7 +29,7 @@ function 첫구질(progress: TeamGameProgress): number {
 /** 사람 차례 하나를 아웃으로 소화한다 (치면 뜬공 아웃, 던지면 첫 구질) */
 function 한타석(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
   if (isBatterTurn(progress)) return applyBatterOutcome(progress, { kind: '아웃', detail: '뜬공아웃' }, random)
-  if (isPitchTurn(progress)) return throwPitch(progress, { typeNumber: 첫구질(progress), gaugeCell: 0 }, random)
+  if (isPitchTurn(progress)) return throwPitch(progress, { typeNumber: 첫구질(progress), courseCell: 4, gaugeCell: 0 }, random)
   throw new Error('사람 차례가 아니다')
 }
 

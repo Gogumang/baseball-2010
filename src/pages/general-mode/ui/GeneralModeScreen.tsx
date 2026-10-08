@@ -6,7 +6,6 @@ import { TeamSelectScreen } from '@/pages/create-player/ui/TeamSelectScreen'
 import { TeamGameScreen } from '@/pages/team-game/ui/TeamGameScreen'
 import { GENERAL_MODE_STEP } from '@/pages/general-mode/lib/generalModeSetup'
 import { useGeneralMode } from '@/pages/general-mode/model/useGeneralMode'
-import type { MatchSettingsSeenSlot } from '@/pages/general-mode/model/useGeneralMode'
 import { AceSelectScreen } from '@/pages/general-mode/ui/AceSelectScreen'
 import { FirstBatStadiumScreen } from '@/pages/general-mode/ui/FirstBatStadiumScreen'
 import type { StadiumEntry } from '@/pages/general-mode/ui/FirstBatStadiumScreen'
@@ -46,15 +45,8 @@ export interface GeneralModeScreenProps {
   readonly onOpenAce?: (cell: number) => void
   /** 구장 표 — 도시명 0xd1df8 · 수용 인원 0xd1e34 (웹판 데이터에 아직 없다) */
   readonly stadiums?: readonly StadiumEntry[]
-  /**
-   * 전역기록의 경기진행 설정 (모드 칸 m = 0) — 설정 창이 열 때 읽고(0x5fef4), 경기 · **이어하기 경기**가 이 값으로 사람 타석을
-   * 가른다(0xc1e04 는 타석마다 전역 칸을 읽는다)
-   */
+  /** 저장에서 읽은 경기진행 설정 (모드 칸 0) */
   readonly initialSettings?: MatchProgressSettings
-  /** 설정 창 확인 0x60376 — 받는 쪽이 전역 m = 0 칸에 되쓰고 저장한다 */
-  readonly onMatchSettingsConfirm?: (settings: MatchProgressSettings) => void
-  /** 전역기록 +0x11e — 22 에 처음 들어오면 설정 창을 저절로 연다(0x3163c~0x31688, 시즌 0xdd 와 같은 칸) */
-  readonly matchSettingsSeen?: MatchSettingsSeenSlot
   /** 환경설정 "투구 게이지" */
   readonly gaugeSettingOn?: boolean
   /** 환경설정 "주루" 가 수동인가 (설정 +0xbd) — 사람이 공격일 때만 먹는다 (0xae690) */
@@ -143,20 +135,19 @@ function withLiveGameInning(props: GeneralModeScreenProps): GeneralModeScreenPro
 }
 
 /**
- * **이어하기 경기** — 저장 블록의 진행에서 장면 0x104 를 다시 세운다. 환경설정(투구 게이지·주루·송구)과 마선수 레벨,
- * 경기진행 설정(전역기록 +0x12c+0 계열 — 0xc1e04 가 타석마다 읽는다)은 원본이 경기 중에 전역 칸에서 그때그때 읽으므로
- * 지금 값으로 바꿔 끼운다.
+ * **이어하기 경기** — 저장 블록의 진행에서 장면 0x104 를 다시 세운다. 환경설정(투구 게이지·주루·송구)과 마선수 레벨은
+ * 원본이 경기 중에 전역 칸에서 그때그때 읽으므로 지금 값으로 바꿔 끼운다. 경기진행 설정은 웹에 전역 칸이 없어
+ * 그 경기를 세울 때의 값을 그대로 쓴다(⚠️ 원본은 전역기록 +0x12c 쪽 값을 다시 읽는다).
  */
 function GeneralModeResume(props: GeneralModeScreenProps & { readonly resumeGame: TeamGameProgress }) {
   const {
-    random, resumeGame, aceLevels, gaugeSettingOn, runningModeManual, throwModeManual, gamePoint, initialSettings,
+    random, resumeGame, aceLevels, gaugeSettingOn, runningModeManual, throwModeManual, gamePoint,
     onFinish, onExit, onGameSave, onSettlementEnter,
   } = props
   const [resumeFrom] = useState<TeamGameProgress>(() => ({
     ...resumeGame,
     options: {
       ...resumeGame.options,
-      ...(initialSettings === undefined ? {} : { settings: initialSettings }),
       ...(gaugeSettingOn === undefined ? {} : { gaugeSettingOn }),
       ...(runningModeManual === undefined ? {} : { runningModeManual }),
       ...(throwModeManual === undefined ? {} : { throwModeManual }),
@@ -182,8 +173,8 @@ function GeneralModeResume(props: GeneralModeScreenProps & { readonly resumeGame
 function GeneralModePrepare(props: GeneralModeScreenProps) {
   const {
     random, isQuickStart = false, openedHiddenTeamIds, openedAcePitcherIds, openedAceBatterIds,
-    aceLevels, onLevelUpAce, gamePoint, onOpenAce, stadiums, initialSettings, onMatchSettingsConfirm, matchSettingsSeen,
-    gaugeSettingOn, runningModeManual, throwModeManual, onFinish, onExit, onGameStart, onGameSave, onSettlementEnter,
+    aceLevels, onLevelUpAce, gamePoint, onOpenAce, stadiums, initialSettings, gaugeSettingOn, runningModeManual,
+    throwModeManual, onFinish, onExit, onGameStart, onGameSave, onSettlementEnter,
   } = props
   /** 이 경기의 첫 저장인가 — 경기정보 OK 몫(0x3136e)이고 그 뒤는 반 이닝 저장(0x4f928)이다 */
   const isFirstSaveRef = useRef(true)
@@ -203,8 +194,6 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
     ...(openedAcePitcherIds === undefined ? {} : { openedAcePitcherIds }),
     ...(openedAceBatterIds === undefined ? {} : { openedAceBatterIds }),
     ...(initialSettings === undefined ? {} : { initialSettings }),
-    ...(onMatchSettingsConfirm === undefined ? {} : { onSettingsConfirm: onMatchSettingsConfirm }),
-    ...(matchSettingsSeen === undefined ? {} : { matchSettingsSeen }),
     ...(gaugeSettingOn === undefined ? {} : { gaugeSettingOn }),
     ...(runningModeManual === undefined ? {} : { runningModeManual }),
     ...(throwModeManual === undefined ? {} : { throwModeManual }),

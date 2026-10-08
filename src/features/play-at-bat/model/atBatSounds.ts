@@ -106,18 +106,13 @@ export interface ContactSoundInput {
  * 5132e  S+0x10 != 0 ? 0x1b(27) : 8  → 0x6ea6d(소리, −1, 0)
  * ```
  *
- * 같은 짝 27/8 이 투구 비행 갱신 0x4e060 안에도 있다 — 판정 없는 헛스윙(`unjudgedWhiffSoundIdOf`).
- * 마선수 타자의 **판정** 헛스윙은 원본도 `+0x10` 만 보므로 8(필살을 안 실었으면)이 맞다.
+ * ⚠️ **못 옮긴 갈래 — 마선수 27**: 같은 짝 27/8 이 투구 비행 갱신 0x4e060 안에도 있다
+ * (0x4e21c~0x4e24a: `0xb633d(현재 타자)` = 마선수면 27). 그 자리는 **스윙이 맞힐 프레임**
+ * (0xb9270: `S+0x18 == 3 && S+0x1c == 1`)에 이르렀는데 공이 타자 근처(|Δ깊이| ≤ 3000, 0x4e1e4)가
+ * **아닐 때** — 판정(0x6aa → 0xab214)을 아예 안 타는 헛스윙이다. 웹은 모든 스윙을 판정에 태우고
+ * 공 깊이도 따로 들고 있지 않아 그 갈래를 가를 수가 없다. 그래서 여기선 판정 쪽(0x51350)만 옮겼고,
+ * 마선수 타자의 판정 헛스윙은 원본도 `+0x10` 만 보므로 8(필살을 안 실었으면)이 맞다.
  */
-/**
- * **판정 없는 헛스윙 소리** — 투구 비행 갱신 0x4e060 (4e21c~4e24a, 직접 뜸): 스윙이 맞힐 프레임(0xb9270: 상태 3 · 프레임 1)에
- * 이르렀는데 공이 타자 근처(|Δ깊이| ≤ 3000, 0x4e1e4)가 **아니면** 판정(0x6aa)을 안 타고
- * `0xb633d(0xae89d(공격 팀))` — 지금 타자가 마선수(+0xa 비트6)면 **27**, 아니면 **8** 을 낸다(필살 `S+0x10` 은 안 본다).
- */
-export function unjudgedWhiffSoundIdOf(isAceBatter: boolean): number {
-  return isAceBatter ? 27 : 8
-}
-
 export function contactSoundIdOf(input: ContactSoundInput): number | null {
   if (!input.hasSwung) return null
   if (!input.hasHit) {

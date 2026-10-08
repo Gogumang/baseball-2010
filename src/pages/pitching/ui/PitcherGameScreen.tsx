@@ -7,7 +7,6 @@ import { BurstMissionWindow } from '@/widgets/burst-mission/ui/BurstMissionWindo
 import type { BurstMissionRow } from '@/entities/burst-mission/model/burstMissionRow'
 import { staminaPercentOf } from '@/entities/pitcher-career/model/pitcherStamina'
 import { canSelectSlot } from '@/features/play-pitcher-game/model/pitcherPitch'
-import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
 import type { PitchSlot } from '@/features/play-pitcher-game/model/pitcherPitch'
 import { pitchSlotsFor, pitchersOfRecordOf } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import type {
@@ -26,7 +25,7 @@ import { useSubstitutionScene } from '@/features/play-game/model/useSubstitution
 import { SubstitutionSceneOverlay } from '@/features/play-game/ui/SubstitutionSceneOverlay'
 import { pitcherMatchupCardsOf } from '@/pages/pitching/lib/pitcherMatchupCards'
 import type { PitcherMatchupRecords } from '@/pages/pitching/lib/pitcherMatchupCards'
-import { AimCursor } from '@/pages/pitching/ui/AimCursor'
+import { CourseGrid } from '@/pages/pitching/ui/CourseGrid'
 import { PitchSlotPicker } from '@/pages/pitching/ui/PitchSlotPicker'
 import type { PitchSlotChoice } from '@/pages/pitching/ui/PitchSlotPicker'
 import { PitchGradeGauge } from '@/pages/pitching/ui/PitchGradeGauge'
@@ -75,9 +74,12 @@ import { PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
  *
  * 원본 경기 장면의 사람 조작 세 단계를 그대로 따른다 (I-controls 0절 · R10 2절):
  *   0xf  구질 고르기 — (2)(4)OK(6)(8) 다섯 자리 + '0' 마구, 틱 8 뒤 넘김 (`PitchSlotPicker`)
- *   0x10 조준 — 방향키로 흐르는 조준점, OK 확정 · CLR 은 0xf 로 (`AimCursor`)
+ *   0x10 코스 고르기 — 방향키
  *   0x11 게이지 — OK 한 번, 틱 10 에 놓는다 (환경설정 "투구 게이지" 가 꺼져 있으면 이 단계가 없다)
  * 그리고 0xe·0xf 에서 `#` 를 누르면 "그만 던지시겠습니까?"(StrGAME[104]) 가 뜬다.
+ *
+ * ⚠️ 원본 코스 커서의 칸 수·좌표는 해독 문서에 없다 — 설명서 <투구 조작> 2단계를 따라 3×3 격자로 둔다
+ * (`features/play-pitcher-game/model/pitcherPitch.courseTargetOf` 주석 참조).
  *
  * 경기 장면 연출(`widgets/game-scene`, 타자편·팀 경기와 같은 부품):
  *   0xc  경기 시작 인트로 — 모드 3 도 적재 상태 8 끝에서 온다(54틱, OK·'5' 건너뛰기). 효과음 61 은 `usePitcherGame`.
@@ -162,8 +164,7 @@ export function PitcherGameScreen({
   const play = progress.lastDefensePlay
   const finishPlayback = useCallback(() => setShownPlay(play), [play])
   const [slot, setSlot] = useState<PitchSlot | null>(null)
-  /** 0x10 에서 확정한 조준점 `+0x10b8` — 게이지(0x11) 뒤 놓을 때 쓴다 */
-  const [aim, setAim] = useState<WorldPoint | null>(null)
+  const [courseCell, setCourseCell] = useState(4)
   /** 제안 대사를 이미 보여 준 돌발 행 */
   const [shownProposal, setShownProposal] = useState<BurstMissionRow | null>(null)
   /** `#` 강판 물음이 떠 있는가 */
@@ -342,17 +343,14 @@ export function PitcherGameScreen({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [acceptsGiveUpKey])
 
-  const throwWith = (gaugeCell: number, throwAim: WorldPoint | null = aim) => {
+  const throwWith = (gaugeCell: number) => {
     if (slot === null) return
     // 이 공으로 끝난 타석 결과를 0x12 대기 틱(`resultWaitTicksOf`)에 쓴다 — 던지기 전 카운트
     atBatBeforeThrowRef.current = progress.atBat
-    actions.throwPitch({ typeNumber: slot.typeNumber, ...(throwAim === null ? {} : { aim: throwAim }), gaugeCell })
+    actions.throwPitch({ typeNumber: slot.typeNumber, courseCell, gaugeCell })
     setPhase('구질')
     setSlot(null)
-    setAim(null)
   }
-  /** 투구 입력 단계를 가리는 팝업 — 원본은 그 동안 상태 틱이 멈추고(0x741a0) 단계 상태는 그대로다 */
-  const isPitchInputPaused = isPopupOpen || asksGiveUp
 
   // 점수판 틀 0x41440 의 두 측 — 내 팀 PLAYER · 상대 COM
   const scoreboardSides = humanVsComputerSidesOf(options.playerSide, options.ourTeamId, options.opponentTeamId)
@@ -732,12 +730,11 @@ export function PitcherGameScreen({
             <SubstitutionSceneOverlay key={substitution.serial} aceSlot={substitution.aceSlot} onDone={substitution.finish} />
           </div>
         )}
-        {!isPitchInputPaused && canPitch && !isAwaitingConfirm && phase === '구질' && <Panel heading="1. 구질 선택" />}
-        {canPitch && !isAwaitingConfirm && phase === '구질' && (
-          <div hidden={isPitchInputPaused}>
+        {!asksGiveUp && !isPopupOpen && canPitch && !isAwaitingConfirm && phase === '구질' && (
+          <>
+            <Panel heading="1. 구질 선택" />
             <PitchSlotPicker
               choices={slotChoices(progress.magicRemaining, pitchSlotsFor(progress))}
-              isPaused={isPitchInputPaused}
               onDecide={(chosen) => {
                 const found = pitchSlotsFor(progress).find((candidate) => candidate.slot === chosen)
                 if (found === undefined || !canSelectSlot(found, progress.magicRemaining)) return
@@ -745,40 +742,36 @@ export function PitcherGameScreen({
                 setPhase('코스')
               }}
             />
-          </div>
+          </>
         )}
 
-        {!isPitchInputPaused && canPitch && phase === '코스' && <Panel heading={<>2. 코스 선택 — {slot?.name}</>} />}
-        {canPitch && phase === '코스' && (
-          <div hidden={isPitchInputPaused}>
-            <AimCursor
-              side={progress.options.stageSide ?? 1}
-              isPaused={isPitchInputPaused}
-              onConfirm={(confirmed) => {
+        {!asksGiveUp && !isPopupOpen && canPitch && phase === '코스' && (
+          <>
+            <Panel heading={<>2. 코스 선택 — {slot?.name}</>} />
+            <CourseGrid
+              selectedCell={courseCell}
+              onSelect={(cell) => {
+                setCourseCell(cell)
                 // 마구는 게이지를 쓰지 않고 등급이 늘 5 다 (0x3f500 의 `구질 != 22`)
                 if (options.gaugeSettingOn && slot?.isMagic !== true) {
-                  setAim(confirmed)
                   setPhase('게이지')
                   return
                 }
-                throwWith(0, confirmed)
-              }}
-              // CLR(0x50ee0) — 0xf 로 돌아가 0xf 진입 0x3d954 가 다시 돈다
-              onCancel={() => {
+                if (slot === null) return
+                actions.throwPitch({ typeNumber: slot.typeNumber, courseCell: cell, gaugeCell: 0 })
                 setPhase('구질')
                 setSlot(null)
-                actions.returnToPitchSelection()
               }}
             />
-            <Hint>방향키(숫자 1~9)로 조준점을 흘려 보내고 OK 로 확정 · CLR 은 구질로</Hint>
-          </div>
+            <Hint>노릴 코스를 고르세요</Hint>
+          </>
         )}
 
-        {!isPitchInputPaused && canPitch && phase === '게이지' && <Panel heading="3. 투구 결정" />}
-        {canPitch && phase === '게이지' && (
-          <div hidden={isPitchInputPaused}>
-            <PitchGradeGauge isPaused={isPitchInputPaused} onRelease={(gaugeCell) => throwWith(gaugeCell)} />
-          </div>
+        {!asksGiveUp && !isPopupOpen && canPitch && phase === '게이지' && (
+          <>
+            <Panel heading="3. 투구 결정" />
+            <PitchGradeGauge onRelease={throwWith} />
+          </>
         )}
 
         <ul className={styles.log}>

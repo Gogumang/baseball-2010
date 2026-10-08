@@ -162,8 +162,16 @@ describe('경기 뒤 반영', () => {
       pitches: 90,
       wins: 1,
       losses: 0,
+      walks: 0,
     })
     expect(after.careerStats.outs).toBe(21)
+  })
+
+  it('사사구(+0x2a)가 쌓이고 0..9999 로 잘린다 (a8b58~a8b74) — 옛 저장 줄은 0 에서', () => {
+    const 볼넷셋 = 경기결과({ seasonDelta: { outs: 21, runsAllowed: 2, strikeouts: 5, pitches: 90, wins: 1, losses: 0, saves: 0, walks: 3 } })
+    const { walks: _walks, ...oldStats } = 투수().stats
+    expect(applyPitcherGameResult({ ...투수(), stats: oldStats }, 볼넷셋).stats.walks).toBe(3)
+    expect(applyPitcherGameResult({ ...투수(), stats: { ...투수().stats, walks: 9998 } }, 볼넷셋).stats.walks).toBe(9999)
   })
 
   it('등판하지 않은 경기는 등판 수를 세지 않는다', () => {

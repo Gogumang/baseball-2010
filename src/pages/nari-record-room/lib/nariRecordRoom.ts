@@ -2,7 +2,7 @@ import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { yearlyStatsOf } from '@/entities/career/model/playerCareer'
 import type { SeasonStats } from '@/entities/career/model/seasonStats'
 import type { PitcherCareer, PitcherSeasonStats } from '@/entities/pitcher-career/model/pitcherCareer'
-import { pitcherYearlyStatsOf, seasonEarnedRunAverageOf } from '@/entities/pitcher-career/model/pitcherCareer'
+import { pitcherWalksOf, pitcherYearlyStatsOf, seasonEarnedRunAverageOf } from '@/entities/pitcher-career/model/pitcherCareer'
 import { pitcherLeagueRecordsOf } from '@/entities/pitcher-career/model/pitcherSeasonFlow'
 import { EMPTY_LEAGUE_RECORD } from '@/entities/awards/model/leaderboard'
 import type { LeagueRecord } from '@/entities/awards/model/leaderboard'
@@ -112,7 +112,11 @@ function battingAverageValueOf(stats: SeasonStats): number {
 /**
  * 타자 칸 글 — 0x56ebc 의 비트 갈래(56f58~57098)와 숫자 찍기 0x6aff9:
  * 0 타율 0xb8e3d → 소수(v > 999 ? 3 : 0) · 1 +0x20 · 2 +0x22 · 4 +0x24 · 8 +0x26 · 0x10 +0x28 · 0x20 +0x2a · 0x40 +0x2c 는 그대로.
- * null = 웹 커리어가 세지 않는 칸 — ⚠️ 0x40 도루(+0x2c)는 내 선수 칸이 웹에 없다(리그 표만 센다). 지어내지 않고 비운다.
+ * null = 웹 커리어가 세지 않는 칸 — ⚠️ 0x40 도루(+0x2c)는 비운다. 내 타자가 +0x2c 를 받는 자리는 원본에 둘이다:
+ * ① 사람 경기 정산 0xa8024 의 도루 판(종류 5, a8340~a83c0) — 루를 옮긴 **주자**에게 주는데, 타자편 사람 판은 내 타석뿐이라
+ * 주자는 늘 동료다. ② 동료 타석의 간이 엔진 0xc262c → 투구 판정 0xc1818 끝 도루(c1a42~c1a98) — 내가 루에 있을 때.
+ * 웹 타자편 동료 타석(`gameFlow.playTeammateAtBat`)은 이 도루 굴림(`onPitchJudged`)을 돌리지 않아 ② 가 일어나지 않는다
+ * (난수 순서가 걸린 엔진 일이라 여기서 고치지 않는다). 지어내지 않고 비운다.
  */
 export function batterYearCellTextOf(stats: SeasonStats, bit: number): string | null {
   switch (bit) {
@@ -133,7 +137,7 @@ export function batterYearCellTextOf(stats: SeasonStats, bit: number): string | 
 /**
  * 투수 칸 글 — 0x56ebc: 0x100 방어율 0xb6ce9 → 소수((v > 100 ? v × 10 : v), 3) · 0x200 0xca7b5(+0x20, 3) = 아웃 / 3 ·
  * 0x400 +0x22 · 0x800 s8 +0x2e · 0x1000 s8 +0x2f · 0x2000 +0x24 · 0x4000 +0x26 · 0x8000 +0x28 · 0x10000 +0x2a.
- * null = ⚠️ 0x10000 사사구(+0x2a)는 내 투수 시즌 칸이 웹에 없다 — 비운다.
+ * +0x2a 사사구는 정산 0xa8024 의 볼넷 · 사구 갈래(a8b58 · a8bd2)가 쌓는다(`PitcherSeasonStats.walks`).
  */
 export function pitcherYearCellTextOf(stats: PitcherSeasonStats, bit: number): string | null {
   switch (bit) {
@@ -148,6 +152,7 @@ export function pitcherYearCellTextOf(stats: PitcherSeasonStats, bit: number): s
     case 0x2000: return String(stats.saves)
     case 0x4000: return String(stats.strikeouts)
     case 0x8000: return String(stats.pitches)
+    case 0x10000: return String(pitcherWalksOf(stats))
     default: return null
   }
 }
@@ -232,7 +237,7 @@ export function nariRankingSideOf(edition: NariRecordEdition): SeasonRankingSide
 
 /**
  * 타자편 순위 재료 — 열 팀 타자 명단 차례(`seasonAwards.leagueRecordsOf` 와 같은 차례)에 +0x2c 도루(`steals`)까지 채운다
- * (순위 종류 10 이 본다). 내 선수 줄은 `myLeagueRecordOf` — ⚠️ 내 도루는 웹이 세지 않아 0 이다.
+ * (순위 종류 10 이 본다). 내 선수 줄은 `myLeagueRecordOf` — ⚠️ 내 도루는 0 이다(`batterYearCellTextOf` 의 ②: 웹 동료 간이 타석에 도루 굴림이 없다).
  */
 export function nariBatterRankingRecordsOf(career: PlayerCareer): readonly LeagueRecord[] {
   const mine = myLeagueRecordOf(career)

@@ -2,7 +2,7 @@ import { pitcherOrdersAfterPostseason } from '@/entities/league/model/league'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { describe, expect, it } from 'vitest'
 import { applyGameResult, applySeasonEnd, countGameForSkills, countReputationZeroGame, createCareer, nextOpponentOf, GAMES_PER_SEASON, gamePointRewardOf, nameByteLengthOf, rookieAbilityOf, startNextSeason, leagueGamePitchersOf, applyLeagueDay, countTraining, nariLastGameRecordLineOf, nariRecordLineTextOf } from '@/entities/career/model/playerCareer'
-import type { NariLastGame } from '@/entities/career/model/playerCareer'
+import type { NariLastGame, PlayerCareer } from '@/entities/career/model/playerCareer'
 import { EMPTY_LEAGUE, opponentOf, recordLeagueResult } from '@/entities/league/model/league'
 import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
 import type { GameSummary } from '@/entities/game/model/gameSummary'
@@ -173,6 +173,24 @@ describe('사람 경기의 타석도 리그 선수 기록표에 쌓인다 — 0x
     expect(career.leaguePlayerStats.batters[leagueBatterIdOf(3, 4)]).toEqual({
       atBats: 2, hits: 1, homeRuns: 0, runsBattedIn: 1,
     })
+  })
+
+  it('상대 공격 간이 엔진의 도루(+0x2c)도 쌓인다 — 포스트시즌은 0xa56dc 가 거짓이라 안 쌓는다 (c1a42)', () => {
+    const summary = {
+      result: '승',
+      stats: EMPTY_SEASON_STATS,
+      recordIds: [],
+      ourTeamId: 0,
+      opponentTeamId: 3,
+      leagueStolenBases: [{ teamId: 3, battingOrderIndex: 4 }, { teamId: 3, battingOrderIndex: 4 }],
+    } as unknown as GameSummary
+
+    expect(applyGameResult(createCareer('선수'), summary).leaguePlayerStats.batters[leagueBatterIdOf(3, 4)]?.steals).toBe(2)
+    const 가을 = {
+      ...createCareer('선수'),
+      postseason: { round: '한국시리즈', teams: [0, 3], wins: [0, 0], winsNeeded: 4 } as unknown as PlayerCareer['postseason'],
+    }
+    expect(applyGameResult(가을, summary).leaguePlayerStats.batters[leagueBatterIdOf(3, 4)]).toBeUndefined()
   })
 
   it('리그 밖 경기(칸이 없는 요약)는 표를 건드리지 않는다', () => {

@@ -33,21 +33,6 @@ export interface BuntStance {
 }
 
 /**
- * **스윙 예약** — 0x51db6 · 0x51dee 가 적는 경기+0xfe0 = 1 · +0xfd8 = 키 틱 F · S+0x10(필살).
- * 다음 갱신(F + 1, 0x4e0ce)에서 풀려 스윙이 나가고, F + 2 에 깊이를 보고 판정(0x6aa)한다.
- */
-export interface SwingReservation {
-  /** 키 틱 F (+0xfd8) — 판정 타이밍 0x34be0 이 읽는다 */
-  readonly frame: number
-  /** 필살 스윙(S+0x10 ≠ 0) */
-  readonly isSpecial: boolean
-  /** 스윙이 나갔다(0xb9374) */
-  readonly isReleased: boolean
-  /** 판정 틱에 공이 타자 근처가 아니어서 0x6aa 를 안 탄 헛스윙(0x4e21c) */
-  readonly isUnjudgedWhiff: boolean
-}
-
-/**
  * 상태 0x13 동안 손에 들고 있는 타격 결과 — 이 단계가 끝나야 인플레이(0x17)로 넘긴다.
  * 결과 문구·HOMERUN 글자도 여기서 꺼내므로 붙잡아 두는 동안에는 화면에 뜨지 않는다.
  */
@@ -178,12 +163,6 @@ export interface StageRefs {
   readonly deckRef: MutableRefObject<PatternDeck | null>
   /** 상태 0x13 이 붙잡고 있는 타격 결과. 없으면 이 단계가 아니다 */
   readonly pendingHitRef: MutableRefObject<PendingHit | null>
-  /** 이 공의 스윙 예약 · 스윙 (`SwingReservation`). 없으면 null — 새 공(0x11 진입의 memset)마다 지운다 */
-  readonly swingRef: MutableRefObject<SwingReservation | null>
-  /** 이 공이 판정됐나 — 경기+0xfe5 (0x4e18a · 0x4e216) */
-  readonly pitchJudgedRef: MutableRefObject<boolean>
-  /** 판정은 났지만 공 끝(0x12)까지 기다리는 결과(헛스윙 · 번트 헛맞음) — 공 끝에서 부른다 */
-  readonly heldResultRef: MutableRefObject<((now: number) => void) | null>
   /** '결과' 단계(0x12)가 서 있을 그림 수 — 결과를 세울 때 정한다 (`resultPhaseTicksOf`) */
   readonly resultTicksRef: MutableRefObject<number>
   /** 살아 있는 파티클 이미터 목록 (원본 파티클 관리자 [0x1400068]) */
@@ -214,9 +193,6 @@ export function useStageRefs(latest: StageLatest): StageRefs {
     buntRef: useRef<BuntStance | null>(null),
     deckRef: useRef<PatternDeck | null>(null),
     pendingHitRef: useRef<PendingHit | null>(null),
-    swingRef: useRef<SwingReservation | null>(null),
-    pitchJudgedRef: useRef(false),
-    heldResultRef: useRef<((now: number) => void) | null>(null),
     resultTicksRef: useRef(RESULT_PHASE_TICKS),
     particlesRef: useRef<ParticleScene>(createParticleScene()),
     pointerDownAtRef: useRef(0),
@@ -235,9 +211,4 @@ export function pitchTickAt(now: number, startedAt: number, millisecondsPerTick:
  */
 export function ballFrameAt(now: number, startedAt: number, millisecondsPerTick: number): number {
   return pitchTickAt(now, startedAt, millisecondsPerTick) - PITCHER_RELEASE_TICKS
-}
-
-/** 공 프레임 F 가 시작하는 시각 — `ballFrameAt` 의 거꾸로 */
-export function ballFrameStartTime(frame: number, startedAt: number, millisecondsPerTick: number): number {
-  return startedAt + (frame + PITCHER_RELEASE_TICKS) * millisecondsPerTick
 }

@@ -32,13 +32,16 @@ describe('124 첫 갈래 — 연도별 기록 (0x5761c · 0x5c984)', () => {
     expect(batterYearCellTextOf(stats, 0x40)).toBeNull()
   })
 
-  it('투수 칸 — 방어율은 소수((v > 100 ? v × 10 : v), 3) · 이닝은 아웃 / 3 · 사사구는 빈 칸', () => {
-    const stats = { ...EMPTY_PITCHER_SEASON_STATS, outs: 100, runsAllowed: 13, wins: 7, losses: 3, saves: 1, strikeouts: 55, pitches: 1500 }
+  it('투수 칸 — 방어율은 소수((v > 100 ? v × 10 : v), 3) · 이닝은 아웃 / 3 · 사사구는 +0x2a', () => {
+    const stats = { ...EMPTY_PITCHER_SEASON_STATS, outs: 100, runsAllowed: 13, wins: 7, losses: 3, saves: 1, strikeouts: 55, pitches: 1500, walks: 21 }
     // 13 × 2700 / 100 = 351 → 3510 → "3.51"
     expect(pitcherYearCellTextOf(stats, 0x100)).toBe('3.51')
     expect([0x200, 0x400, 0x800, 0x1000, 0x2000, 0x4000, 0x8000].map((bit) => pitcherYearCellTextOf(stats, bit)))
       .toEqual(['33', '13', '7', '3', '1', '55', '1500'])
-    expect(pitcherYearCellTextOf(stats, 0x10000)).toBeNull()
+    expect(pitcherYearCellTextOf(stats, 0x10000)).toBe('21')
+    // 옛 저장(칸 없음)은 0
+    const { walks: _walks, ...old } = stats
+    expect(pitcherYearCellTextOf(old, 0x10000)).toBe('0')
   })
 })
 

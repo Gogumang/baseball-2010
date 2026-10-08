@@ -1,18 +1,18 @@
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 import { DEFAULT_REPERTOIRE, selectPitch } from '@/entities/pitching/model/selectPitch'
 import { aceOrderOfMagicNumber, createMagicPitchGameState } from '@/entities/pitching/model/magicPitchGame'
 import { aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
 import type { MagicPitchGameState } from '@/entities/pitching/model/magicPitchGame'
 import type { PitcherRepertoireInfo } from '@/entities/pitching/model/pitch'
 import { pitcherHandOfPitch } from '@/entities/pitching/model/pitcherHand'
-import { ZONE_CENTERS } from '@/entities/pitching/model/pitchCurve'
+import { lastSwingFrameOf } from '@/entities/batting/model/swingTiming'
 import type { BattingSwing } from '@/features/play-at-bat/model/resolvePitch'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { bodyTypeOf } from '@/widgets/batting-stage/lib/batterLayers'
 import { renderBattingStage, renderSettlementLayer } from '@/widgets/batting-stage/lib/renderBattingStage'
 import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
 import { batterFrameNow, pitchSituationOf } from '@/widgets/batting-stage/lib/stageText'
-import { ballFrameAt, ballFrameStartTime, pitchTickAt } from '@/widgets/batting-stage/model/stageRefs'
+import { ballFrameAt, pitchTickAt } from '@/widgets/batting-stage/model/stageRefs'
 import { clearParticles } from '@/entities/particle/model/particleScene'
 import { NO_STAGE_EFFECTS, fireworksPortOf, stepStageFrame } from '@/widgets/batting-stage/lib/homeRunEffects'
 import { tickParticles } from '@/entities/particle/model/particleScene'
@@ -25,8 +25,7 @@ import { preloadPtcParts } from '@/widgets/particles/lib/renderParticles'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import { pitchReleaseSoundIdOf } from '@/widgets/batting-stage/lib/pitchReleaseSound'
 import { isBuntJudgeFrame } from '@/widgets/batting-stage/lib/buntStance'
-import type { StageRefs, SwingReservation } from '@/widgets/batting-stage/model/stageRefs'
-import { isBallInSwingReach, nextFlightEvent, swingReleaseTickOf } from '@/widgets/batting-stage/lib/swingWindow'
+import type { StageRefs } from '@/widgets/batting-stage/model/stageRefs'
 import { DERBY_ORDINARY_PITCH_TYPE } from '@/entities/home-run-derby/model/derbyRules'
 import { resultBackdropOffsetAt, SKY_ROW_COUNT } from '@/widgets/batting-stage/lib/stageScenery'
 import { PRE_PITCH_TICKS } from '@/widgets/batting-stage/lib/stagePhaseTicks'
@@ -36,20 +35,12 @@ const HOME_RUN_DERBY_GAME_MODE = 7
 /** 타자 스킬 22 압도 (skills.json 22) — 상대 투수 실투율 +5 */
 const INTIMIDATE_SKILL_ID = 22
 
-/** 투구 단계가 부르는 고리 — 타석 화면(`BattingStage`)이 채운다 */
-export interface StageHandlers {
-  /** 판정 0x6aa(0x51226) — 맞은 공이면 곧 0x13, 아니면 결과를 들고 공 끝까지 기다린다 */
-  readonly judgePitch: (swing: BattingSwing, now: number) => void
-  /** 공 끝(틱 N + 1, 0x4e24e) — 0x12 결과를 세운다 */
-  readonly endPitch: (now: number) => void
-  /** 상태 0x13 을 끝내고 인플레이로 넘기는 고리 */
-  readonly commitHit: (now: number) => void
-  /** 스윙이 나가는 틱(F + 1, 0x4e0ce) */
-  readonly releaseSwing: (swing: SwingReservation) => void
-}
+type FinishPitch = (swing: BattingSwing | null, now: number) => void
+/** 상태 0x13 을 끝내고 인플레이로 넘기는 고리 */
+type CommitHit = (now: number) => void
 
 /** 캔버스 애니메이션 루프와 투구 단계 진행. */
-export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
+export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, commitHit: CommitHit) {
   const {
     canvasRef,
     pitchRef,
@@ -63,15 +54,9 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
     buntRef,
     pendingHitRef,
     resultTicksRef,
-    swingRef,
-    pitchJudgedRef,
-    heldResultRef,
     particlesRef,
     latestRef,
   } = refs
-  // 고리는 남은 필살 횟수 같은 props 로 자주 바뀐다 — 루프를 다시 세우면 투구 시작 시각이 지워지므로 ref 로 읽는다
-  const handlersRef = useRef(handlers)
-  handlersRef.current = handlers
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -160,10 +145,6 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
           }
           pitchRef.current = choice.pitch
           pitchTypeNumberRef.current = choice.pitchTypeNumber
-          // 0x11 진입 0x3de10 — 스윙 예약 · 판정 칸(+0xfd8 · +0xfe0 · +0xfe5)을 공마다 지운다
-          swingRef.current = null
-          pitchJudgedRef.current = false
-          heldResultRef.current = null
           // 새 투구가 시작하면 홈런 글자 연출을 끈다 (원본 +0x1960 을 다음 플레이가 지우는 자리)
           homeRunStartedAtRef.current = -1
           phaseRef.current = '투구중'
@@ -187,52 +168,15 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
             }),
           )
         }
-        const frameCount = pitch.frameCount
-        const tickLength = millisecondsPerFrame()
-        const zoneDepth = (ZONE_CENTERS[pitch.stageSide] ?? ZONE_CENTERS[0]).z
-        // 0x4e060 한 갱신의 차례대로 — 예약 풀기(F + 1) → 번트 · 스윙 판정(F + 2 · N − 1) → 공 끝(N + 1) (`nextFlightEvent`)
-        for (;;) {
-          const swing = swingRef.current
-          const bunt = buntRef.current
-          const event = nextFlightEvent(
-            {
-              frameCount,
-              swing,
-              bunt,
-              isJudged: pitchJudgedRef.current,
-              isInReach: (tick) => isBallInSwingReach(pitch.worldPath, frameCount, tick, zoneDepth),
-              // 번트 자세는 공이 N−1 틱에 닿는 그 틱에 깊이 조건 없이 판정한다 (0x4e15c r7 → 0x4e1fe 메시지 0x6aa, 확정)
-              isBuntJudgeTick: (at) => isBuntJudgeFrame(at, frameCount),
-            },
-            frame,
-          )
-          if (event === null) break
-          const { judgePitch, endPitch, releaseSwing } = handlersRef.current
-          if (event.kind === '스윙나감' && swing !== null) {
-            // 0xb9374 — 그림의 스윙도 그 틱부터
-            const released = { ...swing, isReleased: true }
-            swingRef.current = released
-            swingStartedAtRef.current = ballFrameStartTime(swingReleaseTickOf(swing.frame), phaseStartedAtRef.current, tickLength)
-            releaseSwing(released)
-          } else if (event.kind === '판정없는헛스윙' && swing !== null) {
-            swingRef.current = { ...swing, isUnjudgedWhiff: true }
-          } else if (event.kind === '판정') {
-            pitchJudgedRef.current = true
-            judgePitch(
-              {
-                frame: event.frame,
-                shift: shiftRef.current,
-                buntKind: event.buntKind,
-                ...(event.isSpecial ? { isSpecial: true } : {}),
-              },
-              now,
-            )
-            if (phaseRef.current !== '투구중') return
-          } else {
-            // 0x4e24e — 공 틱 > N 이고 맞지 않았으면 0x12
-            endPitch(now)
-            return
-          }
+        const bunt = buntRef.current
+        // 번트 자세는 공이 N−1 틱에 닿는 그 틱에 깊이 조건 없이 판정한다 (0x4e15c r7 → 0x4e1fe 메시지 0x6aa, 확정)
+        if (bunt !== null && isBuntJudgeFrame(frame, pitch.frameCount)) {
+          finishPitch({ frame: bunt.frame, shift: shiftRef.current, buntKind: bunt.kind }, now)
+          return
+        }
+        if (frame > lastSwingFrameOf(pitch.frameCount, pitch.isMagicPitch === true)) {
+          finishPitch(null, now)
+          return
         }
       }
 
@@ -240,7 +184,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       if (phaseRef.current === '타격') {
         const pending = pendingHitRef.current
         const held = pitchTickAt(now, phaseStartedAtRef.current, millisecondsPerFrame())
-        if (pending === null || held >= pending.ticks) handlersRef.current.commitHit(now)
+        if (pending === null || held >= pending.ticks) commitHit(now)
         return
       }
 
@@ -409,9 +353,8 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
     phaseStartedAtRef.current = performance.now()
     animationHandle = requestAnimationFrame(frame)
     return () => cancelAnimationFrame(animationHandle)
-    // ref 묶음은 값이 바뀌지 않는다. 고리는 handlersRef 로 읽는다 — 루프를 다시 세우는 때는 예전처럼 판정 · 0x13 고리가 바뀔 때뿐이다
-    // (타자가 바뀌면 판정 고리가 바뀐다). 필살 횟수로 바뀌는 고리(releaseSwing · endPitch)는 투구 도중이라 다시 세우지 않는다
-  }, [handlers.judgePitch, handlers.commitHit])
+    // ref 묶음은 값이 바뀌지 않는다. finishPitch·commitHit만 바뀔 수 있다.
+  }, [commitHit, finishPitch])
 
   useEffect(() => {
     const onVisibilityChange = () => {
@@ -423,9 +366,6 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       phaseStartedAtRef.current = performance.now()
       pitchRef.current = null
       buntRef.current = null
-      swingRef.current = null
-      pitchJudgedRef.current = false
-      heldResultRef.current = null
       pendingHitRef.current = null
       resultTextRef.current = ''
       homeRunStartedAtRef.current = -1

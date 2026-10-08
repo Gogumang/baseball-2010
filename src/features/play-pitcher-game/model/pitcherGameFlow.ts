@@ -94,7 +94,6 @@ import {
 import type { LiveRunnerPlay } from '@/features/defense-play/model/liveRunnerPlay'
 import type { RunnerPlayEngineResult } from '@/features/defense-play/model/runnerPlayEngine'
 import type { Pitch } from '@/entities/pitching/model/pitch'
-import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
@@ -423,6 +422,12 @@ export interface PitcherGameProgress {
    * 타석(0xc1054 등도 정산 0xa8024 를 부른다)에서 이 주자가 들어와도 내 실점이다.
    */
   readonly inheritedRunners: number
+  /**
+   * 내가 마운드에서 내준 볼넷 · 사구 — 레코드 **+0x2a(사사구)**. 정산 0xa8024 의 공통 꼬리가
+   * `state[5] > 3`(볼넷, a8b0c) · `state[0x12]`(사구, a8b8a) 이면 수비 팀 지금 투수 0xae83d 의 +0x2a 를 +1 하고
+   * 0..9999 로 자른다(a8b58~a8b74 · a8bd2~a8bee). 앞머리 게이트 [sp+0x38](0xa56dc)을 **안 본다** — 포스트시즌에도 센다(원본 그대로).
+   */
+  readonly freePassesByMe: number
   /** state+0x88 볼넷 · +0x89 피안타 · +0x8a 실점 — 우리 팀 투수 **전체**가 내준 것 */
   readonly teamWalksAllowed: number
   readonly teamHitsAllowed: number
@@ -833,6 +838,7 @@ export function startPitcherGame(
     pitchCount: 0,
     runsAllowedByMe: 0,
     inheritedRunners: 0,
+    freePassesByMe: 0,
     teamWalksAllowed: 0,
     teamHitsAllowed: 0,
     teamRunsAllowed: 0,
@@ -917,13 +923,18 @@ export function pitchSlotsFor(progress: PitcherGameProgress): readonly PitchSlot
 export interface PitchInput {
   /** 원본 구질 번호 1~21, 마구는 22 */
   readonly typeNumber: number
-  /**
-   * 조준점 x · y · z — 0x10 에서 방향키로 흐른 점(`pitchAim`). 0x4dc78 이 세 칸 그대로 목표로 쓴다.
-   * 안 넘기면 0x10 진입 0x39894 의 존 중심(안 움직인 조준점)
-   */
-  readonly aim?: WorldPoint
+  /** 코스 칸 0~8 */
+  readonly courseCell: number
   /** 게이지에서 누른 칸 0~9. 안 눌렀으면 0 */
   readonly gaugeCell: number
+  /**
+   * **투수 미션 조준점 흔들림 세기 0~3** — 미션 레코드 바이트 13 (`missions.ts` 의
+   * `conditionCode`, 0xaa57c → 0x39c5c). 미션이 아니면 안 넘긴다.
+   *
+   * 안 넘기거나 0 이면 조준점을 안 흔든다 — 지금까지와 똑같이 논다.
+   * ⚠️ 타자 미션은 이 값이 **전부 0** 이라 타자편에서는 아무 일도 없다 (표 확인).
+   */
+  readonly missionConditionCode?: number
 }
 
 /**
@@ -1011,12 +1022,16 @@ export function startPitch(
   const builtPitch = buildHumanPitch(
     {
       typeNumber: input.typeNumber,
-      ...(input.aim === undefined ? {} : { aim: input.aim }),
+      courseCell: input.courseCell,
       grade,
       gaugeCell: input.gaugeCell,
       stats: fatigued,
       repertoire: options.repertoire,
       side: options.stageSide ?? 1,
+      // 투수 미션일 때만 조준 흔들림 세기가 실린다 (0x39c5c)
+      ...(input.missionConditionCode === undefined
+        ? {}
+        : { missionConditionCode: input.missionConditionCode }),
     },
     random,
   )
@@ -1863,6 +1878,8 @@ function applyDefensivePlay(
     pitcherRecord: mine && counts ? pitcherRecordAfterPlay(progress.pitcherRecord, hitByPitch) : progress.pitcherRecord,
     runsAllowedByMe: progress.runsAllowedByMe + chargedCounted,
     inheritedRunners,
+    // 레코드 +0x2a — 게이트 없이 마운드의 내 투수에게 (a8b58 · a8bd2)
+    freePassesByMe: progress.freePassesByMe + (mine && freePass ? 1 : 0),
     teamHitsAllowed: progress.teamHitsAllowed + (hit ? 1 : 0),
     teamWalksAllowed: progress.teamWalksAllowed + (freePass ? 1 : 0),
     teamRunsAllowed: progress.teamRunsAllowed + applied.runsScored,
@@ -2153,15 +2170,6 @@ function enterPitchSelection(progress: PitcherGameProgress, random: RandomPort):
   if (pinched === progress) return progress
   // 0x16 → 0xd(지우기 건너뜀) → 0xe(강판 판정 · OK 대기) → OK 뒤 메시지 1(돌발 굴림) → 0xf 진입 (`confirmScene`)
   return prepareAtBat(pinched, random)
-}
-
-/**
- * **코스 고르기 취소** — 상태 0x10(조준)의 CLR(−16) 가지가 경기 상태를 **0xf** 로 되돌린다
- * (`0x50ee0~0x50ee6` `0xbcb49(…, 0xf)`). 0xf 진입 `0x3d954` 가 다시 돌아 CPU 대타 `0xac228` 를 한 번 더 묻는다
- * (팀 경기 `returnToPitchSelection` 과 같은 자리). 화면이 조준 단계에서 구질 단계로 돌아갈 때 부른다.
- */
-export function returnToPitchSelection(progress: PitcherGameProgress, random: RandomPort): PitcherGameProgress {
-  return enterPitchSelection(progress, random)
 }
 
 /**
@@ -3078,7 +3086,7 @@ export interface PitcherGameSummary {
   readonly decisionCode: number
   /** 방어율 × 100 (0xb6ce8) */
   readonly earnedRunAverage: number
-  /** 시즌 레코드에 더할 값 — +0x20 아웃 · +0x22 실점 · +0x26 탈삼진 · +0x28 투구 수 · +0x2e 승 · +0x2f 패 · +0x24 세이브 */
+  /** 시즌 레코드에 더할 값 — +0x20 아웃 · +0x22 실점 · +0x26 탈삼진 · +0x28 투구 수 · +0x2e 승 · +0x2f 패 · +0x24 세이브 · +0x2a 사사구 */
   readonly seasonDelta: {
     readonly outs: number
     readonly runsAllowed: number
@@ -3087,6 +3095,7 @@ export interface PitcherGameSummary {
     readonly wins: number
     readonly losses: number
     readonly saves: number
+    readonly walks: number
   }
   /** 경기 뒤 남은 스태미나 (레코드 +0x2c). 경기 사이 회복은 `recoverStaminaAfterGameDay` 가 한다 */
   readonly stamina: number
@@ -3197,6 +3206,7 @@ export function summaryOf(progress: PitcherGameProgress): PitcherGameSummary {
       wins: decisionCode === 1 ? 1 : 0,
       losses: decisionCode === 2 ? 1 : 0,
       saves: decisionCode === 3 ? 1 : 0,
+      walks: progress.freePassesByMe,
     },
     stamina: progress.stamina,
     recordIds: gameEndRecordIdsFor(progress),

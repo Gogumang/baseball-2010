@@ -66,10 +66,7 @@ export interface AutoAdvanceDecision {
 }
 
 export interface AutoAdvanceInput extends DefenseContext {
-  /**
-   * 인자 force — **달리는 중인 주자까지** 본다(멈춘 주자는 늘 본다, af950). 원본은 매 틱 슬롯 2 의 52660 이 `0xaf8c0(제어기, 0)`
-   * (force 0), 판 시작 0x17 진입 0x46418 의 0x46766 만 `0xaf8c0(제어기, 1)` 을 한 번 부른다.
-   */
+  /** 인자 force — 멈춘 주자까지 강제로 본다 */
   readonly force?: boolean
   /**
    * 주자의 원본 `+0x84`(직전 목표 루) — 앞길 검사 0xa9924 가 부르는 방향 판정 0x9fe80 이 본다(`isHeadingBack`).
@@ -168,7 +165,7 @@ export function autoAdvanceDecisions(input: AutoAdvanceInput): readonly AutoAdva
     // 0xaf950~0xaf95a — `r0 = vt18(주자) ; r0 != 0 → 계속 ; 아니면 force == 0 이면 건너뜀`.
     // 곧 **루에 붙어 멈춘 주자는 언제나 보고, 달리는 중인 주자는 force 일 때만 본다.**
     // ⚠️ 예전 줄은 이 조건이 **거꾸로**(멈춘 주자를 force 없이는 안 봄) 박혀 있었다.
-    // 부르는 자리는 이제 원본 인자 그대로다 — 매 틱 force 0(52660), 판 시작 한 번 force 1(0x46766).
+    // 부르는 자리(`runDefensePlay`)가 늘 `force: true` 라 겉으로 드러나지 않던 자리다.
     if (!isRunnerStopped(runner) && input.force !== true) continue
 
     // ── 0xaf96e · 0xaf978 — **홈런(+0x111) 이나 폴 홈런(+0x129) 이 서 있으면 틱 비교 없이 한 루 진루** ──

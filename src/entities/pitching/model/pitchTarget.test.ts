@@ -133,6 +133,34 @@ describe('투수 미션 조준점 흔들림 — 0x39c5c (E-7 · 4a)', () => {
   })
 })
 
+describe('제구 오차에 미션 흔들림 꿰기', () => {
+  it('missionAim 을 안 넘기면 난수 차례가 그대로다 — 지금까지와 똑같이 논다', () => {
+    const 값 = [0, 89 / 360, 0.4, 0.4, 0, 0]
+    expect(applyControlError(C, { tier: 3, isComputer: true }, 차례난수(값))).toEqual(
+      applyControlError(C, { tier: 3, isComputer: true, missionAim: undefined }, 차례난수(값)),
+    )
+  })
+
+  it('조건코드 0 도 난수를 건드리지 않는다', () => {
+    const 값 = [0, 89 / 360, 0.4, 0.4, 0, 0]
+    expect(
+      applyControlError(C, { tier: 3, isComputer: true, missionAim: { conditionCode: 0, side: 1 } }, 차례난수(값)),
+    ).toEqual({ x: C.x + 119, y: C.y, z: C.z })
+  })
+
+  it('조건코드 1 이면 흔들림 난수를 먼저 쓰고 그 자리에서 흩어진다', () => {
+    // 앞 둘이 흔들림(0 → 흔든다, 0 → −40), 나머지는 위 "제구 오차" 시험과 같은 차례다
+    const random = 차례난수([0, 0, 0, 89 / 360, 0.4, 0.4, 0, 0])
+    const moved = applyControlError(
+      C,
+      { tier: 3, isComputer: true, missionAim: { conditionCode: 1, side: 1 } },
+      random,
+    )
+
+    expect(moved).toEqual({ x: C.x - 40 + 119, y: C.y, z: C.z })
+  })
+})
+
 describe('derbyPitchTargetOf — 홈런더비는 존 한가운데 (0x34612~0x34644)', () => {
   it('표 0xcfbcc 의 side 칸 그대로', () => {
     expect(derbyPitchTargetOf(1)).toEqual({ x: ZONE_CENTERS[1].x, y: ZONE_CENTERS[1].y, z: PLATE_DEPTH })

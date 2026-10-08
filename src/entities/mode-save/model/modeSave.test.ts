@@ -13,9 +13,6 @@ import {
   withLastPlayedMode,
   withNariGameCleared,
   withNariGameStarted,
-  withGeneralMatchSettings,
-  withMatchSettingsSeen,
-  NEW_SAVE_MATCH_SETTINGS,
 } from '@/entities/mode-save/model/modeSave'
 
 describe('모드 저장 칸 — 전역기록 +0x3c · +0x4d · 모드 1 블록', () => {
@@ -115,27 +112,5 @@ describe('나간 마선수 대결 대기 — 전역기록 g[0x11f](타자편) ·
     expect(withAceMatchResultWritten(이김, false).aceMatchWon[4]).toBe(false)
     expect(withAceMatchCleared(이김, 4).aceMatchWon[4]).toBe(false)
     expect(withAceMatchResultWritten(EMPTY_MODE_SAVE, true)).toBe(EMPTY_MODE_SAVE)
-  })
-})
-
-describe('일반모드 경기진행 설정(+0x12c+0 계열) · 설정 창 본 표시(+0x11e)', () => {
-  it('새 저장은 이닝 · 전체 · 상세 비트 0 이고 창은 아직 안 봤다 — 생성자 0x9f26c 의 0x9f404~0x9f42c', () => {
-    expect(EMPTY_MODE_SAVE.generalMatchSettings).toEqual({
-      kind: 1, value: 0, battingOrderBits: 0, pitchingInningBits: 0, offenseRunnerBits: 0, defenseRunnerBits: 0,
-    })
-    expect(EMPTY_MODE_SAVE.matchSettingsSeen).toBe(false)
-  })
-
-  it('확인 0x60376 이 되쓴 값과 +0x11e 는 저장에 남아 다시 읽힌다 — 옛 세이브(칸 없음)는 새 저장 값', () => {
-    const 설정 = { ...NEW_SAVE_MATCH_SETTINGS, kind: 2, battingOrderBits: 0b11 }
-    const 저장 = withMatchSettingsSeen(withGeneralMatchSettings(EMPTY_MODE_SAVE, 설정))
-
-    const 다시 = normalizeModeSave(JSON.parse(JSON.stringify(저장)))
-    expect(다시.generalMatchSettings).toEqual(설정)
-    expect(다시.matchSettingsSeen).toBe(true)
-
-    const 옛것 = normalizeModeSave({ lastPlayedMode: 4, generalMatchSettings: { kind: '1' } })
-    expect(옛것.generalMatchSettings).toEqual(NEW_SAVE_MATCH_SETTINGS)
-    expect(옛것.matchSettingsSeen).toBe(false)
   })
 })

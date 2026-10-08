@@ -577,6 +577,20 @@ describe('상대 타순은 이닝을 넘어 이어진다 (team+0x32 · 0xaf020 �
     }
   })
 
+  it('상대 공격 간이 엔진의 도루(0xc1a42)도 리그 기록 재료로 남는다 — 상대 팀 주자마다 한 줄', () => {
+    let found = false
+    for (let seed = 1; seed < 40 && !found; seed += 1) {
+      const random = createSeededRandom(seed)
+      let progress = startGame(random)
+      while (!progress.game.isFinished) progress = applyPlayerOutcome(progress, { kind: '삼진' }, random)
+      const steals = summaryOf(progress).leagueStolenBases ?? []
+      if (steals.length === 0) continue
+      found = true
+      expect(steals.every((steal) => steal.teamId === progress.opponentTeamId)).toBe(true)
+    }
+    expect(found).toBe(true)
+  })
+
   it('상대 타순은 아홉 칸만 돈다 — 로스터 뒤 셋(벤치)은 CPU 대타로 들어온 한 명 말고는 안 선다', () => {
     for (let seed = 30; seed < 40; seed += 1) {
       const random = createSeededRandom(seed)

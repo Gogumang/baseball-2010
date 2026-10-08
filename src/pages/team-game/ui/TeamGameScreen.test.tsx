@@ -39,14 +39,11 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-/** 구질 칸을 누르고(0x50da8) 0xf 의 틱 8 을 지나 조준(0x10)으로 넘어간다 (0x39c1c) */
+/** 구질 칸을 누르고(0x50da8) 0xf 의 틱 8 을 지나 코스 고르기(0x10)로 넘어간다 (0x39c1c) */
 const 구질고르기 = (name: string) => {
   fireEvent.click(screen.getByText(name))
   act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 8))
 }
-
-/** 조준점을 안 움직이고 OK (0x50e9c) — 존 중심을 노린다 */
-const 조준확정 = () => fireEvent.click(screen.getByRole('button', { name: '조준 확정' }))
 
 const 기본옵션: TeamGameOptions = {
   mode: 2,
@@ -102,7 +99,7 @@ describe('팀 경기 화면 — 수비(투구) 차례', () => {
   it('게이지 설정이 꺼져 있으면 코스를 확정하는 순간 던진다 (원본 기본값)', () => {
     띄우기({}, 1) // 첫 공이 타구가 안 되는 씨앗 (경기 시작 rand(0, 2) 가 차례를 한 칸 민다)
     구질고르기('FASTBALL')
-    조준확정()
+    fireEvent.click(screen.getAllByRole('button', { name: /[◎·]/ })[0])
 
     // 다시 1단계로 돌아왔다 — 한 개를 던졌다는 뜻이다
     expect(screen.getByText('1. 구질 선택')).toBeTruthy()
@@ -111,7 +108,7 @@ describe('팀 경기 화면 — 수비(투구) 차례', () => {
   it('게이지를 켜면 투구 결정 단계가 뜬다 (상태 0x11)', () => {
     띄우기({ gaugeSettingOn: true })
     구질고르기('FASTBALL')
-    조준확정()
+    fireEvent.click(screen.getAllByRole('button', { name: /[◎·]/ })[0])
 
     expect(screen.getByText('3. 투구 결정')).toBeTruthy()
   })
@@ -135,7 +132,7 @@ describe('팀 경기 화면 — 인플레이 타구는 수비 화면으로 (상�
       OK통과()
       if (screen.queryByText('1. 구질 선택') === null) break
       구질고르기('FASTBALL')
-      조준확정()
+      fireEvent.click(screen.getAllByRole('button', { name: /[◎·]/ })[0])
     }
 
     expect(screen.queryByText('1. 구질 선택')).toBeNull()

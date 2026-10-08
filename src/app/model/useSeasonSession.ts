@@ -1143,11 +1143,6 @@ export function useSeasonSession(
    * 기록연감 훅이 시즌 세션보다 늦게 서므로 경기를 세울 때 부른다. 안 넘기면 그 선수는 예전 근사(남은 표 칸)로 선다.
    */
   readHallOfFame?: () => SeasonHallOfFame | undefined,
-  /**
-   * 전역기록 +0x11e 손잡이 — 0xdd 진입 0x6548 과 일반모드 22 진입 0x3163c~0x31688 이 **같은 칸**을 본다: 둘 중 먼저 들어간
-   * 쪽에서 한 번만 설정 창이 저절로 뜬다. 넘기면 이 칸도 읽고 쓴다(시즌 저장 `matchSettingsSeen` 은 옛 저장 몫으로 계속 적는다).
-   */
-  matchSettingsSeenSlot?: { readonly read: () => boolean; readonly markSeen: () => void },
 ): SeasonSession {
   /** 내 팀 명단 차례 — 영입한 명전 선수에게 기록을 싣는다 (7da5044 의 받는 쪽 `TeamEntryOrder.record`) */
   const recordSourceNow = useCallback((): SeasonEntryRecordSource | undefined => {
@@ -1780,9 +1775,7 @@ export function useSeasonSession(
           ? pending
           : { ...pending, options: { ...pending.options, opponentAces: rollOpponentAces(aces.pitcher, aces.batter, random) } },
       )
-      // +0x11e — 일반모드 22 가 먼저 봤으면 전역 칸이 이미 1 이다
-      const firstTime = current.matchSettingsSeen !== true && matchSettingsSeenSlot?.read() !== true
-      if (firstTime) matchSettingsSeenSlot?.markSeen()
+      const firstTime = current.matchSettingsSeen !== true
       // 6850 은 SR+0xb2 만 본다 — 포스트시즌도 시리즈 첫 경기(g = 0)면 열 팀을 채운다(`postseasonDayOf`)
       const firstDay = pending.kind !== '국가대항전' && current.state.record.games === 0
       if (firstTime || firstDay) {
@@ -1792,7 +1785,7 @@ export function useSeasonSession(
       setIsMatchSettingsOpen(firstTime)
       setScene(SEASON_SCENE_STATE.경기정보)
     },
-    [commit, random, matchSettingsSeenSlot],
+    [commit, random],
   )
 
   /** 확인 `0x48fc`: `SR+0xb4`(포스트시즌) ? 0xef : (this+0x11c = 1, 0xd7 선수단 → 0xdd → 경기) */

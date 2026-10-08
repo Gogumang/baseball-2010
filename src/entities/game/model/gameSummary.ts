@@ -2,7 +2,7 @@ import type { GameLeaguePitchers } from '@/entities/game/model/gamePitcherLines'
 import type { SeasonStats } from '@/entities/career/model/seasonStats'
 import type { GameResult } from '@/entities/game/model/gameState'
 import type { ReputationCounts } from '@/entities/career/model/gameEvaluation'
-import type { LeaguePlateAppearance } from '@/entities/league/model/leaguePlayerStats'
+import type { LeaguePlateAppearance, LeagueStolenBase } from '@/entities/league/model/leaguePlayerStats'
 
 /** 경기 한 판이 끝났을 때의 요약. 육성 보상 계산의 입력이 된다. */
 export interface GameSummary {
@@ -29,6 +29,11 @@ export interface GameSummary {
    * 리그 밖 경기(미션·홈런더비)는 주지 않으므로 **선택 칸**이다.
    */
   readonly leaguePlateAppearances?: readonly LeaguePlateAppearance[]
+  /**
+   * 이 경기에서 나온 **리그 선수 도루**(+0x2c) — 간이 엔진 0xc1818 끝(0xc1a42~0xc1a98)이 루를 옮긴 주자마다.
+   * 내 선수 도루는 빠져 있다(`stats`). 리그 밖 경기는 주지 않으므로 **선택 칸**이다.
+   */
+  readonly leagueStolenBases?: readonly LeagueStolenBase[]
   /**
    * 경기 끝 결과 판(상태 0x18, 0x4fe9c)의 승리투수·패전투수·세이브 이름 — state+0x44/0x50/0x5c 를
    * 거르지 않고 그대로 읽은 것이다(측 2 = 없음이면 null). 사람 경기 진행기만 채운다 — **선택 칸**.

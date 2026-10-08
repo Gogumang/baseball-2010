@@ -2,9 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
-import { ZONE_CENTERS } from '@/entities/pitching/model/pitchCurve'
 import { PitchSlotPicker } from '@/pages/pitching/ui/PitchSlotPicker'
-import { AimCursor } from '@/pages/pitching/ui/AimCursor'
 import { PitchGradeGauge } from '@/pages/pitching/ui/PitchGradeGauge'
 
 beforeEach(() => {
@@ -17,7 +15,6 @@ afterEach(() => {
 
 const 틱 = (n: number) => act(() => void vi.advanceTimersByTime(millisecondsPerFrame() * n))
 const 키 = (key: string, repeat = false) => fireEvent.keyDown(window, { key, repeat })
-const C = ZONE_CENTERS[1]
 
 describe('구질 고르기 0xf — 칸마다 정해진 키, 틱 8 뒤 넘김', () => {
   const 칸들 = [
@@ -53,49 +50,6 @@ describe('구질 고르기 0xf — 칸마다 정해진 키, 틱 8 뒤 넘김', (
     키('2', true)
     틱(20)
     expect(onDecide).not.toHaveBeenCalled()
-  })
-})
-
-describe('조준 0x10 — 흐르는 조준점', () => {
-  const 조준점 = () => {
-    const dot = screen.getByTestId('조준점')
-    return { x: Number(dot.dataset.x), y: Number(dot.dataset.y), z: Number(dot.dataset.z) }
-  }
-
-  it('존 중심에서 시작하고, 방향키는 다른 키를 누를 때까지 틱마다 20 씩 흐른다', () => {
-    render(<AimCursor side={1} onConfirm={vi.fn()} />)
-    expect(조준점()).toEqual(C)
-    키('ArrowUp')
-    fireEvent.keyUp(window, { key: 'ArrowUp' })
-    틱(3)
-    // y 는 위로 · z 는 dy × 10 을 뺀다
-    expect(조준점()).toEqual({ x: C.x, y: C.y + 60, z: C.z - 30 })
-    키('0')
-    틱(5)
-    expect(조준점()).toEqual({ x: C.x, y: C.y + 60, z: C.z - 30 })
-  })
-
-  it('x ±600 · y ±400 · z ±200 에서 멈춘다', () => {
-    render(<AimCursor side={1} onConfirm={vi.fn()} />)
-    키('7')
-    틱(100)
-    expect(조준점()).toEqual({ x: C.x - 600, y: C.y - 400, z: C.z + 200 })
-  })
-
-  it('OK 는 그 틱까지 돈 조준점을 넘기고, CLR 은 취소를 부른다', () => {
-    const onConfirm = vi.fn()
-    const onCancel = vi.fn()
-    const { unmount } = render(<AimCursor side={1} onConfirm={onConfirm} onCancel={onCancel} />)
-    키('6')
-    틱(2)
-    키('5')
-    expect(onConfirm.mock.calls).toEqual([[{ x: C.x + 40, y: C.y, z: C.z }]])
-    unmount()
-
-    render(<AimCursor side={1} onConfirm={onConfirm} onCancel={onCancel} />)
-    키('Escape')
-    expect(onCancel).toHaveBeenCalledTimes(1)
-    expect(onConfirm).toHaveBeenCalledTimes(1)
   })
 })
 

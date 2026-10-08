@@ -1,6 +1,5 @@
 import { MAGIC_PITCH, pitchListOf } from '@/entities/pitching/model/pitchIntelligence'
-import { pitchPathOf, ZONE_CENTERS } from '@/entities/pitching/model/pitchCurve'
-import { aimStartOf } from '@/features/play-pitcher-game/model/pitchAim'
+import { pitchPathOf, PLATE_DEPTH, ZONE_CENTERS } from '@/entities/pitching/model/pitchCurve'
 import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
 import { applyControlError } from '@/entities/pitching/model/pitchTarget'
 import { pitchSpeedStageOf } from '@/entities/pitching/model/pitchSpeedStage'
@@ -34,7 +33,7 @@ import { MAXIMUM_PITCHER_ABILITY } from '@/entities/pitcher-career/model/pitcher
  *
  * 원본 순서(0x50da8 구질 → 0x50e9c 코스 확정 → 0x50e08 게이지 OK → 0x4dc78 투구)를 따른다.
  *   1. 구질 칸 6개 중 하나 (칸 5 = 마구, 남은 횟수가 0 이면 못 고른다 — 0x50db8)
- *   2. 조준점 (0x10 — 방향키로 흐르는 점, `pitchAim`)
+ *   2. 코스(조준점)
  *   3. 게이지 등급 t (0~5). 게이지를 끄면 제구·체력 확률표 0xd896c 로 뽑는다 (0x4dbac)
  *   4. t 로 능력치 배율(70~110%)과 제구 흩어짐 표 0xcfd60 을 먹인 뒤 궤적 레코드를 고른다
  *
@@ -138,7 +137,7 @@ export function pitchGradeOf(input: PitchGradeInput, random: RandomPort): number
  * 존 반폭 (월드) — `selectPitch.ts` 가 월드 좌표를 존 좌표(−1~1)로 바꿀 때 쓰는 값과 같다.
  * 그쪽 상수가 파일 안에 숨어 있어 같은 수를 여기에 다시 적는다 (목표 종류 1·2 의 최대 거리 331·329).
  */
-export const ZONE_HALF_WORLD = { x: 331, y: 329 }
+const ZONE_HALF_WORLD = { x: 331, y: 329 }
 
 /**
  * 스트라이크 존 표 `0xcfb7c` (존 판정 0x341ec, Q1 문서) — 칸 = 타자 우/좌(`scene+0x17e1`).
@@ -154,6 +153,31 @@ export const ZONE_CENTER_POINTS: readonly { x: number; y: number }[] = [
   { x: 237, y: 326 },
 ]
 
+/**
+ * 코스 칸 0~8 → 월드 조준점.
+ *
+ * **근사 두 군데**.
+ *   ① 원본은 사람이 (2)(4)(6)(8) 로 조준 커서를 움직인다(`I-controls` 0절, 상태 0x10 메시지 8).
+ *      **칸이 몇 개인지, 칸마다 어느 좌표인지 적어 둔 문서가 없다** — P6 에는 투구 화면 절 자체가 없고,
+ *      `ui/slt_pitch.raw`(30×30 반투명 원)를 그리는 호출지도 미해결이다(L 5-B).
+ *      그래서 설명서 <투구 조작> 2단계를 따라 웹이 써 온 **3×3 격자**를 그대로 둔다.
+ *   ② 칸 중심은 스트라이크 존 33px 을 셋으로 나눈 자리(±11px)로 잡았다. 존 반폭이 16.5px 이므로
+ *      존 좌표로는 ±2/3 다. (`pitchCommand.courseOf` 의 ±0.62 는 근거가 적힌 값이 아니라 쓰지 않는다.)
+ */
+export const COURSE_GRID = 3
+const COURSE_STEP = 2 / 3
+
+export function courseTargetOf(cell: number, side: number): WorldPoint {
+  const center = ZONE_CENTERS[side] ?? ZONE_CENTERS[0]
+  const column = cell % COURSE_GRID
+  const row = Math.floor(cell / COURSE_GRID)
+  return {
+    x: center.x + (column - 1) * COURSE_STEP * ZONE_HALF_WORLD.x,
+    y: center.y + (1 - row) * COURSE_STEP * ZONE_HALF_WORLD.y,
+    z: PLATE_DEPTH,
+  }
+}
+
 function plateOf(target: WorldPoint, side: number) {
   const center = ZONE_CENTERS[side] ?? ZONE_CENTERS[0]
   return { x: (target.x - center.x) / ZONE_HALF_WORLD.x, y: (target.y - center.y) / ZONE_HALF_WORLD.y }
@@ -161,11 +185,8 @@ function plateOf(target: WorldPoint, side: number) {
 
 export interface HumanPitchInput {
   readonly typeNumber: number
-  /**
-   * 조준점 `+0x10b8/bc/c0` (x · y · z) — 투구 0x4dc78 이 세 칸을 그대로 목표로 복사한다(4dc9a).
-   * 0x10 에서 사람이 움직인 값이다(`pitchAim`). 안 넘기면 0x10 진입 0x39894 의 존 중심 그대로(안 움직인 조준점).
-   */
-  readonly aim?: WorldPoint
+  /** 코스 칸 0~8 */
+  readonly courseCell: number
   /** 등급 t (0~5) */
   readonly grade: number
   /**
@@ -177,6 +198,12 @@ export interface HumanPitchInput {
   readonly repertoire: PitcherRepertoire
   /** 화면 배치 side (투영 원점 0xcfb18 의 칸) */
   readonly side: number
+  /**
+   * **투수 미션 조준점 흔들림 세기** — 미션 레코드 바이트 13 (`missions.ts` 의 `conditionCode`,
+   * 0xaa57c → 0x39c5c). 안 넘기거나 0 이면 안 흔들린다 = 지금까지와 똑같이 논다.
+   * 미션이 아닌 경기(나만의리그·시즌)에서는 늘 없다.
+   */
+  readonly missionConditionCode?: number
 }
 
 /** 게이지를 안 쓴 공의 그림 칸 = t + 3 (0x4dce0) — CPU 의 `COMPUTER_AIM_OFFSET` 과 같은 줄이다 */
@@ -228,12 +255,19 @@ function magicSpeedStageOf(repertoire: PitcherRepertoire): number {
 export function buildHumanPitch(input: HumanPitchInput, random: RandomPort): Pitch {
   const { typeNumber, stats, repertoire, side } = input
   const isMagic = typeNumber === MAGIC_PITCH_TYPE_NUMBER
-  const target = input.aim ?? aimStartOf(side)
-  // 투수 미션의 조준 흔들림(0x39c5c)은 0x10 의 틱마다 이미 지나왔다(`pitchAim.aimTickOf`) — 여기는 놓는 순간
-  // 0x4dc78 의 제구 흩어짐뿐이다
+  const target = courseTargetOf(input.courseCell, side)
+  // 미션 조준 흔들림(0x39c5c)이 제구 흩어짐(0x4dc78)보다 **먼저**다 — 순서·난수 차례는
+  // `applyControlError` 안에 있다. 세기가 0 이면 난수를 한 톨도 안 뽑는다
   const finalTarget = applyControlError(
     target,
-    { tier: input.grade, isComputer: false, aimIndex: aimCellOf(input) },
+    {
+      tier: input.grade,
+      isComputer: false,
+      aimIndex: aimCellOf(input),
+      ...(input.missionConditionCode === undefined
+        ? {}
+        : { missionAim: { conditionCode: input.missionConditionCode, side } }),
+    },
     random,
   )
   const speedStage = isMagic

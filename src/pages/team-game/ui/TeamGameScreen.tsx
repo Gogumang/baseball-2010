@@ -69,10 +69,9 @@ import { HelpScreen } from '@/pages/help/ui/HelpScreen'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 // 투수 조작 부품 두 개는 투수편 화면이 이미 원본 규칙대로 만들어 둔 것을 **그대로 빌려 쓴다**
 // (같은 상태 0x10·0x11 의 조작이라 화면을 따로 만들 이유가 없다).
-import { AimCursor } from '@/pages/pitching/ui/AimCursor'
+import { CourseGrid } from '@/pages/pitching/ui/CourseGrid'
 import { PitchSlotPicker } from '@/pages/pitching/ui/PitchSlotPicker'
 import type { PitchSlotChoice } from '@/pages/pitching/ui/PitchSlotPicker'
-import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
 import { PitchGradeGauge } from '@/pages/pitching/ui/PitchGradeGauge'
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
 import { useFreePassPlayStart } from '@/pages/defense/model/useFreePassPlayStart'
@@ -189,8 +188,7 @@ export function TeamGameScreen({
 
   const [phase, setPhase] = useState<PitchPhase>('구질')
   const [slot, setSlot] = useState<PitchSlot | null>(null)
-  /** 0x10 에서 확정한 조준점 `+0x10b8` — 게이지(0x11) 뒤 놓을 때 쓴다 */
-  const [aim, setAim] = useState<WorldPoint | null>(null)
+  const [courseCell, setCourseCell] = useState(4)
   const menu = useInGameMenuState()
   const isMenuOpen = menu.isOpen
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
@@ -293,7 +291,13 @@ export function TeamGameScreen({
           event.preventDefault()
           return closeChangeWindow()
         }
-        // 코스 고르기(상태 0x10)의 CLR(−16)은 조준 화면(`AimCursor` 의 onCancel)이 받는다 — 0x50ee0 → 0xf
+        // 코스 고르기(상태 0x10)의 CLR(−16)은 구질 고르기(0xf)로 되돌린다 (0x50ee0~0x50ee6) — 0xf 진입 0x3d954 가 다시 돈다
+        if (canPitch && phase === '코스') {
+          event.preventDefault()
+          setPhase('구질')
+          setSlot(null)
+          actions.returnToPitchSelection()
+        }
         return
       }
       // 도루 출발 0x53610 — '3' 1루 주자 · '2' 2루 주자 · '1' 3루 주자(홈으로)
@@ -678,12 +682,11 @@ export function TeamGameScreen({
     )
   }
 
-  const throwWith = (gaugeCell: number, throwAim: WorldPoint | null = aim) => {
+  const throwWith = (gaugeCell: number) => {
     if (slot === null) return
-    actions.throwPitch({ typeNumber: slot.typeNumber, ...(throwAim === null ? {} : { aim: throwAim }), gaugeCell })
+    actions.throwPitch({ typeNumber: slot.typeNumber, courseCell, gaugeCell })
     setPhase('구질')
     setSlot(null)
-    setAim(null)
   }
 
   return (
@@ -931,32 +934,29 @@ export function TeamGameScreen({
             {phase === '코스' && (
               <>
                 <Panel heading={<>2. 코스 선택 — {slot?.name}</>} />
-                <AimCursor
-                  side={options.stageSide ?? 1}
-                  onConfirm={(confirmed) => {
+                <CourseGrid
+                  selectedCell={courseCell}
+                  onSelect={(cell) => {
+                    setCourseCell(cell)
                     // 마구는 게이지를 쓰지 않고 등급이 늘 5 다 (0x3f500 의 `구질 != 22`)
                     if (options.gaugeSettingOn === true && slot?.isMagic !== true) {
-                      setAim(confirmed)
                       setPhase('게이지')
                       return
                     }
-                    throwWith(0, confirmed)
-                  }}
-                  // CLR(−16)은 구질 고르기(0xf)로 되돌린다 (0x50ee0~0x50ee6) — 0xf 진입 0x3d954 가 다시 돈다
-                  onCancel={() => {
+                    if (slot === null) return
+                    actions.throwPitch({ typeNumber: slot.typeNumber, courseCell: cell, gaugeCell: 0 })
                     setPhase('구질')
                     setSlot(null)
-                    actions.returnToPitchSelection()
                   }}
                 />
-                <Hint>방향키(숫자 1~9)로 조준점을 흘려 보내고 OK 로 확정 · CLR 은 구질로</Hint>
+                <Hint>노릴 코스를 고르세요</Hint>
               </>
             )}
 
             {phase === '게이지' && (
               <>
                 <Panel heading="3. 투구 결정" />
-                <PitchGradeGauge onRelease={(gaugeCell) => throwWith(gaugeCell)} />
+                <PitchGradeGauge onRelease={throwWith} />
               </>
             )}
           </>

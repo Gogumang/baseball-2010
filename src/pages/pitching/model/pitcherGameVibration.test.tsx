@@ -8,7 +8,6 @@ import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
 import { usePitcherGame } from '@/pages/pitching/model/usePitcherGame'
 import type { PitcherGameOptions } from '@/pages/pitching/model/usePitcherGame'
 import { pitchSlotsFor } from '@/features/play-pitcher-game/model/pitcherGameFlow'
-import { aimAfterTicks } from '@/features/play-pitcher-game/model/pitchAim'
 
 const 기본옵션: PitcherGameOptions = {
   ourTeamId: 0,
@@ -58,7 +57,7 @@ function 던지며모으기(isVibrationOn: boolean | undefined, seed: number) {
     if (!result.current.canPitch) break
     const strikesBefore = result.current.progress.atBat.strikes
     진동.mockClear()
-    act(() => result.current.actions.throwPitch({ typeNumber: 구질[step % 구질.length] ?? 1, aim: aimAfterTicks(1, { dx: (step % 3) - 1, dy: 1 - Math.floor((step % 9) / 3) }, 11), gaugeCell: 0 }))
+    act(() => result.current.actions.throwPitch({ typeNumber: 구질[step % 구질.length] ?? 1, courseCell: step % 9, gaugeCell: 0 }))
     기록.push({
       strikesBefore,
       kind: result.current.progress.lastResolution?.kind,

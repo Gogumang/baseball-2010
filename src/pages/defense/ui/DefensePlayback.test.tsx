@@ -308,10 +308,7 @@ describe('수비 장면 득점 점수판 0x41a64 — 실시간 갈래', () => {
       }
       expect(shown.length).toBeGreaterThan(0)
       expect(shown.slice(0, 5)).toEqual(['2:3', '2:3', '2:3', '2:3', '2:3'])
-      // 여섯째 갱신부터 새 점수 — 갱신 계수는 시계로 돌아 같은 그림(앞 점수)을 한 번 더 볼 수 있다(아래 21 과 같은 까닭)
-      const firstNew = shown.indexOf('2:4')
-      expect(firstNew === 5 || (firstNew === 6 && shown[5] === '2:3')).toBe(true)
-      expect(shown.slice(firstNew).every((value) => value === '2:4')).toBe(true)
+      expect(shown[5]).toBe('2:4')
       // 20 번 그린다 — 갱신 계수는 시계로 돌아 한 진행에 갱신이 안 오르면 같은 그림을 한 번 더 볼 수 있다
       expect(shown.length).toBeLessThanOrEqual(21)
     } finally {

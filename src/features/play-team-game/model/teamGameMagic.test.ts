@@ -24,7 +24,7 @@ const 기본옵션: TeamGameOptions = {
 const 시작 = (options: Partial<TeamGameOptions> = {}, seed = 20100901) =>
   startTeamGame({ ...기본옵션, opponentAces: { pitcher: -1, batter: -1 }, ...options }, createSeededRandom(seed))
 
-const 마구 = { typeNumber: 22, gaugeCell: 0 }
+const 마구 = { typeNumber: 22, courseCell: 4, gaugeCell: 0 }
 
 describe('우리 팀 마구 횟수 팀+0x28 — 0xaebe4 가 마운드에 오른 투수로 채운다', () => {
   it('로스터 투수는 +0x18 == 0 이라 0 — 마구 칸이 없다', () => {
@@ -117,7 +117,7 @@ describe('공 객체는 경기에 하나 — 사람 투구와 CPU 투구가 공+
   it('CPU 마구 뒤 사람 공에도 그 공+0x10 이 남는다 — 사람이 마구를 안 던져도 0x34d6c 투수 쪽이 선다', () => {
     const 공남음 = { ...시작(), ballMagicNumber: 6 }
     expect(isPitchTurn(공남음)).toBe(true)
-    const 직구 = startThrowPitch(공남음, { typeNumber: 1, gaugeCell: 0 }, createSeededRandom(3))
+    const 직구 = startThrowPitch(공남음, { typeNumber: 1, courseCell: 4, gaugeCell: 0 }, createSeededRandom(3))
     expect(직구.lastPitch?.magicNumber).toBe(6)
     expect(직구.ballMagicNumber).toBe(6)
   })

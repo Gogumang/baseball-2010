@@ -166,8 +166,9 @@ const SIXTEEN_BITS = 16
  * x ±600 · y ±400 으로 자른 뒤, 미션 레코드 바이트 13(`missions.ts` 의 `conditionCode`) 에 따라
  * 흔든다. 세기별 값은 `MISSION_AIM_SHAKES` 에 있다.
  *
- * 이 함수가 원본 틱 하나의 자르기(x · y) → 흔들기다. 걸음(dx · dy)과 z 자르기까지 붙인 틱 전체는
- * `features/play-pitcher-game/model/pitchAim.aimTickOf` 이고, 사람 조준 화면이 0x10 의 **매 틱** 부른다.
+ * ⚠️ **근사 한 군데**: 웹판에는 조준 틱이 없다 — 사람 투구는 3×3 코스 칸을 골라 한 번에 던진다
+ *    (`features/play-pitcher-game` 의 `courseTargetOf`). 그래서 매 틱이 아니라 **던질 때 한 번**만
+ *    흔든다. 자르기 → 흔들기 순서와 난수 차례는 원본 틱 하나와 같다.
  *
  * 흔들고 난 값은 원본도 다시 자르지 않는다 (다음 틱에서야 잘린다) — **원본 그대로 두었다**.
  */
@@ -208,14 +209,19 @@ export interface ControlErrorInput {
    * CPU 는 늘 등급 + 3. 사람 쪽 가름은 `features/play-pitcher-game` 의 `buildHumanPitch` 가 한다.
    */
   readonly aimIndex?: number
+  /**
+   * **투수 미션 조준 흔들림** — `missions.ts` 의 `conditionCode` 0~3 과 존 중심을 고르는 배치 side.
+   * 안 넘기거나 `conditionCode` 가 0 이면 흔들지 않는다 = 지금까지와 똑같이 논다 (0x39c5c).
+   */
+  readonly missionAim?: { readonly conditionCode: number; readonly side: number }
 }
 
-/**
- * 놓는 순간 0x4dc78 의 제구 흩어짐. 투수 미션의 조준 흔들림(0x39c5c)은 여기가 아니라 0x10 의 틱마다
- * (`applyMissionAimShake`) 이미 지나온 조준점으로 들어온다 — 원본 차례: 흔들기 여러 번 → 0x11 → 등급 굴림 → 흩어짐.
- */
 export function applyControlError(target: WorldPoint, input: ControlErrorInput, random: RandomPort): WorldPoint {
-  const aim = target
+  // 원본 차례대로 조준 흔들림(0x39c5c, 조준 중)이 먼저고 제구 흩어짐(0x4dc78, 던질 때)이 나중이다
+  const aim =
+    input.missionAim === undefined || input.missionAim.conditionCode === 0
+      ? target
+      : applyMissionAimShake(target, input.missionAim.conditionCode, input.missionAim.side, random)
   const row = ERROR_ROWS[Math.max(0, Math.min(input.tier, ERROR_ROWS.length - 1))]
   const aimIndex = input.isComputer ? input.tier + COMPUTER_AIM_OFFSET : (input.aimIndex ?? 0)
   const roll = random.rand(0, 100)

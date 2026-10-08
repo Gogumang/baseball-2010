@@ -72,7 +72,7 @@ import {
 } from '@/entities/game/model/gameRecords'
 import { EMPTY_BATTER_GAME_LOG, recordBatterAtBat } from '@/entities/game/model/batterGameLog'
 import type { BatterGameLog } from '@/entities/game/model/batterGameLog'
-import type { LeaguePlateAppearance } from '@/entities/league/model/leaguePlayerStats'
+import type { LeaguePlateAppearance, LeagueStolenBase } from '@/entities/league/model/leaguePlayerStats'
 import type { AcePlayer } from '@/shared/config/original/acePlayers'
 import { pitcherAbilityOf } from '@/entities/game/model/aceOpponent'
 import {
@@ -280,6 +280,11 @@ export interface GameProgress {
    * 레코드에 성적을 쌓는다 (B-2 확정). 내 타석은 `myStats` 가 이미 세므로 여기 넣지 않는다.
    */
   readonly leaguePlateAppearances: readonly LeaguePlateAppearance[]
+  /**
+   * 리그 선수 기록표에 넘길 **도루**(+0x2c) — 상대 공격 반 이닝(간이 엔진 0xc1818 끝 0xc1a42~0xc1a98)이 루를 옮긴
+   * 주자마다. 주자 신원은 `simulateHalfInning` 의 근사(타순 커서 − 루)다.
+   */
+  readonly leagueStolenBases: readonly LeagueStolenBase[]
   /** 우리 투수가 내준 것 — 완투 계열 기록(0xa7de8)이 보는 state+0x88·0x89·0x8a */
   readonly pitching: {
     readonly hitsAllowed: number
@@ -519,6 +524,7 @@ export function startGame(
     homeRunStreak: 0,
     teammateLogs: {},
     leaguePlateAppearances: [],
+    leagueStolenBases: [],
     pitching: { hitsAllowed: 0, walksAllowed: 0, outsRecorded: 0, strikeouts: 0, strikeoutCombo: 0 },
     log: [],
     nextLogId: 1,
@@ -1664,6 +1670,14 @@ function playOpponentInning(progress: GameProgress, random: RandomPort, relay?: 
           runsBattedIn: appearance.runsBattedIn,
         })),
       ],
+      // 0xc1a42 — 성공한 도루의 주자마다 0xa56dc(ctx, 주자, 0) 참이면 +0x2c (마타자 칸은 summary 가 뺀다)
+      leagueStolenBases: [
+        ...(progress.leagueStolenBases ?? []),
+        ...half.stolenBases.map((steal) => ({
+          teamId: progress.opponentTeamId,
+          battingOrderIndex: steal.rosterSlot ?? steal.battingOrderIndex % BATTING_ORDER_SIZE,
+        })),
+      ],
     },
     `${progress.game.inning}회${progress.game.half} 상대 공격 — ${runs}점${half.pinchHits
       .map((pinch) => ` (${(pinch.battingOrderIndex % BATTING_ORDER_SIZE) + 1}번 CPU 대타)`)
@@ -2386,6 +2400,10 @@ export function summaryOf(progress: GameProgress): GameSummary {
     // 마타자(명단 밖 저장 레코드)는 리그 선수 기록표에 없다 — CPU 끼리 경기(`leagueDay`)와 같이 뺀다
     leaguePlateAppearances: progress.leaguePlateAppearances.filter(
       (appearance) => appearance.battingOrderIndex !== ACE_BATTER_ROSTER_SLOT,
+    ),
+    // 도루 +0x2c 도 같다 — 마선수는 0xa56dc 가 거르고(c1a42), 웹 기록표에는 마타자 칸이 없다
+    leagueStolenBases: (progress.leagueStolenBases ?? []).filter(
+      (steal) => steal.battingOrderIndex !== ACE_BATTER_ROSTER_SLOT,
     ),
     pitchersOfRecord: pitchersOfRecordOf(progress),
     // 경기 끝 판의 이닝별 점수판 0x41c18 — 득점 0xb6a9c 가 쌓은 칸

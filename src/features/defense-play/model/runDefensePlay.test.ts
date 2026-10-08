@@ -1162,20 +1162,18 @@ describe('포스 사슬 — 머리는 늘 "타자주자 → 1루" (`createPlayRu
   const 단타판 = (bases: BaseState, runningMode: '수동' | '자동') =>
     runDefensePlay({ outcome: 단타, trajectory: 외야단타, bases, outs: 0, runAbility: 500, runningMode, throwMode: '자동' })
 
-  it('사람 공격 · 주루 수동이면 매 틱 자동 진루(52660)는 안 돌지만 판 시작 0x46766 의 force 한 번은 돈다 — 3루 주자 득점 · 1루 주자는 2루까지', () => {
+  it('사람 공격 · 주루 수동이면 자동 진루(0xaf918)가 안 돌아 포스로 밀린 만큼만 간다 — 타자주자 1루 · 1루 주자 2루', () => {
     const 수동 = 단타판({ first: true, second: false, third: true }, '수동')
 
-    // 3루 주자는 포스가 아니지만(2루가 비어 사슬이 끊긴다) 판 시작 0xaf8c0(제어기, 1) 은 주루 설정 갈림(0xae690)이 없다 —
-    // 리드 뒤 제 루로 돌아오던 3루 주자가 송구보다 2틱 넘게 빨라 홈으로 간다. 1루 주자는 포스로 2루까지만(매 틱 자동 진루가 없다)
-    expect(수동.advance.bases).toEqual({ first: true, second: true, third: false })
-    expect(수동.advance.runsScored).toBe(1)
+    // 3루 주자는 포스가 아니라(2루가 비어 사슬이 끊긴다) 제자리 — 사람이 키를 안 눌렀다
+    expect(수동.advance.bases).toEqual({ first: true, second: true, third: true })
+    expect(수동.advance.runsScored).toBe(0)
     expect(수동.outcome).toEqual(단타)
   })
 
-  it('주루 자동이면 그 위에서 매 틱 자동 진루가 더 보낸다 — 1루 주자는 2루에 선 뒤 3루까지', () => {
+  it('주루 자동이면 그 위에서 자동 진루가 더 보낸다 — 3루 주자 득점', () => {
     const 자동 = 단타판({ first: true, second: false, third: true }, '자동')
 
-    expect(자동.advance.bases).toEqual({ first: true, second: false, third: true })
     expect(자동.advance.runsScored).toBe(1)
     expect(자동.outcome).toEqual(단타)
   })

@@ -22,4 +22,9 @@ export function timingOf(frame: number, frameCount: number, isSpecialPitch: bool
   return Math.max(TIMING_FLOOR, Math.trunc((TIMING_SCALE * (width - penalty)) / width))
 }
 
-// 스윙 창(키를 받는 틱 · 판정 틱 · 공 끝)은 타이밍 값과 무관하다 — `widgets/batting-stage/lib/swingWindow` (0x4e060)
+/** 이 프레임을 넘기면 타이밍이 0 이라 더 기다릴 까닭이 없다 */
+export function lastSwingFrameOf(frameCount: number, isSpecialPitch: boolean): number {
+  let frame = frameCount - 2
+  while (timingOf(frame + 1, frameCount, isSpecialPitch) > 0) frame += 1
+  return frame + 1
+}

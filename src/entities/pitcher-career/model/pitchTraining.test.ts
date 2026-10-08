@@ -9,8 +9,7 @@ import {
   pitchTrainingCostOf,
   pitchTrainingGateOf,
   pitchTypeNameOf,
-  applyPitchTypeTraining,
-  pitchTrainingCountOf,
+  trainPitchType,
 } from '@/entities/pitcher-career/model/pitchTraining'
 import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
@@ -94,61 +93,30 @@ describe('가드 순서 — 0x17912~0x17a4c', () => {
   })
 })
 
-/** 같은 칸을 n 번 훈련한다 */
-const 훈련 = (career: PitcherCareer, row: number, column: number, times: number): PitcherCareer => {
-  let current = career
-  for (let i = 0; i < times; i += 1) current = applyPitchTypeTraining(current, row, column).career
-  return current
-}
+describe('배우기', () => {
+  it('상위 구질을 배우면 칸 단계가 2 가 되고 비트마스크에 구질이 붙는다', () => {
+    const after = trainPitchType(투수(), 0, 2)
 
-describe('훈련 적용 0xa3bac 종류 5 (0xa3cc8~0xa3d76) — 필요 횟수 0xd80de [2, 4, 5] · 훈련마다 G 0xd80d8', () => {
-  it('상위 구질(열 2)은 네 번 훈련해야 단계가 2 가 된다 — 한 번마다 600 G, 보유 마스크는 안 건드린다', () => {
-    const 한번 = applyPitchTypeTraining(투수(), 0, 2)
-    expect(한번.progress).toEqual({ sessions: 1, required: 4, isLearned: false })
-    expect(pitchTrainingCountOf(한번.career, 0)).toBe(1)
-    expect(한번.career.pitchTrainingStages[0]).toBe(1)
-    expect(한번.career.gamePoint).toBe(5000 - 600)
-
-    const 세번 = 훈련(투수(), 0, 2, 3)
-    const 네번 = applyPitchTypeTraining(세번, 0, 2)
-    expect(네번.progress).toEqual({ sessions: 0, required: 4, isLearned: true })
-    expect(네번.career.pitchTrainingStages[0]).toBe(2)
-    expect(pitchTrainingCountOf(네번.career, 0)).toBe(0)
-    expect(네번.career.gamePoint).toBe(5000 - 600 * 4)
-    expect(hasPitchType(네번.career, 10)).toBe(false)
-    // 다 배운 칸은 가드 ② 단계 > 열/2 로 무시
-    expect(pitchTrainingGateOf(네번.career, 0, 2).kind).toBe('무시')
+    expect(hasPitchType(after, 10)).toBe(true)
+    expect(after.pitchTrainingStages[0]).toBe(2)
+    expect(after.gamePoint).toBe(5000 - 600)
   })
 
-  it('기본 구질(열 0·1)은 두 번 — 300 G 씩', () => {
-    const 한번 = applyPitchTypeTraining(투수(), 2, 0)
-    expect(한번.progress).toEqual({ sessions: 1, required: 2, isLearned: false })
-    const 두번 = applyPitchTypeTraining(한번.career, 2, 0)
-    expect(두번.progress.isLearned).toBe(true)
-    expect(두번.career.pitchTrainingStages[pitchTrainingCellOf(2, 0)]).toBe(1)
-    expect(두번.career.gamePoint).toBe(5000 - 600)
-  })
+  it('히든은 계열이 열리고 그 행 두 칸 중 하나가 단계 2 여야 배운다', () => {
+    const 상위습득 = trainPitchType(투수(), 0, 2)
+    const 열림 = openHiddenPitchRow(상위습득, 0)
 
-  it('히든(열 4)은 다섯 번 · 1000 G — 그 행 cell0 단계가 2 면 cell0 에, 아니면 cell1 에 쌓는다', () => {
-    const 열림 = openHiddenPitchRow(훈련(투수({ gamePoint: 20000 }), 0, 2, 4), 0)
-    expect(pitchTrainingGateOf(열림, 0, 4)).toEqual({ kind: '확인', cost: 1000, textIndex: PITCH_TRAINING_TEXT.confirm })
-    const 다섯번 = 훈련(열림, 0, 4, 5)
-    expect(다섯번.pitchTrainingStages[0]).toBe(3)
-    expect(다섯번.pitchTrainingStages[1]).toBe(열림.pitchTrainingStages[1])
-
-    // cell0 이 단계 1 이고 cell1 이 2 면 cell1 에 쌓는다
-    const 오른쪽 = openHiddenPitchRow(훈련(투수(), 0, 3, 4), 0)
-    const 한번 = applyPitchTypeTraining(오른쪽, 0, 4)
-    expect(pitchTrainingCountOf(한번.career, 1)).toBe(1)
-    expect(pitchTrainingCountOf(한번.career, 0)).toBe(0)
-  })
-
-  it('G 는 0 에서 바닥을 친다 (0xa3d4e)', () => {
-    expect(applyPitchTypeTraining(투수({ gamePoint: 300 }), 2, 0).career.gamePoint).toBe(0)
+    expect(pitchTrainingGateOf(열림, 0, 4)).toEqual({
+      kind: '확인',
+      cost: 1000,
+      textIndex: PITCH_TRAINING_TEXT.confirm,
+    })
+    // 히든은 계열 플래그로만 관리된다 — 단계 칸을 건드리지 않는다
+    expect(trainPitchType(열림, 0, 4).pitchTrainingStages).toEqual(열림.pitchTrainingStages)
   })
 
   it('막힌 칸을 배우려 하면 예외다 — 조용히 넘기지 않는다', () => {
-    expect(() => applyPitchTypeTraining(투수(), 0, 4)).toThrow()
+    expect(() => trainPitchType(투수(), 0, 4)).toThrow()
   })
 })
 

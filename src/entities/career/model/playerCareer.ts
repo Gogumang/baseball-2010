@@ -29,6 +29,7 @@ import { BATTER_EDITION_MODE } from '@/entities/pitcher-career/model/pitcherRota
 import {
   EMPTY_LEAGUE_PLAYER_STATS,
   recordLeaguePlateAppearances,
+  recordLeagueStolenBases,
 } from '@/entities/league/model/leaguePlayerStats'
 import type { LeaguePlayerStats } from '@/entities/league/model/leaguePlayerStats'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -75,7 +76,7 @@ export type SeasonEndState = 136 | 130 | 131 | 128 | 132 | 109 | 116 | 137 | 133
  * 평가를 둔다. 경기마다 덮어쓴다.
  */
 export interface NariLastGame {
-  readonly summary: Omit<GameSummary, 'leaguePlateAppearances' | 'leaguePitchers' | 'pitcherStaminas'>
+  readonly summary: Omit<GameSummary, 'leaguePlateAppearances' | 'leagueStolenBases' | 'leaguePitchers' | 'pitcherStaminas'>
   /**
    * 116 이 읽는 S+0x4a · +0x64 · +7 과 그 감독 글. 평가 0xa719c 가 도는 정규시즌 경기만 덮어쓰므로 포스트시즌 경기 뒤에는
    * **앞 평가 경기 값**이다(감독 글은 116 이 그 +0x4a 와 지금 평판으로 다시 고른다).
@@ -887,7 +888,11 @@ export function applyGameResult(career: PlayerCareer, summary: GameSummary): Pla
     // 미션·홈런더비처럼 리그 밖 경기는 이 칸을 주지 않으므로 그때는 표가 그대로다.
     // 투수 줄도 같은 정산 0xa8024 · 경기 끝 0xa7de8 이 쌓는다 — 정규시즌 경기만 (0xa56dc 의 포스트시즌 거짓)
     leaguePlayerStats: recordHumanGamePitchers(
-      recordLeaguePlateAppearances(career.leaguePlayerStats, summary.leaguePlateAppearances ?? []),
+      recordLeagueStolenBases(
+        recordLeaguePlateAppearances(career.leaguePlayerStats, summary.leaguePlateAppearances ?? []),
+        // 도루 +0x2c 의 게이트 0xa56dc(c1a42)는 모드 4 포스트시즌이면 거짓 — 정규시즌 경기만
+        career.postseason === null ? summary.leagueStolenBases ?? [] : [],
+      ),
       summary.leaguePitchers,
       career.postseason === null,
     ),

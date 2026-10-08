@@ -5,7 +5,6 @@ import {
   inPlayCallSoundIdOf,
   pitchCallSoundIdOf,
   PITCH_RELEASE_SOUND,
-  unjudgedWhiffSoundIdOf,
   walkCheerSoundIdOf,
 } from '@/features/play-at-bat/model/atBatSounds'
 import type { AtBatState } from '@/entities/at-bat/model/atBatState'
@@ -29,11 +28,6 @@ describe('타구 순간 소리 (0x515de~0x5164a)', () => {
 
   it('헛스윙은 바람 소리 8 (0x51350)', () => {
     expect(contactSoundIdOf({ hasSwung: true, hasHit: false, buntKind: 0, resultCode: null, pattern: null })).toBe(8)
-  })
-
-  it('판정 없는 헛스윙(0x4e21c)은 지금 타자가 마선수면 27, 아니면 8 — 필살은 안 본다', () => {
-    expect(unjudgedWhiffSoundIdOf(true)).toBe(27)
-    expect(unjudgedWhiffSoundIdOf(false)).toBe(8)
   })
 
   it('필살타법을 실은 헛스윙은 27 이다 — 스윙 객체 +0x10 ≠ 0 (0x5132e)', () => {

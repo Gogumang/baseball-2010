@@ -46,7 +46,6 @@ import { SCENE_PREPARE_FRAMES } from '@/features/play-game/model/useSceneConfirm
 import { SKY_ROW_COUNT } from '@/widgets/batting-stage/lib/stageScenery'
 import { rollHalfInningFielders } from '@/features/play-game/model/halfInningBoard'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
-import { AIM_STILL, aimAfterTicks, aimStartOf } from '@/features/play-pitcher-game/model/pitchAim'
 
 /**
  * 이벤트 112 의 match 명령이 여는 마선수 대결 — 이기면 114, 지면 115 로 돌아가야 한다.
@@ -174,7 +173,7 @@ function countingRandom() {
 }
 
 /**
- * 투수 미션 하나를 열고 조준점을 안 움직인 채(존 중심) 공 하나를 던져, 그동안 뽑은 난수 수를 센다.
+ * 투수 미션 하나를 열고 한가운데(칸 4)로 공 하나를 던져, 그동안 뽑은 난수 수를 센다.
  * 게이지는 **누른 칸** 으로 넘긴다 — 칸 9 가 등급 t=5(최상)다 (0x50e08 `t = max(g−4, 1)`).
  */
 function drawsOfOnePitch(missionId: number, gaugeCell = 9, gaugeSettingOn = true, pitcher?: ModePitcher) {
@@ -199,9 +198,7 @@ function drawsOfOnePitch(missionId: number, gaugeCell = 9, gaugeSettingOn = true
   })
   const before = counter.drawn()
   act(() => {
-    const { session } = rendered.result.current
-    // 조준(0x10)에서 안 움직이고 곧장 OK — 그 틱의 0x39c5c 가 한 번 돈다(투수 미션이면 흔들림 굴림)
-    session.handleThrow(PITCH_TYPES[0], session.aimTick(aimStartOf(1), AIM_STILL), gaugeCell, gaugeSettingOn)
+    rendered.result.current.session.handleThrow(PITCH_TYPES[0], 4, gaugeCell, gaugeSettingOn)
   })
   const drawn = counter.drawn() - before
   const banner = rendered.result.current.runner.bannerText
@@ -225,7 +222,7 @@ describe('투수 미션 조준 흔들림 — 레코드 바이트 13 → 0x39c5c'
   })
 
   /**
-   * 난수를 늘 0 으로 두면 조건코드 3 은 OK 틱의 0x39c5c 에서 `rand(0,100)=0 <= 50` 이라 반드시 텔레포트하고,
+   * 난수를 늘 0 으로 두면 조건코드 3 은 `rand(0,100)=0 <= 50` 이라 반드시 텔레포트하고,
    * 존 중심 −600 자리로 날아간다. 같은 입력인데 조건코드 0 은 "안타"(난수 14번), 조건코드 3 은
    * "헛스윙"(난수 13번)이 나왔다 — 흔들림이 실제로 조준점을 옮겼다는 뜻이다.
    */
@@ -923,15 +920,7 @@ function countedSeeded(seed: number) {
   return { port, drawn: () => draws }
 }
 
-/** 존 중심에서 각 방향으로 11 틱 흘린 조준점 — 왼위 · 오른위 · 왼아래 · 오른아래 · 왼 · 오른 */
-const CORNER_AIMS = [
-  { dx: -1, dy: 1 },
-  { dx: 1, dy: 1 },
-  { dx: -1, dy: -1 },
-  { dx: 1, dy: -1 },
-  { dx: -1, dy: 0 },
-  { dx: 1, dy: 0 },
-].map((direction) => aimAfterTicks(1, direction, 11))
+const CORNER_CELLS = [0, 2, 6, 8, 3, 5]
 
 /** 씨앗을 넘겨 가며 투수 미션 1 에 공을 던지다 벤치 클리어링에 들어간 자리를 찾는다 */
 function sessionInBenchClearing() {
@@ -956,7 +945,7 @@ function sessionInBenchClearing() {
       const current = rendered.result.current
       const before = counter.drawn()
       // 구석 칸들을 돌려 가며 게이지 없이 — 사구가 나올 만한 자리
-      act(() => current.handleThrow(PITCH_TYPES[0], CORNER_AIMS[pitch % CORNER_AIMS.length], 0, false))
+      act(() => current.handleThrow(PITCH_TYPES[0], CORNER_CELLS[pitch % CORNER_CELLS.length], 0, false))
       if (rendered.result.current.pendingBenchClearing !== null) {
         return { rendered, counter, drawnByThrow: counter.drawn() - before }
       }
@@ -972,7 +961,7 @@ describe('투수 미션 사구 뒤 벤치 클리어링 — 0x4e72c → 0x1e 는 
     const held = rendered.result.current
     expect(held.pendingBenchClearing?.outcome.kind).toBe('사구')
     const run = held.pitcherRun
-    act(() => held.handleThrow(PITCH_TYPES[0], aimStartOf(1), 0, false))
+    act(() => held.handleThrow(PITCH_TYPES[0], 4, 0, false))
     expect(rendered.result.current.pitcherRun).toBe(run)
 
     act(() => rendered.result.current.actions.finishBenchClearing(false))
@@ -1056,7 +1045,7 @@ describe('투수 미션 마구 — 남은 횟수 팀+0x28 과 공+0x10', () => {
   it('웨이브 볼(+0x18 = 2)은 0xd84ff[2] = 5 회 — 던질 때마다 줄고 다시 세우면 새로 채운다', () => {
     const { rendered, mission } = 마구세션()
     expect(rendered.result.current.pitcherMagicRemaining).toBe(5)
-    act(() => rendered.result.current.handleThrow(마구칸(5), aimStartOf(1), 0, false))
+    act(() => rendered.result.current.handleThrow(마구칸(5), 4, 0, false))
     expect(rendered.result.current.pitcherMagicRemaining).toBe(4)
     act(() => rendered.result.current.actions.begin(mission))
     expect(rendered.result.current.pitcherMagicRemaining).toBe(5)
@@ -1068,12 +1057,12 @@ describe('투수 미션 마구 — 남은 횟수 팀+0x28 과 공+0x10', () => {
       if (rendered.result.current.pitcherRun?.status !== '진행중' || rendered.result.current.pendingDefensePlay !== null) {
         return
       }
-      act(() => rendered.result.current.handleThrow(마구칸(5 - thrown), aimStartOf(1), 0, false))
+      act(() => rendered.result.current.handleThrow(마구칸(5 - thrown), 4, 0, false))
     }
     expect(rendered.result.current.pitcherMagicRemaining).toBe(0)
     if (rendered.result.current.pitcherRun?.status !== '진행중' || rendered.result.current.pendingDefensePlay !== null) return
     const before = rendered.result.current.pitcherRun
-    act(() => rendered.result.current.handleThrow(마구칸(0), aimStartOf(1), 0, false))
+    act(() => rendered.result.current.handleThrow(마구칸(0), 4, 0, false))
     expect(rendered.result.current.pitcherRun).toBe(before)
   })
 })
@@ -1112,7 +1101,7 @@ describe('투수편 마선수 대결 — 투수 미션 team − 1 을 던지고 
         act(() => session.actions.finishBenchClearing(false))
         continue
       }
-      act(() => session.handleThrow(PITCH_TYPES[0], aimStartOf(1), 9, true))
+      act(() => session.handleThrow(PITCH_TYPES[0], 4, 9, true))
     }
     const status = rendered.result.current.pitcherRun?.status
     let isWin: boolean | null = null
@@ -1333,7 +1322,7 @@ describe('미션의 파울 각 공도 수비 판을 돈다 — 파울로 닫히�
           continue
         }
         const 앞 = rendered.result.current.runner.atBat
-        act(() => session.handleThrow(PITCH_TYPES[0], aimAfterTicks(1, { dx: (pitch % 3) - 1, dy: 1 - Math.floor((pitch % 9) / 3) }, 11), 9, true))
+        act(() => session.handleThrow(PITCH_TYPES[0], pitch % 9, 9, true))
         const pending = rendered.result.current.session.pendingDefensePlay
         if (pending?.isFoulPlay !== true) continue
         파울판 += 1
@@ -1713,7 +1702,7 @@ describe('대기가 서 있는 동안의 보통 미션 — 대결 꼴 (0xaa57c a
         act(() => session.actions.finishBenchClearing(false))
         continue
       }
-      act(() => session.handleThrow(PITCH_TYPES[0], aimStartOf(1), 9, true))
+      act(() => session.handleThrow(PITCH_TYPES[0], 4, 9, true))
     }
     const status = rendered.result.current.pitcherRun?.status
     // 판이 선 그 순간(정산 진입 0x4ea0c) 이미 적은 것들 — 판을 닫기 전

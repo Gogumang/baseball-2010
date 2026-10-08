@@ -151,6 +151,11 @@ export interface PitcherSeasonStats {
   readonly wins: number
   /** +0x2f 패 */
   readonly losses: number
+  /**
+   * +0x2a 사사구 — 정산 0xa8024 가 볼넷(a8b58) · 사구(a8bd2)마다 수비 팀 지금 투수에게 +1, 0..9999 로 자른다(게이트 없음).
+   * 기록실 124 의 투수 열 0x10000 이 읽는다. 옛 저장에는 없어 0 으로 본다(`pitcherWalksOf`).
+   */
+  readonly walks?: number
 }
 
 export const EMPTY_PITCHER_SEASON_STATS: PitcherSeasonStats = {
@@ -162,6 +167,15 @@ export const EMPTY_PITCHER_SEASON_STATS: PitcherSeasonStats = {
   pitches: 0,
   wins: 0,
   losses: 0,
+  walks: 0,
+}
+
+/** 레코드 +0x2a 사사구 상한 — a8b5a `0x270f` */
+const MAXIMUM_PITCHER_WALKS = 9999
+
+/** 시즌 줄의 사사구(+0x2a) — 옛 저장은 칸이 없어 0 */
+export function pitcherWalksOf(stats: PitcherSeasonStats): number {
+  return stats.walks ?? 0
 }
 
 /** 선수 +0x1f0 u16[0..3] — 완투 계열 횟수 (통산, 새 시즌에도 지우지 않는다) */
@@ -310,7 +324,7 @@ export interface PitcherCareer {
   readonly selectedPitchType: number
   /** 이번 레벨에 쌓은 마구 훈련 횟수 (타자 필살타법 +0x200 자리) */
   readonly magicSessions: number
-  /** 구질 훈련 단계 8칸 — 0 없음 · 1 기본 습득 · 2 상위 습득 · 3 히든 습득 (커리어 +0x208 + 칸·4 + 1, J 3-2) */
+  /** 구질 훈련 단계 8칸 — 0 없음 · 1 기본 습득 · 2 상위 습득 (커리어 +0x208, J 3-2) */
   readonly pitchTrainingStages: readonly number[]
   /** 히든 변화구 계열이 열렸는가 (커리어 +0x204+행, 이벤트 30~33) */
   readonly hiddenPitchRows: readonly boolean[]
@@ -326,11 +340,6 @@ export interface PitcherCareer {
   readonly popularity: number
   readonly reputation: number
   readonly morale: number
-  /**
-   * 구질 훈련 **횟수** 8칸 — 커리어 +0x208 + 칸·4 + 0 (s8). 훈련 적용 0xa3bac 종류 5 가 한 번에 1 씩 쌓고 필요 횟수
-   * (0xd80de [2, 4, 5])가 차면 0 으로 돌리며 단계를 올린다(`applyPitchTypeTraining`). 옛 저장에는 없어 0 으로 본다.
-   */
-  readonly pitchTrainingCounts?: readonly number[]
   readonly money: number
   readonly salary: number
   /**
@@ -794,6 +803,8 @@ export interface PitcherGameOutcome {
     readonly wins: number
     readonly losses: number
     readonly saves: number
+    /** +0x2a 사사구 (`PitcherGameSummary.seasonDelta.walks`). 안 넘기면 0 */
+    readonly walks?: number
   }
   /** 경기 뒤 스태미나 (레코드 +0x2c) */
   readonly stamina: number
@@ -813,6 +824,7 @@ function mergeStats(base: PitcherSeasonStats, delta: PitcherGameOutcome['seasonD
     pitches: base.pitches + delta.pitches,
     wins: base.wins + delta.wins,
     losses: base.losses + delta.losses,
+    walks: Math.min(MAXIMUM_PITCHER_WALKS, pitcherWalksOf(base) + (delta.walks ?? 0)),
   }
 }
 

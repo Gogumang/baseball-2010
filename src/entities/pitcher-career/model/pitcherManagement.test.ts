@@ -5,8 +5,6 @@ import {
   PITCHER_TRAINING_MENUS,
   gamesUntilManagementOf,
   pitcherTrainingBlockReasonOf,
-  pitchTypeTrainingLinesOf,
-  runPitchTypeTraining,
   runPitcherTraining,
   seasonPitcherTrainingCountOf,
 } from '@/entities/pitcher-career/model/pitcherManagement'
@@ -145,34 +143,6 @@ describe('마구 훈련 (필살 창 0x17828 의 투수 탭)', () => {
     const career = 투수({ popularity: 5000, magicLevel: MAGIC_MAXIMUM_LEVEL })
 
     expect(pitcherTrainingBlockReasonOf(career, 메뉴('마구'))).toBe('훈련완료')
-  })
-})
-
-describe('구질 훈련 (108 탭 2 → 0x17f5c 의 0x1836a 갈래)', () => {
-  const 구질투수 = (overrides: Partial<PitcherCareer> = {}) =>
-    투수({ gamePoint: 5000, pitchTrainingStages: [1, 1, 0, 0, 0, 0, 0, 0], ...overrides })
-
-  it('사기는 bfa55(6,10) 만큼 — 병아리 −1 · 몹쓸몸 +2 를 더해 깎고, 행동함 · 훈련 칸 4 수를 남긴다 (0x18a5c · 0x18d70)', () => {
-    const 최소결과 = runPitchTypeTraining(구질투수(), 0, 2, 최소)
-    expect(최소결과.rolledMoraleLoss).toBe(6)
-    expect(최소결과.career.morale).toBe(50 - 6)
-    expect(최소결과.career.hasActedThisCycle).toBe(true)
-    expect(최소결과.career.trainingCounts['마구']).toBe(1)
-    expect(최소결과.career.gamePoint).toBe(5000 - 600)
-
-    expect(runPitchTypeTraining(구질투수(), 0, 2, 최대).rolledMoraleLoss).toBe(9)
-    const 몹쓸몸 = runPitchTypeTraining(구질투수({ skillIds: [3] }), 0, 2, 최소)
-    expect(몹쓸몸.moraleLoss).toBe(8)
-    expect(runPitchTypeTraining(구질투수({ skillIds: [0] }), 0, 2, 최소).moraleLoss).toBe(5)
-  })
-
-  it('알림 글 — 덜 찼으면 StrMODE[89] "%d/%d회", 차면 [88] "구질 훈련 완료!"', () => {
-    const 한번 = runPitchTypeTraining(구질투수(), 0, 2, 최소)
-    expect(pitchTypeTrainingLinesOf(한번)).toEqual(['해당 구질 1/4회 훈련', '사기 -6'])
-    const 다른칸 = runPitchTypeTraining(구질투수({ pitchTrainingCounts: [1, 0, 0, 0, 0, 0, 0, 0] }), 2, 0, 최소)
-    expect(pitchTypeTrainingLinesOf(다른칸)[0]).toBe('해당 구질 1/2회 훈련')
-    const 마지막 = runPitchTypeTraining(구질투수({ pitchTrainingCounts: [3, 0, 0, 0, 0, 0, 0, 0] }), 0, 2, 최소)
-    expect(pitchTypeTrainingLinesOf(마지막).slice(0, 1)).toEqual(['구질 훈련 완료!'])
   })
 })
 

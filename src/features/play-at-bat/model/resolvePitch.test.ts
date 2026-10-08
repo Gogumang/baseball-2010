@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isHitByPitch, isStrikeZonePitch, plateErrorOf, resolvePitch, STRIKE_ZONE_BOXES, unjudgedSwingDetailOf } from '@/features/play-at-bat/model/resolvePitch'
+import { isHitByPitch, isStrikeZonePitch, plateErrorOf, resolvePitch, STRIKE_ZONE_BOXES } from '@/features/play-at-bat/model/resolvePitch'
 import { projectToPlate } from '@/entities/pitching/model/pitchCurve'
 import type { BattingContext } from '@/features/play-at-bat/model/resolvePitch'
 import { createPatternDeck, lastDrawnPattern } from '@/entities/batting/model/battedBallOutcome'
@@ -83,19 +83,6 @@ describe('스트라이크 판정 — 0x3dfac 의 상자 0xcfb7c[side] (경계 �
   it('상자는 side 마다 다르다 — side 0 은 (226, 310)', () => {
     expect(STRIKE_ZONE_BOXES[0]).toEqual({ x: 226, y: 310, width: 33, height: 33 })
     expect(STRIKE_ZONE_BOXES[1]).toEqual({ x: 221, y: 310, width: 33, height: 33 })
-  })
-})
-
-describe('판정 없는 스윙 — 0x6aa 를 안 탄 스윙은 헛스윙 스트라이크 (0x3dfac st[0x10] = S+0xe)', () => {
-  it('스윙 수에 들고 굴림 없이 헛스윙 스트라이크다', () => {
-    expect(unjudgedSwingDetailOf(8)).toEqual({
-      resolution: { kind: '스트라이크', isSwinging: true },
-      hasSwung: true,
-      isBunt: false,
-      resultCode: null,
-      contactSoundId: 8,
-    })
-    expect(unjudgedSwingDetailOf(null).contactSoundId).toBeNull()
   })
 })
 
