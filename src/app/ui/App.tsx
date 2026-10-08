@@ -524,6 +524,8 @@ export function App() {
             gameSettings={gameSettings}
             onFinish={onFinish}
             onQuit={pitcherSession.actions.quitAceMatch}
+            // 첫 0x18 판 PITCHER(0x420dc) — 0x1fbd0 은 g[0x176](투수편 대결)이면 늘 투수편 저장 [저장+0x3c] 선수다
+            pitcherName={pitcherSession.career?.name ?? null}
           />
         )}
       />
