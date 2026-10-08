@@ -24,12 +24,14 @@ import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf } from '@/entities/missio
 import {
   BATTERS_PER_TEAM,
   PITCHERS_PER_TEAM,
-  batterAt,
+  quickBatterOf,
   quickPitcherOf,
   rollStartingPitcherIndex,
   startingPitcherOf,
+  teamBatters,
   teamPitchers,
 } from '@/entities/team/model/teamRoster'
+import { recordAbilityOf } from '@/entities/team/model/recordAbility'
 import { cpuGameRotationAdvances, SEASON_MODE } from '@/entities/pitcher-career/model/pitcherRotation'
 import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
 import { pitcherAbilitySumOf, rosterPitcherRoleOf } from '@/entities/pitching/model/pitcherChange'
@@ -240,6 +242,11 @@ export interface LeagueGameExtras {
 export interface LeagueRecordPlayer {
   readonly tableTeamId: number
   readonly tableSlot: number
+  /**
+   * 레코드 +0x19 · +0x1a 장비 니블 네 칸 — 시즌 저장 명단의 값(새 해 CPU 장비 굴림 0x665e8 · `SeasonPlayer.equipment`).
+   * 경기는 레코드를 `0xb6414(rec, k, 1)` 로 읽어 니블 보너스를 먹는다(`recordAbilityOf`). 없으면 그 Xls 행의 니블
+   */
+  readonly equipment?: readonly number[]
 }
 
 /**
@@ -264,11 +271,28 @@ function recordPlayerAt(
   return found ?? { tableTeamId: teamId, tableSlot: slot }
 }
 
-/** 레코드 칸 k 의 투수 표 줄 */
+/** 레코드 칸 k 의 투수 표 줄 (표 행 그대로 — 구질·손을 행 차례로 찾으므로 사본을 만들지 않는다) */
 function recordPitcherRowAt(record: LeagueTeamRecord | undefined, teamId: number, slot: number) {
   const at = recordPlayerAt(record, teamId, true, slot)
   const roster = teamPitchers(at.tableTeamId)
   return roster[at.tableSlot % roster.length]
+}
+
+/** 레코드 칸 k 의 투수 장비 니블 — 레코드의 것(`LeagueRecordPlayer.equipment`), 없으면 undefined(표 행 니블) */
+function recordPitcherEquipmentAt(record: LeagueTeamRecord | undefined, teamId: number, slot: number) {
+  return recordPlayerAt(record, teamId, true, slot).equipment
+}
+
+/** 레코드 칸 k 의 투수 간이 타석 능력 — 밑값 0xb6414(장비 니블 · 장착 스킬, `quickPitcherOf`) */
+function recordQuickPitcherAt(record: LeagueTeamRecord | undefined, teamId: number, slot: number): QuickAtBatPitcher {
+  return quickPitcherOf(recordPitcherRowAt(record, teamId, slot), recordPitcherEquipmentAt(record, teamId, slot))
+}
+
+/** 레코드 칸 k 의 투수 `0xb6414(rec, k, 1)` 네 칸 — 장비 니블 · 장착 스킬을 먹인 밑값 */
+function recordPitcherAbilityAt(record: LeagueTeamRecord | undefined, teamId: number, slot: number): readonly number[] {
+  const row = recordPitcherRowAt(record, teamId, slot)
+  if (row === undefined) return [0, 0, 0, 0]
+  return recordAbilityOf({ ...row, equipment: recordPitcherEquipmentAt(record, teamId, slot) ?? row.equipment }, true)
 }
 
 /**
@@ -301,7 +325,8 @@ const TEAM_ABILITY_SLOT_OF_PITCHER = [2, 0, 0, 3] as const
 const XLS_TEAM_ABILITY_OFFSET = 2
 
 /**
- * CPU 투수 한 칸의 경기용 능력치 — `0xb570c(팀, k, P, 1, 90, 1)` 차례: 0xb6414 실효값(붙박이 로스터는 밑값) → 피로 0xb58e6
+ * CPU 투수 한 칸의 경기용 능력치 — `0xb570c(팀, k, P, 1, 90, 1)` 차례: 0xb6414 실효값(`base` — 부르는 쪽이 장비 니블 ·
+ * 장착 스킬을 먹여 넘긴다, `recordAbilityOf`) → 피로 0xb58e6
  * (체력 인자 90 이면 없음) → 팀 능력치 정액 0xb592c → 코치 0xb5a74 → 0..999 자르기 0xb5b06.
  * 팀 정액·코치 식은 `features/play-team-game/model/gameAbilities`(J-4 확정)와 같다 — entities 가 features 를 못 불러 옮겨 적었다.
  */
@@ -453,12 +478,12 @@ function defenseOf(
     pitcherAt: (slot) =>
       slot === ACE_PITCHER_SLOT && acePitcher !== undefined
         ? acePitcher.quick
-        : quickPitcherOf(rowAt(slot)),
-    // 투수 능력치 순서는 제구·구속·변화·**체력** (칸 3)
+        : recordQuickPitcherAt(record, teamId, slot),
+    // 투수 능력치 순서는 제구·구속·변화·**체력** (칸 3) — 용량 0x66e44 는 `0xb6415(P, 3, 1)` 이라 장비 니블을 먹는다
     staminaAbilityAt: (slot) =>
       slot === ACE_PITCHER_SLOT && acePitcher !== undefined
         ? acePitcher.staminaAbility
-        : rowAt(slot).ability[3],
+        : recordPitcherAbilityAt(record, teamId, slot)[3] ?? 0,
     // 벤치 투수는 제 레코드 값으로 올라온다 — 경기 사이에 이어진 값
     staminaAt: (slot) => staminas[slot] ?? FULL_STAMINA,
     lead,
@@ -483,7 +508,7 @@ function defenseOf(
             acePitcher.staminaAbility,
           ])
         : pitcherAbilitySumOf(
-            (rowAt(slot)?.ability ?? [0, 0, 0, 0]).map((base, k) =>
+            recordPitcherAbilityAt(record, teamId, slot).map((base, k) =>
               cpuPitcherGameAbilityOf(base, k, teamId, abilityContext),
             ),
           ),
@@ -614,7 +639,9 @@ export function simulateLeagueGame(
   /** 명단의 레코드 칸 k 에 앉은 타자 — 트레이드로 옮겨 온 선수는 옛 팀 표 행이다 (`LeagueTeamRecord`) */
   const recordBatterAt = (teamId: number, record: LeagueTeamRecord | undefined, slot: number) => {
     const at = recordPlayerAt(record, teamId, false, slot)
-    return batterAt(at.tableTeamId, at.tableSlot)
+    // 표 칸을 12 로 돌려 쓰는 것은 `batterAt` 과 같다 — 장비 니블은 레코드의 것(없으면 표 행)
+    const roster = teamBatters(at.tableTeamId)
+    return quickBatterOf(roster[at.tableSlot % roster.length], at.equipment)
   }
   const batterOfTeam = (teamId: number, ace: QuickAtBatBatter | undefined, record: LeagueTeamRecord | undefined) =>
     (slot: number) => slot === ACE_BATTER_ROSTER_SLOT && ace !== undefined ? ace : recordBatterAt(teamId, record, slot)
@@ -632,10 +659,10 @@ export function simulateLeagueGame(
   // 길(포스트시즌 한 경기 등)에서 쓰는 기본값이다
   const awayPitcher = awayRecord === undefined
     ? startingPitcherOf(matchup.away, awaySlot)
-    : quickPitcherOf(recordPitcherRowAt(awayRecord, matchup.away, awaySlot))
+    : recordQuickPitcherAt(awayRecord, matchup.away, awaySlot)
   const homePitcher = homeRecord === undefined
     ? startingPitcherOf(matchup.home, homeSlot)
-    : quickPitcherOf(recordPitcherRowAt(homeRecord, matchup.home, homeSlot))
+    : recordQuickPitcherAt(homeRecord, matchup.home, homeSlot)
   let awayRuns = 0
   let homeRuns = 0
   let awayOrder = 0

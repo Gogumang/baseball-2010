@@ -4,6 +4,7 @@ import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { ROSTER_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
 import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
+import { recordAbilityOf } from '@/entities/team/model/recordAbility'
 
 /**
  * 팀별 선수 명단 — 원본 Team 구조체 (+0x0c 투수 8명 · +0x10 타자 12명, 0x1ff98).
@@ -23,24 +24,31 @@ export function teamPitchers(teamId: number): readonly RosterPlayer[] {
   return PITCHERS.slice(from, from + PITCHERS_PER_TEAM)
 }
 
-/** 능력치 순서는 히트·파워·수비·주루 (0xb6414). 간이 타석은 히트·파워·주루만 본다 */
-export function quickBatterOf(player: RosterPlayer): QuickAtBatBatter {
-  return { hit: player.ability[0], power: player.ability[1], run: player.ability[3], skillIds: [] }
+/**
+ * 능력치 순서는 히트·파워·수비·주루. 간이 타석은 히트·파워·주루만 본다 — 스윙 0xab214 가 `0xb570d(…, 1, 0x5a, 1)` 로 읽으므로
+ * 밑값은 레코드의 `0xb6414(rec, k, 1)`(장비 니블 · 장착 스킬, `recordAbilityOf`)이다.
+ * `equipment` 를 주면 레코드의 장비 니블이 그 값이다(시즌 저장 명단 — 새 해 CPU 장비 0x665e8 · 내 팀 장비 창). 없으면 Xls 행 그대로.
+ */
+export function quickBatterOf(player: RosterPlayer, equipment?: readonly number[]): QuickAtBatBatter {
+  const ability = recordAbilityOf({ ...player, equipment: equipment ?? player.equipment }, false)
+  return { hit: ability[0], power: ability[1], run: ability[3], skillIds: [] }
 }
 
 /**
- * 투수 능력치 순서는 제구·구속·변화·체력.
+ * 투수 능력치 순서는 제구·구속·변화·체력 (밑값 0xb6414 — `quickBatterOf` 주석).
  *
  * 손 `0xb63c0(rec)` — 간이 타석 0xab214 가 타자 스킬 13 좌완UP · 14 우완UP 에 쓴다. 로스터 투수는 마선수가 아니라
  * `폼 & 1` 이고, 폼은 같은 레코드 +0xb 상위 니블(`ROSTER_PITCHER_REPERTOIRES`, `PITCHERS` 와 같은 차례 = 전역 번호)이다.
  * 붙박이 표 밖의 선수(전역 번호를 못 찾음)는 손을 싣지 않는다 — 0 으로 본다.
  */
-export function quickPitcherOf(player: RosterPlayer): QuickAtBatPitcher {
+export function quickPitcherOf(player: RosterPlayer, equipment?: readonly number[]): QuickAtBatPitcher {
   const repertoire = ROSTER_PITCHER_REPERTOIRES[PITCHERS.indexOf(player)]
+  // 밑값 = 0xb6414(rec, k, 1) — `quickBatterOf` 주석
+  const ability = recordAbilityOf({ ...player, equipment: equipment ?? player.equipment }, true)
   return {
-    control: player.ability[0],
-    velocity: player.ability[1],
-    stamina: player.ability[3],
+    control: ability[0],
+    velocity: ability[1],
+    stamina: ability[3],
     skillIds: [],
     ...(repertoire === undefined ? {} : { hand: pitcherHandOf(repertoire.form, false) }),
   }

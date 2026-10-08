@@ -10,6 +10,8 @@ import {
   teamBatters,
   teamPitchers,
 } from '@/entities/team/model/teamRoster'
+import { recordAbilityOf } from '@/entities/team/model/recordAbility'
+import type { RosterPlayer } from '@/shared/config/original/roster'
 import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
 import { ACE_BATTERS, ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
 import type { BatterAbility } from '@/entities/batting/model/batter'
@@ -36,6 +38,20 @@ import type {
 
 /** XlsTEAM_DATA 한 줄의 u16 6개 중 뒤 4개가 팀 능력치다 (앞 둘은 id·100) */
 const TEAM_ABILITY_OFFSET = 2
+
+/**
+ * 붙박이 표 줄의 **`0xb6414(rec, k, 1)`** 네 칸 — 장비 니블 · 장착 스킬을 먹인 밑값 (`recordAbilityOf`).
+ * 경기용 능력치 `0xb570c` 는 맨 앞에서 이 값을 받는다(b5728). `equipment` 를 주면 레코드의 장비 니블이 그 값이다
+ * (시즌 저장 명단 — 새 해 CPU 장비 0x665e8 · 내 팀 장비 창 0x7d90). 없으면 Xls 행의 니블(리그 열 팀은 0, 외인구단만 차 있다).
+ */
+function rowAbilityOf(
+  player: RosterPlayer | undefined,
+  isPitcher: boolean,
+  equipment?: readonly number[],
+): readonly [number, number, number, number] {
+  if (player === undefined) return [0, 0, 0, 0]
+  return recordAbilityOf({ ...player, equipment: equipment ?? player.equipment }, isPitcher)
+}
 
 export interface TeamGameAbilityContext {
   /** 원본 게임 모드 (1 일반 · 2 시즌 · 8·9 대전) */
@@ -104,7 +120,7 @@ export function batterGameAbilities(
   const slot = ((rosterSlot % BATTERS_PER_TEAM) + BATTERS_PER_TEAM) % BATTERS_PER_TEAM
   const player = roster[slot]
   const isMyTeam = context.seasonTeamId === teamId
-  return gameAbilitiesOf(player?.ability ?? [0, 0, 0, 0], {
+  return gameAbilitiesOf(rowAbilityOf(player, false), {
     mode: context.mode,
     isPitcher: false,
     isMyTeam,
@@ -123,7 +139,7 @@ export function pitcherGameAbilities(
   const roster = teamPitchers(teamId)
   const slot = ((rosterSlot % PITCHERS_PER_TEAM) + PITCHERS_PER_TEAM) % PITCHERS_PER_TEAM
   const player = roster[slot]
-  return gameAbilitiesOf(player?.ability ?? [0, 0, 0, 0], {
+  return gameAbilitiesOf(rowAbilityOf(player, true), {
     mode: context.mode,
     isPitcher: true,
     isMyTeam: context.seasonTeamId === teamId,
@@ -173,7 +189,7 @@ export function pitcherGameAbilityParts(
 ): PitcherGameAbilityParts {
   const roster = teamPitchers(teamId)
   const slot = ((rosterSlot % PITCHERS_PER_TEAM) + PITCHERS_PER_TEAM) % PITCHERS_PER_TEAM
-  return pitcherGameAbilityPartsOf(roster[slot]?.ability ?? [0, 0, 0, 0], {
+  return pitcherGameAbilityPartsOf(rowAbilityOf(roster[slot], true), {
     mode: context.mode,
     isMyTeam: context.seasonTeamId === teamId,
     teamAbilities: teamAbilitiesOf(context, teamId),
@@ -233,8 +249,16 @@ export function rosterRepertoireOf(teamId: number, rosterSlot: number): PitcherR
  */
 export interface TeamEntryBatter {
   readonly name: string
-  /** 히트 · 파워 · 수비 · 주루 (원본 0~999 눈금 그대로) */
+  /**
+   * 히트 · 파워 · 수비 · 주루 (원본 0~999 눈금) — 레코드의 **`0xb6414(rec, k, 1)`**(장비 니블 · 장착 스킬까지, 마선수는 레벨
+   * 배율 전 값). 경기용 보정(0xb570c 의 시즌·팀 부분)은 `entryBatterGameAbilities` 가 이 위에 먹인다
+   */
   readonly ability: readonly [number, number, number, number]
+  /**
+   * 레코드 +0x19 · +0x1a 장비 니블 네 칸 (0 없음 · n = 레벨 + 1) — 붙박이 표 선수만 든다(마선수·기록으로 선 영입 선수는 없다).
+   * 타석 그림 0x10866 → 0x78fd8 이 이 니블로 장비 겹을 고른다
+   */
+  readonly equipment?: readonly number[]
   /** 수비 위치 코드 = 레코드 `+0x1c & 0xf`. **0 은 자리 없는 후보(벤치)** 다 */
   readonly position: number
   /** 마타자면 `ACE_BATTERS` 칸 0~4, 아니면 −1 */
@@ -276,7 +300,8 @@ export const NO_ACE_BATTER = -1
 export function rosterEntryBattersOf(teamId: number): readonly TeamEntryBatter[] {
   return teamBatters(teamId).map((player, rosterSlot) => ({
     name: player.name,
-    ability: player.ability,
+    ability: rowAbilityOf(player, false),
+    equipment: player.equipment,
     position: player.position ?? 0,
     aceIndex: NO_ACE_BATTER,
     rosterSlot,
@@ -371,7 +396,7 @@ export function entryBatterGameAbilities(
  */
 export interface TeamEntryPitcher {
   readonly name: string
-  /** 제구 · 구속 · 변화 · 체력 (원본 0~999 눈금 그대로 = 레코드 +0xc 부터 u16 넷) */
+  /** 제구 · 구속 · 변화 · 체력 (원본 0~999 눈금) — 레코드 +0xc 부터 u16 넷에 `0xb6414(rec, k, 1)`(장비 니블 · 장착 스킬)를 먹인 값 */
   readonly ability: readonly [number, number, number, number]
   /** 폼·마구·보유 구질 (레코드 `+0xb>>4` · `+0x18` · `+0x1c`) */
   readonly repertoire: PitcherRepertoire
@@ -431,7 +456,7 @@ export const PITCHER_ENTRY_ACE_SLOT = 8
 export function rosterEntryPitchersOf(teamId: number): readonly TeamEntryPitcher[] {
   return teamPitchers(teamId).map((player, slot) => ({
     name: player.name,
-    ability: player.ability,
+    ability: rowAbilityOf(player, true),
     repertoire: rosterRepertoireOf(teamId, slot),
     aceIndex: NO_ACE_BATTER,
     orderIndex: slot,
@@ -465,15 +490,25 @@ export interface TeamEntryOrder {
      * `rosterSlot` 번째로 서고 기록도 그 자리로 쌓는다. 없으면 경기 팀
      */
     readonly tableTeamId?: number
+    /**
+     * 레코드 +0x19 · +0x1a 장비 니블 네 칸 — 시즌 저장 명단의 값(`SeasonPlayer.equipment`). 표 자리로 선 선수의 `0xb6414` 가
+     * 이 니블로 보너스를 먹는다. 없으면 그 Xls 행의 니블. 기록(`record`)으로 선 선수는 쓰지 않는다
+     */
+    readonly equipment?: readonly number[]
   }[]
-  /** 로스터 칸, 붙박이 표 밖 선수(영입 id ≥ 0xb4)의 기록, 또는 다른 팀 표 자리(트레이드로 옮겨 온 투수) */
+  /** 로스터 칸, 붙박이 표 밖 선수(영입 id ≥ 0xb4)의 기록, 또는 표 자리(트레이드로 옮겨 온 투수 · 장비 니블을 든 투수) */
   readonly pitchers: readonly (number | TeamEntryPitcherRecord | TeamEntryTablePitcher)[]
 }
 
-/** 다른 팀 붙박이 표 자리의 투수 — 트레이드로 옮겨 온 투수 (원본 id = 옛 팀 `× 8 + 칸`) */
+/**
+ * 붙박이 표 자리의 투수 — 트레이드로 옮겨 온 투수(원본 id = 옛 팀 `× 8 + 칸`), 또는 레코드 장비 니블을 실은 제 팀 투수
+ */
 export interface TeamEntryTablePitcher {
-  readonly tableTeamId: number
+  /** 붙박이 표 팀 — 없으면 경기 팀(장비 니블만 실은 제 팀 투수) */
+  readonly tableTeamId?: number
   readonly tableSlot: number
+  /** 레코드 장비 니블 네 칸 — `TeamEntryOrder.batters[].equipment` 와 같다. 없으면 그 Xls 행의 니블 */
+  readonly equipment?: readonly number[]
 }
 
 /**
@@ -566,9 +601,11 @@ export function entryBattersOfOrder(teamId: number, order: TeamEntryOrder): read
     if (isForeignTable(batter.tableTeamId, teamId)) {
       // 옮겨 온 선수 — 레코드는 옛 팀 Xls 행 사본이라 그 행의 이름·능력치로 서고, 기록도 그 자리로 쌓는다
       const player = teamBatters(batter.tableTeamId)[batter.rosterSlot]
+      const equipment = batter.equipment ?? player?.equipment
       return {
         name: player?.name ?? '',
-        ability: player?.ability ?? [0, 0, 0, 0],
+        ability: rowAbilityOf(player, false, equipment),
+        ...(equipment === undefined ? {} : { equipment }),
         position,
         aceIndex: NO_ACE_BATTER,
         rosterSlot: batter.rosterSlot,
@@ -577,9 +614,12 @@ export function entryBattersOfOrder(teamId: number, order: TeamEntryOrder): read
     }
     const rosterSlot = slots[index] ?? 0
     const player = table[rosterSlot]
+    // 표 밖 칸을 채운 자리(`tableSlotsOfOrder` 근사)는 그 표 선수로 서므로 차례의 니블을 안 쓴다
+    const equipment = (rosterSlot === batter.rosterSlot ? batter.equipment : undefined) ?? player?.equipment
     return {
       name: player?.name ?? '',
-      ability: player?.ability ?? [0, 0, 0, 0],
+      ability: rowAbilityOf(player, false, equipment),
+      ...(equipment === undefined ? {} : { equipment }),
       position,
       aceIndex: NO_ACE_BATTER,
       rosterSlot,
@@ -590,25 +630,31 @@ export function entryBattersOfOrder(teamId: number, order: TeamEntryOrder): read
 /** 고친 차례로 세운 투수 명단 — 0번이 저장 레코드의 0번이다 (선발 칸은 부르는 쪽이 정한다) */
 export function entryPitchersOfOrder(teamId: number, order: TeamEntryOrder): readonly TeamEntryPitcher[] {
   const table = teamPitchers(teamId)
+  // 장비 니블을 실은 제 팀 표 자리(`TeamEntryTablePitcher`, 표 팀 = 경기 팀)도 그 표 칸을 쓴 것으로 센다 — 수로 온 칸과 같다
   const slots = tableSlotsOfOrder(
-    order.pitchers.map((pitcher) => (typeof pitcher === 'number' ? pitcher : null)),
+    order.pitchers.map((pitcher) => {
+      if (typeof pitcher === 'number') return pitcher
+      return 'tableSlot' in pitcher && (pitcher.tableTeamId ?? teamId) === teamId ? pitcher.tableSlot : null
+    }),
     table.length,
   )
   return order.pitchers.map((pitcher, orderIndex): TeamEntryPitcher => {
     if (typeof pitcher !== 'number' && 'tableSlot' in pitcher) {
-      // 옮겨 온 투수 — 옛 팀 표 행의 이름·능력치·구질(전역 행 = 팀 × 8 + 칸)·보직(+0xb & 3, 칸 차례)으로 선다
-      const player = teamPitchers(pitcher.tableTeamId)[pitcher.tableSlot]
+      // 표 자리 투수(트레이드로 옮겨 온 투수 · 장비 니블을 실은 제 팀 투수) — 그 표 행의 이름·능력치·구질(전역 행 = 팀 × 8 + 칸)·
+      // 보직(+0xb & 3, 칸 차례)으로 서고, 능력치는 레코드의 장비 니블로 0xb6414 를 먹인다
+      const tableTeamId = pitcher.tableTeamId ?? teamId
+      const player = teamPitchers(tableTeamId)[pitcher.tableSlot]
       const role = rosterPitcherRoleOf(pitcher.tableSlot)
       return {
         name: player?.name ?? '',
-        ability: player?.ability ?? [0, 0, 0, 0],
-        repertoire: rosterRepertoireOf(pitcher.tableTeamId, pitcher.tableSlot),
+        ability: rowAbilityOf(player, true, pitcher.equipment),
+        repertoire: rosterRepertoireOf(tableTeamId, pitcher.tableSlot),
         aceIndex: NO_ACE_BATTER,
         orderIndex,
         skillBits: player?.skillBits ?? 0,
         ...(role === undefined ? {} : { role }),
         tableSlot: pitcher.tableSlot,
-        ...(pitcher.tableTeamId === teamId ? {} : { tableTeamId: pitcher.tableTeamId }),
+        ...(tableTeamId === teamId ? {} : { tableTeamId }),
       }
     }
     if (typeof pitcher !== 'number') {
@@ -627,7 +673,7 @@ export function entryPitchersOfOrder(teamId: number, order: TeamEntryOrder): rea
     const player = table[slot]
     return {
       name: player?.name ?? '',
-      ability: player?.ability ?? [0, 0, 0, 0],
+      ability: rowAbilityOf(player, true),
       repertoire: rosterRepertoireOf(teamId, slot),
       aceIndex: NO_ACE_BATTER,
       orderIndex,
