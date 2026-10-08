@@ -33,7 +33,7 @@ const 후보 = (): RecruitListInput => ({
 
 const 띄우기 = (roster = 로스터(), list = 후보()) => {
   const onRecruit = vi.fn()
-  render(<PlayerRecruitScreen roster={roster} list={list} onRecruit={onRecruit} onBack={vi.fn()} />)
+  render(<PlayerRecruitScreen roster={roster} list={list} onRecruit={onRecruit} onDone={vi.fn()} onBack={vi.fn()} />)
   return onRecruit
 }
 
@@ -108,6 +108,19 @@ describe('자리 고르기와 확정 (0xdf → 0xc554)', () => {
     expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain('선수 영입을 완료하였습니다')
   })
 
+  it('[180] 을 닫아야 구단관리로 간다 (0xc5e4 팝업 0x19 → 0x6fe0 → 0xce)', () => {
+    const onDone = vi.fn()
+    render(<PlayerRecruitScreen roster={로스터()} list={후보()} onRecruit={vi.fn()} onDone={onDone} onBack={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole('button', { name: '나리투수 나리투수' }))
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    fireEvent.click(screen.getByRole('button', { name: '투수 2번 #1' }))
+    expect(onDone).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    expect(onDone).toHaveBeenCalledTimes(1)
+  })
+
   it('⚠️ 투수 쪽은 밀려난 선수의 칸 번호를 고치는 줄이 빠져 있다 (S6 4-4)', () => {
     const onRecruit = 띄우기()
 
@@ -165,6 +178,7 @@ describe('원본 후보 목록을 꽂으면 (0xe1dc 목록 종류 0 → 키 0xe3
         roster={roster}
         list={후보()}
         onRecruit={vi.fn()}
+        onDone={vi.fn()}
         onBack={vi.fn()}
         renderCandidates={({ choose }) => (
           <>

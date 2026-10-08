@@ -734,8 +734,9 @@ export function SeasonRoute({
         onRecruit={(result) => {
           // 원본은 밀려난 선수를 빼지 않고 **끼워넣는다** — 그 규칙은 recruitPlayer 안에 있다
           actions.updateRoster(result.roster)
-          backToTeamMenu()
         }}
+        // [180] 팝업(0x19)을 닫으면 0xce — 0x6fe0 (예전에는 영입하자마자 나가 팝업이 안 보였다)
+        onDone={backToTeamMenu}
         onBack={backToTeamMenu}
       />
     )

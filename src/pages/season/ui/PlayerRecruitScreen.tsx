@@ -20,7 +20,7 @@ const ALREADY_RECRUITED = ORIGINAL_MODE_TEXT[181] ?? ''
  * (0x5ac2~0x5ae0). 팝업이 떠 있는 동안 목록은 키를 안 받는다(0x6fe0).
  */
 const CHOOSE_SLOT = ORIGINAL_MODE_TEXT[179] ?? ''
-/** StrMODE[180] — 영입 완료 */
+/** StrMODE[180] "선수 영입을 완료하였습니다" — 0xc5e4 가 팝업 id 0x19 (1, 0x19, 1) 로 띄운다 */
 const RECRUIT_DONE = ORIGINAL_MODE_TEXT[180] ?? ''
 
 export interface PlayerRecruitScreenProps {
@@ -35,8 +35,13 @@ export interface PlayerRecruitScreenProps {
     readonly pitchers: readonly string[]
     readonly batters: readonly string[]
   }
-  /** 영입이 끝났다 — 바뀐 로스터와 **고쳐진 원본 기록**(0xb6604 의 부작용)을 함께 넘긴다 */
+  /**
+   * 영입이 끝났다 — 바뀐 로스터와 **고쳐진 원본 기록**(0xb6604 의 부작용)을 함께 넘긴다. 원본은 여기서 저장(0x1fded)하고
+   * [180] 팝업을 띄운다 — 화면을 떠나는 것은 그 팝업을 닫은 뒤(`onDone`)다.
+   */
   readonly onRecruit: (result: RecruitResult, asPitcher: boolean) => void
+  /** [180] 팝업(id 0x19)을 닫았다 — 목록 키 0x6fe0 이 0xce(구단관리)로 보낸다 */
+  readonly onDone: () => void
   /** 취소(−16) — 구단관리(0xce)로 되돌아간다 */
   readonly onBack: () => void
   /**
@@ -81,9 +86,13 @@ export interface RecruitCandidateActions {
  *
  * ⚠️ **원본 배치 미해독 — 근사**: 0xe340(그리기)의 좌표를 못 찾아 공용 판 목록으로 그린다.
  */
-export function PlayerRecruitScreen({ roster, list, rosterNames, onRecruit, onBack, renderCandidates }: PlayerRecruitScreenProps) {
+export function PlayerRecruitScreen({
+  roster, list, rosterNames, onRecruit, onDone, onBack, renderCandidates,
+}: PlayerRecruitScreenProps) {
   const [step, setStep] = useState<{ readonly candidate: RecruitCandidate; readonly isPitcher: boolean } | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  /** [180] 이 떠 있다 — 닫으면 0xce */
+  const [isRecruited, setRecruited] = useState(false)
 
   const entries = recruitEntriesOf(list, roster)
 
@@ -141,8 +150,9 @@ export function PlayerRecruitScreen({ roster, list, rosterNames, onRecruit, onBa
   const selectSlot = (index: number) => {
     if (chosen === null) return
     const result = recruitPlayer(roster, chosen.candidate.player, chosen.isPitcher, index)
-    setStep(null)
+    // 0xc4ea~0xc608 — 영입·저장 뒤 [180] (팝업 0x19). 자리 목록(0xdf) 위에 뜬다
     setNotice(RECRUIT_DONE)
+    setRecruited(true)
     onRecruit(result, chosen.isPitcher)
   }
 
@@ -187,7 +197,13 @@ export function PlayerRecruitScreen({ roster, list, rosterNames, onRecruit, onBa
         />
       )}
 
-      {notice !== null && <MessageBox text={notice} buttons={['확인']} onAnswer={() => setNotice(null)} />}
+      {notice !== null && (
+        <MessageBox text={notice} buttons={['확인']} onAnswer={() => {
+          setNotice(null)
+          // 0x6fe0 — 팝업 0x19 가 닫히면 0xce
+          if (isRecruited) onDone()
+        }} />
+      )}
     </RawScreen>
   )
 }
