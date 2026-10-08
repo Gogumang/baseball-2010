@@ -5,6 +5,7 @@ import type { SalaryHolder } from '@/entities/career/model/seasonFlow'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { ORIGINAL_ITEMS } from '@/shared/config/original/items'
 import { ORIGINAL_SKILLS } from '@/shared/config/original/skills'
+import { pitchTypeNameOf } from '@/entities/pitcher-career/model/pitchTraining'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 
@@ -94,10 +95,10 @@ const PITCHER_MODE = 3
 const SEASON_MODE = 2
 
 /**
- * 구질 이름표 [0x140026c + 4n] (.data, 직접 읽었다) — 0 은 빈 글, 1 FASTBALL … 16 SF … 22 SPECIAL.
- * 종류 6 은 표 0xd4e40 = [18, 19, 20, 21] 로 값 → n. (웹 `PITCH_TYPES` 는 SF 가 빠진 21칸이라 번호로 못 쓴다.)
+ * 종류 6 의 값 v → 구질 번호 — 표 0xd4e40 u32 = [18, 19, 20, 21] (직접 읽었다). 이름은 원본 이름표 [0x140026c + 4t]
+ * (`ORIGINAL_PITCH_TYPE_NAMES` — SF 가 든 22칸이라 웹 `PITCH_TYPES` 이름으로는 못 쓴다): 18 GYRO · 19 P.SINKER · 20 P.SLIDER · 21 KNUCKLE.
  */
-const HIDDEN_PITCH_NAMES: readonly string[] = ['GYRO', 'P.SINKER', 'P.SLIDER', 'KNUCKLE']
+const HIDDEN_PITCH_TYPE_NUMBERS: readonly number[] = [18, 19, 20, 21]
 
 /** 연봉 변동 (0x8c304~0x8c374) — 값별 [나눔 수, 더함(1) · 뺌(−1)]. 값 0 은 ×30 ÷ 100 */
 function salaryAfter(base: number, code: number): number {
@@ -175,7 +176,7 @@ function buildRewardText(
     } else if (SILENT_KINDS.has(item.kind)) {
       // 5 · 7 · 8 — 머리말("!N" · "!C")만 남는다
     } else if (item.kind === PITCH_KIND) {
-      text += sprintf(MODE_TEXT[222], HIDDEN_PITCH_NAMES[value] ?? '')
+      text += sprintf(MODE_TEXT[222], pitchTypeNameOf(HIDDEN_PITCH_TYPE_NUMBERS[value] ?? 0))
     } else if (item.kind === GP_ITEM_KIND) {
       const base = ctx.mode === SEASON_MODE ? 119 : 98
       const offset = ctx.mode === BATTER_MODE && value === 10 ? value : value - 1

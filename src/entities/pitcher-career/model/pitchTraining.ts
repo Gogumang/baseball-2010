@@ -1,5 +1,4 @@
 import { BALANCE } from '@/shared/config/original/balance'
-import { PITCH_TYPES } from '@/shared/config/original/pitchTypes'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { HIDDEN_PITCH_EVENTS } from '@/entities/pitcher-career/model/pitcherAbility'
 
@@ -9,13 +8,16 @@ import { HIDDEN_PITCH_EVENTS } from '@/entities/pitcher-career/model/pitcherAbil
  * 타자편의 훈련 칸 4 는 필살타법 창(상태 0x6c)을 열지만, **모드 3 은 0x12dc0 에서 상태 0x78** 을 연다
  * (R7 4절 149행). 그 창이 이 표를 그린다.
  *
- * 표 `0xcc390` u32 **4행 × 5열** (행 = 계열, 열 0·1 기본 · 2·3 상위 · 4 히든):
+ * 표 `0xcc390` u32 **4행 × 5열** (행 = 계열, 열 0·1 기본 · 2·3 상위 · 4 히든). 이름은 원본 구질 이름표 [0x140026c](아래
+ * `ORIGINAL_PITCH_TYPE_NAMES`)로 읽었다:
  * ```
- * 행0 |  2 TWO-SEAM |  3 H.FAST   | 10 CUT FAST   | 11 R.FAST   | 18 P.SINKER
- * 행1 |  5 SHOOT    |  4 SINKER   | 13 H.SHOOT    | 12 H.SINKER | 19 P.SLIDER
- * 행2 |  7 CURVE    |  6 SLIDER   | 15 S.CURVE    | 14 H.SLIDER | 20 KNUCKLE
- * 행3 |  8 FORK     |  9 CHANGEUP | 16 S.CHANGEUP | 17 GYRO     | 21 SPECIAL
+ * 행0 |  2 TWO-SEAM |  3 H.FAST   | 10 CUT FAST   | 11 R.FAST     | 18 GYRO
+ * 행1 |  5 SHOOT    |  4 SINKER   | 13 H.SHOOT    | 12 H.SINKER   | 19 P.SINKER
+ * 행2 |  7 CURVE    |  6 SLIDER   | 15 S.CURVE    | 14 H.SLIDER   | 20 P.SLIDER
+ * 행3 |  8 FORK     |  9 CHANGEUP | 16 SF         | 17 S.CHANGEUP | 21 KNUCKLE
  * ```
+ * 히든 열이 보상 종류 6 의 값 v(행)와 맞는다 — 0x8beb8 이 표 0xd4e40 = [18, 19, 20, 21] 로 v → 이름을 고르고(J 3-3 의
+ * 대사 이름: 33 v 0 자이로볼 · 30 v 1 파워싱커 · 31 v 2 파워슬라이더 · 32 v 3 너클볼), 0x8c5da 가 선수[0x204 + v] 로 행을 연다.
  * 칸 상태는 `커리어+0x208 + (행·2 + 열%2)·4 + 1` = **단계**(0 없음 · 1 기본 습득 · 2 상위 습득),
  * 히든 오픈은 `커리어+0x204+행` 이다. 등록에서 고른 기본 변화구 두 개가 그 칸의 단계 1 이다 (J 3-1).
  */
@@ -59,8 +61,22 @@ export function pitchTypeNumberOf(row: number, column: number): number {
   return PITCH_TRAINING_TABLE[row]?.[column] ?? 0
 }
 
+/**
+ * **원본 구질 이름표** [0x140026c + 4t] (.data 23칸, 직접 읽었다 — 칸 0 은 빈 글 0xda908). 구질 번호 t 가 그대로 칸이다:
+ * 1 FASTBALL … 15 S.CURVE · **16 SF** · 17 S.CHANGEUP · 18 GYRO · 19 P.SINKER · 20 P.SLIDER · 21 KNUCKLE · 22 SPECIAL(마구 칸).
+ * 경기 구질 이름 그림(S5 3절 — 프레임 0x00~0x14 = 21종, SF 가 16번째 · 0x15 "????")도 같은 차례다.
+ *
+ * ⚠️ 웹 `PITCH_TYPES`(생성기 `PITCH_TYPE_NAMES`)는 SF 를 빠뜨리고 끝에 SPECIAL 을 붙여 **이름만** t ≥ 16 에서 한 칸씩 밀려
+ * 있다(궤적 · 비행 틱은 pitch.zt1 항목 t − 1 이라 번호대로 맞다). 원본 쪽 파일은 생성기 몫이라 여기서 이름만 원본 표로 푼다.
+ */
+export const ORIGINAL_PITCH_TYPE_NAMES: readonly string[] = [
+  '', 'FASTBALL', 'TWO-SEAM', 'H.FAST', 'SINKER', 'SHOOT', 'SLIDER', 'CURVE', 'FORK', 'CHANGEUP', 'CUT FAST', 'R.FAST',
+  'H.SINKER', 'H.SHOOT', 'H.SLIDER', 'S.CURVE', 'SF', 'S.CHANGEUP', 'GYRO', 'P.SINKER', 'P.SLIDER', 'KNUCKLE', 'SPECIAL',
+]
+
+/** 구질 번호 t(1 FASTBALL … 21 KNUCKLE · 22 SPECIAL)의 이름 — 원본 이름표 [0x140026c] */
 export function pitchTypeNameOf(typeNumber: number): string {
-  return PITCH_TYPES[typeNumber - 1]?.name ?? ''
+  return ORIGINAL_PITCH_TYPE_NAMES[typeNumber] ?? ''
 }
 
 export function hasPitchType(career: PitcherCareer, typeNumber: number): boolean {

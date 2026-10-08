@@ -110,19 +110,17 @@ export const HIDDEN_PITCH_EVENTS: readonly {
   readonly row: number
   readonly pitchName: string
 }[] = [
-  { eventId: 30, dateFrom: [5, 9], dateTo: [13, 45], control: 200, velocity: 250, breaking: 300, row: 1, pitchName: 'P.SLIDER' },
-  { eventId: 31, dateFrom: [6, 9], dateTo: [13, 45], control: 250, velocity: 350, breaking: 250, row: 2, pitchName: 'KNUCKLE' },
-  { eventId: 32, dateFrom: [7, 9], dateTo: [13, 45], control: 300, velocity: 400, breaking: 600, row: 3, pitchName: 'SPECIAL' },
-  { eventId: 33, dateFrom: [8, 9], dateTo: [13, 45], control: 400, velocity: 700, breaking: 400, row: 0, pitchName: 'P.SINKER' },
+  { eventId: 30, dateFrom: [5, 9], dateTo: [13, 45], control: 200, velocity: 250, breaking: 300, row: 1, pitchName: 'P.SINKER' },
+  { eventId: 31, dateFrom: [6, 9], dateTo: [13, 45], control: 250, velocity: 350, breaking: 250, row: 2, pitchName: 'P.SLIDER' },
+  { eventId: 32, dateFrom: [7, 9], dateTo: [13, 45], control: 300, velocity: 400, breaking: 600, row: 3, pitchName: 'KNUCKLE' },
+  { eventId: 33, dateFrom: [8, 9], dateTo: [13, 45], control: 400, velocity: 700, breaking: 400, row: 0, pitchName: 'GYRO' },
 ]
 
 /*
- * ⚠️ **`pitchName` 은 표 이름이지 이벤트 대사가 아니다.** 보상이 여는 것은 `row`(= 보상 종류 6 의 값,
- * 0x8c5da → `선수[0x204+행] = 1`)이고, 행별 열4 구질 번호는 구질 훈련 표 `0xcc390` 이 정한다.
- * 그런데 r_event 대사는 30 "파워싱커" · 31 "파워슬라이더" · 32 "너클볼" · 33 "자이로볼" 이라
- * 여기 이름과 **한 칸씩 어긋난다**. 표 0xcc390 의 구질 **번호**(18~21)는 확정이지만 그 번호→이름
- * 대응(`pitchTypes.ts` 를 1부터 센 것)은 J 3-2 가 **유력**이라고 적어 둔 것이라, 어긋남은
- * 이름표 쪽 문제로 보인다. 판정에 쓰이는 값이 아니므로 **원본 데이터(row)를 그대로 두고** 적어만 둔다.
+ * `pitchName` 은 행별 열4 구질 번호(18~21, 표 `0xcc390`)를 **원본 구질 이름표** [0x140026c](`ORIGINAL_PITCH_TYPE_NAMES`,
+ * SF 가 든 22칸)로 읽은 이름이다 — 18 GYRO · 19 P.SINKER · 20 P.SLIDER · 21 KNUCKLE. r_event 대사(30 "파워싱커" · 31
+ * "파워슬라이더" · 32 "너클볼" · 33 "자이로볼")와 그대로 맞는다. 예전에는 SF 가 빠진 웹 `PITCH_TYPES` 를 1부터 세어
+ * 한 칸씩 어긋나 보였다(J 3-3 정정 ②의 미해결이 이것으로 풀린다). 판정에는 쓰이지 않는다.
  */
 
 /**

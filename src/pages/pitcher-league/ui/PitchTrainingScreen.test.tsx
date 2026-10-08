@@ -39,7 +39,7 @@ describe('구질 훈련 창', () => {
   it('계열이 안 열린 히든은 StrMODE[67] 이다', () => {
     화면(투수())
 
-    fireEvent.click(screen.getByRole('button', { name: 'P.SINKER' }))
+    fireEvent.click(screen.getByRole('button', { name: 'GYRO' }))
 
     expect(screen.getByText(/아직 배울 수 없는 구질/)).toBeTruthy()
   })

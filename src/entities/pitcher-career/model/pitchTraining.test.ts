@@ -8,6 +8,7 @@ import {
   pitchTrainingCellOf,
   pitchTrainingCostOf,
   pitchTrainingGateOf,
+  pitchTypeNameOf,
   trainPitchType,
 } from '@/entities/pitcher-career/model/pitchTraining'
 import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
@@ -22,13 +23,22 @@ const 투수 = (overrides: Partial<PitcherCareer> = {}): PitcherCareer => ({
 })
 
 describe('구질 훈련 표 — 0xcc390 (J 3-2)', () => {
-  it('4행 × 5열이고 행0 은 TWO-SEAM · H.FAST · CUT FAST · R.FAST · P.SINKER 다', () => {
+  it('4행 × 5열이고 행0 은 TWO-SEAM · H.FAST · CUT FAST · R.FAST · GYRO 다', () => {
     expect(PITCH_TRAINING_TABLE).toEqual([
       [2, 3, 10, 11, 18],
       [5, 4, 13, 12, 19],
       [7, 6, 15, 14, 20],
       [8, 9, 16, 17, 21],
     ])
+  })
+
+  it('이름은 원본 이름표 [0x140026c] — 16 SF · 17 S.CHANGEUP · 히든 열 18~21 은 GYRO · P.SINKER · P.SLIDER · KNUCKLE', () => {
+    expect(pitchTypeNameOf(15)).toBe('S.CURVE')
+    expect(pitchTypeNameOf(16)).toBe('SF')
+    expect(pitchTypeNameOf(17)).toBe('S.CHANGEUP')
+    expect(PITCH_TRAINING_TABLE.map((row) => pitchTypeNameOf(row[4]))).toEqual(['GYRO', 'P.SINKER', 'P.SLIDER', 'KNUCKLE'])
+    expect(pitchTypeNameOf(22)).toBe('SPECIAL')
+    expect(pitchTypeNameOf(0)).toBe('')
   })
 
   it('단계 칸은 행·2 + 열%2 — 열0 과 열2 가 한 칸을 함께 쓴다', () => {
@@ -111,7 +121,7 @@ describe('배우기', () => {
 })
 
 describe('히든 변화구 이벤트 조건 (J 3-3)', () => {
-  it('5년차 9경기부터 제구 200 · 구속 250 · 변화 300 이면 P.SLIDER 계열(행1)이 열린다', () => {
+  it('5년차 9경기부터 제구 200 · 구속 250 · 변화 300 이면 P.SINKER 계열(행1)이 열린다', () => {
     const career = 투수({
       season: 5,
       gamesPlayed: 9,
