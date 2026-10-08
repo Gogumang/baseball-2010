@@ -59,8 +59,8 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
  *   0x53420 이 키마다 끝에 0x587(0)을 보내고(0x53452), 0x509a0 분기(0x50afe)가 0x519cc 로 간다. 0x519cc 는
  *   `state[0x1d] || 플레이+0x129 || state[0xb] ∈ {3, 4}` 일 때만 +0xfe7 = 1 · HOMERUN 글자 +0x1960 = 0 · +0x1100 = 0(0x51a04~0x51a18).
  *   더비는 사건이 없어 홈런 갈래가 state[0x1d] 를 세운 뒤에만 선다 → 527f0 은 이미 state[0x1d] 로 막혀 있어 비거리 셈과 무관하다.
- *   ⚠️ 미이식: +0xfe7 이 서면 5284e 가 틱마다 0xbf01c(공) → 0xa25ac(공+0x68 = 그 값)으로 공 틱을 끝으로 넘긴다(홈런 뒤 키로 건너뛰기) —
- *   웹 더비는 키 건너뛰기가 없어 판 길이를 끝까지 붙든다(건너뛰면 폴 뒤 담장선 두 번째 홈런 갈래도 안 설 수 있다).
+ *   +0xfe7 이 서면 5284e 가 틱마다 0xbf01c(공) → 0xa25ac(공+0x68 = 그 값)으로 공 틱을 끝으로 넘긴다 — 홈런 뒤 키로 건너뛰기
+ *   (`skipDerbyBattedBall`, 화면은 `useHomeRunDerby` 의 `skipHomeRun`).
  * - 표시 비거리 +0x36 (526d0): aa0 ≥ t 인 틱마다 지금 점으로 다시 쓴다 — 홈런 · 파울 가리지 않고 **낙구 틱 점의 비거리**가 남는다
  *   (`displayDistance`). 더하는 값(`distance`)과 달리 두 번 더한 공도 한 번 값이다. 쓰는 곳은 이 526d0 · 일반 갈래 0x5297a ·
  *   초기화 0xb687e 뿐이라 안 맞은 공은 앞 값을 그대로 둔다. 읽는 곳은 비거리 판 그리기 0x36cd4(플레이+0x118 == 8 이거나 +0x1960 이면
@@ -112,13 +112,18 @@ export interface DerbyBattedBall {
    * 닫히고, 그 뒤 10틱(`DERBY_PLAY_CLOSE_TICKS`)에 장면이 0xbb9 로 넘긴다.
    */
   readonly endTicks: number
-  /** 판 진행 관문 0xb0d28 이 닫히는 공 틱 — 공이 처음 멈춘 틱(`derbyBallStopTickOf`). 위 갈래는 t = 1 … closeTick − 1 에서 돈다 */
+  /**
+   * 판 진행 관문 0xb0d28 이 닫히는 공 틱 — 보통은 공이 처음 멈춘 틱(`derbyBallStopTickOf`), 홈런 뒤 키로 건너뛰었으면
+   * 키를 받은 틱 + 1 (`skipDerbyBattedBall`). 위 갈래는 t = 1 … closeTick − 1 에서 돈다.
+   */
   readonly closeTick: number
   /**
    * 표시 비거리 +0x36 을 다시 쓴 틱과 값 (526d0 — 관문이 열린 동안 aa0 ≥ t 인 틱마다). 비거리 판 0x36cd4 가 틱마다 이 칸을 읽어
    * **공이 나는 동안 숫자가 따라 오른다**. 비어 있으면 앞 값 그대로다(`derbyDisplayDistanceAt`).
    */
   readonly displayDistanceTicks: readonly { readonly tick: number; readonly value: number }[]
+  /** 홈런 뒤 키로 건너뛴 틱(키 메시지 0x587 → 0x519cc 를 받은 공 틱). 안 건너뛰었으면 null */
+  readonly skippedAtTick: number | null
 }
 
 /** 공+0x68 이 처음으로 멈춘 점(vt18)에 닿는 틱. 끝까지 안 멈추면 마지막 점의 틱 */
@@ -137,7 +142,36 @@ export function derbyBallStopTickOf(trajectory: BattedBallTrajectory): number {
  */
 export function derbyBattedBallOf(pattern: BattedBallPattern, random?: RandomPort): DerbyBattedBall {
   const trajectory = trajectoryWithRandom(battedBallTrajectory(pattern), random)
-  return derbyPlayOf(pattern, trajectory)
+  return derbyPlayOf(pattern, trajectory, null)
+}
+
+/**
+ * **홈런 뒤 키로 건너뛰기** (2026-10-07 직접 뜸 — 0x53420 · 0x519cc · 0x5284e · 0xbf01c · 0xa2b78).
+ * ```
+ * 53450  0x17 키 처리: 키마다 끝에 메시지 0x587(0) — 갈림 없이 모든 키
+ * 519cc  0x587: state[0x1d] || 플레이+0x129 || state[0xb] ∈ {3, 4} 일 때만 →
+ *        0x6e418(소리 멈춤) · [장면+0xfe7] = 1 · HOMERUN 글자 +0x1960 = 0 · +0x1100 = 0 ·
+ *        0x8fc70(홈런 효과 객체 칸 버리기) · 파티클 관리자 +0x57 = 0 · 0x6dee4(파티클 모두 지우기)
+ * 5284e  모드 7 갈래 끝: +0xfe7 이면 공+0x68 = 0xbf01c(공)                       ; 틱마다 (위 갈래 다음)
+ * bf01c  +0x3c(수평 속도) == 0 ? 1000 : ⌈(|+0x14.x − +0x2c.x| + |+0x14.z − +0x2c.z|) / +0x3c⌉
+ * a2b78  점 꺼내기는 번호를 [0, +0x6c − 1] 로 자른다 → 1000 은 마지막 점(멈춘 점)
+ * ```
+ * - 키는 그 그림의 갱신보다 먼저 돈다(0x52c50: 키 0x498d4 → 공용 갱신 0x3f060(공 틱 +1) → 슬롯 2). 그래서 키를 받은 틱 k 의
+ *   위 갈래는 그대로 돈 뒤(526d0 표시 비거리 · 52720 홈런 — 527f0 은 +0xfe7 로 막히지만 state[0x1d] 가 이미 서 있어 같다)
+ *   공 틱이 0xbf01c 값으로 넘어가고, 다음 틱(k + 1)의 관문 0xb0d28 이 멈춘 점을 보고 닫는다 → 10틱 뒤 0xbb9.
+ *   (더비 홈런 공은 원본 패턴 표 99장 모두 미리 계산이 멈춤으로 끝나 +0x3c = 0 → 1000 → 마지막 점이다. 속도가 남은 공이면
+ *   ⌈거리/속도⌉ 번 점이 안 멈춘 점일 수 있고 원본은 그 점에서 다시 재생한다 — 표에 없어 미이식.)
+ * - 더비는 사건 코드가 없어(+0x129 · state[0xb] 가 안 선다) **홈런 갈래가 state[0x1d] 를 세운 뒤의 틱**에만 건너뛴다 — 홈런 틱 h 의
+ *   갱신이 끝난 다음 그림부터(k > h). 관문이 이미 닫힌 뒤(k ≥ closeTick)면 판 길이는 그대로다.
+ * - 건너뛰면 폴(ab0) 뒤 담장선(aa4)에서 한 번 더 지나는 홈런 갈래(두 번 더하기)가 k 뒤라면 안 선다 — 비거리 · 표시 비거리도 k 까지만이다.
+ *
+ * 건너뛸 수 없는 틱이면 같은 공을 그대로 돌려준다. 난수를 쓰지 않는다(이미 깐 궤적을 다시 돈다).
+ */
+export function skipDerbyBattedBall(batted: DerbyBattedBall, keyTick: number): DerbyBattedBall {
+  if (batted.skippedAtTick !== null) return batted
+  const firstHomeRunTick = batted.homeRunTicks[0]
+  if (firstHomeRunTick === undefined || keyTick <= firstHomeRunTick || keyTick >= batted.closeTick) return batted
+  return derbyPlayOf(batted.pattern, batted.trajectory, keyTick)
 }
 
 /** 틱 t 에 비거리 판 0x36cd4 가 읽는 표시 비거리 +0x36 — 그 틱까지 마지막으로 쓴 값, 없으면 `previous`(앞 공의 값) */
@@ -150,10 +184,16 @@ export function derbyDisplayDistanceAt(batted: DerbyBattedBall, tick: number, pr
   return value
 }
 
-/** 판 하나를 공 틱 1 … closeTick − 1 로 돈다 */
-function derbyPlayOf(pattern: BattedBallPattern, trajectory: BattedBallTrajectory): DerbyBattedBall {
+/** 판 하나를 공 틱 1 … closeTick − 1 로 돈다. `skipTick` 이면 그 틱을 끝으로 공 틱을 넘기고 다음 틱에 관문이 닫힌다 */
+function derbyPlayOf(
+  pattern: BattedBallPattern,
+  trajectory: BattedBallTrajectory,
+  skipTick: number | null,
+): DerbyBattedBall {
   const landingTick = trajectory.landingTick
-  const closeTick = derbyBallStopTickOf(trajectory)
+  const stopTick = derbyBallStopTickOf(trajectory)
+  // 5284e → 다음 틱 52502 의 관문이 마지막 점(멈춤)을 보고 닫는다
+  const closeTick = skipTick === null ? stopTick : Math.min(stopTick, skipTick + 1)
   // 0xb68dc — 더비는 state[0x19] = 0(0x35034 가 모드 7 이면 굴리지 않음) · state[0x1f] = 0(쥐는 이가 없음)이라 쏜 각 state[0x1c] 그대로
   const isFoul = !isFairAngle(pattern[0])
 
@@ -179,7 +219,8 @@ function derbyPlayOf(pattern: BattedBallPattern, trajectory: BattedBallTrajector
       distance += derbyDistanceOf(trajectory.pointAt(landingTick))
       homeRunTicks.push(tick)
     }
-    // 527f0 — 낙구 틱, 아직 홈런이 아니면(state[0x1d] == 0) 지금 점으로 0xa600c · 파울이면 25
+    // 527f0 — 낙구 틱, 아직 홈런이 아니고(state[0x1d] == 0) 건너뛰기(+0xfe7)도 아니면 지금 점으로 0xa600c · 파울이면 25.
+    // 건너뛰기는 홈런 뒤에만 서므로 이 갈래는 state[0x1d] 로 이미 막혀 있다
     if (landingTick === tick && !isHomeRun) {
       if (isFoul) foulCallTick = tick
       else distance += derbyDistanceOf(trajectory.pointAt(tick))
@@ -198,5 +239,6 @@ function derbyPlayOf(pattern: BattedBallPattern, trajectory: BattedBallTrajector
     endTicks: closeTick + DERBY_PLAY_CLOSE_TICKS,
     closeTick,
     displayDistanceTicks,
+    skippedAtTick: closeTick < stopTick ? skipTick : null,
   }
 }

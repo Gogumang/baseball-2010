@@ -4,6 +4,7 @@ import { openScenePatternDeck } from '@/entities/batting/model/battedBallOutcome
 import {
   DERBY_HOME_RUN_SOUND,
   derbyBattedBallOf,
+  skipDerbyBattedBall,
   type DerbyBattedBall,
 } from '@/entities/home-run-derby/model/derbyBattedBall'
 import { derbyPitcherOf } from '@/entities/home-run-derby/model/derbyPitcher'
@@ -78,7 +79,7 @@ export function derbyHomeRunTextOf(
 ): { readonly window: HomeRunTextWindow | null; readonly after: HomeRunTextState } {
   const homeRunTick = batted.homeRunTicks[0]
   if (homeRunTick === undefined) return { window: null, after: scene }
-  const lastDrawTick = batted.closeTick - 1
+  const lastDrawTick = (batted.skippedAtTick ?? batted.closeTick) - 1
   const draws = Math.max(0, lastDrawTick - homeRunTick + 1)
   const restartDraws = batted.homeRunTicks
     .slice(1)
@@ -172,6 +173,12 @@ export interface HomeRunDerbySession {
   readonly homeRunText: HomeRunTextWindow | null
   /** 지금 돌고 있는 더비 판의 비거리 판(0x36cd4). 판이 없으면 null */
   readonly distanceBoard: DerbyDistanceBoard | null
+  /**
+   * 판(0x17)이 도는 동안 받은 키 — 0x17 키 처리 0x53420 이 키마다 보내는 메시지 0x587 → 0x519cc (`skipDerbyBattedBall` 머리말).
+   * 홈런 틱 다음부터 판 끝 전까지만 효과가 있다: 공 틱을 끝으로 넘겨 다음 틱에 관문을 닫고(판 끝 = 키 틱 + 1 + 10),
+   * HOMERUN 글자를 끈다. ⚠️ 같은 처리의 소리 멈춤 0x6e418 은 소리 포트에 멈춤이 없어 안 옮겼다(shared — 구역 밖).
+   */
+  readonly skipHomeRun: () => void
 
   readonly onPitchResolved: (detail: PitchOutcomeDetail) => void
   /** 경기 중 메뉴 [다시하기] 예 — 새 경기 장면 (0x3c98e 모드 7 갈래, `restart` 머리말) */
@@ -503,6 +510,26 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
   }
 
 
+  const skipHomeRun = useCallback(() => {
+    const play = playRef.current
+    if (play === null) return
+    const now = performance.now()
+    // 키는 그 그림의 갱신(공 틱 +1)보다 먼저 돈다 — 지금 흐르는 틱 다음 틱이 키를 받은 틱이다
+    const keyTick = Math.floor((now - play.startedAt) / millisecondsPerFrame()) + 1
+    const skipped = skipDerbyBattedBall(play.batted, keyTick)
+    if (skipped === play.batted) return
+    playRef.current = { ...play, batted: skipped }
+    // 키 틱의 홈런 갈래(폴 뒤 담장선)는 그대로 돌고, 그 뒤 틱의 소리는 없다
+    clearPlaySoundTimers()
+    schedulePlaySounds(skipped, play.startedAt, keyTick)
+    showPlay(skipped)
+    // 두 번 더할 갈래가 키 뒤였으면 비거리가 달라진다 — 판 앞 진행에서 다시 셈한다(원본도 0xae3e8 은 판 끝에서 돈다)
+    if (skipped.distance !== play.batted.distance || skipped.displayDistance !== play.batted.displayDistance) {
+      applyPlayResult(play.runBefore, { kind: '타구', outcome: { kind: '홈런' } }, skipped, play.isEventZoneHit)
+    }
+    armPlayEnd(Math.max(0, play.startedAt + skipped.endTicks * millisecondsPerFrame() - now))
+  }, [])
+
   /**
    * **다시하기 = 경기 장면을 새로 세운다 (확정)**. 경기 중 메뉴 [다시하기](0x3c706 → StrGAME[7] 질문 → 하위 3) 의 예
    * 처리 0x3c98e: `0x20094(앱, 5)` · 장면+0x17f9 = 1 → 모드 7 이면(0x3c9d2) 전역 0x140006c = 0x27 · `0xbc291(…, 0x103)`
@@ -557,6 +584,7 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
     result,
     homeRunText,
     distanceBoard,
+    skipHomeRun,
     onPitchResolved,
     restart,
     retryFromResult,

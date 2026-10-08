@@ -366,4 +366,37 @@ describe('더비 판의 HOMERUN 글자 · 비거리 판 · 홈런 뒤 키 건너
     expect(rendered.result.current.homeRunText).toBeNull()
     expect(rendered.result.current.distanceBoard).not.toBeNull()
   })
+
+  it('홈런 아닌 맞은 공은 키를 눌러도 판 길이 그대로다', () => {
+    const 째깍 = 시계()
+    const rendered = 띄우기()
+    act(() => rendered.result.current.onPitchResolved(번트))
+    째깍.흘리기(3 * millisecondsPerFrame())
+    act(() => rendered.result.current.skipHomeRun())
+    expect(rendered.result.current.distanceBoard?.batted.skippedAtTick).toBeNull()
+    째깍.spy.mockRestore()
+  })
+
+  it('홈런 틱 뒤의 키는 판을 키 틱 + 1 + 10 에 끝내고 글자를 그 틱부터 끈다 (0x519cc · 5284e)', () => {
+    const 째깍 = 시계()
+    const rendered = 띄우기()
+    const 판 = derbyBattedBallOf(홈런.pattern!)
+    const 홈런틱 = 판.homeRunTicks[0]!
+    const ms = millisecondsPerFrame()
+    const 시작 = 째깍.now
+    act(() => rendered.result.current.onPitchResolved(홈런))
+    // 틱 홈런틱 의 그림이 지난 뒤 — 다음 틱(홈런틱 + 1)이 키를 받는다
+    째깍.흘리기(홈런틱 * ms + 1)
+    act(() => rendered.result.current.skipHomeRun())
+    const 키틱 = 홈런틱 + 1
+    expect(rendered.result.current.distanceBoard?.batted.skippedAtTick).toBe(키틱)
+    expect(rendered.result.current.homeRunText?.endsAt).toBe(시작 + 키틱 * ms)
+    // 판 끝 = 키 틱 + 1(관문) + 10
+    째깍.흘리기((키틱 + 1 + 10) * ms - (째깍.now - 시작) - 1)
+    expect(rendered.result.current.isPaused).toBe(true)
+    째깍.흘리기(2)
+    expect(rendered.result.current.distanceBoard).toBeNull()
+    expect(rendered.result.current.run.remainingPitches).toBe(9)
+    째깍.spy.mockRestore()
+  })
 })

@@ -4,9 +4,10 @@ import {
   derbyBallStopTickOf,
   derbyBattedBallOf,
   derbyDisplayDistanceAt,
+  skipDerbyBattedBall,
 } from '@/entities/home-run-derby/model/derbyBattedBall'
 import { DERBY_DISTANCE_LIMIT, derbyDistanceOf } from '@/entities/home-run-derby/model/derbyRules'
-import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
+import { battedBallTrajectory, isBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { isFairAngle } from '@/entities/batting/model/battedBallOutcome'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { isBigFlyPattern, isEventZoneHit, isEventZoneVisibleAt } from '@/entities/home-run-derby/model/eventZone'
@@ -136,5 +137,47 @@ describe('비거리 판 0x36cd4 의 숫자 — 표시 비거리 +0x36 을 틱마
     expect(derbyDisplayDistanceAt(공, 0, 37)).toBe(37)
     expect(derbyDisplayDistanceAt(공, 3, 37)).toBe(derbyDistanceOf(공.trajectory.pointAt(3)))
     expect(derbyDisplayDistanceAt(공, 공.endTicks, 37)).toBe(공.displayDistance)
+  })
+})
+
+describe('홈런 뒤 키로 건너뛰기 — 0x587 → 0x519cc 의 +0xfe7 → 5284e 가 공 틱을 0xbf01c 로 넘긴다', () => {
+  it('홈런 틱 다음부터 받은 키는 그 틱의 갈래를 돈 뒤 다음 틱에 관문을 닫는다 — 판 끝 = 키 틱 + 1 + 10', () => {
+    const 공 = derbyBattedBallOf(빠른홈런)
+    const 홈런틱 = 공.homeRunTicks[0]!
+    expect(공.closeTick).toBeGreaterThan(홈런틱 + 2)
+    const 건너뜀 = skipDerbyBattedBall(공, 홈런틱 + 1)
+    expect(건너뜀.skippedAtTick).toBe(홈런틱 + 1)
+    expect(건너뜀.closeTick).toBe(홈런틱 + 2)
+    expect(건너뜀.endTicks).toBe(홈런틱 + 2 + DERBY_PLAY_CLOSE_TICKS)
+    expect(건너뜀.isHomeRun).toBe(true)
+    // 표시 비거리는 키 틱까지만 다시 쓴다 — 낙구 전에 건너뛰면 그 틱의 점 값이 남는다
+    if (공.trajectory.landingTick > 홈런틱 + 1) {
+      expect(건너뜀.displayDistance).toBe(derbyDistanceOf(공.trajectory.pointAt(홈런틱 + 1)))
+    }
+    // 홈런 갈래의 비거리는 낙구 점으로 이미 더했다
+    expect(건너뜀.distance).toBe(공.distance)
+  })
+
+  it('홈런 틱 전 · 그 틱(아직 state[0x1d] 가 안 섰다) · 관문이 닫힌 뒤의 키는 아무것도 안 바꾼다', () => {
+    const 공 = derbyBattedBallOf(빠른홈런)
+    const 홈런틱 = 공.homeRunTicks[0]!
+    expect(skipDerbyBattedBall(공, 홈런틱)).toBe(공)
+    expect(skipDerbyBattedBall(공, 1)).toBe(공)
+    expect(skipDerbyBattedBall(공, 공.closeTick)).toBe(공)
+    const 뜬공 = derbyBattedBallOf(BATTED_BALL_PATTERNS[15]![0]!)
+    expect(skipDerbyBattedBall(뜬공, 3)).toBe(뜬공)
+  })
+
+  it('원본 패턴 표의 더비 홈런은 모두 미리 계산이 멈춤으로 끝난다 — 0xbf01c 는 1000, 점 꺼내기가 마지막 점으로 자른다', () => {
+    let 홈런 = 0
+    for (const pattern of Object.values(BATTED_BALL_PATTERNS).flat()) {
+      const 공 = derbyBattedBallOf(pattern)
+      if (!공.isHomeRun) continue
+      홈런 += 1
+      expect(공.trajectory.isStoppedAt?.(공.trajectory.length - 1)).toBe(true)
+      // 미리 계산이 끝난 공의 +0x3c(수평 속도) = 0 → 0xbf01c 는 1000
+      expect(isBallTrajectory(공.trajectory) && 공.trajectory.flight.body.speed).toBe(0)
+    }
+    expect(홈런).toBe(99)
   })
 })

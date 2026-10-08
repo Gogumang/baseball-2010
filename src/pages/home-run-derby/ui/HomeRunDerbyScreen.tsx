@@ -112,6 +112,18 @@ export function HomeRunDerbyScreen({
   // 상태 0xe — 사람 OK 를 기다린다 (0x532b0). 경기 중 메뉴·조작방법·설정이 떠 있으면 경기 키가 안 간다(일시정지 팝업 0x754f9)
   const acceptsConfirm = session.isAwaitingConfirm && session.result === null && !isMenuOpen && overlay === null
   const { confirm } = session
+  // 판(0x17)이 도는 동안의 키 — 0x53420 이 키마다 0x587 을 보내 홈런 뒤면 건너뛴다(0x519cc). 경기 중 메뉴 · 조작방법 · 설정이 떠 있으면 안 간다
+  const isPlayRunning = session.distanceBoard !== null && session.result === null && !isMenuOpen && overlay === null
+  const { skipHomeRun } = session
+  useEffect(() => {
+    if (!isPlayRunning) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat) return
+      skipHomeRun()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [isPlayRunning, skipHomeRun])
   useEffect(() => {
     if (!acceptsConfirm) return
     const onKeyDown = (event: KeyboardEvent) => {
@@ -189,7 +201,11 @@ export function HomeRunDerbyScreen({
           />
         )}
         {/* 0xe 에서 화면을 누르면 OK 로 본다 (터치용 웹판 편의 — 캔버스 탭이 스윙인 것과 같은 자리) */}
-        <div className={styles.stageArea} onClick={acceptsConfirm ? confirm : undefined}>
+        <div
+          className={styles.stageArea}
+          // 판이 도는 동안 화면을 누르면 키로 본다(터치용 웹판 편의 — 0xe 의 OK 와 같은 자리)
+          onClick={acceptsConfirm ? confirm : isPlayRunning ? skipHomeRun : undefined}
+        >
           <BattingStage
             key={stageSerial}
             batterAbility={ability}
