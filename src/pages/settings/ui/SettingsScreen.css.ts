@@ -72,3 +72,11 @@ export const vibrationHighlight = style({
   background: '#FFFF55',
   pointerEvents: 'none',
 })
+
+/** 상세 설정 지금 값 칸 — 노랑 RGB(255,255,85) 1px 테두리 (0x6a979) */
+export const valueOutline = style({
+  position: 'absolute',
+  boxSizing: 'border-box',
+  border: '1px solid #FFFF55',
+  pointerEvents: 'none',
+})

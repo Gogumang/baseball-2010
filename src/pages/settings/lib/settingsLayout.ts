@@ -147,21 +147,24 @@ export const OK_SELECTED_FRAME = 18
 export const OK_SELECTED_OVERFLOW = 4
 
 /**
- * 상세 설정 (메인 메뉴 상태 0x20 · 페이지 32 — 그리기 0x59e82~0x5a226 의 **4줄 루프** `cmp r6,#4`,
- * 갱신 0x288ac 는 칸 0~3 을 누를 때 값을 `eor #1` 로 뒤집는다 — P7 K2 확정).
- *
- * **확정된 것**
- *  - 줄 아이콘 표 `0xd1afc` = [93, 94, 90, 97]
- *  - 값 = 옵션 +0x2d 투구 · +0xbd 주루 · +0xf4 송구 · +0x3a 전광판
- *  - 값 라벨 첫 번호 표 `0xd1b04` = [74, 76, 76, 78] → 칸 j 는 `StrMAINMENU[첫번호 + j]` 이고
- *    **값 == j 면 흰색(0xcf2e0), 아니면 #7B93D4(0xcf2f0)**
- *  - 다섯째 줄 "터치"(옵션 +0x14c)는 원본이 값만 읽고 **그리지 않는다** → 웹도 안 그린다
- *
- * ⚠️ **근사/추정**: 줄 y·두 칸 자리는 문서에 없다. 같은 공용 페이지(0x593c8 종류 8) 안이라
- * 첫 화면 값 줄(Y_i = 49 + 25i, 막대 프레임 35)과 진동 줄의 OFF/ON 자리를 그대로 빌려 썼다.
- * 좌우 화살(이미지 20)을 상세 줄에도 그리는지는 못 읽어 **안 그린다**.
- * 제목은 img_text **290 "상세 설정"**(46×10) — 그림 글자를 눈으로 확인한 것이라 **유력**
- * (첫 화면 289 "기본 설정" 바로 다음 칸이고, 291 "모드 초기화" · 292 "게임데이터관리" 가 이어진다).
+ * 상세 설정 (메인 메뉴 상태 0x20 · 페이지 32 — 그리기 0x59e82~0x5a2f4 의 **4줄 루프** `cmp r6,#4`,
+ * 갱신 0x288ac 는 칸 0~3 을 누를 때 값을 `eor #1` 로 뒤집는다 — P7 K2 확정). 배치는 직접 떴다:
+ * ```
+ * 줄 i = 0..3, Y = y0 + 30·i (첫 화면과 달리 −5 가 없다, 0x5a214 `adds #0x1e`)
+ *   글머리 slt_frame 이미지 39 (x0 + 14, Y + 44)                                  ; 0x59f74
+ *   이름 "!cffffff%s" StrMAINMENU[0x45 + i] (x0 + 28, Y + 41) 왼쪽 맞춤 흰색          ; 0x59f8c~0x59fb6
+ *   아이콘 바탕 이미지 87 (x0 + 70, Y + 36) · 아이콘 표 0xd1afc 를 그 안 가운데           ; 0x59fd0 · 0x5a056
+ *   값 막대 slt_frame 프레임 38 (x0 + 98, Y + 37)                                   ; 0x5a074
+ *   값 칸 j = 0·1: StrMAINMENU[0xd1b04[i] + j] 를 (x0 + 98 + 39j, Y + 41) 폭 39 가운데,
+ *        값 == j 면 "!C!cffffff%s"(0xcf2e0) 흰색 · 아니면 "!C!c7B93D4%s"(0xcf2f0)          ; 0x5a0ca~0x5a17e
+ *   고른 줄: 글머리 자리에 이미지 38 덧그림                                            ; 0x5a19e
+ *     깜빡일 때만([sp+0x9c]) 화살 이미지 20 (x0 + 91, Y + 41) · 뒤집어(0x11) (x0 + 177, Y + 41) ·
+ *     흰 둥근 테두리 0x6aa65 (x0 + 96, Y + 37, 80×17, 둥글기 1)                         ; 0x5a1aa~0x5a20a
+ * 줄 다음: 줄마다 지금 값 칸에 노랑 RGB(255,255,0x55) 테두리 0x6a979 (x0 + 99 + 39·값, Y + 38, 35×15) ; 0x5a226~
+ * ```
+ * 아래 OK 단추는 이 페이지에 없다. 다섯째 값(+0x14c 터치)은 값 배열에만 읽고 그리지 않는다.
+ * 고른 줄 흔들기(표 0xd1784 · 0xd1754, skin+0x2cc/+0x2c8)는 아직 안 옮겼다 — 미해결.
+ * 제목은 img_text **290 "상세 설정"**(46×10) — 그림 글자를 눈으로 확인한 것이라 **유력**.
  */
 export const DETAIL_TITLE = { frame: 290, x: TITLE.x, y: TITLE.y } as const
 
@@ -178,8 +181,32 @@ export const DETAIL_ROWS = [
 
 export const DETAIL_ROW_COUNT = DETAIL_ROWS.length
 
-/** 두 칸 자리 — 진동 줄의 OFF/ON 자리를 그대로 쓴다 (⚠️ 근사) */
-export const DETAIL_CHOICES = [VIBRATION.off, VIBRATION.on] as const
+/** Y_i = y0 + 30i */
+export const detailRowTopOf = (index: number) => PANEL.y + 30 * index
+
+export const DETAIL_ROW = {
+  bulletImage: 39,
+  selectedBulletImage: 38,
+  bullet: { x: PANEL.x + 14, dy: 44 },
+  name: { x: PANEL.x + 28, dy: 41 },
+  iconBackImage: 87,
+  iconBack: { x: PANEL.x + 70, dy: 36 },
+  barFrame: 38,
+  bar: { x: PANEL.x + 98, dy: 37 },
+  arrowImage: 20,
+  leftArrow: { x: PANEL.x + 91, dy: 41 },
+  rightArrow: { x: PANEL.x + 177, dy: 41 },
+  outline: { x: PANEL.x + 96, dy: 37, width: 80, height: 17 },
+} as const
+
+/** 값 칸 j — (x0 + 98 + 39j, Y + 41) 폭 39 */
+export const DETAIL_CHOICES = [
+  { x: PANEL.x + 98, dy: 41, width: 39 },
+  { x: PANEL.x + 98 + 39, dy: 41, width: 39 },
+] as const
+
+/** 지금 값 칸 노랑 테두리 — (x0 + 99 + 39·값, Y + 38, 35×15) */
+export const detailValueOutlineOf = (value: number) => ({ x: PANEL.x + 99 + 39 * value, dy: 38, width: 35, height: 15 })
 
 /** 값 글 색 — 고른 칸은 흰색, 아닌 칸은 메뉴 줄과 같은 #7B93D4 */
 export const DETAIL_COLORS = { selected: '#FFFFFF', unselected: '#7B93D4' } as const

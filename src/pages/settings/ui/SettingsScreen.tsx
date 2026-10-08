@@ -11,7 +11,8 @@ import { SETTINGS_TEXT } from '@/shared/config/settingsMenu'
 import { MODE_RESET_TEXT } from '@/entities/settings/model/modeReset'
 import type { CareerResetEdition } from '@/entities/settings/model/modeReset'
 import {
-  DETAIL_CHOICES, DETAIL_COLORS, DETAIL_ROWS, DETAIL_ROW_COUNT, DETAIL_TITLE,
+  DETAIL_CHOICES, DETAIL_COLORS, DETAIL_ROW, DETAIL_ROWS, DETAIL_ROW_COUNT, DETAIL_TITLE, detailRowTopOf,
+  detailValueOutlineOf,
   FIRST_MENU_ROW, IN_GAME_PANEL, IN_GAME_ROW_COUNT, MENU_ROW, MODE_RESET_ROW, MODE_RESET_ROW_COUNT, MODE_RESET_TITLE,
   OK_BUTTON, OK_SELECTED_FRAME, OK_SELECTED_OVERFLOW, PANEL, ROW_ICONS,
   SETTINGS_FRAME, SOUND_BARS, SPEED_MARKS, TITLE, VALUE_ROW, VIBRATION,
@@ -444,8 +445,7 @@ function toggleDetail(settings: GameSettings, row: number): GameSettings {
  * 투구 · 주루 · 송구 · 전광판 네 줄이고, 줄마다 두 칸 중 지금 값이 흰색으로 나온다.
  * 다섯째 줄 "터치"(StrMAINMENU[73], 옵션 +0x14c)는 원본이 값만 읽고 그리지 않아 여기도 없다.
  *
- * ⚠️ 줄 y·두 칸 자리는 못 읽어 첫 화면 값 줄·진동 줄 자리를 빌려 썼다 — **근사**
- * (`settingsLayout.ts` 의 `DETAIL_*` 주석).
+ * 배치는 그리기 0x59e82~0x5a2f4 를 직접 뜬 값이다 (`settingsLayout.ts` 의 `DETAIL_*` 주석) — 아래 OK 단추는 없다.
  * 웹판에 배선이 없는 값(송구·전광판)도 **원본에 줄이 있으므로 그대로 보여 주고 저장한다.**
  */
 function DetailSettings({ settings, onChange, mainMenu, panelHeight, onBack }: {
@@ -496,24 +496,28 @@ function DetailSettings({ settings, onChange, mainMenu, panelHeight, onBack }: {
         x={DETAIL_TITLE.x} y={DETAIL_TITLE.y} />
 
       {DETAIL_ROWS.map((row, index) => {
-        const top = rowTopOf(index)
+        const top = detailRowTopOf(index)
         const icon = iconCenterOffsetOf(row.icon)
+        const isSelected = index === cursor
+        // 화살·흰 테두리는 깜빡일 때만([sp+0x9c]) — 펴는 동안은 0x59548 이 끈다
+        const isBlinkOn = isSelected && isOutlineShown && isUnfolded
+        const valueOutline = detailValueOutlineOf(values[index])
         return (
           <div key={row.name}>
             <img className={styles.sprite} alt=""
-              src={imageSrc(SLT_FRAME, VALUE_ROW.bulletImage)}
-              style={{ left: VALUE_ROW.bullet.x, top: top + VALUE_ROW.bullet.dy }} />
-            <FrameSprite folder={`${SLT_FRAME}/frames`} frame={VALUE_ROW.barFrame}
-              origins={frames} x={VALUE_ROW.bar.x} y={top + VALUE_ROW.bar.dy} />
-            <img className={styles.sprite} alt=""
-              src={imageSrc(SLT_FRAME, VALUE_ROW.iconBackImage)}
-              style={{ left: VALUE_ROW.iconBack.x, top: top + VALUE_ROW.iconBack.dy }} />
-            <img className={styles.sprite} alt=""
-              src={imageSrc(SLT_FRAME, row.icon.image)}
-              style={{ left: VALUE_ROW.iconBack.x + icon.dx, top: top + VALUE_ROW.iconBack.dy + icon.dy }} />
-            <div className={styles.valueName} style={{ left: VALUE_ROW.name.x, top: top + VALUE_ROW.name.dy }}>
+              src={imageSrc(SLT_FRAME, isSelected ? DETAIL_ROW.selectedBulletImage : DETAIL_ROW.bulletImage)}
+              style={{ left: DETAIL_ROW.bullet.x, top: top + DETAIL_ROW.bullet.dy }} />
+            <div className={styles.valueName} style={{ left: DETAIL_ROW.name.x, top: top + DETAIL_ROW.name.dy }}>
               {row.name}
             </div>
+            <img className={styles.sprite} alt=""
+              src={imageSrc(SLT_FRAME, DETAIL_ROW.iconBackImage)}
+              style={{ left: DETAIL_ROW.iconBack.x, top: top + DETAIL_ROW.iconBack.dy }} />
+            <img className={styles.sprite} alt=""
+              src={imageSrc(SLT_FRAME, row.icon.image)}
+              style={{ left: DETAIL_ROW.iconBack.x + icon.dx, top: top + DETAIL_ROW.iconBack.dy + icon.dy }} />
+            <FrameSprite folder={`${SLT_FRAME}/frames`} frame={DETAIL_ROW.barFrame}
+              origins={frames} x={DETAIL_ROW.bar.x} y={top + DETAIL_ROW.bar.dy} />
 
             {row.labels.map((label, choice) => (
               <div key={label} className={styles.vibrationLabel}
@@ -527,30 +531,37 @@ function DetailSettings({ settings, onChange, mainMenu, panelHeight, onBack }: {
               </div>
             ))}
 
-            {index === cursor && isOutlineShown && isUnfolded && (
-              <div className={styles.selectedOutline}
-                style={{
-                  left: VALUE_ROW.bar.x, top: top + VALUE_ROW.bar.dy,
-                  width: VALUE_ROW.bar.width, height: VALUE_ROW.bar.height,
-                }} />
+            {isBlinkOn && (
+              <>
+                <img className={styles.sprite} alt=""
+                  src={imageSrc(SLT_FRAME, DETAIL_ROW.arrowImage)}
+                  style={{ left: DETAIL_ROW.leftArrow.x, top: top + DETAIL_ROW.leftArrow.dy }} />
+                <img className={styles.sprite} alt=""
+                  src={imageSrc(SLT_FRAME, DETAIL_ROW.arrowImage)}
+                  style={{ left: DETAIL_ROW.rightArrow.x, top: top + DETAIL_ROW.rightArrow.dy, transform: 'scaleX(-1)' }} />
+                <div className={styles.selectedOutline}
+                  style={{
+                    left: DETAIL_ROW.outline.x, top: top + DETAIL_ROW.outline.dy,
+                    width: DETAIL_ROW.outline.width, height: DETAIL_ROW.outline.height,
+                  }} />
+              </>
             )}
+
+            {/* 줄 루프 뒤 지금 값 칸 노랑 테두리 (0x5a226~) — 줄마다 늘 */}
+            <div className={styles.valueOutline} data-testid={`상세값테두리-${index}`}
+              style={{ left: valueOutline.x, top: top + valueOutline.dy, width: valueOutline.width, height: valueOutline.height }} />
 
             <button type="button" className={styles.row} aria-label={row.name}
               style={{
-                left: VALUE_ROW.bar.x, top: top + VALUE_ROW.bar.dy,
-                width: VALUE_ROW.bar.width, height: VALUE_ROW.bar.height,
+                left: DETAIL_ROW.outline.x, top: top + DETAIL_ROW.outline.dy,
+                width: DETAIL_ROW.outline.width, height: DETAIL_ROW.outline.height,
               }}
               onMouseEnter={() => setCursor(index)}
               onClick={() => { setCursor(index); onChange(toggleDetail(settings, index)) }} />
           </div>
         )
       })}
-
-      <button type="button" className={styles.row} aria-label="확인"
-        style={{ left: (PANEL.width - OK_BUTTON.width) / 2 + PANEL.x, top: OK_BUTTON.y, width: OK_BUTTON.width, height: OK_BUTTON.height }}
-        onClick={onBack}>
-        <img className={styles.sprite} alt="" src={imageSrc(POPUP, OK_BUTTON.frame)} style={{ left: 0, top: 0 }} />
-      </button>
+      {/* 이 페이지에는 아래 OK 단추가 없다 — 나가는 길은 CLR(머리띠 되돌아가기)뿐이다 */}
       </PanelClip>
       <SettingsFrame mainMenu={mainMenu} onBack={onBack} />
     </RawScreen>

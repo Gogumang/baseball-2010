@@ -428,6 +428,18 @@ describe('환경설정 → 상세 설정 (원본 페이지 32, 네 줄)', () => 
 
     expect(onChange).toHaveBeenCalledWith({ ...DEFAULT_SETTINGS, isScoreboardOn: false })
   })
+
+  it('배치는 0x59e82~ 그대로 — 줄 Y = 54 + 30i, 값 칸 x0 + 98 + 39j, 지금 값 노랑 테두리 (x0 + 99 + 39·값, Y + 38) · OK 단추 없음', () => {
+    상세열기()
+
+    // 투구 기본값 0 → 첫 칸, 주루 기본값 1(자동) → 둘째 칸
+    const 투구 = screen.getByTestId('상세값테두리-0')
+    expect([투구.style.left, 투구.style.top, 투구.style.width, 투구.style.height]).toEqual(['123px', '92px', '35px', '15px'])
+    const 주루 = screen.getByTestId('상세값테두리-1')
+    expect([주루.style.left, 주루.style.top]).toEqual(['162px', '122px'])
+    expect(screen.getByText('게이지').style.left).toBe('161px')
+    expect(screen.queryByRole('button', { name: '확인' })).toBeNull()
+  })
 })
 
 /**
