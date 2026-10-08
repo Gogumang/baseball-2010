@@ -268,6 +268,32 @@ describe('첫 종류 21 로 끝난 재생 (0x8d4ce — [0x1552adc] = 1) → 114 
     act(() => rendered.result.current.session.actions.completeScene([], [502, 496, 503], null))
     expect(rendered.result.current.screen.kind).not.toBe('엔딩')
   })
+
+  it('부상 엔딩 — 105 진입 0x11b32 의 판정 0(부상 누적 > 19)은 500 을 번호로 틀고, 그 끝(1c088)이 141 로 간다', async () => {
+    const rendered = 띄우기({
+      ...createCareer('부상'),
+      season: 3,
+      isInjured: true,
+      injuredGamesPlayed: 20,
+      seenEventIds: [String(451)],
+      hasSeenYearGoalWindow: true,
+    })
+    await waitFor(() => expect(rendered.result.current.session.storyEvents).not.toBeNull(), { timeout: 5000 })
+    await waitFor(() => expect(rendered.result.current.screen).toEqual({ kind: '이벤트', eventId: 500, context: '관리' }))
+
+    act(() => rendered.result.current.session.actions.completeScene([], [500], 500))
+    expect(rendered.result.current.screen).toEqual({ kind: '엔딩', endingIndex: 0 })
+    expect(rendered.result.current.session.career?.endingIndex).toBe(0)
+    expect(rendered.result.current.session.career?.seenEventIds).not.toContain('500')
+  })
+
+  it('관리 화면에서 연 이벤트가 첫 종류 21 로 끝나도(뒤 ≠ 113) 141 — 번호는 0xa3a85 판정', () => {
+    const rendered = 띄우기(목표달성선수({ season: 9, popularity: 1000 }))
+    act(() => rendered.result.current.setScreen({ kind: '이벤트', eventId: 500, context: '관리' }))
+    act(() => rendered.result.current.session.actions.completeScene([], [500], 500))
+    // 판정 없음(인기도 정확히 1000)은 −1 그대로
+    expect(rendered.result.current.screen).toEqual({ kind: '엔딩', endingIndex: -1 })
+  })
 })
 
 describe('전역 경기 상태 +0x6b — 타자편 경기도 같은 칸 (0x1c47a · 0x3a200 · 0xb6b6c)', () => {

@@ -95,9 +95,11 @@ import { gameMyPitcherOrderOf } from '@/entities/pitcher-career/model/myPitcherR
 import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
 import type { PlayerSide } from '@/entities/game/model/gameState'
 import {
+  INJURY_ENDING_EVENT_ID,
   MID_SEASON_GAME,
   midSeasonEventId,
   midSeasonTitlesOf,
+  NO_ENDING_JUDGEMENT,
   RETIREMENT_CHOICE_EVENT_ID,
   salaryOfferOf,
   SALARY_EVENT_ID,
@@ -117,6 +119,7 @@ import {
   applyPitcherEndingBonus,
   canContinueAfterPitcherEnding,
   continueAfterPitcherEnding,
+  judgePitcherEnding,
   PITCHER_CONTINUE_COST_GAME_POINT,
   pitcherEndingBonusOf,
   pitcherInjuryEndingOf,
@@ -848,7 +851,7 @@ export function usePitcherLeagueSession(
    *    105 로 돌아와 진입이 다시 돌 때 또 선다. 판정은 모드 3(대상 1·3, `isPitcherEventEligible`)이고, 히든 변화구 30~33
    *    (대상 3 · 능력치 조건)도 이 훑기 안에서 나온다.
    *
-   * 부상 엔딩은 `finishGame` 이 이미 보았다. 117 은 S+0xb2 == 22 && 0xa4280 == 0 (아래), 그 비트는 보상 실행기 끝(0x8cbaa)이 켠다.
+   * 부상 엔딩(500)은 도착 첫 줄이다(아래). 117 은 S+0xb2 == 22 && 0xa4280 == 0 (아래), 그 비트는 보상 실행기 끝(0x8cbaa)이 켠다.
    *
    * ⚠️ 근사 — 원본은 105 에 머무는 **매 틀** 훑고, 조건 22(질병 490)는 틀마다 rand 를 굴린다. 웹은 105 에 **들어올 때**
    *    (경기·이벤트·다른 화면에서 돌아올 때) 한 번 굴려 훑고, 105 에 머문 채 커리어가 바뀌면(훈련·아이템) 굴림 없이 다시
@@ -873,6 +876,15 @@ export function usePitcherLeagueSession(
       const opening = pitcherOpeningScanOf(fileEvents, cursorRef.current)
       cursorRef.current = opening.cursor
       if (opening.event !== null) return openStory({ eventId: opening.event.id, context: '관리', viewed: [] })
+    }
+    if (pitcherInjuryEndingOf(career) !== null) {
+      /*
+       * **부상 엔딩** — 105 진입 곁가지 첫 줄 0x11b32~0x11b44: `0xa3a85(S) == 0` → 0x113e8 이 이벤트 500 을 번호로 틀고
+       * (대상 0 — 훑기로는 안 나온다) `[다음 114, 뒤 141]`(0x11442~0x11454). 500 의 끝 명령(첫 종류 21)이 [0x1552adc] 를 켜
+       * 114 끝 1c088 이 141 로 간다(`completeStory`). 예전 웹은 500 을 건너뛰고 곧장 엔딩 화면을 띄웠다.
+       * 새 선수 오프닝(1cfa6)이 같은 틀에 예약을 덮으므로 그 뒤 — 451 이 끝나 105 로 다시 들어오면 진입이 500 을 다시 세운다.
+       */
+      return openStory({ eventId: INJURY_ENDING_EVENT_ID, context: '관리', viewed: [] })
     }
     if (!career.hasSeenYearGoalWindow) {
       // 115 진입 0x16aac: 0x8a681 로 내장 이벤트를 세우고 `0xa4ee9(S)` — 마이너스 스킬 해제 기록 +0x1d0~+0x1d7 을 지운다
@@ -1285,12 +1297,8 @@ export function usePitcherLeagueSession(
         setNextGameFromManagement(false)
         return setScene('다음경기순위')
       }
-      // 관리 화면 진입 105(0x11910 → 0x11b32)의 첫 줄 — 부상 누적 20경기면 이벤트 500 → 엔딩 141 (B-7)
-      const injury = pitcherInjuryEndingOf(counted)
-      if (injury !== null) {
-        commit({ ...counted, endingIndex: injury })
-        return setScene('엔딩')
-      }
+      // 관리 화면 진입 105(0x11910 → 0x11b32)의 첫 줄 — 부상 누적 20경기면 이벤트 500 → 엔딩 141 (B-7). 그 검사는 105 에
+      // 들어올 때마다 도는 진입 곁가지라 관리 화면 도착 고리(아래 '관리 화면(105)의 이벤트')가 한다
       commit(counted)
       setScene('관리')
     },
@@ -1696,6 +1704,12 @@ export function usePitcherLeagueSession(
         commit({ ...rewarded, hasSeenYearGoalWindow: true })
         return setScene('관리')
       }
+      // 114 끝 1c088 — 뒤 상태가 113(장소)이 아니면 [0x1552adc](첫 종류 21 로 끝남)를 지우고 141(번호는 0x12300 이 판정).
+      // 부상 엔딩 500(105 진입 0x113e8)이 이 길이다. 장소에서 끝난 종류 21 은 원본이 칸을 남겨 두고 105 · 112 틀 1d056 이
+      // 141 로 보내지만, 종류 21 이벤트(500 · 501 · 503 · 504)는 대상 0 이고 장소 이벤트의 갈래도 그리로 안 이어져 닿지 않는다.
+      if (endingEventId !== null && story.context !== '장소') {
+        return enterEnding(viewed, judgePitcherEnding(viewed) ?? NO_ENDING_JUDGEMENT)
+      }
       if (story.context === '지도') {
         // 114 끝 0x1c014 → 0x8b0e4(1c02e)의 0x8b12c — 112 에서 연 이벤트도 행동함(S+4)을 켜고 저장한다(외출 수는 113 몫)
         commit(withOutingEventActed(viewed, true, story.eventId))
@@ -1719,7 +1733,7 @@ export function usePitcherLeagueSession(
       commit(viewed)
       setScene('관리')
     },
-    [career, commit, continueYearEnd, enterOutingMap, random, recordStat, story],
+    [career, commit, continueYearEnd, enterEnding, enterOutingMap, random, recordStat, story],
   )
 
   /**

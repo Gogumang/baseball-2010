@@ -108,7 +108,10 @@ import {
   endingBonusOf,
   continueAfterEnding,
   GOAL_INTRO_EVENT_ID,
+  INJURY_ENDING_EVENT_ID,
+  judgeEnding,
   MID_SEASON_GAME,
+  NO_ENDING_JUDGEMENT,
   midSeasonEventId,
   midSeasonTitlesOf,
   yearEndEventId,
@@ -1012,6 +1015,14 @@ export function useCareerSession({
       if (opening !== null) return setScreen({ kind: '이벤트', eventId: opening.id, context: '관리' })
     }
     /*
+     * **부상 엔딩** — 105 진입 0x11910 곁가지의 첫 줄(0x11b32~0x11b44): `0xa3a85(S) == 0`(부상 누적 +0x1b6 > 19)이면 0x113e8 이
+     * 이벤트 500 을 번호로 틀고(0x8bdc8 — 대상 0 이라 훑기로는 안 나온다) `[다음 114, 뒤 141]` 을 예약한다(0x11442~0x11454).
+     * 500 의 끝 명령(첫 종류 21)이 [0x1552adc] 를 켜 114 끝 1c088 이 141 로 간다(`completeScene`). 새 선수 오프닝 451(위)은
+     * 같은 틀의 1cfa6 이 예약을 덮어 먼저다 — 451 이 끝나 105 로 다시 들어오면 진입이 500 을 다시 세운다. 0x113e8 은 500 을
+     * 틀며 전역기록 +0xa8 = 1 도 쓰는데(0x11412~0x1141c) 엔딩 판 0x87c7c 가 같은 칸(+0xa8 + 0)을 다시 쓴다(`mergeEndingIntoCollection`).
+     */
+    if (judgeEnding(career) === 0) return setScreen({ kind: '이벤트', eventId: INJURY_ENDING_EVENT_ID, context: '관리' })
+    /*
      * 105 진입 0x11910 곁가지(0x11b24~): S+0x1b7 == 0(올해 목표 창 아직 안 봄) → **115 연초** 가 138 보다 먼저다.
      * 115 진입 0x16aac: 내장 이벤트 0x8a681 → `[다음 114, 뒤 105]` → `0xa4ee9(S)` — 마이너스 스킬 해제 기록
      * +0x1d0~+0x1d7 을 지운다(R9 7절). 그래서 해제 기록(0xa4f31)은 "그 해" 것만 남는다. 창이 닫히면 0x7fe90 이 S+0x1b7 = 1.
@@ -1060,6 +1071,15 @@ export function useCareerSession({
     setScreen({ kind: '이벤트', eventId: yearEndEventId(finished), context: '시즌' })
   }
 
+  /** 엔딩 141 로 — 번호는 141 진입 0x12300 의 `0xa3a85(S)` 판정이다 */
+  const enterEnding = (viewed: PlayerCareer, endingIndex: number) => {
+    // 엔딩 보너스는 엔딩을 띄울 때 준다 (0x1220c). 부상·방출은 0 이다
+    setCareer(applyEndingBonus({ ...viewed, endingIndex }, endingIndex))
+    // 보너스 팝업이 닫힐 때 0x1bc4a `0x22c7d(보너스, 모드)` — 웹은 보너스를 이 자리에서 준다
+    recordStat({ kind: 'G획득', mode: BATTER_LEAGUE_MODE, amount: endingBonusOf(endingIndex) })
+    setScreen({ kind: '엔딩', endingIndex })
+  }
+
   const continueSeason = (viewed: PlayerCareer, viewedEventIds: readonly number[], endingRequested = false) => {
     // ── 국가대표 이벤트(461~464)는 연말 사슬 밖이다. 상태 133 이 따로 예약한 것이라 먼저 가른다 ──
     if (viewedEventIds.includes(NATIONAL_CUP_EVENT.출전)) {
@@ -1088,13 +1108,7 @@ export function useCareerSession({
       setCareer(enterSeasonEvent(viewed, step.eventId))
       return setScreen({ kind: '이벤트', eventId: step.eventId, context: '시즌' })
     }
-    if (step.kind === '엔딩') {
-      // 엔딩 보너스는 엔딩을 띄울 때 준다 (0x1220c). 부상·방출은 0 이다
-      setCareer(applyEndingBonus({ ...viewed, endingIndex: step.endingIndex }, step.endingIndex))
-      // 보너스 팝업이 닫힐 때 0x1bc4a `0x22c7d(보너스, 모드)` — 웹은 보너스를 이 자리에서 준다
-      recordStat({ kind: 'G획득', mode: BATTER_LEAGUE_MODE, amount: endingBonusOf(step.endingIndex) })
-      return setScreen({ kind: '엔딩', endingIndex: step.endingIndex })
-    }
+    if (step.kind === '엔딩') return enterEnding(viewed, step.endingIndex)
     if (step.kind === '새시즌') {
       // 연말 상태 132 → 133 국가대표 선발 판정 (`0x1a090`). 연차 idx 는 **끝난 해**의 것이라
       // 새 시즌을 올리기 전에 본다. 방출·13년차 은퇴는 위 '엔딩' 가지에서 이미 빠졌다.
@@ -1799,8 +1813,9 @@ export function useCareerSession({
     /**
      * 재생 끝(114 끝 0x1c014). `endingEventId` 는 첫 종류 21 로 끝난 이벤트(0x8d4ce — [0x1552adc] = 1)다: 그 이벤트는 본 표시를
      * 안 하고(0x8cf8c 를 안 지난다) 거친 다른 이벤트는 0x8b0e4 가 본 표시한다. 엔딩은 그 칸으로 간다(`nextSeasonStep`).
-     * ⚠️ 웹은 엔딩 이벤트(500 · 501 · 503 · 504)를 시즌 끝 사슬('시즌')에서만 튼다 — 원본 1c088 은 이전 상태가 113(장소)이 아닌
-     * 114 끝마다, 틀 0x1cdec 는 어느 상태에서나 그 칸을 본다.
+     * 엔딩 이벤트(첫 종류 21 — 500 · 501 · 503 · 504, 모두 대상 0)를 트는 곳은 원본에서 둘이다: 시즌 끝 사슬(132 의 501 · 504 ·
+     * 502 → 496 → 503)과 105 진입의 부상 엔딩 500(0x11b32 → 0x113e8). 1c088 은 뒤 상태가 113 이 아닌 114 끝마다 그 칸을 보고,
+     * 틀 0x1cdec 의 1d056(105 · 112 에서 훑기가 비었을 때)은 113 끝이 남긴 칸을 보는데 장소에서는 종류 21 이벤트에 닿지 않는다.
      */
     completeScene: (rewards: readonly EventReward[], viewedEventIds: readonly number[], endingEventId: number | null = null) => {
       if (career === null || screen.kind !== '이벤트') return
@@ -1842,6 +1857,11 @@ export function useCareerSession({
         return setScreen({ kind: '관리' })
       }
       if (screen.context === '시즌') return continueSeason(viewed, viewedEventIds, endingEventId !== null)
+      // 114 끝 1c088 — 뒤 상태가 113(장소)이 아니면 [0x1552adc](첫 종류 21 로 끝남)를 지우고 141. 부상 엔딩 500(105 진입
+      // 0x113e8)이 이 길이다. 장소(위)에서 끝난 종류 21 은 원본도 칸을 남겨 두고 105 · 112 틀 1d056 이 141 로 보내는데, 종류 21
+      // 이벤트(500 · 501 · 503 · 504)는 대상 0 이라 훑기로 안 나오고 장소 이벤트의 선택지 · 예아니오 · 경기 결과도 그리로 안
+      // 이어져(가리키는 곳은 496 → 503 하나) 원본 데이터로는 닿지 않는다.
+      if (endingEventId !== null) return enterEnding(viewed, judgeEnding(viewed) ?? NO_ENDING_JUDGEMENT)
       if (screen.context === '외출진입') {
         // 114 끝 0x1c014 → 0x8b0e4(1c02e)의 0x8b12c — 112 에서 연 이벤트도 행동함(S+4)을 켜고 저장한다. 뒤 112 라 장소 끝
         // 처리(외출 수)는 없다. 지금 이벤트 번호는 연 이벤트로 본다(외출 진입 이벤트는 440~444 가 아니다)

@@ -852,11 +852,18 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
    * 부상 엔딩은 **관리 화면 진입**(105, 0x11910 → 0x11b32)의 첫 줄이라 관리 화면이 열리는
    * 짝수 경기 뒤에만 굴러간다 — 그래서 9경기째에서 시작해 10경기로 맞춘다.
    */
-  it('부상으로 20경기를 뛰면 관리 화면에 들어가며 부상 엔딩(0)이다 (B-7)', () => {
+  it('부상으로 20경기를 뛰면 관리 화면에 들어가며 이벤트 500 → 부상 엔딩(0)이다 (B-7 · 0x11b32 → 0x113e8 → 1c088)', async () => {
     const result = 판짜기({ gamesPlayed: 9, isInjured: true, injuredGamesPlayed: 19 })
+    await 이벤트불러오기(result)
+    // 새 선수 오프닝(1cfa6)이 진입 예약을 덮어 먼저다 — 451 · 115 를 넘긴다
+    첫이벤트넘기기(result)
+    expect(result.current.story).toBeNull()
 
     경기치르기(result)
 
+    // 105 진입 곁가지 첫 줄 — 500 을 번호로 튼다(대상 0)
+    expect(result.current.story).toEqual({ eventId: 500, context: '관리', viewed: [] })
+    이벤트끝내기(result)
     expect(result.current.scene).toBe('엔딩')
     expect(result.current.career?.endingIndex).toBe(0)
     // 부상·방출 엔딩은 보너스가 없다

@@ -230,6 +230,8 @@ export function continueAfterEnding(career: PlayerCareer): PlayerCareer {
   return startNextSeason(paid)
 }
 
+/** 부상 엔딩 이벤트 — 105 진입 0x11b32 의 판정 0 → 0x113e8 이 번호로 튼다(대상 0) */
+export const INJURY_ENDING_EVENT_ID = 500
 export const RELEASE_EVENT_ID = 501
 export const FINAL_RETIREMENT_EVENT_ID = 504
 export const RETIREMENT_CHOICE_EVENT_ID = 502
