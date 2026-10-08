@@ -3,6 +3,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { FULL_PLAY_SETTINGS } from '@/features/play-team-game/model/matchSettings'
 import type { MatchProgressSettings } from '@/features/play-team-game/model/matchSettings'
 import { rollTeamSetup, teamGameStartPointOf } from '@/features/play-team-game/model/teamGameFlow'
+import { rollStadiumNumber } from '@/features/play-team-game/model/sceneStadium'
 import { resetLiveGameState } from '@/shared/lib/liveGameState/liveGameState'
 import type { TeamGameOptions, TeamGameProgress, TeamSetupRolls } from '@/features/play-team-game/model/teamGameFlow'
 import type { PlayerSide } from '@/entities/game/model/gameState'
@@ -30,6 +31,7 @@ import {
 } from '@/entities/season-mode/model/seasonEntry'
 import type { SeasonEntryInput, SeasonEntryLists } from '@/entities/season-mode/model/seasonEntry'
 import type { SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
+import { readSetupRecord, writeSetupRecord } from '@/pages/general-mode/model/setupRecord'
 
 export interface UseGeneralModeOptions extends QuickStartOpenState {
   readonly random: RandomPort
@@ -92,6 +94,11 @@ export interface GeneralModeSession {
   readonly userStarterName: string | null
   /** 경기정보 CPU 칸 — 0x30f20 이 세운 AI 팀의 선발·마선수. 상태 22 밖이면 null */
   readonly cpuMatchInfo: CpuMatchInfo | null
+  /**
+   * 22 진입 `0x314b0` 이 새로 만든 무대(메뉴+0xb8)의 구장 +0x70 — `0x78664(무대, st+0x30)` (`rollStadiumNumber`).
+   * 경기정보 구장 미리보기 `0x5fd04` 가 그리는 구장이다(웹은 아직 미리보기를 안 그린다). 상태 22 에 들어온 적이 없으면 null
+   */
+  readonly matchInfoStadium: number | null
   readonly settings: MatchProgressSettings
   /** 경기 장면(0x104)으로 넘어갔는가 */
   readonly isPlaying: boolean
@@ -146,18 +153,23 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
   const [initial] = useState(() => {
     const created = createFlowState({
       isQuickStart,
-      ...(isQuickStart
-        ? { setup: rollQuickStart(random, { openedHiddenTeamIds, openedAcePitcherIds, openedAceBatterIds }) }
-        : {}),
+      // 준비 기록 skin+0xbc 는 앱 전역이다 — 새로하기는 지난 판 기록에서 시작한다(`setupRecord`)
+      setup: isQuickStart
+        ? rollQuickStart(random, { openedHiddenTeamIds, openedAcePitcherIds, openedAceBatterIds })
+        : readSetupRecord(),
     })
-    return {
-      flow: created,
-      rolls: created.step === GENERAL_MODE_STEP.경기정보 ? rollsOf(created.setup, random) : null,
-    }
+    const entry = created.step === GENERAL_MODE_STEP.경기정보 ? matchInfoEntryOf(created.setup, random) : null
+    return { flow: created, rolls: entry?.rolls ?? null, stadium: entry?.stadium ?? null }
   })
   const [flow, setFlow] = useState<GeneralModeFlowState>(initial.flow)
+  // 갱신 함수 끝의 되쓰기 — 화면이 고친 기록(빠른실행 굴림 · 재굴림 포함)이 다음 판까지 남는다
+  useEffect(() => {
+    writeSetupRecord(flow.setup)
+  }, [flow.setup])
   /** 0x30f20 이 굴린 넷 — 상태 22 에 들어올 때마다(23 에서 돌아온 것 말고) 새로 굴린다 */
   const [rolls, setRolls] = useState<TeamSetupRolls | null>(initial.rolls)
+  /** 22 진입 무대의 구장 +0x70 — 진입마다(23 에서 돌아온 것 말고) 새로 만든다. 재굴림 끝(31290)은 무대를 안 만든다 */
+  const [matchInfoStadium, setMatchInfoStadium] = useState<number | null>(initial.stadium)
   const [settings, setSettings] = useState<MatchProgressSettings>(initialSettings ?? FULL_PLAY_SETTINGS)
   const [isSettingsOpen, setSettingsOpen] = useState(false)
   /**
@@ -240,7 +252,9 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
       const next = chooseAce(flow, cell)
       if (next.step === GENERAL_MODE_STEP.경기정보 && flow.step !== GENERAL_MODE_STEP.경기정보) {
         setUserEntryRoster(null)
-        setRolls(rollsOf(next.setup, random))
+        const entry = matchInfoEntryOf(next.setup, random)
+        setRolls(entry.rolls)
+        setMatchInfoStadium(entry.stadium)
         bumpBlockWrite()
         checkMatchSettingsSeen()
       }
@@ -413,7 +427,7 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
   }, [blockWriteSerial])
 
   return {
-    flow, entryEdit, userStarterName, cpuMatchInfo, settings, isPlaying, isSettingsOpen, isRespinning, gameOptions, actions,
+    flow, entryEdit, userStarterName, cpuMatchInfo, matchInfoStadium, settings, isPlaying, isSettingsOpen, isRespinning, gameOptions, actions,
   }
 }
 
@@ -424,4 +438,23 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
 function rollsOf(setup: GeneralModeSetup, random: RandomPort): TeamSetupRolls {
   resetLiveGameState()
   return rollTeamSetup(setup.acePitcherId, setup.aceBatterId, random)
+}
+
+/**
+ * **상태 22 진입 `0x314b0`** (이전 상태가 23 이 아닐 때 — 314c8 `cmp [메뉴+0x28], #0x17`):
+ * ```
+ * 3158c  모드 1 → 0x30f20 — 굴림 넷(`rollsOf`) · 310ec st+0x30 = (s8)rec+0xc
+ * 315a8  옛 무대 [메뉴+0xb8] 버리기 → 315be new(0x94) → 0x76b25 → [메뉴+0xb8]
+ * 315e4  0x78664(무대, (s8)st+0x30)            ; 구장 > 9 면 bfa55(0, 10) — 굴림 하나 더
+ * 315f0  0xb6bdc(st, 1) · (st, 0) → 무대+0x80 · +0x84 · 3161a 무대+0xc = 표 0xce9d8[st+0x30]
+ * 3161e  0x5fd04(스킨, 무대) — 경기정보 구장 미리보기
+ * ```
+ * 재굴림 끝(31290)은 0x30f20 만 부르고 무대를 새로 안 만든다 — 구장은 그때 안 굴린다(원본 그대로).
+ */
+function matchInfoEntryOf(
+  setup: GeneralModeSetup,
+  random: RandomPort,
+): { readonly rolls: TeamSetupRolls; readonly stadium: number } {
+  const rolls = rollsOf(setup, random)
+  return { rolls, stadium: rollStadiumNumber(random, setup.stadiumId) }
 }

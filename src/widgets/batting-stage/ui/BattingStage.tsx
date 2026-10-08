@@ -98,6 +98,16 @@ interface BattingStageProps {
    */
   readonly seasonStadium?: SeasonStadium
   /**
+   * **구장 번호** = 타석 구장 객체 +0x70 — 일반 구장 그리기 0x77974 가 `fence.pzf` 프레임·관중·전광판 상자를, 0x78046 이 하늘 단색(8)을
+   * 이것으로 고른다. 모드 1·8·9 는 장면 셋업 0x39fdc 가 채운다(`TeamGameProgress.sceneStadium`). 안 넘기면 0번 구장
+   */
+  readonly stadium?: number
+  /**
+   * **바닥 그림 팔레트 줄** = 구장 객체 +0xc (0x76b6c 가 stadium/attack 을 이 줄로 싣는다). null · 생략이면 기본색.
+   * `seasonStadium` 이 있으면 그쪽 `grassPalette` 가 먼저다
+   */
+  readonly fieldPalette?: number | null
+  /**
    * **게임 모드** = 원본 전역 `0x1552d10` (1 일반 · 2 시즌 · 4 나리 타자편 · 6 타자 미션 · 7 홈런더비 · 8·9 대전).
    * 지금은 하늘 조명 `0x78490` 만 본다 — 모드 5·6·7 이면 조명을 안 그린다 (0x784a2~0x784b0).
    * 안 넘기면 그 셋이 아닌 것으로 본다.

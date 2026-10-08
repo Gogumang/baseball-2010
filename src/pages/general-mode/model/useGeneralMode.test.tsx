@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { rollTeamSetup, startTeamGame } from '@/features/play-team-game/model/teamGameFlow'
@@ -11,6 +11,11 @@ import {
 } from '@/pages/general-mode/lib/quickStart'
 import { useGeneralMode } from '@/pages/general-mode/model/useGeneralMode'
 import { liveGameInningIndex, setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
+import { readSetupRecord, resetSetupRecord } from '@/pages/general-mode/model/setupRecord'
+import { GENERAL_MODE_STEP } from '@/pages/general-mode/lib/generalModeSetup'
+
+// 준비 기록은 앱 전역이라(`setupRecord`) 시험마다 앱을 새로 연 것처럼 비운다
+beforeEach(() => resetSetupRecord())
 
 /**
  * 상태 22 진입 `0x314b0` → `0x30f20` — 원본은 경기 장면이 아니라 경기정보에 들어올 때 마선수 둘·선발 둘을 굴린다
@@ -261,5 +266,91 @@ describe('경기진행 설정 — 전역 m = 0 칸 · +0x11e (G2 · G4)', () => 
 
     expect(onSettingsConfirm).toHaveBeenCalledWith(설정)
     expect(result.current.gameOptions.settings).toEqual(설정)
+  })
+})
+
+describe('준비 기록 skin+0xbc 는 앱 전역이다 — 스킨은 앱 초기화 0x2ed8 에서 한 번 서고 지우는 곳이 없다', () => {
+  it('새로하기 — 지난 판에 고른 기록에서 시작한다 (20 진입 0x23ed0 의 구장 커서 = 지난 rec+0xc)', () => {
+    const random = createSeededRandom(씨앗)
+    const 첫판 = renderHook(() => useGeneralMode({ random, ...열림 }))
+    act(() => 첫판.result.current.actions.selectUserTeam(3))
+    act(() => 첫판.result.current.actions.selectAiTeam(5))
+    act(() => 첫판.result.current.actions.selectFirstBat(1))
+    act(() => 첫판.result.current.actions.selectStadium(7))
+    첫판.unmount()
+
+    const 둘째판 = renderHook(() => useGeneralMode({ random, ...열림 }))
+    expect(둘째판.result.current.flow.step).toBe(GENERAL_MODE_STEP.유저팀)
+    expect(둘째판.result.current.flow.setup).toMatchObject({ userTeamId: 3, aiTeamId: 5, playerSide: 1, stadiumId: 7 })
+  })
+
+  it('빠른실행 뒤 새로하기 — rec+0xc 가 유저 팀 번호로 남는다(3152e). 히든 팀이면 10칸 목록 밖에서 시작한다(원본 버그 그대로)', () => {
+    const { random, result, unmount } = 빠른실행()
+    const 빠른기록 = result.current.flow.setup
+    expect(빠른기록.stadiumId).toBe(빠른기록.userTeamId)
+    expect(readSetupRecord()).toEqual(빠른기록)
+    unmount()
+
+    const 새로 = renderHook(() => useGeneralMode({ random, ...열림 }))
+    expect(새로.result.current.flow.setup.stadiumId).toBe(빠른기록.userTeamId)
+  })
+
+  it('구장 커서가 10 이상이어도 자르지 않는다 — 좌·우 한 칸은 0x6bead 감기 그대로', () => {
+    const random = createSeededRandom(씨앗)
+    const { result } = renderHook(() => useGeneralMode({ random, ...열림 }))
+    act(() => result.current.actions.moveStadium(12))
+
+    expect(readSetupRecord().stadiumId).toBe(12)
+  })
+})
+
+describe('22 진입 0x314b0 의 무대 구장 0x78664(무대, st+0x30) — 구장 > 9 면 rand(0, 10) 하나 더', () => {
+  const 경기정보까지 = (구장: number) => {
+    const random = createSeededRandom(씨앗)
+    const hook = renderHook(() => useGeneralMode({ random, ...열림 }))
+    const { actions } = hook.result.current
+    act(() => actions.selectUserTeam(2))
+    act(() => hook.result.current.actions.selectAiTeam(4))
+    act(() => hook.result.current.actions.selectFirstBat(0))
+    // 원본은 커서가 곧 rec+0xc — 빠른실행이 남긴 히든 팀 번호 따위가 그대로 올 수 있다
+    act(() => hook.result.current.actions.moveStadium(구장))
+    act(() => hook.result.current.actions.selectAce(0))
+    act(() => hook.result.current.actions.selectAce(5))
+    return { random, ...hook }
+  }
+
+  it('구장 0~9 면 무대+0x70 = 구장, 굴림 없음', () => {
+    const { random, result } = 경기정보까지(6)
+    const 따로 = createSeededRandom(씨앗)
+    rollTeamSetup(0, 0, 따로)
+
+    expect(result.current.matchInfoStadium).toBe(6)
+    expect(random.rand(0, 0x7fffffff)).toBe(따로.rand(0, 0x7fffffff))
+  })
+
+  it('구장 12 면 0x30f20 넷 뒤에 rand(0, 10) — 그 값이 무대 구장이다', () => {
+    const { random, result } = 경기정보까지(12)
+    const 따로 = createSeededRandom(씨앗)
+    rollTeamSetup(0, 0, 따로)
+    const 구장 = 따로.rand(0, 10)
+
+    expect(result.current.matchInfoStadium).toBe(구장)
+    // 기록 rec+0xc 는 그대로 12 — 굴린 값은 무대에만 들어간다
+    expect(result.current.flow.setup.stadiumId).toBe(12)
+    expect(random.rand(0, 0x7fffffff)).toBe(따로.rand(0, 0x7fffffff))
+  })
+
+  it('23 에서 돌아올 때는 무대를 새로 안 만든다 (314c8 → 3163c)', () => {
+    const { random, result } = 경기정보까지(12)
+    const 구장 = result.current.matchInfoStadium
+    act(() => result.current.actions.openEntry(true))
+    act(() => result.current.actions.pressEntryKey('취소'))
+    expect(result.current.entryEdit).toBeNull()
+    const 따로 = createSeededRandom(씨앗)
+    rollTeamSetup(0, 0, 따로)
+    따로.rand(0, 10)
+
+    expect(result.current.matchInfoStadium).toBe(구장)
+    expect(random.rand(0, 0x7fffffff)).toBe(따로.rand(0, 0x7fffffff))
   })
 })

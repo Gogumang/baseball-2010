@@ -185,6 +185,8 @@ import { aceCutInSlotOf } from '@/features/play-game/model/aceCutIn'
 import { atBatResultCodeOf } from '@/entities/batting/model/atBatResultRing'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 import { TEAMS } from '@/shared/config/original/teams'
+import { rollSceneStadium } from '@/features/play-team-game/model/sceneStadium'
+import type { SceneStadium } from '@/features/play-team-game/model/sceneStadium'
 
 /**
  * **사람이 팀을 조작하는 경기** — 원본 게임 모드 **1 일반 · 2 시즌 · 8·9 대전** 이 쓰는 경기다
@@ -404,6 +406,12 @@ export interface TeamGameOptions {
   readonly opponentPitcherOrder?: readonly number[]
   /** 화면 배치 side (투영 원점 표 0xcfb18 의 칸) */
   readonly stageSide?: number
+  /**
+   * **구장** = 경기 상태 st+0x30 (s8) — 모드 1 은 경기 세우기 `0x30f20` 의 310ec 가 준비 기록 rec+0xc 를 옮겨 적는다.
+   * 있으면 경기 장면 셋업 `0x39fdc` 모드 1·8·9 갈래가 두 구장 객체를 이 값으로 채운다(`rollSceneStadium` — 9 보다 크면
+   * 경기 안에서도 rand(0, 10) 둘). 안 넘기면 구장 객체를 안 채운다(그림은 0번 구장 · 기본색, 굴림 없음).
+   */
+  readonly stadiumId?: number
 }
 
 export interface TeamGameLogEntry {
@@ -717,6 +725,11 @@ export interface TeamGameProgress {
    */
   readonly ballMagicNumber: number
   /**
+   * **경기 장면의 두 구장 객체** (`[장면+0xf10]` 타석 · `[장면+0xf14]` 수비) — 장면 셋업 0x39fdc 가 st+0x30 으로 채운다
+   * (`sceneStadium.rollSceneStadium`). 장면 쪽이라 저장 블록에 안 들고 이어하기가 다시 굴린다. `stadiumId` 가 없으면 null
+   */
+  readonly sceneStadium?: SceneStadium | null
+  /**
    * **타순 칸별 이 경기 남은 필살 횟수** = s8 팀[+0x29 + 타순] (0xaea30 이 읽고 0xae9e8 이 쓴다). 아홉 칸.
    * −1 은 "아직 안 채움" — 타석 교대 0xaebe4 가 그 타순 선수로 채운다(`specialSwingRemainingAt`).
    * 대타 교체(0xaede0) 때 그 칸을 −1 로 되돌린다. 이닝이 바뀌어도 다시 차지 않는다 (H2 1-2).
@@ -918,6 +931,8 @@ export function resumeTeamGame(
     autoProgressFlag: autoProgressStopped ? 'stopped' : null,
     // 공 객체 +0x10 — 장면이 새로 만든다 (startTeamGame 과 같은 0)
     ballMagicNumber: 0,
+    // 구장 객체 둘도 장면이 새로 채운다 — 아래 상태 9 의 0x39fdc
+    sceneStadium: null,
     // 기록 ctx(0xa5bb0 · 0xa5b00) — 연속 홈런 +0x162 · 연속 파울 +0x15f · 타석 투구 수 +0x161 · 반 이닝 투구 수 +0x16c · 대타 칸 +0x160.
     // 우리 투수 경기 기록 R(team+0x244)·코스 확정 st[0x8c] 는 저장 블록이라 남는다
     recordTally: {
@@ -935,9 +950,11 @@ export function resumeTeamGame(
   }
   // 이어하기도 상태 7(0x3e340)부터 장면을 새로 연다 — 3ed76 → 0xb08e8 패턴 덱을 새로 섞는다
   openScenePatternDeck(random)
+  // 상태 9 의 3f856 0x39fdc — 블록에서 되살린 st+0x30 으로 구장 객체 둘을 채운다 (모드 1·8·9 갈래 3a076)
+  const resumed: TeamGameProgress = { ...restored, sceneStadium: sceneStadiumOf(restored.options, random) }
   // 상태 9 의 공통 꼬리 0x3fa0e — 새 경기와 같은 rand(0, 2) 한 번
   rollSimulatorInit(random)
-  return advance({ ...restored, halfInningSave: savePointOf(restored) }, random)
+  return advance({ ...resumed, halfInningSave: savePointOf(resumed) }, random)
 }
 
 /* ── 시작 ────────────────────────────────────────────────────────────────────── */
@@ -1170,9 +1187,21 @@ export function startTeamGame(options: TeamGameOptions, random: RandomPort): Tea
   // 상태 9 갱신 0x3f584 의 공통 꼬리 0x3fa0e — 시뮬 초기화 0xc0dac 의 rand(0, 2) 한 번 (모든 모드 — 마선수·선발 굴림 0x30f20 뒤, 1회초 판 0x18 보다 앞)
   // 상태 7 장면 초기화 0x3e340 의 3ed76 → 0xb08e8 — 이 경기 장면의 패턴 덱을 섞는다(상태 9 의 시뮬 초기화보다 앞)
   openScenePatternDeck(random)
+  // 상태 9 의 3f856 0x39fdc — 구장 객체 둘 (모드 1·8·9 갈래 3a076, 시뮬 초기화 3fa0e 앞)
+  const scene: TeamGameProgress = { ...initial, sceneStadium: sceneStadiumOf(options, random) }
   rollSimulatorInit(random)
   // 경기정보 OK(0x3136e)가 0x30f20 이 세운 두 팀·st 를 저장 블록에 두고 파일을 쓴다 — 이어하기의 첫 자리다
-  return advance({ ...initial, halfInningSave: savePointOf(initial) }, random)
+  return advance({ ...scene, halfInningSave: savePointOf(scene) }, random)
+}
+
+/**
+ * 장면 셋업 0x39fdc 의 구장 객체 — 모드 1·8·9 갈래(점프표 0xcfef8[1·8·9] = 0x3a076)만 st+0x30 으로 채운다.
+ * 다른 모드 갈래(시즌 · 나리 · 미션 · 더비)는 이 칸을 안 쓰므로 웹도 null 로 둔다.
+ */
+function sceneStadiumOf(options: TeamGameOptions, random: RandomPort): SceneStadium | null {
+  if (options.stadiumId === undefined) return null
+  if (options.mode !== TEAM_GAME_MODE.일반 && !isVersusMode(options.mode)) return null
+  return rollSceneStadium(random, options.stadiumId)
 }
 
 /** 기본 측 — 일반모드는 빠른실행이 반반으로 뽑지만(0x3123c) 화면이 없으면 후공으로 둔다 */
