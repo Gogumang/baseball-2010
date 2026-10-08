@@ -145,3 +145,20 @@ describe('0x21 두 팀 판 값 — 그 틱이 끝난 자리', () => {
     expect(cpuSteps[cpuSteps.length - 1]?.cards?.outs).toBe(3)
   })
 })
+
+describe('틱 꼴의 이닝별 칸 st[0x6c..] — 득점 0xb6a9c 가 지금 이닝 칸과 합을 함께 올린다', () => {
+  it('타자 미션 자동진행: 칸마다 그 틱 뒤 이닝별 칸이 실리고, 칸의 합 = 합 칸이다', () => {
+    const run = startMission(missionOf('타자', 1))
+    const ended = { ...run, game: { ...run.game, halfEnded: true } }
+    const after = runBatterMissionAutoHalves(ended, createSeededRandom(3))
+    const steps = after.game.autoRelay?.steps ?? []
+    expect(steps.length).toBeGreaterThan(0)
+    for (const step of steps) {
+      expect(step.inningRuns).toBeDefined()
+      const sums = step.inningRuns!.map((row) => row.reduce((sum, runs) => sum + runs, 0))
+      expect(sums).toEqual([step.scores[0], step.scores[1]])
+    }
+    const last = after.game.inningRuns.map((row) => row.reduce((sum, runs) => sum + runs, 0))
+    expect(last).toEqual([after.game.scores[0], after.game.scores[1]])
+  })
+})

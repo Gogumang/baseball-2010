@@ -7,6 +7,19 @@ import * as styles from '@/widgets/game-scene/ui/GameScene.css'
 import { ScoreboardFrame } from '@/widgets/scoreboard-frame/ui/ScoreboardFrame'
 import { SCOREBOARD_AT } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import type { ScoreboardSide } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
+import { LineScoreBoard } from '@/widgets/line-score/ui/LineScoreBoard'
+import { LINE_SCORE_AT } from '@/widgets/line-score/lib/lineScoreLayout'
+
+/** 이닝별 점수판 0x41c18 의 판 값 — 경기 끝 판이 맨 끝(503d8)에 (14, 252) 로 부른다 */
+export interface GameEndLineScore {
+  /** 경기[0x28 + 칸] 두 측 팀 — 작은 로고 team_logo_ini */
+  readonly sideTeams: readonly [number, number]
+  /** st[0x6b] · st[9] */
+  readonly inning: number
+  readonly offenseSide: 0 | 1
+  /** st[0x6c..] 측마다 아홉 칸 */
+  readonly inningRuns: readonly [readonly number[], readonly number[]]
+}
 
 interface GameEndBoardProps {
   readonly side0Score: number
@@ -15,6 +28,11 @@ interface GameEndBoardProps {
   readonly names: readonly (string | null)[]
   /** 점수판 틀 0x41440(경기, 0, 3) 의 두 측 — 팀(0xb6bdd)·CPU(0xb6c21). 안 주면 틀을 안 그린다 */
   readonly scoreboardSides?: readonly [ScoreboardSide, ScoreboardSide]
+  /**
+   * 이닝별 점수판 0x41c18(경기, W/2 − 106, H − 57 − 0xb) = (14, 252) — 503d8 이 판 맨 끝에 부른다(합은 8틱에 5틱 깜빡). 안 주면 안 그린다.
+   * ⚠️ 미이식: 나만의리그 · 팀경기 판은 이닝별 칸 st[0x6c..] 을 아직 안 들어 넘기지 않는다.
+   */
+  readonly lineScore?: GameEndLineScore
   /** OK — 메시지 1(인자 0x18) → 0xae3a0 → 경기 끝이라 **정산 0x19** */
   readonly onConfirm: () => void
 }
@@ -45,7 +63,7 @@ interface GameEndBoardProps {
  * "경기 끝 → 0x18" 로 이 판을 거친다. 웹도 그대로 늘 이 판을 거친다. (레지스터로 번호를 계산해 보내는 자리가
  * 있을 가능성은 남는다.)
  */
-export function GameEndBoard({ side0Score, side1Score, names, scoreboardSides, onConfirm }: GameEndBoardProps) {
+export function GameEndBoard({ side0Score, side1Score, names, scoreboardSides, lineScore, onConfirm }: GameEndBoardProps) {
   const tick = useSceneTick()
   const isLocked = tick < GAME_END_INPUT_LOCK_TICKS
   const confirmRef = useRef(onConfirm)
@@ -76,6 +94,15 @@ export function GameEndBoard({ side0Score, side1Score, names, scoreboardSides, o
         <ScoreboardFrame {...SCOREBOARD_AT.gameEnd} side0={scoreboardSides[0]} side1={scoreboardSides[1]} />
       )}
       <EndBoardRows side0Score={side0Score} side1Score={side1Score} names={names} />
+      {lineScore !== undefined && (
+        <LineScoreBoard
+          {...LINE_SCORE_AT.gameEnd}
+          {...lineScore}
+          totals={[side0Score, side1Score]}
+          isGameOver
+          tick={tick}
+        />
+      )}
       {/* 원본에 없는 웹 전용 단추 — 원본은 OK 키가 한다. 10틱 동안은 원본처럼 먹지 않는다 */}
       <Button variant="corner" className={styles.okButton} disabled={isLocked} onClick={confirm}>
         확인

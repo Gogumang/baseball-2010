@@ -1754,11 +1754,20 @@ export function useMissionSession({
   }
 }
 
-/** 중계 틱 하나의 점수판 0xb69b0 · 이닝 st[0x6b] · 공격 측 st[9] 를 판에 싣는다 — `halfEnded` 는 선 채로 (자동진행 중) */
+/**
+ * 중계 틱 하나의 점수판 0xb69b0 · 이닝별 칸 st[0x6c..] · 이닝 st[0x6b] · 공격 측 st[9] 를 판에 싣는다 — `halfEnded` 는 선 채로
+ * (자동진행 중)
+ */
 function withAutoRelayStep<T extends MissionRun | PitcherRun>(run: T, step: MissionAutoRelayStep): T {
   return {
     ...run,
-    game: { ...run.game, scores: [step.scores[0], step.scores[1]], inning: step.inning, offenseSide: step.offenseSide },
+    game: {
+      ...run.game,
+      scores: [step.scores[0], step.scores[1]],
+      inningRuns: step.inningRuns ?? run.game.inningRuns,
+      inning: step.inning,
+      offenseSide: step.offenseSide,
+    },
   } as T
 }
 

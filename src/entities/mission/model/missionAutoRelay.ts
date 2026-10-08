@@ -1,5 +1,6 @@
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import type { HalfInningPlateAppearance, HalfInningTick } from '@/entities/game/model/simulateHalfInning'
+import type { MissionInningRuns } from '@/entities/mission/model/missionScoreboard'
 
 /**
  * **자동진행 중계(경기 장면 상태 0x21)의 한 틱** — 미션(모드 5·6)도 3아웃 뒤 사람이 안 나서는 반 이닝을 0x21 로 돌린다
@@ -37,6 +38,11 @@ export interface MissionAutoRelayStep {
   readonly line: string | null
   /** 그 틱 뒤 두 팀 판(0x420dc "PITCHER" · 0x42364 "DUE UP")의 값 — 틱 꼴이 싣는다(목록 꼴 `missionAutoRelayStepsOf` 는 없다) */
   readonly cards?: MissionAutoRelayCards
+  /**
+   * 그 틱 뒤 이닝별 점수 칸 st[0x6c..] (0xb6989 — 점수판 0x41c18) — 틱 꼴이 싣는다. 간이 엔진 득점 0xc100a · 0xc109e 가 한 점마다
+   * 0xb6a9c 로 지금 이닝 칸과 합을 함께 올린다(`scoreMissionRuns`).
+   */
+  readonly inningRuns?: MissionInningRuns
 }
 
 /**

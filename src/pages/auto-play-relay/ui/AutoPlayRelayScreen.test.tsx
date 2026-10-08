@@ -99,3 +99,22 @@ describe('0x4258c 자리 — 기준 칸 game_ui 19 상자 4 (폭 212 · 높이 5
     expect(screen.getByTestId('교대판-투수이름').textContent).toBe('김투수')
   })
 })
+
+describe('점수판 0x41c18 (14, 10) — 틱 꼴의 이닝별 칸', () => {
+  it('이닝별 칸이 있으면 점수판을 (14, 10) 에 그리고, 측 1 은 말일 때만 지금 이닝을 그린다', () => {
+    const inningRuns = [[1, 0, 2, 0, 0, 0, 0, 0, 0], [0, 3, 0, 0, 0, 0, 0, 0, 0]] as const
+    const step: MissionAutoRelayStep = { inning: 2, offenseSide: 0, scores: [3, 3], line: null, inningRuns }
+    render(<AutoPlayRelayScreen step={step} onTick={() => {}} sideTeams={[3, 7]} humanSide={1} />)
+    const board = screen.getByTestId('이닝별점수판')
+    expect([board.getAttribute('data-x'), board.getAttribute('data-y')]).toEqual(['14', '10'])
+    // 측 0: 1·0·2 세 칸, 측 1: 0·3 두 칸 (3회초라 측 1 의 3회는 안 그린다)
+    expect(screen.getAllByTestId('이닝별점수판-점수').map((glyph) => glyph.getAttribute('data-image')))
+      .toEqual(['1', '0', '2', '0', '3'])
+    expect(screen.getByTestId('이닝별점수판-로고-1').getAttribute('src')).toBe('./sprites/team_logo_ini/007.png')
+  })
+
+  it('목록 꼴(이닝별 칸 없음)이면 점수판을 안 그린다', () => {
+    render(<AutoPlayRelayScreen step={steps[0]!} onTick={() => {}} sideTeams={[3, 7]} humanSide={1} />)
+    expect(screen.queryByTestId('이닝별점수판')).toBeNull()
+  })
+})

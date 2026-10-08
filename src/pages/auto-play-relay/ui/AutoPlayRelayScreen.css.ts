@@ -40,15 +40,3 @@ export const relayLine = style({
   overflow: 'hidden',
   pointerEvents: 'none',
 })
-
-/** 점수판 0x41c18 자리 — ⚠️ 원본 그림은 미이식이라 웹 글자로 둔다 (자리 · 폭 212 는 원본) */
-export const scoreLine = style({
-  position: 'absolute',
-  width: '212px',
-  textAlign: 'center',
-  color: '#ffffff',
-  fontSize: '12px',
-  lineHeight: '14px',
-  whiteSpace: 'nowrap',
-  pointerEvents: 'none',
-})

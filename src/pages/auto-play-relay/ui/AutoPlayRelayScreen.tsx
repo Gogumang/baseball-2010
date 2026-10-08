@@ -3,7 +3,8 @@ import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { HalfInningCards } from '@/widgets/game-scene/ui/HalfInningCards'
 import type { HalfInningCardsAt } from '@/widgets/game-scene/ui/HalfInningCards'
 import { roundPlateRectsOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
-import { TEAMS } from '@/shared/config/original/teams'
+import { LineScoreBoard } from '@/widgets/line-score/ui/LineScoreBoard'
+import { LINE_SCORE_AT } from '@/widgets/line-score/lib/lineScoreLayout'
 import { useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
 import type { MissionAutoRelayStep } from '@/entities/mission/model/missionAutoRelay'
 import * as styles from '@/pages/auto-play-relay/ui/AutoPlayRelayScreen.css'
@@ -21,8 +22,8 @@ const SCREEN_HEIGHT = 320
  */
 const BASE_BOX = { width: 212, height: 57 } as const
 
-/** 점수판 0x41c18(경기, W/2 − 폭/2, 10, 0) 자리 (42812~4283a) */
-const SCOREBOARD_AT = { x: SCREEN_WIDTH / 2 - BASE_BOX.width / 2, y: 10 } as const
+/** 점수판 0x41c18(경기, W/2 − 폭/2, 10, 0) 자리 (42812~4283a) — `LINE_SCORE_AT.autoRelay` */
+export const SCOREBOARD_AT = { x: SCREEN_WIDTH / 2 - BASE_BOX.width / 2, y: 10 } as const
 
 /** 두 팀 판 — 0x420dc(경기, W/2 − 폭/2 − 6, H − 0x46) → 0x42364(경기, W/2 + 0x24, H − 0x46) 차례 (4283e~4289a) */
 export const RELAY_CARDS_AT: HalfInningCardsAt = {
@@ -92,28 +93,37 @@ interface AutoPlayRelayScreenProps {
  *   PITCHER (8, 250) → DUE UP (156, 250) · 띠 (14, 72, 212×18) · 띠 글 (19, 76) · 팀 이름 그림 오른쪽 끝 221 · 중계 칸 (58, 196, 124×18).
  *   띠 · 글의 y 는 기준 칸의 **높이**(57)에서 잡는다(원본 그대로 — `ldrsh [sp, #0x92]`).
  *
- * ⚠️ 미이식(그림): 점수판 0x41c18(이닝별 점수 줄 — 0x4fe9c 경기 끝 판 503d8 도 부른다)은 웹 어디에도 아직 없고 웹 미션 판은 이닝별
- *    점수 0xb6989 를 들지 않아 옮기지 않았다 — 그 자리에 점수 · 이닝 글자를 둔다. 배경(운동장 전경)도 안 그린다.
+ * - 점수판 0x41c18 은 `widgets/line-score` — 이닝별 칸 st[0x6c..] 은 틱 꼴이 싣는다(`MissionAutoRelayStep.inningRuns`), 깜빡임의
+ *   틱은 이 상태에 들어와 돈 틱 [장면+0x2c](`useSceneTick`). 중계 칸이 이닝별 칸을 안 들면(목록 꼴) 점수판을 안 그린다.
+ *
+ * ⚠️ 미이식(그림): 배경(운동장 전경)은 안 그린다.
  */
 export function AutoPlayRelayScreen({ step, onTick, sideTeams, humanSide }: AutoPlayRelayScreenProps) {
   // 틱 n(1부터)은 n 번째 0x48480 갱신 — 굴림은 부르는 쪽이 그 틱에 한다
-  useSceneTick(() => onTick())
+  const tick = useSceneTick(() => onTick())
   const textOrigins = useFrameOrigins(IMG_TEXT_FRAMES)
   if (step === null) return <RawScreen>{null}</RawScreen>
 
   const offenseTeam = sideTeams[step.offenseSide]
   const label = step.offenseSide === humanSide ? OFFENSE_LABEL.player : OFFENSE_LABEL.computer
-  const teamName = (side: 0 | 1) => TEAMS[sideTeams[side]]?.name ?? ''
   const teamFrame = TEAM_NAME_BASE_FRAME + offenseTeam
   const teamFrameWidth = textOrigins?.[String(teamFrame).padStart(3, '0')]?.width ?? 0
   const cards = step.cards
   return (
     <RawScreen>
-      {/* ⚠️ 미이식: 점수판 0x41c18 — 이닝별 점수 줄(0xb6989(st, 이닝, 측) · 이닝 숫자 0x585ad · 작은 로고 [+0x1054]/[+0x1058])이라
-          웹 미션 판에 이닝별 점수가 없어 옮기지 않았다. 그 자리에 점수 · 이닝 글자를 둔다(웹 전용). */}
-      <div className={styles.scoreLine} style={{ left: SCOREBOARD_AT.x, top: SCOREBOARD_AT.y }} data-testid="중계-점수">
-        {step.inning + 1}회{step.offenseSide === 0 ? '초' : '말'} {teamName(0)} {step.scores[0]} : {step.scores[1]} {teamName(1)}
-      </div>
+      {/* 점수판 0x41c18(경기, 14, 10) — 이닝별 점수 줄 */}
+      {step.inningRuns !== undefined && (
+        <LineScoreBoard
+          {...LINE_SCORE_AT.autoRelay}
+          inning={step.inning}
+          offenseSide={step.offenseSide}
+          inningRuns={step.inningRuns}
+          totals={step.scores}
+          isGameOver={cards?.gameOver ?? false}
+          tick={tick}
+          sideTeams={sideTeams}
+        />
+      )}
       {cards !== undefined && (
         <HalfInningCards
           at={RELAY_CARDS_AT}

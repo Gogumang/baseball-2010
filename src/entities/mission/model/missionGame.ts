@@ -19,6 +19,12 @@ import type { MissionAcePitcher, MissionCpuPitching } from '@/entities/mission/m
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { drainMissionAutoTicks, missionAutoRelayStepOfTick } from '@/entities/mission/model/missionAutoRelay'
 import type { MissionAutoRelay, MissionAutoRelayCards, MissionAutoRelayStep } from '@/entities/mission/model/missionAutoRelay'
+import {
+  clearMissionInningRuns,
+  missionStartInningRunsOf,
+  scoreMissionRuns,
+} from '@/entities/mission/model/missionScoreboard'
+import type { MissionInningRuns, MissionScoreboard } from '@/entities/mission/model/missionScoreboard'
 
 /**
  * **미션 경기의 이닝 · 공수 · 점수** — 미션도 모드 5·6 짜리 보통 경기(장면 0x104)라 3아웃이면 공수가 바뀌고 이닝이 넘어간다
@@ -49,6 +55,8 @@ export interface MissionGame {
   readonly offenseSide: 0 | 1
   /** `st[0x7e]` · `st[0x7f]` — 측 0 · 측 1 점수 (0xb69b0) */
   readonly scores: readonly [number, number]
+  /** `st[0x6c..]` — 측마다 이닝별 점수 아홉 칸 (0xb6989 — 점수판 0x41c18 이 읽는다, `missionScoreboard`) */
+  readonly inningRuns: MissionInningRuns
   /** 미션 객체 `+0x24` — 0xaae7c 마선수 다시 끼우기가 마지막으로 본 이닝 (0xaa57c aa8b6 이 −1) */
   readonly aceCheckedInning: number
   /** 사람 칸 팀의 타선 — 투수 미션의 자동진행 반 이닝이 친다 (레코드 +7 윗 4비트 타순) */
@@ -222,6 +230,8 @@ export function startMissionGame(mission: OriginalMission, setup: MissionGameSet
     inning: mission.start.inning - 1,
     offenseSide: mission.side === '투수' ? cpu : human,
     scores,
+    // aa608~aa64e — 레코드 +0x8e 아홉 칸씩 (합은 위 `scores` 와 같다)
+    inningRuns: missionStartInningRunsOf(mission),
     aceCheckedInning: -1,
     humanBatting: {
       teamId: humanTeamId,
@@ -257,12 +267,11 @@ export function withMissionAutoRelay(game: MissionGame, steps: readonly MissionA
   return { ...game, autoRelay: { serial: (game.autoRelay?.serial ?? 0) + 1, steps } }
 }
 
-/** 점수판 득점 (0xa5c34) — 그 측 점수에 더한다 */
+/** 점수판 득점 (0xa5c34 → 0xb6a9c 한 점씩) — 그 측 합과 지금 이닝 칸에 더한다 (98 이하일 때만 오른다) */
 export function withMissionScore(game: MissionGame, side: 0 | 1, runs: number): MissionGame {
   if (runs <= 0) return game
-  const scores: [number, number] = [game.scores[0], game.scores[1]]
-  scores[side] += runs
-  return { ...game, scores }
+  const board = scoreMissionRuns(game, game.inning, side, runs)
+  return { ...game, scores: board.scores, inningRuns: board.inningRuns }
 }
 
 /** **경기 끝 판정 0xb68fc** — 지금 반 이닝 · 주어진 아웃(3아웃 판 끝이면 3)으로 */
@@ -276,13 +285,14 @@ export function isMissionGameOver(game: MissionGame, outs: number, scores: reado
   })
 }
 
-/** **반 이닝 넘김 0xb6b6c** — 말이 끝났으면 이닝 +1, 공격 측을 뒤집는다 (주자 · 아웃은 부르는 쪽이 비운다) */
+/**
+ * **반 이닝 넘김 0xb6b6c** — 말이 끝났으면 이닝 +1 하고 새 이닝 두 칸을 0 으로(b6b92 · b6ba0), 공격 측을 뒤집는다
+ * (주자 · 아웃은 부르는 쪽이 비운다)
+ */
 export function flipMissionHalf(game: MissionGame): MissionGame {
-  return {
-    ...game,
-    inning: game.offenseSide === 1 ? game.inning + 1 : game.inning,
-    offenseSide: game.offenseSide === 0 ? 1 : 0,
-  }
+  if (game.offenseSide === 0) return { ...game, offenseSide: 1 }
+  const inning = game.inning + 1
+  return { ...game, inning, offenseSide: 0, inningRuns: clearMissionInningRuns(game.inningRuns, inning) }
 }
 
 /** 그 타선의 지금 타순 칸에 선 레코드 (마스터 줄 · 미션 타자 표지) */
@@ -401,12 +411,16 @@ export function* simulateMissionAutoHalfTicks(
       gameOver: isMissionGameOver({ ...game, scores: [scores[0], scores[1]] }, tick.outs),
     }
   }
-  let relayScores: readonly [number, number] = game.scores
+  // 그 틱 뒤 점수판 — 간이 엔진 득점(0xc100a · 0xc109e → 0xb6a9c)은 지금 이닝 칸과 합을 함께 올린다
+  let relayBoard: MissionScoreboard = { scores: game.scores, inningRuns: game.inningRuns }
   let next = ticks.next()
   while (next.done !== true) {
-    const step = missionAutoRelayStepOfTick({ inning: game.inning, offenseSide }, relayScores, next.value, nameOf, cardsOf)
-    relayScores = step.scores
-    yield step
+    const tick = next.value
+    const step = missionAutoRelayStepOfTick({ inning: game.inning, offenseSide }, relayBoard.scores, tick, nameOf, cardsOf)
+    relayBoard = scoreMissionRuns(
+      relayBoard, game.inning, offenseSide, tick.kind === 'plateAppearance' ? tick.appearance.runsBattedIn : 0,
+    )
+    yield { ...step, scores: relayBoard.scores, inningRuns: relayBoard.inningRuns }
     next = ticks.next()
   }
   const result = next.value
