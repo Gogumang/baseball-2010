@@ -1,7 +1,7 @@
 import type { OriginalMission } from '@/shared/config/original/missions'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { missionKeyOf } from '@/entities/mission/model/missionGoal'
-import { quickPitcherOf, teamPitchers } from '@/entities/team/model/teamRoster'
+import { quickPitcherOf, teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { changePitcherIfNeeded, drainPitcherForPitch } from '@/entities/game/model/simulateHalfInning'
 import type { HalfInningDefense, HalfInningMound } from '@/entities/game/model/simulateHalfInning'
 import { pitcherAbilitySumOf, rosterPitcherRoleOf } from '@/entities/pitching/model/pitcherChange'
@@ -19,6 +19,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { RosterPlayer } from '@/shared/config/original/roster'
 import { ROSTER_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
+import type { BatterAbility } from '@/entities/batting/model/batter'
 import { staminaPercentOf } from '@/entities/pitcher-career/model/pitcherStamina'
 import { equippedSeasonAbilityOf } from '@/entities/season-mode/model/seasonPlayerRecord'
 
@@ -268,6 +269,38 @@ export function missionCpuMoundPitcherAbilityOf(team: MissionCpuTeam): PitcherAb
     ...(repertoire === undefined
       ? {}
       : { repertoire: { form: repertoire.form, pitchMask: repertoire.pitchMask, magicId: repertoire.magicId } }),
+  }
+}
+
+/**
+ * **투수 미션의 지금 CPU 타자** `0xae89c(공격 팀)` — 타순 `team+0x32` 칸에 선 명단 줄. 마타자 칸이면 `isAce`(줄은 null),
+ * 아니면 마스터 팀 타자 줄(Xls 행 사본, 0x1ff98 — 대타로 들어온 벤치 줄 포함). CPU 공격 팀이 없으면(타자 미션) null.
+ */
+export function missionCpuBatterOf(
+  team: MissionCpuTeam,
+): { readonly order: number; readonly isAce: boolean; readonly row: RosterPlayer | null } | null {
+  const batting = team.batting
+  if (batting === null) return null
+  const rosterSlot = rosterSlotAt(batting.lineup, batting.order)
+  if (rosterSlot === MISSION_ACE_ROSTER_SLOT) return { order: batting.order, isAce: true, row: null }
+  return { order: batting.order, isAce: false, row: teamBatters(batting.teamId)[rosterSlot] ?? null }
+}
+
+/**
+ * **지금 CPU 타자(마스터 줄)의 경기용 능력치** — 네 칸 모두 `0xb6415(타자, k, 1)`(장비 니블 · 장착 스킬 보정). 마타자 칸이거나
+ * CPU 공격 팀이 없으면 null — 부르는 쪽이 마타자 값(레벨 배율)을 쓴다.
+ * CPU 타자 결정 0x34334 의 h 는 `0xb570d(ctx, 0, 타자, 1, 90, 1)` — 0xb570c 가 b5728 에서 이 값을 받고 모드 5 는 모드 갈래 ·
+ * 팀 능력치 마스크를 안 탄다(부르는 쪽 `gameAbilityOf` 가 0..999 로 자른다).
+ */
+export function missionCpuBatterAbilityOf(team: MissionCpuTeam): BatterAbility | null {
+  const batter = missionCpuBatterOf(team)
+  if (batter === null || batter.row === null) return null
+  const row = batter.row
+  return {
+    hit: masterGameAbilityOf(row, false, 0),
+    power: masterGameAbilityOf(row, false, 1),
+    defense: masterGameAbilityOf(row, false, 2),
+    run: masterGameAbilityOf(row, false, 3),
   }
 }
 

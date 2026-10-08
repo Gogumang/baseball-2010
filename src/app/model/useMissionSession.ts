@@ -101,6 +101,8 @@ import {
   enterMissionPitchSelection,
   isMissionCpuMoundAce,
   missionCpuAfterPitch,
+  missionCpuBatterAbilityOf,
+  missionCpuBatterOf,
   missionCpuMoundPitcherAbilityOf,
   missionCpuAtNewPlateAppearance,
 } from '@/entities/mission/model/missionCpuTeam'
@@ -346,6 +348,8 @@ const MISSION_STAGE_SIDE = 1
 const MISSION_STAMINA_PERCENT = 100
 
 const NO_SKILLS: readonly number[] = []
+/** 팀 new 0xb891c — 필살 남은 칸 모두 −1 */
+const NO_SPECIAL_SWING_SLOTS: Readonly<Record<number, number>> = {}
 
 /** 미션 모드 한 판 — 타자편(MissionRun)과 투수편(PitcherRun)을 함께 다룬다. */
 export function useMissionSession({
@@ -414,10 +418,7 @@ export function useMissionSession({
   >(null)
   /**
    * **필살 남은 칸** s8 팀[+0x29 + 타순] — 미션 한 판에 한 번 채우고(0xaebe4) 스윙 틱 0x4e136 이 줄인다. −1 = 안 채움.
-   * 타자 미션은 내 타자 칸, 투수 미션은 상대 타자 칸이다.
-   * ⚠️ 근사: 웹 미션은 상대 타석을 모두 같은 선수(마타자 미션이면 그 마타자)로 친다 — 그래서 칸도 하나다.
-   *    원본 마타자는 0xaae7c 가 레코드 +7 아래 4비트 타순 칸에 세운다(`missionCpuTeam` — 타순 · 타순 칸 기록은 CPU 대타
-   *    판정에만 들고, 투구 엔진의 타자 능력치는 아직 그 칸을 안 본다).
+   * 이 칸은 타자 미션의 내 타자 칸이다 — 투수 미션 상대 타자 칸은 타순마다 `opponentSpecialSwingStored` 가 든다.
    */
   const [batterSpecialSwingStored, setBatterSpecialSwingStored] = useState(UNFILLED_SPECIAL_SWING)
   /**
@@ -448,7 +449,10 @@ export function useMissionSession({
     enterNewAtBatConfirm()
     runner.resetAtBat(count)
   }
-  const [opponentSpecialSwingStored, setOpponentSpecialSwingStored] = useState(UNFILLED_SPECIAL_SWING)
+  /** 투수 미션 CPU 타자의 필살 남은 칸 s8 팀[+0x29 + 타순] — 타순 칸(0~8)마다. 없는 칸은 −1(안 채움) */
+  const [opponentSpecialSwingStored, setOpponentSpecialSwingStored] = useState<Readonly<Record<number, number>>>(
+    NO_SPECIAL_SWING_SLOTS,
+  )
   /**
    * **투수 미션 마구 남은 칸** s8 팀[+0x28] — −1 = 안 채움(팀 new 0xb891c). 0xaebe4 가 미션 투수로 채우고
    * (`modePitcherMagicRemainingOf`) 코스 확정 0x50e9c 가 줄인다. 미션 한 판(새 경기)마다 −1 로 돌아간다.
@@ -845,14 +849,18 @@ export function useMissionSession({
       },
       random,
     )
-    // 마타자 미션은 원본 마선수 능력치로, 그 밖에는 평범한 타자로 상대한다.
-    const opponent = missionOpponent(pitcherRun.mission)
-    // 마타자는 0xb6414 첫 단계에서 레벨 배율 0xd88aa[mgr[0x13f + 순번]] 을 네 칸 모두 먹는다
-    const rawBatter = missionOpponentAbility(pitcherRun.mission, aceLevels) ?? ROOKIE_BATTER_ABILITY
+    // 지금 타석의 CPU 타자 0xae89c(공격 팀) — 타순 team+0x32 칸에 선 명단 줄 (`missionCpuBatterOf`).
+    // 마타자 칸이면 마선수 레코드(0xb6414 첫 단계 레벨 배율 0xd88aa[mgr[0x13f + 순번]] 을 네 칸 모두), 그 밖은 마스터 팀 줄의
+    // 0xb6415(타자, k, 1) — 0xaae7c 는 마타자를 시작 타순 칸에만 세우고, 다른 칸 · 대타는 마스터 줄이다.
+    const cpuBatter = missionCpuBatterOf(pitcherRun.cpu)
+    const isAceBatter = cpuBatter?.isAce === true
+    const rawBatter =
+      (isAceBatter ? missionOpponentAbility(pitcherRun.mission, aceLevels) : missionCpuBatterAbilityOf(pitcherRun.cpu)) ??
+      ROOKIE_BATTER_ABILITY
     // CPU 타자 결정 0x34334 의 h 는 **경기용 히트** 0xb570d(ctx, 0, 타자, 1, 90, 1) 다 (ce462ce).
     // 미션 모드 5 에서 0xb570c 는 나만의리그 갈래(모드 3·4)도 시즌 갈래(2)도 안 타고, 체력 인자 90 은
     // 감소가 없고, 팀 능력치 마스크 {1,2,8,9} 에도 없다 → 0xb6414 값을 0..999 로 자른 것이다.
-    // ⚠️ 미해결: 0xb6414 스킬 보정(+0x14, 플래그 1)은 마선수 표에 스킬 비트가 없어 못 붙인다.
+    // ⚠️ 미해결: 마타자의 0xb6414 스킬 보정(+0x14, 플래그 1)은 마선수 표에 스킬 비트가 없어 못 붙인다(마스터 줄은 붙인다).
     const batterAbility = {
       ...rawBatter,
       hit: gameAbilityOf({
@@ -863,8 +871,17 @@ export function useMissionSession({
         isMyTeam: false,
       }),
     }
-    // 마타자 필살 0x34468~0x34488 — 남은 칸(0xaea30)이 0 이 아니면 휘두를 때마다 필살이다 (난수 없음)
-    const specialSwing = missionOpponentSpecialSwingOf(pitcherRun.mission, opponentSpecialSwingStored, aceLevels)
+    // 필살 남은 칸 s8 팀[+0x29 + 타순] — 지금 타순 칸의 값
+    const batterOrderSlot = cpuBatter?.order ?? 0
+    // 마타자 필살 0x34468~0x34488 — 남은 칸(0xaea30)이 0 이 아니면 휘두를 때마다 필살이다 (난수 없음).
+    // 일반 CPU 타자(마스터 줄)는 S+0x10 을 쓰지 않는다 (Q1 5절)
+    const specialSwing = isAceBatter
+      ? missionOpponentSpecialSwingOf(
+          pitcherRun.mission,
+          opponentSpecialSwingStored[batterOrderSlot] ?? UNFILLED_SPECIAL_SWING,
+          aceLevels,
+        )
+      : null
     // CPU 도루 0x520de — 상태 0x11 의 10번째 틱(0x537dc → 메시지 0x583)이라 실투 판정(0x4dea0) 뒤, CPU 타자 결정
     // (11번째 틱 0x34334) **바로 앞**이다. 후보가 있을 때만 rand(0,1000) 한 번 → 0xa9bd4 출발 (`rollCpuStealStart`).
     // ⚠️ 근사: 미션 레코드에 상대 타선이 없어 주자 주루는 진행기 기본값(500)이다 — 0x520de 의 표 칸은 주자 속도
@@ -888,7 +905,7 @@ export function useMissionSession({
       {
         isMistakePitch: isMistake,
         // 0xb633d(타자) — 마타자 미션의 상대는 마선수 레코드(+0xa 비트 6)라 번트 칸을 뽑아도 친다
-        isMagicBatter: opponent !== null,
+        isMagicBatter: isAceBatter,
         ...(specialSwing === null ? {} : { specialSwing }),
         // 판정 묶음 '투수미션' = 모드 5 — 수비(사람) −10 (0xab5c0, 모드 3·4 밖) 과
         // 0xab42a 의 비트7 투수 +100. 미션 투수는 나리 투수편 저장 [저장+0x3c] 의 선수(0x1fbd0, 9fe86db) 또는
@@ -903,7 +920,10 @@ export function useMissionSession({
     const resolution = thrown.resolution
     const foulContact = thrown.foulContact
     // 0x4e136 — 필살 스윙이 나간 틱에 남은 −1 (헛스윙도). 마타자가 아니면 null 이라 칸을 안 건드린다
-    if (thrown.specialSwingRemaining !== null) setOpponentSpecialSwingStored(thrown.specialSwingRemaining)
+    if (thrown.specialSwingRemaining !== null) {
+      const remaining = thrown.specialSwingRemaining
+      setOpponentSpecialSwingStored((previous) => ({ ...previous, [batterOrderSlot]: remaining }))
+    }
 
     // 0xa5e14 — 사람이 던져도 공마다 state[0xd] · state[0xe](CPU 대타 막음)를 내린다 (a5e72 · a5e7c)
     let nextRun = recordPitch(
@@ -1143,7 +1163,7 @@ export function useMissionSession({
     // 새 경기 — 0xaae7c 가 저장된 마투수 레코드(+0x2c = 10000)를 다시 베낀다
     setOpponentMoundStamina(FULL_STAMINA)
     setBatterSpecialSwingStored(UNFILLED_SPECIAL_SWING)
-    setOpponentSpecialSwingStored(UNFILLED_SPECIAL_SWING)
+    setOpponentSpecialSwingStored(NO_SPECIAL_SWING_SLOTS)
     setPitcherMagicStored(UNFILLED_SPECIAL_SWING)
     setBallMagicNumber(0)
     resetAtBatWithConfirm(mission.start)
@@ -1209,7 +1229,7 @@ export function useMissionSession({
     beginAceMatch: (mission: OriginalMission, pending: Omit<Extract<Screen, { kind: '마선수대결' }>, 'kind' | 'mission'>) => {
       setOpponentMoundStamina(FULL_STAMINA)
       setBatterSpecialSwingStored(UNFILLED_SPECIAL_SWING)
-      setOpponentSpecialSwingStored(UNFILLED_SPECIAL_SWING)
+      setOpponentSpecialSwingStored(NO_SPECIAL_SWING_SLOTS)
       resetAtBatWithConfirm(mission.start)
       runner.setBannerText('')
       runner.setIsPaused(false)

@@ -12,6 +12,8 @@ import {
   missionCpuAfterPlateAppearance,
   missionCpuAfterRuns,
   missionCpuAtNewPlateAppearance,
+  missionCpuBatterAbilityOf,
+  missionCpuBatterOf,
   missionCpuMoundPitcherAbilityOf,
   startMissionCpuTeam,
 } from '@/entities/mission/model/missionCpuTeam'
@@ -19,7 +21,7 @@ import type { MissionCpuTeam } from '@/entities/mission/model/missionCpuTeam'
 import { missionKeyOf } from '@/entities/mission/model/missionGoal'
 import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
-import { teamPitchers } from '@/entities/team/model/teamRoster'
+import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { ROSTER_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
 
 const missionOf = (side: OriginalMission['side'], id: number): OriginalMission => {
@@ -259,5 +261,43 @@ describe('타자 미션 마운드의 마스터 줄 투수 — 투구 엔진 입�
 
   it('투수 미션은 CPU 수비 팀이 없어 null', () => {
     expect(missionCpuMoundPitcherAbilityOf(startMissionCpuTeam(missionOf('투수', 1)))).toBeNull()
+  })
+})
+
+describe('투수 미션의 지금 CPU 타자 — 0xae89c(공격 팀) = 타순 team+0x32 칸의 명단 줄', () => {
+  it('시작 타순(레코드 +7)의 마스터 줄이 서고, 타석이 끝날 때마다 0xaf020 이 다음 칸 줄로 넘긴다', () => {
+    // 투수 2 — 팀 6, 시작 타순 8
+    const team = startMissionCpuTeam(missionOf('투수', 2))
+    const rows = teamBatters(6)
+    expect(missionCpuBatterOf(team)).toEqual({ order: 8, isAce: false, row: rows[8] })
+    expect(missionCpuBatterAbilityOf(team)).toEqual({
+      hit: rows[8].ability[0],
+      power: rows[8].ability[1],
+      defense: rows[8].ability[2],
+      run: rows[8].ability[3],
+    })
+    const next = missionCpuAfterPlateAppearance(team, 아웃)
+    expect(missionCpuBatterOf(next)).toEqual({ order: 0, isAce: false, row: rows[0] })
+  })
+
+  it('마타자 칸이면 isAce · 능력치 null(부르는 쪽이 마선수 값), 다음 타순은 마스터 줄', () => {
+    const team = startMissionCpuTeam(missionOf('투수', 18))
+    expect(missionCpuBatterOf(team)).toEqual({ order: 3, isAce: true, row: null })
+    expect(missionCpuBatterAbilityOf(team)).toBeNull()
+    const next = missionCpuAfterPlateAppearance(team, 아웃)
+    expect(missionCpuBatterOf(next)?.row).toBe(teamBatters(14)[4])
+  })
+
+  it('장착 스킬 20(수비불가)은 수비 칸에서 100 을 뺀다 — 0xb6415 플래그 1', () => {
+    const rows = teamBatters(6)
+    const index = rows.findIndex((row) => ((row.skillBits >>> 20) & 1) === 1)
+    if (index < 0) return
+    let team = startMissionCpuTeam(missionOf('투수', 2))
+    while (missionCpuBatterOf(team)?.row !== rows[index]) team = missionCpuAfterPlateAppearance(team, 아웃)
+    expect(missionCpuBatterAbilityOf(team)?.defense).toBe(Math.max(rows[index].ability[2] - 100, 0))
+  })
+
+  it('타자 미션은 CPU 공격 팀이 없어 null', () => {
+    expect(missionCpuBatterOf(startMissionCpuTeam(missionOf('타자', 1)))).toBeNull()
   })
 })
