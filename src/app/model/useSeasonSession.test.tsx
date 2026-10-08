@@ -733,6 +733,8 @@ describe('시즌 끝 사슬', () => {
     expect(result.current.state?.record.phase).toBe(SEASON_PHASE.정규시즌순위)
     expect([401, 402, 403]).toContain(이벤트넘기기(result)[0])
     expect(result.current.scene).toBe(SEASON_SCENE_STATE.시즌결산)
+    // 0xef 진입 0x6900 머리(0x690e~0x6922) — phase 0xf 를 쓰고 저장한다
+    expect(result.current.state?.record.phase).toBe(SEASON_PHASE.결산)
   })
 
   it('시상 창 글은 system 3 · 4 일 때만 — 370 은 타자 타이틀 세 칸(0x8b3bc), 376 은 축하 줄 없는 MVP 창(시즌 갈래)', () => {

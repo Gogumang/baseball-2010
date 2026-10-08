@@ -1334,6 +1334,8 @@ export function useSeasonSession(
       if (opens) setOpenedHiddenIds((opened) => [...opened, SEASON_AUTOBOT_BAT_HIDDEN_ID])
       summaryEntrySerial.current += 1
       setSummaryEntry({ serial: summaryEntrySerial.current, opensAutobotBat: opens })
+      // 0x690e~0x6922 — 머리에서 SR+0x50 = 0xf 를 쓰고 0x1fded · 0x22755 로 저장한다(조건 없이, 포스트시즌 경기 뒤 다시 들어와도)
+      commit({ ...save, state: { ...save.state, record: { ...record, phase: SEASON_PHASE.결산 } } })
       return
     }
 
