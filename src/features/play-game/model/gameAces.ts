@@ -80,10 +80,12 @@ export function gameAcePitcherOf(
 ): GameAcePitcher | undefined {
   const player = acePitcherPlayerOf(index)
   if (player === undefined) return undefined
-  const ability = aceAbilityAtLevel(player.ability, aceLevelOf(levels, aceLevelSlotOf('투수', index + 1)))
+  const level = aceLevelOf(levels, aceLevelSlotOf('투수', index + 1))
+  const ability = aceAbilityAtLevel(player.ability, level)
   return {
     player,
-    quick: { control: ability.hit, velocity: ability.power, stamina: ability.run, skillIds: [] },
+    // 0xc11f0 c1278 — 마투수면 보정 구조체 out+4 · +6 에 D[0xce/0x9c + 2k] (k = 레벨·5 + 순번, `quickSwingBoostOf`)
+    quick: { control: ability.hit, velocity: ability.power, stamina: ability.run, skillIds: [], ace: { order: index, level } },
     control: ability.hit,
     velocity: ability.power,
     breaking: ability.defense,
@@ -98,8 +100,10 @@ export function gameAceBatterOf(
 ): QuickAtBatBatter | undefined {
   const player = aceBatterPlayerOf(index)
   if (player === undefined) return undefined
-  const ability = aceAbilityAtLevel(player.ability, aceLevelOf(levels, aceLevelSlotOf('타자', index + 1)))
-  return { hit: ability.hit, power: ability.power, run: ability.run, skillIds: [] }
+  const level = aceLevelOf(levels, aceLevelSlotOf('타자', index + 1))
+  const ability = aceAbilityAtLevel(player.ability, level)
+  // 0xc11f0 c1226 — 마타자면 보정 구조체 out+0 · +2 에 D[0x100/0x132 + 2k] (`quickSwingBoostOf`)
+  return { hit: ability.hit, power: ability.power, run: ability.run, skillIds: [], ace: { order: index, level } }
 }
 
 /**
