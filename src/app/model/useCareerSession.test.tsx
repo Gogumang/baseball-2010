@@ -4,6 +4,7 @@ import { nariLineupSlotsOf } from '@/entities/career/model/nariTeamRecord'
 import { describe, expect, it } from 'vitest'
 import { NARI_YEAR_START_EVENT_ID } from '@/entities/story/model/storyScene'
 import { act, renderHook, waitFor } from '@testing-library/react'
+import { LOADING_TIPS } from '@/shared/config/loadingTips'
 import { applyGameEvaluation, isEvaluatedGame, useCareerSession } from '@/app/model/useCareerSession'
 import { advancePostseason, EMPTY_LEAGUE, LEAGUE_TEAM_COUNT, startPostseason } from '@/entities/league/model/league'
 import { useAtBatRunner } from '@/app/model/useAtBatRunner'
@@ -431,6 +432,28 @@ describe('첫 종류 21 로 끝난 재생 (0x8d4ce — [0x1552adc] = 1) → 114 
     act(() => rendered.result.current.session.actions.completeScene([], [500], 500))
     // 판정 없음(인기도 정확히 1000)은 −1 그대로
     expect(rendered.result.current.screen).toEqual({ kind: '엔딩', endingIndex: -1 })
+  })
+})
+
+describe('경기 장면 시작의 로딩 팁 — 상태 7 진입 0x39f88 → 0x53dbc 의 rand(0, 73) 이 굴림 맨 앞', () => {
+  it('142 확인 뒤 첫 굴림이 팁이다 — 덱 1275 · 효과 1202(startGame)보다 앞', () => {
+    const seeded = createSeededRandom(20100901)
+    const values: number[] = []
+    const random = { ...seeded, next: () => { const value = seeded.next(); values.push(value); return value } }
+    const saveGame = 메모리저장({ ...createCareer('팁'), gamesPlayed: 4 })
+    const rendered = renderHook(() => {
+      const [screen, setScreen] = useState<Screen>({ kind: '메인메뉴' })
+      const runner = useAtBatRunner()
+      return { screen, setScreen, session: useCareerSession({ runner, random, saveGame, screen, setScreen }) }
+    })
+    act(() => rendered.result.current.session.actions.continueSaved())
+    act(() => rendered.result.current.session.actions.runCommand('다음경기'))
+    act(() => rendered.result.current.session.actions.confirmNextGameStandings())
+    const before = values.length
+    act(() => rendered.result.current.session.actions.confirmMatchPrepare())
+
+    expect(values.length).toBeGreaterThan(before + 1)
+    expect(rendered.result.current.session.loadingTip).toBe(LOADING_TIPS[Math.floor(values[before] * LOADING_TIPS.length)])
   })
 })
 

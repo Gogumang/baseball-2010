@@ -142,7 +142,8 @@ import { OUTING_PLACES } from '@/shared/config/outingPlaces'
 import { TRAINING_MENUS } from '@/shared/config/trainingMenus'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { isInfiniteGamePointOn } from '@/shared/lib/dev/devOptions'
-import { pickLoadingTip } from '@/shared/config/loadingTips'
+import { LOADING_TIPS } from '@/shared/config/loadingTips'
+import { rollSceneLoadingTip } from '@/entities/game/model/sceneLoadingTip'
 import { stadiumSkyRowOf } from '@/widgets/batting-stage/lib/stageScenery'
 import type { SaveGamePort } from '@/shared/api/save/saveGamePort'
 import { KOREA_TEAM_ID, createNationalCup, nationalCupMatchupOf, nationalCupSideOf } from '@/entities/national-cup/model/nationalCup'
@@ -572,6 +573,8 @@ export function useCareerSession({
     ) => {
       // 경기 장면 셋업 0x39fdc 모드 3·4 갈래(0x3a200) — 0xb6814(전역 상태): +0x6b = 0 (`liveGameState`)
       resetLiveGameState()
+      // 상태 7 진입 0x39f88 → 0x53dbc 의 팁 rand(0, 73) — 경기 시작 굴림의 맨 앞(덱 1275 · 효과 1202 보다 앞, `rollSceneLoadingTip`)
+      const tip = LOADING_TIPS[rollSceneLoadingTip(random)] ?? null
       // 환경설정 "주루" 를 경기에 태운다 — 타자편은 사람이 늘 공격이라 설정이 그대로 먹는다 (0xae690)
       const started = startGame(
         random, ourTeamId, battingOrder, opponentTeamId, playerSide, dayCounter, runningModeManualRef.current, pitchers, aces,
@@ -588,7 +591,7 @@ export function useCareerSession({
       foulPlayRef.current = false
       runner.setBannerText('')
       runner.setIsPaused(true)
-      setLoadingTip(pickLoadingTip(random))
+      setLoadingTip(tip)
       setScreen({ kind: '경기' })
     },
     [random, runner, setScreen],
