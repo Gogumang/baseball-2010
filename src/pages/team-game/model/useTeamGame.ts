@@ -190,6 +190,9 @@ export function useTeamGame(
     // 맨 앞은 상태 7 **진입** 0x39f88 → 0x53dbc 의 로딩 팁 rand(0, 73) — 모드를 안 가려 새 경기 · 이어하기 모두
     // 경기 장면 시작마다 한 번, 갱신 0x3e340 의 덱 1275 보다 먼저다 (`rollSceneLoadingTip`). 웹 팀경기는 팁 판을 안 그려 값은 버린다
     rollSceneLoadingTip(random)
+    // 상태 7 갱신 0x3e340 의 맨 앞 0x3e350 이 울리던 소리를 끊는다(0x6e418) — 경기 장면은 배경음 없이 시작한다. 그리는 자리라
+    // 자식 화면(자동진행 중계 0x21 의 33 · 인트로 61)의 효과보다 먼저다
+    activeSound().stop()
     // 자동진행 중계(0x21)는 화면이 한 틱씩 돌린다 — 그 사이 CLR 중단 · 속도 키를 받는다
     const live: TeamGameOptions = { ...options, liveAutoRelay: true }
     const record = autoRelayRecordPort()

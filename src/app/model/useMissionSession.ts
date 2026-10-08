@@ -1513,6 +1513,8 @@ export function useMissionSession({
     // 그 앞 상태 7 장면 초기화 0x3e340 의 3ed76 → 0xb08e8 이 이 장면의 패턴 덱을 섞는다(사람 · CPU 타자가 같이 쓴다).
     // 맨 앞은 상태 7 **진입** 0x39f88 → 0x53dbc 의 로딩 팁 rand(0, 73) — 갱신 0x3e340 보다 한 걸음 먼저다 (`rollSceneLoadingTip`)
     setLoadingTip(LOADING_TIPS[rollSceneLoadingTip(random)] ?? null)
+    // 상태 7 갱신 0x3e340 의 맨 앞 0x3e350 이 울리던 소리를 끊는다(0x6e418) — 로딩 판부터 배경음이 없다
+    audio.stop()
     openScenePatternDeck(random)
     rollSimulatorInit(random)
     // 상태 9 끝 3fa5e 가 예약한 상태 8 경기 적재(48774 → 0x352e8 → 0x783b0) — 하늘 줄 rand(0, 6)
@@ -1627,6 +1629,8 @@ export function useMissionSession({
       // 마선수 대결도 미션 장면(모드 6)으로 나간다 — 상태 7 진입 0x39f88 의 로딩 팁 rand(0, 73) · 장면 덱(0x3e340 → 0xb08e8) ·
       // 0x3fa0e 의 rand(0, 2) 한 번 (`resetForNewMatch` 와 같다)
       setLoadingTip(LOADING_TIPS[rollSceneLoadingTip(random)] ?? null)
+      // 상태 7 갱신 0x3e340 의 맨 앞 0x3e350 이 울리던 소리를 끊는다(0x6e418)
+      audio.stop()
       openScenePatternDeck(random)
       rollSimulatorInit(random)
       // 그 뒤 상태 8 경기 적재의 하늘 줄 rand(0, 6) (`rollSkyRow` 머리말)

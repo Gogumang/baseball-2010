@@ -10,7 +10,10 @@ import type { PitcherScene } from '@/app/model/usePitcherLeagueSession'
  * 1  메인메뉴          장면 0x103 상태 3~5 (타이틀 뒤 메뉴)
  * 3  모드 준비·설정    0x105 상태 202 · 0x106 상태 101 · 0x107 로비
  * 4  관리 화면         시즌(0x105)·나만의리그(0x106) 관리
- * 33 경기              0x104 상태 0x21 (0x3abf0 · 0x48480 · 0x4258c)
+ * —  경기              0x104 — 상태 7 갱신 0x3e340 의 맨 앞 0x3e350 이 소리를 끊고(0x6e418) 시작한다. 경기 안 배경음은
+ *                      자동진행 중계 0x21 진입 0x3abf0 의 33(모드 {1,2,8,9} · 속도 ≠ 2 — `TeamAutoRelay`)과
+ *                      벤치클리어링 44(한 번)뿐이다. 끊기는 장면을 세우는 쪽(`useTeamGame` · `usePitcherGame` ·
+ *                      나리 타자편 · 미션 · 홈런더비의 상태 7 자리)이 그리는 때 한다 — 화면 표는 안 바꾼다(null)
  * 40 이벤트(대화)      0x106 상태 114 · 0x105 상태 211
  * 46 엔딩              0x106 상태 141 · 0x105 상태 245 예약 (141 은 e ≤ 1 이면 52 — `endingBgmOf`, 245 는 e == 0 이면 52 — `seasonEndingBgmOf`)
  * ```
@@ -34,7 +37,7 @@ export const SCREEN_BGM = {
   투수편: 3,
   일반모드: 3,
   미션선택: 3,
-  홈런더비: 3,
+  // 홈런더비는 없다 — 선수 고르기는 장면 0x103 하위 16(메뉴 안)이라 메뉴의 1 이 이어지고, 경기는 0x3e350 이 끊는다
   스페셜: 3,
   도움말: 3,
   환경설정: 3,
@@ -44,10 +47,6 @@ export const SCREEN_BGM = {
   아이템: 4,
   외출: 4,
   성적: 4,
-  경기: 33,
-  미션진행: 33,
-  투수미션: 33,
-  마선수대결: 33,
   이벤트: 40,
   엔딩: 46,
 } as const satisfies Partial<Record<Screen['kind'], number>>
@@ -126,6 +125,8 @@ export function pitcherLeagueBgmOf(
   if (scene === '외출') return SCREEN_BGM.외출
   // 142 진입 0x1c46c 는 배경음을 안 건드린다 — 109(4) · 128(40 / 이어하기 4)의 것이 이어진다
   if (scene === '경기준비') return null
+  // 경기 장면 0x104 는 상태 7 의 0x3e350 이 소리를 끊고 시작한다 — 끊기는 `usePitcherGame` 이 한다
+  if (scene === '경기') return null
   return SCREEN_BGM.투수편
 }
 

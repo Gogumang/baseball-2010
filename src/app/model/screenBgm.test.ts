@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import { pitcherLeagueBgmOf, screenBgmOf, seasonEndingBgmOf, seasonMenuBgmOf, usePitcherLeagueBgm, useSeasonMenuBgm } from '@/app/model/screenBgm'
 import { createSilentSound } from '@/shared/api/audio/soundPort'
+import { useSceneBgm } from '@/app/model/useSound'
 import type { PitcherScene } from '@/app/model/usePitcherLeagueSession'
 
 describe('포스트시즌 대진 128 배경음 — 진입 0x120a4 (이전 상태 1 일 때만 4)', () => {
@@ -32,8 +33,9 @@ describe('투수편 배경음 — 안쪽 장면을 본다 (128 진입 0x120a4 �
     expect(result.current).toBeNull()
     rerender({ isActive: true, scene: '포스트시즌' })
     expect(result.current).toBe(4)
+    // 경기 장면은 0x3e350 이 끊고 시작한다 — 화면 표는 안 바꾼다
     rerender({ isActive: true, scene: '경기' })
-    expect(result.current).toBe(3)
+    expect(result.current).toBeNull()
     rerender({ isActive: true, scene: '포스트시즌' })
     expect(result.current).toBe(40)
     // 메인 메뉴로 나갔다가 다시 들어오면 다시 이어하기 진입이다
@@ -111,5 +113,39 @@ describe('시즌모드 10년차 엔딩 0xf5 배경음 — 진입 0x6be8 의 6c4a
     expect(seasonEndingBgmOf(1)).toBe(46)
     expect(seasonEndingBgmOf(4)).toBe(46)
     expect(seasonEndingBgmOf(null)).toBe(46)
+  })
+})
+
+describe('경기 장면 — 0x3e340 의 맨 앞 0x3e350 이 소리를 끊고 시작한다 (경기 안 배경음은 중계 33 · 벤치클리어링 44 뿐)', () => {
+  it('경기 · 미션 · 마선수대결 · 홈런더비 화면은 배경음을 안 바꾼다', () => {
+    expect(screenBgmOf({ kind: '경기' })).toBeNull()
+    expect(screenBgmOf({ kind: '홈런더비' })).toBeNull()
+    expect(pitcherLeagueBgmOf('경기', false)).toBeNull()
+  })
+
+  it('화면 배경음 훅 — 끊긴 뒤 같은 번호의 화면으로 돌아오면 다시 튼다', () => {
+    const played: number[] = []
+    let remembered: number | null = null
+    const port = {
+      ...createSilentSound(),
+      playBgm: (id: number) => {
+        played.push(id)
+        remembered = id
+      },
+      currentBgm: () => remembered,
+    }
+    const { rerender } = renderHook(({ bgm }: { bgm: number | null }) => useSceneBgm(port, bgm), {
+      initialProps: { bgm: 4 as number | null },
+    })
+    expect(played).toEqual([4])
+    // 같은 번호가 기억돼 있으면 다시 안 튼다
+    rerender({ bgm: null })
+    rerender({ bgm: 4 })
+    expect(played).toEqual([4])
+    // 경기 장면이 끊었다(0x6e418 — 기억도 잊는다)
+    rerender({ bgm: null })
+    remembered = null
+    rerender({ bgm: 4 })
+    expect(played).toEqual([4, 4])
   })
 })

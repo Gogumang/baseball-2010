@@ -273,6 +273,8 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
   const startScene = () => {
     if (randomRef.current === undefined) return
     const started = rollDerbySceneStart(randomRef.current)
+    // 상태 7 갱신 0x3e340 의 맨 앞 0x3e350 이 울리던 소리를 끊는다(0x6e418) — 첫 장면 · 다시하기 · 재도전마다 새 장면이다
+    activeSound().stop()
     setSkyRow(started.skyRow)
     isLoadingRef.current = true
     setLoadingTip(LOADING_TIPS[started.loadingTipIndex] ?? null)

@@ -104,6 +104,8 @@ export function usePitcherGame(
     // 맨 앞은 상태 7 **진입** 0x39f88 → 0x53dbc 의 로딩 팁 rand(0, 73) — 갱신 0x3e340 의 덱 1275 보다 먼저 (`rollSceneLoadingTip`).
     // 웹 투수편은 팁 판을 안 그려 값은 버린다
     rollSceneLoadingTip(random)
+    // 상태 7 갱신 0x3e340 의 맨 앞 0x3e350 이 울리던 소리를 끊는다(0x6e418) — 경기 장면은 배경음 없이 시작한다 (인트로 61 효과보다 먼저)
+    activeSound().stop()
     return startPitcherGame(options, random)
   })
 

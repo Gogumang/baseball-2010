@@ -75,11 +75,15 @@ export function useSceneEnterSound(sound: SoundPort, screenKind: string, soundId
  * 같은 번호면 `playBgm` 이 그대로 두므로 화면 안에서 다시 그려도 끊기지 않는다.
  * `null` 이면 배경음이 없는 화면이라 **멈추지 않고 그대로 둔다** — 원본도 배경음이 없는 상태로
  * 넘어갈 때 따로 끄지 않고, 다음 배경음이 통로를 가져갈 때 자연히 바뀐다 (0x6e9d4).
+ *
+ * 앞서 튼 번호와 같아도 그 사이 누가 기억한 배경음을 지웠으면(경기 장면 0x3e350 의 소리 끊기 0x6e418) 다시 튼다 —
+ * 관리 화면(4) → 경기 → 관리 화면(4) 에서 4 가 다시 나야 한다.
  */
 export function useSceneBgm(sound: SoundPort, bgmId: number | null): void {
   const lastRef = useRef<number | null>(null)
   useEffect(() => {
-    if (bgmId === null || bgmId === lastRef.current) return
+    if (bgmId === null) return
+    if (bgmId === lastRef.current && sound.currentBgm() === bgmId) return
     lastRef.current = bgmId
     sound.playBgm(bgmId)
   }, [sound, bgmId])
