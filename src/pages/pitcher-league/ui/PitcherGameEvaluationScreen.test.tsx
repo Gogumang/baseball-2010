@@ -44,6 +44,11 @@ describe('투수편 116 경기 뒤 평가 (0x11e0c · 0x8a6fc)', () => {
     expect(막대.getAttribute('data-rows')).toBe('30')
   })
 
+  it('감독 초상화 바닥은 관리 화면 쪽 135 — 0x7fbc4 가 프레임 10 박스 0 의 y + h − 2 를 0x7f998 에 (아래 여백 320 − 135)', () => {
+    const { container } = render(<PitcherGameEvaluationScreen career={createPitcherCareer('테스터')} lastGame={경기} onConfirm={vi.fn()} />)
+    expect(container.querySelector('[style*="bottom: 185px"]')).not.toBeNull()
+  })
+
   it('대사(기록 줄 + 감독 글) → 변화 창(system sub 2 · 0x86c90) → 확인이면 114 로', () => {
     const onConfirm = vi.fn()
     render(<PitcherGameEvaluationScreen career={{ ...createPitcherCareer('테스터'), lastEvaluation: { moraleChange: 3, popularityChange: 0, reputationChange: -2 } }}
