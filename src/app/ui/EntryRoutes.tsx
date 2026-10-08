@@ -272,8 +272,13 @@ export function EntryRoutes({
       setDerbyPick(null)
       setScreen({ kind: '메인메뉴' })
     }
-    // 하위 16 선수 고르기 — 결과 0(되돌아가기)은 하위 5 모드 목록(웹은 메인 메뉴), 2·4 → 모드 7 (0x29ac8).
+    // 하위 16 선수 고르기 — 결과 0(되돌아가기)은 하위 5 게임시작 목록, 2·4 → 모드 7 (0x29ac8).
+    // 같은 장면 0x103 안이라 생성자를 안 지난다 — 커서 [0x1552d24] 는 [홈런더비] 그대로, 띠 [0xe4] 는 이미 다 자랐다
     // 육성·명예 타자가 다 없으면 코드 5·6 팝업만 떠서 들어갈 수 없다 (신인 대체 없음, Q2 3-1)
+    const cancelPick = () => {
+      setDerbyPick(null)
+      setScreen({ kind: '메인메뉴', openTier: 5, isBandGrown: true })
+    }
     if (derbyPick === null) {
       return (
         <HallOfFameScreen
@@ -287,9 +292,9 @@ export function EntryRoutes({
               onLastPlayedMode?.(HOME_RUN_DERBY_MODE)
               setDerbyPick(pick)
             },
-            onCancel: leave,
+            onCancel: cancelPick,
           }}
-          onBack={leave}
+          onBack={cancelPick}
         />
       )
     }

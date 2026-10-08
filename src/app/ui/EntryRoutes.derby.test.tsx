@@ -113,9 +113,9 @@ describe('홈런더비 진입 — 하위 16 선수 고르기 (0x25e6c · 0x29ac8
     expect(recordStat).toHaveBeenCalledWith({ kind: 'G획득', mode: 7, amount: 123 })
   })
 
-  it('되돌아가기는 메인 메뉴 (결과 0)', () => {
+  it('되돌아가기는 결과 0 — 같은 장면의 하위 5 게임시작 목록으로, 띠는 이미 다 자랐다 (0x29ac8)', () => {
     const { setScreen } = 띄우기(나리)
     fireEvent.click(view.getByRole('button', { name: '되돌아가기' }))
-    expect(setScreen).toHaveBeenCalledWith({ kind: '메인메뉴' })
+    expect(setScreen).toHaveBeenCalledWith({ kind: '메인메뉴', openTier: 5, isBandGrown: true })
   })
 })

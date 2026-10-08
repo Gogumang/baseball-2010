@@ -63,9 +63,19 @@ describe('미션 모드 진입 — 하위 17 선수 고르기를 먼저 띄운�
     expect(view.getByRole('button', { name: '되돌아가기' })).toBeTruthy()
   })
 
-  it('되돌아가기는 결과 0 — 메인 메뉴로', () => {
+  it('되돌아가기는 결과 0 — 같은 장면의 하위 5 게임시작 목록으로, 띠는 이미 다 자랐다 (0x29a92)', () => {
     const { setScreenSpy } = 띄우기({ 투수: null, 타자: null })
     fireEvent.click(view.getByRole('button', { name: '되돌아가기' }))
-    expect(setScreenSpy).toHaveBeenCalledWith({ kind: '메인메뉴' })
+    expect(setScreenSpy).toHaveBeenCalledWith({ kind: '메인메뉴', openTier: 5, isBandGrown: true })
+  })
+
+  it('미션 목록 CLR 은 선수 고르기를 다시 연다(0x1e8d0 [0x140006c] = 0x11) — 그 뒤 되돌아가기는 띠를 1 부터 (생성자 0x2381c)', () => {
+    const { 슬롯, setScreenSpy } = 띄우기({ 투수: null, 타자: { name: '홍길동', equippedAbility: [500, 500, 500, 500] } })
+    fireEvent.click(슬롯(5))
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(setScreenSpy).toHaveBeenLastCalledWith({ kind: '미션선택' })
+    expect(view.getByRole('button', { name: '5번 슬롯' })).toBeTruthy()
+    fireEvent.click(view.getByRole('button', { name: '되돌아가기' }))
+    expect(setScreenSpy).toHaveBeenLastCalledWith({ kind: '메인메뉴', openTier: 5 })
   })
 })
