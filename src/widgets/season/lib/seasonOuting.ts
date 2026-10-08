@@ -35,15 +35,6 @@ export type SeasonOutingPlace = (typeof SEASON_OUTING_PLACES)[number]
  */
 export const SEASON_OUTING_ACTIVITIES: readonly string[] = SCHEDULE_ACTIVITIES.slice(5)
 
-/** 각 칸이 StrHOWTO[22] "외출 커맨드"(시즌 쪽) 에서 설명하는 방향 */
-export const SEASON_OUTING_DESCRIPTIONS: readonly string[] = [
-  '친선경기를 통해 소지금을 획득합니다',
-  '회식을 통해 사기를 대폭 회복합니다. 단, 소지금을 소모합니다',
-  '입원을 통해 부상, 질병을 회복시키고, 소량의 사기를 회복합니다. 단, 소지금을 소모합니다',
-  '야구교실을 통해 인기도와 평판이 상승합니다',
-  '구단CF을 통해 인기도 상승과 소량의 사기를 회복합니다. 단, 소지금을 소모합니다',
-]
-
 /**
  * 비용 (100만 원 단위) — 가드 `0xbd38` 2번이 읽는 값. p1 **4** · p2 **5** · p4 **10**,
  * p0·p3 은 0 이다. 효과표의 소지금 기본값과 부호만 다른 같은 값이다.

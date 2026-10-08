@@ -202,6 +202,14 @@ export function SeasonRoute({
   useEffect(() => {
     if (scene === SEASON_SCENE_STATE.경기직전) setTrainingResultFirstLine(0)
   }, [scene])
+  /**
+   * 외출 지도 고른 칸 this+0xf8 — 장면 0x105 객체 칸이라 지도를 오가도 남고(진입 0xbd24 는 그림만 싣는다), 경기로 장면이
+   * 지워졌다 새로 서면(위 창 첫 줄과 같은 수명) 0 이다.
+   */
+  const [outingCursor, setOutingCursor] = useState(0)
+  useEffect(() => {
+    if (scene === SEASON_SCENE_STATE.경기직전) setOutingCursor(0)
+  }, [scene])
   /** 0xdf 목적 1 에서 나리 선수를 고르면 뜨는 StrMODE[220] 알림 (0xbbef9(…, 1, 1, 1) — 상태는 0xdf 그대로) */
   const [pickNotice, setPickNotice] = useState<string | null>(null)
   /**
@@ -750,7 +758,8 @@ export function SeasonRoute({
     return (
       <SeasonOutingScreen
         state={state}
-        outingSubItems={state.record.outingSubItems}
+        cursor={outingCursor}
+        onCursorChange={setOutingCursor}
         onRun={(_place, index) => actions.runOuting(index)}
         onBack={backToManagement}
       />
