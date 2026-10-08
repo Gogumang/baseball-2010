@@ -117,13 +117,23 @@ const MAX_CLOSED_CATCH_UP = 30
 const UPDATES_PER_TICK = 1
 
 /**
- * **펌블(공 놓침) 소리 53** — 원본은 야수 동작 `0xd` 를 거는 `0xa1e60` 이 그 자리에서 낸다
- * (`shared/config/original/sounds` 53번: "선수 넘어짐 / 공 놓침", `+0xb4 = 15` 동안 먼지 애니).
+ * **펌블 함성 29** — 펌블 갈래 b4274~b4286 은 야수 +0xb8 = 6 · 메시지 0xbc2(처리기는 `bx lr`)뿐이고 동작 잠금 · 동작 0xd 가 없다
+ * (53 을 내는 0xa1e60 은 필살타법 타구에 맞은 야수 몫이다 — CORRECTIONS 077c6ff · de278ad). 소리는 0x17 그리기 0x46c88 →
+ * 야수 그리기 0x43278 의 0x4381a~0x43870 이 낸다:
+ * ```
+ * 437a4  +0xb4(동작 잠금) > 0 이면 먼지 애니 갈래 — 아니면 43818
+ * 4381a  +0xb8 > 0 && +0xb8 == 6 → [+0xec]+0x2e += 1(9999 로 자름) · 0xa755d([…+0x230], 3) · 0x6e499(소리, 0x1d = 29, 0)  ; 예약
+ * ```
+ * +0xb8 은 야수 틱 0xa1284(a12da)가 잠금이 없을 때 틱마다 −1 한다. 한 그림의 차례는 G1 0x3f060(목록 틱 — 야수 틱) →
+ * 슬롯 2(플레이 틱 — 펌블 굴림 0xb41d0) → G3 그리기라, **펌블이 난 틱의 그림**만 6 을 본다 → 그 틱에 29 한 번.
+ * 키 건너뛰기(+0xfe7) 동안은 52b26 이 G1 → G2 만 되풀이하고 그리지 않아 소리가 없다.
+ * ⚠️ 한 판에 펌블이 둘 나면 원본은 두 번 내지만 진행기 칸(`fumbled`)이 한 번만 알려 웹은 첫 펌블만 낸다.
+ * ⚠️ 필살타법 타구에 맞은 야수의 53(0xa1e60)은 아직 안 잇는다.
  *
  * 펌블을 굴리는 곳은 진행기(`runDefensePlay` 의 0xb41d0 굴림)지만 그쪽은 순수 함수라 소리를 못 낸다 —
  * 틱을 실제로 돌리는 **이 화면**이 원본과 같은 틱에 낸다.
  */
-const FUMBLE_SOUND = 53
+const FUMBLE_CHEER_SOUND = 29
 
 /**
  * 수비 한 플레이를 보여 준다 — 갈래가 둘이다.
@@ -556,11 +566,12 @@ function LivePlayback({
         // 득점 점수판 0x41a64 (그리기 0x46e62). 한 갱신에 여러 틱을 따라잡으면 마지막 틱 모습만 보인다
         board = drawBoard(running.held.scoreboardRuns)
       }
-      // 펌블 소리 53 — 진행기가 `state.fumbled` 를 세우는 **그 틱**에 낸다 (0xb41d0 굴림 → 동작 0xd).
+      // 펌블 함성 29 — 진행기가 `state.fumbled` 를 세우는 **그 틱**의 그림에 낸다 (0xb41d0 굴림 → +0xb8 = 6 → 그리기 0x4381a).
       // 플레이 끝에 몰아서 내면 아웃 콜(0x51b36)을 덮는다 — 소리 통로가 하나뿐이기 때문이다.
       if (running.fumbled && !fumbleSoundPlayedRef.current) {
         fumbleSoundPlayedRef.current = true
-        activeSound().play(FUMBLE_SOUND)
+        // 그리기 0x4381a 의 예약 29 — 건너뛰는 동안(+0xfe7)은 그리지 않아 안 난다
+        if (!running.fastForward) activeSound().play(FUMBLE_CHEER_SOUND)
       }
       // 슬라이딩 소리 10 — 진행기가 그 틱에 낸다고 표시한 대로 낸다. 한 플레이 한 번 잠금(+0x31c)은
       // 사람 키 갈래에만 있고 진행기가 이미 걸었다 — 자동 갈래(0x5268c)는 잠금이 없어 여기서도 안 막는다.

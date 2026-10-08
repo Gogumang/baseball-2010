@@ -179,11 +179,12 @@ describe('수비 재생 — 타구를 받아 실시간으로 돌리는 갈래 (�
   })
 
   /**
-   * **펌블 소리 53** (야수 동작 0xd 를 거는 0xa1e60).
+   * **펌블 함성 29** — 펌블은 야수 +0xb8 = 6 뿐이고 그 틱의 그리기 0x4381a 가 예약 29 를 낸다
+   * (53 의 0xa1e60 은 필살타법 타구에 맞은 야수 몫이라 펌블엔 없다).
    * 굴림은 진행기가 하지만 소리는 **틱을 도는 이 화면**이 낸다 — 플레이 끝에 몰아서 내면
    * 아웃 콜(0x51b36)을 덮기 때문이다.
    */
-  it('펌블이 난 그 틱에 53 을 한 번만 낸다 (0xb41d0 → 동작 0xd, 0xa1e60)', () => {
+  it('펌블이 난 그 틱에 29 를 한 번만 내고 53 은 안 낸다 (0xb41d0 → +0xb8 = 6 → 0x4381a)', () => {
     vi.useFakeTimers()
     const 울린것: number[] = []
     setActiveSound({
@@ -204,14 +205,15 @@ describe('수비 재생 — 타구를 받아 실시간으로 돌리는 갈래 (�
       끝까지(onDone)
 
       expect(결과(onDone).fumbled).toBe(true)
-      expect(울린것.filter((id) => id === 53)).toEqual([53])
+      expect(울린것.filter((id) => id === 29)).toEqual([29])
+      expect(울린것).not.toContain(53)
     } finally {
       setActiveSound(null)
       vi.useRealTimers()
     }
   })
 
-  it('펌블이 없으면 53 을 내지 않는다 — 난수를 안 주면 굴림 자체가 안 돈다', () => {
+  it('펌블이 없으면 29 를 내지 않는다 — 난수를 안 주면 굴림 자체가 안 돈다', () => {
     vi.useFakeTimers()
     const 울린것: number[] = []
     setActiveSound({
@@ -230,7 +232,7 @@ describe('수비 재생 — 타구를 받아 실시간으로 돌리는 갈래 (�
       끝까지(onDone)
 
       expect(결과(onDone).fumbled).toBe(false)
-      expect(울린것).not.toContain(53)
+      expect(울린것).not.toContain(29)
     } finally {
       setActiveSound(null)
       vi.useRealTimers()
