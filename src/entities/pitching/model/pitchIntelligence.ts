@@ -8,7 +8,7 @@ import type { PitchPatternDifficulty } from '@/shared/config/original/pitchPatte
  *   구질 목록 0xb6d2c — 투수 레코드 +0x1c 비트마스크, 칸 표 0xd8920
  *   구질 고르기 0x344dc — 마구 조건 → 목록 rand(0,6) 칸
  *   목표 종류 0x9ede0 · 0x9eeac — pitchpattern_*.arr 행 (난이도는 환경설정 +0x2c)
- * 구질 번호 t 는 pitch.zt1 항목 번호 + 1 (1 FASTBALL … 21 SPECIAL, 22 마구).
+ * 구질 번호 t 는 pitch.zt1 항목 번호 + 1 (1 FASTBALL … 16 SF … 21 KNUCKLE, 22 마구 — 이름표 [0x140026c]).
  */
 const SLOT_OF_TYPE = [6, 0, 1, 1, 2, 2, 3, 3, 4, 4, 1, 1, 2, 2, 3, 3, 4, 4, 1, 2, 3, 4]
 const LIST_SIZE = 6

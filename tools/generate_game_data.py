@@ -1032,10 +1032,13 @@ def generate_missions() -> None:
 # 이 한 값만 우리가 정했고, 구질 사이의 상대 비율은 전부 원본 그대로다.
 PITCH_BREAK_DIVISOR = 1793
 
+# 원본 구질 이름표 [0x140026c + 4t] (.data 23칸 — 칸 0 빈 글, 22 SPECIAL 은 마구 칸)의 칸 1~21.
+# pitch.zt1 항목 t − 1 이 구질 t 다. 16 SF 를 빠뜨리면 t ≥ 16 의 이름이 한 칸씩 밀린다.
+# pitch.zt1 의 22번째 항목(t = 22 마구)은 마구 경로(번호 · 폼 레코드)로 따로 그려 여기 넣지 않는다.
 PITCH_TYPE_NAMES = [
     'FASTBALL', 'TWO-SEAM', 'H.FAST', 'SINKER', 'SHOOT', 'SLIDER', 'CURVE', 'FORK',
     'CHANGEUP', 'CUT FAST', 'R.FAST', 'H.SINKER', 'H.SHOOT', 'H.SLIDER', 'S.CURVE',
-    'S.CHANGEUP', 'GYRO', 'P.SINKER', 'P.SLIDER', 'KNUCKLE', 'SPECIAL',
+    'SF', 'S.CHANGEUP', 'GYRO', 'P.SINKER', 'P.SLIDER', 'KNUCKLE',
 ]
 
 # 레코드 수가 가장 많은 직구(32)를 기준 구속 1.0으로 둔다.
@@ -1132,7 +1135,7 @@ def generate_pitch_types() -> None:
         '  readonly flightSteps: readonly number[]',
         '}',
         '',
-        '/** 원작 구질 21종. 이름은 binary.mod, 변화량·구속·비행 프레임은 data/pitch.zt1 에서 왔다. */',
+        '/** 원작 구질 21종 (구질 번호 t = 칸 + 1). 이름은 binary.mod 이름표 [0x140026c], 변화량·구속·비행 프레임은 data/pitch.zt1 항목 t − 1 에서 왔다. */',
         'export const PITCH_TYPES: readonly PitchTypeInfo[] = [',
     ]
     for curve in read_pitch_curves():

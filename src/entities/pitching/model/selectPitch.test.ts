@@ -261,8 +261,8 @@ describe('flightMillisecondsOf — 사용자 투구(투수편)용', () => {
     expect(빠른직구).toBe(FASTBALL.flightSteps[3] * millisecondsPerFrame())
   })
 
-  it('S.CURVE 와 SPECIAL 은 원본이 반대로 느려진다', () => {
-    for (const name of ['S.CURVE', 'SPECIAL']) {
+  it('S.CURVE 와 KNUCKLE 은 원본이 반대로 느려진다', () => {
+    for (const name of ['S.CURVE', 'KNUCKLE']) {
       const type = PITCH_TYPES.find((candidate) => candidate.name === name)
       if (type === undefined) throw new Error(`${name} 구질을 찾지 못했습니다`)
       expect(flightMillisecondsOf(type.flightSteps, 100)).toBeGreaterThan(flightMillisecondsOf(type.flightSteps, 0))

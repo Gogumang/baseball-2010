@@ -15,7 +15,7 @@ export interface PitchTypeInfo {
   readonly flightSteps: readonly number[]
 }
 
-/** 원작 구질 21종. 이름은 binary.mod, 변화량·구속·비행 프레임은 data/pitch.zt1 에서 왔다. */
+/** 원작 구질 21종 (구질 번호 t = 칸 + 1). 이름은 binary.mod 이름표 [0x140026c], 변화량·구속·비행 프레임은 data/pitch.zt1 항목 t − 1 에서 왔다. */
 export const PITCH_TYPES: readonly PitchTypeInfo[] = [
   { name: 'FASTBALL', horizontalBreak: 0.000, verticalBreak: 0.000, speed: 1.000, flightSteps: [18, 16, 14, 12] },
   { name: 'TWO-SEAM', horizontalBreak: 0.232, verticalBreak: -0.124, speed: 0.500, flightSteps: [23, 21, 19, 17] },
@@ -32,10 +32,10 @@ export const PITCH_TYPES: readonly PitchTypeInfo[] = [
   { name: 'H.SHOOT', horizontalBreak: 0.186, verticalBreak: 0.061, speed: 0.500, flightSteps: [19, 18, 16, 14] },
   { name: 'H.SLIDER', horizontalBreak: -0.392, verticalBreak: -0.010, speed: 0.375, flightSteps: [19, 18, 17, 15] },
   { name: 'S.CURVE', horizontalBreak: -0.314, verticalBreak: -0.442, speed: 0.500, flightSteps: [24, 25, 26, 28] },
-  { name: 'S.CHANGEUP', horizontalBreak: -0.014, verticalBreak: -0.273, speed: 0.500, flightSteps: [20, 19, 18, 16] },
-  { name: 'GYRO', horizontalBreak: 0.250, verticalBreak: -0.565, speed: 0.500, flightSteps: [24, 23, 22, 21] },
-  { name: 'P.SINKER', horizontalBreak: -0.098, verticalBreak: 0.005, speed: 0.500, flightSteps: [18, 17, 16, 14] },
-  { name: 'P.SLIDER', horizontalBreak: 0.513, verticalBreak: -0.289, speed: 0.375, flightSteps: [19, 17, 15, 13] },
-  { name: 'KNUCKLE', horizontalBreak: -0.497, verticalBreak: 0.010, speed: 0.500, flightSteps: [18, 17, 15, 13] },
-  { name: 'SPECIAL', horizontalBreak: -0.226, verticalBreak: -0.632, speed: 0.500, flightSteps: [26, 29, 32, 35] },
+  { name: 'SF', horizontalBreak: -0.014, verticalBreak: -0.273, speed: 0.500, flightSteps: [20, 19, 18, 16] },
+  { name: 'S.CHANGEUP', horizontalBreak: 0.250, verticalBreak: -0.565, speed: 0.500, flightSteps: [24, 23, 22, 21] },
+  { name: 'GYRO', horizontalBreak: -0.098, verticalBreak: 0.005, speed: 0.500, flightSteps: [18, 17, 16, 14] },
+  { name: 'P.SINKER', horizontalBreak: 0.513, verticalBreak: -0.289, speed: 0.375, flightSteps: [19, 17, 15, 13] },
+  { name: 'P.SLIDER', horizontalBreak: -0.497, verticalBreak: 0.010, speed: 0.500, flightSteps: [18, 17, 15, 13] },
+  { name: 'KNUCKLE', horizontalBreak: -0.226, verticalBreak: -0.632, speed: 0.500, flightSteps: [26, 29, 32, 35] },
 ]

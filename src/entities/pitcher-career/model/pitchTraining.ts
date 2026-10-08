@@ -1,4 +1,5 @@
 import { BALANCE } from '@/shared/config/original/balance'
+import { PITCH_TYPES } from '@/shared/config/original/pitchTypes'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { HIDDEN_PITCH_EVENTS } from '@/entities/pitcher-career/model/pitcherAbility'
 
@@ -66,13 +67,11 @@ export function pitchTypeNumberOf(row: number, column: number): number {
  * 1 FASTBALL … 15 S.CURVE · **16 SF** · 17 S.CHANGEUP · 18 GYRO · 19 P.SINKER · 20 P.SLIDER · 21 KNUCKLE · 22 SPECIAL(마구 칸).
  * 경기 구질 이름 그림(S5 3절 — 프레임 0x00~0x14 = 21종, SF 가 16번째 · 0x15 "????")도 같은 차례다.
  *
- * ⚠️ 웹 `PITCH_TYPES`(생성기 `PITCH_TYPE_NAMES`)는 SF 를 빠뜨리고 끝에 SPECIAL 을 붙여 **이름만** t ≥ 16 에서 한 칸씩 밀려
- * 있다(궤적 · 비행 틱은 pitch.zt1 항목 t − 1 이라 번호대로 맞다). 원본 쪽 파일은 생성기 몫이라 여기서 이름만 원본 표로 푼다.
+ * 칸 1~21 은 생성 표 `PITCH_TYPES`(생성기 `PITCH_TYPE_NAMES` — 이 이름표 칸 1~21, pitch.zt1 항목 t − 1)의 이름 그대로다.
+ * 칸 0 빈 글과 칸 22 SPECIAL(마구 칸 — pitch.zt1 항목 21 은 마구 경로로 따로 그려 생성 표에 없다)만 여기서 붙인다.
  */
-export const ORIGINAL_PITCH_TYPE_NAMES: readonly string[] = [
-  '', 'FASTBALL', 'TWO-SEAM', 'H.FAST', 'SINKER', 'SHOOT', 'SLIDER', 'CURVE', 'FORK', 'CHANGEUP', 'CUT FAST', 'R.FAST',
-  'H.SINKER', 'H.SHOOT', 'H.SLIDER', 'S.CURVE', 'SF', 'S.CHANGEUP', 'GYRO', 'P.SINKER', 'P.SLIDER', 'KNUCKLE', 'SPECIAL',
-]
+const MAGIC_PITCH_TYPE_LABEL = 'SPECIAL'
+export const ORIGINAL_PITCH_TYPE_NAMES: readonly string[] = ['', ...PITCH_TYPES.map((type) => type.name), MAGIC_PITCH_TYPE_LABEL]
 
 /** 구질 번호 t(1 FASTBALL … 21 KNUCKLE · 22 SPECIAL)의 이름 — 원본 이름표 [0x140026c] */
 export function pitchTypeNameOf(typeNumber: number): string {

@@ -96,7 +96,7 @@ const SEASON_MODE = 2
 
 /**
  * 종류 6 의 값 v → 구질 번호 — 표 0xd4e40 u32 = [18, 19, 20, 21] (직접 읽었다). 이름은 원본 이름표 [0x140026c + 4t]
- * (`ORIGINAL_PITCH_TYPE_NAMES` — SF 가 든 22칸이라 웹 `PITCH_TYPES` 이름으로는 못 쓴다): 18 GYRO · 19 P.SINKER · 20 P.SLIDER · 21 KNUCKLE.
+ * (`ORIGINAL_PITCH_TYPE_NAMES`): 18 GYRO · 19 P.SINKER · 20 P.SLIDER · 21 KNUCKLE.
  */
 const HIDDEN_PITCH_TYPE_NUMBERS: readonly number[] = [18, 19, 20, 21]
 
