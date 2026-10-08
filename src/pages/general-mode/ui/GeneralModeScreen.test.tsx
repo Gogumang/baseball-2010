@@ -75,6 +75,22 @@ describe('준비 흐름', () => {
     expect(screen.getByRole('button', { name: TEAMS[2].name })).toBeTruthy()
   })
 
+  it('잠긴 히든 팀 OK 는 힌트 팝업 [225] · [216+팀] · [0] 만 띄우고 단계는 그대로다 (18: 0x29d74 · 0x29d8a)', () => {
+    띄우기({ openedHiddenTeamIds: [12] })
+
+    // 잠긴 칸 넷(10 · 11 · 13 · 14) 중 셋째 = 13 미국
+    fireEvent.click(screen.getAllByRole('button', { name: '???' })[2])
+
+    const 알림글 = screen.getByRole('dialog', { name: '알림' }).textContent ?? ''
+    expect(알림글).toContain('히든 팀 오픈 힌트')
+    expect(알림글).toContain('메이저를 넘어서라')
+    expect(알림글).toContain('선택 할 수 없는 팀입니다')
+    // 일반모드라서 [1] "일반모드에서 사용 할 수 있습니다" 는 안 붙는다
+    expect(알림글).not.toContain('일반모드에서')
+    // 아직 18 — AI 팀으로 넘어가지 않았다
+    expect(screen.getAllByRole('button', { name: '???' })).toHaveLength(4)
+  })
+
   it('히든 팀은 해금 기록을 넘기면 고를 수 있다 — 일반모드라서다', () => {
     띄우기({ openedHiddenTeamIds: [12] })
 

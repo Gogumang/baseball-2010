@@ -11,6 +11,9 @@ import { FirstBatStadiumScreen } from '@/pages/general-mode/ui/FirstBatStadiumSc
 import type { StadiumEntry } from '@/pages/general-mode/ui/FirstBatStadiumScreen'
 import { MatchInfoScreen } from '@/pages/general-mode/ui/MatchInfoScreen'
 import { MatchSettingsWindow } from '@/pages/general-mode/ui/MatchSettingsWindow'
+import { hiddenTeamHintMessage } from '@/pages/general-mode/lib/hiddenTeam'
+import { TEAM_GAME_MODE } from '@/features/play-team-game/model/gameAbilities'
+import { MessageBox } from '@/shared/ui'
 import { EntryEditorScreen } from '@/widgets/entry-editor'
 import { TEAMS } from '@/shared/config/original/teams'
 import { setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
@@ -90,10 +93,8 @@ export interface GeneralModeScreenProps {
  *
  * 팀 고르기 두 장은 **나만의리그가 쓰던 화면을 그대로 빌려 쓴다** (`pages/create-player` 의
  * `TeamSelectScreen` — 원본도 공용 목록 0x63b15 의 k 만 다른 같은 화면이다).
- *
- * ⚠️ **못 옮긴 것**: 잠긴 히든 팀을 눌렀을 때의 힌트 팝업(StrMODE[225] + [216+팀] + [0]).
- *    `TeamSelectScreen` 은 잠긴 칸을 누르면 커서만 옮기고 바깥에 알리지 않아 여기서 팝업을 띄울
- *    길이 없다. 문구를 만드는 함수는 `lib/hiddenTeam.ts` 의 `hiddenTeamHintMessage` 에 있다.
+ * 잠긴 히든 팀에서 OK 하면 힌트 팝업(`hiddenTeamHintMessage` — 18: 0x29d74 · 0x29d8a, 19: 0x29bfe · 0x29c14)만 뜨고
+ * 단계는 그대로다.
  */
 export function GeneralModeScreen(props: GeneralModeScreenProps) {
   const live = withLiveGameInning(props)
@@ -177,6 +178,14 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
   } = props
   /** 이 경기의 첫 저장인가 — 경기정보 OK 몫(0x3136e)이고 그 뒤는 반 이닝 저장(0x4f928)이다 */
   const isFirstSaveRef = useRef(true)
+  /** 18 · 19 에서 잠긴 히든 팀 OK — 힌트 팝업 글 (팝업 0x74ef5). 없으면 null */
+  const [hiddenHint, setHiddenHint] = useState<string | null>(null)
+  const showHiddenHint = (teamId: number) => setHiddenHint(
+    hiddenTeamHintMessage(teamId, { openedHiddenIds: openedHiddenTeamIds ?? [], mode: TEAM_GAME_MODE.일반 }),
+  )
+  const hiddenHintOverlay = hiddenHint !== null && (
+    <MessageBox text={hiddenHint} buttons={['확인']} onAnswer={() => setHiddenHint(null)} />
+  )
 
   const session = useGeneralMode({
     random,
@@ -230,7 +239,9 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
           title="팀선택"
           openedHiddenIds={openedHiddenTeamIds ?? []}
           onSelect={actions.selectUserTeam}
+          onSelectLocked={showHiddenHint}
           onCancel={cancelPrepare}
+          overlay={hiddenHintOverlay}
         />
       )
     case GENERAL_MODE_STEP.AI팀:
@@ -240,7 +251,9 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
           openedHiddenIds={openedHiddenTeamIds ?? []}
           // ⚠️ 유저 팀과 같은 팀인지 보지 않는다 — 원본 그대로다 (R4 3a 상태 19)
           onSelect={actions.selectAiTeam}
+          onSelectLocked={showHiddenHint}
           onCancel={back}
+          overlay={hiddenHintOverlay}
         />
       )
     case GENERAL_MODE_STEP.선공구장:

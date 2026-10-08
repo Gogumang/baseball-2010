@@ -58,14 +58,15 @@ export function canSelectTeam(
  * 못 고르는 히든 팀을 눌렀을 때 뜨는 팝업 글.
  *
  * 두 자리에서 서로 다르게 이어 붙인다:
- *   - **일반모드 팀 고르기**(상태 18·19, R4 3a): 잠겼으면 `[225] + [216+팀] + [0]`
+ *   - **일반모드 팀 고르기**(상태 18·19, R4 3a): 잠겼으면 `sprintf(0xcc1ec "%s!N%s!N!N%s", [225], [216+팀], [0])`
+ *     → 팝업 0x74ef5(…, 1, 0, 0, 0) (18: 0x29d38~0x29d8a · 19: 0x29bb8~0x29c14, 직접 떴다)
  *   - **그 밖의 팀 고르기**(0x14114): 열렸으면 `[225] + [226+k] + [1]`,
  *     잠겼으면 `[225] + [226+k] + [0] + [1]`
  *
  * 고를 수 있는 경우(일반모드 + 열린 팀, 또는 히든이 아닌 팀)에는 `null` 이다.
  *
- * ⚠️ 이어 붙이는 형식 문자열 `0xcc1ec` 의 모양은 노트에 없다 — **그냥 이어 붙인다**.
- * 원본 StrMODE 값들이 이미 `!N` 으로 시작해 줄이 갈리므로 이것으로 충분해 보인다.
+ * ⚠️ "그 밖의 팀 고르기" 갈래는 형식 문자열을 아직 안 떴다 — 그쪽은 그냥 이어 붙인다(시즌 0xca · 트레이드 0xe4 는
+ * `pages/season` 의 `hiddenTeamHintOf` 가 따로 옮겼다).
  */
 export function hiddenTeamHintMessage(
   teamId: number,
@@ -75,6 +76,10 @@ export function hiddenTeamHintMessage(
   const isOpened = isTeamOpened(teamId, options.openedHiddenIds)
   const isGeneralMode = canUseHiddenTeams(options.mode)
   if (isOpened && isGeneralMode) return null
+  if (isGeneralMode) {
+    // 0xcc1ec "%s!N%s!N!N%s" — [225] · [216 + 팀] · [0]
+    return `${ORIGINAL_MODE_TEXT[HIDDEN_HINT_TITLE]}!N${ORIGINAL_MODE_TEXT[HIDDEN_HINT_BASE + teamId]}!N!N${ORIGINAL_MODE_TEXT[TEAM_LOCKED_TEXT]}`
+  }
 
   const parts = [ORIGINAL_MODE_TEXT[HIDDEN_HINT_TITLE], ORIGINAL_MODE_TEXT[HIDDEN_HINT_BASE + teamId]]
   if (!isOpened) parts.push(ORIGINAL_MODE_TEXT[TEAM_LOCKED_TEXT])

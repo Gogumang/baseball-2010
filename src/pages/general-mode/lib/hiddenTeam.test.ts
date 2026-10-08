@@ -45,9 +45,9 @@ describe('힌트 팝업 글', () => {
   it('일반모드에서 잠긴 팀은 머리글 + 팀별 힌트 + "선택 할 수 없는 팀입니다" 다', () => {
     const message = hiddenTeamHintMessage(13, { openedHiddenIds: [], mode: TEAM_GAME_MODE.일반 })
 
-    // StrMODE[225] + [216+13 = 229 "메이저를 넘어서라!"] + [0]
+    // 0xcc1ec "%s!N%s!N!N%s" — StrMODE[225] · [216+13 = 229 "메이저를 넘어서라!"] · [0]
     expect(message).toBe(
-      ORIGINAL_MODE_TEXT[225] + ORIGINAL_MODE_TEXT[229] + ORIGINAL_MODE_TEXT[0],
+      `${ORIGINAL_MODE_TEXT[225]}!N${ORIGINAL_MODE_TEXT[229]}!N!N${ORIGINAL_MODE_TEXT[0]}`,
     )
   })
 
