@@ -15,6 +15,7 @@ import { drawFieldMap } from '@/widgets/batting-stage/lib/renderFieldMap'
 import { drawSoftKeyLabels } from '@/widgets/batting-stage/lib/softKeyLabels'
 import type { StagePhaseSnapshot } from '@/widgets/batting-stage/lib/softKeyLabels'
 import { drawSpecialSwingBadge } from '@/widgets/batting-stage/lib/specialSwingBadge'
+import { drawPitchSpeedReadout } from '@/widgets/batting-stage/lib/pitchSpeedReadout'
 import { drawDerbyPitchingMachine } from '@/widgets/batting-stage/lib/derbyPitchingMachine'
 import { drawHomeRunBanner, drawHomeRunTextFrame } from '@/widgets/batting-stage/lib/renderHomeRunBanner'
 import type { HomeRunTextFrame } from '@/widgets/batting-stage/lib/homeRunBanner'
@@ -185,6 +186,8 @@ export function renderBattingStage(
   }
   // 0x4c4bc 꼬리 0x4c8e0 — "*MENU" · "#TIME" (`softKeyLabels`)
   if (scene.stagePhase !== undefined) drawSoftKeyLabels(context, scene.stagePhase, scene.timeKeyCount ?? null)
+  // 0x4c4bc 의 0x4c9fc — 상태 0x12 의 "Km" 판 · 표시 구속 [+0x19a0] (`pitchSpeedReadout`)
+  if (scene.stagePhase !== undefined) drawPitchSpeedReadout(context, scene.stagePhase, scene.pitch?.displaySpeedKmh)
   // 0x4c4bc 꼬리 0x4cace — 필살 남은 횟수 0x38a30 (`specialSwingBadge`)
   if (scene.stagePhase !== undefined) drawSpecialSwingBadge(context, scene.stagePhase, scene.specialSwingRemaining ?? null, side)
   // 홈런은 판정 글자(game_judge)가 없고 HOMERUN 글자 연출이 대신 나간다 (R2 3-2, 7절 표의 v = 8·12)

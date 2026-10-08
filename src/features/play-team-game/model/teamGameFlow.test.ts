@@ -1734,8 +1734,9 @@ describe('사구 — 우리 타석 결과 4 와 벤치 클리어링 (상태 0x1e
 
 /**
  * 우리가 던진 공에 CPU 타자가 맞는다 — 0x35a20. 기본 배치 side 1(좌타)에서 조준점을 오른위로 11 틱 흘린 공이
- * 흩어져 상자 [271, 309] 에 닿는 씨앗을 골랐다 (439: 벤치 클리어링 안 들어감 · 2016: 들어감 — 공 도착 0.1% 굴림 뒤).
+ * 흩어져 상자 [271, 309] 에 닿는 씨앗을 골랐다 (174: 벤치 클리어링 안 들어감 · 2544: 들어감 — 공 도착 0.1% 굴림 뒤).
  * 코스 3×3 칸을 원본 조준점으로 바꾸며 목표의 z 가 −110 이 되어 182 → 439 로 바꿨다.
+ * 놓기 0x4dc78 의 표시 구속 굴림(0x34968 → 0x66dc0 rand)이 흩어짐 앞에 하나 끼어 439 → 174 · 2016 → 2544 로 바꿨다(1 부터 센 첫 씨앗).
  */
 describe('사구 — 우리 수비에서 CPU 타자가 맞는다 (0x35a20 · 벤치 클리어링 수비 사람 갈래)', () => {
   function 맞히기(seed: number): { 전: TeamGameProgress; 후: TeamGameProgress } {
@@ -1746,7 +1747,7 @@ describe('사구 — 우리 수비에서 CPU 타자가 맞는다 (0x35a20 · 벤
   }
 
   it('밀어내기 1루 · 출루 허용 · 투수 볼넷+사구 칸', () => {
-    const { 후 } = 맞히기(439)
+    const { 후 } = 맞히기(174)
     expect(후.lastResolution).toEqual({ kind: '사구' })
     expect(후.pendingDefensePlay).toBeNull()
     expect(후.game.bases.first).toBe(true)
@@ -1756,8 +1757,8 @@ describe('사구 — 우리 수비에서 CPU 타자가 맞는다 (0x35a20 · 벤
   })
 
   it('벤치 클리어링에 들어가면 우리 투수 스태미나 −1000 · 시즌 평판 S[1] +1 (공격측 CPU)', () => {
-    const 보통 = 맞히기(439).후
-    const 벤치 = 맞히기(2016).후
+    const 보통 = 맞히기(174).후
+    const 벤치 = 맞히기(2544).후
     expect(벤치.lastResolution).toEqual({ kind: '사구' })
     expect(보통.stamina - 벤치.stamina).toBe(1000)
     expect(벤치.gameRecord[1] - 보통.gameRecord[1]).toBe(1)
@@ -1773,7 +1774,7 @@ describe('사구 — 우리 수비에서 CPU 타자가 맞는다 (0x35a20 · 벤
   it('시즌이 아니면(모드 ≠ 2) S[1] 이 안 남는다', () => {
     const { progress } = 시작({ mode: 1 })
     const input = { typeNumber: 첫구질(progress), aim: aimAfterTicks(1, { dx: 1, dy: 1 }, 11), gaugeCell: 0 }
-    const 벤치 = startThrowPitch(progress, input, createSeededRandom(2016))
+    const 벤치 = startThrowPitch(progress, input, createSeededRandom(2544))
     expect(벤치.lastResolution).toEqual({ kind: '사구' })
     expect(벤치.log.some((entry) => entry.text.includes('벤치 클리어링'))).toBe(true)
     expect(벤치.gameRecord).toEqual(progress.gameRecord)

@@ -43,6 +43,11 @@ export interface StagePhaseSnapshot {
   readonly kind: '대기' | '투구중' | '타격' | '결과'
   readonly tick: number
   readonly isPaused: boolean
+  /**
+   * '결과' 가 맞은 공 뒤 인플레이(원본 0x17) 자리인가 — 안 친 공 · 헛스윙의 '결과' 는 상태 0x12 다.
+   * 0x12 만 그리는 "Km" 판(`pitchSpeedReadout`)이 가른다. 안 넘기면 0x12 로 본다
+   */
+  readonly isInPlay?: boolean
 }
 
 /** 0xf 갱신 0x39c1c 가 틱 > 7 에서 0x10 을 예약한다 — '대기' 의 앞 9 그림이 0xf 다 (`stagePhaseTicks`) */

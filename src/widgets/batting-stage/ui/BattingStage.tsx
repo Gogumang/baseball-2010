@@ -281,7 +281,7 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
     // 필살 남은 횟수 표시 0x38a30 이 그림마다 읽는다
     specialSwingRemaining,
   })
-  const { pitchRef, pitchTypeNumberRef, phaseRef, phaseStartedAtRef, resultTextRef, homeRunStartedAtRef, shiftRef, buntRef, deckRef, pendingHitRef, resultTicksRef, swingRef, heldResultRef, particlesRef, latestRef } = refs
+  const { pitchRef, pitchTypeNumberRef, phaseRef, phaseStartedAtRef, resultTextRef, homeRunStartedAtRef, shiftRef, buntRef, deckRef, pendingHitRef, resultTicksRef, isInPlayResultRef, swingRef, heldResultRef, particlesRef, latestRef } = refs
   /** 장면 +0xfdc — 사람 키가 쓰고(`sceneBuntKind` 주석) 판정된 공이 그 값을 넘긴다. 부르는 쪽이 들고 있으면 그 값을 따른다 */
   const sceneBuntKindRef = useRef(sceneBuntKind ?? 0)
   useEffect(() => {
@@ -426,6 +426,7 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
     resultTextRef.current = describeResolution(detail)
     homeRunStartedAtRef.current = isHomeRun ? now : -1
     resultTicksRef.current = resultPhaseTicksOf(detail.resolution, latest.hud)
+    isInPlayResultRef.current = false
     phaseRef.current = '결과'
     phaseStartedAtRef.current = now
     latest.onPitchResolved(detail, pitch, isUncatchable, sceneBuntKindOfThisPitch())
@@ -495,6 +496,7 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
     homeRunStartedAtRef.current = pending.isHomeRun ? now : -1
     // 맞은 공은 원본이 0x12 가 아니라 인플레이(0x17)로 간다 — 웹 결과 문구는 보통 결과 길이로 둔다
     resultTicksRef.current = RESULT_PHASE_TICKS
+    isInPlayResultRef.current = true
     phaseRef.current = '결과'
     phaseStartedAtRef.current = now
     latestRef.current.onPitchResolved(pending.detail, pending.pitch, pending.isUncatchable, pending.buntKind)

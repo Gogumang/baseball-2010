@@ -4,6 +4,7 @@ import { aimStartOf } from '@/features/play-pitcher-game/model/pitchAim'
 import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
 import { applyControlError } from '@/entities/pitching/model/pitchTarget'
 import { pitchSpeedStageOf } from '@/entities/pitching/model/pitchSpeedStage'
+import { rollDisplaySpeedKmh } from '@/entities/pitching/model/displaySpeed'
 import { controlTierOf } from '@/entities/pitching/model/controlTier'
 import { PITCH_TYPES } from '@/shared/config/original/pitchTypes'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
@@ -229,8 +230,14 @@ export function buildHumanPitch(input: HumanPitchInput, random: RandomPort): Pit
   const { typeNumber, stats, repertoire, side } = input
   const isMagic = typeNumber === MAGIC_PITCH_TYPE_NUMBER
   const target = input.aim ?? aimStartOf(side)
+  // 0x34968(4dcc2) — 표시 구속 [+0x19a0]. 부르는 쪽이 등급(0x4dbac · 게이지)을 정한 **뒤**, 흩어짐 rand(0,100) **앞**이다.
+  // 사람 · CPU 를 가르지 않는다 (`displaySpeed`)
+  const displaySpeedKmh = rollDisplaySpeedKmh(
+    { typeNumber, stats, controlTier: input.grade, magicNumber: repertoire.magicNumber, form: repertoire.form },
+    random,
+  )
   // 투수 미션의 조준 흔들림(0x39c5c)은 0x10 의 틱마다 이미 지나왔다(`pitchAim.aimTickOf`) — 여기는 놓는 순간
-  // 0x4dc78 의 제구 흩어짐뿐이다
+  // 0x4dc78 의 표시 구속 · 제구 흩어짐뿐이다
   const finalTarget = applyControlError(
     target,
     { tier: input.grade, isComputer: false, aimIndex: aimCellOf(input) },
@@ -251,6 +258,7 @@ export function buildHumanPitch(input: HumanPitchInput, random: RandomPort): Pit
     controlTier: input.grade,
     worldPath,
     stageSide: side,
+    displaySpeedKmh,
     // 경기+0xfc8 == 0x16 — 0x34be0 의 마구 타이밍 폭 · 이펙트 세 곳이 이 칸으로 연다
     isMagicPitch: isMagic,
   }

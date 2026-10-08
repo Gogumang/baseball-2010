@@ -209,7 +209,9 @@ describe('CPU 타자의 파울 각 공 판 — 판이 끝날 때 콜 (결과 코
   it('파울로 닫힌 판은 "Foul!" 25, 낙구 전에 잡힌 판(파울 뜬공 아웃)은 잡은 아웃 콜 62 — 공 판정 자리에서는 25 가 안 난다', () => {
     let 파울 = 0
     let 뜬공 = 0
-    for (let seed = 11; seed <= 13 && 파울 < 3; seed += 1) {
+    // 놓기 0x4dc78 의 표시 구속 굴림(0x34968 → 0x66dc0 rand)이 흩어짐 앞에 끼어 11~13 에서 파울 판이 안 나와 5~7 로 옮겼다
+    // (1 부터 센 첫 파울 씨앗 5 부터 세 개)
+    for (let seed = 5; seed <= 7 && 파울 < 3; seed += 1) {
       녹음.played.length = 0
       const { result, unmount } = 띄우기(seed)
       for (let pitch = 0; pitch < 300 && 파울 < 3; pitch += 1) {

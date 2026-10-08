@@ -76,6 +76,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
     buntRef,
     pendingHitRef,
     resultTicksRef,
+    isInPlayResultRef,
     swingRef,
     pitchJudgedRef,
     heldResultRef,
@@ -339,6 +340,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         kind: phaseRef.current,
         tick: pitchTickAt(now, pausedSince ?? phaseStartedAtRef.current, tickLength),
         isPaused,
+        isInPlay: phaseRef.current === '결과' && isInPlayResultRef.current,
       }
     }
 
