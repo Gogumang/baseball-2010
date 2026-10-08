@@ -282,6 +282,41 @@ export function selectPitch(
   return { kind: '투구', pitch, pitchTypeNumber: typeNumber, isMistakePitch: isMistake }
 }
 
+/** 교체 틱 구질 굴림의 재료 — **내려가는** 투수(교체는 0xaf09c 가 예약만 하고 맞바꿈은 다음 확정 0xaebe4 다) */
+export interface PitcherChangeTickRoll {
+  /** 지금 마운드 투수 레코드 +0x1c · +0x18 — 구질 목록 scene+0xfac 는 그 투수로 채워져 있다(0x47fc4) */
+  readonly repertoire: Pick<PitcherRepertoireInfo, 'pitchMask' | 'magicId'> | undefined
+  /**
+   * 그 투수 팀의 남은 마구 0xaea11(팀) — 진행기가 들고 있지 않으면 안 넘긴다.
+   * ⚠️ 미해결: 안 넘기면 "남았다(1)" 로 본다 — 마구 칸이 있고 마구 조건(주자 2+ · 2스트라이크 · 0-0 · 0-3)일 때만 결과가 갈린다
+   */
+  readonly magicRemaining?: number
+  readonly runnerCount: number
+  readonly strikes: number
+  readonly balls: number
+}
+
+/**
+ * **CPU 투수 교체 틱의 구질 굴림 한 번** — 0xf 진입 0x3d954 가 CPU 투수 교체(0xac428 → 0xaf09c)로 22 "Time!" · 0x16 을
+ * 예약한 그 틱(0xf 틱 0)에도, 진입 처리 **뒤** 조작 0x498d4 → CPU 조작 0x53850 이 수비 쪽(+0xc ≠ 0)이라 가드 없이
+ * 메시지 0x644 → 0x51212 → 0x344dc 를 부른다(예약은 다음 틱 0xbc9c9 에서 선다). 값은 버려진다 — 0x16 → 0xd → 0xe → OK
+ * 뒤 0xf 에 다시 들어서면 `selectPitch` 가 틱 0~8 의 9번을 새로 굴린다. 마구 조건이면 굴림이 없다(0x344dc).
+ * 사람이 수비하는 쪽(CPU 대타 0xac228 로 0x16)은 CPU 조작이 공격 쪽이라 0x644 가 없다.
+ */
+export function rollCpuPitchTypeOnPitcherChangeTick(input: PitcherChangeTickRoll, random: RandomPort): void {
+  const repertoire = input.repertoire ?? DEFAULT_REPERTOIRE
+  computerPitchTypeOf(
+    {
+      list: pitchListOf(repertoire.pitchMask, repertoire.magicId !== 0),
+      magicCount: input.magicRemaining ?? 1,
+      runnerCount: input.runnerCount,
+      strikes: input.strikes,
+      balls: input.balls,
+    },
+    random,
+  )
+}
+
 /**
  * 구속으로 원본의 구속 단계를 골라 비행 시간을 낸다 — 사용자 투구(투수편) 전용.
  * 단계 사이는 보간한다. 양 끝값은 원본 그대로다.

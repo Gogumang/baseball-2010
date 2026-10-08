@@ -220,6 +220,17 @@ describe('사람 장면 0xf 진입 0x3d954 — 공마다 CPU 투수 교체(0xac4
     expect(뒤.pitcherJustChanged).toBe(true)
   })
 
+  it('교체를 예약한 그 틱(0xf 틱 0)에도 CPU 조작 0x53850 이 내려가는 투수로 구질을 한 번 굴린다 — 0x644 → 0x344dc rand(0,6)', () => {
+    const 판 = 지친상대()
+    const calls: [number, number][] = []
+    const inner = createSeededRandom(1)
+    const 기록 = { rand: (lo: number, hi: number) => { calls.push([lo, hi]); return inner.rand(lo, hi) }, rand9d: inner.rand9d }
+    const 뒤 = applyBatterPitch(판, 볼, 기록)
+    expect(뒤.scenePitcherChange?.serial).toBe(1)
+    // 교체 굴림(0xac428) 뒤 맨 끝 — 그 뒤 0x16 → 0xd → 0xe 는 OK 를 기다려 굴림이 없다
+    expect(calls[calls.length - 1]).toEqual([0, 6])
+  })
+
   it('돌발이 진행 중이면(0x8eb94) 건너뛴다', () => {
     const 판 = 지친상대()
     const row = { id: 1 } as unknown as NonNullable<NonNullable<TeamGameProgress['burst']>['current']>

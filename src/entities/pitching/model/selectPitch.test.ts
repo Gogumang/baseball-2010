@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { flightMillisecondsOf, selectPitch as selectChoice } from '@/entities/pitching/model/selectPitch'
+import {
+  flightMillisecondsOf,
+  rollCpuPitchTypeOnPitcherChangeTick,
+  selectPitch as selectChoice,
+} from '@/entities/pitching/model/selectPitch'
 import type { CpuPitchChoice, PitchSituation } from '@/entities/pitching/model/selectPitch'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import { computerPitchTypeOf, pitchListOf, targetKindOf } from '@/entities/pitching/model/pitchIntelligence'
@@ -482,5 +486,39 @@ describe('홈런더비 구질 (0x344dc 의 0x344ea 모드 7 갈래)', () => {
       expect(choice.pitch.magicNumber).toBe(마투수.repertoire.magicId)
     }
     expect(magic.remaining).toBe(start)
+  })
+})
+
+describe('CPU 투수 교체 틱의 구질 굴림 — 0x3d954 가 0x16 을 예약한 0xf 틱 0 에도 0x53850 → 0x644 → 0x344dc 한 번', () => {
+  const 굴림기록 = () => {
+    const calls: [number, number][] = []
+    const inner = createSeededRandom(5)
+    return {
+      calls,
+      random: { rand: (lo: number, hi: number) => { calls.push([lo, hi]); return inner.rand(lo, hi) }, rand9d: inner.rand9d },
+    }
+  }
+  const 보통 = { pitchMask: 0x1143, magicId: 0 }
+  const 마구투수 = { pitchMask: 0x1143, magicId: 1 }
+
+  it('마구 칸이 없으면 볼카운트와 상관없이 rand(0,6) 한 번', () => {
+    const { calls, random } = 굴림기록()
+    rollCpuPitchTypeOnPitcherChangeTick({ repertoire: 보통, runnerCount: 2, strikes: 2, balls: 0 }, random)
+    expect(calls).toEqual([[0, 6]])
+  })
+
+  it('마구 조건(0-0)이고 남은 마구가 있으면 굴림이 없고, 남은 게 0 이면 한 번', () => {
+    const 남음 = 굴림기록()
+    rollCpuPitchTypeOnPitcherChangeTick({ repertoire: 마구투수, magicRemaining: 2, runnerCount: 0, strikes: 0, balls: 0 }, 남음.random)
+    expect(남음.calls).toEqual([])
+    const 바닥 = 굴림기록()
+    rollCpuPitchTypeOnPitcherChangeTick({ repertoire: 마구투수, magicRemaining: 0, runnerCount: 0, strikes: 0, balls: 0 }, 바닥.random)
+    expect(바닥.calls).toEqual([[0, 6]])
+  })
+
+  it('마구 조건이 아니면(1-1) 마구 투수도 한 번', () => {
+    const { calls, random } = 굴림기록()
+    rollCpuPitchTypeOnPitcherChangeTick({ repertoire: 마구투수, magicRemaining: 2, runnerCount: 0, strikes: 1, balls: 1 }, random)
+    expect(calls).toEqual([[0, 6]])
   })
 })

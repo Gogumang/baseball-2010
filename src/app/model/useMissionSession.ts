@@ -61,6 +61,7 @@ import { rollsIntoBenchClearing } from '@/entities/game/model/benchClearing'
 import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
 import { BATTER_SLOT, gameAbilityOf } from '@/features/play-team-game/model/gameAbilities'
 import { isMistakePitch } from '@/entities/pitching/model/mistakePitch'
+import { rollCpuPitchTypeOnPitcherChangeTick } from '@/entities/pitching/model/selectPitch'
 import { MAGIC_PITCH_TYPE_NUMBER, ballMagicNumberAfterPitch } from '@/entities/pitcher-career/model/magicPitch'
 import { countsTopGradePitch } from '@/entities/pitcher-career/model/pitcherGameRecord'
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
@@ -701,6 +702,20 @@ export function useMissionSession({
       else setMissionRun((previous) => (previous === null ? previous : { ...previous, cpu: team }))
     }
     if (substitution === null) return
+    // 투수 교체를 예약한 그 틱(0xf 틱 0)에도 CPU 조작 0x53850(수비 쪽)이 0x644 → 0x344dc 를 한 번 부른다 — 내려가는 투수의
+    // 구질 목록으로 (`rollCpuPitchTypeOnPitcherChangeTick`). CPU 대타(투수 미션)는 CPU 가 공격 쪽이라 없다.
+    // ⚠️ 미해결: 내려가는 마투수의 남은 마구는 타석 화면이 들고 있어 넘기지 않는다(남았다고 본다)
+    if (substitution.kind === '투수교체') {
+      rollCpuPitchTypeOnPitcherChangeTick(
+        {
+          repertoire: missionMoundPitcherAbility({ ...run, cpu }, aceLevels).repertoire,
+          runnerCount: runnerCountOf(run.bases),
+          strikes: runner.atBatRef.current.strikes,
+          balls: runner.atBatRef.current.balls,
+        },
+        random,
+      )
+    }
     // 3da88 — 0x16 에 들어서기 전
     playSoundIds(audio, [PITCHER_CHANGE_SOUND])
     setSubstitutionScene((previous) => ({

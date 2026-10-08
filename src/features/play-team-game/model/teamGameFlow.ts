@@ -107,6 +107,7 @@ import {
 } from '@/entities/pitching/model/pitcherChange'
 import type { MoundPitcherCounters } from '@/entities/pitching/model/pitcherChange'
 import { runnerCountOf } from '@/entities/game/model/baseState'
+import { rollCpuPitchTypeOnPitcherChangeTick } from '@/entities/pitching/model/selectPitch'
 import {
   buildHumanPitch,
   drainStamina,
@@ -3627,6 +3628,20 @@ function enterPitchSelection(progress: TeamGameProgress, random: RandomPort): Te
     ? judgeAutoPitcherChange(progress, false, random, true)
     : applyCpuPinchHit(progress, false, random, true)
   if (changed === progress) return progress
+  // 교체를 예약한 그 틱(0xf 틱 0)에도 CPU 조작 0x53850 이 0x644 → 0x344dc 를 한 번 부른다 — 수비가 CPU 일 때만,
+  // 내려가는 투수의 구질 목록 · 남은 마구로 (`rollCpuPitchTypeOnPitcherChangeTick`)
+  if (isOurOffense(progress)) {
+    rollCpuPitchTypeOnPitcherChangeTick(
+      {
+        repertoire: pitcherRepertoireAt(progress, progress.options.opponentTeamId, progress.opponentPitcherIndex),
+        magicRemaining: progress.opponentMagicRemaining,
+        runnerCount: runnerCountOf(progress.game.bases),
+        strikes: progress.atBat.strikes,
+        balls: progress.atBat.balls,
+      },
+      random,
+    )
+  }
   // 22 → 0x16 → 0xd(지우기 건너뜀) → 0xe(OK 를 다시 기다린다) → OK 뒤 0xf
   return enterConfirmWait(changed)
 }

@@ -52,6 +52,7 @@ import {
 } from '@/entities/game/model/quickLineup'
 import type { QuickLineup } from '@/entities/game/model/quickLineup'
 import { runnerCountOf } from '@/entities/game/model/baseState'
+import { rollCpuPitchTypeOnPitcherChangeTick } from '@/entities/pitching/model/selectPitch'
 import { ROTATION_SIZE, rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
 import { opponentOf } from '@/entities/league/model/league'
 import type { GameSummary } from '@/entities/game/model/gameSummary'
@@ -1511,6 +1512,17 @@ function enterPitchSelection(progress: GameProgress, random: RandomPort, afterCo
     if (current.burst !== null && current.burst.current !== null) return current
     const changed = changeOpponentPitcher(current, random)
     if (changed === current) return current
+    // 교체를 예약한 그 틱(0xf 틱 0)에도 CPU 조작 0x53850 이 0x644 → 0x344dc 를 한 번 부른다 — 내려가는 투수의 구질 목록으로
+    // (`rollCpuPitchTypeOnPitcherChangeTick`). 마구 칸이 없으면 0x344dc 는 볼카운트 · 주자 · 남은 마구를 안 보고 rand(0,6) 한 번이다.
+    // ⚠️ 미해결: 내려가는 투수가 마구를 들면(142 의 마투수) 굴림 여부가 볼카운트 · 남은 마구에 갈리는데, 타자편 진행기는
+    //    둘 다 들고 있지 않다(볼카운트는 타석 세션, 남은 마구는 타석 화면) — 그 경우는 굴리지 않는다
+    const outgoing = opponentPitcherAbilityOf(current).repertoire
+    if ((outgoing?.magicId ?? 0) === 0) {
+      rollCpuPitchTypeOnPitcherChangeTick(
+        { repertoire: outgoing, runnerCount: runnerCountOf(current.game.bases), strikes: 0, balls: 0 },
+        random,
+      )
+    }
     // 22(3da88) → 0x16(3da94) — 앞 0xe 의 OK 를 다 받은 뒤 선다. 0x16 진입 0x3d458 이 투수 예약을 보고 +0x195c 비트1(마선수면 6)
     const incomingIsAce = moundAcePitcherOf(changed, false) !== undefined
     const scene: SubstitutionScene = {
