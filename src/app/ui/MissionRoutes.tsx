@@ -15,6 +15,7 @@ import { cpuSideOf, humanSideOf } from '@/entities/mission/model/missionGame'
 import { HallOfFameScreen } from '@/pages/special/ui/SpecialScreen'
 import type { HallOfFameNariPlayer } from '@/pages/special/ui/SpecialScreen'
 import type { Collection } from '@/entities/collection/model/collection'
+import { hallOfFameBatterAt } from '@/entities/collection/model/collection'
 import { PitchingScreen } from '@/pages/pitching/ui/PitchingScreen'
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
 import { isWalkPlayResult } from '@/features/defense-play/model/walkPlay'
@@ -109,7 +110,10 @@ export function MissionRoutes({
     screen.kind === '투수미션' ? session.pitcherRun
       : screen.kind === '미션진행' || screen.kind === '마선수대결' ? session.missionRun
         : null
-  const overlay = missionOverlayOf(session, defenseSceneRef, playingRun, runner.bannerText)
+  const overlay = missionOverlayOf(
+    session, defenseSceneRef, playingRun, runner.bannerText,
+    missionBatterNameOf(session, hallOfFame, nari.타자, screen.kind === '마선수대결'),
+  )
   if (overlay !== null) return overlay
 
   // 미션 모드로 들어오면 먼저 선수를 고른다 (하위 17 — 진입 0x2613c · 갱신 0x29a54). 결과 0(되돌아가기)은
@@ -287,6 +291,8 @@ function missionOverlayOf(
   playingRun: MissionRun | PitcherRun | null,
   /** 결과 띠(상태 0x12) — 내려간 뒤에야 0x18 → 0x21 */
   bannerText: string,
+  /** 미션 타자 이름 (`missionBatterNameOf`) — 0x21 DUE UP 의 그 선수 줄 */
+  missionBatterName?: string | null,
 ): ReactNode | null {
   const { pendingDefensePlay, actions } = session
   if (pendingDefensePlay !== null) {
@@ -337,10 +343,29 @@ function missionOverlayOf(
         onTick={session.stepAutoRelay}
         sideTeams={missionWithSideTeamsOf(playingRun.mission, playingRun.game.humanBatting.teamId).sideTeams}
         humanSide={humanSideOf(playingRun.mission)}
+        missionBatterName={missionBatterName ?? null}
       />
     )
   }
   return null
+}
+
+/**
+ * **미션 타자 0x1fc20 의 이름** — 0xb62c0 은 id 가 에디트 이름표 범위 밖이면 기록 +1 을 준다(나리 저장 선수 +0 = 0xfe · 명예 타자
+ * id 도 이름표 칸 밖 — R11). 0x1fc20 은 선수 고르기에서 명예 타자를 골랐으면(+0xa6 ≥ 0) 그 명전 기록, 아니면 나리 타자편 저장 선수 —
+ * 마선수 대결(g[0x11f])은 명예 갈래를 안 탄다(세션 `hallOfFameBatter` 와 같은 갈래).
+ */
+function missionBatterNameOf(
+  session: ReturnType<typeof useMissionSession>,
+  hallOfFame: Collection,
+  nariBatter: HallOfFameNariPlayer | null,
+  isAceMatch: boolean,
+): string | null {
+  const pick = session.player
+  if (!isAceMatch && pick?.side === '타자' && pick.hallOfFameIndex !== null) {
+    return hallOfFameBatterAt(hallOfFame, pick.hallOfFameIndex)?.name ?? null
+  }
+  return nariBatter?.name ?? null
 }
 
 /**

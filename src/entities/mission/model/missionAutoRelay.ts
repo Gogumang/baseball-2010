@@ -68,8 +68,14 @@ export interface MissionAutoRelayCards {
   readonly outs: number
   /** 공격 팀 타순 칸 팀[+0x32] (0~8) */
   readonly currentOrder: number
-  /** 줄 0~2 의 이름 — 타순 칸 (currentOrder + i) mod 9 의 선수 */
+  /** 줄 0~2 의 이름 — 타순 칸 (currentOrder + i) mod 9 의 선수. 미션 타자 칸은 null (`dueUpIsMissionBatter`) */
   readonly dueUpNames: readonly (string | null)[]
+  /**
+   * 줄 0~2 가 **미션 타자**(0xaa57c aa7b8 0xb87cc 가 명부 칸 k 에 넣은 0x1fc20 기록 사본) 칸인가 — 0xb62c0 은 id(+0)가 에디트 이름표
+   * 범위(타자 ≤ 0x77) 밖이면 기록 +1 의 이름을 준다. 나리 저장 선수 +0 = 0xfe(0x10ff8 · 0x110e2) · 명예 타자 id(R11 — 이름표 칸 밖) 모두 밖이라
+   * **그 선수 자신의 이름**이다 — 판은 이름을 안 들어 그리는 쪽이 채운다(`AutoPlayRelayScreen.missionBatterName`)
+   */
+  readonly dueUpIsMissionBatter?: readonly boolean[]
   /** 0xb68fc — 경기 끝 */
   readonly gameOver: boolean
 }

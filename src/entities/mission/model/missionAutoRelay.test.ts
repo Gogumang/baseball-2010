@@ -162,3 +162,23 @@ describe('틱 꼴의 이닝별 칸 st[0x6c..] — 득점 0xb6a9c 가 지금 이�
     expect(last).toEqual([after.game.scores[0], after.game.scores[1]])
   })
 })
+
+describe('0x42364 DUE UP 의 미션 타자 줄 — 0xb62c0 은 그 기록 사본 +1 의 이름', () => {
+  it('타자 미션 사람 칸 반 이닝: 미션 타자 칸은 이름 null 에 표지가 서고, 나머지 줄은 표지가 없다', () => {
+    const run = startMission(missionOf('타자', 1))
+    // 미션 타자는 타순 2 — 사람 칸 반 이닝을 타순 0 부터 돌리면 미션 타자 앞 두 타석의 DUE UP 에 그 줄이 선다
+    const ended = { ...run, game: { ...run.game, halfEnded: true, humanBatting: { ...run.game.humanBatting, order: 0 } } }
+    const cards = [1, 2, 3, 4].flatMap((seed) => {
+      const after = runBatterMissionAutoHalves(ended, createSeededRandom(seed))
+      return (after.game.autoRelay?.steps ?? []).flatMap((step) => (step.cards === undefined ? [] : [step.cards]))
+    })
+    const marked = cards.filter((card) => card.dueUpIsMissionBatter?.some((flag) => flag) === true)
+    expect(marked.length).toBeGreaterThan(0)
+    for (const card of cards) {
+      card.dueUpIsMissionBatter?.forEach((flag, row) => {
+        if (flag) expect(card.dueUpNames[row]).toBeNull()
+        else expect(card.dueUpNames[row]).not.toBeNull()
+      })
+    }
+  })
+})

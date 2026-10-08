@@ -118,3 +118,16 @@ describe('점수판 0x41c18 (14, 10) — 틱 꼴의 이닝별 칸', () => {
     expect(screen.queryByTestId('이닝별점수판')).toBeNull()
   })
 })
+
+describe('0x42364 DUE UP 의 미션 타자 줄', () => {
+  it('미션 타자 칸이면 넘긴 미션 타자 이름을 그린다 (0xb62c0 → 기록 +1)', () => {
+    const cards = {
+      pitcherName: '김투수', strikes: 0, balls: 0, outs: 0, currentOrder: 2,
+      dueUpNames: ['가', null, '다'], dueUpIsMissionBatter: [false, true, false], gameOver: false,
+    }
+    const step: MissionAutoRelayStep = { inning: 2, offenseSide: 1, scores: [1, 0], line: null, cards }
+    render(<AutoPlayRelayScreen step={step} onTick={() => {}} sideTeams={[3, 7]} humanSide={1} missionBatterName="나리" />)
+    expect(screen.getByTestId('교대판-타자이름-1').textContent).toBe('나리')
+    expect(screen.getByTestId('교대판-타자이름-0').textContent).toBe('가')
+  })
+})

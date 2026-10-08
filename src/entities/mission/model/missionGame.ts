@@ -394,10 +394,12 @@ export function* simulateMissionAutoHalfTicks(
   const batterNameAt = (lineup: QuickLineup, lineupSlot: number): string | null => {
     const record = rosterSlotAt(lineup, lineupSlot)
     const row = batting.records[record] ?? record
-    // ⚠️ 미해결: 미션 타자 칸은 그 선수(0x1fc20) 이름인데 이 판은 선수 이름을 들고 있지 않다 — 글을 안 쓴다
+    // 미션 타자 칸은 그 선수(0x1fc20 사본) 자신의 이름 — 판은 이름을 안 들어 그리는 쪽이 채운다(`dueUpIsMissionBatter`)
     if (row === MISSION_NARI_RECORD) return null
     return rows[Math.max(0, row) % rows.length]?.name ?? null
   }
+  const isMissionBatterAt = (lineup: QuickLineup, lineupSlot: number): boolean =>
+    battingRecordAt({ ...batting, lineup }, lineupSlot) === MISSION_NARI_RECORD
   const cardsOf = (tick: HalfInningTick, scores: readonly [number, number]): MissionAutoRelayCards => {
     const currentOrder = tick.battingOrderIndex % LINEUP_SLOTS
     const lineup = tick.lineup ?? batting.lineup
@@ -408,6 +410,7 @@ export function* simulateMissionAutoHalfTicks(
       outs: tick.outs,
       currentOrder,
       dueUpNames: [0, 1, 2].map((row) => batterNameAt(lineup, (currentOrder + row) % LINEUP_SLOTS)),
+      dueUpIsMissionBatter: [0, 1, 2].map((row) => isMissionBatterAt(lineup, (currentOrder + row) % LINEUP_SLOTS)),
       gameOver: isMissionGameOver({ ...game, scores: [scores[0], scores[1]] }, tick.outs),
     }
   }

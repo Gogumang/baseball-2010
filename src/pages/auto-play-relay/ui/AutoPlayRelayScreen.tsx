@@ -75,6 +75,11 @@ interface AutoPlayRelayScreenProps {
   readonly sideTeams: readonly [number, number]
   /** 사람 칸 (st[0x31 + 칸] == 0 인 측) */
   readonly humanSide: 0 | 1
+  /**
+   * 미션 타자(0x1fc20 — 명예 타자 또는 나리 타자편 저장 선수)의 이름 — DUE UP 줄이 그 선수 칸(`dueUpIsMissionBatter`)이면
+   * 0xb62c0 이 기록 +1 의 이름을 그린다. 안 넘기면 그 줄 이름을 비운다.
+   */
+  readonly missionBatterName?: string | null
 }
 
 /**
@@ -98,7 +103,7 @@ interface AutoPlayRelayScreenProps {
  *
  * ⚠️ 미이식(그림): 배경(운동장 전경)은 안 그린다.
  */
-export function AutoPlayRelayScreen({ step, onTick, sideTeams, humanSide }: AutoPlayRelayScreenProps) {
+export function AutoPlayRelayScreen({ step, onTick, sideTeams, humanSide, missionBatterName }: AutoPlayRelayScreenProps) {
   // 틱 n(1부터)은 n 번째 0x48480 갱신 — 굴림은 부르는 쪽이 그 틱에 한다
   const tick = useSceneTick(() => onTick())
   const textOrigins = useFrameOrigins(IMG_TEXT_FRAMES)
@@ -133,7 +138,8 @@ export function AutoPlayRelayScreen({ step, onTick, sideTeams, humanSide }: Auto
             count: { strikes: cards.strikes, balls: cards.balls, outs: cards.outs },
             pitcherName: cards.pitcherName,
             currentOrder: cards.currentOrder,
-            dueUpNames: cards.dueUpNames,
+            dueUpNames: cards.dueUpNames.map((name, row) =>
+              cards.dueUpIsMissionBatter?.[row] === true ? missionBatterName ?? null : name),
           }}
         />
       )}
