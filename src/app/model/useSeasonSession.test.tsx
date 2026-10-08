@@ -1393,6 +1393,23 @@ describe('경기 전 흐름 0xd8 → 0xd7 → 0xdd → 0xe1', () => {
     expect(result.current.scene).toBe(SEASON_SCENE_STATE.다음경기)
   })
 
+  it('0xd7 CLR 로 0xd8 에 다시 들어오면 phase 4 는 쓰지만 저장하지 않는다 (0x4cb8 4cc8 — 이전 상태 0xd7)', () => {
+    const inner = 메모리저장()
+    const saves = vi.fn()
+    const store: JsonStorePort = { load: inner.load, save: (value) => { saves(); inner.save(value) } }
+    const { result } = 띄우기(store)
+    시작(result, 0)
+    act(() => result.current.actions.openNextGame())
+    act(() => result.current.actions.confirmNextGame())
+    const 전 = saves.mock.calls.length
+
+    act(() => result.current.actions.cancelPreGameAce())
+
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.다음경기)
+    expect(result.current.state?.record.phase).toBe(SEASON_PHASE.다음경기)
+    expect(saves.mock.calls.length).toBe(전)
+  })
+
   it('구단관리 코치채용으로 가면 선수단 용도가 코치채용(2)이다', () => {
     const { result } = 다음경기확인()
     act(() => result.current.actions.goto(SEASON_SCENE_STATE.선수단))

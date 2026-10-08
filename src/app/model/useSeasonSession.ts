@@ -1655,11 +1655,18 @@ export function useSeasonSession(
    * (진입 분기 0xcb 는 짝수 경기라도 phase ∈ {1,3} 일 때만 관리 메뉴다).
    */
   const nextGameEntered = useCallback(
-    (current: SeasonSave, fromMenu: boolean) => {
-      commit({
+    (current: SeasonSave, fromMenu: boolean, fromSquad = false) => {
+      const entered: SeasonSave = {
         ...current,
         state: { ...current.state, record: { ...current.state.record, phase: SEASON_PHASE.다음경기 } },
-      })
+      }
+      // 4cc8 — 이전 상태가 0xd7(경기 전 마선수 고르기 CLR)이면 phase 4 는 메모리에만 쓰고 저장하지 않는다
+      if (fromSquad) {
+        latestSave.current = entered
+        setSave(entered)
+      } else {
+        commit(entered)
+      }
       setNextGameFromMenu(fromMenu)
       setScene(SEASON_SCENE_STATE.다음경기)
     },
@@ -1759,7 +1766,7 @@ export function useSeasonSession(
     const step = cancelPreGameAce(preGameAces, save.state.record.inPostseason)
     if (step.kind === '고르기') return setPreGameAces(step.aces)
     setPendingGame(null)
-    if (step.scene === SEASON_SCENE_STATE.다음경기) return nextGameEntered(save, false)
+    if (step.scene === SEASON_SCENE_STATE.다음경기) return nextGameEntered(save, false, true)
     setScene(step.scene)
   }, [nextGameEntered, preGameAces, save])
 
