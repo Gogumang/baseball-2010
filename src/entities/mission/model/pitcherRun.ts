@@ -1,4 +1,5 @@
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
+import type { MissionGameSetup } from '@/entities/mission/model/missionGame'
 import type { OriginalMission } from '@/shared/config/original/missions'
 import {
   createProgress,
@@ -61,7 +62,8 @@ export interface PitcherRun extends MissionRun {
 
 export { inningGoalOf, OUTS_PER_INNING } from '@/entities/mission/model/missionGoal'
 
-export function startPitcherMission(mission: OriginalMission): PitcherRun {
+/** `setup` — 마선수 대결이면 사람 칸 팀을 바꾼다 (`missionHumanTeamIdOf`, 0xaa57c aa6dc~aa728) */
+export function startPitcherMission(mission: OriginalMission, setup: MissionGameSetup = {}): PitcherRun {
   return {
     mission,
     progress: createProgress(),
@@ -76,7 +78,7 @@ export function startPitcherMission(mission: OriginalMission): PitcherRun {
     totalOuts: 0,
     allowed: { runs: 0, hits: 0, walks: 0, baserunner: 0 },
     cpu: startMissionCpuTeam(mission),
-    game: startMissionGame(mission),
+    game: startMissionGame(mission, setup),
   }
 }
 

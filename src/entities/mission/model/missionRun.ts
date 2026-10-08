@@ -1,4 +1,5 @@
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
+import type { MissionGameSetup } from '@/entities/mission/model/missionGame'
 import type { OriginalMission } from '@/shared/config/original/missions'
 import { createProgress, isCleared, recordOutcome, recordSteal } from '@/entities/mission/model/missionGoal'
 import type { MissionProgress } from '@/entities/mission/model/missionGoal'
@@ -69,7 +70,8 @@ export function limitOrNull(limit: number): number | null {
   return limit > 0 ? limit : null
 }
 
-export function startMission(mission: OriginalMission): MissionRun {
+/** `setup` — 마선수 대결이면 사람 칸 팀을 바꾼다 (`missionHumanTeamIdOf`, 0xaa57c aa6dc~aa728) */
+export function startMission(mission: OriginalMission, setup: MissionGameSetup = {}): MissionRun {
   return {
     mission,
     progress: createProgress(),
@@ -80,7 +82,7 @@ export function startMission(mission: OriginalMission): MissionRun {
     bases: mission.start.runners,
     outs: mission.start.outs,
     cpu: startMissionCpuTeam(mission),
-    game: startMissionGame(mission),
+    game: startMissionGame(mission, setup),
   }
 }
 
