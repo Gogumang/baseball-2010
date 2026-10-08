@@ -437,6 +437,11 @@ export interface SeasonActions {
   /** 구장 히든 아이템을 연다 (0x81d0 컬렉터 해금 — `app[0xe0 + …] = 1`) */
   readonly openStadiumItems: (unlockIds: readonly number[]) => void
   /**
+   * 국가대항전 0xf3 갱신 0xe684 가 처음 연 히든 팀 — 0x65de5(전역, 0) 대한민국, 우승(SR+0x144 == 10)이면 결승 상대도.
+   * 0x65de4 가 전역 `+0x7a+k = 1` · 전역 저장 0x1f1b9 · StrCOMMON[138] 팝업 0x22 (팝업은 `NationalCupScreen` 이 띄운다)
+   */
+  readonly openCupHiddenTeams: (teams: readonly number[]) => void
+  /**
    * 엔딩 보너스 팝업 0x2b 를 닫았다 — 0x8bd8 의 8bf4~8c84: G += 0xcbc2e[e] × 1000(99999 상한) · 전역기록 저장 · SR+0x7b = 1 ·
    * 저장 · `0x22c7d(보너스, 2)` 통계. 이미 받았으면 아무것도 안 한다
    */
@@ -2373,11 +2378,7 @@ export function useSeasonSession(
         cupRoster: null,
       })
       commit(next.save)
-      setNotice(
-        finish.openedTeams.length === 0
-          ? '국가대항전이 끝났습니다.'
-          : `국가대항전이 끝났습니다.!N히든 팀이 열렸습니다: ${finish.openedTeams.join(', ')}`,
-      )
+      // 히든 팀은 여기서 열지 않는다 — 0xf3 갱신 0xe684 가 대진판에 있는 동안 열었다(`openCupHiddenTeams`)
       // 대회 연차(짝수 idx)는 마지막 해(9)가 아니라 엔딩 갈래에 닿지 않지만, 같은 0x6e0c 라 같게 둔다
       if (next.scene === SEASON_SCENE_STATE.엔딩) return startEvent(SEASON_FINAL_EVENT_ID, next.scene)
       setScene(next.scene)
@@ -2622,6 +2623,14 @@ export function useSeasonSession(
     })
   }, [])
 
+  /** 0xe684 → 0x65de4 — 전역 해금표(웹 `openedHiddenIds`, 팀은 10~14 그대로)에 쓴다. 앱이 전역 기록으로 모은다 */
+  const openCupHiddenTeams = useCallback((teams: readonly number[]) => {
+    setOpenedHiddenIds((opened) => {
+      const added = teams.filter((id) => !opened.includes(id))
+      return added.length === 0 ? opened : [...opened, ...added]
+    })
+  }, [])
+
   /**
    * 엔딩 보너스 팝업 0x2b 닫힘 — 0x8bd8(직접 떴다):
    * ```
@@ -2780,7 +2789,7 @@ export function useSeasonSession(
       playCupGame, finishCup, finishGame, constructScene: rollSceneLoadTip, saveGameProgress, enterGameSettlement, resumeSavedGame, leaveGame,
       continuePostseason,
       runTraining, closeTrainingResult, runOuting, awardLeagueFirst, spendGamePoint, finishSeason,
-      openStadiumItems, receiveEndingBonus, finishEnding, finishSeasonEvent, giveSeasonEventReward, confirmSeasonEventChoice, confirmEventSystemWindow, clearNotice, quit,
+      openStadiumItems, openCupHiddenTeams, receiveEndingBonus, finishEnding, finishSeasonEvent, giveSeasonEventReward, confirmSeasonEventChoice, confirmEventSystemWindow, clearNotice, quit,
     },
   }
 }

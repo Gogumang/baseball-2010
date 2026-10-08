@@ -1129,6 +1129,23 @@ describe('시즌 끝 사슬', () => {
 
     expect(result.current.gamePoints).toBe(전 + 1000)
   })
+
+  it('대진판 0xf3 이 처음 연 히든 팀은 전역 해금표로 간다 — 대회 끝에 지어낸 알림 글은 없다 (0xe684 → 0x65de4)', () => {
+    const { result } = 띄우기()
+    시작(result, 0)
+    act(() => result.current.actions.openCupHiddenTeams([10]))
+    act(() => result.current.actions.openCupHiddenTeams([10, 12]))
+    expect(result.current.openedHiddenIds).toEqual([10, 12])
+
+    act(() => result.current.actions.finishCup({
+      champion: 10,
+      isKoreaChampion: true,
+      koreaInFinal: true,
+      reward: { popularity: 30, reputation: 40, money: 50, gamePoint: 1000, messageId: 199 },
+      openedTeams: [10, 12],
+    }))
+    expect(result.current.notice).toBe('')
+  })
 })
 
 describe('포스트시즌', () => {

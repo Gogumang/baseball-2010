@@ -895,6 +895,10 @@ export function SeasonRoute({
         // ⚠️ 웹판 임시 — 원본은 여기서 사람이 대표팀을 조작해 경기를 친다 (시즌 221)
         onStartGame={(matchup) => actions.playCupGame(matchup.myTeam, matchup.opponent)}
         onFinish={(finish) => actions.finishCup(finish)}
+        // 0xf3 갱신 0xe684 — 틀마다 0x65de5(전역, 0) 대한민국 · 우승국(SR+0x144)이 10 이면 결승 상대도 연다. 처음 열리면
+        // 0x65de4 가 전역 +0x7a+k = 1 · 저장 · StrCOMMON[138] 팝업 0x22 (나리 134 진입 0x19f30 과 같은 함수)
+        openedHiddenIds={[...(hallOfFame?.openedHiddenIds ?? []), ...session.openedHiddenIds]}
+        onOpenHiddenTeams={actions.openCupHiddenTeams}
         // 공통 앞그림 0xb810 — 0xf3 · 0xf4 는 0xdd · 0xe0 · 0xe1 밖이라 공 무늬를 먼저 깐다(그림 0x896c 는 화면을 안 지운다)
         underlay={<SkinBackdrop kind="공무늬" />}
       />
