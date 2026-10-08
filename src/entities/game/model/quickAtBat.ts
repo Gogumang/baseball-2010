@@ -108,6 +108,14 @@ export interface QuickAtBatPitcher {
   readonly hand?: number
   /** 마선수면 그 순번·레벨 — 보정 구조체에 구속·제구를 얹는다 (`quickSwingBoostOf`) */
   readonly ace?: QuickAceSlot
+  /**
+   * **체력%로 부른 경기 능력** `0xb570c(수비, k, 투수, 1, 체력% 0xaebb0, 1)` — 피로 0xb58e6 을 먹은 제구·구속.
+   * 위 `control`·`velocity` 는 체력 인자 90(피로 없음)으로 부른 값이다. 0xc11f0·0xc1818 은 두 값을 갈라 쓴다:
+   * - 체력% — 구위 등급(c1430~c1448) · 스트라이크존 기준(c1852·c1878) · 0xab214 투수 쪽(ab548, [sp+0x20] = 체력%)
+   * - 90 — 스윙 앞 두 겨루기(c12f8·c135a) · 헛스윙 세 번째 겨루기(c1764)
+   * 안 넘기면 90 값 그대로다(피로 없음 — 체력%를 모르는 부르는 쪽). 반 이닝 엔진은 공마다 채운다.
+   */
+  readonly tired?: { readonly control: number; readonly velocity: number }
 }
 
 export interface QuickAtBatSituation {
@@ -116,6 +124,11 @@ export interface QuickAtBatSituation {
 }
 
 const trunc = Math.trunc
+
+/** 체력%로 부른 제구·구속 (`QuickAtBatPitcher.tired`) — 없으면 90 값 */
+function tiredStatsOf(pitcher: QuickAtBatPitcher): { readonly control: number; readonly velocity: number } {
+  return pitcher.tired ?? { control: pitcher.control, velocity: pitcher.velocity }
+}
 
 /**
  * 구위 등급 (0xb74bc → 부르는 쪽에서 다시 1 을 뺀다).
@@ -206,7 +219,9 @@ export function judgePitchOf(
   random: RandomPort,
 ): PitchJudgement {
   const ownBonus = pitcher.isOwnPlayer === true ? OWN_PLAYER_STRIKE_BONUS : 0
-  const bonus = ownBonus + trunc((pitcher.control + pitcher.velocity) / PITCHER_STAT_DIVISOR)
+  // c1852·c1878 — 0xb570c 를 체력%(0xaebb0)로 부른다
+  const tired = tiredStatsOf(pitcher)
+  const bonus = ownBonus + trunc((tired.control + tired.velocity) / PITCHER_STAT_DIVISOR)
   const threshold = STRIKE_ZONE_BASE - bonus
   const isInsideZone = random.rand(0, 100) > threshold
   if (!isInsideZone) return balls <= BALLS_BEFORE_WALK - 1 ? '볼' : '포볼'
@@ -266,7 +281,9 @@ function verdictOf(
   random: RandomPort,
 ): PitchVerdict {
   const pitch = quickPitchOf(batter, pitcher, situation, random)
-  const controlTier = pitchGradeOf(pitcher.control, pitcher.stamina, random)
+  // 구위 등급(c1430~c1448)과 0xab214 투수 쪽(ab548)은 체력%로 부른 능력이다
+  const tired = tiredStatsOf(pitcher)
+  const controlTier = pitchGradeOf(tired.control, pitcher.stamina, random)
   const swing = swingResultOf(
     {
       horizontalError: pitch.spreadX,
@@ -275,7 +292,7 @@ function verdictOf(
       buntKind: 0,
       controlTier,
       batter,
-      pitcher,
+      pitcher: tired,
       boost: quickSwingBoostOf(batter, pitcher),
       mode: '일반',
       isPitcherExhausted: pitcher.stamina === 0,

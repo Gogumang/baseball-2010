@@ -19,6 +19,7 @@ import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
 import {
   FULL_STAMINA,
+  abilityAfterFatigue,
   consumeStamina,
   pitchStaminaCostOf,
   staminaCapacityOf,
@@ -241,8 +242,13 @@ export interface HalfInningDefense {
   readonly mound: HalfInningMound
   /** 이 팀의 투수 칸 전부 (`team+0x0c` 8명) — 마운드와 이미 쓴 투수를 뺀 나머지가 벤치다 */
   readonly pitcherSlots: readonly number[]
-  /** 그 칸 투수의 간이 타석용 능력 */
+  /** 그 칸 투수의 간이 타석용 능력 — 체력 인자 90(피로 없음)으로 부른 `0xb570c` */
   readonly pitcherAt: (pitcherSlot: number) => QuickAtBatPitcher
+  /**
+   * 그 칸 투수를 **체력%로 부른** `0xb570c` 의 제구·구속 (`QuickAtBatPitcher.tired`) — 피로 0xb58e6 이 팀 능력치 정액·코치보다
+   * 먼저 먹으므로 밑값을 아는 부르는 쪽이 준다. 안 넘기면 `pitcherAt` 값에 피로(`abilityAfterFatigue`)만 먹인다.
+   */
+  readonly tiredPitcherAt?: (pitcherSlot: number, staminaPercent: number) => { readonly control: number; readonly velocity: number }
   /** 그 칸 투수의 **체력 실효 능력치(칸 3)** — 스태미나 용량 X 의 바탕 (0x66e44) */
   readonly staminaAbilityAt: (pitcherSlot: number) => number
   /**
@@ -298,6 +304,19 @@ export interface HalfInningDefense {
    * 미션 객체 +0xbd ∈ {3, 7}). 안 넘기면 막지 않는다.
    */
   readonly pitcherChangeBlocked?: boolean
+}
+
+/**
+ * 마운드 투수가 이 공에 보이는 능력 — 체력%(0xaebb0)와 그 체력%로 부른 제구·구속(`tired`, 0xb58e6).
+ * 0xc11f0·0xc1818 이 0xb570c 를 체력%로 부르는 세 자리(구위 등급 · 스트라이크존 · 0xab214 투수 쪽)가 `tired` 를 본다.
+ */
+function facingPitcherOf(defense: HalfInningDefense, pitcherSlot: number, staminaPercent: number): QuickAtBatPitcher {
+  const fresh = defense.pitcherAt(pitcherSlot)
+  const tired = defense.tiredPitcherAt?.(pitcherSlot, staminaPercent) ?? {
+    control: abilityAfterFatigue(fresh.control, staminaPercent),
+    velocity: abilityAfterFatigue(fresh.velocity, staminaPercent),
+  }
+  return { ...fresh, stamina: staminaPercent, tired }
 }
 
 /** `roleAt` 을 안 넘긴 길 — 보직을 모른다 */
@@ -549,7 +568,7 @@ export function* simulateHalfInningTicks(
      */
     const facing =
       defense !== undefined && mound !== undefined
-        ? { ...defense.pitcherAt(mound.pitcherSlot), stamina: staminaPercentOf(mound.stamina) }
+        ? facingPitcherOf(defense, mound.pitcherSlot, staminaPercentOf(mound.stamina))
         : pitcher
     /** 이 타석 동안 공마다 깎이는 스태미나 — 0xc262c 는 공을 던지기 **앞에** 0xa5e14 로 깎는다(c26c8) */
     let pitchStamina = mound?.stamina
@@ -563,7 +582,7 @@ export function* simulateHalfInningTicks(
             beforePitch: () => {
               const current = mound as HalfInningMound
               pitchStamina = drainQuickPitcher(defense, { ...current, stamina: pitchStamina ?? current.stamina }, 1)
-              return { ...facing, stamina: staminaPercentOf(pitchStamina) }
+              return facingPitcherOf(defense, current.pitcherSlot, staminaPercentOf(pitchStamina))
             },
           }),
       /**
