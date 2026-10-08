@@ -382,6 +382,13 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
                 pitchTickAt(now, backdropStartedAt, tickLength),
               ),
         resultTick: phaseRef.current === '결과' ? pitchTickAt(now, phaseStartedAtRef.current, tickLength) : 0,
+        // 0x4c4bc 의 상태 갈래 재료 — 웹 단계 · 그 단계에 든 뒤 틱 · 쉬는 중(0xd · 0xe 대기 따위)
+        stagePhase: {
+          kind: phaseRef.current,
+          tick: pitchTickAt(now, phaseStartedAtRef.current, tickLength),
+          isPaused: latestRef.current.isPaused,
+        },
+        timeKeyCount: latestRef.current.timeKeyCount ?? null,
         // 일반 구장 번호를 고르는 규칙(st+0x70)이 미확인이라 0 번 구장으로 둔다 (추정).
         // 시즌 구장 세 칸이 넘어오면 배경 묶음 자체가 0x77494 쪽으로 갈린다 (0x40ff0).
         scenery: {

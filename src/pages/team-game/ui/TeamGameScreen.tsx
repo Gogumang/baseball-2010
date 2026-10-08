@@ -808,6 +808,8 @@ export function TeamGameScreen({
               // 그 타자로 채운 값이다: 마타자 0xd84fa[레벨], 그 밖은 +0x18 == 0 이라 0 ('0' 키 무시, 0x51e14)
               specialSwingRemaining={specialSwingRemainingAt(progress, '우리')}
               onSpecialSwingUsed={(remaining) => actions.specialSwingUsed(remaining)}
+              // "#TIME"(0x4c940) — 사람 공격이라 n = 벤치 타자 수 팀[+0x28c]. 팀 경기(모드 1·2·8·9)는 0x38984 가 통과한다
+              timeKeyCount={progress.ourBenchBatters}
               // ⚠️ 미해결: `batterSkillIds` 를 안 넘긴다 — 팀 경기 명단(`TeamEntryBatter`)·로스터 표에 선수 스킬 비트(+0x14)가
               //    없다. 그래서 실투 판정 0x33cbc 의 타자 비트 22 압도(+5)와 0xa5e14 의 압도 ×2 가 늘 거짓이다
               gameMode={options.mode}

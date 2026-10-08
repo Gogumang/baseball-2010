@@ -247,6 +247,12 @@ interface BattingStageProps {
    * 같은 틱에 예약이 남은 채 번트 키를 또 누르면 예약을 지우고 +0xfdc = 0 이다(51e98). 키 사건 비트 9 는 키를 뗀 사건이다(0xbca04).
    */
   readonly sceneBuntKind?: number
+  /**
+   * **"#TIME" 의 벤치 수 n** — 공용 그리기 0x4c4bc 의 0x4c940: 사람이 공격이면 u8 팀[+0x28c](벤치 타자), 수비면 팀[+0x33](벤치 투수).
+   * 0x38984('#' 교체 가능)가 참인 화면만 넘긴다 — 모드 4 · 7 · 미션은 막혀 안 넘긴다. 상태 0xe · 0xf 이고 n > 0 이면
+   * 오른쪽 아래에 game_ui 프레임 91 "#TIME" 을 그린다 (`softKeyLabels`). 안 넘기면 안 그린다.
+   */
+  readonly timeKeyCount?: number
 }
 
 /** 원작 타석 화면. 그리기는 lib, 루프와 조작은 model이 맡는다. */

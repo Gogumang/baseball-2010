@@ -12,6 +12,8 @@ import { rainDrawingOf, type SceneRain } from '@/entities/batting/model/settleme
 import type { ParticleScene } from '@/entities/particle/model/particleScene'
 import { drawHud } from '@/widgets/batting-stage/lib/renderHud'
 import { drawFieldMap } from '@/widgets/batting-stage/lib/renderFieldMap'
+import { drawSoftKeyLabels } from '@/widgets/batting-stage/lib/softKeyLabels'
+import type { StagePhaseSnapshot } from '@/widgets/batting-stage/lib/softKeyLabels'
 import { drawHomeRunBanner, drawHomeRunTextFrame } from '@/widgets/batting-stage/lib/renderHomeRunBanner'
 import type { HomeRunTextFrame } from '@/widgets/batting-stage/lib/homeRunBanner'
 import { batterLayersOf, layerPaletteIndexOf, NO_PITCHER_EQUIPMENT, pitcherLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
@@ -123,6 +125,13 @@ export interface StageScene {
    * 지면 정산 진입 0x4ea0c 가 0x76fc5 로 12 칸에 둔다. 없으면 HUD 이닝의 칸(`skyColumnOfInning`, HUD 가 없으면 1회 = 칸 0).
    */
   readonly skyColumn?: number | null
+  /** 웹 타석 단계 — 공용 그리기 0x4c4bc 의 상태 갈래(소프트키 글자 따위)가 본다. 없으면 그 그림들을 안 그린다 */
+  readonly stagePhase?: StagePhaseSnapshot
+  /**
+   * "#TIME" 의 벤치 수 n (0x4c940 — 사람 공격이면 팀[+0x28c], 사람 수비면 팀[+0x33]). '#' 교체 검사 0x38984 가 참인 화면만 넘긴다 —
+   * 없거나 null 이면 "#TIME" 을 안 그린다 (`softKeyLabels`).
+   */
+  readonly timeKeyCount?: number | null
 }
 
 export function renderBattingStage(
@@ -168,6 +177,8 @@ export function renderBattingStage(
     // 전광판과 별개로 원본이 타석 중에 그리는 작은 지도 (0x395f4) — 루상 주자가 여기 보인다
     drawFieldMap(context, scene.hud.bases)
   }
+  // 0x4c4bc 꼬리 0x4c8e0 — "*MENU" · "#TIME" (`softKeyLabels`)
+  if (scene.stagePhase !== undefined) drawSoftKeyLabels(context, scene.stagePhase, scene.timeKeyCount ?? null)
   // 홈런은 판정 글자(game_judge)가 없고 HOMERUN 글자 연출이 대신 나간다 (R2 3-2, 7절 표의 v = 8·12)
   if (scene.homeRunFrame !== undefined) {
     if (scene.homeRunFrame !== null) drawHomeRunTextFrame(context, scene.homeRunFrame)

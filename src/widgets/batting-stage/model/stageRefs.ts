@@ -130,6 +130,8 @@ export interface StageLatest {
    * `BattingStage` 의 같은 이름 props 주석 참고.
    */
   readonly onPickoff?: (base: 1 | 2 | 3) => void
+  /** "#TIME" 의 벤치 수 — `BattingStage` 의 같은 이름 props 주석 참고 */
+  readonly timeKeyCount?: number
 }
 
 /** 경기 정산 0x4ea0c 의 효과를 고르는 재료 */

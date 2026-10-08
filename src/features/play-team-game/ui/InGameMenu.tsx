@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { activeSound } from '@/shared/api/audio/soundPort'
 import { DialogueBox, Hint, MarkupText, MenuList, Panel } from '@/shared/ui'
 import type { MenuItem } from '@/shared/ui'
 import {
@@ -167,18 +166,8 @@ export function InGameMenu({
         onSelect={(id) => {
           const action = id as InGameMenuAction
           if (action === '계속') return onContinue()
-          // [조작방법](코드 1 0x3c212 → 하위 4) · [설정](코드 2 0x3c326 → 하위 5)은 뷰어를 세운 뒤 일시정지 팝업을 다시 띄우기
-          // 직전(0x3c2f8 · 0x3c45c)에 울리던 소리를 끊는다(0x6e418)
-          if (action === '조작방법') {
-            if (onOpenHelp === undefined) return
-            activeSound().stop()
-            return onOpenHelp()
-          }
-          if (action === '설정') {
-            if (onOpenSettings === undefined) return
-            activeSound().stop()
-            return onOpenSettings()
-          }
+          if (action === '조작방법') return onOpenHelp?.()
+          if (action === '설정') return onOpenSettings?.()
           if (action === '자동진행') {
             if (onAutoProgress === undefined || gamePoint === undefined) return
             // 대전모드는 6회를 넘기면 질문 없이 StrGAME[2] 알림만 뜬다 (0x3c60c)
