@@ -147,7 +147,10 @@ export function screenBgmOf(screen: Screen, enteredFrom: Screen['kind'] | null =
     return enteredFrom === '경기결과' ? null : STORY_BGM
   }
   // 115 연초 이벤트는 0x8a680 이 만든 내장 이벤트([관리자+0x39f] = 1) — 40 을 안 튼다.
-  // ⚠️ 대결결과(140 → 114)의 S+0x50 은 미션 장면 결과 0x4ea0c(4eb3e · 4f044)가 이 저장을 쓰는지 못 읽어 40 으로 둔다(미해결)
+  // 대결결과(140 → 114)도 40 이다 (확정): 미션 장면 결과 0x4ea0c 가 S+0x50 을 쓰는 곳은 4eb3e(`[장면+0xf08]` 이 있으면 3) ·
+  // 4f044 · 4f1ca(다른 모드 갈래)뿐이고, 모드 5 · 6 갈래 0x4ef18~0x4f01e 는 안 쓴다. +0xf08 은 적재 0x3f584 의 모드 3 · 4 갈래
+  // (0x3f6a4)만 세우고 모드 5(0x3f6e0) · 6(0x3f6bc)은 안 세워 new(0x2ac4 의 memset 0) 그대로 0 → 4eb3e 도 건너뛴다.
+  // 곧 대결은 S+0x50 을 안 바꾸고, 대결을 연 114 진입이 이미 2 를 3 으로 고친 뒤라 140 → 114 의 가드는 늘 열린다
   if (screen.kind === '이벤트') return screen.context === '연초' ? null : STORY_BGM
   const table: Partial<Record<string, number>> = SCREEN_BGM
   return table[screen.kind] ?? null
@@ -176,7 +179,7 @@ export function pitcherLeagueBgmOf(
     // 경기 뒤 116 → 114 는 S+0x50 == 2 라 40 을 안 튼다 (`STORY_BGM` 가드)
     return entry.postseasonAfterGame === true ? null : STORY_BGM
   }
-  // 114 이벤트 재생 — 연초 115 는 내장 이벤트라 안 튼다. ⚠️ 대결결과 140 의 S+0x50 은 미해결(타자편 `screenBgmOf` 와 같다)
+  // 114 이벤트 재생 — 연초 115 는 내장 이벤트라 안 튼다. 대결결과 140 → 114 도 40(타자편 `screenBgmOf` 와 같다 — 미션 결과는 S+0x50 을 안 쓴다)
   if (scene === '이벤트') return entry.storyContext === '연초' ? null : STORY_BGM
   // 116 경기 뒤 평가 진입 0x1278c 는 배경음을 안 건드린다 — 경기 장면이 끊은 채다
   if (scene === '경기결과') return null
