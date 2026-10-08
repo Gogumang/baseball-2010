@@ -26,6 +26,7 @@ import { SubstitutionSceneOverlay } from '@/features/play-game/ui/SubstitutionSc
 import { MissionResultBoard } from '@/pages/mission-play/ui/MissionResultBoard'
 import type { MissionResultBoardProps } from '@/pages/mission-play/ui/MissionResultBoard'
 import { setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
+import { cpuSideOf, humanSideOf } from '@/entities/mission/model/missionGame'
 import { settlementBackdropOffsetAt } from '@/pages/team-game/model/settlementBackdrop'
 import { useSettlementEffectLayers } from '@/widgets/batting-stage/ui/SettlementEffectCanvas'
 
@@ -160,10 +161,13 @@ export function MissionPlayScreen({
    * `min(레코드 +3 아래 4비트, 0x63)` = 시작 이닝 인덱스를 쓴다(`start.inning` − 1). 재도전 · 다시하기도 같은 준비를 다시 돈다.
    * ⚠️ 미해결: 미션 경기 안의 이닝 넘김(0xb6b6c)은 웹 미션 진행에 이닝 칸이 없어 따라가지 않는다.
    */
-  const missionStartInningIndex = run.mission.start.inning - 1
+  const missionInningIndex = run.game.inning
   useEffect(() => {
-    setLiveGameInningIndex(missionStartInningIndex)
-  }, [run.mission, missionStartInningIndex])
+    setLiveGameInningIndex(missionInningIndex)
+  }, [run.mission, missionInningIndex])
+  /** 경기 점수판 0xb69b0(st[0x7e] · st[0x7f]) — 사람 칸 · CPU 칸. 타석 득점 · 자동진행 반 이닝 득점이 모두 든다(`run.game.scores`) */
+  const humanScore = run.game.scores[humanSideOf(run.mission)]
+  const cpuScore = run.game.scores[cpuSideOf(run.mission)]
 
   const menu = useInGameMenuState()
   const isMenuOpen = menu.isOpen
@@ -306,12 +310,12 @@ export function MissionPlayScreen({
             isVibrationOn={settings?.isVibrationOn}
             pitcherAbility={pitcherAbility}
             isEagleEyeEnabled={false}
-            // 시작 상황을 원본 HUD 에 보인다. 미션 팀 로고는 레코드에 없어 기본 두 팀을 쓴다 (추정)
+            // 경기 칸(이닝 st[0x6b] · 공격 측 st[9] · 점수 0xb69b0)을 HUD 에 보인다. 미션 팀 로고는 레코드에 없어 기본 두 팀을 쓴다 (추정)
             hud={{
-              inning: run.mission.start.inning,
-              half: '말',
-              ourScore: run.mission.start.ourScore + (run.progress.counts['타점'] ?? 0),
-              opponentScore: run.mission.start.opponentScore,
+              inning: run.game.inning + 1,
+              half: run.game.offenseSide === 0 ? '초' : '말',
+              ourScore: humanScore,
+              opponentScore: cpuScore,
               balls: atBat.balls,
               strikes: atBat.strikes,
               outs: run.outs,
@@ -344,10 +348,10 @@ export function MissionPlayScreen({
                   settlement: {
                     isWin: isSuccess,
                     // 경기 상태 두 측 점수 — 위 HUD 와 같은 근사(웹 미션은 득점 칸을 따로 안 든다). 차이의 절댓값만 쓴다
-                    side0Score: run.mission.start.opponentScore,
-                    side1Score: run.mission.start.ourScore + (run.progress.counts['타점'] ?? 0),
-                    // 하늘 칸 — 타석 하늘과 같은 미션 시작 이닝(⚠️ 미션 안 이닝 넘김은 웹 미션이 안 따른다)
-                    inning: run.mission.start.inning,
+                    side0Score: run.game.scores[0],
+                    side1Score: run.game.scores[1],
+                    // 하늘 칸 — 경기 이닝 st[0x6b]
+                    inning: run.game.inning + 1,
                     random,
                     layers: settlementLayers,
                   },

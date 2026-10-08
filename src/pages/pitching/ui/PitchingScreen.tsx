@@ -148,10 +148,10 @@ export function PitchingScreen({
    * `min(레코드 +3 아래 4비트, 0x63)` = 시작 이닝 인덱스를 쓴다(`start.inning` − 1). 재도전 · 다시하기도 같은 준비를 다시 돈다.
    * ⚠️ 미해결: 미션 경기 안의 이닝 넘김(0xb6b6c)은 웹 미션 진행에 이닝 칸이 없어 따라가지 않는다.
    */
-  const missionStartInningIndex = run.mission.start.inning - 1
+  const missionInningIndex = run.game.inning
   useEffect(() => {
-    setLiveGameInningIndex(missionStartInningIndex)
-  }, [run.mission, missionStartInningIndex])
+    setLiveGameInningIndex(missionInningIndex)
+  }, [run.mission, missionInningIndex])
 
   const [phase, setPhase] = useState<PitchPhase>('구질')
   const [pitchType, setPitchType] = useState<PitchTypeInfo | null>(null)
@@ -239,11 +239,11 @@ export function PitchingScreen({
               random={backdropRandom}
               settlement={{
                 isWin: isSuccess,
-                // 경기 상태 두 측 점수 — 수비 재생 점수판과 같은 근사(우리 = 시작 점수, 상대 = 시작 점수 + 허용 실점). 차이만 쓴다
-                side0Score: run.mission.start.opponentScore + run.allowed.runs,
-                side1Score: run.mission.start.ourScore,
-                // 하늘 칸 — 미션 시작 이닝(⚠️ 미션 안 이닝 넘김은 웹 미션이 안 따른다)
-                inning: run.mission.start.inning,
+                // 경기 상태 두 측 점수 0xb69b0 — 허용 실점 · 자동진행 반 이닝 득점이 모두 든 경기 칸(`run.game.scores`). 차이만 쓴다
+                side0Score: run.game.scores[0],
+                side1Score: run.game.scores[1],
+                // 하늘 칸 — 경기 이닝 st[0x6b]
+                inning: run.game.inning + 1,
                 random,
                 layers: settlementLayers,
               }}

@@ -11,6 +11,7 @@ import {
 import type { useMissionSession } from '@/app/model/useMissionSession'
 import { MissionSelectScreen, MissionBriefing } from '@/pages/mission-select/ui/MissionSelectScreen'
 import { MissionPlayScreen } from '@/pages/mission-play/ui/MissionPlayScreen'
+import { cpuSideOf, humanSideOf } from '@/entities/mission/model/missionGame'
 import { HallOfFameScreen } from '@/pages/special/ui/SpecialScreen'
 import type { HallOfFameNariPlayer } from '@/pages/special/ui/SpecialScreen'
 import type { Collection } from '@/entities/collection/model/collection'
@@ -254,9 +255,8 @@ export function MissionRoutes({
  * 사람이 잡는 쪽(`side`)은 편에 따라 다르다: 타자 미션은 내가 공격(주루), 투수 미션은 내가 수비(송구).
  *
  * 수비 장면 득점 점수판 0x41a64(`runScoreBoard`) — 두 측 팀 · 사람 칸 · 공격 측은 미션 준비 0xaa57c 가 레코드 +2 · +3 으로 세운
- * 그대로다(`missionRunScoreBoardOf`). 두 점수는 플레이 시작 때 값:
- * - 타자 미션: 우리 = 시작 점수 + 타점(화면 HUD 와 같은 근사 — 웹 미션은 득점 칸을 따로 안 든다), 상대 = 시작 점수.
- * - 투수 미션: 우리 = 시작 점수, 상대 = 시작 점수 + 허용 실점(R 실점 칸 `allowed.runs`).
+ * 그대로다(`missionRunScoreBoardOf`). 두 점수는 플레이 시작 때의 경기 점수판 0xb69b0(`run.game.scores` — 타석 득점 · 자동진행
+ * 반 이닝 득점이 모두 든다).
  * ⚠️ 미해결 — 마선수 대결(`isAceMatch` · 투수편 대결)은 사람 칸 팀을 나리 저장의 팀으로 바꾼다(0xaa6dc~0xaa728:
  *    g[0x11f]/g[0x176] 이고 g[0xf6] ∈ 2..4 이면 0x1f55d · 0x1f8d5 객체 +1) — 그 갈래를 안 읽어 대결에는 판을 안 넘긴다.
  */
@@ -273,9 +273,8 @@ function missionOverlayOf(
       isAceMatch || session.pitcherAceMatchMission !== null || run === null
         ? undefined
         : missionRunScoreBoardOf(run.mission, {
-            ours: run.mission.start.ourScore + (isPitcher ? 0 : (run.progress.counts['타점'] ?? 0)),
-            opponents:
-              run.mission.start.opponentScore + (isPitcher ? (session.pitcherRun?.allowed.runs ?? 0) : 0),
+            ours: run.game.scores[humanSideOf(run.mission)],
+            opponents: run.game.scores[cpuSideOf(run.mission)],
           })
     return (
       <DefensePlayback

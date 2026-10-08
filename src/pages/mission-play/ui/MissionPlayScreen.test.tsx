@@ -151,3 +151,35 @@ describe('교체 연출 0x16 — 그리기 0x4da30 의 "CHANGE" 애니 (0xf 진�
     }
   })
 })
+
+describe('미션 HUD 는 경기 칸 run.game 을 그린다 — 점수판 0xb69b0 · 이닝 st[0x6b] · 공격 측 st[9]', () => {
+  it('자동진행 반 이닝 득점이 든 점수 · 넘어간 이닝', () => {
+    const mission = MISSIONS.find((candidate) => candidate.side === '타자')!
+    const start = startMission(mission)
+    const human = start.mission.humanSide
+    const scores: [number, number] = [start.game.scores[0], start.game.scores[1]]
+    scores[human === 0 ? 1 : 0] += 3
+    const run = { ...start, game: { ...start.game, inning: start.game.inning + 1, scores } }
+    render(
+      <MissionPlayScreen
+        run={run}
+        ability={ROOKIE_BATTER_ABILITY}
+        pitcherAbility={DEFAULT_PITCHER_ABILITY}
+        opponent={null}
+        atBat={createAtBat()}
+        isPaused={false}
+        bannerText=""
+        random={createSeededRandom(1)}
+        onPitchResolved={vi.fn()}
+        onGiveUp={vi.fn()}
+        onFinish={vi.fn()}
+        onSteal={vi.fn()}
+      />,
+    )
+    expect(stageProps.last?.hud).toMatchObject({
+      inning: run.game.inning + 1,
+      ourScore: scores[human],
+      opponentScore: scores[human === 0 ? 1 : 0],
+    })
+  })
+})
