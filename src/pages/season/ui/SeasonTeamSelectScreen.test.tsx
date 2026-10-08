@@ -120,3 +120,16 @@ describe('이름 입력 0xc8 (키 0xbc44)', () => {
     expect(이름칸().value).toBe('ABC')
   })
 })
+
+describe('이름 입력 0xc8 그림 0xba28 — mode_ui 프레임 3 박스', () => {
+  it('노랑 테두리 (29,183,113,17) · 이름 글 (62,187) · 입력 방식 칸 (121,185,14,14)', () => {
+    render(<SeasonTeamSelectScreen onChoose={vi.fn()} onExit={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: TEAMS[0].name }))
+
+    const 자리 = (element: HTMLElement) => [element.style.left, element.style.top, element.style.width, element.style.height]
+    expect(자리(screen.getByTestId('이름-테두리'))).toEqual(['29px', '183px', '113px', '17px'])
+    expect(자리(screen.getByTestId('이름-입력방식'))).toEqual(['121px', '185px', '14px', '14px'])
+    const 글칸 = screen.getByLabelText('이름') as HTMLElement
+    expect([글칸.style.left, 글칸.style.top]).toEqual(['62px', '187px'])
+  })
+})

@@ -6,6 +6,8 @@ import { MAXIMUM_NAME_BYTES, nameByteLengthOf } from '@/entities/career/model/pl
 import { TeamSelectScreen } from '@/pages/create-player/ui/TeamSelectScreen'
 import { nameWithoutLastChar } from '@/pages/create-player/lib/registerKeys'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
+import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
+import { INFO_BOARD } from '@/pages/management/lib/basicInfoLayout'
 
 /** 0xca 에서 고를 수 있는 칸의 끝 — 칸 > 9(히든 팀 10~14)는 힌트만 띄운다 (0x8e06 `cmp r3, #9`) */
 const LAST_PICKABLE_TEAM = 9
@@ -89,6 +91,17 @@ const DECIDE_QUESTION = ORIGINAL_MODE_TEXT[2] ?? ''
 /** [3] "한글 4글자, 영문 8글자 까지 입력할 수 있습니다" — 그림 0xba28 끝이 아래 안내줄(0x55545)에 건다 */
 const NAME_LIMIT_GUIDE = ORIGINAL_MODE_TEXT[3] ?? ''
 
+/** mode_ui 프레임 3 박스 1 (30,184,25,15) ∪ 박스 2 (60,184,81,15) 를 (−1, −1, +2, +2) — 0xbaa0~0xbac0 */
+const NAME_FRAME = { x: 29, y: 183, width: 113, height: 17 } as const
+/** 박스 2 + (2, 3) — 0xbb26 · 0xbb28 */
+const NAME_TEXT = { x: 62, y: 187 } as const
+/** 박스 2 의 (x + w − 0x14, y + 1, 14, 14) — 0xbb32~0xbb4a */
+const MODE_BOX = { x: 121, y: 185, width: 14, height: 14 } as const
+/** 0x1400748(0xff, 0xff, 0) — 테두리 · 이름 글 */
+const NAME_COLOR = 'rgb(255, 255, 0)'
+/** 0x1400748(0x2e, 0x94, 0x46) — 입력 방식 칸 */
+const MODE_BOX_COLOR = 'rgb(46, 148, 70)'
+
 interface SeasonTeamNameScreenProps {
   readonly teamId: number
   readonly onConfirm: (name: string) => void
@@ -106,7 +119,21 @@ interface SeasonTeamNameScreenProps {
  * ```
  * 원본 입력기(자판 여러 번 누르기 · 좌우 −3/−4 로 입력 방식 넷을 돈다)는 웹 글 칸으로 대신하고 CP949 8바이트
  * (한글 2 · 그 밖 1, `nameByteLengthOf`)로 자른다.
- * ⚠️ 그림 0xba28 의 창·글 칸 좌표는 그림 자료(gfx+0xc8)에서 오는데 풀지 못했다 — 자리는 **근사**다.
+ *
+ * **그림 0xba28** (직접 떴다) — 자리는 `[[장면+0xc8]+0xc]+8` 의 +0xc = **mode_ui 프레임 3**(구단정보 정보 칸 판과 같은 프레임)의 박스다:
+ * ```
+ * ba3a  창+0x14c = 0 · 0x7ba44(창) 카드 · 창+0x28 = 1 · 0x7c450(창) 정보 칸   ; 창+0x24 = 고른 팀(진입 0xb8fc b95a)
+ * ba74  박스 1 (30,184,25,15) ∪ 박스 2 (60,184,81,15) = (30,184,111,15) → (−1, −1, +2, +2) = (29,183,113,17)
+ *       0xba015(…, 1, (0xff, 0xff, 0))                   ; 노랑 테두리(둥글기 1)
+ * baf8  박스 2 → 0x677d5(입력기, x + 2, y + 3, 글꼴, (0xff, 0xff, 0), 1, 0x11, 0)   ; 이름 글 (62, 187) 노랑
+ * bb32  (x + w − 20, y + 1, 14, 14) = (121, 185, 14, 14) · 0xba0bd(…, 1, (0x2e, 0x94, 0x46))   ; 입력 방식 칸 초록 칠
+ *       0x676f9(입력기, 123, 187, …)                     ; 입력 방식 글
+ * bb92  mode_ui 프레임 24(빨간 ◀ 5×8)를 그 칸에 0xb9e05(…, 0x21, 0, 0, −폭) · (…, 0x24, 0x11, 0, 2 × 폭)   ; 좌우 화살표
+ * bbda  0x55545([this+0xa8], StrMODE[3]) 안내 줄 · 0x7f4ed 머리띠
+ * ```
+ * ⚠️ 미해결(근사): 카드 0x7ba44 · 정보 칸 0x7c450 은 창+0x28 = 1(단장 줄 글을 안 쓴다)로 그리는데, 그때 시즌 레코드(SR)는 아직
+ * 0xcc 초기화 전이라 줄 값의 출처를 못 정했다 — 웹은 팀 이름만 적는다. 입력 방식 글 · 화살표 기준점(0x21 / 0x24) · 안내 줄 0x55545 의
+ * 자리도 못 풀었다(웹 글 칸은 입력 방식이 없다).
  */
 function SeasonTeamNameScreen({ teamId, onConfirm, onBack }: SeasonTeamNameScreenProps) {
   const [name, setName] = useState('')
@@ -135,12 +162,33 @@ function SeasonTeamNameScreen({ teamId, onConfirm, onBack }: SeasonTeamNameScree
 
   return (
     <RawScreen>
+      {/* 공통 앞그림 0xb810 — 0xc8 은 0xdd · 0xe0 · 0xe1 밖이라 공 무늬를 먼저 깐다 */}
+      <SkinBackdrop kind="공무늬" />
+      {/* 정보 칸 0x7c450 의 판 — mode_ui 프레임 3 박스 0 (구단정보 0xd5 와 같은 판) */}
+      <div data-testid="이름-판" style={{
+        position: 'absolute', left: INFO_BOARD.x, top: INFO_BOARD.y, width: INFO_BOARD.width, height: INFO_BOARD.height,
+        background: INFO_BOARD.color,
+      }} />
       <div style={{ position: 'absolute', left: 40, top: 80, width: 160, textAlign: 'center' }}>
         {TEAMS[teamId]?.name ?? ''}
       </div>
+      {/* 0xba015 — 박스 1 ∪ 박스 2 를 1 넓힌 노랑 테두리 (둥글기 1) */}
+      <div data-testid="이름-테두리" style={{
+        position: 'absolute', left: NAME_FRAME.x, top: NAME_FRAME.y, width: NAME_FRAME.width, height: NAME_FRAME.height,
+        boxSizing: 'border-box', border: `1px solid ${NAME_COLOR}`, borderRadius: 1,
+      }} />
+      {/* 0xba0bd — 입력 방식 칸 (박스 2 오른쪽 끝 − 20, +1, 14 × 14) 초록 칠 */}
+      <div data-testid="이름-입력방식" style={{
+        position: 'absolute', left: MODE_BOX.x, top: MODE_BOX.y, width: MODE_BOX.width, height: MODE_BOX.height,
+        background: MODE_BOX_COLOR, borderRadius: 1,
+      }} />
       <form onSubmit={(event) => event.preventDefault()}>
         <TextField value={name} autoFocus aria-label="이름"
-          style={{ position: 'absolute', left: 60, top: 100, width: 120, height: 18 }}
+          // 0x677d5 — 박스 2 의 (x + 2, y + 3) 에 노랑 글. 입력 방식 칸 앞까지
+          style={{
+            position: 'absolute', left: NAME_TEXT.x, top: NAME_TEXT.y, width: MODE_BOX.x - NAME_TEXT.x, height: 12,
+            padding: 0, border: 0, background: 'transparent', color: NAME_COLOR,
+          }}
           onChange={(event) => {
             if (nameByteLengthOf(event.target.value) <= MAXIMUM_NAME_BYTES) setName(event.target.value)
           }} />
