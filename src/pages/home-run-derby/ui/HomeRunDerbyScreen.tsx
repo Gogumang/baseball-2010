@@ -239,6 +239,8 @@ export function HomeRunDerbyScreen({
             isResultBackdrop={isResultShown}
             // HOMERUN 글자는 판의 홈런 틱에 더비 칸(0x5279a — 단계만 0)으로 켠다. 타석 임시 결과로는 안 켠다
             homeRunText={session.homeRunText}
+            // 키 건너뛰기 0x519cc · 판 끝 0x35108 이 파티클을 치운다 — 홈런 효과 굴림은 타석 화면이 글자 창대로 돈다
+            effectsClearedAt={session.effectsClearedAt}
             random={random}
             onPitchResolved={(detail) => session.onPitchResolved(detail)}
           />

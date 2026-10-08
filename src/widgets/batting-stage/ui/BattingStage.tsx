@@ -144,6 +144,12 @@ interface BattingStageProps {
    * 키 건너뛰기(0x519cc 의 +0x1960 = 0)에서 끝을 넘긴다.
    */
   readonly homeRunText?: HomeRunTextWindow | null
+  /**
+   * **효과를 치운 시각** (`performance.now()` ms) — 키 건너뛰기 0x519cc(효과 객체 칸 버리기 0x8fc70 · 파티클 0x6dee4)나
+   * 0x17 끝 0x35108(0x6dee4)이 돈 때. 이 시각 뒤 첫 틱 프레임 머리에서 파티클 장면을 비우고 홈런 효과 객체를 버린다
+   * (`lib/homeRunEffects`). 값이 바뀔 때마다 한 번씩. 안 넘기면 치우지 않는다.
+   */
+  readonly effectsClearedAt?: number | null
   readonly random: RandomPort
   /**
    * **고른 필살타법 번호** (선수 레코드 +0x18, 1~4). 레벨(+0x201)이 아니다 — 경기는 이 번호만 본다

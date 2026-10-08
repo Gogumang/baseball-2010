@@ -92,6 +92,8 @@ export interface StageLatest {
   readonly isResultBackdrop?: boolean
   /** 부르는 쪽이 모는 HOMERUN 글자 창 — `BattingStage` 의 같은 이름 props 주석 참고 */
   readonly homeRunText?: HomeRunTextWindow | null
+  /** 효과를 치운 시각 — `BattingStage` 의 같은 이름 props 주석 참고 */
+  readonly effectsClearedAt?: number | null
   /** 결과 창 뒤 배경의 틱별 +0x17e2 — `BattingStage` 의 같은 이름 props 주석 참고 */
   readonly resultBackdropOffsetOf?: (tick: number) => number
   readonly random: RandomPort

@@ -55,6 +55,9 @@ import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
  * ## 웹 — 이 파일은 칸 기계만 (`initHomeRunFireworks` · `tickHomeRunFireworks`)
  * 파티클 자리(`FireworksParticlePort`)는 부르는 쪽이 파티클 장면으로 잇는다 — 틱은 0x40b18 이 유지 단계를 그린 그림마다,
  * 파티클 틱은 그 그림 뒤 프레임 끝(0x53048 → 0x6de84)이다.
+ * 붙인 곳: 홈런더비(타석 화면 — widgets/batting-stage `homeRunEffects` 가 글자 창대로). ⚠️ 일반 · 팀 · 투수 모드의 홈런은 원본이 0x17
+ * 화면(야수 시점)에서 글자 · 효과를 그리는데, 웹 0x17 홈런 재생(features/defense-play `homeRunPlayback`)은 구보 속도가 근사라 관문이
+ * 닫히는 틱(글자 창의 끝)을 원본대로 낼 수 없고 그 화면엔 난수 · 파티클이 없어 아직 안 붙였다.
  */
 
 /** 원본 화면 크기 — 0x14008b8 · 0x14008c8 */

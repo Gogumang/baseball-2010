@@ -13,7 +13,9 @@ import { renderBattingStage } from '@/widgets/batting-stage/lib/renderBattingSta
 import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
 import { batterFrameNow, pitchSituationOf } from '@/widgets/batting-stage/lib/stageText'
 import { ballFrameAt, pitchTickAt } from '@/widgets/batting-stage/model/stageRefs'
-import { clearParticles, tickParticles } from '@/entities/particle/model/particleScene'
+import { clearParticles } from '@/entities/particle/model/particleScene'
+import { NO_STAGE_EFFECTS, stepStageFrame } from '@/widgets/batting-stage/lib/homeRunEffects'
+import { particleConfigOf } from '@/widgets/particles/lib/particleCatalog'
 import { homeRunTextFrameAt } from '@/widgets/batting-stage/lib/homeRunBanner'
 import { preloadPtcParts } from '@/widgets/particles/lib/renderParticles'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
@@ -197,6 +199,8 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
      */
     let particleTick = 0
     const PARTICLE_CATCH_UP_LIMIT = 4
+    /** 홈런 효과 객체 [0x1400064] — 글자 창(`homeRunText`)이 몬다 (`lib/homeRunEffects`) */
+    let stageEffects = NO_STAGE_EFFECTS
     /** 결과 창 뒤 배경(`isResultBackdrop`)으로 바뀐 시각 — 그때부터 +0x17e2 를 센다. 타석이면 null */
     let backdropStartedAt: number | null = null
 
@@ -222,8 +226,18 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
       const nowTick = pitchTickAt(now, openedAt, tickLength)
       if (particleTick === 0) particleTick = nowTick
       const steps = isBackdrop ? 0 : Math.min(PARTICLE_CATCH_UP_LIMIT, nowTick - particleTick)
+      // 틱마다 원본 프레임 차례 — (치우기) → (홈런 효과 깔기) → 글자 유지 그림의 효과 틱 0x40faa → 파티클 틱 0x6de84
+      const firstSteppedTick = nowTick - steps
       for (let step = 0; step < steps; step += 1) {
-        tickParticles(particlesRef.current, latestRef.current.random)
+        stageEffects = stepStageFrame(stageEffects, {
+          time: openedAt + (firstSteppedTick + step + 1) * tickLength,
+          millisecondsPerTick: tickLength,
+          window: latestRef.current.homeRunText ?? null,
+          effectsClearedAt: latestRef.current.effectsClearedAt ?? null,
+          particles: particlesRef.current,
+          random: latestRef.current.random,
+          configOf: particleConfigOf,
+        })
       }
       particleTick = nowTick
 

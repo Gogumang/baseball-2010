@@ -174,6 +174,11 @@ export interface HomeRunDerbySession {
   /** 지금 돌고 있는 더비 판의 비거리 판(0x36cd4). 판이 없으면 null */
   readonly distanceBoard: DerbyDistanceBoard | null
   /**
+   * 타석 화면에 넘길 **효과를 치운 시각**(`BattingStage` 의 `effectsClearedAt`) — 키 건너뛰기 0x519cc(효과 객체 칸 0x8fc70 ·
+   * 파티클 0x6dee4)의 키 틱, 0x17 끝 0x35108(0x351e2 의 0x6dee4)의 판 끝. 없으면 null
+   */
+  readonly effectsClearedAt: number | null
+  /**
    * 판(0x17)이 도는 동안 받은 키 — 0x17 키 처리 0x53420 이 키마다 보내는 메시지 0x587 → 0x519cc (`skipDerbyBattedBall` 머리말).
    * 홈런 틱 다음부터 판 끝 전까지만 효과가 있다: 공 틱을 끝으로 넘겨 다음 틱에 관문을 닫고(판 끝 = 키 틱 + 1 + 10),
    * HOMERUN 글자를 끈다. ⚠️ 같은 처리의 소리 멈춤 0x6e418 은 소리 포트에 멈춤이 없어 안 옮겼다(shared — 구역 밖).
@@ -213,6 +218,7 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
   const [shownCombo, setShownCombo] = useState<number | null>(null)
   const [result, setResult] = useState<DerbyResult | null>(null)
   const [homeRunText, setHomeRunText] = useState<HomeRunTextWindow | null>(null)
+  const [effectsClearedAt, setEffectsClearedAt] = useState<number | null>(null)
   const [distanceBoard, setDistanceBoard] = useState<DerbyDistanceBoard | null>(null)
   /** 장면의 글자 칸(+0x1961~+0x196a) — 더비는 앞 연출이 남긴 셈에서 이어 센다. 장면을 새로 세우면(다시하기) 0 */
   const homeRunTextSceneRef = useRef<HomeRunTextState>(HOME_RUN_TEXT_SCENE_START)
@@ -384,7 +390,8 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
     // 판 안 소리 — 홈런 갈래 0x527c4 의 11 · 파울 공 낙구 0x5284a 의 25 "Foul!"(즉시, 그 공 틱에)
     // ⚠️ 근사(때): 공 틱 0 을 이 자리(타석 화면이 상태 0x13 을 지나 판을 넘긴 때)로 센다
     // HOMERUN 글자(0x5279a~0x527ac)는 판의 홈런 틱에 켜고(`derbyHomeRunTextOf`), 비거리 판(0x36cd4)은 판 내내 띄운다.
-    // ⚠️ 0x90191(…, 2, 1) 홈런 효과 객체(알갱이 7 · 난수)는 아직 안 옮겼다 — entities/batting `homeRunFireworks` 머리말
+    // 0x90191(…, 2, 1) 홈런 효과 객체(알갱이 7 · 난수)는 글자 창의 첫 그림(홈런 틱)에 타석 화면이 깔고, 유지 단계 그림마다 굴린다
+    // (widgets/batting-stage `homeRunEffects`). ⚠️ 근사(때): 파티클 · 효과 틱은 타석 화면이 rAF 로 도는 틱이라 탭이 쉬면 밀린다
     clearPlaySoundTimers()
     const startedAt = performance.now()
     if (batted !== null) {
@@ -473,6 +480,8 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
     clearTimer()
     timerRef.current = window.setTimeout(() => {
       timerRef.current = null
+      // 0x17 끝 0x35108 — 판(맞은 공)이었으면 파티클을 치운다(0x351e2 → 0x6dee4). 맞지 않은 공(0x12)은 0x17 을 안 지난다
+      if (playRef.current !== null) setEffectsClearedAt(performance.now())
       playRef.current = null
       setBanner('')
       setIsEventZoneShown(false)
@@ -519,6 +528,8 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
     const skipped = skipDerbyBattedBall(play.batted, keyTick)
     if (skipped === play.batted) return
     playRef.current = { ...play, batted: skipped }
+    // 0x519cc — 키 틱 프레임 머리에서 효과 객체 칸을 버리고(0x8fc70) 파티클을 치운다(0x6dee4)
+    setEffectsClearedAt(play.startedAt + keyTick * millisecondsPerFrame())
     // 키 틱의 홈런 갈래(폴 뒤 담장선)는 그대로 돌고, 그 뒤 틱의 소리는 없다
     clearPlaySoundTimers()
     schedulePlaySounds(skipped, play.startedAt, keyTick)
@@ -584,6 +595,7 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
     result,
     homeRunText,
     distanceBoard,
+    effectsClearedAt,
     skipHomeRun,
     onPitchResolved,
     restart,

@@ -76,7 +76,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
  * - 0x90191([0x1400064], 2, 1) 뒤 +8 = +9 = 1 (0x527b4~0x527c0): 장면 효과 객체(0x90190 → 0x8fe58)를 **종류 2(알갱이 칸 7)** 로 다시
  *   깔고 켠다 — 일반 홈런 0x51d1e 와 같은 홈런 효과다(0x4f4d8 은 홈런이 아니라 경기 정산 0x4ea0c 갈래다 — entities/batting
  *   `homeRunFireworks` 머리말). 틱 0x901a0 은 0x40b18 이 **HOMERUN 글자 유지 단계(+0x1961 ≥ 4)를 그린 뒤**(0x40faa)에만 부른다.
- *   ⚠️ 미이식(난수): 알갱이 틱 · 파티클 굴림은 `homeRunFireworks` 머리말의 미해결 때문에 아직 진행기에 안 붙였다.
+ *   타석 화면이 글자 창의 첫 그림에 깔고 유지 그림마다 굴린다(widgets/batting-stage `homeRunEffects` — 파티클 틱과 같은 rAF 틱).
  * - 관문 0xb0d28: 파울 표시 +0x110 · 사건 코드 11 · 주자 · 아웃 갈래는 사건이 없어 안 서고, +0x125 갈래가 공.vt18(멈춤)에서 닫는다.
  *   공 틱은 0x3f060 이 관문이 열려 있을 때만 올리므로(0x3f3b2 → 0xa2594) 위 갈래는 t = 1 … (처음 멈춘 틱 − 1)에서 돈다.
  *   닫힌 뒤 529f0 이 +0x1094 10틱 → 0xbb9 → 52a52 0xae3e8 모드 7 갈래(`applyDerbyPitch`).
