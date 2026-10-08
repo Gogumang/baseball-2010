@@ -678,7 +678,7 @@ export function startPlayerOutcome(
     }
     // ⚠️ 패턴 없이 들어온 홈런(시험·옛 호출)은 날아가는 그림만 따로 만든다 — 점수는 타석 쪽 규칙(전원 득점)이다
     const playback =
-      homeRunPlaybackOf({ outcome, bases: progress.game.bases, pattern: options.pattern }) ?? arrival?.result ?? null
+      homeRunPlaybackOf({ outcome, bases: progress.game.bases, outs: progress.game.outs, pattern: options.pattern }) ?? arrival?.result ?? null
     return finishPlayerOutcome(withoutSteal(progress), outcome, random, null, playback)
   }
   // ⚠️ 패턴 없이 들어온 안타·아웃(시험·옛 호출) — 원본에 없는 길이다. 결과에 맞는 패턴을 원본 표에서 골라 판을 돌린다
@@ -764,7 +764,7 @@ export function resolveBenchClearing(
   if (pending === null) return progress
   if (scene.reachedTargetTick) rollBenchClearingTargets(random)
   const cleared = { ...progress, pendingBenchClearing: null }
-  const playback = homeRunPlaybackOf({ outcome: pending.outcome, bases: cleared.game.bases })
+  const playback = homeRunPlaybackOf({ outcome: pending.outcome, bases: cleared.game.bases, outs: cleared.game.outs })
   return finishPlayerOutcome(cleared, pending.outcome, random, null, playback)
 }
 

@@ -1265,7 +1265,7 @@ function finishNonPlayOutcome(
   random: RandomPort,
 ): PitcherGameProgress {
   // 내가 던진 타석이면 홈런도 날아가는 그림을 보여 준다 — 득점·주자는 아래 길이 그대로 정한다
-  const playback = homeRunPlaybackOf({ outcome, bases: progress.game.bases })
+  const playback = homeRunPlaybackOf({ outcome, bases: progress.game.bases, outs: progress.game.outs })
   return advance(
     applyDefensivePlay(progress, outcome, true, progress.atBat.balls, null, playback),
     random,

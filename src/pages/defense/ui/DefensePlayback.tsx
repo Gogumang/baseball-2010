@@ -199,9 +199,8 @@ function stepRecordedBoard(
 /**
  * 미리 계산해 둔 틱을 차례대로 보여 주기만 한다 — 지금까지의 그 갈래 그대로다.
  *
- * ⚠️ **펌블 소리 53 은 여기서 내지 않는다.** 이 갈래로 오는 것은 홈런 비행(`homeRunPlayback`)뿐이고
- * (`app/ui/GameRoute` · `TeamGameScreen` · `PitcherGameScreen` 셋 다 `play.ticks` 는 홈런 재생이다),
- * 그 틱 묶음은 진행기를 돌리지 않아 펌블 자체가 없다. 화면 스냅샷(`DefenseViewState`)에는
+ * ⚠️ **펌블 소리 53 은 여기서 내지 않는다.** 이 갈래로 오는 타구 판은 패턴 없이 온 홈런의 재생(`homeRunPlayback` — 시험·옛 호출)뿐이고
+ * (그 밖은 견제 · 도루 · 폭투 판), 그 판은 난수 없이 돌려 펌블 굴림 자체가 없다. 화면 스냅샷(`DefenseViewState`)에는
  * 펌블 동작(0xd)도 `fumbled` 칸도 실려 오지 않으므로 여기서는 알 길도 없다.
  * 두 갈래는 `input` 이 있으면 실시간, 없으면 재생으로 **서로 배타**라 겹쳐 울릴 일도 없다.
  */

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { homeRunPlaybackOf } from '@/features/defense-play/model/homeRunPlayback'
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { createAtBat } from '@/entities/at-bat/model/atBatState'
@@ -185,12 +186,13 @@ describe('사람이 치는 타석', () => {
 
     const play = after.lastDefensePlay
     expect(play).not.toBeNull()
-    expect(play!.ticks.length).toBeGreaterThanOrEqual(40)
-    expect(play!.ticks.length).toBeLessThanOrEqual(80)
+    // 원본처럼 같은 수비 판을 돈 틱이다 (`homeRunPlayback`)
+    expect(play!.ticks).toEqual(
+      homeRunPlaybackOf({ outcome: { kind: '홈런' }, bases: progress.game.bases, outs: progress.game.outs })!.ticks,
+    )
     // 주자 없는 홈런은 1점 — 재생을 붙였다고 점수가 달라지면 안 된다
     expect(after.game.ourScore).toBe(progress.game.ourScore + 1)
-    const 마지막 = play!.ticks[play!.ticks.length - 1]
-    expect(마지막.runners.every((runner) => runner.base === 0)).toBe(true)
+    expect(play!.runnerFates.every((fate) => fate.scored)).toBe(true)
   })
 })
 

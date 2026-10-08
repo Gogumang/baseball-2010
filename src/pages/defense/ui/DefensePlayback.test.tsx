@@ -9,6 +9,7 @@ import { representativePatternOf } from '@/features/defense-play/model/represent
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayInput, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import type { BaseState } from '@/entities/game/model/baseState'
+import { basePosition } from '@/entities/fielding/model/fieldGeometry'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 import { setActiveSound } from '@/shared/api/audio/soundPort'
@@ -318,9 +319,12 @@ describe('수비 장면 득점 점수판 0x41a64 — 판이 끝난 뒤 · 재생
   it('재생 갈래 — 타자주자가 홈을 밟으면 판이 서고 공격 쪽 점수가 1점씩 올라간다 (마지막 틱 = 플레이 끝이면 내린다)', async () => {
     const { homeRunPlaybackOf } = await import('@/features/defense-play/model/homeRunPlayback')
     const 홈런 = homeRunPlaybackOf({ outcome: { kind: '홈런', bases: 4 } as AtBatOutcome, bases: 주자3루 })!
-    const last = 홈런.ticks[홈런.ticks.length - 1]!
-    // 원본 0x17 이 홈인 뒤에도 이어지는 경우를 흉내 낸다 — 마지막 그림을 60 틱 더 붙인다
-    const ticks = [...홈런.ticks, ...Array.from({ length: 60 }, () => last)]
+    // 판의 마지막 그림은 틱 머리라 타자주자가 홈을 한 걸음 앞둔 그림이다 — 그 틱 끝(홈인 뒤) 자리로 옮긴 그림을 만들고,
+    // 원본 0x17 이 홈인 뒤에도 이어지는 경우를 흉내 내 62 틱 더 붙인다 — 첫 장이 홈인 틱, 마지막 장이 플레이 끝
+    const 머리 = 홈런.ticks[홈런.ticks.length - 1]!
+    const 홈 = basePosition(0)
+    const last = { ...머리, runners: 머리.runners.map((runner) => ({ ...runner, x: 홈.x, z: 홈.z })) }
+    const ticks = [...홈런.ticks, ...Array.from({ length: 62 }, () => last)]
     vi.useFakeTimers()
     try {
       const onDone = vi.fn()
@@ -338,7 +342,7 @@ describe('수비 장면 득점 점수판 0x41a64 — 판이 끝난 뒤 · 재생
       expect(shown[0]).toBe('0')
       expect(shown).toContain('1')
       expect(shown[shown.length - 1]).toBe('2')
-      // 21 + 20 + 20 번 — 붙인 60 틱과 홈인 틱 안에서 끝 틱(플레이 끝)은 그리지 않는다
+      // 21 + 20 + 20 번 — 홈인 틱부터 세고 끝 틱(플레이 끝)은 그리지 않는다
       expect(shown).toHaveLength(61)
     } finally {
       vi.useRealTimers()

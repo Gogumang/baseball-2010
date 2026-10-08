@@ -2009,7 +2009,7 @@ export function startBatterOutcome(
     // ⚠️ 패턴 없이 들어온 홈런(시험·옛 호출)은 날아가는 그림만 따로 만든다 — 점수는 타석 쪽 규칙(전원 득점)이다.
     // 이 공이 연 도루·폭투 판이 있으면 그 판을 재생 칸에 남긴다
     const playback =
-      homeRunPlaybackOf({ outcome, bases: progress.game.bases, pattern: options.pattern }) ?? arrival?.result ?? null
+      homeRunPlaybackOf({ outcome, bases: progress.game.bases, outs: progress.game.outs, pattern: options.pattern }) ?? arrival?.result ?? null
     return finishBatterOutcome(progress, outcome, random, null, playback)
   }
   // ⚠️ 패턴이 없으면(시험·옛 호출 — 원본에 없는 길) 결과에 맞는 패턴을 원본 표에서 골라 쓴다 (`fixturePatternFor`).
@@ -2037,7 +2037,7 @@ export function resolveBenchClearing(
   if (scene.reachedTargetTick) rollBenchClearingTargets(random)
   const cleared: TeamGameProgress = { ...progress, pendingBenchClearing: null }
   if (pending.side === '공격') {
-    const playback = homeRunPlaybackOf({ outcome: pending.outcome, bases: cleared.game.bases })
+    const playback = homeRunPlaybackOf({ outcome: pending.outcome, bases: cleared.game.bases, outs: cleared.game.outs })
     return finishBatterOutcome(cleared, pending.outcome, random, null, playback)
   }
   // 사구는 인플레이가 아니라 수비 화면 없이 곧장 끝난다
@@ -2559,7 +2559,7 @@ function startDefensiveAtBat(
       return finishDefensiveAtBat(progress, outcome, mine, arrival.result, arrival.result)
     }
     // 내가 던진 타석이면 홈런도 날아가는 그림을 보여 준다 (자동으로 넘긴 타석은 재생 자체가 없다)
-    const playback = mine ? homeRunPlaybackOf({ outcome, bases: progress.game.bases }) : null
+    const playback = mine ? homeRunPlaybackOf({ outcome, bases: progress.game.bases, outs: progress.game.outs }) : null
     return finishDefensiveAtBat(progress, outcome, mine, null, playback)
   }
   // ⚠️ 패턴이 없으면(시험·옛 호출 — 원본에 없는 길) 결과에 맞는 패턴을 원본 표에서 골라 쓴다 (`fixturePatternFor`).

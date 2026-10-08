@@ -22,7 +22,7 @@ import { BATTED_BALL_PATTERNS, type BattedBallPattern } from '@/shared/config/or
  * 그때 기록은 판 결과를 따른다(넘겨받은 결과가 아니다).
  *
  * `직선타아웃` 은 정산이 내지 않는 웹 갈래라(원본은 뜬공·땅볼을 가르지 않는다) `뜬공아웃` 패턴을 준다.
- * 홈런은 판을 안 돌리고 날아가는 그림만 만드는 옛 길(`homeRunPlayback`)이 받으므로 여기서는 담장을 먼저 넘는 첫 패턴이다.
+ * 패턴 없이 온 홈런(`homeRunPlayback`)도 이 패턴으로 같은 판을 돌려 재생거리를 만든다 — 판 끝 정산이 홈런을 내는 첫 패턴이다.
  */
 export function fixturePatternFor(outcome: AtBatOutcome): BattedBallPattern {
   const key = keyOf(outcome)

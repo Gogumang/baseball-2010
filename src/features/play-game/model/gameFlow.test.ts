@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { homeRunPlaybackOf } from '@/features/defense-play/model/homeRunPlayback'
 import {
   applyPlayerOutcome,
   cpuPickoff,
@@ -264,15 +265,13 @@ describe('사람 타석은 수비 시뮬레이션을 돌린다 — CPU 간이 �
 
     const play = after.lastDefensePlay
     expect(play).not.toBeNull()
-    // 다른 타구(땅볼 31 · 뜬공 37~45 · 3루타 72틱)와 비슷한 길이여야 스쳐 지나가지도 지루하지도 않다
-    expect(play!.ticks.length).toBeGreaterThanOrEqual(40)
-    expect(play!.ticks.length).toBeLessThanOrEqual(80)
+    // 원본처럼 같은 수비 판을 돈 틱이다 — 결과에 맞는 원본 패턴 · 원본 구보 속도 · 관문이 닫힌 틱까지 (`homeRunPlayback`)
+    expect(play!.ticks).toEqual(homeRunPlaybackOf({ outcome: { kind: '홈런' }, bases: 만루, outs: 0 })!.ticks)
     // 만루 홈런은 4타점 — 재생을 붙였다고 점수 계산이 달라지면 안 된다
     expect(after.myStats.runsBattedIn).toBe(4)
-    // 마지막 틱에는 타자주자까지 넷 모두 홈에 서 있다
-    const 마지막 = play!.ticks[play!.ticks.length - 1]
-    expect(마지막.runners).toHaveLength(4)
-    expect(마지막.runners.every((runner) => runner.base === 0)).toBe(true)
+    // 타자주자까지 넷 모두 판에 실려 홈까지 돈다
+    expect(play!.ticks[play!.ticks.length - 1].runners).toHaveLength(4)
+    expect(play!.runnerFates.every((fate) => fate.scored)).toBe(true)
   })
 
   it('깊은 뜬공은 3루 주자를 불러들이고, 얕은 뜬공은 못 불러들인다 (희생플라이 보장 제거)', () => {
