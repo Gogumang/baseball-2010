@@ -25,7 +25,7 @@ import {
   specialSwingRemainingAt,
   substitutionDetailAbilities,
 } from '@/features/play-team-game/model/teamGameFlow'
-import { GameEndBoard } from '@/widgets/game-scene/ui/GameEndBoard'
+import { endBoardLineScoreOf, GameEndBoard } from '@/widgets/game-scene/ui/GameEndBoard'
 import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
 import { teamHalfInningCardsOf } from '@/pages/team-game/lib/teamHalfInningCards'
 import { runScoreBoardSourceOf } from '@/pages/defense/lib/runScoreBoard'
@@ -493,6 +493,8 @@ export function TeamGameScreen({
         side1Score={ourSide === 1 ? game.ourScore : game.opponentScore}
         names={[names.win, names.loss, names.save]}
         scoreboardSides={scoreboardSides}
+        // 503d8 — 이닝별 점수판 0x41c18 (득점 0xb6a9c 가 쌓은 칸)
+        lineScore={endBoardLineScoreOf(game, ourSide === 0 ? [options.ourTeamId, options.opponentTeamId] : [options.opponentTeamId, options.ourTeamId])}
         onConfirm={() => {
           setEndBoardClosed(true)
           // 정산 0x19 진입 — 승리 31 · 패배 32 징글 (0x4ea0c). 같은 진입이 +0x4c+모드 를 지운다(0x4f3d6)

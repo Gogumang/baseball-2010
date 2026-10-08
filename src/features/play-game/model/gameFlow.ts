@@ -8,6 +8,7 @@ import { specialSwingCountOf } from '@/entities/batting/model/specialSwing'
 import {
   applyAtBatOutcome,
   applyOpponentInning,
+  lineScoreSlotsOf,
   createGame,
   endSituationOf,
   isGameOverAt,
@@ -1765,6 +1766,12 @@ function changeOpponentPitcher(progress: GameProgress, random: RandomPort): Game
   )
 }
 
+/** 경기 끝 판 0x4fe9c 503d8 의 이닝별 점수판 값 (합은 판이 점수에서 읽는다) */
+function endLineScoreOf(game: GameState): NonNullable<GameSummary['lineScore']> {
+  const slots = lineScoreSlotsOf(game)
+  return { inning: slots.inning, offenseSide: slots.offenseSide, inningRuns: slots.inningRuns }
+}
+
 /** 측별 지금 마운드 투수 칸 — 승·패·세 칸이 "그 순간 마운드에 선 투수" 로 적는다 */
 function moundsOf(progress: GameProgress): MoundBySide {
   return { our: progress.ourMound.pitcherSlot, opponent: progress.opponentMound.pitcherSlot }
@@ -2149,6 +2156,8 @@ export function summaryOf(progress: GameProgress): GameSummary {
       (appearance) => appearance.battingOrderIndex !== ACE_BATTER_ROSTER_SLOT,
     ),
     pitchersOfRecord: pitchersOfRecordOf(progress),
+    // 경기 끝 판의 이닝별 점수판 0x41c18 — 득점 0xb6a9c 가 쌓은 칸
+    lineScore: endLineScoreOf(progress.game),
     // 리그 투수 기록 재료 — 투수 줄(상대 마운드의 투구 수를 얹어)과 경기 끝 판정 0xa7de8
     leaguePitchers: {
       lines: chargePitcherLine(progress.pitcherLines, progress.opponentTeamId, progress.opponentMound.pitcherSlot, {

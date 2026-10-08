@@ -9,6 +9,7 @@ import { SCOREBOARD_AT } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLay
 import type { ScoreboardSide } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import { LineScoreBoard } from '@/widgets/line-score/ui/LineScoreBoard'
 import { LINE_SCORE_AT } from '@/widgets/line-score/lib/lineScoreLayout'
+import { lineScoreSlotsOf, type GameState } from '@/entities/game/model/gameState'
 
 /** 이닝별 점수판 0x41c18 의 판 값 — 경기 끝 판이 맨 끝(503d8)에 (14, 252) 로 부른다 */
 export interface GameEndLineScore {
@@ -30,7 +31,7 @@ interface GameEndBoardProps {
   readonly scoreboardSides?: readonly [ScoreboardSide, ScoreboardSide]
   /**
    * 이닝별 점수판 0x41c18(경기, W/2 − 106, H − 57 − 0xb) = (14, 252) — 503d8 이 판 맨 끝에 부른다(합은 8틱에 5틱 깜빡). 안 주면 안 그린다.
-   * ⚠️ 미이식: 나만의리그 · 팀경기 판은 이닝별 칸 st[0x6c..] 을 아직 안 들어 넘기지 않는다.
+   * 나만의리그 타자편(`GameSummary.lineScore`) · 투수편 · 팀경기는 `endBoardLineScoreOf(경기 상태)` 로 넘긴다(칸은 `GameState.inningRuns`).
    */
   readonly lineScore?: GameEndLineScore
   /** OK — 메시지 1(인자 0x18) → 0xae3a0 → 경기 끝이라 **정산 0x19** */
@@ -109,4 +110,10 @@ export function GameEndBoard({ side0Score, side1Score, names, scoreboardSides, l
       </Button>
     </RawScreen>
   )
+}
+
+/** 경기 상태에서 경기 끝 판의 이닝별 점수판 값을 만든다 (`gameState.lineScoreSlotsOf` — 합은 판이 두 점수에서 읽는다) */
+export function endBoardLineScoreOf(game: GameState, sideTeams: readonly [number, number]): GameEndLineScore {
+  const slots = lineScoreSlotsOf(game)
+  return { sideTeams, inning: slots.inning, offenseSide: slots.offenseSide, inningRuns: slots.inningRuns }
 }

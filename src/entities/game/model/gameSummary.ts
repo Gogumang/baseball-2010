@@ -47,6 +47,15 @@ export interface GameSummary {
    * 사람 경기도 CPU 끼리 경기와 같은 0xa8024·0xa7de8 을 지난다. 리그 사람 경기 진행기만 채운다 — **선택 칸**.
    */
   readonly leaguePitchers?: GameLeaguePitchers
+  /**
+   * 경기 끝 판 0x4fe9c(503d8)가 (14, 252) 에 부르는 이닝별 점수판 0x41c18 의 판 값 — st[0x6b] · st[9] · 칸 st[0x6c..](이닝 mod 9).
+   * `gameState.lineScoreSlotsOf`. 사람 경기 진행기만 채운다 — **선택 칸**.
+   */
+  readonly lineScore?: {
+    readonly inning: number
+    readonly offenseSide: 0 | 1
+    readonly inningRuns: readonly [readonly number[], readonly number[]]
+  }
   readonly pitcherStaminas?: {
     readonly ours: readonly number[]
     readonly opponent: readonly number[]

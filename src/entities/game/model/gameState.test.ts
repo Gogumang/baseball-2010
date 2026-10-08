@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  lineScoreSlotsOf,
   applyAtBatOutcome,
   applyOpponentInning,
   isGameOverAt,
@@ -296,5 +297,45 @@ describe('경기 끝 판정 0xb68fc 그대로 (`isGameOverAt`)', () => {
     expect(판정(7, '초', 3, 10, 0)).toBe(false)
     expect(판정(7, '초', 3, 0, 10)).toBe(true)
     expect(판정(6, '말', 3, 0, 20)).toBe(false)
+  })
+})
+
+describe('이닝별 점수 칸 st[0x6c..] — 득점 0xb6a9c · 점수판 0x41c18 (lineScoreSlotsOf)', () => {
+  const 만루 = { first: true, second: true, third: true }
+
+  it('득점은 그 이닝 · 그 측 칸에 쌓이고, 상대 반 이닝은 상대 측 칸에', () => {
+    // 후공(측 1) — 1회초 상대 2점 → 1회말 우리 만루 홈런 4점
+    let game = applyOpponentInning(createGame(0, PLAYER_SIDE_LAST_BAT), 2)
+    game = applyAtBatOutcome({ ...game, bases: 만루 }, { kind: '홈런' })
+    const slots = lineScoreSlotsOf(game)
+    expect(slots).toMatchObject({ inning: 0, offenseSide: 1, totals: [2, 4] })
+    expect(slots.inningRuns[0].slice(0, 2)).toEqual([2, 0])
+    expect(slots.inningRuns[1].slice(0, 2)).toEqual([4, 0])
+  })
+
+  it('칸은 98 이하일 때만 오른다 — 한 이닝 99 점에서 멈춘다', () => {
+    const game = applyOpponentInning(createGame(0, PLAYER_SIDE_LAST_BAT), 120)
+    expect(lineScoreSlotsOf(game).inningRuns[0][0]).toBe(99)
+    expect(lineScoreSlotsOf(game).totals[0]).toBe(99)
+  })
+
+  it('9회를 넘으면 아홉 칸을 이닝 mod 9 로 돌려 쓰고, 보이는 창(지금 − 8 ~ 지금)의 값이 든다', () => {
+    let game: GameState = { ...createGame(0, PLAYER_SIDE_LAST_BAT), inning: 1 }
+    game = applyOpponentInning(game, 1) // 1회초 1점
+    game = { ...game, inning: 11, half: '초' }
+    game = applyOpponentInning(game, 3) // 11회초 3점 — 칸 (10 mod 9) = 1
+    const slots = lineScoreSlotsOf(game)
+    expect(slots.inning).toBe(10)
+    // 창은 3회(2) ~ 11회(10) — 1회 칸(0)은 11회가 아닌 2회 칸 몫이 아니므로 비고, 칸 1 = 11회 3점
+    expect(slots.inningRuns[0][1]).toBe(3)
+    expect(slots.inningRuns[0][0]).toBe(0)
+  })
+
+  it('경기가 끝난 반 이닝의 측이 st[9] 로 남는다 — 9회초에 홈 팀이 앞서 끝나면 말 칸이 안 보이는 측 0', () => {
+    // 선공(측 0)인 우리가 9회초 3아웃 · 홈(상대)이 앞섬
+    let game: GameState = { ...createGame(0, 0), inning: 9, half: '초', outs: 2, opponentScore: 3 }
+    game = applyAtBatOutcome(game, { kind: '삼진' })
+    expect(game.isFinished).toBe(true)
+    expect(lineScoreSlotsOf(game)).toMatchObject({ inning: 8, offenseSide: 0 })
   })
 })

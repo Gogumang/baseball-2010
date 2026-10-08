@@ -45,7 +45,7 @@ import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
 import { pitcherHalfInningCardsOf } from '@/pages/pitching/lib/pitcherHalfInningCards'
 import { runScoreBoardSourceOf } from '@/pages/defense/lib/runScoreBoard'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
-import { GameEndBoard } from '@/widgets/game-scene/ui/GameEndBoard'
+import { endBoardLineScoreOf, GameEndBoard } from '@/widgets/game-scene/ui/GameEndBoard'
 import { humanVsComputerSidesOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import { usePitchEndSerial, useRecordAlert } from '@/widgets/game-scene/model/useRecordAlert'
 import { RecordAlertScreenOverlay } from '@/widgets/game-scene/ui/RecordAlertPanel'
@@ -467,6 +467,13 @@ export function PitcherGameScreen({
         side1Score={ourSide === 1 ? progress.game.ourScore : progress.game.opponentScore}
         names={[names.win, names.loss, names.save]}
         scoreboardSides={scoreboardSides}
+        // 503d8 — 이닝별 점수판 0x41c18 (득점 0xb6a9c 가 쌓은 칸)
+        lineScore={endBoardLineScoreOf(
+          progress.game,
+          ourSide === 0
+            ? [progress.options.ourTeamId, progress.options.opponentTeamId]
+            : [progress.options.opponentTeamId, progress.options.ourTeamId],
+        )}
         onConfirm={() => {
           setEndBoardClosed(true)
           actions.enterSettlement()

@@ -200,6 +200,15 @@ export function GameResultScreen({
         side1Score={side1Score}
         names={rowNames}
         scoreboardSides={scoreboardSides}
+        // 503d8 — 이닝별 점수판 0x41c18 을 (14, 252) 에 (작은 로고는 측 0 · 측 1 팀)
+        lineScore={
+          summary.lineScore === undefined
+            ? undefined
+            : {
+                ...summary.lineScore,
+                sideTeams: playerSide === 0 ? [summary.ourTeamId, summary.opponentTeamId] : [summary.opponentTeamId, summary.ourTeamId],
+              }
+        }
         onConfirm={() => setPhase('정산')}
       />
     )
