@@ -22,6 +22,9 @@ import { PostseasonScreen } from '@/pages/season-end/ui/PostseasonScreen'
 import { NationalCupScreen } from '@/pages/national-cup/ui/NationalCupScreen'
 import { NariScreenPush } from '@/pages/management/ui/NariScreenPush'
 import { NariEventUnderlay } from '@/pages/management/ui/NariEventUnderlay'
+import { NariMainCommandBar } from '@/pages/management/ui/NariMainCommandBar'
+import { isBattingOrderEventId } from '@/entities/career/model/battingOrder'
+import { useEventEndFrame } from '@/app/model/useEventEndFrame'
 import { OutingMapUnderlay } from '@/pages/management/ui/OutingMapUnderlay'
 import { EndingScreen } from '@/pages/ending/ui/EndingScreen'
 import type { Collection, HallOfFameResult } from '@/entities/collection/model/collection'
@@ -81,6 +84,8 @@ export function CareerRoutes({
 }: CareerRoutesProps) {
   const { actions } = session
   const backToManagement = () => setScreen({ kind: '관리' })
+  /** 114 재생이 끝난 한 틀 — 대화창 없이 0x19da4 를 그린 뒤 넘긴다 (`useEventEndFrame`) */
+  const eventEnd = useEventEndFrame(actions.completeScene)
   /** 이전 화면 — 105 진입 0x11910 이 이전 상태 1 · 114 · 100 이면 가운데 판을 미끄러뜨린다 (0x8a2d8) */
   const screenTrail = useRef<{ readonly kind: Screen['kind']; readonly previous: Screen['kind'] | null }>({ kind: screen.kind, previous: null })
   if (screenTrail.current.kind !== screen.kind) screenTrail.current = { kind: screen.kind, previous: screenTrail.current.kind }
@@ -228,6 +233,19 @@ export function CareerRoutes({
       // 외출진입(112) · 장소(113) · 대결결과(140 — 진입 0x10df8 이 0x7e84c(gfx, 0x70))는 지도 0x7ea64(gfx, −1, 0) 만 (`OutingMapUnderlay`).
       // 같은 [gfx+0x174] 가 초상화 바닥 y 도 고른다(0x7fdee — 지도 252 · 그 밖 135).
       const isOverOutingMap = screen.context === '외출진입' || screen.context === '장소' || screen.context === '대결결과'
+      // 재생이 끝난 한 틀(`useEventEndFrame`) — 0x19e64 는 앞 상태 [this+0x28] 가 112 · 113 일 때만 지도다. 140(대결결과)은 앞 상태가
+      // 0x8c 라 지도가 아니라 0x19da4 를 그린다(재생 중 지도는 [gfx+0x174] = 0x70 탓). 커맨드 줄 칸은 앞 상태가 105 일 때만
+      // (0x7e84c(0x69) 의 관리 6칸 — '관리' 갈래, 138 을 거친 타순 이벤트는 빼고), 그 밖은 칸 수 0 이라 안 그린다
+      if (eventEnd.isEnding) {
+        if (screen.context === '외출진입' || screen.context === '장소') {
+          return <OutingMapUnderlay eventPlaceIds={session.eventPlaceIds} hour={new Date().getHours()} />
+        }
+        return (
+          <NariEventUnderlay career={career}>
+            {screen.context === '관리' && !isBattingOrderEventId(screen.eventId) && <NariMainCommandBar menuEnable={career} />}
+          </NariEventUnderlay>
+        )
+      }
       return (
         <>
           {(screen.context === '관리' || screen.context === '연초' || screen.context === '시즌') && <NariEventUnderlay career={career} />}
@@ -247,7 +265,7 @@ export function CareerRoutes({
             teamName={(TEAMS[career.teamId] ?? TEAMS[0]).name}
             skinIndex={career.skinIndex}
             battingTypeIndex={career.battingTypeIndex}
-            onComplete={actions.completeScene}
+            onComplete={eventEnd.end}
             carried={screen.carried}
             onMatch={(command, carried) => onAceMatch(command, carried, screen.context)}
             // 370·375 의 system 3·4 — 타이틀(0x8b3bc)·MVP(0x8b23c) 발표 창. 130·131 과 같은 판정(0x8dad4 타자 · 0x8dd60)이다

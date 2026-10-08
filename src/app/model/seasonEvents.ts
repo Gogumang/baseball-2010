@@ -154,8 +154,8 @@ export type ResumePoint =
  * 곧 501 · 504(114 — 그리기 0x19e64 가 지도 상태가 아니면 0x19da4 = 커맨드 줄 0x7e418(gfx, [this+0x2c]) · 상태판 0x7d34c ·
  * 머리띠) · 133 · 새 시즌(137 → 105) 밑에 관리 화면의 판 모양과 최상위 커맨드 줄이 서게 한다. 상태 값 · 저장은 안 건드린다.
  * 웹: 판 모양은 관리 화면 판 `BOARD_POLYGON`(managementLayout — 같은 35 · 190 · 30) 그대로라 더할 것이 없다.
- * ⚠️ 남음: 웹 114 밑그림(`NariEventUnderlay`, pages/management)은 0x19da4 의 커맨드 줄 0x7e418 을 아예 안 그린다 — 이 갈래만이
- * 아니라 지도 밖 114 이벤트 모두의 일이라 그 밑그림에서 맡을 일이다(이 파일 밖).
+ * 다만 114 의 0x19da4 는 재생이 끝난 한 틀에만 서고(재생 중에는 대화창 0x8b5ac 가 커맨드 줄 없는 밑그림을 그린다), 그 틀의 칸은
+ * 0x7e84c 가 앞 상태(100 — 그 밖 갈래)로 비운 칸 수 0 이라 이 꼬리가 건 메뉴는 그려지지 않는다(`app/model/useEventEndFrame`).
  */
 export function resumePointOf(career: PlayerCareer): ResumePoint {
   // 1c24e — S+0x50 == 6|7 → 141. 보너스 팝업 0x2b 를 닫은(1bc6e 저장) 엔딩만 저장에 엔딩 칸이 든다(`savedCareerOf`) — 그 전에

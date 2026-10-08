@@ -240,7 +240,7 @@ describe('구단관리 트레이드·코치채용 배선 (0xe4 · 0xd7)', () => 
 })
 
 describe('이벤트 재생 0xd3 배선', () => {
-  it('해마다 첫 관리 메뉴에서 연초 목표 — 감독 대사 다음 올해의 목표 창, 닫으면 관리 메뉴', () => {
+  it('해마다 첫 관리 메뉴에서 연초 목표 — 감독 대사 다음 올해의 목표 창, 닫으면 끝 틀 하나 뒤 관리 메뉴', async () => {
     vi.useFakeTimers()
     const store = 메모리저장(세이브(레코드({ seenEvents: [400, 1] })))
     render(<시즌화면 store={store} onExit={vi.fn()} />)
@@ -260,7 +260,11 @@ describe('이벤트 재생 0xd3 배선', () => {
     expect([...창.querySelectorAll('img')].filter((image) => image.getAttribute('src')?.endsWith('num/106.png'))).toHaveLength(2)
     fireEvent.click(창)
 
-    expect(screen.getByRole('button', { name: '다음경기' })).toBeDefined()
+    // 재생이 끝난 한 틀(0xa09c → 공통 틀 0x9f60) — 대화창이 없고, 앞 상태가 0xd4(연초 목표)라 커맨드 줄 칸이 없다(0x7e84c 그 밖)
+    expect(screen.queryByTestId('대사-상자')).toBeNull()
+    expect(screen.getByTestId('command-bar')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '다음경기' })).toBeNull()
+    expect(await screen.findByRole('button', { name: '다음경기' })).toBeDefined()
   })
 })
 

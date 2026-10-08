@@ -9,7 +9,7 @@ import {
   SeasonMatchInfoScreen, seasonMatchInfoLines, DayResultBoardScreen,
   SeasonPlayerPickScreen, SeasonPlayerCardScreen, seasonCardAbilitiesOf, seasonPlayerDetailViewOf, seasonCardInfoOf,
   SeasonTeamInfoScreen, seasonTeamInfoRowsOf, SeasonOwnedItemsScreen, SeasonRecordPickPopup, SeasonRecordRankScreen,
-  SeasonEquipmentScreen, SeasonItemShopScreen, SeasonStaminaPickScreen, SeasonEventUnderlay,
+  SeasonEquipmentScreen, SeasonItemShopScreen, SeasonStaminaPickScreen, SeasonEventUnderlay, SeasonEventEndFrame,
 } from '@/pages/season'
 import { seasonPlayerEquipmentOf } from '@/entities/season-mode/model/seasonPlayerRecord'
 import { SEASON_STAMINA_ITEM } from '@/entities/season-mode/model/seasonItemShop'
@@ -28,7 +28,8 @@ import { SQUAD_PURPOSE } from '@/entities/season-mode/model/preGameFlow'
 import { TeamSelectScreen } from '@/pages/create-player/ui/TeamSelectScreen'
 import { MessageBox, RawScreen, ScreenOverlay } from '@/shared/ui'
 import { StoryScreen } from '@/pages/story/ui/StoryScreen'
-import { SEASON_PLAYABLE_EVENTS } from '@/entities/season-mode/model/seasonEventFlow'
+import { SEASON_PLAYABLE_EVENTS, YEAR_GOAL_EVENT_ID } from '@/entities/season-mode/model/seasonEventFlow'
+import { useEventEndFrame } from '@/app/model/useEventEndFrame'
 import { SEASON_YEAR_GOAL_LABEL_SET } from '@/pages/story/lib/yearGoalWindow'
 import { SEASON_SCENE_STATE } from '@/entities/season-mode/model/seasonStateMachine'
 import { applySeasonReward, judgeSeasonEnding } from '@/entities/season-mode/model/seasonRewards'
@@ -215,6 +216,8 @@ export function SeasonRoute({
   const sceneTrail = useRef<{ readonly scene: number; readonly previous: number | null }>({ scene, previous: null })
   if (sceneTrail.current.scene !== scene) sceneTrail.current = { scene, previous: sceneTrail.current.scene }
   const previousScene = sceneTrail.current.previous
+  /** 0xd3 재생이 끝난 한 틀 — 대화창 없이 0xa09c 의 끝 그림을 그린 뒤 넘긴다 (`useEventEndFrame`) */
+  const eventEnd = useEventEndFrame(actions.finishSeasonEvent)
   const [isEnteringGame, setEnteringGame] = useState(() => session.isGameInProgress)
   useLayoutEffect(() => {
     if (!isEnteringGame) return
@@ -274,6 +277,19 @@ export function SeasonRoute({
     const playback = session.eventPlayback
     const event = SEASON_PLAYABLE_EVENTS.find((candidate) => candidate.id === playback.eventId)
     if (event !== undefined) {
+      if (eventEnd.isEnding) {
+        // 앞 상태 [this+0x28] — 0xd1 지도면 지도, 0xc9 면 관리 6칸, 그 밖은 칸 없음. 연초 목표(내장 이벤트)는 0xc9 → 0xd4 → 0xd3 이라
+        // 앞 상태가 0xd4 다(웹은 0xd4 를 상태로 안 두고 관리 메뉴에서 곧장 튼다)
+        const kind = previousScene === SEASON_SCENE_STATE.외출지도
+          ? '지도'
+          : previousScene === SEASON_SCENE_STATE.관리메뉴 && playback.eventId !== YEAR_GOAL_EVENT_ID ? '관리메뉴' : '칸없음'
+        return (
+          <RawScreen>
+            <SeasonEventEndFrame record={state.record} teamMorale={state.teamMorale} gamePoint={session.gamePoints}
+              kind={kind} cursor={session.menuCursors.management} />
+          </RawScreen>
+        )
+      }
       return (
         <RawScreen>
           <SeasonEventUnderlay record={state.record} teamMorale={state.teamMorale} gamePoint={session.gamePoints} />
@@ -289,7 +305,7 @@ export function SeasonRoute({
               // 화자 1(플레이어)은 s_event 에 없다. fmt 9 의 %s 는 구단 이름(SR+0x17c)이다
               playerName={state.record.name}
               teamName={state.record.name}
-              onComplete={actions.finishSeasonEvent}
+              onComplete={eventEnd.end}
               // s_event 에는 경기(match) 명령이 없다
               onMatch={() => undefined}
               // SYS sub 1 올해의 목표 창 — 연초 0xd4 내장 이벤트 · 392 (0x8d304 → 0x86fdc, 0x8656c 모드 2 갈래)

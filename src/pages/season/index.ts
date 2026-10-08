@@ -167,5 +167,5 @@ export { SeasonStaminaPickScreen } from '@/pages/season/ui/SeasonStaminaPickScre
 export type { SeasonStaminaPickScreenProps, SeasonStaminaPitcher } from '@/pages/season/ui/SeasonStaminaPickScreen'
 
 /** 이벤트 재생 0xd3 의 밑그림 — 대화창 0x8b5ac 의 공 무늬 · 상태판 · 머리띠 */
-export { SeasonEventUnderlay } from '@/pages/season/ui/SeasonEventUnderlay'
-export type { SeasonEventUnderlayProps } from '@/pages/season/ui/SeasonEventUnderlay'
+export { SeasonEventEndFrame, SeasonEventUnderlay } from '@/pages/season/ui/SeasonEventUnderlay'
+export type { SeasonEventEndFrameProps, SeasonEventUnderlayProps } from '@/pages/season/ui/SeasonEventUnderlay'

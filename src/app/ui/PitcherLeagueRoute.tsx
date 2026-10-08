@@ -2,6 +2,11 @@ import { PitcherCreateFlow } from '@/pages/pitcher-league/ui/PitcherCreateFlow'
 import { useRef } from 'react'
 import { PitcherManagementScreen } from '@/pages/pitcher-league/ui/PitcherManagementScreen'
 import { PitcherEventUnderlay } from '@/pages/pitcher-league/ui/PitcherEventUnderlay'
+import { PitcherStatusBoard } from '@/pages/pitcher-league/ui/PitcherStatusBoard'
+import { NariMainCommandBar } from '@/pages/management/ui/NariMainCommandBar'
+import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
+import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
+import { useEventEndFrame } from '@/app/model/useEventEndFrame'
 import { OutingMapUnderlay } from '@/pages/management/ui/OutingMapUnderlay'
 import { NextGameStandingsScreen } from '@/pages/management/ui/NextGameStandingsScreen'
 import { NariMatchInfoScreen } from '@/pages/management/ui/NariMatchInfoScreen'
@@ -84,6 +89,8 @@ export function PitcherLeagueRoute({
   const sceneTrail = useRef<{ readonly scene: string; readonly previous: string | null }>({ scene, previous: null })
   if (sceneTrail.current.scene !== scene) sceneTrail.current = { scene, previous: sceneTrail.current.scene }
   const previousScene = sceneTrail.current.previous
+  /** 114 재생이 끝난 한 틀 — 대화창 없이 0x19da4 를 그린 뒤 넘긴다 (`useEventEndFrame`) */
+  const eventEnd = useEventEndFrame(actions.completeStory)
 
   if (career === null || scene === '등록') {
     return <PitcherCreateFlow openedHiddenIds={openedHiddenIds} onCreate={actions.create} onCancel={onExit} />
@@ -192,6 +199,21 @@ export function PitcherLeagueRoute({
       const isOverStatusBoard =
         story.context === '관리' || story.context === '중간평가' || story.context === '연초' || story.context === '연말'
       const isOverMap = story.context === '지도' || story.context === '장소' || story.context === '대결결과'
+      // 재생이 끝난 한 틀 — 타자편과 같은 0x19e64: 앞 상태 112 · 113 만 지도, 그 밖(140 포함)은 0x19da4 = 공 무늬 · 상태판(0) ·
+      // 커맨드 줄(앞 상태 105 = '관리' 갈래만 관리 6칸, 그 밖 칸 수 0) · 머리띠 제목 9
+      if (eventEnd.isEnding) {
+        if (story.context === '지도' || story.context === '장소') {
+          return <OutingMapUnderlay eventPlaceIds={session.eventPlaceIds} hour={new Date().getHours()} />
+        }
+        return (
+          <>
+            <SkinBackdrop kind="공무늬" />
+            <PitcherStatusBoard career={career} />
+            {story.context === '관리' && <NariMainCommandBar menuEnable={career} />}
+            <ScreenFrame title="나만의리그투수편" gamePoint={career.gamePoint} onBack={null} footer={5} />
+          </>
+        )
+      }
       return (
         <>
           {isOverStatusBoard && <PitcherEventUnderlay career={career} />}
@@ -210,7 +232,7 @@ export function PitcherLeagueRoute({
             skinIndex={career.skinIndex}
             battingTypeIndex={0}
             replacementsFor={session.storyReplacementsFor}
-            onComplete={actions.completeStory}
+            onComplete={eventEnd.end}
             carried={story.carried}
             onMatch={(command, carry) =>
               renderAceMatch === undefined ? actions.abortStoryAtMatch(carry) : actions.beginAceMatch(command, carry)

@@ -36,6 +36,11 @@ function stepOf(career: PlayerCareer): { path: BattingOrderPath | null; step: nu
   return { path, step: step < 0 ? 0 : step }
 }
 
+/** 타순 이벤트(승격 470~478 · 강등 479~486)인가 — 105 진입이 상태 138 을 거쳐 트는 이벤트다(114 의 앞 상태가 138) */
+export function isBattingOrderEventId(eventId: number): boolean {
+  return [...Object.values(PROMOTE_EVENTS), ...Object.values(DEMOTE_EVENTS)].some((ids) => ids.includes(eventId))
+}
+
 /** 지금 평판으로 볼 타순 이벤트. 없으면 null */
 export function battingOrderEventId(career: PlayerCareer): number | null {
   const { path, step } = stepOf(career)
