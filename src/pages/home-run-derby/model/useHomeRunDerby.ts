@@ -26,6 +26,7 @@ import { LOSE_SOUND, WIN_SOUND } from '@/features/play-game/model/gameSounds'
 import { activeSound, playSoundIds } from '@/shared/api/audio/soundPort'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
+import { rollSceneLoadingTip } from '@/entities/game/model/sceneLoadingTip'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { SKY_ROW_COUNT } from '@/widgets/batting-stage/lib/stageScenery'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
@@ -128,7 +129,8 @@ export interface HomeRunDerbyOptions {
 }
 
 /**
- * **홈런더비 경기 시작 굴림 둘** — 상태 9 갱신 0x3f584 의 공통 꼬리 차례 그대로:
+ * **홈런더비 경기 시작 굴림** — 상태 7 진입 0x39f88 의 로딩 팁 rand(0, 73)(`rollSceneLoadingTip`) · 상태 7 갱신 0x3e340 의 덱 1275 ·
+ * 효과 객체 1202(`openScenePatternDeck`) 뒤, 상태 9 갱신 0x3f584 의 공통 꼬리 차례 그대로:
  * ```
  * 3f856  0x39fdc(scene, 7)  → 모드 7 갈래 3a43e:
  *          3a44e  r7 = (s8) 0x1f8d5(저장, 4)+1          ; 내 타자편 팀
@@ -141,6 +143,8 @@ export interface HomeRunDerbyOptions {
  * ⚠️ 뽑은 상대 팀(수비 팀)은 웹 더비가 그리지 않아 버린다 — 굴림 차례만 맞춘다.
  */
 export function rollDerbySceneStart(random: RandomPort): number {
+  // 상태 7 진입 0x39f88 → 0x53dbc — 로딩 팁 rand(0, 73). 모드를 안 가려 더비도 장면마다 맨 앞에 한 번 (`rollSceneLoadingTip`)
+  rollSceneLoadingTip(random)
   // 상태 7 장면 초기화 0x3e340 의 3ed76 → 0xb08e8 — 이 장면의 패턴 덱을 섞는다(상태 9 의 3a454 보다 앞)
   openScenePatternDeck(random)
   random.nextInRange(0, 9)

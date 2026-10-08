@@ -36,6 +36,7 @@ import { modePitcherOfHallOfFame } from '@/app/model/modePitcher'
 import { EMPTY_COLLECTION, registerHallOfFame, registerHallOfFamePitcher } from '@/entities/collection/model/collection'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
+import { rollSceneLoadingTip } from '@/entities/game/model/sceneLoadingTip'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import { BATTED_BALL_PATTERNS } from '@/shared/config/original/battedBallPatterns'
 import { isFairAngle } from '@/entities/batting/model/battedBallOutcome'
@@ -597,7 +598,8 @@ function setUpPitcherMissionOf(mission: (typeof MISSIONS)[number], seed: number,
 /** 같은 씨앗으로 시작 굴림 하나를 먹인 난수 — 세션이 견제 판에 넘기는 난수와 같은 자리 */
 function seededAfterStart(seed: number): RandomPort {
   const random = createSeededRandom(seed)
-  // 경기 장면 시작 — 상태 7 장면 덱 섞기(0x3e340 → 0xb08e8) · 효과 객체(3ef6e 0x90190, 1202 번) · 상태 9 시뮬 초기화 rand(0, 2)
+  // 경기 장면 시작 — 상태 7 진입 0x39f88 의 로딩 팁 rand(0, 73) · 상태 7 장면 덱 섞기(0x3e340 → 0xb08e8) · 효과 객체(3ef6e 0x90190, 1202 번) · 상태 9 시뮬 초기화 rand(0, 2)
+  rollSceneLoadingTip(random)
   createPatternDeck(random)
   rollSceneEffectInit(random)
   rollSimulatorInit(random)
@@ -691,8 +693,8 @@ describe('투수 미션 사람 견제 — 구질 고르기 0xf 의 0x53548 은 �
 /* ── 견제사도 '아웃' 목표에 든다 (아웃 콜 결과 13 → 0xa7d0c → R+0x13c · 판정 0xaaa6c aacd6) ──────── */
 
 describe("투수 미션 견제사는 '아웃' 목표(R+0x13c)에 든다 — 0x51b36 → 0xa7d0c(a7d52) · 판 끝 판정 0xaaa6c(ae5c4)", () => {
-  // 미션 12 "최강의 챔피언" 1사 1·3루 — 씨앗 290 의 1루 견제는 견제사다 (같은 씨앗의 기대 판으로 확인 — 첫 0x18 판의 굴림 36
-  // (0x3fac4)이 하늘 줄 뒤에 끼며 예전 씨앗 31 은 세이프가 됐다. 1~300 가운데 견제사는 290 하나)
+  // 미션 12 "최강의 챔피언" 1사 1·3루 — 씨앗 47 의 1루 견제는 견제사다 (같은 씨앗의 기대 판으로 확인 — 상태 7 진입 0x39f88 의
+  // 로딩 팁 rand(0, 73) 이 장면 시작 맨 앞에 끼며 예전 씨앗 290 은 세이프가 됐다. 1~400 가운데 견제사는 47 · 58 · 123 · 312)
   const mission12 = MISSIONS.find((row) => row.side === '투수' && row.id === 12)!
   const expectedOf = (seed: number) =>
     runPickoffPlay({
@@ -706,8 +708,8 @@ describe("투수 미션 견제사는 '아웃' 목표(R+0x13c)에 든다 — 0x51
     })
 
   it("견제사 하나 = '아웃' 칸 +1 · 이닝 아웃 +1 — 목표가 탈삼진뿐이면 진행 중 그대로", () => {
-    expect(expectedOf(290).advance.outsAdded).toBe(1)
-    const rendered = setUpPitcherMission(12, 290)
+    expect(expectedOf(47).advance.outsAdded).toBe(1)
+    const rendered = setUpPitcherMission(12, 47)
     const before = rendered.result.current.session.pitcherRun!
 
     act(() => rendered.result.current.session.actions.pickoff('3'))
@@ -724,7 +726,7 @@ describe("투수 미션 견제사는 '아웃' 목표(R+0x13c)에 든다 — 0x51
 
   it("'아웃' 목표가 견제사로 차면 판 끝 판정에서 바로 성공 — 0xaa928 이 상태 1 로 안 남는다", () => {
     const 아웃한개 = { ...mission12, goals: ['아웃'], goalCounts: { '아웃': 1 } }
-    const rendered = setUpPitcherMissionOf(아웃한개, 290)
+    const rendered = setUpPitcherMissionOf(아웃한개, 47)
 
     act(() => rendered.result.current.session.actions.pickoff('3'))
 
@@ -1132,8 +1134,9 @@ describe('투수편 마선수 대결 — 투수 미션 team − 1 을 던지고 
   })
 
   it('실패하면 졌다', () => {
-    // 씨앗 8 — 첫 0x18 판의 굴림 36(0x3fac4)이 하늘 줄 뒤에 끼며 예전 씨앗 1 은 성공 판이 됐다(1~12 가운데 실패는 8 · 9 · 10)
-    const { status, isWin } = playPitcherAceMatch(8)
+    // 씨앗 1 — 상태 7 진입 0x39f88 의 로딩 팁 rand(0, 73) 이 장면 시작 맨 앞에 끼며 예전 씨앗 8 은 성공 판이 됐다
+    // (1~12 가운데 실패는 1 · 3 · 5 · 6 · 7 · 10 · 11 · 12)
+    const { status, isWin } = playPitcherAceMatch(1)
 
     expect(status).toBe('실패')
     expect(isWin).toBe(false)
@@ -1549,11 +1552,12 @@ describe('미션 시작의 첫 0x18 판 — 첫 반 이닝이 사람 몫이라 �
       }))
     return { rendered, random }
   }
-  /** 장면 시작 굴림(덱 → rand(0, 2) → 하늘 줄 rand(0, 6)) 뒤 첫 판 굴림 36 까지 먹인 같은 씨앗의 다음 값 */
+  /** 장면 시작 굴림(팁 rand(0, 73) → 덱 → rand(0, 2) → 하늘 줄 rand(0, 6)) 뒤 첫 판 굴림 36 까지 먹인 같은 씨앗의 다음 값 */
   const nextAfterBoard = (seed: number) => seededAfterStart(seed).next()
   /** 첫 판 굴림이 없을 때의 다음 값 — 하늘 줄 바로 뒤 */
   const nextAfterSky = (seed: number) => {
     const random = createSeededRandom(seed)
+    rollSceneLoadingTip(random)
     createPatternDeck(random)
     rollSceneEffectInit(random)
     rollSimulatorInit(random)
@@ -1593,8 +1597,9 @@ describe('미션 시작의 첫 0x18 판 — 첫 반 이닝이 사람 몫이라 �
     act(() => rendered.result.current.actions.confirmHalfInningBoard())
     act(() => rendered.result.current.actions.begin(mission))
 
-    // 두 번째 장면: 덱 → rand(0, 2) → 하늘 줄 → 판 36
+    // 두 번째 장면: 팁 rand(0, 73) → 덱 → rand(0, 2) → 하늘 줄 → 판 36
     const expected = seededAfterStart(6)
+    rollSceneLoadingTip(expected)
     createPatternDeck(expected)
     rollSceneEffectInit(expected)
     rollSimulatorInit(expected)

@@ -1,11 +1,15 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
-import { CONFIRM_LOCK_FRAMES, resultHoldMillisecondsOf, SCENE_D_FRAMES, useHomeRunDerby } from '@/pages/home-run-derby/model/useHomeRunDerby'
+import { CONFIRM_LOCK_FRAMES, resultHoldMillisecondsOf, rollDerbySceneStart, SCENE_D_FRAMES, useHomeRunDerby } from '@/pages/home-run-derby/model/useHomeRunDerby'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import type { DerbyResult } from '@/entities/home-run-derby/model/derbyRun'
 import { derbyBattedBallOf } from '@/entities/home-run-derby/model/derbyBattedBall'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { createSeededRandom } from '@/shared/api/random/seededRandom'
+import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
+import { rollSceneLoadingTip } from '@/entities/game/model/sceneLoadingTip'
+import { createPatternDeck, rollSceneEffectInit } from '@/entities/batting/model/battedBallOutcome'
 
 /** 홈런 결과 코드 하나 — `outcomeOfPattern` 의 마지막 갈래 */
 const 홈런코드 = 24
@@ -398,5 +402,20 @@ describe('더비 판의 HOMERUN 글자 · 비거리 판 · 홈런 뒤 키 건너
     expect(rendered.result.current.distanceBoard).toBeNull()
     expect(rendered.result.current.run.remainingPitches).toBe(9)
     째깍.spy.mockRestore()
+  })
+})
+
+describe('홈런더비 장면 시작 굴림 차례 (`rollDerbySceneStart`)', () => {
+  it('상태 7 진입 팁 rand(0, 73) → 덱 1275 → 효과 1202 → 상태 9 rand(0, 9) → rand(0, 2) → 상태 8 하늘 줄 rand(0, 6)', () => {
+    const random = createSeededRandom(21)
+    const expected = createSeededRandom(21)
+    const skyRow = rollDerbySceneStart(random)
+    rollSceneLoadingTip(expected)
+    createPatternDeck(expected)
+    rollSceneEffectInit(expected)
+    randomIntegerBelow(expected, 0, 9)
+    randomIntegerBelow(expected, 0, 2)
+    expect(skyRow).toBe(randomIntegerBelow(expected, 0, 6))
+    expect(random.next()).toBe(expected.next())
   })
 })
