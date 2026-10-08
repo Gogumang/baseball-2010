@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   INITIAL_EVENT_BACKDROP, MANAGEMENT_PORTRAIT_BASE_Y, OUTING_MAP_PORTRAIT_BASE_Y, drawEventBackdrop, effectTimelineOf,
-  effectorPhaseAt, isBlockingEffectId, lastEffectIdIn, portraitBaseYOf,
+  clearsDialogueBeforeMatch, effectorPhaseAt, isBlockingEffectId, lastEffectIdIn, portraitBaseYOf,
 } from '@/pages/story/lib/eventBackdrop'
 import type { EventCommand } from '@/shared/config/original/eventTypes'
 
@@ -81,7 +81,7 @@ describe('명령 5 기다림 0x8b564 — id 4~7 은 효과기 끝까지 다음 �
       releaseFrame: 20, entries: [{ id: 6, start: 0, kind: '검정에서밝아짐' }, { id: 4, start: 10, kind: '검게어두워짐' }],
     })
     expect(effectTimelineOf(명령([1])).entries).toEqual([
-      { id: 1, kind: null, color: '검정', vibrationMilliseconds: 500, start: 0 },
+      { id: 1, kind: null, color: '검정', vibrationMilliseconds: 500, start: 0, commandIndex: 0 },
     ])
   })
 
@@ -92,5 +92,15 @@ describe('명령 5 기다림 0x8b564 — id 4~7 은 효과기 끝까지 다음 �
     const 섞음 = [{ op: 'sound', id: 52 }, { op: 'reward', items: [] }, { op: 'effect', id: 6 }, { op: 'sound', id: 1 }]
     expect(effectTimelineOf(섞음 as unknown as EventCommand[])).toMatchObject({ releaseFrame: 2 + 10 + 1, entries: [{ id: 6, start: 2 }] })
     expect(effectTimelineOf([])).toEqual({ entries: [], releaseFrame: 0 })
+  })
+})
+
+describe('0x8d9c2 — id 6 이 끝나고 바로 뒤가 경기 명령이면 상자를 비운다', () => {
+  it('id 6 · 뒤 명령 종류 8 일 때만', () => {
+    const 경기 = { op: 'match', team: 1, resultEvents: [] } as unknown as EventCommand
+    expect(clearsDialogueBeforeMatch(6, 경기)).toBe(true)
+    expect(clearsDialogueBeforeMatch(7, 경기)).toBe(false)
+    expect(clearsDialogueBeforeMatch(6, { op: 'sound', id: 1 })).toBe(false)
+    expect(clearsDialogueBeforeMatch(6, null)).toBe(false)
   })
 })

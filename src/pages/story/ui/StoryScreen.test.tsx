@@ -620,6 +620,32 @@ describe('초상화 바닥 y · 효과 칠 — 0x7fbc4 끝 0x7fdee · 대화창 
     expect(본체높이()).toBe('55')
   })
 
+  it('id 6 바로 뒤가 경기 명령이면 끝난 틀에 상자 · 초상화를 비운다 — 처음으로 돌린 상자도 안 그린다 (0x8d9c2)', () => {
+    const 경기 = vi.fn()
+    const 얼굴 = [{ file: 'event_char_0', animation: 1, side: 'left' }]
+    const 이벤트들 = {
+      ...이벤트,
+      commands: [
+        { op: 'say', text: '한판 붙자', speaker: 0, format: 0, portraits: 얼굴 },
+        { op: 'effect', id: 6 },
+        { op: 'match', team: 1, resultEvents: [] },
+      ],
+    } as unknown as OriginalEvent
+    render(
+      <StoryScreen events={[이벤트들]} event={이벤트들} playerName="테스트" teamName="드래곤즈"
+        onComplete={() => {}} onMatch={경기} />,
+    )
+    틀(200)
+    fireEvent.click(screen.getByRole('button', { name: '대사 넘기기' }))
+    for (let index = 0; index < 20 && 칠() === null; index += 1) 틀씩(1)
+    // '끝' 그리기 — 검정 칠은 들었지만 칸 0 이 비어 0x7fbc4 가 상자를 안 그린다(id 6 만으로는 15 로 다시 오른다)
+    expect(칠()).not.toBeNull()
+    expect(screen.queryByTestId('대사-상자')).toBeNull()
+    expect(초상화판().querySelectorAll('img')).toHaveLength(0)
+    틀씩(3)
+    expect(경기).toHaveBeenCalledTimes(1)
+  })
+
   it('id 6 뒤 경기 명령은 효과가 끝난 뒤에 나간다', () => {
     const 경기 = vi.fn()
     const 이벤트들 = { ...이벤트, commands: [{ op: 'effect', id: 6 }, { op: 'match', team: 1, resultEvents: [] }] } as unknown as OriginalEvent

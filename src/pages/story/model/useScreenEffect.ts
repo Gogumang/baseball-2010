@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'react'
 import { screenEffectFrameAt } from '@/entities/story/model/screenEffect'
 import type { ScreenEffectFrame } from '@/entities/story/model/screenEffect'
 import type { EventStep } from '@/entities/story/model/eventScript'
+import type { EventCommand } from '@/shared/config/original/eventTypes'
 import { vibrate } from '@/entities/defense-controls/model/vibration'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { effectTimelineOf, effectorEndingFrameOf, effectorPhaseAt } from '@/pages/story/lib/eventBackdrop'
@@ -49,8 +50,11 @@ function activeEntryAt(entries: readonly EffectTimelineEntry[], frame: number): 
 export function useScreenEffect(
   step: EventStep,
   isVibrationOn: boolean,
-  /** 대화창이 '끝'(+0x10 = 2)을 보는 그리기 — 건 효과 하나에 한 번, 그 효과의 id 와 (`drawEventBackdrop`) */
-  onEnd?: (effectId: number) => void,
+  /**
+   * 대화창이 '끝'(+0x10 = 2)을 보는 그리기 — 건 효과 하나에 한 번, 그 효과의 id 와 (`drawEventBackdrop`).
+   * `nextCommand` 는 그 명령 5 바로 뒤 명령(없으면 null — 이벤트 끝) — 0x8d9c2 가 본다(`clearsDialogueBeforeMatch`)
+   */
+  onEnd?: (effectId: number, nextCommand: EventCommand | null) => void,
   /** 막는 효과를 다 기다린 틀 — 이 걸음의 멈출 명령이 돈다 (`isStepHeld`) */
   onRelease?: (stepKey: string) => void,
 ): ScreenEffectView {
@@ -130,7 +134,7 @@ export function useScreenEffect(
         }
         if (frameIndex < endFrame) return
         ended[index] = true
-        onEndRef.current?.(entry.id)
+        onEndRef.current?.(entry.id, step.passed[entry.commandIndex + 1] ?? step.command)
       })
       const active = activeEntryAt(entries, frameIndex)
       const lastEffectId = lastIdAt(frameIndex)

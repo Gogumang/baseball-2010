@@ -102,6 +102,8 @@ export interface EffectTimelineEntry {
   readonly color: '검정' | '흰색'
   readonly vibrationMilliseconds: number
   readonly start: number
+  /** 지나온 명령 가운데 몇 번째인가 — 바로 뒤 명령(0x8d9c2 가 보는 [mgr+0x14 + 4(i + 1)])을 찾는다 */
+  readonly commandIndex: number
 }
 
 export interface EffectTimeline {
@@ -122,10 +124,10 @@ export interface EffectTimeline {
 export function effectTimelineOf(commands: readonly EventCommand[]): EffectTimeline {
   const entries: EffectTimelineEntry[] = []
   let frame = 0
-  for (const command of commands) {
+  commands.forEach((command, commandIndex) => {
     if (command.op !== 'effect') {
       frame += 1
-      continue
+      return
     }
     const effect = screenEffectCommandOf(command.id)
     entries.push({
@@ -134,9 +136,10 @@ export function effectTimelineOf(commands: readonly EventCommand[]): EffectTimel
       color: effect?.color ?? '검정',
       vibrationMilliseconds: effect?.vibrationMilliseconds ?? 0,
       start: frame,
+      commandIndex,
     })
     frame += effect?.kind != null && isBlockingEffectId(command.id) ? effectorEndingFrameOf(effect.kind) + 2 : 1
-  }
+  })
   return { entries, releaseFrame: frame }
 }
 
@@ -145,6 +148,21 @@ export function lastEffectIdIn(commands: readonly EventCommand[]): number | null
   let id: number | null = null
   for (const command of commands) if (command.op === 'effect') id = command.id
   return id
+}
+
+/**
+ * **0x8d9a6~0x8da0a** — 명령 5 의 기다림이 [mgr+8] 을 세운 틀(막는 효과면 효과기 '끝'을 본 갱신)에 [mgr+0x2c4] == 6 이고
+ * 바로 뒤 명령([mgr+0x14 + 4(i + 1)] 의 종류)이 8(경기)이면 대사 상자를 비운다:
+ * ```
+ * 0x8d9e2  0x7b870(창)        ; 초상화 셋 비우기
+ * 0x8d9ea  0x7f7cc(창)        ; 높이 0
+ * 0x8d9f0  0x7b824(창, 0 · 1 · 2) ; 글 칸 셋 길이 0
+ * ```
+ * 갱신이 그리기보다 먼저라 같은 틀의 '끝' 그리기 0x7fbc4 는 칸 0 이 비어 상자도 초상화도 안 그린다(0x7fbe0) — 다음 틀에 경기로 나간다.
+ * 경기 명령 자신(0x8d8c4~0x8d8f0)도 같은 셋을 다시 부른다.
+ */
+export function clearsDialogueBeforeMatch(effectId: number, nextCommand: EventCommand | null | undefined): boolean {
+  return effectId === 6 && nextCommand?.op === 'match'
 }
 
 export interface EventBackdropDraw {

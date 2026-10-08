@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { MessageBox } from '@/shared/ui/MessageBox/MessageBox'
 import { SPEAKER_NAMES } from '@/shared/config/original/eventMeta'
-import type { OriginalEvent } from '@/shared/config/original/eventTypes'
+import type { EventCommand, OriginalEvent } from '@/shared/config/original/eventTypes'
 import type { EventReward } from '@/entities/story/model/eventReward'
 import { EventPortraits } from '@/widgets/event-portraits/ui/EventPortraits'
 import { useEventPlayback } from '@/pages/story/model/useEventPlayback'
@@ -15,7 +15,9 @@ import { speakerPrefixOf } from '@/pages/story/lib/eventDialogue'
 import { SYSTEM_YEAR_GOAL_WINDOW } from '@/pages/story/lib/yearGoalWindow'
 import type { YearGoalWindowSource } from '@/pages/story/lib/yearGoalWindow'
 import { SCREEN_HEIGHT } from '@/pages/story/lib/eventDialogue'
-import { INITIAL_EVENT_BACKDROP, drawEventBackdrop, portraitBaseYOf } from '@/pages/story/lib/eventBackdrop'
+import {
+  INITIAL_EVENT_BACKDROP, clearsDialogueBeforeMatch, drawEventBackdrop, portraitBaseYOf,
+} from '@/pages/story/lib/eventBackdrop'
 import type { EventBackdropState } from '@/pages/story/lib/eventBackdrop'
 
 /** 화자 번호 1 은 플레이어 이름으로 바꾼다. */
@@ -114,6 +116,8 @@ export function StoryScreen({
    * 그 이벤트의 첫 say(0x8d1f2)만 상자를 내렸다 다시 올린다.
    */
   const eventLoadsRef = useRef(0)
+  /** 대사 상자 글 칸 — say · 선택지 명령이 돌 때 쓴다 (아래) */
+  const boxRef = useRef<DialogueBoxContent | null>(null)
   const jump = (eventId: number) => {
     eventLoadsRef.current += 1
     jumpToEvent(eventId)
@@ -121,7 +125,12 @@ export function StoryScreen({
   // '끝'(+0x10 = 2) 그리기만 [mgr+0x2c8] 을 바꾸고, id 6 · 7 이면 글 · 초상화 · 상자를 처음으로 돌린다.
   // 처음으로 돌리는 것은 대사 상자 객체(0x7f7d4 · 0x7f7a8 · 0x7f7cc — 모두 [mgr+0xb4])뿐이다 — 공용 창 [0x140005c] 는 안 건드린다.
   // id 6 · 7 은 끝날 때까지 다음 명령을 막으므로(0x8b564) 이 돌리기는 늘 뒤 명령(대사 · 알림 · 예아니오 · 경기)보다 먼저다.
-  const onEffectorEnd = (endedId: number) => {
+  const onEffectorEnd = (endedId: number, nextCommand: EventCommand | null) => {
+    // 0x8d9c2 — 갱신이 먼저: id 6 바로 뒤가 경기 명령이면 초상화 · 높이 · 글 칸 셋을 비운다. 같은 틀의 '끝' 그리기는
+    // 칸 0 이 비어 상자도 초상화도 안 그린다(0x7fbe0)
+    if (clearsDialogueBeforeMatch(endedId, nextCommand) && boxRef.current !== null) {
+      boxRef.current = { ...boxRef.current, slots: [] }
+    }
     const ended = drawEventBackdrop({ effectId: endedId, fill: null }, '끝')
     setBackdrop((previous) => drawEventBackdrop({ ...previous, effectId: endedId }, '끝').state)
     if (!ended.resetsDialogue) return
@@ -158,7 +167,6 @@ export function StoryScreen({
   // say · 선택지 명령이 도는 틀 — 상자 글 칸을 쓴다. system · 예아니오는 대사 상자의 글을 건드리지 않는다 — 0x8b924 는 관리자
   // 버퍼 [mgr+0xba] 에 쓰고(say 글은 0x7b818 이 돌려주는 상자 쪽 글 0xbc965), 0x8b5ac 는 창이 떠 있는 동안에도 틀마다
   // 0x7fbc4 로 앞 상자를 그린다 — 선택지 뒤라면 선택지 줄과 고른 줄 테두리가 그대로 남는다.
-  const boxRef = useRef<DialogueBoxContent | null>(null)
   /** [mgr+0xb9] — 선택지가 돌 때 0, 위 · 아래로 바뀐다. 다음 say · 선택지가 돌 때까지 남는다 */
   const [selectedChoice, setSelectedChoice] = useState(0)
   /** 이 이벤트 실음에서 say 를 돌렸는가 ([mgr+0x2c0]) — 값은 그때의 `eventLoadsRef` */
