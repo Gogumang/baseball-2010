@@ -90,6 +90,9 @@ const CLOSE_START_WIDTH = 240
 const CLOSE_SHRINK = 2
 const CLOSE_END_WIDTH = 99
 
+/** 상자가 받는 키 — 펼치는 동안 · 닫히는 동안에도 기본 동작(스크롤 따위)은 막는다 */
+const HANDLED_KEYS: ReadonlySet<string> = new Set(['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp', 'Enter', ' ', 'Escape', 'Backspace'])
+
 type BoxAnimation =
   | { readonly kind: '열림'; readonly height: number }
   | { readonly kind: '닫힘'; readonly width: number; readonly answer: number }
@@ -214,13 +217,18 @@ export function MessageBox({
     const timer = window.setInterval(() => {
       const previous = animationRef.current
       if (previous === null || isFinishedRef.current) return
+      // 다음 틱 · 키는 그리기를 기다리지 않고 이 값을 본다 — 틱 여럿이 한 그리기에 묶여도 한 틱씩 나아간다
+      const advance = (next: BoxAnimation) => {
+        animationRef.current = next
+        setAnimation(next)
+      }
       if (previous.kind === '열림') {
         const next = previous.height * OPEN_GROWTH
         // 두 배가 목표 이상이면 목표 높이로 맞추고 애니메이션을 끝낸다
-        return setAnimation(next >= fullHeightRef.current ? null : { kind: '열림', height: next })
+        return advance(next >= fullHeightRef.current ? null : { kind: '열림', height: next })
       }
       const next = Math.floor(previous.width / CLOSE_SHRINK)
-      setAnimation({ kind: '닫힘', width: next, answer: previous.answer })
+      advance({ kind: '닫힘', width: next, answer: previous.answer })
       if (next > CLOSE_END_WIDTH) return
       isFinishedRef.current = true
       onAnswerRef.current(previous.answer)
@@ -228,10 +236,24 @@ export function MessageBox({
     return () => window.clearInterval(timer)
   }, [animationKind])
 
+  /**
+   * **키는 창이 떠 있는 동안 늘 창 것이다 — 펼치는 동안 · 닫히는 동안에도** (0x754f8, 직접 떴다).
+   * 장면은 틀마다 먼저 0x754f9(창, 키)를 부르고 참이면 자기 키 처리를 건너뛴다(예: 나리 0x1d070 → 0x1d07c · 시즌 0xec70).
+   * 0x754f8 은 [창+9] ≠ 0(떠 있음)이면 늘 1 을 돌려준다(0x756e4). 그 안에서 펼침([+0x214], 0x75556~0x75588)과
+   * 닫힘([+0x215], 0x7558a~0x755d8 — 다 닫힌 틀도 0x742a8 로 [창+9] = 0 을 하고 1)은 키를 **보지 않고** 돌아가고,
+   * 격자 · OK(−5 · '5' → 답 [+0x21c] · 닫힘 시작) · 키 표(CLR)는 둘 다 아닐 때만 돈다(0x755da~).
+   * 그래서 웹도 이 상자가 그려져 있는 동안(닫히는 중 포함 — 이벤트 보상 창은 답한 뒤에도 다 닫힐 때까지 남는다) 키를 잡아
+   * 뒤 화면에 안 넘기고, 펼치는 동안 · 답한 뒤에는 커서도 답도 움직이지 않는다.
+   */
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       // 잡는 단계에서 멈춰 뒤쪽 화면의 window 리스너(메뉴 목록·커맨드 줄·타석)까지 막는다
       event.stopImmediatePropagation()
+      // 펼치는 동안 · 닫히는 동안(답한 뒤)은 키를 보지 않는다 — 0x75556 · 0x7558a 갈래
+      if (animationRef.current !== null || isAnsweredRef.current) {
+        if (HANDLED_KEYS.has(event.key)) event.preventDefault()
+        return
+      }
       const dx = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
       const dy = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0
       if (dx !== 0 || dy !== 0) {

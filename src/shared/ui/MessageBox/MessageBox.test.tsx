@@ -233,6 +233,37 @@ describe('메시지 상자 애니메이션', () => {
     }
   })
 
+  it('펼치는 동안 · 닫히는 동안에도 키는 창 것이고, 창은 그 키를 보지 않는다 — 0x754f8 은 [창+9] ≠ 0 이면 늘 1 (0x75556 · 0x7558a)', () => {
+    const 되돌리기 = 높이를_잴_수_있게(79)
+    vi.useFakeTimers()
+    const onAnswer = vi.fn()
+    const 뒤화면 = vi.fn()
+    window.addEventListener('keydown', 뒤화면)
+    try {
+      render(<MessageBox text="질문" buttons={['예', '아니오']} onAnswer={onAnswer} />)
+      // 펼치는 동안(10 → 20 → 40 → 79): 커서도 답도 안 움직이고 뒤 화면에도 안 간다
+      fireEvent.keyDown(window, { key: 'ArrowRight' })
+      fireEvent.keyDown(window, { key: 'Enter' })
+      act(() => void vi.advanceTimersByTime(millisecondsPerFrame() * 3))
+      expect(상자().style.width).toBe('')
+      expect(버튼줄().querySelectorAll('img')[0].getAttribute('src')).toContain('006.png')
+      expect(뒤화면).not.toHaveBeenCalled()
+
+      fireEvent.keyDown(window, { key: 'Enter' })
+      expect(상자().style.width).toBe('240px')
+      // 닫히는 동안: 커서가 안 옮겨지고(고른 [예] 그대로) 뒤 화면에도 안 간다
+      fireEvent.keyDown(window, { key: 'ArrowRight' })
+      expect(버튼줄().querySelectorAll('img')[0].getAttribute('src')).toContain('006.png')
+      act(() => void vi.advanceTimersByTime(millisecondsPerFrame() * 2))
+      expect(onAnswer).toHaveBeenCalledWith(0)
+      expect(뒤화면).not.toHaveBeenCalled()
+    } finally {
+      window.removeEventListener('keydown', 뒤화면)
+      vi.useRealTimers()
+      되돌리기()
+    }
+  })
+
   it('`onAnswerKey` 는 키를 받은 그 갱신에 온다 — `onAnswer` 는 그대로 다 닫힌 뒤 (0x8daa0 처럼 답 칸을 곧바로 읽는 자리)', () => {
     const 되돌리기 = 높이를_잴_수_있게(79)
     vi.useFakeTimers()
