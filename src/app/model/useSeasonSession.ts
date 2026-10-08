@@ -2021,22 +2021,13 @@ export function useSeasonSession(
           if (series === null) return null
           const winner = won ? record.teamId : opponent
           // 4f268 → 4f29a 0xb818c(포스트시즌 갈래는 스태미나를 안 건드린다) → 4f2bc 열 팀 +20%.
-          // 그 뒤 결산 0xef 키 0x9dc8 이 CPU 끼리 경기 0xc2760 을 돌린다 — 회복이 **끝난** 표로 서고 깎인 값이
-          // 그대로 남는다(0xc2760 의 하루 끝 0xb818c 포스트시즌 갈래는 회복이 없고, 0xb617c 는 0x4ea0c 에서만 불린다)
+          // CPU 끼리 경기 0xc2760 은 여기서 돌지 않는다 — 부르는 곳은 결산 0xef 키 0x9dc8(9eba) 하나뿐이라 정산 → 장면 0x105
+          // 새로 세우기(팁 rand(0, 73)) → 0xef 진입 → 사람이 키를 눌렀을 때다(`continuePostseason`). 그때 회복이 **끝난** 이 표로
+          // 서고 깎인 값이 그대로 남는다(0xc2760 의 하루 끝 0xb818c 포스트시즌 갈래는 회복이 없고, 0xb617c 는 0x4ea0c 에서만 불린다)
           const rested = withDayEndRecovery(withGameEndStamina(current, summary, ownRotationShift))
-          const cpu = runCpuPostseasonWithStamina(
-            advancePostseason(series, winner),
-            record.teamId,
-            random,
-            rested.cpuPitcherStaminas,
-            aceLevels,
-            seasonAbilityContextOf(current.state),
-            (team) => cpuLeagueRecordOf(current, team),
-          )
-          const advanced = cpu.series
+          const advanced = advancePostseason(series, winner)
           commit({
             ...rested,
-            cpuPitcherStaminas: cpu.pitcherStaminas,
             series: advanced,
             state: {
               ...current.state,
