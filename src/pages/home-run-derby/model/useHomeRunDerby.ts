@@ -525,6 +525,9 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
     clearTimer()
     timerRef.current = window.setTimeout(() => {
       timerRef.current = null
+      // 판정 B 0xae3e8 의 모드 7 갈래 머리 ae40e~ae41a — 이 판에 홈런(state[0x1d])이 났으면 소리를 끊는다(0x6e418).
+      // 맞지 않은 공(0xae24c)은 이 갈래가 없다
+      if (playRef.current?.batted.isHomeRun === true) audioRef.current.stop()
       // 0x17 끝 0x35108 — 판(맞은 공)이었으면 파티클을 치운다(0x351e2 → 0x6dee4). 맞지 않은 공(0x12)은 0x17 을 안 지난다
       if (playRef.current !== null) setEffectsClearedAt(performance.now())
       playRef.current = null
@@ -575,6 +578,8 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
     const skipped = skipDerbyBattedBall(play.batted, keyTick)
     if (skipped === play.batted) return
     playRef.current = { ...play, batted: skipped }
+    // 0x519cc 의 0x519fe — 울리던 소리를 끊는다(0x6e418). 키 틱의 홈런 소리는 그 뒤에 난다
+    audioRef.current.stop()
     // 0x519cc — 키 틱 프레임 머리에서 효과 객체 칸을 버리고(0x8fc70) 파티클을 치운다(0x6dee4)
     setEffectsClearedAt(play.startedAt + keyTick * millisecondsPerFrame())
     // 키 틱의 홈런 갈래(폴 뒤 담장선)는 그대로 돌고, 그 뒤 틱의 소리는 없다

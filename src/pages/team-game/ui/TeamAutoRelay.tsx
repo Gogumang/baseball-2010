@@ -185,7 +185,7 @@ export function TeamAutoRelay({ progress, onStep, onStop, sideTeams, humanSide, 
       if (relay === null) {
         // 0xc2198 거짓 — +0x1784 = 0 · 상태 0x18 · 0x6e418 배경음 끔
         isDoneRef.current = true
-        audio.stopBgm()
+        audio.stop()
         return
       }
       const next = relay.ticks[0]

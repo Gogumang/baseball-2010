@@ -12,7 +12,8 @@ const 소리: SoundPort = {
     녹음.played.push(id)
   },
   playBgm: () => {},
-  stopBgm: () => {
+  stopBgm: () => {},
+  stop: () => {
     녹음.stopped += 1
   },
   resumeBgm: () => {},

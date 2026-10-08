@@ -30,7 +30,7 @@ interface BenchClearingSceneProps {
  *    더그아웃 표 0xcfaf8 에서 투수판 0xcfa8c 로 몰려나오는 모습은, 세계 좌표 → 화면 투영과 선수 동작 그림을
  *    이 화면에 옮기지 않아 그리지 않는다. 웹은 글자(웹 전용)만 둔다.
  * ⚠️ 전환 길이 1500 은 0xbdae8 의 마지막 인자다 — 단위(ms)는 유력. 원본은 전환 객체가 끝났다고 할 때 나간다.
- * ⚠️ 0x6e418 은 울리는 소리를 가리지 않고 끊는다 — 웹 소리 통로에는 그 함수가 없어 `stopBgm` 으로 갈음한다.
+ * 0x6e418 은 울리는 소리를 가리지 않고 끊는다(`SoundPort.stop`) — 44 가 아직 울리면 그것을 끊는다.
  */
 export function BenchClearingScene({ onDone }: BenchClearingSceneProps) {
   const reachedRef = useRef(false)
@@ -43,7 +43,8 @@ export function BenchClearingScene({ onDone }: BenchClearingSceneProps) {
   const finish = () => {
     if (doneRef.current) return
     doneRef.current = true
-    audio.stopBgm()
+    // 0x40500(틱 100 전환 끝) · 0x4063a(키 건너뛰기) — 0x6e418
+    audio.stop()
     onDoneRef.current(reachedRef.current)
   }
 

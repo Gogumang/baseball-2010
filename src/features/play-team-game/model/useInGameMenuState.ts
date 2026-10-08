@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
+import { activeSound } from '@/shared/api/audio/soundPort'
 
 export interface InGameMenuState {
   readonly isOpen: boolean
@@ -35,6 +36,8 @@ export function useInGameMenuState(): InGameMenuState {
       isOpenRef.current = false
       return setOpen(false)
     }
+    // 0x3c02c 맨 앞 0x3c036 — 울리던 소리를 끊는다(0x6e418)
+    activeSound().stop()
     // 0x3c02c → 0x6c00c(메뉴, 0, 0) — 새로 열면 첫 칸
     isOpenRef.current = true
     setCursor(0)

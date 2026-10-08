@@ -535,7 +535,9 @@ function LivePlayback({
       moved = true
       const facts = defenseTickFactsOf(tickBefore, running, isDefensePlayFinished(running))
       if (running.fastForward && !wasFastForward) {
-        // 0x519cc 는 이 틱 갱신보다 먼저 — 글자 끄기 · 효과 칸 버리기 · 파티클 치우기 · 홈런 점수판 [+0x1100] = 0
+        // 0x519cc 는 이 틱 갱신보다 먼저 — 소리 끊기(0x519fe 0x6e418) · 글자 끄기 · 효과 칸 버리기 · 파티클 치우기 ·
+        // 홈런 점수판 [+0x1100] = 0. 이 틱에 나는 소리(펌블 · 슬라이딩)는 끊은 뒤에 난다
+        activeSound().stop()
         effectsRef.current = fastForwardDefenseEffects(effectsRef.current, particlesRef.current)
         boardRef.current = { ...boardRef.current, active: false }
       }
@@ -571,6 +573,8 @@ function LivePlayback({
     if (!moved && finished && pressesRef.current.length > 0) {
       pressesRef.current = []
       if (acceptsFastForwardKey(running)) {
+        // 0x519fe — 소리 끊기(0x6e418)
+        activeSound().stop()
         effectsRef.current = fastForwardDefenseEffects(effectsRef.current, particlesRef.current)
         boardRef.current = { ...boardRef.current, active: false }
         skippedNow = true
