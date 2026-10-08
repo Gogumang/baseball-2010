@@ -543,6 +543,33 @@ describe('사람 조작 — 상태 0x17 키 표 (I-controls 0·2b·2d·3b)', () 
     // 같은 틱에 같은 루로 던져도 레이저(2000)가 먼저 닿는다
     expect(레이저.throwArrivalTick).toBeLessThan(보통.throwArrivalTick)
   })
+
+  it('레이저 발사 0x400bc 는 경기를 멈춘다(+0x1993) — 발사한 그림의 슬롯 2 와 다음 그림이 빠지고 그 뒤 그림에 레이저로 던진다', () => {
+    let state = startDefensePlay({
+      outcome: 단타,
+      trajectory: battedBallTrajectory(fixturePatternFor(단타)),
+      bases: 주자1루,
+      outs: 0,
+      random: 차례난수([0, 0, 0.999, 0]),
+      controls: 계속누름('수비', '2'),
+    })
+    const 틱마다: { tick: number; paused: boolean; step: number; counter: number }[] = []
+    while (!isDefensePlayFinished(state)) {
+      state = stepDefensePlay(state, { key: '2', isRepeat: false })
+      틱마다.push({ tick: state.tick - 1, paused: state.gamePaused, step: state.laserStep, counter: state.endCounter })
+    }
+    const 발사 = state.log.find((line) => line.includes('레이저 발사 (0x400bc)'))
+    expect(발사).toBeDefined()
+    const F = Number(발사!.split('틱')[0])
+    // 그림 F 의 그리기가 단계 0 → 1, 그림 F+1 의 그리기가 단계 1 → 2 와 함께 +0x1993 을 내린다
+    expect(틱마다.find((row) => row.tick === F)).toMatchObject({ paused: true, step: 1 })
+    expect(틱마다.find((row) => row.tick === F + 1)).toMatchObject({ paused: false, step: 2 })
+    expect(틱마다.find((row) => row.tick === F + 3)).toMatchObject({ step: -1 })
+    // 송구는 멈춤이 풀린 그림 F+2 의 플레이 틱(사람 목표 b4660)이 +0x1f4 로 던진다
+    expect(state.throwReleaseTick).toBe(F + 2)
+    expect(state.laserThrow).toBe(true)
+    expect(state.laserArmed).toBe(false)
+  })
 })
 
 describe('2루 커버가 아닌 키스톤 야수 자리 — 0xb1c90 의 0xb203a (매 틱, 송구 없음)', () => {
@@ -1463,11 +1490,13 @@ describe('송구 0xb2e38 — 중계 b4616 · AI 9 미루기 · 던진 야수 AI 
     })
     while (!isDefensePlayFinished(state)) state = stepDefensePlay(state, { key: '6', isRepeat: false })
 
-    // 투수(0)가 1루수(2)에게 — 레이저는 확정됐지만 0xb2e38 이 +0x1f4 를 지운다
-    expect(state.laserConfirmed).toBe(true)
+    // 확정(+0x19ae)으로 0x400bc 가 쏘아 +0x1f4 를 세우고 경기를 멈춘다 — 연출 0x4403c 단계 0 이 +0x19ae 를 내린다.
+    // 투수(0)가 1루수(2)에게 던지므로 0xb2e38 이 +0x1f4 를 지워(b2ee6) 보통 송구로 나간다
+    expect(state.log.filter((line) => line.includes('레이저'))).toEqual([expect.stringContaining('레이저 발사 (0x400bc)')])
+    expect(state.laserConfirmed).toBe(false)
+    expect(state.laserArmed).toBe(false)
     expect(state.laserThrow).toBe(false)
     expect(state.errantThrow).toBe(true)
-    expect(state.log.some((line) => line.includes('레이저'))).toBe(false)
   })
 
   it('결과 코드 9 — 공 든 야수가 루에 막 닿았는데 주자가 서 있으면 0xbba 로 0xafa60 을 한 번 부른다 (b43ec~b444a)', () => {

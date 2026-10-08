@@ -139,15 +139,32 @@ export function passPlayGate(input: PlayGateInput): PlayGateResult {
  *
  * 웹 진행기는 G2 를 그 틱 끝에서 본다(원본은 G1 뒤 주자 틱 0xa01cc 를 지나 다음 틱 머리에서 본다 — 웹은 주자 움직임을 플레이 틱 안에서
  * 돌리므로 그 차례는 근사다). G3 · G4 · G1 은 플레이 틱 뒤 · 주자 틱 앞이라 틱 끝 상태 그대로다.
- * ⚠️ 경기 멈춤(+0x1993, 레이저 번쩍임) 그림은 G3 만 도는데, 웹 진행기에 그 멈춤이 없어 옮기지 않았다.
+ * **경기 멈춤(+0x1993)** — 세우는 곳은 레이저 발사 0x400bc(슬롯 2 머리 524e2) 하나다. 그 그림은 524e6 에서 G2 를 안 부르고, 그리기
+ * 0x46c88 의 G3 는 돌며(앞에 +0x1993 갈래가 없다), 0x3f378 G4 는 3f392 에서 건너뛴다. 다음 그림은 G1(3f0a4) · G2 가 건너뛰고 G3 만 돈다 —
+ * 그 그리기의 레이저 연출 0x4403c 단계 1 이 +0x1993 = 0 으로 내리므로 G4 부터 다시 돈다(`runDefensePlay` 0c · 7b 절).
  */
 export interface PlayGateFrameResult extends PlayGateResult {
   /** 그리기 0x46e3c 의 관문(G3) — 이 그림의 HOMERUN 글자를 그리는가. 건너뛰기 중엔 그리기가 없어 null */
   readonly drawOpen: boolean | null
+  /**
+   * G2(슬롯 2 머리 52502) 를 부르기 **바로 앞**의 +0x120 — 다음 틱 머리에서 레이저 0x400bc 가 경기 멈춤 +0x1993 을 세우면
+   * 원본은 524e6 에서 G2 를 안 부르므로(0x400bc 는 G2 앞 524e2) 이 값으로 되돌린다. G2 를 안 불렀으면 `endCounter` 와 같다.
+   */
+  readonly counterBeforeHead: number
 }
 
-/** 플레이 틱 하나 뒤 · 다음 플레이 틱 앞의 관문 호출 전부 (`open` 은 다음 틱 머리 G2 의 값) */
-export function passPlayGateBetweenTicks(input: PlayGateInput, fastForward = false): PlayGateFrameResult {
+/**
+ * 플레이 틱 하나 뒤 · 다음 플레이 틱 앞의 관문 호출 전부 (`open` 은 다음 틱 머리 G2 의 값).
+ *
+ * **경기 멈춤 +0x1993**(`paused` — 이 그림의 그리기 0x4403c 가 단계를 넘긴 **뒤**의 값): 0x3f378(3f392) · 0x3f060(3f0a4) ·
+ * 0x524c0(524e6) 이 모두 +0x1993 이면 건너뛰므로 G4 · G1 · G2 가 안 돈다 — 그리기 0x46c88 의 G3 만 돈다(앞에 +0x1993 갈래가 없다).
+ * 그때 `open` 은 참(관문을 안 불렀으니 판이 이어진다)이다.
+ */
+export function passPlayGateBetweenTicks(
+  input: PlayGateInput,
+  fastForward = false,
+  paused = false,
+): PlayGateFrameResult {
   let counter = input.endCounter
   const call = (): PlayGateResult => {
     const result = passPlayGate({ ...input, endCounter: counter })
@@ -157,11 +174,13 @@ export function passPlayGateBetweenTicks(input: PlayGateInput, fastForward = fal
   let drawOpen: boolean | null = null
   if (!fastForward) {
     drawOpen = call().open // G3 그리기 0x46e3c
+    if (paused) return { open: true, endCounter: counter, drawOpen, counterBeforeHead: counter }
     if (!input.ballHeld) call() // G4 0x3f3b2 — +0x12c == 0 일 때만
   }
   call() // G1 공용 갱신 0x3f0b8 (건너뛰기 중엔 52b32 의 0x3f060)
+  const counterBeforeHead = counter
   const head = call() // G2 슬롯 2 머리 52502
-  return { open: head.open, endCounter: counter, drawOpen }
+  return { open: head.open, endCounter: counter, drawOpen, counterBeforeHead }
 }
 
 /**

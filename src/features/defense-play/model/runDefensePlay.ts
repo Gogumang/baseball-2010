@@ -17,7 +17,6 @@ import {
   type RunnerTarget,
 } from '@/entities/defense-controls/model/defenseKeys'
 import {
-  canFireLaser,
   isLaserWindowOpen,
   judgeLaserInput,
   rollLaserThrow,
@@ -753,6 +752,17 @@ export interface DefensePlayState {
   laserRolled: boolean
   /** 플레이+0x1f4(레이저 송구가 나갔다) */
   laserThrow: boolean
+  /**
+   * 플레이+0x1f4 — 레이저 발사 0x400bc 가 vt64(1) 로 세운 칸. 서 있으면 다음 송구 0xb2e38 이 b2f06 에서 레이저(vtb0 0xa222c)로
+   * 던지고 vt64(0) 으로 내린다(내야 → 내야 송구 b2ee6 도 내린다).
+   */
+  laserArmed: boolean
+  /** 장면 +0x1992 — 레이저 연출 0x4403c 의 단계(−1 쉼 · 0~3). −1 일 때만 슬롯 2 머리 524c4 가 0x523bc · 0x4e858 · 0x400bc 를 돈다 */
+  laserStep: number
+  /** 장면 +0x1993 — 경기 멈춤. 0x400bc 가 세우고 연출 0x4403c 단계 1(그리기)이 내린다 */
+  gamePaused: boolean
+  /** 앞 틱 끝 G2 앞의 +0x120 (`PlayGateFrameResult.counterBeforeHead`) — 이 틱 머리에서 멈추면 G2 를 안 부른 것으로 되돌린다 */
+  counterBeforeHead: number
   /** 협살 기록칸 P+0x1ec~+0x1f3 (0xb3a04). 대상이 −1 이면 협살 중이 아니다 */
   rundown: RundownPlan
   /** 협살 중 짝에게 던진 공이 닿는 틱. 없으면 −1 */
@@ -999,6 +1009,10 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     laserConfirmed: false,
     laserRolled: false,
     laserThrow: false,
+    laserArmed: false,
+    laserStep: -1,
+    gamePaused: false,
+    counterBeforeHead: 0,
     rundown: NO_RUNDOWN,
     rundownThrowArrival: -1,
     rundownThrowTo: NONE,
@@ -1115,6 +1129,13 @@ export function stepDefensePlay(
   let laserConfirmed = state.laserConfirmed
   let laserRolled = state.laserRolled
   let laserThrow = state.laserThrow
+  let laserArmed = state.laserArmed
+  let laserStep = state.laserStep
+  let gamePaused = state.gamePaused
+  /** 이 틱 머리(그림 F 의 슬롯 2 머리)에서 0x400bc 가 경기를 멈췄는가 */
+  let pausedThisTick = false
+  /** 이 틱이 멈춘 그림 F+1 인가 — 머리에서 이미 +0x1993 이 서 있다(0x3f060 의 목록 틱 · 슬롯 2 가 통째로 없다) */
+  const pausedAtHead = gamePaused
   let rundown = state.rundown
   let rundownThrowArrival = state.rundownThrowArrival
   let rundownThrowTo = state.rundownThrowTo
@@ -1127,6 +1148,7 @@ export function stepDefensePlay(
   let deferredThrowReceiver = state.deferredThrowReceiver
   let deferredThrowBase = state.deferredThrowBase
   let endCounter = state.endCounter
+  let counterBeforeHead = state.counterBeforeHead
   let drawGateOpen = state.drawGateOpen
   // ── 0x17 키 건너뛰기 — 키 처리 0x53420 이 키마다 끝에 메시지 0x587 → 0x509a0(0x50afe) → 0x519cc (갱신 0x524c0 보다 먼저) ──
   // state[0x1d](홈런) || +0x129(폴 홈런) || state[0xb] ∈ {3, 4} 일 때만 +0xfe7 = 1 — 이 틱부터 한 그림 안에서 판을 끝까지 돈다
@@ -1306,12 +1328,8 @@ export function stepDefensePlay(
     //    야수는 못 던지는 것으로 본다(0xa1620 머리 a165a 도 공 칸 +0xd0 이 비면 0 을 돌려준다).
     if (!holder.holdingBall || holder.actionRemainingTicks > 0) return false
     // 레이저 송구 — 반짝임 창 안에 새로 누른 키가 들어왔고 공을 쥐었으면 +0x1f4 (0x400bc)
-    let laser = canFireLaser({
-      isLaserConfirmed: laserConfirmed,
-      hasChosenThrowTarget: play.manualThrowBase !== NONE,
-      isBallHeld: true,
-      isThrowerReady: true,
-    })
+    // b2f06 — 레이저 발사 0x400bc 가 세운 플레이+0x1f4 를 본다(발사는 슬롯 2 머리에서 따로 — 0b 절 끝)
+    let laser = laserArmed
     const plan = planThrow({ fielders, fromSlot, finalSlot: coverSlot, base, special: laser || cpuSpecial })
     // b2eb2~b2ee4: 받는 야수(중계면 중계맨)가 목표점에 없고 1구간 틱 안에 못 닿으면 미룬다 (AI 9)
     const receiver = fielders[plan.toSlot]
@@ -1335,8 +1353,11 @@ export function stepDefensePlay(
       )
       return true
     }
-    // b2ee6: 내야수 → 내야수 송구면 레이저 표시를 지운다
-    if (plan.toSlot <= 5 && fromSlot <= 5) laser = false
+    // b2ee6: 내야수 → 내야수 송구면 레이저 표시를 지운다 (vt64(0))
+    if (plan.toSlot <= 5 && fromSlot <= 5) {
+      laser = false
+      laserArmed = false
+    }
     if (laser) laserThrow = true
     // CPU 홈 송구 20% 특수 송구 — 효과는 `cpuSpecialThrowOf` 참고. 레이저는 0xb2e38 이 다른 함수로 던진다(아래)
     const special = !laser && cpuSpecial ? cpuSpecialThrowOf(fielders, fromSlot, coverSlot) : NO_CPU_SPECIAL_THROW
@@ -1353,6 +1374,8 @@ export function stepDefensePlay(
       fielders = fielders.map((fielder) =>
         fielder.slot === fromSlot ? { ...fielder, throwSpeed: LASER_THROW_SPEED } : fielder,
       )
+      // b2f06 — 레이저로 던진 뒤 vt64(0)
+      laserArmed = false
       thrown = launchThrow({
         thrower: fielders[fromSlot],
         target: receiverTarget,
@@ -1636,13 +1659,16 @@ export function stepDefensePlay(
     // 포구 R 틱 뒤에 0 이 된다. 쥔 동안만 줄고, +0xc8 을 넣는 곳은 쥐기(vt88, b27aa·b27be)뿐이다.
     // a12b4: 동작 잠금 +0xb4 > 0 이면 −1 만 하고(0 이 되면 vt10) 그 틱은 준비 틱 · 이동이 없다 — `lockedThisTick` 이 이동도 막는다
     const lockedThisTick = fielders.map((fielder) => fielder.actionLockTicks > 0)
-    fielders = fielders.map((fielder) =>
-      fielder.actionLockTicks > 0
-        ? { ...fielder, actionLockTicks: fielder.actionLockTicks - 1 }
-        : fielder.holdingBall && fielder.actionRemainingTicks > 0
-          ? { ...fielder, actionRemainingTicks: fielder.actionRemainingTicks - 1 }
-          : fielder,
-    )
+    // 경기 멈춤(+0x1993)이 머리에서 서 있으면 0x3f060 이 3f0a4 에서 돌아가 목록 틱(야수 · 주자)이 없다
+    if (!pausedAtHead) {
+      fielders = fielders.map((fielder) =>
+        fielder.actionLockTicks > 0
+          ? { ...fielder, actionLockTicks: fielder.actionLockTicks - 1 }
+          : fielder.holdingBall && fielder.actionRemainingTicks > 0
+            ? { ...fielder, actionRemainingTicks: fielder.actionRemainingTicks - 1 }
+            : fielder,
+      )
+    }
 
     // ── 0. 사람 조작 (상태 0x17 갈래 0x53420 — I-controls 0·2b·3b절) ──
     // 예전에는 `input.controls?.keyAt(tick)` 로 미리 물어봤다. 이제는 **이번 틱에 눌린 키**를 받는다
@@ -1715,7 +1741,8 @@ export function stepDefensePlay(
     //
     // 주자 수(0xa9598) 관문은 따로 옮기지 않았다 — 이 진행기의 `runners` 에는 타자주자가 늘
     // 들어 있어 타구 플레이에서는 언제나 참이다.
-    if (input.random !== undefined && !uncatchable) {
+    // 슬롯 2 머리 524c4: +0x1992 == −1(레이저 연출이 쉴 때)일 때만 0x523bc · 0x4e858 · 0x400bc 를 돈다
+    if (input.random !== undefined && !uncatchable && laserStep === -1) {
       const ticksSinceCatch = tick - catchTick
       const windowOpen = isLaserWindowOpen({
         ticksSinceCatch,
@@ -1751,6 +1778,33 @@ export function stepDefensePlay(
       laserShining = judged.isShining
       if (judged.isLaserConfirmed) laserConfirmed = true
     }
+
+    // ── 0c. 레이저 발사 0x400bc (슬롯 2 머리 524e2) → 경기 멈춤 +0x1993 (직접 뜸) ──
+    // ```
+    // 400ce  +0x19ae(레이저 확정) · 플레이+0x160 ≠ −1(사람이 고른 송구 목표) · 플레이+0x12c(쥠) · 공 가진 야수(0xb0c90).vtC4(준비)
+    // 40100  → +0x1992 = 0(연출 단계) · +0x1991 = +0x1990 = 1 · **+0x1993 = 1** · 플레이 vt64(1)(+0x1f4 = 1)
+    // 524e6  +0x1993 이면 슬롯 2 를 통째로 건너뛴다(G2 · 플레이 틱 · 자동 진루 · CPU 송구) — 이 그림부터
+    // ```
+    // 다음 그림은 0x3f060(3f0a4 — G1 · 목록 틱) · 0x3f378(3f392 — G4) · 슬롯 2 가 모두 건너뛰고, 그리기 0x46c88 만 돈다(0x4403c 단계 ·
+    // G3). 연출 0x4403c(그리기 46e08)가 단계 0 에서 +0x1997 · +0x19ad · +0x19ae 를 내리고 단계 1 에서 줌 0xbb39d 와 함께 +0x1993 = 0 —
+    // 곧 **발사한 그림의 슬롯 2 와 다음 그림의 갱신 전부**가 빠진다. 송구는 그 뒤 그림의 플레이 틱(사람 목표 b4660)이 +0x1f4 로 던진다.
+    // +0x1993 을 세우는 곳은 0x400bc 하나다(0x441c4 · 0x44398 은 내리기만 한다) — 멈춤은 레이저 송구 판에만 선다.
+    if (laserStep === -1 && !pausedAtHead && laserConfirmed && play.manualThrowBase !== NONE && play.held) {
+      const holder = fielders[play.ballHolderSlot]
+      if (holder !== undefined && holder.holdingBall && holder.actionRemainingTicks <= 0) {
+        laserStep = 0
+        gamePaused = true
+        laserArmed = true
+        pausedThisTick = true
+        // 앞 틱 끝에서 센 G2(52502)는 524e6 뒤라 원본은 부르지 않았다
+        endCounter = state.counterBeforeHead
+        log.push(`${tick}틱 레이저 발사 (0x400bc) — 경기 멈춤 +0x1993`)
+      }
+    }
+
+    // 멈춘 그림은 슬롯 2(포구 · 송구 · 협살 · 자동 진루 · CPU 송구)가 없다 — 그림(5 절)은 그대로 남긴다
+    slot2: {
+    if (gamePaused) break slot2
 
     // ── 1. 포구 ──
     // 포구 틱 갈래 전체(b4074~b42ce: 동작 시작 · 펌블 굴림 · 필살타법 표시 · 결과 코드 9 · 쥐기)는 플레이 틱 0xb401c 머리
@@ -2140,6 +2194,8 @@ export function stepDefensePlay(
       cpuThrowDecision()
     }
 
+    }
+
     // ── 5. 화면 스냅샷 ──
     ticks.push(
       viewStateOf({
@@ -2184,6 +2240,9 @@ export function stepDefensePlay(
       }),
     )
 
+    // 6~7 절은 다음 그림의 목록 틱(0x3f060)과 플레이 틱 꼬리다 — 이 틱에 멈췄으면 다음 그림도 멈춰 있어 없다
+    nextFrame: {
+    if (pausedThisTick) break nextFrame
     // ── 6. 한 틱 움직이기 ──
     // 0xb1c90(플레이 vt30, 매 틱) — 커버(+0xf0) 다시 고르기(`assignCoversForTick`)와 그 가운데의 커버 배치 갈래 0xb203a
     // (2루 커버가 아닌 키스톤 야수의 자리 — 중계 자리 · 기본 자리). 자리 잡기는 원본에서 b1f06 뒤 · b23a4 앞이라
@@ -2450,6 +2509,24 @@ export function stepDefensePlay(
     // 보류 해제 0xaa39e — 푼 수만큼 메시지 0x13(0x64)
     for (let run = scoredBeforeRelease; run < held.scoreboardRuns; run += 1) runInsThisTick.push(RELEASED_RUN_SLOT)
 
+    }
+
+    // ── 7b. 레이저 연출 0x4403c — 이 그림의 그리기 46e08(관문 G3 46e3c 보다 앞) ──
+    // 단계 0: 애니 되감기 · +0x1997 = +0x19ad = +0x19ae = 0 · 단계 1 → 1: 줌 0xbb39d · +0x1993 = 0 · 단계 2 → 2: 단계 3 →
+    // 3: 단계 −1 · +0x1990 = 0 · +0x1998 = +0x1999 = 1. ⚠️ 줌 펀치 0xbb39d · 큰 OUT(+0x1998 → 0x46844) 그림은 웹에 없다.
+    if (laserStep === 0) {
+      laserConfirmed = false
+      laserShining = false
+      laserStep = 1
+    } else if (laserStep === 1) {
+      gamePaused = false
+      laserStep = 2
+    } else if (laserStep === 2) {
+      laserStep = 3
+    } else if (laserStep === 3) {
+      laserStep = -1
+    }
+
     // ── 8. 판 진행 관문 0xb0d28 — 이 틱 그리기 0x46e3c(G3) · 0x3f378(G4, 안 쥐었을 때) · 다음 틱 0x3f060(G1) · 슬롯 2 머리 52502(G2) ──
     // (전문은 `entities/fielding/model/playGate.ts` — `passPlayGateBetweenTicks`). 부를 때마다 +0x120 이 오르므로 주자가 다 서고
     // (+0x94 까지) 누가 공을 쥔 채 관문을 51 번 지나면(그림마다 3 번 — 17 틱) 닫힌다. 그동안에도 자동 진루 · CPU 송구가 돈다.
@@ -2474,7 +2551,11 @@ export function stepDefensePlay(
           : undefined,
         lastEventCode,
         outs,
-        someRunnerActive: stillActive,
+        // 0xaa05c — 7 절의 값과 같다(보류 풀기는 주자를 안 건드린다). 멈춘 틱은 7 절이 없어 여기서 잰다
+        someRunnerActive: someRunnerStillActive(
+          runners.map((runner) => runner.state),
+          isAtTarget,
+        ),
         homeRunDerby: false,
         homeRunFlag,
         poleHomeRunFlag: play.suppressed,
@@ -2484,8 +2565,10 @@ export function stepDefensePlay(
         endCounter,
       },
       fastForward,
+      gamePaused,
     )
     endCounter = gate.endCounter
+    counterBeforeHead = gate.counterBeforeHead
     drawGateOpen = gate.drawOpen
     if (!gate.open) play = { ...play, finished: true }
   }
@@ -2525,6 +2608,10 @@ export function stepDefensePlay(
   state.laserConfirmed = laserConfirmed
   state.laserRolled = laserRolled
   state.laserThrow = laserThrow
+  state.laserArmed = laserArmed
+  state.laserStep = laserStep
+  state.gamePaused = gamePaused
+  state.counterBeforeHead = counterBeforeHead
   state.rundown = rundown
   state.rundownThrowArrival = rundownThrowArrival
   state.rundownThrowTo = rundownThrowTo

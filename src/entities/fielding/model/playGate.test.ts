@@ -141,17 +141,27 @@ describe('판 진행 관문 0xb0d28', () => {
       open: true,
       endCounter: 3,
       drawOpen: true,
+      counterBeforeHead: 2,
     })
     expect(passPlayGateBetweenTicks({ ...닫힘없음, groundRuleFlag: true, endCounter: 0 })).toEqual({
       open: true,
       endCounter: 4,
       drawOpen: true,
+      counterBeforeHead: 3,
     })
     // 건너뛰기(+0xfe7) 동안은 52b32 의 0x3f060(G1) · 524f8 의 G2 둘뿐이고 그리기가 없다
     expect(passPlayGateBetweenTicks({ ...닫힘없음, ballHeld: true, endCounter: 0 }, true)).toEqual({
       open: true,
       endCounter: 2,
       drawOpen: null,
+      counterBeforeHead: 1,
+    })
+    // 경기 멈춤 +0x1993(레이저 0x400bc) — 0x3f378 · 0x3f060 · 0x524c0 이 건너뛰어 그리기 G3 하나뿐, 판은 이어진다
+    expect(passPlayGateBetweenTicks({ ...닫힘없음, ballHeld: true, endCounter: 0 }, false, true)).toEqual({
+      open: true,
+      endCounter: 1,
+      drawOpen: true,
+      counterBeforeHead: 1,
     })
   })
 
