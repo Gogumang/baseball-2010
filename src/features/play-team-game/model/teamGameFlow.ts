@@ -4452,6 +4452,11 @@ function advance(progress: TeamGameProgress, random: RandomPort): TeamGameProgre
         autoSinceHuman: false,
       }
     }
+    // 사람 반 이닝이 끝나(또는 경기 첫 반 이닝) 0x18 을 지난 뒤 다음 반 이닝이 자동이면 — 0x4f928 의 4f990 저장이
+    // 4fac2 0xc2198(자동 갈림)보다 앞이다: 3아웃 → 0x18 → 저장 → 0x21. 0x21 안의 뒤집힘(0xc2198 의 0xb6b6c)은 0x18 을 안 지난다
+    if (!current.autoSinceHuman && passesHalfInningState(current)) {
+      current = { ...current, halfInningSave: savePointOf(withoutBurstOnHalfFlip(current)) }
+    }
     // 화면이 중계를 한 틱씩 돌리면 여기서 멈춘다 — 상태 0x21 에 들어서고 `stepAutoRelay` 가 이어 굴린다
     if (current.options.liveAutoRelay === true) return enterAutoRelay(current)
     // 상태 0x21 진입 0x3abf0 — 사람 장면에서 뜬 채 남은 돌발을 판정 없이 내린다 (0x8f628)
