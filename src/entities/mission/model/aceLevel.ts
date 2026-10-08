@@ -1,4 +1,6 @@
 import type { BatterAbility } from '@/entities/batting/model/batter'
+import { skillIdsOfBits } from '@/entities/team/model/teamRoster'
+import type { AcePlayer } from '@/shared/config/original/acePlayers'
 
 /**
  * **마선수 레벨 능력치 배율** — 표 `u8 0xd88aa` = [60, 70, 80, 90, 100] (%), 레벨 0~4 = Lv1~5.
@@ -222,3 +224,12 @@ export const ACE_LEVEL_UP_TEXT = {
   /** 0xcc214 (코드에 박힌 글) — G 부족 2버튼 팝업 (0x5fbd6). 마선수 오픈 부족 팝업과 같은 글이다 */
   shortage: '!C!cFF0000G포인트가 부족합니다.!cFFFFFF 구매!N페이지로 이동하시겠습니까?',
 } as const
+
+/**
+ * 마선수 레코드 `+0x14` 장착 스킬 비트를 간이 타석 0xab214 가 보는 스킬 번호로 — 타자는 비트 그대로, 투수는 비트 + 16
+ * (`skillIdsOfBits`). 0xb53f0 · 0x9f605/0x9f651 이 넣는 마선수 레코드는 `XlsACE_BAT_DATA`/`XlsACE_PIT_DATA` 행 그대로라
+ * +0x14 = 행 바이트 0x14~0x17 (`acePlayers.skillBits`). 0xb62b4 는 모드도 마선수 비트도 보지 않는다.
+ */
+export function aceSkillIdsOf(ace: Pick<AcePlayer, 'role' | 'skillBits'>): readonly number[] {
+  return skillIdsOfBits(ace.skillBits, ace.role === '투수')
+}

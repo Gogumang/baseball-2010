@@ -21,7 +21,7 @@ import type { QuickLineup } from '@/entities/game/model/quickLineup'
 import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
 import { ACE_BATTERS, ACE_PITCHERS, rollOpponentAceIndex } from '@/entities/game/model/aceOpponent'
 import { EMPTY_BATTER_GAME_RECORD } from '@/entities/batting/model/pinchHitAi'
-import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
+import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf, aceSkillIdsOf } from '@/entities/mission/model/aceLevel'
 import {
   BATTERS_PER_TEAM,
   PITCHERS_PER_TEAM,
@@ -408,6 +408,8 @@ interface LeagueAcePitcher {
   readonly breaking: number
   /** 레코드 +0x2c — 마운드에 오를 때 이 값으로 선다 */
   readonly stamina: number
+  /** 레코드 +0x14 장착 스킬 비트 — XlsACE_PIT_DATA 행 그대로 (`acePlayers.skillBits`) */
+  readonly skillBits: number
 }
 
 function acePitcherOf(index: number, levels: Readonly<Record<number, number>> | undefined): LeagueAcePitcher | undefined {
@@ -418,10 +420,11 @@ function acePitcherOf(index: number, levels: Readonly<Record<number, number>> | 
   const ability = aceAbilityAtLevel(ace.ability, level)
   return {
     // 0xb633c 비트6 — 간이 타석 보정 구조체에 구속·제구가 붙는다 (`quickSwingBoostOf`)
-    quick: { control: ability.hit, velocity: ability.power, stamina: ability.run, skillIds: [], ace: { order: index, level } },
+    quick: { control: ability.hit, velocity: ability.power, stamina: ability.run, skillIds: aceSkillIdsOf(ace), ace: { order: index, level } },
     staminaAbility: ability.run,
     breaking: ability.defense,
     stamina: ACE_PITCHER_RECORD_STAMINA,
+    skillBits: ace.skillBits,
   }
 }
 
@@ -431,7 +434,7 @@ function aceBatterOf(index: number, levels: Readonly<Record<number, number>> | u
   const level = aceLevelOf(levels, aceLevelSlotOf('타자', index + 1))
   const ability = aceAbilityAtLevel(ace.ability, level)
   // 0xb633c 비트6 — 간이 타석 보정 구조체에 히트·파워가 붙는다 (`quickSwingBoostOf`)
-  return { hit: ability.hit, power: ability.power, run: ability.run, skillIds: [], ace: { order: index, level } }
+  return { hit: ability.hit, power: ability.power, run: ability.run, skillIds: aceSkillIdsOf(ace), ace: { order: index, level } }
 }
 
 /**
@@ -560,7 +563,8 @@ function defenseOf(
     // 마무리 굴림 0xac360 을 지나고(CPU 끼리라 0xb6c20 이 늘 거짓), 0xabfcc 는 고르지 않는다(ac084)
     isSpecialPitcherAt: (slot) => slot === ACE_PITCHER_SLOT && acePitcher !== undefined,
     // 공 하나 소모 0xa5e14 의 비겁자(비트 18) · 끈기(비트 10) — 레코드 +0x14. 마투수 다섯 줄은 두 비트가 모두 0 이다(XlsACE_PIT_DATA 행 바이트 0x14~0x17)
-    skillBitsAt: (slot) => (slot === ACE_PITCHER_SLOT && acePitcher !== undefined ? 0 : rowAt(slot).skillBits),
+    skillBitsAt: (slot) =>
+      slot === ACE_PITCHER_SLOT && acePitcher !== undefined ? acePitcher.skillBits : rowAt(slot).skillBits,
     // 마무리 갈래(ac0be)의 정렬 열쇠 0xb5b50 = 경기용 능력치(체력 인자 90) 네 칸 합. 마투수는 0xabfcc 가 거르므로
     // 그 칸 값은 쓰이지 않는다 — 레벨 배율 먹은 네 칸을 그대로 둔다
     abilitySumAt: (slot) =>

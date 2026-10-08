@@ -29,7 +29,7 @@ import { ACE_BATTERS, ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
 import { EMPTY_BATTER_GAME_RECORD } from '@/entities/batting/model/pinchHitAi'
 import type { QuickLineup } from '@/entities/game/model/quickLineup'
 import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
-import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
+import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf, aceSkillIdsOf } from '@/entities/mission/model/aceLevel'
 import { ACE_BATTER_ROSTER_SLOT, ACE_PITCHER_RECORD_STAMINA, ACE_PITCHER_SLOT } from '@/entities/league/model/leagueDay'
 import type { AcePlayer } from '@/shared/config/original/acePlayers'
 
@@ -83,7 +83,7 @@ export function gameAcePitcherOf(
   const ability = aceAbilityAtLevel(player.ability, aceLevelOf(levels, aceLevelSlotOf('투수', index + 1)))
   return {
     player,
-    quick: { control: ability.hit, velocity: ability.power, stamina: ability.run, skillIds: [] },
+    quick: { control: ability.hit, velocity: ability.power, stamina: ability.run, skillIds: aceSkillIdsOf(player) },
     control: ability.hit,
     velocity: ability.power,
     breaking: ability.defense,
@@ -99,7 +99,7 @@ export function gameAceBatterOf(
   const player = aceBatterPlayerOf(index)
   if (player === undefined) return undefined
   const ability = aceAbilityAtLevel(player.ability, aceLevelOf(levels, aceLevelSlotOf('타자', index + 1)))
-  return { hit: ability.hit, power: ability.power, run: ability.run, skillIds: [] }
+  return { hit: ability.hit, power: ability.power, run: ability.run, skillIds: aceSkillIdsOf(player) }
 }
 
 /**
