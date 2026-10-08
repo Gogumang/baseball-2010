@@ -1,12 +1,18 @@
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import { BALL_FRAMES_PER_KIND } from '@/entities/pitching/model/pitchCurve'
 import { ballFrameIndexAt, ballPixelAt, platePixelOf } from '@/widgets/batting-stage/lib/trajectory'
-import { frameAnimations, JUDGE_FRAMES, placedFrame, sprite } from '@/widgets/batting-stage/lib/spriteLoader'
+import { frameAnimations, GAME_EFFECT_FRAMES, JUDGE_FRAMES, placedFrame, sprite } from '@/widgets/batting-stage/lib/spriteLoader'
 import { drawScenery } from '@/widgets/batting-stage/lib/renderScenery'
 import type { SceneryState } from '@/widgets/batting-stage/lib/renderScenery'
 import { judgeAnimationOf, judgeFrameAt, pitcherFrameAt, pitcherIdleFrameAt, skyColumnOfInning } from '@/widgets/batting-stage/lib/stageScenery'
 
 import { magicBallEffectFolderOf, magicBallEffectFrameAt } from '@/widgets/batting-stage/lib/magicBallEffect'
+import {
+  FASTBALL_FLAME_ANIMATION,
+  fastballFlameBallTickOf,
+  fastballFlameFrameAt,
+  hasFastballFlame,
+} from '@/widgets/batting-stage/lib/fastballFlame'
 import { drawParticles } from '@/widgets/particles/lib/renderParticles'
 import { rainDrawingOf, type SceneRain } from '@/entities/batting/model/settlementEffect'
 import type { ParticleScene } from '@/entities/particle/model/particleScene'
@@ -177,6 +183,9 @@ export function renderBattingStage(
     // 마구 이펙트는 원본에서도 공 **다음**에 그려 공 위에 얹힌다 (0x3b422 공 → 0x3b546 이펙트)
     drawMagicBallEffect(context, scene.pitch, scene.frame)
   }
+  // 강속구 불꽃 0x3b6e4 — 같은 공 그리기 0x3b2f4 의 꼬리라 공 · 마구 이펙트 다음이다. 공이 다 온 틱(N)부터라
+  // 웹이 공을 안 그리는 0x12 에서도 돈다 (`fastballFlame`)
+  if (scene.pitch !== null) drawFastballFlame(context, scene.pitch, scene.frame, scene.stagePhase)
   // 그리기 목록을 비운 뒤(0xbe6a1) · HUD(0x4c4bc) 앞 — 홈런더비 투구 기계 0x42f2c (`derbyPitchingMachine`)
   drawDerbyPitchingMachine(context, scene.scenery.gameMode, side, scene.pitcherHand ?? 0)
   if (scene.hud !== null) {
@@ -448,6 +457,25 @@ function drawMagicBallEffect(context: CanvasRenderingContext2D, pitch: Pitch, fr
   if (placed === null) return
 
   const position = ballPixelAt(pitch, frame)
+  context.drawImage(placed.image, Math.round(position.x) + placed.offsetX, Math.round(position.y) + placed.offsetY)
+}
+
+/** 강속구 불꽃 (R2 3-1) — game_effect 애니 1 을 공 화면 자리(마지막 점으로 잘린 0x35820)에 */
+function drawFastballFlame(
+  context: CanvasRenderingContext2D,
+  pitch: Pitch,
+  frame: number,
+  phase: StagePhaseSnapshot | undefined,
+): void {
+  const ballTick = fastballFlameBallTickOf(phase, frame, pitch.frameCount)
+  if (ballTick === null || !hasFastballFlame(pitch)) return
+  const entries = frameAnimations(GAME_EFFECT_FRAMES)?.[FASTBALL_FLAME_ANIMATION]
+  if (entries === undefined) return
+  const frameIndex = fastballFlameFrameAt(entries, ballTick, pitch.frameCount)
+  if (frameIndex === null) return
+  const placed = placedFrame(GAME_EFFECT_FRAMES, frameIndex)
+  if (placed === null) return
+  const position = ballPixelAt(pitch, ballTick)
   context.drawImage(placed.image, Math.round(position.x) + placed.offsetX, Math.round(position.y) + placed.offsetY)
 }
 
