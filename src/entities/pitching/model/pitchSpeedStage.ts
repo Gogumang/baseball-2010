@@ -28,6 +28,8 @@ const FORMULAS: Readonly<Record<string, Formula>> = {
   E: (a0, _a1, a2) => t((a0 * 3) / 10) + t((a2 * 7) / 10),
   F: (a0, _a1, a2) => t(a0 / 5) + t((a2 * 8) / 10),
 }
+/** 마구 구질 22 의 0부터 센 색인 */
+const MAGIC_PITCH_TYPE_INDEX = 21
 /** 구질 1~21 → 식 (표 0x66c98) */
 const FORMULA_OF_TYPE = 'AABDCCDEFABDCCDEFBDCF'
 
@@ -36,6 +38,8 @@ const FORMULA_OF_TYPE = 'AABDCCDEFABDCCDEFBDCF'
  * 0x34968 은 이것을 표시 구속 0x66dc0(구질, rank) 에 넘기고(`displaySpeed`), rank/2 를 구속 단계로 돌려준다
  */
 export function pitchSpeedRankOf(typeIndex: number, stats: PitchingStats, controlTier: number): number {
+  // 66d56: 구질 == 0x16(마구, 색인 21)이면 식 0x66c98 을 안 거치고 rank 0
+  if (typeIndex === MAGIC_PITCH_TYPE_INDEX) return 0
   const percent = TIER_PERCENT[Math.max(0, Math.min(controlTier, TIER_PERCENT.length - 1))]
   const scale = (value: number) => Math.min(MAXIMUM_STAT, t((value * percent) / 100))
   const formula = FORMULAS[FORMULA_OF_TYPE[typeIndex] ?? 'A']
