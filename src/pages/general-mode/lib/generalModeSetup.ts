@@ -138,8 +138,8 @@ export function aceIndexOfCell(cell: number): number {
  * - **마타자**(`+0xd`)는 경기 옵션으로 넘긴다 — 원본 경기 세우기 `0x30f20` 이 같은 칸으로
  *   `0xb8870(팀, k)` 를 불러 **벤치 첫 칸**에 넣는다 (`31046`). 타석에 서는 길은 대타뿐이다.
  *
- * ⚠️ 원본이 준비 화면에서 정하는 것 중 **구장**은 `TeamGameOptions` 에 받을 칸이 아직 없다.
- * 준비 기록에는 그대로 들고 있으니(화면에도 나온다) 옵션에 칸이 생기면 여기서 넘기면 된다.
+ * - **구장**(`+0xc`)은 `0x30f20` 의 310ec 가 st+0x30 에 옮겨 적고, 경기 장면 셋업 `0x39fdc`(모드 1 갈래 3a076)가 그 칸으로
+ *   구장 객체 둘을 채운다 — 9 보다 크면(빠른실행 히든 유저 팀) 경기 안에서 rand(0, 10) 둘 (`TeamGameOptions.stadiumId`).
  * - **마투수**(`+0xe`)도 같은 자리에서 `0xb88c8(팀, k)` 로 **투수 명단 8번 칸**에 들어간다
  *   (`31042`). 마타자의 9번과 칸이 다르다 — 마운드에 서는 길은 `#` 투수 교체뿐이다.
  */
@@ -175,6 +175,8 @@ export function teamGameOptionsOf(
     ourTeamId: setup.userTeamId,
     opponentTeamId: setup.aiTeamId,
     playerSide: setup.playerSide,
+    // st+0x30 = (s8)rec+0xc (0x30f20 310ec)
+    stadiumId: setup.stadiumId,
     // 고른 마타자는 벤치 첫 칸으로 들어간다 (0xb8870). NO_ACE(−1)면 아무도 안 들어간다
     aceBatterId: setup.aceBatterId,
     // 고른 마투수는 투수 명단 8번 칸으로 들어간다 (0xb88c8). AI 팀 마투수(0x66968)의 입력이기도 하다
