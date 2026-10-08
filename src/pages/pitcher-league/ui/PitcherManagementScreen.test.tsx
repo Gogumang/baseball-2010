@@ -17,10 +17,10 @@ import { createNariMainMenuCursor } from '@/pages/management/model/nariMainMenuC
 
 afterEach(cleanup)
 
+/** 고정 난수 0 — 씨앗 몫이 늘 0 이라 `rand(lo, hi)` 는 아래끝, `rand(n)` 은 0 */
 const 난수: RandomPort = {
-  next: () => 0,
-  nextInRange: (minimum) => minimum,
-  pick: (candidates) => candidates[0],
+  rand: (lo, hi) => Math.min(lo, hi),
+  rand9d: () => 0,
 }
 
 const 투수 = (overrides: Partial<PitcherCareer> = {}): PitcherCareer => ({
@@ -533,9 +533,13 @@ describe('두 갈래 팝업의 키 (0x19398 · StrictMode)', () => {
     expect(screen.getByText('원하는 항목을 선택해주세요')).toBeTruthy()
 
     키('Enter')
+    // 탭 1 → 108 창을 거친다 (진입 0x17730 — 커서는 배운 수 L = 0 칸)
+    expect(screen.getByText('마구 훈련')).toBeTruthy()
+    expect(screen.queryByText(/가 소모됩니다/)).toBeNull()
 
-    // StrMODE[66] "%d G포인트가 소모됩니다" — 마구 훈련 확인 팝업까지 왔다
-    expect(screen.getByText(/G포인트가 소모됩니다/)).toBeTruthy()
+    키('Enter')
+    // StrMODE[66] "%d G포인트가 소모됩니다" — 창의 확인 키 0x17828 이 띄운다 (색 바꿈 `!c` 로 글이 나뉜다)
+    expect(screen.getByText(/가 소모됩니다/)).toBeTruthy()
   })
 
   it('좌우 키가 `+0x166` 을 토글한다 — 오른쪽으로 옮기면 [구질] 이 열린다', () => {
@@ -575,6 +579,8 @@ describe('두 갈래 팝업의 키 (0x19398 · StrictMode)', () => {
     엄격화면({ onSave })
 
     키로마구칸까지()
+    키('Enter')
+    // 108 창 — 커서 칸(L = 0)을 확인한다
     키('Enter')
     // StrMODE[66] 확인 팝업의 [예]
     키('Enter')
@@ -732,5 +738,47 @@ describe('능력치 상세 창(120) — 기본정보에서 \'0\' (키 0x1056c ·
     누르기('되돌아가기')
     expect(screen.queryByRole('dialog', { name: '상세정보' })).toBeNull()
     expect(container.querySelectorAll('img[data-footer-mark]').length).toBe(2)
+  })
+})
+
+describe('108 마구 창(탭 1) — 진입 0x17730 · 확인 키 0x17828 (탭 0 필살타법과 같은 갈래)', () => {
+  const 마구창까지 = () => {
+    누르기('트레이닝')
+    누르기('마구')
+    누르기('마구')
+    expect(screen.getByText('마구 훈련')).toBeTruthy()
+  }
+  const 커서칸 = () => screen.getAllByRole('button').filter((button) => button.getAttribute('aria-pressed') === 'true')
+    .map((button) => button.textContent)
+
+  it('처음 커서는 min(배운 수 L, 3) 칸이다 (177c8~17806)', () => {
+    화면({ career: 투수({ magicLevel: 2, popularity: 2000, gamePoint: 5000 }) })
+    마구창까지()
+    const 칸들 = screen.getAllByRole('button').filter((button) => button.hasAttribute('aria-pressed'))
+    expect(칸들.findIndex((button) => button.getAttribute('aria-pressed') === 'true')).toBe(2)
+  })
+
+  it('배운 칸은 StrMODE[63] · 앞 칸이 남았으면 [64] · 인기도가 모자라면 [62] (그 칸 값)', () => {
+    화면({ career: 투수({ magicLevel: 1, popularity: 600, gamePoint: 5000 }) })
+    마구창까지()
+    const 칸들 = () => screen.getAllByRole('button').filter((button) => button.hasAttribute('aria-pressed'))
+
+    fireEvent.click(칸들()[0])
+    expect(screen.getByText(/이미 훈련 완료된 스킬입니다/)).toBeTruthy()
+    fireEvent.click(칸('확인'))
+
+    // 칸 2: 인기도 600 < 1000 → [62] 가 [64] 보다 먼저다
+    fireEvent.click(칸들()[2])
+    expect(screen.getByText(/필요한 인기도 : 1000/)).toBeTruthy()
+    fireEvent.click(칸('확인'))
+  })
+
+  it('취소는 107(트레이닝)로 — 0x17828 17a76 → 0x6b', () => {
+    화면()
+    마구창까지()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.queryByText('마구 훈련')).toBeNull()
+    expect(칸이름들()).toContain('마구')
+    expect(커서칸()).toEqual([])
   })
 })

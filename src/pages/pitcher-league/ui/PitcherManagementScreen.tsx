@@ -15,6 +15,7 @@ import { usePitcherManagementMenu } from '@/pages/pitcher-league/model/usePitche
 import { PitcherStatusBoard } from '@/pages/pitcher-league/ui/PitcherStatusBoard'
 import { PitcherBasicInfoPanel } from '@/pages/pitcher-league/ui/PitcherBasicInfoPanel'
 import { PitcherRepertoirePanel } from '@/pages/pitcher-league/ui/PitcherRepertoirePanel'
+import { PitcherMagicTrainingPanel } from '@/pages/pitcher-league/ui/PitcherMagicTrainingPanel'
 import { PitcherRecordPanel } from '@/pages/pitcher-league/ui/PitcherRecordPanel'
 import { PitchTrainingScreen } from '@/pages/pitcher-league/ui/PitchTrainingScreen'
 import { DetailWindow } from '@/pages/management/ui/DetailPopup'
@@ -271,6 +272,10 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
             />
           )}
           {menu.subWindow === '기록실' && <PitcherRecordPanel career={career} tab={menu.recordWindowTab} />}
+          {menu.subWindow === '마구훈련' && (
+            <PitcherMagicTrainingPanel career={career} cursor={menu.magicTrainingCursor}
+              onMoveCursor={menu.moveMagicTrainingCursor} onConfirm={menu.confirmMagicTrainingCell} />
+          )}
         </div>
       )}
 

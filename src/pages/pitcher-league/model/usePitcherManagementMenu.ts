@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { BALANCE } from '@/shared/config/original/balance'
 import type { MenuItem } from '@/shared/ui'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { PitcherShopTab } from '@/features/shop/model/pitcherShopSelection'
@@ -14,7 +13,12 @@ import { PITCHER_ABILITY_NAMES, PITCHER_ABILITY_ORDER } from '@/entities/pitcher
 import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbility'
 import {
   MAGIC_MAXIMUM_LEVEL,
+  MAGIC_REQUIRED_POPULARITY,
+  MAGIC_TRAINING_CELL_COUNT,
   PITCHER_TRAINING_MENUS,
+  magicTrainingCellBlockOf,
+  magicTrainingCellCostOf,
+  magicTrainingCursorOf,
   PITCHER_TYPE_NAMES,
   pitcherTrainingBlockReasonOf,
   runPitcherTraining,
@@ -57,6 +61,7 @@ import {
 import { pitcherRestDetailRowsOf, pitcherTrainingDetailRowsOf } from '@/pages/pitcher-league/lib/pitcherDetailPopup'
 import type { DetailRow } from '@/pages/management/lib/detailPopup'
 import { rollTrainingInjury } from '@/entities/career/model/condition'
+import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 
 /**
  * 투수편 관리 화면의 상태 기계 — 원본 장면 0x106 의 상태 **105(허브) · 106(선수정보) · 107(트레이닝)**
@@ -69,8 +74,10 @@ import { rollTrainingInjury } from '@/entities/career/model/condition'
  */
 
 export type PitcherMenuKind = '관리' | '선수정보' | '트레이닝' | '아이템'
-/** 하위 창 — 원본 상태 119 · 123 · 108 · 124 · 122(아이템/스킬) 자리 */
-export type PitcherMenuWindow = '기본정보' | '구질목록' | '구질훈련' | '기록실' | '아이템/스킬' | null
+/**
+ * 하위 창 — 원본 상태 119 · 123 · 108 · 124 · 122(아이템/스킬) 자리. 108 은 탭으로 둘이다 — 1 마구(`'마구훈련'`) · 2 구질(`'구질훈련'`).
+ */
+export type PitcherMenuWindow = '기본정보' | '구질목록' | '구질훈련' | '마구훈련' | '기록실' | '아이템/스킬' | null
 
 export interface PitcherMenuQuestion {
   readonly text: string
@@ -159,14 +166,19 @@ export interface PitcherManagementMenu {
   readonly closeWindow: () => void
   /** 구질 훈련 창(108)이 돌려준 커리어를 저장한다 */
   readonly saveTrainedPitch: (career: PitcherCareer) => void
+  /** 108 마구 창(탭 1)의 격자 커서 — 진입 0x17730 이 `min(L, 3)` 에 둔다 */
+  readonly magicTrainingCursor: number
+  readonly moveMagicTrainingCursor: (cell: number) => void
+  /** 108 마구 창의 확인 키 0x17828 — 칸 하나를 확인한다 */
+  readonly confirmMagicTrainingCell: (cell: number) => void
   /** 스킬 창(122) 대화 번호 4(장착)·3(해제) — 0x1483c `0xa4b04(P, s, on)` */
   readonly equipSkill: (skillId: number, on: boolean) => void
   /** 스킬 창(122) 대화 번호 6 — 슬롯 확장 0x1484c. G 가 모자라면 아무것도 안 바뀐다 */
   readonly expandSkillSlots: () => void
 }
 
-/** 마구 훈련 G포인트 — 필살타법 창과 같은 표 (BALANCE.specialSwing, H-4 · R7 4절) */
-const MAGIC_GAME_POINT_COST: readonly number[] = BALANCE.specialSwing.gamePointCost
+/** StrMODE 글 — 화면이 `!C` 를 붙여 그리므로 앞의 가운데 맞춤 표시는 뗀다 */
+const modeTextOf = (index: number): string => (ORIGINAL_MODE_TEXT[index] ?? '').replace(/^!C/, '')
 
 export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): PitcherManagementMenu {
   const { career, random, onSave, onNextGame, onOuting, onOpenShop, onExit } = input
@@ -189,6 +201,8 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
   const [choiceIndex, setChoiceIndex] = useState(0)
   /** 상세 결과 창 — 닫을 때 할 일(부상·회복 판정)을 같이 든다 */
   const [detail, setDetail] = useState<PitcherMenuDetail | null>(null)
+  /** 108 마구 창의 격자 커서 (창 객체 +0xc · +0x10 — 진입 0x17730 이 정한다) */
+  const [magicTrainingCursor, setMagicTrainingCursor] = useState(0)
 
   /** 두 갈래 팝업을 연다 — 커서는 늘 첫 칸부터다 (원본도 `+0x166` 을 0 으로 두고 연다) */
   const openChoice = useCallback((next: PitcherMenuChoice) => {
@@ -262,7 +276,40 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     [career.magicLevel],
   )
 
-  /** 팝업 0x78 — 마구/구질 두 갈래. 트레이닝(107)에서 열면 훈련 창, 선수정보(106)에서 열면 보기 창 */
+  /** 108 진입 0x17730 — 탭이 2 가 아니면 커서를 `min(s8 [저장+0x201], 3)` 칸에 둔다 (177c8~17806) */
+  const enterMagicTraining = useCallback(() => {
+    setMagicTrainingCursor(magicTrainingCursorOf(career))
+    setSubWindow('마구훈련')
+  }, [career])
+
+  /**
+   * 108 마구 창(탭 1)의 확인 키 **0x17828** — 탭 0(타자 필살타법)과 같은 갈래 17858~17a42 다 (`magicTrainingCellBlockOf`).
+   * 팝업 [65](2,2) "예" → 틀 0x106bc → **139 G포인트 충전**, [66](2,3) "예" → **125** → 0x17f5c(훈련) → 105.
+   *
+   * ⚠️ [65] 의 "예"(→ 139 G포인트 충전 페이지)는 웹에 갈 곳이 없어 상자만 닫힌다(창에 남는다).
+   */
+  const confirmMagicTrainingCell = useCallback(
+    (cell: number) => {
+      const block = magicTrainingCellBlockOf(career, cell)
+      if (block === '훈련완료') return setNotice(modeTextOf(63))
+      if (block === '인기도부족') {
+        return setNotice(modeTextOf(62).replace('%d', String(MAGIC_REQUIRED_POPULARITY[cell] ?? 0)))
+      }
+      if (block === '선행필요') return setNotice(modeTextOf(64))
+      if (block === 'G포인트부족') return setQuestion({ text: modeTextOf(65), onYes: () => undefined })
+      const menu = PITCHER_TRAINING_MENUS[PITCHER_TRAINING_MENUS.length - 1]
+      return setQuestion({
+        text: modeTextOf(66).replace('%d', String(magicTrainingCellCostOf(cell))),
+        onYes: () => {
+          setSubWindow(null)
+          runMagicTraining(menu)
+        },
+      })
+    },
+    [career, enterMagicTraining, runMagicTraining],
+  )
+
+  /** 팝업 0x78 — 마구/구질 두 갈래. 트레이닝(107)에서 열면 훈련 창 108, 선수정보(106)에서 열면 보기 창 123 */
   const openPitchWindow = useCallback(
     (isTraining: boolean) => {
       openChoice({
@@ -274,19 +321,14 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
           setChoice(null)
           if (!isTraining) return setSubWindow('구질목록')
           if (!isMagic) return setSubWindow('구질훈련')
-          const menu = PITCHER_TRAINING_MENUS[PITCHER_TRAINING_MENUS.length - 1]
-          const reason = pitcherTrainingBlockReasonOf(career, menu)
-          if (reason !== null) return setNotice(blockNoticeOf(reason))
-          const cost = MAGIC_GAME_POINT_COST[career.magicLevel] ?? 0
-          // StrMODE[66] "%d G포인트가 소모됩니다. 배우시겠습니까?"
-          return setQuestion({
-            text: `${cost} G포인트가 소모됩니다`,
-            onYes: () => runMagicTraining(menu),
-          })
+          // 웹이 둔 주기 검사(한 주기에 한 가지 — 원본 키에 없다)는 예전처럼 창 앞에서 본다
+          if (career.hasActedThisCycle) return setNotice(PITCHER_MANAGEMENT_TEXT.alreadyActed)
+          // 탭 1 → 108(현재 상태가 107 이라) — 창을 거쳐 칸을 고른다. 칸 가드는 창의 확인 키 0x17828 이 본다
+          return enterMagicTraining()
         },
       })
     },
-    [blockNoticeOf, career, openChoice, runMagicTraining],
+    [career.hasActedThisCycle, enterMagicTraining, openChoice],
   )
 
   const selectCommand = useCallback(
@@ -393,8 +435,8 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
   )
 
   const closeWindow = useCallback(() => {
-    // 108(구질 훈련) 취소는 107 로, 나머지 창은 106 으로 돌아간다
-    setKind(subWindow === '구질훈련' ? '트레이닝' : '선수정보')
+    // 108(구질 · 마구 훈련) 취소는 107 로(0x17828 17a76 → 0x6b), 나머지 창은 106 으로 돌아간다
+    setKind(subWindow === '구질훈련' || subWindow === '마구훈련' ? '트레이닝' : '선수정보')
     setSubWindow(null)
     setIsTitleWindowOpen(false)
   }, [subWindow])
@@ -422,6 +464,27 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     const onKey = (event: KeyboardEvent) => {
       // 팝업이 떠 있으면 그쪽이 먼저 키를 가져간다 (원본도 창 위 팝업이 키를 잡는다)
       if (question !== null || choice !== null || notice !== '') return
+      /*
+       * 108 마구 창 — 확인(−5 / '5')은 0x17828 의 칸 가드, 그 밖 키는 창 객체 0x80269 가 격자 커서를 옮긴다.
+       * 칸 넷이 한 줄이라 ←→ 로 돌고 끝에서 감긴다(타자 필살타법 창 `SpecialSwingWindow` 와 같은 창 키). 취소는 `back`.
+       */
+      if (subWindow === '마구훈련') {
+        const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
+        if (step !== 0) {
+          event.preventDefault()
+          return setMagicTrainingCursor((current) => (current + step + MAGIC_TRAINING_CELL_COUNT) % MAGIC_TRAINING_CELL_COUNT)
+        }
+        if (event.key === 'Enter' || event.key === '5') {
+          event.preventDefault()
+          return confirmMagicTrainingCell(magicTrainingCursor)
+        }
+        // 취소(−16) → 107 (17a76 `0xbcb49(this+0x18, 0x6b)`)
+        if (event.key === 'Escape' || event.key === 'Backspace') {
+          event.preventDefault()
+          return back()
+        }
+        return undefined
+      }
       // 120 키 0x1b654 — 취소·'0' → 119, 그 밖은 0x8a044 글 스크롤(↑·'2' / ↓·'8')
       if (abilityDetailOffset !== null) {
         if (event.key === 'Escape' || event.key === 'Backspace' || event.key === '0') return setAbilityDetailOffset(null)
@@ -439,7 +502,8 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [abilityDetailOffset, career, choice, isTitleWindowOpen, notice, question, subWindow])
+  }, [abilityDetailOffset, back, career, choice, confirmMagicTrainingCell, isTitleWindowOpen, magicTrainingCursor, notice,
+    question, subWindow])
 
   /** 129 확인 — `선수+0x1c4 = sel` 뒤 곧바로 저장한다 (0x11f78 의 확인 갈래) */
   const equipTitle = useCallback(
@@ -609,6 +673,9 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     chooseOption,
     closeWindow,
     saveTrainedPitch,
+    magicTrainingCursor,
+    moveMagicTrainingCursor: setMagicTrainingCursor,
+    confirmMagicTrainingCell,
     equipSkill,
     expandSkillSlots: expandPitcherSkillSlots,
   }
