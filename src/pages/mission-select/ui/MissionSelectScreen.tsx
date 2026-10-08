@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Button, DialogueBox, FrameSprite, MarkupText, MessageBox, Notice, Panel, PixelScreen, RawScreen } from '@/shared/ui'
+import { Button, FrameSprite, MessageBox, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { BATTER_MISSIONS, PITCHER_MISSIONS, missionKeyOf } from '@/entities/mission/model/missionGoal'
 import type { OriginalMission } from '@/shared/config/original/missions'
@@ -16,6 +16,11 @@ import * as styles from '@/pages/mission-select/ui/MissionSelectScreen.css'
 
 const SLT_FRAME = './sprites/slt_frame'
 const IMG_TEXT = './sprites/img_text/frames'
+
+/** StrMAINMENU[60] — 잠긴 칸 OK (0x1db84~0x1dba4: 0x74ef5(…, 종류 1)) */
+const LOCKED_MISSION_TEXT = '!C오픈 되지 않은 미션입니다.!N이전 단계를 클리어해주세요'
+/** StrMAINMENU[61] — 열린 칸 OK, %s = 미션 레코드 +0x2e 이름 (0x1db34~0x1db7c: 0x74ef5(…, 종류 2)) */
+const challengeTextOf = (name: string) => `!C[!cFFFF00${name}!cFFFFFF]!N미션에 도전하시겠습니까?`
 
 const imageSrc = (folder: string, id: number) => `${folder}/${String(id).padStart(3, '0')}.png`
 
@@ -44,7 +49,8 @@ interface MissionSelectScreenProps {
  * 격자 칸 안쪽 그림은 아직 못 읽어(0x7a571 내부) 번호와 잠김·클리어 상태만 그린다.
  *
  * 키 0x1daa4 하위 0: 격자 `vt+0x18`(0x6c031 — 숫자키 꼴 1) 이 커서를 옮기고 돌려준 키로
- * OK(−5 · '5') → 칸 14 면 이벤트 미션 창(`EventMissionWindow`), 아니면 미션 · CLR(−16) → 메인 메뉴(장면 상태 4).
+ * OK(−5 · '5') → 칸 14 면 이벤트 미션 창(`EventMissionWindow`), 잠긴 칸이면 StrMAINMENU[60] 알림, 열린 칸이면 [61] 도전 확인 —
+ * 예면 곧바로 경기(장면 상태 3) · CLR(−16) → 메인 메뉴(장면 상태 4).
  * 격자 꼴은 0x330 이라 15칸을 감으며 넘긴다(`MISSION_GRID_SHAPE`).
  * 이벤트 미션 창의 답: 미션실행 → 받은 미션이 없어(웹은 통신이 없다) 알림 `EVENT_MISSION_EMPTY_TEXT` 뒤 목록 ·
  * 미션다운 → 원본은 장면 상태 2(0x1e798 — 통신으로 미션 받기 🌐) — ⚠️ 웹은 통신이 없어 창만 닫고 목록에 남는다(미해결).
@@ -62,6 +68,8 @@ export function MissionSelectScreen({
   /** [this+0xa0] — 이벤트 미션 창의 고름(≠ 0 미션실행). 장면 진입 0x1d9a4 가 1 로 둔다 */
   const [isEventRunSelected, setIsEventRunSelected] = useState(true)
   const [eventWindow, setEventWindow] = useState<'창' | '알림' | null>(null)
+  /** OK 팝업 — [60] 잠긴 칸 알림 · [61] 도전 확인 */
+  const [popup, setPopup] = useState<{ readonly kind: '잠김' } | { readonly kind: '도전'; readonly mission: OriginalMission } | null>(null)
   const frames = useFrameOrigins(`${SLT_FRAME}/frames`)
   const textFrames = useFrameOrigins(IMG_TEXT)
 
@@ -76,10 +84,16 @@ export function MissionSelectScreen({
     return previous !== undefined && !clearedKeys.includes(missionKeyOf(previous))
   }
 
+  /**
+   * 키 0x1daa4 하위 0 의 OK (0x1db06~0x1dba8): 칸 14 → 이벤트 미션 창 · `0xa520d(미션, 칸)` 이 0(잠김)이면 [60] 확인 팝업(하위 0 그대로),
+   * 아니면 [61] 예/아니오 팝업 뒤 하위 1. 하위 1(0x1dbaa~0x1dbf6)은 답 [창+0x21c] 이 0(예)이면 [미션+0xbd] = 칸 · 저장 · 상태 3(경기),
+   * 1(아니오)이면 하위 0 으로 돌아온다.
+   */
   const openEventWindowOrSelect = (index: number) => {
     if (index === EVENT_MISSION_CELL) return setEventWindow('창')
     const mission = missions[index]
-    if (mission !== undefined && !isLockedAt(index)) onSelect(mission)
+    if (mission === undefined) return undefined
+    setPopup(isLockedAt(index) ? { kind: '잠김' } : { kind: '도전', mission })
   }
 
   const onEventAnswer = (answer: EventMissionAnswer) => {
@@ -88,7 +102,7 @@ export function MissionSelectScreen({
   }
 
   useEffect(() => {
-    if (eventWindow !== null) return undefined
+    if (eventWindow !== null || popup !== null) return undefined
     const onKeyDown = (event: KeyboardEvent) => {
       // 숫자키 꼴 1 (표 0xd2e7c): '2' ↑ · '4' ← · '6' → · '8' ↓ · '5' OK
       const direction =
@@ -150,7 +164,7 @@ export function MissionSelectScreen({
               color: isLocked ? '#4A5C8F' : '#FFFFFF',
             }}
             onMouseEnter={() => setCursor(index)}
-            onClick={() => { setCursor(index); if (!isLocked) onSelect(mission) }}>
+            onClick={() => { setCursor(index); openEventWindowOrSelect(index) }}>
             {isLocked ? '' : isCleared ? '★' : index + 1}
           </button>
         )
@@ -209,45 +223,19 @@ export function MissionSelectScreen({
         <EventMissionWindow isRunSelected={isEventRunSelected}
           onToggle={() => setIsEventRunSelected((previous) => !previous)} onAnswer={onEventAnswer} />
       )}
+      {popup?.kind === '잠김' && (
+        <MessageBox text={LOCKED_MISSION_TEXT} buttons={['OK']} onAnswer={() => setPopup(null)} />
+      )}
+      {popup?.kind === '도전' && (
+        <MessageBox text={challengeTextOf(popup.mission.name)} buttons={['예', '아니오']}
+          onAnswer={(answer) => {
+            setPopup(null)
+            if (answer === 0) onSelect(popup.mission)
+          }} />
+      )}
       {eventWindow === '알림' && (
         <MessageBox text={EVENT_MISSION_EMPTY_TEXT} buttons={['OK']} onAnswer={() => setEventWindow(null)} />
       )}
     </RawScreen>
-  )
-}
-
-/**
- * 미션 설명 화면 — 격자에서 미션을 고른 뒤 도전 여부를 묻는 자리.
- * 원본은 선택 화면 안 설명 상자에서 바로 시작하지만, 웹은 한 단계를 더 둔다 (원본에 없는 화면).
- */
-export function MissionBriefing({
-  mission,
-  onStart,
-  onBack,
-}: {
-  readonly mission: OriginalMission
-  readonly onStart: () => void
-  readonly onBack: () => void
-}) {
-  return (
-    <PixelScreen
-      title={mission.name}
-      leftKey={{ label: '도전', onPress: onStart }}
-      rightKey={{ label: '취소', onPress: onBack }}
-    >
-      <DialogueBox>
-        <MarkupText raw={mission.briefing} />
-      </DialogueBox>
-      <Panel heading="목표">
-        {mission.goals.map((goal) => (
-          <Notice key={goal}>
-            · {goal}
-          </Notice>
-        ))}
-        {mission.timeLimitSeconds > 0 && (
-          <Notice>· 제한 시간 {mission.timeLimitSeconds}초</Notice>
-        )}
-      </Panel>
-    </PixelScreen>
   )
 }

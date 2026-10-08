@@ -252,7 +252,7 @@ function heldAceMatchSetupOf(hold: AceMatchHold, nariTeamIds: MissionSessionInpu
  * 진입 0x2613c → 0x5eb8c 가 전역기록 +0xa5 · +0xa6 을 −1 로 되돌리고 다시 고르게 한다.
  * (마선수 대결 '마선수대결' 은 이벤트에서 오는 길이라 넣지 않는다.)
  */
-const MISSION_MODE_SCREENS: readonly Screen['kind'][] = ['미션선택', '미션설명', '미션진행', '투수미션']
+const MISSION_MODE_SCREENS: readonly Screen['kind'][] = ['미션선택', '미션진행', '투수미션']
 
 /** 미션 상대. 원본 레코드의 마선수 순번이 있으면 그 마선수다 (타자 미션이면 마투수). */
 export function missionOpponent(mission: OriginalMission): AcePlayer | null {

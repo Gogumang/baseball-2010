@@ -100,7 +100,6 @@ const ENTRY_SCREENS: readonly Screen['kind'][] = ['이용안내', '로고', '타
 const MISSION_SCREENS: readonly Screen['kind'][] = [
   '마선수대결',
   '미션선택',
-  '미션설명',
   '미션진행',
   '투수미션',
 ]

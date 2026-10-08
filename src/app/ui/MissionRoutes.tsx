@@ -9,7 +9,7 @@ import {
   missionStageBatterOf,
 } from '@/app/model/useMissionSession'
 import type { useMissionSession } from '@/app/model/useMissionSession'
-import { MissionSelectScreen, MissionBriefing } from '@/pages/mission-select/ui/MissionSelectScreen'
+import { MissionSelectScreen } from '@/pages/mission-select/ui/MissionSelectScreen'
 import { MissionPlayScreen } from '@/pages/mission-play/ui/MissionPlayScreen'
 import { cpuSideOf, humanSideOf } from '@/entities/mission/model/missionGame'
 import { HallOfFameScreen } from '@/pages/special/ui/SpecialScreen'
@@ -200,7 +200,8 @@ export function MissionRoutes({
       initialSide={session.player?.side ?? session.lastSide}
       // 고른 선수가 편을 정한다 — 목록 안에서 편을 바꾸는 길은 원본에 없다
       canSwitchSide={session.player === null}
-      onSelect={(mission) => setScreen({ kind: '미션설명', mission })}
+      // [61] 예 → 하위 1 이 [미션+0xbd] = 칸 · 저장 · 상태 3(경기 시작 0x1e908) — 사이에 설명 화면은 없다
+      onSelect={(mission) => actions.begin(mission)}
       // CLR 0x1e8d0: [0x140006c] = 0x11 · 장면 0x103 — 메인 메뉴가 아니라 선수 고르기(하위 17)가 띠 연출과 함께 다시 선다
       onBack={() => {
         setPickSceneRebuilt(true)
@@ -209,16 +210,6 @@ export function MissionRoutes({
       }}
     />
   )
-
-  if (screen.kind === '미션설명') {
-    return (
-      <MissionBriefing
-        mission={screen.mission}
-        onStart={() => actions.begin(screen.mission)}
-        onBack={() => setScreen({ kind: '미션선택' })}
-      />
-    )
-  }
 
   // 이벤트 마선수 대결도 같은 타석 화면이다 — 끝나면 미션 목록 대신 결과 이벤트로 돌아간다
   if (screen.kind === '미션진행' || screen.kind === '마선수대결') {

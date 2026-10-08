@@ -855,7 +855,7 @@ describe('미션 선수 고르기 — 명예 선수를 고르면 0x1fbd0 · 0x1f
   it('미션 모드 화면을 떠나면 고른 선수를 지운다 — 다시 들어오면 0x5eb8c 가 +0xa5/+0xa6 을 −1 로 되돌린다', () => {
     const rendered = 세션()
     act(() => rendered.result.current.actions.choosePlayer({ side: '투수', hallOfFameIndex: 0 }))
-    rendered.rerender({ screen: { kind: '미션설명', mission: MISSIONS[0] } })
+    rendered.rerender({ screen: { kind: '미션진행', mission: MISSIONS[0] } })
     expect(rendered.result.current.player).not.toBeNull()
     rendered.rerender({ screen: { kind: '메인메뉴' } })
     expect(rendered.result.current.player).toBeNull()

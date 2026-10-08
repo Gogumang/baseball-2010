@@ -53,21 +53,29 @@ describe('미션 선택 격자', () => {
     expect(sixth.style.top).toBe(`${cellPositionOf(GRID.columns).y}px`)
   })
 
-  it('잠긴 칸은 고를 수 없다 — 바로 앞 미션을 깨야 열린다', () => {
+  it('잠긴 칸 OK 는 StrMAINMENU[60] 확인 팝업 — 닫으면 목록에 남는다 (0x1db84)', () => {
     const onSelect = vi.fn()
     띄우기({ onSelect })
 
     fireEvent.click(칸(BATTER_MISSIONS[1].name))
+    expect(screen.getByText('오픈 되지 않은 미션입니다.')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'OK' }))
 
+    expect(screen.queryByText('오픈 되지 않은 미션입니다.')).toBeNull()
     expect(onSelect).not.toHaveBeenCalled()
   })
 
-  it('열린 칸을 고르면 그 미션으로 넘어간다', () => {
+  it('열린 칸 OK 는 StrMAINMENU[61] "[이름] 미션에 도전하시겠습니까?" — 예면 그 미션, 아니오면 목록 (0x1db34 · 하위 1 0x1dbaa)', () => {
     const onSelect = vi.fn()
     띄우기({ onSelect })
 
     fireEvent.click(칸(BATTER_MISSIONS[0].name))
+    expect(screen.getByText('미션에 도전하시겠습니까?', { exact: false })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '아니오' }))
+    expect(onSelect).not.toHaveBeenCalled()
 
+    fireEvent.keyDown(window, { key: 'Enter' })
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
     expect(onSelect).toHaveBeenCalledWith(BATTER_MISSIONS[0])
   })
 
@@ -116,6 +124,7 @@ describe('미션 선택 격자', () => {
     fireEvent.keyDown(window, { key: '4' })
     fireEvent.keyDown(window, { key: '6' })
     fireEvent.keyDown(window, { key: '5' })
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
 
     expect(onSelect).toHaveBeenCalledWith(BATTER_MISSIONS[1])
   })
