@@ -206,6 +206,8 @@ def generate_ace_players() -> None:
         '  readonly stillUrl: string',
         '  /** 필살기 이름 (StrCOMMON) */',
         '  readonly burst: string',
+        '  /** 레코드 +0x14 u32 — 장착 스킬 비트 (0xb62b4 가 읽는 칸) */',
+        '  readonly skillBits: number',
         '}',
         '',
         '/** 원본 XlsACE_BAT_DATA / XlsACE_PIT_DATA. 능력치는 원본 0~999 눈금 그대로. */',
@@ -239,7 +241,8 @@ def generate_ace_players() -> None:
                 f"run: {run}, defense: {defense} }}, iconUrl: {quote(icon)}, "
                 f"framesUrl: {quote('./sprites/' + folder + '/frames')}, "
                 f"frameCount: {frame_counts.get(folder, 0)}, "
-                f"stillUrl: {quote(largest_image(folder))}, burst: {quote(burst)} }},"
+                f"stillUrl: {quote(largest_image(folder))}, burst: {quote(burst)}, "
+                f"skillBits: 0x{skill_bits_of(row):x} }},"
             )
     lines.append(']')
     write('acePlayers.ts', '\n'.join(lines) + '\n')

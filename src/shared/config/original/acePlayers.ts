@@ -17,18 +17,20 @@ export interface AcePlayer {
   readonly stillUrl: string
   /** 필살기 이름 (StrCOMMON) */
   readonly burst: string
+  /** 레코드 +0x14 u32 — 장착 스킬 비트 (0xb62b4 가 읽는 칸) */
+  readonly skillBits: number
 }
 
 /** 원본 XlsACE_BAT_DATA / XlsACE_PIT_DATA. 능력치는 원본 0~999 눈금 그대로. */
 export const ACE_PLAYERS: readonly AcePlayer[] = [
-  { id: 'medica', name: '메디카', role: '타자', ability: { hit: 620, power: 620, run: 450, defense: 620 }, iconUrl: './sprites/ace_icon/005.png', framesUrl: './sprites/batter_medica/frames', frameCount: 12, stillUrl: './sprites/batter_medica/024.png', burst: '핑크 봄' },
-  { id: 'kao', name: '어거지죠', role: '타자', ability: { hit: 700, power: 450, run: 650, defense: 600 }, iconUrl: './sprites/ace_icon/006.png', framesUrl: './sprites/batter_kao/frames', frameCount: 15, stillUrl: './sprites/batter_kao/002.png', burst: '플레임 스트라이커' },
-  { id: 'roze', name: '로제', role: '타자', ability: { hit: 580, power: 850, run: 320, defense: 600 }, iconUrl: './sprites/ace_icon/007.png', framesUrl: './sprites/batter_roze/frames', frameCount: 13, stillUrl: './sprites/batter_roze/000.png', burst: '메이든 임팩트' },
-  { id: 'death', name: '크라이져', role: '타자', ability: { hit: 777, power: 555, run: 444, defense: 666 }, iconUrl: './sprites/ace_icon/008.png', framesUrl: './sprites/batter_death/frames', frameCount: 12, stillUrl: './sprites/batter_death/037.png', burst: '하트 브레이커' },
-  { id: 'tiger', name: '킹타이거', role: '타자', ability: { hit: 650, power: 920, run: 380, defense: 450 }, iconUrl: './sprites/ace_icon/009.png', framesUrl: './sprites/batter_tiger/frames', frameCount: 13, stillUrl: './sprites/batter_tiger/001.png', burst: '크로스 액스' },
-  { id: 'psyker', name: '싸이커', role: '투수', ability: { hit: 670, power: 550, run: 300, defense: 820 }, iconUrl: './sprites/ace_icon/000.png', framesUrl: './sprites/pitcher_psyker/frames', frameCount: 20, stillUrl: './sprites/pitcher_psyker/012.png', burst: '싸이킥 스타' },
-  { id: 'leony', name: '레오니', role: '투수', ability: { hit: 580, power: 850, run: 330, defense: 580 }, iconUrl: './sprites/ace_icon/001.png', framesUrl: './sprites/pitcher_leony/frames', frameCount: 16, stillUrl: './sprites/pitcher_leony/000.png', burst: '트리플 크로우' },
-  { id: 'bbmachine', name: '붕붕머신', role: '투수', ability: { hit: 820, power: 620, run: 320, defense: 620 }, iconUrl: './sprites/ace_icon/002.png', framesUrl: './sprites/pitcher_bbmachine/frames', frameCount: 14, stillUrl: './sprites/pitcher_bbmachine/003.png', burst: '홀로그램 레이저' },
-  { id: 'ballantine', name: '발렌타인', role: '투수', ability: { hit: 700, power: 600, run: 280, defense: 800 }, iconUrl: './sprites/ace_icon/003.png', framesUrl: './sprites/pitcher_ballantine/frames', frameCount: 19, stillUrl: './sprites/pitcher_ballantine/012.png', burst: '다크 일루전' },
-  { id: 'dragona', name: '드래고나', role: '투수', ability: { hit: 650, power: 900, run: 300, defense: 650 }, iconUrl: './sprites/ace_icon/004.png', framesUrl: './sprites/pitcher_dragona/frames', frameCount: 14, stillUrl: './sprites/pitcher_dragona/000.png', burst: '브레스 웨폰' },
+  { id: 'medica', name: '메디카', role: '타자', ability: { hit: 620, power: 620, run: 450, defense: 620 }, iconUrl: './sprites/ace_icon/005.png', framesUrl: './sprites/batter_medica/frames', frameCount: 12, stillUrl: './sprites/batter_medica/024.png', burst: '핑크 봄', skillBits: 0x2102 },
+  { id: 'kao', name: '어거지죠', role: '타자', ability: { hit: 700, power: 450, run: 650, defense: 600 }, iconUrl: './sprites/ace_icon/006.png', framesUrl: './sprites/batter_kao/frames', frameCount: 15, stillUrl: './sprites/batter_kao/002.png', burst: '플레임 스트라이커', skillBits: 0x200400 },
+  { id: 'roze', name: '로제', role: '타자', ability: { hit: 580, power: 850, run: 320, defense: 600 }, iconUrl: './sprites/ace_icon/007.png', framesUrl: './sprites/batter_roze/frames', frameCount: 13, stillUrl: './sprites/batter_roze/000.png', burst: '메이든 임팩트', skillBits: 0x9100 },
+  { id: 'death', name: '크라이져', role: '타자', ability: { hit: 777, power: 555, run: 444, defense: 666 }, iconUrl: './sprites/ace_icon/008.png', framesUrl: './sprites/batter_death/frames', frameCount: 12, stillUrl: './sprites/batter_death/037.png', burst: '하트 브레이커', skillBits: 0x16000 },
+  { id: 'tiger', name: '킹타이거', role: '타자', ability: { hit: 650, power: 920, run: 380, defense: 450 }, iconUrl: './sprites/ace_icon/009.png', framesUrl: './sprites/batter_tiger/frames', frameCount: 13, stillUrl: './sprites/batter_tiger/001.png', burst: '크로스 액스', skillBits: 0x401200 },
+  { id: 'psyker', name: '싸이커', role: '투수', ability: { hit: 670, power: 550, run: 300, defense: 820 }, iconUrl: './sprites/ace_icon/000.png', framesUrl: './sprites/pitcher_psyker/frames', frameCount: 20, stillUrl: './sprites/pitcher_psyker/012.png', burst: '싸이킥 스타', skillBits: 0x9002 },
+  { id: 'leony', name: '레오니', role: '투수', ability: { hit: 580, power: 850, run: 330, defense: 580 }, iconUrl: './sprites/ace_icon/001.png', framesUrl: './sprites/pitcher_leony/frames', frameCount: 16, stillUrl: './sprites/pitcher_leony/000.png', burst: '트리플 크로우', skillBits: 0x200100 },
+  { id: 'bbmachine', name: '붕붕머신', role: '투수', ability: { hit: 820, power: 620, run: 320, defense: 620 }, iconUrl: './sprites/ace_icon/002.png', framesUrl: './sprites/pitcher_bbmachine/frames', frameCount: 14, stillUrl: './sprites/pitcher_bbmachine/003.png', burst: '홀로그램 레이저', skillBits: 0x16000 },
+  { id: 'ballantine', name: '발렌타인', role: '투수', ability: { hit: 700, power: 600, run: 280, defense: 800 }, iconUrl: './sprites/ace_icon/003.png', framesUrl: './sprites/pitcher_ballantine/frames', frameCount: 19, stillUrl: './sprites/pitcher_ballantine/012.png', burst: '다크 일루전', skillBits: 0x410000 },
+  { id: 'dragona', name: '드래고나', role: '투수', ability: { hit: 650, power: 900, run: 300, defense: 650 }, iconUrl: './sprites/ace_icon/004.png', framesUrl: './sprites/pitcher_dragona/frames', frameCount: 14, stillUrl: './sprites/pitcher_dragona/000.png', burst: '브레스 웨폰', skillBits: 0x208a00 },
 ]
