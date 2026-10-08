@@ -98,6 +98,7 @@ import {
   SYSTEM_MVP_WINDOW, SYSTEM_TITLE_WINDOW, mvpWindowTextOf, titleWindowTextOf,
 } from '@/pages/story/lib/awardWindows'
 import { activeSound } from '@/shared/api/audio/soundPort'
+import { seasonEndingBgmOf } from '@/app/model/screenBgm'
 import { HELL_TRAINING_GAME_POINT, HELL_TRAINING_INDEX } from '@/widgets/season/lib/seasonTraining'
 import {
   applySeasonTraining, rollSeasonTraining, seasonTrainingResultOf,
@@ -1317,6 +1318,13 @@ export function useSeasonSession(
       if (opens) setOpenedHiddenIds((opened) => [...opened, SEASON_AUTOBOT_BAT_HIDDEN_ID])
       summaryEntrySerial.current += 1
       setSummaryEntry({ serial: summaryEntrySerial.current, opensAutobotBat: opens })
+      return
+    }
+
+    // 10년차 엔딩 0xf5 진입 0x6be8 — 엔딩 판정 0xa3085 로 배경음을 예약한다(0 → 52 · 그 밖 46, `seasonEndingBgmOf`).
+    // ⚠️ 같은 진입의 r5 == 0 갈래 SR+0x7b = 1 · 저장(6c16~6c2e)은 웹 시즌 레코드에 그 칸이 없어 옮기지 않았다
+    if (scene === SEASON_SCENE_STATE.엔딩) {
+      activeSound().playBgm(seasonEndingBgmOf(judgeSeasonEnding(record)))
       return
     }
 

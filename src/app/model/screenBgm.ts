@@ -12,7 +12,7 @@ import type { PitcherScene } from '@/app/model/usePitcherLeagueSession'
  * 4  관리 화면         시즌(0x105)·나만의리그(0x106) 관리
  * 33 경기              0x104 상태 0x21 (0x3abf0 · 0x48480 · 0x4258c)
  * 40 이벤트(대화)      0x106 상태 114 · 0x105 상태 211
- * 46 엔딩              0x106 상태 141 · 0x105 상태 245 예약 (141 은 e ≤ 1 이면 52 — `endingBgmOf`)
+ * 46 엔딩              0x106 상태 141 · 0x105 상태 245 예약 (141 은 e ≤ 1 이면 52 — `endingBgmOf`, 245 는 e == 0 이면 52 — `seasonEndingBgmOf`)
  * ```
  *
  * `null` 은 **배경음을 바꾸지 않는 화면**이다 — 끄지 않고 울리던 것을 그대로 둔다.
@@ -77,6 +77,21 @@ const ENDING_SAD_BGM = 52
  */
 export function endingBgmOf(endingIndex: number): number {
   return endingIndex <= 1 ? ENDING_SAD_BGM : SCREEN_BGM.엔딩
+}
+
+/**
+ * 시즌모드(장면 0x105) 10년차 엔딩 상태 0xf5 의 배경음 — 진입 0x6be8 (직접 떴다):
+ * ```
+ * 6bfc  r5 = 0xa3085(SR)            ; 시즌 엔딩 판정 0xa3084 (`judgeSeasonEnding`) — 연차 idx ≠ 9 면 −1, 그 밖 0~4
+ * 6c0c  0x87919(엔딩 판, r5)
+ * 6c12  cmp r5, #0 ; bne            ; 0(비 인기 구단)이면 SR+0x7b = 1 · 저장(6c16~6c2e)
+ * 6c4a  cmp r5, #0 ; bne 6c54       ; 0 → r1 = 0x34(52) · 그 밖(1~4 · −1) → 0x2e(46)
+ * 6c5a  0x6e499(소리, r1, 1)         ; 예약 · 반복
+ * ```
+ * 나리 141(`endingBgmOf`, e ≤ 1 이면 52)과 달리 **0 하나만** 52 다. r5 는 0xa3084 의 엔딩 번호 그대로다(1 지역 인기 구단도 46).
+ */
+export function seasonEndingBgmOf(endingIndex: number | null): number {
+  return endingIndex === 0 ? ENDING_SAD_BGM : SCREEN_BGM.엔딩
 }
 
 /** 이 화면에서 틀 배경음. 바꾸지 않는 화면이면 null */

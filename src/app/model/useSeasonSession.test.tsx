@@ -10,6 +10,7 @@ import {
 } from '@/entities/league/model/league'
 import { SEASON_GAME_COUNT } from '@/entities/season-mode/model/seasonRecord'
 import { SEASON_PHASE, SEASON_SCENE_STATE } from '@/entities/season-mode/model/seasonStateMachine'
+import { createSilentSound, setActiveSound } from '@/shared/api/audio/soundPort'
 import { SEASON_PLAYABLE_EVENTS } from '@/entities/season-mode/model/seasonEventFlow'
 import { PRE_GAME_ACE_PHASE, SQUAD_PURPOSE } from '@/entities/season-mode/model/preGameFlow'
 import { ENTRY_SUB_TAB, ENTRY_TAB } from '@/entities/season-mode/model/entryEditor'
@@ -780,6 +781,27 @@ describe('시즌 끝 사슬', () => {
     // phase 6 으로 저장해 두어야 다시 들어와도 엔딩으로 온다 (진입 분기 0xcb)
     expect(result.current.state?.record.phase).toBe(SEASON_PHASE.엔딩)
     expect(result.current.state?.record.yearIndex).toBe(9) // 연차를 올리지 않는다
+  })
+
+  it('엔딩 0xf5 진입 0x6be8 은 판정 0(비 인기 구단)이면 배경음 52, 1 이상이면 46 을 튼다 (6c4a `cmp r5,#0`)', () => {
+    for (const [popularity, bgm] of [[100, 52], [900, 46]] as const) {
+      const 튼것: number[] = []
+      setActiveSound({ ...createSilentSound(), playBgm: (id: number) => { 튼것.push(id) } })
+      try {
+        const { result } = 띄우기()
+        시작(result, 0)
+        act(() => result.current.actions.confirmIncome({
+          ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 9, popularity,
+        }))
+        act(() => result.current.actions.finishSeason())
+        튼것.length = 0
+        이벤트넘기기(result)
+        expect(result.current.scene).toBe(SEASON_SCENE_STATE.엔딩)
+        expect(튼것).toEqual([bgm])
+      } finally {
+        setActiveSound(null)
+      }
+    }
   })
 
   it('엔딩을 보면 SR+0x1bc 가 서고, 다시 띄우면 관리 메뉴로 온다 (0x8bd8 → 0xcb)', () => {

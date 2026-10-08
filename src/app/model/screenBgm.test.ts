@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import { renderHook } from '@testing-library/react'
-import { pitcherLeagueBgmOf, screenBgmOf, seasonMenuBgmOf, usePitcherLeagueBgm, useSeasonMenuBgm } from '@/app/model/screenBgm'
+import { pitcherLeagueBgmOf, screenBgmOf, seasonEndingBgmOf, seasonMenuBgmOf, usePitcherLeagueBgm, useSeasonMenuBgm } from '@/app/model/screenBgm'
 import { createSilentSound } from '@/shared/api/audio/soundPort'
 import type { PitcherScene } from '@/app/model/usePitcherLeagueSession'
 
@@ -102,5 +102,14 @@ describe('엔딩 141 배경음 — 진입 0x12300 의 12328 `cmp e,#1 ; bgt` (�
     expect(pitcherLeagueBgmOf('엔딩', false, -1)).toBe(52)
     expect(pitcherLeagueBgmOf('엔딩', false, 0)).toBe(52)
     expect(pitcherLeagueBgmOf('엔딩', false, 5)).toBe(46)
+  })
+})
+
+describe('시즌모드 10년차 엔딩 0xf5 배경음 — 진입 0x6be8 의 6c4a `cmp r5,#0 ; bne` (0 하나만 52)', () => {
+  it('엔딩 0(비 인기 구단) → 52, 1~4 · 판정 없음(−1) → 46', () => {
+    expect(seasonEndingBgmOf(0)).toBe(52)
+    expect(seasonEndingBgmOf(1)).toBe(46)
+    expect(seasonEndingBgmOf(4)).toBe(46)
+    expect(seasonEndingBgmOf(null)).toBe(46)
   })
 })
