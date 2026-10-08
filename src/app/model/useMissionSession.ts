@@ -96,6 +96,7 @@ import {
 } from '@/features/play-at-bat/model/atBatSounds'
 import { playSoundIds } from '@/app/model/useSound'
 import { createSilentSound } from '@/shared/api/audio/soundPort'
+import { LOSE_SOUND, WIN_SOUND } from '@/features/play-game/model/gameSounds'
 import type { SoundPort } from '@/shared/api/audio/soundPort'
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { OriginalMission } from '@/shared/config/original/missions'
@@ -1423,6 +1424,9 @@ export function useMissionSession({
     }
     // 0x4efc6~0x4f018 — 서 있는 대기마다(대결이면 SYS 8 이 세운 그 편 칸도) 결과 바이트를 이 판 결과로. g[0xf6] 은 안 본다
     if (isAceMatchHeld(aceMatchHold?.read() ?? NO_ACE_MATCH_HOLD)) aceMatchHold?.writeResult(isWin)
+    // 결과 징글 — 0x4ea0c 의 모드 표 0xd0428[5 · 6] = 0x4ef18 이 [sp+0x50] 을 [미션+0xbc](성공?)로 덮고(4ef36 · 4efb4),
+    // 모든 모드가 모이는 4f41a 가 1 이면 31 · 0 이면 32 를 예약한다(4f544) — 마선수 대결도 같다
+    audio.play(isWin ? WIN_SOUND : LOSE_SOUND)
   })
 
   /**

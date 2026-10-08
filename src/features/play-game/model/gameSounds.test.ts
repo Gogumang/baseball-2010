@@ -86,7 +86,9 @@ describe('경기 결과 징글', () => {
     expect(gameResultSoundIdOf('패')).toBe(32)
   })
 
-  it('무승부는 원본이 어느 쪽을 내는지 모르므로 비워 둔다', () => {
+  it('무승부는 0xb6a0c 가 측 0 을 이긴 칸으로 본다 — 사람이 선공이면 31, 후공이면 32 (측을 모르면 비운다)', () => {
+    expect(gameResultSoundIdOf('무', 0)).toBe(31)
+    expect(gameResultSoundIdOf('무', 1)).toBe(32)
     expect(gameResultSoundIdOf('무')).toBeNull()
   })
 })

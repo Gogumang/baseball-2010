@@ -263,8 +263,8 @@ export function usePitcherGame(
       enterSettlement: () => {
         const finished = progressRef.current
         if (!finished.game.isFinished) return
-        // 무승부는 원본이 어느 쪽을 내는지 문서에 없어 `gameResultSoundIdOf` 가 비워 둔다
-        playSoundIds(audio, [gameResultSoundIdOf(summaryOf(finished).result)])
+        // 무승부는 동점이면 측 0 을 이긴 칸으로 보는 0xb6a0c 그대로 — 사람이 선공이면 31, 후공이면 32
+        playSoundIds(audio, [gameResultSoundIdOf(summaryOf(finished).result, finished.game.playerSide)])
       },
     }),
     [audio, random, step],

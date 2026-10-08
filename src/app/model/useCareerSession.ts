@@ -740,10 +740,10 @@ export function useCareerSession({
       const recordLine = isEvaluated || previous === undefined
         ? nariRecordLineOf(summary.stats)
         : previous.recordLine ?? nariRecordLineOf(previous.summary.stats)
-      // 승리 31 · 패배 32 징글 (무승부는 원본이 어느 쪽을 내는지 문서에 없어 비워 둔다) →
+      // 승리 31 · 패배 32 징글 (무승부는 0xb6a0c 가 측 0 을 이긴 칸으로 본다 — 선공 31 · 후공 32) →
       // 평가 창 징글 36·37·38 (12c96~: +0x4a). 원본은 두 화면이 따로지만 웹은 한 화면이라 이어서 낸다
       playSoundIds(audio, [
-        gameResultSoundIdOf(summary.result),
+        gameResultSoundIdOf(summary.result, finished.game.playerSide),
         evaluationJingleIdOf(staleEvaluation.popularityChange),
       ])
       // 같은 날 나머지 네 경기도 원본대로 치러 순위표에 넣는다 (0xc2a48)
@@ -845,7 +845,7 @@ export function useCareerSession({
       recordStat({ kind: 'G획득', mode: BATTER_LEAGUE_MODE, amount: gamePointReward })
       recordStat({ kind: '기록달성', recordIds: summary.recordIds ?? [] })
       // 승리 31 · 패배 32 징글 — 정규 경기 결과 화면과 같은 자리 (116 의 평가 징글은 없다)
-      playSoundIds(audio, [gameResultSoundIdOf(summary.result)])
+      playSoundIds(audio, [gameResultSoundIdOf(summary.result, finished.game.playerSide)])
       setScreen({
         kind: '대회경기결과', summary, gamePointReward, cup: next, settlementInning: finished.game.inning,
         settlementPlayerSide: finished.game.playerSide, settlementSkyRow: stadiumSkyRowRef.current,

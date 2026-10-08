@@ -1,5 +1,6 @@
 import { BURST_SOUND } from '@/entities/burst-mission/model/burstMissionJudge'
-import type { GameResult } from '@/entities/game/model/gameState'
+import { PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
+import type { GameResult, PlayerSide } from '@/entities/game/model/gameState'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 
 /**
@@ -40,16 +41,21 @@ export const WIN_SOUND = 31
 export const LOSE_SOUND = 32
 
 /**
- * 경기 결과 징글.
- *
- * ⚠️ **무승부는 잇지 않았다.** 31/32 는 승패 말고 홈런더비 신기록·기록 실패와 돌발미션 실패도
- * 나눠 쓰는 번호인데(sounds.ts 머리 주석), 무승부에 어느 쪽을 내는지 문서에 없다 —
- * 임의로 고르지 않고 비워 둔다.
+ * 경기 결과 징글 — 결과 적재 0x4ea0c 끝 4f41a~4f544 (직접 떴다):
+ * ```
+ * 4ea12  [sp+0x50] = 0x4a350()         ; 0xb6c20(st, 0xb6a0c(st)) == 0 — "이긴 칸이 사람 팀인가"
+ * 4f41a  [sp+0x50] ≠ 0 → 0x1f(31)      ; 아니면 4f4e6~ → 0x20(32)
+ * 4f544  0x6e499(소리, 번호, 0)          ; 예약
+ * ```
+ * 0xb6a0c 는 `점수(측 1) > 점수(측 0) ? 1 : 0` 이라 **동점이면 측 0(선공)이 이긴 칸**이다 — 무승부는 사람이 선공이면 31,
+ * 후공이면 32 (원본 그대로). `playerSide` 를 안 넘기면 무승부는 고르지 않는다(null).
+ * ⚠️ 미션 모드는 4ef36 · 4efb4 가 [sp+0x50] 을 미션 성공 여부로 덮는다 — 이 함수가 아니라 미션 결과 쪽 몫이다(미해결).
  */
-export function gameResultSoundIdOf(result: GameResult): number | null {
+export function gameResultSoundIdOf(result: GameResult, playerSide?: PlayerSide): number | null {
   if (result === '승') return WIN_SOUND
   if (result === '패') return LOSE_SOUND
-  return null
+  if (playerSide === undefined) return null
+  return playerSide === PLAYER_SIDE_FIRST_BAT ? WIN_SOUND : LOSE_SOUND
 }
 
 /**
