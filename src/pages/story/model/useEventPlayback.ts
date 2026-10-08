@@ -153,7 +153,10 @@ export function useEventPlayback(
   jump: (eventId: number) => void
   /** 초상화 셋을 비운다 — 0x7f7a8 → 0x7b870 (화면효과 6 · 7 이 끝난 그리기, `drawEventBackdrop`) */
   clearPortraits: () => void
-  /** 떠나온 이벤트 줄 [mgr+0x38a] — 이 재생에서 거친 이벤트(대결 앞 이벤트 포함) 중 지금 이벤트 말고 (`EventChoiceConfirmHandler`) */
+  /**
+   * 떠나온 이벤트 줄 [mgr+0x38a] 을 꺼낸다 — 이 재생에서 넘어온 이벤트 중 지금 이벤트 말고, 앞 선택지 확인에서 이미 알린 것 말고
+   * (대결 앞 이벤트 carried 는 없다). 꺼내면 줄이 빈다(0x8b0e4 끝) — 선택지 OK 자리에서 한 번 부른다 (`EventChoiceConfirmHandler`)
+   */
   leftEventIds: () => readonly number[]
 } {
   const [cursor, setCursor] = useState(() => jumpToEvent(startEvent.id))
@@ -263,7 +266,22 @@ export function useEventPlayback(
   const skip = () => setCursor(skipSayCursor(events, stepRef.current.cursor))
   const jump = (eventId: number) => setCursor(jumpToEvent(eventId))
   const clearPortraits = () => setPortraits([])
-  const leftEventIds = () => collect().viewedEventIds.filter((id) => id !== stepRef.current.cursor.eventId)
+  /**
+   * 떠나온 이벤트 줄 [mgr+0x38a](수 [mgr+0x39e]) — 원본 줄을 비우는 곳은 관리자 생성(0x8a414 · 0x8a480 — 장면 0x106 셋업 0xf684 ·
+   * 0x105 셋업 0x3b14)과 0x8b0e4 의 끝(8b174~8b188, 본 표시 · 저장 뒤) 둘이고, 넣는 곳은 이벤트 끝 0x8cfc8([mgr+0x2bc] > 0 —
+   * 다른 이벤트로 넘어갈 때 지금 이벤트) 하나다. 재생은 늘 114 끝 0x1c014 의 0x8b0e4(1c02e)로 끝나 줄이 빈 채로 다음 재생이 선다 —
+   * 마선수 대결의 결과 이벤트(140)도 대결 앞 114 끝에서 비었고 장면 0x106 이 새로 서 관리자도 새것이다. 곧 대결 앞 이벤트(carried)는
+   * 줄에 없다. 한 재생 안에서도 선택지 OK 마다 0x8b0e4 가 줄을 비우므로 이미 알린 이벤트는 다음 알림에서 빠진다.
+   */
+  const reportedLeftRef = useRef(new Set<number>())
+  const leftEventIds = () => {
+    const current = stepRef.current.cursor.eventId
+    const left = [...new Set([...rewardsByCursorRef.current.keys()].map((key) => Number(key.split(':')[0])))]
+      .filter((id) => id !== current && !reportedLeftRef.current.has(id))
+    // 8b174~8b188 — 알린 줄을 비운다
+    left.forEach((id) => reportedLeftRef.current.add(id))
+    return left
+  }
 
   // 올해의 목표 창(system 1, 0x8d304 가 키 표에 OK −5 · '5' → 0 을 넣는다)은 Enter/Space 로 닫는다.
   // 대사(say)는 대사 상자(`EventDialogueBox` — 키 0x8b804)가, 선택지는 메뉴가, 알림 · 예아니오(0x74ef4)는 공용 창(`MessageBox`)이 키를 가져간다.

@@ -130,6 +130,24 @@ describe('StoryScreen — 관리 화면 위에 겹치는 덮개다', () => {
     expect(대사글()).toContain('끝')
   })
 
+  it('떠나온 줄은 0x8b0e4 끝(8b174~8b188)에서 비고 대결 앞 이벤트(carried)는 없다 — 결과 이벤트도 빈 줄로 선다', () => {
+    const 선택지 = (id: number, gotoEvent: number) =>
+      ({ ...이벤트, id, commands: [{ op: 'choice', portraits: [], choices: [{ text: '간다', gotoEvent }] }] }) as unknown as OriginalEvent
+    const 끝 = { ...이벤트, id: 4, commands: [{ op: 'say', text: '끝', speaker: 0, format: 0, portraits: [] }] } as unknown as OriginalEvent
+    const 알림: Array<[number, readonly number[]]> = []
+    render(
+      <StoryScreen events={[선택지(1, 2), 선택지(2, 3), 선택지(3, 4), 끝]} event={선택지(1, 2)}
+        playerName="테스트" teamName="드래곤즈" onComplete={() => {}} onMatch={() => {}}
+        carried={{ rewards: [], viewedEventIds: [113, 123] }}
+        onChoiceConfirm={(eventId, left) => 알림.push([eventId, left])} />,
+    )
+    for (let i = 0; i < 3; i += 1) {
+      fireEvent.keyDown(window, { key: 'Enter' })
+      틀(200)
+    }
+    expect(알림).toEqual([[1, []], [2, [1]], [3, [2]]])
+  })
+
   it('고른 이벤트가 say 없이 창을 띄우면 밑의 상자에는 선택지 줄과 고른 줄 테두리가 남는다 (0x8ba2c · 0x8b924)', () => {
     const 선택지이벤트 = {
       ...이벤트,
