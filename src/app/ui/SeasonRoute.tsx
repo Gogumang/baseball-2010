@@ -36,6 +36,7 @@ import type { PostseasonSeries } from '@/entities/league/model/league'
 import { NationalCupScreen } from '@/pages/national-cup/ui/NationalCupScreen'
 import { TeamGameScreen } from '@/pages/team-game/ui/TeamGameScreen'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { seasonRewardNoticeContextOf } from '@/entities/story/model/rewardNotice'
 import type { useGameSettings } from '@/app/model/useGameSettings'
 import {
   seasonGoalInputOf, seasonGoalWindowNumbersFor, seasonLeagueRecordsOf,
@@ -295,6 +296,8 @@ export function SeasonRoute({
               yearGoalWindowOf={() => ({ labelSet: SEASON_YEAR_GOAL_LABEL_SET, ...seasonGoalWindowNumbersFor(goalSource) })}
               // SYS sub 3 · 4 — 시상 370 · 371 의 타이틀 창 0x8b3bc · 376 의 MVP 창 0x8b23c (시즌 갈래)
               systemWindowTextOf={(command) => session.awardWindowTextOf(command.sub)}
+              // 보상 명령 7 의 알림 창 — 0x8beb8 글(모드 2 갈래) → 0x74ef4 종류 1. 종류 11(490)은 글이 굴린다
+              rewardNoticeContext={() => seasonRewardNoticeContextOf(state.record, random)}
               // system 창 답 0 → 0x7fe90 (기록 +0x187 = 1 · 저장)
               onSystemWindowConfirm={actions.confirmEventSystemWindow}
             />

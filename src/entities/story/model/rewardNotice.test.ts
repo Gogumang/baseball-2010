@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { rewardNoticeOf, rewardNoticeContextOf } from '@/entities/story/model/rewardNotice'
+import { rewardNoticeOf, rewardNoticeContextOf, seasonRewardNoticeContextOf } from '@/entities/story/model/rewardNotice'
 import type { RewardNoticeContext } from '@/entities/story/model/rewardNotice'
 import { applyEventRewards } from '@/entities/story/model/eventReward'
 import { createCareer } from '@/entities/career/model/playerCareer'
@@ -119,3 +119,21 @@ describe('rewardNoticeContextOf — 나리 선수 칸', () => {
     expect(context).toMatchObject({ mode: 4, years: 2, illness: 2, salaryBase: 40 })
   })
 })
+
+describe('seasonRewardNoticeContextOf — 시즌모드(모드 2) 알림 맥락', () => {
+  it('393 은 모드 2 연차 보정(+5y)을 글에 얹고 항목은 그대로 돌려준다 (0x8d508)', () => {
+    const ctx = seasonRewardNoticeContextOf({ yearIndex: 2, illness: 0 }, 난수([]))
+    expect(ctx.mode).toBe(2)
+    const result = rewardNoticeOf([{ kind: 0, value: 25 }, { kind: 3, value: 35 }], 393, ctx)
+    expect(result.notice).toEqual({ kind: '알림', text: '!C인기도 + 35!N!C소지금 + 4500만' })
+    expect(result.items).toEqual([{ kind: 0, value: 25 }, { kind: 3, value: 35 }])
+  })
+
+  it('490 질병은 글이 0xbfa55(0, 4) 를 한 번 굴려 값 r + 1 로 고친다 — 음수는 지금 질병 SR+5 이름', () => {
+    const random = 난수([0.6])
+    const result = rewardNoticeOf([{ kind: 11, value: 0 }], 490, seasonRewardNoticeContextOf({ yearIndex: 0, illness: 0 }, random))
+    expect(result.items).toEqual([{ kind: 11, value: 3 }])
+    expect(random.calls()).toBe(1)
+  })
+})
+

@@ -480,7 +480,11 @@ export function applySeasonEventRewards(
         if (eventId === EVENT_100_ID) event100Awarded = true
         break
       case 11: {
-        const kind = reward.value >= 0 ? randomIntegerBelow(random, 0, ILLNESS_KIND_COUNT) + 1 : reward.value
+        // 값 > 0 은 알림 글 0x8beb8 이 이미 굴려 적은 번호(r + 1, `rewardNoticeOf`) — 0x8c718 은 그 번호를 건다.
+        // 값 0 은 알림을 안 거친 재생(굴림 0xbfa55(0, 4) 한 번을 여기서)
+        const kind = reward.value > 0
+          ? reward.value
+          : reward.value === 0 ? randomIntegerBelow(random, 0, ILLNESS_KIND_COUNT) + 1 : reward.value
         record = kind > 0
           ? { ...record, illness: kind, illnessSlack: ILLNESS_SLACK_TABLE[kind] ?? 0, illnessCooldown: ILLNESS_COOLDOWN }
           : { ...record, illness: 0, illnessSlack: ILLNESS_SLACK_TABLE[0] ?? 0, illnessCooldown: ILLNESS_COOLDOWN }

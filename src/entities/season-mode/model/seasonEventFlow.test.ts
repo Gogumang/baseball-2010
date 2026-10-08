@@ -215,6 +215,11 @@ describe('보상 0x8c460 모드 2', () => {
     expect(적용.state.record.illnessCooldown).toBe(ILLNESS_COOLDOWN)
   })
 
+  it('질병 11 의 값 > 0 은 알림 글이 굴려 적은 번호 — 다시 안 굴린다 (0x8c718)', () => {
+    const 굴림 = { next: () => { throw new Error('굴리면 안 된다') } } as unknown as Parameters<typeof applySeasonEventRewards>[3]
+    expect(applySeasonEventRewards(상태(), [{ kind: 11, value: 2 }], 490, 굴림).state.record.illness).toBe(2)
+  })
+
   it('첫 항목이 21 이면 엔딩 진입 (500)', () => {
     expect(applySeasonEventRewards(상태(), [{ kind: 21, value: 0 }], 500, 고정난수(0)).entersEnding).toBe(true)
   })
