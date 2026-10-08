@@ -1342,3 +1342,15 @@ describe('파울 각 공도 수비 판을 돈다 — 낙구 전에 잡히면 파
     expect(뜬공아웃).toBeGreaterThan(0)
   })
 })
+
+describe('투수편 간이 타석(동료 · 내가 없는 수비)은 원본 간이 엔진대로 — 결과 링 아웃 5 (a8a9e)', () => {
+  it('등판일이 아닌 경기는 양 팀 타석이 모두 간이라 오늘 결과 링에 6(노바운드 아웃)이 없다 — 아웃은 5', () => {
+    for (let seed = 1; seed <= 5; seed += 1) {
+      const 끝 = startPitcherGame({ ...기본옵션, dayCounter: 3 }, 씨앗(seed))
+      const 링 = [...끝.ourLineup.records, ...끝.opponentLineup.records].flatMap((record) => record.results ?? [])
+      expect(링.length).toBeGreaterThan(0)
+      expect(링).not.toContain(6)
+      expect(링).toContain(5)
+    }
+  })
+})
