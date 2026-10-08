@@ -79,6 +79,9 @@ export interface PlacedFrame {
 export interface StageAnimationEntry {
   readonly frame: number
   readonly delay: number
+  /** 칸마다 그림을 비켜 놓는 값 — 애니 그리기 0x93c45 가 (x + dx, y + dy) 에 그린다. 표에 없으면 0 */
+  readonly dx?: number
+  readonly dy?: number
 }
 
 const animationsCache = new Map<string, readonly (readonly StageAnimationEntry[])[] | null>()

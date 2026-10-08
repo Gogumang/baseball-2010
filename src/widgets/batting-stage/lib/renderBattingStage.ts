@@ -12,6 +12,7 @@ import { rainDrawingOf, type SceneRain } from '@/entities/batting/model/settleme
 import type { ParticleScene } from '@/entities/particle/model/particleScene'
 import { drawHud } from '@/widgets/batting-stage/lib/renderHud'
 import { drawSoftKeyLabels } from '@/widgets/batting-stage/lib/softKeyLabels'
+import { BASE_WINDOW_IMAGE, RUNNER_FRAMES, baseRunnerDrawsOf, loopingAnimationStepAt, showsBaseRunners } from '@/widgets/batting-stage/lib/baseRunners'
 import type { StagePhaseSnapshot } from '@/widgets/batting-stage/lib/softKeyLabels'
 import { drawSpecialSwingBadge } from '@/widgets/batting-stage/lib/specialSwingBadge'
 import { drawDerbyPitchingMachine } from '@/widgets/batting-stage/lib/derbyPitchingMachine'
@@ -161,6 +162,10 @@ export function renderBattingStage(
     return
   }
   const progress = scene.pitch === null || scene.frame < 0 ? -1 : scene.frame / scene.pitch.frameCount
+  // 루상 주자 0x35b94 — 그리기 목록에 깊이 24499(투수판 z − 1)로 들어가 투수·타자보다 먼저(뒤에) 그려진다 (유력)
+  if (scene.hud !== null && showsBaseRunners(scene.stagePhase)) {
+    drawBaseRunners(context, scene.hud, side, scene.tick)
+  }
   drawPitcher(context, scene.acePitcher, progress, scene.pitcherTick, scene.tick, side, scene.pitcherEquipment, scene.pitcherForm ?? 0, scene.pitcherHand ?? 0)
   drawBatter(context, scene.swingFrame, scene.shift, scene.bodyType, side, scene.batterSkinIndex, scene.batterTeamIndex, scene.batterEquipment)
   if (scene.pitch !== null && scene.isEagleEyeEnabled) {
@@ -196,6 +201,64 @@ export function renderBattingStage(
   if (scene.particles !== null && scene.particles !== undefined) {
     drawParticles(context, scene.particles)
   }
+}
+
+/** 공격 팀 번호 — 초(측 0) · 말(측 1) 중 공격 측이 사람 측(`playerSide`, 기본 1)이면 우리 팀 */
+export function offenseTeamIdOf(hud: HudState): number | null {
+  const offenseSide = hud.half === '말' ? 1 : 0
+  const teamId = offenseSide === (hud.playerSide ?? 1) ? hud.ourTeamId : hud.opponentTeamId
+  return teamId ?? null
+}
+
+/** defender.mpl 은 팀 번호가 곧 벌 번호(15벌) — 범위 밖이면 구운 벌 (`pages/defense` 의 `defenderPaletteIndexOf` 와 같은 규칙) */
+const DEFENDER_TEAM_COUNT = 15
+function runnerPaletteIndexOf(teamId: number | null): number | null {
+  if (teamId === null || !Number.isInteger(teamId) || teamId < 0 || teamId >= DEFENDER_TEAM_COUNT) return null
+  return teamId
+}
+
+function drawBaseRunners(context: CanvasRenderingContext2D, hud: HudState, side: number, tick: number): void {
+  const paletteIndex = runnerPaletteIndexOf(offenseTeamIdOf(hud))
+  for (const draw of baseRunnerDrawsOf(hud.bases, side)) {
+    if (draw.kind === 'window') {
+      const image = sprite(BASE_WINDOW_IMAGE)
+      if (image === null) continue
+      if (!draw.isMirrored) {
+        context.drawImage(image, draw.x, draw.y)
+        continue
+      }
+      // 효과 0x11 · 인자 0 — 제 상자 안에서 좌우 뒤집기
+      context.save()
+      context.translate(draw.x * 2 + image.width, 0)
+      context.scale(-1, 1)
+      context.drawImage(image, draw.x, draw.y)
+      context.restore()
+      continue
+    }
+    const entries = frameAnimations(RUNNER_FRAMES)?.[draw.animation]
+    const step = entries === undefined ? null : loopingAnimationStepAt(entries, tick)
+    if (step === null) continue
+    const placed = placedFrame(RUNNER_FRAMES, step.frame, paletteIndex)
+    if (placed === null) continue
+    const x = draw.x + step.dx + placed.offsetX
+    const y = draw.y + step.dy + placed.offsetY
+    if (draw.isSilhouette) drawSilhouette(context, placed.image, x, y, '#000000')
+    else context.drawImage(placed.image, x, y)
+  }
+}
+
+/** 효과 0xc · 인자 색 — 그림 모양대로 한 색으로 칠한다(R2: 섞는 식은 미해결, 레이저 반짝임과 같은 근사) */
+function drawSilhouette(context: CanvasRenderingContext2D, image: HTMLImageElement, x: number, y: number, color: string): void {
+  const canvas = document.createElement('canvas')
+  canvas.width = image.width
+  canvas.height = image.height
+  const layer = canvas.getContext('2d')
+  if (layer === null) return
+  layer.drawImage(image, 0, 0)
+  layer.globalCompositeOperation = 'source-in'
+  layer.fillStyle = color
+  layer.fillRect(0, 0, canvas.width, canvas.height)
+  context.drawImage(canvas, x, y)
 }
 
 /** 좌투(손 1) — 그림을 뒤집고 x 를 1 옮긴다 (0x79524 효과 0x11 · 0x38db8) */

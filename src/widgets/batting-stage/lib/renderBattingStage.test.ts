@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { pitcherMirrorOf, showsStrikeZone, strikeZoneAnchorOf } from '@/widgets/batting-stage/lib/renderBattingStage'
+import { offenseTeamIdOf, pitcherMirrorOf, showsStrikeZone, strikeZoneAnchorOf } from '@/widgets/batting-stage/lib/renderBattingStage'
 import { pitcherFrameAt } from '@/widgets/batting-stage/lib/stageScenery'
 import { pitcherHandOfPitch } from '@/entities/pitching/model/pitcherHand'
 
@@ -34,5 +34,18 @@ describe('존 표시 0x35ae8', () => {
     expect(showsStrikeZone({ kind: '투구중', tick: 0, isPaused: false })).toBe(true)
     expect(showsStrikeZone({ kind: '결과', tick: 0, isPaused: false })).toBe(true)
     expect(showsStrikeZone(undefined)).toBe(true)
+  })
+})
+
+describe('루상 주자 팔레트 — 공격 팀', () => {
+  const hud = {
+    inning: 1, half: '초', ourScore: 0, opponentScore: 0, balls: 0, strikes: 0, outs: 0,
+    bases: { first: true, second: false, third: false }, ourLogoUrl: '', opponentLogoUrl: '', ourTeamId: 3, opponentTeamId: 7,
+  }
+
+  it('초 공격 = 측 0 — 사람이 후공(기본)이면 상대, 선공이면 우리 팀', () => {
+    expect(offenseTeamIdOf(hud)).toBe(7)
+    expect(offenseTeamIdOf({ ...hud, playerSide: 0 })).toBe(3)
+    expect(offenseTeamIdOf({ ...hud, half: '말' })).toBe(3)
   })
 })
