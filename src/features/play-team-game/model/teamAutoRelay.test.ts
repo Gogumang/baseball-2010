@@ -109,8 +109,9 @@ describe('자동진행 중계(상태 0x21)를 화면이 한 틱씩 돌린다 —
   it('교체 틱(0xc262c 의 c266c — 공 없이 돌아감)도 한 걸음이라, 그 뒤 CLR 로 멈추면 그 타석은 간이 엔진이 안 굴린다', () => {
     const random = createSeededRandom(1)
     let current = startTeamGame({ ...기본옵션, settings: 전부자동, liveAutoRelay: true }, random)
-    // 씨앗 1 은 37 걸음째(0-기준 36)가 교체 틱이다 (헛스윙 세 번째 겨루기 c1748 굴림이 든 뒤 36 → 37)
-    for (let step = 0; step < 37; step += 1) current = stepAutoRelay(current, random)
+    // 씨앗 1 은 36 걸음째(0-기준 35)가 교체 틱이다 (헛스윙 세 번째 겨루기 c1748 굴림이 든 뒤 36 → 37, 자동 타석의 도루 ·
+    // 땅볼 진루 굴림(0xc1818 c1982 · 0xc15b8)과 피로 · 상황 칸이 든 뒤 37 → 36)
+    for (let step = 0; step < 36; step += 1) current = stepAutoRelay(current, random)
     const 교체틱 = current.autoRelay?.ticks
     expect(교체틱).toHaveLength(1)
     expect(교체틱?.[0]?.atBat).toBeNull()
