@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  EVENT_DIALOGUE, layoutDialogue, pageEndOf, pressDialogue, speakerPrefixOf, startDialogue, tickDialogue,
+  DIALOGUE_CURSOR, EVENT_DIALOGUE, EVENT_DIALOGUE_CHOICE, layoutDialogue, lowerDialogueBox, pageEndOf, pressDialogue,
+  restartDialogueText, speakerPrefixOf, startDialogue, tickDialogue,
 } from '@/pages/story/lib/eventDialogue'
 import {
   batterEvaluationExpressionOf, evaluationReputationTierOf, pitcherEvaluationExpressionOf, streakSayExpressionOf,
@@ -42,6 +43,20 @@ describe('say 대사 상자 배치 0x7fbc4 · 0x6ef4c', () => {
     state = tickDialogue(state, layout)
     expect(state.stage).toBe(4)
     expect(pressDialogue(state).advance).toBe(true)
+  })
+
+  it('선택지 갈래 0x7fd22 — 줄 사이 11 + 3 · 고른 줄 테두리 (3, y − 1) 211 × 13 · 넘김 표시 (W − 3, H − 3)', () => {
+    expect(EVENT_DIALOGUE_CHOICE.lineStep).toBe(14)
+    expect(EVENT_DIALOGUE_CHOICE.cursor).toEqual({ x: 3, top: -1, width: 211, height: 13, color: '#FFFF00' })
+    expect(DIALOGUE_CURSOR).toEqual({ x: 237, y: 317, animation: 0 })
+  })
+
+  it('선택지 갈래는 높이만 오르고 찍기 칸은 그대로 · 내리기 0x7f7cc 는 높이 0 · 글 처음으로 0x7f7d4 는 높이를 둔다', () => {
+    const up = { height: 55, firstLine: 3, shown: 9, stage: 1 as const }
+    expect(tickDialogue({ ...up, height: 30 }, null)).toEqual({ ...up, height: 45 })
+    expect(tickDialogue(up, null)).toEqual(up)
+    expect(restartDialogueText(up)).toEqual({ height: 55, firstLine: 0, shown: 0, stage: 0 })
+    expect(tickDialogue(restartDialogueText(lowerDialogueBox(up)), null).height).toBe(15)
   })
 
   it('말하는 이 머리말 0xd4f50', () => {

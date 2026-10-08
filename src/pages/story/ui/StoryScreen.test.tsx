@@ -55,7 +55,7 @@ describe('StoryScreen — 관리 화면 위에 겹치는 덮개다', () => {
     expect(root.className).toContain('overlay')
   })
 
-  it('선택지는 원본 대사 창 갈래로 그린다 — 화살표 없이 고른 줄만 색이 바뀐다 (0x7fd22)', () => {
+  it('선택지는 대사 상자 안 글줄이다 — 줄 k 는 y + k × 14, 고른 줄은 노랑 테두리 (0x7fd22 · 0x6a978)', () => {
     const 선택지이벤트 = {
       ...이벤트,
       commands: [{ op: 'choice', portraits: [], choices: [{ text: '예', gotoEvent: 2 }, { text: '아니오', gotoEvent: 3 }] }],
@@ -72,12 +72,77 @@ describe('StoryScreen — 관리 화면 위에 겹치는 덮개다', () => {
       />,
     )
 
+    // 재생은 높이 0 에서 시작한다 — 다 올라온(55) 틀부터 줄을 그린다
+    expect(screen.queryAllByRole('option')).toHaveLength(0)
+    틀(3)
     const 줄 = screen.getAllByRole('option')
-    expect(줄).toHaveLength(2)
-    // 원본은 고른 줄 글자색만 바꾼다 — ▶ 커서를 그리지 않는다
-    expect(줄.map((item) => item.textContent).join('')).not.toContain('▶')
+    expect(줄.map((item) => item.textContent)).toEqual(['예', '아니오'])
+    expect(줄.map((item) => item.style.top)).toEqual(['270px', '284px'])
     expect(줄[0].getAttribute('aria-selected')).toBe('true')
-    expect(줄[0].className).toContain('choiceItem')
+    // 화살표 · 판이 없다 — 글은 흰색 그대로, 고른 줄에만 (3, y − 1) 폭 211 · 높이 13 노랑 테두리
+    expect(screen.getByTestId('대사-상자').textContent).not.toContain('▶')
+    const 테두리 = screen.getByTestId('대사-상자').querySelector('[data-part="고른줄"] rect') as SVGRectElement
+    expect(테두리.getAttribute('stroke')).toBe('#FFFF00')
+    expect([테두리.getAttribute('x'), 테두리.getAttribute('y'), 테두리.getAttribute('width'), 테두리.getAttribute('height')])
+      .toEqual(['3.5', '269.5', '210', '12'])
+  })
+
+  it('선택지 키 — 위 · 아래는 갈래 수로 돌고, 확인은 상자가 오르는 중에도 그 줄의 이벤트로 간다 (0x8b804)', () => {
+    const 선택지이벤트 = {
+      ...이벤트,
+      commands: [{
+        op: 'choice', portraits: [],
+        choices: [{ text: '하나', gotoEvent: 2 }, { text: '둘', gotoEvent: 3 }, { text: '셋', gotoEvent: 4 }],
+      }],
+    } as unknown as OriginalEvent
+    const 갈래 = (id: number, text: string) =>
+      ({ ...이벤트, id, commands: [{ op: 'say', text, speaker: 0, format: 0, portraits: [] }] }) as unknown as OriginalEvent
+    render(
+      <StoryScreen events={[선택지이벤트, 갈래(2, '첫째'), 갈래(3, '둘째'), 갈래(4, '셋째')]} event={선택지이벤트}
+        playerName="테스트" teamName="드래곤즈" onComplete={() => {}} onMatch={() => {}} />,
+    )
+    // 위(−1) — (0 + 3 − 1) % 3 = 2 · 아래 '8' — (2 + 1) % 3 = 0 · '2' 다시 위 — 2
+    fireEvent.keyDown(window, { key: 'ArrowUp' })
+    fireEvent.keyDown(window, { key: '8' })
+    fireEvent.keyDown(window, { key: '2' })
+    // 좌우는 아무 일도 없다
+    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+    fireEvent.keyDown(window, { key: 'Enter' })
+    틀(200)
+    expect(대사글()).toContain('셋째')
+  })
+
+  it('고른 이벤트가 say 없이 창을 띄우면 밑의 상자에는 선택지 줄과 고른 줄 테두리가 남는다 (0x8ba2c · 0x8b924)', () => {
+    const 선택지이벤트 = {
+      ...이벤트,
+      commands: [{ op: 'choice', portraits: [], choices: [{ text: '갈래 하나', gotoEvent: 2 }, { text: '갈래 둘', gotoEvent: 3 }] }],
+    } as unknown as OriginalEvent
+    const 알림 = {
+      ...이벤트, id: 3,
+      commands: [
+        { op: 'system', sub: 0, arg: 1, text: '알림 글' },
+        { op: 'say', text: '다음 대사', speaker: 0, format: 0, portraits: [] },
+      ],
+    } as unknown as OriginalEvent
+    render(
+      <StoryScreen events={[선택지이벤트, 알림]} event={선택지이벤트} playerName="테스트" teamName="드래곤즈"
+        onComplete={() => {}} onMatch={() => {}} />,
+    )
+    틀(3)
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    fireEvent.keyDown(window, { key: 'Enter' })
+    틀()
+    expect(screen.getByRole('dialog').textContent).toContain('알림 글')
+    const 줄 = screen.getAllByRole('option')
+    expect(줄.map((item) => item.textContent)).toEqual(['갈래 하나', '갈래 둘'])
+    expect(줄[1].getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByTestId('대사-상자').querySelector('[data-part="고른줄"]')).not.toBeNull()
+    // 창의 확인 — 옮긴 이벤트의 첫 say 는 [mgr+0x2c0] 이 0 이라(0x8be20) 상자를 내렸다 다시 올린다
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'OK' }))
+    expect(screen.getByTestId('대사-상자').querySelector('[data-part="본체"]')?.getAttribute('height')).toBe('15')
+    expect(screen.queryAllByRole('option')).toHaveLength(0)
+    틀(200)
+    expect(대사글()).toContain('다음 대사')
   })
 
   it('대사는 그대로 보여 준다', () => {
@@ -348,12 +413,13 @@ describe('say 대사 상자 — 0x7fbc4 · 0x7fad0 · 키 0x8b804', () => {
 
   it('첫 say 는 아래에서 틀마다 15 씩 올라와 55 에서 멈추고, 띠 12 는 그 위 — 다 오른 뒤에야 글을 찍는다', () => {
     띄우기([{ op: 'say', text: '안녕', speaker: 0, format: 0, portraits: [] }])
-    expect(본체().getAttribute('height')).toBe('0')
-    틀()
+    // 0x8d1f2 가 높이를 0 으로 내린 그 틀의 그리기(0x7fad0)가 곧바로 15 로 올린다 — 높이 0 은 화면에 안 나간다
     expect(본체().getAttribute('height')).toBe('15')
     expect(띠().getAttribute('y')).toBe(String(320 - 15 - 12))
     expect(글줄()).toHaveLength(0)
-    틀(3)
+    틀()
+    expect(본체().getAttribute('height')).toBe('30')
+    틀(2)
     expect(본체().getAttribute('y')).toBe('265')
     expect(띠().getAttribute('y')).toBe('253')
     // 다 오른 그 틀에 3 바이트 — "안"(2) · "녕"(시작 바이트 2 < 3) 이 함께 나온다
@@ -364,7 +430,7 @@ describe('say 대사 상자 — 0x7fbc4 · 0x7fad0 · 키 0x8b804', () => {
 
   it('틀마다 3 바이트 — 한글은 2 바이트, 색 표시 !cRRGGBB 는 8 바이트를 먹는다', () => {
     띄우기([{ op: 'say', text: '가나다라!cFF0000마바', speaker: 0, format: 0, portraits: [] }])
-    틀(4)
+    틀(3)
     expect(글줄()[0].textContent).toBe('가나')
     틀()
     expect(글줄()[0].textContent).toBe('가나다')
@@ -381,7 +447,7 @@ describe('say 대사 상자 — 0x7fbc4 · 0x7fad0 · 키 0x8b804', () => {
     const 결과 = 띄우기([{ op: 'say', text: '가나다라마바사아자차', speaker: 0, format: 0, portraits: [] }])
     const 누르기 = () => fireEvent.keyDown(window, { key: 'Enter' })
     누르기()
-    틀(4)
+    틀(3)
     expect(글줄()[0].textContent).toBe('가나')
     누르기()
     틀()
@@ -424,9 +490,8 @@ describe('say 대사 상자 — 0x7fbc4 · 0x7fad0 · 키 0x8b804', () => {
       { op: 'say', text: '둘', speaker: 0, format: 0, portraits: [] },
     ])
     대사넘기기()
+    // 둘째 say 가 도는 틀의 그리기가 곧바로 3 바이트를 찍는다 (0x7f7d5 뒤 0x7fc64)
     expect(본체().getAttribute('height')).toBe('55')
-    expect(글줄().map((line) => line.textContent).join('')).toBe('')
-    틀()
     expect(글줄()[0].textContent).toBe('둘')
   })
 })

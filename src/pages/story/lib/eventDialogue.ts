@@ -1,4 +1,4 @@
-import { FONT_SPACING, measurePixelTextWidth } from '@/shared/lib/font'
+import { FONT_SPACING, LINE_HEIGHT, measurePixelTextWidth } from '@/shared/lib/font'
 
 /**
  * **이벤트 재생기 say 명령의 대사 상자** — 공용 대사 창 0x7fbc4 / 상자 0x7fad0 (직접 떴다 · R14 3-4 와 같은 창 클래스 0x7b7b8).
@@ -24,6 +24,24 @@ import { FONT_SPACING, measurePixelTextWidth } from '@/shared/lib/font'
  *         +0xe8 ≥ 글 길이 → 단계 4 · == 쪽 끝 → 단계 3. 그린 바이트 수는 +0xe8 — 글자는 시작 바이트가 그 안이면 통째로 나온다
  * 키    114 0x13b88 → 0x8b804 (확인 −5 · '5'): 단계 1 → 2 (그 쪽을 다 보인다) · 3 → 0x7f7f4 (첫 줄 += 3, 단계 1) · 4 → 다음 명령
  * ```
+ * **선택지(명령 1)도 같은 상자다** — 0x8d22c → 0x8ba2c(mgr, 명령) · 0x7f7d5(창) · [창+0xe4] = 갈래 수 · 0x7f54c(초상화):
+ * ```
+ * 0x8ba2c  상자 글 칸 셋(+0xa8 + 0x14k) 을 비우고 [mgr+0xb8] = 갈래 수 · [mgr+0xb9] = 0(고른 줄) ·
+ *          칸 k = 0xacad0([mgr+4], [명령+0x1e+2k]) — 스크립트 글표. say 0x8bab8 은 끝에 [창+0xe4] = 1 · [mgr+0xb8] = 1 · [mgr+0xb9] = 0
+ * 0x7fbc4  칸 0 글 길이 == 0 이면 아무것도 안 그린다(0x7fbe0 — 상자 · 초상화 모두). [창+0xe4] == 1 이면 위 say 갈래(칸 0 을 찍기),
+ *          그 밖(> 0)이면 0x7fd22: 줄 k 를 0x6ef4c(글꼴, 칸 k, x 5, y = H − h + 5 + k × (글꼴 높이 + 3), 폭 W − 20,
+ *          바이트 −1(전부) · 줄 −1(전부) · 첫 줄 0 · 줄 높이 −1(= 글꼴 높이 + 줄간)) — 글색은 흰색 하나(0x7fc4c 의 0x6f315),
+ *          k == 고른 줄([mgr+0xb9], 둘째 인자)이면 그 뒤 0x6a978(gfx, 3, y − 1, (W − 20) − 10, 글꼴 높이 + 1, RGB(255, 255, 0)) —
+ *          노랑 사각 **테두리**(0x6a978 은 폭 · 높이에 1 을 더해 플랫폼 0x14006d8 에 넘긴다). 다 올라온(h == 55) 틀만 그린다.
+ * 0x7fd9a  (say · 선택지 모두) 다 올라온 틀이면 mode_ui 애니 0(프레임 22 · 23, 지연 2 · 3)을 (W − 3, H − 3) 에 0xba168 로 그리고
+ *          0x93d90 으로 한 칸 돌린다 — 상자 오른쪽 아래 넘김 표시
+ * 키 0x8b804 (지금 명령이 선택지일 때): 확인 −5 · '5' → [mgr+0x2bc] = [명령+0x24 + 2 × 고른 줄] · [mgr+8] = 1 · 0x8b0e4(본 이벤트 적기) —
+ *          상자 단계와 상관없이 곧바로 · 위 −1 · '2' → (고른 줄 + 갈래 수 − 1) % 갈래 수 · 아래 −2 · '8' → (고른 줄 + 1) % 갈래 수 ·
+ *          좌우 · 취소는 아무 일도 없다
+ * ```
+ * 갈래 수가 1 이면 say 갈래(0x7fc64)로 칸 0 을 찍는다 — 원본 데이터의 선택지는 모두 2 · 3 갈래다.
+ * 고른 줄은 확인 뒤에도 다음 say · 선택지가 쓸 때까지 남는다 — 고른 이벤트가 say 없이 창(알림 · 예아니오)을 띄우면 밑의 상자에는
+ * 선택지 줄과 고른 줄 테두리가 그대로 남는다. 상자 높이 · 글 칸은 이벤트를 옮겨도(0x8be20) 그대로다.
  * 바이트는 원본 글 CP949 다 — 한글 2 · 영문 1, `!N` · `!C` · `!L` · `!R` 2, `!cRRGGBB` 8 (안 보이는 표시도 찍기 시간을 먹는다).
  * 줄 나누기는 0x6ef4c 그대로(`wrapHelpText` 와 같은 규칙). 글꼴은 0x7fc32 의 0x6ecd0 이 고른 앱 전역 글꼴 [[0x1400070]+0x3c]
  * (자간 1 · 줄간 3) — 글자 폭은 0x6f2e4 → 0x9c52c 로 잰 한 글자 폭(`measurePixelTextWidth`: 한글 9 · 영문 5 · 못 그리는 글자 0).
@@ -56,6 +74,30 @@ export const EVENT_DIALOGUE = {
   },
   /** 0x7fcc4 — 틱마다 드러나는 바이트 */
   bytesPerTick: 3,
+} as const
+
+/** 선택지 갈래 0x7fd22 */
+export const EVENT_DIALOGUE_CHOICE = {
+  /** 0x7fd32~0x7fd3a — 줄 사이 = 글꼴 높이 [글꼴+0x6c](11) + 3 */
+  lineStep: LINE_HEIGHT + 3,
+  /**
+   * 0x7fd66~0x7fd88 → 0x6a978(gfx, 3, y − 1, (W − 20) − 10, 글꼴 높이 + 1, 노랑) — 0x6a978 은 폭 · 높이에 1 을 더해 넘기므로
+   * 테두리는 x 3 부터 W − 29 칸 · y − 1 부터 글꼴 높이 + 2 칸이다 (플랫폼 0x14006d8 이 받은 폭 · 높이를 칸 수로 본다 — 유력)
+   */
+  cursor: {
+    x: 3,
+    top: -1,
+    width: SCREEN_WIDTH - 0x14 - 10 + 1,
+    height: LINE_HEIGHT + 1 + 1,
+    color: '#FFFF00',
+  },
+} as const
+
+/** 0x7fd9a~0x7fde2 — 상자 오른쪽 아래 넘김 표시: mode_ui 애니 0 을 (W − 3, H − 3) 에 */
+export const DIALOGUE_CURSOR = {
+  x: SCREEN_WIDTH - 3,
+  y: SCREEN_HEIGHT - 3,
+  animation: 0,
 } as const
 
 /** 0xd4f50 — 말하는 이 머리말 */
@@ -200,10 +242,23 @@ export function startDialogue(slideIn: boolean): DialogueState {
   return { height: slideIn ? 0 : EVENT_DIALOGUE.boxHeight, firstLine: 0, shown: 0, stage: 0 }
 }
 
-/** 한 틀 — 0x7fad0(높이) 뒤 다 올라왔으면 0x7fc64~0x7fcea(찍기) */
-export function tickDialogue(state: DialogueState, layout: DialogueLayout): DialogueState {
+/** 0x7f7d4 · 0x7f7d5 — 글 찍기를 처음으로(첫 줄 0 · 드러난 바이트 0 · 단계 0). 높이는 그대로 */
+export function restartDialogueText(state: DialogueState): DialogueState {
+  return { ...state, firstLine: 0, shown: 0, stage: 0 }
+}
+
+/** 0x7f7cc — 상자 높이 0 (다음 그리기부터 다시 오른다) */
+export function lowerDialogueBox(state: DialogueState): DialogueState {
+  return { ...state, height: 0 }
+}
+
+/**
+ * 한 틀 — 0x7fad0(높이) 뒤 다 올라왔으면 0x7fc64~0x7fcea(찍기). 그리기가 곧 갱신이다 — 0x7fbc4 가 그릴 때마다 높이를 올리고
+ * 글을 찍으므로 화면에 나가는 것은 늘 이 함수를 거친 값이다. `layout` 이 null 이면 선택지 갈래(0x7fd22) — 찍기 칸을 안 건드린다.
+ */
+export function tickDialogue(state: DialogueState, layout: DialogueLayout | null): DialogueState {
   const height = Math.min(state.height + EVENT_DIALOGUE.slideStep, EVENT_DIALOGUE.boxHeight)
-  if (height !== EVENT_DIALOGUE.boxHeight) return { ...state, height }
+  if (height !== EVENT_DIALOGUE.boxHeight || layout === null) return { ...state, height }
   const pageEnd = pageEndOf(layout, state.firstLine)
   let { shown, stage } = state
   if (stage === 0) stage = 1
