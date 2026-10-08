@@ -34,6 +34,20 @@ import type { OriginalMission } from '@/shared/config/original/missions'
 import { missionResultHeldOf } from '@/pages/mission-play/lib/missionResultBoard'
 import { missionRunScoreBoardOf } from '@/pages/mission-play/lib/missionRunScoreBoard'
 
+/*
+ * **마선수 대결의 경기 중 "나가기"** — 확정 (0x40140 · 0xa5368 · SYS 8 0x8d764~0x8d846 · 105 진입 0x11b46~0x11bbe · 0x10df8 직접 뜸):
+ * ```
+ * 40140  전역 모드 0x1552d14 = 장면+0x1104 · "예"이고 모드 5·6 이면 0xa5368(미션, 0)([obj+0xbc] = 0 만 — a538e → a5452)
+ *        0x140006c = 4 · 0xbc291(…, 0x103)(메인 메뉴 처음 단) · 0xbdae9 소리 밀기 — g[0x11f] · g[0x176] · g[0x144] · g[0x177] 을
+ *        읽지도 쓰지도 않고 저장(0x22755)도 없다
+ * ```
+ * 결과 바이트는 SYS 8 이 미리 적어 둔 값이 남는다 — 타자편 g[0x144] = 0(8d7c4~8d7cc), 투수편 g[0x177] = 0x7b971 반환(투수편 갈래에서
+ * 거짓 → 0). 플래그(g[0x11f] / g[0x176])도 1 로 남아, **그 편 나리에 다시 들어올 때** 105 진입이 상태 0x70(112) → 0x8c(140)으로
+ * 가고 0x10df8 이 결과(0 = 짐)로 resultEvents[1] 을 0x8bdc9 로 부른 뒤 칸들을 지운다(타자편 10ebe~10f0c · 투수편 10f0e~).
+ * 그 사이 보통 미션도 플래그를 본다(0xaa57c aa6e0 사람 칸 팀 · 0x4ef3e G 건너뜀 · 결과 판 대결 꼴 · 0x4ea0c 가 결과 바이트를 덮어씀).
+ * ⚠️ 미이식: 그 대기(편 · resultEvents · 맥락 · 결과 바이트 0)를 커리어 · 투수편 세션이 들고 105 진입에서 띄워야 해 웹은 아직
+ *    나가기를 '실패' → 결과 판 → 곧바로 진 이벤트로 잇는다(진 이벤트는 같고, 원본에 없는 결과 판이 끼며 때가 다르다).
+ */
 /**
  * 마선수 대결의 전역 기록 칸 — 타자편 대결은 SYS 8 이 g[0x11f] = 1, 투수편 대결은 g[0x176] = 1 을 적는다.
  * 결과 판 0x4a384 는 둘 중 하나라도 서면 앞부분만 그리고, 0x4ea0c 는 G 보상을 건너뛴다.
@@ -196,8 +210,9 @@ export function MissionRoutes({
         stealableBases={session.stealableBases}
         onSteal={actions.steal}
         // 경기 중 "나가기" — 보통 미션은 0x40140 이 0xa5368(…, 0) 뒤 곧장 메인 메뉴(결과 화면 없음).
-        // ⚠️ 미해결: 마선수 대결(+0x11f/+0x176)도 0x40140 은 플래그를 안 보고 메인 메뉴로 나가는 것으로 보이나, 다시 들어올 때
-        //    105 진입이 결과 이벤트를 어떻게 잇는지 못 읽어 예전(실패 결과 → 진 이벤트) 그대로 둔다
+        // 마선수 대결도 같은 길이다 (확정 — 파일 머리 "마선수 대결의 경기 중 나가기" 주석).
+        // ⚠️ 미이식: 나간 대결의 진 결과 이벤트는 다음 나리 105 진입이 띄우는데 그 대기 칸이 커리어 세션에 없어,
+        //    웹은 예전 근사(실패 결과 판 → 곧바로 진 이벤트)로 둔다
         onGiveUp={screen.kind === '마선수대결' ? actions.giveUpBatter : actions.quitBatterMission}
         onFinish={screen.kind === '마선수대결' ? actions.finishAceMatch : actions.finishBatter}
         // 결과 판 0x4a384(모드 5·6) — "예"는 같은 미션 곧바로 다시(0x140006c = 3)
@@ -427,8 +442,8 @@ export function PitcherAceMatchRoute(
       atBat={runner.atBat}
       bannerText={runner.bannerText}
       onThrow={session.handleThrow}
-      // ⚠️ 근사: 원본 경기 중 메뉴 나가기 0x40140 은 모드 5·6 이면 0xa5368(obj,0) 뒤 메인 메뉴(장면 0x103)로 간다 —
-      //    +0x176 이 서 있을 때 어디로 가는지는 안 읽었다. 웹은 보통 미션처럼 '실패' 로 두어 패배 결과로 잇는다.
+      // 경기 중 메뉴 나가기 0x40140 — +0x176 이 서 있어도 보통 미션과 같이 메인 메뉴(장면 0x103)로 간다 (확정 — 파일 머리 주석).
+      // ⚠️ 미이식: 진 결과 이벤트를 다음 투수편 105 진입에 띄울 대기 칸이 투수편 세션에 없어 웹은 '실패' → 패배 결과로 곧바로 잇는다.
       onGiveUp={actions.giveUpPitcher}
       // 경기 중 메뉴 "다시하기"(0x3c706 → StrGAME[7] 예 → 하위 3 0x3c98e) — 0x3c98e 는 +0x176 을 안 보고 모드 5·6 이면
       // 0x140006c = 3 · 장면 0x107 로 간다. 0x107 진입 0x1d9a4 가 this+0x9c = 미션객체+0xbd 를 잡고 상태 3 0x1e908 이 그 미션을
