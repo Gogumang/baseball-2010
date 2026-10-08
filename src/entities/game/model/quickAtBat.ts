@@ -51,11 +51,12 @@ const SWING_PATH_LIMIT = 59
 const FORCED_SWING_INNING = 15
 /**
  * 스트라이크존에 넣을 확률 (0xc1818).
- *   기준 = 65 − (마선수면 10) − trunc((제구 + 구속) ÷ 50)
+ *   기준 = 65 − (내 육성 선수면 10) − trunc((제구 + 구속) ÷ 50)
  *   `rand(0,100) > 기준` 이면 존 안이다. 투수가 좋을수록 기준이 낮아져 스트라이크가 늘어난다.
  */
 const STRIKE_ZONE_BASE = 65
-const ACE_STRIKE_BONUS = 10
+/** c182a `0xb6389(투수)` = 레코드 +0xa 비트7(육성·명전 — 마선수는 비트6 이라 아니다) 이면 ×10 (c1880 `movs r3,#0xa`) */
+const OWN_PLAYER_STRIKE_BONUS = 10
 const PITCHER_STAT_DIVISOR = 50
 /** 볼 카운트가 이 값을 넘으면 포볼이다 — 0x9d57c 가 `볼 <= 2` 일 때만 볼을 센다 */
 const BALLS_BEFORE_WALK = 3
@@ -88,8 +89,11 @@ export interface QuickAtBatPitcher {
   /** 0 이면 탈진이라 0xab214 가 B·C 에 2000 을 얹는다 */
   readonly stamina: number
   readonly skillIds: readonly number[]
-  /** 마선수면 스트라이크존 기준이 10 낮아진다 (0xc1818) */
-  readonly isAce?: boolean
+  /**
+   * **내 육성·명전 선수**(0xb6389 = 레코드 +0xa 비트7)면 스트라이크존 기준이 10 낮아진다 (0xc1818 c182a·c1880).
+   * ⚠️ 마선수(비트6)가 아니다 — 예전 이름 `isAce` 는 이 비트를 마선수로 잘못 읽은 것이었다(`SwingResultInput.isPitcherOwnPlayer` 와 같은 비트).
+   */
+  readonly isOwnPlayer?: boolean
   /** 손 `0xb63c0(투수)` — 0 우투 · 1 좌투 (`pitcherHandOf`). 타자 스킬 13·14 가 본다. 안 넘기면 0 */
   readonly hand?: number
 }
@@ -189,8 +193,8 @@ export function judgePitchOf(
   balls: number,
   random: RandomPort,
 ): PitchJudgement {
-  const aceBonus = pitcher.isAce === true ? ACE_STRIKE_BONUS : 0
-  const bonus = aceBonus + trunc((pitcher.control + pitcher.velocity) / PITCHER_STAT_DIVISOR)
+  const ownBonus = pitcher.isOwnPlayer === true ? OWN_PLAYER_STRIKE_BONUS : 0
+  const bonus = ownBonus + trunc((pitcher.control + pitcher.velocity) / PITCHER_STAT_DIVISOR)
   const threshold = STRIKE_ZONE_BASE - bonus
   const isInsideZone = random.rand(0, 100) > threshold
   if (!isInsideZone) return balls <= BALLS_BEFORE_WALK - 1 ? '볼' : '포볼'
