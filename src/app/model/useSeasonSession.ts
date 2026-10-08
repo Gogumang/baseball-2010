@@ -2173,7 +2173,10 @@ export function useSeasonSession(
   const confirmIncome = useCallback(
     (record: SeasonRecord) => {
       if (save === null) return
-      const settled: SeasonRecord = { ...record, phase: SEASON_PHASE.기본 }
+      // 0xe9 갱신 0xdea0 끝(e114~e130)은 다음 상태(0xee/0xef/0xf1 · 사이 0xd3)를 걸고 저장만 한다 — phase(SR+0x50)는
+      // 경기 끝 0x4ea0c 가 쓴 2 그대로다. 0xf1 진입 0x953c 도 안 바꾼다. 그래서 0xe9·0xf1 에서 끄고 이어하면 진입 분기 0xcb 가
+      // 다시 0xe9 로 보내 평가 이벤트·구내매점 감소·트레이드 요청을 또 탄다 — 원본 그대로. phase 는 0xc9(3)·0xd8(4) 진입이 고친다
+      const settled: SeasonRecord = record
       commit({ ...save, state: { ...save.state, record: settled } })
       if (settled.games >= SEASON_GAME_COUNT) {
         /*
