@@ -102,7 +102,8 @@ export function cpuPickoffBaseOf(
  * 3463e: 0xbcb49(장면+0x18, 0x11)  ; 상태 0x11(던지기) 예약 — 일반 갈래 0x34888 과 같은 일
  * 34644: → 0x348d6 끝
  * ```
- * 곧 홈런더비는 목표 종류도 목표점도 **굴리지 않고** 존 한가운데를 노린다 (제구 오차 0x4dc78 는 뒤에서 그대로 돈다).
+ * 곧 홈런더비는 목표 종류도 목표점도 **굴리지 않고** 존 한가운데를 노린다. 놓기 0x4dc78 도 4dcce 에서 모드 7 이면
+ * 0x4de60 으로 뛰어 제구 흩어짐(4dcd4~4de5e)을 통째로 건너뛰므로 공은 이 점 그대로 간다(실투 0x33cbc 는 그 뒤라 돈다).
  */
 export function derbyPitchTargetOf(side: number): WorldPoint {
   const center = ZONE_CENTERS[side] ?? ZONE_CENTERS[0]
@@ -211,7 +212,7 @@ export interface ControlErrorInput {
 }
 
 /**
- * 놓는 순간 0x4dc78 의 제구 흩어짐. 투수 미션의 조준 흔들림(0x39c5c)은 여기가 아니라 0x10 의 틱마다
+ * 놓는 순간 0x4dc78 의 제구 흩어짐 (홈런더비 모드 7 은 4dcce 에서 건너뛰어 부르지 않는다). 투수 미션의 조준 흔들림(0x39c5c)은 여기가 아니라 0x10 의 틱마다
  * (`applyMissionAimShake`) 이미 지나온 조준점으로 들어온다 — 원본 차례: 흔들기 여러 번 → 0x11 → 등급 굴림 → 흩어짐.
  */
 export function applyControlError(target: WorldPoint, input: ControlErrorInput, random: RandomPort): WorldPoint {

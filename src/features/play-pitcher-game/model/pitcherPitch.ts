@@ -20,6 +20,7 @@ import {
   MAGIC_PITCH_TYPE_NUMBER,
   MAGIC_PITCH_SLOT,
   magicPitchNameOf,
+  magicPitchRecordIndexOf,
 } from '@/entities/pitcher-career/model/magicPitch'
 import {
   pitchStaminaCostOf,
@@ -206,16 +207,17 @@ function aimCellOf(input: Pick<HumanPitchInput, 'typeNumber' | 'gaugeCell' | 'gr
 }
 
 /**
- * 마구 궤적 레코드 고르기.
- *
- * `pitch.zt1` 구질 22 블록은 17 레코드이고 색인이 **`3(m−1) + trunc(폼/2)`**(육성 1~4) ·
- * **`m + 7`**(마투수 5~9) 이다 (0x9e944, H2 3절). 그 블록의 레코드들은 폼 칸이
- * `0,2,4 / 0,2,4 / 0,2,4 / 0,2,4 / 6,7,8,9,10` 으로 놓여 있어서, 기존
- * `pitchRecordOf(22, 폼, k)` 가 폼으로 거른 뒤 k 번째를 고르면 **k = 마구 번호 − 1** 일 때
- * 정확히 같은 레코드가 나온다. 마투수는 폼 하나에 레코드 하나라 k 가 무엇이든 같다.
+ * 마구 구속 단계 · 궤적 레코드 — 원본 그대로:
+ * - 구속 rank 0x66d54(66d56): 구질 == 0x16(마구)면 식을 안 거치고 **0** → 0x34968 이 돌려주는 단계 rank/2 도 0
+ * - 궤적 준비 0x9e669(9e67c): 구질 == 0x16 이면 공 [+0x18](구속 단계)에 단계 대신 **0** 을 쓴다
+ * - 레코드는 단계가 아니라 0x9e944 번호(`magicPitchRecordIndexOf` — 육성 `3(m−1) + 폼/2` · 마투수 `m + 7`)로 곧장 고른다.
+ *   CPU `releaseCpuPitch` 와 같은 길이다
  */
-function magicSpeedStageOf(repertoire: PitcherRepertoire): number {
-  return repertoire.isAce === true ? 0 : Math.max(0, repertoire.magicNumber - 1)
+const MAGIC_PITCH_SPEED_STAGE = 0
+
+function magicRecordOf(repertoire: PitcherRepertoire): { readonly recordIndex: number } | Record<string, never> {
+  const recordIndex = magicPitchRecordIndexOf(repertoire.magicNumber, repertoire.form)
+  return recordIndex === null ? {} : { recordIndex }
 }
 
 /**
@@ -243,10 +245,14 @@ export function buildHumanPitch(input: HumanPitchInput, random: RandomPort): Pit
     { tier: input.grade, isComputer: false, aimIndex: aimCellOf(input) },
     random,
   )
-  const speedStage = isMagic
-    ? magicSpeedStageOf(repertoire)
-    : pitchSpeedStageOf(typeNumber - 1, stats, input.grade)
-  const worldPath = pitchPathOf({ typeNumber, form: repertoire.form, speedStage, target: finalTarget })
+  const speedStage = isMagic ? MAGIC_PITCH_SPEED_STAGE : pitchSpeedStageOf(typeNumber - 1, stats, input.grade)
+  const worldPath = pitchPathOf({
+    typeNumber,
+    form: repertoire.form,
+    speedStage,
+    target: finalTarget,
+    ...(isMagic ? magicRecordOf(repertoire) : {}),
+  })
   const type = isMagic ? null : (PITCH_TYPES[typeNumber - 1] ?? PITCH_TYPES[0])
 
   return {
@@ -289,11 +295,16 @@ export function mistakeHumanPitchOf(pitch: Pitch, input: MistakeHumanPitchInput)
   const { typeNumber, stats, repertoire, side } = input
   const isMagic = typeNumber === MAGIC_PITCH_TYPE_NUMBER
   const target = ZONE_CENTERS[side] ?? ZONE_CENTERS[0]
-  const speedStage = isMagic
-    ? magicSpeedStageOf(repertoire)
-    : pitchSpeedStageOf(typeNumber - 1, stats, input.grade)
+  const speedStage = isMagic ? MAGIC_PITCH_SPEED_STAGE : pitchSpeedStageOf(typeNumber - 1, stats, input.grade)
   const frames = typeNumber === FASTBALL_TYPE_NUMBER ? MISTAKE_PITCH_FRAMES_FASTBALL : MISTAKE_PITCH_FRAMES
-  const worldPath = pitchPathOf({ typeNumber, form: repertoire.form, speedStage, target, frames })
+  const worldPath = pitchPathOf({
+    typeNumber,
+    form: repertoire.form,
+    speedStage,
+    target,
+    frames,
+    ...(isMagic ? magicRecordOf(repertoire) : {}),
+  })
   return {
     ...pitch,
     plate: plateOf(target, side),

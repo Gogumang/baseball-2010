@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { baseRunnerDrawsOf, loopingAnimationStepAt, showsBaseRunners } from '@/widgets/batting-stage/lib/baseRunners'
+import {
+  baseRunnerDrawsOf,
+  grayRunPipPixel,
+  loopingAnimationStepAt,
+  runPipCountOf,
+  runPipDrawsOf,
+  runnerBoxAnchorOf,
+  showsBaseRunners,
+} from '@/widgets/batting-stage/lib/baseRunners'
 import { BATTER_SIDE } from '@/widgets/batting-stage/lib/stageLayout'
 
 describe('타석 화면 루상 주자 0x35b94', () => {
@@ -37,3 +45,46 @@ describe('타석 화면 루상 주자 0x35b94', () => {
     expect(loopingAnimationStepAt([], 4)).toBeNull()
   })
 })
+
+describe('상태 0xe 주루 칸 — 0x35b94 의 35f4e~3604c', () => {
+  it('상자 잡는 점은 그리는 점과 다르다 — 1·3루는 7 위(y0 + 0x18), 2루는 py − 0x15', () => {
+    expect(runnerBoxAnchorOf('first', BATTER_SIDE.좌타)).toEqual({ x: 220, y: 165 })
+    expect(runnerBoxAnchorOf('second', BATTER_SIDE.좌타)).toEqual({ x: 83 - 0x1b, y: 167 })
+    expect(runnerBoxAnchorOf('second', BATTER_SIDE.우타)).toEqual({ x: 151, y: 167 })
+    expect(runnerBoxAnchorOf('third', BATTER_SIDE.좌타)).toEqual({ x: 20, y: 165 })
+  })
+
+  it('켜진 칸 n = 주력 / 0x14d + 1 — 0..332 → 1 · 333 → 2 · 999 → 4', () => {
+    expect([0, 332, 333, 665, 666, 998, 999].map(runPipCountOf)).toEqual([1, 1, 2, 2, 3, 3, 4])
+  })
+
+  it('x0 = 상자x − ((0x16 − 상자w) >> 1), 6px 간격 넷 — n 개는 그대로, 나머지는 효과 0xa', () => {
+    const box = { x: 100, y: 50, width: 12, height: 20 }
+    expect(runPipDrawsOf('first', box, 400)).toEqual([
+      { x: 95, y: 78, isEmpty: false },
+      { x: 101, y: 78, isEmpty: false },
+      { x: 107, y: 78, isEmpty: true },
+      { x: 113, y: 78, isEmpty: true },
+    ])
+    expect(runPipDrawsOf('third', box, 999).every((pip) => !pip.isEmpty)).toBe(true)
+    expect(runPipDrawsOf('third', box, 999)).toHaveLength(4)
+  })
+
+  it('2루는 머리 위 — y = 상자y − 2', () => {
+    const pips = runPipDrawsOf('second', { x: 60, y: 160, width: 9, height: 20 }, 0)
+    expect(pips.map((pip) => [pip.x, pip.y, pip.isEmpty])).toEqual([
+      [54, 158, false],
+      [60, 158, true],
+      [66, 158, true],
+      [72, 158, true],
+    ])
+  })
+
+  it('효과 0xa 회색 0x97f01 — s = R5 + G5 + B5 + 3, g = s/4 + s/16 + s/64', () => {
+    // 흰색: s = 31·3 + 3 = 96 → g = 24 + 6 + 1 = 31 → 565 0xffdf (초록 6비트 칸은 g << 1 = 62 라 한 단 어둡다)
+    expect(grayRunPipPixel(255, 255, 255)).toEqual({ r: 255, g: 251, b: 255 })
+    // 순수 빨강: s = 34 → g = 8 + 2 + 0 = 10 → R5 10 · G6 20
+    expect(grayRunPipPixel(255, 0, 0)).toEqual({ r: 82, g: 81, b: 82 })
+  })
+})
+

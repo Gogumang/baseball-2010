@@ -9,7 +9,7 @@ import { ORIGINAL_COLORS, UI_COLORS } from '@/shared/config/design'
  *   팀 아이콘: (13,23) · (13,40) — team_logo_ini
  *   베이스: 1루 (68,14) · 2루 (59,9) · 3루 (50,14), 주자 있으면 파트 6 (빈 베이스 파트 5 는 프레임에 있다)
  *   램프: S 파트 13 (58,24)(67,24) · B 파트 14 (58,34)(67,34)(76,34) · O 파트 15 (58,44)(67,44)
- *   이닝: 박스 0 (15,8,10,9) — "회" 글자 앞
+ *   이닝: 박스 0 (15,8,10,9) 오른끝 — "회" 글자 앞, 0xba689 → 0xba51c (`inningGlyphsOf`) 자간 0 · 정렬 4 · 상자 0×0
  *   점수: 숫자 프레임 20~ 를 0xba51c 로 (`alignedNumberGlyphsOf`) — 자간 1 · ox −3, 아래 줄은 y+3 · 공격 막대 높이 h−2 · 위 줄 = 먼저 공격(원정)
  *
  * **확정** (F-3 · 3-1): 숫자 글꼴 = `ui/num.pzx` (0x3740c → 0x330f0), 점수 **오른쪽 정렬**
@@ -36,6 +36,11 @@ export interface HudState {
    * 안 주면 1(사람 = 후공) — 예전 그림(위 = 상대)과 같다.
    */
   readonly playerSide?: number
+  /**
+   * 루상 주자의 **경기용 주력** 0xb570d(ctx, 3, 주자 선수, 1, 90, 1) — 상태 0xe 의 주루 칸(0x35b94 35f74, `runPipDrawsOf`)이 쓴다.
+   * 주자가 누구인지 웹 경기 상태가 아직 들고 있지 않아 부르는 쪽이 아는 루만 채운다. 없는 루는 칸을 안 그린다
+   */
+  readonly runnerRunAbilities?: Partial<Record<'first' | 'second' | 'third', number>>
 }
 
 const HUD_FRAMES = './sprites/game_ui/frames'
@@ -123,7 +128,15 @@ const lampZoom: Record<LampKey, LampZoomMemory> = {
   outs: INITIAL_LAMP_ZOOM,
 }
 
+/**
+ * 이닝 숫자 0xba689 → 0xba51c (0x373d0 의 378a2~378ea, 직접 떴다): 0x94a65(game_ui 프레임, 박스 0) = (9, 2, 10, 9) 에
+ * (6, 6) 을 더해 x = 박스x + 6 + **박스w**, y = 박스y + 6 → (25, 8). 값 = st[+0x6b] + 1, 자간 0, 기준 0(num 000~), 정렬 4.
+ * 0xba689 는 그대로 0xba51c(x, y, **w 0, h 0**, 자간, 값, 기준, 그림, 정렬, ox 0, oy 0, 0)로 넘긴다 (ba6a2~ba6ac) —
+ * 상자 폭 0 에 오른쪽 맞춤이라 (25, 8) 이 오른끝, 글자는 아래 맞춤
+ */
 const INNING_BOX = { x: 15, y: 8, width: 10 }
+const INNING_LETTER_SPACING = 0
+const INNING_ALIGN = 0x4
 const SCORE_DIGITS_START = 20
 /**
  * 점수 숫자 0xba719 → 0xba51c (37552~3756c 위 · 37624~37640 아래, 직접 떴다): 박스 = 줄 상자에서 x 를 로고 앞 +3 (3751c · 375ee)
@@ -174,7 +187,24 @@ export function drawHud(context: CanvasRenderingContext2D, hud: HudState, tick: 
     }
   }
 
-  drawNumber(context, hud.inning, INNING_BOX.x + INNING_BOX.width, INNING_BOX.y, INNING_DIGITS_START)
+  const innings = inningGlyphsOf(hud.inning, numGlyphSizeOf)
+  for (const glyph of innings ?? []) {
+    const image = sprite(numGlyphUrl(glyph.index))
+    if (image !== null) context.drawImage(image, glyph.x, glyph.y)
+  }
+}
+
+/** HUD 이닝 숫자 자리 — 0xba689(25, 8, 자간 0, 이닝, 기준 0, num, 정렬 4) → 0xba51c (위 `INNING_BOX` 주석) */
+export function inningGlyphsOf(
+  inning: number,
+  sizeOf: (index: number) => { readonly width: number; readonly height: number } | null,
+): NumberGlyphPlacement[] | null {
+  return alignedNumberGlyphsOf(
+    inning,
+    { x: INNING_BOX.x + INNING_BOX.width, y: INNING_BOX.y, width: 0, height: 0 },
+    { spacing: INNING_LETTER_SPACING, start: INNING_DIGITS_START, align: INNING_ALIGN, offsetX: 0, offsetY: 0 },
+    sizeOf,
+  )
 }
 
 /** HUD 한 줄에 그릴 것 — 팀 로고 · 점수 · 공격 막대 */
@@ -343,25 +373,4 @@ export function alignedNumberGlyphsOf(
     x += size.width + options.spacing
     return glyph
   })
-}
-
-/** ui/num.pzx 숫자를 오른쪽 끝(rightX)에 맞춰 그린다 */
-function drawNumber(
-  context: CanvasRenderingContext2D,
-  value: number,
-  rightX: number,
-  y: number,
-  start: number,
-  spacing = 0,
-): void {
-  const digits = String(Math.max(0, Math.trunc(value)))
-  const images = [...digits].map((digit) => sprite(`./sprites/num/${String(start + Number(digit)).padStart(3, '0')}.png`))
-  if (images.some((image) => image === null)) return
-  const width = images.reduce((total, image) => total + (image?.width ?? 0) + spacing, -spacing)
-  let x = rightX - width
-  for (const image of images) {
-    if (image === null) continue
-    context.drawImage(image, x, y)
-    x += image.width + spacing
-  }
 }
