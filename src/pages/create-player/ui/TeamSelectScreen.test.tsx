@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { TeamSelectScreen } from '@/pages/create-player/ui/TeamSelectScreen'
 import { TEAMS } from '@/shared/config/original/teams'
-import { GRID, TEAM_COUNT, cellPositionOf } from '@/pages/create-player/lib/teamSelectLayout'
+import { GRID, MY_LEAGUE_TEAM_GRID_SHAPE, TEAM_COUNT, cellPositionOf } from '@/pages/create-player/lib/teamSelectLayout'
 
 /** 팀 고르기 (상태 0x65) — 15팀 격자에서 하나를 고른다 */
 
@@ -116,6 +116,20 @@ describe('팀 고르기', () => {
     // 기본값은 팀선택 = game_frame 5
     const 기본 = 띄우기()
     expect(기본.container.querySelector('img[src$="game_frame/005.png"]')).toBeTruthy()
+  })
+
+  it('나만의리그 격자(꼴 0x10)는 가로를 같은 줄 안에서 감고 세로는 끝에서 멈춘다 (0xf6d4~0xf6e6)', () => {
+    const onSelect = vi.fn()
+    띄우기({ onSelect, gridShape: MY_LEAGUE_TEAM_GRID_SHAPE })
+
+    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(onSelect).toHaveBeenLastCalledWith(4)
+
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    fireEvent.keyDown(window, { key: 'ArrowUp' })
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(onSelect).toHaveBeenLastCalledWith(0)
   })
 
   it('아래 키는 한 줄(5칸)씩 내려간다', () => {

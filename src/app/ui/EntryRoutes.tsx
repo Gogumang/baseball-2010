@@ -30,6 +30,7 @@ import { MainMenuScreen } from '@/pages/main-menu/ui/MainMenuScreen'
 import type { GameStartCursor, NariGameReady } from '@/pages/main-menu/model/mainMenu'
 import { CreatePlayerScreen } from '@/pages/create-player/ui/CreatePlayerScreen'
 import { TeamSelectScreen } from '@/pages/create-player/ui/TeamSelectScreen'
+import { MY_LEAGUE_TEAM_GRID_SHAPE } from '@/pages/create-player/lib/teamSelectLayout'
 import { HelpScreen } from '@/pages/help/ui/HelpScreen'
 import { SpecialEditScreen } from '@/pages/special-edit/ui/SpecialEditScreen'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
@@ -222,6 +223,7 @@ export function EntryRoutes({
         title="나만의리그타자편"
         // 히든 팀 열림은 커리어가 아니라 전역 기록 +0x70 + idx 다 — 투수편(App 의 PitcherCreateFlow)과 같은 출처
         openedHiddenIds={collection.openedHiddenIds}
+        gridShape={MY_LEAGUE_TEAM_GRID_SHAPE}
         onSelect={(teamId) => setScreen({ kind: '선수등록', teamId })}
         onCancel={() => setScreen({ kind: '메인메뉴' })}
       />

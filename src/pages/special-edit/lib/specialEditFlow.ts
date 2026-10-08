@@ -5,6 +5,8 @@ import {
 import type {
   EntryBatterRow, EntryEditorState, EntryKey, EntryLists, EntryPitcherRow,
 } from '@/entities/season-mode/model/entryEditor'
+import { moveGridCursor } from '@/pages/record/lib/annalsGrid'
+import type { AnnalsDirection, AnnalsGridShape } from '@/pages/record/lib/annalsGrid'
 
 /**
  * **스페셜 에디트** — 메인 메뉴 하위 상태 29 (진입 0x24804 · 갱신 0x2b2e0 · 그리기 0x2e1e0, R11 1a 확정).
@@ -26,6 +28,14 @@ export type SpecialEditStep = (typeof SPECIAL_EDIT_STEP)[keyof typeof SPECIAL_ED
 export const EDIT_TEAM_COUNT = 10
 export const EDIT_GRID_COLUMNS = 5
 
+/**
+ * 격자 꼴 — `vtable+0x1c(격자, 5, 2, 1, 0x10)` 의 꼴 **0x10** = 가로로 넘치면 같은 줄 반대쪽으로 감고,
+ * 세로는 끝에서 멈춘다 (0x6bead — 기록연감 격자 [this+0x7c] 와 같은 객체 vtable 0xd2ea0).
+ */
+export const EDIT_GRID_SHAPE: AnnalsGridShape = {
+  columns: EDIT_GRID_COLUMNS, rows: EDIT_TEAM_COUNT / EDIT_GRID_COLUMNS, wrapsColumns: true, wrapsRows: false,
+}
+
 export interface SpecialEditState {
   readonly step: SpecialEditStep
   /** 격자 커서 `[격자+0x10] × [+0x14] + [+0xc]` */
@@ -40,9 +50,9 @@ export function createSpecialEditState(): SpecialEditState {
   return { step: SPECIAL_EDIT_STEP.팀고르기, gridCursor: 0, team: 0, editor: openEntryEditor(false) }
 }
 
-/** 격자 커서 옮기기 — 끝에서 멈춘다(감싸지 않음, 팀 고르기 화면과 같은 근사 — 격자 객체 0x7a571 커서 내부 미해독) */
-export function moveEditGrid(state: SpecialEditState, step: number): SpecialEditState {
-  return { ...state, gridCursor: Math.min(EDIT_TEAM_COUNT - 1, Math.max(0, state.gridCursor + step)) }
+/** 격자 커서 한 칸 옮기기 — 꼴 0x10 (`EDIT_GRID_SHAPE`) */
+export function moveEditGrid(state: SpecialEditState, direction: AnnalsDirection): SpecialEditState {
+  return { ...state, gridCursor: moveGridCursor(EDIT_GRID_SHAPE, state.gridCursor, direction) }
 }
 
 /** 웹 전용 — 칸을 눌러 커서를 옮긴다 */

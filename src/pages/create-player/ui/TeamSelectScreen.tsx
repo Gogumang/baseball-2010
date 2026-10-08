@@ -8,6 +8,8 @@ import {
   ABILITY_CHART, ANCHOR_A, ANCHOR_B, GRID, LOCKED_CIRCLES, LOCKED_NAME, NAME_BAR, TAG,
   TEAM_COUNT, abilityChartFrameOf, abilityChartVerticesOf, cellPositionOf, isTeamOpen,
 } from '@/pages/create-player/lib/teamSelectLayout'
+import { moveGridCursor } from '@/pages/record/lib/annalsGrid'
+import type { AnnalsGridShape } from '@/pages/record/lib/annalsGrid'
 import * as styles from '@/pages/create-player/ui/TeamSelectScreen.css'
 
 /** 이미지 폴더 (128장) — 노트가 "slt_frame 이미지 N" 이라 부르는 막대들이 여기 있다.
@@ -45,6 +47,11 @@ interface TeamSelectScreenProps {
   readonly title?: ScreenFrameTitle
   /** 머리띠 G포인트 — 들고 있는 곳에서만 넘긴다 */
   readonly gamePoint?: number
+  /**
+   * 격자 꼴 — 나만의리그는 `MY_LEAGUE_TEAM_GRID_SHAPE`(꼴 0x10, 가로 감기). 안 넘기면 칸 번호대로 끝에서 멈춘다
+   * (다른 모드의 격자 꼴은 아직 확정하지 않았다).
+   */
+  readonly gridShape?: AnnalsGridShape
   readonly onSelect: (teamId: number) => void
   readonly onCancel: () => void
 }
@@ -62,7 +69,7 @@ interface TeamSelectScreenProps {
  *     확정했지만(아래 `TeamAbilityChart`), 값 도형을 채우는 호출은 못 짚었다.
  */
 export function TeamSelectScreen({
-  openedHiddenIds = [], title = '팀선택', gamePoint = 0, onSelect, onCancel,
+  openedHiddenIds = [], title = '팀선택', gamePoint = 0, gridShape, onSelect, onCancel,
 }: TeamSelectScreenProps) {
   const [cursor, setCursor] = useState(0)
 
@@ -77,6 +84,12 @@ export function TeamSelectScreen({
         : event.key === 'ArrowDown' ? GRID.columns
         : event.key === 'ArrowUp' ? -GRID.columns
         : 0
+      if (step !== 0 && gridShape !== undefined) {
+        event.preventDefault()
+        const direction = event.key === 'ArrowRight' ? 'right' : event.key === 'ArrowLeft' ? 'left'
+          : event.key === 'ArrowDown' ? 'down' : 'up'
+        return setCursor((previous) => moveGridCursor(gridShape, previous, direction))
+      }
       if (step !== 0) {
         event.preventDefault()
         // 원본 격자는 끝에서 멈춘다 — 감싸지 않는다 (0x7a2xx 커서 이동)
@@ -93,7 +106,7 @@ export function TeamSelectScreen({
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [cursor, openedHiddenIds, onSelect, onCancel])
+  }, [cursor, openedHiddenIds, gridShape, onSelect, onCancel])
 
   return (
     <RawScreen>

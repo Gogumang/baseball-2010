@@ -11,6 +11,7 @@
  * k = 0 보정 (표 0xd1eac) → A = (58, 110) · B = (178, 96)
  * ```
  */
+import type { AnnalsGridShape } from '@/pages/record/lib/annalsGrid'
 import { cosineSixteen, sineSixteen } from '@/shared/lib/math/originalTrigonometry'
 
 const SCREEN_WIDTH = 240
@@ -80,6 +81,14 @@ export const TEAM_COUNT = 15
 export const OPEN_TEAM_COUNT = 10
 
 export const gridRowCountOf = (count: number) => Math.ceil(count / GRID.columns)
+
+/**
+ * 나만의리그 팀 고르기 격자 [this+0x70] 의 꼴 — 장면 셋업 0xf6c2~0xf6e6 이 `new(0x3c)` → 0x6c219(vtable 0xd2ea0) 뒤
+ * `vtable+0x1c(격자, 5, 3, 1, 0x10)` 로 짓는다. 꼴 **0x10** = 가로는 같은 줄 안에서 감고 세로는 끝에서 멈춘다 (0x6bead).
+ */
+export const MY_LEAGUE_TEAM_GRID_SHAPE: AnnalsGridShape = {
+  columns: GRID.columns, rows: TEAM_COUNT / GRID.columns, wrapsColumns: true, wrapsRows: false,
+}
 
 /**
  * 격자 칸 i 의 왼쪽 위 (그리기 `0x7a571`, S9 3-2·4-3 확정).

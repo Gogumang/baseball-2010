@@ -10,9 +10,10 @@ import {
   ABILITY_CHART, ANCHOR_A, ANCHOR_B, GRID, NAME_BAR, TAG, abilityChartFrameOf, abilityChartVerticesOf, cellPositionOf,
 } from '@/pages/create-player/lib/teamSelectLayout'
 import {
-  EDIT_GRID_COLUMNS, EDIT_TEAM_COUNT, SPECIAL_EDIT_STEP, chooseEditTeam, closeEditName, createSpecialEditState,
+  EDIT_TEAM_COUNT, SPECIAL_EDIT_STEP, chooseEditTeam, closeEditName, createSpecialEditState,
   editEntryListsOf, editTargetOf, moveEditGrid, pointEditGrid, pressEditEntryKey,
 } from '@/pages/special-edit/lib/specialEditFlow'
+import type { AnnalsDirection } from '@/pages/record/lib/annalsGrid'
 import * as styles from '@/pages/special-edit/ui/SpecialEditScreen.css'
 import { EntryEditorScreen } from '@/widgets/entry-editor'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
@@ -60,7 +61,7 @@ export function SpecialEditScreen({ gamePoint, onRename, onBack }: SpecialEditSc
       <EditTeamSelect
         cursor={state.gridCursor}
         gamePoint={gamePoint}
-        onMove={(step) => setState((previous) => moveEditGrid(previous, step))}
+        onMove={(direction) => setState((previous) => moveEditGrid(previous, direction))}
         onPoint={(index) => setState((previous) => pointEditGrid(previous, index))}
         onChoose={() => setState((previous) => chooseEditTeam(previous))}
         onBack={onBack}
@@ -99,10 +100,15 @@ export function SpecialEditScreen({ gamePoint, onRename, onBack }: SpecialEditSc
 interface EditTeamSelectProps {
   readonly cursor: number
   readonly gamePoint: number
-  readonly onMove: (step: number) => void
+  readonly onMove: (direction: AnnalsDirection) => void
   readonly onPoint: (index: number) => void
   readonly onChoose: () => void
   readonly onBack: () => void
+}
+
+/** 격자 키 — 방향키와 숫자 2·4·6·8 (격자 키 처리 0x6c299 의 표 0xd2e7c) */
+const ARROW_DIRECTIONS: Readonly<Record<string, AnnalsDirection>> = {
+  ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down', 4: 'left', 6: 'right', 2: 'up', 8: 'down',
 }
 
 /**
@@ -115,14 +121,10 @@ function EditTeamSelect({ cursor, gamePoint, onMove, onPoint, onChoose, onBack }
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      const step = event.key === 'ArrowRight' ? 1
-        : event.key === 'ArrowLeft' ? -1
-          : event.key === 'ArrowDown' ? EDIT_GRID_COLUMNS
-            : event.key === 'ArrowUp' ? -EDIT_GRID_COLUMNS
-              : 0
-      if (step !== 0) {
+      const direction = ARROW_DIRECTIONS[event.key]
+      if (direction !== undefined) {
         event.preventDefault()
-        return onMove(step)
+        return onMove(direction)
       }
       if (event.key === 'Enter' || event.key === '5') {
         event.preventDefault()

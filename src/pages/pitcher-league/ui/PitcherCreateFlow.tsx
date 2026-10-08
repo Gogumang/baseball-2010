@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { TeamSelectScreen } from '@/pages/create-player/ui/TeamSelectScreen'
 import { PitcherRegisterScreen } from '@/pages/pitcher-league/ui/PitcherRegisterScreen'
+import { MY_LEAGUE_TEAM_GRID_SHAPE } from '@/pages/create-player/lib/teamSelectLayout'
 import type { PitcherRookieProfile } from '@/entities/pitcher-career/model/pitcherRegistration'
 
 /**
@@ -24,7 +25,8 @@ export function PitcherCreateFlow({ openedHiddenIds = [], onCreate, onCancel }: 
 
   if (teamId === null) {
     return (
-      <TeamSelectScreen title="나만의리그투수편" openedHiddenIds={openedHiddenIds} onSelect={setTeamId} onCancel={onCancel} />
+      <TeamSelectScreen title="나만의리그투수편" openedHiddenIds={openedHiddenIds} gridShape={MY_LEAGUE_TEAM_GRID_SHAPE}
+        onSelect={setTeamId} onCancel={onCancel} />
     )
   }
   return (

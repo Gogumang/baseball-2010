@@ -7,12 +7,17 @@ import {
 } from '@/pages/special-edit/lib/specialEditFlow'
 
 describe('스페셜 에디트 흐름 (상태 29, 0x2b2e0)', () => {
-  it('팀 격자는 10칸(팀 0~9)이고 끝에서 멈춘다', () => {
+  it('팀 격자는 5열 × 2줄 10칸 — 가로는 같은 줄 안에서 감고 세로는 끝에서 멈춘다 (꼴 0x10)', () => {
     const start = createSpecialEditState()
     expect(start.step).toBe(SPECIAL_EDIT_STEP.팀고르기)
-    expect(moveEditGrid(start, -1).gridCursor).toBe(0)
-    expect(moveEditGrid(pointEditGrid(start, 7), 5).gridCursor).toBe(EDIT_TEAM_COUNT - 1)
+    expect(moveEditGrid(start, 'left').gridCursor).toBe(4)
+    expect(moveEditGrid(pointEditGrid(start, 4), 'right').gridCursor).toBe(0)
+    expect(moveEditGrid(pointEditGrid(start, 9), 'right').gridCursor).toBe(5)
+    expect(moveEditGrid(start, 'up').gridCursor).toBe(0)
+    expect(moveEditGrid(pointEditGrid(start, 7), 'down').gridCursor).toBe(7)
+    expect(moveEditGrid(pointEditGrid(start, 2), 'down').gridCursor).toBe(7)
     expect(pointEditGrid(start, 10).gridCursor).toBe(0)
+    expect(EDIT_TEAM_COUNT).toBe(10)
   })
 
   it('OK → 하위 1, 엔트리 편집기는 보기 전용 · 투수 탭으로 연다 (0x5561d(ed, 팀, 0, 0, 1))', () => {
@@ -35,7 +40,7 @@ describe('스페셜 에디트 흐름 (상태 29, 0x2b2e0)', () => {
     expect(state.editor.tab).toBe(ENTRY_TAB.타자)
     state = pressEditEntryKey(state, '아래')
     expect(state.editor.cursor).toBe(1)
-    const back = pressEditEntryKey(moveEditGrid(state, -6), '취소')
+    const back = pressEditEntryKey(moveEditGrid(state, 'left'), '취소')
     expect(back.step).toBe(SPECIAL_EDIT_STEP.팀고르기)
     expect(back.gridCursor).toBe(6)
   })
