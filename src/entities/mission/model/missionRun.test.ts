@@ -5,6 +5,7 @@ import {
   giveUp,
   isMissionBatterUp,
   missionAdvance,
+  missionFirstHalfIsHuman,
   recordSwing,
   runBatterMissionAutoHalves,
   startMission,
@@ -16,6 +17,8 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { MISSIONS } from '@/shared/config/original/missions'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
+import { startPitcherMission } from '@/entities/mission/model/pitcherRun'
+import { aceMatchMissionOf } from '@/entities/story/model/aceMatch'
 
 const 첫걸음 = MISSIONS.find((m) => m.name === '명품 타자의 첫 걸음')!
 
@@ -319,5 +322,34 @@ describe('타자 미션의 이닝 넘김 — 3아웃 → 0x18 → 자동진행 0
     run = applyOutcome(recordSwing(run), { kind: '삼진' })
     expect(run.remainingSwings).toBe(swings)
     expect(run.remainingPlateAppearances).toBe(plates)
+  })
+})
+
+describe('미션 첫 반 이닝이 사람 몫인가 — 첫 0x18 판의 0xc2198 → 0xc1e04 → !0xc1d38', () => {
+  it('모든 타자 미션(모드 6)은 시작 타순 칸에 미션 타자가 서 사람 몫이다 (aa7e8 · aa88c → 0xae944 → 0xae89c)', () => {
+    for (const mission of MISSIONS.filter((m) => m.side === '타자')) {
+      expect(missionFirstHalfIsHuman(startMission(mission))).toBe(true)
+    }
+  })
+
+  it('모든 투수 미션(모드 5)은 수비 투수가 사람 투수라 사람 몫이다 (aa81c~aa878 첫 육성 · 명예 투수를 0번에)', () => {
+    for (const mission of MISSIONS.filter((m) => m.side === '투수')) {
+      expect(missionFirstHalfIsHuman(startPitcherMission(mission))).toBe(true)
+    }
+  })
+
+  it('마선수 대결(팀 16~20, 두 편)도 같다', () => {
+    for (let team = 16; team <= 20; team += 1) {
+      const batter = aceMatchMissionOf(team, '타자')
+      const pitcher = aceMatchMissionOf(team, '투수')
+      if (batter !== null) expect(missionFirstHalfIsHuman(startMission(batter))).toBe(true)
+      if (pitcher !== null) expect(missionFirstHalfIsHuman(startPitcherMission(pitcher))).toBe(true)
+    }
+  })
+
+  it('타자 미션에서 지금 타자가 미션 타자가 아니면 사람 몫이 아니다 (0xc1d38 모드 6 c1dae 거짓)', () => {
+    const run = applyOutcome(startMission(첫걸음), { kind: '아웃', detail: '땅볼아웃' })
+    expect(isMissionBatterUp(run)).toBe(false)
+    expect(missionFirstHalfIsHuman(run)).toBe(false)
   })
 })
