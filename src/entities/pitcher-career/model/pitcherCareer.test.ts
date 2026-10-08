@@ -202,6 +202,14 @@ describe('시즌 넘기기 · 방어율', () => {
     expect(next.season).toBe(2)
   })
 
+  it('지난 해 시즌 줄을 연도별 칸 0x1fa78(S[0xb3] − 1)에 쌓는다 (1b7c4~1b834 투수편) — 옛 저장은 빈 목록에서', () => {
+    const 첫해 = { ...투수().stats, outs: 300, runsAllowed: 40, wins: 9 }
+    const next = startNextPitcherSeason(투수({ stats: 첫해, gamesPlayed: GAMES_PER_SEASON }))
+
+    expect(next.yearlyStats).toEqual([첫해])
+    expect(next.stats.outs).toBe(0)
+  })
+
   it('방어율 = min(9999, trunc(실점 × 2700 / 아웃)) (0xb6ce8)', () => {
     expect(seasonEarnedRunAverageOf({ ...투수().stats, outs: 27, runsAllowed: 3 })).toBe(300)
     expect(seasonEarnedRunAverageOf({ ...투수().stats, outs: 0, runsAllowed: 1 })).toBe(9999)

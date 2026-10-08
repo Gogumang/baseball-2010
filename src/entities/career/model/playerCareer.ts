@@ -383,6 +383,14 @@ export interface PlayerCareer {
    * 있으면 대회 중 · 없으면 아님. 새 시즌 0x1b768 이 내린다(`endNationalCup`). 옛 저장에는 없다.
    */
   readonly nationalCup?: NationalCup
+  /**
+   * **지난 해들의 시즌 줄** — 원본 연도별 기록 칸 `0x1fa8c(저장, i)` = [저장+0xbc] + 0x40c + 0x30 × i (내 선수 레코드 0x30 바이트).
+   * 새 시즌 0x1b768 의 1b7c4~1b834 가 `memcpy(0x1fa8c(저장, S[0xb3] − 1), 0x1fc20(저장) 내 타자, 0x30)` 뒤 0xb8e28 로 시즌 칸
+   * (+0x20~+0x2e)을 비운다 — 곧 i 칸은 (i + 1)년차가 끝났을 때의 레코드다. 기록실 124 첫 갈래(0x5761c)가 i < S[0xb3] 칸을 차례로
+   * 읽고 이어 올해 레코드를 붙여 보인다. 웹은 레코드의 시즌 줄(`stats`)만 떠 둔다 — 능력치 · 생김새 칸은 124 가 그리지 않는다.
+   * 옛 저장에는 없다(빈 목록 — 그 앞 해들은 모른다).
+   */
+  readonly yearlyStats?: readonly SeasonStats[]
   /** 목표 타순 경로 — 이벤트 487 에서 고른다. 고르기 전에는 null */
   readonly battingOrderPath: '4번' | '1번' | null
   /** 지난 중간평가 달성 수 (원본 +0x1cc) — 칭호 "전년 대비 성적 우수" */
@@ -1069,6 +1077,8 @@ export function endNationalCup<T extends { readonly nationalCup?: NationalCup }>
 export function startNextSeason(career: PlayerCareer): PlayerCareer {
   return {
     ...endNationalCup(career),
+    // 1b7c4~1b834 — 지난 해 레코드를 연도별 칸 S[0xb3] − 1 에 복사한 뒤 시즌 칸을 비운다(아래 `stats`)
+    yearlyStats: [...yearlyStatsOf(career), career.stats],
     season: career.season + 1,
     gamesPlayed: 0,
     // 칭호 25·26 은 새 시즌 첫 경기 전에 **지난해** 외출 수로 본다 (P3 9절) — 세는 칸을 비우기 전에 떠 둔다
@@ -1110,6 +1120,11 @@ export function startNextSeason(career: PlayerCareer): PlayerCareer {
     draws: 0,
     losses: 0,
   }
+}
+
+/** 연도별 기록 칸 (0x1fa8c) — 옛 저장은 빈 목록 */
+export function yearlyStatsOf(career: Pick<PlayerCareer, 'yearlyStats'>): readonly SeasonStats[] {
+  return career.yearlyStats ?? []
 }
 
 /** 한 경기에 단타·2루타·3루타·홈런을 모두 쳤는가 */

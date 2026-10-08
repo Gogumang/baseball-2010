@@ -429,6 +429,13 @@ export interface PitcherCareer {
    * 새 시즌 0x1b768 이 내린다. 옛 저장에는 없다.
    */
   readonly nationalCup?: NationalCup
+  /**
+   * **지난 해들의 시즌 줄** — 원본 연도별 기록 칸 `0x1fa78(저장, i)` = [저장+0xb8] + 0x40c + 0x30 × i (내 투수 레코드 0x30 바이트).
+   * 새 시즌 0x1b768 의 1b7c4~1b834 투수편 갈래가 `memcpy(0x1fa78(저장, S[0xb3] − 1), 0x1fbd0(저장), 0x30)` 뒤 0xb6cc4 로 시즌 칸을
+   * 비운다(스태미나 +0x2c = 10000). 기록실 124 첫 갈래(0x5761c 투수편 0x1fa79 · 0x1fbd1)가 읽는다. 웹은 시즌 줄(`stats`)만 떠 둔다.
+   * 옛 저장에는 없다(빈 목록).
+   */
+  readonly yearlyStats?: readonly PitcherSeasonStats[]
   readonly leaguePlayerStats: LeaguePlayerStats
   /**
    * 리그 열 팀 투수의 레코드 스태미나 `+0x2c` — 팀 번호 → 붙박이 표 칸(0~7)별 값. 없는 팀·칸은 10000. 내 투수 값은
@@ -1053,6 +1060,8 @@ export function startNextPitcherSeason(career: PitcherCareer): PitcherCareer {
   return {
     // 0x1b768 의 1b774 `S+0x12c = 0` — 국가대항전 플래그를 내린다
     ...endNationalCup(career),
+    // 1b7c4~1b834 — 지난 해 레코드를 연도별 칸 S[0xb3] − 1 에 복사한 뒤 시즌 칸을 비운다(아래 `stats` · `stamina`)
+    yearlyStats: [...pitcherYearlyStatsOf(career), career.stats],
     ...(order === null ? {} : { nariTeams: withMyPitcherOrder(career, order), positionCode: myPitcherPositionCodeOf(order) }),
     season: career.season + 1,
     gamesPlayed: 0,
@@ -1086,6 +1095,11 @@ export function startNextPitcherSeason(career: PitcherCareer): PitcherCareer {
     draws: 0,
     losses: 0,
   }
+}
+
+/** 연도별 기록 칸 (0x1fa78) — 옛 저장은 빈 목록 */
+export function pitcherYearlyStatsOf(career: Pick<PitcherCareer, 'yearlyStats'>): readonly PitcherSeasonStats[] {
+  return career.yearlyStats ?? []
 }
 
 /** 방어율 × 100 (0xb6ce8) — 경기 화면 밖(성적 화면)에서도 같은 식을 쓴다 */

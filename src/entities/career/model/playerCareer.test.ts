@@ -70,6 +70,16 @@ describe('새 시즌 전환 — 0x1b768', () => {
     expect(startNextSeason({ ...createCareer('선수'), money: 999_000, salary: 100 }).money).toBe(999_900)
   })
 
+  it('지난 해 시즌 줄을 연도별 칸 S[0xb3] − 1 에 쌓고 시즌 줄을 비운다 (1b7c4~1b834 · 0xb8e28) — 옛 저장은 빈 목록에서', () => {
+    const 첫해 = { ...createCareer('선수').stats, atBats: 120, hits: 40, homeRuns: 7 }
+    const 둘째해시작 = startNextSeason({ ...createCareer('선수'), stats: 첫해 })
+    expect(둘째해시작.yearlyStats).toEqual([첫해])
+    expect(둘째해시작.stats.atBats).toBe(0)
+
+    const 둘째해 = { ...둘째해시작.stats, atBats: 90, hits: 20 }
+    expect(startNextSeason({ ...둘째해시작, stats: 둘째해 }).yearlyStats).toEqual([첫해, 둘째해])
+  })
+
   it('올해의 목표 플래그 둘을 되돌린다 — +0x1b7(0xa39d0) · +0x1bc(0x1b882)', () => {
     const next = startNextSeason({
       ...createCareer('선수'),
