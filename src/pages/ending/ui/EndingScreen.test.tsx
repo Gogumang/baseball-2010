@@ -215,7 +215,8 @@ describe('엔딩 흐름', () => {
     expect(onRegister).toHaveBeenCalledWith(null)
     expect(screen.getByText(/등록이 완료되었습니다/)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '확인' }))
-    expect(onFinish).toHaveBeenCalled()
+    // 등록하고 떠난다 — 0x62dbe 의 모드 저장 지우기
+    expect(onFinish).toHaveBeenCalledWith(true)
   })
 
   it('보너스 팝업 0x2b 를 닫을 때 onBonusReceived · 이미 받았으면(S+0x7b) 보너스 없이 등록 팝업 0x2d (0x1220c 12276~12284)', () => {
@@ -245,7 +246,8 @@ describe('엔딩 흐름', () => {
     fireEvent.click(screen.getByRole('button', { name: '확인' }))
     fireEvent.click(screen.getByRole('button', { name: '아니오' }))
 
-    expect(onFinish).toHaveBeenCalled()
+    // 등록 없이 떠난다 — 1bd04~1bd28 은 [this+0x278] · 화면 전환뿐, 저장을 안 지운다
+    expect(onFinish).toHaveBeenCalledWith(false)
   })
 
   it('부상·방출 엔딩은 제작진 없이 이어하기를 묻는다', () => {

@@ -61,7 +61,11 @@ interface EndingScreenProps {
   }
   /** 5000 G포인트로 이어하기. 모자라면 false */
   readonly onContinue: () => boolean
-  readonly onFinish: () => void
+  /**
+   * 엔딩을 떠나 메인 메뉴로 — `isRegistered` 는 명예의 전당에 등록하고 떠나는가(등록 0x62dbe 의 모드 저장 지우기 0x224ec).
+   * 팝업 0x2d · 0x32 의 "아니오" · 145 의 "나중에 등록" · 안내 창은 등록 없이 떠난다(저장을 안 건드린다).
+   */
+  readonly onFinish: (isRegistered: boolean) => void
   /**
    * 선수의 생김새 (레코드 +0xb, 0x63a5c) — 걸어 들어오는 그림과 제작진의 선수 애니·팔레트를 고른다.
    * 안 주면 **타격형 황인 타자**로 본다 — 애니 바탕 0 · 팔레트 2 로, 원본이 그 비트에서 뽑는 값과 같다.
@@ -105,15 +109,16 @@ interface Question {
  *
  * 키 0x1220c: 부상·방출(0·1)은 곧장 StrMODE[221] 이어하기를 묻는다. 그 밖은 단계 1 의 키가 제작진으로 넘기고,
  * 제작진(단계 > 2)의 키가 엔딩 보너스(StrMODE[214]) → 명예의 전당 등록(StrMODE[215])을 묻는다.
- * 등록은 명예의 전당 목록(상태 145, `HallOfFameScreen` 의 '등록')에서 칸을 골라 한다. "나중에 등록" 은 원본에서 선수를
- * 남겨 두지만, 웹판은 저장이 하나라 등록하지 않으면 사라진다.
+ * 등록은 명예의 전당 목록(상태 145, `HallOfFameScreen` 의 '등록')에서 칸을 골라 한다. 저장을 지우는 것은 등록(0x62dbe 의
+ * 0x224ec)뿐이라 "나중에 등록" · 아니오로 떠나면 선수 저장이 남는다(`onFinish(false)`).
  * G포인트가 모자랄 때 원본이 어디로 가는지는 미확인 — StrCOMMON[41] 을 띄우고 끝낸다 (추정).
  *
  * ⚠️ 근사한 곳: 단계 0(배경음이 들어오는 동안 아무것도 안 그림)과 단계 2(키 뒤 배경음이 빠지는 동안)는 배경음 페이드
  * 끝(0x1bf54)을 기다리는데, 웹은 그 기다림 없이 바로 넘긴다 — 틀 수 n 도 화면이 뜬 때부터 센다.
  */
 export function EndingScreen(props: EndingScreenProps) {
-  const { playerName, endingIndex, bonusGamePoint, isContinuable, hallOfFame, onContinue, onFinish } = props
+  const { playerName, endingIndex, bonusGamePoint, isContinuable, hallOfFame, onContinue } = props
+  const onFinish = () => props.onFinish(false)
   const walkInLook = props.walkInLook ?? DEFAULT_WALK_IN_LOOK
   const seenEventIds = props.seenEventIds ?? NO_EVENTS
   const [phase, setPhase] = useState<Phase>('엔딩')
@@ -151,7 +156,8 @@ export function EndingScreen(props: EndingScreenProps) {
           edition: hallOfFame.edition,
           nari: hallOfFame.nari,
           onRegister: hallOfFame.onRegister,
-          onDone: onFinish,
+          // 등록 완료 창을 닫았다 — 0x62dbe 가 이미 모드 저장을 지웠다
+          onDone: () => props.onFinish(true),
           onLater: onFinish,
         }}
         onBack={onFinish}

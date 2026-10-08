@@ -318,8 +318,8 @@ export interface PitcherLeagueSession {
     readonly continueAfterEnding: () => boolean
     /** 엔딩 141 의 보너스 팝업 0x2b 를 닫았다 — 보너스 · S+0x7b = 1 · 저장 (1bbf4~1bc70) */
     readonly receiveEndingBonus: () => void
-    /** 엔딩을 다 본 뒤 — 선수를 지운다 (145 틀이 메인 메뉴로 나가는 자리) */
-    readonly finishEnding: () => void
+    /** 엔딩을 떠나 메인 메뉴로 — 명예의 전당에 등록했으면 선수 저장을 지운다(0x224ec), 아니면 저장이 남는다 */
+    readonly finishEnding: (isRegistered: boolean) => void
     /** 111 장비 상점 · 121 장비착용을 연다 */
     readonly openShop: (tab: PitcherShopTab) => void
     /**
@@ -578,6 +578,60 @@ function settlePlaceForAceMatch(current: PitcherCareer, context: PitcherStoryCon
 /** 연봉 칸 한 단위(100만원)를 금액 서식(만원 단위)으로 — 0x8bc4c 의 ×100 */
 const MONEY_TEXT_SCALE = 100
 
+/** 이어하기 — 저장에서 고른 이어할 자리와 그 자리에 들어서며 고친 커리어 (상태 100 진입 0x1c154) */
+interface PitcherResume {
+  readonly career: PitcherCareer | null
+  readonly point: PitcherResumePoint
+}
+
+function pitcherResumeOf(saved: PitcherCareer | null): PitcherResume {
+  const point: PitcherResumePoint = saved === null ? { kind: '관리' } : pitcherResumePointOf(saved)
+  return {
+    career: saved !== null && point.kind === '이벤트'
+      ? enterPitcherYearEndEvent(saved, point.eventId)
+      // 1c25e — S+0x50 == 0x11(464 거절 보상 뒤 끊김) → 새 시즌 처리 0x1b768 → 137 → 105
+      : saved !== null && point.kind === '새시즌' ? startNextPitcherSeason(saved)
+      // 134 의 틀 0x1b92c 머리 — 들어온 첫 틀에 비트 8 이 없으면 칭호 8 "국가 대표" (463 보상 뒤 끊겼으면 아직 없다)
+      : saved !== null && point.kind === '국가대항전' ? withNationalCupTitle(saved)
+      // S+0x50 == 2 → 116 진입 0x1278c 다시 — 경기 뒤 카운터를 한 번 더 쓴다(겹쳐 쌓임). 정산(0x4ea0c)은 다시 안 돈다
+      : saved !== null && point.kind === '경기결과' ? enterPitcherGameEvaluation(resumedPitcherLastGameOf(saved)) : saved,
+    point,
+  }
+}
+
+function pitcherSceneOfResume(career: PitcherCareer | null, resumePoint: PitcherResumePoint): PitcherScene {
+  return career === null
+    ? '등록'
+    : resumePoint.kind === '이벤트'
+      ? '이벤트'
+      : resumePoint.kind === '포스트시즌'
+        ? '포스트시즌'
+        : resumePoint.kind === '시즌종료'
+          ? '시즌종료'
+          // 109 — 이전 상태가 1(자원 적재)이라 `nextGameFromManagement` 는 거짓 그대로다
+          : resumePoint.kind === '다음경기순위'
+            ? '다음경기순위'
+            : resumePoint.kind === '경기결과'
+              ? '경기결과'
+              // 0x1c154 그 밖 갈래 S+0x12c → 134 — 저장의 대회로 대진판부터
+              : resumePoint.kind === '국가대항전' ? '국가대항전'
+                // 1c24e S+0x50 == 6 → 141 — 보너스를 받은 저장(S+0x7b)이라 키 0x1220c 가 등록 팝업 0x2d 로 간다
+                : resumePoint.kind === '엔딩' ? '엔딩' : '관리'
+}
+
+function pitcherStoryOfResume(resumePoint: PitcherResumePoint): PitcherStory | null {
+  return resumePoint.kind === '이벤트' ? { eventId: resumePoint.eventId, context: '연말', viewed: [] } : null
+}
+
+function postseasonPopupOfResume(career: PitcherCareer | null, resumePoint: PitcherResumePoint): PostseasonPopup | null {
+  // 128 진입 0x120a4 를 다시 밟는다 — 정규시즌 우승 보상을 아직 안 받았고 1위면 팝업 0xb
+  return career !== null && resumePoint.kind === '포스트시즌' ? regularSeasonPopupOnEnter(career) : null
+}
+
+function cupViewOfResume(resumePoint: PitcherResumePoint): { cup: NationalCup; atStandings: boolean } | null {
+  return resumePoint.kind === '국가대항전' ? { cup: resumePoint.cup, atStandings: false } : null
+}
+
 export function usePitcherLeagueSession(
   store: JsonStorePort,
   random: RandomPort,
@@ -651,24 +705,10 @@ export function usePitcherLeagueSession(
    * 경기 뒤(116, S+0x50 = 2)에 끊겼으면 116 의 끝처럼 대진이 있을 때 g == 0 → 시즌 끝(136 자리) · 아니면 128.
    * 타자편 794c8d9 `continueSaved` 와 같은 꼴이다.
    */
-  const resumed = useRef<{ career: PitcherCareer | null; point: PitcherResumePoint } | null>(null)
-  if (resumed.current === null) {
-    const saved = loaded.current
-    const point: PitcherResumePoint = saved === null ? { kind: '관리' } : pitcherResumePointOf(saved)
-    resumed.current = {
-      career: saved !== null && point.kind === '이벤트'
-        ? enterPitcherYearEndEvent(saved, point.eventId)
-        // 1c25e — S+0x50 == 0x11(464 거절 보상 뒤 끊김) → 새 시즌 처리 0x1b768 → 137 → 105
-        : saved !== null && point.kind === '새시즌' ? startNextPitcherSeason(saved)
-        // 134 의 틀 0x1b92c 머리 — 들어온 첫 틀에 비트 8 이 없으면 칭호 8 "국가 대표" (463 보상 뒤 끊겼으면 아직 없다)
-        : saved !== null && point.kind === '국가대항전' ? withNationalCupTitle(saved)
-        // S+0x50 == 2 → 116 진입 0x1278c 다시 — 경기 뒤 카운터를 한 번 더 쓴다(겹쳐 쌓임). 정산(0x4ea0c)은 다시 안 돈다
-        : saved !== null && point.kind === '경기결과' ? enterPitcherGameEvaluation(resumedPitcherLastGameOf(saved)) : saved,
-      point,
-    }
-  }
-  const resumePoint = resumed.current.point
-
+  const resumed = useRef<PitcherResume | null>(null)
+  if (resumed.current === null) resumed.current = pitcherResumeOf(loaded.current)
+  /** 이어할 자리 — 엔딩을 등록 없이 떠나면(`finishEnding(false)`) 남은 저장으로 다시 고른다 */
+  const [resumePoint, setResumePoint] = useState<PitcherResumePoint>(resumed.current.point)
   const [career, setCareer] = useState<PitcherCareer | null>(resumed.current.career)
 
   /**
@@ -687,36 +727,13 @@ export function usePitcherLeagueSession(
     if (before === null || before.name !== career.name || before.ids === career.equippedSkillIds) return
     skillEquipStatEventsOf(PITCHER_LEAGUE_MODE, before.ids, career.equippedSkillIds).forEach(recordStat)
   }, [career, recordStat])
-  const [scene, setScene] = useState<PitcherScene>(() =>
-    career === null
-      ? '등록'
-      : resumePoint.kind === '이벤트'
-        ? '이벤트'
-        : resumePoint.kind === '포스트시즌'
-          ? '포스트시즌'
-          : resumePoint.kind === '시즌종료'
-            ? '시즌종료'
-            // 109 — 이전 상태가 1(자원 적재)이라 `nextGameFromManagement` 는 거짓 그대로다
-            : resumePoint.kind === '다음경기순위'
-              ? '다음경기순위'
-              : resumePoint.kind === '경기결과'
-                ? '경기결과'
-                // 0x1c154 그 밖 갈래 S+0x12c → 134 — 저장의 대회로 대진판부터
-                : resumePoint.kind === '국가대항전' ? '국가대항전'
-                  // 1c24e S+0x50 == 6 → 141 — 보너스를 받은 저장(S+0x7b)이라 키 0x1220c 가 등록 팝업 0x2d 로 간다
-                  : resumePoint.kind === '엔딩' ? '엔딩' : '관리',
-  )
+  const [scene, setScene] = useState<PitcherScene>(() => pitcherSceneOfResume(career, resumePoint))
   const [gameOptions, setGameOptions] = useState<PitcherGameOptions | null>(null)
-  const [story, setStory] = useState<PitcherStory | null>(() =>
-    resumePoint.kind === '이벤트' ? { eventId: resumePoint.eventId, context: '연말', viewed: [] } : null,
-  )
+  const [story, setStory] = useState<PitcherStory | null>(() => pitcherStoryOfResume(resumePoint))
   const [storyNotice, setStoryNotice] = useState('')
   /** 128 로 넘어가며 접어 둔 연말 사슬의 본 번호 — 128 이 끝나면 여기서 132 로 잇는다 */
   const yearEndViewedRef = useRef<readonly number[]>([])
-  const [postseasonPopup, setPostseasonPopup] = useState<PostseasonPopup | null>(() =>
-    // 128 진입 0x120a4 를 다시 밟는다 — 정규시즌 우승 보상을 아직 안 받았고 1위면 팝업 0xb
-    career !== null && resumePoint.kind === '포스트시즌' ? regularSeasonPopupOnEnter(career) : null,
-  )
+  const [postseasonPopup, setPostseasonPopup] = useState<PostseasonPopup | null>(() => postseasonPopupOfResume(career, resumePoint))
 
 
   /** 이벤트 재생(114)으로 — 뒤 상태는 `story.context` 가 정한다 */
@@ -786,7 +803,7 @@ export function usePitcherLeagueSession(
     playSoundIds(activeSound(), [
       pitcherEvaluationJingleIdOf((replayed.lastEvaluation ?? NO_LAST_EVALUATION).popularityChange),
     ])
-  }, [resumePoint.kind, store])
+  }, [resumePoint, store])
 
   /**
    * 이어하기로 새 시즌 처리를 했으면(`resumePoint` '새시즌' — 1c25e S+0x50 == 0x11 → 0x1b768) 그 자리에서 저장한다 — 한 번만.
@@ -801,7 +818,7 @@ export function usePitcherLeagueSession(
     const started = resumed.current?.career
     if (started === null || started === undefined) return
     store.save(started)
-  }, [resumePoint.kind, store])
+  }, [resumePoint, store])
 
   const commitWith = useCallback(
     (update: (current: PitcherCareer) => PitcherCareer) => {
@@ -1073,9 +1090,7 @@ export function usePitcherLeagueSession(
    * 국가대항전 대회 · 142 대진 · 치르는 대회 경기. 대회 칸은 커리어 저장(`nationalCup` — S+0x12c · L+0xa8~)에도 들어 이어하기가
    * 134 로 돌아온다(0x1c154 1c348~1c358).
    */
-  const [cupView, setCupView] = useState<{ cup: NationalCup; atStandings: boolean } | null>(() =>
-    resumePoint.kind === '국가대항전' ? { cup: resumePoint.cup, atStandings: false } : null,
-  )
+  const [cupView, setCupView] = useState<{ cup: NationalCup; atStandings: boolean } | null>(() => cupViewOfResume(resumePoint))
   const [cupMatch, setCupMatch] = useState<{ matchup: NationalCupMatchup; cup: NationalCup } | null>(null)
   const cupGameRef = useRef<NationalCup | null>(null)
 
@@ -1483,16 +1498,32 @@ export function usePitcherLeagueSession(
   }, [career, commit, recordStat])
 
   /**
-   * 엔딩을 다 본 뒤 — 선수를 지운다 (145 틀이 `+0x278` 을 켜고 메인 메뉴 장면 0x103 으로 나가는 자리).
-   * 저장소에 `clear` 가 없어 **이름 없는 빈 덩어리**를 덮어쓴다 — `normalizePitcherCareer` 가 null 로 읽는다.
+   * 엔딩을 떠나 메인 메뉴로 (직접 떴다). 커리어 저장을 지우는 곳은 **명예의 전당 등록** 하나다 — 0x62d40~0x62d7e 의 투수 갈래가
+   * 선수 사본(0x1f655) 뒤 `0x224ec(저장, 3)`(모드 저장 지우기 — +0x43 · +0x4f = 0, 투수편 저장 칸을 비운다)를 부른다.
+   * 팝업 0x2d · 0x32 "아니오"는 `[this+0x278] = 1` · 화면 전환뿐이고 그 끝 1bfa2~1bfe2 는 장면 0x103(메인 메뉴)으로 나갈 뿐이라
+   * 저장이 남는다. 다시 들어오면 장면 0x106 이 새로 서 100 → 0x1c154 가 **남은 저장으로** 이어한다(보너스를 받은 저장이면 141).
+   * 웹은 세션이 앱 동안 살아 있어, 등록 없이 떠나면 그 자리에서 저장을 다시 읽어 이어할 자리를 고른다(`pitcherResumeOf`).
    */
-  const finishEnding = useCallback(() => {
-    // 명예의 전당 등록 0x62d7c 가 모드 저장 지우기 0x224ec(저장, 3) — +0x43 · +0x4f = 0. 등록 없이 끝나도 마지막 정산이 이미 0
-    nariGameSaveRef.current?.clear()
-    store.save({})
-    setCareer(null)
+  const finishEnding = useCallback((isRegistered: boolean) => {
     setGameOptions(null)
-    setScene('등록')
+    if (isRegistered) {
+      // 저장소에 `clear` 가 없어 **이름 없는 빈 덩어리**를 덮어쓴다 — `normalizePitcherCareer` 가 null 로 읽는다
+      nariGameSaveRef.current?.clear()
+      store.save({})
+      setCareer(null)
+      setScene('등록')
+      return
+    }
+    const next = pitcherResumeOf(normalizePitcherCareer(store.load()))
+    resumed.current = next
+    replayedEvaluationRef.current = false
+    resumedNewSeasonRef.current = false
+    setResumePoint(next.point)
+    setCareer(next.career)
+    setScene(pitcherSceneOfResume(next.career, next.point))
+    setStory(pitcherStoryOfResume(next.point))
+    setPostseasonPopup(postseasonPopupOfResume(next.career, next.point))
+    setCupView(cupViewOfResume(next.point))
   }, [store])
 
   const goto = useCallback((next: PitcherScene) => setScene(next), [])

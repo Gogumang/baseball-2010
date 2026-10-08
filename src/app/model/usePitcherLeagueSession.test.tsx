@@ -959,17 +959,44 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     expect(result.current.scene).toBe('엔딩')
   })
 
-  it('엔딩을 다 보면 선수가 지워지고 저장도 빈다 (145 틀 → 메인 메뉴)', () => {
+  it('명예의 전당에 등록하고 떠나면 선수가 지워지고 저장도 빈다 (0x62d7e → 0x224ec(저장, 3))', () => {
     const store = 메모리저장()
     const { result } = 띄우기(store)
     act(() => result.current.actions.create('투수', 신인))
 
-    act(() => result.current.actions.finishEnding())
+    act(() => result.current.actions.finishEnding(true))
 
     expect(result.current.career).toBeNull()
     expect(result.current.scene).toBe('등록')
     // 다시 띄워도 옛 선수가 살아나지 않는다
     expect(띄우기(store).result.current.career).toBeNull()
+  })
+
+  it('등록 없이 떠나면(0x2d · 0x32 아니오 — 1bd04 · 1be46 → 장면 0x103) 저장이 남아 그 저장으로 이어한다', () => {
+    const store = 메모리저장()
+    const 첫판 = 띄우기(store).result
+    act(() => 첫판.current.actions.create('투수', 신인))
+    act(() => 첫판.current.actions.save({
+      ...첫판.current.career!, season: 9, gamesPlayed: 45, popularity: 1600, gamePoint: 0, seasonEndState: 132,
+    }))
+    const result = 띄우기(store).result
+    act(() => result.current.actions.completeStory([], [502, 496, 503], 503))
+    expect(result.current.scene).toBe('엔딩')
+
+    // 보너스 전에 떠나면 — 141 은 저장하지 않아 114 끝 저장(132)이 남고, 다시 들어오면 502 를 다시 튼다
+    act(() => result.current.actions.finishEnding(false))
+    expect(store.load()).toMatchObject({ endingIndex: null, seasonEndState: 132 })
+    expect(result.current.career?.name).toBe(첫판.current.career?.name)
+    expect(result.current.scene).toBe('이벤트')
+    expect(result.current.story?.eventId).toBe(502)
+
+    // 보너스를 받고 떠나면 — S+0x50 = 6 · 엔딩 칸 저장이라 141 로 돌아온다
+    act(() => result.current.actions.completeStory([], [502, 496, 503], 503))
+    act(() => result.current.actions.receiveEndingBonus())
+    act(() => result.current.actions.finishEnding(false))
+    expect(store.load()).toMatchObject({ endingIndex: 5, endingBonusReceived: true })
+    expect(result.current.scene).toBe('엔딩')
+    expect(result.current.career?.endingIndex).toBe(5)
   })
 
   /**

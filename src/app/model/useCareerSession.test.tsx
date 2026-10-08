@@ -290,6 +290,26 @@ describe('보상 명령 뒤 이어하기 자리 (0x8c460 끝 8cc2e — S+0x50 �
     expect(saveGame.load()).toMatchObject({ endingIndex: null, seasonEndState: 132 })
   })
 
+  it('엔딩을 등록 없이 떠나면 저장이 남는다 — 저장을 지우는 곳은 명예의 전당 등록 0x62dbe 의 0x224ec(저장, 4) 하나', () => {
+    const saveGame = 메모리저장(목표달성선수({ season: 9, popularity: 1600, seasonEndState: 132, gamePoint: 0 }))
+    const 처음 = 열기(saveGame)
+    act(() => 처음.result.current.session.actions.completeScene([], [502, 496, 503], 503))
+    act(() => 처음.result.current.session.actions.receiveEndingBonus())
+    // 0x2d "아니오"(1bd04~1bd28) — [this+0x278] = 1 · 화면 전환 → 장면 0x103. 저장은 그대로
+    act(() => 처음.result.current.session.actions.finishEnding(false))
+    expect(처음.result.current.screen).toEqual({ kind: '메인메뉴' })
+    expect(처음.result.current.session.career).toBeNull()
+    expect(saveGame.load()).toMatchObject({ endingIndex: 5, endingBonusReceived: true })
+    expect(처음.result.current.session.savedCareer?.endingIndex).toBe(5)
+    act(() => 처음.result.current.session.actions.continueSaved())
+    expect(처음.result.current.screen).toEqual({ kind: '엔딩', endingIndex: 5 })
+
+    // 등록하고 떠나면 지운다
+    act(() => 처음.result.current.session.actions.finishEnding(true))
+    expect(saveGame.load()).toBeNull()
+    expect(처음.result.current.session.savedCareer).toBeNull()
+  })
+
   it('선택지 확인(0x8b804 → 0x8b0e4) — 떠나온 줄을 본 표시하고 저장한다 · 장소에서 연 이벤트면 행동함(S+4)', () => {
     const saveGame = 메모리저장(목표달성선수({ seasonEndState: 132 }))
     const 처음 = 열기(saveGame)

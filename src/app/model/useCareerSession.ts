@@ -2107,13 +2107,19 @@ export function useCareerSession({
     },
 
     /**
-     * 엔딩을 본 뒤 — 선수를 지우고 메인 메뉴로 (등록한 선수는 수집 기록에 남는다). 명예의 전당 등록은 0x62dbe 에서
-     * 모드 저장 지우기 0x224ec(저장, 4) 를 부른다 — +0x50 = 0. 등록 없이 끝나도 마지막 경기 정산이 이미 0 으로 두었다.
+     * 엔딩을 본 뒤 메인 메뉴로 (직접 떴다). 커리어 저장을 지우는 곳은 **명예의 전당 등록** 하나다 — 등록 0x62d80~0x62dc0 이
+     * 선수 사본(0x1f681) 뒤 `0x224ec(저장, 4)`(모드 저장 지우기 — +0x44 · +0x50 = 0, 그 편 저장 칸을 비운다)를 부른다.
+     * 팝업 0x2d "아니오"(1bd04~1bd28)와 0x32 "아니오"(1be46~1beae)는 `[this+0x278] = 1` · 화면 전환만 걸고, 그 끝 1bfa2~1bfe2 도
+     * 밀기 · 0x375d · [0x140006c] = 5 · 장면 0x103(메인 메뉴)뿐이다 — 저장을 안 건드린다. 145 목록의 "나중에 등록"도 메인 메뉴뿐이다.
+     * 그래서 등록하지 않으면 마지막 저장(`savedCareerOf` — 보너스를 받았으면 S+0x50 = 6 · 엔딩 칸, 아니면 엔딩 칸을 비운 그 앞)이
+     * 남아 이어하기가 그 자리로 돌아온다.
      */
-    finishEnding: () => {
-      nariGameSaveRef.current?.clear()
-      saveGame.clear()
-      setSavedCareer(null)
+    finishEnding: (isRegistered: boolean) => {
+      if (isRegistered) {
+        nariGameSaveRef.current?.clear()
+        saveGame.clear()
+        setSavedCareer(null)
+      }
       setCareer(null)
       setScreen({ kind: '메인메뉴' })
     },

@@ -314,8 +314,8 @@ export function PitcherLeagueRoute({
           ...(hallOfFame?.gamePoint === undefined ? {} : { gamePoint: hallOfFame.gamePoint }),
         }}
         onContinue={actions.continueAfterEnding}
-        onFinish={() => {
-          actions.finishEnding()
+        onFinish={(isRegistered) => {
+          actions.finishEnding(isRegistered)
           onExit()
         }}
       />
