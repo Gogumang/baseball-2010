@@ -32,6 +32,11 @@ export interface AnnalsGridShape {
   readonly carriesRowOnColumnWrap?: boolean
   /** 꼴 비트 0x200 — 0x20 으로 세로가 감기면 열이 둘 이상일 때 가로로 부호(dy) 한 칸 더 옮긴다 (0x6bf66~0x6bf9a) */
   readonly carriesColumnOnRowWrap?: boolean
+  /**
+   * 막힌 칸(칸 번호) — 0x6c219 격자의 표 [+0x28] 에서 0 인 칸. vt+0x1c(0x6c4bd)가 모두 1 로 채운 뒤 진입이 몇 칸을 0 으로 지운다.
+   * 옮기기 vt+0x8(0x6c445)은 막힌 칸을 같은 방향으로 건너뛴다 — `moveGridCursor` 머리글. 안 주면 없다.
+   */
+  readonly blockedCells?: readonly number[]
 }
 
 /**
@@ -57,6 +62,26 @@ export const DIRECTION_CODES: Record<AnnalsDirection, number> = { left: 0, right
  * 막힌 칸 표 [+0x28] 은 0x6c4bd 가 모두 1 로 채워 건너뛸 칸이 없다.
  */
 export function moveGridCursor(shape: AnnalsGridShape, index: number, direction: AnnalsDirection): number {
+  const blocked = shape.blockedCells ?? []
+  if (blocked.length === 0) return stepGridCursor(shape, index, direction)
+  // 0x6c445: 열린 칸 수(0x6c3f4)가 — 지금 칸이 열렸으면 2 이상, 막혔으면 1 이상일 때만 옮긴다.
+  // 한 칸씩(0x6be71) 옮기다 열린 칸에 서면 멈춘다. 한 걸음이 제자리면(끝에서 잘림) 처음 칸으로 되돌린다.
+  const cellCount = shape.columns * shape.rows
+  const isOpen = (cell: number) => !blocked.includes(cell)
+  let openCount = 0
+  for (let cell = 0; cell < cellCount; cell += 1) if (isOpen(cell)) openCount += 1
+  if (isOpen(index) ? openCount <= 1 : openCount <= 0) return index
+  let current = index
+  for (let guard = 0; guard <= cellCount; guard += 1) {
+    const next = stepGridCursor(shape, current, direction)
+    current = next === current ? index : next
+    if (isOpen(current) || current === index) return current
+  }
+  return current
+}
+
+/** 한 걸음 (0x6be71 → 0x6bead) */
+function stepGridCursor(shape: AnnalsGridShape, index: number, direction: AnnalsDirection): number {
   const dx = direction === 'left' ? -1 : direction === 'right' ? 1 : 0
   const dy = direction === 'up' ? -1 : direction === 'down' ? 1 : 0
   const cell = { x: index % shape.columns, y: Math.floor(index / shape.columns) }

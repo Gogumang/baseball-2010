@@ -29,6 +29,8 @@ import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLay
 import { HallOfFameFigure, useHallOfFameFigure } from '@/pages/special/ui/HallOfFameFigure'
 import type { HallOfFameListOwner } from '@/pages/special/ui/HallOfFameFigure'
 import { HALL_OF_FAME_FIGURE_TEAM } from '@/pages/special/lib/hallOfFameFigure'
+import { moveGridCursor } from '@/pages/record/lib/annalsGrid'
+import type { AnnalsDirection, AnnalsGridShape } from '@/pages/record/lib/annalsGrid'
 import type { SecretCodeState } from '@/pages/record/lib/statCells'
 import type { HallOfFameFigureLook } from '@/pages/special/lib/hallOfFameFigure'
 
@@ -420,7 +422,9 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
   const current = slots[slot]
   const cell = hallOfFameCellOf(slot - view.firstSlot)
   const { a, b } = HALL_OF_FAME_DETAIL
-  const figure = useHallOfFameFigure(listOwner ?? (mode.kind === '등록' ? '나리' : '메뉴'), {
+  const owner = listOwner ?? (mode.kind === '등록' ? '나리' : '메뉴')
+  const menuGrid = owner === '메뉴' ? menuHallOfFameGridOf(mode) : null
+  const figure = useHallOfFameFigure(owner, {
     slot,
     isBatterSlot: slot >= HALL_OF_FAME_PITCHER_SLOTS,
     look: current.kind === '찬칸' ? current.figure : null,
@@ -541,6 +545,24 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
           return setIsBubbleOpen(false)
         }
         return
+      }
+      if (menuGrid !== null) {
+        // 메인 메뉴 16 · 17 · 27: 키 0x62568 이 격자 [목록+0x134] = [메뉴+0x74] 의 vt+0x18(0x6c299 → 0x6c521 → 0x6c031,
+        // 숫자키 꼴 1)에 넘긴다 — '2' '4' '6' '8' 은 ↑ ← → ↓, '5' 는 OK
+        const direction: AnnalsDirection | null =
+          event.key === 'ArrowRight' || event.key === '6' ? 'right'
+          : event.key === 'ArrowLeft' || event.key === '4' ? 'left'
+          : event.key === 'ArrowDown' || event.key === '8' ? 'down'
+          : event.key === 'ArrowUp' || event.key === '2' ? 'up'
+          : null
+        if (direction !== null) {
+          event.preventDefault()
+          return setSlot((previous) => view.firstSlot + moveGridCursor(menuGrid, previous - view.firstSlot, direction))
+        }
+        if (event.key === '5') {
+          event.preventDefault()
+          return pressSlot(slot)
+        }
       }
       const dx = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
       const dy = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0
@@ -915,7 +937,26 @@ function hallOfFameIconOf(slot: number, state: HallOfFameSlotState) {
   return slot < HALL_OF_FAME_PITCHER_SLOTS ? HALL_OF_FAME_SLOT_ART.glove : HALL_OF_FAME_SLOT_ART.bat
 }
 
-/** 격자 안에서 커서 옮기기 (5열 3행, 가장자리에서 멈춘다) */
+/**
+ * 메인 메뉴 명전 목록의 격자 [메뉴+0x74] (= [목록+0x134], 진입이 넣는다) — `vt+0x1c(5열, 줄, 숫자키 꼴 1, 꼴 0x10)` 뒤
+ * 막힌 칸 표 [+0x28] 의 몇 칸을 0 으로 지운다 (직접 떴다):
+ * ```
+ * 16 홈런더비  0x25e6c: (5, 2, 1, 0x10) · 막힘 [열] = 칸 5 (셋째 인자 5 를 더해 슬롯 10)      0x25e86~0x25eaa
+ * 17 미션      0x2613c: (5, 3, 1, 0x10) · 막힘 [2·열] = 칸 10 (슬롯 10, 안 쓰는 칸)            0x26156~0x26180
+ * 27 스페셜    0x25f8c: (5, 3, 1, 0x10) · 막힘 [0] · [열] · [2·열] = 첫 열(나리 0 · 5 · 슬롯 10) · 커서 (1, 0)  0x25fa6~0x25fe8
+ * ```
+ * 꼴 0x10 이라 가로는 같은 줄 안에서 감고 세로는 끝에서 멈춘다. 옮기기 0x6c445 는 막힌 칸을 같은 방향으로 건너뛴다.
+ * 등록(나리 145)·시즌 선수영입(0xe2)은 다른 장면의 격자라 여기 넣지 않는다 — null (⚠️ 그쪽 꼴은 안 떴다, 아래 근사).
+ */
+function menuHallOfFameGridOf(mode: HallOfFameMode): AnnalsGridShape | null {
+  const base = { columns: HALL_OF_FAME_GRID.columns, wrapsColumns: true, wrapsRows: false } as const
+  if (mode.kind === '보기') return { ...base, rows: HALL_OF_FAME_GRID.rows, blockedCells: [0, 5, 10] }
+  if (mode.kind !== '선수고르기') return null
+  if (mode.purpose === '홈런더비') return { ...base, rows: 2, blockedCells: [5] }
+  return { ...base, rows: HALL_OF_FAME_GRID.rows, blockedCells: [10] }
+}
+
+/** 격자 안에서 커서 옮기기 (5열 3행, 가장자리에서 멈춘다) — ⚠️ 등록 · 시즌 선수영입의 근사 */
 function moveHallOfFameSlot(slot: number, dx: number, dy: number, view: HallOfFameGridView = FULL_GRID): number {
   const columns = HALL_OF_FAME_GRID.columns
   const cell = slot - view.firstSlot

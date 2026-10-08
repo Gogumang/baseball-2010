@@ -171,6 +171,20 @@ describe('명예의 전당 격자 5×3', () => {
     expect(srcs).toContain('./sprites/main_title/007.png')
   })
 
+  it('하위 27 격자: 첫 열(칸 0·5·10)이 막혀 ← 는 건너뛰어 같은 줄 끝으로 감고, ↓ 는 끝에서 멈춘다 (0x25fa6~0x25fe8)', () => {
+    찬칸열기()
+    const 커서 = (name: string) => screen.getByRole('button', { name }).getAttribute('aria-current')
+    expect(커서('2번 슬롯')).toBe('true')
+    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+    expect(커서('5번 슬롯')).toBe('true')
+    fireEvent.keyDown(window, { key: '8' })
+    fireEvent.keyDown(window, { key: '8' })
+    fireEvent.keyDown(window, { key: '8' })
+    expect(커서('15번 슬롯')).toBe('true')
+    fireEvent.keyDown(window, { key: '6' })
+    expect(커서('12번 슬롯')).toBe('true')
+  })
+
   it('슬롯 15칸이고 왼쪽 x 20 에서 40 씩, 줄은 179 에서 40 씩이다', () => {
     열기()
 
@@ -483,14 +497,23 @@ describe('홈런더비 선수 고르기 — 하위 16 (0x25e6c 목록 종류 1 �
     expect(onPick).toHaveBeenLastCalledWith({ side: '타자', hallOfFameIndex: 0 })
   })
 
-  it('방향키는 두 줄 안에서만 움직인다', () => {
+  const 커서 = (name: string) => screen.getByRole('button', { name }).getAttribute('aria-current')
+
+  it('방향키는 두 줄 안에서만 움직이고, 막힌 칸 5(슬롯 10)는 건너뛰다 끝에 닿으면 제자리다 (0x25eaa · 0x6c445)', () => {
     열기()
+    // 슬롯 5 ↓ → 칸 5 막힘 → 한 걸음 더 ↓ 는 끝이라 처음 칸으로
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    expect(커서('6번 슬롯')).toBe('true')
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
     fireEvent.keyDown(window, { key: 'ArrowDown' })
     fireEvent.keyDown(window, { key: 'ArrowDown' })
-    expect(screen.getByRole('button', { name: '11번 슬롯' }).getAttribute('aria-current')).toBe('true')
-    fireEvent.keyDown(window, { key: 'ArrowUp' })
-    fireEvent.keyDown(window, { key: 'ArrowUp' })
-    expect(screen.getByRole('button', { name: '6번 슬롯' }).getAttribute('aria-current')).toBe('true')
+    expect(커서('12번 슬롯')).toBe('true')
+    // 아랫줄 ← : 칸 6 → 칸 5 막힘 → 감아 칸 9 (꼴 0x10)
+    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+    expect(커서('15번 슬롯')).toBe('true')
+    fireEvent.keyDown(window, { key: '2' })
+    fireEvent.keyDown(window, { key: '2' })
+    expect(커서('10번 슬롯')).toBe('true')
   })
 })
 
