@@ -1533,6 +1533,13 @@ export function usePitcherLeagueSession(
       setScene('등록')
       return
     }
+    /*
+     * 등록 없이 떠남 — 141 끝 1bfa2~1bfe2 는 화면 전환 · 0x375d · [0x140006c] = 5 · 장면 0x103 뿐(저장 없음)이고, 다음에 투수편으로
+     * 들어오면 장면 0x106 이 새로 서며 100 → 0x1c154 가 그 저장으로 이어한다. 웹 세션은 앱 동안 살아 있어 여기서 미리 같은 저장으로
+     * 고른다 — 그 사이 투수 저장을 쓰는 곳은 이 세션뿐이고(지갑 다리는 같은 커리어를 다시 쓸 뿐), 이 자리의 이어할 자리(엔딩 141 ·
+     * 연말 사슬 이벤트)는 굴림 · 저장 · 소리가 없다. 105 진입 곁가지(부상 엔딩 · 나간 대결 140 · 115 · 훑기 굴림)는 들어와 관리 장면에
+     * 닿을 때 도는 도착 고리(`isOnScreen` — 투수편 화면일 때만)라 원본 진입 때와 같은 차례다.
+     */
     const next = pitcherResumeOf(normalizePitcherCareer(store.load()))
     resumed.current = next
     replayedEvaluationRef.current = false
