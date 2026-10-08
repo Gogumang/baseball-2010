@@ -172,7 +172,12 @@ describe('하늘 줄 — 구장 +0x10 (0x783b0)', () => {
     expect(stadiumSkyRowOf({ mode: 8, side0TeamId: 4 })).toBe(4)
   })
 
-  it('모드 0 · 5 · 6 · 7 은 rand(0, 6) — 부르는 쪽이 굴린다(null)', () => {
-    for (const mode of [0, 5, 6, 7]) expect(stadiumSkyRowOf({ mode, dayCounter: 3, side0TeamId: 2 })).toBeNull()
+  it('모드 0 은 0x39fdc(3a066~3a072)가 전역 모드를 1 로 바꿔 모드 1 갈래 — 측 0 팀 mod 6, 굴림 없음', () => {
+    expect(stadiumSkyRowOf({ mode: 0, side0TeamId: 9 })).toBe(3)
+    expect(stadiumSkyRowOf({ mode: 0, dayCounter: 3, side0TeamId: 2 })).toBe(stadiumSkyRowOf({ mode: 1, side0TeamId: 2 }))
+  })
+
+  it('모드 5 · 6 · 7 은 rand(0, 6) — 부르는 쪽이 굴린다(null)', () => {
+    for (const mode of [5, 6, 7]) expect(stadiumSkyRowOf({ mode, dayCounter: 3, side0TeamId: 2 })).toBeNull()
   })
 })
