@@ -18,7 +18,7 @@ const IMG_TEXT = './sprites/img_text/frames'
  * ```
  * 창 판(0x746cc)은 공용 알림과 같은 띠다 — 웹은 `MessageBox` 의 판 모양을 높이 100 으로 쓴다. 뒤 어둡게는 이벤트 장면의 6/16.
  * 열림은 공용 갱신(0x75556)이 높이를 ×2 로 키운다고 보고 6 에서 시작한다. 닫힘은 공용 알림과 같은 폭 ÷2(240 → 120 → 60).
- * ⚠️ 원본은 키를 받은 그 갱신에 [mgr+8] = 1 이라 다음 명령이 닫힘 애니와 겹쳐 돈다 — 웹은 다 닫힌 뒤 넘긴다(`MessageBox` 와 같다).
+ * 키를 받은 그 갱신에 [mgr+8] = 1 이라 다음 명령이 닫힘 애니와 겹쳐 돈다 — `onKey` 가 그 갱신, `onClose` 는 다 닫힌 뒤다.
  */
 export const REWARD_SKILL_WINDOW = {
   height: 100,
@@ -39,9 +39,12 @@ const CLOSE_END_WIDTH = 99
 
 type Animation = { readonly kind: '열림'; readonly height: number } | { readonly kind: '닫힘'; readonly width: number } | null
 
-export function RewardSkillWindow({ text, gained, onClose }: {
+export function RewardSkillWindow({ text, gained, onKey, onClose }: {
   readonly text: string
   readonly gained: boolean
+  /** 키 0x8e054 를 받은 그 갱신 — 0x742a9(닫기 시작) · [mgr+8] = 1 (다음 명령) */
+  readonly onKey?: () => void
+  /** 닫힘 애니가 끝났다 — 창이 사라진다 */
   readonly onClose: () => void
 }) {
   const [animation, setAnimation] = useState<Animation>({ kind: '열림', height: REWARD_SKILL_WINDOW.openStartHeight })
@@ -49,11 +52,16 @@ export function RewardSkillWindow({ text, gained, onClose }: {
   animationRef.current = animation
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
+  const onKeyRef = useRef(onKey)
+  onKeyRef.current = onKey
   const isClosedRef = useRef(false)
 
   const close = () => {
     if (animationRef.current?.kind === '닫힘' || isClosedRef.current) return
-    setAnimation({ kind: '닫힘', width: CLOSE_START_WIDTH })
+    const closing: Animation = { kind: '닫힘', width: CLOSE_START_WIDTH }
+    animationRef.current = closing
+    setAnimation(closing)
+    onKeyRef.current?.()
   }
 
   const animationKind = animation?.kind ?? null

@@ -232,4 +232,26 @@ describe('메시지 상자 애니메이션', () => {
       되돌리기()
     }
   })
+
+  it('`onAnswerKey` 는 키를 받은 그 갱신에 온다 — `onAnswer` 는 그대로 다 닫힌 뒤 (0x8daa0 처럼 답 칸을 곧바로 읽는 자리)', () => {
+    const 되돌리기 = 높이를_잴_수_있게(79)
+    vi.useFakeTimers()
+    const onAnswer = vi.fn()
+    const onAnswerKey = vi.fn()
+    try {
+      render(<MessageBox text="알림" buttons={['OK']} onAnswer={onAnswer} onAnswerKey={onAnswerKey} />)
+      act(() => void vi.advanceTimersByTime(millisecondsPerFrame() * 3))
+
+      fireEvent.keyDown(window, { key: 'Enter' })
+      expect(onAnswerKey).toHaveBeenCalledWith(0)
+      expect(onAnswer).not.toHaveBeenCalled()
+      act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
+      act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
+      expect(onAnswer).toHaveBeenCalledWith(0)
+      expect(onAnswerKey).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+      되돌리기()
+    }
+  })
 })

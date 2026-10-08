@@ -745,10 +745,12 @@ describe('StoryScreen — 보상 명령 7 의 알림 창 (0x8d4c4 · 0x8daa0)', 
     expect(스킬창.querySelector('img')?.getAttribute('data-frame')).toBe('370')
     expect(스킬창.textContent).toContain('"행운"')
     expect(스킬창.textContent).toContain('스킬을 획득하였습니다.')
-    // 열림(6 → … → 100) 뒤 OK 로 닫는다 — 닫힘(240 → 120 → 60) 이 끝나야 다음 명령
+    // 열림(6 → … → 100) 뒤 OK 로 닫는다 — 키를 받은 그 갱신에 다음 명령(0x8e054 · [mgr+8] = 1), 닫힘(240 → 120 → 60)과 겹친다
     틀(6)
+    expect(screen.queryByTestId('대사-상자')).toBeNull()
     fireEvent.keyDown(window, { key: 'Enter' })
     expect(screen.getByTestId('스킬-보상-창')).toBeTruthy()
+    expect(screen.getByTestId('대사-상자').getAttribute('data-text')).toBe('끝 대사')
     틀(2)
     expect(screen.queryByTestId('스킬-보상-창')).toBeNull()
     대사넘기기()
@@ -756,6 +758,33 @@ describe('StoryScreen — 보상 명령 7 의 알림 창 (0x8d4c4 · 0x8daa0)', 
     expect(onComplete).toHaveBeenCalledWith(
       [{ kind: 0, value: 5 }, { kind: 2, value: -3 }, { kind: 4, value: 7 }], [1],
     )
+  })
+
+  it('알림 OK 를 받은 그 갱신에 다음 명령 — 창은 닫힘(240 → 120 → 60)을 마저 돌며 겹친다 (0x8daa0)', () => {
+    const 원래 = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight')
+    Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, get: () => 79 })
+    try {
+      const 알림이벤트 = {
+        ...이벤트,
+        commands: [
+          { op: 'reward', items: [{ kind: 0, value: 5 }] },
+          { op: 'say', text: '끝 대사', speaker: 0, format: 0, portraits: [] },
+        ],
+      } as unknown as OriginalEvent
+      render(<StoryScreen events={[알림이벤트]} event={알림이벤트} playerName="테스트" teamName="드래곤즈"
+        onComplete={() => {}} onMatch={() => {}} rewardNoticeContext={맥락} />)
+      // 열림 10 → 20 → 40 → 79 (틀마다 따로)
+      틀(1); 틀(1); 틀(1)
+      fireEvent.keyDown(window, { key: 'Enter' })
+      expect(screen.getByRole('dialog', { name: '알림' })).toBeTruthy()
+      expect(screen.getByTestId('대사-상자').getAttribute('data-text')).toBe('끝 대사')
+      틀(1); 틀(1)
+      expect(screen.queryByRole('dialog', { name: '알림' })).toBeNull()
+      expect(screen.getByTestId('대사-상자').getAttribute('data-text')).toBe('끝 대사')
+    } finally {
+      if (원래 === undefined) Reflect.deleteProperty(HTMLElement.prototype, 'offsetHeight')
+      else Object.defineProperty(HTMLElement.prototype, 'offsetHeight', 원래)
+    }
   })
 
   it('맥락을 안 주면 예전처럼 창 없이 지나간다', () => {

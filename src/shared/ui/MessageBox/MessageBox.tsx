@@ -52,6 +52,11 @@ interface MessageBoxProps {
   readonly dimOpacity?: number
   /** 누른 버튼 번호 */
   readonly onAnswer: (index: number) => void
+  /**
+   * 키를 받은 **그 갱신**의 답 — 닫힘 애니메이션(0x7558a~)을 기다리지 않는다. 띄운 쪽이 답 칸([창+0x21c])을 그 갱신에 읽는
+   * 자리(예: 이벤트 보상의 기다림 0x8daa0)가 쓴다. `onAnswer` 는 그대로 다 닫힌 뒤에 온다.
+   */
+  readonly onAnswerKey?: (index: number) => void
 }
 
 /**
@@ -144,7 +149,7 @@ function moveGridCursor(index: number, columns: number, count: number, dx: numbe
 }
 
 export function MessageBox({
-  text, buttons, listItems, initialSelected = 0, buttonFrames, grid, cancelAnswer, dimOpacity, onAnswer,
+  text, buttons, listItems, initialSelected = 0, buttonFrames, grid, cancelAnswer, dimOpacity, onAnswer, onAnswerKey,
 }: MessageBoxProps) {
   /** 격자 열 수 — 안 주면 버튼이 한 줄이다 */
   const columns = Math.max(1, grid?.columns ?? buttons.length)
@@ -157,6 +162,8 @@ export function MessageBox({
   selectedRef.current = selected
   const onAnswerRef = useRef(onAnswer)
   onAnswerRef.current = onAnswer
+  const onAnswerKeyRef = useRef(onAnswerKey)
+  onAnswerKeyRef.current = onAnswerKey
   const isAnsweredRef = useRef(false)
   const isFinishedRef = useRef(false)
 
@@ -192,6 +199,7 @@ export function MessageBox({
   const answer = useCallback((index: number) => {
     if (isAnsweredRef.current) return
     isAnsweredRef.current = true
+    onAnswerKeyRef.current?.(index)
     // 원본은 닫힘 애니메이션이 끝난 뒤에 콜백을 부른다 (0x755d8). 레이아웃이 없으면 곧바로.
     if (fullHeightRef.current <= 0) return onAnswerRef.current(index)
     setAnimation({ kind: '닫힘', width: CLOSE_START_WIDTH, answer: index })

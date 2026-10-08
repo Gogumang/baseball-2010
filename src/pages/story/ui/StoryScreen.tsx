@@ -13,7 +13,7 @@ import { YearGoalWindow } from '@/pages/story/ui/YearGoalWindow'
 import { EventDialogueBox } from '@/pages/story/ui/EventDialogueBox'
 import { RewardSkillWindow } from '@/pages/story/ui/RewardSkillWindow'
 import { rewardNoticeOf } from '@/entities/story/model/rewardNotice'
-import type { RewardNoticeContext } from '@/entities/story/model/rewardNotice'
+import type { RewardNotice, RewardNoticeContext } from '@/entities/story/model/rewardNotice'
 import { speakerPrefixOf } from '@/pages/story/lib/eventDialogue'
 import { SYSTEM_YEAR_GOAL_WINDOW } from '@/pages/story/lib/yearGoalWindow'
 import type { YearGoalWindowSource } from '@/pages/story/lib/yearGoalWindow'
@@ -225,6 +225,25 @@ export function StoryScreen({
   // 상자는 창 밑에도 남는다 — 키는 창 것이다(0x8b804 는 지금 명령이 say · 선택지일 때만 받는다)
   const isBoxActive = command?.op === 'say' || command?.op === 'choice'
   const choiceCommand = command?.op === 'choice' ? command : null
+  /**
+   * 보상 창(알림 · 스킬) — 기다림 0x8daa0 은 답 0 · 0x14 를 받은 **그 갱신에** [mgr+8] = 1 로 다음 명령으로 넘긴다(스킬 창 키
+   * 0x8e054 도 0x742a9 로 닫기 시작하며 같은 갱신에). 창은 닫힘 애니(240 → 120 → 60)를 마저 돌고 그동안 다음 명령이 겹쳐 돈다 —
+   * 넘긴 뒤에도 다 닫힐 때까지 이 칸에 남겨 그린다. 다음 명령이 또 보상 창이면 공용 창이 새로 서므로 그쪽이 덮는다.
+   */
+  const [closingReward, setClosingReward] = useState<{ readonly key: string; readonly notice: RewardNotice } | null>(null)
+  const currentReward = command?.op === 'reward' && rewardNotice !== null &&
+    (rewardNotice.kind === '알림' || rewardNotice.kind === '스킬')
+    ? { key: commandKey, notice: rewardNotice }
+    : null
+  const shownReward = currentReward ?? closingReward
+  /** 키를 받은 그 갱신 — 닫히는 창을 남겨 두고 다음 명령으로 (0x8daa0 · 0x8e054) */
+  const answerReward = () => {
+    if (currentReward === null) return
+    setClosingReward(currentReward)
+    next()
+  }
+  /** 다 닫혔다 — 남겨 둔 창을 걷는다 (새 보상 창이 섰으면 그것은 그대로) */
+  const finishRewardWindow = (key: string) => setClosingReward((closing) => (closing?.key === key ? null : closing))
   /** system 창의 답 0 — 0x7fe90(목표 창 봤음 · 저장) 뒤 다음 명령 (창이 다 닫히면 0x8d91c 가 넘긴다) */
   const closeSystemWindow = () => {
     onSystemWindowConfirm?.()
@@ -274,16 +293,18 @@ export function StoryScreen({
           text={noticeText} buttons={NOTICE_BUTTONS} dimOpacity={EVENT_WINDOW_DIM_OPACITY} onAnswer={closeSystemWindow} />
       )}
 
-      {command?.op === 'reward' && rewardNotice?.kind === '알림' && (
-        // 0x8d71c — 0xbbef8(글, 1, 1, 1) → 0x74ef4 종류 1. 기다림 0x8daa0 은 답 0(OK · CLR)이면 다음 명령
-        <MessageBox key={`${step.cursor.eventId}:${step.cursor.commandIndex}`}
-          text={rewardNotice.text} buttons={NOTICE_BUTTONS} dimOpacity={EVENT_WINDOW_DIM_OPACITY} onAnswer={next} />
+      {shownReward?.notice.kind === '알림' && (
+        // 0x8d71c — 0xbbef8(글, 1, 1, 1) → 0x74ef4 종류 1. 기다림 0x8daa0 은 답 0(OK · CLR)을 받은 그 갱신에 다음 명령
+        <MessageBox key={shownReward.key}
+          text={shownReward.notice.text} buttons={NOTICE_BUTTONS} dimOpacity={EVENT_WINDOW_DIM_OPACITY}
+          onAnswerKey={answerReward} onAnswer={() => finishRewardWindow(shownReward.key)} />
       )}
 
-      {command?.op === 'reward' && rewardNotice?.kind === '스킬' && (
-        // 0x8d6bc — 첫 종류 4 는 스킬 창 0x741a0 (그리기 0x87108 · 키 0x8e054)
-        <RewardSkillWindow key={`${step.cursor.eventId}:${step.cursor.commandIndex}`}
-          text={rewardNotice.text} gained={rewardNotice.gained} onClose={next} />
+      {shownReward?.notice.kind === '스킬' && (
+        // 0x8d6bc — 첫 종류 4 는 스킬 창 0x741a0 (그리기 0x87108 · 키 0x8e054 — 받은 그 갱신에 다음 명령)
+        <RewardSkillWindow key={shownReward.key}
+          text={shownReward.notice.text} gained={shownReward.notice.gained}
+          onKey={answerReward} onClose={() => finishRewardWindow(shownReward.key)} />
       )}
 
       {command?.op === 'yesno' && (
