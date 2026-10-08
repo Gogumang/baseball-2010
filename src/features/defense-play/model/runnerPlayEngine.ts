@@ -43,7 +43,8 @@ import type { ManualAutoMode } from '@/entities/settings/model/gameSettings'
 import { viewStateOf, type ActionMemory, type DefensePlayView } from '@/features/defense-play/model/defensePlayView'
 import { drawDefenseScene, enterDefenseScene, type DefenseScene } from '@/features/defense-play/model/defenseScene'
 import { postJudgeMessage } from '@/features/defense-play/model/laserPresentation'
-import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
+import type { DefenseKeyPress, DefensePlayControls, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
+import { inPlayCommandOf } from '@/entities/defense-controls/model/defenseKeys'
 import { cpuSpecialThrowOf } from '@/features/defense-play/model/runDefensePlay'
 import { runnerFateOf } from '@/features/defense-play/model/runnerFates'
 import {
@@ -131,10 +132,17 @@ export interface RunnerPlayEngineInput {
   readonly defenseIsCpu?: boolean
   readonly throwMode?: ManualAutoMode
   /**
-   * 사람이 고른 송구 목표 루 (+0x160). 판이 열릴 때 이미 골라 둔 키로 본다 —
-   * 원본은 그 키로 한 번 던지면 `+0x160 = −1` 로 지운다(b46a8). 그래서 **첫 송구에만** 쓴다.
+   * 판이 열릴 때의 사람 송구 목표 루 (플레이+0x160). 안 주면 앞 판에서 넘어온 값(`scene.throwTarget`)이다 —
+   * +0x160 을 쓰는 곳은 플레이 생성자(0xb0b3a · 0xb0b6e) · 키 메시지 0x588 의 vt60 0xb3118 · 던진 뒤 b46a8 의 −1 셋뿐이라
+   * 판을 넘어 남는다. 그 키로 한 번 던지면 −1 로 지운다(b46a8).
    */
   readonly manualThrowBase?: number
+  /**
+   * 사람 조작 — 이 판 동안 틱마다 눌린 키(`runDefensePlay` 와 같은 꼴). 상태 0x17 키 0x53420 은 판 종류를 안 가린다 —
+   * 사람이 수비면 0x533c8 이 메시지 0x588(목표 루) → 0x51890 → 플레이 vt60 → +0x160. 안 주면 키가 없다.
+   * ⚠️ 공격 쪽 키(진루 · 귀루 · 슬라이딩 — 0x5331c · 0x585)는 이 진행기가 아직 안 받는다.
+   */
+  readonly controls?: DefensePlayControls
   readonly offenseIsCpu?: boolean
   readonly runningMode?: ManualAutoMode
   readonly maximumTicks?: number
@@ -163,14 +171,66 @@ interface ThrowInFlight {
   readonly releaseTick: number
 }
 
+/**
+ * 판을 한 틱씩 돌리는 손잡이 — 화면이 실시간으로 키를 넣을 때 쓴다(`DefensePlayback` 의 주자 판 갈래).
+ * `step(키)` 한 번 = 그 틱 하나(키는 그 틱 머리에 먹인다). 다 돌면 `result()`.
+ */
+export interface RunnerPlayStepper {
+  /** 다음에 돌 틱 */
+  readonly tick: number
+  readonly finished: boolean
+  /** 지금까지 그린 그림 */
+  readonly ticks: readonly DefensePlayView[]
+  step(press: DefenseKeyPress | null): void
+  result(): RunnerPlayEngineResult
+}
+
+export function startRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayStepper {
+  const ticks: DefensePlayView[] = []
+  const steps = runnerPlaySteps(input, ticks)
+  let current = steps.next(null)
+  return {
+    get tick() {
+      return current.done === true ? ticks.length : current.value
+    },
+    get finished() {
+      return current.done === true
+    },
+    ticks,
+    step(press) {
+      if (current.done === true) return
+      current = steps.next(press)
+    },
+    result() {
+      if (current.done !== true) throw new Error('주자 판이 아직 안 끝났다')
+      return current.value
+    },
+  }
+}
+
+/** 판 하나를 끝까지 돌린다 — 키는 `controls.keyAt(틱)` 으로 묻는다 */
 export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineResult {
+  const stepper = startRunnerPlay(input)
+  while (!stepper.finished) stepper.step(input.controls?.keyAt(stepper.tick) ?? null)
+  return stepper.result()
+}
+
+/** 슬롯 2 의 0x52602 — [sp+0x14] = 0xae61c(판 종류 ∉ 마스크 0x58c = 2 · 3 · 7 · 8 · 10)가 참일 때만 플레이 vt4c 0xb45dc 를 부른다 */
+const VT4C_BLOCKED_PLAY_KINDS: readonly number[] = [2, 3, 7, 8, 10]
+
+function* runnerPlaySteps(
+  input: RunnerPlayEngineInput,
+  ticks: DefensePlayView[],
+): Generator<number, RunnerPlayEngineResult, DefenseKeyPress | null> {
   const abilities = input.abilities
   const maximumTicks = input.maximumTicks ?? DEFAULT_MAXIMUM_TICKS
   const autoBaserunningEnabled = input.offenseIsCpu === true || (input.runningMode ?? '자동') !== '수동'
   const cpuThrowEnabled = input.defenseIsCpu === true || (input.throwMode ?? '수동') !== '수동'
-  const manualThrowBase = input.manualThrowBase ?? NONE
+  /** 플레이+0x160 — 사람이 고른 송구 목표 (키 메시지 0x588 이 쓰고 b46a8 이 −1) */
+  let manualThrowBase = input.manualThrowBase ?? input.scene?.throwTarget ?? NONE
+  /** 플레이 vt4c 0xb45dc(사람 목표 b4660 · AI 9 b4838)가 도는 판인가 */
+  const vt4cRuns = !VT4C_BLOCKED_PLAY_KINDS.includes(input.kind)
   const log: string[] = []
-  const ticks: DefensePlayView[] = []
   const previousActions: ActionMemory = new Map<string, { action: number; since: number }>()
 
   let fielders = input.fielders
@@ -198,8 +258,6 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
   let ballBody = chase?.body
   /** sp+0x24 — 이번 틱 포구 틱의 사건(펌블 0xbc2). 서면 틱 끝 b45a4 가 0xb3148 */
   let ballEventThisTick = false
-  /** 사람 목표 +0x160 이 아직 안 쓰였나 — 공 가진 야수가 준비되면 한 번 보고 −1 (b46a4) */
-  let manualPending = manualThrowBase !== NONE
   /** 이번 틱에 0xb36d0 이 아웃을 냈나 — 결과 코드 13 → 메시지 0xbba */
   let outJudgedThisTick = false
   /** 이번 틱 플레이 틱이 보낼 결과 메시지 0xbba 의 코드 — 포구 b4292 의 9 를 b4540 의 13 이 덮는다(b4562 에서 한 번) */
@@ -406,6 +464,7 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
   }
 
   for (let tick = 0; tick <= maximumTicks && !play.finished; tick += 1) {
+    const press = yield tick
     outJudgedThisTick = false
     tickMessageCode = 0
     // ── 0. 야수 틱 0xa1284 — 공용 갱신 0x3f060 이 슬롯 2(0x524c0)보다 먼저 돈다. 쥔 동안 +0xc8 −= 1 (타구 진행기 0' 절) ──
@@ -415,6 +474,16 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
         : fielder,
     )
     ballEventThisTick = false
+    // ── 0b. 사람 조작 — 상태 0x17 키 0x53420: 수비면 0x533c8 → 메시지 0x588(목표 루) → 0x51890 → 플레이 vt60 0xb3118 → +0x160.
+    //        판 종류를 안 가린다. 키 반복(누르고 있기)도 0x536bc 가 0x17 갈래로 보낸다 ──
+    if (press !== null && input.controls?.side === '수비' && !play.finished) {
+      const command = inPlayCommandOf(press.key, '수비', { isHoldRepeat: press.isRepeat === true })
+      if (command !== null && command.kind === '송구') {
+        manualThrowBase = command.target
+        play = { ...play, manualThrowBase }
+        log.push(`${tick}틱 사람이 ${command.target}루로 송구 지시`)
+      }
+    }
     // ── 1. 포구 틱 갈래 0xb401c — 쫓는 공을 고른 야수가 포구 틱(+0x174)에 ──
     // ```
     // b4224  r4 = 펌블표[등급] > rand(0, 10000)       ; 늘 먹는다
@@ -466,16 +535,18 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
     }
 
     // ── 3b. 사람 목표 +0x160 — 플레이 틱 vt4c 의 b4660~b46a8: 쥠 && 준비(vtC4) 이면 발밑 루가 아닐 때 vt58, 그리고 −1 ──
-    if (!play.finished && manualPending && isHolderReady()) {
-      manualPending = false
+    // vt4c 는 판 종류가 마스크 0x58c 밖일 때만 돈다(0x52602) — 밀어내기(종류 2)는 키가 +0x160 만 적고 안 던진다(다음 판으로 남는다)
+    if (!play.finished && vt4cRuns && manualThrowBase !== NONE && isHolderReady()) {
+      const target = manualThrowBase
+      manualThrowBase = NONE
       play = { ...play, manualThrowBase: NONE }
-      if (!isSamePoint(fielders[play.ballHolderSlot].position, basePosition(manualThrowBase))) {
-        sendToBase(tick, manualThrowBase, true, false)
+      if (!isSamePoint(fielders[play.ballHolderSlot].position, basePosition(target))) {
+        sendToBase(tick, target, true, false)
       }
     }
 
-    // ── 3c. AI 9 — 미룬 송구 (b4838): 받을 야수.vtc0() ≤ 공 가진 야수.vtb8(루 좌표) 가 되면 0xb2c90(루, 0), 참이면 AI 0 ──
-    if (!play.finished && deferredThrowReceiver !== NONE) {
+    // ── 3c. AI 9 — 미룬 송구 (b4838, 같은 vt4c): 받을 야수.vtc0() ≤ 공 가진 야수.vtb8(루 좌표) 가 되면 0xb2c90(루, 0), 참이면 AI 0 ──
+    if (!play.finished && vt4cRuns && deferredThrowReceiver !== NONE) {
       for (let slot = 0; slot < fielders.length; slot += 1) {
         if (fielders[slot]?.aiState !== AI_STATE.RECEIVE) continue
         const receiver = fielders[deferredThrowReceiver]
@@ -694,7 +765,7 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
     specialDefense: { jumpUnlocked: false, slideUnlocked: false },
     laserThrow: false,
     laserOutFlag,
-    scene,
+    scene: { ...scene, throwTarget: manualThrowBase },
     rundowns: 0,
     rundownOuts: 0,
     runnerFates: runners.map((runner) => runnerFateOf(runner.state)),

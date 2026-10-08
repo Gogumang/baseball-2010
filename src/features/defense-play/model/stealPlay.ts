@@ -15,10 +15,11 @@ import { applyRunnerLead, runnerLeadOf } from '@/entities/fielding/model/runnerL
 import { STEAL_PLAY_KIND, stealTargetBaseOf, type StealBase } from '@/entities/fielding/model/stealStart'
 import type { BaseState } from '@/entities/game/model/baseState'
 import type { ManualAutoMode } from '@/entities/settings/model/gameSettings'
-import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
+import type { DefensePlayControls, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import {
   RUNNER_PLAY_RESULT,
   runRunnerPlay,
+  type RunnerPlayEngineInput,
   type RunnerPlayEngineResult,
   type RunnerPlayResultCode,
 } from '@/features/defense-play/model/runnerPlayEngine'
@@ -141,6 +142,8 @@ export interface StealPlayInput {
   readonly offenseTeamIndex?: number
   /** 앞 판에서 넘어온 수비 장면 연출 칸 (`DefensePlayInput.scene`) */
   readonly scene?: DefenseScene
+  /** 사람 조작 — 틱마다 눌린 키 (`RunnerPlayEngineInput.controls`) */
+  readonly controls?: DefensePlayControls
 }
 
 export interface StealPlayResult extends RunnerPlayEngineResult {
@@ -154,7 +157,16 @@ export interface StealPlayResult extends RunnerPlayEngineResult {
 const DEFAULT_ABILITY = 500
 const CATCHER_SLOT = 1
 
+/** 판 하나를 끝까지 돌린다 — 시작(리드 굴림) → 진행기 → 정리 */
 export function runStealPlay(input: StealPlayInput): StealPlayResult {
+  return stealPlayResultOf(input, runRunnerPlay(stealPlayEngineInputOf(input)))
+}
+
+/**
+ * 판 시작 — 야수 · 주자 · 리드(도루 주자마다 rand(0,9))까지 세운 진행기 입력. 실시간으로 돌릴 때는 이것을
+ * `startRunnerPlay` 에 넣고, 다 돈 결과를 `stealPlayResultOf` 로 정리한다(굴림 차례는 `runStealPlay` 와 같다).
+ */
+export function stealPlayEngineInputOf(input: StealPlayInput): RunnerPlayEngineInput {
   const abilities = input.defenseAbilities ?? Array.from({ length: 9 }, () => DEFAULT_ABILITY)
   const covers = [...PICKOFF_COVER_OF_BASE]
 
@@ -200,7 +212,7 @@ export function runStealPlay(input: StealPlayInput): StealPlayResult {
     runners.push(applyRunnerLead(started, lead))
   })
 
-  const result = runRunnerPlay({
+  return {
     kind: STEAL_PLAY_KIND,
     fielders,
     // b29d4: 0xb2710(P, 1, 0) — 엔진이 첫 틱 앞에서 쥐게 하려고 쥠 칸을 세워 둔다. 쥐기는 +0x128 = 1 도 세운다(b2720)
@@ -219,8 +231,12 @@ export function runStealPlay(input: StealPlayInput): StealPlayResult {
     defenseTeamIndex: input.defenseTeamIndex,
     offenseTeamIndex: input.offenseTeamIndex,
     scene: input.scene,
-  })
+    controls: input.controls,
+  }
+}
 
+/** 판 끝 정리 — 잡힌 · 루를 옮긴 도루 주자 (정산 0xa8024 @a83c6 · @a83de 가 본다) */
+export function stealPlayResultOf(input: StealPlayInput, result: RunnerPlayEngineResult): StealPlayResult {
   const stolenFrom: StealBase[] = []
   const caughtFrom: StealBase[] = []
   result.runnerFates.forEach((fate) => {

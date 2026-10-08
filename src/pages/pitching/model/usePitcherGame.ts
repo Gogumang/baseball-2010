@@ -9,6 +9,7 @@ import {
   pickoff,
   resolveBenchClearing,
   resolveDefensePlay,
+  resolveRunnerPlay,
   startPitch,
   startPitcherGame,
   summaryOf,
@@ -16,6 +17,7 @@ import {
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { isPickoffPlayResult, pickoffCallSoundIdOf } from '@/features/defense-play/model/pickoffPlay'
+import { runLiveRunnerPlayWithoutKeys } from '@/features/defense-play/model/liveRunnerPlay'
 import { applyPitchResolution } from '@/entities/at-bat/model/atBatState'
 import {
   deepHitCheerSoundIdOf,
@@ -65,6 +67,11 @@ export interface PitcherGameSession {
     readonly pickoff: (key: string) => void
     /** 수비 화면이 한 타구를 다 돌렸다 (`DefensePlayback` 의 `onDone`) */
     readonly finishDefensePlay: (result?: DefensePlayResult) => void
+    /**
+     * 수비 화면이 내 수비의 주자 판(도루 · 폭투 · 견제 — `progress.pendingRunnerPlay`)을 다 돌렸다. 결과를 못 받았으면 키 없이
+     * 끝까지 돌려서라도 붙든 상태를 푼다.
+     */
+    readonly finishRunnerPlay: (result?: DefensePlayResult) => void
     /** 상태 0xe 의 OK — 그 뒤 굴림(돌발 0x8f158 · 0xf 진입 0x3d954 의 CPU 대타)을 돌린다 (`confirmScene`) */
     readonly confirmScene: () => void
     /** `#` 스스로 강판 (StrGAME[104] 에 "예") */
@@ -143,7 +150,8 @@ export function usePitcherGame(
     () => ({
       throwPitch: (input: PitchInput) =>
         step(
-          (current) => startPitch(current, input, random),
+          // 공 도착의 도루 · 폭투 판은 붙들어 수비 화면이 실시간으로 돌린다(송구 키 +0x160 — `live`)
+          (current) => startPitch(current, input, random, true),
           // 투구 순간 소리 12 / 마구 28 (0x3f378) → 심판 콜(0x51a94). 통로가 하나라 뒤 소리가 앞을 끊는다.
           // 내 투수는 육성(rec+0xa 비트7)이라 0xb633d 가 거짓 — 구질 22 일 때만 28 이다
           (before, after) => {
@@ -213,9 +221,25 @@ export function usePitcherGame(
           },
         )
       },
+      finishRunnerPlay: (result?: DefensePlayResult) => {
+        const pending = progressRef.current.pendingRunnerPlay
+        if (pending == null) return
+        const played = result ?? runLiveRunnerPlayWithoutKeys(pending)
+        step(
+          (current) => resolveRunnerPlay(current, played, random),
+          // 판정 콜 — 도루 · 폭투는 공 도착 판(`lastArrivalPlay`), 견제는 그 결과. ⚠️ 원본은 공이 잡히는 틱에 낸다(판 끝 근사)
+          (before, after) => [
+            after.lastArrivalPlay !== null && after.lastArrivalPlay !== before.lastArrivalPlay
+              ? after.lastArrivalPlay.callSoundId
+              : null,
+            pending.kind === 'pickoff' && isPickoffPlayResult(played) ? pickoffCallSoundIdOf(played) : null,
+          ],
+        )
+      },
       pickoff: (key: string) =>
         step(
-          (current) => pickoff(current, key, random),
+          // 견제 판은 붙들어 수비 화면이 실시간으로 돌린다(송구 키 +0x160) — 콜은 판이 끝나 결과를 먹일 때(`finishRunnerPlay`)
+          (current) => pickoff(current, key, random, true),
           // 판정 콜 — 세이프면 늘 17 (0x51c14 의 종류 4·5 갈래), 견제사면 62/20 (0x51b36).
           // ⚠️ 원본은 공이 잡히는 **틱**에 낸다. 웹은 견제 판을 미리 다 돌려 재생하므로 판을 연 자리에서 낸다
           // — 홈런 비행 재생과 같은 근사다

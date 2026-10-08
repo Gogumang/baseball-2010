@@ -35,7 +35,13 @@ import { viewStateOf, type ActionMemory, type DefensePlayView } from '@/features
 import { drawDefenseScene, enterDefenseScene, type DefenseScene } from '@/features/defense-play/model/defenseScene'
 import { postJudgeMessage } from '@/features/defense-play/model/laserPresentation'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
-import { cpuSpecialThrowOf, type DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
+import {
+  cpuSpecialThrowOf,
+  type DefenseKeyPress,
+  type DefensePlayControls,
+  type DefensePlayResult,
+} from '@/features/defense-play/model/runDefensePlay'
+import { inPlayCommandOf } from '@/entities/defense-controls/model/defenseKeys'
 import { runnerFateOf } from '@/features/defense-play/model/runnerFates'
 import {
   bounceOffFielder,
@@ -138,6 +144,12 @@ export interface PickoffPlayInput {
    * 되감지 않는 것으로 본다(유력 — 견제 키 0xf → 0x17 길을 다 뜨지 않았다)
    */
   readonly scene?: DefenseScene
+  /**
+   * 사람 조작 — 이 판 동안 틱마다 눌린 키. 상태 0x17 키 0x53420 은 판 종류를 안 가린다 — 사람이 수비면 0x533c8 이
+   * 메시지 0x588 → 플레이 vt60 → +0x160, 종류 4 는 vt4c 가 도니 b4660 이 준비된 쥔 야수를 그 루로 보낸다.
+   * ⚠️ 공격 쪽 키(진루 · 귀루 · 슬라이딩)는 아직 안 받는다.
+   */
+  readonly controls?: DefensePlayControls
 }
 
 export interface PickoffPlayResult extends DefensePlayResult {
@@ -154,13 +166,53 @@ interface PickoffRunner {
 /**
  * 견제 한 판을 끝까지 돌린다. 경기 상태는 건드리지 않고 결과(`advance`)만 돌려준다.
  */
+/** 견제 판을 한 틱씩 돌리는 손잡이 (`runnerPlayEngine.RunnerPlayStepper` 와 같은 꼴) */
+export interface PickoffPlayStepper {
+  readonly tick: number
+  readonly finished: boolean
+  readonly ticks: readonly DefensePlayView[]
+  step(press: DefenseKeyPress | null): void
+  result(): PickoffPlayResult
+}
+
+export function startPickoffPlay(input: PickoffPlayInput): PickoffPlayStepper {
+  const ticks: DefensePlayView[] = []
+  const steps = pickoffPlaySteps(input, ticks)
+  let current = steps.next(null)
+  return {
+    get tick() {
+      return current.done === true ? ticks.length : current.value
+    },
+    get finished() {
+      return current.done === true
+    },
+    ticks,
+    step(press) {
+      if (current.done === true) return
+      current = steps.next(press)
+    },
+    result() {
+      if (current.done !== true) throw new Error('견제 판이 아직 안 끝났다')
+      return current.value
+    },
+  }
+}
+
 export function runPickoffPlay(input: PickoffPlayInput): PickoffPlayResult {
+  const stepper = startPickoffPlay(input)
+  while (!stepper.finished) stepper.step(input.controls?.keyAt(stepper.tick) ?? null)
+  return stepper.result()
+}
+
+function* pickoffPlaySteps(
+  input: PickoffPlayInput,
+  ticks: DefensePlayView[],
+): Generator<number, PickoffPlayResult, DefenseKeyPress | null> {
   const abilities = input.defenseAbilities ?? Array.from({ length: 9 }, () => DEFAULT_ABILITY)
   const speed = runnerSpeedOf(input.runAbility ?? DEFAULT_ABILITY)
   const autoBaserunningEnabled = input.offenseIsCpu === true || (input.runningMode ?? '자동') !== '수동'
   const targetBase = input.targetBase
   const log: string[] = []
-  const ticks: DefensePlayView[] = []
   const previousActions: ActionMemory = new Map<string, { action: number; since: number }>()
 
   // ── 1. 시작 0xb28be ──
@@ -221,6 +273,8 @@ export function runPickoffPlay(input: PickoffPlayInput): PickoffPlayResult {
   let tickMessageCode = 0
   /** 수비 장면 연출 칸 — 0x17 진입 0x46418 이 결과 판 타이머를 −1 로 (`defenseScene`) */
   let scene = enterDefenseScene(input.scene, false)
+  /** 플레이+0x160 — 판을 넘어 남는 사람 송구 목표 (`DefenseScene.throwTarget`). 키 메시지 0x588 이 쓰고 b46a8 이 −1 */
+  let manualThrowBase = scene.throwTarget
   /** state[0x8b] — 결과 판 큰 OUT 이 +0x1999 를 보고 세운다 */
   let laserOutFlag = false
   /** +0x15c · +0x158 — 0xb2e38 이 미룬 송구(AI 9)의 받을 야수 · 목표 루 */
@@ -400,6 +454,7 @@ export function runPickoffPlay(input: PickoffPlayInput): PickoffPlayResult {
   }
 
   for (let tick = 0; tick <= MAXIMUM_TICKS && !play.finished; tick += 1) {
+    const press = yield tick
     outJudgedThisTick = false
     tickMessageCode = 0
     // ── 야수 틱 0xa1284 — 공 쥔 야수의 준비 틱 +0xc8 −= 1 (공용 갱신 0x3f060 이 슬롯 2 보다 먼저, 타구 진행기 0' 절) ──
@@ -409,6 +464,23 @@ export function runPickoffPlay(input: PickoffPlayInput): PickoffPlayResult {
         : fielder,
     )
     ballEventThisTick = false
+    // ── 2b. 사람 조작 — 수비면 0x533c8 → 메시지 0x588 → 0x51890 → 플레이 vt60 0xb3118 → +0x160 (판 종류를 안 가린다) ──
+    if (press !== null && input.controls?.side === '수비' && !play.finished) {
+      const command = inPlayCommandOf(press.key, '수비', { isHoldRepeat: press.isRepeat === true })
+      if (command !== null && command.kind === '송구') {
+        manualThrowBase = command.target
+        log.push(`${tick}틱 사람이 ${command.target}루로 송구 지시`)
+      }
+    }
+    // ── 2c. 사람 목표 +0x160 — 플레이 vt4c 0xb45dc 의 b4660~b46a8 (야수 고리의 AI 0xe b47da 보다 앞): 쥠 && 준비(vtC4)면
+    //        발밑 루가 아닐 때 0xb2c90, 그리고 −1. 판 시작에 투수가 쥔 공(b29da vt88(0) — 준비 틱 0)도 이 갈래가 먼저 본다 ──
+    if (!play.finished && manualThrowBase !== NONE && isHolderReady()) {
+      const target = manualThrowBase
+      manualThrowBase = NONE
+      if (!isSamePoint(fielders[play.ballHolderSlot].position, basePosition(target))) {
+        sendToBase(tick, target, ' (사람 송구 키)', false)
+      }
+    }
     // ── 3. AI 상태 0xe 0xb47da — 투수가 0xe 인 동안 매 틱 플레이.vt58(state[0x27], 0) = 0xb2c90 (직접 뜬 것, S8 3절) ──
     // 0xb2c90 → 0xb2e38: 커버(루 번호 + 1)가 1구간 틱 안에 루에 못 닿으면 AI 9 로 미루고(b30a2), 던지면 0xa1620(악송구 ·
     // 긴 송구 흔들림 굴림) · 세계 0xbfed0 · 받는 점(커버 목표 = 대상 루) 끼워 넣기 · 예보 vt24(0) · vt34, 던진 투수는 AI 0(b2df8)
@@ -653,7 +725,7 @@ export function runPickoffPlay(input: PickoffPlayInput): PickoffPlayResult {
     specialDefense: { jumpUnlocked: false, slideUnlocked: false },
     laserThrow: false,
     laserOutFlag,
-    scene,
+    scene: { ...scene, throwTarget: manualThrowBase },
     rundowns: 0,
     rundownOuts: 0,
     // 목록 = 찬 루 오름차순, 타자주자 없음 (종류 4 — 위 "상태 0x17 진입" 주석)

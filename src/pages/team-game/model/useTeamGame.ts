@@ -19,6 +19,7 @@ import {
   returnToPitchSelection,
   resolveBenchClearing,
   resolveDefensePlay,
+  resolveRunnerPlay,
   resumeTeamGame,
   runAutoProgress,
   spendOurSpecialSwing,
@@ -41,6 +42,7 @@ import type {
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { isPickoffPlayResult, pickoffCallSoundIdOf } from '@/features/defense-play/model/pickoffPlay'
+import { runLiveRunnerPlayWithoutKeys } from '@/features/defense-play/model/liveRunnerPlay'
 import type { PickoffBase } from '@/entities/defense-controls/model/pickoff'
 import { applyPitchResolution } from '@/entities/at-bat/model/atBatState'
 import {
@@ -143,6 +145,11 @@ export interface TeamGameSession {
      * 붙들어 둔 상태를 푼다 — 안 그러면 다음 타석이 영영 시작되지 않는다.
      */
     readonly finishDefensePlay: (result?: DefensePlayResult) => void
+    /**
+     * 수비 화면이 사람 수비의 주자 판(도루 · 폭투 · 견제 — `progress.pendingRunnerPlay`)을 다 돌렸다. 결과를 못 받았으면
+     * 키 없이 끝까지 돌려서라도 붙든 상태를 푼다.
+     */
+    readonly finishRunnerPlay: (result?: DefensePlayResult) => void
     /**
      * 벤치 클리어링 연출(상태 0x1e)이 끝났다 (`BenchClearingScene` 의 `onDone`) — 출구 0xae24c 뒤 사구를 먹인다.
      * `reachedTargetTick` 이면 틱 10 의 굴림 8 번을 진행기가 먼저 낸다.
@@ -284,7 +291,8 @@ export function useTeamGame(
       // 판정 콜 — 세이프면 늘 17 (0x51c14 의 종류 4·5 갈래), 견제사면 62/20 (0x51b36).
       // ⚠️ 원본은 공이 잡히는 **틱**에 낸다. 웹은 견제 판을 미리 다 돌려 재생하므로 판을 연 자리에서 낸다
       // — 투수편(`usePitcherGame.pickoff`)과 같은 근사다
-      pickoff: (key: string) => step((current) => pickoff(current, key, random), pickoffCallSoundsOf),
+      // 사람 견제는 판을 붙들고 수비 화면이 실시간으로 돌린다(송구 키 +0x160) — 콜은 판이 끝나 결과를 먹일 때 낸다
+      pickoff: (key: string) => step((current) => pickoff(current, key, random, true), pickoffCallSoundsOf),
       cpuPickoff: (base: PickoffBase) =>
         step((current) => cpuPickoff(current, base, random), pickoffCallSoundsOf),
       closeBurst: () => step((current) => closeBurstWindow(current)),
@@ -304,6 +312,19 @@ export function useTeamGame(
       autoProgress: () => step((current) => runAutoProgress(current, random)),
       finishBenchClearing: (reachedTargetTick: boolean) =>
         step((current) => resolveBenchClearing(current, { reachedTargetTick }, random)),
+      finishRunnerPlay: (result?: DefensePlayResult) => {
+        const pending = progressRef.current.pendingRunnerPlay
+        if (pending == null) return
+        const played = result ?? runLiveRunnerPlayWithoutKeys(pending)
+        step(
+          (current) => resolveRunnerPlay(current, played, random),
+          // 판정 콜 — 도루 · 폭투는 공 도착 판(`lastArrivalPlay`), 견제는 그 결과. ⚠️ 원본은 공이 잡히는 틱에 낸다(판 끝 근사)
+          (before, after) => [
+            arrivalCallSoundIdOf(before, after),
+            pending.kind === 'pickoff' && isPickoffPlayResult(played) ? pickoffCallSoundIdOf(played) : null,
+          ],
+        )
+      },
       finishDefensePlay: (result?: DefensePlayResult) => {
         const pending = progressRef.current.pendingDefensePlay
         if (pending === null) return

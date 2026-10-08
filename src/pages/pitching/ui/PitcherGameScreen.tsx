@@ -232,6 +232,7 @@ export function PitcherGameScreen({
     progress.sceneConfirm,
     !isSceneShowing &&
       progress.pendingDefensePlay === null &&
+      progress.pendingRunnerPlay == null &&
       !isReplaying &&
       !isPopupOpen &&
       overlay === null &&
@@ -243,6 +244,7 @@ export function PitcherGameScreen({
     progress.sceneConfirmPending === true ? progress.sceneConfirm : null,
     !isSceneShowing &&
       progress.pendingDefensePlay === null &&
+      progress.pendingRunnerPlay == null &&
       !isReplaying &&
       !isPopupOpen &&
       overlay === null &&
@@ -291,6 +293,7 @@ export function PitcherGameScreen({
     !asksGiveUp &&
     !isReplaying &&
     progress.pendingDefensePlay === null &&
+    progress.pendingRunnerPlay == null &&
     progress.managerHookText === null &&
     visibleBurstLines === null &&
     (isAwaitingConfirm ? sceneConfirm.isInConfirmState : phase === '구질')
@@ -330,8 +333,9 @@ export function PitcherGameScreen({
     progress.lastResolution,
     progress.lastDefensePlay,
     progress.pendingDefensePlay === null,
+    progress.pendingRunnerPlay == null,
   ])
-  const isInPlayShown = progress.pendingDefensePlay !== null || isReplaying
+  const isInPlayShown = progress.pendingDefensePlay !== null || progress.pendingRunnerPlay != null || isReplaying
   const recordAlert = useRecordAlert(progress.recordIds, {
     isDrawing: !isInPlayShown,
     isFrozen: isPopupOpen || asksGiveUp,
@@ -405,6 +409,16 @@ export function PitcherGameScreen({
         runScoreBoard={runScoreBoardSourceOf(progress.game, scoreboardSides)}
         sceneMemory={defenseSceneRef}
         onDone={actions.finishDefensePlay}
+      />
+    )
+  }
+  // 내 수비의 주자 판(도루 · 폭투 · 견제) — 송구 키(+0x160)로 던지므로 실시간으로 한 틱씩 돌린다 (`liveRunnerPlay`)
+  if (progress.pendingRunnerPlay != null) {
+    return (
+      <DefensePlayback
+        runnerPlay={progress.pendingRunnerPlay}
+        runScoreBoard={runScoreBoardSourceOf(progress.game, scoreboardSides)}
+        onDone={actions.finishRunnerPlay}
       />
     )
   }

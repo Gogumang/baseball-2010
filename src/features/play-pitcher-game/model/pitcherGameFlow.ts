@@ -70,7 +70,8 @@ import {
 import type { DefensePlayInput, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import type { DefenseScene } from '@/features/defense-play/model/defenseScene'
 import { homeRunPlaybackOf } from '@/features/defense-play/model/homeRunPlayback'
-import { PICKOFF_RESULT, runPickoffPlay } from '@/features/defense-play/model/pickoffPlay'
+import { isPickoffPlayResult, PICKOFF_RESULT, runPickoffPlay } from '@/features/defense-play/model/pickoffPlay'
+import type { PickoffPlayInput, PickoffPlayResult } from '@/features/defense-play/model/pickoffPlay'
 import { chargedRunsOfFates, runnerFatesWithoutPlay } from '@/features/defense-play/model/runnerFates'
 import { pickoffPlayForKey, PICKOFF_PLAY_KIND } from '@/entities/defense-controls/model/pickoff'
 import { fixturePatternFor } from '@/features/defense-play/model/representativePattern'
@@ -83,11 +84,15 @@ import type { StealBase } from '@/entities/fielding/model/stealStart'
 import {
   arrivalApplicationOf,
   arrivesUnhit,
+  finishPitchArrivalPlay,
+  openPitchArrivalPlay,
   pitchJudgementOf,
   rollCpuStealStart,
-  runPitchArrivalPlay,
+  runOpenedPitchArrivalPlay,
   type PitchArrivalPlay,
 } from '@/features/defense-play/model/pitchArrivalPlay'
+import type { LiveRunnerPlay } from '@/features/defense-play/model/liveRunnerPlay'
+import type { RunnerPlayEngineResult } from '@/features/defense-play/model/runnerPlayEngine'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
@@ -461,6 +466,12 @@ export interface PitcherGameProgress {
    * 객체 칸이라 판마다 안 지워진다 — 판 결과의 `scene` 을 받아 두었다가 다음 판(타구 · 주자 · 견제)에 넘긴다. 없으면 경기 첫 판.
    */
   readonly defenseScene?: DefenseScene
+  /**
+   * **내가 수비하며 실시간으로 돌리는 주자 판** (도루 · 폭투·포일 · 견제 — `features/defense-play/model/liveRunnerPlay`).
+   * 원본 상태 0x17 동안 사람 송구 키가 +0x160 을 적고 vt4c 가 그 루로 던진다 — 판 결과가 키에 달려 미리 돌릴 수 없어
+   * 화면이 한 틱씩 돌린 뒤 `resolveRunnerPlay` 로 넘긴다. 그동안 다음 공이 안 나간다.
+   */
+  readonly pendingRunnerPlay?: PitcherPendingRunnerPlay | null
   /**
    * **이번 투구에 출발한 주자들의 루** — state[0x14 + 루]. 투수편은 늘 CPU 공격이라 투구마다 CPU 타자 결정(0x34334)
    * 바로 앞에서 `0x520de` 를 굴려 넣는다(`rollCpuStealStart`). 공이 도착하면(0x3dfac) 도루 판(종류 5)을 열거나
@@ -885,6 +896,8 @@ export function isPitchTurn(progress: PitcherGameProgress): boolean {
     progress.onMound &&
     progress.managerHookText === null &&
     progress.pendingDefensePlay === null &&
+    // 내가 수비하는 주자 판(상태 0x17)이 도는 동안도
+    progress.pendingRunnerPlay == null &&
     // 벤치 클리어링 연출(0x1e)이 도는 동안도 0xf 로 안 돌아간다
     progress.pendingBenchClearing === null &&
     progress.game.half === opponentHalfOf(progress.game)
@@ -955,6 +968,11 @@ export function startPitch(
   progress: PitcherGameProgress,
   input: PitchInput,
   random: RandomPort,
+  /**
+   * 화면이 도는 갈래 — 공 도착의 도루 · 폭투 판을 붙들어(`pendingRunnerPlay`) 화면이 키(+0x160)를 받으며 실시간으로 돌리게 한다.
+   * 안 주면 예전처럼 키 없이 미리 돌린다(`throwPitch` · 시험)
+   */
+  live = false,
 ): PitcherGameProgress {
   if (!isPitchTurn(progress)) return progress
   const { options } = progress
@@ -1115,11 +1133,25 @@ export function startPitch(
   }
 
   // 공 도착 0x3dfac — 못 맞힌 공이면 0.1% 폭투·포일(종류 9)이나 CPU 가 건 도루(종류 5) 판을 연다
+  const resume = { buntKind: thrown.buntKind ?? 0 }
   const arrival = arrivePitcherPitch(
     afterPitch,
     { resolution, outcomeAfter: afterPitch.atBat.outcome, buntKind: thrown.buntKind ?? 0 },
     random,
+    live ? resume : undefined,
   )
+  if (arrival.deferred === true) return arrival.progress
+  return afterMyPitchArrival(arrival, resume, random)
+}
+
+/**
+ * 내 공의 공 도착 뒤 — `startPitch` 의 뒷부분. 실시간 주자 판이 끝난 뒤(`resolveRunnerPlay`)도 여기서 잇는다.
+ */
+function afterMyPitchArrival(
+  arrival: PitcherPitchArrival,
+  resume: { readonly buntKind: number },
+  random: RandomPort,
+): PitcherGameProgress {
   // 판에서 반 이닝·경기가 끝났다 — 이 타석은 끊긴다 (판정 B 0xae3e8: 아웃 > 2 → 0x18)
   if (arrival.interrupted) return advance(arrival.progress, random)
   const arrived = arrival.progress
@@ -1139,15 +1171,19 @@ export function startPitch(
       pendingDefensePlay: withPredictedOutcome({
         ...defensePlayInputOf(arrived, outcome, random),
         // 장면 +0xfdc — CPU 타자의 번트 종류. 페어 번트 판도 판 시작 리드(0x3d7b8 +3 틱) · 필살수비 관문(50fc8) · 정산이 본다
-        buntKind: thrown.buntKind ?? 0,
+        buntKind: resume.buntKind,
       }),
     }
   }
   // 낫아웃 — 폭투·포일 판의 진루(타자주자 포함)를 이 삼진 타석의 진루로 먹인다 (0x3e0d0 state[0x1a]).
-  // 삼진 기록(0xa7c4c)은 그대로 남는다 — `applyDefensivePlay` 의 보통 삼진 길을 판의 결과로 지난다
+  // 삼진 기록(0xa7c4c)은 그대로 남는다 — `applyDefensivePlay` 의 보통 삼진 길을 판의 결과로 지난다.
+  // 실시간으로 이미 보여 준 판(`shownLive`)은 재생 칸에 다시 안 넣는다
   const play = arrival.play
   if (play !== null && arrivalApplicationOf(play) === 'batterRuns') {
-    return advance(applyDefensivePlay(arrived, outcome, true, arrived.atBat.balls, play.result, play.result), random)
+    return advance(
+      applyDefensivePlay(arrived, outcome, true, arrived.atBat.balls, play.result, play.shownLive === true ? null : play.result),
+      random,
+    )
   }
   // 사구면 상태 0x12 끝(0x4e74c)에서 벤치 클리어링을 굴린다 — 밀어내기 주루(0x17)·정산 0xa8024 보다 앞이다
   const settled = withPitcherBenchClearing(arrived, outcome, random)
@@ -1159,6 +1195,31 @@ export function startPitch(
   return finishNonPlayOutcome(settled, outcome, random, play)
 }
 
+/**
+ * 실시간 주자 판과 판이 끝난 뒤 이어 갈 재료 — 공 도착 판은 `startPitch` 의 나머지를, 견제 판은 `applyPickoffResult` 를 잇는다.
+ */
+export type PitcherPendingRunnerPlay = LiveRunnerPlay & { readonly resume?: { readonly buntKind: number } }
+
+/**
+ * **실시간 주자 판이 끝났다** — 화면이 키(+0x160)를 받으며 다 돌린 도루 · 폭투 · 견제 판(`pendingRunnerPlay`)의 결과를
+ * 경기에 먹이고 투구 흐름을 잇는다. 이미 눈으로 본 판이라 재생 칸(`lastDefensePlay`)에는 다시 안 넣는다.
+ */
+export function resolveRunnerPlay(
+  progress: PitcherGameProgress,
+  result: DefensePlayResult,
+  random: RandomPort,
+): PitcherGameProgress {
+  const pending = progress.pendingRunnerPlay
+  if (pending == null) return progress
+  const cleared: PitcherGameProgress = { ...progress, pendingRunnerPlay: null }
+  if (pending.kind === 'pickoff') {
+    if (!isPickoffPlayResult(result)) return cleared
+    return applyPickoffResult(cleared, pending.input.targetBase, result, random, true)
+  }
+  const play = finishPitchArrivalPlay(pending.opened, result as RunnerPlayEngineResult, true)
+  return afterMyPitchArrival(applyPitcherArrival(cleared, play), pending.resume ?? { buntKind: 0 }, random)
+}
+
 /** 공 도착 한 걸음의 결과 */
 interface PitcherPitchArrival {
   readonly progress: PitcherGameProgress
@@ -1166,6 +1227,8 @@ interface PitcherPitchArrival {
   readonly play: PitchArrivalPlay | null
   /** 판에서 반 이닝·경기가 끝나 이 타석이 끊겼다 — 타석 결과를 먹이지 말고 `advance` 로 다음 타석을 세운다 */
   readonly interrupted: boolean
+  /** 판을 실시간으로 돌리려고 붙들었다(`pendingRunnerPlay`) — 부르는 쪽은 그대로 돌려준다 */
+  readonly deferred?: boolean
 }
 
 /**
@@ -1178,8 +1241,9 @@ interface PitcherPitchArrival {
  *   `startPitch` 가 `applyDefensivePlay(…, result, result)` 로 삼진 타석의 진루로 먹인다.
  * - 정산: 도루(5)는 늘, 폭투·포일(9)은 삼진이 그대로 선 판만 0xa8024 를 지난다(`withMyRunnerPlay` 의 `settles`).
  * - 기록: 도루 판의 24(도루 저지)만 0xa77f0 게이트를 지난다(사람 수비) — 8(도루)은 버려진다.
- * - 판은 **송구 키 없이 미리 다 돌린다**(견제 `pickoff` 와 같은 근사).
- *   ⚠️ 원본은 상태 0x17 동안 사람이 송구 키(0x533c8)를 누를 수 있다 — 키 송구 루(+0x160)는 안 받는다(미해결).
+ * - 도루 · 폭투 판은 상태 0x17 동안 사람 송구 키(0x533c8 → 0x588 → +0x160)로 던진다 — 화면이 도는 갈래(`live`)는 판을
+ *   붙들어(`pendingRunnerPlay`) 화면이 한 틱씩 돌리고 `resolveRunnerPlay` 가 잇는다(`liveRunnerPlay`). 밀어내기(종류 2)는
+ *   vt4c 가 안 돌아 키 송구가 없으니 미리 돌린다.
  *
  * ⚠️ 근사: 루에 선 주자 = 상대 타순 1·2·3칸 앞 타자(`runAbilitiesOnBaseOf`).
  * ⚠️ 미해결: 삼진 + 도루(종류 5)면 원본 판정 B 는 정산 0xa8024 를 **종류 5 로 한 번** 부른다 — R+0x138(타자 수)이
@@ -1199,13 +1263,15 @@ function arrivePitcherPitch(
     readonly buntKind?: number
   },
   random: RandomPort,
+  /** 화면이 도는 갈래면 도루 · 폭투 판을 붙든다 — `afterMyPitchArrival` 이 쓸 값 */
+  live?: PitcherPendingRunnerPlay['resume'],
 ): PitcherPitchArrival {
   if (!arrivesUnhit(pitch.resolution)) {
     const next = pitch.resolution.kind === '타구' ? progress : withoutSteal(progress)
     return { progress: next, play: null, interrupted: false }
   }
   const before = progress.game
-  const play = runPitchArrivalPlay(
+  const opened = openPitchArrivalPlay(
     {
       gameMode: PITCHER_EDITION_MODE,
       pitchJudgement: pitchJudgementOf(pitch.resolution, pitch.outcomeAfter),
@@ -1224,14 +1290,29 @@ function arrivePitcherPitch(
     },
     random,
   )
+  if (opened === null) return { progress: withoutSteal(progress), play: null, interrupted: false }
+  // 도루 · 폭투 판 — 키(+0x160)로 던지므로 화면이 실시간으로 돌린다 (`liveRunnerPlay`). 밀어내기(종류 2)는 미리 돌린다
+  if (live !== undefined && opened.kind !== 2) {
+    return {
+      progress: { ...progress, pendingRunnerPlay: { kind: 'arrival', opened, resume: live } },
+      play: null,
+      interrupted: false,
+      deferred: true,
+    }
+  }
+  return applyPitcherArrival(progress, runOpenedPitchArrivalPlay(opened))
+}
+
+/** 다 돈 공 도착 판을 경기에 먹인다 — `arrivePitcherPitch` 의 뒷부분. 실시간으로 보여 준 판(`shownLive`)은 재생 칸에 다시 안 넣는다 */
+function applyPitcherArrival(progress: PitcherGameProgress, play: PitchArrivalPlay): PitcherPitchArrival {
+  const before = progress.game
   const cleared = withoutSteal(progress)
-  if (play === null) return { progress: cleared, play: null, interrupted: false }
   const opened: PitcherGameProgress = { ...cleared, lastArrivalPlay: play, defenseScene: play.result.scene }
   // 낫아웃 · 볼넷 · 사구는 타석 결과 쪽(`startPitch`)이 먹인다 — 밀어내기 판(종류 2)은 재생 칸에만
   if (arrivalApplicationOf(play) !== 'runnerOnly') return { progress: opened, play, interrupted: false }
 
   const settles = play.kind === 5 || play.strikeout === 'strikeoutStands'
-  let next = withMyRunnerPlay(opened, play.result, settles).progress
+  let next = withMyRunnerPlay(opened, play.result, settles, play.shownLive === true).progress
   // 0xa77f0 — 24(도루 저지)는 수비 계열이라 사람 수비에서 지난다. 8(도루)은 공격 계열이라 버려진다
   const recordIds = play.recordIds.filter((id) => passesRecordTeamGate(id, { offenseIsHuman: false, defenseIsHuman: true }))
   if (recordIds.length > 0 && recordsAllowed(next)) next = { ...next, recordIds: [...next.recordIds, ...recordIds] }
@@ -1399,8 +1480,9 @@ export function resolveDefensePlay(
  * 정산 0xa8024 가 불려도 `state[0x26] = 4` 라 **타자 상대 수(R+0x138)·타석 수(+0x14)가 안 오른다**
  * (`recordBatterFaced` · `pinchHitAi.recordPlateAppearance`).
  *
- * 수비 화면은 `runPickoffPlay` 가 미리 끝까지 돌린 틱을 `lastDefensePlay` 로 재생한다 — 견제 중에는 사람이
- * 바꿀 것이 없어서다(`pickoffPlay` 머리 주석). 난수는 그 안의 **악송구 굴림(0xa1828) 1번 · 악송구면 +2번**뿐이다.
+ * 견제 판(종류 4)도 vt4c 가 돌아 사람 송구 키(+0x160)로 받은 야수가 던진다 — 화면이 도는 갈래(`live`)는 판을 붙들어 화면이
+ * 한 틱씩 돌리고 `resolveRunnerPlay` 가 잇는다(`liveRunnerPlay`). 안 주면 키 없이 미리 돌려 `lastDefensePlay` 로 재생한다.
+ * 난수는 그 안의 **주자 리드 굴림 · 악송구 굴림(0xa1828) 1번 · 악송구면 +2번**뿐이다.
  *
  * - 사람 경기의 CPU 도루(0x520de)는 공이 나는 동안(상태 0x11)에만 걸리고 견제는 상태 0xf 에서만 들어와 겹치지
  *   않는다(Q1 3b). 견제사·진루는 판 시작 리드(0x3d7b8, 3370bf0)로 루를 떠난 주자에게서 난다.
@@ -1411,6 +1493,8 @@ export function pickoff(
   progress: PitcherGameProgress,
   webKey: string,
   random: RandomPort,
+  /** 화면이 판을 실시간으로 돌린다 — 판을 붙들고(`pendingRunnerPlay`) 끝나면 `resolveRunnerPlay` (사람 송구 키 +0x160) */
+  live = false,
 ): PitcherGameProgress {
   if (!isPitchTurn(progress) || !progress.atBatPrepared) return progress
   const bases = progress.game.bases
@@ -1419,7 +1503,7 @@ export function pickoff(
   )
   if (play === null) return progress
 
-  const result = runPickoffPlay({
+  const input: PickoffPlayInput = {
     targetBase: play.targetBase,
     bases,
     outs: progress.game.outs,
@@ -1438,8 +1522,19 @@ export function pickoff(
     defenseIsCpu: false,
     throwMode: progress.options.throwModeManual === false ? '자동' : '수동',
     scene: progress.defenseScene,
-  })
+  }
+  if (live) return { ...progress, pendingRunnerPlay: { kind: 'pickoff', input } }
+  return applyPickoffResult(progress, play.targetBase, runPickoffPlay(input), random, false)
+}
 
+/** 다 돈 견제 판을 경기에 먹인다 — `pickoff` 의 뒷부분. 실시간으로 보여 준 판은 재생 칸에 다시 안 넣는다 */
+function applyPickoffResult(
+  progress: PitcherGameProgress,
+  targetBase: number,
+  result: PickoffPlayResult,
+  random: RandomPort,
+  shownLive: boolean,
+): PitcherGameProgress {
   // 0xa8d98 — 종류 4 는 R+0x138 을 안 올린다 (그대로 돌려받는다)
   const faced: PitcherGameProgress = {
     ...progress,
@@ -1448,7 +1543,7 @@ export function pickoff(
       : progress.pitcherRecord,
   }
   // 견제도 정산 0xa8024 를 지난다(I 4a-3) — 들어온 주자는 주자 운명으로 센다
-  const applied = withMyRunnerPlay(faced, result, true)
+  const applied = withMyRunnerPlay(faced, result, true, shownLive)
   const { changed } = applied
   const advanceResult = result.advance
   const before = progress.game
@@ -1456,7 +1551,7 @@ export function pickoff(
   const call = result.resultCode === PICKOFF_RESULT.OUT ? '견제사' : result.errantThrow ? '악송구' : '세이프'
   next = appendLog(
     next,
-    `${before.inning}회${before.half} ${play.targetBase}루 견제 — ${call}${
+    `${before.inning}회${before.half} ${targetBase}루 견제 — ${call}${
       advanceResult.runsScored > 0 ? ` (${advanceResult.runsScored}실점)` : ''
     }`,
     true,
@@ -1484,6 +1579,8 @@ function withMyRunnerPlay(
   progress: PitcherGameProgress,
   result: DefensePlayResult,
   settles: boolean,
+  /** 화면이 실시간으로 이미 보여 준 판 — 재생 칸에 다시 안 넣는다 */
+  shownLive = false,
 ): { readonly progress: PitcherGameProgress; readonly changed: boolean } {
   const before = progress.game
   const bases = before.bases
@@ -1494,7 +1591,11 @@ function withMyRunnerPlay(
     advanceResult.bases.first !== bases.first ||
     advanceResult.bases.second !== bases.second ||
     advanceResult.bases.third !== bases.third
-  let next: PitcherGameProgress = { ...progress, lastDefensePlay: result, defenseScene: result.scene }
+  let next: PitcherGameProgress = {
+    ...progress,
+    lastDefensePlay: shownLive ? progress.lastDefensePlay : result,
+    defenseScene: result.scene,
+  }
   if (!changed) return { progress: next, changed }
   const applied = applyOpponentRunnerPlay(before, progress.opponentOrderIndex, advanceResult)
   let decision = progress.decision

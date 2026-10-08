@@ -44,6 +44,11 @@ import {
   type DefenseSceneMemory,
 } from '@/pages/defense/lib/defenseHomeRunEffects'
 import { DefenseDistanceBoard, DefenseHomeRunText, DefenseParticles } from '@/pages/defense/ui/DefenseEffectsLayer'
+import {
+  startLiveRunnerPlay,
+  type LiveRunnerPlay,
+  type LiveRunnerStepper,
+} from '@/features/defense-play/model/liveRunnerPlay'
 
 /** 수비 장면 득점 점수판 0x41a64 의 재료 — 플레이가 시작될 때의 경기 (`lib/runScoreBoard`) */
 export interface RunScoreBoardSource {
@@ -67,6 +72,11 @@ interface DefensePlaybackProps {
    * `ticks` 와 같이 주면 이 쪽이 이긴다.
    */
   readonly input?: DefensePlayInput
+  /**
+   * **실시간으로 돌릴 주자 판**(사람 수비의 도루 · 폭투 · 견제 — `features/defense-play/model/liveRunnerPlay`). 주면 진행기를
+   * 매 갱신 한 틱씩 돌리며 `keydown` 을 그 틱의 키로 넘긴다(송구 키 → +0x160). `input` 이 없을 때만 본다.
+   */
+  readonly runnerPlay?: LiveRunnerPlay
   /**
    * 사람이 어느 쪽을 잡는가 — 조작 객체 `[+0xc]` (0 공격/주루 · 1 수비/송구).
    * **안 주면 자동이다**: 키를 눌러도 아무 일도 없고 CPU 규칙대로만 굴러간다.
@@ -127,6 +137,7 @@ const FUMBLE_SOUND = 53
 export function DefensePlayback({
   ticks,
   input,
+  runnerPlay,
   side,
   onDone,
   grassPalette = null,
@@ -147,6 +158,13 @@ export function DefensePlayback({
       >
         {children}
       </LivePlayback>
+    )
+  }
+  if (runnerPlay !== undefined) {
+    return (
+      <LiveRunnerPlayback play={runnerPlay} onDone={onDone} grassPalette={grassPalette} runScoreBoard={runScoreBoard}>
+        {children}
+      </LiveRunnerPlayback>
     )
   }
   return (
@@ -284,6 +302,89 @@ function RecordedPlayback({ ticks, onDone, grassPalette, runScoreBoard, freePass
   }, [isFinished, onDone])
 
   const state = ticks[index]
+  if (state === undefined) return null
+  let board: readonly [number, number] | null = null
+  if (runScoreBoard !== undefined && holder.tally.visible && !holder.tally.ended) {
+    const runs = holder.tally.runs
+    const scores: readonly [number, number] = [
+      runScoreBoard.scores[0] + (runScoreBoard.battingSide === 0 ? runs : 0),
+      runScoreBoard.scores[1] + (runScoreBoard.battingSide === 1 ? runs : 0),
+    ]
+    board = runScoreBoardHiddenScoresOf(scores, runScoreBoard.battingSide, holder.tally.hidden)
+  }
+  return (
+    <DefenseScreen state={state} grassPalette={grassPalette}>
+      {board !== null && runScoreBoard !== undefined && <RunScoreBoard sides={runScoreBoard.sides} scores={board} />}
+      {children}
+    </DefenseScreen>
+  )
+}
+
+interface LiveRunnerPlaybackProps {
+  readonly play: LiveRunnerPlay
+  readonly onDone: (result?: DefensePlayResult) => void
+  readonly grassPalette: number | null
+  readonly runScoreBoard?: RunScoreBoardSource
+  readonly children?: React.ReactNode
+}
+
+/**
+ * 사람이 수비하는 **주자 판**(도루 · 폭투 · 견제)을 매 갱신 한 틱씩 돌린다 — 타구 판(`LivePlayback`)과 같은 모양이다.
+ * 눌린 키를 줄 세워 한 틱에 하나씩 진행기에 먹이고(상태 0x17 키 0x53420 → 송구 0x588 → +0x160), 관문이 닫힌 뒤로는 재생 갈래와
+ * 같은 닫힌 갱신(+0x1094 가 11 이 되는 갱신에 0x35108)과 득점 점수판 셈(`stepRecordedBoard`)을 지난다.
+ */
+function LiveRunnerPlayback({ play, onDone, grassPalette, runScoreBoard, children }: LiveRunnerPlaybackProps) {
+  const update = useUpdateCounter(true)
+  const stepperRef = useRef<{ readonly play: LiveRunnerPlay; readonly stepper: LiveRunnerStepper; readonly startedAt: number } | null>(
+    null,
+  )
+  if (stepperRef.current === null || stepperRef.current.play !== play) {
+    stepperRef.current = { play, stepper: startLiveRunnerPlay(play), startedAt: update }
+  }
+  const pressesRef = useRef<DefenseKeyPress[]>([])
+  const tallyRef = useRef<{ readonly play: LiveRunnerPlay; tally: RecordedBoardTally } | null>(null)
+  if (tallyRef.current === null || tallyRef.current.play !== play) {
+    tallyRef.current = { play, tally: EMPTY_RECORDED_TALLY }
+    pressesRef.current = []
+  }
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      // 원본이 아는 키만 담는다 (숫자·방향·OK·CLR)
+      if (originalKeyOf(event.key) === null) return
+      pressesRef.current.push({ key: event.key, isRepeat: event.repeat })
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
+
+  const { stepper, startedAt } = stepperRef.current
+  // 한 갱신 = 한 틱. 프레임을 건너뛴 만큼은 따라잡는다 (`LivePlayback` 과 같은 상한은 진행기의 판 끝이 정한다)
+  const wanted = Math.floor((update - startedAt) / UPDATES_PER_TICK) + 1
+  let guard = 0
+  while (!stepper.finished && stepper.tick < wanted && guard < MAX_CLOSED_CATCH_UP) {
+    stepper.step(pressesRef.current.shift() ?? null)
+    guard += 1
+  }
+  const ticks = stepper.ticks
+  const lastIndex = Math.max(0, ticks.length - 1)
+  // 판 동안은 그려진 틱까지, 닫힌 뒤로는 닫힌 갱신(+0x1094)을 센다
+  const holder = tallyRef.current
+  const seen = update - startedAt
+  while (ticks.length > 0 && !holder.tally.ended && holder.tally.nextIndex <= seen) {
+    const at = holder.tally.nextIndex
+    if (at > lastIndex && !stepper.finished) break
+    const view = ticks[Math.min(at, lastIndex)]
+    if (view === undefined) break
+    holder.tally = stepRecordedBoard(holder.tally, view, false, at > lastIndex)
+  }
+  const isFinished = stepper.finished && holder.tally.ended
+
+  useEffect(() => {
+    if (isFinished) onDone(stepper.result())
+  }, [isFinished, onDone, stepper])
+
+  const state = ticks[Math.min(Math.max(0, seen), lastIndex)]
   if (state === undefined) return null
   let board: readonly [number, number] | null = null
   if (runScoreBoard !== undefined && holder.tally.visible && !holder.tally.ended) {

@@ -21,6 +21,7 @@ import {
   pitchersOfRecordOf,
   resolveBenchClearing,
   resolveDefensePlay,
+  resolveRunnerPlay,
   startPitch,
   startPitcherGame,
   startsToday,
@@ -28,6 +29,7 @@ import {
   throwPitch,
 } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
+import { runLiveRunnerPlayWithoutKeys } from '@/features/defense-play/model/liveRunnerPlay'
 import type {
   PitcherGameOptions,
   PitcherGameProgress,
@@ -1156,6 +1158,46 @@ describe('CPU 도루 0x520de · 공 도착 판 0x3dfac — 투수편은 늘 CPU 
       }
     }
     expect(opened).toBeGreaterThan(0)
+  })
+
+  it('화면이 도는 갈래(`live`)는 도루 판을 붙든다(송구 키 +0x160) — 키 없이 끝내면 미리 돌린 판과 경기 · 굴림 차례가 같다', () => {
+    let deferred = 0
+    for (let seed = 1; seed <= 400; seed += 1) {
+      const progress = startPitcherGame(기본옵션, 씨앗(1))
+      const 일루 = { ...progress, game: { ...progress.game, bases: { first: true, second: false, third: false } } }
+      const 미리Random = 씨앗(seed)
+      const 미리 = startPitch(일루, 가운데직구, 미리Random)
+      const 실시간Random = 씨앗(seed)
+      const 붙듦 = startPitch(일루, 가운데직구, 실시간Random, true)
+      const pending = 붙듦.pendingRunnerPlay
+      if (pending == null) continue
+      deferred += 1
+      expect(isPitchTurn(붙듦)).toBe(false)
+      const 끝 = resolveRunnerPlay(붙듦, runLiveRunnerPlayWithoutKeys(pending), 실시간Random)
+      expect(끝.pendingRunnerPlay ?? null).toBeNull()
+      expect(끝.game).toEqual(미리.game)
+      expect(끝.recordIds).toEqual(미리.recordIds)
+      // 실시간으로 본 판은 재생 칸에 다시 안 넣는다
+      expect(끝.lastDefensePlay).toBe(일루.lastDefensePlay)
+      expect(실시간Random.next()).toBe(미리Random.next())
+    }
+    expect(deferred).toBeGreaterThan(0)
+  })
+
+  it('견제도 화면이 도는 갈래는 판을 붙든다 — 키 없이 끝내면 미리 돌린 견제와 같다', () => {
+    const progress = startPitcherGame(기본옵션, 씨앗(1))
+    const 일루 = { ...progress, game: { ...progress.game, bases: { first: true, second: false, third: false } } }
+    expect(isPitchTurn(일루) && 일루.atBatPrepared).toBe(true)
+    const 미리Random = 씨앗(5)
+    const 미리 = pickoff(일루, '3', 미리Random)
+    const 실시간Random = 씨앗(5)
+    const 붙듦 = pickoff(일루, '3', 실시간Random, true)
+    expect(붙듦.pendingRunnerPlay?.kind).toBe('pickoff')
+    const pending = 붙듦.pendingRunnerPlay
+    if (pending == null) return
+    const 끝 = resolveRunnerPlay(붙듦, runLiveRunnerPlayWithoutKeys(pending), 실시간Random)
+    expect(끝.game).toEqual(미리.game)
+    expect(실시간Random.next()).toBe(미리Random.next())
   })
 
   it('주자가 없으면 CPU 도루 굴림이 없다 — 못 맞힌 공은 0.1% 굴림(0x35034) 하나만 더 쓴다', () => {

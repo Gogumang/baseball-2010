@@ -16,10 +16,23 @@ import { stealPlayRecordIdsOf } from '@/entities/game/model/gameRecords'
 import type { ManualAutoMode } from '@/entities/settings/model/gameSettings'
 import {
   passedBallCallSoundIdOf,
-  runPassedBallPlay,
+  passedBallPlayEngineInputOf,
+  passedBallPlayResultOf,
+  type PassedBallPlayInput,
   type PassedBallPlayResult,
 } from '@/features/defense-play/model/passedBallPlay'
-import { runStealPlay, stealCallSoundIdOf, type StealPlayResult } from '@/features/defense-play/model/stealPlay'
+import {
+  stealCallSoundIdOf,
+  stealPlayEngineInputOf,
+  stealPlayResultOf,
+  type StealPlayInput,
+  type StealPlayResult,
+} from '@/features/defense-play/model/stealPlay'
+import {
+  runRunnerPlay,
+  type RunnerPlayEngineInput,
+  type RunnerPlayEngineResult,
+} from '@/features/defense-play/model/runnerPlayEngine'
 import { runWalkPlay, type WalkPlayResult } from '@/features/defense-play/model/walkPlay'
 
 /**
@@ -161,7 +174,7 @@ export interface PitchArrivalPlayInput {
   readonly scene?: DefenseScene
 }
 
-export type PitchArrivalPlay =
+export type PitchArrivalPlay = (
   | {
       readonly kind: 9
       readonly result: PassedBallPlayResult
@@ -187,6 +200,13 @@ export type PitchArrivalPlay =
       readonly callSoundId: null
       readonly recordIds: readonly number[]
     }
+) & {
+  /**
+   * 화면이 이 판을 **실시간으로 이미 보여 주며** 돌렸는가(사람 수비의 키 송구 — `openPitchArrivalPlay`). 서 있으면 경기 흐름이
+   * 재생 칸(`lastDefensePlay`)에 다시 넣지 않는다 — 넣으면 같은 판을 한 번 더 튼다.
+   */
+  readonly shownLive?: boolean
+}
 
 /**
  * 공 도착 한 번. **난수 차례**: `rollPassedBall` 1번(모드 7 제외) → 종류 9 면 `passedBallShot` 2번 → 판 안의 굴림
@@ -194,6 +214,36 @@ export type PitchArrivalPlay =
  * 종류 2(볼넷 · 사구)는 굴림 없음. 판이 안 열리면 null.
  */
 export function runPitchArrivalPlay(input: PitchArrivalPlayInput, random: RandomPort): PitchArrivalPlay | null {
+  const opened = openPitchArrivalPlay(input, random)
+  return opened === null ? null : runOpenedPitchArrivalPlay(opened)
+}
+
+/**
+ * **판 시작까지 굴린 공 도착 판** — 종류 · 낫아웃 갈래 · 진행기 입력(도루 판은 리드 굴림까지 끝낸 것). 사람이 수비하는 도루 ·
+ * 폭투 판은 화면이 이 입력으로 진행기를 실시간으로 돌려(키 → +0x160) 다 돈 결과를 `finishPitchArrivalPlay` 에 넘긴다 —
+ * 굴림 차례는 `runPitchArrivalPlay` 와 같다(판 시작 굴림 → 판 안의 굴림, 그 사이에 다른 굴림이 없다).
+ */
+export type OpenedPitchArrivalPlay =
+  | {
+      readonly kind: 9
+      readonly strikeout: PassedBallStrikeout
+      readonly playInput: PassedBallPlayInput
+      readonly engineInput: RunnerPlayEngineInput
+    }
+  | {
+      readonly kind: 5
+      readonly strikeout: 'none'
+      readonly playInput: StealPlayInput
+      readonly engineInput: RunnerPlayEngineInput
+    }
+  | {
+      /** 밀어내기 — 굴림 · 키 송구가 없다(종류 2 는 vt4c 가 안 돈다) */
+      readonly kind: 2
+      readonly walkInput: Parameters<typeof runWalkPlay>[0]
+    }
+
+/** 공 도착 판을 판 시작까지 연다 — 판이 안 열리면 null (굴림: `runPitchArrivalPlay` 의 앞부분) */
+export function openPitchArrivalPlay(input: PitchArrivalPlayInput, random: RandomPort): OpenedPitchArrivalPlay | null {
   const passedBall = rollPassedBall(input.gameMode, random)
   const kind = pitchPlayKindOf({
     passedBall,
@@ -204,21 +254,23 @@ export function runPitchArrivalPlay(input: PitchArrivalPlayInput, random: Random
   // 0x3e1cc — 볼넷·사구면 판정 칸 스위치가 종류를 2(밀어내기)로 덮어쓴다 — 0x3e062 의 종류 9 는 v ≠ 3·4 일 때만이라
   // 여기 오는 것은 종류 없음 · 종류 5(도루) 둘뿐이고, 어느 쪽이든 밀어내기 판이 열린다
   if (input.pitchJudgement === PITCH_JUDGEMENT.WALK || input.pitchJudgement === PITCH_JUDGEMENT.HIT_BY_PITCH) {
-    const result = runWalkPlay({
-      bases: input.bases,
-      outs: input.outs,
-      pitchJudgement: input.pitchJudgement,
-      stealingFrom: input.stealingFrom,
-      defenseAbilities: input.defenseAbilities,
-      runAbilities: input.runAbilities,
-      runAbility: input.runAbility,
-      runnerTeamGrade: input.runnerTeamGrade,
-      aceIndexes: input.aceIndexes,
-      defenseTeamIndex: input.defenseTeamIndex,
-      offenseTeamIndex: input.offenseTeamIndex,
-      scene: input.scene,
-    })
-    return { kind: 2, result, strikeout: 'none', callSoundId: null, recordIds: [] }
+    return {
+      kind: 2,
+      walkInput: {
+        bases: input.bases,
+        outs: input.outs,
+        pitchJudgement: input.pitchJudgement,
+        stealingFrom: input.stealingFrom,
+        defenseAbilities: input.defenseAbilities,
+        runAbilities: input.runAbilities,
+        runAbility: input.runAbility,
+        runnerTeamGrade: input.runnerTeamGrade,
+        aceIndexes: input.aceIndexes,
+        defenseTeamIndex: input.defenseTeamIndex,
+        offenseTeamIndex: input.offenseTeamIndex,
+        scene: input.scene,
+      },
+    }
   }
   if (kind === null) return null
   const strikeout =
@@ -247,30 +299,55 @@ export function runPitchArrivalPlay(input: PitchArrivalPlayInput, random: Random
   }
   if (kind === PASSED_BALL_PLAY_KIND) {
     const shot = passedBallShot(random)
-    const result = runPassedBallPlay({
+    const playInput: PassedBallPlayInput = {
       ...common,
       shot,
       batterRuns: strikeout === 'batterRuns',
       runAbilities: input.runAbilities,
-    })
-    return { kind: 9, result, strikeout, callSoundId: passedBallCallSoundIdOf(result), recordIds: [] }
+    }
+    return { kind: 9, strikeout, playInput, engineInput: passedBallPlayEngineInputOf(playInput) }
   }
   const runAbilities = input.runAbilities
-  const result = runStealPlay({
+  const playInput: StealPlayInput = {
     ...common,
     stealingFrom: input.stealingFrom,
     // 0x3d7b8 — 도루 안 한 주자의 리드 +3 틱(번트 종류가 서 있으면)
     buntKind: input.buntKind,
     runAbilities:
       runAbilities === undefined ? undefined : { 1: runAbilities[1], 2: runAbilities[2], 3: runAbilities[3] },
-  })
+  }
+  // 리드 굴림(도루 주자마다 rand(0,9))은 판 시작 — 진행기 입력을 세울 때 돈다
+  return { kind: 5, strikeout: 'none', playInput, engineInput: stealPlayEngineInputOf(playInput) }
+}
+
+/** 다 돈 진행기 결과로 공 도착 판을 마무리한다 — 판정 콜 · 판 기록 후보 */
+export function finishPitchArrivalPlay(
+  opened: Exclude<OpenedPitchArrivalPlay, { readonly kind: 2 }>,
+  engineResult: RunnerPlayEngineResult,
+  shownLive = false,
+): PitchArrivalPlay {
+  const live = shownLive ? { shownLive: true } : {}
+  if (opened.kind === 9) {
+    const result = passedBallPlayResultOf(opened.playInput, engineResult)
+    return { kind: 9, result, strikeout: opened.strikeout, callSoundId: passedBallCallSoundIdOf(result), recordIds: [], ...live }
+  }
+  const result = stealPlayResultOf(opened.playInput, engineResult)
   return {
     kind: 5,
     result,
     strikeout: 'none',
     callSoundId: stealCallSoundIdOf(result),
     recordIds: stealRecordIdsOf(result),
+    ...live,
   }
+}
+
+/** 열어 둔 판을 미리 끝까지 돌려 마무리한다(키 없음 — 재생만 할 판) */
+export function runOpenedPitchArrivalPlay(opened: OpenedPitchArrivalPlay): PitchArrivalPlay {
+  if (opened.kind === 2) {
+    return { kind: 2, result: runWalkPlay(opened.walkInput), strikeout: 'none', callSoundId: null, recordIds: [] }
+  }
+  return finishPitchArrivalPlay(opened, runRunnerPlay(opened.engineInput))
 }
 
 /**

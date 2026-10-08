@@ -240,7 +240,8 @@ export function TeamGameScreen({
   const flightProbeRef = useRef<(() => boolean) | null>(null)
   /** 경기 장면 동안 남는 HOMERUN 글자 칸 · 표시 비거리 +0x36 — 수비 판 홈런 연출이 판마다 이어 쓴다 (`defenseHomeRunEffects`) */
   const defenseSceneRef = useSceneScopedRef<DefenseSceneMemory>(DEFENSE_SCENE_START, options)
-  const isDefenseInPlay = session.pendingDefensePlay !== null
+  /** 수비 화면이 실시간으로 도는 판(타구 · 사람 수비의 주자 판)이 있는가 — 원본 상태 0x17 */
+  const isDefenseInPlay = session.pendingDefensePlay !== null || progress.pendingRunnerPlay != null
   /** 상태 0xe 에서 OK 를 기다리는 중인가 — 아래 `useSceneConfirm` 이 매 그리기마다 채운다 */
   const isAwaitingConfirmRef = useRef(false)
   /** 대기 중 0xd 두 그림을 지나 0xe 에 들어섰는가 — '#' 는 0xe·0xf 에서만 열린다 */
@@ -446,6 +447,7 @@ export function TeamGameScreen({
     progress.lastResolution,
     progress.lastDefensePlay,
     progress.pendingDefensePlay === null,
+    progress.pendingRunnerPlay == null,
     battingPitchEnds,
   ])
   const recordAlert = useRecordAlert(progress.recordIds, {
@@ -584,6 +586,21 @@ export function TeamGameScreen({
         runScoreBoard={runScoreBoardSourceOf(progress.game, scoreboardSides)}
         sceneMemory={defenseSceneRef}
         onDone={actions.finishDefensePlay}
+      />
+    )
+  }
+  /**
+   * 사람 수비의 주자 판(도루 · 폭투 · 견제) — 상태 0x17 동안 송구 키(0x533c8 → +0x160)로 던지므로 **실시간으로 한 틱씩** 돌린다
+   * (`features/defense-play/model/liveRunnerPlay`). 다 돌면 `finishRunnerPlay` 가 결과를 먹이고 투구 흐름을 잇는다.
+   */
+  const runnerPlay = progress.pendingRunnerPlay
+  if (runnerPlay != null) {
+    return (
+      <DefensePlayback
+        runnerPlay={runnerPlay}
+        grassPalette={seasonStadium?.grassPalette ?? null}
+        runScoreBoard={runScoreBoardSourceOf(progress.game, scoreboardSides)}
+        onDone={actions.finishRunnerPlay}
       />
     )
   }

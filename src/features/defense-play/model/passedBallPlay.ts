@@ -18,10 +18,11 @@ import { secondBaseCoverSlot } from '@/entities/fielding/model/throwArrival'
 import type { BaseState } from '@/entities/game/model/baseState'
 import type { ManualAutoMode } from '@/entities/settings/model/gameSettings'
 import { forecastCatch } from '@/features/defense-play/model/catchForecast'
-import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
+import type { DefensePlayControls, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import {
   RUNNER_PLAY_RESULT,
   runRunnerPlay,
+  type RunnerPlayEngineInput,
   type RunnerPlayEngineResult,
 } from '@/features/defense-play/model/runnerPlayEngine'
 
@@ -96,6 +97,8 @@ export interface PassedBallPlayInput {
   readonly offenseTeamIndex?: number
   /** 앞 판에서 넘어온 수비 장면 연출 칸 (`DefensePlayInput.scene`) */
   readonly scene?: DefenseScene
+  /** 사람 조작 — 틱마다 눌린 키 (`RunnerPlayEngineInput.controls`) */
+  readonly controls?: DefensePlayControls
 }
 
 export interface PassedBallPlayResult extends RunnerPlayEngineResult {
@@ -112,7 +115,13 @@ export function passedBallTrajectoryOf(shot: PassedBallShot): BattedBallTrajecto
   return battedBallTrajectory([-shot.angle, shot.strength, shot.verticalSpeed, 0], { origin: BATTING_POINT })
 }
 
+/** 판 하나를 끝까지 돌린다 — 시작 → 진행기 → 정리 */
 export function runPassedBallPlay(input: PassedBallPlayInput): PassedBallPlayResult {
+  return passedBallPlayResultOf(input, runRunnerPlay(passedBallPlayEngineInputOf(input)))
+}
+
+/** 판 시작 — 예보 · 커버까지 세운 진행기 입력 (실시간이면 `startRunnerPlay` 에, 끝나면 `passedBallPlayResultOf`) */
+export function passedBallPlayEngineInputOf(input: PassedBallPlayInput): RunnerPlayEngineInput {
   const abilities = input.defenseAbilities ?? Array.from({ length: 9 }, () => DEFAULT_ABILITY)
   const trajectory = passedBallTrajectoryOf(input.shot)
   const batterRuns = input.batterRuns === true
@@ -162,7 +171,7 @@ export function runPassedBallPlay(input: PassedBallPlayInput): PassedBallPlayRes
     everHeld: true,
   }
 
-  const result = runRunnerPlay({
+  return {
     kind: PASSED_BALL_PLAY_KIND,
     fielders,
     play,
@@ -181,8 +190,13 @@ export function runPassedBallPlay(input: PassedBallPlayInput): PassedBallPlayRes
     defenseTeamIndex: input.defenseTeamIndex,
     offenseTeamIndex: input.offenseTeamIndex,
     scene: input.scene,
-  })
-  return { ...result, shot: input.shot, batterRuns }
+    controls: input.controls,
+  }
+}
+
+/** 판 끝 정리 */
+export function passedBallPlayResultOf(input: PassedBallPlayInput, result: RunnerPlayEngineResult): PassedBallPlayResult {
+  return { ...result, shot: input.shot, batterRuns: input.batterRuns === true }
 }
 
 /**

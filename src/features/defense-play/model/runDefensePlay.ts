@@ -986,6 +986,8 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
 
   let play: PlayView = {
     ...initialPlayView(1),
+    // 플레이+0x160 — 판 시작이 안 지운다. 앞 판에서 못 쓴 사람 송구 키가 남아 있으면 이어받는다 (`DefenseScene.throwTarget`)
+    manualThrowBase: input.scene?.throwTarget ?? NONE,
     coverOfBase: covers,
     ballHolderSlot: chaserSlot,
     catchFielderSlot: chaserSlot,
@@ -2787,7 +2789,7 @@ export function defensePlayResultOf(state: DefensePlayState): DefensePlayResult 
     specialDefense: state.specialDefense,
     laserThrow: state.laserThrow,
     laserOutFlag: state.laserOutFlag,
-    scene: state.scene,
+    scene: { ...state.scene, throwTarget: state.play.manualThrowBase },
     rundowns: state.rundowns,
     rundownOuts: state.rundownOuts,
     // 진행기 주자 배열이 곧 원본 목록 순서다 — 0 = 타자주자, 그 뒤 찬 루 오름차순 (`createPlayRunners`)

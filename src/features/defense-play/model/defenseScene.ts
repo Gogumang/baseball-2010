@@ -48,6 +48,13 @@ export interface DefenseScene {
   readonly zoomPunch: ZoomPunchState
   /** deadly_effect 애니 0 — 경기 내내 되감기지 않는다 */
   readonly deadlyAnim: DeadlyAnimState
+  /**
+   * 플레이 객체 +0x160 — 사람이 고른 송구 목표 루(−1 없음). 플레이 객체도 장면과 함께 한 번 만들어지고(생성자 0xb0b3a · 0xb0b6e),
+   * +0x160 을 쓰는 곳은 그 둘 · 키 메시지 0x588 의 vt60 0xb3118 · 던진 뒤 b46a8 의 −1 뿐이다(즉치 0xb0 << 1 전수) — 판 시작
+   * vt1c 0xb0edc 도 안 지운다. 그래서 판 안에서 못 쓴 키(공을 아무도 안 쥐었거나 밀어내기 판처럼 vt4c 가 안 도는 판)는 다음 판의
+   * 첫 쥔 야수가 준비되면 그 루로 보낸다.
+   */
+  readonly throwTarget: number
 }
 
 /** deadly_effect 애니 0 의 상태 칸 (애니 +8 객체의 [0] 칸 · [2] 비트) — 지연 0 이라 셈 칸은 늘 0 이다 */
@@ -72,6 +79,7 @@ export const DEFENSE_SCENE_START: DefenseScene = {
   slideDirection: 0,
   zoomPunch: NO_ZOOM_PUNCH,
   deadlyAnim: { frameIndex: 0, playing: false, ended: false },
+  throwTarget: -1,
 }
 
 /**
@@ -273,7 +281,7 @@ export function drawDefenseScene(scene: DefenseScene, context: SceneDrawContext)
   zoomPunch = zoom.next
 
   return {
-    scene: { popup, effectStep, laserRunning, jumpFlash, slideFlash, slideDirection, zoomPunch, deadlyAnim },
+    scene: { ...scene, popup, effectStep, laserRunning, jumpFlash, slideFlash, slideDirection, zoomPunch, deadlyAnim },
     bigOut: popupStep.bigOut,
     judgeText: popupStep.text,
     flash,

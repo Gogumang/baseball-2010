@@ -22,6 +22,8 @@ import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { BATTED_BALL_PATTERNS, type BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 import { setActiveSound } from '@/shared/api/audio/soundPort'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createSeededRandom } from '@/shared/api/random/seededRandom'
+import { openPitchArrivalPlay } from '@/features/defense-play/model/pitchArrivalPlay'
 
 /**
  * 수비 한 플레이 재생 (원본 경기 장면 상태 0x17).
@@ -470,5 +472,60 @@ describe('0x17 키 건너뛰기 0x519cc (+0xfe7) — 실시간 갈래', () => {
     expect(acceptsFastForwardKey({ ...state, play: { ...state.play, suppressed: true } })).toBe(true)
     expect(acceptsFastForwardKey({ ...state, lastEventCode: 3 })).toBe(true)
     expect(acceptsFastForwardKey({ ...state, lastEventCode: 4 })).toBe(true)
+  })
+})
+
+describe('수비 재생 — 사람 수비의 주자 판을 실시간으로 돌리는 갈래 (도루 · 폭투 · 견제, `liveRunnerPlay`)', () => {
+  /** 1루 주자가 도루를 건 볼 — 공 도착 판(종류 5)을 판 시작까지 연다 */
+  const 도루판 = () => {
+    const opened = openPitchArrivalPlay(
+      {
+        gameMode: 2,
+        pitchJudgement: 2,
+        stealingFrom: [1],
+        bases: { first: true, second: false, third: false },
+        outs: 0,
+        defenseIsCpu: false,
+        offenseIsCpu: true,
+      },
+      createSeededRandom(3),
+    )
+    if (opened === null || opened.kind === 2) throw new Error('도루 판이 안 열렸다')
+    return { kind: 'arrival' as const, opened }
+  }
+
+  it("판 중 '2' 를 누르면 그 틱에 포수가 2루로 던진다 — 키 없으면 공을 든 채 끝난다(수동 송구)", () => {
+    vi.useFakeTimers()
+    try {
+      const 가만히 = vi.fn()
+      render(<DefensePlayback runnerPlay={도루판()} onDone={가만히} />)
+      끝까지(가만히)
+      cleanup()
+
+      const 눌렀다 = vi.fn()
+      render(<DefensePlayback runnerPlay={도루판()} onDone={눌렀다} />)
+      끝까지(눌렀다, '2')
+
+      expect(결과(가만히).throwBase).toBe(-1)
+      expect(결과(눌렀다).throwBase).toBe(2)
+      expect(결과(눌렀다).log.some((line) => line.includes('사람이 2루로 송구 지시'))).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('판이 닫힌 뒤 닫힌 갱신(+0x1094)을 지나야 끝났다고 알린다 — 판 틱 수보다 늦게', () => {
+    vi.useFakeTimers()
+    try {
+      const onDone = vi.fn()
+      render(<DefensePlayback runnerPlay={도루판()} onDone={onDone} />)
+      let 갱신 = 0
+      for (; 갱신 < 400 && onDone.mock.calls.length === 0; 갱신 += 1) {
+        act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
+      }
+      expect(갱신).toBeGreaterThan(결과(onDone).ticks.length)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

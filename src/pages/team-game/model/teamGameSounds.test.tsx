@@ -7,7 +7,8 @@ import { useTeamGame } from '@/pages/team-game/model/useTeamGame'
 import { TeamGameScreen } from '@/pages/team-game/ui/TeamGameScreen'
 import type { TeamGameOptions } from '@/pages/team-game/model/useTeamGame'
 import { PITCHER_CHANGE_SOUND, stepSoundIdsOf } from '@/pages/team-game/model/teamGameSounds'
-import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
+import { runDefensePlay, type DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
+import { runLiveRunnerPlayWithoutKeys } from '@/features/defense-play/model/liveRunnerPlay'
 import { GAME_INTRO_SOUND, HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import { isPickoffPlayResult } from '@/features/defense-play/model/pickoffPlay'
@@ -237,13 +238,17 @@ describe('`#` 투수 교체 화면 — "Time!" 22 (상태 0xb 진입 0x3af06)', 
 })
 
 describe('견제 판정 콜 — 세이프면 늘 17 (0x51c14 의 종류 4·5 갈래)', () => {
-  it('사람 투수 견제: 주자 있는 루로 3·1·7 을 누르면 견제 판이 열리고 17 이 난다', () => {
+  it('사람 투수 견제: 주자 있는 루로 3·1·7 을 누르면 견제 판을 붙들고(실시간 — 송구 키 +0x160), 판이 끝나면 17 이 난다', () => {
     const { result } = 띄우기()
     // 주자가 나갈 때까지 던진다 (볼넷·안타 — 인플레이면 수비 화면을 끝까지 돌린다)
     for (let pitch = 0; pitch < 500; pitch += 1) {
       const { progress } = result.current
       if (result.current.pendingDefensePlay !== null) {
         act(() => result.current.actions.finishDefensePlay())
+        continue
+      }
+      if (progress.pendingRunnerPlay != null) {
+        act(() => result.current.actions.finishRunnerPlay())
         continue
       }
       if (result.current.canBat) {
@@ -264,10 +269,24 @@ describe('견제 판정 콜 — 세이프면 늘 17 (0x51c14 의 종류 4·5 갈
 
     act(() => result.current.actions.pickoff(key))
 
-    const play = result.current.progress.lastDefensePlay
-    expect(isPickoffPlayResult(play)).toBe(true)
+    // 판은 수비 화면이 돌린다 — 아직 콜도 재생 칸도 없다
+    expect(result.current.progress.pendingRunnerPlay?.kind).toBe('pickoff')
+    expect(result.current.canPitch).toBe(false)
+    expect(녹음.played).toEqual([])
+    let played: DefensePlayResult | undefined
+    act(() => {
+      const pending = result.current.progress.pendingRunnerPlay
+      if (pending == null) return
+      played = runLiveRunnerPlayWithoutKeys(pending)
+      result.current.actions.finishRunnerPlay(played)
+    })
+
+    expect(result.current.progress.pendingRunnerPlay ?? null).toBeNull()
+    // 이미 실시간으로 본 판이라 재생 칸에 다시 안 넣는다
+    expect(result.current.progress.lastDefensePlay).toBe(전.lastDefensePlay)
+    expect(isPickoffPlayResult(played ?? null)).toBe(true)
     expect(result.current.progress.pitchCount).toBe(전.pitchCount)
-    if (isPickoffPlayResult(play) && !play.errantThrow) expect(녹음.played).toEqual([17])
+    if (played !== undefined && isPickoffPlayResult(played) && !played.errantThrow) expect(녹음.played).toEqual([17])
   })
 
   it('CPU 견제: 사람이 칠 차례에 주자 있는 루로 걸리면 17 이 나고 타석은 그대로다', () => {

@@ -51,7 +51,9 @@ import {
   startSteal,
   summaryOf,
   throwPitch,
+  resolveRunnerPlay,
 } from '@/features/play-team-game/model/teamGameFlow'
+import { runLiveRunnerPlayWithoutKeys } from '@/features/defense-play/model/liveRunnerPlay'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import { isPickoffPlayResult, PICKOFF_RESULT } from '@/features/defense-play/model/pickoffPlay'
 import {
@@ -594,6 +596,34 @@ describe('도루 출발 (0x53610 → 메시지 0x583 → 0xa9bd4) · 공 도착 
     expect(opened).toBeGreaterThan(0)
     // 1루 도루는 리드 뒤 송구할 루가 없어 늘 세이프다 (c8649a3)
     expect(caught).toBe(0)
+  })
+
+  it('화면이 도는 갈래(`startThrowPitch`)는 우리 수비의 도루 판을 붙든다 — 키 없이 끝내면 미리 돌린 판과 경기 · 굴림 차례가 같다', () => {
+    let deferred = 0
+    for (let seed = 1; seed <= 400; seed += 1) {
+      const { progress } = 시작({}, seed)
+      const 일루 = { ...progress, game: { ...progress.game, bases: { first: true, second: false, third: false } } }
+      const pitch = { typeNumber: 첫구질(일루), courseCell: 0, gaugeCell: 0 }
+      const 미리Random = createSeededRandom(seed)
+      const 미리 = throwPitch(일루, pitch, 미리Random)
+      const 실시간Random = createSeededRandom(seed)
+      const 붙듦 = startThrowPitch(일루, pitch, 실시간Random)
+      const pending = 붙듦.pendingRunnerPlay
+      if (pending == null) continue
+      deferred += 1
+      // 판이 도는 동안은 다음 공이 안 나간다 (상태 0x17)
+      expect(isPitchTurn(붙듦)).toBe(false)
+      expect(붙듦.game).toBe(일루.game)
+      const 끝 = resolveRunnerPlay(붙듦, runLiveRunnerPlayWithoutKeys(pending), 실시간Random)
+      expect(끝.pendingRunnerPlay ?? null).toBeNull()
+      expect(끝.game).toEqual(미리.game)
+      expect(끝.recordIds).toEqual(미리.recordIds)
+      expect(끝.lastArrivalPlay?.kind).toBe(미리.lastArrivalPlay?.kind)
+      // 실시간으로 본 판은 재생 칸에 다시 안 넣는다
+      expect(끝.lastDefensePlay).toBe(일루.lastDefensePlay)
+      expect(실시간Random.next()).toBe(미리Random.next())
+    }
+    expect(deferred).toBeGreaterThan(0)
   })
 })
 
