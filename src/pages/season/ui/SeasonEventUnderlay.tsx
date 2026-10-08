@@ -41,6 +41,7 @@ export function SeasonEventUnderlay({ record, teamMorale, gamePoint, isPreviousG
 /** 칸 등장이 다 내려온 틀 수 — 0xd3 이 오래 서 있던 뒤라 [this+0x2c] 가 크다 */
 const SETTLED_SLIDE_UPDATES = 1_000
 const NO_SLOTS: readonly never[] = []
+/** 시즌 창의 [!] 칸 [gfx+0x9c] — 늘 0 (아래 `SeasonEventEndFrame` 머리글) */
 const NO_PLACES: ReadonlySet<string> = new Set()
 
 export interface SeasonEventEndFrameProps {
@@ -61,7 +62,11 @@ export interface SeasonEventEndFrameProps {
  * 앞 상태 [this+0x28] ∈ {0xd1, 0xd2} → 외출 지도 0x7ea65(gfx, −1, 0), 그 밖 → 공통 틀 0x9f60(커맨드 줄 0x7e418 · 상태판(0) ·
  * 가운데 판은 0xd3 이라 없음 · 머리띠). 0xd3 으로는 0x7e84c 가 안 불려(0xe9ac e9da) 칸 표는 앞 상태의 것이고, [gfx+0x15c] 는
  * 0xc9 진입(0x4fca)이 0 으로 둔다. 한 틀 뒤 다음 상태로 넘어간다(`app/model/useEventEndFrame`).
- * ⚠️ 근사: 지도의 [!] 칸([gfx+0x9c])은 시즌 외출이 안 찍어 비워 둔다. 관리 메뉴 아닌 하위 메뉴(0xcd · 0xce · 0xcf · 0xd0)에서 곧장
+ * 지도의 [!] 칸 [gfx+0x9c+2i](0x7ed6c~0x7edfc 가 칸 ≠ 0 이면 그린다)은 **늘 비었다**: 그 칸을 쓰는 곳은 0x7fed5(비우기) · 0x7fee9
+ * (넣기) 둘이고 둘 다 0x8cdc0 만 부르며(re.py xref), 0x8cdc0 을 부르는 곳은 나리 112 진입 0x118e4 하나다(이벤트 관리자 +0xb4 = 나리
+ * 장면의 창). 시즌 창은 장면 0x105 초기화 0x3b14(0x3ef4~0x3f7c)가 new(0x398) — 0x1239 → 0x2ac4 가 0 으로 채운다 — → 0x7b7b9 로 따로
+ * 만들고 0x7b4dc 는 +0x98 까지만 채운다. 곧 나리 창의 칸이 시즌으로 새지 않는다. (시즌 s_event 는 지도 209 에서 하나도 안 떠 이 갈래에
+ * 닿는 길은 원본 데이터로는 없다 — `seasonEventFlow`.) 관리 메뉴 아닌 하위 메뉴(0xcd · 0xce · 0xcf · 0xd0)에서 곧장
  * 이벤트로 가는 길은 웹에 없어 그 표는 안 다룬다.
  */
 export function SeasonEventEndFrame({ record, teamMorale, gamePoint, kind, cursor }: SeasonEventEndFrameProps) {
