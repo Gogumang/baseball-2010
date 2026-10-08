@@ -26,6 +26,7 @@ import {
   flipMissionHalf,
   isMissionGameOver,
   simulateHumanTeamAutoHalf,
+  withMissionAutoRelay,
   startMissionGame,
   withMissionScore,
 } from '@/entities/mission/model/missionGame'
@@ -253,8 +254,10 @@ export function runPitcherMissionAutoHalves(run: PitcherRun, random: RandomPort)
   const settled: PitcherRun = { ...run, game: { ...run.game, halfEnded: false } }
   if (settled.status !== '진행중') return settled
   const auto = simulateHumanTeamAutoHalf(flipMissionHalf(settled.game), random)
-  if (auto.gameEnded) return { ...settled, game: auto.game, status: '실패' }
-  const game = flipMissionHalf(auto.game)
+  // 0x21 중계 — 그 반 이닝의 타석마다 한 틱 (`missionAutoRelay`)
+  const relayed = withMissionAutoRelay(auto.game, auto.relay)
+  if (auto.gameEnded) return { ...settled, game: relayed, status: '실패' }
+  const game = flipMissionHalf(relayed)
   const judged: PitcherRun = { ...settled, game, bases: EMPTY_BASES, outs: 0 }
   const status = judgeStatus(judged, 0)
   if (status !== '진행중') return { ...judged, status }

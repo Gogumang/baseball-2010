@@ -23,10 +23,12 @@ import {
   isMissionGameOver,
   simulateMissionAutoHalf,
   startMissionGame,
+  withMissionAutoRelay,
   withMissionScore,
 } from '@/entities/mission/model/missionGame'
 import { isMissionPitcherChangeBlocked, missionAcePitcherOf } from '@/entities/mission/model/missionCpuTeam'
 import type { MissionGame } from '@/entities/mission/model/missionGame'
+import type { MissionAutoRelayStep } from '@/entities/mission/model/missionAutoRelay'
 import { lineupSlotOf, recordLineupPlay } from '@/entities/game/model/quickLineup'
 
 /**
@@ -454,19 +456,23 @@ export function runBatterMissionAutoHalves(
   if (cpuBatting === null || humanPitching === null || cpuPitching === null) return { ...run, game }
   const blocked = isMissionPitcherChangeBlocked(run.mission)
   const ace = missionAcePitcherOf(run.mission, aceLevels)
+  // 0x21 중계 — 이번 자동진행의 반 이닝들이 한 줄로 이어진다 (3아웃 넘김은 0xc2198 안에서 같은 틱)
+  const relay: MissionAutoRelayStep[] = []
+  const relayed = (next: MissionGame): MissionGame => withMissionAutoRelay(next, relay)
   for (let half = 0; half < MAXIMUM_AUTO_HALVES; half += 1) {
     // CPU 공격 반 이닝
     game = flipMissionHalf(game)
     const cpuHalf = simulateMissionAutoHalf(game, game.cpuAutoBatting ?? cpuBatting, game.humanPitching ?? humanPitching, random, false, {
       pitcherChangeBlocked: blocked,
     })
+    relay.push(...cpuHalf.relay)
     game = {
       ...withMissionScore(game, game.offenseSide, cpuHalf.runs),
       cpuAutoBatting: cpuHalf.batting,
       // 이닝 교대 0xa5b00 이 A 를 0 으로
       humanPitching: { ...cpuHalf.pitching, inningRunsAllowed: 0 },
     }
-    if (cpuHalf.gameEnded) return { ...run, game, cpu: { ...run.cpu, pitching: cpuPitching }, status: '실패' }
+    if (cpuHalf.gameEnded) return { ...run, game: relayed(game), cpu: { ...run.cpu, pitching: cpuPitching }, status: '실패' }
     // 사람 칸 팀 반 이닝 — 미션 타자 차례까지
     game = flipMissionHalf(game)
     const humanHalf = simulateMissionAutoHalf(
@@ -477,6 +483,7 @@ export function runBatterMissionAutoHalves(
       true,
       { ...(ace === undefined ? {} : { ace }), pitcherChangeBlocked: blocked },
     )
+    relay.push(...humanHalf.relay)
     game = { ...withMissionScore(game, game.offenseSide, humanHalf.runs), humanBatting: humanHalf.batting }
     cpuPitching = {
       ...humanHalf.pitching,
@@ -484,12 +491,14 @@ export function runBatterMissionAutoHalves(
       ourRuns: humanHalf.pitching.ourRuns + humanHalf.runs,
       inningRunsAllowed: humanHalf.stoppedBeforeNari ? humanHalf.pitching.inningRunsAllowed : 0,
     }
-    if (humanHalf.gameEnded) return { ...run, game, cpu: { ...run.cpu, pitching: cpuPitching }, status: '실패' }
+    if (humanHalf.gameEnded) return { ...run, game: relayed(game), cpu: { ...run.cpu, pitching: cpuPitching }, status: '실패' }
     if (humanHalf.stoppedBeforeNari) {
-      return { ...run, game, cpu: { ...run.cpu, pitching: cpuPitching }, bases: humanHalf.bases, outs: humanHalf.outs }
+      return {
+        ...run, game: relayed(game), cpu: { ...run.cpu, pitching: cpuPitching }, bases: humanHalf.bases, outs: humanHalf.outs,
+      }
     }
   }
-  return { ...run, game, cpu: { ...run.cpu, pitching: cpuPitching } }
+  return { ...run, game: relayed(game), cpu: { ...run.cpu, pitching: cpuPitching } }
 }
 
 export function giveUp(run: MissionRun): MissionRun {

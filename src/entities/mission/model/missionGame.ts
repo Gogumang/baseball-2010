@@ -15,6 +15,8 @@ import type { BaseState } from '@/entities/game/model/baseState'
 import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
 import type { MissionAcePitcher, MissionCpuPitching } from '@/entities/mission/model/missionCpuTeam'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { missionAutoRelayStepsOf } from '@/entities/mission/model/missionAutoRelay'
+import type { MissionAutoRelay, MissionAutoRelayStep } from '@/entities/mission/model/missionAutoRelay'
 
 /**
  * **미션 경기의 이닝 · 공수 · 점수** — 미션도 모드 5·6 짜리 보통 경기(장면 0x104)라 3아웃이면 공수가 바뀌고 이닝이 넘어간다
@@ -57,6 +59,11 @@ export interface MissionGame {
   readonly humanPitching: MissionCpuPitching | null
   /** 사람이 맡은 반 이닝이 3아웃으로 끝나 0x18 · 자동진행을 기다린다 (부르는 쪽이 난수로 `runMissionAutoHalves` 류를 돌린다) */
   readonly halfEnded: boolean
+  /**
+   * 마지막 자동진행(0x18 → 0x21 → 0x18)의 중계 틱 — 사람 반 이닝이 3아웃으로 끝날 때마다 새로 쌓는다(`withMissionAutoRelay`).
+   * 화면이 `serial` 이 바뀔 때마다 한 번 튼다(틱마다 한 칸). 아직 안 돌았으면 null.
+   */
+  readonly autoRelay: MissionAutoRelay | null
 }
 
 export interface MissionTeamBatting {
@@ -235,7 +242,13 @@ export function startMissionGame(mission: OriginalMission, setup: MissionGameSet
         }
       : null,
     halfEnded: false,
+    autoRelay: null,
   }
+}
+
+/** 한 번의 자동진행이 끝났다 — 그 동안의 중계 틱을 새 `serial` 로 싣는다 */
+export function withMissionAutoRelay(game: MissionGame, steps: readonly MissionAutoRelayStep[]): MissionGame {
+  return { ...game, autoRelay: { serial: (game.autoRelay?.serial ?? 0) + 1, steps } }
 }
 
 /** 점수판 득점 (0xa5c34) — 그 측 점수에 더한다 */
@@ -284,6 +297,8 @@ export interface MissionAutoHalf {
   readonly gameEnded: boolean
   /** 미션 타자 차례라 멈췄다 (타자 미션의 사람 칸 팀 공격만) */
   readonly stoppedBeforeNari: boolean
+  /** 이 반 이닝의 0x21 중계 틱 (`missionAutoRelay`) */
+  readonly relay: readonly MissionAutoRelayStep[]
 }
 
 /**
@@ -337,6 +352,16 @@ export function simulateMissionAutoHalf(
   const inningRunsAllowed = result.runs - (lastChange?.runsBefore ?? 0)
   const scores: [number, number] = [game.scores[0], game.scores[1]]
   scores[offenseSide] += result.runs
+  // 0xc25e4 — 그 타석에 선 레코드 칸(대타 포함)의 이름 0xb62c0. 미션 타자 표지는 멈춤 갈래가 먼저 걸러 여기 안 온다
+  const relay = missionAutoRelayStepsOf(
+    { inning: game.inning, offenseSide, scores: game.scores },
+    result.plateAppearances,
+    (appearance) => {
+      const record = appearance.rosterSlot ?? rosterSlotAt(batting.lineup, appearance.battingOrderIndex)
+      const row = batting.records[record] ?? record
+      return rows[Math.max(0, row) % rows.length]?.name ?? ''
+    },
+  )
   return {
     batting: { ...batting, lineup: result.lineup ?? batting.lineup, order: result.nextBattingOrderIndex },
     pitching: { ...pitching, mound: result.mound ?? pitching.mound, inningRunsAllowed },
@@ -345,6 +370,7 @@ export function simulateMissionAutoHalf(
     bases: result.bases ?? EMPTY_BASES,
     gameEnded: result.gameEnded === true || isMissionGameOver({ ...game, scores }, result.outs),
     stoppedBeforeNari: result.stoppedBeforeBatter === true,
+    relay,
   }
 }
 
@@ -355,9 +381,9 @@ export function simulateMissionAutoHalf(
 export function simulateHumanTeamAutoHalf(
   game: MissionGame,
   random: RandomPort,
-): { readonly game: MissionGame; readonly gameEnded: boolean } {
+): { readonly game: MissionGame; readonly gameEnded: boolean; readonly relay: readonly MissionAutoRelayStep[] } {
   const pitching = game.cpuAutoPitching
-  if (pitching === null) return { game, gameEnded: false }
+  if (pitching === null) return { game, gameEnded: false, relay: [] }
   const half = simulateMissionAutoHalf(game, game.humanBatting, pitching, random, false)
   return {
     game: {
@@ -367,5 +393,6 @@ export function simulateHumanTeamAutoHalf(
       cpuAutoPitching: { ...half.pitching, inningRunsAllowed: 0 },
     },
     gameEnded: half.gameEnded,
+    relay: half.relay,
   }
 }

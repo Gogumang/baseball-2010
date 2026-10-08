@@ -284,6 +284,11 @@ export interface QuickAtBatPlay {
   /** 끝났을 때의 볼 카운트 — 풀카운트 삼진(17) 판정에 쓴다 */
   readonly balls: number
   readonly strikes: number
+  /**
+   * 이 타석에 파울(스윙 코드 9)이 한 번이라도 났나 — 0xc11f0 c1662 가 sim+0xc4(중계 글 코드)를 13 "파울" 로 적고, 코드 0 뜬공 아웃
+   * (c1642)은 이 칸을 안 고쳐 남는다. 0x21 중계 글(0xc25e4)이 이 값을 본다. 난수와 상관없다.
+   */
+  readonly fouled?: true
 }
 
 /** 투구 하나가 지나는 자리에 부르는 갈고리 */
@@ -316,8 +321,11 @@ export function playQuickAtBat(
 ): QuickAtBatPlay {
   let strikes = 0
   let balls = 0
+  let fouled = false
   for (let pitch = 1; pitch <= MAXIMUM_PITCHES; pitch += 1) {
-    const done = (outcome: AtBatOutcome): QuickAtBatPlay => ({ outcome, pitches: pitch, balls, strikes })
+    const done = (outcome: AtBatOutcome): QuickAtBatPlay => ({
+      outcome, pitches: pitch, balls, strikes, ...(fouled ? { fouled: true as const } : {}),
+    })
     const pitcher = hooks.beforePitch?.() ?? startingPitcher
     const isSwing =
       randomIntegerBelow(random, 0, 100) <= SWING_PATH_LIMIT || situation.inning === FORCED_SWING_INNING
@@ -336,13 +344,14 @@ export function playQuickAtBat(
     if (verdict.kind === '끝') return done(verdict.outcome)
     // 파울은 투 스트라이크까지만 센다
     if (verdict.kind === '파울') {
+      fouled = true
       if (strikes < STRIKES_FOR_STRIKEOUT - 1) strikes += 1
       continue
     }
     strikes += 1
     if (strikes >= STRIKES_FOR_STRIKEOUT) return done({ kind: '삼진' })
   }
-  return { outcome: { kind: '삼진' }, pitches: MAXIMUM_PITCHES, balls, strikes }
+  return { outcome: { kind: '삼진' }, pitches: MAXIMUM_PITCHES, balls, strikes, ...(fouled ? { fouled: true as const } : {}) }
 }
 
 /** 결과만 필요할 때 쓰는 얇은 껍데기 */

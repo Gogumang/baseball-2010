@@ -66,6 +66,13 @@ export interface HalfInningPlateAppearance {
    * **그 순간 마운드 투수**를 승·패 투수로 적는다 (S1 2·3절) — 부르는 쪽이 그 판정을 돌릴 재료다.
    */
   readonly pitcherSlot?: number
+  /**
+   * 이 타석 앞에서 **0xc1ba4 가 교체를 내 0xc262c 가 공 없이 돌아간 횟수**(c266c) — 자동진행 0x21 은 틱마다 0xc262c 를 한 번 부르므로
+   * 그만큼 틱이 더 든다(중계 글 없음, sim+0xc4 = 0). 0 이면 안 적는다.
+   */
+  readonly substitutionCalls?: number
+  /** 이 타석에 파울이 났나 (`QuickAtBatPlay.fouled`) — 0x21 중계 글 코드가 본다 */
+  readonly fouled?: true
 }
 
 /**
@@ -411,6 +418,7 @@ export function simulateHalfInning(
     // 0xc1ba4 안 차례 그대로 — **CPU 대타(공격 팀)가 먼저**다 (0xc1c50, 투수 교체 0xc1ce2 보다 앞).
     // 둘 중 하나라도 바뀌면 0xc1ba4 가 1 을 돌려 0xc262c 가 공 없이 돌아가고(c266c), 다음 부름에서 **같은 타석**으로
     // 0xc1ba4 를 다시 지난다 — 바뀐 쪽은 state[0xe]·state[0xd] 로 곧장 빠지고 안 바뀐 쪽은 다시 판정(굴림 포함)한다.
+    let substitutionCalls = 0
     for (let call = 0; call < MAXIMUM_SUBSTITUTION_CALLS; call += 1) {
       let substituted = false
       if (lineup !== undefined && pinchHitUsed !== undefined) {
@@ -461,6 +469,7 @@ export function simulateHalfInning(
         }
       }
       if (!substituted) break
+      substitutionCalls += 1
     }
     // 상태 0xf — 타석 준비. 원본은 여기서 돌발미션 발동을 굴린다 (0x8f158)
     hooks.onAtBatStart?.({
@@ -564,6 +573,8 @@ export function simulateHalfInning(
       runsBattedIn: scored,
       ...(rosterSlot === undefined ? {} : { rosterSlot }),
       ...(mound === undefined ? {} : { pitcherSlot: mound.pitcherSlot }),
+      ...(substitutionCalls > 0 ? { substitutionCalls } : {}),
+      ...(play.fouled === true ? { fouled: true as const } : {}),
     })
     // 타순 칸 기록(안타·홈런·타석) — 다음 CPU 대타 판정이 본다 (0xa8024)
     if (lineup !== undefined) lineup = recordLineupPlay(lineup, order, outcome)
