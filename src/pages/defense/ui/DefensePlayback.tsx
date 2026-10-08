@@ -335,6 +335,7 @@ function LivePlayback({
    * 난수는 진행기와 같은 경기 난수(`input.random`)다 — 진행기 굴림 뒤에 그 그림의 효과 · 파티클 굴림이 든다.
    */
   const effectsRef = useRef<DefenseEffects>(defenseEffectsOf(sceneMemory?.current ?? DEFENSE_SCENE_START))
+  // 0x17 진입 0x46418 이 4673e 에서 파티클 관리자를 비운다(0x6dee4) — 타석 화면(0x11 · 0x13)의 타격 불꽃은 여기로 안 이어진다
   const particlesRef = useRef<ParticleScene>(createParticleScene())
   /** 마지막으로 돈 갱신 — 판이 닫힌 뒤 건너뛴 갱신을 따라잡는다 */
   const closedUpdateRef = useRef<number | null>(null)
