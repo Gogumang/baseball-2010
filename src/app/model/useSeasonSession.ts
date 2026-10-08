@@ -832,6 +832,8 @@ function withSeasonFirstDayStamina(save: SeasonSave): SeasonSave {
 /**
  * 시즌 CPU 경기의 경기용 능력치 갈래 (`0xb570c` 모드 2) — 팀 능력치 정액 `0xb592c`(시즌 기록의 10팀 네 칸)와
  * 코치 `0xb5a74`(SR+0x185, 팀 검사 없음). 리그 CPU 경기 교체의 마무리 후보 정렬(능력 합 `0xb5b50`)이 쓴다 (27f02c7).
+ * 간이 타석도 같은 갈래다 — 스윙 0xab214 가 타자 히트·파워를 `0xb570d(팀, k, 타자, 1, 0x5a, 1)`(ab4ce·ab4fe), 0xc11f0 이 주력을
+ * `0xb570d(…, 3, …, 0x5a, 1)`(c152e) 로 읽어 팀 정액·코치를 먹는다 (`cpuBatterGameAbilityOf`, f3ba9d1).
  */
 function seasonAbilityContextOf(state: SeasonState): LeagueAbilityContext {
   return { mode: SEASON_MODE, teamAbilities: state.teamAbilities, coach: state.record.coach }
