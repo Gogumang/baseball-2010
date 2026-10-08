@@ -106,6 +106,13 @@ import * as styles from '@/pages/team-game/ui/TeamGameScreen.css'
  * 경기가 끝나면 상태 0x18 의 **경기 끝 결과 판**(`widgets/game-scene` `GameEndBoard`)을 먼저 띄우고,
  * OK 뒤에 정산(0x19) 자리인 요약 화면으로 간다.
  */
+/** 명단 칸의 장비 니블 네 칸(히트·파워·수비·주루) → `BattingStage` 의 `batterEquipmentLevels` (니블 그대로) */
+function batterEquipmentPropsOf(equipment: readonly number[] | undefined) {
+  if (equipment === undefined) return {}
+  const [hit = 0, power = 0, defense = 0, run = 0] = equipment
+  return { batterEquipmentLevels: { hit, power, defense, run } }
+}
+
 const smallLogoUrlOf = (teamId: number) => `./sprites/team_logo_ini/${String(teamId).padStart(3, '0')}.png`
 
 type PitchPhase = '구질' | '코스' | '게이지'
@@ -795,6 +802,9 @@ export function TeamGameScreen({
               batterAbility={currentBatterAbility(progress)}
               // 마타자가 대타로 올라오면 필살 연출 점프표(0xd01e4)가 이 순번을 본다
               aceBatterIndex={currentBatterEntry(progress)?.aceIndex ?? -1}
+              // 타석 그림 0x10866 → 0x78fd8 — 선수 레코드 +0x19·+0x1a 장비 니블(부위 0~3 = 히트·파워·수비·주루 칸)로 장비 겹을
+              // 고른다. 명단 칸이 니블을 들 때만(붙박이 표 선수) 넘긴다 — 니블 0 이면 원본도 그 부위를 안 그린다
+              {...batterEquipmentPropsOf(currentBatterEntry(progress)?.equipment)}
               // 장면 +0xfdc — CPU 타석(0x34436)과 사람 키가 같은 칸을 쓴다. 진행기가 공마다 든 값을 넘긴다
               sceneBuntKind={progress.sceneBuntKind ?? 0}
               // 번트 '7'/'8'/'9' — 0x535a4 → 0x6a7 → 0x51e48 은 모드를 안 본다. 마타자(0xb633c)면 위젯이 거른다
