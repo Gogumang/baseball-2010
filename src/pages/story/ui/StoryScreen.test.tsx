@@ -850,6 +850,44 @@ describe('StoryScreen — 보상은 명령마다 그 자리에서 준다 (0x8d4c
     expect(onComplete).not.toHaveBeenCalled()
   })
 
+  it('첫 종류 21 은 주지 않고 그 자리에서 재생을 끝낸다 — 뒤 명령 · 같은 명령의 다른 항목도 안 돈다 (0x8d4ce~0x8d506)', () => {
+    const 엔딩이벤트 = {
+      ...이벤트,
+      commands: [
+        { op: 'reward', items: [{ kind: 21, value: 0 }, { kind: 0, value: 10 }] },
+        { op: 'say', text: '뒤 대사', speaker: 0, format: 0, portraits: [] },
+      ],
+    } as unknown as OriginalEvent
+    const onReward = vi.fn()
+    const onComplete = vi.fn()
+    render(<StoryScreen events={[엔딩이벤트]} event={엔딩이벤트} playerName="테스트" teamName="드래곤즈"
+      onComplete={onComplete} onMatch={() => {}} onReward={onReward}
+      rewardNoticeContext={() => ({ mode: 4, years: 0, illness: 0, salaryBase: 10, random: 고정난수 })} />)
+    expect(onReward).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(onComplete).toHaveBeenCalledTimes(1)
+    expect(onComplete).toHaveBeenCalledWith([], [1])
+    expect(screen.queryByText('뒤 대사')).toBeNull()
+  })
+
+  it('첫 종류 21 은 그 자리 보상(onReward)을 안 써도 끝낸다 — 모아 넘기는 보상에 그 명령은 안 든다', () => {
+    const 엔딩이벤트 = {
+      ...이벤트,
+      commands: [
+        { op: 'reward', items: [{ kind: 0, value: 5 }] },
+        { op: 'reward', items: [{ kind: 21, value: 0 }, { kind: 0, value: 10 }] },
+        { op: 'say', text: '뒤 대사', speaker: 0, format: 0, portraits: [] },
+      ],
+    } as unknown as OriginalEvent
+    const onComplete = vi.fn()
+    render(<StoryScreen events={[엔딩이벤트]} event={엔딩이벤트} playerName="테스트" teamName="드래곤즈"
+      onComplete={onComplete} onMatch={() => {}} />)
+    // 지나온 명령(앞 보상)을 한 틀씩 돌린 뒤 그 명령이 돈다
+    틀(2)
+    expect(onComplete).toHaveBeenCalledTimes(1)
+    expect(onComplete).toHaveBeenCalledWith([{ kind: 0, value: 5 }], [1])
+  })
+
   it('보상을 준 뒤에도 끝 · 경기로 넘기는 보상은 비어 있다 — 결과 이벤트로 이어도 다시 안 준다', () => {
     const 경기이벤트 = {
       ...이벤트,

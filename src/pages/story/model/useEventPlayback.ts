@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { advanceCursor, jumpToEvent, skipSayCursor, stepFrom } from '@/entities/story/model/eventScript'
+import { advanceCursor, findEvent, jumpToEvent, skipSayCursor, stepFrom } from '@/entities/story/model/eventScript'
 import type { EventCursor, EventStep } from '@/entities/story/model/eventScript'
-import { rewardsIn } from '@/entities/story/model/eventReward'
+import { EVENT_REWARD_KIND, rewardsIn } from '@/entities/story/model/eventReward'
 import type { EventReward } from '@/entities/story/model/eventReward'
 import type { RewardNotice, RewardNoticeResult } from '@/entities/story/model/rewardNotice'
 import type { EventCommand, EventPortrait, OriginalEvent } from '@/shared/config/original/eventTypes'
@@ -17,14 +17,27 @@ export type RewardCommand = Extract<EventCommand, { op: 'reward' }>
 /** 보상 명령 하나의 알림 — 부르는 쪽이 맥락(모드 · 선수 · 난수)을 묶어 준다 (`rewardNoticeOf`) */
 export type RewardNoticeOf = (items: readonly EventReward[], eventId: number) => RewardNoticeResult
 
-/** 알림 창을 띄우는 보상 — 기다림 0x8daa0 이 확인까지 다음 명령을 막는다. 첫 종류 7 · 21 은 이 명령이 창을 안 띄운다 */
+/** 알림 창을 띄우는 보상 — 기다림 0x8daa0 이 확인까지 다음 명령을 막는다. 첫 종류 21 은 창 없이 재생을 끝낸다 */
 const opensRewardWindow = (notice: RewardNotice) => notice.kind === '알림' || notice.kind === '스킬'
+
+/**
+ * **첫 종류 21 — 재생을 곧바로 끝낸다** (0x8d4c4 0x8d4ce~0x8d506, 직접 떴다):
+ * ```
+ * [명령+5] == 0x15 → [0x1552adc] = 1(엔딩) · 0x8a4ec(mgr — 실은 명령들 풀기) · 상자 0x7b871 · 0x7f7cd · 0x7b825(0) · (1)
+ *                  → 0x8d8ee: 0x8a380(관리자 비우기) · 1(끝남)을 돌려준다   ; 보통 재생 끝 0x8d1b6 → 0x8d4e2 와 같은 꼬리
+ * ```
+ * 0x8c460 을 부르지 않는다(그 명령의 다른 항목도 안 준다) · 창이 없다 · 뒤 명령도 돌지 않는다. 보통 끝(마지막 명령 다음,
+ * 0x8cf8c)과 달리 지금 이벤트의 본 표시(0xacf49) · 저장(0x8cfc0)도 이 자리에서는 하지 않는다 — 웹은 본 이벤트를 끝
+ * (`onComplete`)에 모아 넘기므로 그대로 넘긴다(⚠️ 근사 — 웹은 이 목록으로 엔딩 [0x1552adc] 을 대신 본다).
+ * 데이터의 종류 21(r_event 500 · 501 · 503 · 504, s_event 500)은 모두 그 이벤트의 마지막 명령이다.
+ */
+const endsPlayback = (command: RewardCommand) => command.items[0]?.kind === EVENT_REWARD_KIND.엔딩진입
 
 /**
  * 창을 띄우는 명령에서 멈춘다 — 이벤트 스크립트(`stepFrom`)는 system 0 만 멈추는 명령으로 보므로, 지나온 명령 가운데 첫 창 명령에서 끊는다.
  * - system 3 타이틀 · 4 MVP 발표(0x8cf64 → 0xd4ee4): `windowTextOf` 가 글을 주는 것만 — 그 글을 실어 알림 창(0x74ef4 종류 1)으로.
  * - 보상(명령 7, 0x8d4c4): `noticeOf` 가 알림 · 스킬 창을 주는 것 — 명령 값은 0x8beb8 이 고친 값(질병 굴림)으로 바꿔 둔다.
- *   창을 안 띄우는 보상(첫 종류 7 · 21)도 고친 값으로 바꿔 지나간다.
+ *   창을 안 띄우는 보상(웹이 글을 못 짓는 첫 종류 7)은 고친 값으로 바꿔 지나간다. 첫 종류 21 은 늘 멈춘다 — 그 자리에서 재생을 끝낸다.
  * 다음 칸으로 넘기면 창 뒤 명령부터 이어 간다.
  */
 function stopAtWindow(
@@ -34,7 +47,8 @@ function stopAtWindow(
   /** 보상 명령마다 멈춘다 — 그 자리에서 주려고(`onReward`). 창을 안 띄우는 보상은 주고 곧바로 넘긴다 */
   stopsAtEveryReward = false,
 ): EventStep {
-  if (windowTextOf === undefined && noticeOf === undefined && !stopsAtEveryReward) return step
+  const hasEnding = step.passed.some((command) => command.op === 'reward' && endsPlayback(command))
+  if (windowTextOf === undefined && noticeOf === undefined && !stopsAtEveryReward && !hasEnding) return step
   const firstIndex = step.cursor.commandIndex - step.passed.length
   const passed: EventCommand[] = []
   for (let index = 0; index < step.passed.length; index += 1) {
@@ -44,10 +58,10 @@ function stopAtWindow(
       const text = windowTextOf(command)
       if (text !== null) return { cursor: at, command: { ...command, text }, passed }
     }
-    if (command.op === 'reward' && (noticeOf !== undefined || stopsAtEveryReward)) {
+    if (command.op === 'reward' && (noticeOf !== undefined || stopsAtEveryReward || endsPlayback(command))) {
       const result = noticeOf?.(command, at.commandIndex)
       const resolved: RewardCommand = result === undefined ? command : { ...command, items: result.items }
-      if (stopsAtEveryReward || (result !== undefined && opensRewardWindow(result.notice))) {
+      if (stopsAtEveryReward || endsPlayback(command) || (result !== undefined && opensRewardWindow(result.notice))) {
         return { cursor: at, command: resolved, passed }
       }
       passed.push(resolved)
@@ -62,7 +76,7 @@ function stopAtWindow(
 
 /** 이 걸음이 주는 보상 — 지나온 보상 명령과, 알림 창에 멈춘 보상 명령 자신 (원본은 창을 띄운 그 갱신에 0x8c460 으로 준다) */
 const rewardsOfStep = (step: EventStep): readonly EventReward[] =>
-  rewardsIn(step.command?.op === 'reward' ? [...step.passed, step.command] : step.passed)
+  rewardsIn(step.command?.op === 'reward' && !endsPlayback(step.command) ? [...step.passed, step.command] : step.passed)
 
 /** 보상 명령 하나를 그 자리에서 준다 — 항목(0x8beb8 이 고친 값)과 그 명령이 든 이벤트 번호(연차 보정 · 중간평가가 본다) */
 export type EventRewardHandler = (items: readonly EventReward[], eventId: number) => void
@@ -73,7 +87,8 @@ export type EventRewardHandler = (items: readonly EventReward[], eventId: number
  * 선택지가 다른 이벤트를 가리키면 화면을 닫지 않고 그 이벤트로 이어 간다.
  * **보상**: `onReward` 를 주면 원본처럼 명령마다 그 자리에서 준다 — 0x8d4c4 가 글(0x8beb8)을 짓고 창을 띄운 **그 갱신에**
  * 0x8c460 이 준다. 보상 명령마다 멈춰(`stopAtWindow`) 그 걸음이 돌 때(막는 효과를 다 기다린 뒤) 한 번 주고, 창을 안 띄우는
- * 보상(첫 종류 7 · 21)은 주고 곧바로 다음 명령으로 넘긴다. 그래서 이벤트 도중의 저장(0x7fe90)에 그때까지 준 보상이 들고,
+ * 보상(웹이 글을 못 짓는 첫 종류 7)은 주고 곧바로 다음 명령으로 넘긴다. 첫 종류 21 은 주지 않고 그 자리에서 재생을 끝낸다
+ * (`endsPlayback`). 그래서 이벤트 도중의 저장(0x7fe90)에 그때까지 준 보상이 들고,
  * 뒤 보상의 글은 앞 보상을 준 뒤 값을 읽는다. 이때 끝(`onComplete`) · 경기(`onMatch`)로 넘기는 보상은 비어 있다.
  * `onReward` 가 없으면 예전처럼 지나온 보상 명령을 모아 두었다가 끝날 때 한꺼번에 넘긴다.
  * 경기(match)에 닿으면 모은 것을 들고 대결로 나간다 — 결과 이벤트로 돌아올 때 carried 로 다시 받는다.
@@ -159,8 +174,15 @@ export function useEventPlayback(
    */
   const rewardedCursorsRef = useRef(new WeakSet<EventCursor>())
   useEffect(() => {
+    if (!isReleased || step.command?.op !== 'reward' || !endsPlayback(step.command)) return
+    // 0x8d4ce — 주지 않고 재생 끝(이 이벤트의 끝 커서 — 뒤 명령은 지나온 명령에도 안 든다)
+    const event = findEvent(events, step.cursor.eventId)
+    setCursor({ eventId: step.cursor.eventId, commandIndex: event?.commands.length ?? step.cursor.commandIndex + 1 })
+  }, [events, step, isReleased])
+
+  useEffect(() => {
     const give = onRewardRef.current
-    if (give === undefined || !isReleased || step.command?.op !== 'reward') return
+    if (give === undefined || !isReleased || step.command?.op !== 'reward' || endsPlayback(step.command)) return
     if (rewardedCursorsRef.current.has(cursor)) return
     rewardedCursorsRef.current.add(cursor)
     give(step.command.items, step.cursor.eventId)
