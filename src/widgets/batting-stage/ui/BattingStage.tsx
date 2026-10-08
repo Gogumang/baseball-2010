@@ -157,6 +157,11 @@ interface BattingStageProps {
    * 하늘 색 번호는 이 화면의 하늘 줄과 `inning` 칸이다(`entities/batting` `settlementEffect`). 안 넘기면 효과 없음.
    */
   readonly settlement?: SettlementEffectSource
+  /**
+   * **하늘 줄 — 구장 +0x10** (`stadiumSkyRowOf`, 0x783b0). 원본은 경기 장면을 세울 때(적재 상태 8) 한 번 고르고 정산 결과 그림까지 같은 줄을
+   * 쓴다 — 부르는 쪽이 경기 하나 동안 같은 값을 넘긴다. ⚠️ 안 넘기면 그림을 세울 때마다 `random` 으로 rand(0, 6) 을 굴린다(미션 · 홈런더비).
+   */
+  readonly skyRow?: number
   readonly random: RandomPort
   /**
    * **고른 필살타법 번호** (선수 레코드 +0x18, 1~4). 레벨(+0x201)이 아니다 — 경기는 이 번호만 본다

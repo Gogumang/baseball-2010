@@ -28,7 +28,7 @@ import { pitchReleaseSoundIdOf } from '@/widgets/batting-stage/lib/pitchReleaseS
 import { isBuntJudgeFrame } from '@/widgets/batting-stage/lib/buntStance'
 import type { StageRefs } from '@/widgets/batting-stage/model/stageRefs'
 import { DERBY_ORDINARY_PITCH_TYPE } from '@/entities/home-run-derby/model/derbyRules'
-import { resultBackdropOffsetAt } from '@/widgets/batting-stage/lib/stageScenery'
+import { resultBackdropOffsetAt, SKY_ROW_COUNT } from '@/widgets/batting-stage/lib/stageScenery'
 
 /** 홈런더비 = 원본 전역 모드 7 */
 const HOME_RUN_DERBY_GAME_MODE = 7
@@ -37,7 +37,6 @@ const WIND_UP_MILLISECONDS = 850
 /** 결과 문구를 보여주는 시간 */
 const RESULT_DISPLAY_MILLISECONDS = 1150
 const SPECIAL_PITCH = 'SPECIAL'
-const SKY_ROW_COUNT = 6
 /** 타자 스킬 22 압도 (skills.json 22) — 상대 투수 실투율 +5 */
 const INTIMIDATE_SKILL_ID = 22
 
@@ -100,8 +99,9 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
     }
     /** 투구 순간 소리를 이미 낸 공 — 0x3f378 은 투수 단계가 놓는 칸에 **닿는 틱 한 번만** 낸다(`cmp r6,r4 ; bne`) */
     let releaseSoundPitch: object | null = null
-    // 하늘 표 행 = 구장 팀 데이터 +0xb2 — 웹은 팀 데이터에 그 칸이 없어 원본의 대체 규칙 rand(0,6) 을 쓴다 (추정)
-    const skyRow = randomIntegerBelow(latestRef.current.random, 0, SKY_ROW_COUNT)
+    // 하늘 줄 = 구장 +0x10 (0x783b0 — `stadiumSkyRowOf`). 원본은 경기 장면을 세울 때 한 번 고른다 — 부르는 쪽이 그 줄을 넘긴다.
+    // ⚠️ 안 넘기는 화면(미션 · 홈런더비 — 원본 rand(0, 6) 모드)은 예전대로 그림을 세울 때마다 여기서 굴린다(장면당 한 번이 아니다)
+    const skyRow = latestRef.current.skyRow ?? randomIntegerBelow(latestRef.current.random, 0, SKY_ROW_COUNT)
 
     const advancePhase = (now: number) => {
       const elapsed = now - phaseStartedAtRef.current

@@ -98,6 +98,8 @@ export interface StageLatest {
   readonly settlement?: SettlementEffectSource
   /** 결과 창 뒤 배경의 틱별 +0x17e2 — `BattingStage` 의 같은 이름 props 주석 참고 */
   readonly resultBackdropOffsetOf?: (tick: number) => number
+  /** 하늘 줄(구장 +0x10) — `BattingStage` 의 같은 이름 props 주석 참고 */
+  readonly skyRow?: number
   readonly random: RandomPort
   readonly swingMode: SwingMode
   readonly batterSkillIds: readonly number[]

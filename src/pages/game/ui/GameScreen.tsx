@@ -83,6 +83,11 @@ interface GameScreenProps {
    * `onPitchResolved` 넷째 인자로 돌려준다. 부르는 쪽이 경기 장면 동안 들고 있다가 다시 넘긴다. 안 주면 타석 화면이 스스로 든다.
    */
   readonly sceneBuntKind?: number
+  /**
+   * 이 경기 구장의 하늘 줄 +0x10 (0x783b0 모드 4 — 나리 저장 +0xb2 mod 6). 경기를 세울 때 정한 값을 경기 내내 넘긴다 —
+   * 수비 재생으로 화면이 내려갔다 다시 서도 같은 줄이다. 안 주면 타석 화면이 그림을 세울 때 굴린다(예전 근사)
+   */
+  readonly skyRow?: number
   /** 경기 중 기록 달성 알림 0x4e35c 의 이번 그림 (`useRecordAlert`, 부르는 쪽이 든다). 안 넘기면 안 그린다 */
   readonly recordAlert?: RecordAlertFrame
   /** 알림을 든 쪽에 이 화면의 팝업 · 장면 갈래를 알린다 (`RecordAlertScene`) — 바뀔 때마다 */
@@ -123,6 +128,7 @@ export function GameScreen({
   onBenchClearingDone,
   onSpecialSwingUsed,
   sceneBuntKind,
+  skyRow,
   recordAlert,
   onRecordAlertSceneChange,
 }: GameScreenProps) {
@@ -331,6 +337,7 @@ export function GameScreen({
             // 조작방법 뷰어 동안도 일시정지 팝업이 떠 있어 경기 갱신이 멈춘다 (0x52cc6 0x754f9)
             // 0xe(OK 대기)에서도 공이 안 나간다 — 타석 장면(0xd 그리기)만 선다
             isPaused={isPaused || isMenuOpen || overlay !== null || sceneConfirm.isAwaiting}
+            {...(skyRow === undefined ? {} : { skyRow })}
             random={random}
             // 필살타법 '0' (0x535a4 → 0x51dee → 0x34c74). 레벨이 아니라 **고른 번호**(+0x18)를 넘긴다 —
             // 0 이면(아직 안 고름) '0' 키가 무시된다

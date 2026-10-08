@@ -50,6 +50,7 @@ import { passesRecordTeamGate, recordGamePointsOf } from '@/entities/game/model/
 import { SettlementBoard } from '@/pages/team-game/ui/SettlementBoard'
 import { settlementBackdropOffsetAt } from '@/pages/team-game/model/settlementBackdrop'
 import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
+import { stadiumSkyRowOf } from '@/widgets/batting-stage/lib/stageScenery'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { useSettlementEffectLayers } from '@/widgets/batting-stage/ui/SettlementEffectCanvas'
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
@@ -479,7 +480,8 @@ export function PitcherGameScreen({
             isPaused
             isResultBackdrop
             resultBackdropOffsetOf={(tick) => settlementBackdropOffsetAt(tick, isHumanWin)}
-            // ⚠️ 웹 타석 그림이 세울 때 굴리는 하늘 줄 rand(0, 6)(추정 대체)이 경기 난수에 새지 않게 따로 든 난수로 세운다
+            // 하늘 줄 = 구장 +0x10 — 0x783b0 모드 3: 나리 저장 +0xb2(리그 날짜 g) mod 6, 굴림 없음. 배경 난수는 꼴만 채운다
+            skyRow={stadiumSkyRowOf({ mode: PITCHER_CAREER_MODE, dayCounter: options.dayCounter }) ?? 0}
             random={backdropRandom}
             // 정산 효과 0x4ea0c(밤 승리 불꽃 · 패배 비)와 결과 그림 0x4a384 의 효과 · 파티클 틱은 경기 난수로 돈다
             settlement={{

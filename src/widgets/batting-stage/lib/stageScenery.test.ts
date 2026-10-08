@@ -10,6 +10,7 @@ import {
   isSkyLightModeShown,
   skyLightFrameAt,
   skyLightPaletteRowOf,
+  stadiumSkyRowOf,
   judgeAnimationOf,
   judgeFrameAt,
   pitcherFrameAt,
@@ -158,5 +159,20 @@ describe('결과 창 뒤 구장 밀기 — +0x17e2 (진입 0x4f574 = 0 · 갱신
   it('150 에서 멈춘다', () => {
     expect(resultBackdropOffsetAt(29)).toBe(150)
     expect(resultBackdropOffsetAt(1_000)).toBe(150)
+  })
+})
+
+describe('하늘 줄 — 구장 +0x10 (0x783b0)', () => {
+  it('모드 2 · 3 · 4 는 리그 날짜 g(+0xb2) mod 6, 모드 1 · 8 · 9 는 측 0 팀 번호 mod 6 — 굴림이 없다', () => {
+    expect(stadiumSkyRowOf({ mode: 4, dayCounter: 0 })).toBe(0)
+    expect(stadiumSkyRowOf({ mode: 4, dayCounter: 13 })).toBe(1)
+    expect(stadiumSkyRowOf({ mode: 3, dayCounter: 41 })).toBe(5)
+    expect(stadiumSkyRowOf({ mode: 2, dayCounter: 6 })).toBe(0)
+    expect(stadiumSkyRowOf({ mode: 1, side0TeamId: 9 })).toBe(3)
+    expect(stadiumSkyRowOf({ mode: 8, side0TeamId: 4 })).toBe(4)
+  })
+
+  it('모드 0 · 5 · 6 · 7 은 rand(0, 6) — 부르는 쪽이 굴린다(null)', () => {
+    for (const mode of [0, 5, 6, 7]) expect(stadiumSkyRowOf({ mode, dayCounter: 3, side0TeamId: 2 })).toBeNull()
   })
 })

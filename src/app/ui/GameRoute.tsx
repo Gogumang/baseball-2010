@@ -207,6 +207,8 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
         aceLevels={aceLevels}
         isPaused={runner.isPaused || burstLines !== null}
         bannerText={runner.bannerText}
+        // 구장 하늘 줄 — 경기를 세울 때(0x783b0) 한 번 정했다
+        skyRow={session.stadiumSkyRow}
         random={random}
         onPitchResolved={handlePitchResolved}
         sceneBuntKind={sceneBuntKindRef.current}

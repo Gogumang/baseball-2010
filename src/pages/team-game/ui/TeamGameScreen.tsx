@@ -6,6 +6,7 @@ import { TEAMS } from '@/shared/config/original/teams'
 import { ORIGINAL_BURST_TABLES } from '@/shared/config/original/burstMissions'
 import { BurstMissionWindow } from '@/widgets/burst-mission/ui/BurstMissionWindow'
 import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
+import { stadiumSkyRowOf } from '@/widgets/batting-stage/lib/stageScenery'
 import type { SeasonStadium } from '@/widgets/batting-stage/lib/renderScenery'
 import { staminaPercentOf } from '@/entities/pitcher-career/model/pitcherStamina'
 import { canSelectSlot } from '@/features/play-pitcher-game/model/pitcherPitch'
@@ -361,8 +362,17 @@ export function TeamGameScreen({
     actions.confirmScene,
   )
   const isAwaitingConfirm = sceneConfirm.isAwaiting && (canBat || canPitch)
-  /** 정산 배경 전용 난수 — 경기 난수를 건드리지 않는다 (정산 갈래 주석) */
+  /** 정산 배경 전용 난수 — 하늘 줄을 넘기므로 굴릴 일이 없다(꼴만 채운다). 경기 난수를 건드리지 않는다 */
   const [backdropRandom] = useState(() => createSeededRandom(0))
+  /**
+   * 구장 하늘 줄 +0x10 — 0x783b0: 모드 2 는 시즌 레코드 +0xb2(리그 날짜 g) mod 6, 모드 1 · 8 · 9 는 경기[0x28](측 0 팀) mod 6. 굴림이 없고
+   * 경기 내내(정산 결과 그림까지) 같다 — 타석 · 정산 배경 두 캔버스가 같이 쓴다
+   */
+  const stadiumSkyRow = stadiumSkyRowOf({
+    mode: options.mode,
+    dayCounter: options.dayCounter ?? 0,
+    side0TeamId: options.playerSide === 0 ? options.ourTeamId : options.opponentTeamId,
+  })
   /** 정산 효과 층(비 · 파티클) — 타석 배경과 정산 판이 같이 쓴다 (원본 그리기 차례 0x4a384) */
   const settlementLayers = useSettlementEffectLayers()
   isAwaitingConfirmRef.current = isAwaitingConfirm
@@ -500,8 +510,8 @@ export function TeamGameScreen({
             isPaused
             isResultBackdrop
             resultBackdropOffsetOf={(tick) => settlementBackdropOffsetAt(tick, isHumanWin)}
-            // ⚠️ 웹 타석 화면은 그림을 세울 때 하늘 줄을 rand(0, 6) 으로 고른다(원본은 구장 팀 데이터 +0xb2, 추정 대체) —
-            //    경기가 끝난 뒤 그 굴림이 경기 난수에 새지 않게 이 배경은 따로 든 난수로 세운다
+            // 하늘 줄은 경기 중 타석과 같은 구장 +0x10 (0x783b0)
+            {...(stadiumSkyRow === null ? {} : { skyRow: stadiumSkyRow })}
             random={backdropRandom}
             // 정산 효과 0x4ea0c(밤 승리 불꽃 · 패배 비)와 결과 그림 0x4a384 의 효과 · 파티클 틱은 경기 난수로 돈다
             settlement={{
@@ -779,6 +789,8 @@ export function TeamGameScreen({
               cpuMagic={opponentMagicStateOf(progress)}
               // 0xe 에서는 공이 안 나간다 — 타석 장면(0xd 그리기)만 선다
               isPaused={visibleBurstLines !== null || isAwaitingConfirm}
+              // 구장 하늘 줄 — 경기 하나에 한 번(0x783b0). 수비 재생으로 화면이 다시 서도 같은 줄이다
+              {...(stadiumSkyRow === null ? {} : { skyRow: stadiumSkyRow })}
               random={random}
               onPitchResolved={(detail, _pitch, isUncatchable, buntKind) => {
                 actions.resolvePitch(detail, isUncatchable, buntKind)

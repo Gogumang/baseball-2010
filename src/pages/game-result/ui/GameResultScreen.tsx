@@ -87,7 +87,13 @@ interface GameResultScreenProps {
    * (점수 · 점수판 틀 두 측이 측 0 = 선공부터), `random` 은 경기 난수.
    * 이어하기로 116 을 다시 띄울 때(1c26a → 0x1278c — 경기 장면도 정산 0x4ea0c 도 다시 안 돈다)는 안 넘긴다 — 곧장 평가다.
    */
-  readonly settlement?: { readonly inning: number; readonly playerSide: PlayerSide; readonly random: RandomPort }
+  readonly settlement?: {
+    readonly inning: number
+    readonly playerSide: PlayerSide
+    readonly random: RandomPort
+    /** 그 경기 구장의 하늘 줄 +0x10(0x783b0) — 경기 중 타석 화면과 같은 줄. 안 주면 배경 난수로 굴린다(옛 근사) */
+    readonly skyRow?: number
+  }
 }
 
 /** 화면 단계 — 경기 끝 판(0x18) → 정산(0x19 · 그림 0x4a384) → 116 평가(114 내장 이벤트) */
@@ -122,9 +128,8 @@ export function GameResultScreen({
   const [phase, setPhase] = useState<Phase>(() =>
     settlement !== undefined ? '끝판' : evaluation !== undefined ? '평가' : '정산')
   const [isTitlePopupOpen, setIsTitlePopupOpen] = useState(newTitles.length > 0)
-  // ⚠️ 근사: 웹 타석 그림이 세울 때 굴리는 하늘 줄 rand(0, 6)(추정 대체)이 경기 난수에 새지 않게 배경은 따로 든 난수로 세운다
-  //    (팀경기 · 투수편과 같은 근사). 원본은 경기 내내 같은 구장객체라 경기 중 하늘 줄 그대로다 — 경기 타석 캔버스를 이어 쓰려면
-  //    widgets/batting-stage · pages/game 쪽 배선이 필요하다(미해결)
+  // 결과 배경의 하늘 줄은 경기를 세울 때 고른 구장 +0x10(`settlement.skyRow`, 0x783b0 모드 4 — 굴림 없음)이다. 원본은 경기 내내 같은
+  // 구장객체라 정산 그림도 그 줄이다. 배경 난수는 줄을 안 받았을 때(옛 호출)만 쓰여 경기 난수에 새지 않게 따로 든다
   const [backdropRandom] = useState(() => createSeededRandom(0))
   /** 정산 효과 층 — 비는 진 판 덮개 위 · 띠 아래, 파티클은 판 맨 위 (원본 그리기 차례 0x4a384) */
   const settlementLayers = useSettlementEffectLayers()
@@ -220,6 +225,7 @@ export function GameResultScreen({
             isPaused
             isResultBackdrop
             resultBackdropOffsetOf={(tick) => settlementBackdropOffsetAt(tick, isWin)}
+            {...(settlement.skyRow === undefined ? {} : { skyRow: settlement.skyRow })}
             random={backdropRandom}
             settlement={{
               isWin,

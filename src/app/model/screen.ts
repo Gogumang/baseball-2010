@@ -50,6 +50,8 @@ export type Screen =
       readonly settlementInning?: number
       /** 사람 팀의 측(0 = 선공) — 경기 끝 판 0x4fe9c · 정산 판 0x4a948 의 점수 · 점수판 틀 두 측 차례. 정산을 지났을 때만 */
       readonly settlementPlayerSide?: PlayerSide
+      /** 그 경기 구장의 하늘 줄 +0x10(0x783b0) — 정산 결과 그림 배경이 경기 중 줄 그대로 쓴다. 정산을 지났을 때만 */
+      readonly settlementSkyRow?: number
     }
   /**
    * 나리 국가대항전 사람 경기 결과 — 경기 끝 판(상태 0x18) · 정산 그림(0x19 · 0x4a384)을 정규 경기 결과 화면 한 장으로 보인다.
@@ -64,6 +66,8 @@ export type Screen =
       readonly settlementInning: number
       /** 사람 팀의 측(0 = 선공) — 대회는 0xb7844 가 정한다(결승 2위면 선공) */
       readonly settlementPlayerSide: PlayerSide
+      /** 그 경기 구장의 하늘 줄 +0x10(0x783b0 — 대회 날짜 mod 6) */
+      readonly settlementSkyRow: number
     }
   | { readonly kind: '관리' }
   /**

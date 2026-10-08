@@ -129,6 +129,7 @@ import { TRAINING_MENUS } from '@/shared/config/trainingMenus'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { isInfiniteGamePointOn } from '@/shared/lib/dev/devOptions'
 import { pickLoadingTip } from '@/shared/config/loadingTips'
+import { stadiumSkyRowOf } from '@/widgets/batting-stage/lib/stageScenery'
 import type { SaveGamePort } from '@/shared/api/save/saveGamePort'
 import { KOREA_TEAM_ID, createNationalCup, nationalCupMatchupOf, nationalCupSideOf } from '@/entities/national-cup/model/nationalCup'
 import {
@@ -359,6 +360,12 @@ export function useCareerSession({
   const [managementDetail, setManagementDetail] = useState<ManagementDetail | null>(null)
   /** 경기 전 원작 로딩 화면에 띄울 팁. null 이면 로딩 중이 아니다. */
   const [loadingTip, setLoadingTip] = useState<string | null>(null)
+  /**
+   * 이 경기 장면의 하늘 줄 — 구장 +0x10 (0x783b0 모드 4 갈래: 나리 저장 +0xb2 = 리그 날짜 g mod 6, 굴림 없음). 경기를 세울 때 정하고
+   * 타석 화면과 정산 결과 그림(0x4a384)이 같이 쓴다 (`stadiumSkyRowOf`)
+   */
+  const [stadiumSkyRow, setStadiumSkyRow] = useState(0)
+  const stadiumSkyRowRef = useRef(0)
   /** 142 진입 0x1c46c 가 이 장면에서 굴린 마선수 — 경기정보 마투수·마타자 줄이 읽는다 */
   const [matchAces, setMatchAces] = useState<NariMatchAces | null>(null)
   /** 143 경기 전 엔트리 보기 (진입 0x16af8 · 키 0x1457c) — 142 위에 선다. 없으면 null */
@@ -483,6 +490,8 @@ export function useCareerSession({
       aces?: GameAceSetup,
       /** 내 팀 명단 — 나리 팀 레코드 타자 배열 차례(`nariQuickLineupOf`) · 국가대항전은 대표팀 칸(+0xbc4) */
       ourRecordLineup?: QuickLineup,
+      /** 나리 저장 +0xb2 — 구장 하늘 줄(0x783b0 모드 4)이 본다. 정규 · 포스트시즌은 `dayCounter`, 국가대항전은 대회 날짜(L+0x32) */
+      skyDayCounter = dayCounter,
     ) => {
       // 경기 장면 셋업 0x39fdc 모드 3·4 갈래(0x3a200) — 0xb6814(전역 상태): +0x6b = 0 (`liveGameState`)
       resetLiveGameState()
@@ -493,6 +502,10 @@ export function useCareerSession({
       )
       progressRef.current = started
       setProgress(started)
+      // 적재(상태 8)의 구장 준비 0x352e8 → 0x783b0 — 이 경기 내내 같은 하늘 줄
+      const skyRow = stadiumSkyRowOf({ mode: BATTER_LEAGUE_MODE, dayCounter: skyDayCounter }) ?? 0
+      stadiumSkyRowRef.current = skyRow
+      setStadiumSkyRow(skyRow)
       runner.resetAtBat()
       pitchTallyRef.current = EMPTY_AT_BAT_PITCH_TALLY
       foulPlayRef.current = false
@@ -617,6 +630,8 @@ export function useCareerSession({
       },
       undefined,
       nariQuickLineupOf(teams.korea),
+      // 대회 중 나리 저장 +0xb2 = L+0x32 는 대회 날짜다(0xb7bf0 이 0 으로 놓고 하루 끝마다 +1)
+      cup.day,
     )
   }
 
@@ -692,9 +707,10 @@ export function useCareerSession({
         newTitles: dynamite === null ? [] : [dynamite],
         evaluation,
         streakNotices: streakEventOf(advanced).notices,
-        // 0x4ea0c 꼬리 4f41a~ 의 정산 효과 — 하늘 칸은 경기 끝 이닝 (구장객체 +0x14)
+        // 0x4ea0c 꼬리 4f41a~ 의 정산 효과 — 하늘 칸은 경기 끝 이닝 (구장객체 +0x14), 하늘 줄은 경기를 세울 때 고른 구장 +0x10
         settlementInning: finished.game.inning,
         settlementPlayerSide: finished.game.playerSide,
+        settlementSkyRow: stadiumSkyRowRef.current,
       })
     },
     [aceLevels, audio, random, recordStat, setScreen],
@@ -747,7 +763,10 @@ export function useCareerSession({
       recordStat({ kind: '기록달성', recordIds: summary.recordIds ?? [] })
       // 승리 31 · 패배 32 징글 — 정규 경기 결과 화면과 같은 자리 (116 의 평가 징글은 없다)
       playSoundIds(audio, [gameResultSoundIdOf(summary.result)])
-      setScreen({ kind: '대회경기결과', summary, gamePointReward, cup: next, settlementInning: finished.game.inning, settlementPlayerSide: finished.game.playerSide })
+      setScreen({
+        kind: '대회경기결과', summary, gamePointReward, cup: next, settlementInning: finished.game.inning,
+        settlementPlayerSide: finished.game.playerSide, settlementSkyRow: stadiumSkyRowRef.current,
+      })
     },
     [audio, random, recordStat, setCareer, setScreen],
   )
@@ -1906,6 +1925,7 @@ export function useCareerSession({
     managementDetail,
     pendingTitle,
     loadingTip,
+    stadiumSkyRow,
     matchAces,
     /** 143 경기 전 엔트리 보기 — 142(`경기준비`) 위에 선다 */
     entryView: screen.kind === '경기준비' ? entryView : null,

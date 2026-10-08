@@ -162,7 +162,15 @@ export function CareerRoutes({
           // 정산 0x4ea0c 를 막 지났을 때만 — 결과 그림 0x4a384 의 배경 · 정산 효과(경기 난수)
           {...(screen.settlementInning === undefined
             ? {}
-            : { settlement: { inning: screen.settlementInning, playerSide: screen.settlementPlayerSide ?? 1, random } })}
+            : {
+              settlement: {
+                inning: screen.settlementInning,
+                playerSide: screen.settlementPlayerSide ?? 1,
+                random,
+                // 경기 중 구장 하늘 줄 그대로 (0x783b0 — 경기를 세울 때 한 번)
+                ...(screen.settlementSkyRow === undefined ? {} : { skyRow: screen.settlementSkyRow }),
+              },
+            })}
         />
       )
 
@@ -176,7 +184,9 @@ export function CareerRoutes({
           career={career}
           onContinue={actions.confirmCupGameResult}
           // 대회 경기도 정산 0x4ea0c 꼬리를 지난다 — 결과 그림 0x4a384 의 배경 · 정산 효과(경기 난수)
-          settlement={{ inning: screen.settlementInning, playerSide: screen.settlementPlayerSide, random }}
+          settlement={{
+            inning: screen.settlementInning, playerSide: screen.settlementPlayerSide, random, skyRow: screen.settlementSkyRow,
+          }}
         />
       )
 
