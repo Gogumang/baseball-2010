@@ -4,6 +4,8 @@ import { BALANCE } from '@/shared/config/original/balance'
 import { D_LEVEL } from '@/shared/config/original/dLevel'
 import type { SwingBoost } from '@/entities/batting/model/swingBoost'
 import type { SwingMode } from '@/entities/batting/model/swingResult'
+import { EMPTY_BASES, runnerCountOf } from '@/entities/game/model/baseState'
+import type { BaseState } from '@/entities/game/model/baseState'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
 /**
@@ -135,6 +137,12 @@ export interface QuickAtBatSituation {
    * 자동진행으로 넘긴 상대 타석이어도 사람 팀이 수비면 참이다. 안 넘기면 거짓(CPU 끼리 경기)
    */
   readonly isDefenseHuman?: boolean
+  /**
+   * 0xab214 스킬 상황 칸 중 타석 동안 바뀌지 않는 것 — 공격 팀이 지고 있나(0xab966 `0xb69b0(수비) > 0xb69b0(공격)`, 스킬 10) ·
+   * 이 타순 칸의 오늘 타석 결과 링(팀 객체 + 타순×0x18 + 0x34, 오래된 차례 — 스킬 16·17). 안 넘기면 거짓 · 빈 링
+   */
+  readonly isLosing?: boolean
+  readonly recentAtBatCodes?: readonly number[]
 }
 
 const trunc = Math.trunc
@@ -288,11 +296,19 @@ const FOUL_CODE = 9
 const OUT_CODE = 0
 const HIT_CODES = { single: 15, double: 18, homeRun: 24 } as const
 
+/** 공 하나를 던질 때의 볼카운트 st[4]·st[5] 와 주자 목록(sim+0x80) — 0xab214 스킬 상황 칸이 본다 */
+interface PitchMoment {
+  readonly strikes: number
+  readonly balls: number
+  readonly bases: BaseState
+}
+
 function verdictOf(
   batter: QuickAtBatBatter,
   pitcher: QuickAtBatPitcher,
   situation: QuickAtBatSituation,
   random: RandomPort,
+  moment: PitchMoment,
 ): PitchVerdict {
   const pitch = quickPitchOf(batter, pitcher, situation, random)
   // 구위 등급(c1430~c1448)과 0xab214 투수 쪽(ab548)은 체력%로 부른 능력이다
@@ -316,16 +332,18 @@ function verdictOf(
       pitcherSkillIds: pitcher.skillIds,
       situation: {
         inning: situation.inning,
-        isLosing: false,
-        runnerCount: 0,
-        hasSecondBaseRunner: false,
+        isLosing: situation.isLosing === true,
+        // ab9c2 0xa9889(주자 목록) · abd06 0xa97a0(주자 목록, 2) — 간이 엔진의 주자 목록 sim+0x80 = 이 공의 루
+        runnerCount: runnerCountOf(moment.bases),
+        hasSecondBaseRunner: moment.bases.second,
         // 0xab214 는 두 레코드로 손 0xb63c0(0xab9f0·0xaba1e·0xabc50)·칸 0xb6394(0xabcd8)를 바로 읽는다
         pitcherSide: pitcher.hand ?? 0,
         batterSide: batter.hand ?? 0,
-        balls: 0,
-        strikes: 0,
+        // st[5]·st[4] — 이 공을 던지기 앞의 카운트
+        balls: moment.balls,
+        strikes: moment.strikes,
         batterOrderIndex: batter.recordSlot ?? 0,
-        recentAtBatCodes: [],
+        recentAtBatCodes: situation.recentAtBatCodes ?? [],
       },
     },
     random,
@@ -392,6 +410,11 @@ export interface QuickAtBatHooks {
    * 안 넘기면 받은 `startingPitcher` 를 그대로 쓴다. 난수를 쓰지 않는다.
    */
   readonly beforePitch?: () => QuickAtBatPitcher
+  /**
+   * 이 공을 던질 때의 루 — 0xab214 가 주자 목록(sim+0x80)으로 주자 수(스킬 12·37)·2루 주자(스킬 33)를 본다. 도루로 타석 중에도
+   * 바뀌므로 공마다 묻는다. 안 넘기면 빈 루다. 난수를 쓰지 않는다.
+   */
+  readonly basesAtPitch?: () => BaseState
 }
 
 /**
@@ -429,7 +452,11 @@ export function playQuickAtBat(
       continue
     }
 
-    const verdict = verdictOf(batter, pitcher, situation, random)
+    const verdict = verdictOf(batter, pitcher, situation, random, {
+      strikes,
+      balls,
+      bases: hooks.basesAtPitch?.() ?? EMPTY_BASES,
+    })
     if (verdict.kind === '끝') return done(verdict.outcome)
     // 파울은 투 스트라이크까지만 센다
     if (verdict.kind === '파울') {

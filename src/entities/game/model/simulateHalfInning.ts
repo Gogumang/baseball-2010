@@ -28,6 +28,7 @@ import {
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { strikeoutRecordIdsOf, threePitchInningRecordIdsOf } from '@/entities/game/model/gameRecords'
 import {
+  lineupSlotOf,
   recordLineupPlay,
   rosterSlotAt,
   tryQuickCpuPinchHit,
@@ -581,7 +582,15 @@ export function* simulateHalfInningTicks(
     /** 볼넷(판정 3)이 판정 자리에서 민 주자의 득점 — 볼넷이 아니면 null */
     let walkRuns: number | null = null
     const rosterSlot = lineup !== undefined ? rosterSlotAt(lineup, order) : undefined
-    const play = playQuickAtBat(batterOn(order), facing, { ...swing, inning }, random, {
+    const play = playQuickAtBat(batterOn(order), facing, {
+      ...swing,
+      inning,
+      // 0xab966 — 수비 점수 > 공격 점수 (반 이닝 시작 리드에서 이 이닝 득점을 뺀다). 수비를 모르면 거짓
+      ...(defense === undefined ? {} : { isLosing: defense.lead - runs > 0 }),
+      // 이 타순 칸의 오늘 타석 결과 링 (0xa908c 가 넣는 팀 객체 + 타순×0x18 + 0x34)
+      ...(lineup === undefined ? {} : { recentAtBatCodes: lineup.records[lineupSlotOf(order)]?.results ?? [] }),
+    }, random, {
+      basesAtPitch: () => bases,
       ...(defense === undefined || mound === undefined
         ? {}
         : {
