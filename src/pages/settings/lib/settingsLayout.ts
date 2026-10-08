@@ -25,24 +25,35 @@ export const rowTopOf = (index: number) => PANEL.y - 5 + 25 * index
 /** 값 줄(사운드·속도·진동)과 메뉴 줄(상세 설정·모드 초기화·게임 데이터 관리)의 경계 */
 export const FIRST_MENU_ROW = 3
 
-/** 값 줄 — 글머리 이미지 39, 이름 흰색, 아이콘 바탕 이미지 87, 값 막대 프레임 35, 좌우 화살 이미지 20 */
+/**
+ * 값 줄 — 글머리 이미지 39(고른 줄은 38 덧그림), 이름 흰색, 아이콘 바탕 이미지 87, 값 막대 프레임 35(진동 줄은 38),
+ * 좌우 화살 이미지 20 — 화살은 **고른 줄이 깜빡일 때만** (x0 + 91 · 뒤집어 x0 + 176, Y + 41) (0x597a2~0x597da).
+ * 그리기 0x59600~0x598f2 를 직접 떴다.
+ */
 export const VALUE_ROW = {
   bulletImage: 39,
+  selectedBulletImage: 38,
   bullet: { x: PANEL.x + 14, dy: 44 },
   name: { x: PANEL.x + 33, dy: 41 },
   iconBackImage: 87,
   iconBack: { x: PANEL.x + 68, dy: 36 },
   barFrame: 35,
+  /** 진동 줄(칸 2)만 프레임 0x26 = 38 (0x596ee) */
+  vibrationBarFrame: 38,
   bar: { x: PANEL.x + 98, dy: 37, width: 77, height: 18 },
   arrowImage: 20,
   leftArrow: { x: PANEL.x + 91, dy: 41 },
   rightArrow: { x: PANEL.x + 176, dy: 41 },
 } as const
 
-/** 메뉴 줄 — 노란 네모 38, 막대 프레임 37, 이름 #7B93D4 가운데 */
+/**
+ * 메뉴 줄 — 글머리 이미지 39(고른 줄은 38 덧그림, 둘 다 (x0 + 14, Y + 44)), 막대 프레임 37,
+ * 이름 가운데 — 고른 줄 "!C!cffffff%s" 흰색 · 아닌 줄 "!C!c7B93D4%s" (0x5981a~0x598c0)
+ */
 export const MENU_ROW = {
-  bulletImage: 38,
-  bullet: { x: PANEL.x + 14, dy: 45 },
+  bulletImage: 39,
+  selectedBulletImage: 38,
+  bullet: { x: PANEL.x + 14, dy: 44 },
   barFrame: 37,
   bar: { x: PANEL.x + 32, dy: 38, width: 142, height: 18 },
   name: { x: PANEL.x + 32, dy: 42, width: 142 },
@@ -61,6 +72,9 @@ export const ROW_ICONS = [
   { image: ROW_ICON_IMAGES.speed, width: 11, height: 11 },
   { image: ROW_ICON_IMAGES.vibration, width: 10, height: 13 },
 ] as const
+/** 소리 0 이면 아이콘 0x58 = 88 (0x59942) · 진동 켜짐이면 0x5c = 92 (0x59c50) */
+export const SOUND_OFF_ICON = { image: 88, width: 10, height: 13 } as const
+export const VIBRATION_ON_ICON = { image: 92, width: 18, height: 13 } as const
 
 /** 20×20 바탕 안 가운데 맞춤 보정 */
 export const iconCenterOffsetOf = (size: { readonly width: number; readonly height: number }) => ({
@@ -69,14 +83,16 @@ export const iconCenterOffsetOf = (size: { readonly width: number; readonly heig
 })
 
 /**
- * 사운드 값 — 소리 크기만큼 이미지 98 + k 를 `x = x0 + 118 + k·(w + 1)`,
- * `y = Y + 35 + (h최대 − h)` 에 찍는다 (P6 5절 확정). 곧 **아래 맞춤**이다.
- * 이미지 98~101 은 12×2 · 12×5 · 12×8 · 12×11 이라 밑변이 모두 Y + 46 에 모인다.
+ * 사운드 값 — 소리 크기만큼 이미지 98 + k 를 `x = x0 + 118 + k·(w + 1)`, `y = Y + 35 + (막대 높이 18 − h)` 에 찍는다
+ * (0x59a14~0x59a86 직접 뜸 — 높이 기준은 그림 중 최대가 아니라 **값 막대 프레임 35 의 높이**다). 밑변이 모두 Y + 53 이다.
+ * 소리 0 이면 막대 대신 StrMAINMENU[0x4e] "OFF" 를 "!C!c7B93D4%s" 로 (x0 + 98, Y + 41) 막대 폭 가운데 (0x59a94~0x59ae8).
  */
 export const SOUND_BARS = {
   firstImage: 98,
   x: PANEL.x + 118,
   dy: 35,
+  /** 기준 높이 — 값 막대 프레임 35 */
+  baseHeight: 18,
   gap: 1,
   /** 이미지 98~101 의 폭·높이 (public/sprites/slt_frame/098~101.png) */
   sizes: [
@@ -86,18 +102,15 @@ export const SOUND_BARS = {
 } as const
 
 /**
- * 속도 값 — 속도 + 1 개만큼 이미지 102 + k 를 x0 + 107 부터 가로로, `y = Y + 37` **아래 맞춤**.
- *
- * 속도는 0~4 라 꺾쇠가 **최대 다섯 장(102~106)** 나온다. 예전에는 표에 102~105 넷만 적어 두어
- * 다섯째 장(106, 13×11)을 넷째 크기(12×9)로 잘못 보고 혼자 2px 내려앉았다 — 다섯 장을 다 적는다.
- * 다섯 장의 h최대는 11 이라 밑변이 모두 Y + 48 에 모인다 (소리 막대는 Y + 46).
- * 가로 간격은 원본 식을 못 읽어 예전 값(12px)을 그대로 둔다.
+ * 속도 값 — 속도 + 1 개만큼 이미지 102 + k 를 x0 + 107 부터 **틈 없이 붙여**(x += 그 그림 폭)
+ * `y = Y + 37 + (막대 높이 18 − h)/2` — 막대 안 **세로 가운데** (0x59b9c~0x59c10 직접 뜸).
+ * 속도는 0~4 라 꺾쇠가 최대 다섯 장(102~106)이다.
  */
 export const SPEED_MARKS = {
   firstImage: 102,
   x: PANEL.x + 107,
   dy: 37,
-  step: 12,
+  baseHeight: 18,
   /** 이미지 102~106 의 폭·높이 (public/sprites/slt_frame/102~106.png) */
   sizes: [
     { width: 11, height: 7 }, { width: 11, height: 7 },
@@ -106,26 +119,37 @@ export const SPEED_MARKS = {
   ],
 } as const
 
-/** 아래 맞춤 세로 보정 — `(h최대 − h)`. 표에 없는 칸은 마지막 칸으로 본다. */
-export function bottomAlignOffset(sizes: readonly { readonly height: number }[], index: number): number {
-  if (sizes.length === 0) return 0
-  const tallest = Math.max(...sizes.map((size) => size.height))
-  const size = sizes[Math.min(Math.max(0, index), sizes.length - 1)]
-  return tallest - size.height
+/** 사운드 막대 k 의 (x, y 보정) — 아래 맞춤 `18 − h` */
+export function soundBarAt(k: number): { readonly x: number; readonly dy: number } {
+  const size = SOUND_BARS.sizes[Math.min(Math.max(0, k), SOUND_BARS.sizes.length - 1)]
+  return { x: SOUND_BARS.x + k * (size.width + SOUND_BARS.gap), dy: SOUND_BARS.dy + SOUND_BARS.baseHeight - size.height }
 }
-/** 진동 값 — OFF/ON 두 칸, 고른 쪽에 노랑 사각 35×15 */
+
+/** 속도 꺾쇠 k 의 (x, y 보정) — 앞 그림 폭만큼 붙이고 막대 안 세로 가운데 */
+export function speedMarkAt(k: number): { readonly x: number; readonly dy: number } {
+  let x = SPEED_MARKS.x
+  for (let j = 0; j < k; j += 1) x += SPEED_MARKS.sizes[Math.min(j, SPEED_MARKS.sizes.length - 1)].width
+  const size = SPEED_MARKS.sizes[Math.min(Math.max(0, k), SPEED_MARKS.sizes.length - 1)]
+  return { x, dy: SPEED_MARKS.dy + Math.trunc((SPEED_MARKS.baseHeight - size.height) / 2) }
+}
+
+/**
+ * 진동 값 — StrMAINMENU[0x4e] "OFF" (x0 + 97) · [0x4f] "ON" (x0 + 136), y Y + 41, 폭 38 가운데.
+ * 지금 값 쪽이 "!C!cffffff%s" 흰색, 아닌 쪽 "!C!c7B93D4%s" (0x59cc6~0x59d6c).
+ * 지금 값 칸에 노랑 RGB(255,255,85) **테두리** 0x6a979 (x0 + 99 + 39·값, Y + 38, 35×15) (0x59d70~0x59d9a) — 채우기가 아니다.
+ */
 export const VIBRATION = {
   off: { x: PANEL.x + 97, dy: 41, width: 38 },
   on: { x: PANEL.x + 136, dy: 41, width: 38 },
-  highlight: { width: 35, height: 15, dy: 38 },
+  outline: { x: PANEL.x + 99, step: 39, width: 35, height: 15, dy: 38 },
 } as const
 
 /**
- * 아래 OK 버튼 — `ui/popup.pzx` 프레임 0 을 가운데에.
- * 원본 식은 `y = H/2 + hh/2 − h − 6` 인데 문서가 적어 둔 결과값은 251 이라 −6 이 빠진 값과 맞는다.
- * 여기서는 문서의 결과값을 따른다 (h = 15).
+ * 아래 OK 버튼 — `ui/popup.pzx` 프레임 0 을 가운데에. `y = H/2 + hh/2 − h − 6` (0x59dc8~0x59de6 직접 뜸, h = 15) —
+ * 메인 메뉴(hh 212) 245 · 경기 중(hh 130) 204. 예전 값 251 은 −6 을 빠뜨린 문서 결과값이었다.
  */
-export const OK_BUTTON = { frame: 0, width: 41, height: 15, y: 251 } as const
+export const OK_BUTTON = { frame: 0, width: 41, height: 15 } as const
+export const okButtonTopOf = (panelHeight: number) => SCREEN.height / 2 + Math.trunc(panelHeight / 2) - OK_BUTTON.height - 6
 
 /**
  * **경기 중 메뉴 "설정"**(0x3c326 → 하위 5, 그리기 0x3cdd0 이 0x593c8 종류 8)은 **작은 판**이다.

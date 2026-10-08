@@ -4,8 +4,8 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import { DEFAULT_SETTINGS, SPEED_LEVEL_COUNT } from '@/entities/settings/model/gameSettings'
 import {
-  IN_GAME_PANEL, MENU_ROW, MODE_RESET_ROW, MODE_RESET_TITLE, OK_BUTTON, PANEL, SOUND_BARS, SPEED_MARKS, VALUE_ROW,
-  bottomAlignOffset, closingFold, isSelectedOutlineShown, modeResetRowTopOf, nextPanelFold, openingFold, panelClipOf,
+  IN_GAME_PANEL, MENU_ROW, MODE_RESET_ROW, MODE_RESET_TITLE, PANEL, SOUND_BARS, SPEED_MARKS, VALUE_ROW,
+  closingFold, okButtonTopOf, soundBarAt, speedMarkAt, isSelectedOutlineShown, modeResetRowTopOf, nextPanelFold, openingFold, panelClipOf,
   rowTopOf,
 } from '@/pages/settings/lib/settingsLayout'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
@@ -74,38 +74,29 @@ describe('환경설정 창 배치', () => {
 })
 
 /**
- * 예전에는 `alignSelf:'end'` 로 아래 맞춤을 흉내 냈는데, 그 그림들은 `position:absolute` 라
- * 아무 효과가 없어 막대가 **천장에 붙은 내림 계단**으로 나왔다 (최대 9px 어긋남).
- * P6 5절 확정 식 `y = Y + 35 + (h최대 − h)` · `y = Y + 37 아래 맞춤` 을 직접 더하도록 바꿨다.
+ * 그리기 0x59a14~0x59c10 (직접 뜸): 소리 막대는 `y = Y + 35 + (18 − h)` 아래 맞춤(기준은 값 막대 프레임 35 높이 18),
+ * 속도 꺾쇠는 `x += 앞 그림 폭`(틈 없음) · `y = Y + 37 + (18 − h)/2` 세로 가운데다.
  */
-describe('소리 막대·속도 꺾쇠는 아래 맞춤이다 (P6 5절 확정)', () => {
-  it('소리 막대 넷(12×2·5·8·11)의 밑변이 모두 Y + 46 에 모인다', () => {
-    const 밑변 = SOUND_BARS.sizes.map(
-      (size, k) => SOUND_BARS.dy + bottomAlignOffset(SOUND_BARS.sizes, k) + size.height,
-    )
-
-    expect(밑변).toEqual([46, 46, 46, 46])
+describe('소리 막대·속도 꺾쇠 (0x59a14 · 0x59b9c)', () => {
+  it('소리 막대 넷(12×2·5·8·11)의 밑변이 모두 Y + 53 이고 13px 간격이다', () => {
+    const 막대 = SOUND_BARS.sizes.map((size, k) => ({ x: soundBarAt(k).x, 밑변: soundBarAt(k).dy + size.height }))
+    expect(막대.map((bar) => bar.밑변)).toEqual([53, 53, 53, 53])
+    expect(막대.map((bar) => bar.x - PANEL.x)).toEqual([118, 131, 144, 157])
   })
 
-  /**
-   * 꺾쇠는 **넷이 아니라 다섯**이다 — 속도 [옵션+0x2f] 는 0~4 고(K-5 5-1, 프레임 표 0xd7624 =
-   * [250,100,62,45,35] 다섯 칸) 그리는 쪽은 `속도 + 1 개만큼 이미지 102 + k` 라(P6 5절)
-   * 최대 속도에서 **102~106 다섯 장**이 나온다. 106 은 13×11 이라(public/sprites/slt_frame/106.png)
-   * h최대가 9 에서 11 로 올라가고 밑변은 Y + 48 이 된다.
-   * 예전 표는 102~105 넷만 적어 다섯째 장을 넷째 크기(12×9)로 보고 혼자 2px 내려앉혔다.
-   */
-  it('속도 꺾쇠 다섯(11×7·11×7·12×9·12×9·13×11)의 밑변이 모두 Y + 48 에 모인다', () => {
-    const 밑변 = SPEED_MARKS.sizes.map(
-      (size, k) => SPEED_MARKS.dy + bottomAlignOffset(SPEED_MARKS.sizes, k) + size.height,
-    )
-
+  it('속도 꺾쇠 다섯은 붙어 있고 막대 안 세로 가운데다', () => {
     expect(SPEED_MARKS.sizes.length).toBe(SPEED_LEVEL_COUNT)
-    expect(밑변).toEqual([48, 48, 48, 48, 48])
+    expect(SPEED_MARKS.sizes.map((_size, k) => speedMarkAt(k).x - PANEL.x)).toEqual([107, 118, 129, 141, 153])
+    expect(SPEED_MARKS.sizes.map((_size, k) => speedMarkAt(k).dy)).toEqual([42, 42, 41, 41, 40])
   })
 
-  it('가장 낮은 막대는 9px 내려 앉는다 — 예전 값(0)과 다른 곳이다', () => {
-    expect(bottomAlignOffset(SOUND_BARS.sizes, 0)).toBe(9)
-    expect(bottomAlignOffset(SOUND_BARS.sizes, 3)).toBe(0)
+  it('소리 0 이면 아이콘 88 과 "OFF" — 진동이 켜지면 아이콘 92, 노랑은 지금 값 칸 테두리', () => {
+    띄우기({ settings: { ...DEFAULT_SETTINGS, soundLevel: 0, isVibrationOn: true } })
+    expect(screen.getByTestId('설정아이콘-0').getAttribute('src')).toContain('/088.png')
+    expect(screen.getAllByText('OFF')).toHaveLength(2)
+    expect(screen.getByTestId('설정아이콘-2').getAttribute('src')).toContain('/092.png')
+    expect(screen.getByTestId('진동값테두리').style.left).toBe(`${PANEL.x + 99 + 39}px`)
+    expect(screen.getByText('ON').style.color).toBe('rgb(255, 255, 255)')
   })
 })
 
@@ -187,12 +178,13 @@ describe('경기 중 메뉴 "설정" — 작은 판 세 줄 (skin+0x125)', () =>
     }
   })
 
-  it('판은 (24, 95, 192, 130) — y0 = 160 − 65, 줄·OK 가 41 내려간다', () => {
+  it('판은 (24, 95, 192, 130) — y0 = 160 − 65, 줄은 41 내려가고 OK 는 H/2 + 65 − 15 − 6 = 204', () => {
     경기중()
 
     expect(IN_GAME_PANEL).toEqual({ x: 24, y: 95, width: 192, height: 130 })
     expect(줄('사운드').style.top).toBe(`${rowTopOf(0) + 41 + VALUE_ROW.bar.dy}px`)
-    expect(줄('확인').style.top).toBe(`${OK_BUTTON.y + 41}px`)
+    expect(줄('확인').style.top).toBe('204px')
+    expect(okButtonTopOf(PANEL.height)).toBe(245)
   })
 
   it('넷째 커서 칸이 OK — 고르면 popup 프레임 18, OK 를 누르면 경기 중 메뉴로', () => {

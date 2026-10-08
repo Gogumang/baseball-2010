@@ -15,9 +15,10 @@ import {
   detailValueOutlineOf,
   FIRST_MENU_ROW, IN_GAME_PANEL, IN_GAME_ROW_COUNT, MENU_ROW, MODE_RESET_ROW, MODE_RESET_ROW_COUNT, MODE_RESET_TITLE,
   OK_BUTTON, OK_SELECTED_FRAME, OK_SELECTED_OVERFLOW, PANEL, ROW_ICONS,
-  SETTINGS_FRAME, SOUND_BARS, SPEED_MARKS, TITLE, VALUE_ROW, VIBRATION,
+  SETTINGS_FRAME, SOUND_BARS, SOUND_OFF_ICON, SPEED_MARKS, TITLE, VALUE_ROW, VIBRATION, VIBRATION_ON_ICON,
+  okButtonTopOf, soundBarAt, speedMarkAt,
   MAIN_MENU_CURSOR_COUNT, SCREEN, SETTINGS_DESCRIPTIONS, DETAIL_DESCRIPTIONS,
-  bottomAlignOffset, closingFold, iconCenterOffsetOf, isSelectedOutlineShown, modeResetRowTopOf, nextPanelFold,
+  closingFold, iconCenterOffsetOf, isSelectedOutlineShown, modeResetRowTopOf, nextPanelFold,
   openingFold, panelClipOf, rowTopOf,
 } from '@/pages/settings/lib/settingsLayout'
 import type { PanelFold } from '@/pages/settings/lib/settingsLayout'
@@ -288,83 +289,92 @@ export function SettingsScreen({
         const isValueRow = index < FIRST_MENU_ROW
         const bar = isValueRow ? VALUE_ROW.bar : MENU_ROW.bar
         const bullet = isValueRow ? VALUE_ROW : MENU_ROW
+        const isSelected = index === cursor
+        // 화살·흰 테두리는 고른 줄이 깜빡일 때만 — 펴는 동안은 0x59548 이 끈다
+        const isBlinkOn = isSelected && isOutlineShown && isUnfolded
+        const barFrame = isValueRow ? (index === 2 ? VALUE_ROW.vibrationBarFrame : VALUE_ROW.barFrame) : MENU_ROW.barFrame
+        const icon = index === 0 && settings.soundLevel === 0 ? SOUND_OFF_ICON
+          : index === 2 && settings.isVibrationOn ? VIBRATION_ON_ICON : ROW_ICONS[index]
         return (
           <div key={name}>
             <img className={styles.sprite} alt=""
-              src={imageSrc(SLT_FRAME, bullet.bulletImage)}
+              src={imageSrc(SLT_FRAME, isSelected ? bullet.selectedBulletImage : bullet.bulletImage)}
               style={{ left: bullet.bullet.x, top: top + bullet.bullet.dy }} />
-            <FrameSprite folder={`${SLT_FRAME}/frames`} frame={isValueRow ? VALUE_ROW.barFrame : MENU_ROW.barFrame}
+            <FrameSprite folder={`${SLT_FRAME}/frames`} frame={barFrame}
               origins={frames} x={bar.x} y={top + bar.dy} />
 
-            {isValueRow ? (
+            {isValueRow && icon !== undefined ? (
               <>
-                <img className={styles.sprite} alt=""
-                  src={imageSrc(SLT_FRAME, VALUE_ROW.iconBackImage)}
-                  style={{ left: VALUE_ROW.iconBack.x, top: top + VALUE_ROW.iconBack.dy }} />
-                <img className={styles.sprite} alt=""
-                  src={imageSrc(SLT_FRAME, ROW_ICONS[index].image)}
-                  style={{
-                    left: VALUE_ROW.iconBack.x + iconCenterOffsetOf(ROW_ICONS[index]).dx,
-                    top: top + VALUE_ROW.iconBack.dy + iconCenterOffsetOf(ROW_ICONS[index]).dy,
-                  }} />
                 <div className={styles.valueName} style={{ left: VALUE_ROW.name.x, top: top + VALUE_ROW.name.dy }}>
                   {name}
                 </div>
                 <img className={styles.sprite} alt=""
-                  src={imageSrc(SLT_FRAME, VALUE_ROW.arrowImage)}
-                  style={{ left: VALUE_ROW.leftArrow.x, top: top + VALUE_ROW.leftArrow.dy }} />
-                <img className={styles.sprite} alt=""
-                  src={imageSrc(SLT_FRAME, VALUE_ROW.arrowImage)}
-                  style={{ left: VALUE_ROW.rightArrow.x, top: top + VALUE_ROW.rightArrow.dy, transform: 'scaleX(-1)' }} />
-                {/*
-                  소리 막대·속도 꺾쇠는 **아래 맞춤**이다 (P6 5절 확정).
-                  그림이 position:absolute 라 `alignSelf:'end'` 는 아무 일도 하지 않았다 —
-                  원본 식대로 `y + (h최대 − h)` 를 직접 더한다.
-                */}
+                  src={imageSrc(SLT_FRAME, VALUE_ROW.iconBackImage)}
+                  style={{ left: VALUE_ROW.iconBack.x, top: top + VALUE_ROW.iconBack.dy }} />
+                <img className={styles.sprite} alt="" data-testid={`설정아이콘-${index}`}
+                  src={imageSrc(SLT_FRAME, icon.image)}
+                  style={{
+                    left: VALUE_ROW.iconBack.x + iconCenterOffsetOf(icon).dx,
+                    top: top + VALUE_ROW.iconBack.dy + iconCenterOffsetOf(icon).dy,
+                  }} />
+                {isBlinkOn && (
+                  <>
+                    <img className={styles.sprite} alt=""
+                      src={imageSrc(SLT_FRAME, VALUE_ROW.arrowImage)}
+                      style={{ left: VALUE_ROW.leftArrow.x, top: top + VALUE_ROW.leftArrow.dy }} />
+                    <img className={styles.sprite} alt=""
+                      src={imageSrc(SLT_FRAME, VALUE_ROW.arrowImage)}
+                      style={{ left: VALUE_ROW.rightArrow.x, top: top + VALUE_ROW.rightArrow.dy, transform: 'scaleX(-1)' }} />
+                  </>
+                )}
+                {/* 소리 막대 — 아래 맞춤, 기준은 막대 높이 18 (밑변 Y + 53). 0 이면 "OFF" */}
                 {index === 0 && Array.from({ length: settings.soundLevel }, (_unused, k) => (
-                  <img key={k} className={styles.sprite} alt=""
+                  <img key={k} className={styles.sprite} alt="" data-testid={`소리막대-${k}`}
                     src={imageSrc(SLT_FRAME, SOUND_BARS.firstImage + k)}
-                    style={{
-                      left: SOUND_BARS.x + k * (SOUND_BARS.sizes[Math.min(k, SOUND_BARS.sizes.length - 1)].width + SOUND_BARS.gap),
-                      top: top + SOUND_BARS.dy + bottomAlignOffset(SOUND_BARS.sizes, k),
-                    }} />
+                    style={{ left: soundBarAt(k).x, top: top + soundBarAt(k).dy }} />
                 ))}
+                {index === 0 && settings.soundLevel === 0 && (
+                  <div className={styles.vibrationLabel}
+                    style={{ left: VALUE_ROW.bar.x, top: top + VALUE_ROW.name.dy, width: VALUE_ROW.bar.width, color: DETAIL_COLORS.unselected }}>
+                    {SETTINGS_TEXT.vibrationOff}
+                  </div>
+                )}
+                {/* 속도 꺾쇠 — 틈 없이 붙이고 막대 안 세로 가운데 */}
                 {index === 1 && Array.from({ length: settings.speedLevel + 1 }, (_unused, k) => (
-                  <img key={k} className={styles.sprite} alt=""
+                  <img key={k} className={styles.sprite} alt="" data-testid={`속도꺾쇠-${k}`}
                     src={imageSrc(SLT_FRAME, SPEED_MARKS.firstImage + k)}
-                    style={{
-                      left: SPEED_MARKS.x + k * SPEED_MARKS.step,
-                      top: top + SPEED_MARKS.dy + bottomAlignOffset(SPEED_MARKS.sizes, k),
-                    }} />
+                    style={{ left: speedMarkAt(k).x, top: top + speedMarkAt(k).dy }} />
                 ))}
                 {index === 2 && (
                   <>
-                    <div className={styles.vibrationHighlight}
-                      style={{
-                        left: (settings.isVibrationOn ? VIBRATION.on : VIBRATION.off).x,
-                        top: top + VIBRATION.highlight.dy,
-                        width: VIBRATION.highlight.width,
-                        height: VIBRATION.highlight.height,
-                      }} />
                     <div className={styles.vibrationLabel}
-                      style={{ left: VIBRATION.off.x, top: top + VIBRATION.off.dy, width: VIBRATION.off.width, color: settings.isVibrationOn ? '#FFFFFF' : '#000000' }}>
+                      style={{
+                        left: VIBRATION.off.x, top: top + VIBRATION.off.dy, width: VIBRATION.off.width,
+                        color: settings.isVibrationOn ? DETAIL_COLORS.unselected : DETAIL_COLORS.selected,
+                      }}>
                       {SETTINGS_TEXT.vibrationOff}
                     </div>
                     <div className={styles.vibrationLabel}
-                      style={{ left: VIBRATION.on.x, top: top + VIBRATION.on.dy, width: VIBRATION.on.width, color: settings.isVibrationOn ? '#000000' : '#FFFFFF' }}>
+                      style={{
+                        left: VIBRATION.on.x, top: top + VIBRATION.on.dy, width: VIBRATION.on.width,
+                        color: settings.isVibrationOn ? DETAIL_COLORS.selected : DETAIL_COLORS.unselected,
+                      }}>
                       {SETTINGS_TEXT.vibrationOn}
                     </div>
                   </>
                 )}
               </>
             ) : (
-              <div className={styles.menuName} style={{ left: MENU_ROW.name.x, top: top + MENU_ROW.name.dy, width: MENU_ROW.name.width }}>
+              <div className={styles.menuName}
+                style={{
+                  left: MENU_ROW.name.x, top: top + MENU_ROW.name.dy, width: MENU_ROW.name.width,
+                  color: isSelected ? DETAIL_COLORS.selected : DETAIL_COLORS.unselected,
+                }}>
                 {name}
               </div>
             )}
 
-            {/* 펴는 동안은 테두리를 끈다 (0x59548) */}
-            {index === cursor && isOutlineShown && isUnfolded && (
+            {isBlinkOn && (
               <div className={styles.selectedOutline}
                 style={{ left: bar.x, top: top + bar.dy, width: bar.width, height: bar.height }} />
             )}
@@ -377,8 +387,18 @@ export function SettingsScreen({
         )
       })}
 
+      {/* 진동 지금 값 칸 노랑 테두리 — 줄 루프 뒤 (0x59d70) */}
+      {names.length > 2 && (
+        <div className={styles.valueOutline} data-testid="진동값테두리"
+          style={{
+            left: VIBRATION.outline.x + VIBRATION.outline.step * (settings.isVibrationOn ? 1 : 0),
+            top: rowTopOf(2) + panelDy + VIBRATION.outline.dy,
+            width: VIBRATION.outline.width, height: VIBRATION.outline.height,
+          }} />
+      )}
+
       <button type="button" className={styles.row} aria-label="확인"
-        style={{ left: (PANEL.width - OK_BUTTON.width) / 2 + PANEL.x, top: OK_BUTTON.y + panelDy, width: OK_BUTTON.width, height: OK_BUTTON.height }}
+        style={{ left: (PANEL.width - OK_BUTTON.width) / 2 + PANEL.x, top: okButtonTopOf(panel.height), width: OK_BUTTON.width, height: OK_BUTTON.height }}
         onMouseEnter={() => setCursor(okCell)}
         onClick={() => { setCursor(okCell); leave() }}>
         <img className={styles.sprite} alt=""
