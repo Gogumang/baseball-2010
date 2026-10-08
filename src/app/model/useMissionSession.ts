@@ -109,6 +109,7 @@ import { vibrate } from '@/entities/defense-controls/model/vibration'
 import { strikeoutVibrationMillisecondsOf } from '@/features/play-game/model/strikeoutVibration'
 import { enterSceneConfirm } from '@/features/play-game/model/sceneConfirm'
 import type { SubstitutionScene } from '@/features/play-game/model/substitutionScene'
+import { aceCutInSlotOf } from '@/features/play-game/model/aceCutIn'
 import { SCENE_PREPARE_FRAMES } from '@/features/play-game/model/useSceneConfirm'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import {
@@ -644,6 +645,10 @@ export function useMissionSession({
       serial: (previous?.serial ?? 0) + 1,
       incomingIsAce: substitution.incomingIsAce,
       entrySoundId: pitcherEntrySoundIdOf({ isAce: substitution.incomingIsAce, bases: run.bases }),
+      // 마선수 등장 컷인 0x473f0 번호 — 미션 상대 마선수(1 부터) 0xb63a1 = opponentAce − 1, 대타면 +5
+      ...(substitution.incomingIsAce && run.mission.opponentAce > 0
+        ? { aceSlot: aceCutInSlotOf(substitution.kind === '대타' ? '타자' : '투수', run.mission.opponentAce - 1) }
+        : {}),
     }))
     // 0x16 → 0xd → 0xe — 새 대기(화면은 연출이 끝난 뒤부터 0xd 두 그림을 센다)
     setSceneConfirm(enterSceneConfirm())
