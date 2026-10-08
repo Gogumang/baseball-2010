@@ -98,9 +98,12 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
     }
     /** 투구 순간 소리를 이미 낸 공 — 0x3f378 은 투수 단계가 놓는 칸에 **닿는 틱 한 번만** 낸다(`cmp r6,r4 ; bne`) */
     let releaseSoundPitch: object | null = null
-    // 하늘 줄 = 구장 +0x10 (0x783b0 — `stadiumSkyRowOf`). 원본은 경기 장면을 세울 때 한 번 고른다 — 부르는 쪽이 그 줄을 넘긴다.
-    // ⚠️ 안 넘기는 화면(미션 · 홈런더비 — 원본 rand(0, 6) 모드)은 예전대로 그림을 세울 때마다 여기서 굴린다(장면당 한 번이 아니다)
-    const skyRow = latestRef.current.skyRow ?? randomIntegerBelow(latestRef.current.random, 0, SKY_ROW_COUNT)
+    // 하늘 줄 = 구장 +0x10 (0x783b0 — `stadiumSkyRowOf`). 원본은 경기 장면을 세울 때 한 번 고른다 — 부르는 쪽이 그 줄을 넘긴다
+    // (미션 · 홈런더비도 세션이 장면마다 한 번 굴린 rand(0, 6) 을 넘긴다 — 홈런더비는 결과 진입 0x4f574 에서 한 번 더).
+    // 그리는 그림마다 넘겨받은 줄을 읽는다. ⚠️ 안 넘기는 화면만 예전대로 그림을 세울 때 여기서 굴린다(장면당 한 번이 아니다)
+    const fallbackSkyRow =
+      latestRef.current.skyRow === undefined ? randomIntegerBelow(latestRef.current.random, 0, SKY_ROW_COUNT) : 0
+    const skyRowNow = () => latestRef.current.skyRow ?? fallbackSkyRow
 
     const advancePhase = (now: number) => {
       const elapsed = now - phaseStartedAtRef.current
@@ -246,7 +249,7 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
           {
             isWin: settlement.isWin,
             // 0x4f42c 는 구장 +0x14(지금 하늘 칸 = 경기 상태 +0x6b, 0부터)로 하늘 색을 본다
-            skyColorIndex: skyColorsOf(skyRow, skyColumnOfInning(settlement.inning)).colorIndex,
+            skyColorIndex: skyColorsOf(skyRowNow(), skyColumnOfInning(settlement.inning)).colorIndex,
             side0Score: settlement.side0Score,
             side1Score: settlement.side1Score,
           },
@@ -326,7 +329,7 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
         // 일반 구장 번호를 고르는 규칙(st+0x70)이 미확인이라 0 번 구장으로 둔다 (추정).
         // 시즌 구장 세 칸이 넘어오면 배경 묶음 자체가 0x77494 쪽으로 갈린다 (0x40ff0).
         scenery: {
-          skyRow,
+          skyRow: skyRowNow(),
           stadium: 0,
           seasonStadium: latestRef.current.seasonStadium,
           // 하늘 조명 0x78490 은 모드 5·6·7(미션·홈런더비)에서 안 그린다

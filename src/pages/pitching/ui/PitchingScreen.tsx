@@ -113,6 +113,8 @@ interface PitchingScreenProps {
    */
   readonly substitutionScene?: SubstitutionScene | null
   readonly onSubstitutionSceneDone?: () => void
+  /** 하늘 줄 — 구장 +0x10 (0x783b0). 미션은 장면마다 한 번 굴린 rand(0, 6) — 세션이 든다. 안 넘기면 타석 그림이 굴린다 */
+  readonly skyRow?: number
   /**
    * **경기 난수** — 결과 판(경기 상태 0x19)의 배경 · 정산 효과(0x4ea0c 꼬리: 성공이면 밤하늘일 때 불꽃, 실패면 비)와 그림마다
    * 효과 · 파티클 틱이 쓴다. 안 넘기면 결과 판에 배경 · 효과가 없다.
@@ -138,6 +140,7 @@ export function PitchingScreen({
   onSceneConfirm,
   substitutionScene = null,
   onSubstitutionSceneDone,
+  skyRow,
   random,
   onRestart,
   settings,
@@ -162,8 +165,8 @@ export function PitchingScreen({
   /** 일시정지 팝업(0x741a0)이 떠 있는가 — 경기 중 메뉴 또는 그 하위 [조작방법] 뷰어. 경기 키가 안 간다 */
   const isPopupOpen = isMenuOpen || overlay !== null
   const isRunning = run.status === '진행중'
-  // ⚠️ 웹 타석 그림이 세울 때 굴리는 하늘 줄 rand(0, 6)(추정 대체)이 경기 난수에 새지 않게 결과 배경은 따로 든 난수로 세운다
-  //    (팀경기 · 투수편 정산과 같은 근사 — 원본은 경기 내내 같은 구장객체)
+  // 결과 배경 캔버스의 난수 — 하늘 줄은 세션이 장면마다 한 번 굴린 `skyRow` 를 넘기므로 여기서 굴리지 않는다(넘기지 않은
+  // 화면만 이 따로 든 난수로 굴린다 — 경기 난수에 새지 않게)
   const [backdropRandom] = useState(() => createSeededRandom(0))
   /** 정산 효과 층(비 · 파티클) — 결과 배경 타석 캔버스와 미션 결과 판이 같이 쓴다 (원본 그리기 차례 0x4a384) */
   const settlementLayers = useSettlementEffectLayers()
@@ -225,6 +228,7 @@ export function PitchingScreen({
           */}
           {random !== undefined && (
             <BattingStage
+              skyRow={skyRow}
               // 결과 배경은 선수·공을 안 그려 능력치를 읽지 않는다 — 꼴을 채우는 기본값
               batterAbility={STARTING_ABILITY}
               pitcherAbility={DEFAULT_PITCHER_ABILITY}

@@ -67,6 +67,8 @@ import {
 } from '@/app/model/modePitcher'
 import { hallOfFameModeBatterOf } from '@/app/model/modeBatter'
 import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
+import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
+import { SKY_ROW_COUNT } from '@/widgets/batting-stage/lib/stageScenery'
 import { openScenePatternDeck } from '@/entities/batting/model/battedBallOutcome'
 import { hallOfFamePitcherAt } from '@/entities/collection/model/collection'
 import type { Collection, HallOfFamePlayerPick } from '@/entities/collection/model/collection'
@@ -1230,6 +1232,14 @@ export function useMissionSession({
     missionRecord.save(next)
   }
 
+  /**
+   * **하늘 줄 — 구장 +0x10** (0x783b0, `stadiumSkyRowOf`). 미션(모드 5 · 6)은 그 밖 갈래라 rand(0, 6) — 경기 적재(상태 8 갱신
+   * 0x48658 의 48774 → 구장 준비 0x352e8(354d2))가 **장면마다 한 번** 굴리고 정산 결과 그림까지 같은 줄이다. 차례는 상태 7 장면 초기화
+   * (0x3e340 — 패턴 덱 0xb08e8) 뒤 · 상태 9 경기 시작 꼬리(0x3fa0e — 0xc0dac) 앞.
+   */
+  const [skyRow, setSkyRow] = useState(0)
+  const rollSkyRow = () => setSkyRow(randomIntegerBelow(random, 0, SKY_ROW_COUNT))
+
   /** 새 경기 — 필살·마구 남은 칸은 0xaebe4 가 다시 채운다 (팀 new 0xb891c 가 −1), 공 객체도 새것 */
   const resetForNewMatch = (mission: OriginalMission) => {
     // 새 경기 — 0xaae7c 가 저장된 마투수 레코드(+0x2c = 10000)를 다시 베낀다
@@ -1248,6 +1258,7 @@ export function useMissionSession({
     // 미션(모드 5·6)도 보통 경기 장면이라 모드 점프 뒤 이 꼬리를 탄다 — 1회초 판·첫 타석 준비보다 앞.
     // 그 앞 상태 7 장면 초기화 0x3e340 의 3ed76 → 0xb08e8 이 이 장면의 패턴 덱을 섞는다(사람 · CPU 타자가 같이 쓴다)
     openScenePatternDeck(random)
+    rollSkyRow()
     rollSimulatorInit(random)
   }
 
@@ -1308,6 +1319,7 @@ export function useMissionSession({
       setStealingFrom([])
       // 마선수 대결도 미션 장면(모드 6)으로 나간다 — 장면 덱(0x3e340 → 0xb08e8) · 0x3fa0e 의 rand(0, 2) 한 번 (`resetForNewMatch` 와 같다)
       openScenePatternDeck(random)
+      rollSkyRow()
       rollSimulatorInit(random)
       setMissionRun(startMission(mission))
       setScreen({ kind: '마선수대결', mission, ...pending })
@@ -1589,6 +1601,8 @@ export function useMissionSession({
     substitutionScene,
     /** 화면이 교체 연출을 다 그렸다 */
     finishSubstitutionScene,
+    /** 이 미션 장면의 하늘 줄 (구장 +0x10 — 장면을 세울 때 한 번 굴린 rand(0, 6)) — 타석 · 정산 결과 배경이 같이 쓴다 */
+    skyRow,
     /** 경기 난수 — 결과 판 0x4a384 의 정산 효과가 쓴다 (투수편 마선수 대결 화면 `PitcherAceMatchRoute`) */
     random,
     /** 타자 미션 상대 마투수의 체력% `0xaebb0` = trunc(+0x2c / 100) — `missionPitcherAbility` 셋째 인자 */

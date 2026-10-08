@@ -114,6 +114,8 @@ interface MissionPlayScreenProps {
    */
   readonly substitutionScene?: SubstitutionScene | null
   readonly onSubstitutionSceneDone?: () => void
+  /** 하늘 줄 — 구장 +0x10 (0x783b0). 미션은 장면마다 한 번 굴린 rand(0, 6) — 세션이 든다. 안 넘기면 타석 그림이 굴린다 */
+  readonly skyRow?: number
 }
 
 /**
@@ -155,6 +157,7 @@ export function MissionPlayScreen({
   onSceneConfirm,
   substitutionScene = null,
   onSubstitutionSceneDone,
+  skyRow,
 }: MissionPlayScreenProps) {
   /**
    * 전역 경기 상태 +0x6b (`liveGameState`) — 미션 준비 0xaa57c 가 0xb6814 로 0 을 둔 뒤(0xaa5fc) 곧바로 0xaa698 이
@@ -292,6 +295,7 @@ export function MissionPlayScreen({
         {/* 0xe 에서 화면을 누르면 OK 로 본다 (터치용 웹판 편의 — 캔버스 탭이 스윙인 것과 같은 자리) */}
         <div className={styles.stageArea} onClick={sceneConfirm.acceptsConfirm ? sceneConfirm.confirm : undefined}>
           <BattingStage
+            skyRow={skyRow}
             batterAbility={ability}
             batterSkillIds={batterSkillIds}
             // 판정 묶음 '미션' = 모드 6(타자 미션) — 공격(사람) +100 (0xab5c0)

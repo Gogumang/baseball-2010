@@ -207,6 +207,8 @@ export function HomeRunDerbyScreen({
           onClick={acceptsConfirm ? confirm : isPlayRunning ? skipHomeRun : undefined}
         >
           <BattingStage
+            // 하늘 줄 — 세션이 장면 시작 · 결과 진입 0x4f574 에 굴린 구장 +0x10
+            skyRow={session.skyRow}
             key={stageSerial}
             batterAbility={ability}
             batterForm={batterForm}

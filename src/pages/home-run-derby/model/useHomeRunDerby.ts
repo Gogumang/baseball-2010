@@ -26,6 +26,8 @@ import { LOSE_SOUND, WIN_SOUND } from '@/features/play-game/model/gameSounds'
 import { activeSound, playSoundIds } from '@/shared/api/audio/soundPort'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
+import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
+import { SKY_ROW_COUNT } from '@/widgets/batting-stage/lib/stageScenery'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { resetLiveGameState } from '@/shared/lib/liveGameState/liveGameState'
 import {
@@ -133,17 +135,23 @@ export interface HomeRunDerbyOptions {
  *          3a454  v = rand(0, 9) → sp+0x18 ; v == r7 이면 9   ; 상대 팀 — 0xb6bd5(ctx, 1, v) · 팀 객체 0xb891c
  * 3fa0e  0xc0dac 시뮬 초기화 → c0df6 rand(0, 2)          ; `rollSimulatorInit` (dcfcef7)
  * ```
+ * 그 앞 상태 8 경기 적재(0x48658 의 48774 → 구장 준비 0x352e8(354d2) → 0x783b0)가 하늘 줄 rand(0, 6) 을 굴린다 — 모드 7 은 0x783b0 의
+ * 그 밖 갈래다(`stadiumSkyRowOf`). 돌려주는 값이 이 장면의 하늘 줄(구장 +0x10 = 값 mod 6)이다.
  * ⚠️ 뽑은 상대 팀(수비 팀)은 웹 더비가 그리지 않아 버린다 — 굴림 차례만 맞춘다.
  */
-export function rollDerbySceneStart(random: RandomPort): void {
+export function rollDerbySceneStart(random: RandomPort): number {
   // 상태 7 장면 초기화 0x3e340 의 3ed76 → 0xb08e8 — 이 장면의 패턴 덱을 섞는다(상태 9 의 3a454 보다 앞)
   openScenePatternDeck(random)
+  const skyRow = randomIntegerBelow(random, 0, SKY_ROW_COUNT)
   random.nextInRange(0, 9)
   rollSimulatorInit(random)
+  return skyRow
 }
 
 export interface HomeRunDerbySession {
   readonly run: DerbyRun
+  /** 이 장면의 하늘 줄 (구장 +0x10 — 장면 시작 · 결과 진입에 굴린 rand(0, 6)). 난수가 없으면 undefined */
+  readonly skyRow: number | undefined
   readonly pitcher: DerbyPitcher
   /** 공 하나가 끝난 뒤 띄우는 문구. 비어 있으면 안내 줄을 보여 준다 */
   readonly banner: string
@@ -243,13 +251,15 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
 
   // 장면에 들어선 첫 그림 뒤 한 번 — 첫 공(상태 0xd → 투구)보다 앞이다. StrictMode 의 효과 두 번 돌기에도 한 번만
   const isSceneStartRolledRef = useRef(false)
+  /** 하늘 줄 — 구장 +0x10 (`rollDerbySceneStart` · 결과 진입 0x4f574). 굴리기 전(난수 없음)엔 undefined — 타석 그림이 굴린다 */
+  const [skyRow, setSkyRow] = useState<number | undefined>(undefined)
   useEffect(() => {
     if (isSceneStartRolledRef.current) return
     isSceneStartRolledRef.current = true
     // 0x39fdc 모드 7 갈래 3a49c — 0xb6814(전역 상태): +0x6b = 0 (`liveGameState`). 더비는 한 공 끝 판정 A 가 0x18 로
     // 안 가(모드 7 → 0xd / 0x1a) 이닝 넘김 0xb6b6c 를 안 지나므로 그대로 0 이 남는다
     resetLiveGameState()
-    if (randomRef.current !== undefined) rollDerbySceneStart(randomRef.current)
+    if (randomRef.current !== undefined) setSkyRow(rollDerbySceneStart(randomRef.current))
   }, [])
 
   const timerRef = useRef<number | null>(null)
@@ -491,6 +501,8 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
       if (runRef.current.isFinished) {
         const finished = derbyResultOf(runRef.current, bestRef.current)
         setResult(finished)
+        // 결과 창 진입 0x4f574 의 4f6b0 — 구장 준비 0x352e8 을 다시 불러 하늘 줄 rand(0, 6) 을 한 번 더 굴린다(결과 배경이 이 줄)
+        if (randomRef.current !== undefined) setSkyRow(randomIntegerBelow(randomRef.current, 0, SKY_ROW_COUNT))
         // 결과 창(상태 0x1a) 진입 0x4f574 — 누적 > 저장 +0x5c 면 신기록 0x1f(31), 아니면 0x20(32)
         // 을 예약한다 (R14 1-2 · L 1-F). 승패 징글과 **같은 번호를 나눠 쓰는 자리**다
         playSoundIds(audioRef.current, [finished.isNewRecord ? WIN_SOUND : LOSE_SOUND])
@@ -563,7 +575,7 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
     enterScenePrepare()
     // 새 경기 장면의 상태 9 — 같은 시작 굴림 둘 (0x39fdc 모드 7 의 +0x6b = 0 도 다시)
     resetLiveGameState()
-    if (randomRef.current !== undefined) rollDerbySceneStart(randomRef.current)
+    if (randomRef.current !== undefined) setSkyRow(rollDerbySceneStart(randomRef.current))
     const fresh = createDerbyRun()
     runRef.current = fresh
     setRun(fresh)
@@ -585,6 +597,7 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
 
   return {
     run,
+    skyRow,
     pitcher: derbyPitcherOf(run.stage, aceLevels),
     banner,
     isPaused: isPaused || isPreparing || isAwaitingConfirm,

@@ -200,6 +200,8 @@ export function MissionRoutes({
         sceneConfirm={session.sceneConfirm}
         onSceneConfirm={session.confirmScene}
         substitutionScene={session.substitutionScene}
+        // 하늘 줄 — 장면을 세울 때 한 번 굴린 구장 +0x10 (0x783b0 rand(0, 6))
+        skyRow={session.skyRow}
         onSubstitutionSceneDone={session.finishSubstitutionScene}
       />
     )
@@ -235,6 +237,8 @@ export function MissionRoutes({
         sceneConfirm={session.sceneConfirm}
         onSceneConfirm={session.confirmScene}
         substitutionScene={session.substitutionScene}
+        // 하늘 줄 — 장면을 세울 때 한 번 굴린 구장 +0x10 (0x783b0 rand(0, 6))
+        skyRow={session.skyRow}
         onSubstitutionSceneDone={session.finishSubstitutionScene}
         // 결과 판 0x4a384 의 배경 · 정산 효과(0x4ea0c 꼬리 — 모드를 안 가린다)는 경기 난수로
         random={random}
@@ -361,6 +365,7 @@ export function PitcherAceMatchRoute(
       sceneConfirm={session.sceneConfirm}
       onSceneConfirm={session.confirmScene}
       substitutionScene={session.substitutionScene}
+      skyRow={session.skyRow}
       onSubstitutionSceneDone={session.finishSubstitutionScene}
       onFinish={() => {
         const isWin = actions.finishPitcherAceMatch()
