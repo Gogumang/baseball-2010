@@ -246,6 +246,19 @@ describe('질병 조건 22 — 사기 구간 확률 (0xadb32)', () => {
     expect(nextEventFor(지친선수, ORIGINAL_EVENTS, EVENT_TRIGGER.관리, 고정난수(0.99))?.id).not.toBe(490)
     expect(nextEventFor(지친선수, ORIGINAL_EVENTS, EVENT_TRIGGER.관리, 고정난수(0))?.id).toBe(490)
   })
+
+  it('이미 본 490 에는 굴리지 않는다 — 판정 0xacfbc 가 본 이벤트(0xad07e)를 조건보다 먼저 본다', () => {
+    let rolls = 0
+    const 세는난수: RandomPort = { ...고정난수(0), rand: (lo, hi) => { rolls += 1; return 고정난수(0).rand(lo, hi) } }
+    const 본선수 = 오프닝을본선수({
+      morale: 5,
+      season: 2,
+      seenEventIds: ORIGINAL_EVENTS.map((event) => String(event.id)),
+    })
+
+    expect(scanEventFrom(본선수, ORIGINAL_EVENTS, EVENT_TRIGGER.관리, 0, 세는난수).event).toBeNull()
+    expect(rolls).toBe(0)
+  })
 })
 
 describe('finishEvent', () => {

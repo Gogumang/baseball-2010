@@ -181,7 +181,9 @@ export function scanEventFrom(
 
   for (let at = Math.max(0, cursor); at < events.length; at += 1) {
     const event = events[at]
-    if (isEligible(event, career, trigger, random) && !hasSeen(career, event.id)) {
+    // 판정 0xacfbc 는 본 이벤트를(0xad07e~0xad08c `0xacf30` 참이면 불발) trigger · 선행 · 날짜 · 조건보다 **먼저** 본다 —
+    // 본 이벤트에는 무작위 조건(22 질병 · 20 스킬 획득 굴림)을 굴리지 않는다
+    if (!hasSeen(career, event.id) && isEligible(event, career, trigger, random)) {
       return { event, cursor: at }
     }
   }
