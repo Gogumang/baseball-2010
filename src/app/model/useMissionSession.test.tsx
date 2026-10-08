@@ -1460,3 +1460,24 @@ describe('마선수 대결의 사람 칸 팀 — g[0xf6] 모드 저장 레코드
     expect(rendered.result.current.missionRun?.game.humanBatting.teamId).toBe(mission.sideTeams[mission.humanSide === 0 ? 0 : 1])
   })
 })
+
+/* ── 미션 타자의 레코드 칸 k (0xb53f0 · 0xb6720) ───────────────────────────── */
+
+describe('타자 미션의 미션 타자 레코드 칸 — 나리 저장 선수 +0xa & 0x1f', () => {
+  it('begin · beginAceMatch 가 나리 타자편 저장 선수의 칸 k 를 넘긴다 — 옛 [k] 는 끝(12)으로', () => {
+    const mission = MISSIONS.find((m) => m.side === '타자' && m.id === 1)!
+    const rendered = renderHook(() =>
+      useMissionSession({
+        runner: useAtBatRunner(), random: createSeededRandom(3), missionRecord: { load: () => ({}), save: vi.fn() },
+        screen: { kind: '미션선택' }, setScreen: vi.fn(), nariBatterRecordSlot: 5,
+      }))
+    act(() => rendered.result.current.actions.begin(mission))
+    const records = rendered.result.current.missionRun?.game.humanBatting.records
+    const order = rendered.result.current.missionRun?.game.humanBatting.order
+    expect(records?.[12]).toBe(5)
+    expect(records?.[5]).toBe(order)
+    const ace = aceMatchMissionOf(16, '타자')!
+    act(() => rendered.result.current.actions.beginAceMatch(ace, { resultEvents: [1, 2], context: '대결결과', carried: EMPTY_STORY_CARRY }))
+    expect(rendered.result.current.missionRun?.game.humanBatting.records[12]).toBe(5)
+  })
+})

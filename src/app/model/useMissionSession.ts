@@ -176,7 +176,23 @@ interface MissionSessionInput {
    * 안 넘기면(그 편 저장이 없으면) 레코드 팀 그대로다 (원본은 저장 없이 그 편 이벤트가 돌 수 없다).
    */
   readonly nariTeamIds?: { readonly batter?: number; readonly pitcher?: number }
+  /**
+   * **나리 타자편 저장 선수의 `+0xa & 0x1f`** — 타자 미션 0xaa57c 의 0xb87cc · 0xb53f0(0x80 갈래 · 0xb6720)이 미션 타자를 넣는 레코드
+   * 칸 k (`MissionGameSetup.nariRecordSlot`). App 은 자기 나리 팀 레코드의 내 줄 첨자를 넘긴다(`myBatterIndexOf` — 142 · 경기 장면이
+   * 0xb8768 로 배열 첨자로 다시 매긴 값, 홈런더비 타순 `EntryRoutes` 와 같은 칸 — ⚠️ 유력: 저장 선수 +0xa 를 그 첨자로 적는 마지막
+   * 자리를 다 훑지는 않았다). 안 넘기면(내 줄이 없으면) 끝 칸 12.
+   */
+  readonly nariBatterRecordSlot?: number
 }
+
+/**
+ * **명예 타자(0x1f640)의 레코드 칸 k** — 등록 0x1f680 이 `+0xa = 0x20` 을 통째로 적는다(1f682 `movs r3,#0x20` · 1f684 `strb r3,[r1,#0xa]`).
+ * 0xb53f0 은 0x40(b5406 마선수) · 0x80(b547e) · 0xc0(b548e) 갈래를 안 타고 b5532 의 0x20 갈래로 가서 같은 0xb6720 으로
+ * k = 0x20 & 0x1f = **0** 을 꺼내 0x80 갈래와 같은 옮김(b5546 배열 늘림 · b5576 옛 [k] 를 끝으로 · b55ae [k] ← 선수 · b55c2 수비 위치는
+ * 옛 선수 것 · b55d6 0xb6605 다시 매김)을 한다. aa7c2 의 0xb6394(0x1fc20(저장)) 도 같은 기록이라 0 이다.
+ * (웹 명전 기록에는 +0xa 칸이 없지만 등록이 늘 0x20 을 적으므로 값이 하나뿐이다.)
+ */
+const HALL_OF_FAME_BATTER_RECORD_SLOT = 0x20 & 0x1f
 
 /** g[0xf6] — SYS 8 이 0x8d836~0x8d846 에서 적는 그때 모드 (0x1552d10): 나리 투수편 3 · 타자편 4 */
 const PITCHER_EDITION_MODE = 3
@@ -397,6 +413,7 @@ export function useMissionSession({
   hallOfFame,
   isVibrationOn,
   nariTeamIds,
+  nariBatterRecordSlot,
 }: MissionSessionInput) {
   const nariPitcher = useMemo(() => pitcherInput ?? modePitcherOf(null), [pitcherInput])
   /**
@@ -1320,7 +1337,9 @@ export function useMissionSession({
         setScreen({ kind: '투수미션', mission })
         return
       }
-      setMissionRun(startMission(mission))
+      // 0xaa57c aa7b0 — 미션 타자(0x1fc20: 명예 타자 또는 나리 타자편 저장 선수)가 드는 레코드 칸 k = +0xa & 0x1f
+      const nariRecordSlot = hallOfFameBatter !== null ? HALL_OF_FAME_BATTER_RECORD_SLOT : nariBatterRecordSlot
+      setMissionRun(startMission(mission, nariRecordSlot === undefined ? {} : { nariRecordSlot }))
       setScreen({ kind: '미션진행', mission })
     },
 
@@ -1340,7 +1359,11 @@ export function useMissionSession({
       rollSkyRow()
       rollSimulatorInit(random)
       // 0xaa57c aa6e0 — g[0x11f] 가 서 있고 g[0xf6] = 4(나리 타자편, SYS 8 0x8d836) → 사람 칸 = 타자편 저장 팀
-      setMissionRun(startMission(mission, aceMatchSetupOf(BATTER_EDITION_MODE, nariTeamIds?.batter)))
+      // 0x1fc20 은 g[0x11f] 면 명예 타자 갈래를 안 타 늘 나리 타자편 저장 선수 — k 도 그 선수 +0xa & 0x1f
+      setMissionRun(startMission(mission, {
+        ...aceMatchSetupOf(BATTER_EDITION_MODE, nariTeamIds?.batter),
+        ...(nariBatterRecordSlot === undefined ? {} : { nariRecordSlot: nariBatterRecordSlot }),
+      }))
       setScreen({ kind: '마선수대결', mission, ...pending })
     },
 

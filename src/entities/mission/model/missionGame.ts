@@ -192,7 +192,8 @@ export function missionHumanTeamIdOf(mission: OriginalMission, aceMatch?: Missio
 export interface MissionGameSetup {
   readonly aceMatch?: MissionAceMatchOrigin
   /**
-   * 타자 미션 — 미션 타자(0x1fc20) +0xa & 0x1f (`humanRecordsOf`). 나리 타자편 저장 선수면 자기 나리 팀 타자 칸.
+   * 타자 미션 — 미션 타자(0x1fc20) +0xa & 0x1f (`humanRecordsOf`). 나리 타자편 저장 선수면 자기 나리 팀 타자 칸,
+   * 명예 타자면 0 (등록 0x1f680 이 +0xa = 0x20 을 적고 0xb53f0 b5532 의 0x20 갈래가 같은 0xb6720 으로 꺼낸다 — `useMissionSession`).
    * 안 주면 `MISSION_NARI_RECORD_FALLBACK`(12).
    */
   readonly nariRecordSlot?: number

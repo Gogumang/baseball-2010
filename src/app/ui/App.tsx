@@ -20,6 +20,7 @@ import { GAME_POINT_USAGE } from '@/entities/collection/model/annalsStats'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 import { isEveryMissionCleared } from '@/entities/mission/model/missionGoal'
 import { aceMatchMissionOf, matchResultEventOf } from '@/entities/story/model/aceMatch'
+import { myBatterIndexOf, nariTeamRecordOf, nariTeamsOf } from '@/entities/career/model/nariTeamRecord'
 import { modeBatterOf } from '@/app/model/modeBatter'
 import { modePitcherOf } from '@/app/model/modePitcher'
 import type { AceMatchStarter } from '@/app/ui/CareerRoutes'
@@ -227,6 +228,9 @@ export function App() {
   // 타자 미션(모드 6)은 0x213c0 이 6→4 로 나리 타자편 저장을 올린다 — 마투수 투구 소모(0xa5e14)의 압도 22 가 이 타자를 본다
   const missionBatterCareer = careerSession.career ?? careerSession.savedCareer
   const missionBatterSkillIds = missionBatterCareer?.equippedSkillIds
+  const missionBatterRecordSlot = missionBatterCareer === null || missionBatterCareer === undefined
+    ? -1
+    : myBatterIndexOf(nariTeamRecordOf(nariTeamsOf(missionBatterCareer), missionBatterCareer.teamId))
   // 미션 보상 G (0x4ef72) — 지갑으로 들어간다. 육성 선수가 없어도 사라지지 않는다
   const mission = useMissionSession({
     runner, random, missionRecord, screen, setScreen, sound,
@@ -248,6 +252,8 @@ export function App() {
       ...(missionBatterCareer === null || missionBatterCareer === undefined ? {} : { batter: missionBatterCareer.teamId }),
       ...(pitcherSession.career === null || pitcherSession.career === undefined ? {} : { pitcher: pitcherSession.career.teamId }),
     },
+    // 타자 미션 0xb53f0 의 k = 나리 타자편 저장 선수 +0xa & 0x1f — 자기 나리 팀 레코드의 내 줄 첨자 (홈런더비 타순과 같은 칸)
+    ...(missionBatterRecordSlot < 0 ? {} : { nariBatterRecordSlot: missionBatterRecordSlot }),
   })
   // 투수편이 연 히든(장비 컬렉터 20·24·28·32)도 같은 전역 표 `app+0xc0` 에 모은다 (0x62368)
   // 시즌 결산이 연 전역 해금(0x29)도 같은 전역 표에 모은다
