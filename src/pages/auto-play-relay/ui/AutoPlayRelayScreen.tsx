@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { FrameSprite, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { HalfInningCards } from '@/widgets/game-scene/ui/HalfInningCards'
@@ -70,7 +71,7 @@ interface AutoPlayRelayScreenProps {
    * 갱신 0x48480 한 번 — 틱마다 부른다. 부르는 쪽(세션 `stepAutoRelay`)이 0xc2198 → 0xc262c 한 번을 굴리고, 0xc2198 이 거짓이면
    * (자동진행 끝) 상태 0x18 로 넘긴다(+0x1784 = 0, 미션은 판 없이 곧장 0xd — 이 화면이 내려간다).
    */
-  readonly onTick: () => void
+  readonly onTick: (tick: number) => void
   /** 두 측 팀 (경기[0x28 + 칸] — 0xaa57c 가 세운 사람 칸 · 다른 칸 팀) */
   readonly sideTeams: readonly [number, number]
   /** 사람 칸 (st[0x31 + 칸] == 0 인 측) */
@@ -80,6 +81,11 @@ interface AutoPlayRelayScreenProps {
    * 0xb62c0 이 기록 +1 의 이름을 그린다. 안 넘기면 그 줄 이름을 비운다.
    */
   readonly missionBatterName?: string | null
+  /**
+   * 모드 ∈ {1, 2, 8, 9} 갈래가 위에 얹는 것 — 안내 띠 · 속도 칸 · "CHANGE" · CLR 중단 질문 (`pages/team-game` 의 `TeamAutoRelay`).
+   * 미션 · 나리편은 안 넘긴다.
+   */
+  readonly overlay?: ReactNode
 }
 
 /**
@@ -103,11 +109,11 @@ interface AutoPlayRelayScreenProps {
  *
  * ⚠️ 미이식(그림): 배경(운동장 전경)은 안 그린다.
  */
-export function AutoPlayRelayScreen({ step, onTick, sideTeams, humanSide, missionBatterName }: AutoPlayRelayScreenProps) {
+export function AutoPlayRelayScreen({ step, onTick, sideTeams, humanSide, missionBatterName, overlay }: AutoPlayRelayScreenProps) {
   // 틱 n(1부터)은 n 번째 0x48480 갱신 — 굴림은 부르는 쪽이 그 틱에 한다
-  const tick = useSceneTick(() => onTick())
+  const tick = useSceneTick((next) => onTick(next))
   const textOrigins = useFrameOrigins(IMG_TEXT_FRAMES)
-  if (step === null) return <RawScreen>{null}</RawScreen>
+  if (step === null) return <RawScreen>{overlay ?? null}</RawScreen>
 
   const offenseTeam = sideTeams[step.offenseSide]
   const label = step.offenseSide === humanSide ? OFFENSE_LABEL.player : OFFENSE_LABEL.computer
@@ -165,6 +171,7 @@ export function AutoPlayRelayScreen({ step, onTick, sideTeams, humanSide, missio
           </div>
         </>
       )}
+      {overlay}
     </RawScreen>
   )
 }

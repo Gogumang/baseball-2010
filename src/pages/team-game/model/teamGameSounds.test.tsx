@@ -310,8 +310,9 @@ describe('견제 판정 콜 — 세이프면 늘 17 (0x51c14 의 종류 4·5 갈
 
 describe('경기 결과 징글 — 정산 0x19 진입(0x4ea0c)', () => {
   it('승리 31 · 패배 32 는 경기가 끝난 자리가 아니라 결과 판 OK 뒤 정산(enterSettlement)에서 난다', () => {
-    // 사람이 한 타석도 안 잡는 설정 — 경기를 세우는 자리에서 이미 끝난다
+    // 사람이 한 타석도 안 잡는 설정 — 첫 타석부터 자동진행 중계(0x21)가 경기 끝까지 돈다
     const { result } = 띄우기({ settings: { ...FULL_PLAY_SETTINGS, kind: MATCH_SETTING_KIND.상세, value: 0 } })
+    while (result.current.progress.autoRelay != null) act(() => void result.current.actions.stepAutoRelay())
     expect(result.current.summary).not.toBeNull()
     expect(녹음.played.some((id) => id === 31 || id === 32)).toBe(false)
 

@@ -40,6 +40,7 @@ import { HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
 import { useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
 import { settlementBackdropOffsetAt } from '@/pages/team-game/model/settlementBackdrop'
 import { SettlementBoard } from '@/pages/team-game/ui/SettlementBoard'
+import { TeamAutoRelay } from '@/pages/team-game/ui/TeamAutoRelay'
 import { humanVsComputerSidesOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { useSettlementEffectLayers } from '@/widgets/batting-stage/ui/SettlementEffectCanvas'
@@ -641,6 +642,22 @@ export function TeamGameScreen({
         // 두 팀 판 0x42364("DUE UP") · 0x420dc("PITCHER")
         cards={teamHalfInningCardsOf(progress, board.half)}
         onConfirm={() => setClosedBoardSerial(board.serial)}
+      />
+    )
+  }
+
+  /**
+   * 자동진행 중계(경기 상태 0x21) — 경기진행 설정의 자동 이닝 · 30G 자동진행. 화면이 갱신마다 0xc2198 → 0xc262c 를 한 번씩
+   * 굴리고(`stepAutoRelay`), 그 사이 속도 ←→ · CLR 중단 질문을 받는다 (`TeamAutoRelay`). 끝나면 진행기가 다음 사람 타석을 세운다.
+   */
+  if (progress.autoRelay != null) {
+    return (
+      <TeamAutoRelay
+        progress={progress}
+        onStep={actions.stepAutoRelay}
+        onStop={actions.stopAutoRelay}
+        sideTeams={options.playerSide === 0 ? [options.ourTeamId, options.opponentTeamId] : [options.opponentTeamId, options.ourTeamId]}
+        humanSide={options.playerSide}
       />
     )
   }

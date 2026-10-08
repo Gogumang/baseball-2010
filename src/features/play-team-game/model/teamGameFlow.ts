@@ -279,6 +279,12 @@ export interface TeamGameOptions {
   /** 환경설정 "투구 게이지" (설정 +0x2d) — **원본 기본값은 꺼짐** (K 5-2) */
   readonly gaugeSettingOn?: boolean
   /**
+   * **자동진행 중계(상태 0x21)를 화면이 한 틱씩 돌린다** — 참이면 사람 장면 사이의 간이 타석을 한꺼번에 굴리지 않고
+   * `autoRelay` 를 세운 채 멈춘다. 화면이 틱마다 `stepAutoRelay`(갱신 0x48480 의 0xc2198 → 0xc262c 한 번)를 부르고,
+   * CLR 중단(`stopAutoRelay`)도 그 사이에 받는다. 거짓(기본 — 시험 · 화면 없는 진행)이면 예전처럼 한 번에 굴린다(굴림 차례는 같다).
+   */
+  readonly liveAutoRelay?: boolean
+  /**
    * 환경설정 "주루" 가 **수동**인가 (설정 +0xbd). 안 넘기면 자동이다.
    * 갈림길은 `0xae690` — `(경기[0x31 + 공격측] == 1) || (설정+0xbd != 0)` 이 거짓이면
    * 자동 진루 제어기(0xaf8c0)를 통째로 안 돌린다. 곧 **사람이 공격일 때만** 설정이 먹는다.
@@ -779,6 +785,51 @@ export interface TeamGameProgress {
    * 이어하기는 `resumeTeamGame` 으로 다시 세운다. 쓰는 자리·담기는 것은 `TEAM_GAME_RESUME_SAVE` 주석.
    */
   readonly halfInningSave?: TeamGameProgress | null
+  /**
+   * **자동진행 중계 중**(경기 상태 0x21, `options.liveAutoRelay` 일 때만) — 있는 동안 `isHumanTurn` 은 거짓이고, 화면이
+   * `stepAutoRelay` 로 한 걸음씩 돌린다. 걸음마다 그 걸음에 돈 0xc262c 틱들을 싣는다.
+   */
+  readonly autoRelay?: TeamAutoRelay | null
+  /**
+   * 간이 시뮬레이터의 자동진행 표시 두 칸 — `'running'` = sim+0xa0(30G 자동진행 3c942), `'stopped'` = sim+0x9f(CLR 중단
+   * 0xc0ea8(sim, 1)). 0xc1e04 가 경기진행 설정보다 먼저 본다(`isHumanTurn`). 없으면 둘 다 0.
+   */
+  readonly autoProgressFlag?: 'running' | 'stopped' | null
+}
+
+/**
+ * **자동진행 중계 한 걸음** — `stepAutoRelay` 한 번에 돈 0xc262c 틱들(교체 틱 · 타석 틱). 원본은 0xc262c 한 번이 갱신 한 번이라
+ * 화면은 이 틱들을 갱신마다 한 칸씩 그린다.
+ */
+export interface TeamAutoRelay {
+  readonly serial: number
+  readonly ticks: readonly TeamAutoRelayTick[]
+  /**
+   * 이 걸음 마지막 타석이 3아웃을 냈다 — 원본 3아웃 넘김 0xb6b6c 는 **다음** 0xc2198(c21fc)이 한다. 그 부름이 참(계속)이면
+   * 모드 ∈ {1, 2, 8, 9} · 속도 ≠ 2 일 때 연출 대기 sim+0x9c = 1 · +0x9d = 10 ("CHANGE")을 건다 — 다음 걸음 첫 틱의 `halfFlipped`.
+   */
+  readonly flipPending: boolean
+}
+
+/** 0xc262c 한 번 — 그 틱 뒤의 진행(중계 칸을 비운 사본)과, 타석 틱이면 그 타석. 교체 틱은 `atBat` 이 null 이다 */
+export interface TeamAutoRelayTick {
+  readonly progress: TeamGameProgress
+  /** 이 틱 앞의 경기 — 3아웃 넘김은 다음 틱 0xc2198 이라 이 틱 그림은 앞 반 이닝 그대로다 */
+  readonly before: GameState
+  /** 이 틱의 0xc2198 이 반 이닝을 넘겼다(0xb6b6c) — 연출 대기 "CHANGE" 를 거는 틱 */
+  readonly halfFlipped: boolean
+  readonly atBat: {
+    /** 공격이 우리인가 */
+    readonly ours: boolean
+    /** 친 타자의 타순 커서 */
+    readonly orderIndex: number
+    readonly outcome: AtBatOutcome
+    /** 그 타석에 파울이 났나 (`relayCodeOf`) */
+    readonly fouled: boolean
+    /** 타석 끝 카운트 st[4] · st[5] */
+    readonly strikes: number
+    readonly balls: number
+  } | null
 }
 
 /**
@@ -850,6 +901,9 @@ export function resumeTeamGame(saved: TeamGameProgress, random: RandomPort): Tea
     pendingDefensePlay: null,
     scenePinchHit: null,
     scenePitcherChange: null,
+    // 장면 초기화 0xc0e60 — sim+0x9f(중단)는 전역 기록에서 되살리고 sim+0xa0(자동진행)은 0 이다
+    autoRelay: null,
+    autoProgressFlag: saved.autoProgressFlag === 'stopped' ? 'stopped' : null,
     // 공 객체 +0x10 — 장면이 새로 만든다 (startTeamGame 과 같은 0)
     ballMagicNumber: 0,
     // 기록 ctx(0xa5bb0 · 0xa5b00) — 연속 홈런 +0x162 · 연속 파울 +0x15f · 타석 투구 수 +0x161 · 반 이닝 투구 수 +0x16c · 대타 칸 +0x160.
@@ -1126,6 +1180,14 @@ export function isHumanTurn(progress: TeamGameProgress): boolean {
   if (progress.pendingRunnerPlay != null) return false
   // 벤치 클리어링 연출(0x1e) 중에도 다음 공이 안 나간다
   if (progress.pendingBenchClearing !== null) return false
+  // 자동진행 중계(상태 0x21) 동안은 화면이 `stepAutoRelay` 로 넘길 때까지 사람 차례가 아니다
+  if (progress.autoRelay != null) return false
+  // 0xc1e04 — 모드 1·2(c1f20): sim+0x9f → 사람 · sim+0xa0 → 자동. 모드 8·9(c1f04): 0-기준 이닝 > 5 → 사람이 먼저다
+  const flag = progress.autoProgressFlag ?? null
+  if (flag !== null) {
+    if (isVersusMode(progress.options.mode) && progress.game.inning - 1 > AUTO_PROGRESS_LAST_INNING_INDEX) return true
+    return flag === 'stopped'
+  }
   const ours = isOurOffense(progress)
   return isHumanControlled(settingsOf(progress), {
     mode: progress.options.mode,
@@ -4250,9 +4312,10 @@ export function canAutoProgress(progress: TeamGameProgress): boolean {
  * 곧 일반·시즌은 **경기 끝까지**, 대전은 **0-기준 이닝이 6(7회)에 들면** 멈춘다 — 둘 다 원본 그대로다 (확정).
  * 간이 엔진 타석의 기록달성은 그대로 쌓인다(`[ctx+0x24]` 를 안 세운다 — R15 10-3).
  *
- * ⚠️ **중계 화면(경기 상태 0x21)은 옮기지 않았다** — 속도 칸 v = 전역 +0xbc(0..2, 틱 간격 8·4·1)·주자 그림·
- *    "공격팀(PLAYER/COM)" 띠·CLR 중단 질문(StrGAME[6], 예 → sim+0xa0 = 0 · 0xc0ea8(sim, 1) → 다음 0xc2198 이 거짓)은
- *    R10 7절에 있다. 웹은 결과를 한 번에 계산해 사람이 도중에 멈출 틈이 없다.
+ * **중계 화면(경기 상태 0x21)** — `options.liveAutoRelay` 면 여기서 타석을 굴리지 않고 sim+0xa0 = 1 로 중계에 들어선다.
+ *    화면(`pages/team-game` 의 `TeamAutoRelay`)이 속도 칸 v = 전역 +0xbc(0..2, 틱 간격 8·4·1)대로 `stepAutoRelay` 를 부르고,
+ *    CLR 중단 질문(StrGAME[6], 예 → `stopAutoRelay` = sim+0xa0 = 0 · 0xc0ea8(sim, 1) → 다음 0xc2198 이 거짓)을 받는다.
+ *    거짓(시험 · 화면 없는 진행)이면 아래 고리가 한 번에 굴린다 — 멈추지 않으면 굴림 차례는 같다.
  * **멈출 때** (대전 7회 진입 — 경기 끝 전): 0x21 갱신 0x48480 이 `+0x1784 = 0` · 다음 상태 0x18 을 걸고 경기 끝(0xb68fc)이
  * 아니면 `0xc0ee8(sim)` → `0xc22b4(sim)` 를 부른다 (0x48538~0x48564). 둘 다 팀 경기에서는 **굴림이 없다** (확정):
  * ```
@@ -4270,6 +4333,11 @@ export function runAutoProgress(progress: TeamGameProgress, random: RandomPort):
   // 상태 0x21 진입 0x3abf0 — 사람 장면에서 뜬 채 남은 돌발을 판정 없이 내린다 (0x8f628).
   // 0xe 에서 '*' 메뉴로 왔으면 OK 를 안 받았으니 OK 뒤 굴림(돌발 0x8f158 · 0xf 진입 0x3d954)은 돌지 않는다
   let current: TeamGameProgress = withoutPendingBurst({ ...progress, sceneConfirmPending: false })
+  if (progress.options.liveAutoRelay === true) {
+    // 3c942 sim+0xa0 = 1 · 3c94a 0xc0ea8(sim, 0) → sim+0x9f = 0 — 0xc1e04 가 경기 끝(대전은 7회 앞)까지 자동이라 한다.
+    // 타석은 화면이 틱마다 `stepAutoRelay` 로 굴린다
+    return enterAutoRelay({ ...current, autoProgressFlag: 'running' })
+  }
   for (let step = 0; step < MAXIMUM_AUTO_STEPS; step += 1) {
     if (current.game.isFinished) return current
     if (isVersusMode(current.options.mode) && current.game.inning - 1 > AUTO_PROGRESS_LAST_INNING_INDEX) {
@@ -4376,10 +4444,78 @@ function advance(progress: TeamGameProgress, random: RandomPort): TeamGameProgre
         autoSinceHuman: false,
       }
     }
+    // 화면이 중계를 한 틱씩 돌리면 여기서 멈춘다 — 상태 0x21 에 들어서고 `stepAutoRelay` 가 이어 굴린다
+    if (current.options.liveAutoRelay === true) return enterAutoRelay(current)
     // 상태 0x21 진입 0x3abf0 — 사람 장면에서 뜬 채 남은 돌발을 판정 없이 내린다 (0x8f628)
     current = playAutoAtBat(withoutPendingBurst(current), random)
   }
   throw new Error('팀 경기 자동 진행이 끝나지 않았습니다 — 진행 규칙을 확인하세요')
+}
+
+/**
+ * **상태 0x21 에 들어선다** — 진입 0x3abf0 이 남은 돌발을 판정 없이 내린다(0x8f628, 굴림 없음). 배경음 33(모드 ∈ {1, 2, 8, 9} ·
+ * 속도 ≠ 2)은 화면이 낸다. 타석은 아직 안 굴린다.
+ */
+function enterAutoRelay(progress: TeamGameProgress): TeamGameProgress {
+  return {
+    ...withoutPendingBurst(progress),
+    autoRelay: { serial: (progress.autoRelay?.serial ?? 0) + 1, ticks: [], flipPending: false },
+  }
+}
+
+/**
+ * **자동진행 중계 한 걸음** — 갱신 0x48480 의 `r = 0xc2198(sim, 1)` → 참이면 0xc262c (2026-10-08 직접 뜸):
+ * ```
+ * 48512  r = 0xc2198(sim, 1)   ; sim+0x9c · +0x9d 를 지우고, 3아웃이면 0xb6b6c 로 넘긴 뒤 넘겼고 모드 ∈ {1,2,8,9} · 속도 ≠ 2 면
+ *                              ; +0x9c = 1 · +0x9d = 10. 경기 끝(0xb68fc)이면 거짓, 아니면 0xc1e04(누가 조작하나)
+ * 48520  +0x9c 면 0x47cc8      ; 작은 다이아몬드 그림 칸 되돌림 (굴림 없음 — 웹은 다이아몬드를 안 그린다)
+ * 4852e  참 → 0xc262c(sim)     ; 간이 타석 하나 또는 교체 틱 하나
+ * 48538  거짓 → +0x1784 = 0 · 0xbcb48(…, 0x18) · 경기 끝 아니면 0xc0ee8 · 0xc22b4 (굴림 없음) · 0x6e418 배경음 끔
+ * ```
+ * 웹 간이 타석은 교체 판정(0xc1ba4)과 타석을 한 번에 굴리므로 한 걸음이 0xc262c 여러 번(교체 틱 + 타석 틱)이다 — 굴림 차례는
+ * 같고, 화면이 틱들을 갱신마다 한 칸씩 그린다. 거짓이면 중계를 걷고 평소처럼 다음 사람 타석을 세운다(0x18 을 지나 저장 · 판 없음).
+ *
+ * ⚠️ 근사: 교체 틱과 그 뒤 타석 틱 사이에 CLR 로 멈추면 원본은 타석을 안 굴리지만 웹은 이미 굴렸다(타석 뒤에 멈춘다).
+ */
+export function stepAutoRelay(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
+  const relay = progress.autoRelay
+  if (relay == null) return progress
+  const outside: TeamGameProgress = { ...progress, autoRelay: null }
+  if (outside.game.isFinished || isHumanTurn(outside)) {
+    // 0xc2198 거짓 — 0x18 로. 사람 타석 준비는 평소 길(advance)이 한다
+    return advance(outside, random)
+  }
+  const ticks: TeamAutoRelayTick[] = []
+  const played = playAutoAtBat(outside, random, ticks)
+  const flipped = played.game.inning !== outside.game.inning || played.game.half !== outside.game.half
+  return {
+    ...played,
+    autoRelay: {
+      serial: relay.serial + 1,
+      ticks: ticks.map((tick, index) => (index === 0 && relay.flipPending ? { ...tick, halfFlipped: true } : tick)),
+      flipPending: flipped && !played.game.isFinished,
+    },
+  }
+}
+
+/** 그 틱 뒤 진행을 중계 칸에 싣는다 — 사본에는 중계 칸을 안 남긴다 */
+function relayTickOf(
+  after: TeamGameProgress,
+  before: GameState,
+  atBat: TeamAutoRelayTick['atBat'],
+): TeamAutoRelayTick {
+  return { progress: { ...after, autoRelay: null }, before, halfFlipped: false, atBat }
+}
+
+/**
+ * **CLR 중단 — 질문 StrGAME[6] "자동진행을 중단하시겠습니까?"(코드 0x1e)에 예** — sim+0xa0 = 0 · 0xc0ea8(sim, 1) → sim+0x9f = 1
+ * (전역 기록 [mgr+..+0x14d] 에도 쓴다). 다음 0xc2198 의 0xc1e04 가 사람이라 하여 0x18 로 넘어간다. 0x9f 는 이 경기 동안
+ * 남는다 — 일반·시즌은 경기진행 설정과 상관없이 남은 경기를 사람이 잡는다(c1f20 이 설정보다 먼저 본다).
+ * ⚠️ 전역 기록 · 저장 쪽은 이 진행에만 남긴다(장면 초기화 0xc0e60 이 되살리는 몫은 `resumeTeamGame`).
+ */
+export function stopAutoRelay(progress: TeamGameProgress): TeamGameProgress {
+  if (progress.autoRelay == null || progress.autoProgressFlag === 'stopped') return progress
+  return { ...progress, autoProgressFlag: 'stopped' }
 }
 
 /**
@@ -4405,10 +4541,15 @@ function withoutBurstOnHalfFlip(progress: TeamGameProgress): TeamGameProgress {
 }
 
 /** 자동 타석 하나 (간이 엔진, 상태 0x21) — 지났다는 표시를 남긴다 */
-function playAutoAtBat(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
+function playAutoAtBat(
+  progress: TeamGameProgress,
+  random: RandomPort,
+  /** 중계 틱을 여기 쌓는다 (`stepAutoRelay`) */
+  relay?: TeamAutoRelayTick[],
+): TeamGameProgress {
   const played = isOurOffense(progress)
-    ? playAutoOffenseAtBat(progress, random)
-    : playAutoDefenseAtBat(progress, random)
+    ? playAutoOffenseAtBat(progress, random, relay)
+    : playAutoDefenseAtBat(progress, random, relay)
   return played.autoSinceHuman ? played : { ...played, autoSinceHuman: true }
 }
 
@@ -4466,12 +4607,15 @@ function runQuickSubstitutions(
   progress: TeamGameProgress,
   battingIsOurs: boolean,
   random: RandomPort,
+  /** 교체가 난 0xc262c 한 번(공 없이 돌아감, c266c) — 중계 교체 틱 */
+  onSubstitutionTick?: (after: TeamGameProgress, before: GameState) => void,
 ): TeamGameProgress {
   let current = progress
   for (let call = 0; call < MAXIMUM_QUICK_SUBSTITUTION_CALLS; call += 1) {
     const pinched = applyCpuPinchHit(current, battingIsOurs, random)
     const changed = judgeAutoPitcherChange(pinched, !battingIsOurs, random)
     if (changed === current) return current
+    onSubstitutionTick?.(changed, current.game)
     current = changed
   }
   return current
@@ -4481,10 +4625,14 @@ function runQuickSubstitutions(
 const MAXIMUM_QUICK_SUBSTITUTION_CALLS = 3
 
 /** 자동으로 넘기는 우리 타석 — 원본도 같은 간이 엔진을 쓴다 (0xc11f0) */
-function playAutoOffenseAtBat(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
+function playAutoOffenseAtBat(
+  progress: TeamGameProgress,
+  random: RandomPort,
+  relay?: TeamAutoRelayTick[],
+): TeamGameProgress {
   // 0xc262c 는 타석마다 먼저 0xc1ba4 를 부른다 — CPU 대타(공격 팀, 0xc1c50) 뒤 CPU 투수 교체(0xc1ce2).
   // 우리가 공격 중이면 **상대 투수**를 본다
-  progress = runQuickSubstitutions(progress, true, random)
+  progress = runQuickSubstitutions(progress, true, random, (after, before) => relay?.push(relayTickOf(after, before, null)))
   // 이어 c26b6 0xa5bcc 가 대타 홈런 칸 ctx+0x160 을 지운다 — 간이 엔진 타석은 기록 5 를 못 낸다
   if (progress.pinchHitHomeRunHalf !== null) progress = { ...progress, pinchHitHomeRunHalf: null }
   const { options } = progress
@@ -4519,7 +4667,7 @@ function playAutoOffenseAtBat(progress: TeamGameProgress, random: RandomPort): T
   // 간이 엔진 타석도 같은 0xa8024 → 0xa77f0 을 지난다 — 기록달성도 똑같이 쌓인다 (대타 홈런 5 는 c26b6 이 지워 없다)
   const recorded = withOurAtBatRecords(progress, slot, outcome, runsBattedIn, false)
 
-  return appendLog(
+  const result = appendLog(
     {
       ...recorded,
       game,
@@ -4563,12 +4711,27 @@ function playAutoOffenseAtBat(progress: TeamGameProgress, random: RandomPort): T
     }`,
     false,
   )
+  relay?.push(
+    relayTickOf(result, before, {
+      ours: true,
+      orderIndex: slot,
+      outcome,
+      fouled: play.fouled === true,
+      strikes: play.strikes,
+      balls: play.balls,
+    }),
+  )
+  return result
 }
 
 /** 자동으로 넘기는 상대 타석 */
-function playAutoDefenseAtBat(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
+function playAutoDefenseAtBat(
+  progress: TeamGameProgress,
+  random: RandomPort,
+  relay?: TeamAutoRelayTick[],
+): TeamGameProgress {
   // 0xc1ba4 안 차례 그대로 — CPU 대타(공격 = 상대 팀, 0xc1c50) 뒤 **우리 투수** 교체 판정(0xc1ce2)
-  progress = runQuickSubstitutions(progress, false, random)
+  progress = runQuickSubstitutions(progress, false, random, (after, before) => relay?.push(relayTickOf(after, before, null)))
   const { options } = progress
   const pitcher = entryQuickPitcherOf(progress, options.ourTeamId, progress.ourPitcherIndex)
   const drain = quickPitcherDrainOf(
@@ -4586,7 +4749,9 @@ function playAutoDefenseAtBat(progress: TeamGameProgress, random: RandomPort): T
     random,
     { beforePitch: drain.beforePitch },
   )
-  return startDefensiveAtBat(
+  const before = progress.game
+  const orderIndex = progress.opponentOrderIndex
+  const result = startDefensiveAtBat(
     {
       ...progress,
       // 간이 엔진도 공마다 0xa5e14 가 이 타석·반 이닝 투구 수(ctx+0x161·+0x16c)를 올리고, 0xc1818 이 볼카운트
@@ -4608,6 +4773,17 @@ function playAutoDefenseAtBat(progress: TeamGameProgress, random: RandomPort): T
     false,
     random,
   )
+  relay?.push(
+    relayTickOf(result, before, {
+      ours: false,
+      orderIndex,
+      outcome: play.outcome,
+      fouled: play.fouled === true,
+      strikes: play.strikes,
+      balls: play.balls,
+    }),
+  )
+  return result
 }
 
 /**

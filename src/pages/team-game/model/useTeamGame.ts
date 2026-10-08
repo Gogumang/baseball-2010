@@ -23,6 +23,8 @@ import {
   resolveRunnerPlay,
   resumeTeamGame,
   runAutoProgress,
+  stepAutoRelay,
+  stopAutoRelay,
   spendOurSpecialSwing,
   startBatterOutcome,
   startBatterPitch,
@@ -35,6 +37,7 @@ import {
 import type {
   PendingDefensePlay,
   StealBase,
+  TeamAutoRelay,
   TeamGameOptions,
   TeamGameProgress,
   TeamGameSummary,
@@ -139,6 +142,13 @@ export interface TeamGameSession {
     /** 경기 중 메뉴 '*' 의 자동진행 — **비용 검사는 화면이 먼저 한다** */
     readonly autoProgress: () => void
     /**
+     * 자동진행 중계(상태 0x21) 갱신 한 번 — 0xc2198 → 0xc262c (`stepAutoRelay`). 굴린 걸음의 중계 칸을 돌려준다 —
+     * null 이면 0xc2198 이 거짓이라 중계가 끝났다(+0x1784 = 0, 상태 0x18).
+     */
+    readonly stepAutoRelay: () => TeamAutoRelay | null
+    /** CLR 중단 질문(StrGAME[6])에 예 — sim+0xa0 = 0 · sim+0x9f = 1 (`stopAutoRelay`) */
+    readonly stopAutoRelay: () => void
+    /**
      * 수비 화면이 한 타구를 다 돌렸다 (`DefensePlayback` 의 `onDone`).
      * **여기서야** 진루·아웃·득점이 경기 상태가 된다.
      *
@@ -179,7 +189,11 @@ export function useTeamGame(
     // 맨 앞은 상태 7 **진입** 0x39f88 → 0x53dbc 의 로딩 팁 rand(0, 73) — 모드를 안 가려 새 경기 · 이어하기 모두
     // 경기 장면 시작마다 한 번, 갱신 0x3e340 의 덱 1275 보다 먼저다 (`rollSceneLoadingTip`). 웹 팀경기는 팁 판을 안 그려 값은 버린다
     rollSceneLoadingTip(random)
-    return resumeFrom === undefined ? startTeamGame(options, random) : resumeTeamGame(resumeFrom, random)
+    // 자동진행 중계(0x21)는 화면이 한 틱씩 돌린다 — 그 사이 CLR 중단 · 속도 키를 받는다
+    const live: TeamGameOptions = { ...options, liveAutoRelay: true }
+    return resumeFrom === undefined
+      ? startTeamGame(live, random)
+      : resumeTeamGame({ ...resumeFrom, options: { ...resumeFrom.options, liveAutoRelay: true } }, random)
   })
 
   /**
@@ -314,6 +328,8 @@ export function useTeamGame(
       // 도루 출발 — 주자를 출발만 시킨다(난수·소리 없음). 판정은 공이 도착할 때 도루 판(종류 5)이 한다
       steal: (base: StealBase) => step((current) => startSteal(current, base)),
       autoProgress: () => step((current) => runAutoProgress(current, random)),
+      stepAutoRelay: () => step((current) => stepAutoRelay(current, random)).autoRelay ?? null,
+      stopAutoRelay: () => void step((current) => stopAutoRelay(current)),
       finishBenchClearing: (reachedTargetTick: boolean) =>
         step((current) => resolveBenchClearing(current, { reachedTargetTick }, random)),
       finishRunnerPlay: (result?: DefensePlayResult) => {
@@ -399,6 +415,7 @@ function pickoffCallSoundsOf(before: TeamGameProgress, after: TeamGameProgress):
 export type {
   PendingDefensePlay,
   StealBase,
+  TeamAutoRelay,
   TeamGameOptions,
   TeamGameProgress,
   TeamGameSummary,

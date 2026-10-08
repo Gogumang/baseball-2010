@@ -238,6 +238,9 @@ describe('경기 중 메뉴 (표 0xcfcfc 행 0)', () => {
     fireEvent.click(screen.getByText('예'))
 
     expect(onSpendGamePoint).toHaveBeenCalledWith(30)
+    // 자동진행 중계(상태 0x21)가 선다 — 속도 0 이면 8틱마다 0xc262c 한 번
+    expect(screen.getByTestId('중계-속도').dataset.speed).toBe('0')
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 8 * 400))
     // 시즌 경기는 끝까지 소화된다 — 상태 0x18 경기 끝 결과 판(승·패·세 세 줄)이 먼저 뜬다
     expect(screen.getByAltText('승리투수')).toBeTruthy()
     // 처음 10틱은 OK 가 안 먹고(경기+0x32), 그 뒤 OK → 정산(0x19) 자리인 요약 화면
