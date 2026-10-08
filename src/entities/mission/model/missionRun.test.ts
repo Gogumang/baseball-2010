@@ -134,12 +134,12 @@ describe('applyOutcome', () => {
 describe('missionAdvance — 미션 주루도 수비 시뮬레이션이 정한다 (P2 7절 · U-02)', () => {
   const 주자 = (first: boolean, second: boolean, third: boolean) => ({ first, second, third })
 
-  it('1루타에 2루 주자는 3루에서 멈춘다 — 고정표가 아니라 자동 진루 0xaf918 의 틱 비교가 정한다', () => {
-    // 대표 단타를 잡은 외야수(칸 6)의 준비 틱(+0xc8)은 야수 틱 0xa1284 가 쥔 동안 하나씩 줄인다. 그래서 수비 틱
-    // 예측 0xaf284 가 포구 직후보다 작아지고, 3루에 닿은 주자는 "홈에 2틱 넘게 먼저" 가 안 서 멈춘다.
+  it('1루타에 2루 주자는 홈까지 든다 — 고정표가 아니라 자동 진루 0xaf918 가 정한다(판 시작 force 1 한 번 · 매 틱 force 0)', () => {
+    // 판 시작 0x46766 의 `0xaf8c0(제어기, 1)` 이 리드 뒤 제 루로 돌아오던 2루 주자를 곧장 3루로 보내고(송구보다 2틱 넘게 먼저),
+    // 3루에 서면 매 틱 자동 진루(force 0)의 틱 비교가 홈까지 보낸다. (예전 웹은 판 시작 호출이 없어 2루로 돌아갔다가 3루에서 멈췄다.)
     expect(missionAdvance(주자(false, true, false), 0, { kind: '안타', bases: 1 })).toEqual({
-      bases: 주자(true, false, true),
-      runsScored: 0,
+      bases: 주자(true, false, false),
+      runsScored: 1,
       outsAdded: 0,
     })
   })

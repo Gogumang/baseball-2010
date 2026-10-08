@@ -997,6 +997,15 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     earliestCatchTick: forecast.earliestCatchTick,
   }
 
+  // ── 0x46766 — 0x17 진입 0x46418 끝: 판 진행 관문 0xb0d28 이 열려 있으면 `0xaf8c0(제어기, 1)` 을 **한 번**, 주루 설정
+  //    갈림(0xae690) 없이 부른다. force = 1 이라 달리는 주자(리드 뒤 돌아오는 주자 · 도루 · 포스 · 타자주자)까지 본다.
+  //    진루 자리 afa0e 는 vt48(0xb6228(R+0x78)) = +0x8c + 1 — 이미 그 루로 달리는 주자는 목표가 그대로고(+0x84 도 같은 값),
+  //    +0x128 = 1 은 결정마다 선다. 굴림 없음.
+  play = applyPlayStartAutoAdvance(
+    { play, fielders, runners: runners.map((runner) => runner.state), currentTick: 0, landingTick: trajectory.landingTick },
+    runners,
+  )
+
   return {
     // 판 시작이 굴린 필살타법 성공(0x517e6)을 입력 칸에 적어 둔다 — 결과의 `isUncatchable` 이 그 값을 낸다
     input: uncatchable === (input.isUncatchable === true) ? input : { ...input, isUncatchable: uncatchable },
@@ -2183,7 +2192,9 @@ export function stepDefensePlay(
     }
 
     // ── 4. 자동 추가 진루 (0xaf918) ──
-    // 멈춘 주자(루에 붙은 주자·태그업 대기)까지 보려면 force 가 필요하다 — 원본 인자 그대로다.
+    // 슬롯 2 의 52660 은 `0xaf8c0(제어기, 0)` — **force = 0** 이다(r1 = 0). 그래서 af950 에서 멈춘 주자(vt18 참 — 루에 서
+    // 있거나 태그업으로 기다리는 주자)만 보고 달리는 중인 주자는 건너뛴다. force = 1 은 판 시작 0x46766 한 번뿐이다
+    // (`startDefensePlay` 끝).
     //
     // **언제 도는가** — 원본 0x5261c~0x52668 (매 틱, 경기 장면 슬롯 2) 을 그대로 옮긴다:
     //   0xae690 = (공격측이 CPU) || (설정+0xbd ≠ 0 = 자동) 이 참이면 돈다.
@@ -2200,7 +2211,7 @@ export function stepDefensePlay(
       const decisions = autoAdvanceDecisions({
         ...contextAt(tick),
         play: { ...play, finished: homeRunFlag },
-        force: true,
+        force: false,
         // 앞길 검사 0xa9924 의 방향 판정 0x9fe80 이 보는 +0x84
         previousTargetOf: (index) => runners.find((runner) => runner.state.index === index)?.previousTarget ?? NONE,
       })
@@ -2208,9 +2219,8 @@ export function stepDefensePlay(
         const runner = runners[decision.runnerIndex]
         if (runner === undefined || runner.state.isOut || runner.state.scored) continue
         if (decision.toBase > HOME_BASE) continue
-        // **근사**: 원본은 이 판정을 매 틱 돌리지만, 여기서는 **지금 목표 루에 닿아 있을 때만** 묻는다.
-        // 안 그러면 달리는 도중에 한 루씩 계속 얹혀 타구가 떠나기도 전에 홈까지 밀려 버린다.
-        if (!isAtTarget(runner.state)) continue
+        // force = 0 이라 결정은 멈춘 주자(= 제 목표 루에 선 주자)에게만 난다 — 예전 `force: true` + "목표 루에 닿아 있을 때만"
+        // 근사와 같은 걸러냄이 이제 원본 인자에서 나온다
         // 타자주자도 다른 주자와 똑같이 보낸다 — 원본엔 결과 코드가 정한 루가 없다(타자주자가 선 루가 곧 루타다,
         // 판 끝 정산 0xa8024). 예전 웹은 타석 결과 코드의 루에서 타자주자를 세웠다 — 결과를 먼저 정한 웹 다리라 걷었다
         startLeg(runner, decision.toBase)
@@ -2980,6 +2990,28 @@ function isAtTarget(runner: RunnerState): boolean {
 
 function markOut(runner: MutableRunner): void {
   runner.state = { ...runner.state, isOut: true, settled: true }
+}
+
+/**
+ * **판 시작의 자동 진루 `0xaf8c0(제어기, 1)`** (0x46766, 0x46418 의 리드 고리 0x3d7b8 뒤). 결정마다 플레이+0x128 = 1 (afa0e) ·
+ * 목표가 바뀌는 주자만 새 구간을 연다(vt48 a07b0 은 같은 목표면 +0x84 = 옛 +0x7c 로 같은 값을 적을 뿐이다).
+ * ⚠️ 이 줄의 `startLeg` 는 출발 루(+0x8c)를 옛 목표로 적는다 — 목표가 바뀌는 주자는 멈춰 섰거나(+0x7c == +0x8c) 리드 뒤
+ * 제 루로 돌아오는 중(+0x7c == +0x8c)이라 같은 값이다.
+ */
+function applyPlayStartAutoAdvance(context: DefenseContext, runners: readonly MutableRunner[]): PlayView {
+  let play = context.play
+  const decisions = autoAdvanceDecisions({
+    ...context,
+    force: true,
+    previousTargetOf: (index) => runners.find((runner) => runner.state.index === index)?.previousTarget ?? NONE,
+  })
+  for (const decision of decisions) {
+    play = { ...play, wantsThrow: true }
+    const runner = runners.find((candidate) => candidate.state.index === decision.runnerIndex)
+    if (runner === undefined || decision.toBase === runner.state.targetBase) continue
+    startLeg(runner, decision.toBase)
+  }
+  return play
 }
 
 /** 다음 구간 시작 — 출발점(+0x14)과 출발 루(+0x7c)를 새로 잡아야 진행률·협살 계산이 맞는다 */
