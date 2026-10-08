@@ -55,7 +55,8 @@ export function SeasonMatchInfoScreen({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Enter') {
+      // 0x83cc: −5(OK)·'5'(0x35, 0x8442) → 0x847e 경기 시작
+      if (event.key === 'Enter' || event.key === '5') {
         event.preventDefault()
         return onStart()
       }
@@ -161,7 +162,7 @@ export function SeasonMatchInfoScreen({
         0 경기설정
       </Button>
       <div className={styles.hintLine}>
-        <Hint>Enter 경기 시작 · 0 경기설정 · ←/→ 엔트리</Hint>
+        <Hint>Enter/5 경기 시작 · 0 경기설정 · ←/→ 엔트리</Hint>
       </div>
 
       {/* 머리띠(제목 12 "경기정보")·바닥띠 — 원본 공용 목록 k 4 도 이 둘을 얹는다 (P6 1-1 · 2a-6) */}

@@ -19,6 +19,16 @@ describe('시즌 경기정보 0xdd', () => {
     expect(onOpenEntry.mock.calls).toEqual([[true], [true], [false], [false]])
   })
 
+  it("OK·'5' 는 경기 시작 0x847e (0x8442 cmp r4, #0x35)", () => {
+    const onStart = vi.fn()
+    render(
+      <SeasonMatchInfoScreen lines={[]} myTeamId={0} opponentTeamId={1} playerSide={PLAYER_SIDE_LAST_BAT}
+        onStart={onStart} onOpenSettings={vi.fn()} onCancel={vi.fn()} />,
+    )
+    for (const key of ['Enter', '5']) fireEvent.keyDown(window, { key })
+    expect(onStart).toHaveBeenCalledTimes(2)
+  })
+
   it('바닥은 0x44 — "0경기설정"(game_frame 프레임 6) + 되돌아가기 (0xb3cc~0xb3e2)', () => {
     const { container } = render(
       <SeasonMatchInfoScreen lines={[]} myTeamId={0} opponentTeamId={1} playerSide={PLAYER_SIDE_LAST_BAT}
