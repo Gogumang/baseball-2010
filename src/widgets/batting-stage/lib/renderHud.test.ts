@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { hudRowsOf, lampCountOf, type HudState } from '@/widgets/batting-stage/lib/renderHud'
+import { INITIAL_LAMP_ZOOM, hudRowsOf, lampCountOf, stepLampZoom, type HudState, type LampZoomMemory } from '@/widgets/batting-stage/lib/renderHud'
 
 const HUD: HudState = {
   inning: 1,
@@ -38,5 +38,35 @@ describe('lampCountOf — 램프 칸 수를 자른다 (0x376a4~0x376d0)', () => 
     expect(lampCountOf({ max: 3 }, 4)).toBe(3)
     expect(lampCountOf({ max: 2 }, 1)).toBe(1)
     expect(lampCountOf({ max: 3 }, 0)).toBe(0)
+  })
+})
+
+describe('stepLampZoom — 새 램프 확대 (0x37730~0x37892)', () => {
+  const run = (counts: readonly number[], ticks: readonly number[], start: LampZoomMemory = INITIAL_LAMP_ZOOM) => {
+    let memory = start
+    return counts.map((count, index) => {
+      memory = stepLampZoom(memory, count, ticks[index] ?? index)
+      return memory.zoom
+    })
+  }
+
+  it('칸 수가 바뀌면 5·4·3·2·1 배로 다섯 그림 동안 줄인다', () => {
+    expect(run([1, 1, 1, 1, 1, 1, 1], [0, 1, 2, 3, 4, 5, 6])).toEqual([5, 4, 3, 2, 1, 0, 0])
+  })
+
+  it('같은 틱에 두 번 그려도 한 그림으로 센다', () => {
+    expect(run([1, 1, 1], [0, 0, 1])).toEqual([5, 5, 4])
+  })
+
+  it('칸 0 이면 지난 칸 수를 안 바꾼다 — 1 → 0 → 1 은 확대가 없다(원본 그대로)', () => {
+    expect(run([1, 1, 1, 1, 1, 0, 1, 2], [0, 1, 2, 3, 4, 5, 6, 7])).toEqual([5, 4, 3, 2, 1, 0, 0, 5])
+  })
+
+  it('칸 0 인 동안은 타이머도 줄지 않는다', () => {
+    expect(run([1, 0, 0, 1], [0, 1, 2, 3])).toEqual([5, 0, 0, 4])
+  })
+
+  it('틱이 거꾸로 가면(타석 시작 0xd 진입 0x48f08) 타이머만 지운다 — 지난 칸 수는 남는다', () => {
+    expect(run([1, 1, 2], [10, 0, 1])).toEqual([5, 0, 5])
   })
 })

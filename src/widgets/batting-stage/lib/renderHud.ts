@@ -14,7 +14,7 @@ import { ORIGINAL_COLORS, UI_COLORS } from '@/shared/config/design'
  *
  * **확정** (F-3 · 3-1): 숫자 글꼴 = `ui/num.pzx` (0x3740c → 0x330f0), 점수 **오른쪽 정렬**
  * (0x3756c 정렬 0x24 = 오른쪽+세로 가운데, 아래 줄은 오른쪽만),
- * 그리고 **새 램프 확대 연출이 있다** (0x37828) — 예전 주석의 "없음" 은 틀렸다.
+ * 그리고 **새 램프 확대 연출이 있다** (0x37828, `stepLampZoom`) — 예전 주석의 "없음" 은 틀렸다.
  */
 export interface HudState {
   readonly inning: number
@@ -69,34 +69,55 @@ export function lampCountOf(lamp: { readonly max: number }, count: number): numb
 }
 
 /**
- * 새 램프 확대 연출 (0x37828, F-3 · 3-1 확정).
- * 카운트가 바뀌면 그 종류의 타이머를 5 로 두고(0x37744), 타이머 z > 0 인 동안
- * **가장 새 램프(칸 = 개수−1)만** 효과 0x10(정수 배 확대)·배율 z 로 그린 뒤 z 를 하나 줄인다.
- * 자리는 `(x − (z−1)·w/2, y − (z−1)·h/2)` — 제자리에 가운데를 고정한 채 5배에서 1배로 줄어든다.
+ * 새 램프 확대 연출 (0x37730~0x37892, 직접 떴다). 종류 k 마다 장면에 "지난 칸 수" +0x17d4~6 · 타이머 +0x17d7~9 를 둔다.
+ * ```
+ * c = 자른 칸 수 (lampCountOf)
+ * c ≤ 0 (0x37736)        → 아무것도 안 한다 — 지난 칸 수도 타이머도 그대로(타이머가 줄지도 않는다)
+ * c > 0 이고 지난 ≠ c     → 타이머 = 5 · 지난 = c (0x37744)
+ * 칸 i = 0..c−1          → 타이머 > 0 이고 i == c−1 이면 효과 0x10 · 배율 z = 타이머로 그리고 타이머 −1 (0x37828~0x37858)
+ * ```
+ * 그래서 새 램프가 5·4·3·2·1 배로 다섯 그림 동안 줄어든다. 확대 자리는 **상자** w·h 로 `(x − ((z−1)·w >> 1), y − ((z−1)·h >> 1))`.
+ * 타석 시작 0xd 진입(0x48f08)은 **타이머만** 0 으로 지운다 — 지난 칸 수는 경기 적재 0x48658(48cc2~48cf2)이 한 번 채울 뿐이다.
+ * 원본 버그 그대로: 칸이 0 으로 내려갔다 같은 수로 다시 켜지면(지난 1 → 0 → 1) 확대가 없다.
  * 정수 배 확대라는 것은 R6 3b 확정 (프레임 그리기 0x944b5 의 e == 0x10, b > 0 → 좌표·크기 ×b).
  */
-const LAMP_ZOOM_TICKS = 5
+const LAMP_ZOOM_TIMER = 5
+/** 램프 상자 크기 — game_ui 프레임 0 의 상자 7~13 이 모두 7×7 (boxes.json) */
+const LAMP_BOX_SIZE = 7
 
 type LampKey = (typeof LAMPS)[number]['key']
 
-/** 램프 종류별 "지난 카운트"와 "타이머를 5 로 둔 틱". 원본은 게임 객체에 들고 있다 */
-const lampZoom: Record<LampKey, { count: number; startedTick: number }> = {
-  strikes: { count: 0, startedTick: -LAMP_ZOOM_TICKS },
-  balls: { count: 0, startedTick: -LAMP_ZOOM_TICKS },
-  outs: { count: 0, startedTick: -LAMP_ZOOM_TICKS },
+/** 한 종류의 기억 — 지난 칸 수 · 다음 그림의 타이머 · 이번 틱에 쓴 배율(같은 틱에 두 번 그려도 한 그림으로 센다) */
+export interface LampZoomMemory {
+  readonly last: number
+  readonly timer: number
+  readonly tick: number
+  readonly zoom: number
 }
-/** 틱이 거꾸로 가면 타석이 새로 열린 것이라 기억을 버린다 */
-let lastHudTick = -1
 
-/** 지금 배율 z (1 이면 보통 그리기와 같다). 틱으로 세니 한 틱에 두 번 그려도 같은 값이다 */
-function lampScaleAt(key: LampKey, count: number, tick: number): number {
-  const remembered = lampZoom[key]
-  if (remembered.count !== count) {
-    lampZoom[key] = { count, startedTick: tick }
-    return LAMP_ZOOM_TICKS
+export const INITIAL_LAMP_ZOOM: LampZoomMemory = { last: 0, timer: 0, tick: -1, zoom: 0 }
+
+/**
+ * 한 그림치 램프 확대 걸음. `zoom` > 0 이면 마지막 칸을 그 배율로 그린다(1 이면 보통과 같다).
+ * `tick` 이 지난 그림보다 작으면 타석이 새로 열린 것(0xd 진입)이라 타이머만 지운다.
+ */
+export function stepLampZoom(memory: LampZoomMemory, count: number, tick: number): LampZoomMemory {
+  if (tick === memory.tick) return memory
+  let { last, timer } = memory
+  if (tick < memory.tick) timer = 0
+  if (count <= 0) return { last, timer, tick, zoom: 0 }
+  if (last !== count) {
+    timer = LAMP_ZOOM_TIMER
+    last = count
   }
-  const scale = LAMP_ZOOM_TICKS - (tick - remembered.startedTick)
-  return Math.max(1, Math.min(LAMP_ZOOM_TICKS, scale))
+  const zoom = timer
+  return { last, timer: timer > 0 ? timer - 1 : 0, tick, zoom }
+}
+
+const lampZoom: Record<LampKey, LampZoomMemory> = {
+  strikes: INITIAL_LAMP_ZOOM,
+  balls: INITIAL_LAMP_ZOOM,
+  outs: INITIAL_LAMP_ZOOM,
 }
 
 const INNING_BOX = { x: 15, y: 8, width: 10 }
@@ -107,11 +128,6 @@ const INNING_DIGITS_START = 0
 
 /** `tick` = 타석이 열린 뒤 흐른 틱. 새 램프 확대 연출이 이걸로 z 를 센다 */
 export function drawHud(context: CanvasRenderingContext2D, hud: HudState, tick: number): void {
-  if (tick < lastHudTick) {
-    for (const lamp of LAMPS) lampZoom[lamp.key] = { count: 0, startedTick: tick - LAMP_ZOOM_TICKS }
-  }
-  lastHudTick = tick
-
   context.fillStyle = ORIGINAL_COLORS.black
   context.fillRect(5, 5, 82, 50)
   context.fillStyle = ORIGINAL_COLORS.boardFill
@@ -134,7 +150,8 @@ export function drawHud(context: CanvasRenderingContext2D, hud: HudState, tick: 
   for (const lamp of LAMPS) {
     const image = sprite(PART(lamp.part))
     const count = lampCountOf(lamp, hud[lamp.key])
-    const scale = lampScaleAt(lamp.key, count, tick)
+    lampZoom[lamp.key] = stepLampZoom(lampZoom[lamp.key], count, tick)
+    const scale = lampZoom[lamp.key].zoom
     if (image === null) continue
     for (let index = 0; index < count; index += 1) {
       const x = lamp.x + index * LAMP_STEP
@@ -171,7 +188,7 @@ export function hudRowsOf(hud: HudState): { readonly top: HudRow; readonly botto
   }
 }
 
-/** 정수 배 확대 — 자리 `(x − (z−1)·w/2, y − (z−1)·h/2)`, 크기 `w·z × h·z` (0x944b5) */
+/** 정수 배 확대 — 자리 `(x − ((z−1)·w >> 1), y − ((z−1)·h >> 1))` 는 상자 w·h 로(0x37828~0x3784c), 크기 `w·z × h·z` (0x944b5) */
 function drawZoomedLamp(
   context: CanvasRenderingContext2D,
   image: HTMLImageElement,
@@ -183,8 +200,8 @@ function drawZoomedLamp(
   context.imageSmoothingEnabled = false
   context.drawImage(
     image,
-    x - ((scale - 1) * image.width) / 2,
-    y - ((scale - 1) * image.height) / 2,
+    x - (((scale - 1) * LAMP_BOX_SIZE) >> 1),
+    y - (((scale - 1) * LAMP_BOX_SIZE) >> 1),
     image.width * scale,
     image.height * scale,
   )
