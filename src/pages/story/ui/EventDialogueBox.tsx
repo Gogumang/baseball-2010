@@ -94,6 +94,7 @@ export function EventDialogueBox({
   stateRef.current = state
   const layoutRef = useRef(typingLayout)
   layoutRef.current = typingLayout
+  // 명령이 돌거나 상자를 내린 틀은 위에서 이미 그렸다 — 다음 그리기는 한 틀 뒤다(틀 시계를 그 틀에 맞춘다)
   useEffect(() => {
     const tick = window.setInterval(() => {
       const next = tickDialogue(stateRef.current, layoutRef.current)
@@ -103,7 +104,7 @@ export function EventDialogueBox({
       if (next.height === EVENT_DIALOGUE.boxHeight) setCursorUpdates((count) => count + 1)
     }, millisecondsPerFrame())
     return () => window.clearInterval(tick)
-  }, [])
+  }, [textKeySeen, lowerKeySeen])
   const isUp = state.height === EVENT_DIALOGUE.boxHeight
   const onAdvanceRef = useRef(onAdvance)
   onAdvanceRef.current = onAdvance

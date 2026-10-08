@@ -40,9 +40,9 @@ function activeEntryAt(entries: readonly EffectTimelineEntry[], frame: number): 
 /**
  * 이벤트 명령 5 화면효과를 재생한다 (`entities/story/model/screenEffect` 머리말).
  *
- * 걸음(step)이 바뀌면 그 사이 지나온 명령 5 들을 원본 차례대로 돌린다(`effectTimelineOf`) — id 4~7 은 효과가 끝날 때까지
- * 다음 명령을 막고(0x8b564), 나머지는 곧바로 넘긴다(뒤 효과가 효과기를 덮는다 — 0xbdae8). 진동은 그 명령이 도는 틀에
- * 울린다(0x3a44, 환경설정 진동이 켜졌을 때만). 막는 효과가 다 끝난 다음 틀에 `onRelease` — 그때 멈출 명령이 돈다.
+ * 걸음(step)이 바뀌면 그 사이 지나온 명령들을 원본 차례대로 돌린다(`effectTimelineOf`) — 명령 하나에 한 틀, id 4~7 은 효과가
+ * 끝날 때까지 다음 명령을 막는다(0x8b564). 뒤 효과는 그 명령이 도는 틀에 효과기를 덮는다(0xbdae8). 진동은 그 명령이 도는 틀에
+ * 울린다(0x3a44, 환경설정 진동이 켜졌을 때만). 지나온 명령을 다 돌린 틀에 `onRelease` — 그때 멈출 명령이 돈다.
  * 효과기는 전역 하나라 다음 걸음으로 넘어가도 끝날 때까지 돌고, 새 효과가 걸리면 덮인다.
  * 덮개가 걷힌 뒤에도 대화창 0x8b5ac 가 '끝'(+0x10 = 2)을 한 번 더 보므로 그 그리기까지 돈다.
  */
@@ -70,7 +70,7 @@ export function useScreenEffect(
   // 효과기는 전역 하나라 다음 명령으로 넘어가도 끝날 때까지 돈다 — 화면을 떠날 때만 멈춘다
   useLayoutEffect(() => () => cancelAnimationFrame(handleRef.current), [])
 
-  // 레이아웃 이펙트 — 막지 않는 걸음은 그리기 전에 곧바로 풀어 멈출 명령이 한 번도 가려지지 않게 한다
+  // 레이아웃 이펙트 — 지나온 명령이 없는 걸음은 그리기 전에 곧바로 풀어 멈출 명령이 한 번도 가려지지 않게 한다
   useLayoutEffect(() => {
     const key = stepKeyOf(step)
     const { entries, releaseFrame } = effectTimelineOf(step.passed)
@@ -86,21 +86,32 @@ export function useScreenEffect(
       }
     }
     vibrateUpTo(0)
-    if (entries.every((entry) => entry.kind === null)) {
-      // 효과기를 안 건드리는 걸음 — 앞 효과는 그대로 돈다
-      if (entries.length > 0) setView((previous) => ({ ...previous, lastEffectId: entries[entries.length - 1].id }))
+    if (releaseFrame === 0) {
       onReleaseRef.current?.(key)
-      return
+      return undefined
+    }
+    if (entries.every((entry) => entry.kind === null)) {
+      // 효과기를 안 건드리는 걸음 — 앞 효과는 그대로 돌고, 명령 하나에 한 틀씩 지나 멈출 명령이 돈다
+      const timers = entries.map((entry) => window.setTimeout(() => {
+        vibrateUpTo(entry.start)
+        setView((previous) => ({ ...previous, lastEffectId: entry.id }))
+      }, entry.start * millisecondsPerFrame()))
+      const release = window.setTimeout(() => onReleaseRef.current?.(key), releaseFrame * millisecondsPerFrame())
+      return () => {
+        timers.forEach((timer) => window.clearTimeout(timer))
+        window.clearTimeout(release)
+      }
     }
 
-    // 새로 걸면 앞 효과를 덮는다 (0xbdae8)
-    cancelAnimationFrame(handleRef.current)
     serialRef.current += 1
     const serial = serialRef.current
     const startedAt = performance.now()
     /** 효과마다 '끝' 그리기를 봤는가 — 프레임이 건너뛰어도 꼭 한 번 거친다([mgr+0x2c8] 을 바꾸는 그리기다) */
     const ended = entries.map(() => false)
     let isReleased = false
+    /** 이 걸음의 효과가 효과기를 쥐었는가 — 그 전에는 앞 걸음의 효과가 그대로 돈다(효과기는 전역 하나, 0xbdae8 이 덮는다) */
+    let hasTakenOver = false
+    let waitHandle = 0
     const lastIdAt = (frame: number) => {
       let id: number | null = null
       for (const entry of entries) if (entry.start <= frame) id = entry.id
@@ -122,24 +133,49 @@ export function useScreenEffect(
         onEndRef.current?.(entry.id)
       })
       const active = activeEntryAt(entries, frameIndex)
-      const entry = entries[active]
-      const local = frameIndex - entry.start
-      const phase = entry.kind === null ? '없음' : effectorPhaseAt(entry.kind, local)
-      setView({
-        frame: entry.kind === null ? null : screenEffectFrameAt(entry.kind, entry.color, local),
-        phase, serial, lastEffectId: lastIdAt(frameIndex),
-      })
+      const lastEffectId = lastIdAt(frameIndex)
+      if (active === -1) {
+        // 아직 효과기를 건드리지 않았다 — 지나온 명령 5(효과기 없음 · 진동만)의 id 만 [mgr+0x2c4] 에 남긴다
+        if (lastEffectId !== null) setView((previous) => ({ ...previous, lastEffectId }))
+      } else {
+        if (!hasTakenOver) {
+          // 새로 걸면 앞 효과를 덮는다 (0xbdae8)
+          hasTakenOver = true
+          cancelAnimationFrame(handleRef.current)
+        }
+        const entry = entries[active]
+        const local = frameIndex - entry.start
+        const phase = entry.kind === null ? '없음' : effectorPhaseAt(entry.kind, local)
+        setView({
+          frame: entry.kind === null ? null : screenEffectFrameAt(entry.kind, entry.color, local),
+          phase, serial, lastEffectId,
+        })
+      }
       if (!isReleased && frameIndex >= releaseFrame) {
         isReleased = true
         onReleaseRef.current?.(key)
       }
-      return phase !== '없음' || !isReleased || activeEntryAt(entries, Infinity) !== active
+      if (!isReleased) return true
+      if (active === -1) return false
+      const phase = entries[active].kind === null ? '없음' : effectorPhaseAt(entries[active].kind, frameIndex - entries[active].start)
+      return phase !== '없음' || activeEntryAt(entries, Infinity) !== active
     }
     const tick = (now: number) => {
       const frameIndex = Math.floor((now - startedAt) / millisecondsPerFrame())
-      if (draw(frameIndex)) handleRef.current = requestAnimationFrame(tick)
+      if (!draw(frameIndex)) return
+      const handle = requestAnimationFrame(tick)
+      if (hasTakenOver) handleRef.current = handle
+      else waitHandle = handle
     }
-    if (draw(0)) handleRef.current = requestAnimationFrame(tick)
+    if (draw(0)) {
+      const handle = requestAnimationFrame(tick)
+      if (hasTakenOver) handleRef.current = handle
+      else waitHandle = handle
+    }
+    // 효과기를 쥐기 전에 걸음이 바뀌면 이 걸음의 기다림만 거둔다 — 쥔 뒤의 효과기는 다음 걸음에도 끝까지 돈다
+    return () => {
+      if (!hasTakenOver) cancelAnimationFrame(waitHandle)
+    }
   }, [step])
 
   return view

@@ -229,11 +229,16 @@ describe('StoryScreen — system 3·4 발표 창 (0x8cf64 → 0x8b3bc · 0x8b23c
       />,
     )
     대사넘기기()
+    // 보상 명령이 한 틀을 쓴다 — 그동안 창은 아직 없다 (0x8dac2 → 다음 0x8cf64)
+    expect(within(container).queryByRole('dialog')).toBeNull()
+    틀()
     // 0x8d404 — 공용 알림 창 0x74ef4(…, 종류 1): 대사 상자 밖 공용 판에 글 · [OK] 하나
     const 창 = within(container).getByRole('dialog')
     expect(창.textContent).toContain('홈런왕')
     expect(끝).toHaveLength(0)
     fireEvent.click(within(창).getByRole('button', { name: 'OK' }))
+    expect(끝).toHaveLength(0)
+    틀()
     expect(끝).toHaveLength(1)
     expect(끝[0].rewards).toHaveLength(2)
   })
@@ -252,6 +257,10 @@ describe('StoryScreen — system 3·4 발표 창 (0x8cf64 → 0x8b3bc · 0x8b23c
     )
     void container
     대사넘기기()
+    // 보상 · system 3 · 보상 — 명령 하나에 한 틀
+    틀(2)
+    expect(끝).toHaveLength(0)
+    틀()
     expect(끝).toHaveLength(1)
   })
 })
@@ -277,6 +286,9 @@ describe('system 0 알림 · 예아니오 — 공용 창 0x74ef4 (0x8d288 · 0x8
     } as unknown as OriginalEvent
     const 끝 = 띄우기([알림이벤트])
     대사넘기기()
+    // 소리 명령이 한 틀 — 그동안 앞 say 상자만 남고 키도 없다
+    expect(screen.queryByRole('dialog')).toBeNull()
+    틀()
     const 창 = screen.getByRole('dialog')
     expect(창.textContent).toContain('아이템')
     expect(within(창).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual(['OK'])
@@ -393,6 +405,8 @@ describe('system 1 — 올해의 목표 창 (0x8d304 → 0x741a1 · 그리기 0x
     )
     대사넘기기()
     expect(screen.queryByTestId('올해의-목표-창')).toBeNull()
+    // 창 없는 system 도 한 틀(0x8d91c — [창+9] == 0 → 0x8dac2)
+    틀()
     expect(끝).toBe(1)
   })
 })
@@ -562,6 +576,25 @@ describe('초상화 바닥 y · 효과 칠 — 0x7fbc4 끝 0x7fdee · 대화창 
     expect(초상화판().style.bottom).toBe('68px')
   })
 
+  it('id 6 이 끝난 그리기는 상자를 0 으로 내리고 곧바로 15 로 올린다 — 뒤 say 는 그 높이에서 이어 오른다 (0x8b6d0 · 0x7fad0 · 0x8d1f2)', () => {
+    띄우기([
+      { op: 'say', text: '앞', speaker: 0, format: 0, portraits: [] },
+      { op: 'effect', id: 6 },
+      { op: 'say', text: '뒤', speaker: 0, format: 0, portraits: [] },
+    ])
+    틀(200)
+    fireEvent.click(screen.getByRole('button', { name: '대사 넘기기' }))
+    for (let index = 0; index < 20 && 본체높이() === '55'; index += 1) 틀씩(1)
+    // '끝' 그리기 — 0x7f7cc 로 0 이 된 높이를 그 그리기의 0x7fad0 이 15 로 올린다(높이 0 은 화면에 안 나간다)
+    const 상자글 = () => screen.getByTestId('대사-상자').getAttribute('data-text')
+    expect(본체높이()).toBe('15')
+    expect(상자글()).toBe('앞')
+    for (let index = 0; index < 5 && 상자글() !== '뒤'; index += 1) 틀씩(1)
+    // 뒤 say 는 이 이벤트의 첫 say 가 아니라 상자를 다시 내리지 않는다 — 15 에서 이어 오른다
+    expect(상자글()).toBe('뒤')
+    expect(['30', '45']).toContain(본체높이())
+  })
+
   it('이벤트 첫 명령이 id 6 이면 끝날 때까지 상자가 없다 — 앞 글이 없으면 0x7fbc4 는 안 그린다', () => {
     띄우기([{ op: 'effect', id: 6 }, 말])
     틀(4)
@@ -600,9 +633,13 @@ describe('초상화 바닥 y · 효과 칠 — 0x7fbc4 끝 0x7fdee · 대화창 
     expect(경기).toHaveBeenCalledTimes(1)
   })
 
-  it('흔들기(2 · 3)는 안 막는다 — 뒤 say 가 곧바로 돈다', () => {
+  it('흔들기(2 · 3)는 안 막는다 — 효과를 건 다음 틀에 뒤 say 가 돈다', () => {
     띄우기([{ op: 'effect', id: 3 }, 말])
-    틀(4)
+    expect(screen.queryByTestId('대사-상자')).toBeNull()
+    // 효과기(rAF 16ms 칸)가 틀 1 에 닿으면 풀린다 — 막는 효과(10 틀)와 달리 곧바로다
+    틀씩(2)
+    expect(본체높이()).toBe('15')
+    틀씩(3)
     expect(본체높이()).toBe('55')
   })
 

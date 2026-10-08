@@ -111,15 +111,22 @@ export interface EffectTimeline {
 }
 
 /**
- * 지나온 명령들의 명령 5 차례. 4~7 은 효과가 끝날 때까지 다음 명령을 막는다(`isBlockingEffectId`) — 프레임
- * `start + 끝 세움 + 1` 이 '끝' 그리기, 그다음 틀에 다음 명령이 돈다. 나머지는 막지 않는다.
- * ⚠️ 근사: 원본은 멈추지 않는 명령(소리 · 보상 · 막지 않는 효과)도 하나에 한 틀씩 쓰지만(0x8dac2 → 다음 0x8cf64) 웹은 0 틀로 둔다.
+ * 지나온 명령들의 차례 — **명령 하나가 적어도 한 틀**이다. 실행기 0x8cf64 는 틀마다 [mgr+8] 이 서 있으면 다음 명령으로 넘겨
+ * 그 틀에 돌리고(0x8d1be · 0x8d1e2), 같은 틀에 기다림 표 0xd4efc 를 본다 — 소리(0x8dac2) · 막지 않는 효과(0x8b564) ·
+ * 창 없는 system(0x8d91c) · 하위 ≠ 0 예아니오(0x8d954)는 그 자리에서 [mgr+8] = 1 을 세우므로 다음 명령은 **다음 틀**에 돈다.
+ * 4~7 은 효과가 끝날 때까지 다음 명령을 막는다(`isBlockingEffectId`) — 프레임 `start + 끝 세움 + 1` 이 '끝' 그리기,
+ * 그다음 틀에 다음 명령이 돈다. 그동안 앞 say 상자 · 초상화는 그대로다(`isStepHeld`).
+ * ⚠️ 보상(명령 7)은 원본에서 보상 알림 창(0x8beb8 글 → 0xbbef8 → 0x74ef4 종류 1 · 첫 종류 4 는 0x741a0)을 띄우고 확인까지 기다린다
+ * (0x8daa0). 웹은 그 창을 아직 안 옮겨 한 틀로 둔다.
  */
 export function effectTimelineOf(commands: readonly EventCommand[]): EffectTimeline {
   const entries: EffectTimelineEntry[] = []
   let frame = 0
   for (const command of commands) {
-    if (command.op !== 'effect') continue
+    if (command.op !== 'effect') {
+      frame += 1
+      continue
+    }
     const effect = screenEffectCommandOf(command.id)
     entries.push({
       id: command.id,
@@ -128,7 +135,7 @@ export function effectTimelineOf(commands: readonly EventCommand[]): EffectTimel
       vibrationMilliseconds: effect?.vibrationMilliseconds ?? 0,
       start: frame,
     })
-    if (effect?.kind != null && isBlockingEffectId(command.id)) frame += effectorEndingFrameOf(effect.kind) + 2
+    frame += effect?.kind != null && isBlockingEffectId(command.id) ? effectorEndingFrameOf(effect.kind) + 2 : 1
   }
   return { entries, releaseFrame: frame }
 }

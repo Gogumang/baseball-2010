@@ -80,10 +80,17 @@ describe('명령 5 기다림 0x8b564 — id 4~7 은 효과기 끝까지 다음 �
     expect(effectTimelineOf(명령([6, 4]))).toMatchObject({
       releaseFrame: 20, entries: [{ id: 6, start: 0, kind: '검정에서밝아짐' }, { id: 4, start: 10, kind: '검게어두워짐' }],
     })
-    expect(effectTimelineOf(명령([2, 3])).releaseFrame).toBe(0)
     expect(effectTimelineOf(명령([1])).entries).toEqual([
       { id: 1, kind: null, color: '검정', vibrationMilliseconds: 500, start: 0 },
     ])
-    expect(effectTimelineOf([{ op: 'sound', id: 52 }] as unknown as EventCommand[])).toEqual({ entries: [], releaseFrame: 0 })
+  })
+
+  it('멈추지 않는 명령도 하나에 한 틀 — 다음 명령은 다음 틀에 돈다 (0x8dac2 → 다음 0x8cf64)', () => {
+    const 명령 = (ids: readonly number[]) => ids.map((id) => ({ op: 'effect', id })) as unknown as EventCommand[]
+    expect(effectTimelineOf(명령([2, 3]))).toMatchObject({ releaseFrame: 2, entries: [{ id: 2, start: 0 }, { id: 3, start: 1 }] })
+    expect(effectTimelineOf([{ op: 'sound', id: 52 }] as unknown as EventCommand[])).toEqual({ entries: [], releaseFrame: 1 })
+    const 섞음 = [{ op: 'sound', id: 52 }, { op: 'reward', items: [] }, { op: 'effect', id: 6 }, { op: 'sound', id: 1 }]
+    expect(effectTimelineOf(섞음 as unknown as EventCommand[])).toMatchObject({ releaseFrame: 2 + 10 + 1, entries: [{ id: 6, start: 2 }] })
+    expect(effectTimelineOf([])).toEqual({ entries: [], releaseFrame: 0 })
   })
 })
