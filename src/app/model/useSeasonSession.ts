@@ -914,6 +914,8 @@ export const SEASON_DEFAULT_MATCH_SETTINGS: MatchProgressSettings = {
 const SEASON_GAME_MODE = 2
 /** 경기 뒤 마무리 0xf1 진입 0x953c 가 트는 배경음 — 관리 화면 4 (`0x6ea6d(소리, 4, −1, 1)`) */
 const SEASON_MANAGEMENT_BGM = 4
+/** 이벤트 재생 0xd3 배경음 (0x5110 `0x6ea6d(소리, 0x28, −1, 1)`) */
+const SEASON_EVENT_BGM = 40
 
 /** 정산 진입에서 정산을 마친 경기 — 결과 화면 확인 뒤 갈 장면과 그때 낼 평가 징글 */
 interface SettledSeasonGame {
@@ -1265,6 +1267,10 @@ export function useSeasonSession(
     playbackSerial.current += 1
     setEventPlayback({ eventId, returnScene, serial: playbackSerial.current })
     setScene(SEASON_SCENE_STATE.이벤트재생)
+    // 0xd3 진입 0x5110 — 0x8be21(이벤트 시작) 뒤 SR+0x50(phase) ≠ 2(정규시즌 경기 끝)이고 내장 이벤트([관리자+0x39f],
+    // 연초 목표 0xc038 → 0x8a680)가 아니면 배경음 40 (512c~5152, 나리 114 0x11d00 과 같은 두 가드)
+    const phase = latestSave.current?.state.record.phase
+    if (eventId !== YEAR_GOAL_EVENT_ID && phase !== SEASON_PHASE.경기끝) activeSound().playBgm(SEASON_EVENT_BGM)
   }, [])
 
   /**
@@ -1318,6 +1324,8 @@ export function useSeasonSession(
     // 한 번 돌린다. 안 열리면 진입이 곧장 G 검사를 한 번(0x69d4~0x6ac0) — 결산 화면(`SeasonSummaryScreen`)이 이 값으로
     // 그 창과 검사를 맡는다
     if (scene === SEASON_SCENE_STATE.시즌결산) {
+      // 0xef 진입 0x6900 — SR+0x50 = 0xf · 저장 뒤 조건 없이 관리 화면 배경음 4 (6926~6934 `0x6ea6d(소리, 4, −1, 1)`)
+      activeSound().playBgm(SEASON_MANAGEMENT_BGM)
       const input = autobotBatInputRef.current?.()
       const opens = input !== undefined && opensSeasonAutobotBat(record, {
         ...input,

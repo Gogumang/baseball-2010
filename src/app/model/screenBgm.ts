@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { SoundPort } from '@/shared/api/audio/soundPort'
 import type { Screen } from '@/app/model/screen'
-import type { PitcherScene } from '@/app/model/usePitcherLeagueSession'
+import type { PitcherScene, PitcherStoryContext } from '@/app/model/usePitcherLeagueSession'
 
 /**
  * 화면 → 배경음 번호 (`shared/config/original/sounds` 의 `scene` 칸 그대로).
@@ -14,7 +14,7 @@ import type { PitcherScene } from '@/app/model/usePitcherLeagueSession'
  *                      자동진행 중계 0x21 진입 0x3abf0 의 33(모드 {1,2,8,9} · 속도 ≠ 2 — `TeamAutoRelay`)과
  *                      벤치클리어링 44(한 번)뿐이다. 끊기는 장면을 세우는 쪽(`useTeamGame` · `usePitcherGame` ·
  *                      나리 타자편 · 미션 · 홈런더비의 상태 7 자리)이 그리는 때 한다 — 화면 표는 안 바꾼다(null)
- * 40 이벤트(대화)      0x106 상태 114 · 0x105 상태 211
+ * 40 이벤트(대화)      0x106 상태 114 · 0x105 상태 211 — 두 가드(`STORY_BGM`)
  * 46 엔딩              0x106 상태 141 · 0x105 상태 245 예약 (141 은 e ≤ 1 이면 52 — `endingBgmOf`, 245 는 e == 0 이면 52 — `seasonEndingBgmOf`)
  * ```
  *
@@ -45,7 +45,6 @@ export const SCREEN_BGM = {
   아이템: 4,
   외출: 4,
   성적: 4,
-  이벤트: 40,
   엔딩: 46,
 } as const satisfies Partial<Record<Screen['kind'], number>>
 
@@ -55,11 +54,26 @@ export const SCREEN_BGM = {
  * if [장면+0x28](이전 상태) == 1:  0x6ea6d(소리, 4, −1, 1)   ; 관리 화면 배경음 4 를 반복으로
  * ```
  * 이전 상태 1 은 상태 100(재진입)이 거쳐 보내는 자원 적재 칸이라 **이어하기로 돌아온 때**뿐이다.
- * 그 밖에는 128 이 배경음을 안 건드린다 — 들어오는 길(131 뒤 · 경기 뒤 116)이 모두 이벤트 재생 114 를
- * 지나오고 114 진입 0x11d00 이 배경음 40 을 트므로 그 40 이 이어진다. 웹은 경기 뒤 116 → 114 화면이 없어
- * 그 자리를 여기서 40 으로 채운다.
+ * 그 밖에는 128 이 배경음을 안 건드린다 — 들어오는 길(131 뒤 · 경기 뒤 116)이 모두 이벤트 재생 114 를 지나온다.
+ * 114 진입 0x11d00 은 S+0x50 ≠ 2 일 때만 40 을 튼다(`STORY_BGM_GUARD`): 131 뒤(S+0x50 = 0xe)는 40 이 이어지고,
+ * **경기 뒤**(116 진입 0x1278c 가 S+0x50 = 2)는 안 튼다 — 경기 장면이 끊은 채(0x3e350)로 128 에 온다(null).
+ * 웹은 116 → 114 화면이 없어 128 에 들어선 앞 화면(경기 결과 116)으로 가른다.
  */
 const POSTSEASON_REENTRY_BGM = 4
+
+/**
+ * 이벤트 재생 배경음 40 의 두 가드 — 나리 114 진입 0x11d00(11d3a~11d5c) · 시즌 0xd3 진입 0x5110(512c~5152) 이 같다:
+ * ```
+ * 0x8be21(이벤트 시작) 뒤
+ * if S+0x50 ≠ 2 && [관리자+0x39f] == 0:  0x6ea6d(소리, 0x28, −1, 1)
+ * ```
+ * - S+0x50 == 2 — 나리는 116 진입 0x1278c 가 쓰고(경기 뒤 116 → 114), 114 진입이 이 검사 **뒤에** 3(또는 0xb)으로 고친다
+ *   (11d60~11d88). 시즌은 SR+0x50(phase) 2 = 정규시즌 경기 끝(0x4f044).
+ * - [관리자+0x39f] — 내장 이벤트 표시. 쓰는 곳은 0x8a680(8a6e2, = 1) 하나 — 시즌 0xc038(연초 목표) · 나리 115 0x16aac
+ *   (연초 이벤트)가 부른다. 0x8cf64(재생 끝)가 지운다.
+ * 22경기 뒤 중간평가(117 → 114)는 105 진입 0x11910(1198c~11990)이 S+0x50 = 3 을 쓴 뒤라 40 이 난다.
+ */
+const STORY_BGM = 40
 
 /** 엔딩 141 에서 부상 · 방출 · 판정 없음(e ≤ 1) 쪽 배경음 0x34 */
 const ENDING_SAD_BGM = 52
@@ -110,19 +124,31 @@ export function restartsMenuBgm(previousKind: Screen['kind'] | null, screen: Scr
  */
 export function useScreenBgm(screen: Screen): { readonly bgm: number | null; readonly restartSerial: number } {
   const [previousKind, setPreviousKind] = useState<Screen['kind'] | null>(null)
+  const [enteredFrom, setEnteredFrom] = useState<Screen['kind'] | null>(null)
   const [restartSerial, setRestartSerial] = useState(0)
   // 그리는 중에 앞 값과 견줘 고친다 (`usePitcherLeagueBgm` 과 같은 꼴 — 효과 한 틀 늦지 않게)
   if (screen.kind !== previousKind) {
     setPreviousKind(screen.kind)
+    setEnteredFrom(previousKind)
     if (restartsMenuBgm(previousKind, screen)) setRestartSerial((serial) => serial + 1)
   }
-  return { bgm: screenBgmOf(screen), restartSerial }
+  return { bgm: screenBgmOf(screen, enteredFrom), restartSerial }
 }
 
-/** 이 화면에서 틀 배경음. 바꾸지 않는 화면이면 null */
-export function screenBgmOf(screen: Screen): number | null {
+/**
+ * 이 화면에서 틀 배경음. 바꾸지 않는 화면이면 null.
+ * `enteredFrom` 은 이 화면에 들어설 때의 앞 화면이다 (128 대진이 경기 뒤 길인지 가른다).
+ */
+export function screenBgmOf(screen: Screen, enteredFrom: Screen['kind'] | null = null): number | null {
   if (screen.kind === '엔딩') return endingBgmOf(screen.endingIndex)
-  if (screen.kind === '포스트시즌') return screen.fromReentry === true ? POSTSEASON_REENTRY_BGM : SCREEN_BGM.이벤트
+  if (screen.kind === '포스트시즌') {
+    if (screen.fromReentry === true) return POSTSEASON_REENTRY_BGM
+    // 경기 뒤 116 → 114 는 S+0x50 == 2 라 40 을 안 튼다 (`STORY_BGM` 가드)
+    return enteredFrom === '경기결과' ? null : STORY_BGM
+  }
+  // 115 연초 이벤트는 0x8a680 이 만든 내장 이벤트([관리자+0x39f] = 1) — 40 을 안 튼다.
+  // ⚠️ 대결결과(140 → 114)의 S+0x50 은 미션 장면 결과 0x4ea0c(4eb3e · 4f044)가 이 저장을 쓰는지 못 읽어 40 으로 둔다(미해결)
+  if (screen.kind === '이벤트') return screen.context === '연초' ? null : STORY_BGM
   const table: Partial<Record<string, number>> = SCREEN_BGM
   return table[screen.kind] ?? null
 }
@@ -142,9 +168,18 @@ export function pitcherLeagueBgmOf(
   scene: PitcherScene,
   postseasonFromReentry: boolean,
   endingIndex: number | null = null,
+  entry: { readonly storyContext?: PitcherStoryContext | null; readonly postseasonAfterGame?: boolean } = {},
 ): number | null {
   if (scene === '엔딩' && endingIndex !== null) return endingBgmOf(endingIndex)
-  if (scene === '포스트시즌') return postseasonFromReentry ? POSTSEASON_REENTRY_BGM : SCREEN_BGM.이벤트
+  if (scene === '포스트시즌') {
+    if (postseasonFromReentry) return POSTSEASON_REENTRY_BGM
+    // 경기 뒤 116 → 114 는 S+0x50 == 2 라 40 을 안 튼다 (`STORY_BGM` 가드)
+    return entry.postseasonAfterGame === true ? null : STORY_BGM
+  }
+  // 114 이벤트 재생 — 연초 115 는 내장 이벤트라 안 튼다. ⚠️ 대결결과 140 의 S+0x50 은 미해결(타자편 `screenBgmOf` 와 같다)
+  if (scene === '이벤트') return entry.storyContext === '연초' ? null : STORY_BGM
+  // 116 경기 뒤 평가 진입 0x1278c 는 배경음을 안 건드린다 — 경기 장면이 끊은 채다
+  if (scene === '경기결과') return null
   if (scene === '다음경기순위') return SCREEN_BGM.다음경기순위
   if (scene === '관리') return SCREEN_BGM.관리
   if (scene === '상점') return SCREEN_BGM.아이템
@@ -167,9 +202,19 @@ export function usePitcherLeagueBgm(
   isActive: boolean,
   scene: PitcherScene,
   endingIndex: number | null = null,
+  storyContext: PitcherStoryContext | null = null,
 ): number | null {
   const [wasActive, setWasActive] = useState(false)
   const [fromReentry, setFromReentry] = useState(false)
+  /** 앞 그리기의 장면 · 128 에 들어선 앞 장면이 116(경기 결과)이었나 */
+  const [previousScene, setPreviousScene] = useState<PitcherScene | null>(null)
+  const [postseasonAfterGame, setPostseasonAfterGame] = useState(false)
+  if (scene !== previousScene) {
+    setPreviousScene(scene)
+    // 142 를 들렀다 128 로 물러나는 것은 같은 진입으로 본다(142 는 배경음을 안 바꾼다)
+    if (scene !== '포스트시즌' && scene !== '경기준비') setPostseasonAfterGame(false)
+    else if (scene === '포스트시즌' && previousScene !== '경기준비') setPostseasonAfterGame(previousScene === '경기결과')
+  }
   // 그리는 중에 앞 값과 견줘 고친다 (React 의 "이전 렌더 값으로 상태 고치기" — 효과 한 틀 늦지 않게)
   if (isActive !== wasActive) {
     setWasActive(isActive)
@@ -179,7 +224,7 @@ export function usePitcherLeagueBgm(
     setFromReentry(false)
   }
   // 위에서 상태를 고쳤으면 React 가 이 그리기를 버리고 곧바로 다시 그린다 — 돌려주는 값은 고친 상태로 다시 구한다
-  return isActive ? pitcherLeagueBgmOf(scene, fromReentry, endingIndex) : null
+  return isActive ? pitcherLeagueBgmOf(scene, fromReentry, endingIndex, { storyContext, postseasonAfterGame }) : null
 }
 
 /** 시즌 관리 메뉴 상태 0xc9 · 장면 생성 뒤 첫 상태(진입 분기) 0xcb */

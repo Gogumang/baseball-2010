@@ -193,3 +193,33 @@ describe('메인 메뉴 아래 화면 — 상태 7 · 8 · 13 · 하위 목록�
     expect(played).toEqual(['틀기 1', '끊기', '틀기 1'])
   })
 })
+
+describe('이벤트 재생 배경음 40 — 114 진입 0x11d00 · 0xd3 진입 0x5110 의 두 가드 (S+0x50 ≠ 2 · [관리자+0x39f] == 0)', () => {
+  it('타자편 이벤트는 40, 연초 115 내장 이벤트는 안 바꾼다', () => {
+    expect(screenBgmOf({ kind: '이벤트', eventId: 370, context: '시즌' })).toBe(40)
+    expect(screenBgmOf({ kind: '이벤트', eventId: 451, context: '연초' })).toBeNull()
+  })
+
+  it('투수편 이벤트 장면 — 연초는 안 바꾸고 중간평가(105 진입이 S+0x50 = 3)는 40, 116 경기 결과는 안 바꾼다', () => {
+    expect(pitcherLeagueBgmOf('이벤트', false, null, { storyContext: '중간평가' })).toBe(40)
+    expect(pitcherLeagueBgmOf('이벤트', false, null, { storyContext: '연초' })).toBeNull()
+    expect(pitcherLeagueBgmOf('경기결과', false)).toBeNull()
+  })
+
+  it('경기 뒤 116 → 114 → 128 은 S+0x50 == 2 라 40 이 없다 — 131 뒤는 40', () => {
+    expect(screenBgmOf({ kind: '포스트시즌', popup: null }, '경기결과')).toBeNull()
+    expect(screenBgmOf({ kind: '포스트시즌', popup: null }, '이벤트')).toBe(40)
+    const { result, rerender } = renderHook(
+      ({ scene }: { scene: PitcherScene }) => usePitcherLeagueBgm(true, scene),
+      { initialProps: { scene: '경기결과' as PitcherScene } },
+    )
+    rerender({ scene: '포스트시즌' })
+    expect(result.current).toBeNull()
+    rerender({ scene: '경기준비' })
+    rerender({ scene: '포스트시즌' })
+    expect(result.current).toBeNull()
+    rerender({ scene: '이벤트' })
+    rerender({ scene: '포스트시즌' })
+    expect(result.current).toBe(40)
+  })
+})

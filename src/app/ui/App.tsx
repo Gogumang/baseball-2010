@@ -217,7 +217,9 @@ export function App() {
     screen.kind === '투수편',
   )
   // 화면이 바뀌면 그 화면의 배경음으로 갈아탄다 (`screenBgm.ts` 의 표). 투수편은 안쪽 장면(128 이어하기 4)을 본다
-  const pitcherBgm = usePitcherLeagueBgm(screen.kind === '투수편', pitcherSession.scene, pitcherSession.career?.endingIndex ?? null)
+  const pitcherBgm = usePitcherLeagueBgm(
+    screen.kind === '투수편', pitcherSession.scene, pitcherSession.career?.endingIndex ?? null, pitcherSession.story?.context ?? null,
+  )
   // 메인 메뉴는 환경설정에서 돌아올 때(0x24a40) · 게임시작 목록으로 새로 설 때(0x25b88) 1 을 처음부터 다시 튼다
   const screenBgm = useScreenBgm(screen)
   useSceneBgm(sound, screen.kind === '투수편' ? pitcherBgm : screenBgm.bgm, screenBgm.restartSerial)
