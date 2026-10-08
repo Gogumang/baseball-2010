@@ -268,6 +268,8 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
     batterTeamIndex: batterTeamIndex ?? props.hud?.ourTeamId ?? 0,
     batterSkillIds,
     recentAtBatCodes,
+    // 필살 남은 횟수 표시 0x38a30 이 그림마다 읽는다
+    specialSwingRemaining,
   })
   const { pitchRef, pitchTypeNumberRef, phaseRef, phaseStartedAtRef, resultTextRef, homeRunStartedAtRef, shiftRef, buntRef, deckRef, pendingHitRef, resultTicksRef, swingRef, heldResultRef, particlesRef, latestRef } = refs
   /** 장면 +0xfdc — 사람 키가 쓰고(`sceneBuntKind` 주석) 판정된 공이 그 값을 넘긴다. 부르는 쪽이 들고 있으면 그 값을 따른다 */

@@ -267,6 +267,24 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
     let settlementEffect: SettlementEffect | null | undefined
     /** 결과 창 뒤 배경(`isResultBackdrop`)으로 바뀐 시각 — 그때부터 +0x17e2 를 센다. 타석이면 null */
     let backdropStartedAt: number | null = null
+    /**
+     * '대기' 에서 쉬기 시작한 시각 — 쉬는 동안은 단계 시작 시각을 그림마다 되밀어 틱이 늘 0 이라 따로 센다.
+     * 0xe 진입 0x50674 가 필살 횟수 표시의 애니(game_ui 애니 5)를 되감아 거는 자리다 (`specialSwingBadge`).
+     */
+    let pausedSince: number | null = null
+
+    /** 0x4c4bc 의 상태 갈래 재료 — 쉬는 '대기' 면 쉬기 시작한 뒤 틱(⚠️ 근사: 웹 쉬기는 0xd 두 그림부터라 0xe 진입보다 두 그림 이르다) */
+    const stagePhaseNow = (now: number, tickLength: number) => {
+      const isPaused = latestRef.current.isPaused
+      const pausedWaiting = phaseRef.current === '대기' && isPaused
+      if (!pausedWaiting) pausedSince = null
+      else if (pausedSince === null) pausedSince = now
+      return {
+        kind: phaseRef.current,
+        tick: pitchTickAt(now, pausedSince ?? phaseStartedAtRef.current, tickLength),
+        isPaused,
+      }
+    }
 
     const frame = (now: number) => {
       const isBackdrop = latestRef.current.isResultBackdrop === true
@@ -383,12 +401,9 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
               ),
         resultTick: phaseRef.current === '결과' ? pitchTickAt(now, phaseStartedAtRef.current, tickLength) : 0,
         // 0x4c4bc 의 상태 갈래 재료 — 웹 단계 · 그 단계에 든 뒤 틱 · 쉬는 중(0xd · 0xe 대기 따위)
-        stagePhase: {
-          kind: phaseRef.current,
-          tick: pitchTickAt(now, phaseStartedAtRef.current, tickLength),
-          isPaused: latestRef.current.isPaused,
-        },
+        stagePhase: stagePhaseNow(now, tickLength),
         timeKeyCount: latestRef.current.timeKeyCount ?? null,
+        specialSwingRemaining: latestRef.current.specialSwingRemaining ?? null,
         // 일반 구장 번호를 고르는 규칙(st+0x70)이 미확인이라 0 번 구장으로 둔다 (추정).
         // 시즌 구장 세 칸이 넘어오면 배경 묶음 자체가 0x77494 쪽으로 갈린다 (0x40ff0).
         scenery: {

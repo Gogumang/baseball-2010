@@ -14,6 +14,7 @@ import { drawHud } from '@/widgets/batting-stage/lib/renderHud'
 import { drawFieldMap } from '@/widgets/batting-stage/lib/renderFieldMap'
 import { drawSoftKeyLabels } from '@/widgets/batting-stage/lib/softKeyLabels'
 import type { StagePhaseSnapshot } from '@/widgets/batting-stage/lib/softKeyLabels'
+import { drawSpecialSwingBadge } from '@/widgets/batting-stage/lib/specialSwingBadge'
 import { drawHomeRunBanner, drawHomeRunTextFrame } from '@/widgets/batting-stage/lib/renderHomeRunBanner'
 import type { HomeRunTextFrame } from '@/widgets/batting-stage/lib/homeRunBanner'
 import { batterLayersOf, layerPaletteIndexOf, NO_PITCHER_EQUIPMENT, pitcherLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
@@ -132,6 +133,8 @@ export interface StageScene {
    * 없거나 null 이면 "#TIME" 을 안 그린다 (`softKeyLabels`).
    */
   readonly timeKeyCount?: number | null
+  /** 필살 남은 횟수 0xaea30(공격 팀) — 0x38a30 이 타자 옆에 "0:SP×n" 을 그린다 (`specialSwingBadge`). 없거나 null 이면 안 그린다 */
+  readonly specialSwingRemaining?: number | null
 }
 
 export function renderBattingStage(
@@ -179,6 +182,8 @@ export function renderBattingStage(
   }
   // 0x4c4bc 꼬리 0x4c8e0 — "*MENU" · "#TIME" (`softKeyLabels`)
   if (scene.stagePhase !== undefined) drawSoftKeyLabels(context, scene.stagePhase, scene.timeKeyCount ?? null)
+  // 0x4c4bc 꼬리 0x4cace — 필살 남은 횟수 0x38a30 (`specialSwingBadge`)
+  if (scene.stagePhase !== undefined) drawSpecialSwingBadge(context, scene.stagePhase, scene.specialSwingRemaining ?? null, side)
   // 홈런은 판정 글자(game_judge)가 없고 HOMERUN 글자 연출이 대신 나간다 (R2 3-2, 7절 표의 v = 8·12)
   if (scene.homeRunFrame !== undefined) {
     if (scene.homeRunFrame !== null) drawHomeRunTextFrame(context, scene.homeRunFrame)
