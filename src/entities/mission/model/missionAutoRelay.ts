@@ -101,8 +101,11 @@ const RELAY_SEPARATOR = ' '
  *   9 파울 13(c1662) · 15·18 안타 — 진루 굴림 뒤 1·2·3 루면 9·10·11(c16e0~c16f0) · 24 홈런 12(c1708) · 헛스윙 삼진 5(c1742 · c17d8).
  * 웹 간이 타석(`quickAtBat.verdictOf`)은 코드 3 을 '땅볼아웃'/내야안타로, 코드 0 을 '뜬공아웃' 으로 낸다. 그 밖 코드에서 오는 '땅볼아웃'
  * (웹 근사 — 번트 코드는 스윙만 하는 간이 타석에 안 나온다)도 땅볼 길과 같이 1 로 둔다.
+ * 헛스윙 세 번째 스트라이크 겨루기(c1748)에서 타자가 이겨 삼진이 아닌 아웃이 된 타석(`swingingStrikeOutLost`)도 c17d8 이
+ * sim+0xc4 = 5 를 적는다 — 결과는 '아웃' 이지만 글은 5 "삼진 아웃" 이다.
  */
-export function relayCodeOf(outcome: AtBatOutcome, fouled: boolean): number {
+export function relayCodeOf(outcome: AtBatOutcome, fouled: boolean, swingingStrikeOutLost = false): number {
+  if (swingingStrikeOutLost) return 5
   switch (outcome.kind) {
     case '삼진':
       return 5
@@ -146,7 +149,7 @@ export function missionAutoRelayStepsOf(
       inning: half.inning,
       offenseSide: half.offenseSide,
       scores: [scores[0], scores[1]],
-      line: relayLineOf(nameOf(appearance), relayCodeOf(appearance.outcome, appearance.fouled === true)),
+      line: relayLineOf(nameOf(appearance), relayCodeOf(appearance.outcome, appearance.fouled === true, appearance.swingingStrikeOutLost === true)),
     })
   }
   return steps
@@ -168,7 +171,7 @@ export function missionAutoRelayStepOfTick(
   if (tick.kind === 'plateAppearance') scores[half.offenseSide] += tick.appearance.runsBattedIn
   const line = tick.kind === 'substitution'
     ? null
-    : relayLineOf(nameOf(tick.appearance), relayCodeOf(tick.appearance.outcome, tick.appearance.fouled === true))
+    : relayLineOf(nameOf(tick.appearance), relayCodeOf(tick.appearance.outcome, tick.appearance.fouled === true, tick.appearance.swingingStrikeOutLost === true))
   return {
     inning: half.inning,
     offenseSide: half.offenseSide,

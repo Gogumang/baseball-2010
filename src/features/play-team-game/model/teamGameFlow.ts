@@ -830,6 +830,8 @@ export interface TeamAutoRelayTick {
     readonly outcome: AtBatOutcome
     /** 그 타석에 파울이 났나 (`relayCodeOf`) */
     readonly fouled: boolean
+    /** 헛스윙 세 번째 겨루기에서 진 아웃 — 결과는 '아웃' 이지만 중계 글은 5 "삼진 아웃"(c17d8, `relayCodeOf`) */
+    readonly swingingStrikeOutLost?: boolean
     /** 타석 끝 카운트 st[4] · st[5] */
     readonly strikes: number
     readonly balls: number
@@ -4813,6 +4815,7 @@ function playAutoOffenseAtBat(
       orderIndex: slot,
       outcome,
       fouled: play.fouled === true,
+      swingingStrikeOutLost: play.swingingStrikeOutLost === true,
       strikes: play.strikes,
       balls: play.balls,
     }),
@@ -4874,6 +4877,7 @@ function playAutoDefenseAtBat(
       orderIndex,
       outcome: play.outcome,
       fouled: play.fouled === true,
+      swingingStrikeOutLost: play.swingingStrikeOutLost === true,
       strikes: play.strikes,
       balls: play.balls,
     }),

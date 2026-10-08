@@ -2410,6 +2410,8 @@ export interface PitcherAutoRelayTick {
     readonly outcome: AtBatOutcome
     /** 그 타석에 파울이 났나 — 코드 0 뜬공 아웃의 중계 글이 앞 공의 13(파울)으로 남는다 (`relayCodeOf`) */
     readonly fouled: boolean
+    /** 헛스윙 세 번째 겨루기에서 진 아웃 — 결과는 '아웃' 이지만 중계 글은 5 "삼진 아웃"(c17d8, `relayCodeOf`) */
+    readonly swingingStrikeOutLost?: boolean
     /** 타석 끝 카운트 st[4] · st[5] (간이 엔진이 올린 그대로) */
     readonly strikes: number
     readonly balls: number
@@ -2627,6 +2629,7 @@ function playDefensiveAtBat(
       orderIndex: progress.opponentOrderIndex,
       outcome: play.outcome,
       fouled: play.fouled === true,
+      swingingStrikeOutLost: play.swingingStrikeOutLost === true,
       strikes: play.strikes,
       balls: play.balls,
     }),
@@ -2728,6 +2731,7 @@ function playTeammateAtBat(
       orderIndex: slot,
       outcome,
       fouled: play.fouled === true,
+      swingingStrikeOutLost: play.swingingStrikeOutLost === true,
       strikes: play.strikes,
       balls: play.balls,
     }),

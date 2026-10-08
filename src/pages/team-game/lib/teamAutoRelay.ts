@@ -49,7 +49,7 @@ export function teamAutoRelayStepOf(tick: Pick<TeamAutoRelayTick, 'progress' | '
   const line =
     atBat === null
       ? null
-      : relayLineOf(batterNameAt(progress, atBat.ours, atBat.orderIndex) ?? '', relayCodeOf(atBat.outcome, atBat.fouled))
+      : relayLineOf(batterNameAt(progress, atBat.ours, atBat.orderIndex) ?? '', relayCodeOf(atBat.outcome, atBat.fouled, atBat.swingingStrikeOutLost === true))
   return {
     inning: slots.inning,
     offenseSide: slots.offenseSide,

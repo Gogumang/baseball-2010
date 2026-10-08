@@ -1383,6 +1383,8 @@ export interface GameAutoRelayTick {
     readonly outcome: AtBatOutcome
     /** 파울이 났나 — 코드 0 뜬공 아웃의 중계 글(`relayCodeOf`) */
     readonly fouled: boolean
+    /** 헛스윙 세 번째 겨루기에서 진 아웃 — 결과는 '아웃' 이지만 중계 글은 5 "삼진 아웃"(c17d8, `relayCodeOf`) */
+    readonly swingingStrikeOutLost?: boolean
     /** 타석 끝 st[4] · st[5] */
     readonly strikes: number
     readonly balls: number
@@ -1638,6 +1640,7 @@ function playOpponentInning(progress: GameProgress, random: RandomPort, relay?: 
               rosterSlot: tick.appearance.rosterSlot ?? rosterSlotAt(tick.lineup ?? progress.opponentLineup, tick.battingOrderIndex),
               outcome: tick.appearance.outcome,
               fouled: tick.appearance.fouled === true,
+              swingingStrikeOutLost: tick.appearance.swingingStrikeOutLost === true,
               strikes: tick.strikes,
               balls: tick.balls,
             }
@@ -1778,6 +1781,7 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort, relay?: G
       rosterSlot: rosterSlotAt(progress.ourLineup, slot),
       outcome,
       fouled: play.fouled === true,
+      swingingStrikeOutLost: play.swingingStrikeOutLost === true,
       strikes: play.strikes,
       balls: play.balls,
     },
