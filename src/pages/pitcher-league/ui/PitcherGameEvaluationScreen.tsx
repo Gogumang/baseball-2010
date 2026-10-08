@@ -5,6 +5,7 @@ import type { PitcherCareer, PitcherLastGame } from '@/entities/pitcher-career/m
 import { pitcherStreakEventOfCareer, pitcherStreakMarkupOf } from '@/entities/pitcher-career/model/pitcherStreaks'
 import { PitcherEventUnderlay } from '@/pages/pitcher-league/ui/PitcherEventUnderlay'
 import { EvaluationEventPlayer } from '@/pages/story/ui/EvaluationEventPlayer'
+import { evaluationGaugeDivisorOf } from '@/pages/story/lib/evaluationGauge'
 import { pitcherEvaluationExpressionOf, streakSayExpressionOf } from '@/pages/story/lib/evaluationDialogue'
 import { pitcherYearGoalWindowValuesOf } from '@/entities/pitcher-career/model/pitcherYearGoals'
 import { leagueDayCounterOf } from '@/entities/career/model/leagueGameSetup'
@@ -65,6 +66,7 @@ export function PitcherGameEvaluationScreen({ career, lastGame, onConfirm }: Pit
         game={changeGame}
         streak={pitcherStreakMarkupOf(streakEvent, ORIGINAL_USER_EVENTS)}
         streakExpression={streakSayExpressionOf(streakEvent.bad !== null)}
+        gauge={{ popularityChange: changes.popularityChange, divisor: evaluationGaugeDivisorOf({ kind: 'pitcher', role: career.role }) }}
         onDone={onConfirm}
       />
     </RawScreen>

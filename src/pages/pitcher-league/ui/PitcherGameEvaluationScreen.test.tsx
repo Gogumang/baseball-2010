@@ -31,6 +31,19 @@ describe('투수편 116 경기 뒤 평가 (0x11e0c · 0x8a6fc)', () => {
     expect(container.textContent).toContain('테스터')
   })
 
+  it('0x8b5ac 덧그림 — 인기도 변화 막대가 틀마다 한 줄씩 오른다 (선발 d 12: 6 → 30 줄)', () => {
+    render(<PitcherGameEvaluationScreen career={{ ...createPitcherCareer('테스터'), lastEvaluation: { moraleChange: 0, popularityChange: 6, reputationChange: 0 } }}
+      lastGame={경기} onConfirm={vi.fn()} />)
+    const 막대 = screen.getByTestId('인기도-막대')
+    expect(막대.getAttribute('data-rows')).toBe('0')
+    act(() => {
+      vi.advanceTimersByTime(10 * millisecondsPerFrame())
+    })
+    expect(막대.getAttribute('data-rows')).toBe('10')
+    다찍기()
+    expect(막대.getAttribute('data-rows')).toBe('30')
+  })
+
   it('대사(기록 줄 + 감독 글) → 변화 창(system sub 2 · 0x86c90) → 확인이면 114 로', () => {
     const onConfirm = vi.fn()
     render(<PitcherGameEvaluationScreen career={{ ...createPitcherCareer('테스터'), lastEvaluation: { moraleChange: 3, popularityChange: 0, reputationChange: -2 } }}

@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { EventPortraits } from '@/widgets/event-portraits/ui/EventPortraits'
 import { EventDialogueBox } from '@/pages/story/ui/EventDialogueBox'
 import { EvaluationChangeWindow } from '@/pages/story/ui/EvaluationChangeWindow'
+import { EvaluationGauge } from '@/pages/story/ui/EvaluationGauge'
 import type { EvaluationChangeValues } from '@/pages/story/lib/evaluationChangeWindow'
 import type { YearGoalWindowSource } from '@/pages/story/lib/yearGoalWindow'
 import { evaluationManagerPortraitsOf } from '@/pages/story/lib/evaluationDialogue'
@@ -28,6 +29,11 @@ interface EvaluationEventPlayerProps {
   /** 명령 3 글 — 연속 기록 알림 줄(전역 버퍼 0x1552af4). 빈 글이면 명령이 없다 */
   readonly streak: string
   readonly streakExpression: number
+  /**
+   * 0x8587c 의 인기도 변화 막대 — S+0x4a 와 d(`evaluationGaugeDivisorOf`). 0x8b5ac 가 틀마다 대사 상자 뒤에
+   * 0x847e0 · 0x85944 · 0x858cc 로 그린다(`EvaluationGauge`)
+   */
+  readonly gauge: { readonly popularityChange: number; readonly divisor: number }
   /** 마지막 명령이 끝나면 — 114 끝 */
   readonly onDone: () => void
 }
@@ -39,7 +45,7 @@ interface EvaluationEventPlayerProps {
  * 초상화(감독 · 오른쪽)는 0x7fbc4 끝(0x7fdee~)이 상자 위에 그린다 — 바닥 y 는 `StoryScreen` 과 같은 자리(⚠️ 114 값 미해결).
  */
 export function EvaluationEventPlayer({
-  underlay, dialogue, dialogueExpression, changeValues, goals, year, game, streak, streakExpression, onDone,
+  underlay, dialogue, dialogueExpression, changeValues, goals, year, game, streak, streakExpression, gauge, onDone,
 }: EvaluationEventPlayerProps) {
   const [step, setStep] = useState<EvaluationStep>('대사')
   const afterChange = () => (streak !== '' ? setStep('연속기록') : onDone())
@@ -57,6 +63,10 @@ export function EvaluationEventPlayer({
         ) : (
           <EventDialogueBox key="대사" raw={dialogue} slideIn isActive={step === '대사'} onAdvance={() => setStep('변화')} />
         )}
+      </div>
+      {/* 0x8b72c~0x8b75a — 상자 · 초상화(0x7fbc4) 다음에 그린다. 팝업(변화 창)은 그 위 */}
+      <div style={{ position: 'absolute', inset: 0, zIndex: 35, pointerEvents: 'none' }}>
+        <EvaluationGauge popularityChange={gauge.popularityChange} divisor={gauge.divisor} />
       </div>
       {step === '변화' && (
         // 팝업은 상자 · 초상화 위에 그린다

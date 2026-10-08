@@ -9,6 +9,7 @@ import { nariRecordLineTextOf } from '@/entities/career/model/playerCareer'
 import type { NariRecordLine, PlayerCareer } from '@/entities/career/model/playerCareer'
 import { ORIGINAL_USER_EVENTS } from '@/shared/config/original/userEvents'
 import { EvaluationEventPlayer } from '@/pages/story/ui/EvaluationEventPlayer'
+import { evaluationGaugeDivisorOf } from '@/pages/story/lib/evaluationGauge'
 import { batterEvaluationExpressionOf, streakSayExpressionOf } from '@/pages/story/lib/evaluationDialogue'
 import { hasHitlessStreak, nariStreakSayOf } from '@/pages/game-result/lib/nariStreakSay'
 import { yearGoalWindowValuesOf } from '@/entities/career/model/seasonFlow'
@@ -141,6 +142,7 @@ export function GameResultScreen({
           game={messageGameNumberOf(leagueDayCounterOf(career), career.postseason !== null, true)}
           streak={nariStreakSayOf(streakNotices, ORIGINAL_USER_EVENTS)}
           streakExpression={streakSayExpressionOf(hasHitlessStreak(streakNotices))}
+          gauge={{ popularityChange: evaluation.popularityChange, divisor: evaluationGaugeDivisorOf({ kind: 'batter' }) }}
           onDone={onContinue}
         />
       </RawScreen>
