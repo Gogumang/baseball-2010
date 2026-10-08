@@ -35,6 +35,32 @@ export interface MissionAutoRelayStep {
   readonly scores: readonly [number, number]
   /** 중계 글 (`relayLineOf`) — null 이면 sim+0xc4 = 0 이라 칸을 안 그린다 (교체 틱 · 파울 없는 코드 0 뜬공) */
   readonly line: string | null
+  /** 그 틱 뒤 두 팀 판(0x420dc "PITCHER" · 0x42364 "DUE UP")의 값 — 틱 꼴이 싣는다(목록 꼴 `missionAutoRelayStepsOf` 는 없다) */
+  readonly cards?: MissionAutoRelayCards
+}
+
+/**
+ * **0x21 그리기 0x4258c 의 두 팀 판 값** — 그 틱(0xc262c 한 번)이 끝난 자리의 판:
+ * - 0x420dc: 수비 팀(st[0xa]) 지금 투수 0xae83c 의 이름 0xb62c0 · 카운트 st[4] · st[5] · st[6](점은 min(s,2) · min(b,3) · min(o,2)).
+ *   타석 틱이면 그 타석이 끝났을 때의 카운트 — 새 타자로 넘기며 st[4] · st[5] 를 지우는 것은 다음 부름 머리 0xc0ee8(c0f42 지금 타자 ≠
+ *   예약 다음 타자 → c0f7c 0xb6764)라 이 틱에는 남는다. 교체 틱은 그 머리에서 지운 뒤라 0 이다. (⚠️ 유력: 간이 판정 0xc1818 ·
+ *   0xc11f0 이 타석 끝에서 st[4] · st[5] 를 따로 지우는지는 다 훑지 않았다 — 웹은 간이 타석의 끝 카운트를 싣는다)
+ * - 0x42364: 공격 팀(st[9]) 타순 칸 팀[+0x32] 부터 세 칸의 이름 — 타석 틱이면 방금 친 타자가 아직 팀[+0x32] 다(예약 확정 0xaebe4 는
+ *   다음 부름 머리). 대타가 들어선 칸은 대타 이름이다.
+ * - 경기 끝(0xb68fc)이면 0x420dc 는 점을, 0x42364 는 세 줄을 안 그린다(42252 · 42450).
+ */
+export interface MissionAutoRelayCards {
+  /** 수비 팀 지금 투수 이름 — 모르면 null (글을 안 쓴다) */
+  readonly pitcherName: string | null
+  readonly strikes: number
+  readonly balls: number
+  readonly outs: number
+  /** 공격 팀 타순 칸 팀[+0x32] (0~8) */
+  readonly currentOrder: number
+  /** 줄 0~2 의 이름 — 타순 칸 (currentOrder + i) mod 9 의 선수 */
+  readonly dueUpNames: readonly (string | null)[]
+  /** 0xb68fc — 경기 끝 */
+  readonly gameOver: boolean
 }
 
 /**
@@ -118,18 +144,20 @@ export function missionAutoRelayStepOfTick(
   scoresBefore: readonly [number, number],
   tick: HalfInningTick,
   nameOf: (appearance: HalfInningPlateAppearance) => string,
+  /** 그 틱 뒤 두 팀 판 값 (`MissionAutoRelayCards`) — 안 주면 싣지 않는다 */
+  cardsOf?: (tick: HalfInningTick, scores: readonly [number, number]) => MissionAutoRelayCards,
 ): MissionAutoRelayStep {
-  if (tick.kind === 'substitution') {
-    return { inning: half.inning, offenseSide: half.offenseSide, scores: [scoresBefore[0], scoresBefore[1]], line: null }
-  }
-  const { appearance } = tick
   const scores: [number, number] = [scoresBefore[0], scoresBefore[1]]
-  scores[half.offenseSide] += appearance.runsBattedIn
+  if (tick.kind === 'plateAppearance') scores[half.offenseSide] += tick.appearance.runsBattedIn
+  const line = tick.kind === 'substitution'
+    ? null
+    : relayLineOf(nameOf(tick.appearance), relayCodeOf(tick.appearance.outcome, tick.appearance.fouled === true))
   return {
     inning: half.inning,
     offenseSide: half.offenseSide,
     scores,
-    line: relayLineOf(nameOf(appearance), relayCodeOf(appearance.outcome, appearance.fouled === true)),
+    line,
+    ...(cardsOf === undefined ? {} : { cards: cardsOf(tick, scores) }),
   }
 }
 

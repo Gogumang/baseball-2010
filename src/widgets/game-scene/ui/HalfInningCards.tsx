@@ -49,15 +49,31 @@ function NameText({ box, name, testId }: { readonly box: CardBox; readonly name:
 }
 
 /**
- * **공수 교대 판의 두 팀 판 0x420dc("PITCHER") · 0x42364("DUE UP")** — 머리말은 `lib/halfInningCardsLayout`.
- * 점수판 틀 0x41440 뒤에 그린다(0x4ff16).
+ * 두 판의 자리를 따로 줄 때 — 자동진행 중계 0x21 그리기 0x4258c 는 0x420dc 를 (W/2 − 상자폭/2 − 6, H − 70), 0x42364 를
+ * (W/2 + 0x24, H − 70) 에 **이 차례로** 그린다(공격 측을 안 본다, 42864 · 42896).
  */
-export function HalfInningCards({ data }: { readonly data: HalfInningCardsData }) {
+export interface HalfInningCardsAt {
+  readonly pitcherX: number
+  readonly dueUpX: number
+  readonly y: number
+}
+
+/**
+ * **공수 교대 판의 두 팀 판 0x420dc("PITCHER") · 0x42364("DUE UP")** — 머리말은 `lib/halfInningCardsLayout`.
+ * 점수판 틀 0x41440 뒤에 그린다(0x4ff16). `at` 을 주면 그 자리에 PITCHER → DUE UP 차례로 그린다(0x21 중계).
+ * `isGameOver`(0xb68fc) 면 0x420dc 는 점을(42252), 0x42364 는 세 줄을(42450) 안 그린다.
+ */
+export function HalfInningCards({ data, at: fixedAt, isGameOver = false }: {
+  readonly data: HalfInningCardsData
+  readonly at?: HalfInningCardsAt
+  readonly isGameOver?: boolean
+}) {
   const gameUiOrigins = useFrameOrigins(GAME_UI_FRAMES)
   const textOrigins = useFrameOrigins(IMG_TEXT_FRAMES)
-  const at = halfInningCardsAt(data.battingSide)
-  const pitcher = pitcherCardPlacementOf(at.pitcherX, HALF_INNING_CARDS_Y, data.count)
-  const dueUp = dueUpCardPlacementOf(at.dueUpX, HALF_INNING_CARDS_Y, data.currentOrder)
+  const at = fixedAt ?? { ...halfInningCardsAt(data.battingSide), y: HALF_INNING_CARDS_Y }
+  const pitcher = pitcherCardPlacementOf(at.pitcherX, at.y, isGameOver ? { strikes: 0, balls: 0, outs: 0 } : data.count)
+  const dueUp = dueUpCardPlacementOf(at.dueUpX, at.y, data.currentOrder)
+  const dueUpRows = isGameOver ? [] : dueUp.rows
   // 그리는 차례: 초면 0x42364 → 0x420dc, 말이면 0x420dc → 0x42364 (왼쪽 먼저)
   const pitcherCard = (
     <div key="pitcher" data-testid="교대판-투수" data-x={at.pitcherX}>
@@ -82,7 +98,7 @@ export function HalfInningCards({ data }: { readonly data: HalfInningCardsData }
         x={dueUp.title.x} y={dueUp.title.y} />
       <FrameSprite folder={GAME_UI_FRAMES} frame={dueUp.frame.frame} origins={gameUiOrigins}
         x={dueUp.frame.x} y={dueUp.frame.y} />
-      {dueUp.rows.map((row, index) => (
+      {dueUpRows.map((row, index) => (
         <span key={index} data-testid={`교대판-타순-${index}`} data-order={row.order}>
           {row.digits.map((digit, part) => (
             <img key={part} className={styles.sprite} alt="" src={`${NUM}/${pad(digit.image)}.png`}
@@ -95,7 +111,7 @@ export function HalfInningCards({ data }: { readonly data: HalfInningCardsData }
   )
   return (
     <div className={styles.cardLayer}>
-      {data.battingSide === 0 ? [dueUpCard, pitcherCard] : [pitcherCard, dueUpCard]}
+      {fixedAt === undefined && data.battingSide === 0 ? [dueUpCard, pitcherCard] : [pitcherCard, dueUpCard]}
     </div>
   )
 }

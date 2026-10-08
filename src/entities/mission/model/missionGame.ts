@@ -1,12 +1,13 @@
 import type { OriginalMission } from '@/shared/config/original/missions'
 import { missionKeyOf } from '@/entities/mission/model/missionGoal'
-import { quickBatterOf, teamBatters } from '@/entities/team/model/teamRoster'
+import { quickBatterOf, teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { rosterLineupOf, rosterSlotAt } from '@/entities/game/model/quickLineup'
 import type { QuickLineup } from '@/entities/game/model/quickLineup'
 import { simulateHalfInningTicks } from '@/entities/game/model/simulateHalfInning'
-import type { HalfInningPlateAppearance } from '@/entities/game/model/simulateHalfInning'
+import type { HalfInningPlateAppearance, HalfInningTick } from '@/entities/game/model/simulateHalfInning'
 import { isGameOverAt } from '@/entities/game/model/gameState'
 import {
+  MISSION_ACE_ROSTER_SLOT,
   MISSION_CPU_START,
   missionPitchingDefenseOf,
   startMissionCpuPitching,
@@ -17,7 +18,7 @@ import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
 import type { MissionAcePitcher, MissionCpuPitching } from '@/entities/mission/model/missionCpuTeam'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { drainMissionAutoTicks, missionAutoRelayStepOfTick } from '@/entities/mission/model/missionAutoRelay'
-import type { MissionAutoRelay, MissionAutoRelayStep } from '@/entities/mission/model/missionAutoRelay'
+import type { MissionAutoRelay, MissionAutoRelayCards, MissionAutoRelayStep } from '@/entities/mission/model/missionAutoRelay'
 
 /**
  * **미션 경기의 이닝 · 공수 · 점수** — 미션도 모드 5·6 짜리 보통 경기(장면 0x104)라 3아웃이면 공수가 바뀌고 이닝이 넘어간다
@@ -122,6 +123,9 @@ export function humanRecordsOf(startOrder: number, nariRecordSlot: number = MISS
   records[k] = atOrder
   return records
 }
+
+/** 타순 아홉 칸 — 0x42364 의 0xae914 가 (팀[+0x32] + i) mod 9 */
+const LINEUP_SLOTS = 9
 
 /** 마스터 팀 타자 12 줄 */
 const BATTERS_PER_TEAM = 12
@@ -369,10 +373,38 @@ export function* simulateMissionAutoHalfTicks(
     const row = batting.records[record] ?? record
     return rows[Math.max(0, row) % rows.length]?.name ?? ''
   }
+  // 0x21 두 팀 판 — 수비 팀 지금 투수 이름 · 공격 팀 타순 칸 세 줄 (`MissionAutoRelayCards`)
+  const pitcherRows = teamPitchers(pitching.teamId)
+  const pitcherNameOf = (slot: number | undefined): string | null => {
+    if (slot === undefined) return null
+    const row = pitching.roster[slot] ?? slot
+    if (row === MISSION_ACE_ROSTER_SLOT) return defenseOptions.ace?.name ?? null
+    return pitcherRows[row]?.name ?? null
+  }
+  const batterNameAt = (lineup: QuickLineup, lineupSlot: number): string | null => {
+    const record = rosterSlotAt(lineup, lineupSlot)
+    const row = batting.records[record] ?? record
+    // ⚠️ 미해결: 미션 타자 칸은 그 선수(0x1fc20) 이름인데 이 판은 선수 이름을 들고 있지 않다 — 글을 안 쓴다
+    if (row === MISSION_NARI_RECORD) return null
+    return rows[Math.max(0, row) % rows.length]?.name ?? null
+  }
+  const cardsOf = (tick: HalfInningTick, scores: readonly [number, number]): MissionAutoRelayCards => {
+    const currentOrder = tick.battingOrderIndex % LINEUP_SLOTS
+    const lineup = tick.lineup ?? batting.lineup
+    return {
+      pitcherName: pitcherNameOf(tick.pitcherSlot),
+      strikes: tick.kind === 'plateAppearance' ? tick.strikes : 0,
+      balls: tick.kind === 'plateAppearance' ? tick.balls : 0,
+      outs: tick.outs,
+      currentOrder,
+      dueUpNames: [0, 1, 2].map((row) => batterNameAt(lineup, (currentOrder + row) % LINEUP_SLOTS)),
+      gameOver: isMissionGameOver({ ...game, scores: [scores[0], scores[1]] }, tick.outs),
+    }
+  }
   let relayScores: readonly [number, number] = game.scores
   let next = ticks.next()
   while (next.done !== true) {
-    const step = missionAutoRelayStepOfTick({ inning: game.inning, offenseSide }, relayScores, next.value, nameOf)
+    const step = missionAutoRelayStepOfTick({ inning: game.inning, offenseSide }, relayScores, next.value, nameOf, cardsOf)
     relayScores = step.scores
     yield step
     next = ticks.next()

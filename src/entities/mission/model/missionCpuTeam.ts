@@ -362,6 +362,8 @@ export function missionCpuBatterAbilityOf(team: MissionCpuTeam): BatterAbility |
 export interface MissionAcePitcher {
   readonly quick: QuickAtBatPitcher
   readonly staminaAbility: number
+  /** 이름 0xb62c0 — 0x21 중계의 "PITCHER" 판(0x420dc)이 쓴다 */
+  readonly name?: string
 }
 
 /** 타자 미션의 마투수 (마투수 미션이 아니면 undefined) */
@@ -376,6 +378,7 @@ export function missionAcePitcherOf(
   return {
     quick: { control: ability.hit, velocity: ability.power, stamina: ability.run, skillIds: [] },
     staminaAbility: ability.run,
+    name: ace.name,
   }
 }
 

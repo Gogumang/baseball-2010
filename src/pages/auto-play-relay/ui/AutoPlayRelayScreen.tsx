@@ -1,4 +1,8 @@
-import { RawScreen } from '@/shared/ui'
+import { FrameSprite, RawScreen } from '@/shared/ui'
+import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
+import { HalfInningCards } from '@/widgets/game-scene/ui/HalfInningCards'
+import type { HalfInningCardsAt } from '@/widgets/game-scene/ui/HalfInningCards'
+import { roundPlateRectsOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import { TEAMS } from '@/shared/config/original/teams'
 import { useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
 import type { MissionAutoRelayStep } from '@/entities/mission/model/missionAutoRelay'
@@ -7,9 +11,56 @@ import * as styles from '@/pages/auto-play-relay/ui/AutoPlayRelayScreen.css'
 /** "공격팀(%s)" 의 %s — st[0x31 + st[9]] == 0(사람 칸)이면 "PLAYER"(0xd0724), 아니면 "COM"(0xd072c) */
 export const OFFENSE_LABEL = { player: 'PLAYER', computer: 'COM' } as const
 
-/** ⚠️ 유력/근사: 띠 · 중계 칸의 y — 원본은 0x94a64 가 잡은 칸(sp+0x8c)의 +0x92 + 0xf · + 0x13 인데 그 칸을 안 읽었다 */
-const OFFENSE_BAND_Y = 200
-const RELAY_LINE_Y = 222
+/** 화면 240×320 — W · H */
+const SCREEN_WIDTH = 240
+const SCREEN_HEIGHT = 320
+
+/**
+ * **기준 칸** — 425bc `0x94a65(out, game_ui 프레임 19, 0, 4)` = `boxes.json` "019" 상자 4 (14, 213, 212, 57) — 교대 판 0x4fe9c 와 같은
+ * 칸(`HALF_INNING_CARDS_SPAN`). 0x4258c 는 그 **폭**(+4)으로 가로 자리를, **높이**(+6 — `ldrsh [sp, #0x92]`)로 띠 · 글의 y 를 잡는다.
+ */
+const BASE_BOX = { width: 212, height: 57 } as const
+
+/** 점수판 0x41c18(경기, W/2 − 폭/2, 10, 0) 자리 (42812~4283a) */
+const SCOREBOARD_AT = { x: SCREEN_WIDTH / 2 - BASE_BOX.width / 2, y: 10 } as const
+
+/** 두 팀 판 — 0x420dc(경기, W/2 − 폭/2 − 6, H − 0x46) → 0x42364(경기, W/2 + 0x24, H − 0x46) 차례 (4283e~4289a) */
+export const RELAY_CARDS_AT: HalfInningCardsAt = {
+  pitcherX: SCREEN_WIDTH / 2 - BASE_BOX.width / 2 - 6,
+  dueUpX: SCREEN_WIDTH / 2 + 0x24,
+  y: SCREEN_HEIGHT - 0x46,
+}
+
+/** "공격팀(%s)" 띠 — 0x6b7d4(gfx, W/2 − 폭/2, 높이 + 0xf, 폭, 0x12, 1, 0xB4122352) (428b8~428e2) */
+export const OFFENSE_BAND = {
+  x: SCREEN_WIDTH / 2 - BASE_BOX.width / 2,
+  y: BASE_BOX.height + 0xf,
+  width: BASE_BOX.width,
+  height: 0x12,
+} as const
+
+/** 띠 글 — 0xba269(글, W/2 − 폭/2 + 5, 높이 + 0x13, 폭, −1, 0) 왼쪽 맞춤 노랑 (42974~429aa) */
+export const OFFENSE_TEXT_AT = { x: OFFENSE_BAND.x + 5, y: BASE_BOX.height + 0x13 } as const
+
+/**
+ * 공격 팀 이름 그림 — img_text 프레임 0xb6bdd(st, st[9]) + 0x41 을 오른쪽 끝 (W/2 + 폭/2 − 그림폭 − 5, 높이 + 0x13) 에
+ * (0x913e5 팔레트 0 · 0xba815 크기 · 0xba759, 429ae~42a16)
+ */
+export const OFFENSE_TEAM_RIGHT = SCREEN_WIDTH / 2 + BASE_BOX.width / 2 - 5
+const TEAM_NAME_BASE_FRAME = 0x41
+
+/**
+ * 중계 글 칸 — 0x7c×0x12 칸을 ((W − 0x7c) >> 1, ((H − 0x12) >> 1) + 0x2d) 에 0xba0bd(둥글기 1, 0xB4122352),
+ * 글 `"!C!cffff00%s"`(0xd0744) 는 0xba269(글, 칸x, 칸y + 4, 0x7c, −1, 0) 가운데 노랑 (42a1a~42aae, sim+0xc4 ≠ 0 일 때만)
+ */
+export const RELAY_BOX = {
+  x: (SCREEN_WIDTH - 0x7c) >> 1,
+  y: ((SCREEN_HEIGHT - 0x12) >> 1) + 0x2d,
+  width: 0x7c,
+  height: 0x12,
+} as const
+
+const IMG_TEXT_FRAMES = './sprites/img_text/frames'
 
 interface AutoPlayRelayScreenProps {
   /** 마지막으로 굴린 틱의 중계 칸 (`useMissionSession.autoRelayStep`) — 아직 안 굴렸으면 null */
@@ -37,30 +88,66 @@ interface AutoPlayRelayScreenProps {
  *   `팀 + 0x41`) · 중계 글(sim+0xc4 ≠ 0 일 때만)을 그린다.
  * - 제한 시간은 이 동안에도 흐른다(0xaada4 — 부르는 세션의 타이머가 그대로 돈다).
  *
- * ⚠️ 미해결(그림): 점수판 0x41c18(팀 로고 +0x1054/+0x1058 · 점수 · 이닝)과 두 팀 판(그 자리 0x420dc "PITCHER" · 0x42364 "DUE UP" —
- *    수비 투수 이름 · 다음 세 타자, 좌표 (W/2 − w/2 − 6, H − 70) · (W/2 + 36, H − 70))은 옮기지 않았다 — 웹은 점수 · 이닝 글자를 둔다.
- *    띠 · 중계 칸의 y 도 근사(위 상수). 배경(0x18 판과 같은 운동장 전경)도 안 그린다.
+ * - 자리(0x4258c, 직접 떴다): 기준 칸 = game_ui 프레임 19 상자 4(폭 212 · 높이 57). 점수판 0x41c18 (14, 10) · 두 팀 판
+ *   PITCHER (8, 250) → DUE UP (156, 250) · 띠 (14, 72, 212×18) · 띠 글 (19, 76) · 팀 이름 그림 오른쪽 끝 221 · 중계 칸 (58, 196, 124×18).
+ *   띠 · 글의 y 는 기준 칸의 **높이**(57)에서 잡는다(원본 그대로 — `ldrsh [sp, #0x92]`).
+ *
+ * ⚠️ 미이식(그림): 점수판 0x41c18(이닝별 점수 줄 — 0x4fe9c 경기 끝 판 503d8 도 부른다)은 웹 어디에도 아직 없고 웹 미션 판은 이닝별
+ *    점수 0xb6989 를 들지 않아 옮기지 않았다 — 그 자리에 점수 · 이닝 글자를 둔다. 배경(운동장 전경)도 안 그린다.
  */
 export function AutoPlayRelayScreen({ step, onTick, sideTeams, humanSide }: AutoPlayRelayScreenProps) {
   // 틱 n(1부터)은 n 번째 0x48480 갱신 — 굴림은 부르는 쪽이 그 틱에 한다
   useSceneTick(() => onTick())
+  const textOrigins = useFrameOrigins(IMG_TEXT_FRAMES)
   if (step === null) return <RawScreen>{null}</RawScreen>
 
   const offenseTeam = sideTeams[step.offenseSide]
   const label = step.offenseSide === humanSide ? OFFENSE_LABEL.player : OFFENSE_LABEL.computer
   const teamName = (side: 0 | 1) => TEAMS[sideTeams[side]]?.name ?? ''
+  const teamFrame = TEAM_NAME_BASE_FRAME + offenseTeam
+  const teamFrameWidth = textOrigins?.[String(teamFrame).padStart(3, '0')]?.width ?? 0
+  const cards = step.cards
   return (
     <RawScreen>
-      <div className={styles.scoreLine} data-testid="중계-점수">
+      {/* ⚠️ 미이식: 점수판 0x41c18 — 이닝별 점수 줄(0xb6989(st, 이닝, 측) · 이닝 숫자 0x585ad · 작은 로고 [+0x1054]/[+0x1058])이라
+          웹 미션 판에 이닝별 점수가 없어 옮기지 않았다. 그 자리에 점수 · 이닝 글자를 둔다(웹 전용). */}
+      <div className={styles.scoreLine} style={{ left: SCOREBOARD_AT.x, top: SCOREBOARD_AT.y }} data-testid="중계-점수">
         {step.inning + 1}회{step.offenseSide === 0 ? '초' : '말'} {teamName(0)} {step.scores[0]} : {step.scores[1]} {teamName(1)}
       </div>
-      <div className={styles.offenseBand} style={{ top: OFFENSE_BAND_Y }} data-testid="중계-공격팀" data-team={offenseTeam}>
-        공격팀({label}) {TEAMS[offenseTeam]?.name ?? ''}
+      {cards !== undefined && (
+        <HalfInningCards
+          at={RELAY_CARDS_AT}
+          isGameOver={cards.gameOver}
+          data={{
+            battingSide: step.offenseSide,
+            count: { strikes: cards.strikes, balls: cards.balls, outs: cards.outs },
+            pitcherName: cards.pitcherName,
+            currentOrder: cards.currentOrder,
+            dueUpNames: cards.dueUpNames,
+          }}
+        />
+      )}
+      <div
+        className={styles.offenseBand}
+        style={{ left: OFFENSE_BAND.x, top: OFFENSE_BAND.y, width: OFFENSE_BAND.width, height: OFFENSE_BAND.height }}
+      />
+      <div className={styles.offenseText} style={{ left: OFFENSE_TEXT_AT.x, top: OFFENSE_TEXT_AT.y }}
+        data-testid="중계-공격팀" data-team={offenseTeam}>
+        공격팀({label})
       </div>
+      <FrameSprite folder={IMG_TEXT_FRAMES} frame={teamFrame} origins={textOrigins}
+        x={OFFENSE_TEAM_RIGHT - teamFrameWidth} y={OFFENSE_TEXT_AT.y} />
       {step.line !== null && (
-        <div className={styles.relayLine} style={{ top: RELAY_LINE_Y }} data-testid="중계-글">
-          {step.line}
-        </div>
+        <>
+          {roundPlateRectsOf(RELAY_BOX).map((rect, part) => (
+            <span key={part} className={styles.relayPlate}
+              style={{ left: rect.x, top: rect.y, width: rect.width, height: rect.height }} />
+          ))}
+          <div className={styles.relayLine} style={{ left: RELAY_BOX.x, top: RELAY_BOX.y + 4, width: RELAY_BOX.width }}
+            data-testid="중계-글">
+            {step.line}
+          </div>
+        </>
       )}
     </RawScreen>
   )

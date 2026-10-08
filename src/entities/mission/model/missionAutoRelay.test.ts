@@ -128,3 +128,20 @@ describe('틱마다 한 번 — 0x48480 갱신 한 번 = 0xc262c 한 번 (중계
     expect(partial.draws()).toBeLessThan(whole.draws())
   })
 })
+
+describe('0x21 두 팀 판 값 — 그 틱이 끝난 자리', () => {
+  it('타자 미션 CPU 반 이닝: 수비 = 사람 칸 팀 투수, 타석 틱은 방금 친 타자가 DUE UP 첫 줄 · 아웃은 st[6]', () => {
+    const run = startMission(missionOf('타자', 1))
+    const ended = { ...run, game: { ...run.game, halfEnded: true } }
+    const after = runBatterMissionAutoHalves(ended, createSeededRandom(3))
+    const steps = after.game.autoRelay?.steps ?? []
+    const first = steps.find((step) => step.line !== null)
+    expect(first?.cards?.pitcherName).toBeTruthy()
+    expect(first?.cards?.dueUpNames).toHaveLength(3)
+    expect(first?.cards?.dueUpNames[0]).toBe(first?.line?.split(' ')[0])
+    // 반 이닝 안에서 아웃은 줄지 않고, 3아웃 틱에서 3 이 된다
+    const cpuSide = run.mission.humanSide === 0 ? 1 : 0
+    const cpuSteps = steps.filter((step) => step.offenseSide === cpuSide && step.inning === steps[0]!.inning)
+    expect(cpuSteps[cpuSteps.length - 1]?.cards?.outs).toBe(3)
+  })
+})

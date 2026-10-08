@@ -380,8 +380,27 @@ export function simulateHalfInning(
  * 다. 굴림은 그 부름 안에서만 나간다 — 다음 틱을 안 부르면 남은 타석은 굴리지 않는다.
  */
 export type HalfInningTick =
-  | { readonly kind: 'substitution' }
-  | { readonly kind: 'plateAppearance'; readonly appearance: HalfInningPlateAppearance }
+  | ({ readonly kind: 'substitution' } & HalfInningTickState)
+  | ({
+      readonly kind: 'plateAppearance'
+      readonly appearance: HalfInningPlateAppearance
+      /** 그 타석이 끝났을 때의 카운트 — 다음 부름 머리 0xc0ee8(c0f7c → 0xb6764)가 새 타자로 넘길 때 st[4] · st[5] 를 지운다 */
+      readonly strikes: number
+      readonly balls: number
+    } & HalfInningTickState)
+
+/**
+ * 그 틱이 끝난 자리의 판 — 0x21 그리기(두 팀 판 0x420dc · 0x42364)가 읽는 칸.
+ * - `battingOrderIndex`: 타순 커서 팀[+0x32] — 타석 틱이면 **방금 친 타자**(다음 타자로 넘기는 것은 다음 부름 머리 0xc0ee8 →
+ *   0xaebe4 의 예약 확정), 교체 틱이면 그 부름 머리에서 넘어온 지금 타자.
+ * - `lineup`: 그때 명단(대타 포함) · `pitcherSlot`: 그때 마운드 투수 칸 · `outs`: st[6]
+ */
+export interface HalfInningTickState {
+  readonly battingOrderIndex: number
+  readonly lineup?: QuickLineup
+  readonly pitcherSlot?: number
+  readonly outs: number
+}
 
 /**
  * `simulateHalfInning` 의 **틱 단위** 꼴 — 0xc262c 한 번마다 멈춘다(`HalfInningTick`). 끝까지 돌리면 `simulateHalfInning` 과
@@ -503,7 +522,13 @@ export function* simulateHalfInningTicks(
       if (!substituted) break
       substitutionCalls += 1
       // 0xc262c c266c — 이 부름은 공 없이 돌아간다 (한 틱)
-      yield { kind: 'substitution' }
+      yield {
+        kind: 'substitution',
+        battingOrderIndex: order,
+        ...(lineup === undefined ? {} : { lineup }),
+        ...(mound === undefined ? {} : { pitcherSlot: mound.pitcherSlot }),
+        outs,
+      }
     }
     // 상태 0xf — 타석 준비. 원본은 여기서 돌발미션 발동을 굴린다 (0x8f158)
     hooks.onAtBatStart?.({
@@ -643,7 +668,16 @@ export function* simulateHalfInningTicks(
     if (pinchHitUsed !== undefined) pinchHitUsed = false
     order += 1
     // 0xc262c 한 번 = 이 타석 (한 틱). 경기 끝 · 3아웃 판정은 다음 틱의 0xc2198 이라 굴림이 없다
-    yield { kind: 'plateAppearance', appearance: plateAppearances[plateAppearances.length - 1]! }
+    yield {
+      kind: 'plateAppearance',
+      appearance: plateAppearances[plateAppearances.length - 1]!,
+      strikes: play.strikes,
+      balls: play.balls,
+      battingOrderIndex: order - 1,
+      ...(lineup === undefined ? {} : { lineup }),
+      ...(mound === undefined ? {} : { pitcherSlot: mound.pitcherSlot }),
+      outs,
+    }
     // 0xc2198 c21d6 — 타석 뒤 경기 끝 판정 0xb68fc (3아웃이 된 타석 뒤에도 반 이닝 넘김보다 먼저 본다)
     if (hooks.endsGame?.({ runs, outs }) === true) {
       gameEnded = true

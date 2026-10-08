@@ -2,7 +2,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useState } from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { AutoPlayRelayScreen } from '@/pages/auto-play-relay/ui/AutoPlayRelayScreen'
+import {
+  AutoPlayRelayScreen, OFFENSE_BAND, OFFENSE_TEAM_RIGHT, OFFENSE_TEXT_AT, RELAY_BOX, RELAY_CARDS_AT,
+} from '@/pages/auto-play-relay/ui/AutoPlayRelayScreen'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import type { MissionAutoRelayStep } from '@/entities/mission/model/missionAutoRelay'
 
@@ -72,5 +74,28 @@ describe('자동진행 중계 화면 (상태 0x21, 미션 갈래)', () => {
     expect(onTick).not.toHaveBeenCalled()
     act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 2))
     expect(onTick).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('0x4258c 자리 — 기준 칸 game_ui 19 상자 4 (폭 212 · 높이 57)', () => {
+  it('두 팀 판 PITCHER (8, 250) → DUE UP (156, 250) · 띠 (14, 72) · 띠 글 (19, 76) · 중계 칸 (58, 196, 124×18)', () => {
+    expect(RELAY_CARDS_AT).toEqual({ pitcherX: 8, dueUpX: 156, y: 250 })
+    expect(OFFENSE_BAND).toEqual({ x: 14, y: 72, width: 212, height: 18 })
+    expect(OFFENSE_TEXT_AT).toEqual({ x: 19, y: 76 })
+    expect(OFFENSE_TEAM_RIGHT).toBe(221)
+    expect(RELAY_BOX).toEqual({ x: 58, y: 196, width: 124, height: 18 })
+  })
+
+  it('두 팀 판 값을 싣는다 — 경기 끝이면 DUE UP 세 줄을 안 그린다', () => {
+    const cards = { pitcherName: '김투수', strikes: 1, balls: 2, outs: 1, currentOrder: 3, dueUpNames: ['가', '나', '다'], gameOver: false }
+    const step: MissionAutoRelayStep = { inning: 2, offenseSide: 0, scores: [1, 0], line: '가 1루타', cards }
+    const { rerender } = render(<AutoPlayRelayScreen step={step} onTick={() => {}} sideTeams={[3, 7]} humanSide={1} />)
+    expect(screen.getByTestId('교대판-투수').getAttribute('data-x')).toBe('8')
+    expect(screen.getByTestId('교대판-타자').getAttribute('data-x')).toBe('156')
+    expect(screen.getByTestId('교대판-투수이름').textContent).toBe('김투수')
+    expect(screen.getByTestId('교대판-타자이름-0').textContent).toBe('가')
+    rerender(<AutoPlayRelayScreen step={{ ...step, cards: { ...cards, gameOver: true } }} onTick={() => {}} sideTeams={[3, 7]} humanSide={1} />)
+    expect(screen.queryByTestId('교대판-타자이름-0')).toBeNull()
+    expect(screen.getByTestId('교대판-투수이름').textContent).toBe('김투수')
   })
 })
