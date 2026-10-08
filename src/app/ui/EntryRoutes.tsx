@@ -238,7 +238,9 @@ export function EntryRoutes({
         openedHiddenIds={collection.openedHiddenIds}
         gridShape={MY_LEAGUE_TEAM_GRID_SHAPE}
         onSelect={(teamId) => setScreen({ kind: '선수등록', teamId })}
-        onCancel={() => setScreen({ kind: '메인메뉴' })}
+        // 101 취소 0x14114 1424c~14264: 0x375d · 장면 0x103 · [0x140006c] = 5(게임시작 목록으로 바로) · [0x1552d14] = 1(전역 모드를
+        // 일반으로 — 메인 메뉴 생성자 0x237fa 가 [0x1552d10] 에 옮긴다. 다음 모드 진입 0x327b8 이 다시 적으니 웹은 들 칸이 없다)
+        onCancel={() => setScreen({ kind: '메인메뉴', openTier: 5 })}
       />
     )
   }

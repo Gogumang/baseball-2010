@@ -115,7 +115,9 @@ export function PitcherLeagueRoute({
   const eventEnd = useEventEndFrame(actions.completeStory)
 
   if (career === null || scene === '등록') {
-    return <PitcherCreateFlow openedHiddenIds={openedHiddenIds} onCreate={actions.create} onCancel={() => onExit()} />
+    return <PitcherCreateFlow openedHiddenIds={openedHiddenIds} onCreate={actions.create}
+      // 101 팀 고르기 취소 0x14114 1424c~14264: [0x140006c] = 5 — 게임시작 목록으로 바로 연다([0x1552d14] = 1 은 전역 모드를 일반으로)
+      onCancel={() => onExit(5)} />
   }
 
   if (scene === '경기' && gameOptions !== null) {
@@ -375,7 +377,8 @@ export function PitcherLeagueRoute({
         onContinue={actions.continueAfterEnding}
         onFinish={(isRegistered) => {
           actions.finishEnding(isRegistered)
-          onExit()
+          // 141 끝 0x1bfd4 · 145 목록 0x1ca92 — 등록 여부와 상관없이 [0x140006c] = 5(게임시작 목록으로 바로)
+          onExit(5)
         }}
       />
     )

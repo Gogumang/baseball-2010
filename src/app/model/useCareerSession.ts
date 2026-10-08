@@ -2130,7 +2130,8 @@ export function useCareerSession({
       // 등록했으면 저장은 등록하는 순간 지웠다 (`eraseSaveForHallOfFame`) — 여기서는 떠나기만 한다
       if (isRegistered) isSaveErasedRef.current = false
       setCareer(null)
-      setScreen({ kind: '메인메뉴' })
+      // 141 끝 0x1bfd4 · 145 목록 0x1ca92 — 등록 여부와 상관없이 [0x140006c] = 5: 메인 메뉴를 게임시작 목록으로 바로 연다
+      setScreen({ kind: '메인메뉴', openTier: 5 })
     },
 
     /**

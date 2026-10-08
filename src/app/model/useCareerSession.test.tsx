@@ -300,7 +300,8 @@ describe('보상 명령 뒤 이어하기 자리 (0x8c460 끝 8cc2e — S+0x50 �
     act(() => 처음.result.current.session.actions.receiveEndingBonus())
     // 0x2d "아니오"(1bd04~1bd28) — [this+0x278] = 1 · 화면 전환 → 장면 0x103. 저장은 그대로
     act(() => 처음.result.current.session.actions.finishEnding(false))
-    expect(처음.result.current.screen).toEqual({ kind: '메인메뉴' })
+    // 끝 1bfa2~1bfe2 의 [0x140006c] = 5 — 메인 메뉴를 게임시작 목록으로 바로 연다
+    expect(처음.result.current.screen).toEqual({ kind: '메인메뉴', openTier: 5 })
     expect(처음.result.current.session.career).toBeNull()
     expect(saveGame.load()).toMatchObject({ endingIndex: 5, endingBonusReceived: true })
     expect(처음.result.current.session.savedCareer?.endingIndex).toBe(5)
@@ -315,7 +316,7 @@ describe('보상 명령 뒤 이어하기 자리 (0x8c460 끝 8cc2e — S+0x50 �
     expect(saveGame.load()).toBeNull()
     act(() => 처음.result.current.session.actions.finishEnding(true))
     expect(saveGame.load()).toBeNull()
-    expect(처음.result.current.screen).toEqual({ kind: '메인메뉴' })
+    expect(처음.result.current.screen).toEqual({ kind: '메인메뉴', openTier: 5 })
   })
 
   it('선택지 확인(0x8b804 → 0x8b0e4) — 떠나온 줄을 본 표시하고 저장한다 · 장소에서 연 이벤트면 행동함(S+4)', () => {
