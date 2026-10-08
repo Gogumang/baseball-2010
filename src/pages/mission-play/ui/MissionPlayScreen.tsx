@@ -33,6 +33,11 @@ interface MissionPlayScreenProps {
   readonly run: MissionRun
   readonly ability: BatterAbility
   /**
+   * 지금 타자 이름 — 마스터 타순 차례(미션 타자가 아닌 사람 칸 타자)면 그 줄 이름(0xb62c0). 0xe 소개 판 0x44944 의 타자 칸.
+   * 안 넘기면 비운다(미션 타자 — 웹 미션 상태에 이름 칸이 없다).
+   */
+  readonly batterName?: string
+  /**
    * 치는 선수의 **장착** 스킬 (0xb62b4 — 선수 기록 +0x14). 미션은 나리 타자편 저장을 올리므로 그 선수 것이다.
    * 압도 22 면 CPU 실투율 +5 (0x33d52). 안 넘기면 스킬 없음.
    */
@@ -121,6 +126,7 @@ type MenuOverlay = '조작방법' | '설정'
 export function MissionPlayScreen({
   run,
   ability,
+  batterName,
   batterSkillIds,
   pitcherAbility,
   opponent,
@@ -365,7 +371,7 @@ export function MissionPlayScreen({
             <SceneMatchupCards
               batterHand={0}
               pitcher={{ isComputer: true, ...(opponent === null ? {} : { name: opponent.name }) }}
-              batter={{ isComputer: false }}
+              batter={{ isComputer: false, ...(batterName === undefined ? {} : { name: batterName }) }}
             />
           )}
 

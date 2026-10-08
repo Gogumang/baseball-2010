@@ -7,10 +7,15 @@ import {
   missionOpponentSpecialSwingOf,
   missionOpponentStaminaAfterPitch,
   missionPitcherAbility,
+  missionStageBatterOf,
   useMissionSession,
   withPitcherNotOut,
 } from '@/app/model/useMissionSession'
 import { startPitcherMission } from '@/entities/mission/model/pitcherRun'
+import { applyOutcome, isMissionBatterUp, startMission } from '@/entities/mission/model/missionRun'
+import { battingRecordAt } from '@/entities/mission/model/missionGame'
+import { masterBatterAbilityOf } from '@/entities/mission/model/missionCpuTeam'
+import { teamBatters } from '@/entities/team/model/teamRoster'
 import type { PitchArrivalPlay } from '@/features/defense-play/model/pitchArrivalPlay'
 import { useAtBatRunner } from '@/app/model/useAtBatRunner'
 import type { Screen } from '@/app/model/screen'
@@ -1394,5 +1399,28 @@ describe('미션 상대 CPU 교체 — 0xf 진입 0x3d954 (타자 미션 0xac428
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+describe('타자 미션 타석 화면의 타자 — 미션 타자 차례가 아니면 사람 칸 팀 마스터 줄 (`missionStageBatterOf`)', () => {
+  const 미션타자 = { ability: { hit: 900, power: 900, defense: 900, run: 900 }, skillIds: [22], specialSwingNumber: 2 }
+
+  it('미션 타자 차례면 받은 능력치 · 스킬 · 필살 그대로', () => {
+    const 빠르게 = MISSIONS.find((m) => m.side === '타자' && m.id === 10)!
+    const run = startMission(빠르게)
+    expect(isMissionBatterUp(run)).toBe(true)
+    expect(missionStageBatterOf(run, 미션타자)).toEqual(미션타자)
+  })
+
+  it('다음 타순 마스터 타자면 그 줄의 0xb6415 능력치 · 이름 · +0x14 스킬, 필살 0', () => {
+    const 빠르게 = MISSIONS.find((m) => m.side === '타자' && m.id === 10)!
+    const run = applyOutcome(startMission(빠르게), { kind: '아웃', detail: '땅볼아웃' })
+    expect(isMissionBatterUp(run)).toBe(false)
+    const row = teamBatters(run.game.humanBatting.teamId)[battingRecordAt(run.game.humanBatting)]!
+    const stage = missionStageBatterOf(run, 미션타자)
+    expect(stage.ability).toEqual(masterBatterAbilityOf(row))
+    expect(stage.name).toBe(row.name)
+    expect(stage.specialSwingNumber).toBe(0)
+    expect(stage.skillIds).not.toContain(22)
   })
 })

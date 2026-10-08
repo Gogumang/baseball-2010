@@ -111,6 +111,7 @@ import {
   enterMissionPitchSelection,
   isMissionCpuMoundAce,
   missionCpuAfterPitch,
+  masterBatterAbilityOf,
   missionCpuBatterAbilityOf,
   missionCpuBatterOf,
   missionCpuMoundPitcherAbilityOf,
@@ -1658,6 +1659,30 @@ export function missionHumanBatterOf(
   if (isMissionBatterUp(run)) return { isMissionBatter: true }
   const record = battingRecordAt(run.game.humanBatting)
   return { isMissionBatter: false, row: teamBatters(run.game.humanBatting.teamId)[record] ?? null }
+}
+
+/**
+ * **타석 화면이 그릴 사람 칸 타자** (타자 미션) — 미션 타자 차례면 받은 미션 타자 그대로, 마스터 타순 차례면 그 줄의
+ * 능력치 `0xb6415(타자, k, 1)` · 이름 · +0x14 장착 스킬, 필살은 0(마스터 줄 +0x18 = 0 — '0' 키 0x51dee 가 안 받는다).
+ */
+export function missionStageBatterOf(
+  run: MissionRun,
+  missionBatter: { readonly ability: BatterAbility; readonly skillIds: readonly number[]; readonly specialSwingNumber?: number },
+): { readonly ability: BatterAbility; readonly skillIds: readonly number[]; readonly specialSwingNumber: number; readonly name?: string } {
+  const batter = missionHumanBatterOf(run)
+  if (batter.isMissionBatter || batter.row === null) {
+    return {
+      ability: missionBatter.ability,
+      skillIds: missionBatter.skillIds,
+      specialSwingNumber: missionBatter.specialSwingNumber ?? 0,
+    }
+  }
+  return {
+    ability: masterBatterAbilityOf(batter.row),
+    skillIds: missionBatterSkillIdsOf(run, missionBatter.skillIds),
+    specialSwingNumber: 0,
+    name: batter.row.name,
+  }
 }
 
 /** 지금 타자의 장착 스킬 — 미션 타자면 세션이 받은 것, 마스터 줄이면 그 줄 +0x14 의 켜진 비트 (0xb62b4(타자, n) — 압도 22) */

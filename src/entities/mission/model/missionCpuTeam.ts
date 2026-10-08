@@ -342,16 +342,20 @@ export function missionCpuBatterOf(
  * CPU 타자 결정 0x34334 의 h 는 `0xb570d(ctx, 0, 타자, 1, 90, 1)` — 0xb570c 가 b5728 에서 이 값을 받고 모드 5 는 모드 갈래 ·
  * 팀 능력치 마스크를 안 탄다(부르는 쪽 `gameAbilityOf` 가 0..999 로 자른다).
  */
-export function missionCpuBatterAbilityOf(team: MissionCpuTeam): BatterAbility | null {
-  const batter = missionCpuBatterOf(team)
-  if (batter === null || batter.row === null) return null
-  const row = batter.row
+/** 마스터 줄 타자의 경기용 능력치 네 칸 — `0xb6415(타자, k, 1)` (사람 칸 팀 마스터 타자의 타석 화면도 같은 값) */
+export function masterBatterAbilityOf(row: RosterPlayer): BatterAbility {
   return {
     hit: masterGameAbilityOf(row, false, 0),
     power: masterGameAbilityOf(row, false, 1),
     defense: masterGameAbilityOf(row, false, 2),
     run: masterGameAbilityOf(row, false, 3),
   }
+}
+
+export function missionCpuBatterAbilityOf(team: MissionCpuTeam): BatterAbility | null {
+  const batter = missionCpuBatterOf(team)
+  if (batter === null || batter.row === null) return null
+  return masterBatterAbilityOf(batter.row)
 }
 
 /** 미션 마투수의 간이 타석 재료 — 레벨 배율 먹은 네 칸(0xb6414, 레코드 +0xc 부터 제구 · 구속 · 변화 · 체력) */

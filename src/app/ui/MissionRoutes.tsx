@@ -2,7 +2,12 @@ import { useEffect, useRef } from 'react'
 import type { MutableRefObject, ReactNode } from 'react'
 import type { Screen } from '@/app/model/screen'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
-import { missionBatterSpecialSwingRemainingOf, missionMoundOpponent, missionMoundPitcherAbility } from '@/app/model/useMissionSession'
+import {
+  missionBatterSpecialSwingRemainingOf,
+  missionMoundOpponent,
+  missionMoundPitcherAbility,
+  missionStageBatterOf,
+} from '@/app/model/useMissionSession'
 import type { useMissionSession } from '@/app/model/useMissionSession'
 import { MissionSelectScreen, MissionBriefing } from '@/pages/mission-select/ui/MissionSelectScreen'
 import { MissionPlayScreen } from '@/pages/mission-play/ui/MissionPlayScreen'
@@ -84,7 +89,6 @@ export function MissionRoutes({
 }: MissionRoutesProps) {
   const { missionRun, pitcherRun, actions } = session
   const batter = session.hallOfFameBatter ?? nariBatter
-  const { ability } = batter
   /**
    * 미션 경기 장면 0x104 하나 — 미션 · 마선수 대결을 세울 때마다(`begin` · `beginAceMatch` 가 새 화면 칸을 세운다) 새로 만든다.
    * 이 라우트는 목록 · 설명 · 결과도 그려 마운트 수명이 장면보다 길다 — 진행 화면 칸이 바뀔 때 아래 칸들을 0 으로 둔다
@@ -148,11 +152,14 @@ export function MissionRoutes({
   // 이벤트 마선수 대결도 같은 타석 화면이다 — 끝나면 미션 목록 대신 결과 이벤트로 돌아간다
   if (screen.kind === '미션진행' || screen.kind === '마선수대결') {
     if (missionRun === null) return selectScreen
+    // 지금 사람 칸 타석의 타자 — 미션 타자 차례가 아니면 사람 칸 팀 마스터 줄(능력치 0xb6415 · 이름 · +0x14 스킬, 필살 0)
+    const stageBatter = missionStageBatterOf(missionRun, batter)
     return (
       <MissionPlayScreen
         run={missionRun}
-        ability={ability}
-        batterSkillIds={batter.skillIds}
+        ability={stageBatter.ability}
+        batterSkillIds={stageBatter.skillIds}
+        batterName={stageBatter.name}
         pitcherAbility={missionMoundPitcherAbility(missionRun, session.aceLevels, session.opponentStaminaPercent)}
         opponent={missionMoundOpponent(missionRun)}
         atBat={runner.atBat}
@@ -165,8 +172,8 @@ export function MissionRoutes({
         }}
         sceneBuntKind={sceneBuntKindRef.current}
         // 필살타법 — 나리 타자편 저장 선수의 번호(+0x18)와 이 미션 한 판의 남은 횟수 (0xaebe4 가 채운다)
-        specialSwingNumber={batter.specialSwingNumber}
-        specialSwingRemaining={missionBatterSpecialSwingRemainingOf(session.batterSpecialSwingStored, batter)}
+        specialSwingNumber={stageBatter.specialSwingNumber}
+        specialSwingRemaining={missionBatterSpecialSwingRemainingOf(session.batterSpecialSwingStored, stageBatter)}
         onSpecialSwingUsed={actions.specialSwingUsed}
         // 상대 마투수 마구 횟수 0xd8509[레벨] (타석 교대 0xaebe4) — 안 넘기면 늘 Lv1 의 3회다
         aceLevels={session.aceLevels}
