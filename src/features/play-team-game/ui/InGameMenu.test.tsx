@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { createSilentSound, setActiveSound } from '@/shared/api/audio/soundPort'
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
 
 afterEach(cleanup)
@@ -109,5 +110,45 @@ describe('경기 중 메뉴 — 자동진행 알림 문구는 StrGAME 원문이�
     fireEvent.click(screen.getByText('예'))
     expect(screen.getByText(/자동진행을 할 수 없습니다/)).toBeTruthy()
     expect(screen.getByText(/에서 충전할 수 있습니다/)).toBeTruthy()
+  })
+})
+
+describe('경기 중 메뉴 — [조작방법] · [설정] 은 울리던 소리를 끊는다 (0x3c2f8 · 0x3c45c 의 0x6e418)', () => {
+  const 통로 = () => {
+    const port = { ...createSilentSound(), stop: vi.fn() }
+    setActiveSound(port)
+    return port
+  }
+  afterEach(() => setActiveSound(null))
+
+  it('[조작방법] 을 고르면 끊고 뷰어를 연다', () => {
+    const port = 통로()
+    const onOpenHelp = vi.fn()
+    render(<InGameMenu mode={3} onContinue={vi.fn()} onOpenHelp={onOpenHelp} />)
+
+    fireEvent.click(screen.getByText('조작방법'))
+
+    expect(port.stop).toHaveBeenCalledTimes(1)
+    expect(onOpenHelp).toHaveBeenCalledTimes(1)
+  })
+
+  it('[설정] 을 고르면 끊고 설정을 연다', () => {
+    const port = 통로()
+    const onOpenSettings = vi.fn()
+    render(<InGameMenu mode={3} onContinue={vi.fn()} onOpenSettings={onOpenSettings} />)
+
+    fireEvent.click(screen.getByText('설정'))
+
+    expect(port.stop).toHaveBeenCalledTimes(1)
+    expect(onOpenSettings).toHaveBeenCalledTimes(1)
+  })
+
+  it('[계속] 은 끊지 않는다', () => {
+    const port = 통로()
+    render(<InGameMenu mode={3} onContinue={vi.fn()} />)
+
+    fireEvent.click(screen.getByText('계속'))
+
+    expect(port.stop).not.toHaveBeenCalled()
   })
 })
