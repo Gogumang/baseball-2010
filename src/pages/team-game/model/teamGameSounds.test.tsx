@@ -189,7 +189,7 @@ describe('팀 경기 화면의 소리 배선', () => {
     expect(result.current.canPitch).toBe(true)
     녹음.played.length = 0
 
-    act(() => result.current.actions.throwPitch({ typeNumber: 0, courseCell: 4, gaugeCell: 0 }))
+    act(() => result.current.actions.throwPitch({ typeNumber: 0, gaugeCell: 0 }))
     expect(녹음.played[0]).toBe(12)
   })
 })
@@ -260,7 +260,7 @@ describe('견제 판정 콜 — 세이프면 늘 17 (0x51c14 의 종류 4·5 갈
       if (!result.current.canPitch) break
       if (progress.game.bases.first || progress.game.bases.second || progress.game.bases.third) break
       const typeNumber = pitchSlotsFor(progress).find((slot) => slot.typeNumber !== 0)?.typeNumber ?? 1
-      act(() => result.current.actions.throwPitch({ typeNumber, courseCell: 4, gaugeCell: 0 }))
+      act(() => result.current.actions.throwPitch({ typeNumber, gaugeCell: 0 }))
     }
     expect(result.current.canPitch).toBe(true)
     const bases = result.current.progress.game.bases

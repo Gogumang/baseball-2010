@@ -67,6 +67,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { battingPatternOdds } from '@/shared/config/original/battingPatterns'
 import { ACE_BATTERS } from '@/entities/game/model/aceOpponent'
 import { aceLeveledAbility } from '@/features/play-team-game/model/teamGameRoster'
+import { aimAfterTicks } from '@/features/play-pitcher-game/model/pitchAim'
 
 const 기본옵션: TeamGameOptions = {
   mode: 2,
@@ -97,7 +98,7 @@ function 끝까지(progress: TeamGameProgress, random: RandomPort): TeamGameProg
       continue
     }
     if (isPitchTurn(current)) {
-      current = throwPitch(current, { typeNumber: 첫구질(current), courseCell: 4, gaugeCell: 0 }, random)
+      current = throwPitch(current, { typeNumber: 첫구질(current), gaugeCell: 0 }, random)
     } else if (isBatterTurn(current)) {
       current = applyBatterOutcome(current, { kind: '아웃', detail: '뜬공아웃' }, random)
     } else {
@@ -145,7 +146,7 @@ describe('팀 경기 시작', () => {
 describe('사람이 던지는 타석', () => {
   it('공을 하나 던지면 투구 수가 오르고 스태미나가 깎인다', () => {
     const { progress, random } = 시작()
-    const after = throwPitch(progress, { typeNumber: 첫구질(progress), courseCell: 4, gaugeCell: 0 }, random)
+    const after = throwPitch(progress, { typeNumber: 첫구질(progress), gaugeCell: 0 }, random)
 
     expect(after.pitchCount).toBe(1)
     expect(after.stamina).toBeLessThan(progress.stamina)
@@ -154,7 +155,7 @@ describe('사람이 던지는 타석', () => {
 
   it('칠 차례에는 던질 수 없다', () => {
     const { progress, random } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
-    expect(throwPitch(progress, { typeNumber: 1, courseCell: 4, gaugeCell: 0 }, random)).toBe(progress)
+    expect(throwPitch(progress, { typeNumber: 1, gaugeCell: 0 }, random)).toBe(progress)
   })
 
   it('우리 선발 구질 칸은 로스터 투수의 구질 표에서 온다', () => {
@@ -292,7 +293,7 @@ describe('사람 타석의 공마다 상대 투수를 깎는다 — 0x3dec6 의 
     const 칠때 = { ...시작({ playerSide: PLAYER_SIDE_FIRST_BAT }).progress, cpuPinchHitUsed: true }
     expect(applyBatterPitch(칠때, 볼(1), createSeededRandom(1)).cpuPinchHitUsed).toBe(false)
     const 던질때 = { ...시작().progress, cpuPinchHitUsed: true }
-    const 던진뒤 = throwPitch(던질때, { typeNumber: 첫구질(던질때), courseCell: 4, gaugeCell: 0 }, createSeededRandom(1))
+    const 던진뒤 = throwPitch(던질때, { typeNumber: 첫구질(던질때), gaugeCell: 0 }, createSeededRandom(1))
     expect(던진뒤.pitchCount).toBe(1)
     expect(던진뒤.cpuPinchHitUsed).toBe(false)
   })
@@ -369,7 +370,7 @@ describe('경기용 능력치가 화면까지 이어진다', () => {
 describe('스태미나가 보는 팀 사기 (0x66e44 의 팀 레코드 +2)', () => {
   const 한공 = (options: Partial<TeamGameOptions>) => {
     const { progress, random } = 시작({ playerSide: PLAYER_SIDE_LAST_BAT, ...options })
-    const after = throwPitch(progress, { typeNumber: 첫구질(progress), courseCell: 4, gaugeCell: 0 }, random)
+    const after = throwPitch(progress, { typeNumber: 첫구질(progress), gaugeCell: 0 }, random)
     return progress.stamina - after.stamina
   }
 
@@ -456,7 +457,7 @@ describe('경기 중 투수 교체 (0xc1ba4 → 0xac428)', () => {
   it('구원 투수는 첫 투수 보너스(0x66e44 +200)를 못 받아 한 공에 더 깎인다 (0xaeb08, P1 3-2)', () => {
     const { progress } = 시작()
     const 구원 = changePitcher(progress, availablePitchers(progress)[0], createSeededRandom(0))
-    const 투구 = { typeNumber: 첫구질(구원), courseCell: 4, gaugeCell: 0 }
+    const 투구 = { typeNumber: 첫구질(구원), gaugeCell: 0 }
     const 구원뒤 = throwPitch({ ...구원, pitcherJustChanged: false }, 투구, createSeededRandom(3))
     // 같은 투수·같은 공인데 "아직 교체가 없다" 로 꾸미면 용량이 커져 덜 깎인다
     const 첫투수뒤 = throwPitch({ ...구원, pitcherJustChanged: false, ourUsedPitchers: [] }, 투구, createSeededRandom(3))
@@ -607,7 +608,7 @@ describe('도루 출발 (0x53610 → 메시지 0x583 → 0xa9bd4) · 공 도착 
     for (let seed = 1; seed <= 400; seed += 1) {
       const { progress } = 시작({}, seed)
       const 일루 = { ...progress, game: { ...progress.game, bases: { first: true, second: false, third: false } } }
-      const next = throwPitch(일루, { typeNumber: 첫구질(일루), courseCell: 0, gaugeCell: 0 }, createSeededRandom(seed * 7919))
+      const next = throwPitch(일루, { typeNumber: 첫구질(일루), aim: aimAfterTicks(1, { dx: -1, dy: 1 }, 11), gaugeCell: 0 }, createSeededRandom(seed * 7919))
       if (next.lastArrivalPlay?.kind === 5) {
         opened += 1
         caught += next.lastArrivalPlay.result.caughtFrom.length
@@ -623,7 +624,7 @@ describe('도루 출발 (0x53610 → 메시지 0x583 → 0xa9bd4) · 공 도착 
     for (let seed = 1; seed <= 400; seed += 1) {
       const { progress } = 시작({}, seed)
       const 일루 = { ...progress, game: { ...progress.game, bases: { first: true, second: false, third: false } } }
-      const pitch = { typeNumber: 첫구질(일루), courseCell: 0, gaugeCell: 0 }
+      const pitch = { typeNumber: 첫구질(일루), aim: aimAfterTicks(1, { dx: -1, dy: 1 }, 11), gaugeCell: 0 }
       const 미리Random = createSeededRandom(seed * 7919)
       const 미리 = throwPitch(일루, pitch, 미리Random)
       const 실시간Random = createSeededRandom(seed * 7919)
@@ -844,7 +845,6 @@ describe('주자 처리는 수비 화면이 끝나야 정해진다 (상태 0x17 
 
   const 같은코스 = (progress: TeamGameProgress) => ({
     typeNumber: 첫구질(progress),
-    courseCell: 4,
     gaugeCell: 0,
   })
 
@@ -1352,7 +1352,7 @@ describe('환경설정 "송구" (+0xf4) — 0xae6c8', () => {
     let 현재 = progress
     for (let step = 0; step < 2_000 && 현재.pendingDefensePlay === null; step += 1) {
       if (isPitchTurn(현재)) {
-        현재 = startThrowPitch(현재, { typeNumber: 첫구질(현재), courseCell: 4, gaugeCell: 0 }, random)
+        현재 = startThrowPitch(현재, { typeNumber: 첫구질(현재), gaugeCell: 0 }, random)
       } else if (isBatterTurn(현재)) {
         현재 = applyBatterOutcome(현재, { kind: '아웃', detail: '뜬공아웃' }, random)
       } else break
@@ -1592,7 +1592,7 @@ describe('견제 — 메시지 0x10 → 0x50f28 → 플레이 종류 4 (사람 �
   it('견제를 끼워도 기존 경로의 난수 차례는 그대로다 — 견제 판의 굴림만큼만 밀린다', () => {
     const { progress } = 시작()
     const 판 = 주자(progress, { first: true, second: false, third: false })
-    const 투구 = { typeNumber: 첫구질(판), courseCell: 4, gaugeCell: 0 }
+    const 투구 = { typeNumber: 첫구질(판), gaugeCell: 0 }
     const 그냥 = throwPitch(판, 투구, createSeededRandom(5))
     // 견제 판이 굴린 수만큼 앞에서 먹여 둔 난수와 같은 차례가 된다
     const { random, counter } = 세는난수(5)
@@ -1624,7 +1624,7 @@ function 각본난수(rest: number, index = -1, hit = rest) {
 describe('실투 판정 0x33cbc — 사람이 던지는 공', () => {
   it('궤적 뒤 · CPU 타자 결정 앞에서 rand(0,100) 한 번 — 실투면 지켜볼 공도 친다', () => {
     const { progress } = 시작()
-    const input = { typeNumber: 첫구질(progress), courseCell: 4, gaugeCell: 0 }
+    const input = { typeNumber: 첫구질(progress), gaugeCell: 0 }
 
     // 모든 굴림이 0.7 이면 존 안 공이고, 실투가 아니며(70 ≥ p) 타자는 지켜본다
     const 평소 = 각본난수(0.7)
@@ -1649,7 +1649,7 @@ describe('마타자 0xb633d — 번트 칸을 뽑아도 친다', () => {
 
   it('같은 굴림에서 일반 타자는 번트, 마타자는 치기 칸과 똑같이 휘두른다', () => {
     const { progress } = 시작()
-    const input = { typeNumber: 첫구질(progress), courseCell: 4, gaugeCell: 0 }
+    const input = { typeNumber: 첫구질(progress), gaugeCell: 0 }
     // 표 굴림 자리 = 0.7 일 때 지켜보는 공의 마지막 굴림
     const 기준 = 각본난수(0.7)
     startThrowPitch(progress, input, 기준)
@@ -1733,19 +1733,20 @@ describe('사구 — 우리 타석 결과 4 와 벤치 클리어링 (상태 0x1e
 })
 
 /**
- * 우리가 던진 공에 CPU 타자가 맞는다 — 0x35a20. 기본 배치 side 1(좌타)에서 바깥 칸 2 를 노린 공이
- * 흩어져 상자 [271, 309] 에 닿는 씨앗을 골랐다 (182: 벤치 클리어링 안 들어감 · 2016: 들어감 — 공 도착 0.1% 굴림 뒤).
+ * 우리가 던진 공에 CPU 타자가 맞는다 — 0x35a20. 기본 배치 side 1(좌타)에서 조준점을 오른위로 11 틱 흘린 공이
+ * 흩어져 상자 [271, 309] 에 닿는 씨앗을 골랐다 (439: 벤치 클리어링 안 들어감 · 2016: 들어감 — 공 도착 0.1% 굴림 뒤).
+ * 코스 3×3 칸을 원본 조준점으로 바꾸며 목표의 z 가 −110 이 되어 182 → 439 로 바꿨다.
  */
 describe('사구 — 우리 수비에서 CPU 타자가 맞는다 (0x35a20 · 벤치 클리어링 수비 사람 갈래)', () => {
   function 맞히기(seed: number): { 전: TeamGameProgress; 후: TeamGameProgress } {
     const { progress } = 시작()
-    const input = { typeNumber: 첫구질(progress), courseCell: 2, gaugeCell: 0 }
+    const input = { typeNumber: 첫구질(progress), aim: aimAfterTicks(1, { dx: 1, dy: 1 }, 11), gaugeCell: 0 }
     const 후 = startThrowPitch(progress, input, createSeededRandom(seed))
     return { 전: progress, 후 }
   }
 
   it('밀어내기 1루 · 출루 허용 · 투수 볼넷+사구 칸', () => {
-    const { 후 } = 맞히기(182)
+    const { 후 } = 맞히기(439)
     expect(후.lastResolution).toEqual({ kind: '사구' })
     expect(후.pendingDefensePlay).toBeNull()
     expect(후.game.bases.first).toBe(true)
@@ -1755,7 +1756,7 @@ describe('사구 — 우리 수비에서 CPU 타자가 맞는다 (0x35a20 · 벤
   })
 
   it('벤치 클리어링에 들어가면 우리 투수 스태미나 −1000 · 시즌 평판 S[1] +1 (공격측 CPU)', () => {
-    const 보통 = 맞히기(182).후
+    const 보통 = 맞히기(439).후
     const 벤치 = 맞히기(2016).후
     expect(벤치.lastResolution).toEqual({ kind: '사구' })
     expect(보통.stamina - 벤치.stamina).toBe(1000)
@@ -1771,7 +1772,7 @@ describe('사구 — 우리 수비에서 CPU 타자가 맞는다 (0x35a20 · 벤
 
   it('시즌이 아니면(모드 ≠ 2) S[1] 이 안 남는다', () => {
     const { progress } = 시작({ mode: 1 })
-    const input = { typeNumber: 첫구질(progress), courseCell: 2, gaugeCell: 0 }
+    const input = { typeNumber: 첫구질(progress), aim: aimAfterTicks(1, { dx: 1, dy: 1 }, 11), gaugeCell: 0 }
     const 벤치 = startThrowPitch(progress, input, createSeededRandom(2016))
     expect(벤치.lastResolution).toEqual({ kind: '사구' })
     expect(벤치.log.some((entry) => entry.text.includes('벤치 클리어링'))).toBe(true)
@@ -1808,7 +1809,7 @@ describe('공수 교대 판 (상태 0x18 교대 가지 — 앞뒤 장면이 모�
     let current = progress
     for (let step = 0; step < 400 && current.game.inning === 1; step += 1) {
       current = isPitchTurn(current)
-        ? throwPitch(current, { typeNumber: 첫구질(current), courseCell: 4, gaugeCell: 0 }, random)
+        ? throwPitch(current, { typeNumber: 첫구질(current), gaugeCell: 0 }, random)
         : applyBatterOutcome(current, { kind: '아웃', detail: '뜬공아웃' }, random)
     }
     // 1회초 판 · 1회말 판 · 2회초 판
@@ -2238,7 +2239,7 @@ describe('출루 허용 state[0x88] — 정산 0xa8c5c~0xa8ca6 은 주자 목록
       const random = createSeededRandom(seed)
       let current = startTeamGame(기본옵션, random)
       for (let pitch = 0; pitch < 60 && isPitchTurn(current); pitch += 1) {
-        current = startThrowPitch(current, { typeNumber: 첫구질(current), courseCell: 4, gaugeCell: 0 }, random)
+        current = startThrowPitch(current, { typeNumber: 첫구질(current), gaugeCell: 0 }, random)
         if (current.pendingDefensePlay !== null) {
           if (current.pitching.allowedBaserunner) break
           return { progress: current, random }
@@ -2276,7 +2277,7 @@ describe('36 필살송구 아웃 — 결과 코드 0xd(그 판의 아웃 판정)
       const random = createSeededRandom(seed)
       let current = startTeamGame(기본옵션, random)
       for (let pitch = 0; pitch < 60 && isPitchTurn(current); pitch += 1) {
-        current = startThrowPitch(current, { typeNumber: 첫구질(current), courseCell: 4, gaugeCell: 0 }, random)
+        current = startThrowPitch(current, { typeNumber: 첫구질(current), gaugeCell: 0 }, random)
         if (current.pendingDefensePlay !== null && current.game.outs === 0) return { progress: current, random }
         if (current.pendingDefensePlay !== null) break
       }
@@ -2447,7 +2448,7 @@ describe('상태 0xe 의 OK 대기 (0x39e14 → 0x532b0) — 진행기가 0xe �
     expect(다음타자.sceneConfirm?.entries).toBeGreaterThanOrEqual(1)
 
     const 수비 = 시작()
-    const 한공 = throwPitch(수비.progress, { typeNumber: 첫구질(수비.progress), courseCell: 4, gaugeCell: 0 }, 수비.random)
+    const 한공 = throwPitch(수비.progress, { typeNumber: 첫구질(수비.progress), gaugeCell: 0 }, 수비.random)
     if (한공.atBat.balls + 한공.atBat.strikes > 0 && 한공.scenePinchHit === 수비.progress.scenePinchHit) {
       expect(한공.sceneConfirm).toBe(수비.progress.sceneConfirm)
     }
@@ -2483,7 +2484,7 @@ describe('상태 0xe 의 OK 대기 (0x39e14 → 0x532b0) — 진행기가 0xe �
           continue
         }
         current = isPitchTurn(current)
-          ? throwPitch(current, { typeNumber: 첫구질(current), courseCell: 4, gaugeCell: 0 }, random)
+          ? throwPitch(current, { typeNumber: 첫구질(current), gaugeCell: 0 }, random)
           : applyBatterOutcome(current, { kind: '아웃', detail: '뜬공아웃' }, random)
       }
     }
@@ -2561,7 +2562,7 @@ describe('파울 각 공도 수비 판을 돈다 — 판이 파울로 닫히면 
           continue
         }
         if (!isPitchTurn(progress)) break
-        const next = startThrowPitch(progress, { typeNumber: 첫구질(progress), courseCell: 4, gaugeCell: 0 }, random)
+        const next = startThrowPitch(progress, { typeNumber: 첫구질(progress), gaugeCell: 0 }, random)
         const pending = next.pendingDefensePlay
         if (pending === null) {
           progress = next

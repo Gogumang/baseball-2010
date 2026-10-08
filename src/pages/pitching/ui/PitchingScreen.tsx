@@ -5,9 +5,11 @@ import { GoalBar } from '@/entities/mission/ui/GoalBar'
 import type { PitchTypeInfo } from '@/shared/config/original/pitchTypes'
 import type { PitcherRun } from '@/entities/mission/model/pitcherRun'
 import type { AtBatState } from '@/entities/at-bat/model/atBatState'
-import { CourseGrid } from '@/pages/pitching/ui/CourseGrid'
+import { AimCursor } from '@/pages/pitching/ui/AimCursor'
 import { PitchSlotPicker } from '@/pages/pitching/ui/PitchSlotPicker'
 import type { PitchSlotChoice } from '@/pages/pitching/ui/PitchSlotPicker'
+import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
+import type { AimDirection } from '@/features/play-pitcher-game/model/pitchAim'
 import { PitchGradeGauge } from '@/pages/pitching/ui/PitchGradeGauge'
 import { useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
 import { SceneMatchupCards } from '@/widgets/matchup-cards/ui/SceneMatchupCards'
@@ -32,8 +34,10 @@ import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
 /**
- * 투구 화면. 원작 설명서 <투구 조작>의 세 단계를 그대로 따른다:
- *   1. 구질 선택  2. 코스 선택  3. 투구 결정(게이지 — OK 로 칸을 정하고 틱 10 에 놓는다)
+ * 투구 화면. 원본 경기 상태 셋을 그대로 따른다 (나리 투수편 `PitcherGameScreen` 과 같다):
+ *   0xf 구질 — 칸마다 정해진 키, 틱 8 뒤 넘김 (`PitchSlotPicker`)
+ *   0x10 조준 — 방향키로 흐르는 조준점, OK 확정 · CLR 은 0xf 로 (`AimCursor`). 투수 미션은 매 틱 흔들린다(0x39c5c)
+ *   0x11 게이지 — OK 로 칸을 정하고 틱 10 에 놓는다 (`PitchGradeGauge`)
  *
  * ⚠️ 게이지가 넘겨 주는 것은 **누른 칸 g(0~9)** 하나다 — 원본에는 PERFECT/GOOD/BAD 라는
  * 글자도 판정도 없다 (S5 U-15 확정, 누름 0x50e08). 등급 t = max(g−4, 1) 은 부르는 쪽
@@ -78,10 +82,20 @@ interface PitchingScreenProps {
    */
   readonly onThrow: (
     type: PitchTypeInfo,
-    courseCell: number,
+    /** 0x10 에서 확정한 조준점 x · y · z (0x4dc78 이 그대로 목표로 쓴다) */
+    aim: WorldPoint,
     gaugeCell: number,
     gaugeSettingOn: boolean,
   ) => void
+  /** 조준점의 존 중심 칸(0xcfbcc) — 세션이 공을 만들 때 쓰는 side 와 같다. 기본 1 */
+  readonly aimSide?: number
+  /**
+   * 0x10 의 틱 하나(0x39c5c) — 투수 미션은 세션이 경기 난수로 흔들림까지 넣는다(`useMissionSession.aimTick`).
+   * 안 넘기면 걸음 · 자르기만 한다
+   */
+  readonly onAimTick?: (aim: WorldPoint, direction: AimDirection) => WorldPoint
+  /** 조준(0x10)의 CLR — 0xf 진입 0x3d954 를 다시 돌린다(`useMissionSession.returnToPitchSelection`) */
+  readonly onReturnToPitchSelection?: () => void
   /** 경기 중 메뉴 **"나가기"** (표 0xcfcfc 행 1 칸 4 — StrGAME[0]/[1] 확인 뒤 0x22 → 0x40140) */
   readonly onGiveUp: () => void
   /** 결과 판에서 미션 목록으로(0x140006c = 1) — 마선수 대결이면 대결 끝 */
@@ -143,6 +157,9 @@ export function PitchingScreen({
   magicRemaining,
   isMagicType,
   onThrow,
+  aimSide = 1,
+  onAimTick,
+  onReturnToPitchSelection,
   onGiveUp,
   onFinish,
   onRetry,
@@ -171,7 +188,8 @@ export function PitchingScreen({
 
   const [phase, setPhase] = useState<PitchPhase>('구질')
   const [pitchType, setPitchType] = useState<PitchTypeInfo | null>(null)
-  const [courseCell, setCourseCell] = useState(4)
+  /** 0x10 에서 확정한 조준점 — 게이지(0x11) 뒤 놓을 때 쓴다 */
+  const [aim, setAim] = useState<WorldPoint | null>(null)
   const menu = useInGameMenuState()
   const isMenuOpen = menu.isOpen
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
@@ -305,10 +323,11 @@ export function PitchingScreen({
 
   /** 게이지가 놓을 때(틱 10) 정한 칸 g 를 그대로 넘긴다 (0x50e08 — 못 정했으면 0) */
   const throwPitch = (gaugeCell: number) => {
-    if (pitchType === null) return
-    onThrow(pitchType, courseCell, gaugeCell, true)
+    if (pitchType === null || aim === null) return
+    onThrow(pitchType, aim, gaugeCell, true)
     setPhase('구질')
     setPitchType(null)
+    setAim(null)
   }
 
   /** 마구 칸인데 남은 횟수가 0 이하 — 0x50db8 이 키를 버린다 */
@@ -393,48 +412,59 @@ export function PitchingScreen({
         </div>
       )}
 
-      {!isPopupOpen && phase === '구질' && !isAwaitingConfirm && (
-        <>
-          <Panel heading="1. 구질 선택" />
+      {!isPopupOpen && phase === '구질' && !isAwaitingConfirm && <Panel heading="1. 구질 선택" />}
+      {phase === '구질' && !isAwaitingConfirm && (
+        <div hidden={isPopupOpen}>
           <PitchSlotPicker
             choices={slotChoices}
+            isPaused={isPopupOpen}
             onDecide={(chosen) => {
-              const found = repertoire[slotChoices.findIndex((choice) => choice.slot === chosen)]
+              const index = slotChoices.findIndex((choice) => choice.slot === chosen)
+              const found = repertoire[index]
               if (found === undefined || isBlockedMagic(found)) return
               setPitchType(found)
               setPhase('코스')
             }}
           />
-        </>
+        </div>
       )}
 
-      {!isPopupOpen && phase === '코스' && (
-        <>
-          <Panel heading={<>2. 코스 선택 — {pitchType?.name}</>} />
-          <CourseGrid
-            selectedCell={courseCell}
-            onSelect={(cell) => {
-              setCourseCell(cell)
-              if (usesGauge) {
+      {!isPopupOpen && phase === '코스' && <Panel heading={<>2. 코스 선택 — {pitchType?.name}</>} />}
+      {phase === '코스' && (
+        <div hidden={isPopupOpen}>
+          <AimCursor
+            side={aimSide}
+            isPaused={isPopupOpen}
+            {...(onAimTick === undefined ? {} : { onTick: onAimTick })}
+            onConfirm={(confirmed) => {
+              // 마구는 게이지를 쓰지 않는다 (0x3f500 의 `구질 != 22`)
+              if (usesGauge && pitchType !== null && isMagicType?.(pitchType) !== true) {
+                setAim(confirmed)
                 setPhase('게이지')
               } else if (pitchType !== null) {
                 // 기본 투구 — 게이지 단계가 아예 없고, 등급은 제구·체력 표로 뽑힌다 (0x4dbac)
-                onThrow(pitchType, cell, 0, false)
+                onThrow(pitchType, confirmed, 0, false)
                 setPhase('구질')
                 setPitchType(null)
               }
             }}
+            // CLR(0x50ee0) — 0xf 로 돌아가 0xf 진입 0x3d954 가 다시 돈다
+            onCancel={() => {
+              setPhase('구질')
+              setPitchType(null)
+              onReturnToPitchSelection?.()
+            }}
           />
-          <Hint>노릴 코스를 고르세요 · 존 밖으로 빼려면 가장자리</Hint>
-        </>
+          <Hint>방향키(숫자 1~9)로 조준점을 흘려 보내고 OK 로 확정 · CLR 은 구질로</Hint>
+        </div>
       )}
 
-      {!isPopupOpen && phase === '게이지' && (
-        <>
+      {!isPopupOpen && phase === '게이지' && <Panel heading="3. 투구 결정" />}
+      {phase === '게이지' && (
+        <div hidden={isPopupOpen}>
           {/* 원본에는 결과 글자가 없다 — 작아지는 원 한 장뿐이라 안내 문구도 붙이지 않는다 (S5 U-15) */}
-          <Panel heading="3. 투구 결정" />
-          <PitchGradeGauge onRelease={throwPitch} />
-        </>
+          <PitchGradeGauge isPaused={isPopupOpen} onRelease={throwPitch} />
+        </div>
       )}
     </PixelScreen>
     {overlay === '조작방법' && (

@@ -203,3 +203,59 @@ describe('투수 미션 경기 중 메뉴 — 원본 미션 장면(0x104)도 \'*
     expect(onGiveUp).toHaveBeenCalled()
   })
 })
+
+describe('투수 미션 조준 (상태 0x10) — 세션의 틱 0x39c5c 를 매 틱 부르고 확정한 조준점을 넘긴다', () => {
+  function 조준띄우기() {
+    vi.useFakeTimers()
+    const onThrow = vi.fn()
+    const onAimTick = vi.fn((aim: { x: number; y: number; z: number }, direction: { dx: number; dy: number }) => ({
+      x: aim.x + direction.dx * 20,
+      y: aim.y + direction.dy * 20,
+      z: aim.z - direction.dy * 10,
+    }))
+    const onReturnToPitchSelection = vi.fn()
+    render(
+      <PitchingScreen
+        run={startPitcherMission(PITCHER_MISSIONS[0]!)}
+        repertoire={[직구]}
+        usesGauge={false}
+        atBat={createAtBat()}
+        bannerText=""
+        onThrow={onThrow}
+        onAimTick={onAimTick}
+        onReturnToPitchSelection={onReturnToPitchSelection}
+        onGiveUp={() => {}}
+        onFinish={() => {}}
+      />,
+    )
+    fireEvent.keyDown(window, { key: 'Enter' })
+    틱(8)
+    return { onThrow, onAimTick, onReturnToPitchSelection }
+  }
+
+  it("'6' 을 누르면 오른쪽으로 흐르고, OK 틱까지 한 번 더 돈 조준점을 넘긴다", () => {
+    const { onThrow, onAimTick } = 조준띄우기()
+    fireEvent.keyDown(window, { key: '6' })
+    틱(3)
+    fireEvent.keyDown(window, { key: 'Enter' })
+
+    // 세 틱은 오른쪽(dx 1), OK 틱은 방향을 지운 채(dx 0) 한 번 더
+    expect(onAimTick.mock.calls.map(([, direction]) => direction)).toEqual([
+      { dx: 1, dy: 0 },
+      { dx: 1, dy: 0 },
+      { dx: 1, dy: 0 },
+      { dx: 0, dy: 0 },
+    ])
+    expect(onThrow).toHaveBeenCalledTimes(1)
+    expect(onThrow.mock.calls[0]![1]).toEqual({ x: 20585 + 60, y: 1202, z: 29705 })
+  })
+
+  it('CLR 은 던지지 않고 0xf 진입을 다시 부른다 (0x50ee0)', () => {
+    const { onThrow, onReturnToPitchSelection } = 조준띄우기()
+    fireEvent.keyDown(window, { key: 'Backspace' })
+
+    expect(onThrow).not.toHaveBeenCalled()
+    expect(onReturnToPitchSelection).toHaveBeenCalledTimes(1)
+    expect(screen.getByText('1. 구질 선택')).toBeTruthy()
+  })
+})

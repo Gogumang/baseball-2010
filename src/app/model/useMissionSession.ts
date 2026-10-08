@@ -67,6 +67,9 @@ import { countsTopGradePitch } from '@/entities/pitcher-career/model/pitcherGame
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
 import { buildHumanPitch, fatiguedStatsOf, mistakeHumanPitchOf, pitchGradeOf } from '@/features/play-pitcher-game/model/pitcherPitch'
+import { aimTickOf } from '@/features/play-pitcher-game/model/pitchAim'
+import type { AimDirection } from '@/features/play-pitcher-game/model/pitchAim'
+import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
 import {
   isModeMagicPitchType, modePitcherMagicRemainingOf, modePitcherOf, modePitcherOfHallOfFame,
 } from '@/app/model/modePitcher'
@@ -973,12 +976,11 @@ export function useMissionSession({
    * **진행 중인 미션의 조준점 흔들림 세기** — 레코드 바이트 13 (`conditionCode`, 0xaa57c → 0x39c5c).
    * 미션이 안 도는 중이면 0 이다 = 안 흔들린다.
    *
-   * 경기 진행기(`features/play-pitcher-game` 의 `PitchInput.missionConditionCode`)가 이 값을 받아
-   * 조준점을 흔든다. 값의 뜻은 `shared/config/original/missions.ts` 의 `MISSION_AIM_SHAKES` 에 있다.
+   * 값의 뜻은 `shared/config/original/missions.ts` 의 `MISSION_AIM_SHAKES` 에 있다.
    *
    * ⚠️ 타자 미션은 표가 **전부 0** 이라 타자편에서는 늘 0 이다 (원본 그대로).
    *
-   * 아래 `handleThrow` 가 이 값을 `buildHumanPitch` 에 실어 **실제로 흔든다**. 원본 0x39c5c 는
+   * 아래 `aimTick` 이 조준(0x10)의 **매 틱** 투수 미션 세기로 흔든다. 원본 0x39c5c 는
    * 경기 장면 **상태 0x10(조준) 의 갱신 함수**이고(R10 2절 상태표) 그 안에서
    * `[this+0x1788] != 0 && [this+0x1104] == 5`(= 미션 객체가 있고 모드 5 = 투수 미션) 일 때만
    * 조건코드 1·2·3 갈래로 간다 — 즉 **원본 미션 투구도 보통 경기와 같은 조준·투구 길**이다.
@@ -990,10 +992,25 @@ export function useMissionSession({
     : 0
 
   /**
-   * 원작 투구 조작: 구질 → 코스 → 게이지. 타자는 자동으로 반응한다.
+   * **조준(상태 0x10)의 틱 하나 `0x39c5c`** — 화면(`AimCursor`)이 0x10 에 있는 동안 매 틱 부른다.
+   * 걸음 · 자르기 뒤 투수 미션(모드 5 — 마선수 대결도)이면 조건코드대로 **경기 난수로** 흔든다. OK · CLR 을 누른 틱도 한 번 돈다.
+   * 원본 차례: 흔들기 여러 번 → 0x11 → 놓을 때 등급 굴림(0x4dbac) → 흩어짐(0x4dc78) — `handleThrow` 가 뒤 둘이다.
+   */
+  const aimTick = (aim: WorldPoint, direction: AimDirection): WorldPoint =>
+    aimTickOf(
+      aim,
+      direction,
+      MISSION_STAGE_SIDE,
+      pitcherRun !== null && pitcherRun.status === '진행중'
+        ? { conditionCode: pitcherRun.mission.conditionCode, random }
+        : undefined,
+    )
+
+  /**
+   * 원작 투구 조작: 구질 → 조준 → 게이지. 타자는 자동으로 반응한다.
    *
    * 공은 나리 투수편과 **같은 진행기 부품**(`buildHumanPitch`)으로 만든다 — 원본 순서
-   * 0x50da8 구질 → 0x50e9c 코스 → **0x39c5c 조준 흔들림** → 0x4dc78 제구 흩어짐 그대로다.
+   * 0x50da8 구질 → **0x39c5c 조준(매 틱 흔들림, `aimTick`)** → 0x50e9c 확정 → 0x11 → 0x4dc78 등급 · 제구 흩어짐 그대로다.
    * 조준점이 월드 좌표라야 미션 흔들림(±600·±400)이 뜻을 갖는다.
    *
    * ⚠️ 경기 상태(이닝·점수·로스터)는 미션 레코드에 없으므로 진행기 `PitcherGameProgress` 를
@@ -1001,7 +1018,8 @@ export function useMissionSession({
    */
   const handleThrow = (
     type: PitchTypeInfo,
-    courseCell: number,
+    /** 0x10 에서 확정한 조준점 x · y · z (흔들림은 `aimTick` 이 틱마다 이미 넣었다) */
+    aim: WorldPoint,
     /** 게이지에서 **누른 칸 0~9** 그대로다 (0x50e08). 안 눌렀거나 게이지를 안 쓰면 0 */
     gaugeCell: number,
     /** 환경설정 [투구] 가 게이지인가 (설정 +0x2d, 0x3f500) */
@@ -1052,14 +1070,12 @@ export function useMissionSession({
     const builtPitch = buildHumanPitch(
       {
         typeNumber,
-        courseCell,
+        aim,
         grade,
         gaugeCell,
         stats: fatigued,
         repertoire: pitcher.repertoire,
         side: MISSION_STAGE_SIDE,
-        // 조건코드 0 이면 `applyControlError` 가 난수를 한 톨도 안 뽑는다 = 예전과 같다
-        missionConditionCode,
       },
       random,
     )
@@ -2013,6 +2029,10 @@ export function useMissionSession({
     aceMatchHold: hold,
     player, hallOfFameBatter,
     missionConditionCode, pendingDefensePlay, pendingBenchClearing, pickoffReplay, handleMissionPitch, handleThrow, actions,
+    /** 조준(0x10)의 틱 하나 0x39c5c — 화면 `AimCursor` 의 onTick (투수 미션 흔들림은 경기 난수) */
+    aimTick,
+    /** 조준(0x10)의 CLR — 0xf 로 돌아가 0xf 진입 0x3d954 가 CPU 대타를 다시 묻는다 */
+    returnToPitchSelection: () => askPitchSelection('same'),
     batterSpecialSwingStored, pitcherMagicRemaining, stealableBases, resultEarnedGamePointOf,
     /** 상태 0xe 의 OK 대기 — 화면이 `useSceneConfirm` 에 넘긴다 (새 타석이면 메시지 0xbc1 의 타석 등장음을 실었다) */
     sceneConfirm: announcedSceneConfirm,

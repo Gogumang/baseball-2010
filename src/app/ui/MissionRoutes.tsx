@@ -307,6 +307,9 @@ export function MissionRoutes({
         atBat={runner.atBat}
         bannerText={runner.bannerText}
         onThrow={session.handleThrow}
+        // 조준(0x10)의 틱 0x39c5c — 투수 미션 흔들림은 경기 난수로 · CLR 은 0xf 진입을 다시
+        onAimTick={session.aimTick}
+        onReturnToPitchSelection={session.returnToPitchSelection}
         // 경기 중 메뉴 "나가기" — 보통 미션은 0x40140 이 0xa5368(…, 0) 뒤 곧장 메인 메뉴(결과 화면 없음, 모드 5·6 같은 갈래)
         onGiveUp={actions.quitPitcherMission}
         onFinish={actions.finishPitcher}
@@ -570,6 +573,8 @@ export function PitcherAceMatchRoute(
       atBat={runner.atBat}
       bannerText={runner.bannerText}
       onThrow={session.handleThrow}
+      onAimTick={session.aimTick}
+      onReturnToPitchSelection={session.returnToPitchSelection}
       // 경기 중 메뉴 나가기 0x40140 — +0x176 이 서 있어도 보통 미션과 같이 메인 메뉴(장면 0x103)로 간다(저장 없음). 진 결과
       // 이벤트는 다음 투수편 105 진입이 띄운다 (파일 머리 주석)
       onGiveUp={() => {

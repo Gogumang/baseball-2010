@@ -87,7 +87,7 @@ describe('팀 경기 고리 — 수비 화면이 도는 동안 경기를 붙든�
       if (!result.current.canPitch) break
       const slots = pitchSlotsFor(result.current.progress)
       const typeNumber = slots.find((slot) => slot.typeNumber !== 0)?.typeNumber ?? 1
-      act(() => result.current.actions.throwPitch({ typeNumber, courseCell: 4, gaugeCell: 0 }))
+      act(() => result.current.actions.throwPitch({ typeNumber, gaugeCell: 0 }))
     }
 
     expect(result.current.pendingDefensePlay).not.toBeNull()

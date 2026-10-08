@@ -32,11 +32,14 @@ const OK통과 = () => {
 /** 경기 장면 틱 n 개를 흘린다 */
 const 틱 = (n: number) => act(() => void vi.advanceTimersByTime(millisecondsPerFrame() * n))
 
-/** 구질 칸을 누르고(0x50da8) 0xf 의 틱 8 을 지나 코스 고르기(0x10)로 넘어간다 (0x39c1c) */
+/** 구질 칸을 누르고(0x50da8) 0xf 의 틱 8 을 지나 조준(0x10)으로 넘어간다 (0x39c1c) */
 const 구질고르기 = (name: string) => {
   fireEvent.click(screen.getByText(name))
   틱(8)
 }
+
+/** 조준점을 안 움직이고 OK (0x50e9c) — 존 중심을 노린다 */
+const 조준확정 = () => fireEvent.click(screen.getByRole('button', { name: '조준 확정' }))
 
 /**
  * 수비 화면에 무엇이 넘어가는지 적어 두려고 **원본을 그대로 감싼다** (그림은 원본이 그린다).
@@ -145,6 +148,14 @@ describe('투수편 경기 화면', () => {
     expect(screen.getByText(/2\. 코스 선택 — FASTBALL/)).toBeTruthy()
   })
 
+  it('조준에서 CLR 은 구질 고르기로 돌아간다 (0x50ee0 → 0xf)', () => {
+    띄우기()
+    구질고르기('FASTBALL')
+    fireEvent.keyDown(window, { key: 'Escape' })
+
+    expect(screen.getByText('1. 구질 선택')).toBeTruthy()
+  })
+
   it('환경설정 게이지가 꺼져 있으면 코스를 확정하는 순간 던진다 (원본 기본값)', () => {
     // 첫 공이 인플레이면 수비 화면이 덮는다 — 게이지 끈 공의 흩어짐을 t + 3 칸(0x4dce0)으로 고친 뒤
     // 기본 씨앗의 첫 공이 인플레이가 되어, 첫 공이 볼·스트라이크인 씨앗 1 로 옮겼다.
@@ -152,7 +163,8 @@ describe('투수편 경기 화면', () => {
     // 경기 맨 앞 로딩 팁 rand(0, 73)(상태 7 진입 0x39f88 → 0x53dbc)로 한 칸 밀려 첫 공이 인플레이가 되어 2 → 3 으로 옮겼다
     띄우기({}, 3)
     구질고르기('FASTBALL')
-    fireEvent.click(screen.getAllByRole('button', { name: /[◎·]/ })[0])
+    expect(screen.getByText(/2\. 코스 선택/)).toBeTruthy()
+    조준확정()
 
     // 다시 1단계로 돌아왔다 — 한 개를 던졌다는 뜻이다
     expect(screen.getByText('1. 구질 선택')).toBeTruthy()
@@ -161,10 +173,13 @@ describe('투수편 경기 화면', () => {
   it('게이지를 켜면 3단계 투구 결정이 뜬다 (상태 0x11)', () => {
     띄우기({ gaugeSettingOn: true })
     구질고르기('FASTBALL')
-    fireEvent.click(screen.getAllByRole('button', { name: /[◎·]/ })[0])
+    조준확정()
 
     expect(screen.getByText('3. 투구 결정')).toBeTruthy()
     expect(screen.getByLabelText(/투구 게이지/)).toBeTruthy()
+    // 누르지 않아도 0x11 의 틱 10 에 놓는다 (0x4e060)
+    틱(10)
+    expect(screen.queryByText('3. 투구 결정')).toBeNull()
   })
 
   it('`#` 를 누르면 StrGAME[104] "그만 던지시겠습니까?" 가 뜬다 — 모드 3 은 교체 화면이 없다', () => {
@@ -335,10 +350,10 @@ describe('경기 중 메뉴 (표 0xcfcfc 행 2 — 나만의리그)', () => {
  * 진행기를 화면에서 한 틱씩 돌리고, 다 돌면 그 결과가 그때 경기 상태가 된다.
  */
 describe('내가 던진 인플레이 타구 — 수비 화면이 실시간으로 돈다 (상태 0x17)', () => {
-  /** 한 개 던진다 — 구질 FASTBALL → 코스 가운데 (게이지가 꺼져 있어 코스 확정이 곧 투구다) */
+  /** 한 개 던진다 — 구질 FASTBALL → 조준점을 안 움직이고 OK (게이지가 꺼져 있어 확정이 곧 투구다) */
   function 한개던지기() {
     구질고르기('FASTBALL')
-    fireEvent.click(screen.getAllByRole('button', { name: /[◎·]/ })[0])
+    조준확정()
   }
 
   /** 인플레이 타구가 떠서 수비 화면이 설 때까지 던진다 */

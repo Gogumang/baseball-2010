@@ -37,6 +37,7 @@ import type {
 } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { BATTED_BALL_PATTERNS } from '@/shared/config/original/battedBallPatterns'
 import { SCENE_EFFECT_INIT_ROLL_COUNT } from '@/entities/batting/model/battedBallOutcome'
+import { aimAfterTicks } from '@/features/play-pitcher-game/model/pitchAim'
 
 const 씨앗 = (seed: number) => createSeededRandom(seed)
 
@@ -59,7 +60,7 @@ const 기본옵션: PitcherGameOptions = {
   gaugeSettingOn: false,
 }
 
-const 한가운데직구 = { typeNumber: 1, courseCell: 4, gaugeCell: 0 }
+const 한가운데직구 = { typeNumber: 1, gaugeCell: 0 }
 
 /** 사람 차례가 아니면 더 던질 것이 없다 — 경기가 끝날 때까지 한가운데 직구만 던진다 */
 function 끝까지던지기(progress: PitcherGameProgress, seed = 1): PitcherGameProgress {
@@ -219,10 +220,10 @@ describe('투구', () => {
 
   it('마구는 코스 확정 때 횟수가 준다 — 다 쓰면 못 던진다 (0x50e9c · 0x50db8)', () => {
     let progress = startPitcherGame({ ...기본옵션, magicCount: 1 }, 씨앗(3))
-    progress = throwPitch(progress, { typeNumber: 22, courseCell: 4, gaugeCell: 0 }, 씨앗(5))
+    progress = throwPitch(progress, { typeNumber: 22, gaugeCell: 0 }, 씨앗(5))
     expect(progress.magicRemaining).toBe(0)
 
-    const 막힘 = throwPitch(progress, { typeNumber: 22, courseCell: 4, gaugeCell: 0 }, 씨앗(6))
+    const 막힘 = throwPitch(progress, { typeNumber: 22, gaugeCell: 0 }, 씨앗(6))
     expect(막힘).toBe(progress)
   })
 
@@ -661,23 +662,6 @@ describe('주자 처리는 수비 화면이 끝나야 정해진다 (상태 0x17 
  * 투수 미션 조준 흔들림 (0x39c5c) — 진행기 입력에 실린 `conditionCode` 가 투구 만들기까지 간다.
  * ⚠️ 흔들림 값은 **투수 미션 레코드**에서 온다. 타자 미션은 전부 0 이라 아무 일도 없다.
  */
-describe('미션 조준 흔들림을 진행기가 실어 나른다', () => {
-  const 던진공 = (missionConditionCode?: number) =>
-    startPitch(
-      startPitcherGame(기본옵션, 씨앗(3)),
-      { ...한가운데직구, ...(missionConditionCode === undefined ? {} : { missionConditionCode }) },
-      씨앗(5),
-    ).lastPitch
-
-  it('안 실으면 지금까지와 똑같은 공이다', () => {
-    expect(던진공(0)?.plate).toEqual(던진공()?.plate)
-  })
-
-  it('세기 3 을 실으면 공이 달라진다', () => {
-    expect(던진공(3)?.plate).not.toEqual(던진공()?.plate)
-  })
-})
-
 describe('견제 — 구질 고르기(0xf)에서 3·1·7 (0x53548 → 0x50f28 → 종류 4)', () => {
   const 주자있는판 = (bases: PitcherGameProgress['game']['bases']): PitcherGameProgress => {
     const progress = startPitcherGame(기본옵션, 씨앗(3))
@@ -748,7 +732,7 @@ describe('실투 판정 0x33cbc — 투구 순간에 굴린다', () => {
     const 보통 = 각본난수(0.99)
     startPitch(등판, 한가운데직구, 보통)
     const 마구 = 각본난수(0.99)
-    const 던짐 = startPitch(등판, { typeNumber: 22, courseCell: 4, gaugeCell: 0 }, 마구)
+    const 던짐 = startPitch(등판, { typeNumber: 22, gaugeCell: 0 }, 마구)
     expect(던짐.lastPitch).not.toBeNull()
     // 마구는 등급 뽑기(0x4dbac)도 굴리지 않는다(늘 5) — 실투 굴림까지 둘이 빠진다
     expect(마구.calls()).toBe(보통.calls() - 2)
@@ -757,17 +741,18 @@ describe('실투 판정 0x33cbc — 투구 순간에 굴린다', () => {
 
 /**
  * 내가 던진 공에 CPU 타자가 맞는다 — 0x35a20 (지켜본 공이 사각형 0xcfd50 안).
- * 기본 배치 side 1(좌타)에서 바깥 칸 2 를 노린 직구가 흩어져 상자 [271, 309] 에 닿는 씨앗을 골랐다.
- * 게이지를 끈 공의 흩어짐 반지름이 t + 3 칸(0x4dce0)이라 칸 2 직구의 첫 공 사구는 1% 안팎이다 — 씨앗 3000 개 중 23 개.
+ * 기본 배치 side 1(좌타)에서 조준점을 오른위로 11 틱 흘린(x +220 · y +220 · z −110) 직구가 흩어져 상자 [271, 309] 에 닿는 씨앗을 골랐다.
+ * 게이지를 끈 공의 흩어짐 반지름이 t + 3 칸(0x4dce0)이라 첫 공 사구는 드물다 — 씨앗 6000 개 중 17 개.
  */
 describe('사구 — 내가 맞힌 타석 (0x35a20 → 0xa8024 · 벤치 클리어링)', () => {
-  const 바깥직구 = { typeNumber: 1, courseCell: 2, gaugeCell: 0 }
+  const 바깥직구 = { typeNumber: 1, aim: aimAfterTicks(1, { dx: 1, dy: 1 }, 11), gaugeCell: 0 }
   /**
    * 사구지만 벤치 클리어링 굴림이 20 이상인 씨앗 · 굴림이 19 이하인 씨앗.
    * 벤치 클리어링 굴림 앞에 공 도착 0x3dfac 의 0.1% 굴림(0x35034)이 하나 끼어 1179 → 86 으로 바꿨다.
-   * 원본 난수 생성기(0xbfa54 · 0x9d468)로 바꾸며 35 → 182 · 86 → 2016 으로 바꿨다
+   * 원본 난수 생성기(0xbfa54 · 0x9d468)로 바꾸며 35 → 182 · 86 → 2016 으로 바꿨다.
+   * 코스 3×3 칸을 원본 조준점(0x10 의 흐르는 점)으로 바꾸며 목표가 (+221, +219, z 0) → (+220, +220, z −110) 이 되어 182 → 439 로 바꿨다
    */
-  const 사구씨앗 = 182
+  const 사구씨앗 = 439
   const 벤치씨앗 = 2016
 
   it('밀어내기 1루 · R+0x148 사구 칸 · 출루 허용(state[0x88]) · 삼자범퇴 칸이 깨진다 — R+0x144 볼넷은 그대로', () => {
@@ -996,7 +981,7 @@ describe('경기 끝 결과 판의 승·패·세 이름 (0x4fe9c — state+0x44/
 })
 
 describe('투수 쪽 보정 0x34d6c — 공+0x10 (0x3de10) · 내 투수 보너스 (0xab214)', () => {
-  const 마구 = { typeNumber: 22, courseCell: 4, gaugeCell: 0 }
+  const 마구 = { typeNumber: 22, gaugeCell: 0 }
 
   /** 타석이 이어지는 동안(사람 차례) 한 공을 던진다 — 인플레이면 수비까지 미리 돌린다 */
   const 한공 = (progress: PitcherGameProgress, input: typeof 마구, random: RandomPort) =>
@@ -1181,7 +1166,7 @@ describe('자동 타석(0x21)의 0xc1ba4 — 양 팀 마운드와 CPU 대타 (0x
 })
 
 describe('CPU 도루 0x520de · 공 도착 판 0x3dfac — 투수편은 늘 CPU 공격', () => {
-  const 가운데직구 = { typeNumber: 1, courseCell: 4, gaugeCell: 0 }
+  const 가운데직구 = { typeNumber: 1, gaugeCell: 0 }
 
   it('1루 주자가 있으면 타자 결정 앞에서 굴린다 — 못 맞힌 공이면 도루 판(종류 5)이 열리고, 1루 도루는 늘 세이프', () => {
     let opened = 0
@@ -1280,7 +1265,7 @@ describe('상태 0xe 의 OK 대기 — 내가 던지는 타석마다 (0x39e14 �
     expect(progress.sceneConfirm?.entries).toBeGreaterThanOrEqual(1)
     for (let step = 0; step < 400 && !progress.game.isFinished && isPitchTurn(progress); step += 1) {
       const before = progress
-      progress = throwPitch(progress, { typeNumber: 1, courseCell: 4, gaugeCell: 0 }, random)
+      progress = throwPitch(progress, { typeNumber: 1, gaugeCell: 0 }, random)
       if (progress.managerHookText !== null) {
         expect(progress.sceneConfirm).toBe(before.sceneConfirm)
         break

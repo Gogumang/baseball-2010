@@ -6,12 +6,10 @@ import { MAGIC_PITCH_SLOT, MAGIC_PITCH_TYPE_NUMBER } from '@/entities/pitcher-ca
 import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
 import { pitchTypeNameOf } from '@/entities/pitcher-career/model/pitchTraining'
 import {
-  COURSE_GRID,
   GAUGE_CELL_COUNT,
   PITCH_SLOT_COUNT,
   buildHumanPitch,
   canSelectSlot,
-  courseTargetOf,
   drainStamina,
   fatiguedStatsOf,
   mistakeHumanPitchOf,
@@ -20,6 +18,7 @@ import {
 } from '@/features/play-pitcher-game/model/pitcherPitch'
 import type { PitcherRepertoire, PitcherStats } from '@/features/play-pitcher-game/model/pitcherPitch'
 import { ZONE_CENTERS } from '@/entities/pitching/model/pitchCurve'
+import { aimAfterTicks, aimStartOf } from '@/features/play-pitcher-game/model/pitchAim'
 
 const 씨앗 = (seed: number) => createSeededRandom(seed)
 /** 난수를 안 쓰는 갈래를 볼 때 쓰는 고정 난수 */
@@ -153,14 +152,33 @@ describe('체력%에 따른 능력치 감소 (0xb58e6)', () => {
   })
 })
 
-describe('코스 칸', () => {
-  it('3×3 이고 가운데 칸(4)은 존 중심이다', () => {
-    expect(COURSE_GRID).toBe(3)
-    const 가운데 = courseTargetOf(4, 0)
-    const 왼위 = courseTargetOf(0, 0)
+describe('조준점 (0x10 → 0x4dc78)', () => {
+  const 던지기 = (aim?: Parameters<typeof buildHumanPitch>[0]['aim']) =>
+    buildHumanPitch(
+      {
+        typeNumber: 1,
+        ...(aim === undefined ? {} : { aim }),
+        grade: 5,
+        gaugeCell: 9,
+        stats: 능력,
+        repertoire: 레퍼토리,
+        side: 1,
+      },
+      씨앗(11),
+    )
 
-    expect(왼위.x).toBeLessThan(가운데.x)
-    expect(왼위.y).toBeGreaterThan(가운데.y)
+  it('안 넘기면 0x39894 의 존 중심 — 중심을 그대로 넘긴 것과 같은 공이다', () => {
+    expect(던지기().worldPath).toEqual(던지기(aimStartOf(1)).worldPath)
+  })
+
+  it('x · y · z 세 칸을 그대로 목표로 쓴다 — 흩어짐 굴림 차례는 같고 자리만 옮겨진다', () => {
+    const 중심 = 던지기()
+    const 왼위 = 던지기(aimAfterTicks(1, { dx: -1, dy: 1 }, 10))
+    const 끝 = (공: ReturnType<typeof buildHumanPitch>) => 공.worldPath![공.worldPath!.length - 1]
+    expect(끝(왼위).x - 끝(중심).x).toBe(-200)
+    expect(끝(왼위).y - 끝(중심).y).toBe(200)
+    // z 는 dy × 10 을 뺀다 (0x39c5c)
+    expect(끝(왼위).z - 끝(중심).z).toBe(-100)
   })
 })
 
@@ -169,7 +187,6 @@ describe('사람 투구 만들기', () => {
     const 공 = buildHumanPitch(
       {
         typeNumber: 1,
-        courseCell: 4,
         grade: 5,
         gaugeCell: 9,
         stats: 능력,
@@ -189,7 +206,6 @@ describe('사람 투구 만들기', () => {
     const 공 = buildHumanPitch(
       {
         typeNumber: MAGIC_PITCH_TYPE_NUMBER,
-        courseCell: 4,
         grade: 5,
         gaugeCell: 9,
         stats: 능력,
@@ -211,7 +227,6 @@ describe('사람 투구 만들기', () => {
         const 공 = buildHumanPitch(
           {
             typeNumber: 1,
-            courseCell: 4,
             grade,
             gaugeCell: grade + 4,
             stats: 능력,
@@ -238,7 +253,6 @@ describe('제구 흩어짐 그림 칸 (0x4dce0)', () => {
     buildHumanPitch(
       {
         typeNumber: overrides.typeNumber ?? 1,
-        courseCell: 4,
         grade: overrides.grade,
         gaugeCell: overrides.gaugeCell,
         stats: 능력,
@@ -273,46 +287,6 @@ describe('제구 흩어짐 그림 칸 (0x4dce0)', () => {
   })
 })
 
-/**
- * 투수 미션 조준 흔들림 (0x39c5c) — 세기는 미션 레코드 바이트 13(`conditionCode`)다.
- * 여기서는 **값이 진짜 전달되는지**만 본다. 흔드는 식 자체는 `entities/pitching` 쪽 시험이 맡는다.
- */
-describe('미션 조준 흔들림 전달', () => {
-  const 던지기 = (missionConditionCode?: number) =>
-    buildHumanPitch(
-      {
-        typeNumber: 1,
-        courseCell: 4,
-        grade: 3,
-        gaugeCell: 6,
-        stats: 능력,
-        repertoire: 레퍼토리,
-        side: 1,
-        ...(missionConditionCode === undefined ? {} : { missionConditionCode }),
-      },
-      씨앗(7),
-    )
-
-  it('안 넘기면 지금까지와 똑같이 논다', () => {
-    expect(던지기().plate).toEqual(던지기(undefined).plate)
-  })
-
-  it('세기 0 은 난수를 한 톨도 안 쓴다 — 안 넘긴 것과 같은 공이다', () => {
-    expect(던지기(0).plate).toEqual(던지기().plate)
-  })
-
-  it('세기 3(존 안 아무 데로 옮기기)은 다른 공이 된다', () => {
-    expect(던지기(3).plate).not.toEqual(던지기().plate)
-  })
-
-  it('세기 1(가로만 ±40)은 세로가 그대로일 수도 있을 만큼 작게 흔든다', () => {
-    const 흔든공 = 던지기(1)
-    const 안흔든공 = 던지기()
-
-    expect(Math.abs(흔든공.plate.x - 안흔든공.plate.x)).toBeGreaterThan(0)
-  })
-})
-
 describe('구질 칸 이름은 원본 이름표 [0x140026c] 칸 그대로 — t ≥ 16 도 (16 SF … 21 KNUCKLE)', () => {
   it('구질 하나씩 — 그 칸 이름이 이름표 칸 t (16 SF · 17 S.CHANGEUP · 18 GYRO · 19 P.SINKER · 20 P.SLIDER · 21 KNUCKLE)', () => {
     const names: string[] = []
@@ -331,7 +305,6 @@ describe('구질 칸 이름은 원본 이름표 [0x140026c] 칸 그대로 — t 
         stats: { control: 500, velocity: 500, breaking: 500, stamina: 500 },
         repertoire: 레퍼토리,
         side: 0,
-        courseCell: 4,
         grade: 3,
       } as Parameters<typeof buildHumanPitch>[0],
       createSeededRandom(1),
