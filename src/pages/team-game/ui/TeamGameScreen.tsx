@@ -107,6 +107,13 @@ import * as styles from '@/pages/team-game/ui/TeamGameScreen.css'
  * 경기가 끝나면 상태 0x18 의 **경기 끝 결과 판**(`widgets/game-scene` `GameEndBoard`)을 먼저 띄우고,
  * OK 뒤에 정산(0x19) 자리인 요약 화면으로 간다.
  */
+/** 명단 칸의 장비 니블 네 칸(히트·파워·수비·주루) → `BattingStage` 의 `batterEquipmentLevels` (니블 그대로) */
+function batterEquipmentPropsOf(equipment: readonly number[] | undefined) {
+  if (equipment === undefined) return {}
+  const [hit = 0, power = 0, defense = 0, run = 0] = equipment
+  return { batterEquipmentLevels: { hit, power, defense, run } }
+}
+
 const smallLogoUrlOf = (teamId: number) => `./sprites/team_logo_ini/${String(teamId).padStart(3, '0')}.png`
 
 type PitchPhase = '구질' | '코스' | '게이지'
@@ -690,6 +697,11 @@ export function TeamGameScreen({
     )
   }
 
+  /** 경기 중 메뉴 · 조작방법 뷰어 — 일시정지 팝업 0x741a0 동안 장면 틱이 멈춘다 */
+  const isPopupOpen = isMenuOpen || overlay === '조작방법'
+  /** 이 공이 게이지를 쓰는가 (`0x3f500` — 게이지 켬 ∧ 마구 아님). 안 써도 0x11 은 지나 틱 10 에 놓는다 */
+  const showsGauge = options.gaugeSettingOn === true && slot?.isMagic !== true
+
   const throwWith = (gaugeCell: number, throwAim: WorldPoint | null = aim) => {
     if (slot === null) return
     actions.throwPitch({ typeNumber: slot.typeNumber, ...(throwAim === null ? {} : { aim: throwAim }), gaugeCell })
@@ -741,7 +753,7 @@ export function TeamGameScreen({
           </span>
         </div>
 
-        {isMenuOpen ? (
+        {isMenuOpen && (
           <InGameMenu
             mode={options.mode}
             cursor={menu.cursor}
@@ -773,8 +785,10 @@ export function TeamGameScreen({
                   }
             }
           />
-        ) : overlay === '조작방법' ? (
-          // 뷰어 동안은 메뉴를 띄웠을 때처럼 타석을 내려 둔다 — 다시 올리면 타석이 새로 서며 굴림이 샌다
+        )}
+        {isPopupOpen && !(canPitch && !canBat && changeWindow === null) ? (
+          // 메뉴 · 뷰어 동안은 타석을 내려 둔다 — 다시 올리면 타석이 새로 서며 굴림이 샌다.
+          // 투구 단계(0xf·0x10·0x11)만은 아래에서 숨긴 채 세워 둔다 — 원본은 팝업 동안 장면이 멈출 뿐이다(0x52cc6)
           null
         ) : isChangingPitcher ? (
           <PitcherChangeWindow
@@ -807,6 +821,9 @@ export function TeamGameScreen({
               batterAbility={currentBatterAbility(progress)}
               // 마타자가 대타로 올라오면 필살 연출 점프표(0xd01e4)가 이 순번을 본다
               aceBatterIndex={currentBatterEntry(progress)?.aceIndex ?? -1}
+              // 타석 그림 0x10866 → 0x78fd8 — 선수 레코드 +0x19·+0x1a 장비 니블(부위 0~3 = 히트·파워·수비·주루 칸)로 장비 겹을
+              // 고른다. 명단 칸이 니블을 들 때만(붙박이 표 선수) 넘긴다 — 니블 0 이면 원본도 그 부위를 안 그린다
+              {...batterEquipmentPropsOf(currentBatterEntry(progress)?.equipment)}
               // 장면 +0xfdc — CPU 타석(0x34436)과 사람 키가 같은 칸을 쓴다. 진행기가 공마다 든 값을 넘긴다
               sceneBuntKind={progress.sceneBuntKind ?? 0}
               // 번트 '7'/'8'/'9' — 0x535a4 → 0x6a7 → 0x51e48 은 모드를 안 본다. 마타자(0xb633c)면 위젯이 거른다
@@ -892,7 +909,9 @@ export function TeamGameScreen({
             </Hint>
           </div>
         ) : canPitch ? (
-          <>
+          // 팝업(경기 중 메뉴 · 조작방법) 동안은 숨긴 채 멈춘다 — 원본은 일시정지 팝업 0x741a0 동안 장면 틱이 멈추고
+          // 단계 상태(0xf·0x10·0x11)와 조준점·게이지 틱은 그대로다 (0x52cc6, 투수편 `isPitchInputPaused` 와 같은 자리)
+          <div hidden={isPopupOpen}>
             <div className={styles.count}>
               <span>
                 B{' '}
@@ -935,6 +954,7 @@ export function TeamGameScreen({
                 )}
                 <PitchSlotPicker
                   choices={slotChoices(progress.magicRemaining, pitchSlotsFor(progress))}
+                  isPaused={isPopupOpen}
                   onDecide={(chosen) => {
                     const found = pitchSlotsFor(progress).find((candidate) => candidate.slot === chosen)
                     if (found === undefined || !canSelectSlot(found, progress.magicRemaining)) return
@@ -950,14 +970,12 @@ export function TeamGameScreen({
                 <Panel heading={<>2. 코스 선택 — {slot?.name}</>} />
                 <AimCursor
                   side={options.stageSide ?? 1}
+                  isPaused={isPopupOpen}
                   onConfirm={(confirmed) => {
-                    // 마구는 게이지를 쓰지 않고 등급이 늘 5 다 (0x3f500 의 `구질 != 22`)
-                    if (options.gaugeSettingOn === true && slot?.isMagic !== true) {
-                      setAim(confirmed)
-                      setPhase('게이지')
-                      return
-                    }
-                    throwWith(0, confirmed)
+                    // OK(0x50e9c)는 늘 0x11 로 간다(0x50ed0) — 게이지를 안 쓰는 공(게이지 끔 · 마구 0x3f500 의 `구질 != 22`)도
+                    // 0x11 의 틱 10 에 놓는다(0x4e060). 게이지 그림만 0x4d3f8 에서 건너뛴다
+                    setAim(confirmed)
+                    setPhase('게이지')
                   }}
                   // CLR(−16)은 구질 고르기(0xf)로 되돌린다 (0x50ee0~0x50ee6) — 0xf 진입 0x3d954 가 다시 돈다
                   onCancel={() => {
@@ -972,11 +990,15 @@ export function TeamGameScreen({
 
             {phase === '게이지' && (
               <>
-                <Panel heading="3. 투구 결정" />
-                <PitchGradeGauge onRelease={(gaugeCell) => throwWith(gaugeCell)} />
+                {showsGauge && <Panel heading="3. 투구 결정" />}
+                <PitchGradeGauge
+                  isPaused={isPopupOpen}
+                  showsGauge={showsGauge}
+                  onRelease={(gaugeCell) => throwWith(gaugeCell)}
+                />
               </>
             )}
-          </>
+          </div>
         ) : (
           <Hint>자동 진행 중…</Hint>
         )}

@@ -2217,7 +2217,12 @@ export function stepDefensePlay(
       })
       for (const decision of decisions) {
         const runner = runners[decision.runnerIndex]
-        if (runner === undefined || runner.state.isOut || runner.state.scored) continue
+        if (runner === undefined) continue
+        // afa0e 는 죽은 주자(+0x96 — 아웃·득점)에게도 +0x128 = 1 을 세운다. 죽은 주자는 주자 틱이 안 옮기므로 목표만 그대로 둔다
+        if (runner.state.isOut || runner.state.scored) {
+          play = { ...play, wantsThrow: true }
+          continue
+        }
         if (decision.toBase > HOME_BASE) continue
         // force = 0 이라 결정은 멈춘 주자(= 제 목표 루에 선 주자)에게만 난다 — 예전 `force: true` + "목표 루에 닿아 있을 때만"
         // 근사와 같은 걸러냄이 이제 원본 인자에서 나온다

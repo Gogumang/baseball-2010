@@ -48,6 +48,12 @@ const 구질고르기 = (name: string) => {
 /** 조준점을 안 움직이고 OK (0x50e9c) — 존 중심을 노린다 */
 const 조준확정 = () => fireEvent.click(screen.getByRole('button', { name: '조준 확정' }))
 
+/** 게이지를 안 쓰는 공 — OK 뒤 0x11 의 틱 10 에 놓인다 (0x50ed0 → 0x4e060) */
+const 조준확정후놓기 = () => {
+  조준확정()
+  act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 10))
+}
+
 const 기본옵션: TeamGameOptions = {
   mode: 2,
   ourTeamId: 0,
@@ -99,15 +105,43 @@ describe('팀 경기 화면 — 수비(투구) 차례', () => {
     expect(screen.queryByText(/2\. 코스 선택/)).toBeNull()
   })
 
-  it('게이지 설정이 꺼져 있으면 코스를 확정하는 순간 던진다 (원본 기본값)', () => {
+  it('게이지 설정이 꺼져 있어도 0x11 을 지나 틱 10 에 던진다 (원본 기본값 — 0x50ed0 · 0x4e060)', () => {
     // 첫 공이 타구가 안 되는 씨앗 (경기 시작 rand(0, 2) 가 차례를 한 칸 민다). 놓기 0x4dc78 의 표시 구속 굴림
     // (0x34968 → 0x66dc0 rand)이 흩어짐 앞에 끼어 첫 공이 타구가 되어 1 → 2(1 부터 센 첫 씨앗)로 옮겼다
     띄우기({}, 2)
     구질고르기('FASTBALL')
     조준확정()
 
+    // 게이지 그림·안내는 없고 아직 안 던졌다
+    expect(screen.queryByText('3. 투구 결정')).toBeNull()
+    expect(screen.queryByText('1. 구질 선택')).toBeNull()
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 9))
+    expect(screen.queryByText('1. 구질 선택')).toBeNull()
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
+
     // 다시 1단계로 돌아왔다 — 한 개를 던졌다는 뜻이다
     expect(screen.getByText('1. 구질 선택')).toBeTruthy()
+  })
+
+  it('경기 중 메뉴를 열어도 투구 단계는 숨긴 채 멈춘다 — 닫으면 게이지 틱이 이어진다 (팝업 동안 장면 정지 0x52cc6)', () => {
+    띄우기({ gaugeSettingOn: true })
+    구질고르기('FASTBALL')
+    조준확정()
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 5))
+
+    fireEvent.keyDown(window, { key: '*' })
+    // 내리지 않고 숨긴다
+    expect(screen.getByText('3. 투구 결정').closest('[hidden]')).not.toBeNull()
+    // 메뉴 동안은 틱이 안 흘러 공이 안 나간다
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 30))
+    fireEvent.keyDown(window, { key: '*' })
+
+    // 0x11 그대로 — 처음부터가 아니라 남은 다섯 틱 뒤에 놓는다
+    expect(screen.getByText('3. 투구 결정').closest('[hidden]')).toBeNull()
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 4))
+    expect(screen.getByText('3. 투구 결정')).toBeTruthy()
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
+    expect(screen.queryByText('3. 투구 결정')).toBeNull()
   })
 
   it('게이지를 켜면 투구 결정 단계가 뜬다 (상태 0x11)', () => {
@@ -137,7 +171,7 @@ describe('팀 경기 화면 — 인플레이 타구는 수비 화면으로 (상�
       OK통과()
       if (screen.queryByText('1. 구질 선택') === null) break
       구질고르기('FASTBALL')
-      조준확정()
+      조준확정후놓기()
     }
 
     expect(screen.queryByText('1. 구질 선택')).toBeNull()

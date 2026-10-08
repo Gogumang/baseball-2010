@@ -246,8 +246,14 @@ describe('투수 미션 조준 (상태 0x10) — 세션의 틱 0x39c5c 를 매 �
       { dx: 1, dy: 0 },
       { dx: 0, dy: 0 },
     ])
+    // OK 는 0x11 로 갈 뿐이다(0x50ed0) — 게이지를 안 써도 0x11 의 틱 10 에 놓는다(0x4e060)
+    expect(onThrow).not.toHaveBeenCalled()
+    틱(10)
     expect(onThrow).toHaveBeenCalledTimes(1)
     expect(onThrow.mock.calls[0]![1]).toEqual({ x: 20585 + 60, y: 1202, z: 29705 })
+    // 게이지를 안 쓴 공 — 칸 0 · 게이지 안 씀
+    expect(onThrow.mock.calls[0]![2]).toBe(0)
+    expect(onThrow.mock.calls[0]![3]).toBe(false)
   })
 
   it('CLR 은 던지지 않고 0xf 진입을 다시 부른다 (0x50ee0)', () => {

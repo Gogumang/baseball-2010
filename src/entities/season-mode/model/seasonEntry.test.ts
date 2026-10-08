@@ -6,6 +6,7 @@ import {
 import { swapEntryBatters, swapEntryPitchers } from '@/entities/season-mode/model/entryEditor'
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { ACE_BATTERS, ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
+import { equipmentBonusOf } from '@/entities/career/model/equipment'
 
 /** 시즌 0xe0 이 보는 명단 — 시즌 세이브 명단 + 0x6548 이 넣은 마선수 + 로테이션 */
 
@@ -81,6 +82,56 @@ describe('영입한 나리 선수(0xfe)는 명단에 든 기록 사본으로 선
     const lists = seasonEntryListsOf({ teamId: 0, roster, dayCounter: 0, acePitcherId: -1, aceBatterId: -1 })
     expect(lists.batters[0]).toMatchObject({ name: '나리타', ability: [5, 6, 7, 8] })
     expect(lists.pitchers[0]).toMatchObject({ name: '나리투', ability: [1, 2, 3, 4] })
+  })
+})
+
+describe('영입 선수 기록에 밑값 · +0x14 · 니블이 있으면 경기 0xb6414 를 시즌 명단 니블로 다시 셈한다 (0xc554 · 0x7d90 · 0xb8680)', () => {
+  // 밑값 500 네 칸 · 장착 스킬 7(전설 +50) · 영입 때 히트 니블 2(Lv1 +보너스)
+  const 타자기록 = {
+    name: '나리타',
+    ability: [0, 0, 0, 0] as const,
+    baseAbility: [500, 500, 500, 500] as const,
+    skillBits: 1 << 7,
+    equipment: [2, 0, 0, 0],
+  }
+  const 투수기록 = {
+    ...타자기록,
+    name: '나리투',
+    repertoire: { name: '나리투', form: 1, magicId: 0, pitchMask: 1 },
+  }
+
+  it('시즌 장비 창이 니블을 안 바꿨으면 옮긴 기록의 니블로', () => {
+    const order = seasonEntryOrderOf({
+      pitchers: [{ id: 0xfe, kindByte: 0x80, fieldPosition: 0, stamina: 10000, record: 투수기록 }],
+      batters: [{ id: 0xfe, kindByte: 0xa0, fieldPosition: 3, stamina: 0, record: 타자기록 }],
+    })
+    const 보너스 = equipmentBonusOf(2)
+    expect(order.batters[0]?.record?.ability).toEqual([500 + 보너스 + 50, 550, 550, 550])
+    const 투수 = order.pitchers[0]
+    expect(typeof 투수 === 'object' && 'ability' in 투수 ? 투수.ability : null).toEqual([500 + 보너스 + 50, 550, 550, 550])
+    // 장착 비트(+0x14)도 경기로 간다
+    expect(typeof 투수 === 'object' && 'skillBits' in 투수 ? 투수.skillBits : null).toBe(1 << 7)
+  })
+
+  it('시즌에 산 장비(명단 니블)가 얹힌다 — 영입 때 값이 아니라 지금 레코드 값', () => {
+    const order = seasonEntryOrderOf({
+      pitchers: [],
+      batters: [{ id: 0xfe, kindByte: 0xa0, fieldPosition: 3, stamina: 0, record: 타자기록, equipment: [2, 5, 0, 0] }],
+    })
+    expect(order.batters[0]?.record?.ability).toEqual([
+      500 + equipmentBonusOf(2) + 50,
+      500 + equipmentBonusOf(5) + 50,
+      550,
+      550,
+    ])
+  })
+
+  it('밑값이 없는 옛 사본은 영입 때 남긴 0xb6414 값 그대로', () => {
+    const order = seasonEntryOrderOf({
+      pitchers: [],
+      batters: [{ id: 0xfe, kindByte: 0xa0, fieldPosition: 3, stamina: 0, record: { name: '옛', ability: [1, 2, 3, 4] as const }, equipment: [5, 5, 5, 5] }],
+    })
+    expect(order.batters[0]?.record?.ability).toEqual([1, 2, 3, 4])
   })
 })
 

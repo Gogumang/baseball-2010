@@ -171,6 +171,8 @@ export function GameScreen({
   /**
    * **교체 연출 0x16** — 진행기가 0xe 확인 뒤 0xf 진입의 CPU 투수 교체를 실어 두면(`progress.substitutionScene`) 그 OK 를 받은 뒤
    * "CHANGE" 애니를 그린다. 그동안은 0xd · 0xe 가 아니라 다음 대기를 세지 않는다(0x16 → 0xd → 0xe).
+   * 타석 중간(볼 · 스트라이크 · 파울 · 판 끝 · 견제 끝의 0xf 진입, be9a27f)이면 진행기가 새 대기(entries 1)와 `confirmsBefore` 0
+   * 연출을 싣는다 — 곧장 서고, 카운트는 그대로(0xd 가 앞 상태 0x16 이라 타석 초기화를 건너뜀, 48e94) 0xe 의 OK 를 기다린다.
    */
   const substitution = useSubstitutionScene(progress.substitutionScene, progress.sceneConfirm, isSceneUncovered)
   const sceneConfirm = useSceneConfirm(progress.sceneConfirm, isSceneUncovered && !substitution.isShown)

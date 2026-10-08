@@ -573,7 +573,12 @@ function* pickoffPlaySteps(
       const decisions = autoAdvanceDecisions({ ...contextAt(tick), force: false })
       for (const decision of decisions) {
         const runner = runners.find((candidate) => candidate.state.index === decision.runnerIndex)
-        if (runner === undefined || runner.state.isOut || runner.state.scored) continue
+        if (runner === undefined) continue
+        // afa0e 는 죽은 주자(+0x96 — 아웃·득점)에게도 +0x128 = 1 을 세운다. 죽은 주자는 주자 틱이 안 옮기므로 목표만 그대로 둔다
+        if (runner.state.isOut || runner.state.scored) {
+          play = { ...play, wantsThrow: true }
+          continue
+        }
         if (decision.toBase > HOME_BASE) continue
         runner.state = {
           ...runner.state,

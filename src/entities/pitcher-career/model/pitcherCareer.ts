@@ -901,6 +901,9 @@ export function applyPitcherLeagueDay(
     career.leaguePitcherStaminas ?? {},
     aceLevels,
     false,
+    // 간이 타석의 능력 0xb570d(…, 1, 0x5a, 1) — 모드 3 은 팀 능력치 정액 0xb592c(모드 비트 0x306 = 1·2·8·9)도 코치(모드 2)도
+    // 안 탄다. 밑값 그대로다
+    { mode: PITCHER_EDITION_MODE },
   )
   return {
     ...career,

@@ -321,10 +321,13 @@ export function PitchingScreen({
     )
   }
 
+  /** 이 공이 게이지를 쓰는가 (`0x3f500` — 게이지 켬 ∧ 마구 아님). 안 써도 0x11 은 지나 틱 10 에 놓는다 */
+  const showsGauge = usesGauge && pitchType !== null && isMagicType?.(pitchType) !== true
+
   /** 게이지가 놓을 때(틱 10) 정한 칸 g 를 그대로 넘긴다 (0x50e08 — 못 정했으면 0) */
   const throwPitch = (gaugeCell: number) => {
     if (pitchType === null || aim === null) return
-    onThrow(pitchType, aim, gaugeCell, true)
+    onThrow(pitchType, aim, showsGauge ? gaugeCell : 0, showsGauge)
     setPhase('구질')
     setPitchType(null)
     setAim(null)
@@ -437,15 +440,11 @@ export function PitchingScreen({
             isPaused={isPopupOpen}
             {...(onAimTick === undefined ? {} : { onTick: onAimTick })}
             onConfirm={(confirmed) => {
-              // 마구는 게이지를 쓰지 않는다 (0x3f500 의 `구질 != 22`)
-              if (usesGauge && pitchType !== null && isMagicType?.(pitchType) !== true) {
+              // OK(0x50e9c)는 늘 0x11 로 간다(0x50ed0) — 게이지를 안 쓰는 공(게이지 끔 · 마구 0x3f500 의 `구질 != 22`)도
+              // 0x11 의 틱 10 에 놓는다(0x4e060). 그때 등급은 제구·체력 표로 뽑힌다 (0x4dbac)
+              if (pitchType !== null) {
                 setAim(confirmed)
                 setPhase('게이지')
-              } else if (pitchType !== null) {
-                // 기본 투구 — 게이지 단계가 아예 없고, 등급은 제구·체력 표로 뽑힌다 (0x4dbac)
-                onThrow(pitchType, confirmed, 0, false)
-                setPhase('구질')
-                setPitchType(null)
               }
             }}
             // CLR(0x50ee0) — 0xf 로 돌아가 0xf 진입 0x3d954 가 다시 돈다
@@ -459,11 +458,11 @@ export function PitchingScreen({
         </div>
       )}
 
-      {!isPopupOpen && phase === '게이지' && <Panel heading="3. 투구 결정" />}
+      {!isPopupOpen && phase === '게이지' && showsGauge && <Panel heading="3. 투구 결정" />}
       {phase === '게이지' && (
         <div hidden={isPopupOpen}>
           {/* 원본에는 결과 글자가 없다 — 작아지는 원 한 장뿐이라 안내 문구도 붙이지 않는다 (S5 U-15) */}
-          <PitchGradeGauge isPaused={isPopupOpen} onRelease={throwPitch} />
+          <PitchGradeGauge isPaused={isPopupOpen} showsGauge={showsGauge} onRelease={throwPitch} />
         </div>
       )}
     </PixelScreen>

@@ -7,7 +7,7 @@ import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import { createAtBat } from '@/entities/at-bat/model/atBatState'
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
-import { startGame } from '@/features/play-game/model/gameFlow'
+import { arrivePitch, startGame } from '@/features/play-game/model/gameFlow'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import { GameScreen } from '@/pages/game/ui/GameScreen'
 import { DEFAULT_SETTINGS } from '@/entities/settings/model/gameSettings'
@@ -216,5 +216,42 @@ describe('상태 0xe — 내 타석마다 사람 OK 를 기다린다 (0x39e14 �
     act(() => vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_READY_FRAMES))
     fireEvent.keyDown(window, { key: '5' })
     expect((screen.getByRole('button', { name: '확인' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+})
+
+describe('타석 중간 CPU 투수 교체 — 0xf 진입 0x3d954 → 0x16 → 0xd → 0xe (be9a27f 의 새 대기)', () => {
+  afterEach(() => vi.useRealTimers())
+
+  it('볼 뒤 교체가 서면 같은 카운트 그대로 CHANGE 연출 → 소개 판 · OK 대기를 세우고, 그 동안 타석이 멈춘다', () => {
+    vi.useFakeTimers()
+    // gameFlow 시험의 "지친 투수" — 0xe 의 OK 를 이미 받은 타석 중간(돌발 없음), 상대 투수 체력 0
+    const random = createSeededRandom(11)
+    const 시작 = startGame(random)
+    const 지침: GameProgress = {
+      ...시작,
+      sceneConfirm: null,
+      burst: null,
+      opponentMound: { ...시작.opponentMound, stamina: 0, justChanged: false },
+    }
+    const { progress, play } = arrivePitch(지침, { resolution: { kind: '볼' }, outcomeAfter: null }, random)
+    // 씨앗 11 은 폭투·포일(0.1%)이 안 난다
+    expect(play).toBeNull()
+    expect(progress.substitutionScene?.confirmsBefore).toBe(0)
+
+    띄우기({ progress, atBat: createAtBat({ balls: 1, strikes: 0 }) })
+    if (screen.queryByRole('button', { name: '메뉴' }) === null) fireEvent.keyDown(window, { key: 'Enter' })
+
+    // 0x16 — 앞 OK 를 기다리지 않고 곧장 선다. 그동안 0xe 대기는 세지 않는다
+    expect(screen.getByTestId('교체연출')).toBeTruthy()
+    expect((screen.getByRole('button', { name: '확인' }) as HTMLButtonElement).disabled).toBe(true)
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 17))
+    expect(screen.queryByTestId('교체연출')).toBeNull()
+
+    // → 0xd 두 그림 → 0xe 소개 판 · OK 하나
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_PREPARE_FRAMES))
+    expect(screen.getByTestId('소개판')).toBeTruthy()
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_READY_FRAMES))
+    fireEvent.keyDown(window, { key: '5' })
+    expect(screen.queryByRole('button', { name: '확인' })).toBeNull()
   })
 })

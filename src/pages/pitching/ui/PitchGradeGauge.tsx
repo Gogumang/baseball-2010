@@ -26,6 +26,12 @@ interface PitchGradeGaugeProps {
   readonly onRelease: (gaugeCell: number) => void
   /** 일시정지 팝업(0x741a0)이 떠 있으면 틱이 멈춘다 */
   readonly isPaused?: boolean
+  /**
+   * 게이지를 쓰는 공인가 (`0x3f500` — 환경설정 게이지 켬 ∧ 구질 ≠ 22 마구). 원본은 0x10 OK(0x50e9c → 0x50ed0)에서 **늘** 0x11 로
+   * 가고 틱 10 에 놓는다(0x4e060) — 게이지를 안 쓰는 공은 그리기 0x4d2ac 가 0x4d3f8 에서 게이지를 건너뛸 뿐이다. 그래서 거짓이면
+   * 아무것도 안 그리고 누름도 안 받은 채 틱 10 에 칸 0 으로 놓는다(등급은 놓기 0x4dbac 가 제구·체력 표로 뽑는다). 기본 참
+   */
+  readonly showsGauge?: boolean
 }
 
 const isDecidedCell = (cell: number) => cell >= 1 && cell <= GAUGE_LAST_CELL
@@ -43,7 +49,7 @@ const isDecidedCell = (cell: number) => cell >= 1 && cell <= GAUGE_LAST_CELL
  * ⚠️ 미이식: t 가 선 뒤 0x4d53c~0x4d69e 가 덧그리는 것(그림 플래그 8 의 멈춘 커서 · 레코드 비트에 걸린 칸 그림 · t == 5 의 덧그림)은
  * 멈춘 커서 원 하나로만 옮겼다.
  */
-export function PitchGradeGauge({ onRelease, isPaused = false }: PitchGradeGaugeProps) {
+export function PitchGradeGauge({ onRelease, isPaused = false, showsGauge = true }: PitchGradeGaugeProps) {
   /** 0x11 상태 틱 `[+0x2c]` */
   const tickRef = useRef(0)
   /** 커서 `+0x17bc` */
@@ -80,7 +86,7 @@ export function PitchGradeGauge({ onRelease, isPaused = false }: PitchGradeGauge
   }, [isPaused])
 
   const press = () => {
-    if (releasedRef.current || isPaused) return
+    if (releasedRef.current || isPaused || !showsGauge) return
     pressedRef.current = gaugePressedCellOf(pressedRef.current, cursorRef.current)
     setPressed(pressedRef.current)
   }
@@ -101,6 +107,9 @@ export function PitchGradeGauge({ onRelease, isPaused = false }: PitchGradeGauge
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
+
+  // 게이지를 안 쓰는 공 — 0x11 의 10틱만 흘려 보낸다 (그림 없음)
+  if (!showsGauge) return null
 
   const isDecided = isDecidedCell(pressed)
   const circle = (frame: GaugeFrame, offsetY = 0) =>

@@ -69,6 +69,14 @@ describe('자동 추가 진루 0xaf918 — "수비보다 2틱 이상 빠를 때�
     expect(결정).toEqual([{ runnerIndex: 1, toBase: 3 }])
   })
 
+  it('죽은 주자(+0x96)도 거르지 않는다 — 루프 af93c~afa36 에 +0x96 검사가 없다', () => {
+    const 죽은 = { ...createRunner(1, 2, 주력500), isOut: true }
+    const 결정 = autoAdvanceDecisions(
+      문맥({ ballHolderSlot: 8, catchFielderSlot: 8 }, [죽은], { fielders: 끌려나간수비 }),
+    )
+    expect(결정).toEqual([{ runnerIndex: 1, toBase: 3 }])
+  })
+
   it('수비가 빠르면 안 간다 — 포수는 늘 홈에 붙어 있다', () => {
     const 주자 = createRunner(1, 2, 주력500, { targetBase: 3 })
     expect(autoAdvanceDecisions(문맥({ ballHolderSlot: 4, catchFielderSlot: 4 }, [주자]))).toEqual([])

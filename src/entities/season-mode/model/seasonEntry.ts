@@ -1,6 +1,7 @@
 import { ACE_BATTERS, ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
 import { ROTATION_SIZE, rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
+import { recordAbilityOf } from '@/entities/team/model/recordAbility'
 import { HALL_OF_FAME_FIRST_ID, tableTeamOf } from '@/entities/season-mode/model/playerRecruit'
 import type { SeasonPlayer, SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
 import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
@@ -220,6 +221,38 @@ export interface SeasonEntryBatterRecord {
   readonly profile?: number
   /** +0x18 — 고른 필살타법 번호 (0 안 고름). 옛 사본엔 없다 */
   readonly specialNumber?: number
+  /** +0xc 네 칸 — `0xb6415(기록, k, 0)` 밑값 (장비·스킬 전). 옛 사본엔 없다 (`SeasonEntryRecordParts`) */
+  readonly baseAbility?: readonly [number, number, number, number]
+  /** +0x14 장착 스킬 비트. 옛 사본엔 없다 */
+  readonly skillBits?: number
+  /** +0x19 · +0x1a 장비 니블 네 칸 — 영입 0xc554 가 옮긴 기록의 니블. 옛 사본엔 없다 */
+  readonly equipment?: readonly number[]
+}
+
+/**
+ * 기록 사본의 0x30 바이트 중 `0xb6414` 를 다시 셈하는 칸 — 밑값 +0xc · 장착 스킬 +0x14 · 장비 니블 +0x19/+0x1a.
+ *
+ * 영입 0xc554 는 기록 0x30 바이트를 통째로 팀 레코드에 옮기고, 시즌 장비 창(0xdc → 적용 0x7d90)은 그 팀 레코드의 +0x19 · +0x1a 에
+ * 니블을 쓴다. 경기용 팀 0xb891c → 0xb8680 은 그 레코드를 읽어 `0xb6414(기록, k, 1)` = 밑값 + 니블 보너스 + 장착 스킬을 **경기마다**
+ * 셈한다 — 그래서 시즌에 산 장비가 영입 선수에게도 얹힌다. 세 칸이 있으면 `seasonRecordAbilityOf` 가 그렇게 셈하고, 없는 옛 사본은
+ * 영입 때 남긴 `ability`(그때의 0xb6414)를 그대로 쓴다.
+ */
+export type SeasonEntryRecordParts = Pick<SeasonEntryBatterRecord, 'ability' | 'baseAbility' | 'skillBits' | 'equipment'>
+
+/**
+ * 기록으로 선 선수의 경기 능력치 `0xb6414(기록, k, 1)` — 니블은 시즌 명단 값(`SeasonPlayer.equipment` — 장비 창이 쓴 것),
+ * 없으면 영입 때 옮긴 기록의 니블. 밑값이 없는 옛 사본은 `ability` 그대로.
+ */
+export function seasonRecordAbilityOf(
+  record: SeasonEntryRecordParts,
+  rosterEquipment: readonly number[] | undefined,
+  isPitcher: boolean,
+): readonly [number, number, number, number] {
+  if (record.baseAbility === undefined) return record.ability
+  return recordAbilityOf(
+    { ability: record.baseAbility, skillBits: record.skillBits ?? 0, equipment: rosterEquipment ?? record.equipment ?? [] },
+    isPitcher,
+  )
 }
 
 /**
@@ -242,6 +275,10 @@ export interface SeasonEntryPitcherRecord {
   readonly recordId?: number
   /** +0xb 한 바이트 (`seasonRecordProfileOf`, 아랫 2비트 = `role`). 옛 사본엔 없다 */
   readonly profile?: number
+  /** +0xc 네 칸 밑값 · +0x14 · +0x19/+0x1a — `SeasonEntryBatterRecord` 의 같은 칸 (`SeasonEntryRecordParts`) */
+  readonly baseAbility?: readonly [number, number, number, number]
+  readonly skillBits?: number
+  readonly equipment?: readonly number[]
 }
 
 /** 표 밖 선수의 기록을 찾아 준다 — 없으면 undefined */
@@ -287,10 +324,15 @@ export function seasonEntryOrderOf(roster: SeasonTeamRoster, recordOf?: SeasonEn
         }
       }
       const record = player.record ?? recordOf?.batter(player)
-      // 원본 id 를 함께 실어 그 선수의 시즌 기록을 제 줄(리그 기록표의 표 밖 줄)로 쌓게 한다
+      // 원본 id 를 함께 실어 그 선수의 시즌 기록을 제 줄(리그 기록표의 표 밖 줄)로 쌓게 한다.
+      // 능력치는 그 기록의 0xb6414 를 지금 니블로 다시 셈한다 — 시즌 장비 창이 산 장비가 얹힌다 (`seasonRecordAbilityOf`)
       return record === undefined
         ? { rosterSlot: NOT_IN_ROSTER, position }
-        : { rosterSlot: NOT_IN_ROSTER, position, record: { name: record.name, ability: record.ability, recordId: player.id } }
+        : {
+            rosterSlot: NOT_IN_ROSTER,
+            position,
+            record: { name: record.name, ability: seasonRecordAbilityOf(record, player.equipment, false), recordId: player.id },
+          }
     }),
     pitchers: roster.pitchers.map((player) => {
       if (isTablePlayer(player)) {
@@ -303,7 +345,14 @@ export function seasonEntryOrderOf(roster: SeasonTeamRoster, recordOf?: SeasonEn
       }
       const carried = player.record
       const record = carried !== undefined && 'repertoire' in carried ? carried : recordOf?.pitcher(player)
-      return record === undefined ? NOT_IN_ROSTER : { ...record, recordId: player.id }
+      if (record === undefined) return NOT_IN_ROSTER
+      // 0xb6414 를 지금 니블로 다시 셈한다(`seasonRecordAbilityOf`). 장착 비트(+0x14)도 실어 경기의 스킬 판정이 본다
+      const { baseAbility: _base, equipment: _equipment, ...rest } = record
+      return {
+        ...rest,
+        ability: seasonRecordAbilityOf(record, player.equipment, true),
+        recordId: player.id,
+      }
     }),
   }
 }
