@@ -2602,6 +2602,14 @@ function quickDefenseOf(
     // 마선수 0xb633c(+0xa 비트6) — 마운드면 특수 문턱(ac4f2), 벤치에 있으면 0xb8a8d 가 참이라 마무리 굴림 0xac360 을
     // 지나고, 0xabfcc 는 고르지 않는다 (`leagueDay.defenseOf` 와 같다)
     isSpecialPitcherAt: isAce,
+    // 공 하나 소모 0xa5e14 의 비겁자(비트 18) · 끈기(비트 10) — 레코드 +0x14. 내 투수는 장착 스킬(`pitcherIsCoward` ·
+    // `pitcherEndures`, 사람 투구 `drainStamina` 와 같은 칸), 붙박이 줄은 Xls 행 그대로, 마투수 다섯 줄은 0
+    skillBitsAt: (slot) =>
+      isOurs && slot === MY_PITCHER_SLOT
+        ? (options.pitcherIsCoward === true ? 1 << 18 : 0) | (options.pitcherEndures === true ? 1 << 10 : 0)
+        : isAce(slot)
+          ? 0
+          : roster[slot % roster.length].skillBits,
     // 마무리 갈래(ac0be)의 정렬 열쇠 0xb5b50 = 0xb570c(팀, k, P, 1, 90, 1) 네 칸 합. 모드 3 은 팀 능력치(0x306)·코치
     // 정액이 없고 0xb574a 가지는 내 육성 선수(0xb6388)에만 붙는다 — 로스터 투수는 밑값을 0..999 로 자른 합.
     // 내 투수는 0xabfcc 가 모드 3 에서 거르므로(내선수거름) 그 칸 값은 쓰이지 않는다 — 실효 능력치 네 칸 합을 둔다

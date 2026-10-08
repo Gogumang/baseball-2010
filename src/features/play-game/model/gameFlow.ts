@@ -614,7 +614,7 @@ export interface PlayerOutcomeOptions {
  * 깎은 스태미나는 다음 타석 시작의 CPU 교체(0xac428)와 동료 간이 타석이 본다. 난수는 쓰지 않는다.
  *
  * `batterIntimidates` = 타석에 선 내 선수가 타자 스킬 22 압도를 **장착**했는가.
- * 상대 투수 스킬 18·10 은 웹 로스터에 스킬 비트가 없어 늘 거짓이다 (`drainPitcherForPitch`).
+ * 상대 투수 스킬 18 비겁자 · 10 끈기는 그 레코드 +0x14 (`quickDefenseOf` 의 `skillBitsAt` → `drainPitcherForPitch`).
  */
 export function throwOpponentPitch(
   progress: GameProgress,
@@ -1639,6 +1639,8 @@ function quickDefenseOf(
     // 마선수 0xb633c(+0xa 비트6) — 마투수 8번 칸. 마운드면 특수 문턱(ac4f2), 벤치에 있으면 0xb8a8d 가 참이라
     // 마무리 굴림 0xac360 을 지나고, 0xabfcc 는 고르지 않는다 (`leagueDay.defenseOf` 와 같다). 보직은 칸 8 이 표 밖이라 없다
     isSpecialPitcherAt: isAce,
+    // 공 하나 소모 0xa5e14 의 비겁자(비트 18) · 끈기(비트 10) — 레코드 +0x14. 붙박이 줄은 Xls 행 그대로, 마투수 다섯 줄은 0
+    skillBitsAt: (slot) => (isAce(slot) ? 0 : roster[slot % roster.length].skillBits),
   }
 }
 

@@ -1630,6 +1630,27 @@ function pitcherEntryAt(
   return entry[slot] ?? entry[0]
 }
 
+/** 0xa5f30 `movs r1, #0x12` — 투수 스킬 18 비겁자 */
+const COWARD_SKILL_BIT = 18
+/** 0xa5f52 `movs r1, #0xa` — 투수 스킬 10 끈기 */
+const ENDURE_SKILL_BIT = 10
+
+/**
+ * 공 하나 소모 0xa5e14 의 투수 비트 — `0xb62b4(0xae83c(수비 팀), 18)`(a5f32 비겁자 ×2) · `(…, 10)`(a5f56 끈기 −1).
+ * 그 칸 레코드 +0x14 (`TeamEntryPitcher.skillBits` — 붙박이 줄은 Xls 행 그대로, 마투수 0).
+ */
+function pitcherSkillFlagsAt(
+  progress: TeamGameProgress,
+  teamId: number,
+  slot: number,
+): { readonly pitcherIsCoward: boolean; readonly pitcherEndures: boolean } {
+  const bits = pitcherEntryAt(progress, teamId, slot)?.skillBits ?? 0
+  return {
+    pitcherIsCoward: ((bits >>> COWARD_SKILL_BIT) & 1) === 1,
+    pitcherEndures: ((bits >>> ENDURE_SKILL_BIT) & 1) === 1,
+  }
+}
+
 /** 투수 명단 한 칸의 경기용 능력치 네 칸 (제구·구속·변화·체력) */
 function pitcherAbilitiesAt(
   progress: TeamGameProgress,
@@ -1914,8 +1935,7 @@ function throwOpponentPitch(progress: TeamGameProgress, pitchTypeNumber: number 
       teamMorale: 100,
       isFirstPitcher: progress.opponentUsedPitchers.length === 0,
       batterIntimidates: false,
-      pitcherIsCoward: false,
-      pitcherEndures: false,
+      ...pitcherSkillFlagsAt(progress, progress.options.opponentTeamId, progress.opponentPitcherIndex),
     }),
     opponentPitcherCounters: addRunsToCounters(progress.opponentPitcherCounters, 0, 1, false),
     pitcherLines: chargeMoundLine(progress, false, { pitches: 1 }),
@@ -2396,8 +2416,7 @@ function pitchOnce(
     isFirstPitcher: progress.ourUsedPitchers.length === 0,
     // 상대 타자의 스킬 22(0xb62b4)를 웹 로스터가 들고 있지 않아 늘 거짓이다
     batterIntimidates: false,
-    pitcherIsCoward: false,
-    pitcherEndures: false,
+    ...pitcherSkillFlagsAt(progress, options.ourTeamId, progress.ourPitcherIndex),
   })
 
   const afterPitch: TeamGameProgress = {
@@ -4135,13 +4154,14 @@ function quickPitcherDrainOf(
   staminaAbility: number,
   teamMorale: number,
   isFirstPitcher: boolean,
+  /** 수비 투수 레코드 +0x14 의 비겁자 · 끈기 (`pitcherSkillFlagsAt`) */
+  skillFlags: { readonly pitcherIsCoward: boolean; readonly pitcherEndures: boolean },
 ): QuickPitcherDrain {
   const capacity = staminaCapacityOf(staminaAbility, teamMorale, isFirstPitcher)
   const cost = pitchStaminaCostOf({
     pitchTypeNumber: 1,
     batterIntimidates: false,
-    pitcherIsCoward: false,
-    pitcherEndures: false,
+    ...skillFlags,
   })
   let current = stamina
   return {
@@ -4293,6 +4313,7 @@ function playAutoOffenseAtBat(progress: TeamGameProgress, random: RandomPort): T
     opponentPitcherStaminaAbility(progress),
     100,
     progress.opponentUsedPitchers.length === 0,
+    pitcherSkillFlagsAt(progress, options.opponentTeamId, progress.opponentPitcherIndex),
   )
   const play = playQuickAtBat(
     entryQuickBatterOf(progress, options.ourTeamId, before.battingOrderIndex),
@@ -4373,6 +4394,7 @@ function playAutoDefenseAtBat(progress: TeamGameProgress, random: RandomPort): T
     ourPitcherStats(progress).stamina,
     ourTeamMoraleOf(progress.options),
     progress.ourUsedPitchers.length === 0,
+    pitcherSkillFlagsAt(progress, options.ourTeamId, progress.ourPitcherIndex),
   )
   const play = playQuickAtBat(
     entryQuickBatterOf(progress, options.opponentTeamId, progress.opponentOrderIndex),
