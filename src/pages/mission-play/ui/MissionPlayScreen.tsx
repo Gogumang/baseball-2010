@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { BigResult, Hint, PixelScreen } from '@/shared/ui'
+import { PixelScreen } from '@/shared/ui'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
 import { useInGameMenuState } from '@/features/play-team-game/model/useInGameMenuState'
@@ -398,19 +398,7 @@ export function MissionPlayScreen({
             />
           )}
 
-          <div className={styles.overlay}>
-            {isOver ? null : bannerText === '' ? (
-              <Hint>
-                {atBat.balls}볼 {atBat.strikes}스트라이크
-                {canBunt && ' · 8·7·9(Shift)·길게 눌러 번트'}
-                {stealableBases.includes(1) && ' · 3 도루(1루)'}
-                {stealableBases.includes(2) && ' · 2 도루(2루)'}
-                {stealableBases.includes(3) && ' · 1 도루(3루)'}
-              </Hint>
-            ) : (
-              <BigResult>{bannerText}</BigResult>
-            )}
-          </div>
+          {/* 원본 타석 화면에는 글자 안내가 없다 — 웹 전용 조작 안내(Hint) · 큰 결과 글자(BigResult)를 걷어 냈다 */}
 
           {/* 경기 상태 0x19 — 미션 결과 판 0x4a384(모드 5·6) · 키 0x407f0 */}
           {isOver && (

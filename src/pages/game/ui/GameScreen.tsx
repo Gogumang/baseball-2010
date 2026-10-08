@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { BigResult, Hint, PixelScreen } from '@/shared/ui'
+import { PixelScreen } from '@/shared/ui'
 import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
@@ -33,7 +33,6 @@ import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import type { Pitch, PitcherAbility } from '@/entities/pitching/model/pitch'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import * as styles from '@/pages/game/ui/GameScreen.css'
-import { detail } from '@/shared/ui/MenuList/MenuList.css'
 
 const smallLogoUrlOf = (teamId: number) => `./sprites/team_logo_ini/${String(teamId).padStart(3, '0')}.png`
 
@@ -282,16 +281,10 @@ export function GameScreen({
       >
         {/* 0xe 에서 화면을 누르면 OK 로 본다 (터치용 웹판 편의 — 캔버스 탭이 스윙인 것과 같은 자리) */}
         <div className={styles.stageArea} onClick={sceneConfirm.acceptsConfirm ? sceneConfirm.confirm : undefined}>
-          {ace !== null && (
-            <div className={styles.aceAlert}>
-              <img src={ace.iconUrl} alt={ace.name} width={33} height={33} />
-              <div>
-                <strong>{ace.name}</strong> 등판!
-                <span className={detail}>필살기 · {ace.burst}</span>
-              </div>
-            </div>
-          )}
-
+          {/*
+            원본 타석 화면에는 글자 안내가 없다 — 마선수 등판은 컷인 0x473f0 · 판정은 game_judge 애니뿐이라
+            웹 전용 "등판!" 띠 · 조작 안내(Hint) · 큰 결과 글자(BigResult)를 걷어 냈다
+          */}
           <BattingStage
             batterAbility={effectiveAbilityOf(career)}
             // 번트 '7'/'8'/'9' — 0x535a4 → 0x6a7 → 0x51e48 은 모드를 안 본다. 타자편은 내 선수가 쳐서 마선수(0xb633c)가 아니다
@@ -394,16 +387,7 @@ export function GameScreen({
                   }
             }
           />
-        ) : bannerText === '' ? (
-          <Hint>
-            탭·Space·5 스윙 · 좌우 끝 탭·←→(4·6) 타자 이동 · 8·7·9(Shift)·길게 눌러 번트
-            {stealableBases.includes(1) && ' · 3 도루(1루)'}
-            {stealableBases.includes(2) && ' · 2 도루(2루)'}
-            {stealableBases.includes(3) && ' · 1 도루(3루)'}
-          </Hint>
-        ) : (
-          <BigResult>{bannerText}</BigResult>
-        )}
+        ) : null}
       </PixelScreen>
       {overlay === '조작방법' && (
         <HelpScreen
