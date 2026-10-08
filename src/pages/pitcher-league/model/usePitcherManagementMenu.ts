@@ -286,7 +286,15 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
    * 108 마구 창(탭 1)의 확인 키 **0x17828** — 탭 0(타자 필살타법)과 같은 갈래 17858~17a42 다 (`magicTrainingCellBlockOf`).
    * 팝업 [65](2,2) "예" → 틀 0x106bc → **139 G포인트 충전**, [66](2,3) "예" → **125** → 0x17f5c(훈련) → 105.
    *
-   * ⚠️ [65] 의 "예"(→ 139 G포인트 충전 페이지)는 웹에 갈 곳이 없어 상자만 닫힌다(창에 남는다).
+   * **139** = 진입 0x11840 · 틀 0x15954 · 그리기 0x167b8 → 0x5d054 — 공용 충전 화면 0x65a65 / 0x65b01(시즌 0xfa · 메인 메뉴
+   * 스페셜과 같다). 단계 [skin+0x314]: 0 목록 넷(값 표 0xd1f0c 실제 현금 100 · 500 · 1000 · 3000원 → 0xd1f1c × 100 =
+   * 300 · 1500 · 3300 · 12000 G) — 확인이면 StrMAINMENU[98] "실제 현금 %d원 …" 예/아니오(종류 4, 처음 커서 0) → 단계 1:
+   * 예 → 0x707a1(망, 0x16) 결제 요청 · 단계 2(망 응답 +0x70 == 1 이면 G += 값 · 0x1f1b9 저장 · [99] "충전 완료" → 단계 3 → 0) ·
+   * 실패면 콜백 0x6354d 가 단계 0 · 오류 글(표 0xd0b1f − 코드×0x80, "%s!N(%d)") / 아니오 → 단계 0. 목록 CLR 이면 닫히고
+   * 틀 0x15954 가 **뒤 상태 [장면+0x24] = 108** 로 돌린다 — 108 진입 0x17730 이 다시 돌아 커서가 `min(L, 3)` 이 된다.
+   *
+   * 웹에는 실제 결제가 없다 — **결제하지 않고 139 를 떠난 길**(목록 CLR)만 옮긴다: G 는 그대로이고 108 을 다시 들어선다.
+   * ⚠️ 139 화면(목록 그림 0x5d054 · StrMAINMENU[98] · [99] · 오류 글)은 옮기지 않았다.
    */
   const confirmMagicTrainingCell = useCallback(
     (cell: number) => {
@@ -296,7 +304,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
         return setNotice(modeTextOf(62).replace('%d', String(MAGIC_REQUIRED_POPULARITY[cell] ?? 0)))
       }
       if (block === '선행필요') return setNotice(modeTextOf(64))
-      if (block === 'G포인트부족') return setQuestion({ text: modeTextOf(65), onYes: () => undefined })
+      if (block === 'G포인트부족') return setQuestion({ text: modeTextOf(65), onYes: enterMagicTraining })
       const menu = PITCHER_TRAINING_MENUS[PITCHER_TRAINING_MENUS.length - 1]
       return setQuestion({
         text: modeTextOf(66).replace('%d', String(magicTrainingCellCostOf(cell))),

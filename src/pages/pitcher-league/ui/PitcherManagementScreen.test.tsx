@@ -773,6 +773,22 @@ describe('108 마구 창(탭 1) — 진입 0x17730 · 확인 키 0x17828 (탭 0 
     fireEvent.click(칸('확인'))
   })
 
+  it('G 부족 [65] 의 "예"(→ 139)는 결제 없이 떠난 길 — G 그대로 108 을 다시 들어서 커서가 L 칸이다', () => {
+    const onSave = vi.fn()
+    화면({ career: 투수({ magicLevel: 1, popularity: 2000, gamePoint: 100 }), onSave })
+    마구창까지()
+    const 칸들 = () => screen.getAllByRole('button').filter((button) => button.hasAttribute('aria-pressed'))
+    // 커서를 칸 3 으로 옮겨 둔다 — 139 에서 돌아오면 108 진입이 다시 L 칸에 둔다
+    fireEvent.pointerEnter(칸들()[3])
+    fireEvent.click(칸들()[1])
+    expect(screen.getByText(/G포인트가 부족합니다/)).toBeTruthy()
+    fireEvent.click(칸('예'))
+
+    expect(screen.getByText('마구 훈련')).toBeTruthy()
+    expect(칸들().findIndex((button) => button.getAttribute('aria-pressed') === 'true')).toBe(1)
+    expect(onSave).not.toHaveBeenCalled()
+  })
+
   it('취소는 107(트레이닝)로 — 0x17828 17a76 → 0x6b', () => {
     화면()
     마구창까지()

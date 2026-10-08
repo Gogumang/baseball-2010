@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
@@ -93,6 +94,8 @@ const BASIC_INFO_FOOTER = 0x87
 export function ManagementScreen(props: ManagementScreenProps) {
   const { career, noticeText } = props
   const menu = useManagementMenu(props)
+  /** 108 필살타법 창에 들어선 횟수 — 139 G 충전에서 돌아오면 108 진입 0x17730 이 다시 돈다(창을 새로 마운트) */
+  const [swingTrainingEntry, setSwingTrainingEntry] = useState(0)
   const labelOrigins = useFrameOrigins('./sprites/img_text/frames')
   const slots = menu.kind === 'main' ? COMMAND_SLOTS : COMMAND_MENUS[menu.kind]
   const labelWidths = Object.fromEntries(
@@ -168,8 +171,13 @@ export function ManagementScreen(props: ManagementScreenProps) {
           onExpandSlots={props.onExpandSkillSlots ?? (() => {})} onClose={menu.closeOverlay} />
       )}
       {menu.overlay === '필살타법훈련' && (
-        // G 부족([65])의 "예" 는 원본의 G 구매 페이지라 웹엔 갈 곳이 없다 — 창만 닫힌다
-        <SpecialSwingWindow mode="훈련" level={career.specialSwingLevel} sessions={career.specialSwingSessions}
+        /*
+         * G 부족([65])의 "예" → 틀 0x106bc → 139 G포인트 충전(실제 현금 결제 0x65a65 / 0x65b01). 웹에는 결제가 없어 **결제하지
+         * 않고 139 를 떠난 길**(목록 CLR → 틀 0x15954 가 뒤 상태 108 로)만 옮긴다 — G 는 그대로이고 108 진입 0x17730 이 다시 돈다
+         * (창을 새로 마운트한다). 자세한 139 흐름은 투수편 `usePitcherManagementMenu` 의 `confirmMagicTrainingCell` 주석.
+         */
+        <SpecialSwingWindow key={swingTrainingEntry} onBuyGamePoint={() => setSwingTrainingEntry((entry) => entry + 1)}
+          mode="훈련" level={career.specialSwingLevel} sessions={career.specialSwingSessions}
           battingTypeIndex={career.battingTypeIndex} selectedNumber={career.specialSwingNumber}
           popularity={career.popularity} gamePoint={career.gamePoint}
           onTrain={menu.startSpecialSwingTraining} onClose={menu.closeOverlay} />

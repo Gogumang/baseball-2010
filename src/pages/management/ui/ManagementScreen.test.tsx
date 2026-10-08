@@ -126,6 +126,26 @@ describe('관리 화면 알림 상자', () => {
     expect(screen.queryByRole('dialog', { name: '알림' })?.textContent).toContain('인기도')
   })
 
+  it('G 부족 [65] 의 "예"(→ 139 G 충전)는 결제 없이 떠난 길 — G 그대로 108 창으로 다시 들어선다 (0x106bc · 0x15954)', () => {
+    const onTraining = vi.fn()
+    const career = { ...createCareer('테스터'), popularity: 9999, gamePoint: 0 }
+    render(<ManagementScreen {...propsWith({ career, onTraining })} />)
+
+    clickCommand('트레이닝')
+    clickCommand('필살타법')
+    const 창 = screen.getByRole('dialog', { name: '필살타법' })
+    fireEvent.click(screen.getByRole('button', { name: '파워 스윙' }))
+    expect(document.body.textContent).toContain('G포인트가 부족합니다')
+    // 키로 [예] (처음 커서) — 상자 단추를 누르면 클릭이 창 바깥 덮개(닫기)까지 올라간다
+    fireEvent.keyDown(window, { key: 'Enter' })
+
+    // 108 진입 0x17730 이 다시 돈다 — 창이 새로 선다
+    const 다시 = screen.getByRole('dialog', { name: '필살타법' })
+    expect(다시).not.toBe(창)
+    expect(document.body.textContent).not.toContain('G포인트가 부족합니다')
+    expect(onTraining).not.toHaveBeenCalled()
+  })
+
   it('사기 0 이면 창을 열기 전에 막는다 (0x12d8a)', () => {
     const onTrainingBlocked = vi.fn()
     const career = { ...createCareer('테스터'), morale: 0 }
