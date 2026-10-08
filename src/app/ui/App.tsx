@@ -537,6 +537,8 @@ export function App() {
         collection={collection.collection} random={random} wallet={wallet} aceSelect={aceSelect}
         hallOfFameDeletion={hallOfFameDeletion}
         recordStat={recordStat}
+        // 홈런더비 타자 게터 0x1fc20 — 타자편 대결 대기(g[0x11f])면 명예 타자 대신 나리 타자
+        aceMatchHold={aceMatchHoldPort}
         onRenamePlayer={editedNames.rename}
         onResetEditedNames={editedNames.clear}
         // 모드 초기화 나리 칸 — 0x224ec(mgr, 4 타자 / 3 투수): 그 편 저장(game_br/pr.sav)·+0x40+m·+0x4c+m 지움 → 0x223a8 이

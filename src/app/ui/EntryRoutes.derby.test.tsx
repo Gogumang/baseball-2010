@@ -32,10 +32,11 @@ describe('홈런더비 진입 — 하위 16 선수 고르기 (0x25e6c · 0x29ac8
   if (등록결과.kind !== '등록') throw new Error('등록 실패')
   const 명전기록 = 등록결과.collection
 
-  function 띄우기(career: typeof 나리 | null, recordStat = vi.fn()) {
+  function 띄우기(career: typeof 나리 | null, recordStat = vi.fn(), isBatterHeld = false) {
     const setScreen = vi.fn()
     const props = {
       recordStat,
+      aceMatchHold: { read: () => ({ batter: isBatterHeld, pitcher: false, originalMode: isBatterHeld ? 4 : 0 }), writeResult: vi.fn() },
       screen: { kind: '홈런더비' } as Screen,
       setScreen,
       session: { career, savedCareer: null, actions: { gainGamePoint: vi.fn() } } as unknown as Props['session'],
@@ -77,6 +78,13 @@ describe('홈런더비 진입 — 하위 16 선수 고르기 (0x25e6c · 0x29ac8
     띄우기(나리)
     fireEvent.click(view.getByRole('button', { name: '7번 슬롯' }))
     expect(받은것.at(-1)).toMatchObject({ batterSkillIds: [22], batterForm: 5, batterSkinIndex: 1 })
+  })
+
+  it('타자편 대결 대기(g[0x11f])가 서 있으면 명예 타자를 골라도 나리 타자편 저장 선수로 친다 (0x1fc20 1fc3c)', () => {
+    띄우기(나리, vi.fn(), true)
+    fireEvent.click(view.getByRole('button', { name: '7번 슬롯' }))
+    expect(받은것.at(-1)).toMatchObject({ ability: modeBatterOf(나리).ability, batterForm: 2, batterSkinIndex: 2 })
+    expect((받은것.at(-1)?.['matchupBatter'] as { name: string }).name).toBe('나리')
   })
 
   it('나리 타자가 없어도 명예 타자로 들어갈 수 있고, 나리 칸은 StrCOMMON[38] 로 막힌다', () => {

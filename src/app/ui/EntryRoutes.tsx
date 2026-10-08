@@ -9,6 +9,8 @@ import type { MatchupBatterCard } from '@/widgets/matchup-cards/ui/MatchupCards'
 import { modeBatterOf, modeBatterOfHallOfFame } from '@/app/model/modeBatter'
 import { nariBatterOf } from '@/app/model/useCollection'
 import { hallOfFameBatterAt } from '@/entities/collection/model/collection'
+import type { AceMatchHoldPort } from '@/entities/mode-save/model/modeSave'
+import { derbyHallOfFameBatterIndexOf } from '@/pages/home-run-derby/lib/derbyModeBatter'
 import type { HallOfFamePlayerPick } from '@/entities/collection/model/collection'
 import { createLocalStorageJsonStore } from '@/shared/api/save/localStorageJsonStore'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -115,6 +117,11 @@ interface EntryRoutesProps {
   readonly nariGameReady?: NariGameReady
   /** 그 갈래의 곧장 경기 — 0x213c0(앱, m, 0) 으로 그 편 저장을 올려 장면 0x104 */
   readonly onResumeNariGame?: (edition: '타자편' | '투수편') => void
+  /**
+   * 나간 마선수 대결 대기 칸(`entities/mode-save` — g[0x11f] · g[0x176] · g[0xf6]). 홈런더비의 타자 게터 0x1fc20 이 g[0x11f] 를 본다
+   * (`derbyHallOfFameBatterIndexOf`). 안 넘기면 대기 없음
+   */
+  readonly aceMatchHold?: AceMatchHoldPort
 }
 
 /** 원본 모드 번호 — 0x327b8 이 +0x3c 에 적는 값 */
@@ -128,7 +135,7 @@ export function EntryRoutes({
   screen, setScreen, session, gameSettings, collection, random, wallet, aceSelect, hallOfFameDeletion, claimCollectionReward,
   onRenamePlayer, onResetEditedNames, onResetCareerEdition, careerResetBlockOf, onResetSeason, onStartGeneralMode,
   isGeneralGameInProgress = false, lastPlayedMode = 1, onLastPlayedMode, onResumeGeneralGame,
-  nariGameReady, onResumeNariGame, recordStat,
+  nariGameReady, onResumeNariGame, recordStat, aceMatchHold,
 }: EntryRoutesProps) {
   /** 전부 수집 보상 팝업 글 (0x292f8 의 `0xbbef9(글, 1, −1, 1)`) — 메뉴 위에 뜬다 */
   const [collectionRewardText, setCollectionRewardText] = useState<string | null>(null)
@@ -256,8 +263,10 @@ export function EntryRoutes({
         />
       )
     }
-    // 선수 게터 0x1fc20: 모드 7 · +0x11f == 0 · +0xa6 ≥ 0 → 명전 기록 0x1f640, 그 밖은 나리 타자편 저장(0x213c0(앱,4,0))
-    const famer = derbyPick.hallOfFameIndex === null ? null : hallOfFameBatterAt(collection, derbyPick.hallOfFameIndex)
+    // 선수 게터 0x1fc20: 모드 7 · +0x11f == 0 · +0xa6 ≥ 0 → 명전 기록 0x1f640, 그 밖은 나리 타자편 저장(0x213c0(앱,4,0)) —
+    // 타자편 대결 대기(g[0x11f])가 서 있으면 명예 타자를 골랐어도 나리 타자 (`derbyHallOfFameBatterIndexOf`)
+    const famerIndex = derbyHallOfFameBatterIndexOf(derbyPick, aceMatchHold?.read().batter ?? false)
+    const famer = famerIndex === null ? null : hallOfFameBatterAt(collection, famerIndex)
     if (famer === null && career === null) return null
     const derbyBatter = famer === null ? modeBatterOf(career) : modeBatterOfHallOfFame(famer)
     // 겉모습도 그 기록의 생김새(+0xb: 폼 = 2×타입 + 손 · 피부)와 장비 니블이다 — 옛 명전 기록에 없으면 기본 그림
