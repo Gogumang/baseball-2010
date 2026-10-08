@@ -5,5 +5,5 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 export const LOADING_TIPS: readonly string[] = ORIGINAL_TIPS.slice(1, 1 + Number(ORIGINAL_TIPS[0]))
 
 export function pickLoadingTip(random: RandomPort): string {
-  return random.pick(LOADING_TIPS)
+  return LOADING_TIPS[random.rand(0, LOADING_TIPS.length)]
 }

@@ -6,7 +6,7 @@ import { useMissionSession } from '@/app/model/useMissionSession'
 import { CareerRoutes } from '@/app/ui/CareerRoutes'
 import { EntryRoutes } from '@/app/ui/EntryRoutes'
 import { MissionRoutes, PitcherAceMatchRoute } from '@/app/ui/MissionRoutes'
-import { createSeededRandom } from '@/shared/api/random/seededRandom'
+import { bootSeed, createSeededRandom } from '@/shared/api/random/seededRandom'
 import { createLocalStorageSaveGame } from '@/shared/api/save/localStorageSaveGame'
 import { createLocalStorageMissionRecord } from '@/shared/api/save/localStorageMissionRecord'
 import { createLocalStorageJsonStore } from '@/shared/api/save/localStorageJsonStore'
@@ -146,7 +146,8 @@ export function App() {
   const gameSettings = useGameSettings(settingsStore)
   // 소리 통로 하나 — 환경설정 칸(0~4) × 25 가 원본 소리 크기다 (옵션 +0x2e)
   const sound = useSound(gameSettings.settings.soundLevel)
-  const random = useMemo(() => createSeededRandom(Date.now() & 0x7fffffff), [])
+  // 부팅 씨앗 — 원본 0x2ed8 은 밀리초 시계의 아래 32비트 (저장 · 읽기 때 다시 세우기는 옮기지 않았다 — seededRandom 머리 주석)
+  const random = useMemo(() => createSeededRandom(bootSeed()), [])
   const [screen, setScreen] = useState<Screen>({ kind: '타이틀' })
   /** 게임시작 목록 커서 전역 [0x1552d24] — 장면 0x103 이 내려가도 남는다(관리 메뉴 취소로 하위 5 에 바로 서면 그 칸) */
   const gameStartCursor = useRef(createGameStartCursor()).current
