@@ -4,6 +4,7 @@ import type { EventStep } from '@/entities/story/model/eventScript'
 import { rewardsIn } from '@/entities/story/model/eventReward'
 import type { EventReward } from '@/entities/story/model/eventReward'
 import type { EventCommand, EventPortrait, OriginalEvent } from '@/shared/config/original/eventTypes'
+import { SYSTEM_YEAR_GOAL_WINDOW } from '@/pages/story/lib/yearGoalWindow'
 import { EMPTY_STORY_CARRY, mergeStoryCarry } from '@/entities/story/model/aceMatch'
 import type { StoryCarry } from '@/entities/story/model/aceMatch'
 
@@ -13,7 +14,7 @@ export type SystemCommand = Extract<EventCommand, { op: 'system' }>
 /**
  * 창을 띄우는 system 명령(3 타이틀 · 4 MVP 발표, 0x8cf64 → 0xd4ee4)에서 멈춘다 — `windowTextOf` 가 글을 주는 것만.
  * 이벤트 스크립트(`stepFrom`)는 system 0 만 멈추는 명령으로 보므로, 지나온 명령 가운데 첫 창 명령에서 끊고
- * 그 글을 실어 알림처럼 보여 준다. 다음 칸으로 넘기면 창 뒤 명령부터 이어 간다.
+ * 그 글을 실어 알림 창(0x74ef4 종류 1)으로 보여 준다. 다음 칸으로 넘기면 창 뒤 명령부터 이어 간다.
  */
 function stopAtWindow(step: EventStep, windowTextOf: ((command: SystemCommand) => string | null) | undefined): EventStep {
   if (windowTextOf === undefined) return step
@@ -102,11 +103,12 @@ export function useEventPlayback(
   const jump = (eventId: number) => setCursor(jumpToEvent(eventId))
   const clearPortraits = () => setPortraits([])
 
-  // 알림은 Enter/Space 로 넘긴다. 대사(say)는 대사 상자(`EventDialogueBox` — 키 0x8b804)가, 선택지는 메뉴가 키를 가져간다.
+  // 올해의 목표 창(system 1, 0x8d304 가 키 표에 OK −5 · '5' → 0 을 넣는다)은 Enter/Space 로 닫는다.
+  // 대사(say)는 대사 상자(`EventDialogueBox` — 키 0x8b804)가, 선택지는 메뉴가, 알림 · 예아니오(0x74ef4)는 공용 창(`MessageBox`)이 키를 가져간다.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      const op = stepRef.current.command?.op
-      if (op !== 'system') return
+      const command = stepRef.current.command
+      if (command?.op !== 'system' || command.sub !== SYSTEM_YEAR_GOAL_WINDOW) return
       if (event.key !== 'Enter' && event.key !== ' ') return
       if (event.target instanceof HTMLButtonElement) return
       event.preventDefault()

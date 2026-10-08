@@ -24,7 +24,7 @@ interface EventDialogueBoxProps {
   readonly slideIn: boolean
   /** 글 끝(단계 4)에서 확인 — 다음 명령으로 */
   readonly onAdvance: () => void
-  /** 키를 받는가 — 위에 다른 창이 떠 있으면 끈다 */
+  /** 키 · 누르기를 받는가 — 위에 다른 창이 떠 있거나 지금 명령이 say 가 아니면 끈다(0x8b804 는 say · 선택지 명령만 본다) */
   readonly isActive?: boolean
 }
 
@@ -98,7 +98,7 @@ export function EventDialogueBox({ raw, replacements = [], slideIn, onAdvance, i
       {/* 0xba19d 장식 — mode_ui 프레임 21 을 (W, 본체 위) */}
       <FrameSprite folder={MODE_UI} frame={EVENT_DIALOGUE.ornamentFrame} origins={origins} x={SCREEN_WIDTH} y={boxTop} />
       <button type="button" className={styles.hit} aria-label="대사 넘기기"
-        style={{ height: height + EVENT_DIALOGUE.bandHeight }} onClick={press} />
+        style={{ height: height + EVENT_DIALOGUE.bandHeight }} onClick={isActive ? press : undefined} />
       {lines.map((line, index) => (
         <div key={state.firstLine + index} className={styles.textLine} data-part="글줄"
           style={{

@@ -163,11 +163,12 @@ describe('StoryScreen — system 3·4 발표 창 (0x8cf64 → 0x8b3bc · 0x8b23c
         systemWindowTextOf={(command) => (command.sub === 3 ? '!C[홈런왕] 선정!N서울 드래곤즈 테스트' : null)}
       />,
     )
-    const 대사창 = () => within(container).getByRole('button')
     대사넘기기()
-    expect(대사창().textContent).toContain('홈런왕')
+    // 0x8d404 — 공용 알림 창 0x74ef4(…, 종류 1): 대사 상자 밖 공용 판에 글 · [OK] 하나
+    const 창 = within(container).getByRole('dialog')
+    expect(창.textContent).toContain('홈런왕')
     expect(끝).toHaveLength(0)
-    fireEvent.click(대사창())
+    fireEvent.click(within(창).getByRole('button', { name: 'OK' }))
     expect(끝).toHaveLength(1)
     expect(끝[0].rewards).toHaveLength(2)
   })
@@ -187,6 +188,84 @@ describe('StoryScreen — system 3·4 발표 창 (0x8cf64 → 0x8b3bc · 0x8b23c
     void container
     대사넘기기()
     expect(끝).toHaveLength(1)
+  })
+})
+
+describe('system 0 알림 · 예아니오 — 공용 창 0x74ef4 (0x8d288 · 0x8d426)', () => {
+  const 띄우기 = (events: readonly OriginalEvent[]) => {
+    const 끝: number[] = []
+    render(
+      <StoryScreen events={events} event={events[0]} playerName="테스트" teamName="드래곤즈"
+        onComplete={() => 끝.push(1)} onMatch={() => {}} />,
+    )
+    return 끝
+  }
+
+  it('알림은 대사 상자 밖 공용 창 — 앞 say 상자는 글을 남긴 채 밑에 그려지고, 키는 창 것이다', () => {
+    const 알림이벤트 = {
+      ...이벤트,
+      commands: [
+        { op: 'say', text: '아이템을 볼까?', speaker: 0, format: 0, portraits: [] },
+        { op: 'sound', id: 52 },
+        { op: 'system', sub: 0, arg: 197, text: '!C하단 다섯 번째에 위치한!N아이템' },
+      ],
+    } as unknown as OriginalEvent
+    const 끝 = 띄우기([알림이벤트])
+    대사넘기기()
+    const 창 = screen.getByRole('dialog')
+    expect(창.textContent).toContain('아이템')
+    expect(within(창).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual(['OK'])
+    // 0x8b5ac 는 창이 떠 있어도 0x7fbc4 로 앞 say 를 그린다 — 다시 오르지도, 글을 다시 찍지도 않는다
+    expect(대사글()).toContain('아이템을 볼까?')
+    expect(screen.getByTestId('대사-상자').querySelector('[data-part="본체"]')?.getAttribute('height')).toBe('55')
+    틀(10)
+    expect(screen.getAllByTestId('대사-상자')[0].querySelector('[data-part="글줄"]')?.textContent).toBe('아이템을 볼까?')
+    expect(끝).toHaveLength(0)
+    // 상자 넘기기 단추는 지금 명령이 say 가 아니라 아무 일도 없다(0x8b804) — 창의 확인만 닫는다
+    fireEvent.click(screen.getByRole('button', { name: '대사 넘기기' }))
+    expect(끝).toHaveLength(0)
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(끝).toHaveLength(1)
+  })
+
+  it('예아니오는 [예] · [아니오] 그림 버튼 — 처음 커서는 [예], 답대로 그 이벤트로 간다 (0x8d954)', () => {
+    const 질문 = {
+      ...이벤트,
+      commands: [
+        { op: 'say', text: '갈래?', speaker: 0, format: 0, portraits: [] },
+        { op: 'yesno', text: '정말 갈까요?', yesEvent: 2, noEvent: 3 },
+      ],
+    } as unknown as OriginalEvent
+    const 예 = { ...이벤트, id: 2, commands: [{ op: 'say', text: '예를 골랐다', speaker: 0, format: 0, portraits: [] }] } as unknown as OriginalEvent
+    const 아니오 = { ...이벤트, id: 3, commands: [{ op: 'say', text: '아니오를 골랐다', speaker: 0, format: 0, portraits: [] }] } as unknown as OriginalEvent
+    띄우기([질문, 예, 아니오])
+    대사넘기기()
+    const 창 = screen.getByRole('dialog')
+    expect(창.textContent).toContain('정말 갈까요?')
+    expect(대사글()).toContain('갈래?')
+    const 버튼 = within(창).getAllByRole('button')
+    expect(버튼.map((button) => button.getAttribute('aria-label'))).toEqual(['예', '아니오'])
+    // 고른 칸은 주황 그림 6 — 0x749d5 를 안 불러 첫 버튼
+    expect(버튼[0].querySelector('img')?.getAttribute('src')).toContain('006.png')
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    틀(200)
+    expect(대사글()).toContain('아니오를 골랐다')
+  })
+
+  it('예아니오 취소(CLR)는 [아니오] (0x7514a — 키 −16 → 1)', () => {
+    const 질문 = {
+      ...이벤트,
+      commands: [{ op: 'yesno', text: '정말?', yesEvent: 2, noEvent: 3 }],
+    } as unknown as OriginalEvent
+    const 아니오 = { ...이벤트, id: 3, commands: [{ op: 'say', text: '취소', speaker: 0, format: 0, portraits: [] }] } as unknown as OriginalEvent
+    띄우기([질문, 아니오])
+    // 앞 say 가 없으면 상자도 없다 — 0x7fbc4 는 상자 글 길이 0 이면 그리지 않는다(0x7fbe0)
+    expect(screen.queryByTestId('대사-상자')).toBeNull()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    틀(200)
+    expect(대사글()).toContain('취소')
   })
 })
 

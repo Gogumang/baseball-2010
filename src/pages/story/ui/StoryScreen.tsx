@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { Hint, MarkupText, MenuList } from '@/shared/ui'
+import { MenuList } from '@/shared/ui'
 import type { MenuItem } from '@/shared/ui'
-import { dialogueButton } from '@/shared/ui/DialogueBox/DialogueBox.css'
+import { MessageBox } from '@/shared/ui/MessageBox/MessageBox'
 import { SPEAKER_NAMES } from '@/shared/config/original/eventMeta'
 import type { OriginalEvent } from '@/shared/config/original/eventTypes'
 import type { EventReward } from '@/entities/story/model/eventReward'
@@ -25,6 +25,20 @@ import type { EventBackdropState } from '@/pages/story/lib/eventBackdrop'
 const PLAYER_SPEAKER = 1
 /** 대사 fmt 9 는 %s 자리에 팀 이름을 넣는다 (그 밖에는 선수 이름). */
 const TEAM_NAME_FORMAT = 9
+
+/**
+ * 공용 알림 · 질문 창 0x74ef4(창 [0x140005c], 글 [mgr+0xba], 종류, 0, 0, 0) 의 버튼 — 화면에는 `ui/popup.pzx` 그림이 나간다.
+ * 종류 1(알림)은 프레임 0 "OK" 하나 · 종류 2(예아니오)는 1 "예" · 2 "아니오"(0x750f8~0x75140).
+ */
+const NOTICE_BUTTONS = ['OK'] as const
+const YES_NO_BUTTONS = ['예', '아니오'] as const
+
+/** 0x8b5ac 가 틀마다 0x7fbc4 로 그리는 마지막 say — 대사 상자 객체의 글([dlg+0xa8])은 다음 say · 선택지가 쓸 때까지 남는다 */
+interface ShownSay {
+  readonly key: string
+  readonly raw: string
+  readonly replacements: readonly string[]
+}
 
 interface StoryScreenProps {
   readonly events: readonly OriginalEvent[]
@@ -127,12 +141,23 @@ export function StoryScreen({
   const replacements =
     replacementsFor?.(step.cursor.eventId) ??
     (command?.op === 'say' && command.format === TEAM_NAME_FORMAT ? [teamName] : [playerName, teamName])
-  // say 는 재생기 대사 상자(`EventDialogueBox`)가 그린다 — 여기 글은 예아니오 · 알림 창 글
-  const dialogue = command?.op === 'yesno' ? command.text : command?.op === 'system' ? (command.text ?? '') : ''
   /** 이 재생에서 say 를 이미 그렸는가 — 첫 say 만 상자가 올라온다 (114 진입 0x8be20 이 [mgr+0x2c0] = 0, 0x8d1f2 가 1) */
   const hasShownSayRef = useRef(false)
   const isFirstSay = command?.op === 'say' && !hasShownSayRef.current
   const isSayRising = isFirstSay || (command?.op === 'say' && isRisePendingRef.current)
+  // system · 예아니오는 대사 상자의 글을 건드리지 않는다 — 0x8b924 는 관리자 버퍼 [mgr+0xba] 에 쓰고(say 글은 0x7b818 이
+  // 돌려주는 상자 쪽 글 0xbc965), 0x8b5ac 는 창이 떠 있는 동안에도 틀마다 0x7fbc4 로 앞 say 상자를 그린다.
+  const lastSayRef = useRef<ShownSay | null>(null)
+  if (command?.op === 'say') {
+    lastSayRef.current = {
+      key: `${step.cursor.eventId}:${step.cursor.commandIndex}`,
+      raw: `${speakerPrefixOf(speakerName)}${command.text}`,
+      replacements,
+    }
+  }
+  // 선택지(0x8d22c)는 0x8ba2c 로 상자 글을 선택지 줄로 바꾼다 — 웹은 선택지를 따로 그리므로 앞 say 를 잊는다.
+  // ⚠️ 미해결: 선택지 뒤 say 없이 창이 뜨면 원본은 상자에 선택지 줄을 남긴다 — 원본 데이터에는 그런 차례가 없다.
+  if (command?.op === 'choice') lastSayRef.current = null
   useEffect(() => {
     if (command?.op !== 'say') return
     hasShownSayRef.current = true
@@ -142,14 +167,17 @@ export function StoryScreen({
   const menu: MenuItem[] | null =
     command?.op === 'choice'
       ? command.choices.map((choice) => ({ id: String(choice.gotoEvent), label: stripGameMarkup(choice.text) }))
-      : command?.op === 'yesno'
-        ? [
-            { id: String(command.yesEvent), label: '예' },
-            { id: String(command.noEvent), label: '아니오' },
-          ]
-        : null
-  const isDialogue = command?.op === 'system'
+      : null
   const isYearGoalWindow = command?.op === 'system' && command.sub === SYSTEM_YEAR_GOAL_WINDOW && yearGoalWindowOf !== undefined
+  /**
+   * 0x8cf64 명령 2(system) 하위 0(0x8b924) · 3(0x8b3bc) · 4(0x8b23c) · 5(0x8b1b8) 는 글을 [mgr+0xba] 에 채워 공용 창
+   * 0x74ef4(…, 종류 1) 을 띄운다(0x8d404~0x8d414). 명령 3(예아니오, 0x8d426) 은 하위 0 일 때만 0x8b924 → 0x74ef4(…, 종류 2).
+   * 창은 대사 상자 밖 — 화면 가운데 공용 판이다(`MessageBox`). 창이 닫히면(0x8d91c · 0x8d954 → [창+9] == 0 → 0x8dac2) 다음 명령.
+   */
+  const noticeText = command?.op === 'system' && !isYearGoalWindow ? (command.text ?? null) : null
+  // 앞 say 상자는 창 밑에 남는다 — 키는 창 것이다(0x8b804 는 지금 명령이 say · 선택지일 때만 받는다)
+  const shownSay =
+    command?.op === 'say' || command?.op === 'yesno' || noticeText !== null || isYearGoalWindow ? lastSayRef.current : null
 
   return (
     <div className={styles.overlay}
@@ -170,25 +198,31 @@ export function StoryScreen({
           skinIndex={skinIndex} battingTypeIndex={battingTypeIndex} />
       </div>
 
-      {command?.op === 'say' && (
-        <EventDialogueBox key={`${step.cursor.eventId}:${step.cursor.commandIndex}:${dialogueResets}`}
-          raw={`${speakerPrefixOf(speakerName)}${command.text}`} replacements={replacements}
-          slideIn={isSayRising} onAdvance={next} />
-      )}
-
-      {dialogue !== '' && (
-        <button type="button" className={dialogueButton} onClick={isDialogue ? next : undefined}>
-          <MarkupText raw={dialogue} replacements={replacements} />
-        </button>
+      {shownSay !== null && (
+        <EventDialogueBox key={`${shownSay.key}:${dialogueResets}`}
+          raw={shownSay.raw} replacements={shownSay.replacements}
+          slideIn={isSayRising} onAdvance={next} isActive={command?.op === 'say'} />
       )}
 
       {isYearGoalWindow && <YearGoalWindow values={yearGoalWindowOf()} onClose={next} />}
 
-      {menu !== null ? (
+      {noticeText !== null && (
+        // 0x74ef4 종류 1 — 알림. CLR 도 0(0x751c2~0x751ec: 키 −16 → 0)
+        <MessageBox key={`${step.cursor.eventId}:${step.cursor.commandIndex}`}
+          text={noticeText} buttons={NOTICE_BUTTONS} onAnswer={next} />
+      )}
+
+      {command?.op === 'yesno' && (
+        // 0x74ef4 종류 2 — 0x749d5 를 안 불러 처음 커서는 [예]. CLR 은 1 [아니오](0x7514a~0x75174: 키 −16 → 1).
+        // 답 0 → [mgr+0x2bc] = 예 이벤트([명령+8]) · 1 → 아니오 이벤트([명령+0xa]) (0x8d954~0x8d9a2)
+        <MessageBox key={`${step.cursor.eventId}:${step.cursor.commandIndex}`}
+          text={command.text} buttons={YES_NO_BUTTONS}
+          onAnswer={(answer) => jump(answer === 0 ? command.yesEvent : command.noEvent)} />
+      )}
+
+      {menu !== null && (
         // 원본 선택지는 대사 창 안 글줄이라 화살표·판이 없고 고른 줄만 노랑이다 (0x7fd22, R14 3-4)
         <MenuList items={menu} cursorStyle="선택지" onSelect={(id) => jump(Number(id))} />
-      ) : command?.op === 'say' ? null : (
-        <Hint>대사창을 누르거나 Enter</Hint>
       )}
 
       {effect?.overlay != null && (
