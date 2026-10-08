@@ -106,7 +106,15 @@ describe('rewardNoticeOf — 보상 알림 글 0x8beb8', () => {
     expect(rewardNoticeOf([{ kind: 0, value: 10 }], 396, 맥락({ years: 1, mode: 2 })).notice).toMatchObject({ text: '!C인기도 + 0' })
   })
 
-  it('첫 종류 7 은 창 없음 · 21 은 엔딩 (0x8d4c4 · 0x8d70e)', () => {
+  it('첫 종류 7 은 0x62368 의 히든 오픈 알림 창 · 21 은 엔딩 (0x8d4c4 · 0x8d70e · 0x8c60e)', () => {
+    // 0x62368(전역, |값|, 1) — id 로 글이 갈린다(모드와 상관없이): 19~34 투수편 · 35~50 타자편
+    expect(rewardNoticeOf([{ kind: 7, value: 43 }], 304, 맥락()).notice).toEqual({
+      kind: '알림', text: expect.stringMatching(/^히든 아이템 오픈!! \[.+\] 나만의리그 타자편에서 사용가능합니다$/),
+    })
+    expect(rewardNoticeOf([{ kind: 7, value: 29 }], 307, 맥락({ mode: 3 })).notice).toEqual({
+      kind: '알림', text: expect.stringMatching(/^히든 아이템 오픈!! \[.+\] 나만의리그 투수편에서 사용가능합니다$/),
+    })
+    // 웹이 글을 못 짓는 id(≤ 12 — 데이터에 없다)는 창 없이 지나간다
     expect(rewardNoticeOf([{ kind: 7, value: 3 }], 1, 맥락()).notice).toEqual({ kind: '없음' })
     expect(rewardNoticeOf([{ kind: 21, value: 0 }], 500, 맥락()).notice).toEqual({ kind: '엔딩' })
   })

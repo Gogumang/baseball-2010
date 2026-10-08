@@ -6,6 +6,8 @@ import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { ORIGINAL_ITEMS } from '@/shared/config/original/items'
 import { ORIGINAL_SKILLS } from '@/shared/config/original/skills'
 import { pitchTypeNameOf } from '@/entities/pitcher-career/model/pitchTraining'
+import { hiddenOpenTextOf } from '@/entities/career/model/equipment'
+import { pitcherHiddenOpenTextOf } from '@/entities/pitcher-career/model/pitcherEquipment'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 
@@ -17,7 +19,9 @@ import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
  *          이벤트 393 · 394 · 395 · 396 이면 연차 보정을 명령 값에 **덮어 쓴다**(0x8d508~0x8d69c, y = [[mgr+0x2fc]+0x33])
  *          0x8beb8(mgr, 명령) — 글을 [mgr+0xba] 에 짓는다(아래). 종류 11 은 여기서 굴린다
  *          첫 종류 == 4 → 0x1552af4 = 글 · 0x741a1(창, 높이 0x64, 그리기 값 > 0 ? 0x8e0b1(획득) : 0x8e0a5(제거), 키 0x8e081, mgr)
- *          첫 종류 == 7 → 창 없음 (0x8c460 의 종류 7 0x8c60e 가 0x62368 로 히든 오픈 알림을 띄운다)
+ *          첫 종류 == 7 → 이 명령은 창을 안 세운다 — 곧이어 0x8c460 의 종류 7(0x8c60e)이 0x62368(전역, |값|, 1)로
+ *                         **같은 공용 창** [0x140005c] 에 히든 오픈 알림을 띄운다(0x6249e 0x74ef5(창, 글, 종류 1, 0, 0) — OK 하나).
+ *                         기다림 0x8daa0 은 그 창의 답을 기다린다 → 알림 창으로 다룬다(`HIDDEN_OPEN_KIND`)
  *          그 밖      → 0xbbef8([mgr+0xba], 1, 1, 1) → 0x74ef4(창, 글, 종류 1(알림), …) · [창+0x248] = 1
  *          0x8c460(mgr, 명령) — 보상을 **그 자리에서** 준다(창을 띄운 뒤, 같은 갱신)
  * 기다림  0x8daa0: 창이 떠 있고 답이 0 · 0x14 면 답 = −1 · [mgr+8] = 1 → 다음 명령. 창이 없으면 그대로 기다린다.
@@ -64,7 +68,7 @@ export type RewardNotice =
   | { readonly kind: '알림'; readonly text: string }
   /** 0x741a0 — 그리기 0x87108(img_text 370 획득 / 371 제거 + 글) */
   | { readonly kind: '스킬'; readonly text: string; readonly gained: boolean }
-  /** 첫 종류 7 — 이 명령은 창을 안 띄운다(히든 오픈 알림은 보상 0x62368 몫) */
+  /** 첫 종류 7 인데 0x62368 글을 웹이 못 짓는 id(≤ 12 · ≥ 51 — 데이터에 없다) — 창 없이 지나간다(⚠️ 미해결) */
   | { readonly kind: '없음' }
   /** 첫 종류 21 — 엔딩(0x8d4c4), 글 · 창 없음 */
   | { readonly kind: '엔딩' }
@@ -217,8 +221,28 @@ export function rewardNoticeOf(items: readonly EventReward[], eventId: number, c
   if (first === SKILL_KIND) {
     return { notice: { kind: '스킬', text: built.text, gained: (adjusted[0]?.value ?? 0) > 0 }, items: resolved }
   }
-  if (first === HIDDEN_OPEN_KIND) return { notice: { kind: '없음' }, items: resolved }
+  if (first === HIDDEN_OPEN_KIND) {
+    const text = hiddenOpenNoticeTextOf(items)
+    return { notice: text === null ? { kind: '없음' } : { kind: '알림', text }, items: resolved }
+  }
   return { notice: { kind: '알림', text: built.text }, items: resolved }
+}
+
+/**
+ * **첫 종류 7 의 창 글** — 0x8c460 이 항목마다 종류 7 이면 0x62368(전역, |값|, 1)을 부른다. 셋째 인자 1 이라 이미 열렸는지
+ * (0x61f5c)를 안 보고 **늘** 공용 창을 띄운다(R13 11절). 글은 StrCOMMON[139] "히든 아이템 오픈!! [이름]" + 쓰는 곳 줄
+ * (id 13~18 [141] 시즌 · 19~34 [142] 투수편 · 35~50 [143] 타자편, 0x62420~0x62480) — 모드와 상관없이 id 로 갈린다
+ * (투수편 장소 이벤트 304 · 305 의 타자 id 도 타자편 글). 글은 상점 알림과 같은 웹 글(`pitcherHiddenOpenTextOf` ·
+ * `hiddenOpenTextOf`)을 쓴다.
+ * 한 명령에 종류 7 이 여럿이면 0x62368 이 같은 창을 차례로 다시 세워 **마지막 것**이 남는다(유력 — 데이터의 종류 7 명령
+ * 304 · 305 · 306 · 307 은 모두 한 항목이라 겉으로 갈리지 않는다). 웹이 글을 못 짓는 id 면 null.
+ */
+function hiddenOpenNoticeTextOf(items: readonly EventReward[]): string | null {
+  const opened = items.filter((item) => item.kind === HIDDEN_OPEN_KIND)
+  const last = opened[opened.length - 1]
+  if (last === undefined) return null
+  const id = Math.abs(last.value)
+  return pitcherHiddenOpenTextOf(id) ?? hiddenOpenTextOf(id)
 }
 
 /** 알림 글이 읽는 선수 칸 — 나리 타자편 `PlayerCareer` · 투수편 `PitcherCareer` 가 같은 이름으로 든다 */

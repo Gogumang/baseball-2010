@@ -820,7 +820,7 @@ describe('StoryScreen — 보상은 명령마다 그 자리에서 준다 (0x8d4c
     expect(onComplete).toHaveBeenCalledWith([], [1])
   })
 
-  it('창이 없는 보상(첫 종류 7)도 주고 곧바로 넘긴다 — 뒤 보상의 글은 앞 보상을 준 뒤 값을 읽는다', () => {
+  it('첫 종류 7 은 0x62368 의 히든 오픈 알림 창을 그 명령이 기다린다 — 뒤 보상의 글은 앞 보상을 준 뒤 값을 읽는다', () => {
     const 보상이벤트 = {
       ...이벤트,
       commands: [
@@ -833,12 +833,21 @@ describe('StoryScreen — 보상은 명령마다 그 자리에서 준다 (0x8d4c
     const onReward = vi.fn((items: readonly { kind: number; value: number }[]) => {
       if (items[0]?.kind === 7) salaryBase = 100
     })
+    const onComplete = vi.fn()
     render(<StoryScreen events={[보상이벤트]} event={보상이벤트} playerName="테스트" teamName="드래곤즈"
-      onComplete={() => {}} onMatch={() => {}} onReward={onReward}
+      onComplete={onComplete} onMatch={() => {}} onReward={onReward}
       rewardNoticeContext={() => ({ mode: 4, years: 0, illness: 0, salaryBase, random: 고정난수 })} />)
+    // 0x8c60e → 0x62368(전역, 19, 1) — 이미 열렸는지 안 보고 늘 공용 창(종류 1). id 19 는 투수편 글이다(모드와 상관없이)
+    expect(onReward.mock.calls.map(([items]) => items)).toEqual([[{ kind: 7, value: 19 }]])
+    const 히든창 = screen.getByRole('dialog', { name: '알림' })
+    expect(히든창.textContent).toContain('히든 아이템 오픈!!')
+    expect(히든창.textContent).toContain('나만의리그 투수편에서 사용가능합니다')
+    // 기다림 0x8daa0 — 답(OK)을 받은 그 갱신에 다음 명령
+    fireEvent.click(within(히든창).getByRole('button', { name: 'OK' }))
     expect(onReward.mock.calls.map(([items]) => items)).toEqual([[{ kind: 7, value: 19 }], [{ kind: 20, value: 0 }]])
     // 연봉 100 × 1.3 = 130 → "13000만" (앞 보상 전 값 10 이면 1300만)
     expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain('연봉 13000만 결정!')
+    expect(onComplete).not.toHaveBeenCalled()
   })
 
   it('보상을 준 뒤에도 끝 · 경기로 넘기는 보상은 비어 있다 — 결과 이벤트로 이어도 다시 안 준다', () => {

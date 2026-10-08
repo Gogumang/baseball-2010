@@ -1661,8 +1661,8 @@ export function usePitcherLeagueSession(
   /**
    * 보상 명령 하나를 그 자리에서 준다 — 0x8c460 모드 3 갈래(`applyPitcherEventRewards`, 연말 사슬은 `finishPitcherYearEndEvent`).
    * 이벤트 번호는 그 명령이 든 이벤트다 — 연차 보정 0x8d508(393~396) · 중간평가 비트 0x8cbaa(452~454)가 [mgr] 의 지금 이벤트를 본다.
-   * G 보상(종류 10)은 한 줄마다 0x8c6e2 `0x22c7d(값, 모드 3)` 로 적는다. 종류 7 의 히든 오픈 알림(0x62368)은 재생이 끝나 105 에서
-   * 띄운다(⚠️ 근사 — 원본은 이 명령이 그 창을 기다린다). 저장은 하지 않는다 — 0x7fe90 · 재생 끝이 저장한다.
+   * G 보상(종류 10)은 한 줄마다 0x8c6e2 `0x22c7d(값, 모드 3)` 로 적는다. 종류 7 의 히든 오픈 알림(0x62368 → 공용 창)은 재생
+   * 화면이 그 명령의 알림 창으로 띄우고 확인까지 기다린다(`rewardNoticeOf` — 기다림 0x8daa0). 저장은 하지 않는다 — 0x7fe90 · 재생 끝이 저장한다.
    */
   const giveStoryReward = useCallback(
     (items: readonly EventReward[], eventId: number) => {
@@ -1673,8 +1673,6 @@ export function usePitcherLeagueSession(
       items
         .filter((reward) => reward.kind === EVENT_REWARD_KIND.G포인트)
         .forEach((reward) => recordStat({ kind: 'G획득', mode: PITCHER_LEAGUE_MODE, amount: reward.value }))
-      const hiddenNotice = hiddenOpenNoticeOf(items)
-      if (hiddenNotice !== '') setStoryNotice((shown) => (shown === '' ? hiddenNotice : `${shown}!N${hiddenNotice}`))
       setCareer(rewarded)
     },
     [career, random, recordStat, story],
