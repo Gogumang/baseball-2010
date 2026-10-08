@@ -243,7 +243,7 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
     return (
       <PitchTrainingScreen
         career={career}
-        onTrained={menu.saveTrainedPitch}
+        onTrain={menu.trainPitch}
         onClose={menu.closeWindow}
       />
     )

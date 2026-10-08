@@ -124,8 +124,8 @@ export const HIDDEN_PITCH_EVENTS: readonly {
  */
 
 /**
- * **아직 못 채운 것**: 구질 훈련 횟수 표(StrMODE[89] "%d/%d회")는 해독 문서에 값이 없다 (J 3-2 미해결).
- * 값을 지어내지 않고 자리만 비워 둔다.
+ * 구질 훈련 횟수 표(StrMODE[89] "%d/%d회")는 훈련 적용 0xa3bac 종류 5 의 `0xd80de` [2, 4, 5] 다(열/2 — 직접 떴다,
+ * `pitchTraining.applyPitchTypeTraining`).
  *
  * (등록 시작 능력치 표는 **있다** — C-4 의 `0xcc3f2`: 선발 [10,10,10,20]·구원 [12,12,12,10] ×10,
  * 타입 보너스 +30. `pitcherRegistration.ts` 가 쓴다. 예전에 "없다" 고 적혀 있던 것을 바로잡았다.)

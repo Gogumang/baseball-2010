@@ -10,8 +10,6 @@ import {
   pitchTrainingCostOf,
   pitchTrainingGateOf,
   pitchTypeNameOf,
-  pitchTypeNumberOf,
-  trainPitchType,
 } from '@/entities/pitcher-career/model/pitchTraining'
 import * as styles from '@/pages/pitcher-league/ui/PitchTrainingScreen.css'
 
@@ -22,14 +20,14 @@ import * as styles from '@/pages/pitcher-league/ui/PitchTrainingScreen.css'
  * 칸을 고르면 원본 가드 순서를 그대로 탄다: 이미 가진 구질·단계 초과는 **아무 말 없이 무시**,
  * 히든 미오픈 StrMODE[67] · 선행 미완 [68] · G 부족 [65] · 그 밖은 [66] 확인 상자.
  *
- * ⚠️ 훈련 **횟수**(StrMODE[89] "해당 구질 %d/%d회 훈련") 표는 해독 문서에 없다 (J 3-2 미해결) —
- * 한 번에 배우는 것으로 둔다.
+ * [예] 는 125 의 훈련 한 번이다 — 필요 횟수(0xd80de [2, 4, 5])가 차야 단계가 오르고 훈련마다 G 를 낸다
+ * (`runPitchTypeTraining`). 창은 떠나 105 로 가므로 결과 알림은 관리 화면이 띄운다.
  */
 
 interface PitchTrainingScreenProps {
   readonly career: PitcherCareer
-  /** 배운 뒤의 커리어를 돌려준다 */
-  readonly onTrained: (career: PitcherCareer) => void
+  /** 확인 [예] — 그 칸을 한 번 훈련한다 (`usePitcherManagementMenu.trainPitch`) */
+  readonly onTrain: (row: number, column: number) => void
   readonly onClose: () => void
 }
 
@@ -40,7 +38,7 @@ const BLOCK_TEXT: Readonly<Record<number, string>> = {
   [PITCH_TRAINING_TEXT.notEnoughPoints]: 'G포인트가 부족합니다',
 }
 
-export function PitchTrainingScreen({ career, onTrained, onClose }: PitchTrainingScreenProps) {
+export function PitchTrainingScreen({ career, onTrain, onClose }: PitchTrainingScreenProps) {
   const [notice, setNotice] = useState('')
   const [asking, setAsking] = useState<{ row: number; column: number; cost: number } | null>(null)
 
@@ -95,9 +93,7 @@ export function PitchTrainingScreen({ career, onTrained, onClose }: PitchTrainin
             const chosen = asking
             setAsking(null)
             if (index !== 0) return
-            const trained = trainPitchType(career, chosen.row, chosen.column)
-            setNotice(`${pitchTypeNameOf(pitchTypeNumberOf(chosen.row, chosen.column))} 을(를) 배웠습니다`)
-            onTrained(trained)
+            onTrain(chosen.row, chosen.column)
           }}
         />
       )}

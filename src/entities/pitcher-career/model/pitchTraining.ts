@@ -19,7 +19,8 @@ import { HIDDEN_PITCH_EVENTS } from '@/entities/pitcher-career/model/pitcherAbil
  * ```
  * 히든 열이 보상 종류 6 의 값 v(행)와 맞는다 — 0x8beb8 이 표 0xd4e40 = [18, 19, 20, 21] 로 v → 이름을 고르고(J 3-3 의
  * 대사 이름: 33 v 0 자이로볼 · 30 v 1 파워싱커 · 31 v 2 파워슬라이더 · 32 v 3 너클볼), 0x8c5da 가 선수[0x204 + v] 로 행을 연다.
- * 칸 상태는 `커리어+0x208 + (행·2 + 열%2)·4 + 1` = **단계**(0 없음 · 1 기본 습득 · 2 상위 습득),
+ * 칸 상태는 `커리어+0x208 + (행·2 + 열%2)·4 + 1` = **단계**(0 없음 · 1 기본 습득 · 2 상위 습득 · 히든을 마치면 3),
+ * `+0x208 + 칸·4 + 0` = 그 칸의 **훈련 횟수**(`applyPitchTypeTraining`),
  * 히든 오픈은 `커리어+0x204+행` 이다. 등록에서 고른 기본 변화구 두 개가 그 칸의 단계 1 이다 (J 3-1).
  */
 
@@ -143,26 +144,76 @@ export function pitchTrainingGateOf(career: PitcherCareer, row: number, column: 
   return { kind: '확인', cost, textIndex: PITCH_TRAINING_TEXT.confirm }
 }
 
+/** 필요 훈련 횟수 `0xd80de` s8 [2, 4, 5] 를 **열/2** 로 고른다 (창 글 0x18484 는 같은 값의 `0xcc362` 를 본다) */
+const REQUIRED_SESSIONS: readonly number[] = [2, 4, 5]
+/** G 상한 — 0xa3d42 리터럴 0x1869f */
+const MAXIMUM_GAME_POINT = 99_999
+
+export function pitchTrainingRequiredSessionsOf(column: number): number {
+  return REQUIRED_SESSIONS[Math.trunc(column / 2)] ?? 0
+}
+
 /**
- * 확인에서 [예] — 구질을 배운다.
- *
- * 열0·1 은 칸 단계를 1 로, 열2·3 은 2 로 올린다. **열4(히든)는 단계 칸을 건드리지 않는다** —
- * 히든은 칸이 아니라 계열 플래그(+0x204+행)로 관리되고, 단계를 올리는 줄이 문서에 없다.
- *
- * 훈련 **횟수**(StrMODE[89] "해당 구질 %d/%d회 훈련") 표는 아직 못 찾았다 (J 3-2 미해결) —
- * 한 번에 배우는 것으로 둔다. 횟수 표가 나오면 `sessions` 를 여기에 붙이면 된다.
+ * 횟수 · 단계를 쌓는 칸 — 열%2 칸, 단 **열 4(히든)는 그 행 cell0 단계가 2 가 아니면(≤ 1) cell1** 이다
+ * (훈련 적용 0xa3cdc~0xa3cfa · 창 글 0x18454~0x18472 가 같은 식). 가드(0x17980)는 이 보정 없이 열%2 칸을 본다.
  */
-export function trainPitchType(career: PitcherCareer, row: number, column: number): PitcherCareer {
+export function pitchTrainingProgressCellOf(career: PitcherCareer, row: number, column: number): number {
+  if (column === HIDDEN_PITCH_COLUMN && (career.pitchTrainingStages[row * 2] ?? 0) <= 1) return row * 2 + 1
+  return pitchTrainingCellOf(row, column)
+}
+
+/** 칸의 훈련 횟수 — `커리어+0x208 + 칸·4` (s8). 옛 저장에는 칸이 없어 0 */
+export function pitchTrainingCountOf(career: PitcherCareer, cell: number): number {
+  return career.pitchTrainingCounts?.[cell] ?? 0
+}
+
+export interface PitchTrainingProgress {
+  /** 적용 뒤 칸의 횟수 (다 차면 0 으로 돌아간다) */
+  readonly sessions: number
+  readonly required: number
+  /** 적용 뒤 단계 > 열/2 — 창 글이 StrMODE[88] "구질 훈련 완료!" 로 간다 (0x184a6) */
+  readonly isLearned: boolean
+}
+
+/** s8 칸 (ldrsb · strb) */
+const toInt8 = (value: number) => ((value & 0xff) << 24) >> 24
+
+/**
+ * 확인에서 [예] → 125 → 훈련 0x17f5c 의 탭 2 갈래(0x1836a) → **훈련 적용 0xa3bac 종류 5**(0xa3cc8~0xa3d76, 직접 떴다):
+ * ```
+ * a3cca  필요 = 0xd80de[열/2] · 비용 = 0xd80d8[열/2] (s16 −300 · −600 · −1000)
+ * a3cdc  칸 = 행·2 + 열%2 (열 4 는 cell0 단계 ≤ 1 이면 cell1)
+ * a3d0c  횟수 = min(횟수 + 1, 필요) ; 횟수 == 필요면 횟수 = 0 · 단계 += 1
+ * a3d3e  G = clamp(G + 비용, 0, 99999) → 전역 저장 · 0x22c29(모드 4 ? 1 : 2, |비용|)
+ * ```
+ * 곧 **한 번에 배우지 않는다** — 필요 횟수만큼 훈련해야 단계가 오르고, 훈련마다 G 를 낸다. 보유 마스크 `+0x1c` 는
+ * 건드리지 않는다(경기 구질은 123 창 탭 2 가 마스크에 켠다 — `pitchSelection`). 사기 · 행동 · 훈련 수는
+ * `runPitchTypeTraining`(0x17f5c 의 나머지)이 맡는다.
+ */
+export function applyPitchTypeTraining(
+  career: PitcherCareer,
+  row: number,
+  column: number,
+): { readonly career: PitcherCareer; readonly progress: PitchTrainingProgress } {
   const gate = pitchTrainingGateOf(career, row, column)
   if (gate.kind !== '확인') throw new Error(`구질 훈련을 할 수 없는 칸입니다 (행 ${row} 열 ${column})`)
-  const typeNumber = pitchTypeNumberOf(row, column)
+  const required = pitchTrainingRequiredSessionsOf(column)
+  const cell = pitchTrainingProgressCellOf(career, row, column)
+  const counts = Array.from({ length: career.pitchTrainingStages.length }, (_, index) => pitchTrainingCountOf(career, index))
   const stages = [...career.pitchTrainingStages]
-  if (column !== HIDDEN_PITCH_COLUMN) stages[pitchTrainingCellOf(row, column)] = Math.trunc(column / 2) + 1
-  return {
+  const counted = toInt8(Math.min(toInt8(counts[cell] + 1), required))
+  const isFilled = counted === required
+  counts[cell] = isFilled ? 0 : counted
+  if (isFilled) stages[cell] = toInt8((stages[cell] ?? 0) + 1)
+  const trained: PitcherCareer = {
     ...career,
-    gamePoint: Math.max(0, career.gamePoint - gate.cost),
-    pitchMask: career.pitchMask | (1 << (typeNumber - 1)),
+    gamePoint: Math.min(MAXIMUM_GAME_POINT, Math.max(0, career.gamePoint - gate.cost)),
     pitchTrainingStages: stages,
+    pitchTrainingCounts: counts,
+  }
+  return {
+    career: trained,
+    progress: { sessions: counts[cell], required, isLearned: (stages[cell] ?? 0) > Math.trunc(column / 2) },
   }
 }
 

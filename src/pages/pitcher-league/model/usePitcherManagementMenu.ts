@@ -21,6 +21,8 @@ import {
   magicTrainingCursorOf,
   PITCHER_TYPE_NAMES,
   pitcherTrainingBlockReasonOf,
+  pitchTypeTrainingLinesOf,
+  runPitchTypeTraining,
   runPitcherTraining,
 } from '@/entities/pitcher-career/model/pitcherManagement'
 import type {
@@ -165,8 +167,8 @@ export interface PitcherManagementMenu {
   readonly answerQuestion: (isYes: boolean) => void
   readonly chooseOption: (index: number) => void
   readonly closeWindow: () => void
-  /** 구질 훈련 창(108)이 돌려준 커리어를 저장한다 */
-  readonly saveTrainedPitch: (career: PitcherCareer) => void
+  /** 구질 훈련 창(108 탭 2)에서 확인 [예] — 125 의 훈련 한 번(0x17f5c 탭 2 갈래) 뒤 알림을 띄우고 105 로 */
+  readonly trainPitch: (row: number, column: number) => void
   /** 108 마구 창(탭 1)의 격자 커서 — 진입 0x17730 이 `min(L, 3)` 에 둔다 */
   readonly magicTrainingCursor: number
   readonly moveMagicTrainingCursor: (cell: number) => void
@@ -635,11 +637,21 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     return () => window.removeEventListener('keydown', onKey)
   }, [closeDetail, detail])
 
-  const saveTrainedPitch = useCallback(
-    (trained: PitcherCareer) => {
-      onSave(trained)
+  /**
+   * 108 탭 2 확인 [예] → 125 → 0x17f5c(탭 2 갈래 0x1836a — `runPitchTypeTraining`) → 알림 창(코드 4) → 닫히면 125 틀 0x18dd8 이
+   * **105** 로. 창(108)은 떠나므로 하위 창을 닫고 알림은 관리 화면 위에 띄운다. 105 진입은 알림이 닫히기 전에 친다(근사 — 알림을
+   * 관리 화면 알림 상자로 보이는 다른 훈련 길과 같다).
+   */
+  const trainPitch = useCallback(
+    (row: number, column: number) => {
+      const outcome = runPitchTypeTraining(career, row, column, random)
+      onSave(outcome.career)
+      setSubWindow(null)
+      setKind('관리')
+      setNotice(pitchTypeTrainingLinesOf(outcome).join('!N'))
+      onReenter?.()
     },
-    [onSave],
+    [career, onReenter, onSave, random],
   )
 
   /** 0xa4b04 켜기는 0xb663c 가 곧바로 저장(0x1f1e1)한다 — 웹은 `onSave` 가 저장이다 */
@@ -682,7 +694,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     answerQuestion,
     chooseOption,
     closeWindow,
-    saveTrainedPitch,
+    trainPitch,
     magicTrainingCursor,
     moveMagicTrainingCursor: setMagicTrainingCursor,
     confirmMagicTrainingCell,

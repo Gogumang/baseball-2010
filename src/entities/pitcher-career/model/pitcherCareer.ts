@@ -310,7 +310,7 @@ export interface PitcherCareer {
   readonly selectedPitchType: number
   /** 이번 레벨에 쌓은 마구 훈련 횟수 (타자 필살타법 +0x200 자리) */
   readonly magicSessions: number
-  /** 구질 훈련 단계 8칸 — 0 없음 · 1 기본 습득 · 2 상위 습득 (커리어 +0x208, J 3-2) */
+  /** 구질 훈련 단계 8칸 — 0 없음 · 1 기본 습득 · 2 상위 습득 · 3 히든 습득 (커리어 +0x208 + 칸·4 + 1, J 3-2) */
   readonly pitchTrainingStages: readonly number[]
   /** 히든 변화구 계열이 열렸는가 (커리어 +0x204+행, 이벤트 30~33) */
   readonly hiddenPitchRows: readonly boolean[]
@@ -326,6 +326,11 @@ export interface PitcherCareer {
   readonly popularity: number
   readonly reputation: number
   readonly morale: number
+  /**
+   * 구질 훈련 **횟수** 8칸 — 커리어 +0x208 + 칸·4 + 0 (s8). 훈련 적용 0xa3bac 종류 5 가 한 번에 1 씩 쌓고 필요 횟수
+   * (0xd80de [2, 4, 5])가 차면 0 으로 돌리며 단계를 올린다(`applyPitchTypeTraining`). 옛 저장에는 없어 0 으로 본다.
+   */
+  readonly pitchTrainingCounts?: readonly number[]
   readonly money: number
   readonly salary: number
   /**
