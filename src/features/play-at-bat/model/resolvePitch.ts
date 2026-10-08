@@ -157,6 +157,33 @@ export function isHitByPitch(pitch: Pitch, batterSide: number): boolean {
 }
 
 /**
+ * 스트라이크 상자 — 표 `0xcfb7c[+0x17e1]` = side 0 (226, 310, 33, 33) · side 1 (221, 310, 33, 33) (x, y, 폭, 높이, s16).
+ * 판정 좌표계(카메라 오프셋 없음, `projectToPlate`)다.
+ */
+export const STRIKE_ZONE_BOXES = [
+  { x: 226, y: 310, width: 33, height: 33 },
+  { x: 221, y: 310, width: 33, height: 33 },
+] as const
+
+/**
+ * **스트라이크 판정 — 상태 0x12 진입 `0x3dfac`** (직접 뜸):
+ * ```
+ * 3dfd8  상자 = 0xcfb7c[경기+0x17e1] (x, y, w, h)
+ * 3dff0  (px, py) = (경기+0x10dc, 경기+0x10e0)                              ; 공 도착 판정 좌표 — 사구 0x35a20 과 같은 칸
+ * 3e016  x ≤ px ≤ x+w  그리고  y ≤ py ≤ y+h                                ; 경계 포함
+ * ```
+ * 판정 좌표는 궤적 마지막 점을 `projectToPlate` 로 옮긴 자리다(`isHitByPitch` 와 같다). 궤적이 없는 사용자 투구만
+ * 예전처럼 정규화 존(|x|, |y| ≤ 1)으로 본다(추정).
+ */
+export function isStrikeZonePitch(pitch: Pitch): boolean {
+  const path = pitch.worldPath
+  if (path === null || path.length === 0) return isInsideStrikeZone(pitch.plate)
+  const point = projectToPlate(path[path.length - 1], pitch.stageSide)
+  const box = STRIKE_ZONE_BOXES[pitch.stageSide] ?? STRIKE_ZONE_BOXES[0]
+  return point.x >= box.x && point.x <= box.x + box.width && point.y >= box.y && point.y <= box.y + box.height
+}
+
+/**
  * 투구 하나를 끝까지 처리한다: 스윙 결과(0xab214) → 방향(0x5141c) → 원본 타구 패턴 → 안타·아웃(대체 근사, 추정).
  * 패턴 덱은 섞인 순서를 이어 쓰므로 새 덱을 함께 돌려준다.
  */
@@ -184,7 +211,7 @@ export function resolvePitch(
         isUncatchable: false,
       }
     }
-    const resolution: PitchResolution = isInsideStrikeZone(pitch.plate)
+    const resolution: PitchResolution = isStrikeZonePitch(pitch)
       ? { kind: '스트라이크', isSwinging: false }
       : { kind: '볼' }
     return {

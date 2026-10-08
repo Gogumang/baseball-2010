@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { isHitByPitch, plateErrorOf, resolvePitch } from '@/features/play-at-bat/model/resolvePitch'
+import { isHitByPitch, isStrikeZonePitch, plateErrorOf, resolvePitch, STRIKE_ZONE_BOXES } from '@/features/play-at-bat/model/resolvePitch'
+import { projectToPlate } from '@/entities/pitching/model/pitchCurve'
 import type { BattingContext } from '@/features/play-at-bat/model/resolvePitch'
 import { createPatternDeck, lastDrawnPattern } from '@/entities/batting/model/battedBallOutcome'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
@@ -54,6 +55,34 @@ describe('resolvePitch — 스윙하지 않은 경우', () => {
     const deck = createPatternDeck(고정(0))
     expect(resolvePitch(직구(), null, 상황, deck, 고정(0)).detail.resolution).toEqual({ kind: '스트라이크', isSwinging: false })
     expect(resolvePitch(직구({ plate: { x: 1.5, y: 0 } }), null, 상황, deck, 고정(0)).detail.resolution).toEqual({ kind: '볼' })
+  })
+})
+
+describe('스트라이크 판정 — 0x3dfac 의 상자 0xcfb7c[side] (경계 포함)', () => {
+  /** 판정 좌표 px 가 원하는 값이 되는 도착 x — side 1 존 중심(20585)에서 x 를 옮긴다 */
+  const 공 = (x: number) => 직구({ worldPath: [{ x: 19501, y: 1110, z: 24500 }, { x, y: 1202, z: 29705 }], stageSide: 1 })
+
+  it('궤적 마지막 점의 투영이 상자 (221, 310, 33, 33) 안이면 스트라이크', () => {
+    expect(isStrikeZonePitch(공(20585))).toBe(true)
+    const deck = createPatternDeck(고정(0))
+    expect(resolvePitch(공(20585), null, 상황, deck, 고정(0)).detail.resolution).toEqual({ kind: '스트라이크', isSwinging: false })
+  })
+
+  it('상자 경계(x = 221 · 254)까지 스트라이크이고 한 칸 밖은 볼이다', () => {
+    const pxOf = (x: number) => projectToPlate({ x, y: 1202, z: 29705 }, 1).x
+    const 왼끝 = [...Array(4000).keys()].map((i) => 20585 - i).find((x) => pxOf(x) < 221)
+    const 오른끝 = [...Array(4000).keys()].map((i) => 20585 + i).find((x) => pxOf(x) > 254)
+    expect(왼끝).toBeDefined()
+    expect(오른끝).toBeDefined()
+    expect(isStrikeZonePitch(공(왼끝! + 1))).toBe(true)
+    expect(isStrikeZonePitch(공(왼끝!))).toBe(false)
+    expect(isStrikeZonePitch(공(오른끝!))).toBe(false)
+    expect(isStrikeZonePitch(공(오른끝! - 1))).toBe(true)
+  })
+
+  it('상자는 side 마다 다르다 — side 0 은 (226, 310)', () => {
+    expect(STRIKE_ZONE_BOXES[0]).toEqual({ x: 226, y: 310, width: 33, height: 33 })
+    expect(STRIKE_ZONE_BOXES[1]).toEqual({ x: 221, y: 310, width: 33, height: 33 })
   })
 })
 
