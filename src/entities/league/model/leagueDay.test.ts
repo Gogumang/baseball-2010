@@ -838,3 +838,31 @@ describe('CPU 팀 레코드가 트레이드로 바뀌면 그 레코드로 선다
     expect(plain.playerStats.batters[leagueBatterIdOf(1, 0)]).toBeDefined()
   })
 })
+
+describe('CPU 레코드의 장비 니블이 간이 경기 능력치(0xb6414 보너스)로 먹는다 — 새 해 0x665e8', () => {
+  const equippedRecord = (teamId: number, nibble: number): LeagueTeamRecord => ({
+    batters: Array.from({ length: BATTERS_PER_TEAM }, (_, slot) => ({ tableTeamId: teamId, tableSlot: slot, equipment: [nibble, nibble, 0, nibble] })),
+    pitchers: Array.from({ length: PITCHERS_PER_TEAM }, (_, slot) => ({ tableTeamId: teamId, tableSlot: slot, equipment: [nibble, nibble, 0, nibble] })),
+  })
+
+  it('니블 0 이면 표 그대로와 같다', () => {
+    for (const seed of [2, 11]) {
+      const plain = simulateLeagueGame({ away: 1, home: 2 }, createSeededRandom(seed), 0)
+      const zero = simulateLeagueGame(
+        { away: 1, home: 2 }, createSeededRandom(seed), 0, undefined, { records: { away: equippedRecord(1, 0), home: equippedRecord(2, 0) } },
+      )
+      expect(zero).toEqual(plain)
+    }
+  })
+
+  it('높은 장비를 낀 팀은 결과가 표 그대로와 갈린다', () => {
+    const differs = [1, 2, 3, 4, 5, 6].some((seed) => {
+      const plain = simulateLeagueGame({ away: 1, home: 2 }, createSeededRandom(seed), 0)
+      const equipped = simulateLeagueGame(
+        { away: 1, home: 2 }, createSeededRandom(seed), 0, undefined, { records: { away: equippedRecord(1, 11) } },
+      )
+      return plain.awayRuns !== equipped.awayRuns || plain.homeRuns !== equipped.homeRuns
+    })
+    expect(differs).toBe(true)
+  })
+})
