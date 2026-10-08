@@ -881,7 +881,15 @@ function savePointOf(progress: TeamGameProgress): TeamGameProgress {
  * 그 뒤 새 경기와 같은 꼬리 — 시뮬 초기화 rand(0, 2) 한 번(3fa0e) → 인트로 끝의 판(굴림 36) 또는 곧장 첫 타석.
  * 저장된 진행은 아웃 0 · 볼카운트 0 인 자리라(0x18 진입이 지웠다) 판은 그 반 이닝으로 선다.
  */
-export function resumeTeamGame(saved: TeamGameProgress, random: RandomPort): TeamGameProgress {
+export function resumeTeamGame(
+  saved: TeamGameProgress,
+  random: RandomPort,
+  /**
+   * 장면 초기화 0xc0e60 이 되살리는 sim+0x9f — 전역기록 +0x14d + m(`entities/mode-save` 의 `autoRelayRecord`)의 그 모드 칸.
+   * 안 넘기면 저장된 진행에 남은 표시(웹 그림자)를 쓴다.
+   */
+  autoProgressStopped: boolean = saved.autoProgressFlag === 'stopped',
+): TeamGameProgress {
   const { game } = saved
   const restored: TeamGameProgress = {
     ...saved,
@@ -903,7 +911,7 @@ export function resumeTeamGame(saved: TeamGameProgress, random: RandomPort): Tea
     scenePitcherChange: null,
     // 장면 초기화 0xc0e60 — sim+0x9f(중단)는 전역 기록에서 되살리고 sim+0xa0(자동진행)은 0 이다
     autoRelay: null,
-    autoProgressFlag: saved.autoProgressFlag === 'stopped' ? 'stopped' : null,
+    autoProgressFlag: autoProgressStopped ? 'stopped' : null,
     // 공 객체 +0x10 — 장면이 새로 만든다 (startTeamGame 과 같은 0)
     ballMagicNumber: 0,
     // 기록 ctx(0xa5bb0 · 0xa5b00) — 연속 홈런 +0x162 · 연속 파울 +0x15f · 타석 투구 수 +0x161 · 반 이닝 투구 수 +0x16c · 대타 칸 +0x160.
@@ -4508,9 +4516,9 @@ function relayTickOf(
 
 /**
  * **CLR 중단 — 질문 StrGAME[6] "자동진행을 중단하시겠습니까?"(코드 0x1e)에 예** — sim+0xa0 = 0 · 0xc0ea8(sim, 1) → sim+0x9f = 1
- * (전역 기록 [mgr+..+0x14d] 에도 쓴다). 다음 0xc2198 의 0xc1e04 가 사람이라 하여 0x18 로 넘어간다. 0x9f 는 이 경기 동안
- * 남는다 — 일반·시즌은 경기진행 설정과 상관없이 남은 경기를 사람이 잡는다(c1f20 이 설정보다 먼저 본다).
- * ⚠️ 전역 기록 · 저장 쪽은 이 진행에만 남긴다(장면 초기화 0xc0e60 이 되살리는 몫은 `resumeTeamGame`).
+ * (전역기록 +0x14d + m 에도 쓴다 — 부르는 쪽(`pages/team-game` 의 `useTeamGame`)이 `entities/mode-save` 의 `autoRelayRecord` 에).
+ * 다음 0xc2198 의 0xc1e04 가 사람이라 하여 0x18 로 넘어간다. 0x9f 는 이 경기 동안 남는다 — 일반·시즌은 경기진행 설정과 상관없이
+ * 남은 경기를 사람이 잡는다(c1f20 이 설정보다 먼저 본다). 이어하기는 장면 초기화 0xc0e60 이 전역기록 칸에서 되살린다(`resumeTeamGame`).
  */
 export function stopAutoRelay(progress: TeamGameProgress): TeamGameProgress {
   if (progress.autoRelay == null || progress.autoProgressFlag === 'stopped') return progress

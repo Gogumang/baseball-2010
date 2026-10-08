@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { rollSceneLoadingTip } from '@/entities/game/model/sceneLoadingTip'
+import { autoRelayModeSlotOf, autoRelayRecordPort } from '@/entities/mode-save/model/autoRelayRecord'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
@@ -191,9 +192,17 @@ export function useTeamGame(
     rollSceneLoadingTip(random)
     // 자동진행 중계(0x21)는 화면이 한 틱씩 돌린다 — 그 사이 CLR 중단 · 속도 키를 받는다
     const live: TeamGameOptions = { ...options, liveAutoRelay: true }
-    return resumeFrom === undefined
-      ? startTeamGame(live, random)
-      : resumeTeamGame({ ...resumeFrom, options: { ...resumeFrom.options, liveAutoRelay: true } }, random)
+    const record = autoRelayRecordPort()
+    const slot = autoRelayModeSlotOf(options.mode)
+    if (resumeFrom === undefined) {
+      // 새 경기 — 경기를 여는 키(일반 · 대전 경기정보 OK +0x14d · +0x14f, 시즌 0x847e +0x14e)가 그 모드 칸을 0 으로 쓴 뒤
+      // 장면 초기화 0xc0e60 이 그 0 을 sim+0x9f 로 읽는다
+      record.setStopped(slot, false)
+      return startTeamGame(live, random)
+    }
+    // 이어하기 — 0xc0e60 이 전역기록 +0x14d + m 에서 sim+0x9f 를 되살린다
+    return resumeTeamGame({ ...resumeFrom, options: { ...resumeFrom.options, liveAutoRelay: true } }, random,
+      record.read().stopped[slot])
   })
 
   /**
@@ -327,9 +336,17 @@ export function useTeamGame(
       returnToPitchSelection: () => step((current) => returnToPitchSelection(current, random)),
       // 도루 출발 — 주자를 출발만 시킨다(난수·소리 없음). 판정은 공이 도착할 때 도루 판(종류 5)이 한다
       steal: (base: StealBase) => step((current) => startSteal(current, base)),
-      autoProgress: () => step((current) => runAutoProgress(current, random)),
+      autoProgress: () => {
+        // 3c94a 0xc0ea8(sim, 0) — sim+0x9f = 0 을 전역기록 +0x14d + m 에도 쓴다
+        const after = step((current) => runAutoProgress(current, random))
+        if (after.autoProgressFlag === 'running') autoRelayRecordPort().setStopped(autoRelayModeSlotOf(after.options.mode), false)
+      },
       stepAutoRelay: () => step((current) => stepAutoRelay(current, random)).autoRelay ?? null,
-      stopAutoRelay: () => void step((current) => stopAutoRelay(current)),
+      stopAutoRelay: () => {
+        // 52cac 0xc0ea8(sim, 1) — sim+0x9f = 1 을 전역기록 +0x14d + m 에도 쓴다
+        const after = step((current) => stopAutoRelay(current))
+        if (after.autoProgressFlag === 'stopped') autoRelayRecordPort().setStopped(autoRelayModeSlotOf(after.options.mode), true)
+      },
       finishBenchClearing: (reachedTargetTick: boolean) =>
         step((current) => resolveBenchClearing(current, { reachedTargetTick }, random)),
       finishRunnerPlay: (result?: DefensePlayResult) => {

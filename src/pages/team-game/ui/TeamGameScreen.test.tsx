@@ -5,6 +5,7 @@ import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import { TeamGameScreen } from '@/pages/team-game/ui/TeamGameScreen'
+import { createMemoryAutoRelayRecordPort, setAutoRelayRecordPort } from '@/entities/mode-save/model/autoRelayRecord'
 import { DEFENSE_BACKGROUND_URL } from '@/pages/defense/lib/defenseView'
 import type { TeamGameOptions } from '@/features/play-team-game/model/teamGameFlow'
 import { SCENE_CONFIRM_READY_FRAMES, SCENE_PREPARE_FRAMES } from '@/features/play-game/model/useSceneConfirm'
@@ -33,6 +34,7 @@ const OK통과 = () => {
 }
 
 afterEach(() => {
+  setAutoRelayRecordPort(null)
   cleanup()
   vi.useRealTimers()
 })
@@ -221,6 +223,8 @@ describe('경기 중 메뉴 (표 0xcfcfc 행 0)', () => {
 
   it('G포인트가 넉넉하면 비용을 알리고 경기를 자동으로 소화한다', () => {
     vi.useFakeTimers()
+    // 전역기록 새 저장 — 속도 +0xbc = 1
+    setAutoRelayRecordPort(createMemoryAutoRelayRecordPort())
     const onSpendGamePoint = vi.fn()
     render(
       <TeamGameScreen
@@ -238,8 +242,8 @@ describe('경기 중 메뉴 (표 0xcfcfc 행 0)', () => {
     fireEvent.click(screen.getByText('예'))
 
     expect(onSpendGamePoint).toHaveBeenCalledWith(30)
-    // 자동진행 중계(상태 0x21)가 선다 — 속도 0 이면 8틱마다 0xc262c 한 번
-    expect(screen.getByTestId('중계-속도').dataset.speed).toBe('0')
+    // 자동진행 중계(상태 0x21)가 선다 — 새 저장 속도 1 이면 4틱마다 0xc262c 한 번
+    expect(screen.getByTestId('중계-속도').dataset.speed).toBe('1')
     act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 8 * 400))
     // 시즌 경기는 끝까지 소화된다 — 상태 0x18 경기 끝 결과 판(승·패·세 세 줄)이 먼저 뜬다
     expect(screen.getByAltText('승리투수')).toBeTruthy()

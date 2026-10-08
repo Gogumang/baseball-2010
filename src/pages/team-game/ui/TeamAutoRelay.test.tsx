@@ -9,6 +9,8 @@ import { FULL_PLAY_SETTINGS, MATCH_SETTING_KIND } from '@/features/play-team-gam
 import type { TeamGameOptions } from '@/features/play-team-game/model/teamGameFlow'
 import { TeamGameScreen } from '@/pages/team-game/ui/TeamGameScreen'
 import { setAutoRelaySpeed } from '@/pages/team-game/model/autoRelaySpeed'
+import { createMemoryAutoRelayRecordPort, setAutoRelayRecordPort } from '@/entities/mode-save/model/autoRelayRecord'
+import type { AutoRelayRecordPort } from '@/entities/mode-save/model/autoRelayRecord'
 
 const 기본옵션: TeamGameOptions = {
   mode: 2,
@@ -22,7 +24,11 @@ const 기본옵션: TeamGameOptions = {
 
 const 소리 = { playBgm: vi.fn<(id: number) => void>(), stopBgm: vi.fn<() => void>() }
 
+let 기록: AutoRelayRecordPort
+
 beforeEach(() => {
+  기록 = createMemoryAutoRelayRecordPort()
+  setAutoRelayRecordPort(기록)
   setAutoRelaySpeed(0)
   소리.playBgm.mockClear()
   소리.stopBgm.mockClear()
@@ -30,6 +36,7 @@ beforeEach(() => {
 })
 afterEach(() => {
   cleanup()
+  setAutoRelayRecordPort(null)
   setActiveSound(null)
   vi.useRealTimers()
 })
@@ -115,5 +122,24 @@ describe('팀경기 자동진행 중계 화면 (상태 0x21 — 갱신 0x48480 �
     // 설정이 모두 자동이어도 sim+0x9f 가 이겨 사람 장면(0xe OK 대기)이다
     expect(screen.getByRole('button', { name: '확인' })).toBeTruthy()
     expect(소리.stopBgm).toHaveBeenCalled()
+    // 0xc0ea8(sim, 1) — 전역기록 +0x14d + m(시즌 칸 1)에도 쓴다
+    expect(기록.read().stopped).toEqual([false, true, false])
+  })
+
+  it('속도는 전역기록 +0xbc 에 쓴다 — 다음 중계도 그 속도로 선다 (새 저장은 1)', () => {
+    setAutoRelayRecordPort(createMemoryAutoRelayRecordPort())
+    띄우기()
+    expect(screen.getByTestId('중계-속도').dataset.speed).toBe('1')
+    fireEvent.keyDown(window, { key: '4' })
+    cleanup()
+    띄우기()
+    expect(screen.getByTestId('중계-속도').dataset.speed).toBe('0')
+  })
+
+  it('새 경기는 그 모드 칸의 중단 표시를 0 으로 쓰고 연다 (경기를 여는 키 → 장면 초기화 0xc0e60)', () => {
+    기록.setStopped(1, true)
+    띄우기()
+    expect(기록.read().stopped[1]).toBe(false)
+    expect(screen.getByTestId('중계-공격팀')).toBeTruthy()
   })
 })

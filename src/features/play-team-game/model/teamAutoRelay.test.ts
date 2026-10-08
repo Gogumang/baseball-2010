@@ -100,8 +100,10 @@ describe('자동진행 중계(상태 0x21)를 화면이 한 틱씩 돌린다 —
     expect(사람.autoRelay ?? null).toBeNull()
     expect(isHumanTurn(사람)).toBe(true)
     expect(사람.atBatPrepared).toBe(true)
-    // 이어하기(장면 초기화 0xc0e60)도 sim+0x9f 를 되살린다
+    // 이어하기(장면 초기화 0xc0e60)는 sim+0x9f 를 전역기록 +0x14d + m 에서 되살린다 — 안 넘기면 저장된 진행의 그림자
     expect(resumeTeamGame(사람, createSeededRandom(2)).autoProgressFlag).toBe('stopped')
+    expect(resumeTeamGame(사람, createSeededRandom(2), false).autoProgressFlag).toBeNull()
+    expect(resumeTeamGame({ ...사람, autoProgressFlag: null }, createSeededRandom(2), true).autoProgressFlag).toBe('stopped')
   })
 
   it('교체 틱(0xc262c 의 c266c — 공 없이 돌아감)도 한 걸음이라, 그 뒤 CLR 로 멈추면 그 타석은 간이 엔진이 안 굴린다', () => {
