@@ -58,7 +58,7 @@ import { PITCHERS_PER_TEAM, teamBatters, teamPitchers } from '@/entities/team/mo
 import { FULL_STAMINA, recoverStaminaAfterGameDay } from '@/entities/pitcher-career/model/pitcherStamina'
 import type { TeamGameOptions, TeamGameProgress, TeamGameSummary } from '@/features/play-team-game/model/teamGameFlow'
 import { rollOpponentAces } from '@/features/play-team-game/model/teamGameFlow'
-import { CHANCE_VALUE, MATCH_SETTING_KIND } from '@/features/play-team-game/model/matchSettings'
+import { INNING_VALUE, MATCH_SETTING_KIND } from '@/features/play-team-game/model/matchSettings'
 import type { MatchProgressSettings } from '@/features/play-team-game/model/matchSettings'
 import {
   PRE_GAME_ACES_START, SQUAD_PURPOSE, cancelPreGameAce, choosePreGameAce, matchInfoCancelScene,
@@ -524,7 +524,7 @@ interface SeasonSave {
    * 웹엔 그 전역 저장 객체가 없어 시즌 저장에 두되, 새 시즌(`chooseTeam`)이 앞 저장의 값을 그대로 넘겨받는다.
    * 모드 초기화 0x224ec(2) 는 이 칸을 안 지운다 — `resetSeason` 이 시즌 없는 덩어리에 남겨 둔다(`SeasonGlobalCarry`).
    * ⚠️ 시즌 저장 칸을 통째로 지우면(브라우저 저장 삭제) 함께 사라진다 — 그 점만 근사다.
-   * 한 번도 고치지 않았으면 원본 저장의 0 초기값(`SEASON_DEFAULT_MATCH_SETTINGS` — 찬스 · 공격 득점권)이다.
+   * 한 번도 고치지 않았으면 생성자 0x9f26c 의 기본값(`SEASON_DEFAULT_MATCH_SETTINGS` — 이닝 · 전체)이다.
    */
   readonly matchSettings?: MatchProgressSettings
   /**
@@ -926,14 +926,15 @@ function staminaOptionsOf(save: SeasonSave, opponentTeamId: number): Partial<Tea
 const NO_CHAMPION = 0xf
 
 /**
- * 경기진행 설정의 원본 기본값 — 전역 저장이 0 으로 초기화되므로 모든 칸이 0 이다:
- * 종류 0 **찬스** · 값 0 **공격 득점권**(사람이 공격 중 2·3루에 주자가 있을 때만 조작) · 상세 비트 모두 0.
- * 예전에는 웹판 판단으로 "모든 이닝 직접"(`FULL_PLAY_SETTINGS`)을 박아 두었다 — 원본과 달라 걷었다.
- * 처음 경기정보(0xdd)에 들어오면 설정 창이 저절로 열리므로(+0x11e) 사람이 바로 고를 수 있다.
+ * 경기진행 설정의 원본 기본값 — 전역기록 생성자 0x9f26c 의 0x9f404~0x9f42c(m = 0 · 1 두 번 도는 고리, 직접 떴다):
+ * `+0x12c+m = 1`(종류 **이닝**) · `+0x146+m = 0`(값 **전체** — 모든 이닝을 사람이 잡는다) · 상세 비트 +0x120+2m · +0x124+2m ·
+ * +0x128+m · +0x12a+m = 0. 그 뒤 0x9f42e~ 가 +0x14d~+0x14f 를 0 으로 둔다.
+ * (⚠️ 예전 주석의 "전역 저장이 0 으로 초기화되므로 찬스 · 공격 득점권" 은 틀렸다 — 생성자가 종류 칸에 1 을 넣는다.)
+ * 처음 경기정보(0xdd)에 들어오면 설정 창이 저절로 열린다(+0x11e).
  */
 export const SEASON_DEFAULT_MATCH_SETTINGS: MatchProgressSettings = {
-  kind: MATCH_SETTING_KIND.찬스,
-  value: CHANCE_VALUE.공격득점권,
+  kind: MATCH_SETTING_KIND.이닝,
+  value: INNING_VALUE.전체,
   battingOrderBits: 0,
   pitchingInningBits: 0,
   offenseRunnerBits: 0,

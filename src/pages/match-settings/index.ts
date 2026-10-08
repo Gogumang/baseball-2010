@@ -12,7 +12,7 @@
  * - 시즌 경기 직전(상태 0xdd)에서 '0', 그리고 **한 번도 안 봤으면 저절로 열린다** (R13 4절)
  *
  * 시즌 세션은 이 창이 돌려준 설정을 시즌 저장 `matchSettings`(전역 +0x12c+1 자리, 새 시즌이 넘겨받는다)에 담아
- * `TeamGameOptions.settings` 로 넘긴다 — 한 번도 안 고쳤으면 원본 0 초기값 `SEASON_DEFAULT_MATCH_SETTINGS`
+ * `TeamGameOptions.settings` 로 넘긴다 — 한 번도 안 고쳤으면 생성자 0x9f26c 의 기본값(이닝 · 전체) `SEASON_DEFAULT_MATCH_SETTINGS`
  * (`src/app/model/useSeasonSession.ts`).
  */
 export { MatchSettingsWindow, MatchSettingsScreen } from '@/pages/match-settings/ui/MatchSettingsWindow'

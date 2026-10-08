@@ -14,12 +14,10 @@ import {
   courseTargetOf,
   drainStamina,
   fatiguedStatsOf,
-  mistakeHumanPitchOf,
   pitchGradeOf,
   pitchSlotsOf,
 } from '@/features/play-pitcher-game/model/pitcherPitch'
 import type { PitcherRepertoire, PitcherStats } from '@/features/play-pitcher-game/model/pitcherPitch'
-import { ZONE_CENTERS } from '@/entities/pitching/model/pitchCurve'
 
 const 씨앗 = (seed: number) => createSeededRandom(seed)
 /** 난수를 안 쓰는 갈래를 볼 때 쓰는 고정 난수 */
@@ -337,40 +335,5 @@ describe('구질 칸 이름은 원본 이름표 [0x140026c] 칸 그대로 — t 
       createSeededRandom(1),
     )
     expect(pitch.isMagicPitch).toBe(true)
-  })
-})
-
-describe('사람 투구의 실투 — 0x4dc78 은 사람·CPU 를 가르지 않고 4dec0~4df5e 에서 공을 한가운데로 다시 놓는다', () => {
-  const 던진공 = (typeNumber: number) =>
-    buildHumanPitch(
-      {
-        typeNumber,
-        stats: 능력,
-        repertoire: 레퍼토리,
-        side: 1,
-        courseCell: 0,
-        gaugeCell: 0,
-        grade: 3,
-      } as Parameters<typeof buildHumanPitch>[0],
-      씨앗(7),
-    )
-
-  it('직구(구질 1)면 N = 18, 아니면 20 — 끝점은 타자 좌우별 존 한가운데 0xcfbcc[+0x17e1], plate (0, 0)', () => {
-    for (const [typeNumber, N] of [
-      [1, 18],
-      [2, 20],
-    ] as const) {
-      const 공 = 던진공(typeNumber)
-      const 실투 = mistakeHumanPitchOf(공, { typeNumber, grade: 3, stats: 능력, repertoire: 레퍼토리, side: 1 })
-      expect(실투.frameCount).toBe(N)
-      expect(실투.worldPath).toHaveLength(N)
-      expect(실투.worldPath![N - 1]).toEqual(ZONE_CENTERS[1])
-      expect(실투.plate.x).toBeCloseTo(0)
-      expect(실투.plate.y).toBeCloseTo(0)
-      // 레코드·구속 단계는 그대로라 첫 점(투수판 쪽)은 원래 곡선과 같다 — 공의 다른 칸도 그대로
-      expect(실투.worldPath![0]).toEqual(공.worldPath![0])
-      expect(실투.type).toBe(공.type)
-      expect(실투.controlTier).toBe(공.controlTier)
-    }
   })
 })

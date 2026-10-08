@@ -1424,11 +1424,11 @@ describe('경기 전 흐름 0xd8 → 0xd7 → 0xdd → 0xe1', () => {
     expect(result.current.pendingGame?.kind).toBe('정규')
   })
 
-  it('경기진행 설정의 기본은 원본 저장 0 초기값 — 찬스 · 공격 득점권 (전역 +0x12c+1)', () => {
+  it('경기진행 설정의 기본은 생성자 0x9f26c 의 값 — 이닝 · 전체 (전역 +0x12c+1 = 1 · +0x146+1 = 0)', () => {
     const { result } = 띄우기()
     시작(result, 0)
     expect(result.current.matchSettings).toEqual(SEASON_DEFAULT_MATCH_SETTINGS)
-    expect(result.current.matchSettings).toMatchObject({ kind: 0, value: 0 })
+    expect(result.current.matchSettings).toMatchObject({ kind: 1, value: 0 })
   })
 
   it('경기진행 설정과 창을 본 표시는 전역 칸이라 새 시즌이 넘겨받는다 (+0x12c+1 · +0x11e)', () => {

@@ -157,7 +157,6 @@ import {
   buildHumanPitch,
   drainStamina,
   fatiguedStatsOf,
-  mistakeHumanPitchOf,
   pitchGradeOf,
   pitchSlotsOf,
 } from '@/features/play-pitcher-game/model/pitcherPitch'
@@ -1028,7 +1027,7 @@ export function startPitch(
     },
     random,
   )
-  const aimedPitch: Pitch = {
+  const pitch: Pitch = {
     ...builtPitch,
     // P+0x10 — 0x34d6c 투수 쪽 번호. 내 투수는 육성(비트7)이라 1~4 면 표 칸 n = 번호 − 1 (pitcherBoostSideOf)
     magicNumber: ballMagicNumber,
@@ -1056,16 +1055,6 @@ export function startPitch(
     },
     random,
   )
-  // 실투면 0x4dec0~0x4df5e 가 곡선 0x9e3c9 앞에서 공을 존 한가운데 · N 18/20 으로 다시 놓는다 (굴림 없음)
-  const pitch = isMistake
-    ? mistakeHumanPitchOf(aimedPitch, {
-        typeNumber: input.typeNumber,
-        grade,
-        stats: fatigued,
-        repertoire: options.repertoire,
-        side: options.stageSide ?? 1,
-      })
-    : aimedPitch
 
   const batter = opponentBatterAbility(options, opponentRosterSlotOf(progress))
   // CPU 도루 0x520de — 상태 0x11 의 10번째 틱(0x537dc → 메시지 0x583)이라 실투 판정(0x4dea0) 뒤, CPU 타자 결정
