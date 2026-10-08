@@ -78,7 +78,7 @@ if 0xb62b4(P, 10): c -= 1                           ; a5f52~a5f60  (투수 스�
 | 1 | FASTBALL | 9 |
 | 2~9 | 기본 변화구 8종 | 11 |
 | 10~17 | 상위 변화구 8종 | 12 |
-| 18~21 | 히든 4종 (P.SINKER·P.SLIDER·KNUCKLE·SPECIAL) | 13 |
+| 18~21 | 히든 4종 (~~P.SINKER·P.SLIDER·KNUCKLE·SPECIAL~~ **GYRO·P.SINKER·P.SLIDER·KNUCKLE** — 이름표 [0x140026c] 정정, 메인 e7abb70) | 13 |
 | 22 | 마구 | 9 |
 | 그 밖 | — | 9 |
 
