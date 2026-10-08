@@ -111,6 +111,7 @@ import {
   buildHumanPitch,
   drainStamina,
   fatiguedStatsOf,
+  mistakeHumanPitchOf,
   pitchGradeOf,
   pitchSlotsOf,
 } from '@/features/play-pitcher-game/model/pitcherPitch'
@@ -2466,7 +2467,7 @@ function pitchOnce(
     repertoire.magicId,
     magicRemainingAfter,
   )
-  const pitch: Pitch = { ...builtPitch, magicNumber: ballMagicNumber, pitcherMagicNumber: repertoire.magicId }
+  const aimedPitch: Pitch = { ...builtPitch, magicNumber: ballMagicNumber, pitcherMagicNumber: repertoire.magicId }
 
   // 실투 판정 0x33cbc — 투구 순간 0x4dc78 이 궤적 준비 0x9e669 **뒤**(0x4dea0)에 부른다.
   // 등급 뽑기·제구 흩어짐 굴림 뒤, CPU 타자 결정 0x34334 앞이다. 마구가 아니면 rand(0,100) 한 번.
@@ -2487,6 +2488,16 @@ function pitchOnce(
     },
     random,
   )
+  // 실투면 0x4dec0~0x4df5e 가 곡선 0x9e3c9 앞에서 공을 존 한가운데 · N 18/20 으로 다시 놓는다 (굴림 없음)
+  const pitch = isMistake
+    ? mistakeHumanPitchOf(aimedPitch, {
+        typeNumber: input.typeNumber,
+        grade,
+        stats: fatigued,
+        repertoire: { pitchMask: repertoire.pitchMask, form: repertoire.form, magicNumber: repertoire.magicId },
+        side: options.stageSide ?? 1,
+      })
+    : aimedPitch
 
   const batter = entryStageAbilityOf(progress, options.opponentTeamId, progress.opponentOrderIndex)
   // 0xb633d(타자) — 레코드 +0xa 비트 6. 명단에 끼운 마타자(`withAceBatter`)만 참이다
