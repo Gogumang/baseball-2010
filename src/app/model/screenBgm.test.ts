@@ -60,6 +60,12 @@ describe('투수편 배경음 — 안쪽 장면을 본다 (128 진입 0x120a4 �
     // 142 진입 0x1c46c 는 배경음을 안 건드린다
     expect(pitcherLeagueBgmOf('경기준비', false)).toBeNull()
   })
+
+  it('시즌 끝 사슬(136 · 130 · 131 · 132 · 133)과 국가대항전(134 · 135)은 배경음을 안 건드린다 — 진입 · 처리 · 키 · 그리기에 소리 호출이 없다', () => {
+    expect(pitcherLeagueBgmOf('시즌종료', false)).toBeNull()
+    expect(pitcherLeagueBgmOf('연말', false)).toBeNull()
+    expect(pitcherLeagueBgmOf('국가대항전', false)).toBeNull()
+  })
 })
 
 describe('시즌 관리 메뉴 0xc9 의 틀 0x73b8 — 이전 상태가 목록에 들면 배경음 4', () => {
