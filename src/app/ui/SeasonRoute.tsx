@@ -112,9 +112,15 @@ interface SeasonRouteProps {
   }
 }
 
-/** 관리 메뉴 진입 0x5044~0x505e — 이 이전 상태에서 오면 0x8a2d8 로 가운데 판을 오른쪽에서 미끄러뜨린다 */
+/**
+ * 관리 메뉴 진입 0x5044~0x505e — 이 이전 상태([this+0x28])에서 오면 0x8a2d8 로 가운데 판을 오른쪽에서 미끄러뜨린다.
+ * 원본 표는 1 · 0xd3 · 0xcb · 0xf5 · 0xf1 다섯이다. 새 시즌은 원본이 0xca → 0xc8 → 0xcc → **0xcb** → 0xc9 로 가
+ * 이전이 0xcb 지만, 웹은 0xc8·0xcc·0xcb 를 상태로 두지 않고 0xca 에서 곧장 0xc9 로 온다 — 그래서 0xca 를 0xcb 자리로 넣는다
+ * (0xca 에서 0xc9 로 오는 다른 길은 없다: 취소는 장면을 나간다).
+ */
 const CENTER_SLIDE_FROM: readonly number[] = [
   1, SEASON_SCENE_STATE.이벤트재생, SEASON_SCENE_STATE.진입분기, SEASON_SCENE_STATE.엔딩, SEASON_SCENE_STATE.경기뒤마무리,
+  SEASON_SCENE_STATE.팀고르기,
 ]
 
 /** 나리 칸 후보 — id 0xfe · +0xa 0x80/0xa0 · 기록 사본 (`nariRecruitPlayerOf`) */
