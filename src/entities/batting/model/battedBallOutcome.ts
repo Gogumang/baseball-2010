@@ -167,10 +167,12 @@ export const SCENE_EFFECT_INIT_ROLL_COUNT = 2 + EFFECT_PARTICLE_COUNT * 6
  *        +8 = rand(−60, 20) · +0x10 = rand(20, 40) · +0x14 = rand(H − 50, H + 20) · +0xf = rand(5, 10) · +0x12 = rand(0, 20)
  * ```
  * (rand 0xbfa54 는 범위와 무관하게 LCG 를 한 번 돌린다 — 웹은 `randomIntegerBelow` 하나 = `next()` 하나.)
- * **그 값은 아무 데도 안 쓰인다**: 객체를 굴리고 그리는 틱 0x901a0(← 경기 프레임 0x40b18 · 0x4a384)은 머리 901a8 에서 +8 이 0 이면
- * 곧장 끝난다(904c0). +8 을 1 로 세우는 곳은 종류 2 로 다시 부른 직후(0x4f4d8 · 0x51d1e · 0x527be)뿐이고, 다시 부르면 0x8fe58 이
- * 0x8fc70 으로 종류 0 알갱이 버퍼를 버리고 새로 만든다. 0x1400064 의 다른 xref 는 생성자(0x90534) · 해제(0x2d2a · 0x3309e ·
- * 0x332e6 · 0x51a1a) 뿐이다. → 그림은 없고 rand **2 + 200 × 6 = 1202 번**만 남는다.
+ * **그 값은 아무 데도 안 쓰인다**: 객체를 굴리고 그리는 틱 0x901a0(← HOMERUN 글자 0x40b18 의 0x40faa · 결과 화면 0x4a384)은 머리 901a8 에서
+ * +8 이 0 이면 곧장 끝난다(904c0). +8 을 1 로 세우는 곳은 모두 0x90190 으로 **다시 깐 직후**다 — 홈런 0x51d1e · 0x527be(종류 2) ·
+ * 경기 정산 0x4ea0c 의 0x4f4d8(종류 2) · 0x4f52a(**종류 0 을 새로 깔아** — 다시 1202 번 · 비). 다시 부르면 0x8fe58 이 0x8fc70 으로
+ * 이 알갱이 버퍼를 버린다. 0x1400064 의 다른 xref 는 생성자(0x90534) · 해제(0x2d2a · 0x3309e · 0x332e6) · 키 건너뛰기 0x519cc 의
+ * 0x51a1a(0x8fc70 칸 버리기) 뿐이다. → 3ef6e 이 깐 알갱이는 그림 없이 rand **2 + 200 × 6 = 1202 번**만 남는다
+ * (홈런 효과 종류 2 는 `homeRunFireworks`).
  */
 export function rollSceneEffectInit(random: RandomPort): void {
   randomIntegerBelow(random, 1, 3)
