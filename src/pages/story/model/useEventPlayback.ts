@@ -52,6 +52,8 @@ export function useEventPlayback(
   portraits: readonly EventPortrait[]
   next: () => void
   jump: (eventId: number) => void
+  /** 초상화 셋을 비운다 — 0x7f7a8 → 0x7b870 (화면효과 6 · 7 이 끝난 그리기, `drawEventBackdrop`) */
+  clearPortraits: () => void
 } {
   const [cursor, setCursor] = useState(() => jumpToEvent(startEvent.id))
   // 창 글은 커리어에서 나온다 — 부르는 쪽이 렌더마다 새 함수를 넘겨도 걸음이 다시 계산되지 않게 ref 로 든다
@@ -98,6 +100,7 @@ export function useEventPlayback(
   stepRef.current = step
   const next = () => setCursor(advanceCursor(stepRef.current.cursor))
   const jump = (eventId: number) => setCursor(jumpToEvent(eventId))
+  const clearPortraits = () => setPortraits([])
 
   // 알림은 Enter/Space 로 넘긴다. 대사(say)는 대사 상자(`EventDialogueBox` — 키 0x8b804)가, 선택지는 메뉴가 키를 가져간다.
   useEffect(() => {
@@ -113,5 +116,5 @@ export function useEventPlayback(
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
-  return { step, portraits, next, jump }
+  return { step, portraits, next, jump, clearPortraits }
 }

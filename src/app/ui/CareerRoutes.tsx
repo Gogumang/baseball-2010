@@ -208,10 +208,12 @@ export function CareerRoutes({
       // 그 밖(105 · 115 · 116 · 117 · 130~138 뒤)은 공 무늬 + 상태판(둘째 인자 [이벤트+0xb]) + 머리띠 (`NariEventUnderlay`).
       // 웹이 트는 이벤트는 파일 이벤트라 [이벤트+0xb] 는 0 이다(경기 뒤 평가 내장 이벤트는 경기결과 화면이 맡는다).
       // 외출진입(112) · 장소(113) · 대결결과(140 — 진입 0x10df8 이 0x7e84c(gfx, 0x70))는 지도 0x7ea64(gfx, −1, 0) 만 (`OutingMapUnderlay`).
+      // 같은 [gfx+0x174] 가 초상화 바닥 y 도 고른다(0x7fdee — 지도 252 · 그 밖 135).
+      const isOverOutingMap = screen.context === '외출진입' || screen.context === '장소' || screen.context === '대결결과'
       return (
         <>
           {(screen.context === '관리' || screen.context === '연초' || screen.context === '시즌') && <NariEventUnderlay career={career} />}
-          {(screen.context === '외출진입' || screen.context === '장소' || screen.context === '대결결과') && (
+          {isOverOutingMap && (
             <OutingMapUnderlay eventPlaceIds={session.eventPlaceIds} hour={new Date().getHours()} />
           )}
           {/* 대사창은 화면 **위에 얹히는 덮개**다 — 안 감싸면 창 전체로 퍼져 구석에 그려진다 */}
@@ -219,6 +221,7 @@ export function CareerRoutes({
           <StoryScreen
             // 명령 5 의 500ms 진동(0x3a44)은 환경설정 진동(옵션 +0x3b)이 켜졌을 때만
             isVibrationOn={gameSettings.settings.isVibrationOn}
+            isOverOutingMap={isOverOutingMap}
             key={event.id}
             events={session.storyEvents}
             event={event}

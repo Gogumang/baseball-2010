@@ -351,3 +351,69 @@ describe('say 대사 상자 — 0x7fbc4 · 0x7fad0 · 키 0x8b804', () => {
     expect(글줄()[0].textContent).toBe('둘')
   })
 })
+
+describe('초상화 바닥 y · 효과 칠 — 0x7fbc4 끝 0x7fdee · 대화창 0x8b5ac', () => {
+  beforeEach(() => {
+    vi.useRealTimers()
+    vi.useFakeTimers({
+      toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'requestAnimationFrame', 'cancelAnimationFrame',
+        'performance', 'Date'],
+    })
+  })
+  const 띄우기 = (commands: readonly unknown[], props: Partial<Parameters<typeof StoryScreen>[0]> = {}) => {
+    const 이벤트들 = { ...이벤트, commands } as unknown as OriginalEvent
+    render(
+      <StoryScreen events={[이벤트들]} event={이벤트들} playerName="테스트" teamName="드래곤즈"
+        onComplete={() => {}} onMatch={() => {}} {...props} />,
+    )
+  }
+  const 초상화판 = () => screen.getByTestId('event-portrait-layer')
+  const 칠 = () => screen.queryByTestId('event-backdrop-fill')
+  const 본체높이 = () =>
+    screen.getByTestId('대사-상자').querySelector('[data-part="본체"]')?.getAttribute('height')
+  const 말 = { op: 'say', text: '안녕', speaker: 0, format: 0, portraits: [] }
+
+  it('관리 · 연초 · 시즌 위(기본)는 135 — 판 아래 여백 320 − 135', () => {
+    띄우기([말])
+    expect(초상화판().style.bottom).toBe('185px')
+    expect(칠()).toBeNull()
+  })
+
+  it('외출 지도 · 장소 · 대결결과 위([gfx+0x174] 0x70 · 0x71)는 252', () => {
+    띄우기([말], { isOverOutingMap: true })
+    expect(초상화판().style.bottom).toBe('68px')
+  })
+
+  it('id 6 은 도는 동안 135 · 칠 없음, 끝난 그리기부터 검정 칠 · 252 — 상자는 높이 0 에서 다시 오르고 글을 처음부터 찍는다', () => {
+    띄우기([{ op: 'effect', id: 6 }, 말])
+    틀(4)
+    expect(본체높이()).toBe('55')
+    expect(초상화판().style.bottom).toBe('185px')
+    expect(칠()).toBeNull()
+    // 프레임 9 가 '끝'(+0x10 = 2) 그리기
+    틀(6)
+    expect(칠()?.style.background).toContain('0, 0, 0')
+    expect(초상화판().style.bottom).toBe('68px')
+    expect(Number(본체높이())).toBeLessThan(55)
+    // 효과기가 비워진 뒤에도 [mgr+0x2c8] 은 남아 틀마다 칠한다
+    틀(20)
+    expect(칠()).not.toBeNull()
+    expect(초상화판().style.bottom).toBe('68px')
+    expect(본체높이()).toBe('55')
+  })
+
+  it('id 4 가 끝나면 칠을 걷어 다시 135', () => {
+    띄우기([{ op: 'effect', id: 6 }, 말, { op: 'effect', id: 4 }, 말])
+    틀(30)
+    expect(칠()).not.toBeNull()
+    대사넘기기()
+    // 건 직후 그리기(+0x10 = 0)는 남은 색을 칠한다(0x8b69a) — 도는 동안은 칠도 효과 칠 인자도 없다(0x8b6f0)
+    expect(칠()).not.toBeNull()
+    틀(2)
+    expect(칠()).toBeNull()
+    expect(초상화판().style.bottom).toBe('185px')
+    틀(30)
+    expect(칠()).toBeNull()
+    expect(초상화판().style.bottom).toBe('185px')
+  })
+})

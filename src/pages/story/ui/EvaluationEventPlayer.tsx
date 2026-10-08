@@ -9,6 +9,7 @@ import type { YearGoalWindowSource } from '@/pages/story/lib/yearGoalWindow'
 import { evaluationManagerPortraitsOf } from '@/pages/story/lib/evaluationDialogue'
 import { PORTRAIT_HEIGHT } from '@/pages/story/ui/StoryScreen.css'
 import { SCREEN_HEIGHT } from '@/pages/story/lib/eventDialogue'
+import { portraitBaseYOf } from '@/pages/story/lib/eventBackdrop'
 
 /** 평가 내장 이벤트를 차례로 튼다 — 명령 1 say → 명령 2 system sub 2(변화 창) → (있으면) 명령 3 say(연속 기록) */
 type EvaluationStep = '대사' | '변화' | '연속기록'
@@ -20,8 +21,7 @@ type EvaluationStep = '대사' | '변화' | '연속기록'
  * 화면 효과(0x140007c) 칠이 걸렸을 때만 1 을 넘기는데 평가 이벤트에는 그런 명령이 없어 135 다.
  * 0x7f998 은 (0, 0, W, y + 1) 로 잘라 y 를 바닥으로 그린다.
  */
-const PORTRAIT_BASE_Y = 65 + 72 - 2
-const PORTRAIT_BOTTOM = SCREEN_HEIGHT - PORTRAIT_BASE_Y
+const PORTRAIT_BOTTOM = SCREEN_HEIGHT - portraitBaseYOf(false, false)
 
 interface EvaluationEventPlayerProps {
   /** 116 · 114 밑그림 — 공 무늬 · 상태판([이벤트+0xb] = 1) · 머리띠 */

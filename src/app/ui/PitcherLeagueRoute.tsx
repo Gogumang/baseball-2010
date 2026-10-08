@@ -198,6 +198,8 @@ export function PitcherLeagueRoute({
           <StoryScreen
             // 명령 5 의 500ms 진동(0x3a44)은 환경설정 진동(옵션 +0x3b)이 켜졌을 때만
             isVibrationOn={gameSettings.settings.isVibrationOn}
+            // 초상화 바닥 y — [gfx+0x174] 0x70 · 0x71 이면 252, 그 밖 135 (0x7fdee)
+            isOverOutingMap={isOverMap}
             key={`${story.context}:${event.id}`}
             events={session.storyEvents}
             event={event}

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Hint, MarkupText, MenuList } from '@/shared/ui'
 import type { MenuItem } from '@/shared/ui'
 import { dialogueButton } from '@/shared/ui/DialogueBox/DialogueBox.css'
@@ -17,6 +17,9 @@ import { EventDialogueBox } from '@/pages/story/ui/EventDialogueBox'
 import { speakerPrefixOf } from '@/pages/story/lib/eventDialogue'
 import { SYSTEM_YEAR_GOAL_WINDOW } from '@/pages/story/lib/yearGoalWindow'
 import type { YearGoalWindowSource } from '@/pages/story/lib/yearGoalWindow'
+import { SCREEN_HEIGHT } from '@/pages/story/lib/eventDialogue'
+import { INITIAL_EVENT_BACKDROP, drawEventBackdrop, portraitBaseYOf } from '@/pages/story/lib/eventBackdrop'
+import type { EventBackdropState } from '@/pages/story/lib/eventBackdrop'
 
 /** 화자 번호 1 은 플레이어 이름으로 바꾼다. */
 const PLAYER_SPEAKER = 1
@@ -61,22 +64,58 @@ interface StoryScreenProps {
    * 시즌모드(0x7b999) — 말하는 이 1(선수)의 이름 머리말을 안 붙인다(0x8bab8 의 0x8bafe: 시즌이면 빈 이름).
    */
   readonly isSeasonMode?: boolean
+  /**
+   * 장면 [gfx+0x174] 이 0x70 · 0x71 — 외출 지도(112) · 장소(113) · 대결결과(140, 진입 0x10df8 이 0x7e84c(gfx, 0x70)) 뒤에 뜬 이벤트.
+   * 대화창 0x8b5ac 가 밑그림으로 지도를 깔고, 초상화 바닥 y 가 H − 0x44 = 252 다(0x7fdee). 그 밖(관리 · 연초 · 시즌 …)은 135.
+   * 안 넘기면 거짓.
+   */
+  readonly isOverOutingMap?: boolean
 }
 
 /** 원작 이벤트. 대사마다 원본이 정한 인물·표정·자리로 초상화를 띄운다. */
 export function StoryScreen({
   events, event, playerName, teamName, skinIndex, battingTypeIndex, onComplete, onMatch, carried, replacementsFor,
-  systemWindowTextOf, yearGoalWindowOf, isVibrationOn = true, isSeasonMode = false,
+  systemWindowTextOf, yearGoalWindowOf, isVibrationOn = true, isSeasonMode = false, isOverOutingMap = false,
 }: StoryScreenProps) {
   // 목표 창도 재생기가 멈추는 창이다 — 글 대신 빈 글로 세워 두고 아래에서 창을 그린다
   const windowTextOf = systemWindowTextOf === undefined && yearGoalWindowOf === undefined
     ? undefined
     : (command: SystemCommand) =>
       command.sub === SYSTEM_YEAR_GOAL_WINDOW && yearGoalWindowOf !== undefined ? '' : (systemWindowTextOf?.(command) ?? null)
-  const { step, portraits, next, jump } = useEventPlayback(events, event, onComplete, onMatch, carried, windowTextOf)
+  const { step, portraits, next, jump, clearPortraits } =
+    useEventPlayback(events, event, onComplete, onMatch, carried, windowTextOf)
+  // 0x8b5ac 의 효과 칠 — [mgr+0x2c4](마지막 명령 5 id) · [mgr+0x2c8](칠 색). 재생은 0x8a380 이 비운 값으로 시작한다
+  const [backdrop, setBackdrop] = useState<EventBackdropState>(INITIAL_EVENT_BACKDROP)
+  /** 0x8b6d0~0x8b6ea 로 글 · 상자를 처음으로 돌린 횟수 — 상자를 새로 세우는 열쇠 */
+  const [dialogueResets, setDialogueResets] = useState(0)
+  /** 0x7f7cc 로 상자 높이가 0 이 된 뒤 아직 say 상자가 오르지 않았는가 */
+  const isRisePendingRef = useRef(false)
+  const effectIdRef = useRef(backdrop.effectId)
+  // '끝'(+0x10 = 2) 그리기만 [mgr+0x2c8] 을 바꾸고, id 6 · 7 이면 글 · 초상화 · 상자를 처음으로 돌린다
+  const onEffectorEnd = () => {
+    const ended = drawEventBackdrop({ effectId: effectIdRef.current, fill: null }, '끝')
+    setBackdrop((previous) => drawEventBackdrop({ ...previous, effectId: effectIdRef.current }, '끝').state)
+    if (!ended.resetsDialogue) return
+    clearPortraits()
+    isRisePendingRef.current = true
+    setDialogueResets((count) => count + 1)
+  }
   // 명령 5 화면효과 — 흔들기 오프셋·덮개 (효과기 0xbd844)
-  const effect = useScreenEffect(step, isVibrationOn)
+  const screenEffect = useScreenEffect(step, isVibrationOn, onEffectorEnd)
+  const effect = screenEffect.frame
   const command = step.command
+
+  const effectId = screenEffect.lastEffectId ?? backdrop.effectId
+  effectIdRef.current = effectId
+  const passedEffectId = screenEffect.lastEffectId
+  useEffect(() => {
+    if (passedEffectId !== null) setBackdrop((previous) => ({ ...previous, effectId: passedEffectId }))
+  }, [passedEffectId, step])
+  // '끝' 의 바뀐 색은 위에서 이미 들였으니 이 그리기는 '없음' 처럼 남은 색만 본다
+  const backdropDraw = drawEventBackdrop(
+    { effectId, fill: backdrop.fill }, screenEffect.phase === '끝' ? '없음' : screenEffect.phase,
+  )
+  const portraitBaseY = portraitBaseYOf(isOverOutingMap, backdropDraw.isEffectFill)
 
   // 0x8bab8 — 말하는 이 [명령+0x20]: 1 은 선수 이름(시즌모드면 빈 머리말) · 2~24 는 StrMODE[말하는 이 + 91] · 그 밖 없음
   const speakerName =
@@ -93,9 +132,12 @@ export function StoryScreen({
   /** 이 재생에서 say 를 이미 그렸는가 — 첫 say 만 상자가 올라온다 (114 진입 0x8be20 이 [mgr+0x2c0] = 0, 0x8d1f2 가 1) */
   const hasShownSayRef = useRef(false)
   const isFirstSay = command?.op === 'say' && !hasShownSayRef.current
+  const isSayRising = isFirstSay || (command?.op === 'say' && isRisePendingRef.current)
   useEffect(() => {
-    if (command?.op === 'say') hasShownSayRef.current = true
-  }, [command])
+    if (command?.op !== 'say') return
+    hasShownSayRef.current = true
+    isRisePendingRef.current = false
+  }, [command, dialogueResets])
 
   const menu: MenuItem[] | null =
     command?.op === 'choice'
@@ -115,13 +157,23 @@ export function StoryScreen({
       style={effect === null || (effect.offset.x === 0 && effect.offset.y === 0)
         ? undefined
         : { transform: `translate(${effect.offset.x}px, ${effect.offset.y}px)` }}>
-      <EventPortraits portraits={portraits} height={styles.PORTRAIT_HEIGHT}
-        skinIndex={skinIndex} battingTypeIndex={battingTypeIndex} />
+      {backdropDraw.fill !== null && (
+        // 0x6a734 — 밑그림 위 · 상자와 초상화 아래에 화면 전체를 칠한다 ([mgr+0x2c8])
+        <div className={styles.backdropFill} data-testid="event-backdrop-fill"
+          style={{ background: backdropDraw.fill === '흰색' ? '#FFFFFF' : '#000000' }} />
+      )}
+
+      {/* 초상화 바닥 y — 0x7fbc4 끝 0x7fdee (외출 지도 · 효과 칠 252, 그 밖 135) */}
+      <div className={styles.portraitLayer} data-testid="event-portrait-layer"
+        style={{ bottom: SCREEN_HEIGHT - portraitBaseY }}>
+        <EventPortraits portraits={portraits} height={styles.PORTRAIT_HEIGHT}
+          skinIndex={skinIndex} battingTypeIndex={battingTypeIndex} />
+      </div>
 
       {command?.op === 'say' && (
-        <EventDialogueBox key={`${step.cursor.eventId}:${step.cursor.commandIndex}`}
+        <EventDialogueBox key={`${step.cursor.eventId}:${step.cursor.commandIndex}:${dialogueResets}`}
           raw={`${speakerPrefixOf(speakerName)}${command.text}`} replacements={replacements}
-          slideIn={isFirstSay} onAdvance={next} />
+          slideIn={isSayRising} onAdvance={next} />
       )}
 
       {dialogue !== '' && (

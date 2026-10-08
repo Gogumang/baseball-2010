@@ -10,12 +10,11 @@ export const PORTRAIT_HEIGHT = 104
 
 /**
  * 이벤트는 관리 화면 위에 겹쳐 뜬다 (trigger 0). 240×320 칸 전체를 덮되 뒤 화면이 비치도록
- * 배경은 칠하지 않고, 초상화·선택지만 아래쪽에 모은다. say 대사 상자(`EventDialogueBox`)는 화면 좌표로 따로 놓인다.
- * 아래 여백 68 = 대사 상자 띠 위 (H − 55 − 12 − 1) — 초상화 바닥을 상자 위에 둔다.
+ * 배경은 칠하지 않는다. say 대사 상자(`EventDialogueBox`)와 초상화 판(`portraitLayer`)은 화면 좌표로 따로 놓이고,
+ * 선택지 · 알림만 아래 여백 68 = 대사 상자 띠 위 (H − 55 − 12 − 1) 에 모은다.
  * 초상화 바닥 y (0x7fbc4 끝 0x7fdee~0x7fe4c → 0x7f998(창, y), 직접 떴다): 장면 [gfx+0x174] 이 0x70 · 0x71(외출 지도)이거나
- * 0x8b5ac 가 효과 칠 인자(화면 효과 0x140007c 칠이 걸린 동안)를 1 로 넘기면 H − 0x44 = 252, 그 밖은 mode_ui 프레임 10
- * 박스 0 (0, 65, 240, 72) 의 y + h − 2 = **135**(관리 화면 위). ⚠️ 이 판은 아직 모든 곳에서 252(아래 여백 68)에 둔다 —
- * 관리 · 연초 · 시즌 맥락(app 라우트의 `NariEventUnderlay` 쪽)을 135 로 나누는 일은 남았다. 평가 이벤트는 `EvaluationEventPlayer` 가 135.
+ * 0x8b5ac 가 효과 칠 인자를 1 로 넘기면 H − 0x44 = 252, 그 밖은 mode_ui 프레임 10 박스 0 (0, 65, 240, 72) 의
+ * y + h − 2 = **135**(관리 화면 위) — `pages/story/lib/eventBackdrop`. 맥락은 app 라우트가 `isOverOutingMap` 으로 넘긴다.
  */
 export const overlay = style({
   position: 'absolute',
@@ -27,6 +26,22 @@ export const overlay = style({
   gap: '4px',
   padding: '0 8px 68px',
   zIndex: 30,
+})
+
+/** 초상화 판 — 바닥(아래 여백 = H − 바닥 y)은 그릴 때 정한다 */
+export const portraitLayer = style({
+  position: 'absolute',
+  left: 0,
+  right: 0,
+  pointerEvents: 'none',
+})
+
+/** 0x8b5ac 의 화면 칠 0x6a734 ([mgr+0x2c8]) — 밑그림을 덮고 초상화 · 상자 · 창 아래에 깐다 */
+export const backdropFill = style({
+  position: 'absolute',
+  inset: 0,
+  zIndex: -1,
+  pointerEvents: 'none',
 })
 
 /** 명령 5 화면효과 덮개 — 240×320 칸 전체를 덮고 누르기는 막지 않는다 (효과기 0xbd844 의 (0, 0, 폭, 높이) 칠하기) */

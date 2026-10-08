@@ -268,6 +268,7 @@ export function SeasonRoute({
 
   // 이벤트 재생 0xd3 (갱신 0x5110 · 키 0x90ec · 그리기 0xa09c → 대화창 0x8b5ac).
   // 대화창 0x8b5ac 가 공 무늬 · 상태판(둘째 인자 [이벤트+0xb]) · 머리띠를 먼저 깐다 (`SeasonEventUnderlay`).
+  // 지도 갈래([gfx+0x174] 0x70 · 0x71)가 아니므로 초상화 바닥 y 는 135 다(0x7fdee — `StoryScreen` 기본).
   if (scene === SEASON_SCENE_STATE.이벤트재생 && session.eventPlayback !== null) {
     const playback = session.eventPlayback
     const event = SEASON_PLAYABLE_EVENTS.find((candidate) => candidate.id === playback.eventId)
