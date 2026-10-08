@@ -523,6 +523,8 @@ export function SeasonRoute({
         onFinish={actions.closeTradeResult}
         onCancelRequest={actions.cancelTradeRequest}
         onBack={backToTeamMenu}
+        // 0xe4 히든 칸 힌트 — 해금(전역 +0x70)이면 [0] 줄이 빠진다 (0x82f0)
+        openedHiddenIds={hallOfFame?.openedHiddenIds ?? []}
       />
     )
   }

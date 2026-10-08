@@ -143,7 +143,7 @@ export const ORIGINAL_SOUNDS: readonly OriginalSound[] = [
   { id: 31, role: 'jingle', name: '승리 징글 · 신기록(0x1f)', scene: '경기 결과 승리 · 홈런더비 최고 비거리 갱신(0x4f574) · 최고 기록 저장 +0x5c 갱신' },
   { id: 32, role: 'jingle', name: '패배 징글 · 기록 실패(0x20)', scene: '경기 결과 패배 · 신기록이 아닐 때 · 돌발미션 결과 1(실패)' },
   { id: 33, role: 'bgm', name: '경기 배경음', scene: '경기 장면 0x104 상태 0x21 자동진행 중계 (0x3abf0) · 0x48480 · 0x4258c' },
-  { id: 34, role: 'effect', name: '용도 미해결', scene: '경기 장면 0x52392 갈래 — 장면을 못 밝혔다' },
+  { id: 34, role: 'effect', name: '용도 미해결', scene: '이벤트 스크립트 소리 명령 6(데이터 번호 35 → 파일 34, 0x8d470)이 부른다 — 0x52392 는 34 가 아니라 타석 등장음 14 의 자리다' },
   { id: 35, role: 'effect', name: '돌발 결과 보상 (등급 3·4)', scene: '돌발 결과 대사 394·395' },
   /**
    * 평가 창이 보는 값은 레코드 `+0x4a` = **직전 경기 인기도 변화 p** 로 확정돼 있다
@@ -165,8 +165,8 @@ export const ORIGINAL_SOUNDS: readonly OriginalSound[] = [
   { id: 42, role: 'effect', name: '돌발미션 시작 (0x2a)', scene: '후보 추첨 뒤 대사 로드 0x8eba0 · 0x8e2dc' },
   { id: 44, role: 'bgm', name: '벤치 클리어링 (loop 목록에 든다)', scene: '경기 상태 0x1e 진입 0x3a5f0 꼬리 0x3aba4 — 0x6e498(음, 0x2c, 0) 예약, 나갈 때 0x6e418 로 끊는다' },
   { id: 46, role: 'bgm', name: '엔딩 배경음', scene: '0x106 상태 141 엔딩 화면 · 0x105 상태 245 예약' },
-  { id: 48, role: 'effect', name: '용도 미해결', scene: '부르는 곳을 못 찾았다' },
-  { id: 50, role: 'effect', name: '용도 미해결', scene: '부르는 곳을 못 찾았다' },
+  { id: 48, role: 'effect', name: '용도 미해결', scene: '이벤트 스크립트 소리 명령 6(데이터 번호 49 → 파일 48, 0x8d470)이 부른다' },
+  { id: 50, role: 'effect', name: '용도 미해결', scene: '이벤트 스크립트 소리 명령 6(데이터 번호 51 → 파일 50, 0x8d470)이 부른다' },
   { id: 51, role: 'effect', name: '돌발 결과 페널티', scene: '돌발 결과 대사 396 (인기도 −5 · 평판 −4)' },
   { id: 52, role: 'bgm', name: '용도 미해결 (loop 목록에 든다)', scene: '이벤트 스크립트 명령 6 의 loop 목록에만 있다' },
   { id: 53, role: 'effect', name: '선수 넘어짐 / 공 놓침(펌블)', scene: '야수 동작 0xd (0xa1e60) — +0xb4 = 15 동안 먼지·고리 애니' },
