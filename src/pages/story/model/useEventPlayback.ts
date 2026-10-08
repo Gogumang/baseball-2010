@@ -99,11 +99,11 @@ export function useEventPlayback(
   const next = () => setCursor(advanceCursor(stepRef.current.cursor))
   const jump = (eventId: number) => setCursor(jumpToEvent(eventId))
 
-  // 대사·알림은 Enter/Space 로 넘긴다. 선택지는 메뉴가 키를 가져간다.
+  // 알림은 Enter/Space 로 넘긴다. 대사(say)는 대사 상자(`EventDialogueBox` — 키 0x8b804)가, 선택지는 메뉴가 키를 가져간다.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const op = stepRef.current.command?.op
-      if (op !== 'say' && op !== 'system') return
+      if (op !== 'system') return
       if (event.key !== 'Enter' && event.key !== ' ') return
       if (event.target instanceof HTMLButtonElement) return
       event.preventDefault()

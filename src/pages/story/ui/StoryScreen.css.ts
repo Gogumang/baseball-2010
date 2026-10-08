@@ -1,5 +1,4 @@
 import { style } from '@vanilla-extract/css'
-import { theme } from '@/app/styles/theme.css'
 
 /**
  * 초상화 판 높이. 가장 큰 인물(event_char_1, 101px)이 들어가는 값.
@@ -9,21 +8,11 @@ import { theme } from '@/app/styles/theme.css'
  */
 export const PORTRAIT_HEIGHT = 104
 
-export const nameTag = style({
-  alignSelf: 'flex-start',
-  marginBottom: '-8px',
-  padding: '1px 8px',
-  border: `2px solid ${theme.color.line}`,
-  borderBottom: 'none',
-  background: theme.color.panelRaised,
-  color: theme.color.accent,
-  fontSize: '11px',
-  fontWeight: 700,
-})
-
 /**
  * 이벤트는 관리 화면 위에 겹쳐 뜬다 (trigger 0). 240×320 칸 전체를 덮되 뒤 화면이 비치도록
- * 배경은 칠하지 않고, 대사·선택지만 아래쪽에 모은다.
+ * 배경은 칠하지 않고, 초상화·선택지만 아래쪽에 모은다. say 대사 상자(`EventDialogueBox`)는 화면 좌표로 따로 놓인다.
+ * 아래 여백 68 = 대사 상자 띠 위 (H − 55 − 12 − 1) — 초상화 바닥을 상자 위에 둔다.
+ * ⚠️ 114 의 초상화 바닥 y 는 미해결이다(A 7절 — 112·113 은 H − 68, 그 밖은 [mgr+0x138] 프레임 사각형 값을 안 떴다).
  */
 export const overlay = style({
   position: 'absolute',
@@ -33,7 +22,7 @@ export const overlay = style({
   justifyContent: 'flex-end',
   alignItems: 'stretch',
   gap: '4px',
-  padding: '0 8px 24px',
+  padding: '0 8px 68px',
   zIndex: 30,
 })
 

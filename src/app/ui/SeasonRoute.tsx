@@ -279,6 +279,8 @@ export function SeasonRoute({
             <StoryScreen
               // 명령 5 의 500ms 진동(0x3a44)은 환경설정 진동(옵션 +0x3b)이 켜졌을 때만
               isVibrationOn={gameSettings.settings.isVibrationOn}
+              // 0x8bab8 — 시즌모드(0x7b999)면 말하는 이 1 의 이름 머리말이 없다
+              isSeasonMode
               key={playback.serial}
               events={SEASON_PLAYABLE_EVENTS}
               event={event}

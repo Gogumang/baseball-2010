@@ -2,7 +2,8 @@
 import { useEffect } from 'react'
 import type { ComponentProps } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { SeasonRoute } from '@/app/ui/SeasonRoute'
 import { useSeasonSession } from '@/app/model/useSeasonSession'
 import { useGameSettings } from '@/app/model/useGameSettings'
@@ -213,11 +214,17 @@ describe('구단관리 트레이드·코치채용 배선 (0xe4 · 0xd7)', () => 
 
 describe('이벤트 재생 0xd3 배선', () => {
   it('해마다 첫 관리 메뉴에서 연초 목표 — 감독 대사 다음 올해의 목표 창, 닫으면 관리 메뉴', () => {
+    vi.useFakeTimers()
     const store = 메모리저장(세이브(레코드({ seenEvents: [400, 1] })))
     render(<시즌화면 store={store} onExit={vi.fn()} />)
 
-    expect(document.body.textContent).toContain('올해의 목표다!!')
-    fireEvent.click(screen.getByText(/올해의 목표다!!/))
+    // 재생기 say 상자 — 다 오르고 글을 끝까지 찍은 뒤 확인 (0x7fbc4 · 0x8b804)
+    act(() => {
+      vi.advanceTimersByTime(200 * millisecondsPerFrame())
+    })
+    expect(screen.getByTestId('대사-상자').textContent).toContain('올해의 목표다!!')
+    fireEvent.click(screen.getByRole('button', { name: '대사 넘기기' }))
+    vi.useRealTimers()
     // SYS(sub 1) 창 — 0x8656c 모드 2 갈래: 이름 0xd41f4 [순위 · 승률 · 타율 · 방어 · 인기도]
     const 창 = screen.getByTestId('올해의-목표-창')
     const 글 = [...창.querySelectorAll('img[data-frame]')].map((image) => Number(image.getAttribute('data-frame')))

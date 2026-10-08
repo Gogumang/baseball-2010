@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { Hint, MarkupText, MenuList } from '@/shared/ui'
 import type { MenuItem } from '@/shared/ui'
 import { dialogueButton } from '@/shared/ui/DialogueBox/DialogueBox.css'
@@ -12,6 +13,8 @@ import type { MatchCommand, SystemCommand } from '@/pages/story/model/useEventPl
 import type { StoryCarry } from '@/entities/story/model/aceMatch'
 import * as styles from '@/pages/story/ui/StoryScreen.css'
 import { YearGoalWindow } from '@/pages/story/ui/YearGoalWindow'
+import { EventDialogueBox } from '@/pages/story/ui/EventDialogueBox'
+import { speakerPrefixOf } from '@/pages/story/lib/eventDialogue'
 import { SYSTEM_YEAR_GOAL_WINDOW } from '@/pages/story/lib/yearGoalWindow'
 import type { YearGoalWindowSource } from '@/pages/story/lib/yearGoalWindow'
 
@@ -54,12 +57,16 @@ interface StoryScreenProps {
    * 안 넘기면 켠 것으로 본다(원본 기본값 켬).
    */
   readonly isVibrationOn?: boolean
+  /**
+   * 시즌모드(0x7b999) — 말하는 이 1(선수)의 이름 머리말을 안 붙인다(0x8bab8 의 0x8bafe: 시즌이면 빈 이름).
+   */
+  readonly isSeasonMode?: boolean
 }
 
 /** 원작 이벤트. 대사마다 원본이 정한 인물·표정·자리로 초상화를 띄운다. */
 export function StoryScreen({
   events, event, playerName, teamName, skinIndex, battingTypeIndex, onComplete, onMatch, carried, replacementsFor,
-  systemWindowTextOf, yearGoalWindowOf, isVibrationOn = true,
+  systemWindowTextOf, yearGoalWindowOf, isVibrationOn = true, isSeasonMode = false,
 }: StoryScreenProps) {
   // 목표 창도 재생기가 멈추는 창이다 — 글 대신 빈 글로 세워 두고 아래에서 창을 그린다
   const windowTextOf = systemWindowTextOf === undefined && yearGoalWindowOf === undefined
@@ -71,16 +78,24 @@ export function StoryScreen({
   const effect = useScreenEffect(step, isVibrationOn)
   const command = step.command
 
+  // 0x8bab8 — 말하는 이 [명령+0x20]: 1 은 선수 이름(시즌모드면 빈 머리말) · 2~24 는 StrMODE[말하는 이 + 91] · 그 밖 없음
   const speakerName =
     command?.op !== 'say' || command.speaker === 0
       ? null
       : command.speaker === PLAYER_SPEAKER
-        ? playerName
+        ? (isSeasonMode ? null : playerName)
         : (SPEAKER_NAMES[command.speaker] ?? null)
   const replacements =
     replacementsFor?.(step.cursor.eventId) ??
     (command?.op === 'say' && command.format === TEAM_NAME_FORMAT ? [teamName] : [playerName, teamName])
-  const dialogue = command?.op === 'say' || command?.op === 'yesno' ? command.text : command?.op === 'system' ? (command.text ?? '') : ''
+  // say 는 재생기 대사 상자(`EventDialogueBox`)가 그린다 — 여기 글은 예아니오 · 알림 창 글
+  const dialogue = command?.op === 'yesno' ? command.text : command?.op === 'system' ? (command.text ?? '') : ''
+  /** 이 재생에서 say 를 이미 그렸는가 — 첫 say 만 상자가 올라온다 (114 진입 0x8be20 이 [mgr+0x2c0] = 0, 0x8d1f2 가 1) */
+  const hasShownSayRef = useRef(false)
+  const isFirstSay = command?.op === 'say' && !hasShownSayRef.current
+  useEffect(() => {
+    if (command?.op === 'say') hasShownSayRef.current = true
+  }, [command])
 
   const menu: MenuItem[] | null =
     command?.op === 'choice'
@@ -91,7 +106,7 @@ export function StoryScreen({
             { id: String(command.noEvent), label: '아니오' },
           ]
         : null
-  const isDialogue = command?.op === 'say' || command?.op === 'system'
+  const isDialogue = command?.op === 'system'
   const isYearGoalWindow = command?.op === 'system' && command.sub === SYSTEM_YEAR_GOAL_WINDOW && yearGoalWindowOf !== undefined
 
   return (
@@ -102,7 +117,12 @@ export function StoryScreen({
         : { transform: `translate(${effect.offset.x}px, ${effect.offset.y}px)` }}>
       <EventPortraits portraits={portraits} height={styles.PORTRAIT_HEIGHT}
         skinIndex={skinIndex} battingTypeIndex={battingTypeIndex} />
-      {speakerName !== null && <span className={styles.nameTag}>{speakerName}</span>}
+
+      {command?.op === 'say' && (
+        <EventDialogueBox key={`${step.cursor.eventId}:${step.cursor.commandIndex}`}
+          raw={`${speakerPrefixOf(speakerName)}${command.text}`} replacements={replacements}
+          slideIn={isFirstSay} onAdvance={next} />
+      )}
 
       {dialogue !== '' && (
         <button type="button" className={dialogueButton} onClick={isDialogue ? next : undefined}>
@@ -115,7 +135,7 @@ export function StoryScreen({
       {menu !== null ? (
         // 원본 선택지는 대사 창 안 글줄이라 화살표·판이 없고 고른 줄만 노랑이다 (0x7fd22, R14 3-4)
         <MenuList items={menu} cursorStyle="선택지" onSelect={(id) => jump(Number(id))} />
-      ) : (
+      ) : command?.op === 'say' ? null : (
         <Hint>대사창을 누르거나 Enter</Hint>
       )}
 
