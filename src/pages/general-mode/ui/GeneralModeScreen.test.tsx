@@ -114,6 +114,9 @@ describe('경기 시작', () => {
     const onGameStart = vi.fn()
     const onGameSave = vi.fn()
     띄우기({ isQuickStart: true, onGameStart, onGameSave })
+    // 22 들어옴 0x30f20 이 이미 블록만 한 번 썼다(31134 0x22755) — OK 는 그 뒤 첫 저장이다
+    expect(onGameSave).toHaveBeenCalledTimes(1)
+    onGameSave.mockClear()
 
     fireEvent.click(screen.getByRole('button', { name: '경기 시작' }))
 
