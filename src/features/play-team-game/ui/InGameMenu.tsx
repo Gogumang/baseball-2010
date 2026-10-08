@@ -160,6 +160,8 @@ export function InGameMenu({
         key="메뉴"
         items={items}
         initialIndex={cursor}
+        // 0x3c02c 의 목록은 `0x6bfe1(1열, 4|5줄, 숫자키 꼴 2, 0x230)`(0x3c08e) — 숫자로 칸을 바로 고르고 OK 다
+        selectsByDigit
         onCursorChange={(index) => {
           setCursor(index)
           onCursorChange?.(index)

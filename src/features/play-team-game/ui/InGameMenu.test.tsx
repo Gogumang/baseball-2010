@@ -152,3 +152,23 @@ describe('경기 중 메뉴 — [조작방법] · [설정] 은 울리던 소리�
     expect(port.stop).not.toHaveBeenCalled()
   })
 })
+
+describe('경기 중 메뉴 숫자키 — 목록 0x6bfe1(1열, 4|5줄, 숫자키 꼴 2, 0x230) (0x3c08e · 0x6c100)', () => {
+  it('숫자 n 은 n 번째 칸을 바로 고르고 OK 다 — 1 = 계속', () => {
+    const onContinue = vi.fn()
+    render(<InGameMenu mode={6} onContinue={onContinue} />)
+    fireEvent.keyDown(window, { key: '1' })
+    expect(onContinue).toHaveBeenCalledTimes(1)
+  })
+
+  it('칸이 있으면 커서를 옮기고 묻는 칸이면 질문으로 간다 — 칸 수를 넘는 숫자는 아무 일도 없다', () => {
+    const onCursorChange = vi.fn()
+    render(<InGameMenu mode={6} onContinue={vi.fn()} onRestart={vi.fn()} onCursorChange={onCursorChange} />)
+    fireEvent.keyDown(window, { key: '9' })
+    expect(onCursorChange).not.toHaveBeenCalledWith(8)
+
+    const restartIndex = screen.getAllByRole('option').findIndex((option) => option.textContent?.includes('다시하기'))
+    fireEvent.keyDown(window, { key: String(restartIndex + 1) })
+    expect(screen.getByText(/다시 플레이하시겠습니까/)).toBeTruthy()
+  })
+})

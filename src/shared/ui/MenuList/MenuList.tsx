@@ -24,6 +24,12 @@ interface MenuListProps {
   readonly initialIndex?: number
   /** 커서가 옮겨질 때마다 불린다 — 부르는 쪽이 커서를 들고 있다가 `initialIndex` 로 되돌려 줄 때 쓴다 */
   readonly onCursorChange?: (index: number) => void
+  /**
+   * 숫자키로 칸을 바로 고른다 — 원본 목록의 **숫자키 꼴 2** (0x6c031 의 0x6c100~0x6c14e).
+   * '1'~'9' 는 칸 0~8, '0' 은 칸 9 이고 칸이 있으면 커서를 그 칸으로 옮긴 뒤(vt+0xc) **곧바로 OK(−5)** 로 돌려준다.
+   * 안 주면 숫자키를 안 받는다. 예: 경기 중 메뉴 0x3c02c 의 `0x6bfe1(1열, 4|5줄, 2, 0x230)`.
+   */
+  readonly selectsByDigit?: boolean
 }
 
 /**
@@ -36,6 +42,7 @@ export function MenuList({
   onSelect,
   initialIndex = 0,
   onCursorChange,
+  selectsByDigit = false,
 }: MenuListProps) {
   const [selectedIndex, setSelectedIndex] = useState(() =>
     initialIndex >= 0 && initialIndex < items.length ? initialIndex : 0,
@@ -48,6 +55,8 @@ export function MenuList({
 
   const onSelectRef = useRef(onSelect)
   onSelectRef.current = onSelect
+  const selectsByDigitRef = useRef(selectsByDigit)
+  selectsByDigitRef.current = selectsByDigit
 
   /**
    * 메뉴 **구성이 바뀌면** 커서를 첫 항목으로 되돌린다.
@@ -82,6 +91,17 @@ export function MenuList({
         setSelectedIndex(
           (previous) => (previous + step + currentItems.length) % currentItems.length,
         )
+        return
+      }
+
+      if (selectsByDigitRef.current && /^[0-9]$/.test(event.key)) {
+        const index = event.key === '0' ? 9 : Number(event.key) - 1
+        if (index >= currentItems.length) return
+        event.preventDefault()
+        selectedIndexRef.current = index
+        setSelectedIndex(index)
+        const selected = currentItems[index]
+        if (selected !== undefined && selected.isDisabled !== true) onSelectRef.current(selected.id)
         return
       }
 
