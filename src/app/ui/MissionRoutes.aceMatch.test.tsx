@@ -40,16 +40,18 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
     if (mission === null) throw new Error('투수 미션 17 이 없다')
     const onFinish = vi.fn()
     const screen: Screen = { kind: '투수편' }
+    let 세션: ReturnType<typeof useMissionSession> | null = null
 
     function Harness() {
       const runner = useAtBatRunner()
       const session = useMissionSession({
         runner, random: createSeededRandom(1), missionRecord: { load: () => ({}), save: vi.fn() }, screen, setScreen: vi.fn(),
       })
+      세션 = session
       return (
         <PitcherAceMatchRoute
           mission={mission!} session={session} runner={runner} pitchControl="게이지" gameSettings={설정 as never}
-          onFinish={onFinish}
+          onFinish={onFinish} onQuit={vi.fn()}
         />
       )
     }
@@ -59,16 +61,43 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
     expect(shown.settings).toBe(설정.settings)
     expect(shown.onSettingsChange).toBe(설정.setSettings)
     expect(shown.onRestart).toBeTypeOf('function')
-    act(() => shown.onGiveUp())
+    act(() => 세션!.actions.giveUpPitcher())
     expect(받은것.at(-1)?.run.status).toBe('실패')
     // 다시하기 — 새 판(진행중)이고 여전히 대결이다: 끝나면 투수편으로 이겼나를 넘긴다
     act(() => 받은것.at(-1)!.onRestart!())
     const again = 받은것.at(-1)!
     expect(again.run.mission).toBe(mission)
     expect(again.run.status).toBe('진행중')
-    act(() => again.onGiveUp())
+    act(() => 세션!.actions.giveUpPitcher())
     act(() => 받은것.at(-1)!.onFinish())
     expect(onFinish).toHaveBeenCalledWith(false)
+  })
+
+  it('경기 중 "나가기" 0x40140 — 결과 판 없이 메인 메뉴로, 투수편 세션은 대결을 내려놓는다(이겼나를 안 넘긴다)', () => {
+    const mission = aceMatchMissionOf(17, '투수')
+    if (mission === null) throw new Error('투수 미션 17 이 없다')
+    const onFinish = vi.fn()
+    const onQuit = vi.fn()
+    const setScreen = vi.fn()
+    const screen: Screen = { kind: '투수편' }
+
+    function Harness() {
+      const runner = useAtBatRunner()
+      const session = useMissionSession({
+        runner, random: createSeededRandom(1), missionRecord: { load: () => ({}), save: vi.fn() }, screen, setScreen,
+      })
+      return (
+        <PitcherAceMatchRoute
+          mission={mission!} session={session} runner={runner} pitchControl="게이지" gameSettings={설정 as never}
+          onFinish={onFinish} onQuit={onQuit}
+        />
+      )
+    }
+    render(<Harness />)
+    act(() => 받은것.at(-1)!.onGiveUp())
+    expect(onQuit).toHaveBeenCalledTimes(1)
+    expect(setScreen).toHaveBeenLastCalledWith({ kind: '메인메뉴' })
+    expect(onFinish).not.toHaveBeenCalled()
   })
 
   it('들어서면 투수 미션 레코드로 대결을 세워 투구 화면을 띄우고, 결과 [확인]에서 이겼나를 넘긴다', () => {
@@ -77,16 +106,18 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
     const onFinish = vi.fn()
     const screen: Screen = { kind: '투수편' }
     const random = createSeededRandom(1)
+    let 세션: ReturnType<typeof useMissionSession> | null = null
 
     function Harness() {
       const runner = useAtBatRunner()
       const session = useMissionSession({
         runner, random, missionRecord: { load: () => ({}), save: vi.fn() }, screen, setScreen: vi.fn(),
       })
+      세션 = session
       return (
         <PitcherAceMatchRoute
           mission={mission!} session={session} runner={runner} pitchControl="게이지" gameSettings={설정 as never}
-          onFinish={onFinish}
+          onFinish={onFinish} onQuit={vi.fn()}
         />
       )
     }
@@ -94,7 +125,7 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
 
     const shown = 받은것.at(-1)
     expect(shown?.run.mission).toMatchObject({ side: '투수', id: 18, name: '로제' })
-    act(() => shown?.onGiveUp())
+    act(() => 세션!.actions.giveUpPitcher())
     const finished = 받은것.at(-1)
     expect(finished?.run.status).toBe('실패')
     act(() => finished?.onFinish())

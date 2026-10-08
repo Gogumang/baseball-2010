@@ -1,6 +1,7 @@
 import { batterCollectorHiddenIdsOf } from '@/entities/collection/model/collection'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Screen } from '@/app/model/screen'
+import { EMPTY_STORY_CARRY, matchResultEventOf } from '@/entities/story/model/aceMatch'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import { isAtBatFinished } from '@/entities/at-bat/model/atBatState'
 import { describeOutcomeBanner } from '@/entities/at-bat/model/resolutionText'
@@ -258,6 +259,17 @@ function withRewardResumePatch(career: PlayerCareer, eventId: number, items: rea
   if (patch.nationalCup === true) return withNationalCupEntered(salaried)
   const state = nariSeasonEndStateOfResumeCode(patch.resumeCode)
   return salaried.seasonEndState === state ? salaried : { ...salaried, seasonEndState: state }
+}
+
+/**
+ * **나간 마선수 대결의 결과 이벤트** — 105 진입 곁가지 0x11b46~0x11b6a: 전역 g[0x11f] 가 서 있고 모드가 4(타자편)면 현재를
+ * 112(0x70)로 · 0x7e84d(그림, 0x70) · 0x118e4 · 다음 140(11b94~11bbe). 140 진입 0x10df8 이 결과 바이트 g[0x144](SYS 8 이 적은 0 이
+ * 남았다 = 짐)로 resultEvents[1] 을 0x8bdc9 로 튼다 · [다음 114, 뒤 105]. 대기가 없으면 null.
+ */
+function pendingAceMatchScreenOf(career: PlayerCareer): Screen | null {
+  const resultEvents = career.pendingAceMatchResultEvents
+  if (resultEvents === undefined) return null
+  return { kind: '이벤트', eventId: matchResultEventOf(resultEvents, false), context: '대결결과', carried: EMPTY_STORY_CARRY }
 }
 
 /** 타자 스킬 22 압도 — 상대 투수 투구 스태미나 소모 ×2 (0xa5f0e) */
@@ -1030,6 +1042,9 @@ export function useCareerSession({
      * 틀며 전역기록 +0xa8 = 1 도 쓰는데(0x11412~0x1141c) 엔딩 판 0x87c7c 가 같은 칸(+0xa8 + 0)을 다시 쓴다(`mergeEndingIntoCollection`).
      */
     if (judgeEnding(career) === 0) return setScreen({ kind: '이벤트', eventId: INJURY_ENDING_EVENT_ID, context: '관리' })
+    // 나간 마선수 대결 — 곁가지 0x11b46~0x11bbe 가 112 → 140 (`pendingAceMatchScreenOf`)
+    const pendingAceMatch = pendingAceMatchScreenOf(career)
+    if (pendingAceMatch !== null) return setScreen(pendingAceMatch)
     /*
      * 105 진입 0x11910 곁가지(0x11b24~): S+0x1b7 == 0(올해 목표 창 아직 안 봄) → **115 연초** 가 138 보다 먼저다.
      * 115 진입 0x16aac: 내장 이벤트 0x8a681 → `[다음 114, 뒤 105]` → `0xa4ee9(S)` — 마이너스 스킬 해제 기록
@@ -1066,8 +1081,24 @@ export function useCareerSession({
     if (!injuryEntryPendingRef.current || !isAtManagement || career === null || story.events === null) return
     injuryEntryPendingRef.current = false
     if (managementCheck !== null || !career.seenEventIds.includes(String(OPENING_EVENT_ID))) return
-    if (judgeEnding(career) === 0) setScreen({ kind: '이벤트', eventId: INJURY_ENDING_EVENT_ID, context: '관리' })
+    if (judgeEnding(career) === 0) return setScreen({ kind: '이벤트', eventId: INJURY_ENDING_EVENT_ID, context: '관리' })
+    // 같은 곧은 길의 다음 줄 0x11b46~0x11bbe — 나간 마선수 대결의 결과 이벤트
+    const pendingAceMatch = pendingAceMatchScreenOf(career)
+    if (pendingAceMatch !== null) setScreen(pendingAceMatch)
   }, [isAtManagement, managementCheck, career, story.events, setScreen])
+
+  /*
+   * 140 진입 0x10df8 — 결과 이벤트를 틀며 대기 칸(g[0xec] · g[0xee] · g[0x11f] · g[0x144])을 지우고 전역기록을 저장한다(10f72).
+   * 웹은 결과 이벤트('대결결과')가 열리는 자리면 어디서 왔든(대결을 마치고 · 105 진입에서) 칸을 지운다.
+   */
+  const isAceMatchResultScreen = screen.kind === '이벤트' && screen.context === '대결결과'
+  useEffect(() => {
+    if (!isAceMatchResultScreen) return
+    setCareer((current) =>
+      current === null || current.pendingAceMatchResultEvents === undefined
+        ? current
+        : { ...current, pendingAceMatchResultEvents: undefined })
+  }, [isAceMatchResultScreen])
 
   /**
    * 새 시즌 처리 `0x1b768` → 137 "N년차" → 105 관리 화면.
@@ -1787,6 +1818,17 @@ export function useCareerSession({
       if (career === null) return
       const visited = spendCycleAction({ ...career, outingsThisSeason: career.outingsThisSeason + 1 })
       setCareer(visited)
+    },
+
+    /**
+     * **SYS 8 타자편 갈래**(0x8d782~0x8d7ce) — g[0xf7] = team − 1 · g[0xec]/g[0xee] = 결과 이벤트 · g[0x11f] = 1 · g[0x144] = 0 ·
+     * g[0xf6] = 모드 → 전역기록 저장(8d84a) · 지금 이벤트 본 표시(8d85c) · 커리어 저장(8d870). match 가 끝남을 돌려 114 끝
+     * 0x1c014 의 0x8b0e4 가 떠나온 줄도 본 표시 · 저장한다. 대결을 나가도(0x40140) 이 칸들은 저장에 남는다.
+     */
+    holdAceMatch: (resultEvents: readonly number[], viewedEventIds: readonly number[]) => {
+      setCareer((current) => current === null
+        ? current
+        : { ...markRewardedEvent(current, null, viewedEventIds), pendingAceMatchResultEvents: resultEvents })
     },
 
     /**

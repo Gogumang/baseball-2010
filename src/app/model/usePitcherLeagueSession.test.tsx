@@ -1187,6 +1187,44 @@ describe('마선수 대결 (match → 투수 미션 team−1 → 140 결과 이�
     act(() => result.current.actions.finishAceMatch(false))
     expect(result.current.story?.eventId).toBe(125)
   })
+
+  it('경기 중 "나가기" 0x40140 — 저장에 남은 대기(SYS 8)로 다음 105 진입이 112 → 140 진 결과 이벤트를 띄우고 칸을 지운다', async () => {
+    const store = 메모리저장()
+    const { result } = 띄우기(store)
+    act(() => result.current.actions.create('투수', 신인))
+    await 이벤트불러오기(result)
+    첫이벤트넘기기(result)
+    while (result.current.scene === '이벤트') 이벤트끝내기(result)
+    act(() => result.current.actions.openOuting())
+    act(() => result.current.actions.enterOutingPlace(OUTING_PLACES[0]))
+    act(() => result.current.actions.beginAceMatch({ op: 'match', team: 20, resultEvents: [124, 125] }, { rewards: [], viewedEventIds: [123] }))
+    // SYS 8 — 결과 이벤트 칸 · 지금 이벤트 본 표시를 저장한다
+    expect(store.load()).toMatchObject({ pendingAceMatchResultEvents: [124, 125] })
+    expect((store.load() as { seenEventIds: string[] }).seenEventIds).toContain('123')
+
+    // 나가기 — 플래그를 안 보고 메인 메뉴로(저장 없음). 장면 0x106 은 다시 100 → 0x1c154 로 선다(g 0 짝수 → 105)
+    act(() => result.current.actions.quitAceMatch())
+    expect(result.current.aceMatch).toBeNull()
+    expect(result.current.story).toEqual({ eventId: 125, context: '대결결과', viewed: [] })
+    expect(store.load()).toMatchObject({ pendingAceMatchResultEvents: undefined })
+
+    // 다시 켜도 칸은 지워졌다 — 결과 이벤트를 다시 안 튼다
+    const 다시 = 띄우기(store).result
+    await 이벤트불러오기(다시)
+    expect(다시.current.story?.eventId).not.toBe(125)
+  })
+
+  it('대결 중 꺼진 저장으로 띄워도 105 진입이 진 결과 이벤트를 띄운다 (부상 엔딩 다음 · 115 앞)', async () => {
+    const store = 메모리저장()
+    const 첫판 = 띄우기(store).result
+    act(() => 첫판.current.actions.create('투수', 신인))
+    act(() => 첫판.current.actions.save({
+      ...첫판.current.career!, seenEventIds: ['451'], hasSeenYearGoalWindow: false, pendingAceMatchResultEvents: [124, 125],
+    }))
+    const result = 띄우기(store).result
+    await 이벤트불러오기(result)
+    expect(result.current.story).toEqual({ eventId: 125, context: '대결결과', viewed: [] })
+  })
 })
 
 describe('외출 [!] · [들어가기] (0x8cdc0 · 0x16c64 · 114)', () => {

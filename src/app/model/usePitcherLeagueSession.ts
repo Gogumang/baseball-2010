@@ -357,6 +357,11 @@ export interface PitcherLeagueSession {
     readonly beginAceMatch: (command: MatchCommand, carry: StoryCarry) => void
     /** 대결이 끝났다 — 105 진입이 +0x176 을 보고 140 → 결과 이벤트 resultEvents[이김 ? 0 : 1] */
     readonly finishAceMatch: (isWin: boolean) => void
+    /**
+     * 대결 경기 중 "나가기" 0x40140 — 플래그를 안 보고 메인 메뉴(0x103)로, 저장 없음. 부르는 쪽이 메인 메뉴로 간다.
+     * 대기 칸(`pendingAceMatchResultEvents`)은 남아 다음 105 진입이 진 결과 이벤트를 띄운다.
+     */
+    readonly quitAceMatch: () => void
     readonly dismissStoryNotice: () => void
     /** 128 [다음] — 키 0x13da0 (끝났으면 우승 발표 · 내 차례면 경기 · 아니면 CPU 끼리) */
     readonly pressPostseason: () => void
@@ -870,6 +875,8 @@ export function usePitcherLeagueSession(
    *    훑는다 — 타자편(`useCareerSession` 의 '무작위포함'/'고정')과 같은 꼴이다. 틀 수를 따라 굴리지 않으므로 질병이 원본보다 드물다.
    */
   const wasIdleAtManagementRef = useRef(false)
+  /** 112 다시 찍기(0x118e4) — 아래에서 정의되는 `enterOutingMap` 을 이 고리가 부른다 */
+  const enterOutingMapRef = useRef<() => void>(() => {})
   useEffect(() => {
     const isIdle = career !== null && scene === '관리' && story === null && fileEvents !== null
     if (!isIdle) {
@@ -898,6 +905,17 @@ export function usePitcherLeagueSession(
        */
       return openStory({ eventId: INJURY_ENDING_EVENT_ID, context: '관리', viewed: [] })
     }
+    const pendingResultEvents = career.pendingAceMatchResultEvents
+    if (pendingResultEvents !== undefined) {
+      /*
+       * **나간 마선수 대결** — 진입 곁가지 0x11b6c~0x11bbe: 전역 g[0x176] 이 서 있고 모드가 4 가 아니면 현재를 112(0x70)로 ·
+       * 0x7e84d(그림, 0x70) · 0x118e4([!] 칸 다시 찍기) · 다음 140. 140 진입 0x10df8 이 결과 바이트 g[0x177](SYS 8 이 적은 0 이
+       * 남았다 = 짐)으로 resultEvents[1] 을 0x8bdc9 로 틀고 칸들을 지운 뒤 전역기록을 저장한다(10f72) · [다음 114, 뒤 105].
+       */
+      enterOutingMapRef.current()
+      commit({ ...career, pendingAceMatchResultEvents: undefined })
+      return openStory({ eventId: matchResultEventOf(pendingResultEvents, false), context: '대결결과', viewed: [] })
+    }
     if (!career.hasSeenYearGoalWindow) {
       // 115 진입 0x16aac: 0x8a681 로 내장 이벤트를 세우고 `0xa4ee9(S)` — 마이너스 스킬 해제 기록 +0x1d0~+0x1d7 을 지운다
       commitWith((current) => (current.removedMinusSkillIds.length === 0 ? current : { ...current, removedMinusSkillIds: [] }))
@@ -919,7 +937,7 @@ export function usePitcherLeagueSession(
       })
       openStory({ eventId: midSeasonEventId(achieved), context: '중간평가', viewed: [] })
     }
-  }, [career, commitWith, fileEvents, openStory, random, scanAuto, scene, story])
+  }, [career, commit, commitWith, fileEvents, openStory, random, scanAuto, scene, story])
 
   /**
    * **커리어 칸 ↔ 지갑 다리** — 타자편(`useCareerSession`)과 같은 모양이다.
@@ -1591,6 +1609,7 @@ export function usePitcherLeagueSession(
     // 0x8cdc0 은 머리 0x8cdd4 · 끝 0x8ce34 에서 reader+0x28 = 0 — 112 진입 뒤 자동 발동은 처음부터 훑는다
     cursorRef.current = 0
   }, [])
+  enterOutingMapRef.current = enterOutingMap
   const openOuting = useCallback(() => {
     setOutingNotice('')
     setOutingResult(null)
@@ -1826,7 +1845,13 @@ export function usePitcherLeagueSession(
       if (career === null || story === null) return
       const mission = aceMatchMissionOf(command.team, '투수')
       if (mission === null) return abortStoryAtMatch(carry)
-      if (story.context === '장소') commit(settlePlaceForAceMatch(career, story.context))
+      /*
+       * SYS 8 투수편 갈래(0x8d7d0~0x8d834): g[0x175] = team − 1 · g[0x170]/g[0x172] = 결과 이벤트 · g[0x176] = 1 · g[0x177] = 0 ·
+       * g[0xf6] = 모드 → 전역기록 저장(8d84a) · 지금 이벤트 본 표시(8d85c) · 커리어 저장(8d870). match 가 끝남을 돌려 114 끝
+       * 0x1c014 가 떠나온 줄 본 표시(0x8b0e4) · 장소 끝 처리를 한다 — 대결을 나가도 이 칸들은 저장에 남는다.
+       */
+      const settled = story.context === '장소' ? settlePlaceForAceMatch(career, story.context) : career
+      commit({ ...markRewardedEvent(settled, null, carry.viewedEventIds), pendingAceMatchResultEvents: command.resultEvents })
       setStory(null)
       setAceMatch({ mission, resultEvents: command.resultEvents, carried: carry })
       setScene('마선수대결')
@@ -1843,6 +1868,10 @@ export function usePitcherLeagueSession(
     (isWin: boolean) => {
       if (aceMatch === null) return
       setAceMatch(null)
+      // 140 진입 0x10df8 — 대기 칸을 지우고 전역기록 저장(10f72)
+      if (career !== null && career.pendingAceMatchResultEvents !== undefined) {
+        commit({ ...career, pendingAceMatchResultEvents: undefined })
+      }
       // 105 진입의 +0x176 갈래(0x11bb2)가 현재를 112 로 두고 0x118e4 — [!] 칸을 다시 찍는다(140 밑 지도가 이 값을 그린다)
       enterOutingMap()
       openStory({
@@ -1852,8 +1881,14 @@ export function usePitcherLeagueSession(
         carried: aceMatch.carried,
       })
     },
-    [aceMatch, enterOutingMap, openStory],
+    [aceMatch, career, commit, enterOutingMap, openStory],
   )
+
+  const quitAceMatch = useCallback(() => {
+    // 0x40140 — g[0x176] · g[0x177] · 결과 이벤트 칸을 안 건드리고 저장도 없다. 장면 0x106 은 헐리고 다음에 100 → 0x1c154 로 선다
+    setAceMatch(null)
+    quitGame()
+  }, [quitGame])
   const dismissStoryNotice = useCallback(() => setStoryNotice(''), [])
 
   /** 128 이 끝났다 (팝업 7 · 8 닫힘 → 132 연말) — 접어 둔 연말 사슬을 이어 연말 0x10c54 의 이벤트로 */
@@ -2112,6 +2147,7 @@ export function usePitcherLeagueSession(
       abortStoryAtMatch,
       beginAceMatch,
       finishAceMatch,
+      quitAceMatch,
       dismissStoryNotice,
       pressPostseason,
       closePostseasonPopup,

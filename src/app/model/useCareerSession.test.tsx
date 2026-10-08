@@ -913,6 +913,30 @@ describe('마선수 대결로 나가는 장소 이벤트 — match 의 "끝남" 
   })
 })
 
+describe('나간 마선수 대결 (SYS 8 0x8d782~ · 0x40140 · 105 진입 0x11b46~0x11bbe · 140 0x10df8)', () => {
+  it('SYS 8 이 결과 이벤트 칸을 저장하고, 결과 이벤트(140)가 열리면 지운다', () => {
+    const rendered = 띄우기({ ...createCareer('대결'), morale: 50 })
+    act(() => rendered.result.current.setScreen({ kind: '이벤트', eventId: 113, context: '장소' }))
+    act(() => rendered.result.current.session.actions.holdAceMatch([114, 115], [113]))
+    expect(rendered.result.current.session.career?.pendingAceMatchResultEvents).toEqual([114, 115])
+    expect(rendered.result.current.session.career?.seenEventIds).toContain('113')
+    act(() => rendered.result.current.setScreen({ kind: '이벤트', eventId: 114, context: '대결결과' }))
+    expect(rendered.result.current.session.career?.pendingAceMatchResultEvents).toBeUndefined()
+  })
+
+  it('나간 뒤 105 에 들어오면 진 결과 이벤트(resultEvents[1])를 대결결과로 띄운다 — 부상 엔딩 다음, 115 앞', async () => {
+    const rendered = 띄우기({
+      ...createCareer('대결'),
+      seenEventIds: [String(451)],
+      hasSeenYearGoalWindow: false,
+      pendingAceMatchResultEvents: [114, 115],
+    })
+    await waitFor(() => expect(rendered.result.current.session.storyEvents).not.toBeNull(), { timeout: 5000 })
+    await waitFor(() => expect(rendered.result.current.screen).toMatchObject({ kind: '이벤트', eventId: 115, context: '대결결과' }))
+    expect(rendered.result.current.session.career?.pendingAceMatchResultEvents).toBeUndefined()
+  })
+})
+
 describe('외출 지도 [!] 칸 — 112 진입 0x118e4 → 0x8cdc0 이 한 번 찍는다', () => {
   it('지도에 머문 채 장소 기능으로 커리어가 바뀌어도 [!] 칸은 다시 재지 않는다 · 밖에서 다시 들어오면 다시 찍는다', async () => {
     const rendered = 띄우기({ ...createCareer('외출'), morale: 50, money: 1000 })

@@ -359,6 +359,8 @@ export function App() {
       setScreen({ kind: '이벤트', eventId: matchResultEventOf(command.resultEvents, false), context: '대결결과', carried })
       return
     }
+    // SYS 8 — 결과 이벤트 · 플래그를 적고 저장한다(나가도 남아 다음 105 진입이 띄운다)
+    careerSession.actions.holdAceMatch(command.resultEvents, carried.viewedEventIds)
     mission.actions.beginAceMatch(target, { resultEvents: command.resultEvents, context: '대결결과', carried })
   }
 
@@ -507,6 +509,7 @@ export function App() {
             pitchControl={gameSettings.settings.pitchControl}
             gameSettings={gameSettings}
             onFinish={onFinish}
+            onQuit={pitcherSession.actions.quitAceMatch}
           />
         )}
       />
