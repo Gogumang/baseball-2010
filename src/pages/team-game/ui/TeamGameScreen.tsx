@@ -496,6 +496,14 @@ export function TeamGameScreen({
             // ⚠️ 웹 타석 화면은 그림을 세울 때 하늘 줄을 rand(0, 6) 으로 고른다(원본은 구장 팀 데이터 +0xb2, 추정 대체) —
             //    경기가 끝난 뒤 그 굴림이 경기 난수에 새지 않게 이 배경은 따로 든 난수로 세운다
             random={backdropRandom}
+            // 정산 효과 0x4ea0c(밤 승리 불꽃 · 패배 비)와 결과 그림 0x4a384 의 효과 · 파티클 틱은 경기 난수로 돈다
+            settlement={{
+              isWin: isHumanWin,
+              side0Score: ourSide === 0 ? summary.ourScore : summary.opponentScore,
+              side1Score: ourSide === 1 ? summary.ourScore : summary.opponentScore,
+              inning: progress.game.inning,
+              random,
+            }}
             onPitchResolved={() => {}}
           />
           <SettlementBoard

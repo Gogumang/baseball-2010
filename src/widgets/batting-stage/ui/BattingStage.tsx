@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo } from 'react'
 import type { HomeRunTextWindow } from '@/widgets/batting-stage/lib/homeRunBanner'
+import type { SettlementEffectSource } from '@/widgets/batting-stage/model/stageRefs'
 import { resolvePitch } from '@/features/play-at-bat/model/resolvePitch'
 import type { BattingSwing } from '@/features/play-at-bat/model/resolvePitch'
 import { nextBatterShift } from '@/features/play-at-bat/model/batterShift'
@@ -150,6 +151,12 @@ interface BattingStageProps {
    * (`lib/homeRunEffects`). 값이 바뀔 때마다 한 번씩. 안 넘기면 치우지 않는다.
    */
   readonly effectsClearedAt?: number | null
+  /**
+   * **경기 정산 효과** (결과 창 뒤 배경 `isResultBackdrop` 에서만). 0x4ea0c 가 이기고 밤하늘이면 종류 2 불꽃 · 지면 비를 깔고
+   * 결과 그림 0x4a384 가 그림마다 굴린다 — 그 굴림과 파티클 틱은 **`random`(경기 난수)** 로 돈다(배경 `random` 은 하늘 줄만).
+   * 하늘 색 번호는 이 화면의 하늘 줄과 `inning` 칸이다(`entities/batting` `settlementEffect`). 안 넘기면 효과 없음.
+   */
+  readonly settlement?: SettlementEffectSource
   readonly random: RandomPort
   /**
    * **고른 필살타법 번호** (선수 레코드 +0x18, 1~4). 레벨(+0x201)이 아니다 — 경기는 이 번호만 본다

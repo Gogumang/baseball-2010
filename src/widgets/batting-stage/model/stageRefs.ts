@@ -94,6 +94,8 @@ export interface StageLatest {
   readonly homeRunText?: HomeRunTextWindow | null
   /** 효과를 치운 시각 — `BattingStage` 의 같은 이름 props 주석 참고 */
   readonly effectsClearedAt?: number | null
+  /** 경기 정산 효과 — `BattingStage` 의 같은 이름 props 주석 참고 */
+  readonly settlement?: SettlementEffectSource
   /** 결과 창 뒤 배경의 틱별 +0x17e2 — `BattingStage` 의 같은 이름 props 주석 참고 */
   readonly resultBackdropOffsetOf?: (tick: number) => number
   readonly random: RandomPort
@@ -108,6 +110,19 @@ export interface StageLatest {
    * `BattingStage` 의 같은 이름 props 주석 참고.
    */
   readonly onPickoff?: (base: 1 | 2 | 3) => void
+}
+
+/** 경기 정산 0x4ea0c 의 효과를 고르는 재료 */
+export interface SettlementEffectSource {
+  /** 0x4a350 — 사람 팀이 이겼나 */
+  readonly isWin: boolean
+  /** 0xb69b0(st, 0) · (st, 1) */
+  readonly side0Score: number
+  readonly side1Score: number
+  /** 하늘 표 칸(구장객체 +0x14) — 타석 하늘과 같은 이닝 */
+  readonly inning: number
+  /** 경기 난수 — 효과 깔기 · 틱 · 파티클 틱 */
+  readonly random: RandomPort
 }
 
 export interface StageRefs {

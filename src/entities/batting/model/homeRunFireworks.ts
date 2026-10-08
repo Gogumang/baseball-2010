@@ -117,8 +117,8 @@ export function initHomeRunFireworks<E>(): HomeRunFireworks<E> {
   }
 }
 
-/** 0x8f97c(칸, 0, 0, 0) — 인자 꺼짐: 자리를 굴린다 (x 먼저, y 다음) */
-function respawn<E>(random: RandomPort): FireworkSlot<E> {
+/** 0x8f97c(칸, 0, 0, 0) — 인자 꺼짐(+0x20 == 0): 자리를 굴린다 (x 먼저, y 다음) · 기다림 50. 경기 정산 0x4f4cc 도 이것으로 깐다 */
+export function respawnFireworkSlot<E>(random: RandomPort): FireworkSlot<E> {
   const x = randomIntegerBelow(random, 40, SCREEN_WIDTH - 40)
   const y = randomIntegerBelow(random, SCREEN_HEIGHT + 50, SCREEN_HEIGHT + 100)
   return { state: 1, x, y, delay: RESPAWN_DELAY, linger: 0, burst: null }
@@ -140,7 +140,7 @@ export function tickHomeRunFireworks<E>(
     if (alive) return next
     const linger = signedByte(next.linger - 1)
     if (linger > 0) return { ...next, linger }
-    return respawn<E>(random)
+    return respawnFireworkSlot<E>(random)
   })
   return { slots }
 }

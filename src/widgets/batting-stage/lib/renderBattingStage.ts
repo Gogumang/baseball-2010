@@ -8,6 +8,7 @@ import { judgeAnimationOf, judgeFrameAt, pitcherFrameAt, pitcherIdleFrameAt } fr
 
 import { magicBallEffectFolderOf, magicBallEffectFrameAt } from '@/widgets/batting-stage/lib/magicBallEffect'
 import { drawParticles } from '@/widgets/particles/lib/renderParticles'
+import { rainDrawingOf, type SceneRain } from '@/entities/batting/model/settlementEffect'
 import type { ParticleScene } from '@/entities/particle/model/particleScene'
 import { drawHud } from '@/widgets/batting-stage/lib/renderHud'
 import { drawFieldMap } from '@/widgets/batting-stage/lib/renderFieldMap'
@@ -115,6 +116,8 @@ export interface StageScene {
    * 값은 장면 +0x17e2(구장·바닥을 내리는 y). 선수·공·파티클·HUD·판정 글자는 그리지 않는다.
    */
   readonly resultBackdropOffsetY?: number | null
+  /** 경기 정산 비(종류 0) — 결과 배경 위에 빗방울 선 · 튐 점을 그린다 (0x8f8ec · 0x8fb08) */
+  readonly rain?: SceneRain | null
 }
 
 export function renderBattingStage(
@@ -132,7 +135,12 @@ export function renderBattingStage(
     opponentTeamId: scene.hud?.opponentTeamId ?? null,
     offsetY: backdropOffsetY ?? 0,
   })
-  if (backdropOffsetY !== null) return
+  if (backdropOffsetY !== null) {
+    // 결과 그림 0x4a384 — 배경 뒤 효과 틱 0x4a452 가 비를 그리고, 프레임 끝 0x6dd69 가 파티클(불꽃)을 그린다
+    if (scene.rain !== null && scene.rain !== undefined) drawRain(context, scene.rain)
+    if (scene.particles !== null && scene.particles !== undefined) drawParticles(context, scene.particles)
+    return
+  }
   const progress = scene.pitch === null || scene.frame < 0 ? -1 : scene.frame / scene.pitch.frameCount
   drawPitcher(context, scene.acePitcher, progress, scene.pitcherTick, scene.tick, side, scene.pitcherEquipment, scene.pitcherForm ?? 0, scene.pitcherHand ?? 0)
   drawBatter(context, scene.swingFrame, scene.shift, scene.bodyType, side, scene.batterSkinIndex, scene.batterTeamIndex, scene.batterEquipment)
@@ -349,3 +357,25 @@ function drawResultText(context: CanvasRenderingContext2D, text: string, resultT
   context.fillStyle = UI_COLORS.resultText
   context.fillText(text, centerX, centerY)
 }
+
+/** 비 그리기 — 빗방울 0x8f8ec(선, 0xc7c7c7 · 짙기 +0xe) · 튐 0x8fb08(흰 점, 수명 3 은 가로선 ±2 도) */
+function drawRain(context: CanvasRenderingContext2D, rain: SceneRain): void {
+  const { lines, dots, bars } = rainDrawingOf(rain)
+  context.save()
+  context.lineWidth = 1
+  context.strokeStyle = '#c7c7c7'
+  for (const line of lines) {
+    context.globalAlpha = line.alpha / 255
+    context.beginPath()
+    context.moveTo(line.x0 + 0.5, line.y0 + 0.5)
+    context.lineTo(line.x1 + 0.5, line.y1 + 0.5)
+    context.stroke()
+  }
+  context.globalAlpha = 1
+  context.strokeStyle = '#ffffff'
+  context.fillStyle = '#ffffff'
+  for (const bar of bars) context.fillRect(bar.x - 2, bar.y, 5, 1)
+  for (const dot of dots) context.fillRect(dot.x, dot.y, 1, 1)
+  context.restore()
+}
+

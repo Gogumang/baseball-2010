@@ -14,7 +14,10 @@ import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
 import { batterFrameNow, pitchSituationOf } from '@/widgets/batting-stage/lib/stageText'
 import { ballFrameAt, pitchTickAt } from '@/widgets/batting-stage/model/stageRefs'
 import { clearParticles } from '@/entities/particle/model/particleScene'
-import { NO_STAGE_EFFECTS, stepStageFrame } from '@/widgets/batting-stage/lib/homeRunEffects'
+import { NO_STAGE_EFFECTS, fireworksPortOf, stepStageFrame } from '@/widgets/batting-stage/lib/homeRunEffects'
+import { tickParticles } from '@/entities/particle/model/particleScene'
+import { enterSettlementEffect, tickSettlementEffect, type SettlementEffect } from '@/entities/batting/model/settlementEffect'
+import { skyColorsOf } from '@/widgets/batting-stage/lib/stageScenery'
 import { particleConfigOf } from '@/widgets/particles/lib/particleCatalog'
 import { homeRunTextFrameAt } from '@/widgets/batting-stage/lib/homeRunBanner'
 import { preloadPtcParts } from '@/widgets/particles/lib/renderParticles'
@@ -201,6 +204,8 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
     const PARTICLE_CATCH_UP_LIMIT = 4
     /** 홈런 효과 객체 [0x1400064] — 글자 창(`homeRunText`)이 몬다 (`lib/homeRunEffects`) */
     let stageEffects = NO_STAGE_EFFECTS
+    /** 경기 정산 효과 — 결과 배경의 첫 그림에서 한 번 깐다(0x4ea0c). 깔기 전이면 undefined, 끈 효과면 null */
+    let settlementEffect: SettlementEffect | null | undefined
     /** 결과 창 뒤 배경(`isResultBackdrop`)으로 바뀐 시각 — 그때부터 +0x17e2 를 센다. 타석이면 null */
     let backdropStartedAt: number | null = null
 
@@ -225,10 +230,30 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
 
       const nowTick = pitchTickAt(now, openedAt, tickLength)
       if (particleTick === 0) particleTick = nowTick
-      const steps = isBackdrop ? 0 : Math.min(PARTICLE_CATCH_UP_LIMIT, nowTick - particleTick)
+      const settlement = isBackdrop ? latestRef.current.settlement : undefined
+      // 결과 배경은 정산 효과가 있을 때만 틱을 돈다 — 0x4a384 의 효과 틱 → 프레임 끝 파티클 틱 (둘 다 경기 난수)
+      const steps =
+        isBackdrop && settlement === undefined ? 0 : Math.min(PARTICLE_CATCH_UP_LIMIT, nowTick - particleTick)
+      if (settlement !== undefined && settlementEffect === undefined) {
+        settlementEffect = enterSettlementEffect(
+          {
+            isWin: settlement.isWin,
+            skyColorIndex: skyColorsOf(skyRow, settlement.inning).colorIndex,
+            side0Score: settlement.side0Score,
+            side1Score: settlement.side1Score,
+          },
+          settlement.random,
+        )
+      }
       // 틱마다 원본 프레임 차례 — (치우기) → (홈런 효과 깔기) → 글자 유지 그림의 효과 틱 0x40faa → 파티클 틱 0x6de84
       const firstSteppedTick = nowTick - steps
-      for (let step = 0; step < steps; step += 1) {
+      for (let step = 0; step < steps && settlement !== undefined; step += 1) {
+        if (settlementEffect !== null && settlementEffect !== undefined) {
+          tickSettlementEffect(settlementEffect, fireworksPortOf(particlesRef.current, particleConfigOf), settlement.random)
+        }
+        tickParticles(particlesRef.current, settlement.random)
+      }
+      for (let step = 0; step < steps && settlement === undefined; step += 1) {
         stageEffects = stepStageFrame(stageEffects, {
           time: openedAt + (firstSteppedTick + step + 1) * tickLength,
           millisecondsPerTick: tickLength,
@@ -277,6 +302,7 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
         pitcherTick: isPitching ? pitchTickAt(now, phaseStartedAtRef.current, tickLength) : null,
         tick: nowTick,
         particles: particlesRef.current,
+        rain: settlementEffect?.kind === 'rain' ? settlementEffect.rain : null,
         resultBackdropOffsetY:
           backdropStartedAt === null
             ? null

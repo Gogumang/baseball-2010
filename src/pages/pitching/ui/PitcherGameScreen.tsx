@@ -473,6 +473,14 @@ export function PitcherGameScreen({
             resultBackdropOffsetOf={(tick) => settlementBackdropOffsetAt(tick, isHumanWin)}
             // ⚠️ 웹 타석 그림이 세울 때 굴리는 하늘 줄 rand(0, 6)(추정 대체)이 경기 난수에 새지 않게 따로 든 난수로 세운다
             random={backdropRandom}
+            // 정산 효과 0x4ea0c(밤 승리 불꽃 · 패배 비)와 결과 그림 0x4a384 의 효과 · 파티클 틱은 경기 난수로 돈다
+            settlement={{
+              isWin: isHumanWin,
+              side0Score: ourSide === 0 ? summary.ourScore : summary.opponentScore,
+              side1Score: ourSide === 1 ? summary.ourScore : summary.opponentScore,
+              inning: progress.game.inning,
+              random,
+            }}
             onPitchResolved={() => {}}
           />
           <SettlementBoard
