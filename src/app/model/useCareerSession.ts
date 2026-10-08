@@ -578,9 +578,6 @@ export function useCareerSession({
       // 상태 7 갱신 0x3e340 의 맨 앞 0x3e350 이 울리던 소리를 끊는다(0x6e418) — 로딩 판부터 배경음이 없다.
       // (관리 화면이 경기로 넘길 때 0x15cfa · 0x1e916 도 먼저 끊지만 들리는 것은 같다)
       audio.stop()
-      // 상태 7 갱신 0x3e340 의 맨 앞 0x3e350 이 울리던 소리를 끊는다(0x6e418) — 로딩 판부터 배경음이 없다.
-      // (관리 화면이 경기로 넘길 때 0x15cfa · 0x1e916 도 먼저 끊지만 들리는 것은 같다)
-      audio.stop()
       // 환경설정 "주루" 를 경기에 태운다 — 타자편은 사람이 늘 공격이라 설정이 그대로 먹는다 (0xae690)
       const started = startGame(
         random, ourTeamId, battingOrder, opponentTeamId, playerSide, dayCounter, runningModeManualRef.current, pitchers, aces,
