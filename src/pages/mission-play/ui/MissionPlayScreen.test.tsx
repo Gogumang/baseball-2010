@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render } from '@testing-library/react'
+import { act, cleanup, render } from '@testing-library/react'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { MissionPlayScreen } from '@/pages/mission-play/ui/MissionPlayScreen'
 import { ROOKIE_BATTER_ABILITY } from '@/entities/batting/model/batter'
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
@@ -99,5 +100,54 @@ describe('미션 타석의 번트는 목표와 상관없이 켜진다 (0x535a4 �
       />,
     )
     expect(stageProps.last?.canBunt).toBe(true)
+  })
+})
+
+describe('교체 연출 0x16 — 그리기 0x4da30 의 "CHANGE" 애니 (0xf 진입 CPU 투수 교체 뒤)', () => {
+  it('서 있는 동안 타석을 멈추고 17 그림 뒤 끝을 알린다 — 그동안 0xe 대기를 세지 않는다', () => {
+    vi.useFakeTimers()
+    try {
+      const mission = MISSIONS.find((candidate) => candidate.side === '타자')!
+      const onDone = vi.fn()
+      const view = render(
+        <MissionPlayScreen
+          run={startMission(mission)}
+          ability={ROOKIE_BATTER_ABILITY}
+          pitcherAbility={DEFAULT_PITCHER_ABILITY}
+          opponent={null}
+          atBat={createAtBat()}
+          isPaused={false}
+          bannerText=""
+          random={createSeededRandom(1)}
+          onPitchResolved={vi.fn()}
+          onGiveUp={vi.fn()}
+          onFinish={vi.fn()}
+          onSteal={vi.fn()}
+          sceneConfirm={{ entries: 1 }}
+          substitutionScene={{ serial: 1, incomingIsAce: false, entrySoundId: 14 }}
+          onSubstitutionSceneDone={onDone}
+        />,
+      )
+      expect(stageProps.last?.isPaused).toBe(true)
+      const scene = view.getByTestId('교체연출')
+      expect(scene.dataset.frame).toBe('79')
+      act(() => {
+        vi.advanceTimersByTime(millisecondsPerFrame() * 7)
+      })
+      expect(view.getByTestId('교체연출').dataset.frame).toBe('82')
+      act(() => {
+        vi.advanceTimersByTime(millisecondsPerFrame() * 9)
+      })
+      expect(view.getByTestId('교체연출').dataset.frame).toBe('84')
+      expect(onDone).not.toHaveBeenCalled()
+      act(() => {
+        vi.advanceTimersByTime(millisecondsPerFrame())
+      })
+      expect(onDone).toHaveBeenCalledTimes(1)
+      // 0xe 대기는 아직 OK 를 받지 않는다 (연출 동안 세지 않음)
+      expect((view.getByRole('button', { name: '확인' }) as HTMLButtonElement).disabled).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

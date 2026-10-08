@@ -34,6 +34,8 @@ import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import { BATTED_BALL_PATTERNS } from '@/shared/config/original/battedBallPatterns'
 import { isFairAngle } from '@/entities/batting/model/battedBallOutcome'
+import { SCENE_PREPARE_FRAMES } from '@/features/play-game/model/useSceneConfirm'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 
 /**
  * 이벤트 112 의 match 명령이 여는 마선수 대결 — 이기면 114, 지면 115 로 돌아가야 한다.
@@ -1314,7 +1316,7 @@ describe('미션의 파울 각 공도 수비 판을 돈다 — 파울로 닫히�
 })
 
 describe('미션 상대 CPU 교체 — 0xf 진입 0x3d954 (타자 미션 0xac428 · `missionCpuTeam`)', () => {
-  it("3점 홈런으로 CPU 투수의 이닝 실점이 3 이 되면 다음 타석 0xe 뒤에 바꾼다 — 22 'Time!' · 등판음 14 · OK 를 두 번 받는다", () => {
+  it("3점 홈런으로 CPU 투수의 이닝 실점이 3 이 되면 다음 타석 0xe 의 OK 뒤에 바꾼다 — 22 'Time!' → 교체 연출 0x16 → 0xd 두 그림 뒤 등판음 14 · OK 를 한 번 더", () => {
     vi.useFakeTimers()
     try {
       const played: number[] = []
@@ -1357,12 +1359,37 @@ describe('미션 상대 CPU 교체 — 0xf 진입 0x3d954 (타자 미션 0xac428
       act(() => {
         vi.advanceTimersByTime(1500)
       })
+      // 결과 띠가 걷혀 0xd → 0xe 대기 — 0xf 진입은 OK 뒤라 아직 안 묻는다
+      expect(rendered.result.current.runner.bannerText).toBe('')
+      expect(rendered.result.current.session.missionRun!.cpu.pitching?.mound.pitcherSlot).toBe(0)
+      expect(played).toEqual([])
+      const firstWait = rendered.result.current.session.sceneConfirm
+
+      // 0xe 의 OK → 메시지 1 → 0xf 진입 0x3d954 → 0xac428 참 → 22 · 0x16
+      act(() => rendered.result.current.session.confirmScene())
       const changed = rendered.result.current.session.missionRun!
       expect(changed.cpu.pitching?.mound.pitcherSlot).not.toBe(0)
       expect(changed.cpu.pitching?.mound.justChanged).toBe(true)
+      expect(played).toEqual([22])
+      expect(rendered.result.current.session.substitutionScene).toMatchObject({ incomingIsAce: false, entrySoundId: 14 })
+      // 0x16 → 0xd → 0xe — 새 대기 하나
+      const secondWait = rendered.result.current.session.sceneConfirm
+      expect(secondWait).not.toBe(firstWait)
+      expect(secondWait?.entries).toBe(1)
+
+      // 화면이 "CHANGE" 애니를 다 그렸다 → 0xd 두 그림 → 0xe 그리기가 등판음
+      act(() => rendered.result.current.session.finishSubstitutionScene())
+      expect(rendered.result.current.session.substitutionScene).toBeNull()
+      expect(played).toEqual([22])
+      act(() => {
+        vi.advanceTimersByTime(SCENE_PREPARE_FRAMES * millisecondsPerFrame())
+      })
       expect(played).toEqual([22, 14])
-      // 0x16 → 0xd → 0xe — 같은 걸음의 둘째 0xe
-      expect(rendered.result.current.session.sceneConfirm?.entries).toBe(2)
+
+      // 둘째 OK — 0xf 재진입은 state[0xd] 가 서 있어 다시 묻지 않는다
+      act(() => rendered.result.current.session.confirmScene())
+      expect(played).toEqual([22, 14])
+      expect(rendered.result.current.session.sceneConfirm).toBe(secondWait)
       rendered.unmount()
     } finally {
       vi.useRealTimers()

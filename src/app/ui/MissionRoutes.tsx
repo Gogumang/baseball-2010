@@ -190,6 +190,9 @@ export function MissionRoutes({
         onSettingsChange={gameSettings.setSettings}
         // 상태 0xe — 새 타석마다 사람 OK 를 기다린다
         sceneConfirm={session.sceneConfirm}
+        onSceneConfirm={session.confirmScene}
+        substitutionScene={session.substitutionScene}
+        onSubstitutionSceneDone={session.finishSubstitutionScene}
       />
     )
   }
@@ -222,6 +225,9 @@ export function MissionRoutes({
         onPickoffKey={actions.pickoff}
         // 상태 0xe — 새 타석마다 사람 OK 를 기다린다
         sceneConfirm={session.sceneConfirm}
+        onSceneConfirm={session.confirmScene}
+        substitutionScene={session.substitutionScene}
+        onSubstitutionSceneDone={session.finishSubstitutionScene}
         // 결과 판 0x4a384 의 배경 · 정산 효과(0x4ea0c 꼬리 — 모드를 안 가린다)는 경기 난수로
         random={random}
       />
@@ -347,6 +353,9 @@ export function PitcherAceMatchRoute(
       onPickoffKey={actions.pickoff}
       // 대결도 미션 장면이라 새 타석마다 0xe 에서 OK 를 기다린다
       sceneConfirm={session.sceneConfirm}
+      onSceneConfirm={session.confirmScene}
+      substitutionScene={session.substitutionScene}
+      onSubstitutionSceneDone={session.finishSubstitutionScene}
       onFinish={() => {
         const isWin = actions.finishPitcherAceMatch()
         if (isWin !== null) onFinish(isWin)

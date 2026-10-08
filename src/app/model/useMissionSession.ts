@@ -96,7 +96,10 @@ import { aceMatchClearCountAfterWin, aceMatchClearKeyOf } from '@/entities/missi
 import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
 import { vibrate } from '@/entities/defense-controls/model/vibration'
 import { strikeoutVibrationMillisecondsOf } from '@/features/play-game/model/strikeoutVibration'
-import { chainSceneConfirm, enterSceneConfirm } from '@/features/play-game/model/sceneConfirm'
+import { enterSceneConfirm } from '@/features/play-game/model/sceneConfirm'
+import type { SubstitutionScene } from '@/features/play-game/model/substitutionScene'
+import { SCENE_PREPARE_FRAMES } from '@/features/play-game/model/useSceneConfirm'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import {
   enterMissionPitchSelection,
   isMissionCpuMoundAce,
@@ -440,11 +443,22 @@ export function useMissionSession({
   const handledPitchSelectionRef = useRef(0)
   const signalPitchSelection = (kind: 'new' | 'same') =>
     setPitchSelectionEntry((previous) => ({ serial: (previous?.serial ?? 0) + 1, kind }))
+  /**
+   * 새 타석의 0xe 대기 — 이 대기가 OK 를 받으면(메시지 1 → 0xf 진입 0x3d954) CPU 교체를 묻는다(`confirmScene`).
+   * 그 뒤 교체 연출이 다시 세운 대기는 0xf 재진입이 state[0xd] · state[0xe] 로 굴림 없이 지나므로 묻지 않는다.
+   */
+  const newAtBatWaitRef = useRef<SceneConfirmWait | null>(null)
   /** 새 타석 0xd → 0xe — OK 를 기다린 뒤 0xf 로 간다 */
   const enterNewAtBatConfirm = () => {
-    setSceneConfirm(enterSceneConfirm())
-    signalPitchSelection('new')
+    const wait = enterSceneConfirm()
+    newAtBatWaitRef.current = wait
+    setSceneConfirm(wait)
   }
+  /**
+   * **교체 연출 0x16** (`features/play-game/model/substitutionScene`) — 0xf 진입이 CPU 교체를 내면 싣고, 화면이 "CHANGE" 애니를
+   * 다 그리면(`finishSubstitutionScene`) 내린다. 서 있는 동안 화면은 0xe 대기를 세지 않는다(0x16 → 0xd → 0xe).
+   */
+  const [substitutionScene, setSubstitutionScene] = useState<SubstitutionScene | null>(null)
   /** 타석을 새로 세운다 — 0xd → 0xe 라 OK 를 기다린다 */
   const resetAtBatWithConfirm = (count?: { balls: number; strikes: number }) => {
     enterNewAtBatConfirm()
@@ -520,25 +534,20 @@ export function useMissionSession({
   /**
    * **상태 0xf 진입 `0x3d954`** — 미션 CPU 교체 (`entities/mission/model/missionCpuTeam`).
    * 타자 미션(모드 6)은 CPU 투수 교체 0xac428, 투수 미션(모드 5)은 CPU 대타 0xac228 — 나리 타자편 · 투수편과 같은 자리(3da3e ·
-   * 3da70)의 같은 함수다. 나면 22 "Time!"(3da88) → 교체 연출 0x16 → 0xd(지우기 건너뜀) → 0xe 에서 들어온 선수의 등판음
-   * (0x38b64 — 마선수 26 · 2·3루 주자 15 · 그 밖 14)을 내고 **OK 를 한 번 더** 기다린 뒤 0xf 재진입 — 그때는 state[0xd]
-   * (교체 직후) · state[0xe](대타 막음)가 서 있어 굴림 없이 지나므로 다시 묻지 않는다.
-   * ⚠️ 근사(때): 새 타석이면 원본은 0xe 의 OK **뒤에** 묻는데, 웹은 0xe 대기를 세울 때(타자 미션은 결과 띠가 걷힐 때) 미리 묻고
-   *    OK 를 두 번 받게 한다 — 대기 동안 다른 굴림이 없어 굴림 차례는 같지만 22 · 등판음이 OK 보다 먼저 난다.
-   *    같은 타석 다음 공이면 공 결과를 먹인 바로 뒤에 물어 22 가 심판 콜과 붙는다(원본은 결과 상태 0x12 가 끝난 뒤).
-   * ⚠️ 미이식: 교체 연출(0x16)의 그림 — 미션 화면(`MissionPlayScreen` · `PitchingScreen`)에 그 판이 아직 없다.
+   * 3da70)의 같은 함수다. 나면 22 "Time!"(3da88) → 교체 연출 0x16(`SubstitutionSceneOverlay` — game_ui 애니 9 "CHANGE" 17 그림)
+   * → 0xd(지우기 건너뜀) 두 그림 → 0xe 에서 들어온 선수의 등판음(0x38b64 — 마선수 26 · 2·3루 주자 15 · 그 밖 14)을 내고
+   * **OK 를 한 번 더** 기다린 뒤 0xf 재진입 — 그때는 state[0xd](교체 직후) · state[0xe](대타 막음)가 서 있어 굴림 없이 지나므로
+   * 다시 묻지 않는다.
+   * - 새 타석: 0xe 의 OK(메시지 1 → 0x50c18 → 0xf)를 받는 화면 콜백(`confirmScene`)에서 묻는다 — 원본 차례 그대로 22 가 OK 뒤에 난다.
+   * - 같은 타석 다음 공: 공 결과를 먹인 바로 뒤에 묻는다(아래 효과).
+   *   ⚠️ 근사(때): 원본은 결과 상태 0x12 가 끝난 뒤 0xf 로 들어서 22 가 그때 난다 — 웹은 심판 콜과 붙는다. 그 사이 굴림은 없다.
    */
-  useEffect(() => {
-    const entry = pitchSelectionEntry
-    if (entry === null || entry.serial === handledPitchSelectionRef.current) return
+  const askPitchSelection = (kind: 'new' | 'same') => {
     const isPitcherSide = screen.kind === '투수미션' || pitcherAceMatchMission !== null
-    // 타자 미션의 새 타석은 결과 띠(0x12 → 0xd)가 걷혀야 0xd · 0xe 다
-    if (!isPitcherSide && runner.bannerText !== '') return
-    handledPitchSelectionRef.current = entry.serial
     const run = isPitcherSide ? pitcherRun : missionRun
     if (run === null || run.status !== '진행중') return
     // 새 타석 0xd(0x48d50 48eb6)가 state[0xe] 를 내린다
-    const cpu = entry.kind === 'new' ? missionCpuAtNewPlateAppearance(run.cpu) : run.cpu
+    const cpu = kind === 'new' ? missionCpuAtNewPlateAppearance(run.cpu) : run.cpu
     const { team, substitution } = enterMissionPitchSelection(
       cpu,
       {
@@ -555,14 +564,50 @@ export function useMissionSession({
       else setMissionRun((previous) => (previous === null ? previous : { ...previous, cpu: team }))
     }
     if (substitution === null) return
-    playSoundIds(audio, [
-      PITCHER_CHANGE_SOUND,
-      pitcherEntrySoundIdOf({ isAce: substitution.incomingIsAce, bases: run.bases }),
-    ])
-    // 0x16 → 0xd → 0xe — 새 타석이면 같은 걸음의 둘째 0xe, 같은 타석이면 새 대기
-    setSceneConfirm((previous) => (entry.kind === 'new' ? chainSceneConfirm(previous) : enterSceneConfirm()))
+    // 3da88 — 0x16 에 들어서기 전
+    playSoundIds(audio, [PITCHER_CHANGE_SOUND])
+    setSubstitutionScene((previous) => ({
+      serial: (previous?.serial ?? 0) + 1,
+      incomingIsAce: substitution.incomingIsAce,
+      entrySoundId: pitcherEntrySoundIdOf({ isAce: substitution.incomingIsAce, bases: run.bases }),
+    }))
+    // 0x16 → 0xd → 0xe — 새 대기(화면은 연출이 끝난 뒤부터 0xd 두 그림을 센다)
+    setSceneConfirm(enterSceneConfirm())
+  }
+
+  /** 같은 타석 다음 공의 0xf 진입 — 진행이 다 먹인 뒤의 판을 봐야 해서 그린 뒤에 돈다 */
+  useEffect(() => {
+    const entry = pitchSelectionEntry
+    if (entry === null || entry.serial === handledPitchSelectionRef.current) return
+    // 타자 미션은 결과 띠가 걷혀야(0x12 가 끝나야) 0xf 다
+    const isPitcherSide = screen.kind === '투수미션' || pitcherAceMatchMission !== null
+    if (!isPitcherSide && runner.bannerText !== '') return
+    handledPitchSelectionRef.current = entry.serial
+    askPitchSelection(entry.kind)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pitchSelectionEntry, runner.bannerText])
+
+  /**
+   * 0xe 의 OK 하나 — 화면(`useSceneConfirm` 의 `onConfirm`)이 부른다. 새 타석 대기의 OK 면 0xf 진입 0x3d954 가 CPU 교체를 묻는다.
+   * OK 를 받은 그 걸음 안에서 묻는다 — 교체가 나면 새 대기가 같은 걸음에 서서 공이 나가는 그림이 끼지 않는다.
+   */
+  const confirmScene = () => {
+    const wait = newAtBatWaitRef.current
+    if (wait === null || wait !== sceneConfirm) return
+    newAtBatWaitRef.current = null
+    askPitchSelection('new')
+  }
+
+  /**
+   * 화면이 교체 연출 0x16 을 다 그렸다(끝 비트 → 메시지 0xd). 0xd 두 그림 뒤 0xe 그리기(0x38d1c 38dc2 → 0x38b64)가 등판음을 낸다.
+   * ⚠️ 근사: 웹은 0xd 두 그림을 타이머로 센다(화면의 0xe 대기는 같은 때부터 0xd 두 그림을 센다).
+   */
+  const finishSubstitutionScene = () => {
+    const scene = substitutionScene
+    if (scene === null) return
+    setSubstitutionScene(null)
+    window.setTimeout(() => playSoundIds(audio, [scene.entrySoundId]), SCENE_PREPARE_FRAMES * millisecondsPerFrame())
+  }
 
   /**
    * 타자 미션의 공 하나.
@@ -1516,6 +1561,12 @@ export function useMissionSession({
     batterSpecialSwingStored, pitcherMagicRemaining, stealableBases, resultEarnedGamePointOf,
     /** 상태 0xe 의 OK 대기 — 화면이 `useSceneConfirm` 에 넘긴다 */
     sceneConfirm,
+    /** 0xe 의 OK 하나 — 화면이 `useSceneConfirm` 셋째 인자로 넘긴다 (새 타석이면 0xf 진입이 CPU 교체를 묻는다) */
+    confirmScene,
+    /** 교체 연출 0x16 — 서 있으면 화면이 "CHANGE" 애니를 그리고 0xe 대기를 세지 않는다 */
+    substitutionScene,
+    /** 화면이 교체 연출을 다 그렸다 */
+    finishSubstitutionScene,
     /** 경기 난수 — 결과 판 0x4a384 의 정산 효과가 쓴다 (투수편 마선수 대결 화면 `PitcherAceMatchRoute`) */
     random,
     /** 타자 미션 상대 마투수의 체력% `0xaebb0` = trunc(+0x2c / 100) — `missionPitcherAbility` 셋째 인자 */

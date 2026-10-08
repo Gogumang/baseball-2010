@@ -21,6 +21,8 @@ import type { AcePlayer } from '@/shared/config/original/acePlayers'
 import { useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
 import { SceneMatchupCards } from '@/widgets/matchup-cards/ui/SceneMatchupCards'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
+import type { SubstitutionScene } from '@/features/play-game/model/substitutionScene'
+import { SubstitutionSceneOverlay } from '@/features/play-game/ui/SubstitutionSceneOverlay'
 import { MissionResultBoard } from '@/pages/mission-play/ui/MissionResultBoard'
 import type { MissionResultBoardProps } from '@/pages/mission-play/ui/MissionResultBoard'
 import { setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
@@ -98,6 +100,14 @@ interface MissionPlayScreenProps {
    * **상태 0xe 의 OK 대기** — 세션이 새 타석마다 싣는다 (`useMissionSession.sceneConfirm`). 안 넘기면 기다리지 않는다
    */
   readonly sceneConfirm?: SceneConfirmWait | null
+  /** 0xe 의 OK 하나를 받을 때마다 — 세션이 0xf 진입(CPU 투수 교체 0xac428)을 이때 묻는다 (`useMissionSession.confirmScene`) */
+  readonly onSceneConfirm?: () => void
+  /**
+   * **교체 연출 0x16** — 서 있으면 타석을 멈추고 "CHANGE" 애니(0x4da30)를 얹으며 0xe 대기를 세지 않는다.
+   * 다 그리면 `onSubstitutionSceneDone`.
+   */
+  readonly substitutionScene?: SubstitutionScene | null
+  readonly onSubstitutionSceneDone?: () => void
 }
 
 /**
@@ -135,6 +145,9 @@ export function MissionPlayScreen({
   settings,
   onSettingsChange,
   sceneConfirm: sceneConfirmWait,
+  onSceneConfirm,
+  substitutionScene = null,
+  onSubstitutionSceneDone,
 }: MissionPlayScreenProps) {
   /**
    * 전역 경기 상태 +0x6b (`liveGameState`) — 미션 준비 0xaa57c 가 0xb6814 로 0 을 둔 뒤(0xaa5fc) 곧바로 0xaa698 이
@@ -159,9 +172,12 @@ export function MissionPlayScreen({
    * **상태 0xe — 새 타석마다 사람 OK 를 기다린다** (0x39e14 → 0x532b0, 모드 갈림 없음). 결과 연출·메뉴·조작방법·설정이 덮으면
    * 받지 않는다. ⚠️ 미이식: 0xe 그리기 0x4d9ec 가 0xd 그리기 위에 얹는 안내 판 0x44944.
    */
+  const isSubstituting = !isOver && substitutionScene !== null
+  // 교체 연출 0x16 동안은 0xd · 0xe 가 아니다 — 연출이 끝난 뒤부터 0xd 두 그림을 센다
   const sceneConfirm = useSceneConfirm(
     sceneConfirmWait,
-    !isOver && !isPaused && bannerText === '' && !isMenuOpen && overlay === null,
+    !isOver && !isPaused && bannerText === '' && !isMenuOpen && overlay === null && !isSubstituting,
+    onSceneConfirm,
   )
   const isAwaitingConfirm = sceneConfirm.isAwaiting && !isOver
   /**
@@ -305,7 +321,8 @@ export function MissionPlayScreen({
             canBunt={canBunt}
             // 조작방법 뷰어 동안은 일시정지 팝업이 떠 있어 경기 갱신이 멈춘다 (0x52cc6 0x754f9)
             // 0xe(OK 대기)에서도 공이 안 나간다
-            isPaused={isPaused || isOver || overlay !== null || isAwaitingConfirm}
+            // 교체 연출 0x16 에는 갱신이 없다(R10 표 — 진입 0x3d458 · 그리기 0x4da30 뿐)
+            isPaused={isPaused || isOver || overlay !== null || isAwaitingConfirm || isSubstituting}
             random={random}
             /*
               경기 상태 0x19 — 결과 그림 0x4a384 는 모드를 안 가리고 구름 0x78448 · 배경 0x40ff0(+0x17e2)만 그린다(선수 · 공 · HUD 없음).
@@ -339,6 +356,11 @@ export function MissionPlayScreen({
             0xe 그리기 0x4d9ec — 0xd 두 그림 뒤 투수·타자 소개 판 0x44944 (모드 검사 없음). 사람이 치므로 타자 PLAYER · 투수 COM.
             ⚠️ 웹 미션 상태에 없는 칸(이름·기록·좌우 등)은 비운다 — 마투수 미션이면 투수 이름만 적는다. 타자 손은 우타(0) 배치.
           */}
+          {/* 교체 연출 0x16 — 그리기 0x4da30 이 타석 그림 위에 game_ui 애니 9 "CHANGE" 를 얹는다 */}
+          {isSubstituting && substitutionScene !== null && (
+            <SubstitutionSceneOverlay key={substitutionScene.serial} onDone={() => onSubstitutionSceneDone?.()} />
+          )}
+
           {isAwaitingConfirm && sceneConfirm.isInConfirmState && (
             <SceneMatchupCards
               batterHand={0}

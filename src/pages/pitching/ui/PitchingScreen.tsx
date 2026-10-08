@@ -14,6 +14,8 @@ import * as styles from '@/pages/pitching/ui/PitcherGameScreen.css'
 import { MissionResultBoard } from '@/pages/mission-play/ui/MissionResultBoard'
 import type { MissionResultBoardProps } from '@/pages/mission-play/ui/MissionResultBoard'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
+import type { SubstitutionScene } from '@/features/play-game/model/substitutionScene'
+import { SubstitutionSceneOverlay } from '@/features/play-game/ui/SubstitutionSceneOverlay'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
 import { useInGameMenuState } from '@/features/play-team-game/model/useInGameMenuState'
@@ -104,6 +106,13 @@ interface PitchingScreenProps {
    * **상태 0xe 의 OK 대기** — 세션이 새 타석마다 싣는다 (`useMissionSession.sceneConfirm`). 안 넘기면 기다리지 않는다
    */
   readonly sceneConfirm?: SceneConfirmWait | null
+  /** 0xe 의 OK 하나를 받을 때마다 — 세션이 0xf 진입(CPU 대타 0xac228)을 이때 묻는다 (`useMissionSession.confirmScene`) */
+  readonly onSceneConfirm?: () => void
+  /**
+   * **교체 연출 0x16** — 서 있으면 "CHANGE" 애니(0x4da30)를 그리고 0xe 대기를 세지 않는다. 다 그리면 `onSubstitutionSceneDone`.
+   */
+  readonly substitutionScene?: SubstitutionScene | null
+  readonly onSubstitutionSceneDone?: () => void
   /**
    * **경기 난수** — 결과 판(경기 상태 0x19)의 배경 · 정산 효과(0x4ea0c 꼬리: 성공이면 밤하늘일 때 불꽃, 실패면 비)와 그림마다
    * 효과 · 파티클 틱이 쓴다. 안 넘기면 결과 판에 배경 · 효과가 없다.
@@ -126,6 +135,9 @@ export function PitchingScreen({
   resultBoard,
   onPickoffKey,
   sceneConfirm: sceneConfirmWait,
+  onSceneConfirm,
+  substitutionScene = null,
+  onSubstitutionSceneDone,
   random,
   onRestart,
   settings,
@@ -176,7 +188,12 @@ export function PitchingScreen({
    * **상태 0xe — 새 타석마다 사람 OK 를 기다린다** (0x39e14 → 0x532b0 — 공수·모드 갈림 없음). 결과 연출 동안은 받지 않는다.
    * ⚠️ 미이식: 0xe 그리기 0x4d9ec 가 0xd 그리기 위에 얹는 안내 판 0x44944.
    */
-  const sceneConfirm = useSceneConfirm(sceneConfirmWait, isRunning && bannerText === '' && !isPopupOpen)
+  // 교체 연출 0x16 동안은 0xd · 0xe 가 아니다 — 연출이 끝난 뒤부터 0xd 두 그림을 센다
+  const sceneConfirm = useSceneConfirm(
+    sceneConfirmWait,
+    isRunning && bannerText === '' && !isPopupOpen && substitutionScene === null,
+    onSceneConfirm,
+  )
   const isAwaitingConfirm = sceneConfirm.isAwaiting && run.status === '진행중'
 
   // 견제 — 구질 고르기(0xf)에서만. 끝난 미션(결과 화면)·0xe(OK 대기)는 키를 안 받는다
@@ -336,6 +353,15 @@ export function PitchingScreen({
         0xe — 0xd 두 그림 뒤 0x4d9ec 가 투수·타자 소개 판 0x44944 를 그린다(모드 검사 없음). 내가 던지므로 투수 PLAYER · 타자 COM.
         ⚠️ 원본은 판 아래 0xd 그리기(타석 장면)가 깔리지만 웹 투구 화면엔 그 캔버스가 없다. 웹 미션 상태에 없는 칸은 비운다.
       */}
+      {/*
+        교체 연출 0x16 — 0x4da30 의 "CHANGE" 애니. ⚠️ 원본은 그 아래 타석 그림이 깔리지만 웹 투구 화면엔 그 캔버스가 없다.
+      */}
+      {isRunning && substitutionScene !== null && (
+        <div className={styles.matchupFrame}>
+          <SubstitutionSceneOverlay key={substitutionScene.serial} onDone={() => onSubstitutionSceneDone?.()} />
+        </div>
+      )}
+
       {!isPopupOpen && isAwaitingConfirm && sceneConfirm.isInConfirmState && (
         <div className={styles.matchupFrame}>
           <SceneMatchupCards batterHand={0} pitcher={{ isComputer: false }} batter={{ isComputer: true }} />
