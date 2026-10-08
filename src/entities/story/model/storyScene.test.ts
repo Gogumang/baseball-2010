@@ -5,6 +5,7 @@ import {
   finishEvent,
   forgetRepeatableEvents,
   illnessChanceOf,
+  markRewardedEvent,
   nextEventFor,
   OPENING_EVENT_ID,
   placeTriggerOf,
@@ -254,5 +255,21 @@ describe('finishEvent', () => {
 
     expect(after.seenEventIds).toEqual([String(OPENING_EVENT_ID), '2'])
     expect(before.seenEventIds).toEqual([])
+  })
+})
+
+describe('markRewardedEvent — 0x8c460 끝 (0x8cbe0~0x8cc1a)', () => {
+  it('파일 이벤트만 본 표시(0xacf49 · 0x8b0e4 줄) — 내장 이벤트(웹 음수 번호, [mgr+0xa] ≠ 0)는 안 남긴다', () => {
+    const after = markRewardedEvent(선수(), { id: -115, trigger: 0 }, [3, -115])
+    expect(after.seenEventIds).toEqual(['3'])
+    expect(after.hasActedThisCycle).toBe(false)
+  })
+
+  it('지금 이벤트가 장소(trigger 2~6)면 S+4 행동함 — trigger 0 · 1 은 그대로, 다시 해도 같은 값', () => {
+    expect(markRewardedEvent(선수(), { id: 101, trigger: 4 }, [101]).hasActedThisCycle).toBe(true)
+    expect(markRewardedEvent(선수(), { id: 1, trigger: 0 }, [1]).hasActedThisCycle).toBe(false)
+    expect(markRewardedEvent(선수(), { id: 401, trigger: 1 }, [401]).hasActedThisCycle).toBe(false)
+    const once = markRewardedEvent(선수(), { id: 101, trigger: 4 }, [101])
+    expect(markRewardedEvent(once, { id: 101, trigger: 4 }, [101])).toBe(once)
   })
 })

@@ -113,7 +113,7 @@ import {
   midSeasonTitlesOf,
   yearEndEventId,
 } from '@/entities/career/model/seasonFlow'
-import { forgetRepeatableEvents } from '@/entities/story/model/storyScene'
+import { forgetRepeatableEvents, markRewardedEvent } from '@/entities/story/model/storyScene'
 import { battingOrderEventId, emptyPlaceEventId, isEmptyPlaceEventId } from '@/entities/career/model/battingOrder'
 import type { OutingPlace } from '@/shared/config/outingPlaces'
 import { applyEventRewards } from '@/entities/story/model/eventReward'
@@ -428,6 +428,10 @@ export function useCareerSession({
   }, [rawCareer, recordStat])
 
   // 커리어가 바뀔 때마다 저장한다. 저장 실패는 게임 진행을 막지 않는다.
+  // 원본은 저장(0x22755)을 부르는 자리가 67곳으로 정해져 있다(re.py xref 0x22754). 이벤트 재생 중에는 보상 명령마다(0x8c460 끝 —
+  // 0x8b0e4 · 0x8cd44), system 창 답 0(0x7fe90), 경기 명령(0x8d870), 마지막 명령 뒤 끝(0x8cfc0)과 114 끝 처리(0x1c014)가
+  // 저장한다 — 웹 커리어가 이벤트 중에 바뀌는 자리(보상 · 목표 창 · 끝)가 모두 그 자리라 이 자리에서는 원본보다 잦지 않다
+  // (`giveEventReward`). ⚠️ 다른 장면 전수 대조는 안 했다.
   useEffect(() => {
     if (career === null) return
     saveGame.save(career)
@@ -1736,8 +1740,12 @@ export function useCareerSession({
      * 명령이 든 이벤트다(연차 보정 0x8d508 이 지금 이벤트를 본다). 재생 화면이 `StoryScreen.onReward` 로 부르면 `completeScene` 에
      * 오는 보상은 비어 있다. 종류 7 의 히든 오픈 알림(0x62368 → 공용 창)은 재생 화면이 그 명령의 알림 창으로 띄우고 확인까지
      * 기다린다(`rewardNoticeOf` — 기다림 0x8daa0) — 여기서 따로 띄우지 않는다.
+     *
+     * **저장**: 원본 0x8c460 은 항목을 다 준 뒤 본 표시 · 장소 행동함을 하고 **곧바로 저장한다**(0x8b0e4 → 0x22755, 나리면 다시
+     * 0x8cd44 → 0x22755 · 0x1f1b9 — `markRewardedEvent`). 그래서 웹이 커리어가 바뀔 때마다 저장하는 것이 이 자리에서는 원본보다
+     * 잦지 않다 — 다만 그 저장에 본 표시 · 행동함이 들어야 이벤트 도중에 끄고 이어할 때 같은 이벤트가 다시 서지 않는다(원본 그대로).
      */
-    giveEventReward: (items: readonly EventReward[], eventId: number) => {
+    giveEventReward: (items: readonly EventReward[], eventId: number, viewedEventIds: readonly number[] = [eventId]) => {
       if (career === null || screen.kind !== '이벤트') return
       const rewarded = applyEventRewards(career, items, random, eventId)
       // 보상 19(0x8ca7e)는 타순 칸이 아니라 레코드를 고친다 — `0xb5d09(내 팀, 내 칸, 값 − 1)` 로 셋이 돈다
@@ -1750,7 +1758,7 @@ export function useCareerSession({
       items
         .filter((reward) => reward.kind === EVENT_REWARD_KIND.G포인트)
         .forEach((reward) => recordStat({ kind: 'G획득', mode: BATTER_LEAGUE_MODE, amount: reward.value }))
-      setCareer(given)
+      setCareer(markRewardedEvent(given, storyEvents?.find((event) => event.id === eventId) ?? null, viewedEventIds))
     },
 
     completeScene: (rewards: readonly EventReward[], viewedEventIds: readonly number[]) => {

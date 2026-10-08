@@ -641,6 +641,34 @@ describe('외출 장소 기능 가드 (113 키 0x16cf0) — 막히면 원문 알
   })
 })
 
+describe('보상 명령 하나 (0x8c460) — 끝(0x8cbe0~0x8cc1a)이 본 표시 · 장소 행동함을 하고 저장한다 (0x8b0e4 → 0x22755)', () => {
+  it('저장에 준 보상 · 지금 이벤트와 떠나온 이벤트의 본 표시 · 장소(trigger 2~6) 행동함이 든다 — 끝을 기다리지 않는다', async () => {
+    const saveGame = 메모리저장({ ...createCareer('보상저장'), morale: 50 })
+    const random = createSeededRandom(20100901)
+    const rendered = renderHook(() => {
+      const [screen, setScreen] = useState<Screen>({ kind: '메인메뉴' })
+      const runner = useAtBatRunner()
+      return { screen, setScreen, session: useCareerSession({ runner, random, saveGame, screen, setScreen }) }
+    })
+    act(() => rendered.result.current.session.actions.continueSaved())
+    await waitFor(() => expect(rendered.result.current.session.storyEvents).not.toBeNull(), { timeout: 5000 })
+    // 101 — 장소 이벤트(trigger 4)
+    act(() => rendered.result.current.setScreen({ kind: '이벤트', eventId: 101, context: '장소' }))
+    const before = rendered.result.current.session.career!
+    expect(before.hasActedThisCycle).toBe(false)
+
+    act(() => rendered.result.current.session.actions.giveEventReward([{ kind: 0, value: 7 }], 101, [100, 101]))
+
+    const saved = saveGame.load()!
+    expect(saved.popularity).toBe(before.popularity + 7)
+    expect(saved.seenEventIds).toEqual(expect.arrayContaining(['100', '101']))
+    expect(saved.hasActedThisCycle).toBe(true)
+    // 외출 수는 0x1c014 끝 처리 몫이라 그대로
+    expect(saved.outingsThisSeason).toBe(before.outingsThisSeason)
+    expect(rendered.result.current.screen).toMatchObject({ kind: '이벤트', eventId: 101 })
+  })
+})
+
 describe('마선수 대결로 나가는 장소 이벤트 — match 의 "끝남" 으로 0x1c014 장소 끝 처리가 나가는 자리에서 돈다 (0x8d904)', () => {
   it('나갈 때 행동을 쓰고 외출 수 +1, 140 결과 이벤트(대결결과) 끝에서는 다시 안 쓰고 105', () => {
     const rendered = 띄우기({ ...createCareer('대결'), morale: 50 })

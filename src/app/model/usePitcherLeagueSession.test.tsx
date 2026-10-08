@@ -1011,19 +1011,27 @@ describe('자동 발동 (0x1cf9c → 0x8be80 → 0xadc70) · 연초 115', () => 
     expect(result.current.scene).toBe('이벤트')
   })
 
-  it('보상 명령 하나를 그 자리에서 준다(0x8c460) — 저장은 0x7fe90 · 재생 끝 몫이라 안 한다', async () => {
+  it('보상 명령 하나를 그 자리에서 준다(0x8c460) — 끝(0x8cbe0~0x8cc1a)이 본 표시를 하고 저장한다(0x8b0e4 → 0x22755)', async () => {
     const store = 메모리저장()
     const { result } = 띄우기(store)
     act(() => result.current.actions.create('투수', 신인))
     await 이벤트불러오기(result)
     const 전 = result.current.career!
-    const 저장전 = store.load()
 
-    act(() => result.current.actions.giveStoryReward([{ kind: 0, value: 7 }, { kind: 10, value: 30 }], 1))
+    // 이벤트 1(trigger 0) — 앞서 거친 이벤트 3 도 떠나온 줄(0x8b0e4)이라 본 표시
+    act(() => result.current.actions.giveStoryReward([{ kind: 0, value: 7 }, { kind: 10, value: 30 }], 1, [3, 1]))
 
     expect(result.current.career?.popularity).toBe(전.popularity + 7)
     expect(result.current.career?.gamePoint).toBe(전.gamePoint + 30)
-    expect(store.load()).toBe(저장전)
+    const 저장 = store.load() as { popularity: number; seenEventIds: string[]; hasActedThisCycle: boolean }
+    expect(저장.popularity).toBe(전.popularity + 7)
+    expect(저장.seenEventIds).toEqual(expect.arrayContaining(['1', '3']))
+    // 장소 이벤트가 아니라 행동함은 그대로
+    expect(저장.hasActedThisCycle).toBe(전.hasActedThisCycle)
+
+    // 장소 이벤트(trigger 2~6 — 101 은 4)면 0x8cbfa 가 S+4 = 1(행동함)
+    act(() => result.current.actions.giveStoryReward([{ kind: 0, value: 1 }], 101))
+    expect((store.load() as { hasActedThisCycle: boolean }).hasActedThisCycle).toBe(true)
   })
 
   it('외출 지도(112)에 들어오면 trigger 1 이벤트를 틀고 끝나면 지도로 돌아온다 (401 인기도 3000)', async () => {

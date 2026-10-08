@@ -812,9 +812,10 @@ describe('StoryScreen — 보상은 명령마다 그 자리에서 준다 (0x8d4c
     render(<StoryScreen events={[보상이벤트]} event={보상이벤트} playerName="테스트" teamName="드래곤즈"
       onComplete={onComplete} onMatch={() => {}} onReward={onReward}
       rewardNoticeContext={() => ({ mode: 4, years: 0, illness: 0, salaryBase: 10, random: 고정난수 })} />)
-    expect(onReward.mock.calls).toEqual([[[{ kind: 0, value: 5 }], 1]])
+    // 셋째 값은 이 재생에서 거친 이벤트 — 0x8c460 끝이 본 표시를 한다(0xacf49 · 0x8b0e4)
+    expect(onReward.mock.calls).toEqual([[[{ kind: 0, value: 5 }], 1, [1]]])
     fireEvent.click(within(screen.getByRole('dialog', { name: '알림' })).getByRole('button', { name: 'OK' }))
-    expect(onReward.mock.calls).toEqual([[[{ kind: 0, value: 5 }], 1], [[{ kind: 1, value: 2 }], 1]])
+    expect(onReward.mock.calls).toEqual([[[{ kind: 0, value: 5 }], 1, [1]], [[{ kind: 1, value: 2 }], 1, [1]]])
     fireEvent.click(within(screen.getByRole('dialog', { name: '알림' })).getByRole('button', { name: 'OK' }))
     expect(onReward).toHaveBeenCalledTimes(2)
     expect(onComplete).toHaveBeenCalledWith([], [1])

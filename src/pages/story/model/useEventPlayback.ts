@@ -78,8 +78,12 @@ function stopAtWindow(
 const rewardsOfStep = (step: EventStep): readonly EventReward[] =>
   rewardsIn(step.command?.op === 'reward' && !endsPlayback(step.command) ? [...step.passed, step.command] : step.passed)
 
-/** 보상 명령 하나를 그 자리에서 준다 — 항목(0x8beb8 이 고친 값)과 그 명령이 든 이벤트 번호(연차 보정 · 중간평가가 본다) */
-export type EventRewardHandler = (items: readonly EventReward[], eventId: number) => void
+/**
+ * 보상 명령 하나를 그 자리에서 준다 — 항목(0x8beb8 이 고친 값)과 그 명령이 든 이벤트 번호(연차 보정 · 중간평가가 본다).
+ * `viewedEventIds` 는 이 재생에서 지금까지 거친 이벤트(대결 앞 이벤트 · 선택지로 떠난 이벤트 · 지금 이벤트) — 0x8c460 끝이
+ * 지금 이벤트(0xacf49)와 떠나온 이벤트 줄 [mgr+0x38a](0x8b0e4)에 본 표시를 하고 저장한다.
+ */
+export type EventRewardHandler = (items: readonly EventReward[], eventId: number, viewedEventIds: readonly number[]) => void
 
 /**
  * 이벤트 한 편을 원본 명령 순서대로 재생한다.
@@ -185,7 +189,7 @@ export function useEventPlayback(
     if (give === undefined || !isReleased || step.command?.op !== 'reward' || endsPlayback(step.command)) return
     if (rewardedCursorsRef.current.has(cursor)) return
     rewardedCursorsRef.current.add(cursor)
-    give(step.command.items, step.cursor.eventId)
+    give(step.command.items, step.cursor.eventId, [...new Set([...collect().viewedEventIds, step.cursor.eventId])])
     const notice = noticeCacheRef.current.get(cursor)?.get(step.cursor.commandIndex)?.notice
     if (notice === undefined || !opensRewardWindow(notice)) setCursor(advanceCursor(step.cursor))
   }, [cursor, step, isReleased])

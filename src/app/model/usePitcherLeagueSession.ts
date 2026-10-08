@@ -59,7 +59,7 @@ import {
   pitcherPlaceEventOf,
   scanPitcherEventFrom,
 } from '@/entities/pitcher-career/model/pitcherStoryScene'
-import { EVENT_TRIGGER } from '@/entities/story/model/storyScene'
+import { EVENT_TRIGGER, markRewardedEvent } from '@/entities/story/model/storyScene'
 import { achievedPitcherGoalCount } from '@/entities/pitcher-career/model/pitcherYearGoals'
 import {
   careerNationalCupRewardItems,
@@ -327,7 +327,7 @@ export interface PitcherLeagueSession {
      * 이벤트의 보상 명령 7 하나를 그 자리에서 준다 — 0x8d4c4 가 글 · 창을 세운 그 갱신의 0x8c460(모드 3 갈래). 저장은 안 한다
      * (원본도 0x7fe90 · 재생 끝 0x1c014 에서 저장한다). `StoryScreen.onReward` 로 잇는다.
      */
-    readonly giveStoryReward: (items: readonly EventReward[], eventId: number) => void
+    readonly giveStoryReward: (items: readonly EventReward[], eventId: number, viewedEventIds?: readonly number[]) => void
     /** 이벤트 재생이 끝났다 — 지나온 보상과 본 이벤트 번호 (114 틀 0x1c014) */
     readonly completeStory: (rewards: readonly EventReward[], viewedEventIds: readonly number[]) => void
     /**
@@ -1662,10 +1662,14 @@ export function usePitcherLeagueSession(
    * 보상 명령 하나를 그 자리에서 준다 — 0x8c460 모드 3 갈래(`applyPitcherEventRewards`, 연말 사슬은 `finishPitcherYearEndEvent`).
    * 이벤트 번호는 그 명령이 든 이벤트다 — 연차 보정 0x8d508(393~396) · 중간평가 비트 0x8cbaa(452~454)가 [mgr] 의 지금 이벤트를 본다.
    * G 보상(종류 10)은 한 줄마다 0x8c6e2 `0x22c7d(값, 모드 3)` 로 적는다. 종류 7 의 히든 오픈 알림(0x62368 → 공용 창)은 재생
-   * 화면이 그 명령의 알림 창으로 띄우고 확인까지 기다린다(`rewardNoticeOf` — 기다림 0x8daa0). 저장은 하지 않는다 — 0x7fe90 · 재생 끝이 저장한다.
+   * 화면이 그 명령의 알림 창으로 띄우고 확인까지 기다린다(`rewardNoticeOf` — 기다림 0x8daa0).
+   *
+   * **저장한다** — 0x8c460 은 모드 3 · 4 공용으로 항목을 다 준 뒤 본 표시(지금 이벤트 0xacf49 · 떠나온 줄 0x8b0e4) · 장소 행동함을
+   * 하고 0x8b0e4 → 0x22755 로 저장한다(나리면 0x8cd44 에서 한 번 더 · 0x1f1b9, `markRewardedEvent`). 예전 웹은 "0x7fe90 · 재생
+   * 끝이 저장한다" 고 보고 저장하지 않아, 이벤트 도중에 끄면 준 보상이 사라졌다.
    */
   const giveStoryReward = useCallback(
-    (items: readonly EventReward[], eventId: number) => {
+    (items: readonly EventReward[], eventId: number, viewedEventIds: readonly number[] = [eventId]) => {
       if (career === null || story === null) return
       const rewarded = story.context === '연말'
         ? finishPitcherYearEndEvent(career, eventId, items)
@@ -1673,9 +1677,9 @@ export function usePitcherLeagueSession(
       items
         .filter((reward) => reward.kind === EVENT_REWARD_KIND.G포인트)
         .forEach((reward) => recordStat({ kind: 'G획득', mode: PITCHER_LEAGUE_MODE, amount: reward.value }))
-      setCareer(rewarded)
+      commit(markRewardedEvent(rewarded, storyEvents?.find((event) => event.id === eventId) ?? null, viewedEventIds))
     },
-    [career, random, recordStat, story],
+    [career, commit, random, recordStat, story, storyEvents],
   )
 
   /**
