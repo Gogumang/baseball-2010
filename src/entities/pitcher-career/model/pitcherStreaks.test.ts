@@ -53,7 +53,7 @@ describe('pitcherStreakEventOf — 0x8a6fc 모드 3 갈래', () => {
     expect(event.goodCommentIndex).toBe(109)
     expect(event.rewards).toEqual([{ kind: 1, value: 15 }])
     expect(pitcherStreakMarkupOf(event, ORIGINAL_USER_EVENTS)).toBe(
-      `3${ORIGINAL_USER_EVENTS[106]} /5${ORIGINAL_USER_EVENTS[103]}!N${ORIGINAL_USER_EVENTS[109]}`,
+      `3${ORIGINAL_USER_EVENTS[106]} / 5${ORIGINAL_USER_EVENTS[103]}!N${ORIGINAL_USER_EVENTS[109]}`,
     )
   })
 

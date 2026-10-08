@@ -233,10 +233,13 @@ export function pitcherStreakEventOfCareer(
   })
 }
 
+/** 0xcc298 — 좋은 칸 사이 글 " / " (0x8aa1c~0x8aa28: 첫 칸이 있었으면 둘째 칸 앞에 덧붙인다 — 모드 3 · 4 같은 길) */
+const GOOD_SEPARATOR = ' / '
+
 /** 알림 줄 글 — `n경기 연속 …` 들을 원본 차례대로 잇는다(0xbc73d 숫자 · 0xbc965 덧붙이기). 글 표는 부르는 쪽이 준다 */
 export function pitcherStreakMarkupOf(event: PitcherStreakEvent, texts: readonly string[]): string {
   const item = (entry: PitcherStreakItem) => `${entry.count}${texts[entry.labelIndex] ?? ''}`
-  let markup = event.good.map(item).join(' /')
+  let markup = event.good.map(item).join(GOOD_SEPARATOR)
   if (event.bad !== null) markup += item(event.bad)
   if (event.goodCommentIndex !== null) markup += `!N${texts[event.goodCommentIndex] ?? ''}`
   if (event.badCommentIndex !== null) markup += `!N${texts[event.badCommentIndex] ?? ''}`
