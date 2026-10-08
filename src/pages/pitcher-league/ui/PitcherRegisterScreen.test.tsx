@@ -101,6 +101,28 @@ describe('투수 등록 화면', () => {
     expect(screen.getByLabelText('이름')).toBeTruthy()
   })
 
+  it('0x67 칸 커서 — 처음 칸 0, ↓ 는 +2, OK 로 켠 뒤 두 개면 OK 칸으로 간다 (0x12410)', () => {
+    화면()
+    이름넣기('투수')
+    fireEvent.click(등록버튼())
+    const 커서 = (name: string) => screen.getByRole('button', { name }).getAttribute('aria-current')
+    expect(커서('TWO-SEAM')).toBe('true')
+
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    expect(커서('SHOOT')).toBe('true')
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(눌림('SHOOT')).toBe('true')
+    expect(커서('CURVE')).toBe('true')
+
+    fireEvent.keyDown(window, { key: '6' })
+    fireEvent.keyDown(window, { key: '5' })
+    expect(눌림('SLIDER')).toBe('true')
+    expect(커서('OK 칸')).toBe('true')
+
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(screen.getByText(/이대로 결정/)).toBeTruthy()
+  })
+
   it('CLR 로 등록 줄에 돌아갔다 와도 고른 변화구가 남는다', () => {
     화면()
     이름넣기('테스트')

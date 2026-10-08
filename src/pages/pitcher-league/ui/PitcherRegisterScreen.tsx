@@ -23,6 +23,12 @@ import type { PitcherRookieProfile } from '@/entities/pitcher-career/model/pitch
 import { DEFAULT_TEAM_ID } from '@/entities/pitcher-career/model/pitcherCareer'
 import { pitchTypeNameOf } from '@/entities/pitcher-career/model/pitchTraining'
 import { nameWithoutLastChar, registerKeyOf, registerKeyOutcomeOf } from '@/pages/create-player/lib/registerKeys'
+import {
+  BREAKING_PITCH_OK_CELL,
+  breakingPitchCursorAfter,
+  breakingPitchCursorAfterToggle,
+  breakingPitchKeyOf,
+} from '@/pages/pitcher-league/lib/breakingPitchCursor'
 import * as styles from '@/pages/pitcher-league/ui/PitcherRegisterScreen.css'
 
 /**
@@ -37,6 +43,7 @@ import * as styles from '@/pages/pitcher-league/ui/PitcherRegisterScreen.css'
  * - 처음엔 아무것도 안 골라져 있다(+0x13c..+0x143 = 0). 칸 규칙은 `toggleBreakingPitchSlot`(0x123ac).
  * - OK 칸(8)에서 고른 수가 1 이하면 StrMODE[13] 알림, 2 면 StrMODE[2] 확인 → 예면 104(등록 확정).
  * - CLR 은 0x66 으로 — 0x66 진입 0x17360 은 변화구 바이트를 건드리지 않아 **고른 값이 남는다**.
+ * - 칸 커서 [this+0x88] 은 들어올 때마다 칸 0 이고, 옮기기는 `breakingPitchCursor`(0x12410 · 꼴 0x330)다.
  * - 0x67 동안 그리기 0x15ef0 은 정보 칸(0x7c450)을 그리지 않는다.
  *
  * ⚠️ **근사**: 원본은 관리 화면 기본정보 카드(0x15e20)를 그대로 그리고 커서만 얹는다(C-6).
@@ -74,11 +81,29 @@ export function PitcherRegisterScreen({
   const [selectedRow, setSelectedRow] = useState<RowId>('이름')
   const [phase, setPhase] = useState<Phase>('등록')
   const [popup, setPopup] = useState<PitchPopup | null>(null)
+  /** 0x67 격자 [this+0x88] 칸 — 0~7 구질 · 8 OK. 0x10b18 이 들어올 때마다 0 에 둔다 */
+  const [pitchCell, setPitchCell] = useState(0)
 
   const ability = rookiePitcherAbilityOf(profile.role, profile.typeIndex)
 
   /** 0x67 OK 칸(8) — 0x12410: 고른 수 ≤ 1 이면 StrMODE[13], 아니면 StrMODE[2] */
   const pressPitchOk = () => setPopup(canRegisterPitcher(profile) ? '확인' : '부족')
+
+  /** 0x66 → 0x67 — 칸 커서를 0 으로 (0x10b18 의 vtable+0x14(0, 0)) */
+  const enterPitchPhase = () => {
+    setPitchCell(0)
+    setPhase('변화구')
+  }
+
+  /** 구질 칸에서 OK — 0x123ac 로 켜고/끄고, 개수가 2 면 OK 칸 · 아니면 칸 + 2 (0x124fe~0x12560) */
+  const togglePitchCell = (cell: number) => {
+    const slots = toggleBreakingPitchSlot(profile.breakingPitchSlots, cell)
+    setProfile({ ...profile, breakingPitchSlots: slots })
+    setPitchCell(breakingPitchCursorAfterToggle(cell, slots.length))
+  }
+
+  /** 0x67 OK — 칸 8 이면 상자, 아니면 그 칸 켜고/끄기 (0x12426) */
+  const pressPitchCellOk = (cell: number) => (cell === BREAKING_PITCH_OK_CELL ? pressPitchOk() : togglePitchCell(cell))
 
   const valueOf = (id: RowId): string => {
     if (id === '이름') return name
@@ -107,18 +132,19 @@ export function PitcherRegisterScreen({
 
   /**
    * 키 — 0x66 줄 고르기는 타자편과 같은 갱신 0x16f28 이다(`registerKeyOutcomeOf`, 마지막 줄 OK 만 0x67 로).
-   * 0x67 은 OK = OK 칸(8) · CLR = 0x66 (0x12410). ⚠️ 0x67 격자 [this+0x88] 의 칸 옮기기 키는 아직 웹에 없다(누르기만).
+   * 0x67 은 키 0x12410 — OK 는 지금 칸(`pressPitchCellOk`) · 방향은 `breakingPitchCursorAfter` · CLR = 0x66.
    */
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (popup !== null) return
       const isTyping = event.target instanceof HTMLInputElement
       if (phase === '변화구') {
-        const key = registerKeyOf(event.key, false)
-        if (key === 'clr') setPhase('등록')
-        else if (key === 'ok') pressPitchOk()
-        else return
-        return event.preventDefault()
+        const key = breakingPitchKeyOf(event.key)
+        if (key === null) return
+        event.preventDefault()
+        if (key === 'clr') return setPhase('등록')
+        if (key === 'ok') return pressPitchCellOk(pitchCell)
+        return setPitchCell(breakingPitchCursorAfter(pitchCell, key))
       }
       const row = ROW_ORDER.indexOf(selectedRow)
       const key = registerKeyOf(event.key, selectedRow === '이름')
@@ -128,7 +154,7 @@ export function PitcherRegisterScreen({
         event.preventDefault()
         if (outcome.kind === 'cancel') return onCancel()
         if (outcome.kind === 'deleteChar') return setName(nameWithoutLastChar(name))
-        if (outcome.kind === 'finish') return setPhase('변화구')
+        if (outcome.kind === 'finish') return enterPitchPhase()
         if (outcome.kind === 'move') {
           const nameInput = document.querySelector<HTMLInputElement>('input[aria-label="이름"]')
           if (outcome.row === 0) nameInput?.focus()
@@ -157,7 +183,7 @@ export function PitcherRegisterScreen({
       badge={(TEAMS[teamId] ?? TEAMS[0]).name}
       leftKey={{ label: '취소', onPress: phase === '등록' ? onCancel : () => setPhase('등록') }}
       rightKey={phase === '등록'
-        ? { label: '등록', onPress: () => setPhase('변화구'), isDisabled: name.length === 0 }
+        ? { label: '등록', onPress: enterPitchPhase, isDisabled: name.length === 0 }
         : { label: 'OK', onPress: pressPitchOk }}
     >
       {phase === '등록' && <Panel heading="기본 정보">
@@ -198,18 +224,20 @@ export function PitcherRegisterScreen({
             const chosen = profile.breakingPitchSlots.includes(slot)
             return (
               <button key={typeNumber} type="button"
-                className={`${styles.pitchCell} ${chosen ? styles.pitchCellChosen : ''}`}
+                className={`${styles.pitchCell} ${chosen ? styles.pitchCellChosen : ''} ${slot === pitchCell ? styles.pitchCellCursor : ''}`}
                 aria-pressed={chosen}
-                onClick={() =>
-                  setProfile((previous) => ({
-                    ...previous,
-                    breakingPitchSlots: toggleBreakingPitchSlot(previous.breakingPitchSlots, slot),
-                  }))
-                }>
+                aria-current={slot === pitchCell}
+                onClick={() => togglePitchCell(slot)}>
                 {pitchTypeNameOf(typeNumber)}
               </button>
             )
           })}
+          <button type="button" aria-label="OK 칸"
+            className={`${styles.pitchCell} ${styles.pitchOkCell} ${pitchCell === BREAKING_PITCH_OK_CELL ? styles.pitchCellCursor : ''}`}
+            aria-current={pitchCell === BREAKING_PITCH_OK_CELL}
+            onClick={() => { setPitchCell(BREAKING_PITCH_OK_CELL); pressPitchOk() }}>
+            OK
+          </button>
         </div>
         {/* StrMODE[12] — 0x67 그리기 0x162bc 의 안내 */}
         <MarkupText raw={PITCH_HINT} />

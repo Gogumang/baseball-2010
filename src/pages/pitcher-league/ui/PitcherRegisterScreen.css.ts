@@ -58,3 +58,14 @@ export const pitchCellChosen = style({
   borderColor: ORIGINAL_COLORS.highlightYellow,
   color: ORIGINAL_COLORS.highlightYellow,
 })
+
+/** 0x67 칸 커서 — 0x165b6~0x165ee 가 칸보다 사방 1px 큰 노란(255,255,0) 네모를 긋는다 (10 프레임에 한 번 꺼지는 깜빡임은 생략) */
+export const pitchCellCursor = style({
+  outline: '1px solid #FFFF00',
+  outlineOffset: '1px',
+})
+
+/** 칸 8 = OK — 0x165fc 가 칸 자리 9 에 그린다 */
+export const pitchOkCell = style({
+  gridColumn: '1 / -1',
+})
