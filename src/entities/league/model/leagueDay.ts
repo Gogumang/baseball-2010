@@ -21,7 +21,12 @@ import type { QuickLineup } from '@/entities/game/model/quickLineup'
 import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
 import { ACE_BATTERS, ACE_PITCHERS, rollOpponentAceIndex } from '@/entities/game/model/aceOpponent'
 import { EMPTY_BATTER_GAME_RECORD } from '@/entities/batting/model/pinchHitAi'
-import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf, aceSkillIdsOf } from '@/entities/mission/model/aceLevel'
+import {
+  aceLevelOf,
+  aceLevelSlotOf,
+  aceRecordAbilityAtLevel,
+  aceSkillIdsOf,
+} from '@/entities/mission/model/aceLevel'
 import {
   BATTERS_PER_TEAM,
   PITCHERS_PER_TEAM,
@@ -417,7 +422,8 @@ function acePitcherOf(index: number, levels: Readonly<Record<number, number>> | 
   if (ace === undefined) return undefined
   // 마투수 레코드 +0xc 부터 u16 넷 = 제구·구속·변화·체력 (acePlayers 의 hit·power·defense·run 칸 차례)
   const level = aceLevelOf(levels, aceLevelSlotOf('투수', index + 1))
-  const ability = aceAbilityAtLevel(ace.ability, level)
+  // 0xb570c 첫머리의 0xb6415(rec, k, 1) — 레벨 배율 뒤 장착 스킬(발렌타인 냉정 22 = 제구 + 1/10)
+  const ability = aceRecordAbilityAtLevel(ace, level)
   return {
     // 0xb633c 비트6 — 간이 타석 보정 구조체에 구속·제구가 붙는다 (`quickSwingBoostOf`)
     quick: { control: ability.hit, velocity: ability.power, stamina: ability.run, skillIds: aceSkillIdsOf(ace), ace: { order: index, level } },
@@ -432,7 +438,7 @@ function aceBatterOf(index: number, levels: Readonly<Record<number, number>> | u
   const ace = ACE_BATTERS[index]
   if (ace === undefined) return undefined
   const level = aceLevelOf(levels, aceLevelSlotOf('타자', index + 1))
-  const ability = aceAbilityAtLevel(ace.ability, level)
+  const ability = aceRecordAbilityAtLevel(ace, level)
   // 0xb633c 비트6 — 간이 타석 보정 구조체에 히트·파워가 붙는다 (`quickSwingBoostOf`)
   return { hit: ability.hit, power: ability.power, run: ability.run, skillIds: aceSkillIdsOf(ace), ace: { order: index, level } }
 }

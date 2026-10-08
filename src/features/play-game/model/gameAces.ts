@@ -29,7 +29,7 @@ import { ACE_BATTERS, ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
 import { EMPTY_BATTER_GAME_RECORD } from '@/entities/batting/model/pinchHitAi'
 import type { QuickLineup } from '@/entities/game/model/quickLineup'
 import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
-import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf, aceSkillIdsOf } from '@/entities/mission/model/aceLevel'
+import { aceLevelOf, aceLevelSlotOf, aceRecordAbilityAtLevel, aceSkillIdsOf } from '@/entities/mission/model/aceLevel'
 import { ACE_BATTER_ROSTER_SLOT, ACE_PITCHER_RECORD_STAMINA, ACE_PITCHER_SLOT } from '@/entities/league/model/leagueDay'
 import type { AcePlayer } from '@/shared/config/original/acePlayers'
 
@@ -80,7 +80,8 @@ export function gameAcePitcherOf(
 ): GameAcePitcher | undefined {
   const player = acePitcherPlayerOf(index)
   if (player === undefined) return undefined
-  const ability = aceAbilityAtLevel(player.ability, aceLevelOf(levels, aceLevelSlotOf('투수', index + 1)))
+  // 0xb6415(rec, k, 1) — 레벨 배율 뒤 장착 스킬(발렌타인 냉정 22 = 제구 + 1/10)
+  const ability = aceRecordAbilityAtLevel(player, aceLevelOf(levels, aceLevelSlotOf('투수', index + 1)))
   return {
     player,
     quick: { control: ability.hit, velocity: ability.power, stamina: ability.run, skillIds: aceSkillIdsOf(player) },
@@ -98,7 +99,7 @@ export function gameAceBatterOf(
 ): QuickAtBatBatter | undefined {
   const player = aceBatterPlayerOf(index)
   if (player === undefined) return undefined
-  const ability = aceAbilityAtLevel(player.ability, aceLevelOf(levels, aceLevelSlotOf('타자', index + 1)))
+  const ability = aceRecordAbilityAtLevel(player, aceLevelOf(levels, aceLevelSlotOf('타자', index + 1)))
   return { hit: ability.hit, power: ability.power, run: ability.run, skillIds: aceSkillIdsOf(player) }
 }
 

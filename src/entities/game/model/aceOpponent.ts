@@ -4,6 +4,7 @@ import type { PitcherAbility } from '@/entities/pitching/model/pitch'
 import { ACE_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
+import { recordAbilityOf } from '@/entities/team/model/recordAbility'
 
 /**
  * 마선수 등판.
@@ -124,14 +125,19 @@ export function pitcherAbilityOf(
     aceLevels === undefined || order < 0
       ? ace.ability
       : aceAbilityAtLevel(ace.ability, aceLevelOf(aceLevels, aceLevelSlotOf('투수', order + 1)))
+  const record = recordAbilityOf(
+    { ability: [ability.hit, ability.power, ability.defense, ability.run], skillBits: ace.skillBits, equipment: [] },
+    true,
+  )
   return {
     control: Math.round(ability.hit / PITCHER_ENGINE_DIVISOR),
     velocity: Math.round(ability.power / PITCHER_ENGINE_DIVISOR),
     breaking: Math.round(ability.defense / PITCHER_ENGINE_DIVISOR),
     // 0xb570c 의 피로 앞 값 = 0xb6414 실효값(레벨 배율). 마선수는 나리(모드 4)·미션(5·6)·홈런더비(7)에서만 이 길로
     // 오고, 그 모드들은 팀 능력치(마스크 0x306)·코치(모드 2)가 없어 피로 뒤 정액이 없다.
-    // ⚠️ 마선수 레코드의 장비 니블(+0x19~)·스킬 비트(+0x14) 보정(0xb6494~)은 웹 표에 없어 안 먹인다 (미해결)
-    gameAbility: { beforeFatigue: { control: ability.hit, velocity: ability.power, breaking: ability.defense } },
+    // 0xb6415(rec, k, 1) 의 장비 니블(+0x19~, 마선수 열 줄 모두 0)·장착 스킬(+0x14) 단계(0xb6494~)도 먹는다 —
+    // 발렌타인의 냉정 22 가 제구에 1/10 을 얹는다(`aceRecordAbilityAtLevel` 와 같은 단계)
+    gameAbility: { beforeFatigue: { control: record[0], velocity: record[1], breaking: record[2] } },
     ...(staminaPercent === undefined ? {} : { staminaPercent }),
     ...(repertoire === undefined ? {} : { repertoire: { form: repertoire.form, pitchMask: repertoire.pitchMask, magicId: repertoire.magicId } }),
   }

@@ -1,4 +1,5 @@
 import type { BatterAbility } from '@/entities/batting/model/batter'
+import { recordAbilityOf } from '@/entities/team/model/recordAbility'
 import { skillIdsOfBits } from '@/entities/team/model/teamRoster'
 import type { AcePlayer } from '@/shared/config/original/acePlayers'
 
@@ -232,4 +233,23 @@ export const ACE_LEVEL_UP_TEXT = {
  */
 export function aceSkillIdsOf(ace: Pick<AcePlayer, 'role' | 'skillBits'>): readonly number[] {
   return skillIdsOfBits(ace.skillBits, ace.role === '투수')
+}
+
+/**
+ * 마선수 레코드의 **`0xb6414(rec, k, 1)`** 네 칸 — 레벨 배율(b6438) 뒤 장비 니블 · 장착 스킬 단계(b6494~, `recordAbilityOf`).
+ * 경기용 능력치 0xb570c/0xb570d 가 첫머리 b5728 에서 플래그 1 로 부르는 값이다(간이 타석 0xab214 · 마무리 정렬 0xb5b50 ·
+ * 사람 투구 피로 앞 값). 마선수 열 줄은 니블 +0x19·+0x1a 가 모두 0 이고, 무력감 5 · 전설 7 · 수비불가 20 도 없다 —
+ * 걸리는 것은 **발렌타인(+0x14 = 0x410000)의 냉정 22: 제구 += 제구 / 10**(b64e6, 자르지 않는다) 하나뿐이다.
+ * (킹타이거도 비트 22 가 있으나 타자라 0xb6278 이 거짓이다.)
+ */
+export function aceRecordAbilityAtLevel(
+  ace: Pick<AcePlayer, 'role' | 'ability' | 'skillBits'>,
+  level: number,
+): BatterAbility {
+  const scaled = aceAbilityAtLevel(ace.ability, level)
+  const [hit, power, defense, run] = recordAbilityOf(
+    { ability: [scaled.hit, scaled.power, scaled.defense, scaled.run], skillBits: ace.skillBits, equipment: [] },
+    ace.role === '투수',
+  )
+  return { hit, power, defense, run }
 }
